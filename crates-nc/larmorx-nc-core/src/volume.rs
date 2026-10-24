@@ -342,7 +342,8 @@ impl Volume {
         }
         let n = self.nvoxels() as usize;
         let mut v = Volume::new(self.dims[0], self.dims[1], self.dims[2], 1);
-        v.data.copy_from_slice(&self.data[t as usize * n..(t as usize + 1) * n]);
+        v.data
+            .copy_from_slice(&self.data[t as usize * n..(t as usize + 1) * n]);
         v.copy_properties(self);
         Ok(v)
     }
@@ -516,7 +517,11 @@ impl Volume {
             dets = arma::det(&self.sform) as f32;
             det = dets;
         }
-        order = if det < 0.0 { RADIOLOGICAL } else { NEUROLOGICAL };
+        order = if det < 0.0 {
+            RADIOLOGICAL
+        } else {
+            NEUROLOGICAL
+        };
         if self.sform_code != nifti::XFORM_UNKNOWN && self.qform_code != nifti::XFORM_UNKNOWN {
             if dets * detq < 0.0 {
                 order = INCONSISTENT;
@@ -604,7 +609,10 @@ impl Volume {
 /// any correct sort gives the same sequence (equal values are interchangeable). A shell with
 /// NaN has no defined order in C++; NaN values are put last here.
 fn sort_like_std(v: &mut [f32]) {
-    v.sort_by(|a, b| a.partial_cmp(b).unwrap_or_else(|| a.is_nan().cmp(&b.is_nan())));
+    v.sort_by(|a, b| {
+        a.partial_cmp(b)
+            .unwrap_or_else(|| a.is_nan().cmp(&b.is_nan()))
+    });
 }
 
 /// `periodicclamp` (miscmaths.cc).
@@ -664,7 +672,9 @@ pub fn make_basename(name: &str) -> String {
 
 /// `valid_imagefilename`: an existing regular file.
 fn is_regular_file(name: &str) -> bool {
-    std::fs::metadata(name).map(|m| m.is_file()).unwrap_or(false)
+    std::fs::metadata(name)
+        .map(|m| m.is_file())
+        .unwrap_or(false)
 }
 
 /// `return_validimagefilename(filename)`: the header-bearing file of an image, or FSL's error.
@@ -696,7 +706,10 @@ pub fn return_validimagefilename(filename: &str) -> Result<String, FslError> {
         ));
     }
     if count == 0 {
-        return Err(FslError::imthrow(format!("No image files match: {bname}"), 63));
+        return Err(FslError::imthrow(
+            format!("No image files match: {bname}"),
+            63,
+        ));
     }
     Ok(validname)
 }
@@ -736,7 +749,11 @@ fn header_left_right_order(h: &NiftiHeader) -> i32 {
         dets = nifti::mat33_determ(&nifti::mat44_to_mat33(&h.get_sform()));
         det = dets;
     }
-    order = if det < 0.0 { RADIOLOGICAL } else { NEUROLOGICAL };
+    order = if det < 0.0 {
+        RADIOLOGICAL
+    } else {
+        NEUROLOGICAL
+    };
     if h.sform_code != nifti::XFORM_UNKNOWN && h.qform_code != nifti::XFORM_UNKNOWN {
         if dets * detq < 0.0 {
             order = INCONSISTENT;
@@ -782,22 +799,27 @@ fn convert_buffer(raw: &[u8], datatype: i16, n: usize, slope: f32, inter: f32) -
     }
     match datatype {
         // (S) * float + float: integers of up to 32 bits become float first.
-        dt::SIGNED_SHORT => conv!(i16, 2, |v: i16| f32::from(v), |v: i16| f32::from(v) * slope + inter),
-        dt::UNSIGNED_CHAR => conv!(u8, 1, |v: u8| f32::from(v), |v: u8| f32::from(v) * slope + inter),
-        dt::SIGNED_INT => conv!(i32, 4, |v: i32| v as f32, |v: i32| (v as f32) * slope + inter),
+        dt::SIGNED_SHORT => conv!(i16, 2, |v: i16| f32::from(v), |v: i16| f32::from(v) * slope
+            + inter),
+        dt::UNSIGNED_CHAR => conv!(u8, 1, |v: u8| f32::from(v), |v: u8| f32::from(v) * slope
+            + inter),
+        dt::SIGNED_INT => conv!(i32, 4, |v: i32| v as f32, |v: i32| (v as f32) * slope
+            + inter),
         dt::FLOAT => conv!(f32, 4, |v: f32| v, |v: f32| v * slope + inter),
         // double * float is double, + float is double, then (float).
-        dt::DOUBLE => conv!(
-            f64,
-            8,
-            |v: f64| v as f32,
-            |v: f64| (v * f64::from(slope) + f64::from(inter)) as f32
-        ),
-        dt::INT8 => conv!(i8, 1, |v: i8| f32::from(v), |v: i8| f32::from(v) * slope + inter),
-        dt::UINT16 => conv!(u16, 2, |v: u16| f32::from(v), |v: u16| f32::from(v) * slope + inter),
-        dt::UINT32 => conv!(u32, 4, |v: u32| v as f32, |v: u32| (v as f32) * slope + inter),
-        dt::INT64 => conv!(i64, 8, |v: i64| v as f32, |v: i64| (v as f32) * slope + inter),
-        dt::UINT64 => conv!(u64, 8, |v: u64| v as f32, |v: u64| (v as f32) * slope + inter),
+        dt::DOUBLE => conv!(f64, 8, |v: f64| v as f32, |v: f64| (v * f64::from(slope)
+            + f64::from(inter))
+            as f32),
+        dt::INT8 => conv!(i8, 1, |v: i8| f32::from(v), |v: i8| f32::from(v) * slope
+            + inter),
+        dt::UINT16 => conv!(u16, 2, |v: u16| f32::from(v), |v: u16| f32::from(v) * slope
+            + inter),
+        dt::UINT32 => conv!(u32, 4, |v: u32| v as f32, |v: u32| (v as f32) * slope
+            + inter),
+        dt::INT64 => conv!(i64, 8, |v: i64| v as f32, |v: i64| (v as f32) * slope
+            + inter),
+        dt::UINT64 => conv!(u64, 8, |v: u64| v as f32, |v: u64| (v as f32) * slope
+            + inter),
         _ => None,
     }
 }
@@ -806,7 +828,10 @@ fn convert_buffer(raw: &[u8], datatype: i16, n: usize, slope: f32, inter: f32) -
 /// file's datatype.
 fn read_general(filename: &str, settings: &Settings) -> Result<(Volume, i16, i32), FslError> {
     let fail = |what: &str| {
-        FslError::imthrow(format!("Failed to read volume {filename}\nError : {what}"), 22)
+        FslError::imthrow(
+            format!("Failed to read volume {filename}\nError : {what}"),
+            22,
+        )
     };
     let valid = match return_validimagefilename(filename) {
         Ok(v) => v,
@@ -822,7 +847,11 @@ fn read_general(filename: &str, settings: &Settings) -> Result<(Volume, i16, i32
     let keep_ext = settings
         .get("FSL_LOAD_NIFTI_EXTENSIONS")
         .is_some_and(|v| crate::settings::atoi(v) != 0);
-    let extensions = if keep_ext { loaded.extensions } else { Vec::new() };
+    let extensions = if keep_ext {
+        loaded.extensions
+    } else {
+        Vec::new()
+    };
     if header.is_analyze() {
         header.s_x[0] = header.pixdim[1];
         header.s_y[1] = header.pixdim[2];
@@ -852,8 +881,7 @@ fn read_general(filename: &str, settings: &Settings) -> Result<(Volume, i16, i32
         slope = 1.0;
         inter = 0.0;
     }
-    let doscaling =
-        (f64::from(slope) - 1.0).abs() > 1e-30 || f64::from(inter.abs()) > 1e-30;
+    let doscaling = (f64::from(slope) - 1.0).abs() > 1e-30 || f64::from(inter.abs()) > 1e-30;
     let data = if header.datatype == dt::FLOAT && !doscaling {
         convert_buffer(&loaded.data, dt::FLOAT, n, 1.0, 0.0)
     } else {
@@ -908,10 +936,7 @@ fn read_general(filename: &str, settings: &Settings) -> Result<(Volume, i16, i32
 }
 
 /// `read_volume4D(target, filename)`: the volume, the file's datatype and its `xyzt_units`.
-pub fn read_volume4d(
-    filename: &str,
-    settings: &Settings,
-) -> Result<(Volume, i16, i32), FslError> {
+pub fn read_volume4d(filename: &str, settings: &Settings) -> Result<(Volume, i16, i32), FslError> {
     read_general(filename, settings)
 }
 
@@ -1070,7 +1095,12 @@ pub enum Conversion {
 
 impl Volume {
     /// `save_volume(source, filename)`: as float.
-    pub fn save(&self, filename: &str, settings: &Settings, description: &[u8]) -> Result<(), SaveError> {
+    pub fn save(
+        &self,
+        filename: &str,
+        settings: &Settings,
+        description: &[u8],
+    ) -> Result<(), SaveError> {
         self.save_typed(
             filename,
             SaveType::Float,

@@ -115,7 +115,9 @@ pub fn interpolate(v: &Volume, x: f32, y: f32, z: f32, spline: Option<&SplineCoe
             q_tri(n[0], n[1], n[2], n[3], n[4], n[5], n[6], n[7], dx, dy, dz)
         }
         Interpolation::Sinc => kernel_interpolation(v, x, y, z),
-        Interpolation::Spline => spline_interpolate(v, x, y, z, spline.expect("spline coefficients")),
+        Interpolation::Spline => {
+            spline_interpolate(v, x, y, z, spline.expect("spline coefficients"))
+        }
     }
 }
 

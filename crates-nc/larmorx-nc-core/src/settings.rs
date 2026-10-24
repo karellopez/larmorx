@@ -126,6 +126,9 @@ mod tests {
     fn tables() {
         let s = Settings::new().with("FSLOUTPUTTYPE", "NIFTI");
         assert_eq!(s.get("FSLOUTPUTTYPE"), Some("NIFTI"));
-        assert_eq!(s.clone().without("FSLOUTPUTTYPE").get("FSLOUTPUTTYPE"), None);
+        assert_eq!(
+            s.clone().without("FSLOUTPUTTYPE").get("FSLOUTPUTTYPE"),
+            None
+        );
     }
 }

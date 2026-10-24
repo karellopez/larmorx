@@ -29,7 +29,8 @@ const EXIT_IO_ERROR: u8 = 1;
 
 /// A tool of the `fsl` family: its name and the function that runs it with the original
 /// arguments, the settings, D13's mode and the thread count.
-type ToolFn = fn(&[String], &Settings, UpstreamDefects, usize, &mut dyn Write, &mut dyn Write) -> u8;
+type ToolFn =
+    fn(&[String], &Settings, UpstreamDefects, usize, &mut dyn Write, &mut dyn Write) -> u8;
 
 /// The FSL tools this program replicates. Add one line per tool.
 const FSL_TOOLS: &[(&str, ToolFn)] = &[("mcflirt", larmorx_nc_mcflirt::mcflirt)];
@@ -146,7 +147,11 @@ Environment:
 
 fn main() -> ExitCode {
     let args = std::env::args_os().map(|a| a.to_string_lossy().into_owned());
-    ExitCode::from(run(args, &mut io::stdout().lock(), &mut io::stderr().lock()))
+    ExitCode::from(run(
+        args,
+        &mut io::stdout().lock(),
+        &mut io::stderr().lock(),
+    ))
 }
 
 #[cfg(test)]

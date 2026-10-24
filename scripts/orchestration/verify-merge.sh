@@ -27,8 +27,9 @@ done
 mkdir -p "$OUT/records"; L=$OUT/main.log; : > "$L"
 log() { echo "$*" | tee -a "$L"; }
 log "commit $(git -C "$R" rev-parse --short HEAD) dirty=[$(git -C "$R" status --porcelain | wc -l)] start $(date -Is)"
-bash "$D/gates-rust.sh" "$R" both > "$OUT/rust.log" 2>&1; log "STEP1 rust gates exit $?"
+bash "$D/gates-rust.sh" "$R" all > "$OUT/rust.log" 2>&1; log "STEP1 rust gates exit $?"
 bash "$D/build-gpl.sh" "$R" > "$OUT/gpl-build.log" 2>&1; log "GPL build exit $?"
+bash "$D/build-nc.sh" "$R" > "$OUT/nc-build.log" 2>&1; log "NC build exit $?"
 bash "$D/gates-python.sh" "$R" > "$OUT/python.log" 2>&1; log "STEP2+3 python gates exit $?"
 if [ $GOLDEN = 0 ]; then
   (export PYTHONPATH=$R/python:$R/validation/src; cd "$R" && python -m pytest -q tests/parity) > "$OUT/parity-tests.log" 2>&1; log "STEP4 parity smoke exit $?"

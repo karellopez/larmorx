@@ -19,7 +19,8 @@ use crate::volume::{Extrapolation, FslError, Interpolation, NEUROLOGICAL, Volume
 pub fn isotropic_resample(aniso: &Volume, scale: f32, warnings: &mut Vec<String>) -> Volume {
     let mut scale = scale;
     if scale < 0.0 {
-        warnings.push("WARNING:: Negative scale in isotropic_resample - using abs value".to_owned());
+        warnings
+            .push("WARNING:: Negative scale in isotropic_resample - using abs value".to_owned());
         scale = scale.abs();
     }
     let mut src = aniso.clone();
@@ -206,7 +207,8 @@ pub fn affine_transform_mask(
             let mut o2 = xf * a[4] + zf * a[6] + a[7];
             let mut o3 = xf * a[8] + zf * a[10] + a[11];
             for y in 0..vout.ysize() {
-                let inside = o1 >= xb0 && o2 >= yb0 && o3 >= zb0 && o1 <= xb1 && o2 <= yb1 && o3 <= zb1;
+                let inside =
+                    o1 >= xb0 && o2 >= yb0 && o3 >= zb0 && o1 <= xb1 && o2 <= yb1 && o3 <= zb1;
                 if !inside {
                     let i = vout.idx(x, y, z);
                     vout.data[i] = padval;

@@ -170,7 +170,8 @@ pub fn optimise1d(
         pt,
         messages,
     );
-    let (mut x1, mut xmid, mut x2, mut y1, mut ymid, mut y2) = (b.x1, b.xmid, b.x2, b.y1, b.ymid, b.y2);
+    let (mut x1, mut xmid, mut x2, mut y1, mut ymid, mut y2) =
+        (b.x1, b.xmid, b.x2, b.y1, b.ymid, b.y2);
     let min_dist = (0.1 * f64::from(unittol)) as f32;
     let mut it = 0;
     loop {

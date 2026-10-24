@@ -194,7 +194,9 @@ fn main() {
         threads = args.get(i + 1).and_then(|v| v.parse().ok()).unwrap_or(0);
         args.drain(i..(i + 2).min(args.len()));
     }
-    let _ = rayon::ThreadPoolBuilder::new().num_threads(threads).build_global();
+    let _ = rayon::ThreadPoolBuilder::new()
+        .num_threads(threads)
+        .build_global();
     let all = args.is_empty();
     let want = |s: &str| all || args.iter().any(|a| a == s);
     let angles = |x: f32| x.abs() <= 0.5;
@@ -203,10 +205,24 @@ fn main() {
         ok &= kernel_report();
     }
     if want("sinf") {
-        ok &= sweep("sinf", f32::sin, glibc_float::sinf, math::sinf, angles, "angles |x| <= 0.5");
+        ok &= sweep(
+            "sinf",
+            f32::sin,
+            glibc_float::sinf,
+            math::sinf,
+            angles,
+            "angles |x| <= 0.5",
+        );
     }
     if want("cosf") {
-        ok &= sweep("cosf", f32::cos, glibc_float::cosf, math::cosf, angles, "angles |x| <= 0.5");
+        ok &= sweep(
+            "cosf",
+            f32::cos,
+            glibc_float::cosf,
+            math::cosf,
+            angles,
+            "angles |x| <= 0.5",
+        );
     }
     if want("sincosf") {
         ok &= sweep(

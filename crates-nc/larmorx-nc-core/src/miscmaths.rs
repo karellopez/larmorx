@@ -12,7 +12,6 @@
 //! the rotations' sines and cosines are `float`s (`sincosf` of a `float` angle) and the Euler
 //! angles come from glibc's `atan2f` ([`crate::fdlibm`]).
 
-
 use crate::arma::{self, Mat};
 use crate::fdlibm::atan2f;
 
@@ -155,11 +154,7 @@ pub fn rotmat2euler(rotmat: &Mat) -> [f64; 3] {
         let cx = r(2, 2) as f32;
         let sx = (-r(3, 2)) as f32;
         let sy = (-r(1, 3)) as f32;
-        [
-            f64::from(atan2f(sx, cx)),
-            f64::from(atan2f(sy, 0.0)),
-            0.0,
-        ]
+        [f64::from(atan2f(sx, cx)), f64::from(atan2f(sy, 0.0)), 0.0]
     } else {
         let cz = (r(1, 1) / f64::from(cy)) as f32;
         let sz = (r(1, 2) / f64::from(cy)) as f32;
@@ -203,15 +198,25 @@ pub fn decompose_aff(affmat: &Mat, centre: &Mat) -> [f64; 12] {
     let skew = Mat::from_rows(
         3,
         3,
-        &[1.0, f64::from(a), f64::from(b), 0.0, 1.0, f64::from(c), 0.0, 0.0, 1.0],
+        &[
+            1.0,
+            f64::from(a),
+            f64::from(b),
+            0.0,
+            1.0,
+            f64::from(c),
+            0.0,
+            0.0,
+            1.0,
+        ],
     );
     params[9] = f64::from(a);
     params[10] = f64::from(b);
     params[11] = f64::from(c);
     // aff3 * scales.i() * skew(1:3,1:3).i(): Armadillo evaluates A * solve(B, inv(C)).
     let skew_inv = arma::inv(&skew).unwrap_or_else(|_| Mat::from_rows(3, 3, &[f64::NAN; 9]));
-    let solved = arma::solve(&scales, &skew_inv)
-        .unwrap_or_else(|_| Mat::from_rows(3, 3, &[f64::NAN; 9]));
+    let solved =
+        arma::solve(&scales, &skew_inv).unwrap_or_else(|_| Mat::from_rows(3, 3, &[f64::NAN; 9]));
     let rotmat = arma::mul_tinysq(&aff3, &solved);
     // transl = aff3*centre + affmat(1:3,4) - centre
     let ac = arma::gemv_tinysq(&aff3, centre.as_slice(), false);
@@ -453,11 +458,18 @@ mod tests {
     #[test]
     fn identity_round_trip() {
         let centre = Mat::col(&[10.0, 20.0, 30.0]);
-        let p = Mat::col(&[0.01, -0.02, 0.03, 1.0, -2.0, 0.5, 1.0, 1.0, 1.0, 0.0, 0.0, 0.0]);
+        let p = Mat::col(&[
+            0.01, -0.02, 0.03, 1.0, -2.0, 0.5, 1.0, 1.0, 1.0, 0.0, 0.0, 0.0,
+        ]);
         let a = compose_aff(&p, 6, &centre);
         let q = decompose_aff(&a, &centre);
         for k in 0..6 {
-            assert!((q[k] - p.get(k)).abs() < 1e-6, "{k}: {} vs {}", q[k], p.get(k));
+            assert!(
+                (q[k] - p.get(k)).abs() < 1e-6,
+                "{k}: {} vs {}",
+                q[k],
+                p.get(k)
+            );
         }
         let i = Mat::eye(4);
         assert_eq!(rms_deviation(&i, &i, &centre, 80.0).unwrap(), 0.0);

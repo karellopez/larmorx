@@ -34,7 +34,9 @@ pub fn usage() -> String {
     s.push_str("        -init <filename>                   (initial transform matrix to apply to all vols)\n");
     s.push_str("        -gdt                               (run search on gradient images)\n");
     s.push_str("        -meanvol                           register timeseries to mean volume (overrides refvol and reffile options)\n");
-    s.push_str("        -stats                             produce variance and std. dev. images\n");
+    s.push_str(
+        "        -stats                             produce variance and std. dev. images\n",
+    );
     s.push_str("        -mats                              save transformation matricies in subdirectory outfilename.mat\n");
     s.push_str("        -plots                             save transformation parameters in file outputfilename.par\n");
     s.push_str("        -report                            report progress to screen\n");
@@ -216,7 +218,10 @@ fn hex_prefix(s: &str) -> f64 {
     if j < b.len() && (b[j] == b'p' || b[j] == b'P') {
         let rest = &s[j + 1..];
         let e = atoi(rest);
-        if rest.trim_start_matches(['+', '-']).starts_with(|c: char| c.is_ascii_digit()) {
+        if rest
+            .trim_start_matches(['+', '-'])
+            .starts_with(|c: char| c.is_ascii_digit())
+        {
             scale += e;
         }
     }
@@ -311,7 +316,11 @@ fn float_option(
 
 /// `parse_command_line(argc, argv)` (`args` without the program name), in `mode`. Notices of
 /// the defects met are collected in `notices`; messages go into the returned outputs.
-pub fn parse(args: &[String], mode: UpstreamDefects, notices: &mut Vec<Notice>) -> (Parsed, String) {
+pub fn parse(
+    args: &[String],
+    mode: UpstreamDefects,
+    notices: &mut Vec<Notice>,
+) -> (Parsed, String) {
     let mut err = String::new();
     // argc < 3: the usage and exit 1 (so `mcflirt -help` alone exits 1: FSL-07).
     if args.len() < 2 {
@@ -524,7 +533,9 @@ pub fn parse(args: &[String], mode: UpstreamDefects, notices: &mut Vec<Notice>) 
                         notices.push(Notice::new(
                             &defects::FSL_06,
                             mode,
-                            format!("the unknown cost '{v}' is replaced by normcorr, as in mcflirt"),
+                            format!(
+                                "the unknown cost '{v}' is replaced by normcorr, as in mcflirt"
+                            ),
                         ));
                         Ok(())
                     }
@@ -577,7 +588,10 @@ pub fn parse(args: &[String], mode: UpstreamDefects, notices: &mut Vec<Notice>) 
         }
     }
     if !o.no_reporting {
-        err.push_str(&format!("Processed data will be saved as {}\n", o.outputfname));
+        err.push_str(&format!(
+            "Processed data will be saved as {}\n",
+            o.outputfname
+        ));
     }
     (Parsed::Run(Box::new(o)), err)
 }

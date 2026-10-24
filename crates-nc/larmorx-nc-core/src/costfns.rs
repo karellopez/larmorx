@@ -108,20 +108,39 @@ impl Costfn {
         match self.costtype {
             CostType::NormCorr => {
                 let c = if self.smoothsize > 0.0 {
-                    p_normcorr_smoothed(&self.refvol, &self.testvol, affmat, self.smoothsize, false, skip)
+                    p_normcorr_smoothed(
+                        &self.refvol,
+                        &self.testvol,
+                        affmat,
+                        self.smoothsize,
+                        false,
+                        skip,
+                    )
                 } else {
                     p_normcorr(&self.refvol, &self.testvol, affmat, skip)
                 };
                 (1.0 - f64::from(c.abs())) as f32
             }
             CostType::NormCorrSinc => {
-                let c =
-                    p_normcorr_smoothed(&self.refvol, &self.testvol, affmat, self.smoothsize, true, skip);
+                let c = p_normcorr_smoothed(
+                    &self.refvol,
+                    &self.testvol,
+                    affmat,
+                    self.smoothsize,
+                    true,
+                    skip,
+                );
                 (1.0 - f64::from(c.abs())) as f32
             }
             CostType::LeastSq => {
                 if self.smoothsize > 0.0 {
-                    p_leastsquares_smoothed(&self.refvol, &self.testvol, affmat, self.smoothsize, skip)
+                    p_leastsquares_smoothed(
+                        &self.refvol,
+                        &self.testvol,
+                        affmat,
+                        self.smoothsize,
+                        skip,
+                    )
                 } else {
                     p_leastsquares(&self.refvol, &self.testvol, affmat, skip)
                 }
@@ -138,13 +157,25 @@ impl Costfn {
                         skip,
                     )
                 } else {
-                    p_corr_ratio(&self.refvol, &self.testvol, &self.bindex, affmat, self.no_bins, skip)
+                    p_corr_ratio(
+                        &self.refvol,
+                        &self.testvol,
+                        &self.bindex,
+                        affmat,
+                        self.no_bins,
+                        skip,
+                    )
                 };
                 (1.0 - f64::from(c)) as f32
             }
-            CostType::Woods => {
-                p_woods_fn(&self.refvol, &self.testvol, &self.bindex, affmat, self.no_bins, skip)
-            }
+            CostType::Woods => p_woods_fn(
+                &self.refvol,
+                &self.testvol,
+                &self.bindex,
+                affmat,
+                self.no_bins,
+                skip,
+            ),
             CostType::MutualInfo | CostType::NormMI => {
                 // smoothsize > 0 or fuzzyfrac > 0 (always 0.5 in mcflirt): the smoothed form.
                 let (minv, maxv) = {
@@ -268,7 +299,10 @@ pub fn findrangex(
     let (mut xmin1, mut xmax1) = if xmax0 < xmin0 {
         (1u32, 0u32)
     } else {
-        (cnum::f32_to_u32(xmin0.ceil()), cnum::f32_to_u32(xmax0.floor()))
+        (
+            cnum::f32_to_u32(xmin0.ceil()),
+            cnum::f32_to_u32(xmax0.floor()),
+        )
     };
     let (xmin_t, xmax_t) = (xmin1, xmax1);
     let mut x = o1;
@@ -411,7 +445,12 @@ pub fn p_normcorr(vref: &Volume, vtest: &Volume, aff: &Mat, skip: bool) -> f32 {
             while x <= xmax {
                 if use_point(vtest, x, xmin, xmax, o1, o2, o3) {
                     let val = q_tri_interpolation(vtest, o1, o2, o3);
-                    if !skip || (val.is_finite() && vref.value(i64::from(x), i64::from(y), i64::from(z)).is_finite()) {
+                    if !skip
+                        || (val.is_finite()
+                            && vref
+                                .value(i64::from(x), i64::from(y), i64::from(z))
+                                .is_finite())
+                    {
                         num += 1;
                         let valx = vref.value(i64::from(x), i64::from(y), i64::from(z));
                         let valy = val;
@@ -498,7 +537,12 @@ pub fn p_normcorr_smoothed(
                     } else {
                         q_tri_interpolation(vtest, o1, o2, o3)
                     };
-                    if !skip || (val.is_finite() && vref.value(i64::from(x), i64::from(y), i64::from(z)).is_finite()) {
+                    if !skip
+                        || (val.is_finite()
+                            && vref
+                                .value(i64::from(x), i64::from(y), i64::from(z))
+                                .is_finite())
+                    {
                         let weight = g.weight(o1, o2, o3, sm);
                         let valx = vref.value(i64::from(x), i64::from(y), i64::from(z));
                         let valy = val;
@@ -548,7 +592,14 @@ pub fn p_normcorr_smoothed(
 /// The final formula of the smoothed correlations: `sumxy/(num-1.0)` is a double division (the
 /// literal), `(sumx*sumy)/(num*num)` a float one, their difference stored in a float.
 #[inline]
-pub fn normcorr_from_sums(num: f32, sumx: f32, sumy: f32, sumx2: f32, sumy2: f32, sumxy: f32) -> f32 {
+pub fn normcorr_from_sums(
+    num: f32,
+    sumx: f32,
+    sumy: f32,
+    sumx2: f32,
+    sumy2: f32,
+    sumxy: f32,
+) -> f32 {
     let mut corr: f32 = 0.0;
     if f64::from(num) > 2.0 {
         let nm1 = f64::from(num) - 1.0;
@@ -576,7 +627,12 @@ pub fn p_leastsquares(vref: &Volume, vtest: &Volume, aff: &Mat, skip: bool) -> f
             while x <= xmax {
                 if use_point(vtest, x, xmin, xmax, o1, o2, o3) {
                     let val = q_tri_interpolation(vtest, o1, o2, o3);
-                    if !skip || (val.is_finite() && vref.value(i64::from(x), i64::from(y), i64::from(z)).is_finite()) {
+                    if !skip
+                        || (val.is_finite()
+                            && vref
+                                .value(i64::from(x), i64::from(y), i64::from(z))
+                                .is_finite())
+                    {
                         num += 1;
                         let valx = vref.value(i64::from(x), i64::from(y), i64::from(z));
                         let valy = val;
@@ -625,7 +681,12 @@ pub fn p_leastsquares_smoothed(
             while x <= xmax {
                 if use_point(vtest, x, xmin, xmax, o1, o2, o3) {
                     let val = q_tri_interpolation(vtest, o1, o2, o3);
-                    if !skip || (val.is_finite() && vref.value(i64::from(x), i64::from(y), i64::from(z)).is_finite()) {
+                    if !skip
+                        || (val.is_finite()
+                            && vref
+                                .value(i64::from(x), i64::from(y), i64::from(z))
+                                .is_finite())
+                    {
                         let weight = g.weight(o1, o2, o3, sm);
                         let valx = vref.value(i64::from(x), i64::from(y), i64::from(z));
                         let valy = val;
@@ -695,7 +756,12 @@ pub fn p_corr_ratio_smoothed(
             while x <= xmax {
                 if use_point(vtest, x, xmin, xmax, o1, o2, o3) {
                     let val = q_tri_interpolation(vtest, o1, o2, o3);
-                    if !skip || (val.is_finite() && vref.value(i64::from(x), i64::from(y), i64::from(z)).is_finite()) {
+                    if !skip
+                        || (val.is_finite()
+                            && vref
+                                .value(i64::from(x), i64::from(y), i64::from(z))
+                                .is_finite())
+                    {
                         let b = bindex[bptr] as usize;
                         let weight = g.weight(o1, o2, o3, sm);
                         numy[b] += weight;
@@ -785,7 +851,12 @@ pub fn p_corr_ratio(
             while x <= xmax {
                 if use_point(vtest, x, xmin, xmax, o1, o2, o3) {
                     let val = q_tri_interpolation(vtest, o1, o2, o3);
-                    if !skip || (val.is_finite() && vref.value(i64::from(x), i64::from(y), i64::from(z)).is_finite()) {
+                    if !skip
+                        || (val.is_finite()
+                            && vref
+                                .value(i64::from(x), i64::from(y), i64::from(z))
+                                .is_finite())
+                    {
                         let b = bindex[bptr] as usize;
                         numy[b] += 1;
                         sumy[b] += val;
@@ -863,7 +934,12 @@ pub fn p_woods_fn(
             while x <= xmax {
                 if use_point(vtest, x, xmin, xmax, o1, o2, o3) {
                     let val = q_tri_interpolation(vtest, o1, o2, o3);
-                    if !skip || (val.is_finite() && vref.value(i64::from(x), i64::from(y), i64::from(z)).is_finite()) {
+                    if !skip
+                        || (val.is_finite()
+                            && vref
+                                .value(i64::from(x), i64::from(y), i64::from(z))
+                                .is_finite())
+                    {
                         let b = bindex[bptr] as usize;
                         num[b] += 1;
                         sum[b] += val;
@@ -939,7 +1015,12 @@ pub fn calc_smoothed_entropy(
             while x <= xmax {
                 if use_point(vtest, x, xmin, xmax, o1, o2, o3) {
                     let val = q_tri_interpolation(vtest, o1, o2, o3);
-                    if !skip || (val.is_finite() && vref.value(i64::from(x), i64::from(y), i64::from(z)).is_finite()) {
+                    if !skip
+                        || (val.is_finite()
+                            && vref
+                                .value(i64::from(x), i64::from(y), i64::from(z))
+                                .is_finite())
+                    {
                         let geomweight = g.weight(o1, o2, o3, sm);
                         let a = i64::from(bindex[bptr]);
                         let mut bidx = val * b1 + b0;

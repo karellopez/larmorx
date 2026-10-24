@@ -158,7 +158,9 @@ impl Default for LegacyFields {
 impl LegacyFields {
     /// `origin()`: the first three shorts of `originator` (native byte order).
     pub fn origin(&self) -> [i16; 5] {
-        std::array::from_fn(|i| i16::from_le_bytes([self.originator[2 * i], self.originator[2 * i + 1]]))
+        std::array::from_fn(|i| {
+            i16::from_le_bytes([self.originator[2 * i], self.originator[2 * i + 1]])
+        })
     }
 
     pub fn set_origin(&mut self, i: usize, v: i16) {
@@ -549,10 +551,9 @@ pub fn mat44_to_quatern(rm: &Mat44) -> Quatern {
     r31 = f64::from(p[2][0]);
     r32 = f64::from(p[2][1]);
     r33 = f64::from(p[2][2]);
-    let zdet = r11 * r22 * r33 - r11 * r32 * r23 - r21 * r12 * r33
-        + r21 * r32 * r13
-        + r31 * r12 * r23
-        - r31 * r22 * r13;
+    let zdet =
+        r11 * r22 * r33 - r11 * r32 * r23 - r21 * r12 * r33 + r21 * r32 * r13 + r31 * r12 * r23
+            - r31 * r22 * r13;
     let qfac = if zdet > 0.0 {
         1.0
     } else {
@@ -625,10 +626,9 @@ pub fn mat33_inverse(r: &Mat33) -> Mat33 {
     let (r11, r12, r13) = (g(0, 0), g(0, 1), g(0, 2));
     let (r21, r22, r23) = (g(1, 0), g(1, 1), g(1, 2));
     let (r31, r32, r33) = (g(2, 0), g(2, 1), g(2, 2));
-    let mut deti = r11 * r22 * r33 - r11 * r32 * r23 - r21 * r12 * r33
-        + r21 * r32 * r13
-        + r31 * r12 * r23
-        - r31 * r22 * r13;
+    let mut deti =
+        r11 * r22 * r33 - r11 * r32 * r23 - r21 * r12 * r33 + r21 * r32 * r13 + r31 * r12 * r23
+            - r31 * r22 * r13;
     if deti != 0.0 {
         deti = x87::div_to_f64(1.0, deti);
     }
@@ -659,10 +659,9 @@ pub fn mat44_inverse(r: &Mat44) -> Mat44 {
     let (r21, r22, r23) = (g(1, 0), g(1, 1), g(1, 2));
     let (r31, r32, r33) = (g(2, 0), g(2, 1), g(2, 2));
     let (v1, v2, v3) = (g(0, 3), g(1, 3), g(2, 3));
-    let mut deti = r11 * r22 * r33 - r11 * r32 * r23 - r21 * r12 * r33
-        + r21 * r32 * r13
-        + r31 * r12 * r23
-        - r31 * r22 * r13;
+    let mut deti =
+        r11 * r22 * r33 - r11 * r32 * r23 - r21 * r12 * r33 + r21 * r32 * r13 + r31 * r12 * r23
+            - r31 * r22 * r13;
     if deti != 0.0 {
         deti = x87::div_to_f64(1.0, deti);
     }
@@ -671,25 +670,19 @@ pub fn mat44_inverse(r: &Mat44) -> Mat44 {
     q[0][1] = (deti * (-r12 * r33 + r32 * r13)) as f32;
     q[0][2] = (deti * (r12 * r23 - r22 * r13)) as f32;
     q[0][3] = (deti
-        * (-r12 * r23 * v3 + r12 * v2 * r33 + r22 * r13 * v3
-            - r22 * v1 * r33
-            - r32 * r13 * v2
+        * (-r12 * r23 * v3 + r12 * v2 * r33 + r22 * r13 * v3 - r22 * v1 * r33 - r32 * r13 * v2
             + r32 * v1 * r23)) as f32;
     q[1][0] = (deti * (-r21 * r33 + r31 * r23)) as f32;
     q[1][1] = (deti * (r11 * r33 - r31 * r13)) as f32;
     q[1][2] = (deti * (-r11 * r23 + r21 * r13)) as f32;
     q[1][3] = (deti
-        * (r11 * r23 * v3 - r11 * v2 * r33 - r21 * r13 * v3
-            + r21 * v1 * r33
-            + r31 * r13 * v2
+        * (r11 * r23 * v3 - r11 * v2 * r33 - r21 * r13 * v3 + r21 * v1 * r33 + r31 * r13 * v2
             - r31 * v1 * r23)) as f32;
     q[2][0] = (deti * (r21 * r32 - r31 * r22)) as f32;
     q[2][1] = (deti * (-r11 * r32 + r31 * r12)) as f32;
     q[2][2] = (deti * (r11 * r22 - r21 * r12)) as f32;
     q[2][3] = (deti
-        * (-r11 * r22 * v3 + r11 * r32 * v2 + r21 * r12 * v3
-            - r21 * r32 * v1
-            - r31 * r12 * v2
+        * (-r11 * r22 * v3 + r11 * r32 * v2 + r21 * r12 * v3 - r21 * r32 * v1 - r31 * r12 * v2
             + r31 * r22 * v1)) as f32;
     q[3][3] = if deti == 0.0 { 0.0 } else { 1.0 };
     q
@@ -756,7 +749,16 @@ pub fn mat33_polar(a: &Mat33) -> Mat33 {
         }
         // fabs(Z00-X00)+fabs(Z01-X01)+... in row order, in float.
         dif = (z[0][0] - x[0][0]).abs();
-        for (i, j) in [(0, 1), (0, 2), (1, 0), (1, 1), (1, 2), (2, 0), (2, 1), (2, 2)] {
+        for (i, j) in [
+            (0, 1),
+            (0, 2),
+            (1, 0),
+            (1, 1),
+            (1, 2),
+            (2, 0),
+            (2, 1),
+            (2, 2),
+        ] {
             dif += (z[i][j] - x[i][j]).abs();
         }
         k += 1;
@@ -1330,7 +1332,10 @@ pub fn load_image(path: &Path) -> Result<Loaded, NiftiError> {
     for d in 1..=7 {
         if header.dim[d] < 1 {
             // xmax = dim-1 < xmin = 0: FSL's ROI check.
-            return Err(err(format!("Error: Nonsensical ROI for {}", path.display())));
+            return Err(err(format!(
+                "Error: Nonsensical ROI for {}",
+                path.display()
+            )));
         }
     }
     let width = header.datum_byte_width();
@@ -1422,7 +1427,9 @@ pub fn save_image(
         write_file(filename, &first, use_compression)
     } else {
         write_file(filename, &first, use_compression)?;
-        let pos = filename.rfind(".hdr").expect("a pair's header name ends in .hdr");
+        let pos = filename
+            .rfind(".hdr")
+            .expect("a pair's header name ends in .hdr");
         let img = format!("{}.img{}", &filename[..pos], &filename[pos + 4..]);
         write_file(&img, &data[..n.min(data.len())], use_compression)
     }

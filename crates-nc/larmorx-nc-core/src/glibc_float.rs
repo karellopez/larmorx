@@ -182,7 +182,11 @@ pub fn sinf(y: f32) -> f32 {
         let sign = (xi >> 31) as i32;
         let (x, n) = reduce_large(xi);
         let s = TABLE[0].sign[((n + sign) & 3) as usize];
-        let p = if (n + sign) & 2 != 0 { &TABLE[1] } else { &TABLE[0] };
+        let p = if (n + sign) & 2 != 0 {
+            &TABLE[1]
+        } else {
+            &TABLE[0]
+        };
         return sinf_poly(x * s, x * x, p, n);
     }
     // __math_invalidf: (x - x) / (x - x), NaN for an infinity or a NaN.
@@ -211,7 +215,11 @@ pub fn cosf(y: f32) -> f32 {
         let sign = (xi >> 31) as i32;
         let (x, n) = reduce_large(xi);
         let s = TABLE[0].sign[((n + sign) & 3) as usize];
-        let p = if (n + sign) & 2 != 0 { &TABLE[1] } else { &TABLE[0] };
+        let p = if (n + sign) & 2 != 0 {
+            &TABLE[1]
+        } else {
+            &TABLE[0]
+        };
         return sinf_poly(x * s, x * x, p, n ^ 1);
     }
     (y - y) / (y - y)
@@ -241,7 +249,11 @@ pub fn sincosf(y: f32) -> (f32, f32) {
         let sign = (xi >> 31) as i32;
         let (x, n) = reduce_large(xi);
         let s = TABLE[0].sign[((n + sign) & 3) as usize];
-        let p = if (n + sign) & 2 != 0 { &TABLE[1] } else { &TABLE[0] };
+        let p = if (n + sign) & 2 != 0 {
+            &TABLE[1]
+        } else {
+            &TABLE[0]
+        };
         return sincosf_poly(x * s, x * x, p, n);
     }
     let v = y - y;

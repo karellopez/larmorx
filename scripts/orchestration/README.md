@@ -11,9 +11,10 @@ repository), `LARMORX_VENV` (default: `<workspace>/.venv`), cargo first on the p
 
 | Script | What it does |
 |---|---|
-| `gates-rust.sh <checkout> [root\|gpl\|both]` | fmt, clippy `-D warnings`, tests, in the root workspace and `crates-gpl` |
+| `gates-rust.sh <checkout> [root\|gpl\|nc\|both\|all]` | fmt, clippy `-D warnings`, tests, in the root workspace, `crates-gpl` and `crates-nc` (`both`: root and gpl; `all`: the three) |
 | `gates-python.sh <checkout> [--no-build]` | `maturin develop --release` (main checkout only), `pytest tests/python tests/golden`, ruff, SPDX |
 | `build-gpl.sh <checkout>` | the `larmorx-gpl` replica program (release) |
+| `build-nc.sh <checkout>` | the `larmorx-nc` replica program (release) |
 | `lxv.sh <checkout> <args>` | `python -m larmorx_validation <args>` from that checkout |
 | `verify-merge.sh <checkout> <out> [--suite "..."]... [--site <dir> --evidence <tool>...] [--golden] [--threads N]` | the checklist's steps 1-5 on a committed merge, one line per step in `<out>/main.log` |
 | `compare_records.py <out>/records <suite>...` | the re-run records against the committed ones, case by case |

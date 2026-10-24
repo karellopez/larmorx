@@ -35,15 +35,24 @@ fn the_apache_notices_are_current_copies() {
 #[test]
 fn the_fsl_source_is_complete() {
     let dir = Path::new(env!("CARGO_MANIFEST_DIR")).join("../fsl-source");
-    let manifest = std::fs::read_to_string(dir.join("MANIFEST.tsv")).expect("fsl-source/MANIFEST.tsv");
+    let manifest =
+        std::fs::read_to_string(dir.join("MANIFEST.tsv")).expect("fsl-source/MANIFEST.tsv");
     let mut n = 0;
     for line in manifest.lines().skip(1) {
         let f: Vec<&str> = line.split('\t').collect();
         assert_eq!(f.len(), 4, "{line}");
         let path = dir.join(f[0]).join(f[2]);
         let data = std::fs::read(&path).unwrap_or_else(|e| panic!("{}: {e}", path.display()));
-        let digest: String = Sha256::digest(&data).iter().map(|b| format!("{b:02x}")).collect();
-        assert_eq!(digest, f[3], "{} changed (scripts/fsl_source.py)", path.display());
+        let digest: String = Sha256::digest(&data)
+            .iter()
+            .map(|b| format!("{b:02x}"))
+            .collect();
+        assert_eq!(
+            digest,
+            f[3],
+            "{} changed (scripts/fsl_source.py)",
+            path.display()
+        );
         n += 1;
     }
     assert!(n > 0, "fsl-source/MANIFEST.tsv lists no files");

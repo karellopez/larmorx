@@ -723,3 +723,10 @@ def mri_mat_text(m: np.ndarray) -> str:
 
 def mri_par_text(params: np.ndarray) -> str:
     """``(N, 6)`` motion parameters in mcflirt's ``.par`` text format."""
+
+def mri_hmc_world(
+    matrices: np.ndarray, params: np.ndarray, series: str, reference: str | None = None
+) -> dict[str, Any]:
+    """``ras``, ``itk`` (``(N, 4, 4)``) and ``fd`` (``(N,)``) of mcflirt-convention matrices and
+    motion parameters computed by the ``larmorx-nc`` replica, for the series at ``series``
+    registered to the reference at ``reference`` (``None``: the series' grid)."""

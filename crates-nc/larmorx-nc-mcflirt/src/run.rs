@@ -18,7 +18,7 @@ use larmorx_nc_core::nifti;
 use larmorx_nc_core::optimise;
 use larmorx_nc_core::settings::Settings;
 use larmorx_nc_core::volume::{
-    self, Conversion, FslError, Interpolation, SaveError, SaveType, Volume, Extrapolation,
+    self, Conversion, Extrapolation, FslError, Interpolation, SaveError, SaveType, Volume,
 };
 use rayon::prelude::*;
 
@@ -166,7 +166,13 @@ impl Search<'_> {
     }
 
     /// `usroptimise(matresult, dof, 1, new_tolerance)` → `optimise_strategy1`.
-    fn usroptimise(&self, cf: &mut Costfn, matresult: &Mat, new_tolerance: f32, cerr: &mut Cerr) -> Mat {
+    fn usroptimise(
+        &self,
+        cf: &mut Costfn,
+        matresult: &Mat,
+        new_tolerance: f32,
+        cerr: &mut Cerr,
+    ) -> Mat {
         // usroptimise(matresult, globalopts.dof, ...): Min(globalopts.dof, usrdof), the same.
         let mut dof = self.o.dof;
         if dof < 6 {
@@ -359,13 +365,25 @@ impl Run<'_> {
                 let o = self.o.clone();
                 let mode = self.mode;
                 let fixed = self.fixed;
-                let results: Vec<Result<VolumeResult, FslError>> = with_pool(self.n_threads, || {
-                    rest.par_iter()
-                        .map(|&vi| {
-                            register_volume(&o, &st, mode, &refvol, timeseries, vi, scaling, new_tolerance, &mat_in[vi as usize], fixed)
-                        })
-                        .collect()
-                });
+                let results: Vec<Result<VolumeResult, FslError>> =
+                    with_pool(self.n_threads, || {
+                        rest.par_iter()
+                            .map(|&vi| {
+                                register_volume(
+                                    &o,
+                                    &st,
+                                    mode,
+                                    &refvol,
+                                    timeseries,
+                                    vi,
+                                    scaling,
+                                    new_tolerance,
+                                    &mat_in[vi as usize],
+                                    fixed,
+                                )
+                            })
+                            .collect()
+                    });
                 for (r, &vi) in results.into_iter().zip(&rest) {
                     if !self.o.no_reporting {
                         self.e(&format!("[{vi}]"));
@@ -453,7 +471,18 @@ fn register_volume(
     fixed: bool,
 ) -> Result<VolumeResult, FslError> {
     let mut st = st.clone();
-    register_volume_mut(o, &mut st, mode, refvol, timeseries, i, scaling, new_tolerance, start, fixed)
+    register_volume_mut(
+        o,
+        &mut st,
+        mode,
+        refvol,
+        timeseries,
+        i,
+        scaling,
+        new_tolerance,
+        start,
+        fixed,
+    )
 }
 
 /// One volume of `correct()`: the test volume (in-plane padded if needed), its cost function and
@@ -590,7 +619,8 @@ impl Run<'_> {
             ));
         }
         self.report("Reading time series... \n");
-        let (mut timeseries, _, in_units) = volume::read_volume4d(&self.o.inputfname, self.settings)?;
+        let (mut timeseries, _, in_units) =
+            volume::read_volume4d(&self.o.inputfname, self.settings)?;
         let datatype = volume::file_dtype(&self.o.inputfname)?;
         self.st.no_volumes = timeseries.tsize() as i32;
         let n = self.st.no_volumes;
@@ -630,6 +660,8 @@ impl Run<'_> {
                     } else {
                         anisorefvol = Some(timeseries.sub_volume(i64::from(self.st.refnum))?);
                     }
+                    let reference = anisorefvol.clone().expect("reference");
+                    self.non_finite_notice(&timeseries, &reference);
                 } else {
                     // The second pass: the mean of the first pass's corrected volumes.
                     let mut mv = timeseries.sub_volume(0)?;
@@ -702,8 +734,26 @@ impl Run<'_> {
                 self.report("Registering volumes ... ");
                 let mut m0 = std::mem::take(&mut mat0);
                 let mut m1 = std::mem::take(&mut mat1);
-                self.correct(1, &rv, &timeseries, current_scale, new_tolerance, &mut m0, &mut m1, mean_cond)?;
-                self.correct(-1, &rv, &timeseries, current_scale, new_tolerance, &mut m0, &mut m1, mean_cond)?;
+                self.correct(
+                    1,
+                    &rv,
+                    &timeseries,
+                    current_scale,
+                    new_tolerance,
+                    &mut m0,
+                    &mut m1,
+                    mean_cond,
+                )?;
+                self.correct(
+                    -1,
+                    &rv,
+                    &timeseries,
+                    current_scale,
+                    new_tolerance,
+                    &mut m0,
+                    &mut m1,
+                    mean_cond,
+                )?;
                 mat0 = m0;
                 mat1 = m1;
             } else {
@@ -736,8 +786,26 @@ impl Run<'_> {
                 self.report("Registering volumes ... ");
                 let mut m1 = std::mem::take(&mut mat1);
                 let mut m2 = std::mem::take(&mut mat2);
-                self.correct(1, &rv, &timeseries, current_scale, new_tolerance, &mut m1, &mut m2, mean_cond)?;
-                self.correct(-1, &rv, &timeseries, current_scale, new_tolerance, &mut m1, &mut m2, mean_cond)?;
+                self.correct(
+                    1,
+                    &rv,
+                    &timeseries,
+                    current_scale,
+                    new_tolerance,
+                    &mut m1,
+                    &mut m2,
+                    mean_cond,
+                )?;
+                self.correct(
+                    -1,
+                    &rv,
+                    &timeseries,
+                    current_scale,
+                    new_tolerance,
+                    &mut m1,
+                    &mut m2,
+                    mean_cond,
+                )?;
                 mat1 = m1;
                 mat2 = m2;
             } else {
@@ -750,8 +818,26 @@ impl Run<'_> {
                 let rv = refvol.clone().expect("the reference of stage 2");
                 let mut m2 = std::mem::take(&mut mat2);
                 let mut m1 = std::mem::take(&mut mat1);
-                self.correct(1, &rv, &timeseries, current_scale, new_tolerance, &mut m2, &mut m1, mean_cond)?;
-                self.correct(-1, &rv, &timeseries, current_scale, new_tolerance, &mut m2, &mut m1, mean_cond)?;
+                self.correct(
+                    1,
+                    &rv,
+                    &timeseries,
+                    current_scale,
+                    new_tolerance,
+                    &mut m2,
+                    &mut m1,
+                    mean_cond,
+                )?;
+                self.correct(
+                    -1,
+                    &rv,
+                    &timeseries,
+                    current_scale,
+                    new_tolerance,
+                    &mut m2,
+                    &mut m1,
+                    mean_cond,
+                )?;
                 mat2 = m2;
                 mat1 = m1;
             } else {
@@ -768,8 +854,26 @@ impl Run<'_> {
             let rv = refvol.clone().expect("the reference of stage 3");
             let mut m1 = std::mem::take(&mut mat1);
             let mut m0 = std::mem::take(&mut mat0);
-            self.correct(1, &rv, &timeseries, current_scale, 0.1, &mut m1, &mut m0, mean_cond)?;
-            self.correct(-1, &rv, &timeseries, current_scale, 0.1, &mut m1, &mut m0, mean_cond)?;
+            self.correct(
+                1,
+                &rv,
+                &timeseries,
+                current_scale,
+                0.1,
+                &mut m1,
+                &mut m0,
+                mean_cond,
+            )?;
+            self.correct(
+                -1,
+                &rv,
+                &timeseries,
+                current_scale,
+                0.1,
+                &mut m1,
+                &mut m0,
+                mean_cond,
+            )?;
             mat0 = m0;
         } else {
             mat0.clone_from(&mat1);
@@ -780,7 +884,10 @@ impl Run<'_> {
             match miscmaths::read_ascii_matrix(&self.o.init_transform) {
                 Ok(m) => m,
                 Err(MatrixFileError::CannotOpen) => {
-                    self.e(&format!("Could not open matrix file {}\n", self.o.init_transform));
+                    self.e(&format!(
+                        "Could not open matrix file {}\n",
+                        self.o.init_transform
+                    ));
                     Mat::zeros(0, 0)
                 }
                 Err(MatrixFileError::NotEnoughNumbers) => {
@@ -816,7 +923,9 @@ impl Run<'_> {
         };
         if self.o.sinc_final && timeseries.kernel.is_none() {
             let mut msgs = Vec::new();
-            timeseries.kernel = Some(std::sync::Arc::new(kernel::sinc_kernel("blackman", 7, 1201, &mut msgs)));
+            timeseries.kernel = Some(std::sync::Arc::new(kernel::sinc_kernel(
+                "blackman", 7, 1201, &mut msgs,
+            )));
         }
         // With a reference file the output grid is the reference's; mcflirt reads it in the
         // first stage only, so with `-stages 0` it is still the empty volume (`volume<float>
@@ -826,7 +935,10 @@ impl Run<'_> {
         } else {
             None
         };
-        let mats: Vec<Mat> = mat0.iter().map(|m| arma::mul_tinysq(m, &init_trans)).collect();
+        let mats: Vec<Mat> = mat0
+            .iter()
+            .map(|m| arma::mul_tinysq(m, &init_trans))
+            .collect();
         let resampled: Vec<Result<Volume, FslError>> = with_pool(self.n_threads, || {
             (0..n)
                 .into_par_iter()
@@ -879,6 +991,51 @@ impl Run<'_> {
         Ok(())
     }
 
+    /// FSL-14's notice: the volumes registered (and the reference) with NaN or infinite voxels.
+    fn non_finite_notice(&mut self, ts: &Volume, reference: &Volume) {
+        let per = ts.nvoxels() as usize;
+        let skip = if self.o.reffileflag {
+            -1
+        } else {
+            i64::from(self.st.refnum)
+        };
+        let vols: Vec<usize> = (0..ts.tsize() as usize)
+            .filter(|&t| t as i64 != skip)
+            .filter(|&t| {
+                ts.data[t * per..(t + 1) * per]
+                    .iter()
+                    .any(|v| !v.is_finite())
+            })
+            .collect();
+        let in_reference = reference.data.iter().any(|v| !v.is_finite());
+        if vols.is_empty() && !in_reference {
+            return;
+        }
+        let mut names: Vec<String> = vols.iter().take(5).map(usize::to_string).collect();
+        if vols.len() > 5 {
+            names.push(format!("... ({} volumes)", vols.len()));
+        }
+        let which = match (vols.len(), in_reference) {
+            (0, _) => "the reference has".to_owned(),
+            (1, false) => format!("volume {} has", names[0]),
+            (_, false) => format!("volumes {} have", names.join(", ")),
+            (1, true) => format!("volume {} and the reference have", names[0]),
+            (_, true) => format!("volumes {} and the reference have", names.join(", ")),
+        };
+        let detail = if self.mode.fix() {
+            format!(
+                "{which} NaN or infinite voxels: they are left out of the centre of mass and the \
+                 cost; mcflirt's matrices for such volumes are NaN"
+            )
+        } else {
+            format!(
+                "{which} NaN or infinite voxels: as in mcflirt, they make the centre of mass, and \
+                 so the matrix, of such volumes NaN"
+            )
+        };
+        self.notice(&defects::FSL_14, detail);
+    }
+
     /// Checks of the corrected command line before any work (FSL-12): the inputs mcflirt
     /// accepts and then aborts on.
     fn precheck(&mut self, timeseries: &Volume) -> Result<(), End> {
@@ -927,7 +1084,15 @@ impl Run<'_> {
     fn save(&mut self, v: &Volume, name: &str, ty: SaveType, code: Option<i16>) -> Result<(), End> {
         let settings = self.output_settings();
         let units = nifti::UNITS_MM_SEC;
-        match v.save_typed(name, ty, Conversion::X86Cast, &settings, DESCRIP, code, units) {
+        match v.save_typed(
+            name,
+            ty,
+            Conversion::X86Cast,
+            &settings,
+            DESCRIP,
+            code,
+            units,
+        ) {
             Ok(()) => Ok(()),
             Err(SaveError::OutputType(e)) => Err(End::Exit(1, e.printed)),
             Err(SaveError::Exception(e)) => Err(End::Abort(e)),
@@ -966,7 +1131,11 @@ impl Run<'_> {
                     "int8 data are written as int8, rounded and clamped; mcflirt writes uint8 and \
                      truncates",
                 );
-                (SaveType::Int8, Conversion::RoundClamp, Some(nifti::dt::INT8))
+                (
+                    SaveType::Int8,
+                    Conversion::RoundClamp,
+                    Some(nifti::dt::INT8),
+                )
             } else if integer {
                 let rounded = ts
                     .data
@@ -985,7 +1154,10 @@ impl Run<'_> {
             }
         } else {
             if datatype == nifti::dt::INT8 {
-                self.notice(&defects::FSL_09, "int8 data are written as uint8, as in mcflirt");
+                self.notice(
+                    &defects::FSL_09,
+                    "int8 data are written as uint8, as in mcflirt",
+                );
             }
             (ty, Conversion::X86Cast, None)
         };
@@ -1012,7 +1184,15 @@ impl Run<'_> {
             nifti::UNITS_MM_SEC
         };
         let settings = self.output_settings();
-        match ts.save_typed(&self.o.outputfname, ty, conv, &settings, DESCRIP, code, units) {
+        match ts.save_typed(
+            &self.o.outputfname,
+            ty,
+            conv,
+            &settings,
+            DESCRIP,
+            code,
+            units,
+        ) {
             Ok(()) => Ok(()),
             Err(SaveError::OutputType(e)) => Err(End::Exit(1, e.printed)),
             Err(SaveError::Exception(e)) => Err(End::Abort(e)),
@@ -1028,7 +1208,11 @@ impl Run<'_> {
         let mut variancevol = meanvol.clone();
         let mut sigmavol = meanvol.clone();
         let (nx, ny, nz) = (ts.xsize(), ts.ysize(), ts.zsize());
-        let (z0, z1) = if self.mode.fix() { (0, nz) } else { (1, nz - 1) };
+        let (z0, z1) = if self.mode.fix() {
+            (0, nz)
+        } else {
+            (1, nz - 1)
+        };
         let nv = ts.nvoxels() as usize;
         for x in 0..nx {
             for y in 0..ny {
@@ -1074,11 +1258,26 @@ impl Run<'_> {
         };
         self.notice(&defects::FSL_08, detail);
         self.report("Saving mean volume... \n");
-        self.save(&meanvol, &self.derived_name("_meanvol"), SaveType::Float, None)?;
+        self.save(
+            &meanvol,
+            &self.derived_name("_meanvol"),
+            SaveType::Float,
+            None,
+        )?;
         self.report("Saving variance volume... \n");
-        self.save(&variancevol, &self.derived_name("_variance"), SaveType::Float, None)?;
+        self.save(
+            &variancevol,
+            &self.derived_name("_variance"),
+            SaveType::Float,
+            None,
+        )?;
         self.report("Saving standard deviation volume... \n");
-        self.save(&sigmavol, &self.derived_name("_sigma"), SaveType::Float, None)?;
+        self.save(
+            &sigmavol,
+            &self.derived_name("_sigma"),
+            SaveType::Float,
+            None,
+        )?;
         Ok(())
     }
 
@@ -1089,9 +1288,18 @@ impl Run<'_> {
         let rmax: f32 = 80.0;
         let out = self.o.outputfname.clone();
         let mut center = Mat::zeros(3, 1);
-        center.put(0, 0.5 * (refvol.xsize() as f64 - 1.0) * f64::from(refvol.xdim()));
-        center.put(1, 0.5 * (refvol.ysize() as f64 - 1.0) * f64::from(refvol.ydim()));
-        center.put(2, 0.5 * (refvol.zsize() as f64 - 1.0) * f64::from(refvol.zdim()));
+        center.put(
+            0,
+            0.5 * (refvol.xsize() as f64 - 1.0) * f64::from(refvol.xdim()),
+        );
+        center.put(
+            1,
+            0.5 * (refvol.ysize() as f64 - 1.0) * f64::from(refvol.ydim()),
+        );
+        center.put(
+            2,
+            0.5 * (refvol.zsize() as f64 - 1.0) * f64::from(refvol.zdim()),
+        );
         let mut par = String::new();
         let mut tmpmatflag = self.o.tmpmatflag;
         // FSL-13: mcflirt creates the .mat directory for -rmsrel and -rmsabs without -mats.
@@ -1151,7 +1359,10 @@ impl Run<'_> {
             }
             write_text(&format!("{out}_rel.rms"), &text);
             let m = mean / (self.st.no_volumes - 1) as f32;
-            write_text(&format!("{out}_rel_mean.rms"), &format!("{}\n", cnum::stream(f64::from(m))));
+            write_text(
+                &format!("{out}_rel_mean.rms"),
+                &format!("{}\n", cnum::stream(f64::from(m))),
+            );
         }
         if self.o.rmsabsflag {
             let mut text = String::new();
@@ -1165,7 +1376,10 @@ impl Run<'_> {
             }
             write_text(&format!("{out}_abs.rms"), &text);
             let m = mean / self.st.no_volumes as f32;
-            write_text(&format!("{out}_abs_mean.rms"), &format!("{}\n", cnum::stream(f64::from(m))));
+            write_text(
+                &format!("{out}_abs_mean.rms"),
+                &format!("{}\n", cnum::stream(f64::from(m))),
+            );
         }
         let mut warnings = Vec::new();
         for (i, m) in mats.iter().enumerate().take(n) {
@@ -1177,7 +1391,13 @@ impl Run<'_> {
                 write_text(&format!("{d}/{name}"), &mat_text(&product));
             }
             if self.o.plotflag {
-                let cog = Mat::col(&refvol.cog_scaled_mm(&mut warnings));
+                // The parameters' centre: the reference's centre of mass (of its finite values
+                // when FSL-14 is corrected).
+                let cog = if self.mode.fix() {
+                    Mat::col(&cog_finite(refvol, &mut warnings))
+                } else {
+                    Mat::col(&refvol.cog_scaled_mm(&mut warnings))
+                };
                 let p = miscmaths::decompose_aff(&product, &cog);
                 for k in 0..6 {
                     par.push_str(&cnum::stream(p[k]));
@@ -1283,4 +1503,3 @@ pub fn cog_finite(v: &Volume, warnings: &mut Vec<String>) -> [f64; 3] {
     }
     clean.cog_scaled_mm(warnings)
 }
-

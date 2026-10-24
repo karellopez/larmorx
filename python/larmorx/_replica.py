@@ -3,14 +3,16 @@
 
 Some tools have two implementations (``docs/licensing.md``): the clean-room original in this
 Apache-2.0 package, and a replica translated from the upstream's source, in a package of the
-upstream's licence family (``larmorx-gpl``). larmorx never imports, loads or links a replica.
-It runs the replica package's program as a separate process and exchanges files with it, so
-the licences stay separate. This module knows the program's name and arguments, nothing more.
+upstream's licence family (``larmorx-gpl``, ``larmorx-nc``). larmorx never imports, loads or
+links a replica. It runs the replica package's program as a separate process and exchanges
+files with it, so the licences stay separate. This module knows the program's name and
+arguments, nothing more.
 
 The registry of tools with a replica and the search for the program are shared with the
 command line (``larmorx_cli::replica`` in Rust, through :mod:`larmorx._core`). The search
-order is the program's environment variable (``LARMORX_GPL_BIN``), then this Python
-environment's scripts directory, then ``PATH``. It is done once per call; nothing is cached.
+order is the program's environment variable (``LARMORX_GPL_BIN``, ``LARMORX_NC_BIN``), then
+this Python environment's scripts directory, then ``PATH``. It is done once per call; nothing
+is cached.
 
 A tool's wrapper uses it in three steps (see ``larmorx.afni.tshift``)::
 

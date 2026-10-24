@@ -4,7 +4,7 @@
 //!
 //! Some tools have two implementations: the clean-room original in this Apache-2.0 package,
 //! and a replica translated from the upstream source, in a package of the upstream's licence
-//! family (`larmorx-gpl`; later `larmorx-nc`). This crate never links a replica. It finds the
+//! family (`larmorx-gpl`, `larmorx-nc`). This crate never links a replica. It finds the
 //! replica package's program and runs it as a child process, with the tool's original
 //! arguments; the two exchange files only. So the licences stay separate. This module knows
 //! the replica's program name and arguments, nothing more.
@@ -12,7 +12,8 @@
 //! The same rules serve the command line (`larmorx afni 3dTshift ...`) and the Python wrappers
 //! (`lx.afni.tshift(..., implementation="auto")`, through `larmorx._core`):
 //! - [`REPLICAS`] lists every tool that has a replica: adding one is one line;
-//! - [`find`] looks for the program: the package's environment variable (`LARMORX_GPL_BIN`),
+//! - [`find`] looks for the program: the package's environment variable (`LARMORX_GPL_BIN`,
+//!   `LARMORX_NC_BIN`),
 //!   then the directories the caller gives (the Python environment's scripts directory, or the
 //!   directory of the `larmorx` binary), then `PATH`;
 //! - [`choose`] applies `auto`, `replica` or `original`;
@@ -48,6 +49,16 @@ pub const LARMORX_GPL: Package = Package {
     install: "pip install \"larmorx[exact]\"",
 };
 
+/// The replicas of FSL tools (`crates-nc/`), under the FSL Licence's terms: non-commercial use
+/// only. Installed by name, so that its licence is accepted knowingly (`docs/licensing.md`).
+pub const LARMORX_NC: Package = Package {
+    name: "larmorx-nc",
+    program: "larmorx-nc",
+    env: "LARMORX_NC_BIN",
+    licence: "LicenseRef-FSL",
+    install: "pip install larmorx-nc (FSL Licence: non-commercial use only)",
+};
+
 /// A tool with a replica: `larmorx <family> <tool> ...` runs
 /// `<package.program> <family> <tool> ...`.
 #[derive(Debug)]
@@ -80,6 +91,14 @@ pub const REPLICAS: &[Replica] = &[
         family: "afni",
         tool: "3dUnifize",
         package: &LARMORX_GPL,
+        original: true,
+    },
+    // The clean-room original is `larmorx mri hmc` (`lx.mri.hmc`), which takes mcflirt's
+    // arguments.
+    Replica {
+        family: "fsl",
+        tool: "mcflirt",
+        package: &LARMORX_NC,
         original: true,
     },
 ];

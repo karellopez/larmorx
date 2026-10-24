@@ -88,7 +88,8 @@ fn pow2(e: i32) -> f64 {
         f64::from_bits(((e + 1023) as u64) << 52)
     } else {
         // Below the normal range: scale in two steps (results are normal in the callers).
-        f64::from_bits(((e + 1023 + 600) as u64) << 52) * f64::from_bits(((1023 - 600) as u64) << 52)
+        f64::from_bits(((e + 1023 + 600) as u64) << 52)
+            * f64::from_bits(((1023 - 600) as u64) << 52)
     }
 }
 

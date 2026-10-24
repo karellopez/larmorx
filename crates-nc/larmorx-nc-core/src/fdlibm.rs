@@ -43,7 +43,11 @@ pub fn atan2f(y: f32, x: f32) -> f32 {
         }
     }
     if ix == 0 {
-        return if hy < 0 { -PI_O_2 - TINY } else { PI_O_2 + TINY };
+        return if hy < 0 {
+            -PI_O_2 - TINY
+        } else {
+            PI_O_2 + TINY
+        };
     }
     if ix == 0x7f80_0000 {
         if iy == 0x7f80_0000 {
@@ -62,7 +66,11 @@ pub fn atan2f(y: f32, x: f32) -> f32 {
         };
     }
     if iy == 0x7f80_0000 {
-        return if hy < 0 { -PI_O_2 - TINY } else { PI_O_2 + TINY };
+        return if hy < 0 {
+            -PI_O_2 - TINY
+        } else {
+            PI_O_2 + TINY
+        };
     }
     let k = (iy - ix) >> 23;
     let z = if k > 60 {

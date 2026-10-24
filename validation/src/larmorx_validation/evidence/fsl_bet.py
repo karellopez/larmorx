@@ -574,17 +574,22 @@ def _example_surf(ctx: core.Context, e: fcache.Entry) -> dict:
     )
     for x in diffs:
         _verdict(x, same, "this head", h)
-    k = img.shape[2] // 2
+    # the middle axial slice of the display grid; the crosshair on the skull mask nearest its centre
+    sk = ex.values(ex.key("fsl", "skull")) != 0
+    k = sk.shape[2] // 2
+    pts = np.argwhere(sk[:, :, k])
+    c = np.array(sk.shape[:2]) / 2
+    i, j = pts[int(np.argmin(((pts - c) ** 2).sum(1)))] if len(pts) else c.astype(int)
     default = {
         "output": "skull",
         "plane": "axial",
-        "voxel": [img.shape[0] // 2, img.shape[1] // 2, k],
+        "voxel": [int(i), int(j), k],
         "panels": ["t1", "fsl", "replica", "image"],
         "diffs": ["replica-fsl", "image-fsl"],
         "compare": {"a": "fsl", "b": "replica"},
     }
     out = common.finish(ctx, ex, diffs, copy.deepcopy(SURF_OUTPUTS), default=default,
-                        window_panel="fsl", caption="the skull's mask over the T1-like head.")  # fmt: skip
+                        window_panel="fsl", caption="the crosshair on the skull's mask.")  # fmt: skip
     vers = info.get("versions", {})
     return {
         "id": "betsurf-head",

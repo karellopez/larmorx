@@ -23,6 +23,24 @@ SITE_BUDGET = 500_000_000
 #: One page: its JSON and the images of its examples (about 25 tool pages fit the site budget
 #: at 20 MB on average; a page holds two or three examples as full volumes, the rest as slices).
 PAGE_BUDGET = 40_000_000
+#: Pages whose budget is raised, with the reason. The guard never removes content (the user,
+#: 2026-10-24: the site never shows less than it did): a page over the default budget gets a
+#: raised one here, its reason printed with the sizes.
+PAGE_BUDGETS: dict[str, tuple[int, str]] = {
+    "ants-n4": (
+        60_000_000,
+        "the ANTS-40 example, fMRIPrep's final N4 of ds005454's 0.8 mm 7T T1w template, is a "
+        "whole volume (172 x 214 x 172 voxels shown, about 40 MB) beside the ds000005 example "
+        "(10 MB): an existing 3D view, kept at full resolution",
+    ),
+}
+
+
+def budget(page: str) -> int:
+    """A page's budget: :data:`PAGE_BUDGET`, or its raised one."""
+    return PAGE_BUDGETS.get(page, (PAGE_BUDGET, ""))[0]
+
+
 BLOB_NAME = re.compile(r"\b[0-9a-f]{24}\.(?:bin|webp)\b")
 
 
@@ -75,9 +93,7 @@ def report(site: Path) -> dict:
     }
 
 
-def problems(
-    rep: dict, site_budget: int = SITE_BUDGET, page_budget: int = PAGE_BUDGET
-) -> list[str]:
+def problems(rep: dict, site_budget: int = SITE_BUDGET) -> list[str]:
     out = []
     if rep["total"] > site_budget:
         big = sorted(rep["pages"].items(), key=lambda kv: -kv[1]["total"])[:5]
@@ -86,6 +102,7 @@ def problems(
             "largest pages: " + ", ".join(f"{k} {v['total'] / 1e6:.1f} MB" for k, v in big)
         )
     for name, p in rep["pages"].items():
+        page_budget = budget(name)
         if p["total"] > page_budget:
             big = sorted(p["examples"].items(), key=lambda kv: -kv[1])[:4]
             out.append(
@@ -118,6 +135,8 @@ def table(rep: dict) -> str:
         )
         + f"; budgets: site {SITE_BUDGET / 1e6:.0f} MB, page {PAGE_BUDGET / 1e6:.0f} MB"
     )
+    for name, (b, why) in PAGE_BUDGETS.items():
+        rows.append(f"budget of {name} raised to {b / 1e6:.0f} MB: {why}")
     return "\n".join(rows)
 
 
@@ -142,4 +161,13 @@ def write_manifest(site: Path) -> Path:
     return path
 
 
-__all__ = ["PAGE_BUDGET", "SITE_BUDGET", "problems", "report", "table", "write_manifest"]
+__all__ = [
+    "PAGE_BUDGET",
+    "PAGE_BUDGETS",
+    "SITE_BUDGET",
+    "budget",
+    "problems",
+    "report",
+    "table",
+    "write_manifest",
+]

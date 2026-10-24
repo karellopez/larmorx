@@ -621,6 +621,165 @@ def _example_bold(ctx: core.Context, e: fcache.Entry, o: fcache.Entry) -> dict:
     }
 
 
+#: A data-panel case (larmorx-testdata's panel, 2026-10-24), shown as three slices: AFNI's
+#: default on a child's run with extreme head motion (MRIQC mean FD 4.97 mm), whole field of view.
+PANEL_CASE = "panel-ds000256-CTS203-nofeedback"
+PANEL_BOLD = "openneuro/ds000256/sub-CTS203/func/sub-CTS203_task-restfixationnofeedback_bold.nii.gz"
+PANEL_DATA = {
+    "dataset": "OpenNeuro ds000256 (Greene et al., 2018), snapshot 00002",
+    "subject": "sub-CTS203, task restfixationnofeedback",
+    "licence": "PDDL-1.0",
+}
+#: The clean-room original's runs in this entry (at most 3 threads on the shared machine).
+PANEL_ORIGINAL_RUNS = [
+    ("original", "fix", "1"),
+    ("original-reproduce", "reproduce", "1"),
+    ("original-3", "fix", "3"),
+]
+
+
+def _compute_panel(e: fcache.Entry) -> None:
+    import larmorx_testdata as td
+
+    bold = e.input("BOLD", Path(td.get(PANEL_BOLD)))
+    args = ["-prefix", "{out}.nii.gz", str(bold)]
+    run_all(e, PROGRAM, "", args, [bold])
+    run_original(e, PROGRAM, "", args, runs=PANEL_ORIGINAL_RUNS)
+    e.finish(
+        versions={**versions(PROGRAM), "larmorx": larmorx_version()},
+        command=f"3dAutomask -prefix mask.nii.gz {Path(PANEL_BOLD).name}",
+        threads={"larmorx": ["1", "3"]},
+        settings="AFNI's default (3dAutomask -prefix) on a data-panel run: ds000256 sub-CTS203, "
+        "restfixationnofeedback (164 volumes, extreme head motion); AFNI 25.2.09 (the "
+        "repository's build and fMRIPrep's), the larmorx-gpl replica and the clean-room original "
+        "in both modes (the original also at 3 threads); 3dAutomask is single-threaded",
+    )
+
+
+def panel_entry(ctx: core.Context) -> fcache.Entry:
+    return fcache.entry(
+        ctx.figures_context(),
+        TOOL,
+        PANEL_CASE,
+        "AFNI's default on the data panel's ds000256 sub-CTS203 extreme-motion run: AFNI, "
+        "fMRIPrep's AFNI, the replica and the clean-room original, default and reproduce",
+        _compute_panel,
+    )
+
+
+def _example_panel(ctx: core.Context, pe: fcache.Entry) -> dict:
+    """A data-panel case as three full-resolution slices (``view="slices"``), the whole field of
+    view shown (nothing masked; only margins where every array is exactly 0 are left out)."""
+    import larmorx_testdata as td
+    import nibabel as nib
+
+    from larmorx_validation.evidence import example as exm
+
+    info = pe.info()
+    img = nib.load(td.get(PANEL_BOLD))
+    runs_here = PANELS + ORIGINAL_PANELS
+    extra = [("original-3", "original-3", "larmorx", "LARMORX clean-room original", "3 threads")]
+    arrays = runs(pe, "", MASK_ONLY, runs_here + extra)
+    raw = np.asanyarray(img.dataobj, dtype=np.float64)
+    mean = np.abs(raw).mean(axis=3).astype(np.float32)
+    show = common.unmasked(mean, *[a["mask"] for a in arrays.values()])
+    grid = core.Grid.around(img, show)
+    ex = exm.Example(ctx, grid, show, view="slices")
+    ex.add(exm.Panel("bold-mean", "input", "ds000256 sub-CTS203 BOLD, rest (no feedback)",
+                     f"the mean of |value| over its {img.shape[3]} volumes (computed for this "
+                     "page in float64, shown as float32): what 3dAutomask masks",
+                     {"all": mean}))  # fmt: skip
+    over = {"mask": {"on": "bold-mean", "window": window_of(ex, "bold-mean")}}
+    for pid, _stem, role, label, sub in runs_here:
+        ex.add(exm.Panel(pid, role, label, sub, arrays[pid], overlay=over))
+    d = common.d
+    diffs = [
+        d("original-afni", "original", "afni", "main", "original − AFNI 25.2.09", common.ROLE_LX),
+        d("replica-afni", "replica", "afni", "main", "replica − AFNI 25.2.09", common.ROLE_LX),
+        d("image-afni", "image", "afni", "variability",
+          "fMRIPrep's AFNI − the repository's AFNI build", common.ROLE_ORIG),
+        d("original-replica", "original", "replica", "check",
+          "original − replica (both default mode)", common.ROLE_SELF),
+        d("original-threads", "original-3", "original", "check",
+          "original, 3 threads − 1 thread", common.ROLE_SELF),
+        d("original-repro", "original", "original-reproduce", "check",
+          "original, default − reproduce mode", common.ROLE_SELF),
+        d("replica-repro", "replica", "replica-reproduce", "check",
+          "replica, default − reproduce mode", common.ROLE_SELF),
+    ]  # fmt: skip
+    common.compare_all(ex, diffs, MASK_ONLY, full={"original-3": arrays["original-3"]})
+    same = common.identical(diffs)
+    for x in diffs:
+        _verdict(x, same)
+    original_verdicts(diffs, same)
+    for x in diffs:
+        if x["id"] == "original-threads" and same["original-threads"]:
+            x["reason"] = (
+                "The original's result does not depend on its thread count: the same bytes at 1 "
+                "and 3 threads."
+            )
+    at = common.slice_voxel(ex, "original", "afni", "mask")
+    default = {
+        "output": "mask",
+        "plane": "axial",
+        "voxel": at,
+        "panels": ["bold-mean", "afni", "original", "replica"],
+        "diffs": ["original-afni", "replica-afni", "image-afni"],
+        "compare": {"a": "afni", "b": "original"},
+    }
+    differs = not all(same[i] for i in ("original-afni", "replica-afni"))
+    out = common.finish(
+        ctx, ex, diffs, copy.deepcopy(MASK_ONLY), default=default, window_panel="afni",
+        caption="the crosshair " + ("where the original's mask differs from AFNI's"
+                                    if differs else "at the centre of the field of view")
+        + "; the three slices through it are stored at full resolution.",
+    )  # fmt: skip
+    vers = info.get("versions", {})
+    a = arrays["afni"]["mask"]
+    return {
+        "id": "panel-ds000256-motion",
+        "title": "Data panel: a child's run with extreme head motion",
+        "summary": (
+            "The first case of the data panel on this page: AFNI's default (the mean of the "
+            f"absolute values over the {img.shape[3]} volumes, then its mask) on a 7.5-year-old's "
+            "resting-state run whose head moved 4.97 mm per volume on average (the dataset's "
+            "MRIQC), given to AFNI 25.2.09, fMRIPrep's AFNI, the replica and the clean-room "
+            "original in both modes. The whole field of view is shown, its noise and the mask's "
+            "edges included; as a panel case beside the examples above, it is stored as three "
+            "full-resolution slices."
+        ),
+        "facts": [
+            {
+                "label": "Data",
+                "text": f"{PANEL_DATA['dataset']}, {PANEL_DATA['subject']} "
+                f"({PANEL_DATA['licence']}): {' × '.join(map(str, img.shape))} int16 values; "
+                "the whole field of view shown",
+            },
+            {
+                "label": "Command",
+                "text": f"`3dAutomask -prefix mask.nii.gz {Path(PANEL_BOLD).name}`",
+            },
+            {
+                "label": "Programs",
+                "text": f"{vers.get('afni', '?')}; AFNI {vers.get('afni_in_fmriprep_image', '?')} "
+                f"in fMRIPrep's image; {vers.get('larmorx-gpl', '?')}; "
+                f"{vers.get('larmorx', 'larmorx')}",
+            },
+            {"label": "Mask", "text": f"{int(np.count_nonzero(a)):,} of {a.size:,} voxels"},
+            {
+                "label": "Grid",
+                "text": f"{' × '.join(map(str, img.shape))} voxels of "
+                f"{' × '.join(f'{z:.3g}' for z in img.header.get_zooms()[:3])} mm; shown: the whole field of "
+                f"view ({' × '.join(map(str, grid.shape))}), only margins where every array is 0 left out",
+            },
+        ],
+        **out,
+        "chain": None,
+        "metrics_note": _note(img),
+        "provenance": common.provenance(info, f"{TOOL}/{pe.case}", [PANEL_DATA]),
+    }
+
+
 def _example_peels(ctx: core.Context, e: fcache.Entry, o: fcache.Entry, reg: dict) -> dict:
     import nibabel as nib
     from scipy import ndimage
@@ -1123,6 +1282,7 @@ def export(ctx: core.Context) -> dict:
             _example_ref(ctx, e, o),
             _example_bold(ctx, e, o),
             _example_peels(ctx, e, o, reg),
+            _example_panel(ctx, panel_entry(ctx)),
         ],
     }
 

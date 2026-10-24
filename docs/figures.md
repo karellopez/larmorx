@@ -35,10 +35,14 @@ python -m larmorx_validation evidence all --site ../larmorx_documentation   # ev
 
 Every export ends with the **size guard**: it prints the table of `evidence sizes` and fails
 (exit status 1, naming the largest pages and examples) when the published site would exceed
-**500 MB** (GitHub Pages publishes at most 1 GB) or one page **40 MB** (its JSON and the images
-it names; about 25 tool pages fit the site at 20 MB on average: two or three key examples as
-whole volumes, the rest as slices). Every export also attaches the **credits** (below) and
-refuses an example whose *Data* fact states another licence than the catalog's.
+**500 MB** (GitHub Pages publishes at most 1 GB) or one page its budget: **40 MB** by default
+(its JSON and the images it names; about 25 tool pages fit the site at 20 MB on average), or a
+raised one, with its reason, in `sizes.PAGE_BUDGETS` (N4's page: 60 MB, its ANTS-40 example being
+a 40 MB whole volume). **The guard never removes content** (the user, 2026-10-24: the site never
+shows less, or lower quality, than it did): a page over its budget gets its budget raised, with
+the reason; nothing existing is converted to slices or cropped further. Every export also
+attaches the **credits** (below) and refuses an example whose *Data* fact states another licence
+than the catalog's.
 
 **The images are not in the site's `main` branch.** `static/evidence/blobs/` is git-ignored
 there; the manifest `blobs.sha256` (every blob a JSON names, with its full SHA-256) is committed
@@ -89,24 +93,29 @@ evidence").
   Blobs are named by their SHA-256 (byte-deterministic with this machine's zlib), so an unchanged
   result is the same file. Still posters (lossless WebP) of the default view serve readers
   without JavaScript.
-- **The shown region**: the brain (fMRIPrep's mask, dilated) by default. The whole head
-  (`common.head_mask(data)`: the head above a low threshold, holes filled, dilated; the box is
-  then the head's) only for images whose defacing was checked: larmorx-testdata's `panel.toml`
-  gives each anatomical image of the data panel `show = "head"` or `"brain"`; an image whose face
-  could be recognised is shown brain-masked only, and so is everything computed from it.
+- **The shown region**: the existing examples show the brain (fMRIPrep's mask, dilated), as
+  before. A **data-panel case** shows everything, background, noise, artefacts and every edge
+  included (`common.unmasked(*arrays)`: the box where any array is not 0; outside it every array
+  is exactly 0, so only constant margins are left out), for images whose defacing was checked:
+  larmorx-testdata's `panel.toml` gives each anatomical image of the data panel `show = "head"`
+  or `"brain"`; an image whose face could be recognised is shown brain-masked only, and so is
+  everything computed from it. Cropping never removes anything but margins where every array of
+  the viewer (input, every output, differences, masks, overlays) is exactly constant.
 - **Views** (`Example(ctx, grid, show, view=...)`): `"volume"` ships the whole display grid
-  (every slice, for the two or three key datasets of a tool); `"slices"` ships three
-  full-resolution orthogonal slices, one per plane, through one voxel, each cropped to the shown
-  region in that plane plus 2 voxels, the arrays stored as the slices one after the other
-  (axial, coronal, sagittal; for a series, volume after volume) with each plane's box and offset
-  in the example's `view`, so the viewer maps a voxel to its value exactly. The voxel is the
-  default view's (`common.finish` cuts there): `common.slice_voxel(ex, a, b, output)` gives the
-  voxel where the main comparison differs most over the whole shown region, or the region's
-  centre where nothing differs. Every metric is still computed offline over every voxel of the
-  files; only *where the shown data differ most* (the "go to the largest difference" button and
-  the viewers' check) is sought in the three slices. The model: N4's ANTS-40 example
-  (`corrections.Spec(..., view="slices")`), a 0.8 mm 7T image that took 40 MB as a volume and
-  takes 0.7 MB as slices.
+  (every existing example, and the two or three key datasets of a tool); `"slices"` ships three
+  full-resolution orthogonal slices, one per plane, through one voxel, **for new data-panel cases
+  only, added beside the existing examples: an existing volume is never converted** (the user,
+  2026-10-24). Each slice is cropped only where every array is exactly constant (every array 0,
+  the display mask the value recorded as the plane's `outside_mask`, which the viewer draws
+  exactly); the arrays are stored as the slices one after the other (axial, coronal, sagittal;
+  for a series, volume after volume) with each plane's box and offset in the example's `view`, so
+  the viewer maps a voxel to its value exactly. The voxel is the default view's (`common.finish`
+  cuts there): `common.slice_voxel(ex, a, b, output)` gives the voxel where the main comparison
+  differs most over the whole shown region, or the region's centre where nothing differs. Every
+  metric is still computed offline over every voxel of the files; only *where the shown data
+  differ most* (the "go to the largest difference" button and the viewers' check) is sought in
+  the three slices. The model: 3dAutomask's data-panel case (`afni_automask._example_panel`:
+  AFNI's default on ds000256's extreme-motion child run, the whole field of view).
 - **Credits** (`evidence/credits.py`): every dataset an example names (an OpenNeuro accession, a
   TemplateFlow template) gets its credit line from larmorx-testdata's catalog (title, version,
   DOI, licence, citation): the example's `credits` and the page's `credits`, `cases_credits` for
@@ -165,9 +174,11 @@ with itself (thread counts, builds, versions) carry no verdict: they are the yar
    band uses, fMRIPrep's own build if it differs; larmorx in both modes and at 1 and 12 threads.
    Keep it to minutes.
 3. The view: `view="volume"` for the tool's two or three key panel datasets, `view="slices"`
-   (cut at `common.slice_voxel`) for the other panel cases; panels in their files' own types
-   (`common.stored`); the head only where `panel.toml` allows it. The page must stay within the
-   40 MB budget (`evidence sizes`).
+   (cut at `common.slice_voxel`) for the other, new panel cases, added beside the existing
+   examples (never replacing one); panels in their files' own types (`common.stored`); a panel
+   case's whole field of view (`common.unmasked`) only where `panel.toml` allows it. Check the
+   page against its budget (`evidence sizes`); over it, raise the budget with the reason in
+   `sizes.PAGE_BUDGETS`, never remove or reduce content.
 4. The example: panels (`Example.add`; order them so the closest references come first), the
    comparisons (`_diffs`), their verdicts from the metrics, the chain of causes where larmorx
    and fMRIPrep differ, a default view worth seeing (a slice through tissue where the tool

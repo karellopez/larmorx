@@ -224,26 +224,22 @@ def slice_voxel(ex, a: str, b: str, output: str, t: int | None = None) -> list[i
     return [int(i) for i in idx[int(np.argmin(((idx - c) ** 2).sum(axis=1)))]]
 
 
-def head_mask(data: np.ndarray, fraction: float = 0.08, margin: int = 2) -> np.ndarray:
-    """The head in an anatomical image, for an example that shows the whole head (only for
-    images whose defacing was checked: larmorx-testdata's ``panel.toml``, ``show = "head"``):
-    the voxels above ``fraction`` of the smoothed image's 99th percentile, the largest connected
-    part, its holes filled slice by slice and in 3D, dilated by ``margin`` voxels."""
-    from scipy import ndimage
-
-    a = np.asarray(data, dtype=np.float64)
-    if a.ndim == 4:
-        a = a.mean(axis=3)
-    s = ndimage.gaussian_filter(a, 1.0)
-    m = s > fraction * float(np.percentile(s, 99))
-    lab, n = ndimage.label(m)
-    if n:
-        sizes = ndimage.sum(m, lab, range(1, n + 1))
-        m = lab == 1 + int(np.argmax(sizes))
-    m = ndimage.binary_fill_holes(m)
-    for z in range(m.shape[2]):
-        m[..., z] = ndimage.binary_fill_holes(m[..., z])
-    return ndimage.binary_dilation(m, iterations=margin) if margin else m
+def unmasked(*arrays: np.ndarray) -> np.ndarray:
+    """The shown region of an example that shows everything (a data-panel case: background,
+    noise, artefacts and every edge included): every voxel inside the box where any of
+    ``arrays`` (on the file's grid; a series counts each volume) is not 0. Outside that box
+    every array is exactly 0, so cropping to it removes only constant margins. Only for images
+    whose defacing was checked (larmorx-testdata's ``panel.toml``, ``show = "head"``); an image
+    whose face could be recognised is shown brain-masked."""
+    nz = np.zeros(arrays[0].shape[:3], dtype=bool)
+    for a in arrays:
+        nz |= (a != 0).any(axis=3) if a.ndim == 4 else a != 0
+    show = np.zeros_like(nz)
+    idx = np.argwhere(nz)
+    if idx.size:
+        lo, hi = idx.min(0), idx.max(0) + 1
+        show[lo[0] : hi[0], lo[1] : hi[1], lo[2] : hi[2]] = True
+    return show
 
 
 def centre_view(ex, plane: str = "axial") -> tuple[list[int], int]:

@@ -6,12 +6,13 @@ default view (for pages read without JavaScript).
 **Views.** An example ships either its whole display grid (``view="volume"``: every slice of
 the box around the shown region, for a tool's two or three key datasets) or three orthogonal
 full-resolution slices through one voxel (``view="slices"``: the voxel where the main
-comparison differs most, or the region's centre where nothing differs; every other panel-
-dataset case). Each slice is cropped to the shown region's box in that plane plus
-:data:`SLICE_MARGIN` voxels, and the arrays are stored as the slices one after the other
-(axial, coronal, sagittal; for a series, volume by volume), each with its offset, so the viewer
-maps a voxel to its value exactly. Every metric is still computed offline over every voxel of
-the files: a view decides only what the reader can browse."""
+comparison differs most, or the region's centre where nothing differs; for new data-panel cases
+only, added beside the existing examples, never replacing a volume). Each slice is cropped only
+where every array is exactly constant (the constant recorded, so the viewer draws it exactly),
+and the arrays are stored as the slices one after the other (axial, coronal, sagittal; for a
+series, volume by volume), each with its offset, so the viewer maps a voxel to its value
+exactly. Every metric is still computed offline over every voxel of the files: a view decides
+only what the reader can browse."""
 
 from __future__ import annotations
 
@@ -36,8 +37,6 @@ from larmorx_validation.evidence.core import (
 VIEWS = ("volume", "slices")
 #: The planes of a slices view, in their order in the stored arrays.
 PLANE_ORDER = ("axial", "coronal", "sagittal")
-#: The voxels kept around the shown region in each slice of a slices view.
-SLICE_MARGIN = 2
 
 
 @dataclass
@@ -187,8 +186,11 @@ class Example:
 
     # ------------------------------------------------------------------ slices
     def cut(self, voxel) -> None:
-        """A slices view: the three planes through ``voxel`` (display voxel), each cropped to
-        the shown region in it, and every array encoded on them."""
+        """A slices view: the three planes through ``voxel`` (display voxel), and every array
+        encoded on them. A plane is cropped only where every array is exactly constant: the box
+        keeps every voxel where any array (input, output, mask) is not 0 or the display mask
+        differs from its value at the plane's corner; outside the box every array is 0 and the
+        mask is that corner value (``outside_mask``), which the viewer draws exactly."""
         if self.view != "slices":
             raise ValueError("cut() is for a slices view")
         voxel = [int(v) for v in voxel[:3]]
@@ -200,14 +202,23 @@ class Example:
         for name in PLANE_ORDER:
             s = PLANE_AXES[name][0]
             m2 = np.take(self.mask, voxel[s], axis=s)
-            idx = np.argwhere(m2)
+            corner = int(m2[0, 0])
+            keep = m2 != corner
+            for a in self.shown.values():
+                a2 = np.take(a, voxel[s], axis=s)
+                keep |= (a2 != 0).any(axis=2) if a2.ndim == 3 else a2 != 0
+            idx = np.argwhere(keep)
             if idx.size:
-                lo = np.maximum(idx.min(0) - SLICE_MARGIN, 0)
-                hi = np.minimum(idx.max(0) + 1 + SLICE_MARGIN, m2.shape)
-            else:  # nothing shown in this plane: one voxel, outside the mask
+                lo, hi = idx.min(0), idx.max(0) + 1
+            else:  # every array constant in this plane: one voxel
                 lo, hi = np.zeros(2, int), np.ones(2, int)
             box = [int(lo[0]), int(lo[1]), int(hi[0] - lo[0]), int(hi[1] - lo[1])]
-            self.planes[name] = {"index": voxel[s], "box": box, "offset": off}
+            self.planes[name] = {
+                "index": voxel[s],
+                "box": box,
+                "offset": off,
+                "outside_mask": corner,
+            }
             off += box[2] * box[3]
         self.per_volume = off
         for key, spec, cands, pred, meta in self.pending:

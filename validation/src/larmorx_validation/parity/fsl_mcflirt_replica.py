@@ -629,6 +629,10 @@ EDGES: dict[str, Edge] = {
         ("-in", "@in", "-out", "out", "-cost", "corratio", "-bins", "2", "-stages", "1", "-mats"),
         description="the correlation ratio with 2 bins",
     ),
+    "in-missing": Edge(
+        ("-in", "nosuch", "-out", "out", "-mats"),
+        description="-in names no file",
+    ),
     "init-missing": Edge(
         ("-in", "@in", "-out", "out", "-init", "nosuch.mat", "-mats"),
         description="-init names no file",

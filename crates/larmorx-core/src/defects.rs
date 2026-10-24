@@ -394,6 +394,8 @@ defects! {
         "-rmsrel and -rmsabs create the .mat directory without -mats (holding only the reference's identity)";
     FSL_14 = "FSL-14", "mcflirt", true,
         "one NaN or infinite voxel makes the volume's centre of mass, and so its matrix, NaN";
+    FSL_21 = "FSL-21", "mcflirt", true,
+        "with a histogram cost (corratio, mutualinfo, normmi, woods) and -bins below 8, the first stage's histogram has no bins (-bins divided by the 8 mm scale): the costs are degenerate and the matrices arbitrary, and corratio writes before its arrays and aborts";
     FSL_20 = "FSL-20", "mcflirt", true,
         "when the .mat directory cannot be created for another reason than its permissions (a missing parent directory), mcflirt prints an error and exits with status 0, writing neither the matrices, the .par and .rms files nor the corrected series";
     ITK_50 = "ITK-50", "ITK", true,

@@ -65,6 +65,16 @@ pub struct FslError {
 }
 
 impl FslError {
+    /// An abort by the C library itself (no C++ exception): it prints `msg` and raises
+    /// SIGABRT, as glibc's allocator does when it finds its heap corrupted.
+    pub fn library_abort(msg: impl Into<String>) -> FslError {
+        FslError {
+            printed: vec![msg.into()],
+            type_name: "",
+            what: String::new(),
+        }
+    }
+
     /// `imthrow(msg, n)`: prints `Image Exception : #n :: msg`, throws an `std::runtime_error`.
     pub fn imthrow(msg: impl Into<String>, n: i32) -> FslError {
         let msg = msg.into();
@@ -86,6 +96,9 @@ impl FslError {
 
     /// What std::terminate adds on standard error.
     pub fn terminate_text(&self) -> String {
+        if self.type_name.is_empty() {
+            return String::new();
+        }
         format!(
             "terminate called after throwing an instance of '{}'\n  what():  {}\n",
             self.type_name, self.what

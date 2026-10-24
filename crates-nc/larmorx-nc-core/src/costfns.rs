@@ -52,6 +52,10 @@ pub struct Costfn {
     /// FSL-14's correction: points whose reference or interpolated value is not finite are
     /// left out of the cost (FSL counts them, so one NaN makes the cost NaN).
     pub skip_nonfinite: bool,
+    /// Set when a correlation ratio ran with no bins (FSL-21): FSL's code then adds the last
+    /// bin into index -1, before its arrays, which corrupts the allocator's bookkeeping, and
+    /// the arrays' release aborts (glibc: "double free or corruption (out)").
+    pub heap_corrupted: bool,
 }
 
 impl Costfn {
@@ -72,6 +76,7 @@ impl Costfn {
             bindex: Vec::new(),
             count: 0,
             skip_nonfinite: false,
+            heap_corrupted: false,
         }
     }
 
@@ -146,7 +151,7 @@ impl Costfn {
                 }
             }
             CostType::CorrRatio => {
-                let c = if self.smoothsize > 0.0 {
+                let (c, corrupted) = if self.smoothsize > 0.0 {
                     p_corr_ratio_smoothed(
                         &self.refvol,
                         &self.testvol,
@@ -166,6 +171,7 @@ impl Costfn {
                         skip,
                     )
                 };
+                self.heap_corrupted |= corrupted;
                 (1.0 - f64::from(c)) as f32
             }
             CostType::Woods => p_woods_fn(
@@ -730,7 +736,8 @@ fn min_ff(a: f32, b: f32) -> f32 {
     if a < b { a } else { b }
 }
 
-/// `p_corr_ratio_smoothed`: 1 - the weighted correlation ratio over the reference's bins.
+/// `p_corr_ratio_smoothed`: 1 - the weighted correlation ratio over the reference's bins,
+/// and whether FSL's code writes before its arrays (no bins, FSL-21).
 pub fn p_corr_ratio_smoothed(
     vref: &Volume,
     vtest: &Volume,
@@ -739,7 +746,7 @@ pub fn p_corr_ratio_smoothed(
     no_bins: i32,
     smoothsize: f32,
     skip: bool,
-) -> f32 {
+) -> (f32, bool) {
     let g = Geometry::new(vref, vtest, aff);
     let sm = smooth3(smoothsize, vtest);
     let (a11, a21, a31) = (g.a[0], g.a[4], g.a[8]);
@@ -791,7 +798,10 @@ fn corr_ratio_finish(
     sumy2: &mut [f32],
     nb: usize,
     enough: impl Fn(f32) -> bool,
-) -> f32 {
+) -> (f32, bool) {
+    // With no bins, FSL adds bin 0 into bin -1, before the arrays (FSL-21): any non-zero
+    // value there corrupts the allocator's bookkeeping. The defined part is reproduced.
+    let corrupted = nb == 0 && (numy[0] != 0.0 || sumy[0] != 0.0 || sumy2[0] != 0.0);
     if nb >= 1 {
         numy[nb - 1] += numy[nb];
         sumy[nb - 1] += sumy[nb];
@@ -820,14 +830,16 @@ fn corr_ratio_finish(
     if var > 0.0 {
         corr_ratio /= var;
     }
-    if numtoty <= 1.0 || var <= 0.0 {
+    let value = if numtoty <= 1.0 || var <= 0.0 {
         0.0
     } else {
         (1.0 - f64::from(corr_ratio)) as f32
-    }
+    };
+    (value, corrupted)
 }
 
-/// `p_corr_ratio` (counts as integers, converted to float where FSL converts them).
+/// `p_corr_ratio` (counts as integers, converted to float where FSL converts them), and
+/// whether FSL's code writes before its arrays (no bins, FSL-21).
 pub fn p_corr_ratio(
     vref: &Volume,
     vtest: &Volume,
@@ -835,7 +847,7 @@ pub fn p_corr_ratio(
     aff: &Mat,
     no_bins: i32,
     skip: bool,
-) -> f32 {
+) -> (f32, bool) {
     let g = Geometry::new(vref, vtest, aff);
     let (a11, a21, a31) = (g.a[0], g.a[4], g.a[8]);
     let nb = no_bins.max(0) as usize;
@@ -874,6 +886,8 @@ pub fn p_corr_ratio(
             }
         }
     }
+    // With no bins, FSL adds bin 0 into bin -1, before its arrays (FSL-21).
+    let corrupted = nb == 0 && (numy[0] != 0 || sumy[0] != 0.0 || sumy2[0] != 0.0);
     if nb >= 1 {
         numy[nb - 1] += numy[nb];
         sumy[nb - 1] += sumy[nb];
@@ -902,11 +916,12 @@ pub fn p_corr_ratio(
     if var > 0.0 {
         corr_ratio /= var;
     }
-    if numtoty <= 1 || var <= 0.0 {
+    let value = if numtoty <= 1 || var <= 0.0 {
         0.0
     } else {
         (1.0 - f64::from(corr_ratio)) as f32
-    }
+    };
+    (value, corrupted)
 }
 
 /// `p_woods_fn`: the count-weighted coefficients of variation of the test values in the

@@ -102,6 +102,9 @@ struct State {
 struct Search<'a> {
     o: &'a Options,
     st: &'a State,
+    /// The length of the volume's messages when a cost evaluation corrupted FSL's heap
+    /// (FSL-21), where mcflirt's run ends.
+    corrupted_at: std::cell::Cell<Option<usize>>,
 }
 
 /// The result of registering one volume: its matrix and what it printed.
@@ -162,7 +165,11 @@ impl Search<'_> {
             cerr.s("\n");
         }
         cf.costtype = self.st.maincostfn;
-        cf.cost(&affmat)
+        let c = cf.cost(&affmat);
+        if cf.heap_corrupted && self.corrupted_at.get().is_none() {
+            self.corrupted_at.set(Some(cerr.text.len()));
+        }
+        c
     }
 
     /// `usroptimise(matresult, dof, 1, new_tolerance)` → `optimise_strategy1`.
@@ -522,8 +529,20 @@ fn register_volume_mut(
     cf.set_no_bins(o.no_bins / scaling as i32);
     cf.smoothsize = st.smoothsize;
     cf.skip_nonfinite = mode.fix();
-    let search = Search { o, st };
+    let search = Search {
+        o,
+        st,
+        corrupted_at: std::cell::Cell::new(None),
+    };
     let res = search.usroptimise(&mut cf, &offsettrans, new_tolerance, &mut cerr);
+    if let Some(len) = search.corrupted_at.get() {
+        // FSL-21, reproduced (the corrected run refuses such -bins first): the correlation
+        // ratio with no bins wrote before its arrays, and glibc aborts when they are released.
+        return Err(FslError::library_abort(format!(
+            "{}double free or corruption (out)",
+            &cerr.text[..len]
+        )));
+    }
     // finalmat = offsettrans * initmat (the identity).
     let finalmat = arma::mul_tinysq(&res, &Mat::eye(4));
     Ok(VolumeResult {
@@ -619,6 +638,11 @@ impl Run<'_> {
             );
         }
         if self.mode.fix() && self.o.gdtflag {
+            self.notice(
+                &defects::FSL_04,
+                "-gdt is refused: mcflirt registers each volume's gradient image to the \
+                 reference's plain image",
+            );
             return Err(End::Refuse(
                 "-gdt (registration of gradient images) is not supported: mcflirt computes the \
                  reference's gradient and discards it (FSL-04)"
@@ -1047,6 +1071,25 @@ impl Run<'_> {
     /// accepts and then aborts on.
     fn precheck(&mut self, timeseries: &Volume) -> Result<(), End> {
         let n = self.st.no_volumes;
+        let histogram = matches!(
+            self.st.maincostfn,
+            CostType::CorrRatio | CostType::MutualInfo | CostType::NormMI | CostType::Woods
+        );
+        if histogram && self.o.no_stages >= 1 && self.o.no_bins / 8 == 0 {
+            self.notice(
+                &defects::FSL_21,
+                format!(
+                    "-bins {} is refused with this cost: the first stage's histogram would have \
+                     no bins",
+                    self.o.no_bins
+                ),
+            );
+            return Err(End::Refuse(format!(
+                "-bins {}: the histogram costs need at least 8 bins (the first stage uses -bins / \
+                 8 of them; mcflirt computes them with none, FSL-21)",
+                self.o.no_bins
+            )));
+        }
         if !self.o.reffileflag && (self.st.refnum < 0 || self.st.refnum >= n) {
             return Err(End::Refuse(format!(
                 "-refvol {}: invalid volume index for a series of {n} volumes (mcflirt aborts: \
@@ -1352,6 +1395,13 @@ impl Run<'_> {
                 }
                 Err(DirError::Other(d)) => {
                     if self.mode.fix() {
+                        self.notice(
+                            &defects::FSL_20,
+                            format!(
+                                "the directory {d} cannot be created: an error; mcflirt exits \
+                                 with status 0 and writes nothing more"
+                            ),
+                        );
                         return Err(End::Refuse(format!(
                             "cannot create the directory {d} for the matrices (FSL-20: mcflirt \
                              prints \"Error!: Unknown Log directory return value\" and exits \

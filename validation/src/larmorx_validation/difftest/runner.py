@@ -986,7 +986,8 @@ def run_heavy(
 
 
 def heavy_queue(out: Path, only: set[str] | None = None) -> list[dict]:
-    """The heavy cases of ``out`` still without a result (and named in ``only``), the quickest
+    """The heavy cases of ``out`` still without a result (and named in ``only``, which also
+    runs a case recorded "pending: larger machine"), the quickest
     first by their predicted hours (``heavy-prediction.json``, from ``heavy_predict.py``; a case
     without a prediction after those with one, in queue order)."""
     from larmorx_validation.difftest import report
@@ -1000,7 +1001,11 @@ def heavy_queue(out: Path, only: set[str] | None = None) -> list[dict]:
     rows = []
     for i, h in enumerate(report.heavy(out)):
         name = f"{h['tool']}:{h['seed']}:{h['n']}"
-        if h.get("result") or (only is not None and name not in only):
+        if only is not None and name not in only:
+            continue
+        # A case recorded "pending: larger machine" runs only where it is named.
+        verdict = str((h.get("result") or {}).get("verdict", ""))
+        if h.get("result") and not (only is not None and verdict.startswith("pending")):
             continue
         rows.append((predicted.get(name, float("inf")), i, h))
     return [h for _, _, h in sorted(rows, key=lambda r: (r[0], r[1]))]

@@ -349,6 +349,16 @@ def test_the_heavy_queue_runs_the_quickest_first_and_only_what_is_named(tmp_path
     )
     assert [h["n"] for h in runner.heavy_queue(out)] == [2, 1, 4]
     assert [h["n"] for h in runner.heavy_queue(out, {"ants-n4:r:1", "ants-n4:r:3"})] == [1]
+    # A case pending a larger machine waits, unless it is named.
+    with (out / "heavy-results.jsonl").open("a") as f:
+        f.write(
+            json.dumps(
+                {"tool": "ants-n4", "seed": "r", "n": 1, "verdict": "pending: larger machine"}
+            )
+            + "\n"
+        )
+    assert [h["n"] for h in runner.heavy_queue(out)] == [2, 4]
+    assert [h["n"] for h in runner.heavy_queue(out, {"ants-n4:r:1"})] == [1]
 
 
 def test_a_tool_held_to_thresholds_gets_one_group_per_implementation(tmp_path):

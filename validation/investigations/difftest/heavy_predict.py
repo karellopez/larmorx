@@ -263,6 +263,8 @@ def main() -> int:
                     if "ants_hours" in r
                     else ""
                 )
+                # Over 1 TiB: beyond any machine; over this machine's heavy box: pending, to
+                # run on a larger machine (heavy_pending.py adds its command line).
                 verdict = (
                     "beyond any machine"
                     if min(r["ants_gib"], r["larmorx_gib"]) > 1024

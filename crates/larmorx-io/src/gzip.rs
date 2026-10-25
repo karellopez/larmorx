@@ -104,12 +104,19 @@ impl<W: Write> ParallelGzEncoder<W> {
 }
 
 impl<W: Write> Write for ParallelGzEncoder<W> {
+    /// Takes at most what fills the batch, so the encoder never holds more than one batch of
+    /// input (`write_all` of a whole image comes back for the rest): a full copy of the image
+    /// was held before (random testing, 2026-10-25: ResampleImageBySpacing at 2.8 times ANTs'
+    /// peak memory). The blocks start at the same offsets of the stream however the input is
+    /// split, so the output is the same, byte for byte.
     fn write(&mut self, buf: &[u8]) -> io::Result<usize> {
-        self.pending.extend_from_slice(buf);
+        let room = BLOCK_SIZE * BATCH_BLOCKS - self.pending.len();
+        let n = buf.len().min(room);
+        self.pending.extend_from_slice(&buf[..n]);
         if self.pending.len() >= BLOCK_SIZE * BATCH_BLOCKS {
             self.flush_blocks()?;
         }
-        Ok(buf.len())
+        Ok(n)
     }
 
     /// Does nothing: blocks are only emitted when complete, to keep the output independent of
@@ -211,6 +218,19 @@ mod tests {
                 .unwrap();
             assert_eq!(back, data, "n={n}");
         }
+    }
+
+    /// One `write_all` of an image several batches long never holds more than one batch of it.
+    #[test]
+    fn a_large_write_holds_one_batch_at_most() {
+        let batch = BLOCK_SIZE * BATCH_BLOCKS;
+        let data = sample(2 * batch + 7);
+        let mut enc = ParallelGzEncoder::new(Vec::new(), 1).unwrap();
+        enc.write_all(&data).unwrap();
+        assert!(enc.pending.len() < batch, "{}", enc.pending.len());
+        assert_eq!(enc.pending.capacity(), batch);
+        let gz = enc.finish().unwrap();
+        assert_eq!(gz, compress(&data, 1, 1, 4096));
     }
 
     #[test]

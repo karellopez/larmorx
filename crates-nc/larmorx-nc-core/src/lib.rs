@@ -17,8 +17,8 @@
 //! - [`costfns`], [`optimise`], [`miscmaths`]: FLIRT's cost functions, miscmaths' line-search
 //!   optimiser and the transform algebra (Euler angles, `compose_aff`/`decompose_aff`,
 //!   `rms_deviation`, `read_ascii_matrix`).
-//! - [`cnum`], [`x87`], [`fdlibm`]: C semantics of FSL's x86-64 build (float-to-integer
-//!   conversions, `long double`, `printf` and stream formatting, glibc's `atan2f`).
+//! - [`cnum`], [`x87`], [`fdlibm`], [`sse`]: C semantics of FSL's x86-64 build (float-to-integer
+//!   conversions, `long double`, `printf` and stream formatting, glibc's `atan2f`, SSE's NaNs).
 //!
 //! The API is written for the other FSL tools to come (FLIRT, BET, FAST, topup): a tool crate
 //! (`larmorx-nc-mcflirt`, `larmorx-nc-bet`, ...) builds on these modules, and code two tools share
@@ -39,6 +39,7 @@ pub mod newimagefns;
 pub mod nifti;
 pub mod optimise;
 pub mod settings;
+pub mod sse;
 pub mod volume;
 pub mod x87;
 

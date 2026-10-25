@@ -115,10 +115,12 @@ fn main() {
                 println!("call {n} (0-based): parameters {diff:?} differ");
                 for &i in &diff {
                     println!(
-                        "   p{}: FSL {:.17e}, replica {:.17e}",
+                        "   p{}: FSL {:.17e} ({:#018x}), replica {:.17e} ({:#018x})",
                         i + 1,
                         want[i],
-                        got[i]
+                        want[i].to_bits(),
+                        got[i],
+                        got[i].to_bits()
                     );
                 }
                 explain(&m);

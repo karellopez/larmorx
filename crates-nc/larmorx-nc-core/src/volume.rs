@@ -26,6 +26,7 @@ use crate::arma::{self, Mat};
 use crate::cnum;
 use crate::nifti::{self, NiftiExtension, NiftiHeader, dt};
 use crate::settings::Settings;
+use crate::sse;
 
 /// `FSL_RADIOLOGICAL`, `FSL_NEUROLOGICAL`, `FSL_INCONSISTENT`, `FSL_ZERODET`.
 pub const RADIOLOGICAL: i32 = -1;
@@ -458,14 +459,53 @@ impl Volume {
         v_cog[0] += vx;
         v_cog[1] += vy;
         v_cog[2] += vz;
+        if v_cog.iter().any(|c| c.is_nan()) || total.is_nan() {
+            // NaN or infinite voxels: the same sums with SSE's NaNs.
+            (v_cog, total) = self.cog_sums_sse(vmin, nlim);
+        }
         if total.abs() < 1e-5 {
             warnings.push("WARNING::in calculating COG, total = 0.0".to_owned());
             total = 1.0;
         }
-        v_cog[0] /= total;
-        v_cog[1] /= total;
-        v_cog[2] /= total;
+        for c in v_cog.iter_mut() {
+            *c = sse::div_f64(*c, total);
+        }
         v_cog
+    }
+
+    /// [`Volume::calc_cog`]'s sums (`v_cog`, `total`) with every operation's NaN as SSE gives
+    /// it, in the source's order (`vx += val*x`: `vx` first).
+    #[cold]
+    fn cog_sums_sse(&self, vmin: f32, nlim: i64) -> ([f64; 3], f64) {
+        use sse::{add_f64 as add, mul_f64 as mul};
+        let mut v_cog = [0.0f64; 3];
+        let (mut total, mut vx, mut vy, mut vz, mut tot) = (0.0f64, 0.0f64, 0.0f64, 0.0f64, 0.0f64);
+        let mut n: i64 = 0;
+        for z in 0..self.zsize() {
+            for y in 0..self.ysize() {
+                for x in 0..self.xsize() {
+                    let val = f64::from(sse::sub_f32(self.get(x, y, z), vmin));
+                    vx = add(vx, mul(val, x as f64));
+                    vy = add(vy, mul(val, y as f64));
+                    vz = add(vz, mul(val, z as f64));
+                    tot = add(tot, val);
+                    n += 1;
+                    if n > nlim {
+                        n = 0;
+                        total = add(total, tot);
+                        v_cog[0] = add(v_cog[0], vx);
+                        v_cog[1] = add(v_cog[1], vy);
+                        v_cog[2] = add(v_cog[2], vz);
+                        (tot, vx, vy, vz) = (0.0, 0.0, 0.0, 0.0);
+                    }
+                }
+            }
+        }
+        total = add(total, tot);
+        v_cog[0] = add(v_cog[0], vx);
+        v_cog[1] = add(v_cog[1], vy);
+        v_cog[2] = add(v_cog[2], vz);
+        (v_cog, total)
     }
 
     /// `backgroundval()` (`calc_bval(vol, 2)`): the 10th percentile of the values in a 2-voxel

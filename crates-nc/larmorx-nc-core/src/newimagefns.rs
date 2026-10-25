@@ -275,6 +275,24 @@ pub fn gradient(source: &Volume) -> Volume {
                 // sqrt(float) and sqrt(double) rounded to float agree (no double rounding for
                 // the square root).
                 grad.data[k] = (vx * vx + vy * vy + vz * vz).sqrt();
+                if grad.data[k].is_nan() {
+                    // NaN or infinite voxels: the same sums with SSE's NaNs.
+                    use crate::sse::{add_f32 as add, mul_f32 as mul};
+                    let (mut vx, mut vy, mut vz) = (0.0f32, 0.0f32, 0.0f32);
+                    for mz in -1i64..=1 {
+                        for my in -1i64..=1 {
+                            for mx in -1i64..=1 {
+                                let v = source.get(x + mx, y + my, z + mz);
+                                let i = ((mx + 1) + 3 * ((my + 1) + 3 * (mz + 1))) as usize;
+                                vx = add(vx, mul(v, m[0][i]));
+                                vy = add(vy, mul(v, m[1][i]));
+                                vz = add(vz, mul(v, m[2][i]));
+                            }
+                        }
+                    }
+                    let s = add(add(mul(vx, vx), mul(vy, vy)), mul(vz, vz));
+                    grad.data[k] = crate::sse::sqrt_f32(s);
+                }
             }
         }
     }

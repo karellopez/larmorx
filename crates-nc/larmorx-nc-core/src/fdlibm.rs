@@ -36,7 +36,8 @@ pub fn atan2f(y: f32, x: f32) -> f32 {
     let hy = y.to_bits() as i32;
     let iy = hy & 0x7fff_ffff;
     if ix > 0x7f80_0000 || iy > 0x7f80_0000 {
-        return x + y;
+        // `x + y`: glibc's binary adds `y` into `x` (`addss %xmm2,%xmm0`), so `x`'s NaN wins.
+        return crate::sse::add_f32(x, y);
     }
     if hx == 0x3f80_0000 {
         return atanf(y);
@@ -141,7 +142,7 @@ pub fn atanf_with_at0(x: f32, at0: f32) -> f32 {
     let id: i32;
     if ix >= 0x4c00_0000 {
         if ix > 0x7f80_0000 {
-            return x + x;
+            return crate::sse::add_f32(x, x);
         }
         return if hx > 0 {
             ATANHI[3] + ATANLO[3]
@@ -196,6 +197,15 @@ mod tests {
         assert_eq!(atan2f(1.0, 0.0), f32::from_bits(0x3fc9_0fdb));
         assert!(atan2f(f32::NAN, 1.0).is_nan());
         assert_eq!(atan2f(1.0, 1.0), atanf(1.0));
+        // Two NaNs: glibc's binary passes on x's (atan2f(y, x)); one NaN: that one.
+        let (p, n) = (f32::from_bits(0x7fc0_0000), f32::from_bits(0xffc0_0000));
+        assert_eq!(atan2f(p, n).to_bits(), 0xffc0_0000);
+        assert_eq!(atan2f(n, p).to_bits(), 0x7fc0_0000);
+        assert_eq!(
+            atan2f(f32::from_bits(0x7fc1_1111), 2.0).to_bits(),
+            0x7fc1_1111
+        );
+        assert_eq!(atanf(f32::from_bits(0xffc2_2222)).to_bits(), 0xffc2_2222);
         let r = atan2f(0.3, 0.9);
         assert!((f64::from(r) - (0.3f64).atan2(0.9)).abs() < 1e-7);
         let r = atan2f(-0.3, -0.9);

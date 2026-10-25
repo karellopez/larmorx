@@ -11,6 +11,7 @@
 
 use crate::cnum;
 use crate::kernel::{Kernel, kernelval};
+use crate::sse;
 use crate::volume::{Extrapolation, Interpolation, Volume};
 
 /// `q_tri_interpolation(v000, ..., dx, dy, dz)` (newimage.cc): x, then y, then z.
@@ -35,7 +36,27 @@ pub fn q_tri(
     let temp4 = (v111 - v011) * dx + v011;
     let temp5 = (temp3 - temp1) * dy + temp1;
     let temp6 = (temp4 - temp2) * dy + temp2;
-    (temp6 - temp5) * dz + temp5
+    let r = (temp6 - temp5) * dz + temp5;
+    if r.is_nan() {
+        // A NaN or infinite neighbour: the same steps with SSE's NaNs (crate::sse).
+        return q_tri_sse([v000, v001, v010, v011, v100, v101, v110, v111], dx, dy, dz);
+    }
+    r
+}
+
+/// [`q_tri`] with every operation's NaN as SSE gives it (operands in the source's order).
+#[cold]
+fn q_tri_sse(v: [f32; 8], dx: f32, dy: f32, dz: f32) -> f32 {
+    use crate::sse::{add_f32 as add, mul_f32 as mul, sub_f32 as sub};
+    let [v000, v001, v010, v011, v100, v101, v110, v111] = v;
+    let lerp = |a: f32, b: f32, t: f32| add(mul(sub(b, a), t), a);
+    let temp1 = lerp(v000, v100, dx);
+    let temp2 = lerp(v001, v101, dx);
+    let temp3 = lerp(v010, v110, dx);
+    let temp4 = lerp(v011, v111, dx);
+    let temp5 = lerp(temp1, temp3, dy);
+    let temp6 = lerp(temp2, temp4, dy);
+    lerp(temp5, temp6, dz)
 }
 
 /// `MISCMATHS::round(float x)`: `(int)(x + 0.5)` above 0, `(int)(x - 0.5)` otherwise (in
@@ -150,19 +171,44 @@ fn kernel_interp_with(v: &Volume, k: &Kernel, x: f32, y: f32, z: f32) -> f32 {
     }
     let mut convsum: f32 = 0.0;
     let mut kersum: f32 = 0.0;
-    for z1 in iz0 - i64::from(wz)..=iz0 + i64::from(wz) {
-        let zj = (iz0 - z1 + i64::from(wz)) as usize;
-        for y1 in iy0 - i64::from(wy)..=iy0 + i64::from(wy) {
-            let yj = (iy0 - y1 + i64::from(wy)) as usize;
-            for x1 in ix0 - i64::from(wx)..=ix0 + i64::from(wx) {
+    // A NaN coordinate makes the start the most negative int64_t: FSL's loop bounds wrap (as
+    // x86-64 integer arithmetic does), so its loops run no step; so do these, in every build.
+    let (wx, wy, wz) = (i64::from(wx), i64::from(wy), i64::from(wz));
+    for z1 in iz0.wrapping_sub(wz)..=iz0.wrapping_add(wz) {
+        let zj = iz0.wrapping_sub(z1).wrapping_add(wz) as usize;
+        for y1 in iy0.wrapping_sub(wy)..=iy0.wrapping_add(wy) {
+            let yj = iy0.wrapping_sub(y1).wrapping_add(wy) as usize;
+            for x1 in ix0.wrapping_sub(wx)..=ix0.wrapping_add(wx) {
                 if v.in_bounds(x1, y1, z1) {
-                    let xj = (ix0 - x1 + i64::from(wx)) as usize;
+                    let xj = ix0.wrapping_sub(x1).wrapping_add(wx) as usize;
                     let kerfac = storex[xj] * storey[yj] * storez[zj];
                     convsum += v.get(x1, y1, z1) * kerfac;
                     kersum += kerfac;
                 }
             }
         }
+    }
+    if convsum.is_nan() || kersum.is_nan() {
+        // NaN or infinite voxels: the same sums with SSE's NaNs.
+        (convsum, kersum) = (0.0, 0.0);
+        for z1 in iz0.wrapping_sub(wz)..=iz0.wrapping_add(wz) {
+            let zj = iz0.wrapping_sub(z1).wrapping_add(wz) as usize;
+            for y1 in iy0.wrapping_sub(wy)..=iy0.wrapping_add(wy) {
+                let yj = iy0.wrapping_sub(y1).wrapping_add(wy) as usize;
+                for x1 in ix0.wrapping_sub(wx)..=ix0.wrapping_add(wx) {
+                    if v.in_bounds(x1, y1, z1) {
+                        let xj = ix0.wrapping_sub(x1).wrapping_add(wx) as usize;
+                        let kerfac = sse::mul_f32(sse::mul_f32(storex[xj], storey[yj]), storez[zj]);
+                        convsum = sse::add_f32(convsum, sse::mul_f32(v.get(x1, y1, z1), kerfac));
+                        kersum = sse::add_f32(kersum, kerfac);
+                    }
+                }
+            }
+        }
+        if f64::from(kersum.abs()) > 1e-9 {
+            return sse::div_f32(convsum, kersum);
+        }
+        return v.extrapolate(ix0, iy0, iz0);
     }
     if f64::from(kersum.abs()) > 1e-9 {
         convsum / kersum
@@ -241,7 +287,13 @@ impl SplineCoefs {
                     for (t, c) in col.iter_mut().enumerate() {
                         *c = f64::from(coef[start + t * steps[dim]]);
                     }
+                    let line = col.clone();
                     deconv(&mut col, et);
+                    if col.iter().any(|c| c.is_nan()) {
+                        // NaN or infinite voxels on the line: SSE's NaNs.
+                        col.copy_from_slice(&line);
+                        deconv_sse(&mut col, et);
+                    }
                     for (t, c) in col.iter().enumerate() {
                         coef[start + t * steps[dim]] = *c as f32;
                     }
@@ -339,6 +391,24 @@ impl SplineCoefs {
                 }
             }
         }
+        if val.is_nan() {
+            // NaN or infinite coefficients: the same sum with SSE's NaNs.
+            use sse::{add_f64 as add, mul_f64 as mul};
+            val = 0.0;
+            for k in 0..ni {
+                let wgt1 = (1.0 * 1.0) * wgts[2][k];
+                let linear1 = d0 * d1 * self.indx2indx(inds[2] + k as i32, 2);
+                for j in 0..ni {
+                    let wgt2 = wgt1 * wgts[1][j];
+                    let linear2 = linear1 + d0 * self.indx2indx(inds[1] + j as i32, 1);
+                    for i in 0..ni {
+                        let c =
+                            f64::from(self.coef[linear2 + self.indx2indx(inds[0] + i as i32, 0)]);
+                        val = add(val, mul(mul(c, wgts[0][i]), wgt2));
+                    }
+                }
+            }
+        }
         val
     }
 }
@@ -403,6 +473,53 @@ fn deconv(col: &mut [f64], et: SplineExtrap) {
     }
 }
 
+/// [`deconv`] with every operation's NaN as SSE gives it (operands in the source's order).
+#[cold]
+fn deconv_sse(col: &mut [f64], et: SplineExtrap) {
+    use sse::{add_f64 as add, div_f64 as div, mul_f64 as mul, sub_f64 as sub};
+    let sz = col.len();
+    let z = 3.0f64.sqrt() - 2.0;
+    let sf = 6u32;
+    let prec = 1e-8f64;
+    let n = ((larmorx_core::math::log(prec) / larmorx_core::math::log(z.abs())) + 1.5) as u32;
+    let n = (n as usize).min(sz);
+    let mut iv = col[0];
+    let mut z2i = z;
+    if et == SplineExtrap::Periodic {
+        for i in 1..n {
+            iv = add(iv, mul(z2i, col[sz - i]));
+            z2i *= z;
+        }
+    } else {
+        for c in col.iter().take(n).skip(1) {
+            iv = add(iv, mul(z2i, *c));
+            z2i *= z;
+        }
+    }
+    col[0] = iv;
+    let lv = col[sz - 1];
+    for i in 1..sz {
+        col[i] = add(col[i], mul(z, col[i - 1]));
+    }
+    col[sz - 1] = if et == SplineExtrap::Periodic {
+        let mut iv = mul(z, col[sz - 1]);
+        let mut z2i = z * z;
+        for i in 1..n {
+            iv = add(iv, mul(z2i, col[i - 1]));
+            z2i *= z;
+        }
+        div(iv, z2i - 1.0)
+    } else {
+        mul(-z / (1.0 - z * z), sub(mul(2.0, col[sz - 1]), lv))
+    };
+    for i in (0..sz.saturating_sub(1)).rev() {
+        col[i] = mul(z, sub(col[i + 1], col[i]));
+    }
+    for c in col.iter_mut() {
+        *c = mul(*c, f64::from(sf));
+    }
+}
+
 /// `splineinterpolate(x, y, z)`.
 fn spline_interpolate(v: &Volume, x: f32, y: f32, z: f32, s: &SplineCoefs) -> f32 {
     let ep = v.extrap;
@@ -417,4 +534,34 @@ fn spline_interpolate(v: &Volume, x: f32, y: f32, z: f32, s: &SplineCoefs) -> f3
         return v.padvalue;
     }
     s.value_at([f64::from(x), f64::from(y), f64::from(z)]) as f32
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// An infinite neighbour weighted 0, and the infinities of both signs, give SSE's default
+    /// NaN; a NaN neighbour is passed on with its bits, as FSL's x86-64 build does.
+    #[test]
+    fn trilinear_nans_as_sse() {
+        let inf = f32::INFINITY;
+        let v = [1.0, 2.0, 3.0, 4.0, inf, 6.0, 7.0, 8.0];
+        // dx = 0: (inf - 1) * 0 = NaN made from numbers.
+        let r = q_tri(
+            v[0], v[1], v[2], v[3], v[4], v[5], v[6], v[7], 0.0, 0.5, 0.5,
+        );
+        assert_eq!(r.to_bits(), 0xffc0_0000);
+        let w = [1.0, 2.0, 3.0, 4.0, inf, 6.0, -inf, 8.0];
+        let r = q_tri(
+            w[0], w[1], w[2], w[3], w[4], w[5], w[6], w[7], 0.5, 0.5, 0.5,
+        );
+        assert_eq!(r.to_bits(), 0xffc0_0000);
+        let p = f32::from_bits(0x7fc1_2345);
+        let r = q_tri(1.0, 2.0, 3.0, 4.0, p, 6.0, 7.0, 8.0, 0.5, 0.5, 0.5);
+        assert_eq!(r.to_bits(), 0x7fc1_2345);
+        assert_eq!(
+            q_tri(1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0, 0.5, 0.5, 0.5),
+            4.5
+        );
+    }
 }

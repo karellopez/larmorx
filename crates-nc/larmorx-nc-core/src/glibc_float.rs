@@ -160,9 +160,15 @@ fn reduce_large(xi: u32) -> (f64, i32) {
     (x * PI63, n as i32)
 }
 
+/// `__math_invalidf(x)`: `(x - x) / (x - x)` as SSE computes it: the NaN `x` quieted for a NaN,
+/// SSE's default NaN (`-nan`) for an infinity or a negative number (`logf`).
+fn math_invalidf(x: f32) -> f32 {
+    let d = crate::sse::sub_f32(x, x);
+    crate::sse::div_f32(d, d)
+}
+
 /// glibc's `sinf` (x86-64, FMA build).
 #[must_use]
-#[allow(clippy::eq_op)] // __math_invalidf's (x - x) / (x - x)
 pub fn sinf(y: f32) -> f32 {
     let x = f64::from(y);
     let top = abstop12(y);
@@ -190,13 +196,11 @@ pub fn sinf(y: f32) -> f32 {
         };
         return sinf_poly(x * s, x * x, p, n);
     }
-    // __math_invalidf: (x - x) / (x - x), NaN for an infinity or a NaN.
-    (y - y) / (y - y)
+    math_invalidf(y)
 }
 
 /// glibc's `cosf` (x86-64, FMA build).
 #[must_use]
-#[allow(clippy::eq_op)] // __math_invalidf's (x - x) / (x - x)
 pub fn cosf(y: f32) -> f32 {
     let x = f64::from(y);
     let top = abstop12(y);
@@ -224,12 +228,11 @@ pub fn cosf(y: f32) -> f32 {
         };
         return sinf_poly(x * s, x * x, p, n ^ 1);
     }
-    (y - y) / (y - y)
+    math_invalidf(y)
 }
 
 /// glibc's `sincosf` (x86-64, FMA build): `(sin y, cos y)`.
 #[must_use]
-#[allow(clippy::eq_op)] // __math_invalidf's (x - x) / (x - x)
 pub fn sincosf(y: f32) -> (f32, f32) {
     let x = f64::from(y);
     let top = abstop12(y);
@@ -259,7 +262,8 @@ pub fn sincosf(y: f32) -> (f32, f32) {
         };
         return sincosf_poly(x * s, x * x, p, n);
     }
-    let v = y - y;
+    // `*sinp = *cosp = y - y`: SSE's default NaN for an infinity, the NaN itself for a NaN.
+    let v = crate::sse::sub_f32(y, y);
     (v, v)
 }
 
@@ -291,7 +295,6 @@ const LOGF_POLY: [f64; 3] = [
 
 /// glibc's `logf` (x86-64, FMA build).
 #[must_use]
-#[allow(clippy::eq_op)] // __math_invalidf's (x - x) / (x - x)
 pub fn logf(x: f32) -> f32 {
     const OFF: u32 = 0x3f33_0000;
     let mut ix = x.to_bits();
@@ -308,8 +311,7 @@ pub fn logf(x: f32) -> f32 {
             return x;
         }
         if (ix & 0x8000_0000) != 0 || ix.wrapping_mul(2) >= 0xff00_0000 {
-            // __math_invalidf(x): (x - x) / (x - x).
-            return (x - x) / (x - x);
+            return math_invalidf(x);
         }
         // A subnormal: normalized.
         ix = (x * f32::from_bits(0x4b00_0000)).to_bits();
@@ -353,6 +355,15 @@ mod tests {
         assert_eq!(logf(1.0).to_bits(), 0);
         assert_eq!(logf(0.0), f32::NEG_INFINITY);
         assert!(logf(-1.0).is_nan());
+        // The bits glibc's x86-64 build gives (SSE's default NaN for a NaN made from numbers,
+        // the operand quieted for a NaN), on every platform.
+        assert_eq!(sinf(f32::INFINITY).to_bits(), 0xffc0_0000);
+        assert_eq!(cosf(f32::NEG_INFINITY).to_bits(), 0xffc0_0000);
+        let (s, c) = sincosf(f32::INFINITY);
+        assert_eq!((s.to_bits(), c.to_bits()), (0xffc0_0000, 0xffc0_0000));
+        assert_eq!(logf(-1.0).to_bits(), 0xffc0_0000);
+        assert_eq!(sinf(f32::from_bits(0x7fa0_0001)).to_bits(), 0x7fe0_0001);
+        assert_eq!(logf(f32::from_bits(0xffc1_2345)).to_bits(), 0xffc1_2345);
         assert_eq!(logf(f32::INFINITY), f32::INFINITY);
         let (s, c) = sincosf(1e-30);
         assert_eq!((s, c), (1e-30, 1.0));

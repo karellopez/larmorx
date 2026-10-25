@@ -327,6 +327,30 @@ def test_heavy_cases_are_reported_with_their_results(tmp_path):
     assert "now: agree" in (out / "report.md").read_text()
 
 
+def test_the_heavy_queue_runs_the_quickest_first_and_only_what_is_named(tmp_path):
+    from larmorx_validation.difftest import runner
+
+    out = tmp_path / "night"
+    out.mkdir()
+    queue = [{"tool": "ants-n4", "seed": "r", "n": n} for n in (1, 2, 3, 4)]
+    (out / "heavy.jsonl").write_text("".join(json.dumps(h) + "\n" for h in queue))
+    # Case 3 is recorded already (beyond any machine); case 4 has no sizing law.
+    (out / "heavy-results.jsonl").write_text(
+        json.dumps({"tool": "ants-n4", "seed": "r", "n": 3, "verdict": "beyond any machine"}) + "\n"
+    )
+    (out / "heavy-prediction.json").write_text(
+        json.dumps(
+            [
+                {"case": "ants-n4:r:1", "ants_gib": 1, "ants_hours": 5.0, "larmorx_hours": 1.0},
+                {"case": "ants-n4:r:2", "ants_gib": 1, "ants_hours": 0.5, "larmorx_hours": 0.1},
+                {"case": "ants-n4:r:4", "prediction": "no sizing law here"},
+            ]
+        )
+    )
+    assert [h["n"] for h in runner.heavy_queue(out)] == [2, 1, 4]
+    assert [h["n"] for h in runner.heavy_queue(out, {"ants-n4:r:1", "ants-n4:r:3"})] == [1]
+
+
 def test_a_tool_held_to_thresholds_gets_one_group_per_implementation(tmp_path):
     out = tmp_path / "night"
     (out / "findings" / "mri-hmc").mkdir(parents=True)

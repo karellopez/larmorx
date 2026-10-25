@@ -94,6 +94,12 @@ def add_arguments(p: argparse.ArgumentParser) -> None:
     p.add_argument(
         "--heavy-hours", type=float, default=2.0, help="with --heavy: hours for each run"
     )
+    p.add_argument(
+        "--heavy-only",
+        default=None,
+        help="with --heavy: the cases to run (TOOL:SEED:N, comma-separated, or a file of them, "
+        "one per line); the others wait",
+    )
     p.add_argument("--case-timeout", type=float, default=None, help=argparse.SUPPRESS)
     p.add_argument("--judge-recipe", help=argparse.SUPPRESS)
     p.add_argument("--impl", help=argparse.SUPPRESS)
@@ -106,6 +112,15 @@ def _workspace() -> Path:
     if ws is None:
         raise SystemExit("the workspace (with oracles/) was not found; pass --out")
     return ws
+
+
+def _cases_named(spec: str | None) -> set[str] | None:
+    """``--heavy-only``: a comma-separated list of ``tool:seed:n``, or a file of them."""
+    if not spec:
+        return None
+    path = Path(spec)
+    text = path.read_text(encoding="utf-8") if path.is_file() else spec.replace(",", "\n")
+    return {line.strip() for line in text.splitlines() if line.strip()}
 
 
 def main(args: argparse.Namespace) -> int:
@@ -150,6 +165,7 @@ def main(args: argparse.Namespace) -> int:
             Path(args.heavy),
             memory_gib=args.memory_gib or limits.HEAVY_GIB,
             hours=args.heavy_hours,
+            only=_cases_named(args.heavy_only),
             log=lambda s: print(s, file=sys.stderr, flush=True),
         )
         print(f"{len(done)} heavy case(s) run; {Path(args.heavy) / 'report.md'}")

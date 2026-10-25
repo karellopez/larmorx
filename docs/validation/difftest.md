@@ -33,7 +33,7 @@ python -m larmorx_validation difftest --list                                    
 | `--shrink-budget` | seconds to shrink one difference (default 600) |
 | `--out` | the night's directory (default `<workspace>/oracles/difftest/<date>/`) |
 | `--memory-gib`, `--box-gib` | the hard memory limit of each worker (3 GiB, no swap) and the box the command makes for itself when it runs in none (8 GiB); `--memory-gib 0` runs without limits (only where cgroup v2 is not writable) |
-| `--heavy <night>`, `--heavy-hours` | run a night's heavy cases to their end (below) |
+| `--heavy <night>`, `--heavy-hours`, `--heavy-only` | run a night's heavy cases to their end (below), the quickest first by their prediction; `--heavy-only` names the cases to run (`tool:seed:n`, comma-separated or a file) |
 
 A night writes `oracles/difftest/<date>/` (outside git, like every oracle output):
 

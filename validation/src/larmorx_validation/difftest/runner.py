@@ -907,12 +907,15 @@ def run_heavy(
     memory_gib: float = limits.HEAVY_GIB,
     swap_gib: float = limits.HEAVY_SWAP_GIB,
     hours: float = 2.0,
+    only: set[str] | None = None,
     log=print,
 ) -> list[dict]:
     """Runs the heavy queue of the night in ``out`` (``heavy.jsonl``) to its end, one case at a
     time: each implementation in a child process of its own, in a leaf of ``memory_gib`` GiB and
     ``swap_gib`` GiB of swap, for at most ``hours`` each; the results go to
-    ``heavy-results.jsonl`` with each run's peak memory. Cases with a result are skipped."""
+    ``heavy-results.jsonl`` with each run's peak memory. Cases with a result are skipped, and with
+    ``only`` (``tool:seed:n``) every case not named; the queue runs in order of its predicted
+    time (``heavy_queue``)."""
     from larmorx_validation.difftest import report
 
     box = limits.MemoryBox.find()
@@ -924,9 +927,7 @@ def run_heavy(
     # physical memory: what fits the box runs in both modes.
     os.environ["LARMORX_MEMORY_LIMIT"] = str(int((memory_gib + swap_gib) * limits.GIB))
     done = []
-    for k, h in enumerate(report.heavy(out)):
-        if h.get("result"):
-            continue
+    for k, h in enumerate(heavy_queue(out, only)):
         tool = tools.get(h["tool"])
         recipe = core.make_recipe(tool, h["seed"], h["n"])
         line: dict = {
@@ -982,6 +983,27 @@ def run_heavy(
         done.append(line)
     report.write(out)
     return done
+
+
+def heavy_queue(out: Path, only: set[str] | None = None) -> list[dict]:
+    """The heavy cases of ``out`` still without a result (and named in ``only``), the quickest
+    first by their predicted hours (``heavy-prediction.json``, from ``heavy_predict.py``; a case
+    without a prediction after those with one, in queue order)."""
+    from larmorx_validation.difftest import report
+
+    predicted: dict[str, float] = {}
+    path = out / "heavy-prediction.json"
+    if path.is_file():
+        for row in json.loads(path.read_text(encoding="utf-8")):
+            hours = (row.get("ants_hours") or 0.0) + 2 * (row.get("larmorx_hours") or 0.0)
+            predicted[row["case"]] = hours if "ants_gib" in row else float("inf")
+    rows = []
+    for i, h in enumerate(report.heavy(out)):
+        name = f"{h['tool']}:{h['seed']}:{h['n']}"
+        if h.get("result") or (only is not None and name not in only):
+            continue
+        rows.append((predicted.get(name, float("inf")), i, h))
+    return [h for _, _, h in sorted(rows, key=lambda r: (r[0], r[1]))]
 
 
 def _resume(out: Path, tool: str) -> int:

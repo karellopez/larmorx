@@ -50,15 +50,16 @@ def run(work: Path, program: str, size: list[int], spacing: list[float], args: l
     from larmorx_validation.parity.ants_programs import ants_bin
 
     work.mkdir(parents=True, exist_ok=True)
-    inp = work / "in.nii.gz"
+    suffix = os.environ.get("MEMORY_PAIR_SUFFIX", ".nii.gz")
+    inp = work / f"in{suffix}"
     volume(size, spacing, inp)
     env = {**os.environ, "ITK_GLOBAL_DEFAULT_NUMBER_OF_THREADS": "1", "OMP_NUM_THREADS": "1"}
     rows = {}
-    out_a = work / "ants.nii.gz"
+    out_a = work / f"ants{suffix}"
     cmd = [str(ants_bin() / program), *(a.format(**{"in": inp, "out": out_a}) for a in args)]
     rows["ANTs"] = (*peak_of(cmd, env), out_a)
     for mode in ("reproduce", "fix"):
-        out_l = work / f"larmorx-{mode}.nii.gz"
+        out_l = work / f"larmorx-{mode}{suffix}"
         cmd = [
             sys.executable,
             "-m",

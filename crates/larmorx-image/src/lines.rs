@@ -20,6 +20,8 @@ use crate::FilterError;
 
 /// How many neighbouring lines are filtered together along the strided axes.
 pub(crate) const LANES: usize = 32;
+/// The lines one task of a strided axis owns (filtered [`LANES`] at a time).
+const GROUP: usize = 8 * LANES;
 
 /// A filter of a group of `w` lines of `n` values: `input[i * w + l]` is value `i` of line
 /// `l`; the filter writes `output` the same way (`scratch` has the same size, for its own
@@ -116,14 +118,17 @@ pub(crate) fn filter_lines<T: LinePixel, F: LineFilter>(
                 },
             );
         } else {
-            // Strided lines: each task owns the pieces of `w ≤ LANES` neighbouring lines, one
-            // piece per position along the axis.
+            // Strided lines: each task owns the pieces of up to `GROUP` neighbouring lines, one
+            // piece per position along the axis, and filters them `LANES` lines at a time (each
+            // line is filtered alone, so the grouping changes no value). One reference per
+            // `GROUP` voxels of a row, not per `LANES`: the task list was 0.5 byte per voxel
+            // (random testing, 2026-10-25: SmoothImage's peak memory against ANTs').
             let mut tasks: Vec<Vec<&mut [T]>> = Vec::new();
             for block in data.chunks_mut(inner * n) {
                 let first = tasks.len();
-                tasks.extend((0..inner.div_ceil(LANES)).map(|_| Vec::with_capacity(n)));
+                tasks.extend((0..inner.div_ceil(GROUP)).map(|_| Vec::with_capacity(n)));
                 for row in block.chunks_mut(inner) {
-                    for (c, piece) in row.chunks_mut(LANES).enumerate() {
+                    for (c, piece) in row.chunks_mut(GROUP).enumerate() {
                         tasks[first + c].push(piece);
                     }
                 }
@@ -131,23 +136,28 @@ pub(crate) fn filter_lines<T: LinePixel, F: LineFilter>(
             tasks.into_par_iter().for_each_init(
                 || Buffers::new(n * LANES),
                 |b, mut rows| {
-                    let w = rows[0].len();
-                    let len = n * w;
-                    for (i, row) in rows.iter().enumerate() {
-                        for (x, &v) in b.input[i * w..(i + 1) * w].iter_mut().zip(row.iter()) {
-                            *x = v.to_f64();
+                    let width = rows[0].len();
+                    for start in (0..width).step_by(LANES) {
+                        let w = LANES.min(width - start);
+                        let len = n * w;
+                        for (i, row) in rows.iter().enumerate() {
+                            let src = &row[start..start + w];
+                            for (x, &v) in b.input[i * w..(i + 1) * w].iter_mut().zip(src) {
+                                *x = v.to_f64();
+                            }
                         }
-                    }
-                    filter.filter(
-                        &b.input[..len],
-                        &mut b.output[..len],
-                        &mut b.scratch[..len],
-                        n,
-                        w,
-                    );
-                    for (i, row) in rows.iter_mut().enumerate() {
-                        for (v, &x) in row.iter_mut().zip(b.output[i * w..(i + 1) * w].iter()) {
-                            *v = T::from_f64(x);
+                        filter.filter(
+                            &b.input[..len],
+                            &mut b.output[..len],
+                            &mut b.scratch[..len],
+                            n,
+                            w,
+                        );
+                        for (i, row) in rows.iter_mut().enumerate() {
+                            let dst = &mut row[start..start + w];
+                            for (v, &x) in dst.iter_mut().zip(b.output[i * w..(i + 1) * w].iter()) {
+                                *v = T::from_f64(x);
+                            }
                         }
                     }
                 },

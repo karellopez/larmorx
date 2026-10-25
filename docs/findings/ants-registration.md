@@ -279,6 +279,12 @@ composed with `Compose(·, pre = true)` (a `TranslationTransform` through its of
   `difftest/sampled-derivatives-aliased`). SyN's and B-spline SyN's stages do the same (their
   metrics are of local support too); the time-varying velocity-field stages drop such points in
   both modes without naming them (their sampling is clock-seeded, ANTS-82).
+- **A later level's zero Mattes bin size (ITK-100).** The threader's joint histogram images are
+  created at a stage's first evaluation and kept for its later levels, so a level whose analysis
+  region has one intensity throws `SetSpacing`'s exception only at the first level; at a later
+  level ITK uses the bin size of 0 (NaN bin indices, clamped; the metric 0). larmorx threw at
+  every level in both modes (`ants-registration:20261025:884`); now `reproduce` follows ITK and
+  the default keeps the exception (rule B), both naming ITK-100.
 - **The empty sample set's exception** is ITK's `itkImageToImageMetricv4.hxx:263` with the
   metric's own class name (`MattesMutualInformationImageToImageMetricv4`, ...), or
   `itkJointHistogramMutualInformationImageToImageMetricv4.hxx:233` for `MI`; larmorx printed line

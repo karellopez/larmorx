@@ -20,7 +20,7 @@ python -m larmorx_validation difftest --case ants-image-math:20261025:17        
 python -m larmorx_validation difftest --replay <finding or permanent case .json>   # a reproducer
 python -m larmorx_validation difftest --report oracles/difftest/2026-10-25         # report again
 python -m larmorx_validation difftest --promote <finding .json> --id <name> [--tier smoke] \
-    [--expect pass|divergence|error --reason TEXT] [--status fixed|register|open --defect ID --rule A-D]
+    [--expect pass|divergence|error|guard --reason TEXT] [--status fixed|register|open --defect ID --rule A-D]
 python -m larmorx_validation difftest --list                                       # the tools here
 ```
 
@@ -124,7 +124,8 @@ the machine swapped until the editor and every agent running in it went down. Si
   (a child process stopped, the worker alive: read from the leaf's `memory.events` and the
   exits the worker saw) or "larmorx exceeds 3 GiB" (the worker, which runs larmorx in-process,
   stopped: each implementation then runs again in a child process of its own, as a crash
-  does); a fresh worker takes the leaf and the night goes on (the self-test tool
+  does; that process also compares the outputs, whose arrays count toward the limit, so a large
+  output can stop it where larmorx itself fits); a fresh worker takes the leaf and the night goes on (the self-test tool
   `selftest-memory` and the test `test_a_case_over_the_memory_limit_is_recorded_and_the_night_goes_on`
   prove it on a real boxed night);
 - **time**: each run has its alarm (the tool's timeout) and each case its deadline, past which
@@ -138,7 +139,14 @@ machine is quiet (the user says when); the results, with each run's peak memory,
 `heavy-results.jsonl`, and the report's "Heavy cases" section lists every queued case with its
 result (or "waiting"). Before a queue is run, `validation/investigations/difftest/heavy_predict.py`
 predicts each case's memory and time from the original's sizing law and the unit costs measured
-on smaller variants of the same case (`n4_memory.py`, `scaled_memory.py`).
+on smaller variants of the same case (`n4_memory.py`, `scaled_memory.py`; 3dUnifize's ball of
+neighbours from AFNI's own formula). A case predicted beyond the heavy box (24 GiB and 48 GiB of
+swap) is not run: `heavy_predict.py --record-beyond` writes its result, *beyond this machine* or,
+above 1 TiB, *beyond any machine*, with the prediction, and `--heavy` skips it. Where such a size
+grows from a header's units (ANTS-162, AFNI-75), larmorx's default checks the memory before it
+allocates and stops at once with the GiB needed and the likely cause (`LARMORX_MEMORY_LIMIT` sets
+another limit than the machine's memory; `reproduce` attempts the computation); a permanent case
+per kind (`--expect guard`) runs only that check.
 
 ## Shrinking
 

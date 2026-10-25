@@ -828,7 +828,6 @@ fn run(
     ctx.variance = ctx.padded(&variance);
     drop(variance);
     ctx.patch_distance = patch_distances(&ctx, n_threads)?;
-    let mut ctx = ctx;
 
     // The centres, block by block in raster order; each output voxel is summed once every
     // centre whose patch reaches it is known.

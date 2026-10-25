@@ -13,6 +13,13 @@ sizing law, times the unit costs measured on smaller variants of the same case
   iteration, summed over the levels.
 - ``ants-resample-image-by-spacing``: the output has ``int(n * spacing_in / spacing_out +
   addvox)`` voxels per axis; memory: output voxels times bytes per voxel.
+- ``afni-unifize`` (AFNI-75): ``-EPI`` sets the ball's radius to ``18.3 / cbrt(|dx dy dz|)``
+  voxels (at least 4.14; the voxel sizes in mm, as AFNI and ITK read a header's units), else
+  ``-Urad`` or ``-rbt``'s first value (18.3 by default), halved (plus 0.001) for the half-size
+  copy of more than a million voxels; the ball has ``4/3 pi r^3`` points, built whole first: 10
+  bytes each in AFNI (three shorts and a float), 24 plus 4 per worker in the GPL replica.
+
+``ants_gib`` is the original program's prediction (ANTs or AFNI), ``larmorx_gib`` larmorx's.
 
     python -P validation/investigations/difftest/heavy_predict.py oracles/difftest/<date> \\
         [--n4-point-bytes 16] [--n4-voxel-bytes 24] [--n4-point-seconds 3.7e-7] ...
@@ -85,6 +92,24 @@ def n4_size(words: list[str], size: list[int], spacing: list[float]) -> dict:
     }
 
 
+def unifize_ball(words: list[str], size: list[int], spacing: list[float]) -> dict:
+    nvox = math.prod(size[:3])
+    radius = 18.3
+    if "-Urad" in words:
+        radius = float(words[words.index("-Urad") + 1])
+    for opt in ("-rbt", "-param"):
+        if opt in words:
+            radius = float(words[words.index(opt) + 1])
+    epi = "-EPI" in words
+    if epi:
+        uu = float(np.cbrt(np.float32(abs(spacing[0] * spacing[1] * spacing[2]))))
+        radius = max(18.3 / uu, 4.14)
+    elif nvox > 1_000_000 and "-noduplo" not in words and "-nodouble" not in words:
+        radius = 0.5 * radius + 0.001
+    points = 4.0 / 3.0 * math.pi * radius**3 + 1.0
+    return {"epi": epi, "radius": radius, "points": points, "voxels": nvox}
+
+
 def by_spacing_size(words: list[str], size: list[int], spacing: list[float]) -> dict:
     dim = int(words[0])
     out_spacing = [float(w) for w in words[3 : 3 + dim]]
@@ -135,7 +160,7 @@ def main() -> int:
         for h in report.heavy(args.night):
             tool = tools.get(h["tool"])
             recipe = core.make_recipe(tool, h["seed"], h["n"])
-            spec = recipe["inputs"].get("a")
+            spec = recipe["inputs"].get("a") or recipe["inputs"].get("input")
             row = {
                 "tool": h["tool"],
                 "seed": h["seed"],
@@ -185,6 +210,13 @@ def main() -> int:
                     ants_gib=s["output_voxels"] * args.by_spacing_voxel_bytes / GIB,
                     larmorx_gib=s["output_voxels"] * args.by_spacing_voxel_bytes_lx / GIB,
                 )
+            elif h["tool"] == "afni-unifize":
+                s = unifize_ball(words, size, spacing)
+                row.update(
+                    sizing=s,
+                    ants_gib=s["points"] * 10.0 / GIB,
+                    larmorx_gib=s["points"] * (24.0 + 4.0) / GIB,
+                )
             else:
                 row["prediction"] = "no sizing law here: run a smaller variant"
             if "ants_gib" in row:
@@ -216,7 +248,13 @@ def main() -> int:
         with (args.night / "heavy-results.jsonl").open("a", encoding="utf-8") as f:
             for r in beyond:
                 s = r["sizing"]
-                last = "x".join(map(str, s.get("lattice_last", s.get("output", []))))
+                afni = r["tool"].startswith("afni-")
+                last = (
+                    f"a ball of radius {s['radius']:.1f} voxels, {s['points']:.3g} points"
+                    if afni
+                    else "largest lattice "
+                    + "x".join(map(str, s.get("lattice_last", s.get("output", []))))
+                )
                 hours = (
                     f", about {r['ants_hours']:.3g} h of computation for ANTs"
                     if "ants_hours" in r
@@ -228,12 +266,22 @@ def main() -> int:
                     else "beyond this machine"
                 )
                 detail = (
-                    f"{verdict} (ANTS-162): predicted from the growth law measured on "
-                    f"smaller variants of the same input, ANTs about {r['ants_gib']:.4g} GiB and "
-                    f"larmorx about {r['larmorx_gib']:.4g} GiB (largest lattice {last}){hours}; "
-                    "not run in the heavy box; larmorx's default stops before allocating "
-                    "(permanent case), its replica bit-identical to ANTs on every variant both "
-                    "finished (docs/findings/ants-n4.md, Memory)"
+                    (
+                        f"{verdict} (AFNI-75): predicted from AFNI's sizing of its ball of "
+                        f"neighbours, AFNI about {r['ants_gib']:.4g} GiB and the replica about "
+                        f"{r['larmorx_gib']:.4g} GiB ({last}); not run in the heavy box; the "
+                        "replica's default stops before building the ball (permanent case "
+                        "epi-ball-beyond-any-machine)"
+                    )
+                    if afni
+                    else (
+                        f"{verdict} (ANTS-162): predicted from the growth law measured on "
+                        f"smaller variants of the same input, ANTs about {r['ants_gib']:.4g} GiB "
+                        f"and larmorx about {r['larmorx_gib']:.4g} GiB ({last}){hours}; not run "
+                        "in the heavy box; larmorx's default stops before allocating (permanent "
+                        "case), its replica bit-identical to ANTs on every variant both "
+                        "finished (docs/findings/ants-n4.md, Memory)"
+                    )
                 )
                 line = {
                     "tool": r["tool"],

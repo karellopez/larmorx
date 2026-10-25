@@ -191,7 +191,7 @@ Random inputs must not make the cache grow without bound, and every finding must
 ## Before the first night: three trial runs
 
 Three short runs (half an hour each at two jobs, 2026-10-25, seeds `trial1` to `trial3`; 642,
-1563 and {TRIAL3_CASES} cases) tested the harness and found, before the first night, what the
+1563 and 1678 cases) tested the harness and found, before the first night, what the
 triage file lists as fixed: in the ports, ITK's sform/qform choice made in vnl's float SVD
 (larmorx decided in double), allocations ITK refuses (larmorx aborted), singular directions ITK
 refuses, composite transform names ITK cannot create, a float transform's point indexed in

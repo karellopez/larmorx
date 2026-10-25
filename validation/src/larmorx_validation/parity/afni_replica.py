@@ -679,8 +679,10 @@ class Scenario:
     inputs: tuple[str, ...]
     outputs: tuple[str, ...]
     tier: str = "smoke"
-    #: ``pass``, ``error`` (both refuse), ``crash`` (AFNI crashes, larmorx refuses) or
-    #: ``divergence`` (AFNI succeeds and larmorx refuses, for ``reason``).
+    #: ``pass``, ``error`` (both refuse), ``crash`` (AFNI crashes, larmorx refuses),
+    #: ``divergence`` (AFNI succeeds and larmorx refuses, for ``reason``) or ``guard`` (beyond
+    #: any machine, AFNI-75: neither AFNI nor ``reproduce`` runs; the default must stop before
+    #: allocating, naming the defect and the memory it would need).
     expect: str = "pass"
     env: tuple[tuple[str, str | None], ...] = ()
     #: Files in each program's directory before the run (name, text).
@@ -785,6 +787,15 @@ def run_case(spec: ToolSpec, case: Case, checks: CheckList) -> None:
         a_dir, l_dir = tmp / "afni", tmp / "larmorx"
         _setup(a_dir, s)
         _setup(l_dir, s)
+        if s.expect == "guard":
+            ours = run_larmorx(program, args, defects.FIX, env, l_dir, impl)
+            text = ours.err.replace(str(tmp), "<tmp>")
+            checks(
+                "larmorx refuses before allocating (AFNI-75)",
+                ours.code != 0 and "(AFNI-75)" in text and "GiB" in text,
+                detail=text[-600:],
+            )
+            return
         afni = run_afni(program, args, env, a_dir, never=case_never(s))
         ours = run_larmorx(program, args, defects.REPRODUCE, env, l_dir, impl)
         a_out, l_out = _produced(a_dir, s), _produced(l_dir, s)

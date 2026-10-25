@@ -1,0 +1,293 @@
+{
+ "defect": null,
+ "description": "a ManifoldParzenWindows class with one sample: ANTs' warning comes from antsManifoldParzenWindowsListSampleFunction.hxx line 55 with its own class and text; larmorx printed the Gaussian model's",
+ "expect": "pass",
+ "found": {
+  "detail": "stderr: line 1: ANTs 'WARNING: In ImageSegmentation/antsManifoldParzenWindowsListSampleFunction.hxx, line 55', larmorx 'WARNING: In ImageSegmentation/antsGaussianListSampleFunction.hxx, line 105'; D13 fix pass: ANTS-95: no values changed",
+  "n": 566,
+  "seed": "20261025",
+  "shrink_moves": [],
+  "signature": [
+   "DN fix pass",
+   "stderr"
+  ]
+ },
+ "id": "manifold-parzen-one-sample-warning",
+ "implementations": [
+  "port"
+ ],
+ "reason": "",
+ "recipe": {
+  "extra": {
+   "keep_inputs": [
+    "prior01",
+    "prior02",
+    "prior03"
+   ],
+   "min_size": 6,
+   "outputs": [
+    "seg.nii.gz",
+    "post01.nii.gz",
+    "post02.nii.gz",
+    "post03.nii.gz"
+   ]
+  },
+  "features": {
+   "axis0": 1.2,
+   "axis1": 1.05,
+   "axis2": 0.95,
+   "bias0": -0.005,
+   "bias1": -0.0025,
+   "bias2": -0.01,
+   "bias3": 0.0075,
+   "centre0": -5.0,
+   "centre1": 5.0,
+   "centre2": 3.5,
+   "classes": 3,
+   "content": "sparse",
+   "convergence": "[1,0]",
+   "dimension": 3,
+   "dtype": "uint8",
+   "formulation": "Socrates[1]",
+   "icm": "0",
+   "image weight": false,
+   "initialization": "KMeans",
+   "inter": -5.0,
+   "likelihood": true,
+   "likelihood model": "ManifoldParzenWindows[1,10]",
+   "mrf": true,
+   "n0": 10,
+   "n1": 11,
+   "n2": 13,
+   "noise": 3.0,
+   "outliers": false,
+   "partial volume": false,
+   "posterior": true,
+   "range": "plain",
+   "second modality": false,
+   "size": 24.0,
+   "slope": 1.5,
+   "smoothing": "0",
+   "spacing": 1.0,
+   "sparse": 0.01,
+   "suffix": ".nii.gz",
+   "tissues": "epi"
+  },
+  "groups": [
+   {
+    "args": [
+     "-i",
+     "KMeans[3]"
+    ],
+    "name": "initialization",
+    "optional": false
+   },
+   {
+    "args": [
+     "-d",
+     "3"
+    ],
+    "name": "dimension",
+    "optional": false
+   },
+   {
+    "args": [
+     "-a",
+     "{in:a}"
+    ],
+    "name": "image",
+    "optional": false
+   },
+   {
+    "args": [
+     "-x",
+     "{in:mask}"
+    ],
+    "name": "mask",
+    "optional": false
+   },
+   {
+    "args": [
+     "-c",
+     "[1,0]"
+    ],
+    "name": "convergence",
+    "optional": false
+   },
+   {
+    "args": [
+     "-r",
+     "0"
+    ],
+    "name": "seed",
+    "optional": false
+   },
+   {
+    "args": [
+     "-k",
+     "ManifoldParzenWindows[1,10]"
+    ],
+    "name": "likelihood",
+    "optional": true
+   },
+   {
+    "args": [
+     "-m",
+     "[0,1x1x1]"
+    ],
+    "name": "mrf",
+    "optional": true
+   },
+   {
+    "args": [
+     "-p",
+     "Socrates[1]"
+    ],
+    "name": "posterior",
+    "optional": true
+   },
+   {
+    "args": [
+     "-g",
+     "0"
+    ],
+    "name": "icm",
+    "optional": true
+   },
+   {
+    "args": [
+     "-o",
+     "[{out}/seg.nii.gz,{out}/post%02d.nii.gz]"
+    ],
+    "name": "output",
+    "optional": false
+   }
+  ],
+  "inputs": {
+   "a": {
+    "content": {
+     "axes": [
+      1.2,
+      1.05,
+      0.95
+     ],
+     "bias": [
+      -0.005,
+      -0.0025,
+      -0.01,
+      0.0075
+     ],
+     "centre": [
+      4.5,
+      5.0,
+      6.0
+     ],
+     "noise": 3.0,
+     "seed": 409469380,
+     "size": 4.5,
+     "tissues": "epi",
+     "type": "head"
+    },
+    "dtype": "int16",
+    "geometry": {
+     "origin": [
+      0.0,
+      0.0,
+      0.0
+     ],
+     "qfac": 1,
+     "qform_code": 1,
+     "quaternion": [
+      1,
+      0,
+      0,
+      0
+     ],
+     "sform": "same",
+     "sform_code": 1,
+     "spacing": [
+      1.0,
+      1.0,
+      1.0
+     ],
+     "units": "mm"
+    },
+    "scaling": {
+     "inter": -5.0,
+     "slope": 1.5
+    },
+    "shape": [
+     10,
+     11,
+     13
+    ],
+    "suffix": ".nii.gz",
+    "values": {
+     "offset": 0.0,
+     "scale": 1.0
+    }
+   },
+   "mask": {
+    "binary": true,
+    "content": {
+     "fraction": 0.01,
+     "seed": 1514637454,
+     "type": "sparse"
+    },
+    "dtype": "uint8",
+    "geometry": {
+     "origin": [
+      0.0,
+      0.0,
+      0.0
+     ],
+     "qfac": 1,
+     "qform_code": 1,
+     "quaternion": [
+      1,
+      0,
+      0,
+      0
+     ],
+     "sform": "same",
+     "sform_code": 1,
+     "spacing": [
+      1.0,
+      1.0,
+      1.0
+     ],
+     "units": "mm"
+    },
+    "scaling": null,
+    "shape": [
+     10,
+     11,
+     13
+    ],
+    "suffix": ".nii.gz",
+    "values": {
+     "binarize": true,
+     "offset": 0.0,
+     "scale": 1.0
+    }
+   }
+  },
+  "n": 566,
+  "options": [
+   "-g",
+   "-k",
+   "-m",
+   "-p",
+   "3 classes",
+   "KMeans initialization",
+   "dimension 3"
+  ],
+  "seed": "20261025",
+  "tool": "ants-atropos"
+ },
+ "rule": null,
+ "status": "fixed",
+ "suite": "ants-atropos",
+ "tier": "smoke",
+ "tool": "ants-atropos"
+}

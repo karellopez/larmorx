@@ -308,3 +308,48 @@ fn outputs_and_threads() {
         o.stderr
     );
 }
+
+/// FSL-08's correction of the derived names reaches the `-meanvol` image (`<-out>_mean_reg`):
+/// named in its notice whenever it changes the name (`-out` with an image extension), and not
+/// when it does not; with `-stats` too, one FSL-08 notice covers both (random testing,
+/// `fsl-mcflirt:20261025:616`).
+#[test]
+fn meanvol_name_corrected_with_its_notice() {
+    let fsl08 = |e: &str| named(e).iter().filter(|n| *n == "FSL-08").count();
+    let d = tempfile::tempdir().unwrap();
+    let dir = d.path();
+    let bold = series(dir);
+    let b = bold.to_str().unwrap();
+    let o = mcflirt(dir, &["-in", b, "-out", "m.nii", "-meanvol"], "fix", &[]);
+    assert_eq!(o.code, 0, "{}", o.stderr);
+    assert!(dir.join("m_mean_reg.nii").is_file());
+    assert!(!dir.join("m.nii_mean_reg.nii").exists());
+    assert_eq!(fsl08(&o.stderr), 1, "{}", o.stderr);
+    assert!(
+        o.stderr.contains("-meanvol image is named after 'm'"),
+        "{}",
+        o.stderr
+    );
+
+    let o = mcflirt(
+        dir,
+        &["-in", b, "-out", "r.nii", "-meanvol"],
+        "reproduce",
+        &[],
+    );
+    assert_eq!(o.code, 0, "{}", o.stderr);
+    assert!(dir.join("r.nii_mean_reg.nii").is_file());
+    assert_eq!(fsl08(&o.stderr), 1, "{}", o.stderr);
+
+    let o = mcflirt(dir, &["-in", b, "-out", "p", "-meanvol"], "fix", &[]);
+    assert_eq!(o.code, 0, "{}", o.stderr);
+    assert!(dir.join("p_mean_reg.nii").is_file());
+    assert_eq!(fsl08(&o.stderr), 0, "{}", o.stderr);
+
+    let args = ["-in", b, "-out", "s.nii", "-meanvol", "-stats"];
+    let o = mcflirt(dir, &args, "fix", &[]);
+    assert_eq!(o.code, 0, "{}", o.stderr);
+    assert!(dir.join("s_mean_reg.nii").is_file() && dir.join("s_sigma.nii").is_file());
+    assert_eq!(fsl08(&o.stderr), 1, "{}", o.stderr);
+    assert!(o.stderr.contains("-stats"), "{}", o.stderr);
+}

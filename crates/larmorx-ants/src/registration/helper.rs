@@ -2071,6 +2071,25 @@ pub(crate) fn outside_notices(
     outside: &larmorx_registration::metric::OutsideDerivatives,
 ) {
     let (aliased, beyond) = (outside.aliased(), outside.beyond());
+    let stale = outside.stale_bins();
+    if stale > 0 {
+        push_once(
+            notices,
+            Notice::new(
+                &defects::ITK_100,
+                mode,
+                if mode.fix() {
+                    format!(
+                        "stage {stage}: a later level's Mattes analysis region has one intensity (a bin size of 0): an error, as the stage's first level gives; ITK keeps the first level's joint histogram and computes a metric of 0"
+                    )
+                } else {
+                    format!(
+                        "stage {stage}: a later level's Mattes bin size of 0 used as ITK uses it ({stale} evaluation(s), the metric 0)"
+                    )
+                },
+            ),
+        );
+    }
     if aliased > 0 {
         push_once(
             notices,

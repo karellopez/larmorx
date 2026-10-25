@@ -446,6 +446,8 @@ defects! {
         "the HDF5 transform writer (with compression) cannot write a transform without parameters (a chunk of 0 values): an IdentityTransform, or the inverse a displacement field without an inverse field gives, stops the file part-written with HDF5's error";
     ITK_97 = "ITK-97", "ITK", true,
         "a sampled metric's derivative at a sample point outside the virtual region (a shrink factor: the samples are drawn on the fixed image) is added at the region's linear offset of its index, another voxel's parameters (StorePointDerivativeResult checks nothing)";
+    ITK_100 = "ITK-100", "ITK", true,
+        "MattesMutualInformationImageToImageMetricv4 keeps its joint histogram images from a stage's first level, so a later level whose analysis region has one intensity (a bin size of 0) never reaches ImageBase::SetSpacing's exception, as the first level does: the bin size is used silently, the bin indices are NaN or infinite and clamped, the metric is 0";
     ITK_99 = "ITK-99", "ITK", true,
         "a sampled metric's derivative at a sample point outside the virtual region whose linear offset falls outside the derivative array is written past its end: memory it does not own";
     ITK_98 = "ITK-98", "ITK", true,

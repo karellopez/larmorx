@@ -84,6 +84,9 @@ pub struct OutsideDerivatives {
     pub alias: bool,
     aliased: Arc<AtomicUsize>,
     beyond: Arc<AtomicUsize>,
+    /// ITK-100: evaluations of a Mattes metric at a later level whose bin size is 0 or less
+    /// (`alias`, as everything this value carries in `reproduce`: used as ITK uses it).
+    stale_bins: Arc<AtomicUsize>,
 }
 
 impl OutsideDerivatives {
@@ -103,6 +106,15 @@ impl OutsideDerivatives {
     /// How many ITK writes past its derivative array (ITK-99).
     pub fn beyond(&self) -> usize {
         self.beyond.load(Ordering::Relaxed)
+    }
+
+    /// How many evaluations met a later level's Mattes bin size of 0 or less (ITK-100).
+    pub fn stale_bins(&self) -> usize {
+        self.stale_bins.load(Ordering::Relaxed)
+    }
+
+    pub(crate) fn count_stale_bins(&self) {
+        self.stale_bins.fetch_add(1, Ordering::Relaxed);
     }
 }
 

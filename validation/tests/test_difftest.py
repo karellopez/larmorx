@@ -625,3 +625,35 @@ def test_outputs_are_compared_chunk_by_chunk_with_the_whole_arrays_numbers(monke
     j = i.copy()
     j[999] ^= 1
     assert ap.value_differences(i, j)[0] == 1 and ap.value_differences(i, j)[3] == 0
+
+
+def test_outputs_too_large_to_load_are_compared_from_their_files(tmp_path, monkeypatch):
+    """Above STREAM_VALUES the values are read from the files a chunk at a time (gzip or
+    not): the numbers of the arrays loaded whole."""
+    import nibabel as nib
+    from larmorx_validation.parity import ants_programs as ap
+
+    rng = np.random.default_rng(11)
+    a = rng.normal(size=(9, 8, 7)).astype(np.float32)
+    b = a.copy()
+    b[1, 2, 3] += 1.0
+    b[8, 7, 6] = np.nextafter(b[8, 7, 6], np.float32(5))
+    paths = []
+    for name, x in (("a.nii.gz", a), ("b.nii", b)):
+        nib.save(nib.Nifti1Image(x, np.eye(4)), str(tmp_path / name))
+        paths.append(tmp_path / name)
+    stored = [ap.StoredValues(p, nib.load(str(p))) for p in paths]
+    assert stored[0].shape == a.shape and stored[1].dtype == b.dtype
+    monkeypatch.setattr(ap, "COMPARE_CHUNK", 50)
+    assert ap.value_differences(*stored) == ap.value_differences(a, b)
+    assert ap.value_differences(*stored)[0] == 2
+    # compare_outputs takes the files' way above the threshold, with the same checks.
+    from larmorx_validation.parity.harness import CheckList
+
+    results = {}
+    for limit in (1 << 28, 10):
+        monkeypatch.setattr(ap, "STREAM_VALUES", limit)
+        checks = CheckList()
+        ap.compare_outputs(checks, paths[0], paths[1], "out", None)
+        results[limit] = [(c.name, c.passed, c.value, c.detail) for c in checks.checks]
+    assert results[1 << 28] == results[10]

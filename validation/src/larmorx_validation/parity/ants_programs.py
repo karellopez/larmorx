@@ -357,22 +357,23 @@ def ulps(a: np.ndarray, b: np.ndarray) -> int:
 COMPARE_CHUNK = 1 << 22
 
 
-def value_differences(a: np.ndarray, b: np.ndarray) -> tuple[int, float, float, int]:
+def value_differences(a, b) -> tuple[int, float, float, int]:
     """The values that differ between two arrays of one shape and type (their bits, every NaN
     alike), the largest absolute difference, that over the largest finite magnitude of ``a``,
     and the largest distance in ulp, computed :data:`COMPARE_CHUNK` values at a time (the same
-    numbers as on the whole arrays)."""
-    a1, b1 = np.ascontiguousarray(a).reshape(-1), np.ascontiguousarray(b).reshape(-1)
-    chunks = [
-        (a1[i : i + COMPARE_CHUNK], b1[i : i + COMPARE_CHUNK])
-        for i in range(0, a1.size, COMPARE_CHUNK)
+    numbers as on the whole arrays). ``a`` and ``b`` are arrays, or :class:`StoredValues` of
+    files too large to load (read twice, a chunk at a time)."""
+    chunks_a = a.chunks if isinstance(a, StoredValues) else _array_chunks(a)
+    chunks_b = b.chunks if isinstance(b, StoredValues) else _array_chunks(b)
+    counts = [
+        int(np.count_nonzero(_canonical_bits(x) != _canonical_bits(y)))
+        for x, y in zip(chunks_a(), chunks_b(), strict=True)
     ]
-    counts = [int(np.count_nonzero(_canonical_bits(x) != _canonical_bits(y))) for x, y in chunks]
     n = sum(counts)
     if n == 0:
         return 0, 0.0, 0.0, 0
     max_abs, scale, max_ulp = 0.0, 0.0, 0
-    for (x, y), k in zip(chunks, counts, strict=True):
+    for (x, y), k in zip(zip(chunks_a(), chunks_b(), strict=True), counts, strict=True):
         xf = x.astype(np.float64)
         finite = np.abs(xf[np.isfinite(xf)])
         if finite.size:
@@ -387,6 +388,49 @@ def value_differences(a: np.ndarray, b: np.ndarray) -> tuple[int, float, float, 
         max_abs = max(max_abs, float(d.max()))
         max_ulp = max(max_ulp, ulps(x, y))
     return n, max_abs, max_abs / (scale or 1.0), max_ulp
+
+
+def _array_chunks(x: np.ndarray):
+    flat = np.ascontiguousarray(x).reshape(-1)
+    return lambda: (flat[i : i + COMPARE_CHUNK] for i in range(0, flat.size, COMPARE_CHUNK))
+
+
+#: Outputs of more values than this are compared from their files, a chunk at a time, without
+#: loading them (each would otherwise be held whole, twice with larmorx's run in the process).
+STREAM_VALUES = 1 << 28
+
+
+class StoredValues:
+    """The voxel values of a NIfTI file as stored (``get_unscaled``), read a chunk of
+    :data:`COMPARE_CHUNK` values at a time from the file (gzip or not): an output of billions
+    of voxels compared without loading it."""
+
+    def __init__(self, path: Path, image) -> None:
+        # The image's array proxy knows where its values start (the header's vox_offset may
+        # read 0 once loaded) and how they are stored.
+        proxy = image.dataobj
+        self.path = Path(path)
+        self.dtype = np.dtype(proxy.dtype)
+        self.shape = tuple(int(n) for n in proxy.shape)
+        self.size = int(np.prod(self.shape, dtype=np.int64))
+        self.offset = int(proxy.offset)
+
+    def chunks(self):
+        import gzip
+
+        with self.path.open("rb") as f:
+            magic = f.read(2)
+        opener = gzip.open if magic == b"\x1f\x8b" else open
+        with opener(self.path, "rb") as f:
+            f.seek(self.offset)
+            left = self.size
+            while left:
+                k = min(left, COMPARE_CHUNK)
+                block = f.read(k * self.dtype.itemsize)
+                if len(block) != k * self.dtype.itemsize:
+                    raise ValueError(f"{self.path}: the file ends before its {self.size} values")
+                yield np.frombuffer(block, dtype=self.dtype)
+                left -= k
 
 
 def affine_difference(a: np.ndarray, b: np.ndarray) -> float:
@@ -424,8 +468,13 @@ def compare_outputs(
         detail="; ".join(differing),
     )
     a_img, b_img = nib.load(ants_path), nib.load(lx_path)
-    a = np.asanyarray(a_img.dataobj.get_unscaled())
-    b = np.asanyarray(b_img.dataobj.get_unscaled())
+    if max(np.prod(a_img.shape, dtype=np.int64), np.prod(b_img.shape, dtype=np.int64)) > (
+        STREAM_VALUES
+    ):
+        a, b = StoredValues(ants_path, a_img), StoredValues(lx_path, b_img)
+    else:
+        a = np.asanyarray(a_img.dataobj.get_unscaled())
+        b = np.asanyarray(b_img.dataobj.get_unscaled())
     checks(
         f"{prefix}data type",
         a.dtype == b.dtype,

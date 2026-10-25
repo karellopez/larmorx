@@ -530,3 +530,14 @@ its refinements), so the lattice is zero away from the data; a sparse lattice, w
 padding kept virtual (its voxels have weight 0 and are cropped at the end), gives the same
 result in memory proportional to the data (here about a thousand points of 256 control points
 each).
+
+**In 2D, larmorx is less efficient than ANTs** (measured the same day, `n4_memory.py` on
+`ants-n4:20261025:406`, a 15x20 image of 1 x 3 m voxels, distances 480, 240 and 120 mm; every
+output bit-identical to ANTs): ANTs needs 26.2 bytes per control point of the last level and
+1.7e-8 s per point and iteration, larmorx 78.7 bytes and 2.2e-7 s (3 times the memory, 12.5
+times the time), where in 3D larmorx needs less than ANTs (12 bytes against 17, 2.6e-7 s against
+3.3e-7). The case itself (distance 30: 56.8 million points) needs about 1.4 GiB in ANTs and 4.2
+GiB in larmorx, which the night's case limit of 3 GiB stopped. The per-iteration work over the
+whole lattice (the fit's omega and delta, the division) costs larmorx more than ANTs when the
+image has few voxels and the lattice many points; a follow-up for the fit's 2D path
+(`larmorx_image::bspline::fit`).

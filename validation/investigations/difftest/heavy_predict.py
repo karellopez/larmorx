@@ -144,6 +144,13 @@ def main() -> int:
     ap.add_argument("--n4-point-seconds-lx", type=float, default=2.6e-7)
     ap.add_argument("--n4-voxel-seconds", type=float, default=7.3e-8)
     ap.add_argument("--n4-voxel-seconds-lx", type=float, default=2.1e-8)
+    # In 2D (n4_memory.py on ants-n4:20261025:406, distances 480 to 120): ANTs 26.2 bytes per
+    # control point of the last level and 1.73e-8 s per point and iteration; larmorx 78.7 and
+    # 2.17e-7 (the same results, bit for bit).
+    ap.add_argument("--n4-point-bytes-2d", type=float, default=26.2)
+    ap.add_argument("--n4-point-bytes-lx-2d", type=float, default=78.7)
+    ap.add_argument("--n4-point-seconds-2d", type=float, default=1.73e-8)
+    ap.add_argument("--n4-point-seconds-lx-2d", type=float, default=2.17e-7)
     ap.add_argument("--by-spacing-voxel-bytes", type=float, default=7.3)
     ap.add_argument("--by-spacing-voxel-bytes-lx", type=float, default=16.0)
     ap.add_argument("--box-gib", type=float, default=limits.HEAVY_GIB + limits.HEAVY_SWAP_GIB)
@@ -180,26 +187,21 @@ def main() -> int:
             words = core.arguments(recipe)
             if h["tool"] == "ants-n4":
                 s = n4_size(words, size, spacing)
-                ants = (
-                    max(s["points"]) * args.n4_point_bytes
-                    + s["padded_voxels"] * args.n4_voxel_bytes
-                )
-                lx = (
-                    max(s["points"]) * args.n4_point_bytes_lx
-                    + s["padded_voxels"] * args.n4_voxel_bytes_lx
-                )
+                two = s["dimension"] == 2
+                pb = args.n4_point_bytes_2d if two else args.n4_point_bytes
+                pb_lx = args.n4_point_bytes_lx_2d if two else args.n4_point_bytes_lx
+                ps = args.n4_point_seconds_2d if two else args.n4_point_seconds
+                ps_lx = args.n4_point_seconds_lx_2d if two else args.n4_point_seconds_lx
+                ants = max(s["points"]) * pb + s["padded_voxels"] * args.n4_voxel_bytes
+                lx = max(s["points"]) * pb_lx + s["padded_voxels"] * args.n4_voxel_bytes_lx
                 work = sum(i * pt for i, pt in zip(s["iterations"], s["points"], strict=True))
                 pad_work = sum(s["iterations"]) * s["padded_voxels"]
                 row.update(
                     sizing=s,
                     ants_gib=ants / GIB,
                     larmorx_gib=lx / GIB,
-                    ants_hours=(work * args.n4_point_seconds + pad_work * args.n4_voxel_seconds)
-                    / 3600,
-                    larmorx_hours=(
-                        work * args.n4_point_seconds_lx + pad_work * args.n4_voxel_seconds_lx
-                    )
-                    / 3600,
+                    ants_hours=(work * ps + pad_work * args.n4_voxel_seconds) / 3600,
+                    larmorx_hours=(work * ps_lx + pad_work * args.n4_voxel_seconds_lx) / 3600,
                 )
             elif h["tool"] in ("ants-resample-image-by-spacing", "ants-resample-image"):
                 s = (by_spacing_size if h["tool"].endswith("spacing") else resample_size)(

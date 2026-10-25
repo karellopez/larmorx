@@ -2,7 +2,7 @@
 # Golden checksums of the larmorx-nc replicas (tests/golden.rs): SHA-256 of the files
 # larmorx-nc writes on Linux x86_64 (images by header and data, with sampled values).
 # Every platform must reproduce them (docs/validation/golden.md). Do not edit by hand.
-# Recorded from 53481ee26e1ca2f98b200c9138f7e96c6c019b42 on 2026-10-24 (Linux x86_64)
+# Recorded from ef73e6fc4158bd8725724a50dfafb54fff99331f on 2026-10-25 (Linux x86_64)
 # case	output	sha256	type	sample
 mcflirt.2d.slab	mcflirt.2d.slab.mat/MAT_0000	633321b8478677454c33d3e82c9de5c297714b8f258fde08d8db42db06ec802f	-	-
 mcflirt.2d.slab	mcflirt.2d.slab.mat/MAT_0001	8795c62cc2ad469560c04bb9ab443d63c187836bf092a312f22b39c9e8e429ae	-	-
@@ -129,7 +129,7 @@ mcflirt.nonfinite.reproduce	mcflirt.nonfinite.reproduce.mat/MAT_0002	c8b0554af65
 mcflirt.nonfinite.reproduce	mcflirt.nonfinite.reproduce.mat/MAT_0003	649685661ef93e6e101a329266311f6359efcc9e19ff23ad2d45399ac4080dc3	-	-
 mcflirt.nonfinite.reproduce	mcflirt.nonfinite.reproduce.nii.data	f0cc94e6dd5437e479abdcd4bdf78c77232d95ad5fec22e065a3cd255369e234	float32	1a92c34078613d41e9e60141dc530041000020400000b0400000004000000040
 mcflirt.nonfinite.reproduce	mcflirt.nonfinite.reproduce.nii.header	c5adb0b5bc888dd50644619e1b10d9b221c3ee59132fff6dcebfcbfbf16316ec	-	-
-mcflirt.nonfinite.reproduce	mcflirt.nonfinite.reproduce.par	b08d9de299aee0b5d30bc98eaba0fd86b9bcdf683e69a5c99529f0977fa2eb88	-	-
+mcflirt.nonfinite.reproduce	mcflirt.nonfinite.reproduce.par	0f3a48c679d6ed3aabffebd9708e9e1c04f2dc814557dd51043ee12729ff4910	-	-
 mcflirt.nonfinite.reproduce	mcflirt.nonfinite.reproduce_abs.rms	39fdf2e234eea5538a5b22950b51766bbd472e7b6bdc2af1b1a66523e5c13bc1	-	-
 mcflirt.nonfinite.reproduce	mcflirt.nonfinite.reproduce_abs_mean.rms	82ffb37b20c79a91a08873b777c412e7e4927be2871198ea23e7053f7ec29ee6	-	-
 mcflirt.normmi.stages1	mcflirt.normmi.stages1.mat/MAT_0000	fec3aeb371d3a3c2626fef23069098f556aa93e7219a815168d56d48121ef955	-	-

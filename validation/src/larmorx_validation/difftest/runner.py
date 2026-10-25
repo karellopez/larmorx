@@ -461,8 +461,13 @@ def isolated_judge(
         except subprocess.TimeoutExpired:
             return Judgement(TIMEOUT, ("timeout",), f"no result within {timeout:.0f} s")
     if p.returncode == -signal.SIGKILL and leaf is not None and leaf.oom_kills() > oom_before:
-        # The child itself was stopped: larmorx, which runs in it.
-        return memory_judgement("larmorx", leaf.limit, "the kernel stopped the process running it")
+        # The child itself was stopped: larmorx runs in it, and so does the comparison of the
+        # outputs (both count toward the limit; the heavy run measures larmorx's own peak).
+        return memory_judgement(
+            "larmorx",
+            leaf.limit,
+            "the kernel stopped the process that runs larmorx and compares the outputs (both count)",
+        )
     if p.returncode < 0 or not p.stdout.strip().startswith("{"):
         tail = " ".join(p.stderr.strip().splitlines()[-3:])[-400:]
         return Judgement(

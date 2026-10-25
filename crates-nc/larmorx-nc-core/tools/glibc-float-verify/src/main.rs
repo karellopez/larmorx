@@ -377,6 +377,27 @@ fn main() {
             |x| x.abs() <= 0.05,
             "small arguments |x| <= 0.05",
         );
+        // fdlibm's comment value of aT[0] (0x3eaaaaaa, the translation before 2026-10-25):
+        // the inputs whose atanf it changes (1,037,658; 882,244 below 0.4375).
+        let comment = f32::from_bits(0x3eaa_aaaa);
+        let (n, small) = (0u32..=u32::MAX >> 16)
+            .into_par_iter()
+            .map(|hi| {
+                let (mut n, mut small) = (0u64, 0u64);
+                for lo in 0..=0xffffu32 {
+                    let x = f32::from_bits((hi << 16) | lo);
+                    if !same(fdlibm::atanf(x), fdlibm::atanf_with_at0(x, comment)) {
+                        n += 1;
+                        small += u64::from(x.abs() < 0.4375);
+                    }
+                }
+                (n, small)
+            })
+            .reduce(|| (0, 0), |a, b| (a.0 + b.0, a.1 + b.1));
+        println!(
+            "atanf with fdlibm's comment value of aT[0] (0x3eaaaaaa): differs on {n} of 2^32 inputs \
+             ({small} with |x| < 0.4375)"
+        );
     }
     if want("atan2f") {
         ok &= atan2f_report();

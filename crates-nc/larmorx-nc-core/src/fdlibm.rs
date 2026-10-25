@@ -97,6 +97,15 @@ pub fn atan2f(y: f32, x: f32) -> f32 {
 
 /// glibc's `atanf(x)` (`__atanf`).
 pub fn atanf(x: f32) -> f32 {
+    atanf_with_at0(x, AT0)
+}
+
+/// `aT[0]` as the compiler rounds fdlibm's `3.3333334327e-01` (its comment says `0x3eaaaaaa`).
+pub const AT0: f32 = f32::from_bits(0x3eaa_aaab);
+
+/// [`atanf`] with another first polynomial coefficient `aT[0]`: how far fdlibm's comment value
+/// (`0x3eaaaaaa`) moves the results (`tools/glibc-float-verify atanf`).
+pub fn atanf_with_at0(x: f32, at0: f32) -> f32 {
     const ATANHI: [f32; 4] = [
         f32::from_bits(0x3eed_6338),
         f32::from_bits(0x3f49_0fda),
@@ -109,7 +118,7 @@ pub fn atanf(x: f32) -> f32 {
         f32::from_bits(0x3314_0fb4),
         f32::from_bits(0x33a2_2168),
     ];
-    // aT[0] = 3.3333334327e-01 rounds to 0x3eaaaaab (fdlibm's comment says 0x3eaaaaaa).
+    // AT[0] is not used: `at0` (AT0, 0x3eaaaaab, for glibc's atanf) takes its place.
     const AT: [f32; 11] = [
         f32::from_bits(0x3eaa_aaab),
         f32::from_bits(0xbe4c_cccd),
@@ -165,7 +174,7 @@ pub fn atanf(x: f32) -> f32 {
     }
     let z = x * x;
     let w = z * z;
-    let s1 = z * (AT[0] + w * (AT[2] + w * (AT[4] + w * (AT[6] + w * (AT[8] + w * AT[10])))));
+    let s1 = z * (at0 + w * (AT[2] + w * (AT[4] + w * (AT[6] + w * (AT[8] + w * AT[10])))));
     let s2 = w * (AT[1] + w * (AT[3] + w * (AT[5] + w * (AT[7] + w * AT[9]))));
     if id < 0 {
         x - x * (s1 + s2)

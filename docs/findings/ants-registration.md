@@ -276,7 +276,9 @@ composed with `Compose(·, pre = true)` (a `TranslationTransform` through its of
   its derivative array. larmorx drops them by default and, in `reproduce`, adds those inside the
   array where ITK does: five displacement-field cases of the first night became bit-identical
   (`docs/findings/upstream-defects.md`, ITK-97; permanent case
-  `difftest/sampled-derivatives-aliased`).
+  `difftest/sampled-derivatives-aliased`). SyN's and B-spline SyN's stages do the same (their
+  metrics are of local support too); the time-varying velocity-field stages drop such points in
+  both modes without naming them (their sampling is clock-seeded, ANTS-82).
 - **The empty sample set's exception** is ITK's `itkImageToImageMetricv4.hxx:263` with the
   metric's own class name (`MattesMutualInformationImageToImageMetricv4`, ...), or
   `itkJointHistogramMutualInformationImageToImageMetricv4.hxx:233` for `MI`; larmorx printed line

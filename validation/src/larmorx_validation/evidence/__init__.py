@@ -39,7 +39,7 @@ def main(args) -> int:
     from larmorx_validation.evidence.core import Context, prune, write_tool
     from larmorx_validation.figures.core import REPO, default_cache
 
-    tools = list(TOOLS) if args.tool == "all" else [] if args.tool == "summary" else [args.tool]
+    tools = list(TOOLS) if args.tool == "all" else [] if args.tool in ("summary", "difftest") else [args.tool]
     for tool in tools:
         if tool not in TOOLS:
             raise SystemExit(
@@ -62,6 +62,15 @@ def main(args) -> int:
             continue
         path = write_tool(ctx, tool, doc)
         print(f"{tool}: {path}")
+    if args.tool in ("all", "difftest"):
+        # Random testing's panels (docs/validation/difftest.md): from the latest night.
+        from larmorx_validation.evidence import difftest
+
+        try:
+            print(f"difftest: {write_tool(ctx, 'difftest', difftest.export(ctx))}")
+        except FileNotFoundError as e:
+            print(f"skipped difftest: {e}")
+            status = 1
     if args.tool in ("all", "summary"):
         from larmorx_validation.evidence import summary
 

@@ -51,6 +51,8 @@ def draw(d: gen.Draw) -> dict:
         "scaling": None,
         "timing": {"tr": 2.0, "tunits": "sec", "slice_code": 0},
         "suffix": ".nii.gz",
+        # A constant series has no motion to estimate: shrinking keeps the phantom.
+        "keep_content": True,
     }
     in_files = {"in": series}
     groups = [required("input", "-in", "{in:in}"), required("output", "-out", "{run}/out_mcf.nii.gz")]
@@ -86,7 +88,7 @@ def draw(d: gen.Draw) -> dict:
     if outs:
         groups.append(group("outputs", *outs))
         options += outs
-    return {"groups": groups, "inputs": in_files, "options": options, "extra": {"min_size": 8, "min_volumes": 4, "keep_inputs": ["in"]}}
+    return {"groups": groups, "inputs": in_files, "options": options, "extra": {"min_size": 12, "min_volumes": 4, "keep_inputs": ["in"]}}
 
 
 @functools.cache

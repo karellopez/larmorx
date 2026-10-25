@@ -97,7 +97,9 @@ def compare(checks: CheckList, name: str, actual: np.ndarray, expected: np.ndarr
     af, ef = a.astype(np.float64), e.astype(np.float64)
     both_nan = np.isnan(af) & np.isnan(ef)
     with np.errstate(invalid="ignore"):
-        d = np.where(both_nan, 0.0, np.abs(af - ef))
+        # Equal values differ by 0, equal infinities included (inf - inf is NaN; found by
+        # random testing, 2026-10-25: a field map pushing samples to infinity on both sides).
+        d = np.where(both_nan | (af == ef), 0.0, np.abs(af - ef))
     d = np.where(np.isnan(d), np.inf, d)
     finite = ef[np.isfinite(ef)]
     scale = float(np.abs(finite).max()) if finite.size else 1.0

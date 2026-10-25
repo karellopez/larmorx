@@ -1,0 +1,343 @@
+# One description per tool and per validation record: the facts that the README's tool table,
+# the validation index (docs/validation/README.md) and the documentation site's status table
+# (data/status.yml) show and that the records cannot provide. The numbers come from the
+# records' JSON (docs/validation/<record>.json), computed by larmorx_validation.tables:
+#
+#     python -m larmorx_validation tables            # write the three tables
+#     python -m larmorx_validation tables --check    # fail when a committed table differs
+#
+# In the texts, {<record>.<metric>} is a number from a record (larmorx_validation.tables.METRICS
+# says how each is computed); [text](record:<record>) links a record and [text](repo:<path>) a
+# file of this repository, each written as the table's place needs (README.md, the validation
+# index, the site's repo: links). Edit a text here, never in the generated tables.
+
+# ------------------------------------------------------------------------------------------------
+# Tools: the README's "Supported tools" table and the site's status table, in this order.
+
+[[tool]]
+id = "nifti-io"
+title = "NIfTI-1/2 I/O"
+eco = "larmorx"
+page = "/tools/nifti-io/"
+use = ["lx.load", "lx.save", "lx.Image"]
+how = "own implementation"
+validation = "[{nifti-io.cases} files](record:nifti-io), data bit-identical to nibabel; [4–8× faster](repo:docs/benchmarks/nifti-io.md) on compressed writes with threads"
+
+[[tool]]
+id = "ants-apply-transforms"
+title = "antsApplyTransforms"
+eco = "ants"
+page = "/tools/ants-apply-transforms/"
+use = ["larmorx ants antsApplyTransforms", "lx.ants.apply_transforms"]
+how = "port (ANTs/ITK)"
+validation = "[{ants-apply-transforms.cases} cases](record:ants-apply-transforms): {ants-apply-transforms.identical} of {ants-apply-transforms.compared} compared bit-identical to ANTs, the rest differ only through glibc's maths; B-spline transforms included"
+
+[[tool]]
+id = "itk-hdf5"
+title = "ITK transform files (`.mat`, `.txt`, `.h5`)"
+eco = "ants"
+page = "/tools/itk-hdf5/"
+use = ["lx.transforms"]
+how = "port (ITK, HDF5)"
+validation = "[{itk-hdf5.cases} cases](record:itk-hdf5), {itk-hdf5.fail} failures; HDF5 read and written in pure Rust"
+
+[[tool]]
+id = "ants-n4"
+title = "N4BiasFieldCorrection"
+eco = "ants"
+page = "/tools/ants-n4/"
+use = ["larmorx ants N4BiasFieldCorrection", "lx.ants.n4_bias_field_correction"]
+how = "port"
+validation = "[{ants-n4.identical} of {ants-n4.compared}](record:ants-n4) bit-identical to ANTs, {ants-n4.compared} of {ants-n4.compared} with correctly rounded maths; ANTS-40 corrected by default"
+
+[[tool]]
+id = "ants-denoise"
+title = "DenoiseImage"
+eco = "ants"
+page = "/tools/ants-denoise/"
+use = ["larmorx ants DenoiseImage", "lx.ants.denoise_image"]
+how = "port"
+validation = "[{ants-denoise.identical} of {ants-denoise.compared}](record:ants-denoise) bit-identical to ANTs, {ants-denoise.compared} of {ants-denoise.compared} with correctly rounded maths; ANTS-43 and ANTS-44 corrected by default"
+
+[[tool]]
+id = "ants-image-math"
+title = "ImageMath (every operation fMRIPrep, sMRIPrep and sdcflows call)"
+eco = "ants"
+page = "/tools/ants-programs/"
+use = ["larmorx ants ImageMath", "lx.ants.image_math"]
+how = "port"
+validation = "[{ants-image-math.cases} cases](record:ants-image-math): values bit-identical in {ants-image-math.identical} of {ants-image-math.compared}, headers in {ants-image-math.headers} of {ants-image-math.compared}; ANTS-17, -22 and -23 corrected, checked against known results"
+
+[[tool]]
+id = "ants-programs"
+title = "ThresholdImage, MultiplyImages, SmoothImage, ResampleImage, ResampleImageBySpacing"
+eco = "ants"
+page = "/tools/ants-programs/"
+use = ["larmorx ants ..."]
+how = "port"
+# The records of the first four predate the reported values in their JSON: "bit-identical"
+# is their records' own statement (their Markdown highlights), kept here.
+validation = "bit-identical in every compared case ([threshold](record:ants-threshold-image), [multiply](record:ants-multiply-images), [smooth](record:ants-smooth-image), [resample](record:ants-resample-image), [by spacing](record:ants-resample-image-by-spacing))"
+
+[[tool]]
+id = "ants-registration"
+title = "antsRegistration (every stage: linear, SyN, B-spline SyN, B-spline, displacement-field, exponential and time-varying velocity-field; image and point-set metrics)"
+eco = "ants"
+page = "/tools/ants-registration/"
+use = ["larmorx ants antsRegistration", "lx.ants.registration"]
+how = "port"
+validation = "[{ants-registration.cases} cases](record:ants-registration): {ants-registration.as_built} of {ants-registration.compared} compared identical to ANTs (outputs and messages), {ants-registration.with_crmath} more with correctly rounded maths; [the corrections' effects](record:ants-registration-corrections)"
+
+[[tool]]
+id = "ants-ai"
+title = "antsAI, antsAffineInitializer"
+eco = "ants"
+page = "/tools/ants-ai/"
+use = ["larmorx ants antsAI", "larmorx ants antsAffineInitializer"]
+how = "port"
+validation = "[antsAI](record:ants-ai): {ants-ai.compared} of {ants-ai.compared} compared identical ({ants-ai.as_built} as built, {ants-ai.with_crmath} with correctly rounded maths), the blob alignment (`-b`) included (its corrections, ANTS-116 among them, by default); [antsAffineInitializer](record:ants-affine-initializer): {ants-affine-initializer.compared} of {ants-affine-initializer.compared}"
+
+[[tool]]
+id = "ants-atropos"
+title = "Atropos (every initialization, likelihood model, MRF, outlier and partial-volume option)"
+eco = "ants"
+page = "/tools/ants-atropos/"
+use = ["larmorx ants Atropos", "lx.ants.atropos"]
+how = "port"
+validation = "[{ants-atropos.cases} cases](record:ants-atropos): {ants-atropos.identical} of {ants-atropos.compared} compared bit-identical to ANTs, {ants-atropos.compared} of {ants-atropos.compared} with correctly rounded maths, sMRIPrep's call on the five oracle runs included; partial-volume classes with the MRF corrected (ANTS-106)"
+
+[[tool]]
+id = "resample-series"
+title = "fMRIPrep's one-shot BOLD resampler"
+eco = "larmorx"
+page = "/tools/resample-series/"
+use = ["lx.transforms.resample_series"]
+how = "port (fMRIPrep, nitransforms, SciPy)"
+validation = "[{resample-series.cases} cases](record:resample-series): {resample-series.pass} of {resample-series.pass} compared bit-identical"
+
+[[tool]]
+id = "afni-tshift"
+title = "3dTshift (slice timing)"
+eco = "afni"
+page = "/tools/afni-tshift/"
+use = ["larmorx afni 3dTshift", "lx.afni.tshift"]
+how = "clean-room original; exact replica in `larmorx-gpl`"
+validation = "original: [{afni-tshift.compared} of {afni-tshift.compared}](record:afni-tshift) compared agree, {afni-tshift.identical} bit-identical, [2–6× faster](repo:docs/benchmarks/afni-tshift.md); replica: [{afni-tshift-replica.identical} of {afni-tshift-replica.compared}](record:afni-tshift-replica) bit-identical"
+
+[[tool]]
+id = "afni-automask"
+title = "3dAutomask (brain mask)"
+eco = "afni"
+page = "/tools/afni-automask/"
+use = ["larmorx afni 3dAutomask", "lx.afni.automask"]
+how = "clean-room original; exact replica in `larmorx-gpl`"
+# "84 of 85" and "85 of 85" are the records' own statements (their JSON keeps no per-case
+# identity for this suite).
+validation = "original: [{afni-automask.cases} cases](record:afni-automask), 84 of 85 compared cases that write outputs bit-identical to AFNI (the other: AFNI-10's header, its data bit-identical), fMRIPrep's call on every oracle run's BOLD reference included; replica: [85 of 85](record:afni-automask-replica) bit-identical"
+
+[[tool]]
+id = "afni-unifize"
+title = "3dUnifize (intensity uniformization)"
+eco = "afni"
+page = "/tools/afni-unifize/"
+use = ["larmorx afni 3dUnifize", "lx.afni.unifize"]
+how = "clean-room original; exact replica in `larmorx-gpl`"
+validation = "original: [{afni-unifize.cases} cases](record:afni-unifize), none failing: {afni-unifize.identical} of {afni-unifize.written} compared cases that write outputs bit-identical to AFNI, the other {afni-unifize.with_crmath} within 1e-5 (at most 8.7e-8 of the largest value) and bit-identical to AFNI run with correctly rounded maths (glibc's `tanhf` in AFNI's squash), fMRIPrep's call on every oracle run included; 4 to 25 times faster than AFNI (informal timings); replica: [{afni-unifize.written} of {afni-unifize.written}](record:afni-unifize-replica) bit-identical at 1, 2 and 6 threads"
+
+[[tool]]
+id = "mri-hmc"
+title = "Head-motion correction (mcflirt)"
+eco = "fsl"
+page = "/tools/mri-hmc/"
+use = ["larmorx mri hmc", "larmorx fsl mcflirt", "lx.mri.hmc"]
+how = "clean-room original, `experimental`; exact replica in `larmorx-nc` (FSL Licence, non-commercial)"
+validation = "original: [compared with FSL's mcflirt](record:mri-hmc): {mri-hmc.pass} of {mri-hmc.compared} compared cases within thresholds; [5–16× faster](repo:docs/benchmarks/mri-hmc.md) with threads; replica: [{fsl-mcflirt-replica.pass} of {fsl-mcflirt-replica.compared}](record:fsl-mcflirt-replica) compared cases bit-identical to mcflirt as built (the 137 recorded runs, fMRIPrep's calls on the five oracle runs, 32 edge cases; {fsl-mcflirt-replica.both} more rejected by both, alike), fMRIPrep's own matrices identical"
+
+# ------------------------------------------------------------------------------------------------
+# Records: the validation index's table (docs/validation/README.md), in this order.
+
+[[record]]
+id = "nifti-io"
+larmorx = "`larmorx.io.load` / `save`"
+reference = "nibabel"
+status = "`validated`"
+
+[[record]]
+id = "ants-apply-transforms"
+larmorx = "`lx.ants.apply_transforms`, `larmorx ants antsApplyTransforms` (double, and single precision as `--float 1`; B-spline transforms since A5 part 3)"
+reference = "antsApplyTransforms (ANTs 2.6.5 binary, as built and with CORE-MATH preloaded; ANTsPy in-process if the binary is missing)"
+status = "`validated`"
+
+[[record]]
+id = "itk-hdf5"
+larmorx = "`lx.transforms.read`/`write` of `.h5` files, `lx.transforms.load_itk_composite`, `-t x.h5` of `larmorx ants antsApplyTransforms` (crates `larmorx-hdf5`, `larmorx-io`)"
+reference = "ITK 5.4.5 on HDF5 1.12.1 (ANTs 2.6.5 binaries: what ITK reads, written back by antsApplyTransforms; what it writes), h5py, nitransforms 25.1.0"
+status = "`validated` ({itk-hdf5.expected} expected divergences: a composite of 38 transforms is laid out compactly; a 2-D component in a 3-D composite is refused, ITK-17; data stored in other files, which ITK's HDF5 follows, are refused: external raw files, external links, virtual datasets)"
+
+[[record]]
+id = "afni-tshift"
+larmorx = "`lx.afni.tshift`, `larmorx afni 3dTshift` (clean-room)"
+reference = "3dTshift (AFNI 25.2.09 binary)"
+status = "`validated`"
+
+[[record]]
+id = "oracles"
+larmorx = "how the original programs were built (BUILD_INFO, every program's SHA-256)"
+reference = "—"
+status = "reference"
+
+[[record]]
+id = "oracle-runs"
+larmorx = "how the fMRIPrep oracle runs were made (image digest, arguments, seeds, threads)"
+reference = "—"
+status = "reference"
+
+[[record]]
+id = "oracle-cache"
+larmorx = "how the parity suites run the original programs once: the key, what is never cached and why, the modes, `verify`, the measured gain"
+reference = "—"
+status = "reference"
+
+[[record]]
+id = "difftest"
+larmorx = "differential random testing: random valid inputs and options through every original program and larmorx each night, differences shrunk into permanent cases (`python -m larmorx_validation difftest`)"
+reference = "—"
+status = "reference"
+
+[[record]]
+id = "afni-tshift-replica"
+larmorx = "`larmorx-gpl afni 3dTshift` (GPL replica, `crates-gpl/`)"
+reference = "3dTshift (AFNI 25.2.09 binary)"
+status = "`validated`"
+
+[[record]]
+id = "afni-automask"
+larmorx = "`lx.afni.automask`, `larmorx afni 3dAutomask` (clean-room original, `crates/larmorx-afni`)"
+reference = "3dAutomask (AFNI 25.2.09 binary; fMRIPrep 25.2.6's AFNI as a second build)"
+status = "`validated`"
+
+[[record]]
+id = "afni-automask-replica"
+larmorx = "`larmorx-gpl afni 3dAutomask` (GPL replica, `crates-gpl/`), run by `larmorx afni 3dAutomask` and `lx.afni.automask`"
+reference = "3dAutomask (AFNI 25.2.09 binary; fMRIPrep 25.2.6's AFNI as a second build)"
+status = "`validated`"
+
+[[record]]
+id = "afni-unifize"
+larmorx = "`lx.afni.unifize`, `larmorx afni 3dUnifize` (clean-room original)"
+reference = "3dUnifize (AFNI 25.2.09 binary, as built and with CORE-MATH's correctly rounded functions preloaded; 1 and 6 OpenMP threads; fMRIPrep 25.2.6's AFNI)"
+status = "`validated`"
+
+[[record]]
+id = "afni-unifize-replica"
+larmorx = "`larmorx-gpl afni 3dUnifize` (GPL replica), run by `larmorx afni 3dUnifize` and `lx.afni.unifize`"
+reference = "3dUnifize (AFNI 25.2.09 binary, 1, 2 and 6 OpenMP threads; fMRIPrep 25.2.6's AFNI)"
+status = "`validated`"
+
+[[record]]
+id = "resample-series"
+larmorx = "`lx.transforms.resample_series`, `lx.transforms.load_transforms`, `lx.ndimage`"
+reference = "fMRIPrep's `ResampleSeries`, nitransforms 25.1.0, SciPy 1.15 (in-process)"
+status = "`validated`"
+
+[[record]]
+id = "numpy-linalg"
+larmorx = "`larmorx_transform::openblas` through `lx.transforms`: 4×4 products and inverses, point mapping, `ensure_positive_cosines`, loaded transforms"
+reference = "numpy 2.3.5 on OpenBLAS 0.3.30's Haswell kernels, nitransforms, sdcflows, fMRIPrep (in-process); other kernels in [numpy-linalg-kernels.json](repo:docs/validation/numpy-linalg-kernels.json)"
+status = "`validated` ({numpy-linalg.expected} expected divergence: exactly 45° grids)"
+
+[[record]]
+id = "ants-image-math"
+larmorx = "`lx.ants.image_math` and its typed wrappers, `larmorx ants ImageMath` (arithmetic, `Neg`, `TruncateImageIntensity`, `Normalize`, `RescaleImage`, `G`, `Laplacian`, `Grad`, `UnsharpMask`, `MD`, `ME`, `MO`, `MC`, `GD`, `GE`, `GO`, `GC`, `FillHoles`, `PadImage`, `GetLargestComponent`, `D`, `MaurerDistance`, `ExtractContours`, `ThresholdAtMean`, `ReplaceVoxelValue`)"
+reference = "ImageMath (ANTs 2.6.5 binary)"
+status = "`validated`"
+
+[[record]]
+id = "ants-threshold-image"
+larmorx = "`lx.ants.threshold_image`, `lx.ants.otsu_threshold`, `larmorx ants ThresholdImage` (no `Kmeans` yet)"
+reference = "ThresholdImage (ANTs 2.6.5 binary)"
+status = "`validated`"
+
+[[record]]
+id = "ants-multiply-images"
+larmorx = "`lx.ants.multiply_images`, `larmorx ants MultiplyImages`"
+reference = "MultiplyImages (ANTs 2.6.5 binary)"
+status = "`validated`"
+
+[[record]]
+id = "ants-smooth-image"
+larmorx = "`lx.ants.smooth_image`, `larmorx ants SmoothImage` (recursive Gaussian and median)"
+reference = "SmoothImage (ANTs 2.6.5 binary)"
+status = "`validated`"
+
+[[record]]
+id = "ants-resample-image-by-spacing"
+larmorx = "`lx.ants.resample_image_by_spacing`, `larmorx ants ResampleImageBySpacing`"
+reference = "ResampleImageBySpacing (ANTs 2.6.5 binary)"
+status = "`validated` ({ants-resample-image-by-spacing.cases} cases: {ants-resample-image-by-spacing.identical} of {ants-resample-image-by-spacing.compared} compared bit-identical, values and headers; {ants-resample-image-by-spacing.both} rejected by both; ANTs' values not compared where it resamples memory it never wrote, ANTS-28; ANTS-32 corrected by default, checked against known results)"
+
+[[record]]
+id = "ants-resample-image"
+larmorx = "`lx.ants.resample_image`, `larmorx ants ResampleImage`"
+reference = "ResampleImage (ANTs 2.6.5 binary)"
+status = "`validated` (B-spline, Gaussian and windowed sinc in 3D only; 2 expected divergences)"
+
+[[record]]
+id = "ants-n4"
+larmorx = "`lx.ants.n4_bias_field_correction`, `larmorx ants N4BiasFieldCorrection`"
+reference = "N4BiasFieldCorrection (ANTs 2.6.5 binary, one thread; exact reference with CORE-MATH preloaded, `scripts/build_crmath_preload.sh`)"
+status = "`validated`"
+
+[[record]]
+id = "ants-denoise"
+larmorx = "`lx.ants.denoise_image`, `larmorx ants DenoiseImage`"
+reference = "DenoiseImage (ANTs 2.6.5 binary with ITK's AdaptiveDenoising at `24825c8d`, one thread; exact reference with CORE-MATH preloaded)"
+status = "`validated`"
+
+[[record]]
+id = "ants-registration"
+larmorx = "`lx.ants.registration`, `larmorx ants antsRegistration` (linear stages: `Translation`, `Rigid`, `Similarity`, `Affine`, `CompositeAffine`; SyN stages (A5 part 1); BSplineSyN, GaussianDisplacementField, BSplineDisplacementField and BSpline stages (A5 part 2); Exponential, BSplineExponential, TimeVaryingVelocityField and TimeVaryingBSplineVelocityField stages (A5 part 3); every image metric, `Demons` included, and every point-set metric, `ICP`, `PSE`, `JHCT`, `IGDM`; displacement fields among the initial transforms; 2D, 3D, 4D, double and float)"
+reference = "antsRegistration (ANTs 2.6.5 binary, one thread, `ANTS_RANDOM_SEED=42`; exact reference with CORE-MATH preloaded)"
+status = "`validated` (full tier: [ants-registration-full](record:ants-registration-full), with sMRIPrep's brain extraction and template registration, whole, on the five oracle runs, and [ants-registration-velocity-full](record:ants-registration-velocity-full); {ants-registration.expected} expected divergences: no seed, ANTS-51's crash, `--version`, ANTS-45, MINC transforms, in the point-set metrics a random fraction seeded from the clock, IGDM's reads before its arrays and a reader that never ends, linear stages after a field or a velocity field (ANTS-72), ANTS-77's B-spline meshes, and the velocity-field stages' samplings seeded from the clock (ANTS-82))"
+
+[[record]]
+id = "ants-registration-corrections"
+larmorx = "`lx.ants.registration`, `larmorx ants antsRegistration` in the default mode against `reproduce`: what the corrections decided on 2026-10-21 change (IGDM, JHCT, the B-spline field meshes, stages after a B-spline transform)"
+reference = "larmorx's `reproduce` mode (ANTs' result); for ITK-35, antsRegistration and antsApplyTransforms (ANTs 2.6.5 binary)"
+status = "`validated` ({ants-registration-corrections.cases} cases, every correction named and measured); the displacement-field references of ITK-35 run five times (ANTS-72: ANTs' own runs up to 8.5 mm apart)"
+
+[[record]]
+id = "ants-registration-velocity-full"
+larmorx = "the full tier's velocity-field and corrections cases of [ants-registration](record:ants-registration) (A5 part 3): 4D, the four stages on the five oracle runs, the exponential stages at full size"
+reference = "as ants-registration"
+status = "`validated` ({ants-registration-velocity-full.cases} cases: {ants-registration-velocity-full.as_built} identical to ANTs, {ants-registration-velocity-full.with_crmath} with CORE-MATH, every real case among them; {ants-registration-velocity-full.both} rejected by both, {ants-registration-velocity-full.expected} expected divergences)"
+
+[[record]]
+id = "ants-ai"
+larmorx = "`lx.ants.ai`, `larmorx ants antsAI` (initial alignments, principal axes, the blob alignment, the multi-start search with `Mattes`, `GC`, `MI`; 2D and 3D)"
+reference = "antsAI (ANTs 2.6.5 binary, one thread; exact reference with CORE-MATH preloaded)"
+status = "`validated` ({ants-ai.cases} cases: {ants-ai.compared} compared, {ants-ai.as_built} identical as built and {ants-ai.with_crmath} with CORE-MATH, {ants-ai.both} rejected by both, {ants-ai.expected} expected divergences; full tier [ants-ai-full](record:ants-ai-full): {ants-ai-full.cases} cases, the blob alignment on all five oracle runs' T1w against MNI; with fMRIPrep's own `init_aff` command lines; aborts compared up to the abort; ANTs' `-b` crashes above one thread, ANTS-60; the blob alignment's corrections, ANTS-116 included, in the fix pass)"
+
+[[record]]
+id = "ants-affine-initializer"
+larmorx = "`lx.ants.affine_initializer`, `larmorx ants antsAffineInitializer` (2D, 3D, 4D)"
+reference = "antsAffineInitializer (ANTs 2.6.5 binary, one thread)"
+status = "`validated`"
+
+[[record]]
+id = "ants-atropos"
+larmorx = "`lx.ants.atropos`, `larmorx ants Atropos` (every initialization, likelihood model, posterior formulation, MRF, ICM, outlier and partial-volume option; 2D, 3D, 4D)"
+reference = "Atropos (ANTs 2.6.5 binary, one thread; exact reference with CORE-MATH preloaded)"
+status = "`validated` (full tier: [ants-atropos-full](record:ants-atropos-full); sMRIPrep's call on the five oracle runs; expected divergences: ANTs' aborts and crashes, its clock seed); partial-volume classes with the MRF on a phantom of known fractions (ANTS-106 corrected: Dice 0.86 and 0.81 where ANTs gives 0.30 and 0.41)"
+
+[[record]]
+id = "mri-hmc"
+larmorx = "`lx.mri.hmc`, `larmorx mri hmc` (clean-room)"
+reference = "mcflirt (FSL 6.0.7.17, the recorded runs in `oracles/fsl-6.0.7/mcflirt/`)"
+status = "`experimental` ({mri-hmc.fail} of {mri-hmc.compared} compared cases misses its threshold)"
+
+[[record]]
+id = "fsl-mcflirt-replica"
+larmorx = "`larmorx-nc fsl mcflirt`, `lx.mri.hmc(implementation=\"replica\")` (the replica, FSL Licence)"
+reference = "mcflirt (FSL 6.0.7.17 as built: the recorded runs, fMRIPrep's calls, edge cases run here)"
+status = "`validated` ({fsl-mcflirt-replica.pass} of {fsl-mcflirt-replica.compared} compared cases bit-identical; {fsl-mcflirt-replica.both} rejected by both, with the same messages and status)"

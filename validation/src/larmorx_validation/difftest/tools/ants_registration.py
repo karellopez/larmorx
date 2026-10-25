@@ -59,6 +59,8 @@ def _phantom_pair(d: gen.Draw, dim: int) -> tuple[dict, dict]:
         "dtype": d.choice("fixed dtype", ("float32", "float32", "int16", "float64", "uint8")),
         "scaling": None,
         "suffix": ".nii.gz",
+        # A constant image makes every metric degenerate: shrinking keeps the phantom.
+        "keep_content": True,
     }
     m_geo = dict(fixed_geo)
     if d.chance("moving on another grid", 0.6):

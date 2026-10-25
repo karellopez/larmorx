@@ -27,13 +27,14 @@ import json
 import multiprocessing
 import os
 import signal
+import tempfile
 import time
 import traceback
 from multiprocessing.connection import Connection, wait
 from pathlib import Path
 
 from larmorx_validation.difftest import core, gen, inputs, tools
-from larmorx_validation.difftest.core import DIFFER, EXPLAINED, SKIP, Judgement
+from larmorx_validation.difftest.core import DIFFER, EXPLAINED, NOTICE, SKIP, Judgement
 from larmorx_validation.parity import harness
 
 TIMEOUT = "timeout"
@@ -75,8 +76,42 @@ def limit_threads(threads: int) -> None:
     _ = afni_replica
 
 
+UNDEFINED = "undefined"
+
+#: The D13 notices larmorx's in-process runs printed in ``reproduce`` mode during a case.
+_NOTICES: list[str] = []
+
+
+def _watch_notices() -> None:
+    """Wraps ``larmorx._core.cli_main`` (every suite's in-process larmorx run goes through it) so
+    the defects larmorx names while reproducing the original are known to the verdict: a
+    defect whose original result depends on memory it never wrote or on the clock
+    (:data:`~larmorx_validation.oracle_cache.policy.VARYING_DEFECTS`) makes the values
+    incomparable, as the parity suites' ``undefined_values`` says."""
+    from larmorx import _core
+
+    if getattr(_core.cli_main, "_difftest", False):
+        return
+    original = _core.cli_main
+
+    def cli_main(*args, **kw):
+        code, out, err = original(*args, **kw)
+        if os.environ.get("LARMORX_UPSTREAM_DEFECTS") == "reproduce":
+            from larmorx_validation.parity.defects import notices_in
+
+            _NOTICES.extend(notices_in(err))
+        return code, out, err
+
+    cli_main._difftest = True
+    _core.cli_main = cli_main
+
+
 def execute(tool: core.Tool, recipe: dict, impl: str, *, timeout: float | None = None, **case_kw) -> tuple[Judgement, float, harness.CaseResult | None]:
     """Runs one implementation of ``recipe`` through its parity runner and judges it."""
+    from larmorx_validation.oracle_cache.policy import VARYING_DEFECTS
+
+    _watch_notices()
+    _NOTICES.clear()
     case = tool.case(recipe, impl, **case_kw)
     suite = harness.Suite(
         name=f"difftest-{tool.name}",
@@ -95,11 +130,19 @@ def execute(tool: core.Tool, recipe: dict, impl: str, *, timeout: float | None =
         result = harness.run_one(suite, case)
     except CaseTimeout:
         return Judgement(TIMEOUT, ("timeout",), f"no result within {limit} s"), time.monotonic() - start, None
+    except BaseException as e:  # noqa: BLE001 - a Rust panic is a BaseException (PyO3)
+        if type(e).__name__ != "PanicException":
+            raise
+        return Judgement(DIFFER, ("larmorx panicked",), f"PanicException: {e}"[:600], "fail"), time.monotonic() - start, None
     finally:
         signal.alarm(0)
         signal.signal(signal.SIGALRM, previous)
         inputs.release(f"run/{gen.digest(recipe['inputs'])}")
-    return core.judge(tool, impl, result), time.monotonic() - start, result
+    j = core.judge(tool, impl, result)
+    varying = sorted({n for n in _NOTICES if n in VARYING_DEFECTS})
+    if j.verdict == DIFFER and varying:
+        j = Judgement(UNDEFINED, tuple(f"undefined: {n}" for n in varying), f"{', '.join(varying)}: {VARYING_DEFECTS[varying[0]]}; {j.detail}", j.status, j.checks)
+    return j, time.monotonic() - start, result
 
 
 @contextlib.contextmanager
@@ -200,7 +243,83 @@ def run_case(
         line["impls"][impl] = entry
     line["seconds"] = round(time.monotonic() - start, 2)
     verdicts = [e["verdict"] for e in line["impls"].values()]
-    line["verdict"] = next((v for v in (DIFFER, TIMEOUT, EXPLAINED, SKIP) if v in verdicts), core.AGREE)
+    line["verdict"] = next((v for v in (DIFFER, TIMEOUT, UNDEFINED, NOTICE, EXPLAINED, SKIP) if v in verdicts), core.AGREE)
+    return line
+
+
+# ------------------------------------------------------------------------------------------------
+# Crashes: a case that kills its process (larmorx aborting) runs in a child process of its own
+
+
+CRASH = "crash"
+
+
+def isolated_judge(tool_name: str, recipe: dict, impl: str, timeout: float) -> Judgement:
+    """The verdict of ``recipe`` judged in a child process; a child killed by a signal (an
+    abort, a segmentation fault) is a difference with the signature ``crash``."""
+    import subprocess
+    import sys
+
+    with tempfile.TemporaryDirectory(prefix="lx-dt-crash-") as t:
+        path = Path(t) / "recipe.json"
+        path.write_text(json.dumps({"tool": tool_name, "recipe": recipe}), encoding="utf-8")
+        env = {**os.environ, "LARMORX_ORACLE_CACHE_MODE": os.environ.get("LARMORX_ORACLE_CACHE_MODE", "off")}
+        try:
+            p = subprocess.run(
+                [sys.executable, "-m", "larmorx_validation", "difftest", "--judge-recipe", str(path), "--impl", impl],
+                capture_output=True,
+                text=True,
+                errors="replace",
+                env=env,
+                timeout=timeout,
+                check=False,
+            )
+        except subprocess.TimeoutExpired:
+            return Judgement(TIMEOUT, ("timeout",), f"no result within {timeout:.0f} s")
+    if p.returncode < 0 or not p.stdout.strip().startswith("{"):
+        tail = " ".join(p.stderr.strip().splitlines()[-3:])[-400:]
+        return Judgement(DIFFER, (CRASH,), f"the process ended by signal {-p.returncode}: {tail}" if p.returncode < 0 else f"exit {p.returncode}: {tail}", "crash")
+    d = json.loads(p.stdout.strip().splitlines()[-1])
+    return Judgement(d["verdict"], tuple(d["signature"]), d["detail"], d.get("status", ""), d.get("checks", []))
+
+
+def crash_case(tool_name: str, seed: str, n: int, *, shrink_budget: float = 600.0, **_) -> dict:
+    """A case whose run killed its worker: each implementation judged in a child process, the
+    crash shrunk the same way (each candidate in a child of its own)."""
+    from larmorx_validation.difftest import shrink as shrinking
+
+    tool = tools.get(tool_name)
+    recipe = core.make_recipe(tool, seed, n)
+    line: dict = {"tool": tool_name, "seed": seed, "n": n, "recipe_id": core.recipe_id(recipe), "options": recipe["options"], "features": recipe.get("features", {}), "impls": {}, "findings": [], "isolated": True}
+    start = time.monotonic()
+    for impl in tool.implementations:
+        j = isolated_judge(tool_name, recipe, impl, tool.timeout * 2)
+        line["impls"][impl] = {"verdict": j.verdict, "signature": list(j.signature), "detail": j.detail[:600], "status": j.status}
+        if j.verdict == DIFFER:
+            def attempt(r: dict, impl: str = impl) -> Judgement:
+                return isolated_judge(tool_name, r, impl, tool.timeout * 2)
+
+            small, kept, last, runs = shrinking.shrink(recipe, j.signature, attempt, budget_s=shrink_budget, extra=tool.shrink)
+            line["findings"].append(
+                {
+                    "tool": tool_name,
+                    "implementation": impl,
+                    "seed": seed,
+                    "n": n,
+                    "signature": list(j.signature),
+                    "detail": j.detail,
+                    "checks": j.checks,
+                    "recipe": recipe,
+                    "shrunk": small,
+                    "shrink_moves": kept,
+                    "shrink_runs": runs,
+                    "shrunk_detail": last.detail if last else j.detail,
+                    "shrunk_checks": last.checks if last else j.checks,
+                }
+            )
+    line["seconds"] = round(time.monotonic() - start, 2)
+    verdicts = [e["verdict"] for e in line["impls"].values()]
+    line["verdict"] = CRASH if any(e["signature"] == [CRASH] for e in line["impls"].values()) else next((v for v in (DIFFER, TIMEOUT, UNDEFINED, NOTICE, EXPLAINED, SKIP) if v in verdicts), core.AGREE)
     return line
 
 
@@ -220,7 +339,8 @@ def _worker(conn: Connection, threads: int) -> None:
         if task is None:
             return
         try:
-            line = run_case(**task)
+            kind = task.pop("kind", "case")
+            line = crash_case(**task) if kind == CRASH else run_case(**task)
         except BaseException:  # noqa: BLE001 - report everything to the parent
             line = {**{k: task.get(k) for k in ("tool_name", "seed", "n")}, "verdict": "harness-error", "detail": traceback.format_exc(limit=6)[-1500:]}
         conn.send(line)
@@ -248,7 +368,7 @@ class Pool:
     def submit(self, w: dict, task: dict, deadline_s: float) -> None:
         w["task"], w["started"] = task, time.monotonic()
         w["deadline"] = w["started"] + deadline_s
-        w["conn"].send(task)
+        w["conn"].send(dict(task))
 
     def busy(self) -> int:
         return sum(w["task"] is not None for w in self.workers)
@@ -262,17 +382,19 @@ class Pool:
             if w["task"] is None:
                 continue
             if w["conn"] in ready:
+                task = w["task"]
                 try:
                     line = w["conn"].recv()
                 except (EOFError, OSError):
-                    line = {"verdict": "harness-error", "detail": "the worker died"}
+                    code = w["proc"].exitcode
+                    line = {"verdict": CRASH, "detail": f"the worker died (exit code {code}): larmorx or the harness crashed"}
                     self._replace(w)
-                out.append((w["task"], line))
+                out.append((task, line))
                 w["task"] = None
             elif time.monotonic() > w["deadline"]:
-                task = w["task"]
+                task, started = w["task"], w["started"]
                 self._replace(w)
-                out.append((task, {"verdict": TIMEOUT, "detail": f"killed after {time.monotonic() - w['started']:.0f} s"}))
+                out.append((task, {"verdict": TIMEOUT, "detail": f"killed after {time.monotonic() - started:.0f} s"}))
         return out
 
     def _replace(self, w: dict) -> None:
@@ -341,12 +463,18 @@ def night(
     counts = {t.name: 0 for t in selected}
     next_n = {t.name: _resume(out, t.name) for t in selected}
     pool = Pool(jobs, threads)
+    crashes: list[dict] = []
     started = time.monotonic()
     try:
         while True:
             elapsed = time.monotonic() - started
             open_tools = [t for t in selected if max_cases is None or counts[t.name] < max_cases]
             for w in pool.idle():
+                if crashes:
+                    task = crashes.pop(0)
+                    ct = tools.get(task["tool_name"])
+                    pool.submit(w, task, deadline_s=ct.timeout * 4 * len(ct.implementations) + shrink_budget * 2 + 300)
+                    continue
                 if elapsed >= budget_s or not open_tools:
                     break
                 t = min(open_tools, key=lambda t: (spent[t.name] / t.weight, t.name))
@@ -357,13 +485,15 @@ def night(
                 task = {"tool_name": t.name, "seed": seed, "n": n, "shrink_budget": shrink_budget}
                 pool.submit(w, task, deadline_s=t.timeout * len(t.implementations) * 3 + shrink_budget * 2 + 120)
                 open_tools = [t for t in selected if max_cases is None or counts[t.name] < max_cases]
-            if pool.busy() == 0 and (elapsed >= budget_s or not open_tools):
+            if pool.busy() == 0 and not crashes and (elapsed >= budget_s or not open_tools):
                 break
             for task, line in pool.collect():
                 line = {"tool": task["tool_name"], "seed": task["seed"], "n": task["n"], **line}
                 spent[line["tool"]] += float(line.get("seconds") or (time.monotonic() - started) * 0)
                 if line.get("verdict") == TIMEOUT and "seconds" not in line:
                     spent[line["tool"]] += tools.get(line["tool"]).timeout
+                if line.get("verdict") == CRASH and task.get("kind") != CRASH:
+                    crashes.append({"kind": CRASH, "tool_name": task["tool_name"], "seed": task["seed"], "n": task["n"], "shrink_budget": shrink_budget})
                 findings = line.pop("findings", [])
                 for f in findings:
                     path = _write_finding(out, f)
@@ -416,5 +546,5 @@ def _environment() -> dict:
     return env
 
 
-__all__ = ["TIMEOUT", "CaseTimeout", "Pool", "execute", "judge_once", "limit_threads", "night", "run_case"]
+__all__ = ["CRASH", "TIMEOUT", "UNDEFINED", "CaseTimeout", "Pool", "crash_case", "execute", "isolated_judge", "judge_once", "limit_threads", "night", "run_case"]
 

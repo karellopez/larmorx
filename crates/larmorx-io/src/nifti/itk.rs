@@ -14,7 +14,7 @@ use std::path::Path;
 use larmorx_core::array::DynArray;
 use larmorx_core::element::DataType;
 use larmorx_core::element::RealElement;
-use larmorx_core::{dispatch_real_dyn_array, linalg};
+use larmorx_core::{dispatch_real_dyn_array, vnl_svd, vnl_svd_f32};
 use rayon::prelude::*;
 
 use super::header::{NiftiHeader, NiftiVersion, xform};
@@ -142,36 +142,61 @@ fn top3(m: &M44) -> [[f32; 3]; 3] {
     [0, 1, 2].map(|i| [m[i][0], m[i][1], m[i][2]])
 }
 
-fn to_f64<const N: usize>(m: &[[f32; N]; N]) -> [[f64; N]; N] {
-    m.map(|row| row.map(f64::from))
-}
-
-/// ITK's `IsAffine`: the bottom row is (0, 0, 0, 1) and the matrix is well conditioned.
+/// ITK's `IsAffine`: the bottom row is (0, 0, 0, 1) and the matrix is well conditioned
+/// (`vnl_matrix_inverse<double>(m).well_condition()`: the smallest of vnl's singular values
+/// over the largest).
 fn is_affine(m: &M44) -> bool {
     let bottom =
         (f64::from(m[3][3]) - 1.0).abs() + (0..3).map(|i| f64::from(m[3][i]).abs()).sum::<f64>();
     if bottom > f64::from(f32::EPSILON) {
         return false;
     }
-    let (sv, _) = linalg::svd_u(&to_f64(m));
-    let condition = if sv[0] > 0.0 { sv[3] / sv[0] } else { 0.0 };
+    let flat: Vec<f64> = m.iter().flatten().map(|&v| f64::from(v)).collect();
+    let Some((_, w, _)) = vnl_svd::vnl_svd(&flat, 4, 4) else {
+        return false;
+    };
+    let condition = w[3] / w[0];
     condition > f64::EPSILON
 }
 
-/// Whether the 3×3 part of the sform has orthonormal columns once each is normalised (float
-/// arithmetic, tolerance 1e-4, as ITK checks it).
+/// The 3×3 part of a matrix, row-major, as a flat array.
+fn flat3(m: &M44) -> Vec<f32> {
+    top3(m).iter().flatten().copied().collect()
+}
+
+/// Whether the 3×3 part of the sform has orthonormal columns once each is normalised, as ITK
+/// checks it: every column scaled by `1 / sqrt(Σ v²)` (the root and the quotient in double,
+/// rounded to float: vnl's `normalize`), then `R·Rᵀ` in float within 1e-4 of the identity.
 fn sform_is_orthonormal(s: &M44) -> bool {
     let mut r = top3(s);
     for j in 0..3 {
-        let norm = (r[0][j] * r[0][j] + r[1][j] * r[1][j] + r[2][j] * r[2][j]).sqrt();
-        for row in &mut r {
-            row[j] /= norm;
+        let sum: f32 = r[0][j] * r[0][j] + r[1][j] * r[1][j] + r[2][j] * r[2][j];
+        if sum != 0.0 {
+            let scale = (1.0 / f64::from(sum).sqrt()) as f32;
+            for row in &mut r {
+                row[j] *= scale;
+            }
         }
     }
+    let flat: Vec<f32> = r.iter().flatten().copied().collect();
+    let mut rt = vec![0.0f32; 9];
+    for i in 0..3 {
+        for j in 0..3 {
+            rt[i * 3 + j] = flat[j * 3 + i];
+        }
+    }
+    let product = vnl_svd_f32::matmul_f32(&flat, 3, 3, &rt, 3);
+    is_identity_f32(&product, 1.0e-4)
+}
+
+/// vnl's `is_identity(tol)`: every entry within `tol` of the identity's, the difference taken
+/// in float.
+fn is_identity_f32(m: &[f32], tol: f64) -> bool {
     (0..3).all(|i| {
         (0..3).all(|j| {
-            let v: f32 = (0..3).map(|k| r[i][k] * r[j][k]).sum();
-            (v - if i == j { 1.0 } else { 0.0 }).abs() <= 1.0e-4
+            let x = m[i * 3 + j];
+            let dev = if i == j { (x - 1.0).abs() } else { x.abs() };
+            f64::from(dev) <= tol
         })
     })
 }
@@ -184,18 +209,29 @@ fn qform_sform_are_similar(s: &M44, q: &M44) -> bool {
     rot_ok && f64::from(trans) <= 1.0e-7 && f64::from(bottom) <= 1.0e-7
 }
 
-/// ITK's second test: same singular values, rotations, offsets and bottom rows (1e-4).
+/// ITK's second test: the same singular values, rotations, offsets and bottom rows (1e-4),
+/// with vnl's single-precision SVD of each 3×3 part (`vnl_svd<float>`), `U_s · inverse(U_q)`
+/// (`vnl_matrix_inverse<float>`) within 1e-4 of the identity. Where two singular values are
+/// equal (two equal voxel sizes) the singular vectors are not unique: LINPACK's choice for each
+/// matrix decides, so this test must be vnl's own (a difference found by random testing, 2026-10-25).
 fn sform_qform_very_similar(s: &M44, q: &M44) -> bool {
-    let (sw, su) = linalg::svd_u(&to_f64(&top3(s)));
-    let (qw, qu) = linalg::svd_u(&to_f64(&top3(q)));
-    let spacing_similar = (0..3).all(|i| (sw[i] - qw[i]).abs() <= 1.0e-4);
-    let Some(qu_inv) = linalg::inverse3(&qu) else {
+    let (Some((su, sw, _)), Some((qu, qw, _))) =
+        (vnl_svd_f32::vnl_svd_f32(&flat3(s), 3, 3), vnl_svd_f32::vnl_svd_f32(&flat3(q), 3, 3))
+    else {
         return false;
     };
-    let candidate = linalg::mul3(&su, &qu_inv);
-    let rotation_similar = (0..3).all(|i| {
-        (0..3).all(|j| (candidate[i][j] - if i == j { 1.0 } else { 0.0 }).abs() <= 1.0e-4)
-    });
+    // U is column-major; row-major copies for the product and the inverse.
+    let row_major = |u: &[f32]| -> [[f32; 3]; 3] {
+        std::array::from_fn(|i| std::array::from_fn(|j| u[i + 3 * j]))
+    };
+    let su_rm: Vec<f32> = row_major(&su).iter().flatten().copied().collect();
+    let Some(qu_inv) = vnl_svd_f32::vnl_inverse3_f32(&row_major(&qu)) else {
+        return false;
+    };
+    let qu_inv: Vec<f32> = qu_inv.iter().flatten().copied().collect();
+    let candidate = vnl_svd_f32::matmul_f32(&su_rm, 3, 3, &qu_inv, 3);
+    let spacing_similar = (0..3).all(|i| f64::from((sw[i] - qw[i]).abs()) <= 1.0e-4);
+    let rotation_similar = is_identity_f32(&candidate, 1.0e-4);
     let offsets_similar = (0..3).all(|i| f64::from((s[i][3] - q[i][3]).abs()) <= 1.0e-4);
     let perspective_similar = (0..4).all(|j| f64::from((s[3][j] - q[3][j]).abs()) <= 1.0e-4);
     rotation_similar && offsets_similar && perspective_similar && spacing_similar
@@ -740,6 +776,35 @@ mod tests {
             itk_geometry(&sheared),
             Err(ItkGeometryError::NoOrthonormalTransform)
         );
+    }
+
+    /// Found by differential random testing (2026-10-25, `ants-image-math:test1:0`): a qform of
+    /// a 90° rotation about y stored in float (`quatern_c` 0.70710677), voxels 2.5 × 4 × 4 mm,
+    /// a TALAIRACH sform holding the exact rotation. The two equal voxel sizes make the singular
+    /// vectors of each matrix non-unique; vnl's float SVD gives `U_s · U_q⁻¹` far from the
+    /// identity, so ITK keeps the qform (ANTs' output sform then holds the qform's float
+    /// residue, 8.6e-8). An SVD that picks the vectors otherwise took the sform.
+    #[test]
+    fn equal_voxel_sizes_keep_vnls_choice() {
+        let mut h = NiftiHeader::new(NiftiVersion::V1, &[1, 23, 13], DataType::U16).unwrap();
+        h.pixdim[1] = 2.5;
+        h.pixdim[2] = 4.0;
+        h.pixdim[3] = 4.0;
+        h.quatern_b = 0.0;
+        h.quatern_c = f64::from(0.707_106_77_f32);
+        h.quatern_d = 0.0;
+        h.qoffset_x = -53.0;
+        h.qoffset_y = -37.5;
+        h.qoffset_z = 48.25;
+        h.qform_code = 1;
+        h.sform_code = 3;
+        h.srow_x = [0.0, 0.0, 4.0, -53.0];
+        h.srow_y = [0.0, 4.0, 0.0, -37.5];
+        h.srow_z = [-2.5, 0.0, 0.0, 48.25];
+        assert_eq!(itk_geometry(&h).unwrap().source, GeometrySource::Qform);
+        // Labelled SCANNER_ANAT, the sform is taken as before.
+        h.sform_code = 1;
+        assert_eq!(itk_geometry(&h).unwrap().source, GeometrySource::Sform);
     }
 
     #[test]

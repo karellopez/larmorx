@@ -17,7 +17,7 @@ from pathlib import Path
 
 from larmorx_validation.difftest import core
 
-VERDICT_ORDER = (core.AGREE, core.EXPLAINED, core.DIFFER, "timeout", "crash", core.SKIP, "harness-error", "draw-error")
+VERDICT_ORDER = (core.AGREE, core.EXPLAINED, core.NOTICE, "undefined", core.DIFFER, "timeout", "crash", core.SKIP, "harness-error", "draw-error")
 
 
 def load(out: Path) -> tuple[dict, list[dict]]:
@@ -76,6 +76,13 @@ def summarise(out: Path) -> dict:
                 "case": f"{tool}:{best['seed']}:{best['n']}",
             }
         )
+    notices: dict[tuple[str, str], list[str]] = defaultdict(list)
+    for line in lines:
+        for impl, e in (line.get("impls") or {}).items():
+            if e.get("verdict") == core.NOTICE:
+                for sig in e.get("signature", []):
+                    for entry in sig.removeprefix("notice: ").split(", "):
+                        notices[(line["tool"], entry)].append(f"{line['tool']}:{line.get('seed')}:{line.get('n')}")
     tools = {}
     for name, t in sorted(per.items()):
         tools[name] = {
@@ -87,6 +94,7 @@ def summarise(out: Path) -> dict:
             "features_covered": len(t["features"]),
             "seconds": round(t["seconds"], 1),
             "differences": [d for d in diffs if d["tool"] == name],
+            "notices": {entry: {"cases": len(cs), "example": cs[0]} for (tool, entry), cs in sorted(notices.items()) if tool == name},
         }
     unclear = [
         {"tool": ln["tool"], "case": f"{ln['tool']}:{ln.get('seed')}:{ln.get('n')}", "verdict": ln.get("verdict"), "detail": str(ln.get("detail", ""))[:300]}
@@ -151,15 +159,17 @@ def write(out: Path) -> Path:
         "",
         "Verdicts: *agree* (the parity runner passed, bit-identical where the tool must be), *explained* "
         "(differs from the original as built only through glibc's maths: identical with CORE-MATH preloaded), "
-        "*differ* (a finding: shrunk below), *timeout* and *crash* (unclear: listed at the end).",
+        "*notice* (a D13 notice where the correction changed nothing visible), *undefined* (the original's "
+        "values depend on memory it never wrote or on the clock, a defect larmorx names: not comparable), *differ* (a finding: shrunk "
+        "below), *timeout* and *crash* (unclear: listed at the end).",
         "",
-        "| Tool | Cases | Agree | Explained | Differ | Timeout | Crash | Skipped | Harness | Options covered | Time (s) |",
-        "|---|---|---|---|---|---|---|---|---|---|---|",
+        "| Tool | Cases | Agree | Explained | Notice | Undefined | Differ | Timeout | Crash | Skipped | Harness | Options covered | Time (s) |",
+        "|---|---|---|---|---|---|---|---|---|---|---|---|---|",
     ]
     for name, t in s["tools"].items():
         v = t["verdicts"]
         lines.append(
-            f"| {name} | {t['cases']} | {v.get('agree', 0)} | {v.get('explained', 0)} | {v.get('differ', 0)} | "
+            f"| {name} | {t['cases']} | {v.get('agree', 0)} | {v.get('explained', 0)} | {v.get('notice', 0)} | {v.get('undefined', 0)} | {v.get('differ', 0)} | "
             f"{v.get('timeout', 0)} | {v.get('crash', 0)} | {v.get('skipped', 0)} | {v.get('harness-error', 0) + v.get('draw-error', 0)} | "
             f"{t['options_covered']} | {t['seconds']:.0f} |"
         )
@@ -182,6 +192,21 @@ def write(out: Path) -> Path:
                 "",
             ]
     if not any_diff:
+        lines.append("None.")
+    lines += [
+        "",
+        "## D13 notices without a visible change",
+        "",
+        "A correction was named where it changed nothing this input shows (D13: a notice fires exactly "
+        "where the result differs). Not a mistake in a result; each to be made precise or declared.",
+        "",
+    ]
+    any_notice = False
+    for name, t in s["tools"].items():
+        for entry, n in t["notices"].items():
+            any_notice = True
+            lines.append(f"- {name}: {entry} in {n['cases']} case(s), e.g. `{n['example']}`")
+    if not any_notice:
         lines.append("None.")
     if s["unclear"]:
         lines += ["", "## Unclear (for the orchestrator)", ""]

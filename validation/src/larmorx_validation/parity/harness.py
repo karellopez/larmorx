@@ -111,6 +111,13 @@ class Suite:
     #: Extra summary lines for the report, computed from the results (optional).
     highlights: Callable[[list[CaseResult]], list[str]] | None = None
 
+    def __post_init__(self) -> None:
+        # The permanent cases random testing found for this suite's tool
+        # (validation/difftest/cases/<tool>/), as regular cases (docs/validation/difftest.md).
+        from larmorx_validation.difftest import permanent
+
+        permanent.attach(self)
+
 
 def run(
     suite: Suite,

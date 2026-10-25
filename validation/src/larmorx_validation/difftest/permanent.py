@@ -77,6 +77,64 @@ def payloads(tool_name: str, tier: str = "full", implementation: str | None = No
     return [c.payload for c in cases(tool_name, tier, implementation)]
 
 
+#: parity suite -> (difftest tool, implementation): where each tool's permanent cases run.
+SUITES: dict[str, tuple[str, str]] = {
+    **{
+        name: (name, "port")
+        for name in (
+            "ants-image-math",
+            "ants-threshold-image",
+            "ants-multiply-images",
+            "ants-smooth-image",
+            "ants-resample-image",
+            "ants-resample-image-by-spacing",
+            "ants-n4",
+            "ants-denoise",
+            "ants-registration",
+            "ants-ai",
+            "ants-affine-initializer",
+            "ants-atropos",
+            "ants-apply-transforms",
+            "nifti-io",
+            "resample-series",
+        )
+    },
+    "itk-hdf5": ("itk-transforms", "port"),
+    "afni-tshift": ("afni-tshift", "original"),
+    "afni-tshift-replica": ("afni-tshift", "replica"),
+    "afni-automask": ("afni-automask", "original"),
+    "afni-automask-replica": ("afni-automask", "replica"),
+    "afni-unifize": ("afni-unifize", "original"),
+    "afni-unifize-replica": ("afni-unifize", "replica"),
+    "mri-hmc": ("mri-hmc", "original"),
+    "fsl-mcflirt-replica": ("fsl-mcflirt", "replica"),
+}
+
+
+def attach(suite) -> None:
+    """Adds the permanent cases of ``suite``'s tool to its cases (every tier: each case's own
+    tier filters it), and runs those whose payload is a difftest one (a recorded run made live:
+    head motion) through the tool's own runner. Nothing changes for a suite without any."""
+    if suite.name not in SUITES:
+        return
+    tool_name, impl = SUITES[suite.name]
+    if not files(tool_name):
+        return
+    base_cases, base_run = suite.cases, suite.run_case
+
+    def with_permanent(tier: str):
+        return [*base_cases(tier), *cases(tool_name, tier, impl)]
+
+    def run_case(case, checks):
+        payload = case.payload
+        if isinstance(payload, dict) and "recipe" in payload:
+            return tools.get(tool_name).run(impl)(case, checks)
+        return base_run(case, checks)
+
+    suite.cases = with_permanent
+    suite.run_case = run_case
+
+
 def promote(finding: Path, case_id: str, *, tier: str = "smoke", expect: str = "pass", reason: str = "", status: str = "fixed", defect: str | None = None, rule: str | None = None, description: str = "", out_root: Path | None = None) -> Path:
     """Writes the permanent case of a finding (its shrunk recipe)."""
     f = json.loads(Path(finding).read_text(encoding="utf-8"))
@@ -111,4 +169,4 @@ def promote(finding: Path, case_id: str, *, tier: str = "smoke", expect: str = "
     return path
 
 
-__all__ = ["cases", "files", "load", "payloads", "promote"]
+__all__ = ["SUITES", "attach", "cases", "files", "load", "payloads", "promote"]

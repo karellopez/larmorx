@@ -268,6 +268,12 @@ def cmd_difftest(args: argparse.Namespace) -> int:
     return cli.main(args)
 
 
+def cmd_tables(args: argparse.Namespace) -> int:
+    from larmorx_validation import tables
+
+    return tables.main(args)
+
+
 def cmd_pipeline_stages(args: argparse.Namespace) -> int:
     from larmorx_validation import stages
 
@@ -351,6 +357,15 @@ def main(argv: Sequence[str] | None = None) -> int:
 
     difftest_arguments(dtp)
     dtp.set_defaults(func=cmd_difftest)
+    tb = sub.add_parser(
+        "tables",
+        help="write the tables that repeat the records' facts (README, the validation index, the "
+        "site's status) from validation/tools.toml and the records; --check fails on a difference",
+    )
+    from larmorx_validation.tables import add_arguments as tables_arguments
+
+    tables_arguments(tb)
+    tb.set_defaults(func=cmd_tables)
     b = sub.add_parser("bench", help="benchmark larmorx against reference implementations")
     b.add_argument("suite", choices=BENCH_SUITES)
     b.add_argument("--tier", default="full", choices=("smoke", "standard", "full"))

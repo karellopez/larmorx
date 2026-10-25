@@ -47,6 +47,8 @@ def add_arguments(p: argparse.ArgumentParser) -> None:
     p.add_argument("--rule", default=None)
     p.add_argument("--description", default="")
     p.add_argument("--list", action="store_true", help="list the tools and whether they can run here")
+    p.add_argument("--judge-recipe", help=argparse.SUPPRESS)
+    p.add_argument("--impl", help=argparse.SUPPRESS)
 
 
 def _workspace() -> Path:
@@ -91,6 +93,12 @@ def main(args: argparse.Namespace) -> int:
     from larmorx_validation.difftest import runner
 
     runner.limit_threads(args.threads)
+    if args.judge_recipe:
+        # A child process of a crash case: one verdict, as JSON on the last line.
+        doc = json.loads(Path(args.judge_recipe).read_text(encoding="utf-8"))
+        j = runner.judge_once(tools.get(doc["tool"]), doc["recipe"], args.impl)
+        print(json.dumps({"verdict": j.verdict, "signature": list(j.signature), "detail": j.detail, "status": j.status, "checks": j.checks}, default=str))
+        return 0
     if args.case:
         name, seed, n = args.case.rsplit(":", 2)
         t = tools.get(name)

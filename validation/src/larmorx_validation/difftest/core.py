@@ -26,6 +26,7 @@ A **verdict** of one implementation's run:
 from __future__ import annotations
 
 import copy
+import json
 import re
 from collections.abc import Callable, Iterator
 from dataclasses import dataclass, field
@@ -43,8 +44,8 @@ from larmorx_validation.parity.harness import (
     CheckList,
 )
 
-AGREE, EXPLAINED, DIFFER, SKIP = "agree", "explained", "differ", "skipped"
-VERDICTS = (AGREE, EXPLAINED, DIFFER, SKIP)
+AGREE, EXPLAINED, NOTICE, DIFFER, SKIP = "agree", "explained", "notice", "differ", "skipped"
+VERDICTS = (AGREE, EXPLAINED, NOTICE, DIFFER, SKIP)
 
 
 @dataclass(frozen=True)
@@ -118,7 +119,8 @@ def make_recipe(tool: Tool, seed: str, n: int) -> dict:
         "extra": body.get("extra", {}),
         "features": {k: v for k, v in d.chosen.items() if isinstance(v, str | int | float | bool)},
     }
-    return recipe
+    # Plain JSON (tuples as lists): a recipe read back from a finding is the same recipe.
+    return json.loads(json.dumps(recipe))
 
 
 def recipe_id(recipe: dict) -> str:
@@ -161,6 +163,9 @@ def judge(tool: Tool, impl: str, result: CaseResult) -> Judgement:
     if result.status == SKIPPED:
         return Judgement(SKIP, (), result.reason[:300], result.status, checks)
     if result.status == FAIL:
+        notice = _notice_only(failed)
+        if notice:
+            return Judgement(NOTICE, (f"notice: {notice}",), failed[0].detail, result.status, checks)
         names = tuple(sorted({_norm(c.name) for c in failed}))
         if not names:
             first = (result.reason or "fail").strip().splitlines()
@@ -172,8 +177,7 @@ def judge(tool: Tool, impl: str, result: CaseResult) -> Judgement:
             c
             for c in result.checks
             if any(c.name.endswith(s) for s in tool.exact_checks)
-            and c.value not in (0, "0", None, "True", True)
-            and not (isinstance(c.value, str) and c.value.startswith("0/0"))
+            and not identical_value(c.value)
         ]
         if inexact:
             explained = _explained(tool, result)
@@ -191,7 +195,32 @@ def _explained(tool: Tool, result: CaseResult) -> bool:
     if not tool.explain_checks:
         return False
     found = [c for c in result.checks if any(c.name.endswith(s) for s in tool.explain_checks)]
-    return bool(found) and all(c.value in (0, "0", "True", True) for c in found)
+    return bool(found) and all(identical_value(c.value) for c in found)
+
+
+def identical_value(v) -> bool:
+    """A reported check's value that says "identical": no value (nothing compared), the count
+    0, ``True`` (told apart from the count 1: ``1 == True`` in Python)."""
+    if v is None:
+        return True
+    if isinstance(v, bool):
+        return v
+    if isinstance(v, int | float):
+        return v == 0
+    return isinstance(v, str) and v in ("0", "True")
+
+
+_NOTICE_ONLY = re.compile(r"^((?:[A-Z]+-\d+)(?:, [A-Z]+-\d+)*): no values changed$")
+
+
+def _notice_only(failed) -> str:
+    """The defects a fix pass named where its correction changed nothing visible (the only
+    failed check): a D13 notice that fires on a condition whose effect this input does not
+    show. Not a mistake in the result, so a verdict of its own (``notice``), reported apart."""
+    if len(failed) != 1 or failed[0].name != "D13 fix pass":
+        return ""
+    m = _NOTICE_ONLY.match(failed[0].detail.strip())
+    return m.group(1) if m else ""
 
 
 def same_difference(signature: tuple[str, ...], judged: Judgement) -> bool:
@@ -210,6 +239,7 @@ __all__ = [
     "AGREE",
     "DIFFER",
     "EXPLAINED",
+    "NOTICE",
     "SKIP",
     "VERDICTS",
     "Judgement",
@@ -217,6 +247,7 @@ __all__ = [
     "arguments",
     "deep",
     "group",
+    "identical_value",
     "judge",
     "make_recipe",
     "recipe_id",

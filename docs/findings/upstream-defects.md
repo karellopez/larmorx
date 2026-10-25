@@ -289,13 +289,14 @@ completing 3dTshift, part 2b, then AFNI-26's switch the same day); – = nothing
 | FSL-18 † | mcflirt Woods cost | squared bin counts | – (c? until 2026-10-24) | none | reproduces | – (decided 2026-10-24, rule C: not a defect; `n_b² σ_b / Σ_b` is Woods' `n_b σ_b / μ_b`) |
 | FSL-20 † | mcflirt | `.mat` directory not creatable (a missing parent): message, exit 0, nothing more written | e | none | the replica: an error by default (rule B, 2026-10-24), mcflirt's exit 0 with `reproduce`; the clean-room original: to do (the spec) | – |
 | FSL-21 † | mcflirt histogram costs | `-bins` below 8: no bins in the first stage; arbitrary matrices, `corratio` writes before its arrays and aborts | a | none | the replica: refused by default (rule B, 2026-10-24); `reproduce` gives mcflirt's matrices and, for `corratio`, its abort; the clean-room original: to do (the spec) | – |
+| FSL-22 † | `calc_bval` (newimage) | the background value sorts the 2-voxel border with `std::sort` and `operator<`: with NaN voxels not a strict weak ordering (undefined in C++); libstdc++'s introsort leaves a position-dependent order, so the pad value of mcflirt's output (and `affine_transform`'s) is arbitrary | a | none (fMRIPrep's inputs have no NaN) | NaNs sorted last in both modes (defined); `reproduce` reproduces every defined part and warns when NaN border voxels make the original's order undefined (D13, 2026-10-11; libstdc++'s order is not emulated: its code is GPL-3.0, which no FSL-licensed package may include) | – |
 
-**Counts** (242 entries, recounted from the table on 2026-10-25 after the mcflirt replica's merge; an entry with two classes
+**Counts** (243 entries, recounted from the table on 2026-10-25 after the mcflirt replica's NaN fix; an entry with two classes
 counts under its first; "c (c? until …)" entries, decided, count as (c)):
 
 | Class | Entries | of them questionable (c?) |
 |---|---|---|
-| (a) crash, undefined behaviour, out of bounds | 40 | |
+| (a) crash, undefined behaviour, out of bounds | 41 | |
 | (b) race, nondeterminism | 11 | |
 | (c) deterministic bug that changes results | 117 | 8 |
 | (d) imprecision | 20 | |
@@ -3965,3 +3966,20 @@ fMRIPrep 25.2.6 (the oracle runs) or its source at `21a490fb`, niworkflows 1.15.
   `corratio`, its abort (when the out-of-bounds write is non-zero, as at every real
   evaluation). The clean-room original: to be specified.
 - **D13 / gap:** done in the replica; the original's is open.
+### FSL-22 † The background value sorts NaNs: undefined order — (a)
+- **What:** newimage's `calc_bval` (`sort(hist.begin(), hist.end()); return hist[numbins/10]`)
+  sorts the 2-voxel border with `operator<`; with NaN voxels that is not a strict weak ordering,
+  undefined behaviour in C++. libstdc++'s introsort then leaves a position-dependent order, so the
+  pad value of mcflirt's output (and of `affine_transform`'s) is arbitrary.
+- **Evidence:** the NaN matrix (`validation/probes/fsl-mcflirt-affine-trace/nan_matrix.py`):
+  inputs with NaN background voxels in `reproduce`, 32 of 160 cases, the output images of
+  volumes whose matrix is NaN padded with another value.
+- **fMRIPrep:** none (its inputs have no NaN).
+- **larmorx:** NaNs sorted last in both modes (defined, the same on every platform). By D13's
+  rule for undefined behaviour (2026-10-11), `reproduce` reproduces every defined part and warns
+  when NaN border voxels make the original's order undefined. libstdc++'s order is not emulated:
+  its introsort is GPL-3.0 code, which the FSL-licensed package may not include (decided by the
+  orchestrator, 2026-10-25).
+- **D13 / gap:** the warning in `reproduce` (to add with BET's merge, where `calc_bval` moves
+  into `larmorx-nc-core`).
+

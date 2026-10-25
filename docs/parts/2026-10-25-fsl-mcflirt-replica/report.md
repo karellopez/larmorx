@@ -149,3 +149,22 @@ cases differing. The agent was sent back. Its report, verbatim:
 **New record** (full tier, clean commit 205bee4): 194 cases, 173 of 173 compared bit-identical, 21 rejected by both alike; recorded runs 137 (125 + 12), edge cases 35 (26 + 9), fMRIPrep calls 22 on 12 oracle runs (22 pass); fMRIPrep's own `.mat` files identical as text: 4,517 of 4,517; 50 of 57 original-program runs from the oracle cache.
 
 **Gates.** crates-nc fmt, clippy, tests (golden unchanged); ruff, SPDX; `pytest tests/python tests/golden validation/tests` 539 passed; `pytest tests/parity -k mcflirt` 113 passed. Site: the head-motion page re-exported with the panel's exporter (number check 182/182, cases 176 → 194, inventory after ≥ before), local `evidence-blobs` 5b89607 (295 blobs).
+
+## Follow-up (2026-10-25, evening): NaNs on ARM
+
+After the publication (9b7e8ee) the `gpl` CI job failed on the three ARM platforms in the
+crates-nc golden case `mcflirt.nonfinite` (NaN and infinite voxels). The agent was sent back. Its
+report, in short (verbatim text in the session; the commits carry it): x86-64's SSE makes a NaN
+from numbers with the sign set, AArch64's with it clear, and when two NaNs meet the compiler's
+operand order decides which passes on. An LD_PRELOAD probe (`libnan_trap.so`, `NAN_TRAP_ARM=1`
+emulates ARM's NaN on x86) reproduced the ARM CI's checksums exactly. Fix (ef73e6f):
+`larmorx-nc-core/src/sse.rs` makes SSE's NaN rules explicit (a NaN made from numbers is x86's
+default NaN; operands pass on in the source's order; NaNs from the input keep their bits), used
+by the interpolation, the centre of mass, the `-stats`/`-meanvol` sums, `-gdt`'s gradient, the
+glibc float functions, Armadillo's small-matrix algebra and miscmaths; an all-NaN affine
+decomposes as FSL's binary does (200 of 200 probe cases); no measurable cost. NaN matrix: 160
+cases × release, debug and both with ARM's NaN emulated: all four agree; in `reproduce` mcflirt's
+bytes except 32 cases of FSL-22 (`calc_bval` sorting NaNs: undefined in C++; the orchestrator
+decided: NaNs last, a warning in `reproduce`, libstdc++'s GPL code not emulated). Golden
+(bba2ff9): one checksum changed, to mcflirt's own `.par`. Gates: crates-nc fmt, clippy, tests;
+Python 539; 48 full-tier cases and 5 NaN cases pass.

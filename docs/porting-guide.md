@@ -422,6 +422,15 @@ rule 10).
   the code. A replica that needs a C library's own rounding carries a translation of it in its
   own licence family (the 3dTshift replica's glibc `sinf`/`cosf`, LGPL), never the main
   package.
+- **NaN bits are part of the output** (2026-10-25, the mcflirt replica's ARM CI failure).
+  x86-64's SSE makes a NaN from numbers with the sign set (`-nan`), AArch64's with the sign
+  clear, and when two NaNs meet the compiler's operand order decides which passes on. A replica
+  whose output can hold NaNs computes those paths with SSE's rules made explicit
+  (`larmorx-nc-core/src/sse.rs`: `S32`/`S64` keep an expression's text; NaNs from the input keep
+  their bits), and is checked with `validation/probes/fsl-mcflirt-affine-trace/nan_trap.c`
+  (`NAN_TRAP_ARM=1` emulates ARM's NaN on x86) and with a debug and a release build. Debug builds
+  also check integer overflow: index arithmetic on NaN coordinates (the most negative `int64_t`)
+  uses wrapping operations, as the original's x86-64 code wraps.
 - **Fixed operation order.** Port the original's order of every sum and product; reductions
   use fixed chunks, independent of the thread count. Write explicit `mul_add` where the
   original fuses, and nothing where it does not; no fast-math, no `target-cpu=native`. A

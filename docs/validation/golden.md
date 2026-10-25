@@ -24,6 +24,11 @@ Replicas and clean-room originals are covered alike. Written 2026-10-11.
 
 No CI job or runner was added. Parity, benchmarks and real data still never run in CI.
 
+`larmorx-nc`'s checksums were re-recorded on 2026-10-25 from ef73e6f (the NaN fix for ARM): one
+checksum changed, `mcflirt.nonfinite.reproduce`'s `.par` (`b08d9de2…` → `0f3a48c6…`), which is FSL
+6.0.7.17 mcflirt's own output for the same input; the old value came from a debug build whose
+`atan2f` passed on the other of two NaNs.
+
 ## What is covered
 
 A coverage test fails when anything below has no case; its message says what to do.

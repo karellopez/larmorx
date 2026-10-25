@@ -17,6 +17,7 @@ use larmorx_nc_core::newimagefns::{self, affine_transform, isotropic_resample};
 use larmorx_nc_core::nifti;
 use larmorx_nc_core::optimise;
 use larmorx_nc_core::settings::Settings;
+use larmorx_nc_core::sse;
 use larmorx_nc_core::volume::{
     self, Conversion, Extrapolation, FslError, Interpolation, SaveError, SaveType, Volume,
 };
@@ -704,12 +705,12 @@ impl Run<'_> {
                         let mut testvol = src.clone();
                         affine_transform(&src, &mut testvol, &mat1[i as usize], 1.0)?;
                         for (m, t) in mv.data.iter_mut().zip(&testvol.data) {
-                            *m += *t;
+                            *m = sse::add_f32(*m, *t);
                         }
                     }
                     let nf = n as f32;
                     for m in mv.data.iter_mut() {
-                        *m /= nf;
+                        *m = sse::div_f32(*m, nf);
                     }
                     self.mean_reg_notice();
                     self.save(&mv, &self.derived_name("_mean_reg"), SaveType::Float, None)?;
@@ -1301,11 +1302,20 @@ impl Run<'_> {
             for y in 0..ny {
                 for z in z0..z1 {
                     let k = meanvol.idx(x, y, z);
-                    let mut m = meanvol.data[k];
+                    let m0 = meanvol.data[k];
+                    let mut m = m0;
                     for i in 0..vmax as usize {
                         m += ts.data[i * nv + k];
                     }
                     meanvol.data[k] = m / vmax as f32;
+                    if meanvol.data[k].is_nan() {
+                        // NaN or infinite voxels: the same sum with SSE's NaNs.
+                        let mut m = m0;
+                        for i in 0..vmax as usize {
+                            m = sse::add_f32(m, ts.data[i * nv + k]);
+                        }
+                        meanvol.data[k] = sse::div_f32(m, vmax as f32);
+                    }
                 }
             }
         }
@@ -1314,14 +1324,24 @@ impl Run<'_> {
                 for z in z0..z1 {
                     let k = meanvol.idx(x, y, z);
                     let mean = meanvol.data[k];
-                    let mut v = variancevol.data[k];
+                    let v0 = variancevol.data[k];
+                    let mut v = v0;
                     for i in 0..vmax as usize {
                         let d = ts.data[i * nv + k] - mean;
                         v += d * d;
                     }
-                    let var = v / (vmax - 1) as f32;
+                    let mut var = v / (vmax - 1) as f32;
+                    if var.is_nan() {
+                        // NaN or infinite voxels: the same sums with SSE's NaNs.
+                        let mut v = v0;
+                        for i in 0..vmax as usize {
+                            let d = sse::sub_f32(ts.data[i * nv + k], mean);
+                            v = sse::add_f32(v, sse::mul_f32(d, d));
+                        }
+                        var = sse::div_f32(v, (vmax - 1) as f32);
+                    }
                     variancevol.data[k] = var;
-                    sigmavol.data[k] = var.sqrt();
+                    sigmavol.data[k] = sse::sqrt_f32(var);
                 }
             }
         }

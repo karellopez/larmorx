@@ -14,10 +14,11 @@
 
 use crate::arma::{self, Mat};
 use crate::fdlibm::atan2f;
+use crate::sse::{S32, S64};
 
 /// `norm2(x)`: `sqrt(SumSquare(x))`.
 pub fn norm2(x: &Mat) -> f64 {
-    x.sum_square().sqrt()
+    S64(x.sum_square()).sqrt().0
 }
 
 /// `MISCMATHS::dot(a, b)`: `Sum(SP(a, b))` (Armadillo's two-accumulator dot product),
@@ -28,9 +29,13 @@ pub fn dot_f(a: &Mat, b: &Mat) -> f32 {
 
 /// `cross(a, b)` of 3-vectors.
 pub fn cross(a: &Mat, b: &Mat) -> Mat {
-    let (a1, a2, a3) = (a.get(0), a.get(1), a.get(2));
-    let (b1, b2, b3) = (b.get(0), b.get(1), b.get(2));
-    Mat::col(&[a2 * b3 - a3 * b2, a3 * b1 - a1 * b3, a1 * b2 - a2 * b1])
+    let (a1, a2, a3) = (S64(a.get(0)), S64(a.get(1)), S64(a.get(2)));
+    let (b1, b2, b3) = (S64(b.get(0)), S64(b.get(1)), S64(b.get(2)));
+    Mat::col(&[
+        (a2 * b3 - a3 * b2).0,
+        (a3 * b1 - a1 * b3).0,
+        (a1 * b2 - a2 * b1).0,
+    ])
 }
 
 /// `sincosf` of a `float` angle (GCC merges `sin(theta)` and `cos(theta)` into one call): the C
@@ -101,7 +106,7 @@ pub fn construct_rotmat_euler(params: &Mat, n: i32, centre: &Mat) -> Mat {
         }
     }
     for k in 0..3 {
-        let v = aff.at(k, 3) + params.get(3 + k);
+        let v = (S64(aff.at(k, 3)) + params.get(3 + k)).0;
         aff.set(k, 3, v);
         if n == k as i32 + 4 {
             return aff;
@@ -126,7 +131,7 @@ pub fn compose_aff(params: &Mat, n: i32, centre: &Mat) -> Mat {
     scale.set(2, 2, if n >= 9 { params.get(8) } else { params.get(6) });
     let sc = arma::gemv_tinysq(&scale.sub(0, 3, 0, 3), centre.as_slice(), false);
     for r in 0..3 {
-        scale.set(r, 3, centre.get(r) - sc[r]);
+        scale.set(r, 3, (S64(centre.get(r)) - sc[r]).0);
     }
     let mut skew = Mat::eye(4);
     if n >= 10 {
@@ -140,7 +145,7 @@ pub fn compose_aff(params: &Mat, n: i32, centre: &Mat) -> Mat {
     }
     let kc = arma::gemv_tinysq(&skew.sub(0, 3, 0, 3), centre.as_slice(), false);
     for r in 0..3 {
-        skew.set(r, 3, centre.get(r) - kc[r]);
+        skew.set(r, 3, (S64(centre.get(r)) - kc[r]).0);
     }
     // aff * skew * scale: (aff skew) scale.
     arma::mul_tinysq(&arma::mul_tinysq(&aff, &skew), &scale)
@@ -148,19 +153,19 @@ pub fn compose_aff(params: &Mat, n: i32, centre: &Mat) -> Mat {
 
 /// `rotmat2euler(angles, rotmat)` (`R = Rx Ry Rz`): float sines and cosines, glibc's `atan2f`.
 pub fn rotmat2euler(rotmat: &Mat) -> [f64; 3] {
-    let r = |i: usize, j: usize| rotmat.at(i - 1, j - 1);
-    let cy = (r(1, 1) * r(1, 1) + r(1, 2) * r(1, 2)).sqrt() as f32;
+    let r = |i: usize, j: usize| S64(rotmat.at(i - 1, j - 1));
+    let cy = (r(1, 1) * r(1, 1) + r(1, 2) * r(1, 2)).sqrt().0 as f32;
     if f64::from(cy) < 1e-4 {
-        let cx = r(2, 2) as f32;
-        let sx = (-r(3, 2)) as f32;
-        let sy = (-r(1, 3)) as f32;
+        let cx = r(2, 2).0 as f32;
+        let sx = (-r(3, 2)).0 as f32;
+        let sy = (-r(1, 3)).0 as f32;
         [f64::from(atan2f(sx, cx)), f64::from(atan2f(sy, 0.0)), 0.0]
     } else {
-        let cz = (r(1, 1) / f64::from(cy)) as f32;
-        let sz = (r(1, 2) / f64::from(cy)) as f32;
-        let cx = (r(3, 3) / f64::from(cy)) as f32;
-        let sx = (r(2, 3) / f64::from(cy)) as f32;
-        let sy = (-r(1, 3)) as f32;
+        let cz = (r(1, 1) / f64::from(cy)).0 as f32;
+        let sz = (r(1, 2) / f64::from(cy)).0 as f32;
+        let cx = (r(3, 3) / f64::from(cy)).0 as f32;
+        let sx = (r(2, 3) / f64::from(cy)).0 as f32;
+        let sy = (-r(1, 3)).0 as f32;
         [
             f64::from(atan2f(sx, cx)),
             f64::from(atan2f(sy, cy)),
@@ -177,17 +182,19 @@ pub fn decompose_aff(affmat: &Mat, centre: &Mat) -> [f64; 12] {
     let x = affmat.sub(0, 3, 0, 1);
     let y = affmat.sub(0, 3, 1, 2);
     let z = affmat.sub(0, 3, 2, 3);
-    let sx = norm2(&x) as f32;
-    let dxy = dot_f(&x, &y);
-    let sy = (dot_f(&y, &y) - ((dxy * dxy) / (sx * sx))).sqrt();
+    let sx = S32(norm2(&x) as f32);
+    let dxy = S32(dot_f(&x, &y));
+    let sy = (S32(dot_f(&y, &y)) - ((dxy * dxy) / (sx * sx))).sqrt();
     let a = dxy / (sx * sy);
+    let (sx, sy, a) = (sx.0, sy.0, a.0);
     let x0 = x.div_scalar(f64::from(sx));
     let y0 = y.div_scalar(f64::from(sy)).minus(&x0.scale(f64::from(a)));
-    let d0 = dot_f(&x0, &z);
-    let d1 = dot_f(&y0, &z);
-    let sz = (dot_f(&z, &z) - d0 * d0 - d1 * d1).sqrt();
-    let b = dot_f(&x0, &z) / sz;
-    let c = dot_f(&y0, &z) / sz;
+    let d0 = S32(dot_f(&x0, &z));
+    let d1 = S32(dot_f(&y0, &z));
+    let sz = (S32(dot_f(&z, &z)) - d0 * d0 - d1 * d1).sqrt();
+    let b = (S32(dot_f(&x0, &z)) / sz).0;
+    let c = (S32(dot_f(&y0, &z)) / sz).0;
+    let sz = sz.0;
     params[6] = f64::from(sx);
     params[7] = f64::from(sy);
     params[8] = f64::from(sz);
@@ -221,11 +228,26 @@ pub fn decompose_aff(affmat: &Mat, centre: &Mat) -> [f64; 12] {
     // transl = aff3*centre + affmat(1:3,4) - centre
     let ac = arma::gemv_tinysq(&aff3, centre.as_slice(), false);
     for i in 0..3 {
-        params[3 + i] = (ac[i] + affmat.at(i, 3)) - centre.get(i);
+        params[3 + i] = ((S64(ac[i]) + affmat.at(i, 3)) - centre.get(i)).0;
     }
     let rp = rotmat2euler(&rotmat);
     params[..3].copy_from_slice(&rp);
+    if uniform_nan(affmat) {
+        // An affine all of one NaN (what FSL-14's NaN centre of mass makes of a matrix): FSL's
+        // binary gives the y rotation the other sign. Which of two NaNs an SSE instruction
+        // passes on is the compiler's choice of operands (IEEE leaves it open); in the products
+        // before rotmat2euler GCC's choice leaves rotmat(1,2) with the other sign, and
+        // rotmat2euler's cy takes rotmat(1,2)'s NaN (validation/probes/fsl-mcflirt-affine-trace,
+        // nan_decompose.cc and nan_r2e.cc). The rest of decompose_aff follows the source's order.
+        params[1] = -params[1];
+    }
     params
+}
+
+/// Whether the top three rows of `affmat` hold one NaN, bit for bit, in all twelve places.
+fn uniform_nan(affmat: &Mat) -> bool {
+    let first = affmat.at(0, 0);
+    first.is_nan() && (0..3).all(|r| (0..4).all(|c| affmat.at(r, c).to_bits() == first.to_bits()))
 }
 
 /// `rms_deviation(affmat1, affmat2, centre, rmax)` of two 4 × 4 matrices.
@@ -235,11 +257,11 @@ pub fn rms_deviation(a1: &Mat, a2: &Mat, centre: &Mat, rmax: f32) -> Result<f32,
     let isodiff = arma::mul_tinysq(a1, &a2i).minus(&Mat::eye(4));
     let adiff = isodiff.sub(0, 3, 0, 3);
     let ac = arma::gemv_tinysq(&adiff, centre.as_slice(), false);
-    let tr: Vec<f64> = (0..3).map(|i| isodiff.at(i, 3) + ac[i]).collect();
-    let tt = arma::dot(&tr, &tr);
+    let tr: Vec<f64> = (0..3).map(|i| (S64(isodiff.at(i, 3)) + ac[i]).0).collect();
+    let tt = S64(arma::dot(&tr, &tr));
     let r2 = f64::from(rmax * rmax) / 5.0;
     let trace = arma::trace_at_b(&adiff, &adiff);
-    Ok((tt + r2 * trace).sqrt() as f32)
+    Ok((tt + S64(r2) * trace).sqrt().0 as f32)
 }
 
 // ------------------------------------------------------------------------------------------------
@@ -544,5 +566,53 @@ mod tests {
         for k in 0..12 {
             assert_eq!(got[k].to_bits(), want[k], "parameter {}", k + 1);
         }
+    }
+
+    /// FSL's `decompose_aff` (libfsl-miscmaths, through `nan_decompose.cc` of
+    /// validation/probes/fsl-mcflirt-affine-trace) on affines all of one NaN, with numbers and
+    /// with NaN centres: "<affine, column-major> <centre> -> <params>" as bits. The y rotation
+    /// takes the other sign, the float parameters lose the payload, the translations keep it.
+    #[test]
+    fn decompose_aff_uniform_nan_as_fsl() {
+        const CASES: [&str; 4] = [
+            "fff8000000000000,fff8000000000000,fff8000000000000,0000000000000000,fff8000000000000,fff8000000000000,fff8000000000000,0000000000000000,fff8000000000000,fff8000000000000,fff8000000000000,0000000000000000,fff8000000000000,fff8000000000000,fff8000000000000,3ff0000000000000 4026000000000000,4028000000000000,402a000000000000 -> fff8000000000000,7ff8000000000000,fff8000000000000,fff8000000000000,fff8000000000000,fff8000000000000,fff8000000000000,fff8000000000000,fff8000000000000,fff8000000000000,fff8000000000000,fff8000000000000",
+            "7ff8000012345000,7ff8000012345000,7ff8000012345000,0000000000000000,7ff8000012345000,7ff8000012345000,7ff8000012345000,0000000000000000,7ff8000012345000,7ff8000012345000,7ff8000012345000,0000000000000000,7ff8000012345000,7ff8000012345000,7ff8000012345000,3ff0000000000000 7ff8000000000000,fff8000000000000,fff8000000000000 -> 7ff8000000000000,fff8000000000000,7ff8000000000000,7ff8000012345000,7ff8000012345000,7ff8000012345000,7ff8000000000000,7ff8000000000000,7ff8000000000000,7ff8000000000000,7ff8000000000000,7ff8000000000000",
+            "7ff8000012345000,7ff8000012345000,7ff8000012345000,0000000000000000,7ff8000012345000,7ff8000012345000,7ff8000012345000,0000000000000000,7ff8000012345000,7ff8000012345000,7ff8000012345000,0000000000000000,7ff8000012345000,7ff8000012345000,7ff8000012345000,3ff0000000000000 4026000000000000,4028000000000000,402a000000000000 -> 7ff8000000000000,fff8000000000000,7ff8000000000000,7ff8000012345000,7ff8000012345000,7ff8000012345000,7ff8000000000000,7ff8000000000000,7ff8000000000000,7ff8000000000000,7ff8000000000000,7ff8000000000000",
+            "7ff8000000000000,7ff8000000000000,7ff8000000000000,0000000000000000,7ff8000000000000,7ff8000000000000,7ff8000000000000,0000000000000000,7ff8000000000000,7ff8000000000000,7ff8000000000000,0000000000000000,7ff8000000000000,7ff8000000000000,7ff8000000000000,3ff0000000000000 4026000000000000,4028000000000000,402a000000000000 -> 7ff8000000000000,fff8000000000000,7ff8000000000000,7ff8000000000000,7ff8000000000000,7ff8000000000000,7ff8000000000000,7ff8000000000000,7ff8000000000000,7ff8000000000000,7ff8000000000000,7ff8000000000000",
+        ];
+        let bits = |s: &str| -> Vec<f64> {
+            s.split(',')
+                .map(|h| f64::from_bits(u64::from_str_radix(h, 16).unwrap()))
+                .collect()
+        };
+        for line in CASES {
+            let parts: Vec<&str> = line.split_whitespace().collect();
+            let (a, c, want) = (bits(parts[0]), bits(parts[1]), bits(parts[3]));
+            let mut rows = [0.0f64; 16];
+            for r in 0..4 {
+                for col in 0..4 {
+                    rows[r * 4 + col] = a[col * 4 + r];
+                }
+            }
+            let got = decompose_aff(&Mat::from_rows(4, 4, &rows), &Mat::col(&c));
+            for k in 0..12 {
+                assert_eq!(
+                    got[k].to_bits(),
+                    want[k].to_bits(),
+                    "parameter {} of {line}",
+                    k + 1
+                );
+            }
+        }
+    }
+
+    /// NaNs made from numbers are SSE's default NaN (sign set), on every platform.
+    #[test]
+    fn made_nans_have_the_sign_set() {
+        let inf = f64::INFINITY;
+        let c = cross(&Mat::col(&[inf, 0.0, 1.0]), &Mat::col(&[inf, 1.0, 0.0]));
+        // a3*b1 - a1*b3 = 1*inf - inf*0: inf - NaN(0 * inf): the default NaN.
+        assert_eq!(c.get(1).to_bits(), 0xfff8_0000_0000_0000);
+        assert_eq!(norm2(&Mat::col(&[inf, -inf, 1.0])), inf);
     }
 }

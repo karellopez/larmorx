@@ -31,6 +31,8 @@
 
 use std::fmt;
 
+use crate::sse::{self, S64};
+
 /// A column-major dense matrix of `f64` (Armadillo's `Mat<double>`; NEWMAT indices are 1-based,
 /// these are 0-based).
 #[derive(Clone, PartialEq)]
@@ -207,7 +209,7 @@ impl Mat {
                 .data
                 .iter()
                 .zip(&other.data)
-                .map(|(a, b)| a + b)
+                .map(|(a, b)| sse::add_f64(*a, *b))
                 .collect(),
         }
     }
@@ -222,7 +224,7 @@ impl Mat {
                 .data
                 .iter()
                 .zip(&other.data)
-                .map(|(a, b)| a - b)
+                .map(|(a, b)| sse::sub_f64(*a, *b))
                 .collect(),
         }
     }
@@ -232,7 +234,7 @@ impl Mat {
         Mat {
             rows: self.rows,
             cols: self.cols,
-            data: self.data.iter().map(|a| a * k).collect(),
+            data: self.data.iter().map(|a| sse::mul_f64(*a, k)).collect(),
         }
     }
 
@@ -241,7 +243,7 @@ impl Mat {
         Mat {
             rows: self.rows,
             cols: self.cols,
-            data: self.data.iter().map(|a| a / k).collect(),
+            data: self.data.iter().map(|a| sse::div_f64(*a, k)).collect(),
         }
     }
 
@@ -255,7 +257,7 @@ impl Mat {
 
     /// `SumSquare()`: `accu(square(X))`.
     pub fn sum_square(&self) -> f64 {
-        let sq: Vec<f64> = self.data.iter().map(|v| v * v).collect();
+        let sq: Vec<f64> = self.data.iter().map(|v| sse::mul_f64(*v, *v)).collect();
         accu(&sq)
     }
 
@@ -281,8 +283,8 @@ pub fn direct_max(x: &[f64]) -> f64 {
 /// Armadillo's `accu()` of a dense expression (`accu_proxy_linear`): two interleaved partial
 /// sums, then their sum.
 pub fn accu(x: &[f64]) -> f64 {
-    let mut val1 = 0.0;
-    let mut val2 = 0.0;
+    let mut val1 = S64(0.0);
+    let mut val2 = S64(0.0);
     let n = x.len();
     let mut i = 0;
     let mut j = 1;
@@ -295,7 +297,7 @@ pub fn accu(x: &[f64]) -> f64 {
     if i < n {
         val1 += x[i];
     }
-    val1 + val2
+    (val1 + val2).0
 }
 
 /// `op_dot::direct_dot_arma` (used by `dot()`, `as_scalar(a.t()*b)` and the small products for
@@ -307,20 +309,20 @@ pub fn dot(a: &[f64], b: &[f64]) -> f64 {
         "dot of more than 32 elements goes to BLAS (not ported)"
     );
     let n = a.len();
-    let mut val1 = 0.0;
-    let mut val2 = 0.0;
+    let mut val1 = S64(0.0);
+    let mut val2 = S64(0.0);
     let mut i = 0;
     let mut j = 1;
     while j < n {
-        val1 += a[i] * b[i];
-        val2 += a[j] * b[j];
+        val1 += S64(a[i]) * b[i];
+        val2 += S64(a[j]) * b[j];
         i += 2;
         j += 2;
     }
     if i < n {
-        val1 += a[i] * b[i];
+        val1 += S64(a[i]) * b[i];
     }
-    val1 + val2
+    (val1 + val2).0
 }
 
 /// `gemv_emul_tinysq`: `y = A x` (or `Aᵀ x` with `trans`) for a square `A` of size 1 to 4, each
@@ -335,11 +337,11 @@ pub fn gemv_tinysq(a: &Mat, x: &[f64], trans: bool) -> Vec<f64> {
     };
     (0..n)
         .map(|r| {
-            let mut acc = am[pos(r, 0)] * x[0];
+            let mut acc = S64(am[pos(r, 0)]) * x[0];
             for (c, xc) in x.iter().enumerate().skip(1) {
-                acc += am[pos(r, c)] * xc;
+                acc += S64(am[pos(r, c)]) * *xc;
             }
-            acc
+            acc.0
         })
         .collect()
 }
@@ -495,16 +497,16 @@ pub fn det_tiny(x: &Mat) -> f64 {
     match n {
         0 => 1.0,
         1 => xm[0],
-        2 => xm[p(2, 0, 0)] * xm[p(2, 1, 1)] - xm[p(2, 0, 1)] * xm[p(2, 1, 0)],
+        2 => (S64(xm[p(2, 0, 0)]) * xm[p(2, 1, 1)] - S64(xm[p(2, 0, 1)]) * xm[p(2, 1, 0)]).0,
         3 => {
-            let q = |r, c| xm[p(3, r, c)];
+            let q = |r, c| S64(xm[p(3, r, c)]);
             let val1 = q(0, 0) * (q(2, 2) * q(1, 1) - q(2, 1) * q(1, 2));
             let val2 = q(1, 0) * (q(2, 2) * q(0, 1) - q(2, 1) * q(0, 2));
             let val3 = q(2, 0) * (q(1, 2) * q(0, 1) - q(1, 1) * q(0, 2));
-            val1 - val2 + val3
+            (val1 - val2 + val3).0
         }
         4 => {
-            let q = |r, c| xm[p(4, r, c)];
+            let q = |r, c| S64(xm[p(4, r, c)]);
             let val_03_12 = q(0, 3) * q(1, 2);
             let val_02_13 = q(0, 2) * q(1, 3);
             let val_03_11 = q(0, 3) * q(1, 1);
@@ -529,7 +531,7 @@ pub fn det_tiny(x: &Mat) -> f64 {
             let val_20_33 = q(2, 0) * q(3, 3);
             let val_21_33 = q(2, 1) * q(3, 3);
             let val_22_33 = q(2, 2) * q(3, 3);
-            val_03_12 * val_21_30 - val_02_13 * val_21_30 - val_03_11 * val_22_30
+            (val_03_12 * val_21_30 - val_02_13 * val_21_30 - val_03_11 * val_22_30
                 + val_01_13 * val_22_30
                 + val_02_11 * val_23_30
                 - val_01_12 * val_23_30
@@ -550,7 +552,8 @@ pub fn det_tiny(x: &Mat) -> f64 {
                 + val_02_10 * val_21_33
                 - val_00_12 * val_21_33
                 - val_01_10 * val_22_33
-                + val_00_11 * val_22_33
+                + val_00_11 * val_22_33)
+                .0
         }
         _ => panic!("det_tiny: size {n}"),
     }
@@ -598,25 +601,25 @@ fn det_lu(x: &Mat) -> f64 {
             sign = -sign;
         }
         let pivot = a.at(k, k);
-        let rec = 1.0 / pivot;
+        let rec = sse::div_f64(1.0, pivot);
         for r in k + 1..n {
-            let l = a.at(r, k) * rec;
+            let l = sse::mul_f64(a.at(r, k), rec);
             a.set(r, k, l);
         }
         for c in k + 1..n {
             let ukc = a.at(k, c);
             for r in k + 1..n {
-                let v = a.at(r, c) - a.at(r, k) * ukc;
+                let v = (S64(a.at(r, c)) - S64(a.at(r, k)) * ukc).0;
                 a.set(r, c, v);
             }
         }
     }
     // Armadillo multiplies the diagonal in order, starting from the first element.
-    let mut val = a.at(0, 0);
+    let mut val = S64(a.at(0, 0));
     for i in 1..n {
         val *= a.at(i, i);
     }
-    val * sign
+    (val * sign).0
 }
 
 /// Why an inverse or a solve failed (Armadillo throws "inv(): matrix is singular").
@@ -645,23 +648,23 @@ pub fn inv_tiny(x: &Mat) -> Option<Mat> {
     match n {
         0 => return Some(out),
         1 => {
-            out.data[0] = 1.0 / xm[0];
+            out.data[0] = sse::div_f64(1.0, xm[0]);
             return Some(out);
         }
         2 => {
-            let a = xm[p(2, 0, 0)];
-            let b = xm[p(2, 0, 1)];
-            let c = xm[p(2, 1, 0)];
-            let d = xm[p(2, 1, 1)];
+            let a = S64(xm[p(2, 0, 0)]);
+            let b = S64(xm[p(2, 0, 1)]);
+            let c = S64(xm[p(2, 1, 0)]);
+            let d = S64(xm[p(2, 1, 1)]);
             let det_val = a * d - b * c;
-            let abs_det = det_val.abs();
+            let abs_det = det_val.0.abs();
             if abs_det < det_min || abs_det > det_max {
                 return None;
             }
-            out.data[p(2, 0, 0)] = d / det_val;
-            out.data[p(2, 0, 1)] = -b / det_val;
-            out.data[p(2, 1, 0)] = -c / det_val;
-            out.data[p(2, 1, 1)] = a / det_val;
+            out.data[p(2, 0, 0)] = (d / det_val).0;
+            out.data[p(2, 0, 1)] = (-b / det_val).0;
+            out.data[p(2, 1, 0)] = (-c / det_val).0;
+            out.data[p(2, 1, 1)] = (a / det_val).0;
             return Some(out);
         }
         3 => {
@@ -670,20 +673,20 @@ pub fn inv_tiny(x: &Mat) -> Option<Mat> {
             if abs_det < det_min || abs_det > det_max {
                 return None;
             }
-            let q = |r, c| xm[p(3, r, c)];
+            let q = |r, c| S64(xm[p(3, r, c)]);
             let o = &mut out.data;
-            o[p(3, 0, 0)] = (q(2, 2) * q(1, 1) - q(2, 1) * q(1, 2)) / det_val;
-            o[p(3, 1, 0)] = -(q(2, 2) * q(1, 0) - q(2, 0) * q(1, 2)) / det_val;
-            o[p(3, 2, 0)] = (q(2, 1) * q(1, 0) - q(2, 0) * q(1, 1)) / det_val;
-            o[p(3, 0, 1)] = -(q(2, 2) * q(0, 1) - q(2, 1) * q(0, 2)) / det_val;
-            o[p(3, 1, 1)] = (q(2, 2) * q(0, 0) - q(2, 0) * q(0, 2)) / det_val;
-            o[p(3, 2, 1)] = -(q(2, 1) * q(0, 0) - q(2, 0) * q(0, 1)) / det_val;
-            o[p(3, 0, 2)] = (q(1, 2) * q(0, 1) - q(1, 1) * q(0, 2)) / det_val;
-            o[p(3, 1, 2)] = -(q(1, 2) * q(0, 0) - q(1, 0) * q(0, 2)) / det_val;
-            o[p(3, 2, 2)] = (q(1, 1) * q(0, 0) - q(1, 0) * q(0, 1)) / det_val;
+            o[p(3, 0, 0)] = ((q(2, 2) * q(1, 1) - q(2, 1) * q(1, 2)) / det_val).0;
+            o[p(3, 1, 0)] = (-(q(2, 2) * q(1, 0) - q(2, 0) * q(1, 2)) / det_val).0;
+            o[p(3, 2, 0)] = ((q(2, 1) * q(1, 0) - q(2, 0) * q(1, 1)) / det_val).0;
+            o[p(3, 0, 1)] = (-(q(2, 2) * q(0, 1) - q(2, 1) * q(0, 2)) / det_val).0;
+            o[p(3, 1, 1)] = ((q(2, 2) * q(0, 0) - q(2, 0) * q(0, 2)) / det_val).0;
+            o[p(3, 2, 1)] = (-(q(2, 1) * q(0, 0) - q(2, 0) * q(0, 1)) / det_val).0;
+            o[p(3, 0, 2)] = ((q(1, 2) * q(0, 1) - q(1, 1) * q(0, 2)) / det_val).0;
+            o[p(3, 1, 2)] = (-(q(1, 2) * q(0, 0) - q(1, 0) * q(0, 2)) / det_val).0;
+            o[p(3, 2, 2)] = ((q(1, 1) * q(0, 0) - q(1, 0) * q(0, 1)) / det_val).0;
             let check_val =
                 q(0, 0) * o[p(3, 0, 0)] + q(0, 1) * o[p(3, 1, 0)] + q(0, 2) * o[p(3, 2, 0)];
-            if (1.0 - check_val).abs() >= 1e-10 {
+            if (1.0 - check_val).0.abs() >= 1e-10 {
                 return None;
             }
             return Some(out);
@@ -696,8 +699,10 @@ pub fn inv_tiny(x: &Mat) -> Option<Mat> {
     if abs_det < det_min || abs_det > det_max {
         return None;
     }
-    let q = |r, c| xm[p(4, r, c)];
-    let o = &mut out.data;
+    let q = |r, c| S64(xm[p(4, r, c)]);
+    let det_val = S64(det_val);
+    let mut o4 = [S64(0.0); 16];
+    let o = &mut o4;
     o[p(4, 0, 0)] = (q(1, 2) * q(2, 3) * q(3, 1) - q(1, 3) * q(2, 2) * q(3, 1)
         + q(1, 3) * q(2, 1) * q(3, 2)
         - q(1, 1) * q(2, 3) * q(3, 2)
@@ -798,11 +803,14 @@ pub fn inv_tiny(x: &Mat) -> Option<Mat> {
         + q(0, 0) * q(1, 1) * q(2, 2))
         / det_val;
 
-    let check_val = q(0, 0) * o[p(4, 0, 0)]
-        + q(0, 1) * o[p(4, 1, 0)]
-        + q(0, 2) * o[p(4, 2, 0)]
-        + q(0, 3) * o[p(4, 3, 0)];
-    if (1.0 - check_val).abs() >= 1e-10 {
+    for (dst, v) in out.data.iter_mut().zip(o4.iter()) {
+        *dst = v.0;
+    }
+    let check_val = q(0, 0) * o4[p(4, 0, 0)]
+        + q(0, 1) * o4[p(4, 1, 0)]
+        + q(0, 2) * o4[p(4, 2, 0)]
+        + q(0, 3) * o4[p(4, 3, 0)];
+    if (1.0 - check_val).0.abs() >= 1e-10 {
         return None;
     }
     Some(out)
@@ -829,7 +837,7 @@ pub fn inv(x: &Mat) -> Result<Mat, Singular> {
             if v == 0.0 {
                 ok = false;
             }
-            out.set(i, i, 1.0 / v);
+            out.set(i, i, sse::div_f64(1.0, v));
         }
         return if ok { Ok(out) } else { Err(Singular) };
     }
@@ -879,17 +887,17 @@ fn inv_lu(x: &Mat) -> Result<Mat, Singular> {
         }
         let pivot = a.at(k, k);
         for c in 0..n {
-            a.set(k, c, a.at(k, c) / pivot);
-            b.set(k, c, b.at(k, c) / pivot);
+            a.set(k, c, sse::div_f64(a.at(k, c), pivot));
+            b.set(k, c, sse::div_f64(b.at(k, c), pivot));
         }
         for r in 0..n {
             if r == k {
                 continue;
             }
-            let f = a.at(r, k);
+            let f = S64(a.at(r, k));
             for c in 0..n {
-                a.set(r, c, a.at(r, c) - f * a.at(k, c));
-                b.set(r, c, b.at(r, c) - f * b.at(k, c));
+                a.set(r, c, (S64(a.at(r, c)) - f * a.at(k, c)).0);
+                b.set(r, c, (S64(b.at(r, c)) - f * b.at(k, c)).0);
             }
         }
     }
@@ -914,8 +922,8 @@ pub fn solve(a: &Mat, b: &Mat) -> Result<Mat, Singular> {
 /// `trace(A)` of an evaluated matrix: two interleaved partial sums of the diagonal.
 pub fn trace(a: &Mat) -> f64 {
     let n = a.rows.min(a.cols);
-    let mut val1 = 0.0;
-    let mut val2 = 0.0;
+    let mut val1 = S64(0.0);
+    let mut val2 = S64(0.0);
     let mut i = 0;
     let mut j = 1;
     while j < n {
@@ -927,7 +935,7 @@ pub fn trace(a: &Mat) -> f64 {
     if i < n {
         val1 += a.at(i, i);
     }
-    val1 + val2
+    (val1 + val2).0
 }
 
 /// `trace(A.t() * B)`, which Armadillo computes without forming the product: the sum, column by
@@ -935,11 +943,11 @@ pub fn trace(a: &Mat) -> f64 {
 pub fn trace_at_b(a: &Mat, b: &Mat) -> f64 {
     assert_eq!(a.rows, b.rows);
     let n = a.cols.min(b.cols);
-    let mut acc = 0.0;
+    let mut acc = S64(0.0);
     for k in 0..n {
         acc += dot(a.colptr(k), b.colptr(k));
     }
-    acc
+    acc.0
 }
 
 #[cfg(test)]

@@ -215,9 +215,10 @@ fn qform_sform_are_similar(s: &M44, q: &M44) -> bool {
 /// equal (two equal voxel sizes) the singular vectors are not unique: LINPACK's choice for each
 /// matrix decides, so this test must be vnl's own (a difference found by random testing, 2026-10-25).
 fn sform_qform_very_similar(s: &M44, q: &M44) -> bool {
-    let (Some((su, sw, _)), Some((qu, qw, _))) =
-        (vnl_svd_f32::vnl_svd_f32(&flat3(s), 3, 3), vnl_svd_f32::vnl_svd_f32(&flat3(q), 3, 3))
-    else {
+    let (Some((su, sw, _)), Some((qu, qw, _))) = (
+        vnl_svd_f32::vnl_svd_f32(&flat3(s), 3, 3),
+        vnl_svd_f32::vnl_svd_f32(&flat3(q), 3, 3),
+    ) else {
         return false;
     };
     // U is column-major; row-major copies for the product and the inverse.

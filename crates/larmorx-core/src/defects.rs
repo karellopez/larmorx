@@ -450,6 +450,8 @@ defects! {
         "a rigid or similarity blob alignment that keeps no landmark writes a transform of NaNs (ITK's rigid landmark fits divide the landmark sums by their count, 0)";
     ANTS_116 = "ANTS-116", "antsAI", true,
         "the blob alignment compares two blobs' patches after turning the moving one with a rotation built from the patches' principal axes, whose signs are arbitrary, without checking its determinant: identical patches can be compared reflected or turned by 180 degrees";
+    ANTS_160 = "ANTS-160", "ResampleImage", true,
+        "Gaussian interpolation given fewer sigmas than dimensions reads the missing sigmas past the end of their list: the result depends on memory the program never wrote";
 }
 
 /// The register entry with ID `id`.

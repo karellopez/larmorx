@@ -763,7 +763,13 @@ pub fn vnl_determinant(m: &[Vec<f64>]) -> f64 {
             let mut sum = 0.0;
             for (k, (sign, [a, b, c, d])) in TERMS.iter().enumerate() {
                 let term = r(*a, 0) * r(*b, 1) * r(*c, 2) * r(*d, 3);
-                sum = if k == 0 { term } else if *sign > 0.0 { sum + term } else { sum - term };
+                sum = if k == 0 {
+                    term
+                } else if *sign > 0.0 {
+                    sum + term
+                } else {
+                    sum - term
+                };
             }
             sum
         }
@@ -909,16 +915,33 @@ mod tests {
         nifti::write(&p, &h, a.view(), &WriteOptions::default()).unwrap();
         // In 2D and in 3D alike (ImageFileReader pads the file's 2D direction with zeros and
         // the third axis's own column): the first column stays zero.
-        for (mode, dim) in [(UpstreamDefects::Reproduce, 2), (UpstreamDefects::Fix, 2), (UpstreamDefects::Reproduce, 3)] {
-            let e = read_with::<f32, _>(&mut FileStore, p.to_str().unwrap(), dim, 1, &mut Notices::new(mode))
-                .unwrap_err();
-            assert!(e.to_string().contains("Bad direction, determinant is 0"), "{e}");
+        for (mode, dim) in [
+            (UpstreamDefects::Reproduce, 2),
+            (UpstreamDefects::Fix, 2),
+            (UpstreamDefects::Reproduce, 3),
+        ] {
+            let e = read_with::<f32, _>(
+                &mut FileStore,
+                p.to_str().unwrap(),
+                dim,
+                1,
+                &mut Notices::new(mode),
+            )
+            .unwrap_err();
+            assert!(
+                e.to_string().contains("Bad direction, determinant is 0"),
+                "{e}"
+            );
         }
     }
 
     #[test]
     fn vnl_determinants() {
-        let id = |n: usize| (0..n).map(|i| (0..n).map(|j| f64::from(u8::from(i == j))).collect()).collect::<Vec<Vec<f64>>>();
+        let id = |n: usize| {
+            (0..n)
+                .map(|i| (0..n).map(|j| f64::from(u8::from(i == j))).collect())
+                .collect::<Vec<Vec<f64>>>()
+        };
         for n in 1..=4 {
             assert_eq!(vnl_determinant(&id(n)), 1.0);
         }

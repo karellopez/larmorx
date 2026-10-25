@@ -46,7 +46,10 @@ mod tests {
     fn impossible_allocations_are_errors() {
         let e = filled(usize::MAX / 2, 0.0f32).unwrap_err();
         assert_eq!(e.element_bytes, 4);
-        assert!(e.to_string().starts_with("Failed to allocate memory for image"));
+        assert!(
+            e.to_string()
+                .starts_with("Failed to allocate memory for image")
+        );
         assert!(filled(1usize << 62, 0u8).is_err());
     }
 }

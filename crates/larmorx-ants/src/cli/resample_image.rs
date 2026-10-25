@@ -327,7 +327,7 @@ impl Job<'_> {
     }
 
     /// The interpolator ANTs chooses from the sixth to eighth arguments.
-    fn interpolation<T>(&self, image: &AntsImage<T>) -> Result<Interpolation, String> {
+    fn interpolation<T>(&mut self, image: &AntsImage<T>) -> Result<Interpolation, String> {
         let (argv, dim) = (self.argv, self.dim);
         let argc = argv.len();
         let kind = match argv.get(6) {
@@ -343,10 +343,23 @@ impl Job<'_> {
                         crash(&format!("'{}' starts with an empty element", argv[7]))
                     })?;
                     if sg.len() < dim {
-                        return Err(crash(&format!(
-                            "{} Gaussian sigmas for {dim} dimensions (ANTs reads past them)",
+                        // ANTS-160 (found by differential random testing, 2026-10-25): ANTs
+                        // reads the missing sigmas past the end of its vector
+                        // (`ResampleImage.cxx:178-182`) and exits 0 with a result that depends
+                        // on the heap (usually NaN: an image of zeros in an integer type, and
+                        // vnl's convergence messages). Class (a): an error in both modes, never
+                        // reproduced (as ANTS-77).
+                        let detail = format!(
+                            "{} Gaussian sigmas for {dim} dimensions: ANTs reads the missing ones past the end of its list (its result depends on memory it never wrote)",
                             sg.len()
-                        )));
+                        );
+                        if self.notices.fix() {
+                            self.notices
+                                .add(&defects::ANTS_160, format!("{detail}: an error"));
+                        }
+                        return Err(format!(
+                            "larmorx: ResampleImage: {detail}: an error (ANTS-160)"
+                        ));
                     }
                     sigma = sg[..dim].to_vec();
                 }
@@ -466,5 +479,44 @@ mod tests {
             UpstreamDefects::Fix,
         );
         assert!(!err.contains("ANTS-30"), "{err}");
+    }
+
+    /// ANTS-160 (differential random testing, 2026-10-25): one Gaussian sigma for three
+    /// dimensions. ANTs reads the other two past the end of its vector and exits 0 with a
+    /// result that depends on the heap; larmorx refuses in both modes (class (a)).
+    #[test]
+    fn missing_gaussian_sigmas_are_refused() {
+        use larmorx_core::element::DataType;
+        use larmorx_io::nifti::{self, NiftiHeader, NiftiVersion, WriteOptions};
+        let dir = tempfile::tempdir().unwrap();
+        let a = dir.path().join("a.nii");
+        let h = NiftiHeader::new(NiftiVersion::V1, &[2, 2, 2], DataType::F32).unwrap();
+        let data = larmorx_core::ndarray::ArrayD::from_elem(
+            larmorx_core::ndarray::IxDyn(&[2, 2, 2]),
+            3.0f32,
+        );
+        nifti::write(&a, &h, data.view(), &WriteOptions::default()).unwrap();
+        let (a, b) = (a.to_str().unwrap(), dir.path().join("b.nii"));
+        let b = b.to_str().unwrap();
+        let args = ["3", a, b, "3x3x3", "1", "2", "1", "1"];
+        let (code, _, err) = run_capture(&args, UpstreamDefects::Fix);
+        assert_eq!(code, 1, "{err}");
+        assert!(
+            err.contains("an error (ANTS-160)")
+                && err.contains("ANTS-160 (ResampleImage) corrected"),
+            "{err}"
+        );
+        let (code, _, err) = run_capture(&args, UpstreamDefects::Reproduce);
+        assert_eq!(code, 1, "{err}");
+        assert!(
+            err.contains("an error (ANTS-160)") && !err.contains("ANTS-160 (ResampleImage)"),
+            "{err}"
+        );
+        assert!(!dir.path().join("b.nii").exists());
+        // Three sigmas: no notice.
+        let args = ["3", a, b, "3x3x3", "1", "2", "1x1x1", "1"];
+        let (code, _, err) = run_capture(&args, UpstreamDefects::Fix);
+        assert_eq!(code, 0, "{err}");
+        assert!(!err.contains("ANTS-160"), "{err}");
     }
 }

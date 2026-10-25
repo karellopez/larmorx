@@ -94,7 +94,12 @@ UNDEFINED_DEFECTS: dict[str, str] = {
     "ITK-25": "the manifold Parzen windows read past the end of their neighbours (memory)",
     "SCI-01": "map_coordinates reads outside the array for huge or NaN coordinates (memory)",
     "AFNI-04": "a shift beyond the series reads past it (memory)",
+    "ANTS-160": "ResampleImage reads missing Gaussian sigmas past the end of their list (memory)",
 }
+
+#: A refusal that names its defect (``... an error (ANTS-160)``): larmorx refuses a class (a)
+#: case in both modes, so no notice names it while reproducing.
+_REFUSAL = re.compile(r"\(([A-Z]+-\d+)\)")
 
 #: The D13 notices larmorx's in-process runs printed in ``reproduce`` mode during a case.
 _NOTICES: list[str] = []
@@ -158,7 +163,8 @@ def execute(tool: core.Tool, recipe: dict, impl: str, *, timeout: float | None =
         signal.signal(signal.SIGALRM, previous)
         inputs.release(f"run/{gen.digest(recipe['inputs'])}")
     j = core.judge(tool, impl, result)
-    varying = sorted({n for n in _NOTICES if n in undefined_defects})
+    named = set(_NOTICES) | set(_REFUSAL.findall(j.detail or ""))
+    varying = sorted({n for n in named if n in undefined_defects})
     if j.verdict == DIFFER and varying:
         j = Judgement(UNDEFINED, tuple(f"undefined: {n}" for n in varying), f"{', '.join(varying)}: {undefined_defects[varying[0]]}; {j.detail}", j.status, j.checks)
     return j, time.monotonic() - start, result

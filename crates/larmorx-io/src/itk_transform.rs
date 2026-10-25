@@ -164,7 +164,9 @@ pub fn transform_from_parts(parts: &[ItkTransformParts]) -> Result<Transform, Tr
 /// file. Found by differential random testing (2026-10-25): `CompositeTransform_double_3` was
 /// read as a composite.
 fn registered_composite(name: &str) -> Result<(), TransformError> {
-    if name.starts_with("CompositeTransform") && !crate::itk_transform_names::REGISTERED.contains(&name) {
+    if name.starts_with("CompositeTransform")
+        && !crate::itk_transform_names::REGISTERED.contains(&name)
+    {
         return Err(TransformError::Invalid(format!(
             "Could not create an instance of \"{name}\" (not a transform class ITK registers)"
         )));
@@ -888,7 +890,10 @@ mod tests {
             fixed_parameters: vec![],
         };
         let e = transform_from_parts(&[part("CompositeTransform_double_3")]).unwrap_err();
-        assert!(e.to_string().contains("Could not create an instance"), "{e}");
+        assert!(
+            e.to_string().contains("Could not create an instance"),
+            "{e}"
+        );
         assert!(transform_from_parts(&[part("CompositeTransform_double_3_3")]).is_ok());
     }
 

@@ -462,7 +462,10 @@ mod tests {
     #[test]
     fn padding_beyond_memory_is_an_error() {
         let e = pad(&[1.0; 8], &[2, 2, 2], &[1 << 21; 3], &[1 << 21; 3]).unwrap_err();
-        assert!(e.to_string().starts_with("Failed to allocate memory for image"));
+        assert!(
+            e.to_string()
+                .starts_with("Failed to allocate memory for image")
+        );
     }
 
     #[test]

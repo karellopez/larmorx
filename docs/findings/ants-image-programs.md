@@ -174,3 +174,110 @@ validated in 2D and 4D. Spatial operations need more:
 - Without an output name it prints "missing output filename" (line 53) and aborts (`throw;` with no
   active exception). A missing first file crashes before anything is printed
   (`CreateImageIO` returns null). Dimension 1 is accepted by ANTs; larmorx supports 2 to 4.
+
+## Found by differential random testing (2026-10-25)
+
+- **The median's zero.** `MedianImageFilter` takes the element `std::nth_element` leaves in the
+  middle; `-0.0` and `+0.0` compare equal, so which one ITK writes depends on libstdc++'s
+  introselect. larmorx selected with `total_cmp` (`ants-smooth-image:20261025:564`: one voxel
+  `+0` against ANTs' `-0`). Where the median is a zero of a box holding both, larmorx now selects
+  again with GCC 14.3's algorithm, emulated statement by statement
+  (`larmorx_image::libstdcxx::nth_element`), on ITK's box order (permanent case
+  `difftest/median-zero-sign`).
+- **ITK-95 at a larger radius.** ITK's moving-histogram morphology on an image whose first axis
+  has one voxel is wrong above radius 0 too: `ImageMath 4 out GD a 3` on a 1x7x4x6 image writes
+  99 at two voxels where the maximum over ITK's ball (offsets within 3.5 voxels) is 97
+  (`ants-image-math:20261025:1541`, computed by brute force over the ball); larmorx gives the
+  true value in both modes (`reproduce` does not yet give ITK's).
+- **ANTS-163:** ImageMath `Normalize` and `TruncateImageIntensity` with a mask of another size
+  read it outside its buffer; larmorx refuses (as before), now naming the defect.
+- **ANTS-161:** ResampleImage's refusal of a Gaussian sigma or alpha of 0 or less now names the
+  defect.
+- **ANTS-162:** ResampleImage's and ResampleImageBySpacing's output grid is checked against the
+  machine's memory before it is allocated (7.5 bytes per output voxel, the most it was
+  measured to need); see [ants-n4.md](ants-n4.md), "Memory".
+
+## Memory against ANTs (2026-10-25)
+
+The user's rule (2026-10-25): larmorx never needs more memory than the original program for the
+same call. Measured with `validation/investigations/difftest/memory_pair.py`: ANTs 2.6.5 and
+larmorx's command (`python -m larmorx ants <program> ...`, what the `larmorx` console script
+runs), each process's peak resident memory (`/usr/bin/time -v`), one thread, larmorx in both D13
+modes; `rss_timeline.py` shows a run's memory over time, `scaled_memory.py` a heavy random case
+at smaller scales (bytes per output voxel). `tests/parity/test_memory_peak.py` holds larmorx to
+ANTs' peak plus 8 MiB (the Python interpreter; a call on 16 voxels needs 20 MiB in larmorx, 18
+in ANTs) on 13 of the calls below (every program, and each operation that needed more), and
+checks larmorx's output bit for bit in `reproduce`.
+
+| Call (float input; one thread) | Output voxels | ANTs | larmorx before | larmorx |
+|---|---|---|---|---|
+| `ResampleImageBySpacing 3 in out 0.5 0.5 0.5` (128×128×64 at 2 mm) | 67 M | 279 MiB | 2.2 times | 283 MiB |
+| `ResampleImageBySpacing 3 in out 0.4 0.4 0.4` (the same) | 131 M | 523 MiB | 2.2 times | 527 MiB |
+| `ResampleImage 3 in out 0.4x0.4x0.4 0 0` (the same) | 131 M | 534 MiB | | 527 MiB |
+| `ResampleImage 3 in out 1x1x1 0 4` (B-spline) | 8.4 M | 65 MiB | | 65 MiB |
+| `SmoothImage 3 in 1.5 out` (256×256×128) | 8.4 M | 83 MiB | 90 MiB | 88 MiB |
+| `ThresholdImage 3 in out 20 60` (the same) | 8.4 M | 83 MiB | 90 MiB | 88 MiB |
+| `MultiplyImages 3 in 2.5 out` (the same) | 8.4 M | 116 MiB | 89 MiB | 88 MiB |
+| `ImageMath 3 out G in 1.5` (the same) | 8.4 M | 121 MiB | 90 MiB | 89 MiB |
+| `ImageMath 3 out m in in` (the same) | 8.4 M | 121 MiB | 121 MiB | 120 MiB |
+| `ImageMath 3 out ME in 1` (the same) | 8.4 M | 97 MiB | 150 MiB | 94 MiB |
+| `ImageMath 3 out MD in 1` (the same) | 8.4 M | 97 MiB | 101 MiB | 94 MiB |
+| `ImageMath 3 out GD in 1` (the same) | 8.4 M | 88 MiB | 181 MiB | 85 MiB |
+| `ImageMath 3 out GE in 1` (the same) | 8.4 M | 89 MiB | 213 MiB | 85 MiB |
+| `ImageMath 3 out GO in 1`, `GC in 2` (the same) | 8.4 M | 187, 189 MiB | | 87, 89 MiB |
+| `ImageMath 3 out MO in 1`, `MC in 1` (the same) | 8.4 M | 129, 163 MiB | | 125, 158 MiB |
+| `ImageMath 3 out TruncateImageIntensity in 0.01 0.999 256` (the same) | 8.4 M | 89 MiB | 117 MiB | 85 MiB |
+| `ImageMath 3 out GetLargestComponent in`, `FillHoles in 2` (the same) | 8.4 M | 250, 475 MiB | | 125, 134 MiB |
+| `ImageMath 3 out Normalize in`, `PadImage in 10` (the same) | 8.4 M | 88, 99 MiB | | 84, 91 MiB |
+| `N4BiasFieldCorrection -d 3 -i in -o out -s 2 -c [20x20,0]` (128×128×96 at 1.5 mm) | 1.6 M | 79 MiB | 104 MiB | 41 MiB |
+| `DenoiseImage -d 3 -i in -o out` (96×96×64 at 2 mm) | 0.6 M | 40 MiB | 85 MiB | 44 MiB |
+| `ThresholdImage 3 in out 20 60` (4×4×1: the interpreter) | 16 | 18 MiB | 32 MiB | 20 MiB |
+
+What grows with the image costs larmorx no more than ANTs: per output voxel of the resamplers,
+4.0 bytes for float outputs and 1.0 for `unsigned char` ones in both (fitted on
+`ants-resample-image:20261025:556` at 94 to 756 M voxels: ANTs 1.003, larmorx 1.004), and 7.2
+for a 2D ResampleImageBySpacing in `reproduce` as in ANTs (4.0 in larmorx's default;
+`ants-resample-image-by-spacing:20261025:137`). The rest is a constant of a few MiB. What was
+found and changed, each with the same output bit for bit:
+
+- **ResampleImageBySpacing resampled twice** in the default, the second time with ANTs' outside
+  value, to count exactly the voxels ANTS-32's notice names: 2.2 times ANTs' memory (16 bytes
+  per output voxel against 7.3 on the heavy random cases). The voxels beyond the input are now
+  counted in the one pass (`larmorx_ants::resample::resample_identity_outside`), the same count.
+- **The gzip writer** copied a whole image into its input batch before compressing; it now
+  holds two blocks per worker (at most 64; `larmorx_io::gzip`), the same bytes.
+- **The command line imported NumPy** and every subpackage at start (`import larmorx`): 31.9 MiB
+  before any work. The package now loads its subpackages and names on first use (PEP 562): 15.6
+  MiB, ANTs' programs 18.
+- **The line operations** (`larmorx_image::lines`: `filter_lines`, SmoothImage and the
+  recursive and discrete Gaussians; `for_each_line`, morphology and distance maps) held one task
+  reference per 32 voxels of a row along a strided axis (half a byte per voxel); now one per 256,
+  32 lines at a time as before.
+- **The resamplers' guard (ANTS-162)** counted 16 bytes per output voxel, the old cost; it now
+  counts 7.5, the most measured, so a call that fits is no longer refused.
+- **Grayscale morphology** (GD, GE, GO, GC) copied its keys (the values as integers in
+  `total_cmp` order), widened its runs into a second buffer, made the complements for an
+  erosion and the values at the end as new images: up to five images where ITK holds two. It
+  now widens the runs in place on the keys it is given, the complements and values in place,
+  and the command line hands it the image's own buffer
+  (`larmorx_image::morphology::grayscale_dilate_owned` and the others;
+  `larmorx_ants::image_math::grayscale_morphological_owned`).
+- **ME** made both ANTs' thresholded image and the corrected one to count ANTS-17's voxels; it
+  now counts them and writes the mode's values in one pass. The binary filters free their sites
+  once the distances are made (MD and the others too).
+- **TruncateImageIntensity** made a label image (4 bytes per voxel) for the histogram of the
+  voxels it counts; they are decided where they are counted now
+  (`larmorx_image::statistics::histogram_where`, the same histogram).
+- **The gzip writer** holds one block per batch on one thread (two per worker otherwise) behind
+  a 64 KiB buffer; the plain writer keeps its 1 MiB buffer.
+
+The comparison of the random tests' heavy cases held both outputs (and float64 copies where
+values differ) in the process that had run larmorx: `ants-resample-image:20261025:556` and
+`ants-resample-image-by-spacing:20261025:938`, outputs of 6·10⁹ and 3.8·10⁹ voxels, were stopped
+at 24 GiB and 48 GiB of swap by the harness, not by the programs. Outputs of more than 2²⁸ values
+are now compared from their files, a chunk at a time
+(`larmorx_validation.parity.ants_programs.StoredValues`), with the same numbers; the two cases
+wait for a larger machine with the night's other heavy cases.
+
+N4BiasFieldCorrection and DenoiseImage: [ants-n4.md](ants-n4.md) and
+[ants-denoise.md](ants-denoise.md), "Memory against ANTs".

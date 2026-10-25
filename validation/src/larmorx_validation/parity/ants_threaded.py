@@ -38,6 +38,7 @@ from larmorx_validation.parity.ants_programs import (
     case_never,
     crmath_preload,
     fix_pass,
+    guard,
     header_differences,
     known_summary,
     raw_header,
@@ -132,6 +133,10 @@ def compare(
     and records the checks; ``labels`` names the outputs."""
     if ants_bin() is None:
         raise Outcome(SKIPPED, "the ANTs 2.6.5 oracle was not found (LARMORX_ANTS_BIN)")
+    if c.expect == "guard":
+        with tempfile.TemporaryDirectory(prefix=prefix) as tmp_name:
+            guard(c, Path(tmp_name), checks, LX_THREADS)
+        return
     with tempfile.TemporaryDirectory(prefix=prefix) as tmp_name:
         tmp = Path(tmp_name)
         a_code, a_out, a_err, a_outputs, a_ok = run(run_ants, c, tmp, "ants", 1)

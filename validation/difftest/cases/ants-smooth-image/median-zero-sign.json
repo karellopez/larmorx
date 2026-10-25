@@ -1,0 +1,171 @@
+{
+ "defect": null,
+ "description": "a median filter box holding both zeros: the zero libstdc++'s nth_element leaves, as ITK writes it",
+ "expect": "pass",
+ "found": {
+  "detail": "values (bit-identical): 1 of 3 values differ; max |diff| 0 (0.0e+00 of max |ANTs|), at most 0 ulp",
+  "n": 564,
+  "seed": "20261025",
+  "shrink_moves": [
+   "a: axis 2 28 -> 14 voxels",
+   "a: axis 1 21 -> 10 voxels",
+   "a: axis 0 14 -> 7 voxels",
+   "a: axis 1 10 -> 5 voxels",
+   "a: axis 2 14 -> 7 voxels",
+   "a: axis 0 7 -> 3 voxels",
+   "a: axis 2 7 -> 3 voxels",
+   "a: axis 1 5 -> 2 voxels",
+   "a: axis 2 3 -> 1 voxels",
+   "a: axis 1 2 -> 1 voxels",
+   "a (and its grid): unit spacing",
+   "a (and its grid): origin at 0",
+   "a (and its grid): qform and sform codes 1",
+   "a: content sparse -> blobs"
+  ],
+  "signature": [
+   "values (bit-identical)"
+  ]
+ },
+ "id": "median-zero-sign",
+ "implementations": [
+  "port"
+ ],
+ "reason": "",
+ "recipe": {
+  "extra": {},
+  "features": {
+   "content": "sparse",
+   "dimension": 3,
+   "dtype": "float32",
+   "extra": 4,
+   "orientation": "plumb",
+   "origin0": 47.75,
+   "origin1": -53.5,
+   "origin2": 46.5,
+   "qfac": 1,
+   "qform_code": 4,
+   "range": "plain",
+   "sform": "same",
+   "sform_code": 1,
+   "shape": "14x21x28",
+   "sigma": "1.5",
+   "spacing0": 2.5,
+   "spacing1": 2.0,
+   "spacing2": 1.5,
+   "sparse": 0.01,
+   "specials": 3,
+   "suffix": ".nii.gz",
+   "units": "mm"
+  },
+  "groups": [
+   {
+    "args": [
+     "3"
+    ],
+    "name": "dimension",
+    "optional": false
+   },
+   {
+    "args": [
+     "{in:a}"
+    ],
+    "name": "input",
+    "optional": false
+   },
+   {
+    "args": [
+     "1.5"
+    ],
+    "name": "sigma",
+    "optional": false
+   },
+   {
+    "args": [
+     "{out}"
+    ],
+    "name": "output",
+    "optional": false
+   },
+   {
+    "args": [
+     "0",
+     "1"
+    ],
+    "name": "physical / median",
+    "optional": true
+   }
+  ],
+  "inputs": {
+   "a": {
+    "content": {
+     "axes": [
+      1.0,
+      1.0,
+      1.0
+     ],
+     "centre": [
+      0.0,
+      0.0,
+      0.0
+     ],
+     "n": 1,
+     "seed": 319803563,
+     "size": 12.0,
+     "type": "blobs"
+    },
+    "dtype": "float32",
+    "geometry": {
+     "origin": [
+      0.0,
+      0.0,
+      0.0
+     ],
+     "qfac": 1,
+     "qform_code": 1,
+     "quaternion": [
+      1,
+      0,
+      0,
+      0
+     ],
+     "sform": "same",
+     "sform_code": 1,
+     "spacing": [
+      1.0,
+      1.0,
+      1.0
+     ],
+     "units": "mm"
+    },
+    "scaling": null,
+    "shape": [
+     3,
+     1,
+     1
+    ],
+    "suffix": ".nii.gz",
+    "values": {
+     "offset": 0.0,
+     "scale": 1.0,
+     "specials": [
+      "inf",
+      "-inf",
+      "-0"
+     ]
+    }
+   }
+  },
+  "n": 564,
+  "options": [
+   "dimension 3",
+   "extra 0 1"
+  ],
+  "seed": "20261025",
+  "tool": "ants-smooth-image"
+ },
+ "rule": null,
+ "status": "fixed",
+ "suite": "ants-smooth-image",
+ "tier": "smoke",
+ "tool": "ants-smooth-image"
+}

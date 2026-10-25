@@ -262,6 +262,18 @@ def cmd_oracle_cache(args: argparse.Namespace) -> int:
     return cli.main(args)
 
 
+def cmd_difftest(args: argparse.Namespace) -> int:
+    from larmorx_validation.difftest import cli
+
+    return cli.main(args)
+
+
+def cmd_tables(args: argparse.Namespace) -> int:
+    from larmorx_validation import tables
+
+    return tables.main(args)
+
+
 def cmd_pipeline_stages(args: argparse.Namespace) -> int:
     from larmorx_validation import stages
 
@@ -336,6 +348,24 @@ def main(argv: Sequence[str] | None = None) -> int:
 
     oracle_arguments(oc)
     oc.set_defaults(func=cmd_oracle_cache)
+    dtp = sub.add_parser(
+        "difftest",
+        help="differential random testing: random valid inputs and options through each original "
+        "program and larmorx, differences shrunk (docs/validation/difftest.md)",
+    )
+    from larmorx_validation.difftest.cli import add_arguments as difftest_arguments
+
+    difftest_arguments(dtp)
+    dtp.set_defaults(func=cmd_difftest)
+    tb = sub.add_parser(
+        "tables",
+        help="write the tables that repeat the records' facts (README, the validation index, the "
+        "site's status) from validation/tools.toml and the records; --check fails on a difference",
+    )
+    from larmorx_validation.tables import add_arguments as tables_arguments
+
+    tables_arguments(tb)
+    tb.set_defaults(func=cmd_tables)
     b = sub.add_parser("bench", help="benchmark larmorx against reference implementations")
     b.add_argument("suite", choices=BENCH_SUITES)
     b.add_argument("--tier", default="full", choices=("smoke", "standard", "full"))

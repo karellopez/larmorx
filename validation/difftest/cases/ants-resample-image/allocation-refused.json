@@ -1,0 +1,185 @@
+{
+ "defect": null,
+ "description": "an output grid that cannot be allocated: ITK throws (ANTs aborts), larmorx refuses with ITK's message (it aborted)",
+ "expect": "error",
+ "found": {
+  "detail": "the process ended by signal 6: memory allocation of 117295280544 bytes failed note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace",
+  "n": 10,
+  "seed": "trial1",
+  "shrink_moves": [
+   "dropped interpolation (0)",
+   "a: axis 1 19 -> 9 voxels",
+   "a: axis 0 17 -> 8 voxels",
+   "a: axis 1 9 -> 4 voxels",
+   "a: axis 2 9 -> 4 voxels",
+   "a: axis 0 8 -> 4 voxels",
+   "a: axis 0 4 -> 2 voxels",
+   "a: axis 1 4 -> 2 voxels",
+   "a: axis 2 4 -> 2 voxels",
+   "a: axis 0 2 -> 1 voxels",
+   "a: axis 1 2 -> 1 voxels",
+   "a: axis 2 2 -> 1 voxels",
+   "a (and its grid): plumb orientation"
+  ],
+  "signature": [
+   "crash"
+  ]
+ },
+ "id": "allocation-refused",
+ "implementations": [
+  "port"
+ ],
+ "reason": "",
+ "recipe": {
+  "extra": {},
+  "features": {
+   "axis0": 0.95,
+   "axis1": 0.95,
+   "axis2": 0.85,
+   "centre0": 3.0,
+   "centre1": -1.5,
+   "centre2": 1.5,
+   "content": "labels",
+   "dimension": 4,
+   "dtype": "uint16",
+   "interpolation": "0",
+   "interpolation given": true,
+   "labels": 8,
+   "orientation": "axes+oblique",
+   "origin0": -56.0,
+   "origin1": 57.0,
+   "origin2": 23.25,
+   "pixel type": false,
+   "qfac": 1,
+   "qform_code": 0,
+   "range": "plain",
+   "sform": "same",
+   "sform_code": 1,
+   "shape": "17x19x9x8",
+   "size": false,
+   "slice_code": 4,
+   "spacing": "1.7",
+   "spacing0": 1.2,
+   "spacing1": 2.5,
+   "spacing2": 4.0,
+   "suffix": ".nii.gz",
+   "tr": 2.5,
+   "tunits": "sec",
+   "units": "m"
+  },
+  "groups": [
+   {
+    "args": [
+     "4"
+    ],
+    "name": "dimension",
+    "optional": false
+   },
+   {
+    "args": [
+     "{in:a}"
+    ],
+    "name": "input",
+    "optional": false
+   },
+   {
+    "args": [
+     "{out}"
+    ],
+    "name": "output",
+    "optional": false
+   },
+   {
+    "args": [
+     "1.7"
+    ],
+    "name": "target",
+    "optional": false
+   },
+   {
+    "args": [
+     "0"
+    ],
+    "name": "size or spacing",
+    "optional": false
+   }
+  ],
+  "inputs": {
+   "a": {
+    "content": {
+     "axes": [
+      0.95,
+      0.95,
+      0.85
+     ],
+     "centre": [
+      3.0,
+      -1.5,
+      1.5
+     ],
+     "n": 8,
+     "seed": 227457670,
+     "size": 27.0,
+     "type": "labels"
+    },
+    "dtype": "uint16",
+    "geometry": {
+     "origin": [
+      -56.0,
+      57.0,
+      23.25
+     ],
+     "qfac": 1,
+     "qform_code": 0,
+     "quaternion": [
+      1,
+      0,
+      0,
+      0
+     ],
+     "sform": "same",
+     "sform_code": 1,
+     "spacing": [
+      1.2,
+      2.5,
+      4.0
+     ],
+     "units": "m"
+    },
+    "scaling": null,
+    "shape": [
+     1,
+     1,
+     1,
+     8
+    ],
+    "suffix": ".nii.gz",
+    "timing": {
+     "slice_code": 4,
+     "slice_duration": 0.2778,
+     "slice_end": 0,
+     "slice_start": 0,
+     "tr": 2.5,
+     "tunits": "sec"
+    },
+    "values": {
+     "offset": 0.0,
+     "scale": 1.0
+    }
+   }
+  },
+  "n": 10,
+  "options": [
+   "dimension 4",
+   "interpolation 0",
+   "spacing"
+  ],
+  "seed": "trial1",
+  "tool": "ants-resample-image"
+ },
+ "rule": null,
+ "status": "fixed",
+ "suite": "ants-resample-image",
+ "tier": "smoke",
+ "tool": "ants-resample-image"
+}

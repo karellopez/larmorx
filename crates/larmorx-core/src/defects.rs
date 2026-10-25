@@ -334,8 +334,8 @@ defects! {
         "a negative scl_slope is dropped where a voxel's series is read (THD_extract_array) but applied elsewhere: 3dTshift's shifted slices come out sign-flipped and scaled, 3dAutomask averages several sub-bricks without the factor, 3dUnifize -EPI's median volume has the wrong sign";
     AFNI_02 = "AFNI-02", "AFNI", true,
         "float32 data with a slope and an intercept are scaled when read and keep the slope in the output header, so they are scaled twice";
-    AFNI_03 = "AFNI-03", "3dTshift", true,
-        "header slice code 2 (sequential decreasing) gives every slice time 0, so nothing is shifted";
+    AFNI_03 = "AFNI-03", "AFNI", true,
+        "header slice code 2 (sequential decreasing) gives every slice time 0: 3dTshift shifts nothing, and 3dAutomask and 3dUnifize write no slice timing";
     AFNI_05 = "AFNI-05", "3dTshift", true,
         "-no_detrend removes and restores the mean of only the first voxel of each pair; the second is shifted as raw values";
     AFNI_07 = "AFNI-07", "AFNI", true,
@@ -370,6 +370,8 @@ defects! {
         "a volume of more than a million voxels with an axis of 2 or 3 voxels: its half-size scale image expands back to a grid of another size, which AFNI reads as if it were the input's, past its end";
     AFNI_48 = "AFNI-48", "3dUnifize", true,
         "-T2 given three or more times (the help documents once and twice) leaves the output inverted: neither inverted back nor edge-clipped";
+    AFNI_75 = "AFNI-75", "3dUnifize", true,
+        "-EPI sets the neighbourhood's radius to 18.3 mm over the voxels' geometric mean size, in voxels, with no upper bound: on micrometre (or otherwise tiny) voxels the ball of neighbours has trillions of points, built before any is used, which fills the machine until the process is stopped";
     FSL_01 = "FSL-01", "mcflirt", true,
         "the last volume of the series starts its first stage from the identity, not from the previous volume's result";
     FSL_02 = "FSL-02", "mcflirt", false,
@@ -420,8 +422,8 @@ defects! {
         "with --minimize-memory-usage the prior probability images are stored with their voxel numbers in float, so in images of more than 2^24 voxels prior values land on rounded voxel numbers";
     ANTS_98 = "ANTS-98", "Atropos", true,
         "KMeans takes the first image's range from the voxels labelled 1 in the mask only: a mask with other values gives infinite initial centres";
-    ANTS_99 = "ANTS-99", "Atropos", true,
-        "without -d every image is segmented in 3D: Atropos asks the image reader for the dimension before the reader has read the header, and NIfTI's reader answers 3";
+    ANTS_99 = "ANTS-99", "ANTs", true,
+        "without -d every image is taken as 3D (Atropos, N4BiasFieldCorrection, DenoiseImage): the program asks the image reader for the dimension before the reader has read the header, and NIfTI's reader answers 3";
     ANTS_100 = "ANTS-100", "Atropos", true,
         "prior probability images given as one vector image (without --minimize-memory-usage) all hold the last component: every class gets the last class's prior";
     ANTS_101 = "ANTS-101", "Atropos", true,
@@ -440,6 +442,16 @@ defects! {
         "with GrubbsRosner, whose output keeps growing (ANTS-94), Atropos weighs the samples beyond the masked voxels with weights it never sets (uninitialized memory): the class parameters depend on what the memory held";
     ITK_60 = "ITK-60", "ITK", true,
         "LandmarkBasedTransformInitializer's 2D rigid fit takes the angle -pi/2 whenever the landmarks' summed dot product is within 5e-5 of 0, whatever the sign of their cross product (a quarter turn the other way gives the opposite rotation)";
+    ITK_96 = "ITK-96", "ITK", true,
+        "the HDF5 transform writer (with compression) cannot write a transform without parameters (a chunk of 0 values): an IdentityTransform, or the inverse a displacement field without an inverse field gives, stops the file part-written with HDF5's error";
+    ITK_97 = "ITK-97", "ITK", true,
+        "a sampled metric's derivative at a sample point outside the virtual region (a shrink factor: the samples are drawn on the fixed image) is added at the region's linear offset of its index, another voxel's parameters (StorePointDerivativeResult checks nothing)";
+    ITK_100 = "ITK-100", "ITK", true,
+        "MattesMutualInformationImageToImageMetricv4 keeps its joint histogram images from a stage's first level, so a later level whose analysis region has one intensity (a bin size of 0) never reaches ImageBase::SetSpacing's exception, as the first level does: the bin size is used silently, the bin indices are NaN or infinite and clamped, the metric is 0";
+    ITK_99 = "ITK-99", "ITK", true,
+        "a sampled metric's derivative at a sample point outside the virtual region whose linear offset falls outside the derivative array is written past its end: memory it does not own";
+    ITK_98 = "ITK-98", "ITK", true,
+        "B-spline interpolation mirrors a support index only once at each end of an axis: on an axis too short for the spline's support (2 voxels for orders 3 and 4, 2 or 3 for order 5) it reads the coefficient image outside its buffer, memory it never wrote";
     ANTS_110 = "ANTS-110", "antsAI", true,
         "the blob alignment keeps the blob pairs whose displacements have about the same length as the others' (the squared distance between a pair's fixed and moving blob over another pair's), not those whose distances to the other blobs are preserved between the images, as its comment and ImageMath's MatchBlobs say";
     ANTS_111 = "ANTS-111", "antsAI", true,
@@ -450,6 +462,10 @@ defects! {
         "a rigid or similarity blob alignment that keeps no landmark writes a transform of NaNs (ITK's rigid landmark fits divide the landmark sums by their count, 0)";
     ANTS_116 = "ANTS-116", "antsAI", true,
         "the blob alignment compares two blobs' patches after turning the moving one with a rotation built from the patches' principal axes, whose signs are arbitrary, without checking its determinant: identical patches can be compared reflected or turned by 180 degrees";
+    ANTS_160 = "ANTS-160", "ResampleImage", true,
+        "Gaussian interpolation given fewer sigmas than dimensions reads the missing sigmas past the end of their list: the result depends on memory the program never wrote";
+    ANTS_162 = "ANTS-162", "ANTs", true,
+        "N4BiasFieldCorrection's B-spline lattice and padding, and ResampleImage's and ResampleImageBySpacing's output grids, are sized from the image's physical extent with no check: a header in metres or micrometres, or a 4D image's time axis, can make a tiny input need more memory than any machine has, which fills the machine until the process is stopped";
 }
 
 /// The register entry with ID `id`.

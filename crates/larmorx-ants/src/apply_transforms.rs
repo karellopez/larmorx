@@ -30,7 +30,7 @@ use larmorx_core::defects::{Notice, Notices, UpstreamDefects};
 use larmorx_core::element::RealElement;
 use larmorx_core::parallel::{self, ThreadPoolError};
 use larmorx_core::{Grid3, IndexFloor, ItkReal, Precision, same_value};
-use larmorx_interp::{InterpError, Interpolation, Interpolator, Volume, is_inside};
+use larmorx_interp::{BSplineMirror, InterpError, Interpolation, Interpolator, Volume, is_inside};
 use larmorx_transform::{PrecisionChain, TransformChain, TransformError};
 use rayon::prelude::*;
 
@@ -152,6 +152,9 @@ fn apply_as<T: RealElement, R: ItkReal>(
     // floor, and counted if its value changed.
     let floor = IndexFloor::new(mode);
     let floor = &floor;
+    // ITK-98: the B-spline's mirror on an axis too short for its support.
+    let mirror = BSplineMirror::new(mode);
+    let mirror = &mirror;
     let output = parallel::with_threads(options.n_threads, || {
         // With several volumes, map every voxel once and reuse the indices (ITK recomputes
         // them per volume, with the same result).
@@ -169,7 +172,8 @@ fn apply_as<T: RealElement, R: ItkReal>(
                 &options.interpolation,
                 input_grid.spacing,
                 R::PRECISION,
-            )?;
+            )?
+            .with_bspline_mirror(mirror.local());
             let value = |c: [f64; 3], floor: &IndexFloor| {
                 if is_inside(c, input_grid.size) {
                     output_pixel::<R>(interpolator.evaluate_with_floor(c, floor))
@@ -204,10 +208,12 @@ fn apply_as<T: RealElement, R: ItkReal>(
                     }
                 },
             );
+            mirror.absorb(interpolator.bspline_mirror());
         }
         Ok::<_, ApplyTransformsError>(output)
     })??;
     floor.notice(&mut notices, "output voxels");
+    mirror.notice(&mut notices, "output voxels");
     Ok((output, notices.into_vec()))
 }
 

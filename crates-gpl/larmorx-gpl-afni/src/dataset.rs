@@ -1543,6 +1543,32 @@ pub fn write(
             } else {
                 UpstreamDefects::Fix
             };
+            // AFNI-03: header slice code 2 read as every slice time 0 changes the slice timing
+            // the output keeps (3dAutomask, 3dUnifize: found by random testing, 2026-10-25;
+            // 3dTshift names it where it shifts). Corrected, the times are the header's; AFNI
+            // writes what zeros give.
+            if let Some((sfirst, slast)) = ds.seq_dec {
+                let zeros = vec![0.0f32; tlist.len()];
+                let afni = slice_fields(&zeros, UpstreamDefects::Reproduce);
+                if mode.reproduce() || afni != (code, start, end, dur) {
+                    notices.add(
+                        &defects::AFNI_03,
+                        if mode.fix() {
+                            format!(
+                                "header slice code 2 (sequential decreasing): the output keeps \
+                                 slices {slast}..{sfirst}'s times (slice code {code}, \
+                                 slice_end {end}); AFNI reads every slice time as 0 and writes \
+                                 slice code {}, slice_end {}",
+                                afni.0, afni.2
+                            )
+                        } else {
+                            "header slice code 2 (sequential decreasing) read as every slice \
+                             time 0, as AFNI does"
+                                .to_owned()
+                        },
+                    );
+                }
+            }
             if slice_fields(tlist, other) != (code, start, end, dur) {
                 let n = tlist.len();
                 notices.add(

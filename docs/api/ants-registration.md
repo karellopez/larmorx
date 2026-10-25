@@ -251,7 +251,11 @@ larmorx ants antsRegistration -d 3 -o [out_,out_warped.nii.gz] ... \
   similarity's crashes), ANTS-73 (an image that is not a displacement field given as one:
   refused), ANTS-74 (a stale saved state), ANTS-61 (IGDM among other metrics). ANTS-72 (a
   linear stage after a field is not repeatable in ANTs) is not reproduced: larmorx draws its
-  voxels with the seed.
+  voxels with the seed. Found by random testing (2026-10-25): ITK-97 (a sampled metric with a
+  shrink factor: a sample point outside the shrunk region has its derivative added to another
+  voxel's parameters in ITK; dropped by default), ITK-99 (written past the derivative array:
+  dropped in both modes), ITK-100 (Mattes at a later level whose analysis region has one
+  intensity: ITK computes a metric of 0 where its first level refuses; an error by default).
 
 ## B-spline and displacement-field stages
 

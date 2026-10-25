@@ -1271,8 +1271,11 @@ fn segmentation(
                 if verbose {
                     log.cerr(&format!("{}\n", itk_exception(&e).print()));
                 } else {
+                    // One line (an ITK description can hold several): larmorx's own line,
+                    // which ANTs does not print without --verbose 1.
                     log.cerr(&format!(
-                        "larmorx: Atropos: {e} (ANTs exits 1 and prints this only with --verbose 1, ANTS-45)\n"
+                        "larmorx: Atropos: {} (ANTs exits 1 and prints this only with --verbose 1, ANTS-45)\n",
+                        e.to_string().replace('\n', " ")
                     ));
                 }
                 1
@@ -1898,6 +1901,50 @@ mod tests {
             String::from_utf8(out).unwrap(),
             String::from_utf8(err).unwrap(),
         )
+    }
+
+    /// A mask without a voxel: k-means throws while finding the empty sample's bounds, before
+    /// any Gaussian is built (differential random testing, 2026-10-25).
+    #[test]
+    fn an_empty_mask_stops_the_k_means() {
+        let dir = tempfile::tempdir().unwrap();
+        let (t1, _) = phantom(dir.path());
+        let mask = dir.path().join("empty.nii.gz");
+        write(&mask, vec![0.0; SHAPE.iter().product()]);
+        let mask = mask.to_str().unwrap();
+        let out_spec = format!("[{}]", dir.path().join("seg.nii.gz").display());
+        let args = [
+            "-d",
+            "3",
+            "-a",
+            &t1,
+            "-x",
+            mask,
+            "-i",
+            "KMeans[3]",
+            "-c",
+            "[5,0]",
+            "-r",
+            "0",
+            "-o",
+            &out_spec,
+        ];
+        let (code, out, err) = run_capture(&args, 1);
+        assert_eq!(code, 1, "{out}{err}");
+        assert!(
+            !err.contains("list sample has <= 1") && !err.contains("ANTS-98"),
+            "{err}"
+        );
+        assert!(err.contains("compute bounds of a sample list"), "{err}");
+        let mut verbose = args.to_vec();
+        verbose.extend_from_slice(&["-v", "1"]);
+        let (_, _, err) = run_capture(&verbose, 1);
+        assert!(
+            err.contains(
+                "File: Modules/Numerics/Statistics/include/itkStatisticsAlgorithm.hxx\nLine: 263"
+            ),
+            "{err}"
+        );
     }
 
     #[test]

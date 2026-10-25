@@ -1,0 +1,430 @@
+{
+ "defect": null,
+ "description": "B-spline SyN with --float 1 and a mask leaving no valid point: ITK sums the two halves' FLT_MAX metric values in float (inf) before halving them; larmorx summed in double",
+ "expect": "pass",
+ "found": {
+  "detail": "ANTs with CORE-MATH: standard output: line 517: ANTs 'WDIAGNOSTIC,     1, inf, inf, ', larmorx 'WDIAGNOSTIC,     1, 3.402823466385e+38, inf, '; D13 fix pass: ANTS-78, ITK-30, ITK-35, ITK-31: no values changed",
+  "n": 1081,
+  "seed": "20261025",
+  "shrink_moves": [],
+  "signature": [
+   "ANTs with CORE-MATH: standard output",
+   "DN fix pass"
+  ]
+ },
+ "id": "syn-float-metric-sum-overflow",
+ "implementations": [
+  "port"
+ ],
+ "reason": "the fix pass names corrections of the case's other steps that change nothing this input shows: ANTS-78, ITK-30, ITK-35, ITK-31",
+ "recipe": {
+  "extra": {
+   "min_size": 6
+  },
+  "features": {
+   "axis0": 1.15,
+   "axis1": 1.05,
+   "axis2": 0.8,
+   "bias0": -0.0075,
+   "bias1": -0.0075,
+   "bias2": 0.005,
+   "bias3": -0.005,
+   "centre0": -1.5,
+   "centre1": -3.0,
+   "centre2": -1.5,
+   "collapse": false,
+   "composite": false,
+   "content": "zeros",
+   "dimension": 3,
+   "dtype": "uint8",
+   "exp total0": "0",
+   "exp total1": "0",
+   "exp total2": "0",
+   "family0": "BSpline",
+   "family1": "BSplineExponential",
+   "family2": "BSplineSyN",
+   "fixed dtype": "uint8",
+   "fixed mask only": true,
+   "fixed n0": 11,
+   "fixed n1": 14,
+   "fixed n2": 12,
+   "fixed spacing": 2.0,
+   "float": true,
+   "gdf total0": "0.5",
+   "gdf total1": "0.5",
+   "gdf total2": "0",
+   "histogram matching": false,
+   "initial": false,
+   "iterations00": "3",
+   "iterations01": "8",
+   "iterations10": "5",
+   "iterations20": "5",
+   "iterations21": "8",
+   "levels0": 2,
+   "levels1": 1,
+   "levels2": 2,
+   "masks": true,
+   "mesh0": "2",
+   "mesh1": "3",
+   "mesh2": "2",
+   "metric weight0": "1",
+   "metric weight1": "1",
+   "metric weight2": "0.5",
+   "metric0": "CC",
+   "metric1": "GC",
+   "metric2": "MeanSquares",
+   "moving dtype": "float64",
+   "moving offset": 0.0,
+   "moving on another grid": true,
+   "moving origin0": 3.0,
+   "moving origin1": 1.0,
+   "moving origin2": 0.0,
+   "moving scale": 1.3,
+   "moving spacing": 3.0,
+   "ms sampling2": false,
+   "noise": 1.0,
+   "oblique fixed": false,
+   "outputs": "[{out}/r,{out}/w.nii.gz,{out}/iw.nii.gz]",
+   "radius0": "3",
+   "range": "plain",
+   "rot b": 1,
+   "rot c": -2,
+   "rot d": 1,
+   "rot scale": 3,
+   "shift0": -2.25,
+   "shift1": -1.0,
+   "shift2": -2.25,
+   "size": 27.5,
+   "smoothing units0": "",
+   "smoothing units1": "vox",
+   "smoothing units2": "",
+   "stages": 3,
+   "step0": "0.2",
+   "step1": "0.1",
+   "step2": "0.2",
+   "suffix": ".nii.gz",
+   "syn total0": "0.3",
+   "syn total1": "0",
+   "syn total2": "0",
+   "syn update0": "3",
+   "syn update1": "3",
+   "syn update2": "2",
+   "tissues": "t2",
+   "tvb points0": "4",
+   "tvb points1": "4",
+   "tvb points2": "4",
+   "tvf points0": "3",
+   "tvf points1": "3",
+   "tvf points2": "2",
+   "window0": "10",
+   "window1": "5",
+   "window2": "3",
+   "winsorize": false
+  },
+  "groups": [
+   {
+    "args": [
+     "-d",
+     "3"
+    ],
+    "name": "dimension",
+    "optional": false
+   },
+   {
+    "args": [
+     "-v",
+     "1"
+    ],
+    "name": "verbose",
+    "optional": false
+   },
+   {
+    "args": [
+     "-o",
+     "[{out}/r,{out}/w.nii.gz,{out}/iw.nii.gz]"
+    ],
+    "name": "output",
+    "optional": false
+   },
+   {
+    "args": [
+     "--float",
+     "1"
+    ],
+    "name": "float",
+    "optional": true
+   },
+   {
+    "args": [
+     "-x",
+     "[{in:fmask}]"
+    ],
+    "name": "masks",
+    "optional": true
+   },
+   {
+    "args": [
+     "-t",
+     "BSpline[0.2,2x2x2]",
+     "-m",
+     "CC[{in:fixed},{in:moving},1,3]",
+     "-c",
+     "[3x8,1e-6,10]",
+     "-f",
+     "2x1",
+     "-s",
+     "1x0"
+    ],
+    "name": "stage 0",
+    "optional": false
+   },
+   {
+    "args": [
+     "-t",
+     "BSplineExponential[0.5,3x3x3,0,0,3]",
+     "-m",
+     "GC[{in:fixed},{in:moving},1]",
+     "-c",
+     "[5,1e-6,5]",
+     "-f",
+     "1",
+     "-s",
+     "0vox"
+    ],
+    "name": "stage 1",
+    "optional": false
+   },
+   {
+    "args": [
+     "-t",
+     "BSplineSyN[0.2,2x2x2,0,3]",
+     "-m",
+     "MeanSquares[{in:fixed},{in:moving},0.5]",
+     "-c",
+     "[5x8,1e-6,3]",
+     "-f",
+     "2x1",
+     "-s",
+     "1x0"
+    ],
+    "name": "stage 2",
+    "optional": false
+   }
+  ],
+  "inputs": {
+   "fixed": {
+    "content": {
+     "axes": [
+      1.15,
+      1.05,
+      0.8
+     ],
+     "bias": [
+      -0.0075,
+      -0.0075,
+      0.005,
+      -0.005
+     ],
+     "centre": [
+      0.0,
+      0.0,
+      0.0
+     ],
+     "noise": 1.0,
+     "seed": 809992750,
+     "size": 9.24,
+     "tissues": "t2",
+     "type": "head"
+    },
+    "dtype": "uint8",
+    "geometry": {
+     "origin": [
+      -10.0,
+      -13.0,
+      -11.0
+     ],
+     "qfac": 1,
+     "qform_code": 1,
+     "quaternion": [
+      1,
+      0,
+      0,
+      0
+     ],
+     "sform": "same",
+     "sform_code": 1,
+     "spacing": [
+      2.0,
+      2.0,
+      2.0
+     ],
+     "units": "mm"
+    },
+    "keep_content": true,
+    "scaling": null,
+    "shape": [
+     11,
+     14,
+     12
+    ],
+    "suffix": ".nii.gz",
+    "values": {
+     "offset": 0.0,
+     "scale": 1.0
+    }
+   },
+   "fmask": {
+    "binary": true,
+    "content": {
+     "seed": 12697290,
+     "type": "zeros"
+    },
+    "dtype": "uint8",
+    "geometry": {
+     "origin": [
+      -10.0,
+      -13.0,
+      -11.0
+     ],
+     "qfac": 1,
+     "qform_code": 1,
+     "quaternion": [
+      1,
+      0,
+      0,
+      0
+     ],
+     "sform": "same",
+     "sform_code": 1,
+     "spacing": [
+      2.0,
+      2.0,
+      2.0
+     ],
+     "units": "mm"
+    },
+    "scaling": null,
+    "shape": [
+     11,
+     14,
+     12
+    ],
+    "suffix": ".nii.gz",
+    "values": {
+     "binarize": true,
+     "offset": 0.0,
+     "scale": 1.0
+    }
+   },
+   "moving": {
+    "content": {
+     "axes": [
+      1.15,
+      1.05,
+      0.8
+     ],
+     "bias": [
+      -0.0075,
+      -0.0075,
+      0.005,
+      -0.005
+     ],
+     "centre": [
+      0.0,
+      0.0,
+      0.0
+     ],
+     "noise": 1.0,
+     "seed": 809992751,
+     "size": 9.24,
+     "tissues": "t2",
+     "type": "head"
+    },
+    "dtype": "float64",
+    "geometry": {
+     "origin": [
+      -7.0,
+      -12.0,
+      -11.0
+     ],
+     "qfac": 1,
+     "qform_code": 1,
+     "quaternion": [
+      1,
+      0,
+      0,
+      0
+     ],
+     "sform": "same",
+     "sform_code": 1,
+     "spacing": [
+      3.0,
+      3.0,
+      3.0
+     ],
+     "units": "mm"
+    },
+    "keep_content": true,
+    "motion": [
+     {
+      "centre": [
+       0.0,
+       0.0,
+       0.0
+      ],
+      "quaternion": [
+       44,
+       1,
+       -2,
+       1
+      ],
+      "translation": [
+       -2.25,
+       -1.0,
+       -2.25
+      ]
+     }
+    ],
+    "scaling": null,
+    "shape": [
+     11,
+     14,
+     12
+    ],
+    "suffix": ".nii.gz",
+    "values": {
+     "offset": 0.0,
+     "scale": 1.3
+    }
+   }
+  },
+  "n": 1081,
+  "options": [
+   "--float 1",
+   "-x",
+   "BSpline",
+   "BSpline with CC",
+   "BSplineExponential",
+   "BSplineExponential with GC",
+   "BSplineSyN",
+   "BSplineSyN with MeanSquares",
+   "CC metric",
+   "GC metric",
+   "MeanSquares metric",
+   "dimension 3"
+  ],
+  "seed": "20261025",
+  "tool": "ants-registration"
+ },
+ "rule": null,
+ "silent_ok": [
+  "ANTS-78",
+  "ITK-30",
+  "ITK-35",
+  "ITK-31"
+ ],
+ "status": "fixed",
+ "suite": "ants-registration",
+ "tier": "smoke",
+ "tool": "ants-registration"
+}

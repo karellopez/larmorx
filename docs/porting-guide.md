@@ -620,13 +620,15 @@ Mandatory for every tool (PLAN.md §4, rule 7). Copy the models.
 | 4 | Command line with the original's arguments, exit codes and thread variables | family crate's `cli` module | `larmorx ants N4BiasFieldCorrection` |
 | 5 | API page: option-mapping table, deliberate differences, known last-bit differences | `docs/api/<tool>.md` | [api/afni-tshift.md](api/afni-tshift.md) |
 | 6 | Findings, and register entries for every defect | `docs/findings/<tool>.md`, [findings/upstream-defects.md](findings/upstream-defects.md) | [findings/ants-n4.md](findings/ants-n4.md) |
-| 7 | Parity suite and validation record, with the band and the status | `validation/`, `docs/validation/<tool>.md`, the table in [validation/README.md](validation/README.md) | [validation/ants-n4.md](validation/ants-n4.md) |
+| 7 | Parity suite and validation record, with the band and the status | `validation/`, `docs/validation/<tool>.md`, the tool's entry in `validation/tools.toml` (the index in [validation/README.md](validation/README.md) is generated from it) | [validation/ants-n4.md](validation/ants-n4.md) |
 | 8 | Benchmark against the original | `docs/benchmarks/<tool>.md` | [benchmarks/ants-n4.md](benchmarks/ants-n4.md) |
 | 9 | Provenance | the crate's `PROVENANCE.md`, `NOTICE`, SPDX headers | [crates/larmorx-afni/PROVENANCE.md](../crates/larmorx-afni/PROVENANCE.md) |
 | 10 | Golden cases for every CLI tool, ImageMath operation and public function | `tests/golden/registry.py` (replicas: `crates-gpl/.../tests/golden.rs`) | [validation/golden.md](validation/golden.md), "Adding a golden case" |
 | 11 | The stage comparison, if fMRIPrep runs the tool | `validation/.../stages/catalogue.py` | [validation/fmriprep-stages.md](validation/fmriprep-stages.md) |
-| 12 | A status line in CLAUDE.md and the record's row in the validation index | `CLAUDE.md`, `docs/validation/README.md` | |
+| 12 | A status line in CLAUDE.md; the README's tool table, the validation index and the site's status generated from `validation/tools.toml` (`python -m larmorx_validation tables`, never edited by hand) | `CLAUDE.md`, `validation/tools.toml` | |
 | 13 | Figures and the tool's page on the documentation site | `validation/.../figures/<tool>.py`; the site's `static/figures/<tool>/`, `content/tools/<tool>.md` | [figures.md](figures.md); `figures/ants_n4.py` |
+| 14 | Random testing: a difftest descriptor (option grammar, input generators, implementations, exact checks) and a short trial night (`difftest --tools <tool> --budget 0.5`, boxed) before the gates; every difference triaged in `validation/difftest/triage.toml` (2026-10-25) | `validation/src/larmorx_validation/difftest/tools/` | [validation/difftest.md](validation/difftest.md) |
+| 15 | Memory: the tool's peak memory on a mid-size call at most the original's (plus the interpreter's few MiB), a case in `tests/parity/test_memory_peak.py` (user, 2026-10-25) | `tests/parity/test_memory_peak.py` | `validation/investigations/difftest/memory_pair.py` |
 
 How the code is laid out, and how to add an ImageMath group or a replica:
 [architecture.md](architecture.md).

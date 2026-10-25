@@ -99,3 +99,30 @@ values compressed at level 5 (as ANTs asks). Everything about ITK's HDF5 files, 
 writing: [itk-hdf5.md](itk-hdf5.md). *Validated* (`itk-hdf5`; parity cases
 `transform/chain-larmorx-written-h5` and `transform/chain-h5-larmorx-dense` of
 `ants-apply-transforms`, bit-identical).
+
+## Found by differential random testing (2026-10-25)
+
+- **Four more classes evaluated.** larmorx read `QuaternionRigidTransform`,
+  `ScaleVersor3DTransform`, `ScaleSkewVersor3DTransform` and `ScaleTransform` files but its
+  antsApplyTransforms could not apply them (exit 1 where ANTs gives 0;
+  `itk-transforms:20261025:282`). Now (`larmorx_transform::linear`): the quaternion's matrix is
+  vnl's `rotation_matrix_transpose` of its conjugate, in `R`, the quaternion never normalised
+  (`itkQuaternionRigidTransform.hxx`, `ComputeMatrix`); the scaled versors take the versor's
+  matrix and add `scale - 1.0` to the diagonal (in double, stored as `R`) and the skews off it
+  (in `R`), their versor set as Similarity3D's (`SetParameters`); `ScaleTransform` maps
+  `(p - c)·s + c` axis by axis with its own `TransformPoint`, and inverts to the scales `1/s`
+  about the same centre (`GetInverse`). Bit-identical to ANTs on the parity image, in double and
+  with `--float 1` (permanent cases `difftest/quaternion-and-scaled-versors`,
+  `difftest/float-versor-cosine`).
+- **A float versor's cosine.** `Versor<float>::Set` takes `sqrt(1.0 - sinangle2 * sinangle2)`
+  with `sinangle2` a float: the square in float. larmorx squared it in double, so a float
+  `VersorRigid3D`, `Similarity3D` or scaled-versor transform could map points an ulp away from
+  ANTs' `--float 1` (`itk-transforms:trial3:85`: 9547 of 26520 voxels up to 0.002 apart).
+  Fixed; the registration crate already squared in float.
+- **Shortest numbers at a tie.** ITK writes transform parameters with double-conversion's
+  `ToShortest`, which at an exact tie between two shortest candidates takes the even one
+  (`bignum-dtoa.cc`, "round towards even"); Rust's shortest formatting rounds up. A float
+  B-spline parameter of exactly 0.173828125 was written `0.17382812` by ITK and `0.17382813` by
+  larmorx (`ants-registration:20261025:165`). `larmorx_io::itk_transform::itk_number` now checks
+  the exact decimal expansion of a value whose last digit is odd and takes the even candidate at
+  a tie.

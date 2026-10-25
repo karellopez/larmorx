@@ -41,9 +41,131 @@ pub mod vnl;
 
 use std::collections::BTreeMap;
 
+use larmorx_core::defects::{self, Notices, UpstreamDefects};
 use larmorx_core::math;
 use larmorx_core::{IndexFloor, ItkReal, Precision, RealElement};
 use rayon::prelude::*;
+use std::sync::atomic::{AtomicUsize, Ordering};
+
+/// The mirror boundary of B-spline evaluation (defect ITK-98), and how many values it reached.
+///
+/// `BSplineInterpolateImageFunction::ApplyMirrorBoundaryConditions` mirrors a support index
+/// once at each end of an axis. On an axis shorter than the support needs (2 voxels for orders
+/// 3 and 4, 2 or 3 voxels for order 5) the mirrored index can still lie outside the
+/// axis, and ITK reads the coefficient image outside its buffer: memory it never wrote. The
+/// decomposition's boundary is the whole-sample mirror (period `2·(size − 1)`), so the exact
+/// continuation mirrors again until the index lies inside: that is [`BSplineMirror::full`]
+/// ([`UpstreamDefects::Fix`], and the default). [`UpstreamDefects::Reproduce`] keeps ITK's
+/// single mirror, everything ITK reads inside the image reproduced, and fills the reads outside
+/// it with 0 (deterministic, and named in the notice). Either way the values that needed the
+/// second mirror are counted (atomically: one `BSplineMirror` serves every thread).
+#[derive(Debug)]
+pub struct BSplineMirror {
+    full: bool,
+    beyond: AtomicUsize,
+}
+
+impl Default for BSplineMirror {
+    fn default() -> Self {
+        Self::full()
+    }
+}
+
+impl Clone for BSplineMirror {
+    fn clone(&self) -> Self {
+        BSplineMirror {
+            full: self.full,
+            beyond: AtomicUsize::new(self.beyond.load(Ordering::Relaxed)),
+        }
+    }
+}
+
+impl BSplineMirror {
+    /// The repeated mirror with [`UpstreamDefects::Fix`], ITK's single one with
+    /// [`UpstreamDefects::Reproduce`].
+    pub fn new(mode: UpstreamDefects) -> Self {
+        BSplineMirror {
+            full: mode.fix(),
+            beyond: AtomicUsize::new(0),
+        }
+    }
+
+    /// The exact continuation (the default).
+    pub fn full() -> Self {
+        Self::new(UpstreamDefects::Fix)
+    }
+
+    /// How many values needed an index mirrored twice (ITK reads outside the image there).
+    pub fn beyond(&self) -> usize {
+        self.beyond.load(Ordering::Relaxed)
+    }
+
+    /// A fresh mirror of the same kind (count at 0), for one interpolator.
+    pub fn local(&self) -> Self {
+        BSplineMirror {
+            full: self.full,
+            beyond: AtomicUsize::new(0),
+        }
+    }
+
+    /// Adds another mirror's count (an interpolator's, once it has run) to this one's.
+    pub fn absorb(&self, other: &BSplineMirror) {
+        self.beyond.fetch_add(other.beyond(), Ordering::Relaxed);
+    }
+
+    /// The index of support point `i` on an axis of `size` voxels, and whether ITK's single
+    /// mirror leaves it outside the axis (`None`: a read outside the image, with ITK's mirror).
+    #[inline]
+    pub(crate) fn index(&self, i: i64, size: usize) -> (Option<usize>, bool) {
+        if size == 1 {
+            return (Some(0), false);
+        }
+        let end = size as i64 - 1;
+        let mut j = i;
+        if j < 0 {
+            j = -j;
+        }
+        if j >= end {
+            j = end - (j - end);
+        }
+        if (0..=end).contains(&j) {
+            return (Some(j as usize), false);
+        }
+        if !self.full {
+            return (None, true);
+        }
+        let period = 2 * end;
+        let mut k = i.rem_euclid(period);
+        if k > end {
+            k = period - k;
+        }
+        (Some(k as usize), true)
+    }
+
+    #[inline]
+    pub(crate) fn count(&self) {
+        self.beyond.fetch_add(1, Ordering::Relaxed);
+    }
+
+    /// Adds the ITK-98 notice to `notices` if any value needed the second mirror (`what` names
+    /// the values: "output voxels").
+    pub fn notice(&self, notices: &mut Notices, what: &str) {
+        let n = self.beyond();
+        if n == 0 {
+            return;
+        }
+        let detail = if self.full {
+            format!(
+                "{n} {what} use B-spline coefficients mirrored twice on an axis too short for                  the spline's support, where ITK reads outside the coefficient image (memory it                  never wrote)"
+            )
+        } else {
+            format!(
+                "{n} {what} read B-spline coefficients outside the image as ITK's single mirror                  does; ITK reads memory it never wrote there, filled with 0 here"
+            )
+        };
+        notices.add(&defects::ITK_98, detail);
+    }
+}
 
 /// A 3D scalar image in Fortran order (`x` fastest), read as f64.
 #[derive(Clone, Copy, Debug)]
@@ -128,6 +250,8 @@ pub struct Interpolator<'a, T> {
     precision: Precision,
     /// The floor of the windowed sinc's base index (ITK's by default; defect ITK-01).
     floor: IndexFloor,
+    /// The B-spline's mirror boundary (the exact one by default; defect ITK-98).
+    mirror: BSplineMirror,
 }
 
 enum Kind {
@@ -207,7 +331,19 @@ impl<'a, T: RealElement> Interpolator<'a, T> {
             kind,
             precision,
             floor: IndexFloor::itk(),
+            mirror: BSplineMirror::full(),
         })
+    }
+
+    /// The B-spline's mirror boundary: the repeated one (the default) or ITK's (ITK-98).
+    pub fn with_bspline_mirror(mut self, mirror: BSplineMirror) -> Self {
+        self.mirror = mirror;
+        self
+    }
+
+    /// The mirror choice, with its count ([`BSplineMirror::beyond`]).
+    pub fn bspline_mirror(&self) -> &BSplineMirror {
+        &self.mirror
     }
 
     /// The floor the windowed sinc takes of its base index: ITK's (the default here; 0 just
@@ -254,7 +390,7 @@ impl<'a, T: RealElement> Interpolator<'a, T> {
             Kind::BSpline {
                 order,
                 coefficients,
-            } => bspline::evaluate(coefficients, self.volume.size, *order, cidx),
+            } => bspline::evaluate(coefficients, self.volume.size, *order, cidx, &self.mirror),
             Kind::Gaussian(p) => gaussian::<T, R>(&self.volume, p, cidx),
             Kind::MultiLabel(p) => multi_label::<T, R>(&self.volume, p, cidx),
             Kind::GenericLabel => generic_label(&self.volume, cidx),
@@ -948,29 +1084,31 @@ mod bspline {
         size: [usize; 3],
         order: u32,
         cidx: [f64; 3],
+        mirror: &BSplineMirror,
     ) -> f64 {
         let n = order as usize + 1;
         let half: f32 = if order & 1 == 1 { 0.0 } else { 0.5 };
         let mut index = [[0usize; 6]; 3];
+        let mut inside = [[true; 6]; 3];
         let mut w = [[0.0f64; 6]; 3];
+        let (mut beyond, mut outside) = (false, false);
         for d in 0..3 {
             let first = ((cidx[d] as f32) + half).floor() as i64 - i64::from(order / 2);
             w[d] = weights(order, cidx[d], first);
-            let end = size[d] as i64 - 1;
             for (k, slot) in index[d].iter_mut().take(n).enumerate() {
-                let mut i = first + k as i64;
-                if size[d] == 1 {
-                    i = 0;
-                } else {
-                    if i < 0 {
-                        i = -i;
-                    }
-                    if i >= end {
-                        i = end - (i - end);
+                let (i, twice) = mirror.index(first + k as i64, size[d]);
+                beyond |= twice;
+                match i {
+                    Some(i) => *slot = i,
+                    None => {
+                        inside[d][k] = false;
+                        outside = true;
                     }
                 }
-                *slot = i as usize;
             }
+        }
+        if beyond {
+            mirror.count();
         }
         let (nx, ny) = (size[0], size[1]);
         let mut sum = 0.0f64;
@@ -978,8 +1116,13 @@ mod bspline {
             for ky in 0..n {
                 for kx in 0..n {
                     let weight = w[0][kx] * w[1][ky] * w[2][kz];
-                    sum += weight
-                        * coefficients[index[0][kx] + nx * (index[1][ky] + ny * index[2][kz])];
+                    // ITK-98, reproduced: a read outside the coefficient image is 0 here.
+                    let c = if outside && !(inside[0][kx] && inside[1][ky] && inside[2][kz]) {
+                        0.0
+                    } else {
+                        coefficients[index[0][kx] + nx * (index[1][ky] + ny * index[2][kz])]
+                    };
+                    sum += weight * c;
                 }
             }
         }

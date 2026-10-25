@@ -646,11 +646,21 @@ def _resolve(path: str, tmp: Path) -> str:
         out = tmp / ("larmorx-" + source.name)
         lx.transforms.write(out, lx.transforms.read(source))
         return str(out)
-    return str(td.get(path))
+    return str(_catalog(path))
+
+
+def _catalog(path: str) -> Path:
+    """A catalog file, or (``dt:<key>``) an input of a differential test's case
+    (:mod:`larmorx_validation.difftest.inputs`)."""
+    if path.startswith("dt:"):
+        from larmorx_validation.difftest import inputs
+
+        return inputs.path(path)
+    return td.get(path)
 
 
 def _args(s: Scenario, tmp: Path, output: Path) -> list[str]:
-    args = ["-d", "3", "-i", str(td.get(s.image)), "-r", str(td.get(s.reference))]
+    args = ["-d", "3", "-i", str(_catalog(s.image)), "-r", str(_catalog(s.reference))]
     for path, invert in s.transforms:
         resolved = _resolve(path, tmp)
         args += ["-t", f"[{resolved},1]" if invert else resolved]

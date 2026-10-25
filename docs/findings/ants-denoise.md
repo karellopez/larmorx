@@ -309,3 +309,39 @@ requires: the same bits on every platform.
 - The output sums need every centre whose patch reaches a voxel: larmorx computes the centres
   block by block (2¹⁸ voxels) and keeps a window of their contributions, so memory stays at
   about 25 bytes per voxel plus the window.
+
+## Found by differential random testing (2026-10-25)
+
+- **ANTS-14 in the Rician bias's smoothing.** The bias is smoothed with a discrete Gaussian of
+  variance 2 mm²; on micrometre voxels that is 2·10⁶ voxels², whose ITK kernel is NaN (ANTS-14),
+  so ITK leaves the bias unsmoothed. larmorx used the corrected kernel in both modes
+  (`ants-denoise:20261025:41`: 27 of 27 voxels about 10⁻³ apart). Now `reproduce` keeps ITK's
+  kernel and both modes name ANTS-14.
+- **ANTS-99 in DenoiseImage.** Without `-d`, `DenoiseImage.cxx:647-649` asks a new ImageIO for the
+  dimension before it reads the header; NIfTI's answers 3, so a 2D or 4D image is denoised and
+  written as 3D (`:188`, `:254`). larmorx used the file's dimension in both modes; now
+  `reproduce` takes 3, both modes name ANTS-99 (N4BiasFieldCorrection likewise; permanent case
+  `difftest/no-dimension-2d-image`).
+
+## Memory against ANTs (2026-10-25)
+
+The user's rule (2026-10-25): larmorx never needs more memory than the original for the same
+call (measured as in [ants-image-programs.md](ants-image-programs.md), "Memory against ANTs").
+On `DenoiseImage -d 3 -i in -o out` (96×96×64 float voxels of 2 mm, one thread) larmorx needed
+**85 MiB, ANTs 40**; it now needs **44 MiB**, in 2.0 s (ANTs 13 s), with the same output bit for
+bit (`tests/parity/test_memory_peak.py`, against ANTs with CORE-MATH preloaded). The causes, from
+`validation/investigations/difftest/rss_timeline.py`:
+
+- **The window of contributions.** Each centre's weighted patch (one float per patch offset,
+  27 in 3D) is kept until every centre that reaches its output voxels is known; blocks of 2¹⁸
+  centres made that 28 MiB. Blocks are now 2¹³ centres or the patch's reach (one slice and a
+  row), whichever is larger, in a window reserved once: 2.9 MiB here.
+- **Two padded images fewer.** `input − mean` and the averaged values (`input²` with the Rician
+  model) were padded images of their own; they are computed where they are read, each with the
+  one float operation that made them.
+- **The counts** are folded into the estimates (the sum over the count, computed where the sum
+  is complete, the same division), with two bits per voxel for "counted" and "a noise estimate
+  was written" (ANTS-44); the Gaussian model, which writes no noise estimate, has no bias image.
+- **Copies and lifetimes.** The shrink with factor 1 copied the image; the unpadded mean lived
+  through the centres (it is made again from the padded one); the padded images lived through
+  the bias smoothing; the filter's bias image lived until the end.

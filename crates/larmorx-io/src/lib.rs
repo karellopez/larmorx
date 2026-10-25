@@ -13,6 +13,7 @@
 
 pub mod gzip;
 pub mod itk_hdf5;
+pub mod itk_output;
 pub mod itk_transform;
 mod itk_transform_names;
 pub mod nifti;

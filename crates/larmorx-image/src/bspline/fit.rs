@@ -172,12 +172,36 @@ pub struct GridFitPlan<'a> {
 
 impl<'a> GridFitPlan<'a> {
     /// Prepares the fit of values at the grid voxels `voxels` (linear indices into a grid of
-    /// `grid_size`, Fortran order, increasing), each with its weight (`None`: 1).
+    /// `grid_size`, Fortran order, increasing), each with its weight (`None`: 1); the factors
+    /// are cached up to 512 MiB.
     pub fn new(
         fit: &GridFit<'_>,
         grid_size: &[usize],
         voxels: &'a [usize],
         weights: Option<&[f32]>,
+        n_threads: usize,
+    ) -> Result<Self, FilterError> {
+        Self::with_factor_budget(
+            fit,
+            grid_size,
+            voxels,
+            weights,
+            FACTOR_BUDGET_BYTES,
+            n_threads,
+        )
+    }
+
+    /// [`GridFitPlan::new`] with the factors `B³·w/Σ B²` cached only when they need at most
+    /// `budget` bytes (4 per point and neighbour); otherwise each fit computes them again, with
+    /// the same result, bit for bit. The cache makes each fit faster but costs `(order + 1)^D`
+    /// floats per point: 256 bytes in 3D, where an N4 run's own images take about 40 per
+    /// voxel (random testing, 2026-10-25: N4's peak memory 1.31 times ANTs' with it).
+    pub fn with_factor_budget(
+        fit: &GridFit<'_>,
+        grid_size: &[usize],
+        voxels: &'a [usize],
+        weights: Option<&[f32]>,
+        budget: usize,
         n_threads: usize,
     ) -> Result<Self, FilterError> {
         let d = grid_size.len();
@@ -254,7 +278,13 @@ impl<'a> GridFitPlan<'a> {
                 })
             })
             .collect();
-        let fixed: Vec<usize> = (d - d.min(2)..d).collect();
+        // The last two axes split the work in 3D and above, the last one in 2D: with both
+        // axes of a 2D lattice fixed every block would be a single control point, a task and
+        // an allocation per point (random testing, 2026-10-25: 3 times ANTs' memory and 12
+        // times its time on a lattice of 57 million points). Each control point is summed in
+        // point order either way, so the result is the same, bit for bit.
+        let n_fixed = if d >= 3 { 2 } else { 1 };
+        let fixed: Vec<usize> = (d - n_fixed..d).collect();
         let n_free = d - fixed.len();
         let free_count = n.pow(n_free as u32);
         let cp = fit.control_points.to_vec();
@@ -325,7 +355,8 @@ impl<'a> GridFitPlan<'a> {
                 let wc = plan.weights[i];
                 wc * t * t
             });
-            if voxels.len().saturating_mul(nn).saturating_mul(4) <= FACTOR_BUDGET_BYTES {
+            if voxels.len().saturating_mul(nn).saturating_mul(4) <= budget.min(FACTOR_BUDGET_BYTES)
+            {
                 plan.factors = Some(plan.all_factors());
             }
             Ok(())
@@ -474,6 +505,84 @@ impl<'a> GridFitPlan<'a> {
         out
     }
 
+    /// `δ` without cached factors: [`GridFitPlan::accumulate_with`]'s loops with each factor
+    /// `B³·w / Σ B²` computed where it is added, as [`GridFitPlan::product`] computes `B` (the
+    /// kernel weights multiplied into a float, axis 0 first), the same float operations in the
+    /// same order; within a task's slab the fixed axes' weights are known, so a point needs
+    /// only its free coordinates (random testing, 2026-10-25: N4 without the factors' cache,
+    /// which cost 256 bytes per point in 3D, as fast as with it).
+    fn delta_uncached(&self, values: &[f32]) -> Vec<f32> {
+        let d = self.d;
+        let n = self.n;
+        let order = n - 1;
+        let cp = &self.control_points;
+        let n_fixed = self.fixed.len();
+        let n_free = d - n_fixed;
+        let n_tasks: usize = self.fixed.iter().map(|&a| cp[a]).product();
+        let blocks: Vec<Vec<f32>> = (0..n_tasks)
+            .into_par_iter()
+            .map(|task| {
+                let mut block = vec![0.0f32; self.block_len];
+                let mut c = [0usize; 2];
+                let mut ranges = [(0usize, 0usize); 2];
+                let mut rest = task;
+                for (k, &a) in self.fixed.iter().enumerate() {
+                    c[k] = rest % cp[a];
+                    rest /= cp[a];
+                    let first = &self.tables[a].first;
+                    let lo = first.partition_point(|&b| (b as usize) + order < c[k]);
+                    let hi = first.partition_point(|&b| (b as usize) <= c[k]);
+                    ranges[k] = (lo, hi);
+                }
+                let mut free = vec![0usize; n_free];
+                let size0 = self.grid_size[self.fixed[0]];
+                let (r1lo, r1hi) = if n_fixed == 2 { ranges[1] } else { (0, 1) };
+                for x1 in r1lo..r1hi {
+                    for x0 in ranges[0].0..ranges[0].1 {
+                        let slab = if n_fixed == 2 { x0 + size0 * x1 } else { x0 };
+                        // The fixed axes' kernel weights of this task's control point.
+                        let t0 = &self.tables[self.fixed[0]];
+                        let w_fixed0 = t0.weights[x0 * n + (c[0] - t0.first[x0] as usize)];
+                        let w_fixed1 = (n_fixed == 2).then(|| {
+                            let t1 = &self.tables[self.fixed[1]];
+                            t1.weights[x1 * n + (c[1] - t1.first[x1] as usize)]
+                        });
+                        for i in self.slab_start[slab]..self.slab_start[slab + 1] {
+                            let mut rest = self.voxels[i];
+                            for (a, x) in free.iter_mut().enumerate() {
+                                *x = rest % self.grid_size[a];
+                                rest /= self.grid_size[a];
+                            }
+                            let (value, wc, w2) = (values[i], self.weights[i], self.w2[i]);
+                            let base = self.free_offset[i] as usize;
+                            for mf in 0..self.free_count {
+                                let mut b = 1.0f32;
+                                for (a, &x) in free.iter().enumerate() {
+                                    b = (f64::from(b)
+                                        * self.tables[a].weights[x * n + self.digits[mf * d + a]])
+                                        as f32;
+                                }
+                                b = (f64::from(b) * w_fixed0) as f32;
+                                if let Some(w) = w_fixed1 {
+                                    b = (f64::from(b) * w) as f32;
+                                }
+                                let t = b;
+                                block[base + self.neighbour_offset[mf] as usize] +=
+                                    value * (t * t * t * wc / w2);
+                            }
+                        }
+                    }
+                }
+                block
+            })
+            .collect();
+        let mut out = Vec::with_capacity(n_tasks * self.block_len);
+        for b in blocks {
+            out.extend_from_slice(&b);
+        }
+        out
+    }
+
     /// The B-spline fit of `values` (one per point): the control-point lattice (`phi`).
     pub fn fit(&self, values: &[f32], n_threads: usize) -> Result<Lattice, FilterError> {
         if values.len() != self.voxels.len() {
@@ -486,13 +595,7 @@ impl<'a> GridFitPlan<'a> {
         let nn = self.nn;
         let delta = larmorx_core::parallel::with_threads(n_threads, || match &self.factors {
             Some(f) => self.accumulate_with(|i, m, _| values[i] * f[i * nn + m], false),
-            None => self.accumulate_with(
-                |i, m, x| {
-                    let t = self.product(x, m);
-                    values[i] * (t * t * t * self.weights[i] / self.w2[i])
-                },
-                true,
-            ),
+            None => self.delta_uncached(values),
         })?;
         let data = self
             .omega
@@ -654,10 +757,14 @@ mod tests {
                         .unwrap();
                     assert_eq!(got.data, expected, "{dim}D, {threads} threads");
                 }
-                // Without cached factors.
-                let mut plan = GridFitPlan::new(&fit, &size, &voxels, Some(&weights), 3).unwrap();
-                plan.factors = None;
+                // Without cached factors (a budget below their size).
+                let plan =
+                    GridFitPlan::with_factor_budget(&fit, &size, &voxels, Some(&weights), 0, 3)
+                        .unwrap();
+                assert!(plan.factors.is_none());
                 assert_eq!(plan.fit(&values, 2).unwrap().data, expected);
+                let plan = GridFitPlan::new(&fit, &size, &voxels, Some(&weights), 3).unwrap();
+                assert!(plan.factors.is_some());
             }
         }
     }

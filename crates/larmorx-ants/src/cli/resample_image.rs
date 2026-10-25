@@ -327,7 +327,7 @@ impl Job<'_> {
     }
 
     /// The interpolator ANTs chooses from the sixth to eighth arguments.
-    fn interpolation<T>(&self, image: &AntsImage<T>) -> Result<Interpolation, String> {
+    fn interpolation<T>(&mut self, image: &AntsImage<T>) -> Result<Interpolation, String> {
         let (argv, dim) = (self.argv, self.dim);
         let argc = argv.len();
         let kind = match argv.get(6) {
@@ -343,16 +343,35 @@ impl Job<'_> {
                         crash(&format!("'{}' starts with an empty element", argv[7]))
                     })?;
                     if sg.len() < dim {
-                        return Err(crash(&format!(
-                            "{} Gaussian sigmas for {dim} dimensions (ANTs reads past them)",
+                        // ANTS-160 (found by differential random testing, 2026-10-25): ANTs
+                        // reads the missing sigmas past the end of its vector
+                        // (`ResampleImage.cxx:178-182`) and exits 0 with a result that depends
+                        // on the heap (usually NaN: an image of zeros in an integer type, and
+                        // vnl's convergence messages). Class (a): an error in both modes, never
+                        // reproduced (as ANTS-77); the message names the defect, no notice (both
+                        // modes give the same result).
+                        return Err(format!(
+                            "larmorx: ResampleImage: {} Gaussian sigmas for {dim} dimensions: ANTs reads the missing ones past the end of its list (its result depends on memory it never wrote): an error (ANTS-160)",
                             sg.len()
-                        )));
+                        ));
                     }
                     sigma = sg[..dim].to_vec();
                 }
                 let alpha = argv.get(8).map_or(1.0, |s| atof(s));
                 if dim != 3 {
                     return Err(unsupported("Gaussian", dim));
+                }
+                // ANTS-161 (rule B, 2026-10-25): a sigma or alpha of 0 or less divides by zero
+                // in ITK's Gaussian interpolator (an image of NaN, exit 0); refused, named.
+                if alpha <= 0.0 || sigma[..3].iter().any(|&s| s <= 0.0) {
+                    return Err(format!(
+                        "larmorx: ResampleImage: Gaussian sigma and alpha must be positive (sigma {}, alpha {alpha}); ANTs divides by zero and writes an image of NaN: an error (ANTS-161)",
+                        sigma[..3]
+                            .iter()
+                            .map(|s| s.to_string())
+                            .collect::<Vec<_>>()
+                            .join("x")
+                    ));
                 }
                 Interpolation::Gaussian {
                     sigma: [sigma[0], sigma[1], sigma[2]],
@@ -466,5 +485,109 @@ mod tests {
             UpstreamDefects::Fix,
         );
         assert!(!err.contains("ANTS-30"), "{err}");
+    }
+
+    /// ANTS-160 (differential random testing, 2026-10-25): one Gaussian sigma for three
+    /// dimensions. ANTs reads the other two past the end of its vector and exits 0 with a
+    /// result that depends on the heap; larmorx refuses in both modes (class (a)).
+    #[test]
+    fn missing_gaussian_sigmas_are_refused() {
+        use larmorx_core::element::DataType;
+        use larmorx_io::nifti::{self, NiftiHeader, NiftiVersion, WriteOptions};
+        let dir = tempfile::tempdir().unwrap();
+        let a = dir.path().join("a.nii");
+        let h = NiftiHeader::new(NiftiVersion::V1, &[2, 2, 2], DataType::F32).unwrap();
+        let data = larmorx_core::ndarray::ArrayD::from_elem(
+            larmorx_core::ndarray::IxDyn(&[2, 2, 2]),
+            3.0f32,
+        );
+        nifti::write(&a, &h, data.view(), &WriteOptions::default()).unwrap();
+        let (a, b) = (a.to_str().unwrap(), dir.path().join("b.nii"));
+        let b = b.to_str().unwrap();
+        let args = ["3", a, b, "3x3x3", "1", "2", "1", "1"];
+        for mode in [UpstreamDefects::Fix, UpstreamDefects::Reproduce] {
+            let (code, _, err) = run_capture(&args, mode);
+            assert_eq!(code, 1, "{err}");
+            assert!(
+                err.contains("an error (ANTS-160)") && !err.contains("ANTS-160 (ResampleImage)"),
+                "{err}"
+            );
+        }
+        assert!(!dir.path().join("b.nii").exists());
+        // Three sigmas: no notice.
+        let args = ["3", a, b, "3x3x3", "1", "2", "1x1x1", "1"];
+        let (code, _, err) = run_capture(&args, UpstreamDefects::Fix);
+        assert_eq!(code, 0, "{err}");
+        assert!(!err.contains("ANTS-160"), "{err}");
+    }
+
+    /// ANTS-162: an image in metres resampled to micrometre voxels needs a grid of 10^18
+    /// voxels; by default larmorx stops before allocating, naming the memory and its cause.
+    #[test]
+    fn a_grid_beyond_any_machine_is_refused_before_allocating() {
+        use larmorx_core::element::DataType;
+        use larmorx_io::nifti::{self, NiftiHeader, NiftiVersion, WriteOptions};
+        let dir = tempfile::tempdir().unwrap();
+        let a = dir.path().join("a.nii");
+        let mut h = NiftiHeader::new(NiftiVersion::V1, &[2, 2, 2], DataType::F32).unwrap();
+        h.pixdim[1..4].copy_from_slice(&[1000.0, 1000.0, 1000.0]);
+        let data = larmorx_core::ndarray::ArrayD::from_elem(
+            larmorx_core::ndarray::IxDyn(&[2, 2, 2]),
+            3.0f32,
+        );
+        nifti::write(&a, &h, data.view(), &WriteOptions::default()).unwrap();
+        let b = dir.path().join("b.nii");
+        let args = [
+            "3",
+            a.to_str().unwrap(),
+            b.to_str().unwrap(),
+            "0.001x0.001x0.001",
+            "0",
+        ];
+        let (code, _, err) = run_capture(&args, UpstreamDefects::Fix);
+        assert_eq!(code, 1, "{err}");
+        assert!(err.contains("(ANTS-162)") && err.contains("GiB"), "{err}");
+        assert!(err.contains("2000000 x 2000000 x 2000000 voxels"), "{err}");
+        assert!(!b.exists());
+    }
+
+    /// ITK-98 (differential random testing, 2026-10-25, where larmorx panicked): a cubic
+    /// B-spline on an image whose y and z axes have 2 voxels. ITK's single mirror leaves support
+    /// index -1 for points in the last half voxel and reads outside the coefficient image; larmorx
+    /// mirrors again (fix) or fills those reads with 0 (reproduce), and names the defect in
+    /// both modes.
+    #[test]
+    fn a_bspline_on_a_two_voxel_axis_reads_no_memory() {
+        use larmorx_core::element::DataType;
+        use larmorx_io::nifti::{self, NiftiHeader, NiftiVersion, WriteOptions};
+        let dir = tempfile::tempdir().unwrap();
+        let a = dir.path().join("a.nii");
+        let h = NiftiHeader::new(NiftiVersion::V1, &[3, 2, 2], DataType::F32).unwrap();
+        let data = larmorx_core::ndarray::ArrayD::from_shape_vec(
+            larmorx_core::ndarray::IxDyn(&[3, 2, 2]),
+            (0..12).map(|k| (k * k % 7) as f32).collect(),
+        )
+        .unwrap();
+        nifti::write(&a, &h, data.view(), &WriteOptions::default()).unwrap();
+        let a = a.to_str().unwrap();
+        let mut outputs = Vec::new();
+        for (mode, name) in [
+            (UpstreamDefects::Fix, "fix.nii"),
+            (UpstreamDefects::Reproduce, "reproduce.nii"),
+        ] {
+            let b = dir.path().join(name);
+            let args = ["3", a, b.to_str().unwrap(), "7x5x5", "1", "4", "3"];
+            let (code, _, err) = run_capture(&args, mode);
+            assert_eq!(code, 0, "{err}");
+            assert!(err.contains("ITK-98"), "{err}");
+            outputs.push(std::fs::read(&b).unwrap());
+        }
+        assert_ne!(outputs[0], outputs[1]);
+        // Order 1 needs no second mirror: no notice.
+        let b = dir.path().join("linear.nii");
+        let args = ["3", a, b.to_str().unwrap(), "7x5x5", "1", "4", "1"];
+        let (code, _, err) = run_capture(&args, UpstreamDefects::Fix);
+        assert_eq!(code, 0, "{err}");
+        assert!(!err.contains("ITK-98"), "{err}");
     }
 }

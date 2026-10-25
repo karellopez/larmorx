@@ -231,6 +231,26 @@ impl<const D: usize> Space<D> {
         })
     }
 
+    /// `TransformPhysicalPointToIndex<R>` of a `Point<R>`: the sum is a `TCoordRep` (`R`), so
+    /// each term `M[i][j]·(p[j] − origin[j])` is computed in double and added to the sum in
+    /// `R`, and the sum is rounded half up in `R` (`2x + 0.5` in float for a float point).
+    /// With `R = f64` it is [`Space::point_to_index`]. ITK takes this path for a float
+    /// transform's point (`DisplacementFieldTransform<float>::ComputeJacobianWithRespectToPosition`;
+    /// found by differential random testing, 2026-10-25: an Exponential stage after another
+    /// deformable stage, `--float 1`, its virtual points half-way between the field's voxels).
+    #[inline]
+    pub fn point_to_index_r<R: Real>(&self, p: &[R; D]) -> [i64; D] {
+        std::array::from_fn(|i| {
+            let mut s = R::ZERO;
+            for j in 0..D {
+                s = R::from_f64(
+                    s.to_f64() + self.point_to_index[i][j] * (p[j].to_f64() - self.origin[j]),
+                );
+            }
+            s.itk_round_half_up()
+        })
+    }
+
     /// Whether `idx` lies in the region (`ImageRegion::IsInside`).
     #[inline]
     pub fn contains(&self, idx: &[i64; D]) -> bool {
@@ -252,5 +272,23 @@ impl<const D: usize> Space<D> {
     #[inline]
     pub fn local_to_physical_vector(&self, v: &[f64; D]) -> [f64; D] {
         mat_vec(&self.direction, v)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// `TransformPhysicalPointToIndex<float>` sums in float: `2.6f − 0.1` is 2.4999999 in
+    /// double (index 2) but 2.5 once stored in float, which rounds half up to 3.
+    #[test]
+    fn a_float_point_is_indexed_in_float() {
+        let identity = [[1.0, 0.0, 0.0], [0.0, 1.0, 0.0], [0.0, 0.0, 1.0]];
+        let s = Space::<3>::new([6, 6, 6], [0, 0, 0], [1.0; 3], [0.1; 3], identity).unwrap();
+        let p = [2.6f32; 3];
+        let pd = p.map(f64::from);
+        assert_eq!(s.point_to_index(&pd), [2; 3]);
+        assert_eq!(s.point_to_index_r(&p), [3; 3]);
+        assert_eq!(s.point_to_index_r(&pd), s.point_to_index(&pd));
     }
 }

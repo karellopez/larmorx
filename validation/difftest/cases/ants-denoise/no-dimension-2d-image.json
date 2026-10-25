@@ -1,0 +1,152 @@
+{
+ "defect": null,
+ "description": "DenoiseImage without -d on a 2D image: ANTs takes it as 3D (ANTS-99, reproduced), larmorx used the file's dimension in both modes",
+ "expect": "pass",
+ "found": {
+  "detail": "denoised: header (every field): dim: ANTs [3, 3, 3, 1, 1, 1, 1, 1], larmorx [2, 3, 3, 1, 1, 1, 1, 1]; srow_x: ANTs [1.0, 0.0, -0.0, -0.0], larmorx [1.0, 0.0, 0.0, -0.0]; srow_y: ANTs [0.0, 1.0, -0.0, -0.0], larmorx [0.0, 1.0, 0.0, -0.0]; denoised: data type and shape: ANTs float32 (3, 3, 1), larmorx float32 (3, 3)",
+  "n": 188,
+  "seed": "20261025",
+  "shrink_moves": [
+   "dropped patch (-p 1)",
+   "dropped noise model (-n RICIAN)",
+   "a: axis 1 17 -> 8 voxels",
+   "a: axis 0 13 -> 6 voxels",
+   "a: axis 1 8 -> 4 voxels",
+   "a: axis 0 6 -> 3 voxels",
+   "a: axis 1 4 -> 3 voxels",
+   "a (and its grid): plumb orientation",
+   "a (and its grid): unit spacing",
+   "a (and its grid): origin at 0",
+   "a (and its grid): qform and sform codes 1",
+   "a (and its grid): millimetres",
+   "a: float32 storage",
+   "a: content crop -> constant"
+  ],
+  "signature": [
+   "denoised: data type and shape",
+   "denoised: header (every field)"
+  ]
+ },
+ "id": "no-dimension-2d-image",
+ "implementations": [
+  "port"
+ ],
+ "reason": "",
+ "recipe": {
+  "extra": {
+   "min_size": 3,
+   "outputs": [
+    "{out}"
+   ]
+  },
+  "features": {
+   "content": "crop",
+   "corner0": 43,
+   "corner1": 33,
+   "corner2": 33,
+   "crop source": "templateflow/tpl-MNI152NLin2009cAsym/tpl-MNI152NLin2009cAsym_res-02_T1w.nii.gz",
+   "crop stride": 1,
+   "dimension": 2,
+   "dimension given": false,
+   "dtype": "int16",
+   "mask": false,
+   "model": "RICIAN",
+   "noise model": true,
+   "noise output": false,
+   "nx": 13,
+   "ny": 17,
+   "orientation": "axes",
+   "origin0": 14.0,
+   "origin1": -7.5,
+   "origin2": 46.5,
+   "output form": "[{out}]",
+   "patch": true,
+   "patch radius": "1",
+   "qfac": 1,
+   "qform_code": 2,
+   "range": "plain",
+   "search": false,
+   "sform": "same",
+   "sform_code": 2,
+   "shrink": false,
+   "spacing0": 3.0,
+   "spacing1": 1.0,
+   "spacing2": 0.8,
+   "suffix": ".nii.gz",
+   "units": "unknown"
+  },
+  "groups": [
+   {
+    "args": [
+     "-i",
+     "{in:a}"
+    ],
+    "name": "input",
+    "optional": false
+   },
+   {
+    "args": [
+     "-o",
+     "[{out}]"
+    ],
+    "name": "output",
+    "optional": false
+   }
+  ],
+  "inputs": {
+   "a": {
+    "content": {
+     "seed": 1027754263,
+     "type": "constant"
+    },
+    "dtype": "float32",
+    "geometry": {
+     "origin": [
+      0.0,
+      0.0,
+      0.0
+     ],
+     "qfac": 1,
+     "qform_code": 1,
+     "quaternion": [
+      1,
+      0,
+      0,
+      0
+     ],
+     "sform": "same",
+     "sform_code": 1,
+     "spacing": [
+      1.0,
+      1.0,
+      1.0
+     ],
+     "units": "mm"
+    },
+    "scaling": null,
+    "shape": [
+     3,
+     3
+    ],
+    "suffix": ".nii.gz",
+    "values": {
+     "offset": 0.0,
+     "scale": 1.0
+    }
+   }
+  },
+  "n": 188,
+  "options": [
+   "-n",
+   "-p",
+   "dimension 2"
+  ],
+  "seed": "20261025",
+  "tool": "ants-denoise"
+ },
+ "rule": null,
+ "status": "fixed",
+ "suite": "ants-denoise",
+ "tier": "smoke",
+ "tool": "ants-denoise"
+}

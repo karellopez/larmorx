@@ -780,8 +780,9 @@ impl<R: Real, const D: usize> FieldXfm<R, D> {
             std::array::from_fn(|i| std::array::from_fn(|j| if i == j { R::ONE } else { R::ZERO }));
         let field = &self.field;
         let s = &field.space;
-        let pf: [f64; D] = std::array::from_fn(|k| p[k].to_f64());
-        let index = s.point_to_index(&pf);
+        // `TransformPhysicalPointToIndex(point)` of the transform's `InputPointType`
+        // (`Point<R>`): the sum in `R`.
+        let index = s.point_to_index_r(p);
         for i in 0..D {
             let upper = s.start[i] + s.size[i] as i64 - 1;
             if index[i] <= s.start[i] || index[i] >= upper {

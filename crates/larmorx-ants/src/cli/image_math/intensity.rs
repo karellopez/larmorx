@@ -79,7 +79,7 @@ fn run_truncate(ctx: &mut Context<'_>) -> Result<(), OpError> {
         && m.size() != image.size()
     {
         return Err(OpError::crash(format!(
-            "larmorx: the mask size {:?} differs from the image size {:?} (ANTs reads outside one of them)",
+            "larmorx: the mask size {:?} differs from the image size {:?} (ANTs reads outside one of them): an error (ANTS-163)",
             m.size(),
             image.size()
         )));
@@ -119,7 +119,7 @@ fn run_normalize(ctx: &mut Context<'_>) -> Result<(), OpError> {
         Some(m) => {
             if m.size() != image.size() {
                 return Err(OpError::crash(format!(
-                    "larmorx: the mask size {:?} differs from the image size {:?} (ANTs reads outside one of them)",
+                    "larmorx: the mask size {:?} differs from the image size {:?} (ANTs reads outside one of them): an error (ANTS-163)",
                     m.size(),
                     image.size()
                 )));

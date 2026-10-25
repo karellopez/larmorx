@@ -1,0 +1,331 @@
+{
+ "defect": "ANTS-51",
+ "description": "-z 0 with a Translation stage whose Demons metric throws (no transform added) before a Gaussian displacement-field stage: ANTs writes the field under the Translation stage's .mat name as its own GaussianSmoothingOnUpdateDisplacementFieldTransform; larmorx wrote a plain DisplacementFieldTransform",
+ "expect": "pass",
+ "found": {
+  "detail": "ANTs with CORE-MATH: r1Translation.mat: bytes differ",
+  "n": 979,
+  "seed": "20261025",
+  "shrink_moves": [],
+  "signature": [
+   "ANTs with CORE-MATH: rNTranslation.mat"
+  ]
+ },
+ "id": "field-under-a-mat-name",
+ "implementations": [
+  "port"
+ ],
+ "reason": "",
+ "recipe": {
+  "extra": {
+   "min_size": 6
+  },
+  "features": {
+   "axis0": 1.2,
+   "axis1": 0.95,
+   "axis2": 0.95,
+   "blobs": 3,
+   "centre0": -3.5,
+   "centre1": 1.5,
+   "centre2": 5.5,
+   "collapse": true,
+   "collapse value": "0",
+   "composite": false,
+   "content": "blobs",
+   "dimension": 3,
+   "exp total0": "0",
+   "exp total1": "0",
+   "family0": "Translation",
+   "family1": "GaussianDisplacementField",
+   "fixed dtype": "float64",
+   "fixed n0": 20,
+   "fixed n1": 11,
+   "fixed n2": 15,
+   "fixed spacing": 2.5,
+   "float": false,
+   "gdf total0": "0",
+   "gdf total1": "0.5",
+   "histogram matching": true,
+   "initial": true,
+   "initial kind": "2",
+   "iterations00": "5",
+   "iterations10": "3",
+   "levels0": 1,
+   "levels1": 1,
+   "masks": false,
+   "mesh0": "3",
+   "mesh1": "2",
+   "metric weight0": "1",
+   "metric weight1": "0.5",
+   "metric0": "Demons",
+   "metric1": "CC",
+   "moving dtype": "float32",
+   "moving offset": 0.0,
+   "moving on another grid": true,
+   "moving origin0": 0.5,
+   "moving origin1": 3.0,
+   "moving origin2": -1.0,
+   "moving scale": 0.8,
+   "moving spacing": 3.0,
+   "oblique fixed": false,
+   "outputs": "{out}/r",
+   "radius1": "3",
+   "rot b": -1,
+   "rot c": -2,
+   "rot d": -2,
+   "rot scale": 6,
+   "shift0": -1.25,
+   "shift1": 1.0,
+   "shift2": 1.5,
+   "size": 13.5,
+   "smoothing units0": "",
+   "smoothing units1": "",
+   "stages": 2,
+   "step0": "0.5",
+   "step1": "0.25",
+   "syn total0": "0.3",
+   "syn total1": "0",
+   "syn update0": "3",
+   "syn update1": "2",
+   "tvb points0": "4",
+   "tvb points1": "4",
+   "tvf points0": "2",
+   "tvf points1": "3",
+   "window0": "3",
+   "window1": "5",
+   "winsorize": false
+  },
+  "groups": [
+   {
+    "args": [
+     "-d",
+     "3"
+    ],
+    "name": "dimension",
+    "optional": false
+   },
+   {
+    "args": [
+     "-v",
+     "1"
+    ],
+    "name": "verbose",
+    "optional": false
+   },
+   {
+    "args": [
+     "-o",
+     "{out}/r"
+    ],
+    "name": "output",
+    "optional": false
+   },
+   {
+    "args": [
+     "-z",
+     "0"
+    ],
+    "name": "collapse",
+    "optional": true
+   },
+   {
+    "args": [
+     "-u",
+     "1"
+    ],
+    "name": "histogram matching",
+    "optional": true
+   },
+   {
+    "args": [
+     "-r",
+     "[{in:fixed},{in:moving},2]"
+    ],
+    "name": "initial",
+    "optional": true
+   },
+   {
+    "args": [
+     "-t",
+     "Translation[0.5]",
+     "-m",
+     "Demons[{in:fixed},{in:moving},1]",
+     "-c",
+     "[5,1e-6,3]",
+     "-f",
+     "1",
+     "-s",
+     "0"
+    ],
+    "name": "stage 0",
+    "optional": false
+   },
+   {
+    "args": [
+     "-t",
+     "GaussianDisplacementField[0.25,3,0.5]",
+     "-m",
+     "CC[{in:fixed},{in:moving},0.5,3]",
+     "-c",
+     "[3,1e-6,5]",
+     "-f",
+     "1",
+     "-s",
+     "0"
+    ],
+    "name": "stage 1",
+    "optional": false
+   }
+  ],
+  "inputs": {
+   "fixed": {
+    "content": {
+     "axes": [
+      1.2,
+      0.95,
+      0.95
+     ],
+     "centre": [
+      0.0,
+      0.0,
+      0.0
+     ],
+     "n": 3,
+     "seed": 641191885,
+     "size": 11.549999999999999,
+     "type": "blobs"
+    },
+    "dtype": "float64",
+    "geometry": {
+     "origin": [
+      -23.75,
+      -12.5,
+      -17.5
+     ],
+     "qfac": 1,
+     "qform_code": 1,
+     "quaternion": [
+      1,
+      0,
+      0,
+      0
+     ],
+     "sform": "same",
+     "sform_code": 1,
+     "spacing": [
+      2.5,
+      2.5,
+      2.5
+     ],
+     "units": "mm"
+    },
+    "keep_content": true,
+    "scaling": null,
+    "shape": [
+     20,
+     11,
+     15
+    ],
+    "suffix": ".nii.gz",
+    "values": {
+     "offset": 0.0,
+     "scale": 1.0
+    }
+   },
+   "moving": {
+    "content": {
+     "axes": [
+      1.2,
+      0.95,
+      0.95
+     ],
+     "centre": [
+      0.0,
+      0.0,
+      0.0
+     ],
+     "n": 3,
+     "seed": 641191885,
+     "size": 11.549999999999999,
+     "type": "blobs"
+    },
+    "dtype": "float32",
+    "geometry": {
+     "origin": [
+      -23.25,
+      -9.5,
+      -18.5
+     ],
+     "qfac": 1,
+     "qform_code": 1,
+     "quaternion": [
+      1,
+      0,
+      0,
+      0
+     ],
+     "sform": "same",
+     "sform_code": 1,
+     "spacing": [
+      3.0,
+      3.0,
+      3.0
+     ],
+     "units": "mm"
+    },
+    "keep_content": true,
+    "motion": [
+     {
+      "centre": [
+       0.0,
+       0.0,
+       0.0
+      ],
+      "quaternion": [
+       16,
+       -1,
+       -2,
+       -2
+      ],
+      "translation": [
+       -1.25,
+       1.0,
+       1.5
+      ]
+     }
+    ],
+    "scaling": null,
+    "shape": [
+     20,
+     11,
+     15
+    ],
+    "suffix": ".nii.gz",
+    "values": {
+     "offset": 0.0,
+     "scale": 0.8
+    }
+   }
+  },
+  "n": 979,
+  "options": [
+   "-r",
+   "-u 1",
+   "-z",
+   "CC metric",
+   "Demons metric",
+   "GaussianDisplacementField",
+   "GaussianDisplacementField with CC",
+   "Translation",
+   "Translation with Demons",
+   "dimension 3"
+  ],
+  "seed": "20261025",
+  "tool": "ants-registration"
+ },
+ "rule": null,
+ "status": "fixed",
+ "suite": "ants-registration",
+ "tier": "smoke",
+ "tool": "ants-registration"
+}

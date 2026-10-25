@@ -1,0 +1,94 @@
+{
+ "defect": null,
+ "description": "a float ScaleSkewVersor3DTransform with --float 1: larmorx squared the versor's sine in double (ITK in float), points an ulp away",
+ "expect": "pass",
+ "found": {
+  "detail": "ITK's reading: ANTs cannot write the transforms back; antsApplyTransforms agrees: ANTs exit -6 (/super_fmriprep/tags/ITK-v5.4.5/Modules/IO/TransformHDF5/src/itkHDF5TransformIO.cxx:462:\nITK ERROR: HDF5TransformIOTemplate(0x64d0476ff180): H5Pset_chunk failed); on an image: ANTs 0, larmorx 1; ITK's float reading (--float 1): ANTs cannot write the transforms back; antsApplyTransforms agrees: ANTs exit -6 (/super_fmriprep/tags/ITK-v5.4.5/Modules/IO/TransformHDF5/src/itkHDF5TransformIO.cxx:462:\nITK ERROR: HDF5TransformIOTemplate(0x5d009d9a51a0): H5Pset_chunk failed); on an image: ANTs 0, la",
+  "n": 85,
+  "seed": "trial3",
+  "shrink_moves": [],
+  "signature": [
+   "ITK's float reading (--float N): ANTs cannot write the transforms back; antsApplyTransforms agrees",
+   "ITK's reading: ANTs cannot write the transforms back; antsApplyTransforms agrees"
+  ]
+ },
+ "id": "float-versor-cosine",
+ "implementations": [
+  "port"
+ ],
+ "reason": "",
+ "recipe": {
+  "extra": {},
+  "features": {
+   "c00": 2.0,
+   "c01": 4.0,
+   "c02": -3.0,
+   "c10": 3.0,
+   "c11": 2.0,
+   "c12": 0.5,
+   "common type0": false,
+   "common type1": false,
+   "composite": false,
+   "float0": true,
+   "float1": true,
+   "format": ".txt",
+   "other type0": "ScaleSkewVersor3DTransform",
+   "other type1": "IdentityTransform",
+   "q0a": 6,
+   "q0b": -1,
+   "q0c": 2,
+   "q0d": 2,
+   "q1a": 29,
+   "q1b": -1,
+   "q1c": 0,
+   "q1d": 1,
+   "spelling f00": "e",
+   "spelling f01": "short",
+   "spelling f02": "repr",
+   "spelling p00": "repr",
+   "spelling p01": "repr",
+   "spelling p010": "short",
+   "spelling p011": "repr",
+   "spelling p012": "repr",
+   "spelling p013": "repr",
+   "spelling p014": "repr",
+   "spelling p02": "short",
+   "spelling p03": "e",
+   "spelling p04": "repr",
+   "spelling p05": "repr",
+   "spelling p06": "repr",
+   "spelling p07": "repr",
+   "spelling p08": "repr",
+   "spelling p09": "repr",
+   "transforms": 2,
+   "x00": 5.0,
+   "x01": -0.75,
+   "x02": 3.25,
+   "x10": -3.75,
+   "x11": 1.0,
+   "x12": 4.0
+  },
+  "groups": [],
+  "inputs": {
+   "file": {
+    "kind": "text",
+    "suffix": ".txt",
+    "text": "#Insight Transform File V1.0\n#Transform 0\nTransform: ScaleSkewVersor3DTransform_float_3_3\nParameters: -0.14907119849998599 0.29814239699997197 0.298142 5.00000000000000000e+00 -0.75 3.25 1.1 0.9 1.0 0.01 0 -0.02 0.0 0.03 0.0\nFixedParameters: 2.00000000000000000e+00 4 -3.0\n#Transform 1\nTransform: IdentityTransform_float_3_3\nParameters: \nFixedParameters: \n"
+   }
+  },
+  "n": 85,
+  "options": [
+   ".txt file",
+   "2 transforms",
+   "IdentityTransform",
+   "ScaleSkewVersor3DTransform"
+  ],
+  "seed": "trial3",
+  "tool": "itk-transforms"
+ },
+ "rule": null,
+ "status": "fixed",
+ "suite": "itk-hdf5",
+ "tier": "smoke",
+ "tool": "itk-transforms"
+}

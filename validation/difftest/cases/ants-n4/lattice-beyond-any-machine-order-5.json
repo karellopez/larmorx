@@ -1,0 +1,271 @@
+{
+ "defect": "ANTS-162",
+ "description": "N4 -b [30,5] with a mask on a 29x32x7 image of 1.5x1.2x2 m voxels: a lattice of 11205x9925x3205 control points at the fourth level; larmorx refuses before allocating (ANTS-162)",
+ "expect": "guard",
+ "found": {
+  "detail": "larmorx exceeds 3 GiB: the kernel stopped the process running it",
+  "n": 108,
+  "seed": "20261025",
+  "shrink_moves": [],
+  "signature": [
+   "larmorx exceeds the memory limit"
+  ]
+ },
+ "id": "lattice-beyond-any-machine-order-5",
+ "implementations": [
+  "port"
+ ],
+ "reason": "ANTS-162: about 5 TB at the last fitting level",
+ "recipe": {
+  "extra": {
+   "min_size": 4,
+   "outputs": [
+    "{out}"
+   ]
+  },
+  "features": {
+   "axis0": 1.1,
+   "axis1": 1.2,
+   "axis2": 1.0,
+   "bias field output": false,
+   "bias0": 0.0,
+   "bias1": -0.01,
+   "bias2": 0.0,
+   "bias3": -0.0075,
+   "bracket": true,
+   "bspline": true,
+   "centre0": -4.5,
+   "centre1": 2.5,
+   "centre2": -3.0,
+   "content": "labels",
+   "convergence": false,
+   "dimension": 3,
+   "dtype": "int16",
+   "histogram": false,
+   "inter": 0.0,
+   "labels": 4,
+   "mask": true,
+   "noise": 3.0,
+   "order": ",5",
+   "orientation": "oblique",
+   "origin0": -58.25,
+   "origin1": -7.25,
+   "origin2": 40.25,
+   "output form": "{out}",
+   "qfac": 1,
+   "qform_code": 1,
+   "range": "plain",
+   "rescale": true,
+   "rescale value": "1",
+   "sform": "same",
+   "sform_code": 4,
+   "shape": "29x32x7",
+   "shrink": true,
+   "shrink factor": "1",
+   "size": 25.0,
+   "slope": 0.01,
+   "spacing0": 1.5,
+   "spacing1": 1.2,
+   "spacing2": 2.0,
+   "spline": "30",
+   "suffix": ".nii",
+   "tissues": "epi",
+   "units": "m",
+   "verbose": false,
+   "weight": false
+  },
+  "groups": [
+   {
+    "args": [
+     "-d",
+     "3"
+    ],
+    "name": "dimension",
+    "optional": false
+   },
+   {
+    "args": [
+     "-i",
+     "{in:a}"
+    ],
+    "name": "input",
+    "optional": false
+   },
+   {
+    "args": [
+     "-x",
+     "{in:mask}"
+    ],
+    "name": "mask",
+    "optional": true
+   },
+   {
+    "args": [
+     "-s",
+     "1"
+    ],
+    "name": "shrink",
+    "optional": true
+   },
+   {
+    "args": [
+     "-b",
+     "[30,5]"
+    ],
+    "name": "bspline",
+    "optional": true
+   },
+   {
+    "args": [
+     "-r",
+     "1"
+    ],
+    "name": "rescale",
+    "optional": true
+   },
+   {
+    "args": [
+     "-o",
+     "{out}"
+    ],
+    "name": "output",
+    "optional": false
+   }
+  ],
+  "inputs": {
+   "a": {
+    "content": {
+     "axes": [
+      0.95,
+      1.15,
+      1.1
+     ],
+     "bias": [
+      0.0,
+      -0.01,
+      0.0,
+      -0.0075
+     ],
+     "centre": [
+      4.5,
+      4.5,
+      1.0
+     ],
+     "noise": 3.0,
+     "seed": 478413088,
+     "size": 17.5,
+     "tissues": "epi",
+     "type": "head"
+    },
+    "dtype": "uint8",
+    "geometry": {
+     "origin": [
+      -58.25,
+      -7.25,
+      40.25
+     ],
+     "qfac": 1,
+     "qform_code": 1,
+     "quaternion": [
+      39,
+      -3,
+      -2,
+      -3
+     ],
+     "sform": "same",
+     "sform_code": 4,
+     "spacing": [
+      1.5,
+      1.2,
+      2.0
+     ],
+     "units": "m"
+    },
+    "scaling": {
+     "inter": 0.0,
+     "slope": 0.01
+    },
+    "shape": [
+     29,
+     32,
+     7
+    ],
+    "suffix": ".nii",
+    "values": {
+     "offset": 0.0,
+     "scale": 1.0
+    }
+   },
+   "mask": {
+    "binary": true,
+    "content": {
+     "axes": [
+      1.1,
+      1.2,
+      1.0
+     ],
+     "centre": [
+      -4.5,
+      2.5,
+      -3.0
+     ],
+     "n": 4,
+     "seed": 510284564,
+     "size": 25.0,
+     "type": "labels"
+    },
+    "dtype": "int16",
+    "geometry": {
+     "origin": [
+      -58.25,
+      -7.25,
+      40.25
+     ],
+     "qfac": 1,
+     "qform_code": 1,
+     "quaternion": [
+      39,
+      -3,
+      -2,
+      -3
+     ],
+     "sform": "same",
+     "sform_code": 4,
+     "spacing": [
+      1.5,
+      1.2,
+      2.0
+     ],
+     "units": "m"
+    },
+    "scaling": null,
+    "shape": [
+     29,
+     32,
+     7
+    ],
+    "suffix": ".nii",
+    "values": {
+     "binarize": true,
+     "offset": 0.0,
+     "scale": 1.0
+    }
+   }
+  },
+  "n": 108,
+  "options": [
+   "-b",
+   "-r",
+   "-s",
+   "-x",
+   "dimension 3"
+  ],
+  "seed": "20261025",
+  "tool": "ants-n4"
+ },
+ "rule": "C",
+ "status": "register",
+ "suite": "ants-n4",
+ "tier": "smoke",
+ "tool": "ants-n4"
+}

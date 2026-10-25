@@ -1,0 +1,28 @@
+# Differential random testing: the tools behind its findings
+
+The nightly random testing (`python -m larmorx_validation difftest`,
+[docs/validation/difftest.md](../../../docs/validation/difftest.md)) writes each difference as a
+finding (`oracles/difftest/<night>/findings/<tool>/<seed>-<n>-<implementation>.json`) with its
+shrunk recipe. `difftest --replay <finding>` runs it again through the parity runner; the scripts
+here look inside one, by hand. Run them with the repository's `python/` and `validation/src` on
+`PYTHONPATH`, with `python -P` (some are named like modules).
+
+| Script | What it shows | Findings it explained |
+|---|---|---|
+| `inspect_finding.py <finding> [dir]` | an ANTs image program's finding: ANTs twice (does it repeat itself?), larmorx in both D13 modes, exit statuses, messages, values and header fields that differ | the sform/qform choice in vnl's float SVD; allocation refusals; the singular direction |
+| `run_pair.py <finding> <dir> <program>` | any ANTs program on a finding's inputs: ANTs at one thread and larmorx in both modes, each run's full standard error, the standard output lines that differ | Atropos on an empty mask (k-means throws before any Gaussian) |
+| `inspect_registration.py <finding> <dir> [--crmath]` | an antsRegistration finding: ANTs (as built or with CORE-MATH) and larmorx in `reproduce`, their standard error and the first differing standard output line | the vnl SVD warning of Mattes' NaN bin sizes |
+| `bisect_registration.py <finding> <dir> ["old=>new" ...]` | where an antsRegistration finding starts to differ: the first differing `DIAGNOSTIC` line (time columns removed) and every output file's differing values, with edits of the argument line (`re:` for a regular expression) | the float transform's point indexed in float (an Exponential stage after a deformable one, `--float 1`); the CC metric's flat neighbourhoods and ITK-35 |
+| `morphology_radius0.py <ANTs bin> <dir> [radii]` | ImageMath's GO, GC, GD and GE with a radius of 0 on small images: the voxels ITK's moving histogram leaves at ±FLT_MAX | ITK-95 |
+| `probe_resample_sigma.py <dir>` | ResampleImage's Gaussian interpolation with too few, zero or negative sigmas, ANTs against larmorx in both modes | ANTS-160, ANTS-161 |
+| `signed_zero_origin.py <dir> [x,y,z ...]` | the sign of a zero origin component through ANTs' reading and writing (ImageFileWriter's `TransformIndexToPhysicalPoint`) | the writer's origin |
+| `inspect_tshift.py <finding> <dir>` | a 3dTshift finding: AFNI, the GPL replica and the clean-room original in both modes, the header fields that differ (black-box) | the clean-room original's AFNI-07 header |
+| `mcflirt_pair.py <finding> <dir> [--threads N] [--preload so] ["old=>new" ...]` | an mcflirt finding: FSL's mcflirt (optionally with a CORE-MATH preload) and the replica in `reproduce`, the first differing line of standard error, the `.par` rows and the voxels that differ | the replica's open differences (below) |
+| `build_crmath_double_preload.sh <out>` | a CORE-MATH preload with only the double-precision functions (glibc's float ones kept, as the mcflirt replica computes) | ruled glibc's double rounding out for the mcflirt replica's differences |
+| `n4_memory.py <tool:seed:n> <dir> --distances ... [--levels L] [--predict D]` (in a memory box: `boxed.sh 6 python -P ...`) | an N4 case's input with smaller variants of its spline distance and levels: ANTs and larmorx (both modes), each in a cgroup leaf of its own, peak memory (`memory.peak`), time, outputs compared; the lattice per level as ANTs sizes it; the growth law fitted and the case predicted | ANTS-162 (the N4 case that took the machine down) |
+| `scaled_memory.py <tool:seed:n> <program> <dir> --scale-args i,j --factors 8,4,2` (in a memory box) | any heavy ANTs case with argument words scaled (e.g. an output spacing made coarser): peak memory and time of ANTs and larmorx per scale, outputs compared, the peak fitted against the output voxels | the heavy ResampleImageBySpacing cases |
+| `rss_timeline.py [--step-mib 1] -- <command...>` | a command's resident memory over its run (`/proc/<pid>/status` every half millisecond, printed where it changes), to tell a program's memory phases apart (reading, working images, writing) and set them against its code | N4BiasFieldCorrection's and DenoiseImage's peak memory against ANTs' (2026-10-25) |
+| `memory_pair.py <dir> <program> <size> <spacing> -- <arguments with {in} and {out}>` | an ANTs program and larmorx's command (`python -m larmorx ants ...`, both D13 modes) on one deterministic float volume, each process's peak resident memory (`/usr/bin/time -v`) and time, the outputs compared bit for bit (`MEMORY_PAIR_SUFFIX=.nii` for uncompressed files) | larmorx's peak memory against ANTs' (2026-10-25; `tests/parity/test_memory_peak.py` holds it) |
+| `heavy_pending.py <night> [<cases file>]` | marks a night's heavy cases "pending: larger machine" (beyond the heavy box, or named), each with its prediction and the command that runs it where it fits | the first night's 21 cases for the lab's server |
+| `heavy_predict.py <night>` | each heavy case's predicted memory and time (the original's sizing law times the measured unit costs), whether it fits the heavy box | the heavy queue, before `difftest --heavy` |
+| `hmc_residuals.py <night> <dir> [--max N]` | the clean-room head-motion correction's findings: mcflirt and `larmorx mri hmc` (both modes) on each shrunk phantom, the corrected series' temporal standard deviation in the phantom (lower is better aligned) beside the input's; in how many cases larmorx aligns better, alike or worse (black-box) | the `mri-hmc` differences of the first night (section of the report) |

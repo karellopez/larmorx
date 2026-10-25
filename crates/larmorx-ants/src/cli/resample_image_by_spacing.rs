@@ -306,6 +306,9 @@ fn resample(
     }
     let (resampled, _, resample_notices) =
         resample_image_by_spacing(&image, &options, n_threads, notices.mode()).map_err(|e| {
+            if e.to_string().contains("(ANTS-162)") {
+                return format!("larmorx: ResampleImageBySpacing: {e}");
+            }
             format!(
                 "larmorx: ResampleImageBySpacing: {e} (ANTs {})",
                 if thin.is_empty() {

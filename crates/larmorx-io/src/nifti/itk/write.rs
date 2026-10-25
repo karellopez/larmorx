@@ -61,6 +61,14 @@ pub enum ItkWriteError {
     BadNdim(usize),
     #[error("{0}: not a NIfTI file name (ITK's NIfTI writer needs .nii, .nii.gz, .hdr or .img)")]
     BadFileName(String),
+    /// `ImageFileWriter` throws for an image with an axis of no voxel: its largest possible
+    /// region does not contain the region to write (`itkImageFileWriter.hxx:245`; the ANTs
+    /// programs do not catch it and abort). Found by differential random testing
+    /// (2026-10-25): ResampleImageBySpacing to a spacing larger than the image.
+    #[error(
+        "ImageFileWriter: Largest possible region does not fully contain requested paste IO region: an image of size {0:?} (ITK throws)"
+    )]
+    EmptyImage(Vec<usize>),
 }
 
 // ------------------------------------------------------------------------------------------------
@@ -317,6 +325,9 @@ pub fn itk_header(
     if !(1..=7).contains(&n) {
         return Err(ItkWriteError::BadNdim(n));
     }
+    if geometry.size.contains(&0) {
+        return Err(ItkWriteError::EmptyImage(geometry.size.clone()));
+    }
     for (axis, &size) in geometry.size.iter().enumerate() {
         if size > i16::MAX as usize {
             return Err(ItkWriteError::TooLarge { axis, size });
@@ -337,8 +348,9 @@ pub fn itk_header(
     h.scl_slope = 1.0;
     h.scl_inter = 0.0;
     h.xyzt_units = 2 | 8; // NIFTI_UNITS_MM | NIFTI_UNITS_SEC
+    let written = written_origin(geometry);
     h.toffset = if n >= 4 {
-        f64::from(geometry.origin[3] as f32)
+        f64::from(written[3] as f32)
     } else {
         0.0
     };
@@ -372,8 +384,16 @@ pub fn itk_header(
         dirz = [0.0, 0.0, 1.0];
     }
     let rows = make_orthog([dirx, diry, dirz]);
+    if !orthogonal_in_float(geometry) {
+        crate::itk_output::warning(
+            "Modules/IO/NIFTI/src/itkNiftiImageIO.cxx",
+            2314,
+            "NiftiImageIO",
+            "Non-orthogonal direction matrix coerced to orthogonal",
+        );
+    }
     let m: M33 = std::array::from_fn(|i| std::array::from_fn(|j| rows[j][i]));
-    let origin = |i: usize| geometry.origin.get(i).copied().unwrap_or(0.0);
+    let origin = |i: usize| written.get(i).copied().unwrap_or(0.0);
     let offset = [
         -origin(0) as f32,
         if n > 1 { -origin(1) as f32 } else { 0.0 },
@@ -415,6 +435,57 @@ pub fn itk_header(
     let k = meta.aux_file.len().min(23);
     h.aux_file[..k].copy_from_slice(&meta.aux_file[..k]);
     Ok(h)
+}
+
+/// Whether `SetNIfTIOrientationFromImageIO` finds the direction orthogonal: the direction (its
+/// `n × n` block, `n` the image's dimensions) as a `vnl_matrix<float>` times its transpose,
+/// summed in float, within 1e-4 of the identity (`is_identity(1.0e-4)`); otherwise ITK warns
+/// that it coerced it (found by differential random testing, 2026-10-25: a 2D image read from
+/// an oblique file has the top-left 2 × 2 block of a rotation).
+fn orthogonal_in_float(geometry: &ItkGeometry) -> bool {
+    let n = geometry.ndim;
+    let m = |r: usize, c: usize| geometry.direction[r][c] as f32;
+    for i in 0..n {
+        for j in 0..n {
+            let mut sum = 0.0f32;
+            for k in 0..n {
+                sum += m(i, k) * m(j, k);
+            }
+            let dev = if i == j { (sum - 1.0).abs() } else { sum.abs() };
+            if f64::from(dev) > 1.0e-4 {
+                return false;
+            }
+        }
+    }
+    true
+}
+
+/// The origin `ImageFileWriter` gives the image IO: the physical point of the largest
+/// region's first index (`TransformIndexToPhysicalPoint(startIndex)`, index 0 here), that is
+/// `origin[i] + Σ_j M[i][j]·0` in that order with `M = Direction · diag(spacing)` (vnl's
+/// product, zeros included). Only the sign of a zero changes: a `−0.0` component becomes
+/// `+0.0` unless every `M[i][j]` is negative or `−0.0` (found by differential random testing,
+/// 2026-10-25: an origin of RAS x = 0 with other components non-zero, which `SetOrigin` keeps
+/// as `−0.0`, was written with the other sign).
+fn written_origin(geometry: &ItkGeometry) -> Vec<f64> {
+    let n = geometry.ndim;
+    (0..geometry.origin.len())
+        .map(|i| {
+            let mut point = geometry.origin[i];
+            if i >= n {
+                return point;
+            }
+            for j in 0..n {
+                let scale = |k: usize| if k == j { geometry.spacing[j] } else { 0.0 };
+                let mut m = geometry.direction[i][0] * scale(0);
+                for k in 1..n {
+                    m += geometry.direction[i][k] * scale(k);
+                }
+                point += m * 0.0;
+            }
+            point
+        })
+        .collect()
 }
 
 /// Whether ITK's NIfTI writer accepts `path` (`nifti_find_file_extension`: `.nii`, `.nii.gz`,
@@ -512,6 +583,58 @@ pub fn write_itk_vector_image<T: Element>(
 mod tests {
     use super::*;
     use crate::nifti::itk::{GeometrySource, itk_geometry};
+
+    /// ITK warns when it writes a direction that is not orthogonal in float (a 2D image read
+    /// from an oblique file keeps the top-left block of a rotation).
+    #[test]
+    fn a_non_orthogonal_direction_is_warned_about() {
+        let _ = crate::itk_output::take();
+        let identity = [[1.0, 0.0, 0.0], [0.0, 1.0, 0.0], [0.0, 0.0, 1.0]];
+        let g = geometry(identity, [1.0; 3], [0.0; 3]);
+        itk_header(&g, DataType::F32, &ItkMeta::default()).unwrap();
+        assert!(crate::itk_output::take().is_empty());
+        let (c, s) = (0.8, 0.6);
+        let mut g = geometry(
+            [[c, -s, 0.0], [s, c, 0.0], [0.0, 0.0, 1.0]],
+            [1.0; 3],
+            [0.0; 3],
+        );
+        g.ndim = 2;
+        g.size.truncate(2);
+        g.spacing.truncate(2);
+        g.origin.truncate(2);
+        g.direction = vec![vec![c, -s * 0.5], vec![s, c]];
+        itk_header(&g, DataType::F32, &ItkMeta::default()).unwrap();
+        let w = crate::itk_output::take();
+        assert_eq!(w.len(), 1);
+        assert!(w[0].contains("Non-orthogonal direction matrix coerced to orthogonal"));
+    }
+
+    #[test]
+    fn an_empty_image_is_refused() {
+        let identity = [[1.0, 0.0, 0.0], [0.0, 1.0, 0.0], [0.0, 0.0, 1.0]];
+        let mut g = geometry(identity, [1.0; 3], [0.0; 3]);
+        g.size = vec![0, 0, 0];
+        let e = itk_header(&g, DataType::F32, &ItkMeta::default()).unwrap_err();
+        assert!(e.to_string().contains("Largest possible region"), "{e}");
+    }
+
+    /// The sign of a zero origin component, as ImageFileWriter passes it on (its
+    /// `TransformIndexToPhysicalPoint` of index 0): `−0.0` becomes `+0.0` with the identity
+    /// direction, and stays `−0.0` when the axis's row of `Direction · diag(spacing)` is all
+    /// negative or `−0.0`.
+    #[test]
+    fn a_negative_zero_origin_is_written_as_itk_writes_it() {
+        let identity = [[1.0, 0.0, 0.0], [0.0, 1.0, 0.0], [0.0, 0.0, 1.0]];
+        let g = geometry(identity, [1.0; 3], [-0.0, 5.25, -11.0]);
+        let h = itk_header(&g, DataType::F32, &ItkMeta::default()).unwrap();
+        assert!(h.qoffset_x == 0.0 && h.qoffset_x.is_sign_negative());
+        assert!(h.srow_x[3] == 0.0 && h.srow_x[3].is_sign_negative());
+        let flipped = [[-1.0, -0.0, -0.0], [0.0, 1.0, 0.0], [0.0, 0.0, 1.0]];
+        let g = geometry(flipped, [1.0; 3], [-0.0, 5.25, -11.0]);
+        let h = itk_header(&g, DataType::F32, &ItkMeta::default()).unwrap();
+        assert!(h.qoffset_x == 0.0 && h.qoffset_x.is_sign_positive());
+    }
 
     fn geometry(direction: [[f64; 3]; 3], spacing: [f64; 3], origin: [f64; 3]) -> ItkGeometry {
         ItkGeometry {

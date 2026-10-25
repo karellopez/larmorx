@@ -37,6 +37,7 @@ pub mod grid;
 pub mod intensity;
 pub mod itk_math;
 pub mod kdtree;
+pub mod libstdcxx;
 mod lines;
 pub mod median;
 pub mod morphology;

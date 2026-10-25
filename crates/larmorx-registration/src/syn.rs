@@ -100,6 +100,9 @@ pub struct SynStage<R, const D: usize> {
     /// `BSplineSyNImageRegistrationMethod`: the update and total fields smoothed by B-spline
     /// approximations instead of Gaussians (the variances are then not used).
     pub bspline: Option<BSplineSynSmoothing<D>>,
+    /// ITK-97 and ITK-99: the derivatives of sample points outside the virtual region,
+    /// aliased as ITK does (`reproduce`) or dropped, and their counts.
+    pub outside: crate::metric::OutsideDerivatives,
     pub n_threads: usize,
 }
 
@@ -284,6 +287,7 @@ fn initialize_metric<R: Real, const D: usize>(
     virtual_space: &Space<D>,
     samples: &Option<Arc<Vec<[f64; D]>>>,
     fixed_transform: Option<Composite<R, D>>,
+    outside: &crate::metric::OutsideDerivatives,
 ) -> Result<Initialized<R, D>, ItkException> {
     let metric = ImageMetricv4 {
         fixed: Arc::clone(fixed),
@@ -297,6 +301,7 @@ fn initialize_metric<R: Real, const D: usize>(
         moving_gradient_image: moving_gradient,
         pixel_f32: false,
         local_support: true,
+        outside: outside.clone(),
     };
     let state = match kind {
         MetricKind::Demons => {
@@ -325,12 +330,7 @@ fn metric_derivative<R: Real, const D: usize>(
     if let Some(s) = &m.metric.samples
         && s.is_empty()
     {
-        return Err(ItkException::new(
-            "Modules/Registration/Metricsv4/include/itkImageToImageMetricv4.hxx",
-            268,
-            "ImageToImageMetricv4",
-            "VirtualSampledPointSet must have 1 or more points.",
-        ));
+        return Err(crate::method::empty_sample_set(m.kind));
     }
     match (&m.state, m.kind) {
         (Some(state), _) => state.evaluate(&m.metric, moving, true, floor, warnings),
@@ -419,10 +419,15 @@ pub(crate) struct GradientCall<'a, R, const D: usize> {
     /// the mask the previous call set (ITK-31, reproduced when `stale_masks`).
     pub(crate) masks: &'a mut [(Option<Mask<D>>, Option<Mask<D>>)],
     pub(crate) stale_masks: bool,
+    /// Each metric object's joint histogram images (Mattes): created at its first evaluation
+    /// in the stage.
+    pub(crate) joint_pdfs: &'a [Arc<std::sync::atomic::AtomicBool>],
     /// The fixed and moving transforms the image metrics are evaluated through, on top of
     /// their resampled images (ITK-36 reproduced: a time-varying B-spline velocity field's
     /// multi-metric whose last metric is a point-set metric); `None`: the identity.
     pub(crate) through: Option<(&'a Composite<R, D>, &'a Composite<R, D>)>,
+    /// What becomes of the derivatives of sample points outside the virtual region (ITK-97).
+    pub(crate) outside: &'a crate::metric::OutsideDerivatives,
 }
 
 impl<R: Real, const D: usize> GradientCall<'_, R, D> {
@@ -531,9 +536,15 @@ impl<R: Real, const D: usize> GradientCall<'_, R, D> {
                 self.virtual_space,
                 &lm.samples,
                 self.through.map(|(f, _)| f.clone()),
+                self.outside,
             );
             match result {
-                Ok(m) => initialized.push(Some(m)),
+                Ok(mut m) => {
+                    if let Some(s) = &mut m.state {
+                        s.share_joint_pdf(&self.joint_pdfs[j]);
+                    }
+                    initialized.push(Some(m));
+                }
                 Err(e) if self.multi => {
                     return Err(e.wrapped(
                         "Modules/Registration/Metricsv4/include/itkObjectToObjectMultiMetricv4.hxx",
@@ -716,6 +727,10 @@ fn run_syn_levels<R: Real, const D: usize>(
     let invert_settings = InvertSettings::<R>::syn();
     let mut state: Option<(FieldXfm<R, D>, FieldXfm<R, D>)> = None;
     let mut stale_masks = false;
+    // Each metric object's joint histogram images (Mattes), kept across the levels and calls
+    // of the stage.
+    let joint_pdfs: Vec<Arc<std::sync::atomic::AtomicBool>> =
+        stage.metrics.iter().map(|_| Default::default()).collect();
     for (level, factors) in stage.shrink_factors.iter().enumerate() {
         let virtual_space = shrink_space(&virtual_base, factors)?;
         let sigma = stage.smoothing_sigmas[level];
@@ -942,7 +957,9 @@ fn run_syn_levels<R: Real, const D: usize>(
                     floor,
                     masks: &mut mask_state,
                     stale_masks: !stage.correct_stale_masks,
+                    joint_pdfs: &joint_pdfs,
                     through: None,
+                    outside: &stage.outside,
                 };
                 // B-spline SyN with a single point-set metric: the B-spline fitted to the
                 // points' derivatives.
@@ -1029,7 +1046,12 @@ fn run_syn_levels<R: Real, const D: usize>(
             let (new_f2m, new_m2m, moving_value, fixed_value) = pooled(stage.n_threads, step)??;
             f2m = new_f2m;
             m2m = new_m2m;
-            let metric_value = R::from_f64(0.5 * (moving_value.to_f64() + fixed_value.to_f64()));
+            // `0.5 * (movingMetricValue + fixedMetricValue)`: the sum in the metric's
+            // `MeasureType` (float with `--float 1`, where two metrics with no valid point,
+            // each FLT_MAX, overflow to inf; random testing, 2026-10-25,
+            // `ants-registration:20261025:1081`), the half in double.
+            let sum = moving_value + fixed_value;
+            let metric_value = R::from_f64(0.5 * sum.to_f64());
             convergence.add(metric_value.to_f64());
             let convergence_value = R::from_f64(convergence.value());
             if convergence_value < stage.convergence_threshold {
@@ -1122,6 +1144,7 @@ pub fn full_scale_cc<R: Real, const D: usize>(
             moving_gradient_image: None,
             pixel_f32: false,
             local_support: true,
+            outside: Default::default(),
         };
         crate::metric::neighborhood_correlation::NeighborhoodCorrelation { radius: 4 }.evaluate(
             &metric,

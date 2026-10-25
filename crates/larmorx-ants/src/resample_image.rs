@@ -24,11 +24,11 @@
 
 use larmorx_core::defects::{self, Notice, Notices, UpstreamDefects};
 use larmorx_core::{IndexFloor, RealElement};
-use larmorx_interp::Interpolation;
+use larmorx_interp::{BSplineMirror, Interpolation};
 use larmorx_io::nifti::itk::ItkGeometry;
 
 use crate::image::{AntsImage, Pixel};
-use crate::resample::{ResampleError, resample_identity};
+use crate::resample::{Coordinates, ResampleError, resample_identity_mirrored};
 
 /// How [`resample_image`] sets the output grid.
 #[derive(Clone, Copy, Debug, PartialEq)]
@@ -138,6 +138,11 @@ pub fn resample_image<T: Pixel + RealElement>(
 ) -> Result<(AntsImage<T>, Vec<Notice>), ResampleImageError> {
     let mut notices = Notices::new(mode);
     let geometry = output_geometry(&input.geometry, target, mode)?;
+    if mode.fix() {
+        // ANTS-162: before anything is allocated (`reproduce` attempts it as ANTs does).
+        crate::resample::check_output_grid(&input.geometry, &geometry)
+            .map_err(ResampleImageError::Invalid)?;
+    }
     if geometry.spacing.iter().any(|s| !s.is_finite()) {
         // ANTS-29 reproduced: no output point maps into the input.
         notices.add(
@@ -154,17 +159,23 @@ pub fn resample_image<T: Pixel + RealElement>(
         return Ok((image, notices.into_vec()));
     }
     let floor = IndexFloor::new(mode);
-    let data = resample_identity(
+    // ITK-98: on an axis too short for the B-spline's support, the mirror repeated (fix) or
+    // ITK's single one with its reads outside the image as 0 (reproduce).
+    let mirror = BSplineMirror::new(mode);
+    let data = resample_identity_mirrored(
         &input.data,
         &input.geometry,
         &geometry,
         interpolation,
         T::from_f64(0.0),
         T::from_f64_bounded,
+        Coordinates::Double,
         &floor,
+        &mirror,
         n_threads,
     )?;
     floor.notice(&mut notices, "output voxels");
+    mirror.notice(&mut notices, "output voxels");
     Ok((
         AntsImage {
             data,

@@ -43,7 +43,9 @@ struct Column<R> {
 type Values<R> = Option<(R, R)>;
 
 /// A voxel's local correlation and derivative, or `None` where it does not count.
-type PointResult<R> = Option<(R, Vec<R>, Option<usize>, Option<Vec<usize>>)>;
+/// A valid point's local CC, derivative, voxel, derivative columns, and whether its derivative
+/// used the moving transform's Jacobian (`sFixedFixed` and `sMovingMoving` above epsilon).
+type PointResult<R> = Option<(R, Vec<R>, Option<usize>, Option<Vec<usize>>, bool)>;
 
 /// The metric's state for a level: its radius.
 #[derive(Clone, Copy, Debug)]
@@ -145,6 +147,7 @@ impl NeighborhoodCorrelation {
         };
         let mut derivative = Vec::new();
         let mut cols = None;
+        let mut jacobian_used = false;
         if compute_derivative {
             // A B-spline transform's derivative is zero away from the point's control points.
             let sparse = !m.local_support && transform.active().is_bspline();
@@ -160,6 +163,7 @@ impl NeighborhoodCorrelation {
                     std::array::from_fn(|q| R::from_f64(factor * s.moving_gradient[q].to_f64()));
                 let vp: [R; D] = std::array::from_fn(|k| R::from_f64(p[k]));
                 let jac = m.jacobian_columns(transform, &vp);
+                jacobian_used = true;
                 derivative = (0..jac.n)
                     .map(|par| {
                         let mut v = R::ZERO;
@@ -177,7 +181,7 @@ impl NeighborhoodCorrelation {
         } else {
             None
         };
-        Some((local_cc, derivative, voxel, cols))
+        Some((local_cc, derivative, voxel, cols, jacobian_used))
     }
 
     /// `GetValue` (`compute_derivative` false) or `GetValueAndDerivative`.
@@ -196,6 +200,7 @@ impl NeighborhoodCorrelation {
         };
         let r = self.radius as i64;
         let mut reduction = BaseReduction::for_metric(m, transform, compute_derivative);
+        let mut jacobian_used = false;
         match &m.samples {
             None => {
                 // Every voxel's values once.
@@ -254,7 +259,8 @@ impl NeighborhoodCorrelation {
                     })
                     .collect();
                 for line in lines {
-                    for (cc, d, voxel, cols) in line.into_iter().flatten() {
+                    for (cc, d, voxel, cols, used) in line.into_iter().flatten() {
+                        jacobian_used |= used;
                         reduction.add_point_cols(-cc, &d, cols.as_deref(), voxel);
                     }
                 }
@@ -284,12 +290,19 @@ impl NeighborhoodCorrelation {
                         self.point(m, transform, &queue, &center, compute_derivative, floor, np)
                     })
                     .collect();
-                for (cc, d, voxel, cols) in results.into_iter().flatten() {
+                for (cc, d, voxel, cols, used) in results.into_iter().flatten() {
+                    jacobian_used |= used;
                     reduction.add_point_cols(-cc, &d, cols.as_deref(), voxel);
                 }
             }
         }
-        Ok(reduction.finish(compute_derivative, np))
+        let mut r = reduction.finish(compute_derivative, np);
+        // ComputeMovingTransformDerivative returns before the transform's Jacobian when a
+        // neighbourhood is flat: a transform without a Jacobian with respect to position (a
+        // B-spline after the active one, ITK-35) throws only if some point got that far
+        // (found by differential random testing, 2026-10-25).
+        r.jacobian_used = jacobian_used;
+        Ok(r)
     }
 }
 

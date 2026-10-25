@@ -1005,6 +1005,7 @@ pub fn search<const D: usize>(
         moving_gradient_image: Some(moving_gradient),
         pixel_f32: true,
         local_support: false,
+        outside: Default::default(),
     };
     let StartPoints {
         mut list,

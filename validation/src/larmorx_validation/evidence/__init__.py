@@ -33,7 +33,7 @@ TOOLS: dict[str, str] = {
 
 
 #: Targets of ``evidence`` that are not a tool.
-OTHER = ("summary", "panel", "sizes", "all")
+OTHER = ("summary", "panel", "sizes", "difftest", "all")
 
 
 def main(args) -> int:
@@ -74,6 +74,15 @@ def main(args) -> int:
             continue
         path = write_tool(ctx, tool, credits.attach(tool, doc))
         print(f"{tool}: {path}")
+    if args.tool in ("all", "difftest"):
+        # Random testing's panels (docs/validation/difftest.md): from the latest night.
+        from larmorx_validation.evidence import difftest
+
+        try:
+            print(f"difftest: {write_tool(ctx, 'difftest', difftest.export(ctx))}")
+        except FileNotFoundError as e:
+            print(f"skipped difftest: {e}")
+            status = 1
     if args.tool in ("all", "summary"):
         from larmorx_validation.evidence import summary
 

@@ -596,15 +596,16 @@ fn with_output(
     body: impl FnOnce(&mut dyn Write) -> io::Result<()>,
 ) -> Result<()> {
     let run = || -> io::Result<()> {
-        let file = BufWriter::with_capacity(1 << 20, File::create(path)?);
         if paths::wants_gzip(path) {
+            // The encoder writes whole compressed blocks: a small buffer is enough (memory).
+            let file = BufWriter::with_capacity(1 << 16, File::create(path)?);
             let mut enc = ParallelGzEncoder::new(file, level)?;
             body(&mut enc)?;
             enc.finish()?
                 .into_inner()
                 .map_err(io::IntoInnerError::into_error)?;
         } else {
-            let mut file = file;
+            let mut file = BufWriter::with_capacity(1 << 20, File::create(path)?);
             body(&mut file)?;
             file.into_inner().map_err(io::IntoInnerError::into_error)?;
         }

@@ -57,6 +57,44 @@ pub enum Likelihood {
 }
 
 impl Likelihood {
+    /// Where the model's `itkWarningMacro` stands in ANTs (its file and line, and the class
+    /// `GetNameOfClass` names): the "<= 1 element" warning of `SetInputListSample` (random
+    /// testing, 2026-10-25: larmorx printed the Gaussian model's for every model).
+    pub fn warning_origin(&self) -> (&'static str, u32, &'static str) {
+        match self {
+            Likelihood::Gaussian(_) => (
+                "ImageSegmentation/antsGaussianListSampleFunction.hxx",
+                105,
+                "GaussianListSampleFunction",
+            ),
+            Likelihood::PartialVolume(_) => (
+                "ImageSegmentation/antsPartialVolumeGaussianListSampleFunction.hxx",
+                116,
+                "PartialVolumeGaussianListSampleFunction",
+            ),
+            Likelihood::HistogramParzen(_) => (
+                "ImageSegmentation/antsHistogramParzenWindowsListSampleFunction.hxx",
+                57,
+                "HistogramParzenWindowsListSampleFunction",
+            ),
+            Likelihood::ManifoldParzen(_) => (
+                "ImageSegmentation/antsManifoldParzenWindowsListSampleFunction.hxx",
+                55,
+                "ManifoldParzenWindowsListSampleFunction",
+            ),
+            Likelihood::LogEuclidean(_) => (
+                "ImageSegmentation/antsLogEuclideanGaussianListSampleFunction.hxx",
+                134,
+                "LogEuclideanGaussianListSampleFunction",
+            ),
+            Likelihood::JointShape(_) => (
+                "ImageSegmentation/antsJointHistogramParzenShapeAndOrientationListSampleFunction.hxx",
+                381,
+                "JointHistogramParzenShapeAndOrientationListSampleFunction",
+            ),
+        }
+    }
+
     /// The tissue class model for `model`; `mode` decides ANTs' defects in the models.
     pub fn new(model: &LikelihoodModel, mode: UpstreamDefects) -> Self {
         match *model {
@@ -316,6 +354,25 @@ impl HistogramParzenModel {
         let mut histograms = Vec::with_capacity(m);
         for d in 0..m {
             let spacing = f64::from((max[d] - min[d]) / (self.bins.wrapping_sub(1)) as f32);
+            // `SetSpacing` of the histogram image (ITK built with ITK_LEGACY_REMOVE, as ANTs
+            // builds it) throws for a spacing of 0 (a channel with one value in the sample) or
+            // below (found by differential random testing, 2026-10-25: larmorx went on).
+            if spacing <= 0.0 {
+                let to = larmorx_registration::format::OStream::default().float(spacing);
+                let (line, what) = if spacing == 0.0 {
+                    (77, "Zero-valued spacing")
+                } else {
+                    (90, "Negative spacing")
+                };
+                return Err(EstimateError {
+                    file: "Modules/Core/Common/include/itkImageBase.hxx",
+                    line,
+                    class: "Image",
+                    description: format!(
+                        "{what} is not supported and may result in undefined behavior.\nRefusing to change spacing from [1] to [{to}]"
+                    ),
+                });
+            }
             let origin = f64::from(min[d]) - 3.0 * (f64::from(sigma) * spacing);
             let three = 3.0f32 * (sigma * spacing as f32);
             let extent = ((max[d] + three) - (min[d] - three)) / spacing as f32;
@@ -1127,6 +1184,67 @@ fn gaussian_text(g: &GaussianMembership) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// Each model's "<= 1 element" warning comes from its own ANTs file, line and class
+    /// (random testing, 2026-10-25, `ants-atropos:20261025:566`: larmorx printed the Gaussian
+    /// model's for ManifoldParzenWindows and HistogramParzenWindows), with that file's text.
+    #[test]
+    fn each_model_warns_from_its_own_file() {
+        let mode = UpstreamDefects::Reproduce;
+        let manifold = Likelihood::new(
+            &LikelihoodModel::ManifoldParzenWindows {
+                regularization_sigma: 1.0,
+                evaluation_k: 10,
+                covariance_k: 0,
+                kernel_sigma: 1.0,
+            },
+            mode,
+        );
+        assert_eq!(
+            manifold.warning_origin(),
+            (
+                "ImageSegmentation/antsManifoldParzenWindowsListSampleFunction.hxx",
+                55,
+                "ManifoldParzenWindowsListSampleFunction"
+            )
+        );
+        let parzen = Likelihood::new(
+            &LikelihoodModel::HistogramParzenWindows {
+                sigma: 1.0,
+                bins: 32,
+            },
+            mode,
+        );
+        assert_eq!(parzen.warning_origin().1, 57);
+        assert_eq!(
+            Likelihood::new(&LikelihoodModel::Gaussian, mode)
+                .warning_origin()
+                .1,
+            105
+        );
+        // HistogramParzenWindows' text has no blank after the first sentence.
+        let mut h = HistogramParzenModel::new(1.0, 32);
+        assert_eq!(h.set_sample(&[3.0], 1, &[]).unwrap(), Some(SMALL));
+        assert!(SMALL.contains("element.Function"));
+    }
+
+    /// A channel with one value: its histogram's spacing is 0, which ITK's `SetSpacing`
+    /// refuses (random testing, 2026-10-25).
+    #[test]
+    fn a_constant_channel_has_no_histogram() {
+        let mut m = HistogramParzenModel::new(1.0, 32);
+        // Two components: the first varies, the second is constant.
+        let samples = [1.0f32, 5.0, 2.0, 5.0, 3.0, 5.0];
+        let e = m.set_sample(&samples, 2, &[]).unwrap_err();
+        assert_eq!((e.line, e.class), (77, "Image"));
+        assert!(
+            e.description
+                .ends_with("Refusing to change spacing from [1] to [0]"),
+            "{}",
+            e.description
+        );
+        assert!(m.set_sample(&[1.0, 2.0, 3.0], 1, &[]).is_ok());
+    }
 
     #[test]
     fn tensor_dimensions() {

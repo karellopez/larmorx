@@ -1,0 +1,362 @@
+{
+ "defect": null,
+ "description": "a stage whose sampled point set is empty: ITK's exception at itkImageToImageMetricv4.hxx:263 with the metric's class (larmorx printed line 268 and the base class)",
+ "expect": "pass",
+ "found": {
+  "detail": "ANTs with CORE-MATH: standard output: line 350: ANTs 'Line: 263', larmorx 'Line: 268'",
+  "n": 417,
+  "seed": "20261025",
+  "shrink_moves": [],
+  "signature": [
+   "ANTs with CORE-MATH: standard output"
+  ]
+ },
+ "id": "empty-sample-set-exception",
+ "implementations": [
+  "port"
+ ],
+ "reason": "",
+ "recipe": {
+  "extra": {
+   "min_size": 6
+  },
+  "features": {
+   "bins0": "16",
+   "bins1": "8",
+   "collapse": false,
+   "composite": false,
+   "content": "sparse",
+   "corner0": 43,
+   "corner1": 51,
+   "corner2": 34,
+   "crop source": "templateflow/tpl-MNI152NLin2009cAsym/tpl-MNI152NLin2009cAsym_res-02_desc-fMRIPrep_boldref.nii.gz",
+   "crop stride": 1,
+   "dimension": 3,
+   "dtype": "uint8",
+   "exp total0": "0.5",
+   "exp total1": "0",
+   "family0": "Rigid",
+   "family1": "Translation",
+   "fixed dtype": "float32",
+   "fixed mask only": true,
+   "fixed n0": 21,
+   "fixed n1": 21,
+   "fixed n2": 11,
+   "fixed spacing": 2.5,
+   "float": false,
+   "gdf total0": "0.5",
+   "gdf total1": "0",
+   "histogram matching": true,
+   "initial": false,
+   "iterations00": "8",
+   "iterations01": "3",
+   "iterations10": "8",
+   "iterations11": "2",
+   "levels0": 2,
+   "levels1": 2,
+   "masks": true,
+   "mesh0": "4",
+   "mesh1": "4",
+   "metric weight0": "0.5",
+   "metric weight1": "1",
+   "metric0": "MI",
+   "metric1": "Mattes",
+   "moving dtype": "int16",
+   "moving offset": 0.0,
+   "moving on another grid": true,
+   "moving origin0": 0.0,
+   "moving origin1": -3.0,
+   "moving origin2": -3.0,
+   "moving scale": 0.8,
+   "moving spacing": 3.5,
+   "oblique fixed": false,
+   "outputs": "{out}/r",
+   "percentage1": "0.25",
+   "range": "plain",
+   "rot b": -2,
+   "rot c": 1,
+   "rot d": 0,
+   "rot scale": 6,
+   "sampling0": "",
+   "sampling1": "Regular",
+   "shift0": 2.75,
+   "shift1": -0.5,
+   "shift2": 1.75,
+   "smoothing units0": "",
+   "smoothing units1": "mm",
+   "sparse": 0.001,
+   "stages": 2,
+   "step0": "0.25",
+   "step1": "0.1",
+   "suffix": ".nii.gz",
+   "syn total0": "0.3",
+   "syn total1": "0",
+   "syn update0": "3",
+   "syn update1": "3",
+   "tvb points0": "4",
+   "tvb points1": "2",
+   "tvf points0": "2",
+   "tvf points1": "2",
+   "window0": "3",
+   "window1": "10",
+   "winsorize": false
+  },
+  "groups": [
+   {
+    "args": [
+     "-d",
+     "3"
+    ],
+    "name": "dimension",
+    "optional": false
+   },
+   {
+    "args": [
+     "-v",
+     "1"
+    ],
+    "name": "verbose",
+    "optional": false
+   },
+   {
+    "args": [
+     "-o",
+     "{out}/r"
+    ],
+    "name": "output",
+    "optional": false
+   },
+   {
+    "args": [
+     "-u",
+     "1"
+    ],
+    "name": "histogram matching",
+    "optional": true
+   },
+   {
+    "args": [
+     "-x",
+     "[{in:fmask}]"
+    ],
+    "name": "masks",
+    "optional": true
+   },
+   {
+    "args": [
+     "-t",
+     "Rigid[0.25]",
+     "-m",
+     "MI[{in:fixed},{in:moving},0.5,16]",
+     "-c",
+     "[8x3,1e-6,3]",
+     "-f",
+     "2x1",
+     "-s",
+     "1x0"
+    ],
+    "name": "stage 0",
+    "optional": false
+   },
+   {
+    "args": [
+     "-t",
+     "Translation[0.1]",
+     "-m",
+     "Mattes[{in:fixed},{in:moving},1,8,Regular,0.25]",
+     "-c",
+     "[8x2,1e-6,10]",
+     "-f",
+     "2x1",
+     "-s",
+     "1x0mm"
+    ],
+    "name": "stage 1",
+    "optional": false
+   }
+  ],
+  "inputs": {
+   "fixed": {
+    "content": {
+     "corner": [
+      43,
+      51,
+      34
+     ],
+     "seed": 2090622668,
+     "source": "templateflow/tpl-MNI152NLin2009cAsym/tpl-MNI152NLin2009cAsym_res-02_desc-fMRIPrep_boldref.nii.gz",
+     "stride": 1,
+     "type": "crop"
+    },
+    "dtype": "float32",
+    "geometry": {
+     "origin": [
+      -25.0,
+      -25.0,
+      -12.5
+     ],
+     "qfac": 1,
+     "qform_code": 1,
+     "quaternion": [
+      1,
+      0,
+      0,
+      0
+     ],
+     "sform": "same",
+     "sform_code": 1,
+     "spacing": [
+      2.5,
+      2.5,
+      2.5
+     ],
+     "units": "mm"
+    },
+    "keep_content": true,
+    "scaling": null,
+    "shape": [
+     21,
+     21,
+     11
+    ],
+    "suffix": ".nii.gz",
+    "values": {
+     "offset": 0.0,
+     "scale": 1.0
+    }
+   },
+   "fmask": {
+    "binary": true,
+    "content": {
+     "fraction": 0.001,
+     "seed": 1001968507,
+     "type": "sparse"
+    },
+    "dtype": "uint8",
+    "geometry": {
+     "origin": [
+      -25.0,
+      -25.0,
+      -12.5
+     ],
+     "qfac": 1,
+     "qform_code": 1,
+     "quaternion": [
+      1,
+      0,
+      0,
+      0
+     ],
+     "sform": "same",
+     "sform_code": 1,
+     "spacing": [
+      2.5,
+      2.5,
+      2.5
+     ],
+     "units": "mm"
+    },
+    "scaling": null,
+    "shape": [
+     21,
+     21,
+     11
+    ],
+    "suffix": ".nii.gz",
+    "values": {
+     "binarize": true,
+     "offset": 0.0,
+     "scale": 1.0
+    }
+   },
+   "moving": {
+    "content": {
+     "corner": [
+      43,
+      51,
+      34
+     ],
+     "seed": 2090622668,
+     "source": "templateflow/tpl-MNI152NLin2009cAsym/tpl-MNI152NLin2009cAsym_res-02_desc-fMRIPrep_boldref.nii.gz",
+     "stride": 1,
+     "type": "crop"
+    },
+    "dtype": "int16",
+    "geometry": {
+     "origin": [
+      -25.0,
+      -28.0,
+      -15.5
+     ],
+     "qfac": 1,
+     "qform_code": 1,
+     "quaternion": [
+      1,
+      0,
+      0,
+      0
+     ],
+     "sform": "same",
+     "sform_code": 1,
+     "spacing": [
+      3.5,
+      3.5,
+      3.5
+     ],
+     "units": "mm"
+    },
+    "keep_content": true,
+    "motion": [
+     {
+      "centre": [
+       0.0,
+       0.0,
+       0.0
+      ],
+      "quaternion": [
+       25,
+       -2,
+       1,
+       0
+      ],
+      "translation": [
+       2.75,
+       -0.5,
+       1.75
+      ]
+     }
+    ],
+    "scaling": null,
+    "shape": [
+     21,
+     21,
+     11
+    ],
+    "suffix": ".nii.gz",
+    "values": {
+     "offset": 0.0,
+     "scale": 0.8
+    }
+   }
+  },
+  "n": 417,
+  "options": [
+   "-u 1",
+   "-x",
+   "MI metric",
+   "Mattes metric",
+   "Rigid",
+   "Rigid with MI",
+   "Translation",
+   "Translation with Mattes",
+   "dimension 3"
+  ],
+  "seed": "20261025",
+  "tool": "ants-registration"
+ },
+ "rule": null,
+ "status": "fixed",
+ "suite": "ants-registration",
+ "tier": "smoke",
+ "tool": "ants-registration"
+}

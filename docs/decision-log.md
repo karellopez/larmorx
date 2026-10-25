@@ -1243,6 +1243,66 @@ choices made while building it ([validation/oracle-cache.md](validation/oracle-c
   user's decision of 2026-10-16: everything), never with `[exact]` (orchestrator, at the merge,
   2026-10-25: the `[all]` extra added to `pyproject.toml` accordingly).
 
+## 2026-10-25: Random testing, how it decides; heavy cases run to their end
+
+**What counts as a difference** (implementing the user's rule of 2026-10-24). A case agrees when
+the tool's own parity runner passes it (bit for bit for ports and replicas in `reproduce` mode; a
+clean-room original within its record's thresholds). Two outcomes are not differences and are
+counted apart: *notice* (a D13 notice named where its correction changed nothing the input
+shows, or named in one mode only because another correction took a different path; the parity
+suites' `silent_ok` and `one_mode`) and *undefined* (the original's result depends on memory it
+never wrote or on its clock: the defect is named by larmorx, or known to the descriptor, e.g.
+ANTS-82's clock-seeded sampling). Random cases run the originals with the oracle cache off; only
+a finding's shrunk reproducer is stored, so the cache grows by the findings alone
+([validation/difftest.md](validation/difftest.md)).
+
+**Random testing in a memory box; heavy cases run to their end** (after the first night's N4 case
+filled the machine; the orchestrator's instruction and the user's addition). Every night runs in
+a memory box (`scripts/orchestration/boxed.sh 8`, or the nightly script's own), and each worker,
+with every original and larmorx process of its cases, in a cgroup v2 leaf of 3 GiB without swap;
+a run over the limit is the verdict *memory* (the side that exceeded named), never a crash of
+the harness, and the case is queued in the night's `heavy.jsonl`. Heavy cases are run, not
+avoided: `difftest --heavy <night>` runs the queue one case at a time in a box of 24 GiB with 48
+GiB of swap, only when the user says the machine is quiet, after a prediction of each case's
+memory and time from the original's sizing law and unit costs measured on smaller variants
+(`heavy_predict.py`); cases predicted beyond the heavy box are recorded as *beyond this machine*
+or *beyond any machine* with that evidence and not run.
+
+## 2026-10-25: ANTS-162 and AFNI-75: the method kept, a guard by default
+
+Decided by the orchestrator, by the rules. N4's lattice and padding and the resamplers' output
+grids are sized from the image's physical extent without a check; a header in metres or
+micrometres makes a tiny input need hundreds of GiB to terabytes. Rule C for the method (the
+memory is the work asked for; nothing in the result is wrong): larmorx keeps the same lattice,
+padding and grid, and the replica stays bit-identical. But D13 never reproduces a crash by
+default, and exhausting the machine is one: by default larmorx computes the bytes it will need
+before it allocates and, when they exceed the machine's physical memory or
+`LARMORX_MEMORY_LIMIT`, stops at once with the GiB needed and the likely cause (the voxels' size
+and the extent they give), naming ANTS-162; `reproduce` attempts it as ANTs does. Every case that
+fits is unchanged, bit for bit. Follow-up (D11, not this part): a sparse lattice with virtual
+padding, the same result in memory proportional to the data. The same day the guard was applied
+where a size grows the same way: 3dUnifize's `-EPI` ball of neighbours in the GPL replica
+(AFNI-75: its radius is 18.3 mm over the voxel size, in voxels, unbounded; micrometre voxels
+make it terabytes), by the same decision; the clean-room original follows from its spec.
+
+## 2026-10-25: Never more memory than the original (decided by the user)
+
+"Fix the resamplers' memory NOW, not 'if small': larmorx must never need more memory than the
+original for the same call" (the user, through the orchestrator, after random testing found the
+resamplers at 2.2 times ANTs' peak). For the same call larmorx's peak resident memory is at most
+the original program's, plus the Python interpreter's few MiB; a speed cache that would raise
+the peak is kept only within what the call needs anyway (N4's B-spline factors). Measured per
+call against the original (each process's peak, one thread,
+`validation/investigations/difftest/memory_pair.py`); `tests/parity/test_memory_peak.py` holds 13
+mid-size calls (both resamplers, SmoothImage, ThresholdImage, MultiplyImages, ImageMath m, ME,
+GD, GE and TruncateImageIntensity, N4BiasFieldCorrection at -s 2 and -s 4, DenoiseImage) at ANTs'
+peak plus 8 MiB, bit for bit in reproduce. The other tools are measured the same way next
+([next-steps.md](next-steps.md), follow-ups). Random tests are realistic (the user, the same day:
+"I thought we were supposed to use reasonable size tests"): nine cases in ten in realistic
+physical ranges, a labelled tenth extreme; a case of a tool with a memory law is predicted before
+it runs, and one predicted over the case's limit is a guard case (larmorx must stop at once with
+its clear error), never run.
+
 ## Open decisions (PLAN.md §16)
 
 | # | Decision | Recommended default (used until decided) | Status |

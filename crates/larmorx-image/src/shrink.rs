@@ -157,6 +157,32 @@ pub fn shrink<T: Copy + Send + Sync>(
     Ok(result)
 }
 
+/// Whether `plan` maps every voxel of `input` to itself (every factor 1, no offset): then
+/// [`shrink`] copies the image unchanged.
+pub fn is_identity(input: &ItkGrid, plan: &ShrinkPlan) -> bool {
+    plan.factors.iter().all(|&f| f == 1)
+        && plan.offset.iter().all(|&o| o == 0)
+        && plan.output.size == input.size
+        && plan.output.start == input.start
+}
+
+/// [`shrink`], or `data` itself where the plan is the identity ([`is_identity`]): the same
+/// voxels without a copy (random testing, 2026-10-25: larmorx's peak memory against ANTs').
+pub fn shrink_or_borrow<'a, T: Copy + Send + Sync>(
+    data: &'a [T],
+    input: &ItkGrid,
+    plan: &ShrinkPlan,
+    n_threads: usize,
+) -> Result<std::borrow::Cow<'a, [T]>, FilterError> {
+    if is_identity(input, plan) && data.len() == input.len() {
+        Ok(std::borrow::Cow::Borrowed(data))
+    } else {
+        Ok(std::borrow::Cow::Owned(shrink(
+            data, input, plan, n_threads,
+        )?))
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -198,5 +224,11 @@ mod tests {
         let same = shrink_plan(&input, &[1, 1, 1]).unwrap();
         assert_eq!(same.output.origin, input.origin);
         assert_eq!(shrink(&data, &input, &same, 3).unwrap(), data);
+        // The identity is not copied.
+        assert!(is_identity(&input, &same) && !is_identity(&input, &plan));
+        let borrowed = shrink_or_borrow(&data, &input, &same, 1).unwrap();
+        assert!(matches!(borrowed, std::borrow::Cow::Borrowed(_)));
+        assert_eq!(*borrowed, *data);
+        assert_eq!(*shrink_or_borrow(&data, &input, &plan, 1).unwrap(), *out);
     }
 }

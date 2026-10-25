@@ -267,3 +267,39 @@ one `AffineTransform`, centred where the last matrix-offset transform of the que
 composed with `Compose(·, pre = true)` (a `TranslationTransform` through its offset; an
 `IdentityTransform` dereferences a null pointer, ANTS-48). `-a 1` writes `Composite.h5` and
 `InverseComposite.h5`; otherwise one file per transform (ANTS-51 for their names).
+
+## Found by differential random testing (2026-10-25)
+
+- **Aliased derivatives (ITK-97, ITK-99).** With a sampled metric and a shrink factor, sample
+  points drawn on the fixed image can fall outside the shrunk virtual region; ITK adds their
+  derivative at the region's linear offset of their index (another voxel's parameters) or past
+  its derivative array. larmorx drops them by default and, in `reproduce`, adds those inside the
+  array where ITK does: five displacement-field cases of the first night became bit-identical
+  (`docs/findings/upstream-defects.md`, ITK-97; permanent case
+  `difftest/sampled-derivatives-aliased`). SyN's and B-spline SyN's stages do the same (their
+  metrics are of local support too); the time-varying velocity-field stages drop such points in
+  both modes without naming them (their sampling is clock-seeded, ANTS-82).
+- **A later level's zero Mattes bin size (ITK-100).** The threader's joint histogram images are
+  created at a stage's first evaluation and kept for its later levels, so a level whose analysis
+  region has one intensity throws `SetSpacing`'s exception only at the first level; at a later
+  level ITK uses the bin size of 0 (NaN bin indices, clamped; the metric 0). larmorx threw at
+  every level in both modes (`ants-registration:20261025:884`); now `reproduce` follows ITK and
+  the default keeps the exception (rule B), both naming ITK-100.
+- **A field under a `.mat` name (ANTS-51).** Without collapsing, a stage that adds no transform
+  of its own (a Translation stage whose Demons metric throws, "The moving transform must be a
+  displacement field transform", which ANTs catches and goes on) leaves ANTs' list of names one
+  short, so the next stage's displacement field is written under the linear stage's `.mat` name; ANTs' `WriteTransform` (`itkantsReadWriteTransform.h:146-170`)
+  then writes the stage's object itself (`GaussianSmoothingOnUpdateDisplacementFieldTransform`),
+  where for `.h5` and composites it makes a new `DisplacementFieldTransform`. larmorx wrote the
+  new one everywhere (`ants-registration:20261025:979`: the same parameters, another class name);
+  now a field keeps its stage's class under a `.mat` or `.txt` name.
+- **The empty sample set's exception** is ITK's `itkImageToImageMetricv4.hxx:263` with the
+  metric's own class name (`MattesMutualInformationImageToImageMetricv4`, ...), or
+  `itkJointHistogramMutualInformationImageToImageMetricv4.hxx:233` for `MI`; larmorx printed line
+  268 and the base class (`ants-registration:20261025:417`).
+- **antsAI's warnings in ITK's order:** each start point's scales warnings come before its
+  multi-start warning (`ants-ai:20261025:244`); the problem now hands its warnings to the
+  multi-start loop as they arise.
+- **Transforms of four dimensions:** the parity runner reads a 4D displacement-field composite
+  (`DisplacementFieldTransform_double_4_4`, which `lx.transforms.read` does not hold) by its HDF5
+  parameters (`ants-registration:20261025:379`).

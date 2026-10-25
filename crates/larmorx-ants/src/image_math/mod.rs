@@ -23,6 +23,6 @@ pub use intensity::{
     threshold_at_mean, truncate_image_intensity,
 };
 pub use morphology::{
-    FillHolesError, Morphology, PadImageError, fill_holes, float_labels, morphological, pad_image,
-    radius_from_f32,
+    FillHolesError, Morphology, PadImageError, fill_holes, float_labels,
+    grayscale_morphological_owned, morphological, pad_image, radius_from_f32,
 };

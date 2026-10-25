@@ -43,7 +43,9 @@ reproduces at all); **decide** = needs a user decision first; **rule 8** = to fo
 source (decided); **replica** = corrected in the clean-room original, the replica's switch
 still to do; **original** = corrected by default in both 3dTshift implementations, but the
 clean-room original's `reproduce` did not give AFNI's result yet (none left since 2026-10-12:
-completing 3dTshift, part 2b, then AFNI-26's switch the same day); – = nothing to do. How the switch works: [api/upstream-defects.md](../api/upstream-defects.md).
+completing 3dTshift, part 2b, then AFNI-26's switch the same day); **switch**, **notice**,
+**reproduce** = the default is already correct, the compatibility switch or the notice is still
+to add (since 2026-10-25: "Random testing's gaps", below); – = nothing to do. How the switch works: [api/upstream-defects.md](../api/upstream-defects.md).
 
 | ID | Tool | Defect | Class | fMRIPrep users | larmorx today | Gap |
 |---|---|---|---|---|---|---|
@@ -60,7 +62,7 @@ completing 3dTshift, part 2b, then AFNI-26's switch the same day); – = nothing
 | ANTS-11 | ImageMath `Neg` | range missed on increasing images | c | none | corrected by default (`upstream_defects`, 2026-10-12) | – |
 | ANTS-12 | ImageMath `TruncateImageIntensity` | brightest voxel can fall outside the histogram; 64 bins, usage says 65 | c, f | possible | corrected by default (`upstream_defects`, 2026-10-12) | – |
 | ANTS-13 | ImageMath `Normalize` | range starts at 0 and 1e9 | c | none | corrected by default (`upstream_defects`, 2026-10-12) | – |
-| ANTS-14 | ImageMath `G` (ITK) | variance above ≈709 voxels² gives NaN | c | none | corrected by default (`upstream_defects`, 2026-10-12) | – |
+| ANTS-14 | ImageMath `G`, DenoiseImage's Rician bias (ITK) | variance above ≈709 voxels² gives NaN | c | none | corrected by default (`upstream_defects`, 2026-10-12); in DenoiseImage named in both modes, `reproduce` keeps ITK's NaN kernel (2026-10-25) | – |
 | ANTS-15 | ImageMath `G`, SmoothImage | wrong number of sigmas: unchanged image or 1 mm, exit 0 | e | none | corrected by default (`upstream_defects`, 2026-10-12) | – |
 | ANTS-16 | ImageMath `Laplacian` | normalize flag read from the sigma argument | e | none (same result) | corrected by default (`upstream_defects`, 2026-10-12) | – |
 | ANTS-17 | ImageMath `MO`, `ME` | `MO r 0` is a dilation of zeros; `ME` keeps other labels as 1 | c (c? until 2026-10-23) | none | corrected by default: `ME r v` gives the eroded mask of `v`, `MO r 0` opens the zeros (2026-10-23) | – |
@@ -97,7 +99,7 @@ completing 3dTshift, part 2b, then AFNI-26's switch the same day); – = nothing
 | ANTS-48 | antsApplyTransforms | transform outputs: crashes and aborts (an unknown extension, `-i` without `-r`, a Gaussian interpolator without `-i`, a collapsed `IdentityTransform`) | a | none | refuses (exit 1) | – |
 | ANTS-49 | antsRegistration | a linear stage that throws is dropped and the run goes on, exit 0 | e | none seen | corrected by default: an error (A4 part 2) | – |
 | ANTS-50 | antsRegistration | `--save-state` after linear stages only: exit 1 without a message, no transform written | e | none | corrected by default: the state is written (A4 part 2) | – |
-| ANTS-51 | antsRegistration | transform files without collapsing: initial transforms skipped by counting `-r` options, each file named after the next stage; a composite `-r` file or a restored state gives a misnamed file, then a read past the end of the names (crash) | a | none (fMRIPrep collapses) | corrected by default; `reproduce` writes ANTs' files up to the crash and stops (A4 part 2) | – |
+| ANTS-51 | antsRegistration | transform files without collapsing: initial transforms skipped by counting `-r` options, each file named after the next stage; a composite `-r` file or a restored state gives a misnamed file, then a read past the end of the names (crash) | a | none (fMRIPrep collapses) | corrected by default; `reproduce` writes ANTs' files up to the crash and stops (A4 part 2); a Gaussian or B-spline smoothing field that ANTs misnames `.mat` or `.txt` written with its own class (2026-10-25) | reproduce (a velocity field under such a name) |
 | ANTS-52 | antsAI | the translation grid does not move `Rigid`/`Similarity` start points in 2D nor `Similarity` ones in 3D | c | none (fMRIPrep's grids are for `Affine`) | corrected by default (A4 part 3) | – |
 | ANTS-53 | antsAI | `AlignGeometricCenters`/`AlignCentersOfMass` with iterations write an empty `.mat`, exit 0 (`.txt`, `.h5`: a crash) | e | none | corrected by default: the alignment is written (A4 part 3) | – |
 | ANTS-54 | antsAffineInitializer | the local-search argument is never read: 20 iterations whatever it says | c (c? until 2026-10-17) | niworkflows passes 10, ANTs runs 20 | corrected by default: the argument is honoured (0: no local search), a notice where it is not 20 (2026-10-17) | – |
@@ -138,7 +140,7 @@ completing 3dTshift, part 2b, then AFNI-26's switch the same day); – = nothing
 | ANTS-96 | Atropos | partial-volume classes are never re-estimated | c | none | corrected by default (A6) | – |
 | ANTS-97 | Atropos | `-u 1` stores the priors' voxel numbers in `float` (rounded above 2^24 voxels) | c | none | corrected by default (A6) | – |
 | ANTS-98 | Atropos | `KMeans` takes the first image's range from the mask's label 1 only: a mask of 255s gives infinite centres and an error | c | none (fMRIPrep's masks are 0 and 1) | corrected by default (A6) | – |
-| ANTS-99 | Atropos | without `-d` every image is segmented in 3D | e | none (nipype passes `-d`) | corrected by default (A6) | – |
+| ANTS-99 | Atropos, N4BiasFieldCorrection, DenoiseImage | without `-d` every image is read as 3D (Atropos segments it in 3D) | e | none (nipype passes `-d`) | corrected by default (A6; N4BiasFieldCorrection and DenoiseImage since 2026-10-25, named in both modes) | – |
 | ANTS-100 | Atropos | priors given as one vector image: every class gets the last component | c | none | corrected by default (A6) | – |
 | ANTS-101 | Atropos | an unknown `-p` formulation silently runs Socrates | e | none | corrected by default: an error (A6) | – |
 | ANTS-102 | Atropos | `--icm [async,iterations]`, the documented form (and what nipype's `icm_use_synchronous_update` writes), aborts | a | none (sMRIPrep does not set it) | read as documented; `reproduce` stops with ANTs' message (A6) | – |
@@ -153,7 +155,11 @@ completing 3dTshift, part 2b, then AFNI-26's switch the same day); – = nothing
 | ANTS-114 | antsAI `-b` | a rigid or similarity alignment with no landmark writes a transform of NaNs (exit 0) | c | none | corrected by default: an error (2026-10-23) | – |
 | ANTS-115 | antsAI `-b` | an empty blob list (a constant image) prints its message, then dereferences a null transform (crash) | a | none | refuses with ANTs' message (exit 1) | – |
 | ANTS-116 | antsAI `-b` | the patch rotation `V·Uᵀ` is not checked for a reflection, and the gradients' axes have arbitrary signs: identical patches can be compared reflected or turned (4 of the 13 identical blob pairs whose patches fit, on a T1w and its shifted copy, correlate at 1) | c (c? until 2026-10-23) | none | corrected by default: proper rotations, every sign combination of the axes, the best correlation (2026-10-23) | – |
-| ITK-01 | ITK `Math::Floor` | 0 instead of −1 for tiny negative values | c | none seen | corrected by default (`upstream_defects`, 2026-10-12) | – |
+| ANTS-160 | ResampleImage | Gaussian interpolation given fewer sigmas than dimensions reads the missing ones past the end of its list: exit 0, a result that depends on the heap (usually NaN: zeros in an integer type, with vnl's convergence messages) | a | none | refused in both modes, the message naming ANTS-160 (2026-10-25) | – |
+| ANTS-161 | ResampleImage | Gaussian interpolation with a sigma or alpha of 0 or less (`2 0x0x0`): NaN weights, vnl's "Failed to converge" messages, an image of zeros or NaN, exit 0 | c (rule B, 2026-10-25) | none | refused in both modes (the interpolator rejects them) | switch (`reproduce`: ANTs' NaN image) |
+| ANTS-162 | N4BiasFieldCorrection, ResampleImage, ResampleImageBySpacing | memory and time are sized from the image's physical extent with no check: N4's lattice has `ceil(extent / distance) + order` control points per axis, doubled at each fitting level, and its image is padded to a whole span; the resamplers' output grid is `extent / spacing` voxels per axis. A header in metres or micrometres, or a 4D image's time axis in seconds, makes a tiny input need gigabytes to terabytes, and the program fills the machine until it is stopped | c (rule C for the method, 2026-10-25) | none (fMRIPrep's calls: millimetres, 3D, lattices of a few thousand points) | the method kept (the same lattice, padding and grid; larmorx's N4 needs 12 bytes per control point against ANTs' 17); by default a guard computes the bytes before allocating and stops at once, with the GiB needed and the likely cause, when they exceed the machine's physical memory (or `LARMORX_MEMORY_LIMIT`); `reproduce` attempts it as ANTs does (2026-10-25) | – (a D11 option: a sparse lattice with virtual padding, the same result in memory proportional to the data) |
+| ANTS-163 | ImageMath `Normalize`, `TruncateImageIntensity` | a mask whose size differs from the image's is read at the image's indices, outside the mask's buffer when it is smaller (memory it never wrote) | a | none | refused in both modes, the message naming ANTS-163 (2026-10-25) | – |
+| ITK-01 | ITK `Math::Floor` | 0 instead of −1 for tiny negative values | c | none seen | corrected by default (`upstream_defects`, 2026-10-12); the notice is missing in antsRegistration's displacement-field lookups (random testing, 2026-10-25) | notice (registration) |
 | ITK-02 | ITK reader | a file with more dimensions than `D` loses its direction | c | none seen | corrected by default (`upstream_defects`, 2026-10-12) | – |
 | ITK-03 | ITK relabelling | float labels stop at 2^24 | c | latent | corrected by default (`upstream_defects`, 2026-10-12) | – |
 | ITK-04 | ITK Danielsson map | approximate, order-dependent distances | d | none | reproduces | – (D11) |
@@ -198,6 +204,12 @@ completing 3dTshift, part 2b, then AFNI-26's switch the same day); – = nothing
 | ITK-50 | ITK `KdTreeBasedKmeansEstimator` | the point a k-d tree node is split at is left out of the new centres when the node is divided between candidates | c | every run: sMRIPrep's Atropos call (corrected: 1 to 25 of 0.8 to 2.5 million voxels change label on the five oracle runs) | corrected by default (A6) | – |
 | ITK-51 | ITK `TDistribution` | density and `InverseCDF` NaN above about 340 degrees of freedom (Gamma overflows): Grubbs-Rosner never finds an outlier in an image | c | none | corrected by default (A6) | – |
 | ITK-60 | ITK `LandmarkBasedTransformInitializer` (antsAI `-b`, 2D) | the 2D rigid fit takes −90° whenever the landmarks' summed dot product is within 5e-5 of 0, whatever the sign of the cross product | c | none | corrected by default: `atan2` there too (2026-10-23) | – |
+| ITK-95 | ITK `MovingHistogramMorphologyImageFilter` (ImageMath `GO`, `GC`, `GD`, `GE`) | an image whose first axis has one voxel: at a radius of 0 the moving histogram empties and voxels become ±FLT_MAX instead of their own value; at a larger radius some voxels take values from outside the structuring element | c (rule A, 2026-10-25) | none (fMRIPrep's images have no axis of one voxel) | the true result in both modes (the identity at radius 0) | switch and notice (`reproduce`: ITK's values) |
+| ITK-96 | ITK HDF5 transform writer | a transform without parameters (an IdentityTransform, or the inverse a displacement field without an inverse field gives) makes a chunk of 0 values: HDF5's error (`H5Pset_chunk failed`), the file part-written (ITK-15's writer behaviour, met in antsRegistration's inverse composite) | a | none | antsRegistration writes no inverse composite there and names ITK-96, in both modes; larmorx's HDF5 writer itself stores such a transform uncompressed (ITK-15) | reproduce (the part-written file and HDF5's messages) |
+| ITK-97 | ITK `ImageToImageMetricv4` (antsRegistration's displacement-field stages) | a sampled metric (Random, Regular) with a shrink factor: a sample point (drawn on the fixed image) outside the shrunk virtual region has its derivative added at the region's linear offset of its index, another voxel's parameters (`StorePointDerivativeResult` checks nothing) | c (rule A, 2026-10-25) | none (fMRIPrep's displacement-field stages sample densely) | dropped by default (the point's value still counts); `reproduce` adds it where ITK does; named in both modes with the count | notice in the time-varying stages |
+| ITK-98 | ITK `BSplineInterpolateImageFunction` | the mirror boundary is applied once: on an axis too short for the spline's support (2 voxels for orders 3 and 4, 2 or 3 for order 5) a support index stays outside the axis and the coefficient image is read outside its buffer (memory it never wrote) | a | none (fMRIPrep's images have no such axis) | the mirror repeated by default (the decomposition's whole-sample mirror, the exact continuation); `reproduce` keeps ITK's single mirror with those reads as 0; named in both modes in ResampleImage and antsApplyTransforms (2026-10-25) | notice in antsRegistration's warped outputs and the N-D resampler |
+| ITK-99 | the same as ITK-97 | the same with a linear offset before or past the derivative array: written outside it (memory it does not own) | a | none | dropped in both modes, named | – |
+| ITK-100 | ITK `MattesMutualInformationImageToImageMetricv4` (antsRegistration, antsAI) | the threader's joint histogram images are created at a stage's first evaluation and kept: a later level whose analysis region has one intensity (a bin size of 0) never reaches `ImageBase::SetSpacing`'s exception, which the first level gives; the bin size is used silently, the bin indices NaN or infinite and clamped, the metric 0 | e (rule B, 2026-10-25) | none (fMRIPrep's masks hold more than one intensity) | an error by default, as the first level gives, named; `reproduce` uses it as ITK does (the metric 0), named | – |
 | HDF-01 | HDF5 1.12 `H5T__conv_f_f` | non-native floats converted with state carried from one element to the next | c | none (fMRIPrep's are native floats) | corrected by default (`upstream_defects`, 2026-10-16) | – |
 | PIPE-01 | nipype, niworkflows | `shrink_factor=2` dropped: the BOLD reference's N4 shrinks by 4 | c | every run | not a tool defect | later (decided 2026-10-23: when larmorprepx is built) |
 | PIPE-02 | fMRIPrep `ResampleSeries`, OpenBLAS | volumes corrupted when OpenBLAS runs threads | b | outside fMRIPrep's image | thread-independent | – |
@@ -235,7 +247,7 @@ completing 3dTshift, part 2b, then AFNI-26's switch the same day); – = nothing
 | ANTSPY-03 | ANTsPy 0.6.3 | header direction transposed and rounded | c | none | – | – |
 | AFNI-01 † | 3dTshift, 3dAutomask, 3dUnifize | negative `scl_slope`: output sign-flipped and scaled | c | rare | corrected by default in both implementations (replica 2026-10-12); the clean-room originals of 3dAutomask and 3dUnifize since 2026-10-23 | – |
 | AFNI-02 † | 3dTshift, 3dAutomask, 3dUnifize | float32 with slope and intercept scaled twice | c | rare | corrected by default in both implementations (scales once; replica 2026-10-12); the clean-room originals of 3dAutomask and 3dUnifize since 2026-10-23 | – |
-| AFNI-03 † | 3dTshift | header slice code 2 (sequential decreasing): no shift | c | none | corrected by default in both implementations (replica 2026-10-12) | – |
+| AFNI-03 † | 3dTshift (3dAutomask, 3dUnifize: no slice timing written) | header slice code 2 (sequential decreasing): no shift | c | none | corrected by default in both implementations (replica 2026-10-12); the GPL replicas of 3dAutomask and 3dUnifize name it where the written header changes (2026-10-25), their clean-room originals not yet | – |
 | AFNI-04 † | 3dTshift | can crash for a shift beyond the series on odd slices | a | none | defined (zeros) | – |
 | AFNI-05 † | 3dTshift | `-no_detrend` de-means one voxel of each pair only | c | none | corrected by default in both implementations (replica 2026-10-12) | – |
 | AFNI-06 † | 3dTshift | `-rlt+` restores the intercept; the help says the mean | f | none | AFNI's behaviour, in both implementations and both modes; larmorx's docs say what `-rlt+` does | – (decided 2026-10-12: the help text is the error) |
@@ -262,13 +274,14 @@ completing 3dTshift, part 2b, then AFNI-26's switch the same day); – = nothing
 | AFNI-40 † | 3dAutomask, 3dUnifize | an option's value missing as the last argument (`-peels`, `-nbhrs`, `-clfrac`, `-SI`, `-dilate`, `-erode`; `-T2up`): a crash | a | none | an error (exit 1) in both modes, after AFNI's messages; the clean-room originals of 3dAutomask and 3dUnifize since 2026-10-23 | – |
 | AFNI-41 † | 3dAutomask | `-nbhrs` outside 6..26 silently becomes 17 (the range check never runs); 19..26 act as 18 | e (c? until 2026-10-23) | none | refused by default in both implementations (a fatal error naming AFNI-41; the replica since the small-fixes part, the clean-room original since 2026-10-23); `reproduce` keeps AFNI's behaviour | – (rule B, 2026-10-23) |
 | AFNI-42 † | 3dAutomask | `-NN1`, `-NN2`, `-NN3` also set the peeling threshold to 6, 18, 26, overriding `-nbhrs` (an explicit `-NN2` peels with 18, the default with 17) | c? | none | AFNI's behaviour in both modes | – (decided 2026-10-23, rule C: AFNI's behaviour kept, documented) |
-| AFNI-43 † | 3dAutomask | `-peels 0` peels once; the help says 0 turns the peeling off | c | none | corrected by default (no peel), named when the mask changes; `reproduce` peels once; the clean-room originals of 3dAutomask and 3dUnifize since 2026-10-23 | – |
+| AFNI-43 † | 3dAutomask | `-peels 0` peels once; the help says 0 turns the peeling off | c | none | corrected by default (no peel), named when the mask changes; `reproduce` peels once; the clean-room originals of 3dAutomask and 3dUnifize since 2026-10-23; the GPL replica also names it where only the clustering messages differ (2026-10-25) | – |
 | AFNI-44 † | 3dAutomask | the large-hole filling runs or not depending on the number of slices only (32 to 93 slices: yes; fewer: no) | c? | every BOLD reference (fMRIPrep's) | AFNI's behaviour in both modes | – (decided 2026-10-23, rule C: AFNI's behaviour kept, documented) |
 | AFNI-45 † | 3dUnifize | `-T2up` at or near 100: the percentile read one past the sorted values (memory never written; in AFNI's runs 0, which zeroes the output) | a | none | inverts about the largest value by default, named; `reproduce` fills the read with 0; the clean-room originals of 3dAutomask and 3dUnifize since 2026-10-23 | – |
 | AFNI-46 † | 3dUnifize | `-T2` on a 2D image smaller than 16 × 16: an empty automask dereferenced, a crash | a | none | an error (exit 1) in both modes, after AFNI's messages; the clean-room originals of 3dAutomask and 3dUnifize since 2026-10-23 | – |
 | AFNI-47 † | 3dUnifize | more than a million voxels with an axis of 2 or 3: the half-size scale image comes back smaller than the input and is read past its end (a crash in AFNI's runs, or values from that memory) | a | none | the scale brought back to the input's grid by default, named; `reproduce` reads AFNI's smaller image, 0 past its end; the clean-room originals of 3dAutomask and 3dUnifize since 2026-10-23 | – |
 | AFNI-48 † | 3dUnifize | `-T2` three times: neither inverted back nor edge-clipped (the output stays inverted); the help documents once and twice | e (c? until 2026-10-23) | none | refused by default in both implementations (a fatal error naming AFNI-48; with `-EPI`, which implies `-T2` itself, it runs as in AFNI); `reproduce` keeps AFNI's behaviour | – (rule B, 2026-10-23) |
 | AFNI-49 † | 3dUnifize | the help gives `-clfrac`'s default as 0.1, then says it was raised to 0.2 in 2016; the code uses 0.2 | f | none | 0.2; larmorx's docs say so | – |
+| AFNI-75 † | 3dUnifize | `-EPI` sets the neighbourhood's radius from the voxel size ("-EPI changes -Urad to N voxels"), unbounded: on micrometre voxels N is about 6100 and the ball of neighbours has about 10¹² points; AFNI fills the machine until it is stopped | c (rule C for the method, 2026-10-25) | none (fMRIPrep does not call `-EPI`; its voxels are millimetres) | the method kept; by default the GPL replica computes the ball's memory first and stops at once, naming AFNI-75 with the GiB needed and the likely cause (micrometre units); `reproduce` attempts it as AFNI does (2026-10-25) | the clean-room original (its spec) |
 | FSL-01 † | mcflirt | last volume not initialised from the previous one | c | every run | corrected by default (`upstream_defects`, 2026-10-11); on a synthetic series with large motion mcflirt's last volume converges to a 180° rotation, the corrected one to 0.36 mm from the truth ([mri-hmc-normcorr-count.md](../validation/mri-hmc-normcorr-count.md)) | – |
 | FSL-02 † | mcflirt | normalised correlation effectively uncentred | c | every run | reproduces; the corrected count is opt-in (`normcorr_count="weights"`), measured in [mri-hmc-normcorr-count.md](../validation/mri-hmc-normcorr-count.md): a change about the size of mcflirt's band, no gain against the ground truth | – (decided 2026-10-23, rule C: mcflirt's behaviour kept; the corrected count stays opt-in) |
 | FSL-03 † | mcflirt | in-plane mode pads the first stage's reference twice | c, f | none | corrected by default (`upstream_defects`, 2026-10-11) | – |
@@ -291,16 +304,16 @@ completing 3dTshift, part 2b, then AFNI-26's switch the same day); – = nothing
 | FSL-21 † | mcflirt histogram costs | `-bins` below 8: no bins in the first stage; arbitrary matrices, `corratio` writes before its arrays and aborts | a | none | the replica: refused by default (rule B, 2026-10-24); `reproduce` gives mcflirt's matrices and, for `corratio`, its abort; the clean-room original: to do (the spec) | – |
 | FSL-22 † | `calc_bval` (newimage) | the background value sorts the 2-voxel border with `std::sort` and `operator<`: with NaN voxels not a strict weak ordering (undefined in C++); libstdc++'s introsort leaves a position-dependent order, so the pad value of mcflirt's output (and `affine_transform`'s) is arbitrary | a | none (fMRIPrep's inputs have no NaN) | NaNs sorted last in both modes (defined); `reproduce` reproduces every defined part and warns when NaN border voxels make the original's order undefined (D13, 2026-10-11; libstdc++'s order is not emulated: its code is GPL-3.0, which no FSL-licensed package may include) | – |
 
-**Counts** (243 entries, recounted from the table on 2026-10-25 after the mcflirt replica's NaN fix; an entry with two classes
+**Counts** (254 entries, recounted from the table on 2026-10-25, after the random-testing merge; an entry with two classes
 counts under its first; "c (c? until …)" entries, decided, count as (c)):
 
 | Class | Entries | of them questionable (c?) |
 |---|---|---|
-| (a) crash, undefined behaviour, out of bounds | 41 | |
+| (a) crash, undefined behaviour, out of bounds | 46 | |
 | (b) race, nondeterminism | 11 | |
-| (c) deterministic bug that changes results | 117 | 8 |
+| (c) deterministic bug that changes results | 122 | 8 |
 | (d) imprecision | 20 | |
-| (e) command-line or parsing quirk | 41 | |
+| (e) command-line or parsing quirk | 42 | |
 | (f) documentation or message only | 11 | |
 | explained, not a defect | 2 | |
 
@@ -369,6 +382,20 @@ implementer who never read AFNI's source) correct the same defects by default wi
 switch, and implement the user's decisions of 2026-10-23: AFNI-41 and AFNI-48 refused by default
 (rule B), AFNI-42 and AFNI-44 kept (rule C). The **yes** of AFNI-41 and AFNI-48 is done for the
 originals.
+Differential random testing (2026-10-25; [validation/difftest.md](../validation/difftest.md))
+added ANTS-160 (class (a): refused in both modes), ANTS-161 (rule B: refused, named), ANTS-162
+(rule C for the method, with a guard by default: the case of its first night that filled the
+machine), ANTS-163 (class (a): refused, named), ITK-95 (rule A: the identity), ITK-96 (class (a);
+ITK-15's writer behaviour, met in antsRegistration's inverse composite), ITK-97 (rule A: dropped
+by default, reproduced), ITK-98 and ITK-99 (class (a)), ITK-100 (rule B: an error by default,
+reproduced), AFNI-75 (rule C for the method, with a guard by default, as ANTS-162); it extended
+ANTS-99 to N4BiasFieldCorrection and DenoiseImage, ANTS-14 to DenoiseImage's Rician bias, and
+AFNI-03 to 3dAutomask and 3dUnifize; and it found ITK-01's notice missing in antsRegistration's
+field lookups and ANTS-51's velocity fields not reproduced under a `.mat` name. The larmorx
+mistakes it found were fixed the same day, each with a unit test and, where the original's
+result is defined, a permanent case ([triage](../../validation/difftest/triage.toml)). No entry
+it added is **decide** or **yes**; the gaps it left (switches and notices to add, AFNI-75's guard
+in the clean-room original) are listed below ("Random testing's gaps").
 
 ## D13 gaps: what the next task switches to "correct by default"
 
@@ -453,6 +480,21 @@ switch; the new FSL-20 and FSL-21 refused by default (rule B), each with `reprod
 the clean-room original's corrections of FSL-01, -03, -05 to -10, -13 and -14. **Open:** FSL-20
 and FSL-21 in the clean-room original (a spec writer adds them to `specs/mcflirt.md`, then a
 clean-room implementer).
+
+**Random testing's gaps** (2026-10-25, open; found by differential random testing,
+[validation/difftest.md](../validation/difftest.md); every default is already correct, these are
+switches and notices still to add):
+
+| ID | Defect | Code path | fMRIPrep |
+|---|---|---|---|
+| ANTS-161 | ResampleImage's Gaussian sigma or alpha ≤ 0 (`reproduce`: ANTs' NaN image, vnl's messages) | `larmorx_ants::cli::resample_image` | none |
+| ITK-01 | the notice in antsRegistration's displacement-field lookups (each lookup's floor counts are dropped) | `larmorx_registration::field::FieldXfm` | none |
+| ITK-95 | GO/GC/GD/GE on a first axis of one voxel, at radius 0 and above (`reproduce` and the notice) | `larmorx_image::morphology` (ITK's moving histogram) | none |
+| ITK-96 | antsRegistration's part-written inverse composite when a displacement field has no inverse (`reproduce`) | `larmorx_ants::cli::registration` (the writer, `larmorx_io::itk_hdf5`, already reproduces ITK-15's file) | none |
+| ITK-97 | the time-varying velocity-field stages: not named (their metrics drop such points in both modes; their sampling is clock-seeded, ANTS-82) | `larmorx_registration::time_varying` | none |
+| ITK-98 | the notice in antsRegistration's warped outputs and the N-D resampler (both use the repeated mirror) | `larmorx_registration::resample` | none |
+| AFNI-75 | the clean-room original of 3dUnifize: the same guard (its spec, then its agent) | `crates/larmorx-afni` (3dUnifize) | none |
+| ANTS-51 | a velocity field written under a `.mat` name in `reproduce` (ANTs writes the velocity lattice) | `larmorx_ants::cli::registration` (`write_one_transform`) | none |
 
 **Main package, fMRIPrep's libraries and SciPy** (done 2026-10-11):
 
@@ -765,6 +807,10 @@ ANTs v2.6.5 and ITK v5.4.5 unless stated. Details in [ants-cli.md](ants-cli.md),
   started above both `k` and `t` (ITK's start is too low for such `t`, ITK-11); elsewhere
   ITK's kernel bit for bit (`larmorx_image::discrete_gaussian::gaussian_kernel_corrected`,
   `DiscreteGaussianOptions::upstream_defects`).
+  DenoiseImage's Rician bias smoothing (variance 2 mm²) meets it on micrometre voxels; until
+  2026-10-25 larmorx used the corrected kernel there in both modes. Now `reproduce` keeps ITK's
+  NaN kernel (the bias left unsmoothed, as in ANTs) and both modes name ANTS-14 (random testing,
+  `ants-denoise:20261025:41`).
 - **D13 / gap:** done. No gap.
 
 ### ANTS-15 A wrong number of sigmas is not an error — (e)
@@ -1258,7 +1304,13 @@ ANTs v2.6.5 and ITK v5.4.5 unless stated. Details in [ants-cli.md](ants-cli.md),
 - **larmorx:** corrected by default (A4 part 2): every transform a stage computed is written, at
   its position, named after that stage; `reproduce` writes ANTs' files up to the point where
   ANTs reads past the end of its list, then stops with an error.
-- **D13 / gap:** class (a): the crash is not reproduced. No gap.
+- **D13 / gap:** class (a): the crash is not reproduced. Gap (random testing, 2026-10-25,
+  `ants-registration:20261025:979` and `:1353`): where the misnaming puts a stage's field under a
+  `.mat` or `.txt` name, ANTs' `WriteTransform` (`itkantsReadWriteTransform.h:146-170`) writes the
+  transform object itself; larmorx now writes a Gaussian or B-spline smoothing displacement field
+  with its own class (bit-identical), but a time-varying (or exponential) velocity field's own
+  parameters (the velocity lattice, and its fixed parameters) are not reproduced: larmorx writes
+  the integrated displacement field there.
 
 ### ANTS-52 antsAI's translation grid ignored by some transforms — (c)
 - **What:** for each translation of `-g [step,AxBxC]`, `antsAI` builds the start point from
@@ -1831,6 +1883,11 @@ ANTs v2.6.5 and ITK v5.4.5 unless stated. Details in [ants-cli.md](ants-cli.md),
 - **What:** without `-d`, `Atropos.cxx:1710-1712` asks a new image IO for the number of
   dimensions before it has read the file's header; NIfTI's IO answers its default, 3. A 2D or
   4D image is then read as 3D.
+- **Also** N4BiasFieldCorrection and DenoiseImage (`N4.cxx:917-919`, `DenoiseImage.cxx:647-649`):
+  the same call before the header is read. Found by random testing (2026-10-25,
+  `ants-denoise:20261025:188` and `:254`: a 2D and a 4D image without `-d`, written by ANTs as
+  3D); until then larmorx used the file's dimension in both modes with no notice. Now the file's
+  dimension by default, 3 in `reproduce`, ANTS-99 named in both modes.
 - **Evidence:** read; validated (`no-dimension`).
 - **fMRIPrep:** none (nipype passes `--image-dimensionality`).
 - **larmorx:** corrected by default: the first image's dimension, with a notice (A6).
@@ -2032,6 +2089,90 @@ ANTs v2.6.5 and ITK v5.4.5 unless stated. Details in [ants-cli.md](ants-cli.md),
   3D rotated phantom 0.50 mm off (ANTs 34 mm), the 2D one 0.85 mm off (ANTs 6.2 mm), the rotated
   T1w 1.08 mm off (ANTs: no landmark).
 - **D13 / gap:** done. No gap.
+
+### ANTS-160 ResampleImage reads missing Gaussian sigmas past their list — (a)
+- **What:** `ResampleImage d in out size 1 2 <sigmas>` copies `ImageDimension` sigmas from
+  `ConvertVector(argv[7])` (`ResampleImage.cxx:178-182`) whatever its length: with fewer values
+  than dimensions it reads past the end of the vector. With the heap's contents (in practice
+  NaN or 0) the Gaussian weights are NaN, vnl prints "vnl_gamma_cont_frac : Failed to converge
+  in 100 steps" for each evaluation, and ANTs writes an image of zeros (an integer type) or NaN,
+  exit 0.
+- **Evidence:** read; verified (random testing, `ants-resample-image:trial1:5`; `2 1` and
+  `2 1x1` in 3D; `validation/investigations/difftest/probe_resample_sigma.py`).
+- **fMRIPrep:** none (no Gaussian `ResampleImage`).
+- **larmorx:** refused in both modes, the message naming ANTS-160 (2026-10-25); the permanent
+  case `difftest/gaussian-sigmas-short` is an expected divergence.
+- **D13 / gap:** none (class (a): never reproduced; its ANTs runs are never cached).
+
+### ANTS-161 ResampleImage's Gaussian interpolation with a zero or negative sigma — (c)
+- **What:** a sigma or alpha of 0 or less (`… 2 0x0x0`, `… 2 1x1x1 0`) makes ITK's
+  `GaussianInterpolateImageFunction` divide by zero: infinite scaling, NaN error-function
+  weights (vnl prints its convergence messages for each), an image of NaN (zeros once cast to an
+  integer type), exit 0. A negative sigma also becomes the pixel type through ANTS-30 (`-1`:
+  "Unsupported pixel type").
+- **Evidence:** verified (`probe_resample_sigma.py`).
+- **fMRIPrep:** none.
+- **larmorx:** refused in both modes ("Gaussian sigma and alpha must be positive"), as the Python
+  API always did. Decided by rule B (the input makes no sense, ANTs silently writes NaN) on
+  2026-10-25.
+- **D13 / gap:** the switch: `reproduce` should give ANTs' NaN image (and vnl's messages).
+
+### ANTS-162 Lattices, paddings and grids sized from the physical extent, unchecked — (c)
+- **What:** with `-b [distance, order]`, N4BiasFieldCorrection (`N4BiasFieldCorrection.cxx:
+  253-280`) gives each axis `ceil((n - 1) spacing / distance)` spans and pads the image by
+  `(spans distance - domain) / spacing + 0.5` voxels so the domain is a whole number of spans;
+  ITK's N4 filter fits a lattice of `spans 2^level + order` control points per axis at each
+  fitting level (one per `-c` entry, 4 by default). ResampleImage and ResampleImageBySpacing
+  make an output grid of `extent / spacing` voxels per axis. Nothing bounds any of them. A
+  distance far below the extent (a header in metres: the extent 1000 times what it looks)
+  gives billions of control points; a distance far above an axis's extent pads that axis by up
+  to `distance / spacing` voxels (a 4D image's time axis in seconds, a header in micrometres);
+  millimetre output voxels for an image in metres give billions of voxels. The allocation
+  succeeds (Linux overcommits) and the program fills the machine while it writes it, until the
+  kernel stops it.
+- **Evidence:** measured (differential random testing, 2026-10-25). `ants-n4:20261025:24`
+  (`-d 4 -s 3 -b [20,3]`, a 14×28×23×7 image of 4×1×1 m voxels, TR 3 s: 52×27×22 m and 18 s)
+  grew to 28 GB resident in four minutes on the first night and took the machine down; random
+  testing now holds every case in a memory box. `validation/investigations/difftest/
+  n4_memory.py` on smaller variants of its input (each run in a cgroup leaf of its own, peak from
+  `memory.peak`): ANTs needs 17 bytes per control point of the largest level and 25 per padded
+  voxel, larmorx 12 and 21; 3.3·10⁻⁷ s (ANTs) and 2.6·10⁻⁷ s (larmorx) per control point and
+  iteration; the replica bit-identical to ANTs in every variant both finished
+  (`docs/findings/ants-n4.md`, "Memory"). The case itself needs 246 GiB at its first level and
+  344 TB at its fourth (larmorx 174 GiB and 243 TB), about 72 hours of computation at the first
+  level: beyond any machine, like `:56` (2.6 TB) and `:108` (5 TB). ResampleImageBySpacing
+  (`scaled_memory.py`): 7.3 bytes per output voxel for ANTs, 12.5 to 16 for larmorx before the
+  memory work of the same day, which brought every resampler call measured to ANTs' peak plus
+  the interpreter's few MiB ([ants-image-programs.md](ants-image-programs.md), "Memory against
+  ANTs").
+- **fMRIPrep:** none.
+- **larmorx:** the method is kept (rule C: the memory is the work asked for; nothing in the
+  result is wrong): the same lattice, padding and grid, the replica bit-identical. By default
+  (D13: a crash is never reproduced by default, and exhausting the machine is one) a guard
+  computes the bytes larmorx will need before it allocates (`larmorx_core::alloc::check_plan`:
+  the largest lattice and the padded image for N4, the output grid for the resamplers) and,
+  when they exceed the machine's physical memory or `LARMORX_MEMORY_LIMIT`, stops at once with
+  the GiB needed and the likely cause ("the image's voxels are 4000 x 1000 x 1000 x 3 mm, the
+  fourth axis in s: it spans 52000 x 27000 x 22000 x 18 against a spline distance of 20 (a
+  header whose units are metres or micrometres makes an image 1000 times larger or smaller than
+  it looks)"), naming ANTS-162. Every case that fits is unchanged, bit for bit. `reproduce`
+  attempts it as ANTs does. Permanent cases `difftest/lattice-beyond-any-machine-4d-metres`,
+  `-3d-metres` and `-order-5` (n4:24, :56, :108) expect the guard's error; neither ANTs nor
+  larmorx's `reproduce` runs on them. Decided 2026-10-25 (orchestrator, by the rules).
+- **D13 / gap:** none. Follow-up (D11): a sparse lattice with the padding kept virtual (a control
+  point without data in its support stays 0, and so do its refinements) would give the same
+  result in memory proportional to the data.
+
+### ANTS-163 A mask of another size is read at the image's indices — (a)
+- **What:** ImageMath's `Normalize` with a mask and `TruncateImageIntensity` with a mask read the
+  mask with `GetPixel` at each image voxel's index; a mask smaller than the image (a 3D mask for
+  a 4D image of more than one volume: `ImageMath 4 out Normalize a.nii mask.nii`) is read
+  outside its buffer.
+- **Evidence:** read; verified (random testing, `ants-image-math:20261025:14`: ANTs exit 0 on a
+  1×1×1×2 image with a 1×1×1 mask).
+- **fMRIPrep:** none.
+- **larmorx:** refused in both modes (as before), the message now naming ANTS-163 (2026-10-25).
+- **D13 / gap:** none (class (a)).
 
 ### ITK-18 The joint-histogram MI swaps its marginals — (c)
 - **What:** `JointHistogramMutualInformationImageToImageMetricv4::InitializeForIteration` sums
@@ -2291,7 +2432,10 @@ ANTs v2.6.5 and ITK v5.4.5 unless stated. Details in [ants-cli.md](ants-cli.md),
   differing floor is computed again with the other one, and the warning counts the voxels
   whose stored value changed. `reproduce` takes ITK's floor
   (`larmorx_image::grid::{vnl_floor_f32, itk_floor_f64}`, `ItkReal::itk_floor`).
-- **D13 / gap:** done. No gap.
+- **D13 / gap:** done, except the notice in antsRegistration's displacement-field lookups
+  (`larmorx_registration::field::FieldXfm`, each lookup with a floor of its own whose counts are
+  dropped): random testing found a field value one float ulp from ANTs' by default, with no
+  notice (`ants-registration:trial2:35`; `reproduce` exact).
 
 ### ITK-02 Extra dimensions are read with an identity direction — (c)
 - **What:** a file with more dimensions than the program's `D` is read as its first
@@ -2654,6 +2798,123 @@ ANTs v2.6.5 and ITK v5.4.5 unless stated. Details in [ants-cli.md](ants-cli.md),
 - **larmorx:** corrected by default (2026-10-23): `atan2` there too, a notice where the angle
   differs; `reproduce` keeps −π/2.
 - **D13 / gap:** done. No gap.
+
+### ITK-95 Grayscale morphology on a first axis of one voxel — (c)
+- **What:** ImageMath's `GO`, `GC`, `GD` and `GE` with a radius of 0 use a one-voxel
+  `BinaryBallStructuringElement`, which `GrayscaleDilateImageFilter` and its siblings run with
+  `MovingHistogramImageFilter`. On an image whose first axis has one voxel (1×3×1, 1×3×4, 1×4 in
+  2D), the line-by-line histogram moves empty some voxels' histograms, which then give the
+  boundary value: ±FLT_MAX (3.4e38) instead of the voxel's own value. A radius of 0 is the
+  identity on every other image. The same filters on such an image with a radius above 0 give
+  values from outside the structuring element.
+- **Evidence:** verified (random testing, `ants-image-math:trial1:47`;
+  `validation/investigations/difftest/morphology_radius0.py`: which voxels, per shape and
+  operation). Above radius 0: `ants-image-math:20261025:1541` (`ImageMath 4 out GD a 3`, a 4D
+  image of 1x7x4x6 voxels): ANTs writes 99 at two voxels where the maximum over ITK's ball of
+  radius 3 (the offsets within 3.5 voxels) is 97, larmorx's value; computed by brute force over
+  the ball.
+- **fMRIPrep:** none (its radii are 1 and more, on images with no axis of one voxel).
+- **larmorx:** the true result in both modes (the identity at radius 0; larmorx computes the
+  ball's extremum directly, not with ITK's moving histogram). Decided by rule A (the input makes
+  sense, the result is wrong) on 2026-10-25.
+- **D13 / gap:** the switch and the notice: `reproduce` should give ITK's values (its
+  moving-histogram order), and the default should name ITK-95 where they differ.
+
+### ITK-96 The HDF5 writer fails on a transform without parameters — (a)
+- **What:** ITK's `HDF5TransformIOTemplate::Write` stores each transform's parameters as a
+  chunked, compressed dataset; a transform with no parameters (an `IdentityTransform`, or the
+  inverse that a displacement field without an inverse field gives in antsRegistration's
+  inverse composite) asks for a chunk of 0 values: `H5Pset_chunk` fails ("all chunk dimensions
+  must be positive"), ITK throws, and the file stays part-written (`itkHDF5TransformIO.cxx:462`).
+  It is ITK-15's writer behaviour, met where antsRegistration writes its inverse composite.
+- **Evidence:** verified (random testing, `itk-transforms:trial2`, `ants-registration:20261025:375`:
+  ANTs writes `rInverseComposite.h5` part-written and 14 lines of HDF5 errors).
+- **fMRIPrep:** none.
+- **larmorx:** antsRegistration writes no inverse composite there and names ITK-96, in both
+  modes (`larmorx_ants::cli::registration`); larmorx's HDF5 writer itself stores a transform
+  without parameters uncompressed by default and gives ITK's error and part-written file in
+  `reproduce` (ITK-15, `larmorx_io::itk_hdf5`).
+- **D13 / gap:** the switch: antsRegistration's `reproduce` should write the part-written
+  inverse composite and HDF5's messages.
+
+### ITK-97 A sampled metric's derivative outside the virtual region is aliased — (c)
+- **What:** with a sampling strategy and a shrink factor, ANTs draws the sample points on the
+  fixed image while the stage's virtual domain is the shrunk one; a point near the edge can have
+  a virtual index outside the shrunk region. For a transform of local support (the
+  displacement-field stages), `ImageToImageMetricv4GetValueAndDerivativeThreaderBase::
+  StorePointDerivativeResult` (line 309) adds the point's derivative at
+  `ComputeParameterOffsetFromVirtualIndex(index)`, `ComputeOffset(index) · D` without a bounds
+  check (`itkObjectToObjectMetric.hxx:346-352`): one past the end of a row is the next row's first
+  voxel, and so on (Mattes stores the point's joint-PDF index there in the same way).
+- **Evidence:** read; verified (random testing, 2026-10-25: `ants-registration:20261025:263`,
+  `:353`, `:387`, `:437`, `:564`: the metric differs from the fourth iteration in the 12th digit,
+  identical with `None` sampling or without the shrink factor; reproduced, all five are now
+  bit-identical; `validation/investigations/difftest/bisect_registration.py`).
+- **fMRIPrep:** none.
+- **larmorx:** by default the derivative of such a point is dropped (its value still counts);
+  `reproduce` adds it where ITK does (`larmorx_registration::metric::OutsideDerivatives`); both
+  modes name ITK-97 with the number of derivatives (points times evaluations). Decided by rule A
+  (the input makes sense; the derivative lands on a voxel it does not belong to) on 2026-10-25.
+- **D13 / gap:** the linear, displacement-field, SyN and B-spline SyN stages alias in `reproduce`
+  and name it in both modes; the time-varying velocity-field stages drop such points in both modes
+  and do not name it (their sampling is clock-seeded, ANTS-82, so `reproduce` is not comparable).
+
+### ITK-98 B-spline interpolation reads outside the coefficients on a short axis — (a)
+- **What:** `BSplineInterpolateImageFunction::ApplyMirrorBoundaryConditions`
+  (`itkBSplineInterpolateImageFunction.hxx:462-495`) mirrors each support index once at each end
+  of an axis (`i < 0: -i`; `i >= end: 2 end - i`). On an axis of 2 voxels (orders 3 and 4) or 2
+  or 3 voxels (order 5) the points near the end get an index of -1 (or more) after the mirror,
+  and `m_Coefficients->GetPixel` reads outside the coefficient image's buffer: the result
+  depends on memory ITK never wrote. Orders 0 to 2 are never affected; an axis of one voxel is
+  handled.
+- **Evidence:** read; verified (random testing, `ants-resample-image:20261025:4` and `:14`,
+  where larmorx panicked on the index -1: `ResampleImage 3 a out 19x11x8 1 4 5` on a 3×2×2 image,
+  `ResampleImage 3 a out 2.5 0 4` on 2×3×1).
+- **fMRIPrep:** none.
+- **larmorx:** by default the mirror is repeated until the index lies inside the axis: the
+  decomposition (`BSplineDecompositionImageFilter`) assumes the whole-sample mirror of period
+  `2 (L - 1)`, so this is the exact continuation of the interpolant (symmetric about every
+  sample, as the unit test `a_short_axis_is_mirrored_again` checks). `reproduce` keeps ITK's
+  single mirror, everything ITK reads inside the image reproduced, and takes the reads outside it
+  as 0. Both modes name ITK-98 with the number of output voxels concerned
+  (`larmorx_interp::BSplineMirror`; ResampleImage and antsApplyTransforms). Class (a), never
+  reproduced by default; its ANTs runs are never cached.
+- **D13 / gap:** the notice in antsRegistration's warped outputs and the N-D resampler
+  (`larmorx_registration::resample`), which use the repeated mirror without naming it.
+
+### ITK-99 A sampled metric writes a derivative past its array — (a)
+- **What:** as ITK-97, with a linear offset before the array's start or past its end (an index
+  before the first voxel, or past the last plane): ITK writes outside the per-thread derivative
+  array.
+- **Evidence:** read (no crash seen in the random cases).
+- **fMRIPrep:** none.
+- **larmorx:** dropped in both modes, named ITK-99 (class (a): memory it does not own; its ANTs
+  runs are never cached).
+- **D13 / gap:** none.
+
+### ITK-100 A later level's zero Mattes bin size is used silently — (e)
+- **What:** `MattesMutualInformationImageToImageMetricv4GetValueAndDerivativeThreader::
+  BeforeThreadedExecution` (`...Threader.hxx:96-124`) creates its joint histogram images, with
+  the two bin sizes as their spacing, only when none exist with the same number of work units
+  and bins; the metric object, and so the images, last the whole stage. At the first level a
+  bin size of 0 (an analysis region of one intensity: the sampled points, or the masked or whole
+  fixed image) makes `ImageBase::SetSpacing` throw (`itkImageBase.hxx:77`); at a later level
+  `Initialize` computes the new bin sizes (`itkMattesMutualInformationImageToImageMetricv4.hxx:
+  254-261`) and the images are only refilled, so a bin size of 0 is used: every fixed value
+  divides by 0, the bin indices are NaN or infinite and clamp to the histogram's edges, and the
+  metric is 0 (ANTs then stops the level after its convergence window).
+- **Evidence:** read; verified (random testing, 2026-10-25: `ants-registration:20261025:884`, a
+  BSpline stage with MI, `Regular` sampling or none, a sparse mask where the full-resolution
+  fixed image has one intensity: ANTs' second level prints a metric of `-0` and exits 0; larmorx
+  threw the first level's exception at the second level in both modes; now bit-identical in
+  `reproduce`).
+- **fMRIPrep:** none (its masks hold the brain's intensities at every level).
+- **larmorx:** by default the first level's exception at any level (rule B: the input makes no
+  sense for mutual information, and ITK silently computes an arbitrary 0 where its first level
+  refuses), with a notice naming ITK-100; `reproduce` uses the bin size as ITK does, named
+  (`larmorx_registration::metric::mattes::check_joint_pdf_spacing`; unit test
+  `a_later_level_zero_bin_size_is_used_as_itk_uses_it`). Decided by rule B on 2026-10-25.
+- **D13 / gap:** none.
 
 ## fMRIPrep and its libraries
 
@@ -3113,7 +3374,9 @@ fMRIPrep 25.2.6 (the oracle runs) or its source at `21a490fb`, niworkflows 1.15.
 - **What:** for `slice_code = 2` (sequential decreasing) `THD_open_nifti` loops
   `for( kk=slice_end ; kk >= slice_end ; kk-- )` (`thd_niftiread.c:653`): only `slice_end` is
   visited, every offset stays 0, and 3dTshift warns "input has only 1 time offset" and shifts
-  nothing.
+  nothing. 3dAutomask and 3dUnifize write no slice timing either (a dataset's slice fields are
+  zero); the GPL replicas name AFNI-03 where that changes the written header (random testing,
+  trial runs of 2026-10-25).
 - **Evidence:** read; validated (`header-timing/code2-seq-dec`); spec §3.2 (observed).
 - **fMRIPrep:** none (it passes `-tpattern`).
 - **larmorx:** both implementations visit the slices from `slice_end` down to
@@ -3646,7 +3909,9 @@ fMRIPrep 25.2.6 (the oracle runs) or its source at `21a490fb`, niworkflows 1.15.
   BOLD reference of ds005040; parity case `defects/peels-0`; the site's worked example).
 - **fMRIPrep:** none (it never passes `-peels`).
 - **larmorx:** corrected by default: no peeling, named when the mask changes; `reproduce`
-  peels once (`larmorx_gpl_afni::mask::MaskSettings::set_peelcounts`).
+  peels once (`larmorx_gpl_afni::mask::MaskSettings::set_peelcounts`). The GPL replica of
+  3dAutomask also names AFNI-43 where the mask is the same but the clustering messages differ
+  (random testing, `afni-automask:20261025:118`).
 - **D13 / gap:** done.
 
 ### AFNI-44 † The large-hole filling depends on the number of slices — (c?)
@@ -3722,6 +3987,34 @@ fMRIPrep 25.2.6 (the oracle runs) or its source at `21a490fb`, niworkflows 1.15.
 - **fMRIPrep:** none (it passes 0.2).
 - **larmorx:** 0.2; `docs/api/afni-unifize.md` says so.
 - **D13 / gap:** not D13.
+
+### AFNI-75 † `-EPI`'s ball of neighbours grows without bound on tiny voxels — (c)
+- **What:** with `-EPI`, 3dUnifize sets the radius of its local-percentile ball to
+  `18.3 / cbrt(|dx dy dz|)` voxels, at least 4.14 (`3dUnifize.c:1060-1068`, voxel sizes in mm;
+  `-Urad` and `-rbt` are overridden), with no upper bound; `mri_local_percmean` builds the whole
+  ball with `MCW_spheremask(1,1,1,radius)` before using it (`:300-302`, `:425-427`;
+  `edt_buildmask.c`), looping over a cube of `(2 radius + 1)³` offsets. A header in micrometres
+  (`xyzt_units` 3) makes the voxels 1000 times smaller than they look: a radius of about 6100
+  voxels, about 10¹² points of 10 bytes, whatever the image's size.
+- **Evidence:** measured (differential random testing, 2026-10-25): `afni-unifize:20261025:89`,
+  `:118` and `:226` (4D inputs of 25×32×23×6, 15×12×28×4 and 10×30×27×5 voxels in micrometres,
+  with `-EPI`): AFNI exceeded the case's 3 GiB limit in the replica's comparison and ran past
+  600 s in the original's; the ball needs about 10¹³ bytes (beyond any machine). The replica's
+  `sphere(radius)` is AFNI's loop, so its `reproduce` does the same.
+- **fMRIPrep:** none.
+- **larmorx:** the method is kept (rule C: the radius is AFNI's design for EPI voxels; the
+  memory is the work asked for). By default the GPL replica computes the ball's bytes before it
+  is built (`larmorx_gpl_afni::unifize::ball_bytes`: `4/3 π r³` points, 24 bytes each while the
+  offsets grow, 4 more per worker's buffer) and, when they exceed the machine's physical memory or
+  `LARMORX_MEMORY_LIMIT`, stops at once with the GiB needed, the radius and the voxel sizes, and
+  the likely cause ("a header whose units are micrometres ..."), naming AFNI-75; every case that
+  fits is unchanged, bit for bit. `reproduce` attempts it as AFNI does. Permanent case
+  `difftest/epi-ball-beyond-any-machine` (`afni-unifize:20261025:89`) expects the guard's error;
+  neither AFNI nor `reproduce` runs on it. Decided 2026-10-25 by the rules, as ANTS-162 (the
+  orchestrator's decision of that day: a guard wherever a size grows the same way).
+- **D13 / gap:** the clean-room original of 3dUnifize (`crates/larmorx-afni`) has no such guard:
+  its spec needs the black-box behaviour ("-EPI changes -Urad to N voxels", N growing as the
+  voxels shrink; on micrometre voxels AFNI exhausts memory) and the guard, then its agent.
 
 ### AFNI-01 †, extended to 3dAutomask and 3dUnifize
 - **What:** 3dAutomask averages a series' sub-bricks through `THD_extract_array`

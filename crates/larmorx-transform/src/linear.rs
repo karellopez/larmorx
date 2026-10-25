@@ -24,6 +24,15 @@ pub enum LinearKind {
     VersorRigid3D,
     /// `Similarity3DTransform`: versor, 3 translations and an isotropic scale.
     Similarity3D,
+    /// `QuaternionRigidTransform`: a quaternion (x, y, z, w; not normalised) and 3
+    /// translations.
+    QuaternionRigid,
+    /// `ScaleVersor3DTransform`: versor, 3 translations and 3 scales.
+    ScaleVersor3D,
+    /// `ScaleSkewVersor3DTransform`: versor, 3 translations, 3 scales and 6 skews.
+    ScaleSkewVersor3D,
+    /// `ScaleTransform`: 3 scales about the centre (its fixed parameters).
+    Scale,
     /// `TranslationTransform`: 3 translations.
     Translation,
     /// `IdentityTransform`: no parameters.
@@ -41,6 +50,10 @@ impl LinearKind {
             "Euler3DTransform" => LinearKind::Euler3D,
             "VersorRigid3DTransform" => LinearKind::VersorRigid3D,
             "Similarity3DTransform" => LinearKind::Similarity3D,
+            "QuaternionRigidTransform" => LinearKind::QuaternionRigid,
+            "ScaleVersor3DTransform" => LinearKind::ScaleVersor3D,
+            "ScaleSkewVersor3DTransform" => LinearKind::ScaleSkewVersor3D,
+            "ScaleTransform" => LinearKind::Scale,
             "TranslationTransform" => LinearKind::Translation,
             "IdentityTransform" => LinearKind::Identity,
             _ => return None,
@@ -51,8 +64,10 @@ impl LinearKind {
         match self {
             LinearKind::Affine => 12,
             LinearKind::Euler3D | LinearKind::VersorRigid3D => 6,
-            LinearKind::Similarity3D => 7,
-            LinearKind::Translation => 3,
+            LinearKind::Similarity3D | LinearKind::QuaternionRigid => 7,
+            LinearKind::ScaleVersor3D => 9,
+            LinearKind::ScaleSkewVersor3D => 15,
+            LinearKind::Translation | LinearKind::Scale => 3,
             LinearKind::Identity => 0,
         }
     }
@@ -80,6 +95,9 @@ pub struct MatrixOffset<R> {
     /// `TranslationTransform`: it maps `x + offset`, with no matrix product, and inverts to
     /// `−offset`.
     pub translation_only: bool,
+    /// `ScaleTransform`'s centre: it maps `(x − c)·s + c` axis by axis (its own
+    /// `TransformPoint`, not `M·x + offset`), `s` the matrix's diagonal.
+    pub scale_about: Option<[R; 3]>,
 }
 
 /// The matrix of a versor (`Versor<R>::GetMatrix`): each product of two components in `R`,
@@ -164,7 +182,11 @@ pub(crate) fn versor<R: ItkReal>(
             true,
         ));
     }
-    let cos = R::from_f64((1.0 - sin.to_f64() * sin.to_f64()).sqrt());
+    // `std::sqrt(1.0 - sinangle2 * sinangle2)` with `sinangle2` a `ValueType`: the square in
+    // R (in float for a float versor; differential random testing, 2026-10-25: larmorx squared
+    // in double, and a float VersorRigid3D, Similarity3D or Scale(Skew)Versor3D transform could
+    // map points an ulp away from ANTs' `--float 1`).
+    let cos = R::from_f64((1.0 - (sin * sin).to_f64()).sqrt());
     Ok(((v[0], v[1], v[2], cos), false))
 }
 
@@ -265,6 +287,57 @@ impl<R: ItkReal> MatrixOffset<R> {
                 let r = versor_matrix(x, y, z, w);
                 (r.map(|row| row.map(|v| v * p[6])), [p[3], p[4], p[5]])
             }
+            LinearKind::QuaternionRigid => {
+                // QuaternionRigidTransform::ComputeMatrix: vnl_quaternion's
+                // rotation_matrix_transpose of the conjugate (x, y, z negated), in R, the
+                // quaternion as stored (never normalised).
+                let (x, y, z, r) = (-p[0], -p[1], -p[2], p[3]);
+                let (x2, xy, rx) = (x * x, x * y, r * x);
+                let (y2, yz, ry) = (y * y, y * z, r * y);
+                let (z2, zx, rz) = (z * z, z * x, r * z);
+                let r2 = r * r;
+                let two = R::from_f64(2.0);
+                (
+                    [
+                        [r2 + x2 - y2 - z2, two * (xy + rz), two * (zx - ry)],
+                        [two * (xy - rz), r2 - x2 + y2 - z2, two * (yz + rx)],
+                        [two * (zx + ry), two * (yz - rx), r2 - x2 - y2 + z2],
+                    ],
+                    [p[4], p[5], p[6]],
+                )
+            }
+            LinearKind::ScaleVersor3D | LinearKind::ScaleSkewVersor3D => {
+                // Scale(Skew)Versor3DTransform::SetParameters: the versor as Similarity3D's
+                // (the squares summed in double), then ComputeMatrix: the versor's matrix with
+                // `scale - 1.0` added to the diagonal (in double, stored as R) and, with skews,
+                // the skews added off the diagonal (in R).
+                let mut norm = (p[0] * p[0]).to_f64();
+                norm += (p[1] * p[1]).to_f64();
+                norm += (p[2] * p[2]).to_f64();
+                if norm > 0.0 {
+                    norm = norm.sqrt();
+                }
+                let ((x, y, z, w), c) = versor([p[0], p[1], p[2]], norm, mode)?;
+                corrected |= c;
+                let mut m = versor_matrix(x, y, z, w);
+                for i in 0..3 {
+                    m[i][i] = R::from_f64(m[i][i].to_f64() + (p[6 + i].to_f64() - 1.0));
+                }
+                if kind == LinearKind::ScaleSkewVersor3D {
+                    m[0][1] = m[0][1] + p[9];
+                    m[0][2] = m[0][2] + p[10];
+                    m[1][0] = m[1][0] + p[11];
+                    m[1][2] = m[1][2] + p[12];
+                    m[2][0] = m[2][0] + p[13];
+                    m[2][1] = m[2][1] + p[14];
+                }
+                (m, [p[3], p[4], p[5]])
+            }
+            // ScaleTransform::ComputeMatrix: the identity with the scales on the diagonal.
+            LinearKind::Scale => (
+                [[p[0], zero, zero], [zero, p[1], zero], [zero, zero, p[2]]],
+                [zero; 3],
+            ),
             LinearKind::Translation => (identity, [p[0], p[1], p[2]]),
             LinearKind::Identity => (identity, [zero; 3]),
         };
@@ -281,6 +354,7 @@ impl<R: ItkReal> MatrixOffset<R> {
                 matrix,
                 offset,
                 translation_only: kind == LinearKind::Translation,
+                scale_about: (kind == LinearKind::Scale).then_some(center),
             },
             corrected,
         ))
@@ -292,6 +366,9 @@ impl<R: ItkReal> MatrixOffset<R> {
     pub fn transform_point(&self, p: [R; 3]) -> [R; 3] {
         if self.translation_only {
             return std::array::from_fn(|i| p[i] + self.offset[i]);
+        }
+        if let Some(c) = self.scale_about {
+            return std::array::from_fn(|i| (p[i] - c[i]) * self.matrix[i][i] + c[i]);
         }
         let m = &self.matrix;
         std::array::from_fn(|i| {
@@ -313,6 +390,27 @@ impl<R: ItkReal> MatrixOffset<R> {
                 matrix: self.matrix,
                 offset: self.offset.map(|o| -o),
                 translation_only: true,
+                scale_about: None,
+            });
+        }
+        if let Some(c) = self.scale_about {
+            // ScaleTransform::GetInverse: a ScaleTransform of the same centre with the scales
+            // 1/s (in R), then ComputeMatrix and ComputeOffset.
+            let (zero, one) = (R::ZERO, R::ONE);
+            let s: [R; 3] = std::array::from_fn(|i| one / self.matrix[i][i]);
+            let matrix = [[s[0], zero, zero], [zero, s[1], zero], [zero, zero, s[2]]];
+            let offset = std::array::from_fn(|i| {
+                let mut o = zero + c[i];
+                for (&m, &cj) in matrix[i].iter().zip(&c) {
+                    o = o - m * cj;
+                }
+                o
+            });
+            return Some(MatrixOffset {
+                matrix,
+                offset,
+                translation_only: false,
+                scale_about: Some(c),
             });
         }
         let inv = R::itk_inverse3(&self.matrix)?;
@@ -327,6 +425,7 @@ impl<R: ItkReal> MatrixOffset<R> {
             matrix: inv,
             offset,
             translation_only: false,
+            scale_about: None,
         })
     }
 }
@@ -414,6 +513,9 @@ impl LinearTransform {
             matrix: self.matrix,
             offset: self.offset,
             translation_only: self.kind == LinearKind::Translation,
+            scale_about: (self.kind == LinearKind::Scale).then(|| {
+                std::array::from_fn(|i| self.fixed_parameters.get(i).copied().unwrap_or(0.0))
+            }),
         }
     }
 
@@ -493,6 +595,92 @@ mod tests {
             [3.0, -2.0, 7.0],
             1e-12
         ));
+    }
+
+    /// `Versor<float>::Set`: the cosine from the sine squared in float (`itk-transforms:trial3:85`,
+    /// where the square in double moved the versor's w by an ulp).
+    #[test]
+    fn a_float_versor_squares_its_sine_in_float() {
+        let p = [-0.1490712f32, 0.2981424, 0.298142];
+        let norm = (p[0] * p[0] + p[1] * p[1] + p[2] * p[2]).sqrt() as f64;
+        let ((_, _, _, w), _) = versor(p, norm, UpstreamDefects::Fix).unwrap();
+        let squared: f64 = p.iter().map(|&c| f64::from(c) * f64::from(c)).sum();
+        let sin = squared.sqrt() as f32;
+        assert_eq!(w, (1.0 - f64::from(sin * sin)).sqrt() as f32);
+        assert_ne!(w, (1.0 - f64::from(sin) * f64::from(sin)).sqrt() as f32);
+    }
+
+    /// The quaternion and scaled-versor classes antsApplyTransforms read but could not evaluate
+    /// (differential random testing, 2026-10-25, `itk-transforms:20261025:282`): a unit
+    /// quaternion is the versor's rotation; scales of 1 and skews of 0 add nothing.
+    #[test]
+    fn quaternion_and_scaled_versors() {
+        let s = (0.2f64).sin();
+        let c = (0.2f64).cos();
+        let centre = [1.0, -2.0, 0.5];
+        let versor = LinearTransform::from_itk(
+            "VersorRigid3DTransform_double_3_3",
+            &[0.0, 0.0, s, 1.0, 2.0, 3.0],
+            &centre,
+        )
+        .unwrap();
+        let quaternion = LinearTransform::from_itk(
+            "QuaternionRigidTransform_double_3_3",
+            &[0.0, 0.0, s, c, 1.0, 2.0, 3.0],
+            &centre,
+        )
+        .unwrap();
+        let scaled = LinearTransform::from_itk(
+            "ScaleVersor3DTransform_double_3_3",
+            &[0.0, 0.0, s, 1.0, 2.0, 3.0, 1.0, 1.0, 1.0],
+            &centre,
+        )
+        .unwrap();
+        let skewed = LinearTransform::from_itk(
+            "ScaleSkewVersor3DTransform_double_3_3",
+            &[
+                0.0, 0.0, s, 1.0, 2.0, 3.0, 1.0, 1.0, 1.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0,
+            ],
+            &centre,
+        )
+        .unwrap();
+        for p in [[0.0, 0.0, 0.0], [3.0, -1.0, 2.5]] {
+            let v = versor.transform_point(p);
+            assert!(close(quaternion.transform_point(p), v, 1e-12), "{p:?}");
+            assert_eq!(scaled.transform_point(p), v);
+            assert_eq!(skewed.transform_point(p), v);
+        }
+        // Scales and skews: x scaled by 2 about the centre, y sheared by x.
+        let t = LinearTransform::from_itk(
+            "ScaleSkewVersor3DTransform_float_3_3",
+            &[
+                0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 2.0, 1.0, 1.0, 0.0, 0.0, 0.5, 0.0, 0.0, 0.0,
+            ],
+            &[0.0; 3],
+        )
+        .unwrap();
+        assert!(close(
+            t.transform_point([1.0, 1.0, 1.0]),
+            [2.0, 1.5, 1.0],
+            1e-6
+        ));
+        // ScaleTransform maps (p − c)·s + c itself, and inverts to the scales 1/s.
+        let scale = LinearTransform::from_itk(
+            "ScaleTransform_double_3_3",
+            &[1.2, 0.8, 1.0],
+            &[0.5, -1.5, 2.0],
+        )
+        .unwrap();
+        let p = [0.3, 0.7, -0.1];
+        let expected: [f64; 3] = std::array::from_fn(|i| {
+            let (s, c) = ([1.2, 0.8, 1.0][i], [0.5, -1.5, 2.0][i]);
+            (p[i] - c) * s + c
+        });
+        assert_eq!(scale.transform_point(p), expected);
+        let m = scale.with_precision::<f64>().unwrap();
+        assert_eq!(m.transform_point(p), expected);
+        let back = m.inverse().unwrap().transform_point(expected);
+        assert!(close(back, p, 1e-15), "{back:?}");
     }
 
     #[test]

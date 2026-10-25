@@ -887,8 +887,13 @@ fn run(
     // ANTS-44: the voxels outside the mask whose bias ITK leaves unsmoothed, with the bias
     // the other mode gives them.
     let mut other_bias: Vec<(usize, f32)> = Vec::new();
+    // ANTS-14: the axes along which ITK's smoothing kernel of the bias overflows (a variance
+    // above about 709 voxels²: micrometre voxels; random testing, 2026-10-25).
+    let mut overflowing: Vec<usize> = Vec::new();
     if rician {
-        let options = DiscreteGaussianOptions::new(d, f64::from(parameters.smoothing_variance));
+        let mut options = DiscreteGaussianOptions::new(d, f64::from(parameters.smoothing_variance));
+        options.upstream_defects = parameters.upstream_defects;
+        overflowing = options.overflowing_axes(input.spacing);
         let smoothed = discrete_gaussian(
             VolumeRef::new(&raw_bias, input.size, input.spacing),
             &options,
@@ -973,6 +978,29 @@ fn run(
         })?;
     }
     let mut notices = Notices::new(parameters.upstream_defects);
+    if !overflowing.is_empty() {
+        let axes = overflowing
+            .iter()
+            .map(ToString::to_string)
+            .collect::<Vec<_>>()
+            .join(", ");
+        notices.add(
+            &defects::ANTS_14,
+            if fix {
+                format!(
+                    "the Gaussian kernel that smooths the Rician bias along axis {axes} (a \
+                     variance above about 709 voxels²) is computed without overflow; ITK's is \
+                     NaN, and the bias is left unsmoothed"
+                )
+            } else {
+                format!(
+                    "the Gaussian kernel that smooths the Rician bias along axis {axes} \
+                     overflows (a variance above about 709 voxels²): the bias is left \
+                     unsmoothed, as in ITK"
+                )
+            },
+        );
+    }
     let overflowed = overflowed.into_inner();
     if overflowed > 0 {
         notices.add(
@@ -1512,6 +1540,34 @@ mod tests {
         g.upstream_defects = UpstreamDefects::Reproduce;
         assert_eq!(a, adaptive_non_local_means(v, None, &g, 1).unwrap());
         assert!(a.notices.is_empty());
+    }
+
+    /// ANTS-14 in the Rician bias's smoothing (differential random testing, 2026-10-25,
+    /// `ants-denoise:20261025:41`): on micrometre voxels the smoothing variance of 2 mm² is
+    /// 2·10⁶ voxels², whose ITK kernel is NaN, so ITK leaves the bias unsmoothed. `reproduce`
+    /// now does too (larmorx smoothed it with the corrected kernel in both modes); both modes
+    /// name ANTS-14.
+    #[test]
+    fn the_bias_smoothing_kernel_overflows_on_micrometre_voxels() {
+        let size = [3usize, 3, 3];
+        let data: Vec<f32> = (0..27).map(|i| 30.0 + i as f32).collect();
+        let v = VolumeRef::new(&data, &size, &[0.001; 3]);
+        let mut p = AdaptiveNlmParameters::denoise_image(3, true);
+        let fixed = adaptive_non_local_means(v, None, &p, 1).unwrap();
+        p.upstream_defects = UpstreamDefects::Reproduce;
+        let ants = adaptive_non_local_means(v, None, &p, 1).unwrap();
+        for out in [&fixed, &ants] {
+            assert!(
+                out.notices.iter().any(|n| n.defect.id == "ANTS-14"),
+                "{:?}",
+                out.notices
+            );
+        }
+        assert_ne!(fixed.denoised, ants.denoised);
+        // On millimetre voxels the kernel is finite: no ANTS-14.
+        let mm = VolumeRef::new(&data, &size, &[1.0; 3]);
+        let out = adaptive_non_local_means(mm, None, &p, 1).unwrap();
+        assert!(out.notices.iter().all(|n| n.defect.id != "ANTS-14"));
     }
 
     #[test]

@@ -316,7 +316,14 @@ pub fn parse_itk_text_with(
 /// (`1e-7`, `1.5e+21`), `0` for both zeros, `NaN`, `Infinity` and `-Infinity`.
 pub fn itk_number(v: f64) -> String {
     ecmascript(v.is_nan(), v.is_infinite(), v == 0.0, v < 0.0, || {
-        format!("{:e}", v.abs())
+        let bits = v.abs().to_bits();
+        let (e, f) = ((bits >> 52) as i32, bits & ((1 << 52) - 1));
+        let (m, exp) = if e == 0 {
+            (f, -1074)
+        } else {
+            (f | (1 << 52), e - 1075)
+        };
+        ties_to_even(format!("{:e}", v.abs()), m, exp)
     })
 }
 
@@ -324,8 +331,83 @@ pub fn itk_number(v: f64) -> String {
 /// reads back to the same `float`.
 pub fn itk_number_f32(v: f32) -> String {
     ecmascript(v.is_nan(), v.is_infinite(), v == 0.0, v < 0.0, || {
-        format!("{:e}", v.abs())
+        let bits = v.abs().to_bits();
+        let (e, f) = ((bits >> 23) as i32, u64::from(bits & ((1 << 23) - 1)));
+        let (m, exp) = if e == 0 {
+            (f, -149)
+        } else {
+            (f | (1 << 23), e - 150)
+        };
+        ties_to_even(format!("{:e}", v.abs()), m, exp)
     })
+}
+
+/// The shortest digits of `m · 2^exp` (Rust's, `{:e}`), with double-conversion's choice at a
+/// tie: when the value lies exactly halfway between two shortest candidates (its exact
+/// decimal expansion is the shorter digits followed by a single 5), double-conversion's
+/// `BignumDtoa` takes the one whose last digit is even (`bignum-dtoa.cc`, "round towards
+/// even"), where Rust rounds up (found by differential random testing, 2026-10-25: a float
+/// B-spline parameter of 0.173828125 written as `0.17382812` by ITK, `0.17382813` by Rust).
+fn ties_to_even(shortest: String, m: u64, exp: i32) -> String {
+    let (mantissa, exponent) = shortest.split_once('e').expect("{:e} has an exponent");
+    let digits: Vec<u8> = mantissa.bytes().filter(|c| *c != b'.').collect();
+    let n = digits.len();
+    let last = digits[n - 1] - b'0';
+    // Rust rounds a tie up; the result differs from double-conversion's only where the
+    // candidate below is even, that is where Rust's last digit is odd.
+    if last.is_multiple_of(2) {
+        return shortest;
+    }
+    let exact = exact_digits(m, exp);
+    let exact = exact.trim_end_matches('0').as_bytes();
+    if exact.len() != n + 1 || exact[n] != b'5' {
+        return shortest;
+    }
+    let below = &exact[..n];
+    // The candidate below must be the shortest digits less one in the last place.
+    let mut expected = digits.clone();
+    expected[n - 1] -= 1;
+    if below != expected.as_slice() {
+        return shortest;
+    }
+    let mut out = String::with_capacity(shortest.len());
+    out.push(char::from(below[0]));
+    if n > 1 {
+        out.push('.');
+        out.extend(below[1..].iter().map(|&c| char::from(c)));
+    }
+    out.push('e');
+    out.push_str(exponent);
+    out
+}
+
+/// The exact decimal digits of `m · 2^exp` (a dyadic number has a finite expansion): those of
+/// the integer `m · 2^exp` for `exp ≥ 0`, else those of `m · 5^(−exp)` (the value times
+/// `10^(−exp)`), without leading zeros.
+fn exact_digits(m: u64, exp: i32) -> String {
+    // Little-endian limbs of 10^9.
+    const BASE: u64 = 1_000_000_000;
+    let mut limbs: Vec<u64> = vec![m % BASE, (m / BASE) % BASE, m / BASE / BASE];
+    let (factor, count) = if exp >= 0 { (2u64, exp) } else { (5u64, -exp) };
+    for _ in 0..count {
+        let mut carry = 0u64;
+        for l in &mut limbs {
+            let v = *l * factor + carry;
+            *l = v % BASE;
+            carry = v / BASE;
+        }
+        if carry > 0 {
+            limbs.push(carry);
+        }
+    }
+    while limbs.len() > 1 && limbs.last() == Some(&0) {
+        limbs.pop();
+    }
+    let mut s = limbs.last().expect("one limb").to_string();
+    for l in limbs.iter().rev().skip(1) {
+        s.push_str(&format!("{l:09}"));
+    }
+    s
 }
 
 /// double-conversion's `ToShortest` with `EcmaScriptConverter()`'s settings (flags
@@ -943,8 +1025,21 @@ mod tests {
             (0.1f32, "0.1"),
             (-0.4087162f32, "-0.4087162"),
             (3.0e-8f32, "3e-8"),
+            // A tie between two shortest candidates: double-conversion takes the even one
+            // (ants-registration:20261025:165, a BSpline transform's parameter).
+            (89.0f32 / 512.0, "0.17382812"),
+            (0.17382814f32, "0.17382814"),
         ] {
             assert_eq!(itk_number_f32(v), s, "{v:e}");
+        }
+        assert_eq!(exact_digits(89, -9), "173828125");
+        assert_eq!(exact_digits(3, 2), "12");
+        // Every float of a range: the tie rule changes only exact halfway cases, and the
+        // result always reads back to the same float.
+        for k in 0..20000u32 {
+            let v = f32::from_bits(0x3e30_0000 + k * 37);
+            let s = itk_number_f32(v);
+            assert_eq!(s.parse::<f32>().unwrap(), v, "{s}");
         }
     }
 

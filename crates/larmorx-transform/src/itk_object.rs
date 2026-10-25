@@ -216,6 +216,10 @@ fn read_class(l: &LinearTransform) -> Result<&'static str, TransformError> {
         "Euler3DTransform" => "Euler3DTransform",
         "VersorRigid3DTransform" => "VersorRigid3DTransform",
         "Similarity3DTransform" => "Similarity3DTransform",
+        "QuaternionRigidTransform" => "QuaternionRigidTransform",
+        "ScaleVersor3DTransform" => "ScaleVersor3DTransform",
+        "ScaleSkewVersor3DTransform" => "ScaleSkewVersor3DTransform",
+        "ScaleTransform" => "ScaleTransform",
         "TranslationTransform" => "TranslationTransform",
         "IdentityTransform" => "IdentityTransform",
         other => return Err(TransformError::Unsupported(other.to_owned())),
@@ -305,6 +309,23 @@ impl<R: ItkReal> LinearObject<R> {
                 if l.kind == LinearKind::Similarity3D {
                     out.push(p[6]);
                 }
+                ([p[3], p[4], p[5]], out)
+            }
+            // GetParameters: the quaternion and the translation as stored.
+            LinearKind::QuaternionRigid => ([p[4], p[5], p[6]], p.clone()),
+            // The scales; no translation.
+            LinearKind::Scale => ([R::ZERO; 3], p.clone()),
+            LinearKind::ScaleVersor3D | LinearKind::ScaleSkewVersor3D => {
+                // The versor's components, then the translation, the scales and the skews.
+                let mut norm = (p[0] * p[0]).to_f64();
+                norm += (p[1] * p[1]).to_f64();
+                norm += (p[2] * p[2]).to_f64();
+                if norm > 0.0 {
+                    norm = norm.sqrt();
+                }
+                let ((x, y, z, _), _) = versor([p[0], p[1], p[2]], norm, mode)?;
+                let mut out = vec![x, y, z];
+                out.extend_from_slice(&p[3..]);
                 ([p[3], p[4], p[5]], out)
             }
             LinearKind::Translation | LinearKind::Identity => unreachable!(),

@@ -11,6 +11,7 @@ differs from AFNI's (black-box: only the programs' outputs).
 
 from __future__ import annotations
 
+import difflib
 import json
 import os
 import re
@@ -65,6 +66,7 @@ def main() -> int:
     env = {k: v for k, v in os.environ.items() if not k.startswith("AFNI_")}
     env.update(AFNI_DONT_LOGFILE="YES", AFNI_NIFTI_TYPE_WARN="NO", OMP_NUM_THREADS="1")
     runs = {}
+    errs: dict[str, str] = {}
     for who in ("AFNI", "replica reproduce", "replica fix", "original reproduce", "original fix"):
         d = work / who.replace(" ", "-")
         d.mkdir(exist_ok=True)
@@ -82,6 +84,8 @@ def main() -> int:
         p = subprocess.run(cmd, cwd=d, env=e, capture_output=True, text=True, check=False)
         notes = re.findall(r"upstream defect ([A-Z]+-\d+) \(", p.stderr)
         runs[who] = d
+        (d / "stderr.txt").write_text(p.stderr, encoding="utf-8")
+        errs[who] = p.stderr.replace(str(d), "<dir>").replace(str(work), "<work>")
         print(f"{who}: exit {p.returncode}; notices {notes}")
     for out in outputs:
         ref = runs["AFNI"] / out
@@ -101,6 +105,16 @@ def main() -> int:
             data = np.asarray(img.dataobj)
             nd = int(np.count_nonzero(data != d0)) if data.shape == d0.shape else -1
             print(f"  {out} {who}: {nd} values differ; " + ("; ".join(diffs) or "header identical"))
+    for who, text in errs.items():
+        if who == "AFNI":
+            continue
+        diff = list(
+            difflib.unified_diff(
+                errs["AFNI"].splitlines(), text.splitlines(), "AFNI", who, n=0, lineterm=""
+            )
+        )
+        print(f"  standard error, AFNI against {who}: " + ("identical" if not diff else ""))
+        print("\n".join("    " + ln for ln in diff[2:40]))
     return 0
 
 

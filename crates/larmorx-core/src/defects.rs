@@ -420,8 +420,8 @@ defects! {
         "with --minimize-memory-usage the prior probability images are stored with their voxel numbers in float, so in images of more than 2^24 voxels prior values land on rounded voxel numbers";
     ANTS_98 = "ANTS-98", "Atropos", true,
         "KMeans takes the first image's range from the voxels labelled 1 in the mask only: a mask with other values gives infinite initial centres";
-    ANTS_99 = "ANTS-99", "Atropos", true,
-        "without -d every image is segmented in 3D: Atropos asks the image reader for the dimension before the reader has read the header, and NIfTI's reader answers 3";
+    ANTS_99 = "ANTS-99", "ANTs", true,
+        "without -d every image is taken as 3D (Atropos, N4BiasFieldCorrection, DenoiseImage): the program asks the image reader for the dimension before the reader has read the header, and NIfTI's reader answers 3";
     ANTS_100 = "ANTS-100", "Atropos", true,
         "prior probability images given as one vector image (without --minimize-memory-usage) all hold the last component: every class gets the last class's prior";
     ANTS_101 = "ANTS-101", "Atropos", true,

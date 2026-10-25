@@ -17,7 +17,7 @@
 //!   of 50 iterations, threshold 0.001); without `-c` at all, ANTs' (four levels of 50,
 //!   threshold 0) (ANTS-35);
 //! - `-c [iterations]` sets the threshold to 0, `-c [iterations,threshold]` to `threshold`;
-//! - without `-d`, the dimension is the input file's;
+//! - without `-d`, the dimension is the input file's (ANTs: 3 whatever the file, ANTS-99);
 //! - a mask that cannot be read is replaced by an image of ones ("Mask not read"), but
 //!   still counts as given: outside-mask restoration and rescaling happen (ANTS-36);
 //! - rescaling is on when a mask is given, unless `-r 0`; without a mask `-r 1` does nothing
@@ -345,14 +345,26 @@ fn execute(
                 return Ok(1);
             };
             let name = i.parameters.first().unwrap_or(&i.name).clone();
-            match store.load(&name, n_threads, notices) {
+            let dims = match store.load(&name, n_threads, notices) {
                 Ok(image) => image.geometry.ndim,
                 Err(_) => {
                     return Err(format!(
                         "larmorx: N4BiasFieldCorrection: cannot read '{name}' (ANTs crashes here)"
                     ));
                 }
+            };
+            // ANTS-99: ANTs asks a new ImageIO for the dimension before it reads the header,
+            // and NIfTI's answers 3 for every file (random testing, 2026-10-25).
+            if dims != 3 {
+                notices.add(
+                    &defects::ANTS_99,
+                    format!(
+                        "{name} is {dims}-dimensional and processed as such; ANTs processes it \
+                         in 3D"
+                    ),
+                );
             }
+            if notices.fix() { dims } else { 3 }
         }
     };
     if !(2..=4).contains(&dim) {

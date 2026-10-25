@@ -30,7 +30,8 @@ relate, is in [docs/licensing.md](../docs/licensing.md):
 | `larmorx-nc-core` | the FSL libraries the replicas share: NIfTI I/O as FSL does it (NewNifti, znzlib, `FSLOUTPUTTYPE`), `volume<float>` (newimage), interpolation (trilinear, sinc, splines), FLIRT's cost functions (`costfns`), the optimiser (`optimise`), the transform algebra and `.mat` files (miscmaths), Armadillo's matrix rules as armawrap evaluates them (`arma`), x87 extended precision where FSL's NIfTI code uses `long double` (`x87`), and the C library's float functions as FSL's Linux build calls them (glibc 2.35's `sinf`, `cosf`, `sincosf`, `logf`, `atan2f`: `glibc_float`, `fdlibm`). Provenance: `larmorx-nc-core/PROVENANCE.md` |
 | `larmorx-nc-mcflirt` | the `mcflirt` replica (head-motion correction): every option, message, exit status and output file of mcflirt 2111.0 (FSL 6.0.7.17). Provenance: `larmorx-nc-mcflirt/PROVENANCE.md` |
 | `larmorx-nc-cli` | the `larmorx-nc` command line: `larmorx-nc fsl mcflirt <mcflirt's arguments>` |
-| `larmorx-nc-core/tools/glibc-float-verify` | compares the glibc float functions with the platform's C library on all 2^32 inputs, and the C library with correctly rounded maths at mcflirt's arguments (Linux x86-64) |
+| `larmorx-nc-core/tools/glibc-float-verify` | compares the glibc float functions (`sinf`, `cosf`, `sincosf`, `logf`, `atanf`; `atan2f` on seeded random pairs) with the platform's C library on all 2^32 inputs, and the C library with correctly rounded maths at mcflirt's arguments (Linux x86-64) |
+| `larmorx-nc-core/tools/affine-trace-replay` | replays mcflirt's own `decompose_aff` calls, traced by `validation/probes/fsl-mcflirt-affine-trace`, through the replica, parameter by parameter |
 | `fsl-source/` | FSL's original source of the replicated parts, unchanged (`MANIFEST.tsv`; `python scripts/fsl_source.py --check`) |
 | `pyproject.toml`, `NOTICE`, `LICENSES/` | the `larmorx-nc` wheel and the licences and notices it carries (below) |
 

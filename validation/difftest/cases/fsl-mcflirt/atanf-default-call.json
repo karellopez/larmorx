@@ -1,0 +1,307 @@
+{
+ "defect": null,
+ "description": "the replica with fdlibm's comment value of atanf's aT[0] (0x3eaaaaaa, before 2026-10-25) differed from mcflirt (the default call: volume 0 of the output series); glibc's constant is 0x3eaaaaab",
+ "expect": "pass",
+ "found": {
+  "detail": "every file bit-identical: out_mcf.nii.gz: 769 of 14112 values differ (max |diff| 1.94)",
+  "n": 6,
+  "seed": "20261025",
+  "shrink_moves": [
+   "dropped outputs (-mats -plots -rmsabs)",
+   "dropped final (-sinc_final)",
+   "dropped reffile (-reffile {in:ref})",
+   "in: axis 2 19 -> 12 voxels",
+   "in: axis 0 18 -> 12 voxels",
+   "in: float32 storage"
+  ],
+  "signature": [
+   "every file bit-identical"
+  ]
+ },
+ "id": "atanf-default-call",
+ "implementations": [
+  "replica"
+ ],
+ "reason": "",
+ "recipe": {
+  "extra": {
+   "keep_inputs": [
+    "in"
+   ],
+   "min_size": 12,
+   "min_volumes": 4
+  },
+  "features": {
+   "-mats": true,
+   "-plots": true,
+   "-rmsabs": true,
+   "-rmsrel": false,
+   "bins": false,
+   "cost": false,
+   "dof": false,
+   "dtype": "int16",
+   "final": true,
+   "final interpolation": "-sinc_final",
+   "first at rest": true,
+   "fudge": false,
+   "gdt": false,
+   "meanvol": false,
+   "noise": 0.0,
+   "nx": 18,
+   "ny": 14,
+   "nz": 19,
+   "oblique": false,
+   "reffile": true,
+   "rot b": 2,
+   "rot c": 0,
+   "rot d": 0,
+   "rot scale": 6,
+   "rotation": false,
+   "scaling": false,
+   "shift0": 0.0,
+   "shift1": -0.25,
+   "shift2": 0.5,
+   "shift3": 2.0,
+   "shift4": 2.0,
+   "shift5": 2.0,
+   "shift6": 0.5,
+   "slice spacing": 3.0,
+   "smooth": false,
+   "spacing": 2.0,
+   "stages": false,
+   "stats": false,
+   "tissues": "t2",
+   "volumes": 7
+  },
+  "groups": [
+   {
+    "args": [
+     "-in",
+     "{in:in}"
+    ],
+    "name": "input",
+    "optional": false
+   },
+   {
+    "args": [
+     "-out",
+     "{run}/out_mcf.nii.gz"
+    ],
+    "name": "output",
+    "optional": false
+   }
+  ],
+  "inputs": {
+   "in": {
+    "content": {
+     "axes": [
+      1.0,
+      1.1,
+      0.9
+     ],
+     "bias": [
+      0.0,
+      0.0,
+      0.0,
+      0.0
+     ],
+     "centre": [
+      0.0,
+      0.0,
+      0.0
+     ],
+     "noise": 0.0,
+     "seed": 1541899867,
+     "size": 11.76,
+     "tissues": "t2",
+     "type": "head"
+    },
+    "dtype": "float32",
+    "geometry": {
+     "origin": [
+      -17.0,
+      -13.0,
+      -18.0
+     ],
+     "qfac": 1,
+     "qform_code": 1,
+     "quaternion": [
+      1,
+      0,
+      0,
+      0
+     ],
+     "sform": "same",
+     "sform_code": 1,
+     "spacing": [
+      2.0,
+      2.0,
+      3.0
+     ],
+     "units": "mm"
+    },
+    "keep_content": true,
+    "motion": [
+     {
+      "centre": [
+       0.0,
+       0.0,
+       0.0
+      ],
+      "quaternion": [
+       1,
+       0,
+       0,
+       0
+      ],
+      "translation": [
+       0.0,
+       0.0,
+       0.0
+      ]
+     },
+     {
+      "centre": [
+       0.0,
+       0.0,
+       0.0
+      ],
+      "quaternion": [
+       53,
+       1,
+       0,
+       1
+      ],
+      "translation": [
+       0.0,
+       1.75,
+       1.5
+      ]
+     },
+     {
+      "centre": [
+       0.0,
+       0.0,
+       0.0
+      ],
+      "quaternion": [
+       53,
+       -1,
+       -1,
+       0
+      ],
+      "translation": [
+       0.0,
+       0.5,
+       0.0
+      ]
+     },
+     {
+      "centre": [
+       0.0,
+       0.0,
+       0.0
+      ],
+      "quaternion": [
+       59,
+       2,
+       0,
+       1
+      ],
+      "translation": [
+       -1.75,
+       0.25,
+       -1.0
+      ]
+     },
+     {
+      "centre": [
+       0.0,
+       0.0,
+       0.0
+      ],
+      "quaternion": [
+       55,
+       0,
+       2,
+       1
+      ],
+      "translation": [
+       1.75,
+       0.5,
+       -0.75
+      ]
+     },
+     {
+      "centre": [
+       0.0,
+       0.0,
+       0.0
+      ],
+      "quaternion": [
+       30,
+       -1,
+       1,
+       -2
+      ],
+      "translation": [
+       -2.0,
+       -1.75,
+       2.0
+      ]
+     },
+     {
+      "centre": [
+       0.0,
+       0.0,
+       0.0
+      ],
+      "quaternion": [
+       26,
+       2,
+       0,
+       0
+      ],
+      "translation": [
+       0.0,
+       -0.25,
+       0.5
+      ]
+     }
+    ],
+    "scaling": null,
+    "shape": [
+     12,
+     14,
+     12,
+     7
+    ],
+    "suffix": ".nii.gz",
+    "timing": {
+     "slice_code": 0,
+     "tr": 2.0,
+     "tunits": "sec"
+    },
+    "values": {
+     "offset": 0.0,
+     "scale": 1.0
+    }
+   }
+  },
+  "n": 6,
+  "options": [
+   "-mats",
+   "-plots",
+   "-reffile",
+   "-rmsabs",
+   "-sinc_final"
+  ],
+  "seed": "20261025",
+  "tool": "fsl-mcflirt"
+ },
+ "rule": null,
+ "status": "fixed",
+ "suite": "fsl-mcflirt-replica",
+ "tier": "smoke",
+ "tool": "fsl-mcflirt"
+}

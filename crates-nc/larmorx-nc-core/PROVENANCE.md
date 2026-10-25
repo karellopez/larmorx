@@ -46,7 +46,7 @@ Every source file starts with an SPDX header naming its licence and the files it
 | `miscmaths` | fsl-miscmaths `miscmaths.{h,cc}` | `make_rot`, `construct_rotmat_euler`, `compose_aff`, `decompose_aff`, `rotmat2euler`, `rms_deviation`, `read_ascii_matrix` (`skip_alpha`, `isNumber`), `norm2`, `dot`, `cross` |
 | `newimagefns` | fsl-newimage `newimagefns.{h,cc}` | `isotropic_resample`, `affine_transform`, `raw_affine_transform`, `affine_transform_mask`, `make_grad_masks`, `gradient` |
 | `arma` | Armadillo 10.5.1 (fsl-armawrap 0.6.0) | the evaluation of `*` chains (`glue_times` with `inv` and `solve` rewriting), `gemv`/`gemm_emul_tinysq`, `gemm_emul_large`, `op_dot::direct_dot_arma`, `accu`, `max`, `op_inv::apply_tiny`, `op_det`, `auxlib::solve_square_tiny`, `trace` |
-| `fdlibm` | glibc 2.35 `e_atan2f.c`, `s_atanf.c` (fdlibm) | `atan2f`, `atanf` |
+| `fdlibm` | glibc 2.35 `e_atan2f.c`, `s_atanf.c` (fdlibm) | `atan2f`, `atanf`, with the constants as the compiler rounds fdlibm's decimal literals (`aT[0]` is `0x3eaaaaab`, not its comment's `0x3eaaaaaa`; corrected 2026-10-25) (`tools/glibc-float-verify`: `atanf` bit-identical to the C library on all 2^32 inputs, `atan2f` on every pair of 38 special values and 3 × 2^30 seeded random pairs) |
 | `glibc_float` | Arm Optimized Routines v19.11 `math/sincosf.h`, `sincosf.c`, `sinf.c`, `cosf.c`, `sincosf_data.c`, `logf.c`, `logf_data.c` | `sinf`, `cosf`, `sincosf`, `logf`, as glibc 2.35's x86-64 FMA build computes them (`tools/glibc-float-verify`: bit-identical to the C library on all 2^32 inputs of each) |
 
 ## Changes from the originals

@@ -711,6 +711,7 @@ impl Run<'_> {
                     for m in mv.data.iter_mut() {
                         *m /= nf;
                     }
+                    self.mean_reg_notice();
                     self.save(&mv, &self.derived_name("_mean_reg"), SaveType::Float, None)?;
                     anisorefvol = Some(mv.clone());
                     meanvol = Some(mv);
@@ -1119,6 +1120,27 @@ impl Run<'_> {
         Ok(())
     }
 
+    /// FSL-08's notice for the `-meanvol` image's name (`outputfname + "_mean_reg"`), when the
+    /// correction changes it: only when `-out` ends in an image extension.
+    fn mean_reg_notice(&mut self) {
+        let stem = volume::make_basename(&self.o.outputfname);
+        if stem == self.o.outputfname {
+            return;
+        }
+        let detail = if self.mode.fix() {
+            format!(
+                "the -meanvol image is named after '{stem}'; mcflirt names it after '{}'",
+                self.o.outputfname
+            )
+        } else {
+            format!(
+                "the -meanvol image is named after '{}', as in mcflirt",
+                self.o.outputfname
+            )
+        };
+        self.notice(&defects::FSL_08, detail);
+    }
+
     /// `outputfname + suffix`, or, corrected (FSL-08), the stem of `-out` without its image
     /// extension plus `suffix`.
     fn derived_name(&self, suffix: &str) -> String {
@@ -1317,7 +1339,16 @@ impl Run<'_> {
                 self.o.outputfname
             )
         };
-        self.notice(&defects::FSL_08, detail);
+        // The -stats notice (it names the -meanvol image too) replaces a -meanvol one in place.
+        let notice = Notice::new(&defects::FSL_08, self.mode, detail);
+        match self
+            .notices
+            .iter_mut()
+            .find(|n| n.defect.id == defects::FSL_08.id)
+        {
+            Some(n) => *n = notice,
+            None => self.notices.push(notice),
+        }
         self.report("Saving mean volume... \n");
         self.save(
             &meanvol,

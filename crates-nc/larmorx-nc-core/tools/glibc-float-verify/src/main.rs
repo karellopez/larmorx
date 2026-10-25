@@ -12,12 +12,17 @@
 //! the sinc kernel of `-sinc_final` and the fourth stage (`MISCMATHS::sinckernel1D`: Blackman
 //! window, width 7, 1201 samples; its double `cos` too).
 //!
-//! Usage: `glibc-float-verify [--threads N] [kernel] [sinf] [cosf] [sincosf] [logf]` (all
-//! when none is named). Exits 0 when the port matches the platform everywhere.
+//! `larmorx_nc_core::fdlibm`'s `atanf` is compared on all 2^32 inputs too, and its `atan2f`
+//! (`rotmat2euler`) on every pair of special values and on 3 × 2^30 seeded random pairs:
+//! random bits, rotation-like pairs (`|y| <= 1`, `x` in `[0.5, 1]`: `atan2(sy, cy)`), and
+//! pairs in `[-1, 1]` (`atan2(sx, cx)`, `atan2(sz, cz)`).
+//!
+//! Usage: `glibc-float-verify [--threads N] [kernel] [sinf] [cosf] [sincosf] [logf] [atanf]
+//! [atan2f]` (all when none is named). Exits 0 when the port matches the platform everywhere.
 #![deny(unsafe_code)]
 
 use larmorx_core::math;
-use larmorx_nc_core::{glibc_float, kernel};
+use larmorx_nc_core::{fdlibm, glibc_float, kernel};
 use rayon::prelude::*;
 
 #[allow(unsafe_code)]
@@ -187,6 +192,117 @@ fn kernel_report() -> bool {
     d_port == 0 && d_kernel_port == 0 && q_port == 0
 }
 
+/// SplitMix64: the seeded pairs of `atan2f_report`.
+fn splitmix64(i: u64) -> u64 {
+    let mut z = i.wrapping_add(0x9e37_79b9_7f4a_7c15);
+    z = (z ^ (z >> 30)).wrapping_mul(0xbf58_476d_1ce4_e5b9);
+    z = (z ^ (z >> 27)).wrapping_mul(0x94d0_49bb_1331_11eb);
+    z ^ (z >> 31)
+}
+
+/// A family of seeded `(y, x)` pairs: its name and the pair of a 64-bit random number.
+type PairFamily = (&'static str, fn(u64) -> (f32, f32));
+
+/// A float uniform in `[lo, hi]` from 24 random bits.
+fn uniform(bits: u32, lo: f32, hi: f32) -> f32 {
+    lo + (hi - lo) * ((bits >> 8) as f32 / (1u32 << 24) as f32)
+}
+
+/// `atan2f`: the port against the C library on every pair of special values and on three
+/// families of 2^30 seeded random pairs.
+fn atan2f_report() -> bool {
+    let specials: Vec<f32> = [
+        0.0f32,
+        f32::MIN_POSITIVE,
+        f32::from_bits(1),
+        1e-30,
+        1e-20,
+        1e-10,
+        1e-4,
+        0.4375,
+        0.5,
+        0.6875,
+        1.0,
+        1.1875,
+        1.5,
+        2.4375,
+        1e10,
+        3.4e38,
+        f32::MAX,
+        f32::INFINITY,
+        f32::NAN,
+    ]
+    .iter()
+    .flat_map(|&v| [v, -v])
+    .collect();
+    let mut bad = 0u64;
+    let mut n = 0u64;
+    for &y in &specials {
+        for &x in &specials {
+            n += 1;
+            if !same(y.atan2(x), fdlibm::atan2f(y, x)) {
+                bad += 1;
+                if bad <= 3 {
+                    println!("atan2f: port differs at ({y:e}, {x:e})");
+                }
+            }
+        }
+    }
+    println!("atan2f: port differs from the C library on {bad} of {n} pairs of special values");
+    let mut ok = bad == 0;
+    let families: [PairFamily; 3] = [
+        ("random bits", |r| {
+            (f32::from_bits(r as u32), f32::from_bits((r >> 32) as u32))
+        }),
+        ("rotation-like (|y| <= 1, x in [0.5, 1])", |r| {
+            (
+                uniform(r as u32, -1.0, 1.0),
+                uniform((r >> 32) as u32, 0.5, 1.0),
+            )
+        }),
+        ("in [-1, 1]", |r| {
+            (
+                uniform(r as u32, -1.0, 1.0),
+                uniform((r >> 32) as u32, -1.0, 1.0),
+            )
+        }),
+    ];
+    for (f, (name, pair)) in families.iter().enumerate() {
+        let base = (f as u64) << 40;
+        let (bad, cr) = (0u64..1 << 14)
+            .into_par_iter()
+            .map(|hi| {
+                let (mut bad, mut cr) = (0u64, 0u64);
+                for lo in 0..1u64 << 16 {
+                    let (y, x) = pair(splitmix64(base | (hi << 16) | lo));
+                    let g = y.atan2(x);
+                    if !same(g, fdlibm::atan2f(y, x)) {
+                        bad += 1;
+                        if bad <= 3 {
+                            println!(
+                                "atan2f: port differs at ({y:e}, {x:e}) ({:#010x}, {:#010x})",
+                                y.to_bits(),
+                                x.to_bits()
+                            );
+                        }
+                    }
+                    let want = math::atan2(f64::from(y), f64::from(x)) as f32;
+                    cr += u64::from(!same(g, want));
+                }
+                (bad, cr)
+            })
+            .reduce(|| (0, 0), |a, b| (a.0 + b.0, a.1 + b.1));
+        let total = 1u64 << 30;
+        println!(
+            "atan2f, {name}: port differs from the C library on {bad} of {total} pairs; the C \
+             library is not the float nearest the correctly rounded double on {cr} ({:.4} %)",
+            100.0 * cr as f64 / total as f64
+        );
+        ok &= bad == 0;
+    }
+    ok
+}
+
 fn main() {
     let mut args: Vec<String> = std::env::args().skip(1).collect();
     let mut threads = 0;
@@ -251,6 +367,40 @@ fn main() {
             |x| x > 0.0 && x <= 1.0,
             "probabilities in (0, 1]",
         );
+    }
+    if want("atanf") {
+        ok &= sweep(
+            "atanf",
+            f32::atan,
+            fdlibm::atanf,
+            |x| math::atan2(f64::from(x), 1.0) as f32,
+            |x| x.abs() <= 0.05,
+            "small arguments |x| <= 0.05",
+        );
+        // fdlibm's comment value of aT[0] (0x3eaaaaaa, the translation before 2026-10-25):
+        // the inputs whose atanf it changes (1,037,658; 882,244 below 0.4375).
+        let comment = f32::from_bits(0x3eaa_aaaa);
+        let (n, small) = (0u32..=u32::MAX >> 16)
+            .into_par_iter()
+            .map(|hi| {
+                let (mut n, mut small) = (0u64, 0u64);
+                for lo in 0..=0xffffu32 {
+                    let x = f32::from_bits((hi << 16) | lo);
+                    if !same(fdlibm::atanf(x), fdlibm::atanf_with_at0(x, comment)) {
+                        n += 1;
+                        small += u64::from(x.abs() < 0.4375);
+                    }
+                }
+                (n, small)
+            })
+            .reduce(|| (0, 0), |a, b| (a.0 + b.0, a.1 + b.1));
+        println!(
+            "atanf with fdlibm's comment value of aT[0] (0x3eaaaaaa): differs on {n} of 2^32 inputs \
+             ({small} with |x| < 0.4375)"
+        );
+    }
+    if want("atan2f") {
+        ok &= atan2f_report();
     }
     std::process::exit(i32::from(!ok));
 }

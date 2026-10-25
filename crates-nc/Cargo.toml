@@ -12,6 +12,7 @@ resolver = "3"
 members = [
     "larmorx-nc-core",
     "larmorx-nc-core/tools/glibc-float-verify",
+    "larmorx-nc-core/tools/affine-trace-replay",
     "larmorx-nc-mcflirt",
     "larmorx-nc-cli",
 ]

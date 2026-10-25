@@ -306,6 +306,33 @@ bit-identical to the C library on all 2^32 inputs of `sinf`, `cosf`, both output
 build, which differs on 12 `sinf` and 22 `cosf` inputs (GLIBC-03): there mcflirt's own results
 can differ from the replica's (and from mcflirt's on this machine).
 
+**fdlibm's constants are its decimal literals, not its comments (corrected 2026-10-25).**
+`rotmat2euler`'s `atan2f` and the `atanf` it calls are fdlibm's code in glibc 2.35 (the
+disassembly of `__atan2f_finite` and `atanf` follows `e_atan2f.c` and `s_atanf.c` operation by
+operation, without fused multiply-adds). The first translation took `aT[0]` from the source's
+hex comment, `0x3eaaaaaa`; the compiler reads the decimal literal `3.3333334327e-01`, which
+rounds to `0x3eaaaaab`, and that is the value in glibc's `.rodata` (every other constant of the
+two functions matches its comment). The comment's value changes `atanf` by one ulp on
+1,037,658 of the 2^32 inputs (882,244 of them below 0.4375, the branch small rotation angles
+take). Two fMRIPrep calls added to the oracle panel on 2026-10-25 reached such an input:
+ds002422's rest run (1.5 T, a 79 mm slab), where one of mcflirt's 600 rotation decompositions
+(volume 166, the start of the third stage: `atan2f(0x3c7c2fbe, 0x3f7ff83d)`, glibc
+`0x3c7c324a`, the port `0x3c7c324b`) moved that volume's matrix, and ds000256 CTS203's
+rest-fixation-no-feedback run (mean framewise displacement 4.97 mm), where the first stage's
+chain carried the difference from volume 122 to the last. The cause was isolated with
+LD_PRELOAD interposers on FSL's own functions (`validation/probes/fsl-mcflirt-affine-trace`):
+volume 166's second stage was identical evaluation by evaluation (26 matrices and costs, as
+bits), FSL's cost function gave the replica's costs at the replica's matrices, and the replay
+of mcflirt's 600 `decompose_aff` calls through the replica
+(`crates-nc/larmorx-nc-core/tools/affine-trace-replay`) found the one call and its `atan2f`.
+With the corrected constant `atanf` is bit-identical to glibc on all 2^32 inputs and `atan2f`
+on every pair of 38 special values and on 3 × 2^30 seeded random pairs (random bits,
+rotation-like pairs, pairs in [-1, 1]; `tools/glibc-float-verify atanf atan2f`), and both
+calls give mcflirt's matrices. mcflirt itself is deterministic on both (two runs identical);
+with the CORE-MATH preload 1 of ds002422's 200 and 64 of ds000256's 164 matrices change, so
+glibc's own rounding is what the replica must carry. glibc's `atanf` is not correctly rounded
+on 21,089,462 inputs (0.49 %), 7,060 of them with |x| ≤ 0.05. *Verified* (2026-10-25).
+
 **Corrections and reproductions found while translating** (register entries FSL-20, FSL-21;
 FSL-04 now reproduced):
 - `-gdt` (FSL-04) is reproduced with `reproduce`: each test volume is replaced by its 3×3×3
@@ -336,10 +363,32 @@ sum stay sequential. Outputs are byte-identical at 1 and 3 threads (golden and p
 
 **fMRIPrep's mcflirt is not FSL 6.0.7.17's, but gives the same matrices.** fMRIPrep 25.2.6's
 image has fsl-mcflirt 2111.0 with fsl-newimage 2501.4, fsl-miscmaths 2412.4 and fsl-armawrap
-0.7.0 (FSL 6.0.7.17: 2203.12, 2203.2, 0.6.0), and glibc 2.35. On the seven mcflirt calls of the
-five fMRIPrep oracle runs, its `.mat` files are identical as text to FSL 6.0.7.17's and to the
-replica's: 1,273 of 1,273 matrices (the replica's record, `docs/validation/fsl-mcflirt-replica.md`,
-the `fmriprep/` cases). *Verified* (2026-10-24).
+0.7.0 (FSL 6.0.7.17: 2203.12, 2203.2, 0.6.0), and glibc 2.35. On the 22 mcflirt calls of the
+12 fMRIPrep oracle runs that have BOLD runs (the five first runs and the data panel's: a child's
+extreme motion, 1.5 T, multiband-8 with 600 volumes, multi-echo, a stroke, a glioma), its `.mat`
+files are identical as text to FSL 6.0.7.17's and to the replica's: 4,517 of 4,517 matrices (the
+replica's record, `docs/validation/fsl-mcflirt-replica.md`, the `fmriprep/` cases). *Verified*
+(2026-10-24; the panel's calls 2026-10-25).
+
+**Random testing (2026-10-25).** The differential random tests (`larmorx_validation.difftest`,
+small generated phantoms, 4-8 volumes, at most 32 × 32 × 20 voxels) found the replica differing
+from mcflirt in 61 of their first cases, each shrunk to a minimal recipe
+(`oracles/difftest/2026-10-25/findings/fsl-mcflirt/`). Replayed with a build that has fdlibm's
+comment value of `aT[0]` (`0x3eaaaaaa`), 58 of the first 59 shrunk recipes still differ; with the
+corrected constant all 61, shrunk and original recipes alike (122 runs), are bit-identical to
+mcflirt in every file, both streams and the exit status. The other one (`:616`, `-meanvol` with
+`-out out_mcf.nii.gz`) was the replica's own: its corrected default names the `-meanvol` image
+after the stem (`out_mcf_mean_reg.nii.gz`, as the clean-room original does under FSL-08) but did
+not name FSL-08 in a notice; it does now, whenever the correction changes the name. Five of the
+findings and that one are permanent cases (`validation/difftest/cases/fsl-mcflirt/`), and three
+moving phantoms of the suite's own (`edge/atanf-phantom-*`, smoke tier) reach the same `atanf`
+arguments: they fail with the comment's constant and pass with glibc's.
+
+**Memory.** The record compares files and counts changed values in chunks (16 MB), so a
+600-volume series (ds004958's multiband-8 run, 1.7 GiB as float) is never held whole (before, the
+suite's own process reached 7.75 GiB on it); the replica peaks at about 7 GiB there, and the full
+tier runs in a 16 GiB memory box
+(`scripts/orchestration/boxed.sh`).
 
 **What the replica does not reproduce:** the abort's signal (it prints what mcflirt prints and
 one line of its own, then exits with status 1), FSL's build string in `descrip`, and mcflirt's

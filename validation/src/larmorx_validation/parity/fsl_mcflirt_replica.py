@@ -188,11 +188,6 @@ def run_replica(
 # Comparing two runs
 
 
-def _image_bytes(path: Path) -> bytes:
-    data = path.read_bytes()
-    return gzip.decompress(data) if data[:2] == b"\x1f\x8b" else data
-
-
 def _without_descrip(data: bytes) -> bytes:
     """A NIfTI-1/2 or ANALYZE header's bytes with ``descrip`` (80 bytes) blanked."""
     size = int.from_bytes(data[:4], "little")
@@ -224,7 +219,136 @@ def _image_values(path: Path) -> np.ndarray | None:
         return None
 
 
+#: Bytes read at a time when files are compared: large series (fMRIPrep's 600-volume runs are
+#: 1.7 GiB as float) are never held in memory whole.
+_CHUNK = 1 << 24
+
+#: The bytes of a NIfTI-2 header (the longer one): ``descrip`` lies inside them in both versions.
+_HEADER_BYTES = 540
+
+
+def _open_stream(path: Path):
+    """``path``'s bytes as a program reads them (a gzip file decompressed)."""
+    with open(path, "rb") as f:
+        gz = f.read(2) == b"\x1f\x8b"
+    return gzip.open(path, "rb") if gz else open(path, "rb")
+
+
+def _same_streams(a: Path, b: Path, *, blank_descrip: bool) -> bool:
+    """Whether two files hold the same bytes once decompressed, ``descrip`` blanked in the
+    headers of images that have one; read in chunks."""
+    with _open_stream(a) as fa, _open_stream(b) as fb:
+        ha, hb = fa.read(_HEADER_BYTES), fb.read(_HEADER_BYTES)
+        if blank_descrip and len(ha) >= 4 and len(hb) >= 4:
+            ha, hb = _without_descrip(ha), _without_descrip(hb)
+        if ha != hb:
+            return False
+        while True:
+            ca, cb = fa.read(_CHUNK), fb.read(_CHUNK)
+            if ca != cb:
+                return False
+            if not ca:
+                return True
+
+
+def _same_bytes(a: Path, b: Path) -> bool:
+    """Whether two files hold the same bytes (as stored), read in chunks."""
+    if a.stat().st_size != b.stat().st_size:
+        return False
+    with open(a, "rb") as fa, open(b, "rb") as fb:
+        while True:
+            ca, cb = fa.read(_CHUNK), fb.read(_CHUNK)
+            if ca != cb:
+                return False
+            if not ca:
+                return True
+
+
+def _layout(path: Path) -> tuple[tuple[int, ...], np.dtype, int, float, float] | None:
+    """A single-file NIfTI image's shape, stored type, data offset and scaling, as nibabel's
+    array proxy reads them (a loaded image's ``header`` copy may report offset 0)."""
+    import nibabel as nib
+
+    try:
+        proxy = nib.load(path).dataobj
+        return (
+            tuple(int(n) for n in proxy.shape),
+            np.dtype(proxy.dtype),
+            int(proxy.offset),
+            float(proxy.slope),
+            float(proxy.inter),
+        )
+    except Exception:
+        return None
+
+
+def _streamable(a: Path, b: Path) -> tuple[tuple, tuple] | None:
+    """Both images' layouts when their values can be compared in chunks with the whole arrays'
+    results: single-file NIfTI images of the same shape and stored type, without scaling (so
+    nibabel's values are the stored ones)."""
+    if not all(p.name.endswith((".nii", ".nii.gz")) for p in (a, b)):
+        return None
+    la, lb = _layout(a), _layout(b)
+    if la is None or lb is None or la[:2] != lb[:2]:
+        return None
+    if la[3:] != (1.0, 0.0) or lb[3:] != (1.0, 0.0):
+        return None
+    return la, lb
+
+
+def _value_chunks(a: Path, b: Path, la: tuple, lb: tuple):
+    """The stored values of two images, chunk by chunk (equal-length arrays)."""
+    total = int(np.prod(la[0], dtype=np.int64))
+    size = la[1].itemsize
+    step = max(1, _CHUNK // size)
+    with _open_stream(a) as fa, _open_stream(b) as fb:
+        fa.read(la[2])
+        fb.read(lb[2])
+        left = total
+        while left > 0:
+            k = min(step, left)
+            ra, rb = fa.read(k * size), fb.read(k * size)
+            if len(ra) != k * size or len(rb) != k * size:
+                raise ValueError("truncated image data")
+            yield np.frombuffer(ra, la[1]), np.frombuffer(rb, lb[1])
+            left -= k
+
+
+def _change(fixed: Path, reproduced: Path) -> defects.Change:
+    """``defects.Change.of`` of two images' values, in chunks when they allow it."""
+    lay = _streamable(fixed, reproduced)
+    if lay is not None:
+        n, total, worst = 0, 0, None
+        try:
+            for va, vb in _value_chunks(fixed, reproduced, *lay):
+                fa, fb = va.astype(np.float64), vb.astype(np.float64)
+                same = (fa == fb) | (np.isnan(fa) & np.isnan(fb))
+                n += int(np.count_nonzero(~same))
+                total += va.size
+                with np.errstate(invalid="ignore", over="ignore"):
+                    diff = np.abs(fa - fb)[~same]
+                finite = diff[np.isfinite(diff)]
+                if finite.size:
+                    top = float(finite.max())
+                    worst = top if worst is None else max(worst, top)
+        except (OSError, EOFError, ValueError):
+            pass
+        else:
+            # Change.of's maximum: of the finite differences, inf only when none is finite.
+            if worst is None:
+                worst = 0.0 if n == 0 else float("inf")
+            return defects.Change(n, total, worst)
+    return defects.Change.of(_image_values(fixed), _image_values(reproduced))
+
+
 def _differing_values(a: Path, b: Path) -> str:
+    """How many values of two images differ, and by how much at most (in chunks where
+    :func:`_streamable` allows it, else on the whole arrays)."""
+    if _streamable(a, b) is not None:
+        c = _change(a, b)
+        if c.differing == 0:
+            return "header differs"
+        return f"{c.differing} of {c.total} values differ (max |diff| {c.max_abs:.3g})"
     va, vb = _image_values(a), _image_values(b)
     if va is None or vb is None or va.shape != vb.shape:
         return "differ"
@@ -236,6 +360,12 @@ def _differing_values(a: Path, b: Path) -> str:
     d = np.abs(fa - fb)[~same]
     d = d[np.isfinite(d)]
     return f"{n} of {fa.size} values differ (max |diff| {d.max() if d.size else float('inf'):.3g})"
+
+
+def _head(path: Path) -> bytes:
+    """An image file's first bytes (decompressed): its NIfTI-1, NIfTI-2 or ANALYZE header."""
+    with _open_stream(path) as f:
+        return f.read(_HEADER_BYTES + 4)
 
 
 def _clean(text: str, run_dir: Path) -> str:
@@ -289,15 +419,11 @@ def compare(
     for name in sorted(set(theirs) & set(ours)):
         a, b = theirs[name], ours[name]
         if _is_image(name):
-            da, db = _image_bytes(a), _image_bytes(b)
-            if name.endswith((".img", ".img.gz")):
-                same = da == db
-            else:
-                same = _without_descrip(da) == _without_descrip(db)
+            same = _same_streams(a, b, blank_descrip=not name.endswith((".img", ".img.gz")))
             if not same:
                 different.append(f"{name}: {_differing_values(a, b)}")
         else:
-            same = a.read_bytes() == b.read_bytes()
+            same = _same_bytes(a, b)
             if not same:
                 different.append(name)
         identical += same
@@ -338,8 +464,8 @@ def fix_pass(
         change = defects.Change(0, 0, 0.0)
         for key in sorted(set(a) & set(b)):
             if _is_image(key) and not key.endswith((".img", ".img.gz")):
-                change = change + defects.Change.of(_image_values(b[key]), _image_values(a[key]))
-                ha, hb = _image_bytes(a[key]), _image_bytes(b[key])
+                change = change + _change(b[key], a[key])
+                ha, hb = _head(a[key]), _head(b[key])
                 off = 352 if int.from_bytes(ha[:4], "little") == 348 else 544
                 if _without_descrip(ha[:off]) != _without_descrip(hb[:off]):
                     others.append(f"{key} header")
@@ -588,6 +714,46 @@ def _write_like(src: Path, dst: Path, data: np.ndarray, dtype: Any, analyze: boo
     nib.save(out, dst)
 
 
+def _moving_phantom(seed: int, shape=(12, 14, 12), nvol: int = 7, spacing=(2.0, 2.0, 3.0)):
+    """A small analytic head-like phantom (a soft ellipsoid and three seeded blobs, float32)
+    sampled after a seeded rigid motion per volume (up to 3 degrees about each axis and 2 mm;
+    the first volume at rest): no interpolation, so each volume is the exact moved function."""
+    import nibabel as nib
+
+    rng = np.random.default_rng(seed)
+    sp = np.asarray(spacing)
+    centre = (np.asarray(shape) - 1) / 2 * sp
+    grid = np.meshgrid(*[np.arange(n) for n in shape], indexing="ij")
+    pts = np.stack(grid, -1).astype(np.float64) * sp - centre
+    axes = np.array([9.0, 10.0, 12.0])
+    blobs = [
+        (rng.uniform(-4, 4, 3), rng.uniform(2.0, 4.0), rng.uniform(150, 400)) for _ in range(3)
+    ]
+
+    def f(q: np.ndarray) -> np.ndarray:
+        r = np.sqrt(((q / axes) ** 2).sum(-1))
+        v = 600.0 / (1.0 + np.exp((r - 1.0) * 12.0))
+        for c, w, a in blobs:
+            v += a * np.exp(-((q - c) ** 2).sum(-1) / (2 * w * w))
+        return v
+
+    vols = []
+    for t in range(nvol):
+        ang = np.radians(rng.uniform(-3, 3, 3)) if t else np.zeros(3)
+        shift = rng.uniform(-2, 2, 3) if t else np.zeros(3)
+        (cx, cy, cz), (sx, sy, sz) = np.cos(ang), np.sin(ang)
+        rx = np.array([[1, 0, 0], [0, cx, sx], [0, -sx, cx]])
+        ry = np.array([[cy, 0, -sy], [0, 1, 0], [sy, 0, cy]])
+        rz = np.array([[cz, sz, 0], [-sz, cz, 0], [0, 0, 1]])
+        vols.append(f((pts - shift) @ (rx @ ry @ rz)).astype(np.float32))
+    aff = np.diag([*spacing, 1.0])
+    aff[:3, 3] = -centre
+    img = nib.Nifti1Image(np.stack(vols, -1), aff)
+    img.header.set_xyzt_units("mm", "sec")
+    img.header["pixdim"][4] = 2.0
+    return img
+
+
 def _make_inputs(kind: str, d: Path) -> dict[str, str]:
     """The generated inputs of ``kind`` in ``d`` (deterministic: derived from the test data's
     synthetic series)."""
@@ -614,6 +780,9 @@ def _make_inputs(kind: str, d: Path) -> dict[str, str]:
         shape = img.shape[:3]
         rgb = np.zeros(shape, dtype=[("R", "u1"), ("G", "u1"), ("B", "u1")])
         nib.save(nib.Nifti1Image(rgb, img.affine), d / "in.nii.gz")
+        files["in"] = "in.nii.gz"
+    elif kind.startswith("phantom-"):
+        nib.save(_moving_phantom(int(kind.removeprefix("phantom-"))), d / "in.nii.gz")
         files["in"] = "in.nii.gz"
     elif kind == "nan-ref":
         r = np.asanyarray(nib.load(ref).dataobj).astype(np.float32)
@@ -761,6 +930,17 @@ EDGES: dict[str, Edge] = {
         ),
         description="-meanvol from a reference file, sinc, -stats, -out with its extension",
     ),
+    # Three moving phantoms whose rotation decompositions reach atanf arguments where fdlibm's
+    # comment value of aT[0] (0x3eaaaaaa, the translation before 2026-10-25) gives one ulp
+    # more than glibc (0x3eaaaaab): 11 of 60 seeds do; with the old constant these cases fail.
+    **{
+        f"atanf-phantom-{seed}": Edge(
+            ("-in", "@in", "-out", "out", "-mats", "-plots"),
+            inputs=f"phantom-{seed}",
+            description=f"a moving phantom (seed {seed}) reaching atanf's aT[0] (random testing)",
+        )
+        for seed in (2, 11, 27)
+    },
     "rotation0": Edge(
         ("-in", "@in", "-out", "out", "-rotation", "0", "-stages", "1", "-mats"),
         description="-rotation 0 (infinite rotation tolerances)",

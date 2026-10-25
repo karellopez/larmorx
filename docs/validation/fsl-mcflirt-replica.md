@@ -1,13 +1,14 @@
 # Parity: mcflirt replica (bit-exact, FSL Licence)
 
-**All cases agree.** 176 cases on the `full` tier: 155 pass, 21 rejected by both, 0 expected divergences, 0 failures.
+**All cases agree.** 194 cases on the `full` tier: 173 pass, 21 rejected by both, 0 expected divergences, 0 failures.
 
 - **Validated:** `larmorx-nc fsl mcflirt` (crate larmorx-nc-mcflirt, translated from FSL 6.0.7.17's source; `lx.mri.hmc(implementation="replica")`)
 - **Reference:** mcflirt from FSL 6.0.7.17 (fsl-mcflirt 2111.0, the conda build at `~/fsl`, as built: glibc 2.35's maths): the recorded runs in `oracles/fsl-6.0.7/mcflirt/` and runs made here
 - **Test data:** larmorx-testdata `b0999a9e0c31`, tier `full`
-- **Generated:** 2026-10-24 on Linux x86_64, with `python -m larmorx_validation parity fsl-mcflirt-replica --tier full`
+- **Generated:** 2026-10-25 on Linux x86_64, with `python -m larmorx_validation parity fsl-mcflirt-replica --tier full`
+- **Original programs:** 57 runs: 50 from the oracle cache, 7 run; cache `<workspace>/oracles/cache`, mode `use`
 
-- **Bit-identical to mcflirt as built** (every file, the exit status and both streams; the replica in `reproduce` mode): 155 of 155 compared cases; 21 where both end with the same error.
+- **Bit-identical to mcflirt as built** (every file, the exit status and both streams; the replica in `reproduce` mode): 173 of 173 compared cases; 21 where both end with the same error.
 
 The three columns of the head-motion validation (the clean-room original's numbers from its record, `docs/validation/mri-hmc.md`, not computed again):
 
@@ -149,13 +150,13 @@ The three columns of the head-motion validation (the clean-room original's numbe
 | `syn/orientation/ras/reffile` | pass (18/18 files) | pass: p95 RMS 0.0713 mm, MAT identical 0/12 |
 
 - **D13 fix pass** (larmorx's default, `upstream_defects="fix"`; the comparison above runs `reproduce`): the corrections met
-  - FSL-01: 138 case(s) named it, 137 with changed values (largest difference inf), 23 with other changes (exit N -> N; files ['out.nii.gz_mean_reg.nii.gz', 'out.nii.gz_meanvol.nii.gz', 'out.nii.gz_sigma.nii.gz', 'out.nii.gz_variance.nii.gz']; files ['out_mcf.nii.gz.mat/MAT_N']; files ['out_mcf.nii.gz_mean_reg.nii.gz', 'out_mcf_mean_reg.nii.gz']; files ['out_mcf.nii.gz_meanvol.nii.gz', 'out_mcf.nii.gz_sigma.nii.gz', 'out_mcf.nii.gz_variance.nii.gz', 'out_mcf_meanvol.nii.gz']; out.nii.gz header; out_mcf.nii.gz header): `recorded/real/ds000005/default`, `recorded/real/ds000005/fmriprep`, `recorded/real/ds000005/fmriprep-repeat2`, `recorded/real/ds000005/fmriprep-repeat3`, `recorded/real/ds000005/fmriprep-reports`, `recorded/real/ds000005/opt-2d`, `recorded/real/ds000005/opt-bins64`, `recorded/real/ds000005/opt-cost-corratio` …
+  - FSL-01: 156 case(s) named it, 155 with changed values (largest difference inf), 23 with other changes (exit N -> N; files ['out.nii.gz_mean_reg.nii.gz', 'out.nii.gz_meanvol.nii.gz', 'out.nii.gz_sigma.nii.gz', 'out.nii.gz_variance.nii.gz']; files ['out_mcf.nii.gz.mat/MAT_N']; files ['out_mcf.nii.gz_mean_reg.nii.gz', 'out_mcf_mean_reg.nii.gz']; files ['out_mcf.nii.gz_meanvol.nii.gz', 'out_mcf.nii.gz_sigma.nii.gz', 'out_mcf.nii.gz_variance.nii.gz', 'out_mcf_meanvol.nii.gz']; out.nii.gz header; out_mcf.nii.gz header): `recorded/real/ds000005/default`, `recorded/real/ds000005/fmriprep`, `recorded/real/ds000005/fmriprep-repeat2`, `recorded/real/ds000005/fmriprep-repeat3`, `recorded/real/ds000005/fmriprep-reports`, `recorded/real/ds000005/opt-2d`, `recorded/real/ds000005/opt-bins64`, `recorded/real/ds000005/opt-cost-corratio` …
   - FSL-03: 6 case(s) named it, 6 with changed values (largest difference 371), 6 with other changes (out.nii.gz header; out_mcf.nii.gz header): `recorded/real/ds000005/opt-2d`, `recorded/syn/geometry/thin-slab/default`, `recorded/syn/geometry/thin-slab/fov10`, `recorded/syn/geometry/thin-slab/rotation2`, `recorded/syn/motion/small/2d`, `edge/fov0-2d`
   - FSL-04: 1 case(s) named it, 0 with changed values (largest difference 0), 1 with other changes (exit N -> N; files ['grefvol_out.nii.gz', 'out.nii.gz', 'out.par']): `edge/gdt`
   - FSL-05: 2 case(s) named it, 2 with changed values (largest difference 15): `recorded/real/ds000005/opt-scaling3`, `edge/scaling-hist`
   - FSL-06: 1 case(s) named it, 0 with changed values (largest difference 0), 1 with other changes (exit N -> N; files ['out_mcf.nii.gz', 'out_mcf.nii.gz.mat/MAT_N', 'out_mcf.nii.gz.mat/MAT_N', 'out_mcf.nii.gz.mat/MAT_N']): `recorded/syn/motion/small/unknown-cost`
-  - FSL-08: 3 case(s) named it, 3 with changed values (largest difference 15), 3 with other changes (files ['out.nii.gz_mean_reg.nii.gz', 'out.nii.gz_meanvol.nii.gz', 'out.nii.gz_sigma.nii.gz', 'out.nii.gz_variance.nii.gz']; files ['out_mcf.nii.gz_meanvol.nii.gz', 'out_mcf.nii.gz_sigma.nii.gz', 'out_mcf.nii.gz_variance.nii.gz', 'out_mcf_meanvol.nii.gz']; out.nii.gz header): `recorded/real/ds000005/opt-stats`, `recorded/syn/motion/small/stats`, `edge/meanvol-reffile-sinc-stats`
-  - FSL-09: 125 case(s) named it, 125 with changed values (largest difference 876), 20 with other changes (files ['out.nii.gz_mean_reg.nii.gz', 'out.nii.gz_meanvol.nii.gz', 'out.nii.gz_sigma.nii.gz', 'out.nii.gz_variance.nii.gz']; files ['out_mcf.nii.gz.mat/MAT_N']; files ['out_mcf.nii.gz_mean_reg.nii.gz', 'out_mcf_mean_reg.nii.gz']; files ['out_mcf.nii.gz_meanvol.nii.gz', 'out_mcf.nii.gz_sigma.nii.gz', 'out_mcf.nii.gz_variance.nii.gz', 'out_mcf_meanvol.nii.gz']; out.nii.gz header; out_mcf.nii.gz header): `recorded/real/ds000005/default`, `recorded/real/ds000005/fmriprep`, `recorded/real/ds000005/fmriprep-repeat2`, `recorded/real/ds000005/fmriprep-repeat3`, `recorded/real/ds000005/fmriprep-reports`, `recorded/real/ds000005/opt-2d`, `recorded/real/ds000005/opt-bins64`, `recorded/real/ds000005/opt-cost-corratio` …
+  - FSL-08: 6 case(s) named it, 6 with changed values (largest difference 54), 6 with other changes (files ['out.nii.gz_mean_reg.nii.gz', 'out.nii.gz_meanvol.nii.gz', 'out.nii.gz_sigma.nii.gz', 'out.nii.gz_variance.nii.gz']; files ['out_mcf.nii.gz_mean_reg.nii.gz', 'out_mcf_mean_reg.nii.gz']; files ['out_mcf.nii.gz_meanvol.nii.gz', 'out_mcf.nii.gz_sigma.nii.gz', 'out_mcf.nii.gz_variance.nii.gz', 'out_mcf_meanvol.nii.gz']; out.nii.gz header; out_mcf.nii.gz header): `recorded/real/ds000005/opt-meanvol`, `recorded/real/ds000005/opt-meanvol-noref`, `recorded/real/ds000005/opt-stats`, `recorded/syn/motion/small/meanvol`, `recorded/syn/motion/small/stats`, `edge/meanvol-reffile-sinc-stats`
+  - FSL-09: 138 case(s) named it, 138 with changed values (largest difference 1.07e+03), 20 with other changes (files ['out.nii.gz_mean_reg.nii.gz', 'out.nii.gz_meanvol.nii.gz', 'out.nii.gz_sigma.nii.gz', 'out.nii.gz_variance.nii.gz']; files ['out_mcf.nii.gz.mat/MAT_N']; files ['out_mcf.nii.gz_mean_reg.nii.gz', 'out_mcf_mean_reg.nii.gz']; files ['out_mcf.nii.gz_meanvol.nii.gz', 'out_mcf.nii.gz_sigma.nii.gz', 'out_mcf.nii.gz_variance.nii.gz', 'out_mcf_meanvol.nii.gz']; out.nii.gz header; out_mcf.nii.gz header): `recorded/real/ds000005/default`, `recorded/real/ds000005/fmriprep`, `recorded/real/ds000005/fmriprep-repeat2`, `recorded/real/ds000005/fmriprep-repeat3`, `recorded/real/ds000005/fmriprep-reports`, `recorded/real/ds000005/opt-2d`, `recorded/real/ds000005/opt-bins64`, `recorded/real/ds000005/opt-cost-corratio` …
   - FSL-10: 3 case(s) named it, 3 with changed values (largest difference 33), 3 with other changes (out_mcf.nii.gz header): `recorded/real/ds003345/default`, `recorded/real/ds003345/fmriprep`, `recorded/real/ds003345/fmriprep-reports`
   - FSL-13: 1 case(s) named it, 1 with changed values (largest difference 3), 1 with other changes (files ['out_mcf.nii.gz.mat/MAT_N']): `recorded/syn/cli/rmsrel-only`
   - FSL-14: 3 case(s) named it, 3 with changed values (largest difference inf), 1 with other changes (out.nii.gz header): `recorded/syn/content/nan/default`, `recorded/syn/content/nan/reffile`, `edge/nan-reffile`
@@ -176,8 +177,8 @@ The three columns of the head-motion validation (the clean-room original's numbe
 
 | Category | Cases | Pass | Both reject | Expected divergence | Fail |
 |---|---|---|---|---|---|
-| edge cases | 32 | 23 | 9 | 0 | 0 |
-| fMRIPrep's calls | 7 | 7 | 0 | 0 | 0 |
+| edge cases | 35 | 26 | 9 | 0 | 0 |
+| fMRIPrep's calls | 22 | 22 | 0 | 0 | 0 |
 | recorded: options (ds000005) | 28 | 27 | 1 | 0 | 0 |
 | recorded: real | 30 | 29 | 1 | 0 | 0 |
 | recorded: synthetic/cli | 11 | 6 | 5 | 0 | 0 |
@@ -217,7 +218,7 @@ The three columns of the head-motion validation (the clean-room original's numbe
 
 | Component | Version |
 |---|---|
-| larmorx | 0.0.1 (920ee8e64f2b) |
+| larmorx | 0.0.1 (205bee40f36f) |
 | larmorx-testdata | b0999a9e0c31 |
 | Python | 3.12.10 |
 | Platform | Linux x86_64 (Linux-6.8.0-124-generic-x86_64-with-glibc2.35) |
@@ -398,6 +399,9 @@ The replica runs as a separate program, the FSL replica package's (`larmorx-nc`)
 | `edge/nan-reffile` | pass | 6/6 | a reference with a NaN voxel (FSL-14) |
 | `edge/refvol-last` | pass | 6/6 | the last volume as the reference |
 | `edge/meanvol-reffile-sinc-stats` | pass | 6/6 | -meanvol from a reference file, sinc, -stats, -out with its extension |
+| `edge/atanf-phantom-2` | pass | 6/6 | a moving phantom (seed 2) reaching atanf's aT[0] (random testing) |
+| `edge/atanf-phantom-11` | pass | 6/6 | a moving phantom (seed 11) reaching atanf's aT[0] (random testing) |
+| `edge/atanf-phantom-27` | pass | 6/6 | a moving phantom (seed 27) reaching atanf's aT[0] (random testing) |
 | `edge/rotation0` | pass | 6/6 | -rotation 0 (infinite rotation tolerances) |
 | `edge/smooth-negative` | pass | 6/6 | a negative -smooth |
 | `edge/scaling-hist` | pass | 6/6 | -scaling and -hist (no effect: FSL-05) |
@@ -405,6 +409,21 @@ The replica runs as a separate program, the FSL replica package's (`larmorx-nc`)
 | `fmriprep/ds000005-sub-01-noreconall/task_mixedgamblestask_run_01` | pass | 7/7 | fMRIPrep 25.2.6's mcflirt call (ds000005-sub-01-noreconall, task_mixedgamblestask_run_01) |
 | `fmriprep/ds000005-sub-01-noreconall/task_mixedgamblestask_run_02` | pass | 7/7 | fMRIPrep 25.2.6's mcflirt call (ds000005-sub-01-noreconall, task_mixedgamblestask_run_02) |
 | `fmriprep/ds000005-sub-01-noreconall/task_mixedgamblestask_run_03` | pass | 7/7 | fMRIPrep 25.2.6's mcflirt call (ds000005-sub-01-noreconall, task_mixedgamblestask_run_03) |
+| `fmriprep/ds000228-sub-pixar008-noreconall/task_pixar` | pass | 7/7 | fMRIPrep 25.2.6's mcflirt call (ds000228-sub-pixar008-noreconall, task_pixar) |
+| `fmriprep/ds000256-sub-CTS203-noreconall/task_restbaseline` | pass | 7/7 | fMRIPrep 25.2.6's mcflirt call (ds000256-sub-CTS203-noreconall, task_restbaseline) |
+| `fmriprep/ds000256-sub-CTS203-noreconall/task_restfixationfixed` | pass | 7/7 | fMRIPrep 25.2.6's mcflirt call (ds000256-sub-CTS203-noreconall, task_restfixationfixed) |
+| `fmriprep/ds000256-sub-CTS203-noreconall/task_restfixationnofeedback` | pass | 7/7 | fMRIPrep 25.2.6's mcflirt call (ds000256-sub-CTS203-noreconall, task_restfixationnofeedback) |
+| `fmriprep/ds002422-sub-02-noreconall/task_arithm_run_01` | pass | 7/7 | fMRIPrep 25.2.6's mcflirt call (ds002422-sub-02-noreconall, task_arithm_run_01) |
+| `fmriprep/ds002422-sub-02-noreconall/task_arithm_run_02` | pass | 7/7 | fMRIPrep 25.2.6's mcflirt call (ds002422-sub-02-noreconall, task_arithm_run_02) |
+| `fmriprep/ds002422-sub-02-noreconall/task_rest` | pass | 7/7 | fMRIPrep 25.2.6's mcflirt call (ds002422-sub-02-noreconall, task_rest) |
+| `fmriprep/ds002603-sub-01-noreconall/task_wm_acq_Mb4Mm3Tr550` | pass | 7/7 | fMRIPrep 25.2.6's mcflirt call (ds002603-sub-01-noreconall, task_wm_acq_Mb4Mm3Tr550) |
+| `fmriprep/ds002603-sub-01-noreconall/task_wm_acq_SeqMm3Tr2000` | pass | 7/7 | fMRIPrep 25.2.6's mcflirt call (ds002603-sub-01-noreconall, task_wm_acq_SeqMm3Tr2000) |
+| `fmriprep/ds003592-sub-280-noreconall/ses_1_task_rest_echo_1` | pass | 7/7 | fMRIPrep 25.2.6's mcflirt call (ds003592-sub-280-noreconall, ses_1_task_rest_echo_1) |
+| `fmriprep/ds004884-sub-M2079-noreconall/ses_217_task_naming40_acq_epfid2_dir_AP_run_2` | pass | 7/7 | fMRIPrep 25.2.6's mcflirt call (ds004884-sub-M2079-noreconall, ses_217_task_naming40_acq_epfid2_dir_AP_run_2) |
+| `fmriprep/ds004884-sub-M2079-noreconall/ses_217_task_rest_acq_epfidp2p2_dir_AP_run_9` | pass | 7/7 | fMRIPrep 25.2.6's mcflirt call (ds004884-sub-M2079-noreconall, ses_217_task_rest_acq_epfidp2p2_dir_AP_run_9) |
+| `fmriprep/ds004958-sub-fsm64ps-noreconall/task_rest` | pass | 7/7 | fMRIPrep 25.2.6's mcflirt call (ds004958-sub-fsm64ps-noreconall, task_rest) |
+| `fmriprep/ds005003-sub-RS001-noreconall/ses_1_task_motor` | pass | 7/7 | fMRIPrep 25.2.6's mcflirt call (ds005003-sub-RS001-noreconall, ses_1_task_motor) |
+| `fmriprep/ds005003-sub-RS001-noreconall/ses_1_task_rest` | pass | 7/7 | fMRIPrep 25.2.6's mcflirt call (ds005003-sub-RS001-noreconall, ses_1_task_rest) |
 | `fmriprep/ds005040-sub-002-noreconall/task_clip_run_1` | pass | 7/7 | fMRIPrep 25.2.6's mcflirt call (ds005040-sub-002-noreconall, task_clip_run_1) |
 | `fmriprep/ds005454-sub-16-noreconall/task_rest` | pass | 7/7 | fMRIPrep 25.2.6's mcflirt call (ds005454-sub-16-noreconall, task_rest) |
 | `fmriprep/ds005752-sub-ON01016-noreconall/ses_01_task_rest_dir_forward` | pass | 7/7 | fMRIPrep 25.2.6's mcflirt call (ds005752-sub-ON01016-noreconall, ses_01_task_rest_dir_forward) |

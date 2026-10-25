@@ -36,7 +36,7 @@ Phase L1 in progress. History: [docs/status-log.md](docs/status-log.md) (to 2026
 | I/O and transforms | NIfTI-1/2 I/O (`lx.load`, `lx.save`, `lx.Image`); ITK transform files, HDF5 included, read and written in pure Rust (`larmorx-hdf5`); fMRIPrep's one-shot BOLD resampler (`lx.transforms.resample_series`) | `nifti-io`, `itk-hdf5`, `resample-series` |
 | ANTs and ITK (ports) | antsApplyTransforms (`--float 1`, transform outputs, B-spline transforms), N4BiasFieldCorrection, DenoiseImage, ImageMath (every operation fMRIPrep, sMRIPrep and sdcflows call), ThresholdImage, MultiplyImages, SmoothImage, ResampleImage(BySpacing), antsRegistration (every stage: linear, SyN, BSplineSyN, BSpline, displacement-field, Exponential, BSplineExponential and time-varying velocity-field; image and point-set metrics; the corrections of 2026-10-21 on by default), antsAI (every option, the blob alignment included), antsAffineInitializer, Atropos (every option; sMRIPrep's call bit-identical with correctly rounded maths on the five oracle runs) | `ants-*` |
 | AFNI | 3dTshift, 3dAutomask, 3dUnifize, complete: clean-room originals (`crates/larmorx-afni`) and GPL replicas (`crates-gpl/`) | `afni-tshift`, `afni-tshift-replica`, `afni-automask`, `afni-automask-replica`, `afni-unifize`, `afni-unifize-replica` |
-| FSL | head-motion correction with mcflirt-style options, clean-room original, `experimental` (`lx.mri.hmc`); the mcflirt replica (`crates-nc/`, package `larmorx-nc`, FSL Licence: non-commercial, FSL's source in `crates-nc/fsl-source/`), bit-identical to mcflirt as built (155 of 155 compared cases of its record, fMRIPrep's calls on the five oracle runs included, and fMRIPrep's own matrices identical); `larmorx-nc-core` is the shared core of the next FSL replicas | `mri-hmc`, `fsl-mcflirt-replica` |
+| FSL | head-motion correction with mcflirt-style options, clean-room original, `experimental` (`lx.mri.hmc`); the mcflirt replica (`crates-nc/`, package `larmorx-nc`, FSL Licence: non-commercial, FSL's source in `crates-nc/fsl-source/`), bit-identical to mcflirt as built (173 of 173 compared cases of its record, fMRIPrep's 22 calls on the twelve oracle runs with BOLD runs included, and fMRIPrep's own matrices identical); `larmorx-nc-core` is the shared core of the next FSL replicas | `mri-hmc`, `fsl-mcflirt-replica` |
 
 Golden tests cover every tool on all six platforms (`docs/validation/golden.md`); CI has been green at every merge. Stage-by-stage comparisons with fMRIPrep 25.2.6 were run on four oracle runs (`docs/validation/fmriprep-stages*.md`); further fMRIPrep comparisons wait until every tool is ported (user, 2026-10-16).
 
@@ -64,8 +64,11 @@ re-runs entries to catch drift. Each record's header names its runs from the cac
 smoke tier leaves a marker that `scripts/record_golden.py` reuses (no second smoke run).
 **The mcflirt replica merged** (2026-10-25; FSL, item 7): `crates-nc/` (`larmorx-nc`, FSL
 Licence, FSL's original source included), its shared core `larmorx-nc-core`, and mcflirt
-bit-identical to FSL 6.0.7.17's (155 of 155 compared cases; 21 rejected by both alike); new
-FSL-20 and FSL-21 (rule B); `lx.mri.hmc(implementation=...)` and `larmorx fsl mcflirt`.
+bit-identical to FSL 6.0.7.17's (173 of 173 compared cases; 21 rejected by both alike); new
+FSL-20 and FSL-21 (rule B); `lx.mri.hmc(implementation=...)` and `larmorx fsl mcflirt`. Its follow-up
+(2026-10-25): one constant of the C library's `atanf` (fdlibm's `aT[0]`, taken from a source comment)
+explained the two panel calls and 58 of the first 59 random-testing findings; FSL-08's notice now also
+covers the `-meanvol` image's name.
 **The data panel and evidence that scales merged** (2026-10-25; built 2026-10-24): fourteen
 OpenNeuro subjects in larmorx-testdata (`panel.toml`, `docs/panel.md`; `python -m larmorx_testdata
 fetch --tier full --tag panel`, 219 files, 2.35 GB; every file hash-verified and checked against its

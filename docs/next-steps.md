@@ -91,8 +91,9 @@ starts no other agent.
    (2026-10-25): `crates-nc/` (`larmorx-nc`, FSL Licence, FSL's source included), the core crate
    `larmorx-nc-core` (NIfTI as FSL does it, `volume<float>`, interpolation, FLIRT's cost
    functions, the optimiser, the transform algebra, Armadillo's rules, glibc's float maths) for
-   the next FSL replicas; record [fsl-mcflirt-replica](validation/fsl-mcflirt-replica.md): 155 of
-   155 compared cases bit-identical. **BET:** the replica and its spec are built, to be merged
+   the next FSL replicas; record [fsl-mcflirt-replica](validation/fsl-mcflirt-replica.md): 173 of
+   173 compared cases bit-identical (the data panel's fMRIPrep calls and 61 random-testing findings
+   included, after one `atanf` constant was corrected). **BET:** the replica and its spec are built, to be merged
    after its FSL library code moves into `larmorx-nc-core`; then BET's clean-room original,
    FLIRT with BBR, FAST, topup.
 8. **Field maps, FreeSurfer, surfaces, confounds:** sdcflows' field-map estimation (Apache Python:

@@ -125,3 +125,27 @@ The replica is shown beside mcflirt and the clean-room original. Following your 
 ## At the merge (orchestrator)
 
 The `[all]` question was settled by the user's decision of 2026-10-16 (`[all]` installs every replica package, `larmorx-nc` included; `[exact]` only `larmorx-gpl`); the extra was added to `pyproject.toml` and `docs/licensing.md` corrected. `run_oracle` now goes through the oracle-output cache (`Policy(threads=1, family="fsl")`). The full parity tier and the golden checksums were re-run and re-recorded from the merge.
+
+## Follow-up (2026-10-25), after the data panel's runs and random testing
+
+At the merge's verification the suite picked up the data panel's fMRIPrep runs, and two calls
+differed (ds000256 from MAT_0122, ds002422 from MAT_0166); random testing then found 57 of 584
+cases differing. The agent was sent back. Its report, verbatim:
+
+**The cause was a bug in my translation, not in mcflirt.** In my port of glibc's `atanf` (`crates-nc/larmorx-nc-core/src/fdlibm.rs`), I took the constant `aT[0]` from fdlibm's source comment, `0x3eaaaaaa`. The decimal literal the compiler actually reads is `3.3333334327e-01`, which rounds to `0x3eaaaaab`. glibc 2.35's `.rodata` holds `0x3eaaaaab` (I checked it with objdump; every other constant of `atanf`/`atan2f` matches).
+- The wrong value changes `atanf` by one ulp on 1,037,658 of the 2^32 inputs.
+- On ds002422 rest it hit 1 of mcflirt's 600 rotation decompositions: volume 166, start of stage 3, `atan2f(0x3c7c2fbe, 0x3f7ff83d)` gave `…24b` instead of `…24a`.
+- On ds000256 CTS203 no-feedback it hit volume 122, and the chained first stage carried it to the last volume.
+- mcflirt itself is deterministic on both (two runs give identical output). With the CORE-MATH preload, 1 of 200 and 64 of 164 matrices change, so glibc's own rounding is what the replica has to reproduce.
+
+**How I found it.** LD_PRELOAD interposers on FSL's own `decompose_aff` and `Costfn::cost`: stage 2 of volume 166 matched bit for bit (26 evaluations); FSL's cost function gives the replica's costs at the replica's matrices; replaying mcflirt's 600 `decompose_aff` calls through the replica isolated the one call and its `atan2f`. Probes: `validation/probes/fsl-mcflirt-affine-trace/`; replay tool: `crates-nc/larmorx-nc-core/tools/affine-trace-replay`.
+
+**The fix and its tests (e687cd1, aa2c28f):** `aT[0]` is now `0x3eaaaaab`; `glibc-float-verify` checks `atanf` on all 2^32 inputs and `atan2f` on 1,444 special-value pairs plus 3 × 2^30 seeded pairs: 0 differences; unit tests `atanf_glibc_bits`, `atan2f_mcflirt_ds002422`, `decompose_aff_mcflirt_ds002422`; both fMRIPrep calls now give mcflirt's matrices: 200/200 and 164/164.
+
+**Random testing.** All 61 findings, shrunk and original recipes (122 runs), are bit-identical to mcflirt in every file, both streams and the exit status, with the D13 fix pass included. `:616` was a separate issue: the default renames the `-meanvol` output to `<stem>_mean_reg` (FSL-08) but printed no notice; FSL-08's notice is now given (d196995). Permanent cases: six in `validation/difftest/cases/fsl-mcflirt/` (attached once random testing's harness hook is on main) and three self-contained smoke cases `edge/atanf-phantom-{2,11,27}` (205bee4).
+
+**Memory (37d6505).** The 8 GiB box killed two runs on ds004958 (600 volumes): the suite's own process reached 7.75 GiB because the fix pass loaded whole images. Comparison and change-counting now run in 16 MB chunks, exactly equal to the whole-array results (`validation/tests/test_fsl_mcflirt_compare.py`); the full tier ran in `boxed.sh 16`.
+
+**New record** (full tier, clean commit 205bee4): 194 cases, 173 of 173 compared bit-identical, 21 rejected by both alike; recorded runs 137 (125 + 12), edge cases 35 (26 + 9), fMRIPrep calls 22 on 12 oracle runs (22 pass); fMRIPrep's own `.mat` files identical as text: 4,517 of 4,517; 50 of 57 original-program runs from the oracle cache.
+
+**Gates.** crates-nc fmt, clippy, tests (golden unchanged); ruff, SPDX; `pytest tests/python tests/golden validation/tests` 539 passed; `pytest tests/parity -k mcflirt` 113 passed. Site: the head-motion page re-exported with the panel's exporter (number check 182/182, cases 176 → 194, inventory after ≥ before), local `evidence-blobs` 5b89607 (295 blobs).

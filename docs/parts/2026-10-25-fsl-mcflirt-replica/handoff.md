@@ -318,3 +318,53 @@ Screenshots (`shots/`): `before/mri-hmc-{1440,390}-{light,dark}-y0.png` and
 `after/mri-hmc-{1440,390}-{light,dark}-y0.png` (full pages); `before/viewer-*-y3300.png` and
 `after/viewer-*-y3950.png` (the viewer, live); `before/example-1440-light-y0.png`,
 `after/example-*.png` (the example alone: its canvases render only in the live viewport shots).
+
+## Follow-up of 2026-10-25 (supersedes the numbers above)
+
+Branch `worktree-agent-a5874ac3558d79d85` now = local main `c3e5976` (merged in twice: d0b4036's cache,
+then the data panel) + the follow-up commits e687cd1 (atanf aT[0]), ceaaca5, 37d6505 (streamed compare),
+d196995 (FSL-08 -meanvol notice), 205bee4 (cases), cd80351 (record), ebcf570 (findings/API),
+d6ba67e (merge of main c3e5976), aa2c28f (atanf_with_at0 in the verify tool; investigation tools; atanf
+re-verified on all 2^32 inputs after this refactor, so the record from 205bee4 stands).
+Site branch `fsl-mcflirt-evidence` = `panel-site` (0ec6198, merged in) + f0eba84; its local
+`evidence-blobs` = 5b89607 (295 blobs; push it before main, as the panel part says).
+
+### Numbers (record `docs/validation/fsl-mcflirt-replica.{md,json}`, full tier, from clean 205bee4)
+194 cases: 173 pass (bit-identical: every file, exit status, both streams), 21 rejected by both
+alike, 0 failures. Recorded runs 137 (125 + 12), edge cases 35 (26 + 9; new: atanf-phantom-2, -11,
+-27), fMRIPrep's calls 22 on 12 oracle runs (22 pass; fMRIPrep's own `.mat` files identical:
+4,517 of 4,517). Original programs: 57 runs, 50 from the oracle cache. Smoke tier: 113 cases.
+
+### README.md (Tools table, head-motion row: replace the replica part)
+replica: [173 of 173](docs/validation/fsl-mcflirt-replica.md) compared cases bit-identical to mcflirt as built (the 137 recorded runs, fMRIPrep's 22 calls on the 12 oracle runs with BOLD runs, the data panel's included, 35 edge cases; 21 more rejected by both, alike), fMRIPrep's own matrices identical (4,517)
+
+### docs/validation/README.md (fsl-mcflirt-replica row, status cell)
+`validated` (173 of 173 compared cases bit-identical, fMRIPrep's 22 calls on the 12 oracle runs included; 21 rejected by both, with the same messages and status)
+
+### CLAUDE.md
+- FSL row: "... bit-identical to mcflirt as built (173 of 173 compared cases of its record, fMRIPrep's 22 calls on the twelve oracle runs with BOLD runs included, and fMRIPrep's own matrices identical) ..."
+- "The mcflirt replica merged" paragraph: "(173 of 173 compared cases; 21 rejected by both alike)"; add: "Its follow-up (2026-10-25): one constant of the C library's `atanf` (fdlibm's `aT[0]`, taken from a source comment) explained the two panel calls and 58 of the first 59 random-testing findings; FSL-08's notice now also covers the `-meanvol` image's name."
+
+### site data/status.yml (Head-motion correction row)
+    how: clean-room original, `experimental`; exact replica in `larmorx-nc`
+    validation: "original: [compared with FSL's mcflirt](repo:docs/validation/mri-hmc.md): 121 of 122 compared cases within thresholds; [5–16× faster](repo:docs/benchmarks/mri-hmc.md) with threads; replica: [173 of 173](repo:docs/validation/fsl-mcflirt-replica.md) compared cases bit-identical to mcflirt as built, fMRIPrep's 22 calls on the twelve oracle runs included"
+And re-export `static/evidence/summary.json` at the merge (my export wrote only mri-hmc.json and the manifest).
+
+### docs/findings/upstream-defects.md
+- FSL-08 table row (l. 279): "mcflirt `-stats`, `-meanvol`" | "end slices left 0; names with the extension inside (the `-stats` images and `-meanvol`'s `_mean_reg`)" | ... | "corrected by default (`upstream_defects`, 2026-10-11); the replica names it for `-meanvol` alone too (2026-10-25, random testing `fsl-mcflirt:20261025:616`)".
+- FSL-08 detailed entry (l. 3814 ff., stale: it still says "reproduces both" and "Gap" while the table says corrected): **larmorx:** "corrected by default in both implementations: every slice, and the `-stats` and `-meanvol` images named after the stem of `-out` (`x_meanvol.nii.gz`, `x_mean_reg.nii.gz`); `reproduce` gives mcflirt's slices and names." **D13 / gap:** "none."
+- GLIBC-03 (or a sentence in the glibc section): "glibc 2.35's `atanf` (fdlibm, no FMA build) is not correctly rounded on 21,089,462 of the 2^32 inputs (0.49 %), 7,060 with |x| ≤ 0.05; the replica carries it bit for bit (`atanf` on all 2^32 inputs, `atan2f` on 3 × 2^30 seeded pairs: 0 differences)."
+- History paragraph: "2026-10-25: the mcflirt replica's follow-up found no new defect of mcflirt: the panel's two differing calls and the random tests' 61 findings were the replica's own (`atanf`'s `aT[0]` from fdlibm's comment, and a missing FSL-08 notice for `-meanvol`), both fixed."
+
+### docs/api/upstream-defects.md (FSL-08 row, "larmorx call" cell)
+`larmorx mri hmc -stats`, `-meanvol`
+
+### docs/validation/golden.md
+No change: no checksum changed (crates-nc golden and `cli.fsl.mcflirt` pass unchanged).
+
+### Random testing (for the random-testing part's merge)
+Six permanent cases in its format: `validation/difftest/cases/fsl-mcflirt/{atanf-default-call,
+atanf-matrices-from-0, atanf-matrices-from-4, atanf-printed-params, atanf-par-only,
+meanvol-name-notice}.json` (written with its `permanent.promote`, tier smoke, status fixed); they
+attach to `fsl-mcflirt-replica` once its harness hook is on main. All 61 findings (shrunk and
+original recipes, 122 runs) are bit-identical to mcflirt with this branch, the fix pass included.

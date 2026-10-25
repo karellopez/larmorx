@@ -276,7 +276,7 @@ completing 3dTshift, part 2b, then AFNI-26's switch the same day); – = nothing
 | FSL-05 † | mcflirt | `-scaling`, `-hist` ignored; `-edge` not an option | e | none | ignored with a warning; `-edge` explained (2026-10-11) | – |
 | FSL-06 † | mcflirt | unknown `-cost` silently keeps normcorr | e | none | corrected by default (`upstream_defects`, 2026-10-11): an error | – |
 | FSL-07 † | mcflirt | numbers read with `atoi`/`atof`; `-help` alone exits 1 | e | none | corrected by default (`upstream_defects`, 2026-10-11) | – |
-| FSL-08 † | mcflirt `-stats` | end slices left 0; names with the extension inside | c, e | none | corrected by default (`upstream_defects`, 2026-10-11) | – |
+| FSL-08 † | mcflirt `-stats`, `-meanvol` | end slices left 0; names with the extension inside (the `-stats` images and `-meanvol`'s `_mean_reg`) | c, e | none | corrected by default (`upstream_defects`, 2026-10-11); the replica names it for `-meanvol` alone too (2026-10-25, random testing `fsl-mcflirt:20261025:616`) | – |
 | FSL-09 † | mcflirt | output types: int8 → uint8, truncation, no clamping | c, a | none | corrected by default (`upstream_defects`, 2026-10-11): int8 kept, rounded and clamped; `reproduce` truncates and wraps as x86-64 does | – |
 | FSL-10 † | mcflirt | units forced to mm and s: a TR in ms becomes s | c | ms-unit inputs | corrected by default (`upstream_defects`, 2026-10-11) | – |
 | FSL-11 † | mcflirt | `FSLOUTPUTTYPE` unset: fails after writing the matrices | e | none | writes `.nii.gz` | – (decided 2026-10-23: larmorx's behaviour kept) |
@@ -444,7 +444,10 @@ followed in the replica and then in the clean-room original (2026-10-12): nothin
 | ANTS-116 | antsAI's patch orientation | `larmorx_ants::ai_blobs` (`Patches::correlation`) | none |
 | AFNI-41, AFNI-48 | refused (rule B) | the GPL replicas' command lines (`larmorx-gpl-afni` `cli::automask`, `cli::unifize`) | none |
 
-**The mcflirt replica** (`larmorx-nc`, merged 2026-10-25): FSL-04 refused by default with the
+**The mcflirt replica** (`larmorx-nc`, merged 2026-10-25; its follow-up the same day found no new
+defect of mcflirt: the panel's two differing calls and the random tests' 61 findings were the
+replica's own, `atanf`'s `aT[0]` taken from fdlibm's comment and a missing FSL-08 notice for
+`-meanvol`, both fixed): FSL-04 refused by default with the
 switch; the new FSL-20 and FSL-21 refused by default (rule B), each with `reproduce`; it shares
 the clean-room original's corrections of FSL-01, -03, -05 to -10, -13 and -14. **Open:** FSL-20
 and FSL-21 in the clean-room original (a spec writer adds them to `specs/mcflirt.md`, then a
@@ -3037,7 +3040,10 @@ fMRIPrep 25.2.6 (the oracle runs) or its source at `21a490fb`, niworkflows 1.15.
   The mcflirt replica (`larmorx-nc`) carries glibc 2.35's FMA build of `sinf`, `cosf`,
   `sincosf` and `logf`, translated from Arm's Optimized Routines (MIT) and verified on all 2^32
   inputs (`crates-nc/larmorx-nc-core/tools/glibc-float-verify`), as FSL's Linux binaries call
-  them (2026-10-24).
+  them (2026-10-24). glibc 2.35's `atanf` (fdlibm, no FMA build) is not correctly
+  rounded on 21,089,462 of the 2^32 inputs (0.49 %), 7,060 with |x| ≤ 0.05; the replica carries it
+  bit for bit (`atanf` on all 2^32 inputs, `atan2f` on 3 × 2^30 seeded pairs: 0 differences;
+  2026-10-25).
 - **D13 / gap:** not D13.
 
 ### GLIBC-04 `pow` for SciPy's filter poles — (d)
@@ -3818,9 +3824,12 @@ fMRIPrep 25.2.6 (the oracle runs) or its source at `21a490fb`, niworkflows 1.15.
   for `x_variance.nii.gz` (PIPE-15).
 - **Evidence:** read; verified.
 - **fMRIPrep:** none (not used).
-- **larmorx:** reproduces both (`larmorx_mri::hmc::stats::temporal`,
-  `larmorx_mri::cli::hmc::write_outputs`).
-- **D13 / gap:** every slice; names from the stem (to confirm); switch. **Gap.**
+- **larmorx:** corrected by default in both implementations: every slice, and the `-stats` and
+  `-meanvol` images named after the stem of `-out` (`x_meanvol.nii.gz`, `x_mean_reg.nii.gz`);
+  `reproduce` gives mcflirt's slices and names (`larmorx_mri::hmc::stats::temporal`,
+  `larmorx_mri::cli::hmc::write_outputs`; the replica's notice for `-meanvol` alone since
+  2026-10-25).
+- **D13 / gap:** none.
 
 ### FSL-09 † Output types and conversion — (c), (a)
 - **What:** the output type comes from `dtype(inputfname)` and `closestTemplatedType`

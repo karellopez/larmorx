@@ -1,0 +1,272 @@
+{
+ "defect": "FSL-08",
+ "description": "-meanvol with an -out extension: the corrected name of the -meanvol image (<stem>_mean_reg) is named in FSL-08's notice (missing before 2026-10-25)",
+ "expect": "pass",
+ "found": {
+  "detail": "D13 fix pass: no defect named: no values; files ['out_mcf.nii.gz_mean_reg.nii.gz', 'out_mcf_mean_reg.nii.gz'] changed",
+  "n": 616,
+  "seed": "20261025",
+  "shrink_moves": [
+   "dropped outputs (-mats -plots -rmsabs)",
+   "dropped cost (-cost normcorr)",
+   "dropped reffile (-reffile {in:ref})",
+   "in: axis 0 29 -> 14 voxels",
+   "in: axis 1 27 -> 13 voxels",
+   "in: axis 0 14 -> 12 voxels",
+   "in: axis 1 13 -> 12 voxels",
+   "in (and its grid): origin at 0",
+   "in: float32 storage",
+   "dropped final (-nn_final)"
+  ],
+  "signature": [
+   "DN fix pass"
+  ]
+ },
+ "id": "meanvol-name-notice",
+ "implementations": [
+  "replica"
+ ],
+ "reason": "",
+ "recipe": {
+  "extra": {
+   "keep_inputs": [
+    "in"
+   ],
+   "min_size": 12,
+   "min_volumes": 4
+  },
+  "features": {
+   "-mats": true,
+   "-plots": true,
+   "-rmsabs": true,
+   "-rmsrel": false,
+   "bins": false,
+   "cost": true,
+   "cost value": "normcorr",
+   "dof": false,
+   "dtype": "uint16",
+   "final": true,
+   "final interpolation": "-nn_final",
+   "first at rest": false,
+   "fudge": true,
+   "gdt": false,
+   "meanvol": true,
+   "noise": 0.0,
+   "nx": 29,
+   "ny": 27,
+   "nz": 10,
+   "oblique": false,
+   "reffile": true,
+   "rot b": -1,
+   "rot c": 2,
+   "rot d": 1,
+   "rot scale": 3,
+   "rotation": false,
+   "scaling": false,
+   "shift0": -1.0,
+   "shift1": -1.0,
+   "shift2": 1.0,
+   "shift3": 1.0,
+   "slice spacing": 3.0,
+   "smooth": false,
+   "spacing": 3.0,
+   "stages": false,
+   "stats": false,
+   "tissues": "t2",
+   "volumes": 4
+  },
+  "groups": [
+   {
+    "args": [
+     "-in",
+     "{in:in}"
+    ],
+    "name": "input",
+    "optional": false
+   },
+   {
+    "args": [
+     "-out",
+     "{run}/out_mcf.nii.gz"
+    ],
+    "name": "output",
+    "optional": false
+   },
+   {
+    "args": [
+     "-meanvol"
+    ],
+    "name": "meanvol",
+    "optional": true
+   },
+   {
+    "args": [
+     "-fudge"
+    ],
+    "name": "fudge",
+    "optional": true
+   }
+  ],
+  "inputs": {
+   "in": {
+    "content": {
+     "axes": [
+      1.0,
+      1.1,
+      0.9
+     ],
+     "bias": [
+      0.0,
+      0.0,
+      0.0,
+      0.0
+     ],
+     "centre": [
+      0.0,
+      0.0,
+      0.0
+     ],
+     "noise": 0.0,
+     "seed": 1793309656,
+     "size": 34.019999999999996,
+     "tissues": "t2",
+     "type": "head"
+    },
+    "dtype": "float32",
+    "geometry": {
+     "origin": [
+      0.0,
+      0.0,
+      0.0
+     ],
+     "qfac": 1,
+     "qform_code": 1,
+     "quaternion": [
+      1,
+      0,
+      0,
+      0
+     ],
+     "sform": "same",
+     "sform_code": 1,
+     "spacing": [
+      3.0,
+      3.0,
+      3.0
+     ],
+     "units": "mm"
+    },
+    "keep_content": true,
+    "motion": [
+     {
+      "centre": [
+       0.0,
+       0.0,
+       0.0
+      ],
+      "quaternion": [
+       12,
+       2,
+       -2,
+       -2
+      ],
+      "translation": [
+       0.25,
+       0.0,
+       0.25
+      ]
+     },
+     {
+      "centre": [
+       0.0,
+       0.0,
+       0.0
+      ],
+      "quaternion": [
+       59,
+       2,
+       -1,
+       1
+      ],
+      "translation": [
+       0.0,
+       0.0,
+       2.0
+      ]
+     },
+     {
+      "centre": [
+       0.0,
+       0.0,
+       0.0
+      ],
+      "quaternion": [
+       37,
+       2,
+       1,
+       1
+      ],
+      "translation": [
+       -1.0,
+       0.75,
+       -0.5
+      ]
+     },
+     {
+      "centre": [
+       0.0,
+       0.0,
+       0.0
+      ],
+      "quaternion": [
+       40,
+       -1,
+       2,
+       1
+      ],
+      "translation": [
+       -1.0,
+       -1.0,
+       1.0
+      ]
+     }
+    ],
+    "scaling": null,
+    "shape": [
+     12,
+     12,
+     10,
+     4
+    ],
+    "suffix": ".nii.gz",
+    "timing": {
+     "slice_code": 0,
+     "tr": 2.0,
+     "tunits": "sec"
+    },
+    "values": {
+     "offset": 0.0,
+     "scale": 1.0
+    }
+   }
+  },
+  "n": 616,
+  "options": [
+   "-cost normcorr",
+   "-fudge",
+   "-mats",
+   "-meanvol",
+   "-nn_final",
+   "-plots",
+   "-reffile",
+   "-rmsabs"
+  ],
+  "seed": "20261025",
+  "tool": "fsl-mcflirt"
+ },
+ "rule": null,
+ "status": "fixed",
+ "suite": "fsl-mcflirt-replica",
+ "tier": "smoke",
+ "tool": "fsl-mcflirt"
+}

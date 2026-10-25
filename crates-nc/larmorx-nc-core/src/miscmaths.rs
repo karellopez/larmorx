@@ -487,4 +487,62 @@ mod tests {
         assert!(!is_number(""));
         assert!(!is_number("1.5a"));
     }
+
+    /// One of mcflirt's own `decompose_aff` calls, its inputs and FSL's outputs as bits (an
+    /// LD_PRELOAD interposer on FSL 6.0.7.17's `MISCMATHS::decompose_aff`,
+    /// `validation/probes/fsl-mcflirt-affine-trace`): fMRIPrep's ds002422 rest run, volume 166,
+    /// the start of the third stage. With fdlibm's comment value of `aT[0]` the y rotation came
+    /// out one ulp larger.
+    #[test]
+    fn decompose_aff_mcflirt_ds002422() {
+        let a: [u64; 16] = [
+            0x3fef_fe13_24b2_9f58,
+            0xbf8e_e623_73b6_262c,
+            0x3f8f_e095_2505_67fc,
+            0x0000_0000_0000_0000,
+            0x3f8f_4290_5512_8b67,
+            0x3fef_fe86_5744_cff5,
+            0xbf87_14a4_e940_e4e7,
+            0x0000_0000_0000_0000,
+            0xbf8f_85f7_bd53_176a,
+            0x3f87_8fd1_019f_e000,
+            0x3fef_fe7c_a436_7380,
+            0x0000_0000_0000_0000,
+            0xbfef_718e_395b_3ecc,
+            0x3ff3_4e8b_5874_8bed,
+            0xbf86_b682_d587_9440,
+            0x3ff0_0000_0000_0000,
+        ];
+        let centre: [u64; 3] = [
+            0x405e_7435_1b2e_6f4b,
+            0x405a_fc3d_95fd_fa12,
+            0x4050_8c30_fb57_b530,
+        ];
+        let want: [u64; 12] = [
+            0x3f87_90aa_2000_0000,
+            0x3f8f_8649_4000_0000,
+            0x3f8f_43d2_8000_0000,
+            0xbfd8_7a8a_47d9_5b00,
+            0x3fbc_617d_8228_c000,
+            0x3fe5_0032_365d_5180,
+            0x3fef_ffff_e000_0000,
+            0x3fef_ffff_e000_0000,
+            0x3fef_ffff_e000_0000,
+            0x3e13_4c0f_6000_0000,
+            0xbe02_e7ca_a000_0000,
+            0xbda2_78fc_6000_0000,
+        ];
+        let mut rows = [0.0f64; 16];
+        for r in 0..4 {
+            for col in 0..4 {
+                rows[r * 4 + col] = f64::from_bits(a[col * 4 + r]);
+            }
+        }
+        let m = Mat::from_rows(4, 4, &rows);
+        let c = Mat::col(&centre.map(f64::from_bits));
+        let got = decompose_aff(&m, &c);
+        for k in 0..12 {
+            assert_eq!(got[k].to_bits(), want[k], "parameter {}", k + 1);
+        }
+    }
 }

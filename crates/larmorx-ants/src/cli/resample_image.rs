@@ -361,6 +361,18 @@ impl Job<'_> {
                 if dim != 3 {
                     return Err(unsupported("Gaussian", dim));
                 }
+                // ANTS-161 (rule B, 2026-10-25): a sigma or alpha of 0 or less divides by zero
+                // in ITK's Gaussian interpolator (an image of NaN, exit 0); refused, named.
+                if alpha <= 0.0 || sigma[..3].iter().any(|&s| s <= 0.0) {
+                    return Err(format!(
+                        "larmorx: ResampleImage: Gaussian sigma and alpha must be positive (sigma {}, alpha {alpha}); ANTs divides by zero and writes an image of NaN: an error (ANTS-161)",
+                        sigma[..3]
+                            .iter()
+                            .map(|s| s.to_string())
+                            .collect::<Vec<_>>()
+                            .join("x")
+                    ));
+                }
                 Interpolation::Gaussian {
                     sigma: [sigma[0], sigma[1], sigma[2]],
                     alpha,

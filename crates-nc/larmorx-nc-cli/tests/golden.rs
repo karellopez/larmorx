@@ -22,8 +22,8 @@
 
 use std::collections::BTreeMap;
 use std::fmt::Write as _;
-use std::path::{Path, PathBuf};
 use std::io::Read as _;
+use std::path::{Path, PathBuf};
 use std::process::Command;
 
 use sha2::{Digest, Sha256};
@@ -273,7 +273,7 @@ const CASES: &[Case] = &[
         input: Input::Float32NonFinite,
         args: args!["-mats", "-plots", "-rmsabs"],
         mode: "fix",
-        named: &["FSL-14"],
+        named: &["FSL-14", "FSL-22"],
         output_type: "NIFTI",
     },
     Case {
@@ -282,7 +282,7 @@ const CASES: &[Case] = &[
         input: Input::Float32NonFinite,
         args: args!["-mats", "-plots", "-rmsabs"],
         mode: "reproduce",
-        named: &["FSL-14"],
+        named: &["FSL-14", "FSL-22"],
         output_type: "NIFTI",
     },
     Case {
@@ -781,8 +781,10 @@ fn bet_nifti(dims: &[i64], datatype: i16, bitpix: i16, data: &[u8]) -> Vec<u8> {
 fn write_bet_inputs(dir: &Path) -> BTreeMap<&'static str, PathBuf> {
     std::fs::create_dir_all(dir).unwrap();
     let [nx, ny, nz] = HEAD;
-    let i16_bytes = |v: &[i64]| -> Vec<u8> { v.iter().flat_map(|&x| (x as i16).to_le_bytes()).collect() };
-    let f32_bytes = |v: &[i64]| -> Vec<u8> { v.iter().flat_map(|&x| (x as f32).to_le_bytes()).collect() };
+    let i16_bytes =
+        |v: &[i64]| -> Vec<u8> { v.iter().flat_map(|&x| (x as i16).to_le_bytes()).collect() };
+    let f32_bytes =
+        |v: &[i64]| -> Vec<u8> { v.iter().flat_map(|&x| (x as f32).to_le_bytes()).collect() };
     let t1 = bet_head_values(T1_LEVELS, 1);
     let t2 = bet_head_values(T2_LEVELS, 2);
     let mut paths = BTreeMap::new();
@@ -797,7 +799,10 @@ fn write_bet_inputs(dir: &Path) -> BTreeMap<&'static str, PathBuf> {
     for t in 0..4u64 {
         series.extend(bet_head_values(T1_LEVELS, 10 + t));
     }
-    put("4d", bet_nifti(&[nx, ny, nz, 4], 4, 16, &i16_bytes(&series)));
+    put(
+        "4d",
+        bet_nifti(&[nx, ny, nz, 4], 4, 16, &i16_bytes(&series)),
+    );
     let plane = (nx * ny) as usize;
     let slab = &t1[7 * plane..17 * plane];
     put("slab", bet_nifti(&[nx, ny, 10], 4, 16, &i16_bytes(slab)));
@@ -1170,7 +1175,13 @@ fn golden() {
     let prep = dir.path().join("bet-prep");
     std::fs::create_dir(&prep).unwrap();
     let t1 = bet_inputs["t1"].display().to_string();
-    let out = run_bet(&prep, "fsl bet2", &[t1, "t1".into(), "-e".into(), "-n".into()], "fix", "NIFTI");
+    let out = run_bet(
+        &prep,
+        "fsl bet2",
+        &[t1, "t1".into(), "-e".into(), "-n".into()],
+        "fix",
+        "NIFTI",
+    );
     assert!(out.status.success(), "bet2 -e: {out:?}");
     let mesh = prep.join("t1_mesh.vtk");
     for case in BET_CASES {

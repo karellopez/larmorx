@@ -398,11 +398,15 @@ defects! {
         "with a histogram cost (corratio, mutualinfo, normmi, woods) and -bins below 8, the first stage's histogram has no bins (-bins divided by the 8 mm scale): the costs are degenerate and the matrices arbitrary, and corratio writes before its arrays and aborts";
     FSL_20 = "FSL-20", "mcflirt", true,
         "when the .mat directory cannot be created for another reason than its permissions (a missing parent directory), mcflirt prints an error and exits with status 0, writing neither the matrices, the .par and .rms files nor the corrected series";
+    FSL_22 = "FSL-22", "FSL", true,
+        "the background value (calc_bval) sorts the 2-voxel border with std::sort and operator<: with NaN voxels the order is undefined in C++, so the padding value of a resampled volume is arbitrary";
     FSL_40 = "FSL-40", "bet2", true,
         "the input and output names lose their first '.hdr' wherever it stands (a directory named x.hdr is read as x), and a name with '.img' but no '.hdr' aborts the program";
+    FSL_41 = "FSL-41", "bet2", true,
+        "with no voxel strictly between the 2nd and 98th percentiles inside the initial sphere (a constant or binary image), the median brain intensity is read from the end of an empty list: FSL crashes";
     FSL_42 = "FSL-42", "bet2", true,
         "numeric options without meaning are used as given: a NaN threshold (-f, -g), a negative, NaN or infinite radius (-r), a smoothness of 0 or less (-w), a centre (-c) or search depth (--parameter_d1/d2) that is not finite";
-    FSL_43 = "FSL-43", "bet2", true,
+    FSL_43 = "FSL-43", "bet2, betsurf", true,
         "the fill of a surface's mask starts at the vertices' centroid without a bounds check: a centroid outside the image (a single slice, a surface leaving the grid) writes and reads outside the volume";
     FSL_44 = "FSL-44", "bet", true,
         "the script expands its arguments unquoted: a name with a blank is split into words (an input with a blank is reported not valid, an output with a blank writes other files), and an empty argument ends the options";
@@ -418,6 +422,8 @@ defects! {
         "one skull profile whose search range is empty ends the program with status 255 and no message, before any output is written";
     FSL_51 = "FSL-51", "betsurf", true,
         "a profile search can read past the profile's last sample, into memory FSL never set, and use it";
+    FSL_52 = "FSL-52", "betsurf", true,
+        "mesh files are read without checks: a number that does not read leaves values never set, and a face naming a vertex the file does not have reads past the vertices";
     FSL_53 = "FSL-53", "betsurf", true,
         "a matrix file with fewer than the 12 numbers betsurf uses leaves the missing entries at values never set (the first that does not read is 0)";
     FSL_54 = "FSL-54", "betsurf", true,

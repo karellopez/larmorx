@@ -701,6 +701,7 @@ impl Run<'_> {
                     mv.data.iter_mut().for_each(|v| *v = 0.0);
                     timeseries.extrap = Extrapolation::Extraslice;
                     timeseries.interp = Interpolation::Trilinear;
+                    self.background_nan_notice(&timeseries)?;
                     for i in 0..n {
                         let src = timeseries.sub_volume(i64::from(i))?;
                         let mut testvol = src.clone();
@@ -973,6 +974,7 @@ impl Run<'_> {
             .iter()
             .map(|m| arma::mul_tinysq(m, &init_trans))
             .collect();
+        self.background_nan_notice(&timeseries)?;
         let resampled: Vec<Result<Volume, FslError>> = with_pool(self.n_threads, || {
             (0..n)
                 .into_par_iter()
@@ -1068,6 +1070,44 @@ impl Run<'_> {
             )
         };
         self.notice(&defects::FSL_14, detail);
+    }
+
+    /// FSL-22: the volumes whose 2-voxel border holds a NaN voxel, where `calc_bval`'s
+    /// `std::sort` has no defined order in C++ and the background value (the resampling's
+    /// padding) is arbitrary in mcflirt. Both modes sort NaN values last (a defined order: every
+    /// other value is FSL's); the notice says so.
+    fn background_nan_notice(&mut self, timeseries: &Volume) -> Result<(), FslError> {
+        if !timeseries.data.iter().any(|v| v.is_nan()) {
+            return Ok(());
+        }
+        let mut names = Vec::new();
+        for i in 0..timeseries.tsize() {
+            if timeseries.sub_volume(i)?.background_value().1 {
+                names.push(i.to_string());
+            }
+        }
+        if names.is_empty() {
+            return Ok(());
+        }
+        let which = if names.len() == 1 {
+            format!("volume {} has", names[0])
+        } else {
+            format!("volumes {} have", names.join(", "))
+        };
+        let detail = if self.mode.fix() {
+            format!(
+                "{which} NaN voxels in the 2-voxel border: they are sorted last for the background \
+                 value (the resampling's padding); C++ leaves the order of mcflirt's sort undefined"
+            )
+        } else {
+            format!(
+                "{which} NaN voxels in the 2-voxel border, whose order mcflirt's sort leaves \
+                 undefined: the background value (the resampling's padding) has them sorted last, \
+                 not libstdc++'s arbitrary order; everything else is mcflirt's"
+            )
+        };
+        self.notice(&defects::FSL_22, detail);
+        Ok(())
     }
 
     /// Checks of the corrected command line before any work (FSL-12): the inputs mcflirt
@@ -1168,7 +1208,12 @@ impl Run<'_> {
     /// How an image is written: mcflirt's `descrip`, `units`, and NewNifti's data offset for
     /// several extensions (FSL-56) corrected unless reproduced, with its notice when the
     /// offset would differ.
-    fn save_options(&mut self, v: &Volume, settings: &Settings, units: i32) -> SaveOptions<'static> {
+    fn save_options(
+        &mut self,
+        v: &Volume,
+        settings: &Settings,
+        units: i32,
+    ) -> SaveOptions<'static> {
         if volume::offset_defect_applies(v, settings) {
             self.notice(
                 &defects::FSL_56,

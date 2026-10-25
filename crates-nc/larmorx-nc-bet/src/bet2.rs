@@ -18,12 +18,12 @@ use larmorx_core::defects::{self, Notices, UpstreamDefects};
 
 use larmorx_nc_core::cnum;
 use larmorx_nc_core::fdlibm;
+use larmorx_nc_core::mesh::{Mesh, V3};
 use larmorx_nc_core::options::{ArgFlag, Opt, OptionParser, Value};
 use larmorx_nc_core::settings::Settings;
 use larmorx_nc_core::sse;
 use larmorx_nc_core::volume::{self, Elem, FslError, SaveError, SaveOptions, Saved, Volume};
 use larmorx_nc_core::{arma, glibc_double};
-use larmorx_nc_core::mesh::{Mesh, V3};
 
 const NORMAL_MAX_UPDATE_FRACTION: f64 = 0.5;
 const LAMBDA_FIT: f64 = 0.1;
@@ -205,8 +205,11 @@ pub struct Bet2Result {
 }
 
 /// `adjust_initial_mesh`: the thresholds, the radius, the centre of gravity, the median
-/// intensity inside the initial sphere; the mesh moved and scaled there. `Err` when no voxel
-/// lies strictly between the robust limits inside the sphere (FSL-41).
+/// intensity inside the initial sphere; the mesh moved and scaled there. When no voxel lies
+/// strictly between the robust limits inside the sphere (FSL-41: FSL dereferences the end of an
+/// empty list and crashes), `Err` unless `fill_undefined`, which gives that median the value 0
+/// and says so (`Ok((_, true))`): everything else is FSL's.
+#[allow(clippy::too_many_arguments)]
 pub fn adjust_initial_mesh(
     image: &Volume<f32>,
     m: &mut Mesh,
@@ -215,7 +218,8 @@ pub fn adjust_initial_mesh(
     ypara: f64,
     zpara: f64,
     warn: &mut String,
-) -> Result<BetParameters, usize> {
+    fill_undefined: bool,
+) -> Result<(BetParameters, bool), usize> {
     let mut bp = BetParameters::default();
     let (mx, mn) = image.extrema();
     bp.min = f64::from(mn);
@@ -321,7 +325,12 @@ pub fn adjust_initial_mesh(
     }
     let med = vm.len() / 2;
     if vm.is_empty() {
-        return Err(0);
+        if !fill_undefined {
+            return Err(0);
+        }
+        // FSL reads `*max_element(begin, begin)` of an empty vector: no value; 0 here
+        bp.tm = 0.0;
+        return Ok((bp, true));
     }
     // nth_element(med - 1) then the largest of the first med values: the (med-1)-th smallest
     // value; with one value (med 0), libstdc++ returns it.
@@ -332,7 +341,7 @@ pub fn adjust_initial_mesh(
         *nth
     };
     bp.tm = tm;
-    Ok(bp)
+    Ok((bp, false))
 }
 
 /// `step_of_computation`.
@@ -560,12 +569,18 @@ pub fn draw_mesh_bis(image: &Volume<f32>, m: &Mesh) -> Volume<f32> {
 /// fill starts at the nearest voxel inside the image; reproduced, only what FSL defines is done:
 /// no write outside, and of the start's neighbours FSL's bounds allow, those inside the image are
 /// examined (those outside count as not `from`). Further outside (a centroid that is not a number
-/// truncates to `INT_MIN`) FSL writes far from the volume and crashes: [`Fill::Crash`] in both
-/// modes, except that `fix` fills from the nearest voxel when the start is a real position.
+/// truncates to `INT_MIN`) FSL writes far from the volume and crashes: `fix` fills from the
+/// nearest voxel when the start is a real position, and refuses otherwise ([`Fill::Crash`]);
+/// reproduced, the write FSL crashes on is not done and nothing is filled ([`Fill::Skipped`]:
+/// D13's failure cases, what FSL defines kept, the rest left as it was).
 pub fn fill_mask(mask: &mut Volume<i16>, start: [i64; 3], from: i16, to: i16, fix: bool) -> Fill {
     let (nx, ny, nz) = (mask.xsize(), mask.ysize(), mask.zsize());
     if nx <= 0 || ny <= 0 || nz <= 0 {
-        return Fill::Crash(start);
+        return if fix {
+            Fill::Crash(start)
+        } else {
+            Fill::Skipped(start)
+        };
     }
     let inside = mask.in_bounds(start[0], start[1], start[2]);
     let real = start.iter().all(|&c| c != i64::from(i32::MIN));
@@ -576,7 +591,11 @@ pub fn fill_mask(mask: &mut Volume<i16>, start: [i64; 3], from: i16, to: i16, fi
         && start[1] <= ny
         && start[2] <= nz;
     if !inside && !(if fix { real } else { near }) {
-        return Fill::Crash(start);
+        return if fix {
+            Fill::Crash(start)
+        } else {
+            Fill::Skipped(start)
+        };
     }
     let mut current: Vec<[i64; 3]> = Vec::new();
     let neighbours = |[x, y, z]: [i64; 3]| {
@@ -626,8 +645,24 @@ pub enum Fill {
     Inside,
     /// Outside the image, handled (FSL-43's notice).
     Outside([i64; 3]),
-    /// Where FSL writes far outside the volume and crashes: nothing filled.
+    /// Where FSL writes far outside the volume and crashes, corrected: nothing filled, refused.
     Crash([i64; 3]),
+    /// The same, reproduced: the write FSL crashes on is not done and nothing is filled
+    /// (FSL-43's notice).
+    Skipped([i64; 3]),
+}
+
+/// The FSL-43 notice of a fill FSL crashes on, reproduced without it ([`Fill::Skipped`]).
+pub(crate) fn skipped_notice(notices: &mut Notices, start: [i64; 3], what: &str) {
+    notices.add(
+        &defects::FSL_43,
+        format!(
+            "{what} starts at voxel {} {} {}, far outside the image (or not a number), where FSL \
+             writes far outside the volume and crashes: not filled (the mask holds the drawn \
+             surface only); everything else is FSL's",
+            start[0], start[1], start[2]
+        ),
+    );
 }
 
 /// The refusal of a fill FSL crashes on (FSL-43).
@@ -1177,18 +1212,35 @@ pub fn compute(
         yarg,
         zarg,
         &mut warn,
+        notices.reproduce(),
     ) {
-        Ok(bp) => {
+        Ok((bp, filled)) => {
             let _ = err.write_all(warn.as_bytes());
+            if filled {
+                notices.add(
+                    &defects::FSL_41,
+                    "no voxel inside the initial sphere has an intensity strictly between the \
+                     2nd and 98th percentiles, so the median brain intensity is undefined (FSL \
+                     reads the end of an empty list and crashes): it is taken as 0 and the run \
+                     goes on; every other value is FSL's",
+                );
+            }
             bp
         }
         Err(_) => {
             let _ = err.write_all(warn.as_bytes());
+            notices.add(
+                &defects::FSL_41,
+                "no voxel inside the initial sphere has an intensity strictly between the 2nd \
+                 and 98th percentiles (a constant or binary image), so the median brain \
+                 intensity is undefined: refused",
+            );
             let _ = writeln!(
                 err,
                 "bet2: stopped: no voxel inside the initial sphere has an intensity strictly \
                  between the 2nd and 98th percentiles, so the median brain intensity is \
-                 undefined; FSL's bet2 reads an empty list here and crashes (FSL-41) (larmorx)"
+                 undefined; FSL's bet2 reads an empty list here and crashes (FSL-41; \
+                 LARMORX_UPSTREAM_DEFECTS=reproduce fills it with 0 and goes on) (larmorx)"
             );
             return Err(1);
         }
@@ -1323,6 +1375,7 @@ pub fn compute(
     match start {
         Fill::Inside => {}
         Fill::Outside(s) => outside_notice(notices, s, "the fill of the brain mask"),
+        Fill::Skipped(s) => skipped_notice(notices, s, "the fill of the brain mask"),
         Fill::Crash(s) => {
             let _ = writeln!(err, "{}", crash_message("bet2", s));
             return Err(1);

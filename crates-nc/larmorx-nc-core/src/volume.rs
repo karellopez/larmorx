@@ -1154,12 +1154,9 @@ fn convert_buffer<T: Elem>(raw: &[u8], h: &NiftiHeader) -> Option<Vec<T>> {
     // (an integer of up to 64 bits to float or double rounds once, as x86-64 converts it).
     let scaled_f32 = |x: f32| T::from_f32(x * slope + inter);
     match h.datatype {
-        dt::SIGNED_SHORT => conv!(
-            i16,
-            2,
-            |v: i16| T::from_f32(f32::from(v)),
-            |v: i16| scaled_f32(f32::from(v))
-        ),
+        dt::SIGNED_SHORT => conv!(i16, 2, |v: i16| T::from_f32(f32::from(v)), |v: i16| {
+            scaled_f32(f32::from(v))
+        }),
         dt::UNSIGNED_CHAR => conv!(
             u8,
             1,
@@ -1172,30 +1169,21 @@ fn convert_buffer<T: Elem>(raw: &[u8], h: &NiftiHeader) -> Option<Vec<T>> {
             |v: i8| T::from_f32(f32::from(v)),
             |v: i8| scaled_f32(f32::from(v))
         ),
-        dt::UINT16 => conv!(
-            u16,
-            2,
-            |v: u16| T::from_f32(f32::from(v)),
-            |v: u16| scaled_f32(f32::from(v))
-        ),
-        dt::SIGNED_INT => conv!(
-            i32,
-            4,
-            |v: i32| T::from_f64(f64::from(v)),
-            |v: i32| scaled_f32(v as f32)
-        ),
-        dt::UINT32 => conv!(
-            u32,
-            4,
-            |v: u32| T::from_f64(f64::from(v)),
-            |v: u32| scaled_f32(v as f32)
-        ),
-        dt::INT64 => conv!(i64, 8, |v: i64| int64_to::<T>(v as i128), |v: i64| scaled_f32(
-            v as f32
-        )),
-        dt::UINT64 => conv!(u64, 8, |v: u64| int64_to::<T>(v as i128), |v: u64| scaled_f32(
-            v as f32
-        )),
+        dt::UINT16 => conv!(u16, 2, |v: u16| T::from_f32(f32::from(v)), |v: u16| {
+            scaled_f32(f32::from(v))
+        }),
+        dt::SIGNED_INT => conv!(i32, 4, |v: i32| T::from_f64(f64::from(v)), |v: i32| {
+            scaled_f32(v as f32)
+        }),
+        dt::UINT32 => conv!(u32, 4, |v: u32| T::from_f64(f64::from(v)), |v: u32| {
+            scaled_f32(v as f32)
+        }),
+        dt::INT64 => conv!(i64, 8, |v: i64| int64_to::<T>(v as i128), |v: i64| {
+            scaled_f32(v as f32)
+        }),
+        dt::UINT64 => conv!(u64, 8, |v: u64| int64_to::<T>(v as i128), |v: u64| {
+            scaled_f32(v as f32)
+        }),
         dt::FLOAT => conv!(f32, 4, |v: f32| T::from_f32(v), |v: f32| scaled_f32(v)),
         // double * float is double, + float is double, then (T).
         dt::DOUBLE => conv!(f64, 8, |v: f64| T::from_f64(v), |v: f64| T::from_f64(

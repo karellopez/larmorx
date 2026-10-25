@@ -615,11 +615,11 @@ def _scenarios() -> list[tuple[str, str, str, Scenario]]:
     add("img-output", "bet2", "an output name with .img and no .hdr (FSL-40: FSL aborts)",
         S("bet2", ("{0}", "out.img"), (h,), expect="crash"))
     add("hdr-in-name", "defects", "an output name with .hdr inside (FSL-40)", S("bet2", ("{0}", "a.hdrb", "-m"), (h,)))
-    add("constant", "bet2", "a constant image (FSL-41: FSL reads an empty list and crashes)",
-        S("bet2", ("{0}", "out", "-m"), ("constant",), expect="crash", tier="standard"))
-    add("nan-f", "defects", "-f nan (FSL-42)", S("bet2", ("{0}", "out", "-f", "nan", "-m"), (h,), fix_refuses="FSL-42", tier="standard"))
+    add("constant", "bet2", "a constant image (FSL-41: FSL reads an empty list and crashes; reproduce fills the median with 0)",
+        S("bet2", ("{0}", "out", "-m"), ("constant",), expect="crash-filled", fix_refuses="FSL-41", tier="standard"))
+    add("nan-f", "defects", "-f nan (FSL-42; FSL crashes in its fill, FSL-43)", S("bet2", ("{0}", "out", "-f", "nan", "-m"), (h,), expect="crash-filled", fix_refuses="FSL-42", tier="standard"))
     add("negative-r", "defects", "-r -50 (FSL-42)", S("bet2", ("{0}", "out", "-r", "-50", "-m"), (h,), fix_refuses="FSL-42", tier="standard"))
-    add("zero-w", "defects", "-w 0 (FSL-42)", S("bet2", ("{0}", "out", "-w", "0", "-m"), (h,), fix_refuses="FSL-42", tier="standard"))
+    add("zero-w", "defects", "-w 0 (FSL-42; FSL crashes in its fill, FSL-43)", S("bet2", ("{0}", "out", "-w", "0", "-m"), (h,), expect="crash-filled", fix_refuses="FSL-42", tier="standard"))
 
     # --- Storage types, scaling, orientation and formats ----------------------------------------
     for img in ("head-i16", "head-u8", "head-i8", "head-u16", "head-i32", "head-f64", "head-i16-scaled",
@@ -690,6 +690,10 @@ def _scenarios() -> list[tuple[str, str, str, Scenario]]:
     add("p-bad", "betsurf", "-p with a word", S("betsurf", ("-p", "x", "{0}"), ("head",), expect="error"))
     add("short-matrix", "defects", "a matrix of 6 numbers (FSL-53)", S("betsurf", ("-1", "-m", "{0}", "{1}", "{2}", "out"), ("head", "head-mesh", "short-mat"),
                                                                        fix_refuses="FSL-53", tier="standard"))
+    for name, desc in (("mesh-unread", "a coordinate that does not read"), ("mesh-missing-vertex", "a face naming a vertex the mesh does not have"),
+                       ("mesh-truncated", "a mesh file that ends after two vertices")):
+        add(name, "defects", f"{desc} (FSL-52: FSL crashes; reproduce fills what FSL leaves undefined)",
+            S("betsurf", ("-1", "-m", "{0}", "{1}", "{2}", "out"), ("head", name, "head-mat"), expect="crash-filled", fix_refuses="FSL-52", tier="standard"))
     add("t2-other-grid", "defects", "a T2 on another grid (FSL-48)", S("betsurf", ("-m", "{0}", "{1}", "{2}", "{3}", "out"), ("head", "head-t2-small", *sb),
                                                                          fix_refuses="FSL-48", tier="standard"))
     add("off-mesh", "betsurf", "an OFF mesh", S("betsurf", ("-1", "-m", "{0}", "{1}", "{2}", "out"), ("head", "head-mesh-off", "head-mat"), tier="standard"))
@@ -866,6 +870,18 @@ def _phantoms() -> dict[str, Path]:
     p["head-mesh-off"].write_text(_vtk_to(p["head-mesh"], "off"), encoding="utf-8")
     p["head-mesh-fs"] = d / "head_mesh.asc"
     p["head-mesh-fs"].write_text(_vtk_to(p["head-mesh"], "fs"), encoding="utf-8")
+    # FSL-52: mesh files FSL reads without checks (it crashes on each)
+    lines = p["head-mesh"].read_text(encoding="utf-8").splitlines()
+    pi = next(i for i, ln in enumerate(lines) if ln.startswith("POINTS"))
+    fi = next(i for i, ln in enumerate(lines) if ln.startswith("POLYGONS"))
+    bad = {
+        "mesh-unread": [*lines[: pi + 1], "1 x 2", *lines[pi + 2 :]],
+        "mesh-missing-vertex": [*lines[: fi + 1], "3 0 1 99999", *lines[fi + 2 :]],
+        "mesh-truncated": lines[: pi + 3],
+    }
+    for name, body in bad.items():
+        p[name] = d / f"{name}.vtk"
+        p[name].write_text("\n".join(body) + "\n", encoding="utf-8")
     return p
 
 
@@ -1065,12 +1081,23 @@ def run_case(case: Case, checks: CheckList) -> None:
         fsl = oracle_run(s.tool, args, env, f_dir, never=case_never(s))
         ours = run_larmorx(s.tool, args, "reproduce", env, r_dir)
         crash = crashed(fsl)
-        if crash:
+        filled = crash and s.expect == "crash-filled"
+        if filled:
+            checks(
+                EXIT,
+                ours.code == 0,
+                detail=f"FSL crashed ({fsl.code}); larmorx fills what FSL leaves undefined and "
+                f"finishes ({ours.code})",
+            )
+        elif crash:
             checks(EXIT, ours.code == 1, detail=f"FSL crashed ({fsl.code}), larmorx {ours.code}")
         else:
             checks(EXIT, fsl.code == ours.code, detail=f"FSL {fsl.code}, larmorx {ours.code}")
         check_messages(checks, fsl, ours, crash)
-        compare_dirs(checks, f_dir, r_dir, inputs)
+        if filled:
+            _filled(checks, s, args, env, ours, r_dir, root, inputs)
+        else:
+            compare_dirs(checks, f_dir, r_dir, inputs)
         identical = all(c.passed for c in checks.checks)
         if s.truth is not None:
             _truth(checks, f_dir, r_dir, s)
@@ -1084,10 +1111,56 @@ def run_case(case: Case, checks: CheckList) -> None:
         _fix_pass(checks, s, ours, fixed, r_dir, fix_dir, inputs)
         if s.python is not None and identical and fsl.code == 0:
             _python(checks, s, paths, f_dir)
+        if filled and all(c.passed for c in checks.checks):
+            raise Outcome(
+                EXPECTED,
+                f"FSL crashes (status {fsl.code}); with upstream_defects='reproduce' larmorx fills what FSL "
+                f"leaves undefined deterministically, names {s.fix_refuses} and writes its "
+                "outputs; the default refuses",
+            )
         if crash and all(c.passed for c in checks.checks):
             raise Outcome(BOTH_ERROR, f"FSL crashes, larmorx refuses: {larmorx_err_line(ours)}")
         if fsl.code != 0 and not crash and all(c.passed for c in checks.checks):
             raise Outcome(BOTH_ERROR, f"both refuse (exit {fsl.code}) with {last_line(fsl)}")
+
+
+def _filled(
+    checks: CheckList,
+    s: Scenario,
+    args: list[str],
+    env: dict[str, str],
+    ours: Run,
+    r_dir: Path,
+    root: Path,
+    inputs: tuple[str, ...],
+) -> None:
+    """Where FSL crashes on what it leaves undefined and ``reproduce`` fills it (D13's failure
+    cases): the replica names the defect as reproduced, writes its outputs, and gives the same
+    bytes when run again (the fill is deterministic). FSL's outputs are not compared: it wrote
+    none, or ones that depend on memory it never set."""
+    entry = s.fix_refuses or ""
+    named = f"upstream defect {entry} (" in ours.err and ") reproduced: " in ours.err
+    checks(
+        "what FSL leaves undefined filled, and named",
+        named,
+        detail=next(
+            (ln for ln in ours.err.splitlines() if f"upstream defect {entry} (" in ln),
+            "no notice",
+        ),
+    )
+    written = sorted(p.name for p in r_dir.iterdir() if p.name not in inputs)
+    checks("outputs written", bool(written), detail=", ".join(written) or "none")
+    again = root / "larmorx-again"
+    _prepare(again, s)
+    run_larmorx(s.tool, args, "reproduce", env, again)
+    sub = CheckList()
+    compare_dirs(sub, r_dir, again, inputs)
+    same = all(c.passed for c in sub.checks)
+    checks(
+        "the fill is deterministic (run twice)",
+        same,
+        detail="bit-identical" if same else "; ".join(c.detail for c in sub.checks if not c.passed),
+    )
 
 
 def larmorx_err_line(run: Run) -> str:

@@ -21,14 +21,14 @@ use crate::bet2::{Fill, Run, crash_message, fill_mask, outside_notice, report_ab
 use larmorx_nc_core::cnum;
 use larmorx_nc_core::fdlibm;
 use larmorx_nc_core::istream::{Got, IStream};
-use larmorx_nc_core::options::{ArgFlag, Opt, OptionParser, Value};
-use larmorx_nc_core::stdsort;
-use larmorx_nc_core::settings::Settings;
-use larmorx_nc_core::newimagefns;
-use larmorx_nc_core::volume::{self, FslError, SaveError, SaveOptions, Saved, Volume};
 use larmorx_nc_core::mesh::load::{self, LoadError};
 use larmorx_nc_core::mesh::profile::{NOT_FOUND, Profile};
 use larmorx_nc_core::mesh::{Mesh, V3};
+use larmorx_nc_core::newimagefns;
+use larmorx_nc_core::options::{ArgFlag, Opt, OptionParser, Value};
+use larmorx_nc_core::settings::Settings;
+use larmorx_nc_core::stdsort;
+use larmorx_nc_core::volume::{self, FslError, SaveError, SaveOptions, Saved, Volume};
 
 const TITLE: &str = "BETSURF (BET Surface Finder) v2.1 - FMRIB Analysis Group, Oxford";
 const EXAMPLES: &str = " betsurf          [options] <t1> <t2> <bet_mesh.vtk> <t1_to_standard.mat> <output>\n betsurf --t1only [options] <t1>      <bet_mesh.vtk> <t1_to_standard.mat> <output>";
@@ -338,13 +338,14 @@ fn make_mask_from_mesh(
     m: &Mesh,
     notices: &mut Notices,
 ) -> Result<Volume<i16>, Fail> {
-    if m.points.is_empty() {
+    if m.points.is_empty() && notices.fix() {
         return Err(Fail::Refused(
             "the mesh has no vertices: FSL's betsurf divides by 0 for its centre and writes \
              outside the image"
                 .into(),
         ));
     }
+    // reproduced, an empty mesh's centre is 0/0: not a number, so its fill is skipped (FSL-43)
     let start = fill_start(image, m);
     fill_from(image, start, notices)
 }
@@ -358,6 +359,9 @@ fn fill_from(
     match fill_mask(&mut mask, start, 0, 1, notices.fix()) {
         Fill::Inside => {}
         Fill::Outside(s) => outside_notice(notices, s, "the fill of a surface's mask"),
+        Fill::Skipped(s) => {
+            crate::bet2::skipped_notice(notices, s, "the fill of a surface's mask");
+        }
         Fill::Crash(s) => {
             let msg = crash_message("betsurf", s);
             let why = msg
@@ -847,7 +851,11 @@ fn write_ext_skull(
     notices: &mut Notices,
 ) -> Result<(), Fail> {
     let t1 = img.t1;
-    let (xdim, ydim, zdim) = (f64::from(t1.xdim()), f64::from(t1.ydim()), f64::from(t1.zdim()));
+    let (xdim, ydim, zdim) = (
+        f64::from(t1.xdim()),
+        f64::from(t1.ydim()),
+        f64::from(t1.zdim()),
+    );
     let mut meshimage = zeros_like(t1);
     draw_mesh(&mut meshimage, m);
     let mut glob_counter = 0i32;
@@ -994,7 +1002,8 @@ fn save(
     if volume::offset_defect_applies(v, run.fsl) {
         crate::bet2::offset_notice(notices, v.extensions.len());
     }
-    let opts = SaveOptions::new(volume::BUILDSTRING.as_bytes()).reproducing_offset(run.mode.reproduce());
+    let opts =
+        SaveOptions::new(volume::BUILDSTRING.as_bytes()).reproducing_offset(run.mode.reproduce());
     match v.save_volume(name, run.fsl, &opts) {
         Ok(Saved::Written) => Ok(()),
         Ok(Saved::Nothing) => Err(Fail::Exit(255)),
@@ -1029,13 +1038,39 @@ fn surfaces(
         }
     };
     let mut stdin = std::io::stdin().lock();
-    let mut m = match load::load(&names.mesh, out, &mut stdin) {
-        Ok(m) => m,
+    let mut m = match load::load(&names.mesh, out, &mut stdin, notices.reproduce()) {
+        Ok((m, fills)) => {
+            if !fills.is_empty() {
+                let shown: Vec<&str> = fills.iter().take(3).map(String::as_str).collect();
+                let more = if fills.len() > 3 {
+                    format!(" (and {} more)", fills.len() - 3)
+                } else {
+                    String::new()
+                };
+                notices.add(
+                    &defects::FSL_52,
+                    format!(
+                        "the mesh file {} leaves values undefined in FSL, filled: {}{more}",
+                        names.mesh,
+                        shown.join("; ")
+                    ),
+                );
+            }
+            m
+        }
         Err(LoadError::Exit { printed, code }) => {
             let _ = err.write_all(printed.as_bytes());
             return Err(Fail::Exit(code));
         }
-        Err(LoadError::Refused(why)) => return Err(Fail::Refused(why)),
+        Err(LoadError::Refused(why)) => {
+            if why.contains("FSL-52") {
+                notices.add(
+                    &defects::FSL_52,
+                    format!("the mesh file {}: refused ({why})", names.mesh),
+                );
+            }
+            return Err(Fail::Refused(why));
+        }
     };
     let mat = read_matrix(&names.matrix, err, notices)?;
     let mut t1 = read_t(&names.t1, run.fsl, err)?;
@@ -1077,7 +1112,11 @@ fn surfaces(
             );
         }
     }
-    let (xdim, ydim, zdim) = (f64::from(t1.xdim()), f64::from(t1.ydim()), f64::from(t1.zdim()));
+    let (xdim, ydim, zdim) = (
+        f64::from(t1.xdim()),
+        f64::from(t1.ydim()),
+        f64::from(t1.zdim()),
+    );
     let (xsize, ysize, zsize) = (t1.xsize(), t1.ysize(), t1.zsize());
 
     // the brain's robust maximum (useful if the skull is too bright)

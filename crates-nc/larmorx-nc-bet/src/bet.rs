@@ -22,8 +22,8 @@ use std::io::Write;
 
 use larmorx_core::defects::{self, Notices};
 
-use larmorx_nc_core::avwutils::{self as avw, ToolFailure};
 use crate::bet2::{self, Run};
+use larmorx_nc_core::avwutils::{self as avw, ToolFailure};
 use larmorx_nc_core::settings::Settings;
 
 const USAGE: &str = "

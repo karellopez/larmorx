@@ -32,6 +32,8 @@ python -m larmorx_validation difftest --list                                    
 | `--seed` | the night's seed (default: the date); every case is drawn from (tool, seed, case number) |
 | `--shrink-budget` | seconds to shrink one difference (default 600) |
 | `--out` | the night's directory (default `<workspace>/oracles/difftest/<date>/`) |
+| `--memory-gib`, `--box-gib` | the hard memory limit of each worker (3 GiB, no swap) and the box the command makes for itself when it runs in none (8 GiB); `--memory-gib 0` runs without limits (only where cgroup v2 is not writable) |
+| `--heavy <night>`, `--heavy-hours` | run a night's heavy cases to their end (below) |
 
 A night writes `oracles/difftest/<date>/` (outside git, like every oracle output):
 
@@ -41,6 +43,7 @@ A night writes `oracles/difftest/<date>/` (outside git, like every oracle output
 | `results.jsonl` | one line per case as it ends: tool, case number, verdict per implementation, the options and input features it covered, seconds, its findings' files |
 | `findings/<tool>/<seed>-<n>-<implementation>.json` | each difference: the drawn recipe, the shrunk recipe, the moves that shrank it, the checks that failed (both), how to replay it |
 | `report.md`, `summary.json` | the morning report and its numbers (the site's exporter reads `summary.json`) |
+| `heavy.jsonl`, `heavy-results.jsonl`, `heavy-prediction.json` | the cases over the memory limit, their results once `--heavy` ran them, their predicted memory and time |
 
 ## What a case is
 
@@ -91,13 +94,51 @@ and counted per defect, not shrunk); *undefined* (the original's result depends 
 never wrote or on its clock, and larmorx names the defect while reproducing it, refuses with
 the defect's ID, or the descriptor knows the drawn case meets it, `extra["undefined"]`: e.g.
 ANTS-82's clock-seeded sampling of the velocity-field stages; not comparable, never cached);
-*differ* (a finding); *timeout*, *crash* (unclear, for the orchestrator). Replicas and ports must
+*differ* (a finding); *memory* (a run exceeded the case's memory limit: queued as a heavy case,
+below); *timeout*, *crash* (unclear, for the orchestrator). Replicas and ports must
 be bit-identical (compared in `reproduce` mode; the fix pass checks that a D13 notice is named
 exactly where the default changes the result); clean-room originals are held to their records'
 thresholds.
 
 **Crashes:** a case that kills its worker (larmorx aborting, a Rust allocation failure) is run
 again in a child process of its own, and shrunk there, each candidate in a child.
+
+## Memory and time limits; heavy cases
+
+On 2026-10-25 one random N4BiasFieldCorrection case of the first night (a 4D image whose header
+gives its voxels in metres, with a spline distance of 20 mm: ANTS-162) grew to 28 GB resident;
+the machine swapped until the editor and every agent running in it went down. Since then
+(`validation/src/larmorx_validation/difftest/limits.py`):
+
+- **the night runs in a memory box**: `scripts/orchestration/difftest-nightly.sh` runs inside
+  `scripts/orchestration/boxed.sh 8 ...` or boxes itself (a systemd user scope of 8 GiB,
+  `LARMORX_DIFFTEST_BOX_GIB`, and no swap); `python -m larmorx_validation difftest` (a night,
+  `--case`, `--replay`) re-runs itself in such a box when it runs in none (`--box-gib`);
+- **each worker has a hard limit**: a cgroup v2 leaf of the box with `memory.max` of
+  `--memory-gib` (3 GiB by default, `LARMORX_DIFFTEST_CASE_GIB` for the nightly script, many
+  times what an input of at most 32^3 voxels needs; a worker's peak is about 0.3 to 1.5 GiB) and
+  `memory.swap.max` 0. The worker enters its leaf before it runs anything, so every original
+  program and larmorx run of its cases is held there;
+- **a run over the limit is an outcome, not a crash of the harness**: the kernel stops the
+  largest process of the leaf; the verdict is *memory*, "the original <program> exceeds 3 GiB"
+  (a child process stopped, the worker alive: read from the leaf's `memory.events` and the
+  exits the worker saw) or "larmorx exceeds 3 GiB" (the worker, which runs larmorx in-process,
+  stopped: each implementation then runs again in a child process of its own, as a crash
+  does); a fresh worker takes the leaf and the night goes on (the self-test tool
+  `selftest-memory` and the test `test_a_case_over_the_memory_limit_is_recorded_and_the_night_goes_on`
+  prove it on a real boxed night);
+- **time**: each run has its alarm (the tool's timeout) and each case its deadline, past which
+  its worker's process group is killed (*timeout*).
+
+**Heavy cases are run, not avoided** (user, 2026-10-25). Every case with a *memory* verdict is
+queued in the night's `heavy.jsonl`. `python -m larmorx_validation difftest --heavy
+oracles/difftest/<date>` runs the queue later, one case at a time, each implementation in a
+child process in a leaf of 24 GiB with 48 GiB of swap (`--heavy-hours`, 2 per run), only when the
+machine is quiet (the user says when); the results, with each run's peak memory, go to
+`heavy-results.jsonl`, and the report's "Heavy cases" section lists every queued case with its
+result (or "waiting"). Before a queue is run, `validation/investigations/difftest/heavy_predict.py`
+predicts each case's memory and time from the original's sizing law and the unit costs measured
+on smaller variants of the same case (`n4_memory.py`, `scaled_memory.py`).
 
 ## Shrinking
 

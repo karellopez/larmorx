@@ -254,7 +254,13 @@ impl<'a> GridFitPlan<'a> {
                 })
             })
             .collect();
-        let fixed: Vec<usize> = (d - d.min(2)..d).collect();
+        // The last two axes split the work in 3D and above, the last one in 2D: with both
+        // axes of a 2D lattice fixed every block would be a single control point, a task and
+        // an allocation per point (random testing, 2026-10-25: 3 times ANTs' memory and 12
+        // times its time on a lattice of 57 million points). Each control point is summed in
+        // point order either way, so the result is the same, bit for bit.
+        let n_fixed = if d >= 3 { 2 } else { 1 };
+        let fixed: Vec<usize> = (d - n_fixed..d).collect();
         let n_free = d - fixed.len();
         let free_count = n.pow(n_free as u32);
         let cp = fit.control_points.to_vec();

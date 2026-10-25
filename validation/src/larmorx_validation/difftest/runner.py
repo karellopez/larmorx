@@ -47,6 +47,9 @@ from larmorx_validation.parity import harness
 TIMEOUT = "timeout"
 #: A run the kernel stopped because it exceeded its memory limit (:mod:`limits`).
 MEMORY = limits.MEMORY
+#: A case predicted over the case's memory limit: not compared; larmorx's default stopped at
+#: once with its guard's error (ANTS-162, AFNI-75), the prediction recorded (``sizing``).
+GUARD = "guard"
 #: How many cases with the same difference (tool, implementation, failed checks) are shrunk in a
 #: night; later ones are counted and kept unshrunk (shrinking is the night's costliest part).
 SHRINKS_PER_SIGNATURE = 2
@@ -326,6 +329,15 @@ def run_case(
     line["features"] = recipe.get("features", {})
     line["impls"] = {}
     line["findings"] = []
+    predicted = predict_case(tool_name, recipe)
+    if predicted is not None:
+        line["predicted"] = predicted
+        for impl in tool.implementations:
+            line["impls"][impl] = guard_case(tool, recipe, impl, predicted)
+        line["seconds"] = round(time.monotonic() - start, 2)
+        verdicts = [e["verdict"] for e in line["impls"].values()]
+        line["verdict"] = next((v for v in (DIFFER, MEMORY, GUARD) if v in verdicts), GUARD)
+        return line
     for impl in tool.implementations:
         j = judge_once(tool, recipe, impl)
         entry: dict = {
@@ -411,6 +423,95 @@ def run_case(
         core.AGREE,
     )
     return line
+
+
+def case_limit() -> int:
+    """The memory limit of a case here: this worker's leaf's, else :data:`limits.CASE_GIB`."""
+    leaf = limits.current()
+    return leaf.limit if leaf is not None else int(limits.CASE_GIB * limits.GIB)
+
+
+def predict_case(tool_name: str, recipe: dict) -> dict | None:
+    """The case's predicted need (``sizing``) when it exceeds the case's memory limit, else
+    ``None`` (the case runs)."""
+    from larmorx_validation.difftest import sizing
+
+    p = sizing.predict(tool_name, recipe)
+    if p is None:
+        return None
+    limit = case_limit() / limits.GIB
+    if max(p["ants_gib"], p["larmorx_gib"]) <= limit:
+        return None
+    out = {
+        "law": p["law"],
+        "limit_gib": round(limit, 3),
+        "ants_gib": round(p["ants_gib"], 4),
+        "larmorx_gib": round(p["larmorx_gib"], 4),
+    }
+    for k in ("ants_hours", "larmorx_hours"):
+        if k in p:
+            out[k] = round(p[k], 4)
+    return out
+
+
+#: The implementations whose default checks a size before allocating it (ANTS-162, AFNI-75).
+GUARDED = {
+    "ants-n4": ("port",),
+    "ants-resample-image": ("port",),
+    "ants-resample-image-by-spacing": ("port",),
+    "afni-unifize": ("replica",),
+}
+
+
+def guard_case(tool: core.Tool, recipe: dict, impl: str, predicted: dict) -> dict:
+    """One implementation of a case predicted over the case's memory limit: not compared with
+    the original (whose prediction is recorded, and which ``difftest --heavy`` runs later).
+    Where larmorx's own need is over the limit too, its default runs alone with the limit as
+    ``LARMORX_MEMORY_LIMIT`` and must stop at once with its guard's error (verdict ``guard``;
+    a finding if it does not). Where it fits, or has no guard, nothing runs (``memory``)."""
+    limit = case_limit()
+    what = (
+        f"predicted ({predicted['law']}): the original about {predicted['ants_gib']:.4g} GiB, "
+        f"larmorx about {predicted['larmorx_gib']:.4g} GiB, over the case's limit of "
+        f"{limits.gib(limit)}"
+    )
+    guarded = impl in GUARDED.get(tool.name, ())
+    if not guarded or predicted["larmorx_gib"] <= limit / limits.GIB:
+        why = (
+            "larmorx's need fits; the original's does not"
+            if guarded
+            else "this implementation has no guard"
+        )
+        return {
+            "verdict": MEMORY,
+            "signature": ["predicted over the memory limit"],
+            "detail": f"{what}; not run ({why}): queued for the heavy box",
+            "status": MEMORY,
+        }
+    saved = os.environ.get("LARMORX_MEMORY_LIMIT")
+    os.environ["LARMORX_MEMORY_LIMIT"] = str(limit)
+    try:
+        j, _, _ = execute(tool, recipe, impl, expect="guard")
+    finally:
+        if saved is None:
+            os.environ.pop("LARMORX_MEMORY_LIMIT", None)
+        else:
+            os.environ["LARMORX_MEMORY_LIMIT"] = saved
+    if j.verdict == core.AGREE:
+        return {
+            "verdict": GUARD,
+            "signature": ["guard"],
+            "detail": f"{what}; larmorx's default stopped at once with its guard's error",
+            "status": GUARD,
+        }
+    return {
+        "verdict": DIFFER,
+        "signature": ["guard missing"],
+        "detail": f"{what}; larmorx's default did not stop with its guard's error: {j.detail}"[
+            :600
+        ],
+        "status": "fail",
+    }
 
 
 # ------------------------------------------------------------------------------------------------
@@ -843,7 +944,7 @@ def night(
                         }
                     )
                 if line.get("impls") and any(
-                    e.get("verdict") == MEMORY for e in line["impls"].values()
+                    e.get("verdict") in (MEMORY, GUARD) for e in line["impls"].values()
                 ):
                     _queue_heavy(out, line, queued)
                 findings = line.pop("findings", [])
@@ -893,8 +994,9 @@ def _queue_heavy(out: Path, line: dict, queued: set) -> None:
         "detail": "; ".join(
             f"{impl}: {e.get('detail', '')}"
             for impl, e in line["impls"].items()
-            if e.get("verdict") == MEMORY
+            if e.get("verdict") in (MEMORY, GUARD)
         ),
+        "predicted": line.get("predicted"),
         "queued": time.strftime("%Y-%m-%dT%H:%M:%S"),
     }
     with (out / "heavy.jsonl").open("a", encoding="utf-8") as f:

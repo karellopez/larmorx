@@ -126,6 +126,8 @@ pub enum N4Error {
 /// `validation/investigations/difftest/n4_memory.py` (`docs/findings/ants-n4.md`; ANTs needs 17
 /// and 25).
 const LATTICE_BYTES: f64 = 12.0;
+/// In 2D (measured on ants-n4:20261025:406, 2026-10-25): 16.1 bytes per control point.
+const LATTICE_BYTES_2D: f64 = 16.5;
 const PADDED_BYTES: f64 = 21.0;
 
 /// ANTS-162: the memory the lattices and the padded image need, checked before anything is
@@ -148,7 +150,12 @@ fn check_memory(
         .collect();
     let points: f64 = last.iter().product();
     let voxels: f64 = padded.iter().map(|&n| n as f64).product();
-    let needed = LATTICE_BYTES * points + PADDED_BYTES * voxels;
+    let per_point = if g.ndim == 2 {
+        LATTICE_BYTES_2D
+    } else {
+        LATTICE_BYTES
+    };
+    let needed = per_point * points + PADDED_BYTES * voxels;
     let Err(limit) = larmorx_core::alloc::check_plan(needed) else {
         return Ok(());
     };

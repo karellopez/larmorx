@@ -812,7 +812,7 @@ def run_case(spec: ToolSpec, case: Case, checks: CheckList) -> None:
             checks(
                 "larmorx refuses before allocating (AFNI-75)",
                 ours.code != 0 and "(AFNI-75)" in text and "GiB" in text,
-                detail=text[-600:],
+                detail=f"exit {ours.code}: {text[-600:]}",
             )
             return
         afni = run_afni(program, args, env, a_dir, never=case_never(s))

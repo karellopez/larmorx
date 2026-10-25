@@ -16,8 +16,15 @@ use rayon::prelude::*;
 pub const BLOCK_SIZE: usize = 256 * 1024;
 /// Deflate's window: the dictionary handed to each block.
 const DICT_SIZE: usize = 32 * 1024;
-/// Blocks compressed together per batch (bounds the memory held by the encoder).
+/// At most this many blocks compressed together per batch (bounds the memory held by the
+/// encoder): two per worker of the current pool, so a one-thread write holds two blocks of input
+/// and their output, not 64 (random testing, 2026-10-25: larmorx's peak memory against ANTs').
 const BATCH_BLOCKS: usize = 64;
+
+/// The blocks of one batch on the current rayon pool.
+fn batch_blocks() -> usize {
+    (2 * rayon::current_num_threads()).clamp(2, BATCH_BLOCKS)
+}
 
 /// A gzip encoder that compresses blocks in parallel on the current rayon pool.
 ///
@@ -26,6 +33,8 @@ pub struct ParallelGzEncoder<W: Write> {
     inner: W,
     level: u32,
     pending: Vec<u8>,
+    /// Input bytes per batch (`BLOCK_SIZE` times [`batch_blocks`]).
+    batch: usize,
     dictionary: Vec<u8>,
     crc: crc32fast::Hasher,
     total_in: u64,
@@ -45,7 +54,8 @@ impl<W: Write> ParallelGzEncoder<W> {
         Ok(ParallelGzEncoder {
             inner,
             level,
-            pending: Vec::with_capacity(BLOCK_SIZE * BATCH_BLOCKS),
+            pending: Vec::with_capacity(BLOCK_SIZE * batch_blocks()),
+            batch: BLOCK_SIZE * batch_blocks(),
             dictionary: Vec::new(),
             crc: crc32fast::Hasher::new(),
             total_in: 0,
@@ -110,10 +120,10 @@ impl<W: Write> Write for ParallelGzEncoder<W> {
     /// peak memory). The blocks start at the same offsets of the stream however the input is
     /// split, so the output is the same, byte for byte.
     fn write(&mut self, buf: &[u8]) -> io::Result<usize> {
-        let room = BLOCK_SIZE * BATCH_BLOCKS - self.pending.len();
+        let room = self.batch - self.pending.len();
         let n = buf.len().min(room);
         self.pending.extend_from_slice(&buf[..n]);
-        if self.pending.len() >= BLOCK_SIZE * BATCH_BLOCKS {
+        if self.pending.len() >= self.batch {
             self.flush_blocks()?;
         }
         Ok(n)
@@ -223,9 +233,10 @@ mod tests {
     /// One `write_all` of an image several batches long never holds more than one batch of it.
     #[test]
     fn a_large_write_holds_one_batch_at_most() {
-        let batch = BLOCK_SIZE * BATCH_BLOCKS;
-        let data = sample(2 * batch + 7);
+        let data = sample(3 * BLOCK_SIZE * BATCH_BLOCKS + 7);
         let mut enc = ParallelGzEncoder::new(Vec::new(), 1).unwrap();
+        let batch = enc.batch;
+        assert!((2 * BLOCK_SIZE..=BLOCK_SIZE * BATCH_BLOCKS).contains(&batch));
         enc.write_all(&data).unwrap();
         assert!(enc.pending.len() < batch, "{}", enc.pending.len());
         assert_eq!(enc.pending.capacity(), batch);

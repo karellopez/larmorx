@@ -491,6 +491,10 @@ def run_case(case: Case, checks: CheckList) -> None:
         tmp = Path(tmp_name)
         for name, text in c.files:
             (tmp / name).write_text(text, encoding="utf-8")
+        if c.expect == "guard":
+            # Beyond the memory at hand (ANTS-162): only larmorx's default runs, and must stop.
+            guard(c, tmp, checks)
+            return
         results = {}
         for tool, runner in [
             ("ants", functools.partial(_run_ants, never=case_never(c))),
@@ -550,7 +554,7 @@ def guard(c: AntsCase, tmp: Path, checks: CheckList, threads: int | None = None)
     checks(
         "larmorx refuses before allocating (ANTS-162)",
         code != 0 and "(ANTS-162)" in text and "GiB" in text,
-        detail=text[-600:],
+        detail=f"exit {code}: {text[-600:]}",
     )
 
 

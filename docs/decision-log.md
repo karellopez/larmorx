@@ -1152,6 +1152,57 @@ session's); (4) small questions are collected and decided in batches.
   runs pass to ANTs programs; kept as values, one NaN slab would turn a smoothed image entirely to
   NaN. nifti_clib's deliberate design, no gain for the pipelines.
 
+## 2026-10-24: The data panel, the site's quality, four agents (decided by the user)
+
+- **The data panel approved** ("I am okay with your recommendations"): the 12 datasets the
+  research proposed (OpenNeuro: ds000005, ds001600, ds005040, ds005752, ds005454 already in use;
+  new ds004958, ds002422, ds000256, ds000228, ds003592, ds005003, ds004173), plus ds002603
+  (Philips single-band and multiband 4) and one ds004884 stroke subject with its manual lesion
+  mask (fMRIPrep's lesion-masked path). One subject each; the data stays on OpenNeuro and only the
+  catalog (URLs, SHA-256s, licences, citations) is in `larmorx-testdata`. The user approves the
+  list before anything is downloaded.
+- **ds004884's lesion mask** (orchestrator, within that approval): the dataset draws its masks on
+  the T2w; fMRIPrep wants one on the T1w's grid. The oracle run uses the mask resampled onto
+  ses-217's T1w by nearest neighbour through the scanner coordinates (the two images agree to
+  0.38° and 1.1 mm by their headers), made by a committed deterministic script; both fMRIPrep and
+  larmorx get that same file, and the catalog keeps the original mask.
+- **Random testing's differences:** a clear larmorx mistake is fixed at once (its shrunk input
+  becomes a permanent case); everything else goes into the register the day it is found and is
+  fixed in batches, by rules A-D.
+- **The site's evidence only ever improves** ("I do not really want to have less quality than
+  now, always better quality and information"): nothing shown is removed, downsampled or turned
+  into slices; space is saved only where nothing is lost (margins where every array of a viewer
+  is exactly constant, lossless encodings, image blobs kept out of git's history); space-saving
+  forms only for new content; a page over its budget gets a larger budget. Each part proves it
+  with a before/after inventory and screenshots.
+- **No Zenodo for now** (the user has no account; "I do not want it now"): no full-data downloads
+  from the site; every result is reproducible from the test-data recipes. To reconsider at the
+  first public release.
+- **Four agents at once** for the evidence infrastructure and FSL ("Everything is okay with the
+  weekly limits for now. I will tell you if something gets wrong"): an exception to "never more
+  than two"; the FSL agents used at most 3 threads each.
+
+## 2026-10-24: The oracle-output cache, how it decides
+
+Built from the decision of 2026-10-23 ("speed at the same quality", points 1 and 2), these
+choices made while building it ([validation/oracle-cache.md](validation/oracle-cache.md)):
+- **The key** is the program's SHA-256 and its shared libraries' (glibc's `libm` decides the
+  unmodified programs' maths), or a container image's; the arguments with inputs named by their
+  content (a `.gz` input by its decompressed stream) and suffix and the run's directories by
+  their roles; the environment variables of the program's family; the CPU's model and flags.
+  Not the larmorx commit, file names or `PATH`. (Intel's `KMP_*` variables left AFNI's key on
+  2026-10-25: AFNI uses GNU libgomp, or no OpenMP, and never reads them.)
+- **Runs above one thread** are served only once three runs agreed (the porting guide's rule for
+  races), the programs known to vary there (`antsRegistration`, `antsAI`,
+  `antsAffineInitializer`, `DenoiseImage`) never; clock seeds, memory never written, hangs,
+  crashes and the cases that measure the original's own spread always run.
+- **A difference** between a fresh run and its entry is a finding: both kept, the entry never
+  served again, reported loudly (`refresh` and `verify` fail).
+- **No duplicate smoke runs:** a passing `pytest tests/parity` of a clean commit leaves a marker
+  that `scripts/record_golden.py` reuses for the same commit and build.
+- **Suites' own derived inputs** live outside the cache's directory, in `oracles/inputs/<suite>/`
+  (orchestrator, 2026-10-25).
+
 ## Open decisions (PLAN.md §16)
 
 | # | Decision | Recommended default (used until decided) | Status |

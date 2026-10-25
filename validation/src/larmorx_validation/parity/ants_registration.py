@@ -1296,12 +1296,17 @@ def _laplacian(tmp: Path, image: Path) -> Path:
         b = ants_bin()
         if b is None or not (b / "ImageMath").is_file():
             raise Outcome(SKIPPED, "the ANTs oracle's ImageMath was not found")
-        subprocess.run(
-            [str(b / "ImageMath"), "3", str(path), "Laplacian", str(image), "1.5", "1"],
-            check=True,
-            capture_output=True,
+        from larmorx_validation import oracle_cache
+
+        argv = [str(b / "ImageMath"), "3", str(path), "Laplacian", str(image), "1.5", "1"]
+        p = oracle_cache.run(
+            argv,
             env={**os.environ, "ITK_GLOBAL_DEFAULT_NUMBER_OF_THREADS": "1"},
+            policy=oracle_cache.Policy(threads=1, family="itk"),
+            runner="ants-registration-inputs",
         )
+        if p.returncode != 0:
+            raise subprocess.CalledProcessError(p.returncode, argv, p.stdout, p.stderr)
     return path
 
 
@@ -1768,7 +1773,12 @@ def _run_ants(
     *,
     correctly_rounded: bool = False,
     timeout: float = ANTS_TIMEOUT,
+    never: str = "",
 ):
+    """antsRegistration, through the oracle cache: never kept without a seed (the clock), above
+    one thread (``VARIES_ABOVE_ONE_THREAD``), or when ``never`` says why (:func:`case_never`)."""
+    from larmorx_validation import oracle_cache
+
     b = ants_bin()
     if b is None or not (b / PROGRAM).is_file():
         raise Outcome(SKIPPED, "the ANTs oracle's antsRegistration was not found")
@@ -1781,19 +1791,36 @@ def _run_ants(
         if lib is None:
             raise FileNotFoundError("libcrmath.so (scripts/build_crmath_preload.sh)")
         env["LD_PRELOAD"] = str(lib)
-    try:
-        p = subprocess.run(
-            [str(b / PROGRAM), *args],
-            capture_output=True,
-            text=True,
-            encoding="utf-8",
-            errors="replace",
-            env=env,
-            timeout=timeout,
-        )
-    except subprocess.TimeoutExpired:
+    policy = oracle_cache.Policy(
+        threads=oracle_cache.itk_threads(env),
+        never=never or oracle_cache.ants_seed_never(PROGRAM, list(args), env),
+        family="itk",
+    )
+    p = oracle_cache.run(
+        [str(b / PROGRAM), *args],
+        env=env,
+        policy=policy,
+        timeout=timeout,
+        runner="ants-registration",
+    )
+    if p.timed_out:
         return None, "", ""
     return p.returncode, p.stdout, p.stderr
+
+
+def case_never(c) -> str:
+    """Why ANTs' runs of a registration (or antsAI) case are never kept in the oracle cache:
+    a hang (its outcome is the clock's), a case that measures ANTs' own spread, or the case's
+    texts naming a defect whose result varies (``VARYING_DEFECTS``)."""
+    from larmorx_validation.oracle_cache import never_for
+
+    if c.expect == "hang":
+        return "ANTs never finishes: the outcome is the timeout's"
+    if c.expect == "random":
+        return "ANTs seeds from the clock: the case measures its own spread"
+    if why := getattr(c, "nondeterministic", ""):
+        return why
+    return never_for(c.description, c.reason)
 
 
 def _run_larmorx(args: list[str], seed: str | None, mode: str = defects.REPRODUCE):
@@ -1975,7 +2002,10 @@ def run_case(case: Case, checks: CheckList) -> None:
         l_dir.mkdir()
         a_args, l_args = _resolve(c, a_dir, tmp), _resolve(c, l_dir, tmp)
         ants = _run_ants(
-            a_args, c.seed, timeout=HANG_SECONDS if c.expect == "hang" else ANTS_TIMEOUT
+            a_args,
+            c.seed,
+            timeout=HANG_SECONDS if c.expect == "hang" else ANTS_TIMEOUT,
+            never=case_never(c),
         )
         lx = _run_larmorx(l_args, c.seed)
         if c.expect == "hang":
@@ -2055,7 +2085,9 @@ def run_case(case: Case, checks: CheckList) -> None:
             )
             c_dir = tmp / "ants-cr"
             c_dir.mkdir()
-            cr = _run_ants(_resolve(c, c_dir, tmp), c.seed, correctly_rounded=True)
+            cr = _run_ants(
+                _resolve(c, c_dir, tmp), c.seed, correctly_rounded=True, never=case_never(c)
+            )
             _compare(checks, "ANTs with CORE-MATH", cr, lx, c_dir, l_dir)
         if c.band and ants[0] == 0:
             ref = _parameters(a_dir)
@@ -2063,7 +2095,7 @@ def run_case(case: Case, checks: CheckList) -> None:
             for n in BAND_THREADS:
                 b_dir = tmp / f"ants-{n}"
                 b_dir.mkdir()
-                _run_ants(_resolve(c, b_dir, tmp), c.seed, threads=n)
+                _run_ants(_resolve(c, b_dir, tmp), c.seed, threads=n, never=case_never(c))
                 other = _parameters(b_dir)
                 if ref is not None and other is not None and other.shape == ref.shape:
                     band = max(band, float(np.max(np.abs(other - ref))))

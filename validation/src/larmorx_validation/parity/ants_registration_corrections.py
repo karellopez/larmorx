@@ -168,20 +168,32 @@ def _larmorx(args: list[str], mode: str) -> tuple[int, str, str]:
     return _run_larmorx(args, SEED, mode)
 
 
-def _ants(args: list[str]) -> tuple[int, str, str]:
+#: Why the references with a displacement field always run (they are run FIELD_RUNS times).
+VARIES = "ANTS-72: a linear stage after a displacement field draws its voxels from the clock"
+
+
+def _ants(args: list[str], never: str = "") -> tuple[int, str, str]:
     from larmorx_validation.parity.ants_registration import _run_ants
 
-    code, out, err = _run_ants(args, SEED)
+    code, out, err = _run_ants(args, SEED, never=never)
     return code, out, err
 
 
 def _apply(args: list[str]) -> None:
+    from larmorx_validation import oracle_cache
+
     b = ants_bin()
     env = {**os.environ, "ITK_GLOBAL_DEFAULT_NUMBER_OF_THREADS": "1"}
     env.pop("LD_PRELOAD", None)
-    subprocess.run(
-        [str(b / "antsApplyTransforms"), "-d", "3", *args], env=env, check=True, capture_output=True
+    argv = [str(b / "antsApplyTransforms"), "-d", "3", *args]
+    p = oracle_cache.run(
+        argv,
+        env=env,
+        policy=oracle_cache.Policy(threads=1, family="itk"),
+        runner="ants-registration-corrections",
     )
+    if p.returncode != 0:
+        raise subprocess.CalledProcessError(p.returncode, argv, p.stdout, p.stderr)
 
 
 def _params(path: Path) -> np.ndarray:
@@ -200,12 +212,22 @@ def _mask() -> np.ndarray:
     return np.asarray(nib.load(ants_inputs.path("reg-mask")).dataobj) > 0
 
 
+def _stable(path: Path, tmp: Path) -> str:
+    """A name for ``path``'s derived files that is the same in every run (its path below the
+    case's directory; ``hash()`` changes from process to process): the oracle cache finds the
+    runs that make them again."""
+    import hashlib
+
+    rel = path.relative_to(tmp) if path.is_relative_to(tmp) else path
+    return hashlib.sha256(rel.as_posix().encode()).hexdigest()[:16]
+
+
 def _displacement(path: Path, tmp: Path) -> np.ndarray:
     """A transform file's displacement on the fixed phantom's grid (antsApplyTransforms' field
     output), as (voxels, 3) in the image's C order."""
     import nibabel as nib
 
-    out = tmp / (path.name + f".{abs(hash(str(path)))}.field.nii.gz")
+    out = tmp / (path.name + f".{_stable(path, tmp)}.field.nii.gz")
     f = str(ants_inputs.path("reg-fixed"))
     _apply(["-i", f, "-r", f, "-t", str(path), "-o", f"[{out},1]"])
     return np.asarray(nib.load(out).dataobj, dtype=float).reshape(-1, 3)
@@ -223,7 +245,7 @@ def _true_mse(bspline: Path, second: Path, tmp: Path) -> float:
     import nibabel as nib
 
     f, m = ants_inputs.path("reg-fixed"), ants_inputs.path("reg-moving")
-    out = tmp / f"warped-{abs(hash(str(second)))}.nii.gz"
+    out = tmp / f"warped-{_stable(second, tmp)}.nii.gz"
     _apply(["-i", str(m), "-r", str(f), "-t", str(bspline), "-t", str(second), "-o", str(out)])
     a = np.asarray(nib.load(f).dataobj, float)
     b = np.asarray(nib.load(out).dataobj, float)
@@ -413,7 +435,8 @@ def _chain(sc: Scenario, tmp: Path, checks: CheckList) -> None:
             d = tmp / f"ants-field-{'fine' if ref == fine else 'grid'}-{r}"
             d.mkdir()
             code, _o, err = _ants(
-                ["-d", "3", "-v", "1", "-o", str(d / "r"), "-r", str(fld), *second_args]
+                ["-d", "3", "-v", "1", "-o", str(d / "r"), "-r", str(fld), *second_args],
+                never=VARIES,
             )
             runs.append((code, d / f"r{sc.second_file}"))
         repeated[f"ANTs with the B-spline transform as a displacement field ({tag})"] = runs

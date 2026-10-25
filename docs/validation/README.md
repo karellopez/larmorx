@@ -10,6 +10,7 @@ One record per validated tool: larmorx compared, case by case, with the referenc
 | [afni-tshift](afni-tshift.md) | `lx.afni.tshift`, `larmorx afni 3dTshift` (clean-room) | 3dTshift (AFNI 25.2.09 binary) | `validated` |
 | [oracles](oracles.md) | how the original programs were built (BUILD_INFO, every program's SHA-256) | — | reference |
 | [oracle-runs](oracle-runs.md) | how the fMRIPrep oracle runs were made (image digest, arguments, seeds, threads) | — | reference |
+| [oracle-cache](oracle-cache.md) | how the parity suites run the original programs once: the key, what is never cached and why, the modes, `verify`, the measured gain | — | reference |
 | [afni-tshift-replica](afni-tshift-replica.md) | `larmorx-gpl afni 3dTshift` (GPL replica, `crates-gpl/`) | 3dTshift (AFNI 25.2.09 binary) | `validated` |
 | [afni-automask](afni-automask.md) | `lx.afni.automask`, `larmorx afni 3dAutomask` (clean-room original, `crates/larmorx-afni`) | 3dAutomask (AFNI 25.2.09 binary; fMRIPrep 25.2.6's AFNI as a second build) | `validated` |
 | [afni-automask-replica](afni-automask-replica.md) | `larmorx-gpl afni 3dAutomask` (GPL replica, `crates-gpl/`), run by `larmorx afni 3dAutomask` and `lx.afni.automask` | 3dAutomask (AFNI 25.2.09 binary; fMRIPrep 25.2.6's AFNI as a second build) | `validated` |
@@ -58,6 +59,18 @@ These records compare larmorx with the original tools on Linux x86-64. That the 
 platforms reproduce larmorx's own Linux x86-64 output is checked by the golden tests, in CI:
 [golden.md](golden.md).
 
+**The original programs run once.** Every parity suite runs the originals through the
+[oracle-output cache](oracle-cache.md): a run seen before (the same oracle build, inputs,
+arguments and settings) is served from `<workspace>/oracles/cache`, so re-making a record runs
+only larmorx; each record's header says how many original runs came from the cache. Runs whose
+result the original itself varies (its clock, races, the thread bands of programs that vary,
+memory it never wrote) always run. A record made from the cache is byte-identical, apart from
+that line and the timings, to one made without it. Measured on a busy machine (other agents ran
+beside it; load average 8 to 31): the smoke tier's records took 2021 s without the cache and
+694 s warm, `pytest tests/parity` 94 minutes and 27, `ants-registration`'s standard record 2.0
+hours and 49 minutes (509 of its 657 original runs from the cache); details and the proof in
+[oracle-cache.md](oracle-cache.md).
+
 **The ANTs oracle** is ITK 5.4.5 and ANTs 2.6.5 built from the pinned tags by
 `scripts/build_ants_oracle.sh` into `<workspace>/oracles/ants-2.6.5`. The records compare
 with what the C++ source defines (CLAUDE.md rule 8), so the build must not miscompile it:
@@ -104,3 +117,6 @@ python -m larmorx_validation.parity.mri_hmc_band --mcflirt ~/fsl/bin/mcflirt   #
 python -m larmorx_validation parity mri-hmc --tier standard --out docs/validation   # needs the recorded mcflirt runs
 python -m larmorx_validation pipeline-stages --oracle <workspace>/oracles/fmriprep-25.2.6/ds000005-sub-01-noreconall --out docs/validation   # needs the fMRIPrep oracle run (scripts/run_fmriprep_oracle.sh), its image and Apptainer; about an hour
 ```
+
+The commands use the oracle cache (`--oracle-cache use`, the default); `--oracle-cache off` runs
+every original program, `--oracle-cache refresh` runs them and compares them with the cache.

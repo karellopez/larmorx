@@ -24,8 +24,28 @@ def _short(text: str, n: int = 160) -> str:
     return text if len(text) <= n else text[: n - 1] + "…"
 
 
+def oracle_line(oracle: dict[str, Any]) -> str:
+    """The record's line on the original programs' runs: how many came from the oracle cache,
+    how many ran (and how many of those may never be cached), and the cache's location."""
+    served, ran = oracle.get("served", 0), oracle.get("ran", 0)
+    never = sum(n for why, n in oracle.get("fresh", {}).items() if why.startswith("never cached"))
+    total = served + ran
+    text = (
+        f"- **Original programs:** {total} run{'s' if total != 1 else ''}: {served} from the "
+        f"oracle cache, {ran} run"
+    )
+    if never:
+        text += f" ({never} never cached: the original varies)"
+    return text + f"; cache `{oracle.get('location', '?')}`, mode `{oracle.get('mode', '?')}`"
+
+
 def render(
-    suite: Suite, results: list[CaseResult], env: dict[str, Any], tier: str, command: str
+    suite: Suite,
+    results: list[CaseResult],
+    env: dict[str, Any],
+    tier: str,
+    command: str,
+    oracle: dict[str, Any] | None = None,
 ) -> str:
     counts = Counter(r.status for r in results)
     n = len(results)
@@ -41,8 +61,10 @@ def render(
         f"- **Reference:** {suite.reference}",
         f"- **Test data:** larmorx-testdata `{env['larmorx_testdata_commit']}`, tier `{tier}`",
         f"- **Generated:** {dt.date.today().isoformat()} on {env['platform']}, with `{command}`",
-        "",
     ]
+    if oracle is not None:
+        lines.append(oracle_line(oracle))
+    lines.append("")
     if suite.highlights is not None:
         lines += [*suite.highlights(results), ""]
     lines += [

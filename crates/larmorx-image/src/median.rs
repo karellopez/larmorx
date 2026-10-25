@@ -6,9 +6,12 @@
 //!
 //! The median *value* does not depend on how the selection is done, with two exceptions where
 //! ITK's result depends on the order `std::nth_element` happens to leave: `-0.0` and `+0.0`
-//! compare equal in ITK, and NaN is unordered. larmorx orders with `f32::total_cmp`
-//! (`-0.0 < +0.0`, NaN last). ANTs never sees a NaN from a NIfTI file (the reader turns them
-//! into 0).
+//! compare equal in ITK, and NaN is unordered. larmorx selects with `f32::total_cmp`
+//! (`-0.0 < +0.0`, NaN last), and where the median is a zero of a box that holds both zeros it
+//! selects again as libstdc++'s `std::nth_element` does on ITK's box order
+//! ([`crate::libstdcxx::nth_element`]), so the zero's sign is ITK's (found by differential
+//! random testing, 2026-10-25: `ants-smooth-image:20261025:564`). ANTs never sees a NaN from a
+//! NIfTI file (the reader turns them into 0).
 
 use larmorx_core::parallel;
 use rayon::prelude::*;
@@ -84,6 +87,25 @@ pub fn median(
                     }
                     let (_, m, _) = values.select_nth_unstable(k / 2);
                     *o = value(*m);
+                    if *o == 0.0 {
+                        // Both zeros in the box: the one libstdc++'s nth_element leaves.
+                        let gather = |xi_of: &dyn Fn(isize) -> usize| -> Vec<f32> {
+                            bases
+                                .iter()
+                                .zip(&offsets)
+                                .map(|(&base, off)| input.data[base + xi_of(off[0])])
+                                .collect()
+                        };
+                        let xi_of =
+                            |o0: isize| (x as isize + o0).clamp(0, nx as isize - 1) as usize;
+                        let mut box_values = gather(&xi_of);
+                        let negative = box_values.iter().any(|v| *v == 0.0 && v.is_sign_negative());
+                        let positive = box_values.iter().any(|v| *v == 0.0 && v.is_sign_positive());
+                        if negative && positive {
+                            crate::libstdcxx::nth_element(&mut box_values, k / 2);
+                            *o = box_values[k / 2];
+                        }
+                    }
                 }
             },
         );

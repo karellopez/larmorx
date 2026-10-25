@@ -1,0 +1,327 @@
+{
+ "defect": null,
+ "description": "a sampled B-spline displacement-field stage with a shrink factor: the derivatives of sample points outside the shrunk virtual region, aliased by ITK (ITK-97, reproduced)",
+ "expect": "pass",
+ "found": {
+  "detail": "ANTs with CORE-MATH: rComposite.h5: datasets differ",
+  "n": 353,
+  "seed": "20261025",
+  "shrink_moves": [
+   "fixed: axis 0 22 -> 11 voxels",
+   "tool move 0",
+   "fixed: axis 1 21 -> 10 voxels",
+   "fixed: axis 2 21 -> 10 voxels",
+   "fixed: axis 1 10 -> 6 voxels",
+   "moving: axis 1 21 -> 10 voxels",
+   "moving: axis 2 21 -> 10 voxels",
+   "moving: axis 1 10 -> 6 voxels",
+   "fixed: float32 storage"
+  ],
+  "signature": [
+   "ANTs with CORE-MATH: rComposite.hN"
+  ]
+ },
+ "id": "sampled-derivatives-aliased",
+ "implementations": [
+  "port"
+ ],
+ "reason": "",
+ "recipe": {
+  "extra": {
+   "min_size": 6
+  },
+  "features": {
+   "axis0": 0.85,
+   "axis1": 0.85,
+   "axis2": 1.0,
+   "blobs": 1,
+   "centre0": -4.5,
+   "centre1": 0.5,
+   "centre2": 1.0,
+   "collapse": false,
+   "composite": true,
+   "content": "blobs",
+   "dimension": 3,
+   "exp total0": "0",
+   "exp total1": "0",
+   "exp total2": "0.5",
+   "family0": "BSplineDisplacementField",
+   "family1": "BSplineSyN",
+   "family2": "BSpline",
+   "fixed dtype": "int16",
+   "fixed n0": 22,
+   "fixed n1": 21,
+   "fixed n2": 21,
+   "fixed spacing": 3.0,
+   "float": false,
+   "gdf total0": "0",
+   "gdf total1": "0.5",
+   "gdf total2": "0",
+   "histogram matching": false,
+   "initial": false,
+   "iterations00": "5",
+   "iterations01": "5",
+   "iterations10": "5",
+   "iterations20": "5",
+   "levels0": 2,
+   "levels1": 1,
+   "levels2": 1,
+   "masks": false,
+   "mesh0": "3",
+   "mesh1": "4",
+   "mesh2": "4",
+   "metric weight0": "1",
+   "metric weight1": "1",
+   "metric weight2": "1",
+   "metric0": "MeanSquares",
+   "metric1": "MeanSquares",
+   "metric2": "CC",
+   "moving dtype": "float32",
+   "moving offset": 0.0,
+   "moving on another grid": true,
+   "moving origin0": -1.0,
+   "moving origin1": 1.0,
+   "moving origin2": -3.0,
+   "moving scale": 1.0,
+   "moving spacing": 2.5,
+   "ms sampling0": true,
+   "ms sampling1": false,
+   "msp0": "0.5",
+   "mss0": "Regular",
+   "oblique fixed": false,
+   "outputs": "[{out}/r,{out}/w.nii.gz]",
+   "radius2": "1",
+   "rot b": 0,
+   "rot c": 1,
+   "rot d": 0,
+   "rot scale": 3,
+   "shift0": 0.5,
+   "shift1": -2.75,
+   "shift2": 4.5,
+   "size": 23.5,
+   "smoothing units0": "",
+   "smoothing units1": "vox",
+   "smoothing units2": "mm",
+   "stages": 3,
+   "step0": "0.2",
+   "step1": "0.5",
+   "step2": "0.25",
+   "syn total0": "0",
+   "syn total1": "0.3",
+   "syn total2": "0",
+   "syn update0": "2",
+   "syn update1": "2",
+   "syn update2": "3",
+   "tvb points0": "2",
+   "tvb points1": "2",
+   "tvb points2": "4",
+   "tvf points0": "3",
+   "tvf points1": "3",
+   "tvf points2": "3",
+   "window0": "3",
+   "window1": "3",
+   "window2": "5",
+   "winsorize": false
+  },
+  "groups": [
+   {
+    "args": [
+     "-d",
+     "3"
+    ],
+    "name": "dimension",
+    "optional": false
+   },
+   {
+    "args": [
+     "-v",
+     "1"
+    ],
+    "name": "verbose",
+    "optional": false
+   },
+   {
+    "args": [
+     "-o",
+     "[{out}/r,{out}/w.nii.gz]"
+    ],
+    "name": "output",
+    "optional": false
+   },
+   {
+    "args": [
+     "-a",
+     "1"
+    ],
+    "name": "composite",
+    "optional": true
+   },
+   {
+    "args": [
+     "-t",
+     "BSplineDisplacementField[0.2,3x3x3,0,3]",
+     "-m",
+     "MeanSquares[{in:fixed},{in:moving},1,0,Regular,0.5]",
+     "-c",
+     "[5x5,1e-6,3]",
+     "-f",
+     "2x1",
+     "-s",
+     "1x0"
+    ],
+    "name": "stage 0",
+    "optional": false
+   }
+  ],
+  "inputs": {
+   "fixed": {
+    "content": {
+     "axes": [
+      0.85,
+      0.85,
+      1.0
+     ],
+     "centre": [
+      0.0,
+      0.0,
+      0.0
+     ],
+     "n": 1,
+     "seed": 685886058,
+     "size": 26.459999999999997,
+     "type": "blobs"
+    },
+    "dtype": "float32",
+    "geometry": {
+     "origin": [
+      -31.5,
+      -30.0,
+      -30.0
+     ],
+     "qfac": 1,
+     "qform_code": 1,
+     "quaternion": [
+      1,
+      0,
+      0,
+      0
+     ],
+     "sform": "same",
+     "sform_code": 1,
+     "spacing": [
+      3.0,
+      3.0,
+      3.0
+     ],
+     "units": "mm"
+    },
+    "keep_content": true,
+    "scaling": null,
+    "shape": [
+     11,
+     6,
+     10
+    ],
+    "suffix": ".nii.gz",
+    "values": {
+     "offset": 0.0,
+     "scale": 1.0
+    }
+   },
+   "moving": {
+    "content": {
+     "axes": [
+      0.85,
+      0.85,
+      1.0
+     ],
+     "centre": [
+      0.0,
+      0.0,
+      0.0
+     ],
+     "n": 1,
+     "seed": 685886058,
+     "size": 26.459999999999997,
+     "type": "blobs"
+    },
+    "dtype": "float32",
+    "geometry": {
+     "origin": [
+      -32.5,
+      -29.0,
+      -33.0
+     ],
+     "qfac": 1,
+     "qform_code": 1,
+     "quaternion": [
+      1,
+      0,
+      0,
+      0
+     ],
+     "sform": "same",
+     "sform_code": 1,
+     "spacing": [
+      2.5,
+      2.5,
+      2.5
+     ],
+     "units": "mm"
+    },
+    "keep_content": true,
+    "motion": [
+     {
+      "centre": [
+       0.0,
+       0.0,
+       0.0
+      ],
+      "quaternion": [
+       32,
+       0,
+       1,
+       0
+      ],
+      "translation": [
+       0.5,
+       -2.75,
+       4.5
+      ]
+     }
+    ],
+    "scaling": null,
+    "shape": [
+     22,
+     6,
+     10
+    ],
+    "suffix": ".nii.gz",
+    "values": {
+     "offset": 0.0,
+     "scale": 1.0
+    }
+   }
+  },
+  "n": 353,
+  "options": [
+   "-a 1",
+   "BSpline",
+   "BSpline with CC",
+   "BSplineDisplacementField",
+   "BSplineDisplacementField with MeanSquares",
+   "BSplineSyN",
+   "BSplineSyN with MeanSquares",
+   "CC metric",
+   "MeanSquares metric",
+   "dimension 3"
+  ],
+  "seed": "20261025",
+  "tool": "ants-registration"
+ },
+ "rule": null,
+ "status": "fixed",
+ "suite": "ants-registration",
+ "tier": "smoke",
+ "tool": "ants-registration"
+}

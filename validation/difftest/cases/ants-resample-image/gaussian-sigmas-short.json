@@ -1,0 +1,173 @@
+{
+ "defect": "ANTS-160",
+ "description": "Gaussian interpolation with one sigma for three dimensions (ANTS-160); the sigma 6 is also ANTs' pixel type, float, as larmorx reads it (no ANTS-30)",
+ "expect": "divergence",
+ "found": {
+  "detail": "both succeed: ANTs exit 0: a = 0.5   x= -nan; larmorx exit 1: larmorx: upstream defect ANTS-30 (ResampleImage) reproduced: argument 7 is read as the pixel type too, as in ANTs: unsigned char [LARMORX_UPSTREAM_DEFECTS=fix corrects it]",
+  "n": 5,
+  "note": "the interpolation's parameters edited by hand from the shrunk ['2', '1', '1'] to ['2', '6'], so that ANTS-30 does not also arise",
+  "seed": "trial1",
+  "shrink_moves": [
+   "a: axis 0 18 -> 9 voxels",
+   "a: axis 1 16 -> 8 voxels",
+   "a: axis 0 9 -> 4 voxels",
+   "a: axis 1 8 -> 4 voxels",
+   "a: axis 2 8 -> 4 voxels",
+   "a: axis 0 4 -> 2 voxels",
+   "a: axis 1 4 -> 2 voxels",
+   "a: axis 2 4 -> 2 voxels",
+   "a (and its grid): unit spacing",
+   "a (and its grid): origin at 0",
+   "a (and its grid): qform and sform codes 1",
+   "a: float32 storage",
+   "a: content blobs -> constant"
+  ],
+  "signature": [
+   "both succeed"
+  ]
+ },
+ "id": "gaussian-sigmas-short",
+ "implementations": [
+  "port"
+ ],
+ "reason": "ANTS-160: one Gaussian sigma for three dimensions; ANTs reads the other two past the end of its vector (its result depends on the heap), larmorx refuses in both modes",
+ "recipe": {
+  "extra": {},
+  "features": {
+   "axis0": 1.2,
+   "axis1": 1.0,
+   "axis2": 1.05,
+   "blobs": 2,
+   "centre0": -2.5,
+   "centre1": -5.0,
+   "centre2": 4.5,
+   "content": "blobs",
+   "dimension": 3,
+   "dtype": "float64",
+   "gaussian": 3,
+   "interpolation": "2",
+   "orientation": "plumb",
+   "origin0": 19.25,
+   "origin1": 3.5,
+   "origin2": 37.0,
+   "per axis": true,
+   "pixel type": false,
+   "qfac": 1,
+   "qform_code": 1,
+   "range": "plain",
+   "sform": "same",
+   "sform_code": 4,
+   "shape": "18x16x8",
+   "size": true,
+   "size0": 17,
+   "size1": 21,
+   "size2": 11,
+   "spacing0": 0.5,
+   "spacing1": 3.0,
+   "spacing2": 1.5,
+   "suffix": ".nii.gz",
+   "units": "mm"
+  },
+  "groups": [
+   {
+    "args": [
+     "3"
+    ],
+    "name": "dimension",
+    "optional": false
+   },
+   {
+    "args": [
+     "{in:a}"
+    ],
+    "name": "input",
+    "optional": false
+   },
+   {
+    "args": [
+     "{out}"
+    ],
+    "name": "output",
+    "optional": false
+   },
+   {
+    "args": [
+     "17x21x11"
+    ],
+    "name": "target",
+    "optional": false
+   },
+   {
+    "args": [
+     "1"
+    ],
+    "name": "size or spacing",
+    "optional": false
+   },
+   {
+    "args": [
+     "2",
+     "6"
+    ],
+    "name": "interpolation",
+    "optional": true
+   }
+  ],
+  "inputs": {
+   "a": {
+    "content": {
+     "seed": 1193053945,
+     "type": "constant"
+    },
+    "dtype": "float32",
+    "geometry": {
+     "origin": [
+      0.0,
+      0.0,
+      0.0
+     ],
+     "qfac": 1,
+     "qform_code": 1,
+     "quaternion": [
+      1,
+      0,
+      0,
+      0
+     ],
+     "sform": "same",
+     "sform_code": 1,
+     "spacing": [
+      1.0,
+      1.0,
+      1.0
+     ],
+     "units": "mm"
+    },
+    "scaling": null,
+    "shape": [
+     2,
+     2,
+     2
+    ],
+    "suffix": ".nii.gz",
+    "values": {
+     "offset": 0.0,
+     "scale": 1.0
+    }
+   }
+  },
+  "n": 5,
+  "options": [
+   "dimension 3",
+   "interpolation 2",
+   "size"
+  ],
+  "seed": "trial1",
+  "tool": "ants-resample-image"
+ },
+ "rule": null,
+ "status": "register",
+ "suite": "ants-resample-image",
+ "tier": "smoke",
+ "tool": "ants-resample-image"
+}

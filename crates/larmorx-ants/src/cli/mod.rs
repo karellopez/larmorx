@@ -94,6 +94,23 @@ pub fn run(
     out: &mut dyn Write,
     err: &mut dyn Write,
 ) -> Option<u8> {
+    // ITK's output window: the warnings its file IO prints while the program runs, written at
+    // the program's end (`larmorx_io::itk_output`).
+    let _ = larmorx_io::itk_output::take();
+    let code = run_tool(tool, args, loader, out, err);
+    for w in larmorx_io::itk_output::take() {
+        let _ = err.write_all(w.as_bytes());
+    }
+    code
+}
+
+fn run_tool(
+    tool: &str,
+    args: &[String],
+    loader: &dyn TransformLoader,
+    out: &mut dyn Write,
+    err: &mut dyn Write,
+) -> Option<u8> {
     match tool {
         "antsAffineInitializer" => Some(affine_initializer::main(args, out, err)),
         "antsAI" => Some(ai::main(args, out, err)),

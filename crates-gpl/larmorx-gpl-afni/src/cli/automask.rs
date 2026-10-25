@@ -574,6 +574,7 @@ fn run(pre: &Prefiltered, mode: UpstreamDefects, quiet: bool, io: &mut Io<'_>) -
     }
     let mut log = Vec::new();
     let mask = am::automask(&ds, &o.settings, mode, &mut log);
+    let printed = log.clone();
     for m in log {
         io.message(m);
     }
@@ -582,11 +583,13 @@ fn run(pre: &Prefiltered, mode: UpstreamDefects, quiet: bool, io: &mut Io<'_>) -
     ))?;
     if peels0 {
         let s = MaskSettings {
-            verbose: false,
             peelcount: if mode.fix() { 1 } else { 0 },
             ..o.settings.clone()
         };
-        let other = am::automask(&ds, &s, mode, &mut Vec::new());
+        let mut other_log = Vec::new();
+        let other = am::automask(&ds, &s, mode, &mut other_log);
+        // The notice where the mask differs, or only AFNI's messages (the clusters it counts
+        // before and after peeling; random testing, 2026-10-25).
         if other.as_deref() != Some(&mask[..]) {
             notices.add(
                 &defects::AFNI_43,
@@ -595,6 +598,17 @@ fn run(pre: &Prefiltered, mode: UpstreamDefects, quiet: bool, io: &mut Io<'_>) -
                 } else {
                     "-peels 0: the mask is peeled once, as AFNI does (its help says 0 turns the \
                      peeling off)"
+                },
+            );
+        } else if other_log != printed {
+            notices.add(
+                &defects::AFNI_43,
+                if mode.fix() {
+                    "-peels 0: the mask is not peeled, as the help says (AFNI peels it once): the \
+                     same mask, but the clustering messages count other voxels"
+                } else {
+                    "-peels 0: the mask is peeled once, as AFNI does: the same mask as without \
+                     peeling, but the clustering messages count other voxels"
                 },
             );
         }

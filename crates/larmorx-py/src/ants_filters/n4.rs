@@ -8,7 +8,7 @@ use larmorx_ants::image::{AntsImage, OutputImage};
 use larmorx_ants::n4_bias_field_correction::{
     BSplineMesh, N4Error, N4Options, n4_bias_field_correction,
 };
-use pyo3::exceptions::PyValueError;
+use pyo3::exceptions::{PyMemoryError, PyValueError};
 use pyo3::prelude::*;
 use pyo3::types::{PyList, PyTuple};
 
@@ -94,6 +94,8 @@ fn ants_n4_bias_field_correction<'py>(
             N4Error::MeshResolution => {
                 PyValueError::new_err(format!("the mesh needs one value per axis ({dim})"))
             }
+            // ANTS-162: the guard's refusal, before anything was allocated.
+            N4Error::BeyondMemory(message) => PyMemoryError::new_err(message),
             other => PyValueError::new_err(other.to_string()),
         })?;
     let iterations = PyList::new(

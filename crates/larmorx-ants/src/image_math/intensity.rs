@@ -8,7 +8,7 @@ use larmorx_core::parallel;
 use larmorx_image::FilterError;
 use larmorx_image::intensity::rescale_intensity;
 use larmorx_image::itk_math::almost_equal_f32;
-use larmorx_image::statistics::label_histogram;
+use larmorx_image::statistics::histogram_where;
 use rayon::prelude::*;
 
 const CHUNK: usize = 1 << 16;
@@ -84,9 +84,15 @@ pub fn truncate_image_intensity(
             "TruncateImageIntensity needs at least one histogram bin".into(),
         ));
     }
-    let mut labels = vec![0i32; data.len()];
+    // The voxels counted (ANTs' label 1): positive, finite and in the mask, decided where
+    // they are counted (no label image: random testing, 2026-10-25, memory).
+    let counted = |i: usize| -> bool {
+        let v = data[i];
+        v > 0.0 && f64::from(mask.map_or(1, |m| m[i])) >= 0.5 && v.is_finite()
+    };
     let (mut min, mut max) = (f32::MAX, -f32::MAX);
     let (mut true_min, mut true_max) = (f32::MAX, -f32::MAX);
+    let mut any = false;
     for (i, &v) in data.iter().enumerate() {
         let m = mask.map_or(1, |m| m[i]);
         if v > 0.0 && f64::from(m) >= 0.5 {
@@ -95,18 +101,15 @@ pub fn truncate_image_intensity(
             } else if v > max {
                 max = v;
             }
-            labels[i] = 1;
             if v.is_finite() {
+                any = true;
                 true_min = true_min.min(v);
                 true_max = true_max.max(v);
             }
         }
-        if v.is_nan() || v.is_infinite() {
-            labels[i] = 0;
-        }
     }
     let mut notices = Notices::new(mode);
-    if labels.contains(&1) && (min, max) != (true_min, true_max) {
+    if any && (min, max) != (true_min, true_max) {
         notices.add(
             &defects::ANTS_12,
             format!(
@@ -118,14 +121,13 @@ pub fn truncate_image_intensity(
             (min, max) = (true_min, true_max);
         }
     }
-    let histogram = label_histogram(
+    let histogram = histogram_where(
         data,
-        &labels,
-        1,
         options.bins,
         f64::from(min),
         f64::from(max),
         n_threads,
+        counted,
     )?
     .ok_or_else(|| {
         FilterError::Invalid(

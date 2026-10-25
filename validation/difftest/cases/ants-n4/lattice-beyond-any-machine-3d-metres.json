@@ -1,0 +1,203 @@
+{
+ "defect": "ANTS-162",
+ "description": "N4 -s 1 -b 25 on a 25x29x9 image of 1 m voxels: a lattice of 7683x8963x2563 control points at the fourth level; larmorx refuses before allocating (ANTS-162)",
+ "expect": "guard",
+ "found": {
+  "detail": "larmorx exceeds 3 GiB: the kernel stopped the process running it",
+  "n": 56,
+  "seed": "20261025",
+  "shrink_moves": [],
+  "signature": [
+   "larmorx exceeds the memory limit"
+  ]
+ },
+ "id": "lattice-beyond-any-machine-3d-metres",
+ "implementations": [
+  "port"
+ ],
+ "reason": "ANTS-162: about 2.6 TB at the last fitting level",
+ "recipe": {
+  "extra": {
+   "min_size": 4,
+   "outputs": [
+    "{out}",
+    "{out2}"
+   ]
+  },
+  "features": {
+   "axis0": 0.8,
+   "axis1": 0.75,
+   "axis2": 1.15,
+   "bias field output": true,
+   "bias0": 0.0075,
+   "bias1": 0.0025,
+   "bias2": 0.0075,
+   "bias3": -0.0075,
+   "bracket": false,
+   "bspline": true,
+   "centre0": 1.0,
+   "centre1": 4.0,
+   "centre2": -1.5,
+   "content": "head",
+   "convergence": false,
+   "dimension": 3,
+   "dtype": "uint16",
+   "histogram": true,
+   "histogram parameters": "[0.15,0.01,256]",
+   "mask": false,
+   "noise": 3.0,
+   "order": ",2",
+   "orientation": "axes+oblique",
+   "origin0": 39.5,
+   "origin1": 24.5,
+   "origin2": 9.5,
+   "output form": "[{out},{out2}]",
+   "qfac": -1,
+   "qform_code": 1,
+   "range": "plain",
+   "rescale": false,
+   "sform": "same",
+   "sform_code": 1,
+   "shape": "25x29x9",
+   "shrink": true,
+   "shrink factor": "1",
+   "size": 23.0,
+   "spacing0": 1.0,
+   "spacing1": 1.0,
+   "spacing2": 1.0,
+   "spline": "25",
+   "suffix": ".nii.gz",
+   "tissues": "t1",
+   "units": "m",
+   "verbose": false,
+   "weight": false
+  },
+  "groups": [
+   {
+    "args": [
+     "-d",
+     "3"
+    ],
+    "name": "dimension",
+    "optional": false
+   },
+   {
+    "args": [
+     "-i",
+     "{in:a}"
+    ],
+    "name": "input",
+    "optional": false
+   },
+   {
+    "args": [
+     "-s",
+     "1"
+    ],
+    "name": "shrink",
+    "optional": true
+   },
+   {
+    "args": [
+     "-b",
+     "25"
+    ],
+    "name": "bspline",
+    "optional": true
+   },
+   {
+    "args": [
+     "-t",
+     "[0.15,0.01,256]"
+    ],
+    "name": "histogram",
+    "optional": true
+   },
+   {
+    "args": [
+     "-o",
+     "[{out},{out2}]"
+    ],
+    "name": "output",
+    "optional": false
+   }
+  ],
+  "inputs": {
+   "a": {
+    "content": {
+     "axes": [
+      0.8,
+      0.75,
+      1.15
+     ],
+     "bias": [
+      0.0075,
+      0.0025,
+      0.0075,
+      -0.0075
+     ],
+     "centre": [
+      1.0,
+      4.0,
+      -1.5
+     ],
+     "noise": 3.0,
+     "seed": 497350562,
+     "size": 23.0,
+     "tissues": "t1",
+     "type": "head"
+    },
+    "dtype": "uint16",
+    "geometry": {
+     "origin": [
+      39.5,
+      24.5,
+      9.5
+     ],
+     "qfac": -1,
+     "qform_code": 1,
+     "quaternion": [
+      39,
+      -33,
+      -35,
+      29
+     ],
+     "sform": "same",
+     "sform_code": 1,
+     "spacing": [
+      1.0,
+      1.0,
+      1.0
+     ],
+     "units": "m"
+    },
+    "scaling": null,
+    "shape": [
+     25,
+     29,
+     9
+    ],
+    "suffix": ".nii.gz",
+    "values": {
+     "offset": 0.0,
+     "scale": 1.0
+    }
+   }
+  },
+  "n": 56,
+  "options": [
+   "-b",
+   "-s",
+   "-t",
+   "bias field output",
+   "dimension 3"
+  ],
+  "seed": "20261025",
+  "tool": "ants-n4"
+ },
+ "rule": "C",
+ "status": "register",
+ "suite": "ants-n4",
+ "tier": "smoke",
+ "tool": "ants-n4"
+}

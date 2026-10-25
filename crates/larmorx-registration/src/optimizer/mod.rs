@@ -38,6 +38,12 @@ pub trait Problem<R: Real> {
     fn estimate_step_scale(&mut self, step: &mut [R]) -> Result<R, ItkException>;
     /// `EstimateMaximumStepSize()`: the smallest virtual spacing.
     fn estimate_maximum_step(&self) -> R;
+    /// The warnings ITK printed so far while this problem was evaluated (the scales
+    /// estimator's), handed over in order so that a caller printing its own warnings keeps
+    /// ITK's sequence (the multi-start optimizer's, between start points). None by default.
+    fn take_warnings(&mut self) -> Vec<String> {
+        Vec::new()
+    }
 }
 
 /// Why an optimisation stopped.

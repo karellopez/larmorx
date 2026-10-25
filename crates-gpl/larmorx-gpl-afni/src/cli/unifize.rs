@@ -512,6 +512,48 @@ fn run(
             "-EPI changes -Urad to {:.1} voxels",
             f64::from(o.uprad)
         ));
+        // AFNI-75: the radius has no upper bound, and the ball is built whole before it is
+        // used. By default its memory is checked first (the method kept, rule C, as ANTS-162);
+        // `reproduce` attempts it as AFNI does.
+        if mode.fix() {
+            let workers = if n_threads == 0 {
+                std::thread::available_parallelism().map_or(1, |n| n.get())
+            } else {
+                n_threads
+            };
+            let needed = crate::unifize::ball_bytes(o.uprad, workers);
+            if let Err(limit) = larmorx_core::alloc::check_plan(needed) {
+                let mm = |x: f32| {
+                    let s = format!("{:.6}", f64::from(x.abs()));
+                    s.trim_end_matches('0').trim_end_matches('.').to_string()
+                };
+                let tiny = d.iter().any(|x| x.abs() < 0.01);
+                let why = format!(
+                    "3dUnifize -EPI would need about {} for its ball of neighbours (radius {:.1} \
+                     voxels: 18.3 mm over the voxels' {} x {} x {} mm), more than {limit}{}",
+                    larmorx_core::alloc::gib(needed),
+                    f64::from(o.uprad),
+                    mm(d[0]),
+                    mm(d[1]),
+                    mm(d[2]),
+                    if tiny {
+                        " (a header whose units are micrometres makes the voxels 1000 times \
+                         smaller than they look)"
+                    } else {
+                        ""
+                    },
+                );
+                io.notice(&Notice::new(
+                    &defects::AFNI_75,
+                    mode,
+                    format!("{why}: an error (exit status 1); AFNI fills the machine"),
+                ));
+                return Err(Fail::Fatal(format!(
+                    "{why}. An error (AFNI-75); LARMORX_UPSTREAM_DEFECTS=reproduce attempts it \
+                     as AFNI does"
+                )));
+            }
+        }
     }
     let mut log: Vec<Message> = Vec::new();
     if verbose {
@@ -827,6 +869,97 @@ mod tests {
         ];
         let (_, err) = run(&epi, UpstreamDefects::Fix);
         assert!(!err.contains("AFNI-48"), "{err}");
+    }
+
+    /// AFNI-03 in 3dUnifize (random testing, 2026-10-25): a series whose header says slice code
+    /// 2 keeps its slice times in the corrected output, where AFNI reads them as zeros and
+    /// writes no slice timing; both modes name it.
+    #[test]
+    fn header_slice_code_2_is_named() {
+        use larmorx_core::element::DataType;
+        use larmorx_io::nifti::{self, NiftiHeader, NiftiVersion, WriteOptions};
+        let dir = tempfile::tempdir().unwrap();
+        let input = dir.path().join("in.nii");
+        let mut h = NiftiHeader::new(NiftiVersion::V1, &[4, 4, 4, 2], DataType::F32).unwrap();
+        h.dim_info = 3 << 4;
+        h.slice_code = 2;
+        h.slice_start = 0;
+        h.slice_end = 3;
+        h.slice_duration = 0.125;
+        h.pixdim[4] = 0.5;
+        h.xyzt_units = 2 | 8;
+        let data = larmorx_core::ndarray::ArrayD::from_elem(
+            larmorx_core::ndarray::IxDyn(&[4, 4, 4, 2]),
+            100.0f32,
+        );
+        nifti::write(&input, &h, data.view(), &WriteOptions::default()).unwrap();
+        for mode in [UpstreamDefects::Fix, UpstreamDefects::Reproduce] {
+            let out = dir.path().join(format!("uni-{}.nii", mode.name()));
+            let args: Vec<String> = [
+                "-EPI",
+                "-prefix",
+                out.to_str().unwrap(),
+                input.to_str().unwrap(),
+            ]
+            .iter()
+            .map(|s| (*s).to_owned())
+            .collect();
+            let (mut o, mut e) = (Vec::new(), Vec::new());
+            let code = main_with(&args, mode, Settings::empty(), &mut o, &mut e);
+            let err = String::from_utf8(e).unwrap();
+            assert_eq!(code, 0, "{err}");
+            assert!(
+                err.contains("upstream defect AFNI-03 (AFNI)"),
+                "{mode}: {err}"
+            );
+        }
+    }
+
+    /// AFNI-75 (random testing, 2026-10-25): -EPI on micrometre voxels makes the ball of
+    /// neighbours 6100 voxels in radius (about 10^12 points); by default the memory is checked
+    /// before the ball is built, and the run stops with an error naming the defect.
+    #[test]
+    fn epi_ball_beyond_any_machine_is_refused() {
+        use larmorx_core::element::DataType;
+        use larmorx_io::nifti::{self, NiftiHeader, NiftiVersion, WriteOptions};
+        let dir = tempfile::tempdir().unwrap();
+        let input = dir.path().join("in.nii");
+        let mut h = NiftiHeader::new(NiftiVersion::V1, &[4, 4, 4, 2], DataType::F32).unwrap();
+        h.pixdim[1] = 3.0;
+        h.pixdim[2] = 3.0;
+        h.pixdim[3] = 3.0;
+        h.pixdim[4] = 2.0;
+        h.xyzt_units = 3 | 8; // micrometres, seconds
+        let data = larmorx_core::ndarray::ArrayD::from_elem(
+            larmorx_core::ndarray::IxDyn(&[4, 4, 4, 2]),
+            100.0f32,
+        );
+        nifti::write(&input, &h, data.view(), &WriteOptions::default()).unwrap();
+        let out = dir.path().join("uni.nii");
+        let args: Vec<String> = [
+            "-EPI",
+            "-prefix",
+            out.to_str().unwrap(),
+            input.to_str().unwrap(),
+        ]
+        .iter()
+        .map(|s| (*s).to_owned())
+        .collect();
+        let (mut o, mut e) = (Vec::new(), Vec::new());
+        let code = main_with(
+            &args,
+            UpstreamDefects::Fix,
+            Settings::empty(),
+            &mut o,
+            &mut e,
+        );
+        let err = String::from_utf8(e).unwrap();
+        assert_ne!(code, 0, "{err}");
+        assert!(err.contains("(AFNI-75)") && err.contains("GiB"), "{err}");
+        assert!(err.contains("radius 6100.0 voxels"), "{err}");
+        assert!(!out.exists());
+        // A ball of the default -Urad needs a few megabytes.
+        assert!(crate::unifize::ball_bytes(18.3, 12) < 2e6);
     }
 
     #[test]

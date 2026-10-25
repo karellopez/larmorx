@@ -300,6 +300,26 @@ pub fn label_histogram(
     Ok(Some(h))
 }
 
+/// The histogram (`bins` bins over `[lower, upper]`) of the values of `data` for which
+/// `keep(index)` holds, `None` where none does: [`label_histogram`] without a label image
+/// (random testing, 2026-10-25: TruncateImageIntensity's label image was a third of its
+/// memory).
+pub fn histogram_where(
+    data: &[f32],
+    bins: usize,
+    lower: f64,
+    upper: f64,
+    n_threads: usize,
+    keep: impl Fn(usize) -> bool + Sync,
+) -> Result<Option<Histogram>, FilterError> {
+    let present = parallel::with_threads(n_threads, || (0..data.len()).into_par_iter().any(&keep))?;
+    if !present {
+        return Ok(None);
+    }
+    let template = Histogram::new(bins, lower, upper);
+    Ok(Some(count(data, &template, n_threads, keep)?))
+}
+
 /// Counts every value of `data` for which `keep(index)` holds into a copy of `template`.
 fn count(
     data: &[f32],

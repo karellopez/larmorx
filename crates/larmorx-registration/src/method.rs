@@ -64,6 +64,33 @@ pub enum MetricKind {
     Demons,
 }
 
+/// ITK's exception for a sampled metric left without points: thrown in
+/// `ImageToImageMetricv4::GetValueAndDerivativeExecute` (`itkImageToImageMetricv4.hxx:263`),
+/// in the joint-histogram metric's `InitializeForIteration` (line 233) for `MI`; the class
+/// printed is the metric's own (random testing, 2026-10-25: larmorx printed line 268 and the
+/// base class).
+pub(crate) fn empty_sample_set(kind: MetricKind) -> ItkException {
+    const BASE: &str = "Modules/Registration/Metricsv4/include/itkImageToImageMetricv4.hxx";
+    let (file, line, class) = match kind {
+        MetricKind::Mi { .. } => (
+            "Modules/Registration/Metricsv4/include/itkJointHistogramMutualInformationImageToImageMetricv4.hxx",
+            233,
+            "JointHistogramMutualInformationImageToImageMetricv4",
+        ),
+        MetricKind::Mattes { .. } => (BASE, 263, "MattesMutualInformationImageToImageMetricv4"),
+        MetricKind::MeanSquares => (BASE, 263, "MeanSquaresImageToImageMetricv4"),
+        MetricKind::Gc => (BASE, 263, "CorrelationImageToImageMetricv4"),
+        MetricKind::Cc { .. } => (BASE, 263, "ANTSNeighborhoodCorrelationImageToImageMetricv4"),
+        MetricKind::Demons => (BASE, 263, "DemonsImageToImageMetricv4"),
+    };
+    ItkException::new(
+        file,
+        line,
+        class,
+        "VirtualSampledPointSet must have 1 or more points.",
+    )
+}
+
 /// One image metric of a stage: its images (preprocessed), masks and settings.
 #[derive(Clone, Debug)]
 pub struct ImageStageMetric<R, const D: usize> {
@@ -151,6 +178,9 @@ pub struct Stage<R, const D: usize> {
     /// ITK-35 corrected: a B-spline transform applied after the stage's transform has its
     /// Jacobian with respect to position (ITK throws at the first derivative).
     pub correct_bspline_jacobian: bool,
+    /// ITK-97 and ITK-99: the derivatives of sample points outside the virtual region,
+    /// aliased as ITK does (`reproduce`) or dropped, and their counts.
+    pub outside: crate::metric::OutsideDerivatives,
     pub n_threads: usize,
 }
 
@@ -231,8 +261,58 @@ impl<R: Real> LevelMetric<R> {
         })
     }
 
+    /// A Mattes metric's joint histogram images, kept by the metric object across the levels
+    /// and calls of a stage (`flag` is the stage's).
+    pub(crate) fn share_joint_pdf(&mut self, flag: &std::sync::Arc<std::sync::atomic::AtomicBool>) {
+        if let LevelMetric::Mattes(m) = self {
+            m.share_joint_pdf(flag);
+        }
+    }
+
     /// `GetValue` or `GetValueAndDerivative`.
     pub(crate) fn evaluate<const D: usize>(
+        &self,
+        metric: &ImageMetricv4<R, D>,
+        moving: &Composite<R, D>,
+        derivative: bool,
+        floor: &IndexFloor,
+        warnings: &mut Vec<String>,
+    ) -> Result<(R, Vec<R>), ItkException> {
+        self.evaluate_jacobian(metric, moving, derivative, floor, warnings)
+            .map(|(v, d, _)| (v, d))
+    }
+
+    /// [`LevelMetric::evaluate`], and whether a point's derivative used the moving
+    /// transform's Jacobian ([`Reduced::jacobian_used`](mean_squares::Reduced)).
+    pub(crate) fn evaluate_jacobian<const D: usize>(
+        &self,
+        metric: &ImageMetricv4<R, D>,
+        moving: &Composite<R, D>,
+        derivative: bool,
+        floor: &IndexFloor,
+        warnings: &mut Vec<String>,
+    ) -> Result<(R, Vec<R>, bool), ItkException> {
+        if let LevelMetric::Cc(m) = self {
+            let r = m.evaluate(metric, moving, derivative, floor)?;
+            let used = r.jacobian_used;
+            if r.no_valid_points {
+                warnings.push(no_valid_points_warning(
+                    VERIFY_FILE,
+                    544,
+                    "ANTSNeighborhoodCorrelationImageToImageMetricv4",
+                ));
+            }
+            return Ok((r.value, r.derivative, used));
+        }
+        // Demons' derivative is the image gradient's own (`ProcessPoint` never asks the moving
+        // transform for a Jacobian): a B-spline transform after the active one never throws
+        // there (ITK-35; found by differential random testing, 2026-10-25).
+        let used = !matches!(self, LevelMetric::Demons);
+        self.evaluate_inner(metric, moving, derivative, floor, warnings)
+            .map(|(v, d)| (v, d, used))
+    }
+
+    fn evaluate_inner<const D: usize>(
         &self,
         metric: &ImageMetricv4<R, D>,
         moving: &Composite<R, D>,
@@ -247,7 +327,7 @@ impl<R: Real> LevelMetric<R> {
             (r.value, r.derivative)
         };
         match self {
-            LevelMetric::Mattes(m) => m.evaluate(metric, moving, derivative, floor),
+            LevelMetric::Mattes(m) => m.evaluate(metric, moving, derivative, floor, warnings),
             LevelMetric::MeanSquares => {
                 let r = mean_squares::evaluate(metric, moving, derivative, floor)?;
                 Ok(reduced(r, "MeanSquaresImageToImageMetricv4", warnings))
@@ -313,6 +393,44 @@ pub struct LevelProblem<'a, R, const D: usize> {
 }
 
 impl<'a, R: Real, const D: usize> LevelProblem<'a, R, D> {
+    fn estimate_scales_inner(&mut self, no_shift: &mut bool) -> Result<Vec<R>, ItkException> {
+        self.check_samples()?;
+        if self.moving.active().is_bspline() {
+            // CentralRegionSampling (VirtualDomainPointSetSampling with a point-set metric
+            // first); every parameter.
+            let samples = if self.point_set_samples {
+                self.samples.clone()
+            } else {
+                scales::central_region(&self.virtual_space)
+            };
+            return scales::estimate_bspline_scales(&mut self.moving, &samples, no_shift);
+        }
+        if self.moving.active().has_local_support() {
+            // CentralRegionSampling (VirtualDomainPointSetSampling with a point-set metric
+            // first), the parameters of the central voxel (the first point's).
+            let (samples, index) = if self.point_set_samples {
+                let p = self.samples[0];
+                (self.samples.clone(), self.virtual_space.point_to_index(&p))
+            } else {
+                (
+                    scales::central_region(&self.virtual_space),
+                    scales::central_index(&self.virtual_space),
+                )
+            };
+            if !self.virtual_space.contains(&index) {
+                return Err(ItkException::new(
+                    "Modules/Numerics/Optimizersv4/include/itkObjectToObjectMetric.hxx",
+                    330,
+                    "ObjectToObjectMetric",
+                    " point is not inside virtual domain. Cannot compute offset. ",
+                ));
+            }
+            let offset = self.virtual_space.offset(&index) * D;
+            return scales::estimate_local_scales(&mut self.moving, &samples, offset, no_shift);
+        }
+        scales::estimate_scales_checked(&mut self.moving, &self.samples, no_shift)
+    }
+
     /// The problem of one image metric outside a registration method (`antsAI`,
     /// `antsAffineInitializer`): `metric` with its sample points and gradient images already
     /// set, initialised here (`Initialize()`), and the moving transform `moving`, whose scales
@@ -326,12 +444,7 @@ impl<'a, R: Real, const D: usize> LevelProblem<'a, R, D> {
         if let Some(s) = &metric.samples
             && s.is_empty()
         {
-            return Err(ItkException::new(
-                "Modules/Registration/Metricsv4/include/itkImageToImageMetricv4.hxx",
-                268,
-                "ImageToImageMetricv4",
-                "VirtualSampledPointSet must have 1 or more points.",
-            ));
+            return Err(empty_sample_set(kind));
         }
         let state = LevelMetric::initialize(kind, &metric)?;
         let samples = scales::corners(&metric.virtual_space);
@@ -374,8 +487,14 @@ impl<'a, R: Real, const D: usize> LevelProblem<'a, R, D> {
             None
         };
         let before = warnings.len();
+        let mut jacobian_used = true;
         let result = match entry {
-            LevelEntry::Image(m, state) => state.evaluate(m, moving, derivative, floor, warnings),
+            LevelEntry::Image(m, state) => state
+                .evaluate_jacobian(m, moving, derivative, floor, warnings)
+                .map(|(v, d, used)| {
+                    jacobian_used = used;
+                    (v, d)
+                }),
             LevelEntry::PointSet(p) => {
                 if derivative {
                     p.value_and_derivative(moving, warnings)
@@ -388,6 +507,9 @@ impl<'a, R: Real, const D: usize> LevelProblem<'a, R, D> {
         let Some(e) = jacobian_error else {
             return result;
         };
+        if result.is_ok() && !jacobian_used {
+            return result;
+        }
         let no_valid = warnings[before..]
             .iter()
             .any(|w| w.contains("No valid points were found"));
@@ -513,42 +635,19 @@ impl<R: Real, const D: usize> Problem<R> for LevelProblem<'_, R, D> {
         self.moving.number_of_local_parameters()
     }
 
+    fn take_warnings(&mut self) -> Vec<String> {
+        std::mem::take(&mut self.warnings)
+    }
+
     fn estimate_scales(&mut self) -> Result<Vec<R>, ItkException> {
-        self.check_samples()?;
-        if self.moving.active().is_bspline() {
-            // CentralRegionSampling (VirtualDomainPointSetSampling with a point-set metric
-            // first); every parameter.
-            let samples = if self.point_set_samples {
-                self.samples.clone()
-            } else {
-                scales::central_region(&self.virtual_space)
-            };
-            return scales::estimate_bspline_scales(&mut self.moving, &samples);
+        // ITK warns when no parameter moves a voxel (found by differential random testing,
+        // 2026-10-25: antsAI's start points outside the images).
+        let mut no_shift = false;
+        let scales = self.estimate_scales_inner(&mut no_shift);
+        if no_shift {
+            self.warnings.push(scales::NO_SHIFT_WARNING.to_owned());
         }
-        if self.moving.active().has_local_support() {
-            // CentralRegionSampling (VirtualDomainPointSetSampling with a point-set metric
-            // first), the parameters of the central voxel (the first point's).
-            let (samples, index) = if self.point_set_samples {
-                let p = self.samples[0];
-                (self.samples.clone(), self.virtual_space.point_to_index(&p))
-            } else {
-                (
-                    scales::central_region(&self.virtual_space),
-                    scales::central_index(&self.virtual_space),
-                )
-            };
-            if !self.virtual_space.contains(&index) {
-                return Err(ItkException::new(
-                    "Modules/Numerics/Optimizersv4/include/itkObjectToObjectMetric.hxx",
-                    330,
-                    "ObjectToObjectMetric",
-                    " point is not inside virtual domain. Cannot compute offset. ",
-                ));
-            }
-            let offset = self.virtual_space.offset(&index) * D;
-            return scales::estimate_local_scales(&mut self.moving, &samples, offset);
-        }
-        scales::estimate_scales(&mut self.moving, &self.samples)
+        scales
     }
 
     fn estimate_step_scale(&mut self, step: &mut [R]) -> Result<R, ItkException> {
@@ -769,6 +868,7 @@ pub fn full_scale_cc<R: Real, const D: usize>(
         moving_gradient_image: None,
         pixel_f32: false,
         local_support: false,
+        outside: Default::default(),
     };
     let r =
         NeighborhoodCorrelation { radius: 4 }.evaluate(&metric, moving_transform, false, floor)?;
@@ -897,6 +997,9 @@ where
     let mut weights: Vec<R> = stage.metrics.iter().map(|m| m.weight()).collect();
     let mut current_seed = stage.seed;
     let mut outcomes = Vec::new();
+    // Each metric object's joint histogram images (Mattes), kept across the levels.
+    let joint_pdfs: Vec<std::sync::Arc<std::sync::atomic::AtomicBool>> =
+        stage.metrics.iter().map(|_| Default::default()).collect();
     for (level, factors) in stage.shrink_factors.iter().enumerate() {
         let virtual_space = shrink_space(&virtual_base, factors)?;
         // The level's adaptor: a displacement field resampled onto the level's virtual domain
@@ -966,6 +1069,7 @@ where
                     moving_gradient_image: None,
                     pixel_f32: false,
                     local_support,
+                    outside: stage.outside.clone(),
                 }),
                 StageMetric::PointSet(_) => None,
             });
@@ -1032,12 +1136,7 @@ where
                     if let Some(s) = &m.samples
                         && s.is_empty()
                     {
-                        return Err(ItkException::new(
-                            "Modules/Registration/Metricsv4/include/itkImageToImageMetricv4.hxx",
-                            268,
-                            "ImageToImageMetricv4",
-                            "VirtualSampledPointSet must have 1 or more points.",
-                        ));
+                        return Err(empty_sample_set(sm.kind));
                     }
                     // Demons checks its transform before ImageToImageMetricv4::Initialize, and
                     // takes its gradient from the fixed image.
@@ -1047,14 +1146,17 @@ where
                             m.fixed_gradient_image =
                                 Some(Arc::new(gradient_image(&m.fixed, stage.n_threads)?));
                         }
-                        return LevelMetric::initialize(sm.kind, &m)
-                            .map(|s| LevelEntry::Image(m, s));
+                        return LevelMetric::initialize(sm.kind, &m).map(|mut s| {
+                            s.share_joint_pdf(&joint_pdfs[j]);
+                            LevelEntry::Image(m, s)
+                        });
                     }
                     if sm.use_gradient_filter {
                         m.moving_gradient_image =
                             Some(Arc::new(gradient_image(&m.moving, stage.n_threads)?));
                     }
                     let mut state = LevelMetric::initialize(sm.kind, &m)?;
+                    state.share_joint_pdf(&joint_pdfs[j]);
                     if let LevelMetric::Gc { correct_local } = &mut state {
                         *correct_local = stage.correct_gc_derivative;
                     }
@@ -1194,6 +1296,37 @@ mod tests {
         Image::new(space, data)
     }
 
+    /// ITK-97 and ITK-99 (differential random testing, 2026-10-25): the parameter offset of a
+    /// virtual index outside the region, as ITK computes it (the region's linear offset): a
+    /// voxel of the array (aliased, kept only with `alias`) or none (past the array).
+    #[test]
+    fn outside_indices_alias_as_in_itk() {
+        let fixed = Arc::new(blob(4, 0.0, [3.0; 3]));
+        for alias in [false, true] {
+            let metric = ImageMetricv4 {
+                fixed: Arc::clone(&fixed),
+                moving: Arc::clone(&fixed),
+                fixed_mask: None,
+                moving_mask: None,
+                fixed_transform: None,
+                virtual_space: fixed.space.clone(),
+                samples: None,
+                fixed_gradient_image: None,
+                moving_gradient_image: None,
+                pixel_f32: false,
+                local_support: true,
+                outside: crate::metric::OutsideDerivatives::new(alias),
+            };
+            assert_eq!(metric.voxel_of(&[1, 2, 3]), Some(1 + 4 * 2 + 16 * 3));
+            // One past the end of the first axis: the next row's first voxel.
+            assert_eq!(metric.voxel_of(&[4, 0, 0]), alias.then_some(4));
+            // Before the first voxel, or past the last plane: outside the array.
+            assert_eq!(metric.voxel_of(&[-1, 0, 0]), None);
+            assert_eq!(metric.voxel_of(&[0, 0, 4]), None);
+            assert_eq!((metric.outside.aliased(), metric.outside.beyond()), (1, 2));
+        }
+    }
+
     /// The derivative of MeanSquares through a composite against central finite differences
     /// of its value: the best scalar `c` with `derivative ≈ c·fd` and the relative residual.
     fn derivative_check(composite: Composite<f64, 3>) -> (f64, f64) {
@@ -1213,6 +1346,7 @@ mod tests {
             moving_gradient_image: None,
             pixel_f32: false,
             local_support: false,
+            outside: Default::default(),
         };
         let floor = IndexFloor::new(larmorx_core::defects::UpstreamDefects::Fix);
         let mut problem =

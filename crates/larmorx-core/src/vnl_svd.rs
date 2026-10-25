@@ -210,8 +210,18 @@ fn drot(x: &mut [f64], y: &mut [f64], c: f64, s: f64) {
 /// The SVD of a `rows × cols` matrix (row-major input), as `vnl_svd` computes it:
 /// `(U (rows × cols, column-major), w (singular values, ≥ 0), V (cols × cols, column-major))`,
 /// or `None` if LINPACK fails to converge. Requires `rows ≥ cols` (economy size, `job = 21`).
-#[allow(clippy::many_single_char_names)]
 pub fn vnl_svd(m: &[f64], rows: usize, cols: usize) -> Option<(Vec<f64>, Vec<f64>, Vec<f64>)> {
+    vnl_svd_info(m, rows, cols).ok()
+}
+
+/// `(U, w, V)` as [`vnl_svd`] returns them.
+pub type Svd = (Vec<f64>, Vec<f64>, Vec<f64>);
+
+/// The decomposition of [`vnl_svd`], or LINPACK's `info` when it fails to converge (`dsvdc`'s
+/// `m`, the number of singular values still to find), which `vnl_svd` prints in its warning
+/// ([`suspicious_svdc`]).
+#[allow(clippy::many_single_char_names)]
+pub fn vnl_svd_info(m: &[f64], rows: usize, cols: usize) -> Result<Svd, usize> {
     let (n, p) = (rows, cols);
     assert!(n >= p && p > 0 && m.len() == n * p);
     // vnl_fortran_copy: column-major.
@@ -372,7 +382,7 @@ pub fn vnl_svd(m: &[f64], rows: usize, cols: usize) -> Option<(Vec<f64>, Vec<f64
     let maxit = 1000;
     while m_ != 0 {
         if iter >= maxit {
-            return None;
+            return Err(m_);
         }
         // Find l: e[l] is negligible, or l = 0.
         let mut l = 0usize;
@@ -542,7 +552,56 @@ pub fn vnl_svd(m: &[f64], rows: usize, cols: usize) -> Option<(Vec<f64>, Vec<f64
     let w = (0..p)
         .map(|j| if j < mm_len { s[j + 1].abs() } else { 0.0 })
         .collect();
-    Some((u.data, w, v.data))
+    Ok((u.data, w, v.data))
+}
+
+/// `vnl_svd.hxx`'s `__FILE__`: the build's path to the header; ITK's own path from
+/// `Modules/` here (the parity suites compare the messages from there).
+pub const VNL_SVD_FILE: &str = "Modules/ThirdParty/VNL/src/vxl/core/vnl/algo/vnl_svd.hxx";
+
+/// The warning `vnl_svd<double>` prints on standard error when LINPACK does not converge
+/// (`vnl_svd.hxx:107-110`, ITK v5.4.5; usually a matrix with NaN or infinite entries): the
+/// return value `info`, the matrix's size and the matrix, printed by
+/// `vnl_matlab_print(std::cerr, M, "M", vnl_matlab_print_format_long)` (`m` row-major).
+pub fn suspicious_svdc(m: &[f64], rows: usize, cols: usize, info: usize) -> String {
+    let mut s = format!(
+        "{VNL_SVD_FILE}: suspicious return value ({info}) from SVDC\n{VNL_SVD_FILE}: M is {rows}x{cols}\nM = [ ...\n"
+    );
+    for i in 0..rows {
+        for j in 0..cols {
+            s.push_str(&matlab_long(m[i * cols + j]));
+        }
+        if i + 1 == rows {
+            s.push_str(" ]");
+        }
+        s.push('\n');
+    }
+    s
+}
+
+/// `vnl_matlab_print_scalar(double, buf, vnl_matlab_print_format_long)`: `"%16d "` of 0 for
+/// an exact zero (either sign), else `"%16.13f "`, with glibc's `nan`, `-nan`, `inf` and
+/// `-inf`.
+pub fn matlab_long(v: f64) -> String {
+    if v == 0.0 {
+        return format!("{:>16} ", 0);
+    }
+    let text = if v.is_nan() {
+        if v.is_sign_negative() {
+            "-nan".to_owned()
+        } else {
+            "nan".to_owned()
+        }
+    } else if v.is_infinite() {
+        if v < 0.0 {
+            "-inf".to_owned()
+        } else {
+            "inf".to_owned()
+        }
+    } else {
+        format!("{v:.13}")
+    };
+    format!("{text:>16} ")
 }
 
 /// `vnl_matrix_inverse<double>(m).as_matrix()` for a 3×3 matrix: `V · W⁻¹ · Uᵀ` from
@@ -614,6 +673,26 @@ pub fn vnl_inverse(m: &[f64], n: usize) -> Option<Vec<f64>> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// The text `vnl_svd` printed for antsRegistration's Mattes joint histogram with a NaN
+    /// fixed bin size (ANTs 2.6.5, differential random testing, 2026-10-25).
+    #[test]
+    fn suspicious_svdc_prints_as_vnl() {
+        let nan = -f64::NAN;
+        let m = [nan, 0.0, nan, 0.0713535348574];
+        let info = vnl_svd_info(&m, 2, 2).unwrap_err();
+        let text = suspicious_svdc(&m, 2, 2, info);
+        assert_eq!(
+            text,
+            format!(
+                "{VNL_SVD_FILE}: suspicious return value (2) from SVDC\n{VNL_SVD_FILE}: M is 2x2\nM = [ ...\n            -nan                0 \n            -nan  0.0713535348574  ]\n"
+            )
+        );
+        assert_eq!(matlab_long(-0.0), "               0 ");
+        assert_eq!(matlab_long(f64::INFINITY), "             inf ");
+        assert_eq!(matlab_long(1.5), " 1.5000000000000 ");
+        assert!(vnl_svd_info(&[1.0, 0.0, 0.0, 2.0], 2, 2).is_ok());
+    }
 
     #[test]
     fn the_general_inverse_matches_the_3x3_one() {

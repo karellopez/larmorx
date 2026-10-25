@@ -12,7 +12,8 @@ use larmorx_image::components::{connected_components, relabel_components};
 use larmorx_image::itk_math::almost_equal_f32;
 use larmorx_image::morphology::{
     binary_closing, binary_dilate, binary_erode, binary_opening, grayscale_closing,
-    grayscale_dilate, grayscale_erode, grayscale_opening,
+    grayscale_closing_owned, grayscale_dilate, grayscale_dilate_owned, grayscale_erode,
+    grayscale_erode_owned, grayscale_opening, grayscale_opening_owned,
 };
 use larmorx_image::{FilterError, VolumeRef, strides};
 use larmorx_io::nifti::itk::ItkGeometry;
@@ -105,25 +106,24 @@ pub fn morphological(
     let out = match operation {
         Morphology::BinaryDilate => binary_dilate(input, radius, value, lowest, n_threads)?,
         Morphology::BinaryErode => {
-            let eroded = binary_erode(input, radius, value, lowest, n_threads)?;
-            let (ants, fixed): (Vec<f32>, Vec<f32>) = parallel::with_threads(n_threads, || {
+            let mut eroded = binary_erode(input, radius, value, lowest, n_threads)?;
+            // ANTs' value and the corrected one, counted and the mode's written in place in
+            // one pass (random testing, 2026-10-25: both images were made, 1.5 times ANTs'
+            // peak memory).
+            let fix = mode.fix();
+            let (other, lost) = parallel::with_threads(n_threads, || {
                 eroded
-                    .par_iter()
+                    .par_iter_mut()
                     .zip(input.data.par_iter())
                     .with_min_len(CHUNK)
-                    .map(|(&e, &v)| {
-                        let ants = if e > 0.5 && v > 0.5 { 1.0 } else { 0.0 };
-                        let fixed = if e == value { 1.0 } else { 0.0 };
-                        (ants, fixed)
+                    .map(|(e, &v)| {
+                        let ants = if *e > 0.5 && v > 0.5 { 1.0 } else { 0.0 };
+                        let fixed = if *e == value { 1.0 } else { 0.0 };
+                        *e = if fix { fixed } else { ants };
+                        (usize::from(ants > fixed), usize::from(ants < fixed))
                     })
-                    .unzip()
+                    .reduce(|| (0, 0), |(a, b), (c, d)| (a + c, b + d))
             })?;
-            let (other, lost) = ants
-                .iter()
-                .zip(&fixed)
-                .fold((0usize, 0usize), |(o, l), (&a, &f)| {
-                    (o + usize::from(a > f), l + usize::from(a < f))
-                });
             if other + lost > 0 {
                 let what = format!(
                     "{other} voxel(s) that are not the foreground {value} but above 0.5, and \
@@ -144,7 +144,7 @@ pub fn morphological(
                     },
                 );
             }
-            if mode.fix() { fixed } else { ants }
+            eroded
         }
         Morphology::BinaryOpen if value == 0.0 => {
             // ITK's opening background (0) is the foreground itself (ANTS-17).
@@ -183,6 +183,27 @@ pub fn morphological(
         Morphology::GrayscaleClose => grayscale_closing(input, radius, n_threads)?,
     };
     Ok((out, notices.into_vec()))
+}
+
+/// A grayscale operation (`GD`, `GE`, `GO`, `GC`) of an image given whole: its buffer becomes
+/// the output, so the operation needs two images of memory, as ITK's filters (random testing,
+/// 2026-10-25: GE needed 2.4 times ANTs' peak). The same values as [`morphological`].
+pub fn grayscale_morphological_owned(
+    data: Vec<f32>,
+    size: &[usize],
+    operation: Morphology,
+    radius: usize,
+    n_threads: usize,
+) -> Result<Vec<f32>, FilterError> {
+    match operation {
+        Morphology::GrayscaleErode => grayscale_erode_owned(data, size, radius, n_threads),
+        Morphology::GrayscaleDilate => grayscale_dilate_owned(data, size, radius, n_threads),
+        Morphology::GrayscaleOpen => grayscale_opening_owned(data, size, radius, n_threads),
+        Morphology::GrayscaleClose => grayscale_closing_owned(data, size, radius, n_threads),
+        _ => Err(FilterError::Invalid(
+            "a binary operation needs the input image after it".into(),
+        )),
+    }
 }
 
 /// The radius ANTs uses for ImageMath's float argument: `static_cast<unsigned long>(rad)`,

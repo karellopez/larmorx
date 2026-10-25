@@ -270,6 +270,9 @@ impl<R: Compute, const D: usize> RegistrationHelper<R, D> {
                 update_mesh,
                 total_mesh,
             }),
+            outside: larmorx_registration::metric::OutsideDerivatives::new(
+                !self.upstream_defects.fix(),
+            ),
             n_threads: self.n_threads,
         };
         log.logger(&format!(
@@ -288,6 +291,12 @@ impl<R: Compute, const D: usize> RegistrationHelper<R, D> {
             Some(e) => Err(e),
             None => run_syn(&syn, &mut observer, floor, &mut warnings, &mut events),
         };
+        super::helper::outside_notices(
+            &mut self.notices,
+            self.upstream_defects,
+            stage,
+            &syn.outside,
+        );
         let log = observer.log;
         for w in &warnings {
             log.cerr(w);

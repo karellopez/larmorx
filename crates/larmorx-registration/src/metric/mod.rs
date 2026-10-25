@@ -22,6 +22,7 @@ pub mod mean_squares;
 pub mod neighborhood_correlation;
 
 use std::sync::Arc;
+use std::sync::atomic::{AtomicUsize, Ordering};
 
 use larmorx_core::IndexFloor;
 use rayon::prelude::*;
@@ -64,6 +65,57 @@ pub struct ImageMetricv4<R, const D: usize> {
     /// voxel's `D` entries of a derivative over the whole virtual domain, which is not averaged
     /// (`StorePointDerivativeResult` for a transform of local support).
     pub local_support: bool,
+    /// What becomes of the derivative of a sample point outside the virtual region
+    /// (ITK-97, ITK-99), and how many there were.
+    pub outside: OutsideDerivatives,
+}
+
+/// The derivative of a sample point whose virtual index lies outside the virtual region
+/// (a sampled metric with a shrink factor: the samples are drawn on the fixed image, the
+/// virtual domain is the shrunk one). ITK's `StorePointDerivativeResult` takes the point's
+/// parameters at `ComputeParameterOffsetFromVirtualIndex`, the region's linear offset of the
+/// index, without a check: inside the derivative array it is another voxel's (ITK-97, the
+/// derivative aliased), outside it a write past the array (ITK-99, memory). By default larmorx
+/// drops such a derivative (the point's value still counts); `alias` (`reproduce`) adds it
+/// where ITK does when that lies inside the array and drops the others. The counts (one per
+/// point and evaluation) serve the notices; the clones of one value share them.
+#[derive(Clone, Debug, Default)]
+pub struct OutsideDerivatives {
+    pub alias: bool,
+    aliased: Arc<AtomicUsize>,
+    beyond: Arc<AtomicUsize>,
+    /// ITK-100: evaluations of a Mattes metric at a later level whose bin size is 0 or less
+    /// (`alias`, as everything this value carries in `reproduce`: used as ITK uses it).
+    stale_bins: Arc<AtomicUsize>,
+}
+
+impl OutsideDerivatives {
+    /// ITK's aliasing (`reproduce`) or the derivative dropped (the default).
+    pub fn new(alias: bool) -> Self {
+        OutsideDerivatives {
+            alias,
+            ..Default::default()
+        }
+    }
+
+    /// How many derivatives of points outside the region ITK adds to another voxel (ITK-97).
+    pub fn aliased(&self) -> usize {
+        self.aliased.load(Ordering::Relaxed)
+    }
+
+    /// How many ITK writes past its derivative array (ITK-99).
+    pub fn beyond(&self) -> usize {
+        self.beyond.load(Ordering::Relaxed)
+    }
+
+    /// How many evaluations met a later level's Mattes bin size of 0 or less (ITK-100).
+    pub fn stale_bins(&self) -> usize {
+        self.stale_bins.load(Ordering::Relaxed)
+    }
+
+    pub(crate) fn count_stale_bins(&self) {
+        self.stale_bins.fetch_add(1, Ordering::Relaxed);
+    }
 }
 
 /// One virtual point as the metric sees it (`ProcessVirtualPoint`'s locals).
@@ -172,9 +224,24 @@ impl<R: Real, const D: usize> ImageMetricv4<R, D> {
     /// (`None` outside the virtual region, where ITK would write outside its derivative).
     #[inline]
     pub fn voxel_of(&self, index: &[i64; D]) -> Option<usize> {
-        self.virtual_space
-            .contains(index)
-            .then(|| self.virtual_space.offset(index))
+        let space = &self.virtual_space;
+        if space.contains(index) {
+            return Some(space.offset(index));
+        }
+        // ComputeOffset of an index outside the region: the signed linear offset.
+        let mut offset = 0i64;
+        let mut stride = 1i64;
+        for k in 0..D {
+            offset += (index[k] - space.start[k]) * stride;
+            stride *= space.size[k] as i64;
+        }
+        if (0..stride).contains(&offset) {
+            self.outside.aliased.fetch_add(1, Ordering::Relaxed);
+            self.outside.alias.then_some(offset as usize)
+        } else {
+            self.outside.beyond.fetch_add(1, Ordering::Relaxed);
+            None
+        }
     }
 
     /// The number of domain points (`GetNumberOfDomainPoints`).

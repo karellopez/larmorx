@@ -404,6 +404,25 @@ def compare_files(a: Path, b: Path) -> Comparison:
     detail = (
         "bit-identical" if identical else f"{n} of {total} values differ, max |diff| {max_abs:.6g}"
     )
+    if not identical and n == 0:
+        # Equal as numbers, not as bits: signed zeros or NaN payloads (random testing,
+        # 2026-10-25: "0 of 294 values differ" said nothing of what did).
+        try:
+            width = f"u{va.dtype.itemsize}"
+            ia = np.ascontiguousarray(va).view(width).ravel()
+            ib = np.ascontiguousarray(vb).view(width).ravel()
+            where = np.flatnonzero(ia != ib)
+        except (TypeError, ValueError):
+            where = np.array([], dtype=np.int64)
+        if where.size:
+            i = int(where[0])
+            x, y = va.ravel()[i], vb.ravel()[i]
+            detail = (
+                f"{where.size} of {total} values differ in their bits only, equal as numbers "
+                f"(signed zeros or NaN payloads; e.g. value {i}: AFNI {x!r}, larmorx {y!r})"
+            )
+        else:
+            detail = "the data bytes differ outside the values"
     del same
     return Comparison(identical, ha == hb, n, total, max_abs, detail)
 
@@ -679,8 +698,10 @@ class Scenario:
     inputs: tuple[str, ...]
     outputs: tuple[str, ...]
     tier: str = "smoke"
-    #: ``pass``, ``error`` (both refuse), ``crash`` (AFNI crashes, larmorx refuses) or
-    #: ``divergence`` (AFNI succeeds and larmorx refuses, for ``reason``).
+    #: ``pass``, ``error`` (both refuse), ``crash`` (AFNI crashes, larmorx refuses),
+    #: ``divergence`` (AFNI succeeds and larmorx refuses, for ``reason``) or ``guard`` (beyond
+    #: any machine, AFNI-75: neither AFNI nor ``reproduce`` runs; the default must stop before
+    #: allocating, naming the defect and the memory it would need).
     expect: str = "pass"
     env: tuple[tuple[str, str | None], ...] = ()
     #: Files in each program's directory before the run (name, text).
@@ -754,6 +775,13 @@ def _produced(d: Path, s: Scenario) -> list[str]:
     return out
 
 
+def _difftest_input(name: str) -> Path:
+    """An input of a differential test's case (:mod:`larmorx_validation.difftest.inputs`)."""
+    from larmorx_validation.difftest import inputs
+
+    return inputs.path(name)
+
+
 def run_case(spec: ToolSpec, case: Case, checks: CheckList) -> None:
     s: Scenario = case.payload
     program = spec.program
@@ -765,7 +793,10 @@ def run_case(spec: ToolSpec, case: Case, checks: CheckList) -> None:
             "skipped", "the larmorx-gpl binary was not found (LARMORX_GPL_BIN, crates-gpl build)"
         )
     try:
-        paths = [spec.inputs(name) for name in s.inputs]
+        paths = [
+            _difftest_input(name) if name.startswith("dt:") else spec.inputs(name)
+            for name in s.inputs
+        ]
     except FileNotFoundError as e:
         raise Outcome("skipped", f"input not available: {e}") from e
     env = environment(s.env)
@@ -775,6 +806,15 @@ def run_case(spec: ToolSpec, case: Case, checks: CheckList) -> None:
         a_dir, l_dir = tmp / "afni", tmp / "larmorx"
         _setup(a_dir, s)
         _setup(l_dir, s)
+        if s.expect == "guard":
+            ours = run_larmorx(program, args, defects.FIX, env, l_dir, impl)
+            text = ours.err.replace(str(tmp), "<tmp>")
+            checks(
+                "larmorx refuses before allocating (AFNI-75)",
+                ours.code != 0 and "(AFNI-75)" in text and "GiB" in text,
+                detail=f"exit {ours.code}: {text[-600:]}",
+            )
+            return
         afni = run_afni(program, args, env, a_dir, never=case_never(s))
         ours = run_larmorx(program, args, defects.REPRODUCE, env, l_dir, impl)
         a_out, l_out = _produced(a_dir, s), _produced(l_dir, s)
@@ -1119,7 +1159,10 @@ def _fix_pass(
     d = tmp / "fix"
     _setup(d, s)
     r = run_larmorx(program, args, defects.FIX, env, d, impl)
-    if s.fix_refuses is not None:
+    # A refusal happens where the program would use the option; an input it gives up on
+    # earlier (a constant image, found by random testing) never gets there: then the default
+    # runs, and the ordinary fix pass below checks it.
+    if s.fix_refuses is not None and (r.code != 0 or s.fix_refuses in defects.notices_in(r.err)):
         named = defects.notices_in(r.err)
         checks.add(
             Check(

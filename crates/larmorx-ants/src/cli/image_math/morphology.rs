@@ -7,9 +7,11 @@ use super::{Context, OpError, Operation};
 use crate::cli::cstd::atof;
 use crate::image::AntsImage;
 use crate::image_math::{
-    FillHolesError, Morphology, fill_holes, morphological, pad_image, radius_from_f32,
+    FillHolesError, Morphology, fill_holes, grayscale_morphological_owned, morphological,
+    pad_image, radius_from_f32,
 };
 use larmorx_image::morphology::MAX_RADIUS;
+use larmorx_io::nifti::itk::ItkMeta;
 
 const ALL: &[usize] = &[2, 3, 4];
 
@@ -81,6 +83,19 @@ fn run_morph(ctx: &mut Context<'_>) -> Result<(), OpError> {
             ctx.op()
         )));
     };
+    if !operation.is_binary() {
+        // The image's buffer becomes the output (two images of memory, as ITK's filters).
+        let AntsImage { data, geometry, .. } = image;
+        let size = geometry.size.clone();
+        let data = grayscale_morphological_owned(data, &size, operation, radius, ctx.n_threads)?;
+        let result = AntsImage {
+            data,
+            geometry,
+            meta: ItkMeta::default(),
+        };
+        ctx.write_if_long(&output, result)?;
+        return Ok(());
+    }
     let (data, notices) = morphological(
         image.view(),
         operation,

@@ -1,0 +1,325 @@
+{
+ "defect": null,
+ "description": "an Exponential stage after a deformable one with --float 1: the displacement field's Jacobian at the voxel nearest a float point, indexed in float (larmorx indexed in double; half-way points rounded differently)",
+ "expect": "pass",
+ "found": {
+  "detail": "ANTs with CORE-MATH: r0InverseWarp.nii.gz: header identical; 243 of 648 values differ (max 2.05e-08); ANTs with CORE-MATH: r0Warp.nii.gz: header identical; 192 of 648 values differ (max 2.05e-08)",
+  "n": 33,
+  "seed": "trial1",
+  "shrink_moves": [
+   "fixed: axis 1 20 -> 10 voxels",
+   "fixed: axis 2 16 -> 8 voxels",
+   "fixed: axis 0 10 -> 6 voxels",
+   "fixed: axis 1 10 -> 6 voxels",
+   "moving: axis 1 20 -> 10 voxels",
+   "moving: axis 2 16 -> 8 voxels",
+   "fixed: axis 2 8 -> 6 voxels",
+   "moving: axis 0 10 -> 6 voxels",
+   "moving: axis 2 8 -> 6 voxels",
+   "fixed: float32 storage",
+   "fixed: content head -> ramp",
+   "moving: axis 1 10 -> 6 voxels",
+   "moving: float32 storage",
+   "moving: plain value range",
+   "moving: content head -> ramp",
+   "fixed (and its grid): unit spacing",
+   "moving (and its grid): unit spacing"
+  ],
+  "signature": [
+   "ANTs with CORE-MATH: rNInverseWarp.nii.gz",
+   "ANTs with CORE-MATH: rNWarp.nii.gz"
+  ]
+ },
+ "id": "float-field-jacobian-index",
+ "implementations": [
+  "port"
+ ],
+ "reason": "",
+ "recipe": {
+  "extra": {
+   "min_size": 6
+  },
+  "features": {
+   "axis0": 0.75,
+   "axis1": 0.9,
+   "axis2": 1.25,
+   "bias0": 0.0075,
+   "bias1": -0.0025,
+   "bias2": 0.0025,
+   "bias3": 0.0,
+   "bins0": "8",
+   "centre0": 0.5,
+   "centre1": -5.5,
+   "centre2": 3.0,
+   "collapse": false,
+   "composite": false,
+   "content": "head",
+   "dimension": 3,
+   "exp total0": "0",
+   "exp total1": "0.5",
+   "family0": "Exponential",
+   "family1": "Exponential",
+   "fixed dtype": "float64",
+   "fixed n0": 10,
+   "fixed n1": 20,
+   "fixed n2": 16,
+   "fixed spacing": 3.0,
+   "float": true,
+   "fq a": 27,
+   "fq b": -2,
+   "fq c": 0,
+   "fq d": 1,
+   "gdf total0": "0.5",
+   "gdf total1": "0.5",
+   "histogram matching": false,
+   "initial": false,
+   "iterations00": "2",
+   "iterations01": "8",
+   "iterations10": "3",
+   "iterations11": "3",
+   "levels0": 2,
+   "levels1": 2,
+   "masks": false,
+   "mesh0": "2",
+   "mesh1": "2",
+   "metric weight0": "1",
+   "metric weight1": "1",
+   "metric0": "Mattes",
+   "metric1": "GC",
+   "moving dtype": "float64",
+   "moving offset": 0.0,
+   "moving on another grid": true,
+   "moving origin0": 0.5,
+   "moving origin1": -1.5,
+   "moving origin2": 2.0,
+   "moving scale": 0.8,
+   "moving spacing": 3.5,
+   "noise": 0.0,
+   "oblique fixed": true,
+   "outputs": "{out}/r",
+   "rot b": -2,
+   "rot c": 2,
+   "rot d": -2,
+   "rot scale": 2,
+   "sampling0": "",
+   "shift0": 3.75,
+   "shift1": -1.25,
+   "shift2": 0.75,
+   "size": 21.0,
+   "smoothing units0": "mm",
+   "smoothing units1": "",
+   "stages": 2,
+   "step0": "0.2",
+   "step1": "0.25",
+   "syn total0": "0.3",
+   "syn total1": "0.3",
+   "syn update0": "3",
+   "syn update1": "3",
+   "tissues": "epi",
+   "tvb points0": "4",
+   "tvb points1": "2",
+   "tvf points0": "3",
+   "tvf points1": "3",
+   "window0": "5",
+   "window1": "3",
+   "winsorize": false
+  },
+  "groups": [
+   {
+    "args": [
+     "-d",
+     "3"
+    ],
+    "name": "dimension",
+    "optional": false
+   },
+   {
+    "args": [
+     "-v",
+     "1"
+    ],
+    "name": "verbose",
+    "optional": false
+   },
+   {
+    "args": [
+     "-o",
+     "{out}/r"
+    ],
+    "name": "output",
+    "optional": false
+   },
+   {
+    "args": [
+     "--float",
+     "1"
+    ],
+    "name": "float",
+    "optional": true
+   },
+   {
+    "args": [
+     "-t",
+     "Exponential[0.2,3,0]",
+     "-m",
+     "Mattes[{in:fixed},{in:moving},1,8]",
+     "-c",
+     "[2x8,1e-6,5]",
+     "-f",
+     "2x1",
+     "-s",
+     "1x0mm"
+    ],
+    "name": "stage 0",
+    "optional": false
+   },
+   {
+    "args": [
+     "-t",
+     "Exponential[0.25,3,0.5]",
+     "-m",
+     "GC[{in:fixed},{in:moving},1]",
+     "-c",
+     "[3x3,1e-6,3]",
+     "-f",
+     "2x1",
+     "-s",
+     "1x0"
+    ],
+    "name": "stage 1",
+    "optional": false
+   }
+  ],
+  "inputs": {
+   "fixed": {
+    "content": {
+     "direction": [
+      1,
+      0,
+      0
+     ],
+     "seed": 751809639,
+     "type": "ramp"
+    },
+    "dtype": "float32",
+    "geometry": {
+     "origin": [
+      -13.5,
+      -28.5,
+      -22.5
+     ],
+     "qfac": 1,
+     "qform_code": 1,
+     "quaternion": [
+      27,
+      -2,
+      0,
+      1
+     ],
+     "sform": "same",
+     "sform_code": 1,
+     "spacing": [
+      1.0,
+      1.0,
+      1.0
+     ],
+     "units": "mm"
+    },
+    "scaling": null,
+    "shape": [
+     6,
+     6,
+     6
+    ],
+    "suffix": ".nii.gz",
+    "values": {
+     "offset": 0.0,
+     "scale": 1.0
+    }
+   },
+   "moving": {
+    "content": {
+     "direction": [
+      1,
+      0,
+      0
+     ],
+     "seed": 751809640,
+     "type": "ramp"
+    },
+    "dtype": "float32",
+    "geometry": {
+     "origin": [
+      -13.0,
+      -30.0,
+      -20.5
+     ],
+     "qfac": 1,
+     "qform_code": 1,
+     "quaternion": [
+      1,
+      0,
+      0,
+      0
+     ],
+     "sform": "same",
+     "sform_code": 1,
+     "spacing": [
+      1.0,
+      1.0,
+      1.0
+     ],
+     "units": "mm"
+    },
+    "motion": [
+     {
+      "centre": [
+       0.0,
+       0.0,
+       0.0
+      ],
+      "quaternion": [
+       43,
+       -2,
+       2,
+       -2
+      ],
+      "translation": [
+       3.75,
+       -1.25,
+       0.75
+      ]
+     }
+    ],
+    "scaling": null,
+    "shape": [
+     6,
+     6,
+     6
+    ],
+    "suffix": ".nii.gz",
+    "values": {
+     "offset": 0.0,
+     "scale": 1.0
+    }
+   }
+  },
+  "n": 33,
+  "options": [
+   "--float 1",
+   "Exponential",
+   "Exponential with GC",
+   "Exponential with Mattes",
+   "GC metric",
+   "Mattes metric",
+   "dimension 3"
+  ],
+  "seed": "trial1",
+  "tool": "ants-registration"
+ },
+ "rule": null,
+ "status": "fixed",
+ "suite": "ants-registration",
+ "tier": "smoke",
+ "tool": "ants-registration"
+}

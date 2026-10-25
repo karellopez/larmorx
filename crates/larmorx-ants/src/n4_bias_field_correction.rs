@@ -30,7 +30,7 @@ use larmorx_core::defects::{Notice, UpstreamDefects};
 use larmorx_image::bspline::evaluate;
 use larmorx_image::itk_math::almost_equal_f32;
 use larmorx_image::n4::{N4Iteration, N4Parameters, n4_bias_field};
-use larmorx_image::shrink::{shrink, shrink_plan};
+use larmorx_image::shrink::{shrink, shrink_or_borrow, shrink_plan};
 use larmorx_image::{FilterError, ItkGrid};
 use rayon::prelude::*;
 
@@ -110,6 +110,96 @@ pub enum N4Error {
     /// ITK throws (ANTs prints "Exception caught" and exits 1).
     #[error(transparent)]
     Filter(#[from] FilterError),
+    /// The padded image needs more memory than the machine has (a spline distance far beyond
+    /// the image: ITK throws `MemoryAllocationError`, which ANTs does not catch: it aborts).
+    #[error(transparent)]
+    Memory(#[from] larmorx_core::alloc::AllocError),
+    /// The lattice and padding need more memory than larmorx may plan for (ANTS-162; the
+    /// message says how much, and why).
+    #[error("{0}")]
+    BeyondMemory(String),
+}
+
+/// larmorx's working memory per control point of the largest fitting level's lattice (three
+/// float lattices: the fit's numerator and denominator and the field) and per voxel of the
+/// padded image (the padded input, mask and field and their subsampled copies), measured with
+/// `validation/investigations/difftest/n4_memory.py` (`docs/findings/ants-n4.md`; ANTs needs 17
+/// and 25).
+const LATTICE_BYTES: f64 = 12.0;
+/// In 2D (measured on ants-n4:20261025:406, 2026-10-25): 16.1 bytes per control point.
+const LATTICE_BYTES_2D: f64 = 16.5;
+const PADDED_BYTES: f64 = 21.0;
+
+/// ANTS-162: the memory the lattices and the padded image need, checked before anything is
+/// allocated; an error naming the bytes needed and their likely cause when they exceed the
+/// [`larmorx_core::alloc::memory_limit`].
+fn check_memory(
+    g: &larmorx_io::nifti::itk::ItkGeometry,
+    control_points: &[usize],
+    order: u32,
+    levels: usize,
+    padded: &[usize],
+    distance: Option<f32>,
+) -> Result<(), N4Error> {
+    let last: Vec<f64> = control_points
+        .iter()
+        .map(|&c| {
+            let spans = c.saturating_sub(order as usize) as f64;
+            spans * 2f64.powi(levels.saturating_sub(1) as i32) + f64::from(order)
+        })
+        .collect();
+    let points: f64 = last.iter().product();
+    let voxels: f64 = padded.iter().map(|&n| n as f64).product();
+    let per_point = if g.ndim == 2 {
+        LATTICE_BYTES_2D
+    } else {
+        LATTICE_BYTES
+    };
+    let needed = per_point * points + PADDED_BYTES * voxels;
+    let Err(limit) = larmorx_core::alloc::check_plan(needed) else {
+        return Ok(());
+    };
+    let short = |x: f64| {
+        let s = format!("{x:.4}");
+        let s = s.trim_end_matches('0').trim_end_matches('.');
+        s.to_string()
+    };
+    let join = |v: &[f64]| v.iter().map(|&x| short(x)).collect::<Vec<_>>().join(" x ");
+    let spacing = join(&g.spacing);
+    let extent: Vec<f64> = (0..g.ndim)
+        .map(|i| (g.size[i].saturating_sub(1)) as f64 * g.spacing[i])
+        .collect();
+    let unusual = g.spacing[..g.ndim.min(3)]
+        .iter()
+        .any(|&s| !(0.01..100.0).contains(&s.abs()));
+    let time = if g.ndim > 3 {
+        ", the fourth axis in s"
+    } else {
+        ""
+    };
+    let against = distance.map_or(String::new(), |d| {
+        format!(" against a spline distance of {d}")
+    });
+    Err(N4Error::BeyondMemory(format!(
+        "N4BiasFieldCorrection would need about {} (the last fitting level's B-spline lattice of \
+         {} control points; the image padded to {} voxels), more than {limit}. The image's \
+         voxels are {spacing} mm{time}: it spans {}{against}{}. An error (ANTS-162); \
+         LARMORX_UPSTREAM_DEFECTS=reproduce attempts it as ANTs does",
+        larmorx_core::alloc::gib(needed),
+        join(&last),
+        padded
+            .iter()
+            .map(|n| n.to_string())
+            .collect::<Vec<_>>()
+            .join(" x "),
+        join(&extent),
+        if unusual {
+            " (a header whose units are metres or micrometres makes an image 1000 times larger \
+             or smaller than it looks)"
+        } else {
+            ""
+        },
+    )))
 }
 
 /// The padding and control points that `-b [distance]` gives.
@@ -189,10 +279,19 @@ pub(crate) fn congruent(
 
 /// Zero-padding of a Fortran-ordered image by `lower`/`upper` voxels per axis
 /// (`ConstantPadImageFilter` with constant 0).
-fn pad(data: &[f32], size: &[usize], lower: &[usize], upper: &[usize]) -> (Vec<f32>, Vec<usize>) {
+fn pad(
+    data: &[f32],
+    size: &[usize],
+    lower: &[usize],
+    upper: &[usize],
+) -> Result<(Vec<f32>, Vec<usize>), larmorx_core::alloc::AllocError> {
     let d = size.len();
     let new_size: Vec<usize> = (0..d).map(|i| size[i] + lower[i] + upper[i]).collect();
-    let mut out = vec![0.0f32; new_size.iter().product()];
+    let voxels = new_size
+        .iter()
+        .try_fold(1usize, |n, &s| n.checked_mul(s))
+        .unwrap_or(usize::MAX);
+    let mut out = larmorx_core::alloc::filled(voxels, 0.0f32)?;
     let n0 = size[0];
     let rows = data.len() / n0;
     for r in 0..rows {
@@ -207,7 +306,30 @@ fn pad(data: &[f32], size: &[usize], lower: &[usize], upper: &[usize]) -> (Vec<f
         }
         out[dst..dst + n0].copy_from_slice(&data[r * n0..(r + 1) * n0]);
     }
-    (out, new_size)
+    Ok((out, new_size))
+}
+
+/// [`pad`], or `data` itself when nothing is padded.
+fn pad_or_borrow<'a>(
+    data: &'a [f32],
+    size: &[usize],
+    lower: &[usize],
+    upper: &[usize],
+) -> Result<std::borrow::Cow<'a, [f32]>, larmorx_core::alloc::AllocError> {
+    if lower.iter().chain(upper).all(|&p| p == 0) {
+        Ok(std::borrow::Cow::Borrowed(data))
+    } else {
+        Ok(std::borrow::Cow::Owned(pad(data, size, lower, upper)?.0))
+    }
+}
+
+/// [`crop`] of an image no longer needed: itself when nothing was padded.
+fn crop_owned(data: Vec<f32>, padded: &[usize], lower: &[usize], size: &[usize]) -> Vec<f32> {
+    if padded == size {
+        data
+    } else {
+        crop(&data, padded, lower, size)
+    }
 }
 
 /// The voxels of a padded image inside the original grid (`ExtractImageFilter` back to the
@@ -302,17 +424,38 @@ pub fn n4_bias_field_correction(
     let (lower, upper) = padding
         .as_ref()
         .map_or((&zero, &zero), |p| (&p.lower, &p.upper));
-    let (padded_input, padded_size) = pad(&input.data, &g.size, lower, upper);
-    let ones;
-    let mask_data: &[f32] = match mask {
-        Some(m) => &m.data,
-        None => {
-            ones = vec![1.0f32; len];
-            &ones
-        }
+    if options.upstream_defects.fix() {
+        // ANTS-162: before anything is allocated (`reproduce` attempts it as ANTs does).
+        let padded: Vec<usize> = (0..d)
+            .map(|i| g.size[i].saturating_add(lower[i]).saturating_add(upper[i]))
+            .collect();
+        let distance = match &options.mesh {
+            BSplineMesh::Distance(x) => Some(*x),
+            _ => None,
+        };
+        check_memory(
+            g,
+            &control_points,
+            order,
+            options.iterations.len().max(1),
+            &padded,
+            distance,
+        )?;
+    }
+    // Memory (random testing, 2026-10-25: larmorx's peak against ANTs'): without padding the
+    // images are used as they are, not copied; without a mask, the image of ones is made only
+    // to be shrunk; the full-resolution images of the last step are dropped as soon as they
+    // have been used.
+    let padded_size: Vec<usize> = (0..d).map(|i| g.size[i] + lower[i] + upper[i]).collect();
+    let padded_input = pad_or_borrow(&input.data, &g.size, lower, upper)?;
+    let padded_mask = match mask {
+        Some(m) => Some(pad_or_borrow(&m.data, &g.size, lower, upper)?),
+        None => None,
     };
-    let (padded_mask, _) = pad(mask_data, &g.size, lower, upper);
-    let padded_weight = weight.map(|w| pad(&w.data, &g.size, lower, upper).0);
+    let padded_weight = match weight {
+        Some(w) => Some(pad_or_borrow(&w.data, &g.size, lower, upper)?),
+        None => None,
+    };
     let padded_grid = ItkGrid {
         size: padded_size.clone(),
         start: lower.iter().map(|&l| -(l as i64)).collect(),
@@ -331,11 +474,19 @@ pub fn n4_bias_field_correction(
         factors[3] = 1;
     }
     let plan = shrink_plan(&padded_grid, &factors)?;
-    let small_input = shrink(&padded_input, &padded_grid, &plan, n_threads)?;
-    let small_mask = shrink(&padded_mask, &padded_grid, &plan, n_threads)?;
+    let small_input = shrink_or_borrow(&padded_input[..], &padded_grid, &plan, n_threads)?;
+    let small_mask = match &padded_mask {
+        Some(m) => shrink_or_borrow(m.as_ref(), &padded_grid, &plan, n_threads)?,
+        None => {
+            // ANTs' mask of ones on the input's grid, padded with 0.
+            let ones = vec![1.0f32; len];
+            let padded_ones = pad_or_borrow(&ones, &g.size, lower, upper)?;
+            std::borrow::Cow::Owned(shrink(&padded_ones, &padded_grid, &plan, n_threads)?)
+        }
+    };
     let small_weight = padded_weight
         .as_ref()
-        .map(|w| shrink(w, &padded_grid, &plan, n_threads))
+        .map(|w| shrink_or_borrow(w.as_ref(), &padded_grid, &plan, n_threads))
         .transpose()?;
 
     let parameters = N4Parameters {
@@ -349,11 +500,19 @@ pub fn n4_bias_field_correction(
         // ITK's source: `r` and the points' coordinates rounded to float on every axis.
         double_axes: 0,
         upstream_defects: options.upstream_defects,
+        // Two float images of the full-resolution grid: the last step below holds three more
+        // than the fit does, so the factors' cache never raises the peak.
+        factor_budget: Some(
+            padded_size
+                .iter()
+                .product::<usize>()
+                .saturating_mul(2 * size_of::<f32>()),
+        ),
     };
     let result = n4_bias_field(
         &small_input,
         &plan.output,
-        Some(&small_mask),
+        Some(small_mask.as_ref()),
         small_weight.as_deref(),
         &parameters,
         n_threads,
@@ -368,25 +527,29 @@ pub fn n4_bias_field_correction(
         &g.spacing,
         n_threads,
     )?;
-    let (bias, mut corrected): (Vec<f32>, Vec<f32>) =
-        larmorx_core::parallel::with_threads(n_threads, || {
-            log_field
-                .par_iter()
-                .zip(padded_input.par_iter())
-                .with_min_len(1 << 14)
-                .map(|(&l, &v)| {
-                    let b = larmorx_core::math::exp(f64::from(l)) as f32;
-                    let c = if almost_equal_f32(b, 0.0) {
-                        f32::MAX
-                    } else {
-                        v / b
-                    };
-                    (b, c)
-                })
-                .unzip()
-        })
-        .map_err(FilterError::from)?;
-    if mask.is_some() {
+    drop(small_input);
+    drop(small_mask);
+    drop(small_weight);
+    // The bias field in place of the log field, then the corrected image.
+    let mut bias = log_field;
+    let mut corrected = larmorx_core::alloc::filled(bias.len(), 0.0f32)?;
+    larmorx_core::parallel::with_threads(n_threads, || {
+        bias.par_iter_mut()
+            .zip(corrected.par_iter_mut())
+            .zip(padded_input.par_iter())
+            .with_min_len(1 << 14)
+            .for_each(|((l, c), &v)| {
+                let b = larmorx_core::math::exp(f64::from(*l)) as f32;
+                *c = if almost_equal_f32(b, 0.0) {
+                    f32::MAX
+                } else {
+                    v / b
+                };
+                *l = b;
+            });
+    })
+    .map_err(FilterError::from)?;
+    if let Some(padded_mask) = &padded_mask {
         for (i, c) in corrected.iter_mut().enumerate() {
             if almost_equal_f32(padded_mask[i], 0.0) {
                 *c = padded_input[i];
@@ -412,8 +575,11 @@ pub fn n4_bias_field_correction(
             }
         }
     }
-    let corrected = crop(&corrected, &padded_size, lower, &g.size);
-    let bias = crop(&bias, &padded_size, lower, &g.size);
+    drop(padded_mask);
+    drop(padded_weight);
+    drop(padded_input);
+    let corrected = crop_owned(corrected, &padded_size, lower, &g.size);
+    let bias = crop_owned(bias, &padded_size, lower, &g.size);
     Ok(N4Output {
         corrected: input.derived(corrected),
         bias_field: input.derived(bias),
@@ -440,10 +606,81 @@ mod tests {
         assert_eq!(p.upper, [1, 1, 9]);
     }
 
+    /// Found by differential random testing (2026-10-25, `ants-n4:trial1:0`): `-b [200,5]` on
+    /// micrometre voxels pads to 2·10⁵ voxels per axis; ANTs aborts (`MemoryAllocationError`),
+    /// larmorx refuses instead of aborting the process.
+    #[test]
+    fn padding_beyond_memory_is_an_error() {
+        let e = pad(&[1.0; 8], &[2, 2, 2], &[1 << 21; 3], &[1 << 21; 3]).unwrap_err();
+        assert!(
+            e.to_string()
+                .starts_with("Failed to allocate memory for image")
+        );
+    }
+
+    /// ANTS-162 (differential random testing, 2026-10-25, `ants-n4:20261025:24`, the case that
+    /// filled the machine): a 14×28×23×7 image whose header gives its voxels in metres (4×1×1 m,
+    /// TR 3 s) with a spline distance of 20 mm needs 1.55·10¹⁰ control points at the first
+    /// fitting level and 2.2·10¹³ at the fourth. By default larmorx stops before allocating,
+    /// naming the memory needed and its likely cause; a small image is not affected.
+    #[test]
+    fn a_lattice_beyond_any_machine_is_refused_before_allocating() {
+        use larmorx_io::nifti::itk::{GeometrySource, ItkGeometry};
+        let geometry = |size: &[usize], spacing: &[f64]| ItkGeometry {
+            ndim: size.len(),
+            size: size.to_vec(),
+            spacing: spacing.to_vec(),
+            origin: vec![0.0; size.len()],
+            direction: (0..size.len())
+                .map(|i| {
+                    (0..size.len())
+                        .map(|j| f64::from(u8::from(i == j)))
+                        .collect()
+                })
+                .collect(),
+            source: GeometrySource::Default,
+            flipped: vec![false; size.len()],
+        };
+        let size = [14usize, 28, 23, 7];
+        let input = AntsImage {
+            data: (0..size.iter().product::<usize>())
+                .map(|i| (i % 17) as f32 + 1.0)
+                .collect(),
+            geometry: geometry(&size, &[4000.0, 1000.0, 1000.0, 3.0]),
+            meta: Default::default(),
+        };
+        let options = N4Options {
+            shrink_factor: 3,
+            mesh: BSplineMesh::Distance(20.0),
+            ..N4Options::default()
+        };
+        let start = std::time::Instant::now();
+        let e = n4_bias_field_correction(&input, None, None, &options, 1, None).unwrap_err();
+        let message = e.to_string();
+        assert!(matches!(e, N4Error::BeyondMemory(_)), "{message}");
+        assert!(message.contains("an error (ANTS-162)") || message.contains("An error (ANTS-162)"));
+        assert!(
+            message.contains("20803 x 10803 x 8803 x 11 control points"),
+            "{message}"
+        );
+        assert!(message.contains("4000 x 1000 x 1000 x 3 mm"), "{message}");
+        assert!(message.contains("52000 x 27000 x 22000 x 18"), "{message}");
+        assert!(message.contains("metres or micrometres"), "{message}");
+        assert!(start.elapsed().as_secs() < 5, "refused before any work");
+        // The same image in millimetres: a few control points, no refusal (the work is tiny).
+        let mut small = input.clone();
+        small.geometry = geometry(&size, &[4.0, 1.0, 1.0, 3.0]);
+        let options = N4Options {
+            iterations: vec![2],
+            ..options
+        };
+        assert!(n4_bias_field_correction(&small, None, None, &options, 1, None).is_ok());
+    }
+
     #[test]
     fn pad_and_crop_round_trip() {
         let data: Vec<f32> = (0..24).map(|v| v as f32).collect();
-        let (p, size) = pad(&data, &[4, 3, 2], &[1, 0, 2], &[2, 1, 0]);
+        let (p, size) = pad(&data, &[4, 3, 2], &[1, 0, 2], &[2, 1, 0]).unwrap();
         assert_eq!(size, [7, 4, 4]);
         assert_eq!(crop(&p, &size, &[1, 0, 2], &[4, 3, 2]), data);
         assert_eq!(p.iter().filter(|&&v| v != 0.0).count(), 23);

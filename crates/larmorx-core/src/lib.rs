@@ -19,6 +19,7 @@
 #![deny(unsafe_code)]
 
 pub mod affine;
+pub mod alloc;
 pub mod array;
 pub mod defects;
 pub mod eigen_sym;

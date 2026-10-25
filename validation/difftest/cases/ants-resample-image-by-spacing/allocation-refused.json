@@ -1,0 +1,187 @@
+{
+ "defect": null,
+ "description": "an output grid that cannot be allocated: ITK throws (ANTs aborts), larmorx refuses with ITK's message (it aborted)",
+ "expect": "error",
+ "found": {
+  "detail": "the process ended by signal 6: memory allocation of 119097000000 bytes failed note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace",
+  "n": 5,
+  "seed": "trial1",
+  "shrink_moves": [
+   "a: axis 0 29 -> 14 voxels",
+   "a: axis 2 23 -> 11 voxels",
+   "a: axis 0 14 -> 7 voxels",
+   "a: axis 2 11 -> 5 voxels",
+   "a: axis 0 7 -> 3 voxels"
+  ],
+  "signature": [
+   "crash"
+  ]
+ },
+ "id": "allocation-refused",
+ "implementations": [
+  "port"
+ ],
+ "reason": "",
+ "recipe": {
+  "extra": {},
+  "features": {
+   "axis0": 0.85,
+   "axis1": 1.0,
+   "axis2": 1.25,
+   "bias0": -0.0025,
+   "bias1": 0.01,
+   "bias2": -0.0025,
+   "bias3": 0.0,
+   "centre0": 5.5,
+   "centre1": -3.0,
+   "centre2": -5.5,
+   "content": "head",
+   "dimension": 4,
+   "dtype": "float32",
+   "noise": 6.0,
+   "orientation": "axes+oblique",
+   "origin0": -23.75,
+   "origin1": 38.0,
+   "origin2": -46.75,
+   "qfac": 1,
+   "qform_code": 3,
+   "range": "plain",
+   "sform": "same",
+   "sform_code": 0,
+   "shape": "29x2x23x5",
+   "size": 19.5,
+   "slice_code": 3,
+   "spacing0": "1",
+   "spacing1": "4",
+   "spacing2": "1.7",
+   "suffix": ".nii.gz",
+   "tail": 8,
+   "tissues": "t2",
+   "tr": 0.8,
+   "tunits": "msec",
+   "units": "m"
+  },
+  "groups": [
+   {
+    "args": [
+     "4"
+    ],
+    "name": "dimension",
+    "optional": false
+   },
+   {
+    "args": [
+     "{in:a}"
+    ],
+    "name": "input",
+    "optional": false
+   },
+   {
+    "args": [
+     "{out}"
+    ],
+    "name": "output",
+    "optional": false
+   },
+   {
+    "args": [
+     "1",
+     "4",
+     "1.7"
+    ],
+    "name": "spacing",
+    "optional": false
+   },
+   {
+    "args": [
+     "2"
+    ],
+    "name": "smooth, add voxels, nearest",
+    "optional": true
+   }
+  ],
+  "inputs": {
+   "a": {
+    "content": {
+     "axes": [
+      0.85,
+      1.0,
+      1.25
+     ],
+     "bias": [
+      -0.0025,
+      0.01,
+      -0.0025,
+      0.0
+     ],
+     "centre": [
+      5.5,
+      -3.0,
+      -5.5
+     ],
+     "noise": 6.0,
+     "seed": 1359767673,
+     "size": 19.5,
+     "tissues": "t2",
+     "type": "head"
+    },
+    "dtype": "float32",
+    "geometry": {
+     "origin": [
+      -23.75,
+      38.0,
+      -46.75
+     ],
+     "qfac": 1,
+     "qform_code": 3,
+     "quaternion": [
+      30,
+      3,
+      3,
+      -28
+     ],
+     "sform": "same",
+     "sform_code": 0,
+     "spacing": [
+      1.5,
+      1.5,
+      1.5
+     ],
+     "units": "m"
+    },
+    "scaling": null,
+    "shape": [
+     3,
+     2,
+     5,
+     5
+    ],
+    "suffix": ".nii.gz",
+    "timing": {
+     "slice_code": 3,
+     "slice_duration": 34.7826,
+     "slice_end": 4,
+     "slice_start": 0,
+     "tr": 800.0,
+     "tunits": "msec"
+    },
+    "values": {
+     "offset": 0.0,
+     "scale": 1.0
+    }
+   }
+  },
+  "n": 5,
+  "options": [
+   "dimension 4",
+   "tail 1"
+  ],
+  "seed": "trial1",
+  "tool": "ants-resample-image-by-spacing"
+ },
+ "rule": null,
+ "status": "fixed",
+ "suite": "ants-resample-image-by-spacing",
+ "tier": "smoke",
+ "tool": "ants-resample-image-by-spacing"
+}

@@ -445,6 +445,9 @@ impl<R: Compute, const D: usize> RegistrationHelper<R, D> {
             correct_stale_masks: self.upstream_defects.fix(),
             correct_point_set_transforms: self.upstream_defects.fix(),
             bspline: None,
+            outside: larmorx_registration::metric::OutsideDerivatives::new(
+                !self.upstream_defects.fix(),
+            ),
             n_threads: self.n_threads,
         };
         let originals = match (&self.metrics[0].fixed, &self.metrics[0].moving) {
@@ -477,6 +480,12 @@ impl<R: Compute, const D: usize> RegistrationHelper<R, D> {
             Some(e) => Err(e),
             None => run_syn(&syn, &mut observer, floor, &mut warnings, &mut events),
         };
+        super::helper::outside_notices(
+            &mut self.notices,
+            self.upstream_defects,
+            stage,
+            &syn.outside,
+        );
         let observed = std::mem::take(&mut observer.warnings);
         let ants_71 = observer.ants_71;
         for w in &warnings {

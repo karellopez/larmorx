@@ -1148,6 +1148,10 @@ def _generated_env(name: str, data: np.ndarray, src, path: Path) -> Path:  # typ
 
 
 def _image_path(image: str) -> Path:
+    if image.startswith("dt:"):  # an input of a differential test's case
+        from larmorx_validation.difftest import inputs
+
+        return inputs.path(image)
     if image.startswith("gen:"):
         return _generated(image.removeprefix("gen:"))
     if image == "missing":

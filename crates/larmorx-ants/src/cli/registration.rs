@@ -26,7 +26,7 @@ use std::io::Write;
 use std::path::Path;
 use std::sync::Arc;
 
-use larmorx_core::defects::{EXIT_BAD_MODE, Notices, UpstreamDefects};
+use larmorx_core::defects::{self, EXIT_BAD_MODE, Notices, UpstreamDefects};
 use larmorx_core::{IndexFloor, Precision};
 use larmorx_registration::initializer::{Feature, initialize};
 use larmorx_registration::mask::Mask;
@@ -2780,7 +2780,24 @@ fn write_one_transform<R: Compute, const D: usize>(
         write_field_image(log, ctx, name, &f.field);
         return;
     }
-    write_transform_file(log, ctx.notices, name, &[xfm_parts(&forward_only(t))]);
+    let mut parts = xfm_parts(&forward_only(t));
+    // A field given a `.mat` or `.txt` name (ANTS-51's names in `reproduce`) is written as the
+    // stage's own object, not a new `DisplacementFieldTransform` (`itkantsReadWriteTransform.h:
+    // 146`, `:170`): the Gaussian or B-spline smoothing subclass keeps its class name, with the
+    // same parameters (random testing, 2026-10-25, `ants-registration:20261025:979`).
+    if let Xfm::Field(f) = t
+        && (name.contains(".mat") || name.contains(".txt"))
+        && matches!(
+            f.smoothing,
+            Some(
+                larmorx_registration::field::FieldSmoothing::Gaussian { .. }
+                    | larmorx_registration::field::FieldSmoothing::BSpline { .. }
+            )
+        )
+    {
+        parts.name = format!("{}_{}_{D}_{D}", f.class(), R::ITK_NAME);
+    }
+    write_transform_file(log, ctx.notices, name, &[parts]);
 }
 
 /// The transform ANTs' writers store for a displacement field: a new
@@ -3166,6 +3183,21 @@ fn write_transforms<R: Compute, const D: usize>(
                 ctx.notices,
                 &format!("{prefix}InverseComposite.h5"),
                 &parts,
+            );
+        } else if to_write
+            .iter()
+            .any(|t| matches!(t, Xfm::Field(f) if f.inverse.is_none()))
+        {
+            // ITK-96 (random testing, 2026-10-25): ITK inverts a displacement field without
+            // an inverse field into one without a field, whose 0 parameters its HDF5 writer
+            // cannot chunk: ANTs leaves a part-written InverseComposite.h5 and HDF5's error,
+            // exit 0. larmorx writes no inverse composite, in both modes (`reproduce` does not
+            // reproduce the part-written file).
+            ctx.notices.add(
+                &defects::ITK_96,
+                format!(
+                    "no {prefix}InverseComposite.h5: a displacement field of the composite has no inverse; ANTs writes the file in part and fails with HDF5's error"
+                ),
             );
         }
     } else if collapse {

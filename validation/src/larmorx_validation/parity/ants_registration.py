@@ -116,6 +116,10 @@ class RegCase:
     reason: str = ""
     seed: str | None = SEED
     band: bool = False
+    #: Defects whose notice the fix pass may name without a visible change (besides ANTS-62's
+    #: and ITK-41's), as the other ANTs suites' ``silent_ok`` (a permanent case of random
+    #: testing whose other stages name corrections this input does not exercise).
+    silent_ok: tuple[str, ...] = ()
 
 
 # ------------------------------------------------------------------------------------------------
@@ -1872,6 +1876,8 @@ def _normalise(text: str, out: Path) -> list[str]:
         )
         # An exception's what() inside another's description: the thrower's file and line.
         line = re.sub(r"^\S*?/(Modules|Utilities|Examples)/(\S+:\d+:)$", r"\1/\2", line)
+        # vnl's warnings name their header by the build's path (`__FILE__`; vnl_svd.hxx).
+        line = re.sub(r"^\S*?/(Modules/ThirdParty/VNL/\S+?\.(?:hxx|h|cxx)): ", r"\1: ", line)
         line = re.sub(r"(Elapsed time \(stage \d+\)|Total elapsed time): .*", r"\1: T", line)
         # The sign of a NaN result: IEEE 754 leaves it unspecified, the compiler's operand order
         # decides it (docs/findings/ants-registration.md).
@@ -1932,6 +1938,21 @@ def _outputs(d: Path) -> dict[str, Path]:
     return {p.name: p for p in sorted(d.iterdir()) if p.is_file()}
 
 
+def _h5_parameters(path: Path) -> list[np.ndarray]:
+    """The ``TransformParameters`` datasets of an ITK HDF5 transform file, in group order."""
+    import h5py
+
+    out = []
+    with h5py.File(path, "r") as f:
+        group = f.get("TransformGroup")
+        if group is None:
+            return out
+        for name in sorted(group, key=lambda k: int(k) if k.isdigit() else -1):
+            if "TransformParameters" in group[name]:
+                out.append(np.asarray(group[name]["TransformParameters"], dtype=np.float64))
+    return out
+
+
 def _parameters(d: Path) -> np.ndarray | None:
     """Every transform parameter written, in file order (for the thread band): the parameters
     of transform files, and the vectors of displacement-field images."""
@@ -1940,7 +1961,17 @@ def _parameters(d: Path) -> np.ndarray | None:
     vals = []
     for p in _outputs(d).values():
         if p.suffix in (".mat", ".txt", ".h5"):
-            for t in lx.transforms.read(p):
+            try:
+                transforms = lx.transforms.read(p)
+            except ValueError:
+                if p.suffix != ".h5":
+                    raise
+                # A transform larmorx's reader does not hold (a 4D displacement field,
+                # `DisplacementFieldTransform_double_4_4`; random testing, 2026-10-25): its
+                # parameters as the file stores them.
+                vals.extend(_h5_parameters(p))
+                continue
+            for t in transforms:
                 vals.append(np.asarray(t.parameters, dtype=np.float64))
         elif p.name.endswith("Warp.nii.gz"):
             import nibabel as nib
@@ -2133,7 +2164,7 @@ def run_case(case: Case, checks: CheckList) -> None:
             defects.notices_in(fx[2]),
             change,
             other_changes="; ".join(other),
-            silent_ok=("ANTS-62", "ITK-41"),
+            silent_ok=("ANTS-62", "ITK-41", *c.silent_ok),
         )
 
 

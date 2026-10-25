@@ -29,6 +29,7 @@ starts no other agent.
 | AFNI masks original | `worktree-agent-a4282c736dbd9fe7c` (10-23) | the clean-room originals of 3dAutomask and 3dUnifize (from the specs; built for speed: a sliding window of ranked values for 3dUnifize's ball, union-find clusters, breadth-first exterior clip and depth, parallel passes), `implementation=` for both, AFNI-41 and AFNI-48 refused by default; CORE-MATH's `tanhf` and `cbrtf`; 8 golden cases; both evidence pages with the original | a benchmark report (on a quiet machine); the replica records to regenerate under `-replica`; the shared CORE-MATH preload to rebuild |
 | A5.3 | `worktree-agent-aaab33aced8cdf16d` (10-23) | `antsRegistration`'s Exponential, BSplineExponential and time-varying velocity-field stages (every stage ANTs accepts); the corrections ANTS-67/68/70/78 and ITK-24/29/35 by default (and ITK-42); `antsApplyTransforms` with `BSplineTransform` files; both evidence pages | benchmark of the deformable stages; ITK-38 and ITK-40's fix pass on the full tier; MINC transform files |
 | A6 | `worktree-agent-a6259dedbd25d703c` (10-22) | `Atropos` to full completeness (every initialisation, likelihood model, posterior formulation, MRF/ICM, outlier and partial-volume option), its evidence page; ITK-50, ITK-51, ANTS-90 to ANTS-107 | – |
+| Random testing, tables | `worktree-agent-ab7de196daece3c4e` (10-25) | `difftest` (21 tool descriptors, shrinking, permanent cases, triage, nightly script, first night 34 880 cases); fixes it found in the ports (the sform/qform choice in vnl's float SVD, allocation refusals, singular directions, unregistered composite names, a float transform's point indexed in float, vnl's SVD warning in Mattes, ImageFileWriter's origin and empty images, Atropos on an empty mask, CC's Jacobian and ITK-35; and from the first night: ResampleImage's B-spline on a 2-voxel axis, DenoiseImage's Rician smoothing kernel and dimension without -d, ITK's shortest numbers at a tie, four transform classes in antsApplyTransforms, a float versor's cosine, the empty sample set's exception, antsAI's warning order, the median's zero, the aliased derivatives of sampled metrics (and in SyN), a later level's zero Mattes bin size, a field's class under a .mat name, SyN's metric sum in float, Atropos' model warnings, the NIfTI writer's non-orthogonal warning, the 2D B-spline fit's memory and time, memory guards (N4, the resamplers, 3dUnifize -EPI)); ANTS-160 to ANTS-163, ITK-95 to ITK-100, AFNI-75; the memory box and the heavy queue; memory no more than ANTs' for the image programs (`tests/parity/test_memory_peak.py`); `tables` (README, validation index, site status); the site's "Random testing" panels | "Random testing's open items" and "Memory against the originals" (follow-ups) |
 
 ## The order from here
 
@@ -76,11 +77,22 @@ starts no other agent.
    approved by the user on 2026-10-24, 2.35 GB, every criterion covered, defacing checked; the
    site's evidence scales to it without losing anything: slices views for new panel cases, the
    blob branch, the size guard, credits; the site's Data panel page; 3dAutomask's first panel
-   case); its nine new fMRIPrep oracle runs done (all exit 0); **differential random
-   testing** (a shared harness that generates random valid command lines and inputs per tool and
-   compares with the original, overnight on this machine, never in CI; then every finished
-   tool); **generated tables** (the README's tool table, the validation index and the site's
-   status table from one description per tool and its records). Then every finished tool is
+   case); its nine new fMRIPrep oracle runs done (all exit 0); **differential random testing:
+   done** (2026-10-25; [validation/difftest.md](validation/difftest.md)): one descriptor per
+   finished tool (21), seeded plain-arithmetic inputs, the parity runners as judges, shrinking,
+   permanent cases, `triage.toml`, the nightly script, every night in a memory box (never in CI);
+   its first night (6.2 h): 34 880 cases, 31790 agree, 3 explained, 1350 notice, 394 undefined,
+   1227 differ, 76 memory, 38 timeout; 58 groups of differences: 34 fixed in larmorx, 6 defects
+   of the originals in the register, 17 open for the clean-room originals' agents, 1 the
+   harness's own; 76 heavy cases queued (40 run here: 26 agree, 14 notices; 11 beyond any
+   machine; 25 for a larger machine); the mcflirt replica's 107 differences of that night are all
+   bit-identical with its follow-up's fixes (the `atanf` constant, e687cd1; FSL-08's notice of the
+   `-meanvol` name, d196995; recounted with `validation/investigations/difftest/mcflirt_pair.py`);
+   **generated tables: done** (2026-10-25): `validation/tools.toml` +
+   the records → the README's tool table, the validation index and the site's status table
+   (`python -m larmorx_validation tables --check`); and, at the user's request the same day,
+   **memory no more than the original's** for the ANTs image programs (13 calls in
+   `tests/parity/test_memory_peak.py`). Then every finished tool is
    re-validated on the panel, with its evidence page updated. Each tool: its existing examples
    unchanged; the panel's cases added beside them, two or three key datasets as whole volumes,
    the rest as slices (`docs/figures.md`, Views); a page over its budget gets a raised one with
@@ -124,6 +136,54 @@ starts no other agent.
   then a clean-room implementer adds them to `lx.mri.hmc`'s original.
 - **A benchmark report of the mcflirt replica** (informal: fMRIPrep's call on ds000005, the
   replica 20 s at 3 threads and 36 s at one, mcflirt 70 s, on a busy machine).
+
+- **Random testing's open items** (2026-10-25, `validation/difftest/triage.toml`):
+  - the heavy queue of the first night: batch 1 ran here (2026-10-25, 40 cases: 26 agree, 14
+    notices that changed no value, no difference); 11 are beyond any machine (guard cases); 25
+    wait for a larger machine (the lab's server): 13 N4 cases too long for this machine (51.5 h
+    predicted in all, one at a time; 4 to 58 GiB), 8 predicted beyond its heavy box of 24 GiB and
+    48 GiB of swap (7 N4, one ResampleImageBySpacing; 119 to 1,140 GiB), and 4 of the first batch
+    to run again with the harness's fixes (ResampleImage #556 and ResampleImageBySpacing #938,
+    whose comparison held both outputs of billions of voxels; #1278, whose comparison started
+    before a fix; N4 #777, which passed the suite's 30-minute run limit while swapping); each with
+    its prediction and command line in the night's `heavy-results.jsonl` (verdict "pending:
+    larger machine"; `validation/investigations/difftest/heavy_pending.py` prints them).
+  - ITK-01's notice is missing where the exact floor reaches antsRegistration's
+    displacement-field lookups (`FieldXfm`): a value changes in its last bit by default with no
+    notice (`reproduce` is exact; `ants-registration:20261025:428`).
+  - the `reproduce` switches of ANTS-161 (ANTs' NaN image), ITK-95 (ITK's moving-histogram values
+    at radius 0, and its notice) and ITK-96 (the part-written file); the notice of ITK-98 in
+    antsRegistration's outputs and the N-D resampler.
+  - `lx.transforms.read` does not read 4D transforms (`DisplacementFieldTransform_double_4_4`):
+    the registration runner reads such files by their HDF5 parameters.
+  - `lx.transforms.resample_series` gives one voxel of a near-zero value (−7.8·10⁻¹⁷, a
+    cancellation) one float ulp from fMRIPrep's (`resample-series:20261025:462`;
+    `validation/investigations/difftest/resample_pair.py`): the order of one sum to find.
+  - the timeouts of the first night (38: afni-unifize 1, ants-ai 1, ants-n4 14, ants-registration
+    10, ants-resample-image 8, ants-resample-image-by-spacing 3, ants-smooth-image 1): cases over
+    their tool's time limit, not yet run to their end.
+  - the clean-room originals' differences (3dTshift, 3dAutomask, 3dUnifize, head-motion
+    correction), each with a black-box reproducer (`python -m larmorx_validation difftest --replay
+    oracles/difftest/2026-10-25/findings/<tool>/<finding>.json`), passed to their agents through
+    the orchestrator's brief (clean-room implementers do not read `docs/parts/`).
+  - D11: N4's lattice as a sparse lattice with virtual padding (ANTS-162; the same result in
+    memory proportional to the data).
+  - AFNI-75's guard is in the GPL replica of 3dUnifize only: the clean-room original needs it
+    through `specs/3dUnifize.md` (a spec writer), then a clean-room agent.
+- **Random testing, more**: the data panel's real crops as inputs; BET's descriptor with BET;
+  nights on a schedule (cron, boxed) once the machine is free at night.
+- **Memory against the originals, the remaining tools** (user's rule of 2026-10-25): every ANTs
+  image program measured so far needs at most ANTs' peak plus the Python interpreter's few MiB
+  on the same call (`tests/parity/test_memory_peak.py`, 13 mid-size calls, bit for bit in
+  `reproduce`; `docs/findings/ants-image-programs.md`, `ants-n4.md`, `ants-denoise.md`, "Memory
+  against ANTs"). Measure antsRegistration, antsApplyTransforms, Atropos, antsAI,
+  antsAffineInitializer, the AFNI programs (replicas and clean-room originals), mcflirt (replica
+  and original) and `lx.transforms.resample_series` the same way (`memory_pair.py`, one thread,
+  mid-size calls), fix what needs more than the original, and add a `test_memory_peak.py` case
+  for each.
+- **ResampleImage's speed** with nearest-neighbour resampling to `unsigned char` (3D, most voxels
+  beyond the input): 2.4 times ANTs' time (15.2 s against 6.4 s on 756 million output voxels,
+  `ants-resample-image:20261025:556` at half its spacing; the same memory).
 
 - **The oracle cache, further:** `pipeline-stages` still keeps its own runs (`oracles/compare`)
   and could use the cache; mcflirt's variability band (`parity/mri_hmc_band.py`) and the recorded

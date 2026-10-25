@@ -102,6 +102,7 @@ changed it (`reproduce`); nothing is said when the two would agree.
 | AFNI-45 | 3dUnifize | `lx.afni.unifize(t2=True, t2_percentile=100)`, `-T2up` near 100 | the percentile is read one past the sorted values (memory never written; AFNI read 0 and wrote zeros) | the largest value (the 100th percentile); `reproduce` uses 0 |
 | AFNI-47 | 3dUnifize | inputs of more than a million voxels with an axis of 2 or 3 | the half-size scale image is read past its end | brought back to the input's grid; `reproduce` reads AFNI's image, 0 past its end |
 | AFNI-01 | 3dAutomask, 3dUnifize `-EPI` | a series with a negative `scl_slope` | the factor dropped when the series is averaged (3dAutomask) or its median taken (3dUnifize `-EPI`: all zeros) | the factor applied |
+| AFNI-75 | 3dUnifize `-EPI` | `larmorx afni 3dUnifize -EPI` (the GPL replica) | the ball of neighbours is sized from the voxel size, unbounded: beyond any machine's memory on micrometre voxels | the same computation; by default the replica stops before building the ball when it exceeds the machine's memory (or `LARMORX_MEMORY_LIMIT`), naming AFNI-75; `reproduce` attempts it (the clean-room original: to do, from its spec) |
 | FSL-01 | mcflirt | `lx.mri.hmc`, `larmorx mri hmc` | the last volume of the series starts the first stage from the identity instead of its predecessor's result (every fMRIPrep run's last volume) | it continues its chain like every other volume |
 | FSL-03 | mcflirt | both | the in-plane mode pads the first stage's reference grid twice | once, like the other stages |
 | FSL-14 | mcflirt | both | one NaN or infinite voxel makes the volume's centre of mass, and so its matrix, NaN | non-finite voxels are left out of the centre of mass and the cost |
@@ -200,7 +201,7 @@ Rows naming `larmorx fsl mcflirt` are the replica's (`larmorx-nc`, `lx.mri.hmc(i
 | ANTS-96 | Atropos | partial-volume classes never re-estimated | re-estimated from their two classes |
 | ANTS-97 | Atropos | `-u 1`: the priors' voxel numbers stored in `float` | exact |
 | ANTS-98 | Atropos | `KMeans`' range from the mask's label 1 only | the mask's non-zero voxels |
-| ANTS-99 | Atropos | without `-d`, every image in 3D | the first image's dimension |
+| ANTS-99 | Atropos, N4BiasFieldCorrection, DenoiseImage | without `-d`, every image read as 3D | the image's dimension (N4BiasFieldCorrection and DenoiseImage since 2026-10-25) |
 | ANTS-100 | Atropos | vector priors: every class the last component | each class its component |
 | ANTS-101 | Atropos | an unknown `-p` runs Socrates silently | an error |
 | ANTS-102 | Atropos | `--icm [1,2]` (the documented form) aborts | read as documented (`reproduce`: ANTs' message, exit 1) |
@@ -214,6 +215,10 @@ Rows naming `larmorx fsl mcflirt` are the replica's (`larmorx-nc`, `lx.mri.hmc(i
 | ANTS-112 | antsAI `-b` | the blob detector does not keep the N strongest maxima | the N strongest |
 | ANTS-114 | antsAI `-b` | no landmark: a rigid transform of NaNs, exit 0 | an error |
 | ANTS-116 | antsAI `-b` | blob patches compared in the orientation the eigenvectors' signs give, reflected or not | proper rotations, every sign combination, the best correlation |
+| ANTS-160 | ResampleImage | fewer Gaussian sigmas than dimensions: read past the list (heap-dependent result) | an error in both modes |
+| ANTS-161 | ResampleImage | a Gaussian sigma or alpha ≤ 0: NaN weights, an image of NaN or zeros | an error in both modes, named (`reproduce` not yet ANTs' NaN image) |
+| ANTS-162 | N4BiasFieldCorrection, ResampleImage, ResampleImageBySpacing | lattice, padding or grid sized from the physical extent with no check: beyond any machine's memory for a header in metres or micrometres | the same computation; by default stopped before allocating when it exceeds the machine's memory (`LARMORX_MEMORY_LIMIT`), with the GiB needed and the likely cause |
+| ANTS-163 | ImageMath `Normalize`, `TruncateImageIntensity` | a mask of another size read outside its buffer | an error in both modes |
 | ITK-01 | ITK `Math::Floor` | 0 instead of −1 just below 0 (x86-64) | the exact floor |
 | ITK-02 | ITK reader | extra dimensions read with an identity direction | the file's direction, where it applies |
 | ITK-03 | ITK relabelling | float labels stop at 2^24 | integer labels |
@@ -248,6 +253,12 @@ Rows naming `larmorx fsl mcflirt` are the replica's (`larmorx-nc`, `lx.mri.hmc(i
 | ITK-50 | ITK `KdTreeBasedKmeansEstimator` (Atropos `KMeans`) | the point each divided k-d tree node is split at is left out of the new centres | every point counted |
 | ITK-51 | ITK `TDistribution` (Atropos' Grubbs-Rosner) | NaN above about 340 degrees of freedom: no outlier is ever found in an image | the Gamma ratio through its logarithm where it would overflow |
 | ITK-60 | ITK `LandmarkBasedTransformInitializer` (antsAI `-b`, 2D) | −90° whenever the dot product is near 0 | `atan2` |
+| ITK-95 | ITK grayscale morphology (ImageMath `GO`, `GC`, `GD`, `GE`) | a first axis of one voxel: voxels at ±FLT_MAX at radius 0, values from outside the structuring element above | the true result (`reproduce` not yet ITK's values) |
+| ITK-96 | ITK HDF5 transform writer (antsRegistration's inverse composite) | a transform without parameters: HDF5's error, a part-written file (ITK-15, met there) | not written, named |
+| ITK-97 | ITK sampled metrics (displacement-field stages) | a sample point outside the shrunk virtual region: its derivative added to another voxel's parameters | dropped; `reproduce` adds it as ITK does |
+| ITK-98 | ITK B-spline interpolation | an axis too short for one mirror: coefficients read outside their buffer | the mirror repeated; `reproduce` reads them as 0 |
+| ITK-99 | ITK sampled metrics | a derivative written past its array | dropped in both modes |
+| ITK-100 | ITK Mattes metric | a later level's bin size of 0 used silently (the metric 0) where the first level refuses | an error by default; `reproduce` as ITK |
 
 **Not the default yet:**
 

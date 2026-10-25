@@ -1,0 +1,349 @@
+{
+ "defect": "ITK-100",
+ "description": "a BSpline stage with MI and a sparse mask where the full-resolution fixed image has one intensity: ITK keeps the first level's joint histogram images, so the second level's bin size of 0 is used silently (the metric 0) where the first level would refuse (ITK-100, reproduced)",
+ "expect": "pass",
+ "found": {
+  "detail": "ANTs with CORE-MATH: exit status: ANTs 0, larmorx 1; ANTs with CORE-MATH: standard output: line 182: ANTs 'DIAGNOSTIC,Iteration,metricValue,convergenceValue,ITERATION_TIME_INDEX,SINCE_LAST', larmorx 'Exception caught: '; ANTs with CORE-MATH: files written: ANTs ['rComposite.h5', 'w.nii.gz'], larmorx []",
+  "n": 884,
+  "seed": "20261025",
+  "shrink_moves": [],
+  "signature": [
+   "ANTs with CORE-MATH: exit status",
+   "ANTs with CORE-MATH: files written",
+   "ANTs with CORE-MATH: standard output"
+  ]
+ },
+ "id": "mattes-later-level-one-intensity",
+ "implementations": [
+  "port"
+ ],
+ "reason": "",
+ "recipe": {
+  "extra": {
+   "min_size": 6
+  },
+  "features": {
+   "axis0": 0.8,
+   "axis1": 0.9,
+   "axis2": 0.75,
+   "bins0": "8",
+   "blobs": 5,
+   "centre0": 2.5,
+   "centre1": 1.0,
+   "centre2": -4.0,
+   "collapse": false,
+   "composite": true,
+   "content": "sparse",
+   "dimension": 3,
+   "dtype": "uint8",
+   "exp total0": "0",
+   "family0": "BSpline",
+   "fixed dtype": "uint8",
+   "fixed mask only": false,
+   "fixed n0": 12,
+   "fixed n1": 13,
+   "fixed n2": 14,
+   "fixed spacing": 2.5,
+   "float": false,
+   "gdf total0": "0.5",
+   "histogram matching": true,
+   "initial": false,
+   "iterations00": "5",
+   "iterations01": "3",
+   "levels0": 2,
+   "masks": true,
+   "mesh0": "3",
+   "metric weight0": "1",
+   "metric0": "MI",
+   "moving dtype": "float32",
+   "moving offset": 20.0,
+   "moving on another grid": true,
+   "moving origin0": 1.0,
+   "moving origin1": 0.5,
+   "moving origin2": 3.0,
+   "moving scale": 1.3,
+   "moving spacing": 2.0,
+   "oblique fixed": false,
+   "outputs": "[{out}/r,{out}/w.nii.gz,{out}/iw.nii.gz]",
+   "percentage0": "0.5",
+   "range": "plain",
+   "rot b": -2,
+   "rot c": -1,
+   "rot d": -1,
+   "rot scale": 4,
+   "sampling0": "Regular",
+   "shift0": -3.75,
+   "shift1": -2.5,
+   "shift2": 1.25,
+   "size": 9.5,
+   "smoothing units0": "mm",
+   "sparse": 0.01,
+   "stages": 1,
+   "step0": "0.2",
+   "suffix": ".nii",
+   "syn total0": "0.3",
+   "syn update0": "3",
+   "tvb points0": "2",
+   "tvf points0": "3",
+   "window0": "3",
+   "winsorize": false
+  },
+  "groups": [
+   {
+    "args": [
+     "-d",
+     "3"
+    ],
+    "name": "dimension",
+    "optional": false
+   },
+   {
+    "args": [
+     "-v",
+     "1"
+    ],
+    "name": "verbose",
+    "optional": false
+   },
+   {
+    "args": [
+     "-o",
+     "[{out}/r,{out}/w.nii.gz,{out}/iw.nii.gz]"
+    ],
+    "name": "output",
+    "optional": false
+   },
+   {
+    "args": [
+     "-a",
+     "1"
+    ],
+    "name": "composite",
+    "optional": true
+   },
+   {
+    "args": [
+     "-u",
+     "1"
+    ],
+    "name": "histogram matching",
+    "optional": true
+   },
+   {
+    "args": [
+     "-x",
+     "{in:fmask}"
+    ],
+    "name": "masks",
+    "optional": true
+   },
+   {
+    "args": [
+     "-t",
+     "BSpline[0.2,3x3x3]",
+     "-m",
+     "MI[{in:fixed},{in:moving},1,8,Regular,0.5]",
+     "-c",
+     "[5x3,1e-6,3]",
+     "-f",
+     "2x1",
+     "-s",
+     "1x0mm"
+    ],
+    "name": "stage 0",
+    "optional": false
+   }
+  ],
+  "inputs": {
+   "fixed": {
+    "content": {
+     "axes": [
+      0.8,
+      0.9,
+      0.75
+     ],
+     "centre": [
+      0.0,
+      0.0,
+      0.0
+     ],
+     "n": 5,
+     "seed": 1892052996,
+     "size": 12.6,
+     "type": "blobs"
+    },
+    "dtype": "uint8",
+    "geometry": {
+     "origin": [
+      -13.75,
+      -15.0,
+      -16.25
+     ],
+     "qfac": 1,
+     "qform_code": 1,
+     "quaternion": [
+      1,
+      0,
+      0,
+      0
+     ],
+     "sform": "same",
+     "sform_code": 1,
+     "spacing": [
+      2.5,
+      2.5,
+      2.5
+     ],
+     "units": "mm"
+    },
+    "keep_content": true,
+    "scaling": null,
+    "shape": [
+     12,
+     13,
+     14
+    ],
+    "suffix": ".nii.gz",
+    "values": {
+     "offset": 0.0,
+     "scale": 1.0
+    }
+   },
+   "fmask": {
+    "binary": true,
+    "content": {
+     "fraction": 0.01,
+     "seed": 708852148,
+     "type": "sparse"
+    },
+    "dtype": "uint8",
+    "geometry": {
+     "origin": [
+      -13.75,
+      -15.0,
+      -16.25
+     ],
+     "qfac": 1,
+     "qform_code": 1,
+     "quaternion": [
+      1,
+      0,
+      0,
+      0
+     ],
+     "sform": "same",
+     "sform_code": 1,
+     "spacing": [
+      2.5,
+      2.5,
+      2.5
+     ],
+     "units": "mm"
+    },
+    "scaling": null,
+    "shape": [
+     12,
+     13,
+     14
+    ],
+    "suffix": ".nii",
+    "values": {
+     "binarize": true,
+     "offset": 0.0,
+     "scale": 1.0
+    }
+   },
+   "moving": {
+    "content": {
+     "axes": [
+      0.8,
+      0.9,
+      0.75
+     ],
+     "centre": [
+      0.0,
+      0.0,
+      0.0
+     ],
+     "n": 5,
+     "seed": 1892052996,
+     "size": 12.6,
+     "type": "blobs"
+    },
+    "dtype": "float32",
+    "geometry": {
+     "origin": [
+      -12.75,
+      -14.5,
+      -13.25
+     ],
+     "qfac": 1,
+     "qform_code": 1,
+     "quaternion": [
+      1,
+      0,
+      0,
+      0
+     ],
+     "sform": "same",
+     "sform_code": 1,
+     "spacing": [
+      2.0,
+      2.0,
+      2.0
+     ],
+     "units": "mm"
+    },
+    "keep_content": true,
+    "motion": [
+     {
+      "centre": [
+       0.0,
+       0.0,
+       0.0
+      ],
+      "quaternion": [
+       19,
+       -2,
+       -1,
+       -1
+      ],
+      "translation": [
+       -3.75,
+       -2.5,
+       1.25
+      ]
+     }
+    ],
+    "scaling": null,
+    "shape": [
+     12,
+     13,
+     14
+    ],
+    "suffix": ".nii.gz",
+    "values": {
+     "offset": 20.0,
+     "scale": 1.3
+    }
+   }
+  },
+  "n": 884,
+  "options": [
+   "-a 1",
+   "-u 1",
+   "-x",
+   "BSpline",
+   "BSpline with MI",
+   "MI metric",
+   "dimension 3"
+  ],
+  "seed": "20261025",
+  "tool": "ants-registration"
+ },
+ "rule": "B",
+ "status": "fixed",
+ "suite": "ants-registration",
+ "tier": "smoke",
+ "tool": "ants-registration"
+}

@@ -113,8 +113,9 @@ class AntsCase:
     """One invocation of an ANTs program, compared with larmorx's.
 
     ``args`` are the program's arguments with placeholders (see the module docstring).
-    ``expect`` is ``"pass"``, ``"error"`` (both must fail) or ``"divergence"`` (ANTs succeeds,
-    larmorx refuses on purpose, ``reason`` says why). ``tolerance_ulps`` allows values that are
+    ``expect`` is ``"pass"``, ``"error"`` (both must fail), ``"divergence"`` (ANTs succeeds,
+    larmorx refuses on purpose, ``reason`` says why) or ``"guard"`` (beyond any machine,
+    ANTS-162: only larmorx's default runs, and must refuse before allocating; :func:`guard`). ``tolerance_ulps`` allows values that are
     not bit-identical, up to that many units in the last place, with ``reason`` explaining
     the cause. ``undefined_values`` says why ANTs' values depend on memory it never wrote:
     they are then not compared (the rest is). ``silent_ok`` lists the defects the fix pass
@@ -181,7 +182,8 @@ def _resolve(arg: str, tmp: Path, outdir: Path) -> str:
     return re.sub(r"\{([^{}]+)\}", sub, arg)
 
 
-def _env(threads: int = THREADS) -> dict[str, str]:
+def _env(threads: int | None = None) -> dict[str, str]:
+    threads = THREADS if threads is None else threads
     return {**os.environ, "ITK_GLOBAL_DEFAULT_NUMBER_OF_THREADS": str(threads)}
 
 
@@ -218,7 +220,7 @@ def case_never(c) -> str:
 def _run_ants(
     program: str,
     args: list[str],
-    threads: int = THREADS,
+    threads: int | None = None,
     *,
     correctly_rounded: bool = False,
     never: str = "",
@@ -237,19 +239,32 @@ def _run_ants(
         env["LD_PRELOAD"] = str(lib)
     argv = [str(ants_bin() / program), *args]
     policy = oracle_cache.Policy(threads=oracle_cache.itk_threads(env), never=never, family="itk")
-    p = oracle_cache.run(argv, env=env, policy=policy, timeout=1800, runner="ants-programs")
+    limit = run_timeout()
+    p = oracle_cache.run(argv, env=env, policy=policy, timeout=limit, runner="ants-programs")
     if p.timed_out:
-        raise subprocess.TimeoutExpired(argv, 1800)
+        raise subprocess.TimeoutExpired(argv, limit)
     return p.returncode, p.stdout, p.stderr
 
 
+def run_timeout() -> float:
+    """The seconds a run of the original may take: 30 minutes, or what a heavy random case
+    allows (``LARMORX_PARITY_RUN_TIMEOUT``, set by ``difftest --heavy``'s judge: the first
+    night's ``ants-n4:20261025:777`` swapped past 30 minutes in the heavy box)."""
+    try:
+        return max(1800.0, float(os.environ.get("LARMORX_PARITY_RUN_TIMEOUT", "1800")))
+    except ValueError:
+        return 1800.0
+
+
 def _run_larmorx(
-    program: str, args: list[str], threads: int = THREADS, *, mode: str = defects.REPRODUCE
+    program: str, args: list[str], threads: int | None = None, *, mode: str = defects.REPRODUCE
 ) -> tuple[int, str, str]:
     """Run ``larmorx ants <program>`` in-process; ``mode`` is D13's
-    ``LARMORX_UPSTREAM_DEFECTS``: ``reproduce`` for the comparison with ANTs."""
+    ``LARMORX_UPSTREAM_DEFECTS``: ``reproduce`` for the comparison with ANTs. ``threads``:
+    :data:`THREADS` unless given (read when called, so a caller may lower it)."""
     from larmorx.cli import run
 
+    threads = THREADS if threads is None else threads
     out, err = io.StringIO(), io.StringIO()
     previous = os.environ.get("ITK_GLOBAL_DEFAULT_NUMBER_OF_THREADS")
     os.environ["ITK_GLOBAL_DEFAULT_NUMBER_OF_THREADS"] = str(threads)
@@ -346,6 +361,89 @@ def ulps(a: np.ndarray, b: np.ndarray) -> int:
     return int(d.max())
 
 
+#: Values compared at a time (:func:`value_differences`): the comparison of two outputs of
+#: billions of voxels needs the two outputs and a few chunks, not several float64 copies of
+#: them (random testing, 2026-10-25: the heavy case ``ants-resample-image:20261025:556``, two
+#: outputs of 6·10⁹ voxels, was stopped at 24 GiB + 48 GiB of swap by its comparison).
+COMPARE_CHUNK = 1 << 22
+
+
+def value_differences(a, b) -> tuple[int, float, float, int]:
+    """The values that differ between two arrays of one shape and type (their bits, every NaN
+    alike), the largest absolute difference, that over the largest finite magnitude of ``a``,
+    and the largest distance in ulp, computed :data:`COMPARE_CHUNK` values at a time (the same
+    numbers as on the whole arrays). ``a`` and ``b`` are arrays, or :class:`StoredValues` of
+    files too large to load (read twice, a chunk at a time)."""
+    chunks_a = a.chunks if isinstance(a, StoredValues) else _array_chunks(a)
+    chunks_b = b.chunks if isinstance(b, StoredValues) else _array_chunks(b)
+    counts = [
+        int(np.count_nonzero(_canonical_bits(x) != _canonical_bits(y)))
+        for x, y in zip(chunks_a(), chunks_b(), strict=True)
+    ]
+    n = sum(counts)
+    if n == 0:
+        return 0, 0.0, 0.0, 0
+    max_abs, scale, max_ulp = 0.0, 0.0, 0
+    for (x, y), k in zip(zip(chunks_a(), chunks_b(), strict=True), counts, strict=True):
+        xf = x.astype(np.float64)
+        finite = np.abs(xf[np.isfinite(xf)])
+        if finite.size:
+            scale = max(scale, float(finite.max()))
+        if k == 0:
+            continue
+        yf = y.astype(np.float64)
+        with np.errstate(invalid="ignore"):
+            d = np.abs(xf - yf)
+        d = np.where(np.isnan(xf) & np.isnan(yf), 0.0, d)
+        d = np.where(np.isnan(d), np.inf, d)
+        max_abs = max(max_abs, float(d.max()))
+        max_ulp = max(max_ulp, ulps(x, y))
+    return n, max_abs, max_abs / (scale or 1.0), max_ulp
+
+
+def _array_chunks(x: np.ndarray):
+    flat = np.ascontiguousarray(x).reshape(-1)
+    return lambda: (flat[i : i + COMPARE_CHUNK] for i in range(0, flat.size, COMPARE_CHUNK))
+
+
+#: Outputs of more values than this are compared from their files, a chunk at a time, without
+#: loading them (each would otherwise be held whole, twice with larmorx's run in the process).
+STREAM_VALUES = 1 << 28
+
+
+class StoredValues:
+    """The voxel values of a NIfTI file as stored (``get_unscaled``), read a chunk of
+    :data:`COMPARE_CHUNK` values at a time from the file (gzip or not): an output of billions
+    of voxels compared without loading it."""
+
+    def __init__(self, path: Path, image) -> None:
+        # The image's array proxy knows where its values start (the header's vox_offset may
+        # read 0 once loaded) and how they are stored.
+        proxy = image.dataobj
+        self.path = Path(path)
+        self.dtype = np.dtype(proxy.dtype)
+        self.shape = tuple(int(n) for n in proxy.shape)
+        self.size = int(np.prod(self.shape, dtype=np.int64))
+        self.offset = int(proxy.offset)
+
+    def chunks(self):
+        import gzip
+
+        with self.path.open("rb") as f:
+            magic = f.read(2)
+        opener = gzip.open if magic == b"\x1f\x8b" else open
+        with opener(self.path, "rb") as f:
+            f.seek(self.offset)
+            left = self.size
+            while left:
+                k = min(left, COMPARE_CHUNK)
+                block = f.read(k * self.dtype.itemsize)
+                if len(block) != k * self.dtype.itemsize:
+                    raise ValueError(f"{self.path}: the file ends before its {self.size} values")
+                yield np.frombuffer(block, dtype=self.dtype)
+                left -= k
+
+
 def affine_difference(a: np.ndarray, b: np.ndarray) -> float:
     """The largest difference between two affines, equal infinities and NaNs counting 0
     (ANTs writes an infinite spacing and a NaN origin for an image of one voxel per axis,
@@ -381,8 +479,13 @@ def compare_outputs(
         detail="; ".join(differing),
     )
     a_img, b_img = nib.load(ants_path), nib.load(lx_path)
-    a = np.asanyarray(a_img.dataobj.get_unscaled())
-    b = np.asanyarray(b_img.dataobj.get_unscaled())
+    if max(np.prod(a_img.shape, dtype=np.int64), np.prod(b_img.shape, dtype=np.int64)) > (
+        STREAM_VALUES
+    ):
+        a, b = StoredValues(ants_path, a_img), StoredValues(lx_path, b_img)
+    else:
+        a = np.asanyarray(a_img.dataobj.get_unscaled())
+        b = np.asanyarray(b_img.dataobj.get_unscaled())
     checks(
         f"{prefix}data type",
         a.dtype == b.dtype,
@@ -407,7 +510,7 @@ def compare_outputs(
                 f"{prefix}values not compared",
                 True,
                 metric="undefined in ANTs",
-                value=int(np.count_nonzero(_canonical_bits(a) != _canonical_bits(b))),
+                value=value_differences(a, b)[0],
                 threshold="reported",
                 detail=undefined_values,
             )
@@ -422,21 +525,7 @@ def compare_outputs(
             )
         )
         return
-    diff_mask = _canonical_bits(a) != _canonical_bits(b)
-    n = int(np.count_nonzero(diff_mask))
-    if n == 0:
-        rel, max_ulp, max_abs = 0.0, 0, 0.0
-    else:
-        af, bf = a.astype(np.float64), b.astype(np.float64)
-        with np.errstate(invalid="ignore"):
-            d = np.abs(af - bf)
-        d = np.where(np.isnan(af) & np.isnan(bf), 0.0, d)
-        d = np.where(np.isnan(d), np.inf, d)
-        max_abs = float(d.max())
-        finite = np.abs(af[np.isfinite(af)])
-        scale = float(finite.max()) if finite.size else 1.0
-        rel = max_abs / (scale or 1.0)
-        max_ulp = ulps(a, b)
+    n, max_abs, rel, max_ulp = value_differences(a, b)
     detail = f"{n} of {a.size} values differ" + (
         f"; max |diff| {max_abs:.3g} ({rel:.1e} of max |ANTs|), at most {max_ulp} ulp" if n else ""
     )
@@ -487,6 +576,10 @@ def run_case(case: Case, checks: CheckList) -> None:
         tmp = Path(tmp_name)
         for name, text in c.files:
             (tmp / name).write_text(text, encoding="utf-8")
+        if c.expect == "guard":
+            # Beyond the memory at hand (ANTS-162): only larmorx's default runs, and must stop.
+            guard(c, tmp, checks)
+            return
         results = {}
         for tool, runner in [
             ("ants", functools.partial(_run_ants, never=case_never(c))),
@@ -534,12 +627,28 @@ def run_case(case: Case, checks: CheckList) -> None:
         fix_pass(c, tmp, checks, results["larmorx"])
 
 
+def guard(c: AntsCase, tmp: Path, checks: CheckList, threads: int | None = None) -> None:
+    """A case beyond any machine (``expect="guard"``, ANTS-162): ANTs and larmorx's
+    ``reproduce`` would fill the machine, so neither runs; larmorx's default must stop before
+    allocating, naming ANTS-162 and the memory it would need."""
+    outdir = tmp / "larmorx-fix"
+    outdir.mkdir()
+    args = [_resolve(a, tmp, outdir) for a in c.args]
+    code, out, err = _run_larmorx(c.program, args, threads, mode=defects.FIX)
+    text = (err or out).replace(str(tmp), "<tmp>").strip()
+    checks(
+        "larmorx refuses before allocating (ANTS-162)",
+        code != 0 and "(ANTS-162)" in text and "GiB" in text,
+        detail=f"exit {code}: {text[-600:]}",
+    )
+
+
 def fix_pass(
     c: AntsCase,
     tmp: Path,
     checks: CheckList,
     reproduced: tuple,
-    threads: int = THREADS,
+    threads: int | None = None,
 ) -> bool:
     """D13: larmorx's default (``fix``) on the case's arguments, compared with its
     ``reproduce`` run (``reproduced``: exit code, stdout, stderr, outputs, produced): the

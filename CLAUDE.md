@@ -67,7 +67,7 @@ Licence, FSL's original source included), its shared core `larmorx-nc-core`, and
 bit-identical to FSL 6.0.7.17's (173 of 173 compared cases; 21 rejected by both alike); new
 FSL-20 and FSL-21 (rule B); `lx.mri.hmc(implementation=...)` and `larmorx fsl mcflirt`. Its follow-up
 (2026-10-25): one constant of the C library's `atanf` (fdlibm's `aT[0]`, taken from a source comment)
-explained the two panel calls and 58 of the first 59 random-testing findings; FSL-08's notice now also
+explained the two panel calls and 58 of the first 59 random-testing findings (all 61 bit-identical after the fixes); FSL-08's notice now also
 covers the `-meanvol` image's name.
 **The data panel and evidence that scales merged** (2026-10-25; built 2026-10-24): fourteen
 OpenNeuro subjects in larmorx-testdata (`panel.toml`, `docs/panel.md`; `python -m larmorx_testdata
@@ -82,7 +82,33 @@ site's images moved to the orphan branch `evidence-blobs` (`tools/blobs.py`;
 first panel case (ds000256's extreme-motion child run). The panel's nine new fMRIPrep oracle runs all
 finished (exit 0; `docs/validation/oracle-runs.md`), and the pipeline-stage catalogue classifies
 every program node of the fourteen runs (multi-echo included).
-**Next:** **the evidence infrastructure** (decision log 2026-10-23), after the oracle-output cache and the data panel: differential random testing and generated tables (in progress), then every finished tool re-validated on the panel; and FSL (BET next, its replica built; then BET's clean-room original, FLIRT with BBR, FAST, topup). Then field maps, FreeSurfer, surfaces, confounds, larmorprepx (`docs/next-steps.md`). Each a bounded agent run with a stop after it, each bringing its evidence.
+**Differential random testing and the generated tables merged** (2026-10-25; the evidence
+infrastructure's items 4 and 2): `python -m larmorx_validation difftest` draws random valid
+inputs (seeded plain arithmetic, ≤ 32³) and option combinations for every finished tool (21
+descriptors in `validation/src/larmorx_validation/difftest/tools/`), runs the original and
+larmorx through the tool's own parity runner, shrinks each difference to its smallest input and
+fewest options, and keeps what was done about it in `validation/difftest/triage.toml`; a fixed
+difference becomes a permanent parity case (`validation/difftest/cases/<tool>/<id>.json`, loaded
+by the suites as `difftest/<id>`). Nightly: `scripts/orchestration/difftest-nightly.sh`
+(`oracles/difftest/<date>/`: `report.md`, `summary.json`, the findings); the first night
+(6.2 h, 3 jobs): 34 880 cases, 31790 agree, 3 explained, 1350 notice, 394 undefined, 1227 differ, 76 memory, 38 timeout; 58 groups of differences: 34 fixed in larmorx, 6 defects of the originals in the register, 17 open for the clean-room originals' agents, 1 the harness's own; 76 heavy cases queued
+([docs/validation/difftest.md](docs/validation/difftest.md)). `python -m larmorx_validation
+tables [--check]` generates the README's tool table, the validation index and the site's status
+table from `validation/tools.toml` and the records (a test fails when a committed table differs).
+Random testing runs in a memory box (`boxed.sh 8`; each worker a cgroup leaf of 3 GiB without
+swap); a case over its limit is the verdict *memory*, queued in the night's `heavy.jsonl` and run
+to its end later by `difftest --heavy` in a box of 24 GiB with 48 GiB of swap when the machine is
+quiet (the first night's N4 case that filled the machine is ANTS-162: larmorx's guard stops such
+a computation before allocating). Of the 76 heavy cases, 40 ran here (26 agree, 14 notices that
+changed no value), 11 are beyond any machine (guard cases) and 25 wait for a larger machine. The
+same part brought every ANTs image program measured to at most ANTs' peak memory on the same call
+(the user's rule of 2026-10-25; `tests/parity/test_memory_peak.py`, 13 calls, bit for bit).
+**Next:** BET's merge (its FSL library code moved into `larmorx-nc-core`, one translation of each
+FSL library), then a clean stop to plan the next stage. After it: the evidence infrastructure's
+last item (decision log 2026-10-23), every finished tool re-validated on the data panel (the
+oracle-output cache, the data panel, differential random testing and the generated tables are
+done; the nights run by `scripts/orchestration/difftest-nightly.sh`); and FSL (BET's clean-room
+original, FLIRT with BBR, FAST, topup). Then field maps, FreeSurfer, surfaces, confounds, larmorprepx (`docs/next-steps.md`). Each a bounded agent run with a stop after it, each bringing its evidence.
 **Build-cache seed** for the next agent: the newest merged worktree's `target/` (now the mcflirt replica's, `.claude/worktrees/agent-a5874ac3558d79d85/`, with `crates-nc/target/`).
 
 **fMRIPrep oracle runs** (`oracles/fmriprep-25.2.6/<run>/`, fMRIPrep 25.2.6 through Apptainer, `scripts/run_fmriprep_oracle.sh`; settings in each run's `RUN_INFO.txt`): `ds000005-sub-01-noreconall` (no field maps, no slice timing), `ds001600-sub-1-noreconall` (anatomy only: its BOLD runs have 5 volumes), `ds005040-sub-002-noreconall` (PEPOLAR, slice timing), `ds005454-sub-16-noreconall` (phase difference, multiband, 280 volumes), `ds005752-sub-ON01016-noreconall` (a direct field map fMRIPrep does not use: no `IntendedFor`); and the data panel's nine (2026-10-24 and 25, `validation/investigations/panel-oracle-runs/`, every one finished with exit status 0): `ds000228-sub-pixar008-noreconall` (a 3.5-year-old), `ds005003-sub-RS001-noreconall` (a glioma), `ds004173-sub-603309-noreconall` (anatomy only, strong motion), `ds002422-sub-02-noreconall` (1.5 T, two field-map estimators), `ds000256-sub-CTS203-noreconall` (a child's three motion levels), `ds004884-sub-M2079-noreconall` (a stroke, with its lesion mask resampled onto the T1w's grid), `ds003592-sub-280-noreconall` (multi-echo), `ds002603-sub-01-noreconall` (Philips multiband, a field map), `ds004958-sub-fsm64ps-noreconall` (multiband-8, 600 volumes; field maps not linked).
@@ -111,6 +137,11 @@ every program node of the fourteen runs (multi-echo included).
 - **CI stays as it is** (user, 2026-10-16): every push to `main` that is not docs-only runs the full six-platform workflow.
 - **Very strong evidence** (user, 2026-10-23: "reliable programs replicas, clean room, and very very strong evidence"): besides the parity suites against the originals (as built, with correctly rounded maths, in fMRIPrep's image, at several thread counts) and the explained differences, (1) shared documents go through the orchestrator (above), (2) the tables that repeat facts (README tools, validation index, the site's status) are generated from the records, (3) every tool is validated on one fixed **data panel** (3T and 7T, multiband and single-band, children and older adults, a lesion, low quality and motion), (4) **differential random testing** against the original runs overnight for every tool, and (5) large ports get an **independent review** before merging (decision log 2026-10-23).
 - **Speed at the same quality** (user, 2026-10-23): oracle outputs are cached by content and never computed twice (the oracle-output cache, since 2026-10-25: verification re-runs only larmorx; variation is still measured fresh), no duplicate runs (the golden recording reuses the parity smoke result through its marker; the long tier once, at the end), small questions decided in batches. **Agents run on the model the user chooses** (now the session's): never launch an agent with a different or cheaper model.
+- **Never more memory than the original** (user, 2026-10-25): for the same call larmorx's peak
+  memory is at most the original program's, plus the Python interpreter's few MiB; no full-size
+  copies where the original holds none, and no speed cache that raises the peak.
+  `tests/parity/test_memory_peak.py` holds the measured calls; every new port adds its own
+  (`validation/investigations/difftest/memory_pair.py` measures one).
 - **Settled technical choices** (decision log): `.h5` files compared by content, not compressed bytes (2026-10-16; byte-identical deflate deferred); pretrained models re-implemented as Rust inference with the original weights, validated as equivalence (2026-10-19); FreeSurfer's licence key is a runtime check, not a licence term, so `larmorx-freesurfer` needs none; Washington University's Talairach step gets a clean-room original with its atlas fetched from FreeSurfer on first use (2026-10-19; `docs/licensing.md`).
 
 ## Workspace layout
@@ -203,6 +234,7 @@ Every agent reads this file first, then `docs/porting-guide.md`, its section of 
 - **Gates before the final commits:** the three Rust workspaces (root, `crates-gpl`, `crates-nc`; refresh their `Cargo.lock` when dependencies change; `scripts/orchestration/gates-rust.sh <checkout> all`): `cargo fmt --all --check`, `cargo clippy --workspace --all-targets --locked -- -D warnings`, `cargo test --workspace --locked`; `ruff check`, `ruff format --check`, `python scripts/check_spdx.py`, `pytest tests/python tests/golden validation/tests`, `pytest tests/parity`.
 - **Records only from a clean commit** (a record stamped `-dirty` is redone). Golden checksums with `scripts/record_golden.py` from a clean commit (it runs the parity smoke tier first, about 10 minutes, unless that tier passed for the same clean commit and build: then it reuses its marker). Validation against the oracles named here only (the ANTs oracle is the GCC 14.3 build).
 - **The oracle-output cache** ([docs/validation/oracle-cache.md](docs/validation/oracle-cache.md)): new suites run original programs through `oracle_cache.run` (never `subprocess.run`), with a `Policy` naming the thread count, the family of environment variables and, from the case, why a run must never be cached (`case_never`: a clock seed, memory never written, a defect of `VARYING_DEFECTS`, a case that measures the original's own spread). A difference between a fresh run and its entry is a finding (`<cache>/findings.jsonl`), never overwritten. Suites keep derived inputs outside the cache's directory (`oracles/inputs/<suite>/`).
+- **Random testing** ([docs/validation/difftest.md](docs/validation/difftest.md)): a new tool gets a difftest descriptor (`validation/src/larmorx_validation/difftest/tools/`, one short module: its option grammar, input generators, implementations, exact checks) in the same part, and a short trial night (`difftest --tools <tool> --budget 0.5`, boxed as every night) before its gates; every difference is triaged by the user's rule (a larmorx mistake fixed with a permanent case, a defect of the original registered by rules A-D, a clean-room original's reported with its reproducer) into `validation/difftest/triage.toml`. Tables that repeat facts are generated: edit `validation/tools.toml` and run `python -m larmorx_validation tables`, never the generated blocks.
 - **No permission prompts.** Temporary clones, copies and build outputs go in the agent's scratch directory (`/tmp/claude-1000/.../scratchpad/<task>/`), never under a `.claude/` folder: writes there raise a permission prompt the user has to answer, which stalls the run (2026-10-21: a denied copy into `<worktree>/.claude/s/`). Prefer approaches that need no approval; report any that does.
 - **Portable tests.** No test may assume a temporary path free of `~` or blanks (GitHub's Windows runners: `C:\Users\RUNNER~1\...`). Helper scripts kept beside others run with `python -P` (a script named like a standard module, e.g. `types.py`, shadows it otherwise).
 - **Commits.** Early and often (WIP checkpoints are fine), with the configured git identity and no AI attribution (rule 9). Agents do not push, do not merge into `main` and do not edit this file; the orchestrator does.
@@ -273,6 +305,8 @@ Every agent reads this file first, then `docs/porting-guide.md`, its section of 
 | `.github/workflows/ci.yml` | lint + wheel build and tests on the six targets |
 | `validation/` | parity suites and benchmarks (dev-only package `larmorx-validation`) |
 | `validation/src/larmorx_validation/oracle_cache/`, `validation/tests/` | the oracle-output cache (key, store, policy, replays, `verify`) and the validation package's own tests ([docs/validation/oracle-cache.md](docs/validation/oracle-cache.md)) |
+| `validation/src/larmorx_validation/difftest/`, `validation/difftest/` | differential random testing: the harness and one descriptor per tool; the permanent cases and `triage.toml` ([docs/validation/difftest.md](docs/validation/difftest.md)) |
+| `validation/tools.toml`, `validation/src/larmorx_validation/tables.py` | one description per tool, from which the README's tool table, the validation index and the site's status table are generated (`python -m larmorx_validation tables`) |
 | `docs/architecture.md`, `docs/api/`, `docs/validation/`, `docs/benchmarks/`, `docs/findings/` | conventions, user docs per tool, validation records, benchmark reports, findings about the upstream tools |
 | `docs/findings/upstream-defects.md` | the register of every defect found in the originals (class, evidence, fMRIPrep impact, what larmorx does, D13 gap), with the list of defects larmorx still reproduces by default |
 | `../larmorx-testdata/` (github.com/karellopez/larmorx-testdata) | test-data catalog, generated edge cases, hash-verified downloader (`pip install -e`) |

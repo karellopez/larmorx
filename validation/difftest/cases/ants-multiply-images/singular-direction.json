@@ -1,0 +1,148 @@
+{
+ "defect": null,
+ "description": "a 2D image whose direction (from a sform rotated 90 degrees about y) is singular: ITK refuses it (ANTs crashes on the null image), larmorx refuses with ITK's message (it read it)",
+ "expect": "error",
+ "found": {
+  "detail": "both succeed: ANTs killed by signal 11: ; larmorx exit 0: ",
+  "n": 14,
+  "seed": "trial1",
+  "shrink_moves": [
+   "a: axis 0 25 -> 12 voxels",
+   "a: axis 0 12 -> 6 voxels",
+   "a: axis 0 6 -> 3 voxels",
+   "a: axis 1 4 -> 2 voxels",
+   "a: axis 0 3 -> 1 voxels",
+   "a: axis 1 2 -> 1 voxels",
+   "a (and its grid): unit spacing",
+   "a (and its grid): origin at 0",
+   "a (and its grid): millimetres",
+   "a: float32 storage",
+   "a: content crop -> constant"
+  ],
+  "signature": [
+   "both succeed"
+  ]
+ },
+ "id": "singular-direction",
+ "implementations": [
+  "port"
+ ],
+ "reason": "",
+ "recipe": {
+  "extra": {},
+  "features": {
+   "content": "crop",
+   "corner0": 32,
+   "corner1": 49,
+   "corner2": 47,
+   "crop source": "templateflow/tpl-MNI152NLin2009cAsym/tpl-MNI152NLin2009cAsym_res-02_T1w.nii.gz",
+   "crop stride": 1,
+   "dimension": 2,
+   "dtype": "int32",
+   "image operand": false,
+   "inter": 0.0,
+   "number": "0",
+   "nx": 25,
+   "ny": 4,
+   "orientation": "axes",
+   "origin0": -26.75,
+   "origin1": -28.5,
+   "origin2": 3.5,
+   "qfac": 1,
+   "qform_code": 1,
+   "range": "plain",
+   "sform": "same",
+   "sform_code": 1,
+   "slope": 0.01,
+   "spacing0": 1.2,
+   "spacing1": 3.0,
+   "spacing2": 4.0,
+   "suffix": ".nii.gz",
+   "units": "um"
+  },
+  "groups": [
+   {
+    "args": [
+     "2"
+    ],
+    "name": "dimension",
+    "optional": false
+   },
+   {
+    "args": [
+     "{in:a}"
+    ],
+    "name": "input",
+    "optional": false
+   },
+   {
+    "args": [
+     "0"
+    ],
+    "name": "operand",
+    "optional": false
+   },
+   {
+    "args": [
+     "{out}"
+    ],
+    "name": "output",
+    "optional": false
+   }
+  ],
+  "inputs": {
+   "a": {
+    "content": {
+     "seed": 535624198,
+     "type": "constant"
+    },
+    "dtype": "float32",
+    "geometry": {
+     "origin": [
+      0.0,
+      0.0,
+      0.0
+     ],
+     "qfac": 1,
+     "qform_code": 1,
+     "quaternion": [
+      1,
+      0,
+      1,
+      0
+     ],
+     "sform": "same",
+     "sform_code": 1,
+     "spacing": [
+      1.0,
+      1.0,
+      1.0
+     ],
+     "units": "mm"
+    },
+    "scaling": null,
+    "shape": [
+     1,
+     1
+    ],
+    "suffix": ".nii.gz",
+    "values": {
+     "offset": 0.0,
+     "scale": 1.0
+    }
+   }
+  },
+  "n": 14,
+  "options": [
+   "dimension 2",
+   "number operand"
+  ],
+  "seed": "trial1",
+  "tool": "ants-multiply-images"
+ },
+ "rule": null,
+ "status": "fixed",
+ "suite": "ants-multiply-images",
+ "tier": "smoke",
+ "tool": "ants-multiply-images"
+}

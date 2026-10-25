@@ -59,3 +59,13 @@ coordinates: what each one changes is in [ants-float.md](ants-float.md). *Read; 
 
 *Read; ported in `larmorx-interp`. Parity per interpolator is in the antsApplyTransforms
 validation record.*
+
+## B-spline interpolation on a short axis (ITK-98; random testing, 2026-10-25)
+
+`BSplineInterpolateImageFunction::ApplyMirrorBoundaryConditions` mirrors each support index once
+at each end; on an axis of 2 voxels (orders 3 and 4) or 2 or 3 voxels (order 5) an index stays
+outside the axis and the coefficients are read outside their buffer. larmorx panicked there
+(`ants-resample-image:20261025:4`). It now repeats the mirror by default (the decomposition's
+whole-sample mirror of period `2 (L - 1)`, the exact continuation) and, in `reproduce`, keeps
+ITK's single mirror with the reads outside the image as 0; both modes name ITK-98
+(`larmorx_interp::BSplineMirror`).

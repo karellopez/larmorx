@@ -467,3 +467,103 @@ decision log.
   rows once.
 - ANTs' N4 runs single-threaded for fMRIPrep's BOLD reference; the anatomical N4s run with
   `omp_nthreads`. larmorx's result is the same for any `n_threads`.
+
+## Memory: the lattice and the padding grow with the physical extent (ANTS-162)
+
+Found by differential random testing on its first night (2026-10-25): one case,
+`ants-n4:20261025:24` (`N4BiasFieldCorrection -d 4 -i a.nii -s 3 -b [20,3] -o out.nii`, a
+14×28×23×7 int16 image whose header gives its voxels in **metres**: 4×1×1 m, TR 3 s), grew to
+28 GB resident (121 GB virtual) in about four minutes; the machine swapped until the editor and
+every agent running in it went down. Random testing now holds every case in a memory box
+([difftest.md](../validation/difftest.md), "Memory and time limits; heavy cases").
+
+**Why.** With `-b [distance, order]` (`N4.cxx:253-280`) each axis gets
+`spans = ceil((n - 1) · spacing / distance)` spans (float), the image is padded by
+`(spans · distance - domain) / spacing + 0.5` voxels so that its domain is a whole number of
+spans, and ITK's filter fits a lattice of `spans · 2^level + order` control points per axis at
+each fitting level (one level per `-c` entry, four by default). Nothing bounds either. ITK's
+NIfTI reader turns metres into millimetres (×1000) and a time axis in milliseconds into
+seconds, so this input spans 52 × 27 × 22 m and 18 s: 2603 × 1353 × 1103 × 4 control points at
+the first level (1.55·10¹⁰) and 20803 × 10803 × 8803 × 11 at the fourth (2.18·10¹³). Two regimes:
+
+- **a distance far below the extent** (a header in metres): billions of control points;
+- **a distance far above an axis's extent**: that axis is padded by up to `distance / spacing`
+  voxels (the time axis of a 4D image, in seconds; a header in microns: `ants-n4:20261025:46`,
+  a 24×24 image of 1 µm voxels with `-b [50,5]`, is padded to 50001 × 50001 voxels).
+
+**Measured** (`validation/investigations/difftest/n4_memory.py` on the case's own input, one
+fitting level of 5 iterations, spline distances from 800 down to 70 mm; each run in a cgroup
+leaf of its own with a 5 GiB limit and no swap; peak from the leaf's `memory.peak`):
+
+| Distance (mm) | Control points | ANTs: peak, time | larmorx `reproduce`: peak, time | larmorx against ANTs |
+|---|---|---|---|---|
+| 800 | 68×37×31×4 = 3.1·10⁵ | 0.066 GiB, 7.2 s | 0.066 GiB, 1.5 s | bit-identical |
+| 400 | 133×71×58×4 = 2.2·10⁶ | 0.053 GiB, 19.6 s | 0.054 GiB, 5.7 s | bit-identical |
+| 200 | 263×138×113×4 = 1.6·10⁷ | 0.27 GiB, 67 s | 0.21 GiB, 24 s | bit-identical |
+| 100 | 523×273×223×4 = 1.3·10⁸ | 2.03 GiB, 237 s | 1.45 GiB, 251 s | bit-identical |
+| 70 | 746×389×318×4 = 3.7·10⁸ | over 5 GiB (stopped after 6 s) | 4.15 GiB, 485 s | (ANTs stopped) |
+
+Fitted on these runs, the peak is **17 bytes per control point** of the largest level for ANTs
+(four float lattices: the fit's phi, omega and delta and the accumulated field) and **12** for
+larmorx; the time **3.3·10⁻⁷ s** (ANTs) and **2.6·10⁻⁷ s** (larmorx) per control point and
+iteration. The padding regime, measured on `ants-n4:20261025:46` with distances of 2.5, 5 and
+10 mm (padded to 2500², 5000² and 10000² voxels, three levels of 5 iterations): ANTs 0.16,
+0.60 and 2.37 GiB (110 s at 10⁸ voxels), larmorx 0.14, 0.51 and 1.97 GiB (32 s): **25 bytes
+per padded voxel** for ANTs, **21** for larmorx. The replica is bit-identical to ANTs in every
+run both finished (`reproduce`); the default differs by at most 1.4·10⁻¹⁴ in some voxels
+(ANTS-40's correction).
+
+**The case itself** needs about 246 GiB at its first fitting level and 344 TB at its fourth for
+ANTs (174 GiB and 243 TB for larmorx), and some 72 hours of computation at the first level
+alone (larmorx 56): no machine finishes it, and the heavy box (24 GiB with 48 GiB of swap) would stop both
+after filling it. Decided by rule C (2026-10-25): the memory is the method's own work for the
+extent and distance asked, nothing in the result is wrong; larmorx keeps ANTs' lattice and
+padding. **A guard by default** (D13: a crash is never reproduced by default, and exhausting
+the machine is one): before it allocates, larmorx computes the bytes it will need (12 per
+control point of the largest level, 21 per padded voxel) and, when they exceed the machine's
+physical memory or `LARMORX_MEMORY_LIMIT`, stops at once with the GiB needed and the likely
+cause (the voxels' size and the extent they give, against the spline distance), naming
+ANTS-162; every case that fits is unchanged, bit for bit; `reproduce` attempts it as ANTs does.
+The same guard covers ResampleImage's and ResampleImageBySpacing's output grids (7.5 bytes per
+output voxel). **A D11 option:** a control point without data in its support gets phi = 0 (and so do
+its refinements), so the lattice is zero away from the data; a sparse lattice, with the
+padding kept virtual (its voxels have weight 0 and are cropped at the end), gives the same
+result in memory proportional to the data (here about a thousand points of 256 control points
+each).
+
+**In 2D, larmorx was less efficient than ANTs; fixed the same day** (`n4_memory.py` on
+`ants-n4:20261025:406`, a 15x20 image of 1 x 3 m voxels; every output bit-identical to ANTs): ANTs
+needs 18.7 bytes per control point of the last level and 2.3e-8 s per point and iteration;
+larmorx needed 78.7 bytes and 2.2e-7 s (four times the memory, ten times the time), so the case
+itself (distance 30: 56.8 million points; ANTs about 1.0 GiB) went past the night's case limit of
+3 GiB in larmorx. The cause: the B-spline fit (`larmorx_image::bspline::fit::GridFitPlan`)
+splits its work by the lattice's last two axes, which in 2D are all of them, so every block was a
+single control point, with a task and an allocation of its own. In 2D it now splits by the last
+axis alone (one block per lattice row); each control point is still summed in point order, so
+the result is the same, bit for bit (the unit test against ITK's sequential order in 2 to 4
+dimensions, and the variants above). After the fix larmorx needs 16.1 bytes and 1.9e-8 s, less
+than ANTs (distances 480 to 60, both modes bit-identical to ANTs).
+
+## Memory against ANTs (2026-10-25)
+
+The user's rule (2026-10-25): larmorx never needs more memory than the original for the same
+call (measured as in [ants-image-programs.md](ants-image-programs.md), "Memory against ANTs").
+On `N4BiasFieldCorrection -d 3 -i in -o out -s 2 -c [20x20,0]` (128×128×96 float voxels of
+1.5 mm, one thread) larmorx needed **104 MiB, ANTs 79**; it now needs **43 MiB**, in 5.5 s (ANTs
+21 s), with the same output bit for bit (`tests/parity/test_memory_peak.py`, with `-s 2` and
+`-s 4`, against ANTs with CORE-MATH preloaded, the build N4's records compare with). The causes,
+from `validation/investigations/difftest/rss_timeline.py`:
+
+- **The B-spline fit's cache.** For a fitting level the plan kept every factor `B³·w/Σ B²`, 4
+  bytes per point and control point it reaches: 256 bytes per point in 3D, 48 MiB for the
+  shrunk image here, at every level. The cache is now kept only within two float images of the
+  full-resolution grid (`N4Parameters::factor_budget`; `GridFitPlan::with_factor_budget`),
+  which N4's last step holds anyway, so it never raises the peak (it is kept at `-s 4`, the
+  shrink fMRIPrep uses). Without it, each fit computes the factors where they are added with
+  the fixed axes' kernel weights known per slab (`GridFitPlan::delta_uncached`): the same float
+  operations in the same order (this run: 5.5 s, 4.3 s with the cache, 8.4 s with the
+  general recomputation).
+- **Copies.** Without padding the input, mask and weight image were copied into padded images,
+  a mask of ones was made and kept for the whole run, the shrink with factor 1 copied, and the
+  corrected image and bias field were cropped into new images while the padded ones lived: now
+  they are borrowed, made only to be shrunk, computed in place of the log field and moved.

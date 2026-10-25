@@ -52,6 +52,16 @@ impl std::fmt::Display for AtroposError {
 
 impl std::error::Error for AtroposError {}
 
+/// `Algorithm::FindSampleBound`'s exception for a sample without a measurement vector.
+fn empty_sample() -> AtroposError {
+    AtroposError::Itk {
+        file: "Modules/Numerics/Statistics/include/itkStatisticsAlgorithm.hxx",
+        line: 263,
+        class: "",
+        description: "ITK ERROR: Attempting to compute bounds of a sample list containing no measurement vectors".into(),
+    }
+}
+
 impl From<EstimateError> for AtroposError {
     fn from(e: EstimateError) -> Self {
         AtroposError::Itk {
@@ -83,11 +93,10 @@ fn itk(line: u32, description: impl Into<String>) -> AtroposError {
     }
 }
 
-/// ITK's text of the Gaussian model's warning `w` (`itkWarningMacro`).
-fn gaussian_warning(w: &str) -> String {
-    format!(
-        "WARNING: In ImageSegmentation/antsGaussianListSampleFunction.hxx, line 105\nGaussianListSampleFunction (0x0): {w}\n\n"
-    )
+/// ITK's text of the model's warning `w` (`itkWarningMacro`, at the model's file and line).
+fn model_warning(model: &super::models::Likelihood, w: &str) -> String {
+    let (file, line, class) = model.warning_origin();
+    format!("WARNING: In {file}, line {line}\n{class} (0x0): {w}\n\n")
 }
 
 /// One iteration as the verbose observer reports it: the elapsed iterations and the posterior
@@ -647,7 +656,7 @@ impl<'a> Atropos<'a> {
                 let w = self.components[c].set_sample(&samples[c], m, &weights[c])?;
                 self.model_notices(c, &weights[c]);
                 if let Some(w) = w {
-                    self.warnings.push(gaussian_warning(w));
+                    self.warnings.push(model_warning(&self.components[c], w));
                 }
                 self.proportions[c] = if self.options.use_mixture_model_proportions {
                     sizes[c] as f32 / total_size as f32
@@ -661,7 +670,7 @@ impl<'a> Atropos<'a> {
                     let w =
                         self.components[c].set_indexed_sample(d, &samples[l], m, &weights[l])?;
                     if let Some(w) = w {
-                        self.warnings.push(gaussian_warning(w));
+                        self.warnings.push(model_warning(&self.components[c], w));
                     }
                 }
                 self.proportions[c] = 0.0;
@@ -673,6 +682,10 @@ impl<'a> Atropos<'a> {
 
     /// `GenerateInitialClassLabelingWithKMeansClustering`.
     fn kmeans_labeling(&mut self) -> Result<(), AtroposError> {
+        // An empty mask stops at the k-means (below), before any result: no notice either.
+        if !(0..self.n).any(|v| self.in_mask(v)) {
+            return Err(empty_sample());
+        }
         let classes = self.classes();
         let fix = self.options.upstream_defects.fix();
         let first = self.intensities[0];
@@ -836,6 +849,13 @@ impl<'a> Atropos<'a> {
         m: usize,
         initial: &[f64],
     ) -> Result<Vec<f64>, AtroposError> {
+        // KdTreeBasedKmeansEstimator::StartOptimization finds the sample's bounds
+        // (`Algorithm::FindSampleBound`), which throws for an empty sample: a mask without a
+        // voxel (found by differential random testing, 2026-10-25; larmorx went on to the
+        // Gaussians' warnings and the labels' exception).
+        if samples.is_empty() {
+            return Err(empty_sample());
+        }
         let tree = KdTree::new(samples, m, 16).map_err(|e| AtroposError::Refused(e.to_string()))?;
         let fix = self.options.upstream_defects.fix();
         let km = Kmeans {
@@ -1144,7 +1164,7 @@ impl<'a> Atropos<'a> {
             if c < classes {
                 let w = self.components[c].set_sample(&sample, m, &weights)?;
                 if let Some(w) = w {
-                    self.warnings.push(gaussian_warning(w));
+                    self.warnings.push(model_warning(&self.components[c], w));
                 }
                 self.model_notices(c, &weights);
             } else {

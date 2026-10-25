@@ -9,7 +9,7 @@
 
 use rayon::prelude::*;
 
-use super::{SINC_RADIUS, Window, bspline, erf_weights, sinc, window};
+use super::{BSplineMirror, SINC_RADIUS, Window, bspline, erf_weights, sinc, window};
 use larmorx_core::{IndexFloor, ItkReal, Precision, RealElement};
 
 /// The Gaussian interpolators' per-axis factors (`ComputeBoundingBox`): the scaling
@@ -65,9 +65,22 @@ pub struct InterpolatorNd<'a, T, const D: usize> {
     strides: [usize; D],
     kind: Kind<D>,
     precision: Precision,
+    /// The B-spline's mirror boundary (the exact one by default; defect ITK-98).
+    mirror: BSplineMirror,
 }
 
 impl<'a, T: RealElement, const D: usize> InterpolatorNd<'a, T, D> {
+    /// The B-spline's mirror boundary: the repeated one (the default) or ITK's (ITK-98).
+    pub fn with_bspline_mirror(mut self, mirror: BSplineMirror) -> Self {
+        self.mirror = mirror;
+        self
+    }
+
+    /// The mirror choice, with its count ([`BSplineMirror::beyond`]).
+    pub fn bspline_mirror(&self) -> &BSplineMirror {
+        &self.mirror
+    }
+
     /// Prepares `method` for the image `data` of `size` and `spacing` (for the Gaussian ones),
     /// with ITK's coordinate type `precision` (B-spline coefficients computed here, in parallel
     /// on the current rayon pool, each line independently).
@@ -121,6 +134,7 @@ impl<'a, T: RealElement, const D: usize> InterpolatorNd<'a, T, D> {
             strides,
             kind,
             precision,
+            mirror: BSplineMirror::full(),
         })
     }
 
@@ -138,7 +152,14 @@ impl<'a, T: RealElement, const D: usize> InterpolatorNd<'a, T, D> {
             Kind::BSpline {
                 order,
                 coefficients,
-            } => bspline_evaluate(coefficients, self.size, self.strides, *order, cidx),
+            } => bspline_evaluate(
+                coefficients,
+                self.size,
+                self.strides,
+                *order,
+                cidx,
+                &self.mirror,
+            ),
             Kind::Gaussian(p) => self.gaussian::<R>(p, cidx),
             Kind::MultiLabel(p) => self.multi_label::<R>(p, cidx),
             Kind::WindowedSinc(w, edge) => self.windowed_sinc::<R>(*w, *edge, cidx, floor),
@@ -335,29 +356,31 @@ fn bspline_evaluate<const D: usize>(
     strides: [usize; D],
     order: u32,
     cidx: [f64; D],
+    mirror: &BSplineMirror,
 ) -> f64 {
     let n = order as usize + 1;
     let half: f32 = if order & 1 == 1 { 0.0 } else { 0.5 };
     let mut index = [[0usize; 6]; D];
+    let mut inside = [[true; 6]; D];
     let mut w = [[0.0f64; 6]; D];
+    let (mut beyond, mut outside) = (false, false);
     for d in 0..D {
         let first = ((cidx[d] as f32) + half).floor() as i64 - i64::from(order / 2);
         w[d] = bspline::weights(order, cidx[d], first);
-        let end = size[d] as i64 - 1;
         for (k, slot) in index[d].iter_mut().take(n).enumerate() {
-            let mut i = first + k as i64;
-            if size[d] == 1 {
-                i = 0;
-            } else {
-                if i < 0 {
-                    i = -i;
-                }
-                if i >= end {
-                    i = end - (i - end);
+            let (i, twice) = mirror.index(first + k as i64, size[d]);
+            beyond |= twice;
+            match i {
+                Some(i) => *slot = i,
+                None => {
+                    inside[d][k] = false;
+                    outside = true;
                 }
             }
-            *slot = i as usize;
         }
+    }
+    if beyond {
+        mirror.count();
     }
     let lens = [n; D];
     let mut k = [0usize; D];
@@ -365,11 +388,19 @@ fn bspline_evaluate<const D: usize>(
     loop {
         let mut weight = w[0][k[0]];
         let mut offset = index[0][k[0]] * strides[0];
+        let mut read = inside[0][k[0]];
         for d in 1..D {
             weight *= w[d][k[d]];
             offset += index[d][k[d]] * strides[d];
+            read &= inside[d][k[d]];
         }
-        sum += weight * coefficients[offset];
+        // ITK-98, reproduced: a read outside the coefficient image is 0 here.
+        sum += weight
+            * if outside && !read {
+                0.0
+            } else {
+                coefficients[offset]
+            };
         if !advance(&mut k, &lens) {
             break;
         }
@@ -404,7 +435,14 @@ pub fn bspline_at<const D: usize>(
     for d in 1..D {
         strides[d] = strides[d - 1] * size[d - 1];
     }
-    bspline_evaluate(coefficients, size, strides, order, cidx)
+    bspline_evaluate(
+        coefficients,
+        size,
+        strides,
+        order,
+        cidx,
+        &BSplineMirror::full(),
+    )
 }
 
 #[cfg(test)]

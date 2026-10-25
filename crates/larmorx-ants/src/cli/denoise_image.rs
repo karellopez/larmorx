@@ -18,7 +18,7 @@
 //!   the filter runs on: with `-s 2` a full-resolution mask makes ITK throw, and ANTs exits 1
 //!   (printing the exception only with `-v`); a mask that cannot be read is no mask, and
 //!   the whole image is denoised (ANTS-47);
-//! - without `-d`, the dimension is the input file's;
+//! - without `-d`, the dimension is the input file's (ANTs: 3 whatever the file, ANTS-99);
 //! - `-o [denoised,noise]` writes the noise first, then the denoised image; without `-o`
 //!   nothing is written.
 //!
@@ -249,14 +249,26 @@ fn execute(
                 return Ok(1);
             };
             let name = i.parameters.first().unwrap_or(&i.name).clone();
-            match store.load(&name, n_threads, notices) {
+            let dims = match store.load(&name, n_threads, notices) {
                 Ok(image) => image.geometry.ndim,
                 Err(_) => {
                     return Err(format!(
                         "larmorx: DenoiseImage: cannot read '{name}' (ANTs crashes here)"
                     ));
                 }
+            };
+            // ANTS-99: ANTs asks a new ImageIO for the dimension before it reads the header,
+            // and NIfTI's answers 3 for every file (random testing, 2026-10-25).
+            if dims != 3 {
+                notices.add(
+                    &defects::ANTS_99,
+                    format!(
+                        "{name} is {dims}-dimensional and processed as such; ANTs processes it \
+                         in 3D"
+                    ),
+                );
             }
+            if notices.fix() { dims } else { 3 }
         }
     };
     if !(2..=4).contains(&dim) {
@@ -465,6 +477,39 @@ mod tests {
         let (code, _, err) = run_capture(&["-d", "3", "--nope", "1"]);
         assert_eq!(code, 1);
         assert!(err.contains("Invalid flag"));
+    }
+
+    /// ANTS-99 (differential random testing, 2026-10-25, `ants-denoise:20261025:188`): without
+    /// `-d`, ANTs takes a 2D file as 3D (its ImageIO answers 3 before reading the header) and
+    /// writes a 3D image; larmorx denoises it in 2D by default, as ANTs in `reproduce`, and
+    /// names ANTS-99 in both modes.
+    #[test]
+    fn without_d_a_2d_image_is_3d_in_ants() {
+        use larmorx_core::element::DataType;
+        use larmorx_io::nifti::{self, NiftiHeader, NiftiVersion, WriteOptions};
+        let dir = tempfile::tempdir().unwrap();
+        let a = dir.path().join("a.nii");
+        let h = NiftiHeader::new(NiftiVersion::V1, &[5, 4], DataType::F32).unwrap();
+        let data = larmorx_core::ndarray::ArrayD::from_shape_vec(
+            larmorx_core::ndarray::IxDyn(&[5, 4]),
+            (0..20).map(|k| 10.0 + (k * k % 7) as f32).collect(),
+        )
+        .unwrap();
+        nifti::write(&a, &h, data.view(), &WriteOptions::default()).unwrap();
+        for (mode, dims) in [(UpstreamDefects::Fix, 2), (UpstreamDefects::Reproduce, 3)] {
+            let b = dir.path().join(format!("{}.nii", mode.name()));
+            let args: Vec<String> = ["-i", a.to_str().unwrap(), "-o", b.to_str().unwrap()]
+                .iter()
+                .map(|s| s.to_string())
+                .collect();
+            let (mut out, mut err) = (Vec::new(), Vec::new());
+            let code = run(&args, &mut FileStore, 1, mode, &mut out, &mut err);
+            let err = String::from_utf8(err).unwrap();
+            assert_eq!(code, 0, "{err}");
+            assert!(err.contains("ANTS-99"), "{err}");
+            let header = nifti::read_header(&b).unwrap();
+            assert_eq!(header.dim[0] as usize, dims, "{mode:?}");
+        }
     }
 
     #[test]

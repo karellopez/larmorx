@@ -226,7 +226,12 @@ def _changes(prep: Prepared, before: dict[Path, tuple]) -> tuple[list[Path], lis
 
 
 def _place_of(prep: Prepared, path: Path) -> tuple[str, str]:
-    """``(place, path below it)`` of a file the run wrote (the longest place that holds it)."""
+    """``(place, path below it)`` of a file the run wrote: ``("in<n>", "")`` when it is one of
+    its inputs (a run that rewrites a file it was given: replayed onto this run's input),
+    else the longest place that holds it."""
+    for n, item in enumerate(prep.inputs):
+        if item.path == path:
+            return f"in{n}", ""
     best = None
     for name, p in prep.places:
         if (path == p or under(path, p)) and (best is None or len(str(p)) > len(str(best[1]))):
@@ -238,6 +243,8 @@ def _place_of(prep: Prepared, path: Path) -> tuple[str, str]:
 
 
 def _resolve_place(prep: Prepared, name: str, rest: str) -> Path:
+    if name.startswith("in") and name[2:].isdigit():
+        return prep.inputs[int(name[2:])].path
     for n, p in prep.places:
         if n == name:
             return p / rest if rest else p

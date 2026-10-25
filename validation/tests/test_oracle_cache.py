@@ -249,13 +249,16 @@ def test_afni_family_reads_home_by_its_contents(cache, fake, workdir, tmp_path):
     home1.mkdir()
     home2.mkdir()
 
-    def k(home: Path) -> str:
-        env = env_for(HOME=str(home), AFNI_DONT_LOGFILE="YES")
+    def k(home: Path, **extra: str) -> str:
+        env = env_for(HOME=str(home), AFNI_DONT_LOGFILE="YES", **extra)
         return key.prepare(
             key.program_identity(fake, env), [str(src), str(dst)], env, family="afni"
         ).key
 
     assert k(home1) == k(home2)  # two empty homes
+    # Intel's OpenMP variables (set by libraries the harness imports): not read by libgomp
+    assert k(home1, KMP_DUPLICATE_LIB_OK="True", KMP_INIT_AT_FORK="FALSE") == k(home1)
+    assert k(home1, OMP_NUM_THREADS="2") != k(home1)
     (home2 / ".afnirc").write_text("AFNI_X = YES\n")
     assert k(home1) != k(home2)
 
@@ -466,6 +469,24 @@ def test_a_case_that_runs_a_command_again_runs_it_and_compares(cache, fake, work
     assert core.identical_runs(cache.read(e["key"])) == 3
 
 
+def test_a_rewritten_input_is_replayed_onto_this_runs_input(cache, fake, workdir):
+    """Two runs with the same key whose rewritten input has another name (the key names
+    inputs by content): the replay writes this run's file, not the stored run's name."""
+    _d, src, dst = workdir()
+    first = dst.with_name("first-name.nii")
+    first.write_bytes(b"there before")
+    run(fake, src, first)
+    (e,) = entries(cache)
+    assert [(o["place"], o["path"]) for o in e["result"]["outputs"]] == [("in1", "")]
+    oc.begin_case("another name")
+    _d2, src2, dst2 = workdir()
+    second = dst2.with_name("second-name.nii")
+    second.write_bytes(b"there before")
+    assert run(fake, src2, second).cached
+    assert second.read_bytes() == b"dlrow olleh"
+    assert not second.with_name("first-name.nii").exists()
+
+
 def test_an_output_there_before_the_run_is_an_input(cache, fake, workdir):
     """A file the arguments name that exists is an input (its content is in the key), and the
     run may write it: its rewrite is captured and put back."""
@@ -474,7 +495,7 @@ def test_an_output_there_before_the_run_is_an_input(cache, fake, workdir):
     run(fake, src, dst)
     (e,) = entries(cache)
     assert len(e["parts"]["inputs"]) == 2
-    assert [o["path"] for o in e["result"]["outputs"]] == ["result.nii"]
+    assert [(o["place"], o["path"]) for o in e["result"]["outputs"]] == [("in1", "")]
     oc.begin_case("again")
     _d2, src2, dst2 = workdir()
     dst2.write_bytes(b"there before")

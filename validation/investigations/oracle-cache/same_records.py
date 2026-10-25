@@ -7,9 +7,10 @@ allowed to change: the record's line on the original programs' runs, the JSON's
 
 Every other byte of every ``<suite>.md`` and ``<suite>.json`` must be equal. ``--volatile``
 also masks what changes between any two runs, with the cache or without: memory addresses
-(``0x...``, which ANTs prints in the messages of the runs that end by a signal: never cached)
-and temporary paths (``/tmp/lx-...``, which larmorx's own messages name). Exit status 1 when a
-suite differs; each difference is printed.
+(``0x...``, which ANTs prints in the messages of the runs that end by a signal: never cached),
+temporary paths (``/tmp/lx-...``, which larmorx's own messages name) and the date in the line
+"Generated:" (runs that cross midnight). Exit status 1 when a suite differs; each difference is
+printed.
 """
 
 from __future__ import annotations
@@ -22,10 +23,11 @@ from pathlib import Path
 ORACLE_LINE = re.compile(r"(?m)^- \*\*Original programs:\*\* .*\n")
 ADDRESS = re.compile(r"\b0x[0-9a-f]+\b")
 TEMPORARY = re.compile(r"/tmp/[^\s'\"`|,;)\]]*")
+GENERATED = re.compile(r"(\*\*Generated:\*\* )\d{4}-\d{2}-\d{2}")
 
 
 def _volatile(text: str) -> str:
-    return TEMPORARY.sub("<tmp>", ADDRESS.sub("0x…", text))
+    return GENERATED.sub(r"\1<date>", TEMPORARY.sub("<tmp>", ADDRESS.sub("0x…", text)))
 
 
 def _md(text: str, addresses: bool) -> str:

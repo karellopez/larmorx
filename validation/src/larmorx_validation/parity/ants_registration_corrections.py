@@ -212,12 +212,22 @@ def _mask() -> np.ndarray:
     return np.asarray(nib.load(ants_inputs.path("reg-mask")).dataobj) > 0
 
 
+def _stable(path: Path, tmp: Path) -> str:
+    """A name for ``path``'s derived files that is the same in every run (its path below the
+    case's directory; ``hash()`` changes from process to process): the oracle cache finds the
+    runs that make them again."""
+    import hashlib
+
+    rel = path.relative_to(tmp) if path.is_relative_to(tmp) else path
+    return hashlib.sha256(rel.as_posix().encode()).hexdigest()[:16]
+
+
 def _displacement(path: Path, tmp: Path) -> np.ndarray:
     """A transform file's displacement on the fixed phantom's grid (antsApplyTransforms' field
     output), as (voxels, 3) in the image's C order."""
     import nibabel as nib
 
-    out = tmp / (path.name + f".{abs(hash(str(path)))}.field.nii.gz")
+    out = tmp / (path.name + f".{_stable(path, tmp)}.field.nii.gz")
     f = str(ants_inputs.path("reg-fixed"))
     _apply(["-i", f, "-r", f, "-t", str(path), "-o", f"[{out},1]"])
     return np.asarray(nib.load(out).dataobj, dtype=float).reshape(-1, 3)
@@ -235,7 +245,7 @@ def _true_mse(bspline: Path, second: Path, tmp: Path) -> float:
     import nibabel as nib
 
     f, m = ants_inputs.path("reg-fixed"), ants_inputs.path("reg-moving")
-    out = tmp / f"warped-{abs(hash(str(second)))}.nii.gz"
+    out = tmp / f"warped-{_stable(second, tmp)}.nii.gz"
     _apply(["-i", str(m), "-r", str(f), "-t", str(bspline), "-t", str(second), "-o", str(out)])
     a = np.asarray(nib.load(f).dataobj, float)
     b = np.asarray(nib.load(out).dataobj, float)

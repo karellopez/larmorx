@@ -61,10 +61,13 @@ COMMON_ENV = (
     "TZ",
 )
 #: The variables each family of programs reads, besides :data:`COMMON_ENV`. ITK also reads the
-#: variables ``ITK_NUMBER_OF_THREADS_ENV_LIST`` names.
+#: variables ``ITK_NUMBER_OF_THREADS_ENV_LIST`` names. AFNI's OpenMP runtime is GNU libgomp
+#: (``ldd``): it reads ``OMP_*`` and ``GOMP_*``, not Intel's ``KMP_*``, which libraries imported
+#: by the harness set in its own process (``KMP_DUPLICATE_LIB_OK``, ``KMP_INIT_AT_FORK``: under
+#: pytest they kept every AFNI run from being found, 2026-10-24).
 ENV_FAMILIES = {
     "itk": ("ITK_", "ANTS_", "NSLOTS"),
-    "afni": ("AFNI_", "NIML_", "OMP_", "GOMP_", "KMP_", "HOME"),
+    "afni": ("AFNI_", "NIML_", "OMP_", "GOMP_", "HOME"),
     "fsl": ("FSL*", "OMP_", "GOMP_"),
 }
 

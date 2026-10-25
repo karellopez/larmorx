@@ -316,6 +316,25 @@ impl HistogramParzenModel {
         let mut histograms = Vec::with_capacity(m);
         for d in 0..m {
             let spacing = f64::from((max[d] - min[d]) / (self.bins.wrapping_sub(1)) as f32);
+            // `SetSpacing` of the histogram image (ITK built with ITK_LEGACY_REMOVE, as ANTs
+            // builds it) throws for a spacing of 0 (a channel with one value in the sample) or
+            // below (found by differential random testing, 2026-10-25: larmorx went on).
+            if spacing == 0.0 || spacing < 0.0 {
+                let to = larmorx_registration::format::OStream::default().float(spacing);
+                let (line, what) = if spacing == 0.0 {
+                    (77, "Zero-valued spacing")
+                } else {
+                    (90, "Negative spacing")
+                };
+                return Err(EstimateError {
+                    file: "Modules/Core/Common/include/itkImageBase.hxx",
+                    line,
+                    class: "Image",
+                    description: format!(
+                        "{what} is not supported and may result in undefined behavior.\nRefusing to change spacing from [1] to [{to}]"
+                    ),
+                });
+            }
             let origin = f64::from(min[d]) - 3.0 * (f64::from(sigma) * spacing);
             let three = 3.0f32 * (sigma * spacing as f32);
             let extent = ((max[d] + three) - (min[d] - three)) / spacing as f32;
@@ -1127,6 +1146,24 @@ fn gaussian_text(g: &GaussianMembership) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// A channel with one value: its histogram's spacing is 0, which ITK's `SetSpacing`
+    /// refuses (random testing, 2026-10-25).
+    #[test]
+    fn a_constant_channel_has_no_histogram() {
+        let mut m = HistogramParzenModel::new(1.0, 32);
+        // Two components: the first varies, the second is constant.
+        let samples = [1.0f32, 5.0, 2.0, 5.0, 3.0, 5.0];
+        let e = m.set_sample(&samples, 2, &[]).unwrap_err();
+        assert_eq!((e.line, e.class), (77, "Image"));
+        assert!(
+            e.description
+                .ends_with("Refusing to change spacing from [1] to [0]"),
+            "{}",
+            e.description
+        );
+        assert!(m.set_sample(&[1.0, 2.0, 3.0], 1, &[]).is_ok());
+    }
 
     #[test]
     fn tensor_dimensions() {

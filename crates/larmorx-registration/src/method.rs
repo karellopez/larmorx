@@ -274,8 +274,12 @@ impl<R: Real> LevelMetric<R> {
             }
             return Ok((r.value, r.derivative, used));
         }
+        // Demons' derivative is the image gradient's own (`ProcessPoint` never asks the moving
+        // transform for a Jacobian): a B-spline transform after the active one never throws
+        // there (ITK-35; found by differential random testing, 2026-10-25).
+        let used = !matches!(self, LevelMetric::Demons);
         self.evaluate_inner(metric, moving, derivative, floor, warnings)
-            .map(|(v, d)| (v, d, true))
+            .map(|(v, d)| (v, d, used))
     }
 
     fn evaluate_inner<const D: usize>(

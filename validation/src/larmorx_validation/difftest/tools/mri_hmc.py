@@ -304,6 +304,9 @@ ORIGINAL = Tool(
     case=case,
     run=lambda impl: _run_original,
     exact=lambda impl: False,
+    # Its record's metrics (parameters, matrices, FD, voxels, RMS files): which of them exceed
+    # their thresholds varies with the size of a difference, so one group.
+    group_differences="implementation",
     timeout=300,
     weight=1.0,
     unavailable=_unavailable_mcflirt,

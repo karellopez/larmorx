@@ -326,6 +326,45 @@ def test_heavy_cases_are_reported_with_their_results(tmp_path):
     assert "now: agree" in (out / "report.md").read_text()
 
 
+def test_a_tool_held_to_thresholds_gets_one_group_per_implementation(tmp_path):
+    out = tmp_path / "night"
+    (out / "findings" / "mri-hmc").mkdir(parents=True)
+    (out / "findings" / "ants-n4").mkdir(parents=True)
+    (out / "run.json").write_text(json.dumps({"seed": "r", "started": "x"}))
+    recipe = {"groups": [], "inputs": {}}
+    lines = []
+
+    def finding(tool, impl, n, signature):
+        lines.append({"tool": tool, "seed": "r", "n": n, "verdict": "differ", "impls": {}})
+        f = {
+            "tool": tool,
+            "implementation": impl,
+            "seed": "r",
+            "n": n,
+            "signature": signature,
+            "recipe": recipe,
+            "shrunk": recipe,
+        }
+        (out / "findings" / tool / f"r-{n}-{impl}.json").write_text(json.dumps(f))
+
+    finding("mri-hmc", "original", 0, ["par: median difference"])
+    finding("mri-hmc", "original", 1, ["par: median difference", "voxel values"])
+    finding("ants-n4", "port", 2, ["corrected: bit-identical"])
+    finding("ants-n4", "port", 3, ["stderr"])
+    (out / "results.jsonl").write_text("".join(json.dumps(x) + "\n" for x in lines))
+    report.write(out)
+    s = json.loads((out / "summary.json").read_text())
+    (hmc,) = s["tools"]["mri-hmc"]["differences"]
+    assert hmc["cases"] == 2 and hmc["variants"] == 2
+    assert hmc["by_check"] == {"par: median difference": 2, "voxel values": 1}
+    assert hmc["signature"] == ["par: median difference", "voxel values"]
+    # A tool held to bit-identity keeps a group per signature.
+    assert len(s["tools"]["ants-n4"]["differences"]) == 2
+    text = (out / "report.md").read_text()
+    assert "### mri-hmc (original): beyond its record's thresholds" in text
+    assert "par: median difference: 2; voxel values: 1" in text
+
+
 def _memory_box_available() -> bool:
     """A systemd user scope with a memory limit, whose cgroup v2 leaves this user may make."""
     import shutil

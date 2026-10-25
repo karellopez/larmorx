@@ -92,6 +92,10 @@ class Tool:
     #: The fields of the suite's case object a permanent case sets (``tier``, ``expect``,
     #: ``reason``, ``expect_error``).
     payload_fields: tuple[str, ...] = ("tier", "expect", "reason")
+    #: How the morning report groups its differences: by their failed checks ("signature"), or one
+    #: group per implementation held to thresholds ("implementation": a metric's failed checks vary
+    #: with the size of the difference, not its cause; the group counts the cases of each check).
+    group_differences: str = "signature"
     notes: str = ""
 
 

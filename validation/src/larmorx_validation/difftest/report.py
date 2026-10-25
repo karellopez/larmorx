@@ -7,6 +7,10 @@ Per tool: the cases run, their verdicts (agree; explained by glibc's maths; diff
 skipped; the harness's own errors), the options and input features covered, the time; then
 every difference, grouped by its signature (the checks that failed), with the number of cases
 that showed it, the smallest reproducer found and how to replay it; and what needs a decision.
+A tool held to metric thresholds rather than to bit-identity whose failed checks vary from case
+to case with the size of the difference, not with its cause (``Tool.group_differences``: the
+clean-room head-motion correction), gets one group per implementation, which lists how many cases
+failed each check (``by_check``).
 """
 
 from __future__ import annotations
@@ -121,16 +125,31 @@ def summarise(out: Path) -> dict:
     for f in findings(out):
         if any(sig.endswith(MEMORY_SIGNATURE) for sig in f["signature"]):
             continue
-        groups[(f["tool"], f["implementation"], tuple(f["signature"]))].append(f)
+        if _thresholds(f["tool"], f["implementation"]):
+            # One group: the union of the checks its cases failed.
+            groups[(f["tool"], f["implementation"], None)].append(f)
+        else:
+            groups[(f["tool"], f["implementation"], tuple(f["signature"]))].append(f)
     diffs = []
-    for (tool, impl, sig), fs in sorted(groups.items()):
+    for (tool, impl, sig), fs in sorted(
+        groups.items(), key=lambda kv: (kv[0][0], kv[0][1], kv[0][2] or ())
+    ):
         shrunk = [f for f in fs if not f.get("not_shrunk")] or fs
         best = min(shrunk, key=lambda f: (_size(f["shrunk"]), f["n"]))
+        by_check = Counter(c for f in fs for c in set(f["signature"])) if sig is None else None
         diffs.append(
             {
                 "tool": tool,
                 "implementation": impl,
-                "signature": list(sig),
+                "signature": sorted(by_check) if by_check is not None else list(sig),
+                **(
+                    {
+                        "by_check": dict(sorted(by_check.items())),
+                        "variants": len({tuple(f["signature"]) for f in fs}),
+                    }
+                    if by_check is not None
+                    else {}
+                ),
                 "cases": len(fs),
                 "example": best["_file"],
                 "shrunk_args": " ".join(core.arguments(best["shrunk"]))[:400],
@@ -197,6 +216,19 @@ def summarise(out: Path) -> dict:
         "tools": tools,
         "unclear": unclear,
     }
+
+
+def _thresholds(tool: str, implementation: str) -> bool:
+    """Whether the report gives the tool's implementation one group: held to its record's
+    thresholds, not to bit-identity (``Tool.exact``), and grouped by implementation
+    (``Tool.group_differences``)."""
+    from larmorx_validation.difftest import tools
+
+    try:
+        t = tools.get(tool)
+    except (KeyError, ImportError):
+        return False
+    return t.group_differences == "implementation" and not t.exact(implementation)
 
 
 def _size(recipe: dict) -> tuple:
@@ -267,11 +299,25 @@ def write(out: Path) -> Path:
     for name, t in s["tools"].items():
         for d in t["differences"]:
             any_diff = True
+            heading = (
+                f"### {name} ({d['implementation']}): beyond its record's thresholds"
+                if "by_check" in d
+                else f"### {name} ({d['implementation']}): {', '.join(d['signature'])}"
+            )
             lines += [
-                f"### {name} ({d['implementation']}): {', '.join(d['signature'])}",
+                heading,
                 "",
                 f"- {d['cases']} case(s); smallest reproducer `{d['case']}` ({d['example']}), after "
                 f"{len(d['moves'])} shrinking moves",
+            ]
+            if "by_check" in d:
+                lines.append(
+                    f"- failed checks ({d['variants']} combinations): "
+                    + "; ".join(
+                        f"{c}: {n}" for c, n in sorted(d["by_check"].items(), key=lambda kv: -kv[1])
+                    )
+                )
+            lines += [
                 f"- arguments: `{d['shrunk_args']}`",
                 "- inputs: " + "; ".join(f"{k}: {v}" for k, v in d["shrunk_inputs"].items()),
                 f"- what differs: {d['detail']}",

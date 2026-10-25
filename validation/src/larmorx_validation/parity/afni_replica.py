@@ -404,6 +404,25 @@ def compare_files(a: Path, b: Path) -> Comparison:
     detail = (
         "bit-identical" if identical else f"{n} of {total} values differ, max |diff| {max_abs:.6g}"
     )
+    if not identical and n == 0:
+        # Equal as numbers, not as bits: signed zeros or NaN payloads (random testing,
+        # 2026-10-25: "0 of 294 values differ" said nothing of what did).
+        try:
+            width = f"u{va.dtype.itemsize}"
+            ia = np.ascontiguousarray(va).view(width).ravel()
+            ib = np.ascontiguousarray(vb).view(width).ravel()
+            where = np.flatnonzero(ia != ib)
+        except (TypeError, ValueError):
+            where = np.array([], dtype=np.int64)
+        if where.size:
+            i = int(where[0])
+            x, y = va.ravel()[i], vb.ravel()[i]
+            detail = (
+                f"{where.size} of {total} values differ in their bits only, equal as numbers "
+                f"(signed zeros or NaN payloads; e.g. value {i}: AFNI {x!r}, larmorx {y!r})"
+            )
+        else:
+            detail = "the data bytes differ outside the values"
     del same
     return Comparison(identical, ha == hb, n, total, max_abs, detail)
 

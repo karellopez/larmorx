@@ -578,7 +578,7 @@ tool = "afni-automask"
 implementation = "original"
 signature = ["masked.nii: data"]
 status = "open"
-explanation = "the clean-room original's -apply_prefix output differs from AFNI's in a few values (`afni-automask:20261025:1305`); for its agent"
+explanation = "the clean-room original's -apply_prefix output writes +0 where AFNI keeps the input's -0 (one value of 294, equal as numbers; `afni-automask:20261025:1305`); for its agent"
 
 [[difference]]
 tool = "afni-automask"

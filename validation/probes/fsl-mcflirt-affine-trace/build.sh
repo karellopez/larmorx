@@ -15,4 +15,11 @@ mkdir -p "$out"
 "$cxx" -std=c++17 -O2 -march=nocona -mtune=haswell -I"$fsl/include" -o "$out/cost_probe" \
   "$here/cost_probe.cc" -L"$fsl/lib" -Wl,-rpath,"$fsl/lib" -lfsl-newimage -lfsl-miscmaths \
   -lfsl-NewNifti -lfsl-znz -lfsl-utils -lfsl-cprob -llapack -lblas -lz
+for p in nan_decompose nan_r2e; do
+  "$cxx" -std=c++17 -O2 -march=nocona -mtune=haswell -I"$fsl/include" -o "$out/$p" "$here/$p.cc" \
+    -L"$fsl/lib" -Wl,-rpath,"$fsl/lib" -lfsl-miscmaths -lfsl-NewNifti -lfsl-znz -lfsl-utils \
+    -lfsl-cprob -llapack -lblas -lz
+done
+# The NaN trap (plain C, no FSL).
+"${CC:-gcc}" -O2 -shared -fPIC -o "$out/libnan_trap.so" "$here/nan_trap.c" -lm
 echo "built in $out"

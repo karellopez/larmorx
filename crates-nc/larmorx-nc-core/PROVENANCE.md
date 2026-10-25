@@ -27,8 +27,9 @@ transform algebra and the matrix rules of Armadillo as armawrap evaluates them.
   glibc 2.35's `sinf`, `cosf`, `sincosf` and `logf` are these routines with the same
   arithmetic; the translation is made from Arm's MIT files, not from glibc's LGPL copies
   (compared line by line: identical expressions and constants).
-- `cnum.rs` and `settings.rs` hold no FSL code (C/C++ number semantics of FSL's x86-64
-  binaries; FSL's environment variables as a table, porting guide §9.1); `x87.rs` emulates the
+- `cnum.rs`, `settings.rs` and `sse.rs` hold no FSL code (C/C++ number semantics of FSL's x86-64
+  binaries; FSL's environment variables as a table, porting guide §9.1; SSE's NaN rules, made
+  explicit so that NaN results have FSL's x86-64 bits on every platform); `x87.rs` emulates the
   x87 extended-precision arithmetic that FSL's NIfTI code uses through `long double`.
 
 Every source file starts with an SPDX header naming its licence and the files it translates.

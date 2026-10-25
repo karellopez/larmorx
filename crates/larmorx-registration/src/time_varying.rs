@@ -745,6 +745,7 @@ fn run_tvvf_e<R: Real, const D: usize, const E: usize>(
                         stale_masks: false,
                         joint_pdfs: &joint_pdfs,
                         through: None,
+                        outside: &crate::metric::OutsideDerivatives::default(),
                     };
                     let (value, derivative) = call.gradient_field(false, warnings)?;
                     value_sum = value_sum + value;

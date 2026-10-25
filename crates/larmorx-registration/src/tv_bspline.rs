@@ -773,6 +773,7 @@ fn run_levels<R: Real, const D: usize, const E: usize>(
                         stale_masks: false,
                         joint_pdfs: &joint_pdfs,
                         through: images_through,
+                        outside: &crate::metric::OutsideDerivatives::default(),
                     };
                     let (value, derivative) = call.gradient_field(false, warnings)?;
                     value_sum = value_sum + value;

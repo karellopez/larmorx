@@ -100,6 +100,9 @@ pub struct SynStage<R, const D: usize> {
     /// `BSplineSyNImageRegistrationMethod`: the update and total fields smoothed by B-spline
     /// approximations instead of Gaussians (the variances are then not used).
     pub bspline: Option<BSplineSynSmoothing<D>>,
+    /// ITK-97 and ITK-99: the derivatives of sample points outside the virtual region,
+    /// aliased as ITK does (`reproduce`) or dropped, and their counts.
+    pub outside: crate::metric::OutsideDerivatives,
     pub n_threads: usize,
 }
 
@@ -284,6 +287,7 @@ fn initialize_metric<R: Real, const D: usize>(
     virtual_space: &Space<D>,
     samples: &Option<Arc<Vec<[f64; D]>>>,
     fixed_transform: Option<Composite<R, D>>,
+    outside: &crate::metric::OutsideDerivatives,
 ) -> Result<Initialized<R, D>, ItkException> {
     let metric = ImageMetricv4 {
         fixed: Arc::clone(fixed),
@@ -297,7 +301,7 @@ fn initialize_metric<R: Real, const D: usize>(
         moving_gradient_image: moving_gradient,
         pixel_f32: false,
         local_support: true,
-        outside: Default::default(),
+        outside: outside.clone(),
     };
     let state = match kind {
         MetricKind::Demons => {
@@ -422,6 +426,8 @@ pub(crate) struct GradientCall<'a, R, const D: usize> {
     /// their resampled images (ITK-36 reproduced: a time-varying B-spline velocity field's
     /// multi-metric whose last metric is a point-set metric); `None`: the identity.
     pub(crate) through: Option<(&'a Composite<R, D>, &'a Composite<R, D>)>,
+    /// What becomes of the derivatives of sample points outside the virtual region (ITK-97).
+    pub(crate) outside: &'a crate::metric::OutsideDerivatives,
 }
 
 impl<R: Real, const D: usize> GradientCall<'_, R, D> {
@@ -530,6 +536,7 @@ impl<R: Real, const D: usize> GradientCall<'_, R, D> {
                 self.virtual_space,
                 &lm.samples,
                 self.through.map(|(f, _)| f.clone()),
+                self.outside,
             );
             match result {
                 Ok(mut m) => {
@@ -952,6 +959,7 @@ fn run_syn_levels<R: Real, const D: usize>(
                     stale_masks: !stage.correct_stale_masks,
                     joint_pdfs: &joint_pdfs,
                     through: None,
+                    outside: &stage.outside,
                 };
                 // B-spline SyN with a single point-set metric: the B-spline fitted to the
                 // points' derivatives.

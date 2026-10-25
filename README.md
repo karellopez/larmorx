@@ -184,7 +184,7 @@ ruff check && ruff format --check
 The GPL replicas are a separate Cargo workspace: `cd crates-gpl && cargo test --workspace`
 (build its wheel with `maturin build --release`).
 
-Parity checks and benchmarks need the test data (`larmorx-testdata`, a separate repository kept next to this one; not published yet), the validation package and the original programs as oracles (`scripts/build_ants_oracle.sh`, `scripts/build_afni_oracle.sh`):
+Parity checks and benchmarks need the test data (`larmorx-testdata`, github.com/karellopez/larmorx-testdata, kept next to this one; its data panel, `docs/panel.md` there, is the fixed set every tool is validated on), the validation package and the original programs as oracles (`scripts/build_ants_oracle.sh`, `scripts/build_afni_oracle.sh`):
 
 ```bash
 pip install -e ../larmorx-testdata -e "validation[oracles]"

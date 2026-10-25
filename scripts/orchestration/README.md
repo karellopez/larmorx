@@ -15,6 +15,7 @@ repository), `LARMORX_VENV` (default: `<workspace>/.venv`), cargo first on the p
 | `gates-python.sh <checkout> [--no-build]` | `maturin develop --release` (main checkout only), `pytest tests/python tests/golden`, ruff, SPDX |
 | `build-gpl.sh <checkout>` | the `larmorx-gpl` replica program (release) |
 | `build-nc.sh <checkout>` | the `larmorx-nc` replica program (release) |
+| `boxed.sh <GiB> <command>` | runs a heavy job in its own memory box (a systemd user scope, no swap): a runaway process is killed inside it and nothing else is touched; use it for every parity, random-testing, oracle, benchmark or merge-verification run |
 | `lxv.sh <checkout> <args>` | `python -m larmorx_validation <args>` from that checkout |
 | `verify-merge.sh <checkout> <out> [--suite "..."]... [--site <dir> --evidence <tool>...] [--golden] [--threads N] [--oracle-cache use\|refresh\|off]` | the checklist's steps 1-5 on a committed merge, one line per step in `<out>/main.log`; the parity runs use the oracle-output cache (below) |
 | `compare_records.py <out>/records <suite>...` | the re-run records against the committed ones, case by case |

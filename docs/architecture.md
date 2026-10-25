@@ -76,7 +76,7 @@ How the code is organised and the conventions every tool follows. The plan behin
 | Parity with reference tools, case by case on the test-data catalog | `validation/` suites, `tests/parity/` | locally (smoke or standard tier); in CI on all platforms once the test data are published |
 | Benchmarks against reference tools | `validation/` (`bench`) | on demand; reports in `docs/benchmarks/` |
 
-Test data live in a separate repository, `larmorx-testdata` (next to this one in the workspace; not published yet): a catalog of every file (source, licence, SHA-256, properties), small generated edge cases committed in the repo, and a downloader that verifies hashes into a content-addressed cache. larmorx never commits image data.
+Test data live in a separate repository, `larmorx-testdata` (github.com/karellopez/larmorx-testdata, next to this one in the workspace; its data panel, `docs/panel.md` there, is the fixed set every tool is validated on): a catalog of every file (source, licence, SHA-256, properties), small generated edge cases committed in the repo, and a downloader that verifies hashes into a content-addressed cache. larmorx never commits image data.
 
 ## Adding a tool (the per-tool contract, PLAN.md §4)
 

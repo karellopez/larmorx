@@ -66,10 +66,23 @@ smoke tier leaves a marker that `scripts/record_golden.py` reuses (no second smo
 Licence, FSL's original source included), its shared core `larmorx-nc-core`, and mcflirt
 bit-identical to FSL 6.0.7.17's (155 of 155 compared cases; 21 rejected by both alike); new
 FSL-20 and FSL-21 (rule B); `lx.mri.hmc(implementation=...)` and `larmorx fsl mcflirt`.
-**Next:** **the evidence infrastructure** (decision log 2026-10-23), after the oracle-output cache: the data panel (14 OpenNeuro datasets, approved by the user 2026-10-24), differential random testing, generated tables, applied to every finished tool; and FSL (BET next, its replica built; then BET's clean-room original, FLIRT with BBR, FAST, topup). Then field maps, FreeSurfer, surfaces, confounds, larmorprepx (`docs/next-steps.md`). Each a bounded agent run with a stop after it, each bringing its evidence.
+**The data panel and evidence that scales merged** (2026-10-25; built 2026-10-24): fourteen
+OpenNeuro subjects in larmorx-testdata (`panel.toml`, `docs/panel.md`; `python -m larmorx_testdata
+fetch --tier full --tag panel`, 219 files, 2.35 GB; every file hash-verified and checked against its
+snapshot's content key, every anatomical image checked for defacing); the evidence exporter ships a
+per-example view (every existing example a whole volume, as before; new panel cases may be three
+full-resolution slices through the largest difference, cropped only where every array is constant),
+keeps integer types, credits every dataset from the catalog, guards the site's size (500 MB; 40 MB
+per page, raised with a reason, never by removing content: N4 60 MB; `evidence sizes`), and the
+site's images moved to the orphan branch `evidence-blobs` (`tools/blobs.py`;
+`static/evidence/blobs.sha256` on `main`); the site has a Data panel page, and 3dAutomask's page the
+first panel case (ds000256's extreme-motion child run). The panel's nine new fMRIPrep oracle runs all
+finished (exit 0; `docs/validation/oracle-runs.md`), and the pipeline-stage catalogue classifies
+every program node of the fourteen runs (multi-echo included).
+**Next:** **the evidence infrastructure** (decision log 2026-10-23), after the oracle-output cache and the data panel: differential random testing and generated tables (in progress), then every finished tool re-validated on the panel; and FSL (BET next, its replica built; then BET's clean-room original, FLIRT with BBR, FAST, topup). Then field maps, FreeSurfer, surfaces, confounds, larmorprepx (`docs/next-steps.md`). Each a bounded agent run with a stop after it, each bringing its evidence.
 **Build-cache seed** for the next agent: the newest merged worktree's `target/` (now the mcflirt replica's, `.claude/worktrees/agent-a5874ac3558d79d85/`, with `crates-nc/target/`).
 
-**fMRIPrep oracle runs** (`oracles/fmriprep-25.2.6/<run>/`, fMRIPrep 25.2.6 through Apptainer, `scripts/run_fmriprep_oracle.sh`; settings in each run's `RUN_INFO.txt`): `ds000005-sub-01-noreconall` (no field maps, no slice timing), `ds001600-sub-1-noreconall` (anatomy only: its BOLD runs have 5 volumes), `ds005040-sub-002-noreconall` (PEPOLAR, slice timing), `ds005454-sub-16-noreconall` (phase difference, multiband, 280 volumes), `ds005752-sub-ON01016-noreconall` (a direct field map fMRIPrep does not use: no `IntendedFor`).
+**fMRIPrep oracle runs** (`oracles/fmriprep-25.2.6/<run>/`, fMRIPrep 25.2.6 through Apptainer, `scripts/run_fmriprep_oracle.sh`; settings in each run's `RUN_INFO.txt`): `ds000005-sub-01-noreconall` (no field maps, no slice timing), `ds001600-sub-1-noreconall` (anatomy only: its BOLD runs have 5 volumes), `ds005040-sub-002-noreconall` (PEPOLAR, slice timing), `ds005454-sub-16-noreconall` (phase difference, multiband, 280 volumes), `ds005752-sub-ON01016-noreconall` (a direct field map fMRIPrep does not use: no `IntendedFor`); and the data panel's nine (2026-10-24 and 25, `validation/investigations/panel-oracle-runs/`, every one finished with exit status 0): `ds000228-sub-pixar008-noreconall` (a 3.5-year-old), `ds005003-sub-RS001-noreconall` (a glioma), `ds004173-sub-603309-noreconall` (anatomy only, strong motion), `ds002422-sub-02-noreconall` (1.5 T, two field-map estimators), `ds000256-sub-CTS203-noreconall` (a child's three motion levels), `ds004884-sub-M2079-noreconall` (a stroke, with its lesion mask resampled onto the T1w's grid), `ds003592-sub-280-noreconall` (multi-echo), `ds002603-sub-01-noreconall` (Philips multiband, a field map), `ds004958-sub-fsm64ps-noreconall` (multiband-8, 600 volumes; field maps not linked).
 
 
 ## The user's direction (settled; do not re-propose the alternatives)
@@ -210,6 +223,7 @@ Every agent reads this file first, then `docs/porting-guide.md`, its section of 
 - Run long jobs (fMRIPrep and FreeSurfer oracles, benchmarks) in the background with `tmux` or `nohup`.
   - Log to `oracles/logs/`.
   - Record the exact command, image tag/version, seeds and thread counts next to the outputs.
+- **Every heavy job runs in a memory box** (2026-10-25): `scripts/orchestration/boxed.sh <GiB> <command>` (a systemd user scope, hard memory limit, no swap), for parity tiers, random testing, fMRIPrep oracle runs, benchmarks, `record_golden.py` and `verify-merge.sh`; a harness that runs original programs on generated inputs also caps each process. On 2026-10-25 one random N4BiasFieldCorrection case grew to 28 GB; the machine swapped until VS Code's terminal host stopped answering, and the editor and every agent in it went down. Boxes of parallel agents together stay under about 24 GiB (the machine has 31).
 - Never commit image data or oracle outputs to git. Use content-addressed storage (PLAN.md §11.1).
 - **Run one agent at a time** (user, 2026-10-10; a two-agent trial on 2026-10-11 was stopped the same evening to stay within usage limits). Four parallel agents once exhausted the session limit and were killed mid-task. Brief every agent to commit as soon as its work passes the gates; when pausing one, ask for a WIP checkpoint commit and a NOTES file first.
 - **The ANTs oracle is built with conda-forge GCC 14.3** (`oracles/toolchains/gcc-14.3`, user-level). Ubuntu 22.04's GCC 11.4 and 12.3 miscompile float roundings at `-O3` (GCC bug 110182); `scripts/build_ants_oracle.sh` probes for it and refuses such a compiler. The old GCC 11 build is kept as evidence in `oracles/ants-2.6.5-gcc11-O3`; validate registration (A4/A5) against the new build only.

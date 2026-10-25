@@ -177,6 +177,27 @@ def _run_info(path: Path) -> dict[str, str]:
     return info
 
 
+#: fMRIPrep's last words when a run completes (``fmriprep/cli/run.py``).
+FMRIPREP_DONE = "fMRIPrep finished successfully!"
+
+
+def run_finished(root: Path) -> bool:
+    """Whether an fMRIPrep oracle run has ended: its ``RUN_INFO.txt`` has the ``finished:``
+    line ``scripts/run_fmriprep_oracle.sh`` writes when the container exits (whatever the
+    exit status), or fMRIPrep's log says it finished. A run still in progress has neither: its
+    working directory is incomplete and changing, so nothing should read it as a reference."""
+    root = Path(root)
+    info = root / "RUN_INFO.txt"
+    if info.is_file() and "finished" in _run_info(info):
+        return True
+    log = root / "fmriprep.log"
+    if log.is_file():
+        with log.open("rb") as f:
+            f.seek(max(0, log.stat().st_size - 65536))
+            return FMRIPREP_DONE.encode() in f.read()
+    return False
+
+
 def _workspace(start: Path) -> Path | None:
     """The workspace root: the directory above ``oracles/``."""
     for parent in [start, *start.parents]:
@@ -207,6 +228,11 @@ class OracleRun:
     @property
     def name(self) -> str:
         return self.root.name
+
+    @property
+    def finished(self) -> bool:
+        """Whether the run has ended (:func:`run_finished`)."""
+        return run_finished(self.root)
 
     @property
     def version(self) -> str:
@@ -311,4 +337,4 @@ def _paths(value: str) -> list[str]:
     return re.findall(r"(/[^'\",\]\s]+)", value)
 
 
-__all__ = ["CONTAINER_MOUNTS", "Node", "OracleRun", "read_node"]
+__all__ = ["CONTAINER_MOUNTS", "FMRIPREP_DONE", "Node", "OracleRun", "read_node", "run_finished"]

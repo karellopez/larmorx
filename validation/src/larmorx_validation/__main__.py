@@ -384,7 +384,11 @@ def main(argv: Sequence[str] | None = None) -> int:
         help="export a tool's validation evidence (worked examples, metrics, verdicts, cases) "
         "for the documentation site's interactive pages",
     )
-    ev.add_argument("tool", help="a tool (larmorx_validation.evidence.TOOLS), 'summary' or 'all'")
+    ev.add_argument(
+        "tool",
+        help="a tool (larmorx_validation.evidence.TOOLS), 'summary', 'panel' (the Data panel "
+        "page), 'all', or 'sizes' (the published site's size per page, against the budgets)",
+    )
     ev.add_argument("--site", required=True, help="the documentation site's checkout")
     ev.add_argument(
         "--cache",

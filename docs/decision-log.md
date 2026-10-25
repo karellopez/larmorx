@@ -1182,6 +1182,24 @@ session's); (4) small questions are collected and decided in batches.
   weekly limits for now. I will tell you if something gets wrong"): an exception to "never more
   than two"; the FSL agents used at most 3 threads each.
 
+## 2026-10-24: The data panel built; evidence at full quality that scales
+
+Built by the panel part from the user's decisions above (merged 2026-10-25):
+- **The site's evidence:** voxel values stay lossless; integer data ship in their own type; a view
+  is cropped only where every array it shows (input, outputs, differences, masks) is exactly
+  constant, its offset recorded; every existing example stays a whole volume; new panel cases are
+  added beside them, a tool's two or three key datasets as whole volumes, the others as three
+  full-resolution slices through the voxel of largest difference, every metric still over every
+  voxel. The images left the site's `main` history for an orphan branch `evidence-blobs`, replaced
+  at every export and verified by the Pages workflow against a committed manifest (no GitHub
+  release: only `git push` is available here). A size guard: 500 MB for the site, 40 MB per page,
+  raised for a page with its reason, never by removing content (N4 60 MB). Every example credited
+  from the catalog (CC-BY attribution, CC-BY-SA share-alike notice); a Data panel page.
+- **Found while building it:** ds004958 sub-fsm02cd's BOLD is truncated as published (the panel
+  takes sub-fsm64ps, a fourth older adult); every ds004884 lesion mask is drawn on a T2w (the
+  derived input above); three examples stated a wrong licence (ds005454 is CC-BY-4.0, ds000005
+  PDDL-1.0), corrected and now checked by the export.
+
 ## 2026-10-24: The oracle-output cache, how it decides
 
 Built from the decision of 2026-10-23 ("speed at the same quality", points 1 and 2), these

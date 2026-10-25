@@ -809,7 +809,7 @@ def _confounds_tsv(s: rn.Settings, node: Node) -> Path | None:
     _, keys = normalise(node.path)
     run = keys.get("run", "")
     for p in sorted((s.run.root / "out").rglob("*_desc-confounds_timeseries.tsv")):
-        if _bids_run(p.name) == run:
+        if _same_run(_bids_run(p.name), run):
             return p
     return None
 
@@ -817,7 +817,7 @@ def _confounds_tsv(s: rn.Settings, node: Node) -> Path | None:
 def _hmc_xfm(s: rn.Settings, node: Node) -> Path | None:
     _, keys = normalise(node.path)
     for p in sorted((s.run.root / "out").rglob("*_desc-hmc_xfm.txt")):
-        if _bids_run(p.name) == keys.get("run", ""):
+        if _same_run(_bids_run(p.name), keys.get("run", "")):
             return p
     return None
 
@@ -831,6 +831,14 @@ def _bids_run(filename: str) -> str:
         if p.split("-")[0] in ("ses", "task", "acq", "ce", "rec", "dir", "run", "echo", "part")
     ]
     return "_".join(p.replace("-", "_") for p in parts)
+
+
+def _same_run(derivative: str, workflow: str) -> bool:
+    """A derivative's run key (:func:`_bids_run`) names the run of a workflow's key. A
+    multi-echo run's workflow is named after its first echo (``..._echo_1``) while its
+    derivatives combine the echoes and drop the entity, so the workflow's key is also tried
+    without it."""
+    return derivative == workflow or derivative == re.sub(r"_echo_\d+", "", workflow)
 
 
 # ------------------------------------------------------------------------------------------------

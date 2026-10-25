@@ -165,7 +165,7 @@ fn envelope_line(line: &mut [u32], cap: u32, s: &mut Envelope) {
 /// index distance `t` (`Σ Δ_i² ≤ t`). Exact (integers); the result does not depend on
 /// `n_threads`.
 pub(crate) fn within_distance(
-    site: &[bool],
+    site: Vec<bool>,
     size: &[usize],
     t: u64,
     n_threads: usize,
@@ -181,6 +181,8 @@ pub(crate) fn within_distance(
             .map(|&s| if s { 0 } else { cap })
             .collect()
     })?;
+    // The sites are in the distances now (random testing, 2026-10-25: memory).
+    drop(site);
     for axis in 0..size.len() {
         if size[axis] <= 1 {
             continue;
@@ -236,7 +238,7 @@ pub fn binary_dilate(
             .map(|&v| v == foreground)
             .collect()
     })?;
-    let near = within_distance(&site, input.size, ball_squared_radius(radius), n_threads)?;
+    let near = within_distance(site, input.size, ball_squared_radius(radius), n_threads)?;
     Ok(parallel::with_threads(n_threads, || {
         input
             .data
@@ -278,7 +280,7 @@ pub fn binary_erode(
             .map(|&v| v != foreground)
             .collect()
     })?;
-    let near = within_distance(&site, input.size, ball_squared_radius(radius), n_threads)?;
+    let near = within_distance(site, input.size, ball_squared_radius(radius), n_threads)?;
     Ok(parallel::with_threads(n_threads, || {
         input
             .data
@@ -479,7 +481,7 @@ impl Runs {
 
 /// The maximum over the ball (keys), outside voxels counting as `boundary`.
 fn dilate_keys(
-    keys: &[u32],
+    keys: Vec<u32>,
     size: &[usize],
     runs: &Runs,
     boundary: u32,
@@ -493,29 +495,31 @@ fn dilate_keys(
     let d = size.len();
     let row_stride = strides(&size[1..]);
     let mut out = vec![0u32; n];
-    let mut current: Vec<u32> = keys.to_vec();
-    let mut next = vec![0u32; n];
+    // The keys themselves are the maxima over runs of half-width 0, then made wider in place
+    // (random testing, 2026-10-25: a copy of the keys and a second buffer were 2.4 times ANTs'
+    // peak memory for GE).
+    let mut current = keys;
     for w in 0..=runs.radius {
         if w > 0 {
-            // The maximum over [x - w, x + w] from the one over [x - w + 1, x + w - 1].
+            // The maximum over [x - w, x + w] from the one over [x - w + 1, x + w - 1], in
+            // place: `previous` holds the old value left of `x`.
             parallel::with_threads(n_threads, || {
-                next.par_chunks_mut(nx)
-                    .zip(current.par_chunks(nx))
-                    .with_min_len(64)
-                    .for_each(|(o, c)| {
-                        for x in 0..nx {
-                            let mut m = c[x];
-                            if x > 0 {
-                                m = m.max(c[x - 1]);
-                            }
-                            if x + 1 < nx {
-                                m = m.max(c[x + 1]);
-                            }
-                            o[x] = m;
+                current.par_chunks_mut(nx).with_min_len(64).for_each(|c| {
+                    let mut previous = c[0];
+                    for x in 0..nx {
+                        let here = c[x];
+                        let mut m = here;
+                        if x > 0 {
+                            m = m.max(previous);
                         }
-                    });
+                        if x + 1 < nx {
+                            m = m.max(c[x + 1]);
+                        }
+                        c[x] = m;
+                        previous = here;
+                    }
+                });
             })?;
-            std::mem::swap(&mut current, &mut next);
         }
         let these: Vec<&Vec<isize>> = runs
             .runs
@@ -556,6 +560,7 @@ fn dilate_keys(
                 });
         })?;
     }
+    drop(current);
     // Voxels whose ball reaches outside the image (within `radius` of a face) see the
     // boundary value too.
     let r = runs.radius;
@@ -586,36 +591,27 @@ fn dilate_keys(
 /// The minimum over the ball (keys), outside voxels counting as `boundary`: the complement of
 /// the maximum of the complements.
 fn erode_keys(
-    keys: &[u32],
+    mut keys: Vec<u32>,
     size: &[usize],
     runs: &Runs,
     boundary: u32,
     n_threads: usize,
 ) -> Result<Vec<u32>, FilterError> {
-    let complement: Vec<u32> = keys.iter().map(|&k| !k).collect();
-    let mut out = dilate_keys(&complement, size, runs, !boundary, n_threads)?;
+    // The complements in place of the keys.
+    keys.iter_mut().for_each(|k| *k = !*k);
+    let mut out = dilate_keys(keys, size, runs, !boundary, n_threads)?;
     out.iter_mut().for_each(|k| *k = !*k);
     Ok(out)
 }
 
-fn keys_of(input: &VolumeRef<'_, f32>, n_threads: usize) -> Result<Vec<u32>, FilterError> {
-    Ok(parallel::with_threads(n_threads, || {
-        input
-            .data
-            .par_iter()
-            .with_min_len(CHUNK)
-            .map(|&v| key(v))
-            .collect()
-    })?)
+/// The keys of an image in place of its values (the same size: no copy).
+fn into_keys(values: Vec<f32>) -> Vec<u32> {
+    values.into_iter().map(key).collect()
 }
 
-fn values_of(keys: &[u32], n_threads: usize) -> Result<Vec<f32>, FilterError> {
-    Ok(parallel::with_threads(n_threads, || {
-        keys.par_iter()
-            .with_min_len(CHUNK)
-            .map(|&k| value(k))
-            .collect()
-    })?)
+/// The values of keys in place of them.
+fn into_values(keys: Vec<u32>) -> Vec<f32> {
+    keys.into_iter().map(value).collect()
 }
 
 fn check_dims(input: &VolumeRef<'_, f32>, radius: usize) -> Result<(), FilterError> {
@@ -634,10 +630,21 @@ pub fn grayscale_dilate(
     n_threads: usize,
 ) -> Result<Vec<f32>, FilterError> {
     check_dims(&input, radius)?;
-    let runs = Runs::new(input.dim(), radius);
-    let keys = keys_of(&input, n_threads)?;
-    let out = dilate_keys(&keys, input.size, &runs, key(-f32::MAX), n_threads)?;
-    values_of(&out, n_threads)
+    grayscale_dilate_owned(input.data.to_vec(), input.size, radius, n_threads)
+}
+
+/// [`grayscale_dilate`] of an image given whole (`data`, of `size`): its buffer becomes the
+/// output, so the filter needs two images of memory, as ITK (random testing, 2026-10-25).
+pub fn grayscale_dilate_owned(
+    data: Vec<f32>,
+    size: &[usize],
+    radius: usize,
+    n_threads: usize,
+) -> Result<Vec<f32>, FilterError> {
+    check_owned(&data, size, radius)?;
+    let runs = Runs::new(size.len(), radius);
+    let out = dilate_keys(into_keys(data), size, &runs, key(-f32::MAX), n_threads)?;
+    Ok(into_values(out))
 }
 
 /// `GrayscaleErodeImageFilter<float, float, BinaryBallStructuringElement>`: the minimum over
@@ -648,10 +655,20 @@ pub fn grayscale_erode(
     n_threads: usize,
 ) -> Result<Vec<f32>, FilterError> {
     check_dims(&input, radius)?;
-    let runs = Runs::new(input.dim(), radius);
-    let keys = keys_of(&input, n_threads)?;
-    let out = erode_keys(&keys, input.size, &runs, key(f32::MAX), n_threads)?;
-    values_of(&out, n_threads)
+    grayscale_erode_owned(input.data.to_vec(), input.size, radius, n_threads)
+}
+
+/// [`grayscale_erode`] of an image given whole (see [`grayscale_dilate_owned`]).
+pub fn grayscale_erode_owned(
+    data: Vec<f32>,
+    size: &[usize],
+    radius: usize,
+    n_threads: usize,
+) -> Result<Vec<f32>, FilterError> {
+    check_owned(&data, size, radius)?;
+    let runs = Runs::new(size.len(), radius);
+    let out = erode_keys(into_keys(data), size, &runs, key(f32::MAX), n_threads)?;
+    Ok(into_values(out))
 }
 
 /// `GrayscaleMorphologicalOpeningImageFilter` (`SafeBorder` on): the image padded by `radius`
@@ -662,15 +679,29 @@ pub fn grayscale_opening(
     n_threads: usize,
 ) -> Result<Vec<f32>, FilterError> {
     check_dims(&input, radius)?;
-    let runs = Runs::new(input.dim(), radius);
-    let keys = keys_of(&input, n_threads)?;
-    let (padded, size) = pad(&keys, input.size, radius, key(f32::MAX), n_threads)?;
+    grayscale_opening_owned(input.data.to_vec(), input.size, radius, n_threads)
+}
+
+/// [`grayscale_opening`] of an image given whole (see [`grayscale_dilate_owned`]).
+pub fn grayscale_opening_owned(
+    data: Vec<f32>,
+    size: &[usize],
+    radius: usize,
+    n_threads: usize,
+) -> Result<Vec<f32>, FilterError> {
+    check_owned(&data, size, radius)?;
+    let runs = Runs::new(size.len(), radius);
+    let keys = into_keys(data);
+    let (padded, padded_size) = pad(&keys, size, radius, key(f32::MAX), n_threads)?;
     drop(keys);
-    let eroded = erode_keys(&padded, &size, &runs, key(f32::MAX), n_threads)?;
-    drop(padded);
-    let dilated = dilate_keys(&eroded, &size, &runs, key(-f32::MAX), n_threads)?;
-    drop(eroded);
-    values_of(&crop(&dilated, &size, radius, n_threads)?, n_threads)
+    let eroded = erode_keys(padded, &padded_size, &runs, key(f32::MAX), n_threads)?;
+    let dilated = dilate_keys(eroded, &padded_size, &runs, key(-f32::MAX), n_threads)?;
+    Ok(into_values(crop(
+        &dilated,
+        &padded_size,
+        radius,
+        n_threads,
+    )?))
 }
 
 /// `GrayscaleMorphologicalClosingImageFilter` (`SafeBorder` on): the image padded by `radius`
@@ -681,15 +712,39 @@ pub fn grayscale_closing(
     n_threads: usize,
 ) -> Result<Vec<f32>, FilterError> {
     check_dims(&input, radius)?;
-    let runs = Runs::new(input.dim(), radius);
-    let keys = keys_of(&input, n_threads)?;
-    let (padded, size) = pad(&keys, input.size, radius, key(-f32::MAX), n_threads)?;
+    grayscale_closing_owned(input.data.to_vec(), input.size, radius, n_threads)
+}
+
+/// [`grayscale_closing`] of an image given whole (see [`grayscale_dilate_owned`]).
+pub fn grayscale_closing_owned(
+    data: Vec<f32>,
+    size: &[usize],
+    radius: usize,
+    n_threads: usize,
+) -> Result<Vec<f32>, FilterError> {
+    check_owned(&data, size, radius)?;
+    let runs = Runs::new(size.len(), radius);
+    let keys = into_keys(data);
+    let (padded, padded_size) = pad(&keys, size, radius, key(-f32::MAX), n_threads)?;
     drop(keys);
-    let dilated = dilate_keys(&padded, &size, &runs, key(-f32::MAX), n_threads)?;
-    drop(padded);
-    let eroded = erode_keys(&dilated, &size, &runs, key(f32::MAX), n_threads)?;
-    drop(dilated);
-    values_of(&crop(&eroded, &size, radius, n_threads)?, n_threads)
+    let dilated = dilate_keys(padded, &padded_size, &runs, key(-f32::MAX), n_threads)?;
+    let eroded = erode_keys(dilated, &padded_size, &runs, key(f32::MAX), n_threads)?;
+    Ok(into_values(crop(&eroded, &padded_size, radius, n_threads)?))
+}
+
+/// [`check_dims`] for an image given whole.
+fn check_owned(data: &[f32], size: &[usize], radius: usize) -> Result<(), FilterError> {
+    let spacing = vec![1.0; size.len()];
+    let v = VolumeRef::new(data, size, &spacing);
+    check_dims(&v, radius)?;
+    if data.len() != size.iter().product::<usize>() {
+        return Err(FilterError::SizeMismatch {
+            what: "the image",
+            actual: data.len(),
+            expected: size.iter().product(),
+        });
+    }
+    Ok(())
 }
 
 #[cfg(test)]
@@ -837,7 +892,8 @@ mod tests {
             let site: Vec<bool> = data.iter().map(|&v| v > 55.0).collect();
             let expected = brute_dilate_set(&site, &size, r);
             for threads in [1, 3] {
-                let got = within_distance(&site, &size, ball_squared_radius(r), threads).unwrap();
+                let got =
+                    within_distance(site.clone(), &size, ball_squared_radius(r), threads).unwrap();
                 assert_eq!(got, expected, "{size:?} r {r}");
             }
         }

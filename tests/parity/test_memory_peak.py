@@ -38,6 +38,10 @@ CASES = [
     ("SmoothImage", "256x256x128", "1,1,1", "3 {in} 1.5 {out}"),
     ("MultiplyImages", "256x256x128", "1,1,1", "3 {in} 2.5 {out}"),
     ("ImageMath", "256x256x128", "1,1,1", "3 {out} m {in} {in}"),
+    ("ImageMath", "256x256x128", "1,1,1", "3 {out} ME {in} 1"),
+    ("ImageMath", "256x256x128", "1,1,1", "3 {out} GD {in} 1"),
+    ("ImageMath", "256x256x128", "1,1,1", "3 {out} GE {in} 1"),
+    ("ImageMath", "256x256x128", "1,1,1", "3 {out} TruncateImageIntensity {in} 0.01 0.999 256"),
     (
         "N4BiasFieldCorrection",
         "128x128x96",

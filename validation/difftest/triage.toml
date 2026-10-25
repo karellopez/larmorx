@@ -121,7 +121,7 @@ implementation = "port"
 signature = ["values (bit-identical)"]
 status = "register"
 defect = "ITK-95"
-explanation = "GO, GC, GD or GE with a radius of 0 on an image whose first axis has one voxel: ITK's moving histogram leaves voxels at ±FLT_MAX; larmorx gives the identity in both modes (rule A); the reproduce switch is a follow-up"
+explanation = "ITK's moving-histogram morphology on an image whose first axis has one voxel: GO, GC, GD or GE with a radius of 0 leaves voxels at ±FLT_MAX, and with a larger radius (a 4D image, GD radius 3) gives values from outside the structuring element (99 where the ball's maximum is 97, `ants-image-math:20261025:1541`); larmorx gives the true result in both modes (rule A); the reproduce switch is a follow-up"
 
 [[difference]]
 tool = "afni-tshift"
@@ -186,7 +186,7 @@ tool = "ants-atropos"
 implementation = "port"
 signature = ["DN fix pass", "stderr"]
 status = "fixed"
-explanation = "an empty mask or a constant channel in a Parzen histogram: larmorx's one-line explanation (ANTS-45: ANTs explains its exception only with --verbose 1) held ITK's two-line description, whose second line the comparison saw; now one line. The remaining notice is ANTS-91's (no values changed)"
+explanation = "two of larmorx's messages: the one-line explanation of an empty mask or a constant channel in a Parzen histogram (ANTS-45: ANTs explains its exception only with --verbose 1) held ITK's two-line description, now one line; and the '<= 1 element' warning of a class with one sample was printed as the Gaussian model's for every model, where ANTs prints each model's own (ManifoldParzenWindows at line 55, HistogramParzenWindows at line 57: another file, class and text), now each model's. The remaining fix-pass notices name defects that changed no value"
 
 [[difference]]
 tool = "ants-atropos"
@@ -518,3 +518,85 @@ signature = ["ANTs with CORE-MATH: rNTranslation.mat"]
 status = "fixed"
 defect = "ANTS-51"
 explanation = "without collapsing (-z 0), a Translation stage whose Demons metric throws (it needs a displacement field; ANTs catches it and goes on) adds no transform and leaves ANTs' names one short (ANTS-51), so the next stage's displacement field is written under the linear stage's .mat name; ANTs' WriteTransform writes the stage's own object there (GaussianSmoothingOnUpdateDisplacementFieldTransform), larmorx a new DisplacementFieldTransform: the same parameters, another class name. Now the field keeps its stage's class under a .mat or .txt name"
+
+[[difference]]
+tool = "ants-registration"
+implementation = "port"
+signature = ["ANTs with CORE-MATH: rNAffine.mat"]
+status = "register"
+defect = "ANTS-51"
+explanation = "without collapsing, an Affine stage whose Demons metric throws (ANTs goes on) adds no transform, so the next stage's time-varying B-spline velocity field is written under the Affine stage's .mat name (ANTS-51); there ANTs writes the transform object itself, TimeVaryingBSplineVelocityFieldTransform with its control-point lattice as the parameters, larmorx the integrated displacement field. The default corrects ANTS-51 (each transform under its own stage's name); reproducing the lattice under a .mat name is a follow-up"
+
+[[difference]]
+tool = "ants-registration"
+implementation = "port"
+signature = ["ANTs with CORE-MATH: standard output", "DN fix pass"]
+status = "fixed"
+explanation = "SyN and B-spline SyN take the iteration's metric value as half the sum of the two halves' values, the sum in the metric's own type: with --float 1 two metrics with no valid point (FLT_MAX each) overflow to inf in ITK, and its convergence value follows; larmorx summed in double. Now the sum is taken in the metric's type"
+
+[[difference]]
+tool = "ants-registration"
+implementation = "port"
+signature = ["ANTs with CORE-MATH: rComposite.hN", "ANTs with CORE-MATH: standard output"]
+status = "fixed"
+defect = "ITK-97"
+explanation = "ITK-97 reproduced: the derivatives of sample points outside the shrunk virtual region (a sampled B-spline displacement-field stage with a shrink factor)"
+
+[[difference]]
+tool = "ants-registration"
+implementation = "port"
+signature = ["ANTs with CORE-MATH: rNInverseWarp.nii.gz", "ANTs with CORE-MATH: rNWarp.nii.gz", "ANTs with CORE-MATH: standard output", "DN fix pass"]
+status = "fixed"
+defect = "ITK-97"
+explanation = "ITK-97 reproduced (as above)"
+
+[[difference]]
+tool = "ants-ai"
+implementation = "port"
+signature = ["ANTs with CORE-MATH: t.txt"]
+status = "fixed"
+explanation = "a parameter of antsAI's output transform at an exact tie between two shortest decimals: ITK's double-conversion writes the even one, Rust's shortest formatting rounded up; larmorx's ITK number writer now takes the even one (`larmorx_io::itk_transform::itk_number`)"
+
+[[difference]]
+tool = "ants-denoise"
+implementation = "port"
+signature = ["denoised: affine", "denoised: data type and shape", "denoised: header (every field)"]
+status = "fixed"
+defect = "ANTS-99"
+explanation = "DenoiseImage without -d on a 4D image: ANTs takes it as 3D (ANTS-99); now reproduced, both modes naming it"
+
+[[difference]]
+tool = "ants-denoise"
+implementation = "port"
+signature = ["denoised: data type and shape", "denoised: header (every field)", "noise: data type and shape", "noise: header (every field)"]
+status = "fixed"
+defect = "ANTS-99"
+explanation = "DenoiseImage without -d on a 2D or 4D image: ANTs takes it as 3D (ANTS-99); now reproduced, both modes naming it"
+
+[[difference]]
+tool = "afni-automask"
+implementation = "original"
+signature = ["masked.nii: data"]
+status = "open"
+explanation = "the clean-room original's -apply_prefix output differs from AFNI's in a few values (`afni-automask:20261025:1305`); for its agent"
+
+[[difference]]
+tool = "afni-automask"
+implementation = "original"
+signature = ["mask.nii.gz: header bytes"]
+status = "open"
+explanation = "the clean-room original's header bytes on a tiny oblique image; for its agent"
+
+[[difference]]
+tool = "afni-automask"
+implementation = "original"
+signature = ["mask.nii.gz: data", "messages: AFNI's, byte for byte"]
+status = "open"
+explanation = "the clean-room original on a one-slice oblique constant image: its mask and its 'first 0 x-planes are zero [from ?]' (AFNI names the side); for its agent"
+
+[[difference]]
+tool = "afni-unifize"
+implementation = "original"
+signature = ["am.nii: header bytes", "uni.nii.gz: header bytes"]
+status = "open"
+explanation = "the clean-room original's header bytes on a tiny oblique image (the output and the -amsave file); for its agent"

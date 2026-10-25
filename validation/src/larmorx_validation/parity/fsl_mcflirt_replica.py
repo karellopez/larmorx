@@ -714,6 +714,46 @@ def _write_like(src: Path, dst: Path, data: np.ndarray, dtype: Any, analyze: boo
     nib.save(out, dst)
 
 
+def _moving_phantom(seed: int, shape=(12, 14, 12), nvol: int = 7, spacing=(2.0, 2.0, 3.0)):
+    """A small analytic head-like phantom (a soft ellipsoid and three seeded blobs, float32)
+    sampled after a seeded rigid motion per volume (up to 3 degrees about each axis and 2 mm;
+    the first volume at rest): no interpolation, so each volume is the exact moved function."""
+    import nibabel as nib
+
+    rng = np.random.default_rng(seed)
+    sp = np.asarray(spacing)
+    centre = (np.asarray(shape) - 1) / 2 * sp
+    grid = np.meshgrid(*[np.arange(n) for n in shape], indexing="ij")
+    pts = np.stack(grid, -1).astype(np.float64) * sp - centre
+    axes = np.array([9.0, 10.0, 12.0])
+    blobs = [
+        (rng.uniform(-4, 4, 3), rng.uniform(2.0, 4.0), rng.uniform(150, 400)) for _ in range(3)
+    ]
+
+    def f(q: np.ndarray) -> np.ndarray:
+        r = np.sqrt(((q / axes) ** 2).sum(-1))
+        v = 600.0 / (1.0 + np.exp((r - 1.0) * 12.0))
+        for c, w, a in blobs:
+            v += a * np.exp(-((q - c) ** 2).sum(-1) / (2 * w * w))
+        return v
+
+    vols = []
+    for t in range(nvol):
+        ang = np.radians(rng.uniform(-3, 3, 3)) if t else np.zeros(3)
+        shift = rng.uniform(-2, 2, 3) if t else np.zeros(3)
+        (cx, cy, cz), (sx, sy, sz) = np.cos(ang), np.sin(ang)
+        rx = np.array([[1, 0, 0], [0, cx, sx], [0, -sx, cx]])
+        ry = np.array([[cy, 0, -sy], [0, 1, 0], [sy, 0, cy]])
+        rz = np.array([[cz, sz, 0], [-sz, cz, 0], [0, 0, 1]])
+        vols.append(f((pts - shift) @ (rx @ ry @ rz)).astype(np.float32))
+    aff = np.diag([*spacing, 1.0])
+    aff[:3, 3] = -centre
+    img = nib.Nifti1Image(np.stack(vols, -1), aff)
+    img.header.set_xyzt_units("mm", "sec")
+    img.header["pixdim"][4] = 2.0
+    return img
+
+
 def _make_inputs(kind: str, d: Path) -> dict[str, str]:
     """The generated inputs of ``kind`` in ``d`` (deterministic: derived from the test data's
     synthetic series)."""
@@ -740,6 +780,9 @@ def _make_inputs(kind: str, d: Path) -> dict[str, str]:
         shape = img.shape[:3]
         rgb = np.zeros(shape, dtype=[("R", "u1"), ("G", "u1"), ("B", "u1")])
         nib.save(nib.Nifti1Image(rgb, img.affine), d / "in.nii.gz")
+        files["in"] = "in.nii.gz"
+    elif kind.startswith("phantom-"):
+        nib.save(_moving_phantom(int(kind.removeprefix("phantom-"))), d / "in.nii.gz")
         files["in"] = "in.nii.gz"
     elif kind == "nan-ref":
         r = np.asanyarray(nib.load(ref).dataobj).astype(np.float32)
@@ -887,6 +930,17 @@ EDGES: dict[str, Edge] = {
         ),
         description="-meanvol from a reference file, sinc, -stats, -out with its extension",
     ),
+    # Three moving phantoms whose rotation decompositions reach atanf arguments where fdlibm's
+    # comment value of aT[0] (0x3eaaaaaa, the translation before 2026-10-25) gives one ulp
+    # more than glibc (0x3eaaaaab): 11 of 60 seeds do; with the old constant these cases fail.
+    **{
+        f"atanf-phantom-{seed}": Edge(
+            ("-in", "@in", "-out", "out", "-mats", "-plots"),
+            inputs=f"phantom-{seed}",
+            description=f"a moving phantom (seed {seed}) reaching atanf's aT[0] (random testing)",
+        )
+        for seed in (2, 11, 27)
+    },
     "rotation0": Edge(
         ("-in", "@in", "-out", "out", "-rotation", "0", "-stages", "1", "-mats"),
         description="-rotation 0 (infinite rotation tolerances)",

@@ -985,11 +985,15 @@ def _queue_heavy(out: Path, line: dict, queued: set) -> None:
     if key in queued:
         return
     queued.add(key)
+    # The recipe itself, drawn by this night's generator: a later generator draws another case
+    # from the same (tool, seed, n), and --heavy runs it later (night_recipe).
+    recipe = core.make_recipe(tools.get(line["tool"]), line["seed"], line["n"])
     entry = {
         "tool": line["tool"],
         "seed": line["seed"],
         "n": line["n"],
         "recipe_id": line.get("recipe_id"),
+        "recipe": recipe if core.recipe_id(recipe) == line.get("recipe_id") else None,
         "options": line.get("options", []),
         "detail": "; ".join(
             f"{impl}: {e.get('detail', '')}"
@@ -1001,6 +1005,28 @@ def _queue_heavy(out: Path, line: dict, queued: set) -> None:
     }
     with (out / "heavy.jsonl").open("a", encoding="utf-8") as f:
         f.write(json.dumps(entry, sort_keys=True) + "\n")
+
+
+def night_recipe(out: Path, h: dict) -> dict | None:
+    """The recipe a queued case ``h`` ran with in the night ``out``: the queue line's own, else
+    the night's finding of that case with the same recipe id, else the generator's draw when it
+    still gives that id; ``None`` when none does. A seed and case number name a case only for the
+    generator of the night's commit (``run.json``): the generator changes (2026-10-25: realistic
+    cases and the extreme share), and every recipe of the first night's heavy queue is drawn
+    differently since, while its findings keep each one whole."""
+    want = h.get("recipe_id")
+    if isinstance(h.get("recipe"), dict):
+        return h["recipe"]
+    d = out / "findings" / h["tool"]
+    for p in sorted(d.glob(f"{h['seed']}-{int(h['n']):05d}-*.json")) if d.is_dir() else ():
+        try:
+            r = json.loads(p.read_text(encoding="utf-8")).get("recipe")
+        except (OSError, ValueError):
+            continue
+        if isinstance(r, dict) and (want is None or core.recipe_id(r) == want):
+            return r
+    r = core.make_recipe(tools.get(h["tool"]), h["seed"], int(h["n"]))
+    return r if want is None or core.recipe_id(r) == want else None
 
 
 def run_heavy(
@@ -1031,7 +1057,23 @@ def run_heavy(
     done = []
     for k, h in enumerate(heavy_queue(out, only)):
         tool = tools.get(h["tool"])
-        recipe = core.make_recipe(tool, h["seed"], h["n"])
+        recipe = night_recipe(out, h)
+        if recipe is None:
+            skipped = {
+                "tool": h["tool"],
+                "seed": h["seed"],
+                "n": h["n"],
+                "recipe_id": h.get("recipe_id"),
+                "impls": {},
+                "verdict": SKIP,
+                "detail": "the night kept no recipe of this case and the generator draws another "
+                "one since: run it with the night's commit (run.json)",
+            }
+            with (out / "heavy-results.jsonl").open("a", encoding="utf-8") as f:
+                f.write(json.dumps(skipped, sort_keys=True) + "\n")
+            log(f"heavy {h['tool']}:{h['seed']}:{h['n']}: {skipped['detail']}")
+            done.append(skipped)
+            continue
         line: dict = {
             "tool": h["tool"],
             "seed": h["seed"],

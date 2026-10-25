@@ -33,7 +33,7 @@ import sys
 import tempfile
 from pathlib import Path
 
-from larmorx_validation.difftest import core, inputs, limits, report, sizing, tools
+from larmorx_validation.difftest import core, inputs, limits, report, runner, sizing
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
@@ -56,8 +56,12 @@ def main() -> int:
     rows = []
     with tempfile.TemporaryDirectory(prefix="lx-heavy-predict-") as t:
         for h in report.heavy(args.night):
-            tool = tools.get(h["tool"])
-            recipe = core.make_recipe(tool, h["seed"], h["n"])
+            recipe = runner.night_recipe(args.night, h)
+            if recipe is None:
+                rows.append(
+                    {"case": f"{h['tool']}:{h['seed']}:{h['n']}", "prediction": "no recipe kept"}
+                )
+                continue
             spec = recipe["inputs"].get("a") or recipe["inputs"].get("input")
             row = {
                 "tool": h["tool"],

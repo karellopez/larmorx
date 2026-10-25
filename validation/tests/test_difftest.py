@@ -361,6 +361,33 @@ def test_the_heavy_queue_runs_the_quickest_first_and_only_what_is_named(tmp_path
     assert [h["n"] for h in runner.heavy_queue(out, {"ants-n4:r:1"})] == [1]
 
 
+def test_a_heavy_case_runs_the_recipe_of_its_night_after_the_generator_changed(tmp_path):
+    """A seed and case number name a case only for the night's generator; the heavy queue runs
+    later, after the generator may have changed (2026-10-25: every recipe of the first night's
+    queue is drawn differently since), so it takes the recipe the night kept."""
+    from larmorx_validation.difftest import runner
+
+    out = tmp_path / "night"
+    tool = tools.get("ants-n4")
+    # The night's case 7 had the recipe today's generator draws for case 8.
+    kept = json.loads(json.dumps(core.make_recipe(tool, "r", 8)))
+    drawn = core.make_recipe(tool, "r", 7)
+    assert core.recipe_id(kept) != core.recipe_id(drawn)
+    h = {"tool": "ants-n4", "seed": "r", "n": 7, "recipe_id": core.recipe_id(kept)}
+    # Nothing kept: the case is not run with another recipe.
+    assert runner.night_recipe(out, h) is None
+    # The night's finding of the case keeps it (its other findings are other cases).
+    (out / "findings" / "ants-n4").mkdir(parents=True)
+    other = core.make_recipe(tool, "r", 9)
+    for name, recipe in (("r-00007-port.json", kept), ("r-00070-port.json", other)):
+        (out / "findings" / "ants-n4" / name).write_text(json.dumps({"recipe": recipe}))
+    assert core.recipe_id(runner.night_recipe(out, h)) == core.recipe_id(kept)
+    # A queue line written since keeps its recipe itself; a draw that gives the id is used.
+    assert runner.night_recipe(out, {**h, "recipe": other}) == other
+    same = {"tool": "ants-n4", "seed": "r", "n": 7, "recipe_id": core.recipe_id(drawn)}
+    assert core.recipe_id(runner.night_recipe(tmp_path / "none", same)) == core.recipe_id(drawn)
+
+
 def test_a_tool_held_to_thresholds_gets_one_group_per_implementation(tmp_path):
     out = tmp_path / "night"
     (out / "findings" / "mri-hmc").mkdir(parents=True)

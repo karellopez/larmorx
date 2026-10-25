@@ -67,6 +67,29 @@ transforms (text in many spellings, MATLAB, HDF5), and small crops of real templ
 `larmorx-testdata` where a tool needs anatomy. Phantoms are functions of world coordinates, so a
 moved copy of one (registration, head motion) is exact and its answer known.
 
+**Realistic cases, and a labelled extreme share** (user, 2026-10-25: "reasonable size tests";
+`gen.EXTREME_SHARE`, `REALISTIC_SPACINGS`, `EXTREME_SPACINGS`). Every case decides first whether
+it is one of the night's *extreme* share (10 %, the case's feature `extreme`): the others are
+realistic, with headers in millimetres (or without units) and voxels of 0.5 to 4 mm (within the
+0.2 to 10 mm of real scanners), matrices of at most 32 voxels per axis and the tools' typical
+options; an extreme case may also have metres or micrometres and voxels of 0.01 to 50 units. The
+report gives each tool's count of extreme cases (column *Extreme*), and the site's panels too.
+
+**Predicted before run** (`difftest/sizing.py`). For the tools whose memory grows with what their
+options and header ask for (N4BiasFieldCorrection's lattice and padding, the resamplers' output
+grids, 3dUnifize `-EPI`'s ball of neighbours), each case's need is predicted from the original's
+sizing law and the unit costs measured on smaller variants of real cases (the original's and
+larmorx's GiB and hours). A case predicted over the case's memory limit is not compared: larmorx's
+default runs alone, with the limit as `LARMORX_MEMORY_LIMIT`, and must stop at once with its
+guard's clear error (ANTS-162, AFNI-75), the verdict *guard* (a finding, `guard missing`, if it
+does not); where larmorx's own need fits, or the implementation has no guard, nothing runs
+(*memory*). Either way the prediction is kept in the case's line (`predicted`) and the case is
+queued in the night's `heavy.jsonl`, for the heavy box (`difftest --heavy`), and on a larger
+machine when it is beyond this one ("pending: larger machine",
+`validation/investigations/difftest/heavy_pending.py`, with the command line that runs it there).
+The tests: `validation/tests/test_difftest.py::test_most_cases_are_realistic_and_the_extreme_share_is_labelled`
+and `::test_the_sizing_laws_and_a_case_predicted_over_the_limit`.
+
 | Tool | Parity runner | Implementations | Drawn |
 |---|---|---|---|
 | `nifti-io` | `parity.nifti_io` | larmorx vs nibabel | every NIfTI form, type, scaling, geometry, extension, NIfTI-2, byte order |
@@ -137,7 +160,12 @@ oracles/difftest/<date>` runs the queue later, one case at a time, each implemen
 child process in a leaf of 24 GiB with 48 GiB of swap (`--heavy-hours`, 2 per run), only when the
 machine is quiet (the user says when); the results, with each run's peak memory, go to
 `heavy-results.jsonl`, and the report's "Heavy cases" section lists every queued case with its
-result (or "waiting"). Before a queue is run, `validation/investigations/difftest/heavy_predict.py`
+result (or "waiting"). Each case runs with the recipe its night drew: a seed and case number
+name a case only for the generator of the night's commit (`run.json`), and the generator
+changes (the realistic share, 2026-10-25, draws every case of the first night's queue
+differently), so the queue line keeps the recipe itself, and for a night queued before that the
+night's finding of the case does (`runner.night_recipe`; a case with neither is skipped with
+the reason). Before a queue is run, `validation/investigations/difftest/heavy_predict.py`
 predicts each case's memory and time from the original's sizing law and the unit costs measured
 on smaller variants of the same case (`n4_memory.py`, `scaled_memory.py`; 3dUnifize's ball of
 neighbours from AFNI's own formula). A case predicted beyond the heavy box (24 GiB and 48 GiB of

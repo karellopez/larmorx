@@ -85,6 +85,12 @@ moved copy of one (registration, head motion) is exact and its answer known.
 input alike; for a replica or port every reported bit-identity check is identical); *explained*
 (the values differ from the original as built only through glibc's maths: identical with
 CORE-MATH preloaded, by the suite's own second run or by a re-run of the case with the preload);
+*notice* (the only failed check is the fix pass naming a correction that changed nothing this
+input shows: D13 notices are meant to fire exactly where the result changes, so these are kept
+and counted per defect, not shrunk); *undefined* (the original's result depends on memory it
+never wrote or on its clock, and larmorx names the defect while reproducing it, refuses with
+the defect's ID, or the descriptor knows the drawn case meets it, `extra["undefined"]`: e.g.
+ANTS-82's clock-seeded sampling of the velocity-field stages; not comparable, never cached);
 *differ* (a finding); *timeout*, *crash* (unclear, for the orchestrator). Replicas and ports must
 be bit-identical (compared in `reproduce` mode; the fix pass checks that a D13 notice is named
 exactly where the default changes the result); clean-room originals are held to their records'
@@ -111,6 +117,22 @@ A difference worth keeping becomes `validation/difftest/cases/<tool>/<id>.json`
 expectation. The tool's parity suite loads it as a regular case, `difftest/<id>`
 (`difftest.permanent.cases`), in the tiers it names: its inputs are rebuilt from the recipe, the
 original's runs replay from the oracle cache.
+
+## Triage
+
+Every difference is decided by the user's rule (2026-10-24): a clear larmorx mistake in a port
+or replica is fixed at once (bit-identical again, with a unit test, a permanent case and the
+gates); a clean-room original's difference is reported for its agent with the black-box
+reproducer (an agent that has read the upstream source never edits a clean-room crate); a defect
+of the original goes into the register, decided by rules A-D with the D13 switch where one is
+required; anything else is listed for the orchestrator. What was done about each is written in
+`validation/difftest/triage.toml` (tool, implementation, the failed checks, `status` fixed |
+register | open | harness | unclear, the explanation, the permanent case or finding it links to);
+the site's "Random testing" panels show it beside each night's differences.
+
+The tools behind the findings are in `validation/investigations/difftest/` (its README): replaying
+a finding by hand against ANTs, AFNI or mcflirt, bisecting a registration's options, probing an
+original's behaviour on edge cases.
 
 ## The oracle cache
 

@@ -248,6 +248,44 @@ impl<R: Real> LevelMetric<R> {
         floor: &IndexFloor,
         warnings: &mut Vec<String>,
     ) -> Result<(R, Vec<R>), ItkException> {
+        self.evaluate_jacobian(metric, moving, derivative, floor, warnings)
+            .map(|(v, d, _)| (v, d))
+    }
+
+    /// [`LevelMetric::evaluate`], and whether a point's derivative used the moving
+    /// transform's Jacobian ([`Reduced::jacobian_used`](mean_squares::Reduced)).
+    pub(crate) fn evaluate_jacobian<const D: usize>(
+        &self,
+        metric: &ImageMetricv4<R, D>,
+        moving: &Composite<R, D>,
+        derivative: bool,
+        floor: &IndexFloor,
+        warnings: &mut Vec<String>,
+    ) -> Result<(R, Vec<R>, bool), ItkException> {
+        if let LevelMetric::Cc(m) = self {
+            let r = m.evaluate(metric, moving, derivative, floor)?;
+            let used = r.jacobian_used;
+            if r.no_valid_points {
+                warnings.push(no_valid_points_warning(
+                    VERIFY_FILE,
+                    544,
+                    "ANTSNeighborhoodCorrelationImageToImageMetricv4",
+                ));
+            }
+            return Ok((r.value, r.derivative, used));
+        }
+        self.evaluate_inner(metric, moving, derivative, floor, warnings)
+            .map(|(v, d)| (v, d, true))
+    }
+
+    fn evaluate_inner<const D: usize>(
+        &self,
+        metric: &ImageMetricv4<R, D>,
+        moving: &Composite<R, D>,
+        derivative: bool,
+        floor: &IndexFloor,
+        warnings: &mut Vec<String>,
+    ) -> Result<(R, Vec<R>), ItkException> {
         let reduced = |r: mean_squares::Reduced<R>, class: &str, warnings: &mut Vec<String>| {
             if r.no_valid_points {
                 warnings.push(no_valid_points_warning(VERIFY_FILE, 544, class));
@@ -382,8 +420,14 @@ impl<'a, R: Real, const D: usize> LevelProblem<'a, R, D> {
             None
         };
         let before = warnings.len();
+        let mut jacobian_used = true;
         let result = match entry {
-            LevelEntry::Image(m, state) => state.evaluate(m, moving, derivative, floor, warnings),
+            LevelEntry::Image(m, state) => state
+                .evaluate_jacobian(m, moving, derivative, floor, warnings)
+                .map(|(v, d, used)| {
+                    jacobian_used = used;
+                    (v, d)
+                }),
             LevelEntry::PointSet(p) => {
                 if derivative {
                     p.value_and_derivative(moving, warnings)
@@ -396,6 +440,9 @@ impl<'a, R: Real, const D: usize> LevelProblem<'a, R, D> {
         let Some(e) = jacobian_error else {
             return result;
         };
+        if result.is_ok() && !jacobian_used {
+            return result;
+        }
         let no_valid = warnings[before..]
             .iter()
             .any(|w| w.contains("No valid points were found"));

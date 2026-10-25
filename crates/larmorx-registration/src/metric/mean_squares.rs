@@ -30,6 +30,10 @@ pub struct Reduced<R> {
     pub value: R,
     pub derivative: Vec<R>,
     pub no_valid_points: bool,
+    /// Whether a point's derivative asked the moving transform for its Jacobian (every valid
+    /// point does, except in the CC metric, which skips points of a flat neighbourhood): only
+    /// then can a transform without a Jacobian with respect to position throw (ITK-35).
+    pub jacobian_used: bool,
 }
 
 impl<R: Real> BaseReduction<R> {
@@ -140,6 +144,7 @@ impl<R: Real> BaseReduction<R> {
                     value: R::MAX,
                     derivative: vec![R::ZERO; derivative.len()],
                     no_valid_points: true,
+                    jacobian_used: true,
                 };
             }
             let n = R::from_i64(self.valid as i64);
@@ -147,6 +152,7 @@ impl<R: Real> BaseReduction<R> {
                 value: (R::ZERO + self.measure) / n,
                 derivative,
                 no_valid_points: false,
+                jacobian_used: true,
             };
         }
         let mut derivative = if compute_derivative {
@@ -166,6 +172,7 @@ impl<R: Real> BaseReduction<R> {
                 value: R::MAX,
                 derivative: vec![R::ZERO; derivative.len()],
                 no_valid_points: true,
+                jacobian_used: true,
             };
         }
         let n = R::from_i64(self.valid as i64);
@@ -177,6 +184,7 @@ impl<R: Real> BaseReduction<R> {
             value,
             derivative,
             no_valid_points: false,
+            jacobian_used: true,
         }
     }
 }

@@ -214,15 +214,14 @@ pub fn vnl_svd(m: &[f64], rows: usize, cols: usize) -> Option<(Vec<f64>, Vec<f64
     vnl_svd_info(m, rows, cols).ok()
 }
 
+/// `(U, w, V)` as [`vnl_svd`] returns them.
+pub type Svd = (Vec<f64>, Vec<f64>, Vec<f64>);
+
 /// The decomposition of [`vnl_svd`], or LINPACK's `info` when it fails to converge (`dsvdc`'s
 /// `m`, the number of singular values still to find), which `vnl_svd` prints in its warning
 /// ([`suspicious_svdc`]).
 #[allow(clippy::many_single_char_names)]
-pub fn vnl_svd_info(
-    m: &[f64],
-    rows: usize,
-    cols: usize,
-) -> Result<(Vec<f64>, Vec<f64>, Vec<f64>), usize> {
+pub fn vnl_svd_info(m: &[f64], rows: usize, cols: usize) -> Result<Svd, usize> {
     let (n, p) = (rows, cols);
     assert!(n >= p && p > 0 && m.len() == n * p);
     // vnl_fortran_copy: column-major.

@@ -42,6 +42,9 @@ def _tool(name: str, title: str, program: str, draw, weight: float = 1.0, timeou
         case=lambda recipe, impl, **kw: _ants.ants_case(recipe, program, **{**_expectation(recipe), **kw}),
         run=_run,
         crmath_retry=True,
+        # An expected divergence (larmorx refuses an interpolator it does not port in 2D or
+        # 4D) where ANTs aborts too (an image it cannot allocate): both fail, as they should.
+        crash_kw={"expect": "error"},
         timeout=timeout,
         weight=weight,
         unavailable=_ants.ants_unavailable,

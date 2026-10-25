@@ -27,6 +27,7 @@ use larmorx_nc_core::mesh::{Mesh, V3};
 use larmorx_nc_core::newimagefns;
 use larmorx_nc_core::options::{ArgFlag, Opt, OptionParser, Value};
 use larmorx_nc_core::settings::Settings;
+use larmorx_nc_core::sse::{self, S64};
 use larmorx_nc_core::stdsort;
 use larmorx_nc_core::volume::{self, FslError, SaveError, SaveOptions, Saved, Volume};
 
@@ -423,21 +424,30 @@ impl Deform {
         let vol = mask.is_some();
         let mask = mask.unwrap_or(&empty);
         let interp_mask = |p: V3| f64::from(mask.interpolate(p.x as f32, p.y as f32, p.z as f32));
+        // Every operation that NaN or infinite voxels reach computes with SSE's NaNs
+        // (larmorx_nc_core::sse), in the source's order.
+        let in_voxels = |v: V3| {
+            V3::new(
+                sse::div_f64(v.x, xdim),
+                sse::div_f64(v.y, ydim),
+                sse::div_f64(v.z, zdim),
+            )
+        };
         if nb_iter % 50 == 0 {
-            let mut l2 = 0.0;
+            let mut l2 = S64(0.0);
             let mut counter = 0i32;
             for i in 0..m.points.len() {
                 counter += 1;
                 l2 += m.medium_distance_of_neighbours(i);
             }
-            self.l = l2 / f64::from(counter);
+            self.l = (l2 / f64::from(counter)).0;
         }
         if nb_iter % 100 == 0 {
             for i in 0..m.points.len() {
                 let n = m.local_normal(i);
                 let point = m.points[i].coord;
-                let ipoint = V3::new(point.x / xdim, point.y / ydim, point.z / zdim);
-                let inn = V3::new(n.x / xdim, n.y / ydim, n.z / zdim);
+                let ipoint = in_voxels(point);
+                let inn = in_voxels(n);
                 let mut max = 0.0f64;
                 let c_m1 = ipoint.add(inn.scale(-1.0));
                 let mut current = interp(c_m1);
@@ -448,7 +458,7 @@ impl Deform {
                     }
                     let c_p = ipoint.add(inn.scale(i2));
                     let tmpp = interp(c_p);
-                    let tmp = (tmpp - current) * 100.0;
+                    let tmp = ((S64(tmpp) - current) * 100.0).0;
                     max = fmax(max, tmp);
                     current = tmpp;
                     if tmpp > 0.1 {
@@ -470,20 +480,20 @@ impl Deform {
             let sn = n.scale(tmp);
             let st = dv.sub(sn);
             let u1 = st.scale(0.5);
-            let rinv = (2.0 * sn.dot(n).abs()) / (l * l);
-            let f2 = (1.0 + fdlibm::tanh(f * (rinv - e))) * 0.5;
+            let rinv = ((2.0 * S64(sn.dot(n)).abs()) / (S64(l) * l)).0;
+            let f2 = ((1.0 + S64(fdlibm::tanh((S64(f) * (S64(rinv) - e)).0))) * 0.5).0;
             let u2 = sn.scale(f2).scale(f64::from(addsmooth));
             let point = m.points[i].coord;
-            let ipoint = V3::new(point.x / xdim, point.y / ydim, point.z / zdim);
+            let ipoint = in_voxels(point);
             let mut f3;
             // FSL sets f2 to 0 below once u2 is computed: a store without effect (FSL-57, kept)
             if m.points[i].data.last().copied() == Some(0.0) {
-                let inn = V3::new(n.x / xdim, n.y / ydim, n.z / zdim);
+                let inn = in_voxels(n);
                 let c_m = ipoint.add(inn.scale(-1.0));
                 let c_p = ipoint.add(inn.scale(1.0));
                 let tmp = interp(c_p);
-                let gradient = tmp - interp(c_m);
-                let tmp2 = gradient * 100.0;
+                let gradient = sse::sub_f64(tmp, interp(c_m));
+                let tmp2 = sse::mul_f64(gradient, 100.0);
                 f3 = std_max(-1.0, std_min(tmp2, 1.0));
                 if (0.0..0.1).contains(&tmp2) && tmp < 0.1 {
                     f3 = f64::from(speed);
@@ -491,17 +501,17 @@ impl Deform {
                 if vol {
                     let tmpvol = interp_mask(ipoint);
                     if tmpvol > 0.0 {
-                        f3 = fmax(fmax(tmpvol * 0.5, 0.1), f3);
+                        f3 = fmax(fmax(sse::mul_f64(tmpvol, 0.5), 0.1), f3);
                     }
                 }
             } else {
                 f3 = 0.0;
                 let tmpvol = interp_mask(ipoint);
                 if tmpvol > 0.0 {
-                    f3 = fmax(tmpvol * 0.5, 0.1);
+                    f3 = fmax(sse::mul_f64(tmpvol, 0.5), 0.1);
                 }
             }
-            let u3 = n.scale(0.05 * f3);
+            let u3 = n.scale(sse::mul_f64(0.05, f3));
             let u = u1.add(u2).add(u3);
             m.points[i].update_coord = point.add(u);
         }

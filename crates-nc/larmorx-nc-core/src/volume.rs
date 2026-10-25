@@ -857,8 +857,12 @@ fn sort_like_std(v: &mut [f32]) {
 
 /// `find_thresholds` without a mask, for `float` volumes: from a 1000-bin histogram between
 /// the extremes, the bins holding 2% and 98% of the voxels, refined over at most 10 passes
-/// while the range they span is under a tenth of the histogram's.
+/// while the range they span is under a tenth of the histogram's. The limits are computed with
+/// SSE's NaNs (an infinite voxel makes `0 * inf`: x86-64's default NaN on every platform).
 fn find_thresholds(vol: &Volume) -> (f32, f32) {
+    use sse::{S32, S64};
+    // max - min in float, as a double
+    let range = |max: f32, min: f32| S64(f64::from((S32(max) - min).0));
     const BINS: i32 = 1000;
     const MAX_PASSES: i32 = 10;
     let mut hist = vec![0f64; BINS as usize];
@@ -874,11 +878,11 @@ fn find_thresholds(vol: &Volume) -> (f32, f32) {
             bottom_bin = (bottom_bin - 1).max(0);
             top_bin = (top_bin + 1).min(BINS - 1);
             let tmpmin = (f64::from(min)
-                + (f64::from(bottom_bin) / f64::from(BINS)) * f64::from(max - min))
-                as f32;
+                + (S64(f64::from(bottom_bin)) / f64::from(BINS)) * range(max, min))
+            .0 as f32;
             max = (f64::from(min)
-                + (f64::from(top_bin + 1) / f64::from(BINS)) * f64::from(max - min))
-                as f32;
+                + (S64(f64::from(top_bin + 1)) / f64::from(BINS)) * range(max, min))
+            .0 as f32;
             min = tmpmin;
         }
         if pass == MAX_PASSES || min == max {
@@ -900,7 +904,7 @@ fn find_thresholds(vol: &Volume) -> (f32, f32) {
             thresh98 = min;
             break;
         }
-        let fa = f64::from(max - min) / f64::from(BINS);
+        let fa = range(max, min) / f64::from(BINS);
         let mut count: i32 = 0;
         bottom_bin = lowest_bin;
         while i64::from(count) < validsize / 50 {
@@ -908,7 +912,7 @@ fn find_thresholds(vol: &Volume) -> (f32, f32) {
             bottom_bin += 1;
         }
         bottom_bin -= 1;
-        thresh2 = min + (f64::from(bottom_bin) * fa) as f32;
+        thresh2 = (S32(min) + (f64::from(bottom_bin) * fa).0 as f32).0;
         count = 0;
         top_bin = highest_bin;
         while i64::from(count) < validsize / 50 {
@@ -916,7 +920,7 @@ fn find_thresholds(vol: &Volume) -> (f32, f32) {
             top_bin -= 1;
         }
         top_bin += 1;
-        thresh98 = min + (f64::from(top_bin + 1) * fa) as f32;
+        thresh98 = (S32(min) + (f64::from(top_bin + 1) * fa).0 as f32).0;
         if pass == MAX_PASSES {
             break;
         }

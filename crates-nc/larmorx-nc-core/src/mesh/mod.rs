@@ -10,6 +10,9 @@
 //! its triangles again in the original's order. Points live in the mesh's point vector (their
 //! number is their index); triangles in an arena, with the mesh's triangle list holding their
 //! ids in list order.
+//!
+//! The arithmetic of points and vectors gives SSE's NaNs (`crate::sse`): a surface that NaN or
+//! infinite voxels reach has x86-64's NaN bits on every platform.
 
 pub mod load;
 pub mod profile;
@@ -17,6 +20,7 @@ pub mod profile;
 use std::fmt::Write as _;
 
 use crate::cnum;
+use crate::sse::{self, S64};
 
 /// A point or a vector (meshclass's `Pt` and `Vec`, both three doubles).
 #[derive(Clone, Copy, Debug, Default, PartialEq)]
@@ -34,7 +38,9 @@ impl V3 {
     /// `Vec::norm`.
     #[inline]
     pub fn norm(self) -> f64 {
-        (self.x * self.x + self.y * self.y + self.z * self.z).sqrt()
+        (S64(self.x) * self.x + S64(self.y) * self.y + S64(self.z) * self.z)
+            .sqrt()
+            .0
     }
 
     /// `Vec::normalize` (unchanged when the norm is 0).
@@ -42,50 +48,66 @@ impl V3 {
     pub fn normalize(&mut self) {
         let n = self.norm();
         if n != 0.0 {
-            self.x /= n;
-            self.y /= n;
-            self.z /= n;
+            self.x = sse::div_f64(self.x, n);
+            self.y = sse::div_f64(self.y, n);
+            self.z = sse::div_f64(self.z, n);
         }
     }
 
     /// `operator|`: the dot product.
     #[inline]
     pub fn dot(self, o: V3) -> f64 {
-        self.x * o.x + self.y * o.y + self.z * o.z
+        (S64(self.x) * o.x + S64(self.y) * o.y + S64(self.z) * o.z).0
     }
 
     /// `operator*(Vec, Vec)`: the cross product, as meshclass writes it.
     #[inline]
     pub fn cross(self, v2: V3) -> V3 {
         V3::new(
-            self.y * v2.z - self.z * v2.y,
-            v2.x * self.z - v2.z * self.x,
-            self.x * v2.y - v2.x * self.y,
+            (S64(self.y) * v2.z - S64(self.z) * v2.y).0,
+            (S64(v2.x) * self.z - S64(v2.z) * self.x).0,
+            (S64(self.x) * v2.y - S64(v2.x) * self.y).0,
         )
     }
 
     /// `d * v` (and `v * d`).
     #[inline]
     pub fn scale(self, d: f64) -> V3 {
-        V3::new(d * self.x, d * self.y, d * self.z)
+        V3::new(
+            sse::mul_f64(d, self.x),
+            sse::mul_f64(d, self.y),
+            sse::mul_f64(d, self.z),
+        )
     }
 
     #[inline]
     #[allow(clippy::should_implement_trait)]
     pub fn add(self, o: V3) -> V3 {
-        V3::new(self.x + o.x, self.y + o.y, self.z + o.z)
+        V3::new(
+            sse::add_f64(self.x, o.x),
+            sse::add_f64(self.y, o.y),
+            sse::add_f64(self.z, o.z),
+        )
     }
 
     #[inline]
     #[allow(clippy::should_implement_trait)]
     pub fn sub(self, o: V3) -> V3 {
-        V3::new(self.x - o.x, self.y - o.y, self.z - o.z)
+        V3::new(
+            sse::sub_f64(self.x, o.x),
+            sse::sub_f64(self.y, o.y),
+            sse::sub_f64(self.z, o.z),
+        )
     }
 
     /// `Vec / d`: unchanged (with meshclass's "division by zero" message) when `d` is 0.
     pub fn div(self, d: f64, err: &mut String) -> V3 {
         if d != 0.0 {
-            V3::new(self.x / d, self.y / d, self.z / d)
+            V3::new(
+                sse::div_f64(self.x, d),
+                sse::div_f64(self.y, d),
+                sse::div_f64(self.z, d),
+            )
         } else {
             err.push_str("division by zero\n");
             self
@@ -221,9 +243,9 @@ impl Mesh {
             self.points[c].coord,
         );
         V3::new(
-            (p.x + q.x + r.x) / 3.0,
-            (p.y + q.y + r.y) / 3.0,
-            (p.z + q.z + r.z) / 3.0,
+            ((S64(p.x) + q.x + r.x) / 3.0).0,
+            ((S64(p.y) + q.y + r.y) / 3.0).0,
+            ((S64(p.z) + q.z + r.z) / 3.0).0,
         )
     }
 
@@ -233,9 +255,7 @@ impl Mesh {
         let mut v = V3::default();
         for &t in &self.points[p].triangles {
             let n = self.tri_normal(t);
-            v.x += n.x;
-            v.y += n.y;
-            v.z += n.z;
+            v = v.add(n);
         }
         v.normalize();
         v
@@ -247,16 +267,13 @@ impl Mesh {
         let mut r = V3::default();
         let nb = &self.points[p].neighbours;
         for &n in nb {
-            let c = self.points[n].coord;
-            r.x += c.x;
-            r.y += c.y;
-            r.z += c.z;
+            r = r.add(self.points[n].coord);
         }
-        let counter = nb.len() as i32;
+        let counter = f64::from(nb.len() as i32);
         V3::new(
-            r.x / f64::from(counter),
-            r.y / f64::from(counter),
-            r.z / f64::from(counter),
+            sse::div_f64(r.x, counter),
+            sse::div_f64(r.y, counter),
+            sse::div_f64(r.z, counter),
         )
     }
 
@@ -268,12 +285,12 @@ impl Mesh {
 
     /// `Mpoint::medium_distance_of_neighbours`.
     pub fn medium_distance_of_neighbours(&self, p: usize) -> f64 {
-        let mut l = 0.0;
+        let mut l = S64(0.0);
         let me = self.points[p].coord;
         for &n in &self.points[p].neighbours {
             l += self.points[n].coord.sub(me).norm();
         }
-        l / self.points[p].neighbours.len() as f64
+        (l / self.points[p].neighbours.len() as f64).0
     }
 
     /// `operator<(Mpoint, Mpoint)`: whether a neighbour of `p1` has `p2`'s coordinates
@@ -300,7 +317,7 @@ impl Mesh {
     /// `Mesh::translation`.
     pub fn translation(&mut self, x: f64, y: f64, z: f64) {
         for p in &mut self.points {
-            p.coord = V3::new(p.coord.x + x, p.coord.y + y, p.coord.z + z);
+            p.coord = p.coord.add(V3::new(x, y, z));
         }
     }
 
@@ -356,19 +373,19 @@ impl Mesh {
                 self.points[v2].coord,
             );
             let pt0 = V3::new(
-                (c1.x + c2.x) / 2.0,
-                (c1.y + c2.y) / 2.0,
-                (c1.z + c2.z) / 2.0,
+                ((S64(c1.x) + c2.x) / 2.0).0,
+                ((S64(c1.y) + c2.y) / 2.0).0,
+                ((S64(c1.z) + c2.z) / 2.0).0,
             );
             let pt2 = V3::new(
-                (c0.x + c1.x) / 2.0,
-                (c0.y + c1.y) / 2.0,
-                (c0.z + c1.z) / 2.0,
+                ((S64(c0.x) + c1.x) / 2.0).0,
+                ((S64(c0.y) + c1.y) / 2.0).0,
+                ((S64(c0.z) + c1.z) / 2.0).0,
             );
             let pt1 = V3::new(
-                (c0.x + c2.x) / 2.0,
-                (c0.y + c2.y) / 2.0,
-                (c0.z + c2.z) / 2.0,
+                ((S64(c0.x) + c2.x) / 2.0).0,
+                ((S64(c0.y) + c2.y) / 2.0).0,
+                ((S64(c0.z) + c2.z) / 2.0).0,
             );
             let (mut p0, mut p1, mut p2) = (usize::MAX, usize::MAX, usize::MAX);
             let (mut b0, mut b1, mut b2) = (true, true, true);

@@ -21,7 +21,7 @@ use larmorx_nc_core::fdlibm;
 use larmorx_nc_core::mesh::{Mesh, V3};
 use larmorx_nc_core::options::{ArgFlag, Opt, OptionParser, Value};
 use larmorx_nc_core::settings::Settings;
-use larmorx_nc_core::sse;
+use larmorx_nc_core::sse::{self, S64};
 use larmorx_nc_core::volume::{self, Elem, FslError, SaveError, SaveOptions, Saved, Volume};
 use larmorx_nc_core::{arma, glibc_double};
 
@@ -226,7 +226,8 @@ pub fn adjust_initial_mesh(
     bp.max = f64::from(mx);
     let (t2f, t98f) = image.robust_limits();
     let (t2, t98) = (f64::from(t2f), f64::from(t98f));
-    let t = t2 + 0.1 * (t98 - t2);
+    // NaN or infinite voxels reach these sums: SSE's NaNs (larmorx_nc_core::sse)
+    let t = (S64(t2) + 0.1 * (S64(t98) - t2)).0;
     bp.t98 = t98;
     bp.t2 = t2;
     bp.t = t;
@@ -279,25 +280,37 @@ pub fn adjust_initial_mesh(
     }
     let center = if xpara == 0.0 && ypara == 0.0 && zpara == 0.0 {
         // `double counter` (kept double "to preserve old results")
-        let mut counter = 0.0f64;
-        let tmp = t - t2;
+        let mut counter = S64(0.0);
+        let tmp = (S64(t) - t2).0;
         let mut c3 = V3::default();
         for k in 0..nz {
             for j in 0..ny {
                 for i in 0..nx {
-                    let mut c = f64::from(image.value(i, j, k)) - t2;
+                    let mut c = (S64(f64::from(image.value(i, j, k))) - t2).0;
                     if c > tmp {
-                        c = fmin(c, t98 - t2);
+                        c = fmin(c, (S64(t98) - t2).0);
                         counter += c;
-                        let p = V3::new(c * i as f64 * xd, c * j as f64 * yd, c * k as f64 * zd);
-                        c3 = V3::new(c3.x + p.x, c3.y + p.y, c3.z + p.z);
+                        let p = V3::new(
+                            (S64(c) * i as f64 * xd).0,
+                            (S64(c) * j as f64 * yd).0,
+                            (S64(c) * k as f64 * zd).0,
+                        );
+                        c3 = c3.add(p);
                     }
                 }
             }
         }
-        V3::new(c3.x / counter, c3.y / counter, c3.z / counter)
+        V3::new(
+            sse::div_f64(c3.x, counter.0),
+            sse::div_f64(c3.y, counter.0),
+            sse::div_f64(c3.z, counter.0),
+        )
     } else {
-        V3::new(xpara * xd, ypara * yd, zpara * zd)
+        V3::new(
+            sse::mul_f64(xpara, xd),
+            sse::mul_f64(ypara, yd),
+            sse::mul_f64(zpara, zd),
+        )
     };
     bp.cog = center;
     m.translation(center.x, center.y, center.z);
@@ -384,29 +397,35 @@ pub fn step_of_computation(
     let dscale = fmin(fmin(fmin(xdim, ydim), zdim), 1.0);
 
     if iteration_number == 50 || iteration_number % 100 == 0 {
-        *l = 0.0;
+        let mut sum = S64(0.0);
         let mut counter = 0i32;
         for p in 0..m.points.len() {
             counter += 1;
-            *l += m.medium_distance_of_neighbours(p);
+            sum += m.medium_distance_of_neighbours(p);
         }
-        *l /= f64::from(counter);
+        *l = (sum / f64::from(counter)).0;
     }
+    // Every operation that NaN or infinite voxels reach computes with SSE's NaNs
+    // (larmorx_nc_core::sse), in the source's order.
     let lv = *l;
-    let fit = NORMAL_MAX_UPDATE_FRACTION * LAMBDA_FIT * lv;
+    let fit = (S64(NORMAL_MAX_UPDATE_FRACTION) * LAMBDA_FIT * lv).0;
     let d1f = f64::from(d1);
     let d2f = f64::from(d2);
     for p in 0..m.points.len() {
         let n = m.local_normal(p);
         let dv = m.difference_vector(p);
         let tmp = dv.dot(n);
-        let sn = V3::new(n.x * tmp, n.y * tmp, n.z * tmp);
+        let sn = V3::new((S64(n.x) * tmp).0, (S64(n.y) * tmp).0, (S64(n.z) * tmp).0);
         let st = dv.sub(sn);
-        let u1 = V3::new(st.x * 0.5, st.y * 0.5, st.z * 0.5);
-        let rinv = (2.0 * sn.dot(n).abs()) / (lv * lv);
-        let mut f2 = (1.0 + fdlibm::tanh(f * (rinv - e))) * 0.5;
+        let u1 = V3::new(
+            (S64(st.x) * 0.5).0,
+            (S64(st.y) * 0.5).0,
+            (S64(st.z) * 0.5).0,
+        );
+        let rinv = ((2.0 * S64(sn.dot(n)).abs()) / (S64(lv) * lv)).0;
+        let mut f2 = ((1.0 + S64(fdlibm::tanh((S64(f) * (S64(rinv) - e)).0))) * 0.5).0;
         if pass > 0 && tmp > 0.0 {
-            f2 *= increase_smoothing;
+            f2 = (S64(f2) * increase_smoothing).0;
             f2 = fmin(f2, 1.0);
         }
         let u2 = sn.scale(f2);
@@ -419,37 +438,38 @@ pub fn step_of_computation(
                 1.0,
                 fmax(
                     0.0,
-                    bet_main_parameter + local_th * (coord.z - zcog) / radius,
+                    (S64(bet_main_parameter) + S64(local_th) * (S64(coord.z) - zcog) / radius).0,
                 ),
             );
         }
         let mut imin = tm;
         let mut imax = t;
         let pp = coord.add(n.scale(-1.0));
-        let mut iv = pp.x / xdim + 0.5;
-        let mut jv = pp.y / ydim + 0.5;
-        let mut kv = pp.z / zdim + 0.5;
+        let mut iv = (S64(pp.x) / xdim + 0.5).0;
+        let mut jv = (S64(pp.y) / ydim + 0.5).0;
+        let mut kv = (S64(pp.z) / zdim + 0.5).0;
         if image.in_bounds(trunc_i(iv), trunc_i(jv), trunc_i(kv)) {
             let mut im = f64::from(image.value(trunc_i(iv), trunc_i(jv), trunc_i(kv)));
             imin = fmin(imin, im);
             imax = fmax(imax, im);
-            let mut nxv = n.x / xdim;
-            let mut nyv = n.y / ydim;
-            let mut nzv = n.z / zdim;
-            let i2 = trunc_i(iv - f64::from(d1.wrapping_sub(1)) * nxv);
-            let j2 = trunc_i(jv - f64::from(d1.wrapping_sub(1)) * nyv);
-            let k2 = trunc_i(kv - f64::from(d1.wrapping_sub(1)) * nzv);
-            nxv *= dscale;
-            nyv *= dscale;
-            nzv *= dscale;
+            let mut nxv = sse::div_f64(n.x, xdim);
+            let mut nyv = sse::div_f64(n.y, ydim);
+            let mut nzv = sse::div_f64(n.z, zdim);
+            let back = f64::from(d1.wrapping_sub(1));
+            let i2 = trunc_i((S64(iv) - S64(back) * nxv).0);
+            let j2 = trunc_i((S64(jv) - S64(back) * nyv).0);
+            let k2 = trunc_i((S64(kv) - S64(back) * nzv).0);
+            nxv = sse::mul_f64(nxv, dscale);
+            nyv = sse::mul_f64(nyv, dscale);
+            nzv = sse::mul_f64(nzv, dscale);
             if image.in_bounds(i2, j2, k2) {
                 im = f64::from(image.value(i2, j2, k2));
                 imin = fmin(imin, im);
                 let mut gi = 2.0;
                 while gi < d1f {
-                    iv -= nxv;
-                    jv -= nyv;
-                    kv -= nzv;
+                    iv = sse::sub_f64(iv, nxv);
+                    jv = sse::sub_f64(jv, nyv);
+                    kv = sse::sub_f64(kv, nzv);
                     im = f64::from(image.value(trunc_i(iv), trunc_i(jv), trunc_i(kv)));
                     imin = fmin(imin, im);
                     if gi < d2f {
@@ -459,15 +479,15 @@ pub fn step_of_computation(
                 }
                 imin = fmax(t2, imin);
                 imax = fmin(tm, imax);
-                let tl = (imax - t2) * local_t + t2;
-                f3 = if imax - t2 > 0.0 {
-                    2.0 * (imin - tl) / (imax - t2)
+                let tl = ((S64(imax) - t2) * local_t + t2).0;
+                f3 = if (S64(imax) - t2).0 > 0.0 {
+                    (2.0 * (S64(imin) - tl) / (S64(imax) - t2)).0
                 } else {
-                    (imin - tl) * 2.0
+                    ((S64(imin) - tl) * 2.0).0
                 };
             }
         }
-        f3 *= fit;
+        f3 = sse::mul_f64(f3, fit);
         let u3 = n.scale(f3);
         let u = u1.add(u2).add(u3);
         m.points[p].update_coord = coord.add(u);

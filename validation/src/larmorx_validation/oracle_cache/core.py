@@ -459,6 +459,7 @@ def _new_entry(
                 "companions": [[s, h] for s, h, _ in i.companions],
                 "at": prep.role_of(i.path),
                 "relative": i.relative,
+                "written": i.written,
             }
             for i in prep.inputs
         ],

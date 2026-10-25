@@ -621,6 +621,42 @@ def test_verify_puts_inputs_back_where_they_were(cache, fake, workdir):
     assert again.cached and (d2 / "out.nii").read_bytes() == b"dlrow olleh"
 
 
+def test_resolve_serves_a_false_alarm_again_and_logs_it(cache, fake, workdir, capsys):
+    from larmorx_validation.__main__ import main
+
+    run(fake, *workdir()[1:], "--random")
+    run(fake, *workdir()[1:], "--random")  # differs: disputed
+    (e,) = entries(cache)
+    assert e["disputed"]
+    assert main(["oracle-cache", "resolve", e["key"][:12], "--reason", "a test"]) == 0
+    resolved = cache.read(e["key"])
+    assert "disputed" not in resolved and resolved["history"][-1]["event"] == "resolved"
+    lines = (cache.root / "findings.jsonl").read_text().splitlines()
+    assert len(lines) == 2 and json.loads(lines[-1])["event"] == "resolved"
+    assert list((cache.root / "disputes").glob("*/*.json"))  # the dispute's record stays
+    assert main(["oracle-cache", "resolve", "ffff", "--reason", "none"]) == 1
+
+
+def test_verify_names_an_input_as_it_was_written(cache, fake, workdir):
+    """An input named by a path that is not normal (``a/sub/../x``), as AFNI's suite does: the
+    program prints it so, and ``verify`` writes it so again."""
+    from larmorx_validation.oracle_cache import rerun
+
+    d, src, dst = workdir()
+    (d / "sub").mkdir()
+    odd = f"{d}/sub/../{src.name}"
+    r = oc.run([fake, odd, dst], env=env_for(), policy=ONE)
+    assert r.stdout == f"read {odd} wrote {dst}\n"
+    (e,) = entries(cache)
+    assert e["inputs"][0]["written"].endswith("/sub/../in.nii")
+    assert rerun.rerun(cache, e).status == "same"
+    # the same file named normally is another key (the program prints another path)
+    d2, src2, dst2 = workdir()
+    (d2 / "sub").mkdir()
+    assert prepared(fake, Path(f"{d2}/sub/../{src2.name}"), dst2).key == e["key"]
+    assert prepared(fake, src2, dst2).key != e["key"]
+
+
 def test_verify_skips_an_entry_whose_program_changed(cache, fake, workdir):
     from larmorx_validation.oracle_cache import rerun
 
@@ -760,6 +796,12 @@ def test_volatile_text_is_masked():
     b = b"ITK ERROR: Filter(0x7f00bb)\nElapsed time (stage 0): 9.87\nElapsed = 1.25 sec\n"
     assert compare.mask(a) == compare.mask(b)
     assert compare.mask(b"value 1.0") != compare.mask(b"value 2.0")
+    # antsRegistration's DIAGNOSTIC lines: the times masked, the metric and convergence kept
+    d1 = b" 2DIAGNOSTIC,     1, -1.154460330281e+00, 1.797693134862e+308, 1.6401e-03, 1.6401e-03, "
+    d2 = b" 2DIAGNOSTIC,     1, -1.154460330281e+00, 1.797693134862e+308, 1.1749e-03, 1.1749e-03, "
+    d3 = b" 2DIAGNOSTIC,     1, -1.154460330299e+00, 1.797693134862e+308, 1.6401e-03, 1.6401e-03, "
+    assert compare.mask(d1) == compare.mask(d2)
+    assert compare.mask(d1) != compare.mask(d3)
 
 
 def test_hdf5_strings_compare_by_their_contents(tmp_path):

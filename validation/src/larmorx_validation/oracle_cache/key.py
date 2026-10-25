@@ -283,6 +283,9 @@ class Input:
     companions_content: tuple[str, ...] = ()
     #: the argument as written when it named the file relative to the working directory
     relative: str | None = None
+    #: the argument as written, by its place, when it named the file by a path that is not
+    #: normal (``{d0}/sub/../x.nii``: the program prints it so)
+    written: str | None = None
 
 
 @dataclass
@@ -466,9 +469,11 @@ class _Mapper:
             return text
         if path.is_file():
             name = self._input(path)
+            i = int(name[2:])
             if relative:
-                i = int(name[2:])
                 self.inputs[i] = replace(self.inputs[i], relative=text)
+            elif os.path.normpath(text) != text and (written := self._as_written(text)):
+                self.inputs[i] = replace(self.inputs[i], written=written)
             return "{" + name + "}"
         # A directory the run may write in, or a path it may create.
         target = Path(os.path.abspath(path))
@@ -489,6 +494,17 @@ class _Mapper:
             # impossible to store (the cache could not put it back).
             self._watch(anchor)
         return text
+
+    def _as_written(self, text: str) -> str | None:
+        """``{place}`` and the rest of ``text`` as written, for the longest place it starts
+        with (``None``: none)."""
+        best = None
+        for name, p in self.places:
+            if name in self.files:
+                continue
+            if text.startswith(str(p) + "/") and (best is None or len(str(p)) > len(str(best[1]))):
+                best = (name, p)
+        return None if best is None else "{" + best[0] + "}" + text[len(str(best[1])) :]
 
     def argument(self, arg: str) -> str:
         pieces = _SPLIT.split(arg)
@@ -569,6 +585,12 @@ def prepare(
                         )
                     }
                     if i.companions
+                    else {}
+                ),
+                # a path not written normally (a/sub/../x) is printed so: its shape counts
+                **(
+                    {"spelled": i.written[: len(i.written) - len(i.path.name)] + "{name}"}
+                    if i.written
                     else {}
                 ),
             }

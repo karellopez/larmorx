@@ -82,6 +82,13 @@ def _layout(store: Store, entry: dict, root: Path) -> tuple[Prepared, dict[str, 
             comps.append((suf, sha, c))
         inputs.append(Input(path, item["sha256"], item["suffix"], tuple(comps), ""))
         values[f"in{i}"] = item.get("relative") or str(path)
+        if written := item.get("written"):  # a path as written (a/sub/../x): its directories
+            parts = _fill(written, values).split("/")
+            for k in range(1, len(parts)):
+                prefix = "/".join(parts[:k])
+                if prefix and ".." not in parts[:k] and "." not in parts[:k]:
+                    Path(prefix).mkdir(parents=True, exist_ok=True)
+            values[f"in{i}"] = _fill(written, values)
     home = root / "home"
     home.mkdir()
     values["home"] = str(home)

@@ -32,6 +32,9 @@ VOLATILE = (
     r"(?<=Elapsed = )[0-9.]+(?= sec)",
     r"(?i)(?<=cpu time)\s*[=:]\s*[0-9.eE+-]+",
     r"(?i)(?<=clock time)\s*[=:]\s*[0-9.eE+-]+",
+    # antsRegistration's DIAGNOSTIC lines: the 4th and 5th fields after the word are times
+    # (ITERATION_TIME_INDEX, SINCE_LAST), which the registration suite masks too
+    (r"(DIAGNOSTIC,(?:[^,\n]*,){3})[^,\n]*,[^,\n]*,", r"\1…,…,"),
 )
 
 
@@ -39,7 +42,8 @@ def mask(text: bytes, volatile: Sequence[str] = ()) -> bytes:
     """``text`` with what changes from run to run replaced by ``…``."""
     s = text.decode("utf-8", "replace")
     for pattern in (*VOLATILE, *volatile):
-        s = re.sub(pattern, "…", s)
+        regex, replacement = pattern if isinstance(pattern, tuple) else (pattern, "…")
+        s = re.sub(regex, replacement, s)
     return s.encode()
 
 

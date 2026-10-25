@@ -9,6 +9,8 @@
   ``CONFIRMATIONS`` identical runs), until they are or one differs.
 - ``stats``: what the cache holds.
 - ``disputes``: the entries a run disagreed with.
+- ``resolve KEY... --reason TEXT``: serve disputed entries again when their difference was none
+  (something that changes from run to run the comparison did not mask); logged, never silent.
 """
 
 from __future__ import annotations
@@ -46,6 +48,8 @@ def cmd_verify(args: argparse.Namespace) -> int:
     entries = _complete(store)
     if args.program:
         entries = [e for e in entries if e["parts"]["oracle"].get("program") in args.program]
+    if args.max_seconds is not None:
+        entries = [e for e in entries if e.get("seconds", 0.0) <= args.max_seconds]
     rng = random.Random(args.seed)
     chosen = rng.sample(entries, min(args.sample, len(entries)))
     print(f"oracle cache {store.root}: {len(entries)} entries served; re-running {len(chosen)}")
@@ -127,6 +131,46 @@ def cmd_disputes(args: argparse.Namespace) -> int:
     return 0
 
 
+def cmd_resolve(args: argparse.Namespace) -> int:
+    """A dispute found to be no difference of the result (something that changes from run to
+    run the comparison did not mask, fixed since): the entry is served again. The dispute's
+    record stays, and the resolution is logged next to it (``findings.jsonl``) and in the
+    entry's history: nothing is silently overwritten."""
+    import json
+
+    from larmorx_validation.oracle_cache.store import now
+
+    store = _store(args)
+    status = 0
+    for prefix in args.keys:
+        found = [e for e in store.entries() if e["key"].startswith(prefix) and e.get("disputed")]
+        if len(found) != 1:
+            print(f"{prefix}: {len(found)} disputed entries match", file=sys.stderr)
+            status = 1
+            continue
+        entry = found[0]
+        if args.check:
+            from larmorx_validation.oracle_cache.rerun import rerun
+
+            outcome = rerun(store, entry, timeout=args.timeout)
+            if outcome.status != "same":
+                print(
+                    f"{prefix}: not resolved, running it again: {outcome.status} {outcome.detail}"
+                )
+                status = 1
+                continue
+        with store.lock(entry["key"]):
+            entry = store.read(entry["key"])
+            dispute = entry.pop("disputed")
+            event = {"date": now(), "event": "resolved", "reason": args.reason, "dispute": dispute}
+            entry.setdefault("history", []).append(event)
+            store.write(entry)
+        with (store.root / "findings.jsonl").open("a", encoding="utf-8") as f:
+            f.write(json.dumps({"key": entry["key"], **event}, sort_keys=True) + "\n")
+        print(f"resolved {entry['key'][:16]}: {args.reason}")
+    return status
+
+
 def add_arguments(parser: argparse.ArgumentParser) -> None:
     parser.add_argument(
         "--cache", help="the cache (default: LARMORX_ORACLE_CACHE, else <workspace>/oracles/cache)"
@@ -136,6 +180,12 @@ def add_arguments(parser: argparse.ArgumentParser) -> None:
     v.add_argument("--sample", type=int, default=10)
     v.add_argument("--seed", type=int, default=None, help="the sample's seed (default: random)")
     v.add_argument("--program", nargs="+", help="only these programs (their names)")
+    v.add_argument(
+        "--max-seconds",
+        type=float,
+        default=None,
+        help="only entries whose stored run took at most this long (a quick check)",
+    )
     v.add_argument("--jobs", type=int, default=1)
     v.add_argument("--timeout", type=float, default=4 * 3600)
     v.set_defaults(oracle_func=cmd_verify)
@@ -149,6 +199,20 @@ def add_arguments(parser: argparse.ArgumentParser) -> None:
     s.set_defaults(oracle_func=cmd_stats)
     d = sub.add_parser("disputes", help="the entries a run disagreed with")
     d.set_defaults(oracle_func=cmd_disputes)
+    r = sub.add_parser(
+        "resolve",
+        help="serve disputed entries again, when their difference was no difference of the "
+        "result (the reason is logged; the dispute's record stays)",
+    )
+    r.add_argument("keys", nargs="+", help="the entries' keys (a unique prefix)")
+    r.add_argument("--reason", required=True, help="why the difference was none")
+    r.add_argument(
+        "--check",
+        action="store_true",
+        help="run each entry again first, and resolve it only if it gives the same result",
+    )
+    r.add_argument("--timeout", type=float, default=4 * 3600)
+    r.set_defaults(oracle_func=cmd_resolve)
 
 
 def main(args: argparse.Namespace) -> int:

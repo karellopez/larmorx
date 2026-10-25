@@ -26,7 +26,8 @@ use larmorx_core::parallel::{self, ThreadPoolError};
 use larmorx_core::vnl_svd::vnl_inverse;
 use larmorx_core::{IndexFloor, RealElement, same_value};
 use larmorx_interp::{
-    InterpError, Interpolation, Interpolator, LinearYz, NearestYz, Volume, linear, nearest,
+    BSplineMirror, InterpError, Interpolation, Interpolator, LinearYz, NearestYz, Volume, linear,
+    nearest,
 };
 use larmorx_io::nifti::itk::ItkGeometry;
 use rayon::prelude::*;
@@ -256,6 +257,55 @@ pub enum Coordinates {
     Float,
 }
 
+/// larmorx's working memory per output voxel of `ResampleImage` and `ResampleImageBySpacing`
+/// (the output and the second default's pass, as float, and the file's copy), measured with
+/// `validation/investigations/difftest/scaled_memory.py` (12.5 to 16 bytes; ANTs 7.3).
+pub const GRID_BYTES: f64 = 16.0;
+
+/// ANTS-162: the memory an output grid of `output` needs ([`GRID_BYTES`] per voxel), checked
+/// before anything is allocated; the error names the bytes and their likely cause (the
+/// input's extent over the output's spacing; a header in metres or micrometres) when they
+/// exceed [`larmorx_core::alloc::memory_limit`].
+pub fn check_output_grid(input: &ItkGeometry, output: &ItkGeometry) -> Result<(), String> {
+    let voxels: f64 = output.size.iter().map(|&n| n as f64).product();
+    let needed = GRID_BYTES * voxels;
+    let Err(limit) = larmorx_core::alloc::check_plan(needed) else {
+        return Ok(());
+    };
+    let short = |x: f64| {
+        let s = format!("{x:.4}");
+        s.trim_end_matches('0').trim_end_matches('.').to_string()
+    };
+    let join = |v: &[f64]| v.iter().map(|&x| short(x)).collect::<Vec<_>>().join(" x ");
+    let extent: Vec<f64> = (0..input.ndim)
+        .map(|i| input.size[i] as f64 * input.spacing[i])
+        .collect();
+    let unusual = input.spacing[..input.ndim.min(3)]
+        .iter()
+        .any(|&s| !(0.01..100.0).contains(&s.abs()));
+    Err(format!(
+        "the output would need about {} (a grid of {} voxels), more than {limit}. The \
+         input's voxels are {} mm: it spans {} mm, resampled to voxels of {} mm{}. An error \
+         (ANTS-162); LARMORX_UPSTREAM_DEFECTS=reproduce attempts it as ANTs does",
+        larmorx_core::alloc::gib(needed),
+        output
+            .size
+            .iter()
+            .map(|n| n.to_string())
+            .collect::<Vec<_>>()
+            .join(" x "),
+        join(&input.spacing),
+        join(&extent),
+        join(&output.spacing),
+        if unusual {
+            " (a header whose units are metres or micrometres makes an image 1000 times larger \
+             or smaller than it looks)"
+        } else {
+            ""
+        },
+    ))
+}
+
 /// Resamples `input` (on `input_geometry`) onto `output` through the identity transform, as
 /// `ResampleImageFilter` does: points outside the input get `default_value`, the others the
 /// interpolated value (in double) passed through `cast`.
@@ -309,6 +359,39 @@ where
     T: RealElement,
     O: Copy + PartialEq + Send + Sync,
 {
+    resample_identity_mirrored(
+        input,
+        input_geometry,
+        output,
+        interpolation,
+        default_value,
+        cast,
+        coordinates,
+        floor,
+        &BSplineMirror::full(),
+        n_threads,
+    )
+}
+
+/// [`resample_identity_with`] with the B-spline's mirror boundary `mirror` (the repeated one,
+/// or ITK's: defect ITK-98), which counts the output values that needed the second mirror.
+#[allow(clippy::too_many_arguments)]
+pub fn resample_identity_mirrored<T, O>(
+    input: &[T],
+    input_geometry: &ItkGeometry,
+    output: &ItkGeometry,
+    interpolation: &Interpolation,
+    default_value: O,
+    cast: impl Fn(f64) -> O + Sync,
+    coordinates: Coordinates,
+    floor: &IndexFloor,
+    mirror: &BSplineMirror,
+    n_threads: usize,
+) -> Result<Vec<O>, ResampleError>
+where
+    T: RealElement,
+    O: Copy + PartialEq + Send + Sync,
+{
     let d = input_geometry.ndim;
     if output.ndim != d {
         return Err(ResampleError::Dimensions {
@@ -346,7 +429,8 @@ where
         other if d == 3 => {
             let spacing: [f64; 3] = std::array::from_fn(|k| input_geometry.spacing[k]);
             parallel::with_threads(n_threads, || {
-                Interpolator::new(volume3(), other, spacing).map(Evaluator::Other)
+                Interpolator::new(volume3(), other, spacing)
+                    .map(|i| Evaluator::Other(i.with_bspline_mirror(mirror.local())))
             })??
         }
         other => return Err(ResampleError::Interpolation(name(other), d)),
@@ -371,6 +455,9 @@ where
         3 => job.run::<3>(&mut out),
         _ => job.run::<4>(&mut out),
     })?;
+    if let Evaluator::Other(interpolator) = &job.evaluator {
+        mirror.absorb(interpolator.bspline_mirror());
+    }
     Ok(out)
 }
 

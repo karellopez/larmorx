@@ -1271,8 +1271,11 @@ fn segmentation(
                 if verbose {
                     log.cerr(&format!("{}\n", itk_exception(&e).print()));
                 } else {
+                    // One line (an ITK description can hold several): larmorx's own line,
+                    // which ANTs does not print without --verbose 1.
                     log.cerr(&format!(
-                        "larmorx: Atropos: {e} (ANTs exits 1 and prints this only with --verbose 1, ANTS-45)\n"
+                        "larmorx: Atropos: {} (ANTs exits 1 and prints this only with --verbose 1, ANTS-45)\n",
+                        e.to_string().replace('\n', " ")
                     ));
                 }
                 1

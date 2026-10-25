@@ -106,6 +106,8 @@ UNDEFINED_DEFECTS: dict[str, str] = {
     "ITK-25": "the manifold Parzen windows read past the end of their neighbours (memory)",
     "SCI-01": "map_coordinates reads outside the array for huge or NaN coordinates (memory)",
     "AFNI-04": "a shift beyond the series reads past it (memory)",
+    "ANTS-163": "a mask of another size is read outside its buffer (memory)",
+    "ITK-98": "B-spline interpolation on a short axis reads outside the coefficients (memory)",
 }
 
 #: A refusal that names its defect (``... an error (ANTS-160)``): larmorx refuses a class (a)
@@ -257,11 +259,13 @@ def judge_once(
     impl: str,
     explore_mode: str = "off",
     timeout: float | None = None,
+    case_kw: dict | None = None,
 ) -> Judgement:
     """The verdict of ``recipe`` (CORE-MATH's explanation included), as shrinking needs it;
-    ``timeout``: seconds for each run (default: the tool's)."""
+    ``timeout``: seconds for each run (default: the tool's); ``case_kw``: the suite case's
+    own fields (a permanent case's expectation)."""
     with cache_mode(explore_mode):
-        j, _, _ = execute(tool, recipe, impl, timeout=timeout)
+        j, _, _ = execute(tool, recipe, impl, timeout=timeout, **(case_kw or {}))
         if j.verdict == DIFFER and tool.crash_kw and _original_crashed(j):
             # The original crashed or aborted: compared the suite's way for such a run.
             j2, _, _ = execute(tool, recipe, impl, **tool.crash_kw)
@@ -910,6 +914,9 @@ def run_heavy(
         raise RuntimeError("difftest --heavy runs in a memory box (it makes one with systemd-run)")
     box.nest()
     limits.watch_exits()
+    # larmorx's ANTS-162 guard plans for the heavy box (memory and swap), not the machine's
+    # physical memory: what fits the box runs in both modes.
+    os.environ["LARMORX_MEMORY_LIMIT"] = str(int((memory_gib + swap_gib) * limits.GIB))
     done = []
     for k, h in enumerate(report.heavy(out)):
         if h.get("result"):

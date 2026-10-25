@@ -1,0 +1,208 @@
+{
+ "defect": "ANTS-162",
+ "description": "N4 -b [20,3] on a 14x28x23x7 image of 4x1x1 m voxels (TR 3 s): the case that filled the machine on 2026-10-25; larmorx refuses before allocating (ANTS-162)",
+ "expect": "guard",
+ "found": {
+  "detail": "larmorx exceeds 3 GiB: the kernel stopped the process running it",
+  "n": 24,
+  "seed": "20261025",
+  "shrink_moves": [],
+  "signature": [
+   "larmorx exceeds the memory limit"
+  ]
+ },
+ "id": "lattice-beyond-any-machine-4d-metres",
+ "implementations": [
+  "port"
+ ],
+ "reason": "ANTS-162: a 4D image in metres with a 20 mm spline distance needs about 246 GiB (ANTs) at its first fitting level and 344 TB at its fourth; larmorx's default stops before allocating, neither ANTs nor larmorx's reproduce is run",
+ "recipe": {
+  "extra": {
+   "min_size": 4,
+   "outputs": [
+    "{out}"
+   ]
+  },
+  "features": {
+   "axis0": 0.9,
+   "axis1": 0.75,
+   "axis2": 1.1,
+   "bias field output": false,
+   "bias0": 0.0,
+   "bias1": 0.005,
+   "bias2": 0.005,
+   "bias3": -0.0075,
+   "bracket": true,
+   "bspline": true,
+   "centre0": -0.5,
+   "centre1": 4.0,
+   "centre2": -1.5,
+   "content": "head",
+   "convergence": false,
+   "dimension": 4,
+   "dtype": "int16",
+   "histogram": false,
+   "inter": -5.0,
+   "mask": false,
+   "noise": 0.0,
+   "order": ",3",
+   "orientation": "axes",
+   "origin0": -44.0,
+   "origin1": 25.0,
+   "origin2": 17.0,
+   "output form": "{out}",
+   "qfac": 1,
+   "qform_code": 1,
+   "range": "plain",
+   "rescale": false,
+   "sform": "same",
+   "sform_code": 0,
+   "shape": "14x28x23x7",
+   "shrink": true,
+   "shrink factor": "3",
+   "size": 10.0,
+   "slice_code": 4,
+   "slope": 0.01,
+   "spacing0": 4.0,
+   "spacing1": 1.0,
+   "spacing2": 1.0,
+   "spline": "20",
+   "suffix": ".nii",
+   "tissues": "t2",
+   "tr": 3.0,
+   "tunits": "msec",
+   "units": "m",
+   "verbose": false,
+   "weight": false
+  },
+  "groups": [
+   {
+    "args": [
+     "-d",
+     "4"
+    ],
+    "name": "dimension",
+    "optional": false
+   },
+   {
+    "args": [
+     "-i",
+     "{in:a}"
+    ],
+    "name": "input",
+    "optional": false
+   },
+   {
+    "args": [
+     "-s",
+     "3"
+    ],
+    "name": "shrink",
+    "optional": true
+   },
+   {
+    "args": [
+     "-b",
+     "[20,3]"
+    ],
+    "name": "bspline",
+    "optional": true
+   },
+   {
+    "args": [
+     "-o",
+     "{out}"
+    ],
+    "name": "output",
+    "optional": false
+   }
+  ],
+  "inputs": {
+   "a": {
+    "content": {
+     "axes": [
+      0.9,
+      0.75,
+      1.1
+     ],
+     "bias": [
+      0.0,
+      0.005,
+      0.005,
+      -0.0075
+     ],
+     "centre": [
+      -0.5,
+      4.0,
+      -1.5
+     ],
+     "noise": 0.0,
+     "seed": 2061570638,
+     "size": 10.0,
+     "tissues": "t2",
+     "type": "head"
+    },
+    "dtype": "int16",
+    "geometry": {
+     "origin": [
+      -44.0,
+      25.0,
+      17.0
+     ],
+     "qfac": 1,
+     "qform_code": 1,
+     "quaternion": [
+      1,
+      0,
+      0,
+      -1
+     ],
+     "sform": "same",
+     "sform_code": 0,
+     "spacing": [
+      4.0,
+      1.0,
+      1.0
+     ],
+     "units": "m"
+    },
+    "scaling": {
+     "inter": -5.0,
+     "slope": 0.01
+    },
+    "shape": [
+     14,
+     28,
+     23,
+     7
+    ],
+    "suffix": ".nii",
+    "timing": {
+     "slice_code": 4,
+     "slice_duration": 130.4348,
+     "slice_end": 22,
+     "slice_start": 0,
+     "tr": 3000.0,
+     "tunits": "msec"
+    },
+    "values": {
+     "offset": 0.0,
+     "scale": 1.0
+    }
+   }
+  },
+  "n": 24,
+  "options": [
+   "-b",
+   "-s",
+   "dimension 4"
+  ],
+  "seed": "20261025",
+  "tool": "ants-n4"
+ },
+ "rule": "C",
+ "status": "register",
+ "suite": "ants-n4",
+ "tier": "smoke",
+ "tool": "ants-n4"
+}

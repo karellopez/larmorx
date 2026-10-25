@@ -149,6 +149,11 @@ pub fn resample_image_by_spacing(
 ) -> Result<(AntsImage<f32>, ResampleBySpacingPlan, Vec<Notice>), ResampleBySpacingError> {
     let mut notices = Notices::new(mode);
     let plan = plan(&input.geometry, options)?;
+    if mode.fix() {
+        // ANTS-162: before anything is allocated (`reproduce` attempts it as ANTs does).
+        crate::resample::check_output_grid(&input.geometry, &plan.geometry)
+            .map_err(ResampleBySpacingError::Invalid)?;
+    }
     let d = input.dim();
     // ANTs' outside value: `inputImage->GetPixel({1, 1, ...})`, read before smoothing.
     let thin = input.size().iter().any(|&n| n < 2);

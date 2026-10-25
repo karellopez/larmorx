@@ -69,6 +69,8 @@ VARYING_DEFECTS: dict[str, str] = {
     "AFNI-45": "3dUnifize reads memory it never wrote",
     "AFNI-47": "3dUnifize reads past the end of its scale image",
     "ANTS-160": "ResampleImage reads missing Gaussian sigmas past the end of their list (the heap)",
+    "ANTS-163": "ImageMath reads a mask of another size outside its buffer (the heap)",
+    "ITK-98": "B-spline interpolation reads the coefficients outside their buffer on a short axis",
 }
 _DEFECT_ID = re.compile(r"\b(ANTS|ITK|AFNI|FSL|NIB)-\d+\b")
 

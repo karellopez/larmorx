@@ -74,7 +74,9 @@ def add_arguments(p: argparse.ArgumentParser) -> None:
     p.add_argument("--id", help="with --promote: the permanent case's name")
     p.add_argument("--tier", default="smoke", choices=("smoke", "standard", "full"))
     p.add_argument(
-        "--expect", default="pass", choices=("pass", "divergence", "error", "abort", "crash")
+        "--expect",
+        default="pass",
+        choices=("pass", "divergence", "error", "abort", "crash", "guard"),
     )
     p.add_argument("--reason", default="")
     p.add_argument("--status", default="fixed", choices=("fixed", "register", "open"))
@@ -204,12 +206,21 @@ def main(args: argparse.Namespace) -> int:
         doc = json.loads(Path(args.replay).read_text(encoding="utf-8"))
         recipe = doc.get("shrunk") or doc["recipe"]
         t = tools.get(doc["tool"])
+        # A permanent case replays with its expectation (a guard case runs only larmorx's
+        # default: its original would fill the machine).
+        from larmorx_validation.difftest import permanent
+
+        case_kw = permanent._kw(doc["tool"], doc) if "id" in doc and "found" in doc else {}
         status = 0
         for impl in doc.get("implementations") or [
             doc.get("implementation") or t.implementations[0]
         ]:
             j = runner.judge_once(
-                t, recipe, impl, explore_mode=os.environ.get("LARMORX_ORACLE_CACHE_MODE", "use")
+                t,
+                recipe,
+                impl,
+                explore_mode=os.environ.get("LARMORX_ORACLE_CACHE_MODE", "use"),
+                case_kw=case_kw,
             )
             print(f"{doc['tool']} ({impl}): {j.verdict} {', '.join(j.signature)}")
             if j.detail:

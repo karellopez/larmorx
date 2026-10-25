@@ -113,8 +113,9 @@ class AntsCase:
     """One invocation of an ANTs program, compared with larmorx's.
 
     ``args`` are the program's arguments with placeholders (see the module docstring).
-    ``expect`` is ``"pass"``, ``"error"`` (both must fail) or ``"divergence"`` (ANTs succeeds,
-    larmorx refuses on purpose, ``reason`` says why). ``tolerance_ulps`` allows values that are
+    ``expect`` is ``"pass"``, ``"error"`` (both must fail), ``"divergence"`` (ANTs succeeds,
+    larmorx refuses on purpose, ``reason`` says why) or ``"guard"`` (beyond any machine,
+    ANTS-162: only larmorx's default runs, and must refuse before allocating; :func:`guard`). ``tolerance_ulps`` allows values that are
     not bit-identical, up to that many units in the last place, with ``reason`` explaining
     the cause. ``undefined_values`` says why ANTs' values depend on memory it never wrote:
     they are then not compared (the rest is). ``silent_ok`` lists the defects the fix pass
@@ -535,6 +536,22 @@ def run_case(case: Case, checks: CheckList) -> None:
             label = "" if len(a_outputs) == 1 else f"output {i + 1}"
             compare_outputs(checks, pa, pl, label, c.tolerance_ulps, c.undefined_values)
         fix_pass(c, tmp, checks, results["larmorx"])
+
+
+def guard(c: AntsCase, tmp: Path, checks: CheckList, threads: int | None = None) -> None:
+    """A case beyond any machine (``expect="guard"``, ANTS-162): ANTs and larmorx's
+    ``reproduce`` would fill the machine, so neither runs; larmorx's default must stop before
+    allocating, naming ANTS-162 and the memory it would need."""
+    outdir = tmp / "larmorx-fix"
+    outdir.mkdir()
+    args = [_resolve(a, tmp, outdir) for a in c.args]
+    code, out, err = _run_larmorx(c.program, args, threads, mode=defects.FIX)
+    text = (err or out).replace(str(tmp), "<tmp>").strip()
+    checks(
+        "larmorx refuses before allocating (ANTS-162)",
+        code != 0 and "(ANTS-162)" in text and "GiB" in text,
+        detail=text[-600:],
+    )
 
 
 def fix_pass(

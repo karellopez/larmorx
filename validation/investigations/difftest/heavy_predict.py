@@ -93,17 +93,42 @@ def by_spacing_size(words: list[str], size: list[int], spacing: list[float]) -> 
     return {"output": out, "output_voxels": math.prod(out)}
 
 
+def resample_size(words: list[str], size: list[int], spacing: list[float]) -> dict:
+    """ResampleImage's output grid: ``MxNxO`` voxels (size mode, ``1``) or
+    ``int(spacing_in * n / spacing_out + 0.5)`` per axis (spacing mode, the default)."""
+    dim = int(words[0])
+    values = [float(v) for v in words[3].split("x")]
+    values = values * dim if len(values) == 1 else values
+    by_size = len(words) > 4 and words[4].strip() not in ("", "0")
+    if by_size:
+        out = [int(v) for v in values[:dim]]
+    else:
+        out = [int(spacing[d] * size[d] / values[d] + 0.5) for d in range(dim)]
+    return {"output": out, "output_voxels": math.prod(out)}
+
+
 def main() -> int:
     ap = argparse.ArgumentParser()
     ap.add_argument("night", type=Path)
-    ap.add_argument("--n4-point-bytes", type=float, default=16.0, help="ANTs, per control point")
-    ap.add_argument("--n4-point-bytes-lx", type=float, default=11.4)
-    ap.add_argument("--n4-voxel-bytes", type=float, default=24.0, help="per padded voxel")
-    ap.add_argument("--n4-point-seconds", type=float, default=3.7e-7)
-    ap.add_argument("--n4-point-seconds-lx", type=float, default=4.0e-7)
-    ap.add_argument("--by-spacing-voxel-bytes", type=float, default=8.0)
-    ap.add_argument("--by-spacing-voxel-bytes-lx", type=float, default=12.0)
+    # The unit costs measured on smaller variants (docs/findings/ants-n4.md, "Memory"):
+    ap.add_argument("--n4-point-bytes", type=float, default=17.0, help="ANTs, per control point")
+    ap.add_argument("--n4-point-bytes-lx", type=float, default=12.0)
+    ap.add_argument("--n4-voxel-bytes", type=float, default=25.0, help="ANTs, per padded voxel")
+    ap.add_argument("--n4-voxel-bytes-lx", type=float, default=21.0)
+    ap.add_argument("--n4-point-seconds", type=float, default=3.3e-7)
+    ap.add_argument("--n4-point-seconds-lx", type=float, default=2.6e-7)
+    ap.add_argument("--n4-voxel-seconds", type=float, default=7.3e-8)
+    ap.add_argument("--n4-voxel-seconds-lx", type=float, default=2.1e-8)
+    ap.add_argument("--by-spacing-voxel-bytes", type=float, default=7.3)
+    ap.add_argument("--by-spacing-voxel-bytes-lx", type=float, default=16.0)
     ap.add_argument("--box-gib", type=float, default=limits.HEAVY_GIB + limits.HEAVY_SWAP_GIB)
+    ap.add_argument(
+        "--record-beyond",
+        action="store_true",
+        help="write a result 'beyond this machine' (over the heavy box) or 'beyond any machine' "
+        "(over 1 TiB) into heavy-results.jsonl for each case whose prediction exceeds the heavy "
+        "box (difftest --heavy then skips it)",
+    )
     args = ap.parse_args()
     rows = []
     with tempfile.TemporaryDirectory(prefix="lx-heavy-predict-") as t:
@@ -112,8 +137,12 @@ def main() -> int:
             recipe = core.make_recipe(tool, h["seed"], h["n"])
             spec = recipe["inputs"].get("a")
             row = {
+                "tool": h["tool"],
+                "seed": h["seed"],
+                "n": h["n"],
                 "case": f"{h['tool']}:{h['seed']}:{h['n']}",
                 "args": " ".join(core.arguments(recipe)),
+                "result": h.get("result"),
             }
             if spec is None:
                 row["prediction"] = "no sizing law here"
@@ -132,18 +161,25 @@ def main() -> int:
                 )
                 lx = (
                     max(s["points"]) * args.n4_point_bytes_lx
-                    + s["padded_voxels"] * args.n4_voxel_bytes
+                    + s["padded_voxels"] * args.n4_voxel_bytes_lx
                 )
                 work = sum(i * pt for i, pt in zip(s["iterations"], s["points"], strict=True))
+                pad_work = sum(s["iterations"]) * s["padded_voxels"]
                 row.update(
                     sizing=s,
                     ants_gib=ants / GIB,
                     larmorx_gib=lx / GIB,
-                    ants_hours=work * args.n4_point_seconds / 3600,
-                    larmorx_hours=work * args.n4_point_seconds_lx / 3600,
+                    ants_hours=(work * args.n4_point_seconds + pad_work * args.n4_voxel_seconds)
+                    / 3600,
+                    larmorx_hours=(
+                        work * args.n4_point_seconds_lx + pad_work * args.n4_voxel_seconds_lx
+                    )
+                    / 3600,
                 )
-            elif h["tool"] == "ants-resample-image-by-spacing":
-                s = by_spacing_size(words, size, spacing)
+            elif h["tool"] in ("ants-resample-image-by-spacing", "ants-resample-image"):
+                s = (by_spacing_size if h["tool"].endswith("spacing") else resample_size)(
+                    words, size, spacing
+                )
                 row.update(
                     sizing=s,
                     ants_gib=s["output_voxels"] * args.by_spacing_voxel_bytes / GIB,
@@ -169,6 +205,47 @@ def main() -> int:
             f"{hours}; {'fits' if r['fits'] else 'does NOT fit'} the heavy box "
             f"({args.box_gib:g} GiB with swap); {r['args']}"
         )
+    if args.record_beyond:
+        beyond = [
+            r
+            for r in rows
+            if r.get("result") is None
+            and "ants_gib" in r
+            and min(r["ants_gib"], r["larmorx_gib"]) > args.box_gib
+        ]
+        with (args.night / "heavy-results.jsonl").open("a", encoding="utf-8") as f:
+            for r in beyond:
+                s = r["sizing"]
+                last = "x".join(map(str, s.get("lattice_last", s.get("output", []))))
+                hours = (
+                    f", about {r['ants_hours']:.3g} h of computation for ANTs"
+                    if "ants_hours" in r
+                    else ""
+                )
+                verdict = (
+                    "beyond any machine"
+                    if min(r["ants_gib"], r["larmorx_gib"]) > 1024
+                    else "beyond this machine"
+                )
+                detail = (
+                    f"{verdict} (ANTS-162): predicted from the growth law measured on "
+                    f"smaller variants of the same input, ANTs about {r['ants_gib']:.4g} GiB and "
+                    f"larmorx about {r['larmorx_gib']:.4g} GiB (largest lattice {last}){hours}; "
+                    "not run in the heavy box; larmorx's default stops before allocating "
+                    "(permanent case), its replica bit-identical to ANTs on every variant both "
+                    "finished (docs/findings/ants-n4.md, Memory)"
+                )
+                line = {
+                    "tool": r["tool"],
+                    "seed": r["seed"],
+                    "n": r["n"],
+                    "verdict": verdict,
+                    "detail": detail,
+                    "impls": {},
+                    "predicted": {"ants_gib": r["ants_gib"], "larmorx_gib": r["larmorx_gib"]},
+                }
+                f.write(json.dumps(line, sort_keys=True) + "\n")
+                print(f"recorded {verdict}: {r['case']}")
     return 0
 
 

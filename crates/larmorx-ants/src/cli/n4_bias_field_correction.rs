@@ -494,6 +494,7 @@ fn execute(
                  (ITK throws MemoryAllocationError; ANTs aborts)"
             ));
         }
+        Err(N4Error::BeyondMemory(message)) => return Err(format!("larmorx: {message}")),
         Err(e) => {
             if settings.verbose {
                 let _ = writeln!(err, "Exception caught: {e}");

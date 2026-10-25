@@ -442,6 +442,8 @@ defects! {
         "LandmarkBasedTransformInitializer's 2D rigid fit takes the angle -pi/2 whenever the landmarks' summed dot product is within 5e-5 of 0, whatever the sign of their cross product (a quarter turn the other way gives the opposite rotation)";
     ITK_96 = "ITK-96", "ITK", true,
         "the HDF5 transform writer (with compression) cannot write a transform without parameters (a chunk of 0 values): an IdentityTransform, or the inverse a displacement field without an inverse field gives, stops the file part-written with HDF5's error";
+    ITK_98 = "ITK-98", "ITK", true,
+        "B-spline interpolation mirrors a support index only once at each end of an axis: on an axis too short for the spline's support (2 voxels for orders 3 and 4, 2 or 3 for order 5) it reads the coefficient image outside its buffer, memory it never wrote";
     ANTS_110 = "ANTS-110", "antsAI", true,
         "the blob alignment keeps the blob pairs whose displacements have about the same length as the others' (the squared distance between a pair's fixed and moving blob over another pair's), not those whose distances to the other blobs are preserved between the images, as its comment and ImageMath's MatchBlobs say";
     ANTS_111 = "ANTS-111", "antsAI", true,
@@ -454,6 +456,8 @@ defects! {
         "the blob alignment compares two blobs' patches after turning the moving one with a rotation built from the patches' principal axes, whose signs are arbitrary, without checking its determinant: identical patches can be compared reflected or turned by 180 degrees";
     ANTS_160 = "ANTS-160", "ResampleImage", true,
         "Gaussian interpolation given fewer sigmas than dimensions reads the missing sigmas past the end of their list: the result depends on memory the program never wrote";
+    ANTS_162 = "ANTS-162", "ANTs", true,
+        "N4BiasFieldCorrection's B-spline lattice and padding, and ResampleImage's and ResampleImageBySpacing's output grids, are sized from the image's physical extent with no check: a header in metres or micrometres, or a 4D image's time axis, can make a tiny input need more memory than any machine has, which fills the machine until the process is stopped";
 }
 
 /// The register entry with ID `id`.

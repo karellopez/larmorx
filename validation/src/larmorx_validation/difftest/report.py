@@ -315,6 +315,7 @@ def write(out: Path) -> Path:
                 f"{impl}: {e.get('verdict')} {e.get('detail', '')[:200]}"
                 for impl, e in (r.get("impls") or {}).items()
             )
+            + (r.get("detail", "")[:600] if not r.get("impls") else "")
             + (f" (peak {r['peak']}, {r.get('seconds')} s)" if r.get("peak") else "")
         )
         lines.append(

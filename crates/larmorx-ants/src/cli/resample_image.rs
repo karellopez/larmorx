@@ -508,4 +508,74 @@ mod tests {
         assert_eq!(code, 0, "{err}");
         assert!(!err.contains("ANTS-160"), "{err}");
     }
+
+    /// ANTS-162: an image in metres resampled to micrometre voxels needs a grid of 10^18
+    /// voxels; by default larmorx stops before allocating, naming the memory and its cause.
+    #[test]
+    fn a_grid_beyond_any_machine_is_refused_before_allocating() {
+        use larmorx_core::element::DataType;
+        use larmorx_io::nifti::{self, NiftiHeader, NiftiVersion, WriteOptions};
+        let dir = tempfile::tempdir().unwrap();
+        let a = dir.path().join("a.nii");
+        let mut h = NiftiHeader::new(NiftiVersion::V1, &[2, 2, 2], DataType::F32).unwrap();
+        h.pixdim[1..4].copy_from_slice(&[1000.0, 1000.0, 1000.0]);
+        let data = larmorx_core::ndarray::ArrayD::from_elem(
+            larmorx_core::ndarray::IxDyn(&[2, 2, 2]),
+            3.0f32,
+        );
+        nifti::write(&a, &h, data.view(), &WriteOptions::default()).unwrap();
+        let b = dir.path().join("b.nii");
+        let args = [
+            "3",
+            a.to_str().unwrap(),
+            b.to_str().unwrap(),
+            "0.001x0.001x0.001",
+            "0",
+        ];
+        let (code, _, err) = run_capture(&args, UpstreamDefects::Fix);
+        assert_eq!(code, 1, "{err}");
+        assert!(err.contains("(ANTS-162)") && err.contains("GiB"), "{err}");
+        assert!(err.contains("2000000 x 2000000 x 2000000 voxels"), "{err}");
+        assert!(!b.exists());
+    }
+
+    /// ITK-98 (differential random testing, 2026-10-25, where larmorx panicked): a cubic
+    /// B-spline on an image whose y and z axes have 2 voxels. ITK's single mirror leaves support
+    /// index -1 for points in the last half voxel and reads outside the coefficient image; larmorx
+    /// mirrors again (fix) or fills those reads with 0 (reproduce), and names the defect in
+    /// both modes.
+    #[test]
+    fn a_bspline_on_a_two_voxel_axis_reads_no_memory() {
+        use larmorx_core::element::DataType;
+        use larmorx_io::nifti::{self, NiftiHeader, NiftiVersion, WriteOptions};
+        let dir = tempfile::tempdir().unwrap();
+        let a = dir.path().join("a.nii");
+        let h = NiftiHeader::new(NiftiVersion::V1, &[3, 2, 2], DataType::F32).unwrap();
+        let data = larmorx_core::ndarray::ArrayD::from_shape_vec(
+            larmorx_core::ndarray::IxDyn(&[3, 2, 2]),
+            (0..12).map(|k| (k * k % 7) as f32).collect(),
+        )
+        .unwrap();
+        nifti::write(&a, &h, data.view(), &WriteOptions::default()).unwrap();
+        let a = a.to_str().unwrap();
+        let mut outputs = Vec::new();
+        for (mode, name) in [
+            (UpstreamDefects::Fix, "fix.nii"),
+            (UpstreamDefects::Reproduce, "reproduce.nii"),
+        ] {
+            let b = dir.path().join(name);
+            let args = ["3", a, b.to_str().unwrap(), "7x5x5", "1", "4", "3"];
+            let (code, _, err) = run_capture(&args, mode);
+            assert_eq!(code, 0, "{err}");
+            assert!(err.contains("ITK-98"), "{err}");
+            outputs.push(std::fs::read(&b).unwrap());
+        }
+        assert_ne!(outputs[0], outputs[1]);
+        // Order 1 needs no second mirror: no notice.
+        let b = dir.path().join("linear.nii");
+        let args = ["3", a, b.to_str().unwrap(), "7x5x5", "1", "4", "1"];
+        let (code, _, err) = run_capture(&args, UpstreamDefects::Fix);
+        assert_eq!(code, 0, "{err}");
+        assert!(!err.contains("ITK-98"), "{err}");
+    }
 }

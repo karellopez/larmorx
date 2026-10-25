@@ -114,6 +114,85 @@ pub enum N4Error {
     /// the image: ITK throws `MemoryAllocationError`, which ANTs does not catch: it aborts).
     #[error(transparent)]
     Memory(#[from] larmorx_core::alloc::AllocError),
+    /// The lattice and padding need more memory than larmorx may plan for (ANTS-162; the
+    /// message says how much, and why).
+    #[error("{0}")]
+    BeyondMemory(String),
+}
+
+/// larmorx's working memory per control point of the largest fitting level's lattice (three
+/// float lattices: the fit's numerator and denominator and the field) and per voxel of the
+/// padded image (the padded input, mask and field and their subsampled copies), measured with
+/// `validation/investigations/difftest/n4_memory.py` (`docs/findings/ants-n4.md`; ANTs needs 17
+/// and 25).
+const LATTICE_BYTES: f64 = 12.0;
+const PADDED_BYTES: f64 = 21.0;
+
+/// ANTS-162: the memory the lattices and the padded image need, checked before anything is
+/// allocated; an error naming the bytes needed and their likely cause when they exceed the
+/// [`larmorx_core::alloc::memory_limit`].
+fn check_memory(
+    g: &larmorx_io::nifti::itk::ItkGeometry,
+    control_points: &[usize],
+    order: u32,
+    levels: usize,
+    padded: &[usize],
+    distance: Option<f32>,
+) -> Result<(), N4Error> {
+    let last: Vec<f64> = control_points
+        .iter()
+        .map(|&c| {
+            let spans = c.saturating_sub(order as usize) as f64;
+            spans * 2f64.powi(levels.saturating_sub(1) as i32) + f64::from(order)
+        })
+        .collect();
+    let points: f64 = last.iter().product();
+    let voxels: f64 = padded.iter().map(|&n| n as f64).product();
+    let needed = LATTICE_BYTES * points + PADDED_BYTES * voxels;
+    let Err(limit) = larmorx_core::alloc::check_plan(needed) else {
+        return Ok(());
+    };
+    let short = |x: f64| {
+        let s = format!("{x:.4}");
+        let s = s.trim_end_matches('0').trim_end_matches('.');
+        s.to_string()
+    };
+    let join = |v: &[f64]| v.iter().map(|&x| short(x)).collect::<Vec<_>>().join(" x ");
+    let spacing = join(&g.spacing);
+    let extent: Vec<f64> = (0..g.ndim)
+        .map(|i| (g.size[i].saturating_sub(1)) as f64 * g.spacing[i])
+        .collect();
+    let unusual = g.spacing[..g.ndim.min(3)]
+        .iter()
+        .any(|&s| !(0.01..100.0).contains(&s.abs()));
+    let time = if g.ndim > 3 {
+        ", the fourth axis in s"
+    } else {
+        ""
+    };
+    let against = distance.map_or(String::new(), |d| {
+        format!(" against a spline distance of {d}")
+    });
+    Err(N4Error::BeyondMemory(format!(
+        "N4BiasFieldCorrection would need about {} (the last fitting level's B-spline lattice of \
+         {} control points; the image padded to {} voxels), more than {limit}. The image's \
+         voxels are {spacing} mm{time}: it spans {}{against}{}. An error (ANTS-162); \
+         LARMORX_UPSTREAM_DEFECTS=reproduce attempts it as ANTs does",
+        larmorx_core::alloc::gib(needed),
+        join(&last),
+        padded
+            .iter()
+            .map(|n| n.to_string())
+            .collect::<Vec<_>>()
+            .join(" x "),
+        join(&extent),
+        if unusual {
+            " (a header whose units are metres or micrometres makes an image 1000 times larger \
+             or smaller than it looks)"
+        } else {
+            ""
+        },
+    )))
 }
 
 /// The padding and control points that `-b [distance]` gives.
@@ -315,6 +394,24 @@ pub fn n4_bias_field_correction(
     let (lower, upper) = padding
         .as_ref()
         .map_or((&zero, &zero), |p| (&p.lower, &p.upper));
+    if options.upstream_defects.fix() {
+        // ANTS-162: before anything is allocated (`reproduce` attempts it as ANTs does).
+        let padded: Vec<usize> = (0..d)
+            .map(|i| g.size[i].saturating_add(lower[i]).saturating_add(upper[i]))
+            .collect();
+        let distance = match &options.mesh {
+            BSplineMesh::Distance(x) => Some(*x),
+            _ => None,
+        };
+        check_memory(
+            g,
+            &control_points,
+            order,
+            options.iterations.len().max(1),
+            &padded,
+            distance,
+        )?;
+    }
     let (padded_input, padded_size) = pad(&input.data, &g.size, lower, upper)?;
     let ones;
     let mask_data: &[f32] = match mask {
@@ -466,6 +563,65 @@ mod tests {
             e.to_string()
                 .starts_with("Failed to allocate memory for image")
         );
+    }
+
+    /// ANTS-162 (differential random testing, 2026-10-25, `ants-n4:20261025:24`, the case that
+    /// filled the machine): a 14×28×23×7 image whose header gives its voxels in metres (4×1×1 m,
+    /// TR 3 s) with a spline distance of 20 mm needs 1.55·10¹⁰ control points at the first
+    /// fitting level and 2.2·10¹³ at the fourth. By default larmorx stops before allocating,
+    /// naming the memory needed and its likely cause; a small image is not affected.
+    #[test]
+    fn a_lattice_beyond_any_machine_is_refused_before_allocating() {
+        use larmorx_io::nifti::itk::{GeometrySource, ItkGeometry};
+        let geometry = |size: &[usize], spacing: &[f64]| ItkGeometry {
+            ndim: size.len(),
+            size: size.to_vec(),
+            spacing: spacing.to_vec(),
+            origin: vec![0.0; size.len()],
+            direction: (0..size.len())
+                .map(|i| {
+                    (0..size.len())
+                        .map(|j| f64::from(u8::from(i == j)))
+                        .collect()
+                })
+                .collect(),
+            source: GeometrySource::Default,
+            flipped: vec![false; size.len()],
+        };
+        let size = [14usize, 28, 23, 7];
+        let input = AntsImage {
+            data: (0..size.iter().product::<usize>())
+                .map(|i| (i % 17) as f32 + 1.0)
+                .collect(),
+            geometry: geometry(&size, &[4000.0, 1000.0, 1000.0, 3.0]),
+            meta: Default::default(),
+        };
+        let options = N4Options {
+            shrink_factor: 3,
+            mesh: BSplineMesh::Distance(20.0),
+            ..N4Options::default()
+        };
+        let start = std::time::Instant::now();
+        let e = n4_bias_field_correction(&input, None, None, &options, 1, None).unwrap_err();
+        let message = e.to_string();
+        assert!(matches!(e, N4Error::BeyondMemory(_)), "{message}");
+        assert!(message.contains("an error (ANTS-162)") || message.contains("An error (ANTS-162)"));
+        assert!(
+            message.contains("20803 x 10803 x 8803 x 11 control points"),
+            "{message}"
+        );
+        assert!(message.contains("4000 x 1000 x 1000 x 3 mm"), "{message}");
+        assert!(message.contains("52000 x 27000 x 22000 x 18"), "{message}");
+        assert!(message.contains("metres or micrometres"), "{message}");
+        assert!(start.elapsed().as_secs() < 5, "refused before any work");
+        // The same image in millimetres: a few control points, no refusal (the work is tiny).
+        let mut small = input.clone();
+        small.geometry = geometry(&size, &[4.0, 1.0, 1.0, 3.0]);
+        let options = N4Options {
+            iterations: vec![2],
+            ..options
+        };
+        assert!(n4_bias_field_correction(&small, None, None, &options, 1, None).is_ok());
     }
 
     #[test]

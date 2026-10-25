@@ -319,7 +319,7 @@ impl HistogramParzenModel {
             // `SetSpacing` of the histogram image (ITK built with ITK_LEGACY_REMOVE, as ANTs
             // builds it) throws for a spacing of 0 (a channel with one value in the sample) or
             // below (found by differential random testing, 2026-10-25: larmorx went on).
-            if spacing == 0.0 || spacing < 0.0 {
+            if spacing <= 0.0 {
                 let to = larmorx_registration::format::OStream::default().float(spacing);
                 let (line, what) = if spacing == 0.0 {
                     (77, "Zero-valued spacing")

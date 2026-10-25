@@ -173,3 +173,49 @@ fn bspline_orders_are_validated() {
     ));
     assert!(is_inside([-0.5, 0.0, 4.49], SIZE) && !is_inside([0.0, 5.5, 0.0], SIZE));
 }
+
+/// ITK-98: on an axis of 2 voxels a cubic B-spline's support reaches index 3 in the last half
+/// voxel, which ITK's single mirror maps to -1 (a read outside the coefficient image). The
+/// repeated mirror continues the decomposition's whole-sample mirror: the 2-voxel signal
+/// `a, b` extends to `a, b, a, b, ...`, symmetric about each sample, so the value at `1 + t`
+/// equals the value at `1 - t`. ITK's mirror fills the outside read with 0 and differs; the
+/// values that needed the second mirror are counted, and nothing panics.
+#[test]
+fn a_short_axis_is_mirrored_again() {
+    let reproduce = || BSplineMirror::new(UpstreamDefects::Reproduce);
+    let data = [3.0f64, -1.0];
+    for order in 3..=5u32 {
+        let method = Interpolation::BSpline { order };
+        let full = Interpolator::new(Volume::new(&data, [2, 1, 1]), &method, [1.0; 3]).unwrap();
+        let itk = Interpolator::new(Volume::new(&data, [2, 1, 1]), &method, [1.0; 3])
+            .unwrap()
+            .with_bspline_mirror(reproduce());
+        for t in [0.1, 0.25, 0.4] {
+            let lo = full.evaluate([1.0 - t, 0.0, 0.0]);
+            let hi = full.evaluate([1.0 + t, 0.0, 0.0]);
+            assert!((lo - hi).abs() < 1e-12, "order {order}, t {t}: {lo} {hi}");
+            assert!(itk.evaluate([1.0 + t, 0.0, 0.0]).is_finite());
+        }
+        assert!(full.bspline_mirror().beyond() > 0, "order {order}");
+        assert!(itk.bspline_mirror().beyond() > 0, "order {order}");
+        let reproduced = itk.evaluate([1.25, 0.0, 0.0]);
+        assert_ne!(reproduced, full.evaluate([1.25, 0.0, 0.0]), "order {order}");
+    }
+    // Inside the range one mirror covers, both mirrors give ITK's value and count nothing.
+    let data: Vec<f64> = (0..8).map(|k| (k * k % 5) as f64).collect();
+    for order in 0..=5u32 {
+        let method = Interpolation::BSpline { order };
+        let full = Interpolator::new(Volume::new(&data, [8, 1, 1]), &method, [1.0; 3]).unwrap();
+        let itk = Interpolator::new(Volume::new(&data, [8, 1, 1]), &method, [1.0; 3])
+            .unwrap()
+            .with_bspline_mirror(reproduce());
+        for k in 0..=150 {
+            let x = -0.5 + k as f64 * 0.05;
+            assert_eq!(full.evaluate([x, 0.0, 0.0]), itk.evaluate([x, 0.0, 0.0]));
+        }
+        assert_eq!(
+            full.bspline_mirror().beyond() + itk.bspline_mirror().beyond(),
+            0
+        );
+    }
+}

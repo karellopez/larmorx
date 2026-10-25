@@ -115,6 +115,8 @@ def arguments(recipe: dict) -> list[str]:
 def make_recipe(tool: Tool, seed: str, n: int) -> dict:
     """Draws case ``n`` of ``tool`` for the night's ``seed``."""
     d = gen.Draw(f"{tool.name}:{seed}:{n}")
+    # Most cases are realistic; a small share is extreme (gen.EXTREME_SHARE), labelled.
+    d.extreme = d.chance("extreme", gen.EXTREME_SHARE)
     body = tool.draw(d)
     recipe = {
         "tool": tool.name,

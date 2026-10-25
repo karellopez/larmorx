@@ -29,131 +29,21 @@ from __future__ import annotations
 
 import argparse
 import json
-import math
-import re
 import sys
 import tempfile
 from pathlib import Path
 
-import numpy as np
-from larmorx_validation.difftest import core, inputs, limits, report, tools
+from larmorx_validation.difftest import core, inputs, limits, report, sizing, tools
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
-from n4_memory import itk_spacing
 
 GIB = limits.GIB
-
-
-def _f32(x: float) -> np.float32:
-    return np.float32(x)
-
-
-def n4_size(words: list[str], size: list[int], spacing: list[float]) -> dict:
-    dim = int(words[words.index("-d") + 1])
-    size, spacing = size[:dim], spacing[:dim]
-    order, distance, mesh = 3, None, [1] * dim
-    if "-b" in words:
-        b = words[words.index("-b") + 1].strip("[] ")
-        first = b.split(",")[0].strip()
-        if "," in b:
-            order = int(float(b.split(",")[1]))
-        if "x" in first:
-            mesh = [int(float(v)) for v in first.split("x")]
-        elif re.fullmatch(r"[-+\d.eE]+", first):
-            distance = float(first)
-    iterations = [50, 50, 50, 50]
-    if "-c" in words:
-        c = words[words.index("-c") + 1].strip("[] ").split(",")[0].strip()
-        iterations = [int(v) for v in c.split("x") if v]
-    shrink = int(words[words.index("-s") + 1]) if "-s" in words else 4
-    padded = list(size)
-    if distance is not None:
-        spans = []
-        for d in range(dim):
-            domain = _f32(size[d] - 1) * _f32(spacing[d])
-            sp = math.ceil(float(_f32(domain / _f32(distance))))
-            extra = int((sp * distance - float(domain)) / spacing[d] + 0.5)
-            padded[d] = size[d] + extra
-            spans.append(sp)
-    else:
-        spans = mesh
-    lattice = [[sp * (1 << lv) + order for sp in spans] for lv in range(len(iterations))]
-    points = [math.prod(c) for c in lattice]
-    return {
-        "dimension": dim,
-        "order": order,
-        "distance": distance,
-        "iterations": iterations,
-        "shrink": shrink,
-        "padded": padded,
-        "padded_voxels": math.prod(padded),
-        "lattice_last": lattice[-1],
-        "points": points,
-    }
-
-
-def unifize_ball(words: list[str], size: list[int], spacing: list[float]) -> dict:
-    nvox = math.prod(size[:3])
-    radius = 18.3
-    if "-Urad" in words:
-        radius = float(words[words.index("-Urad") + 1])
-    for opt in ("-rbt", "-param"):
-        if opt in words:
-            radius = float(words[words.index(opt) + 1])
-    epi = "-EPI" in words
-    if epi:
-        uu = float(np.cbrt(np.float32(abs(spacing[0] * spacing[1] * spacing[2]))))
-        radius = max(18.3 / uu, 4.14)
-    elif nvox > 1_000_000 and "-noduplo" not in words and "-nodouble" not in words:
-        radius = 0.5 * radius + 0.001
-    points = 4.0 / 3.0 * math.pi * radius**3 + 1.0
-    return {"epi": epi, "radius": radius, "points": points, "voxels": nvox}
-
-
-def by_spacing_size(words: list[str], size: list[int], spacing: list[float]) -> dict:
-    dim = int(words[0])
-    out_spacing = [float(w) for w in words[3 : 3 + dim]]
-    addvox = int(words[3 + dim + 1]) if len(words) > 3 + dim + 1 else 0
-    out = [int(size[d] * spacing[d] / out_spacing[d] + addvox) for d in range(dim)]
-    return {"output": out, "output_voxels": math.prod(out)}
-
-
-def resample_size(words: list[str], size: list[int], spacing: list[float]) -> dict:
-    """ResampleImage's output grid: ``MxNxO`` voxels (size mode, ``1``) or
-    ``int(spacing_in * n / spacing_out + 0.5)`` per axis (spacing mode, the default)."""
-    dim = int(words[0])
-    values = [float(v) for v in words[3].split("x")]
-    values = values * dim if len(values) == 1 else values
-    by_size = len(words) > 4 and words[4].strip() not in ("", "0")
-    if by_size:
-        out = [int(v) for v in values[:dim]]
-    else:
-        out = [int(spacing[d] * size[d] / values[d] + 0.5) for d in range(dim)]
-    return {"output": out, "output_voxels": math.prod(out)}
 
 
 def main() -> int:
     ap = argparse.ArgumentParser()
     ap.add_argument("night", type=Path)
-    # The unit costs measured on smaller variants (docs/findings/ants-n4.md, "Memory"):
-    ap.add_argument("--n4-point-bytes", type=float, default=17.0, help="ANTs, per control point")
-    ap.add_argument("--n4-point-bytes-lx", type=float, default=12.0)
-    ap.add_argument("--n4-voxel-bytes", type=float, default=25.0, help="ANTs, per padded voxel")
-    ap.add_argument("--n4-voxel-bytes-lx", type=float, default=21.0)
-    ap.add_argument("--n4-point-seconds", type=float, default=3.3e-7)
-    ap.add_argument("--n4-point-seconds-lx", type=float, default=2.6e-7)
-    ap.add_argument("--n4-voxel-seconds", type=float, default=7.3e-8)
-    ap.add_argument("--n4-voxel-seconds-lx", type=float, default=2.1e-8)
-    # In 2D (n4_memory.py on ants-n4:20261025:406, distances 480 to 60, after the 2D fit's
-    # fix of 2026-10-25): ANTs 18.7 bytes per control point of the last level and 2.3e-8 s per
-    # point and iteration; larmorx 16.1 and 1.9e-8 (the same results, bit for bit; before the
-    # fix larmorx needed 78.7 bytes and 2.2e-7 s).
-    ap.add_argument("--n4-point-bytes-2d", type=float, default=18.7)
-    ap.add_argument("--n4-point-bytes-lx-2d", type=float, default=16.1)
-    ap.add_argument("--n4-point-seconds-2d", type=float, default=2.3e-8)
-    ap.add_argument("--n4-point-seconds-lx-2d", type=float, default=1.9e-8)
-    ap.add_argument("--by-spacing-voxel-bytes", type=float, default=7.3)
-    ap.add_argument("--by-spacing-voxel-bytes-lx", type=float, default=16.0)
+    # The unit costs are sizing.py's (larmorx_validation.difftest.sizing).
     ap.add_argument("--box-gib", type=float, default=limits.HEAVY_GIB + limits.HEAVY_SWAP_GIB)
     ap.add_argument(
         "--record-beyond",
@@ -183,43 +73,12 @@ def main() -> int:
                 continue
             p = Path(t) / f"{h['n']}-a{inputs.suffix_of(spec)}"
             inputs.materialize(spec, p)
-            size, spacing = itk_spacing(p)
+            size, spacing = sizing.itk_spacing(p)
             row.update(size=size, spacing_itk=spacing)
             words = core.arguments(recipe)
-            if h["tool"] == "ants-n4":
-                s = n4_size(words, size, spacing)
-                two = s["dimension"] == 2
-                pb = args.n4_point_bytes_2d if two else args.n4_point_bytes
-                pb_lx = args.n4_point_bytes_lx_2d if two else args.n4_point_bytes_lx
-                ps = args.n4_point_seconds_2d if two else args.n4_point_seconds
-                ps_lx = args.n4_point_seconds_lx_2d if two else args.n4_point_seconds_lx
-                ants = max(s["points"]) * pb + s["padded_voxels"] * args.n4_voxel_bytes
-                lx = max(s["points"]) * pb_lx + s["padded_voxels"] * args.n4_voxel_bytes_lx
-                work = sum(i * pt for i, pt in zip(s["iterations"], s["points"], strict=True))
-                pad_work = sum(s["iterations"]) * s["padded_voxels"]
-                row.update(
-                    sizing=s,
-                    ants_gib=ants / GIB,
-                    larmorx_gib=lx / GIB,
-                    ants_hours=(work * ps + pad_work * args.n4_voxel_seconds) / 3600,
-                    larmorx_hours=(work * ps_lx + pad_work * args.n4_voxel_seconds_lx) / 3600,
-                )
-            elif h["tool"] in ("ants-resample-image-by-spacing", "ants-resample-image"):
-                s = (by_spacing_size if h["tool"].endswith("spacing") else resample_size)(
-                    words, size, spacing
-                )
-                row.update(
-                    sizing=s,
-                    ants_gib=s["output_voxels"] * args.by_spacing_voxel_bytes / GIB,
-                    larmorx_gib=s["output_voxels"] * args.by_spacing_voxel_bytes_lx / GIB,
-                )
-            elif h["tool"] == "afni-unifize":
-                s = unifize_ball(words, size, spacing)
-                row.update(
-                    sizing=s,
-                    ants_gib=s["points"] * 10.0 / GIB,
-                    larmorx_gib=s["points"] * (24.0 + 4.0) / GIB,
-                )
+            if h["tool"] in sizing.TOOLS:
+                pred = sizing.predict_from(h["tool"], words, size, spacing)
+                row.update({k: v for k, v in pred.items() if k != "law"})
             else:
                 row["prediction"] = "no sizing law here: run a smaller variant"
             if "ants_gib" in row:

@@ -94,21 +94,33 @@ AXIS_QUATERNIONS: tuple[tuple[int, int, int, int], ...] = (
 # The stream of choices
 
 
+#: The share of cases drawn as *extreme* (user, 2026-10-25: "reasonable size tests"): header
+#: units of metres or micrometres and voxel sizes far outside an MRI's. The others are
+#: realistic: millimetres (or no units), voxels of 0.5 to 4 mm, at most 32 voxels per axis.
+EXTREME_SHARE = 0.1
+#: Realistic voxel sizes, mm (within 0.2 to 10 mm), and the extreme ones.
+REALISTIC_SPACINGS = (0.5, 0.8, 1.0, 1.0, 1.2, 1.5, 2.0, 2.5, 3.0, 4.0)
+EXTREME_SPACINGS = (0.01, 0.05, 0.1, 15.0, 25.0, 50.0)
+
+
 class Draw:
     """The seeded choices of one case. Each choice is named; the names and values chosen are
     kept (:attr:`chosen`), so the night's report can say which options and input features
-    were covered."""
+    were covered. :attr:`extreme`: the case is one of the night's extreme share (the generators
+    may then draw odd units and sizes)."""
 
     def __init__(self, key: str):
         self.key = key
         digest = hashlib.sha256(key.encode("utf-8")).digest()
         self.rng = np.random.default_rng(int.from_bytes(digest[:16], "little"))
         self.chosen: dict[str, Any] = {}
+        self.extreme = False
 
     def child(self, name: str) -> Draw:
         """An independent stream for a part of the case (an input, an option group)."""
         d = Draw(f"{self.key}/{name}")
         d.chosen = self.chosen
+        d.extreme = self.extreme
         return d
 
     def seed(self) -> int:
@@ -183,11 +195,11 @@ def draw_shape(
 
 
 def draw_geometry(d: Draw, *, oblique: float = 0.3, axis: float = 0.4) -> dict:
-    """Spacing, orientation (a rational quaternion), origin, the qform and sform codes."""
-    spacing = [
-        d.choice(f"spacing{k}", (0.5, 0.8, 1.0, 1.0, 1.2, 1.5, 2.0, 2.5, 3.0, 4.0))
-        for k in range(3)
-    ]
+    """Spacing, orientation (a rational quaternion), origin, the qform and sform codes. A
+    realistic case has voxels of 0.5 to 4 mm in millimetres (or no units); an extreme one
+    (:attr:`Draw.extreme`) may have metres or micrometres and voxels from 0.01 to 50 units."""
+    choices = REALISTIC_SPACINGS + (EXTREME_SPACINGS if d.extreme else ())
+    spacing = [d.choice(f"spacing{k}", choices) for k in range(3)]
     if d.rng.random() < 0.3:  # isotropic
         spacing = [spacing[0]] * 3
     kind = d.choice(
@@ -216,7 +228,9 @@ def draw_geometry(d: Draw, *, oblique: float = 0.3, axis: float = 0.4) -> dict:
         "qform_code": qcode,
         "sform_code": scode,
         "sform": sform,
-        "units": d.choice("units", ("mm", "mm", "mm", "m", "um", "unknown")),
+        "units": d.choice(
+            "units", ("m", "um", "mm") if d.extreme else ("mm", "mm", "mm", "mm", "unknown")
+        ),
     }
     if sform == "other":
         geometry["shear"] = [d.step(f"shear{k}", -0.1, 0.1, 0.025) for k in range(3)]

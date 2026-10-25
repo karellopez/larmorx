@@ -52,6 +52,7 @@ OUTCOMES = (
     "undefined",
     "differ",
     "memory",
+    "guard",
     "timeout",
     "crash",
     "skipped",
@@ -148,6 +149,8 @@ def export(ctx: core.Context) -> dict:
                 # Cases that ended without a verdict of their own (for the orchestrator).
                 "unclear": sum(t["verdicts"].get(k, 0) for k in UNCLEAR),
                 "options_covered": t["options_covered"],
+                # The cases drawn as the night's extreme share (gen.EXTREME_SHARE).
+                "extreme": t.get("extreme", 0),
                 "features_covered": t["features_covered"],
                 "differences": diffs,
                 "notices": [

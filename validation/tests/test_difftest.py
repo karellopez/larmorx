@@ -506,3 +506,70 @@ def test_a_case_over_the_memory_limit_is_recorded_and_the_night_goes_on(tmp_path
     box = limits.gib(enclosing.limit) if enclosing is not None else "2 GiB"
     assert info["memory"]["case"] == "0.75 GiB" and info["memory"]["box"] == box
     assert "ended" in info
+
+
+def test_most_cases_are_realistic_and_the_extreme_share_is_labelled():
+    """User, 2026-10-25: "reasonable size tests". Most cases are realistic (millimetres or no
+    units, voxels of 0.2 to 10 mm, at most 32 voxels per axis); a small share, labelled
+    ``extreme`` in the case's features, may have odd units and voxel sizes."""
+    n_cases, extreme = 300, 0
+    for name in ("ants-n4", "ants-resample-image-by-spacing", "ants-smooth-image"):
+        tool = tools.get(name)
+        for n in range(n_cases):
+            r = core.make_recipe(tool, "realistic", n)
+            is_extreme = r["features"]["extreme"]
+            extreme += is_extreme
+            for spec in r["inputs"].values():
+                if spec.get("kind", "nifti") != "nifti" or "geometry" not in spec:
+                    continue
+                assert max(spec["shape"][:3]) <= 32, (name, n)
+                if not is_extreme:
+                    g = spec["geometry"]
+                    assert g["units"] in ("mm", "unknown"), (name, n, g["units"])
+                    assert all(0.2 <= s <= 10.0 for s in g["spacing"]), (name, n, g["spacing"])
+    share = extreme / (3 * n_cases)
+    assert 0.05 < share < 0.15, share
+
+
+def test_the_sizing_laws_and_a_case_predicted_over_the_limit():
+    """The case that took the machine down (ants-n4:20261025:24) as the sizing law gives it,
+    and the pre-check of a case over the case's limit (checked as a guard case, not run)."""
+    from larmorx_validation.difftest import runner, sizing
+
+    p = sizing.predict_from(
+        "ants-n4",
+        ["-d", "4", "-i", "{in:a}", "-s", "3", "-b", "[20,3]", "-o", "{out}"],
+        [14, 28, 23, 7],
+        [4000.0, 1000.0, 1000.0, 3.0],
+    )
+    assert p["sizing"]["lattice_last"] == [20803, 10803, 8803, 11]
+    assert p["ants_gib"] > 1e5 and p["larmorx_gib"] < p["ants_gib"]
+    ribs = sizing.predict_from(
+        "ants-resample-image-by-spacing",
+        ["3", "{in:a}", "{out}", "0.5", "0.5", "0.5"],
+        [32, 32, 32],
+        [1000.0, 1000.0, 1000.0],
+    )
+    assert ribs["sizing"]["output"] == [64000, 64000, 64000]
+    ball = sizing.predict_from(
+        "afni-unifize",
+        ["-EPI", "-prefix", "uni.nii", "{in:input}"],
+        [8, 8, 8, 4],
+        [0.003, 0.003, 0.003, 2.0],
+    )
+    assert round(ball["sizing"]["radius"]) == 6100 and ball["ants_gib"] > 8000
+    # A realistic case of a sized tool fits; an extreme one may be predicted over the limit.
+    tool = tools.get("ants-n4")
+    over = None
+    for n in range(400):
+        r = core.make_recipe(tool, "guard", n)
+        predicted = runner.predict_case("ants-n4", r)
+        if not r["features"]["extreme"]:
+            assert predicted is None, (n, predicted)
+        elif predicted is not None:
+            over = predicted
+            break
+    assert over is not None and max(over["ants_gib"], over["larmorx_gib"]) > over["limit_gib"]
+    # An implementation without a guard is not run: queued, its prediction recorded.
+    e = runner.guard_case(tools.get("afni-unifize"), {}, "original", {**over, "law": "x"})
+    assert e["verdict"] == "memory" and "no guard" in e["detail"]

@@ -28,6 +28,7 @@ VERDICT_ORDER = (
     "undefined",
     core.DIFFER,
     "memory",
+    "guard",
     "timeout",
     "crash",
     core.SKIP,
@@ -103,9 +104,12 @@ def summarise(out: Path) -> dict:
                 "options": Counter(),
                 "features": Counter(),
                 "seconds": 0.0,
+                "extreme": 0,
             },
         )
         t["cases"] += 1
+        if (line.get("features") or {}).get("extreme") is True:
+            t["extreme"] += 1
         t["verdicts"][line.get("verdict", "?")] += 1
         for impl, e in (line.get("impls") or {}).items():
             t["impl_verdicts"][impl][e.get("verdict", "?")] += 1
@@ -179,6 +183,7 @@ def summarise(out: Path) -> dict:
             "implementations": {
                 i: {k: c[k] for k in VERDICT_ORDER if c[k]} for i, c in t["impl_verdicts"].items()
             },
+            "extreme": t["extreme"],
             "options_covered": len(t["options"]),
             "options": dict(sorted(t["options"].items())),
             "features_covered": len(t["features"]),
@@ -275,16 +280,19 @@ def write(out: Path) -> Path:
         "(differs from the original as built only through glibc's maths: identical with CORE-MATH preloaded), "
         "*notice* (a D13 notice where the correction changed nothing visible), *undefined* (the original's "
         "values depend on memory it never wrote or on the clock, a defect larmorx names: not comparable), *differ* (a finding: shrunk "
-        "below), *memory* (a run exceeded the memory limit of its case: queued as a heavy case, run "
-        "to its end later by `difftest --heavy`), *timeout* and *crash* (unclear: listed at the end).",
+        "below), *memory* (a run exceeded the memory limit of its case, or was predicted to: queued as a heavy case, run "
+        "to its end later by `difftest --heavy`), *guard* (predicted over the case's memory limit: not "
+        "compared, and larmorx's default stopped at once with its guard's error, ANTS-162 or AFNI-75), "
+        "*timeout* and *crash* (unclear: listed at the end). *Extreme*: the cases drawn as the "
+        "night's extreme share (odd units, extreme voxel sizes); the others are realistic.",
         "",
-        "| Tool | Cases | Agree | Explained | Notice | Undefined | Differ | Memory | Timeout | Crash | Skipped | Harness | Options covered | Time (s) |",
-        "|---|---|---|---|---|---|---|---|---|---|---|---|---|---|",
+        "| Tool | Cases | Extreme | Agree | Explained | Notice | Undefined | Differ | Memory | Guard | Timeout | Crash | Skipped | Harness | Options covered | Time (s) |",
+        "|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|",
     ]
     for name, t in s["tools"].items():
         v = t["verdicts"]
         lines.append(
-            f"| {name} | {t['cases']} | {v.get('agree', 0)} | {v.get('explained', 0)} | {v.get('notice', 0)} | {v.get('undefined', 0)} | {v.get('differ', 0)} | {v.get('memory', 0)} | "
+            f"| {name} | {t['cases']} | {t.get('extreme', 0)} | {v.get('agree', 0)} | {v.get('explained', 0)} | {v.get('notice', 0)} | {v.get('undefined', 0)} | {v.get('differ', 0)} | {v.get('memory', 0)} | {v.get('guard', 0)} | "
             f"{v.get('timeout', 0)} | {v.get('crash', 0)} | {v.get('skipped', 0)} | {v.get('harness-error', 0) + v.get('draw-error', 0)} | "
             f"{t['options_covered']} | {t['seconds']:.0f} |"
         )

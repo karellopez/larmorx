@@ -13,8 +13,15 @@
 //!
 //! FSL's `rotmat2euler` calls `atan2` with `float` arguments, which C++ resolves to `atan2f`;
 //! its results start every line search of mcflirt, so they must be glibc's bits, which are
-//! not always correctly rounded. Checked against the C library on random and edge inputs
-//! (`tools/floatmath-verify`).
+//! not always correctly rounded. `atanf` is bit-identical to glibc 2.35's on all 2^32 inputs,
+//! `atan2f` on 2^32 random and rotation-like pairs and every special case
+//! (`tools/glibc-float-verify`).
+//!
+//! The constants are fdlibm's decimal literals as the compiler rounds them, not the hex values
+//! of its comments: for `aT[0]`, `3.3333334327e-01` is `0x3eaaaaab` (glibc's binary holds it),
+//! while the comment says `0x3eaaaaaa`. A port that took the comment (before 2026-10-25) gave
+//! `atanf` results one ulp off for some small arguments, which moved the start of one
+//! optimisation stage in two of fMRIPrep's mcflirt calls (`docs/findings/fsl-mcflirt.md`).
 
 /// glibc's `atan2f(y, x)` (`__ieee754_atan2f`).
 pub fn atan2f(y: f32, x: f32) -> f32 {
@@ -102,8 +109,9 @@ pub fn atanf(x: f32) -> f32 {
         f32::from_bits(0x3314_0fb4),
         f32::from_bits(0x33a2_2168),
     ];
+    // aT[0] = 3.3333334327e-01 rounds to 0x3eaaaaab (fdlibm's comment says 0x3eaaaaaa).
     const AT: [f32; 11] = [
-        f32::from_bits(0x3eaa_aaaa),
+        f32::from_bits(0x3eaa_aaab),
         f32::from_bits(0xbe4c_cccd),
         f32::from_bits(0x3e12_4925),
         f32::from_bits(0xbde3_8e38),
@@ -183,5 +191,38 @@ mod tests {
         assert!((f64::from(r) - (0.3f64).atan2(0.9)).abs() < 1e-7);
         let r = atan2f(-0.3, -0.9);
         assert!((f64::from(r) - (-0.3f64).atan2(-0.9)).abs() < 1e-6);
+    }
+
+    /// glibc 2.35's bits (its libm on x86-64, called through ctypes), one argument per branch
+    /// of `atanf`'s reduction.
+    #[test]
+    fn atanf_glibc_bits() {
+        for (x, want) in [
+            (0x3c7c_2fbe_u32, 0x3c7c_2aa5_u32),
+            (0x3d00_0000, 0x3cff_eaae),
+            (0x3e80_0000, 0x3e7a_dbb0),
+            (0x3ee8_0000, 0x3ed9_d489),
+            (0x3f40_0000, 0x3f24_bc7d),
+            (0x3fa0_0000, 0x3f65_63e3),
+            (0x4080_0000, 0x3fa9_b465),
+            (0x4c80_0000, 0x3fc9_0fdb),
+            (0x3000_0000, 0x3000_0000),
+            (0xbe99_999a, 0xbe95_39d4),
+        ] {
+            let got = atanf(f32::from_bits(x)).to_bits();
+            assert_eq!(
+                got, want,
+                "atanf({x:#010x}) = {got:#010x}, glibc {want:#010x}"
+            );
+        }
+    }
+
+    /// The `rotmat2euler` call where the comment's `aT[0]` (0x3eaaaaaa) gave one ulp more than
+    /// glibc: fMRIPrep's ds002422 rest run, volume 166, the third stage's start
+    /// (`atan2(sy, cy)`).
+    #[test]
+    fn atan2f_mcflirt_ds002422() {
+        let got = atan2f(f32::from_bits(0x3c7c_2fbe), f32::from_bits(0x3f7f_f83d));
+        assert_eq!(got.to_bits(), 0x3c7c_324a);
     }
 }

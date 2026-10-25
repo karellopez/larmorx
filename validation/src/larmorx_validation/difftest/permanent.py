@@ -141,7 +141,7 @@ def promote(finding: Path, case_id: str, *, tier: str = "smoke", expect: str = "
     root = out_root or inputs.CASES
     d = root / f["tool"]
     d.mkdir(parents=True, exist_ok=True)
-    recipe = f["shrunk"]
+    recipe = f.get("shrunk") or f["recipe"]
     t = tools.get(f["tool"])
     doc = {
         "id": case_id,

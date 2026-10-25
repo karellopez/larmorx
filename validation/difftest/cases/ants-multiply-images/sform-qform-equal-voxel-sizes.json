@@ -1,0 +1,159 @@
+{
+ "defect": null,
+ "description": "the sform or qform choice of ITK's NIfTI reader on a sform with equal voxel sizes: vnl's float SVD (larmorx had double)",
+ "expect": "pass",
+ "found": {
+  "detail": "header (every field): srow_x: ANTs [0.0, 0.0, 1.5, -0.0], larmorx [5.134281266805374e-08, 0.0, 1.5, -0.0]; srow_z: ANTs [-1.5, 0.0, 0.0, 0.0], larmorx [-1.5, 0.0, 5.134281266805374e-08, 0.0]",
+  "n": 6,
+  "seed": "trial1",
+  "shrink_moves": [
+   "a: axis 1 29 -> 14 voxels",
+   "a: axis 0 22 -> 11 voxels",
+   "a: axis 1 14 -> 7 voxels",
+   "a: axis 0 11 -> 5 voxels",
+   "a: axis 2 11 -> 5 voxels",
+   "a: axis 1 7 -> 3 voxels",
+   "a: axis 0 5 -> 2 voxels",
+   "a: axis 2 5 -> 2 voxels",
+   "a: axis 1 3 -> 1 voxels",
+   "a: axis 0 2 -> 1 voxels",
+   "a: axis 2 2 -> 1 voxels",
+   "a: 5 -> 2 volumes",
+   "a (and its grid): origin at 0",
+   "a (and its grid): millimetres",
+   "a: no slice timing",
+   "a: content noise -> constant"
+  ],
+  "signature": [
+   "affine",
+   "header (every field)"
+  ]
+ },
+ "id": "sform-qform-equal-voxel-sizes",
+ "implementations": [
+  "port"
+ ],
+ "reason": "",
+ "recipe": {
+  "extra": {},
+  "features": {
+   "content": "noise",
+   "dimension": 4,
+   "dtype": "float32",
+   "image operand": false,
+   "number": "0.5",
+   "orientation": "axes",
+   "origin0": -33.5,
+   "origin1": 19.75,
+   "origin2": 9.75,
+   "qfac": 1,
+   "qform_code": 2,
+   "range": "plain",
+   "sform": "same",
+   "sform_code": 2,
+   "shape": "22x29x11x5",
+   "slice_code": 5,
+   "spacing0": 1.5,
+   "spacing1": 2.5,
+   "spacing2": 1.5,
+   "suffix": ".nii.gz",
+   "tr": 2.0,
+   "tunits": "sec",
+   "units": "m"
+  },
+  "groups": [
+   {
+    "args": [
+     "4"
+    ],
+    "name": "dimension",
+    "optional": false
+   },
+   {
+    "args": [
+     "{in:a}"
+    ],
+    "name": "input",
+    "optional": false
+   },
+   {
+    "args": [
+     "0.5"
+    ],
+    "name": "operand",
+    "optional": false
+   },
+   {
+    "args": [
+     "{out}"
+    ],
+    "name": "output",
+    "optional": false
+   }
+  ],
+  "inputs": {
+   "a": {
+    "content": {
+     "seed": 599317138,
+     "type": "constant"
+    },
+    "dtype": "float32",
+    "geometry": {
+     "origin": [
+      0.0,
+      0.0,
+      0.0
+     ],
+     "qfac": 1,
+     "qform_code": 2,
+     "quaternion": [
+      1,
+      0,
+      1,
+      0
+     ],
+     "sform": "same",
+     "sform_code": 2,
+     "spacing": [
+      1.5,
+      1.5,
+      1.5
+     ],
+     "units": "mm"
+    },
+    "scaling": null,
+    "shape": [
+     1,
+     1,
+     1,
+     2
+    ],
+    "suffix": ".nii.gz",
+    "timing": {
+     "slice_code": 0,
+     "slice_duration": 0.1818,
+     "slice_end": 0,
+     "slice_start": 0,
+     "tr": 2.0,
+     "tunits": "sec"
+    },
+    "values": {
+     "offset": 0.0,
+     "scale": 1.0
+    }
+   }
+  },
+  "n": 6,
+  "options": [
+   "dimension 4",
+   "number operand"
+  ],
+  "seed": "trial1",
+  "tool": "ants-multiply-images"
+ },
+ "rule": null,
+ "status": "fixed",
+ "suite": "ants-multiply-images",
+ "tier": "smoke",
+ "tool": "ants-multiply-images"
+}

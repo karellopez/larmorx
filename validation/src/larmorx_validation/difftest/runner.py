@@ -94,7 +94,6 @@ UNDEFINED_DEFECTS: dict[str, str] = {
     "ITK-25": "the manifold Parzen windows read past the end of their neighbours (memory)",
     "SCI-01": "map_coordinates reads outside the array for huge or NaN coordinates (memory)",
     "AFNI-04": "a shift beyond the series reads past it (memory)",
-    "ANTS-160": "ResampleImage reads missing Gaussian sigmas past the end of their list (memory)",
 }
 
 #: A refusal that names its defect (``... an error (ANTS-160)``): larmorx refuses a class (a)

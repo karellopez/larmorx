@@ -1,0 +1,189 @@
+{
+ "defect": null,
+ "description": "a shrink factor and B-spline padding whose padded image cannot be allocated: ITK throws MemoryAllocationError (ANTs aborts), larmorx refuses with ITK's message (it aborted)",
+ "expect": "error",
+ "found": {
+  "detail": "the process ended by signal 6: memory allocation of 32000480002400004 bytes failed note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace",
+  "n": 0,
+  "seed": "trial1",
+  "shrink_moves": [
+   "dropped rescale (-r 1)",
+   "dropped histogram (-t [0.15,0.01,200])",
+   "dropped convergence (-c [20,0.001])",
+   "dropped shrink (-s 4)",
+   "a: axis 2 13 -> 6 voxels",
+   "a: axis 0 11 -> 5 voxels",
+   "a: axis 1 7 -> 4 voxels",
+   "a: axis 2 6 -> 4 voxels",
+   "a: axis 0 5 -> 4 voxels",
+   "a (and its grid): plumb orientation",
+   "a (and its grid): origin at 0",
+   "a: float32 storage",
+   "a: content head -> constant"
+  ],
+  "signature": [
+   "crash"
+  ]
+ },
+ "id": "allocation-refused",
+ "implementations": [
+  "port"
+ ],
+ "reason": "",
+ "recipe": {
+  "extra": {
+   "min_size": 4,
+   "outputs": [
+    "{out}",
+    "{out2}"
+   ]
+  },
+  "features": {
+   "axis0": 0.8,
+   "axis1": 0.95,
+   "axis2": 0.95,
+   "bias field output": true,
+   "bias0": 0.005,
+   "bias1": 0.005,
+   "bias2": -0.01,
+   "bias3": -0.01,
+   "bracket": true,
+   "bspline": true,
+   "centre0": -3.0,
+   "centre1": 5.5,
+   "centre2": 2.5,
+   "content": "head",
+   "convergence": true,
+   "convergence form": "[{}]",
+   "dimension": 3,
+   "dtype": "int16",
+   "histogram": true,
+   "histogram parameters": "[0.15,0.01,200]",
+   "iterations0": "20",
+   "levels": 1,
+   "mask": false,
+   "noise": 6.0,
+   "order": ",5",
+   "orientation": "axes+oblique",
+   "origin0": -48.25,
+   "origin1": -45.5,
+   "origin2": 45.0,
+   "output form": "[ {out}, {out2} ]",
+   "qfac": 1,
+   "qform_code": 1,
+   "range": "plain",
+   "rescale": true,
+   "rescale value": "1",
+   "sform": "same",
+   "sform_code": 1,
+   "shape": "11x7x13",
+   "shrink": true,
+   "shrink factor": "4",
+   "size": 23.0,
+   "spacing0": 1.0,
+   "spacing1": 3.0,
+   "spacing2": 1.5,
+   "spline": "200",
+   "suffix": ".nii.gz",
+   "threshold": ",0.001",
+   "tissues": "epi",
+   "units": "um",
+   "verbose": false,
+   "weight": false
+  },
+  "groups": [
+   {
+    "args": [
+     "-d",
+     "3"
+    ],
+    "name": "dimension",
+    "optional": false
+   },
+   {
+    "args": [
+     "-i",
+     "{in:a}"
+    ],
+    "name": "input",
+    "optional": false
+   },
+   {
+    "args": [
+     "-b",
+     "[200,5]"
+    ],
+    "name": "bspline",
+    "optional": true
+   },
+   {
+    "args": [
+     "-o",
+     "[ {out}, {out2} ]"
+    ],
+    "name": "output",
+    "optional": false
+   }
+  ],
+  "inputs": {
+   "a": {
+    "content": {
+     "seed": 233741442,
+     "type": "constant"
+    },
+    "dtype": "float32",
+    "geometry": {
+     "origin": [
+      0.0,
+      0.0,
+      0.0
+     ],
+     "qfac": 1,
+     "qform_code": 1,
+     "quaternion": [
+      1,
+      0,
+      0,
+      0
+     ],
+     "sform": "same",
+     "sform_code": 1,
+     "spacing": [
+      1.0,
+      1.0,
+      1.0
+     ],
+     "units": "um"
+    },
+    "scaling": null,
+    "shape": [
+     4,
+     4,
+     4
+    ],
+    "suffix": ".nii.gz",
+    "values": {
+     "offset": 0.0,
+     "scale": 1.0
+    }
+   }
+  },
+  "n": 0,
+  "options": [
+   "-b",
+   "-c",
+   "-r",
+   "-s",
+   "-t",
+   "bias field output",
+   "dimension 3"
+  ],
+  "seed": "trial1",
+  "tool": "ants-n4"
+ },
+ "rule": null,
+ "status": "fixed",
+ "suite": "ants-n4",
+ "tier": "smoke",
+ "tool": "ants-n4"
+}

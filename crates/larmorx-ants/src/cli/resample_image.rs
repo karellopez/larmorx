@@ -348,17 +348,11 @@ impl Job<'_> {
                         // (`ResampleImage.cxx:178-182`) and exits 0 with a result that depends
                         // on the heap (usually NaN: an image of zeros in an integer type, and
                         // vnl's convergence messages). Class (a): an error in both modes, never
-                        // reproduced (as ANTS-77).
-                        let detail = format!(
-                            "{} Gaussian sigmas for {dim} dimensions: ANTs reads the missing ones past the end of its list (its result depends on memory it never wrote)",
-                            sg.len()
-                        );
-                        if self.notices.fix() {
-                            self.notices
-                                .add(&defects::ANTS_160, format!("{detail}: an error"));
-                        }
+                        // reproduced (as ANTS-77); the message names the defect, no notice (both
+                        // modes give the same result).
                         return Err(format!(
-                            "larmorx: ResampleImage: {detail}: an error (ANTS-160)"
+                            "larmorx: ResampleImage: {} Gaussian sigmas for {dim} dimensions: ANTs reads the missing ones past the end of its list (its result depends on memory it never wrote): an error (ANTS-160)",
+                            sg.len()
                         ));
                     }
                     sigma = sg[..dim].to_vec();
@@ -499,19 +493,14 @@ mod tests {
         let (a, b) = (a.to_str().unwrap(), dir.path().join("b.nii"));
         let b = b.to_str().unwrap();
         let args = ["3", a, b, "3x3x3", "1", "2", "1", "1"];
-        let (code, _, err) = run_capture(&args, UpstreamDefects::Fix);
-        assert_eq!(code, 1, "{err}");
-        assert!(
-            err.contains("an error (ANTS-160)")
-                && err.contains("ANTS-160 (ResampleImage) corrected"),
-            "{err}"
-        );
-        let (code, _, err) = run_capture(&args, UpstreamDefects::Reproduce);
-        assert_eq!(code, 1, "{err}");
-        assert!(
-            err.contains("an error (ANTS-160)") && !err.contains("ANTS-160 (ResampleImage)"),
-            "{err}"
-        );
+        for mode in [UpstreamDefects::Fix, UpstreamDefects::Reproduce] {
+            let (code, _, err) = run_capture(&args, mode);
+            assert_eq!(code, 1, "{err}");
+            assert!(
+                err.contains("an error (ANTS-160)") && !err.contains("ANTS-160 (ResampleImage)"),
+                "{err}"
+            );
+        }
         assert!(!dir.path().join("b.nii").exists());
         // Three sigmas: no notice.
         let args = ["3", a, b, "3x3x3", "1", "2", "1x1x1", "1"];

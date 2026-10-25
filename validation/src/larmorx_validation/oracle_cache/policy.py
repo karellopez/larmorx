@@ -68,6 +68,7 @@ VARYING_DEFECTS: dict[str, str] = {
     "AFNI-20": "AFNI's 1D text file holds a random identifier",
     "AFNI-45": "3dUnifize reads memory it never wrote",
     "AFNI-47": "3dUnifize reads past the end of its scale image",
+    "ANTS-160": "ResampleImage reads missing Gaussian sigmas past the end of their list (the heap)",
 }
 _DEFECT_ID = re.compile(r"\b(ANTS|ITK|AFNI|FSL|NIB)-\d+\b")
 

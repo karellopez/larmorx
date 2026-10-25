@@ -31,6 +31,7 @@ use larmorx_interp::{
 };
 use larmorx_io::nifti::itk::ItkGeometry;
 use rayon::prelude::*;
+use std::sync::atomic::{AtomicUsize, Ordering};
 
 /// [`resample_identity`] failed.
 #[derive(Debug, thiserror::Error)]
@@ -257,9 +258,11 @@ pub enum Coordinates {
     Float,
 }
 
-/// larmorx's working memory per output voxel of `ResampleImage` and `ResampleImageBySpacing`
-/// (the output and the second default's pass, as float, and the file's copy), measured with
-/// `validation/investigations/difftest/scaled_memory.py` (12.5 to 16 bytes; ANTs 7.3).
+/// larmorx's working memory per output voxel of `ResampleImage` and `ResampleImageBySpacing`,
+/// measured with `validation/investigations/difftest/scaled_memory.py` (12.5 to 16 bytes; ANTs
+/// 7.3) when ResampleImageBySpacing still resampled a second time for its ANTS-32 notice (the
+/// voxels beyond the input are now counted in the pass itself): kept as the guard's bound
+/// until measured again.
 pub const GRID_BYTES: f64 = 16.0;
 
 /// ANTS-162: the memory an output grid of `output` needs ([`GRID_BYTES`] per voxel), checked
@@ -392,6 +395,70 @@ where
     T: RealElement,
     O: Copy + PartialEq + Send + Sync,
 {
+    resample_identity_counted(
+        input,
+        input_geometry,
+        output,
+        interpolation,
+        default_value,
+        cast,
+        coordinates,
+        floor,
+        mirror,
+        n_threads,
+    )
+    .map(|(out, _)| out)
+}
+
+/// [`resample_identity`] and the number of output voxels beyond the input (those given
+/// `default_value`): what a second pass with another default would change, counted without one.
+#[allow(clippy::too_many_arguments)]
+pub fn resample_identity_outside<T, O>(
+    input: &[T],
+    input_geometry: &ItkGeometry,
+    output: &ItkGeometry,
+    interpolation: &Interpolation,
+    default_value: O,
+    cast: impl Fn(f64) -> O + Sync,
+    floor: &IndexFloor,
+    n_threads: usize,
+) -> Result<(Vec<O>, usize), ResampleError>
+where
+    T: RealElement,
+    O: Copy + PartialEq + Send + Sync,
+{
+    resample_identity_counted(
+        input,
+        input_geometry,
+        output,
+        interpolation,
+        default_value,
+        cast,
+        Coordinates::Double,
+        floor,
+        &BSplineMirror::full(),
+        n_threads,
+    )
+}
+
+/// The core of the resamplers: the output and its count of voxels beyond the input.
+#[allow(clippy::too_many_arguments)]
+fn resample_identity_counted<T, O>(
+    input: &[T],
+    input_geometry: &ItkGeometry,
+    output: &ItkGeometry,
+    interpolation: &Interpolation,
+    default_value: O,
+    cast: impl Fn(f64) -> O + Sync,
+    coordinates: Coordinates,
+    floor: &IndexFloor,
+    mirror: &BSplineMirror,
+    n_threads: usize,
+) -> Result<(Vec<O>, usize), ResampleError>
+where
+    T: RealElement,
+    O: Copy + PartialEq + Send + Sync,
+{
     let d = input_geometry.ndim;
     if output.ndim != d {
         return Err(ResampleError::Dimensions {
@@ -412,7 +479,7 @@ where
     }
     let n_out: usize = output.size.iter().product();
     if n_out == 0 {
-        return Ok(Vec::new());
+        return Ok((Vec::new(), 0));
     }
     let in_maps = Maps::new(input_geometry).ok_or(ResampleError::Singular("input"))?;
     let out_maps = Maps::new(output).ok_or(ResampleError::Singular("output"))?;
@@ -448,6 +515,7 @@ where
         cast: &cast,
         float: coordinates == Coordinates::Float,
         floor,
+        outside: AtomicUsize::new(0),
     };
     parallel::with_threads(n_threads, || match d {
         1 => job.run::<1>(&mut out),
@@ -458,7 +526,7 @@ where
     if let Evaluator::Other(interpolator) = &job.evaluator {
         mirror.absorb(interpolator.bspline_mirror());
     }
-    Ok(out)
+    Ok((out, job.outside.load(Ordering::Relaxed)))
 }
 
 fn name(i: &Interpolation) -> &'static str {
@@ -488,6 +556,8 @@ struct Rows<'a, T, O, C> {
     float: bool,
     /// The floor of base indices (ITK-01).
     floor: &'a IndexFloor,
+    /// The output voxels given `default_value` (beyond the input).
+    outside: AtomicUsize,
 }
 
 impl<T, O, C> Rows<'_, T, O, C>
@@ -530,9 +600,13 @@ where
                 // The row runs along the input's first axis (axis-aligned images): the other
                 // indices are the same for every voxel (`start + alpha·0`), so their part of
                 // the interpolation is computed once.
-                self.aligned_row(&start, &vector, &limit, line);
+                let beyond = self.aligned_row(&start, &vector, &limit, line);
+                if beyond > 0 {
+                    self.outside.fetch_add(beyond, Ordering::Relaxed);
+                }
                 return;
             }
+            let mut beyond = 0usize;
             for (x, o) in line.iter_mut().enumerate() {
                 let alpha = x as f64 / nx as f64;
                 let mut c: [f64; D] = std::array::from_fn(|k| start[k] + alpha * vector[k]);
@@ -540,6 +614,7 @@ where
                 let inside = (0..D).all(|k| c[k] >= -0.5 && c[k] < limit[k]);
                 if !inside {
                     *o = self.default_value;
+                    beyond += 1;
                     continue;
                 }
                 let c3: [f64; 3] = std::array::from_fn(|k| if k < D { c[k] } else { 0.0 });
@@ -576,6 +651,9 @@ where
                     _ => evaluate(self.floor),
                 };
             }
+            if beyond > 0 {
+                self.outside.fetch_add(beyond, Ordering::Relaxed);
+            }
         });
     }
 
@@ -590,14 +668,14 @@ where
 
     /// One output row whose points share every index but the first (`start[1..]`), in 2D or
     /// 3D with linear or nearest-neighbour interpolation: the same values as the general loop
-    /// of [`Rows::run`].
+    /// of [`Rows::run`]. Returns the number of its voxels beyond the input.
     fn aligned_row<const D: usize>(
         &self,
         start: &[f64; D],
         vector: &[f64; D],
         limit: &[f64; D],
         line: &mut [O],
-    ) {
+    ) -> usize {
         let nx = line.len();
         // `start[k] + alpha · (±0)` for the other axes, at alpha = 0 (the same for every
         // alpha ≥ 0).
@@ -611,7 +689,7 @@ where
         let inside = (1..D).all(|k| c[k] >= -0.5 && c[k] < limit[k]);
         if !inside {
             line.fill(self.default_value);
-            return;
+            return nx;
         }
         let float = self.float;
         let x_value = |x: usize| {
@@ -619,6 +697,7 @@ where
             if float { f64::from(v as f32) } else { v }
         };
         let x_inside = |cx: f64| cx >= -0.5 && cx < limit[0];
+        let mut beyond = 0usize;
         match &self.evaluator {
             Evaluator::Linear3(volume) => {
                 let yz = LinearYz::new(volume, c[1], c[2]);
@@ -627,6 +706,7 @@ where
                     *o = if x_inside(cx) {
                         (self.cast)(yz.evaluate(volume, cx))
                     } else {
+                        beyond += 1;
                         self.default_value
                     };
                 }
@@ -638,12 +718,14 @@ where
                     *o = if x_inside(cx) {
                         (self.cast)(yz.evaluate(volume, cx))
                     } else {
+                        beyond += 1;
                         self.default_value
                     };
                 }
             }
             _ => unreachable!("aligned rows are for the 2D and 3D linear and nearest paths"),
         }
+        beyond
     }
 }
 
@@ -763,6 +845,61 @@ mod tests {
                 })
                 .collect();
             assert_eq!(fast, expected, "{interp:?}");
+        }
+    }
+
+    /// The voxels beyond the input are counted in the pass itself: exactly those a second pass
+    /// with another default value changes (ResampleImageBySpacing's ANTS-32 notice), on the
+    /// aligned rows and the general path (an oblique output), in 2D, 3D and 4D.
+    #[test]
+    fn the_voxels_beyond_the_input_are_counted() {
+        let cases: Vec<(Vec<usize>, Vec<usize>, Option<f64>)> = vec![
+            (vec![4, 4], vec![8, 5], None),
+            (vec![3, 4, 2], vec![5, 6, 3], None),
+            (vec![3, 4, 2], vec![5, 6, 3], Some(0.3)),
+            (vec![2, 3, 2, 2], vec![3, 4, 3, 3], None),
+        ];
+        for (size, out_size, rotate) in cases {
+            let n: usize = size.iter().product();
+            let data: Vec<f32> = (0..n).map(|i| (i % 7) as f32 + 0.5).collect();
+            let g = geometry(&size, &vec![1.0; size.len()]);
+            let mut o = g.clone();
+            o.size = out_size;
+            o.origin = vec![-0.75; size.len()];
+            if let Some(t) = rotate {
+                let (s, c) = (f64::sin(t), f64::cos(t));
+                o.direction = vec![vec![c, -s, 0.0], vec![s, c, 0.0], vec![0.0, 0.0, 1.0]];
+            }
+            let floor = IndexFloor::itk();
+            let (a, beyond) = resample_identity_outside(
+                &data,
+                &g,
+                &o,
+                &Interpolation::Linear,
+                0.0f32,
+                |v| v as f32,
+                &floor,
+                2,
+            )
+            .unwrap();
+            let b = resample_identity(
+                &data,
+                &g,
+                &o,
+                &Interpolation::Linear,
+                -7.0f32,
+                |v| v as f32,
+                &floor,
+                2,
+            )
+            .unwrap();
+            let differ = a
+                .iter()
+                .zip(&b)
+                .filter(|(x, y)| x.to_bits() != y.to_bits())
+                .count();
+            assert_eq!(beyond, differ, "{size:?} {rotate:?}");
+            assert!(beyond > 0 && beyond < a.len(), "{size:?}");
         }
     }
 

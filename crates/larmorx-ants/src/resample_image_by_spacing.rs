@@ -37,7 +37,7 @@ use larmorx_image::gaussian::{GaussianOrder, recursive_gaussian};
 use larmorx_io::nifti::itk::ItkGeometry;
 
 use crate::image::AntsImage;
-use crate::resample::{ResampleError, resample_identity};
+use crate::resample::{ResampleError, resample_identity_outside};
 use larmorx_interp::Interpolation;
 
 /// The parameters of [`resample_image_by_spacing`].
@@ -247,19 +247,16 @@ pub fn resample_image_by_spacing(
     // `ResampleImageFilter<float, float>`: the double result cast to float (a linear or
     // nearest value of float voxels is always within float's range).
     let floor = IndexFloor::new(mode);
-    let resample = |default_value: f32, floor: &IndexFloor| {
-        resample_identity(
-            source,
-            &input.geometry,
-            &plan.geometry,
-            &interpolation,
-            default_value,
-            |v| v as f32,
-            floor,
-            n_threads,
-        )
-    };
-    let data = resample(default_value, &floor)?;
+    let (data, beyond) = resample_identity_outside(
+        source,
+        &input.geometry,
+        &plan.geometry,
+        &interpolation,
+        default_value,
+        |v| v as f32,
+        &floor,
+        n_threads,
+    )?;
     floor.notice(&mut notices, "output voxels");
     // ANTS-32's outside value: the voxels beyond the input are those the other default
     // changes (an axis of one voxel has no index 1: ANTs reads outside the image there).
@@ -268,13 +265,10 @@ pub fn resample_image_by_spacing(
         Some(v) => v,
         None => f32::MAX,
     };
+    // The voxels the other default changes are those beyond the input (the resampler counts
+    // them): no second pass, no second output grid in memory.
     if other.to_bits() != default_value.to_bits() {
-        let alternative = resample(other, &IndexFloor::new(mode))?;
-        let outside = data
-            .iter()
-            .zip(&alternative)
-            .filter(|(a, b)| a.to_bits() != b.to_bits())
-            .count();
+        let outside = beyond;
         if outside > 0 {
             let ants_value = match ants_default {
                 Some(v) => format!("the input's value at index (1, 1, ...), {v}"),

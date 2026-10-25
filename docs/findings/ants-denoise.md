@@ -309,3 +309,16 @@ requires: the same bits on every platform.
 - The output sums need every centre whose patch reaches a voxel: larmorx computes the centres
   block by block (2¹⁸ voxels) and keeps a window of their contributions, so memory stays at
   about 25 bytes per voxel plus the window.
+
+## Found by differential random testing (2026-10-25)
+
+- **ANTS-14 in the Rician bias's smoothing.** The bias is smoothed with a discrete Gaussian of
+  variance 2 mm²; on micrometre voxels that is 2·10⁶ voxels², whose ITK kernel is NaN (ANTS-14),
+  so ITK leaves the bias unsmoothed. larmorx used the corrected kernel in both modes
+  (`ants-denoise:20261025:41`: 27 of 27 voxels about 10⁻³ apart). Now `reproduce` keeps ITK's
+  kernel and both modes name ANTS-14.
+- **ANTS-99 in DenoiseImage.** Without `-d`, `DenoiseImage.cxx:647-649` asks a new ImageIO for the
+  dimension before it reads the header; NIfTI's answers 3, so a 2D or 4D image is denoised and
+  written as 3D (`:188`, `:254`). larmorx used the file's dimension in both modes; now
+  `reproduce` takes 3, both modes name ANTS-99 (N4BiasFieldCorrection likewise; permanent case
+  `difftest/no-dimension-2d-image`).

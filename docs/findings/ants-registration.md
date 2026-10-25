@@ -267,3 +267,23 @@ one `AffineTransform`, centred where the last matrix-offset transform of the que
 composed with `Compose(·, pre = true)` (a `TranslationTransform` through its offset; an
 `IdentityTransform` dereferences a null pointer, ANTS-48). `-a 1` writes `Composite.h5` and
 `InverseComposite.h5`; otherwise one file per transform (ANTS-51 for their names).
+
+## Found by differential random testing (2026-10-25)
+
+- **Aliased derivatives (ITK-97, ITK-99).** With a sampled metric and a shrink factor, sample
+  points drawn on the fixed image can fall outside the shrunk virtual region; ITK adds their
+  derivative at the region's linear offset of their index (another voxel's parameters) or past
+  its derivative array. larmorx drops them by default and, in `reproduce`, adds those inside the
+  array where ITK does: five displacement-field cases of the first night became bit-identical
+  (`docs/findings/upstream-defects.md`, ITK-97; permanent case
+  `difftest/sampled-derivatives-aliased`).
+- **The empty sample set's exception** is ITK's `itkImageToImageMetricv4.hxx:263` with the
+  metric's own class name (`MattesMutualInformationImageToImageMetricv4`, ...), or
+  `itkJointHistogramMutualInformationImageToImageMetricv4.hxx:233` for `MI`; larmorx printed line
+  268 and the base class (`ants-registration:20261025:417`).
+- **antsAI's warnings in ITK's order:** each start point's scales warnings come before its
+  multi-start warning (`ants-ai:20261025:244`); the problem now hands its warnings to the
+  multi-start loop as they arise.
+- **Transforms of four dimensions:** the parity runner reads a 4D displacement-field composite
+  (`DisplacementFieldTransform_double_4_4`, which `lx.transforms.read` does not hold) by its HDF5
+  parameters (`ants-registration:20261025:379`).

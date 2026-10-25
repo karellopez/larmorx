@@ -1,0 +1,286 @@
+{
+ "defect": null,
+ "description": "antsAI's start points that throw: each start point's scales warnings before its multi-start warning, in ITK's order",
+ "expect": "pass",
+ "found": {
+  "detail": "ANTs with CORE-MATH: standard error: line 4: ANTs 'WARNING: In Modules/Numerics/Optimizersv4/include/itkRegistrationParameterScalesFromShiftBase.hxx, line 91', larmorx 'WARNING: In Modules/Numerics/Optimizersv4/include/itkMultiStartOptimizerv4.hxx, line 187'",
+  "n": 244,
+  "seed": "20261025",
+  "shrink_moves": [
+   "dropped masks (-x [{in:fmask},{in:mmask}])",
+   "dropped search (-s [30,0.12])",
+   "fixed: axis 0 18 -> 9 voxels",
+   "fixed: axis 1 13 -> 6 voxels",
+   "moving: axis 0 18 -> 9 voxels",
+   "fixed (and its grid): origin at 0",
+   "fixed: axis 0 9 -> 6 voxels",
+   "fixed (and its grid): unit spacing",
+   "fixed: float32 storage",
+   "moving (and its grid): origin at 0",
+   "moving: axis 1 13 -> 6 voxels",
+   "moving: axis 0 9 -> 6 voxels",
+   "moving (and its grid): unit spacing",
+   "moving: plain value range"
+  ],
+  "signature": [
+   "ANTs with CORE-MATH: standard error"
+  ]
+ },
+ "id": "scales-warnings-before-multistart",
+ "implementations": [
+  "port"
+ ],
+ "reason": "",
+ "recipe": {
+  "extra": {
+   "min_size": 6
+  },
+  "features": {
+   "arc": "[30,0.12]",
+   "axis0": 0.9,
+   "axis1": 0.75,
+   "axis2": 1.15,
+   "bins": "32",
+   "blob count": "[30,10]",
+   "blobs": true,
+   "both masks": true,
+   "centre0": 1.5,
+   "centre1": -5.0,
+   "centre2": 3.0,
+   "content": "labels",
+   "convergence": "[2,1e-6,5]",
+   "dimension": 2,
+   "dtype": "uint8",
+   "fixed dtype": "uint8",
+   "fixed n0": 18,
+   "fixed n1": 13,
+   "fixed spacing": 2.5,
+   "grid": false,
+   "labels": 8,
+   "masks": true,
+   "metric": "Mattes",
+   "moving dtype": "float32",
+   "moving offset": 20.0,
+   "moving on another grid": true,
+   "moving origin0": 1.0,
+   "moving origin1": 2.5,
+   "moving origin2": -3.0,
+   "moving scale": 0.8,
+   "moving spacing": 2.0,
+   "oblique fixed": false,
+   "output": "{out}/t.mat",
+   "principal axes": false,
+   "range": "plain",
+   "rot b": -1,
+   "rot c": -1,
+   "rot d": 1,
+   "rot scale": 6,
+   "sampling": ",Regular,0.5",
+   "search": true,
+   "seed": false,
+   "shift0": -3.0,
+   "shift1": -2.5,
+   "shift2": 1.25,
+   "size": 26.0,
+   "step": "0.2",
+   "suffix": ".nii.gz",
+   "transform": "Rigid",
+   "verbose": false
+  },
+  "groups": [
+   {
+    "args": [
+     "-d",
+     "2"
+    ],
+    "name": "dimension",
+    "optional": false
+   },
+   {
+    "args": [
+     "-m",
+     "Mattes[{in:fixed},{in:moving},32,Regular,0.5]"
+    ],
+    "name": "metric",
+    "optional": false
+   },
+   {
+    "args": [
+     "-t",
+     "Rigid[0.2]"
+    ],
+    "name": "transform",
+    "optional": false
+   },
+   {
+    "args": [
+     "-b",
+     "[30,10]"
+    ],
+    "name": "blobs",
+    "optional": true
+   },
+   {
+    "args": [
+     "-c",
+     "[2,1e-6,5]"
+    ],
+    "name": "iterations",
+    "optional": true
+   },
+   {
+    "args": [
+     "-o",
+     "{out}/t.mat"
+    ],
+    "name": "output",
+    "optional": false
+   }
+  ],
+  "inputs": {
+   "fixed": {
+    "content": {
+     "axes": [
+      0.95,
+      1.2,
+      0.8
+     ],
+     "centre": [
+      0.0,
+      0.0,
+      0.0
+     ],
+     "n": 2,
+     "seed": 1723533324,
+     "size": 13.65,
+     "type": "blobs"
+    },
+    "dtype": "float32",
+    "geometry": {
+     "origin": [
+      0.0,
+      0.0,
+      0.0
+     ],
+     "qfac": 1,
+     "qform_code": 1,
+     "quaternion": [
+      1,
+      0,
+      0,
+      0
+     ],
+     "sform": "same",
+     "sform_code": 1,
+     "spacing": [
+      1.0,
+      1.0,
+      1.0
+     ],
+     "units": "mm"
+    },
+    "keep_content": true,
+    "scaling": null,
+    "shape": [
+     6,
+     6
+    ],
+    "suffix": ".nii.gz",
+    "values": {
+     "offset": 0.0,
+     "scale": 1.0
+    }
+   },
+   "moving": {
+    "content": {
+     "axes": [
+      0.95,
+      1.2,
+      0.8
+     ],
+     "centre": [
+      0.0,
+      0.0,
+      0.0
+     ],
+     "n": 2,
+     "seed": 1723533324,
+     "size": 13.65,
+     "type": "blobs"
+    },
+    "dtype": "float32",
+    "geometry": {
+     "origin": [
+      0.0,
+      0.0,
+      0.0
+     ],
+     "qfac": 1,
+     "qform_code": 1,
+     "quaternion": [
+      1,
+      0,
+      0,
+      0
+     ],
+     "sform": "same",
+     "sform_code": 1,
+     "spacing": [
+      1.0,
+      1.0,
+      1.0
+     ],
+     "units": "mm"
+    },
+    "keep_content": true,
+    "motion": [
+     {
+      "centre": [
+       0.0,
+       0.0,
+       0.0
+      ],
+      "quaternion": [
+       26,
+       -1,
+       -1,
+       1
+      ],
+      "translation": [
+       -3.0,
+       -2.5,
+       1.25
+      ]
+     }
+    ],
+    "scaling": null,
+    "shape": [
+     6,
+     6
+    ],
+    "suffix": ".nii.gz",
+    "values": {
+     "offset": 0.0,
+     "scale": 1.0
+    }
+   }
+  },
+  "n": 244,
+  "options": [
+   "-b",
+   "-c",
+   "-s",
+   "-x",
+   "Mattes metric",
+   "Rigid",
+   "dimension 2"
+  ],
+  "seed": "20261025",
+  "tool": "ants-ai"
+ },
+ "rule": null,
+ "status": "fixed",
+ "suite": "ants-ai",
+ "tier": "smoke",
+ "tool": "ants-ai"
+}

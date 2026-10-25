@@ -174,3 +174,20 @@ validated in 2D and 4D. Spatial operations need more:
 - Without an output name it prints "missing output filename" (line 53) and aborts (`throw;` with no
   active exception). A missing first file crashes before anything is printed
   (`CreateImageIO` returns null). Dimension 1 is accepted by ANTs; larmorx supports 2 to 4.
+
+## Found by differential random testing (2026-10-25)
+
+- **The median's zero.** `MedianImageFilter` takes the element `std::nth_element` leaves in the
+  middle; `-0.0` and `+0.0` compare equal, so which one ITK writes depends on libstdc++'s
+  introselect. larmorx selected with `total_cmp` (`ants-smooth-image:20261025:564`: one voxel
+  `+0` against ANTs' `-0`). Where the median is a zero of a box holding both, larmorx now selects
+  again with GCC 14.3's algorithm, emulated statement by statement
+  (`larmorx_image::libstdcxx::nth_element`), on ITK's box order (permanent case
+  `difftest/median-zero-sign`).
+- **ANTS-163:** ImageMath `Normalize` and `TruncateImageIntensity` with a mask of another size
+  read it outside its buffer; larmorx refuses (as before), now naming the defect.
+- **ANTS-161:** ResampleImage's refusal of a Gaussian sigma or alpha of 0 or less now names the
+  defect.
+- **ANTS-162:** ResampleImage's and ResampleImageBySpacing's output grid is checked against the
+  machine's memory before it is allocated (16 bytes per output voxel); see
+  [ants-n4.md](ants-n4.md), "Memory".

@@ -1,0 +1,388 @@
+{
+ "defect": null,
+ "description": "a 4D B-spline displacement-field stage: the runner reads the 4D composite by its HDF5 parameters",
+ "expect": "pass",
+ "found": {
+  "detail": "upstream_defects=upstream_defects)]\n                                              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"/home/karelo/VScode_projects/super_fmriprep/larmorx/.claude/worktrees/agent-ab7de196daece3c4e/python/larmorx/transforms/itk.py\", line 151, in _read_parts\n    parts, notices = _core.itk_transform_read(os.fspath(path), precision, upstream_defects)\n                     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\nValueError: /tmp/lx-reg-33zy1d3u/larmorx/rComposite.h5: unknown transform type \"DisplacementFieldTransform_double_4_4\"\n",
+  "n": 379,
+  "seed": "20261025",
+  "shrink_moves": [
+   "tool move 1",
+   "fixed: axis 0 12 -> 6 voxels",
+   "fixed: axis 2 11 -> 6 voxels",
+   "fixed: axis 1 9 -> 6 voxels",
+   "moving: axis 0 12 -> 6 voxels",
+   "moving: axis 2 11 -> 6 voxels",
+   "moving: axis 1 9 -> 6 voxels",
+   "fixed (and its grid): unit spacing",
+   "fixed (and its grid): origin at 0",
+   "fixed: float32 storage",
+   "moving (and its grid): unit spacing",
+   "moving (and its grid): origin at 0",
+   "moving: float32 storage",
+   "moving: plain value range"
+  ],
+  "signature": [
+   "exception"
+  ]
+ },
+ "id": "four-dimensional-field-parameters",
+ "implementations": [
+  "port"
+ ],
+ "reason": "",
+ "recipe": {
+  "extra": {
+   "min_size": 6
+  },
+  "features": {
+   "axis0": 1.25,
+   "axis1": 0.75,
+   "axis2": 1.05,
+   "bias0": 0.01,
+   "bias1": -0.005,
+   "bias2": 0.005,
+   "bias3": 0.0075,
+   "centre0": 0.0,
+   "centre1": -0.5,
+   "centre2": 1.5,
+   "collapse": false,
+   "composite": true,
+   "content": "head",
+   "dimension": 4,
+   "exp total0": "0",
+   "exp total1": "0",
+   "family0": "Translation",
+   "family1": "BSplineDisplacementField",
+   "fixed dtype": "uint8",
+   "fixed n0": 12,
+   "fixed n1": 9,
+   "fixed n2": 11,
+   "fixed spacing": 2.0,
+   "float": false,
+   "gdf total0": "0.5",
+   "gdf total1": "0",
+   "histogram matching": false,
+   "initial": false,
+   "iterations00": "3",
+   "iterations01": "3",
+   "iterations10": "2",
+   "iterations11": "3",
+   "levels0": 2,
+   "levels1": 2,
+   "masks": false,
+   "mesh0": "2",
+   "mesh1": "2",
+   "metric weight0": "1",
+   "metric weight1": "1",
+   "metric0": "Demons",
+   "metric1": "CC",
+   "moving dtype": "int16",
+   "moving offset": 20.0,
+   "moving on another grid": true,
+   "moving origin0": -2.0,
+   "moving origin1": 3.0,
+   "moving origin2": 2.0,
+   "moving scale": 0.8,
+   "moving spacing": 3.5,
+   "noise": 1.0,
+   "oblique fixed": false,
+   "outputs": "[{out}/r,{out}/w.nii.gz,{out}/iw.nii.gz]",
+   "radius1": "1",
+   "rot b": 1,
+   "rot c": 0,
+   "rot d": 2,
+   "rot scale": 4,
+   "shift0": 3.0,
+   "shift1": -1.5,
+   "shift2": 2.5,
+   "size": 8.5,
+   "smoothing units0": "mm",
+   "smoothing units1": "",
+   "stages": 2,
+   "step0": "0.5",
+   "step1": "0.25",
+   "syn total0": "0.3",
+   "syn total1": "0.3",
+   "syn update0": "3",
+   "syn update1": "2",
+   "tissues": "epi",
+   "tvb points0": "2",
+   "tvb points1": "2",
+   "tvf points0": "2",
+   "tvf points1": "2",
+   "volumes": 4,
+   "window0": "5",
+   "window1": "5",
+   "winsorize": false
+  },
+  "groups": [
+   {
+    "args": [
+     "-d",
+     "4"
+    ],
+    "name": "dimension",
+    "optional": false
+   },
+   {
+    "args": [
+     "-v",
+     "1"
+    ],
+    "name": "verbose",
+    "optional": false
+   },
+   {
+    "args": [
+     "-o",
+     "[{out}/r,{out}/w.nii.gz,{out}/iw.nii.gz]"
+    ],
+    "name": "output",
+    "optional": false
+   },
+   {
+    "args": [
+     "-a",
+     "1"
+    ],
+    "name": "composite",
+    "optional": true
+   },
+   {
+    "args": [
+     "-t",
+     "BSplineDisplacementField[0.25,2x2x2x2,0,3]",
+     "-m",
+     "CC[{in:fixed},{in:moving},1,1]",
+     "-c",
+     "[2x3,1e-6,5]",
+     "-f",
+     "2x1",
+     "-s",
+     "1x0"
+    ],
+    "name": "stage 1",
+    "optional": false
+   }
+  ],
+  "inputs": {
+   "fixed": {
+    "content": {
+     "axes": [
+      1.25,
+      0.75,
+      1.05
+     ],
+     "bias": [
+      0.01,
+      -0.005,
+      0.005,
+      0.0075
+     ],
+     "centre": [
+      0.0,
+      0.0,
+      0.0
+     ],
+     "noise": 1.0,
+     "seed": 670662171,
+     "size": 7.56,
+     "tissues": "epi",
+     "type": "head"
+    },
+    "dtype": "float32",
+    "geometry": {
+     "origin": [
+      0.0,
+      0.0,
+      0.0
+     ],
+     "qfac": 1,
+     "qform_code": 1,
+     "quaternion": [
+      1,
+      0,
+      0,
+      0
+     ],
+     "sform": "same",
+     "sform_code": 1,
+     "spacing": [
+      1.0,
+      1.0,
+      1.0
+     ],
+     "units": "mm"
+    },
+    "keep_content": true,
+    "scaling": null,
+    "shape": [
+     6,
+     6,
+     6,
+     4
+    ],
+    "suffix": ".nii.gz",
+    "values": {
+     "offset": 0.0,
+     "scale": 1.0
+    }
+   },
+   "moving": {
+    "content": {
+     "axes": [
+      1.25,
+      0.75,
+      1.05
+     ],
+     "bias": [
+      0.01,
+      -0.005,
+      0.005,
+      0.0075
+     ],
+     "centre": [
+      0.0,
+      0.0,
+      0.0
+     ],
+     "noise": 1.0,
+     "seed": 670662172,
+     "size": 7.56,
+     "tissues": "epi",
+     "type": "head"
+    },
+    "dtype": "float32",
+    "geometry": {
+     "origin": [
+      0.0,
+      0.0,
+      0.0
+     ],
+     "qfac": 1,
+     "qform_code": 1,
+     "quaternion": [
+      1,
+      0,
+      0,
+      0
+     ],
+     "sform": "same",
+     "sform_code": 1,
+     "spacing": [
+      1.0,
+      1.0,
+      1.0
+     ],
+     "units": "mm"
+    },
+    "keep_content": true,
+    "motion": [
+     {
+      "centre": [
+       0.0,
+       0.0,
+       0.0
+      ],
+      "quaternion": [
+       34,
+       1,
+       0,
+       2
+      ],
+      "translation": [
+       3.0,
+       -1.5,
+       2.5
+      ]
+     },
+     {
+      "centre": [
+       0.0,
+       0.0,
+       0.0
+      ],
+      "quaternion": [
+       34,
+       1,
+       0,
+       2
+      ],
+      "translation": [
+       3.0,
+       -1.5,
+       2.5
+      ]
+     },
+     {
+      "centre": [
+       0.0,
+       0.0,
+       0.0
+      ],
+      "quaternion": [
+       34,
+       1,
+       0,
+       2
+      ],
+      "translation": [
+       3.0,
+       -1.5,
+       2.5
+      ]
+     },
+     {
+      "centre": [
+       0.0,
+       0.0,
+       0.0
+      ],
+      "quaternion": [
+       34,
+       1,
+       0,
+       2
+      ],
+      "translation": [
+       3.0,
+       -1.5,
+       2.5
+      ]
+     }
+    ],
+    "scaling": null,
+    "shape": [
+     6,
+     6,
+     6,
+     4
+    ],
+    "suffix": ".nii.gz",
+    "values": {
+     "offset": 0.0,
+     "scale": 1.0
+    }
+   }
+  },
+  "n": 379,
+  "options": [
+   "-a 1",
+   "BSplineDisplacementField",
+   "BSplineDisplacementField with CC",
+   "CC metric",
+   "Demons metric",
+   "Translation",
+   "Translation with Demons",
+   "dimension 4"
+  ],
+  "seed": "20261025",
+  "tool": "ants-registration"
+ },
+ "rule": null,
+ "status": "fixed",
+ "suite": "ants-registration",
+ "tier": "smoke",
+ "tool": "ants-registration"
+}

@@ -17,13 +17,17 @@ pub const BLOCK_SIZE: usize = 256 * 1024;
 /// Deflate's window: the dictionary handed to each block.
 const DICT_SIZE: usize = 32 * 1024;
 /// At most this many blocks compressed together per batch (bounds the memory held by the
-/// encoder): two per worker of the current pool, so a one-thread write holds two blocks of input
-/// and their output, not 64 (random testing, 2026-10-25: larmorx's peak memory against ANTs').
+/// encoder): two per worker of the current pool, one with a single worker, so a one-thread
+/// write holds one block of input and its output, not 64 (random testing, 2026-10-25: larmorx's
+/// peak memory against ANTs').
 const BATCH_BLOCKS: usize = 64;
 
 /// The blocks of one batch on the current rayon pool.
 fn batch_blocks() -> usize {
-    (2 * rayon::current_num_threads()).clamp(2, BATCH_BLOCKS)
+    match rayon::current_num_threads() {
+        0 | 1 => 1,
+        n => (2 * n).min(BATCH_BLOCKS),
+    }
 }
 
 /// A gzip encoder that compresses blocks in parallel on the current rayon pool.
@@ -71,24 +75,30 @@ impl<W: Write> ParallelGzEncoder<W> {
         let data = &self.pending[..n_blocks * BLOCK_SIZE];
         let dictionary = &self.dictionary;
         let level = self.level;
-        let results: Vec<io::Result<(Vec<u8>, crc32fast::Hasher)>> = (0..n_blocks)
-            .into_par_iter()
-            .map(|i| {
-                let block = &data[i * BLOCK_SIZE..(i + 1) * BLOCK_SIZE];
-                let dict = if i == 0 {
-                    dictionary.as_slice()
-                } else {
-                    &data[i * BLOCK_SIZE - DICT_SIZE..i * BLOCK_SIZE]
-                };
-                let mut crc = crc32fast::Hasher::new();
-                crc.update(block);
-                Ok((deflate_block(dict, block, level, false)?, crc))
-            })
-            .collect();
-        for result in results {
-            let (bytes, crc) = result?;
+        let one = |i: usize| -> io::Result<(Vec<u8>, crc32fast::Hasher)> {
+            let block = &data[i * BLOCK_SIZE..(i + 1) * BLOCK_SIZE];
+            let dict = if i == 0 {
+                dictionary.as_slice()
+            } else {
+                &data[i * BLOCK_SIZE - DICT_SIZE..i * BLOCK_SIZE]
+            };
+            let mut crc = crc32fast::Hasher::new();
+            crc.update(block);
+            Ok((deflate_block(dict, block, level, false)?, crc))
+        };
+        if n_blocks == 1 {
+            // One block (a one-thread write): compressed here, with no task.
+            let (bytes, crc) = one(0)?;
             self.inner.write_all(&bytes)?;
             self.crc.combine(&crc);
+        } else {
+            let results: Vec<io::Result<(Vec<u8>, crc32fast::Hasher)>> =
+                (0..n_blocks).into_par_iter().map(one).collect();
+            for result in results {
+                let (bytes, crc) = result?;
+                self.inner.write_all(&bytes)?;
+                self.crc.combine(&crc);
+            }
         }
         self.total_in += (n_blocks * BLOCK_SIZE) as u64;
         self.dictionary = data[data.len() - DICT_SIZE..].to_vec();
@@ -236,12 +246,24 @@ mod tests {
         let data = sample(3 * BLOCK_SIZE * BATCH_BLOCKS + 7);
         let mut enc = ParallelGzEncoder::new(Vec::new(), 1).unwrap();
         let batch = enc.batch;
-        assert!((2 * BLOCK_SIZE..=BLOCK_SIZE * BATCH_BLOCKS).contains(&batch));
+        assert!((BLOCK_SIZE..=BLOCK_SIZE * BATCH_BLOCKS).contains(&batch));
         enc.write_all(&data).unwrap();
         assert!(enc.pending.len() < batch, "{}", enc.pending.len());
         assert_eq!(enc.pending.capacity(), batch);
         let gz = enc.finish().unwrap();
         assert_eq!(gz, compress(&data, 1, 1, 4096));
+        // On one thread a batch is one block, compressed in place: the same bytes.
+        let pool = rayon::ThreadPoolBuilder::new()
+            .num_threads(1)
+            .build()
+            .unwrap();
+        let one = pool.install(|| {
+            let mut enc = ParallelGzEncoder::new(Vec::new(), 1).unwrap();
+            assert_eq!(enc.batch, BLOCK_SIZE);
+            enc.write_all(&data).unwrap();
+            enc.finish().unwrap()
+        });
+        assert_eq!(one, gz);
     }
 
     #[test]

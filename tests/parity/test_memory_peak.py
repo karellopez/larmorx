@@ -3,14 +3,14 @@
 2026-10-25: "we should fix the memory problem"): each ANTs image program and larmorx's command
 (``python -m larmorx ants <program>``, what the ``larmorx`` console script runs) on the same
 mid-size case, each process's peak resident memory from ``/usr/bin/time -v``, larmorx in both
-D13 modes; its output bit-identical to ANTs' in ``reproduce``
-(``validation/investigations/difftest/memory_pair.py`` measures any call by hand).
+D13 modes; its output bit-identical to ANTs' in ``reproduce`` (N4BiasFieldCorrection's and
+DenoiseImage's to ANTs with correctly rounded maths preloaded, the build their records compare
+with; ``validation/investigations/difftest/memory_pair.py`` measures any call by hand).
 
 The allowance is a constant, not a ratio: ``OVERHEAD_MIB`` for the Python interpreter and the
 gzip writer's two blocks per worker (a 16-voxel call needs 20 MiB in larmorx, 18 in ANTs; what
-grows with the image costs larmorx no more than ANTs). N4BiasFieldCorrection and DenoiseImage
-still need more than ANTs for their working images and are expected to fail until their
-follow-up (``docs/findings/ants-n4.md``, ``ants-denoise.md``, "Memory").
+grows with the image costs larmorx no more than ANTs; ``docs/findings/ants-image-programs.md``,
+``ants-n4.md`` and ``ants-denoise.md``, "Memory").
 """
 
 from __future__ import annotations
@@ -38,21 +38,24 @@ CASES = [
     ("SmoothImage", "256x256x128", "1,1,1", "3 {in} 1.5 {out}"),
     ("MultiplyImages", "256x256x128", "1,1,1", "3 {in} 2.5 {out}"),
     ("ImageMath", "256x256x128", "1,1,1", "3 {out} m {in} {in}"),
-    pytest.param(
+    (
         "N4BiasFieldCorrection",
         "128x128x96",
         "1.5,1.5,1.5",
         "-d 3 -i {in} -o {out} -s 2 -c [20x20,0]",
-        marks=pytest.mark.xfail(strict=True, reason="N4's working images: a follow-up"),
     ),
-    pytest.param(
-        "DenoiseImage",
-        "96x96x64",
-        "2,2,2",
-        "-d 3 -i {in} -o {out}",
-        marks=pytest.mark.xfail(strict=True, reason="DenoiseImage's working images: a follow-up"),
+    (
+        "N4BiasFieldCorrection",
+        "128x128x96",
+        "1.5,1.5,1.5",
+        "-d 3 -i {in} -o {out} -s 4 -c [20x20,0]",
     ),
+    ("DenoiseImage", "96x96x64", "2,2,2", "-d 3 -i {in} -o {out}"),
 ]
+
+#: The programs whose records compare with ANTs built with correctly rounded maths (their
+#: ``expf``, ``logf`` and ``exp``): ANTs runs with CORE-MATH preloaded for them.
+CORRECTLY_ROUNDED = {"N4BiasFieldCorrection", "DenoiseImage"}
 
 
 def _peak(cmd: list[str], env: dict[str, str]) -> tuple[int, float]:
@@ -88,7 +91,13 @@ def test_larmorx_needs_no_more_memory_than_ants(tmp_path, program, size, spacing
         return [w.format(**{"in": inp, "out": out}) for w in words]
 
     a_out = tmp_path / "ants.nii.gz"
-    code, ants_mib = _peak([str(programs.ants_bin() / program), *argv(a_out)], env)
+    ants_env = dict(env)
+    if program in CORRECTLY_ROUNDED:
+        lib = programs.crmath_preload()
+        if lib is None:
+            pytest.skip("libcrmath.so (scripts/build_crmath_preload.sh) was not found")
+        ants_env["LD_PRELOAD"] = str(lib)
+    code, ants_mib = _peak([str(programs.ants_bin() / program), *argv(a_out)], ants_env)
     assert code == 0
     for mode in ("reproduce", "fix"):
         out = tmp_path / f"larmorx-{mode}.nii.gz"
@@ -100,8 +109,7 @@ def test_larmorx_needs_no_more_memory_than_ants(tmp_path, program, size, spacing
         assert mib <= ants_mib + OVERHEAD_MIB, (
             f"{program} ({mode}): larmorx {mib:.0f} MiB, ANTs {ants_mib:.0f} MiB"
         )
-        if mode == "reproduce" and program not in ("N4BiasFieldCorrection", "DenoiseImage"):
-            # N4 and DenoiseImage agree with ANTs' correctly rounded build, not this one.
+        if mode == "reproduce":
             a = np.asarray(nib.load(a_out).dataobj)
             b = np.asarray(nib.load(out).dataobj)
             assert a.tobytes() == b.tobytes(), program

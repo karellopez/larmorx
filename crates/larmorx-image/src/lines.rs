@@ -178,7 +178,8 @@ pub(crate) struct Line {
 /// Calls `f(state, line, where)` on every line of `data` (an image of `size`, Fortran order)
 /// along `axis`, with the line's values in a contiguous slice that `f` may change in place.
 /// Lines along the first axis are passed as they lie in memory; lines along another axis are
-/// gathered in groups of up to [`LANES`] neighbouring lines and scattered back afterwards.
+/// gathered in groups of up to [`LANES`] neighbouring lines (tasks of up to `GROUP`) and
+/// scattered back afterwards.
 /// Each line is seen once, so the result never depends on the thread count (`init` makes
 /// each worker's scratch state).
 pub(crate) fn for_each_line<T, S, I, F>(
@@ -213,17 +214,18 @@ where
                 },
             );
         } else {
-            // Strided lines: each task owns the pieces of `w ≤ LANES` neighbouring lines, one
-            // piece per position along the axis (as in `filter_lines`).
+            // Strided lines: each task owns the pieces of up to `GROUP` neighbouring lines, one
+            // piece per position along the axis, and gathers them `LANES` at a time (as in
+            // `filter_lines`: one reference per `GROUP` voxels of a row, not per `LANES`).
             let mut tasks: Vec<(usize, Vec<&mut [T]>)> = Vec::new();
             for (b, block) in data.chunks_mut(inner * n).enumerate() {
                 let first = tasks.len();
                 tasks.extend(
-                    (0..inner.div_ceil(LANES))
-                        .map(|c| (b * inner * n + c * LANES, Vec::with_capacity(n))),
+                    (0..inner.div_ceil(GROUP))
+                        .map(|c| (b * inner * n + c * GROUP, Vec::with_capacity(n))),
                 );
                 for row in block.chunks_mut(inner) {
-                    for (c, piece) in row.chunks_mut(LANES).enumerate() {
+                    for (c, piece) in row.chunks_mut(GROUP).enumerate() {
                         tasks[first + c].1.push(piece);
                     }
                 }
@@ -231,22 +233,25 @@ where
             tasks.into_par_iter().for_each_init(
                 || (init(), vec![T::default(); n * LANES]),
                 |(state, buf), (start, mut rows)| {
-                    let w = rows[0].len();
-                    for (i, row) in rows.iter().enumerate() {
-                        for (l, &v) in row.iter().enumerate() {
-                            buf[l * n + i] = v;
+                    let width = rows[0].len();
+                    for s0 in (0..width).step_by(LANES) {
+                        let w = LANES.min(width - s0);
+                        for (i, row) in rows.iter().enumerate() {
+                            for (l, &v) in row[s0..s0 + w].iter().enumerate() {
+                                buf[l * n + i] = v;
+                            }
                         }
-                    }
-                    for l in 0..w {
-                        let line = Line {
-                            start: start + l,
-                            stride: inner,
-                        };
-                        f(state, &mut buf[l * n..(l + 1) * n], line);
-                    }
-                    for (i, row) in rows.iter_mut().enumerate() {
-                        for (l, v) in row.iter_mut().enumerate() {
-                            *v = buf[l * n + i];
+                        for l in 0..w {
+                            let line = Line {
+                                start: start + s0 + l,
+                                stride: inner,
+                            };
+                            f(state, &mut buf[l * n..(l + 1) * n], line);
+                        }
+                        for (i, row) in rows.iter_mut().enumerate() {
+                            for (l, v) in row[s0..s0 + w].iter_mut().enumerate() {
+                                *v = buf[l * n + i];
+                            }
                         }
                     }
                 },

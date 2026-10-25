@@ -80,6 +80,13 @@ pub struct N4Parameters {
     /// Correct ITK's defects (ANTS-38, ANTS-39; the default) or reproduce them (see the
     /// module).
     pub upstream_defects: UpstreamDefects,
+    /// The bytes the B-spline fit may use to cache its factors for a fitting level
+    /// ([`GridFitPlan::with_factor_budget`]: faster fits, the same result); `None`: two float
+    /// images of the grid N4 runs on. `N4BiasFieldCorrection` gives two images of the
+    /// full-resolution grid, which its last step needs anyway, so the cache never raises its
+    /// peak memory (random testing, 2026-10-25: 1.31 times ANTs' with a cache of 256 bytes
+    /// per point in 3D).
+    pub factor_budget: Option<usize>,
 }
 
 impl N4Parameters {
@@ -97,6 +104,7 @@ impl N4Parameters {
             bins: 200,
             double_axes: 0,
             upstream_defects: UpstreamDefects::Fix,
+            factor_budget: None,
         }
     }
 }
@@ -549,11 +557,13 @@ pub fn n4_bias_field(
                 .map(|&i| log_uncorrected[i] - sharpened[i])
                 .collect();
             if plan.is_none() {
-                plan = Some(GridFitPlan::new(
+                plan = Some(GridFitPlan::with_factor_budget(
                     &fit,
                     &grid.size,
                     &voxels,
                     Some(&weights),
+                    p.factor_budget
+                        .unwrap_or_else(|| len.saturating_mul(2 * size_of::<f32>())),
                     n_threads,
                 )?);
             }

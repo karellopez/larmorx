@@ -130,6 +130,9 @@ const LANES: usize = 8;
 /// Flags of a centre.
 const CONTRIBUTES: u8 = 1;
 const WRITES_BIAS: u8 = 2;
+/// Marks of an output voxel ([`gather`]).
+const WRITTEN: u8 = 1;
+const UNCOUNTED: u8 = 2;
 
 /// Neighbourhood offsets padded to [`MAXD`] axes, with their steps in memory for one layout.
 struct Offsets {
@@ -177,10 +180,6 @@ struct Context<'a> {
     input: Vec<f32>,
     mean: Vec<f32>,
     variance: Vec<f32>,
-    /// `input − mean`.
-    diff: Vec<f32>,
-    /// The values averaged: `input²` (Rician) or `input`.
-    values: Vec<f32>,
     /// Per voxel, the mean of `(input − mean)²` over its patch (step 2's distance).
     patch_distance: Vec<f32>,
     mask: Option<MaskRef<'a>>,
@@ -200,6 +199,31 @@ struct Context<'a> {
 #[inline(always)]
 fn lanes<T>(data: &[T], at: usize) -> &[T; LANES] {
     data[at..at + LANES].try_into().expect("LANES values")
+}
+
+// `input − mean` and the values averaged (`input²` with the Rician model, else `input`) are
+// computed where they are read, each with the one float operation that made them when they
+// were images of their own: two padded images fewer (random testing, 2026-10-25: DenoiseImage's
+// peak memory 2.13 times ANTs').
+impl Context<'_> {
+    /// `input − mean` at the [`LANES`] voxels from `at`.
+    #[inline(always)]
+    fn diff_lanes(&self, at: usize) -> [f32; LANES] {
+        let x = lanes(&self.input, at);
+        let m = lanes(&self.mean, at);
+        std::array::from_fn(|l| x[l] - m[l])
+    }
+
+    /// The values averaged at the [`LANES`] voxels from `at`.
+    #[inline(always)]
+    fn value_lanes(&self, at: usize) -> [f32; LANES] {
+        let x = lanes(&self.input, at);
+        if self.p.rician {
+            std::array::from_fn(|l| x[l] * x[l])
+        } else {
+            *x
+        }
+    }
 }
 
 /// Per-thread scratch space of a group of centres.
@@ -242,6 +266,18 @@ impl Context<'_> {
             at += (c + self.pad[k]) * self.pstrides[k];
         }
         at
+    }
+
+    /// `src` (in the padded layout) on the image's grid.
+    fn unpadded<T: Copy>(&self, src: &[T]) -> Vec<T> {
+        let nx = self.size[0];
+        let rows: usize = self.size[1..].iter().product();
+        let mut out = Vec::with_capacity(nx * rows);
+        for row in 0..rows {
+            let at = self.padded_row(row);
+            out.extend_from_slice(&src[at..at + nx]);
+        }
+        out
     }
 
     /// `src` (on the image's grid) in the padded layout, 0 in the padding.
@@ -381,7 +417,7 @@ impl Context<'_> {
             self.patch
                 .linear
                 .iter()
-                .map(|&o| *lanes(&self.diff, (at as isize + o) as usize)),
+                .map(|&o| self.diff_lanes((at as isize + o) as usize)),
         );
         let centre_valid = &mut scratch.centre_valid;
         centre_valid.clear();
@@ -461,7 +497,7 @@ impl Context<'_> {
             for &(b0, weight) in weights.iter() {
                 for (a, &o) in acc.iter_mut().zip(&offsets) {
                     let at = (b0 as isize + o) as usize;
-                    let v = lanes(&self.values, at);
+                    let v = self.value_lanes(at);
                     if MASKED {
                         let xv = lanes(&self.valid, at);
                         for l in 0..LANES {
@@ -493,7 +529,7 @@ impl Context<'_> {
             }
         }
         for (n, (acc, &o)) in weighted.iter_mut().zip(&self.patch.linear).enumerate() {
-            let v = lanes(&self.values, (at as isize + o) as usize);
+            let v = self.value_lanes((at as isize + o) as usize);
             for l in 0..LANES {
                 let added = acc[l] + maximum_weight[l] * v[l];
                 acc[l] = if !MASKED || centre_valid[n][l] {
@@ -532,8 +568,8 @@ impl Context<'_> {
         for (n, (&o, y)) in self.patch.linear.iter().zip(centre).enumerate() {
             let ia = (ba as isize + o) as usize;
             let ib = (bb as isize + o) as usize;
-            let xa = lanes(&self.diff, ia);
-            let xb = lanes(&self.diff, ib);
+            let xa = self.diff_lanes(ia);
+            let xb = self.diff_lanes(ib);
             if MASKED {
                 let va = lanes(&self.valid, ia);
                 let vb = lanes(&self.valid, ib);
@@ -620,7 +656,7 @@ fn patch_distances(ctx: &Context<'_>, n_threads: usize) -> Result<Vec<f32>, Filt
                         for &o in &ctx.patch.linear {
                             let u = (v as isize + o) as usize;
                             if ctx.valid[u] != 0 {
-                                let t = ctx.diff[u];
+                                let t = ctx.input[u] - ctx.mean[u];
                                 sum += t * t;
                                 count += 1.0;
                             }
@@ -666,11 +702,22 @@ pub fn adaptive_non_local_means(
     parameters: &AdaptiveNlmParameters,
     n_threads: usize,
 ) -> Result<AdaptiveNlmOutput, FilterError> {
-    run(input, mask, parameters, n_threads, BLOCK_VOXELS)
+    // A block of at least the patch's reach: the centres kept between blocks are then never
+    // more than the block (their copy to the window's front costs no more than the block).
+    let image_strides = strides(input.size);
+    let reach: usize = parameters
+        .patch_radius
+        .iter()
+        .zip(&image_strides)
+        .map(|(&r, &s)| r.saturating_mul(s))
+        .fold(0usize, usize::saturating_add);
+    run(input, mask, parameters, n_threads, BLOCK_VOXELS.max(reach))
 }
 
-/// About how many centres are computed between two summing passes.
-const BLOCK_VOXELS: usize = 1 << 18;
+/// About how many centres are computed between two summing passes (at least the patch's
+/// reach): their contributions, one float per patch offset, are kept until summed (27 per
+/// centre in 3D: 0.8 MiB; was 2^18 centres, 28 MiB, random testing, 2026-10-25: memory).
+const BLOCK_VOXELS: usize = 1 << 13;
 
 fn run(
     input: VolumeRef<'_, f32>,
@@ -730,16 +777,6 @@ fn run(
         }
     }
     let rician = parameters.rician;
-    let (diff, values): (Vec<f32>, Vec<f32>) =
-        larmorx_core::parallel::with_threads(n_threads, || {
-            input
-                .data
-                .par_iter()
-                .zip(mean.par_iter())
-                .with_min_len(1 << 14)
-                .map(|(&v, &m)| (v - m, if rician { v * v } else { v }))
-                .unzip()
-        })?;
 
     // The padded layout.
     let size: [usize; MAXD] = std::array::from_fn(|k| input.size.get(k).copied().unwrap_or(1));
@@ -767,8 +804,6 @@ fn run(
         input: Vec::new(),
         mean: Vec::new(),
         variance: Vec::new(),
-        diff: Vec::new(),
-        values: Vec::new(),
         patch_distance: Vec::new(),
         mask,
         mask_strides: match mask {
@@ -788,14 +823,12 @@ fn run(
     ctx.valid = ctx.padded(&vec![1u8; len]);
     ctx.input = ctx.padded(input.data);
     ctx.mean = ctx.padded(&mean);
+    // The mean on the image's grid is made again from the padded one at the end.
+    drop(mean);
     ctx.variance = ctx.padded(&variance);
     drop(variance);
-    ctx.diff = ctx.padded(&diff);
-    drop(diff);
-    ctx.values = ctx.padded(&values);
-    drop(values);
     ctx.patch_distance = patch_distances(&ctx, n_threads)?;
-    let ctx = ctx;
+    let mut ctx = ctx;
 
     // The centres, block by block in raster order; each output voxel is summed once every
     // centre whose patch reaches it is known.
@@ -811,17 +844,27 @@ fn run(
         .unwrap_or(0)
         .max(0) as usize;
     let block_rows = (block_voxels / nx).clamp(1, rows);
-    let mut sums = vec![0.0f32; len];
-    let mut counts = vec![0.0f32; len];
-    let mut raw_bias = vec![0.0f32; len];
-    // Whether a centre that took part wrote a noise estimate at the voxel (its patch reached
-    // it): ANTS-44's voxels outside the mask are those.
-    let mut bias_written = vec![false; len];
+    // Per output voxel: the sum of its contributions over their count (the sum itself where
+    // the count is almost 0), the last noise estimate written there, and its marks: `WRITTEN`
+    // (a centre that took part wrote a noise estimate at the voxel, its patch reached it:
+    // ANTS-44's voxels outside the mask are those) and `UNCOUNTED` (no contribution). The
+    // count is not kept as an image of its own (random testing, 2026-10-25: memory).
+    // The noise estimates only with the Rician model (the Gaussian writes none).
+    let mut estimates = vec![0.0f32; len];
+    let mut raw_bias = if rician {
+        vec![0.0f32; len]
+    } else {
+        Vec::new()
+    };
+    let mut marks = vec![0u8; len];
+    // The window holds the centres of `2 · reach` outputs still to be summed and one block:
+    // reserved once, never grown.
+    let window_len = (2 * reach + block_rows * nx).min(len);
     let mut window = Window {
         start: 0,
-        contribution: Vec::new(),
-        flags: Vec::new(),
-        bias: Vec::new(),
+        contribution: Vec::with_capacity(window_len * np),
+        flags: Vec::with_capacity(window_len),
+        bias: Vec::with_capacity(window_len),
     };
     let mut next_output = 0usize;
     let mut row = 0usize;
@@ -860,10 +903,13 @@ fn run(
                     &ctx,
                     &window,
                     next_output,
-                    &mut sums[next_output..complete],
-                    &mut counts[next_output..complete],
-                    &mut raw_bias[next_output..complete],
-                    &mut bias_written[next_output..complete],
+                    &mut estimates[next_output..complete],
+                    if rician {
+                        &mut raw_bias[next_output..complete]
+                    } else {
+                        &mut []
+                    },
+                    &mut marks[next_output..complete],
                 );
                 next_output = complete;
             }
@@ -879,6 +925,15 @@ fn run(
         }
     })?;
     drop(window);
+    // The padded images are no longer needed: the mean on the image's grid is made from the
+    // padded one, and they are freed before the bias is smoothed.
+    let mean = ctx.unpadded(&ctx.mean);
+    ctx.valid = Vec::new();
+    ctx.input = Vec::new();
+    ctx.mean = Vec::new();
+    ctx.variance = Vec::new();
+    ctx.patch_distance = Vec::new();
+    let ctx = ctx;
 
     // AfterThreadedGenerateData.
     let mut bias_image = Vec::new();
@@ -932,8 +987,8 @@ fn run(
                     .into_par_iter()
                     .with_min_len(1 << 12)
                     .filter(|&lin| {
-                        bias_written[lin]
-                            && !almost_equal_f32(counts[lin], 0.0)
+                        marks[lin] & WRITTEN != 0
+                            && marks[lin] & UNCOUNTED == 0
                             && positive(smoothed[lin])
                             && outside_mask(lin)
                     })
@@ -965,7 +1020,7 @@ fn run(
                     // corrected bias too (the others outside the mask, which no centre that
                     // took part reached, are not denoised and keep 0).
                     let outside = outside_mask(lin);
-                    if outside && !(fix && bias_written[lin]) {
+                    if outside && !(fix && marks[lin] & WRITTEN != 0) {
                         return;
                     }
                     let (v, overflow) = corrected(s, m);
@@ -977,6 +1032,8 @@ fn run(
                 });
         })?;
     }
+    // The bias is corrected: the mean is not needed again (nor, above, the smoothed bias).
+    drop(mean);
     let mut notices = Notices::new(parameters.upstream_defects);
     if !overflowing.is_empty() {
         let axes = overflowing
@@ -1019,11 +1076,11 @@ fn run(
         );
     }
     let estimate = |lin: usize, bias: f32| -> f32 {
-        let (s, n) = (sums[lin], counts[lin]);
-        if almost_equal_f32(n, 0.0) {
-            return s;
+        // The sum over the count, or the sum where the count is almost 0 (`gather`).
+        let mut estimate = estimates[lin];
+        if marks[lin] & UNCOUNTED != 0 {
+            return estimate;
         }
-        let mut estimate = s / n;
         if rician {
             estimate -= bias;
             if estimate < 0.0 {
@@ -1070,31 +1127,38 @@ fn run(
     })
 }
 
-/// Sums the contributions to output voxels `[from, from + sums.len())` in the single
+/// Sums the contributions to output voxels `[from, from + estimates.len())` in the single
 /// thread's order: the centres in raster order, which for a fixed output voxel is the patch
-/// offsets in reverse. The bias is the one written last (the first offset whose centre wrote
-/// one).
+/// offsets in reverse; each estimate is the sum over the count (ITK's division after its
+/// loop, the same float operation), the sum itself where the count is almost 0 (`UNCOUNTED`).
+/// The bias is the one written last (the first offset whose centre wrote one; `WRITTEN`).
 fn gather(
     ctx: &Context<'_>,
     window: &Window,
     from: usize,
-    sums: &mut [f32],
-    counts: &mut [f32],
+    estimates: &mut [f32],
     bias: &mut [f32],
-    written: &mut [bool],
+    marks: &mut [u8],
 ) {
     const CHUNK: usize = 1 << 12;
     let patch = &ctx.image_patch;
     let np = patch.len();
-    sums.par_chunks_mut(CHUNK)
-        .zip(counts.par_chunks_mut(CHUNK))
-        .zip(bias.par_chunks_mut(CHUNK))
-        .zip(written.par_chunks_mut(CHUNK))
+    // The bias is empty with the Gaussian model (no centre writes one).
+    let n_chunks = estimates.len().div_ceil(CHUNK);
+    let bias_chunks: Vec<Option<&mut [f32]>> = if bias.is_empty() {
+        (0..n_chunks).map(|_| None).collect()
+    } else {
+        bias.chunks_mut(CHUNK).map(Some).collect()
+    };
+    estimates
+        .par_chunks_mut(CHUNK)
+        .zip(bias_chunks.into_par_iter())
+        .zip(marks.par_chunks_mut(CHUNK))
         .enumerate()
-        .for_each(|(chunk, (((sums, counts), bias), written))| {
+        .for_each(|(chunk, ((estimates, mut bias), marks))| {
             let first = from + chunk * CHUNK;
             let mut c = coordinates(ctx, first);
-            for i in 0..sums.len() {
+            for i in 0..estimates.len() {
                 let p = first + i;
                 if i > 0 {
                     // Advance the coordinates by one voxel.
@@ -1135,10 +1199,13 @@ fn gather(
                         last_bias = Some(window.bias[w]);
                     }
                 }
-                sums[i] = sum;
-                counts[i] = count;
-                bias[i] = last_bias.unwrap_or(0.0);
-                written[i] = last_bias.is_some();
+                let uncounted = almost_equal_f32(count, 0.0);
+                estimates[i] = if uncounted { sum } else { sum / count };
+                if let Some(bias) = bias.as_deref_mut() {
+                    bias[i] = last_bias.unwrap_or(0.0);
+                }
+                marks[i] = if last_bias.is_some() { WRITTEN } else { 0 }
+                    | if uncounted { UNCOUNTED } else { 0 };
             }
         });
 }

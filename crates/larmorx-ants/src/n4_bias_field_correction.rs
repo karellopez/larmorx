@@ -30,7 +30,7 @@ use larmorx_core::defects::{Notice, UpstreamDefects};
 use larmorx_image::bspline::evaluate;
 use larmorx_image::itk_math::almost_equal_f32;
 use larmorx_image::n4::{N4Iteration, N4Parameters, n4_bias_field};
-use larmorx_image::shrink::{shrink, shrink_plan};
+use larmorx_image::shrink::{shrink, shrink_or_borrow, shrink_plan};
 use larmorx_image::{FilterError, ItkGrid};
 use rayon::prelude::*;
 
@@ -309,6 +309,29 @@ fn pad(
     Ok((out, new_size))
 }
 
+/// [`pad`], or `data` itself when nothing is padded.
+fn pad_or_borrow<'a>(
+    data: &'a [f32],
+    size: &[usize],
+    lower: &[usize],
+    upper: &[usize],
+) -> Result<std::borrow::Cow<'a, [f32]>, larmorx_core::alloc::AllocError> {
+    if lower.iter().chain(upper).all(|&p| p == 0) {
+        Ok(std::borrow::Cow::Borrowed(data))
+    } else {
+        Ok(std::borrow::Cow::Owned(pad(data, size, lower, upper)?.0))
+    }
+}
+
+/// [`crop`] of an image no longer needed: itself when nothing was padded.
+fn crop_owned(data: Vec<f32>, padded: &[usize], lower: &[usize], size: &[usize]) -> Vec<f32> {
+    if padded == size {
+        data
+    } else {
+        crop(&data, padded, lower, size)
+    }
+}
+
 /// The voxels of a padded image inside the original grid (`ExtractImageFilter` back to the
 /// input's region).
 fn crop(data: &[f32], padded: &[usize], lower: &[usize], size: &[usize]) -> Vec<f32> {
@@ -419,18 +442,18 @@ pub fn n4_bias_field_correction(
             distance,
         )?;
     }
-    let (padded_input, padded_size) = pad(&input.data, &g.size, lower, upper)?;
-    let ones;
-    let mask_data: &[f32] = match mask {
-        Some(m) => &m.data,
-        None => {
-            ones = vec![1.0f32; len];
-            &ones
-        }
+    // Memory (random testing, 2026-10-25: larmorx's peak against ANTs'): without padding the
+    // images are used as they are, not copied; without a mask, the image of ones is made only
+    // to be shrunk; the full-resolution images of the last step are dropped as soon as they
+    // have been used.
+    let padded_size: Vec<usize> = (0..d).map(|i| g.size[i] + lower[i] + upper[i]).collect();
+    let padded_input = pad_or_borrow(&input.data, &g.size, lower, upper)?;
+    let padded_mask = match mask {
+        Some(m) => Some(pad_or_borrow(&m.data, &g.size, lower, upper)?),
+        None => None,
     };
-    let (padded_mask, _) = pad(mask_data, &g.size, lower, upper)?;
     let padded_weight = match weight {
-        Some(w) => Some(pad(&w.data, &g.size, lower, upper)?.0),
+        Some(w) => Some(pad_or_borrow(&w.data, &g.size, lower, upper)?),
         None => None,
     };
     let padded_grid = ItkGrid {
@@ -451,11 +474,19 @@ pub fn n4_bias_field_correction(
         factors[3] = 1;
     }
     let plan = shrink_plan(&padded_grid, &factors)?;
-    let small_input = shrink(&padded_input, &padded_grid, &plan, n_threads)?;
-    let small_mask = shrink(&padded_mask, &padded_grid, &plan, n_threads)?;
+    let small_input = shrink_or_borrow(&padded_input[..], &padded_grid, &plan, n_threads)?;
+    let small_mask = match &padded_mask {
+        Some(m) => shrink_or_borrow(m.as_ref(), &padded_grid, &plan, n_threads)?,
+        None => {
+            // ANTs' mask of ones on the input's grid, padded with 0.
+            let ones = vec![1.0f32; len];
+            let padded_ones = pad_or_borrow(&ones, &g.size, lower, upper)?;
+            std::borrow::Cow::Owned(shrink(&padded_ones, &padded_grid, &plan, n_threads)?)
+        }
+    };
     let small_weight = padded_weight
         .as_ref()
-        .map(|w| shrink(w, &padded_grid, &plan, n_threads))
+        .map(|w| shrink_or_borrow(w.as_ref(), &padded_grid, &plan, n_threads))
         .transpose()?;
 
     let parameters = N4Parameters {
@@ -469,11 +500,19 @@ pub fn n4_bias_field_correction(
         // ITK's source: `r` and the points' coordinates rounded to float on every axis.
         double_axes: 0,
         upstream_defects: options.upstream_defects,
+        // Two float images of the full-resolution grid: the last step below holds three more
+        // than the fit does, so the factors' cache never raises the peak.
+        factor_budget: Some(
+            padded_size
+                .iter()
+                .product::<usize>()
+                .saturating_mul(2 * size_of::<f32>()),
+        ),
     };
     let result = n4_bias_field(
         &small_input,
         &plan.output,
-        Some(&small_mask),
+        Some(small_mask.as_ref()),
         small_weight.as_deref(),
         &parameters,
         n_threads,
@@ -488,25 +527,29 @@ pub fn n4_bias_field_correction(
         &g.spacing,
         n_threads,
     )?;
-    let (bias, mut corrected): (Vec<f32>, Vec<f32>) =
-        larmorx_core::parallel::with_threads(n_threads, || {
-            log_field
-                .par_iter()
-                .zip(padded_input.par_iter())
-                .with_min_len(1 << 14)
-                .map(|(&l, &v)| {
-                    let b = larmorx_core::math::exp(f64::from(l)) as f32;
-                    let c = if almost_equal_f32(b, 0.0) {
-                        f32::MAX
-                    } else {
-                        v / b
-                    };
-                    (b, c)
-                })
-                .unzip()
-        })
-        .map_err(FilterError::from)?;
-    if mask.is_some() {
+    drop(small_input);
+    drop(small_mask);
+    drop(small_weight);
+    // The bias field in place of the log field, then the corrected image.
+    let mut bias = log_field;
+    let mut corrected = larmorx_core::alloc::filled(bias.len(), 0.0f32)?;
+    larmorx_core::parallel::with_threads(n_threads, || {
+        bias.par_iter_mut()
+            .zip(corrected.par_iter_mut())
+            .zip(padded_input.par_iter())
+            .with_min_len(1 << 14)
+            .for_each(|((l, c), &v)| {
+                let b = larmorx_core::math::exp(f64::from(*l)) as f32;
+                *c = if almost_equal_f32(b, 0.0) {
+                    f32::MAX
+                } else {
+                    v / b
+                };
+                *l = b;
+            });
+    })
+    .map_err(FilterError::from)?;
+    if let Some(padded_mask) = &padded_mask {
         for (i, c) in corrected.iter_mut().enumerate() {
             if almost_equal_f32(padded_mask[i], 0.0) {
                 *c = padded_input[i];
@@ -532,8 +575,11 @@ pub fn n4_bias_field_correction(
             }
         }
     }
-    let corrected = crop(&corrected, &padded_size, lower, &g.size);
-    let bias = crop(&bias, &padded_size, lower, &g.size);
+    drop(padded_mask);
+    drop(padded_weight);
+    drop(padded_input);
+    let corrected = crop_owned(corrected, &padded_size, lower, &g.size);
+    let bias = crop_owned(bias, &padded_size, lower, &g.size);
     Ok(N4Output {
         corrected: input.derived(corrected),
         bias_field: input.derived(bias),

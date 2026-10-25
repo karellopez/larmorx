@@ -24,8 +24,10 @@
 
 use larmorx_core::IndexFloor;
 use larmorx_core::defects::{Notice, Notices, UpstreamDefects};
-use larmorx_image::adaptive_denoising::{AdaptiveNlmParameters, MaskRef, adaptive_non_local_means};
-use larmorx_image::shrink::{shrink, shrink_plan};
+use larmorx_image::adaptive_denoising::{
+    AdaptiveNlmOutput, AdaptiveNlmParameters, MaskRef, adaptive_non_local_means,
+};
+use larmorx_image::shrink::{shrink_or_borrow, shrink_plan};
 use larmorx_image::{FilterError, ItkGrid, VolumeRef};
 use larmorx_interp::Interpolation;
 use larmorx_io::nifti::itk::ItkGeometry;
@@ -159,7 +161,9 @@ pub fn denoise_image(
     let factor = options.shrink_factor as u32 as usize;
     let grid = ItkGrid::new(&g.size, &g.spacing, &g.origin, &g.direction);
     let plan = shrink_plan(&grid, &vec![factor; d])?;
-    let shrunk = shrink(&input.data, &grid, &plan, n_threads)?;
+    // A shrink factor of 1 uses the image as it is, not a copy (random testing, 2026-10-25:
+    // DenoiseImage's peak memory against ANTs').
+    let shrunk = shrink_or_borrow(&input.data, &grid, &plan, n_threads)?;
     let small = geometry_of(&plan.output, g);
 
     let mask_ref = match mask {
@@ -186,22 +190,29 @@ pub fn denoise_image(
     parameters.search_radius = search;
     parameters.upstream_defects = options.upstream_defects;
     let result = adaptive_non_local_means(
-        VolumeRef::new(&shrunk, &small.size, &small.spacing),
+        VolumeRef::new(&shrunk[..], &small.size, &small.spacing),
         mask_ref,
         &parameters,
         n_threads,
     )?;
 
-    // The noise at the filter's resolution, then on the input's grid.
-    let small_noise: Vec<f32> = larmorx_core::parallel::with_threads(n_threads, || {
-        shrunk
-            .par_iter()
-            .zip(result.denoised.par_iter())
+    // The noise at the filter's resolution (in place of the filter's output, which is not
+    // needed again), then on the input's grid.
+    let AdaptiveNlmOutput {
+        denoised: mut small_noise,
+        rician_bias,
+        notices: filter_notices,
+    } = result;
+    drop(rician_bias);
+    larmorx_core::parallel::with_threads(n_threads, || {
+        small_noise
+            .par_iter_mut()
+            .zip(shrunk.par_iter())
             .with_min_len(1 << 14)
-            .map(|(&a, &b)| a - b)
-            .collect()
+            .for_each(|(b, &a)| *b = a - *b);
     })
     .map_err(FilterError::from)?;
+    drop(shrunk);
     let floor = IndexFloor::new(options.upstream_defects);
     let noise = resample_identity_with(
         &small_noise,
@@ -214,8 +225,9 @@ pub fn denoise_image(
         &floor,
         n_threads,
     )?;
+    drop(small_noise);
     let mut notices = Notices::new(options.upstream_defects);
-    notices.extend(result.notices);
+    notices.extend(filter_notices);
     floor.notice(&mut notices, "output voxels");
     let denoised: Vec<f32> = larmorx_core::parallel::with_threads(n_threads, || {
         input

@@ -600,3 +600,28 @@ def test_the_sizing_laws_and_a_case_predicted_over_the_limit():
     # An implementation without a guard is not run: queued, its prediction recorded.
     e = runner.guard_case(tools.get("afni-unifize"), {}, "original", {**over, "law": "x"})
     assert e["verdict"] == "memory" and "no guard" in e["detail"]
+
+
+def test_outputs_are_compared_chunk_by_chunk_with_the_whole_arrays_numbers(monkeypatch):
+    """Two outputs of billions of voxels are compared a chunk at a time (the heavy case
+    ants-resample-image:20261025:556): the count, the largest difference, its ratio to the
+    largest value and the ulp distance are those of the whole arrays."""
+    from larmorx_validation.parity import ants_programs as ap
+
+    rng = np.random.default_rng(7)
+    a = rng.normal(size=(17, 13, 11)).astype(np.float32)
+    b = a.copy()
+    b.reshape(-1)[[3, 400, 2000]] = np.nextafter(b.reshape(-1)[[3, 400, 2000]], np.float32(9))
+    b.reshape(-1)[1500] += 0.25
+    a.reshape(-1)[50] = b.reshape(-1)[50] = np.nan
+    whole = ap.value_differences(a, b)
+    monkeypatch.setattr(ap, "COMPARE_CHUNK", 64)
+    assert ap.value_differences(a, b) == whole
+    assert whole[0] == 4 and whole[3] >= 1 and abs(whole[1] - 0.25) < 1e-6
+    finite = np.abs(a[np.isfinite(a)]).max()
+    assert whole[2] == whole[1] / float(finite)
+    assert ap.value_differences(a, a) == (0, 0.0, 0.0, 0)
+    i = rng.integers(0, 255, size=1000, dtype=np.uint8)
+    j = i.copy()
+    j[999] ^= 1
+    assert ap.value_differences(i, j)[0] == 1 and ap.value_differences(i, j)[3] == 0

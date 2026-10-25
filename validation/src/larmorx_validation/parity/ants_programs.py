@@ -350,6 +350,45 @@ def ulps(a: np.ndarray, b: np.ndarray) -> int:
     return int(d.max())
 
 
+#: Values compared at a time (:func:`value_differences`): the comparison of two outputs of
+#: billions of voxels needs the two outputs and a few chunks, not several float64 copies of
+#: them (random testing, 2026-10-25: the heavy case ``ants-resample-image:20261025:556``, two
+#: outputs of 6·10⁹ voxels, was stopped at 24 GiB + 48 GiB of swap by its comparison).
+COMPARE_CHUNK = 1 << 22
+
+
+def value_differences(a: np.ndarray, b: np.ndarray) -> tuple[int, float, float, int]:
+    """The values that differ between two arrays of one shape and type (their bits, every NaN
+    alike), the largest absolute difference, that over the largest finite magnitude of ``a``,
+    and the largest distance in ulp, computed :data:`COMPARE_CHUNK` values at a time (the same
+    numbers as on the whole arrays)."""
+    a1, b1 = np.ascontiguousarray(a).reshape(-1), np.ascontiguousarray(b).reshape(-1)
+    chunks = [
+        (a1[i : i + COMPARE_CHUNK], b1[i : i + COMPARE_CHUNK])
+        for i in range(0, a1.size, COMPARE_CHUNK)
+    ]
+    counts = [int(np.count_nonzero(_canonical_bits(x) != _canonical_bits(y))) for x, y in chunks]
+    n = sum(counts)
+    if n == 0:
+        return 0, 0.0, 0.0, 0
+    max_abs, scale, max_ulp = 0.0, 0.0, 0
+    for (x, y), k in zip(chunks, counts, strict=True):
+        xf = x.astype(np.float64)
+        finite = np.abs(xf[np.isfinite(xf)])
+        if finite.size:
+            scale = max(scale, float(finite.max()))
+        if k == 0:
+            continue
+        yf = y.astype(np.float64)
+        with np.errstate(invalid="ignore"):
+            d = np.abs(xf - yf)
+        d = np.where(np.isnan(xf) & np.isnan(yf), 0.0, d)
+        d = np.where(np.isnan(d), np.inf, d)
+        max_abs = max(max_abs, float(d.max()))
+        max_ulp = max(max_ulp, ulps(x, y))
+    return n, max_abs, max_abs / (scale or 1.0), max_ulp
+
+
 def affine_difference(a: np.ndarray, b: np.ndarray) -> float:
     """The largest difference between two affines, equal infinities and NaNs counting 0
     (ANTs writes an infinite spacing and a NaN origin for an image of one voxel per axis,
@@ -411,7 +450,7 @@ def compare_outputs(
                 f"{prefix}values not compared",
                 True,
                 metric="undefined in ANTs",
-                value=int(np.count_nonzero(_canonical_bits(a) != _canonical_bits(b))),
+                value=value_differences(a, b)[0],
                 threshold="reported",
                 detail=undefined_values,
             )
@@ -426,21 +465,7 @@ def compare_outputs(
             )
         )
         return
-    diff_mask = _canonical_bits(a) != _canonical_bits(b)
-    n = int(np.count_nonzero(diff_mask))
-    if n == 0:
-        rel, max_ulp, max_abs = 0.0, 0, 0.0
-    else:
-        af, bf = a.astype(np.float64), b.astype(np.float64)
-        with np.errstate(invalid="ignore"):
-            d = np.abs(af - bf)
-        d = np.where(np.isnan(af) & np.isnan(bf), 0.0, d)
-        d = np.where(np.isnan(d), np.inf, d)
-        max_abs = float(d.max())
-        finite = np.abs(af[np.isfinite(af)])
-        scale = float(finite.max()) if finite.size else 1.0
-        rel = max_abs / (scale or 1.0)
-        max_ulp = ulps(a, b)
+    n, max_abs, rel, max_ulp = value_differences(a, b)
     detail = f"{n} of {a.size} values differ" + (
         f"; max |diff| {max_abs:.3g} ({rel:.1e} of max |ANTs|), at most {max_ulp} ulp" if n else ""
     )

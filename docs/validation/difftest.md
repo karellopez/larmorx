@@ -240,4 +240,55 @@ went into the register: ANTS-160, ANTS-161 and ITK-95.
 
 ## The first night
 
-{FIRST_NIGHT}
+The first night began on the morning of 2026-10-25 and took the machine down after 670 cases:
+by 08:35 one N4 case (ANTS-162) had grown to 28 GB (its results are kept in
+`oracles/difftest/2026-10-25-oom/`). The
+memory box and the per-case limits above were built that morning, and the night ran again at
+11:03, boxed (6.2 h, 3 jobs at one thread, seed `20261025`, the same
+seed, so its first cases are the crashed night's): 34 880 cases of 21 tools; 31790 agree, 3 explained, 1350 notice, 394 undefined, 1227 differ, 76 memory, 38 timeout; 58 groups of differences: 34 fixed in larmorx, 6 defects of the originals in the register, 17 open for the clean-room originals' agents, 1 the harness's own; 76 heavy cases queued
+(`oracles/difftest/2026-10-25/report.md`). Its harness was commit `fa9dfcf`, its larmorx build and
+replica programs those of `1d971f1` (the same Rust).
+
+What it found, by kind (each difference's triage in `validation/difftest/triage.toml`):
+
+- **larmorx mistakes, fixed the same day** (each with a unit test and, where the original's
+  result is defined, a permanent case): ITK's shortest numbers at a tie (a float B-spline
+  parameter written one digit off); four transform classes antsApplyTransforms could not apply
+  (QuaternionRigid, ScaleVersor3D, ScaleSkewVersor3D, Scale); a float versor's cosine squared in
+  double; the empty sample set's exception (line and class); antsAI's warnings in ITK's order;
+  the median's zero of a box holding both zeros (libstdc++'s introselect); DenoiseImage's and
+  N4's dimension without `-d` (ANTS-99) and the Rician bias's smoothing kernel (ANTS-14); the NIfTI
+  writer's warning for direction cosines orthogonal in double but not in float; a field written
+  under a linear stage's `.mat` name keeping its class; and in `reproduce`, ITK's aliased
+  derivatives of sample points outside a shrunk region (ITK-97, displacement-field, SyN and
+  B-spline SyN stages) and a later level's zero Mattes bin size (ITK-100). The 2D B-spline fit
+  of N4 (three times ANTs' memory per control point and twelve times its time, found by a heavy
+  case) now splits its work by lattice rows; ResampleImage's B-spline on a 2-voxel axis no
+  longer panics (ITK-98).
+- **defects of the originals, in the register by rules A-D:** ANTS-162 (rule C for the method,
+  with a guard by default: lattices, paddings and grids sized from the physical extent), ANTS-163
+  (a mask of another size read outside its buffer), ITK-97 (rule A), ITK-98, ITK-99, ITK-100
+  (rule B), AFNI-75 (3dUnifize `-EPI`'s ball of neighbours on micrometre voxels: rule C with a
+  guard by default, as ANTS-162); ANTS-161, ITK-95 and ITK-96 met again (their `reproduce`
+  switches are follow-ups).
+- **the replicas of other parts:** the mcflirt replica differed in 107 cases; its own part's
+  fixes (an atanf constant, and FSL-08's notice of the `-meanvol` name) make every one of them
+  bit-identical.
+- **the clean-room originals, reported for their agents** (black-box reproducers): 3dTshift's
+  header under AFNI-07's correction and `toffset`'s last bits; 3dAutomask's "[from ?]" and its
+  fix pass's messages; 3dUnifize's header and AFNI-08 notice; the head-motion correction beyond
+  its record's thresholds on small phantoms (782 cases), whose alignment is as good as
+  mcflirt's (`hmc_residuals.py`: the corrected series' temporal deviation within 1 % of mcflirt's
+  in 22 of 40 sampled cases, lower in 8, higher in 10).
+- **heavy cases:** 76 cases exceeded the 3 GiB limit of a case. Their predictions
+  (`heavy_predict.py`) put 11 beyond any machine (the N4 lattices of ANTS-162, the 3dUnifize
+  balls of AFNI-75: never run; permanent cases expect the guards' errors). The heavy box ran 40
+  on the evening of 2026-10-25 (batch 1, 2.67 h): 26 agree, 14 notices that changed no value, no
+  difference. 25 wait for a larger machine, each with its prediction and command line: 13 N4
+  cases too long here (51.5 h in all), 8 beyond the heavy box, and 4 of batch 1 to run again
+  with the harness's fixes (two comparisons that held both outputs of billions of voxels, one
+  that started before a fix of that comparison, one original past the suites' 30-minute run
+  limit).
+- **open:** ITK-01's notice in antsRegistration's field lookups (the default's exact floor
+  changes a value in its last bit with no notice); one voxel of `resample_series` one float ulp
+  from fMRIPrep's; the timeouts (38: afni-unifize 1, ants-ai 1, ants-n4 14, ants-registration 10, ants-resample-image 8, ants-resample-image-by-spacing 3, ants-smooth-image 1).

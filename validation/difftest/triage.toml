@@ -10,7 +10,7 @@
 # harness (the comparison's own mistake, corrected in the harness), unclear (for the
 # orchestrator). link: a repository path (a permanent case, a finding) or a site path.
 
-# ---------------------------------------------------------------- fixed in the ports and replicas
+# ---------------------------------------------------------------- the trial runs (2026-10-25)
 
 [[difference]]
 tool = "ants-multiply-images"
@@ -89,8 +89,7 @@ tool = "itk-transforms"
 implementation = "port"
 signature = ["ITK's reading: ANTs cannot write the transforms back; antsApplyTransforms agrees", "ITK's float reading (--float N): ANTs cannot write the transforms back; antsApplyTransforms agrees"]
 status = "fixed"
-explanation = "a composite transform named `CompositeTransform_double_3`: ITK's factory cannot create it and refuses the file; larmorx read it as a composite. Now refused"
-link = "validation/difftest/cases/itk-transforms/unregistered-composite.json"
+explanation = "QuaternionRigidTransform, ScaleVersor3DTransform, ScaleSkewVersor3DTransform and ScaleTransform: larmorx read them but its antsApplyTransforms could not evaluate them (exit 1, ANTs 0); now evaluated as ITK computes them (vnl's rotation matrix of the conjugate quaternion; the versor's matrix with scale - 1 and the skews added; ScaleTransform's own (p - c)·s + c) (`larmorx_transform::linear`)"
 
 [[difference]]
 tool = "ants-registration"
@@ -108,16 +107,13 @@ status = "fixed"
 explanation = "Mattes on images with NaN values: the joint histogram's NaN bin size makes vnl's SVD fail, and vnl prints its warning once per stage; larmorx printed none"
 link = "validation/difftest/cases/ants-registration/mattes-nan-bin-svd-warning.json"
 
-# ---------------------------------------------------------------- defects of the originals
-
 [[difference]]
 tool = "ants-resample-image"
 implementation = "port"
 signature = ["both succeed"]
 status = "register"
-defect = "ANTS-160"
-explanation = "Gaussian interpolation given fewer sigmas than dimensions: ANTs reads the missing ones past the end of its list and exits 0 with a result that depends on the heap; larmorx refuses in both modes (class a, never reproduced)"
-link = "validation/difftest/cases/ants-resample-image/gaussian-sigmas-short.json"
+defect = "ANTS-161"
+explanation = "Gaussian interpolation with a sigma or alpha of 0 or less: ANTs divides by zero and writes an image of NaN (exit 0); larmorx refuses in both modes, naming ANTS-161 (rule B); reproduce's NaN image is a follow-up"
 
 [[difference]]
 tool = "ants-image-math"
@@ -125,18 +121,15 @@ implementation = "port"
 signature = ["values (bit-identical)"]
 status = "register"
 defect = "ITK-95"
-explanation = "grayscale opening, closing, dilation or erosion with a radius of 0 on an image whose first axis has one voxel: ITK's moving histogram leaves voxels at ±FLT_MAX; larmorx gives the input (the identity) in both modes, ITK's values are not reproduced"
-link = "validation/investigations/difftest/morphology_radius0.py"
-
-# ---------------------------------------------------------------- the clean-room originals
+explanation = "GO, GC, GD or GE with a radius of 0 on an image whose first axis has one voxel: ITK's moving histogram leaves voxels at ±FLT_MAX; larmorx gives the identity in both modes (rule A); the reproduce switch is a follow-up"
 
 [[difference]]
 tool = "afni-tshift"
 implementation = "replica"
 signature = ["DN defaults: replica = original"]
 status = "open"
-explanation = "the corrected AFNI-07 header of a sheared sform in metres: the clean-room original's pixdim[3] differs from the replica's in the last bits (1000.6248168945312 against 1000.624755859375); reported for the clean-room agent"
-link = "validation/investigations/difftest/inspect_tshift.py"
+defect = "AFNI-07"
+explanation = "the clean-room original's default (AFNI-07 corrected) writes a sheared metre sform's pixdim and qform 5.5e-05 to 1.2e-04 away from the replica's default; for its agent"
 
 [[difference]]
 tool = "afni-automask"
@@ -151,8 +144,6 @@ implementation = "original"
 signature = ["out_mcf.nii.gz: voxel values", "out_mcf.nii.gz.mat: matrix RMS deviation, Nth percentile", "FD (Power, N mm) correlation", "out_mcf.nii.gz_abs.rms: values", "out_mcf.nii.gz_rel.rms: values", "out_mcf.nii.gz_sigma.nii.gz: voxel values"]
 status = "open"
 explanation = "small random phantoms of 4 to 8 volumes, beyond the record's thresholds: the clean-room original's motion estimates leave mcflirt's on images where the cost function has several minima; reported for the clean-room agent with the reproducers"
-
-# ---------------------------------------------------------------- the comparison's own mistakes
 
 [[difference]]
 tool = "resample-series"
@@ -175,8 +166,6 @@ signature = ["DN fix pass"]
 status = "harness"
 explanation = "the fix pass of a case the correction refuses (AFNI-48: three -T2): an expected error, now known to the descriptor"
 
-# ---------------------------------------------------------------- found by the trial runs of 2026-10-25
-
 [[difference]]
 tool = "ants-resample-image-by-spacing"
 implementation = "port"
@@ -197,7 +186,7 @@ tool = "ants-atropos"
 implementation = "port"
 signature = ["DN fix pass", "stderr"]
 status = "fixed"
-explanation = "an empty mask: ITK's k-means throws while finding the empty sample's bounds; larmorx went on to the Gaussians' warnings and the labels' exception"
+explanation = "an empty mask or a constant channel in a Parzen histogram: larmorx's one-line explanation (ANTS-45: ANTs explains its exception only with --verbose 1) held ITK's two-line description, whose second line the comparison saw; now one line. The remaining notice is ANTS-91's (no values changed)"
 
 [[difference]]
 tool = "ants-atropos"
@@ -218,16 +207,15 @@ tool = "ants-ai"
 implementation = "port"
 signature = ["ANTs with CORE-MATH: standard error"]
 status = "fixed"
-explanation = "ITK's scales estimator warns when no parameter moves a voxel (start points whose samples all fall outside); larmorx used the default scales silently"
+explanation = "antsAI's start points that throw: each start point's scales warnings come before its multi-start warning in ITK; larmorx printed the multi-start warnings first. The problem now hands its warnings to the multi-start loop as they arise"
 
 [[difference]]
 tool = "ants-registration"
 implementation = "port"
 signature = ["DN fix pass"]
 status = "open"
-explanation = "the exact floor (ITK-01 corrected) reaches the displacement-field lookups of the registration without a notice: a value changes in its last bit by default (`reproduce` is exact); the notice needs the lookups' floors counted per stage"
-link = "docs/findings/upstream-defects.md"
 defect = "ITK-01"
+explanation = "the default's exact floor changes a displacement field's value in its last bit (antsRegistration's field lookups, FieldXfm) and no notice names ITK-01 there: reproduce is exact; the notice in the field lookups is a follow-up"
 
 [[difference]]
 tool = "ants-registration"
@@ -235,36 +223,37 @@ implementation = "port"
 signature = ["ANTs with CORE-MATH: files written", "ANTs with CORE-MATH: standard error"]
 status = "register"
 defect = "ITK-96"
-explanation = "`-a 1` with a displacement field that has no inverse: ITK inverts it into a transform without a field, whose 0 parameters its HDF5 writer cannot chunk; ANTs leaves a part-written InverseComposite.h5 and HDF5's error. larmorx writes none and names ITK-96 (its `reproduce` does not write the partial file)"
+explanation = "the inverse composite of a list holding a displacement field without an inverse: ITK inverts it into a field transform with no parameters, whose HDF5 write fails (H5Pset_chunk) after writing part of the file; larmorx writes no inverse composite and names ITK-96 in both modes; reproduce's part-written file and HDF5's messages are a follow-up"
 
 [[difference]]
 tool = "itk-transforms"
 implementation = "port"
 signature = ["ITK's reading: ANTs cannot write the transforms back; antsApplyTransforms agrees"]
-status = "open"
-explanation = "a list with an IdentityTransform cannot be written to HDF5 by ITK (ITK-96), and larmorx's antsApplyTransforms does not evaluate ScaleSkewVersor3D, ScaleVersor3D, QuaternionRigid or Scale transforms (it reads them): the comparison has no way left; the evaluation of those types is to do"
+status = "fixed"
+explanation = "QuaternionRigidTransform, ScaleVersor3DTransform, ScaleSkewVersor3DTransform and ScaleTransform files: larmorx read them but its antsApplyTransforms could not evaluate them; now evaluated as ITK computes them (`larmorx_transform::linear`)"
 
 [[difference]]
 tool = "ants-denoise"
 implementation = "port"
 signature = ["denoised: bit-identical to ANTs with correctly rounded math"]
-status = "unclear"
-explanation = "a Rician denoising of an image in micrometre units differs from ANTs (3e-5 relative) in `reproduce`: the same image in millimetres (and at 0.001 mm) agrees; under investigation"
+status = "fixed"
+defect = "ANTS-14"
+explanation = "as above: the Rician bias's smoothing kernel on micrometre voxels (ANTS-14 now reproduced and named)"
 
 [[difference]]
 tool = "ants-registration"
 implementation = "port"
 signature = ["ANTs with CORE-MATH: rNWarp.nii.gz", "ANTs with CORE-MATH: standard output", "ANTs with CORE-MATH: w.nii.gz"]
-status = "unclear"
-explanation = "a GaussianDisplacementField stage with Regular sampling at a shrink factor of 2 differs from ANTs from its second iteration (Random sampling and full resolution agree); under investigation"
+status = "fixed"
+defect = "ITK-97"
+explanation = "a sampled metric (Random, 50 %) with a shrink factor of 2 on a B-spline displacement-field stage: ITK adds the derivative of sample points that fall outside the shrunk virtual domain to other voxels' parameters (ITK-97); larmorx dropped them in both modes, so the metric differed from the fourth iteration in the 12th digit. Now reproduce does as ITK does and is bit-identical; the default drops them; both name ITK-97 (`larmorx_registration::metric::OutsideDerivatives`)"
 
 [[difference]]
 tool = "fsl-mcflirt"
 implementation = "replica"
 signature = ["every file bit-identical", "stderr identical"]
-status = "unclear"
-explanation = "the mcflirt replica differs from FSL's mcflirt on a few random series (deterministic, at every thread count, not glibc's double maths: identical with a double-only CORE-MATH preload): `-dof 12` on unsigned 16-bit data, `-cost leastsquares` with `-reffile`, `-cost normmi -bins 128 -refvol 4`; for the replica's author"
-link = "validation/investigations/difftest/mcflirt_pair.py"
+status = "fixed"
+explanation = "the atanf constant (as above)"
 
 [[difference]]
 tool = "afni-unifize"
@@ -299,4 +288,233 @@ tool = "afni-tshift"
 implementation = "original"
 signature = ["header fields (scaling, timing, slice fields, units, xform codes)"]
 status = "open"
-explanation = "the clean-room original's toffset differs from AFNI's in the last bits (1.180555820465088 against 1.18055558204...); reported for the clean-room agent"
+explanation = "the clean-room original's toffset differs from AFNI's in its last bits (0.35999995 against 0.36000001); for its agent"
+
+# ---------------------------------------------------------------- the first night (2026-10-25)
+
+[[difference]]
+tool = "ants-resample-image"
+implementation = "port"
+signature = ["larmorx panicked"]
+status = "fixed"
+defect = "ITK-98"
+explanation = "a cubic (or order 4 or 5) B-spline on an axis of 2 voxels: ITK's single mirror leaves a support index of -1 and reads outside the coefficient image (ITK-98, memory it never wrote); larmorx panicked on the index. Now the mirror is repeated by default and ITK's reads outside are 0 in reproduce, named in both modes (`larmorx_interp::BSplineMirror`)"
+
+[[difference]]
+tool = "ants-resample-image"
+implementation = "port"
+signature = ["values (bit-identical)"]
+status = "register"
+defect = "ITK-98"
+explanation = "ITK-98 reproduced: the values ITK reads outside the B-spline coefficients on a 2-voxel axis are memory it never wrote (larmorx takes them as 0): not comparable"
+
+[[difference]]
+tool = "ants-image-math"
+implementation = "port"
+signature = ["both succeed"]
+status = "register"
+defect = "ANTS-163"
+explanation = "Normalize or TruncateImageIntensity with a mask of another size (a 3D mask for a 4D image): ANTs reads the mask outside its buffer and exits 0; larmorx refuses in both modes, now naming ANTS-163 (class (a))"
+
+[[difference]]
+tool = "ants-denoise"
+implementation = "port"
+signature = ["denoised: bit-identical to ANTs with correctly rounded math", "noise: bit-identical to ANTs with correctly rounded math"]
+status = "fixed"
+defect = "ANTS-14"
+explanation = "Rician denoising on micrometre voxels: the bias's smoothing variance of 2 mm² is 2·10⁶ voxels², whose ITK kernel is NaN (ANTS-14), so ITK leaves the bias unsmoothed; larmorx smoothed it with the corrected kernel in both modes. Now reproduce keeps ITK's kernel, and both modes name ANTS-14 (`larmorx_image::adaptive_denoising`)"
+
+[[difference]]
+tool = "ants-denoise"
+implementation = "port"
+signature = ["denoised: NCC with ANTs as built", "denoised: bit-identical to ANTs with correctly rounded math"]
+status = "fixed"
+defect = "ANTS-14"
+explanation = "as above: the Rician bias's smoothing kernel on micrometre voxels (ANTS-14 now reproduced and named)"
+
+[[difference]]
+tool = "ants-denoise"
+implementation = "port"
+signature = ["denoised: data type and shape", "denoised: header (every field)"]
+status = "fixed"
+defect = "ANTS-99"
+explanation = "DenoiseImage without -d on a 2D image: ANTs asks a new ImageIO for the dimension before it reads the header and NIfTI's answers 3, so it denoises and writes a 3D image (ANTS-99, as Atropos); larmorx used the file's dimension in both modes. Now reproduce takes 3, the default the file's dimension, both naming ANTS-99 (N4BiasFieldCorrection likewise)"
+
+[[difference]]
+tool = "ants-registration"
+implementation = "port"
+signature = ["ANTs with CORE-MATH: rNBSpline.txt", "DN fix pass"]
+status = "fixed"
+explanation = "a float B-spline transform parameter of exactly 0.173828125 lies halfway between two shortest decimals: ITK's double-conversion writes the even one (0.17382812), Rust's shortest formatting rounded up (0.17382813). larmorx's ITK number writer now takes the even one at an exact tie (`larmorx_io::itk_transform::itk_number`); the remaining fix-pass notice is ITK-31's (no values changed)"
+
+[[difference]]
+tool = "afni-automask"
+implementation = "replica"
+signature = ["DN fix pass"]
+status = "fixed"
+defect = "AFNI-43"
+explanation = "-peels 0 on a 4D image: the default (no peeling, as the help says) gives the same mask as AFNI's single peel but AFNI's clustering messages count other voxels, and the replica named AFNI-43 only where the masks differ; now also where only the messages do"
+
+[[difference]]
+tool = "afni-automask"
+implementation = "original"
+signature = ["DN fix pass"]
+status = "open"
+explanation = "the clean-room original: -peels 0's default changes the clustering messages (405 against 406 voxels) without naming AFNI-43 (the replica now names it); for its agent: `afni-automask:20261025:118`"
+
+[[difference]]
+tool = "ants-registration"
+implementation = "port"
+signature = ["ANTs with CORE-MATH: exit status", "ANTs with CORE-MATH: files written", "ANTs with CORE-MATH: standard output"]
+status = "fixed"
+defect = "ITK-100"
+explanation = "a Mattes stage whose second level's analysis region (a sparse mask at full resolution) has one intensity: ITK keeps the joint histogram images of the first level, so SetSpacing's exception for a bin size of 0 is not reached and the metric is 0; larmorx threw the first level's exception at every level in both modes. Now reproduce uses the bin size as ITK does; the default keeps the exception (rule B), both naming ITK-100 (`larmorx_registration::metric::mattes::check_joint_pdf_spacing`)"
+
+[[difference]]
+tool = "ants-registration"
+implementation = "port"
+signature = ["ANTs with CORE-MATH: rComposite.hN"]
+status = "fixed"
+defect = "ITK-97"
+explanation = "a sampled metric with a shrink factor on a displacement-field stage: ITK adds the derivative of sample points outside the shrunk virtual region to other voxels' parameters (ITK-97); reproduce now does the same and is bit-identical, the default drops them, both naming ITK-97 (`larmorx_registration::metric::OutsideDerivatives`)"
+
+[[difference]]
+tool = "ants-registration"
+implementation = "port"
+signature = ["ANTs with CORE-MATH: rNInverseWarp.nii.gz", "ANTs with CORE-MATH: rNWarp.nii.gz"]
+status = "fixed"
+defect = "ITK-97"
+explanation = "ITK-97 reproduced (as above): the derivatives of sample points outside the shrunk virtual region"
+
+[[difference]]
+tool = "ants-registration"
+implementation = "port"
+signature = ["ANTs with CORE-MATH: rNInverseWarp.nii.gz", "ANTs with CORE-MATH: rNWarp.nii.gz", "ANTs with CORE-MATH: standard output", "ANTs with CORE-MATH: w.nii.gz"]
+status = "fixed"
+defect = "ITK-97"
+explanation = "ITK-97 reproduced (as above)"
+
+[[difference]]
+tool = "ants-registration"
+implementation = "port"
+signature = ["ANTs with CORE-MATH: rNWarp.nii.gz", "ANTs with CORE-MATH: standard output"]
+status = "fixed"
+defect = "ITK-97"
+explanation = "ITK-97 reproduced (as above)"
+
+[[difference]]
+tool = "ants-registration"
+implementation = "port"
+signature = ["ANTs with CORE-MATH: standard output"]
+status = "fixed"
+explanation = "a stage whose sampled point set is empty: ITK's exception is itkImageToImageMetricv4.hxx:263 with the metric's own class name (MattesMutualInformationImageToImageMetricv4, ...), or line 233 of the joint-histogram MI's file; larmorx printed line 268 and the base class"
+
+[[difference]]
+tool = "ants-registration"
+implementation = "port"
+signature = ["ANTs with CORE-MATH: standard error"]
+status = "fixed"
+explanation = "ITK's NIfTI writer warns when an image's direction cosines are not orthogonal in float (an oblique quaternion that is orthogonal in double); larmorx's writer now prints the same warning (`larmorx_io::itk_output`)"
+
+[[difference]]
+tool = "ants-registration"
+implementation = "port"
+signature = ["ANTs with CORE-MATH: standard error", "DN fix pass"]
+status = "fixed"
+explanation = "the writer's non-orthogonal direction warning (as above); the remaining notice is ITK-31's (no values changed)"
+
+[[difference]]
+tool = "ants-registration"
+implementation = "port"
+signature = ["exception"]
+status = "harness"
+explanation = "a 4D displacement-field composite (DisplacementFieldTransform_double_4_4), which lx.transforms.read does not hold: the parity runner now reads its HDF5 parameters"
+
+[[difference]]
+tool = "ants-denoise"
+implementation = "port"
+signature = ["both succeed"]
+status = "fixed"
+defect = "ANTS-99"
+explanation = "DenoiseImage without -d on a 4D image: ANTs takes it as 3D (ANTS-99); larmorx failed on the file's dimension. Now reproduce takes 3, the default the file's dimension, both naming ANTS-99"
+
+[[difference]]
+tool = "ants-denoise"
+implementation = "port"
+signature = ["denoised: affine", "denoised: data type and shape", "denoised: header (every field)", "noise: affine", "noise: data type and shape", "noise: header (every field)"]
+status = "fixed"
+defect = "ANTS-99"
+explanation = "DenoiseImage without -d on a 4D image: ANTs denoises and writes it as 3D (ANTS-99, as above)"
+
+[[difference]]
+tool = "ants-denoise"
+implementation = "port"
+signature = ["denoised: NCC with ANTs as built", "denoised: bit-identical to ANTs with correctly rounded math", "noise: NCC with ANTs as built", "noise: bit-identical to ANTs with correctly rounded math"]
+status = "fixed"
+defect = "ANTS-14"
+explanation = "the Rician bias's smoothing kernel on micrometre voxels (ANTS-14 now reproduced and named)"
+
+[[difference]]
+tool = "ants-smooth-image"
+implementation = "port"
+signature = ["values (bit-identical)"]
+status = "fixed"
+explanation = "a median of a box holding both -0 and +0: ITK writes the zero libstdc++'s nth_element leaves in the middle; larmorx selected with a total order. Now it selects as GCC 14.3's introselect does, on ITK's box order (`larmorx_image::libstdcxx`)"
+
+[[difference]]
+tool = "resample-series"
+implementation = "port"
+signature = ["not bit-identical: resampled data: bit-identical"]
+status = "open"
+explanation = "one voxel of a near-zero value (-7.8e-17, a cancellation) one float ulp from fMRIPrep's: the order of one sum to find (`validation/investigations/difftest/resample_pair.py`)"
+
+[[difference]]
+tool = "fsl-mcflirt"
+implementation = "replica"
+signature = ["every file bit-identical"]
+status = "fixed"
+explanation = "the mcflirt replica's atanf held fdlibm's commented value of aT[0], not glibc's 0x3eaaaaab (fixed on the replica's branch, e687cd1): with it 58 of the night's first 59 cases are bit-identical; the one left is a fix-pass naming (fsl-mcflirt:20261025:616)"
+
+[[difference]]
+tool = "mri-hmc"
+implementation = "original"
+signature = ["out_mcf.nii.gz.mat: matrix RMS deviation, Nth percentile", "out_mcf.nii.gz.par: median difference", "out_mcf.nii.gz: voxel values"]
+status = "open"
+explanation = "the clean-room head-motion correction beyond its record's thresholds on small random phantoms (4 to 8 volumes of at most 32x32x20): its parameters differ from mcflirt's, but it aligns them as well (the corrected series' temporal standard deviation in the phantom: lower than mcflirt's in 8 of 40 sampled cases, within 1 % in 22, higher in 10; median ratio 1.000; `validation/investigations/difftest/hmc_residuals.py`); for its agent"
+
+[[difference]]
+tool = "afni-automask"
+implementation = "original"
+signature = ["messages: AFNI's, byte for byte"]
+status = "open"
+explanation = "the clean-room original prints 'first 0 x-planes are zero [from ?]' where AFNI names the side ([from L], [from R], [from S]); for its agent"
+
+[[difference]]
+tool = "afni-automask"
+implementation = "original"
+signature = ["mask.nii: header bytes"]
+status = "open"
+explanation = "the clean-room original's header bytes on a tiny oblique constant image; for its agent"
+
+[[difference]]
+tool = "afni-unifize"
+implementation = "original"
+signature = ["DN fix pass", "DN notices in both modes"]
+status = "open"
+defect = "AFNI-08"
+explanation = "the clean-room original's default changes the header without a notice and names AFNI-08 in reproduce only; for its agent"
+
+[[difference]]
+tool = "afni-unifize"
+implementation = "original"
+signature = ["uni.nii: header bytes"]
+status = "open"
+explanation = "the clean-room original's header bytes on a tiny oblique constant image; for its agent"
+
+[[difference]]
+tool = "ants-registration"
+implementation = "port"
+signature = ["ANTs with CORE-MATH: rNTranslation.mat"]
+status = "fixed"
+defect = "ANTS-51"
+explanation = "without collapsing (-z 0), a Translation stage whose Demons metric throws (it needs a displacement field; ANTs catches it and goes on) adds no transform and leaves ANTs' names one short (ANTS-51), so the next stage's displacement field is written under the linear stage's .mat name; ANTs' WriteTransform writes the stage's own object there (GaussianSmoothingOnUpdateDisplacementFieldTransform), larmorx a new DisplacementFieldTransform: the same parameters, another class name. Now the field keeps its stage's class under a .mat or .txt name"

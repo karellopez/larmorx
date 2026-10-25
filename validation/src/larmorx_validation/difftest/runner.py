@@ -123,6 +123,9 @@ def _watch_notices() -> None:
             from larmorx_validation.parity.defects import notices_in
 
             _NOTICES.extend(notices_in(err))
+            # A class (a) case larmorx refuses in both modes names its defect in the error.
+            if code != 0:
+                _NOTICES.extend(_REFUSAL.findall(err if isinstance(err, str) else str(err)))
         return code, out, err
 
     cli_main._difftest = True
@@ -163,8 +166,7 @@ def execute(tool: core.Tool, recipe: dict, impl: str, *, timeout: float | None =
         signal.signal(signal.SIGALRM, previous)
         inputs.release(f"run/{gen.digest(recipe['inputs'])}")
     j = core.judge(tool, impl, result)
-    named = set(_NOTICES) | set(_REFUSAL.findall(j.detail or ""))
-    varying = sorted({n for n in named if n in undefined_defects})
+    varying = sorted({n for n in _NOTICES if n in undefined_defects})
     if j.verdict == DIFFER and varying:
         j = Judgement(UNDEFINED, tuple(f"undefined: {n}" for n in varying), f"{', '.join(varying)}: {undefined_defects[varying[0]]}; {j.detail}", j.status, j.checks)
     return j, time.monotonic() - start, result

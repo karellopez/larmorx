@@ -600,3 +600,10 @@ implementation = "original"
 signature = ["am.nii: header bytes", "uni.nii.gz: header bytes"]
 status = "open"
 explanation = "the clean-room original's header bytes on a tiny oblique image (the output and the -amsave file); for its agent"
+
+[[difference]]
+tool = "fsl-mcflirt"
+implementation = "replica"
+signature = ["DN fix pass"]
+status = "fixed"
+explanation = "the default renamed the -meanvol image (FSL-08's correction, <stem>_mean_reg) without naming FSL-08: the replica's own part names it there now (d196995, on main), and its shrunk case is that part's permanent case meanvol-name-notice"

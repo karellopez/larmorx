@@ -107,7 +107,9 @@ Every source file starts with an SPDX header naming its licence and the files it
   Armadillo's BLAS-backed paths (matrices larger than 4 x 4) are not reached by the replicas and
   panic if they ever are. Where NaN or infinite voxels can reach a result, it is computed with
   SSE's NaN rules (`sse`): the centre of gravity, the trilinear interpolation, the gradient, the
-  Gaussian smoothing, `fslmaths -mas` and `fslstats`'s threshold.
+  Gaussian smoothing, `fslmaths -mas` and `fslstats`'s threshold, newimage's robust range
+  (`find_thresholds`: the histogram's range and the 2 and 98 % thresholds) and meshclass's
+  points and vectors (BET's merge, from BET's NaN matrix, `validation/probes/fsl-bet-nan`).
 - **Thread-independent.** The Gaussian smoothing shares its z slices between threads; nothing
   else here is parallel; the results never depend on the thread count.
 - **D13 hooks.** `Costfn::skip_nonfinite` (FSL-14's non-finite samples), the corrected centre of

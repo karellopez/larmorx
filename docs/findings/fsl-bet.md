@@ -184,7 +184,7 @@ Each is in the register (`docs/findings/upstream-defects.md`); the switch is
   vertex's triangles and neighbours follow these orders.
 - **`real_self_intersection` sorts the vertices by x** with `std::sort` (libstdc++'s introsort):
   equal keys end up in the order that algorithm decides, which the sweep depends on; the replica
-  translates the algorithm (`fsl/stdsort.rs`).
+  translates the algorithm (`larmorx-nc-core/src/stdsort.rs`).
 - **betsurf's CSF image** (`co_ext`, `special_extract`, `csfvolume`) is computed and never
   written: the replica leaves it out (its `Profile::value` calls cannot exit: every position asked
   for is a sample's).

@@ -60,3 +60,8 @@ FSL-57. Details: `docs/findings/fsl-bet.md` (restricted).
 
 The replica does not compute what FSL computes and never uses: betsurf's CSF image (never written)
 is left out.
+
+**NaN bits.** Where NaN or infinite voxels reach BET's own arithmetic (bet2's initial threshold,
+its centre of gravity, the deformation steps of bet2 and betsurf), it computes with SSE's NaN
+rules (`larmorx_nc_core::sse`), in the source's order, so the outputs have FSL's x86-64 bits on
+every platform (`validation/probes/fsl-bet-nan`).

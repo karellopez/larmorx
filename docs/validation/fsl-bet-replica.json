@@ -2,8 +2,8 @@
  "environment": {
   "cpu": "Intel(R) Core(TM) i7-8750H CPU @ 2.20GHz",
   "larmorx": "0.0.1",
-  "larmorx_commit": "fe1815060cc3",
-  "larmorx_testdata_commit": "b0999a9e0c31",
+  "larmorx_commit": "c3b17f2ff7e8",
+  "larmorx_testdata_commit": "52124bc98f9f",
   "logical_cpus": 12,
   "os": "Linux-6.8.0-124-generic-x86_64-with-glibc2.35",
   "packages": {
@@ -12,6 +12,21 @@
   },
   "platform": "Linux x86_64",
   "python": "3.12.10"
+ },
+ "oracle_cache": {
+  "differences": 0,
+  "fresh": {
+   "ended by a signal, SIGABRT (never stored)": 2,
+   "ended by a signal, SIGSEGV (never stored)": 6,
+   "never cached: FSL-43: FSL reads memory it never wrote": 1,
+   "never cached: FSL-53: FSL reads memory it never wrote": 1,
+   "never cached: files in the run's directory that bet may remove (FSL-46): the cache replays no removal": 1
+  },
+  "location": "<workspace>/oracles/cache",
+  "mode": "use",
+  "ran": 11,
+  "saved_seconds": 412.5,
+  "served": 215
  },
  "reference": "bet, bet2 and betsurf from FSL 6.0.7.17 (fsl-bet2 2111.8, fsl-newimage 2203.12, fsl-meshclass 2111.0), the conda installation in `~/fsl`",
  "results": [
@@ -29,7 +44,7 @@
     "out.nii.gz: fMRIPrep's own output (as it ran)": null,
     "out_mask.nii.gz: fMRIPrep's own output (as it ran)": null
    },
-   "seconds": 7.043,
+   "seconds": 13.753,
    "status": "pass"
   },
   {
@@ -46,7 +61,7 @@
     "out.nii.gz: fMRIPrep's own output (as it ran)": null,
     "out_mask.nii.gz: fMRIPrep's own output (as it ran)": null
    },
-   "seconds": 5.73,
+   "seconds": 13.746,
    "status": "pass"
   },
   {
@@ -63,7 +78,347 @@
     "out.nii.gz: fMRIPrep's own output (as it ran)": null,
     "out_mask.nii.gz: fMRIPrep's own output (as it ran)": null
    },
-   "seconds": 5.232,
+   "seconds": 3.025,
+   "status": "pass"
+  },
+  {
+   "case": "fmriprep/ds000228-task_pixar-enhance_and_skullstrip_bold",
+   "category": "fmriprep",
+   "checks_passed": 12,
+   "checks_total": 12,
+   "failed_checks": [],
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0,
+    "FSL run again": null,
+    "fMRIPrep's FSL against the oracle": 0,
+    "out.nii.gz: fMRIPrep's own output (as it ran)": null,
+    "out_mask.nii.gz: fMRIPrep's own output (as it ran)": null
+   },
+   "seconds": 2.988,
+   "status": "pass"
+  },
+  {
+   "case": "fmriprep/ds000256-task_restbaseline-enhance_and_skullstrip_bold",
+   "category": "fmriprep",
+   "checks_passed": 12,
+   "checks_total": 12,
+   "failed_checks": [],
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0,
+    "FSL run again": null,
+    "fMRIPrep's FSL against the oracle": 0,
+    "out.nii.gz: fMRIPrep's own output (as it ran)": null,
+    "out_mask.nii.gz: fMRIPrep's own output (as it ran)": null
+   },
+   "seconds": 3.114,
+   "status": "pass"
+  },
+  {
+   "case": "fmriprep/ds000256-task_restfixationfixed-enhance_and_skullstrip_bold",
+   "category": "fmriprep",
+   "checks_passed": 12,
+   "checks_total": 12,
+   "failed_checks": [],
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0,
+    "FSL run again": null,
+    "fMRIPrep's FSL against the oracle": 0,
+    "out.nii.gz: fMRIPrep's own output (as it ran)": null,
+    "out_mask.nii.gz: fMRIPrep's own output (as it ran)": null
+   },
+   "seconds": 3.247,
+   "status": "pass"
+  },
+  {
+   "case": "fmriprep/ds000256-task_restfixationnofeedback-enhance_and_skullstrip_bold",
+   "category": "fmriprep",
+   "checks_passed": 12,
+   "checks_total": 12,
+   "failed_checks": [],
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0,
+    "FSL run again": null,
+    "fMRIPrep's FSL against the oracle": 0,
+    "out.nii.gz: fMRIPrep's own output (as it ran)": null,
+    "out_mask.nii.gz: fMRIPrep's own output (as it ran)": null
+   },
+   "seconds": 3.398,
+   "status": "pass"
+  },
+  {
+   "case": "fmriprep/ds002422-task_arithm_run_01-enhance_and_skullstrip_bold",
+   "category": "fmriprep",
+   "checks_passed": 12,
+   "checks_total": 12,
+   "failed_checks": [],
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0,
+    "FSL run again": null,
+    "fMRIPrep's FSL against the oracle": 0,
+    "out.nii.gz: fMRIPrep's own output (as it ran)": null,
+    "out_mask.nii.gz: fMRIPrep's own output (as it ran)": null
+   },
+   "seconds": 3.319,
+   "status": "pass"
+  },
+  {
+   "case": "fmriprep/ds002422-task_arithm_run_01-skullstrip_bold",
+   "category": "fmriprep",
+   "checks_passed": 12,
+   "checks_total": 12,
+   "failed_checks": [],
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0,
+    "FSL run again": null,
+    "fMRIPrep's FSL against the oracle": 0,
+    "out.nii.gz: fMRIPrep's own output (as it ran)": null,
+    "out_mask.nii.gz: fMRIPrep's own output (as it ran)": null
+   },
+   "seconds": 2.593,
+   "status": "pass"
+  },
+  {
+   "case": "fmriprep/ds002422-task_arithm_run_02-enhance_and_skullstrip_bold",
+   "category": "fmriprep",
+   "checks_passed": 12,
+   "checks_total": 12,
+   "failed_checks": [],
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0,
+    "FSL run again": null,
+    "fMRIPrep's FSL against the oracle": 0,
+    "out.nii.gz: fMRIPrep's own output (as it ran)": null,
+    "out_mask.nii.gz: fMRIPrep's own output (as it ran)": null
+   },
+   "seconds": 2.776,
+   "status": "pass"
+  },
+  {
+   "case": "fmriprep/ds002422-task_arithm_run_02-skullstrip_bold",
+   "category": "fmriprep",
+   "checks_passed": 12,
+   "checks_total": 12,
+   "failed_checks": [],
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0,
+    "FSL run again": null,
+    "fMRIPrep's FSL against the oracle": 0,
+    "out.nii.gz: fMRIPrep's own output (as it ran)": null,
+    "out_mask.nii.gz: fMRIPrep's own output (as it ran)": null
+   },
+   "seconds": 2.554,
+   "status": "pass"
+  },
+  {
+   "case": "fmriprep/ds002422-task_rest-enhance_and_skullstrip_bold",
+   "category": "fmriprep",
+   "checks_passed": 12,
+   "checks_total": 12,
+   "failed_checks": [],
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0,
+    "FSL run again": null,
+    "fMRIPrep's FSL against the oracle": 0,
+    "out.nii.gz: fMRIPrep's own output (as it ran)": null,
+    "out_mask.nii.gz: fMRIPrep's own output (as it ran)": null
+   },
+   "seconds": 2.78,
+   "status": "pass"
+  },
+  {
+   "case": "fmriprep/ds002422-task_rest-skullstrip_bold",
+   "category": "fmriprep",
+   "checks_passed": 12,
+   "checks_total": 12,
+   "failed_checks": [],
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0,
+    "FSL run again": null,
+    "fMRIPrep's FSL against the oracle": 0,
+    "out.nii.gz: fMRIPrep's own output (as it ran)": null,
+    "out_mask.nii.gz: fMRIPrep's own output (as it ran)": null
+   },
+   "seconds": 3.017,
+   "status": "pass"
+  },
+  {
+   "case": "fmriprep/ds002603-task_wm_acq_Mb4Mm3Tr550-enhance_and_skullstrip_bold",
+   "category": "fmriprep",
+   "checks_passed": 12,
+   "checks_total": 12,
+   "failed_checks": [],
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0,
+    "FSL run again": null,
+    "fMRIPrep's FSL against the oracle": 0,
+    "out.nii.gz: fMRIPrep's own output (as it ran)": null,
+    "out_mask.nii.gz: fMRIPrep's own output (as it ran)": null
+   },
+   "seconds": 3.341,
+   "status": "pass"
+  },
+  {
+   "case": "fmriprep/ds002603-task_wm_acq_Mb4Mm3Tr550-skullstrip_bold",
+   "category": "fmriprep",
+   "checks_passed": 12,
+   "checks_total": 12,
+   "failed_checks": [],
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0,
+    "FSL run again": null,
+    "fMRIPrep's FSL against the oracle": 0,
+    "out.nii.gz: fMRIPrep's own output (as it ran)": null,
+    "out_mask.nii.gz: fMRIPrep's own output (as it ran)": null
+   },
+   "seconds": 3.369,
+   "status": "pass"
+  },
+  {
+   "case": "fmriprep/ds002603-task_wm_acq_SeqMm3Tr2000-enhance_and_skullstrip_bold",
+   "category": "fmriprep",
+   "checks_passed": 12,
+   "checks_total": 12,
+   "failed_checks": [],
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0,
+    "FSL run again": null,
+    "fMRIPrep's FSL against the oracle": 0,
+    "out.nii.gz: fMRIPrep's own output (as it ran)": null,
+    "out_mask.nii.gz: fMRIPrep's own output (as it ran)": null
+   },
+   "seconds": 3.396,
+   "status": "pass"
+  },
+  {
+   "case": "fmriprep/ds002603-task_wm_acq_SeqMm3Tr2000-skullstrip_bold",
+   "category": "fmriprep",
+   "checks_passed": 12,
+   "checks_total": 12,
+   "failed_checks": [],
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0,
+    "FSL run again": null,
+    "fMRIPrep's FSL against the oracle": 0,
+    "out.nii.gz: fMRIPrep's own output (as it ran)": null,
+    "out_mask.nii.gz: fMRIPrep's own output (as it ran)": null
+   },
+   "seconds": 3.338,
+   "status": "pass"
+  },
+  {
+   "case": "fmriprep/ds003592-ses_1_task_rest_echo_1-enhance_and_skullstrip_bold",
+   "category": "fmriprep",
+   "checks_passed": 12,
+   "checks_total": 12,
+   "failed_checks": [],
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0,
+    "FSL run again": null,
+    "fMRIPrep's FSL against the oracle": 0,
+    "out.nii.gz: fMRIPrep's own output (as it ran)": null,
+    "out_mask.nii.gz: fMRIPrep's own output (as it ran)": null
+   },
+   "seconds": 3.532,
+   "status": "pass"
+  },
+  {
+   "case": "fmriprep/ds004884-ses_217_task_naming40_acq_epfid2_dir_AP_run_2-enhance_and_skullstrip_bold",
+   "category": "fmriprep",
+   "checks_passed": 12,
+   "checks_total": 12,
+   "failed_checks": [],
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0,
+    "FSL run again": null,
+    "fMRIPrep's FSL against the oracle": 0,
+    "out.nii.gz: fMRIPrep's own output (as it ran)": null,
+    "out_mask.nii.gz: fMRIPrep's own output (as it ran)": null
+   },
+   "seconds": 3.316,
+   "status": "pass"
+  },
+  {
+   "case": "fmriprep/ds004884-ses_217_task_rest_acq_epfidp2p2_dir_AP_run_9-enhance_and_skullstrip_bold",
+   "category": "fmriprep",
+   "checks_passed": 12,
+   "checks_total": 12,
+   "failed_checks": [],
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0,
+    "FSL run again": null,
+    "fMRIPrep's FSL against the oracle": 0,
+    "out.nii.gz: fMRIPrep's own output (as it ran)": null,
+    "out_mask.nii.gz: fMRIPrep's own output (as it ran)": null
+   },
+   "seconds": 3.636,
+   "status": "pass"
+  },
+  {
+   "case": "fmriprep/ds004958-task_rest-enhance_and_skullstrip_bold",
+   "category": "fmriprep",
+   "checks_passed": 12,
+   "checks_total": 12,
+   "failed_checks": [],
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0,
+    "FSL run again": null,
+    "fMRIPrep's FSL against the oracle": 0,
+    "out.nii.gz: fMRIPrep's own output (as it ran)": null,
+    "out_mask.nii.gz: fMRIPrep's own output (as it ran)": null
+   },
+   "seconds": 3.939,
+   "status": "pass"
+  },
+  {
+   "case": "fmriprep/ds005003-ses_1_task_motor-enhance_and_skullstrip_bold",
+   "category": "fmriprep",
+   "checks_passed": 12,
+   "checks_total": 12,
+   "failed_checks": [],
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0,
+    "FSL run again": null,
+    "fMRIPrep's FSL against the oracle": 0,
+    "out.nii.gz: fMRIPrep's own output (as it ran)": null,
+    "out_mask.nii.gz: fMRIPrep's own output (as it ran)": null
+   },
+   "seconds": 3.248,
+   "status": "pass"
+  },
+  {
+   "case": "fmriprep/ds005003-ses_1_task_rest-enhance_and_skullstrip_bold",
+   "category": "fmriprep",
+   "checks_passed": 12,
+   "checks_total": 12,
+   "failed_checks": [],
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0,
+    "FSL run again": null,
+    "fMRIPrep's FSL against the oracle": 0,
+    "out.nii.gz: fMRIPrep's own output (as it ran)": null,
+    "out_mask.nii.gz: fMRIPrep's own output (as it ran)": null
+   },
+   "seconds": 3.463,
    "status": "pass"
   },
   {
@@ -80,7 +435,7 @@
     "out.nii.gz: fMRIPrep's own output (as it ran)": null,
     "out_mask.nii.gz: fMRIPrep's own output (as it ran)": null
    },
-   "seconds": 7.14,
+   "seconds": 3.61,
    "status": "pass"
   },
   {
@@ -97,7 +452,7 @@
     "out.nii.gz: fMRIPrep's own output (as it ran)": null,
     "out_mask.nii.gz: fMRIPrep's own output (as it ran)": null
    },
-   "seconds": 6.344,
+   "seconds": 3.421,
    "status": "pass"
   },
   {
@@ -114,7 +469,7 @@
     "out.nii.gz: fMRIPrep's own output (as it ran)": null,
     "out_mask.nii.gz: fMRIPrep's own output (as it ran)": null
    },
-   "seconds": 10.016,
+   "seconds": 5.596,
    "status": "pass"
   },
   {
@@ -131,7 +486,7 @@
     "out.nii.gz: fMRIPrep's own output (as it ran)": null,
     "out_mask.nii.gz: fMRIPrep's own output (as it ran)": null
    },
-   "seconds": 10.653,
+   "seconds": 5.696,
    "status": "pass"
   },
   {
@@ -148,7 +503,7 @@
     "out.nii.gz: fMRIPrep's own output (as it ran)": null,
     "out_mask.nii.gz: fMRIPrep's own output (as it ran)": null
    },
-   "seconds": 6.137,
+   "seconds": 3.572,
    "status": "pass"
   },
   {
@@ -165,7 +520,7 @@
     "out.nii.gz: fMRIPrep's own output (as it ran)": null,
     "out_mask.nii.gz: fMRIPrep's own output (as it ran)": null
    },
-   "seconds": 7.106,
+   "seconds": 3.547,
    "status": "pass"
   },
   {
@@ -180,7 +535,7 @@
     "Dice with the known brain (FSL)": 0.953628,
     "Dice with the known brain (larmorx)": 0.953628
    },
-   "seconds": 6.418,
+   "seconds": 5.231,
    "status": "pass"
   },
   {
@@ -195,7 +550,7 @@
     "Dice with the known brain (FSL)": 0.953628,
     "Dice with the known brain (larmorx)": 0.953628
    },
-   "seconds": 5.105,
+   "seconds": 8.548,
    "status": "pass"
   },
   {
@@ -210,7 +565,7 @@
     "Dice with the known brain (FSL)": 0.950656,
     "Dice with the known brain (larmorx)": 0.950656
    },
-   "seconds": 3.064,
+   "seconds": 3.036,
    "status": "pass"
   },
   {
@@ -225,7 +580,7 @@
     "Dice with the known brain (FSL)": 0.952596,
     "Dice with the known brain (larmorx)": 0.952596
    },
-   "seconds": 4.294,
+   "seconds": 3.114,
    "status": "pass"
   },
   {
@@ -240,7 +595,7 @@
     "Dice with the known brain (FSL)": 0.956718,
     "Dice with the known brain (larmorx)": 0.956718
    },
-   "seconds": 3.051,
+   "seconds": 2.861,
    "status": "pass"
   },
   {
@@ -255,7 +610,7 @@
     "Dice with the known brain (FSL)": 0.5599,
     "Dice with the known brain (larmorx)": 0.5599
    },
-   "seconds": 2.902,
+   "seconds": 2.746,
    "status": "pass"
   },
   {
@@ -268,7 +623,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 3.371,
+   "seconds": 3.107,
    "status": "pass"
   },
   {
@@ -281,7 +636,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 3.29,
+   "seconds": 3.131,
    "status": "pass"
   },
   {
@@ -294,7 +649,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 2.93,
+   "seconds": 2.768,
    "status": "pass"
   },
   {
@@ -307,7 +662,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 3.656,
+   "seconds": 2.852,
    "status": "pass"
   },
   {
@@ -320,7 +675,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 3.288,
+   "seconds": 2.542,
    "status": "pass"
   },
   {
@@ -333,7 +688,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 2.999,
+   "seconds": 2.887,
    "status": "pass"
   },
   {
@@ -346,7 +701,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 3.08,
+   "seconds": 2.591,
    "status": "pass"
   },
   {
@@ -359,7 +714,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 2.399,
+   "seconds": 2.285,
    "status": "pass"
   },
   {
@@ -372,7 +727,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 2.62,
+   "seconds": 2.678,
    "status": "pass"
   },
   {
@@ -385,7 +740,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 2.76,
+   "seconds": 2.603,
    "status": "pass"
   },
   {
@@ -398,7 +753,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 3.902,
+   "seconds": 2.887,
    "status": "pass"
   },
   {
@@ -411,7 +766,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 2.882,
+   "seconds": 2.929,
    "status": "pass"
   },
   {
@@ -424,7 +779,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 2.729,
+   "seconds": 2.242,
    "status": "pass"
   },
   {
@@ -437,7 +792,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 0.014,
+   "seconds": 0.007,
    "status": "pass"
   },
   {
@@ -450,7 +805,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 0.013,
+   "seconds": 0.006,
    "status": "both-error"
   },
   {
@@ -463,7 +818,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 0.013,
+   "seconds": 0.007,
    "status": "both-error"
   },
   {
@@ -476,7 +831,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 0.014,
+   "seconds": 0.008,
    "status": "both-error"
   },
   {
@@ -489,7 +844,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 0.013,
+   "seconds": 0.008,
    "status": "both-error"
   },
   {
@@ -502,7 +857,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 0.013,
+   "seconds": 0.009,
    "status": "both-error"
   },
   {
@@ -515,7 +870,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 0.013,
+   "seconds": 0.008,
    "status": "both-error"
   },
   {
@@ -528,7 +883,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 0.013,
+   "seconds": 0.007,
    "status": "both-error"
   },
   {
@@ -541,7 +896,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 0.013,
+   "seconds": 0.009,
    "status": "both-error"
   },
   {
@@ -554,7 +909,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 0.013,
+   "seconds": 0.009,
    "status": "both-error"
   },
   {
@@ -567,7 +922,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 0.013,
+   "seconds": 0.009,
    "status": "both-error"
   },
   {
@@ -580,7 +935,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 0.012,
+   "seconds": 0.014,
    "status": "both-error"
   },
   {
@@ -593,7 +948,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 0.749,
+   "seconds": 1.032,
    "status": "both-error"
   },
   {
@@ -606,34 +961,34 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 2.692,
+   "seconds": 2.13,
    "status": "pass"
   },
   {
    "case": "bet2/constant",
    "category": "bet2",
-   "checks_passed": 4,
-   "checks_total": 4,
+   "checks_passed": 6,
+   "checks_total": 6,
    "failed_checks": [],
-   "reason": "FSL crashes, larmorx refuses: bet2: stopped: no voxel inside the initial sphere has an intensity strictly between the 2nd and 98th percentiles, so the median brain intensity is undefined; FSL's bet2 reads an empty list here and crashes (FSL-41) (larmorx)",
+   "reason": "FSL crashes (status -11); with upstream_defects='reproduce' larmorx fills what FSL leaves undefined deterministically, names FSL-41 and writes its outputs; the default refuses",
    "reported": {
-    "D13 fix pass": 0
+    "D13 fix pass": 1
    },
-   "seconds": 0.087,
-   "status": "both-error"
+   "seconds": 4.636,
+   "status": "expected-divergence"
   },
   {
    "case": "defects/nan-f",
    "category": "defects",
-   "checks_passed": 4,
-   "checks_total": 4,
+   "checks_passed": 6,
+   "checks_total": 6,
    "failed_checks": [],
-   "reason": "FSL crashes, larmorx refuses: bet2: stopped: the surface's centre lies outside the image (voxel -2147483648 -2147483648 -2147483648), where FSL's bet2 starts its fill of a mask, writing outside the image (FSL-43) (larmorx)",
+   "reason": "FSL crashes (status -11); with upstream_defects='reproduce' larmorx fills what FSL leaves undefined deterministically, names FSL-42 and writes its outputs; the default refuses",
    "reported": {
     "D13 fix pass": 1
    },
-   "seconds": 1.166,
-   "status": "both-error"
+   "seconds": 6.044,
+   "status": "expected-divergence"
   },
   {
    "case": "defects/negative-r",
@@ -645,21 +1000,21 @@
    "reported": {
     "D13 fix pass": 1
    },
-   "seconds": 1.895,
+   "seconds": 1.022,
    "status": "pass"
   },
   {
    "case": "defects/zero-w",
    "category": "defects",
-   "checks_passed": 4,
-   "checks_total": 4,
+   "checks_passed": 6,
+   "checks_total": 6,
    "failed_checks": [],
-   "reason": "FSL crashes, larmorx refuses: bet2: stopped: the surface's centre lies outside the image (voxel -2147483648 -2147483648 -2147483648), where FSL's bet2 starts its fill of a mask, writing outside the image (FSL-43) (larmorx)",
+   "reason": "FSL crashes (status -11); with upstream_defects='reproduce' larmorx fills what FSL leaves undefined deterministically, names FSL-42 and writes its outputs; the default refuses",
    "reported": {
     "D13 fix pass": 1
    },
-   "seconds": 1.18,
-   "status": "both-error"
+   "seconds": 7.814,
+   "status": "expected-divergence"
   },
   {
    "case": "formats/head-i16",
@@ -671,7 +1026,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 2.895,
+   "seconds": 2.673,
    "status": "pass"
   },
   {
@@ -684,7 +1039,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 3.499,
+   "seconds": 2.464,
    "status": "pass"
   },
   {
@@ -697,7 +1052,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 2.865,
+   "seconds": 2.122,
    "status": "pass"
   },
   {
@@ -710,7 +1065,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 2.827,
+   "seconds": 2.199,
    "status": "pass"
   },
   {
@@ -723,7 +1078,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 2.719,
+   "seconds": 2.354,
    "status": "pass"
   },
   {
@@ -736,7 +1091,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 2.768,
+   "seconds": 2.321,
    "status": "pass"
   },
   {
@@ -749,7 +1104,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 2.633,
+   "seconds": 2.159,
    "status": "pass"
   },
   {
@@ -762,7 +1117,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 2.964,
+   "seconds": 2.445,
    "status": "pass"
   },
   {
@@ -775,7 +1130,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 3.498,
+   "seconds": 2.696,
    "status": "pass"
   },
   {
@@ -788,7 +1143,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 2.966,
+   "seconds": 2.599,
    "status": "pass"
   },
   {
@@ -801,7 +1156,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 2.808,
+   "seconds": 2.701,
    "status": "pass"
   },
   {
@@ -814,7 +1169,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 2.664,
+   "seconds": 2.787,
    "status": "pass"
   },
   {
@@ -827,7 +1182,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 2.446,
+   "seconds": 2.748,
    "status": "pass"
   },
   {
@@ -840,7 +1195,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 2.454,
+   "seconds": 2.679,
    "status": "pass"
   },
   {
@@ -853,7 +1208,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 2.672,
+   "seconds": 2.453,
    "status": "pass"
   },
   {
@@ -866,7 +1221,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 4.002,
+   "seconds": 2.495,
    "status": "pass"
   },
   {
@@ -879,7 +1234,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 2.887,
+   "seconds": 2.341,
    "status": "pass"
   },
   {
@@ -892,7 +1247,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 2.892,
+   "seconds": 2.43,
    "status": "pass"
   },
   {
@@ -905,7 +1260,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 3.074,
+   "seconds": 2.513,
    "status": "pass"
   },
   {
@@ -918,7 +1273,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 3.161,
+   "seconds": 2.894,
    "status": "pass"
   },
   {
@@ -931,7 +1286,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 3.18,
+   "seconds": 2.655,
    "status": "pass"
   },
   {
@@ -944,7 +1299,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 2.36,
+   "seconds": 1.863,
    "status": "both-error"
   },
   {
@@ -957,7 +1312,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 2.549,
+   "seconds": 1.758,
    "status": "both-error"
   },
   {
@@ -970,7 +1325,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 2.571,
+   "seconds": 1.914,
    "status": "both-error"
   },
   {
@@ -983,7 +1338,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 2.667,
+   "seconds": 1.758,
    "status": "both-error"
   },
   {
@@ -996,7 +1351,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 2.92,
+   "seconds": 2.503,
    "status": "pass"
   },
   {
@@ -1009,7 +1364,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 2.093,
+   "seconds": 2.954,
    "status": "pass"
   },
   {
@@ -1022,7 +1377,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 2.438,
+   "seconds": 1.888,
    "status": "pass"
   },
   {
@@ -1035,7 +1390,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 2.4,
+   "seconds": 1.991,
    "status": "pass"
   },
   {
@@ -1048,7 +1403,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 2.874,
+   "seconds": 2.201,
    "status": "pass"
   },
   {
@@ -1061,7 +1416,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 4.188,
+   "seconds": 2.955,
    "status": "pass"
   },
   {
@@ -1074,7 +1429,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 3.076,
+   "seconds": 2.139,
    "status": "pass"
   },
   {
@@ -1087,7 +1442,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 6.764,
+   "seconds": 6.703,
    "status": "pass"
   },
   {
@@ -1100,7 +1455,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 5.721,
+   "seconds": 4.018,
    "status": "pass"
   },
   {
@@ -1113,7 +1468,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 5.622,
+   "seconds": 4.286,
    "status": "pass"
   },
   {
@@ -1126,7 +1481,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 6.295,
+   "seconds": 5.013,
    "status": "pass"
   },
   {
@@ -1139,7 +1494,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 5.459,
+   "seconds": 3.595,
    "status": "pass"
   },
   {
@@ -1152,7 +1507,7 @@
    "reported": {
     "D13 fix pass": 1118208
    },
-   "seconds": 3.395,
+   "seconds": 2.471,
    "status": "pass"
   },
   {
@@ -1165,7 +1520,7 @@
    "reported": {
     "D13 fix pass": 1677312
    },
-   "seconds": 3.755,
+   "seconds": 2.741,
    "status": "pass"
   },
   {
@@ -1178,7 +1533,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 3.183,
+   "seconds": 2.414,
    "status": "pass"
   },
   {
@@ -1191,7 +1546,7 @@
    "reported": {
     "D13 fix pass": 1763328
    },
-   "seconds": 3.55,
+   "seconds": 2.596,
    "status": "pass"
   },
   {
@@ -1201,7 +1556,7 @@
    "checks_total": 1,
    "failed_checks": [],
    "reason": "needs FSL programs larmorx does not replicate yet: bet: -S (eye and optic nerve cleanup) runs FSL's FLIRT (standard_space_roi and flirt), which larmorx does not replicate yet; this option is pending (larmorx)",
-   "seconds": 0.004,
+   "seconds": 0.003,
    "status": "expected-divergence"
   },
   {
@@ -1211,7 +1566,7 @@
    "checks_total": 1,
    "failed_checks": [],
    "reason": "needs FSL programs larmorx does not replicate yet: bet: -B (bias field and neck cleanup) runs FSL's FLIRT (standard_space_roi) and FAST (the bias field), which larmorx does not replicate yet; this option is pending (larmorx)",
-   "seconds": 0.004,
+   "seconds": 0.003,
    "status": "expected-divergence"
   },
   {
@@ -1221,7 +1576,7 @@
    "checks_total": 1,
    "failed_checks": [],
    "reason": "needs FSL programs larmorx does not replicate yet: bet: -A (skull and scalp surfaces) runs FSL's FLIRT (the registration to MNI152), which larmorx does not replicate yet; this option is pending (larmorx)",
-   "seconds": 0.004,
+   "seconds": 0.003,
    "status": "expected-divergence"
   },
   {
@@ -1231,7 +1586,7 @@
    "checks_total": 1,
    "failed_checks": [],
    "reason": "needs FSL programs larmorx does not replicate yet: bet: -A2 (skull and scalp surfaces with a T2) runs FSL's FLIRT (the T2-to-T1 and MNI152 registrations), which larmorx does not replicate yet; this option is pending (larmorx)",
-   "seconds": 0.004,
+   "seconds": 0.003,
    "status": "expected-divergence"
   },
   {
@@ -1244,7 +1599,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 0.01,
+   "seconds": 0.061,
    "status": "both-error"
   },
   {
@@ -1257,7 +1612,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 0.114,
+   "seconds": 0.034,
    "status": "both-error"
   },
   {
@@ -1270,7 +1625,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 0.115,
+   "seconds": 0.042,
    "status": "both-error"
   },
   {
@@ -1283,7 +1638,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 0.112,
+   "seconds": 0.036,
    "status": "both-error"
   },
   {
@@ -1296,7 +1651,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 0.145,
+   "seconds": 0.039,
    "status": "both-error"
   },
   {
@@ -1309,7 +1664,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 0.14,
+   "seconds": 0.04,
    "status": "both-error"
   },
   {
@@ -1322,7 +1677,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 1.01,
+   "seconds": 1.187,
    "status": "both-error"
   },
   {
@@ -1335,7 +1690,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 2.873,
+   "seconds": 2.239,
    "status": "pass"
   },
   {
@@ -1348,7 +1703,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 5.455,
+   "seconds": 6.489,
    "status": "pass"
   },
   {
@@ -1361,7 +1716,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 14.423,
+   "seconds": 13.119,
    "status": "pass"
   },
   {
@@ -1374,7 +1729,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 12.369,
+   "seconds": 9.097,
    "status": "pass"
   },
   {
@@ -1387,7 +1742,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 10.98,
+   "seconds": 9.091,
    "status": "pass"
   },
   {
@@ -1400,7 +1755,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 17.743,
+   "seconds": 15.476,
    "status": "pass"
   },
   {
@@ -1413,7 +1768,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 9.034,
+   "seconds": 12.496,
    "status": "pass"
   },
   {
@@ -1426,7 +1781,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 0.013,
+   "seconds": 0.012,
    "status": "pass"
   },
   {
@@ -1439,7 +1794,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 0.015,
+   "seconds": 0.012,
    "status": "both-error"
   },
   {
@@ -1452,7 +1807,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 0.012,
+   "seconds": 0.015,
    "status": "pass"
   },
   {
@@ -1478,7 +1833,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 0.028,
+   "seconds": 0.034,
    "status": "pass"
   },
   {
@@ -1491,7 +1846,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 0.011,
+   "seconds": 0.016,
    "status": "both-error"
   },
   {
@@ -1504,7 +1859,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 0.01,
+   "seconds": 0.017,
    "status": "both-error"
   },
   {
@@ -1517,7 +1872,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 0.011,
+   "seconds": 0.015,
    "status": "both-error"
   },
   {
@@ -1530,7 +1885,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 0.011,
+   "seconds": 0.016,
    "status": "both-error"
   },
   {
@@ -1543,8 +1898,47 @@
    "reported": {
     "D13 fix pass": 1
    },
-   "seconds": 7.355,
+   "seconds": 18.056,
    "status": "pass"
+  },
+  {
+   "case": "defects/mesh-unread",
+   "category": "defects",
+   "checks_passed": 6,
+   "checks_total": 6,
+   "failed_checks": [],
+   "reason": "FSL crashes (status -11); with upstream_defects='reproduce' larmorx fills what FSL leaves undefined deterministically, names FSL-52 and writes its outputs; the default refuses",
+   "reported": {
+    "D13 fix pass": 1
+   },
+   "seconds": 30.81,
+   "status": "expected-divergence"
+  },
+  {
+   "case": "defects/mesh-missing-vertex",
+   "category": "defects",
+   "checks_passed": 6,
+   "checks_total": 6,
+   "failed_checks": [],
+   "reason": "FSL crashes (status -11); with upstream_defects='reproduce' larmorx fills what FSL leaves undefined deterministically, names FSL-52 and writes its outputs; the default refuses",
+   "reported": {
+    "D13 fix pass": 1
+   },
+   "seconds": 14.287,
+   "status": "expected-divergence"
+  },
+  {
+   "case": "defects/mesh-truncated",
+   "category": "defects",
+   "checks_passed": 6,
+   "checks_total": 6,
+   "failed_checks": [],
+   "reason": "FSL crashes (status -11); with upstream_defects='reproduce' larmorx fills what FSL leaves undefined deterministically, names FSL-52 and writes its outputs; the default refuses",
+   "reported": {
+    "D13 fix pass": 1
+   },
+   "seconds": 32.96,
+   "status": "expected-divergence"
   },
   {
    "case": "defects/t2-other-grid",
@@ -1556,7 +1950,7 @@
    "reported": {
     "D13 fix pass": 1
    },
-   "seconds": 7.729,
+   "seconds": 7.743,
    "status": "pass"
   },
   {
@@ -1569,7 +1963,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 9.546,
+   "seconds": 14.214,
    "status": "pass"
   },
   {
@@ -1582,7 +1976,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 9.202,
+   "seconds": 14.357,
    "status": "pass"
   },
   {
@@ -1597,7 +1991,7 @@
     "FSL run again": null,
     "fMRIPrep's FSL against the oracle": 0
    },
-   "seconds": 11.298,
+   "seconds": 10.012,
    "status": "pass"
   },
   {
@@ -1612,7 +2006,7 @@
     "FSL run again": null,
     "fMRIPrep's FSL against the oracle": 0
    },
-   "seconds": 28.69,
+   "seconds": 23.472,
    "status": "pass"
   },
   {
@@ -1627,7 +2021,7 @@
     "FSL run again": null,
     "fMRIPrep's FSL against the oracle": 0
    },
-   "seconds": 10.451,
+   "seconds": 8.552,
    "status": "pass"
   },
   {
@@ -1642,7 +2036,7 @@
     "FSL run again": null,
     "fMRIPrep's FSL against the oracle": 0
    },
-   "seconds": 27.431,
+   "seconds": 19.924,
    "status": "pass"
   },
   {
@@ -1657,7 +2051,7 @@
     "FSL run again": null,
     "fMRIPrep's FSL against the oracle": 0
    },
-   "seconds": 18.645,
+   "seconds": 11.459,
    "status": "pass"
   },
   {
@@ -1672,7 +2066,7 @@
     "FSL run again": null,
     "fMRIPrep's FSL against the oracle": 0
    },
-   "seconds": 28.438,
+   "seconds": 17.925,
    "status": "pass"
   },
   {
@@ -1687,7 +2081,7 @@
     "FSL run again": null,
     "fMRIPrep's FSL against the oracle": 0
    },
-   "seconds": 21.612,
+   "seconds": 11.624,
    "status": "pass"
   },
   {
@@ -1702,7 +2096,7 @@
     "FSL run again": null,
     "fMRIPrep's FSL against the oracle": 0
    },
-   "seconds": 17.835,
+   "seconds": 9.792,
    "status": "pass"
   },
   {
@@ -1717,7 +2111,7 @@
     "FSL run again": null,
     "fMRIPrep's FSL against the oracle": 0
    },
-   "seconds": 17.839,
+   "seconds": 12.098,
    "status": "pass"
   },
   {
@@ -1730,7 +2124,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 16.245,
+   "seconds": 14.698,
    "status": "pass"
   },
   {
@@ -1743,16 +2137,16 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 3.454,
+   "seconds": 3.653,
    "status": "pass"
   }
  ],
  "suite": "fsl-bet-replica",
  "summary": {
-  "both-error": 32,
-  "expected-divergence": 4,
+  "both-error": 29,
+  "expected-divergence": 10,
   "fail": 0,
-  "pass": 93,
+  "pass": 113,
   "skipped": 0
  },
  "tier": "standard"

@@ -1,25 +1,28 @@
 # Parity: BET (replica)
 
-**All cases agree.** 143 cases on the `full` tier: 107 pass, 32 rejected by both, 4 expected divergences, 0 failures.
+**All cases agree.** 166 cases on the `full` tier: 127 pass, 29 rejected by both, 10 expected divergences, 0 failures.
 
 - **Validated:** `larmorx-nc fsl bet`, `bet2` and `betsurf` (larmorx-nc 0.0.1; crate larmorx-nc-bet, the replica translated from FSL 6.0.7.17's source under the FSL Licence), run by larmorx as a separate process: `larmorx fsl <tool>` and `lx.fsl.bet` / `lx.fsl.betsurf`
 - **Reference:** bet, bet2 and betsurf from FSL 6.0.7.17 (fsl-bet2 2111.8, fsl-newimage 2203.12, fsl-meshclass 2111.0), the conda installation in `~/fsl`
-- **Test data:** larmorx-testdata `b0999a9e0c31`, tier `full`
-- **Generated:** 2026-10-24 on Linux x86_64, with `python -m larmorx_validation parity fsl-bet --tier full --implementation replica`
+- **Test data:** larmorx-testdata `52124bc98f9f`, tier `full`
+- **Generated:** 2026-10-26 on Linux x86_64, with `python -m larmorx_validation parity fsl-bet --tier full --implementation replica`
+- **Original programs:** 240 runs: 229 from the oracle cache, 11 run (3 never cached: the original varies); cache `<workspace>/oracles/cache`, mode `use`
 
-- **107 of 143 cases bit-identical to FSL** (exit status, messages, every file); 32 where both refuse or FSL crashes and the replica refuses; 4 pending (options that run FSL programs larmorx does not replicate yet).
-- **320 of 320 files** written byte for byte as FSL writes them.
-- fMRIPrep's own BET outputs: 18 of 18 with the same values as the replica's.
-- FSL run again: 18 of 18 runs bit-identical (FSL is deterministic).
-- fMRIPrep 25.2.6's FSL (fsl-newimage 2501.4, fsl-miscmaths 2412.4): 18 of 18 runs with the oracle's values.
+- **127 of 166 cases bit-identical to FSL** (exit status, messages, every file); 29 where both refuse or FSL crashes and the replica refuses; 6 where FSL crashes and the replica's `reproduce` fills what FSL leaves undefined (D13's failure cases: deterministic, named, the default refusing); 4 pending (options that run FSL programs larmorx does not replicate yet).
+- **360 of 360 files** written byte for byte as FSL writes them.
+- fMRIPrep's own BET outputs: 58 of 58 with the same values as the replica's.
+- FSL run again: 38 of 38 runs bit-identical (FSL is deterministic).
+- fMRIPrep 25.2.6's FSL (fsl-newimage 2501.4, fsl-miscmaths 2412.4): 38 of 38 runs with the oracle's values.
 - **D13 fix pass** (larmorx's default, `upstream_defects="fix"`; the comparison above runs `reproduce`): the corrections met
   - FSL-40: 2 case(s) named it, 0 with changed values (largest difference 0), 2 with other changes (exit status N became N; files ['ab.nii.gz', 'ab_mask.nii.gz'] became ['a.hdrb.nii.gz', 'a.hdrb_mask.nii.gz']; files [] became ['out.nii.gz']): `bet2/img-output`, `defects/hdr-in-name`
+  - FSL-41: 1 case(s) named it, 1 with changed values (largest difference 0): `bet2/constant`
   - FSL-42: 3 case(s) named it, 3 with changed values (largest difference 0): `defects/nan-f`, `defects/negative-r`, `defects/zero-w`
   - FSL-43: 1 case(s) named it, 0 with changed values (largest difference 0): `defects/2d`
   - FSL-44: 1 case(s) named it, 0 with changed values (largest difference 0), 1 with other changes (exit status N became N; files [] became ['my out.nii.gz', 'my out_mask.nii.gz']): `defects/blank-in-output`
   - FSL-45: 3 case(s) named it, 3 with changed values (largest difference inf): `bet/small-fov`, `bet/small-fov-verbose`, `bet/debug`
   - FSL-46: 1 case(s) named it, 0 with changed values (largest difference 0), 1 with other changes (the files present before the run: [] kept, ['out_tmp_notes.txt'] by the default): `defects/cleanup`
   - FSL-48: 1 case(s) named it, 1 with changed values (largest difference 0): `defects/t2-other-grid`
+  - FSL-52: 3 case(s) named it, 3 with changed values (largest difference 0): `defects/mesh-unread`, `defects/mesh-missing-vertex`, `defects/mesh-truncated`
   - FSL-53: 1 case(s) named it, 1 with changed values (largest difference 0): `defects/short-matrix`
   - FSL-54: 2 case(s) named it, 0 with changed values (largest difference 0), 2 with other changes (exit status N became N): `defects/too-few-t1only`, `defects/no-matrix-t1only`
   - FSL-56: 1 case(s) named it, 0 with changed values (largest difference 0), 1 with other changes (files ['out.nii', 'out_mask.nii'] became ['out.nii', 'out_mask.nii']; out.nii changed; out_mask.nii changed): `defects/extensions`
@@ -37,10 +40,10 @@
 | Category | Cases | Pass | Both reject | Expected divergence | Fail |
 |---|---|---|---|---|---|
 | bet | 22 | 12 | 6 | 4 | 0 |
-| bet2 | 33 | 20 | 13 | 0 | 0 |
+| bet2 | 33 | 20 | 12 | 1 | 0 |
 | betsurf | 14 | 8 | 6 | 0 | 0 |
-| defects | 13 | 10 | 3 | 0 | 0 |
-| fmriprep | 9 | 9 | 0 | 0 | 0 |
+| defects | 16 | 10 | 1 | 5 | 0 |
+| fmriprep | 29 | 29 | 0 | 0 | 0 |
 | formats | 27 | 23 | 4 | 0 | 0 |
 | real | 25 | 25 | 0 | 0 | 0 |
 
@@ -48,10 +51,16 @@
 
 | Case | Reason |
 |---|---|
+| `bet2/constant` | FSL crashes (status -11); with upstream_defects='reproduce' larmorx fills what FSL leaves undefined deterministically, names FSL-41 and writes its outputs; the default refuses |
+| `defects/nan-f` | FSL crashes (status -11); with upstream_defects='reproduce' larmorx fills what FSL leaves undefined deterministically, names FSL-42 and writes its outputs; the default refuses |
+| `defects/zero-w` | FSL crashes (status -11); with upstream_defects='reproduce' larmorx fills what FSL leaves undefined deterministically, names FSL-42 and writes its outputs; the default refuses |
 | `bet/pending-S` | needs FSL programs larmorx does not replicate yet: bet: -S (eye and optic nerve cleanup) runs FSL's FLIRT (standard_space_roi and flirt), which larmorx does not replicate yet; this option is pending (larmorx) |
 | `bet/pending-B` | needs FSL programs larmorx does not replicate yet: bet: -B (bias field and neck cleanup) runs FSL's FLIRT (standard_space_roi) and FAST (the bias field), which larmorx does not replicate yet; this option is pending (larmorx) |
 | `bet/pending-A` | needs FSL programs larmorx does not replicate yet: bet: -A (skull and scalp surfaces) runs FSL's FLIRT (the registration to MNI152), which larmorx does not replicate yet; this option is pending (larmorx) |
 | `bet/pending-A2` | needs FSL programs larmorx does not replicate yet: bet: -A2 (skull and scalp surfaces with a T2) runs FSL's FLIRT (the T2-to-T1 and MNI152 registrations), which larmorx does not replicate yet; this option is pending (larmorx) |
+| `defects/mesh-unread` | FSL crashes (status -11); with upstream_defects='reproduce' larmorx fills what FSL leaves undefined deterministically, names FSL-52 and writes its outputs; the default refuses |
+| `defects/mesh-missing-vertex` | FSL crashes (status -11); with upstream_defects='reproduce' larmorx fills what FSL leaves undefined deterministically, names FSL-52 and writes its outputs; the default refuses |
+| `defects/mesh-truncated` | FSL crashes (status -11); with upstream_defects='reproduce' larmorx fills what FSL leaves undefined deterministically, names FSL-52 and writes its outputs; the default refuses |
 
 ## Rejected by both
 
@@ -69,9 +78,6 @@
 | `bet2/unrecognised-token` | a third word | both refuse (exit 1) with FSL's usage |
 | `bet2/missing-input` | an input that does not exist (FSL aborts) | FSL crashes, larmorx refuses: bet2: stopped: FSL's bet2 aborts here with an uncaught std::runtime_error (Failed to read volume /nonexistent/in / Error : No ima… |
 | `bet2/img-output` | an output name with .img and no .hdr (FSL-40: FSL aborts) | FSL crashes, larmorx refuses: bet2: stopped: FSL's bet2 aborts here with an uncaught std::out_of_range (basic_string::erase: a name with .img but no .hdr, FSL-… |
-| `bet2/constant` | a constant image (FSL-41: FSL reads an empty list and crashes) | FSL crashes, larmorx refuses: bet2: stopped: no voxel inside the initial sphere has an intensity strictly between the 2nd and 98th percentiles, so the median b… |
-| `defects/nan-f` | -f nan (FSL-42) | FSL crashes, larmorx refuses: bet2: stopped: the surface's centre lies outside the image (voxel -2147483648 -2147483648 -2147483648), where FSL's bet2 starts i… |
-| `defects/zero-w` | -w 0 (FSL-42) | FSL crashes, larmorx refuses: bet2: stopped: the surface's centre lies outside the image (voxel -2147483648 -2147483648 -2147483648), where FSL's bet2 starts i… |
 | `formats/output-ANALYZE` | FSLOUTPUTTYPE=ANALYZE | both refuse (exit 1) with Legal values are: NIFTI, NIFTI_PAIR, NIFTI_GZ, NIFTI_PAIR_GZ |
 | `formats/output-ANALYZE_GZ` | FSLOUTPUTTYPE=ANALYZE_GZ | both refuse (exit 1) with Legal values are: NIFTI, NIFTI_PAIR, NIFTI_GZ, NIFTI_PAIR_GZ |
 | `formats/output-unset` | FSLOUTPUTTYPE unset (FSL stops) | both refuse (exit 1) with e.g. tcsh or csh users add the line "source ${FSLDIR}/etc/fslconf/fsl.csh" |
@@ -94,8 +100,8 @@
 
 | Component | Version |
 |---|---|
-| larmorx | 0.0.1 (fe1815060cc3) |
-| larmorx-testdata | b0999a9e0c31 |
+| larmorx | 0.0.1 (c3b17f2ff7e8) |
+| larmorx-testdata | 52124bc98f9f |
 | Python | 3.12.10 |
 | Platform | Linux x86_64 (Linux-6.8.0-124-generic-x86_64-with-glibc2.35) |
 | CPU | Intel(R) Core(TM) i7-8750H CPU @ 2.20GHz, 12 logical CPUs |
@@ -113,6 +119,26 @@ Both programs run in directories of their own on the same input files, with `PAT
 | `fmriprep/ds000005-task_mixedgamblestask_run_01-enhance_and_skullstrip_bold` | pass | 12/12 | fMRIPrep's call `bet <boldref> <out> -f 0.20 -m` (sub-01_task-mixedgamblestask_run-01_desc-hmc_boldref_corrected.nii.gz) |
 | `fmriprep/ds000005-task_mixedgamblestask_run_02-enhance_and_skullstrip_bold` | pass | 12/12 | fMRIPrep's call `bet <boldref> <out> -f 0.20 -m` (sub-01_task-mixedgamblestask_run-02_desc-hmc_boldref_corrected.nii.gz) |
 | `fmriprep/ds000005-task_mixedgamblestask_run_03-enhance_and_skullstrip_bold` | pass | 12/12 | fMRIPrep's call `bet <boldref> <out> -f 0.20 -m` (sub-01_task-mixedgamblestask_run-03_desc-hmc_boldref_corrected.nii.gz) |
+| `fmriprep/ds000228-task_pixar-enhance_and_skullstrip_bold` | pass | 12/12 | fMRIPrep's call `bet <boldref> <out> -f 0.20 -m` (sub-pixar008_task-pixar_desc-hmc_boldref_corrected.nii.gz) |
+| `fmriprep/ds000256-task_restbaseline-enhance_and_skullstrip_bold` | pass | 12/12 | fMRIPrep's call `bet <boldref> <out> -f 0.20 -m` (sub-CTS203_task-restbaseline_desc-hmc_boldref_corrected.nii.gz) |
+| `fmriprep/ds000256-task_restfixationfixed-enhance_and_skullstrip_bold` | pass | 12/12 | fMRIPrep's call `bet <boldref> <out> -f 0.20 -m` (sub-CTS203_task-restfixationfixed_desc-hmc_boldref_corrected.nii.gz) |
+| `fmriprep/ds000256-task_restfixationnofeedback-enhance_and_skullstrip_bold` | pass | 12/12 | fMRIPrep's call `bet <boldref> <out> -f 0.20 -m` (sub-CTS203_task-restfixationnofeedback_desc-hmc_boldref_corrected.nii… |
+| `fmriprep/ds002422-task_arithm_run_01-enhance_and_skullstrip_bold` | pass | 12/12 | fMRIPrep's call `bet <boldref> <out> -f 0.20 -m` (sub-02_task-arithm_run-01_desc-hmc_boldref_corrected.nii.gz) |
+| `fmriprep/ds002422-task_arithm_run_01-skullstrip_bold` | pass | 12/12 | fMRIPrep's call `bet <boldref> <out> -f 0.20 -m` (sub-02_task-arithm_run-01_desc-coreg_boldref.nii.gz) |
+| `fmriprep/ds002422-task_arithm_run_02-enhance_and_skullstrip_bold` | pass | 12/12 | fMRIPrep's call `bet <boldref> <out> -f 0.20 -m` (sub-02_task-arithm_run-02_desc-hmc_boldref_corrected.nii.gz) |
+| `fmriprep/ds002422-task_arithm_run_02-skullstrip_bold` | pass | 12/12 | fMRIPrep's call `bet <boldref> <out> -f 0.20 -m` (sub-02_task-arithm_run-02_desc-coreg_boldref.nii.gz) |
+| `fmriprep/ds002422-task_rest-enhance_and_skullstrip_bold` | pass | 12/12 | fMRIPrep's call `bet <boldref> <out> -f 0.20 -m` (sub-02_task-rest_desc-hmc_boldref_corrected.nii.gz) |
+| `fmriprep/ds002422-task_rest-skullstrip_bold` | pass | 12/12 | fMRIPrep's call `bet <boldref> <out> -f 0.20 -m` (sub-02_task-rest_desc-coreg_boldref.nii.gz) |
+| `fmriprep/ds002603-task_wm_acq_Mb4Mm3Tr550-enhance_and_skullstrip_bold` | pass | 12/12 | fMRIPrep's call `bet <boldref> <out> -f 0.20 -m` (sub-01_task-wm_acq-Mb4Mm3Tr550_desc-hmc_boldref_corrected.nii.gz) |
+| `fmriprep/ds002603-task_wm_acq_Mb4Mm3Tr550-skullstrip_bold` | pass | 12/12 | fMRIPrep's call `bet <boldref> <out> -f 0.20 -m` (sub-01_task-wm_acq-Mb4Mm3Tr550_desc-coreg_boldref.nii.gz) |
+| `fmriprep/ds002603-task_wm_acq_SeqMm3Tr2000-enhance_and_skullstrip_bold` | pass | 12/12 | fMRIPrep's call `bet <boldref> <out> -f 0.20 -m` (sub-01_task-wm_acq-SeqMm3Tr2000_desc-hmc_boldref_corrected.nii.gz) |
+| `fmriprep/ds002603-task_wm_acq_SeqMm3Tr2000-skullstrip_bold` | pass | 12/12 | fMRIPrep's call `bet <boldref> <out> -f 0.20 -m` (sub-01_task-wm_acq-SeqMm3Tr2000_desc-coreg_boldref.nii.gz) |
+| `fmriprep/ds003592-ses_1_task_rest_echo_1-enhance_and_skullstrip_bold` | pass | 12/12 | fMRIPrep's call `bet <boldref> <out> -f 0.20 -m` (sub-280_ses-1_task-rest_desc-hmc_boldref_corrected.nii.gz) |
+| `fmriprep/ds004884-ses_217_task_naming40_acq_epfid2_dir_AP_run_2-enhance_and_skullstrip_bold` | pass | 12/12 | fMRIPrep's call `bet <boldref> <out> -f 0.20 -m` (sub-M2079_ses-217_task-naming40_acq-epfid2_dir-AP_run-2_desc-hmc_bold… |
+| `fmriprep/ds004884-ses_217_task_rest_acq_epfidp2p2_dir_AP_run_9-enhance_and_skullstrip_bold` | pass | 12/12 | fMRIPrep's call `bet <boldref> <out> -f 0.20 -m` (sub-M2079_ses-217_task-rest_acq-epfidp2p2_dir-AP_run-9_desc-hmc_boldr… |
+| `fmriprep/ds004958-task_rest-enhance_and_skullstrip_bold` | pass | 12/12 | fMRIPrep's call `bet <boldref> <out> -f 0.20 -m` (sub-fsm64ps_task-rest_sbref_corrected.nii.gz) |
+| `fmriprep/ds005003-ses_1_task_motor-enhance_and_skullstrip_bold` | pass | 12/12 | fMRIPrep's call `bet <boldref> <out> -f 0.20 -m` (sub-RS001_ses-1_task-motor_desc-hmc_boldref_corrected.nii.gz) |
+| `fmriprep/ds005003-ses_1_task_rest-enhance_and_skullstrip_bold` | pass | 12/12 | fMRIPrep's call `bet <boldref> <out> -f 0.20 -m` (sub-RS001_ses-1_task-rest_desc-hmc_boldref_corrected.nii.gz) |
 | `fmriprep/ds005040-task_clip_run_1-enhance_and_skullstrip_bold` | pass | 12/12 | fMRIPrep's call `bet <boldref> <out> -f 0.20 -m` (sub-002_task-clip_run-1_desc-hmc_boldref_corrected.nii.gz) |
 | `fmriprep/ds005040-task_clip_run_1-skullstrip_bold` | pass | 12/12 | fMRIPrep's call `bet <boldref> <out> -f 0.20 -m` (sub-002_task-clip_run-1_desc-coreg_boldref.nii.gz) |
 | `fmriprep/ds005454-task_rest-enhance_and_skullstrip_bold` | pass | 12/12 | fMRIPrep's call `bet <boldref> <out> -f 0.20 -m` (sub-16_task-rest_desc-hmc_boldref_corrected.nii.gz) |
@@ -152,10 +178,10 @@ Both programs run in directories of their own on the same input files, with `PAT
 | `bet2/missing-input` | both-error | 4/4 | an input that does not exist (FSL aborts) |
 | `bet2/img-output` | both-error | 4/4 | an output name with .img and no .hdr (FSL-40: FSL aborts) |
 | `defects/hdr-in-name` | pass | 6/6 | an output name with .hdr inside (FSL-40) |
-| `bet2/constant` | both-error | 4/4 | a constant image (FSL-41: FSL reads an empty list and crashes) |
-| `defects/nan-f` | both-error | 4/4 | -f nan (FSL-42) |
+| `bet2/constant` | expected-divergence | 6/6 | a constant image (FSL-41: FSL reads an empty list and crashes; reproduce fills the median with 0) |
+| `defects/nan-f` | expected-divergence | 6/6 | -f nan (FSL-42; FSL crashes in its fill, FSL-43) |
 | `defects/negative-r` | pass | 6/6 | -r -50 (FSL-42) |
-| `defects/zero-w` | both-error | 4/4 | -w 0 (FSL-42) |
+| `defects/zero-w` | expected-divergence | 6/6 | -w 0 (FSL-42; FSL crashes in its fill, FSL-43) |
 | `formats/head-i16` | pass | 6/6 | head-i16: brain and mask |
 | `formats/head-u8` | pass | 6/6 | head-u8: brain and mask |
 | `formats/head-i8` | pass | 6/6 | head-i8: brain and mask |
@@ -225,6 +251,9 @@ Both programs run in directories of their own on the same input files, with `PAT
 | `betsurf/bad-option` | both-error | 4/4 | an unknown option |
 | `betsurf/p-bad` | both-error | 4/4 | -p with a word |
 | `defects/short-matrix` | pass | 10/10 | a matrix of 6 numbers (FSL-53) |
+| `defects/mesh-unread` | expected-divergence | 6/6 | a coordinate that does not read (FSL-52: FSL crashes; reproduce fills what FSL leaves undefined) |
+| `defects/mesh-missing-vertex` | expected-divergence | 6/6 | a face naming a vertex the mesh does not have (FSL-52: FSL crashes; reproduce fills what FSL leaves undefined) |
+| `defects/mesh-truncated` | expected-divergence | 6/6 | a mesh file that ends after two vertices (FSL-52: FSL crashes; reproduce fills what FSL leaves undefined) |
 | `defects/t2-other-grid` | pass | 10/10 | a T2 on another grid (FSL-48) |
 | `betsurf/off-mesh` | pass | 10/10 | an OFF mesh |
 | `betsurf/fs-mesh` | pass | 10/10 | a FreeSurfer ASCII mesh |

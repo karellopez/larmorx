@@ -16,11 +16,14 @@ under the FSL Licence's terms; translated from FSL's source:
 replica that ran.
 
 **Status: `validated`** (the replica), against FSL 6.0.7.17 itself
-([record](../validation/fsl-bet-replica.md), standard tier: 129 cases;
-[full tier](../validation/fsl-bet-replica-full.md): 143): every compared case gives FSL's exit status,
-messages and files byte for byte (images: header and data; meshes as text), fMRIPrep's nine BET
-calls on its oracle runs included, whose outputs also have the values of fMRIPrep's own (and of
-fMRIPrep's build of FSL in its image).
+([record](../validation/fsl-bet-replica.md), standard tier: 152 cases, 113 compared, every one
+bit-identical; [full tier](../validation/fsl-bet-replica-full.md): 166 cases, 127 compared, 360
+of 360 files byte for byte): every compared case gives FSL's exit status, messages and files byte
+for byte (images: header and data; meshes as text), fMRIPrep's 29 BET calls on its twelve oracle
+runs with BOLD runs included (the data panel's), whose outputs also have the values of fMRIPrep's
+own (and of fMRIPrep's build of FSL in its image). 29 cases are rejected by both alike; in 6, FSL
+crashes on what it leaves undefined and `reproduce` fills it (below); 4 variations wait for FLIRT
+and FAST.
 
 ## Quick start
 

@@ -78,10 +78,23 @@ fn maximum_shift<R: Real, const D: usize>(
     Ok(max)
 }
 
+/// The warning ITK's `EstimateScales` prints when no parameter moves a voxel (every shift is
+/// below epsilon) and it uses scales of 1 (`itkRegistrationParameterScalesFromShiftBase.hxx:91`).
+pub const NO_SHIFT_WARNING: &str = "WARNING: In Modules/Numerics/Optimizersv4/include/itkRegistrationParameterScalesFromShiftBase.hxx, line 91\nRegistrationParameterScalesFromPhysicalShift (0x0): Variation in any parameter won't change a voxel position. The default scales (1.0) are used to avoid division-by-zero.\n\n";
+
 /// `EstimateScales` (`RegistrationParameterScalesFromShiftBase`) with corner sampling.
 pub fn estimate_scales<R: Real, const D: usize>(
     transform: &mut Composite<R, D>,
     samples: &[[f64; D]],
+) -> Result<Vec<R>, ItkException> {
+    estimate_scales_checked(transform, samples, &mut false)
+}
+
+/// [`estimate_scales`], setting `no_shift` where ITK prints [`NO_SHIFT_WARNING`].
+pub fn estimate_scales_checked<R: Real, const D: usize>(
+    transform: &mut Composite<R, D>,
+    samples: &[[f64; D]],
+    no_shift: &mut bool,
 ) -> Result<Vec<R>, ItkException> {
     let n = transform.number_of_parameters();
     let small = R::from_f64(SMALL);
@@ -98,6 +111,7 @@ pub fn estimate_scales<R: Real, const D: usize>(
     }
     if min_nonzero == R::MAX {
         // itkWarningMacro("Variation in any parameter won't change a voxel position. ...")
+        *no_shift = true;
         return Ok(vec![R::ONE; n]);
     }
     let factor = R::ONE / (small * small);
@@ -221,6 +235,7 @@ pub fn estimate_local_scales<R: Real, const D: usize>(
     transform: &mut Composite<R, D>,
     samples: &[[f64; D]],
     offset: usize,
+    no_shift: &mut bool,
 ) -> Result<Vec<R>, ItkException> {
     let n_all = transform.number_of_parameters();
     let small = R::from_f64(SMALL);
@@ -236,6 +251,7 @@ pub fn estimate_local_scales<R: Real, const D: usize>(
         }
     }
     if min_nonzero == R::MAX {
+        *no_shift = true;
         return Ok(vec![R::ONE; D]);
     }
     let factor = R::ONE / (small * small);
@@ -260,6 +276,7 @@ pub fn estimate_local_scales<R: Real, const D: usize>(
 pub fn estimate_bspline_scales<R: Real, const D: usize>(
     transform: &mut Composite<R, D>,
     samples: &[[f64; D]],
+    no_shift: &mut bool,
 ) -> Result<Vec<R>, ItkException> {
     let n = transform.number_of_parameters();
     let small = R::from_f64(SMALL);
@@ -273,7 +290,7 @@ pub fn estimate_bspline_scales<R: Real, const D: usize>(
         .collect();
     let (per, affected) = {
         let crate::transform::Xfm::BSpline(b) = transform.active() else {
-            return estimate_scales(transform, samples);
+            return estimate_scales_checked(transform, samples, no_shift);
         };
         let per = b.parameters_per_dimension();
         let mut affected: Vec<Vec<usize>> = vec![Vec::new(); per];
@@ -324,6 +341,7 @@ pub fn estimate_bspline_scales<R: Real, const D: usize>(
         }
     }
     if min_nonzero == R::MAX {
+        *no_shift = true;
         return Ok(vec![R::ONE; n]);
     }
     Ok(vec![min_nonzero; n])

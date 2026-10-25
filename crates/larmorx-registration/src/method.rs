@@ -359,6 +359,44 @@ pub struct LevelProblem<'a, R, const D: usize> {
 }
 
 impl<'a, R: Real, const D: usize> LevelProblem<'a, R, D> {
+    fn estimate_scales_inner(&mut self, no_shift: &mut bool) -> Result<Vec<R>, ItkException> {
+        self.check_samples()?;
+        if self.moving.active().is_bspline() {
+            // CentralRegionSampling (VirtualDomainPointSetSampling with a point-set metric
+            // first); every parameter.
+            let samples = if self.point_set_samples {
+                self.samples.clone()
+            } else {
+                scales::central_region(&self.virtual_space)
+            };
+            return scales::estimate_bspline_scales(&mut self.moving, &samples, no_shift);
+        }
+        if self.moving.active().has_local_support() {
+            // CentralRegionSampling (VirtualDomainPointSetSampling with a point-set metric
+            // first), the parameters of the central voxel (the first point's).
+            let (samples, index) = if self.point_set_samples {
+                let p = self.samples[0];
+                (self.samples.clone(), self.virtual_space.point_to_index(&p))
+            } else {
+                (
+                    scales::central_region(&self.virtual_space),
+                    scales::central_index(&self.virtual_space),
+                )
+            };
+            if !self.virtual_space.contains(&index) {
+                return Err(ItkException::new(
+                    "Modules/Numerics/Optimizersv4/include/itkObjectToObjectMetric.hxx",
+                    330,
+                    "ObjectToObjectMetric",
+                    " point is not inside virtual domain. Cannot compute offset. ",
+                ));
+            }
+            let offset = self.virtual_space.offset(&index) * D;
+            return scales::estimate_local_scales(&mut self.moving, &samples, offset, no_shift);
+        }
+        scales::estimate_scales_checked(&mut self.moving, &self.samples, no_shift)
+    }
+
     /// The problem of one image metric outside a registration method (`antsAI`,
     /// `antsAffineInitializer`): `metric` with its sample points and gradient images already
     /// set, initialised here (`Initialize()`), and the moving transform `moving`, whose scales
@@ -569,41 +607,14 @@ impl<R: Real, const D: usize> Problem<R> for LevelProblem<'_, R, D> {
     }
 
     fn estimate_scales(&mut self) -> Result<Vec<R>, ItkException> {
-        self.check_samples()?;
-        if self.moving.active().is_bspline() {
-            // CentralRegionSampling (VirtualDomainPointSetSampling with a point-set metric
-            // first); every parameter.
-            let samples = if self.point_set_samples {
-                self.samples.clone()
-            } else {
-                scales::central_region(&self.virtual_space)
-            };
-            return scales::estimate_bspline_scales(&mut self.moving, &samples);
+        // ITK warns when no parameter moves a voxel (found by differential random testing,
+        // 2026-10-25: antsAI's start points outside the images).
+        let mut no_shift = false;
+        let scales = self.estimate_scales_inner(&mut no_shift);
+        if no_shift {
+            self.warnings.push(scales::NO_SHIFT_WARNING.to_owned());
         }
-        if self.moving.active().has_local_support() {
-            // CentralRegionSampling (VirtualDomainPointSetSampling with a point-set metric
-            // first), the parameters of the central voxel (the first point's).
-            let (samples, index) = if self.point_set_samples {
-                let p = self.samples[0];
-                (self.samples.clone(), self.virtual_space.point_to_index(&p))
-            } else {
-                (
-                    scales::central_region(&self.virtual_space),
-                    scales::central_index(&self.virtual_space),
-                )
-            };
-            if !self.virtual_space.contains(&index) {
-                return Err(ItkException::new(
-                    "Modules/Numerics/Optimizersv4/include/itkObjectToObjectMetric.hxx",
-                    330,
-                    "ObjectToObjectMetric",
-                    " point is not inside virtual domain. Cannot compute offset. ",
-                ));
-            }
-            let offset = self.virtual_space.offset(&index) * D;
-            return scales::estimate_local_scales(&mut self.moving, &samples, offset);
-        }
-        scales::estimate_scales(&mut self.moving, &self.samples)
+        scales
     }
 
     fn estimate_step_scale(&mut self, step: &mut [R]) -> Result<R, ItkException> {

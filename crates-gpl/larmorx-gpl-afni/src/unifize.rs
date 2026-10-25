@@ -325,6 +325,15 @@ pub fn double_up(far: &[f32], g: Grid, add: [bool; 3], target: Option<Grid>) -> 
     (gar, h)
 }
 
+/// The bytes [`sphere`] and the neighbourhood buffers of [`local_percmean`]'s `threads` workers
+/// need for a ball of `radius` voxels (AFNI-75): the ball's volume `4/3 pi r^3` in points, 12
+/// bytes each, twice over while the offsets' vector grows, and 4 bytes a point per worker.
+pub fn ball_bytes(radius: f32, threads: usize) -> f64 {
+    let r = f64::from(radius.max(0.0));
+    let points = 4.0 / 3.0 * std::f64::consts::PI * r * r * r + 1.0;
+    points * (24.0 + 4.0 * threads.max(1) as f64)
+}
+
 /// `MCW_spheremask(1, 1, 1, radius)`: the offsets `(i, j, k)` with `i^2 + j^2 + k^2 <=
 /// radius^2` (in float), the centre included. The order is irrelevant here (the values are
 /// sorted).

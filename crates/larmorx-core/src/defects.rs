@@ -370,6 +370,8 @@ defects! {
         "a volume of more than a million voxels with an axis of 2 or 3 voxels: its half-size scale image expands back to a grid of another size, which AFNI reads as if it were the input's, past its end";
     AFNI_48 = "AFNI-48", "3dUnifize", true,
         "-T2 given three or more times (the help documents once and twice) leaves the output inverted: neither inverted back nor edge-clipped";
+    AFNI_75 = "AFNI-75", "3dUnifize", true,
+        "-EPI sets the neighbourhood's radius to 18.3 mm over the voxels' geometric mean size, in voxels, with no upper bound: on micrometre (or otherwise tiny) voxels the ball of neighbours has trillions of points, built before any is used, which fills the machine until the process is stopped";
     FSL_01 = "FSL-01", "mcflirt", true,
         "the last volume of the series starts its first stage from the identity, not from the previous volume's result";
     FSL_02 = "FSL-02", "mcflirt", false,

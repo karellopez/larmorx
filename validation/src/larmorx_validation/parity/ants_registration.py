@@ -1872,6 +1872,8 @@ def _normalise(text: str, out: Path) -> list[str]:
         )
         # An exception's what() inside another's description: the thrower's file and line.
         line = re.sub(r"^\S*?/(Modules|Utilities|Examples)/(\S+:\d+:)$", r"\1/\2", line)
+        # vnl's warnings name their header by the build's path (`__FILE__`; vnl_svd.hxx).
+        line = re.sub(r"^\S*?/(Modules/ThirdParty/VNL/\S+?\.(?:hxx|h|cxx)): ", r"\1: ", line)
         line = re.sub(r"(Elapsed time \(stage \d+\)|Total elapsed time): .*", r"\1: T", line)
         # The sign of a NaN result: IEEE 754 leaves it unspecified, the compiler's operand order
         # decides it (docs/findings/ants-registration.md).

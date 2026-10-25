@@ -408,6 +408,10 @@ fn run_levels<R: Real, const D: usize, const E: usize>(
     let mut masks_not_moved = false;
     let need_inverses = has_point_sets;
     let mut mesh = mesh0;
+    // Each metric object's joint histogram images (Mattes), kept across the levels and calls
+    // of the stage.
+    let joint_pdfs: Vec<Arc<std::sync::atomic::AtomicBool>> =
+        stage.metrics.iter().map(|_| Default::default()).collect();
     for (level, factors) in stage.shrink_factors.iter().enumerate() {
         let virtual_space = shrink_space(&virtual_base, factors)?;
         // The level's adaptor: the transform domain (the helper's virtual domain, time [0, 1]
@@ -767,6 +771,7 @@ fn run_levels<R: Real, const D: usize, const E: usize>(
                         floor,
                         masks: &mut masks,
                         stale_masks: false,
+                        joint_pdfs: &joint_pdfs,
                         through: images_through,
                     };
                     let (value, derivative) = call.gradient_field(false, warnings)?;

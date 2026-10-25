@@ -419,6 +419,9 @@ pub(crate) struct GradientCall<'a, R, const D: usize> {
     /// the mask the previous call set (ITK-31, reproduced when `stale_masks`).
     pub(crate) masks: &'a mut [(Option<Mask<D>>, Option<Mask<D>>)],
     pub(crate) stale_masks: bool,
+    /// Each metric object's joint histogram images (Mattes): created at its first evaluation
+    /// in the stage.
+    pub(crate) joint_pdfs: &'a [Arc<std::sync::atomic::AtomicBool>],
     /// The fixed and moving transforms the image metrics are evaluated through, on top of
     /// their resampled images (ITK-36 reproduced: a time-varying B-spline velocity field's
     /// multi-metric whose last metric is a point-set metric); `None`: the identity.
@@ -533,7 +536,12 @@ impl<R: Real, const D: usize> GradientCall<'_, R, D> {
                 self.through.map(|(f, _)| f.clone()),
             );
             match result {
-                Ok(m) => initialized.push(Some(m)),
+                Ok(mut m) => {
+                    if let Some(s) = &mut m.state {
+                        s.share_joint_pdf(&self.joint_pdfs[j]);
+                    }
+                    initialized.push(Some(m));
+                }
                 Err(e) if self.multi => {
                     return Err(e.wrapped(
                         "Modules/Registration/Metricsv4/include/itkObjectToObjectMultiMetricv4.hxx",
@@ -716,6 +724,10 @@ fn run_syn_levels<R: Real, const D: usize>(
     let invert_settings = InvertSettings::<R>::syn();
     let mut state: Option<(FieldXfm<R, D>, FieldXfm<R, D>)> = None;
     let mut stale_masks = false;
+    // Each metric object's joint histogram images (Mattes), kept across the levels and calls
+    // of the stage.
+    let joint_pdfs: Vec<Arc<std::sync::atomic::AtomicBool>> =
+        stage.metrics.iter().map(|_| Default::default()).collect();
     for (level, factors) in stage.shrink_factors.iter().enumerate() {
         let virtual_space = shrink_space(&virtual_base, factors)?;
         let sigma = stage.smoothing_sigmas[level];
@@ -942,6 +954,7 @@ fn run_syn_levels<R: Real, const D: usize>(
                     floor,
                     masks: &mut mask_state,
                     stale_masks: !stage.correct_stale_masks,
+                    joint_pdfs: &joint_pdfs,
                     through: None,
                 };
                 // B-spline SyN with a single point-set metric: the B-spline fitted to the

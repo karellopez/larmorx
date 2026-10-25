@@ -551,6 +551,10 @@ fn run_tvvf_e<R: Real, const D: usize, const E: usize>(
         correct_gc_derivative: stage.correct_gc_derivative,
         optimizer_weights: stage.optimizer_weights.as_deref(),
     };
+    // Each metric object's joint histogram images (Mattes), kept across the levels and calls
+    // of the stage.
+    let joint_pdfs: Vec<Arc<std::sync::atomic::AtomicBool>> =
+        stage.metrics.iter().map(|_| Default::default()).collect();
     for (level, factors) in stage.shrink_factors.iter().enumerate() {
         let virtual_space = shrink_space(&virtual_base, factors)?;
         // TimeVaryingVelocityFieldTransformParametersAdaptor.
@@ -739,6 +743,7 @@ fn run_tvvf_e<R: Real, const D: usize, const E: usize>(
                         floor,
                         masks: &mut masks,
                         stale_masks: false,
+                        joint_pdfs: &joint_pdfs,
                         through: None,
                     };
                     let (value, derivative) = call.gradient_field(false, warnings)?;

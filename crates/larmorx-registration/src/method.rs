@@ -231,6 +231,14 @@ impl<R: Real> LevelMetric<R> {
         })
     }
 
+    /// A Mattes metric's joint histogram images, kept by the metric object across the levels
+    /// and calls of a stage (`flag` is the stage's).
+    pub(crate) fn share_joint_pdf(&mut self, flag: &std::sync::Arc<std::sync::atomic::AtomicBool>) {
+        if let LevelMetric::Mattes(m) = self {
+            m.share_joint_pdf(flag);
+        }
+    }
+
     /// `GetValue` or `GetValueAndDerivative`.
     pub(crate) fn evaluate<const D: usize>(
         &self,
@@ -247,7 +255,7 @@ impl<R: Real> LevelMetric<R> {
             (r.value, r.derivative)
         };
         match self {
-            LevelMetric::Mattes(m) => m.evaluate(metric, moving, derivative, floor),
+            LevelMetric::Mattes(m) => m.evaluate(metric, moving, derivative, floor, warnings),
             LevelMetric::MeanSquares => {
                 let r = mean_squares::evaluate(metric, moving, derivative, floor)?;
                 Ok(reduced(r, "MeanSquaresImageToImageMetricv4", warnings))
@@ -897,6 +905,9 @@ where
     let mut weights: Vec<R> = stage.metrics.iter().map(|m| m.weight()).collect();
     let mut current_seed = stage.seed;
     let mut outcomes = Vec::new();
+    // Each metric object's joint histogram images (Mattes), kept across the levels.
+    let joint_pdfs: Vec<std::sync::Arc<std::sync::atomic::AtomicBool>> =
+        stage.metrics.iter().map(|_| Default::default()).collect();
     for (level, factors) in stage.shrink_factors.iter().enumerate() {
         let virtual_space = shrink_space(&virtual_base, factors)?;
         // The level's adaptor: a displacement field resampled onto the level's virtual domain
@@ -1047,14 +1058,17 @@ where
                             m.fixed_gradient_image =
                                 Some(Arc::new(gradient_image(&m.fixed, stage.n_threads)?));
                         }
-                        return LevelMetric::initialize(sm.kind, &m)
-                            .map(|s| LevelEntry::Image(m, s));
+                        return LevelMetric::initialize(sm.kind, &m).map(|mut s| {
+                            s.share_joint_pdf(&joint_pdfs[j]);
+                            LevelEntry::Image(m, s)
+                        });
                     }
                     if sm.use_gradient_filter {
                         m.moving_gradient_image =
                             Some(Arc::new(gradient_image(&m.moving, stage.n_threads)?));
                     }
                     let mut state = LevelMetric::initialize(sm.kind, &m)?;
+                    state.share_joint_pdf(&joint_pdfs[j]);
                     if let LevelMetric::Gc { correct_local } = &mut state {
                         *correct_local = stage.correct_gc_derivative;
                     }

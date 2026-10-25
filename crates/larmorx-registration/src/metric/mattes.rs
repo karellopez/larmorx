@@ -11,6 +11,9 @@
 //! logarithm of each bin's ratio. All in `R` (`PDFValueType`), in a single ITK thread's
 //! order.
 
+use std::sync::Arc;
+use std::sync::atomic::{AtomicBool, Ordering};
+
 use crate::CompensatedSum;
 use larmorx_core::IndexFloor;
 
@@ -67,6 +70,12 @@ pub struct Mattes<R> {
     pub fixed_normalized_min: R,
     pub moving_bin_size: R,
     pub moving_normalized_min: R,
+    /// Whether the threader's joint histogram images exist: `BeforeThreadedExecution`
+    /// creates them at the metric object's first evaluation and keeps them while the number
+    /// of work units and the bins stay the same (a stage, at one thread). A level's
+    /// `Initialize` keeps them: [`Mattes::share_joint_pdf`] gives every level of a stage the
+    /// stage's flag.
+    pub joint_pdf: Arc<AtomicBool>,
 }
 
 /// One point's contribution, computed in parallel.
@@ -168,7 +177,14 @@ impl<R: Real> Mattes<R> {
             fixed_normalized_min: fmin / fixed_bin_size - padding,
             moving_bin_size,
             moving_normalized_min: mmin / moving_bin_size - padding,
+            joint_pdf: Arc::default(),
         })
+    }
+
+    /// The metric object's joint histogram images, shared by the levels (and the calls) of
+    /// one stage.
+    pub fn share_joint_pdf(&mut self, flag: &Arc<AtomicBool>) {
+        self.joint_pdf = Arc::clone(flag);
     }
 
     /// `static_cast<OffsetValueType>(term)` clamped to `[2, bins − 3]`.
@@ -200,7 +216,14 @@ impl<R: Real> Mattes<R> {
     /// without a buffer, so a later evaluation of the same metric crashes in ITK
     /// (`FillBuffer`); this is the first evaluation's exception (from the default spacing
     /// `[1, 1]`).
-    pub fn check_joint_pdf_spacing(&self) -> Result<(), ItkException> {
+    ///
+    /// When the images are created, `SetSpacing` inverts `Direction · diag(spacing)`
+    /// (`ComputeIndexToPhysicalPointMatrices`, `Matrix::GetInverse`: vnl's SVD): a NaN or
+    /// infinite bin size (an image with NaN or infinite values) makes LINPACK fail, and vnl
+    /// prints its warning on standard error, once per image (one per work unit: once at one
+    /// thread); a determinant of 0 throws (found by differential random testing,
+    /// 2026-10-25).
+    pub fn check_joint_pdf_spacing(&self, warnings: &mut Vec<String>) -> Result<(), ItkException> {
         let spacing = [self.fixed_bin_size.to_f64(), self.moving_bin_size.to_f64()];
         let o = crate::format::OStream::default();
         let to = format!("[{}, {}]", o.float(spacing[0]), o.float(spacing[1]));
@@ -226,6 +249,27 @@ impl<R: Real> Mattes<R> {
                 ));
             }
         }
+        if !self.joint_pdf.swap(true, Ordering::Relaxed) {
+            // Direction (the identity) · diag(spacing), summed as vnl_matrix_fixed multiplies.
+            let [s0, s1] = spacing;
+            let m = [
+                1.0 * s0 + 0.0 * 0.0,
+                1.0 * 0.0 + 0.0 * s1,
+                0.0 * s0 + 1.0 * 0.0,
+                0.0 * 0.0 + 1.0 * s1,
+            ];
+            if m[0] * m[3] - m[1] * m[2] == 0.0 {
+                return Err(ItkException::new(
+                    "Modules/Core/Common/include/itkMatrix.h",
+                    256,
+                    "",
+                    "Singular matrix. Determinant is 0.",
+                ));
+            }
+            if let Err(info) = larmorx_core::vnl_svd::vnl_svd_info(&m, 2, 2) {
+                warnings.push(larmorx_core::vnl_svd::suspicious_svdc(&m, 2, 2, info));
+            }
+        }
         Ok(())
     }
 
@@ -242,8 +286,9 @@ impl<R: Real> Mattes<R> {
         m: &ImageMetricv4<R, D>,
         transform: &Composite<R, D>,
         floor: &IndexFloor,
+        warnings: &mut Vec<String>,
     ) -> Result<(R, Vec<R>), ItkException> {
-        self.check_joint_pdf_spacing()?;
+        self.check_joint_pdf_spacing(warnings)?;
         let bins = self.bins;
         let total = D * m.virtual_space.len();
         let gradients = GradientSource {
@@ -398,11 +443,12 @@ impl<R: Real> Mattes<R> {
         transform: &Composite<R, D>,
         compute_derivative: bool,
         floor: &IndexFloor,
+        warnings: &mut Vec<String>,
     ) -> Result<(R, Vec<R>), ItkException> {
         if m.local_support && compute_derivative {
-            return self.evaluate_local(m, transform, floor);
+            return self.evaluate_local(m, transform, floor, warnings);
         }
-        self.check_joint_pdf_spacing()?;
+        self.check_joint_pdf_spacing(warnings)?;
         let bins = self.bins;
         let np = transform.number_of_parameters();
         let gradients = GradientSource {

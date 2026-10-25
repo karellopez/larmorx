@@ -1052,6 +1052,11 @@ def _prepare(d: Path, s: Scenario) -> None:
         (d / name).write_text(text, encoding="utf-8")
 
 
+#: How the two kinds of expected divergence begin their reasons.
+PENDING = "needs FSL programs larmorx does not replicate yet: "
+FILLED = "FSL crashes (status "
+
+
 def run_case(case: Case, checks: CheckList) -> None:
     s: Scenario = case.payload
     if fsl_dir() is None:
@@ -1074,10 +1079,7 @@ def run_case(case: Case, checks: CheckList) -> None:
             ours = run_larmorx(s.tool, args, "reproduce", env, r_dir)
             refused = ours.code == 1 and "pending" in ours.err and "(larmorx)" in ours.err
             checks("refused as pending", refused, detail=larmorx_err_line(ours))
-            raise Outcome(
-                EXPECTED,
-                "needs FSL programs larmorx does not replicate yet: " + larmorx_err_line(ours),
-            )
+            raise Outcome(EXPECTED, PENDING + larmorx_err_line(ours))
         fsl = oracle_run(s.tool, args, env, f_dir, never=case_never(s))
         ours = run_larmorx(s.tool, args, "reproduce", env, r_dir)
         crash = crashed(fsl)
@@ -1114,7 +1116,7 @@ def run_case(case: Case, checks: CheckList) -> None:
         if filled and all(c.passed for c in checks.checks):
             raise Outcome(
                 EXPECTED,
-                f"FSL crashes (status {fsl.code}); with upstream_defects='reproduce' larmorx fills what FSL "
+                f"{FILLED}{fsl.code}); with upstream_defects='reproduce' larmorx fills what FSL "
                 f"leaves undefined deterministically, names {s.fix_refuses} and writes its "
                 "outputs; the default refuses",
             )
@@ -1373,13 +1375,16 @@ def highlights(results: list[CaseResult]) -> list[str]:
     n = len(results)
     passed = sum(r.status == PASS for r in results)
     both = sum(r.status == BOTH_ERROR for r in results)
-    expected = sum(r.status == EXPECTED for r in results)
+    pending = sum(r.status == EXPECTED and r.reason.startswith(PENDING) for r in results)
+    filled = sum(r.status == EXPECTED and r.reason.startswith(FILLED) for r in results)
     files = sum(1 for r in results for c in r.checks if c.metric == "bytes")
     same = sum(1 for r in results for c in r.checks if c.metric == "bytes" and c.passed)
     lines = [
         f"- **{passed} of {n} cases bit-identical to FSL** (exit status, messages, every file); "
-        f"{both} where both refuse or FSL crashes and the replica refuses; {expected} pending "
-        f"(options that run FSL programs larmorx does not replicate yet).",
+        f"{both} where both refuse or FSL crashes and the replica refuses; {filled} where FSL "
+        "crashes and the replica's `reproduce` fills what FSL leaves undefined (D13's failure "
+        f"cases: deterministic, named, the default refusing); {pending} pending (options that "
+        "run FSL programs larmorx does not replicate yet).",
         f"- **{same} of {files} files** written byte for byte as FSL writes them.",
     ]
     own = [c for r in results for c in r.checks if c.name.endswith(FMRIPREP_OWN)]

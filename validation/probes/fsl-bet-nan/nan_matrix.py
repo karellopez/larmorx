@@ -26,7 +26,6 @@ from pathlib import Path
 
 import nibabel as nib
 import numpy as np
-
 from larmorx_validation.parity import fsl_bet as suite
 
 #: The head's grid: the suite's head at half its size (a 4 mm grid's worth of anatomy on 2 mm
@@ -112,7 +111,8 @@ def outputs(d: Path) -> dict[str, bytes]:
         out[f"<{stream}>"] = "".join(
             x
             for x in lines
-            if not x.startswith(("larmorx-nc:", "larmorx:")) and not x.rstrip().endswith("(larmorx)")
+            if not x.startswith(("larmorx-nc:", "larmorx:"))
+            and not x.rstrip().endswith("(larmorx)")
         ).encode()
     return out
 
@@ -170,9 +170,10 @@ def main() -> int:
                         shutil.rmtree(d)
                     (d / "trap").mkdir(parents=True)
                     env = dict(env, NAN_TRAP_DIR=str(d / "trap")) if "+arm" in label else env
-                    with open(d / "stderr", "w", encoding="utf-8") as e, open(
-                        d / "stdout", "w", encoding="utf-8"
-                    ) as o:
+                    with (
+                        open(d / "stderr", "w", encoding="utf-8") as e,
+                        open(d / "stdout", "w", encoding="utf-8") as o,
+                    ):
                         try:
                             p = subprocess.run(
                                 [*cmd, *args],
@@ -202,7 +203,9 @@ def main() -> int:
                     for ref in refs:
                         if label == ref or label == "fsl":
                             continue
-                        k = [f for f in sorted(set(o) | set(got[ref])) if o.get(f) != got[ref].get(f)]
+                        k = [
+                            f for f in sorted(set(o) | set(got[ref])) if o.get(f) != got[ref].get(f)
+                        ]
                         if k:
                             diffs.append(f"{label} vs {ref}: {', '.join(k[:6])}")
                 n += 1
@@ -211,7 +214,9 @@ def main() -> int:
                     print("    ", line, flush=True)
                 if diffs:
                     bad.append(name)
-    print(f"{n} cases; FSL crashed in {len(fsl_crashes)} (compared among the replica's builds only)")
+    print(
+        f"{n} cases; FSL crashed in {len(fsl_crashes)} (compared among the replica's builds only)"
+    )
     print(f"{len(timeouts)} runs stopped after their time limit (not compared): {timeouts}")
     print(f"{len(bad)} differ: {bad}")
     return 1 if bad else 0

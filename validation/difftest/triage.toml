@@ -174,3 +174,129 @@ implementation = "original"
 signature = ["DN fix pass"]
 status = "harness"
 explanation = "the fix pass of a case the correction refuses (AFNI-48: three -T2): an expected error, now known to the descriptor"
+
+# ---------------------------------------------------------------- found by the trial runs of 2026-10-25
+
+[[difference]]
+tool = "ants-resample-image-by-spacing"
+implementation = "port"
+signature = ["both succeed"]
+status = "fixed"
+explanation = "a spacing that gives an image of no voxel: ITK's ImageFileWriter refuses to write it (ANTs aborts); larmorx wrote an empty file. Now refused with ITK's message (`larmorx-io`, `itk/write.rs`)"
+
+[[difference]]
+tool = "ants-image-math"
+implementation = "port"
+signature = ["header (every field)"]
+status = "fixed"
+explanation = "ImageFileWriter writes the physical point of the first voxel (origin + Σ M·0), which turns an origin component of −0.0 into +0.0; larmorx wrote the origin as stored, so a RAS x of exactly 0 got the other sign (`larmorx-io`, `itk/write.rs`)"
+link = "validation/investigations/difftest/signed_zero_origin.py"
+
+[[difference]]
+tool = "ants-atropos"
+implementation = "port"
+signature = ["DN fix pass", "stderr"]
+status = "fixed"
+explanation = "an empty mask: ITK's k-means throws while finding the empty sample's bounds; larmorx went on to the Gaussians' warnings and the labels' exception"
+
+[[difference]]
+tool = "ants-atropos"
+implementation = "port"
+signature = ["both succeed"]
+status = "fixed"
+explanation = "HistogramParzenWindows on an intensity image constant in the mask: its histogram's spacing is 0, which ITK's SetSpacing refuses (ANTs exits 1); larmorx went on"
+
+[[difference]]
+tool = "ants-registration"
+implementation = "port"
+signature = ["ANTs with CORE-MATH: exit status", "ANTs with CORE-MATH: files written"]
+status = "fixed"
+explanation = "ITK-35 reproduced where ITK does not throw: the CC metric skips the moving transform's Jacobian for flat neighbourhoods and the Demons metric never asks for it, so a B-spline transform after the active one only throws for the other metrics"
+
+[[difference]]
+tool = "ants-ai"
+implementation = "port"
+signature = ["ANTs with CORE-MATH: standard error"]
+status = "fixed"
+explanation = "ITK's scales estimator warns when no parameter moves a voxel (start points whose samples all fall outside); larmorx used the default scales silently"
+
+[[difference]]
+tool = "ants-registration"
+implementation = "port"
+signature = ["DN fix pass"]
+status = "open"
+explanation = "the exact floor (ITK-01 corrected) reaches the displacement-field lookups of the registration without a notice: a value changes in its last bit by default (`reproduce` is exact); the notice needs the lookups' floors counted per stage"
+link = "docs/findings/upstream-defects.md"
+defect = "ITK-01"
+
+[[difference]]
+tool = "ants-registration"
+implementation = "port"
+signature = ["ANTs with CORE-MATH: files written", "ANTs with CORE-MATH: standard error"]
+status = "register"
+defect = "ITK-96"
+explanation = "`-a 1` with a displacement field that has no inverse: ITK inverts it into a transform without a field, whose 0 parameters its HDF5 writer cannot chunk; ANTs leaves a part-written InverseComposite.h5 and HDF5's error. larmorx writes none and names ITK-96 (its `reproduce` does not write the partial file)"
+
+[[difference]]
+tool = "itk-transforms"
+implementation = "port"
+signature = ["ITK's reading: ANTs cannot write the transforms back; antsApplyTransforms agrees"]
+status = "open"
+explanation = "a list with an IdentityTransform cannot be written to HDF5 by ITK (ITK-96), and larmorx's antsApplyTransforms does not evaluate ScaleSkewVersor3D, ScaleVersor3D, QuaternionRigid or Scale transforms (it reads them): the comparison has no way left; the evaluation of those types is to do"
+
+[[difference]]
+tool = "ants-denoise"
+implementation = "port"
+signature = ["denoised: bit-identical to ANTs with correctly rounded math"]
+status = "unclear"
+explanation = "a Rician denoising of an image in micrometre units differs from ANTs (3e-5 relative) in `reproduce`: the same image in millimetres (and at 0.001 mm) agrees; under investigation"
+
+[[difference]]
+tool = "ants-registration"
+implementation = "port"
+signature = ["ANTs with CORE-MATH: rNWarp.nii.gz", "ANTs with CORE-MATH: standard output", "ANTs with CORE-MATH: w.nii.gz"]
+status = "unclear"
+explanation = "a GaussianDisplacementField stage with Regular sampling at a shrink factor of 2 differs from ANTs from its second iteration (Random sampling and full resolution agree); under investigation"
+
+[[difference]]
+tool = "fsl-mcflirt"
+implementation = "replica"
+signature = ["every file bit-identical", "stderr identical"]
+status = "unclear"
+explanation = "the mcflirt replica differs from FSL's mcflirt on a few random series (deterministic, at every thread count, not glibc's double maths: identical with a double-only CORE-MATH preload): `-dof 12` on unsigned 16-bit data, `-cost leastsquares` with `-reffile`, `-cost normmi -bins 128 -refvol 4`; for the replica's author"
+link = "validation/investigations/difftest/mcflirt_pair.py"
+
+[[difference]]
+tool = "afni-unifize"
+implementation = "replica"
+signature = ["DN notices in both modes", "DN fix pass"]
+status = "fixed"
+explanation = "AFNI-03 (header slice code 2 read as zeros) also changes the slice timing 3dUnifize and 3dAutomask write; the GPL replicas now name it in both modes"
+
+[[difference]]
+tool = "afni-automask"
+implementation = "replica"
+signature = ["DN notices in both modes", "DN fix pass"]
+status = "fixed"
+explanation = "AFNI-03 named where it changes the slice timing the output keeps (as for 3dUnifize)"
+
+[[difference]]
+tool = "afni-unifize"
+implementation = "original"
+signature = ["DN notices in both modes", "DN fix pass", "uni.nii.gz: header bytes"]
+status = "open"
+explanation = "the clean-room original keeps a header slice code 2's times by default without naming AFNI-03 (the replica now names it), and one header differs from AFNI's in its bytes; reported for the clean-room agent"
+
+[[difference]]
+tool = "afni-automask"
+implementation = "original"
+signature = ["DN notices in both modes", "DN fix pass", "messages: AFNI's, byte for byte"]
+status = "open"
+explanation = "the clean-room original: AFNI-03 not named where the default keeps a slice code 2's times; the message '++ first 0 y-planes are zero [from ?]' where AFNI prints '[from S]' on an oblique series; reported for the clean-room agent"
+
+[[difference]]
+tool = "afni-tshift"
+implementation = "original"
+signature = ["header fields (scaling, timing, slice fields, units, xform codes)"]
+status = "open"
+explanation = "the clean-room original's toffset differs from AFNI's in the last bits (1.180555820465088 against 1.18055558204...); reported for the clean-room agent"

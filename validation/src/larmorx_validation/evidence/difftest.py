@@ -84,22 +84,31 @@ def triage(repo: Path) -> list[dict]:
 
 
 def _outcome_of(diff: dict, entries: list[dict]) -> dict:
-    """What was done about a night's difference (the first triage entry for its tool,
-    implementation and a signature it shares)."""
-    for e in entries:
+    """What was done about a night's difference: the triage entry of its tool and
+    implementation whose failed checks match its own best (an entry with the same checks
+    first, then the most checks in common, then the first in the file); a difference no entry
+    shares a check with is not yet triaged."""
+    best, best_key = None, None
+    for i, e in enumerate(entries):
         if (
             e["tool"] != diff["tool"]
             or e.get("implementation", diff["implementation"]) != diff["implementation"]
         ):
             continue
-        if set(e["signature"]) & set(diff["signature"]):
-            out = {"status": e["status"], "explanation": e["explanation"]}
-            if e.get("link"):
-                out["link"] = e["link"]
-            if e.get("defect"):
-                out["defect"] = e["defect"]
-            return out
-    return {"status": "unclear", "explanation": "not yet triaged"}
+        common = set(e["signature"]) & set(diff["signature"])
+        if not common:
+            continue
+        key = (set(e["signature"]) == set(diff["signature"]), len(common), -i)
+        if best_key is None or key > best_key:
+            best, best_key = e, key
+    if best is None:
+        return {"status": "unclear", "explanation": "not yet triaged"}
+    out = {"status": best["status"], "explanation": best["explanation"]}
+    if best.get("link"):
+        out["link"] = best["link"]
+    if best.get("defect"):
+        out["defect"] = best["defect"]
+    return out
 
 
 def export(ctx: core.Context) -> dict:

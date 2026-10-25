@@ -253,7 +253,7 @@ tool = "fsl-mcflirt"
 implementation = "replica"
 signature = ["every file bit-identical", "stderr identical"]
 status = "fixed"
-explanation = "the atanf constant (as above)"
+explanation = "the atanf constant (as above); bit-identical with the replica's fixes"
 
 [[difference]]
 tool = "afni-unifize"
@@ -473,7 +473,7 @@ tool = "fsl-mcflirt"
 implementation = "replica"
 signature = ["every file bit-identical"]
 status = "fixed"
-explanation = "the mcflirt replica's atanf held fdlibm's commented value of aT[0], not glibc's 0x3eaaaaab (fixed on the replica's branch, e687cd1): with it 58 of the night's first 59 cases are bit-identical; the one left is a fix-pass naming (fsl-mcflirt:20261025:616)"
+explanation = "the mcflirt replica's atanf held fdlibm's commented value of aT[0], not glibc's 0x3eaaaaab, and FSL-08's notice missed the -meanvol image's name (both fixed by the replica's own part, e687cd1 and aa2c28f): with them every one of the night's 100 cases so far is bit-identical"
 
 [[difference]]
 tool = "mri-hmc"

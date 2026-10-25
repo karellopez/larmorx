@@ -28,7 +28,7 @@ RUNS = {
     "ds002603-sub-01-noreconall": ("ds002603", "01", False),
     "ds004958-sub-fsm64ps-noreconall": ("ds004958", "fsm64ps", False),
 }
-ENTITY = re.compile(r"_(echo-\d+|part-\w+)(?=_)")
+ENTITY = re.compile(r"_(echo-\d+|part-[a-z]+)(?=_|$)")
 
 
 def bold_stems(view: Path, label: str) -> list[str]:
@@ -76,20 +76,34 @@ def check(ws: Path, name: str) -> tuple[list[str], str]:
     n_bold = 0
     if not anat_only:
         view = ws / "oracles" / "bids-views" / ds
+        echoes = {
+            ENTITY.sub("", f.name.split("_bold.nii")[0])
+            for f in (view / f"sub-{label}").rglob("*_echo-*_bold.nii*")
+        }
         for stem in bold_stems(view, label):
             base = Path(stem).name
-            for suffix in (
+            suffixes = [
                 "_space-T1w_desc-preproc_bold.nii.gz",
                 "_space-MNI152NLin2009cAsym_res-2_desc-preproc_bold.nii.gz",
                 "_desc-confounds_timeseries.tsv",
                 "_desc-brain_mask.nii.gz",
                 "_desc-coreg_boldref.nii.gz",
-            ):
+            ]
+            if stem in echoes:  # multi-echo: the T2* map in every output space
+                suffixes += ["_space-T1w_T2starmap.nii.gz", "_space-boldref_T2starmap.nii.gz"]
+            for suffix in suffixes:
                 if not list(sub.rglob(f"func/{base}{suffix}")):
                     problems.append(f"{name}: no func/{base}{suffix}")
             n_bold += 1
-    if ds == "ds004884" and "derived input:" not in info:
-        problems.append(f"{name}: RUN_INFO.txt does not record the derived lesion mask")
+    if ds == "ds004884":
+        if "derived input:" not in info:
+            problems.append(f"{name}: RUN_INFO.txt does not record the derived lesion mask")
+        # sMRIPrep handed the mask to the template registration (its lesion_mask input)
+        reports = (run / "work").glob(
+            "fmriprep_*/sub_*/anat_fit_wf/register_template_wf/*/registration/_report/report.rst"
+        )
+        if not any("label-lesion_roi" in r.read_text(encoding="utf-8") for r in reports):
+            problems.append(f"{name}: the template registration did not read the lesion mask")
     if "BIDS view:" not in info:
         problems.append(f"{name}: RUN_INFO.txt does not record its BIDS view")
     home = str(Path.home())

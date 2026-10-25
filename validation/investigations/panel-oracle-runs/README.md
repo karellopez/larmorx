@@ -50,3 +50,21 @@ run it appends to the run's `RUN_INFO.txt` the BIDS view it read and the commit 
 and for ds004884 the derived lesion mask: its SHA-256, the upstream mask it was made from and how.
 The checkout given supplies `scripts/run_fmriprep_oracle.sh` (the five earlier runs' script); its
 parent is the workspace.
+
+## After the runs
+
+```bash
+python -P verify_runs.py <workspace>            # every run checked; their RUN_INFO sections printed
+PYTHONPATH=<checkout>/python:<checkout>/validation/src \
+    python -P unclassified.py <workspace>/oracles/fmriprep-25.2.6   # the stage catalogue's gaps
+```
+
+`verify_runs.py` checks each run: exit status 0, fMRIPrep's end message, no crash file, the HTML
+report, the anatomical outputs and both MNI transforms, and for every BOLD series of its view the
+preprocessed series in T1w and MNI space, the BOLD mask, reference and confounds (multi-echo: the
+T2* map too); for ds004884 also that the template registration read the lesion mask. It prints the
+`RUN_INFO.txt` sections for `docs/validation/oracle-runs.md`, machine paths as `<workspace>` and
+`~`. `unclassified.py` lists the program nodes the pipeline-stage catalogue
+(`larmorx_validation.stages.catalogue`) neither compares nor lists as missing: the check of
+`tests/parity/test_pipeline_stages.py::test_every_program_node_is_classified`, over every finished
+run.

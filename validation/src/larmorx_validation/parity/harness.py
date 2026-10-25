@@ -50,6 +50,9 @@ class CaseResult:
     checks: list[Check] = field(default_factory=list)
     reason: str = ""
     seconds: float = 0.0
+    #: The original programs' runs of the case: from the oracle cache, or run
+    #: (:class:`larmorx_validation.oracle_cache.Tally`, as a dict). Not part of the record's cases.
+    oracle: dict | None = None
 
     @property
     def failed_checks(self) -> list[Check]:
@@ -156,15 +159,20 @@ def _run_in_worker(factory: Callable[[], Suite], case: Case) -> CaseResult:
 
 
 def run_one(suite: Suite, case: Case) -> CaseResult:
+    from larmorx_validation import oracle_cache
+
     checks = CheckList()
     start = time.perf_counter()
     status, reason = PASS, ""
+    oracle_cache.begin_case(f"{suite.name}/{case.id}")
     try:
         suite.run_case(case, checks)
     except Outcome as outcome:
         status, reason = outcome.status, outcome.reason
     except Exception:  # a harness or larmorx bug: report it as a failure with the traceback
         status, reason = FAIL, "unexpected exception:\n" + traceback.format_exc(limit=6)
+    finally:
+        tally = oracle_cache.end_case()
     if status == PASS and any(not c.passed for c in checks.checks):
         status = FAIL
     return CaseResult(
@@ -175,6 +183,7 @@ def run_one(suite: Suite, case: Case) -> CaseResult:
         checks.checks,
         reason,
         time.perf_counter() - start,
+        tally.to_dict(),
     )
 
 

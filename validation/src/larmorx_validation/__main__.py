@@ -10,6 +10,10 @@ committed records and the figures cache (:mod:`larmorx_validation.figures`, ``do
 ``--implementation replica`` runs a suite against the GPL replica (``larmorx-gpl``, which
 larmorx runs as a separate process) instead of the clean-room original, where a suite has one.
 The FSL replica (``larmorx-nc``) has its own suite, ``fsl-mcflirt-replica``.
+
+``--oracle-cache use|refresh|off`` says how the original programs' runs use the oracle-output
+cache (:mod:`larmorx_validation.oracle_cache`); ``python -m larmorx_validation oracle-cache
+verify --sample N`` re-runs cached entries to check them.
 """
 
 from __future__ import annotations
@@ -124,11 +128,53 @@ def _summary(result) -> dict:
     return out
 
 
+def oracle_summary(results, mode: str) -> dict:
+    """The original programs' runs of a parity run, summed over its cases (``CaseResult.oracle``),
+    with the cache's mode and location (as a record names it)."""
+    from larmorx_validation import oracle_cache
+    from larmorx_validation.oracle_cache.store import workspace
+    from larmorx_validation.report import redact
+
+    tally = oracle_cache.Tally()
+    for r in results:
+        tally.add(oracle_cache.Tally.from_dict(r.oracle))
+    where = oracle_cache.location()
+    ws = workspace()
+    if ws is not None and where.is_relative_to(ws):
+        shown = "<workspace>/" + where.relative_to(ws).as_posix()
+    else:
+        shown = redact(str(where))
+    return {"mode": mode, "location": shown, **tally.to_dict()}
+
+
+def _report_differences(summary: dict) -> None:
+    """The differences between fresh runs and their stored entries, loudly (findings)."""
+    found = summary.get("differences", [])
+    if not found:
+        return
+    print(
+        f"\nORACLE CACHE: {len(found)} run(s) of an original program differ from their stored "
+        "entries. Each is a finding (the original varies, or the key misses something): the "
+        "entries are never served again, both results are kept.",
+        file=sys.stderr,
+    )
+    for d in found:
+        print(f"  {d['case']} ({d['program']}): {'; '.join(d['differences'])[:300]}",
+              file=sys.stderr)  # fmt: skip
+        print(f"    dispute: {d['dispute']}", file=sys.stderr)
+
+
 def cmd_parity(args: argparse.Namespace) -> int:
+    import os
+
+    from larmorx_validation import oracle_cache
     from larmorx_validation.parity import FAIL, run, summarise
     from larmorx_validation.parity.harness import suite_by_name
     from larmorx_validation.parity.render import render
 
+    if args.oracle_cache:
+        os.environ[oracle_cache.ENV_MODE] = args.oracle_cache  # the workers inherit it
+    cache_mode = oracle_cache.mode()
     suite = _parity_suite(args.suite, args.implementation)
 
     def progress(r):
@@ -155,11 +201,20 @@ def cmd_parity(args: argparse.Namespace) -> int:
     )
     print(file=sys.stderr)
     counts = summarise(results)
+    oracle = oracle_summary(results, cache_mode)
     print(
         f"{suite.name}: {len(results)} cases: "
         + ", ".join(f"{v} {k}" for k, v in counts.items() if v),
         file=sys.stderr,
     )
+    print(
+        f"original programs: {oracle['served']} runs from the oracle cache "
+        f"({oracle['saved_seconds']:.0f} s saved), {oracle['ran']} run; cache "
+        f"{oracle_cache.location()} (mode {cache_mode})",
+        file=sys.stderr,
+    )
+    for why, n in sorted(oracle["fresh"].items(), key=lambda kv: -kv[1]):
+        print(f"    {n:5d} ran: {why}", file=sys.stderr)
     for r in results:
         if r.status == FAIL:
             print(f"FAIL {r.case}", file=sys.stderr)
@@ -178,7 +233,7 @@ def cmd_parity(args: argparse.Namespace) -> int:
         out = Path(args.out)
         out.mkdir(parents=True, exist_ok=True)
         (out / f"{suite.name}.md").write_text(
-            render(suite, results, env, args.tier, command), encoding="utf-8"
+            render(suite, results, env, args.tier, command, oracle), encoding="utf-8"
         )
         write_json(
             out / f"{suite.name}.json",
@@ -187,12 +242,24 @@ def cmd_parity(args: argparse.Namespace) -> int:
                 "tier": args.tier,
                 "reference": suite.reference,
                 "environment": env,
+                "oracle_cache": {k: v for k, v in oracle.items() if k != "differences"}
+                | {"differences": len(oracle["differences"])},
                 "summary": counts,
                 "results": [_summary(r) for r in results],
             },
         )
         print(f"report: {out / (suite.name + '.md')}", file=sys.stderr)
-    return 1 if counts[FAIL] else 0
+    _report_differences(oracle)
+    if counts[FAIL]:
+        return 1
+    # A difference ``refresh`` was asked to look for fails the command (a finding).
+    return 1 if cache_mode == "refresh" and oracle["differences"] else 0
+
+
+def cmd_oracle_cache(args: argparse.Namespace) -> int:
+    from larmorx_validation.oracle_cache import cli
+
+    return cli.main(args)
 
 
 def cmd_pipeline_stages(args: argparse.Namespace) -> int:
@@ -249,7 +316,26 @@ def main(argv: Sequence[str] | None = None) -> int:
         "found through LARMORX_GPL_BIN or the crates-gpl build, which larmorx runs as a "
         "separate process)",
     )
+    p.add_argument(
+        "--oracle-cache",
+        choices=("use", "refresh", "off"),
+        default=None,
+        help="the original programs' runs: 'use' the oracle cache (the default; a run missing "
+        "from it runs and is stored), 'refresh' (run every cacheable run again and compare it "
+        "with its entry: a difference is a finding and fails the command), or 'off' "
+        "(LARMORX_ORACLE_CACHE_MODE; the cache is LARMORX_ORACLE_CACHE, else "
+        "<workspace>/oracles/cache; docs/validation/oracle-cache.md)",
+    )
     p.set_defaults(func=cmd_parity)
+    oc = sub.add_parser(
+        "oracle-cache",
+        help="the oracle-output cache: verify entries by running them again, confirm runs "
+        "above one thread, statistics, disputes",
+    )
+    from larmorx_validation.oracle_cache.cli import add_arguments as oracle_arguments
+
+    oracle_arguments(oc)
+    oc.set_defaults(func=cmd_oracle_cache)
     b = sub.add_parser("bench", help="benchmark larmorx against reference implementations")
     b.add_argument("suite", choices=BENCH_SUITES)
     b.add_argument("--tier", default="full", choices=("smoke", "standard", "full"))

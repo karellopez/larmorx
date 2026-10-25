@@ -580,6 +580,14 @@ CLAUDE.md, "Agent working rules"; this section explains why.
   worktree while other runs use it. Build the wheel elsewhere and copy its `_core.abi3.so`.
 - **Records only from a clean commit.** Two agents' records were once stamped `-dirty` and had
   to be redone from the merge.
+- **Run the originals through the oracle cache** ([validation/oracle-cache.md](validation/oracle-cache.md)):
+  a suite calls `oracle_cache.run` with a `Policy` (thread count, environment family, `never`
+  from its case), never `subprocess.run`, so a record re-made at a merge runs only larmorx. Mark
+  what the original varies (a clock seed, memory it never wrote, a case that runs a command twice
+  to measure its spread: `nondeterministic=` or a defect of `VARYING_DEFECTS`); otherwise the
+  cache freezes one run of it. A run that differs from its entry is a finding, kept in the
+  cache's `disputes/`. Derived inputs a suite makes go in `oracles/inputs/<suite>/`, not in the
+  cache's directory.
 - **Finish when a long run ends.** An agent once waited out its last test run and then stopped
   without recording the results; the orchestrator finished its steps. Wait with one background
   wait on the log's final line, then act.

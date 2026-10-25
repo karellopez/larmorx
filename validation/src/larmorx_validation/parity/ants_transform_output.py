@@ -519,6 +519,8 @@ def _run_ants(args: list[str], *, correctly_rounded: bool = False) -> tuple[int,
     b = ants_bin()
     if b is None or not (b / "antsApplyTransforms").is_file():
         raise Outcome(SKIPPED, "the ANTs oracle's antsApplyTransforms was not found")
+    from larmorx_validation import oracle_cache
+
     env = {**os.environ}
     env.setdefault("ITK_GLOBAL_DEFAULT_NUMBER_OF_THREADS", "4")
     if correctly_rounded:
@@ -526,15 +528,16 @@ def _run_ants(args: list[str], *, correctly_rounded: bool = False) -> tuple[int,
         if lib is None:
             raise FileNotFoundError("libcrmath.so (scripts/build_crmath_preload.sh)")
         env["LD_PRELOAD"] = str(lib)
-    p = subprocess.run(
-        [str(b / "antsApplyTransforms"), "-v", "1", *args],
-        capture_output=True,
-        text=True,
-        encoding="utf-8",
-        errors="replace",
+    argv = [str(b / "antsApplyTransforms"), "-v", "1", *args]
+    p = oracle_cache.run(
+        argv,
         env=env,
+        policy=oracle_cache.Policy(threads=oracle_cache.itk_threads(env), family="itk"),
         timeout=3600,
+        runner="ants-apply-transforms",
     )
+    if p.timed_out:
+        raise subprocess.TimeoutExpired(argv, 3600)
     return p.returncode, (p.stdout + p.stderr).strip()
 
 

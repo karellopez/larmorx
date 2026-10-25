@@ -64,21 +64,35 @@ starts no other agent.
    3dAllineate, 3dcalc, 3dTstat, 3dROIstats/3dmaskave, 3dresample, 3dvolreg (low priority).
    Check each program's call graph routine by routine (2026-10-23: the programs' own files can
    be NIH while the library routines they rely on are MCW).
-6. **The evidence infrastructure** (decision log 2026-10-23): next.
-   **First, the oracle-output cache** (decision log 2026-10-23, "speed at the same quality"): every
-   output of an original program kept under a key of the oracle build, inputs, arguments and
-   settings, reused by every parity run, so verification re-runs only larmorx; the golden
-   recording reusing the parity smoke result. Then:
-   **the data panel** (one agreed set of shareable datasets used by every tool: 3T and 7T,
-   multiband and single-band, children and older adults, a lesion, low quality and motion; in
-   `larmorx-testdata` with its licences and hash-verified downloads); **differential random
+6. **The evidence infrastructure** (decision log 2026-10-23): in progress.
+   **The oracle-output cache: done** (2026-10-25; [validation/oracle-cache.md](validation/oracle-cache.md)):
+   every run of an original program computed once, keyed by the oracle build, inputs, arguments and
+   settings; the runs the original varies always run; the golden recording reuses the parity smoke
+   result. Measured on a busy machine (other agents ran beside it; load average 8 to 31): the smoke
+   tier's records took 2021 s without the cache and 694 s warm, `pytest tests/parity` 94 minutes
+   and 27, `ants-registration`'s standard record 2.0 hours and 49 minutes (509 of its 657 original
+   runs from the cache); details and the proof in [oracle-cache.md](validation/oracle-cache.md). Then:
+   **the data panel** (in progress: 14 OpenNeuro datasets approved by the user on 2026-10-24, one
+   subject each, 2.35 GB, 3T and 7T and 1.5T, three vendors, multiband and single-band, children
+   and older adults, a tumour and a stroke with its lesion mask, low quality and motion; in
+   `larmorx-testdata` with its licences and hash-verified downloads; fMRIPrep 25.2.6 oracle runs
+   for the nine new ones; the site's evidence made to scale without losing anything, with credits
+   and a Data panel page); **differential random
    testing** (a shared harness that generates random valid command lines and inputs per tool and
    compares with the original, overnight on this machine, never in CI; then every finished
    tool); **generated tables** (the README's tool table, the validation index and the site's
    status table from one description per tool and its records). Then every finished tool is
    re-validated on the panel, with its evidence page updated.
 7. **FSL:** the mcflirt replica, BET, FAST, FLIRT with BBR, topup: a replica in `larmorx-nc` (FSL
-   licence, with FSL's source as its terms require) and a clean-room original each.
+   licence, with FSL's source as its terms require) and a clean-room original each. In progress
+   (started 2026-10-24, beside item 6 at the user's request). **The mcflirt replica: done**
+   (2026-10-25): `crates-nc/` (`larmorx-nc`, FSL Licence, FSL's source included), the core crate
+   `larmorx-nc-core` (NIfTI as FSL does it, `volume<float>`, interpolation, FLIRT's cost
+   functions, the optimiser, the transform algebra, Armadillo's rules, glibc's float maths) for
+   the next FSL replicas; record [fsl-mcflirt-replica](validation/fsl-mcflirt-replica.md): 155 of
+   155 compared cases bit-identical. **BET:** the replica and its spec are built, to be merged
+   after its FSL library code moves into `larmorx-nc-core`; then BET's clean-room original,
+   FLIRT with BBR, FAST, topup.
 8. **Field maps, FreeSurfer, surfaces, confounds:** sdcflows' field-map estimation (Apache Python:
    the B-spline fit, PEPOLAR and phase-difference preparation) and fMRIPrep's own Python steps;
    FreeSurfer (`larmorx-freesurfer`: `mri_coreg`, `lta_convert`, then recon-all; its Talairach step
@@ -90,6 +104,26 @@ starts no other agent.
 10. **Releases on PyPI** (below).
 
 ## Follow-ups, when they fit
+
+- **mcflirt's FSL-20 and FSL-21 in the clean-room original:** a spec writer adds them to
+  `specs/mcflirt.md` (behaviour only; the replica's record shows mcflirt's black-box outputs),
+  then a clean-room implementer adds them to `lx.mri.hmc`'s original.
+- **A benchmark report of the mcflirt replica** (informal: fMRIPrep's call on ds000005, the
+  replica 20 s at 3 threads and 36 s at one, mcflirt 70 s, on a busy machine).
+
+- **The oracle cache, further:** `pipeline-stages` still keeps its own runs (`oracles/compare`)
+  and could use the cache; mcflirt's variability band (`parity/mri_hmc_band.py`) and the recorded
+  mcflirt runs could go through it; `oracle-cache confirm --jobs 6` overnight serves the thread
+  bands of N4 and the AFNI OpenMP runs from their third agreeing run; `oracle-cache verify
+  --sample 50` at each merge or weekly; an archive policy when the cache grows (it is
+  regenerable; archive, do not delete).
+- **Atropos' clock-seeded cases** (`ants-atropos`, `expect="random"`): the two ANTs runs that
+  measure ANTs' own spread can start within the same second and then get the same seed from
+  ITK's clock, so the record's "ANTs run 1 vs run 2" is sometimes "identical" (seen 2026-10-24 in
+  runs with and without the cache; never cached). Wait a second between the two runs, or check
+  that their outputs differ.
+- **Benchmarks of the oracle cache on a quiet machine** (the measurements of 2026-10-24 ran beside
+  other agents, load average 8 to 31).
 
 - **Benchmark reports** on a quiet machine: N4 against the new oracle; `antsApplyTransforms`
   after `--float`; the BOLD resampler; SyN (one informal measurement: 96³ CC, ANTs 122 s at one

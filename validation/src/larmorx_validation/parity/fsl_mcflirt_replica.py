@@ -144,18 +144,20 @@ def _environment(settings: dict[str, str | None]) -> dict[str, str]:
 
 def run_oracle(args: list[str], *, cwd: Path, settings: dict[str, str | None]) -> Completed:
     """FSL's ``mcflirt`` with ``args`` in ``cwd`` and its clean environment. Every oracle run of
-    this suite goes through here: the oracle-output cache
-    (``larmorx_validation.oracle_cache.run(argv, env=..., cwd=cwd, outputs=[cwd])``, every file
-    the run writes is in ``cwd``) replaces the call at its merge."""
+    this suite goes through here, and through the oracle-output cache
+    (:mod:`larmorx_validation.oracle_cache`): mcflirt is single-threaded and draws no random
+    numbers, so a run is served once it ran (crashes and hangs always run); every file it writes
+    is in ``cwd``."""
+    from larmorx_validation import oracle_cache
+
     argv = [str(fsldir() / "bin" / "mcflirt"), *args]
-    p = subprocess.run(
+    p = oracle_cache.run(
         argv,
-        cwd=cwd,
         env=_environment(settings),
-        capture_output=True,
-        text=True,
-        errors="replace",
-        check=False,
+        cwd=cwd,
+        outputs=[cwd],
+        policy=oracle_cache.Policy(threads=1, family="fsl"),
+        runner="fsl-mcflirt-replica",
     )
     return Completed(p.returncode, p.stdout, p.stderr)
 

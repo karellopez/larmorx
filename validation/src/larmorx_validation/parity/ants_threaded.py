@@ -35,6 +35,7 @@ from larmorx_validation.parity.ants_programs import (
     AntsCase,
     affine_difference,
     ants_bin,
+    case_never,
     crmath_preload,
     fix_pass,
     header_differences,
@@ -98,7 +99,10 @@ def metrics(a: np.ndarray, b: np.ndarray) -> dict[str, float]:
 
 
 def run(tool: Callable, c: AntsCase, tmp: Path, name: str, threads: int, **kw):
-    """Runs ``c`` with ``tool`` (``run_ants`` or ``run_larmorx``) into ``tmp/name``."""
+    """Runs ``c`` with ``tool`` (``run_ants`` or ``run_larmorx``) into ``tmp/name``; ANTs'
+    runs through the oracle cache, never kept for the cases :func:`case_never` names."""
+    if tool is run_ants:
+        kw.setdefault("never", case_never(c))
     outdir = tmp / name
     outdir.mkdir()
     args = [resolve_arg(a, tmp, outdir) for a in c.args]

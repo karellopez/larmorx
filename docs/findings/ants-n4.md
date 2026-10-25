@@ -543,3 +543,27 @@ axis alone (one block per lattice row); each control point is still summed in po
 the result is the same, bit for bit (the unit test against ITK's sequential order in 2 to 4
 dimensions, and the variants above). After the fix larmorx needs 16.1 bytes and 1.9e-8 s, less
 than ANTs (distances 480 to 60, both modes bit-identical to ANTs).
+
+## Memory against ANTs (2026-10-25)
+
+The user's rule (2026-10-25): larmorx never needs more memory than the original for the same
+call (measured as in [ants-image-programs.md](ants-image-programs.md), "Memory against ANTs").
+On `N4BiasFieldCorrection -d 3 -i in -o out -s 2 -c [20x20,0]` (128×128×96 float voxels of
+1.5 mm, one thread) larmorx needed **104 MiB, ANTs 79**; it now needs **43 MiB**, in 5.5 s (ANTs
+21 s), with the same output bit for bit (`tests/parity/test_memory_peak.py`, with `-s 2` and
+`-s 4`, against ANTs with CORE-MATH preloaded, the build N4's records compare with). The causes,
+from `validation/investigations/difftest/rss_timeline.py`:
+
+- **The B-spline fit's cache.** For a fitting level the plan kept every factor `B³·w/Σ B²`, 4
+  bytes per point and control point it reaches: 256 bytes per point in 3D, 48 MiB for the
+  shrunk image here, at every level. The cache is now kept only within two float images of the
+  full-resolution grid (`N4Parameters::factor_budget`; `GridFitPlan::with_factor_budget`),
+  which N4's last step holds anyway, so it never raises the peak (it is kept at `-s 4`, the
+  shrink fMRIPrep uses). Without it, each fit computes the factors where they are added with
+  the fixed axes' kernel weights known per slab (`GridFitPlan::delta_uncached`): the same float
+  operations in the same order (this run: 5.5 s, 4.3 s with the cache, 8.4 s with the
+  general recomputation).
+- **Copies.** Without padding the input, mask and weight image were copied into padded images,
+  a mask of ones was made and kept for the whole run, the shrink with factor 1 copied, and the
+  corrected image and bias field were cropped into new images while the padded ones lived: now
+  they are borrowed, made only to be shrunk, computed in place of the log field and moved.

@@ -206,20 +206,32 @@ runs), each process's peak resident memory (`/usr/bin/time -v`), one thread, lar
 modes; `rss_timeline.py` shows a run's memory over time, `scaled_memory.py` a heavy random case
 at smaller scales (bytes per output voxel). `tests/parity/test_memory_peak.py` holds larmorx to
 ANTs' peak plus 8 MiB (the Python interpreter; a call on 16 voxels needs 20 MiB in larmorx, 18
-in ANTs) on mid-size calls of every program below, and checks larmorx's output bit for bit in
-`reproduce`.
+in ANTs) on 13 of the calls below (every program, and each operation that needed more), and
+checks larmorx's output bit for bit in `reproduce`.
 
-| Call (float input) | Output voxels | ANTs | larmorx |
-|---|---|---|---|
-| `ResampleImageBySpacing 3 in out 0.5 0.5 0.5` (128×128×64 at 2 mm) | 67 M | 279 MiB | 285 MiB |
-| `ResampleImageBySpacing 3 in out 0.4 0.4 0.4` (the same) | 131 M | 523 MiB | 529 MiB |
-| `ResampleImage 3 in out 0.4x0.4x0.4 0 0` (the same) | 131 M | 533 MiB | 529 MiB |
-| `ResampleImage 3 in out 1x1x1 0 4` (B-spline) | 8.4 M | 66 MiB | 65 MiB |
-| `SmoothImage 3 in 1.5 out` (256×256×128) | 8.4 M | 82 MiB | 90 MiB |
-| `ThresholdImage 3 in out 20 60` (the same) | 8.4 M | 83 MiB | 90 MiB |
-| `MultiplyImages 3 in 2.5 out` (the same) | 8.4 M | 116 MiB | 89 MiB |
-| `ImageMath 3 out G in 1.5` (the same) | 8.4 M | 120 MiB | 90 MiB |
-| `ImageMath 3 out m in in` (the same) | 8.4 M | 119 MiB | 121 MiB |
+| Call (float input; one thread) | Output voxels | ANTs | larmorx before | larmorx |
+|---|---|---|---|---|
+| `ResampleImageBySpacing 3 in out 0.5 0.5 0.5` (128×128×64 at 2 mm) | 67 M | 279 MiB | 2.2 times | 283 MiB |
+| `ResampleImageBySpacing 3 in out 0.4 0.4 0.4` (the same) | 131 M | 523 MiB | 2.2 times | 527 MiB |
+| `ResampleImage 3 in out 0.4x0.4x0.4 0 0` (the same) | 131 M | 534 MiB | | 527 MiB |
+| `ResampleImage 3 in out 1x1x1 0 4` (B-spline) | 8.4 M | 65 MiB | | 65 MiB |
+| `SmoothImage 3 in 1.5 out` (256×256×128) | 8.4 M | 83 MiB | 90 MiB | 88 MiB |
+| `ThresholdImage 3 in out 20 60` (the same) | 8.4 M | 83 MiB | 90 MiB | 88 MiB |
+| `MultiplyImages 3 in 2.5 out` (the same) | 8.4 M | 116 MiB | 89 MiB | 88 MiB |
+| `ImageMath 3 out G in 1.5` (the same) | 8.4 M | 121 MiB | 90 MiB | 89 MiB |
+| `ImageMath 3 out m in in` (the same) | 8.4 M | 121 MiB | 121 MiB | 120 MiB |
+| `ImageMath 3 out ME in 1` (the same) | 8.4 M | 97 MiB | 150 MiB | 94 MiB |
+| `ImageMath 3 out MD in 1` (the same) | 8.4 M | 97 MiB | 101 MiB | 94 MiB |
+| `ImageMath 3 out GD in 1` (the same) | 8.4 M | 88 MiB | 181 MiB | 85 MiB |
+| `ImageMath 3 out GE in 1` (the same) | 8.4 M | 89 MiB | 213 MiB | 85 MiB |
+| `ImageMath 3 out GO in 1`, `GC in 2` (the same) | 8.4 M | 187, 189 MiB | | 87, 89 MiB |
+| `ImageMath 3 out MO in 1`, `MC in 1` (the same) | 8.4 M | 129, 163 MiB | | 125, 158 MiB |
+| `ImageMath 3 out TruncateImageIntensity in 0.01 0.999 256` (the same) | 8.4 M | 89 MiB | 117 MiB | 85 MiB |
+| `ImageMath 3 out GetLargestComponent in`, `FillHoles in 2` (the same) | 8.4 M | 250, 475 MiB | | 125, 134 MiB |
+| `ImageMath 3 out Normalize in`, `PadImage in 10` (the same) | 8.4 M | 88, 99 MiB | | 84, 91 MiB |
+| `N4BiasFieldCorrection -d 3 -i in -o out -s 2 -c [20x20,0]` (128×128×96 at 1.5 mm) | 1.6 M | 79 MiB | 104 MiB | 41 MiB |
+| `DenoiseImage -d 3 -i in -o out` (96×96×64 at 2 mm) | 0.6 M | 40 MiB | 85 MiB | 44 MiB |
+| `ThresholdImage 3 in out 20 60` (4×4×1: the interpreter) | 16 | 18 MiB | 32 MiB | 20 MiB |
 
 What grows with the image costs larmorx no more than ANTs: per output voxel of the resamplers,
 4.0 bytes for float outputs and 1.0 for `unsigned char` ones in both (fitted on
@@ -243,6 +255,21 @@ found and changed, each with the same output bit for bit:
   32 lines at a time as before.
 - **The resamplers' guard (ANTS-162)** counted 16 bytes per output voxel, the old cost; it now
   counts 7.5, the most measured, so a call that fits is no longer refused.
+- **Grayscale morphology** (GD, GE, GO, GC) copied its keys (the values as integers in
+  `total_cmp` order), widened its runs into a second buffer, made the complements for an
+  erosion and the values at the end as new images: up to five images where ITK holds two. It
+  now widens the runs in place on the keys it is given, the complements and values in place,
+  and the command line hands it the image's own buffer
+  (`larmorx_image::morphology::grayscale_dilate_owned` and the others;
+  `larmorx_ants::image_math::grayscale_morphological_owned`).
+- **ME** made both ANTs' thresholded image and the corrected one to count ANTS-17's voxels; it
+  now counts them and writes the mode's values in one pass. The binary filters free their sites
+  once the distances are made (MD and the others too).
+- **TruncateImageIntensity** made a label image (4 bytes per voxel) for the histogram of the
+  voxels it counts; they are decided where they are counted now
+  (`larmorx_image::statistics::histogram_where`, the same histogram).
+- **The gzip writer** holds one block per batch on one thread (two per worker otherwise) behind
+  a 64 KiB buffer; the plain writer keeps its 1 MiB buffer.
 
 The comparison of the random tests' heavy cases held both outputs (and float64 copies where
 values differ) in the process that had run larmorx: `ants-resample-image:20261025:556` and

@@ -90,9 +90,9 @@ program is found through `LARMORX_NC_BIN`, the Python environment's scripts dire
 `pyproject.toml` here builds the `larmorx-nc` wheel: the program only (maturin's `bin`
 bindings), licence `LicenseRef-FSL`. It carries, as licence files (in its
 `.dist-info/licenses/`): `LICENSE` (the FSL Licence), `NOTICE` (the FSL, Armadillo, fslpy,
-fdlibm, glibc and Arm notices), `LICENSES/` (the Apache-2.0 text and `NOTICE` of the larmorx crate the program
+fdlibm and Arm notices), `LICENSES/` (the Apache-2.0 text and `NOTICE` of the larmorx crate the program
 includes, copies of the repository's `LICENSE` and `NOTICE` that `tests/notices.rs` keeps
-current; the MIT licence of Arm's Optimized Routines; the LGPL-2.1 of glibc's `pow` and `exp`), FSL's original source (`fsl-source/`)
+current; the MIT licence of Arm's Optimized Routines), FSL's original source (`fsl-source/`)
 and the amended source (the crates' Rust code, `Cargo.toml` and `Cargo.lock`), as the FSL
 Licence requires.
 

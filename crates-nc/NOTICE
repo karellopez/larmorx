@@ -57,19 +57,11 @@ fdlibm, as the GNU C Library 2.35 ships its float functions (atan2f, atanf) and 
   software is freely granted, provided that this notice is preserved."
   Translated in larmorx-nc-core/src/fdlibm.rs, modified from the originals.
 
-The GNU C Library 2.35 (pow, exp: sysdeps/ieee754/dbl-64/e_pow.c, e_pow_log_data.c, e_exp.c,
-e_exp_data.c) - GNU Lesser General Public License, version 2.1 or later
-  Copyright (C) 2018-2022 Free Software Foundation, Inc. The algorithms and tables are Szabolcs
-  Nagy's (Arm), which Arm's Optimized Routines also publish under the MIT License.
-  Translated in larmorx-nc-core/src/glibc_double.rs (the x86-64 FMA build's operations,
-  `__pow_fma` and `__exp_fma`), modified from the originals. Its source is the glibc 2.35
-  release (https://ftp.gnu.org/gnu/glibc/glibc-2.35.tar.xz); the licence text is
-  LICENSES/LGPL-2.1.txt.
-
-Arm Optimized Routines v19.11 (sinf, cosf, sincosf, logf; the functions the GNU C Library
-2.35 took from them) - MIT License
+Arm Optimized Routines v19.11 (sinf, cosf, sincosf, logf, pow, exp; the functions the GNU C
+Library 2.35 took from them) - MIT License
   Copyright (c) 2017-2019, Arm Limited.
-  Translated in larmorx-nc-core/src/glibc_float.rs, modified from the originals. The licence
+  Translated in larmorx-nc-core/src/glibc_float.rs (sinf, cosf, sincosf, logf) and
+  larmorx-nc-core/src/glibc_double.rs (pow, exp), modified from the originals. The licence
   text is LICENSES/MIT-arm-optimized-routines.txt.
 
 

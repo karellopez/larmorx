@@ -47,15 +47,14 @@ the joined version.
   only Sun's permissive notice (`SunPro`), reproduced in the file and in `../NOTICE`. Source:
   glibc 2.35's `sysdeps/ieee754/flt-32/e_atan2f.c`, `s_atanf.c`, `sysdeps/ieee754/dbl-64/s_tanh.c`,
   `s_expm1.c` (fdlibm code, no LGPL notice).
-- **Arm Optimized Routines v19.11** (`glibc_float.rs`): MIT (`../LICENSES/MIT-arm-optimized-routines.txt`).
-  glibc 2.35's `sinf`, `cosf`, `sincosf` and `logf` are these routines with the same
-  arithmetic; the translation is made from Arm's MIT files, not from glibc's LGPL copies
-  (compared line by line: identical expressions and constants).
-- **The GNU C Library 2.35** (`glibc_double.rs`: `pow`, `exp`, from `sysdeps/ieee754/dbl-64/e_pow.c`,
-  `e_pow_log_data.c`, `e_exp.c`, `e_exp_data.c`): LGPL-2.1-or-later, Copyright (C) 2018-2022 Free
-  Software Foundation, Inc.; the algorithms and tables are Szabolcs Nagy's (Arm), which Arm's
-  Optimized Routines publish under MIT. The fused multiply-adds follow the machine code of
-  Ubuntu 22.04's `libm.so.6` (`__pow_fma`, `__exp_fma`; `tools/libm-verify`).
+- **Arm Optimized Routines v19.11** (`glibc_float.rs`, `glibc_double.rs`): MIT
+  (`../LICENSES/MIT-arm-optimized-routines.txt`). glibc 2.35's `sinf`, `cosf`, `sincosf`,
+  `logf`, `pow` and `exp` are these routines with the same arithmetic; the translations are
+  made from Arm's MIT files, not from glibc's LGPL copies (compared line by line: identical
+  expressions and constants; for `pow` and `exp` every number of the tables with Arm's x86-64
+  configuration, `validation/investigations/fsl-bet/arm_glibc_pow_exp.py`). The fused
+  multiply-adds follow the machine code of Ubuntu 22.04's `libm.so.6` (`__pow_fma`,
+  `__exp_fma`; `tools/libm-verify`).
 - **libstdc++ behaviour** (`stdsort.rs`, `istream.rs`): written from the algorithms' published
   descriptions (the SGI STL's introsort and introselect, the C++ standard's `num_get`), not copied
   from libstdc++.
@@ -86,7 +85,7 @@ Every source file starts with an SPDX header naming its licence and the files it
 | `avwutils` | fsl-avwutils `fslstats.cc` (`-C`, `-l`), `fslroi.cc`, `fslmerge.cc` (`-z`), `fslmaths.cc` (`-dilF`, `-mas`), `fslval`; fslpy `fsl/utils/path.py`, `fsl/scripts/imtest.py`, `remove_ext.py`, `imglob.py` | what FSL's scripts run of them |
 | `fdlibm` | glibc 2.35 `e_atan2f.c`, `s_atanf.c`, `s_tanh.c`, `s_expm1.c` (fdlibm) | `atan2f`, `atanf`, with the constants as the compiler rounds fdlibm's decimal literals (`aT[0]` is `0x3eaaaaab`, not its comment's `0x3eaaaaaa`; corrected 2026-10-25) (`tools/glibc-float-verify`: `atanf` bit-identical to the C library on all 2^32 inputs, `atan2f` on every pair of 38 special values and 3 × 2^30 seeded random pairs); `__tanh`, `__expm1` (`tools/libm-verify`) |
 | `glibc_float` | Arm Optimized Routines v19.11 `math/sincosf.h`, `sincosf.c`, `sinf.c`, `cosf.c`, `sincosf_data.c`, `logf.c`, `logf_data.c` | `sinf`, `cosf`, `sincosf`, `logf`, as glibc 2.35's x86-64 FMA build computes them (`tools/glibc-float-verify`: bit-identical to the C library on all 2^32 inputs of each) |
-| `glibc_double` | glibc 2.35 `sysdeps/ieee754/dbl-64/e_pow.c`, `e_pow_log_data.c`, `e_exp.c`, `e_exp_data.c` | `__pow`, `log_inline`, `exp_inline`, `specialcase`, `checkint`; `__exp` and its `specialcase`, as `__pow_fma` and `__exp_fma` (`tools/libm-verify`: 0 of 4 million `pow` and 0 of 4 million `exp` differ from the C library) |
+| `glibc_double` | Arm Optimized Routines v19.11 `math/pow.c`, `pow_log_data.c`, `exp.c`, `exp_data.c` (glibc 2.35's `e_pow.c`, `e_pow_log_data.c`, `e_exp.c`, `e_exp_data.c`) | `__pow`, `log_inline`, `exp_inline`, `specialcase`, `checkint`; `__exp` and its `specialcase`, as `__pow_fma` and `__exp_fma` (`tools/libm-verify`: 0 of 4 million `pow` and 0 of 4 million `exp` differ from the C library) |
 | `cnum` | (glibc behaviour) | `strtod`, `strtof`, `strtol`, `atof`, `atoi`, `printf`'s `%g`, `%f`, `%e`; x86-64's conversions |
 | `x87` | (x87 behaviour) | `long double` sums, products and quotients rounded to 64 bits, then stored (`tools/libm-verify`: 0 of 5 million differ from the x87 unit) |
 | `stdsort` | (libstdc++ behaviour) | `std::sort`, `std::nth_element` on doubles |

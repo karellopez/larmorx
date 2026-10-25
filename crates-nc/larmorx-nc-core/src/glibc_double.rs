@@ -1,14 +1,20 @@
-// SPDX-License-Identifier: LicenseRef-FSL AND LGPL-2.1-or-later
-// Copyright 2026 Karel Lopez Vilaret (the translation).
+// SPDX-License-Identifier: LicenseRef-FSL AND MIT
+// Translated to Rust from Arm's Optimized Routines v19.11 (math/pow.c, pow_log_data.c, exp.c,
+// exp_data.c, math_config.h), Copyright (c) 2018, Arm Limited, SPDX-License-Identifier: MIT (the
+// notice is in LICENSES/MIT-arm-optimized-routines.txt). Rust translation Copyright 2026 Karel
+// Lopez Vilaret; modified from the originals. Distributed as part of larmorx-nc under the FSL
+// Licence (see LICENSE) and the MIT terms.
 //
-// Translated from glibc 2.35's sysdeps/ieee754/dbl-64/e_pow.c, e_pow_log_data.c and
-// e_exp_data.c (Copyright (C) 2018-2022 Free Software Foundation, Inc.; LGPL-2.1-or-later;
-// contributed by Szabolcs Nagy, Arm, whose optimized-routines publish the same algorithm under
-// MIT), as the x86-64 build glibc 2.35 runs it on a CPU with FMA and AVX2: `__pow_fma`, the
-// file compiled with -mfma -mavx2. Every fused multiply-add of that machine code is here a
-// `mul_add`: the three the source asks for (`__builtin_fma`) and the ones GCC contracted
-// (read from `objdump -d` of Ubuntu 22.04's libm.so.6, glibc 2.35-0ubuntu3; see
-// tools/libm-verify).
+// glibc 2.35's `pow` and `exp` (sysdeps/ieee754/dbl-64/e_pow.c, e_pow_log_data.c, e_exp.c,
+// e_exp_data.c) are these routines, contributed by Arm (Szabolcs Nagy): the same expressions,
+// and the same tables with Arm's x86-64 configuration (EXP_TABLE_BITS 7, EXP_POLY_ORDER 5,
+// POW_LOG_TABLE_BITS 7, POW_LOG_POLY_ORDER 8, every number identical:
+// validation/investigations/fsl-bet/arm_glibc_pow_exp.py). This module is translated from
+// Arm's MIT originals, not from glibc, as glibc's x86-64 build runs them on a CPU with FMA and
+// AVX2 (`__pow_fma`, `__exp_fma`, compiled with -mfma -mavx2). Every fused multiply-add of that
+// machine code is here a `mul_add`: the three the source asks for (`fma` with HAVE_FAST_FMA)
+// and the ones GCC contracted (read from `objdump -d` of Ubuntu 22.04's libm.so.6, glibc
+// 2.35-0ubuntu3; see tools/libm-verify).
 //! The C library's `pow` and `exp` as FSL's programs call them on the oracle machine (x86-64 Linux, glibc
 //! 2.35, a CPU with FMA): BET's initial radius (`pow(x, 1/3)`, `pow(x, 0.5)`) and its threshold
 //! exponent (`pow(f, 0.275)`). glibc's `pow` is not correctly rounded: about 0.09 % of these calls

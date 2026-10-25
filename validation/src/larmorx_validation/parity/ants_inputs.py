@@ -64,7 +64,13 @@ def _dir() -> Path:
 
 
 def path(name: str) -> Path:
-    """The file of input ``name``, built on first use."""
+    """The file of input ``name``, built on first use. A name starting ``dt:`` is an input of a
+    random or permanent case of the differential tests, built from its recipe
+    (:mod:`larmorx_validation.difftest.inputs`)."""
+    if name.startswith("dt:"):
+        from larmorx_validation.difftest import inputs
+
+        return inputs.path(name)
     target = _dir() / f"{name}.nii.gz"
     if not target.exists():
         if name not in BUILDERS:

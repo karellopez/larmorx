@@ -700,6 +700,10 @@ def _fieldmap_file(target: Path, seed: int, out: Path) -> Path:
 
 
 def _resolve(path: str, tmp: Path) -> str:
+    if path.startswith("dt:"):  # an input of a differential test's case
+        from larmorx_validation.difftest import inputs
+
+        return str(inputs.path(path))
     if path.startswith("motion:"):
         _, src, seed = path.split(":")
         return str(_motion_file(td.get(src), int(seed), tmp / f"hmc-{seed}.txt"))

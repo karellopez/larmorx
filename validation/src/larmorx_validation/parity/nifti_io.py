@@ -367,7 +367,12 @@ def run_case(case: Case, checks: CheckList) -> None:
 
 def _run_case(case: Case, checks: CheckList) -> None:
     entry: td.FileEntry = case.payload
-    path = td.get(entry)
+    if isinstance(entry, str) and entry.startswith("dt:"):  # a differential test's input
+        from larmorx_validation.difftest import inputs
+
+        path = inputs.path(entry)
+    else:
+        path = td.get(entry)
     ref_result, ref_err = _try(_nib_read, path)
     img, lx_err = _try(lx.load, path)
 

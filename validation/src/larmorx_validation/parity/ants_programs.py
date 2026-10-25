@@ -181,7 +181,8 @@ def _resolve(arg: str, tmp: Path, outdir: Path) -> str:
     return re.sub(r"\{([^{}]+)\}", sub, arg)
 
 
-def _env(threads: int = THREADS) -> dict[str, str]:
+def _env(threads: int | None = None) -> dict[str, str]:
+    threads = THREADS if threads is None else threads
     return {**os.environ, "ITK_GLOBAL_DEFAULT_NUMBER_OF_THREADS": str(threads)}
 
 
@@ -218,7 +219,7 @@ def case_never(c) -> str:
 def _run_ants(
     program: str,
     args: list[str],
-    threads: int = THREADS,
+    threads: int | None = None,
     *,
     correctly_rounded: bool = False,
     never: str = "",
@@ -244,12 +245,14 @@ def _run_ants(
 
 
 def _run_larmorx(
-    program: str, args: list[str], threads: int = THREADS, *, mode: str = defects.REPRODUCE
+    program: str, args: list[str], threads: int | None = None, *, mode: str = defects.REPRODUCE
 ) -> tuple[int, str, str]:
     """Run ``larmorx ants <program>`` in-process; ``mode`` is D13's
-    ``LARMORX_UPSTREAM_DEFECTS``: ``reproduce`` for the comparison with ANTs."""
+    ``LARMORX_UPSTREAM_DEFECTS``: ``reproduce`` for the comparison with ANTs. ``threads``:
+    :data:`THREADS` unless given (read when called, so a caller may lower it)."""
     from larmorx.cli import run
 
+    threads = THREADS if threads is None else threads
     out, err = io.StringIO(), io.StringIO()
     previous = os.environ.get("ITK_GLOBAL_DEFAULT_NUMBER_OF_THREADS")
     os.environ["ITK_GLOBAL_DEFAULT_NUMBER_OF_THREADS"] = str(threads)
@@ -539,7 +542,7 @@ def fix_pass(
     tmp: Path,
     checks: CheckList,
     reproduced: tuple,
-    threads: int = THREADS,
+    threads: int | None = None,
 ) -> bool:
     """D13: larmorx's default (``fix``) on the case's arguments, compared with its
     ``reproduce`` run (``reproduced``: exit code, stdout, stderr, outputs, produced): the

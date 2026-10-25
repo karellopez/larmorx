@@ -2009,9 +2009,10 @@ def case_never(c: AtroposCase) -> str:
     return never_for(c.description, c.reason)
 
 
-def _run_larmorx(args: list[str], threads: int = LX_THREADS, mode: str = defects.REPRODUCE):
+def _run_larmorx(args: list[str], threads: int | None = None, mode: str = defects.REPRODUCE):
     from larmorx import _core
 
+    threads = LX_THREADS if threads is None else threads
     saved = os.environ.get("ITK_GLOBAL_DEFAULT_NUMBER_OF_THREADS")
     os.environ["ITK_GLOBAL_DEFAULT_NUMBER_OF_THREADS"] = str(threads)
     try:

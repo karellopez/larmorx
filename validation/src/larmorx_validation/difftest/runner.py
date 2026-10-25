@@ -170,6 +170,9 @@ def execute(
     )
     start = time.monotonic()
     limit = int(max(1, round(timeout if timeout is not None else tool.timeout)))
+    # A heavy case's runs of the original may take its whole limit (the suites' own is 30 min).
+    previous_run_timeout = os.environ.get("LARMORX_PARITY_RUN_TIMEOUT")
+    os.environ["LARMORX_PARITY_RUN_TIMEOUT"] = str(limit)
     leaf = limits.current()
     oom_before = leaf.oom_kills() if leaf else 0
     limits.clear()
@@ -193,6 +196,10 @@ def execute(
         )
     finally:
         signal.alarm(0)
+        if previous_run_timeout is None:
+            os.environ.pop("LARMORX_PARITY_RUN_TIMEOUT", None)
+        else:
+            os.environ["LARMORX_PARITY_RUN_TIMEOUT"] = previous_run_timeout
         signal.signal(signal.SIGALRM, previous)
         inputs.release(f"run/{gen.digest(recipe['inputs'])}")
     if leaf is not None and leaf.oom_kills() > oom_before:
@@ -1131,7 +1138,7 @@ def run_heavy(
 
 def heavy_queue(out: Path, only: set[str] | None = None) -> list[dict]:
     """The heavy cases of ``out`` still without a result (and named in ``only``, which also
-    runs a case recorded "pending: larger machine"), the quickest
+    runs a named case again: "pending: larger machine", or any but "beyond ..."), the quickest
     first by their predicted hours (``heavy-prediction.json``, from ``heavy_predict.py``; a case
     without a prediction after those with one, in queue order)."""
     from larmorx_validation.difftest import report
@@ -1147,9 +1154,11 @@ def heavy_queue(out: Path, only: set[str] | None = None) -> list[dict]:
         name = f"{h['tool']}:{h['seed']}:{h['n']}"
         if only is not None and name not in only:
             continue
-        # A case recorded "pending: larger machine" runs only where it is named.
+        # A case with a result runs again only where it is named (a case recorded "pending:
+        # larger machine" on that machine; any other after a fix of the harness, its new result
+        # superseding the old), never one predicted beyond the heavy box ("beyond ...").
         verdict = str((h.get("result") or {}).get("verdict", ""))
-        if h.get("result") and not (only is not None and verdict.startswith("pending")):
+        if h.get("result") and (only is None or verdict.startswith("beyond")):
             continue
         rows.append((predicted.get(name, float("inf")), i, h))
     return [h for _, _, h in sorted(rows, key=lambda r: (r[0], r[1]))]

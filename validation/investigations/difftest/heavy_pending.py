@@ -5,10 +5,13 @@ and the command that runs them where they fit (the orchestrator's decision of 20
 lab's server). Each gets a line in the night's ``heavy-results.jsonl`` (a later result of the
 same case supersedes it); ``difftest --heavy`` skips them unless ``--heavy-only`` names them.
 
-    python -P validation/investigations/difftest/heavy_pending.py <night> [<cases file>]
+    python -P validation/investigations/difftest/heavy_pending.py <night> [<cases file>] \
+        [--note "<why they run again>"]
 
 Without a cases file it marks the cases recorded "beyond this machine"; with one (``tool:seed:n``
-per line) also those. The prediction comes from ``heavy-prediction.json`` (``heavy_predict.py``).
+per line) also those, even with a result here (a case to run again after a fix of the harness:
+``--note`` says why, and its earlier result is kept in the line). The prediction comes from
+``heavy-prediction.json`` (``heavy_predict.py``).
 """
 
 from __future__ import annotations
@@ -31,10 +34,16 @@ def command(night: Path, case: str, hours: float, gib: float) -> str:
 
 
 def main() -> int:
-    night = Path(sys.argv[1])
+    argv = list(sys.argv[1:])
+    note = ""
+    if "--note" in argv:
+        i = argv.index("--note")
+        note = argv[i + 1]
+        del argv[i : i + 2]
+    night = Path(argv[0])
     named = (
-        {ln.strip() for ln in Path(sys.argv[2]).read_text().splitlines() if ln.strip()}
-        if len(sys.argv) > 2
+        {ln.strip() for ln in Path(argv[1]).read_text().splitlines() if ln.strip()}
+        if len(argv) > 1
         else set()
     )
     predicted = {r["case"]: r for r in json.loads((night / "heavy-prediction.json").read_text())}
@@ -58,6 +67,9 @@ def main() -> int:
             if gib > 72
             else f"predicted to take about {hours:.2g} h here"
         )
+        earlier = latest.get(case, {})
+        if case in named and note:
+            why = f"{note} (its result here: {earlier.get('verdict')}, {earlier.get('detail', '')[:160]})"
         tool, seed, n = case.rsplit(":", 2)
         detail = (
             f"{PENDING}: {why}; the original about {ants:.4g} GiB, larmorx about {lx:.4g} GiB"

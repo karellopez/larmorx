@@ -239,10 +239,21 @@ def _run_ants(
         env["LD_PRELOAD"] = str(lib)
     argv = [str(ants_bin() / program), *args]
     policy = oracle_cache.Policy(threads=oracle_cache.itk_threads(env), never=never, family="itk")
-    p = oracle_cache.run(argv, env=env, policy=policy, timeout=1800, runner="ants-programs")
+    limit = run_timeout()
+    p = oracle_cache.run(argv, env=env, policy=policy, timeout=limit, runner="ants-programs")
     if p.timed_out:
-        raise subprocess.TimeoutExpired(argv, 1800)
+        raise subprocess.TimeoutExpired(argv, limit)
     return p.returncode, p.stdout, p.stderr
+
+
+def run_timeout() -> float:
+    """The seconds a run of the original may take: 30 minutes, or what a heavy random case
+    allows (``LARMORX_PARITY_RUN_TIMEOUT``, set by ``difftest --heavy``'s judge: the first
+    night's ``ants-n4:20261025:777`` swapped past 30 minutes in the heavy box)."""
+    try:
+        return max(1800.0, float(os.environ.get("LARMORX_PARITY_RUN_TIMEOUT", "1800")))
+    except ValueError:
+        return 1800.0
 
 
 def _run_larmorx(

@@ -359,6 +359,12 @@ def test_the_heavy_queue_runs_the_quickest_first_and_only_what_is_named(tmp_path
         )
     assert [h["n"] for h in runner.heavy_queue(out)] == [2, 4]
     assert [h["n"] for h in runner.heavy_queue(out, {"ants-n4:r:1"})] == [1]
+    # A case with a result runs again where it is named (after a fix of the harness), never
+    # one predicted beyond the heavy box.
+    with (out / "heavy-results.jsonl").open("a") as f:
+        f.write(json.dumps({"tool": "ants-n4", "seed": "r", "n": 2, "verdict": "memory"}) + "\n")
+    assert [h["n"] for h in runner.heavy_queue(out)] == [4]
+    assert [h["n"] for h in runner.heavy_queue(out, {"ants-n4:r:2", "ants-n4:r:3"})] == [2]
 
 
 def test_a_heavy_case_runs_the_recipe_of_its_night_after_the_generator_changed(tmp_path):

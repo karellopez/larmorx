@@ -45,7 +45,11 @@ def _drop_groups(recipe: dict) -> Iterator[Move]:
         r = deep(recipe)
         del r["groups"][i]
         keep = _referenced(r)
-        r["inputs"] = {k: v for k, v in r["inputs"].items() if k in keep or k in recipe.get("extra", {}).get("keep_inputs", ())}
+        r["inputs"] = {
+            k: v
+            for k, v in r["inputs"].items()
+            if k in keep or k in recipe.get("extra", {}).get("keep_inputs", ())
+        }
         yield f"dropped {g['name']} ({' '.join(g['args'])})", r
 
 
@@ -56,7 +60,11 @@ def _grid_key(spec: dict) -> str:
 def _on_grid(recipe: dict, name: str) -> list[str]:
     """``name`` and the inputs that share its grid (so a move keeps them on one grid)."""
     key = _grid_key(recipe["inputs"][name])
-    return [n for n, s in recipe["inputs"].items() if s.get("kind", "nifti") == "nifti" and _grid_key(s) == key]
+    return [
+        n
+        for n, s in recipe["inputs"].items()
+        if s.get("kind", "nifti") == "nifti" and _grid_key(s) == key
+    ]
 
 
 def _shape_moves(recipe: dict, name: str) -> Iterator[Move]:
@@ -123,11 +131,18 @@ def _simplify_moves(recipe: dict, name: str) -> Iterator[Move]:
         r = deep(recipe)
         r["inputs"][name]["values"].pop("specials")
         yield f"{name}: no special values", r
-    if any(values.get(k) for k in ("quantize",)) or values.get("scale", 1.0) != 1.0 or values.get("offset", 0.0) != 0.0:
-        if not values.get("binarize"):
-            r = deep(recipe)
-            r["inputs"][name]["values"] = {"scale": 1.0, "offset": 0.0, **({"specials": values["specials"]} if values.get("specials") else {})}
-            yield f"{name}: plain value range", r
+    if (
+        any(values.get(k) for k in ("quantize",))
+        or values.get("scale", 1.0) != 1.0
+        or values.get("offset", 0.0) != 0.0
+    ) and not values.get("binarize"):
+        r = deep(recipe)
+        r["inputs"][name]["values"] = {
+            "scale": 1.0,
+            "offset": 0.0,
+            **({"specials": values["specials"]} if values.get("specials") else {}),
+        }
+        yield f"{name}: plain value range", r
     timing = spec.get("timing")
     if timing and timing.get("slice_code"):
         r = deep(recipe)

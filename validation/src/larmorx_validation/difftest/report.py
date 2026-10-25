@@ -17,11 +17,26 @@ from pathlib import Path
 
 from larmorx_validation.difftest import core
 
-VERDICT_ORDER = (core.AGREE, core.EXPLAINED, core.NOTICE, "undefined", core.DIFFER, "timeout", "crash", core.SKIP, "harness-error", "draw-error")
+VERDICT_ORDER = (
+    core.AGREE,
+    core.EXPLAINED,
+    core.NOTICE,
+    "undefined",
+    core.DIFFER,
+    "timeout",
+    "crash",
+    core.SKIP,
+    "harness-error",
+    "draw-error",
+)
 
 
 def load(out: Path) -> tuple[dict, list[dict]]:
-    info = json.loads((out / "run.json").read_text(encoding="utf-8")) if (out / "run.json").is_file() else {}
+    info = (
+        json.loads((out / "run.json").read_text(encoding="utf-8"))
+        if (out / "run.json").is_file()
+        else {}
+    )
     lines = []
     path = out / "results.jsonl"
     if path.is_file():
@@ -44,7 +59,17 @@ def summarise(out: Path) -> dict:
     info, lines = load(out)
     per: dict[str, dict] = {}
     for line in lines:
-        t = per.setdefault(line["tool"], {"cases": 0, "verdicts": Counter(), "impl_verdicts": defaultdict(Counter), "options": Counter(), "features": Counter(), "seconds": 0.0})
+        t = per.setdefault(
+            line["tool"],
+            {
+                "cases": 0,
+                "verdicts": Counter(),
+                "impl_verdicts": defaultdict(Counter),
+                "options": Counter(),
+                "features": Counter(),
+                "seconds": 0.0,
+            },
+        )
         t["cases"] += 1
         t["verdicts"][line.get("verdict", "?")] += 1
         for impl, e in (line.get("impls") or {}).items():
@@ -52,7 +77,13 @@ def summarise(out: Path) -> dict:
         for o in line.get("options", []):
             t["options"][o] += 1
         for k, v in (line.get("features") or {}).items():
-            if isinstance(v, str | bool) or k in ("dimension", "dtype", "qform_code", "sform_code", "slice_code"):
+            if isinstance(v, str | bool) or k in (
+                "dimension",
+                "dtype",
+                "qform_code",
+                "sform_code",
+                "slice_code",
+            ):
                 t["features"][f"{k}={v}"] += 1
         t["seconds"] += float(line.get("seconds") or 0.0)
     groups: dict[tuple, list[dict]] = defaultdict(list)
@@ -70,7 +101,9 @@ def summarise(out: Path) -> dict:
                 "cases": len(fs),
                 "example": best["_file"],
                 "shrunk_args": " ".join(core.arguments(best["shrunk"]))[:400],
-                "shrunk_inputs": {k: _describe_input(v) for k, v in best["shrunk"]["inputs"].items()},
+                "shrunk_inputs": {
+                    k: _describe_input(v) for k, v in best["shrunk"]["inputs"].items()
+                },
                 "detail": (best.get("shrunk_detail") or best.get("detail") or "")[:600],
                 "moves": best.get("shrink_moves", []),
                 "replay": f"python -m larmorx_validation difftest --replay {best['_file']}",
@@ -79,26 +112,39 @@ def summarise(out: Path) -> dict:
         )
     notices: dict[tuple[str, str], list[str]] = defaultdict(list)
     for line in lines:
-        for impl, e in (line.get("impls") or {}).items():
+        for e in (line.get("impls") or {}).values():
             if e.get("verdict") == core.NOTICE:
                 for sig in e.get("signature", []):
                     for entry in sig.removeprefix("notice: ").split(", "):
-                        notices[(line["tool"], entry)].append(f"{line['tool']}:{line.get('seed')}:{line.get('n')}")
+                        notices[(line["tool"], entry)].append(
+                            f"{line['tool']}:{line.get('seed')}:{line.get('n')}"
+                        )
     tools = {}
     for name, t in sorted(per.items()):
         tools[name] = {
             "cases": t["cases"],
             "verdicts": {k: t["verdicts"][k] for k in VERDICT_ORDER if t["verdicts"][k]},
-            "implementations": {i: {k: c[k] for k in VERDICT_ORDER if c[k]} for i, c in t["impl_verdicts"].items()},
+            "implementations": {
+                i: {k: c[k] for k in VERDICT_ORDER if c[k]} for i, c in t["impl_verdicts"].items()
+            },
             "options_covered": len(t["options"]),
             "options": dict(sorted(t["options"].items())),
             "features_covered": len(t["features"]),
             "seconds": round(t["seconds"], 1),
             "differences": [d for d in diffs if d["tool"] == name],
-            "notices": {entry: {"cases": len(cs), "example": cs[0]} for (tool, entry), cs in sorted(notices.items()) if tool == name},
+            "notices": {
+                entry: {"cases": len(cs), "example": cs[0]}
+                for (tool, entry), cs in sorted(notices.items())
+                if tool == name
+            },
         }
     unclear = [
-        {"tool": ln["tool"], "case": f"{ln['tool']}:{ln.get('seed')}:{ln.get('n')}", "verdict": ln.get("verdict"), "detail": str(ln.get("detail", ""))[:300]}
+        {
+            "tool": ln["tool"],
+            "case": f"{ln['tool']}:{ln.get('seed')}:{ln.get('n')}",
+            "verdict": ln.get("verdict"),
+            "detail": str(ln.get("detail", ""))[:300],
+        }
         for ln in lines
         if ln.get("verdict") in ("timeout", "crash", "harness-error", "draw-error")
     ]
@@ -175,7 +221,11 @@ def write(out: Path) -> Path:
             f"{t['options_covered']} | {t['seconds']:.0f} |"
         )
     if s["unavailable"]:
-        lines += ["", "Not run (an oracle missing): " + "; ".join(f"{k}: {v}" for k, v in s["unavailable"].items())]
+        lines += [
+            "",
+            "Not run (an oracle missing): "
+            + "; ".join(f"{k}: {v}" for k, v in s["unavailable"].items()),
+        ]
     lines += ["", "## Differences", ""]
     any_diff = False
     for name, t in s["tools"].items():

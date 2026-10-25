@@ -35,7 +35,11 @@ def draw(d: gen.Draw) -> dict:
         main["content"]["noise"] = d.choice("noise", (1.0, 3.0, 6.0))
     inputs = {"a": main, "mask": _ants.mask_of(main, d.child("mask"), dtype="uint8")}
     k = d.choice("classes", (3, 2, 4), (3, 1, 1))
-    init = d.choice("initialization", ("KMeans", "KMeans-centres", "Otsu", "Random", "PriorProbabilityImages", "PriorLabelImage"), (4, 1, 2, 1, 2, 1))
+    init = d.choice(
+        "initialization",
+        ("KMeans", "KMeans-centres", "Otsu", "Random", "PriorProbabilityImages", "PriorLabelImage"),
+        (4, 1, 2, 1, 2, 1),
+    )
     options = [f"{init} initialization", f"{k} classes", f"dimension {dim}"]
     if init.startswith("Prior"):
         k = 3
@@ -47,11 +51,36 @@ def draw(d: gen.Draw) -> dict:
         init_text = f"{init}[{k}]"
     elif init == "PriorProbabilityImages":
         for j in (1, 2, 3):
-            inputs[f"prior{j:02d}"] = {**gen.draw_image(d.child(f"prior{j}"), dim, shape=shape, geometry=geometry, contents=("blobs",), dtypes=("float32",), specials=0.0, extreme=0.0, scaling=0.0), "suffix": ".nii.gz"}
+            inputs[f"prior{j:02d}"] = {
+                **gen.draw_image(
+                    d.child(f"prior{j}"),
+                    dim,
+                    shape=shape,
+                    geometry=geometry,
+                    contents=("blobs",),
+                    dtypes=("float32",),
+                    specials=0.0,
+                    extreme=0.0,
+                    scaling=0.0,
+                ),
+                "suffix": ".nii.gz",
+            }
             inputs[f"prior{j:02d}"]["values"] = {"scale": 0.01, "offset": 0.0}
-        init_text = "PriorProbabilityImages[3,{series:prior},%s%s]" % (d.choice("prior weight", ("0.5", "0.25", "0.8")), d.choice("prior threshold", ("", ",0.1")))
+        weight = d.choice("prior weight", ("0.5", "0.25", "0.8"))
+        threshold = d.choice("prior threshold", ("", ",0.1"))
+        init_text = f"PriorProbabilityImages[3,{{series:prior}},{weight}{threshold}]"
     else:
-        inputs["labels"] = gen.draw_image(d.child("labels"), dim, shape=shape, geometry=geometry, contents=("labels",), dtypes=("uint8",), specials=0.0, extreme=0.0, scaling=0.0)
+        inputs["labels"] = gen.draw_image(
+            d.child("labels"),
+            dim,
+            shape=shape,
+            geometry=geometry,
+            contents=("labels",),
+            dtypes=("uint8",),
+            specials=0.0,
+            extreme=0.0,
+            scaling=0.0,
+        )
         inputs["labels"]["content"]["n"] = 3
         inputs["labels"]["suffix"] = ".nii.gz"
         init_text = f"PriorLabelImage[3,{{in:labels}},{d.choice('label weight', ('0.5', '0.25'))}]"
@@ -60,22 +89,61 @@ def draw(d: gen.Draw) -> dict:
         required("dimension", "-d", str(dim)),
         required("image", "-a", "{in:a}" if not d.chance("image weight", 0.1) else "[{in:a},0.5]"),
         required("mask", "-x", "{in:mask}"),
-        required("convergence", "-c", d.choice("convergence", ("[3,0]", "[2,0]", "[5,0]", "[3,-1]", "[1,0]"))),
+        required(
+            "convergence",
+            "-c",
+            d.choice("convergence", ("[3,0]", "[2,0]", "[5,0]", "[3,-1]", "[1,0]")),
+        ),
         required("seed", "-r", "0"),
     ]
     if d.chance("second modality", 0.15):
-        inputs["b"] = _ants.same_grid(main, d.child("b"), contents=("head", "blobs"), specials=0.0, extreme=0.0)
+        inputs["b"] = _ants.same_grid(
+            main, d.child("b"), contents=("head", "blobs"), specials=0.0, extreme=0.0
+        )
         groups.append(group("second modality", "-a", "{in:b}"))
         options.append("two modalities")
     if d.chance("likelihood", 0.35):
-        groups.append(group("likelihood", "-k", d.choice("likelihood model", ("Gaussian", "HistogramParzenWindows[1,32]", "ManifoldParzenWindows[1,10]", "HistogramParzenWindows[0.5,16]"))))
+        groups.append(
+            group(
+                "likelihood",
+                "-k",
+                d.choice(
+                    "likelihood model",
+                    (
+                        "Gaussian",
+                        "HistogramParzenWindows[1,32]",
+                        "ManifoldParzenWindows[1,10]",
+                        "HistogramParzenWindows[0.5,16]",
+                    ),
+                ),
+            )
+        )
         options.append("-k")
     if d.chance("mrf", 0.6):
         radius = "x".join(["1"] * dim)
-        groups.append(group("mrf", "-m", f"[{d.choice('smoothing', ('0.1', '0.3', '0', '0.05'))},{radius}]"))
+        groups.append(
+            group("mrf", "-m", f"[{d.choice('smoothing', ('0.1', '0.3', '0', '0.05'))},{radius}]")
+        )
         options.append("-m")
     if d.chance("posterior", 0.35):
-        groups.append(group("posterior", "-p", d.choice("formulation", ("Socrates", "Plato", "Aristotle", "Sigmoid", "Socrates[0]", "Socrates[1,2,0.5,0.1]", "Socrates[1]"))))
+        groups.append(
+            group(
+                "posterior",
+                "-p",
+                d.choice(
+                    "formulation",
+                    (
+                        "Socrates",
+                        "Plato",
+                        "Aristotle",
+                        "Sigmoid",
+                        "Socrates[0]",
+                        "Socrates[1,2,0.5,0.1]",
+                        "Socrates[1]",
+                    ),
+                ),
+            )
+        )
         options.append("-p")
     if d.chance("icm", 0.25):
         groups.append(group("icm", "-g", d.choice("icm", ("0", "1"))))
@@ -87,7 +155,13 @@ def draw(d: gen.Draw) -> dict:
         groups.append(group("label propagation", "-l", "[0.5,0.8]"))
         options.append("-l")
     if d.chance("outliers", 0.15):
-        groups.append(group("outliers", "-w", d.choice("outlier handling", ("BoxPlot[0.25,0.75,1.5]", "GrubbsRosner[0.05,0.1]"))))
+        groups.append(
+            group(
+                "outliers",
+                "-w",
+                d.choice("outlier handling", ("BoxPlot[0.25,0.75,1.5]", "GrubbsRosner[0.05,0.1]")),
+            )
+        )
         options.append("-w")
     if k == 3 and d.chance("partial volume", 0.1):
         groups.append(group("partial volume", "-s", "1x2"))
@@ -96,18 +170,44 @@ def draw(d: gen.Draw) -> dict:
     outputs = ["seg.nii.gz"] + [f"post{j:02d}.nii.gz" for j in range(1, k + 1)]
     if "-s" in options:
         outputs.append(f"post{k + 1:02d}.nii.gz")
-    return {"groups": groups, "inputs": inputs, "options": options, "extra": {"outputs": outputs, "min_size": 6, "keep_inputs": ["prior01", "prior02", "prior03"]}}
+    return {
+        "groups": groups,
+        "inputs": inputs,
+        "options": options,
+        "extra": {
+            "outputs": outputs,
+            "min_size": 6,
+            "keep_inputs": ["prior01", "prior02", "prior03"],
+        },
+    }
 
 
-def case(recipe: dict, impl: str, *, case_prefix: str | None = None, cid: str | None = None, description: str | None = None, **kw):
+def case(
+    recipe: dict,
+    impl: str,
+    *,
+    case_prefix: str | None = None,
+    cid: str | None = None,
+    description: str | None = None,
+    **kw,
+):
     from larmorx_validation.difftest import inputs
     from larmorx_validation.parity.ants_atropos import AtroposCase
     from larmorx_validation.parity.harness import Case
 
     prefix = _ants.prefix_of(recipe, case_prefix)
     args = list(_ants.gen_args(recipe, prefix))
-    args = [a.replace("{series:prior}", "{series:dt:" + inputs.key(prefix, "prior") + "}") for a in args]
-    c = AtroposCase(cid or _ants.case_id(recipe), "difftest", description or _ants.describe(recipe), tuple(args), outputs=tuple(recipe["extra"]["outputs"]), **kw)
+    args = [
+        a.replace("{series:prior}", "{series:dt:" + inputs.key(prefix, "prior") + "}") for a in args
+    ]
+    c = AtroposCase(
+        cid or _ants.case_id(recipe),
+        "difftest",
+        description or _ants.describe(recipe),
+        tuple(args),
+        outputs=tuple(recipe["extra"]["outputs"]),
+        **kw,
+    )
     return Case(c.id, c.category, c.description, c)
 
 

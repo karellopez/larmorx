@@ -7,7 +7,6 @@ from __future__ import annotations
 import json
 
 import pytest
-
 from larmorx_validation import tables
 
 
@@ -29,12 +28,23 @@ def test_every_description_names_existing_records():
 
 
 def test_links_are_written_for_each_place(tmp_path):
-    (tmp_path / "x.json").write_text(json.dumps({"summary": {"pass": 3, "fail": 1}, "results": [{}] * 5}))
+    (tmp_path / "x.json").write_text(
+        json.dumps({"summary": {"pass": 3, "fail": 1}, "results": [{}] * 5})
+    )
     m = tables._Records(tmp_path)
     text = "[{x.cases} cases](record:x), {x.compared} compared; [fast](repo:docs/benchmarks/x.md)"
-    assert tables.render_text(text, tables.README, m) == "[5 cases](docs/validation/x.md), 4 compared; [fast](docs/benchmarks/x.md)"
-    assert tables.render_text(text, tables.INDEX, m) == "[5 cases](x.md), 4 compared; [fast](../benchmarks/x.md)"
-    assert tables.render_text(text, tables.SITE, m) == "[5 cases](repo:docs/validation/x.md), 4 compared; [fast](repo:docs/benchmarks/x.md)"
+    assert (
+        tables.render_text(text, tables.README, m)
+        == "[5 cases](docs/validation/x.md), 4 compared; [fast](docs/benchmarks/x.md)"
+    )
+    assert (
+        tables.render_text(text, tables.INDEX, m)
+        == "[5 cases](x.md), 4 compared; [fast](../benchmarks/x.md)"
+    )
+    assert (
+        tables.render_text(text, tables.SITE, m)
+        == "[5 cases](repo:docs/validation/x.md), 4 compared; [fast](repo:docs/benchmarks/x.md)"
+    )
 
 
 def test_identity_is_not_confused_with_one():

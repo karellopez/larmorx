@@ -79,7 +79,10 @@ def _bit_identical(check: str = "bit-identical"):
 
     def metric(doc: dict) -> dict[str, int]:
         compared = [r for r in doc["results"] if _reported(r, check) is not None]
-        return {"compared": len(compared), "identical": sum(_zero(_reported(r, check)) for r in compared)}
+        return {
+            "compared": len(compared),
+            "identical": sum(_zero(_reported(r, check)) for r in compared),
+        }
 
     return metric
 
@@ -90,7 +93,11 @@ def _as_built(first: str, suffix: str = ": bit-identical to ANTs as built"):
 
     def metric(doc: dict) -> dict[str, int]:
         compared = [r for r in doc["results"] if _reported(r, first + suffix) is not None]
-        identical = [r for r in compared if all(_zero(v) for k, v in (r.get("reported") or {}).items() if k.endswith(suffix))]
+        identical = [
+            r
+            for r in compared
+            if all(_zero(v) for k, v in (r.get("reported") or {}).items() if k.endswith(suffix))
+        ]
         return {"compared": len(compared), "identical": len(identical)}
 
     return metric
@@ -101,7 +108,11 @@ def _unmodified(doc: dict) -> dict[str, int]:
     unmodified ANTs reports nothing about it; one identical only with CORE-MATH reports the
     unmodified program's checks (``unmodified ANTs: ...``)."""
     passing = [r for r in doc["results"] if r["status"] == "pass"]
-    as_built = [r for r in passing if not any(k.startswith("unmodified ANTs") for k in (r.get("reported") or {}))]
+    as_built = [
+        r
+        for r in passing
+        if not any(k.startswith("unmodified ANTs") for k in (r.get("reported") or {}))
+    ]
     return {"as_built": len(as_built), "with_crmath": len(passing) - len(as_built)}
 
 
@@ -119,7 +130,9 @@ def _unifize(doc: dict) -> dict[str, int]:
     rounded maths."""
     written = identical = crmath = 0
     for r in doc["results"]:
-        if r["status"] != "pass" or not any(k.endswith(": data") for k in (r.get("measured") or {})):
+        if r["status"] != "pass" or not any(
+            k.endswith(": data") for k in (r.get("measured") or {})
+        ):
             continue
         written += 1
         rep = r.get("reported") or {}
@@ -209,7 +222,9 @@ def readme_table(desc: dict, metrics: _Records) -> str:
     ]
     for t in desc["tool"]:
         use = ", ".join(f"`{u}`" for u in t["use"])
-        rows.append(f"| {t['title']} | {use} | {t['how']} | {render_text(t['validation'], README, metrics)} |")
+        rows.append(
+            f"| {t['title']} | {use} | {t['how']} | {render_text(t['validation'], README, metrics)} |"
+        )
     return "\n".join(rows)
 
 
@@ -262,10 +277,17 @@ def generate(site: Path | None = None) -> dict[Path, str]:
     metrics = _Records(RECORDS)
     out = {}
     for path, name, fn, yaml in TARGETS:
-        out[path] = replace_block(path.read_text(encoding="utf-8"), name, fn(desc, metrics), yaml=yaml)
+        out[path] = replace_block(
+            path.read_text(encoding="utf-8"), name, fn(desc, metrics), yaml=yaml
+        )
     if site is not None:
         path = site / "data" / "status.yml"
-        out[path] = replace_block(path.read_text(encoding="utf-8"), "implemented tools", site_table(desc, metrics), yaml=True)
+        out[path] = replace_block(
+            path.read_text(encoding="utf-8"),
+            "implemented tools",
+            site_table(desc, metrics),
+            yaml=True,
+        )
     return out
 
 
@@ -275,7 +297,10 @@ def main(args) -> int:
     differ = [p for p, text in generated.items() if p.read_text(encoding="utf-8") != text]
     if args.check:
         for p in differ:
-            print(f"{p}: differs from its generated form (python -m larmorx_validation tables)", file=sys.stderr)
+            print(
+                f"{p}: differs from its generated form (python -m larmorx_validation tables)",
+                file=sys.stderr,
+            )
         return 1 if differ else 0
     for p, text in generated.items():
         if p in differ:
@@ -285,8 +310,25 @@ def main(args) -> int:
 
 
 def add_arguments(p) -> None:
-    p.add_argument("--check", action="store_true", help="fail when a committed table differs from its generated form")
+    p.add_argument(
+        "--check",
+        action="store_true",
+        help="fail when a committed table differs from its generated form",
+    )
     p.add_argument("--site", help="the documentation site's checkout: also its data/status.yml")
 
 
-__all__ = ["INDEX", "METRICS", "README", "SITE", "add_arguments", "generate", "index_table", "main", "readme_table", "record_metrics", "render_text", "site_table"]
+__all__ = [
+    "INDEX",
+    "METRICS",
+    "README",
+    "SITE",
+    "add_arguments",
+    "generate",
+    "index_table",
+    "main",
+    "readme_table",
+    "record_metrics",
+    "render_text",
+    "site_table",
+]

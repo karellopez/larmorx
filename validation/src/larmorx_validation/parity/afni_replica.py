@@ -772,7 +772,10 @@ def run_case(spec: ToolSpec, case: Case, checks: CheckList) -> None:
             "skipped", "the larmorx-gpl binary was not found (LARMORX_GPL_BIN, crates-gpl build)"
         )
     try:
-        paths = [_difftest_input(name) if name.startswith("dt:") else spec.inputs(name) for name in s.inputs]
+        paths = [
+            _difftest_input(name) if name.startswith("dt:") else spec.inputs(name)
+            for name in s.inputs
+        ]
     except FileNotFoundError as e:
         raise Outcome("skipped", f"input not available: {e}") from e
     env = environment(s.env)

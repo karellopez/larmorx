@@ -39,7 +39,13 @@ def main(args) -> int:
     from larmorx_validation.evidence.core import Context, prune, write_tool
     from larmorx_validation.figures.core import REPO, default_cache
 
-    tools = list(TOOLS) if args.tool == "all" else [] if args.tool in ("summary", "difftest") else [args.tool]
+    tools = (
+        list(TOOLS)
+        if args.tool == "all"
+        else []
+        if args.tool in ("summary", "difftest")
+        else [args.tool]
+    )
     for tool in tools:
         if tool not in TOOLS:
             raise SystemExit(

@@ -19,7 +19,6 @@ from pathlib import Path
 
 import nibabel as nib
 import numpy as np
-
 from larmorx_validation.difftest import core, inputs
 from larmorx_validation.parity import fsl_mcflirt_replica as fr
 
@@ -68,7 +67,9 @@ def main() -> int:
     ea, er = runs["mcflirt"].stderr.splitlines(), runs["replica"].stderr.splitlines()
     first = next((i for i, (x, y) in enumerate(zip(ea, er, strict=False)) if x != y), None)
     if first is not None:
-        print(f"stderr line {first + 1} of {len(ea)}:\n  mcflirt {ea[first]}\n  replica {er[first]}")
+        print(
+            f"stderr line {first + 1} of {len(ea)}:\n  mcflirt {ea[first]}\n  replica {er[first]}"
+        )
     a, r = work / "mcflirt", work / "replica"
     for f in sorted(a.glob("*.par")):
         pa, pr = f.read_text().splitlines(), (r / f.name).read_text().splitlines()
@@ -86,7 +87,9 @@ def main() -> int:
         d = np.argwhere(x != y)
         if len(d):
             vols = sorted({int(v[3]) for v in d}) if x.ndim == 4 else []
-            print(f"{f.name}: {len(d)} voxels differ, volumes {vols}; e.g. {tuple(int(i) for i in d[0])}: {x[tuple(d[0])]!r} {y[tuple(d[0])]!r}")
+            print(
+                f"{f.name}: {len(d)} voxels differ, volumes {vols}; e.g. {tuple(int(i) for i in d[0])}: {x[tuple(d[0])]!r} {y[tuple(d[0])]!r}"
+            )
     return 0
 
 

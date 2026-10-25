@@ -20,7 +20,6 @@ from pathlib import Path
 
 import nibabel as nib
 import numpy as np
-
 from larmorx_validation.difftest import tools
 from larmorx_validation.parity import ants_programs as ap
 
@@ -34,16 +33,31 @@ def main() -> int:
     c = case.payload
     print(f"{finding['tool']}: {c.program} {' '.join(c.args)}")
     runs = {}
-    for name, runner in (("ants1", "ants"), ("ants2", "ants"), ("lx-reproduce", "reproduce"), ("lx-fix", "fix")):
+    for name, runner in (
+        ("ants1", "ants"),
+        ("ants2", "ants"),
+        ("lx-reproduce", "reproduce"),
+        ("lx-fix", "fix"),
+    ):
         out = work / name
         out.mkdir(exist_ok=True)
         args = [ap.resolve_arg(a, work, out) for a in c.args]
         outputs = [Path(ap.resolve_arg(o, work, out)) for o in c.outputs]
         if runner == "ants":
-            env = {**os.environ, "ITK_GLOBAL_DEFAULT_NUMBER_OF_THREADS": "1", "LARMORX_ORACLE_CACHE_MODE": "off"}
+            env = {
+                **os.environ,
+                "ITK_GLOBAL_DEFAULT_NUMBER_OF_THREADS": "1",
+                "LARMORX_ORACLE_CACHE_MODE": "off",
+            }
             import subprocess
 
-            p = subprocess.run([str(ap.ants_bin() / c.program), *args], capture_output=True, text=True, env=env, check=False)
+            p = subprocess.run(
+                [str(ap.ants_bin() / c.program), *args],
+                capture_output=True,
+                text=True,
+                env=env,
+                check=False,
+            )
             code, err = p.returncode, p.stderr + p.stdout
         else:
             from larmorx.cli import run

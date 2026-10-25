@@ -14,9 +14,50 @@ from larmorx_validation.difftest import gen
 from larmorx_validation.difftest.core import Tool, required
 from larmorx_validation.difftest.tools import _ants
 
-NUMBERS = ("2.5", "-0.5", "0", "-0", "1e-9", "2", "0.37", "1e40", "-3.25", "7", "+5", ".5", "5.", "1e", "-", "1")
-ARITHMETIC = ("m", "+", "-", "/", "^", "max", "exp", "addtozero", "overadd", "Decision", "total", "mean", "vtotal")
-BINARY_OPS = ("FillHoles", "GetLargestComponent", "D", "MaurerDistance", "ExtractContours", "MD", "ME", "MO", "MC")
+NUMBERS = (
+    "2.5",
+    "-0.5",
+    "0",
+    "-0",
+    "1e-9",
+    "2",
+    "0.37",
+    "1e40",
+    "-3.25",
+    "7",
+    "+5",
+    ".5",
+    "5.",
+    "1e",
+    "-",
+    "1",
+)
+ARITHMETIC = (
+    "m",
+    "+",
+    "-",
+    "/",
+    "^",
+    "max",
+    "exp",
+    "addtozero",
+    "overadd",
+    "Decision",
+    "total",
+    "mean",
+    "vtotal",
+)
+BINARY_OPS = (
+    "FillHoles",
+    "GetLargestComponent",
+    "D",
+    "MaurerDistance",
+    "ExtractContours",
+    "MD",
+    "ME",
+    "MO",
+    "MC",
+)
 OPERATIONS = (
     *ARITHMETIC,
     "abs",
@@ -78,7 +119,10 @@ def _operands(d: gen.Draw, op: str, main: dict, inputs: dict) -> list[str]:
     if op in ("GD", "GE", "GO", "GC"):
         return [d.choice("radius", ("0", "1", "2", "3"))]
     if op in ("MD", "ME", "MO", "MC"):
-        return [d.choice("radius", ("1", "2", "3"))] + opt("value", (None, None, "0", "1", "2", "0.6"))
+        return [
+            d.choice("radius", ("1", "2", "3")),
+            *opt("value", (None, None, "0", "1", "2", "0.6")),
+        ]
     if op == "FillHoles":
         return opt("threshold", (None, "0.3", "0.5", "1", "1.5", "2", "3"))
     if op == "GetLargestComponent":
@@ -90,7 +134,10 @@ def _operands(d: gen.Draw, op: str, main: dict, inputs: dict) -> list[str]:
     if op == "D":
         return []
     if op == "PadImage":
-        return [d.choice("pad", ("-3", "-2.5", "-1", "0", "1", "2", "3", "4"))] + opt("value", (None, None, "7", "-1"))
+        return [
+            d.choice("pad", ("-3", "-2.5", "-1", "0", "1", "2", "3", "4")),
+            *opt("value", (None, None, "7", "-1")),
+        ]
     if op == "ThresholdAtMean":
         return opt("factor", (None, "0", "0.5", "1.5"))
     if op == "Normalize":
@@ -100,24 +147,52 @@ def _operands(d: gen.Draw, op: str, main: dict, inputs: dict) -> list[str]:
             return ["{in:mask}"]
         return [] if kind == "none" else [kind]
     if op == "RescaleImage":
-        return list(d.choice("range", (("0", "1"), ("-1", "1"), ("0", "255"), ("100", "200"), ("5", "5"))))
+        return list(
+            d.choice("range", (("0", "1"), ("-1", "1"), ("0", "255"), ("100", "200"), ("5", "5")))
+        )
     if op == "ReplaceVoxelValue":
-        return list(d.choice("replace", (("0", "50", "1"), ("40", "80", "-1"), ("80", "40", "0"), ("1", "2", "7"), ("0", "0", "3"))))
+        return list(
+            d.choice(
+                "replace",
+                (
+                    ("0", "50", "1"),
+                    ("40", "80", "-1"),
+                    ("80", "40", "0"),
+                    ("1", "2", "7"),
+                    ("0", "0", "3"),
+                ),
+            )
+        )
     if op == "TruncateImageIntensity":
         form = d.choice("truncate", ("none", "lo", "lo-hi-bins", "mask"))
         if form == "none":
             return []
         if form == "lo":
             return [d.choice("lo", ("0.05", "0.01", "0.2"))]
-        words = list(d.choice("lo hi bins", (("0.01", "0.999", "256"), ("0.1", "0.9", "1"), ("0.02", "0.98", "64"), ("0", "1", "128"), ("0.25", "0.75", "16"))))
+        words = list(
+            d.choice(
+                "lo hi bins",
+                (
+                    ("0.01", "0.999", "256"),
+                    ("0.1", "0.9", "1"),
+                    ("0.02", "0.98", "64"),
+                    ("0", "1", "128"),
+                    ("0.25", "0.75", "16"),
+                ),
+            )
+        )
         if form == "mask":
             inputs["mask"] = _ants.mask_of(main, d.child("mask"))
             words.append("{in:mask}")
         return words
     if op == "UnsharpMask":
-        return list(d.choice("unsharp", ((), ("0.5", "1"), ("1", "2", "5"), ("0.8", "1.5", "0", "1"))))
+        return list(
+            d.choice("unsharp", ((), ("0.5", "1"), ("1", "2", "5"), ("0.8", "1.5", "0", "1")))
+        )
     if op == "Laplacian":
-        return list(d.choice("laplacian", ((), ("1",), ("1.5",), ("1.5", "1"), ("2", "0"), ("0.8",))))
+        return list(
+            d.choice("laplacian", ((), ("1",), ("1.5",), ("1.5", "1"), ("2", "0"), ("0.8",)))
+        )
     if op == "Grad":
         return list(d.choice("grad", ((), ("1",), ("1.5",), ("2", "1"), ("0",))))
     raise ValueError(op)
@@ -131,7 +206,9 @@ def draw(d: gen.Draw) -> dict:
     ndim = dim
     if d.chance("image dimension differs", 0.04):
         ndim = d.choice("image ndim", (2, 3, 4))
-    binary = op in BINARY_OPS or (op in ("GD", "GE", "GO", "GC") and d.chance("labels for grey morphology", 0.3))
+    binary = op in BINARY_OPS or (
+        op in ("GD", "GE", "GO", "GC") and d.chance("labels for grey morphology", 0.3)
+    )
     contents = ("labels", "sparse", "head", "zeros", "constant") if binary else None
     weights = (5, 2, 1, 0.3, 0.3) if binary else None
     kw = {"contents": contents, "weights": weights} if binary else {}

@@ -16,7 +16,20 @@ from larmorx_validation.difftest.core import Tool, group
 from larmorx_validation.difftest.tools import _ants
 
 METHODS = ("-Fourier", "-linear", "-cubic", "-quintic", "-heptic", "-wsinc5", "-wsinc9")
-PATTERNS = ("alt+z", "altplus", "alt+z2", "alt-z", "altminus", "alt-z2", "seq+z", "seqplus", "seq-z", "seqminus", "zero", "simult")
+PATTERNS = (
+    "alt+z",
+    "altplus",
+    "alt+z2",
+    "alt-z",
+    "altminus",
+    "alt-z2",
+    "seq+z",
+    "seqplus",
+    "seq-z",
+    "seqminus",
+    "zero",
+    "simult",
+)
 
 
 def draw(d: gen.Draw) -> dict:
@@ -33,7 +46,10 @@ def draw(d: gen.Draw) -> dict:
         scaling=0.25,
         suffix=d.choice("suffix", (".nii", ".nii.gz")),
     )
-    spec["signal"] = {"amplitude": d.choice("signal", (0.02, 0.05, 0.2)), "period": d.integer("period", 2, 6)}
+    spec["signal"] = {
+        "amplitude": d.choice("signal", (0.02, 0.05, 0.2)),
+        "period": d.integer("period", 2, 6),
+    }
     nz = shape[2]
     files = []
     groups = []
@@ -44,7 +60,9 @@ def draw(d: gen.Draw) -> dict:
             groups.append(group("tpattern", "-tpattern", d.choice("pattern", PATTERNS)))
             options.append("-tpattern name")
         else:
-            tr = float(spec["timing"]["tr"]) / (1000.0 if spec["timing"]["tunits"] == "msec" else 1.0)
+            tr = float(spec["timing"]["tr"]) / (
+                1000.0 if spec["timing"]["tunits"] == "msec" else 1.0
+            )
             times = [round(tr * ((k * 7) % max(nz, 1)) / max(nz, 1), 4) for k in range(nz)]
             if d.chance("pattern beyond TR", 0.1):
                 times[0] = tr
@@ -57,7 +75,9 @@ def draw(d: gen.Draw) -> dict:
                 groups.append(group("tpattern", "-tpattern", "@{tmp}/st.1D"))
                 options.append("-tpattern @file")
             else:
-                groups.append(group("tpattern", "-tpattern", "@1D: " + " ".join(f"{t:g}" for t in times)))
+                groups.append(
+                    group("tpattern", "-tpattern", "@1D: " + " ".join(f"{t:g}" for t in times))
+                )
                 options.append("-tpattern @1D")
     if d.chance("method", 0.6):
         m = d.choice("method", METHODS)
@@ -68,7 +88,9 @@ def draw(d: gen.Draw) -> dict:
             groups.append(group("slice", "-slice", str(d.integer("slice", 0, max(0, nz - 1)))))
             options.append("-slice")
         else:
-            groups.append(group("tzero", "-tzero", d.choice("tzero", ("0", "0.5", "1", "0.975", "1.5"))))
+            groups.append(
+                group("tzero", "-tzero", d.choice("tzero", ("0", "0.5", "1", "0.975", "1.5")))
+            )
             options.append("-tzero")
     if d.chance("ignore", 0.2):
         groups.append(group("ignore", "-ignore", str(d.integer("ignore", 0, max(0, shape[3] - 3)))))
@@ -84,10 +106,23 @@ def draw(d: gen.Draw) -> dict:
         groups.append(group("verbose", "-verbose"))
     if spec["timing"].get("slice_code"):
         options.append("header slice timing")
-    return {"groups": groups, "inputs": {"series": spec}, "options": options, "extra": {"files": files, "min_volumes": 4}}
+    return {
+        "groups": groups,
+        "inputs": {"series": spec},
+        "options": options,
+        "extra": {"files": files, "min_volumes": 4},
+    }
 
 
-def case(recipe: dict, impl: str, *, case_prefix: str | None = None, cid: str | None = None, description: str | None = None, **kw):
+def case(
+    recipe: dict,
+    impl: str,
+    *,
+    case_prefix: str | None = None,
+    cid: str | None = None,
+    description: str | None = None,
+    **kw,
+):
     from larmorx_validation.difftest import inputs
     from larmorx_validation.difftest.core import arguments
     from larmorx_validation.parity.afni_tshift import Scenario

@@ -79,7 +79,18 @@ def image(
     d: gen.Draw,
     ndim: int,
     *,
-    contents: Sequence[str] = ("head", "blobs", "noise", "ramp", "checker", "constant", "zeros", "sparse", "labels", "crop"),
+    contents: Sequence[str] = (
+        "head",
+        "blobs",
+        "noise",
+        "ramp",
+        "checker",
+        "constant",
+        "zeros",
+        "sparse",
+        "labels",
+        "crop",
+    ),
     weights: Sequence[float] | None = (5, 2, 2, 1, 1, 0.5, 0.3, 0.5, 1, 1),
     **kw,
 ) -> dict:
@@ -97,7 +108,9 @@ def same_grid(spec: dict, d: gen.Draw, **overrides) -> dict:
         len(spec["shape"]),
         shape=spec["shape"],
         geometry=spec["geometry"],
-        contents=overrides.pop("contents", ("head", "blobs", "noise", "ramp", "constant", "zeros", "sparse")),
+        contents=overrides.pop(
+            "contents", ("head", "blobs", "noise", "ramp", "constant", "zeros", "sparse")
+        ),
         **overrides,
     )
     return other
@@ -126,4 +139,15 @@ def scalar(d: gen.Draw, name: str, values: Sequence[str]) -> str:
     return d.choice(name, tuple(values))
 
 
-__all__ = ["ants_case", "ants_unavailable", "case_id", "describe", "gen_args", "image", "mask_of", "prefix_of", "same_grid", "scalar"]
+__all__ = [
+    "ants_case",
+    "ants_unavailable",
+    "case_id",
+    "describe",
+    "gen_args",
+    "image",
+    "mask_of",
+    "prefix_of",
+    "same_grid",
+    "scalar",
+]

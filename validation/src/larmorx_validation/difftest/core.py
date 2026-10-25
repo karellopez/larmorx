@@ -160,7 +160,13 @@ def judge(tool: Tool, impl: str, result: CaseResult) -> Judgement:
     """The verdict of one run (see the module's documentation)."""
     failed = [c for c in result.checks if not c.passed]
     checks = [
-        {"name": c.name, "passed": c.passed, "value": c.value, "threshold": c.threshold, "detail": c.detail[:400]}
+        {
+            "name": c.name,
+            "passed": c.passed,
+            "value": c.value,
+            "threshold": c.threshold,
+            "detail": c.detail[:400],
+        }
         for c in result.checks
     ]
     if result.status == SKIPPED:
@@ -168,19 +174,26 @@ def judge(tool: Tool, impl: str, result: CaseResult) -> Judgement:
     if result.status == FAIL:
         notice = _notice_only(failed)
         if notice:
-            return Judgement(NOTICE, (f"notice: {notice}",), failed[0].detail, result.status, checks)
+            return Judgement(
+                NOTICE, (f"notice: {notice}",), failed[0].detail, result.status, checks
+            )
         names = tuple(sorted({_norm(c.name) for c in failed}))
         if not names:
             first = (result.reason or "fail").strip().splitlines()
-            names = ("exception" if result.reason.startswith("unexpected exception") else _norm(first[0][:80]),)
-        detail = "; ".join(f"{c.name}: {c.detail}"[:300] for c in failed[:6]) or result.reason[-600:]
+            names = (
+                "exception"
+                if result.reason.startswith("unexpected exception")
+                else _norm(first[0][:80]),
+            )
+        detail = (
+            "; ".join(f"{c.name}: {c.detail}"[:300] for c in failed[:6]) or result.reason[-600:]
+        )
         return Judgement(DIFFER, names, detail, result.status, checks)
     if result.status in (PASS, BOTH_ERROR, EXPECTED) and tool.exact(impl):
         inexact = [
             c
             for c in result.checks
-            if any(c.name.endswith(s) for s in tool.exact_checks)
-            and not identical_value(c.value)
+            if any(c.name.endswith(s) for s in tool.exact_checks) and not identical_value(c.value)
         ]
         if inexact:
             explained = _explained(tool, result)
@@ -216,14 +229,36 @@ def identical_value(v) -> bool:
 _NOTICE_ONLY = re.compile(r"^((?:[A-Z]+-\d+)(?:, [A-Z]+-\d+)*): no values changed$")
 
 
+_BOTH_MODES = re.compile(r"^fix: \[(.*)\]; reproduce: \[(.*)\]$")
+
+
 def _notice_only(failed) -> str:
-    """The defects a fix pass named where its correction changed nothing visible (the only
-    failed check): a D13 notice that fires on a condition whose effect this input does not
-    show. Not a mistake in the result, so a verdict of its own (``notice``), reported apart."""
-    if len(failed) != 1 or failed[0].name != "D13 fix pass":
+    """The defects named where nothing in the result is wrong, when the only failed checks are
+    about notices: the fix pass named a correction that changed nothing visible (a D13 notice
+    that fires on a condition whose effect this input does not show), or a defect was named in
+    one mode only (another correction took the other mode down a path where its condition does
+    not arise: the parity cases' ``one_mode``). Not a mistake in the result, so a verdict of its
+    own (``notice``), counted per defect and reported apart."""
+    if not failed or any(
+        c.name not in ("D13 fix pass", "D13 notices in both modes") for c in failed
+    ):
         return ""
-    m = _NOTICE_ONLY.match(failed[0].detail.strip())
-    return m.group(1) if m else ""
+    named: list[str] = []
+    for c in failed:
+        detail = c.detail.strip()
+        if c.name == "D13 fix pass":
+            m = _NOTICE_ONLY.match(detail)
+            if not m:
+                return ""
+            named += m.group(1).split(", ")
+        else:
+            m = _BOTH_MODES.match(detail)
+            if not m:
+                return ""
+            fix = {x.strip(" '\"") for x in m.group(1).split(",") if x.strip()}
+            rep = {x.strip(" '\"") for x in m.group(2).split(",") if x.strip()}
+            named += sorted(fix ^ rep)
+    return ", ".join(dict.fromkeys(named))
 
 
 def same_difference(signature: tuple[str, ...], judged: Judgement) -> bool:

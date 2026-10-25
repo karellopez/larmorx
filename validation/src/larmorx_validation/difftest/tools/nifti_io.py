@@ -17,7 +17,18 @@ from larmorx_validation.difftest import gen
 from larmorx_validation.difftest.core import Tool
 from larmorx_validation.difftest.tools import _ants
 
-DTYPES = ("uint8", "int8", "int16", "uint16", "int32", "uint32", "int64", "uint64", "float32", "float64")
+DTYPES = (
+    "uint8",
+    "int8",
+    "int16",
+    "uint16",
+    "int32",
+    "uint32",
+    "int64",
+    "uint64",
+    "float32",
+    "float64",
+)
 
 
 def draw(d: gen.Draw) -> dict:
@@ -47,7 +58,12 @@ def draw(d: gen.Draw) -> dict:
     if d.chance("gap before data", 0.1) and spec["suffix"] != ".hdr":
         header["vox_pad"] = d.choice("gap", (4, 16, 100))
     if d.chance("extensions", 0.1):
-        header["extensions"] = [(d.choice("ecode", (0, 6, 4, 2)), "difftest extension " * d.integer("extension length", 1, 5))]
+        header["extensions"] = [
+            (
+                d.choice("ecode", (0, 6, 4, 2)),
+                "difftest extension " * d.integer("extension length", 1, 5),
+            )
+        ]
     if d.chance("slope special", 0.08):
         header["slope_special"] = d.choice("slope value", ("nan", "inf", "0", "-0"))
     for name, p, values in (
@@ -59,7 +75,9 @@ def draw(d: gen.Draw) -> dict:
         if d.chance(name, p):
             header[name] = d.choice(f"{name} value", values)
     if d.chance("descrip", 0.2):
-        header["descrip"] = d.choice("descrip text", ("", "x" * 79, "FSL5.0", "ünicode? no: ascii", "a b"))
+        header["descrip"] = d.choice(
+            "descrip text", ("", "x" * 79, "FSL5.0", "ünicode? no: ascii", "a b")
+        )
         header["descrip"] = header["descrip"].encode("ascii", "replace").decode("ascii")
     spec["header"] = header
     options = [
@@ -75,12 +93,25 @@ def draw(d: gen.Draw) -> dict:
     return {"groups": [], "inputs": {"file": spec}, "options": options}
 
 
-def case(recipe: dict, impl: str, *, case_prefix: str | None = None, cid: str | None = None, description: str | None = None, **kw):
+def case(
+    recipe: dict,
+    impl: str,
+    *,
+    case_prefix: str | None = None,
+    cid: str | None = None,
+    description: str | None = None,
+    **kw,
+):
     from larmorx_validation.difftest import inputs
     from larmorx_validation.parity.harness import Case
 
     prefix = _ants.prefix_of(recipe, case_prefix)
-    return Case(cid or _ants.case_id(recipe), "difftest", description or "random file: " + ", ".join(recipe["options"]), "dt:" + inputs.key(prefix, "file"))
+    return Case(
+        cid or _ants.case_id(recipe),
+        "difftest",
+        description or "random file: " + ", ".join(recipe["options"]),
+        "dt:" + inputs.key(prefix, "file"),
+    )
 
 
 def run(impl: str):

@@ -145,7 +145,7 @@ class Draw:
 
     def step(self, name: str, lo: float, hi: float, step: float) -> float:
         """A value in [lo, hi] on a grid of ``step`` (short decimal numbers on command lines)."""
-        n = int(round((hi - lo) / step))
+        n = round((hi - lo) / step)
         v = lo + step * int(self.rng.integers(0, n + 1))
         return self.note(name, float(round(v, 10)))
 
@@ -168,7 +168,7 @@ def draw_shape(
     (``thin``), the volume at most ``max_voxels``; a fourth axis of ``volumes`` volumes."""
     spatial = min(ndim, 3)
     shape = []
-    for k in range(spatial):
+    for _ in range(spatial):
         if lo <= 1 <= hi and d.rng.random() < thin:
             shape.append(1)
         else:
@@ -184,10 +184,17 @@ def draw_shape(
 
 def draw_geometry(d: Draw, *, oblique: float = 0.3, axis: float = 0.4) -> dict:
     """Spacing, orientation (a rational quaternion), origin, the qform and sform codes."""
-    spacing = [d.choice(f"spacing{k}", (0.5, 0.8, 1.0, 1.0, 1.2, 1.5, 2.0, 2.5, 3.0, 4.0)) for k in range(3)]
+    spacing = [
+        d.choice(f"spacing{k}", (0.5, 0.8, 1.0, 1.0, 1.2, 1.5, 2.0, 2.5, 3.0, 4.0))
+        for k in range(3)
+    ]
     if d.rng.random() < 0.3:  # isotropic
         spacing = [spacing[0]] * 3
-    kind = d.choice("orientation", ("plumb", "axes", "oblique", "axes+oblique"), (1 - axis - oblique, axis * 0.7, oblique * 0.7, 0.3 * (axis + oblique)))
+    kind = d.choice(
+        "orientation",
+        ("plumb", "axes", "oblique", "axes+oblique"),
+        (1 - axis - oblique, axis * 0.7, oblique * 0.7, 0.3 * (axis + oblique)),
+    )
     q: tuple[int, ...] = (1, 0, 0, 0)
     if kind in ("axes", "axes+oblique"):
         q = AXIS_QUATERNIONS[int(d.rng.integers(0, len(AXIS_QUATERNIONS)))]
@@ -397,7 +404,11 @@ def _head(content: dict, u: np.ndarray, r2: np.ndarray, rng, shape) -> np.ndarra
     """Nested ellipsoids: skull, CSF, grey and white matter, ventricles; a polynomial bias
     field; Irwin-Hall noise."""
     t = content.get("tissues", "t1")
-    level = {"t1": (160, 30, 70, 110, 25), "t2": (40, 160, 100, 70, 170), "epi": (60, 120, 90, 80, 130)}[t]
+    level = {
+        "t1": (160, 30, 70, 110, 25),
+        "t2": (40, 160, 100, 70, 170),
+        "epi": (60, 120, 90, 80, 130),
+    }[t]
     skull, csf, gm, wm, vent = level
     wavy = 0.7 + 0.08 * (u[0] * u[0] - u[1] * u[1]) + 0.05 * u[2]
     out = np.where(r2 < 1.12**2, float(skull), 0.0)
@@ -408,7 +419,9 @@ def _head(content: dict, u: np.ndarray, r2: np.ndarray, rng, shape) -> np.ndarra
     out = np.where(v < 1.0, float(vent), out)
     b = content.get("bias", [0.0] * 4)
     size = 1.0
-    bias = 1.0 + size * (b[0] * u[0] * 30 + b[1] * u[1] * 30 + b[2] * u[2] * 30 + b[3] * u[0] * u[1] * 900)
+    bias = 1.0 + size * (
+        b[0] * u[0] * 30 + b[1] * u[1] * 30 + b[2] * u[2] * 30 + b[3] * u[0] * u[1] * 900
+    )
     out = out * bias
     if content.get("noise", 0.0):
         out = np.abs(out + content["noise"] * 2.0 * _irwin_hall(rng, shape))
@@ -435,7 +448,11 @@ def _crop(content: dict, shape: Sequence[int]) -> np.ndarray:
 
 def draw_values(d: Draw, *, specials: float = 0.1, extreme: float = 0.15) -> dict:
     v: dict[str, Any] = {"scale": 1.0, "offset": 0.0}
-    r = d.choice("range", ("plain", "tiny", "huge", "negative", "steps", "unit"), (1 - extreme, extreme * 0.2, extreme * 0.2, extreme * 0.3, extreme * 0.2, extreme * 0.1))
+    r = d.choice(
+        "range",
+        ("plain", "tiny", "huge", "negative", "steps", "unit"),
+        (1 - extreme, extreme * 0.2, extreme * 0.2, extreme * 0.3, extreme * 0.2, extreme * 0.1),
+    )
     if r == "tiny":
         v["scale"] = 1e-30
     elif r == "huge":
@@ -447,11 +464,26 @@ def draw_values(d: Draw, *, specials: float = 0.1, extreme: float = 0.15) -> dic
     elif r == "unit":
         v["scale"] = 0.01
     if d.rng.random() < specials:
-        v["specials"] = d.subset("specials", ("nan", "inf", "-inf", "-0", "outlier"), 0.4) or ["outlier"]
+        v["specials"] = d.subset("specials", ("nan", "inf", "-inf", "-0", "outlier"), 0.4) or [
+            "outlier"
+        ]
     return v
 
 
-def draw_dtype(d: Draw, options: Sequence[str] = ("float32", "float32", "float32", "int16", "uint8", "float64", "int32", "uint16", "int8")) -> str:
+def draw_dtype(
+    d: Draw,
+    options: Sequence[str] = (
+        "float32",
+        "float32",
+        "float32",
+        "int16",
+        "uint8",
+        "float64",
+        "int32",
+        "uint16",
+        "int8",
+    ),
+) -> str:
     return d.choice("dtype", tuple(options))
 
 
@@ -476,7 +508,9 @@ def apply_values(x: np.ndarray, values: dict, rng: np.random.Generator) -> np.nd
         flat = x.reshape(-1)
         flat[i] = {"nan": np.nan, "inf": np.inf, "-inf": -np.inf, "-0": -0.0}.get(s, 0.0)
         if s == "outlier":
-            flat[i] = (np.nanmax(np.abs(flat[np.isfinite(flat)])) if np.isfinite(flat).any() else 1.0) * 50.0
+            flat[i] = (
+                np.nanmax(np.abs(flat[np.isfinite(flat)])) if np.isfinite(flat).any() else 1.0
+            ) * 50.0
     return x
 
 
@@ -519,7 +553,17 @@ def draw_image(
     d: Draw,
     ndim: int = 3,
     *,
-    contents: Sequence[str] = ("head", "blobs", "noise", "ramp", "checker", "constant", "zeros", "sparse", "labels"),
+    contents: Sequence[str] = (
+        "head",
+        "blobs",
+        "noise",
+        "ramp",
+        "checker",
+        "constant",
+        "zeros",
+        "sparse",
+        "labels",
+    ),
     content_weights: Sequence[float] | None = None,
     dtypes: Sequence[str] | None = None,
     shape: Sequence[int] | None = None,
@@ -556,7 +600,18 @@ def field_data(spec: dict) -> np.ndarray:
     comps = []
     for _ in range(shape[4]):
         c = (rng.random(10) - 0.5) * 2 * f["amplitude"]
-        v = c[0] + c[1] * u[0] + c[2] * u[1] + c[3] * u[2] + c[4] * u[0] * u[1] + c[5] * u[1] * u[2] + c[6] * u[0] * u[2] + c[7] * u[0] * u[0] + c[8] * u[1] * u[1] + c[9] * u[2] * u[2]
+        v = (
+            c[0]
+            + c[1] * u[0]
+            + c[2] * u[1]
+            + c[3] * u[2]
+            + c[4] * u[0] * u[1]
+            + c[5] * u[1] * u[2]
+            + c[6] * u[0] * u[2]
+            + c[7] * u[0] * u[0]
+            + c[8] * u[1] * u[1]
+            + c[9] * u[2] * u[2]
+        )
         comps.append(v)
     data = np.stack(comps, axis=-1).reshape(shape)
     return to_dtype(data, spec.get("dtype", "float32"), None)
@@ -619,7 +674,11 @@ def header_bytes(spec: dict, data: np.ndarray, nifti2: bool = False) -> bytes:
     big = spec.get("header", {}).get("big_endian", False)
     shape = list(data.shape)
     h["sizeof_hdr"] = 540 if nifti2 else 348
-    h["magic"] = b"n+2\x00\r\n\x1a\n" if nifti2 else (b"n+1" if spec.get("suffix", ".nii") != ".hdr" else b"ni1")
+    h["magic"] = (
+        b"n+2\x00\r\n\x1a\n"
+        if nifti2
+        else (b"n+1" if spec.get("suffix", ".nii") != ".hdr" else b"ni1")
+    )
     dim = [len(shape), *shape] + [1] * (7 - len(shape))
     h["dim"] = dim
     h["datatype"] = DTYPES[data.dtype.name]
@@ -635,12 +694,17 @@ def header_bytes(spec: dict, data: np.ndarray, nifti2: bool = False) -> bytes:
     h["vox_offset"] = (
         0
         if spec.get("suffix") == ".hdr"
-        else (544 if nifti2 else 352) + _extension_size(spec) + spec.get("header", {}).get("vox_pad", 0)
+        else (544 if nifti2 else 352)
+        + _extension_size(spec)
+        + spec.get("header", {}).get("vox_pad", 0)
     )
     sc = spec.get("scaling") or {}
     h["scl_slope"] = sc.get("slope", 0.0) if sc else 0.0
     h["scl_inter"] = sc.get("inter", 0.0) if sc else 0.0
-    h["xyzt_units"] = _UNITS[g.get("units", "mm")] | _TUNITS[timing.get("tunits", "sec" if len(shape) == 4 else "unknown")]
+    h["xyzt_units"] = (
+        _UNITS[g.get("units", "mm")]
+        | _TUNITS[timing.get("tunits", "sec" if len(shape) == 4 else "unknown")]
+    )
     if timing.get("slice_code"):
         h["slice_code"] = timing["slice_code"]
         h["slice_start"] = timing.get("slice_start", 0)
@@ -684,7 +748,11 @@ def _extension_bytes(spec: dict, big: bool) -> bytes:
         body = text.encode("utf-8")
         size = 8 + len(body)
         size += (-size) % 16
-        out += np.array([size, code], dtype=order + "i4").tobytes() + body + b"\x00" * (size - 8 - len(body))
+        out += (
+            np.array([size, code], dtype=order + "i4").tobytes()
+            + body
+            + b"\x00" * (size - 8 - len(body))
+        )
     return out
 
 
@@ -702,7 +770,9 @@ def write_nifti(spec: dict, target: Path) -> Path:
         target.write_bytes(hdr + _extension_bytes(spec, big))
         target.with_suffix(".img").write_bytes(raw)
         return target
-    body = hdr + _extension_bytes(spec, big) + b"\x00" * spec.get("header", {}).get("vox_pad", 0) + raw
+    body = (
+        hdr + _extension_bytes(spec, big) + b"\x00" * spec.get("header", {}).get("vox_pad", 0) + raw
+    )
     if str(target).endswith(".gz"):
         target.write_bytes(gzip.compress(body, compresslevel=6, mtime=0))
     else:
@@ -740,7 +810,13 @@ def itk_text(transforms: Sequence[dict]) -> str:
 
 
 def _num(v: float) -> str:
-    return repr(float(v)) if not float(v).is_integer() else str(int(v)) if abs(v) < 1e15 else repr(float(v))
+    return (
+        repr(float(v))
+        if not float(v).is_integer()
+        else str(int(v))
+        if abs(v) < 1e15
+        else repr(float(v))
+    )
 
 
 def write_itk_mat(transform: dict, target: Path) -> None:
@@ -814,4 +890,3 @@ __all__ = [
     "write_itk_mat",
     "write_nifti",
 ]
-

@@ -48,10 +48,25 @@ def main() -> int:
         runs[who] = p
         print(f"== {who}: exit {p.returncode}")
         print(p.stderr.replace(str(out), "{out}").rstrip() or "(no standard error)")
-    mask = lambda s, who: re.sub(r"0x[0-9a-f]+", "0x", s.replace(str(work / who), "{out}")).splitlines()  # noqa: E731
+
+    def mask(s: str, who: str) -> list[str]:
+        return re.sub(r"0x[0-9a-f]+", "0x", s.replace(str(work / who), "{out}")).splitlines()
+
     for who in ("reproduce", "fix"):
-        diff = list(difflib.unified_diff(mask(runs["ANTs"].stdout, "ANTs"), mask(runs[who].stdout, who), "ANTs", who, n=0, lineterm=""))
-        print(f"== standard output, ANTs against larmorx {who}: " + ("identical" if not diff else f"{len(diff)} diff lines"))
+        diff = list(
+            difflib.unified_diff(
+                mask(runs["ANTs"].stdout, "ANTs"),
+                mask(runs[who].stdout, who),
+                "ANTs",
+                who,
+                n=0,
+                lineterm="",
+            )
+        )
+        print(
+            f"== standard output, ANTs against larmorx {who}: "
+            + ("identical" if not diff else f"{len(diff)} diff lines")
+        )
         print("\n".join(diff[:40]))
     return 0
 

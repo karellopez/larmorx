@@ -33,11 +33,22 @@ def _input(d: gen.Draw, ndim: int, **kw) -> dict:
 
 def draw_automask(d: gen.Draw) -> dict:
     ndim = d.choice("ndim", (3, 4, 2), (0.75, 0.2, 0.05))
-    spec = _input(d.child("input"), ndim) if ndim != 2 else _input(d.child("input"), 3, shape=[d.integer("nx", 4, 32), d.integer("ny", 4, 32), 1])
+    spec = (
+        _input(d.child("input"), ndim)
+        if ndim != 2
+        else _input(d.child("input"), 3, shape=[d.integer("nx", 4, 32), d.integer("ny", 4, 32), 1])
+    )
     out = d.choice("output", ("mask.nii", "mask.nii.gz"))
     groups, outputs, options = [], [out], []
     for name, p, words in (
-        ("clfrac", 0.3, lambda: ["-clfrac", d.choice("clfrac value", ("0.1", "0.2", "0.3", "0.5", "0.7", "0.9"))]),
+        (
+            "clfrac",
+            0.3,
+            lambda: [
+                "-clfrac",
+                d.choice("clfrac value", ("0.1", "0.2", "0.3", "0.5", "0.7", "0.9")),
+            ],
+        ),
         ("nograd", 0.2, lambda: ["-nograd"]),
         ("peels", 0.25, lambda: ["-peels", d.choice("peels value", ("0", "1", "2", "3"))]),
         ("nbhrs", 0.15, lambda: ["-nbhrs", d.choice("nbhrs value", ("6", "12", "17", "20"))]),
@@ -66,7 +77,12 @@ def draw_automask(d: gen.Draw) -> dict:
     if nbhrs is not None and not 6 <= int(nbhrs) <= 18:
         # -nbhrs outside 6..18 (AFNI-41, rule B): the default refuses, naming the defect.
         extra["fix_refuses"] = "AFNI-41"
-    return {"groups": groups, "inputs": {"input": spec}, "options": [*options, f"{ndim}D input"], "extra": extra}
+    return {
+        "groups": groups,
+        "inputs": {"input": spec},
+        "options": [*options, f"{ndim}D input"],
+        "extra": extra,
+    }
 
 
 def draw_unifize(d: gen.Draw) -> dict:
@@ -86,10 +102,21 @@ def draw_unifize(d: gen.Draw) -> dict:
     for name, p, words in (
         ("GM", 0.2, lambda: ["-GM"]),
         ("Urad", 0.2, lambda: ["-Urad", d.choice("Urad value", ("5", "8", "18.3", "25"))]),
-        ("rbt", 0.15, lambda: ["-rbt", *d.choice("rbt values", (("18.3", "65.0", "90.0"), ("10", "30", "60")))]),
+        (
+            "rbt",
+            0.15,
+            lambda: [
+                "-rbt",
+                *d.choice("rbt values", (("18.3", "65.0", "90.0"), ("10", "30", "60"))),
+            ],
+        ),
         ("clfrac", 0.2, lambda: ["-clfrac", d.choice("clfrac value", ("0.1", "0.2", "0.4"))]),
         ("nosquash", 0.1, lambda: ["-nosquash"]),
-        ("T2up", 0.1 if t2 else 0.0, lambda: ["-T2up", d.choice("T2up value", ("95", "98.5", "100"))]),
+        (
+            "T2up",
+            0.1 if t2 else 0.0,
+            lambda: ["-T2up", d.choice("T2up value", ("95", "98.5", "100"))],
+        ),
         ("quiet", 0.1, lambda: [d.choice("verbosity", ("-quiet", "-verb"))]),
         ("useall", 0.05, lambda: ["-useall"]),
         ("noduplo", 0.05, lambda: ["-noduplo"]),
@@ -107,15 +134,32 @@ def draw_unifize(d: gen.Draw) -> dict:
         outputs.append("am.nii")
         options.append("-amsave")
     groups.append(required("prefix", "-prefix", out))
-    groups.append(required("input", *(("-input", "{in:input}") if d.chance("-input", 0.3) else ("{in:input}",))))
+    groups.append(
+        required(
+            "input", *(("-input", "{in:input}") if d.chance("-input", 0.3) else ("{in:input}",))
+        )
+    )
     extra: dict = {"outputs": outputs, "min_size": 4}
     if t2 >= 3 and not epi:
         # -T2 three times or more (AFNI-48, rule B): the default refuses, naming the defect.
         extra["fix_refuses"] = "AFNI-48"
-    return {"groups": groups, "inputs": {"input": spec}, "options": [*options, f"{ndim}D input"], "extra": extra}
+    return {
+        "groups": groups,
+        "inputs": {"input": spec},
+        "options": [*options, f"{ndim}D input"],
+        "extra": extra,
+    }
 
 
-def _case(recipe: dict, impl: str, *, case_prefix: str | None = None, cid: str | None = None, description: str | None = None, **kw):
+def _case(
+    recipe: dict,
+    impl: str,
+    *,
+    case_prefix: str | None = None,
+    cid: str | None = None,
+    description: str | None = None,
+    **kw,
+):
     from larmorx_validation.difftest import inputs
     from larmorx_validation.parity import afni_replica as ar
     from larmorx_validation.parity.harness import Case

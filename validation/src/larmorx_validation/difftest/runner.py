@@ -44,7 +44,7 @@ TIMEOUT = "timeout"
 SHRINKS_PER_SIGNATURE = 2
 
 
-class CaseTimeout(BaseException):  # noqa: N818 - not an error of the case: the clock's
+class CaseTimeout(BaseException):
     """A case ran past its time (raised by an alarm; not an ``Exception``, so the parity
     harness does not turn it into a failed check)."""
 
@@ -131,7 +131,9 @@ def _watch_notices() -> None:
     _core.cli_main = cli_main
 
 
-def execute(tool: core.Tool, recipe: dict, impl: str, *, timeout: float | None = None, **case_kw) -> tuple[Judgement, float, harness.CaseResult | None]:
+def execute(
+    tool: core.Tool, recipe: dict, impl: str, *, timeout: float | None = None, **case_kw
+) -> tuple[Judgement, float, harness.CaseResult | None]:
     """Runs one implementation of ``recipe`` through its parity runner and judges it."""
     from larmorx_validation.oracle_cache.policy import VARYING_DEFECTS
 
@@ -155,11 +157,19 @@ def execute(tool: core.Tool, recipe: dict, impl: str, *, timeout: float | None =
     try:
         result = harness.run_one(suite, case)
     except CaseTimeout:
-        return Judgement(TIMEOUT, ("timeout",), f"no result within {limit} s"), time.monotonic() - start, None
-    except BaseException as e:  # noqa: BLE001 - a Rust panic is a BaseException (PyO3)
+        return (
+            Judgement(TIMEOUT, ("timeout",), f"no result within {limit} s"),
+            time.monotonic() - start,
+            None,
+        )
+    except BaseException as e:
         if type(e).__name__ != "PanicException":
             raise
-        return Judgement(DIFFER, ("larmorx panicked",), f"PanicException: {e}"[:600], "fail"), time.monotonic() - start, None
+        return (
+            Judgement(DIFFER, ("larmorx panicked",), f"PanicException: {e}"[:600], "fail"),
+            time.monotonic() - start,
+            None,
+        )
     finally:
         signal.alarm(0)
         signal.signal(signal.SIGALRM, previous)
@@ -170,7 +180,13 @@ def execute(tool: core.Tool, recipe: dict, impl: str, *, timeout: float | None =
     named = {*_NOTICES, *recipe.get("extra", {}).get("undefined", ())}
     varying = sorted({n for n in named if n in undefined_defects})
     if j.verdict == DIFFER and varying:
-        j = Judgement(UNDEFINED, tuple(f"undefined: {n}" for n in varying), f"{', '.join(varying)}: {undefined_defects[varying[0]]}; {j.detail}", j.status, j.checks)
+        j = Judgement(
+            UNDEFINED,
+            tuple(f"undefined: {n}" for n in varying),
+            f"{', '.join(varying)}: {undefined_defects[varying[0]]}; {j.detail}",
+            j.status,
+            j.checks,
+        )
     return j, time.monotonic() - start, result
 
 
@@ -213,11 +229,19 @@ def judge_once(tool: core.Tool, recipe: dict, impl: str, explore_mode: str = "of
                 if ok:
                     j2, _, _ = execute(tool, recipe, impl)
                     if j2.verdict == core.AGREE:
-                        return Judgement(EXPLAINED, j.signature, "identical with CORE-MATH preloaded into the original: " + j.detail, j.status, j.checks)
+                        return Judgement(
+                            EXPLAINED,
+                            j.signature,
+                            "identical with CORE-MATH preloaded into the original: " + j.detail,
+                            j.status,
+                            j.checks,
+                        )
     return j
 
 
-_CRASHED = re.compile(r"ANTs (?:exit )?-\d+\b|ANTs killed by signal|ANTs \(?signal|by signal \d+|ANTs crash")
+_CRASHED = re.compile(
+    r"ANTs (?:exit )?-\d+\b|ANTs killed by signal|ANTs \(?signal|by signal \d+|ANTs crash"
+)
 
 
 def _original_crashed(j: Judgement) -> bool:
@@ -256,7 +280,12 @@ def run_case(
     line["findings"] = []
     for impl in tool.implementations:
         j = judge_once(tool, recipe, impl)
-        entry: dict = {"verdict": j.verdict, "signature": list(j.signature), "detail": j.detail[:600], "status": j.status}
+        entry: dict = {
+            "verdict": j.verdict,
+            "signature": list(j.signature),
+            "detail": j.detail[:600],
+            "status": j.status,
+        }
         again = [impl, *sorted(j.signature)] in (shrunk_enough or [])
         if j.verdict == DIFFER and again:
             # This difference was shrunk often enough tonight: counted, its recipe kept, not shrunk.
@@ -278,10 +307,13 @@ def run_case(
                 }
             )
         elif j.verdict == DIFFER and shrink:
+
             def attempt(r: dict, impl: str = impl) -> Judgement:
                 return judge_once(tool, r, impl)
 
-            small, kept, last, runs = shrinking.shrink(recipe, j.signature, attempt, budget_s=shrink_budget, extra=tool.shrink)
+            small, kept, last, runs = shrinking.shrink(
+                recipe, j.signature, attempt, budget_s=shrink_budget, extra=tool.shrink
+            )
             finding = {
                 "tool": tool_name,
                 "implementation": impl,
@@ -307,7 +339,10 @@ def run_case(
         line["impls"][impl] = entry
     line["seconds"] = round(time.monotonic() - start, 2)
     verdicts = [e["verdict"] for e in line["impls"].values()]
-    line["verdict"] = next((v for v in (DIFFER, TIMEOUT, UNDEFINED, NOTICE, EXPLAINED, SKIP) if v in verdicts), core.AGREE)
+    line["verdict"] = next(
+        (v for v in (DIFFER, TIMEOUT, UNDEFINED, NOTICE, EXPLAINED, SKIP) if v in verdicts),
+        core.AGREE,
+    )
     return line
 
 
@@ -327,10 +362,22 @@ def isolated_judge(tool_name: str, recipe: dict, impl: str, timeout: float) -> J
     with tempfile.TemporaryDirectory(prefix="lx-dt-crash-") as t:
         path = Path(t) / "recipe.json"
         path.write_text(json.dumps({"tool": tool_name, "recipe": recipe}), encoding="utf-8")
-        env = {**os.environ, "LARMORX_ORACLE_CACHE_MODE": os.environ.get("LARMORX_ORACLE_CACHE_MODE", "off")}
+        env = {
+            **os.environ,
+            "LARMORX_ORACLE_CACHE_MODE": os.environ.get("LARMORX_ORACLE_CACHE_MODE", "off"),
+        }
         try:
             p = subprocess.run(
-                [sys.executable, "-m", "larmorx_validation", "difftest", "--judge-recipe", str(path), "--impl", impl],
+                [
+                    sys.executable,
+                    "-m",
+                    "larmorx_validation",
+                    "difftest",
+                    "--judge-recipe",
+                    str(path),
+                    "--impl",
+                    impl,
+                ],
                 capture_output=True,
                 text=True,
                 errors="replace",
@@ -342,9 +389,18 @@ def isolated_judge(tool_name: str, recipe: dict, impl: str, timeout: float) -> J
             return Judgement(TIMEOUT, ("timeout",), f"no result within {timeout:.0f} s")
     if p.returncode < 0 or not p.stdout.strip().startswith("{"):
         tail = " ".join(p.stderr.strip().splitlines()[-3:])[-400:]
-        return Judgement(DIFFER, (CRASH,), f"the process ended by signal {-p.returncode}: {tail}" if p.returncode < 0 else f"exit {p.returncode}: {tail}", "crash")
+        return Judgement(
+            DIFFER,
+            (CRASH,),
+            f"the process ended by signal {-p.returncode}: {tail}"
+            if p.returncode < 0
+            else f"exit {p.returncode}: {tail}",
+            "crash",
+        )
     d = json.loads(p.stdout.strip().splitlines()[-1])
-    return Judgement(d["verdict"], tuple(d["signature"]), d["detail"], d.get("status", ""), d.get("checks", []))
+    return Judgement(
+        d["verdict"], tuple(d["signature"]), d["detail"], d.get("status", ""), d.get("checks", [])
+    )
 
 
 def crash_case(tool_name: str, seed: str, n: int, *, shrink_budget: float = 600.0, **_) -> dict:
@@ -354,16 +410,34 @@ def crash_case(tool_name: str, seed: str, n: int, *, shrink_budget: float = 600.
 
     tool = tools.get(tool_name)
     recipe = core.make_recipe(tool, seed, n)
-    line: dict = {"tool": tool_name, "seed": seed, "n": n, "recipe_id": core.recipe_id(recipe), "options": recipe["options"], "features": recipe.get("features", {}), "impls": {}, "findings": [], "isolated": True}
+    line: dict = {
+        "tool": tool_name,
+        "seed": seed,
+        "n": n,
+        "recipe_id": core.recipe_id(recipe),
+        "options": recipe["options"],
+        "features": recipe.get("features", {}),
+        "impls": {},
+        "findings": [],
+        "isolated": True,
+    }
     start = time.monotonic()
     for impl in tool.implementations:
         j = isolated_judge(tool_name, recipe, impl, tool.timeout * 2)
-        line["impls"][impl] = {"verdict": j.verdict, "signature": list(j.signature), "detail": j.detail[:600], "status": j.status}
+        line["impls"][impl] = {
+            "verdict": j.verdict,
+            "signature": list(j.signature),
+            "detail": j.detail[:600],
+            "status": j.status,
+        }
         if j.verdict == DIFFER:
+
             def attempt(r: dict, impl: str = impl) -> Judgement:
                 return isolated_judge(tool_name, r, impl, tool.timeout * 2)
 
-            small, kept, last, runs = shrinking.shrink(recipe, j.signature, attempt, budget_s=shrink_budget, extra=tool.shrink)
+            small, kept, last, runs = shrinking.shrink(
+                recipe, j.signature, attempt, budget_s=shrink_budget, extra=tool.shrink
+            )
             line["findings"].append(
                 {
                     "tool": tool_name,
@@ -383,7 +457,14 @@ def crash_case(tool_name: str, seed: str, n: int, *, shrink_budget: float = 600.
             )
     line["seconds"] = round(time.monotonic() - start, 2)
     verdicts = [e["verdict"] for e in line["impls"].values()]
-    line["verdict"] = CRASH if any(e["signature"] == [CRASH] for e in line["impls"].values()) else next((v for v in (DIFFER, TIMEOUT, UNDEFINED, NOTICE, EXPLAINED, SKIP) if v in verdicts), core.AGREE)
+    line["verdict"] = (
+        CRASH
+        if any(e["signature"] == [CRASH] for e in line["impls"].values())
+        else next(
+            (v for v in (DIFFER, TIMEOUT, UNDEFINED, NOTICE, EXPLAINED, SKIP) if v in verdicts),
+            core.AGREE,
+        )
+    )
     return line
 
 
@@ -405,8 +486,12 @@ def _worker(conn: Connection, threads: int) -> None:
         try:
             kind = task.pop("kind", "case")
             line = crash_case(**task) if kind == CRASH else run_case(**task)
-        except BaseException:  # noqa: BLE001 - report everything to the parent
-            line = {**{k: task.get(k) for k in ("tool_name", "seed", "n")}, "verdict": "harness-error", "detail": traceback.format_exc(limit=6)[-1500:]}
+        except BaseException:
+            line = {
+                **{k: task.get(k) for k in ("tool_name", "seed", "n")},
+                "verdict": "harness-error",
+                "detail": traceback.format_exc(limit=6)[-1500:],
+            }
         conn.send(line)
 
 
@@ -451,14 +536,25 @@ class Pool:
                     line = w["conn"].recv()
                 except (EOFError, OSError):
                     code = w["proc"].exitcode
-                    line = {"verdict": CRASH, "detail": f"the worker died (exit code {code}): larmorx or the harness crashed"}
+                    line = {
+                        "verdict": CRASH,
+                        "detail": f"the worker died (exit code {code}): larmorx or the harness crashed",
+                    }
                     self._replace(w)
                 out.append((task, line))
                 w["task"] = None
             elif time.monotonic() > w["deadline"]:
                 task, started = w["task"], w["started"]
                 self._replace(w)
-                out.append((task, {"verdict": TIMEOUT, "detail": f"killed after {time.monotonic() - started:.0f} s"}))
+                out.append(
+                    (
+                        task,
+                        {
+                            "verdict": TIMEOUT,
+                            "detail": f"killed after {time.monotonic() - started:.0f} s",
+                        },
+                    )
+                )
         return out
 
     def _replace(self, w: dict) -> None:
@@ -538,7 +634,13 @@ def night(
                 if crashes:
                     task = crashes.pop(0)
                     ct = tools.get(task["tool_name"])
-                    pool.submit(w, task, deadline_s=ct.timeout * 4 * len(ct.implementations) + shrink_budget * 2 + 300)
+                    pool.submit(
+                        w,
+                        task,
+                        deadline_s=ct.timeout * 4 * len(ct.implementations)
+                        + shrink_budget * 2
+                        + 300,
+                    )
                     continue
                 if elapsed >= budget_s or not open_tools:
                     break
@@ -552,19 +654,39 @@ def night(
                     "seed": seed,
                     "n": n,
                     "shrink_budget": shrink_budget,
-                    "shrunk_enough": [list(k[1:]) for k, c in shrinks.items() if k[0] == t.name and c >= SHRINKS_PER_SIGNATURE],
+                    "shrunk_enough": [
+                        list(k[1:])
+                        for k, c in shrinks.items()
+                        if k[0] == t.name and c >= SHRINKS_PER_SIGNATURE
+                    ],
                 }
-                pool.submit(w, task, deadline_s=t.timeout * len(t.implementations) * 3 + shrink_budget * 2 + 120)
-                open_tools = [t for t in selected if max_cases is None or counts[t.name] < max_cases]
+                pool.submit(
+                    w,
+                    task,
+                    deadline_s=t.timeout * len(t.implementations) * 3 + shrink_budget * 2 + 120,
+                )
+                open_tools = [
+                    t for t in selected if max_cases is None or counts[t.name] < max_cases
+                ]
             if pool.busy() == 0 and not crashes and (elapsed >= budget_s or not open_tools):
                 break
             for task, line in pool.collect():
                 line = {"tool": task["tool_name"], "seed": task["seed"], "n": task["n"], **line}
-                spent[line["tool"]] += float(line.get("seconds") or (time.monotonic() - started) * 0)
+                spent[line["tool"]] += float(
+                    line.get("seconds") or (time.monotonic() - started) * 0
+                )
                 if line.get("verdict") == TIMEOUT and "seconds" not in line:
                     spent[line["tool"]] += tools.get(line["tool"]).timeout
                 if line.get("verdict") == CRASH and task.get("kind") != CRASH:
-                    crashes.append({"kind": CRASH, "tool_name": task["tool_name"], "seed": task["seed"], "n": task["n"], "shrink_budget": shrink_budget})
+                    crashes.append(
+                        {
+                            "kind": CRASH,
+                            "tool_name": task["tool_name"],
+                            "seed": task["seed"],
+                            "n": task["n"],
+                            "shrink_budget": shrink_budget,
+                        }
+                    )
                 findings = line.pop("findings", [])
                 for f in findings:
                     if not f.get("not_shrunk"):
@@ -575,7 +697,11 @@ def night(
                 results.write(json.dumps(line, sort_keys=True) + "\n")
                 results.flush()
                 if line.get("verdict") not in (core.AGREE,):
-                    log(f"{line['tool']} #{line['n']}: {line.get('verdict')} {line.get('impls', '')}"[:300])
+                    log(
+                        f"{line['tool']} #{line['n']}: {line.get('verdict')} {line.get('impls', '')}"[
+                            :300
+                        ]
+                    )
     finally:
         pool.close()
         results.close()
@@ -591,7 +717,11 @@ def _resume(out: Path, tool: str) -> int:
     path = out / "results.jsonl"
     if not path.is_file():
         return 0
-    ns = [json.loads(ln).get("n", -1) for ln in path.read_text(encoding="utf-8").splitlines() if f'"tool": "{tool}"' in ln]
+    ns = [
+        json.loads(ln).get("n", -1)
+        for ln in path.read_text(encoding="utf-8").splitlines()
+        if f'"tool": "{tool}"' in ln
+    ]
     return max(ns, default=-1) + 1
 
 
@@ -611,7 +741,12 @@ def _environment() -> dict:
 
     repo = Path(__file__).resolve().parents[4]
     try:
-        commit = subprocess.run(["git", "-C", str(repo), "describe", "--always", "--dirty", "--abbrev=12"], capture_output=True, text=True, check=False).stdout.strip()
+        commit = subprocess.run(
+            ["git", "-C", str(repo), "describe", "--always", "--dirty", "--abbrev=12"],
+            capture_output=True,
+            text=True,
+            check=False,
+        ).stdout.strip()
     except OSError:
         commit = ""
     env = {"larmorx_commit": commit, "machine": platform.machine(), "cpus": os.cpu_count()}
@@ -620,5 +755,17 @@ def _environment() -> dict:
     return env
 
 
-__all__ = ["CRASH", "TIMEOUT", "UNDEFINED", "CaseTimeout", "Pool", "crash_case", "execute", "isolated_judge", "judge_once", "limit_threads", "night", "run_case"]
-
+__all__ = [
+    "CRASH",
+    "TIMEOUT",
+    "UNDEFINED",
+    "CaseTimeout",
+    "Pool",
+    "crash_case",
+    "execute",
+    "isolated_judge",
+    "judge_once",
+    "limit_threads",
+    "night",
+    "run_case",
+]

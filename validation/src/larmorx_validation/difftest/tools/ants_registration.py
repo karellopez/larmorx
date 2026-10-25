@@ -42,9 +42,16 @@ CLOCK_SEEDED = ("Exponential", "BSplineExponential", "TimeVaryingVelocityField")
 def _phantom_pair(d: gen.Draw, dim: int) -> tuple[dict, dict]:
     n = [d.integer(f"fixed n{k}", 10, 22) for k in range(dim if dim < 4 else 3)]
     spacing = d.choice("fixed spacing", (2.0, 2.5, 3.0))
-    fixed_geo = gen.plumb_geometry((spacing,) * 3, tuple(-(v - 1) * spacing / 2 for v in [*n, 1, 1][:3]))
+    fixed_geo = gen.plumb_geometry(
+        (spacing,) * 3, tuple(-(v - 1) * spacing / 2 for v in [*n, 1, 1][:3])
+    )
     if d.chance("oblique fixed", 0.2):
-        fixed_geo["quaternion"] = [d.integer("fq a", 8, 30), d.integer("fq b", -2, 2), d.integer("fq c", -2, 2), d.integer("fq d", -2, 2)]
+        fixed_geo["quaternion"] = [
+            d.integer("fq a", 8, 30),
+            d.integer("fq b", -2, 2),
+            d.integer("fq c", -2, 2),
+            d.integer("fq d", -2, 2),
+        ]
     content = gen.draw_content(d.child("content"), ("head", "blobs", "crop"), (6, 2, 1))
     if content["type"] in ("head", "blobs"):
         content["size"] = float(min(n) * spacing * 0.42)
@@ -66,13 +73,21 @@ def _phantom_pair(d: gen.Draw, dim: int) -> tuple[dict, dict]:
     }
     m_geo = dict(fixed_geo)
     if d.chance("moving on another grid", 0.6):
-        m_geo = gen.plumb_geometry((d.choice("moving spacing", (2.0, 2.5, 3.0, 3.5)),) * 3, fixed_geo["origin"])
-        m_geo["origin"] = [o + d.step(f"moving origin{k}", -3.0, 3.0, 0.5) for k, o in enumerate(fixed_geo["origin"])]
+        m_geo = gen.plumb_geometry(
+            (d.choice("moving spacing", (2.0, 2.5, 3.0, 3.5)),) * 3, fixed_geo["origin"]
+        )
+        m_geo["origin"] = [
+            o + d.step(f"moving origin{k}", -3.0, 3.0, 0.5)
+            for k, o in enumerate(fixed_geo["origin"])
+        ]
     moving = {
         **fixed,
         "geometry": m_geo,
         "motion": [motion] * (shape[3] if len(shape) == 4 else 1),
-        "values": {"scale": d.choice("moving scale", (1.0, 1.3, 0.8)), "offset": d.choice("moving offset", (0.0, 20.0))},
+        "values": {
+            "scale": d.choice("moving scale", (1.0, 1.3, 0.8)),
+            "offset": d.choice("moving offset", (0.0, 20.0)),
+        },
         "dtype": d.choice("moving dtype", ("float32", "float32", "int16", "float64")),
     }
     if content["type"] == "head":
@@ -94,13 +109,18 @@ def _metric(d: gen.Draw, k: int, linear: bool) -> tuple[str, str]:
     if name == "CC":
         return name, f"CC[{f},{m},{weight},{d.choice(f'radius{k}', ('1', '2', '3'))}]"
     if name == "MeanSquares" and d.chance(f"ms sampling{k}", 0.3):
-        return name, f"MeanSquares[{f},{m},{weight},0,{d.choice(f'mss{k}', ('Regular', 'Random'))},{d.choice(f'msp{k}', ('0.3', '0.5'))}]"
+        return (
+            name,
+            f"MeanSquares[{f},{m},{weight},0,{d.choice(f'mss{k}', ('Regular', 'Random'))},{d.choice(f'msp{k}', ('0.3', '0.5'))}]",
+        )
     return name, f"{name}[{f},{m},{weight}]"
 
 
 def _transform(d: gen.Draw, k: int, family: str, dim: int) -> str:
     step = d.choice(f"step{k}", ("0.1", "0.2", "0.25", "0.5"))
-    mesh = "x".join([d.choice(f"mesh{k}", ("2", "3", "4"))] * min(dim, 3) + (["2"] if dim == 4 else []))
+    mesh = "x".join(
+        [d.choice(f"mesh{k}", ("2", "3", "4"))] * min(dim, 3) + (["2"] if dim == 4 else [])
+    )
     return {
         "Translation": f"Translation[{step}]",
         "Rigid": f"Rigid[{step}]",
@@ -124,7 +144,10 @@ def draw(d: gen.Draw) -> dict:
     fixed, moving = _phantom_pair(d.child("images"), dim)
     inputs = {"fixed": fixed, "moving": moving}
     groups = [required("dimension", "-d", str(dim)), required("verbose", "-v", "1")]
-    out = d.choice("outputs", ("[{out}/r,{out}/w.nii.gz,{out}/iw.nii.gz]", "[{out}/r,{out}/w.nii.gz]", "{out}/r"))
+    out = d.choice(
+        "outputs",
+        ("[{out}/r,{out}/w.nii.gz,{out}/iw.nii.gz]", "[{out}/r,{out}/w.nii.gz]", "{out}/r"),
+    )
     groups.append(required("output", "-o", out))
     options = [f"dimension {dim}"]
     if d.chance("float", 0.3):
@@ -140,14 +163,26 @@ def draw(d: gen.Draw) -> dict:
         groups.append(group("histogram matching", "-u", "1"))
         options.append("-u 1")
     if d.chance("winsorize", 0.2):
-        groups.append(group("winsorize", "-w", d.choice("winsorize range", ("[0.005,0.995]", "[0.01,0.99]"))))
+        groups.append(
+            group("winsorize", "-w", d.choice("winsorize range", ("[0.005,0.995]", "[0.01,0.99]")))
+        )
         options.append("-w")
     if d.chance("initial", 0.35):
-        groups.append(group("initial", "-r", f"[{{in:fixed}},{{in:moving}},{d.choice('initial kind', ('0', '1', '2'))}]"))
+        groups.append(
+            group(
+                "initial",
+                "-r",
+                f"[{{in:fixed}},{{in:moving}},{d.choice('initial kind', ('0', '1', '2'))}]",
+            )
+        )
         options.append("-r")
     if d.chance("masks", 0.2):
         inputs["fmask"] = _ants.mask_of(fixed, d.child("fmask"), dtype="uint8")
-        groups.append(group("masks", "-x", "[{in:fmask}]" if d.chance("fixed mask only", 0.5) else "{in:fmask}"))
+        groups.append(
+            group(
+                "masks", "-x", "[{in:fmask}]" if d.chance("fixed mask only", 0.5) else "{in:fmask}"
+            )
+        )
         options.append("-x")
     n_stages = d.integer("stages", 1, 3)
     deformed = False
@@ -156,14 +191,18 @@ def draw(d: gen.Draw) -> dict:
         if deformed:
             family = d.choice(f"family{k}", DEFORMABLE)
         else:
-            family = d.choice(f"family{k}", (*LINEAR, *DEFORMABLE), (2, 2, 1, 2, 1, *(1,) * len(DEFORMABLE)))
+            family = d.choice(
+                f"family{k}", (*LINEAR, *DEFORMABLE), (2, 2, 1, 2, 1, *(1,) * len(DEFORMABLE))
+            )
         linear = family in LINEAR
         deformed = deformed or not linear
         metric, metric_text = _metric(d.child(f"stage{k}"), k, linear)
         levels = d.integer(f"levels{k}", 1, 2)
         iters = "x".join(d.choice(f"iterations{k}{j}", ("2", "3", "5", "8")) for j in range(levels))
         shrink = "x".join(["2", "1"][-levels:]) if levels == 2 else "1"
-        smooth = ("1x0" if levels == 2 else "0") + d.choice(f"smoothing units{k}", ("vox", "", "mm"))
+        smooth = ("1x0" if levels == 2 else "0") + d.choice(
+            f"smoothing units{k}", ("vox", "", "mm")
+        )
         groups.append(
             required(
                 f"stage {k}",
@@ -190,7 +229,15 @@ def draw(d: gen.Draw) -> dict:
     return {"groups": groups, "inputs": inputs, "options": options, "extra": extra}
 
 
-def case(recipe: dict, impl: str, *, case_prefix: str | None = None, cid: str | None = None, description: str | None = None, **kw):
+def case(
+    recipe: dict,
+    impl: str,
+    *,
+    case_prefix: str | None = None,
+    cid: str | None = None,
+    description: str | None = None,
+    **kw,
+):
     from larmorx_validation.parity.ants_registration import RegCase
     from larmorx_validation.parity.harness import Case
 
@@ -216,7 +263,10 @@ def _no_stages_beyond_one(recipe: dict):
     if len(stages) <= 1:
         return
     for keep in stages:
-        r = {**recipe, "groups": [g for i, g in enumerate(recipe["groups"]) if i not in stages or i == keep]}
+        r = {
+            **recipe,
+            "groups": [g for i, g in enumerate(recipe["groups"]) if i not in stages or i == keep],
+        }
         yield r
 
 

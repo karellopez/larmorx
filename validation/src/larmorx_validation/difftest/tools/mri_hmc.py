@@ -31,16 +31,45 @@ def draw(d: gen.Draw) -> dict:
     n = [d.integer("nx", 12, 32), d.integer("ny", 12, 32), d.integer("nz", 6, 20)]
     vols = d.integer("volumes", 4, 8)
     spacing = d.choice("spacing", (2.0, 3.0, 3.5, 4.0))
-    geometry = gen.plumb_geometry((spacing, spacing, d.choice("slice spacing", (spacing, 4.0, 3.0))), tuple(-(v - 1) * spacing / 2 for v in n))
+    geometry = gen.plumb_geometry(
+        (spacing, spacing, d.choice("slice spacing", (spacing, 4.0, 3.0))),
+        tuple(-(v - 1) * spacing / 2 for v in n),
+    )
     if d.chance("oblique", 0.2):
-        geometry["quaternion"] = [d.integer("qa", 10, 30), d.integer("qb", -2, 2), 0, d.integer("qd", -2, 2)]
-    content = {"type": "head", "seed": d.seed(), "centre": [0.0, 0.0, 0.0], "size": float(min(n[0], n[1]) * spacing * 0.42), "axes": [1.0, 1.1, 0.9], "bias": [0.0, 0.0, 0.0, 0.0], "noise": d.choice("noise", (0.0, 1.0, 3.0)), "tissues": d.choice("tissues", ("epi", "t2"))}
+        geometry["quaternion"] = [
+            d.integer("qa", 10, 30),
+            d.integer("qb", -2, 2),
+            0,
+            d.integer("qd", -2, 2),
+        ]
+    content = {
+        "type": "head",
+        "seed": d.seed(),
+        "centre": [0.0, 0.0, 0.0],
+        "size": float(min(n[0], n[1]) * spacing * 0.42),
+        "axes": [1.0, 1.1, 0.9],
+        "bias": [0.0, 0.0, 0.0, 0.0],
+        "noise": d.choice("noise", (0.0, 1.0, 3.0)),
+        "tissues": d.choice("tissues", ("epi", "t2")),
+    }
     motions = []
     for t in range(vols):
         if t == 0 and d.chance("first at rest", 0.5):
-            motions.append({"quaternion": [1, 0, 0, 0], "translation": [0.0, 0.0, 0.0], "centre": [0.0, 0.0, 0.0]})
+            motions.append(
+                {
+                    "quaternion": [1, 0, 0, 0],
+                    "translation": [0.0, 0.0, 0.0],
+                    "centre": [0.0, 0.0, 0.0],
+                }
+            )
         else:
-            motions.append(gen.draw_rigid(d.child(f"motion{t}"), degrees="small", shift=d.choice(f"shift{t}", (0.5, 1.0, 2.0))))
+            motions.append(
+                gen.draw_rigid(
+                    d.child(f"motion{t}"),
+                    degrees="small",
+                    shift=d.choice(f"shift{t}", (0.5, 1.0, 2.0)),
+                )
+            )
     series = {
         "shape": [*n, vols],
         "geometry": geometry,
@@ -55,10 +84,23 @@ def draw(d: gen.Draw) -> dict:
         "keep_content": True,
     }
     in_files = {"in": series}
-    groups = [required("input", "-in", "{in:in}"), required("output", "-out", "{run}/out_mcf.nii.gz")]
+    groups = [
+        required("input", "-in", "{in:in}"),
+        required("output", "-out", "{run}/out_mcf.nii.gz"),
+    ]
     options = []
     if d.chance("reffile", 0.4):
-        ref = {**series, "shape": n, "motion": [{"quaternion": [1, 0, 0, 0], "translation": [0.0, 0.0, 0.0], "centre": [0.0, 0.0, 0.0]}]}
+        ref = {
+            **series,
+            "shape": n,
+            "motion": [
+                {
+                    "quaternion": [1, 0, 0, 0],
+                    "translation": [0.0, 0.0, 0.0],
+                    "centre": [0.0, 0.0, 0.0],
+                }
+            ],
+        }
         ref.pop("timing")
         in_files["ref"] = ref
         groups.append(group("reffile", "-reffile", "{in:ref}"))
@@ -67,14 +109,29 @@ def draw(d: gen.Draw) -> dict:
         groups.append(group("refvol", "-refvol", str(d.integer("refvol value", 0, vols - 1))))
         options.append("-refvol")
     for name, p, words in (
-        ("cost", 0.4, lambda: ["-cost", d.choice("cost value", ("mutualinfo", "corratio", "normcorr", "normmi", "leastsquares"))]),
+        (
+            "cost",
+            0.4,
+            lambda: [
+                "-cost",
+                d.choice(
+                    "cost value", ("mutualinfo", "corratio", "normcorr", "normmi", "leastsquares")
+                ),
+            ],
+        ),
         ("bins", 0.15, lambda: ["-bins", d.choice("bins value", ("64", "128", "256"))]),
         ("dof", 0.25, lambda: ["-dof", d.choice("dof value", ("6", "7", "9", "12"))]),
         ("stages", 0.25, lambda: ["-stages", d.choice("stages value", ("1", "2", "3", "4"))]),
         ("smooth", 0.2, lambda: ["-smooth", d.choice("smooth value", ("0", "1", "2"))]),
         ("scaling", 0.1, lambda: ["-scaling", d.choice("scaling value", ("3", "6", "1"))]),
         ("rotation", 0.1, lambda: ["-rotation", d.choice("rotation value", ("0.5", "1", "2"))]),
-        ("final", 0.25, lambda: [d.choice("final interpolation", ("-spline_final", "-sinc_final", "-nn_final"))]),
+        (
+            "final",
+            0.25,
+            lambda: [
+                d.choice("final interpolation", ("-spline_final", "-sinc_final", "-nn_final"))
+            ],
+        ),
         ("meanvol", 0.15, lambda: ["-meanvol"]),
         ("stats", 0.15, lambda: ["-stats"]),
         ("fudge", 0.05, lambda: ["-fudge"]),
@@ -88,7 +145,12 @@ def draw(d: gen.Draw) -> dict:
     if outs:
         groups.append(group("outputs", *outs))
         options += outs
-    return {"groups": groups, "inputs": in_files, "options": options, "extra": {"min_size": 12, "min_volumes": 4, "keep_inputs": ["in"]}}
+    return {
+        "groups": groups,
+        "inputs": in_files,
+        "options": options,
+        "extra": {"min_size": 12, "min_volumes": 4, "keep_inputs": ["in"]},
+    }
 
 
 @functools.cache
@@ -98,12 +160,22 @@ def _fsl() -> Path:
     return fsldir()
 
 
-def case(recipe: dict, impl: str, *, case_prefix: str | None = None, cid: str | None = None, description: str | None = None, **kw):
+def case(
+    recipe: dict,
+    impl: str,
+    *,
+    case_prefix: str | None = None,
+    cid: str | None = None,
+    description: str | None = None,
+    **kw,
+):
     from larmorx_validation.parity.harness import Case
 
     prefix = _ants.prefix_of(recipe, case_prefix)
     payload = {"recipe": recipe, "prefix": prefix, "impl": impl}
-    return Case(cid or _ants.case_id(recipe), "difftest", description or _ants.describe(recipe), payload)
+    return Case(
+        cid or _ants.case_id(recipe), "difftest", description or _ants.describe(recipe), payload
+    )
 
 
 def _args_for(recipe: dict, prefix: str, run_dir: Path, copy_inputs: bool) -> list[str]:
@@ -152,7 +224,9 @@ def _run_original(case, checks) -> None:
             "steps": [{"argv": [str(_fsl() / "bin" / "mcflirt"), *args], "exit": done.code}],
         }
         (run_dir / "run.json").write_text(json.dumps(run, indent=1), encoding="utf-8")
-        (root / "manifest.json").write_text(json.dumps({"runs": {name: {"ok": done.code == 0}}}), encoding="utf-8")
+        (root / "manifest.json").write_text(
+            json.dumps({"runs": {name: {"ok": done.code == 0}}}), encoding="utf-8"
+        )
         saved = os.environ.get("LARMORX_MCFLIRT_ORACLE")
         os.environ["LARMORX_MCFLIRT_ORACLE"] = str(root)
         mri_hmc.oracle_dir.cache_clear()
@@ -175,7 +249,10 @@ def _run_replica(case, checks) -> None:
     from larmorx_validation.parity import fsl_mcflirt_replica as rep
 
     p = case.payload
-    with tempfile.TemporaryDirectory(prefix="lx-dt-mcf-") as a_, tempfile.TemporaryDirectory(prefix="lx-dt-mcf-") as b_:
+    with (
+        tempfile.TemporaryDirectory(prefix="lx-dt-mcf-") as a_,
+        tempfile.TemporaryDirectory(prefix="lx-dt-mcf-") as b_,
+    ):
         a, b = Path(a_), Path(b_)
 
         def prepare(d: Path) -> list[str]:
@@ -183,12 +260,22 @@ def _run_replica(case, checks) -> None:
 
         settings: dict[str, str | None] = {}
         oracle = rep.run_oracle(prepare(a), cwd=a, settings=settings)
-        replica = rep.run_replica(prepare(b), cwd=b, settings=settings, mode=defects.REPRODUCE, threads=1)
+        replica = rep.run_replica(
+            prepare(b), cwd=b, settings=settings, mode=defects.REPRODUCE, threads=1
+        )
         exclude = {f"{n}.nii.gz" for n in p["recipe"]["inputs"]}
         rep.compare(
             checks,
-            rep.Completed(oracle.code, oracle.stdout.replace(str(a), "<run>"), oracle.stderr.replace(str(a), "<run>")),
-            rep.Completed(replica.code, replica.stdout.replace(str(b), "<run>"), replica.stderr.replace(str(b), "<run>")),
+            rep.Completed(
+                oracle.code,
+                oracle.stdout.replace(str(a), "<run>"),
+                oracle.stderr.replace(str(a), "<run>"),
+            ),
+            rep.Completed(
+                replica.code,
+                replica.stdout.replace(str(b), "<run>"),
+                replica.stderr.replace(str(b), "<run>"),
+            ),
             a,
             b,
             exclude,

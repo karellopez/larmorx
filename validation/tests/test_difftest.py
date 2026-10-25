@@ -14,7 +14,15 @@ import pytest
 
 difftest = pytest.importorskip("larmorx_validation.difftest")
 
-from larmorx_validation.difftest import core, gen, inputs, permanent, report, shrink, tools  # noqa: E402
+from larmorx_validation.difftest import (  # noqa: E402
+    core,
+    gen,
+    inputs,
+    permanent,
+    report,
+    shrink,
+    tools,
+)
 from larmorx_validation.parity.harness import CaseResult, Check  # noqa: E402
 
 
@@ -38,7 +46,10 @@ def test_every_tool_draws_reproducible_recipes(name):
     assert core.make_recipe(t, "test", 0) != core.make_recipe(t, "test", 1)
 
 
-@pytest.mark.parametrize("name", ["ants-image-math", "afni-tshift", "nifti-io", "ants-apply-transforms", "ants-registration"])
+@pytest.mark.parametrize(
+    "name",
+    ["ants-image-math", "afni-tshift", "nifti-io", "ants-apply-transforms", "ants-registration"],
+)
 def test_inputs_are_the_same_bytes_every_time(name, tmp_path):
     t = tools.get(name)
     recipe = core.make_recipe(t, "bytes", 3)
@@ -69,7 +80,10 @@ def test_header_geometry_reads_back(tmp_path):
 
     spec = {
         "shape": [5, 4, 3],
-        "geometry": {**gen.plumb_geometry((2.0, 3.0, 4.0), (-1.0, 2.0, 3.0)), "quaternion": [10, 1, -2, 1]},
+        "geometry": {
+            **gen.plumb_geometry((2.0, 3.0, 4.0), (-1.0, 2.0, 3.0)),
+            "quaternion": [10, 1, -2, 1],
+        },
         "content": {"type": "ramp", "seed": 1, "direction": [1, 0, 0]},
         "values": {"scale": 1.0, "offset": 0.0},
         "dtype": "int16",
@@ -91,7 +105,13 @@ def _result(status: str, checks: list[Check], reason: str = "") -> CaseResult:
 
 def test_verdicts():
     t = tools.get("ants-image-math")
-    agree = _result("pass", [Check("values (bit-identical)", True, value=0), Check("bit-identical", True, value=0, threshold="reported")])
+    agree = _result(
+        "pass",
+        [
+            Check("values (bit-identical)", True, value=0),
+            Check("bit-identical", True, value=0, threshold="reported"),
+        ],
+    )
     assert core.judge(t, "port", agree).verdict == core.AGREE
     # A reported count of 1 differing value is not "identical" (1 == True in Python).
     one = _result("pass", [Check("bit-identical", True, value=1, threshold="reported")])
@@ -99,12 +119,36 @@ def test_verdicts():
     fail = _result("fail", [Check("header (every field)", False, detail="srow_x differs")])
     j = core.judge(t, "port", fail)
     assert j.verdict == core.DIFFER and j.signature == ("header (every field)",)
-    notice = _result("fail", [Check("D13 fix pass", False, detail="ANTS-38, ANTS-35: no values changed")])
+    notice = _result(
+        "fail", [Check("D13 fix pass", False, detail="ANTS-38, ANTS-35: no values changed")]
+    )
     j = core.judge(t, "port", notice)
     assert j.verdict == core.NOTICE and j.signature == ("notice: ANTS-38, ANTS-35",)
     # A correction that changed values without being named is a difference, not a notice.
-    silent = _result("fail", [Check("D13 fix pass", False, detail="no defect named: 3 of 8 values, max |diff| 1 changed")])
+    silent = _result(
+        "fail",
+        [
+            Check(
+                "D13 fix pass", False, detail="no defect named: 3 of 8 values, max |diff| 1 changed"
+            )
+        ],
+    )
     assert core.judge(t, "port", silent).verdict == core.DIFFER
+    # A defect named in one mode only (another correction's path): a notice, with its defect.
+    one_mode = _result(
+        "fail",
+        [
+            Check(
+                "D13 notices in both modes",
+                False,
+                detail="fix: ['ITK-50']; reproduce: ['ITK-50', 'ANTS-90']",
+            )
+        ],
+    )
+    j = core.judge(t, "port", one_mode)
+    assert j.verdict == core.NOTICE and j.signature == ("notice: ANTS-90",)
+    both = _result("fail", [one_mode.checks[0], silent.checks[0]])
+    assert core.judge(t, "port", both).verdict == core.DIFFER
     clean_room = tools.get("afni-tshift")
     reported = _result("pass", [Check("bit-identical", True, value=7, threshold="reported")])
     assert core.judge(clean_room, "original", reported).verdict == core.AGREE
@@ -129,7 +173,10 @@ def test_shrinking_keeps_the_difference_and_drops_the_rest():
 
     small, kept, last, runs = shrink.shrink(recipe, ("values (bit-identical)",), run, budget_s=60)
     assert 3 <= small["inputs"]["a"]["shape"][0] < 6
-    assert all(n <= 2 for n in small["inputs"]["a"]["shape"][1:3]) or len(small["inputs"]["a"]["shape"]) < 3
+    assert (
+        all(n <= 2 for n in small["inputs"]["a"]["shape"][1:3])
+        or len(small["inputs"]["a"]["shape"]) < 3
+    )
     assert small["inputs"]["a"]["geometry"]["quaternion"] == [1, 0, 0, 0]
     assert last is not None and runs >= len(kept)
 
@@ -138,15 +185,31 @@ def test_permanent_cases_round_trip(tmp_path, monkeypatch):
     t = tools.get("ants-threshold-image")
     recipe = core.make_recipe(t, "perm", 2)
     finding = tmp_path / "f.json"
-    finding.write_text(json.dumps({"tool": t.name, "implementation": "port", "seed": "perm", "n": 2, "signature": ["x"], "recipe": recipe, "shrunk": recipe}))
+    finding.write_text(
+        json.dumps(
+            {
+                "tool": t.name,
+                "implementation": "port",
+                "seed": "perm",
+                "n": 2,
+                "signature": ["x"],
+                "recipe": recipe,
+                "shrunk": recipe,
+            }
+        )
+    )
     monkeypatch.setattr(inputs, "CASES", tmp_path / "cases")
-    path = permanent.promote(finding, "example", tier="standard", status="fixed", out_root=tmp_path / "cases")
+    path = permanent.promote(
+        finding, "example", tier="standard", status="fixed", out_root=tmp_path / "cases"
+    )
     assert path.parent.name == t.name and json.loads(path.read_text())["recipe"] == recipe
     cs = permanent.cases(t.name, "standard")
     assert [c.id for c in cs] == ["difftest/example"]
     assert permanent.cases(t.name, "smoke") == []
     payload = cs[0].payload
-    assert payload.tier == "standard" and any("dt:case/ants-threshold-image/example/" in a for a in payload.args)
+    assert payload.tier == "standard" and any(
+        "dt:case/ants-threshold-image/example/" in a for a in payload.args
+    )
     # The inputs are rebuilt from the permanent case's recipe alone.
     key = next(a for a in payload.args if "dt:case/" in a)[len("{gen:dt:") : -1]
     assert inputs.path(key).is_file()
@@ -156,15 +219,53 @@ def test_report(tmp_path):
     out = tmp_path / "night"
     (out / "findings" / "ants-n4").mkdir(parents=True)
     recipe = core.make_recipe(tools.get("ants-n4"), "r", 0)
-    (out / "run.json").write_text(json.dumps({"seed": "r", "budget_s": 60, "jobs": 1, "threads": 1, "started": "2026-10-25T01:00:00"}))
+    (out / "run.json").write_text(
+        json.dumps(
+            {"seed": "r", "budget_s": 60, "jobs": 1, "threads": 1, "started": "2026-10-25T01:00:00"}
+        )
+    )
     lines = [
-        {"tool": "ants-n4", "seed": "r", "n": 0, "verdict": "agree", "options": ["-b"], "impls": {"port": {"verdict": "agree"}}, "seconds": 1.0},
-        {"tool": "ants-n4", "seed": "r", "n": 1, "verdict": "differ", "options": ["-c"], "impls": {"port": {"verdict": "differ"}}, "seconds": 2.0},
-        {"tool": "ants-n4", "seed": "r", "n": 2, "verdict": "notice", "options": [], "impls": {"port": {"verdict": "notice", "signature": ["notice: ANTS-38"]}}},
+        {
+            "tool": "ants-n4",
+            "seed": "r",
+            "n": 0,
+            "verdict": "agree",
+            "options": ["-b"],
+            "impls": {"port": {"verdict": "agree"}},
+            "seconds": 1.0,
+        },
+        {
+            "tool": "ants-n4",
+            "seed": "r",
+            "n": 1,
+            "verdict": "differ",
+            "options": ["-c"],
+            "impls": {"port": {"verdict": "differ"}},
+            "seconds": 2.0,
+        },
+        {
+            "tool": "ants-n4",
+            "seed": "r",
+            "n": 2,
+            "verdict": "notice",
+            "options": [],
+            "impls": {"port": {"verdict": "notice", "signature": ["notice: ANTS-38"]}},
+        },
     ]
     (out / "results.jsonl").write_text("".join(json.dumps(x) + "\n" for x in lines))
     (out / "findings" / "ants-n4" / "r-00001-port.json").write_text(
-        json.dumps({"tool": "ants-n4", "implementation": "port", "seed": "r", "n": 1, "signature": ["values"], "recipe": recipe, "shrunk": recipe, "shrink_moves": ["a"]})
+        json.dumps(
+            {
+                "tool": "ants-n4",
+                "implementation": "port",
+                "seed": "r",
+                "n": 1,
+                "signature": ["values"],
+                "recipe": recipe,
+                "shrunk": recipe,
+                "shrink_moves": ["a"],
+            }
+        )
     )
     path = report.write(out)
     text = path.read_text()

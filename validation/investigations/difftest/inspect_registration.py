@@ -28,7 +28,9 @@ def main() -> int:
     a_dir, l_dir = work / "ants", work / "larmorx"
     a_dir.mkdir(exist_ok=True)
     l_dir.mkdir(exist_ok=True)
-    a = reg._run_ants(reg._resolve(c, a_dir, work), c.seed, correctly_rounded=crmath, never="inspection")
+    a = reg._run_ants(
+        reg._resolve(c, a_dir, work), c.seed, correctly_rounded=crmath, never="inspection"
+    )
     lx = reg._run_larmorx(reg._resolve(c, l_dir, work), c.seed)
     print("args:", " ".join(c.args))
     print(f"ANTs exit {a[0]}; larmorx exit {lx[0]}")

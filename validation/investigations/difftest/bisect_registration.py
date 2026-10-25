@@ -22,7 +22,6 @@ from pathlib import Path
 
 import nibabel as nib
 import numpy as np
-
 from larmorx_validation.difftest import tools
 from larmorx_validation.parity import ants_registration as reg
 
@@ -52,7 +51,9 @@ def compare_dirs(a: Path, b: Path) -> list[str]:
             continue
         d = np.abs(x.astype(np.float64) - y.astype(np.float64))
         n = int(np.count_nonzero(d))
-        out.append(f"{f.name}: {n} of {d.size} values differ" + (f" (max {d.max():.3g})" if n else ""))
+        out.append(
+            f"{f.name}: {n} of {d.size} values differ" + (f" (max {d.max():.3g})" if n else "")
+        )
         for idx in list(zip(*np.nonzero(d), strict=True))[:4]:
             out.append(f"    at {tuple(int(i) for i in idx)}: ANTs {x[idx]!r}, larmorx {y[idx]!r}")
     return out
@@ -82,7 +83,9 @@ def main() -> int:
         for f in d.iterdir():
             if f.is_file():
                 f.unlink()  # this tool's own outputs of an earlier run with the same edits
-    a = reg._run_ants(reg._resolve(c, a_dir, work), c.seed, correctly_rounded=True, never="inspection")
+    a = reg._run_ants(
+        reg._resolve(c, a_dir, work), c.seed, correctly_rounded=True, never="inspection"
+    )
     lx = reg._run_larmorx(reg._resolve(c, l_dir, work), c.seed)
     print("args:", line)
     print(f"ANTs (CORE-MATH) exit {a[0]}; larmorx exit {lx[0]}")

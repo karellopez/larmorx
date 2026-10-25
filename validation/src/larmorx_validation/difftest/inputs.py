@@ -58,7 +58,9 @@ def _spec(k: str) -> dict:
     if k.startswith("case/"):
         _, tool, rest = k.split("/", 2)
         case_id, name = rest.rsplit("/", 1)
-        recipe = json.loads((CASES / tool / f"{case_id}.json").read_text(encoding="utf-8"))["recipe"]
+        recipe = json.loads((CASES / tool / f"{case_id}.json").read_text(encoding="utf-8"))[
+            "recipe"
+        ]
         return recipe["inputs"][name]
     raise KeyError(f"unknown difftest input {k!r}")
 
@@ -111,7 +113,9 @@ def _itk_part(t: dict):
     import larmorx as lx
 
     return lx.transforms.ItkTransform(
-        t["type"], np.asarray(t["parameters"], dtype=np.float64), np.asarray(t["fixed"], dtype=np.float64)
+        t["type"],
+        np.asarray(t["parameters"], dtype=np.float64),
+        np.asarray(t["fixed"], dtype=np.float64),
     )
 
 

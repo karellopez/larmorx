@@ -135,7 +135,19 @@ def attach(suite) -> None:
     suite.run_case = run_case
 
 
-def promote(finding: Path, case_id: str, *, tier: str = "smoke", expect: str = "pass", reason: str = "", status: str = "fixed", defect: str | None = None, rule: str | None = None, description: str = "", out_root: Path | None = None) -> Path:
+def promote(
+    finding: Path,
+    case_id: str,
+    *,
+    tier: str = "smoke",
+    expect: str = "pass",
+    reason: str = "",
+    status: str = "fixed",
+    defect: str | None = None,
+    rule: str | None = None,
+    description: str = "",
+    out_root: Path | None = None,
+) -> Path:
     """Writes the permanent case of a finding (its shrunk recipe)."""
     f = json.loads(Path(finding).read_text(encoding="utf-8"))
     root = out_root or inputs.CASES

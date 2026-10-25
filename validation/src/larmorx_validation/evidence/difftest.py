@@ -45,7 +45,18 @@ PAGES: dict[str, tuple[str, str]] = {
     "fsl-mcflirt": ("/tools/mri-hmc/", "mcflirt replica"),
     "resample-series": ("/tools/resample-series/", "one-shot resampler"),
 }
-OUTCOMES = ("agree", "explained", "notice", "undefined", "differ", "timeout", "crash", "skipped", "harness-error", "draw-error")
+OUTCOMES = (
+    "agree",
+    "explained",
+    "notice",
+    "undefined",
+    "differ",
+    "timeout",
+    "crash",
+    "skipped",
+    "harness-error",
+    "draw-error",
+)
 UNCLEAR = ("timeout", "crash", "harness-error", "draw-error")
 TRIAGE = "validation/difftest/triage.toml"
 
@@ -65,14 +76,21 @@ def latest_night(repo: Path) -> Path | None:
 
 def triage(repo: Path) -> list[dict]:
     path = repo / TRIAGE
-    return tomllib.loads(path.read_text(encoding="utf-8")).get("difference", []) if path.is_file() else []
+    return (
+        tomllib.loads(path.read_text(encoding="utf-8")).get("difference", [])
+        if path.is_file()
+        else []
+    )
 
 
 def _outcome_of(diff: dict, entries: list[dict]) -> dict:
     """What was done about a night's difference (the first triage entry for its tool,
     implementation and a signature it shares)."""
     for e in entries:
-        if e["tool"] != diff["tool"] or e.get("implementation", diff["implementation"]) != diff["implementation"]:
+        if (
+            e["tool"] != diff["tool"]
+            or e.get("implementation", diff["implementation"]) != diff["implementation"]
+        ):
             continue
         if set(e["signature"]) & set(diff["signature"]):
             out = {"status": e["status"], "explanation": e["explanation"]}
@@ -122,7 +140,9 @@ def export(ctx: core.Context) -> dict:
                 "options_covered": t["options_covered"],
                 "features_covered": t["features_covered"],
                 "differences": diffs,
-                "notices": [{"defect": k, "cases": v["cases"]} for k, v in t.get("notices", {}).items()],
+                "notices": [
+                    {"defect": k, "cases": v["cases"]} for k, v in t.get("notices", {}).items()
+                ],
             }
         )
     return {

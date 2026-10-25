@@ -17,10 +17,18 @@ from pathlib import Path
 
 import nibabel as nib
 import numpy as np
-
 from larmorx_validation.parity import ants_programs
 
-ORIGINS = ("0,-5.25,-11", "0,5.25,11", "0,0,0", "-0,0,0", "0,-5.25,0", "0,0,-11", "1,-5.25,-11", "0,-5.25,-11,oblique")
+ORIGINS = (
+    "0,-5.25,-11",
+    "0,5.25,11",
+    "0,0,0",
+    "-0,0,0",
+    "0,-5.25,0",
+    "0,0,-11",
+    "1,-5.25,-11",
+    "0,-5.25,-11,oblique",
+)
 
 
 def write(path: Path, origin: list[float], oblique: bool) -> None:
@@ -52,13 +60,31 @@ def main() -> int:
         a = work / f"a-{spec}.nii.gz"
         write(a, origin, oblique)
         out = work / f"ants-{spec}.nii.gz"
-        subprocess.run([str(ants), "3", str(out), "m", str(a), "1"], capture_output=True, check=False)
+        subprocess.run(
+            [str(ants), "3", str(out), "m", str(a), "1"], capture_output=True, check=False
+        )
         print(f"origin {spec}: input {fields(a)}")
         print(f"  ANTs    {fields(out)}")
         for mode in ("reproduce", "fix"):
             out = work / f"lx-{mode}-{spec}.nii.gz"
             env = {**os.environ, "LARMORX_UPSTREAM_DEFECTS": mode}
-            subprocess.run([sys.executable, "-m", "larmorx", "ants", "ImageMath", "3", str(out), "m", str(a), "1"], capture_output=True, env=env, check=False)
+            subprocess.run(
+                [
+                    sys.executable,
+                    "-m",
+                    "larmorx",
+                    "ants",
+                    "ImageMath",
+                    "3",
+                    str(out),
+                    "m",
+                    str(a),
+                    "1",
+                ],
+                capture_output=True,
+                env=env,
+                check=False,
+            )
             print(f"  larmorx {mode}: {fields(out)}")
     return 0
 

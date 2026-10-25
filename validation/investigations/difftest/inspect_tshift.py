@@ -16,11 +16,26 @@ from pathlib import Path
 
 import nibabel as nib
 import numpy as np
-
 from larmorx_validation.difftest import core, inputs
 from larmorx_validation.parity import afni_tshift as at
 
-FIELDS = ("qform_code", "sform_code", "quatern_b", "quatern_c", "quatern_d", "qoffset_x", "qoffset_y", "qoffset_z", "srow_x", "srow_y", "srow_z", "pixdim", "slice_code", "slice_duration", "toffset")
+FIELDS = (
+    "qform_code",
+    "sform_code",
+    "quatern_b",
+    "quatern_c",
+    "quatern_d",
+    "qoffset_x",
+    "qoffset_y",
+    "qoffset_z",
+    "srow_x",
+    "srow_y",
+    "srow_z",
+    "pixdim",
+    "slice_code",
+    "slice_duration",
+    "toffset",
+)
 
 
 def main() -> int:
@@ -35,7 +50,12 @@ def main() -> int:
     env.update(HOME=str(work), AFNI_DONT_LOGFILE="YES", AFNI_NIFTI_TYPE_WARN="NO")
     outs = {}
     afni = work / "afni.nii"
-    subprocess.run([at.afni_binary(), *args, "-prefix", str(afni), str(src)], env=env, capture_output=True, check=False)
+    subprocess.run(
+        [at.afni_binary(), *args, "-prefix", str(afni), str(src)],
+        env=env,
+        capture_output=True,
+        check=False,
+    )
     outs["AFNI"] = afni
     for impl in ("replica", "original"):
         for mode in ("reproduce", "fix"):
@@ -43,7 +63,23 @@ def main() -> int:
             e = {**env, "LARMORX_UPSTREAM_DEFECTS": mode, "LARMORX_IMPLEMENTATION": impl}
             if impl == "replica":
                 e["LARMORX_GPL_BIN"] = str(at.replica_binary())
-            p = subprocess.run([sys.executable, "-m", "larmorx", "afni", "3dTshift", *args, "-prefix", str(out), str(src)], env=e, capture_output=True, text=True, check=False)
+            p = subprocess.run(
+                [
+                    sys.executable,
+                    "-m",
+                    "larmorx",
+                    "afni",
+                    "3dTshift",
+                    *args,
+                    "-prefix",
+                    str(out),
+                    str(src),
+                ],
+                env=e,
+                capture_output=True,
+                text=True,
+                check=False,
+            )
             outs[f"{impl} {mode}"] = out
             notes = [ln for ln in p.stderr.splitlines() if "upstream defect" in ln]
             print(f"{impl} {mode}: exit {p.returncode}; " + " | ".join(notes)[:300])

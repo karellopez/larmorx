@@ -17,7 +17,7 @@ import pytest
 pytest.importorskip("nibabel")
 stages = pytest.importorskip("larmorx_validation.stages")
 from larmorx_validation.stages import catalogue, runners  # noqa: E402
-from larmorx_validation.stages.oracle import Node, OracleRun  # noqa: E402
+from larmorx_validation.stages.oracle import Node, OracleRun, run_finished  # noqa: E402
 
 
 def _oracle() -> Path | None:
@@ -87,6 +87,37 @@ def test_slice_timing_stage():
     topup = _node("fmriprep_25_2_wf/sub_1_wf/fmap_preproc_wf/wf_auto_00000/topup", "topup --a")
     assert catalogue.stage_of(topup) is None
     assert catalogue.missing_of(topup).tool == "topup"
+
+
+def test_multi_echo_nodes():
+    """A multi-echo run (ds003592): per-echo nodes under nipype's ``_echoidx_<i>`` iterable,
+    the T2* map's resamplings and report, and tedana's t2smap."""
+    wf = "fmriprep_25_2_wf/sub_280_ses_1_wf/bold_ses_1_task_rest_echo_1_wf"
+    stc = f"{wf}/bold_native_wf/bold_stc_wf/_echoidx_1/slice_timing_correction"
+    norm, keys = catalogue.normalise(stc)
+    assert norm == "bold_wf/bold_native_wf/bold_stc_wf/slice_timing_correction"
+    assert keys == {"subject": "280_ses_1", "run": "ses_1_task_rest_echo_1", "echo": "1"}
+    assert (
+        catalogue.stage_of(_node(stc, "3dTshift -ignore 0 -prefix o.nii.gz i.nii.gz")).id == "F02"
+    )
+    ref = f"{wf}/bold_native_wf/_echoidx_0/boldref_bold"
+    assert catalogue.stage_of(_node(ref, interface="resampling")).id == "F05"
+    t1 = f"{wf}/ds_bold_t1_wf/resample_t2star"
+    assert catalogue.stage_of(_node(t1, "antsApplyTransforms --float 1")).id == "F08"
+    std = f"{wf}/ds_bold_std_wf/_in_tuple_MNI152NLin2009cAsym.res2/resample_t2star"
+    assert catalogue.stage_of(_node(std, "antsApplyTransforms --float 1")).id == "F09"
+    label = f"{wf}/t2s_reporting_wf/label_tfm"
+    assert catalogue.stage_of(_node(label, "antsApplyTransforms --float 0")).id == "F13"
+    t2smap = _node(f"{wf}/bold_native_wf/bold_t2smap_wf/t2smap_node", "t2smap -d a b c -e 14")
+    assert catalogue.stage_of(t2smap) is None
+    assert catalogue.missing_of(t2smap).tool == "t2smap"
+    # the derivatives of a multi-echo run drop the echo entity its workflow's name keeps
+    from larmorx_validation.stages.nodes import _bids_run, _same_run
+
+    tsv = "sub-280_ses-1_task-rest_desc-confounds_timeseries.tsv"
+    assert _same_run(_bids_run(tsv), "ses_1_task_rest_echo_1")
+    assert not _same_run(_bids_run(tsv), "ses_1_task_other_echo_1")
+    assert _same_run("task_x_echo_1", "task_x_echo_1")
 
 
 def test_prepare_inputs(tmp_path):
@@ -175,27 +206,41 @@ needs_oracle = pytest.mark.skipif(ORACLE is None, reason="no fMRIPrep oracle run
 
 
 def _oracle_runs() -> list[Path]:
-    """Every finished fMRIPrep oracle run of the workspace (``oracles/fmriprep-*/<run>``)."""
+    """Every fMRIPrep oracle run of the workspace (``oracles/fmriprep-*/<run>`` with a working
+    directory), finished or not: the test skips one in progress explicitly."""
     for parent in Path(__file__).resolve().parents:
         root = parent / "oracles"
         if root.is_dir():
-            return sorted(
-                p
-                for p in root.glob("fmriprep-*/*")
-                if (p / "work").is_dir() and "finished:" in _info(p)
-            )
+            return sorted(p for p in root.glob("fmriprep-*/*") if (p / "work").is_dir())
     return []
 
 
-def _info(run: Path) -> str:
-    f = run / "RUN_INFO.txt"
-    return f.read_text(encoding="utf-8") if f.is_file() else ""
+def test_run_finished(tmp_path):
+    """A run in progress (no ``finished:`` line, no fMRIPrep end message) is not finished;
+    either marker makes it finished, whatever its exit status."""
+    (tmp_path / "work").mkdir()
+    info = tmp_path / "RUN_INFO.txt"
+    info.write_text("fMRIPrep oracle run: x\nstarted: 2026-10-25T00:00:00Z\n", encoding="utf-8")
+    (tmp_path / "fmriprep.log").write_text("running\n", encoding="utf-8")
+    assert not run_finished(tmp_path) and not OracleRun(tmp_path).finished
+    (tmp_path / "fmriprep.log").write_text("\t fMRIPrep finished successfully!\n", encoding="utf-8")
+    assert run_finished(tmp_path)
+    (tmp_path / "fmriprep.log").write_text("running\n", encoding="utf-8")
+    with info.open("a", encoding="utf-8") as f:
+        f.write("finished: 2026-10-25T01:00:00Z\nexit status: 1\n")
+    assert run_finished(tmp_path)
 
 
 @pytest.mark.parametrize("root", _oracle_runs() or [None], ids=lambda p: p.name if p else "none")
 def test_every_program_node_is_classified(root):
     if root is None:
         pytest.skip("no fMRIPrep oracle run")
+    if not run_finished(root):
+        # An explicit check: a run still in progress has an incomplete working directory that
+        # changes while the test reads it, so it must not fail (or pass) anything.
+        pytest.skip(
+            f"{root.name} has not finished (no 'finished:' in RUN_INFO.txt, no end message)"
+        )
     run = OracleRun(root)
     unclassified = [
         n.path

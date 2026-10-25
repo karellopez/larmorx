@@ -691,7 +691,7 @@ def _band(rec) -> dict:
 A44_DATA = {
     "dataset": "OpenNeuro ds000005 (mixed-gambles task), v00001",
     "subject": "sub-01",
-    "licence": "CC0-1.0",
+    "licence": "PDDL-1.0",
 }
 PREPROC = "out/sub-01/anat/sub-01_desc-preproc_T1w.nii.gz"
 

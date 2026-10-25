@@ -72,17 +72,19 @@ starts no other agent.
    tier's records took 2021 s without the cache and 694 s warm, `pytest tests/parity` 94 minutes
    and 27, `ants-registration`'s standard record 2.0 hours and 49 minutes (509 of its 657 original
    runs from the cache); details and the proof in [oracle-cache.md](validation/oracle-cache.md). Then:
-   **the data panel** (in progress: 14 OpenNeuro datasets approved by the user on 2026-10-24, one
-   subject each, 2.35 GB, 3T and 7T and 1.5T, three vendors, multiband and single-band, children
-   and older adults, a tumour and a stroke with its lesion mask, low quality and motion; in
-   `larmorx-testdata` with its licences and hash-verified downloads; fMRIPrep 25.2.6 oracle runs
-   for the nine new ones; the site's evidence made to scale without losing anything, with credits
-   and a Data panel page); **differential random
+   **the data panel: done** (2026-10-25; larmorx-testdata `docs/panel.md`: fourteen subjects
+   approved by the user on 2026-10-24, 2.35 GB, every criterion covered, defacing checked; the
+   site's evidence scales to it without losing anything: slices views for new panel cases, the
+   blob branch, the size guard, credits; the site's Data panel page; 3dAutomask's first panel
+   case); its nine new fMRIPrep oracle runs done (all exit 0); **differential random
    testing** (a shared harness that generates random valid command lines and inputs per tool and
    compares with the original, overnight on this machine, never in CI; then every finished
    tool); **generated tables** (the README's tool table, the validation index and the site's
    status table from one description per tool and its records). Then every finished tool is
-   re-validated on the panel, with its evidence page updated.
+   re-validated on the panel, with its evidence page updated. Each tool: its existing examples
+   unchanged; the panel's cases added beside them, two or three key datasets as whole volumes,
+   the rest as slices (`docs/figures.md`, Views); a page over its budget gets a raised one with
+   its reason, never less content (the user, 2026-10-24).
 7. **FSL:** the mcflirt replica, BET, FAST, FLIRT with BBR, topup: a replica in `larmorx-nc` (FSL
    licence, with FSL's source as its terms require) and a clean-room original each. In progress
    (started 2026-10-24, beside item 6 at the user's request). **The mcflirt replica: done**
@@ -104,6 +106,17 @@ starts no other agent.
 10. **Releases on PyPI** (below).
 
 ## Follow-ups, when they fit
+
+- **larmorx-testdata:** `ruff format --check` fails on main for three generators
+  (`generators/ants_filters_synthetic.py`, `resampling_synthetic.py`, `tshift_synthetic.py`;
+  untouched by the panel part); its CI's lint step needs them formatted.
+- **Oracle runs in progress, in the parity suites:** `test_every_program_node_is_classified` skips
+  a run that has not finished (`larmorx_validation.stages.oracle.run_finished`). Two suites still
+  enumerate every run without that check: `parity/afni_phantoms.fmriprep_runs` and
+  `parity/itk_hdf5._found_files`; one line each (`if run_finished(...)`).
+- **The site: a JavaScript syntax check in `tools/build.py`** (`node --check` on `static/js/*.js`
+  when node is present): an apostrophe in a single-quoted string once broke `evidence.js` on every
+  page while the build reported 0 problems; only the browser number check caught it.
 
 - **mcflirt's FSL-20 and FSL-21 in the clean-room original:** a spec writer adds them to
   `specs/mcflirt.md` (behaviour only; the replica's record shows mcflirt's black-box outputs),

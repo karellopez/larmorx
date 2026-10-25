@@ -5,7 +5,7 @@ needs for each.
 A **stage** is one step of fMRIPrep's pipeline (e.g. "the final N4 of brain extraction");
 it may have several **nodes** (one per BOLD run, per output space, per map-node item, or the
 dozens of ImageMath calls of one brain-extraction step). Nodes are matched by their path in
-the working directory with the run, space and map-node parts removed (:func:`normalise`).
+the working directory with the run, space, echo and map-node parts removed (:func:`normalise`).
 
 Nodes that ran a program larmorx has are compared (:data:`STAGES`); every other node that ran
 a neuroimaging program, or a Python step larmorx will need, goes into the roadmap
@@ -277,8 +277,8 @@ STAGES: tuple[Stage, ...] = (
     Stage(
         "F08",
         "functional",
-        "boldref and BOLD mask to T1w (Lanczos, MultiLabel)",
-        r"ds_bold_t1_wf/resample_(ref|mask)$",
+        "boldref, BOLD mask and (multi-echo) T2* map to T1w (Lanczos, MultiLabel)",
+        r"ds_bold_t1_wf/resample_(ref|mask|t2star)$",
         "cli",
         "lx.ants.apply_transforms",
         "itk-interpolation",
@@ -286,8 +286,8 @@ STAGES: tuple[Stage, ...] = (
     Stage(
         "F09",
         "functional",
-        "boldref and BOLD mask to MNI (Lanczos, MultiLabel, `.h5`)",
-        r"ds_bold_std_wf/resample_(ref|mask)$",
+        "boldref, BOLD mask and (multi-echo) T2* map to MNI (Lanczos, MultiLabel, `.h5`)",
+        r"ds_bold_std_wf/resample_(ref|mask|t2star)$",
         "cli",
         "lx.ants.apply_transforms",
         "itk-interpolation",
@@ -318,6 +318,16 @@ STAGES: tuple[Stage, ...] = (
         "cli",
         "lx.ants.apply_transforms",
         "itk-interpolation",
+    ),
+    Stage(
+        "F13",
+        "functional",
+        "Multi-echo report: the segmentation to the T2* map's grid (MultiLabel, inverse)",
+        r"t2s_reporting_wf/label_tfm$",
+        "cli",
+        "lx.ants.apply_transforms",
+        "itk-interpolation",
+        absent="no multi-echo BOLD run",
     ),
 )
 
@@ -377,6 +387,13 @@ MISSING: tuple[Missing, ...] = (
         ("prelude",),
         "phase unwrapping of the phase-difference field map",
         "FSL (clean-room + `larmorx-nc`)",
+    ),
+    Missing(
+        "t2smap",
+        ("t2smap",),
+        "multi-echo BOLD: the voxelwise T2* and S0 fit (`--fittype curvefit`) and the optimal "
+        "combination of the echoes (tedana's `t2smap`, LGPL-2.1)",
+        "larmorprepx (numpy/Rust: a clean implementation of the monoexponential fit)",
     ),
     Missing(
         "mri_robust_template",
@@ -452,6 +469,8 @@ def normalise(path: str) -> tuple[str, dict[str, str]]:
 
     ``fmriprep_25_2_wf/sub_01_wf/bold_task_x_run_01_wf/bold_std_wf/_in_tuple_MNI.res2/resample``
     becomes ``bold_wf/bold_std_wf/resample`` with ``{"run": "task_x_run_01", "space": ...}``.
+    A multi-echo run's per-echo nodes (nipype's iterable ``_echoidx_<i>``, 0-based) give
+    ``{"echo": "<i>"}``.
     """
     parts = path.split("/")
     keys: dict[str, str] = {}
@@ -470,6 +489,10 @@ def normalise(path: str) -> tuple[str, dict[str, str]]:
         m = re.fullmatch(r"_(?:in_tuple|template)_(.+)", p)
         if m:
             keys["space"] = m.group(1)
+            continue
+        m = re.fullmatch(r"_echoidx_(\d+)", p)
+        if m:
+            keys["echo"] = m.group(1)
             continue
         if p == "mapflow":
             continue

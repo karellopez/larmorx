@@ -144,13 +144,14 @@ def main() -> int:
     ap.add_argument("--n4-point-seconds-lx", type=float, default=2.6e-7)
     ap.add_argument("--n4-voxel-seconds", type=float, default=7.3e-8)
     ap.add_argument("--n4-voxel-seconds-lx", type=float, default=2.1e-8)
-    # In 2D (n4_memory.py on ants-n4:20261025:406, distances 480 to 120): ANTs 26.2 bytes per
-    # control point of the last level and 1.73e-8 s per point and iteration; larmorx 78.7 and
-    # 2.17e-7 (the same results, bit for bit).
-    ap.add_argument("--n4-point-bytes-2d", type=float, default=26.2)
-    ap.add_argument("--n4-point-bytes-lx-2d", type=float, default=78.7)
-    ap.add_argument("--n4-point-seconds-2d", type=float, default=1.73e-8)
-    ap.add_argument("--n4-point-seconds-lx-2d", type=float, default=2.17e-7)
+    # In 2D (n4_memory.py on ants-n4:20261025:406, distances 480 to 60, after the 2D fit's
+    # fix of 2026-10-25): ANTs 18.7 bytes per control point of the last level and 2.3e-8 s per
+    # point and iteration; larmorx 16.1 and 1.9e-8 (the same results, bit for bit; before the
+    # fix larmorx needed 78.7 bytes and 2.2e-7 s).
+    ap.add_argument("--n4-point-bytes-2d", type=float, default=18.7)
+    ap.add_argument("--n4-point-bytes-lx-2d", type=float, default=16.1)
+    ap.add_argument("--n4-point-seconds-2d", type=float, default=2.3e-8)
+    ap.add_argument("--n4-point-seconds-lx-2d", type=float, default=1.9e-8)
     ap.add_argument("--by-spacing-voxel-bytes", type=float, default=7.3)
     ap.add_argument("--by-spacing-voxel-bytes-lx", type=float, default=16.0)
     ap.add_argument("--box-gib", type=float, default=limits.HEAVY_GIB + limits.HEAVY_SWAP_GIB)

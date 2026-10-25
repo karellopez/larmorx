@@ -531,12 +531,15 @@ padding kept virtual (its voxels have weight 0 and are cropped at the end), give
 result in memory proportional to the data (here about a thousand points of 256 control points
 each).
 
-**In 2D, larmorx is less efficient than ANTs** (measured the same day, `n4_memory.py` on
-`ants-n4:20261025:406`, a 15x20 image of 1 x 3 m voxels, distances 480, 240 and 120 mm; every
-output bit-identical to ANTs): ANTs needs 26.2 bytes per control point of the last level and
-1.7e-8 s per point and iteration, larmorx 78.7 bytes and 2.2e-7 s (3 times the memory, 12.5
-times the time), where in 3D larmorx needs less than ANTs (12 bytes against 17, 2.6e-7 s against
-3.3e-7). The case itself (distance 30: 56.8 million points) needs about 1.4 GiB in ANTs and 4.2
-GiB in larmorx, which the night's case limit of 3 GiB stopped. Where the 2D path spends it is
-not yet located (the fit, `larmorx_image::bspline::fit`, or the lattice's refinement and
-evaluation, `larmorx_image::bspline`): a follow-up.
+**In 2D, larmorx was less efficient than ANTs; fixed the same day** (`n4_memory.py` on
+`ants-n4:20261025:406`, a 15x20 image of 1 x 3 m voxels; every output bit-identical to ANTs): ANTs
+needs 18.7 bytes per control point of the last level and 2.3e-8 s per point and iteration;
+larmorx needed 78.7 bytes and 2.2e-7 s (four times the memory, ten times the time), so the case
+itself (distance 30: 56.8 million points; ANTs about 1.0 GiB) went past the night's case limit of
+3 GiB in larmorx. The cause: the B-spline fit (`larmorx_image::bspline::fit::GridFitPlan`)
+splits its work by the lattice's last two axes, which in 2D are all of them, so every block was a
+single control point, with a task and an allocation of its own. In 2D it now splits by the last
+axis alone (one block per lattice row); each control point is still summed in point order, so
+the result is the same, bit for bit (the unit test against ITK's sequential order in 2 to 4
+dimensions, and the variants above). After the fix larmorx needs 16.1 bytes and 1.9e-8 s, less
+than ANTs (distances 480 to 60, both modes bit-identical to ANTs).

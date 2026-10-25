@@ -26,6 +26,7 @@ import contextlib
 import json
 import multiprocessing
 import os
+import re
 import signal
 import tempfile
 import time
@@ -38,6 +39,9 @@ from larmorx_validation.difftest.core import DIFFER, EXPLAINED, NOTICE, SKIP, Ju
 from larmorx_validation.parity import harness
 
 TIMEOUT = "timeout"
+#: How many cases with the same difference (tool, implementation, failed checks) are shrunk in a
+#: night; later ones are counted and kept unshrunk (shrinking is the night's costliest part).
+SHRINKS_PER_SIGNATURE = 2
 
 
 class CaseTimeout(BaseException):  # noqa: N818 - not an error of the case: the clock's
@@ -77,6 +81,20 @@ def limit_threads(threads: int) -> None:
 
 
 UNDEFINED = "undefined"
+#: Defects whose original result depends on memory it never wrote (or on the clock): the oracle
+#: cache's list, and the class (a) reads beyond a buffer the register names. When larmorx names
+#: one while reproducing the original, the values are not comparable (the parity suites'
+#: ``undefined_values``): the verdict is ``undefined``.
+UNDEFINED_DEFECTS: dict[str, str] = {
+    "ANTS-07": "a smaller second image is read beyond its voxels (memory)",
+    "ANTS-19": "FillHoles reads outside the image (memory)",
+    "ANTS-55": "antsAI reads a translation grid past the end of its extents (memory)",
+    "ANTS-63": "the VTK reader's labels are uninitialised memory",
+    "ANTS-77": "a B-spline mesh read past the end of its list (garbage indices)",
+    "ITK-25": "the manifold Parzen windows read past the end of their neighbours (memory)",
+    "SCI-01": "map_coordinates reads outside the array for huge or NaN coordinates (memory)",
+    "AFNI-04": "a shift beyond the series reads past it (memory)",
+}
 
 #: The D13 notices larmorx's in-process runs printed in ``reproduce`` mode during a case.
 _NOTICES: list[str] = []
@@ -110,6 +128,7 @@ def execute(tool: core.Tool, recipe: dict, impl: str, *, timeout: float | None =
     """Runs one implementation of ``recipe`` through its parity runner and judges it."""
     from larmorx_validation.oracle_cache.policy import VARYING_DEFECTS
 
+    undefined_defects = {**VARYING_DEFECTS, **UNDEFINED_DEFECTS}
     _watch_notices()
     _NOTICES.clear()
     case = tool.case(recipe, impl, **case_kw)
@@ -139,9 +158,9 @@ def execute(tool: core.Tool, recipe: dict, impl: str, *, timeout: float | None =
         signal.signal(signal.SIGALRM, previous)
         inputs.release(f"run/{gen.digest(recipe['inputs'])}")
     j = core.judge(tool, impl, result)
-    varying = sorted({n for n in _NOTICES if n in VARYING_DEFECTS})
+    varying = sorted({n for n in _NOTICES if n in undefined_defects})
     if j.verdict == DIFFER and varying:
-        j = Judgement(UNDEFINED, tuple(f"undefined: {n}" for n in varying), f"{', '.join(varying)}: {VARYING_DEFECTS[varying[0]]}; {j.detail}", j.status, j.checks)
+        j = Judgement(UNDEFINED, tuple(f"undefined: {n}" for n in varying), f"{', '.join(varying)}: {undefined_defects[varying[0]]}; {j.detail}", j.status, j.checks)
     return j, time.monotonic() - start, result
 
 
@@ -174,6 +193,11 @@ def judge_once(tool: core.Tool, recipe: dict, impl: str, explore_mode: str = "of
     """The verdict of ``recipe`` (CORE-MATH's explanation included), as shrinking needs it."""
     with cache_mode(explore_mode):
         j, _, _ = execute(tool, recipe, impl)
+        if j.verdict == DIFFER and tool.crash_kw and _original_crashed(j):
+            # The original crashed or aborted: compared the suite's way for such a run.
+            j2, _, _ = execute(tool, recipe, impl, **tool.crash_kw)
+            if j2.verdict != DIFFER or set(j2.signature) != set(j.signature):
+                j = j2
         if j.verdict == DIFFER and tool.crmath_retry:
             with _correctly_rounded() as ok:
                 if ok:
@@ -181,6 +205,15 @@ def judge_once(tool: core.Tool, recipe: dict, impl: str, explore_mode: str = "of
                     if j2.verdict == core.AGREE:
                         return Judgement(EXPLAINED, j.signature, "identical with CORE-MATH preloaded into the original: " + j.detail, j.status, j.checks)
     return j
+
+
+_CRASHED = re.compile(r"ANTs (?:exit )?-\d+\b|ANTs killed by signal|ANTs \(?signal|by signal \d+|ANTs crash")
+
+
+def _original_crashed(j: Judgement) -> bool:
+    return bool(_CRASHED.search(j.detail)) or any(
+        _CRASHED.search(str(c.get("detail", ""))) for c in j.checks if not c.get("passed")
+    )
 
 
 def run_case(
@@ -192,6 +225,7 @@ def run_case(
     shrink_budget: float = 600.0,
     recipe: dict | None = None,
     store_findings: bool = True,
+    shrunk_enough: list | None = None,
 ) -> dict:
     """Case ``n`` of ``tool_name`` for ``seed``: every implementation, judged; differences
     shrunk. Returns the case's line for ``results.jsonl`` (with the findings' details)."""
@@ -213,7 +247,27 @@ def run_case(
     for impl in tool.implementations:
         j = judge_once(tool, recipe, impl)
         entry: dict = {"verdict": j.verdict, "signature": list(j.signature), "detail": j.detail[:600], "status": j.status}
-        if j.verdict == DIFFER and shrink:
+        again = [impl, *sorted(j.signature)] in (shrunk_enough or [])
+        if j.verdict == DIFFER and again:
+            # This difference was shrunk often enough tonight: counted, its recipe kept, not shrunk.
+            entry["not_shrunk"] = "shrunk often enough tonight"
+            line["findings"].append(
+                {
+                    "tool": tool_name,
+                    "implementation": impl,
+                    "seed": seed,
+                    "n": n,
+                    "signature": list(j.signature),
+                    "detail": j.detail,
+                    "checks": j.checks,
+                    "recipe": recipe,
+                    "shrunk": recipe,
+                    "shrink_moves": [],
+                    "shrink_runs": 0,
+                    "not_shrunk": True,
+                }
+            )
+        elif j.verdict == DIFFER and shrink:
             def attempt(r: dict, impl: str = impl) -> Judgement:
                 return judge_once(tool, r, impl)
 
@@ -464,6 +518,7 @@ def night(
     next_n = {t.name: _resume(out, t.name) for t in selected}
     pool = Pool(jobs, threads)
     crashes: list[dict] = []
+    shrinks: dict[tuple, int] = {}
     started = time.monotonic()
     try:
         while True:
@@ -482,7 +537,13 @@ def night(
                 next_n[t.name] += 1
                 counts[t.name] += 1
                 spent[t.name] += t.timeout * 0.05  # a reservation until the case reports
-                task = {"tool_name": t.name, "seed": seed, "n": n, "shrink_budget": shrink_budget}
+                task = {
+                    "tool_name": t.name,
+                    "seed": seed,
+                    "n": n,
+                    "shrink_budget": shrink_budget,
+                    "shrunk_enough": [list(k[1:]) for k, c in shrinks.items() if k[0] == t.name and c >= SHRINKS_PER_SIGNATURE],
+                }
                 pool.submit(w, task, deadline_s=t.timeout * len(t.implementations) * 3 + shrink_budget * 2 + 120)
                 open_tools = [t for t in selected if max_cases is None or counts[t.name] < max_cases]
             if pool.busy() == 0 and not crashes and (elapsed >= budget_s or not open_tools):
@@ -496,6 +557,9 @@ def night(
                     crashes.append({"kind": CRASH, "tool_name": task["tool_name"], "seed": task["seed"], "n": task["n"], "shrink_budget": shrink_budget})
                 findings = line.pop("findings", [])
                 for f in findings:
+                    if not f.get("not_shrunk"):
+                        k = (f["tool"], f["implementation"], *sorted(f["signature"]))
+                        shrinks[k] = shrinks.get(k, 0) + 1
                     path = _write_finding(out, f)
                     line.setdefault("finding_files", []).append(str(path.relative_to(out)))
                 results.write(json.dumps(line, sort_keys=True) + "\n")

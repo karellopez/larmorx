@@ -48,6 +48,10 @@ pub enum ResampleError {
     Interpolator(#[from] InterpError),
     #[error(transparent)]
     Threads(#[from] ThreadPoolError),
+    /// The output grid needs more memory than the machine has (ITK throws
+    /// `MemoryAllocationError`; the ANTs programs abort).
+    #[error(transparent)]
+    Memory(#[from] larmorx_core::alloc::AllocError),
 }
 
 /// An image geometry's index ↔ point mappings, as `itk::ImageBase` computes them.
@@ -347,7 +351,7 @@ where
         }
         other => return Err(ResampleError::Interpolation(name(other), d)),
     };
-    let mut out = vec![default_value; n_out];
+    let mut out = larmorx_core::alloc::filled(n_out, default_value)?;
     let job = Rows {
         input,
         in_size,

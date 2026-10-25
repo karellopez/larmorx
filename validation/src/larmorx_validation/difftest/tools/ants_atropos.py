@@ -128,4 +128,5 @@ TOOL = Tool(
     timeout=300,
     weight=1.2,
     unavailable=_ants.ants_unavailable,
+    crash_kw={"expect": "abort"},
 )

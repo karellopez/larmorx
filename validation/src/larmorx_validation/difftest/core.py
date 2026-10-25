@@ -86,6 +86,9 @@ class Tool:
     #: from :attr:`case` (an expected divergence, a documented reason).
     permanent: Callable[[dict, str, dict], Case] | None = None
     family: str = "itk"
+    #: The case's keywords when the original crashed or aborted (the suite's own way of comparing
+    #: such a run: what the original printed before it stopped, larmorx's refusal).
+    crash_kw: dict | None = None
     #: The fields of the suite's case object a permanent case sets (``tier``, ``expect``,
     #: ``reason``, ``expect_error``).
     payload_fields: tuple[str, ...] = ("tier", "expect", "reason")

@@ -60,7 +60,8 @@ def summarise(out: Path) -> dict:
         groups[(f["tool"], f["implementation"], tuple(f["signature"]))].append(f)
     diffs = []
     for (tool, impl, sig), fs in sorted(groups.items()):
-        best = min(fs, key=lambda f: (_size(f["shrunk"]), f["n"]))
+        shrunk = [f for f in fs if not f.get("not_shrunk")] or fs
+        best = min(shrunk, key=lambda f: (_size(f["shrunk"]), f["n"]))
         diffs.append(
             {
                 "tool": tool,

@@ -110,6 +110,10 @@ pub enum N4Error {
     /// ITK throws (ANTs prints "Exception caught" and exits 1).
     #[error(transparent)]
     Filter(#[from] FilterError),
+    /// The padded image needs more memory than the machine has (a spline distance far beyond
+    /// the image: ITK throws `MemoryAllocationError`, which ANTs does not catch: it aborts).
+    #[error(transparent)]
+    Memory(#[from] larmorx_core::alloc::AllocError),
 }
 
 /// The padding and control points that `-b [distance]` gives.
@@ -189,10 +193,19 @@ pub(crate) fn congruent(
 
 /// Zero-padding of a Fortran-ordered image by `lower`/`upper` voxels per axis
 /// (`ConstantPadImageFilter` with constant 0).
-fn pad(data: &[f32], size: &[usize], lower: &[usize], upper: &[usize]) -> (Vec<f32>, Vec<usize>) {
+fn pad(
+    data: &[f32],
+    size: &[usize],
+    lower: &[usize],
+    upper: &[usize],
+) -> Result<(Vec<f32>, Vec<usize>), larmorx_core::alloc::AllocError> {
     let d = size.len();
     let new_size: Vec<usize> = (0..d).map(|i| size[i] + lower[i] + upper[i]).collect();
-    let mut out = vec![0.0f32; new_size.iter().product()];
+    let voxels = new_size
+        .iter()
+        .try_fold(1usize, |n, &s| n.checked_mul(s))
+        .unwrap_or(usize::MAX);
+    let mut out = larmorx_core::alloc::filled(voxels, 0.0f32)?;
     let n0 = size[0];
     let rows = data.len() / n0;
     for r in 0..rows {
@@ -207,7 +220,7 @@ fn pad(data: &[f32], size: &[usize], lower: &[usize], upper: &[usize]) -> (Vec<f
         }
         out[dst..dst + n0].copy_from_slice(&data[r * n0..(r + 1) * n0]);
     }
-    (out, new_size)
+    Ok((out, new_size))
 }
 
 /// The voxels of a padded image inside the original grid (`ExtractImageFilter` back to the
@@ -302,7 +315,7 @@ pub fn n4_bias_field_correction(
     let (lower, upper) = padding
         .as_ref()
         .map_or((&zero, &zero), |p| (&p.lower, &p.upper));
-    let (padded_input, padded_size) = pad(&input.data, &g.size, lower, upper);
+    let (padded_input, padded_size) = pad(&input.data, &g.size, lower, upper)?;
     let ones;
     let mask_data: &[f32] = match mask {
         Some(m) => &m.data,
@@ -311,8 +324,11 @@ pub fn n4_bias_field_correction(
             &ones
         }
     };
-    let (padded_mask, _) = pad(mask_data, &g.size, lower, upper);
-    let padded_weight = weight.map(|w| pad(&w.data, &g.size, lower, upper).0);
+    let (padded_mask, _) = pad(mask_data, &g.size, lower, upper)?;
+    let padded_weight = match weight {
+        Some(w) => Some(pad(&w.data, &g.size, lower, upper)?.0),
+        None => None,
+    };
     let padded_grid = ItkGrid {
         size: padded_size.clone(),
         start: lower.iter().map(|&l| -(l as i64)).collect(),
@@ -440,10 +456,19 @@ mod tests {
         assert_eq!(p.upper, [1, 1, 9]);
     }
 
+    /// Found by differential random testing (2026-10-25, `ants-n4:trial1:0`): `-b [200,5]` on
+    /// micrometre voxels pads to 2·10⁵ voxels per axis; ANTs aborts (`MemoryAllocationError`),
+    /// larmorx refuses instead of aborting the process.
+    #[test]
+    fn padding_beyond_memory_is_an_error() {
+        let e = pad(&[1.0; 8], &[2, 2, 2], &[1 << 21; 3], &[1 << 21; 3]).unwrap_err();
+        assert!(e.to_string().starts_with("Failed to allocate memory for image"));
+    }
+
     #[test]
     fn pad_and_crop_round_trip() {
         let data: Vec<f32> = (0..24).map(|v| v as f32).collect();
-        let (p, size) = pad(&data, &[4, 3, 2], &[1, 0, 2], &[2, 1, 0]);
+        let (p, size) = pad(&data, &[4, 3, 2], &[1, 0, 2], &[2, 1, 0]).unwrap();
         assert_eq!(size, [7, 4, 4]);
         assert_eq!(crop(&p, &size, &[1, 0, 2], &[4, 3, 2]), data);
         assert_eq!(p.iter().filter(|&&v| v != 0.0).count(), 23);

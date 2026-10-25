@@ -222,4 +222,5 @@ TOOL = Tool(
     weight=2.5,
     shrink=_no_stages_beyond_one,
     unavailable=_ants.ants_unavailable,
+    crash_kw={"expect": "crash"},
 )

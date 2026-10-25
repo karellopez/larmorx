@@ -687,6 +687,19 @@ pub fn from_itk<T: Pixel>(
             }
         }
     }
+    // `ImageBase::SetDirection` refuses a direction whose determinant is exactly 0 (a 2D file
+    // whose qform turns its first axis out of the plane, a zero column): ITK throws, ANTs'
+    // `ReadImage` prints the exception and goes on without the image, and the program crashes
+    // or aborts (found by differential random testing, 2026-10-25). larmorx refuses the file.
+    if vnl_determinant(&geometry.direction) == 0.0 {
+        return Err(ReadError::Failed {
+            name: name.to_owned(),
+            message: format!(
+                "Bad direction, determinant is 0. Refusing to change direction from the identity to {:?}",
+                geometry.direction
+            ),
+        });
+    }
     let count: usize = geometry.size.iter().product();
     let mode = notices.mode();
     let (data, undefined) = larmorx_core::parallel::with_threads(n_threads, || {
@@ -702,6 +715,60 @@ pub fn from_itk<T: Pixel>(
         geometry,
         meta: image.meta,
     })
+}
+
+/// vnl's determinant of a square matrix of 1 to 4 rows (`vnl_determinant.hxx`: the expansion,
+/// its terms summed left to right in double); larger matrices (which no ANTs program reads)
+/// count as regular.
+pub fn vnl_determinant(m: &[Vec<f64>]) -> f64 {
+    let r = |i: usize, j: usize| m[i][j];
+    match m.len() {
+        1 => r(0, 0),
+        2 => r(0, 0) * r(1, 1) - r(0, 1) * r(1, 0),
+        3 => {
+            r(0, 0) * r(1, 1) * r(2, 2) - r(0, 0) * r(2, 1) * r(1, 2) - r(1, 0) * r(0, 1) * r(2, 2)
+                + r(1, 0) * r(2, 1) * r(0, 2)
+                + r(2, 0) * r(0, 1) * r(1, 2)
+                - r(2, 0) * r(1, 1) * r(0, 2)
+        }
+        4 => {
+            // The 24 terms of vnl_determinant(row0, row1, row2, row3), in its order.
+            const TERMS: [(f64, [usize; 4]); 24] = [
+                (1.0, [0, 1, 2, 3]),
+                (-1.0, [0, 1, 3, 2]),
+                (-1.0, [0, 2, 1, 3]),
+                (1.0, [0, 2, 3, 1]),
+                (1.0, [0, 3, 1, 2]),
+                (-1.0, [0, 3, 2, 1]),
+                (-1.0, [1, 0, 2, 3]),
+                (1.0, [1, 0, 3, 2]),
+                (1.0, [1, 2, 0, 3]),
+                (-1.0, [1, 2, 3, 0]),
+                (-1.0, [1, 3, 0, 2]),
+                (1.0, [1, 3, 2, 0]),
+                (1.0, [2, 0, 1, 3]),
+                (-1.0, [2, 0, 3, 1]),
+                (-1.0, [2, 1, 0, 3]),
+                (1.0, [2, 1, 3, 0]),
+                (1.0, [2, 3, 0, 1]),
+                (-1.0, [2, 3, 1, 0]),
+                (-1.0, [3, 0, 1, 2]),
+                (1.0, [3, 0, 2, 1]),
+                (1.0, [3, 1, 0, 2]),
+                (-1.0, [3, 1, 2, 0]),
+                (-1.0, [3, 2, 0, 1]),
+                (1.0, [3, 2, 1, 0]),
+            ];
+            // Term k is rows[a][0]·rows[b][1]·rows[c][2]·rows[d][3] for its rows (a, b, c, d).
+            let mut sum = 0.0;
+            for (k, (sign, [a, b, c, d])) in TERMS.iter().enumerate() {
+                let term = r(*a, 0) * r(*b, 1) * r(*c, 2) * r(*d, 3);
+                sum = if k == 0 { term } else if *sign > 0.0 { sum + term } else { sum - term };
+            }
+            sum
+        }
+        _ => 1.0,
+    }
 }
 
 /// Images in NIfTI files, read and written as ITK 5.4.5 does.
@@ -815,6 +882,53 @@ mod tests {
 
     fn read<T: Pixel>(name: &str, dim: usize, notices: &mut Notices) -> AntsImage<T> {
         read_with(&mut FileStore, name, dim, 1, notices).unwrap()
+    }
+
+    /// Found by differential random testing (2026-10-25, `ants-multiply-images:trial1:14`): a
+    /// 2D file whose qform turns its first axis out of the plane (90° about y) has a zero
+    /// first direction column in 2D; ITK refuses the direction (determinant 0) and the ANTs
+    /// programs crash. larmorx refuses the file.
+    #[test]
+    fn a_singular_direction_is_refused() {
+        let dir = tempfile::tempdir().unwrap();
+        let p = dir.path().join("plane.nii");
+        let mut h = NiftiHeader::new(NiftiVersion::V1, &[3, 2], DataType::F32).unwrap();
+        // The qform's float quaternion leaves a residue in the plane; the SCANNER_ANAT sform,
+        // which ITK prefers, holds the exact rotation: its first column has no x or y part.
+        h.quatern_c = f64::from(std::f32::consts::FRAC_1_SQRT_2);
+        h.qform_code = 1;
+        h.sform_code = 1;
+        h.srow_x = [0.0, 0.0, 1.0, 0.0];
+        h.srow_y = [0.0, 1.0, 0.0, 0.0];
+        h.srow_z = [-1.0, 0.0, 0.0, 0.0];
+        let a = larmorx_core::ndarray::ArrayD::from_shape_vec(
+            larmorx_core::ndarray::IxDyn(&[3, 2]).f(),
+            vec![1.0f32; 6],
+        )
+        .unwrap();
+        nifti::write(&p, &h, a.view(), &WriteOptions::default()).unwrap();
+        // In 2D and in 3D alike (ImageFileReader pads the file's 2D direction with zeros and
+        // the third axis's own column): the first column stays zero.
+        for (mode, dim) in [(UpstreamDefects::Reproduce, 2), (UpstreamDefects::Fix, 2), (UpstreamDefects::Reproduce, 3)] {
+            let e = read_with::<f32, _>(&mut FileStore, p.to_str().unwrap(), dim, 1, &mut Notices::new(mode))
+                .unwrap_err();
+            assert!(e.to_string().contains("Bad direction, determinant is 0"), "{e}");
+        }
+    }
+
+    #[test]
+    fn vnl_determinants() {
+        let id = |n: usize| (0..n).map(|i| (0..n).map(|j| f64::from(u8::from(i == j))).collect()).collect::<Vec<Vec<f64>>>();
+        for n in 1..=4 {
+            assert_eq!(vnl_determinant(&id(n)), 1.0);
+        }
+        let mut m = id(4);
+        m[0][0] = 2.0;
+        m[1][2] = 3.0;
+        assert_eq!(vnl_determinant(&m), 2.0);
+        m[3] = vec![0.0; 4];
+        assert_eq!(vnl_determinant(&m), 0.0);
+        assert_eq!(vnl_determinant(&[vec![1.0, 2.0], vec![2.0, 4.0]]), 0.0);
     }
 
     #[test]

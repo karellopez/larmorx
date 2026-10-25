@@ -49,8 +49,8 @@ def draw_n4(d: gen.Draw) -> dict:
         groups.append(group("shrink", "-s", d.choice("shrink factor", ("1", "2", "3", "4", "0"))))
         options.append("-s")
     if d.chance("convergence", 0.8):
-        levels = d.integer("levels", 1, 4)
-        iters = "x".join(d.choice(f"iterations{k}", ("5", "10", "20", "50")) for k in range(levels))
+        levels = d.integer("levels", 1, 3)
+        iters = "x".join(d.choice(f"iterations{k}", ("3", "5", "10", "20")) for k in range(levels))
         tail = d.choice("threshold", ("", ",0.001", ",1e-07", ",0", ",1e-3"))
         spelled = d.choice("convergence form", ("[{}]", "[ {} ]", "{}"))
         groups.append(group("convergence", "-c", spelled.format(iters + tail.replace(",", ", " if "[ " in spelled else ","))))

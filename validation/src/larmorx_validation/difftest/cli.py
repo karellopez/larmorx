@@ -40,7 +40,7 @@ def add_arguments(p: argparse.ArgumentParser) -> None:
     p.add_argument("--promote", help="a finding's JSON: write it as a permanent case")
     p.add_argument("--id", help="with --promote: the permanent case's name")
     p.add_argument("--tier", default="smoke", choices=("smoke", "standard", "full"))
-    p.add_argument("--expect", default="pass", choices=("pass", "divergence", "error"))
+    p.add_argument("--expect", default="pass", choices=("pass", "divergence", "error", "abort", "crash"))
     p.add_argument("--reason", default="")
     p.add_argument("--status", default="fixed", choices=("fixed", "register", "open"))
     p.add_argument("--defect", default=None)

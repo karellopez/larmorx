@@ -61,7 +61,12 @@ def draw_automask(d: gen.Draw) -> dict:
         outputs.append("depth.nii")
         options.append("-depth")
     groups += [required("prefix", "-prefix", out), required("input", "{in:input}")]
-    return {"groups": groups, "inputs": {"input": spec}, "options": [*options, f"{ndim}D input"], "extra": {"outputs": outputs}}
+    extra: dict = {"outputs": outputs}
+    nbhrs = next((g["args"][1] for g in groups if g["name"] == "nbhrs"), None)
+    if nbhrs is not None and not 6 <= int(nbhrs) <= 18:
+        # -nbhrs outside 6..18 (AFNI-41, rule B): the default refuses, naming the defect.
+        extra["fix_refuses"] = "AFNI-41"
+    return {"groups": groups, "inputs": {"input": spec}, "options": [*options, f"{ndim}D input"], "extra": extra}
 
 
 def draw_unifize(d: gen.Draw) -> dict:
@@ -103,7 +108,11 @@ def draw_unifize(d: gen.Draw) -> dict:
         options.append("-amsave")
     groups.append(required("prefix", "-prefix", out))
     groups.append(required("input", *(("-input", "{in:input}") if d.chance("-input", 0.3) else ("{in:input}",))))
-    return {"groups": groups, "inputs": {"input": spec}, "options": [*options, f"{ndim}D input"], "extra": {"outputs": outputs, "min_size": 4}}
+    extra: dict = {"outputs": outputs, "min_size": 4}
+    if t2 >= 3 and not epi:
+        # -T2 three times or more (AFNI-48, rule B): the default refuses, naming the defect.
+        extra["fix_refuses"] = "AFNI-48"
+    return {"groups": groups, "inputs": {"input": spec}, "options": [*options, f"{ndim}D input"], "extra": extra}
 
 
 def _case(recipe: dict, impl: str, *, case_prefix: str | None = None, cid: str | None = None, description: str | None = None, **kw):
@@ -118,9 +127,22 @@ def _case(recipe: dict, impl: str, *, case_prefix: str | None = None, cid: str |
         ("dt:" + inputs.key(prefix, "input"),),
         tuple(recipe["extra"]["outputs"]),
         env=(("OMP_NUM_THREADS", "1"),),
+        fix_refuses=_fix_refuses(recipe),
         **kw,
     )
     return Case(cid or _ants.case_id(recipe), "difftest", description or _ants.describe(recipe), s)
+
+
+def _fix_refuses(recipe: dict) -> str | None:
+    """The defect whose correction makes the default refuse the recipe's command line, while
+    its groups still hold the option (shrinking may have dropped it)."""
+    defect = recipe["extra"].get("fix_refuses")
+    names = {g["name"] for g in recipe["groups"]}
+    if defect == "AFNI-41" and "nbhrs" in names:
+        return defect
+    if defect == "AFNI-48" and sum(n.startswith("T2 ") for n in names) >= 3:
+        return defect
+    return None
 
 
 def _resolve_input(name: str):

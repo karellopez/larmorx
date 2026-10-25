@@ -138,6 +138,9 @@ pub fn transform_from_parts(parts: &[ItkTransformParts]) -> Result<Transform, Tr
     let first = parts
         .first()
         .ok_or_else(|| TransformError::Invalid("no transform in file".into()))?;
+    for p in parts {
+        registered_composite(&p.name)?;
+    }
     if first.name.starts_with("CompositeTransform") {
         let components = parts[1..]
             .iter()
@@ -154,6 +157,19 @@ pub fn transform_from_parts(parts: &[ItkTransformParts]) -> Result<Transform, Tr
         ));
     }
     single_from_parts(first)
+}
+
+/// A composite's class name must be one ITK's factory registered
+/// (`CompositeTransform_<double|float>_<D>_<D>`): ITK cannot create any other and refuses the
+/// file. Found by differential random testing (2026-10-25): `CompositeTransform_double_3` was
+/// read as a composite.
+fn registered_composite(name: &str) -> Result<(), TransformError> {
+    if name.starts_with("CompositeTransform") && !crate::itk_transform_names::REGISTERED.contains(&name) {
+        return Err(TransformError::Invalid(format!(
+            "Could not create an instance of \"{name}\" (not a transform class ITK registers)"
+        )));
+    }
+    Ok(())
 }
 
 fn single_from_parts(p: &ItkTransformParts) -> Result<Transform, TransformError> {
@@ -863,6 +879,18 @@ pub fn read_itk_transform_notices(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn unregistered_composites_are_refused() {
+        let part = |name: &str| ItkTransformParts {
+            name: name.into(),
+            parameters: Parameters::F64(vec![]),
+            fixed_parameters: vec![],
+        };
+        let e = transform_from_parts(&[part("CompositeTransform_double_3")]).unwrap_err();
+        assert!(e.to_string().contains("Could not create an instance"), "{e}");
+        assert!(transform_from_parts(&[part("CompositeTransform_double_3_3")]).is_ok());
+    }
 
     const AFFINE: &str = "#Insight Transform File V1.0\n#Transform 0\nTransform: AffineTransform_float_3_3\nParameters: 0.999736 0.00543478 0.0223235 0.00925598 0.794015 -0.607828 -0.0210286 0.607874 0.793755 -5.53715 -45.7572 -48.9496\nFixedParameters: 0 0 0\n";
 

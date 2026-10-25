@@ -488,6 +488,13 @@ fn execute(
                     .into(),
             );
         }
+        Err(N4Error::Memory(e)) => {
+            return Err(format!(
+                "larmorx: N4BiasFieldCorrection: {e}: the image padded for the B-spline mesh \
+                 (ITK throws MemoryAllocationError; ANTs aborts)"
+            )
+            .into());
+        }
         Err(e) => {
             if settings.verbose {
                 let _ = writeln!(err, "Exception caught: {e}");

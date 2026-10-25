@@ -20,6 +20,18 @@ def _run(impl: str):
     return run_case
 
 
+def _expectation(recipe: dict) -> dict:
+    """A recipe's expected divergence (``extra``: ``expect``, ``reason``), while the option that
+    causes it is still there."""
+    e = recipe.get("extra", {})
+    if e.get("expect") != "divergence":
+        return {}
+    interp = next((g["args"] for g in recipe["groups"] if g["name"] == "interpolation"), None)
+    if not interp or interp[0] not in ("2", "3", "4"):
+        return {}
+    return {"expect": "divergence", "reason": e["reason"]}
+
+
 def _tool(name: str, title: str, program: str, draw, weight: float = 1.0, timeout: float = 180) -> Tool:
     return Tool(
         name=name,
@@ -27,7 +39,7 @@ def _tool(name: str, title: str, program: str, draw, weight: float = 1.0, timeou
         suite=name,
         implementations=("port",),
         draw=draw,
-        case=lambda recipe, impl, **kw: _ants.ants_case(recipe, program, **kw),
+        case=lambda recipe, impl, **kw: _ants.ants_case(recipe, program, **{**_expectation(recipe), **kw}),
         run=_run,
         crmath_retry=True,
         timeout=timeout,
@@ -136,7 +148,14 @@ def draw_resample(d: gen.Draw) -> dict:
             if d.chance("pixel type", 0.3):
                 groups.append(group("pixel type", str(d.integer("pixel type", 0, 7))))
                 options.append("pixel type")
-    return {"groups": groups, "inputs": {"a": main}, "options": options}
+    extra = {}
+    interp_words = next((g["args"] for g in groups if g["name"] == "interpolation"), None)
+    if interp_words and interp_words[0] in ("2", "3", "4") and dim != 3:
+        # larmorx's ResampleImage has these interpolators in 3D only (the record's expected
+        # divergence): ANTs runs, larmorx refuses.
+        extra["expect"] = "divergence"
+        extra["reason"] = "B-spline, Gaussian and windowed sinc interpolation in 3D only (docs/validation/ants-resample-image.md)"
+    return {"groups": groups, "inputs": {"a": main}, "options": options, "extra": extra}
 
 
 # ------------------------------------------------------------------------------------------------

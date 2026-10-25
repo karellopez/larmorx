@@ -116,6 +116,7 @@ AI = Tool(
     timeout=300,
     weight=1.2,
     unavailable=_ants.ants_unavailable,
+    crash_kw={"expect": "abort"},
 )
 AFFINE_INITIALIZER = Tool(
     name="ants-affine-initializer",
@@ -128,4 +129,5 @@ AFFINE_INITIALIZER = Tool(
     timeout=300,
     weight=0.8,
     unavailable=_ants.ants_unavailable,
+    crash_kw={"expect": "abort"},
 )

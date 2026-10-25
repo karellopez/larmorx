@@ -93,11 +93,10 @@ fn itk(line: u32, description: impl Into<String>) -> AtroposError {
     }
 }
 
-/// ITK's text of the Gaussian model's warning `w` (`itkWarningMacro`).
-fn gaussian_warning(w: &str) -> String {
-    format!(
-        "WARNING: In ImageSegmentation/antsGaussianListSampleFunction.hxx, line 105\nGaussianListSampleFunction (0x0): {w}\n\n"
-    )
+/// ITK's text of the model's warning `w` (`itkWarningMacro`, at the model's file and line).
+fn model_warning(model: &super::models::Likelihood, w: &str) -> String {
+    let (file, line, class) = model.warning_origin();
+    format!("WARNING: In {file}, line {line}\n{class} (0x0): {w}\n\n")
 }
 
 /// One iteration as the verbose observer reports it: the elapsed iterations and the posterior
@@ -657,7 +656,7 @@ impl<'a> Atropos<'a> {
                 let w = self.components[c].set_sample(&samples[c], m, &weights[c])?;
                 self.model_notices(c, &weights[c]);
                 if let Some(w) = w {
-                    self.warnings.push(gaussian_warning(w));
+                    self.warnings.push(model_warning(&self.components[c], w));
                 }
                 self.proportions[c] = if self.options.use_mixture_model_proportions {
                     sizes[c] as f32 / total_size as f32
@@ -671,7 +670,7 @@ impl<'a> Atropos<'a> {
                     let w =
                         self.components[c].set_indexed_sample(d, &samples[l], m, &weights[l])?;
                     if let Some(w) = w {
-                        self.warnings.push(gaussian_warning(w));
+                        self.warnings.push(model_warning(&self.components[c], w));
                     }
                 }
                 self.proportions[c] = 0.0;
@@ -1165,7 +1164,7 @@ impl<'a> Atropos<'a> {
             if c < classes {
                 let w = self.components[c].set_sample(&sample, m, &weights)?;
                 if let Some(w) = w {
-                    self.warnings.push(gaussian_warning(w));
+                    self.warnings.push(model_warning(&self.components[c], w));
                 }
                 self.model_notices(c, &weights);
             } else {

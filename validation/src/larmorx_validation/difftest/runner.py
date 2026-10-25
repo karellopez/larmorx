@@ -42,6 +42,10 @@ TIMEOUT = "timeout"
 #: How many cases with the same difference (tool, implementation, failed checks) are shrunk in a
 #: night; later ones are counted and kept unshrunk (shrinking is the night's costliest part).
 SHRINKS_PER_SIGNATURE = 2
+#: Shrinks per tool and implementation in a night: past them, a new difference of the same
+#: implementation is counted and kept unshrunk (a clean-room original whose differences vary in
+#: their checks from case to case would otherwise spend the night shrinking).
+SHRINKS_PER_IMPLEMENTATION = 8
 
 
 class CaseTimeout(BaseException):
@@ -286,7 +290,9 @@ def run_case(
             "detail": j.detail[:600],
             "status": j.status,
         }
-        again = [impl, *sorted(j.signature)] in (shrunk_enough or [])
+        again = [impl, *sorted(j.signature)] in (shrunk_enough or []) or [impl] in (
+            shrunk_enough or []
+        )
         if j.verdict == DIFFER and again:
             # This difference was shrunk often enough tonight: counted, its recipe kept, not shrunk.
             entry["not_shrunk"] = "shrunk often enough tonight"
@@ -658,6 +664,12 @@ def night(
                         list(k[1:])
                         for k, c in shrinks.items()
                         if k[0] == t.name and c >= SHRINKS_PER_SIGNATURE
+                    ]
+                    + [
+                        [impl]
+                        for impl in t.implementations
+                        if sum(c for k, c in shrinks.items() if k[:2] == (t.name, impl))
+                        >= SHRINKS_PER_IMPLEMENTATION
                     ],
                 }
                 pool.submit(

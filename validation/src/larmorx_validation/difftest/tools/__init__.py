@@ -37,11 +37,16 @@ TOOLS: dict[str, tuple[str, str]] = {
     "resample-series": ("resample_series", "TOOL"),
 }
 
+#: Tools that test the harness itself: run only when named, never part of ``all``.
+SELFTESTS: dict[str, tuple[str, str]] = {
+    "selftest-memory": ("selftest", "MEMORY_HOG"),
+}
+
 
 def get(name: str) -> Tool:
-    if name not in TOOLS:
+    if name not in TOOLS and name not in SELFTESTS:
         raise KeyError(f"unknown tool {name!r}; choose from {', '.join(TOOLS)}")
-    module, attr = TOOLS[name]
+    module, attr = TOOLS.get(name) or SELFTESTS[name]
     return getattr(importlib.import_module(f"{__name__}.{module}"), attr)
 
 
@@ -49,4 +54,4 @@ def names() -> list[str]:
     return list(TOOLS)
 
 
-__all__ = ["TOOLS", "get", "names"]
+__all__ = ["SELFTESTS", "TOOLS", "get", "names"]

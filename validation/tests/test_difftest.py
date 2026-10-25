@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+from pathlib import Path
 
 import numpy as np
 import pytest
@@ -272,3 +273,159 @@ def test_report(tmp_path):
     assert "ants-n4" in text and "ANTS-38" in text and "difftest --replay" in text
     s = json.loads((out / "summary.json").read_text())
     assert s["tools"]["ants-n4"]["cases"] == 3 and s["tools"]["ants-n4"]["verdicts"]["differ"] == 1
+
+
+def test_heavy_cases_are_reported_with_their_results(tmp_path):
+    out = tmp_path / "night"
+    out.mkdir()
+    (out / "run.json").write_text(
+        json.dumps({"seed": "r", "memory": {"box": "8 GiB", "case": "3 GiB"}, "started": "x"})
+    )
+    lines = [
+        # The worker died, then each implementation ran apart: the isolated line is the case's.
+        {"tool": "ants-n4", "seed": "r", "n": 0, "verdict": "memory", "detail": "worker"},
+        {
+            "tool": "ants-n4",
+            "seed": "r",
+            "n": 0,
+            "verdict": "memory",
+            "isolated": True,
+            "options": ["-b"],
+            "impls": {
+                "port": {"verdict": "memory", "signature": ["larmorx exceeds the memory limit"]}
+            },
+        },
+        {"tool": "ants-n4", "seed": "r", "n": 1, "verdict": "agree", "impls": {}},
+    ]
+    (out / "results.jsonl").write_text("".join(json.dumps(x) + "\n" for x in lines))
+    (out / "heavy.jsonl").write_text(
+        json.dumps({"tool": "ants-n4", "seed": "r", "n": 0, "options": ["-b"], "detail": "x"})
+        + "\n"
+    )
+    report.write(out)
+    s = json.loads((out / "summary.json").read_text())
+    assert s["tools"]["ants-n4"]["cases"] == 2
+    assert s["tools"]["ants-n4"]["verdicts"] == {"agree": 1, "memory": 1}
+    assert s["heavy"][0]["result"] is None
+    assert "waiting for `difftest --heavy`" in (out / "report.md").read_text()
+    (out / "heavy-results.jsonl").write_text(
+        json.dumps(
+            {
+                "tool": "ants-n4",
+                "seed": "r",
+                "n": 0,
+                "verdict": "agree",
+                "impls": {"port": {"verdict": "agree"}},
+                "peak": "5 GiB",
+            }
+        )
+        + "\n"
+    )
+    report.write(out)
+    assert json.loads((out / "summary.json").read_text())["heavy"][0]["result"]["peak"] == "5 GiB"
+    assert "now: agree" in (out / "report.md").read_text()
+
+
+def _memory_box_available() -> bool:
+    """A systemd user scope with a memory limit, whose cgroup v2 leaves this user may make."""
+    import shutil
+    import subprocess
+
+    if (
+        shutil.which("systemd-run") is None
+        or not Path("/sys/fs/cgroup/cgroup.controllers").exists()
+    ):
+        return False
+    probe = (
+        "c=/sys/fs/cgroup$(sed -n 's/^0:://p' /proc/self/cgroup); mkdir \"$c/probe\" && "
+        'rmdir "$c/probe"'
+    )
+    p = subprocess.run(
+        [
+            "systemd-run",
+            "--user",
+            "--scope",
+            "--quiet",
+            "--collect",
+            "-p",
+            "MemoryMax=256M",
+            "--",
+            "/bin/sh",
+            "-c",
+            probe,
+        ],
+        capture_output=True,
+        check=False,
+    )
+    return p.returncode == 0
+
+
+@pytest.mark.skipif(not _memory_box_available(), reason="no systemd user scope with cgroup v2")
+def test_a_case_over_the_memory_limit_is_recorded_and_the_night_goes_on(tmp_path):
+    """A real night of the harness's self-test tool, in a box it makes for itself: a case whose
+    original (a child process) or larmorx (the worker) fills 4 GiB under a limit of 0.75 GiB is
+    stopped by the kernel, recorded with the verdict ``memory`` on the right side and queued as
+    a heavy case, and every case of the night is recorded."""
+    import os
+    import subprocess
+    import sys
+
+    from larmorx_validation.difftest.tools import selftest
+
+    out = tmp_path / "night"
+    cases = 8
+    who = {
+        n: core.make_recipe(tools.get("selftest-memory"), "box", n)["extra"]["who"]
+        for n in range(cases)
+    }
+    assert set(who.values()) == set(selftest.WHO), "the seed must draw every kind of case"
+    env = {**os.environ, "PYTHONPATH": os.pathsep.join(p for p in sys.path if p)}
+    env.pop("LARMORX_DIFFTEST_BOXED", None)
+    env.pop("LARMORX_DIFFTEST_CGROUP", None)
+    p = subprocess.run(
+        [
+            sys.executable,
+            "-m",
+            "larmorx_validation",
+            "difftest",
+            "--tools",
+            "selftest-memory",
+            "--max-cases",
+            str(cases),
+            "--jobs",
+            "1",
+            "--budget",
+            "0.1",
+            "--seed",
+            "box",
+            "--memory-gib",
+            "0.75",
+            "--box-gib",
+            "2",
+            "--out",
+            str(out),
+        ],
+        capture_output=True,
+        text=True,
+        env=env,
+        timeout=600,
+        check=False,
+    )
+    assert p.returncode == 0, p.stderr[-2000:]
+    assert "DIFFTEST FINISHED" in p.stdout
+    _, lines = report.load(out)
+    by_n = {ln["n"]: ln for ln in lines}
+    assert sorted(by_n) == list(range(cases)), "every case is recorded; the night went on"
+    for n, kind in who.items():
+        e = by_n[n]["impls"]["port"]
+        if kind == "nobody":
+            assert e["verdict"] == "agree", (n, e)
+        else:
+            assert e["verdict"] == "memory", (n, e)
+            assert e["signature"] == [f"{kind} exceeds the memory limit"], (n, e)
+            assert "exceeds 0.75 GiB" in e["detail"], (n, e)
+    heavy = {h["n"] for h in report.heavy(out)}
+    assert heavy == {n for n, kind in who.items() if kind != "nobody"}
+    info = json.loads((out / "run.json").read_text())
+    assert info["memory"]["case"] == "0.75 GiB" and info["memory"]["box"] == "2 GiB"
+    assert "ended" in info

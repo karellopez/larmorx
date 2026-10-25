@@ -42,12 +42,25 @@ def main() -> int:
     site, base, out = Path(sys.argv[1]), sys.argv[2].rstrip("/") + "/", Path(sys.argv[3])
     out.mkdir(parents=True, exist_ok=True)
     pages = ["validation/"] + [
-        f"tools/{p.stem}/" for p in sorted((site / "content" / "tools").glob("*.md")) if p.stem != "index"
+        f"tools/{p.stem}/"
+        for p in sorted((site / "content" / "tools").glob("*.md"))
+        if p.stem != "index"
     ]
     results = {}
     for page in pages:
         name = page.strip("/").replace("/", "-")
-        text = shoot(site, base + page, out / "checks", name, "--sizes", "1440x900", "--themes", "light", "--eval", EVAL)
+        text = shoot(
+            site,
+            base + page,
+            out / "checks",
+            name,
+            "--sizes",
+            "1440x900",
+            "--themes",
+            "light",
+            "--eval",
+            EVAL,
+        )
         line = next((ln for ln in text.splitlines() if ln.startswith("eval ")), text[-300:])
         payload = line.split(": ", 1)[1] if ": " in line else line
         try:
@@ -56,7 +69,18 @@ def main() -> int:
         except json.JSONDecodeError:
             results[page] = payload
         panel = "#random-testing-summary" if page == "validation/" else "#random-testing-panel"
-        shoot(site, base + page, out, f"{name}-random-testing", "--sizes", "1440x900,390x844", "--themes", "light,dark", "--select", panel)
+        shoot(
+            site,
+            base + page,
+            out,
+            f"{name}-random-testing",
+            "--sizes",
+            "1440x900,390x844",
+            "--themes",
+            "light,dark",
+            "--select",
+            panel,
+        )
         print(page, results[page], flush=True)
     (out / "checks.json").write_text(json.dumps(results, indent=1) + "\n", encoding="utf-8")
     bad = {

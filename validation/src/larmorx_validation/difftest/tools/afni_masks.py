@@ -51,7 +51,11 @@ def draw_automask(d: gen.Draw) -> dict:
         ),
         ("nograd", 0.2, lambda: ["-nograd"]),
         ("peels", 0.25, lambda: ["-peels", d.choice("peels value", ("0", "1", "2", "3"))]),
-        ("nbhrs", 0.15, lambda: ["-nbhrs", d.choice("nbhrs value", ("6", "12", "17", "20", "5", "30"))]),
+        (
+            "nbhrs",
+            0.15,
+            lambda: ["-nbhrs", d.choice("nbhrs value", ("6", "12", "17", "20", "5", "30"))],
+        ),
         ("NN", 0.2, lambda: [d.choice("neighbourhood", ("-NN1", "-NN2", "-NN3"))]),
         ("eclip", 0.2, lambda: ["-eclip"]),
         ("dilate", 0.35, lambda: ["-dilate", d.choice("dilate value", ("1", "2", "3"))]),

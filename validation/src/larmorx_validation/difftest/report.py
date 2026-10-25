@@ -23,12 +23,16 @@ VERDICT_ORDER = (
     core.NOTICE,
     "undefined",
     core.DIFFER,
+    "memory",
     "timeout",
     "crash",
     core.SKIP,
     "harness-error",
     "draw-error",
 )
+#: A finding of a run the memory limit stopped (``limits``): listed under the heavy cases, not
+#: among the differences.
+MEMORY_SIGNATURE = "exceeds the memory limit"
 
 
 def load(out: Path) -> tuple[dict, list[dict]]:
@@ -43,7 +47,34 @@ def load(out: Path) -> tuple[dict, list[dict]]:
         for ln in path.read_text(encoding="utf-8").splitlines():
             if ln.strip():
                 lines.append(json.loads(ln))
+    # A case whose worker died has two lines: the death, then each implementation run apart
+    # (``isolated``); the second one is the case's.
+    isolated = {(ln["tool"], ln.get("seed"), ln.get("n")) for ln in lines if ln.get("isolated")}
+    lines = [
+        ln
+        for ln in lines
+        if ln.get("isolated") or (ln["tool"], ln.get("seed"), ln.get("n")) not in isolated
+    ]
     return info, lines
+
+
+def heavy(out: Path) -> list[dict]:
+    """The night's heavy cases (``heavy.jsonl``: a run exceeded the memory limit), each with
+    its result from ``difftest --heavy`` (``heavy-results.jsonl``) when it ran."""
+    queue, done = [], {}
+    for name, into in (("heavy.jsonl", queue), ("heavy-results.jsonl", None)):
+        path = out / name
+        if not path.is_file():
+            continue
+        for ln in path.read_text(encoding="utf-8").splitlines():
+            if not ln.strip():
+                continue
+            d = json.loads(ln)
+            if into is not None:
+                into.append(d)
+            else:
+                done[(d["tool"], d["seed"], d["n"])] = d
+    return [{**q, "result": done.get((q["tool"], q["seed"], q["n"]))} for q in queue]
 
 
 def findings(out: Path) -> list[dict]:
@@ -88,6 +119,8 @@ def summarise(out: Path) -> dict:
         t["seconds"] += float(line.get("seconds") or 0.0)
     groups: dict[tuple, list[dict]] = defaultdict(list)
     for f in findings(out):
+        if any(sig.endswith(MEMORY_SIGNATURE) for sig in f["signature"]):
+            continue
         groups[(f["tool"], f["implementation"], tuple(f["signature"]))].append(f)
     diffs = []
     for (tool, impl, sig), fs in sorted(groups.items()):
@@ -149,6 +182,8 @@ def summarise(out: Path) -> dict:
         if ln.get("verdict") in ("timeout", "crash", "harness-error", "draw-error")
     ]
     return {
+        "heavy": heavy(out),
+        "memory": info.get("memory", {}),
         "schema": 1,
         "date": info.get("started", "")[:10],
         "seed": info.get("seed"),
@@ -208,15 +243,16 @@ def write(out: Path) -> Path:
         "(differs from the original as built only through glibc's maths: identical with CORE-MATH preloaded), "
         "*notice* (a D13 notice where the correction changed nothing visible), *undefined* (the original's "
         "values depend on memory it never wrote or on the clock, a defect larmorx names: not comparable), *differ* (a finding: shrunk "
-        "below), *timeout* and *crash* (unclear: listed at the end).",
+        "below), *memory* (a run exceeded the memory limit of its case: queued as a heavy case, run "
+        "to its end later by `difftest --heavy`), *timeout* and *crash* (unclear: listed at the end).",
         "",
-        "| Tool | Cases | Agree | Explained | Notice | Undefined | Differ | Timeout | Crash | Skipped | Harness | Options covered | Time (s) |",
-        "|---|---|---|---|---|---|---|---|---|---|---|---|---|",
+        "| Tool | Cases | Agree | Explained | Notice | Undefined | Differ | Memory | Timeout | Crash | Skipped | Harness | Options covered | Time (s) |",
+        "|---|---|---|---|---|---|---|---|---|---|---|---|---|---|",
     ]
     for name, t in s["tools"].items():
         v = t["verdicts"]
         lines.append(
-            f"| {name} | {t['cases']} | {v.get('agree', 0)} | {v.get('explained', 0)} | {v.get('notice', 0)} | {v.get('undefined', 0)} | {v.get('differ', 0)} | "
+            f"| {name} | {t['cases']} | {v.get('agree', 0)} | {v.get('explained', 0)} | {v.get('notice', 0)} | {v.get('undefined', 0)} | {v.get('differ', 0)} | {v.get('memory', 0)} | "
             f"{v.get('timeout', 0)} | {v.get('crash', 0)} | {v.get('skipped', 0)} | {v.get('harness-error', 0) + v.get('draw-error', 0)} | "
             f"{t['options_covered']} | {t['seconds']:.0f} |"
         )
@@ -259,6 +295,34 @@ def write(out: Path) -> Path:
             lines.append(f"- {name}: {entry} in {n['cases']} case(s), e.g. `{n['example']}`")
     if not any_notice:
         lines.append("None.")
+    lines += ["", "## Heavy cases", ""]
+    mem = s.get("memory") or {}
+    lines.append(
+        f"Each case ran with a hard memory limit of {mem.get('case') or '(none)'} and no swap, the "
+        f"night in a box of {mem.get('box') or '(none)'}. A case that exceeded it is queued in "
+        "`heavy.jsonl` and run to its end, one at a time in a large box, by "
+        "`python -m larmorx_validation difftest --heavy <this directory>` (when the machine is "
+        "quiet); its result is in `heavy-results.jsonl`."
+    )
+    lines.append("")
+    for h in s["heavy"]:
+        r = h.get("result")
+        state = (
+            "waiting for `difftest --heavy`"
+            if r is None
+            else f"{r.get('verdict')}: "
+            + "; ".join(
+                f"{impl}: {e.get('verdict')} {e.get('detail', '')[:200]}"
+                for impl, e in (r.get("impls") or {}).items()
+            )
+            + (f" (peak {r['peak']}, {r.get('seconds')} s)" if r.get("peak") else "")
+        )
+        lines.append(
+            f"- `{h['tool']}:{h['seed']}:{h['n']}` ({', '.join(h.get('options', []))}): "
+            f"{h.get('detail', '')[:200]}; now: {state}"
+        )
+    if not s["heavy"]:
+        lines.append("None.")
     if s["unclear"]:
         lines += ["", "## Unclear (for the orchestrator)", ""]
         for u in s["unclear"][:200]:
@@ -268,4 +332,4 @@ def write(out: Path) -> Path:
     return path
 
 
-__all__ = ["findings", "load", "summarise", "write"]
+__all__ = ["MEMORY_SIGNATURE", "findings", "heavy", "load", "summarise", "write"]

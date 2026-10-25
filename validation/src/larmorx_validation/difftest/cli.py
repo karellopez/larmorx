@@ -9,6 +9,12 @@ a permanent case (``docs/validation/difftest.md``).
     difftest --report oracles/difftest/<date>                          report.md, summary.json
     difftest --promote <finding.json> --id <name> [--tier smoke] ...   a permanent case
     difftest --list                                                    the tools, and why not
+    difftest --heavy oracles/difftest/<date> [--heavy-hours 2]          the night's heavy cases
+
+A night, ``--case`` and ``--replay`` run in a memory box (``--box-gib``, 8 GiB: the command
+re-runs itself in a systemd user scope unless it already runs in one, e.g. through
+``scripts/orchestration/boxed.sh``), each worker (each case) with a hard limit of
+``--memory-gib`` (3 GiB) and no swap (:mod:`~larmorx_validation.difftest.limits`).
 """
 
 from __future__ import annotations
@@ -44,6 +50,19 @@ def add_arguments(p: argparse.ArgumentParser) -> None:
         "--shrink-budget", type=float, default=600.0, help="seconds to shrink one difference"
     )
     p.add_argument("--max-cases", type=int, default=None, help="at most this many cases per tool")
+    p.add_argument(
+        "--memory-gib",
+        type=float,
+        default=None,
+        help="the hard memory limit of each worker and of every process it starts, no swap "
+        "(default 3; 0: no limits, only where cgroup v2 is not writable)",
+    )
+    p.add_argument(
+        "--box-gib",
+        type=float,
+        default=None,
+        help="the memory box this command makes for itself when it runs in none (default 8)",
+    )
     p.add_argument("--case", help="run one case: TOOL:SEED:N")
     p.add_argument("--show", action="store_true", help="with --case: print its recipe only")
     p.add_argument(
@@ -65,6 +84,15 @@ def add_arguments(p: argparse.ArgumentParser) -> None:
     p.add_argument(
         "--list", action="store_true", help="list the tools and whether they can run here"
     )
+    p.add_argument(
+        "--heavy",
+        help="a night's directory: run its heavy cases (heavy.jsonl) to their end, one at a "
+        "time, in a box of 24 GiB and 48 GiB of swap (only when the machine is quiet)",
+    )
+    p.add_argument(
+        "--heavy-hours", type=float, default=2.0, help="with --heavy: hours for each run"
+    )
+    p.add_argument("--case-timeout", type=float, default=None, help=argparse.SUPPRESS)
     p.add_argument("--judge-recipe", help=argparse.SUPPRESS)
     p.add_argument("--impl", help=argparse.SUPPRESS)
 
@@ -108,13 +136,39 @@ def main(args: argparse.Namespace) -> int:
         )
         print(path)
         return 0
-    from larmorx_validation.difftest import runner
+    from larmorx_validation.difftest import limits, runner
 
+    if args.heavy:
+        limits.ensure_box(
+            sys.argv[1:], args.box_gib or limits.HEAVY_GIB, swap_gib=limits.HEAVY_SWAP_GIB
+        )
+        os.environ.setdefault("LARMORX_ORACLE_CACHE_MODE", "off")
+        runner.limit_threads(args.threads)
+        done = runner.run_heavy(
+            Path(args.heavy),
+            memory_gib=args.memory_gib or limits.HEAVY_GIB,
+            hours=args.heavy_hours,
+            log=lambda s: print(s, file=sys.stderr, flush=True),
+        )
+        print(f"{len(done)} heavy case(s) run; {Path(args.heavy) / 'report.md'}")
+        return 0
+    memory_gib = limits.CASE_GIB if args.memory_gib is None else args.memory_gib
+    if memory_gib and not args.judge_recipe and not args.show:
+        # Every run of random inputs is held in a memory box (CLAUDE.md, 2026-10-25).
+        limits.ensure_box(sys.argv[1:], args.box_gib or limits.BOX_GIB)
+        box = limits.MemoryBox.find() if (args.case or args.replay) else None
+        if box is not None:
+            # One case in this process: it and every program it starts held in a leaf.
+            box.nest()
+            box.leaf("case", int(memory_gib * limits.GIB)).enter()
+            limits.watch_exits()
     runner.limit_threads(args.threads)
     if args.judge_recipe:
         # A child process of a crash case: one verdict, as JSON on the last line.
         doc = json.loads(Path(args.judge_recipe).read_text(encoding="utf-8"))
-        j = runner.judge_once(tools.get(doc["tool"]), doc["recipe"], args.impl)
+        j = runner.judge_once(
+            tools.get(doc["tool"]), doc["recipe"], args.impl, timeout=args.case_timeout
+        )
         print(
             json.dumps(
                 {
@@ -182,6 +236,7 @@ def main(args: argparse.Namespace) -> int:
         threads=args.threads,
         shrink_budget=args.shrink_budget,
         max_cases=args.max_cases,
+        memory_gib=memory_gib,
         log=lambda s: print(s, file=sys.stderr, flush=True),
     )
     print(f"{out}/report.md ({info.get('elapsed_s')} s)")

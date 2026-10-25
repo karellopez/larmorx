@@ -51,6 +51,7 @@ OUTCOMES = (
     "notice",
     "undefined",
     "differ",
+    "memory",
     "timeout",
     "crash",
     "skipped",
@@ -151,6 +152,16 @@ def export(ctx: core.Context) -> dict:
                 "differences": diffs,
                 "notices": [
                     {"defect": k, "cases": v["cases"]} for k, v in t.get("notices", {}).items()
+                ],
+                # Cases over the night's memory limit, run to their end later (``--heavy``).
+                "heavy": [
+                    {
+                        "case": f"{h['tool']}:{h['seed']}:{h['n']}",
+                        "result": (h.get("result") or {}).get("verdict", "waiting"),
+                        "peak": (h.get("result") or {}).get("peak"),
+                    }
+                    for h in s.get("heavy", [])
+                    if h["tool"] == name
                 ],
             }
         )

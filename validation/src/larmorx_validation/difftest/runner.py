@@ -18,6 +18,12 @@ reproducer's original runs are stored and replay exactly (the parity suites then
 ``--jobs`` cases at a time; each case's line goes to ``results.jsonl`` as it ends, each
 difference to ``findings/<tool>/``, and ``report.md`` and ``summary.json`` are written at the
 end (:mod:`~larmorx_validation.difftest.report`).
+
+**Limits** (:mod:`~larmorx_validation.difftest.limits`): a night runs in a memory box, and each
+worker, with every process it starts, in a control group of its own with a hard memory limit and
+no swap; a run the kernel stops for memory is the verdict ``memory`` ("the original ... exceeds
+3 GiB", "larmorx exceeds 3 GiB"), and the night goes on. Each run has its alarm and each case its
+deadline (``timeout``).
 """
 
 from __future__ import annotations
@@ -34,11 +40,13 @@ import traceback
 from multiprocessing.connection import Connection, wait
 from pathlib import Path
 
-from larmorx_validation.difftest import core, gen, inputs, tools
+from larmorx_validation.difftest import core, gen, inputs, limits, tools
 from larmorx_validation.difftest.core import DIFFER, EXPLAINED, NOTICE, SKIP, Judgement
 from larmorx_validation.parity import harness
 
 TIMEOUT = "timeout"
+#: A run the kernel stopped because it exceeded its memory limit (:mod:`limits`).
+MEMORY = limits.MEMORY
 #: How many cases with the same difference (tool, implementation, failed checks) are shrunk in a
 #: night; later ones are counted and kept unshrunk (shrinking is the night's costliest part).
 SHRINKS_PER_SIGNATURE = 2
@@ -156,6 +164,9 @@ def execute(
     )
     start = time.monotonic()
     limit = int(max(1, round(timeout if timeout is not None else tool.timeout)))
+    leaf = limits.current()
+    oom_before = leaf.oom_kills() if leaf else 0
+    limits.clear()
     previous = signal.signal(signal.SIGALRM, _alarm)
     signal.alarm(limit)
     try:
@@ -178,6 +189,15 @@ def execute(
         signal.alarm(0)
         signal.signal(signal.SIGALRM, previous)
         inputs.release(f"run/{gen.digest(recipe['inputs'])}")
+    if leaf is not None and leaf.oom_kills() > oom_before:
+        # A process of this run (the original, or a larmorx program run apart) was stopped by
+        # the memory limit; this process, and so larmorx running in it, survived.
+        who = limits.culprit()
+        return (
+            memory_judgement(who, leaf.limit, "the kernel stopped it (no swap)"),
+            time.monotonic() - start,
+            result,
+        )
     j = core.judge(tool, impl, result)
     # The defects larmorx named while reproducing, and those the descriptor knows the drawn
     # case meets (``extra["undefined"]``: e.g. a clock-seeded sampling, ANTS-82).
@@ -192,6 +212,18 @@ def execute(
             j.checks,
         )
     return j, time.monotonic() - start, result
+
+
+def memory_judgement(who: str, limit: int, how: str) -> Judgement:
+    """The verdict of a run stopped by the memory limit: ``who`` (``larmorx``, ``the original
+    N4BiasFieldCorrection``) exceeds ``limit`` bytes."""
+    side = "larmorx" if who == "larmorx" else "original"
+    return Judgement(
+        MEMORY,
+        (f"{side} exceeds the memory limit",),
+        f"{limits.exceeded(who, limit)}: {how}",
+        MEMORY,
+    )
 
 
 @contextlib.contextmanager
@@ -219,10 +251,17 @@ def cache_mode(mode: str):
         yield
 
 
-def judge_once(tool: core.Tool, recipe: dict, impl: str, explore_mode: str = "off") -> Judgement:
-    """The verdict of ``recipe`` (CORE-MATH's explanation included), as shrinking needs it."""
+def judge_once(
+    tool: core.Tool,
+    recipe: dict,
+    impl: str,
+    explore_mode: str = "off",
+    timeout: float | None = None,
+) -> Judgement:
+    """The verdict of ``recipe`` (CORE-MATH's explanation included), as shrinking needs it;
+    ``timeout``: seconds for each run (default: the tool's)."""
     with cache_mode(explore_mode):
-        j, _, _ = execute(tool, recipe, impl)
+        j, _, _ = execute(tool, recipe, impl, timeout=timeout)
         if j.verdict == DIFFER and tool.crash_kw and _original_crashed(j):
             # The original crashed or aborted: compared the suite's way for such a run.
             j2, _, _ = execute(tool, recipe, impl, **tool.crash_kw)
@@ -293,7 +332,24 @@ def run_case(
         again = [impl, *sorted(j.signature)] in (shrunk_enough or []) or [impl] in (
             shrunk_enough or []
         )
-        if j.verdict == DIFFER and again:
+        if j.verdict == MEMORY:
+            line["findings"].append(
+                {
+                    "tool": tool_name,
+                    "implementation": impl,
+                    "seed": seed,
+                    "n": n,
+                    "signature": list(j.signature),
+                    "detail": j.detail,
+                    "checks": j.checks,
+                    "recipe": recipe,
+                    "shrunk": recipe,
+                    "shrink_moves": [],
+                    "shrink_runs": 0,
+                    "not_shrunk": True,
+                }
+            )
+        elif j.verdict == DIFFER and again:
             # This difference was shrunk often enough tonight: counted, its recipe kept, not shrunk.
             entry["not_shrunk"] = "shrunk often enough tonight"
             line["findings"].append(
@@ -346,7 +402,7 @@ def run_case(
     line["seconds"] = round(time.monotonic() - start, 2)
     verdicts = [e["verdict"] for e in line["impls"].values()]
     line["verdict"] = next(
-        (v for v in (DIFFER, TIMEOUT, UNDEFINED, NOTICE, EXPLAINED, SKIP) if v in verdicts),
+        (v for v in (DIFFER, MEMORY, TIMEOUT, UNDEFINED, NOTICE, EXPLAINED, SKIP) if v in verdicts),
         core.AGREE,
     )
     return line
@@ -359,12 +415,17 @@ def run_case(
 CRASH = "crash"
 
 
-def isolated_judge(tool_name: str, recipe: dict, impl: str, timeout: float) -> Judgement:
+def isolated_judge(
+    tool_name: str, recipe: dict, impl: str, timeout: float, case_timeout: float | None = None
+) -> Judgement:
     """The verdict of ``recipe`` judged in a child process; a child killed by a signal (an
-    abort, a segmentation fault) is a difference with the signature ``crash``."""
+    abort, a segmentation fault) is a difference with the signature ``crash``, one the memory
+    limit stopped the verdict ``memory``. ``case_timeout``: each run's seconds in the child."""
     import subprocess
     import sys
 
+    leaf = limits.current()
+    oom_before = leaf.oom_kills() if leaf else 0
     with tempfile.TemporaryDirectory(prefix="lx-dt-crash-") as t:
         path = Path(t) / "recipe.json"
         path.write_text(json.dumps({"tool": tool_name, "recipe": recipe}), encoding="utf-8")
@@ -383,6 +444,7 @@ def isolated_judge(tool_name: str, recipe: dict, impl: str, timeout: float) -> J
                     str(path),
                     "--impl",
                     impl,
+                    *(["--case-timeout", str(case_timeout)] if case_timeout else []),
                 ],
                 capture_output=True,
                 text=True,
@@ -393,6 +455,9 @@ def isolated_judge(tool_name: str, recipe: dict, impl: str, timeout: float) -> J
             )
         except subprocess.TimeoutExpired:
             return Judgement(TIMEOUT, ("timeout",), f"no result within {timeout:.0f} s")
+    if p.returncode == -signal.SIGKILL and leaf is not None and leaf.oom_kills() > oom_before:
+        # The child itself was stopped: larmorx, which runs in it.
+        return memory_judgement("larmorx", leaf.limit, "the kernel stopped the process running it")
     if p.returncode < 0 or not p.stdout.strip().startswith("{"):
         tail = " ".join(p.stderr.strip().splitlines()[-3:])[-400:]
         return Judgement(
@@ -436,6 +501,23 @@ def crash_case(tool_name: str, seed: str, n: int, *, shrink_budget: float = 600.
             "detail": j.detail[:600],
             "status": j.status,
         }
+        if j.verdict == MEMORY:
+            line["findings"].append(
+                {
+                    "tool": tool_name,
+                    "implementation": impl,
+                    "seed": seed,
+                    "n": n,
+                    "signature": list(j.signature),
+                    "detail": j.detail,
+                    "checks": j.checks,
+                    "recipe": recipe,
+                    "shrunk": recipe,
+                    "shrink_moves": [],
+                    "shrink_runs": 0,
+                    "not_shrunk": True,
+                }
+            )
         if j.verdict == DIFFER:
 
             def attempt(r: dict, impl: str = impl) -> Judgement:
@@ -467,7 +549,11 @@ def crash_case(tool_name: str, seed: str, n: int, *, shrink_budget: float = 600.
         CRASH
         if any(e["signature"] == [CRASH] for e in line["impls"].values())
         else next(
-            (v for v in (DIFFER, TIMEOUT, UNDEFINED, NOTICE, EXPLAINED, SKIP) if v in verdicts),
+            (
+                v
+                for v in (DIFFER, MEMORY, TIMEOUT, UNDEFINED, NOTICE, EXPLAINED, SKIP)
+                if v in verdicts
+            ),
             core.AGREE,
         )
     )
@@ -478,8 +564,12 @@ def crash_case(tool_name: str, seed: str, n: int, *, shrink_budget: float = 600.
 # Workers
 
 
-def _worker(conn: Connection, threads: int) -> None:
+def _worker(conn: Connection, threads: int, leaf: limits.Leaf | None = None) -> None:
     os.setpgrp()
+    if leaf is not None:
+        # Before anything runs: every process this worker starts is held in its leaf.
+        leaf.enter()
+    limits.watch_exits()
     os.environ["LARMORX_ORACLE_CACHE_MODE"] = "off"
     limit_threads(threads)
     while True:
@@ -502,20 +592,31 @@ def _worker(conn: Connection, threads: int) -> None:
 
 
 class Pool:
-    """Worker processes, each in its own process group; a task past its deadline kills its
-    group (the worker and any original program it started) and a new worker takes its place."""
+    """Worker processes, each in its own process group (and, with ``leaves``, its own memory
+    limit); a task past its deadline kills its group (the worker and any original program it
+    started) and a new worker takes its place, as after a worker the memory limit stopped."""
 
-    def __init__(self, jobs: int, threads: int):
+    def __init__(self, jobs: int, threads: int, leaves: list[limits.Leaf] | None = None):
         self.ctx = multiprocessing.get_context("spawn")
         self.threads = threads
-        self.workers: list[dict] = [self._start() for _ in range(jobs)]
+        self.leaves = leaves or [None] * jobs
+        self.workers: list[dict] = [self._start(k) for k in range(jobs)]
 
-    def _start(self) -> dict:
+    def _start(self, slot: int) -> dict:
         parent, child = self.ctx.Pipe()
-        p = self.ctx.Process(target=_worker, args=(child, self.threads), daemon=True)
+        leaf = self.leaves[slot]
+        p = self.ctx.Process(target=_worker, args=(child, self.threads, leaf), daemon=True)
         p.start()
         child.close()
-        return {"proc": p, "conn": parent, "task": None, "deadline": None, "started": None}
+        return {
+            "proc": p,
+            "conn": parent,
+            "task": None,
+            "deadline": None,
+            "started": None,
+            "slot": slot,
+            "oom": 0,
+        }
 
     def idle(self) -> list[dict]:
         return [w for w in self.workers if w["task"] is None]
@@ -523,6 +624,8 @@ class Pool:
     def submit(self, w: dict, task: dict, deadline_s: float) -> None:
         w["task"], w["started"] = task, time.monotonic()
         w["deadline"] = w["started"] + deadline_s
+        leaf = self.leaves[w["slot"]]
+        w["oom"] = leaf.oom_kills() if leaf else 0
         w["conn"].send(dict(task))
 
     def busy(self) -> int:
@@ -541,11 +644,22 @@ class Pool:
                 try:
                     line = w["conn"].recv()
                 except (EOFError, OSError):
+                    w["proc"].join(timeout=10)
                     code = w["proc"].exitcode
-                    line = {
-                        "verdict": CRASH,
-                        "detail": f"the worker died (exit code {code}): larmorx or the harness crashed",
-                    }
+                    leaf = self.leaves[w["slot"]]
+                    if leaf is not None and leaf.oom_kills() > w["oom"]:
+                        line = {
+                            "verdict": MEMORY,
+                            "detail": f"{limits.exceeded('larmorx', leaf.limit)}: the kernel "
+                            "stopped the worker running it (no swap)",
+                            "isolate": True,
+                        }
+                    else:
+                        line = {
+                            "verdict": CRASH,
+                            "detail": f"the worker died (exit code {code}): larmorx or the harness crashed",
+                            "isolate": True,
+                        }
                     self._replace(w)
                 out.append((task, line))
                 w["task"] = None
@@ -567,7 +681,7 @@ class Pool:
         with contextlib.suppress(ProcessLookupError, PermissionError):
             os.killpg(w["proc"].pid, signal.SIGKILL)
         w["proc"].join(timeout=10)
-        fresh = self._start()
+        fresh = self._start(w["slot"])
         w.update(fresh)
 
     def close(self) -> None:
@@ -595,12 +709,24 @@ def night(
     threads: int = 1,
     shrink_budget: float = 600.0,
     max_cases: int | None = None,
+    memory_gib: float = limits.CASE_GIB,
     log=print,
 ) -> dict:
     """Runs random cases of ``tool_names`` for ``budget_s`` seconds, ``jobs`` at a time, into
     ``out`` (see the module's documentation). Returns the run's description."""
     from larmorx_validation.difftest import report
 
+    leaves = None
+    box = limits.MemoryBox.find()
+    if memory_gib:
+        if box is None:
+            raise RuntimeError(
+                "a night runs in a memory box: scripts/orchestration/boxed.sh <GiB> ... (or "
+                "python -m larmorx_validation difftest, which boxes itself with systemd-run); "
+                "--memory-gib 0 runs without limits"
+            )
+        box.nest()
+        leaves = [box.leaf(f"worker-{k}", int(memory_gib * limits.GIB)) for k in range(jobs)]
     out.mkdir(parents=True, exist_ok=True)
     selected = []
     skipped = {}
@@ -618,6 +744,10 @@ def night(
         "jobs": jobs,
         "threads": threads,
         "shrink_budget_s": shrink_budget,
+        "memory": {
+            "box": limits.gib(box.limit) if box else None,
+            "case": limits.gib(int(memory_gib * limits.GIB)) if leaves else None,
+        },
         "tools": [t.name for t in selected],
         "unavailable": skipped,
         "started": time.strftime("%Y-%m-%dT%H:%M:%S"),
@@ -628,7 +758,8 @@ def night(
     spent = {t.name: 0.0 for t in selected}
     counts = {t.name: 0 for t in selected}
     next_n = {t.name: _resume(out, t.name) for t in selected}
-    pool = Pool(jobs, threads)
+    pool = Pool(jobs, threads, leaves)
+    queued = {(h["tool"], h["seed"], h["n"]) for h in report.heavy(out)}
     crashes: list[dict] = []
     shrinks: dict[tuple, int] = {}
     started = time.monotonic()
@@ -689,7 +820,9 @@ def night(
                 )
                 if line.get("verdict") == TIMEOUT and "seconds" not in line:
                     spent[line["tool"]] += tools.get(line["tool"]).timeout
-                if line.get("verdict") == CRASH and task.get("kind") != CRASH:
+                if line.pop("isolate", False) and task.get("kind") != CRASH:
+                    # The worker died (a crash, or larmorx stopped by the memory limit): each
+                    # implementation again in a child process of its own.
                     crashes.append(
                         {
                             "kind": CRASH,
@@ -699,6 +832,10 @@ def night(
                             "shrink_budget": shrink_budget,
                         }
                     )
+                if line.get("impls") and any(
+                    e.get("verdict") == MEMORY for e in line["impls"].values()
+                ):
+                    _queue_heavy(out, line, queued)
                 findings = line.pop("findings", [])
                 for f in findings:
                     if not f.get("not_shrunk"):
@@ -717,11 +854,121 @@ def night(
     finally:
         pool.close()
         results.close()
+        for leaf in leaves or ():
+            info.setdefault("memory", {}).setdefault("peaks", []).append(
+                None if leaf.peak() is None else limits.gib(leaf.peak())
+            )
+            leaf.remove()
     info["ended"] = time.strftime("%Y-%m-%dT%H:%M:%S")
     info["elapsed_s"] = round(time.monotonic() - started, 1)
     (out / "run.json").write_text(json.dumps(info, indent=1), encoding="utf-8")
     report.write(out)
     return info
+
+
+def _queue_heavy(out: Path, line: dict, queued: set) -> None:
+    """Adds a case that exceeded its memory limit to the night's heavy queue (``heavy.jsonl``):
+    ``difftest --heavy`` runs it to its end later (user, 2026-10-25: heavy cases are run, not
+    avoided)."""
+    key = (line["tool"], line["seed"], line["n"])
+    if key in queued:
+        return
+    queued.add(key)
+    entry = {
+        "tool": line["tool"],
+        "seed": line["seed"],
+        "n": line["n"],
+        "recipe_id": line.get("recipe_id"),
+        "options": line.get("options", []),
+        "detail": "; ".join(
+            f"{impl}: {e.get('detail', '')}"
+            for impl, e in line["impls"].items()
+            if e.get("verdict") == MEMORY
+        ),
+        "queued": time.strftime("%Y-%m-%dT%H:%M:%S"),
+    }
+    with (out / "heavy.jsonl").open("a", encoding="utf-8") as f:
+        f.write(json.dumps(entry, sort_keys=True) + "\n")
+
+
+def run_heavy(
+    out: Path,
+    *,
+    memory_gib: float = limits.HEAVY_GIB,
+    swap_gib: float = limits.HEAVY_SWAP_GIB,
+    hours: float = 2.0,
+    log=print,
+) -> list[dict]:
+    """Runs the heavy queue of the night in ``out`` (``heavy.jsonl``) to its end, one case at a
+    time: each implementation in a child process of its own, in a leaf of ``memory_gib`` GiB and
+    ``swap_gib`` GiB of swap, for at most ``hours`` each; the results go to
+    ``heavy-results.jsonl`` with each run's peak memory. Cases with a result are skipped."""
+    from larmorx_validation.difftest import report
+
+    box = limits.MemoryBox.find()
+    if box is None:
+        raise RuntimeError("difftest --heavy runs in a memory box (it makes one with systemd-run)")
+    box.nest()
+    limits.watch_exits()
+    done = []
+    for k, h in enumerate(report.heavy(out)):
+        if h.get("result"):
+            continue
+        tool = tools.get(h["tool"])
+        recipe = core.make_recipe(tool, h["seed"], h["n"])
+        line: dict = {
+            "tool": h["tool"],
+            "seed": h["seed"],
+            "n": h["n"],
+            "recipe_id": core.recipe_id(recipe),
+            "options": recipe["options"],
+            "impls": {},
+            "limit": f"{limits.gib(int(memory_gib * limits.GIB))} + "
+            f"{limits.gib(int(swap_gib * limits.GIB))} swap",
+        }
+        start = time.monotonic()
+        peaks = []
+        for impl in tool.implementations:
+            leaf = box.leaf(
+                f"heavy-{k}-{impl}",
+                int(memory_gib * limits.GIB),
+                swap=int(swap_gib * limits.GIB),
+            )
+            leaf.enter()
+            log(f"heavy {h['tool']}:{h['seed']}:{h['n']} ({impl}): running")
+            t0 = time.monotonic()
+            j = isolated_judge(
+                h["tool"], recipe, impl, hours * 3600.0 * 2 + 600, case_timeout=hours * 3600.0
+            )
+            (box.root / "harness" / "cgroup.procs").write_text("0", encoding="ascii")
+            peak = leaf.peak()
+            leaf.remove()
+            peaks.append(peak or 0)
+            line["impls"][impl] = {
+                "verdict": j.verdict,
+                "signature": list(j.signature),
+                "detail": j.detail[:600],
+                "status": j.status,
+                "peak": None if peak is None else limits.gib(peak),
+                "seconds": round(time.monotonic() - t0, 1),
+            }
+            log(f"heavy {h['tool']}:{h['seed']}:{h['n']} ({impl}): {j.verdict} {j.detail[:200]}")
+        verdicts = [e["verdict"] for e in line["impls"].values()]
+        line["verdict"] = next(
+            (
+                v
+                for v in (DIFFER, MEMORY, TIMEOUT, CRASH, UNDEFINED, NOTICE, EXPLAINED, SKIP)
+                if v in verdicts
+            ),
+            core.AGREE,
+        )
+        line["peak"] = limits.gib(max(peaks)) if peaks else None
+        line["seconds"] = round(time.monotonic() - start, 1)
+        with (out / "heavy-results.jsonl").open("a", encoding="utf-8") as f:
+            f.write(json.dumps(line, sort_keys=True) + "\n")
+        done.append(line)
+    report.write(out)
+    return done
 
 
 def _resume(out: Path, tool: str) -> int:
@@ -774,6 +1021,7 @@ def _environment() -> dict:
 
 __all__ = [
     "CRASH",
+    "MEMORY",
     "TIMEOUT",
     "UNDEFINED",
     "CaseTimeout",
@@ -783,6 +1031,8 @@ __all__ = [
     "isolated_judge",
     "judge_once",
     "limit_threads",
+    "memory_judgement",
     "night",
     "run_case",
+    "run_heavy",
 ]

@@ -11,7 +11,20 @@
 # in an agent's worktree) and the replica programs (build-gpl.sh, build-nc.sh).
 # Example crontab line (22:30 every night, 6 hours, 4 jobs):
 #   30 22 * * * /path/to/larmorx/scripts/orchestration/difftest-nightly.sh /path/to/larmorx 6 4
+#
+# The night runs in a memory box (CLAUDE.md, 2026-10-25: one random N4 case once grew to 28 GB and
+# took the machine down): run it as `scripts/orchestration/boxed.sh 8 difftest-nightly.sh ...`, or
+# plainly, and it boxes itself (a systemd user scope of LARMORX_DIFFTEST_BOX_GIB GiB, 8, no swap).
+# Inside, each worker has a hard limit of LARMORX_DIFFTEST_CASE_GIB GiB (3) and no swap; a case
+# that exceeds it is recorded (verdict "memory") and queued in heavy.jsonl, for
+# `python -m larmorx_validation difftest --heavy <night>` when the machine is quiet.
 set -o pipefail
+cgroup=$(sed -n 's/^0:://p' /proc/self/cgroup)
+if [ "$(cat "/sys/fs/cgroup$cgroup/memory.max" 2>/dev/null)" = max ] && [ -z "${LARMORX_DIFFTEST_BOXED:-}" ]; then
+  export LARMORX_DIFFTEST_BOXED=1
+  exec systemd-run --user --scope --quiet --collect -p "MemoryMax=${LARMORX_DIFFTEST_BOX_GIB:-8}G" \
+    -p MemorySwapMax=0 -- "$0" "$@"
+fi
 source "$(dirname "$0")/env.sh"
 W=$1
 HOURS=${2:-6}
@@ -19,14 +32,16 @@ JOBS=${3:-4}
 SEED=${4:-$(date +%Y%m%d)}
 TOOLS=${5:-all}
 DAY=$(date +%Y-%m-%d)
-OUT=$LARMORX_WORKSPACE/oracles/difftest/$DAY
-LOG=$LARMORX_WORKSPACE/oracles/logs/difftest-$DAY.log
+OUT=${LARMORX_DIFFTEST_OUT:-$LARMORX_WORKSPACE/oracles/difftest/$DAY}
+LOG=${LARMORX_DIFFTEST_LOG:-$LARMORX_WORKSPACE/oracles/logs/difftest-$DAY.log}
 mkdir -p "$OUT" "$(dirname "$LOG")"
 export PYTHONPATH=$W/python:$W/validation/src
 cd "$W" || exit 1
 {
   echo "difftest nightly: $(date -Is) checkout $W ($(git -C "$W" describe --always --dirty --abbrev=12)) hours $HOURS jobs $JOBS seed $SEED tools $TOOLS"
-  python -m larmorx_validation difftest --tools "$TOOLS" --budget "$HOURS" --jobs "$JOBS" --seed "$SEED" --out "$OUT"
+  echo "memory box: $(sed -n 's/^0:://p' /proc/self/cgroup) memory.max $(cat "/sys/fs/cgroup$(sed -n 's/^0:://p' /proc/self/cgroup)/memory.max")"
+  python -m larmorx_validation difftest --tools "$TOOLS" --budget "$HOURS" --jobs "$JOBS" --seed "$SEED" --out "$OUT" \
+    --memory-gib "${LARMORX_DIFFTEST_CASE_GIB:-3}"
   status=$?
   echo "report: $OUT/report.md"
   echo "DIFFTEST NIGHTLY FINISHED $status"

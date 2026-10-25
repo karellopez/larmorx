@@ -5,23 +5,10 @@ version.workspace = true
 edition.workspace = true
 license.workspace = true
 repository.workspace = true
-autobins = false
-
-# A small program for the parity suite and the golden tests until the package's own
-# `larmorx-nc` program (larmorx-nc-cli) dispatches to this crate: it takes the same arguments,
-# `larmorx-nc-bet fsl <bet|bet2|betsurf> [original arguments]`.
-[[bin]]
-name = "larmorx-nc-bet"
-path = "src/bin/larmorx-nc-bet.rs"
 
 [dependencies]
 larmorx-core.workspace = true
-flate2.workspace = true
-
-[features]
-# Exposes private routines to the bit-exactness harnesses in tools/ (not an API).
-verification = []
+larmorx-nc-core.workspace = true
 
 [dev-dependencies]
-sha2.workspace = true
 tempfile.workspace = true

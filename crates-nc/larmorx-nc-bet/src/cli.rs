@@ -1,60 +1,36 @@
 // SPDX-License-Identifier: LicenseRef-FSL
 // Copyright 2026 Karel Lopez Vilaret.
 //! The command lines of the BET replicas: `fsl bet`, `fsl bet2`, `fsl betsurf`, with FSL's own
-//! arguments, messages and exit statuses.
-//!
-//! Settings come from the environment, read once: `FSLOUTPUTTYPE` and
-//! `FSL_LOAD_NIFTI_EXTENSIONS` (FSL's), `LARMORX_UPSTREAM_DEFECTS` (D13: `fix`, the default, or
-//! `reproduce`, FSL's result bit for bit), `OMP_NUM_THREADS` (threads; results do not depend on
-//! it). `FSLDIR` is not needed: the replica runs none of
-//! FSL's programs.
+//! arguments, messages and exit statuses, as the `larmorx-nc` program (`larmorx-nc-cli`) runs
+//! them: the original arguments (without the program name), the settings it read from the
+//! environment once (`FSLOUTPUTTYPE`, `FSL_LOAD_NIFTI_EXTENSIONS`), D13's mode
+//! (`LARMORX_UPSTREAM_DEFECTS`: `fix`, the default, or `reproduce`, FSL's result bit for bit)
+//! and the thread count (`OMP_NUM_THREADS`; 0: every logical CPU; the results do not depend on
+//! it). `FSLDIR` is not needed: the replica runs none of FSL's programs.
 
 use std::io::Write;
 
-use larmorx_core::defects::{self, UpstreamDefects};
+use larmorx_core::defects::UpstreamDefects;
+use larmorx_nc_core::settings::Settings;
 
-use crate::fsl::volume::FslSettings;
-use crate::{bet, bet2, betsurf};
+use crate::bet2::Run;
 
 /// The tools, as `larmorx-nc fsl <tool>` names them.
 pub const TOOLS: &[&str] = &["bet", "bet2", "betsurf"];
 
-/// Runs `tool` with its original arguments (without the program name); `None` for an unknown
-/// tool.
-pub fn run(tool: &str, args: &[String], out: &mut dyn Write, err: &mut dyn Write) -> Option<u8> {
-    if !TOOLS.contains(&tool) {
-        return None;
-    }
-    let mode = match UpstreamDefects::from_env() {
-        Ok(m) => m,
-        Err(e) => {
-            let _ = writeln!(err, "error: {e}");
-            return Some(defects::EXIT_BAD_MODE);
-        }
-    };
-    let fsl = FslSettings::from_env();
-    Some(run_with(tool, args, &fsl, mode, threads(), out, err))
-}
-
-/// Threads for the command line: `OMP_NUM_THREADS` if set (the variable larmorx gives its
-/// replica programs), else all logical CPUs. Results do not depend on it.
-pub fn threads() -> usize {
-    let n = std::env::var("OMP_NUM_THREADS")
-        .ok()
-        .and_then(|v| v.trim().parse::<usize>().ok())
-        .unwrap_or(0);
-    if n > 0 {
-        n
+/// `0` (unset) as every logical CPU.
+fn thread_count(threads: usize) -> usize {
+    if threads > 0 {
+        threads
     } else {
         std::thread::available_parallelism().map_or(1, usize::from)
     }
 }
 
-/// [`run`] with the settings given.
-pub fn run_with(
+fn run_tool(
     tool: &str,
     args: &[String],
-    fsl: &FslSettings,
+    settings: &Settings,
     mode: UpstreamDefects,
     threads: usize,
     out: &mut dyn Write,
@@ -62,18 +38,53 @@ pub fn run_with(
 ) -> u8 {
     let mut argv = vec![tool.to_owned()];
     argv.extend(args.iter().cloned());
-    let run = bet2::Run {
-        fsl,
+    let run = Run {
+        fsl: settings,
         mode,
-        threads: threads.max(1),
+        threads: thread_count(threads),
     };
     let code = match tool {
-        "bet2" => bet2::main(&argv, &run, out, err),
-        "bet" => bet::main(&argv, &run, out, err),
-        "betsurf" => betsurf::main(&argv, &run, out, err),
-        _ => 2,
+        "bet2" => crate::bet2::main(&argv, &run, out, err),
+        "bet" => crate::bet::main(&argv, &run, out, err),
+        _ => crate::betsurf::main(&argv, &run, out, err),
     };
     let _ = out.flush();
     let _ = err.flush();
     code
+}
+
+/// `bet <input> <output> [options]` (the `bet` script).
+pub fn bet(
+    args: &[String],
+    settings: &Settings,
+    mode: UpstreamDefects,
+    threads: usize,
+    out: &mut dyn Write,
+    err: &mut dyn Write,
+) -> u8 {
+    run_tool("bet", args, settings, mode, threads, out, err)
+}
+
+/// `bet2 <input> <output> [options]`.
+pub fn bet2(
+    args: &[String],
+    settings: &Settings,
+    mode: UpstreamDefects,
+    threads: usize,
+    out: &mut dyn Write,
+    err: &mut dyn Write,
+) -> u8 {
+    run_tool("bet2", args, settings, mode, threads, out, err)
+}
+
+/// `betsurf [options] <t1> [t2] <bet_mesh.vtk> <t1_to_standard_mat> <output>`.
+pub fn betsurf(
+    args: &[String],
+    settings: &Settings,
+    mode: UpstreamDefects,
+    threads: usize,
+    out: &mut dyn Write,
+    err: &mut dyn Write,
+) -> u8 {
+    run_tool("betsurf", args, settings, mode, threads, out, err)
 }

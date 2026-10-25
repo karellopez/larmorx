@@ -65,45 +65,17 @@ impl Settings {
     }
 }
 
-/// C's `atoi`: optional leading white space, an optional sign, then decimal digits up to the
-/// first other character; 0 when there are none. Out-of-range values give what glibc's
-/// `strtol`-based `atoi` gives on x86-64 (the `long` clamped to its range, then truncated to
-/// `int`).
+/// C's `atoi` ([`crate::cnum::atoi`]): optional leading white space, an optional sign, then
+/// decimal digits up to the first other character; 0 when there are none. Out-of-range values
+/// give what glibc's `strtol`-based `atoi` gives on x86-64 (the `long` clamped to its range,
+/// then truncated to `int`).
 pub fn atoi(s: &str) -> i32 {
-    strtol(s) as i32
+    crate::cnum::atoi(s)
 }
 
 /// glibc's `strtol(s, NULL, 10)`: the value clamped to `long`'s range.
 pub fn strtol(s: &str) -> i64 {
-    let b = s.as_bytes();
-    let mut i = 0;
-    while i < b.len() && matches!(b[i], b' ' | b'\t' | b'\n' | b'\r' | 0x0b | 0x0c) {
-        i += 1;
-    }
-    let mut neg = false;
-    if i < b.len() && (b[i] == b'+' || b[i] == b'-') {
-        neg = b[i] == b'-';
-        i += 1;
-    }
-    let mut v: i128 = 0;
-    let mut overflow = false;
-    while i < b.len() && b[i].is_ascii_digit() {
-        v = v * 10 + i128::from(b[i] - b'0');
-        if v > i128::from(i64::MAX) + 1 {
-            overflow = true;
-        }
-        i += 1;
-    }
-    if neg {
-        v = -v;
-    }
-    if overflow || v > i128::from(i64::MAX) {
-        if neg { i64::MIN } else { i64::MAX }
-    } else if v < i128::from(i64::MIN) {
-        i64::MIN
-    } else {
-        v as i64
-    }
+    crate::cnum::strtol(s, 10).0
 }
 
 #[cfg(test)]

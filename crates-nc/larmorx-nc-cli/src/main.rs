@@ -33,7 +33,12 @@ type ToolFn =
     fn(&[String], &Settings, UpstreamDefects, usize, &mut dyn Write, &mut dyn Write) -> u8;
 
 /// The FSL tools this program replicates. Add one line per tool.
-const FSL_TOOLS: &[(&str, ToolFn)] = &[("mcflirt", larmorx_nc_mcflirt::mcflirt)];
+const FSL_TOOLS: &[(&str, ToolFn)] = &[
+    ("mcflirt", larmorx_nc_mcflirt::mcflirt),
+    ("bet", larmorx_nc_bet::bet),
+    ("bet2", larmorx_nc_bet::bet2),
+    ("betsurf", larmorx_nc_bet::betsurf),
+];
 
 fn tool_names() -> String {
     FSL_TOOLS
@@ -176,7 +181,7 @@ mod tests {
         let (code, out, _) = run_capture(&["dir/larmorx-nc.exe", "-h"]);
         assert_eq!(code, 0);
         assert!(out.contains("Usage: larmorx-nc <family> <tool>"), "{out}");
-        assert!(out.contains("fsl    mcflirt"), "{out}");
+        assert!(out.contains("fsl    mcflirt, bet, bet2, betsurf"), "{out}");
         let (code, out, err) = run_capture(&["larmorx-nc"]);
         assert_eq!((code, out.as_str()), (EXIT_USAGE, ""));
         assert!(err.contains("Usage:"), "{err}");

@@ -14,11 +14,12 @@
 
 use std::path::{Path, PathBuf};
 
-use crate::fsl::arma;
-use crate::fsl::cstr;
-use crate::fsl::filename;
-use crate::fsl::nifti::{self, dt};
-use crate::fsl::volume::{self, Elem, FslSettings, ImageError, Volume};
+use crate::arma::{self, Mat};
+use crate::cnum;
+use crate::nifti::{self, dt};
+use crate::settings::Settings;
+use crate::sse;
+use crate::volume::{self, Elem, FslError, SaveError, SaveOptions, Volume};
 
 /// fslpy's image extensions, in its order.
 pub const FSLPY_EXTS: [&str; 8] = [
@@ -44,7 +45,7 @@ fn get_ext(path: &str) -> &'static str {
 }
 
 fn is_file(p: &str) -> bool {
-    filename::is_regular_file(p)
+    volume::is_regular_file(p)
 }
 
 fn exists(p: &str) -> bool {
@@ -208,33 +209,40 @@ pub struct ToolFailure {
     pub code: u8,
 }
 
-fn failed(e: ImageError) -> ToolFailure {
-    // The programs catch std::exception (print what(), return 1 from main via fallthrough)
-    // or newimage's Exception (exit(EXIT_FAILURE)); either way exit status 1 after the
-    // Image Exception lines.
-    let mut err = e.printed;
-    if e.exit.is_none() && !e.what.is_empty() && e.type_name == "std::runtime_error" {
+fn failed(e: FslError) -> ToolFailure {
+    // The programs catch std::exception (print what(), return 1 from main via fallthrough):
+    // exit status 1 after the Image Exception lines.
+    let mut err = e.printed_text();
+    if !e.what.is_empty() && e.type_name == "std::runtime_error" {
         err.push_str(&e.what);
         err.push('\n');
     }
-    ToolFailure {
-        err,
-        code: e.exit.unwrap_or(1),
+    ToolFailure { err, code: 1 }
+}
+
+fn save_failed(e: SaveError) -> ToolFailure {
+    match e {
+        // FslGetEnvOutputType: exit(EXIT_FAILURE) after its lines.
+        SaveError::OutputType(o) => ToolFailure {
+            err: o.printed.iter().map(|l| format!("{l}\n")).collect(),
+            code: 1,
+        },
+        SaveError::Exception(e) => failed(e),
     }
+}
+
+/// The header of an image named as FSL names it, or the program's failure.
+fn header_of(name: &str) -> Result<nifti::NiftiHeader, ToolFailure> {
+    let path = volume::return_validimagefilename(name).map_err(failed)?;
+    nifti::load_header(Path::new(&path)).map_err(|e| ToolFailure {
+        err: format!("{}\n", e.0),
+        code: 1,
+    })
 }
 
 /// `dtype(filename)` then `closestTemplatedType`: the type avwutils programs read a file as.
 pub fn template_type(name: &str) -> Result<i16, ToolFailure> {
-    let mut printed = String::new();
-    let path =
-        filename::return_validimagefilename(name, &mut printed).map_err(|w| ToolFailure {
-            err: format!("{printed}{w}\n"),
-            code: 1,
-        })?;
-    let h = nifti::load_header(&path).map_err(|e| ToolFailure {
-        err: format!("{}\n", e.0),
-        code: 1,
-    })?;
+    let h = header_of(name)?;
     let t = if h.scl_slope != 1.0 || h.scl_inter != 0.0 {
         if h.scl_slope == 0.0 || h.datatype == dt::DOUBLE {
             h.datatype
@@ -268,19 +276,10 @@ pub fn template_type(name: &str) -> Result<i16, ToolFailure> {
 /// `fslval <name> <dimN|pixdimN>`: the header field as fslhd prints it, with a trailing blank
 /// (the script's `sed 's/-//g'` applied by the caller).
 pub fn fslval(name: &str, key: &str) -> Result<String, ToolFailure> {
-    let mut printed = String::new();
-    let path =
-        filename::return_validimagefilename(name, &mut printed).map_err(|w| ToolFailure {
-            err: format!("{printed}{w}\n"),
-            code: 1,
-        })?;
-    let h = nifti::load_header(&path).map_err(|e| ToolFailure {
-        err: format!("{}\n", e.0),
-        code: 1,
-    })?;
+    let h = header_of(name)?;
     let v = if let Some(k) = key.strip_prefix("pixdim") {
         let k: usize = k.parse().unwrap_or(0);
-        cstr::fmt_f(h.pixdim[k.min(7)], 6)
+        cnum::fmt_f(h.pixdim[k.min(7)], 6)
     } else if let Some(k) = key.strip_prefix("dim") {
         let k: usize = k.parse().unwrap_or(0);
         h.dim[k.min(7)].to_string()
@@ -298,14 +297,14 @@ fn roi<T: Elem>(v: &Volume<T>, min: [i64; 4], max: [i64; 4]) -> Volume<T> {
         max[2] - min[2] + 1,
         max[3] - min[3] + 1,
     ];
-    let mut r = Volume::<T>::new_4d(n[0], n[1], n[2], n[3]);
-    let nvox = v.nvoxels();
+    let mut r = Volume::<T>::new(n[0], n[1], n[2], n[3]);
+    let nvox = v.nvoxels() as usize;
     for t in min[3]..=max[3] {
         for z in min[2]..=max[2] {
             for y in min[1]..=max[1] {
                 for x in min[0]..=max[0] {
                     let val = if v.in_bounds(x, y, z) && t >= 0 && t < v.tsize() {
-                        v.data[t as usize * nvox + v.index(x, y, z)]
+                        v.data[t as usize * nvox + v.idx(x, y, z)]
                     } else {
                         T::default()
                     };
@@ -316,40 +315,51 @@ fn roi<T: Elem>(v: &Volume<T>, min: [i64; 4], max: [i64; 4]) -> Volume<T> {
             }
         }
     }
-    r.copy_properties_from(v);
-    let mut roi2vol = arma::IDENTITY;
-    roi2vol[3][0] = min[0] as f64;
-    roi2vol[3][1] = min[1] as f64;
-    roi2vol[3][2] = min[2] as f64;
+    r.copy_properties(v);
+    // roi2vol(1..3, 4) = the ROI's corner
+    let mut roi2vol = Mat::eye(4);
+    roi2vol.set(0, 3, min[0] as f64);
+    roi2vol.set(1, 3, min[1] as f64);
+    roi2vol.set(2, 3, min[2] as f64);
     if v.sform_code != nifti::XFORM_UNKNOWN {
-        r.sform = arma::mul(&v.sform, &roi2vol);
+        r.sform = arma::mul(&v.sform, &roi2vol, false);
     }
     if v.qform_code != nifti::XFORM_UNKNOWN {
-        r.qform = arma::mul(&v.qform, &roi2vol);
+        r.qform = arma::mul(&v.qform, &roi2vol, false);
     }
     r
 }
 
-fn save<T: Elem>(v: &Volume<T>, name: &str, fsl: &FslSettings) -> Result<(), ToolFailure> {
-    match volume::save_volume(v, name, fsl, false) {
-        Ok(_) => Ok(()),
-        Err(e) => Err(failed(e)),
-    }
+/// `save_volume` as the avwutils programs call it: newimage's `descrip`; `reproduce_offset`
+/// keeps NewNifti's data offset of several extensions (FSL-56).
+fn save<T: Elem>(
+    v: &Volume<T>,
+    name: &str,
+    fsl: &Settings,
+    reproduce_offset: bool,
+) -> Result<(), ToolFailure> {
+    let opts =
+        SaveOptions::new(volume::BUILDSTRING.as_bytes()).reproducing_offset(reproduce_offset);
+    v.save_volume(name, fsl, &opts)
+        .map(|_| ())
+        .map_err(save_failed)
 }
 
-/// `fslroi <in> <out> <args>` with 2 (t) or 6 (x, y, z) numbers, in the input's type.
+/// `fslroi <in> <out> <args>` with 2 (t) or 6 (x, y, z) numbers, in the input's type;
+/// `reproduce_offset` as for every save (FSL-56).
 pub fn fslroi(
     input: &str,
     output: &str,
     args: &[&str],
-    fsl: &FslSettings,
+    fsl: &Settings,
+    reproduce_offset: bool,
 ) -> Result<(), ToolFailure> {
     match template_type(input)? {
-        dt::UNSIGNED_CHAR => fslroi_t::<i8>(input, output, args, fsl),
-        dt::SIGNED_SHORT => fslroi_t::<i16>(input, output, args, fsl),
-        dt::SIGNED_INT => fslroi_t::<i32>(input, output, args, fsl),
-        dt::DOUBLE => fslroi_t::<f64>(input, output, args, fsl),
-        _ => fslroi_t::<f32>(input, output, args, fsl),
+        dt::UNSIGNED_CHAR => fslroi_t::<i8>(input, output, args, fsl, reproduce_offset),
+        dt::SIGNED_SHORT => fslroi_t::<i16>(input, output, args, fsl, reproduce_offset),
+        dt::SIGNED_INT => fslroi_t::<i32>(input, output, args, fsl, reproduce_offset),
+        dt::DOUBLE => fslroi_t::<f64>(input, output, args, fsl, reproduce_offset),
+        _ => fslroi_t::<f32>(input, output, args, fsl, reproduce_offset),
     }
 }
 
@@ -357,10 +367,11 @@ fn fslroi_t<T: Elem>(
     input: &str,
     output: &str,
     args: &[&str],
-    fsl: &FslSettings,
+    fsl: &Settings,
+    reproduce_offset: bool,
 ) -> Result<(), ToolFailure> {
-    let v: Volume<T> = volume::read_volume4d(input, fsl).map_err(failed)?;
-    let a: Vec<i64> = args.iter().map(|s| i64::from(cstr::atoi(s))).collect();
+    let (v, _, _) = volume::read_volume4d::<T>(input, fsl).map_err(failed)?;
+    let a: Vec<i64> = args.iter().map(|s| i64::from(cnum::atoi(s))).collect();
     let (mut min, mut max) = ([0i64; 4], [0i64; 4]);
     if a.len() == 2 {
         min = [0, 0, 0, a[0]];
@@ -389,13 +400,21 @@ fn fslroi_t<T: Elem>(
         });
     }
     let m = v.niftivox2newimagevox_mat();
-    let lo = arma::mul_vec(&m, &[min[0] as f64, min[1] as f64, min[2] as f64, 1.0]);
-    let hi = arma::mul_vec(&m, &[max[0] as f64, max[1] as f64, max[2] as f64, 1.0]);
+    let lo = arma::gemv_tinysq(
+        &m,
+        &[min[0] as f64, min[1] as f64, min[2] as f64, 1.0],
+        false,
+    );
+    let hi = arma::gemv_tinysq(
+        &m,
+        &[max[0] as f64, max[1] as f64, max[2] as f64, 1.0],
+        false,
+    );
     let mut mn = [0i64; 3];
     let mut mx = [0i64; 3];
     for k in 0..3 {
-        mn[k] = i64::from(volume::misc_round(lo[k]));
-        mx[k] = i64::from(volume::misc_round(hi[k]));
+        mn[k] = i64::from(volume::round_f64(lo[k]));
+        mx[k] = i64::from(volume::round_f64(hi[k]));
         if mn[k] > mx[k] {
             std::mem::swap(&mut mn[k], &mut mx[k]);
         }
@@ -405,38 +424,31 @@ fn fslroi_t<T: Elem>(
         [mn[0], mn[1], mn[2], min[3]],
         [mx[0], mx[1], mx[2], max[3]],
     );
-    save(&r, output, fsl)
+    save(&r, output, fsl, reproduce_offset)
 }
 
 /// `fslmerge -z <out> <inputs...>`, in the first input's type.
-pub fn fslmerge_z(output: &str, inputs: &[String], fsl: &FslSettings) -> Result<(), ToolFailure> {
+pub fn fslmerge_z(
+    output: &str,
+    inputs: &[String],
+    fsl: &Settings,
+    reproduce_offset: bool,
+) -> Result<(), ToolFailure> {
     let first = inputs.first().map_or("", String::as_str);
     match template_type(first)? {
-        dt::UNSIGNED_CHAR => fslmerge_z_t::<i8>(output, inputs, fsl),
-        dt::SIGNED_SHORT => fslmerge_z_t::<i16>(output, inputs, fsl),
-        dt::SIGNED_INT => fslmerge_z_t::<i32>(output, inputs, fsl),
-        dt::DOUBLE => fslmerge_z_t::<f64>(output, inputs, fsl),
-        _ => fslmerge_z_t::<f32>(output, inputs, fsl),
+        dt::UNSIGNED_CHAR => fslmerge_z_t::<i8>(output, inputs, fsl, reproduce_offset),
+        dt::SIGNED_SHORT => fslmerge_z_t::<i16>(output, inputs, fsl, reproduce_offset),
+        dt::SIGNED_INT => fslmerge_z_t::<i32>(output, inputs, fsl, reproduce_offset),
+        dt::DOUBLE => fslmerge_z_t::<f64>(output, inputs, fsl, reproduce_offset),
+        _ => fslmerge_z_t::<f32>(output, inputs, fsl, reproduce_offset),
     }
-}
-
-fn header_of(name: &str) -> Result<nifti::NiftiHeader, ToolFailure> {
-    let mut printed = String::new();
-    let path =
-        filename::return_validimagefilename(name, &mut printed).map_err(|w| ToolFailure {
-            err: format!("{printed}{w}\n"),
-            code: 1,
-        })?;
-    nifti::load_header(&path).map_err(|e| ToolFailure {
-        err: format!("{}\n", e.0),
-        code: 1,
-    })
 }
 
 fn fslmerge_z_t<T: Elem>(
     output: &str,
     inputs: &[String],
-    fsl: &FslSettings,
+    fsl: &Settings,
+    reproduce_offset: bool,
 ) -> Result<(), ToolFailure> {
     let h0 = header_of(&inputs[0])?;
     let new_tr = h0.pixdim[4] as f32;
@@ -447,15 +459,15 @@ fn fslmerge_z_t<T: Elem>(
     for name in &inputs[1..] {
         z += header_of(name)?.dim[3].max(1);
     }
-    let mut out = Volume::<T>::new_4d(x, y, z, t);
-    let first: Volume<T> = volume::read_volume4d(&inputs[0], fsl).map_err(failed)?;
-    out.copy_properties_from(&first);
+    let mut out = Volume::<T>::new(x, y, z, t);
+    let (first, _, _) = volume::read_volume4d::<T>(&inputs[0], fsl).map_err(failed)?;
+    out.copy_properties(&first);
     let mut zoff = 0;
     for (k, name) in inputs.iter().enumerate() {
         let v: Volume<T> = if k == 0 {
             first.clone()
         } else {
-            volume::read_volume4d(name, fsl).map_err(failed)?
+            volume::read_volume4d::<T>(name, fsl).map_err(failed)?.0
         };
         if v.xsize() != x || v.ysize() != y || v.tsize() != t {
             return Err(ToolFailure {
@@ -465,14 +477,14 @@ fn fslmerge_z_t<T: Elem>(
                 code: 1,
             });
         }
-        let nvox_in = v.nvoxels();
-        let nvox_out = out.nvoxels();
+        let nvox_in = v.nvoxels() as usize;
+        let nvox_out = out.nvoxels() as usize;
         for tt in 0..t {
             for kz in 0..v.zsize() {
                 for j in 0..y {
                     for i in 0..x {
-                        let src = tt as usize * nvox_in + v.index(i, j, kz);
-                        let dst = tt as usize * nvox_out + out.index(i, j, kz + zoff);
+                        let src = tt as usize * nvox_in + v.idx(i, j, kz);
+                        let dst = tt as usize * nvox_out + out.idx(i, j, kz + zoff);
                         out.data[dst] = v.data[src];
                     }
                 }
@@ -480,15 +492,16 @@ fn fslmerge_z_t<T: Elem>(
         }
         zoff += v.zsize();
     }
-    out.tr = new_tr.abs();
-    save(&out, output, fsl)
+    out.pixdims[3] = new_tr.abs();
+    save(&out, output, fsl, reproduce_offset)
 }
 
 /// `morphfilter(v, box_kernel(3,3,3), "dilate")` on each volume: the maximum of the 3x3x3
-/// neighbourhood inside the image.
-fn dilate_f(v: &Volume<f32>) -> Volume<f32> {
+/// neighbourhood inside the image (NEWMAT's `Maximum`: the first value, then larger ones; a
+/// NaN is never larger, and a first NaN stays).
+fn dilate_f(v: &Volume) -> Volume {
     let mut r = v.clone();
-    let nvox = v.nvoxels();
+    let nvox = v.nvoxels() as usize;
     let (nx, ny, nz) = (v.xsize(), v.ysize(), v.zsize());
     let nvol = v.data.len() / nvox.max(1);
     for t in 0..nvol {
@@ -501,8 +514,7 @@ fn dilate_f(v: &Volume<f32>) -> Volume<f32> {
                     for mz in (z - 1).max(0)..=(z + 1).min(nz - 1) {
                         for my in (y - 1).max(0)..=(y + 1).min(ny - 1) {
                             for mx in (x - 1).max(0)..=(x + 1).min(nx - 1) {
-                                let val = f64::from(v.data[base + v.index(mx, my, mz)]);
-                                // NEWMAT's Maximum: the first value, then larger ones
+                                let val = f64::from(v.data[base + v.idx(mx, my, mz)]);
                                 if !any || val > best {
                                     best = val;
                                     any = true;
@@ -510,7 +522,7 @@ fn dilate_f(v: &Volume<f32>) -> Volume<f32> {
                             }
                         }
                     }
-                    r.data[base + v.index(x, y, z)] = best as f32;
+                    r.data[base + v.idx(x, y, z)] = best as f32;
                 }
             }
         }
@@ -519,24 +531,31 @@ fn dilate_f(v: &Volume<f32>) -> Volume<f32> {
 }
 
 /// `fslmaths <in> -dilF <out>`: float output, display range 0 0.
-pub fn fslmaths_dilf(input: &str, output: &str, fsl: &FslSettings) -> Result<(), ToolFailure> {
-    let v: Volume<f32> = volume::read_volume4d(input, fsl).map_err(failed)?;
+pub fn fslmaths_dilf(
+    input: &str,
+    output: &str,
+    fsl: &Settings,
+    reproduce_offset: bool,
+) -> Result<(), ToolFailure> {
+    let (v, _, _) = volume::read_volume4d::<f32>(input, fsl).map_err(failed)?;
     let mut r = dilate_f(&v);
     r.display_max = 0.0;
     r.display_min = 0.0;
-    save(&r, output, fsl)
+    save(&r, output, fsl, reproduce_offset)
 }
 
 /// `fslmaths <in> -mas <mask> <out>`: the input times the mask binarised (above 0, below its
-/// maximum plus one), in float; float output, display range 0 0.
+/// maximum plus one), in float with SSE's NaNs (an infinite voxel outside the mask is SSE's
+/// default NaN); float output, display range 0 0.
 pub fn fslmaths_mas(
     input: &str,
     mask: &str,
     output: &str,
-    fsl: &FslSettings,
+    fsl: &Settings,
+    reproduce_offset: bool,
 ) -> Result<(), ToolFailure> {
-    let mut v: Volume<f32> = volume::read_volume4d(input, fsl).map_err(failed)?;
-    let mut m: Volume<f32> = volume::read_volume4d(mask, fsl).map_err(failed)?;
+    let (mut v, _, _) = volume::read_volume4d::<f32>(input, fsl).map_err(failed)?;
+    let (mut m, _, _) = volume::read_volume4d::<f32>(mask, fsl).map_err(failed)?;
     let mut err = String::new();
     if v.tsize() == 1 && v.tsize() < m.tsize() {
         let one = v.data.clone();
@@ -558,76 +577,38 @@ pub fn fslmaths_mas(
     }
     let n = m.data.len();
     for (i, x) in v.data.iter_mut().enumerate() {
-        *x *= m.data[i % n];
+        *x = sse::mul_f32(*x, m.data[i % n]);
     }
     v.display_max = 0.0;
     v.display_min = 0.0;
-    save(&v, output, fsl)
+    save(&v, output, fsl, reproduce_offset)
 }
 
 /// `fslstats <in> -l <lthr> -C`: the centre of gravity in NIfTI voxel coordinates, as it prints
-/// it (fixed, 6 decimals, each followed by a blank).
-pub fn fslstats_cog(input: &str, lthr: &str, fsl: &FslSettings) -> Result<String, ToolFailure> {
-    let mut v: Volume<f32> = volume::read_volume4d(input, fsl).map_err(failed)?;
-    let l = cstr::atof(lthr) as f32;
+/// it (fixed, 6 decimals, each followed by a blank): the voxels not above the threshold (or not
+/// below the largest float) multiplied by 0 (SSE's NaNs), newimage's `calc_cog`, and the
+/// coordinates mapped back to the file's voxels.
+pub fn fslstats_cog(input: &str, lthr: &str, fsl: &Settings) -> Result<String, ToolFailure> {
+    let (mut v, _, _) = volume::read_volume4d::<f32>(input, fsl).map_err(failed)?;
+    let l = cnum::atof(lthr) as f32;
     let u = f32::MAX;
     for x in v.data.iter_mut() {
         let keep = *x > l && *x < u;
-        *x *= if keep { 1.0 } else { 0.0 };
+        *x = sse::mul_f32(*x, if keep { 1.0 } else { 0.0 });
     }
-    // calc_cog
-    let vmin = v.min();
-    let nvox = v.nvoxels();
-    let mut nlim = (nvox as f64).sqrt() as i64;
-    if nlim < 1000 {
-        nlim = 1000;
-    }
-    let (mut c1, mut c2, mut c3) = (0.0f64, 0.0f64, 0.0f64);
-    let (mut total, mut vx, mut vy, mut vz, mut tot) = (0.0f64, 0.0, 0.0, 0.0, 0.0);
-    let mut n: i64 = 0;
-    for z in 0..v.zsize() {
-        for y in 0..v.ysize() {
-            for x in 0..v.xsize() {
-                let val = f64::from(v.value(x, y, z) - vmin);
-                vx += val * x as f64;
-                vy += val * y as f64;
-                vz += val * z as f64;
-                tot += val;
-                n += 1;
-                if n > nlim {
-                    n = 0;
-                    total += tot;
-                    c1 += vx;
-                    c2 += vy;
-                    c3 += vz;
-                    tot = 0.0;
-                    vx = 0.0;
-                    vy = 0.0;
-                    vz = 0.0;
-                }
-            }
-        }
-    }
-    total += tot;
-    c1 += vx;
-    c2 += vy;
-    c3 += vz;
-    let mut warn = String::new();
-    if total.abs() < 1e-5 {
-        warn.push_str("WARNING::in calculating COG, total = 0.0\n");
-        total = 1.0;
-    }
-    c1 /= total;
-    c2 /= total;
-    c3 /= total;
+    // fslstats prints calc_cog's warning on standard error only through `cog()`'s caller,
+    // which it does not show: the warning is dropped, as in the original.
+    let mut warnings = Vec::new();
+    let c = v.calc_cog(&mut warnings);
     let m = v.niftivox2newimagevox_mat();
-    let c = arma::solve_vec(&m, &[c1, c2, c3, 1.0]).unwrap_or([c1, c2, c3, 1.0]);
-    let _ = warn;
+    let c = arma::solve(&m, &Mat::col(&[c[0], c[1], c[2], 1.0]))
+        .map(|r| [r.get(0), r.get(1), r.get(2)])
+        .unwrap_or([c[0], c[1], c[2]]);
     Ok(format!(
         "{} {} {} ",
-        cstr::fmt_f(c[0], 6),
-        cstr::fmt_f(c[1], 6),
-        cstr::fmt_f(c[2], 6)
+        cnum::fmt_f(c[0], 6),
+        cnum::fmt_f(c[1], 6),
+        cnum::fmt_f(c[2], 6)
     ))
 }
 

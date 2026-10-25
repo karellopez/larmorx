@@ -18,7 +18,7 @@
 //!   before, or a multi-value option whose last value reads (FSL keeps the numeric prefix);
 //! - `usage()` prints the title, the example and every visible option to standard error.
 
-use crate::fsl::cstr;
+use crate::cnum;
 
 /// How many values an option takes.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -143,11 +143,11 @@ fn string_to_t(kind: Kind, s: &str) -> (Value, bool) {
         Kind::Bool => (Value::Bool(false), false),
         Kind::Str => (Value::Str(s.to_owned()), true),
         Kind::Float => {
-            let (v, end) = cstr::strtod(s);
+            let (v, end) = cnum::strtod(s);
             (Value::Float(v as f32), end == s.len())
         }
         Kind::Int => {
-            let (v, end) = cstr::strtol(s, 0);
+            let (v, end) = cnum::strtol(s, 0);
             (Value::Int(v as i32), end == s.len())
         }
     }

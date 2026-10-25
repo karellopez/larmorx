@@ -67,7 +67,7 @@ from larmorx_validation.parity.harness import (
 TIERS = ("smoke", "standard", "full")
 FMRIPREP_IMAGE = "oracles/images/fmriprep-25.2.6.sif"
 FMRIPREP_RUNS = "oracles/fmriprep-25.2.6"
-REPLICA = "crates-nc/target/{profile}/larmorx-nc-bet{exe}"
+REPLICA = "crates-nc/target/{profile}/larmorx-nc{exe}"
 
 EXIT = "exit status"
 MESSAGES = "messages: FSL's, byte for byte"
@@ -179,6 +179,46 @@ class Run:
     directory: Path
 
 
+#: The extensions FSL's image layer adds to a name given without one (``bet in out`` reads
+#: ``in.nii.gz``): the header-bearing files (an ``.img`` is read beside its ``.hdr``).
+IMAGE_EXTENSIONS = (".nii.gz", ".nii", ".hdr", ".hdr.gz")
+
+#: Defects whose FSL result depends on memory FSL never wrote: such runs are never cached
+#: (the oracle cache's rule for undefined values).
+UNDEFINED_MEMORY = ("FSL-43", "FSL-51", "FSL-53")
+
+
+def implicit_inputs(args: list[str], cwd: Path) -> list[Path]:
+    """The image files FSL reads that ``args`` name without their extension (every candidate
+    that exists, as FSL's name rules look for them)."""
+    out: list[Path] = []
+    for a in args:
+        if not a or a.startswith("-"):
+            continue
+        base = Path(a) if a.startswith("/") else cwd / a
+        if base.is_file():
+            continue
+        for ext in IMAGE_EXTENSIONS:
+            cand = Path(str(base) + ext)
+            if cand.is_file() and cand not in out:
+                out.append(cand)
+    return out
+
+
+def case_never(s: Scenario) -> str:
+    """Why the case's runs of FSL are never served from the oracle cache ("" when they may be)."""
+    if s.files:
+        return (
+            "files in the run's directory that bet may remove (FSL-46): the cache replays no "
+            "removal"
+        )
+    text = " ".join((s.reason, s.fix_refuses or "", *s.silent_ok))
+    for d in UNDEFINED_MEMORY:
+        if d in text:
+            return f"{d}: FSL reads memory it never wrote"
+    return ""
+
+
 def oracle_run(
     program: str,
     args: list[str],
@@ -187,41 +227,59 @@ def oracle_run(
     *,
     build: str = "oracle",
     binds: tuple[Path, ...] = (),
+    never: str = "",
 ) -> Run:
     """Runs FSL's ``program``: the oracle installation (``build="oracle"``) or fMRIPrep
     25.2.6's FSL in its image (``build="fmriprep"``, with ``cwd`` and ``binds`` bound at their
-    own paths). Every run of FSL in this suite goes through here."""
+    own paths). Every run of FSL in this suite goes through here, and through the oracle-output
+    cache (:mod:`larmorx_validation.oracle_cache`): BET is single-threaded and draws no random
+    numbers, so a run is served once it ran (crashes always run; ``never`` says why a case's
+    runs always run, :func:`case_never`). The images it reads by a name without extension are
+    keyed by their content (:func:`implicit_inputs`); every file it writes is in ``cwd``."""
+    from larmorx_validation import oracle_cache
+
+    policy = oracle_cache.Policy(threads=1, never=never, family="fsl")
+    inputs = implicit_inputs(args, cwd)
     if build == "oracle":
         d = fsl_dir()
         assert d is not None
-        cmd = [str(d / "bin" / program), *args]
-        p = subprocess.run(
-            cmd,
-            capture_output=True,
-            text=True,
-            encoding="utf-8",
-            errors="replace",
+        p = oracle_cache.run(
+            [str(d / "bin" / program), *args],
             env=env,
             cwd=cwd,
+            outputs=[cwd],
+            policy=policy,
+            runner="fsl-bet-replica",
+            inputs=inputs,
         )
         return Run(p.returncode, p.stdout, p.stderr, cwd)
     image = fmriprep_image()
     assert image is not None
     inner_fsl = "/app/.pixi/envs/fmriprep"
     bind = sorted({str(cwd), str(home()), *(str(b) for b in binds)})
+    inner_env = {
+        "HOME": str(home()),
+        "FSLDIR": inner_fsl,
+        "FSLOUTPUTTYPE": env.get("FSLOUTPUTTYPE", "NIFTI_GZ"),
+        "PATH": "/usr/bin:/bin",
+    }
     cmd = ["apptainer", "exec", "--cleanenv", "--no-home", "--pwd", str(cwd)]
     for b in bind:
         cmd += ["--bind", f"{b}:{b}"]
-    cmd += ["--env", f"HOME={home()}", "--env", f"FSLDIR={inner_fsl}"]
-    cmd += ["--env", f"FSLOUTPUTTYPE={env.get('FSLOUTPUTTYPE', 'NIFTI_GZ')}"]
-    cmd += ["--env", "PATH=/usr/bin:/bin"]
-    p = subprocess.run(
-        [*cmd, str(image), f"{inner_fsl}/bin/{program}", *args],
-        capture_output=True,
-        text=True,
-        encoding="utf-8",
-        errors="replace",
+    for k in ("HOME", "FSLDIR", "FSLOUTPUTTYPE", "PATH"):
+        cmd += ["--env", f"{k}={inner_env[k]}"]
+    program_path = f"{inner_fsl}/bin/{program}"
+    p = oracle_cache.run_apptainer(
+        image,
+        program_path,
+        args,
+        inner_env,
+        [*cmd, str(image), program_path, *args],
         cwd=cwd,
+        outputs=[cwd],
+        policy=policy,
+        runner="fsl-bet-replica",
+        inputs=inputs,
     )
     return Run(p.returncode, p.stdout, p.stderr, cwd)
 
@@ -272,7 +330,7 @@ _BASH_SIGNAL = re.compile(r"^[^\n]*: line \d+: +\d+ (?:Aborted|Segmentation faul
 def larmorx_own(line: str) -> bool:
     """A line larmorx adds: an upstream-defect notice or one of its own messages."""
     s = line.rstrip("\n")
-    return s.startswith("larmorx: ") or s.endswith("(larmorx)")
+    return s.startswith(("larmorx: ", "larmorx-nc: ")) or s.endswith("(larmorx)")
 
 
 def fsl_text(text: str) -> str:
@@ -930,17 +988,14 @@ def _derived(kind: str, name: str) -> Path:
 
 
 def derived_dir(source: Path) -> Path:
-    """Where FSL's derived inputs of ``source`` are kept: ``oracles/cache/fsl-bet-inputs/<the
-    input's SHA-256>/`` in the workspace (outside git), so that FLIRT runs once per input."""
+    """Where FSL's derived inputs of ``source`` are kept: ``oracles/inputs/fsl-bet/<the input's
+    SHA-256>/`` in the workspace (outside git, and outside the oracle cache's directory, as the
+    suites keep their inputs), so that FLIRT runs once per input."""
     import hashlib
 
     digest = hashlib.sha256(source.read_bytes()).hexdigest()[:20]
     ws = workspace()
-    base = (
-        ws / "oracles" / "cache" / "fsl-bet-inputs"
-        if ws is not None
-        else generated_dir() / "derived"
-    )
+    base = ws / "oracles" / "inputs" / "fsl-bet" if ws is not None else generated_dir() / "derived"
     d = base / digest
     d.mkdir(parents=True, exist_ok=True)
     return d
@@ -1007,7 +1062,7 @@ def run_case(case: Case, checks: CheckList) -> None:
                 EXPECTED,
                 "needs FSL programs larmorx does not replicate yet: " + larmorx_err_line(ours),
             )
-        fsl = oracle_run(s.tool, args, env, f_dir)
+        fsl = oracle_run(s.tool, args, env, f_dir, never=case_never(s))
         ours = run_larmorx(s.tool, args, "reproduce", env, r_dir)
         crash = crashed(fsl)
         if crash:
@@ -1101,7 +1156,7 @@ def _band(
     """FSL's own variability: the oracle run again, and fMRIPrep's FSL build."""
     again = root / "again"
     _prepare(again, s)
-    oracle_run(s.tool, args, env, again)
+    oracle_run(s.tool, args, env, again, never=case_never(s))
     sub = CheckList()
     compare_dirs(sub, f_dir, again)
     same = all(c.passed for c in sub.checks)
@@ -1116,7 +1171,15 @@ def _band(
         return
     fm = root / "fmriprep-fsl"
     _prepare(fm, s)
-    r = oracle_run(s.tool, args, env, fm, build="fmriprep", binds=tuple(p.parent for p in paths))
+    r = oracle_run(
+        s.tool,
+        args,
+        env,
+        fm,
+        build="fmriprep",
+        binds=tuple(p.parent for p in paths),
+        never=case_never(s),
+    )
     sub = CheckList()
     files = compare_dirs(sub, f_dir, fm)
     names = sub.checks[0].passed

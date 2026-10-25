@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: LicenseRef-FSL
 // Translated to Rust from FSL 6.0.7.17: fsl-newimage 2203.12 (newimagefns.{h,cc}:
 // isotropic_resample, affine_transform, raw_affine_transform, affine_transform_mask,
-// make_grad_masks, gradient). Copyright
+// make_grad_masks, gradient; smooth, convolve_separable, gaussian_kernel1D). Copyright
 // (C) 1999-2018 University of Oxford (Mark Jenkinson et al.). Rust translation Copyright 2026
 // Karel Lopez Vilaret; modified from the originals. Distributed under the FSL Licence (see
 // LICENSE).
@@ -297,4 +297,123 @@ pub fn gradient(source: &Volume) -> Volume {
         }
     }
     grad
+}
+
+// ------------------------------------------------------------------------------------------------
+// Smoothing (newimagefns.h: smooth, convolve_separable; newimagefns.cc: gaussian_kernel1D)
+
+/// `gaussian_kernel1D(sigma, radius)`: `2 radius + 1` values `exp(-j^2 / (2 sigma^2))` (glibc's
+/// `exp`) rounded to `float` and summed in `float`, then scaled in `double` by the inverse of the
+/// sum; a sigma of at most 1e-6 gives the unit impulse.
+pub fn gaussian_kernel_1d(sigma: f32, radius: i32) -> Vec<f64> {
+    let mut kern = Vec::with_capacity((2 * i64::from(radius) + 1).max(0) as usize);
+    let mut sum = 0f32;
+    for j in -radius..=radius {
+        let val: f32 = if f64::from(sigma) > 1e-6 {
+            let s = f64::from(sigma);
+            crate::glibc_double::exp(f64::from(-(j.wrapping_mul(j))) / (2.0 * s * s)) as f32
+        } else if j == 0 {
+            1.0
+        } else {
+            0.0
+        };
+        kern.push(f64::from(val));
+        sum += val;
+    }
+    let f = 1.0 / f64::from(sum);
+    for k in &mut kern {
+        *k *= f;
+    }
+    kern
+}
+
+/// One pass of `convolve_separable`: `convolve(source, kernel)` with a kernel along `axis`
+/// (centred on `(n - 1) / 2`), the image zero outside; each output voxel the `float` sum, in
+/// kernel order, of the `double` products (`val += source(...) * kernel(...)`). A sum that
+/// comes out NaN (NaN or infinite voxels) is computed again with SSE's NaNs ([`crate::sse`]:
+/// the products' and the running sum's NaNs as FSL's binary passes them on). The z slices are
+/// shared between `threads` threads; the result does not depend on their number.
+fn convolve_axis(src: &Volume, ker: &[f64], axis: usize, threads: usize) -> Volume {
+    use crate::sse::{add_f64, mul_f64};
+    let mut result = src.clone();
+    let (nx, ny, nz) = (src.dims[0], src.dims[1], src.dims[2]);
+    let mid = (ker.len() as i64 - 1) / 2;
+    let plane = (nx * ny) as usize;
+    let n = (nx * ny * nz) as usize;
+    if n == 0 {
+        return result;
+    }
+    let data = &src.data[..n];
+    let at = |x: i64, y: i64, z: i64, d: i64| -> Option<f32> {
+        let (cx, cy, cz) = match axis {
+            0 => (x + d, y, z),
+            1 => (x, y + d, z),
+            _ => (x, y, z + d),
+        };
+        if cx < 0 || cy < 0 || cz < 0 || cx >= nx || cy >= ny || cz >= nz {
+            return None; // + 0 * k: no change
+        }
+        Some(data[((cz * ny + cy) * nx + cx) as usize])
+    };
+    let slice = |z: i64, out: &mut [f32]| {
+        for y in 0..ny {
+            for x in 0..nx {
+                let mut val = 0f32;
+                for (m, &k) in ker.iter().enumerate() {
+                    if let Some(v) = at(x, y, z, m as i64 - mid) {
+                        val = (f64::from(val) + f64::from(v) * k) as f32;
+                    }
+                }
+                if val.is_nan() {
+                    val = 0.0;
+                    for (m, &k) in ker.iter().enumerate() {
+                        if let Some(v) = at(x, y, z, m as i64 - mid) {
+                            val = add_f64(f64::from(val), mul_f64(f64::from(v), k)) as f32;
+                        }
+                    }
+                }
+                out[(y * nx + x) as usize] = val;
+            }
+        }
+    };
+    let out = &mut result.data[..n];
+    let threads = threads.max(1).min(nz as usize);
+    if threads == 1 {
+        for (z, chunk) in out.chunks_mut(plane).enumerate() {
+            slice(z as i64, chunk);
+        }
+    } else {
+        let per = (nz as usize).div_ceil(threads);
+        std::thread::scope(|scope| {
+            for (t, block) in out.chunks_mut(plane * per).enumerate() {
+                let slice = &slice;
+                scope.spawn(move || {
+                    for (k, chunk) in block.chunks_mut(plane).enumerate() {
+                        slice((t * per + k) as i64, chunk);
+                    }
+                });
+            }
+        });
+    }
+    result
+}
+
+/// `smooth(source, sigma_mm)`: a separable Gaussian of `sigma_mm` millimetres, along x, then y,
+/// then z, each kernel of radius `2 (int)(sigma - 0.001) + 3` voxels, on `threads` threads (the
+/// result does not depend on their number).
+pub fn smooth(src: &Volume, sigma_mm: f32, threads: usize) -> Volume {
+    let sigma = [
+        sigma_mm / src.xdim(),
+        sigma_mm / src.ydim(),
+        sigma_mm / src.zdim(),
+    ];
+    let mut result = src.clone();
+    for (axis, &s) in sigma.iter().enumerate() {
+        let radius = crate::cnum::f64_to_i32(f64::from(s) - 0.001)
+            .wrapping_mul(2)
+            .wrapping_add(3);
+        let ker = gaussian_kernel_1d(s, radius);
+        result = convolve_axis(&result, &ker, axis, threads);
+    }
+    result
 }

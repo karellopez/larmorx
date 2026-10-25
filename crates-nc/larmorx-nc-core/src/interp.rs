@@ -12,7 +12,7 @@
 use crate::cnum;
 use crate::kernel::{Kernel, kernelval};
 use crate::sse;
-use crate::volume::{Extrapolation, Interpolation, Volume};
+use crate::volume::{Elem, Extrapolation, Interpolation, Volume};
 
 /// `q_tri_interpolation(v000, ..., dx, dy, dz)` (newimage.cc): x, then y, then z.
 #[allow(clippy::too_many_arguments)]
@@ -72,27 +72,27 @@ pub fn round_f32(x: f32) -> i32 {
 
 /// `in_neigh_bounds(vol, x, y, z)`.
 #[inline]
-fn in_neigh_bounds(v: &Volume, x: i64, y: i64, z: i64) -> bool {
+fn in_neigh_bounds<T: Elem>(v: &Volume<T>, x: i64, y: i64, z: i64) -> bool {
     x >= 0 && y >= 0 && z >= 0 && x < v.xsize() - 1 && y < v.ysize() - 1 && z < v.zsize() - 1
 }
 
-/// `getneighbours(x, y, z, ...)`: the eight values of the cell at `(x, y, z)`.
+/// `getneighbours(x, y, z, ...)`: the eight values of the cell at `(x, y, z)`, as `float`.
 #[inline]
-pub fn neighbours(v: &Volume, x: i64, y: i64, z: i64) -> [f32; 8] {
+pub fn neighbours<T: Elem>(v: &Volume<T>, x: i64, y: i64, z: i64) -> [f32; 8] {
     let base = v.idx(x, y, z);
     let nx = v.xsize() as usize;
     let nxy = nx * v.ysize() as usize;
     let d = &v.data;
     // v000, v001, v010, v011, v100, v101, v110, v111
     [
-        d[base],
-        d[base + nxy],
-        d[base + nx],
-        d[base + nx + nxy],
-        d[base + 1],
-        d[base + 1 + nxy],
-        d[base + 1 + nx],
-        d[base + 1 + nx + nxy],
+        d[base].to_f32(),
+        d[base + nxy].to_f32(),
+        d[base + nx].to_f32(),
+        d[base + nx + nxy].to_f32(),
+        d[base + 1].to_f32(),
+        d[base + 1 + nxy].to_f32(),
+        d[base + 1 + nx].to_f32(),
+        d[base + 1 + nx + nxy].to_f32(),
     ]
 }
 
@@ -102,15 +102,22 @@ fn floor_i64(x: f32) -> i64 {
     cnum::f32_to_i64(x.floor())
 }
 
-/// `volume<float>::interpolate(x, y, z)` with the volume's methods. `spline` holds the spline
-/// coefficients for [`Interpolation::Spline`] ([`SplineCoefs::new`]).
-pub fn interpolate(v: &Volume, x: f32, y: f32, z: f32, spline: Option<&SplineCoefs>) -> f32 {
+/// `volume<T>::interpolate(x, y, z)` with the volume's methods, as `float`. `spline` holds the
+/// spline coefficients for [`Interpolation::Spline`] ([`SplineCoefs::new`]); the sinc and
+/// spline methods are translated for `volume<float>` only.
+pub fn interpolate<T: Elem>(
+    v: &Volume<T>,
+    x: f32,
+    y: f32,
+    z: f32,
+    spline: Option<&SplineCoefs>,
+) -> f32 {
     match v.interp {
         Interpolation::NearestNeighbour => {
             let ix = i64::from(round_f32(x));
             let iy = i64::from(round_f32(y));
             let iz = i64::from(round_f32(z));
-            v.get(ix, iy, iz)
+            v.get(ix, iy, iz).to_f32()
         }
         Interpolation::Trilinear => {
             let ix = floor_i64(x);
@@ -123,22 +130,41 @@ pub fn interpolate(v: &Volume, x: f32, y: f32, z: f32, spline: Option<&SplineCoe
                 neighbours(v, ix, iy, iz)
             } else {
                 [
-                    v.get(ix, iy, iz),
-                    v.get(ix, iy, iz + 1),
-                    v.get(ix, iy + 1, iz),
-                    v.get(ix, iy + 1, iz + 1),
-                    v.get(ix + 1, iy, iz),
-                    v.get(ix + 1, iy, iz + 1),
-                    v.get(ix + 1, iy + 1, iz),
-                    v.get(ix + 1, iy + 1, iz + 1),
+                    v.get(ix, iy, iz).to_f32(),
+                    v.get(ix, iy, iz + 1).to_f32(),
+                    v.get(ix, iy + 1, iz).to_f32(),
+                    v.get(ix, iy + 1, iz + 1).to_f32(),
+                    v.get(ix + 1, iy, iz).to_f32(),
+                    v.get(ix + 1, iy, iz + 1).to_f32(),
+                    v.get(ix + 1, iy + 1, iz).to_f32(),
+                    v.get(ix + 1, iy + 1, iz + 1).to_f32(),
                 ]
             };
             q_tri(n[0], n[1], n[2], n[3], n[4], n[5], n[6], n[7], dx, dy, dz)
         }
-        Interpolation::Sinc => kernel_interpolation(v, x, y, z),
-        Interpolation::Spline => {
-            spline_interpolate(v, x, y, z, spline.expect("spline coefficients"))
-        }
+        Interpolation::Sinc => kernel_interpolation(float_only(v), x, y, z),
+        Interpolation::Spline => spline_interpolate(
+            float_only(v),
+            x,
+            y,
+            z,
+            spline.expect("spline coefficients"),
+        ),
+    }
+}
+
+/// The volume as `volume<float>`: the methods translated for float volumes only.
+fn float_only<T: Elem>(v: &Volume<T>) -> &Volume {
+    v.as_float()
+        .expect("sinc and spline interpolation are translated for float volumes only")
+}
+
+impl<T: Elem> Volume<T> {
+    /// `interpolate(x, y, z)` with the volume's interpolation and extrapolation (newimage's
+    /// defaults: trilinear, zero outside); [`interpolate`] with spline coefficients.
+    #[inline]
+    pub fn interpolate(&self, x: f32, y: f32, z: f32) -> f32 {
+        interpolate(self, x, y, z, None)
     }
 }
 

@@ -11,7 +11,8 @@
 //! function, final interpolation, stage count, reference choice, input type and output type,
 //! the in-plane mode, `-init`, `-stats`, and the paths of mcflirt's defects (D13): each
 //! corrected (the default, `LARMORX_UPSTREAM_DEFECTS=fix`) and, in the `*.reproduce` cases,
-//! reproduced.
+//! reproduced. BET's cases ([`BET_CASES`]) run bet2's outputs and options, bet's variations and
+//! betsurf on a generated head the same way (gzip-compressed images are hashed decompressed).
 //!
 //! Recording, on Linux x86_64 only, from a committed tree whose replica parity passes:
 //! `LARMORX_GOLDEN_RECORD=1 cargo test --locked -p larmorx-nc-cli --test golden`
@@ -22,6 +23,7 @@
 use std::collections::BTreeMap;
 use std::fmt::Write as _;
 use std::path::{Path, PathBuf};
+use std::io::Read as _;
 use std::process::Command;
 
 use sha2::{Digest, Sha256};
@@ -313,6 +315,119 @@ const CASES: &[Case] = &[
 ];
 
 // ------------------------------------------------------------------------------------------------
+// BET's cases (bet, bet2, betsurf)
+
+/// A case of the BET replicas: the arguments in full (`{t1}`, `{t2}`, `{4d}`, `{slab}` are the
+/// generated inputs, `{mesh}` and `{mat}` the brain surface and the matrix betsurf reads). They
+/// run with an empty `PATH`: `bet -Z` crops its outputs with `imglob` only when FSL's programs
+/// are on it (FSL-45).
+struct BetCase {
+    id: &'static str,
+    /// `<family> <tool>`, as `larmorx-nc --help` lists it.
+    tool: &'static str,
+    args: &'static [&'static str],
+    /// `LARMORX_UPSTREAM_DEFECTS`.
+    mode: &'static str,
+    /// The upstream defects the run must name on standard error, and no other.
+    named: &'static [&'static str],
+    /// `FSLOUTPUTTYPE`.
+    output_type: &'static str,
+}
+
+/// One case per distinct code path: bet2's outputs and options, bet's variations (`-R`, `-F`,
+/// `-Z`), betsurf with and without the T2, and the paths of FSL's defects (D13), corrected (the
+/// default) and, in the `*.reproduce` cases, reproduced.
+const BET_CASES: &[BetCase] = &[
+    BetCase {
+        id: "bet2.outputs",
+        tool: "fsl bet2",
+        args: &["{t1}", "out", "-o", "-m", "-s", "-e", "-f", "0.4"],
+        mode: "fix",
+        named: &[],
+        output_type: "NIFTI",
+    },
+    BetCase {
+        id: "bet2.threshold-gradient-centre",
+        tool: "fsl bet2",
+        args: &[
+            "{t1}", "out", "-n", "-m", "-t", "-g", "0.2", "-w", "1.5", "-r", "50", "-c", "16",
+            "15", "12",
+        ],
+        mode: "fix",
+        named: &[],
+        output_type: "NIFTI_GZ",
+    },
+    BetCase {
+        id: "bet2.ct.pair",
+        tool: "fsl bet2",
+        args: &["{t1}", "out", "--ct", "-m"],
+        mode: "fix",
+        named: &[],
+        output_type: "NIFTI_PAIR",
+    },
+    BetCase {
+        id: "bet2.hdr-name.reproduce",
+        tool: "fsl bet2",
+        args: &["{t1}", "out.hdrx", "-m"],
+        mode: "reproduce",
+        named: &["FSL-40"],
+        output_type: "NIFTI",
+    },
+    BetCase {
+        id: "bet.robust",
+        tool: "fsl bet",
+        args: &["{t1}", "out", "-R", "-m"],
+        mode: "fix",
+        named: &[],
+        output_type: "NIFTI",
+    },
+    BetCase {
+        id: "bet.fmri",
+        tool: "fsl bet",
+        args: &["{4d}", "out", "-F"],
+        mode: "fix",
+        named: &[],
+        output_type: "NIFTI",
+    },
+    BetCase {
+        id: "bet.small-fov",
+        tool: "fsl bet",
+        args: &["{slab}", "out", "-Z", "-m"],
+        mode: "fix",
+        named: &["FSL-45"],
+        output_type: "NIFTI",
+    },
+    BetCase {
+        id: "bet.small-fov.reproduce",
+        tool: "fsl bet",
+        args: &["{slab}", "out", "-Z", "-m"],
+        mode: "reproduce",
+        named: &["FSL-45"],
+        output_type: "NIFTI",
+    },
+    BetCase {
+        id: "betsurf.t1only",
+        tool: "fsl betsurf",
+        args: &[
+            "--t1only", "-o", "-m", "-s", "{t1}", "{mesh}", "{mat}", "out",
+        ],
+        mode: "fix",
+        named: &[],
+        output_type: "NIFTI",
+    },
+    BetCase {
+        id: "betsurf.t2.precision",
+        tool: "fsl betsurf",
+        args: &[
+            "-m", "-s", "-p", "1", "{t1}", "{t2}", "{mesh}", "{mat}", "out",
+        ],
+        mode: "fix",
+        named: &[],
+        output_type: "NIFTI",
+    },
+];
+
+// ------------------------------------------------------------------------------------------------
 // Inputs
 
 fn splitmix64(seed: u64, n: usize) -> Vec<u64> {
@@ -581,6 +696,119 @@ fn write_inputs(dir: &Path) -> BTreeMap<Input, PathBuf> {
 }
 
 // ------------------------------------------------------------------------------------------------
+// BET's inputs
+
+/// The head's grid (2 mm voxels).
+const HEAD: [i64; 3] = [32, 32, 24];
+const T1_LEVELS: [i64; 5] = [700, 150, 60, 800, 10];
+const T2_LEVELS: [i64; 5] = [400, 1500, 40, 300, 10];
+
+/// A head: brain, CSF, skull, scalp and air by (twice) the squared distance from the centre,
+/// with an intensity ramp along x and noise.
+fn bet_head_values(levels: [i64; 5], seed: u64) -> Vec<i64> {
+    let [nx, ny, nz] = HEAD;
+    let noise = splitmix64(seed, (nx * ny * nz) as usize);
+    let mut v = Vec::with_capacity(noise.len());
+    for k in 0..nz {
+        for j in 0..ny {
+            for i in 0..nx {
+                let (x, y, z) = (2 * i - 31, 2 * j - 31, 2 * k - 23);
+                let r = x * x + y * y + 2 * z * z;
+                let level = match r {
+                    0..324 => levels[0],
+                    324..400 => levels[1],
+                    400..484 => levels[2],
+                    484..676 => levels[3],
+                    _ => levels[4],
+                };
+                let n = (noise[v.len()] % 41) as i64 - 20;
+                v.push(level * (90 + i) / 100 + n);
+            }
+        }
+    }
+    v
+}
+
+/// A NIfTI-1 single file of the head's grid: 2 mm voxels, an sform and a qform of
+/// `diag(-2, 2, 2)` (radiological storage, as most scanners' files), the data type and values
+/// given.
+fn bet_nifti(dims: &[i64], datatype: i16, bitpix: i16, data: &[u8]) -> Vec<u8> {
+    let mut h = vec![0u8; 352];
+    h[0..4].copy_from_slice(&348i32.to_le_bytes());
+    let mut dim = [1i16; 8];
+    dim[0] = dims.len() as i16;
+    for (k, &d) in dims.iter().enumerate() {
+        dim[k + 1] = d as i16;
+    }
+    for (k, d) in dim.iter().enumerate() {
+        h[40 + 2 * k..42 + 2 * k].copy_from_slice(&d.to_le_bytes());
+    }
+    h[70..72].copy_from_slice(&datatype.to_le_bytes());
+    h[72..74].copy_from_slice(&bitpix.to_le_bytes());
+    let pixdim: [f32; 8] = [-1.0, 2.0, 2.0, 2.0, 1.5, 1.0, 1.0, 1.0];
+    for (k, p) in pixdim.iter().enumerate() {
+        h[76 + 4 * k..80 + 4 * k].copy_from_slice(&p.to_le_bytes());
+    }
+    h[108..112].copy_from_slice(&352f32.to_le_bytes());
+    h[112..116].copy_from_slice(&1f32.to_le_bytes()); // scl_slope
+    h[123] = 10; // xyzt_units: mm, s
+    h[252..254].copy_from_slice(&1i16.to_le_bytes()); // qform_code
+    h[254..256].copy_from_slice(&1i16.to_le_bytes()); // sform_code
+    // quaternion (0, 0, 0): identity rotation, qfac -1 flips z; offsets
+    let (ox, oy, oz) = (31.0f32, -31.0f32, -23.0f32);
+    for (k, v) in [0f32, 0.0, 0.0, ox, oy, oz].iter().enumerate() {
+        h[256 + 4 * k..260 + 4 * k].copy_from_slice(&v.to_le_bytes());
+    }
+    let rows: [[f32; 4]; 3] = [
+        [-2.0, 0.0, 0.0, ox],
+        [0.0, 2.0, 0.0, oy],
+        [0.0, 0.0, 2.0, oz],
+    ];
+    for (r, row) in rows.iter().enumerate() {
+        for (c, v) in row.iter().enumerate() {
+            let at = 280 + 16 * r + 4 * c;
+            h[at..at + 4].copy_from_slice(&v.to_le_bytes());
+        }
+    }
+    h[344..348].copy_from_slice(b"n+1\0");
+    h.extend_from_slice(data);
+    h
+}
+
+/// The head as int16 (`t1`), its T2-like contrast as float32 (`t2`), 4 volumes of it (`4d`),
+/// a slab of its 10 middle slices (`slab`) and a matrix to MNI152 (`mat`: 1 mm scale, the
+/// head's centre on the template's), in `dir`.
+fn write_bet_inputs(dir: &Path) -> BTreeMap<&'static str, PathBuf> {
+    std::fs::create_dir_all(dir).unwrap();
+    let [nx, ny, nz] = HEAD;
+    let i16_bytes = |v: &[i64]| -> Vec<u8> { v.iter().flat_map(|&x| (x as i16).to_le_bytes()).collect() };
+    let f32_bytes = |v: &[i64]| -> Vec<u8> { v.iter().flat_map(|&x| (x as f32).to_le_bytes()).collect() };
+    let t1 = bet_head_values(T1_LEVELS, 1);
+    let t2 = bet_head_values(T2_LEVELS, 2);
+    let mut paths = BTreeMap::new();
+    let mut put = |name: &'static str, bytes: Vec<u8>| {
+        let p = dir.join(format!("{name}.nii"));
+        std::fs::write(&p, bytes).unwrap();
+        paths.insert(name, p);
+    };
+    put("t1", bet_nifti(&[nx, ny, nz], 4, 16, &i16_bytes(&t1)));
+    put("t2", bet_nifti(&[nx, ny, nz], 16, 32, &f32_bytes(&t2)));
+    let mut series = Vec::new();
+    for t in 0..4u64 {
+        series.extend(bet_head_values(T1_LEVELS, 10 + t));
+    }
+    put("4d", bet_nifti(&[nx, ny, nz, 4], 4, 16, &i16_bytes(&series)));
+    let plane = (nx * ny) as usize;
+    let slab = &t1[7 * plane..17 * plane];
+    put("slab", bet_nifti(&[nx, ny, 10], 4, 16, &i16_bytes(slab)));
+    let mat = "0.5 0 0 72\n0 0.5 0 112\n0 0 0.5 62\n0 0 0 1\n";
+    let p = dir.join("t1_to_std.mat");
+    std::fs::write(&p, mat).unwrap();
+    paths.insert("mat", p);
+    paths
+}
+
+// ------------------------------------------------------------------------------------------------
 // Fingerprints
 
 struct Fingerprint {
@@ -617,7 +845,15 @@ fn dtype_name(code: i16) -> (&'static str, usize) {
 /// `header` (the bytes before the data) and `data` fingerprints of a little-endian NIfTI-1 or
 /// NIfTI-2 file.
 fn nifti_fingerprints(path: &Path) -> Vec<(String, Fingerprint)> {
-    let raw = std::fs::read(path).unwrap();
+    let mut raw = std::fs::read(path).unwrap();
+    if raw.starts_with(&[0x1f, 0x8b]) {
+        // a .nii.gz: its decompressed content (the compressed bytes are zlib's, not ours)
+        let mut out = Vec::new();
+        flate2::read::MultiGzDecoder::new(&raw[..])
+            .read_to_end(&mut out)
+            .unwrap();
+        raw = out;
+    }
     let (datatype, offset) = match i32::from_le_bytes(raw[0..4].try_into().unwrap()) {
         348 => (
             i16::from_le_bytes([raw[70], raw[71]]),
@@ -680,7 +916,7 @@ fn case_fingerprints(dir: &Path) -> Vec<(String, Fingerprint)> {
             .unwrap()
             .to_string_lossy()
             .replace('\\', "/");
-        if name.ends_with(".nii") {
+        if name.ends_with(".nii") || name.ends_with(".nii.gz") {
             for (part, fp) in nifti_fingerprints(&p) {
                 out.push((format!("{name}.{part}"), fp));
             }
@@ -833,6 +1069,57 @@ fn mismatch_dir() -> PathBuf {
         .join("larmorx-nc")
 }
 
+/// Runs `larmorx-nc <family> <tool> args` for a BET case in `cwd` (an empty `PATH`: FSL's
+/// programs are never found; FSL-45's branch depends on it).
+fn run_bet(
+    cwd: &Path,
+    tool: &str,
+    args: &[String],
+    mode: &str,
+    output_type: &str,
+) -> std::process::Output {
+    let (family, tool) = tool.split_once(' ').unwrap();
+    Command::new(EXE)
+        .arg(family)
+        .arg(tool)
+        .args(args)
+        .current_dir(cwd)
+        .env_remove("FSLDIR")
+        .env_remove("FSL_LOAD_NIFTI_EXTENSIONS")
+        .env("PATH", "")
+        .env("FSLOUTPUTTYPE", output_type)
+        .env("LARMORX_UPSTREAM_DEFECTS", mode)
+        .env("OMP_NUM_THREADS", "2")
+        .output()
+        .unwrap()
+}
+
+/// Whether a run named exactly the upstream defects `named` on standard error
+/// (`larmorx-nc: upstream defect <ID> (<tool>) corrected: ...`, or `reproduced:` in
+/// `reproduce`): `None`, or what differs.
+fn named_problem(stderr: &[u8], id: &str, mode: &str, named: &[&str]) -> Option<String> {
+    let stderr = String::from_utf8_lossy(stderr);
+    let mut found: Vec<&str> = stderr
+        .lines()
+        .filter_map(|l| l.strip_prefix("larmorx-nc: upstream defect "))
+        .filter_map(|rest| rest.split(' ').next())
+        .collect();
+    found.sort_unstable();
+    found.dedup();
+    let verb = if mode == "fix" {
+        "corrected"
+    } else {
+        "reproduced"
+    };
+    let all_named = named.iter().all(|d| {
+        stderr.lines().any(|l| {
+            l.contains(&format!("upstream defect {d} (")) && l.contains(&format!(") {verb}: "))
+        })
+    });
+    (found != named || !all_named)
+        .then(|| format!("{id}: named {found:?} ({verb}: {all_named}), expected {named:?}"))
+}
+
 // ------------------------------------------------------------------------------------------------
 // Tests
 
@@ -868,30 +1155,42 @@ fn golden() {
             .output()
             .unwrap();
         assert!(out.status.success(), "{}: {out:?}", case.id);
-        // The notices (`larmorx-nc: upstream defect <ID> (mcflirt) corrected: ...`).
-        let stderr = String::from_utf8_lossy(&out.stderr);
-        let mut found: Vec<&str> = stderr
-            .lines()
-            .filter_map(|l| l.strip_prefix("larmorx-nc: upstream defect "))
-            .filter_map(|rest| rest.split(' ').next())
-            .collect();
-        found.sort_unstable();
-        found.dedup();
-        let verb = if case.mode == "fix" {
-            "corrected"
-        } else {
-            "reproduced"
-        };
-        let all_named = case.named.iter().all(|id| {
-            stderr.lines().any(|l| {
-                l.contains(&format!("upstream defect {id} (")) && l.contains(&format!(") {verb}: "))
+        if let Some(problem) = named_problem(&out.stderr, case.id, case.mode, case.named) {
+            notices.push(problem);
+        }
+        let fps = case_fingerprints(&run);
+        assert!(!fps.is_empty(), "{}: no outputs", case.id);
+        for (name, fp) in fps {
+            actual.insert((case.id.to_owned(), name), fp);
+        }
+        runs.insert(case.id, run);
+    }
+    let bet_inputs = write_bet_inputs(&dir.path().join("bet-inputs"));
+    // betsurf's brain surface: bet2's mesh of the head
+    let prep = dir.path().join("bet-prep");
+    std::fs::create_dir(&prep).unwrap();
+    let t1 = bet_inputs["t1"].display().to_string();
+    let out = run_bet(&prep, "fsl bet2", &[t1, "t1".into(), "-e".into(), "-n".into()], "fix", "NIFTI");
+    assert!(out.status.success(), "bet2 -e: {out:?}");
+    let mesh = prep.join("t1_mesh.vtk");
+    for case in BET_CASES {
+        let run = dir.path().join(case.id);
+        std::fs::create_dir(&run).unwrap();
+        let args: Vec<String> = case
+            .args
+            .iter()
+            .map(|a| match *a {
+                "{mesh}" => mesh.display().to_string(),
+                a if a.starts_with('{') => bet_inputs[a.trim_matches(|c| c == '{' || c == '}')]
+                    .display()
+                    .to_string(),
+                other => other.to_owned(),
             })
-        });
-        if found != case.named || !all_named {
-            notices.push(format!(
-                "{}: named {found:?} ({verb}: {all_named}), expected {:?}",
-                case.id, case.named
-            ));
+            .collect();
+        let out = run_bet(&run, case.tool, &args, case.mode, case.output_type);
+        assert!(out.status.success(), "{}: {out:?}", case.id);
+        if let Some(problem) = named_problem(&out.stderr, case.id, case.mode, case.named) {
+            notices.push(problem);
         }
         let fps = case_fingerprints(&run);
         assert!(!fps.is_empty(), "{}: no outputs", case.id);
@@ -981,7 +1280,10 @@ fn every_tool_has_a_golden_case() {
     assert!(!tools.is_empty(), "{help}");
     let missing: Vec<&String> = tools
         .iter()
-        .filter(|t| !CASES.iter().any(|c| c.tool == t.as_str()))
+        .filter(|t| {
+            !CASES.iter().any(|c| c.tool == t.as_str())
+                && !BET_CASES.iter().any(|c| c.tool == t.as_str())
+        })
         .collect();
     assert!(
         missing.is_empty(),

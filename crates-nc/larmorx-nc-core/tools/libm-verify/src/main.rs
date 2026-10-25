@@ -9,7 +9,7 @@
 use std::io::{BufRead, BufReader, Write};
 use std::process::{Command, Stdio};
 
-use larmorx_nc_bet::fsl::{fdlibm, glibc_pow, x87};
+use larmorx_nc_core::{fdlibm, glibc_double as glibc_pow, x87};
 
 struct Rng(u64);
 

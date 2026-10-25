@@ -16,7 +16,7 @@ pub mod profile;
 
 use std::fmt::Write as _;
 
-use crate::fsl::cstr;
+use crate::cnum;
 
 /// A point or a vector (meshclass's `Pt` and `Vec`, both three doubles).
 #[derive(Clone, Copy, Debug, Default, PartialEq)]
@@ -612,7 +612,7 @@ impl Mesh {
             self.tris[t].data = vec![0.0, centre.x, centre.y, centre.z, max];
         }
         let xs: Vec<f64> = self.points.iter().map(|p| p.coord.x).collect();
-        crate::fsl::stdsort::sort_by(&mut v, |a, b| xs[a.0] < xs[b.0]);
+        crate::stdsort::sort_by(&mut v, |a, b| xs[a.0] < xs[b.0]);
         let mut result = false;
         let mut l: Vec<usize> = Vec::new();
         for (_, tlist) in &v {
@@ -671,9 +671,9 @@ impl Mesh {
             let _ = writeln!(
                 s,
                 "{} {} {}",
-                cstr::fmt_f(c.x, 6),
-                cstr::fmt_f(c.y, 6),
-                cstr::fmt_f(c.z, 6)
+                cnum::fmt_f(c.x, 6),
+                cnum::fmt_f(c.y, 6),
+                cnum::fmt_f(c.z, 6)
             );
         }
         let _ = writeln!(

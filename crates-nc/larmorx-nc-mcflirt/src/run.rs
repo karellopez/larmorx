@@ -19,7 +19,8 @@ use larmorx_nc_core::optimise;
 use larmorx_nc_core::settings::Settings;
 use larmorx_nc_core::sse;
 use larmorx_nc_core::volume::{
-    self, Conversion, Extrapolation, FslError, Interpolation, SaveError, SaveType, Volume,
+    self, Conversion, Extrapolation, FslError, Interpolation, SaveError, SaveOptions, SaveType,
+    Volume,
 };
 use rayon::prelude::*;
 
@@ -1107,7 +1108,7 @@ impl Run<'_> {
                         .into(),
                 ));
             }
-            let (r, _) = volume::read_volume(&self.o.reffilename, self.settings)?;
+            let (r, _) = volume::read_volume::<f32>(&self.o.reffilename, self.settings)?;
             if r.nvoxels() != timeseries.nvoxels() {
                 return Err(End::Refuse(format!(
                     "the reference {} has {} voxels and the series' volumes {}: mcflirt aborts \
@@ -1156,19 +1157,32 @@ impl Run<'_> {
     /// mcflirt's behaviour is reproduced; corrected, `.nii.gz` (larmorx's behaviour, FSL-11).
     fn save(&mut self, v: &Volume, name: &str, ty: SaveType, code: Option<i16>) -> Result<(), End> {
         let settings = self.output_settings();
-        let units = nifti::UNITS_MM_SEC;
-        match v.save_typed(
-            name,
-            ty,
-            Conversion::X86Cast,
-            &settings,
-            DESCRIP,
-            code,
-            units,
-        ) {
+        let opts = self.save_options(v, &settings, nifti::UNITS_MM_SEC);
+        match v.save_typed(name, ty, Conversion::X86Cast, &settings, &opts, code) {
             Ok(()) => Ok(()),
             Err(SaveError::OutputType(e)) => Err(End::Exit(1, e.printed)),
             Err(SaveError::Exception(e)) => Err(End::Abort(e)),
+        }
+    }
+
+    /// How an image is written: mcflirt's `descrip`, `units`, and NewNifti's data offset for
+    /// several extensions (FSL-56) corrected unless reproduced, with its notice when the
+    /// offset would differ.
+    fn save_options(&mut self, v: &Volume, settings: &Settings, units: i32) -> SaveOptions<'static> {
+        if volume::offset_defect_applies(v, settings) {
+            self.notice(
+                &defects::FSL_56,
+                format!(
+                    "{} NIfTI extensions of different sizes: the data offset counts each \
+                     extension's own size (NewNifti adds the first one's once per extension)",
+                    v.extensions.len()
+                ),
+            );
+        }
+        SaveOptions {
+            description: DESCRIP,
+            units,
+            reproduce_offset: self.mode.reproduce(),
         }
     }
 
@@ -1268,15 +1282,8 @@ impl Run<'_> {
             nifti::UNITS_MM_SEC
         };
         let settings = self.output_settings();
-        match ts.save_typed(
-            &self.o.outputfname,
-            ty,
-            conv,
-            &settings,
-            DESCRIP,
-            code,
-            units,
-        ) {
+        let opts = self.save_options(ts, &settings, units);
+        match ts.save_typed(&self.o.outputfname, ty, conv, &settings, &opts, code) {
             Ok(()) => Ok(()),
             Err(SaveError::OutputType(e)) => Err(End::Exit(1, e.printed)),
             Err(SaveError::Exception(e)) => Err(End::Abort(e)),

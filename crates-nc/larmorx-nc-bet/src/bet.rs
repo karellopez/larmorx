@@ -22,9 +22,9 @@ use std::io::Write;
 
 use larmorx_core::defects::{self, Notices};
 
-use crate::avw::{self, ToolFailure};
+use larmorx_nc_core::avwutils::{self as avw, ToolFailure};
 use crate::bet2::{self, Run};
-use crate::fsl::volume::FslSettings;
+use larmorx_nc_core::settings::Settings;
 
 const USAGE: &str = "
 Usage:    bet <input> <output> [options]
@@ -102,7 +102,7 @@ pub fn main(args: &[String], run: &Run, out: &mut dyn Write, err: &mut dyn Write
         }
     };
     let notices = std::mem::replace(&mut s.notices, Notices::new(run.mode));
-    notices.print(s.err);
+    crate::bet2::print_notices(&notices, s.err);
     code
 }
 
@@ -155,7 +155,7 @@ impl Script<'_, '_> {
         vec![value.to_owned()]
     }
 
-    fn fsl(&self) -> &FslSettings {
+    fn fsl(&self) -> &Settings {
         self.run.fsl
     }
 
@@ -481,7 +481,7 @@ impl Script<'_, '_> {
     /// `-F`.
     fn fmri(&mut self, in_name: &str, out_name: &str, opts: &[String]) -> Result<(), Stop> {
         let tmp = format!("{out_name}_tmp");
-        let r = avw::fslroi(in_name, &tmp, &["0", "1"], self.fsl());
+        let r = avw::fslroi(in_name, &tmp, &["0", "1"], self.fsl(), self.reproduce());
         self.tool(r)?;
         self.created(&tmp);
         let mut w = vec![
@@ -500,9 +500,16 @@ impl Script<'_, '_> {
             &format!("{out_name}_tmp_brain_mask"),
             &format!("{out_name}_mask"),
             self.fsl(),
+            self.reproduce(),
         );
         self.tool(r)?;
-        let r = avw::fslmaths_mas(in_name, &format!("{out_name}_mask"), out_name, self.fsl());
+        let r = avw::fslmaths_mas(
+            in_name,
+            &format!("{out_name}_mask"),
+            out_name,
+            self.fsl(),
+            self.reproduce(),
+        );
         self.tool(r)?;
         Ok(())
     }
@@ -549,6 +556,7 @@ impl Script<'_, '_> {
             &bottom,
             &["0", &xd, "0", &yd, "0", "1"],
             self.fsl(),
+            self.reproduce(),
         );
         self.tool(r)?;
         self.created(&bottom);
@@ -558,6 +566,7 @@ impl Script<'_, '_> {
             &top,
             &["0", &xd, "0", &yd, last.trim(), "1"],
             self.fsl(),
+            self.reproduce(),
         );
         self.tool(r)?;
         self.created(&top);
@@ -570,7 +579,7 @@ impl Script<'_, '_> {
             inputs.push(top.clone());
         }
         let padded = format!("{out_name}_tmp");
-        let r = avw::fslmerge_z(&padded, &inputs, self.fsl());
+        let r = avw::fslmerge_z(&padded, &inputs, self.fsl(), self.reproduce());
         self.tool(r)?;
         self.created(&padded);
         let mut w = vec![padded.clone(), out_name.to_owned()];
@@ -630,7 +639,13 @@ impl Script<'_, '_> {
             self.notices.add(&defects::FSL_45, detail);
         }
         for f in targets {
-            let r = avw::fslroi(&f, &f, &["0", &xd, "0", &yd, &npad_s, &zd], self.fsl());
+            let r = avw::fslroi(
+                &f,
+                &f,
+                &["0", &xd, "0", &yd, &npad_s, &zd],
+                self.fsl(),
+                self.reproduce(),
+            );
             self.tool(r)?;
         }
         self.cleanup(out_name, debug);

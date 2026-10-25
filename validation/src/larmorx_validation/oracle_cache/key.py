@@ -563,12 +563,18 @@ def prepare(
     threads_known: bool = True,
     family: str | None = None,
     extra: dict | None = None,
+    inputs: Sequence[Path] = (),
 ) -> Prepared:
     """The key's parts of running the oracle ``oracle`` (``program_identity`` or
     ``image_identity``) with ``args`` in ``env``; ``family`` names the variables that matter
-    (:data:`ENV_FAMILIES`; ``None``: every family's)."""
+    (:data:`ENV_FAMILIES`; ``None``: every family's); ``inputs`` the files the program reads
+    without the arguments naming them (after the named ones, in the order given)."""
     mapper = _Mapper(Path(os.path.abspath(cwd)) if cwd is not None else None, outputs)
     template = [mapper.argument(str(a)) for a in args]
+    for path in inputs:
+        if not Path(path).is_file():
+            raise Uncacheable(f"an input that is not a file: {path}")
+        mapper._input(Path(path))
     env_part, rerun_env = _env_part(env, mapper, family)
     parts = {
         "format": KEY_FORMAT,

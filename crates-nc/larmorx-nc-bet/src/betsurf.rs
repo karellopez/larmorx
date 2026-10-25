@@ -18,15 +18,17 @@ use std::io::Write;
 use larmorx_core::defects::{self, Notices};
 
 use crate::bet2::{Fill, Run, crash_message, fill_mask, outside_notice, report_abort};
-use crate::fsl::cstr::g6;
-use crate::fsl::fdlibm;
-use crate::fsl::istream::{Got, IStream};
-use crate::fsl::options::{ArgFlag, Opt, OptionParser, Value};
-use crate::fsl::stdsort;
-use crate::fsl::volume::{self, FslSettings, ImageError, Volume};
-use crate::mesh::load::{self, LoadError};
-use crate::mesh::profile::{NOT_FOUND, Profile};
-use crate::mesh::{Mesh, V3};
+use larmorx_nc_core::cnum;
+use larmorx_nc_core::fdlibm;
+use larmorx_nc_core::istream::{Got, IStream};
+use larmorx_nc_core::options::{ArgFlag, Opt, OptionParser, Value};
+use larmorx_nc_core::stdsort;
+use larmorx_nc_core::settings::Settings;
+use larmorx_nc_core::newimagefns;
+use larmorx_nc_core::volume::{self, FslError, SaveError, SaveOptions, Saved, Volume};
+use larmorx_nc_core::mesh::load::{self, LoadError};
+use larmorx_nc_core::mesh::profile::{NOT_FOUND, Profile};
+use larmorx_nc_core::mesh::{Mesh, V3};
 
 const TITLE: &str = "BETSURF (BET Surface Finder) v2.1 - FMRIB Analysis Group, Oxford";
 const EXAMPLES: &str = " betsurf          [options] <t1> <t2> <bet_mesh.vtk> <t1_to_standard.mat> <output>\n betsurf --t1only [options] <t1>      <bet_mesh.vtk> <t1_to_standard.mat> <output>";
@@ -59,7 +61,7 @@ fn std_max(a: f64, b: f64) -> f64 {
 /// C's `(int) x` for a double (x86-64: `INT_MIN` out of range).
 #[inline]
 fn trunc_i(x: f64) -> i64 {
-    i64::from(volume::c_to_i32(x))
+    i64::from(cnum::f64_to_i32(x))
 }
 
 /// The options of `betsurf`, in the order FSL adds them.
@@ -109,7 +111,7 @@ pub struct BetsurfArgs {
 pub fn main(args: &[String], run: &Run, out: &mut dyn Write, err: &mut dyn Write) -> u8 {
     let mut notices = Notices::new(run.mode);
     let code = main_inner(args, run, out, err, &mut notices);
-    notices.print(err);
+    crate::bet2::print_notices(&notices, err);
     code
 }
 
@@ -216,7 +218,7 @@ enum Fail {
     /// FSL returns or exits with this status (its message printed already).
     Exit(u8),
     /// An uncaught exception of the image layer.
-    Abort(ImageError),
+    Abort(FslError),
     /// A case without a defined result in FSL (a crash, memory never set, a hang).
     Refused(String),
 }
@@ -260,11 +262,12 @@ fn read_matrix(name: &str, err: &mut dyn Write, notices: &mut Notices) -> Result
     Ok(m)
 }
 
-fn read_t(name: &str, settings: &FslSettings, err: &mut dyn Write) -> Result<Volume<f32>, Fail> {
-    let mut warn = String::new();
-    match volume::read_volume::<f32>(name, settings, &mut warn) {
-        Ok(v) => {
-            let _ = err.write_all(warn.as_bytes());
+fn read_t(name: &str, settings: &Settings, err: &mut dyn Write) -> Result<Volume<f32>, Fail> {
+    match volume::read_volume::<f32>(name, settings) {
+        Ok((v, warning)) => {
+            if let Some(w) = warning {
+                let _ = writeln!(err, "{w}");
+            }
             Ok(v)
         }
         Err(e) => Err(Fail::Abort(e)),
@@ -292,9 +295,9 @@ fn draw_segment(image: &mut Volume<i16>, p1: V3, p2: V3, mininc: f64, dims: (f64
 /// `draw_mesh` (betsurf's: the surface drawn as 1).
 fn draw_mesh(image: &mut Volume<i16>, m: &Mesh) {
     let dims = (
-        f64::from(image.xdim),
-        f64::from(image.ydim),
-        f64::from(image.zdim),
+        f64::from(image.xdim()),
+        f64::from(image.ydim()),
+        f64::from(image.zdim()),
     );
     let mininc = fmin(dims.0, fmin(dims.1, dims.2)) * 0.5;
     for &t in &m.tri_list {
@@ -321,9 +324,9 @@ fn fill_start(image: &Volume<i16>, m: &Mesh) -> [i64; 3] {
     let f = 1.0 / m.points.len() as f64;
     c = V3::new(c.x * f, c.y * f, c.z * f);
     c = V3::new(
-        c.x / f64::from(image.xdim),
-        c.y / f64::from(image.ydim),
-        c.z / f64::from(image.zdim),
+        c.x / f64::from(image.xdim()),
+        c.y / f64::from(image.ydim()),
+        c.z / f64::from(image.zdim()),
     );
     [trunc_i(c.x), trunc_i(c.y), trunc_i(c.z)]
 }
@@ -407,12 +410,12 @@ impl Deform {
         let e = (1.0 / RMIN + 1.0 / RMAX) / 2.0;
         let f = 6.0 / (1.0 / RMIN - 1.0 / RMAX);
         let (xdim, ydim, zdim) = (
-            f64::from(image.xdim),
-            f64::from(image.ydim),
-            f64::from(image.zdim),
+            f64::from(image.xdim()),
+            f64::from(image.ydim()),
+            f64::from(image.zdim()),
         );
         let interp = |p: V3| f64::from(image.interpolate(p.x as f32, p.y as f32, p.z as f32));
-        let empty = Volume::<i16>::new(0, 0, 0);
+        let empty = Volume::<i16>::new(0, 0, 0, 1);
         let vol = mask.is_some();
         let mask = mask.unwrap_or(&empty);
         let interp_mask = |p: V3| f64::from(mask.interpolate(p.x as f32, p.y as f32, p.z as f32));
@@ -844,7 +847,7 @@ fn write_ext_skull(
     notices: &mut Notices,
 ) -> Result<(), Fail> {
     let t1 = img.t1;
-    let (xdim, ydim, zdim) = (f64::from(t1.xdim), f64::from(t1.ydim), f64::from(t1.zdim));
+    let (xdim, ydim, zdim) = (f64::from(t1.xdim()), f64::from(t1.ydim()), f64::from(t1.zdim()));
     let mut meshimage = zeros_like(t1);
     draw_mesh(&mut meshimage, m);
     let mut glob_counter = 0i32;
@@ -855,7 +858,7 @@ fn write_ext_skull(
         let y = trunc_i((c.y + 0.5).floor()) + pad[1];
         let z = trunc_i((c.z + 0.5).floor()) + pad[2];
         if v.in_bounds(x, y, z) {
-            let i = v.index(x, y, z);
+            let i = v.idx(x, y, z);
             v.data[i] += 1.0;
         }
     };
@@ -968,7 +971,7 @@ fn write_ext_skull(
         let removed = if glob_counter == 0 {
             "-nan".to_owned()
         } else {
-            g6(100.0 * f64::from(rem_counter) / f64::from(glob_counter))
+            cnum::stream(100.0 * f64::from(rem_counter) / f64::from(glob_counter))
         };
         let _ = writeln!(out, " removed profiles : {removed}%");
     }
@@ -977,7 +980,7 @@ fn write_ext_skull(
 
 /// `(int) ceil(x)`.
 fn ceil_i(x: f64) -> i32 {
-    volume::c_to_i32(x.ceil())
+    cnum::f64_to_i32(x.ceil())
 }
 
 /// Saves a short image (`save_volume(v, name) < 0` returns -1 from main).
@@ -991,16 +994,17 @@ fn save(
     if volume::offset_defect_applies(v, run.fsl) {
         crate::bet2::offset_notice(notices, v.extensions.len());
     }
-    match volume::save_volume(v, name, run.fsl, run.mode.reproduce()) {
-        Ok(None) => Ok(()),
-        Ok(Some(_)) => Err(Fail::Exit(255)),
-        Err(e) => {
-            if e.exit.is_some() {
-                let _ = err.write_all(e.printed.as_bytes());
-                return Err(Fail::Exit(e.exit.unwrap_or(1)));
+    let opts = SaveOptions::new(volume::BUILDSTRING.as_bytes()).reproducing_offset(run.mode.reproduce());
+    match v.save_volume(name, run.fsl, &opts) {
+        Ok(Saved::Written) => Ok(()),
+        Ok(Saved::Nothing) => Err(Fail::Exit(255)),
+        Err(SaveError::OutputType(o)) => {
+            for l in &o.printed {
+                let _ = writeln!(err, "{l}");
             }
-            Err(Fail::Abort(e))
+            Err(Fail::Exit(1))
         }
+        Err(SaveError::Exception(e)) => Err(Fail::Abort(e)),
     }
 }
 
@@ -1041,9 +1045,9 @@ fn surfaces(
     };
     if let Some(t2) = &t2 {
         let same = t2.dims[..3] == t1.dims[..3]
-            && t2.xdim == t1.xdim
-            && t2.ydim == t1.ydim
-            && t2.zdim == t1.zdim;
+            && t2.xdim() == t1.xdim()
+            && t2.ydim() == t1.ydim()
+            && t2.zdim() == t1.zdim();
         if !same {
             let what = format!(
                 "the T2 ({} x {} x {} voxels of {} x {} x {} mm) is not on the T1's grid ({} x {} \
@@ -1051,15 +1055,15 @@ fn surfaces(
                 t2.dims[0],
                 t2.dims[1],
                 t2.dims[2],
-                g6(f64::from(t2.xdim)),
-                g6(f64::from(t2.ydim)),
-                g6(f64::from(t2.zdim)),
+                cnum::stream(f64::from(t2.xdim())),
+                cnum::stream(f64::from(t2.ydim())),
+                cnum::stream(f64::from(t2.zdim())),
                 t1.dims[0],
                 t1.dims[1],
                 t1.dims[2],
-                g6(f64::from(t1.xdim)),
-                g6(f64::from(t1.ydim)),
-                g6(f64::from(t1.zdim))
+                cnum::stream(f64::from(t1.xdim())),
+                cnum::stream(f64::from(t1.ydim())),
+                cnum::stream(f64::from(t1.zdim()))
             );
             if notices.fix() {
                 notices.add(&defects::FSL_48, format!("{what}: refused"));
@@ -1073,7 +1077,7 @@ fn surfaces(
             );
         }
     }
-    let (xdim, ydim, zdim) = (f64::from(t1.xdim), f64::from(t1.ydim), f64::from(t1.zdim));
+    let (xdim, ydim, zdim) = (f64::from(t1.xdim()), f64::from(t1.ydim()), f64::from(t1.zdim()));
     let (xsize, ysize, zsize) = (t1.xsize(), t1.ysize(), t1.zsize());
 
     // the brain's robust maximum (useful if the skull is too bright)
@@ -1151,10 +1155,11 @@ fn surfaces(
         xsize + i64::from(infxm) + i64::from(infxp),
         ysize + i64::from(infym) + i64::from(infyp),
         zsize + i64::from(infzm) + i64::from(infzp),
+        1,
     );
-    write0.xdim = t1.xdim;
-    write0.ydim = t1.ydim;
-    write0.zdim = t1.zdim;
+    write0.pixdims[0] = t1.xdim();
+    write0.pixdims[1] = t1.ydim();
+    write0.pixdims[2] = t1.zdim();
     let mut counts = Counts {
         inskull: write0.clone(),
         outskull: write0.clone(),
@@ -1180,8 +1185,8 @@ fn surfaces(
     say(out, "blurring");
     const BLURRING: f32 = 3.0;
     const SMOOTHNESS: f32 = 1.0;
-    let write0 = volume::smooth(&counts.inskull, BLURRING, run.threads);
-    let write2 = volume::smooth(&counts.outskin, BLURRING, run.threads);
+    let write0 = newimagefns::smooth(&counts.inskull, BLURRING, run.threads);
+    let write2 = newimagefns::smooth(&counts.outskin, BLURRING, run.threads);
     let mut write1 = counts.outskull;
     say(out, "computation");
     for p in &mut m.points {
@@ -1266,7 +1271,7 @@ fn surfaces(
             *w = 0.0;
         }
     }
-    let write1 = volume::smooth(&write1, BLURRING, run.threads);
+    let write1 = newimagefns::smooth(&write1, BLURRING, run.threads);
 
     // outer skull
     say(out, " outer skull");

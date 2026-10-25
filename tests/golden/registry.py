@@ -921,7 +921,7 @@ def image_math_operations() -> list[str]:
 #: The public functions that run a tool which has only a replica (no clean-room original yet),
 #: with the tool: the replica's program is not installed where these tests run, so their golden
 #: cases are the replica's own (``crates-gpl/larmorx-gpl-cli/tests/golden.rs`` and
-#: ``crates-nc/larmorx-nc-bet/tests/golden.rs``, run on every platform by the replicas' jobs).
+#: ``crates-nc/larmorx-nc-cli/tests/golden.rs``, run on every platform by the replicas' jobs).
 #: ``replica_only`` checks that each tool has one there.
 REPLICA_ONLY_FUNCTIONS: dict[str, str] = {
     "lx.fsl.bet": "fsl bet2",
@@ -930,7 +930,7 @@ REPLICA_ONLY_FUNCTIONS: dict[str, str] = {
 
 #: The replicas' golden cases.
 GPL_GOLDEN = Path(__file__).resolve().parents[2] / "crates-gpl/larmorx-gpl-cli/tests/golden.rs"
-NC_GOLDEN = Path(__file__).resolve().parents[2] / "crates-nc/larmorx-nc-bet/tests/golden.rs"
+NC_GOLDEN = Path(__file__).resolve().parents[2] / "crates-nc/larmorx-nc-cli/tests/golden.rs"
 REPLICA_GOLDEN = (GPL_GOLDEN, NC_GOLDEN)
 
 

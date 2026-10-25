@@ -13,7 +13,7 @@
 
 use std::io::{BufRead, Write};
 
-use crate::fsl::istream::IStream;
+use crate::istream::IStream;
 use crate::mesh::{MPoint, Mesh, V3};
 
 /// Why a mesh was not loaded.

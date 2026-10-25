@@ -11,7 +11,7 @@
 //! nothing: the variable keeps whatever it held (in FSL's code, usually never set). Every later
 //! extraction on a failed stream does nothing.
 
-use crate::fsl::cstr;
+use crate::cnum;
 
 /// What an extraction did to its variable.
 #[derive(Clone, Copy, Debug, PartialEq)]
@@ -196,7 +196,7 @@ impl<'a> IStream<'a> {
             return Got::Untouched;
         }
         let x = self.float_chars();
-        let (v, used) = cstr::strtod(&x);
+        let (v, used) = cnum::strtod(&x);
         if x.is_empty() || used != x.len() {
             self.fail = true;
             return Got::Failed(0.0);
@@ -214,7 +214,7 @@ impl<'a> IStream<'a> {
             return Got::Untouched;
         }
         let x = self.float_chars();
-        let (v, used) = cstr::strtof(&x);
+        let (v, used) = cnum::strtof(&x);
         if x.is_empty() || used != x.len() {
             self.fail = true;
             return Got::Failed(0.0);

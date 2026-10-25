@@ -3,7 +3,7 @@
 (written by the test, as in ``test_replica.py``) they pass FSL's options, settings and D13's
 choice to it and read its outputs back; without it they refuse clearly (there is no clean-room
 original yet). The replica itself is checked by its own golden tests
-(``crates-nc/larmorx-nc-bet/tests/golden.rs``) and by the parity suite against FSL."""
+(``crates-nc/larmorx-nc-cli/tests/golden.rs``) and by the parity suite against FSL."""
 
 from __future__ import annotations
 
@@ -230,7 +230,7 @@ def test_bet_variations_run_the_script(scripts, tmp_path):
 
 def test_bet_turns_notices_and_warnings_into_python_warnings(tmp_path, scripts):
     line = (
-        "larmorx: upstream defect FSL-40 (bet2) reproduced: the output name loses '.hdr' "
+        "larmorx-nc: upstream defect FSL-40 (bet2) reproduced: the output name loses '.hdr' "
         "[LARMORX_UPSTREAM_DEFECTS=fix corrects it]\n"
         "Warning: An input intended to be a single 3D volume has multiple timepoints.\n"
     )

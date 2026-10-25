@@ -15,7 +15,7 @@ members = [
     "larmorx-nc-core/tools/affine-trace-replay",
     "larmorx-nc-mcflirt",
     "larmorx-nc-bet",
-    "larmorx-nc-bet/tools/libm-verify",
+    "larmorx-nc-core/tools/libm-verify",
     "larmorx-nc-cli",
 ]
 

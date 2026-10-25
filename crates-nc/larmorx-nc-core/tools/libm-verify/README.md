@@ -1,7 +1,8 @@
 # libm-verify
 
-Checks the C library functions FSL's programs call, as the BET replica carries them
-(`crates-nc/larmorx-nc-bet/src/fsl/`), against this machine's glibc and x87 unit: `pow` and `exp`
+Checks the C library functions FSL's programs call, as the shared core of the FSL replicas carries
+them (`crates-nc/larmorx-nc-core/src/`: `glibc_double`, `fdlibm`, `x87`), against this machine's glibc
+and x87 unit: `pow` and `exp`
 (glibc 2.35's `__pow_fma` and `__exp_fma`), `tanh` (fdlibm), and the `long double` operations of
 FSL's NIfTI layer (an x87 result rounded to 64 bits, then stored as `double` or `float`). It is
 what supports the replica's claim that its results are FSL's on every input, not only on the

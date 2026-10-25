@@ -181,9 +181,8 @@ dependencies = [
 name = "larmorx-nc-bet"
 version = "0.0.1"
 dependencies = [
- "flate2",
  "larmorx-core",
- "sha2",
+ "larmorx-nc-core",
  "tempfile",
 ]
 
@@ -193,6 +192,7 @@ version = "0.0.1"
 dependencies = [
  "flate2",
  "larmorx-core",
+ "larmorx-nc-bet",
  "larmorx-nc-core",
  "larmorx-nc-mcflirt",
  "sha2",
@@ -234,7 +234,7 @@ checksum = "b6d2cec3eae94f9f509c767b45932f1ada8350c4bdb85af2fcab4a3c14807981"
 name = "libm-verify"
 version = "0.0.0"
 dependencies = [
- "larmorx-nc-bet",
+ "larmorx-nc-core",
 ]
 
 [[package]]

@@ -16,12 +16,14 @@ use std::io::Write;
 
 use larmorx_core::defects::{self, Notices, UpstreamDefects};
 
-use crate::fsl::cstr::g6;
-use crate::fsl::fdlibm;
-use crate::fsl::options::{ArgFlag, Opt, OptionParser, Value};
-use crate::fsl::volume::{self, FslSettings, ImageError, Volume};
-use crate::fsl::{arma, glibc_pow};
-use crate::mesh::{Mesh, V3};
+use larmorx_nc_core::cnum;
+use larmorx_nc_core::fdlibm;
+use larmorx_nc_core::options::{ArgFlag, Opt, OptionParser, Value};
+use larmorx_nc_core::settings::Settings;
+use larmorx_nc_core::sse;
+use larmorx_nc_core::volume::{self, Elem, FslError, SaveError, SaveOptions, Saved, Volume};
+use larmorx_nc_core::{arma, glibc_double};
+use larmorx_nc_core::mesh::{Mesh, V3};
 
 const NORMAL_MAX_UPDATE_FRACTION: f64 = 0.5;
 const LAMBDA_FIT: f64 = 0.1;
@@ -55,7 +57,7 @@ fn fmax(a: f64, b: f64) -> f64 {
 /// C's `(int) x` for a double (x86-64: `INT_MIN` out of range).
 #[inline]
 fn trunc_i(x: f64) -> i64 {
-    i64::from(volume::c_to_i32(x))
+    i64::from(cnum::f64_to_i32(x))
 }
 
 /// The options of `bet2`, in the order FSL adds them (the order of `-h`).
@@ -226,9 +228,9 @@ pub fn adjust_initial_mesh(
     bp.t = t;
     let (nx, ny, nz) = (image.xsize(), image.ysize(), image.zsize());
     let (xd, yd, zd) = (
-        f64::from(image.xdim),
-        f64::from(image.ydim),
-        f64::from(image.zdim),
+        f64::from(image.xdim()),
+        f64::from(image.ydim()),
+        f64::from(image.zdim()),
     );
     if rad == 0.0 {
         let mut counter: i64 = 0;
@@ -242,7 +244,7 @@ pub fn adjust_initial_mesh(
                 }
             }
         }
-        let mut radius = glibc_pow::pow(
+        let mut radius = glibc_double::pow(
             0.75 * counter as f64 * xd * yd * zd / std::f64::consts::PI,
             1.0 / 3.0,
         );
@@ -252,16 +254,16 @@ pub fn adjust_initial_mesh(
         let flat = |a: f32, b: f32, size: i64| {
             f64::from(counter as f32 * a * b) / std::f64::consts::PI / size as f64
         };
-        if f64::from(nx as f32 * image.xdim) < radius {
-            radius = glibc_pow::pow(flat(image.ydim, image.zdim, nx), 1.0 / 2.0);
+        if f64::from(nx as f32 * image.xdim()) < radius {
+            radius = glibc_double::pow(flat(image.ydim(), image.zdim(), nx), 1.0 / 2.0);
             dimensionality -= 1;
         }
-        if f64::from(ny as f32 * image.ydim) < radius {
-            radius = glibc_pow::pow(flat(image.xdim, image.zdim, ny), 1.0 / 2.0);
+        if f64::from(ny as f32 * image.ydim()) < radius {
+            radius = glibc_double::pow(flat(image.xdim(), image.zdim(), ny), 1.0 / 2.0);
             dimensionality -= 1;
         }
-        if f64::from(nz as f32 * image.zdim) < radius {
-            radius = glibc_pow::pow(flat(image.xdim, image.ydim, nz), 1.0 / 2.0);
+        if f64::from(nz as f32 * image.zdim()) < radius {
+            radius = glibc_double::pow(flat(image.xdim(), image.ydim(), nz), 1.0 / 2.0);
             dimensionality -= 1;
         }
         if dimensionality < 2 {
@@ -306,9 +308,9 @@ pub fn adjust_initial_mesh(
                 let d = f64::from(image.value(i, j, k));
                 // i * xdim: int * float, in float
                 let p = V3::new(
-                    f64::from(i as f32 * image.xdim),
-                    f64::from(j as f32 * image.ydim),
-                    f64::from(k as f32 * image.zdim),
+                    f64::from(i as f32 * image.xdim()),
+                    f64::from(j as f32 * image.ydim()),
+                    f64::from(k as f32 * image.zdim()),
                 );
                 let dp = p.sub(center);
                 if d > t2 && d < t98 && dp.dot(dp) < r2 {
@@ -355,18 +357,18 @@ pub fn step_of_computation(
     d2: i32,
 ) {
     let (nx, ny, nz) = (image.xsize(), image.ysize(), image.zsize());
-    let xdim = if f64::from(nx as f32 * image.xdim) > radius {
-        f64::from(image.xdim)
+    let xdim = if f64::from(nx as f32 * image.xdim()) > radius {
+        f64::from(image.xdim())
     } else {
         2.0 * radius
     };
-    let ydim = if f64::from(ny as f32 * image.ydim) > radius {
-        f64::from(image.ydim)
+    let ydim = if f64::from(ny as f32 * image.ydim()) > radius {
+        f64::from(image.ydim())
     } else {
         2.0 * radius
     };
-    let zdim = if f64::from(nz as f32 * image.zdim) > radius {
-        f64::from(image.zdim)
+    let zdim = if f64::from(nz as f32 * image.zdim()) > radius {
+        f64::from(image.zdim())
     } else {
         2.0 * radius
     };
@@ -485,9 +487,9 @@ fn draw_segment(image: &mut Volume<i16>, p1: V3, p2: V3, mininc: f64, dims: (f64
 /// `draw_mesh` (bet2's: the surface drawn as 0 in a short image).
 pub fn draw_mesh(image: &Volume<i16>, m: &Mesh) -> Volume<i16> {
     let dims = (
-        f64::from(image.xdim),
-        f64::from(image.ydim),
-        f64::from(image.zdim),
+        f64::from(image.xdim()),
+        f64::from(image.ydim()),
+        f64::from(image.zdim()),
     );
     let mininc = fmin(dims.0, fmin(dims.1, dims.2)) * 0.5;
     let mut res = image.clone();
@@ -511,9 +513,9 @@ pub fn draw_mesh(image: &Volume<i16>, m: &Mesh) -> Volume<i16> {
 /// truncation of `x + 0.5`.
 pub fn draw_mesh_bis(image: &Volume<f32>, m: &Mesh) -> Volume<f32> {
     let dims = (
-        f64::from(image.xdim),
-        f64::from(image.ydim),
-        f64::from(image.zdim),
+        f64::from(image.xdim()),
+        f64::from(image.ydim()),
+        f64::from(image.zdim()),
     );
     let mininc = fmin(dims.0, fmin(dims.1, dims.2)) * 0.5;
     let mut res = image.clone();
@@ -663,9 +665,9 @@ pub fn make_mask_from_mesh(image: &Volume<f32>, m: &Mesh, fix: bool) -> (Volume<
     }
     let mut mask = draw_mesh(&mask, m);
     let (xd, yd, zd) = (
-        f64::from(image.xdim),
-        f64::from(image.ydim),
-        f64::from(image.zdim),
+        f64::from(image.xdim()),
+        f64::from(image.ydim()),
+        f64::from(image.zdim()),
     );
     let mut c = V3::default();
     for p in &m.points {
@@ -741,9 +743,9 @@ pub fn find_skull(image: &Volume<f32>, m: &Mesh, t2: f64, t: f64, t98: f64) -> V
         volmesh.zsize() as f64,
     );
     let (xdim, ydim, zdim) = (
-        f64::from(volmesh.xdim),
-        f64::from(volmesh.ydim),
-        f64::from(volmesh.zdim),
+        f64::from(volmesh.xdim()),
+        f64::from(volmesh.ydim()),
+        f64::from(volmesh.zdim()),
     );
     let scale = fmin(xdim, fmin(ydim, zdim));
     let interp = |p: V3| f64::from(image.interpolate(p.x as f32, p.y as f32, p.z as f32));
@@ -855,7 +857,7 @@ pub fn find_skull(image: &Volume<f32>, m: &Mesh, t2: f64, t: f64, t98: f64) -> V
 
 /// The settings of a run besides its options.
 pub struct Run<'a> {
-    pub fsl: &'a FslSettings,
+    pub fsl: &'a Settings,
     pub mode: UpstreamDefects,
     /// Threads for the work that can be shared (betsurf's smoothing); 1 or more. The results
     /// do not depend on it.
@@ -864,11 +866,8 @@ pub struct Run<'a> {
 
 /// Prints an uncaught exception of the image layer: what FSL printed before aborting, then
 /// larmorx's own line (FSL's program aborts: no defined result in either mode).
-pub(crate) fn report_abort(e: &ImageError, prog: &str, err: &mut dyn Write) -> u8 {
-    let _ = err.write_all(e.printed.as_bytes());
-    if let Some(code) = e.exit {
-        return code;
-    }
+pub(crate) fn report_abort(e: &FslError, prog: &str, err: &mut dyn Write) -> u8 {
+    let _ = err.write_all(e.printed_text().as_bytes());
     let what = e.what.replace('\n', " / ");
     let _ = writeln!(
         err,
@@ -878,11 +877,33 @@ pub(crate) fn report_abort(e: &ImageError, prog: &str, err: &mut dyn Write) -> u
     1
 }
 
+/// Prints the notices of FSL's defects as the `larmorx-nc` program prints every tool's:
+/// `larmorx-nc: upstream defect <ID> (<tool>) corrected|reproduced: ...`.
+pub(crate) fn print_notices(notices: &Notices, err: &mut dyn Write) {
+    for n in notices.as_slice() {
+        let _ = writeln!(err, "larmorx-nc: {}", n.line());
+    }
+}
+
+/// Prints why a save failed: `FSLOUTPUTTYPE`'s messages (FSL exits with status 1), or an
+/// uncaught exception ([`report_abort`]). Returns the exit status.
+pub(crate) fn report_save(e: &SaveError, prog: &str, err: &mut dyn Write) -> u8 {
+    match e {
+        SaveError::OutputType(o) => {
+            for l in &o.printed {
+                let _ = writeln!(err, "{l}");
+            }
+            1
+        }
+        SaveError::Exception(e) => report_abort(e, prog, err),
+    }
+}
+
 /// `bet2`'s `main`: `args[0]` is the program name. Returns the exit status.
 pub fn main(args: &[String], run: &Run, out: &mut dyn Write, err: &mut dyn Write) -> u8 {
     let mut notices = Notices::new(run.mode);
     let code = main_inner(args, run, out, err, &mut notices);
-    notices.print(err);
+    crate::bet2::print_notices(&notices, err);
     code
 }
 
@@ -1002,10 +1023,11 @@ fn main_inner(
     } else {
         out_name
     };
-    let mut warn = String::new();
-    let testvol: Volume<f32> = match volume::read_volume(&in_name, run.fsl, &mut warn) {
-        Ok(v) => {
-            let _ = err.write_all(warn.as_bytes());
+    let testvol: Volume<f32> = match volume::read_volume::<f32>(&in_name, run.fsl) {
+        Ok((v, warning)) => {
+            if let Some(w) = warning {
+                let _ = writeln!(err, "{w}");
+            }
             v
         }
         Err(e) => return report_abort(&e, "bet2", err),
@@ -1039,13 +1061,13 @@ fn meaningless_values(a: &Bet2Args) -> Option<String> {
     if !a.radius.is_finite() || a.radius < 0.0 {
         return Some(format!(
             "the head radius (-r) must be a finite number of millimetres, 0 or more (0 estimates it), not {}",
-            g6(f64::from(a.radius))
+            cnum::stream(f64::from(a.radius))
         ));
     }
     if !a.smooth.is_finite() || a.smooth <= 0.0 {
         return Some(format!(
             "the smoothness factor (-w) must be a finite number above 0, not {}",
-            g6(f64::from(a.smooth))
+            cnum::stream(f64::from(a.smooth))
         ));
     }
     if let Some(c) = a.centre
@@ -1057,7 +1079,7 @@ fn meaningless_values(a: &Bet2Args) -> Option<String> {
         if !v.is_finite() || !(-2_147_483_648.0..2_147_483_648.0).contains(&v) {
             return Some(format!(
                 "{name} must be a finite number within the range of an integer, not {}",
-                g6(f64::from(v))
+                cnum::stream(f64::from(v))
             ));
         }
     }
@@ -1139,12 +1161,12 @@ pub fn compute(
     let (mut xarg, mut yarg, mut zarg) = (0.0f64, 0.0, 0.0);
     if let Some(c) = a.centre {
         let v = [f64::from(c[0]), f64::from(c[1]), f64::from(c[2]), 1.0];
-        let v = arma::mul_vec(&testvol.niftivox2newimagevox_mat(), &v);
+        let v = arma::gemv_tinysq(&testvol.niftivox2newimagevox_mat(), &v, false);
         xarg = v[0];
         yarg = v[1];
         zarg = v[2];
     }
-    let bet_main_parameter = glibc_pow::pow(f64::from(a.frac), 0.275);
+    let bet_main_parameter = glibc_double::pow(f64::from(a.frac), 0.275);
     let mut m = Mesh::icosa(5);
     let mut warn = String::new();
     let bp = match adjust_initial_mesh(
@@ -1175,21 +1197,21 @@ pub fn compute(
         let _ = writeln!(
             out,
             "min {} thresh2 {} thresh {} thresh98 {} max {}",
-            g6(bp.min),
-            g6(bp.t2),
-            g6(bp.t),
-            g6(bp.t98),
-            g6(bp.max)
+            cnum::stream(bp.min),
+            cnum::stream(bp.t2),
+            cnum::stream(bp.t),
+            cnum::stream(bp.t98),
+            cnum::stream(bp.max)
         );
         let _ = writeln!(
             out,
             "c-of-g {} {} {} mm",
-            g6(bp.cog.x),
-            g6(bp.cog.y),
-            g6(bp.cog.z)
+            cnum::stream(bp.cog.x),
+            cnum::stream(bp.cog.y),
+            cnum::stream(bp.cog.z)
         );
-        let _ = writeln!(out, "radius {} mm", g6(bp.radius));
-        let _ = writeln!(out, "median within-brain intensity {}", g6(bp.tm));
+        let _ = writeln!(out, "radius {} mm", cnum::stream(bp.radius));
+        let _ = writeln!(out, "median within-brain intensity {}", cnum::stream(bp.tm));
     }
     let moriginal = m.copy();
     let rmin = 3.33 * f64::from(a.smooth);
@@ -1198,8 +1220,8 @@ pub fn compute(
     let f = 6.0 / (1.0 / rmin - 1.0 / rmax);
     const NB_ITER: i32 = 1000;
     const SELF_INTERSECTION_THRESHOLD: f64 = 4000.0;
-    let d1 = volume::c_to_i32(f64::from(a.d1));
-    let d2 = volume::c_to_i32(f64::from(a.d2));
+    let d1 = cnum::f64_to_i32(f64::from(a.d1));
+    let d2 = cnum::f64_to_i32(f64::from(a.d2));
     let grad = f64::from(a.grad);
     let mut l = 0.0;
     for i in 0..NB_ITER {
@@ -1230,7 +1252,7 @@ pub fn compute(
         let _ = writeln!(
             out,
             "self-intersection total {} (threshold=4000.0) ",
-            g6(tmp)
+            cnum::stream(tmp)
         );
     }
     let mut self_intersection = if !a.mesh {
@@ -1287,7 +1309,7 @@ pub fn compute(
             let _ = writeln!(
                 out,
                 "self-intersection total {} (threshold=4000.0) ",
-                g6(tmp)
+                cnum::stream(tmp)
             );
         }
         if a.verbose && a.mesh && self_intersection {
@@ -1335,7 +1357,6 @@ fn write_outputs(
     err: &mut dyn Write,
     notices: &mut Notices,
 ) -> u8 {
-    let reproduce_offset = run.mode.reproduce();
     if volume::offset_defect_applies(testvol, run.fsl) {
         offset_notice(notices, testvol.extensions.len());
     }
@@ -1348,23 +1369,14 @@ fn write_outputs(
             }
         }
     }
-    let saved = |r: volume::SaveResult, err: &mut dyn Write| -> Option<u8> {
-        match r {
-            Ok(None) => None,
-            Ok(Some(_)) => Some(255),
-            Err(e) => Some(report_abort(&e, "bet2", err)),
-        }
-    };
     if !a.no_output {
         let mut output = if a.ct { ctvol.clone() } else { testvol.clone() };
-        let n = output.nvoxels();
+        let n = output.nvoxels() as usize;
         for (o, &b) in output.data[..n].iter_mut().zip(&brainmask.data) {
-            *o *= f32::from(1 - b);
+            // a NaN voxel stays its NaN; an infinite one outside the brain is SSE's NaN
+            *o = sse::mul_f32(*o, f32::from(1 - b));
         }
-        if let Some(code) = saved(
-            volume::save_volume(&output, out_name, run.fsl, reproduce_offset),
-            err,
-        ) {
+        if let Some(code) = save_output(&output, out_name, run, err) {
             return code;
         }
     }
@@ -1375,24 +1387,13 @@ fn write_outputs(
         for v in m.data.iter_mut() {
             *v = 1 - *v;
         }
-        if let Some(code) = saved(
-            volume::save_volume(&m, &format!("{out_name}_mask"), run.fsl, reproduce_offset),
-            err,
-        ) {
+        if let Some(code) = save_output(&m, &format!("{out_name}_mask"), run, err) {
             return code;
         }
     }
     if a.outline {
         let outline = draw_mesh_bis(testvol, &res.mesh);
-        if let Some(code) = saved(
-            volume::save_volume(
-                &outline,
-                &format!("{out_name}_overlay"),
-                run.fsl,
-                reproduce_offset,
-            ),
-            err,
-        ) {
+        if let Some(code) = save_output(&outline, &format!("{out_name}_overlay"), run, err) {
             return code;
         }
     }
@@ -1411,17 +1412,28 @@ fn write_outputs(
             res.params.t98,
         );
         let bskull: Volume<i16> = Volume::copyconvert(&skull);
-        if let Some(code) = saved(
-            volume::save_volume(
-                &bskull,
-                &format!("{out_name}_skull"),
-                run.fsl,
-                reproduce_offset,
-            ),
-            err,
-        ) {
+        if let Some(code) = save_output(&bskull, &format!("{out_name}_skull"), run, err) {
             return code;
         }
     }
     0
+}
+
+/// `save_volume(v, name)` of one of bet2's outputs: newimage's `descrip`, NewNifti's data
+/// offset of several extensions reproduced only in `reproduce` (FSL-56). `Some(status)` when
+/// bet2 stops: an image with no volume (FSL returns -1 from `main`: 255), `FSLOUTPUTTYPE`'s
+/// failure, or an exception.
+pub(crate) fn save_output<T: Elem>(
+    v: &Volume<T>,
+    name: &str,
+    run: &Run,
+    err: &mut dyn Write,
+) -> Option<u8> {
+    let opts =
+        SaveOptions::new(volume::BUILDSTRING.as_bytes()).reproducing_offset(run.mode.reproduce());
+    match v.save_volume(name, run.fsl, &opts) {
+        Ok(Saved::Written) => None,
+        Ok(Saved::Nothing) => Some(255),
+        Err(e) => Some(report_save(&e, "bet2", err)),
+    }
 }

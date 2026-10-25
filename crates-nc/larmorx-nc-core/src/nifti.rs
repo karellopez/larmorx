@@ -21,9 +21,8 @@ use std::fs::File;
 use std::io::{self, Read, Write};
 use std::path::Path;
 
-use flate2::Compression;
 use flate2::read::MultiGzDecoder;
-use flate2::write::GzEncoder;
+use flate2::{Compression, GzBuilder};
 
 use crate::x87;
 
@@ -1377,19 +1376,25 @@ pub fn load_image(path: &Path) -> Result<Loaded, NiftiError> {
     })
 }
 
-/// `saveImage(filename, buffer, extensions, header, useCompression)`.
+/// `saveImage(filename, buffer, extensions, header, useCompression)`. `reproduce_offset` keeps
+/// NewNifti's `vox_offset` for two or more extensions (FSL-56: the first extension's size is
+/// added once per extension); otherwise each extension's own size is added.
 pub fn save_image(
     filename: &str,
     data: &[u8],
     extensions: &[NiftiExtension],
     header: &NiftiHeader,
     use_compression: bool,
+    reproduce_offset: bool,
 ) -> Result<(), NiftiError> {
     let mut header = header.clone();
     let mut size_of_extensions = 4usize;
-    for _ in extensions {
-        // FSL adds the size of the first extension once per extension.
-        size_of_extensions += extensions[0].extension_size();
+    for e in extensions {
+        size_of_extensions += if reproduce_offset {
+            extensions[0].extension_size()
+        } else {
+            e.extension_size()
+        };
     }
     header.vox_offset = i64::from(header.sizeof_hdr) + size_of_extensions as i64;
     if !header.single_file() {
@@ -1435,19 +1440,24 @@ pub fn save_image(
     }
 }
 
+/// Writes `bytes` to `name`, gzip-compressed as znzlib's `gzopen(name, "wb")` writes it (zlib's
+/// default level 6 and the gzip header of a Unix zlib: no name, no time, OS 3, so that the file
+/// is FSL's byte for byte), or NewNifti's message when the file cannot be created.
 fn write_file(name: &str, bytes: &[u8], compress: bool) -> Result<(), NiftiError> {
     let open_err = || err(format!("Error: cant open file {name}"));
     let f = File::create(name).map_err(|_| open_err())?;
     let short = |_: io::Error| err("Error: short write, output file will be truncated");
+    let mut w = io::BufWriter::new(f);
     if compress {
-        let mut enc = GzEncoder::new(f, Compression::default());
+        let mut enc = GzBuilder::new()
+            .operating_system(3)
+            .write(&mut w, Compression::new(6));
         enc.write_all(bytes).map_err(short)?;
         enc.finish().map_err(short)?;
     } else {
-        let mut f = f;
-        f.write_all(bytes).map_err(short)?;
+        w.write_all(bytes).map_err(short)?;
     }
-    Ok(())
+    w.flush().map_err(short)
 }
 
 #[cfg(test)]

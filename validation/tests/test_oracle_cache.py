@@ -621,6 +621,42 @@ def test_verify_puts_inputs_back_where_they_were(cache, fake, workdir):
     assert again.cached and (d2 / "out.nii").read_bytes() == b"dlrow olleh"
 
 
+#: An original that finds its input by a stem, as FSL's programs do (``bet in out`` reads
+#: ``in.nii.gz``): ``stem STEM OUT`` writes OUT from STEM.nii.
+STEM = """\
+    import sys
+    data = open(sys.argv[1] + ".nii", "rb").read()
+    open(sys.argv[2], "wb").write(data[::-1])
+"""
+
+
+def test_inputs_the_arguments_do_not_name_count_by_their_content(cache, tmp_path, workdir):
+    """A file the program reads that its arguments do not name (``inputs=``) is in the key by
+    its content, is served only for the same content, and ``verify`` puts it back."""
+    from larmorx_validation.oracle_cache import rerun
+
+    prog = make_program(tmp_path / "stem-bin", STEM, "stem")
+
+    def go(content: bytes, case: str):
+        oc.begin_case(case)
+        d, src, _dst = workdir(content, "in.nii")
+        r = oc.run([prog, "in", "out.nii"], env=env_for(), cwd=d, policy=ONE, inputs=[src])
+        return r, (d / "out.nii").read_bytes()
+
+    first, out1 = go(b"first", "a")
+    assert not first.cached and out1 == b"tsrif"
+    second, out2 = go(b"second", "b")
+    assert not second.cached and out2 == b"dnoces"
+    third, out3 = go(b"first", "c")
+    assert third.cached and out3 == b"tsrif"
+    assert len(entries(cache)) == 2
+    for e in entries(cache):
+        assert [i["at"] for i in e["inputs"]] == ["{cwd}/in.nii"]
+        assert rerun.rerun(cache, e).status == "same"
+    with pytest.raises(key.Uncacheable):
+        key.prepare({}, ["x"], env_for(), cwd=tmp_path, inputs=[tmp_path / "missing.nii"])
+
+
 def test_resolve_serves_a_false_alarm_again_and_logs_it(cache, fake, workdir, capsys):
     from larmorx_validation.__main__ import main
 

@@ -1,7 +1,8 @@
 # Findings: FSL 6.0.7.17's BET (`bet`, `bet2`, `betsurf`) and the libraries it relies on
 
 **Restricted** (CLAUDE.md rule 1): written from FSL's source while translating the replica
-(`crates-nc/larmorx-nc-bet`). Whoever writes the clean-room original of BET must not read this
+(`crates-nc/larmorx-nc-bet`, with FSL's libraries in `crates-nc/larmorx-nc-core` since BET's
+merge, 2026-10-25). Whoever writes the clean-room original of BET must not read this
 file; the behaviour it needs is in `specs/bet.md`. References are `file:line` in the FSL 6.0.7.17
 conda packages' source (`~/fsl/src/<package>/`, copied unmodified to `crates-nc/fsl-source/`):
 fsl-bet2 2111.8, fsl-meshclass 2111.0, fsl-newimage 2203.12, fsl-newnifti 4.1.0, fsl-miscmaths
@@ -29,7 +30,7 @@ fsl-bet2 2111.8, fsl-meshclass 2111.0, fsl-newimage 2203.12, fsl-newnifti 4.1.0,
   - NewNifti's quaternion routines (`legacyFunctions.cc`, `mat44_to_quatern`,
     `quatern_to_mat44`, `mat33_polar`) are written in `long double`: on x86-64, x87 extended
     precision, every intermediate rounded to 64 bits and then stored.
-  `crates-nc/larmorx-nc-bet/tools/libm-verify` compares the replica's ports with this machine's
+  `crates-nc/larmorx-nc-core/tools/libm-verify` compares the replica's ports with this machine's
   glibc and x87 unit: 0 of 4 million `pow` calls (BET's arguments and the whole range), 0 of 4
   million `exp`, 0 of 3 million `tanh` and 0 of 5 million x87 operations differ (2026-10-24).
 - FSL is deterministic: single-threaded, no random numbers; the parity record's runs of FSL again
@@ -49,14 +50,19 @@ Each is in the register (`docs/findings/upstream-defects.md`); the switch is
   and no `.hdr` throws `std::out_of_range` (`basic_string::erase`), uncaught: FSL aborts. The
   default removes one trailing extension; `reproduce` erases as FSL does and, where FSL aborts,
   refuses with FSL's message.
-- **FSL-41** (crash, refused in both modes): `bet2.cpp:427-438`: `tm` is
+- **FSL-41** (crash; refused by default, filled in `reproduce`): `bet2.cpp:427-438`: `tm` is
   `*max_element(vm.begin(), vm.begin() + med)` after `nth_element(..., vm.begin() + med - 1, ...)`.
   With no voxel strictly between `t2` and `t98` inside the initial sphere (a constant image, a
   binary image), `vm` is empty and `max_element` of an empty range is dereferenced: a null read,
   FSL segfaults (`nth_element` returns at once on the empty range). With one voxel `med` is 0:
   `nth_element` with `nth` one before the range only runs its insertion sort on the single
   element, and `max_element` of the empty range `[begin, begin)` returns `vm.begin()`:
-  `tm = vm[0]`, defined; the replica reproduces that.
+  `tm = vm[0]`, defined; the replica reproduces that. The default refuses the empty case (rule B: a constant or
+  binary image has no brain intensities); `reproduce` keeps every value FSL defines and takes
+  `tm = 0` for the one it dereferences from nowhere (D13's failure cases: the defined parts
+  reproduced, the rest filled deterministically, with a warning naming FSL-41). On the parity case
+  `bet2/constant` the surface then collapses and its centroid is not a number, where FSL-43's fill
+  is skipped in `reproduce` (below): the run writes its outputs, the same bytes every time.
 - **FSL-42** (rule B, refused by default): bet2 checks only `f < 0 || f > 1` and `g < -1 || g > 1`
   (`bet2.cpp:845-856`): NaN passes; `-r` negative, NaN or infinite, `-w` of 0 or less, a
   non-finite `-c` and `--parameter_d1/d2` are used as given (the deformation then computes with
@@ -73,8 +79,10 @@ Each is in the register (`docs/findings/upstream-defects.md`); the switch is
   warns that FSL writes and reads outside the volume there. On `defects/2d` both give FSL's
   outputs, bit for bit. Further than one voxel outside, FSL's write lands far from the buffer and
   it crashes (a NaN centroid, as FSL-42's NaN options give, truncates to `INT_MIN`: the parity
-  cases `defects/nan-f` and `defects/zero-w` segfault in FSL): both modes refuse there, except that
-  the default fills from the nearest voxel when the centroid is a real position.
+  cases `defects/nan-f` and `defects/zero-w` segfault in FSL): the default fills from the nearest
+  voxel when the centroid is a real position and refuses otherwise; `reproduce` does not do the
+  write FSL crashes on and fills nothing (the mask holds the drawn surface only), and warns (D13's
+  failure cases, since BET's merge).
 - **FSL-44** (rule A, corrected): the `bet` script expands `$1`, `$2`, `$IN`, `$OUT` unquoted
   throughout (`bet:155-160` and every command): a name with a blank becomes several words (the
   input is "not valid"; an output name writes other files), and `while [ _$1 != _ ]`
@@ -119,12 +127,19 @@ Each is in the register (`docs/findings/upstream-defects.md`); the switch is
   `begin`), the replica reads "nothing there" (+∞, NaN) and marks the profile: the default drops
   it, `reproduce` keeps the result of that reading and warns that FSL's depends on memory
   contents.
-- **FSL-52** (refused in both modes): `Mesh::load_*` (`mesh.cpp:423-612`) reads with `>>` and
+- **FSL-52** (crash; refused by default, filled in `reproduce`): `Mesh::load_*`
+  (`mesh.cpp:423-612`) reads with `>>` and
   never checks the stream: a number that does not read leaves the variable at 0 (C++11) and every
   later one never set (in practice the previous iteration's stack values); a face naming a vertex
   index outside the mesh reads `_points[n]` out of range (a wild pointer). An empty mesh (`c`, or a
-  file of 0 vertices) divides by 0 for the centroid and FSL-43 follows. The replica refuses with
-  the reason. FSL's own VTK files carry no point data: the trailing reads fail and leave each
+  file of 0 vertices) divides by 0 for the centroid and FSL-43 follows. FSL 6.0.7.17 segfaults
+  on each of the parity cases (`defects/mesh-unread`, `mesh-missing-vertex`, `mesh-truncated`;
+  after writing `out_inskull_mesh.vtk` from the never-set values in the first and the last). The
+  default refuses with the reason; `reproduce` keeps the values C++ stores (0 for a number that
+  does not read), takes 0 for every value the stream never sets, leaves out the faces that name
+  a missing vertex, lists what it filled in the FSL-52 warning, and goes on (the centroid of a
+  surface of zeros is not a number: FSL-43's skipped fill). FSL's own VTK files carry no point
+  data: the trailing reads fail and leave each
   point's value never set, but betsurf never uses values (`Mesh::operator=` does not copy them,
   `stream_mesh` type 3 does not write them), so the replica ignores that section.
 - **FSL-53** (rule B, refused by default): betsurf reads the 16 numbers of the matrix with

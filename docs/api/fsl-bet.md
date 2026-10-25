@@ -103,7 +103,7 @@ which profiles cross the eyes); without `t2` the surfaces come from the T1 alone
 
 Corrected by default, reproduced with `upstream_defects="reproduce"`
 (`LARMORX_UPSTREAM_DEFECTS=reproduce`); each correction that changes a result is named as an
-`lx.UpstreamDefectWarning` (on the command line `larmorx: upstream defect <ID> ...`). Decided by
+`lx.UpstreamDefectWarning` (on the command line `larmorx-nc: upstream defect <ID> ...`). Decided by
 the project's rules A to D ([register](../findings/upstream-defects.md)):
 
 - **FSL-40** (A): bet2 removes the first `.hdr` of a name wherever it stands, and a name with
@@ -113,8 +113,10 @@ the project's rules A to D ([register](../findings/upstream-defects.md)):
   value).
 - **FSL-43** (A): the mask's fill starts at the surface's centroid without a bounds check; on a
   single slice that voxel lies below the image and FSL writes and reads outside the volume; the
-  default starts at the nearest voxel inside (`reproduce` does the part FSL defines and warns;
-  where the centroid is not a number FSL crashes, and both modes refuse).
+  default starts at the nearest voxel inside (`reproduce` does the part FSL defines and warns).
+  Where the centroid is far outside or not a number, FSL writes far outside the volume and
+  crashes: the default fills from the nearest voxel for a real position and refuses otherwise;
+  `reproduce` skips the fill (the mask holds the drawn surface only) and warns.
 - **FSL-44** (A): `bet` splits names with blanks into words and stops its options at an empty
   argument; the default keeps each argument whole.
 - **FSL-45** (A): `bet -Z` crops its outputs with `imglob` called without `${FSLDIR}/bin`: with
@@ -137,17 +139,23 @@ the project's rules A to D ([register](../findings/upstream-defects.md)):
 - **FSL-56** (A): an image saved with two or more NIfTI extensions of different sizes (only with
   `FSL_LOAD_NIFTI_EXTENSIONS`) gets a wrong data offset; the default writes the right one.
 
-Refused in both modes, where FSL crashes or computes with memory it never set: **FSL-41** (no
-voxel strictly between the 2nd and 98th percentiles inside the initial sphere: a constant or
-binary image), **FSL-52** (a mesh file FSL cannot read). Kept as FSL's and documented (rule C):
+Where FSL crashes on what it leaves undefined, the default refuses with the reason and
+`reproduce` keeps everything FSL defines, fills the rest deterministically and warns (D13's
+failure cases): **FSL-41** (no voxel strictly between the 2nd and 98th percentiles inside the
+initial sphere, a constant or binary image: FSL reads the median from an empty list; `reproduce`
+takes it as 0) and **FSL-52** (a mesh file FSL reads without checks: `reproduce` takes 0 for the
+values FSL never sets and leaves out the faces that name missing vertices). Kept as FSL's and
+documented (rule C):
 **FSL-49** (betsurf keeps the T1's scalp estimate when the T2's lies further out) and **FSL-57**
 (betsurf's smoothness weight set to 0 after it was used: no effect).
 
 ## Deliberate differences
 
-- Where FSL aborts on an uncaught exception (a missing input, FSL-40's `.img` name) or crashes
-  (FSL-41), the replica prints FSL's messages before the abort and one line of its own, and exits 1
-  (FSL: 134 or a signal).
+- Where FSL aborts on an uncaught exception (a missing input, FSL-40's `.img` name), the
+  replica prints FSL's messages before the abort and one line of its own, and exits 1 (FSL: 134).
+  Where it crashes on what it leaves undefined (FSL-41, FSL-52, FSL-43 far outside), the default
+  refuses (exit 1) and `reproduce` finishes with the undefined part filled (exit 0, the defect
+  named); FSL ends by a signal.
 - The `bet` script's messages name the script by its path (`$0`: `<FSLDIR>/bin/bet failed during
   command:...`); the replica names it `bet`.
 - The replica needs no `FSLDIR` and runs none of FSL's programs; `bet -S`, `-B`, `-A`, `-A2`
@@ -157,7 +165,8 @@ binary image), **FSL-52** (a mesh file FSL cannot read). Kept as FSL's and docum
 
 None: the replica carries the C library functions FSL's programs call as this machine's glibc
 computes them (`pow`, `exp`, `tanh`, and the x87 `long double` arithmetic of FSL's NIfTI layer;
-`crates-nc/larmorx-nc-bet/tools/libm-verify`), on every platform.
+`crates-nc/larmorx-nc-core/tools/libm-verify`), on every platform; NaN and infinite voxels give
+SSE's NaN bits on every platform (`larmorx-nc-core`'s `sse`; `validation/probes/fsl-bet-nan`).
 
 ## Speed
 
@@ -170,6 +179,9 @@ yet.
 
 ## Rust
 
-The replica's Rust API is in the crate `larmorx-nc-bet` (FSL Licence): `bet2::main`, `bet::main`,
-`betsurf::main` take the original arguments; `bet2::compute` runs the extraction on a
-`fsl::volume::Volume<f32>`. The Apache-2.0 crates cannot use it.
+The replica's Rust API is in the crate `larmorx-nc-bet` (FSL Licence): `bet`, `bet2`, `betsurf`
+(the `larmorx-nc` program's entry points: the original arguments, the settings, D13's mode, the
+thread count), `bet2::main`, `bet::main`, `betsurf::main`; `bet2::compute` runs the extraction on
+a `larmorx_nc_core::volume::Volume<f32>`. FSL's libraries are the shared core's,
+`larmorx-nc-core` (its [PROVENANCE](../../crates-nc/larmorx-nc-core/PROVENANCE.md) lists the
+API). The Apache-2.0 crates cannot use them.

@@ -29,8 +29,10 @@ the bits", following it keeps the original closest to FSL.
 **Defects (D13).** Some behaviours below are defects that larmorx corrects by default and
 reproduces with `upstream_defects="reproduce"` (`LARMORX_UPSTREAM_DEFECTS=reproduce`): FSL-40,
 -42 to -48, -50, -51, -53 to -56. §9 lists what the default does for each. Where FSL crashes
-or reads memory it never set and stops (FSL-41, -52), both modes refuse with a clear message. Two
-questionable behaviours are kept as FSL's (rule C): FSL-49, FSL-57.
+on what it leaves undefined (FSL-41, -52, and FSL-43's fill far outside the image), the default
+refuses with a clear message, and `reproduce` keeps everything FSL defines and fills the rest
+deterministically, with a warning (D13's failure cases). Two questionable behaviours are kept as
+FSL's (rule C): FSL-49, FSL-57.
 
 ---
 
@@ -43,7 +45,8 @@ T1-, T2- and proton-density-weighted images and on EPI (one volume), at any voxe
 fMRIPrep 25.2.6 calls it on the BOLD reference, twice per BOLD run (niworkflows'
 `init_enhance_and_skullstrip_bold_wf`, "skullstrip_first_pass", and the `skullstrip_bold_wf` of the
 co-registration reference): **`bet <boldref> <boldref>_brain.nii.gz -f 0.20 -m`** with
-`FSLOUTPUTTYPE=NIFTI_GZ`; it uses the mask. Nine such calls run in the five oracle runs
+`FSLOUTPUTTYPE=NIFTI_GZ`; it uses the mask. 29 such calls run in the twelve oracle runs with
+BOLD runs, the data panel's included
 (`oracles/fmriprep-25.2.6/*/work/**/skullstrip_first_pass/command.txt`).
 
 `betsurf` (normally run by `bet -A` or `-A2`) then finds the inner skull, the outer skull and the
@@ -224,7 +227,8 @@ The verbose line (§4.9) prints these values.
 - **The median within-brain intensity** `tm`: of the voxels with `t2 < v < t98` whose point is
   within the radius `r` of the centre (squared distance `< r²`), in storage order, `tm` is the
   largest of the `floor(N_m / 2)` smallest values (the lower median); with no such voxel FSL reads
-  an empty list and crashes (FSL-41): larmorx refuses in both modes.
+  an empty list and crashes (FSL-41): larmorx refuses, and in `reproduce` takes `tm = 0` and goes
+  on, with a warning.
 - **The fractional threshold** is used as `b_t = f^0.275`.
 
 ### 4.4 The initial surface and its deformation
@@ -470,7 +474,10 @@ Optional arguments (You may optionally specify one or more of):
   cannot be opened: `error opening file`, `could not open the following file: <name>`,
   `terminating.` on standard error, exit 255. A mesh FSL cannot read (numbers that do not read,
   faces naming missing vertices, an empty mesh) makes FSL compute with memory it never set or
-  crash: larmorx refuses (FSL-52).
+  crash (FSL-52): larmorx refuses; in `reproduce` it keeps the values C++ defines (a number that
+  does not read is stored as 0), takes 0 for every value the stream never sets, leaves out the
+  faces that name missing vertices, and warns. An empty mesh's centre is not a number: its mask's
+  fill is skipped (FSL-43).
 - **The matrix**: 16 numbers (FLIRT's 4 x 4 matrix, row by row, from the T1's FSL coordinates in
   mm to MNI152's); only the first 12 are used. A file that cannot be opened: `unable to open
   <name>` on standard error, exit 255 (0 with `--t1only`). Fewer than 12 readable numbers:
@@ -628,7 +635,7 @@ the phases above.
 | bet2 | `-f`, `-g` out of range | empty line, the message | 1 |
 | bet2 | input not found | `Image Exception` lines; FSL aborts (134); larmorx exits 1 | 1 |
 | bet2 | an output with `.img` and no `.hdr` | FSL aborts (std::out_of_range); larmorx exits 1 | 1 |
-| bet2 | a constant image (no voxel for `tm`) | FSL crashes; larmorx refuses (FSL-41) | 1 |
+| bet2 | a constant image (no voxel for `tm`) | FSL crashes; larmorx refuses (FSL-41); `reproduce` goes on with `tm = 0` | 1 (`reproduce`: 0) |
 | bet | no output name | usage (stdout) | 1 |
 | bet | input not an image | empty line, `Error: input image <in> not valid`, empty line | 1 |
 | bet | a failing step | `<path> failed during command:<args>` (stdout) | 1 |
@@ -658,9 +665,9 @@ For an original that wants to stay as close as possible to FSL (not required):
 | ID | Behaviour of FSL | Default (`fix`) | `reproduce` |
 |---|---|---|---|
 | FSL-40 | bet2 removes the first `.hdr` of each name wherever it stands (a directory `x.hdr` is read as `x`); a name with `.img` but no `.hdr` aborts | removes a trailing extension only | FSL's names (and the refusal where FSL aborts) |
-| FSL-41 | no voxel for the median intensity: FSL reads an empty list and crashes | refuses | refuses |
+| FSL-41 | no voxel for the median intensity: FSL reads an empty list and crashes | refuses | `tm = 0`, goes on, warns |
 | FSL-42 | NaN `-f`/`-g`, a negative, NaN or infinite `-r`, `-w ≤ 0`, a non-finite `-c` or search depth are used as given | refuses, naming the value | uses them |
-| FSL-43 | the mask's fill starts outside the image (a single slice): FSL writes and reads outside the volume | starts at the nearest voxel inside | only FSL's defined steps (the start's neighbours inside the image), warns |
+| FSL-43 | the mask's fill starts outside the image (a single slice): FSL writes and reads outside the volume; further outside, or at a centroid that is not a number, it writes far outside the volume and crashes | starts at the nearest voxel inside (a centroid that is not a number: refuses) | one voxel outside: only FSL's defined steps (the start's neighbours inside the image); further: no fill (the drawn surface only); warns |
 | FSL-44 | bet expands its arguments unquoted: a name with a blank becomes several words; an empty argument ends the options | quotes them | FSL's word splitting |
 | FSL-45 | `-Z` crops with `imglob`, called without `${FSLDIR}/bin`: off the PATH the outputs stay padded; on it, other images named like the output are cropped too | crops exactly its outputs | FSL's behaviour for the PATH given |
 | FSL-46 | the cleanup removes every `<out>_tmp*` file, also files the run did not create | removes only its own | removes all |
@@ -669,7 +676,7 @@ For an original that wants to stay as close as possible to FSL (not required):
 | FSL-49 | `S < S2` keeps the T1's scalp (`outskin = outskin`) | kept (rule C) | kept |
 | FSL-50 | one profile with an empty search range ends betsurf with 255, silently, before any output | drops the profile | exits 255 |
 | FSL-51 | a profile search reads past its last sample (memory never set) | drops the profile | reads "nothing there" (+∞, NaN) and warns |
-| FSL-52 | a mesh file FSL cannot read (values never set, missing vertices, empty) | refuses | refuses |
+| FSL-52 | a mesh file FSL cannot read (values never set, missing vertices, empty) | refuses | the values C++ stores, 0 for those never set, faces naming missing vertices left out; warns |
 | FSL-53 | a matrix with fewer than 12 readable numbers leaves entries never set (the first failing one 0) | refuses | uses 0 for them, warns |
 | FSL-54 | `--t1only` exits 0 also when it fails | exits with the failure's status | exits 0 |
 | FSL-55 | a NaN in the T1 inside the brain surface: the 98th percentile is undefined | refuses | libstdc++'s selection, warns |
@@ -699,7 +706,7 @@ Where FSL spends its time (one 1 mm T1, about 2 s for bet2 and 40 s for betsurf 
 Against FSL 6.0.7.17 (`~/fsl`), through `python -m larmorx_validation parity fsl-bet` (the
 replica's suite, `docs/validation/fsl-bet-replica.md`, is the model; the original's suite runs the
 same cases with `implementation="original"`):
-- **Cases**: fMRIPrep's nine calls; every option of bet2, bet and betsurf; every storage type,
+- **Cases**: fMRIPrep's 29 calls; every option of bet2, bet and betsurf; every storage type,
   scaling, orientation (radiological and neurological storage, qform or sform only, oblique) and
   file format; 2D and 4D inputs; the messages and failures of §7; the defects of §9 in both modes;
   synthetic heads with a known brain; real T1w, T2w and EPI images of the data panel (children,

@@ -188,6 +188,57 @@ def entry(ctx: core.Context) -> fcache.Entry:
     )
 
 
+#: A data-panel case (larmorx-testdata's panel): fMRIPrep's BET call on the BOLD reference of the
+#: panel's youngest subject, ds000228 sub-pixar008 (3.5 years), shown as three slices.
+PANEL_CASE = "panel-ds000228-pixar008"
+PANEL_RUN = "ds000228-sub-pixar008-noreconall"
+PANEL_NODE = (
+    "work/fmriprep_25_2_wf/sub_pixar008_wf/bold_task_pixar_wf/bold_fit_wf/"
+    "enhance_and_skullstrip_bold_wf/skullstrip_first_pass"
+)
+PANEL_STEM = "sub-pixar008_task-pixar_desc-hmc_boldref_corrected"
+PANEL_INPUT = f"{PANEL_NODE}/../n4_correct/{PANEL_STEM}.nii.gz"
+PANEL_BRAIN = f"{PANEL_NODE}/{PANEL_STEM}_brain.nii.gz"
+PANEL_MASK = f"{PANEL_NODE}/{PANEL_STEM}_brain_mask.nii.gz"
+PANEL_DATA = {
+    "dataset": "OpenNeuro ds000228 (Richardson et al., 2018), version 1.1.1",
+    "subject": "sub-pixar008 (3.5 years), task pixar",
+    "licence": "CC0-1.0",
+}
+
+
+def _compute_panel(e: fcache.Entry) -> None:
+    run = common.fmriprep_run(PANEL_RUN)
+    command = (run / PANEL_NODE / "command.txt").read_text(encoding="utf-8").strip()
+    boldref = e.input(
+        "BOLD reference, N4-corrected (the node's input)", (run / PANEL_INPUT).resolve()
+    )
+    e.input("fMRIPrep's brain mask (the node's output)", run / PANEL_MASK)
+    words = shlex.split(command)
+    if words[:1] != ["bet"] or words[3:] != ["-f", "0.20", "-m"]:
+        raise AssertionError(f"{TOOL}: an unexpected fMRIPrep command: {command}")
+    run_all(e, "bet", "", [str(boldref), "{out}", "-f", "0.20", "-m"], [boldref])
+    e.finish(
+        versions=versions(),
+        command=command,
+        settings="fMRIPrep 25.2.6's BET node (skullstrip_first_pass) of the data panel's "
+        "ds000228 sub-pixar008 (3.5 years), task pixar, its arguments from command.txt. FSL "
+        "6.0.7.17 (~/fsl, never on the PATH), fMRIPrep's FSL in its image and the larmorx-nc "
+        "replica in both modes; FSL is single-threaded, the replica ran with OMP_NUM_THREADS=2",
+    )
+
+
+def panel_entry(ctx: core.Context) -> fcache.Entry:
+    return fcache.entry(
+        ctx.figures_context(),
+        TOOL,
+        PANEL_CASE,
+        "fMRIPrep's BET call on the BOLD reference of the data panel's ds000228 sub-pixar008 "
+        "(3.5 years): FSL, fMRIPrep's FSL and the replica, default and reproduce",
+        _compute_panel,
+    )
+
+
 def _compute_surf(e: fcache.Entry) -> None:
     from larmorx_validation.parity import fsl_bet as fb
 
@@ -468,6 +519,119 @@ def _example_fmriprep(ctx: core.Context, e: fcache.Entry) -> dict:
         "chain": None,
         "metrics_note": _note(img),
         "provenance": common.provenance(info, f"{TOOL}/{e.case}", [DATA]),
+    }
+
+
+def _example_panel(ctx: core.Context, pe: fcache.Entry) -> dict:
+    """The data-panel case as three full-resolution slices (``view="slices"``), around the masks
+    (dilated by 2 voxels: the BOLD reference is shown brain-masked)."""
+    import nibabel as nib
+    from scipy import ndimage
+
+    from larmorx_validation.evidence import example as exm
+
+    info = pe.info()
+    run = common.fmriprep_run(PANEL_RUN)
+    img = nib.load(str((run / PANEL_INPUT).resolve()))
+    arrays = runs(pe, "")
+    arrays["node"] = {
+        "mask": common.load(str(run / PANEL_MASK)),
+        "brain": common.load(str(run / PANEL_BRAIN)),
+    }
+    show = ndimage.binary_dilation(
+        np.logical_or.reduce([a["mask"] != 0 for a in arrays.values()]), iterations=2
+    )
+    grid = core.Grid.around(img, show)
+    ex = exm.Example(ctx, grid, show, view="slices")
+    ex.add(exm.Panel("boldref", "input", "ds000228 sub-pixar008 BOLD reference, N4-corrected",
+                     "BET's input in fMRIPrep's BOLD reference workflow (float32)",
+                     {"all": np.asanyarray(img.dataobj)}))  # fmt: skip
+    over = {"mask": {"on": "boldref", "window": window_of(ex, "boldref")}}
+    for pid, _stem, role, label, sub in PANELS:
+        ex.add(exm.Panel(pid, role, label, sub, arrays[pid], overlay=over))
+    ex.add(exm.Panel("node", "fmriprep", "fMRIPrep 25.2.6's own output",
+                     "the node's brain and mask, as fMRIPrep wrote them", arrays["node"],
+                     overlay=over))  # fmt: skip
+    d = common.d
+    diffs = [
+        *_diffs()[:4],
+        d("replica-node", "replica", "node", "fmriprep", "replica − fMRIPrep's own output",
+          common.ROLE_FMRIPREP),
+        _diffs()[4],
+    ]  # fmt: skip
+    common.compare_all(ex, diffs, OUTPUTS)
+    same = common.identical(diffs)
+    h = headers(pe, "", {"mask": "_mask.nii.gz", "brain": ".nii.gz"})
+    what = "this child's BOLD reference"
+    for x in diffs:
+        _verdict(x, same, what=what, h=h)
+        if x["id"] == "replica-node" and same["replica-node"]:
+            x["reason"] = (
+                "The replica gives the values fMRIPrep's node wrote, every voxel of the brain and "
+                "of the mask (the headers differ only in FSL's build string, `descrip`)."
+            )
+    at = common.slice_voxel(ex, "replica", "fsl", "mask")
+    default = {
+        "output": "mask",
+        "plane": "axial",
+        "voxel": at,
+        "panels": ["boldref", "fsl", "replica", "node"],
+        "diffs": ["replica-fsl", "image-fsl", "replica-node"],
+        "compare": {"a": "fsl", "b": "replica"},
+    }
+    differs = not same["replica-fsl"]
+    out = common.finish(
+        ctx, ex, diffs, copy.deepcopy(OUTPUTS), default=default, window_panel="fsl",
+        caption="the crosshair " + ("where the replica's mask differs from FSL's" if differs
+                                    else "at the centre of the shown region")
+        + "; the three slices through it are stored at full resolution.",
+    )  # fmt: skip
+    vers = info.get("versions", {})
+    a = arrays["fsl"]["mask"]
+    m = core.compare(arrays["replica"]["mask"], a)
+    return {
+        "id": "panel-ds000228-child",
+        "title": "Data panel: a three-year-old's BOLD reference",
+        "summary": (
+            "The data panel's youngest subject: the BET node fMRIPrep 25.2.6 ran on the "
+            "N4-corrected BOLD reference of OpenNeuro ds000228 sub-pixar008, aged 3.5 (a small "
+            "head, an oblique field of view; task pixar), `bet <boldref> <out> -f 0.20 -m`, "
+            "given to FSL 6.0.7.17, fMRIPrep's build of FSL and the replica in both modes, "
+            "beside the outputs fMRIPrep's node wrote. As a panel case beside the examples "
+            "above, it is stored as three full-resolution slices."
+        ),
+        "facts": [
+            {
+                "label": "Data",
+                "text": f"{PANEL_DATA['dataset']}, {PANEL_DATA['subject']} "
+                f"({PANEL_DATA['licence']}): the BOLD reference fMRIPrep computed and "
+                "N4-corrected; shown around the masks, dilated by 2 voxels",
+            },
+            {
+                "label": "Node",
+                "text": "fMRIPrep 25.2.6, `bold_fit_wf/enhance_and_skullstrip_bold_wf/"
+                "skullstrip_first_pass` (niworkflows' first skull strip)",
+            },
+            {"label": "Command", "text": "`" + short_command(info["command"]) + "`"},
+            {
+                "label": "Programs",
+                "text": f"{vers.get('fsl', '?')}; {vers.get('fsl_in_fmriprep_image', '?')}; "
+                f"{vers.get('larmorx-nc', '?')} (the replica), from larmorx at commit "
+                f"`{info['larmorx_commit'][:12]}`",
+            },
+            {
+                "label": "Mask",
+                "text": f"{int(np.count_nonzero(a)):,} of {a.size:,} voxels; the replica's "
+                + (
+                    "the same, voxel for voxel" if m["identical"] else f"differs in {m['differ']:,}"
+                ),
+            },
+            {"label": "Grid", "text": common.describe_grid(img, grid.shape)},
+        ],
+        **out,
+        "chain": None,
+        "metrics_note": _note(img),
+        "provenance": common.provenance(info, f"{TOOL}/{pe.case}", [PANEL_DATA]),
     }
 
 
@@ -786,10 +950,12 @@ def export(ctx: core.Context) -> dict:
         "fmriprep/ds000005-task_mixedgamblestask_run_01-enhance_and_skullstrip_bold": "fmriprep-bet",
         "real/adult-ds000005-R": "t1w-robust",
         "betsurf/t1t2": "betsurf-head",
+        "fmriprep/ds000228-task_pixar-enhance_and_skullstrip_bold": "panel-ds000228-child",
     }
     cs = cases(rec, _scenarios(), examples)
     e = entry(ctx)
     s = surf_entry(ctx)
+    pe = panel_entry(ctx)
     return {
         "schema": 1,
         "tool": TOOL,
@@ -798,7 +964,7 @@ def export(ctx: core.Context) -> dict:
             "exporter": core.tree_hash(ctx.repo, "validation/src/larmorx_validation/evidence"),
             "records": rec.source(),
             "benchmarks": [],
-            "cache": [fcache.provenance(e), fcache.provenance(s)],
+            "cache": [fcache.provenance(e), fcache.provenance(s), fcache.provenance(pe)],
             "command": f"python -m larmorx_validation evidence {TOOL} --site <site>",
         },
         "implementations": [
@@ -818,6 +984,7 @@ def export(ctx: core.Context) -> dict:
             _example_fmriprep(ctx, e),
             _example_t1(ctx, e),
             _example_surf(ctx, s),
+            _example_panel(ctx, pe),
         ],
     }
 
@@ -826,4 +993,4 @@ if __name__ == "__main__":  # compute the cache entries only
     from larmorx_validation.figures.core import REPO, default_cache
 
     c = core.Context(repo=REPO, site=Path("."), cache=default_cache())
-    print("done", entry(c).dir, surf_entry(c).dir)
+    print("done", entry(c).dir, surf_entry(c).dir, panel_entry(c).dir)

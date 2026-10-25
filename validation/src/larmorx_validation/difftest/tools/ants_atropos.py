@@ -229,4 +229,5 @@ TOOL = Tool(
     weight=1.2,
     unavailable=_ants.ants_unavailable,
     crash_kw={"expect": "abort"},
+    payload_fields=("tier", "expect", "reason", "silent_ok"),
 )

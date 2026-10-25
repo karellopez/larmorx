@@ -45,6 +45,8 @@ def _kw(tool_name: str, p: dict) -> dict:
         kw["expect_error"] = True
     if "reason" in fields and p.get("reason"):
         kw["reason"] = p["reason"]
+    if "silent_ok" in fields and p.get("silent_ok"):
+        kw["silent_ok"] = tuple(p["silent_ok"])
     return kw
 
 

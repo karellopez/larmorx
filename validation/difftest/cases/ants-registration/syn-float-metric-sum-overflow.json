@@ -16,7 +16,7 @@
  "implementations": [
   "port"
  ],
- "reason": "",
+ "reason": "the fix pass names corrections of the case's other steps that change nothing this input shows: ANTS-78, ITK-30, ITK-35, ITK-31",
  "recipe": {
   "extra": {
    "min_size": 6
@@ -417,6 +417,12 @@
   "tool": "ants-registration"
  },
  "rule": null,
+ "silent_ok": [
+  "ANTS-78",
+  "ITK-30",
+  "ITK-35",
+  "ITK-31"
+ ],
  "status": "fixed",
  "suite": "ants-registration",
  "tier": "smoke",

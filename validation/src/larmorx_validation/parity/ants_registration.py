@@ -116,6 +116,10 @@ class RegCase:
     reason: str = ""
     seed: str | None = SEED
     band: bool = False
+    #: Defects whose notice the fix pass may name without a visible change (besides ANTS-62's
+    #: and ITK-41's), as the other ANTs suites' ``silent_ok`` (a permanent case of random
+    #: testing whose other stages name corrections this input does not exercise).
+    silent_ok: tuple[str, ...] = ()
 
 
 # ------------------------------------------------------------------------------------------------
@@ -2160,7 +2164,7 @@ def run_case(case: Case, checks: CheckList) -> None:
             defects.notices_in(fx[2]),
             change,
             other_changes="; ".join(other),
-            silent_ok=("ANTS-62", "ITK-41"),
+            silent_ok=("ANTS-62", "ITK-41", *c.silent_ok),
         )
 
 

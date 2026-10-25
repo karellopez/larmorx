@@ -16,7 +16,7 @@
  "implementations": [
   "port"
  ],
- "reason": "",
+ "reason": "the fix pass names corrections of the case's other steps that change nothing this input shows: ITK-50, ANTS-95",
  "recipe": {
   "extra": {
    "keep_inputs": [
@@ -286,6 +286,10 @@
   "tool": "ants-atropos"
  },
  "rule": null,
+ "silent_ok": [
+  "ITK-50",
+  "ANTS-95"
+ ],
  "status": "fixed",
  "suite": "ants-atropos",
  "tier": "smoke",

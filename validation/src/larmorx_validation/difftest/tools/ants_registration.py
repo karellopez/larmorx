@@ -286,4 +286,5 @@ TOOL = Tool(
     shrink=_no_stages_beyond_one,
     unavailable=_ants.ants_unavailable,
     crash_kw={"expect": "crash"},
+    payload_fields=("tier", "expect", "reason", "silent_ok"),
 )

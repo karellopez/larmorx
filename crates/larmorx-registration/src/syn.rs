@@ -1046,7 +1046,12 @@ fn run_syn_levels<R: Real, const D: usize>(
             let (new_f2m, new_m2m, moving_value, fixed_value) = pooled(stage.n_threads, step)??;
             f2m = new_f2m;
             m2m = new_m2m;
-            let metric_value = R::from_f64(0.5 * (moving_value.to_f64() + fixed_value.to_f64()));
+            // `0.5 * (movingMetricValue + fixedMetricValue)`: the sum in the metric's
+            // `MeasureType` (float with `--float 1`, where two metrics with no valid point,
+            // each FLT_MAX, overflow to inf; random testing, 2026-10-25,
+            // `ants-registration:20261025:1081`), the half in double.
+            let sum = moving_value + fixed_value;
+            let metric_value = R::from_f64(0.5 * sum.to_f64());
             convergence.add(metric_value.to_f64());
             let convergence_value = R::from_f64(convergence.value());
             if convergence_value < stage.convergence_threshold {

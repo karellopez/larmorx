@@ -1126,7 +1126,10 @@ def _fix_pass(
     d = tmp / "fix"
     _setup(d, s)
     r = run_larmorx(program, args, defects.FIX, env, d, impl)
-    if s.fix_refuses is not None:
+    # A refusal happens where the program would use the option; an input it gives up on
+    # earlier (a constant image, found by random testing) never gets there: then the default
+    # runs, and the ordinary fix pass below checks it.
+    if s.fix_refuses is not None and (r.code != 0 or s.fix_refuses in defects.notices_in(r.err)):
         named = defects.notices_in(r.err)
         checks.add(
             Check(

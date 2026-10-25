@@ -35,6 +35,8 @@ DEFORMABLE = (
     "TimeVaryingBSplineVelocityField",
 )
 METRICS = ("MeanSquares", "Mattes", "MI", "CC", "GC", "Demons")
+#: The stages that never seed their metric's sampling (ANTS-82): the clock does.
+CLOCK_SEEDED = ("Exponential", "BSplineExponential", "TimeVaryingVelocityField")
 
 
 def _phantom_pair(d: gen.Draw, dim: int) -> tuple[dict, dict]:
@@ -149,6 +151,7 @@ def draw(d: gen.Draw) -> dict:
         options.append("-x")
     n_stages = d.integer("stages", 1, 3)
     deformed = False
+    undefined: set[str] = set()
     for k in range(n_stages):
         if deformed:
             family = d.choice(f"family{k}", DEFORMABLE)
@@ -177,7 +180,14 @@ def draw(d: gen.Draw) -> dict:
             )
         )
         options += [family, f"{metric} metric", f"{family} with {metric}"]
-    return {"groups": groups, "inputs": inputs, "options": options, "extra": {"min_size": 6}}
+        # ANTS-82: these stages seed their metric's sampling from the clock, so ANTs' result
+        # varies from run to run (a difference is then not comparable: ``undefined``).
+        if family in CLOCK_SEEDED and ("Regular" in metric_text or "Random" in metric_text):
+            undefined.add("ANTS-82")
+    extra: dict = {"min_size": 6}
+    if undefined:
+        extra["undefined"] = sorted(undefined)
+    return {"groups": groups, "inputs": inputs, "options": options, "extra": extra}
 
 
 def case(recipe: dict, impl: str, *, case_prefix: str | None = None, cid: str | None = None, description: str | None = None, **kw):

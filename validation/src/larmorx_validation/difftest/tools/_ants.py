@@ -31,7 +31,12 @@ def case_id(recipe: dict) -> str:
 
 
 def describe(recipe: dict) -> str:
-    return "random case: " + " ".join(arguments(recipe))[:300]
+    """The case's description; it names the defects that make the original's result vary
+    (``extra["undefined"]``), so the oracle cache never keeps its runs (``never_for``)."""
+    text = "random case: " + " ".join(arguments(recipe))[:300]
+    if undefined := recipe.get("extra", {}).get("undefined"):
+        text += f" ({', '.join(undefined)}: the original's result varies from run to run)"
+    return text
 
 
 def ants_case(

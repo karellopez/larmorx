@@ -52,6 +52,16 @@ impl std::fmt::Display for AtroposError {
 
 impl std::error::Error for AtroposError {}
 
+/// `Algorithm::FindSampleBound`'s exception for a sample without a measurement vector.
+fn empty_sample() -> AtroposError {
+    AtroposError::Itk {
+        file: "Modules/Numerics/Statistics/include/itkStatisticsAlgorithm.hxx",
+        line: 263,
+        class: "",
+        description: "ITK ERROR: Attempting to compute bounds of a sample list containing no measurement vectors".into(),
+    }
+}
+
 impl From<EstimateError> for AtroposError {
     fn from(e: EstimateError) -> Self {
         AtroposError::Itk {
@@ -673,6 +683,10 @@ impl<'a> Atropos<'a> {
 
     /// `GenerateInitialClassLabelingWithKMeansClustering`.
     fn kmeans_labeling(&mut self) -> Result<(), AtroposError> {
+        // An empty mask stops at the k-means (below), before any result: no notice either.
+        if !(0..self.n).any(|v| self.in_mask(v)) {
+            return Err(empty_sample());
+        }
         let classes = self.classes();
         let fix = self.options.upstream_defects.fix();
         let first = self.intensities[0];
@@ -836,6 +850,13 @@ impl<'a> Atropos<'a> {
         m: usize,
         initial: &[f64],
     ) -> Result<Vec<f64>, AtroposError> {
+        // KdTreeBasedKmeansEstimator::StartOptimization finds the sample's bounds
+        // (`Algorithm::FindSampleBound`), which throws for an empty sample: a mask without a
+        // voxel (found by differential random testing, 2026-10-25; larmorx went on to the
+        // Gaussians' warnings and the labels' exception).
+        if samples.is_empty() {
+            return Err(empty_sample());
+        }
         let tree = KdTree::new(samples, m, 16).map_err(|e| AtroposError::Refused(e.to_string()))?;
         let fix = self.options.upstream_defects.fix();
         let km = Kmeans {

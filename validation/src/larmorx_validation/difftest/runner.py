@@ -165,7 +165,10 @@ def execute(tool: core.Tool, recipe: dict, impl: str, *, timeout: float | None =
         signal.signal(signal.SIGALRM, previous)
         inputs.release(f"run/{gen.digest(recipe['inputs'])}")
     j = core.judge(tool, impl, result)
-    varying = sorted({n for n in _NOTICES if n in undefined_defects})
+    # The defects larmorx named while reproducing, and those the descriptor knows the drawn
+    # case meets (``extra["undefined"]``: e.g. a clock-seeded sampling, ANTS-82).
+    named = {*_NOTICES, *recipe.get("extra", {}).get("undefined", ())}
+    varying = sorted({n for n in named if n in undefined_defects})
     if j.verdict == DIFFER and varying:
         j = Judgement(UNDEFINED, tuple(f"undefined: {n}" for n in varying), f"{', '.join(varying)}: {undefined_defects[varying[0]]}; {j.detail}", j.status, j.checks)
     return j, time.monotonic() - start, result

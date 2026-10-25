@@ -1,0 +1,176 @@
+# SPDX-License-Identifier: Apache-2.0
+# What was done about each difference random testing found (docs/validation/difftest.md,
+# "Triage"). The site's "Random testing" panels read it (larmorx_validation.evidence.difftest):
+# a night's difference takes the first entry of its tool and implementation that shares one of
+# its checks (`signature`, the names of the checks that failed).
+#
+# status: fixed (larmorx was wrong; fixed, with a unit test and a permanent case), register (a
+# defect of the original, in docs/findings/upstream-defects.md, decided by rules A-D), open (a
+# clean-room original's difference, reported for its agent with a black-box reproducer),
+# harness (the comparison's own mistake, corrected in the harness), unclear (for the
+# orchestrator). link: a repository path (a permanent case, a finding) or a site path.
+
+# ---------------------------------------------------------------- fixed in the ports and replicas
+
+[[difference]]
+tool = "ants-multiply-images"
+implementation = "port"
+signature = ["affine", "header (every field)"]
+status = "fixed"
+explanation = "ITK's NIfTI reader chooses between the sform and the qform with vnl's float SVD; larmorx decided in double, so an image with equal voxel sizes could take the other matrix (`larmorx-io`, `nifti/itk.rs`)"
+link = "validation/difftest/cases/ants-multiply-images/sform-qform-equal-voxel-sizes.json"
+
+[[difference]]
+tool = "ants-threshold-image"
+implementation = "port"
+signature = ["affine", "header (every field)"]
+status = "fixed"
+explanation = "the sform or qform choice of ITK's NIfTI reader, in vnl's float SVD (as for MultiplyImages)"
+link = "validation/difftest/cases/ants-multiply-images/sform-qform-equal-voxel-sizes.json"
+
+[[difference]]
+tool = "ants-denoise"
+implementation = "port"
+signature = ["denoised: header (every field)", "denoised: bit-identical to ANTs with correctly rounded math"]
+status = "fixed"
+explanation = "the sform or qform choice of ITK's NIfTI reader, in vnl's float SVD (as for MultiplyImages)"
+link = "validation/difftest/cases/ants-multiply-images/sform-qform-equal-voxel-sizes.json"
+
+[[difference]]
+tool = "ants-apply-transforms"
+implementation = "port"
+signature = ["affine"]
+status = "fixed"
+explanation = "the sform or qform choice of ITK's NIfTI reader, in vnl's float SVD (as for MultiplyImages)"
+link = "validation/difftest/cases/ants-multiply-images/sform-qform-equal-voxel-sizes.json"
+
+[[difference]]
+tool = "ants-multiply-images"
+implementation = "port"
+signature = ["both succeed"]
+status = "fixed"
+explanation = "a 2D image whose direction is singular (a sform turned 90 degrees about y): ITK refuses it and ANTs crashes on the null image; larmorx read it. Now refused with ITK's message"
+link = "validation/difftest/cases/ants-multiply-images/singular-direction.json"
+
+[[difference]]
+tool = "ants-threshold-image"
+implementation = "port"
+signature = ["both succeed"]
+status = "fixed"
+explanation = "a singular direction: ITK refuses the image (ANTs crashes on the null image); now refused with ITK's message, as for MultiplyImages"
+link = "validation/difftest/cases/ants-multiply-images/singular-direction.json"
+
+[[difference]]
+tool = "ants-n4"
+implementation = "port"
+signature = ["crash"]
+status = "fixed"
+explanation = "a padded image too large to allocate: ITK throws (ANTs aborts) and larmorx aborted; now refused with ITK's message (`larmorx_core::alloc`)"
+link = "validation/difftest/cases/ants-n4/allocation-refused.json"
+
+[[difference]]
+tool = "ants-resample-image"
+implementation = "port"
+signature = ["crash"]
+status = "fixed"
+explanation = "an output grid too large to allocate: ITK throws (ANTs aborts) and larmorx aborted; now refused with ITK's message"
+link = "validation/difftest/cases/ants-resample-image/allocation-refused.json"
+
+[[difference]]
+tool = "ants-resample-image-by-spacing"
+implementation = "port"
+signature = ["crash"]
+status = "fixed"
+explanation = "an output grid too large to allocate: ITK throws (ANTs aborts) and larmorx aborted; now refused with ITK's message"
+link = "validation/difftest/cases/ants-resample-image-by-spacing/allocation-refused.json"
+
+[[difference]]
+tool = "itk-transforms"
+implementation = "port"
+signature = ["ITK's reading: ANTs cannot write the transforms back; antsApplyTransforms agrees", "ITK's float reading (--float N): ANTs cannot write the transforms back; antsApplyTransforms agrees"]
+status = "fixed"
+explanation = "a composite transform named `CompositeTransform_double_3`: ITK's factory cannot create it and refuses the file; larmorx read it as a composite. Now refused"
+link = "validation/difftest/cases/itk-transforms/unregistered-composite.json"
+
+[[difference]]
+tool = "ants-registration"
+implementation = "port"
+signature = ["ANTs with CORE-MATH: rNWarp.nii.gz", "ANTs with CORE-MATH: rNInverseWarp.nii.gz", "ANTs with CORE-MATH: w.nii.gz"]
+status = "fixed"
+explanation = "an Exponential stage after a deformable one with `--float 1`: ITK finds the displacement field's voxel nearest a float point with a float sum (`TransformPhysicalPointToIndex<float>`); larmorx summed in double, and points half-way between voxels rounded to the other one"
+link = "validation/difftest/cases/ants-registration/float-field-jacobian-index.json"
+
+[[difference]]
+tool = "ants-registration"
+implementation = "port"
+signature = ["ANTs with CORE-MATH: standard error", "ANTs with CORE-MATH: standard output"]
+status = "fixed"
+explanation = "Mattes on images with NaN values: the joint histogram's NaN bin size makes vnl's SVD fail, and vnl prints its warning once per stage; larmorx printed none"
+link = "validation/difftest/cases/ants-registration/mattes-nan-bin-svd-warning.json"
+
+# ---------------------------------------------------------------- defects of the originals
+
+[[difference]]
+tool = "ants-resample-image"
+implementation = "port"
+signature = ["both succeed"]
+status = "register"
+defect = "ANTS-160"
+explanation = "Gaussian interpolation given fewer sigmas than dimensions: ANTs reads the missing ones past the end of its list and exits 0 with a result that depends on the heap; larmorx refuses in both modes (class a, never reproduced)"
+link = "validation/difftest/cases/ants-resample-image/gaussian-sigmas-short.json"
+
+[[difference]]
+tool = "ants-image-math"
+implementation = "port"
+signature = ["values (bit-identical)"]
+status = "register"
+defect = "ITK-95"
+explanation = "grayscale opening, closing, dilation or erosion with a radius of 0 on an image whose first axis has one voxel: ITK's moving histogram leaves voxels at ±FLT_MAX; larmorx gives the input (the identity) in both modes, ITK's values are not reproduced"
+link = "validation/investigations/difftest/morphology_radius0.py"
+
+# ---------------------------------------------------------------- the clean-room originals
+
+[[difference]]
+tool = "afni-tshift"
+implementation = "replica"
+signature = ["DN defaults: replica = original"]
+status = "open"
+explanation = "the corrected AFNI-07 header of a sheared sform in metres: the clean-room original's pixdim[3] differs from the replica's in the last bits (1000.6248168945312 against 1000.624755859375); reported for the clean-room agent"
+link = "validation/investigations/difftest/inspect_tshift.py"
+
+[[difference]]
+tool = "afni-automask"
+implementation = "original"
+signature = ["mask.nii: header bytes", "masked.nii: header bytes"]
+status = "open"
+explanation = "a 1 x 1 x 2 constant oblique image: the clean-room original's output header differs from AFNI's in its bytes; reported for the clean-room agent"
+
+[[difference]]
+tool = "mri-hmc"
+implementation = "original"
+signature = ["out_mcf.nii.gz: voxel values", "out_mcf.nii.gz.mat: matrix RMS deviation, Nth percentile", "FD (Power, N mm) correlation", "out_mcf.nii.gz_abs.rms: values", "out_mcf.nii.gz_rel.rms: values", "out_mcf.nii.gz_sigma.nii.gz: voxel values"]
+status = "open"
+explanation = "small random phantoms of 4 to 8 volumes, beyond the record's thresholds: the clean-room original's motion estimates leave mcflirt's on images where the cost function has several minima; reported for the clean-room agent with the reproducers"
+
+# ---------------------------------------------------------------- the comparison's own mistakes
+
+[[difference]]
+tool = "resample-series"
+implementation = "port"
+signature = ["resampled data: values"]
+status = "harness"
+explanation = "the comparison counted infinite values equal in both outputs as a difference (inf − inf is NaN); corrected in the parity suite"
+
+[[difference]]
+tool = "afni-unifize"
+implementation = "replica"
+signature = ["DN fix pass"]
+status = "harness"
+explanation = "the fix pass of a case the correction refuses (AFNI-48: three -T2): an expected error, now known to the descriptor"
+
+[[difference]]
+tool = "afni-unifize"
+implementation = "original"
+signature = ["DN fix pass"]
+status = "harness"
+explanation = "the fix pass of a case the correction refuses (AFNI-48: three -T2): an expected error, now known to the descriptor"

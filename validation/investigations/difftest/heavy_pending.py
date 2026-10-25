@@ -41,11 +41,14 @@ def main() -> int:
         note = argv[i + 1]
         del argv[i : i + 2]
     night = Path(argv[0])
-    named = (
-        {ln.strip() for ln in Path(argv[1]).read_text().splitlines() if ln.strip()}
-        if len(argv) > 1
-        else set()
-    )
+    # A cases file: one ``tool:seed:n`` per line, optionally followed by ``# <its own note>``.
+    notes: dict[str, str] = {}
+    if len(argv) > 1:
+        for ln in Path(argv[1]).read_text().splitlines():
+            case, _, own = ln.partition("#")
+            if case.strip():
+                notes[case.strip()] = own.strip() or note
+    named = set(notes)
     predicted = {r["case"]: r for r in json.loads((night / "heavy-prediction.json").read_text())}
     results_path = night / "heavy-results.jsonl"
     lines = [json.loads(ln) for ln in results_path.read_text().splitlines() if ln.strip()]
@@ -68,8 +71,11 @@ def main() -> int:
             else f"predicted to take about {hours:.2g} h here"
         )
         earlier = latest.get(case, {})
-        if case in named and note:
-            why = f"{note} (its result here: {earlier.get('verdict')}, {earlier.get('detail', '')[:160]})"
+        if notes.get(case):
+            said = earlier.get("detail") or "; ".join(
+                str(e.get("detail", "")) for e in earlier.get("impls", {}).values()
+            )
+            why = f"{notes[case]} (its result here: {earlier.get('verdict')}: {said[:200]})"
         tool, seed, n = case.rsplit(":", 2)
         detail = (
             f"{PENDING}: {why}; the original about {ants:.4g} GiB, larmorx about {lx:.4g} GiB"

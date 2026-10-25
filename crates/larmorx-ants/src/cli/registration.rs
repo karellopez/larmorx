@@ -2780,7 +2780,24 @@ fn write_one_transform<R: Compute, const D: usize>(
         write_field_image(log, ctx, name, &f.field);
         return;
     }
-    write_transform_file(log, ctx.notices, name, &[xfm_parts(&forward_only(t))]);
+    let mut parts = xfm_parts(&forward_only(t));
+    // A field given a `.mat` or `.txt` name (ANTS-51's names in `reproduce`) is written as the
+    // stage's own object, not a new `DisplacementFieldTransform` (`itkantsReadWriteTransform.h:
+    // 146`, `:170`): the Gaussian or B-spline smoothing subclass keeps its class name, with the
+    // same parameters (random testing, 2026-10-25, `ants-registration:20261025:979`).
+    if let Xfm::Field(f) = t
+        && (name.contains(".mat") || name.contains(".txt"))
+        && matches!(
+            f.smoothing,
+            Some(
+                larmorx_registration::field::FieldSmoothing::Gaussian { .. }
+                    | larmorx_registration::field::FieldSmoothing::BSpline { .. }
+            )
+        )
+    {
+        parts.name = format!("{}_{}_{D}_{D}", f.class(), R::ITK_NAME);
+    }
+    write_transform_file(log, ctx.notices, name, &[parts]);
 }
 
 /// The transform ANTs' writers store for a displacement field: a new

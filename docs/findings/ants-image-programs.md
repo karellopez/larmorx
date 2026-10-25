@@ -184,6 +184,11 @@ validated in 2D and 4D. Spatial operations need more:
   again with GCC 14.3's algorithm, emulated statement by statement
   (`larmorx_image::libstdcxx::nth_element`), on ITK's box order (permanent case
   `difftest/median-zero-sign`).
+- **ITK-95 at a larger radius.** ITK's moving-histogram morphology on an image whose first axis
+  has one voxel is wrong above radius 0 too: `ImageMath 4 out GD a 3` on a 1x7x4x6 image writes
+  99 at two voxels where the maximum over ITK's ball (offsets within 3.5 voxels) is 97
+  (`ants-image-math:20261025:1541`, computed by brute force over the ball); larmorx gives the
+  true value in both modes (`reproduce` does not yet give ITK's).
 - **ANTS-163:** ImageMath `Normalize` and `TruncateImageIntensity` with a mask of another size
   read it outside its buffer; larmorx refuses (as before), now naming the defect.
 - **ANTS-161:** ResampleImage's refusal of a Gaussian sigma or alpha of 0 or less now names the

@@ -124,7 +124,7 @@ benchmark reports in [docs/benchmarks](docs/benchmarks/).
 | 3dTshift (slice timing) | `larmorx afni 3dTshift`, `lx.afni.tshift` | clean-room original; exact replica in `larmorx-gpl` | original: [279 of 279](docs/validation/afni-tshift.md) compared agree, 176 bit-identical, [2–6× faster](docs/benchmarks/afni-tshift.md); replica: [279 of 279](docs/validation/afni-tshift-replica.md) bit-identical |
 | 3dAutomask (brain mask) | `larmorx afni 3dAutomask`, `lx.afni.automask` | clean-room original; exact replica in `larmorx-gpl` | original: [109 cases](docs/validation/afni-automask.md), 84 of 85 compared cases that write outputs bit-identical to AFNI (the other: AFNI-10's header, its data bit-identical), fMRIPrep's call on every oracle run's BOLD reference included; replica: [85 of 85](docs/validation/afni-automask-replica.md) bit-identical |
 | 3dUnifize (intensity uniformization) | `larmorx afni 3dUnifize`, `lx.afni.unifize` | clean-room original; exact replica in `larmorx-gpl` | original: [99 cases](docs/validation/afni-unifize.md), none failing: 34 of 74 compared cases that write outputs bit-identical to AFNI, the other 40 within 1e-5 (at most 8.7e-8 of the largest value) and bit-identical to AFNI run with correctly rounded maths (glibc's `tanhf` in AFNI's squash), fMRIPrep's call on every oracle run included; 4 to 25 times faster than AFNI (informal timings); replica: [74 of 74](docs/validation/afni-unifize-replica.md) bit-identical at 1, 2 and 6 threads |
-| Head-motion correction (mcflirt-style options) | `larmorx mri hmc`, `lx.mri.hmc` | clean-room original, `experimental` | [compared with FSL's mcflirt](docs/validation/mri-hmc.md): 121 of 122 compared cases within thresholds; [5–16× faster](docs/benchmarks/mri-hmc.md) with threads |
+| Head-motion correction (mcflirt) | `larmorx mri hmc`, `larmorx fsl mcflirt`, `lx.mri.hmc` | clean-room original, `experimental`; exact replica in `larmorx-nc` (FSL Licence, non-commercial) | original: [compared with FSL's mcflirt](docs/validation/mri-hmc.md): 121 of 122 compared cases within thresholds; [5–16× faster](docs/benchmarks/mri-hmc.md) with threads; replica: [173 of 173](docs/validation/fsl-mcflirt-replica.md) compared cases bit-identical to mcflirt as built (the 137 recorded runs, fMRIPrep's 22 calls on the 12 oracle runs with BOLD runs, the data panel's included, 35 edge cases; 21 more rejected by both, alike), fMRIPrep's own matrices identical (4,517) |
 
 ## Roadmap
 
@@ -133,7 +133,7 @@ The ordered plan is in [docs/next-steps.md](docs/next-steps.md). In outline:
 1. **AFNI:** 3dQwarp, 3dSkullStrip, 3dSkullStrip,
    3dcalc and an analysis track (3dTproject, 3dDespike, 3dReHo, 3dRSFC, 3dDeconvolve/3dREMLfit,
    3dFWHMx/3dClustSim, ...).
-2. **FSL-compatible tools:** the mcflirt replica, BET, FAST, FLIRT with BBR, topup.
+2. **FSL-compatible tools:** BET, FAST, FLIRT with BBR, topup (the mcflirt replica is done).
 3. **sdcflows' field-map estimation, FreeSurfer** (`larmorx-freesurfer`), Connectome
    Workbench- and MSM-compatible surface tools, the confounds.
 4. **larmorprepx:** an independent, fMRIPrep-compatible preprocessing pipeline (BIDS in,
@@ -184,7 +184,7 @@ ruff check && ruff format --check
 The GPL replicas are a separate Cargo workspace: `cd crates-gpl && cargo test --workspace`
 (build its wheel with `maturin build --release`).
 
-Parity checks and benchmarks need the test data (`larmorx-testdata`, a separate repository kept next to this one; not published yet), the validation package and the original programs as oracles (`scripts/build_ants_oracle.sh`, `scripts/build_afni_oracle.sh`):
+Parity checks and benchmarks need the test data (`larmorx-testdata`, github.com/karellopez/larmorx-testdata, kept next to this one; its data panel, `docs/panel.md` there, is the fixed set every tool is validated on), the validation package and the original programs as oracles (`scripts/build_ants_oracle.sh`, `scripts/build_afni_oracle.sh`):
 
 ```bash
 pip install -e ../larmorx-testdata -e "validation[oracles]"
@@ -198,8 +198,9 @@ python -m larmorx_validation bench nifti-io --out docs/benchmarks
 | `crates/larmorx-core`, `crates/larmorx-io`, `crates/larmorx-hdf5` | shared foundation: images, grids, linear algebra, correctly rounded maths, NIfTI and transform files, HDF5 in pure Rust |
 | `crates/larmorx-transform`, `crates/larmorx-interp`, `crates/larmorx-image` | ITK transforms, interpolators and image filters |
 | `crates/larmorx-registration`, `crates/larmorx-ants` | ITK's v4 registration framework; the ANTs programs |
-| `crates/larmorx-afni`, `crates/larmorx-mri` | clean-room originals: 3dTshift, head-motion correction |
+| `crates/larmorx-afni`, `crates/larmorx-mri` | clean-room originals: 3dTshift, 3dAutomask, 3dUnifize; head-motion correction |
 | `crates-gpl/` | the GPL-3.0-or-later replicas (`larmorx-gpl`: 3dTshift, 3dAutomask, 3dUnifize), a separate Cargo workspace |
+| `crates-nc/` | the FSL replicas (`larmorx-nc`, FSL Licence, non-commercial: mcflirt; the shared core `larmorx-nc-core`), a separate Cargo workspace with FSL's original source in `fsl-source/` |
 | `crates/larmorx-cli` | the multicall CLI; standalone `larmorx` and `lx` binaries |
 | `crates/larmorx-py` | the `larmorx._core` extension module (PyO3, abi3 for CPython ≥ 3.12) |
 | `python/larmorx` | the Python package, including `pipelines/larmorprepx` |

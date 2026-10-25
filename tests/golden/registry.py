@@ -3124,6 +3124,26 @@ def _(ctx: Context) -> dict[str, Any]:
     return result
 
 
+@case("cli.fsl.mcflirt", covers=("cli:fsl mcflirt",))
+def _(ctx: Context) -> dict[str, Any]:
+    """``larmorx fsl mcflirt``: mcflirt's command line, run by the clean-room original of
+    ``larmorx mri hmc`` (the replica, ``larmorx-nc``, has its golden cases in ``crates-nc``)."""
+    out = ctx.out("out")
+    previous = os.environ.get("FSLOUTPUTTYPE")
+    os.environ["FSLOUTPUTTYPE"] = "NIFTI_GZ"
+    try:
+        cli("fsl", "mcflirt", "-in", ctx.file("bold.nii"), "-out", out, "-refvol", "0", "-mats", "-plots", "-rmsabs")  # fmt: skip
+    finally:
+        if previous is None:
+            del os.environ["FSLOUTPUTTYPE"]
+        else:
+            os.environ["FSLOUTPUTTYPE"] = previous
+    result: dict[str, Any] = {"out": Nifti(f"{out}.nii.gz"), "par": File(f"{out}.par"), "abs": File(f"{out}_abs.rms")}  # fmt: skip
+    for t in range(SHAPE4[3]):
+        result[f"MAT_{t:04d}"] = File(os.path.join(f"{out}.mat", f"MAT_{t:04d}"))
+    return result
+
+
 def _hmc_outputs(name: str, r: lx.mri.HmcResult) -> dict[str, Any]:
     out = {
         f"{name}.matrices": r.matrices,
@@ -3151,7 +3171,7 @@ def _hmc_outputs(name: str, r: lx.mri.HmcResult) -> dict[str, Any]:
 )
 def _(ctx: Context) -> dict[str, Any]:
     """The default (normcorr, trilinear, resampled) and the result's files."""
-    r = lx.mri.hmc(bold())
+    r = lx.mri.hmc(bold(), implementation=ORIGINAL)
     r.save_mats(ctx.dir / "mats")
     r.save_par(ctx.dir / "out.par")
     r.save_itk(ctx.dir / "out.txt")
@@ -3171,7 +3191,7 @@ def _(ctx: Context) -> dict[str, Any]:
     out: dict[str, Any] = {}
     for cost in lx.mri.COSTS:
         if cost != "normcorr":
-            out[cost] = lx.mri.hmc(bold(), cost=cost, resample=False).matrices
+            out[cost] = lx.mri.hmc(bold(), cost=cost, resample=False, implementation=ORIGINAL).matrices  # fmt: skip
     return out
 
 
@@ -3183,9 +3203,9 @@ def _(ctx: Context) -> dict[str, Any]:
     init[:3, 3] = (0.5, -0.25, 0.0)
     reference = lx.Image(np.asfortranarray(bold().data[..., 2]), bold().affine)
     return {
-        **_hmc_outputs("mean_sinc", lx.mri.hmc(bold(), mean=True, final="sinc", stages=4)),
-        **_hmc_outputs("reference_spline", lx.mri.hmc(ctx.file("bold.nii"), reference=reference, final="spline", dof=12, smooth=0.0)),
-        **_hmc_outputs("in_plane", lx.mri.hmc(bold(), in_plane="always", final="nearest", init=init, fudge=True, bins=64, rotation=2.0)),
+        **_hmc_outputs("mean_sinc", lx.mri.hmc(bold(), mean=True, final="sinc", stages=4, implementation=ORIGINAL)),
+        **_hmc_outputs("reference_spline", lx.mri.hmc(ctx.file("bold.nii"), reference=reference, final="spline", dof=12, smooth=0.0, implementation=ORIGINAL)),
+        **_hmc_outputs("in_plane", lx.mri.hmc(bold(), in_plane="always", final="nearest", init=init, fudge=True, bins=64, rotation=2.0, implementation=ORIGINAL)),
     }  # fmt: skip
 
 
@@ -3196,11 +3216,11 @@ def _(ctx: Context) -> dict[str, Any]:
     reference = lx.Image(np.asfortranarray(bold().data[..., 2]), bold().affine)
     with warnings.catch_warnings():
         warnings.simplefilter("ignore")
-        rep = {"upstream_defects": REPRODUCE, "resample": False}
+        rep = {"upstream_defects": REPRODUCE, "resample": False, "implementation": ORIGINAL}
         return {
             "reference": lx.mri.hmc(ctx.file("bold.nii"), reference=reference, dof=12, smooth=0.0, **rep).matrices,
             "in_plane": lx.mri.hmc(bold(), in_plane="always", fudge=True, bins=64, rotation=2.0, **rep).matrices,
-            "weights": lx.mri.hmc(bold(), reference=reference, normcorr_count="weights", resample=False).matrices,
+            "weights": lx.mri.hmc(bold(), reference=reference, normcorr_count="weights", resample=False, implementation=ORIGINAL).matrices,
         }  # fmt: skip
 
 

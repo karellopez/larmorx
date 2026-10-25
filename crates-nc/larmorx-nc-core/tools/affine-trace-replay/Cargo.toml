@@ -1,0 +1,10 @@
+[package]
+name = "affine-trace-replay"
+description = "Replays mcflirt's own decompose_aff calls (traced by validation/probes/fsl-mcflirt-affine-trace) through larmorx-nc-core and reports every parameter whose bits differ (development tool)"
+version = "0.0.0"
+edition.workspace = true
+license.workspace = true
+publish = false
+
+[dependencies]
+larmorx-nc-core.workspace = true

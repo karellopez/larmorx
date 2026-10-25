@@ -248,6 +248,198 @@
 `fslStartup.cc:70-85` disables OpenBLAS threading before `main`; newimage volumes default to
 one thread. No random numbers. *Verified:* three runs of fMRIPrep's command on ds000005 give byte-identical outputs (`real/ds000005/fmriprep-repeat*`).
 
+## The replica (`larmorx-nc`, 2026-10-24)
+
+The bit-exact replica (`crates-nc/larmorx-nc-mcflirt` and `larmorx-nc-core`) was translated
+from the files above. What the translation had to get right, beyond the source's reading:
+
+**The binary follows the source (rule 8).** The conda build's libraries and `mcflirt` were
+compiled by conda-forge GCC 13.2.0 (producer strings `GCC: (conda-forge gcc 13.2.0-3|4)`).
+`objdump -d` finds no fused multiply-add in `mcflirt`, `libfsl-newimage.so`,
+`libfsl-miscmaths.so`, `libfsl-NewNifti.so`, `libfsl-znz.so` or `libfsl-utils.so`, so every
+`float` and `double` operation is rounded where the source rounds it; x87 instructions occur
+only in `libfsl-NewNifti.so` (102: its `long double` quaternion code, emulated exactly in
+`x87.rs`). With the translation following the source operation by operation, all 137
+recorded runs are bit-identical (below), so no source-built oracle is needed. *Verified*
+(2026-10-24).
+
+**Precision decided by the compiled code** where the source is ambiguous (each checked in the
+disassembly): `q_kernelval`'s second product `kernel[n+1]*dn` is a float product (`mulss`)
+while the first is double (`1.0 - dn` is a double literal; `costfns.cc`); `sincfn`'s small-`x`
+branch is the float `1.0f - |x|`; `kernelval`'s index arithmetic is float throughout and its
+interpolation double (`ColumnVector`); `hanning` and `blackman` evaluate in double and return
+float; `MISCMATHS::dot` returns float; `Min`/`Max` take the second argument's type;
+`round(float)` adds 0.5 in double and truncates; `make_rot` calls `sincosf` on a float angle
+(GCC pairs `sin`/`cos`); `rotmat2euler` calls `atan2f`.
+
+**Armadillo's evaluation (fsl-armawrap 0.6.0, Armadillo 10.5.1).** armawrap's NEWMAT
+expressions become Armadillo expressions whose evaluation order sets the bits: `inv(A)*B*C`
+is `solve(A, B*C)` (for 4 × 4: `inv_tiny(A)` then a large-matrix product with
+`direct_dot_arma`'s two accumulators), `A*inv(B)*C` is `A*solve(B, C)`, three plain factors
+`(A*B)*C`, four `((A*B)*C)*D`; products of at most 4 × 4 use `gemm_emul_tinysq` (left-to-right
+sums); `accu` and `dot` use two accumulators up to 32 elements; `max` keeps one running
+maximum from `-inf`; `inv` of a 4 × 4 uses the cofactor formula when the determinant is in
+`[eps, 1/eps]` and the result checks within 1e-10, else falls back. Larger products go to
+BLAS (OpenBLAS 0.3.26 at run time); mcflirt never reaches them, and the replica panics if it
+ever does.
+
+**The C library's maths: mcflirt as built calls glibc 2.35.** On the oracle machine (a CPU
+with FMA) glibc selects `__sinf_fma`, `__cosf_fma`, `__sincosf_fma` and `__logf_fma`; `atan2f`
+and `atanf` are fdlibm's. None is correctly rounded: over all 2^32 floats `sinf` misrounds
+29,362,812 inputs (0.68 %), `cosf` 28,209,642, `logf` 416,908 (GLIBC-02, -03); at the angles
+mcflirt's searches use (|x| ≤ 0.5) `sinf` misrounds 0.063 %, `cosf` 0.0015 %, and `logf`
+0.020 % of probabilities. mcflirt calls `sincosf` at every cost evaluation (`make_rot`), `logf`
+in the mutual-information costs and `sinf` for the sinc kernels: of the Blackman kernel's 1201
+samples (`-sinc_final`, the fourth stage) 24 `sinf` arguments are misrounded and 20 samples
+differ from correctly rounded ones; glibc's double `cos` agrees with the correctly rounded one
+on all 2402 window arguments, and so do the 201 samples of the stage-4 cost's Hanning table
+and `log` of every bin count up to 4096 (`crates-nc/larmorx-nc-core/tools/glibc-float-verify`).
+With correctly rounded functions (`larmorx_core::math`), 12 of the 79 synthetic recorded runs
+differed from mcflirt as built, and each was bit-identical to mcflirt run with the CORE-MATH
+preload (`oracles/core-math-preload`; the probe is
+`validation/investigations/fsl-mcflirt-replica/crm_compare.py`). The replica therefore
+carries glibc 2.35's float functions as the FMA build computes them, translated from Arm's
+Optimized Routines v19.11 (MIT; glibc's are the same code: identical expressions and
+constants) with every `a + b*c` a fused multiply-add (`larmorx-nc-core/src/glibc_float.rs`):
+bit-identical to the C library on all 2^32 inputs of `sinf`, `cosf`, both outputs of
+`sincosf`, and `logf`. *Verified* (2026-10-24). On a CPU without FMA glibc selects its SSE2
+build, which differs on 12 `sinf` and 22 `cosf` inputs (GLIBC-03): there mcflirt's own results
+can differ from the replica's (and from mcflirt's on this machine).
+
+**fdlibm's constants are its decimal literals, not its comments (corrected 2026-10-25).**
+`rotmat2euler`'s `atan2f` and the `atanf` it calls are fdlibm's code in glibc 2.35 (the
+disassembly of `__atan2f_finite` and `atanf` follows `e_atan2f.c` and `s_atanf.c` operation by
+operation, without fused multiply-adds). The first translation took `aT[0]` from the source's
+hex comment, `0x3eaaaaaa`; the compiler reads the decimal literal `3.3333334327e-01`, which
+rounds to `0x3eaaaaab`, and that is the value in glibc's `.rodata` (every other constant of the
+two functions matches its comment). The comment's value changes `atanf` by one ulp on
+1,037,658 of the 2^32 inputs (882,244 of them below 0.4375, the branch small rotation angles
+take). Two fMRIPrep calls added to the oracle panel on 2026-10-25 reached such an input:
+ds002422's rest run (1.5 T, a 79 mm slab), where one of mcflirt's 600 rotation decompositions
+(volume 166, the start of the third stage: `atan2f(0x3c7c2fbe, 0x3f7ff83d)`, glibc
+`0x3c7c324a`, the port `0x3c7c324b`) moved that volume's matrix, and ds000256 CTS203's
+rest-fixation-no-feedback run (mean framewise displacement 4.97 mm), where the first stage's
+chain carried the difference from volume 122 to the last. The cause was isolated with
+LD_PRELOAD interposers on FSL's own functions (`validation/probes/fsl-mcflirt-affine-trace`):
+volume 166's second stage was identical evaluation by evaluation (26 matrices and costs, as
+bits), FSL's cost function gave the replica's costs at the replica's matrices, and the replay
+of mcflirt's 600 `decompose_aff` calls through the replica
+(`crates-nc/larmorx-nc-core/tools/affine-trace-replay`) found the one call and its `atan2f`.
+With the corrected constant `atanf` is bit-identical to glibc on all 2^32 inputs and `atan2f`
+on every pair of 38 special values and on 3 × 2^30 seeded random pairs (random bits,
+rotation-like pairs, pairs in [-1, 1]; `tools/glibc-float-verify atanf atan2f`), and both
+calls give mcflirt's matrices. mcflirt itself is deterministic on both (two runs identical);
+with the CORE-MATH preload 1 of ds002422's 200 and 64 of ds000256's 164 matrices change, so
+glibc's own rounding is what the replica must carry. glibc's `atanf` is not correctly rounded
+on 21,089,462 inputs (0.49 %), 7,060 of them with |x| ≤ 0.05. *Verified* (2026-10-25).
+
+**Corrections and reproductions found while translating** (register entries FSL-20, FSL-21;
+FSL-04 now reproduced):
+- `-gdt` (FSL-04) is reproduced with `reproduce`: each test volume is replaced by its 3×3×3
+  gradient magnitude (`make_grad_masks`, float sums in mask order), the reference stays plain,
+  and `grefvol_<-out>` is the plain reference; with a relative `-out` it runs to the end.
+- `Log::establishDir` (`Log.cc`) creates `<out>.mat`, adding `+` while the name exists; a
+  permission error prints "Error! Could not create directory: ... No write permission" and goes
+  on; any other error (a missing parent directory) prints "Error!: Unknown Log directory return
+  value" and `exit(0)`s before the `.par`, `.rms` and image are written (FSL-20).
+- The histogram costs take `no_bins / scaling` bins at each stage (`mcflirt.cc` `usrsetscale`):
+  with `-bins` below 8 the first stage has none. The mutual-information costs and Woods' then
+  compute a degenerate cost and the search ends at arbitrary matrices (deterministic:
+  reproduced); the correlation ratio adds bin 0 into bin -1 (`costfns.cc` `numy[no_bins-1] +=
+  numy[no_bins]`), before its arrays, and glibc aborts when they are freed ("double free or
+  corruption (out)"). The replica reproduces the abort when the written values are non-zero
+  (FSL-21).
+- An `-out` whose `.mat` directory cannot be made, an absent `-in`, a missing or malformed
+  `-init` (`Could not open matrix file`, armawrap's `AWException`, Armadillo's "matrix
+  multiplication: incompatible matrix dimensions"), `-dof` out of range ("Erroneous dof"),
+  `-verbose 20` (every evaluated matrix, after which `cerr` stays in fixed notation:
+  armawrap's `operator<<` sets it and never restores it): all reproduced to the byte.
+
+**Threads in the replica.** Within a pass of a stage that does not chain its volumes (stages
+2-4; the first with `-fudge`), each volume's search reads only the reference, its volume and
+its start, so the replica runs them in parallel and prints their messages in mcflirt's order;
+the final resampling is parallel over volumes. The first stage's chain and the mean volume's
+sum stay sequential. Outputs are byte-identical at 1 and 3 threads (golden and parity tests).
+
+**fMRIPrep's mcflirt is not FSL 6.0.7.17's, but gives the same matrices.** fMRIPrep 25.2.6's
+image has fsl-mcflirt 2111.0 with fsl-newimage 2501.4, fsl-miscmaths 2412.4 and fsl-armawrap
+0.7.0 (FSL 6.0.7.17: 2203.12, 2203.2, 0.6.0), and glibc 2.35. On the 22 mcflirt calls of the
+12 fMRIPrep oracle runs that have BOLD runs (the five first runs and the data panel's: a child's
+extreme motion, 1.5 T, multiband-8 with 600 volumes, multi-echo, a stroke, a glioma), its `.mat`
+files are identical as text to FSL 6.0.7.17's and to the replica's: 4,517 of 4,517 matrices (the
+replica's record, `docs/validation/fsl-mcflirt-replica.md`, the `fmriprep/` cases). *Verified*
+(2026-10-24; the panel's calls 2026-10-25).
+
+**Random testing (2026-10-25).** The differential random tests (`larmorx_validation.difftest`,
+small generated phantoms, 4-8 volumes, at most 32 × 32 × 20 voxels) found the replica differing
+from mcflirt in 61 of their first cases, each shrunk to a minimal recipe
+(`oracles/difftest/2026-10-25/findings/fsl-mcflirt/`). Replayed with a build that has fdlibm's
+comment value of `aT[0]` (`0x3eaaaaaa`), 58 of the first 59 shrunk recipes still differ; with the
+corrected constant all 61, shrunk and original recipes alike (122 runs), are bit-identical to
+mcflirt in every file, both streams and the exit status. The other one (`:616`, `-meanvol` with
+`-out out_mcf.nii.gz`) was the replica's own: its corrected default names the `-meanvol` image
+after the stem (`out_mcf_mean_reg.nii.gz`, as the clean-room original does under FSL-08) but did
+not name FSL-08 in a notice; it does now, whenever the correction changes the name. Five of the
+findings and that one are permanent cases (`validation/difftest/cases/fsl-mcflirt/`), and three
+moving phantoms of the suite's own (`edge/atanf-phantom-*`, smoke tier) reach the same `atanf`
+arguments: they fail with the comment's constant and pass with glibc's.
+
+**Memory.** The record compares files and counts changed values in chunks (16 MB), so a
+600-volume series (ds004958's multiband-8 run, 1.7 GiB as float) is never held whole (before, the
+suite's own process reached 7.75 GiB on it); the replica peaks at about 7 GiB there, and the full
+tier runs in a 16 GiB memory box
+(`scripts/orchestration/boxed.sh`).
+
+**NaNs as FSL's x86-64 build makes them, on every platform (2026-10-25).** Images with NaN or
+infinite voxels make NaNs in mcflirt's output (the interpolation of an infinite neighbour weighted
+0, `inf - inf`; with `reproduce`, FSL-14's NaN centre of mass makes whole matrices NaN), and
+their bits are written into images and printed (`-nan` when the sign bit is set). The replica
+first left them to the hardware, and the six-platform CI showed the cost: on the three ARM
+platforms the golden cases `mcflirt.nonfinite` and `.reproduce` differed (image NaNs, `MAT_0003`,
+`.par`). Two rules of SSE are at work. (1) A NaN made from numbers is SSE's *default NaN*,
+`0xffc00000` / `0xfff8000000000000`, sign set; AArch64's default NaN has the sign clear. (2) When
+both operands are NaN, SSE passes on the first source operand, which is the compiler's choice of
+operand order (in FSL's binary GCC's, in the replica LLVM's, which differs between debug and
+release builds: the debug build's `atan2f` passed on the other NaN, and the golden checksum of
+`mcflirt.nonfinite.reproduce.par`, recorded from a debug build, was not mcflirt's). The replica
+now computes every operation NaN or infinite voxels can reach with SSE's rules made explicit
+(`larmorx-nc-core/src/sse.rs`: a NaN made from numbers is the default NaN; NaN operands pass on
+in the source's order), at no measurable cost (a NaN check on results; ds000005's fMRIPrep call
+31 s before and after): the trilinear, sinc and spline interpolation, the centre of mass, the
+`-stats` and `-meanvol` sums, `-gdt`'s gradient, glibc's float functions (`__math_invalidf`,
+`atan2f`'s `x + y`, which glibc's binary adds into `x`), Armadillo's small-matrix algebra and
+the transform algebra. For an affine all of one NaN (FSL-14's matrices) FSL's binary gives the y
+rotation the other sign (GCC's operand order in the products before `rotmat2euler` and in its
+`cy`; probed directly in libfsl-miscmaths: `nan_decompose.cc`, `nan_r2e.cc`), which the replica
+reproduces; for affines that mix NaNs of both signs or hold infinities the replica follows the
+source's order, and FSL's binary differs in 148 of 200 such probe cases (in the NaN matrix below,
+every NaN matrix mcflirt made was uniform). The evidence: an LD_PRELOAD probe
+(`libnan_trap.so`) finds every SSE instruction that makes a NaN and, with `NAN_TRAP_ARM=1`,
+gives its result AArch64's sign, which reproduces the ARM CI's checksums exactly
+(`8bc59e7a...`, `a4e57be9...`); with the changes, a release and a debug build, each also with
+ARM's NaN, agree in all 160 cases of the NaN matrix (5 inputs with NaN and infinite voxels × 16
+option sets × both modes; `validation/probes/fsl-mcflirt-affine-trace/nan_matrix.py`), the
+golden suite passes with ARM's NaN emulated, and in `reproduce` mcflirt's bytes (every file and
+`-verbose 20`'s thousands of printed matrices) are given in every case but those below. The
+golden checksum of `mcflirt.nonfinite.reproduce.par` is now mcflirt's own (`0f3a48c6...`).
+Debug builds also no longer overflow integers on NaN coordinates (the sinc loop's bounds wrap,
+as FSL's `int64_t` arithmetic does on x86-64). *Verified* (2026-10-25).
+
+**`calc_bval` with NaN voxels in the border.** FSL's background value (`calc_bval`, the 10th
+percentile of the values in a 2-voxel border; mcflirt pads its output with it) sorts those values
+with `std::sort` and `operator<`, which is not a strict weak ordering when NaNs are present (C++
+leaves the result undefined; libstdc++'s introsort leaves an order that depends on the values'
+positions). The replica sorts NaNs last (a defined order, in both modes). With `reproduce`, a
+volume whose matrix is NaN and whose border holds NaNs is padded with another value than
+mcflirt's: the NaN matrix's `bgnan` and `bgnegnan` inputs differ from mcflirt in their output
+images (32 of 160 cases; the replica's four runs agree in those too). Reproducing libstdc++'s order would mean emulating its introsort step by
+step (a licence question: libstdc++ is GPL-3.0 with the GCC runtime exception); not done.
+
+**What the replica does not reproduce:** the abort's signal (it prints what mcflirt prints and
+one line of its own, then exits with status 1), FSL's build string in `descrip`, mcflirt's
+single thread, libstdc++'s order of NaN border values in `calc_bval` (above), and which NaN
+passes on when two NaNs of different signs meet in an affine with mixed NaNs (above).
+
 ## fMRIPrep, nipype, niworkflows, nitransforms (Apache-2.0 / MIT; not restricted)
 
 - nipype 1.12.0 `fsl.MCFLIRT(save_mats=True)` with `in_file` and `ref_file` builds

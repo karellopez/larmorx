@@ -1,23 +1,33 @@
-# FSL's original source of the larmorx-nc replicas
+# FSL's original source of the replicated parts
 
-The FSL Licence (`LICENCE.FSL`, FSL 6.0.7.17) allows reproduction and modification without
-financial return only when "the conditions of this Licence are imposed upon the receiver of the
-product, and all original and amended source code is included in any transmitted product". The
-replicas in `crates-nc/` are amended translations of FSL's source, so FSL's original source of
-everything they translate is kept here, unmodified, as the FSL 6.0.7.17 conda packages install it
-(`$FSLDIR/src/<package>/`), without the packages' build scripts:
+The FSL Licence (`../LICENSE`) permits passing FSL's software on, modified or not, only
+without financial return, with the licence imposed on the receiver, and with "all original
+and amended source code included in any transmitted product". larmorx-nc meets the last
+condition with two parts, both in every copy of this directory and in the `larmorx-nc` wheel:
 
-| Directory | Package (version) | Translated by |
-|---|---|---|
-| `fsl-bet2/` | fsl-bet2 2111.8 (`bet`, `bet2.cpp`, `betsurf.cpp`, `betsurf.h`; `robustfov.cc`, the Tcl GUI and `bet4animal` are not translated) | `larmorx-nc-bet` |
-| `fsl-meshclass/` | fsl-meshclass 2111.0 | `larmorx-nc-bet` (`src/mesh/`) |
-| `fsl-newimage/` | fsl-newimage 2203.12 | `larmorx-nc-bet` (`src/fsl/volume.rs`, `filename.rs`) |
-| `fsl-newnifti/` | fsl-newnifti 4.1.0 | `larmorx-nc-bet` (`src/fsl/nifti.rs`) |
-| `fsl-miscmaths/` | fsl-miscmaths 2203.2 | `larmorx-nc-bet` (the parts BET uses) |
-| `fsl-utils/` | fsl-utils 2203.5 | `larmorx-nc-bet` (`src/fsl/options.rs`) |
-| `fsl-znzlib/` | fsl-znzlib 2111.0 | `larmorx-nc-bet` (`src/fsl/nifti.rs`, gzip I/O) |
-| `fsl-avwutils/` | fsl-avwutils 2209.3: `fslstats.cc`, `fslroi.cc`, `fslmerge.cc`, `fslmaths.cc`, `fslval` | `larmorx-nc-bet` (`src/avw.rs`, what `bet` runs of them) |
+- **the amended source**: the Rust translations in `../larmorx-nc-*/src/` (each file names the
+  FSL files it was translated from in its header; each crate's `PROVENANCE.md` lists them and
+  the changes made);
+- **the original source**: the FSL files those translations come from, here, copied unchanged
+  from FSL 6.0.7.17's source tree (`$FSLDIR/src/<package>/`), one directory per FSL package.
 
-Which upstream file each Rust file translates, and the other sources the replicas follow (fslpy
-3.21.1 and armawrap 0.6.0, Apache-2.0; glibc 2.35's `pow` and `exp`, LGPL-2.1-or-later; fdlibm's
-`tanh` and `expm1`), are listed in each crate's `PROVENANCE.md`.
+`MANIFEST.tsv` lists every file with its package, version and SHA-256.
+`python scripts/fsl_source.py --check` verifies the copies; `--fsldir <FSL 6.0.7.17>` makes
+them again.
+
+| Package | Version | Upstream | Files |
+|---|---|---|---|
+| fsl-mcflirt | 2111.0 | https://git.fmrib.ox.ac.uk/fsl/mcflirt | `mcflirt.cc`, `Globaloptions.{h,cc}`, `Log.{h,cc}` |
+| fsl-newimage | 2203.12 | https://git.fmrib.ox.ac.uk/fsl/newimage | `newimage.{h,cc}`, `newimagefns.{h,cc}`, `newimageio.h`, `generalio.cc`, `costfns.{h,cc}` |
+| fsl-miscmaths | 2203.2 | https://git.fmrib.ox.ac.uk/fsl/miscmaths | `miscmaths.{h,cc}`, `optimise.{h,cc}`, `kernel.{h,cc}`, `splinterpolator.h` |
+| fsl-newnifti | 4.1.0 | https://git.fmrib.ox.ac.uk/fsl/NewNifti | `NewNifti.{h,cc}`, `legacyFunctions.{h,cc}`, `nifti1.h`, `nifti2.h` |
+| fsl-znzlib | 2111.0 | https://git.fmrib.ox.ac.uk/fsl/znzlib | `znzlib.{h,c}` |
+
+FSL is Copyright (C) 1999-2023 University of Oxford; the files carry their own notices
+(`nifti1.h`, `znzlib.{h,c}` and the code `legacyFunctions.cc` takes from `nifti1_io.c` were
+released to the public domain by their authors). Armadillo 10.5.1 and fsl-armawrap 0.6.0, whose matrix rules
+`larmorx-nc-core` translates in `src/arma.rs`, are Apache-2.0, not FSL code; their notices are
+in `../NOTICE`.
+
+These files are not compiled: they are here so that every receiver has the source the
+translation was made from.

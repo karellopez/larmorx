@@ -131,6 +131,8 @@ def _node_label(r: dict) -> str:
         )
     if space := keys.get("space"):
         parts.append(space)
+    if (echo := keys.get("echo")) is not None:
+        parts.append(f"echo-{int(echo) + 1}")
     name = r.get("name", "")
     if item := keys.get("item"):
         name = item.lstrip("_")

@@ -272,37 +272,40 @@ completing 3dTshift, part 2b, then AFNI-26's switch the same day); – = nothing
 | FSL-01 † | mcflirt | last volume not initialised from the previous one | c | every run | corrected by default (`upstream_defects`, 2026-10-11); on a synthetic series with large motion mcflirt's last volume converges to a 180° rotation, the corrected one to 0.36 mm from the truth ([mri-hmc-normcorr-count.md](../validation/mri-hmc-normcorr-count.md)) | – |
 | FSL-02 † | mcflirt | normalised correlation effectively uncentred | c | every run | reproduces; the corrected count is opt-in (`normcorr_count="weights"`), measured in [mri-hmc-normcorr-count.md](../validation/mri-hmc-normcorr-count.md): a change about the size of mcflirt's band, no gain against the ground truth | – (decided 2026-10-23, rule C: mcflirt's behaviour kept; the corrected count stays opt-in) |
 | FSL-03 † | mcflirt | in-plane mode pads the first stage's reference twice | c, f | none | corrected by default (`upstream_defects`, 2026-10-11) | – |
-| FSL-04 † | mcflirt `-gdt` | reference gradient unused; absolute `-out` aborts | c, a | none | not supported | – |
+| FSL-04 † | mcflirt `-gdt` | reference gradient unused; absolute `-out` aborts | c, a | none | refused by default (both implementations); the replica reproduces it with `reproduce` (2026-10-24) | – |
 | FSL-05 † | mcflirt | `-scaling`, `-hist` ignored; `-edge` not an option | e | none | ignored with a warning; `-edge` explained (2026-10-11) | – |
 | FSL-06 † | mcflirt | unknown `-cost` silently keeps normcorr | e | none | corrected by default (`upstream_defects`, 2026-10-11): an error | – |
 | FSL-07 † | mcflirt | numbers read with `atoi`/`atof`; `-help` alone exits 1 | e | none | corrected by default (`upstream_defects`, 2026-10-11) | – |
-| FSL-08 † | mcflirt `-stats` | end slices left 0; names with the extension inside | c, e | none | corrected by default (`upstream_defects`, 2026-10-11) | – |
+| FSL-08 † | mcflirt `-stats`, `-meanvol` | end slices left 0; names with the extension inside (the `-stats` images and `-meanvol`'s `_mean_reg`) | c, e | none | corrected by default (`upstream_defects`, 2026-10-11); the replica names it for `-meanvol` alone too (2026-10-25, random testing `fsl-mcflirt:20261025:616`) | – |
 | FSL-09 † | mcflirt | output types: int8 → uint8, truncation, no clamping | c, a | none | corrected by default (`upstream_defects`, 2026-10-11): int8 kept, rounded and clamped; `reproduce` truncates and wraps as x86-64 does | – |
 | FSL-10 † | mcflirt | units forced to mm and s: a TR in ms becomes s | c | ms-unit inputs | corrected by default (`upstream_defects`, 2026-10-11) | – |
 | FSL-11 † | mcflirt | `FSLOUTPUTTYPE` unset: fails after writing the matrices | e | none | writes `.nii.gz` | – (decided 2026-10-23: larmorx's behaviour kept) |
 | FSL-12 † | mcflirt | impossible inputs abort after the whole estimation | a | none | refuses first | – |
 | FSL-13 † | mcflirt | `.mat` directory quirks without `-mats` | e | none | corrected by default (`upstream_defects`, 2026-10-11) | – |
 | FSL-14 † | mcflirt | one NaN voxel makes the volume's matrix NaN | c | rare | corrected by default (`upstream_defects`, 2026-10-11) | – |
-| FSL-15 † | mcflirt `-init` | affects the final resampling only | c? | none | reproduces | later (decided 2026-10-23: when the mcflirt replica is built) |
+| FSL-15 † | mcflirt `-init` | affects the final resampling only | c (c? until 2026-10-24) | none | reproduces | – (decided 2026-10-24, rule C: as documented, "apply to all vols"; kept and documented) |
 | FSL-16 † | mcflirt | rotations orthogonal only to about 1e-8 | d | every run | reproduces | – (D11) |
 | FSL-17 † | mcflirt | implementation differs from its paper | f | every run | follows the implementation | – (D11) |
-| FSL-18 † | mcflirt Woods cost | squared bin counts | c? | none | reproduces | later (decided 2026-10-23: when the mcflirt replica is built) |
+| FSL-18 † | mcflirt Woods cost | squared bin counts | – (c? until 2026-10-24) | none | reproduces | – (decided 2026-10-24, rule C: not a defect; `n_b² σ_b / Σ_b` is Woods' `n_b σ_b / μ_b`) |
+| FSL-20 † | mcflirt | `.mat` directory not creatable (a missing parent): message, exit 0, nothing more written | e | none | the replica: an error by default (rule B, 2026-10-24), mcflirt's exit 0 with `reproduce`; the clean-room original: to do (the spec) | – |
+| FSL-21 † | mcflirt histogram costs | `-bins` below 8: no bins in the first stage; arbitrary matrices, `corratio` writes before its arrays and aborts | a | none | the replica: refused by default (rule B, 2026-10-24); `reproduce` gives mcflirt's matrices and, for `corratio`, its abort; the clean-room original: to do (the spec) | – |
+| FSL-22 † | `calc_bval` (newimage) | the background value sorts the 2-voxel border with `std::sort` and `operator<`: with NaN voxels not a strict weak ordering (undefined in C++); libstdc++'s introsort leaves a position-dependent order, so the pad value of mcflirt's output (and `affine_transform`'s) is arbitrary | a | none (fMRIPrep's inputs have no NaN) | NaNs sorted last in both modes (defined); `reproduce` reproduces every defined part and warns when NaN border voxels make the original's order undefined (D13, 2026-10-11; libstdc++'s order is not emulated: its code is GPL-3.0, which no FSL-licensed package may include) | – |
 
-**Counts** (240 entries, recounted from the table on 2026-10-24 after the small-fixes merge; an entry with two classes
+**Counts** (243 entries, recounted from the table on 2026-10-25 after the mcflirt replica's NaN fix; an entry with two classes
 counts under its first; "c (c? until …)" entries, decided, count as (c)):
 
 | Class | Entries | of them questionable (c?) |
 |---|---|---|
-| (a) crash, undefined behaviour, out of bounds | 39 | |
+| (a) crash, undefined behaviour, out of bounds | 41 | |
 | (b) race, nondeterminism | 11 | |
-| (c) deterministic bug that changes results | 118 | 10 |
+| (c) deterministic bug that changes results | 117 | 8 |
 | (d) imprecision | 20 | |
-| (e) command-line or parsing quirk | 40 | |
+| (e) command-line or parsing quirk | 41 | |
 | (f) documentation or message only | 11 | |
-| explained, not a defect | 1 | |
+| explained, not a defect | 2 | |
 
 Six entries have a second class: ANTS-12 and FSL-03 (f), ANTS-24 (f), FSL-04 and FSL-09 (a),
-FSL-08 (e). ANTS-46 (an early stop) was explained by A4 part 2 as ITK's design. Gap
+FSL-08 (e). ANTS-46 (an early stop) was explained by A4 part 2 as ITK's design, and FSL-18 (Woods' cost) by the mcflirt replica (2026-10-24) as Woods' own criterion. Gap
 column (2026-10-12, after completing 3dTshift, part 2b, and AFNI-26's switch): no **yes**, no
 **replica** and no **original** left (the 9 original gaps, AFNI-07, -08, -11, -12, -16, -18,
 -19, -22 and -23, closed by the clean-room original that day, and AFNI-26, added the same day
@@ -441,6 +444,15 @@ followed in the replica and then in the clean-room original (2026-10-12): nothin
 | ANTS-44 | DenoiseImage's bias outside the mask | `larmorx_image::adaptive_denoising` (`bias_written`) | none (no mask) |
 | ANTS-116 | antsAI's patch orientation | `larmorx_ants::ai_blobs` (`Patches::correlation`) | none |
 | AFNI-41, AFNI-48 | refused (rule B) | the GPL replicas' command lines (`larmorx-gpl-afni` `cli::automask`, `cli::unifize`) | none |
+
+**The mcflirt replica** (`larmorx-nc`, merged 2026-10-25; its follow-up the same day found no new
+defect of mcflirt: the panel's two differing calls and the random tests' 61 findings were the
+replica's own, `atanf`'s `aT[0]` taken from fdlibm's comment and a missing FSL-08 notice for
+`-meanvol`, both fixed): FSL-04 refused by default with the
+switch; the new FSL-20 and FSL-21 refused by default (rule B), each with `reproduce`; it shares
+the clean-room original's corrections of FSL-01, -03, -05 to -10, -13 and -14. **Open:** FSL-20
+and FSL-21 in the clean-room original (a spec writer adds them to `specs/mcflirt.md`, then a
+clean-room implementer).
 
 **Main package, fMRIPrep's libraries and SciPy** (done 2026-10-11):
 
@@ -3008,6 +3020,10 @@ fMRIPrep 25.2.6 (the oracle runs) or its source at `21a490fb`, niworkflows 1.15.
 - **fMRIPrep:** N4 (`logf` of every voxel, `expf`), DenoiseImage (`expf` per patch pair),
   ImageMath `^`.
 - **larmorx:** correctly rounded (`larmorx_core::math::{expf, logf, powf}`).
+  The mcflirt replica (`larmorx-nc`) carries glibc 2.35's FMA build of `sinf`, `cosf`,
+  `sincosf` and `logf`, translated from Arm's Optimized Routines (MIT) and verified on all 2^32
+  inputs (`crates-nc/larmorx-nc-core/tools/glibc-float-verify`), as FSL's Linux binaries call
+  them (2026-10-24).
 - **D13 / gap:** not D13.
 
 ### GLIBC-03 `sinf`, `cosf` are not correctly rounded, and two builds differ — (d)
@@ -3022,6 +3038,13 @@ fMRIPrep 25.2.6 (the oracle runs) or its source at `21a490fb`, niworkflows 1.15.
   `Euler3DTransform<float>` calls them too, under `antsApplyTransforms --float 1`; larmorx uses
   correctly rounded ports of CORE-MATH's `sinf` and `cosf` there (2026-10-11), and the CORE-MATH
   preload replaces glibc's `sinf`, `cosf` and `sincosf` ([ants-float.md](ants-float.md)).
+  The mcflirt replica (`larmorx-nc`) carries glibc 2.35's FMA build of `sinf`, `cosf`,
+  `sincosf` and `logf`, translated from Arm's Optimized Routines (MIT) and verified on all 2^32
+  inputs (`crates-nc/larmorx-nc-core/tools/glibc-float-verify`), as FSL's Linux binaries call
+  them (2026-10-24). glibc 2.35's `atanf` (fdlibm, no FMA build) is not correctly
+  rounded on 21,089,462 of the 2^32 inputs (0.49 %), 7,060 with |x| ≤ 0.05; the replica carries it
+  bit for bit (`atanf` on all 2^32 inputs, `atan2f` on 3 × 2^30 seeded pairs: 0 differences;
+  2026-10-25).
 - **D13 / gap:** not D13.
 
 ### GLIBC-04 `pow` for SciPy's filter poles — (d)
@@ -3760,8 +3783,11 @@ fMRIPrep 25.2.6 (the oracle runs) or its source at `21a490fb`, niworkflows 1.15.
   invalid name and mcflirt aborts.
 - **Evidence:** read; verified (`real/ds000005/opt-gdt`).
 - **fMRIPrep:** none.
-- **larmorx:** not supported (exit 1).
-- **D13 / gap:** No gap.
+- **larmorx:** refused by default in both implementations (exit 1, the notice names FSL-04);
+  the replica reproduces it with `reproduce` (the gradient images registered to the plain
+  reference, `grefvol_` written), bit-identical to mcflirt on a relative `-out`
+  (`edge/gdt` of the replica's record).
+- **D13 / gap:** done (2026-10-24).
 
 ### FSL-05 † Options that do nothing — (e)
 - **What:** `-scaling` sets a value nothing reads (`estimate_scaling`, `mcflirt.cc:286-294`, is
@@ -3799,9 +3825,12 @@ fMRIPrep 25.2.6 (the oracle runs) or its source at `21a490fb`, niworkflows 1.15.
   for `x_variance.nii.gz` (PIPE-15).
 - **Evidence:** read; verified.
 - **fMRIPrep:** none (not used).
-- **larmorx:** reproduces both (`larmorx_mri::hmc::stats::temporal`,
-  `larmorx_mri::cli::hmc::write_outputs`).
-- **D13 / gap:** every slice; names from the stem (to confirm); switch. **Gap.**
+- **larmorx:** corrected by default in both implementations: every slice, and the `-stats` and
+  `-meanvol` images named after the stem of `-out` (`x_meanvol.nii.gz`, `x_mean_reg.nii.gz`);
+  `reproduce` gives mcflirt's slices and names (`larmorx_mri::hmc::stats::temporal`,
+  `larmorx_mri::cli::hmc::write_outputs`; the replica's notice for `-meanvol` alone since
+  2026-10-25).
+- **D13 / gap:** none.
 
 ### FSL-09 † Output types and conversion — (c), (a)
 - **What:** the output type comes from `dtype(inputfname)` and `closestTemplatedType`
@@ -3863,14 +3892,17 @@ fMRIPrep 25.2.6 (the oracle runs) or its source at `21a490fb`, niworkflows 1.15.
 - **D13 / gap:** leave non-finite voxels out of the centre and the cost (to confirm); warn;
   switch. **Gap.**
 
-### FSL-15 † `-init` affects only the final resampling — (c?)
+### FSL-15 † `-init` affects only the final resampling — (c)
 - **What:** `initmat` is reset to the identity before the stages (`mcflirt.cc:707`); `-init` is
   read only for the final resampling (`:769-774,787-804`), so the matrices are the same with
   and without it.
 - **Evidence:** read; verified.
 - **fMRIPrep:** none.
-- **larmorx:** reproduces.
-- **D13 / gap:** decided 2026-10-23 (decision log): decided when the mcflirt replica is built. Was: **decide** whether an "initial transform" should start the search.
+- **larmorx:** reproduces, in both implementations.
+- **D13 / gap:** decided 2026-10-24, rule C: mcflirt's help says "initial transform matrix to
+  apply to all vols", which is what it does (the final resampling); a pipeline that passes
+  `-init` gets the composed resampling it asked for. Kept and documented. Was: **decide**
+  whether an "initial transform" should start the search.
 
 ### FSL-16 † Rotations are not quite orthogonal — (d)
 - **What:** `make_rot` stores `theta = norm2(angl)` in a float while `axis = angl/theta` is
@@ -3893,10 +3925,61 @@ fMRIPrep 25.2.6 (the oracle runs) or its source at `21a490fb`, niworkflows 1.15.
 - **larmorx:** follows the implementation.
 - **D13 / gap:** not D13; better algorithms are D11 options (`docs/api/mri-hmc.md`).
 
-### FSL-18 † Woods' cost squares the bin counts — (c?)
-- **What:** the Woods cost sums `Sqr(num[b])*stdev/sum[b]` (`costfns.cc:1456-1561`), n_b², where
-  Woods' criterion weights by n_b.
+### FSL-18 † Woods' cost squares the bin counts — explained, not a defect
+- **What:** the Woods cost sums `Sqr(num[b])*stdev/sum[b]` (`costfns.cc:1456-1561`). Since
+  `sum[b]/num[b]` is the bin's mean, that is `n_b σ_b / μ_b`, Woods' criterion: not a defect
+  (read while translating the replica, 2026-10-24).
 - **Evidence:** read.
 - **fMRIPrep:** none (Woods registers no BOLD run, for mcflirt or larmorx).
-- **larmorx:** reproduces (spec appendix A).
-- **D13 / gap:** decided 2026-10-23 (decision log): decided when the mcflirt replica is built. Was: **decide.**
+- **larmorx:** reproduces (both implementations; the replica bit for bit).
+- **D13 / gap:** decided 2026-10-24, rule C: not a defect; kept. Was: **decide.**
+
+### FSL-20 † An uncreatable `.mat` directory ends the run with status 0 — (e)
+- **What:** `Log::establishDir` (`Log.cc`) makes `<out>.mat` (adding `+` while the name exists);
+  `decompose_mats` (`mcflirt.cc:489-494`) prints "Error! Could not create directory ... No
+  write permission" for a permission error and goes on, but for any other error (a missing
+  parent directory: `-out missing/out -mats`) `establishDir` prints "Error!: Unknown Log
+  directory return value" and calls `exit(0)`: no matrices, `.par`, `.rms` or corrected series,
+  and success reported.
+- **Evidence:** read; verified (`edge/out-dir-missing` of the replica's record).
+- **fMRIPrep:** none (its `-out` is in an existing work directory).
+- **larmorx:** the replica (2026-10-24): an error, exit 1, naming FSL-20 (rule B: the input
+  cannot be honoured, and mcflirt reports success); `reproduce` gives mcflirt's message and exit
+  0. The clean-room original: to be specified (`specs/mcflirt.md`, the spec writer).
+- **D13 / gap:** done in the replica; the original's is open.
+
+### FSL-21 † Histogram costs with fewer than 8 bins have none — (a)
+- **What:** the histogram costs get `no_bins / scaling` bins at each stage (`usrsetscale`,
+  `mcflirt.cc`; `Costfn::set_no_bins`, `costfns.cc:3622-3661`), so with `-bins` below 8 the
+  first (8 mm) stage has none, and below 4 every stage. With no bins, `mutualinfo`, `normmi`
+  and `woods` compute a degenerate cost and the search ends at arbitrary matrices (every
+  volume the same, or tens of millimetres away; deterministic); `corratio` folds its last bin
+  into index -1 (`numy[no_bins-1] += numy[no_bins]`, `costfns.cc:1269-1274`), before its arrays,
+  and glibc aborts when they are freed ("double free or corruption (out)", signal 6) at the
+  first cost evaluation.
+- **Evidence:** read; verified (`edge/bins4-mutualinfo`, `edge/bins1-normmi`,
+  `edge/bins2-corratio` of the replica's record).
+- **fMRIPrep:** none (it runs normcorr).
+- **larmorx:** the replica (2026-10-24): refused by default before any work (rule B: a
+  histogram needs at least one bin; mcflirt silently returns arbitrary matrices or corrupts its
+  heap), the notice names FSL-21; `reproduce` gives mcflirt's matrices bit for bit and, for
+  `corratio`, its abort (when the out-of-bounds write is non-zero, as at every real
+  evaluation). The clean-room original: to be specified.
+- **D13 / gap:** done in the replica; the original's is open.
+### FSL-22 † The background value sorts NaNs: undefined order — (a)
+- **What:** newimage's `calc_bval` (`sort(hist.begin(), hist.end()); return hist[numbins/10]`)
+  sorts the 2-voxel border with `operator<`; with NaN voxels that is not a strict weak ordering,
+  undefined behaviour in C++. libstdc++'s introsort then leaves a position-dependent order, so the
+  pad value of mcflirt's output (and of `affine_transform`'s) is arbitrary.
+- **Evidence:** the NaN matrix (`validation/probes/fsl-mcflirt-affine-trace/nan_matrix.py`):
+  inputs with NaN background voxels in `reproduce`, 32 of 160 cases, the output images of
+  volumes whose matrix is NaN padded with another value.
+- **fMRIPrep:** none (its inputs have no NaN).
+- **larmorx:** NaNs sorted last in both modes (defined, the same on every platform). By D13's
+  rule for undefined behaviour (2026-10-11), `reproduce` reproduces every defined part and warns
+  when NaN border voxels make the original's order undefined. libstdc++'s order is not emulated:
+  its introsort is GPL-3.0 code, which the FSL-licensed package may not include (decided by the
+  orchestrator, 2026-10-25).
+- **D13 / gap:** the warning in `reproduce` (to add with BET's merge, where `calc_bval` moves
+  into `larmorx-nc-core`).
+

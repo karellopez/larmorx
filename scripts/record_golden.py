@@ -7,6 +7,11 @@ x86_64 only, from a committed tree whose parity with the original tools passes:
 
     python scripts/record_golden.py                  # run tests/parity (smoke tier), then record
     python scripts/record_golden.py --skip-parity    # record without parity (noted in the JSON)
+    python scripts/record_golden.py --rerun-parity   # run the smoke tier even if it passed
+
+The smoke tier does not run twice: when ``pytest tests/parity`` passed for this clean commit
+and this build of the extension, its marker (``<oracle cache>/markers/parity-smoke-<commit>.json``,
+written by ``tests/parity/conftest.py``) is reused, and the JSON says so.
     python scripts/record_golden.py --check          # compare with golden.json; write nothing
     python scripts/record_golden.py --compare DIR    # full differences of a CI artifact
 
@@ -102,6 +107,32 @@ def dumps(document: dict) -> str:
     )
 
 
+def smoke_marker() -> tuple[dict, Path] | None:
+    """The marker of a passing parity smoke tier of this very commit and extension build
+    (written by ``tests/parity/conftest.py`` in the oracle cache's ``markers/``), or ``None``
+    (then the smoke tier runs here). Says why a marker is not reused."""
+    try:
+        from larmorx_validation.oracle_cache import store
+    except ImportError:
+        return None
+    commit = git("rev-parse", "HEAD")
+    path = store.location() / "markers" / f"parity-smoke-{commit}.json"
+    if not path.is_file():
+        return None
+    marker = json.loads(path.read_text(encoding="utf-8"))
+    import hashlib
+
+    import larmorx._core as core
+
+    built = hashlib.sha256(Path(core.__file__).read_bytes()).hexdigest()
+    if marker.get("result") != "passed" or marker.get("commit") != commit:
+        return None
+    if marker.get("extension_sha256") != built:
+        print(f"Not reusing {path}: it tested another build of the extension.", flush=True)
+        return None
+    return marker, path
+
+
 def record(registry, args: argparse.Namespace) -> None:  # type: ignore[no-untyped-def]
     dirty = [
         line
@@ -113,8 +144,17 @@ def record(registry, args: argparse.Namespace) -> None:  # type: ignore[no-untyp
             "the tree has uncommitted changes; commit them first (the checksums name the commit "
             "they come from), or pass --allow-dirty:\n  " + "\n  ".join(dirty)
         )
+    found = None if (args.skip_parity or args.rerun_parity or dirty) else smoke_marker()
     if args.skip_parity:
         parity = "skipped"
+    elif found is not None:
+        marker, path = found
+        print(
+            f"Reusing the parity smoke tier that passed for this commit and this build at "
+            f"{marker['time']} ({path}); --rerun-parity runs it again.",
+            flush=True,
+        )
+        parity = f"passed (pytest tests/parity, smoke tier; the run of {marker['time']}, reused)"
     else:
         print("Running the parity suite (tests/parity, smoke tier) ...", flush=True)
         result = subprocess.run([sys.executable, "-m", "pytest", "tests/parity", "-q"], cwd=ROOT)
@@ -209,6 +249,12 @@ def main() -> int:
         description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter
     )
     parser.add_argument("--skip-parity", action="store_true", help="record without running parity")
+    parser.add_argument(
+        "--rerun-parity",
+        action="store_true",
+        help="run the parity smoke tier even if it passed for this commit and build already "
+        "(its marker in the oracle cache)",
+    )
     parser.add_argument(
         "--allow-dirty", action="store_true", help="record from uncommitted changes"
     )

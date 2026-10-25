@@ -376,6 +376,8 @@ defects! {
         "the normalised correlation's count N is a running sum of running sums of the weights, so the correlation is effectively uncentred";
     FSL_03 = "FSL-03", "mcflirt", true,
         "the in-plane mode pads the first stage's reference grid twice";
+    FSL_04 = "FSL-04", "mcflirt", true,
+        "-gdt registers each volume's gradient image to the reference's plain image (the reference's gradient is computed and discarded), and aborts when -out names a directory";
     FSL_05 = "FSL-05", "mcflirt", true,
         "-scaling and -hist are accepted and ignored";
     FSL_06 = "FSL-06", "mcflirt", true,
@@ -392,6 +394,10 @@ defects! {
         "-rmsrel and -rmsabs create the .mat directory without -mats (holding only the reference's identity)";
     FSL_14 = "FSL-14", "mcflirt", true,
         "one NaN or infinite voxel makes the volume's centre of mass, and so its matrix, NaN";
+    FSL_21 = "FSL-21", "mcflirt", true,
+        "with a histogram cost (corratio, mutualinfo, normmi, woods) and -bins below 8, the first stage's histogram has no bins (-bins divided by the 8 mm scale): the costs are degenerate and the matrices arbitrary, and corratio writes before its arrays and aborts";
+    FSL_20 = "FSL-20", "mcflirt", true,
+        "when the .mat directory cannot be created for another reason than its permissions (a missing parent directory), mcflirt prints an error and exits with status 0, writing neither the matrices, the .par and .rms files nor the corrected series";
     FSL_40 = "FSL-40", "bet2", true,
         "the input and output names lose their first '.hdr' wherever it stands (a directory named x.hdr is read as x), and a name with '.img' but no '.hdr' aborts the program";
     FSL_42 = "FSL-42", "bet2", true,

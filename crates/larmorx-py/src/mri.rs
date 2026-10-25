@@ -392,7 +392,74 @@ fn mri_par_text(params: PyReadonlyArray2<'_, f64>) -> PyResult<String> {
     Ok(larmorx_mri::hmc::report::par_text(&rows))
 }
 
+/// The geometry of the image at `path` as `lx.mri.hmc` reads it (its header, with nibabel's
+/// load-time fixes; the data are not read).
+fn file_geometry(path: &std::path::Path) -> PyResult<larmorx_mri::hmc::world::Geometry> {
+    let mut header = larmorx_io::nifti::read_header(path).map_err(to_py_err)?;
+    header
+        .apply_load_fixes()
+        .map_err(|e| value_err(format!("{}: {e}", path.display())))?;
+    let shape = header
+        .shape()
+        .map_err(|e| value_err(format!("{}: {e}", path.display())))?;
+    let dims = [0, 1, 2].map(|k| shape.get(k).copied().unwrap_or(1));
+    let values = vec![0.0f32; dims.iter().product::<usize>()];
+    let series = Series::from_values([dims[0], dims[1], dims[2], 1], &values, header);
+    Ok(pipeline::series_geometry(&series))
+}
+
+/// The world forms of mcflirt-convention matrices computed elsewhere (by the `larmorx-nc`
+/// replica of `lx.mri.hmc`): `ras` and `itk` for the series at `series` registered to the
+/// reference at `reference` (`None`: the series' own grid), and the framewise displacement of
+/// `params` (radius 50 mm), as `mri_hmc_file` returns them.
+#[pyfunction]
+#[pyo3(signature = (matrices, params, series, reference=None))]
+fn mri_hmc_world<'py>(
+    py: Python<'py>,
+    matrices: numpy::PyReadonlyArray3<'py, f64>,
+    params: PyReadonlyArray2<'py, f64>,
+    series: PathBuf,
+    reference: Option<PathBuf>,
+) -> PyResult<Bound<'py, PyDict>> {
+    let a = matrices.as_array();
+    if a.shape()[1..] != [4, 4] {
+        return Err(value_err("matrices must have shape (N, 4, 4)"));
+    }
+    let ms: Vec<Mat4> = (0..a.shape()[0])
+        .map(|t| std::array::from_fn(|i| std::array::from_fn(|j| a[[t, i, j]])))
+        .collect();
+    let p = params.as_array();
+    if p.ncols() != 6 {
+        return Err(value_err("parameters must have shape (N, 6)"));
+    }
+    let rows: Vec<[f64; 6]> = p
+        .rows()
+        .into_iter()
+        .map(|r| std::array::from_fn(|k| r[k]))
+        .collect();
+    let input = file_geometry(&series)?;
+    let reference = match reference {
+        Some(r) => file_geometry(&r)?,
+        None => input,
+    };
+    let ras: Vec<Mat4> = ms
+        .iter()
+        .map(|m| larmorx_mri::hmc::world::ras_transform(m, &reference, &input))
+        .collect();
+    let itk: Vec<Mat4> = ms
+        .iter()
+        .map(|m| larmorx_mri::hmc::world::itk_transform(m, &reference, &input))
+        .collect();
+    let d = PyDict::new(py);
+    d.set_item("ras", stack(py, &ras))?;
+    d.set_item("itk", stack(py, &itk))?;
+    let fd = pipeline::framewise_displacement(&rows, 50.0);
+    d.set_item("fd", PyArray::from_owned_array(py, Array1::from(fd)))?;
+    Ok(d)
+}
+
 pub fn register(m: &Bound<'_, PyModule>) -> PyResult<()> {
+    m.add_function(wrap_pyfunction!(mri_hmc_world, m)?)?;
     m.add_function(wrap_pyfunction!(mri_hmc_file, m)?)?;
     m.add_function(wrap_pyfunction!(mri_hmc_array, m)?)?;
     m.add_function(wrap_pyfunction!(mri_read_mat, m)?)?;

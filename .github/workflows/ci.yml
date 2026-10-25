@@ -47,9 +47,10 @@ jobs:
       - name: SPDX licence headers (docs/licensing.md)
         run: python scripts/check_spdx.py
 
-  # The GPL-3.0-or-later replicas (crates-gpl/, a Cargo workspace of its own; docs/licensing.md):
-  # format, lint, build and test on the same six platforms as the wheels. Tests that need the
-  # AFNI oracle skip where it is absent.
+  # The replica workspaces, each a Cargo workspace of its own (docs/licensing.md): the
+  # GPL-3.0-or-later replicas (crates-gpl/) and the FSL Licence's (crates-nc/). Format, lint,
+  # build and test on the same six platforms as the wheels, in one job per platform. Tests that
+  # need an oracle skip where it is absent.
   gpl:
     name: gpl (${{ matrix.platform }})
     runs-on: ${{ matrix.runner }}
@@ -74,7 +75,9 @@ jobs:
           components: rustfmt, clippy
       - uses: Swatinem/rust-cache@v2
         with:
-          workspaces: crates-gpl
+          workspaces: |
+            crates-gpl
+            crates-nc
       - name: rustfmt
         run: cargo fmt --all --check
       - name: clippy
@@ -82,6 +85,27 @@ jobs:
       # Includes the golden tests (larmorx-gpl-cli/tests/golden.rs, docs/validation/golden.md).
       # Failures are also printed as annotations, which GitHub shows without a login.
       - name: cargo test
+        run: |
+          cargo test --workspace --locked 2>&1 | tee cargo-test.log || {
+            "$(command -v python || command -v python3)" ../scripts/ci_cargo_failures.py cargo-test.log
+            exit 1
+          }
+        env:
+          LARMORX_GOLDEN_MISMATCHES: ${{ github.workspace }}/golden-mismatches
+      # The FSL replicas (crates-nc/, larmorx-nc): the same three steps. Its tests include the
+      # golden tests (larmorx-nc-cli/tests/golden.rs) and the check of FSL's original source,
+      # which the FSL Licence requires in every copy (fsl-source/, tests/notices.rs).
+      - name: rustfmt (crates-nc)
+        if: ${{ !cancelled() }}
+        working-directory: crates-nc
+        run: cargo fmt --all --check
+      - name: clippy (crates-nc)
+        if: ${{ !cancelled() }}
+        working-directory: crates-nc
+        run: cargo clippy --workspace --all-targets --locked -- -D warnings
+      - name: cargo test (crates-nc)
+        if: ${{ !cancelled() }}
+        working-directory: crates-nc
         run: |
           cargo test --workspace --locked 2>&1 | tee cargo-test.log || {
             "$(command -v python || command -v python3)" ../scripts/ci_cargo_failures.py cargo-test.log

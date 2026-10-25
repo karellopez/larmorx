@@ -1,0 +1,270 @@
+{
+ "defect": null,
+ "description": "the replica with fdlibm's comment value of atanf's aT[0] (0x3eaaaaaa, before 2026-10-25) differed from mcflirt (matrices from MAT_0000); glibc's constant is 0x3eaaaaab",
+ "expect": "pass",
+ "found": {
+  "detail": "every file bit-identical: out_mcf.nii.gz: 15475 of 41888 values differ (max |diff| 38); out_mcf.nii.gz.mat/MAT_0000; out_mcf.nii.gz.mat/MAT_0001; out_mcf.nii.gz.mat/MAT_0002; out_mcf.nii.gz.mat/MAT_0003; out_mcf.nii.gz.par",
+  "n": 25,
+  "seed": "20261025",
+  "shrink_moves": [],
+  "signature": [
+   "every file bit-identical"
+  ]
+ },
+ "id": "atanf-matrices-from-0",
+ "implementations": [
+  "replica"
+ ],
+ "reason": "",
+ "recipe": {
+  "extra": {
+   "keep_inputs": [
+    "in"
+   ],
+   "min_size": 12,
+   "min_volumes": 4
+  },
+  "features": {
+   "-mats": true,
+   "-plots": true,
+   "-rmsabs": true,
+   "-rmsrel": true,
+   "bins": false,
+   "cost": false,
+   "dof": false,
+   "dtype": "int16",
+   "final": false,
+   "first at rest": false,
+   "fudge": false,
+   "gdt": false,
+   "meanvol": true,
+   "noise": 3.0,
+   "nx": 22,
+   "ny": 28,
+   "nz": 17,
+   "oblique": false,
+   "reffile": false,
+   "refvol": false,
+   "rot b": 0,
+   "rot c": 1,
+   "rot d": 0,
+   "rot scale": 2,
+   "rotation": false,
+   "scaling": false,
+   "shift0": 0.0,
+   "shift1": 1.0,
+   "shift2": -0.75,
+   "shift3": 1.0,
+   "slice spacing": 4.0,
+   "smooth": true,
+   "smooth value": "0",
+   "spacing": 4.0,
+   "stages": false,
+   "stats": false,
+   "tissues": "t2",
+   "volumes": 4
+  },
+  "groups": [
+   {
+    "args": [
+     "-in",
+     "{in:in}"
+    ],
+    "name": "input",
+    "optional": false
+   },
+   {
+    "args": [
+     "-out",
+     "{run}/out_mcf.nii.gz"
+    ],
+    "name": "output",
+    "optional": false
+   },
+   {
+    "args": [
+     "-smooth",
+     "0"
+    ],
+    "name": "smooth",
+    "optional": true
+   },
+   {
+    "args": [
+     "-meanvol"
+    ],
+    "name": "meanvol",
+    "optional": true
+   },
+   {
+    "args": [
+     "-mats",
+     "-plots",
+     "-rmsrel",
+     "-rmsabs"
+    ],
+    "name": "outputs",
+    "optional": true
+   }
+  ],
+  "inputs": {
+   "in": {
+    "content": {
+     "axes": [
+      1.0,
+      1.1,
+      0.9
+     ],
+     "bias": [
+      0.0,
+      0.0,
+      0.0,
+      0.0
+     ],
+     "centre": [
+      0.0,
+      0.0,
+      0.0
+     ],
+     "noise": 3.0,
+     "seed": 371236716,
+     "size": 36.96,
+     "tissues": "t2",
+     "type": "head"
+    },
+    "dtype": "int16",
+    "geometry": {
+     "origin": [
+      -42.0,
+      -54.0,
+      -32.0
+     ],
+     "qfac": 1,
+     "qform_code": 1,
+     "quaternion": [
+      1,
+      0,
+      0,
+      0
+     ],
+     "sform": "same",
+     "sform_code": 1,
+     "spacing": [
+      4.0,
+      4.0,
+      4.0
+     ],
+     "units": "mm"
+    },
+    "keep_content": true,
+    "motion": [
+     {
+      "centre": [
+       0.0,
+       0.0,
+       0.0
+      ],
+      "quaternion": [
+       45,
+       2,
+       0,
+       2
+      ],
+      "translation": [
+       -0.25,
+       0.0,
+       0.0
+      ]
+     },
+     {
+      "centre": [
+       0.0,
+       0.0,
+       0.0
+      ],
+      "quaternion": [
+       22,
+       1,
+       -2,
+       -2
+      ],
+      "translation": [
+       -0.25,
+       -1.0,
+       -0.5
+      ]
+     },
+     {
+      "centre": [
+       0.0,
+       0.0,
+       0.0
+      ],
+      "quaternion": [
+       24,
+       0,
+       0,
+       -2
+      ],
+      "translation": [
+       -1.0,
+       -2.0,
+       1.5
+      ]
+     },
+     {
+      "centre": [
+       0.0,
+       0.0,
+       0.0
+      ],
+      "quaternion": [
+       53,
+       0,
+       1,
+       0
+      ],
+      "translation": [
+       0.0,
+       1.0,
+       -0.75
+      ]
+     }
+    ],
+    "scaling": null,
+    "shape": [
+     22,
+     28,
+     17,
+     4
+    ],
+    "suffix": ".nii.gz",
+    "timing": {
+     "slice_code": 0,
+     "tr": 2.0,
+     "tunits": "sec"
+    },
+    "values": {
+     "offset": 0.0,
+     "scale": 1.0
+    }
+   }
+  },
+  "n": 25,
+  "options": [
+   "-mats",
+   "-meanvol",
+   "-plots",
+   "-rmsabs",
+   "-rmsrel",
+   "-smooth 0"
+  ],
+  "seed": "20261025",
+  "tool": "fsl-mcflirt"
+ },
+ "rule": null,
+ "status": "fixed",
+ "suite": "fsl-mcflirt-replica",
+ "tier": "smoke",
+ "tool": "fsl-mcflirt"
+}

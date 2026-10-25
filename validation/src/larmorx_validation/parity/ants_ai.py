@@ -33,7 +33,6 @@ from __future__ import annotations
 
 import os
 import re
-import subprocess
 import tempfile
 from dataclasses import dataclass, replace
 from pathlib import Path
@@ -2113,7 +2112,13 @@ def _run_ants(
     *,
     correctly_rounded: bool = False,
     timeout: float = 7200,
+    never: str = "",
 ):
+    """antsAI or antsAffineInitializer, through the oracle cache: never kept when it reads the
+    clock (``ants_seed_never``), above one thread, or when ``never`` says why
+    (``ants_registration.case_never``). After a timeout: ``None`` and what it printed."""
+    from larmorx_validation import oracle_cache
+
     b = ants_bin()
     if b is None or not (b / program).is_file():
         raise Outcome(SKIPPED, f"the ANTs oracle's {program} was not found")
@@ -2126,22 +2131,16 @@ def _run_ants(
         if lib is None:
             raise FileNotFoundError("libcrmath.so (scripts/build_crmath_preload.sh)")
         env["LD_PRELOAD"] = str(lib)
-    try:
-        p = subprocess.run(
-            [str(b / program), *args],
-            capture_output=True,
-            text=True,
-            encoding="utf-8",
-            errors="replace",
-            env=env,
-            timeout=timeout,
-        )
-    except subprocess.TimeoutExpired as e:
-
-        def text(v) -> str:
-            return v.decode("utf-8", "replace") if isinstance(v, bytes) else (v or "")
-
-        return None, text(e.stdout), text(e.stderr)
+    policy = oracle_cache.Policy(
+        threads=oracle_cache.itk_threads(env),
+        never=never or oracle_cache.ants_seed_never(program, list(args), env),
+        family="itk",
+    )
+    p = oracle_cache.run(
+        [str(b / program), *args], env=env, policy=policy, timeout=timeout, runner="ants-ai"
+    )
+    if p.timed_out:
+        return None, p.stdout, p.stderr
     return p.returncode, p.stdout, p.stderr
 
 
@@ -2275,7 +2274,7 @@ def run_case(case: Case, checks: CheckList) -> None:
         l_dir.mkdir()
         (a_args, seed), (l_args, _) = _resolve(c, a_dir, tmp), _resolve(c, l_dir, tmp)
         timeout = HANG_SECONDS if c.expect == "hang" else 7200
-        ants = _run_ants(program, a_args, seed, timeout=timeout)
+        ants = _run_ants(program, a_args, seed, timeout=timeout, never=reg.case_never(c))
         lx = _run_larmorx(program, l_args, seed)
         if c.expect == "divergence":
             checks(
@@ -2357,7 +2356,7 @@ def run_case(case: Case, checks: CheckList) -> None:
         if c.expect == "random":
             r_dir = tmp / "ants-again"
             r_dir.mkdir()
-            again = _run_ants(program, _resolve(c, r_dir, tmp)[0], seed)
+            again = _run_ants(program, _resolve(c, r_dir, tmp)[0], seed, never=reg.case_never(c))
             checks(
                 "exit status",
                 ants[0] == lx[0] == again[0],
@@ -2395,7 +2394,13 @@ def run_case(case: Case, checks: CheckList) -> None:
             )
             c_dir = tmp / "ants-cr"
             c_dir.mkdir()
-            cr = _run_ants(program, _resolve(c, c_dir, tmp)[0], seed, correctly_rounded=True)
+            cr = _run_ants(
+                program,
+                _resolve(c, c_dir, tmp)[0],
+                seed,
+                correctly_rounded=True,
+                never=reg.case_never(c),
+            )
             _compare(checks, "ANTs with CORE-MATH", cr, lx, c_dir, l_dir)
         if c.fmriprep:
             theirs = _fmriprep_parameters(c.fmriprep)
@@ -2415,7 +2420,9 @@ def run_case(case: Case, checks: CheckList) -> None:
             for n in BAND_THREADS:
                 b_dir = tmp / f"ants-{n}"
                 b_dir.mkdir()
-                code = _run_ants(program, _resolve(c, b_dir, tmp)[0], seed, threads=n)[0]
+                code = _run_ants(
+                    program, _resolve(c, b_dir, tmp)[0], seed, threads=n, never=reg.case_never(c)
+                )[0]
                 if code is not None and code < 0:
                     # ANTS-60: the blob detector indexes its per-thread heaps past their end.
                     crashed.append(f"{n} threads (signal {-code})")

@@ -422,6 +422,15 @@ rule 10).
   the code. A replica that needs a C library's own rounding carries a translation of it in its
   own licence family (the 3dTshift replica's glibc `sinf`/`cosf`, LGPL), never the main
   package.
+- **NaN bits are part of the output** (2026-10-25, the mcflirt replica's ARM CI failure).
+  x86-64's SSE makes a NaN from numbers with the sign set (`-nan`), AArch64's with the sign
+  clear, and when two NaNs meet the compiler's operand order decides which passes on. A replica
+  whose output can hold NaNs computes those paths with SSE's rules made explicit
+  (`larmorx-nc-core/src/sse.rs`: `S32`/`S64` keep an expression's text; NaNs from the input keep
+  their bits), and is checked with `validation/probes/fsl-mcflirt-affine-trace/nan_trap.c`
+  (`NAN_TRAP_ARM=1` emulates ARM's NaN on x86) and with a debug and a release build. Debug builds
+  also check integer overflow: index arithmetic on NaN coordinates (the most negative `int64_t`)
+  uses wrapping operations, as the original's x86-64 code wraps.
 - **Fixed operation order.** Port the original's order of every sum and product; reductions
   use fixed chunks, independent of the thread count. Write explicit `mul_add` where the
   original fuses, and nothing where it does not; no fast-math, no `target-cpu=native`. A
@@ -580,6 +589,14 @@ CLAUDE.md, "Agent working rules"; this section explains why.
   worktree while other runs use it. Build the wheel elsewhere and copy its `_core.abi3.so`.
 - **Records only from a clean commit.** Two agents' records were once stamped `-dirty` and had
   to be redone from the merge.
+- **Run the originals through the oracle cache** ([validation/oracle-cache.md](validation/oracle-cache.md)):
+  a suite calls `oracle_cache.run` with a `Policy` (thread count, environment family, `never`
+  from its case), never `subprocess.run`, so a record re-made at a merge runs only larmorx. Mark
+  what the original varies (a clock seed, memory it never wrote, a case that runs a command twice
+  to measure its spread: `nondeterministic=` or a defect of `VARYING_DEFECTS`); otherwise the
+  cache freezes one run of it. A run that differs from its entry is a finding, kept in the
+  cache's `disputes/`. Derived inputs a suite makes go in `oracles/inputs/<suite>/`, not in the
+  cache's directory.
 - **Finish when a long run ends.** An agent once waited out its last test run and then stopped
   without recording the results; the orchestrator finished its steps. Wait with one background
   wait on the log's final line, then act.

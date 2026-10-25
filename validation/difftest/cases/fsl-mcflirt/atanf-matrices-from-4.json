@@ -1,0 +1,315 @@
+{
+ "defect": null,
+ "description": "the replica with fdlibm's comment value of atanf's aT[0] (0x3eaaaaaa, before 2026-10-25) differed from mcflirt (matrices from MAT_0004); glibc's constant is 0x3eaaaaab",
+ "expect": "pass",
+ "found": {
+  "detail": "every file bit-identical: out_mcf.nii.gz: 9107 of 35280 values differ (max |diff| 1.43); out_mcf.nii.gz.mat/MAT_0004; out_mcf.nii.gz.mat/MAT_0005; out_mcf.nii.gz.par",
+  "n": 44,
+  "seed": "20261025",
+  "shrink_moves": [],
+  "signature": [
+   "every file bit-identical"
+  ]
+ },
+ "id": "atanf-matrices-from-4",
+ "implementations": [
+  "replica"
+ ],
+ "reason": "",
+ "recipe": {
+  "extra": {
+   "keep_inputs": [
+    "in"
+   ],
+   "min_size": 12,
+   "min_volumes": 4
+  },
+  "features": {
+   "-mats": true,
+   "-plots": true,
+   "-rmsabs": false,
+   "-rmsrel": false,
+   "bins": false,
+   "cost": false,
+   "dof": false,
+   "dtype": "float32",
+   "final": false,
+   "first at rest": false,
+   "fudge": false,
+   "gdt": false,
+   "meanvol": false,
+   "noise": 3.0,
+   "nx": 14,
+   "ny": 20,
+   "nz": 18,
+   "oblique": false,
+   "reffile": false,
+   "refvol": true,
+   "refvol value": 2,
+   "rot b": 2,
+   "rot c": -2,
+   "rot d": 1,
+   "rot scale": 5,
+   "rotation": false,
+   "scaling": false,
+   "shift0": 1.5,
+   "shift1": -2.0,
+   "shift2": 1.25,
+   "shift3": 2.0,
+   "shift4": 2.0,
+   "shift5": 1.0,
+   "shift6": 2.0,
+   "slice spacing": 3.0,
+   "smooth": false,
+   "spacing": 2.0,
+   "stages": false,
+   "stats": false,
+   "tissues": "epi",
+   "volumes": 7
+  },
+  "groups": [
+   {
+    "args": [
+     "-in",
+     "{in:in}"
+    ],
+    "name": "input",
+    "optional": false
+   },
+   {
+    "args": [
+     "-out",
+     "{run}/out_mcf.nii.gz"
+    ],
+    "name": "output",
+    "optional": false
+   },
+   {
+    "args": [
+     "-refvol",
+     "2"
+    ],
+    "name": "refvol",
+    "optional": true
+   },
+   {
+    "args": [
+     "-mats",
+     "-plots"
+    ],
+    "name": "outputs",
+    "optional": true
+   }
+  ],
+  "inputs": {
+   "in": {
+    "content": {
+     "axes": [
+      1.0,
+      1.1,
+      0.9
+     ],
+     "bias": [
+      0.0,
+      0.0,
+      0.0,
+      0.0
+     ],
+     "centre": [
+      0.0,
+      0.0,
+      0.0
+     ],
+     "noise": 3.0,
+     "seed": 2070732894,
+     "size": 11.76,
+     "tissues": "epi",
+     "type": "head"
+    },
+    "dtype": "float32",
+    "geometry": {
+     "origin": [
+      -13.0,
+      -19.0,
+      -17.0
+     ],
+     "qfac": 1,
+     "qform_code": 1,
+     "quaternion": [
+      1,
+      0,
+      0,
+      0
+     ],
+     "sform": "same",
+     "sform_code": 1,
+     "spacing": [
+      2.0,
+      2.0,
+      3.0
+     ],
+     "units": "mm"
+    },
+    "keep_content": true,
+    "motion": [
+     {
+      "centre": [
+       0.0,
+       0.0,
+       0.0
+      ],
+      "quaternion": [
+       17,
+       2,
+       -2,
+       0
+      ],
+      "translation": [
+       2.0,
+       1.25,
+       0.75
+      ]
+     },
+     {
+      "centre": [
+       0.0,
+       0.0,
+       0.0
+      ],
+      "quaternion": [
+       46,
+       1,
+       -2,
+       0
+      ],
+      "translation": [
+       -0.25,
+       0.25,
+       0.25
+      ]
+     },
+     {
+      "centre": [
+       0.0,
+       0.0,
+       0.0
+      ],
+      "quaternion": [
+       26,
+       -1,
+       -1,
+       0
+      ],
+      "translation": [
+       1.0,
+       1.0,
+       0.5
+      ]
+     },
+     {
+      "centre": [
+       0.0,
+       0.0,
+       0.0
+      ],
+      "quaternion": [
+       41,
+       0,
+       2,
+       0
+      ],
+      "translation": [
+       0.5,
+       -1.0,
+       -0.75
+      ]
+     },
+     {
+      "centre": [
+       0.0,
+       0.0,
+       0.0
+      ],
+      "quaternion": [
+       42,
+       -2,
+       -1,
+       -2
+      ],
+      "translation": [
+       1.25,
+       -1.0,
+       -0.75
+      ]
+     },
+     {
+      "centre": [
+       0.0,
+       0.0,
+       0.0
+      ],
+      "quaternion": [
+       48,
+       -2,
+       0,
+       -1
+      ],
+      "translation": [
+       1.0,
+       1.0,
+       -0.5
+      ]
+     },
+     {
+      "centre": [
+       0.0,
+       0.0,
+       0.0
+      ],
+      "quaternion": [
+       39,
+       2,
+       -2,
+       1
+      ],
+      "translation": [
+       1.5,
+       -2.0,
+       1.25
+      ]
+     }
+    ],
+    "scaling": null,
+    "shape": [
+     14,
+     20,
+     18,
+     7
+    ],
+    "suffix": ".nii.gz",
+    "timing": {
+     "slice_code": 0,
+     "tr": 2.0,
+     "tunits": "sec"
+    },
+    "values": {
+     "offset": 0.0,
+     "scale": 1.0
+    }
+   }
+  },
+  "n": 44,
+  "options": [
+   "-mats",
+   "-plots",
+   "-refvol"
+  ],
+  "seed": "20261025",
+  "tool": "fsl-mcflirt"
+ },
+ "rule": null,
+ "status": "fixed",
+ "suite": "fsl-mcflirt-replica",
+ "tier": "smoke",
+ "tool": "fsl-mcflirt"
+}

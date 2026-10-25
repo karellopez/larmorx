@@ -140,6 +140,9 @@ class AntsCase:
     outputs: tuple[str, ...] = ("{out}",)
     files: tuple[tuple[str, str], ...] = field(default=())  # (name, text) written to {tmp}
     undefined_values: str = ""
+    #: Why ANTs' result for this case changes from run to run (its runs are then never kept in
+    #: the oracle cache); ``undefined_values`` implies it.
+    nondeterministic: str = ""
     silent_ok: tuple[str, ...] = ()
     one_mode: tuple[str, ...] = ()
     fix_expect: Callable[[list[str], list[Path], Path], tuple[bool, str, object]] | None = field(
@@ -198,26 +201,45 @@ def crmath_preload() -> Path | None:
     return None
 
 
+def case_never(c) -> str:
+    """Why the original's runs of case ``c`` are never kept in the oracle cache (``""``: they
+    may be): the case says the original varies (``nondeterministic``), its values depend on
+    memory the original never wrote (``undefined_values``), or its texts name a defect whose
+    result varies (:data:`larmorx_validation.oracle_cache.policy.VARYING_DEFECTS`)."""
+    from larmorx_validation.oracle_cache.policy import never_for
+
+    if why := getattr(c, "nondeterministic", ""):
+        return why
+    if why := getattr(c, "undefined_values", ""):
+        return f"the original's values depend on memory it never wrote ({why[:120]})"
+    return never_for(c.description, c.reason)
+
+
 def _run_ants(
-    program: str, args: list[str], threads: int = THREADS, *, correctly_rounded: bool = False
+    program: str,
+    args: list[str],
+    threads: int = THREADS,
+    *,
+    correctly_rounded: bool = False,
+    never: str = "",
 ) -> tuple[int, str, str]:
     """Run an ANTs program; with ``correctly_rounded``, with :func:`crmath_preload` preloaded
-    (ITK then calls correctly rounded ``exp``, ``log``, ``sin``, ``cos`` as larmorx does)."""
+    (ITK then calls correctly rounded ``exp``, ``log``, ``sin``, ``cos`` as larmorx does).
+    Through the oracle cache (:mod:`larmorx_validation.oracle_cache`); ``never`` says why this
+    run must always run (:func:`case_never`)."""
+    from larmorx_validation import oracle_cache
+
     env = _env(threads)
     if correctly_rounded:
         lib = crmath_preload()
         if lib is None:
             raise FileNotFoundError("libcrmath.so (scripts/build_crmath_preload.sh)")
         env["LD_PRELOAD"] = str(lib)
-    p = subprocess.run(
-        [str(ants_bin() / program), *args],
-        capture_output=True,
-        text=True,
-        encoding="utf-8",
-        errors="replace",
-        env=env,
-        timeout=1800,
-    )
+    argv = [str(ants_bin() / program), *args]
+    policy = oracle_cache.Policy(threads=oracle_cache.itk_threads(env), never=never, family="itk")
+    p = oracle_cache.run(argv, env=env, policy=policy, timeout=1800, runner="ants-programs")
+    if p.timed_out:
+        raise subprocess.TimeoutExpired(argv, 1800)
     return p.returncode, p.stdout, p.stderr
 
 
@@ -466,7 +488,10 @@ def run_case(case: Case, checks: CheckList) -> None:
         for name, text in c.files:
             (tmp / name).write_text(text, encoding="utf-8")
         results = {}
-        for tool, runner in [("ants", _run_ants), ("larmorx", _run_larmorx)]:
+        for tool, runner in [
+            ("ants", functools.partial(_run_ants, never=case_never(c))),
+            ("larmorx", _run_larmorx),
+        ]:
             outdir = tmp / tool
             outdir.mkdir()
             args = [_resolve(a, tmp, outdir) for a in c.args]
@@ -727,6 +752,7 @@ __all__ = [
     "affine_difference",
     "ants_bin",
     "ants_version",
+    "case_never",
     "cases_for",
     "compare_outputs",
     "crmath_preload",

@@ -668,6 +668,8 @@ def _run_ants(args: list[str], *, correctly_rounded: bool = False) -> int:
     """Run antsApplyTransforms; with ``correctly_rounded``, with CORE-MATH's functions
     preloaded (the oracle binary only)."""
     if (program := _oracle()) is not None:
+        from larmorx_validation import oracle_cache
+
         env = {**os.environ}
         env.setdefault("ITK_GLOBAL_DEFAULT_NUMBER_OF_THREADS", "4")
         if correctly_rounded:
@@ -675,9 +677,17 @@ def _run_ants(args: list[str], *, correctly_rounded: bool = False) -> int:
             if lib is None:
                 raise FileNotFoundError("libcrmath.so (scripts/build_crmath_preload.sh)")
             env["LD_PRELOAD"] = str(lib)
-        return subprocess.run(
-            [str(program), *args], capture_output=True, env=env, timeout=1800
-        ).returncode
+        argv = [str(program), *args]
+        p = oracle_cache.run(
+            argv,
+            env=env,
+            policy=oracle_cache.Policy(threads=oracle_cache.itk_threads(env), family="itk"),
+            timeout=1800,
+            runner="ants-apply-transforms",
+        )
+        if p.timed_out:
+            raise subprocess.TimeoutExpired(argv, 1800)
+        return p.returncode
     import ants
 
     with _quiet_stderr(), contextlib.redirect_stdout(io.StringIO()):

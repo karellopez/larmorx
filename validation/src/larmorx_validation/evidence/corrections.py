@@ -59,6 +59,9 @@ class Spec:
     #: outputs' grid), and how its caption names that region; the whole shown region if None
     focus: Callable[[], np.ndarray] | None = None
     focus_text: str = ""
+    #: the example's view (``example.VIEWS``): the whole display grid, or three slices through
+    #: the voxel where the correction changes the first output most
+    view: str = "volume"
 
 
 def _argv(spec: Spec, out: Callable[[str], str]) -> list[str]:
@@ -141,10 +144,10 @@ RUNS = (
 
 
 def _crosshair(ex, spec: Spec, first: str) -> list[int]:
-    """The default view's voxel: in the axial slice with the most of the shown region, where
-    the correction changes the first output most, within ``spec.focus`` (or the shown region
-    away from its edge); among equal changes (a mask's 0 and 1), the one nearest their centre,
-    so the view is not at the region's first corner."""
+    """The default view's voxel: in the axial slice with the most of the shown region (in a
+    slices view: anywhere in it), where the correction changes the first output most, within
+    ``spec.focus`` (or the shown region away from its edge); among equal changes (a mask's 0
+    and 1), the one nearest their centre, so the view is not at the region's first corner."""
     from scipy import ndimage
 
     from larmorx_validation.evidence.example import PLANE_AXES
@@ -156,15 +159,16 @@ def _crosshair(ex, spec: Spec, first: str) -> list[int]:
     else:
         inner = ndimage.binary_erosion(ex.m, iterations=2)
         region = inner if inner.any() else ex.m
-    axis = PLANE_AXES["axial"][0]
-    others = tuple(i for i in range(3) if i != axis)
-    k = int(np.argmax(ex.m.sum(axis=others)))
-    keep = np.zeros_like(region)
-    index = [slice(None)] * 3
-    index[axis] = k
-    keep[tuple(index)] = True
-    if (region & keep).any():
-        region = region & keep
+    if ex.view == "volume":  # a slices view cuts through the largest change anywhere
+        axis = PLANE_AXES["axial"][0]
+        others = tuple(i for i in range(3) if i != axis)
+        k = int(np.argmax(ex.m.sum(axis=others)))
+        keep = np.zeros_like(region)
+        index = [slice(None)] * 3
+        index[axis] = k
+        keep[tuple(index)] = True
+        if (region & keep).any():
+            region = region & keep
     dv = np.where(region, np.abs(va.astype(np.float64) - vb), -1.0)
     top = np.argwhere(dv == dv.max())
     centre = top.mean(axis=0)
@@ -184,7 +188,7 @@ def example(ctx: core.Context, spec: Spec, reg: dict) -> dict:
     ref_img = nib.load(str(e.dir / f"ants-1-{first}.nii.gz"))
     show = spec.show()
     grid = core.Grid.around(ref_img, show)
-    ex = exm.Example(ctx, grid, show)
+    ex = exm.Example(ctx, grid, show, view=spec.view)
     for key, label, sub in spec.panels:
         ex.add(exm.Panel(key, "input", label, sub, {"all": common.load(str(spec.inputs[key][1]))}))
     for pid, role, label, sub in RUNS:
@@ -269,7 +273,10 @@ def example(ctx: core.Context, spec: Spec, reg: dict) -> dict:
     out = common.finish(
         ctx, ex, diffs, outputs, default=default, window_panel="ants-1",
         caption="the crosshair where larmorx's correction changes the output most"
-        + (f" {spec.focus_text}." if spec.focus is not None else " in it."),
+        + (f" {spec.focus_text}" if spec.focus is not None else (
+            " in the shown region" if spec.view == "slices" else " in it"))
+        + ("; the three slices through it are stored at full resolution, every metric is over "
+           "every voxel" if spec.view == "slices" else "") + ".",
     )  # fmt: skip
     fx = next(x for x in diffs if x["id"] == "fix-repro")
     effect = "; ".join(

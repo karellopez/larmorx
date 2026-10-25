@@ -1,8 +1,20 @@
 # Head-motion correction (`lx.mri.hmc`)
 
-`lx.mri.hmc` (command line `larmorx mri hmc`; Rust crate `larmorx-mri`): head-motion
-correction of a 4D series, compatible with FSL's `mcflirt` (FSL 6.0.7): the same algorithm,
-options, output files and, within mcflirt's own variability, the same numbers.
+`lx.mri.hmc` (command line `larmorx mri hmc`, or `larmorx fsl mcflirt`; Rust crate
+`larmorx-mri`): head-motion correction of a 4D series, compatible with FSL's `mcflirt` (FSL
+6.0.7): the same algorithm, options, output files and, within mcflirt's own variability, the
+same numbers.
+
+**Two implementations** (`implementation="auto" | "replica" | "original"`): the clean-room
+original described on most of this page (Apache-2.0, in `larmorx`), and the bit-exact
+**replica** in the separately licensed `larmorx-nc` package (FSL Licence: non-commercial use
+only), which gives mcflirt's output files byte for byte: 137 of the 137 recorded mcflirt runs,
+with the same messages and exit status where both fail (12 of them), fMRIPrep's own mcflirt
+calls on the 12 oracle runs with BOLD runs (22 of 22, the data panel's included; fMRIPrep's
+4,517 matrices are identical too) and 35 edge cases: 173 of 173 compared cases bit-identical,
+21 rejected alike
+([below](#the-bit-exact-replica-larmorx-nc)). `"auto"`, the default, runs the replica when
+`larmorx-nc` is installed.
 
 **Clean-room re-implementation.** FSL is under a non-commercial licence, so larmorx did not
 port it: the code was written from the behaviour spec [`specs/mcflirt.md`](../../specs/mcflirt.md),
@@ -56,7 +68,7 @@ larmorx mri hmc -in sub-01_task-rest_bold.nii.gz -out bold_mcf.nii.gz \
     -reffile hmc_boldref.nii.gz -mats -plots -rmsrel -rmsabs
 ```
 
-## `lx.mri.hmc(bold, *, reference=None, ref_index=None, mean=False, stages=3, final="trilinear", dof=6, cost="normcorr", smooth=1.0, rotation=1.0, bins=256, fudge=False, in_plane="auto", fov=20, init=None, resample=True, n_threads=1, upstream_defects="fix", normcorr_count="mcflirt")`
+## `lx.mri.hmc(bold, *, reference=None, ref_index=None, mean=False, stages=3, final="trilinear", dof=6, cost="normcorr", smooth=1.0, rotation=1.0, bins=256, fudge=False, in_plane="auto", fov=20, init=None, resample=True, n_threads=1, upstream_defects="fix", normcorr_count="mcflirt", implementation="auto")`
 
 Every volume is registered to the reference with a rigid-body transform (or up to 12 degrees
 of freedom with `dof`) by mcflirt's schedule: one sweep of line searches on the reference
@@ -81,6 +93,7 @@ nibabel image, `(array, affine)`); `reference` likewise. Returns an `HmcResult`:
 | `in_plane` | whether the in-plane mode for thin slabs was used |
 | `image` | the corrected series (float32 `lx.Image`), or `None` with `resample=False` |
 | `mean` | the mean volume of `mean=True` |
+| `implementation` | which implementation computed it: `lx.Implementation("original", "larmorx", ...)` or the replica's (`"replica"`, `"larmorx-nc"`, its version, `"LicenseRef-FSL"`, its program) |
 
 `lx.mri.read_mats(directory)` reads an mcflirt-style `.mat` directory into an `(N, 4, 4)` array.
 
@@ -96,33 +109,68 @@ stages run the volumes in parallel. The result does not depend on the thread cou
 
 ## Option mapping
 
-| mcflirt option | Python | Status |
-|---|---|---|
-| `-in f` (or a bare argument) | `bold` | ✓ |
-| `-out f`, `-o f` | (CLI only: output names) | ✓ |
-| `-reffile f`, `-r f` | `reference` | ✓ (first volume of a 4D file, with mcflirt's warning) |
-| `-refvol n` | `ref_index` | ✓ (`-1`: the default `N/2`) |
-| `-meanvol` | `mean=True` | ✓ |
-| `-stages n` | `stages` | ✓ (1–4; 4 adds the sinc stage) |
-| `-mats`, `-plots`, `-rmsrel`, `-rmsabs` | `matrices`, `params`, `rms_rel`, `rms_abs` (`save_mats`, `save_par`) | ✓ (same files and text formats) |
-| `-stats` | (CLI only) | ✓ (`_meanvol`, `_variance`, `_sigma`; every slice, named after `-out` without its extension; mcflirt's end slices at 0 and names with `reproduce`, FSL-08) |
-| `-sinc_final`, `-spline_final`, `-nn_final` | `final="sinc"`, `"spline"`, `"nearest"` | ✓ |
-| `-dof n` | `dof` | ✓ (6–12; CLI clamps with mcflirt's message) |
-| `-cost c` | `cost` | ✓ `normcorr`; ~ `leastsquares`, `corratio`, `woods`, `mutualinfo`, `normmi` (described in the spec only in outline; not validated) |
-| `-bins n` | `bins` | ✓ |
-| `-smooth x` | `smooth` | ✓ (0: unweighted, Pearson's correlation) |
-| `-rotation x` | `rotation` | ✓ |
-| `-fudge` | `fudge=True` | ✓ (also makes the first stage fully parallel) |
-| `-2d`, `-fov n` | `in_plane="always"`, `fov` | ✓ (`in_plane="never"` is larmorx's) |
-| `-init f` | `init` | ✓ (final resampling only, as mcflirt) |
-| `-scaling x`, `-hist`, `-v`, `-verbose n`, `-report` | – | accepted; `-scaling` and `-hist` have no effect (in mcflirt either; a warning says so, FSL-05); `-report` prints progress messages (not mcflirt's exact text) |
-| `-gdt` | – | ✗ not supported (exit 1) |
-| `-help` | – | ✓ (usage, exit 0; without arguments: exit 1. `-help` alone exits 0; mcflirt's exit 1 with `reproduce`, FSL-07) |
-| (`LARMORX_UPSTREAM_DEFECTS=fix\|reproduce`) | `upstream_defects="fix"` | mcflirt's defects corrected (default) or reproduced ([below](#upstream-defects-d13)) |
-| – | `normcorr_count="mcflirt"` | `"weights"`: the corrected correlation count (FSL-02), opt-in ([below](#the-correlation-count-fsl-02)) |
+| mcflirt option | Python | Clean-room original | Replica (`larmorx-nc`) |
+|---|---|---|---|
+| `-in f` (or a bare argument) | `bold` | ✓ | ✓ |
+| `-out f`, `-o f` | (CLI only: output names) | ✓ | ✓ |
+| `-reffile f`, `-r f` | `reference` | ✓ (first volume of a 4D file, with mcflirt's warning) | ✓ |
+| `-refvol n` | `ref_index` | ✓ (`-1`: the default `N/2`) | ✓ |
+| `-meanvol` | `mean=True` | ✓ | ✓ |
+| `-stages n` | `stages` | ✓ (1–4; 4 adds the sinc stage) | ✓ |
+| `-mats`, `-plots`, `-rmsrel`, `-rmsabs` | `matrices`, `params`, `rms_rel`, `rms_abs` (`save_mats`, `save_par`) | ✓ (same files and text formats) | ✓ (Python returns the files' values: matrices to 6 decimals, parameters and RMS to 6 significant digits) |
+| `-stats` | (CLI only) | ✓ (`_meanvol`, `_variance`, `_sigma`; every slice, named after `-out` without its extension; mcflirt's end slices at 0 and names with `reproduce`, FSL-08) | ✓ (the same corrections) |
+| `-sinc_final`, `-spline_final`, `-nn_final` | `final="sinc"`, `"spline"`, `"nearest"` | ✓ | ✓ |
+| `-dof n` | `dof` | ✓ (6–12; CLI clamps with mcflirt's message) | ✓ |
+| `-cost c` | `cost` | ✓ `normcorr`; ~ `leastsquares`, `corratio`, `woods`, `mutualinfo`, `normmi` (described in the spec only in outline; not validated) | ✓ every cost, bit-identical |
+| `-bins n` | `bins` | ✓ | ✓ (below 8 with a histogram cost: refused by default, FSL-21) |
+| `-smooth x` | `smooth` | ✓ (0: unweighted, Pearson's correlation) | ✓ |
+| `-rotation x` | `rotation` | ✓ | ✓ |
+| `-fudge` | `fudge=True` | ✓ (also makes the first stage fully parallel) | ✓ (the same) |
+| `-2d`, `-fov n` | `in_plane="always"`, `fov` | ✓ (`in_plane="never"` is larmorx's) | ✓ (`in_plane="never"`: the original runs under `"auto"`) |
+| `-init f` | `init` | ✓ (final resampling only, as mcflirt) | ✓ |
+| `-scaling x`, `-hist`, `-v`, `-verbose n`, `-report` | – | accepted; `-scaling` and `-hist` have no effect (in mcflirt either; a warning says so, FSL-05); `-report` prints progress messages (not mcflirt's exact text) | ✓ mcflirt's messages to the byte (`-verbose 20` prints every evaluated matrix) |
+| `-gdt` | – | ✗ not supported (exit 1) | refused by default; `reproduce` registers the gradient images as mcflirt does (FSL-04) |
+| `-help` | – | ✓ (usage, exit 0; without arguments: exit 1. `-help` alone exits 0; mcflirt's exit 1 with `reproduce`, FSL-07) | ✓ (the same) |
+| (`LARMORX_UPSTREAM_DEFECTS=fix\|reproduce`) | `upstream_defects="fix"` | mcflirt's defects corrected (default) or reproduced ([below](#upstream-defects-d13)) | the same corrections; `reproduce` gives mcflirt's bytes |
+| – | `normcorr_count="mcflirt"` | `"weights"`: the corrected correlation count (FSL-02), opt-in ([below](#the-correlation-count-fsl-02)) | ✗ (mcflirt's count; the original runs under `"auto"`) |
+| – | `implementation` | `"original"` | `"replica"`; `"auto"` (default) when `larmorx-nc` is installed |
 
 `FSLOUTPUTTYPE` chooses the output format as for mcflirt (`NIFTI_GZ`, `NIFTI`, `NIFTI2_GZ`,
 `NIFTI2`, the pair types); the CLI's threads come from `OMP_NUM_THREADS` (default: all).
+
+## The bit-exact replica (`larmorx-nc`)
+
+The replica is a translation of mcflirt's source (fsl-mcflirt 2111.0 and the libraries it
+uses, FSL 6.0.7.17) in the `larmorx-nc` package (`crates-nc/`), under the FSL Licence's terms:
+**non-commercial use only**, FSL's original source included ([licensing](../licensing.md)).
+It is installed by name, so that its licence is accepted knowingly:
+
+```bash
+pip install larmorx-nc        # not on PyPI yet: build it from crates-nc/ (crates-nc/README.md)
+```
+
+larmorx never imports it: `lx.mri.hmc` and `larmorx fsl mcflirt` run its program
+(`larmorx-nc fsl mcflirt <mcflirt's arguments>`, found through `LARMORX_NC_BIN`, the Python
+environment's scripts directory or `PATH`) on files and read back what it writes. It gives
+mcflirt's output files byte for byte, its messages and its exit statuses, on every platform:
+it carries the C library's float functions that FSL's Linux build calls (glibc 2.35's `sinf`,
+`cosf`, `sincosf`, `logf`, `atanf`, `atan2f`, each bit-identical to the C library on every input
+checked; [findings](../findings/fsl-mcflirt.md#the-replica-larmorx-nc-2026-10-24)).
+The record: [validation/fsl-mcflirt-replica.md](../validation/fsl-mcflirt-replica.md); the
+random tests' differences of 2026-10-25 were all one constant of `atanf` (fixed) and a missing
+FSL-08 notice for the `-meanvol` image's name (added).
+
+Its defaults are the clean-room original's: mcflirt's deterministic defects are corrected
+(below), and `upstream_defects="reproduce"` gives mcflirt's bytes. Where mcflirt aborts (an
+uncaught exception, or glibc's allocator after FSL-21's out-of-bounds write) the replica prints
+what mcflirt prints and one line of its own, and exits with status 1. Its own threads
+(`n_threads`, `OMP_NUM_THREADS`) run the volumes of the unchained stages and the final
+resampling in parallel; the output does not depend on them. `descrip` in its images is
+`larmorx-nc fsl mcflirt`.
+
+Speed (informal: the evidence's runs on a shared machine, fMRIPrep's command on ds000005, 240
+volumes, writing the corrected series too): 20 s on 3 threads and 36 s on one; mcflirt took
+70 s in the same set of runs (31 s on a quiet machine, [the benchmark](../benchmarks/mri-hmc.md)).
 
 ## Deliberate differences
 
@@ -157,6 +205,9 @@ in both modes ([upstream-defects.md](upstream-defects.md); register entries in
 | FSL-09 | int8 input is written as uint8; integer outputs are truncated toward zero, and values beyond the type's range wrap around (x86-64; observed) | int8 kept; rounded to the nearest (half to even) and clamped | integer outputs of the command line |
 | FSL-10 | the output's units are always millimetres and seconds: a TR in milliseconds is labelled seconds | the input's units are kept (millimetres and seconds where it gives none) | inputs in other units (ds003345: milliseconds) |
 | FSL-13 | `-rmsrel` and `-rmsabs` create the `.mat` directory without `-mats` (holding only the reference's identity) | no `.mat` directory without `-mats` | command line |
+| FSL-04 | `-gdt` registers each volume's gradient image to the reference's plain image (the reference's gradient is computed and discarded) | refused (the clean-room original does not support `-gdt`); the replica reproduces it with `reproduce` | `-gdt` |
+| FSL-20 | when the `.mat` directory cannot be created for another reason than its permissions (a missing parent directory), mcflirt prints "Error!: Unknown Log directory return value" and exits with status 0, writing nothing more | an error (exit 1) | the replica's command line |
+| FSL-21 | with a histogram cost (`corratio`, `mutualinfo`, `normmi`, `woods`) and `-bins` below 8, the first stage's histogram has no bins: the matrices are arbitrary, and `corratio` writes before its arrays and aborts | an error before any work (exit 1) | the replica's command line |
 
 On fMRIPrep's command (`-reffile <boldref> -mats`) FSL-01 changes the last volume's matrix
 (the others are mcflirt's), and FSL-09 the rounding of the corrected series when the input is

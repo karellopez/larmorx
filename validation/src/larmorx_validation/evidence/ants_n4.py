@@ -668,7 +668,7 @@ A40_NODE = f"{A40_WF}/brain_extraction_wf/atropos_wf/inu_n4_final/mapflow/_inu_n
 A40_DATA = {
     "dataset": "OpenNeuro ds005454 (fMRIPrep boot camp, 7T training dataset), v1.0.0",
     "subject": "sub-16",
-    "licence": "CC0-1.0",
+    "licence": "CC-BY-4.0",
 }
 A40_INVESTIGATION = "validation/investigations/ants-40-n4-nonpositive"
 

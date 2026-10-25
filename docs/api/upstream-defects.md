@@ -108,11 +108,16 @@ changed it (`reproduce`); nothing is said when the two would agree.
 | FSL-05 | mcflirt | `larmorx mri hmc` | `-scaling` and `-hist` are accepted and ignored | still ignored (mcflirt gives them no meaning), with a warning |
 | FSL-06 | mcflirt | `larmorx mri hmc` | an unknown `-cost` silently uses normcorr | an error (exit 255) |
 | FSL-07 | mcflirt | `larmorx mri hmc` | numbers are read with C's `atoi`/`atof` (`abc` is 0, `1.5` is 1 for integers); `-help` alone exits 1 | anything but a number is an error (exit 255); `-help` alone exits 0 |
-| FSL-08 | mcflirt | `larmorx mri hmc -stats` | the `-stats` images leave the first and last slices at 0, and `-stats`/`-meanvol` images are named after `-out` with its extension inside (`x.nii.gz_meanvol.nii.gz`) | every slice computed; `x_meanvol.nii.gz` (the names nipype expects) |
+| FSL-08 | mcflirt | `larmorx mri hmc -stats`, `-meanvol` | the `-stats` images leave the first and last slices at 0, and `-stats`/`-meanvol` images are named after `-out` with its extension inside (`x.nii.gz_meanvol.nii.gz`) | every slice computed; `x_meanvol.nii.gz` (the names nipype expects) |
 | FSL-09 | mcflirt | `larmorx mri hmc` | int8 input is written as uint8; integer outputs are truncated toward zero, and values beyond the type's range wrap around (x86-64; C++ leaves it undefined) | int8 stays int8; values are rounded to the nearest (half to even) and clamped |
 | FSL-10 | mcflirt | `larmorx mri hmc` | the output's units are always millimetres and seconds, so a TR in milliseconds is labelled seconds | the input's units are kept |
 | FSL-13 | mcflirt | `larmorx mri hmc` | `-rmsrel` and `-rmsabs` create the `.mat` directory without `-mats` | no `.mat` directory without `-mats` |
+| FSL-04 | mcflirt | `larmorx fsl mcflirt` (the replica; the original refuses `-gdt` in both modes) | `-gdt` registers each volume's gradient image to the reference's plain image | refused (exit 1); `reproduce` registers the gradient images as mcflirt does |
+| FSL-20 | mcflirt | `larmorx fsl mcflirt` (the replica) | when the `.mat` directory cannot be created for another reason than its permissions, mcflirt prints "Error!: Unknown Log directory return value" and exits with status 0, writing nothing more | an error (exit 1) |
+| FSL-21 | mcflirt | `larmorx fsl mcflirt` (the replica) | with a histogram cost and `-bins` below 8, the first stage's histogram has no bins: arbitrary matrices, and `corratio` aborts | an error before any work (exit 1) |
 | SCI-02 | SciPy `ndimage` | `lx.ndimage.*` | NaN results written to a signed integer output, and a `cval` an integer input cannot hold, are converted as x86-64 converts them (C leaves it undefined) | NaN is 0, `cval` clamped |
+
+Rows naming `larmorx fsl mcflirt` are the replica's (`larmorx-nc`, `lx.mri.hmc(implementation="replica")`); it shares the clean-room original's corrections of FSL-01, -03, -05 to -10, -13 and -14.
 
 **ANTs and ITK** (2026-10-12; the tables of each tool's page say which apply to it:
 [ImageMath](ants-image-math.md#upstream-defects-d13),

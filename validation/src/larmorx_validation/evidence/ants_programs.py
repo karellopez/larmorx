@@ -607,7 +607,7 @@ def _speed(ctx: core.Context) -> dict | None:
 A17_DATA = {
     "dataset": "OpenNeuro ds000005 (mixed-gambles task), v00001",
     "subject": "sub-01",
-    "licence": "CC0-1.0",
+    "licence": "PDDL-1.0",
 }
 DSEG = "out/sub-01/anat/sub-01_dseg.nii.gz"
 

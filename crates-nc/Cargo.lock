@@ -3,6 +3,13 @@
 version = 4
 
 [[package]]
+name = "affine-trace-replay"
+version = "0.0.0"
+dependencies = [
+ "larmorx-nc-core",
+]
+
+[[package]]
 name = "autocfg"
 version = "1.5.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -141,6 +148,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "glibc-float-verify"
+version = "0.0.0"
+dependencies = [
+ "larmorx-core",
+ "larmorx-nc-core",
+ "rayon",
+]
+
+[[package]]
 name = "hybrid-array"
 version = "0.4.15"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -172,10 +188,41 @@ dependencies = [
 ]
 
 [[package]]
+name = "larmorx-nc-cli"
+version = "0.0.1"
+dependencies = [
+ "flate2",
+ "larmorx-core",
+ "larmorx-nc-core",
+ "larmorx-nc-mcflirt",
+ "sha2",
+ "tempfile",
+]
+
+[[package]]
+name = "larmorx-nc-core"
+version = "0.0.1"
+dependencies = [
+ "flate2",
+ "larmorx-core",
+ "tempfile",
+]
+
+[[package]]
+name = "larmorx-nc-mcflirt"
+version = "0.0.1"
+dependencies = [
+ "larmorx-core",
+ "larmorx-nc-core",
+ "rayon",
+ "tempfile",
+]
+
+[[package]]
 name = "libc"
-version = "0.2.190"
+version = "0.2.191"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "ce5d3ddc6d3fa000eb1536d85e147bfe31aacaba692ed6a876f95cb7c855be78"
+checksum = "65cd87c9a6d60536580b316ad985726104730a5151c99845f2490428ef91240a"
 
 [[package]]
 name = "libm"
@@ -335,9 +382,9 @@ dependencies = [
 
 [[package]]
 name = "sha2"
-version = "0.11.0"
+version = "0.11.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "446ba717509524cb3f22f17ecc096f10f4822d76ab5c0b9822c5f9c284e825f4"
+checksum = "47d7069beb7d6ac7b9acd1039986e73443f24234f41074da099d6f994ac9ad19"
 dependencies = [
  "cfg-if",
  "cpufeatures",

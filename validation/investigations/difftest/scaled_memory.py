@@ -39,6 +39,13 @@ def main() -> int:
     ap.add_argument("--cap-gib", type=float, default=5.0)
     ap.add_argument("--timeout", type=float, default=1800.0)
     ap.add_argument("--who", default="ANTs,reproduce,fix")
+    ap.add_argument(
+        "--night",
+        type=Path,
+        default=None,
+        help="the night that ran the case: its recipe as the night drew it (the generator "
+        "changes; runner.night_recipe)",
+    )
     args = ap.parse_args()
     box = limits.MemoryBox.find()
     if box is None:
@@ -47,7 +54,12 @@ def main() -> int:
         )
     box.nest()
     name, seed, n = args.case.rsplit(":", 2)
-    recipe = core.make_recipe(tools.get(name), seed, int(n))
+    if args.night is not None:
+        from larmorx_validation.difftest import runner
+
+        recipe = runner.night_recipe(args.night, {"tool": name, "seed": seed, "n": int(n)})
+    else:
+        recipe = core.make_recipe(tools.get(name), seed, int(n))
     args.out.mkdir(parents=True, exist_ok=True)
     paths = {}
     for k, spec in recipe["inputs"].items():

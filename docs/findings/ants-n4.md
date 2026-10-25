@@ -524,7 +524,7 @@ control point of the largest level, 21 per padded voxel) and, when they exceed t
 physical memory or `LARMORX_MEMORY_LIMIT`, stops at once with the GiB needed and the likely
 cause (the voxels' size and the extent they give, against the spline distance), naming
 ANTS-162; every case that fits is unchanged, bit for bit; `reproduce` attempts it as ANTs does.
-The same guard covers ResampleImage's and ResampleImageBySpacing's output grids (16 bytes per
+The same guard covers ResampleImage's and ResampleImageBySpacing's output grids (7.5 bytes per
 output voxel). **A D11 option:** a control point without data in its support gets phi = 0 (and so do
 its refinements), so the lattice is zero away from the data; a sparse lattice, with the
 padding kept virtual (its voxels have weight 0 and are cropped at the end), gives the same

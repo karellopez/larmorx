@@ -259,11 +259,13 @@ pub enum Coordinates {
 }
 
 /// larmorx's working memory per output voxel of `ResampleImage` and `ResampleImageBySpacing`,
-/// measured with `validation/investigations/difftest/scaled_memory.py` (12.5 to 16 bytes; ANTs
-/// 7.3) when ResampleImageBySpacing still resampled a second time for its ANTS-32 notice (the
-/// voxels beyond the input are now counted in the pass itself): kept as the guard's bound
-/// until measured again.
-pub const GRID_BYTES: f64 = 16.0;
+/// the largest measured (`validation/investigations/difftest/scaled_memory.py` and
+/// `memory_pair.py`, 2026-10-25, after the voxels beyond the input were counted in the pass
+/// itself and the gzip writer held one batch): 7.2 bytes, as ANTs' 7.2, for a 2D
+/// ResampleImageBySpacing in `reproduce`; 4.0 for float outputs, 1.0 for `unsigned char` ones
+/// (ANTs 4.0 and 1.0). Was 16 while ResampleImageBySpacing resampled twice for its ANTS-32
+/// notice.
+pub const GRID_BYTES: f64 = 7.5;
 
 /// ANTS-162: the memory an output grid of `output` needs ([`GRID_BYTES`] per voxel), checked
 /// before anything is allocated; the error names the bytes and their likely cause (the

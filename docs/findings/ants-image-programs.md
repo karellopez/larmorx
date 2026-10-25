@@ -194,5 +194,5 @@ validated in 2D and 4D. Spatial operations need more:
 - **ANTS-161:** ResampleImage's refusal of a Gaussian sigma or alpha of 0 or less now names the
   defect.
 - **ANTS-162:** ResampleImage's and ResampleImageBySpacing's output grid is checked against the
-  machine's memory before it is allocated (16 bytes per output voxel); see
-  [ants-n4.md](ants-n4.md), "Memory".
+  machine's memory before it is allocated (7.5 bytes per output voxel, the most it was
+  measured to need); see [ants-n4.md](ants-n4.md), "Memory".

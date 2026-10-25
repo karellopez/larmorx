@@ -334,8 +334,8 @@ defects! {
         "a negative scl_slope is dropped where a voxel's series is read (THD_extract_array) but applied elsewhere: 3dTshift's shifted slices come out sign-flipped and scaled, 3dAutomask averages several sub-bricks without the factor, 3dUnifize -EPI's median volume has the wrong sign";
     AFNI_02 = "AFNI-02", "AFNI", true,
         "float32 data with a slope and an intercept are scaled when read and keep the slope in the output header, so they are scaled twice";
-    AFNI_03 = "AFNI-03", "3dTshift", true,
-        "header slice code 2 (sequential decreasing) gives every slice time 0, so nothing is shifted";
+    AFNI_03 = "AFNI-03", "AFNI", true,
+        "header slice code 2 (sequential decreasing) gives every slice time 0: 3dTshift shifts nothing, and 3dAutomask and 3dUnifize write no slice timing";
     AFNI_05 = "AFNI-05", "3dTshift", true,
         "-no_detrend removes and restores the mean of only the first voxel of each pair; the second is shifted as raw values";
     AFNI_07 = "AFNI-07", "AFNI", true,

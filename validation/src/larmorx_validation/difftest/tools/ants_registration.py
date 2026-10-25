@@ -40,7 +40,10 @@ CLOCK_SEEDED = ("Exponential", "BSplineExponential", "TimeVaryingVelocityField")
 
 
 def _phantom_pair(d: gen.Draw, dim: int) -> tuple[dict, dict]:
-    n = [d.integer(f"fixed n{k}", 10, 22) for k in range(dim if dim < 4 else 3)]
+    # A 4D stage costs one more axis of B-spline support per point: smaller 4D phantoms keep a case
+    # within its time (a 22x17x13x2 BSpline stage took more than 300 s, trial3:9).
+    hi = 22 if dim < 4 else 12
+    n = [d.integer(f"fixed n{k}", 10 if dim < 4 else 8, hi) for k in range(dim if dim < 4 else 3)]
     spacing = d.choice("fixed spacing", (2.0, 2.5, 3.0))
     fixed_geo = gen.plumb_geometry(
         (spacing,) * 3, tuple(-(v - 1) * spacing / 2 for v in [*n, 1, 1][:3])

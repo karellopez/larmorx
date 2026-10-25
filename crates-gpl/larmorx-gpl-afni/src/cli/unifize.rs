@@ -829,6 +829,50 @@ mod tests {
         assert!(!err.contains("AFNI-48"), "{err}");
     }
 
+    /// AFNI-03 in 3dUnifize (random testing, 2026-10-25): a series whose header says slice code
+    /// 2 keeps its slice times in the corrected output, where AFNI reads them as zeros and
+    /// writes no slice timing; both modes name it.
+    #[test]
+    fn header_slice_code_2_is_named() {
+        use larmorx_core::element::DataType;
+        use larmorx_io::nifti::{self, NiftiHeader, NiftiVersion, WriteOptions};
+        let dir = tempfile::tempdir().unwrap();
+        let input = dir.path().join("in.nii");
+        let mut h = NiftiHeader::new(NiftiVersion::V1, &[4, 4, 4, 2], DataType::F32).unwrap();
+        h.dim_info = 3 << 4;
+        h.slice_code = 2;
+        h.slice_start = 0;
+        h.slice_end = 3;
+        h.slice_duration = 0.125;
+        h.pixdim[4] = 0.5;
+        h.xyzt_units = 2 | 8;
+        let data = larmorx_core::ndarray::ArrayD::from_elem(
+            larmorx_core::ndarray::IxDyn(&[4, 4, 4, 2]),
+            100.0f32,
+        );
+        nifti::write(&input, &h, data.view(), &WriteOptions::default()).unwrap();
+        for mode in [UpstreamDefects::Fix, UpstreamDefects::Reproduce] {
+            let out = dir.path().join(format!("uni-{}.nii", mode.name()));
+            let args: Vec<String> = [
+                "-EPI",
+                "-prefix",
+                out.to_str().unwrap(),
+                input.to_str().unwrap(),
+            ]
+            .iter()
+            .map(|s| (*s).to_owned())
+            .collect();
+            let (mut o, mut e) = (Vec::new(), Vec::new());
+            let code = main_with(&args, mode, Settings::empty(), &mut o, &mut e);
+            let err = String::from_utf8(e).unwrap();
+            assert_eq!(code, 0, "{err}");
+            assert!(
+                err.contains("upstream defect AFNI-03 (AFNI)"),
+                "{mode}: {err}"
+            );
+        }
+    }
+
     #[test]
     fn option_rules() {
         let (o, i) =

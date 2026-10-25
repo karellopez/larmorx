@@ -51,7 +51,7 @@ def draw_automask(d: gen.Draw) -> dict:
         ),
         ("nograd", 0.2, lambda: ["-nograd"]),
         ("peels", 0.25, lambda: ["-peels", d.choice("peels value", ("0", "1", "2", "3"))]),
-        ("nbhrs", 0.15, lambda: ["-nbhrs", d.choice("nbhrs value", ("6", "12", "17", "20"))]),
+        ("nbhrs", 0.15, lambda: ["-nbhrs", d.choice("nbhrs value", ("6", "12", "17", "20", "5", "30"))]),
         ("NN", 0.2, lambda: [d.choice("neighbourhood", ("-NN1", "-NN2", "-NN3"))]),
         ("eclip", 0.2, lambda: ["-eclip"]),
         ("dilate", 0.35, lambda: ["-dilate", d.choice("dilate value", ("1", "2", "3"))]),
@@ -74,8 +74,9 @@ def draw_automask(d: gen.Draw) -> dict:
     groups += [required("prefix", "-prefix", out), required("input", "{in:input}")]
     extra: dict = {"outputs": outputs}
     nbhrs = next((g["args"][1] for g in groups if g["name"] == "nbhrs"), None)
-    if nbhrs is not None and not 6 <= int(nbhrs) <= 18:
-        # -nbhrs outside 6..18 (AFNI-41, rule B): the default refuses, naming the defect.
+    if nbhrs is not None and not 6 <= int(nbhrs) <= 26:
+        # -nbhrs outside 6..26 (AFNI-41, rule B): the default refuses, naming the defect (19..26
+        # act as 18 in AFNI and in larmorx alike).
         extra["fix_refuses"] = "AFNI-41"
     return {
         "groups": groups,

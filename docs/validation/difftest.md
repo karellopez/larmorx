@@ -147,6 +147,20 @@ Random inputs must not make the cache grow without bound, and every finding must
   and the permanent case built from it are served from the cache;
 - so the cache grows only by the findings, a few per night at most; nothing is ever deleted.
 
+## Before the first night: three trial runs
+
+Three short runs (half an hour each at two jobs, 2026-10-25, seeds `trial1` to `trial3`; 642,
+1563 and {TRIAL3_CASES} cases) tested the harness and found, before the first night, what the
+triage file lists as fixed: in the ports, ITK's sform/qform choice made in vnl's float SVD
+(larmorx decided in double), allocations ITK refuses (larmorx aborted), singular directions ITK
+refuses, composite transform names ITK cannot create, a float transform's point indexed in
+float, vnl's SVD warning on a NaN Mattes histogram, ImageFileWriter's origin (the sign of a
+zero) and its refusal of an empty image, Atropos' k-means on an empty mask, the CC metric's
+Jacobian (ITK-35 thrown where ITK does not); in the GPL replicas, AFNI-03's notice in 3dAutomask
+and 3dUnifize; and in the harness its own mistakes (an infinite value compared with itself, the
+fix pass of options the program never reaches, ANTS-82's clock). Three defects of the originals
+went into the register: ANTS-160, ANTS-161 and ITK-95.
+
 ## The first night
 
-Written after the first real night (below, filled from its `report.md`).
+{FIRST_NIGHT}

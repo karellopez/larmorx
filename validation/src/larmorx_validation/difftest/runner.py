@@ -752,13 +752,18 @@ def _environment() -> dict:
     from larmorx_validation import environment
 
     repo = Path(__file__).resolve().parents[4]
+    # A night run from an exported copy of a commit (no .git) names it in LARMORX_COMMIT.
+    commit = os.environ.get("LARMORX_COMMIT", "")
     try:
-        commit = subprocess.run(
-            ["git", "-C", str(repo), "describe", "--always", "--dirty", "--abbrev=12"],
-            capture_output=True,
-            text=True,
-            check=False,
-        ).stdout.strip()
+        commit = (
+            commit
+            or subprocess.run(
+                ["git", "-C", str(repo), "describe", "--always", "--dirty", "--abbrev=12"],
+                capture_output=True,
+                text=True,
+                check=False,
+            ).stdout.strip()
+        )
     except OSError:
         commit = ""
     env = {"larmorx_commit": commit, "machine": platform.machine(), "cpus": os.cpu_count()}

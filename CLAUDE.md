@@ -208,6 +208,7 @@ Every agent reads this file first, then `docs/porting-guide.md`, its section of 
 
 ## Working on this machine
 - Run long jobs (fMRIPrep and FreeSurfer oracles, benchmarks) in the background with `tmux` or `nohup`.
+- **Every heavy job runs in a memory box** (2026-10-25): `scripts/orchestration/boxed.sh <GiB> <command>` (a systemd user scope, hard memory limit, no swap), for parity tiers, random testing, fMRIPrep oracle runs, benchmarks, `record_golden.py` and `verify-merge.sh`; a harness that runs original programs on generated inputs also caps each process. On 2026-10-25 one random N4BiasFieldCorrection case grew to 28 GB; the machine swapped until VS Code's terminal host stopped answering, and the editor and every agent in it went down. Boxes of parallel agents together stay under about 24 GiB (the machine has 31).
   - Log to `oracles/logs/`.
   - Record the exact command, image tag/version, seeds and thread counts next to the outputs.
 - Never commit image data or oracle outputs to git. Use content-addressed storage (PLAN.md §11.1).

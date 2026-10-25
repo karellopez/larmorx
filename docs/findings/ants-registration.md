@@ -285,6 +285,14 @@ composed with `Compose(·, pre = true)` (a `TranslationTransform` through its of
   level ITK uses the bin size of 0 (NaN bin indices, clamped; the metric 0). larmorx threw at
   every level in both modes (`ants-registration:20261025:884`); now `reproduce` follows ITK and
   the default keeps the exception (rule B), both naming ITK-100.
+- **A field under a `.mat` name (ANTS-51).** Without collapsing, a stage that adds no transform
+  of its own (a Translation stage whose Demons metric throws, "The moving transform must be a
+  displacement field transform", which ANTs catches and goes on) leaves ANTs' list of names one
+  short, so the next stage's displacement field is written under the linear stage's `.mat` name; ANTs' `WriteTransform` (`itkantsReadWriteTransform.h:146-170`)
+  then writes the stage's object itself (`GaussianSmoothingOnUpdateDisplacementFieldTransform`),
+  where for `.h5` and composites it makes a new `DisplacementFieldTransform`. larmorx wrote the
+  new one everywhere (`ants-registration:20261025:979`: the same parameters, another class name);
+  now a field keeps its stage's class under a `.mat` or `.txt` name.
 - **The empty sample set's exception** is ITK's `itkImageToImageMetricv4.hxx:263` with the
   metric's own class name (`MattesMutualInformationImageToImageMetricv4`, ...), or
   `itkJointHistogramMutualInformationImageToImageMetricv4.hxx:233` for `MI`; larmorx printed line

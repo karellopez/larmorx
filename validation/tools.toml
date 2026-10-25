@@ -151,7 +151,7 @@ eco = "fsl"
 page = "/tools/mri-hmc/"
 use = ["larmorx mri hmc", "larmorx fsl mcflirt", "lx.mri.hmc"]
 how = "clean-room original, `experimental`; exact replica in `larmorx-nc` (FSL Licence, non-commercial)"
-validation = "original: [compared with FSL's mcflirt](record:mri-hmc): {mri-hmc.pass} of {mri-hmc.compared} compared cases within thresholds; [5–16× faster](repo:docs/benchmarks/mri-hmc.md) with threads; replica: [{fsl-mcflirt-replica.pass} of {fsl-mcflirt-replica.compared}](record:fsl-mcflirt-replica) compared cases bit-identical to mcflirt as built (the 137 recorded runs, fMRIPrep's calls on the five oracle runs, 32 edge cases; {fsl-mcflirt-replica.both} more rejected by both, alike), fMRIPrep's own matrices identical"
+validation = "original: [compared with FSL's mcflirt](record:mri-hmc): {mri-hmc.pass} of {mri-hmc.compared} compared cases within thresholds; [5–16× faster](repo:docs/benchmarks/mri-hmc.md) with threads; replica: [{fsl-mcflirt-replica.pass} of {fsl-mcflirt-replica.compared}](record:fsl-mcflirt-replica) compared cases bit-identical to mcflirt as built ({fsl-mcflirt-replica.both} more rejected by both, alike), fMRIPrep's calls on the oracle runs and its own matrices included"
 
 # ------------------------------------------------------------------------------------------------
 # Records: the validation index's table (docs/validation/README.md), in this order.

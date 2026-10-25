@@ -10,8 +10,9 @@ original described on most of this page (Apache-2.0, in `larmorx`), and the bit-
 **replica** in the separately licensed `larmorx-nc` package (FSL Licence: non-commercial use
 only), which gives mcflirt's output files byte for byte: 137 of the 137 recorded mcflirt runs,
 with the same messages and exit status where both fail (12 of them), fMRIPrep's own mcflirt
-calls on the five oracle runs (7 of 7; fMRIPrep's matrices are identical too) and 32 edge
-cases: 155 of 155 compared cases bit-identical, 21 rejected alike
+calls on the 12 oracle runs with BOLD runs (22 of 22, the data panel's included; fMRIPrep's
+4,517 matrices are identical too) and 35 edge cases: 173 of 173 compared cases bit-identical,
+21 rejected alike
 ([below](#the-bit-exact-replica-larmorx-nc)). `"auto"`, the default, runs the replica when
 `larmorx-nc` is installed.
 
@@ -153,8 +154,11 @@ larmorx never imports it: `lx.mri.hmc` and `larmorx fsl mcflirt` run its program
 environment's scripts directory or `PATH`) on files and read back what it writes. It gives
 mcflirt's output files byte for byte, its messages and its exit statuses, on every platform:
 it carries the C library's float functions that FSL's Linux build calls (glibc 2.35's `sinf`,
-`cosf`, `sincosf`, `logf`, `atan2f`; [findings](../findings/fsl-mcflirt.md#the-replica-larmorx-nc-2026-10-24)).
-The record: [validation/fsl-mcflirt-replica.md](../validation/fsl-mcflirt-replica.md).
+`cosf`, `sincosf`, `logf`, `atanf`, `atan2f`, each bit-identical to the C library on every input
+checked; [findings](../findings/fsl-mcflirt.md#the-replica-larmorx-nc-2026-10-24)).
+The record: [validation/fsl-mcflirt-replica.md](../validation/fsl-mcflirt-replica.md); the
+random tests' differences of 2026-10-25 were all one constant of `atanf` (fixed) and a missing
+FSL-08 notice for the `-meanvol` image's name (added).
 
 Its defaults are the clean-room original's: mcflirt's deterministic defects are corrected
 (below), and `upstream_defects="reproduce"` gives mcflirt's bytes. Where mcflirt aborts (an

@@ -131,6 +131,22 @@ The `getenv` trace (9 runs) found 73 names: 3dAutomask's, and the OpenMP runtime
 `Aomp.h:47-54`, before the global options: a `-D` cannot set it). None changes a result. The
 replica's table: `environ::UNIFIZE`.
 
+## AFNI-75: `-EPI`'s ball of neighbours on tiny voxels (random testing, 2026-10-25)
+
+`-EPI` sets `Uprad = 18.3 / cbrtf(|dx dy dz|)`, at least 4.14 (`3dUnifize.c:1060-1068`), after
+the options are read (so `-Urad` and `-rbt` are overridden), with the voxel sizes in mm and no
+upper bound; `mri_local_percmean` then builds `MCW_spheremask(1,1,1,Uprad)` whole
+(`3dUnifize.c:300-302`, `:425-427`; `edt_buildmask.c`), a loop over `(2 Uprad + 1)^3` offsets
+whose points are kept as three shorts and a float. A NIfTI header in micrometres (`xyzt_units`
+3: AFNI's reader scales them to mm) gives voxels of 0.0005 to 0.004 mm, a radius of 5000 to
+12000 voxels and 10^11 to 10^13 points: the night's `afni-unifize:20261025:89`, `:118` and
+`:226` stopped AFNI at the case's 3 GiB limit (the replica's comparison) or at 600 s (the
+original's). The replica's `unifize::sphere` is AFNI's loop; by default `cli::unifize` checks
+`unifize::ball_bytes(radius, workers)` against `larmorx_core::alloc::check_plan` first and stops
+with an error naming AFNI-75 (unit test `epi_ball_beyond_any_machine_is_refused`, permanent case
+`validation/difftest/cases/afni-unifize/epi-ball-beyond-any-machine.json`); `reproduce` attempts
+it. The `-Urad` and `-rbt` radii are limited to 5 to 99 voxels and never reach the guard.
+
 ## Verification
 
 - `docs/validation/afni-unifize.md`: the parity record against the AFNI 25.2.09 binary.

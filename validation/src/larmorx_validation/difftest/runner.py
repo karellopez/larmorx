@@ -108,6 +108,7 @@ UNDEFINED_DEFECTS: dict[str, str] = {
     "AFNI-04": "a shift beyond the series reads past it (memory)",
     "ANTS-163": "a mask of another size is read outside its buffer (memory)",
     "ITK-98": "B-spline interpolation on a short axis reads outside the coefficients (memory)",
+    "ITK-99": "a sampled metric writes a derivative past the end of its array (memory)",
 }
 
 #: A refusal that names its defect (``... an error (ANTS-160)``): larmorx refuses a class (a)

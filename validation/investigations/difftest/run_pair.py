@@ -46,6 +46,9 @@ def main() -> int:
             e = {**env, "LARMORX_UPSTREAM_DEFECTS": who}
         p = subprocess.run(cmd, capture_output=True, text=True, env=e, check=False)
         runs[who] = p
+        # Each run's messages, kept for a closer look.
+        (out / "stdout.txt").write_text(p.stdout, encoding="utf-8")
+        (out / "stderr.txt").write_text(p.stderr, encoding="utf-8")
         print(f"== {who}: exit {p.returncode}")
         print(p.stderr.replace(str(out), "{out}").rstrip() or "(no standard error)")
 

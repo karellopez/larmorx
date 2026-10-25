@@ -64,6 +64,33 @@ pub enum MetricKind {
     Demons,
 }
 
+/// ITK's exception for a sampled metric left without points: thrown in
+/// `ImageToImageMetricv4::GetValueAndDerivativeExecute` (`itkImageToImageMetricv4.hxx:263`),
+/// in the joint-histogram metric's `InitializeForIteration` (line 233) for `MI`; the class
+/// printed is the metric's own (random testing, 2026-10-25: larmorx printed line 268 and the
+/// base class).
+pub(crate) fn empty_sample_set(kind: MetricKind) -> ItkException {
+    const BASE: &str = "Modules/Registration/Metricsv4/include/itkImageToImageMetricv4.hxx";
+    let (file, line, class) = match kind {
+        MetricKind::Mi { .. } => (
+            "Modules/Registration/Metricsv4/include/itkJointHistogramMutualInformationImageToImageMetricv4.hxx",
+            233,
+            "JointHistogramMutualInformationImageToImageMetricv4",
+        ),
+        MetricKind::Mattes { .. } => (BASE, 263, "MattesMutualInformationImageToImageMetricv4"),
+        MetricKind::MeanSquares => (BASE, 263, "MeanSquaresImageToImageMetricv4"),
+        MetricKind::Gc => (BASE, 263, "CorrelationImageToImageMetricv4"),
+        MetricKind::Cc { .. } => (BASE, 263, "ANTSNeighborhoodCorrelationImageToImageMetricv4"),
+        MetricKind::Demons => (BASE, 263, "DemonsImageToImageMetricv4"),
+    };
+    ItkException::new(
+        file,
+        line,
+        class,
+        "VirtualSampledPointSet must have 1 or more points.",
+    )
+}
+
 /// One image metric of a stage: its images (preprocessed), masks and settings.
 #[derive(Clone, Debug)]
 pub struct ImageStageMetric<R, const D: usize> {
@@ -151,6 +178,9 @@ pub struct Stage<R, const D: usize> {
     /// ITK-35 corrected: a B-spline transform applied after the stage's transform has its
     /// Jacobian with respect to position (ITK throws at the first derivative).
     pub correct_bspline_jacobian: bool,
+    /// ITK-97 and ITK-99: the derivatives of sample points outside the virtual region,
+    /// aliased as ITK does (`reproduce`) or dropped, and their counts.
+    pub outside: crate::metric::OutsideDerivatives,
     pub n_threads: usize,
 }
 
@@ -414,12 +444,7 @@ impl<'a, R: Real, const D: usize> LevelProblem<'a, R, D> {
         if let Some(s) = &metric.samples
             && s.is_empty()
         {
-            return Err(ItkException::new(
-                "Modules/Registration/Metricsv4/include/itkImageToImageMetricv4.hxx",
-                268,
-                "ImageToImageMetricv4",
-                "VirtualSampledPointSet must have 1 or more points.",
-            ));
+            return Err(empty_sample_set(kind));
         }
         let state = LevelMetric::initialize(kind, &metric)?;
         let samples = scales::corners(&metric.virtual_space);
@@ -608,6 +633,10 @@ impl<R: Real, const D: usize> Problem<R> for LevelProblem<'_, R, D> {
 
     fn number_of_local_parameters(&self) -> usize {
         self.moving.number_of_local_parameters()
+    }
+
+    fn take_warnings(&mut self) -> Vec<String> {
+        std::mem::take(&mut self.warnings)
     }
 
     fn estimate_scales(&mut self) -> Result<Vec<R>, ItkException> {
@@ -839,6 +868,7 @@ pub fn full_scale_cc<R: Real, const D: usize>(
         moving_gradient_image: None,
         pixel_f32: false,
         local_support: false,
+        outside: Default::default(),
     };
     let r =
         NeighborhoodCorrelation { radius: 4 }.evaluate(&metric, moving_transform, false, floor)?;
@@ -1039,6 +1069,7 @@ where
                     moving_gradient_image: None,
                     pixel_f32: false,
                     local_support,
+                    outside: stage.outside.clone(),
                 }),
                 StageMetric::PointSet(_) => None,
             });
@@ -1105,12 +1136,7 @@ where
                     if let Some(s) = &m.samples
                         && s.is_empty()
                     {
-                        return Err(ItkException::new(
-                            "Modules/Registration/Metricsv4/include/itkImageToImageMetricv4.hxx",
-                            268,
-                            "ImageToImageMetricv4",
-                            "VirtualSampledPointSet must have 1 or more points.",
-                        ));
+                        return Err(empty_sample_set(sm.kind));
                     }
                     // Demons checks its transform before ImageToImageMetricv4::Initialize, and
                     // takes its gradient from the fixed image.
@@ -1270,6 +1296,37 @@ mod tests {
         Image::new(space, data)
     }
 
+    /// ITK-97 and ITK-99 (differential random testing, 2026-10-25): the parameter offset of a
+    /// virtual index outside the region, as ITK computes it (the region's linear offset): a
+    /// voxel of the array (aliased, kept only with `alias`) or none (past the array).
+    #[test]
+    fn outside_indices_alias_as_in_itk() {
+        let fixed = Arc::new(blob(4, 0.0, [3.0; 3]));
+        for alias in [false, true] {
+            let metric = ImageMetricv4 {
+                fixed: Arc::clone(&fixed),
+                moving: Arc::clone(&fixed),
+                fixed_mask: None,
+                moving_mask: None,
+                fixed_transform: None,
+                virtual_space: fixed.space.clone(),
+                samples: None,
+                fixed_gradient_image: None,
+                moving_gradient_image: None,
+                pixel_f32: false,
+                local_support: true,
+                outside: crate::metric::OutsideDerivatives::new(alias),
+            };
+            assert_eq!(metric.voxel_of(&[1, 2, 3]), Some(1 + 4 * 2 + 16 * 3));
+            // One past the end of the first axis: the next row's first voxel.
+            assert_eq!(metric.voxel_of(&[4, 0, 0]), alias.then_some(4));
+            // Before the first voxel, or past the last plane: outside the array.
+            assert_eq!(metric.voxel_of(&[-1, 0, 0]), None);
+            assert_eq!(metric.voxel_of(&[0, 0, 4]), None);
+            assert_eq!((metric.outside.aliased(), metric.outside.beyond()), (1, 2));
+        }
+    }
+
     /// The derivative of MeanSquares through a composite against central finite differences
     /// of its value: the best scalar `c` with `derivative ≈ c·fd` and the relative residual.
     fn derivative_check(composite: Composite<f64, 3>) -> (f64, f64) {
@@ -1289,6 +1346,7 @@ mod tests {
             moving_gradient_image: None,
             pixel_f32: false,
             local_support: false,
+            outside: Default::default(),
         };
         let floor = IndexFloor::new(larmorx_core::defects::UpstreamDefects::Fix);
         let mut problem =

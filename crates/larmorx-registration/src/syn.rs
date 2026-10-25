@@ -297,6 +297,7 @@ fn initialize_metric<R: Real, const D: usize>(
         moving_gradient_image: moving_gradient,
         pixel_f32: false,
         local_support: true,
+        outside: Default::default(),
     };
     let state = match kind {
         MetricKind::Demons => {
@@ -325,12 +326,7 @@ fn metric_derivative<R: Real, const D: usize>(
     if let Some(s) = &m.metric.samples
         && s.is_empty()
     {
-        return Err(ItkException::new(
-            "Modules/Registration/Metricsv4/include/itkImageToImageMetricv4.hxx",
-            268,
-            "ImageToImageMetricv4",
-            "VirtualSampledPointSet must have 1 or more points.",
-        ));
+        return Err(crate::method::empty_sample_set(m.kind));
     }
     match (&m.state, m.kind) {
         (Some(state), _) => state.evaluate(&m.metric, moving, true, floor, warnings),
@@ -1135,6 +1131,7 @@ pub fn full_scale_cc<R: Real, const D: usize>(
             moving_gradient_image: None,
             pixel_f32: false,
             local_support: true,
+            outside: Default::default(),
         };
         crate::metric::neighborhood_correlation::NeighborhoodCorrelation { radius: 4 }.evaluate(
             &metric,

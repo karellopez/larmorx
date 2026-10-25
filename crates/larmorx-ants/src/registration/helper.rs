@@ -1564,6 +1564,9 @@ impl<R: Compute, const D: usize> RegistrationHelper<R, D> {
                 bspline_mesh,
                 correct_gc_derivative: self.upstream_defects.fix(),
                 correct_bspline_jacobian: self.upstream_defects.fix(),
+                outside: larmorx_registration::metric::OutsideDerivatives::new(
+                    !self.upstream_defects.fix(),
+                ),
                 n_threads: self.n_threads,
             };
             if composite.iter().any(Xfm::is_bspline) {
@@ -1790,6 +1793,40 @@ impl<R: Compute, const D: usize> RegistrationHelper<R, D> {
             }
             self.warnings.extend(observed);
             self.warnings.extend(warnings);
+            // ITK-97 and ITK-99: sample points outside the shrunk virtual region (random
+            // testing, 2026-10-25).
+            let (aliased, beyond) = (stage_spec.outside.aliased(), stage_spec.outside.beyond());
+            let fix = self.upstream_defects.fix();
+            if aliased > 0 {
+                push_once(
+                    &mut self.notices,
+                    Notice::new(
+                        &defects::ITK_97,
+                        self.upstream_defects,
+                        if fix {
+                            format!(
+                                "stage {stage}: {aliased} derivative(s) of sample points outside the virtual region dropped; ITK adds them to the parameters of other voxels (the region's linear offset of their index)"
+                            )
+                        } else {
+                            format!(
+                                "stage {stage}: {aliased} derivative(s) of sample points outside the virtual region added to the parameters of other voxels, as ITK does"
+                            )
+                        },
+                    ),
+                );
+            }
+            if beyond > 0 {
+                push_once(
+                    &mut self.notices,
+                    Notice::new(
+                        &defects::ITK_99,
+                        self.upstream_defects,
+                        format!(
+                            "stage {stage}: {beyond} derivative(s) of sample points outside the virtual region dropped; ITK writes them past the end of its derivative array (memory it does not own)"
+                        ),
+                    ),
+                );
+            }
             match result {
                 Ok((mut t, _)) => {
                     // An exponential transform that never integrated (no iteration, no

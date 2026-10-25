@@ -177,6 +177,9 @@ pub fn optimize<R: Real, P: Problem<R> + ?Sized, O: MultiStartObserver<R> + ?Siz
             }
             problem.value()
         })();
+        // The warnings the start point's scales estimation printed come before its own
+        // (random testing, 2026-10-25: antsAI printed them all after the multi-start's).
+        warnings.extend(problem.take_warnings());
         let failed = match attempt {
             Ok(v) => {
                 current_value = v;

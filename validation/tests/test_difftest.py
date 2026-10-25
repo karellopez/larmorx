@@ -19,6 +19,7 @@ from larmorx_validation.difftest import (  # noqa: E402
     core,
     gen,
     inputs,
+    limits,
     permanent,
     report,
     shrink,
@@ -466,5 +467,8 @@ def test_a_case_over_the_memory_limit_is_recorded_and_the_night_goes_on(tmp_path
     heavy = {h["n"] for h in report.heavy(out)}
     assert heavy == {n for n, kind in who.items() if kind != "nobody"}
     info = json.loads((out / "run.json").read_text())
-    assert info["memory"]["case"] == "0.75 GiB" and info["memory"]["box"] == "2 GiB"
+    # The box it made for itself, or the one it already ran in (the gates run in a box).
+    enclosing = limits.MemoryBox.find()
+    box = limits.gib(enclosing.limit) if enclosing is not None else "2 GiB"
+    assert info["memory"]["case"] == "0.75 GiB" and info["memory"]["box"] == box
     assert "ended" in info

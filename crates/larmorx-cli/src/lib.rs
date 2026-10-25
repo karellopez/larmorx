@@ -5,7 +5,7 @@
 //! argument syntax of the program it replaces. Parsing lives here, once, and is shared by the
 //! standalone binaries and the Python console scripts (through `larmorx._core`).
 //!
-//! Tools with a bit-exact replica in another package (`larmorx-gpl`) run that package's
+//! Tools with a bit-exact replica in another package (`larmorx-gpl`, `larmorx-nc`) run that package's
 //! program as a separate process when it is found, and the clean-room original otherwise
 //! ([`replica`], `docs/licensing.md`).
 #![forbid(unsafe_code)]
@@ -32,8 +32,13 @@ const EXIT_IO_ERROR: u8 = 1;
 pub const FAMILIES: &[(&str, &[&str])] = &[
     ("afni", AFNI_TOOLS),
     ("ants", larmorx_ants::cli::TOOLS),
+    ("fsl", FSL_TOOLS),
     ("mri", larmorx_mri::cli::TOOLS),
 ];
+
+/// The FSL tools, with FSL's command lines: the replica (`larmorx-nc`) when it is installed,
+/// else the clean-room original of the same program (`fsl mcflirt` is `mri hmc`).
+const FSL_TOOLS: &[&str] = &["mcflirt"];
 
 /// The AFNI tools: the clean-room originals' (`larmorx_afni::cli::TOOLS`) and those with a
 /// replica only, which run when the `larmorx-gpl` program is installed
@@ -184,6 +189,10 @@ fn run_tool(
     match family {
         "afni" => larmorx_afni::cli::run(tool, args, out, err),
         "ants" => larmorx_ants::cli::run(tool, args, options.loader, out, err),
+        "fsl" => match tool {
+            "mcflirt" => larmorx_mri::cli::run("hmc", args, out, err),
+            _ => None,
+        },
         "mri" => larmorx_mri::cli::run(tool, args, out, err),
         _ => None,
     }
@@ -391,6 +400,13 @@ mod tests {
     }
 
     #[test]
+    fn fsl_mcflirt_is_the_original_of_mri_hmc() {
+        let (code, out, err) = run_capture(&["lx", "fsl", "mcflirt"]);
+        assert_eq!((code, out, err), run_capture(&["lx", "mri", "hmc"]));
+        assert!(replica::lookup("fsl", "mcflirt").is_some_and(|r| r.original));
+    }
+
+    #[test]
     fn every_listed_tool_is_dispatched() {
         let (_, help, _) = run_capture(&["lx", "--help"]);
         for (family, tools) in FAMILIES {
@@ -419,11 +435,18 @@ mod tests {
 
     #[test]
     fn unknown_commands_and_options_are_usage_errors() {
-        let (code, out, err) = run_capture(&["lx", "fsl", "bet"]);
+        let (code, out, err) = run_capture(&["lx", "spm", "realign"]);
         assert_eq!(code, EXIT_USAGE);
         assert_eq!(out, "");
-        assert!(err.starts_with("error: unknown command 'fsl'"), "{err}");
+        assert!(err.starts_with("error: unknown command 'spm'"), "{err}");
         assert!(err.contains("Run 'lx --help'"), "{err}");
+
+        let (code, _, err) = run_capture(&["lx", "fsl", "fslmaths"]);
+        assert_eq!(code, EXIT_USAGE);
+        assert!(
+            err.starts_with("error: unknown fsl tool 'fslmaths'"),
+            "{err}"
+        );
 
         let (code, _, err) = run_capture(&["lx", "afni", "3dvolreg"]);
         assert_eq!(code, EXIT_USAGE);

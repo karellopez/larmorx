@@ -15,6 +15,10 @@ import pytest
 import larmorx as lx
 from larmorx.cli import run as cli_run
 
+# The clean-room original, whatever replicas this machine has installed (the replica's own
+# tests: test_mri_replica.py).
+pytestmark = pytest.mark.usefixtures("no_replica")
+
 SHAPE = (24, 26, 18)
 ZOOMS = (3.5, 3.5, 4.0)
 

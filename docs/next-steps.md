@@ -85,9 +85,14 @@ starts no other agent.
    re-validated on the panel, with its evidence page updated.
 7. **FSL:** the mcflirt replica, BET, FAST, FLIRT with BBR, topup: a replica in `larmorx-nc` (FSL
    licence, with FSL's source as its terms require) and a clean-room original each. In progress
-   (started 2026-10-24, beside item 6 at the user's request): the mcflirt replica (with
-   `crates-nc/` and FSL's shared core) and the BET replica with its spec are built, to be merged
-   one after the other; then BET's clean-room original, FLIRT with BBR, FAST, topup.
+   (started 2026-10-24, beside item 6 at the user's request). **The mcflirt replica: done**
+   (2026-10-25): `crates-nc/` (`larmorx-nc`, FSL Licence, FSL's source included), the core crate
+   `larmorx-nc-core` (NIfTI as FSL does it, `volume<float>`, interpolation, FLIRT's cost
+   functions, the optimiser, the transform algebra, Armadillo's rules, glibc's float maths) for
+   the next FSL replicas; record [fsl-mcflirt-replica](validation/fsl-mcflirt-replica.md): 155 of
+   155 compared cases bit-identical. **BET:** the replica and its spec are built, to be merged
+   after its FSL library code moves into `larmorx-nc-core`; then BET's clean-room original,
+   FLIRT with BBR, FAST, topup.
 8. **Field maps, FreeSurfer, surfaces, confounds:** sdcflows' field-map estimation (Apache Python:
    the B-spline fit, PEPOLAR and phase-difference preparation) and fMRIPrep's own Python steps;
    FreeSurfer (`larmorx-freesurfer`: `mri_coreg`, `lta_convert`, then recon-all; its Talairach step
@@ -99,6 +104,12 @@ starts no other agent.
 10. **Releases on PyPI** (below).
 
 ## Follow-ups, when they fit
+
+- **mcflirt's FSL-20 and FSL-21 in the clean-room original:** a spec writer adds them to
+  `specs/mcflirt.md` (behaviour only; the replica's record shows mcflirt's black-box outputs),
+  then a clean-room implementer adds them to `lx.mri.hmc`'s original.
+- **A benchmark report of the mcflirt replica** (informal: fMRIPrep's call on ds000005, the
+  replica 20 s at 3 threads and 36 s at one, mcflirt 70 s, on a busy machine).
 
 - **The oracle cache, further:** `pipeline-stages` still keeps its own runs (`oracles/compare`)
   and could use the cache; mcflirt's variability band (`parity/mri_hmc_band.py`) and the recorded

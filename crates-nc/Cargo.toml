@@ -1,0 +1,36 @@
+# SPDX-License-Identifier: LicenseRef-FSL
+# The FSL replica workspace (`larmorx-nc`, docs/licensing.md): bit-exact translations of FSL's
+# source, distributed under the FSL Licence's terms (LICENSE: non-commercial use only, the
+# licence passed on to every receiver, FSL's original and amended source included; fsl-source/).
+#
+# It is a separate Cargo workspace, so the Apache-2.0 workspace at the repository root never
+# builds it and no Apache crate can depend on it. Its crates use the Apache crates by path
+# (Apache-2.0 code may be included in this work, with its notices: LICENSES/). It never links
+# the GPL workspace (crates-gpl/): the FSL Licence's conditions and the GPL exclude each other.
+[workspace]
+resolver = "3"
+members = [
+    "larmorx-nc-core",
+    "larmorx-nc-core/tools/glibc-float-verify",
+    "larmorx-nc-mcflirt",
+    "larmorx-nc-cli",
+]
+
+[workspace.package]
+version = "0.0.1"
+edition = "2024"
+license = "LicenseRef-FSL"
+repository = "https://github.com/karellopez/larmorx"
+
+# Pure-Rust dependencies only (CLAUDE.md rule 5): no C, C++, Fortran or HDF5 libraries.
+[workspace.dependencies]
+larmorx-core = { path = "../crates/larmorx-core", version = "0.0.1" }
+larmorx-nc-core = { path = "larmorx-nc-core", version = "0.0.1" }
+larmorx-nc-mcflirt = { path = "larmorx-nc-mcflirt", version = "0.0.1" }
+# zlib-rs: the pure-Rust zlib implementation (no C zlib), as the root workspace.
+flate2 = { version = "1.1.10", default-features = false, features = ["zlib-rs", "runtime_detection"] }
+rayon = "1.12.0"
+thiserror = "2.0.21"
+tempfile = "3.27.0"
+# Test-only: SHA-256 for the golden tests (larmorx-nc-cli/tests/golden.rs).
+sha2 = { version = "0.11.0", default-features = false }

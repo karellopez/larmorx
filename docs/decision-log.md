@@ -1203,6 +1203,28 @@ choices made while building it ([validation/oracle-cache.md](validation/oracle-c
 - **Suites' own derived inputs** live outside the cache's directory, in `oracles/inputs/<suite>/`
   (orchestrator, 2026-10-25).
 
+## 2026-10-24: The mcflirt replica's choices
+
+- **The FSL replica carries glibc's float functions** (as the 3dTshift replica carries glibc's
+  `sinf`/`cosf`). mcflirt calls the C library's `sincosf` at every cost evaluation, `logf` in
+  the mutual-information costs and `sinf` for the sinc kernels; glibc 2.35's are not correctly
+  rounded, and with correctly rounded functions 12 of 79 synthetic recorded runs differed from
+  mcflirt as built (each identical to mcflirt with the CORE-MATH preload). `larmorx-nc-core`
+  translates glibc's FMA build from Arm's Optimized Routines (MIT; the same code glibc ships,
+  so no LGPL code enters the FSL-licensed package) and is verified on all 2^32 inputs; with it
+  the replica is bit-identical to mcflirt as users run it on Linux x86-64 in every case. The
+  double `cos` and `log` stay correctly rounded: glibc agrees with them at every argument
+  mcflirt uses.
+- **mcflirt's questionable behaviours, by the rules of 2026-10-23:** FSL-15 (`-init` in the
+  final resampling only) rule C, kept; FSL-18 (Woods' squared counts) not a defect (it is
+  Woods' criterion), rule C; new FSL-20 (an uncreatable `.mat` directory: exit 0) rule B, an
+  error; new FSL-21 (histogram costs with `-bins` below 8: no bins) rule B, an error. Each
+  keeps the `reproduce` switch in the replica.
+- **`implementation="auto"` runs the FSL replica when `larmorx-nc` is installed**, as for the
+  GPL replicas. `larmorx-nc` (non-commercial) is installed by name or with `larmorx[all]` (the
+  user's decision of 2026-10-16: everything), never with `[exact]` (orchestrator, at the merge,
+  2026-10-25: the `[all]` extra added to `pyproject.toml` accordingly).
+
 ## Open decisions (PLAN.md §16)
 
 | # | Decision | Recommended default (used until decided) | Status |

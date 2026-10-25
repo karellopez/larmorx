@@ -51,12 +51,22 @@ command-line binary. Code from different families is never linked into one binar
   glibc translation, and the Apache-2.0 text and `NOTICE` of the larmorx crates the program
   includes (`crates-gpl/LICENSES/`; copies of the repository's files, kept identical by
   `crates-gpl/larmorx-gpl-cli/tests/notices.rs`, because maturin takes licence files only from
-  below `crates-gpl/`). `larmorx-nc` will be packaged the same way.
+  below `crates-gpl/`). `larmorx-nc` is packaged the same way (`crates-nc/pyproject.toml`, licence
+  `LicenseRef-FSL`): its wheel carries the FSL Licence (`crates-nc/LICENSE`), the FSL,
+  Armadillo, fdlibm and Arm notices (`crates-nc/NOTICE`), the Apache-2.0 text and `NOTICE` of
+  the larmorx crate it includes and Arm's MIT licence (`crates-nc/LICENSES/`), and, because the
+  FSL Licence requires "all original and amended source code" in every transmitted product,
+  FSL's original source of the replicated parts (`crates-nc/fsl-source/`, with `MANIFEST.tsv`)
+  and the Rust translation itself, all as licence files. `crates-nc/larmorx-nc-cli/tests/notices.rs`
+  checks the copies and the source manifest.
 - **Nothing is on PyPI yet.** Build the wheels locally:
   ```bash
   maturin build --release --locked --out dist                    # larmorx (repository root)
   (cd crates-gpl && maturin build --release --locked --out ../dist)   # larmorx-gpl
-  pip install --find-links dist "larmorx[exact]"
+  (cd crates-nc && maturin build --release --locked --out ../dist)    # larmorx-nc (FSL Licence)
+  pip install --find-links dist "larmorx[exact]"                      # + the GPL replicas
+  pip install --find-links dist larmorx-nc                            # the FSL replicas, by name
+  pip install --find-links dist "larmorx[all]"                        # everything, both included
   ```
 - **In the repository** (all in this one repository; for FSL decided 2026-10-10):
   - `crates/` holds the Apache crates;
@@ -202,13 +212,15 @@ library's.
     started, 2 for an invalid `LARMORX_IMPLEMENTATION` or `LARMORX_GPL_BIN`.
   - With `-verbose`, each implementation's first line names it, with its package and version.
 - **Finding the program** (the same rules for both, `larmorx_cli::replica`):
-  1. the package's environment variable, `LARMORX_GPL_BIN` (an error if it names no file);
+  1. the package's environment variable, `LARMORX_GPL_BIN` or `LARMORX_NC_BIN` (an error if it names no file);
   2. the current Python environment's scripts directory (`sysconfig`), where `pip` puts the
      program, so a venv works without being activated; for the standalone `larmorx` binary,
      the directory of that binary;
   3. `PATH`.
 - **Installing the replicas is explicit:** `pip install "larmorx[exact]"` adds `larmorx-gpl`;
-  `larmorx-nc` must be installed by name, so its licence is accepted knowingly.
+  `larmorx-nc` (non-commercial) comes only by name or with `pip install "larmorx[all]"`, which
+  installs everything (the user's decision of 2026-10-16), so its licence is accepted knowingly
+  either way; `[exact]` never brings it.
 - **larmorprepx** (Apache-2.0) uses `implementation="auto"`, so it gives the most accurate
   results whenever the replicas are installed. Its reports say which tools ran which
   implementation.

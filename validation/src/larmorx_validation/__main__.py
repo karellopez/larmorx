@@ -9,6 +9,7 @@ committed records and the figures cache (:mod:`larmorx_validation.figures`, ``do
 
 ``--implementation replica`` runs a suite against the GPL replica (``larmorx-gpl``, which
 larmorx runs as a separate process) instead of the clean-room original, where a suite has one.
+The FSL replica (``larmorx-nc``) has its own suite, ``fsl-mcflirt-replica``.
 
 ``--oracle-cache use|refresh|off`` says how the original programs' runs use the oracle-output
 cache (:mod:`larmorx_validation.oracle_cache`); ``python -m larmorx_validation oracle-cache
@@ -37,6 +38,7 @@ PARITY_MODULES = {
     "resample-series": "resample_series",
     "numpy-linalg": "numpy_linalg",
     "mri-hmc": "mri_hmc",
+    "fsl-mcflirt-replica": "fsl_mcflirt_replica",
     "ants-image-math": "ants_image_math",
     "ants-threshold-image": "ants_threshold_image",
     "ants-multiply-images": "ants_multiply_images",

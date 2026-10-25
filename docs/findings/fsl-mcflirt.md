@@ -248,6 +248,103 @@
 `fslStartup.cc:70-85` disables OpenBLAS threading before `main`; newimage volumes default to
 one thread. No random numbers. *Verified:* three runs of fMRIPrep's command on ds000005 give byte-identical outputs (`real/ds000005/fmriprep-repeat*`).
 
+## The replica (`larmorx-nc`, 2026-10-24)
+
+The bit-exact replica (`crates-nc/larmorx-nc-mcflirt` and `larmorx-nc-core`) was translated
+from the files above. What the translation had to get right, beyond the source's reading:
+
+**The binary follows the source (rule 8).** The conda build's libraries and `mcflirt` were
+compiled by conda-forge GCC 13.2.0 (producer strings `GCC: (conda-forge gcc 13.2.0-3|4)`).
+`objdump -d` finds no fused multiply-add in `mcflirt`, `libfsl-newimage.so`,
+`libfsl-miscmaths.so`, `libfsl-NewNifti.so`, `libfsl-znz.so` or `libfsl-utils.so`, so every
+`float` and `double` operation is rounded where the source rounds it; x87 instructions occur
+only in `libfsl-NewNifti.so` (102: its `long double` quaternion code, emulated exactly in
+`x87.rs`). With the translation following the source operation by operation, all 137
+recorded runs are bit-identical (below), so no source-built oracle is needed. *Verified*
+(2026-10-24).
+
+**Precision decided by the compiled code** where the source is ambiguous (each checked in the
+disassembly): `q_kernelval`'s second product `kernel[n+1]*dn` is a float product (`mulss`)
+while the first is double (`1.0 - dn` is a double literal; `costfns.cc`); `sincfn`'s small-`x`
+branch is the float `1.0f - |x|`; `kernelval`'s index arithmetic is float throughout and its
+interpolation double (`ColumnVector`); `hanning` and `blackman` evaluate in double and return
+float; `MISCMATHS::dot` returns float; `Min`/`Max` take the second argument's type;
+`round(float)` adds 0.5 in double and truncates; `make_rot` calls `sincosf` on a float angle
+(GCC pairs `sin`/`cos`); `rotmat2euler` calls `atan2f`.
+
+**Armadillo's evaluation (fsl-armawrap 0.6.0, Armadillo 10.5.1).** armawrap's NEWMAT
+expressions become Armadillo expressions whose evaluation order sets the bits: `inv(A)*B*C`
+is `solve(A, B*C)` (for 4 × 4: `inv_tiny(A)` then a large-matrix product with
+`direct_dot_arma`'s two accumulators), `A*inv(B)*C` is `A*solve(B, C)`, three plain factors
+`(A*B)*C`, four `((A*B)*C)*D`; products of at most 4 × 4 use `gemm_emul_tinysq` (left-to-right
+sums); `accu` and `dot` use two accumulators up to 32 elements; `max` keeps one running
+maximum from `-inf`; `inv` of a 4 × 4 uses the cofactor formula when the determinant is in
+`[eps, 1/eps]` and the result checks within 1e-10, else falls back. Larger products go to
+BLAS (OpenBLAS 0.3.26 at run time); mcflirt never reaches them, and the replica panics if it
+ever does.
+
+**The C library's maths: mcflirt as built calls glibc 2.35.** On the oracle machine (a CPU
+with FMA) glibc selects `__sinf_fma`, `__cosf_fma`, `__sincosf_fma` and `__logf_fma`; `atan2f`
+and `atanf` are fdlibm's. None is correctly rounded: over all 2^32 floats `sinf` misrounds
+29,362,812 inputs (0.68 %), `cosf` 28,209,642, `logf` 416,908 (GLIBC-02, -03); at the angles
+mcflirt's searches use (|x| ≤ 0.5) `sinf` misrounds 0.063 %, `cosf` 0.0015 %, and `logf`
+0.020 % of probabilities. mcflirt calls `sincosf` at every cost evaluation (`make_rot`), `logf`
+in the mutual-information costs and `sinf` for the sinc kernels: of the Blackman kernel's 1201
+samples (`-sinc_final`, the fourth stage) 24 `sinf` arguments are misrounded and 20 samples
+differ from correctly rounded ones; glibc's double `cos` agrees with the correctly rounded one
+on all 2402 window arguments, and so do the 201 samples of the stage-4 cost's Hanning table
+and `log` of every bin count up to 4096 (`crates-nc/larmorx-nc-core/tools/glibc-float-verify`).
+With correctly rounded functions (`larmorx_core::math`), 12 of the 79 synthetic recorded runs
+differed from mcflirt as built, and each was bit-identical to mcflirt run with the CORE-MATH
+preload (`oracles/core-math-preload`; the probe is
+`validation/investigations/fsl-mcflirt-replica/crm_compare.py`). The replica therefore
+carries glibc 2.35's float functions as the FMA build computes them, translated from Arm's
+Optimized Routines v19.11 (MIT; glibc's are the same code: identical expressions and
+constants) with every `a + b*c` a fused multiply-add (`larmorx-nc-core/src/glibc_float.rs`):
+bit-identical to the C library on all 2^32 inputs of `sinf`, `cosf`, both outputs of
+`sincosf`, and `logf`. *Verified* (2026-10-24). On a CPU without FMA glibc selects its SSE2
+build, which differs on 12 `sinf` and 22 `cosf` inputs (GLIBC-03): there mcflirt's own results
+can differ from the replica's (and from mcflirt's on this machine).
+
+**Corrections and reproductions found while translating** (register entries FSL-20, FSL-21;
+FSL-04 now reproduced):
+- `-gdt` (FSL-04) is reproduced with `reproduce`: each test volume is replaced by its 3×3×3
+  gradient magnitude (`make_grad_masks`, float sums in mask order), the reference stays plain,
+  and `grefvol_<-out>` is the plain reference; with a relative `-out` it runs to the end.
+- `Log::establishDir` (`Log.cc`) creates `<out>.mat`, adding `+` while the name exists; a
+  permission error prints "Error! Could not create directory: ... No write permission" and goes
+  on; any other error (a missing parent directory) prints "Error!: Unknown Log directory return
+  value" and `exit(0)`s before the `.par`, `.rms` and image are written (FSL-20).
+- The histogram costs take `no_bins / scaling` bins at each stage (`mcflirt.cc` `usrsetscale`):
+  with `-bins` below 8 the first stage has none. The mutual-information costs and Woods' then
+  compute a degenerate cost and the search ends at arbitrary matrices (deterministic:
+  reproduced); the correlation ratio adds bin 0 into bin -1 (`costfns.cc` `numy[no_bins-1] +=
+  numy[no_bins]`), before its arrays, and glibc aborts when they are freed ("double free or
+  corruption (out)"). The replica reproduces the abort when the written values are non-zero
+  (FSL-21).
+- An `-out` whose `.mat` directory cannot be made, an absent `-in`, a missing or malformed
+  `-init` (`Could not open matrix file`, armawrap's `AWException`, Armadillo's "matrix
+  multiplication: incompatible matrix dimensions"), `-dof` out of range ("Erroneous dof"),
+  `-verbose 20` (every evaluated matrix, after which `cerr` stays in fixed notation:
+  armawrap's `operator<<` sets it and never restores it): all reproduced to the byte.
+
+**Threads in the replica.** Within a pass of a stage that does not chain its volumes (stages
+2-4; the first with `-fudge`), each volume's search reads only the reference, its volume and
+its start, so the replica runs them in parallel and prints their messages in mcflirt's order;
+the final resampling is parallel over volumes. The first stage's chain and the mean volume's
+sum stay sequential. Outputs are byte-identical at 1 and 3 threads (golden and parity tests).
+
+**fMRIPrep's mcflirt is not FSL 6.0.7.17's, but gives the same matrices.** fMRIPrep 25.2.6's
+image has fsl-mcflirt 2111.0 with fsl-newimage 2501.4, fsl-miscmaths 2412.4 and fsl-armawrap
+0.7.0 (FSL 6.0.7.17: 2203.12, 2203.2, 0.6.0), and glibc 2.35. On the seven mcflirt calls of the
+five fMRIPrep oracle runs, its `.mat` files are identical as text to FSL 6.0.7.17's and to the
+replica's: 1,273 of 1,273 matrices (the replica's record, `docs/validation/fsl-mcflirt-replica.md`,
+the `fmriprep/` cases). *Verified* (2026-10-24).
+
+**What the replica does not reproduce:** the abort's signal (it prints what mcflirt prints and
+one line of its own, then exits with status 1), FSL's build string in `descrip`, and mcflirt's
+single thread.
+
 ## fMRIPrep, nipype, niworkflows, nitransforms (Apache-2.0 / MIT; not restricted)
 
 - nipype 1.12.0 `fsl.MCFLIRT(save_mats=True)` with `in_file` and `ref_file` builds

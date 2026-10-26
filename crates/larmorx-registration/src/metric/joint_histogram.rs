@@ -386,10 +386,14 @@ impl<R: Real> JointHistogramMi<R> {
             ))
         };
         let mut reduction = BaseReduction::for_metric(m, transform, true);
-        m.for_each_sample(process, |(local, voxel, cols)| {
-            reduction.add_point_cols(R::ZERO, &local, cols.as_deref(), voxel);
-            Ok(())
-        })?;
+        m.for_each_sample_of(
+            m.sample_width(transform),
+            process,
+            |(local, voxel, cols)| {
+                reduction.add_point_cols(R::ZERO, &local, cols.as_deref(), voxel);
+                Ok(())
+            },
+        )?;
         let reduced = reduction.finish(true, np);
         if reduced.no_valid_points {
             warnings.push(no_valid_points_warning(

@@ -834,7 +834,7 @@ pub fn gradient_image_with<R: Real, const D: usize>(
     n_threads: usize,
 ) -> Result<Image<[f64; D], D>, ItkException> {
     let space = &image.space;
-    let components = R::gradient(
+    let mut data = R::gradient::<D>(
         &image.data,
         &space.size,
         &space.spacing,
@@ -850,12 +850,9 @@ pub fn gradient_image_with<R: Real, const D: usize>(
             e.to_string(),
         )
     })?;
-    let data = (0..space.len())
-        .map(|o| {
-            let local: [f64; D] = std::array::from_fn(|k| components[k][o]);
-            space.local_to_physical_vector(&local)
-        })
-        .collect();
+    for v in &mut data {
+        *v = space.local_to_physical_vector(v);
+    }
     Ok(Image::new(space.clone(), data))
 }
 

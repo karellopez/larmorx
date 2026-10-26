@@ -32,8 +32,14 @@ use crate::mask::Mask;
 use crate::transform::Composite;
 use crate::{Image, ItkException, Real, Space};
 
-/// Points evaluated in parallel before they are consumed in order.
+/// Points evaluated in parallel before they are consumed in order (at most).
 const CHUNK: usize = 1 << 14;
+
+/// The bytes of results a chunk may hold per thread ([`ImageMetricv4::for_each_sample_of`]).
+const CHUNK_BYTES: usize = 1 << 20;
+
+/// The fewest points per thread in a chunk.
+const MIN_CHUNK: usize = 64;
 
 /// `f` run in a pool of `n_threads` threads (0: every logical CPU), or in the current pool
 /// when `None` (the caller installed the call's pool): never rayon's global pool, whose size
@@ -194,6 +200,20 @@ impl<R: Real, const D: usize> ImageMetricv4<R, D> {
             D
         } else {
             transform.number_of_parameters()
+        }
+    }
+
+    /// The derivative values one sample keeps until its chunk is consumed
+    /// ([`ImageMetricv4::jacobian_columns`]' columns): a B-spline transform's support, else
+    /// [`ImageMetricv4::local_parameters`].
+    #[inline]
+    pub fn sample_width(&self, transform: &Composite<R, D>) -> usize {
+        if self.local_support {
+            D
+        } else {
+            transform
+                .sparse_jacobian_width()
+                .unwrap_or_else(|| transform.number_of_parameters())
         }
     }
 
@@ -428,25 +448,59 @@ impl<R: Real, const D: usize> ImageMetricv4<R, D> {
     pub fn for_each_sample<T: Send>(
         &self,
         f: impl Fn(usize) -> Option<T> + Sync,
-        mut consume: impl FnMut(T) -> Result<(), ItkException>,
+        consume: impl FnMut(T) -> Result<(), ItkException> + Send,
+    ) -> Result<(), ItkException> {
+        self.for_each_sample_of(0, f, consume)
+    }
+
+    /// The points evaluated together when each keeps `width` derivative values and their
+    /// columns: about `CHUNK_BYTES` of results per thread of the call, between `MIN_CHUNK`
+    /// points per thread and `CHUNK` points.
+    pub fn sample_chunk(&self, width: usize) -> usize {
+        let threads = match self.n_threads {
+            Some(t) => larmorx_core::parallel::resolve_threads(t),
+            None => rayon::current_num_threads(),
+        }
+        .max(1);
+        // A value, a column index and the tuple's own words per kept value.
+        let per_sample = 64 + 16 * width;
+        (CHUNK_BYTES * threads / per_sample)
+            .clamp(MIN_CHUNK * threads, CHUNK.max(MIN_CHUNK * threads))
+    }
+
+    /// [`ImageMetricv4::for_each_sample`] for samples that each keep `width` derivative values
+    /// (and their columns) until consumed: the chunks hold at most about `CHUNK_BYTES` per
+    /// thread of results (a B-spline transform's samples keep its whole support: a fixed chunk
+    /// of `CHUNK` of them held hundreds of MiB where ITK holds one sample per thread; the
+    /// user's rule, never more memory than the original). The chunk size never changes a
+    /// result: every sample is consumed in domain order.
+    pub fn for_each_sample_of<T: Send>(
+        &self,
+        width: usize,
+        f: impl Fn(usize) -> Option<T> + Sync,
+        mut consume: impl FnMut(T) -> Result<(), ItkException> + Send,
     ) -> Result<(), ItkException> {
         let n = self.number_of_domain_points();
-        let mut start = 0;
-        let mut buffer: Vec<Option<T>> = Vec::new();
-        while start < n {
-            let end = (start + CHUNK).min(n);
-            buffer.clear();
-            let f = &f;
-            let chunk = &mut buffer;
-            self.in_pool(move || {
-                (start..end).into_par_iter().map(f).collect_into_vec(chunk);
-            })?;
-            for r in buffer.drain(..).flatten() {
-                consume(r)?;
+        let chunk = self.sample_chunk(width);
+        let f = &f;
+        // One entry into the call's pool for every chunk (the chunks consumed in order there).
+        self.in_pool(move || {
+            let mut start = 0;
+            let mut buffer: Vec<Option<T>> = Vec::new();
+            while start < n {
+                let end = (start + chunk).min(n);
+                buffer.clear();
+                (start..end)
+                    .into_par_iter()
+                    .map(f)
+                    .collect_into_vec(&mut buffer);
+                for r in buffer.drain(..).flatten() {
+                    consume(r)?;
+                }
+                start = end;
             }
-            start = end;
-        }
-        Ok(())
+            Ok(())
+        })?
     }
 }
 

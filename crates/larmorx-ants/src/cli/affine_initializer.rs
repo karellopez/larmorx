@@ -301,6 +301,8 @@ fn imp<const D: usize>(ctx: &mut Context<'_, '_>, log: &mut Log<'_>) -> Result<E
         mask = read_mask::<D>(ctx, log, a);
     }
     let fixed64 = fixed.as_ref().map(widened);
+    // The fixed float image is not read again (memory).
+    drop(fixed);
     let moving64 = moving.as_ref().map(widened);
     let (mf, mm) =
         image_moments(fixed64.as_ref(), moving64.as_ref(), log).map_err(|e| failure(log, e))?;
@@ -317,7 +319,7 @@ fn imp<const D: usize>(ctx: &mut Context<'_, '_>, log: &mut Log<'_>) -> Result<E
         &init,
         &Arc::new(fixed64),
         &Arc::new(moving64),
-        &moving32,
+        moving32,
         mask,
         ctx.notices,
         ctx.warnings,

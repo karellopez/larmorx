@@ -97,16 +97,16 @@ pub trait Real: ItkReal + Default + Send + Sync + 'static {
     ) -> Result<Vec<Self>, larmorx_image::FilterError>;
 
     /// `GradientRecursiveGaussianImageFilter<Image<R>>` with one sigma and
-    /// `NormalizeAcrossScale` as given: the component images (double) before the direction
-    /// correction.
-    fn gradient(
+    /// `NormalizeAcrossScale` as given: the `D`-vectors (double) before the direction
+    /// correction, written axis by axis (never the component images beside the vectors).
+    fn gradient<const D: usize>(
         data: &[Self],
         size: &[usize],
         spacing: &[f64],
         sigma: f64,
         normalize_across_scale: bool,
         n_threads: usize,
-    ) -> Result<Vec<Vec<f64>>, larmorx_image::FilterError>;
+    ) -> Result<Vec<[f64; D]>, larmorx_image::FilterError>;
 }
 
 impl Real for f64 {
@@ -146,15 +146,15 @@ impl Real for f64 {
             n_threads,
         )
     }
-    fn gradient(
+    fn gradient<const D: usize>(
         data: &[f64],
         size: &[usize],
         spacing: &[f64],
         sigma: f64,
         normalize_across_scale: bool,
         n_threads: usize,
-    ) -> Result<Vec<Vec<f64>>, larmorx_image::FilterError> {
-        larmorx_image::gaussian::gradient_recursive_gaussian_f64(
+    ) -> Result<Vec<[f64; D]>, larmorx_image::FilterError> {
+        larmorx_image::gaussian::gradient_recursive_gaussian_vectors_f64::<D>(
             larmorx_image::VolumeRef::new(data, size, spacing),
             sigma,
             normalize_across_scale,
@@ -200,15 +200,15 @@ impl Real for f32 {
             n_threads,
         )
     }
-    fn gradient(
+    fn gradient<const D: usize>(
         data: &[f32],
         size: &[usize],
         spacing: &[f64],
         sigma: f64,
         normalize_across_scale: bool,
         n_threads: usize,
-    ) -> Result<Vec<Vec<f64>>, larmorx_image::FilterError> {
-        larmorx_image::gaussian::gradient_recursive_gaussian(
+    ) -> Result<Vec<[f64; D]>, larmorx_image::FilterError> {
+        larmorx_image::gaussian::gradient_recursive_gaussian_vectors::<D>(
             larmorx_image::VolumeRef::new(data, size, spacing),
             sigma,
             normalize_across_scale,

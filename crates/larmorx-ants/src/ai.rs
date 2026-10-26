@@ -893,7 +893,7 @@ pub fn search<const D: usize>(
     init: &Initial<D>,
     fixed: &Arc<Image<f64, D>>,
     moving: &Arc<Image<f64, D>>,
-    moving_f32: &Image<f32, D>,
+    moving_f32: Image<f32, D>,
     fixed_mask: Option<Mask<D>>,
     moving_mask: Option<Mask<D>>,
     log: &mut Log<'_>,
@@ -992,7 +992,9 @@ pub fn search<const D: usize>(
         return Ok(SearchOutcome::NoStartPoint);
     }
     let moving_gradient =
-        Arc::new(gradient_image::<f32, D>(moving_f32, n_threads).map_err(AiError::Uncaught)?);
+        Arc::new(gradient_image::<f32, D>(&moving_f32, n_threads).map_err(AiError::Uncaught)?);
+    // The float image served only the gradient (memory: the search holds the double ones).
+    drop(moving_f32);
     let metric = ImageMetricv4 {
         fixed: Arc::clone(fixed),
         moving: Arc::clone(moving),

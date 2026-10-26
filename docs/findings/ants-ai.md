@@ -370,9 +370,40 @@ any of the five oracle runs: the patch matching rarely pairs the same anatomy ac
 - The best start point is written over the initial transform, centred at the fixed centre of
   mass. Nothing is printed on success but the determinant lines.
 
-## Not found in fMRIPrep's runs
+## Inside fMRIPrep's template registration, not a node of its own
 
-`antsAffineInitializer` runs inside niworkflows' `RobustMNINormalization` only when it gets no
-initial transform (`niworkflows/interfaces/norm.py:174-190`, nipype's defaults: `15 0.1 0 10`);
-fMRIPrep 25.2.6 gives it one, so the oracle runs have no `antsAffineInitializer` node. The
-parity suite runs niworkflows' call on the MNI template and fMRIPrep's preprocessed T1w instead.
+`antsAffineInitializer` runs inside niworkflows' `RobustMNINormalization` when it gets no
+initial transform (`niworkflows/interfaces/norm.py:174-190`, nipype's defaults: `15 0.1 0 10`,
+the node's thread count). fMRIPrep 25.2.6 gives it none (`initial_moving_transform :
+<undefined>` in every run's `register_template_wf/.../registration/_report/report.rst`), so it
+runs once in each run's template registration, as part of that node: the oracle runs have no
+`antsAffineInitializer` node and keep neither its inputs (niworkflows' masked images) nor its
+transform. *Corrected 2026-10-26 (data panel, part a): an earlier version of this paragraph
+said fMRIPrep gives the registration an initial transform.* The panel tier remakes the call
+exactly in each of the fourteen runs (`larmorx_validation.parity.niworkflows_inputs`: the masked
+images from the node's recorded inputs, then the initializer), and the standard tier runs
+niworkflows' call on the MNI template and fMRIPrep's preprocessed T1w.
+
+## Memory and speed against ANTs (2026-10-26, the data panel's re-validation)
+
+On `tests/parity/test_memory_peak.py`'s head of 128 × 128 × 96 voxels at one thread
+(`ants-registration.md`, "Memory against ANTs", has the table):
+
+- **antsAI** (`Mattes`, `Regular` 25 %, `Rigid`, 30° steps): ANTs 92.1 MiB, larmorx 157.2 MiB
+  before this part, 127.3 MiB now; **antsAffineInitializer** (niworkflows' `15 0.1 0 10`): ANTs
+  90.4 MiB, larmorx 139.7 then 110 MiB. Fixed here: the moving image's gradient is written into
+  its vectors axis by axis (it was held twice, as components and as vectors), the float copies
+  are dropped once read (the fixed one after the initial transform, the moving one after its
+  gradient).
+- **Still above ANTs, a follow-up:** the metric holds the two images in double (`Image<f64>`,
+  16 bytes a voxel for both) where ANTs holds them in float (8), and larmorx's interpreter and
+  its allocator's retained pages add about as much again on this size; the gap grows with the
+  image (about 8 bytes a voxel: some 170 MiB on the 7 T MP2RAGE). Closing it means storing the
+  metric's images in their pixel type (`pixel_f32` already rounds every value to float). The
+  two cases are marked `xfail(strict=True)` in the test until then.
+- **Speed at one thread:** antsAffineInitializer on that head takes ANTs 73 s and larmorx 277 s
+  (312 s with the build before the thread-pool fix and rayon's global pool held to one thread:
+  the port's own time, not the fix's). Before the fix, larmorx's metric loop ran on rayon's
+  global pool, every CPU, at any thread count (`ants-cli.md`, "larmorx's own threads"), which hid
+  this. Part of it is the D13 notice of ITK-21: larmorx runs the start points' local searches
+  both ways, to say where ITK's carried-over learning rate changes the result. A follow-up.

@@ -203,3 +203,135 @@ def test_larmorx_needs_no_more_memory_than_fsl(tmp_path, tool, args):
         )
         if mode == "reproduce":
             assert _contents(f_dir) == _contents(r_dir), f"{tool} {args}"
+
+
+#: The kinds of call the data panel's re-validation brought (2026-10-26, part a): Atropos,
+#: antsAI, antsAffineInitializer, antsApplyTransforms on a 4D series through a displacement
+#: field and antsRegistration's linear and SyN stages, each ANTs program with correctly rounded
+#: maths preloaded (the build their records compare with) and larmorx at one thread, on a head of
+#: 128 x 128 x 96 voxels (``{fixed}``, ``{moving}`` two voxels apart, ``{mask}``), a 20-volume
+#: series (``{series}``) and a smooth displacement field (``{warp}``); ``{out}`` is the run's own
+#: output directory. Every output is ANTs' byte for byte in ``reproduce`` (images: header and
+#: values as stored). antsAI and antsAffineInitializer still need more than ANTs (127 and 110
+#: MiB against 92 and 91 on these inputs, 2026-10-26): their metric holds the two images in
+#: double where ANTs holds them in float (``docs/findings/ants-ai.md``, "Memory"); the cases
+#: fail until that is changed (strict: they then pass and must lose the mark).
+_DOUBLE_IMAGES = "the metric's images in double, ANTs' in float (docs/findings/ants-ai.md)"
+MORE_CASES = [
+    (
+        "Atropos",
+        "-d 3 -a {fixed} -x {mask} -i KMeans[3] -c [5,0] -m [0.1,1x1x1] "
+        "-o [{out}/seg.nii.gz,{out}/post%02d.nii.gz]",
+    ),
+    pytest.param(
+        "antsAI",
+        "-d 3 -m Mattes[{fixed},{moving},32,Regular,0.25] -t Rigid[0.1] -s [30,0.12] -c 10 "
+        "-o {out}/ai.mat",
+        marks=pytest.mark.xfail(strict=True, reason=_DOUBLE_IMAGES),
+    ),
+    pytest.param(
+        "antsAffineInitializer",
+        "3 {fixed} {moving} {out}/init.mat 15 0.1 0 10",
+        marks=pytest.mark.xfail(strict=True, reason=_DOUBLE_IMAGES),
+    ),
+    (
+        "antsApplyTransforms",
+        "-d 3 -e 3 -i {series} -r {fixed} -t {warp} -n LanczosWindowedSinc --float 1 "
+        "-o {out}/o.nii.gz",
+    ),
+    (
+        "antsRegistration",
+        "-d 3 -o [{out}/r] -t Rigid[0.1] -m MI[{fixed},{moving},1,32,Regular,0.25] "
+        "-c [20x10,1e-6,10] -f 2x1 -s 1x0vox -t SyN[0.1,3,0] -m CC[{fixed},{moving},1,2] "
+        "-c [4x2,1e-6,10] -f 2x1 -s 1x0vox",
+    ),
+    (
+        "antsRegistration",
+        "-d 3 -o [{out}/b] -t BSpline[0.1,4x4x4] -m MeanSquares[{fixed},{moving},1] "
+        "-c [3x2,1e-6,10] -f 2x1 -s 1x0vox",
+    ),
+]
+
+
+def _more_inputs(d: Path) -> dict[str, str]:
+    rng = np.random.default_rng(11)
+    shape = (128, 128, 96)
+    i, j, k = np.indices(shape, dtype=np.float64)
+    r = np.sqrt((i - 64) ** 2 + (j - 64) ** 2 + ((k - 48) * 1.3) ** 2)
+    head = np.where(r < 50, 400 + i, 20) + np.where(r < 25, 300, 0) + np.where(r < 12, 150, 0)
+    img = (head + rng.normal(0, 10, shape)).astype(np.float32)
+    a = np.diag([1.5, 1.5, 1.5, 1.0])
+    out = {}
+
+    def save(name: str, data, zooms=None, intent=None) -> None:
+        im = nib.Nifti1Image(data, a)
+        if zooms is not None:
+            im.header.set_zooms(zooms)
+        if intent is not None:
+            im.header.set_intent(intent)
+        nib.save(im, d / name)
+        out[name.split(".")[0]] = str(d / name)
+
+    save("fixed.nii.gz", img)
+    save("moving.nii.gz", np.roll(img, 2, axis=0))
+    save("mask.nii.gz", (r < 50).astype(np.uint8))
+    series = np.stack([np.roll(img, t % 2, axis=1) * (1 + 0.01 * t) for t in range(20)], -1)
+    save("series.nii.gz", series.astype(np.float32), zooms=(1.5, 1.5, 1.5, 2.0))
+    field = np.zeros((*shape, 1, 3), np.float32)
+    field[..., 0, 0] = 1.5 * (i / shape[0]) - 0.75
+    field[..., 0, 1] = 0.75 * (k / shape[2])
+    save("warp.nii.gz", field, intent="vector")
+    return out
+
+
+def _stored(d: Path) -> dict[str, bytes]:
+    """Each output file's contents (decompressed; a NIfTI file's four extension bytes after its
+    header aside, as ``validation/investigations/panel-ants/memory_real.py`` compares)."""
+    out = {}
+    for name, raw in _contents(d).items():
+        out[name] = raw[:348] + raw[352:] if name.endswith((".nii", ".nii.gz")) else raw
+    return out
+
+
+@pytest.mark.parametrize(("program", "args"), MORE_CASES)
+def test_larmorx_needs_no_more_memory_than_ants_more(tmp_path, program, args):
+    if programs.ants_bin() is None or not (programs.ants_bin() / program).is_file():
+        pytest.skip("the ANTs 2.6.5 oracle was not found")
+    if not Path("/usr/bin/time").is_file():
+        pytest.skip("/usr/bin/time was not found")
+    lib = programs.crmath_preload()
+    if lib is None:
+        pytest.skip("libcrmath.so (scripts/build_crmath_preload.sh) was not found")
+    inputs = tmp_path / "in"
+    inputs.mkdir()
+    paths = _more_inputs(inputs)
+    env = {
+        **{k: v for k, v in os.environ.items() if k not in ("RAYON_NUM_THREADS", "NSLOTS")},
+        "ITK_GLOBAL_DEFAULT_NUMBER_OF_THREADS": "1",
+        "OMP_NUM_THREADS": "1",
+        "ANTS_RANDOM_SEED": "42",
+    }
+
+    def argv(out: Path) -> list[str]:
+        return [w.format(**paths, out=out) for w in args.split()]
+
+    a_dir = tmp_path / "ants"
+    a_dir.mkdir()
+    code, ants_mib = _peak(
+        [str(programs.ants_bin() / program), *argv(a_dir)], {**env, "LD_PRELOAD": str(lib)}
+    )
+    assert code == 0
+    for mode in ("reproduce", "fix"):
+        r_dir = tmp_path / f"larmorx-{mode}"
+        r_dir.mkdir()
+        code, mib = _peak(
+            [sys.executable, "-m", "larmorx", "ants", program, *argv(r_dir)],
+            {**env, "LARMORX_UPSTREAM_DEFECTS": mode},
+        )
+        assert code == 0
+        print(f"{program} ({mode}): larmorx {mib:.1f} MiB, ANTs {ants_mib:.1f} MiB")
+        assert mib <= ants_mib + OVERHEAD_MIB, (
+            f"{program} ({mode}): larmorx {mib:.0f} MiB, ANTs {ants_mib:.0f} MiB"
+        )
+        if mode == "reproduce":
+            assert _stored(a_dir) == _stored(r_dir), program

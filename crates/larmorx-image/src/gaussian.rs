@@ -596,11 +596,81 @@ fn gradient_components<T: crate::lines::LinePixel>(
     normalize_across_scale: bool,
     n_threads: usize,
 ) -> Result<Vec<Vec<f64>>, FilterError> {
+    let mut out = Vec::with_capacity(input.dim());
+    gradient_each(
+        input,
+        sigma,
+        normalize_across_scale,
+        n_threads,
+        |_, values| {
+            out.push(values.collect());
+        },
+    )?;
+    Ok(out)
+}
+
+/// [`gradient_components`] written straight into `D`-vectors (component `dim` of each pixel
+/// the same value), without holding the component images beside the vectors: one vector image
+/// and one axis's work image at a time, as ITK's filter holds them.
+fn gradient_vectors<T: crate::lines::LinePixel, const D: usize>(
+    input: VolumeRef<'_, T>,
+    sigma: f64,
+    normalize_across_scale: bool,
+    n_threads: usize,
+) -> Result<Vec<[f64; D]>, FilterError> {
+    if input.dim() != D {
+        return Err(FilterError::invalid(format!(
+            "a {}-dimensional image has no {D}-vector gradient",
+            input.dim()
+        )));
+    }
+    let mut out = vec![[0.0f64; D]; input.data.len()];
+    gradient_each(
+        input,
+        sigma,
+        normalize_across_scale,
+        n_threads,
+        |dim, values| {
+            for (o, v) in out.iter_mut().zip(values) {
+                o[dim] = v;
+            }
+        },
+    )?;
+    Ok(out)
+}
+
+/// [`gradient_vectors`] of a `float` image.
+pub fn gradient_recursive_gaussian_vectors<const D: usize>(
+    input: VolumeRef<'_, f32>,
+    sigma: f64,
+    normalize_across_scale: bool,
+    n_threads: usize,
+) -> Result<Vec<[f64; D]>, FilterError> {
+    gradient_vectors(input, sigma, normalize_across_scale, n_threads)
+}
+
+/// [`gradient_vectors`] of a `double` image.
+pub fn gradient_recursive_gaussian_vectors_f64<const D: usize>(
+    input: VolumeRef<'_, f64>,
+    sigma: f64,
+    normalize_across_scale: bool,
+    n_threads: usize,
+) -> Result<Vec<[f64; D]>, FilterError> {
+    gradient_vectors(input, sigma, normalize_across_scale, n_threads)
+}
+
+/// Each axis's gradient component of [`gradient_components`] in turn: `put(dim, values)`.
+fn gradient_each<T: crate::lines::LinePixel>(
+    input: VolumeRef<'_, T>,
+    sigma: f64,
+    normalize_across_scale: bool,
+    n_threads: usize,
+    mut put: impl FnMut(usize, &mut dyn Iterator<Item = f64>),
+) -> Result<(), FilterError> {
     let d = input.dim();
     if d == 0 {
         return Err(FilterError::invalid("the image has no dimensions"));
     }
-    let mut out = Vec::with_capacity(d);
     for dim in 0..d {
         let mut first: Vec<T> = input.data.to_vec();
         pass(
@@ -626,13 +696,14 @@ fn gradient_components<T: crate::lines::LinePixel>(
             )?;
         }
         let spacing = input.spacing[dim];
-        out.push(
-            work.iter()
-                .map(|&v| f64::from((f64::from(v) / spacing) as f32))
-                .collect(),
+        put(
+            dim,
+            &mut work
+                .iter()
+                .map(|&v| f64::from((f64::from(v) / spacing) as f32)),
         );
     }
-    Ok(out)
+    Ok(())
 }
 
 /// [`gradient_components`] of a `float` image (`GradientRecursiveGaussianImageFilter<float>`).

@@ -191,6 +191,16 @@ def largest_in_slice(
 
     inner = ndimage.binary_erosion(ex.m, iterations=2)
     mk = np.take(inner if inner.any() else ex.m, k, axis=s)
+    if not mk.any():
+        # A shown region that is a box (a data-panel case, ``unmasked``): every slice has as
+        # much of it, the first is chosen, and the eroded region misses it. The middle slice of
+        # those with the most of the eroded region instead (only here: other views unchanged).
+        base = inner if inner.any() else ex.m
+        sums = base.sum(axis=other)
+        best = np.flatnonzero(sums == sums.max())
+        k = int(best[len(best) // 2])
+        dk = np.take(np.abs(va - vb), k, axis=s)
+        mk = np.take(base, k, axis=s)
     if np.any(np.where(mk, dk, 0) > 0):
         flat = int(np.argmax(np.where(mk, dk, -1)))
     else:

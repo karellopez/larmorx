@@ -116,5 +116,8 @@ Every source file starts with an SPDX header naming its licence and the files it
   gravity, NewNifti's data offset of several extensions (`SaveOptions::reproduce_offset`,
   FSL-56), and `Volume::background_value`'s flag for a shell with NaN (FSL-22) are options the
   programs set from their mode; with `reproduce` everything is FSL's code path.
-- **Gzip files are zlib's.** Compressed outputs carry the header of a Unix zlib at its default
-  level, as znzlib's `gzopen` writes it, so that a `.nii.gz` is FSL's file byte for byte.
+- **Gzip files with znzlib's settings.** Compressed outputs carry the gzip header of a Unix zlib
+  at its default level, as znzlib's `gzopen` writes it; their decompressed bytes are FSL's. The
+  compressed stream is zlib-rs's (pure Rust), whose blocks need not be zlib's: compressed files are
+  compared decompressed (decision log, 2026-10-16). Saving converts and writes a volume's values
+  chunk by chunk, with no copy of the image, so that it needs no more memory than FSL's.

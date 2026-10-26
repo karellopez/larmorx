@@ -1524,34 +1524,47 @@ impl<T: Elem> Volume<T> {
         settings: &Settings,
         opts: &SaveOptions,
     ) -> Result<Saved, SaveError> {
-        self.write(filename, settings, opts, None, |v| {
-            let mut bytes = Vec::with_capacity(v.data.len() * T::SIZE);
-            for &x in &v.data {
+        let encode = |xs: &[T]| {
+            let mut bytes = Vec::with_capacity(xs.len() * T::SIZE);
+            for &x in xs {
                 x.put_le(&mut bytes);
             }
-            (T::DTYPE, (T::SIZE * 8) as i32, bytes)
-        })
+            bytes
+        };
+        let values = Values {
+            code: T::DTYPE,
+            bits: (T::SIZE * 8) as i32,
+            width: T::SIZE,
+            encode,
+        };
+        self.write(filename, settings, opts, None, values)
     }
 
     /// `save_volume`'s steps: back to the file's left-right order, `FSLOUTPUTTYPE`, the header
-    /// `set_fsl_hdr` builds, the values as `values` gives them (datatype, bits, bytes), the
-    /// NIfTI or pair files.
-    fn write(
+    /// `set_fsl_hdr` builds, the values as `values` encodes them (datatype, bits, bytes, chunk by
+    /// chunk while they are written), the NIfTI or pair files.
+    fn write<F: Fn(&[T]) -> Vec<u8>>(
         &self,
         filename: &str,
         settings: &Settings,
         opts: &SaveOptions,
         datatype_code: Option<i16>,
-        values: impl FnOnce(&Volume<T>) -> (i16, i32, Vec<u8>),
+        values: Values<F>,
     ) -> Result<Saved, SaveError> {
         if self.tsize() < 1 {
             return Ok(Saved::Nothing);
         }
-        let mut v = self.clone();
-        let currently_rad = v.left_right_order() == RADIOLOGICAL;
-        if !v.radiological_file && currently_rad {
-            v.make_neurological();
-        }
+        // A copy only where the left-right order must change back; otherwise the volume is
+        // written as it is, so that saving needs no more memory than FSL's.
+        let swapped;
+        let v: &Volume<T> = if !self.radiological_file && self.left_right_order() == RADIOLOGICAL {
+            let mut c = self.clone();
+            c.make_neurological();
+            swapped = c;
+            &swapped
+        } else {
+            self
+        };
         let filetype = env_output_type(settings).map_err(SaveError::OutputType)?;
         // set_fsl_hdr
         let mut h = NiftiHeader::default();
@@ -1559,7 +1572,7 @@ impl<T: Elem> Volume<T> {
         for k in 0..7 {
             h.dim[k + 1] = v.dims[k];
         }
-        let (code, bits, bytes) = values(&v);
+        let (code, bits) = (values.code, values.bits);
         h.datatype = datatype_code.unwrap_or(code);
         for k in 0..7 {
             h.pixdim[k + 1] = f64::from(v.pixdims[k]);
@@ -1602,6 +1615,11 @@ impl<T: Elem> Volume<T> {
             h.pixdim[1] *= -1.0;
         }
         let name = format!("{}{}", make_basename(filename), output_extension(filetype));
+        let bytes = Chunked {
+            data: &v.data,
+            width: values.width,
+            encode: &values.encode,
+        };
         nifti::save_image(
             &name,
             &bytes,
@@ -1644,17 +1662,60 @@ impl Volume {
         opts: &SaveOptions,
         datatype_code: Option<i16>,
     ) -> Result<(), SaveError> {
-        self.write(filename, settings, opts, datatype_code, |v| {
-            let (code, bytes) = convert_for_save(&v.data, ty, conv);
-            let bits = match ty {
-                SaveType::Char | SaveType::Int8 => 8,
-                SaveType::Short => 16,
-                SaveType::Int | SaveType::Float => 32,
-                SaveType::Double => 64,
-            };
-            (code, bits, bytes)
-        })
-        .map(|_| ())
+        let bits = match ty {
+            SaveType::Char | SaveType::Int8 => 8,
+            SaveType::Short => 16,
+            SaveType::Int | SaveType::Float => 32,
+            SaveType::Double => 64,
+        };
+        let values = Values {
+            code: convert_for_save(&[], ty, conv).0,
+            bits,
+            width: (bits / 8) as usize,
+            encode: |xs: &[f32]| convert_for_save(xs, ty, conv).1,
+        };
+        self.write(filename, settings, opts, datatype_code, values)
+            .map(|_| ())
+    }
+}
+
+/// How a volume's values are saved: the file's datatype and bits per voxel, the bytes per
+/// value, and the conversion of a run of values into the file's bytes (each value on its own).
+struct Values<F> {
+    code: i16,
+    bits: i32,
+    width: usize,
+    encode: F,
+}
+
+/// The values a volume writes, converted chunk by chunk while they are written (the bytes of
+/// the whole image are never held at once: saving needs no more memory than FSL's).
+struct Chunked<'a, T, F> {
+    data: &'a [T],
+    width: usize,
+    encode: &'a F,
+}
+
+/// The values converted at a time while saving.
+const SAVE_CHUNK: usize = 1 << 16;
+
+impl<T: Copy, F: Fn(&[T]) -> Vec<u8>> nifti::ImageBytes for Chunked<'_, T, F> {
+    fn byte_len(&self) -> usize {
+        self.data.len() * self.width
+    }
+
+    fn write_bytes(&self, w: &mut dyn std::io::Write, limit: usize) -> std::io::Result<()> {
+        let mut left = limit.min(self.byte_len());
+        for chunk in self.data.chunks(SAVE_CHUNK) {
+            if left == 0 {
+                break;
+            }
+            let b = (self.encode)(chunk);
+            let k = left.min(b.len());
+            w.write_all(&b[..k])?;
+            left -= k;
+        }
+        Ok(())
     }
 }
 

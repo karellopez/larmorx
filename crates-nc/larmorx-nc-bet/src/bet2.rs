@@ -1087,10 +1087,24 @@ fn main_inner(
         }
         Err(e) => return report_abort(&e, "bet2", err),
     };
-    let ctvol = testvol.clone();
-    let testvol = if a.ct { h2c(&testvol) } else { testvol };
+    // With --ct the extraction runs on the converted image and the brain is cut from the
+    // original one; without it there is one image (no copy: the memory FSL's bet2 needs).
+    let (testvol, ctvol) = if a.ct {
+        (h2c(&testvol), Some(testvol))
+    } else {
+        (testvol, None)
+    };
     match compute(&testvol, &a, out, err, notices) {
-        Ok(res) => write_outputs(&testvol, &ctvol, &a, &res, &out_name, run, err, notices),
+        Ok(res) => write_outputs(
+            &testvol,
+            ctvol.as_ref(),
+            &a,
+            res,
+            &out_name,
+            run,
+            err,
+            notices,
+        ),
         Err(code) => code,
     }
 }
@@ -1422,9 +1436,9 @@ fn pow10(k: i32) -> f64 {
 #[allow(clippy::too_many_arguments)]
 fn write_outputs(
     testvol: &Volume<f32>,
-    ctvol: &Volume<f32>,
+    ctvol: Option<&Volume<f32>>,
     a: &Bet2Args,
-    res: &Bet2Result,
+    res: Bet2Result,
     out_name: &str,
     run: &Run,
     err: &mut dyn Write,
@@ -1433,7 +1447,9 @@ fn write_outputs(
     if volume::offset_defect_applies(testvol, run.fsl) {
         offset_notice(notices, testvol.extensions.len());
     }
-    let mut brainmask = res.outside.clone();
+    // The masks are the result's own (moved, not copied), so that bet2 needs no more memory
+    // than FSL's.
+    let mut brainmask = res.outside;
     if a.threshold {
         let t = res.params.t;
         for (b, &v) in brainmask.data.iter_mut().zip(&testvol.data) {
@@ -1443,7 +1459,7 @@ fn write_outputs(
         }
     }
     if !a.no_output {
-        let mut output = if a.ct { ctvol.clone() } else { testvol.clone() };
+        let mut output = ctvol.unwrap_or(testvol).clone();
         let n = output.nvoxels() as usize;
         for (o, &b) in output.data[..n].iter_mut().zip(&brainmask.data) {
             // a NaN voxel stays its NaN; an infinite one outside the brain is SSE's NaN
@@ -1454,7 +1470,7 @@ fn write_outputs(
         }
     }
     if a.mask {
-        let mut m = brainmask.clone();
+        let mut m = brainmask;
         m.display_max = 1.0;
         m.display_min = 0.0;
         for v in m.data.iter_mut() {

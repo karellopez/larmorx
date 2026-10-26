@@ -607,3 +607,21 @@ implementation = "replica"
 signature = ["DN fix pass"]
 status = "fixed"
 explanation = "the default renamed the -meanvol image (FSL-08's correction, <stem>_mean_reg) without naming FSL-08: the replica's own part names it there now (d196995, on main), and its shrunk case is that part's permanent case meanvol-name-notice"
+
+# ---------------------------------------------------------------- BET (2026-10-26, BET's merge)
+
+[[difference]]
+tool = "fsl-bet"
+implementation = "replica"
+signature = ["messages: FSL's, byte for byte"]
+status = "fixed"
+explanation = "fslstats -C printed no warning where newimage's calc_cog writes 'WARNING::in calculating COG, total = 0.0' to cerr (an empty brain under bet -R): larmorx-nc-core's fslstats_cog returns it"
+link = "validation/difftest/cases/fsl-bet/cog-warning-empty-brain.json"
+
+[[difference]]
+tool = "fsl-bet"
+implementation = "replica"
+signature = ["messages before FSL's crash"]
+status = "fixed"
+explanation = "bet on an image where FSL's bet2 crashes (FSL-41): the replica's bet filled bet2's undefined median and went on; inside bet, reproduce now gives the script's failure message and status, FSL's defined outcome (bet2 alone still fills); and the suite compares what FSL printed before its crash as the start of a filled run's output (FSL's buffered output is lost at its crash)"
+link = "validation/difftest/cases/fsl-bet/bet-script-failure-constant.json"

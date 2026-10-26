@@ -42,6 +42,7 @@ fn run_tool(
         fsl: settings,
         mode,
         threads: thread_count(threads),
+        fill: true,
     };
     let code = match tool {
         "bet2" => crate::bet2::main(&argv, &run, out, err),

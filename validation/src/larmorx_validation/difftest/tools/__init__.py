@@ -34,6 +34,7 @@ TOOLS: dict[str, tuple[str, str]] = {
     "afni-unifize": ("afni_masks", "UNIFIZE"),
     "mri-hmc": ("mri_hmc", "ORIGINAL"),
     "fsl-mcflirt": ("mri_hmc", "REPLICA"),
+    "fsl-bet": ("fsl_bet", "TOOL"),
     "resample-series": ("resample_series", "TOOL"),
 }
 

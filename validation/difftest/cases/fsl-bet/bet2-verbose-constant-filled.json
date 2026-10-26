@@ -1,0 +1,175 @@
+{
+ "defect": null,
+ "description": "bet2 -v on a constant one-voxel image: FSL crashes (FSL-41) and its buffered verbose lines are lost; reproduce fills the median and prints them (the suite compares FSL's output before its crash as the start of the replica's, 2026-10-26)",
+ "expect": "pass",
+ "found": {
+  "detail": "messages before FSL's crash: stdout FSL 0 characters, larmorx 167: '' / 'min 100 thresh2 100 thresh 100 thresh98 100 max 100\\nc-of-g -nan -nan -nan mm\\nrad'",
+  "n": 1,
+  "seed": "bettrial1",
+  "shrink_moves": [
+   "dropped -m (-m)",
+   "dropped -f (-f 0.3)",
+   "input: axis 1 20 -> 10 voxels",
+   "input: axis 0 16 -> 8 voxels",
+   "input: axis 2 16 -> 8 voxels",
+   "input: axis 1 10 -> 5 voxels",
+   "input: axis 0 8 -> 4 voxels",
+   "input: axis 2 8 -> 4 voxels",
+   "input: axis 1 5 -> 2 voxels",
+   "input: axis 0 4 -> 2 voxels",
+   "input: axis 2 4 -> 2 voxels",
+   "input: axis 0 2 -> 1 voxels",
+   "input: axis 1 2 -> 1 voxels",
+   "input: axis 2 2 -> 1 voxels",
+   "input (and its grid): plumb orientation",
+   "input (and its grid): unit spacing",
+   "input (and its grid): origin at 0",
+   "input (and its grid): sform = qform",
+   "input (and its grid): qform and sform codes 1",
+   "input (and its grid): millimetres",
+   "input: float32 storage",
+   "input: content head -> constant"
+  ],
+  "signature": [
+   "messages before FSL's crash"
+  ]
+ },
+ "id": "bet2-verbose-constant-filled",
+ "implementations": [
+  "replica"
+ ],
+ "reason": "",
+ "recipe": {
+  "extra": {
+   "output_type": "NIFTI_GZ",
+   "tool": "bet2"
+  },
+  "features": {
+   "--ct": false,
+   "-c": false,
+   "-e": false,
+   "-f": true,
+   "-g": false,
+   "-m": true,
+   "-n": false,
+   "-o": false,
+   "-r": false,
+   "-s": false,
+   "-t": false,
+   "-v": true,
+   "-w": false,
+   "FSLOUTPUTTYPE": "NIFTI_GZ",
+   "axis0": 1.1,
+   "axis1": 0.8,
+   "axis2": 1.05,
+   "bias0": 0.01,
+   "bias1": -0.0075,
+   "bias2": 0.01,
+   "bias3": 0.0025,
+   "centre0": 4.5,
+   "centre1": 4.5,
+   "centre2": 2.0,
+   "content": "head",
+   "dtype": "float64",
+   "extreme": true,
+   "f": "0.3",
+   "noise": 0.0,
+   "orientation": "axes+oblique",
+   "origin0": -22.5,
+   "origin1": -31.25,
+   "origin2": 30.0,
+   "qfac": 1,
+   "qform_code": 1,
+   "range": "plain",
+   "sform": "other",
+   "sform_code": 4,
+   "shape": "16x20x16",
+   "shear0": 0.1,
+   "shear1": 0.025,
+   "shear2": -0.025,
+   "size": 8.0,
+   "spacing0": 2.5,
+   "spacing1": 15.0,
+   "spacing2": 1.0,
+   "suffix": ".nii",
+   "tissues": "t1",
+   "tool": "bet2",
+   "units": "um"
+  },
+  "groups": [
+   {
+    "args": [
+     "{in:input}",
+     "out"
+    ],
+    "name": "input",
+    "optional": false
+   },
+   {
+    "args": [
+     "-v"
+    ],
+    "name": "-v",
+    "optional": true
+   }
+  ],
+  "inputs": {
+   "input": {
+    "content": {
+     "seed": 947595559,
+     "type": "constant"
+    },
+    "dtype": "float32",
+    "geometry": {
+     "origin": [
+      0.0,
+      0.0,
+      0.0
+     ],
+     "qfac": 1,
+     "qform_code": 1,
+     "quaternion": [
+      1,
+      0,
+      0,
+      0
+     ],
+     "sform": "same",
+     "sform_code": 1,
+     "spacing": [
+      1.0,
+      1.0,
+      1.0
+     ],
+     "units": "mm"
+    },
+    "scaling": null,
+    "shape": [
+     1,
+     1,
+     1
+    ],
+    "suffix": ".nii",
+    "values": {
+     "offset": 0.0,
+     "scale": 1.0
+    }
+   }
+  },
+  "n": 1,
+  "options": [
+   "-f",
+   "-m",
+   "-v",
+   "FSLOUTPUTTYPE=NIFTI_GZ",
+   "bet2"
+  ],
+  "seed": "bettrial1",
+  "tool": "fsl-bet"
+ },
+ "rule": null,
+ "status": "fixed",
+ "suite": "fsl-bet-replica",
+ "tier": "standard",
+ "tool": "fsl-bet"
+}

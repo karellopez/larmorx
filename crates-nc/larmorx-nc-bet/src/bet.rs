@@ -163,10 +163,14 @@ impl Script<'_, '_> {
     fn bet2(&mut self, words: &[String]) -> Result<(), Stop> {
         let mut argv = vec!["bet2".to_owned()];
         argv.extend(words.iter().cloned());
+        // Where FSL's bet2 crashes on what it leaves undefined, the script's ERR trap stops it
+        // with its failure message: that, FSL's defined outcome, is what `reproduce` gives here
+        // (bet2 alone fills the undefined part instead: D13's failure cases).
         let run = Run {
             fsl: self.run.fsl,
             mode: self.run.mode,
             threads: self.run.threads,
+            fill: false,
         };
         // bet2's notices join this run's (one per defect, printed at the end)
         let code = bet2::main_with(&argv, &run, self.out, self.err, &mut self.notices);
@@ -472,7 +476,8 @@ impl Script<'_, '_> {
     /// `find_centre_in_voxels`: `fslstats $1 -l 0.001 -C`, its three first words.
     fn cog(&mut self, name: &str) -> Result<(String, String, String), Stop> {
         let r = avw::fslstats_cog(name, "0.001", self.fsl());
-        let line = self.tool(r)?;
+        let (line, warnings) = self.tool(r)?;
+        let _ = self.err.write_all(warnings.as_bytes());
         let w = split_words(&line);
         let g = |k: usize| w.get(k).cloned().unwrap_or_default();
         Ok((g(0), g(1), g(2)))

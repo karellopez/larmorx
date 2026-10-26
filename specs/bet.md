@@ -360,7 +360,10 @@ blank>`, `verbose=1`, `debug=<0|1>`, `variation=<0..7>`.
 
 When a program the script runs fails, the script prints `<the script's path> failed during
 command:<the script's arguments, as words joined by blanks>` on standard output and exits 1 (bash's
-`ERR` trap; the replica prints `bet` for its own path). The script expands names unquoted
+`ERR` trap; the replica prints `bet` for its own path). That includes bet2 crashing on an input
+it leaves undefined (a constant image, FSL-41): bash reports the signal on standard error, the
+script then prints its failure and exits 1; in `reproduce` the replica's bet gives that outcome
+(its bet2 alone would fill the undefined part instead), and its default refuses with the reason. The script expands names unquoted
 (FSL-44). It ends by removing every file whose name starts with `<output>_tmp` unless `-d`
 (FSL-46).
 
@@ -405,7 +408,9 @@ Miscellaneous options:
 - **`-R`** (robust centre): `-n` is removed from the options (the brain is always written); bet2
   runs; then, up to 10 more times, bet2 runs again with `-c x y z`, the centre of gravity in voxels
   of the previous brain (the mean voxel coordinates of the voxels above 0.001, weighted by their
-  value, as stored, printed with 6 decimals and read back), until the centre moves by less than 1
+  value, as stored, printed with 6 decimals and read back; when those voxels sum to less than
+  1e-5, an empty brain, the sum is taken as 1 and `WARNING::in calculating COG, total = 0.0` is
+  printed on standard error, once per centre computed), until the centre moves by less than 1
   voxel: the squared distance computed with `dc` at scale 0 (truncated to an integer) is below 1.
 - **`-F`** (4D data): the first volume (`<out>_tmp`) is extracted with bet2 `-m -n -f 0.3` and the
   user's options (a later `-f` overrides); its mask is dilated by one voxel (the maximum over the

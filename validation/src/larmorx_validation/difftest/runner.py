@@ -112,6 +112,9 @@ UNDEFINED_DEFECTS: dict[str, str] = {
     "ANTS-163": "a mask of another size is read outside its buffer (memory)",
     "ITK-98": "B-spline interpolation on a short axis reads outside the coefficients (memory)",
     "ITK-99": "a sampled metric writes a derivative past the end of its array (memory)",
+    "FSL-51": "betsurf's profile searches read past their samples (memory)",
+    "FSL-53": "betsurf uses the matrix entries it could not read (memory)",
+    "FSL-55": "the 98th percentile's selection over NaNs runs outside its vector (memory)",
 }
 
 #: A refusal that names its defect (``... an error (ANTS-160)``): larmorx refuses a class (a)

@@ -46,7 +46,7 @@ import subprocess
 import tempfile
 import warnings
 from collections.abc import Iterator
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from pathlib import Path
 from typing import Any
 
@@ -369,7 +369,13 @@ def before_crash(text: str) -> str:
     return _BASH_SIGNAL.sub("", text)
 
 
-def check_messages(checks: CheckList, fsl: Run, ours: Run, crash: bool) -> None:
+def check_messages(
+    checks: CheckList, fsl: Run, ours: Run, crash: bool, filled: bool = False
+) -> None:
+    """Both streams byte for byte; where FSL crashes, what it printed before. Where
+    ``reproduce`` fills what FSL leaves undefined (``filled``), the replica goes on past FSL's
+    crash: what FSL printed is the start of what the replica prints (FSL's buffered standard
+    output may also be lost at its crash, as with ``-v`` on a constant image)."""
     a_out, a_err = fsl_text(fsl.out), fsl_text(fsl.err)
     b_out, b_err = larmorx_text(ours.out), larmorx_text(ours.err)
     if crash:
@@ -377,9 +383,12 @@ def check_messages(checks: CheckList, fsl: Run, ours: Run, crash: bool) -> None:
         name = CRASH
     else:
         name = MESSAGES
-    same = a_out == b_out and a_err == b_err
+    if filled:
+        same = b_out.startswith(a_out) and b_err.startswith(a_err)
+    else:
+        same = a_out == b_out and a_err == b_err
     detail = (
-        "the same"
+        ("what FSL printed before its crash begins the replica's" if filled else "the same")
         if same
         else (
             "stdout " + first_difference(a_out, b_out)
@@ -1021,6 +1030,11 @@ def input_path(name: str) -> Path:
     """The file of an input name: a phantom, a real image, or what FSL derives from one."""
     if name.startswith("/"):
         return Path(name)
+    if name.startswith("dt:"):
+        # a random case's input (differential random testing), built from its recipe
+        from larmorx_validation.difftest import inputs
+
+        return inputs.path(name)
     kind, _, rest = name.partition(":")
     if kind == "real":
         return _real(rest)
@@ -1055,6 +1069,22 @@ def _prepare(d: Path, s: Scenario) -> None:
 #: How the two kinds of expected divergence begin their reasons.
 PENDING = "needs FSL programs larmorx does not replicate yet: "
 FILLED = "FSL crashes (status "
+#: The defects whose failure case ``reproduce`` fills where FSL crashes (D13's rule): a random
+#: case (``expect="random"``, differential random testing) is judged by the one it names.
+FILL_DEFECTS = ("FSL-41", "FSL-43", "FSL-52")
+
+
+def filled_entry(run: Run) -> str | None:
+    """The failure-case defect the replica named as reproduced (filled), if any."""
+    for d in FILL_DEFECTS:
+        if f"upstream defect {d} (" in run.err and ") reproduced: " in run.err:
+            return d
+    return None
+
+
+def named_entry(run: Run) -> str | None:
+    """The failure-case defect the replica named, in either mode, if any."""
+    return next((d for d in FILL_DEFECTS if f"upstream defect {d} (" in run.err), None)
 
 
 def run_case(case: Case, checks: CheckList) -> None:
@@ -1083,6 +1113,15 @@ def run_case(case: Case, checks: CheckList) -> None:
         fsl = oracle_run(s.tool, args, env, f_dir, never=case_never(s))
         ours = run_larmorx(s.tool, args, "reproduce", env, r_dir)
         crash = crashed(fsl)
+        if crash and s.expect == "random" and (entry := named_entry(ours)):
+            if ours.code == 0 and filled_entry(ours):
+                # a random case that met a failure case: judged as the record's crash-filled
+                # cases
+                s = replace(s, expect="crash-filled", fix_refuses=entry)
+            else:
+                # stopped where FSL crashes (inside bet: the script's failure, as FSL's); the
+                # default stops there too, naming the entry
+                s = replace(s, fix_refuses=entry)
         filled = crash and s.expect == "crash-filled"
         if filled:
             checks(
@@ -1095,7 +1134,7 @@ def run_case(case: Case, checks: CheckList) -> None:
             checks(EXIT, ours.code == 1, detail=f"FSL crashed ({fsl.code}), larmorx {ours.code}")
         else:
             checks(EXIT, fsl.code == ours.code, detail=f"FSL {fsl.code}, larmorx {ours.code}")
-        check_messages(checks, fsl, ours, crash)
+        check_messages(checks, fsl, ours, crash, filled)
         if filled:
             _filled(checks, s, args, env, ours, r_dir, root, inputs)
         else:

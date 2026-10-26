@@ -917,6 +917,10 @@ pub struct Run<'a> {
     /// Threads for the work that can be shared (betsurf's smoothing); 1 or more. The results
     /// do not depend on it.
     pub threads: usize,
+    /// Whether `reproduce` fills what FSL leaves undefined where FSL crashes (D13's failure
+    /// cases: bet2 and betsurf run alone), or stops as FSL's run does (bet2 inside the `bet`
+    /// script, whose ERR trap then prints its failure: FSL's defined outcome).
+    pub fill: bool,
 }
 
 /// Prints an uncaught exception of the image layer: what FSL printed before aborting, then
@@ -1094,7 +1098,7 @@ fn main_inner(
     } else {
         (testvol, None)
     };
-    match compute(&testvol, &a, out, err, notices) {
+    match compute(&testvol, &a, run.fill, out, err, notices) {
         Ok(res) => write_outputs(
             &testvol,
             ctvol.as_ref(),
@@ -1219,10 +1223,12 @@ fn strip_names(input: &str, output: &str, notices: &mut Notices) -> Result<(Stri
     Ok((input, output))
 }
 
-/// The surface and the brain mask, with bet2's verbose messages.
+/// The surface and the brain mask, with bet2's verbose messages. `fill`: whether `reproduce`
+/// fills what FSL leaves undefined where FSL crashes ([`Run::fill`]).
 pub fn compute(
     testvol: &Volume<f32>,
     a: &Bet2Args,
+    fill: bool,
     out: &mut dyn Write,
     err: &mut dyn Write,
     notices: &mut Notices,
@@ -1246,7 +1252,7 @@ pub fn compute(
         yarg,
         zarg,
         &mut warn,
-        notices.reproduce(),
+        notices.reproduce() && fill,
     ) {
         Ok((bp, filled)) => {
             let _ = err.write_all(warn.as_bytes());
@@ -1263,18 +1269,29 @@ pub fn compute(
         }
         Err(_) => {
             let _ = err.write_all(warn.as_bytes());
-            notices.add(
-                &defects::FSL_41,
-                "no voxel inside the initial sphere has an intensity strictly between the 2nd \
-                 and 98th percentiles (a constant or binary image), so the median brain \
-                 intensity is undefined: refused",
-            );
+            let (detail, how) = if notices.reproduce() {
+                (
+                    "no voxel inside the initial sphere has an intensity strictly between the \
+                     2nd and 98th percentiles (a constant or binary image), so the median brain \
+                     intensity is undefined: FSL's bet2 crashes here and the bet script stops \
+                     with its failure message, as here",
+                    "the bet script stops here, as FSL's does",
+                )
+            } else {
+                (
+                    "no voxel inside the initial sphere has an intensity strictly between the \
+                     2nd and 98th percentiles (a constant or binary image), so the median brain \
+                     intensity is undefined: refused",
+                    "LARMORX_UPSTREAM_DEFECTS=reproduce fills it with 0 and goes on",
+                )
+            };
+            notices.add(&defects::FSL_41, detail);
             let _ = writeln!(
                 err,
                 "bet2: stopped: no voxel inside the initial sphere has an intensity strictly \
                  between the 2nd and 98th percentiles, so the median brain intensity is \
-                 undefined; FSL's bet2 reads an empty list here and crashes (FSL-41; \
-                 LARMORX_UPSTREAM_DEFECTS=reproduce fills it with 0 and goes on) (larmorx)"
+                 undefined; FSL's bet2 reads an empty list here and crashes (FSL-41; {how}) \
+                 (larmorx)"
             );
             return Err(1);
         }
@@ -1405,7 +1422,7 @@ pub fn compute(
             self_intersection = false;
         }
     }
-    let (outside, start) = make_mask_from_mesh(testvol, &m, notices.fix());
+    let (outside, start) = make_mask_from_mesh(testvol, &m, notices.fix() || !fill);
     match start {
         Fill::Inside => {}
         Fill::Outside(s) => outside_notice(notices, s, "the fill of the brain mask"),

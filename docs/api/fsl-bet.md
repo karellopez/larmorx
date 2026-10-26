@@ -147,7 +147,9 @@ Where FSL crashes on what it leaves undefined, the default refuses with the reas
 failure cases): **FSL-41** (no voxel strictly between the 2nd and 98th percentiles inside the
 initial sphere, a constant or binary image: FSL reads the median from an empty list; `reproduce`
 takes it as 0) and **FSL-52** (a mesh file FSL reads without checks: `reproduce` takes 0 for the
-values FSL never sets and leaves out the faces that name missing vertices). Kept as FSL's and
+values FSL never sets and leaves out the faces that name missing vertices). Inside `bet`, where FSL's
+bet2 crashes, the script's ERR trap reports the failure and exits 1: that is FSL's defined outcome,
+and `reproduce` gives it (bet2 alone fills instead). Kept as FSL's and
 documented (rule C):
 **FSL-49** (betsurf keeps the T1's scalp estimate when the T2's lies further out) and **FSL-57**
 (betsurf's smoothness weight set to 0 after it was used: no effect).
@@ -158,7 +160,8 @@ documented (rule C):
   replica prints FSL's messages before the abort and one line of its own, and exits 1 (FSL: 134).
   Where it crashes on what it leaves undefined (FSL-41, FSL-52, FSL-43 far outside), the default
   refuses (exit 1) and `reproduce` finishes with the undefined part filled (exit 0, the defect
-  named); FSL ends by a signal.
+  named); FSL ends by a signal. FSL's buffered standard output before such a crash may be lost
+  (with `-v`); the replica's goes on.
 - The `bet` script's messages name the script by its path (`$0`: `<FSLDIR>/bin/bet failed during
   command:...`); the replica names it `bet`.
 - The replica needs no `FSLDIR` and runs none of FSL's programs; `bet -S`, `-B`, `-A`, `-A2`

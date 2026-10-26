@@ -587,8 +587,14 @@ pub fn fslmaths_mas(
 /// `fslstats <in> -l <lthr> -C`: the centre of gravity in NIfTI voxel coordinates, as it prints
 /// it (fixed, 6 decimals, each followed by a blank): the voxels not above the threshold (or not
 /// below the largest float) multiplied by 0 (SSE's NaNs), newimage's `calc_cog`, and the
-/// coordinates mapped back to the file's voxels.
-pub fn fslstats_cog(input: &str, lthr: &str, fsl: &Settings) -> Result<String, ToolFailure> {
+/// coordinates mapped back to the file's voxels. Returns what it prints on standard output and
+/// on standard error: `calc_cog`'s warning when the voxels sum to (nearly) 0, which newimage
+/// writes to `cerr` itself (found by random testing, 2026-10-26: an empty brain under `bet -R`).
+pub fn fslstats_cog(
+    input: &str,
+    lthr: &str,
+    fsl: &Settings,
+) -> Result<(String, String), ToolFailure> {
     let (mut v, _, _) = volume::read_volume4d::<f32>(input, fsl).map_err(failed)?;
     let l = cnum::atof(lthr) as f32;
     let u = f32::MAX;
@@ -596,20 +602,20 @@ pub fn fslstats_cog(input: &str, lthr: &str, fsl: &Settings) -> Result<String, T
         let keep = *x > l && *x < u;
         *x = sse::mul_f32(*x, if keep { 1.0 } else { 0.0 });
     }
-    // fslstats prints calc_cog's warning on standard error only through `cog()`'s caller,
-    // which it does not show: the warning is dropped, as in the original.
     let mut warnings = Vec::new();
     let c = v.calc_cog(&mut warnings);
     let m = v.niftivox2newimagevox_mat();
     let c = arma::solve(&m, &Mat::col(&[c[0], c[1], c[2], 1.0]))
         .map(|r| [r.get(0), r.get(1), r.get(2)])
         .unwrap_or([c[0], c[1], c[2]]);
-    Ok(format!(
+    let printed = format!(
         "{} {} {} ",
         cnum::fmt_f(c[0], 6),
         cnum::fmt_f(c[1], 6),
         cnum::fmt_f(c[2], 6)
-    ))
+    );
+    let err = warnings.iter().map(|w| format!("{w}\n")).collect();
+    Ok((printed, err))
 }
 
 #[cfg(test)]

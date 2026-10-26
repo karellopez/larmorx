@@ -336,6 +336,44 @@ for _q in range(6):
         _save(_phantom()["tensors"][..., q], t)
 
 
+def _moved_affine(kind: str) -> np.ndarray:
+    """The phantom's affine just beyond ITK's VerifyInputInformation tolerance (1e-6 of the
+    first spacing, 1e-6 for the direction): a third spacing 1e-5 larger, an origin 1e-4 mm
+    away, or a rotation of 1e-4 rad about the third axis."""
+    a = _affine()
+    if kind == "spacing":
+        a[2, 2] *= 1.0 + 1e-5
+    elif kind == "origin":
+        a[0, 3] += 1e-4
+    else:
+        c, s = np.cos(1e-4), np.sin(1e-4)
+        a[:3, :3] = np.array([[c, -s, 0.0], [s, c, 0.0], [0.0, 0.0, 1.0]]) @ a[:3, :3]
+    return a
+
+
+for _kind in ("spacing", "origin", "direction"):
+
+    @ants_inputs.builder(f"atropos-mask-{_kind}")
+    def _(t, kind=_kind):
+        """The phantom's mask on a grid just beyond ITK's tolerance (its {kind})."""
+        _save(_phantom()["mask"], t, affine=_moved_affine(kind))
+
+
+@ants_inputs.builder("atropos-prior-label-origin")
+def _(t):
+    """The prior label image (``atropos-prior-label``) 1e-4 mm away."""
+    ph = _phantom()
+    idx = np.indices(SHAPE).sum(axis=0)
+    labels = np.where(idx % 7 == 0, 0, ph["labels"]).astype(np.int16)
+    _save(labels, t, affine=_moved_affine("origin"))
+
+
+@ants_inputs.builder("atropos-t2-origin")
+def _(t):
+    """The second contrast 1e-4 mm away."""
+    _save(_phantom()["t2"], t, affine=_moved_affine("origin"))
+
+
 @ants_inputs.builder("atropos-mrf-coefficients")
 def _(t):
     """An MRF coefficient image rising from 0.05 to 0.25 along the first axis."""
@@ -1229,7 +1267,79 @@ def _message_cases() -> list[AtroposCase]:
     X = ("-x", MASK)
     A = ("-a", T1)
     run = ("-d", "3", "-i", "KMeans[3]", *A, *X)
+    # ITK's VerifyInputInformation (found on the data panel, 2026-10-26): an input on another
+    # grid throws at Update; ANTs prints it with --verbose 1 only.
+    km = ("-d", "3", "-i", "KMeans[3]", "-c", "[2,0]")
+    geometry = [
+        _c(
+            f"geometry/mask-{kind}",
+            E,
+            f"the mask on a grid just beyond ITK's tolerance (its {kind})",
+            *km,
+            *A,
+            "-x",
+            f"{{gen:atropos-mask-{kind}}}",
+            "-v",
+            "1",
+            *O3,
+            outputs=(),
+            expect="error",
+            stdout=True,
+        )
+        for kind in ("spacing", "origin", "direction")
+    ]
+    geometry += [
+        _c(
+            "geometry/mask-spacing-silent",
+            E,
+            "the mask on another grid without --verbose: ANTs exits 1 silently",
+            *km,
+            *A,
+            "-x",
+            "{gen:atropos-mask-spacing}",
+            *O3,
+            outputs=(),
+            expect="error",
+            stdout=True,
+        ),
+        _c(
+            "geometry/prior-label-origin",
+            E,
+            "the prior label image (input _2) on another grid",
+            "-d",
+            "3",
+            "-i",
+            "PriorLabelImage[3,{gen:atropos-prior-label-origin},0.5]",
+            "-c",
+            "[2,0]",
+            *A,
+            *X,
+            "-v",
+            "1",
+            *O3,
+            outputs=(),
+            expect="error",
+            stdout=True,
+        ),
+        _c(
+            "geometry/second-image-origin",
+            E,
+            "the second intensity image (input _3) on another grid",
+            *km,
+            *A,
+            "-a",
+            "{gen:atropos-t2-origin}",
+            *X,
+            "-v",
+            "1",
+            *O3,
+            outputs=(),
+            expect="error",
+            stdout=True,
+        ),
+    ]
     cases = [
+        *geometry,
         _c(
             "no-arguments",
             E,
@@ -1973,10 +2083,9 @@ def _(t):
     lx.save(out, t)
 
 
-@ants_inputs.builder("atropos-panel-flair-mask")
-def _(t):
-    """ds003592 sub-280's FLAIR head: the largest connected component of the voxels above 10 %
-    of its 99th percentile, holes filled slice by slice (uint8 on the FLAIR's grid)."""
+def _flair_head():
+    """ds003592 sub-280's FLAIR (its image) and head: the largest connected component of the
+    voxels above 10 % of its 99th percentile, holes filled slice by slice."""
     import larmorx_testdata as td
     import nibabel as nib
     from scipy import ndimage
@@ -1992,7 +2101,31 @@ def _(t):
     head = labels == int(np.argmax(sizes)) if n else above
     for k in range(head.shape[2]):
         head[..., k] = ndimage.binary_fill_holes(head[..., k])
-    out = nib.Nifti1Image(head.astype(np.uint8), img.affine)
+    return img, head.astype(np.uint8)
+
+
+@ants_inputs.builder("atropos-panel-flair-mask")
+def _(t):
+    """ds003592 sub-280's FLAIR head (``_flair_head``) as uint8 with the FLAIR's own header
+    (its pixdim, qform and sform unchanged: exactly the FLAIR's grid)."""
+    import nibabel as nib
+
+    img, head = _flair_head()
+    hdr = img.header.copy()
+    hdr.set_data_dtype(np.uint8)
+    hdr["scl_slope"], hdr["scl_inter"] = 1.0, 0.0
+    nib.save(nib.Nifti1Image(head, None, header=hdr), t)
+
+
+@ants_inputs.builder("atropos-panel-flair-mask-affine")
+def _(t):
+    """The same head written from the FLAIR's affine (nibabel's ``Nifti1Image(data, affine)``):
+    its pixdim recomputed from the affine (0.42187503 x 0.421875 x 2.9999971 mm against the
+    FLAIR's 0.421875 x 0.421875 x 3), beyond ITK's tolerance of 1e-6 of the first spacing."""
+    import nibabel as nib
+
+    img, head = _flair_head()
+    out = nib.Nifti1Image(head, img.affine)
     out.header.set_qform(img.affine, code=int(img.header["qform_code"]))
     out.header.set_sform(img.affine, code=int(img.header["sform_code"]))
     nib.save(out, t)
@@ -2075,6 +2208,28 @@ def _panel_cases() -> list[AtroposCase]:
             "-x",
             "{gen:atropos-panel-flair-mask}",
             *smriprep,
+            tier="panel",
+        ),
+        _c(
+            P.PREFIX + "flair/mask-from-affine",
+            P.CATEGORY,
+            P.describe(
+                "the same with the head mask written from the FLAIR's affine (its spacing "
+                "recomputed, 3e-6 mm off): ITK's VerifyInputInformation throws, ANTs exits 1",
+                P.FLAIR_OLDER,
+            ),
+            "-d",
+            "3",
+            "-a",
+            P.FLAIR_OLDER.arg,
+            "-x",
+            "{gen:atropos-panel-flair-mask-affine}",
+            *smriprep,
+            "-v",
+            "1",
+            outputs=(),
+            expect="error",
+            stdout=True,
             tier="panel",
         ),
     ]

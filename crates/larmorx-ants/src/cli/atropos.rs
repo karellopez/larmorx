@@ -472,6 +472,100 @@ fn read_label(ctx: &mut Ctx<'_, '_>, name: &str) -> Result<AntsImage<u32>, ReadE
     read_with::<u32, _>(ctx.store, name, ctx.dim, ctx.n_threads, ctx.notices)
 }
 
+/// `ImageToImageFilter::VerifyInputInformation` (`itkImageToImageFilter.hxx:147-216`, ITK
+/// v5.4.5) of `AtroposSegmentationImageFilter`: its inputs in the order of their names
+/// (`Primary`, `_1`, `_2`, ... as strings): the first intensity image, the mask (`_1`), the
+/// prior label image (`_2`) and the other intensity images (`_3`, ...); the prior probability
+/// images are not inputs. Each is compared with the first (`IsCongruentImageGeometry`); the
+/// first that differs throws, its message naming what differs. `None` when all agree.
+fn input_information_error(
+    intensities: &[AntsImage<f32>],
+    mask: &AntsImage<u32>,
+    prior_label: Option<&AntsImage<u32>>,
+) -> Option<ItkException> {
+    use larmorx_io::nifti::itk::ItkGeometry;
+    use larmorx_registration::format::format_e;
+
+    let mut inputs: Vec<(String, &ItkGeometry)> = vec![
+        ("Primary".to_owned(), &intensities.first()?.geometry),
+        ("_1".to_owned(), &mask.geometry),
+    ];
+    if let Some(label) = prior_label {
+        inputs.push(("_2".to_owned(), &label.geometry));
+    }
+    for (k, image) in intensities.iter().enumerate().skip(1) {
+        inputs.push((format!("_{}", 2 + k), &image.geometry));
+    }
+    inputs.sort_by(|a, b| a.0.cmp(&b.0));
+    let first = inputs[0].1;
+    let tol = (1e-6 * first.spacing[0]).abs();
+    // vnl's `is_equal`: no element further apart than the tolerance (`abs(a - b) > tol` is
+    // false for a NaN, so a NaN counts as equal).
+    let equal = |x: &[f64], y: &[f64], t: f64| {
+        x.len() == y.len()
+            && x.iter()
+                .zip(y)
+                .all(|(p, q)| (p - q).abs().partial_cmp(&t) != Some(std::cmp::Ordering::Greater))
+    };
+    // `std::scientific` with precision 7, as ITK's FixedArray (`[a, b, c]`) and vnl's matrix
+    // (rows of `a b c`, each ended by a newline) print.
+    let point = |v: &[f64]| {
+        let items: Vec<String> = v.iter().map(|&x| format_e(x, 7)).collect();
+        format!("[{}]", items.join(", "))
+    };
+    let matrix = |m: &[Vec<f64>]| {
+        m.iter()
+            .map(|row| {
+                let items: Vec<String> = row.iter().map(|&x| format_e(x, 7)).collect();
+                items.join(" ") + "\n"
+            })
+            .collect::<String>()
+    };
+    for (name, g) in &inputs[1..] {
+        if crate::n4_bias_field_correction::congruent(first, g) {
+            continue;
+        }
+        let mut description = String::from("Inputs do not occupy the same physical space! \n");
+        if !equal(&first.origin, &g.origin, tol) {
+            description += &format!(
+                "InputImage Origin: {}, InputImage{name} Origin: {}\n\tTolerance: {}\n",
+                point(&first.origin),
+                point(&g.origin),
+                format_e(tol, 7)
+            );
+        }
+        if !equal(&first.spacing, &g.spacing, tol) {
+            description += &format!(
+                "InputImage Spacing: {}, InputImage{name} Spacing: {}\n\tTolerance: {}\n",
+                point(&first.spacing),
+                point(&g.spacing),
+                format_e(tol, 7)
+            );
+        }
+        let rows_equal = first.direction.len() == g.direction.len()
+            && first
+                .direction
+                .iter()
+                .zip(&g.direction)
+                .all(|(r, s)| equal(r, s, 1e-6));
+        if !rows_equal {
+            description += &format!(
+                "InputImage Direction: {}, InputImage{name} Direction: {}\n\tTolerance: {}\n",
+                matrix(&first.direction),
+                matrix(&g.direction),
+                format_e(1e-6, 7)
+            );
+        }
+        return Some(ItkException::new(
+            "Modules/Core/Common/include/itkImageToImageFilter.hxx",
+            215,
+            "AtroposSegmentationImageFilter",
+            description,
+        ));
+    }
+    None
+}
+
 /// Whether two images are on one grid (Atropos assumes they are: its iterators walk them
 /// together).
 fn same_grid<T, U>(a: &AntsImage<T>, b: &AntsImage<U>) -> bool {
@@ -1188,6 +1282,23 @@ fn segmentation(
                 return Err(1);
             }
         }
+    }
+
+    // ITK's VerifyInputInformation, at the filter's Update and before anything is read: inputs
+    // on another grid (origin or spacing beyond 1e-6 of the first image's first spacing,
+    // direction beyond 1e-6) throw; ANTs exits 1, printing the exception only with --verbose 1
+    // (found on the data panel, 2026-10-26: a mask written from the FLAIR's affine).
+    if let Some(e) = input_information_error(&intensities, &mask, prior_label.as_ref()) {
+        if verbose {
+            log.cout("\nProgress: \n");
+            log.cerr(&format!("{}\n", e.print()));
+        } else {
+            log.cerr(&format!(
+                "larmorx: Atropos: {} (ANTs exits 1 and prints this only with --verbose 1, ANTS-45)\n",
+                e.description.trim_end().replace('\n', " ")
+            ));
+        }
+        return Err(1);
     }
 
     // The images must share the first image's grid (Atropos walks them together; a smaller
@@ -1957,6 +2068,56 @@ mod tests {
         assert!(out.contains("PriorProbabilityImages"));
         let (code, out, _) = run_capture(&["-h"], 1);
         assert_eq!((code, out.contains("--likelihood-model")), (0, true));
+    }
+
+    #[test]
+    fn a_mask_on_another_grid_is_itks_exception() {
+        // ITK's VerifyInputInformation (found on the data panel: a mask written from a FLAIR's
+        // affine, its spacing a float rounding away): ANTs exits 1, the exception printed with
+        // --verbose 1 only.
+        let dir = tempfile::tempdir().unwrap();
+        let (t1, _) = phantom(dir.path());
+        let n: usize = SHAPE.iter().product();
+        let mut h = NiftiHeader::new(NiftiVersion::V1, &SHAPE, DataType::F32).unwrap();
+        let affine = Affine::from_zooms([1.5, 1.5, 2.00001], [-9.0, 4.0, 1.0]);
+        h.set_qform(&affine, 1).unwrap();
+        h.set_sform(&affine, 1);
+        let a = ArrayD::from_shape_vec(IxDyn(&SHAPE).f(), vec![1.0f32; n]).unwrap();
+        let mask = dir.path().join("off.nii.gz");
+        nifti::write(&mask, &h, a.view(), &WriteOptions::default()).unwrap();
+        let out_spec = format!("[{}]", dir.path().join("seg.nii.gz").display());
+        let mask = mask.to_str().unwrap();
+        let args = [
+            "-d",
+            "3",
+            "-a",
+            &t1,
+            "-x",
+            mask,
+            "-i",
+            "KMeans[2]",
+            "-o",
+            &out_spec,
+        ];
+        let (code, out, err) = run_capture(&args, 1);
+        assert_eq!(code, 1);
+        assert_eq!(out, "");
+        assert!(err.starts_with("larmorx: Atropos: Inputs do not occupy the same physical space!"));
+        let mut verbose = args.to_vec();
+        verbose.extend_from_slice(&["-v", "1"]);
+        let (code, out, err) = run_capture(&verbose, 1);
+        assert_eq!(code, 1);
+        assert!(out.ends_with("\nProgress: \n"), "{out}");
+        assert!(
+            err.contains(
+                "Description: ITK ERROR: AtroposSegmentationImageFilter(0x0): Inputs do not occupy \
+                 the same physical space! \nInputImage Spacing: [1.5000000e+00, 1.5000000e+00, \
+                 2.0000000e+00], InputImage_1 Spacing: [1.5000000e+00, 1.5000000e+00, \
+                 2.0000100e+00]\n\tTolerance: 1.5000000e-06\n"
+            ),
+            "{err}"
+        );
+        assert!(!dir.path().join("seg.nii.gz").exists());
     }
 
     #[test]

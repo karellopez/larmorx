@@ -964,10 +964,9 @@ def all_cases() -> list[AntsCase]:
 # The data panel's tier
 
 
-@ants_inputs.builder("panel-stroke-nonlesion-mask")
-def _(t):
-    """The head of ds004884 sub-M2079's T2w (values above 5 % of its 99th percentile) without
-    the stroke's manual lesion mask, uint8 on the T2w's grid: N4 fitted outside the lesion."""
+def _stroke_nonlesion():
+    """ds004884 sub-M2079's T2w (its image) and its head (values above 5 % of its 99th
+    percentile) without the stroke's manual lesion mask."""
     import larmorx_testdata as td
     import nibabel as nib
 
@@ -977,7 +976,31 @@ def _(t):
     data = np.asanyarray(img.dataobj).astype(np.float64)
     lesion = np.asanyarray(nib.load(td.get(P.STROKE_LESION.path)).dataobj) > 0
     head = data > 0.05 * np.percentile(data, 99)
-    out = nib.Nifti1Image((head & ~lesion).astype(np.uint8), img.affine)
+    return img, (head & ~lesion).astype(np.uint8)
+
+
+@ants_inputs.builder("panel-stroke-nonlesion-mask")
+def _(t):
+    """The stroke's T2w head without its lesion (``_stroke_nonlesion``), uint8 with the T2w's
+    own header (pixdim, qform and sform unchanged: exactly the T2w's grid): N4 fitted outside
+    the lesion."""
+    import nibabel as nib
+
+    img, mask = _stroke_nonlesion()
+    hdr = img.header.copy()
+    hdr.set_data_dtype(np.uint8)
+    hdr["scl_slope"], hdr["scl_inter"] = 1.0, 0.0
+    nib.save(nib.Nifti1Image(mask, None, header=hdr), t)
+
+
+@ants_inputs.builder("panel-stroke-nonlesion-mask-affine")
+def _(t):
+    """The same mask written from the T2w's affine (nibabel's ``Nifti1Image(data, affine)``):
+    its pixdim recomputed (0.99999797 mm against 1), beyond ITK's tolerance."""
+    import nibabel as nib
+
+    img, mask = _stroke_nonlesion()
+    out = nib.Nifti1Image(mask, img.affine)
     out.header.set_qform(img.affine, code=int(img.header["qform_code"]))
     out.header.set_sform(img.affine, code=int(img.header["sform_code"]))
     nib.save(out, t)
@@ -1031,6 +1054,14 @@ def panel_cases() -> list[AntsCase]:
           "the manual lesion mask (N4 fitted outside the lesion)", P.STROKE_T2W,
           "--mask-image", "{gen:panel-stroke-nonlesion-mask}",
           images=[P.STROKE_T2W, P.STROKE_LESION]),
+        dataclasses.replace(
+            n("final-mask/stroke-t2w-mask-from-affine", "the same with the mask written from "
+              "the T2w's affine (its spacing recomputed, 2e-6 mm off): ITK's "
+              "VerifyInputInformation throws, ANTs aborts and larmorx refuses",
+              P.STROKE_T2W, "--mask-image", "{gen:panel-stroke-nonlesion-mask-affine}",
+              images=[P.STROKE_T2W, P.STROKE_LESION]),
+            expect="error",
+        ),
     ]  # fmt: skip
 
 

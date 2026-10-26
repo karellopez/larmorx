@@ -2141,6 +2141,11 @@ def _fmriprep_node(spec: str) -> tuple[Path, list[str], str | None]:
         "/out/", f"{root / run / 'out'}/"
     )
     text = re.sub(r"/templateflow/[^\s,\]]+", lambda m: str(td.get(m.group(0)[1:])), text)
+    # The run's other mounts (/data: its BIDS input; ds004958's BOLD reference is its sbref, read
+    # straight from the dataset).
+    from larmorx_validation.parity import fmriprep_nodes
+
+    text = fmriprep_nodes.oracle_run(run).host_text(text)
     seed = None
     report = work / "_report" / "report.rst"
     if report.is_file():

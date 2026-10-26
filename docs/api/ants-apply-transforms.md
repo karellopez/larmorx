@@ -41,8 +41,8 @@ through fMRIPrep's `.h5` composites, 166 with `--float 1`; `Gaussian`, `MultiLab
 `LanczosWindowedSinc`, `Linear` and `NearestNeighbor`), and four
 calls fMRIPrep never makes (the 600-volume multiband-8 series to the T1w, the raw 7 T MP2RAGE to
 MNI, the stroke's lesion mask to MNI, the 82-year-old's FLAIR onto its T1w): **425 of 425
-bit-identical with CORE-MATH, 329 to the unmodified ANTs** (the others where ITK calls glibc's
-`exp`, `log`, `sin` or `cos`).
+bit-identical with CORE-MATH, 329 to the unmodified ANTs**, all 167 `--float 1` calls among them
+(the others where ITK calls glibc's `exp`, `log`, `sin` or `cos` in double).
 
 ## Quick start
 

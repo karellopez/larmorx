@@ -150,7 +150,7 @@ PAGES = [
         "/tools/fsl-bet/",
         "BET",
         "fsl",
-        [("larmorx-nc replica", "fsl-bet-replica", "validated", None, None)],
+        [("larmorx-nc replica", "fsl-bet-replica-full", "validated", None, None)],
     ),
     (
         "/tools/mri-hmc/",

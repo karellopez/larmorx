@@ -187,3 +187,32 @@ image programs, 8 for DenoiseImage and the anatomical N4s; [fmriprep-oracle.md](
 *Read; verified* in fMRIPrep's working directory. *larmorx:* every `larmorx ants` program reads
 them the same way (`larmorx_ants::cli::itk_threads_from`, tested); before this, a larmorx
 program run by nipype would have used every core.
+
+## larmorx's own threads: some loops on rayon's global pool (2026-10-26)
+
+*Found during the data panel's re-validation (part a), verified.* larmorx runs a call's parallel
+work in a pool of exactly the call's thread count (`larmorx_core::parallel::with_threads`, threads
+named `larmorx-<n>-<i>`). Some loops are reached outside such a pool and so run on rayon's global
+pool, which has as many threads as the CPUs the process may use (or `RAYON_NUM_THREADS`), whatever
+the call asked for: the image metric's sampled values (`ImageMetricv4::for_each_sample`, the
+loop of antsAI's and antsAffineInitializer's searches and of antsRegistration's linear stages)
+and Atropos' filter. The results do not change (every reduction is fixed-order); only the number
+of threads does.
+
+- **How it showed:** the panel tier's antsAI runs (`ITK_GLOBAL_DEFAULT_NUMBER_OF_THREADS=3`, three
+  parallel cases on ten CPUs) each had its idle `larmorx-3` pool and ten busy unnamed threads;
+  the machine's load average reached 31 on 12 CPUs.
+- **The probe:** `validation/investigations/panel-ants/global_pool_probe.py` runs each program at
+  one thread (`ITK_GLOBAL_DEFAULT_NUMBER_OF_THREADS=1`) on small seeded inputs and lists every
+  thread the process had: antsAffineInitializer, antsRegistration with a Rigid MI stage and
+  Atropos start a global-pool thread beside their `larmorx-1` pool; antsRegistration's SyN stage
+  (CC), N4BiasFieldCorrection, DenoiseImage, antsApplyTransforms and ImageMath do not (their
+  loops run inside `with_threads`).
+- **Effect:** a pipeline that gives the program a thread count (nipype's `NSLOTS`) gets more
+  threads than it asked for in those programs: on a shared machine, oversubscription; never a
+  different result.
+- **Meanwhile:** `RAYON_NUM_THREADS` caps the global pool (the panel records were made with
+  `RAYON_NUM_THREADS=3`, as their larmorx thread count).
+- **The fix (a follow-up):** carry the call's thread count to those loops (the metric gains its
+  `n_threads` and runs each chunk inside `with_threads`; Atropos' entry installs its pool), with a
+  test that a one-thread call starts no thread outside its pool.

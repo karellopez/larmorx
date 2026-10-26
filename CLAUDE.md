@@ -70,6 +70,7 @@ with a stop after it, each bringing its evidence.
 - **How to port (user, 2026-10-09):**
   - Make a faithful **replica** when the licence allows it: ANTs/ITK (Apache-2.0), AFNI's NIH public-domain code, CORE-MATH (MIT), nibabel (MIT). Bit-identical results are the target.
   - When the licence restricts it (AFNI's MCW code, Workbench, FSL), make **both**: a bit-exact replica in that licence family's package, and a clean-room original in the main package (rule 1, `docs/licensing.md`).
+  - **FreeSurfer: both as well** (user, 2026-10-26): a replica of every program in `larmorx-freesurfer` and a clean-room original of every program in the main package, built for speed (FreeSurfer is the slowest stage), every program complete; version 8.2.0 (decision log 2026-10-26).
   - MSM: a clean-room original only, in the surfaces track, after a patent check.
 - **Each tool gets its own Python wrapper**, so other developers can build on the library.
 - **Clean-room originals are built for speed** (user, 2026-10-19): the original's behaviour within the validated thresholds, but designed to be much faster than a replica, with the best methods (efficient algorithms, cache-friendly memory, deterministic multithreading, SIMD with runtime dispatch), benchmarked against the original and the replica (`docs/porting-guide.md`, "Clean-room originals: the same behaviour, built for speed"). Replicas stay bit-exact first.

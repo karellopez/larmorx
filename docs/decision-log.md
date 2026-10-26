@@ -1373,6 +1373,52 @@ its clear error), never run.
   of reasonable size and that larmorx never need more memory than the original (the 2026-10-25
   entries above).
 
+## 2026-10-26: FreeSurfer: replica and clean-room original, every program complete (decided by the user)
+
+The user, after the orchestrator's proposal for porting FreeSurfer fast: "I would really like every
+program functionality, never one incomplete", and for the rest: "choose the best for larmorx
+quality. It should be the best software, not a generic, faulty or incomplete one."
+
+- **Both tracks for FreeSurfer** (replaces "FreeSurfer: unchanged", 2026-10-09 above): a bit-exact
+  replica of every program in `larmorx-freesurfer` (FreeSurfer licence), and a clean-room original
+  of every program in the main package (Apache-2.0), built for speed (porting guide: "Clean-room
+  originals: the same behaviour, built for speed"). Why: FreeSurfer is slow (5-8 h on one core) and
+  the main reason for the track is speed; the originals also give a plain `pip install larmorx` the
+  whole surface pipeline without FreeSurfer's extra terms. The slow programs' originals come first
+  (`mri_ca_register`, `mris_sphere` and `mris_register`, `mris_place_surface`, `mris_fix_topology`,
+  `mri_ca_label`), then the others. FreeSurfer's source-derived findings are restricted like FSL's.
+- **Full completeness for every program** (the rule of 2026-10-12, confirmed): every option,
+  message, exit status and failure case of each program, with D13 switches. The orchestrator's
+  proposal to port only the options recon-all and fMRIPrep pass was declined.
+- **Which programs:** first every program fMRIPrep and sMRIPrep run (recon-all's stream with the
+  steps they call, about 45 programs, and bbregister/mri_segreg, mri_coreg, lta_convert,
+  mri_vol2surf, mri_robust_template/register, mris_convert, mris_expand, mri_vol2vol), each
+  complete; then recon-all's other streams (hi-res, longitudinal, SAMSEG, its learned tools as Rust
+  inference with the original weights). `recon-all` itself is published only once every stream it
+  can run is ported; until then each program is published when it is complete, and larmorprepx calls
+  the programs directly. The other streams do not hold up larmorprepx.
+- **The way of working** (the orchestrator's choices for quality and speed, agreed by the user):
+  FreeSurfer's shared library (volumes, surfaces, GCA and its morph, I/O) ported once, layer by
+  layer, as `larmorx-nc-core` was for FSL, so each program is a thin layer on it; the programs
+  ported in groups that share code (one agent part per group; every program stays a separate
+  program with its own command, Python function, API page, record, golden case, random-testing
+  descriptor and site page); one recon-all run per panel subject with every intermediate and the
+  exact command of each step kept, and one generic parity harness that replays each logged command
+  on FreeSurfer's own inputs, so every program is tested in isolation; the speed that changes no
+  result (one process, data in memory, parallel independent work, better search structures) given
+  to the replica too, the method changes to the originals (D11). Site: one page per program,
+  grouped by stage in the navigation. Agents: one at a time unless the user says otherwise.
+- **D5, the version: FreeSurfer 8.2.0** (the newest release; ported from its release tag, rule 2).
+  fMRIPrep 25.2.6 ships 7.3.2: its runs with recon-all are the second version that measures
+  FreeSurfer's own variability band (PLAN.md §7.2, R0), which the originals must stay within; the
+  end-to-end comparison gives fMRIPrep the same 8.2.0 subjects (`--fs-subjects-dir`) so the
+  version does not blur it. The oracle is FreeSurfer 8.2.0 as distributed, installed under
+  `oracles/` (the laptop's `/usr/local/freesurfer` is 6.0, kept only for its licence file), and a
+  build from source if its code generation departs from the source (rule 8). The first part checks
+  that sMRIPrep's recon-all calls run unchanged on 8.2.0 and reports any difference.
+- **D6, the atlas data:** downloaded on first use from FreeSurfer's official distribution,
+  hash-verified, never bundled in a wheel (as the Talairach atlas, 2026-10-19).
+
 ## Open decisions (PLAN.md §16)
 
 | # | Decision | Recommended default (used until decided) | Status |
@@ -1381,8 +1427,8 @@ its clear error), never run.
 | D2 | Licence of our code | Apache-2.0 | **decided 2026-10-09** |
 | D3 | Distributions | wheel `larmorx` (library + larmorprepx via the `[prep]` extra), wheel `larmorx-freesurfer`, standalone CLI | **decided 2026-10-09** |
 | D4 | Names of clean-room tools | neutral names with documented compatibility | open |
-| D5 | FreeSurfer version to port | v8.2.0, also validated against 7.4.x | open |
-| D6 | FreeSurfer atlas data | download at first use after licence acceptance | open |
+| D5 | FreeSurfer version to port | v8.2.0; fMRIPrep's 7.3.2 measures the variability band | **decided 2026-10-26** |
+| D6 | FreeSurfer atlas data | downloaded on first use from the official distribution, hash-verified, never bundled | **decided 2026-10-26** |
 | D7 | Commercial project or users? | **not commercial**; FSL/MSM binaries may be run as oracles | **decided 2026-10-09** |
 | D8 | Output compatibility | fMRIPrep-compatible derivative names and confound columns | open |
 | D9 | Minimum Python | 3.12 | open |

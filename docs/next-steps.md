@@ -141,9 +141,13 @@ of CLAUDE.md, the working agreements in it). Next, in order:
    are replicated. Then FLIRT with BBR, FAST, topup.
 8. **Field maps, FreeSurfer, surfaces, confounds:** sdcflows' field-map estimation (Apache Python:
    the B-spline fit, PEPOLAR and phase-difference preparation) and fMRIPrep's own Python steps;
-   FreeSurfer (`larmorx-freesurfer`: `mri_coreg`, `lta_convert`, then recon-all; its Talairach step
-   as a clean-room original with its atlas fetched on first use, its data packaged apart from the
-   wheels; `docs/licensing.md`); pretrained models as Rust inference with the original weights
+   FreeSurfer 8.2.0, every program complete, a replica (`larmorx-freesurfer`) and a clean-room
+   original (main package, built for speed) each (decision log 2026-10-26): the oracle runs first
+   (8.2.0 on the panel with every intermediate and command kept; fMRIPrep with recon-all, 7.3.2, as
+   the variability band) and one generic step-replay harness; FreeSurfer's shared library once;
+   the programs fMRIPrep and sMRIPrep run, in groups that share code; the slow programs' originals
+   first; then recon-all's other streams; its Talairach step as a clean-room original with its
+   atlas fetched on first use, atlases downloaded on first use (`docs/licensing.md`); pretrained models as Rust inference with the original weights
    (decision log 2026-10-19); Connectome Workbench- and MSM-compatible surface tools; the
    confounds (CompCor, DVARS, framewise displacement, ...).
 9. **larmorprepx**, then the end-to-end comparison with fMRIPrep.

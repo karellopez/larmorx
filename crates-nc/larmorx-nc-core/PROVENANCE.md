@@ -19,7 +19,7 @@ the joined version.
 
 | Module | What a tool uses |
 |---|---|
-| `volume` | `Volume<T>` (`volume<T>`; `Volume` alone is `volume<float>`) for `T` in [`Elem`]: `i8` (`char`), `i16`, `i32`, `f32`, `f64`. Construction (`new`, `new7`, `copyconvert` between types), access (`value`, `get` with the volume's extrapolation, `set`, `idx`), properties (`pixdims`, `sform`/`qform` and their codes, `copy_properties`, `sub_volume`, `extrema`, `left_right_order`, `swap_lr_order`, `make_radiological`/`make_neurological`, `sampling_mat`, `niftivox2newimagevox_mat`), float statistics (`calc_cog`, `cog_scaled_mm`, `backgroundval`/`background_value` with FSL-22's flag, `robust_limits`). Files: `read_volume::<T>` (a 4D file cut to its first volume with FSL's warning), `read_volume4d::<T>` (the volume, the file's datatype and units), `file_dtype`, `closest_templated_type`; `save_volume` (the volume's own type) and, for float volumes, `save`/`save_typed` (FSL's casts or the FSL-09 correction), with `SaveOptions` (`descrip`, units, FSL-56's offset reproduced or not); `BUILDSTRING` (newimage's `descrip`); `env_output_type`, `output_extension`, `offset_defect_applies`; file names (`make_basename`, `return_validimagefilename`, `find_pathname`, `is_regular_file`); `round_f64` (`MISCMATHS::round(double)`). Errors: `FslError` (FSL's printed lines, the exception's type and `what()`), `SaveError` |
+| `volume` | `Volume<T>` (`volume<T>`; `Volume` alone is `volume<float>`) for `T` in [`Elem`]: `i8` (`char`), `i16`, `i32`, `f32`, `f64`. Construction (`new`, `new7`, `copyconvert` between types), access (`value`, `get` with the volume's extrapolation, `set`, `idx`), properties (`pixdims`, `sform`/`qform` and their codes, `copy_properties`, `sub_volume`, `extrema`, `left_right_order`, `swap_lr_order`, `make_radiological`/`make_neurological`, `sampling_mat`, `niftivox2newimagevox_mat`), float statistics (`calc_cog`, `cog_scaled_mm`, `backgroundval`/`background_value` with FSL-22's `NanOrder` and `Background`, `robust_limits`). Files: `read_volume::<T>` (a 4D file cut to its first volume with FSL's warning), `read_volume4d::<T>` (the volume, the file's datatype and units), `file_dtype`, `closest_templated_type`; `save_volume` (the volume's own type) and, for float volumes, `save`/`save_typed` (FSL's casts or the FSL-09 correction), with `SaveOptions` (`descrip`, units, FSL-56's offset reproduced or not); `BUILDSTRING` (newimage's `descrip`); `env_output_type`, `output_extension`, `offset_defect_applies`; file names (`make_basename`, `return_validimagefilename`, `find_pathname`, `is_regular_file`); `round_f64` (`MISCMATHS::round(double)`). Errors: `FslError` (FSL's printed lines, the exception's type and `what()`), `SaveError` |
 | `nifti` | `NiftiHeader` (every field of NewNifti's header, `get_sform`/`set_sform`, `get_qform`/`set_qform`, `set_nifti_version`), `NiftiExtension`, `load_header`, `load_image`, `save_image` (with FSL-56's switch), the legacy matrix routines (`quatern_to_mat44`, `mat44_to_quatern`, `mat33_determ`, `mat33_inverse`, `mat44_inverse`, `mat33_polar`) |
 | `interp`, `kernel` | `interpolate` (the volume's method: nearest, trilinear for every element type, sinc and splines for float volumes; `Volume::interpolate` for the defaults), `q_tri`, `round_f32`, `SplineCoefs`, the sinc kernels |
 | `newimagefns` | `isotropic_resample`, `affine_transform`, `raw_affine_transform`, `affine_transform_mask`, `gradient`, `smooth` (separable Gaussian, threads without changing the result), `gaussian_kernel_1d` |
@@ -57,7 +57,21 @@ the joined version.
   `__exp_fma`; `tools/libm-verify`).
 - **libstdc++ behaviour** (`stdsort.rs`, `istream.rs`): written from the algorithms' published
   descriptions (the SGI STL's introsort and introselect, the C++ standard's `num_get`), not copied
-  from libstdc++.
+  from libstdc++. The SGI STL is Copyright (c) 1994 Hewlett-Packard Company and Copyright (c)
+  1996 Silicon Graphics Computer Systems, Inc., under their permission notice ("Permission to
+  use, copy, modify, distribute and sell this software and its documentation for any purpose is
+  hereby granted without fee, provided that the above copyright notice appear in all copies and
+  that both that copyright notice and this permission notice appear in supporting
+  documentation. [Hewlett-Packard Company | Silicon Graphics] makes no representations about the
+  suitability of this software for any purpose. It is provided "as is" without express or
+  implied warranty."; both in full in `../NOTICE`). `stdsort.rs` differs from the SGI STL where
+  libstdc++ does: the pivot step moves the median of the second, middle and last elements to
+  the first place and partitions the rest (the SGI STL partitions around a copy of the median of
+  the first, middle and last). `sort_f32_checked` (FSL-22's `reproduce`, `calc_bval`) checks
+  every index against the vector's ends; its results equal libstdc++'s `std::sort` on 768
+  vectors with and without NaN values (GCC 11.4 and 14.3;
+  `validation/probes/libstdcxx-sort/sort_probe.cc`, the unit test
+  `checked_sort_gives_libstdcxx_order_with_nan`).
 - `cnum.rs`, `settings.rs` and `sse.rs` hold no FSL code (C/C++ number semantics of FSL's x86-64
   binaries; FSL's environment variables as a table, porting guide §9.1; SSE's NaN rules, made
   explicit so that NaN results have FSL's x86-64 bits on every platform); `x87.rs` emulates the
@@ -88,7 +102,7 @@ Every source file starts with an SPDX header naming its licence and the files it
 | `glibc_double` | Arm Optimized Routines v19.11 `math/pow.c`, `pow_log_data.c`, `exp.c`, `exp_data.c` (glibc 2.35's `e_pow.c`, `e_pow_log_data.c`, `e_exp.c`, `e_exp_data.c`) | `__pow`, `log_inline`, `exp_inline`, `specialcase`, `checkint`; `__exp` and its `specialcase`, as `__pow_fma` and `__exp_fma` (`tools/libm-verify`: 0 of 4 million `pow` and 0 of 4 million `exp` differ from the C library) |
 | `cnum` | (glibc behaviour) | `strtod`, `strtof`, `strtol`, `atof`, `atoi`, `printf`'s `%g`, `%f`, `%e`; x86-64's conversions |
 | `x87` | (x87 behaviour) | `long double` sums, products and quotients rounded to 64 bits, then stored (`tools/libm-verify`: 0 of 5 million differ from the x87 unit) |
-| `stdsort` | (libstdc++ behaviour) | `std::sort`, `std::nth_element` on doubles |
+| `stdsort` | (libstdc++ behaviour; the SGI STL, under the HP/SGI notice) | `std::sort` (`sort_by`; `sort_f32_checked` for floats that may be NaN), `std::nth_element` on doubles |
 | `istream` | (libstdc++ behaviour) | `operator>>` for `int`, `float`, `double`, `std::string`; `std::getline` |
 
 ## Changes from the originals
@@ -114,8 +128,9 @@ Every source file starts with an SPDX header naming its licence and the files it
   else here is parallel; the results never depend on the thread count.
 - **D13 hooks.** `Costfn::skip_nonfinite` (FSL-14's non-finite samples), the corrected centre of
   gravity, NewNifti's data offset of several extensions (`SaveOptions::reproduce_offset`,
-  FSL-56), and `Volume::background_value`'s flag for a shell with NaN (FSL-22) are options the
-  programs set from their mode; with `reproduce` everything is FSL's code path.
+  FSL-56), and a volume's `nan_order` (FSL-22: a shell with NaN sorted with NaNs last, or in
+  libstdc++'s order; `background_value` says which) are options the programs set from their
+  mode; with `reproduce` everything is FSL's code path.
 - **Gzip files with znzlib's settings.** Compressed outputs carry the gzip header of a Unix zlib
   at its default level, as znzlib's `gzopen` writes it; their decompressed bytes are FSL's. The
   compressed stream is zlib-rs's (pure Rust), whose blocks need not be zlib's: compressed files are

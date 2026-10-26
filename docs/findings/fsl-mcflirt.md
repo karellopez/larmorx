@@ -404,7 +404,7 @@ release builds: the debug build's `atan2f` passed on the other NaN, and the gold
 `mcflirt.nonfinite.reproduce.par`, recorded from a debug build, was not mcflirt's). The replica
 now computes every operation NaN or infinite voxels can reach with SSE's rules made explicit
 (`larmorx-nc-core/src/sse.rs`: a NaN made from numbers is the default NaN; NaN operands pass on
-in the source's order), at no measurable cost (a NaN check on results; ds000005's fMRIPrep call
+in the source's order, or the binary's where the two differ: the `-stats` sums, below), at no measurable cost (a NaN check on results; ds000005's fMRIPrep call
 31 s before and after): the trilinear, sinc and spline interpolation, the centre of mass, the
 `-stats` and `-meanvol` sums, `-gdt`'s gradient, glibc's float functions (`__math_invalidf`,
 `atan2f`'s `x + y`, which glibc's binary adds into `x`), Armadillo's small-matrix algebra and
@@ -425,20 +425,32 @@ golden checksum of `mcflirt.nonfinite.reproduce.par` is now mcflirt's own (`0f3a
 Debug builds also no longer overflow integers on NaN coordinates (the sinc loop's bounds wrap,
 as FSL's `int64_t` arithmetic does on x86-64). *Verified* (2026-10-25).
 
-**`calc_bval` with NaN voxels in the border.** FSL's background value (`calc_bval`, the 10th
-percentile of the values in a 2-voxel border; mcflirt pads its output with it) sorts those values
-with `std::sort` and `operator<`, which is not a strict weak ordering when NaNs are present (C++
-leaves the result undefined; libstdc++'s introsort leaves an order that depends on the values'
-positions). The replica sorts NaNs last (a defined order, in both modes). With `reproduce`, a
-volume whose matrix is NaN and whose border holds NaNs is padded with another value than
-mcflirt's: the NaN matrix's `bgnan` and `bgnegnan` inputs differ from mcflirt in their output
-images (32 of 160 cases; the replica's four runs agree in those too). Reproducing libstdc++'s order would mean emulating its introsort step by
-step (a licence question: libstdc++ is GPL-3.0 with the GCC runtime exception); not done.
+**`calc_bval` with NaN voxels in the border (FSL-22).** FSL's background value (`calc_bval`,
+the 10th percentile of the values in a 2-voxel border; mcflirt pads its output with it) sorts
+those values with `std::sort` and `operator<`, which is not a strict weak ordering when NaNs are
+present: C++ leaves the result undefined, and libstdc++'s introsort leaves an order that depends
+on the values' positions. By default the replica sorts NaNs last (a defined order). Until
+2026-10-25 it did so in `reproduce` too, and the NaN matrix's `bgnan` and `bgnegnan` inputs
+differed from mcflirt in their output images (32 of 160 cases: volumes whose matrix is NaN padded
+with another value). Since 2026-10-26 `reproduce` gives the NaNs libstdc++'s order, move for move
+(`larmorx_nc_core::stdsort::sort_f32_checked`: the SGI STL's introsort with libstdc++'s pivot
+step, written from their description, under the HP/SGI permission notice in `crates-nc/NOTICE`,
+with every index checked against the vector's ends; where libstdc++'s loops would leave the
+vector, NaNs are sorted last and the notice says so). It equals libstdc++'s `std::sort` on 768
+seeded vectors with and without NaNs (GCC 11.4 and 14.3; FSL 6.0.7.17 was built with GCC 13.2;
+`validation/probes/libstdcxx-sort/`, where none made libstdc++ read outside the vector), and it
+gives mcflirt's bytes in all 32 NaN-border cases. One of them, `bgnan-stats`, then showed a
+second, unrelated cause: the `-stats` sums pass on the NaN of the operand order of FSL's binary,
+not the source's (`run_and_save_stats`: `addss` with the voxel's value as the destination for
+the mean, the product for the variance), so 6 voxels whose series mixes NaNs of both signs had
+the other sign in the mean, variance and sigma; the replica now adds in the binary's order.
+*Verified* (2026-10-26): all 160 cases of the NaN matrix give mcflirt's bytes in `reproduce` and
+agree among the replica's four runs.
 
 **What the replica does not reproduce:** the abort's signal (it prints what mcflirt prints and
 one line of its own, then exits with status 1), FSL's build string in `descrip`, mcflirt's
-single thread, libstdc++'s order of NaN border values in `calc_bval` (above), and which NaN
-passes on when two NaNs of different signs meet in an affine with mixed NaNs (above).
+single thread, and which NaN passes on when two NaNs of different signs meet in an affine with
+mixed NaNs (above).
 
 ## fMRIPrep, nipype, niworkflows, nitransforms (Apache-2.0 / MIT; not restricted)
 

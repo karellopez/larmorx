@@ -19,8 +19,8 @@ use larmorx_nc_core::optimise;
 use larmorx_nc_core::settings::Settings;
 use larmorx_nc_core::sse;
 use larmorx_nc_core::volume::{
-    self, Conversion, Extrapolation, FslError, Interpolation, SaveError, SaveOptions, SaveType,
-    Volume,
+    self, Background, Conversion, Extrapolation, FslError, Interpolation, NanOrder, SaveError,
+    SaveOptions, SaveType, Volume,
 };
 use rayon::prelude::*;
 
@@ -654,6 +654,10 @@ impl Run<'_> {
         self.report("Reading time series... \n");
         let (mut timeseries, _, in_units) =
             volume::read_volume4d(&self.o.inputfname, self.settings)?;
+        if self.mode.reproduce() {
+            // FSL-22: the background value with libstdc++'s order of NaN values
+            timeseries.nan_order = NanOrder::Libstdcxx;
+        }
         let datatype = volume::file_dtype(&self.o.inputfname)?;
         self.st.no_volumes = timeseries.tsize() as i32;
         let n = self.st.no_volumes;
@@ -1074,36 +1078,56 @@ impl Run<'_> {
 
     /// FSL-22: the volumes whose 2-voxel border holds a NaN voxel, where `calc_bval`'s
     /// `std::sort` has no defined order in C++ and the background value (the resampling's
-    /// padding) is arbitrary in mcflirt. Both modes sort NaN values last (a defined order: every
-    /// other value is FSL's); the notice says so.
+    /// padding) is arbitrary in mcflirt. The correction sorts NaN values last (a defined order:
+    /// every other value is FSL's); `reproduce` gives them libstdc++'s order, FSL's build's,
+    /// except where libstdc++'s loops would leave the vector (sorted last there, and named).
     fn background_nan_notice(&mut self, timeseries: &Volume) -> Result<(), FslError> {
         if !timeseries.data.iter().any(|v| v.is_nan()) {
             return Ok(());
         }
-        let mut names = Vec::new();
+        let (mut names, mut outside) = (Vec::new(), Vec::new());
         for i in 0..timeseries.tsize() {
-            if timeseries.sub_volume(i)?.background_value().1 {
-                names.push(i.to_string());
+            match timeseries.sub_volume(i)?.background_value().1 {
+                Background::Defined => {}
+                Background::Outside => {
+                    names.push(i.to_string());
+                    outside.push(i.to_string());
+                }
+                Background::NanLast | Background::Libstdcxx => names.push(i.to_string()),
             }
         }
         if names.is_empty() {
             return Ok(());
         }
-        let which = if names.len() == 1 {
-            format!("volume {} has", names[0])
-        } else {
-            format!("volumes {} have", names.join(", "))
+        let which = |names: &[String], verb: [&str; 2]| {
+            if names.len() == 1 {
+                format!("volume {}{}", names[0], verb[0])
+            } else {
+                format!("volumes {}{}", names.join(", "), verb[1])
+            }
         };
         let detail = if self.mode.fix() {
             format!(
-                "{which} NaN voxels in the 2-voxel border: they are sorted last for the background \
-                 value (the resampling's padding); C++ leaves the order of mcflirt's sort undefined"
+                "{} NaN voxels in the 2-voxel border: they are sorted last for the background \
+                 value (the resampling's padding); C++ leaves the order of mcflirt's sort undefined",
+                which(&names, [" has", " have"])
+            )
+        } else if outside.is_empty() {
+            format!(
+                "{} NaN voxels in the 2-voxel border, whose order mcflirt's sort leaves \
+                 undefined in C++: the background value (the resampling's padding) has them in \
+                 libstdc++'s order, as FSL's build sorts them",
+                which(&names, [" has", " have"])
             )
         } else {
             format!(
-                "{which} NaN voxels in the 2-voxel border, whose order mcflirt's sort leaves \
-                 undefined: the background value (the resampling's padding) has them sorted last, \
-                 not libstdc++'s arbitrary order; everything else is mcflirt's"
+                "{} NaN voxels in the 2-voxel border, whose order mcflirt's sort leaves \
+                 undefined in C++: the background value (the resampling's padding) has them in \
+                 libstdc++'s order, except for {}: there libstdc++'s sort reads memory outside \
+                 the vector of border values, so they are sorted last; everything else is \
+                 mcflirt's",
+                which(&names, [" has", " have"]),
+                which(&outside, ["", ""])
             )
         };
         self.notice(&defects::FSL_22, detail);
@@ -1361,10 +1385,12 @@ impl Run<'_> {
                     }
                     meanvol.data[k] = m / vmax as f32;
                     if meanvol.data[k].is_nan() {
-                        // NaN or infinite voxels: the same sum with SSE's NaNs.
+                        // NaN or infinite voxels: the same sum with SSE's NaNs, with the
+                        // operands in the order of FSL's build (`addss (mean), ts`: the voxel's
+                        // value is the destination, so its NaN passes on when both are NaN).
                         let mut m = m0;
                         for i in 0..vmax as usize {
-                            m = sse::add_f32(m, ts.data[i * nv + k]);
+                            m = sse::add_f32(ts.data[i * nv + k], m);
                         }
                         meanvol.data[k] = sse::div_f32(m, vmax as f32);
                     }
@@ -1384,11 +1410,12 @@ impl Run<'_> {
                     }
                     let mut var = v / (vmax - 1) as f32;
                     if var.is_nan() {
-                        // NaN or infinite voxels: the same sums with SSE's NaNs.
+                        // NaN or infinite voxels: the same sums with SSE's NaNs, in the order
+                        // of FSL's build (`subss (mean), ts`; `addss (variance), product`).
                         let mut v = v0;
                         for i in 0..vmax as usize {
                             let d = sse::sub_f32(ts.data[i * nv + k], mean);
-                            v = sse::add_f32(v, sse::mul_f32(d, d));
+                            v = sse::add_f32(sse::mul_f32(d, d), v);
                         }
                         var = sse::div_f32(v, (vmax - 1) as f32);
                     }

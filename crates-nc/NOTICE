@@ -64,6 +64,29 @@ Library 2.35 took from them) - MIT License
   larmorx-nc-core/src/glibc_double.rs (pow, exp), modified from the originals. The licence
   text is LICENSES/MIT-arm-optimized-routines.txt.
 
+The SGI STL (std::sort's introsort and std::nth_element's introselect, as libstdc++ keeps them)
+  Copyright (c) 1994 Hewlett-Packard Company
+
+  Permission to use, copy, modify, distribute and sell this software and its documentation for
+  any purpose is hereby granted without fee, provided that the above copyright notice appear in
+  all copies and that both that copyright notice and this permission notice appear in
+  supporting documentation. Hewlett-Packard Company makes no representations about the
+  suitability of this software for any purpose. It is provided "as is" without express or
+  implied warranty.
+
+  Copyright (c) 1996 Silicon Graphics Computer Systems, Inc.
+
+  Permission to use, copy, modify, distribute and sell this software and its documentation for
+  any purpose is hereby granted without fee, provided that the above copyright notice appear in
+  all copies and that both that copyright notice and this permission notice appear in
+  supporting documentation. Silicon Graphics makes no representations about the suitability of
+  this software for any purpose. It is provided "as is" without express or implied warranty.
+
+  The algorithms are written in larmorx-nc-core/src/stdsort.rs from their description,
+  modified: the pivot step as libstdc++ refines it (the median of the second, middle and last
+  elements moved to the first place, the rest partitioned), and every index checked against the
+  vector's ends (std::sort of floats that may be NaN, FSL-22).
+
 
 Apache-2.0 code included
 ========================

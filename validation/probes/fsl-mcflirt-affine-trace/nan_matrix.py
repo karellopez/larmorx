@@ -12,8 +12,10 @@ compared bit for bit: in ``reproduce`` with mcflirt's, in ``fix`` with the relea
 FSL 6.0.7.17 at ``~/fsl`` (never on the PATH). On 2026-10-25 (after the crate::sse work), the
 release and debug builds and both with ARM's NaN agreed in all 160 cases; in reproduce they
 gave mcflirt's bytes except where NaN voxels lie in the 2-voxel border (``bgnan``,
-``bgnegnan``: FSL's ``calc_bval`` sorts them with ``std::sort``, whose order with NaNs the
-replica does not reproduce; ``docs/findings/fsl-mcflirt.md``).
+``bgnegnan``: FSL's ``calc_bval`` sorts them with ``std::sort``, whose order with NaNs C++
+leaves undefined). On 2026-10-26, with libstdc++'s order reproduced in ``reproduce`` (FSL-22)
+and the ``-stats`` sums in the binary's operand order, all 160 cases give mcflirt's bytes
+(``docs/findings/fsl-mcflirt.md``).
 """
 
 from __future__ import annotations

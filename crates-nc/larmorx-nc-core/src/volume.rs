@@ -297,6 +297,36 @@ pub struct Volume<T: Elem = f32> {
     pub extensions: Vec<NiftiExtension>,
     /// The sinc kernel of `setinterpolationmethod(sinc)` (`interpkernel`), if defined.
     pub kernel: Option<std::sync::Arc<crate::kernel::Kernel>>,
+    /// How [`Volume::background_value`] orders a shell that holds NaN values (FSL-22; not a
+    /// property of FSL's volumes: the D13 mode, copied with the other properties).
+    pub nan_order: NanOrder,
+}
+
+/// How [`Volume::background_value`] orders NaN values, which `std::sort` with `operator<`
+/// leaves without a defined order in C++ (FSL-22).
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub enum NanOrder {
+    /// NaN values sorted last (a defined order; the default).
+    #[default]
+    Last,
+    /// libstdc++'s `std::sort` reproduced move for move ([`crate::stdsort::sort_f32_checked`]),
+    /// the order FSL's build gives them; NaN values sorted last where libstdc++'s loops would
+    /// leave the vector (C++ then reads memory that is not the vector's).
+    Libstdcxx,
+}
+
+/// What [`Volume::background_value`] did with NaN values in the shell.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum Background {
+    /// No NaN in the shell: every correct sort gives FSL's value.
+    Defined,
+    /// NaN values sorted last ([`NanOrder::Last`]).
+    NanLast,
+    /// libstdc++'s order reproduced ([`NanOrder::Libstdcxx`]).
+    Libstdcxx,
+    /// [`NanOrder::Libstdcxx`], but libstdc++'s loops would leave the vector: NaN values sorted
+    /// last instead.
+    Outside,
 }
 
 impl<T: Elem> Volume<T> {
@@ -329,6 +359,7 @@ impl<T: Elem> Volume<T> {
             aux_file: Vec::new(),
             extensions: Vec::new(),
             kernel: None,
+            nan_order: NanOrder::Last,
         }
     }
 
@@ -507,6 +538,7 @@ impl<T: Elem> Volume<T> {
         self.display_min = s.display_min;
         self.aux_file = s.aux_file.clone();
         self.extensions = s.extensions.clone();
+        self.nan_order = s.nan_order;
     }
 
     /// `copyconvert(source, dest)`: the source's dimensions and properties, its values
@@ -789,10 +821,10 @@ impl Volume {
         self.background_value().0
     }
 
-    /// [`Volume::backgroundval`], and whether the shell holds a NaN: then `std::sort` with
-    /// `operator<` has no defined order in C++ (FSL-22) and the value is the one with NaN values
-    /// sorted last.
-    pub fn background_value(&self) -> (f32, bool) {
+    /// [`Volume::backgroundval`], and what was done with NaN values in the shell: `std::sort`
+    /// with `operator<` has no defined order for them in C++ (FSL-22), and the volume's
+    /// [`NanOrder`] decides theirs.
+    pub fn background_value(&self) -> (f32, Background) {
         let (zb, yb, xb) = (self.zsize(), self.ysize(), self.xsize());
         let (mut ewx, mut ewy, mut ewz) = (2i64, 2i64, 2i64);
         if ewx >= xb {
@@ -832,10 +864,25 @@ impl Volume {
                 }
             }
         }
-        let undefined = hist.iter().any(|v| v.is_nan());
-        sort_like_std(&mut hist);
+        let how = if !hist.iter().any(|v| v.is_nan()) {
+            Background::Defined
+        } else if self.nan_order == NanOrder::Last {
+            Background::NanLast
+        } else {
+            let mut exact = hist.clone();
+            match crate::stdsort::sort_f32_checked(&mut exact) {
+                Ok(()) => {
+                    hist = exact;
+                    Background::Libstdcxx
+                }
+                Err(_) => Background::Outside,
+            }
+        };
+        if how != Background::Libstdcxx {
+            sort_nan_last(&mut hist);
+        }
         let p10 = (numbins / 10).max(0) as usize;
-        (hist.get(p10).copied().unwrap_or(0.0), undefined)
+        (hist.get(p10).copied().unwrap_or(0.0), how)
     }
 
     /// `robustmin()`, `robustmax()` (`calc_robustlimits`: Steve Smith's 2%-98% thresholds,
@@ -845,10 +892,10 @@ impl Volume {
     }
 }
 
-/// `std::sort` of floats as libstdc++ orders them with `operator<`: for values without NaN
-/// any correct sort gives the same sequence (equal values are interchangeable). A shell with
-/// NaN has no defined order in C++ (FSL-22); NaN values are put last here.
-fn sort_like_std(v: &mut [f32]) {
+/// `std::sort` of floats with `operator<`: for values without NaN any correct sort gives
+/// libstdc++'s sequence (equal values are interchangeable). With NaN values, which have no
+/// defined order in C++ (FSL-22), they are put last.
+fn sort_nan_last(v: &mut [f32]) {
     v.sort_by(|a, b| {
         a.partial_cmp(b)
             .unwrap_or_else(|| a.is_nan().cmp(&b.is_nan()))
@@ -1833,10 +1880,13 @@ mod tests {
         assert_eq!(v.extrema(), (6.0, 0.0));
         let b = v.backgroundval();
         assert!((0.0..=6.0).contains(&b));
-        assert!(!v.background_value().1);
+        assert_eq!(v.background_value().1, Background::Defined);
         v.data[0] = f32::NAN;
         assert!(v.max().is_nan() && v.min().is_nan());
-        assert!(v.background_value().1);
+        assert_eq!(v.background_value().1, Background::NanLast);
+        v.nan_order = NanOrder::Libstdcxx;
+        assert_eq!(v.background_value().1, Background::Libstdcxx);
+        assert_eq!(v.sub_volume(0).unwrap().nan_order, NanOrder::Libstdcxx);
     }
 
     #[test]

@@ -19,7 +19,8 @@ use larmorx_nc_core::optimise;
 use larmorx_nc_core::settings::Settings;
 use larmorx_nc_core::sse;
 use larmorx_nc_core::volume::{
-    self, Conversion, Extrapolation, FslError, Interpolation, SaveError, SaveType, Volume,
+    self, Background, Conversion, Extrapolation, FslError, Interpolation, NanOrder, SaveError,
+    SaveOptions, SaveType, Volume,
 };
 use rayon::prelude::*;
 
@@ -653,6 +654,10 @@ impl Run<'_> {
         self.report("Reading time series... \n");
         let (mut timeseries, _, in_units) =
             volume::read_volume4d(&self.o.inputfname, self.settings)?;
+        if self.mode.reproduce() {
+            // FSL-22: the background value with libstdc++'s order of NaN values
+            timeseries.nan_order = NanOrder::Libstdcxx;
+        }
         let datatype = volume::file_dtype(&self.o.inputfname)?;
         self.st.no_volumes = timeseries.tsize() as i32;
         let n = self.st.no_volumes;
@@ -700,6 +705,7 @@ impl Run<'_> {
                     mv.data.iter_mut().for_each(|v| *v = 0.0);
                     timeseries.extrap = Extrapolation::Extraslice;
                     timeseries.interp = Interpolation::Trilinear;
+                    self.background_nan_notice(&timeseries)?;
                     for i in 0..n {
                         let src = timeseries.sub_volume(i64::from(i))?;
                         let mut testvol = src.clone();
@@ -972,6 +978,7 @@ impl Run<'_> {
             .iter()
             .map(|m| arma::mul_tinysq(m, &init_trans))
             .collect();
+        self.background_nan_notice(&timeseries)?;
         let resampled: Vec<Result<Volume, FslError>> = with_pool(self.n_threads, || {
             (0..n)
                 .into_par_iter()
@@ -1069,6 +1076,64 @@ impl Run<'_> {
         self.notice(&defects::FSL_14, detail);
     }
 
+    /// FSL-22: the volumes whose 2-voxel border holds a NaN voxel, where `calc_bval`'s
+    /// `std::sort` has no defined order in C++ and the background value (the resampling's
+    /// padding) is arbitrary in mcflirt. The correction sorts NaN values last (a defined order:
+    /// every other value is FSL's); `reproduce` gives them libstdc++'s order, FSL's build's,
+    /// except where libstdc++'s loops would leave the vector (sorted last there, and named).
+    fn background_nan_notice(&mut self, timeseries: &Volume) -> Result<(), FslError> {
+        if !timeseries.data.iter().any(|v| v.is_nan()) {
+            return Ok(());
+        }
+        let (mut names, mut outside) = (Vec::new(), Vec::new());
+        for i in 0..timeseries.tsize() {
+            match timeseries.sub_volume(i)?.background_value().1 {
+                Background::Defined => {}
+                Background::Outside => {
+                    names.push(i.to_string());
+                    outside.push(i.to_string());
+                }
+                Background::NanLast | Background::Libstdcxx => names.push(i.to_string()),
+            }
+        }
+        if names.is_empty() {
+            return Ok(());
+        }
+        let which = |names: &[String], verb: [&str; 2]| {
+            if names.len() == 1 {
+                format!("volume {}{}", names[0], verb[0])
+            } else {
+                format!("volumes {}{}", names.join(", "), verb[1])
+            }
+        };
+        let detail = if self.mode.fix() {
+            format!(
+                "{} NaN voxels in the 2-voxel border: they are sorted last for the background \
+                 value (the resampling's padding); C++ leaves the order of mcflirt's sort undefined",
+                which(&names, [" has", " have"])
+            )
+        } else if outside.is_empty() {
+            format!(
+                "{} NaN voxels in the 2-voxel border, whose order mcflirt's sort leaves \
+                 undefined in C++: the background value (the resampling's padding) has them in \
+                 libstdc++'s order, as FSL's build sorts them",
+                which(&names, [" has", " have"])
+            )
+        } else {
+            format!(
+                "{} NaN voxels in the 2-voxel border, whose order mcflirt's sort leaves \
+                 undefined in C++: the background value (the resampling's padding) has them in \
+                 libstdc++'s order, except for {}: there libstdc++'s sort reads memory outside \
+                 the vector of border values, so they are sorted last; everything else is \
+                 mcflirt's",
+                which(&names, [" has", " have"]),
+                which(&outside, ["", ""])
+            )
+        };
+        self.notice(&defects::FSL_22, detail);
+        Ok(())
+    }
+
     /// Checks of the corrected command line before any work (FSL-12): the inputs mcflirt
     /// accepts and then aborts on.
     fn precheck(&mut self, timeseries: &Volume) -> Result<(), End> {
@@ -1107,7 +1172,7 @@ impl Run<'_> {
                         .into(),
                 ));
             }
-            let (r, _) = volume::read_volume(&self.o.reffilename, self.settings)?;
+            let (r, _) = volume::read_volume::<f32>(&self.o.reffilename, self.settings)?;
             if r.nvoxels() != timeseries.nvoxels() {
                 return Err(End::Refuse(format!(
                     "the reference {} has {} voxels and the series' volumes {}: mcflirt aborts \
@@ -1156,19 +1221,37 @@ impl Run<'_> {
     /// mcflirt's behaviour is reproduced; corrected, `.nii.gz` (larmorx's behaviour, FSL-11).
     fn save(&mut self, v: &Volume, name: &str, ty: SaveType, code: Option<i16>) -> Result<(), End> {
         let settings = self.output_settings();
-        let units = nifti::UNITS_MM_SEC;
-        match v.save_typed(
-            name,
-            ty,
-            Conversion::X86Cast,
-            &settings,
-            DESCRIP,
-            code,
-            units,
-        ) {
+        let opts = self.save_options(v, &settings, nifti::UNITS_MM_SEC);
+        match v.save_typed(name, ty, Conversion::X86Cast, &settings, &opts, code) {
             Ok(()) => Ok(()),
             Err(SaveError::OutputType(e)) => Err(End::Exit(1, e.printed)),
             Err(SaveError::Exception(e)) => Err(End::Abort(e)),
+        }
+    }
+
+    /// How an image is written: mcflirt's `descrip`, `units`, and NewNifti's data offset for
+    /// several extensions (FSL-56) corrected unless reproduced, with its notice when the
+    /// offset would differ.
+    fn save_options(
+        &mut self,
+        v: &Volume,
+        settings: &Settings,
+        units: i32,
+    ) -> SaveOptions<'static> {
+        if volume::offset_defect_applies(v, settings) {
+            self.notice(
+                &defects::FSL_56,
+                format!(
+                    "{} NIfTI extensions of different sizes: the data offset counts each \
+                     extension's own size (NewNifti adds the first one's once per extension)",
+                    v.extensions.len()
+                ),
+            );
+        }
+        SaveOptions {
+            description: DESCRIP,
+            units,
+            reproduce_offset: self.mode.reproduce(),
         }
     }
 
@@ -1268,15 +1351,8 @@ impl Run<'_> {
             nifti::UNITS_MM_SEC
         };
         let settings = self.output_settings();
-        match ts.save_typed(
-            &self.o.outputfname,
-            ty,
-            conv,
-            &settings,
-            DESCRIP,
-            code,
-            units,
-        ) {
+        let opts = self.save_options(ts, &settings, units);
+        match ts.save_typed(&self.o.outputfname, ty, conv, &settings, &opts, code) {
             Ok(()) => Ok(()),
             Err(SaveError::OutputType(e)) => Err(End::Exit(1, e.printed)),
             Err(SaveError::Exception(e)) => Err(End::Abort(e)),
@@ -1309,10 +1385,12 @@ impl Run<'_> {
                     }
                     meanvol.data[k] = m / vmax as f32;
                     if meanvol.data[k].is_nan() {
-                        // NaN or infinite voxels: the same sum with SSE's NaNs.
+                        // NaN or infinite voxels: the same sum with SSE's NaNs, with the
+                        // operands in the order of FSL's build (`addss (mean), ts`: the voxel's
+                        // value is the destination, so its NaN passes on when both are NaN).
                         let mut m = m0;
                         for i in 0..vmax as usize {
-                            m = sse::add_f32(m, ts.data[i * nv + k]);
+                            m = sse::add_f32(ts.data[i * nv + k], m);
                         }
                         meanvol.data[k] = sse::div_f32(m, vmax as f32);
                     }
@@ -1332,11 +1410,12 @@ impl Run<'_> {
                     }
                     let mut var = v / (vmax - 1) as f32;
                     if var.is_nan() {
-                        // NaN or infinite voxels: the same sums with SSE's NaNs.
+                        // NaN or infinite voxels: the same sums with SSE's NaNs, in the order
+                        // of FSL's build (`subss (mean), ts`; `addss (variance), product`).
                         let mut v = v0;
                         for i in 0..vmax as usize {
                             let d = sse::sub_f32(ts.data[i * nv + k], mean);
-                            v = sse::add_f32(v, sse::mul_f32(d, d));
+                            v = sse::add_f32(sse::mul_f32(d, d), v);
                         }
                         var = sse::div_f32(v, (vmax - 1) as f32);
                     }

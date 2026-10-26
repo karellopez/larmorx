@@ -147,6 +147,12 @@ PAGES = [
         ],
     ),
     (
+        "/tools/fsl-bet/",
+        "BET",
+        "fsl",
+        [("larmorx-nc replica", "fsl-bet-replica", "validated", None, None)],
+    ),
+    (
         "/tools/mri-hmc/",
         "Head-motion correction",
         "fsl",

@@ -1,0 +1,153 @@
+{
+ "defect": null,
+ "description": "bet2 on a constant image with an FSLOUTPUTTYPE FSL does not know: FSL crashes first (FSL-41); reproduce fills the median and then stops at the first save, where FSL never gets: the suite judges such a filled run with its later failure (2026-10-26)",
+ "expect": "pass",
+ "found": {
+  "detail": "messages before FSL's crash: stderr FSL 0 characters, larmorx 136: '' / 'ERROR:: Unrecognised value (ANALYZE) of environment variable FSLOUTPUTTYPE\\nLegal'",
+  "n": 24,
+  "seed": "bettrial4",
+  "shrink_moves": [
+   "dropped -w (-w 5)",
+   "dropped -o (-o)",
+   "input: axis 0 12 -> 6 voxels",
+   "input: axis 2 8 -> 4 voxels",
+   "input: axis 0 6 -> 3 voxels",
+   "input: axis 1 6 -> 3 voxels",
+   "input: axis 2 4 -> 2 voxels",
+   "input: axis 0 3 -> 1 voxels",
+   "input: axis 1 3 -> 1 voxels",
+   "input: axis 2 2 -> 1 voxels",
+   "input (and its grid): plumb orientation",
+   "input (and its grid): unit spacing",
+   "input (and its grid): origin at 0",
+   "input (and its grid): qform and sform codes 1",
+   "input: float32 storage",
+   "input: content blobs -> constant"
+  ],
+  "signature": [
+   "messages before FSL's crash"
+  ]
+ },
+ "id": "bet2-filled-then-output-type",
+ "implementations": [
+  "replica"
+ ],
+ "reason": "",
+ "recipe": {
+  "extra": {
+   "output_type": "ANALYZE",
+   "tool": "bet2"
+  },
+  "features": {
+   "--ct": false,
+   "-c": false,
+   "-e": false,
+   "-f": false,
+   "-g": false,
+   "-m": false,
+   "-n": false,
+   "-o": true,
+   "-r": false,
+   "-s": false,
+   "-t": false,
+   "-v": false,
+   "-w": true,
+   "FSLOUTPUTTYPE": "ANALYZE",
+   "axis0": 0.85,
+   "axis1": 1.25,
+   "axis2": 1.0,
+   "blobs": 2,
+   "centre0": -0.5,
+   "centre1": 0.0,
+   "centre2": 2.0,
+   "content": "blobs",
+   "dtype": "float64",
+   "extreme": false,
+   "orientation": "axes+oblique",
+   "origin0": -39.0,
+   "origin1": -54.25,
+   "origin2": -33.25,
+   "qfac": -1,
+   "qform_code": 0,
+   "range": "plain",
+   "sform": "same",
+   "sform_code": 4,
+   "shape": "12x6x8",
+   "size": 14.0,
+   "spacing0": 2.0,
+   "spacing1": 2.0,
+   "spacing2": 0.8,
+   "suffix": ".nii.gz",
+   "tool": "bet2",
+   "units": "mm",
+   "w": "5"
+  },
+  "groups": [
+   {
+    "args": [
+     "{in:input}",
+     "out"
+    ],
+    "name": "input",
+    "optional": false
+   }
+  ],
+  "inputs": {
+   "input": {
+    "content": {
+     "seed": 45007367,
+     "type": "constant"
+    },
+    "dtype": "float32",
+    "geometry": {
+     "origin": [
+      0.0,
+      0.0,
+      0.0
+     ],
+     "qfac": 1,
+     "qform_code": 1,
+     "quaternion": [
+      1,
+      0,
+      0,
+      0
+     ],
+     "sform": "same",
+     "sform_code": 1,
+     "spacing": [
+      1.0,
+      1.0,
+      1.0
+     ],
+     "units": "mm"
+    },
+    "scaling": null,
+    "shape": [
+     1,
+     1,
+     1
+    ],
+    "suffix": ".nii.gz",
+    "values": {
+     "offset": 0.0,
+     "scale": 1.0
+    }
+   }
+  },
+  "n": 24,
+  "options": [
+   "-o",
+   "-w",
+   "FSLOUTPUTTYPE=ANALYZE",
+   "bet2"
+  ],
+  "seed": "bettrial4",
+  "tool": "fsl-bet"
+ },
+ "rule": null,
+ "status": "fixed",
+ "suite": "fsl-bet-replica",
+ "tier": "standard",
+ "tool": "fsl-bet"
+}

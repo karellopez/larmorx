@@ -3,23 +3,28 @@
 // newimageio.h). Copyright (C) 1999-2018 University of Oxford (Mark Jenkinson, Matthew Webster
 // et al.). Rust translation Copyright 2026 Karel Lopez Vilaret; modified from the originals.
 // Distributed under the FSL Licence (see LICENSE).
-//! FSL's `volume<float>`: an image of up to seven dimensions with the properties newimage
-//! carries (voxel sizes, sform and qform, orientation, interpolation and extrapolation
-//! settings), read and saved with FSL's rules.
+//! FSL's `volume<T>`: an image of up to seven dimensions with the properties newimage carries
+//! (voxel sizes, sform and qform, orientation, interpolation and extrapolation settings), read
+//! and saved with FSL's rules, for the element types newimage is instantiated with (`char`,
+//! `short`, `int`, `float`, `double`: [`Elem`]). [`Volume`] without a type is `volume<float>`.
 //!
 //! - [`read_volume4d`] and [`read_volume`] read as FSL does (`readGeneralVolume`): the file
-//!   found by FSL's name rules, values converted to float with `scl_slope`/`scl_inter`, voxel
-//!   sizes made positive, and a neurological image swapped in memory to radiological order.
-//! - [`Volume::save`] and [`Volume::save_dtype`] write as `save_volume` and `save_volume_dtype`
-//!   do: the header FSL builds (`set_fsl_hdr`), swapped back to neurological order when the
-//!   file was, in the format `FSLOUTPUTTYPE` names, converted to the output type with C's casts
-//!   as x86-64 performs them.
-//! - The properties used by registration: [`Volume::sampling_mat`], [`Volume::cog_scaled_mm`],
-//!   [`Volume::backgroundval`], [`Volume::min`] and [`Volume::max`].
+//!   found by FSL's name rules, values converted to the volume's type with `scl_slope` and
+//!   `scl_inter` in `float` (`convertbuffer`), voxel sizes made positive, and a neurological
+//!   image swapped in memory to radiological order.
+//! - [`Volume::save_volume`] writes as `save_volume` does: the header FSL builds (`set_fsl_hdr`),
+//!   swapped back to neurological order when the file was, in the format `FSLOUTPUTTYPE` names,
+//!   in the volume's own type; [`Volume::save`] and [`Volume::save_typed`] write a float volume
+//!   as `save_volume` and `save_volume_dtype` do, converted with C's casts as x86-64 performs
+//!   them.
+//! - The properties used by registration and brain extraction: [`Volume::sampling_mat`],
+//!   [`Volume::cog_scaled_mm`], [`Volume::backgroundval`], [`Volume::robust_limits`],
+//!   [`Volume::min`] and [`Volume::max`].
 //!
 //! Errors are [`FslError`]s with FSL's text: the lines printed before an exception, and the
 //! exception's type and `what()` (an uncaught exception ends an FSL program).
 
+use std::any::Any;
 use std::path::Path;
 
 use crate::arma::{self, Mat};
@@ -28,11 +33,143 @@ use crate::nifti::{self, NiftiExtension, NiftiHeader, dt};
 use crate::settings::Settings;
 use crate::sse;
 
+/// The build string newimage 2203.12 writes into `descrip` (FSL 6.0.7.17's conda build), for
+/// replicas whose files must be FSL's byte for byte.
+pub const BUILDSTRING: &str = "2203.12-dirty 2024-02-01T16:17:47+00:00";
+
 /// `FSL_RADIOLOGICAL`, `FSL_NEUROLOGICAL`, `FSL_INCONSISTENT`, `FSL_ZERODET`.
 pub const RADIOLOGICAL: i32 = -1;
 pub const NEUROLOGICAL: i32 = 1;
 pub const INCONSISTENT: i32 = 0;
 pub const ZERODET: i32 = -101;
+
+/// The element types newimage's templates are instantiated with.
+pub trait Elem: Copy + Default + PartialOrd + std::fmt::Debug + Send + Sync + 'static {
+    /// The NIfTI datatype `save_volume` writes for this type.
+    const DTYPE: i16;
+    /// Bytes per value.
+    const SIZE: usize;
+    fn to_f64(self) -> f64;
+    fn to_f32(self) -> f32;
+    /// C's conversion `(T) x` from `float`, as x86-64 performs it.
+    fn from_f32(x: f32) -> Self;
+    /// C's conversion `(T) x` from `double`, as x86-64 performs it.
+    fn from_f64(x: f64) -> Self;
+    /// The value's bytes as the file stores them (little-endian).
+    fn put_le(self, out: &mut Vec<u8>);
+}
+
+impl Elem for i16 {
+    const DTYPE: i16 = dt::SIGNED_SHORT;
+    const SIZE: usize = 2;
+    fn to_f64(self) -> f64 {
+        f64::from(self)
+    }
+    fn to_f32(self) -> f32 {
+        f32::from(self)
+    }
+    fn from_f32(x: f32) -> Self {
+        // GCC converts a float to short through a 32-bit integer and keeps its low half.
+        cnum::f32_to_i16(x)
+    }
+    fn from_f64(x: f64) -> Self {
+        cnum::f64_to_i32(x) as i16
+    }
+    fn put_le(self, out: &mut Vec<u8>) {
+        out.extend_from_slice(&self.to_le_bytes());
+    }
+}
+
+impl Elem for i32 {
+    const DTYPE: i16 = dt::SIGNED_INT;
+    const SIZE: usize = 4;
+    fn to_f64(self) -> f64 {
+        f64::from(self)
+    }
+    fn to_f32(self) -> f32 {
+        self as f32
+    }
+    fn from_f32(x: f32) -> Self {
+        cnum::f32_to_i32(x)
+    }
+    fn from_f64(x: f64) -> Self {
+        cnum::f64_to_i32(x)
+    }
+    fn put_le(self, out: &mut Vec<u8>) {
+        out.extend_from_slice(&self.to_le_bytes());
+    }
+}
+
+impl Elem for f32 {
+    const DTYPE: i16 = dt::FLOAT;
+    const SIZE: usize = 4;
+    fn to_f64(self) -> f64 {
+        f64::from(self)
+    }
+    fn to_f32(self) -> f32 {
+        self
+    }
+    fn from_f32(x: f32) -> Self {
+        x
+    }
+    fn from_f64(x: f64) -> Self {
+        x as f32
+    }
+    fn put_le(self, out: &mut Vec<u8>) {
+        out.extend_from_slice(&self.to_le_bytes());
+    }
+}
+
+/// FSL's `volume<char>`: C's `char` (signed on x86-64), written as unsigned bytes
+/// (`DT_UNSIGNED_CHAR`); the bytes go through unchanged.
+impl Elem for i8 {
+    const DTYPE: i16 = dt::UNSIGNED_CHAR;
+    const SIZE: usize = 1;
+    fn to_f64(self) -> f64 {
+        f64::from(self)
+    }
+    fn to_f32(self) -> f32 {
+        f32::from(self)
+    }
+    fn from_f32(x: f32) -> Self {
+        cnum::f32_to_i8(x)
+    }
+    fn from_f64(x: f64) -> Self {
+        cnum::f64_to_i32(x) as i8
+    }
+    fn put_le(self, out: &mut Vec<u8>) {
+        out.push(self as u8);
+    }
+}
+
+impl Elem for f64 {
+    const DTYPE: i16 = dt::DOUBLE;
+    const SIZE: usize = 8;
+    fn to_f64(self) -> f64 {
+        self
+    }
+    fn to_f32(self) -> f32 {
+        self as f32
+    }
+    fn from_f32(x: f32) -> Self {
+        f64::from(x)
+    }
+    fn from_f64(x: f64) -> Self {
+        x
+    }
+    fn put_le(self, out: &mut Vec<u8>) {
+        out.extend_from_slice(&self.to_le_bytes());
+    }
+}
+
+/// `(D) x` between element types (C's conversions: a `float` source converts from `float`,
+/// every other from its exact `double` value).
+pub fn convert<S: Elem, D: Elem>(x: S) -> D {
+    match S::DTYPE {
+        dt::FLOAT => D::from_f32(x.to_f32()),
+        _ => D::from_f64(x.to_f64()),
+    }
+}
 
 /// `extrapolation` (newimage.h).
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -106,13 +243,19 @@ impl FslError {
         )
     }
 
-    /// Everything the program writes on standard error from the throw on.
-    pub fn stderr_text(&self) -> String {
+    /// The lines printed before the throw, each ended by a newline.
+    pub fn printed_text(&self) -> String {
         let mut s = String::new();
         for l in &self.printed {
             s.push_str(l);
             s.push('\n');
         }
+        s
+    }
+
+    /// Everything the program writes on standard error from the throw on.
+    pub fn stderr_text(&self) -> String {
+        let mut s = self.printed_text();
         s.push_str(&self.terminate_text());
         s
     }
@@ -126,11 +269,11 @@ impl std::fmt::Display for FslError {
 
 impl std::error::Error for FslError {}
 
-/// FSL's `volume<float>` (a `volume4D` is the same type).
+/// FSL's `volume<T>` (a `volume4D` is the same type); `Volume` alone is `volume<float>`.
 #[derive(Clone, Debug)]
-pub struct Volume {
+pub struct Volume<T: Elem = f32> {
     /// The values, x fastest, then y, z, t and the higher dimensions.
-    pub data: Vec<f32>,
+    pub data: Vec<T>,
     /// `ColumnsX, RowsY, SlicesZ, dim4, dim5, dim6, dim7`.
     pub dims: [i64; 7],
     /// `Xdim, Ydim, Zdim, p_TR, pxdim5, pxdim6, pxdim7`.
@@ -145,7 +288,7 @@ pub struct Volume {
     pub slice_ordering_code: i32,
     pub interp: Interpolation,
     pub extrap: Extrapolation,
-    pub padvalue: f32,
+    pub padvalue: T,
     pub splineorder: i32,
     pub ep_valid: [bool; 3],
     pub display_max: f32,
@@ -154,18 +297,48 @@ pub struct Volume {
     pub extensions: Vec<NiftiExtension>,
     /// The sinc kernel of `setinterpolationmethod(sinc)` (`interpkernel`), if defined.
     pub kernel: Option<std::sync::Arc<crate::kernel::Kernel>>,
+    /// How [`Volume::background_value`] orders a shell that holds NaN values (FSL-22; not a
+    /// property of FSL's volumes: the D13 mode, copied with the other properties).
+    pub nan_order: NanOrder,
 }
 
-impl Volume {
-    /// `volume(x, y, z, t)` (values 0) with `setdefaultproperties()`.
-    pub fn new(x: i64, y: i64, z: i64, t: i64) -> Volume {
+/// How [`Volume::background_value`] orders NaN values, which `std::sort` with `operator<`
+/// leaves without a defined order in C++ (FSL-22).
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub enum NanOrder {
+    /// NaN values sorted last (a defined order; the default).
+    #[default]
+    Last,
+    /// libstdc++'s `std::sort` reproduced move for move ([`crate::stdsort::sort_f32_checked`]),
+    /// the order FSL's build gives them; NaN values sorted last where libstdc++'s loops would
+    /// leave the vector (C++ then reads memory that is not the vector's).
+    Libstdcxx,
+}
+
+/// What [`Volume::background_value`] did with NaN values in the shell.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum Background {
+    /// No NaN in the shell: every correct sort gives FSL's value.
+    Defined,
+    /// NaN values sorted last ([`NanOrder::Last`]).
+    NanLast,
+    /// libstdc++'s order reproduced ([`NanOrder::Libstdcxx`]).
+    Libstdcxx,
+    /// [`NanOrder::Libstdcxx`], but libstdc++'s loops would leave the vector: NaN values sorted
+    /// last instead.
+    Outside,
+}
+
+impl<T: Elem> Volume<T> {
+    /// `volume<T>(x, y, z, t)` (values 0) with `setdefaultproperties()`.
+    pub fn new(x: i64, y: i64, z: i64, t: i64) -> Volume<T> {
         Volume::new7([x, y, z, t, 1, 1, 1])
     }
 
-    pub fn new7(dims: [i64; 7]) -> Volume {
+    pub fn new7(dims: [i64; 7]) -> Volume<T> {
         let n: i64 = dims.iter().product();
         Volume {
-            data: vec![0.0; n.max(0) as usize],
+            data: vec![T::default(); n.max(0) as usize],
             dims,
             pixdims: [1.0; 7],
             sform: Mat::eye(4),
@@ -178,7 +351,7 @@ impl Volume {
             slice_ordering_code: 0,
             interp: Interpolation::Trilinear,
             extrap: Extrapolation::Zeropad,
-            padvalue: 0.0,
+            padvalue: T::default(),
             splineorder: 3,
             ep_valid: [false; 3],
             display_max: 0.0,
@@ -186,7 +359,13 @@ impl Volume {
             aux_file: Vec::new(),
             extensions: Vec::new(),
             kernel: None,
+            nan_order: NanOrder::Last,
         }
+    }
+
+    /// This volume as `volume<float>`, when it is one.
+    pub fn as_float(&self) -> Option<&Volume<f32>> {
+        (self as &dyn Any).downcast_ref::<Volume<f32>>()
     }
 
     #[inline]
@@ -216,6 +395,11 @@ impl Volume {
     #[inline]
     pub fn zdim(&self) -> f32 {
         self.pixdims[2]
+    }
+    /// `tdim()` (`p_TR`).
+    #[inline]
+    pub fn tdim(&self) -> f32 {
+        self.pixdims[3]
     }
 
     /// `nvoxels()`: voxels of one 3D volume.
@@ -257,8 +441,15 @@ impl Volume {
 
     /// `value(x, y, z)`: no bounds handling.
     #[inline]
-    pub fn value(&self, x: i64, y: i64, z: i64) -> f32 {
+    pub fn value(&self, x: i64, y: i64, z: i64) -> T {
         self.data[self.idx(x, y, z)]
+    }
+
+    /// `value(x, y, z) = v`.
+    #[inline]
+    pub fn set(&mut self, x: i64, y: i64, z: i64, v: T) {
+        let i = self.idx(x, y, z);
+        self.data[i] = v;
     }
 
     /// `in_bounds(x, y, z)` for integers.
@@ -269,7 +460,7 @@ impl Volume {
 
     /// `operator()(x, y, z) const`: the value, or the extrapolated one outside the volume.
     #[inline]
-    pub fn get(&self, x: i64, y: i64, z: i64) -> f32 {
+    pub fn get(&self, x: i64, y: i64, z: i64) -> T {
         if self.in_bounds(x, y, z) {
             self.value(x, y, z)
         } else {
@@ -277,10 +468,10 @@ impl Volume {
         }
     }
 
-    /// `extrapolate(x, y, z)` for the methods mcflirt's paths use.
-    pub fn extrapolate(&self, x: i64, y: i64, z: i64) -> f32 {
+    /// `extrapolate(x, y, z)` for the methods the replicated paths use.
+    pub fn extrapolate(&self, x: i64, y: i64, z: i64) -> T {
         match self.extrap {
-            Extrapolation::Zeropad => 0.0,
+            Extrapolation::Zeropad => T::default(),
             Extrapolation::Constpad => self.padvalue,
             Extrapolation::Periodic => {
                 let nx = periodicclamp(x, 0, self.dims[0] - 1);
@@ -319,14 +510,15 @@ impl Volume {
                     self.padvalue
                 }
             }
-            // boundsassert/boundsexception: not reached on mcflirt's paths (affine_transform
-            // switches them to constpad first).
+            // boundsassert/boundsexception: not reached on the replicated paths
+            // (affine_transform switches them to constpad first).
             Extrapolation::BoundsAssert | Extrapolation::BoundsException => self.padvalue,
         }
     }
 
-    /// `copybasicproperties(source, *this)` (and `copyproperties`).
-    pub fn copy_properties(&mut self, s: &Volume) {
+    /// `copybasicproperties(source, *this)` (and `copyproperties`), from a volume of any type
+    /// (the padding value converted with C's conversion).
+    pub fn copy_properties<S: Elem>(&mut self, s: &Volume<S>) {
         self.pixdims = s.pixdims;
         self.sform = s.sform.clone();
         self.qform = s.qform.clone();
@@ -339,23 +531,33 @@ impl Volume {
         self.kernel = s.kernel.clone();
         self.interp = s.interp;
         self.extrap = s.extrap;
-        self.padvalue = s.padvalue;
+        self.padvalue = convert::<S, T>(s.padvalue);
         self.splineorder = s.splineorder;
         self.ep_valid = s.ep_valid;
         self.display_max = s.display_max;
         self.display_min = s.display_min;
         self.aux_file = s.aux_file.clone();
         self.extensions = s.extensions.clone();
+        self.nan_order = s.nan_order;
+    }
+
+    /// `copyconvert(source, dest)`: the source's dimensions and properties, its values
+    /// converted with C's conversions (`convertbuffer` without scaling: `(T) value`).
+    pub fn copyconvert<S: Elem>(s: &Volume<S>) -> Volume<T> {
+        let mut v = Volume::<T>::new7(s.dims);
+        v.copy_properties(s);
+        v.data = s.data.iter().map(|&x| convert::<S, T>(x)).collect();
+        v
     }
 
     /// `timeseries[t]` copied into a 3D volume (`testvol = timeseries[t]`): the values of
     /// volume `t` with every property of the series. `Err` is FSL's "Invalid t index".
-    pub fn sub_volume(&self, t: i64) -> Result<Volume, FslError> {
+    pub fn sub_volume(&self, t: i64) -> Result<Volume<T>, FslError> {
         if t < 0 || t >= self.dims[3] {
             return Err(FslError::imthrow("Invalid t index in [] operator", 61));
         }
         let n = self.nvoxels() as usize;
-        let mut v = Volume::new(self.dims[0], self.dims[1], self.dims[2], 1);
+        let mut v = Volume::<T>::new(self.dims[0], self.dims[1], self.dims[2], 1);
         v.data
             .copy_from_slice(&self.data[t as usize * n..(t as usize + 1) * n]);
         v.copy_properties(self);
@@ -364,7 +566,7 @@ impl Volume {
 
     /// `timeseries[t] = vol` (`ShadowVolume::equals`: the data only). `Err` is FSL's
     /// "Attempted to copydata with non-matching sizes".
-    pub fn set_sub_volume(&mut self, t: i64, vol: &Volume) -> Result<(), FslError> {
+    pub fn set_sub_volume(&mut self, t: i64, vol: &Volume<T>) -> Result<(), FslError> {
         let n = self.nvoxels() as usize;
         if vol.data.len() != n {
             return Err(FslError::imthrow(
@@ -387,19 +589,19 @@ impl Volume {
 
     /// `min()` (`calculateExtrema`): from the first element, each strictly smaller element that
     /// is not also a new maximum; NaN elements never replace one.
-    pub fn min(&self) -> f32 {
+    pub fn min(&self) -> T {
         self.extrema().1
     }
 
     /// `max()` (`calculateExtrema`).
-    pub fn max(&self) -> f32 {
+    pub fn max(&self) -> T {
         self.extrema().0
     }
 
     /// `(max, min)` as `calculateExtrema` finds them.
-    pub fn extrema(&self) -> (f32, f32) {
+    pub fn extrema(&self) -> (T, T) {
         let Some(&first) = self.data.first() else {
-            return (0.0, 0.0);
+            return (T::default(), T::default());
         };
         let (mut mx, mut mn) = (first, first);
         for &v in &self.data[1..] {
@@ -412,6 +614,111 @@ impl Volume {
         (mx, mn)
     }
 
+    /// `left_right_order()`: from the determinants of the qform and sform (4 × 4, Armadillo's
+    /// `det`), as floats.
+    pub fn left_right_order(&self) -> i32 {
+        let mut order;
+        let mut dets: f32 = -1.0;
+        let mut detq: f32 = -1.0;
+        let mut det: f32 = -1.0;
+        if self.qform_code != nifti::XFORM_UNKNOWN {
+            detq = arma::det(&self.qform) as f32;
+            det = detq;
+        }
+        if self.sform_code != nifti::XFORM_UNKNOWN {
+            dets = arma::det(&self.sform) as f32;
+            det = dets;
+        }
+        order = if det < 0.0 {
+            RADIOLOGICAL
+        } else {
+            NEUROLOGICAL
+        };
+        if self.sform_code != nifti::XFORM_UNKNOWN && self.qform_code != nifti::XFORM_UNKNOWN {
+            if dets * detq < 0.0 {
+                order = INCONSISTENT;
+            }
+            if f64::from((dets * detq).abs()) < 1e-12 {
+                order = ZERODET;
+            }
+        }
+        if f64::from(det.abs()) < 1e-12 {
+            order = ZERODET;
+        }
+        order
+    }
+
+    /// `swapmat(-1, 2, 3)`: x reversed about the field of view.
+    pub fn swapmat_lr(&self) -> Mat {
+        let mut m = Mat::zeros(4, 4);
+        m.set(3, 3, 1.0);
+        // setrow(affmat, 1, -1): row 1 is (-1, 0, 0, fov) with fov = (xsize-1)*xdim in float.
+        m.set(0, 0, -1.0);
+        m.set(0, 1, 0.0);
+        m.set(0, 2, 0.0);
+        let fov: f32 = (self.xsize() - 1) as f32 * self.xdim();
+        m.set(0, 3, f64::from(fov));
+        m.set(1, 1, 1.0);
+        m.set(2, 2, 1.0);
+        m
+    }
+
+    /// `swapLRorder()` (`basic_swapdimensions(-1, 2, 3, false)`): every 3D volume reversed along
+    /// x, and the sform and qform made to describe the same positions:
+    /// `S * inv(samp) * inv(swap) * samp'` (Armadillo's four-matrix product).
+    pub fn swap_lr_order(&mut self) {
+        let (nx, ny, nz) = (self.dims[0], self.dims[1], self.dims[2]);
+        let nv = (nx * ny * nz).max(0) as usize;
+        if self.data.len() > 1 && nv > 0 {
+            for block in self.data.chunks_exact_mut(nv) {
+                for row in block.chunks_exact_mut(nx as usize) {
+                    row.reverse();
+                }
+            }
+        }
+        let dx = -self.xdim();
+        let dy = self.ydim();
+        let dz = self.zdim();
+        let mut swapped_samp = Mat::eye(4);
+        swapped_samp.set(0, 0, f64::from(dx.abs()));
+        swapped_samp.set(1, 1, f64::from(dy.abs()));
+        swapped_samp.set(2, 2, f64::from(dz.abs()));
+        let samp_inv = arma::inv(&self.sampling_mat()).expect("diagonal sampling matrix");
+        let swap_inv = arma::inv(&self.swapmat_lr()).expect("swap matrix");
+        let new_s = arma::mul4(&self.sform, &samp_inv, &swap_inv, &swapped_samp);
+        let new_q = arma::mul4(&self.qform, &samp_inv, &swap_inv, &swapped_samp);
+        self.setdims(dx, dy, dz);
+        self.sform = new_s;
+        self.qform = new_q;
+    }
+
+    /// `makeradiological()`.
+    pub fn make_radiological(&mut self) {
+        if self.left_right_order() == NEUROLOGICAL {
+            self.swap_lr_order();
+        }
+    }
+
+    /// `makeneurological()`.
+    pub fn make_neurological(&mut self) {
+        if self.left_right_order() == RADIOLOGICAL {
+            self.swap_lr_order();
+        }
+    }
+
+    /// `niftivox2newimagevox_mat()`: the identity, or for a file read mirrored
+    /// `inv(samp) * swap * samp` (Armadillo rewrites `inv(A) * B * C` as `solve(A, B * C)`).
+    pub fn niftivox2newimagevox_mat(&self) -> Mat {
+        if !self.radiological_file && self.left_right_order() == RADIOLOGICAL {
+            let s = self.sampling_mat();
+            let bc = arma::mul(&self.swapmat_lr(), &s, false);
+            return arma::solve(&s, &bc).unwrap_or_else(|_| Mat::eye(4));
+        }
+        Mat::eye(4)
+    }
+}
+
+impl Volume {
     /// `cog("scaled_mm")` of volume 0 (`calc_cog`, then times the sampling matrix): the centre of
     /// the values minus the minimum, partial sums flushed every `max(1000, √nvoxels)` voxels,
     /// in voxel coordinates scaled by the voxel sizes. Prints FSL's warning when the total is 0.
@@ -511,6 +818,13 @@ impl Volume {
     /// `backgroundval()` (`calc_bval(vol, 2)`): the 10th percentile of the values in a 2-voxel
     /// shell at the edges of volume 0 (an element of the sorted shell, not interpolated).
     pub fn backgroundval(&self) -> f32 {
+        self.background_value().0
+    }
+
+    /// [`Volume::backgroundval`], and what was done with NaN values in the shell: `std::sort`
+    /// with `operator<` has no defined order for them in C++ (FSL-22), and the volume's
+    /// [`NanOrder`] decides theirs.
+    pub fn background_value(&self) -> (f32, Background) {
         let (zb, yb, xb) = (self.zsize(), self.ysize(), self.xsize());
         let (mut ewx, mut ewy, mut ewz) = (2i64, 2i64, 2i64);
         if ewx >= xb {
@@ -550,122 +864,149 @@ impl Volume {
                 }
             }
         }
-        sort_like_std(&mut hist);
-        let p10 = (numbins / 10).max(0) as usize;
-        hist.get(p10).copied().unwrap_or(0.0)
-    }
-
-    /// `left_right_order()`: from the determinants of the qform and sform (4 × 4, Armadillo's
-    /// `det`), as floats.
-    pub fn left_right_order(&self) -> i32 {
-        let mut order;
-        let mut dets: f32 = -1.0;
-        let mut detq: f32 = -1.0;
-        let mut det: f32 = -1.0;
-        if self.qform_code != nifti::XFORM_UNKNOWN {
-            detq = arma::det(&self.qform) as f32;
-            det = detq;
-        }
-        if self.sform_code != nifti::XFORM_UNKNOWN {
-            dets = arma::det(&self.sform) as f32;
-            det = dets;
-        }
-        order = if det < 0.0 {
-            RADIOLOGICAL
+        let how = if !hist.iter().any(|v| v.is_nan()) {
+            Background::Defined
+        } else if self.nan_order == NanOrder::Last {
+            Background::NanLast
         } else {
-            NEUROLOGICAL
-        };
-        if self.sform_code != nifti::XFORM_UNKNOWN && self.qform_code != nifti::XFORM_UNKNOWN {
-            if dets * detq < 0.0 {
-                order = INCONSISTENT;
-            }
-            if f64::from((dets * detq).abs()) < 1e-12 {
-                order = ZERODET;
-            }
-        }
-        if f64::from(det.abs()) < 1e-12 {
-            order = ZERODET;
-        }
-        order
-    }
-
-    /// `swapmat(-1, 2, 3)`: x reversed about the field of view.
-    pub fn swapmat_lr(&self) -> Mat {
-        let mut m = Mat::zeros(4, 4);
-        m.set(3, 3, 1.0);
-        // setrow(affmat, 1, -1): row 1 is (-1, 0, 0, fov) with fov = (xsize-1)*xdim in float.
-        m.set(0, 0, -1.0);
-        m.set(0, 1, 0.0);
-        m.set(0, 2, 0.0);
-        let fov: f32 = (self.xsize() - 1) as f32 * self.xdim();
-        m.set(0, 3, f64::from(fov));
-        m.set(1, 1, 1.0);
-        m.set(2, 2, 1.0);
-        m
-    }
-
-    /// `swapLRorder()` (`basic_swapdimensions(-1, 2, 3, false)`): every 3D volume reversed along
-    /// x, and the sform and qform made to describe the same positions:
-    /// `S * inv(samp) * inv(swap) * samp'` (Armadillo's four-matrix product).
-    pub fn swap_lr_order(&mut self) {
-        let (nx, ny, nz) = (self.dims[0], self.dims[1], self.dims[2]);
-        let nvol = (self.data.len() as i64 / (nx * ny * nz).max(1)) as usize;
-        if self.data.len() > 1 {
-            let nv = (nx * ny * nz) as usize;
-            for t in 0..nvol {
-                let block = &mut self.data[t * nv..(t + 1) * nv];
-                let mut swapped = vec![0.0f32; nv];
-                for z in 0..nz {
-                    for y in 0..ny {
-                        for x in 0..nx {
-                            let src = ((z * ny + y) * nx + x) as usize;
-                            let dst = ((z * ny + y) * nx + (nx - x - 1)) as usize;
-                            swapped[dst] = block[src];
-                        }
-                    }
+            let mut exact = hist.clone();
+            match crate::stdsort::sort_f32_checked(&mut exact) {
+                Ok(()) => {
+                    hist = exact;
+                    Background::Libstdcxx
                 }
-                block.copy_from_slice(&swapped);
+                Err(_) => Background::Outside,
             }
+        };
+        if how != Background::Libstdcxx {
+            sort_nan_last(&mut hist);
         }
-        let dx = -self.xdim();
-        let dy = self.ydim();
-        let dz = self.zdim();
-        let mut swapped_samp = Mat::eye(4);
-        swapped_samp.set(0, 0, f64::from(dx.abs()));
-        swapped_samp.set(1, 1, f64::from(dy.abs()));
-        swapped_samp.set(2, 2, f64::from(dz.abs()));
-        let samp_inv = arma::inv(&self.sampling_mat()).expect("diagonal sampling matrix");
-        let swap_inv = arma::inv(&self.swapmat_lr()).expect("swap matrix");
-        let new_s = arma::mul4(&self.sform, &samp_inv, &swap_inv, &swapped_samp);
-        let new_q = arma::mul4(&self.qform, &samp_inv, &swap_inv, &swapped_samp);
-        self.setdims(dx, dy, dz);
-        self.sform = new_s;
-        self.qform = new_q;
+        let p10 = (numbins / 10).max(0) as usize;
+        (hist.get(p10).copied().unwrap_or(0.0), how)
     }
 
-    /// `makeradiological()`.
-    pub fn make_radiological(&mut self) {
-        if self.left_right_order() == NEUROLOGICAL {
-            self.swap_lr_order();
-        }
-    }
-
-    /// `makeneurological()`.
-    pub fn make_neurological(&mut self) {
-        if self.left_right_order() == RADIOLOGICAL {
-            self.swap_lr_order();
-        }
+    /// `robustmin()`, `robustmax()` (`calc_robustlimits`: Steve Smith's 2%-98% thresholds,
+    /// `find_thresholds` without a mask).
+    pub fn robust_limits(&self) -> (f32, f32) {
+        find_thresholds(self)
     }
 }
 
-/// `std::sort` of floats as libstdc++ orders them with `operator<`: for values without NaN
-/// any correct sort gives the same sequence (equal values are interchangeable). A shell with
-/// NaN has no defined order in C++; NaN values are put last here.
-fn sort_like_std(v: &mut [f32]) {
+/// `std::sort` of floats with `operator<`: for values without NaN any correct sort gives
+/// libstdc++'s sequence (equal values are interchangeable). With NaN values, which have no
+/// defined order in C++ (FSL-22), they are put last.
+fn sort_nan_last(v: &mut [f32]) {
     v.sort_by(|a, b| {
         a.partial_cmp(b)
             .unwrap_or_else(|| a.is_nan().cmp(&b.is_nan()))
     });
+}
+
+/// `find_thresholds` without a mask, for `float` volumes: from a 1000-bin histogram between
+/// the extremes, the bins holding 2% and 98% of the voxels, refined over at most 10 passes
+/// while the range they span is under a tenth of the histogram's. The limits are computed with
+/// SSE's NaNs (an infinite voxel makes `0 * inf`: x86-64's default NaN on every platform).
+fn find_thresholds(vol: &Volume) -> (f32, f32) {
+    use sse::{S32, S64};
+    // max - min in float, as a double
+    let range = |max: f32, min: f32| S64(f64::from((S32(max) - min).0));
+    const BINS: i32 = 1000;
+    const MAX_PASSES: i32 = 10;
+    let mut hist = vec![0f64; BINS as usize];
+    let (mut top_bin, mut bottom_bin) = (0i32, 0i32);
+    let mut pass = 1;
+    let mut lowest_bin = 0i32;
+    let mut highest_bin = BINS - 1;
+    let (mut thresh98, mut thresh2) = (0f32, 0f32);
+    let (vmax, vmin) = vol.extrema();
+    let (mut min, mut max) = (vmin, vmax);
+    while pass == 1 || f64::from(thresh98 - thresh2) < f64::from(max - min) / 10.0 {
+        if pass > 1 {
+            bottom_bin = (bottom_bin - 1).max(0);
+            top_bin = (top_bin + 1).min(BINS - 1);
+            let tmpmin = (f64::from(min)
+                + (S64(f64::from(bottom_bin)) / f64::from(BINS)) * range(max, min))
+            .0 as f32;
+            max = (f64::from(min)
+                + (S64(f64::from(top_bin + 1)) / f64::from(BINS)) * range(max, min))
+            .0 as f32;
+            min = tmpmin;
+        }
+        if pass == MAX_PASSES || min == max {
+            min = vmin;
+            max = vmax;
+        }
+        let mut validsize = image_histogram(vol, BINS, min, max, &mut hist);
+        if validsize < 1 {
+            return (min, max);
+        }
+        if pass == MAX_PASSES {
+            validsize -= i64::from(round_f64(hist[lowest_bin as usize]))
+                + i64::from(round_f64(hist[highest_bin as usize]));
+            lowest_bin += 1;
+            highest_bin -= 1;
+        }
+        if validsize < 0 {
+            thresh2 = min;
+            thresh98 = min;
+            break;
+        }
+        let fa = range(max, min) / f64::from(BINS);
+        let mut count: i32 = 0;
+        bottom_bin = lowest_bin;
+        while i64::from(count) < validsize / 50 {
+            count += round_f64(hist[bottom_bin as usize]);
+            bottom_bin += 1;
+        }
+        bottom_bin -= 1;
+        thresh2 = (S32(min) + (f64::from(bottom_bin) * fa).0 as f32).0;
+        count = 0;
+        top_bin = highest_bin;
+        while i64::from(count) < validsize / 50 {
+            count += round_f64(hist[top_bin as usize]);
+            top_bin -= 1;
+        }
+        top_bin += 1;
+        thresh98 = (S32(min) + (f64::from(top_bin + 1) * fa).0 as f32).0;
+        if pass == MAX_PASSES {
+            break;
+        }
+        pass += 1;
+    }
+    (thresh2, thresh98)
+}
+
+/// `MISCMATHS::round(double x)`: `(int)(x + 0.5)` above 0, `(int)(x - 0.5)` otherwise
+/// (truncated as x86-64 does).
+pub fn round_f64(x: f64) -> i32 {
+    if x > 0.0 {
+        cnum::f64_to_i32(x + 0.5)
+    } else {
+        cnum::f64_to_i32(x - 0.5)
+    }
+}
+
+/// `imageHistogram` without a mask: every value counted in
+/// `hist[max(0, min((int)(fA*v + fB), bins-1))]`; the number of values, or -1 when the range is
+/// empty.
+fn image_histogram(vol: &Volume, bins: i32, min: f32, max: f32, hist: &mut [f64]) -> i64 {
+    if max <= min {
+        return -1;
+    }
+    for h in hist.iter_mut() {
+        *h = 0.0;
+    }
+    let fa = f64::from(bins) / f64::from(max - min);
+    let fb = (f64::from(bins) * f64::from(-min)) / f64::from(max - min);
+    let mut n = 0i64;
+    for &v in &vol.data {
+        let b = cnum::f64_to_i32(fa * f64::from(v) + fb)
+            .min(bins - 1)
+            .max(0);
+        hist[b as usize] += 1.0;
+        n += 1;
+    }
+    n
 }
 
 /// `periodicclamp` (miscmaths.cc).
@@ -724,7 +1065,7 @@ pub fn make_basename(name: &str) -> String {
 }
 
 /// `valid_imagefilename`: an existing regular file.
-fn is_regular_file(name: &str) -> bool {
+pub fn is_regular_file(name: &str) -> bool {
     std::fs::metadata(name)
         .map(|m| m.is_file())
         .unwrap_or(false)
@@ -836,50 +1177,88 @@ pub fn mat_to_mat44(m: &Mat) -> nifti::Mat44 {
     std::array::from_fn(|i| std::array::from_fn(|j| m.at(i, j) as f32))
 }
 
-/// Values of a raw buffer of type `S` converted as `convertbuffer(src, dst, n, slope, inter)`
-/// with a `float` destination.
-fn convert_buffer(raw: &[u8], datatype: i16, n: usize, slope: f32, inter: f32) -> Option<Vec<f32>> {
-    let plain = slope == 1.0 && inter == 0.0;
+/// `ConvertAndScaleNewNiftiBuffer` into `T`: `(T) v` when the slope is 1 and the intercept 0
+/// (or the file holds `T` itself and needs no scaling), else `(T) (v * slope + intercept)` in
+/// the arithmetic C gives the stored type and a `float` (`double` stays `double`).
+fn convert_buffer<T: Elem>(raw: &[u8], h: &NiftiHeader) -> Option<Vec<T>> {
+    let mut slope = h.scl_slope as f32;
+    let mut inter = h.scl_inter as f32;
+    if f64::from(slope.abs()) < 1e-30 {
+        slope = 1.0;
+        inter = 0.0;
+    }
+    let doscaling = (f64::from(slope) - 1.0).abs() > 1e-30 || f64::from(inter.abs()) > 1e-30;
+    let n = h.n_elements();
+    let same = T::DTYPE == h.datatype;
+    let plain = (same && !doscaling) || (slope == 1.0 && inter == 0.0);
     macro_rules! conv {
-        ($t:ty, $w:expr, $to_f32:expr, $scaled:expr) => {{
+        ($t:ty, $w:expr, $plain:expr, $scaled:expr) => {{
             let mut out = Vec::with_capacity(n);
             for chunk in raw.chunks_exact($w).take(n) {
                 let v = <$t>::from_le_bytes(chunk.try_into().expect("width"));
-                out.push(if plain { $to_f32(v) } else { $scaled(v) });
+                out.push(if plain { $plain(v) } else { $scaled(v) });
             }
             Some(out)
         }};
     }
-    match datatype {
-        // (S) * float + float: integers of up to 32 bits become float first.
-        dt::SIGNED_SHORT => conv!(i16, 2, |v: i16| f32::from(v), |v: i16| f32::from(v) * slope
-            + inter),
-        dt::UNSIGNED_CHAR => conv!(u8, 1, |v: u8| f32::from(v), |v: u8| f32::from(v) * slope
-            + inter),
-        dt::SIGNED_INT => conv!(i32, 4, |v: i32| v as f32, |v: i32| (v as f32) * slope
-            + inter),
-        dt::FLOAT => conv!(f32, 4, |v: f32| v, |v: f32| v * slope + inter),
-        // double * float is double, + float is double, then (float).
-        dt::DOUBLE => conv!(f64, 8, |v: f64| v as f32, |v: f64| (v * f64::from(slope)
-            + f64::from(inter))
-            as f32),
-        dt::INT8 => conv!(i8, 1, |v: i8| f32::from(v), |v: i8| f32::from(v) * slope
-            + inter),
-        dt::UINT16 => conv!(u16, 2, |v: u16| f32::from(v), |v: u16| f32::from(v) * slope
-            + inter),
-        dt::UINT32 => conv!(u32, 4, |v: u32| v as f32, |v: u32| (v as f32) * slope
-            + inter),
-        dt::INT64 => conv!(i64, 8, |v: i64| v as f32, |v: i64| (v as f32) * slope
-            + inter),
-        dt::UINT64 => conv!(u64, 8, |v: u64| v as f32, |v: u64| (v as f32) * slope
-            + inter),
+    // (S) * float + float: integers become float first; `(T) value` converts the exact value
+    // (an integer of up to 64 bits to float or double rounds once, as x86-64 converts it).
+    let scaled_f32 = |x: f32| T::from_f32(x * slope + inter);
+    match h.datatype {
+        dt::SIGNED_SHORT => conv!(i16, 2, |v: i16| T::from_f32(f32::from(v)), |v: i16| {
+            scaled_f32(f32::from(v))
+        }),
+        dt::UNSIGNED_CHAR => conv!(
+            u8,
+            1,
+            |v: u8| T::from_f32(f32::from(v)),
+            |v: u8| scaled_f32(f32::from(v))
+        ),
+        dt::INT8 => conv!(
+            i8,
+            1,
+            |v: i8| T::from_f32(f32::from(v)),
+            |v: i8| scaled_f32(f32::from(v))
+        ),
+        dt::UINT16 => conv!(u16, 2, |v: u16| T::from_f32(f32::from(v)), |v: u16| {
+            scaled_f32(f32::from(v))
+        }),
+        dt::SIGNED_INT => conv!(i32, 4, |v: i32| T::from_f64(f64::from(v)), |v: i32| {
+            scaled_f32(v as f32)
+        }),
+        dt::UINT32 => conv!(u32, 4, |v: u32| T::from_f64(f64::from(v)), |v: u32| {
+            scaled_f32(v as f32)
+        }),
+        dt::INT64 => conv!(i64, 8, |v: i64| int64_to::<T>(v as i128), |v: i64| {
+            scaled_f32(v as f32)
+        }),
+        dt::UINT64 => conv!(u64, 8, |v: u64| int64_to::<T>(v as i128), |v: u64| {
+            scaled_f32(v as f32)
+        }),
+        dt::FLOAT => conv!(f32, 4, |v: f32| T::from_f32(v), |v: f32| scaled_f32(v)),
+        // double * float is double, + float is double, then (T).
+        dt::DOUBLE => conv!(f64, 8, |v: f64| T::from_f64(v), |v: f64| T::from_f64(
+            v * f64::from(slope) + f64::from(inter)
+        )),
         _ => None,
     }
 }
 
-/// `readGeneralVolume(target, filename, dtype, true)` for a whole image: the volume and the
-/// file's datatype.
-fn read_general(filename: &str, settings: &Settings) -> Result<(Volume, i16, i32), FslError> {
+/// `(T) v` for a 64-bit integer: to `float` or `double` with one rounding (x86-64's
+/// conversion), to the integer types by C's conversion of that value.
+fn int64_to<T: Elem>(v: i128) -> T {
+    match T::DTYPE {
+        dt::FLOAT => T::from_f32(v as f32),
+        _ => T::from_f64(v as f64),
+    }
+}
+
+/// `readGeneralVolume(target, filename, dtype, true)` for a whole image: the volume, the file's
+/// datatype and its `xyzt_units`.
+fn read_general<T: Elem>(
+    filename: &str,
+    settings: &Settings,
+) -> Result<(Volume<T>, i16, i32), FslError> {
     let fail = |what: &str| {
         FslError::imthrow(
             format!("Failed to read volume {filename}\nError : {what}"),
@@ -926,21 +1305,7 @@ fn read_general(filename: &str, settings: &Settings) -> Result<(Volume, i16, i32
             header.pixdim[i].abs()
         };
     }
-    // ConvertAndScaleNewNiftiBuffer
-    let n = header.n_elements();
-    let mut slope = header.scl_slope as f32;
-    let mut inter = header.scl_inter as f32;
-    if f64::from(slope.abs()) < 1e-30 {
-        slope = 1.0;
-        inter = 0.0;
-    }
-    let doscaling = (f64::from(slope) - 1.0).abs() > 1e-30 || f64::from(inter.abs()) > 1e-30;
-    let data = if header.datatype == dt::FLOAT && !doscaling {
-        convert_buffer(&loaded.data, dt::FLOAT, n, 1.0, 0.0)
-    } else {
-        convert_buffer(&loaded.data, header.datatype, n, slope, inter)
-    };
-    let Some(data) = data else {
+    let Some(data) = convert_buffer::<T>(&loaded.data, &header) else {
         return Err(FslError::imthrow(
             format!("Fslread: DT {} not supported", header.datatype),
             8,
@@ -955,7 +1320,7 @@ fn read_general(filename: &str, settings: &Settings) -> Result<(Volume, i16, i32
         header.dim[6],
         header.dim[7],
     ];
-    let mut v = Volume::new7(dims);
+    let mut v = Volume::<T>::new7(dims);
     v.data = data;
     v.extensions = extensions;
     // set_volume_properties
@@ -989,24 +1354,28 @@ fn read_general(filename: &str, settings: &Settings) -> Result<(Volume, i16, i32
 }
 
 /// `read_volume4D(target, filename)`: the volume, the file's datatype and its `xyzt_units`.
-pub fn read_volume4d(filename: &str, settings: &Settings) -> Result<(Volume, i16, i32), FslError> {
+pub fn read_volume4d<T: Elem>(
+    filename: &str,
+    settings: &Settings,
+) -> Result<(Volume<T>, i16, i32), FslError> {
     read_general(filename, settings)
 }
 
+/// The warning `read_volume` prints for a 4D input it cuts to its first volume.
+pub const TRUNCATED_WARNING: &str = "Warning: An input intended to be a single 3D volume has \
+     multiple timepoints. Input will be truncated to first volume, but this functionality is \
+     deprecated and will be removed in a future release.";
+
 /// `read_volume(target, filename)` (the legacy reader): a 4D file is cut to its first volume
-/// with FSL's warning, which is returned.
-pub fn read_volume(
+/// with FSL's warning ([`TRUNCATED_WARNING`]), which is returned.
+pub fn read_volume<T: Elem>(
     filename: &str,
     settings: &Settings,
-) -> Result<(Volume, Option<String>), FslError> {
-    let (v, _, _) = read_general(filename, settings)?;
+) -> Result<(Volume<T>, Option<String>), FslError> {
+    let (v, _, _) = read_general::<T>(filename, settings)?;
     if v.tsize() > 1 {
-        let warning = "Warning: An input intended to be a single 3D volume has multiple \
-                       timepoints. Input will be truncated to first volume, but this \
-                       functionality is deprecated and will be removed in a future release."
-            .to_owned();
         let first = v.sub_volume(0)?;
-        return Ok((first, Some(warning)));
+        return Ok((first, Some(TRUNCATED_WARNING.to_owned())));
     }
     Ok((v, None))
 }
@@ -1123,6 +1492,54 @@ pub enum SaveError {
     Exception(FslError),
 }
 
+/// What `save_volume` did: wrote the image, or nothing (a volume with no time point: newimage
+/// returns -1 without writing).
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum Saved {
+    Written,
+    Nothing,
+}
+
+/// How a volume is written, besides its own properties.
+#[derive(Clone, Copy, Debug)]
+pub struct SaveOptions<'a> {
+    /// The header's `descrip` ([`BUILDSTRING`] for newimage's own).
+    pub description: &'a [u8],
+    /// The header's `xyzt_units` (FSL always writes [`nifti::UNITS_MM_SEC`]).
+    pub units: i32,
+    /// NewNifti's `vox_offset` of two or more extensions of different sizes reproduced (FSL-56);
+    /// otherwise the data start right after the extensions.
+    pub reproduce_offset: bool,
+}
+
+impl<'a> SaveOptions<'a> {
+    /// `descrip` set to `description`, FSL's units, the correct data offset.
+    pub fn new(description: &'a [u8]) -> SaveOptions<'a> {
+        SaveOptions {
+            description,
+            units: nifti::UNITS_MM_SEC,
+            reproduce_offset: false,
+        }
+    }
+
+    /// The same, with FSL-56's offset reproduced when `reproduce` is set.
+    pub fn reproducing_offset(mut self, reproduce: bool) -> SaveOptions<'a> {
+        self.reproduce_offset = reproduce;
+        self
+    }
+}
+
+/// Whether NewNifti's `vox_offset` (FSL-56) would differ from the correct one when `v` is saved
+/// with `settings`: a single-file output carrying two or more extensions of different sizes.
+pub fn offset_defect_applies<T: Elem>(v: &Volume<T>, settings: &Settings) -> bool {
+    let single = env_output_type(settings).is_ok_and(|t| output_extension(t).starts_with(".nii"));
+    single
+        && v.extensions.len() > 1
+        && v.extensions
+            .iter()
+            .any(|e| e.extension_size() != v.extensions[0].extension_size())
+}
+
 /// The output data type of `save_volume_dtype` (the volume class FSL converts to). `Int8` is
 /// not one of FSL's classes: it is larmorx's correction of FSL-09 (int8 data kept as int8).
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -1146,47 +1563,55 @@ pub enum Conversion {
     RoundClamp,
 }
 
-impl Volume {
-    /// `save_volume(source, filename)`: as float.
-    pub fn save(
+impl<T: Elem> Volume<T> {
+    /// `save_volume(source, filename)` in the volume's own type.
+    pub fn save_volume(
         &self,
         filename: &str,
         settings: &Settings,
-        description: &[u8],
-    ) -> Result<(), SaveError> {
-        self.save_typed(
-            filename,
-            SaveType::Float,
-            Conversion::X86Cast,
-            settings,
-            description,
-            None,
-            nifti::UNITS_MM_SEC,
-        )
+        opts: &SaveOptions,
+    ) -> Result<Saved, SaveError> {
+        let encode = |xs: &[T]| {
+            let mut bytes = Vec::with_capacity(xs.len() * T::SIZE);
+            for &x in xs {
+                x.put_le(&mut bytes);
+            }
+            bytes
+        };
+        let values = Values {
+            code: T::DTYPE,
+            bits: (T::SIZE * 8) as i32,
+            width: T::SIZE,
+            encode,
+        };
+        self.write(filename, settings, opts, None, values)
     }
 
-    /// `save_volume_dtype(source, filename, datatype)` with the conversion `conv` (FSL's is
-    /// [`Conversion::X86Cast`]); `datatype_code` overrides the header's datatype and `units` is
-    /// the header's `xyzt_units` (FSL always writes [`nifti::UNITS_MM_SEC`]).
-    #[allow(clippy::too_many_arguments)]
-    pub fn save_typed(
+    /// `save_volume`'s steps: back to the file's left-right order, `FSLOUTPUTTYPE`, the header
+    /// `set_fsl_hdr` builds, the values as `values` encodes them (datatype, bits, bytes, chunk by
+    /// chunk while they are written), the NIfTI or pair files.
+    fn write<F: Fn(&[T]) -> Vec<u8>>(
         &self,
         filename: &str,
-        ty: SaveType,
-        conv: Conversion,
         settings: &Settings,
-        description: &[u8],
+        opts: &SaveOptions,
         datatype_code: Option<i16>,
-        units: i32,
-    ) -> Result<(), SaveError> {
+        values: Values<F>,
+    ) -> Result<Saved, SaveError> {
         if self.tsize() < 1 {
-            return Ok(());
+            return Ok(Saved::Nothing);
         }
-        let mut v = self.clone();
-        let currently_rad = v.left_right_order() == RADIOLOGICAL;
-        if !v.radiological_file && currently_rad {
-            v.make_neurological();
-        }
+        // A copy only where the left-right order must change back; otherwise the volume is
+        // written as it is, so that saving needs no more memory than FSL's.
+        let swapped;
+        let v: &Volume<T> = if !self.radiological_file && self.left_right_order() == RADIOLOGICAL {
+            let mut c = self.clone();
+            c.make_neurological();
+            swapped = c;
+            &swapped
+        } else {
+            self
+        };
         let filetype = env_output_type(settings).map_err(SaveError::OutputType)?;
         // set_fsl_hdr
         let mut h = NiftiHeader::default();
@@ -1194,7 +1619,7 @@ impl Volume {
         for k in 0..7 {
             h.dim[k + 1] = v.dims[k];
         }
-        let (code, bytes) = convert_for_save(&v.data, ty, conv);
+        let (code, bits) = (values.code, values.bits);
         h.datatype = datatype_code.unwrap_or(code);
         for k in 0..7 {
             h.pixdim[k + 1] = f64::from(v.pixdims[k]);
@@ -1212,19 +1637,14 @@ impl Volume {
         h.cal_min = f64::from(v.display_min);
         h.cal_max = f64::from(v.display_max);
         h.aux_file = v.aux_file.clone();
-        h.units = units;
+        h.units = opts.units;
         h.slice_ordering = 0;
         // save_unswapped_vol
-        h.description = description.to_vec();
+        h.description = opts.description.to_vec();
         let version = filetype % 100 % 10 % 3;
         let single = filetype % 100 < 10;
         h.set_nifti_version(version, single);
-        h.bits_per_voxel = match ty {
-            SaveType::Char | SaveType::Int8 => 8,
-            SaveType::Short => 16,
-            SaveType::Int | SaveType::Float => 32,
-            SaveType::Double => 64,
-        };
+        h.bits_per_voxel = bits;
         if h.is_analyze() {
             let m = if h.sform_code != nifti::XFORM_UNKNOWN {
                 Some(nifti::mat44_inverse(&h.get_sform()))
@@ -1242,8 +1662,107 @@ impl Volume {
             h.pixdim[1] *= -1.0;
         }
         let name = format!("{}{}", make_basename(filename), output_extension(filetype));
-        nifti::save_image(&name, &bytes, &v.extensions, &h, filetype >= 100)
-            .map_err(|e| SaveError::Exception(FslError::nifti(e)))
+        let bytes = Chunked {
+            data: &v.data,
+            width: values.width,
+            encode: &values.encode,
+        };
+        nifti::save_image(
+            &name,
+            &bytes,
+            &v.extensions,
+            &h,
+            filetype >= 100,
+            opts.reproduce_offset,
+        )
+        .map_err(|e| SaveError::Exception(FslError::nifti(e)))?;
+        Ok(Saved::Written)
+    }
+}
+
+impl Volume {
+    /// `save_volume(source, filename)`: as float, `descrip` set to `description`.
+    pub fn save(
+        &self,
+        filename: &str,
+        settings: &Settings,
+        description: &[u8],
+    ) -> Result<(), SaveError> {
+        self.save_typed(
+            filename,
+            SaveType::Float,
+            Conversion::X86Cast,
+            settings,
+            &SaveOptions::new(description),
+            None,
+        )
+    }
+
+    /// `save_volume_dtype(source, filename, datatype)` with the conversion `conv` (FSL's is
+    /// [`Conversion::X86Cast`]); `datatype_code` overrides the header's datatype.
+    pub fn save_typed(
+        &self,
+        filename: &str,
+        ty: SaveType,
+        conv: Conversion,
+        settings: &Settings,
+        opts: &SaveOptions,
+        datatype_code: Option<i16>,
+    ) -> Result<(), SaveError> {
+        let bits = match ty {
+            SaveType::Char | SaveType::Int8 => 8,
+            SaveType::Short => 16,
+            SaveType::Int | SaveType::Float => 32,
+            SaveType::Double => 64,
+        };
+        let values = Values {
+            code: convert_for_save(&[], ty, conv).0,
+            bits,
+            width: (bits / 8) as usize,
+            encode: |xs: &[f32]| convert_for_save(xs, ty, conv).1,
+        };
+        self.write(filename, settings, opts, datatype_code, values)
+            .map(|_| ())
+    }
+}
+
+/// How a volume's values are saved: the file's datatype and bits per voxel, the bytes per
+/// value, and the conversion of a run of values into the file's bytes (each value on its own).
+struct Values<F> {
+    code: i16,
+    bits: i32,
+    width: usize,
+    encode: F,
+}
+
+/// The values a volume writes, converted chunk by chunk while they are written (the bytes of
+/// the whole image are never held at once: saving needs no more memory than FSL's).
+struct Chunked<'a, T, F> {
+    data: &'a [T],
+    width: usize,
+    encode: &'a F,
+}
+
+/// The values converted at a time while saving.
+const SAVE_CHUNK: usize = 1 << 16;
+
+impl<T: Copy, F: Fn(&[T]) -> Vec<u8>> nifti::ImageBytes for Chunked<'_, T, F> {
+    fn byte_len(&self) -> usize {
+        self.data.len() * self.width
+    }
+
+    fn write_bytes(&self, w: &mut dyn std::io::Write, limit: usize) -> std::io::Result<()> {
+        let mut left = limit.min(self.byte_len());
+        for chunk in self.data.chunks(SAVE_CHUNK) {
+            if left == 0 {
+                break;
+            }
+            let b = (self.encode)(chunk);
+            let k = left.min(b.len());
+            w.write_all(&b[..k])?;
+            left -= k;
+        }
+        Ok(())
     }
 }
 
@@ -1361,8 +1880,13 @@ mod tests {
         assert_eq!(v.extrema(), (6.0, 0.0));
         let b = v.backgroundval();
         assert!((0.0..=6.0).contains(&b));
+        assert_eq!(v.background_value().1, Background::Defined);
         v.data[0] = f32::NAN;
         assert!(v.max().is_nan() && v.min().is_nan());
+        assert_eq!(v.background_value().1, Background::NanLast);
+        v.nan_order = NanOrder::Libstdcxx;
+        assert_eq!(v.background_value().1, Background::Libstdcxx);
+        assert_eq!(v.sub_volume(0).unwrap().nan_order, NanOrder::Libstdcxx);
     }
 
     #[test]
@@ -1383,6 +1907,36 @@ mod tests {
         assert_eq!(v.data[0], orig.data[3]);
         v.swap_lr_order();
         assert_eq!(v.data, orig.data);
+        for i in 0..4 {
+            for j in 0..4 {
+                assert_eq!(v.sform.at(i, j), orig.sform.at(i, j));
+            }
+        }
+    }
+
+    #[test]
+    fn robust_limits_of_a_ramp() {
+        let mut v = Volume::new(10, 10, 10, 1);
+        for (i, d) in v.data.iter_mut().enumerate() {
+            *d = i as f32;
+        }
+        let (lo, hi) = v.robust_limits();
+        assert!(lo > 0.0 && lo < 40.0, "{lo}");
+        assert!(hi > 960.0 && hi <= 999.0, "{hi}");
+    }
+
+    #[test]
+    fn conversions_between_types_are_cs() {
+        assert_eq!(convert::<f32, i16>(-2.7), -2);
+        assert_eq!(convert::<f32, i16>(70000.0), 70000_i32 as i16);
+        assert_eq!(convert::<f32, i32>(f32::NAN), i32::MIN);
+        assert_eq!(convert::<i16, f32>(-3), -3.0);
+        let mut v = Volume::<f32>::new(2, 1, 1, 1);
+        v.data = vec![1.9, -1.9];
+        v.padvalue = 3.5;
+        let s: Volume<i16> = Volume::copyconvert(&v);
+        assert_eq!(s.data, vec![1, -1]);
+        assert_eq!(s.padvalue, 3);
     }
 
     /// A series saved in each of FSL's output types and read back: the same values, sizes,
@@ -1419,7 +1973,7 @@ mod tests {
             v.save(base, &settings, b"test").unwrap();
             let path = format!("{base}{ext}");
             assert!(Path::new(&path).is_file(), "{ty}: {path}");
-            let (r, dtype, _units) = read_volume4d(&path, &settings).unwrap();
+            let (r, dtype, _units) = read_volume4d::<f32>(&path, &settings).unwrap();
             assert_eq!(dtype, dt::FLOAT, "{ty}");
             assert_eq!(r.dims[..4], v.dims[..4], "{ty}");
             assert_eq!(r.pixdims[..4], v.pixdims[..4], "{ty}");
@@ -1430,6 +1984,10 @@ mod tests {
                     assert_eq!(r.sform.at(i, j), v.sform.at(i, j), "{ty} sform");
                 }
             }
+            // read into short: C's conversion of each float
+            let (s, _, _) = read_volume4d::<i16>(&path, &settings).unwrap();
+            let want: Vec<i16> = v.data.iter().map(|&x| cnum::f32_to_i16(x)).collect();
+            assert_eq!(s.data, want, "{ty} as short");
         }
     }
 }

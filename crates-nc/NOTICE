@@ -22,9 +22,14 @@ Translated works
 ================
 
 FSL 6.0.7.17 (FMRIB Software Library), The University of Oxford - the FSL Licence (LICENSE)
-  Translated: the mcflirt program (fsl-mcflirt 2111.0) and the parts of fsl-newimage 2203.12,
-  fsl-miscmaths 2203.2, fsl-newnifti 4.1.0 and fsl-znzlib 2111.0 it uses (crates
-  larmorx-nc-mcflirt and larmorx-nc-core).
+  Translated: the mcflirt program (fsl-mcflirt 2111.0); bet, bet2 and betsurf (fsl-bet2
+  2111.8); and the parts of fsl-newimage 2203.12, fsl-miscmaths 2203.2, fsl-newnifti 4.1.0,
+  fsl-znzlib 2111.0, fsl-meshclass 2111.0, fsl-utils 2203.5 and fsl-avwutils 2209.3 they use
+  (crates larmorx-nc-mcflirt, larmorx-nc-bet and larmorx-nc-core).
+  BET: "BETv1 Steve Smith; BETv2 Mickael Pechaud, Mark Jenkinson, Steve Smith; FMRIB Image
+  Analysis Group; Copyright (C) 1999-2003 University of Oxford". bet2's head-CT conversion is,
+  as FSL's code says, "adapted from: https://github.com/neurolabusc/Clinical/blob/master/
+  clinical_h2c.m which is licensed under the BSD-2-clause license" (Chris Rorden).
   FSL is Copyright (C) 1999-2023 University of Oxford. The NIfTI-1 header definitions, znzlib
   and the code of nifti1_io.c that fsl-newnifti includes were released to the public domain by
   their authors (Robert W. Cox, Mark Jenkinson, Rick Reynolds).
@@ -40,17 +45,47 @@ Armadillo 10.5.1, as bundled by fsl-armawrap 0.6.0 - Apache License, Version 2.0
   Copyright 2016-2020 University of Oxford, licensed under the Apache License, Version 2.0.
   The licence text is LICENSES/Apache-2.0.txt.
 
-fdlibm, as the GNU C Library 2.35 ships its float functions (atan2f, atanf)
+fslpy 3.21.1 (the file-name rules of imtest, remove_ext and imglob, which FSL's bet script
+runs) - Apache License, Version 2.0
+  Copyright 2016-2024 University of Oxford, Oxford, UK (Paul McCarthy).
+  Translated in larmorx-nc-core/src/avwutils.rs, modified from the originals. The licence text
+  is LICENSES/Apache-2.0.txt.
+
+fdlibm, as the GNU C Library 2.35 ships its float functions (atan2f, atanf) and tanh and expm1
   "Copyright (C) 1993 by Sun Microsystems, Inc. All rights reserved. Developed at SunPro, a
   Sun Microsystems, Inc. business. Permission to use, copy, modify, and distribute this
   software is freely granted, provided that this notice is preserved."
   Translated in larmorx-nc-core/src/fdlibm.rs, modified from the originals.
 
-Arm Optimized Routines v19.11 (sinf, cosf, sincosf, logf; the functions the GNU C Library
-2.35 took from them) - MIT License
+Arm Optimized Routines v19.11 (sinf, cosf, sincosf, logf, pow, exp; the functions the GNU C
+Library 2.35 took from them) - MIT License
   Copyright (c) 2017-2019, Arm Limited.
-  Translated in larmorx-nc-core/src/glibc_float.rs, modified from the originals. The licence
+  Translated in larmorx-nc-core/src/glibc_float.rs (sinf, cosf, sincosf, logf) and
+  larmorx-nc-core/src/glibc_double.rs (pow, exp), modified from the originals. The licence
   text is LICENSES/MIT-arm-optimized-routines.txt.
+
+The SGI STL (std::sort's introsort and std::nth_element's introselect, as libstdc++ keeps them)
+  Copyright (c) 1994 Hewlett-Packard Company
+
+  Permission to use, copy, modify, distribute and sell this software and its documentation for
+  any purpose is hereby granted without fee, provided that the above copyright notice appear in
+  all copies and that both that copyright notice and this permission notice appear in
+  supporting documentation. Hewlett-Packard Company makes no representations about the
+  suitability of this software for any purpose. It is provided "as is" without express or
+  implied warranty.
+
+  Copyright (c) 1996 Silicon Graphics Computer Systems, Inc.
+
+  Permission to use, copy, modify, distribute and sell this software and its documentation for
+  any purpose is hereby granted without fee, provided that the above copyright notice appear in
+  all copies and that both that copyright notice and this permission notice appear in
+  supporting documentation. Silicon Graphics makes no representations about the suitability of
+  this software for any purpose. It is provided "as is" without express or implied warranty.
+
+  The algorithms are written in larmorx-nc-core/src/stdsort.rs from their description,
+  modified: the pivot step as libstdc++ refines it (the median of the second, middle and last
+  elements moved to the first place, the rest partitioned), and every index checked against the
+  vector's ends (std::sort of floats that may be NaN, FSL-22).
 
 
 Apache-2.0 code included

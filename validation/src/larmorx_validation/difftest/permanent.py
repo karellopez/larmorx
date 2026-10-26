@@ -110,6 +110,7 @@ SUITES: dict[str, tuple[str, str]] = {
     "afni-unifize-replica": ("afni-unifize", "replica"),
     "mri-hmc": ("mri-hmc", "original"),
     "fsl-mcflirt-replica": ("fsl-mcflirt", "replica"),
+    "fsl-bet-replica": ("fsl-bet", "replica"),
 }
 
 

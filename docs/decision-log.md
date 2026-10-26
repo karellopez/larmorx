@@ -1303,6 +1303,56 @@ physical ranges, a labelled tenth extreme; a case of a tool with a memory law is
 it runs, and one predicted over the case's limit is a guard case (larmorx must stop at once with
 its clear error), never run.
 
+## 2026-10-25: BET's merge
+
+- **One translation of each FSL library** (`larmorx-nc-core`): BET's and mcflirt's translations
+  of newimage, NewNifti, Armadillo, fdlibm and the C library were joined into one (newimage's
+  `volume<T>` generic over its element types); every case of both replicas' records, golden
+  tests and NaN matrices gives the same bytes with it. The next FSL replicas build on the core's
+  API (its `PROVENANCE.md`).
+- **BET's questionable behaviours, settled by rules A to D** (no decision needed from the user):
+  A (corrected) FSL-40, -43, -44, -45, -46, -47, -50, -51, -54, -56; B (refused by default)
+  FSL-42, -48, -53, -55; C (kept and documented) FSL-49, -57. Where FSL crashes on what it leaves
+  undefined (FSL-41, FSL-52, FSL-43's crash class) the default refuses and `reproduce` keeps
+  every defined part and fills the rest deterministically, naming the defect (D13's rule of
+  2026-10-11 for failure cases).
+- **The Python API never puts FSL on the PATH** and passes no `FSL*` variable of the process:
+  `lx.fsl.bet(..., upstream_defects="reproduce")` gives the result of FSL's `bet` run with FSL
+  off the PATH (FSL-45: `-Z`'s outputs left padded), which is deterministic.
+- **`pow` and `exp` come from Arm's Optimized Routines** (MIT), as the float functions do: no
+  LGPL code in the FSL-licensed package (the rule of 2026-10-24 applied to BET's maths; glibc's
+  are the same code, `validation/investigations/fsl-bet/arm_glibc_pow_exp.py`).
+- **The FSL core and BET at `opt-level = 1` in debug builds**, so the golden tests stay small in
+  CI (BET's 10 cases: about 30 s instead of 130 s); the NaN matrices compare release builds with
+  unoptimised debug builds (`--config` overrides).
+- **Inside `bet`, `reproduce` gives the script's failure where FSL's bet2 crashes** (FSL-41 on a
+  constant image: bash reports the signal, the ERR trap prints `bet failed during command:...`
+  and exits 1): that is FSL's defined outcome; bet2 run alone still fills (D13's failure case).
+- **FSL-58** (betsurf with no voxel of the T1 inside the brain surface reads its 98th percentile
+  from an empty list; found by random testing, 2026-10-26): a D13 failure case like FSL-41:
+  refused by default, `reproduce` takes it as 0.
+- **BET needs no more memory than FSL** in any measured call (`tests/parity/test_memory_peak.py`):
+  saving streams a volume's values instead of copying them, which every FSL replica shares.
+
+## 2026-10-26: FSL-22's `reproduce` is exact
+
+- **FSL-22's `reproduce` is exact** (2026-10-26): `calc_bval` sorts NaN border values in
+  libstdc++'s order, move for move, through the core's `std::sort` emulation
+  (`larmorx_nc_core::stdsort`), written from the SGI STL (HP/SGI permissive licence, its notice in
+  crates-nc's `NOTICE`) with the one step where libstdc++'s order differs (its pivot step: the
+  median of the second, middle and last elements moved to the first place) written from that
+  step's description, no libstdc++ text. The orchestrator accepted this licensing reading
+  (algorithms, not code, are reused), noting the user may prefer the earlier warning instead
+  (NaNs last in both modes, named). The decision of 2026-10-25 ("not emulated", as libstdc++'s
+  code is GPL-3.0) had assumed copying libstdc++. NaNs stay last by default (D13: undefined
+  behaviour is never reproduced by default); both modes name FSL-22 where NaN border voxels make
+  the order undefined.
+- **Evidence:** the emulation equals libstdc++'s `std::sort` on 768 seeded vectors, 495 of them
+  with NaNs (GCC 11.4 and 14.3 give the same hash; `validation/probes/libstdcxx-sort/`); the
+  mcflirt NaN matrix gives mcflirt's bytes in 160 of 160 cases in `reproduce` (32 differed
+  before). The same reading already covered meshclass's sweep in BET's replica, which uses the
+  same pivot step.
+
 ## Open decisions (PLAN.md §16)
 
 | # | Decision | Recommended default (used until decided) | Status |

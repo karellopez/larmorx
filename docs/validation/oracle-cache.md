@@ -45,7 +45,7 @@ A SHA-256 over the parts below, kept readable in every entry (`parts`).
 |---|---|---|
 | The oracle | the program's SHA-256 and the SHA-256 of every shared library it loads (`ldd`: glibc's `libm` and `libc` decide the unmodified programs' maths); for a script, every file of its build directory; for a container, the image's SHA-256, the program's name and Apptainer's version | a rebuilt oracle, an updated glibc or another image is another oracle |
 | The arguments | as given, with every path replaced: a file that exists is an **input**, `{in0}`, `{in1}`, ...; a directory the run writes in is a **place**, `{cwd}`, `{out0}`, `{d0}`, ..., with the path below it kept | the inputs count by their content, never by their directory or name; the outputs by their role |
-| The inputs | each input's content (for `.gz` files the decompressed stream: the gzip header's time and the compression level do not count), its suffix (`.nii.gz`, `.mat`, `+orig.HEAD`: programs choose a reader by it), the files read beside it (`.img` beside `.hdr`, `.BRIK` beside `.HEAD`), and the shape of a path not written normally (`a/sub/../x`, which the program prints) | the result depends on the bytes a program reads |
+| The inputs | each input's content (for `.gz` files the decompressed stream: the gzip header's time and the compression level do not count), its suffix (`.nii.gz`, `.mat`, `+orig.HEAD`: programs choose a reader by it), the files read beside it (`.img` beside `.hdr`, `.BRIK` beside `.HEAD`), and the shape of a path not written normally (`a/sub/../x`, which the program prints); files a program reads that its arguments do not name as files, when the suite names them (`inputs=`: FSL's images named without their extension, `bet in out` reading `in.nii.gz`), count by their content alike | the result depends on the bytes a program reads |
 | The directories | the directories that exist inside the places along the arguments' paths | writing into a missing directory is not writing into one that exists |
 | The environment | the variables the program's family reads: ITK and ANTs (`ITK_*`, `ANTS_*`, `NSLOTS`, the variables `ITK_NUMBER_OF_THREADS_ENV_LIST` names), AFNI (`AFNI_*`, `NIML_*`, `OMP_*`, `GOMP_*`: its OpenMP runtime is GNU libgomp; `HOME` by its contents), FSL (`FSL*`, `OMP_*`); for every program `LD_PRELOAD` (by its files' content: the CORE-MATH preload), `LD_LIBRARY_PATH`, `GLIBC_TUNABLES`, `MALLOC_*`, the locale (`LANG`, `LC_*`) and `TZ` | thread counts, seeds, the maths library and the program's own settings change results |
 | The machine | the architecture, the CPU's model and flags (glibc picks its maths kernels by them); the number of CPUs when the run sets no thread count | the same binary on another CPU may compute differently |
@@ -93,6 +93,8 @@ hold the run's path.
 | `afni-tshift` (both implementations) | `afni_tshift._run_afni_streams` | 1 (3dTshift has no OpenMP loop) | AFNI-20; the NIfTI extension |
 | `afni-automask`, `afni-unifize` (both) | `afni_replica.run_afni`, `run_fmriprep_afni` (fMRIPrep's image) | `OMP_NUM_THREADS` (2: after 3 runs) | AFNI's undefined reads |
 | `mri-hmc` | none | – | mcflirt's runs are recorded once already (`oracles/fsl-6.0.7/mcflirt`) |
+| `fsl-mcflirt-replica` | `fsl_mcflirt_replica.run_oracle` (FSL in `~/fsl`) | 1 (mcflirt is single-threaded) | crashes (FSL-21's `corratio` abort); every file it writes is in its working directory (`outputs=[cwd]`) |
+| `fsl-bet` | `fsl_bet.oracle_run` (FSL in `~/fsl`; fMRIPrep's FSL through its image) | 1 (FSL's BET is single-threaded) | FSL-43 and FSL-53 (memory FSL never wrote), FSL-46 (the cache replays no removal), crashes; images named without their extension through `inputs=` |
 | `nifti-io`, `resample-series`, `numpy-linalg`, `itk-geometry` | none | – | their references run in-process (nibabel, fMRIPrep's Python, numpy, ANTsPy) |
 
 Not through the cache: `pipeline-stages` (it keeps its own runs in `oracles/compare` and reuses
@@ -209,10 +211,11 @@ twice, and two runs that start in the same second get the same seed from ITK's c
 ## Limits
 
 - An input a program reads without its path in the arguments (a file named inside another
-  file) counts by the path written there, not its content; `verify` catches a change.
+  file) counts by the path written there, not its content, unless the suite names it
+  (`inputs=`); `verify` catches a change.
 - The cache grows: blobs are shared, nothing is deleted (it is regenerable; archive it rather
   than delete it, CLAUDE.md).
 - The cache runs on Linux, where the originals are.
-- Another agent's FSL suite keeps its own inputs in `<workspace>/oracles/cache/fsl-bet-inputs`
-  (since 2026-10-24), beside the cache's files; the cache reads only its own (`FORMAT`, `blobs/`,
-  `entries/`, ...).
+- BET's suite keeps the inputs FSL derives (bet2's meshes and FLIRT's matrices of the real
+  images) in `<workspace>/oracles/inputs/fsl-bet/` (since 2026-10-25), outside the cache's
+  directory, as every suite keeps its inputs.

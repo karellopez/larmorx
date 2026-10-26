@@ -130,16 +130,18 @@ original with random valid inputs and options, a night at a time
 | 3dAutomask (brain mask) | `larmorx afni 3dAutomask`, `lx.afni.automask` | clean-room original; exact replica in `larmorx-gpl` | original: [109 cases](docs/validation/afni-automask.md), 84 of 85 compared cases that write outputs bit-identical to AFNI (the other: AFNI-10's header, its data bit-identical), fMRIPrep's call on every oracle run's BOLD reference included; replica: [85 of 85](docs/validation/afni-automask-replica.md) bit-identical |
 | 3dUnifize (intensity uniformization) | `larmorx afni 3dUnifize`, `lx.afni.unifize` | clean-room original; exact replica in `larmorx-gpl` | original: [99 cases](docs/validation/afni-unifize.md), none failing: 34 of 74 compared cases that write outputs bit-identical to AFNI, the other 40 within 1e-5 (at most 8.7e-8 of the largest value) and bit-identical to AFNI run with correctly rounded maths (glibc's `tanhf` in AFNI's squash), fMRIPrep's call on every oracle run included; 4 to 25 times faster than AFNI (informal timings); replica: [74 of 74](docs/validation/afni-unifize-replica.md) bit-identical at 1, 2 and 6 threads |
 | Head-motion correction (mcflirt) | `larmorx mri hmc`, `larmorx fsl mcflirt`, `lx.mri.hmc` | clean-room original, `experimental`; exact replica in `larmorx-nc` (FSL Licence, non-commercial) | original: [compared with FSL's mcflirt](docs/validation/mri-hmc.md): 121 of 122 compared cases within thresholds; [5–16× faster](docs/benchmarks/mri-hmc.md) with threads; replica: [173 of 173](docs/validation/fsl-mcflirt-replica.md) compared cases bit-identical to mcflirt as built (the recorded runs, fMRIPrep's calls on every oracle run with BOLD runs, the data panel's included, and the edge cases; 21 more rejected by both, alike), fMRIPrep's own matrices identical |
+| BET (brain extraction; the skull and scalp surfaces) | `larmorx fsl bet`, `larmorx fsl bet2`, `larmorx fsl betsurf`, `lx.fsl.bet`, `lx.fsl.betsurf` | exact replica in `larmorx-nc` (FSL Licence, non-commercial); clean-room original planned (`specs/bet.md`) | [115 of 115](docs/validation/fsl-bet-replica.md) compared cases bit-identical to FSL 6.0.7.17, every file, exit status and message ([129 of 129](docs/validation/fsl-bet-replica-full.md) in the full tier, the data panel's T1w images included), fMRIPrep's 29 BET calls on every oracle run with BOLD runs included; 30 more rejected by both, alike; 10 where FSL crashes and `reproduce` fills what it leaves undefined; `bet -S`, `-B`, `-A`, `-A2` pending (FLIRT, FAST) |
 <!-- END GENERATED: tools table -->
 
 ## Roadmap
 
 The ordered plan is in [docs/next-steps.md](docs/next-steps.md). In outline:
 
-1. **AFNI:** 3dQwarp, 3dSkullStrip, 3dSkullStrip,
+1. **AFNI:** 3dQwarp, 3dSkullStrip,
    3dcalc and an analysis track (3dTproject, 3dDespike, 3dReHo, 3dRSFC, 3dDeconvolve/3dREMLfit,
    3dFWHMx/3dClustSim, ...).
-2. **FSL-compatible tools:** BET, FAST, FLIRT with BBR, topup (the mcflirt replica is done).
+2. **FSL-compatible tools:** FAST, FLIRT with BBR, topup, BET's clean-room original (the mcflirt
+   and BET replicas are done).
 3. **sdcflows' field-map estimation, FreeSurfer** (`larmorx-freesurfer`), Connectome
    Workbench- and MSM-compatible surface tools, the confounds.
 4. **larmorprepx:** an independent, fMRIPrep-compatible preprocessing pipeline (BIDS in,
@@ -208,7 +210,7 @@ python -m larmorx_validation tables --check                     # the generated 
 | `crates/larmorx-registration`, `crates/larmorx-ants` | ITK's v4 registration framework; the ANTs programs |
 | `crates/larmorx-afni`, `crates/larmorx-mri` | clean-room originals: 3dTshift, 3dAutomask, 3dUnifize; head-motion correction |
 | `crates-gpl/` | the GPL-3.0-or-later replicas (`larmorx-gpl`: 3dTshift, 3dAutomask, 3dUnifize), a separate Cargo workspace |
-| `crates-nc/` | the FSL replicas (`larmorx-nc`, FSL Licence, non-commercial: mcflirt; the shared core `larmorx-nc-core`), a separate Cargo workspace with FSL's original source in `fsl-source/` |
+| `crates-nc/` | the FSL replicas (`larmorx-nc`, FSL Licence, non-commercial: mcflirt, BET; the shared core `larmorx-nc-core`), a separate Cargo workspace with FSL's original source in `fsl-source/` |
 | `crates/larmorx-cli` | the multicall CLI; standalone `larmorx` and `lx` binaries |
 | `crates/larmorx-py` | the `larmorx._core` extension module (PyO3, abi3 for CPython ≥ 3.12) |
 | `python/larmorx` | the Python package, including `pipelines/larmorprepx` |

@@ -37,8 +37,9 @@ pub const FAMILIES: &[(&str, &[&str])] = &[
 ];
 
 /// The FSL tools, with FSL's command lines: the replica (`larmorx-nc`) when it is installed,
-/// else the clean-room original of the same program (`fsl mcflirt` is `mri hmc`).
-const FSL_TOOLS: &[&str] = &["mcflirt"];
+/// else the clean-room original of the same program (`fsl mcflirt` is `mri hmc`); BET's
+/// programs have no clean-room original yet ([`replica::replica_only`]; a test checks the list).
+const FSL_TOOLS: &[&str] = &["mcflirt", "bet", "bet2", "betsurf"];
 
 /// The AFNI tools: the clean-room originals' (`larmorx_afni::cli::TOOLS`) and those with a
 /// replica only, which run when the `larmorx-gpl` program is installed
@@ -363,6 +364,28 @@ mod tests {
             assert_eq!(code, 0);
             assert!(out.starts_with(&format!("Usage: {tool}")), "{out}");
         }
+    }
+
+    #[test]
+    fn fsl_tools_have_only_their_replica() {
+        let (code, out, _) = run_capture(&["lx", "--help"]);
+        assert_eq!(code, 0);
+        assert!(out.contains("fsl    mcflirt, bet, bet2, betsurf"), "{out}");
+        assert!(
+            out.contains("fsl bet: larmorx-nc (LicenseRef-FSL)"),
+            "{out}"
+        );
+        assert!(out.contains("LARMORX_NC_BIN"), "{out}");
+        assert_eq!(
+            replica::replica_only("fsl").collect::<Vec<_>>(),
+            FSL_TOOLS[1..]
+        );
+        // Without the replica (or with `original` asked for) the tool refuses, naming the
+        // package; exit 127 as for a missing program.
+        let (code, _, err) = run_capture(&["lx", "fsl", "bet", "in", "out"]);
+        assert_eq!(code, replica::EXIT_NOT_FOUND);
+        assert!(err.contains("no clean-room original of fsl bet"), "{err}");
+        assert!(err.contains("pip install larmorx-nc"), "{err}");
     }
 
     #[test]

@@ -1,0 +1,177 @@
+{
+ "defect": null,
+ "description": "bet -R on a small head whose brain comes out empty: FSL's fslstats -C prints newimage's 'WARNING::in calculating COG, total = 0.0' (calc_cog writes it to cerr); the replica had dropped it (fixed 2026-10-26: larmorx-nc-core's fslstats_cog returns it)",
+ "expect": "pass",
+ "found": {
+  "detail": "messages: FSL's, byte for byte: stderr FSL 82 characters, larmorx 0: 'WARNING::in calculating COG, total = 0.0\\nWARNING::in calculating COG, total = 0.' / ''",
+  "n": 16,
+  "seed": "bettrial1",
+  "shrink_moves": [
+   "dropped -o (-o)",
+   "dropped -f (-f 0.2)",
+   "input: axis 2 24 -> 12 voxels",
+   "input (and its grid): qform and sform codes 1",
+   "input: float32 storage"
+  ],
+  "signature": [
+   "messages: FSL's, byte for byte"
+  ]
+ },
+ "id": "cog-warning-empty-brain",
+ "implementations": [
+  "replica"
+ ],
+ "reason": "",
+ "recipe": {
+  "extra": {
+   "output_type": "NIFTI_GZ",
+   "tool": "bet"
+  },
+  "features": {
+   "-c": false,
+   "-d": false,
+   "-e": false,
+   "-f": true,
+   "-g": false,
+   "-m": false,
+   "-n": false,
+   "-o": true,
+   "-r": false,
+   "-s": false,
+   "-t": false,
+   "-v": false,
+   "-w": false,
+   "FSLOUTPUTTYPE": "NIFTI_GZ",
+   "axis0": 0.75,
+   "axis1": 0.9,
+   "axis2": 0.8,
+   "bias0": 0.0,
+   "bias1": 0.0075,
+   "bias2": 0.0025,
+   "bias3": 0.01,
+   "centre0": 3.0,
+   "centre1": -5.0,
+   "centre2": -1.0,
+   "content": "head",
+   "dtype": "int16",
+   "extreme": false,
+   "f": "0.2",
+   "inter": 10.0,
+   "noise": 0.0,
+   "orientation": "axes",
+   "origin0": 5.0,
+   "origin1": -35.5,
+   "origin2": -19.75,
+   "qfac": 1,
+   "qform_code": 1,
+   "range": "plain",
+   "sform": "same",
+   "sform_code": 4,
+   "shape": "9x24x24",
+   "size": 8.5,
+   "slope": 2.0,
+   "spacing0": 0.8,
+   "spacing1": 1.0,
+   "spacing2": 2.5,
+   "suffix": ".nii.gz",
+   "tissues": "t1",
+   "tool": "bet",
+   "units": "mm",
+   "variation": "-R"
+  },
+  "groups": [
+   {
+    "args": [
+     "{in:input}",
+     "out"
+    ],
+    "name": "input",
+    "optional": false
+   },
+   {
+    "args": [
+     "-R"
+    ],
+    "name": "variation",
+    "optional": false
+   }
+  ],
+  "inputs": {
+   "input": {
+    "content": {
+     "axes": [
+      0.75,
+      0.9,
+      0.8
+     ],
+     "bias": [
+      0.0,
+      0.0075,
+      0.0025,
+      0.01
+     ],
+     "centre": [
+      3.0,
+      -5.0,
+      -1.0
+     ],
+     "noise": 0.0,
+     "seed": 2049458977,
+     "size": 8.5,
+     "tissues": "t1",
+     "type": "head"
+    },
+    "dtype": "float32",
+    "geometry": {
+     "origin": [
+      5.0,
+      -35.5,
+      -19.75
+     ],
+     "qfac": 1,
+     "qform_code": 1,
+     "quaternion": [
+      1,
+      0,
+      0,
+      0
+     ],
+     "sform": "same",
+     "sform_code": 1,
+     "spacing": [
+      0.8,
+      1.0,
+      2.5
+     ],
+     "units": "mm"
+    },
+    "scaling": null,
+    "shape": [
+     9,
+     24,
+     12
+    ],
+    "suffix": ".nii.gz",
+    "values": {
+     "offset": 0.0,
+     "scale": 1.0
+    }
+   }
+  },
+  "n": 16,
+  "options": [
+   "-R",
+   "-f",
+   "-o",
+   "FSLOUTPUTTYPE=NIFTI_GZ",
+   "bet"
+  ],
+  "seed": "bettrial1",
+  "tool": "fsl-bet"
+ },
+ "rule": null,
+ "status": "fixed",
+ "suite": "fsl-bet-replica",
+ "tier": "standard",
+ "tool": "fsl-bet"
+}

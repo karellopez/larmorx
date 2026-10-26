@@ -26,6 +26,7 @@ TOOLS: dict[str, str] = {
     "afni-tshift": "afni_tshift",
     "afni-automask": "afni_automask",
     "afni-unifize": "afni_unifize",
+    "fsl-bet": "fsl_bet",
     "mri-hmc": "mri_hmc",
     "resample-series": "resample_series",
     "nifti-io": "nifti_io",

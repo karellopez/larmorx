@@ -30,8 +30,13 @@ starts no other agent.
 | A5.3 | `worktree-agent-aaab33aced8cdf16d` (10-23) | `antsRegistration`'s Exponential, BSplineExponential and time-varying velocity-field stages (every stage ANTs accepts); the corrections ANTS-67/68/70/78 and ITK-24/29/35 by default (and ITK-42); `antsApplyTransforms` with `BSplineTransform` files; both evidence pages | benchmark of the deformable stages; ITK-38 and ITK-40's fix pass on the full tier; MINC transform files |
 | A6 | `worktree-agent-a6259dedbd25d703c` (10-22) | `Atropos` to full completeness (every initialisation, likelihood model, posterior formulation, MRF/ICM, outlier and partial-volume option), its evidence page; ITK-50, ITK-51, ANTS-90 to ANTS-107 | – |
 | Random testing, tables | `worktree-agent-ab7de196daece3c4e` (10-25) | `difftest` (21 tool descriptors, shrinking, permanent cases, triage, nightly script, first night 34 880 cases); fixes it found in the ports (the sform/qform choice in vnl's float SVD, allocation refusals, singular directions, unregistered composite names, a float transform's point indexed in float, vnl's SVD warning in Mattes, ImageFileWriter's origin and empty images, Atropos on an empty mask, CC's Jacobian and ITK-35; and from the first night: ResampleImage's B-spline on a 2-voxel axis, DenoiseImage's Rician smoothing kernel and dimension without -d, ITK's shortest numbers at a tie, four transform classes in antsApplyTransforms, a float versor's cosine, the empty sample set's exception, antsAI's warning order, the median's zero, the aliased derivatives of sampled metrics (and in SyN), a later level's zero Mattes bin size, a field's class under a .mat name, SyN's metric sum in float, Atropos' model warnings, the NIfTI writer's non-orthogonal warning, the 2D B-spline fit's memory and time, memory guards (N4, the resamplers, 3dUnifize -EPI)); ANTS-160 to ANTS-163, ITK-95 to ITK-100, AFNI-75; the memory box and the heavy queue; memory no more than ANTs' for the image programs (`tests/parity/test_memory_peak.py`); `tables` (README, validation index, site status); the site's "Random testing" panels | "Random testing's open items" and "Memory against the originals" (follow-ups) |
+| BET | `worktree-agent-a38ebb82788afa285` (10-26) | the BET replica (`larmorx-nc fsl bet`, `bet2`, `betsurf`; `lx.fsl.bet`, `lx.fsl.betsurf`), bit-identical to FSL 6.0.7.17 in every compared case (129 of 129, 364 files); its FSL libraries joined to mcflirt's in `larmorx-nc-core`; FSL-40 to FSL-58; `specs/bet.md`; its random-testing descriptor, memory cases and evidence page; FSL-22's `reproduce` exact | BET's clean-room original; `bet -S`, `-B`, `-A`, `-A2` (FLIRT, FAST); "BET, further" (follow-ups) |
 
 ## The order from here
+
+**Now (2026-10-26):** this round is complete (BET merged, item 7). Next: a clean stop, then the
+move to the new main machine, then every finished tool re-validated on the data panel (item 6),
+then BET's clean-room original and the next FSL tools (item 7).
 
 1. **Visual reports, part 2: interactive evidence** (user, 2026-10-21; decision log). Part 2a, a
    pilot (merged and approved by the user, 2026-10-21): the Validation guide (method, terms,
@@ -105,9 +110,17 @@ starts no other agent.
    functions, the optimiser, the transform algebra, Armadillo's rules, glibc's float maths) for
    the next FSL replicas; record [fsl-mcflirt-replica](validation/fsl-mcflirt-replica.md): 173 of
    173 compared cases bit-identical (the data panel's fMRIPrep calls and 61 random-testing findings
-   included, after one `atanf` constant was corrected). **BET:** the replica and its spec are built, to be merged
-   after its FSL library code moves into `larmorx-nc-core`; then BET's clean-room original,
-   FLIRT with BBR, FAST, topup.
+   included, after one `atanf` constant was corrected). **BET: the replica done** (built
+   2026-10-24 and 25, merged 2026-10-26; `larmorx-nc fsl bet`, `bet2`, `betsurf`; `lx.fsl.bet`,
+   `lx.fsl.betsurf`; records [fsl-bet-replica](validation/fsl-bet-replica.md): 115 of 115
+   compared cases bit-identical, fMRIPrep's 29 calls included, and
+   [fsl-bet-replica-full](validation/fsl-bet-replica-full.md): 129 of 129, 364 of 364 files), its
+   FSL libraries joined to mcflirt's in `larmorx-nc-core` (one translation of each); under random
+   testing (`fsl-bet`, four trial runs, every difference fixed) and the memory rule (below FSL's in
+   every measured call); FSL-22's `reproduce` made exact the same day. Next for BET: the
+   clean-room original from `specs/bet.md` (an agent that has never read FSL's source; built for
+   speed: the spec's §10), and `bet -S`, `-B`, `-A`, `-A2` once standard_space_roi, FLIRT and FAST
+   are replicated. Then FLIRT with BBR, FAST, topup.
 8. **Field maps, FreeSurfer, surfaces, confounds:** sdcflows' field-map estimation (Apache Python:
    the B-spline fit, PEPOLAR and phase-difference preparation) and fMRIPrep's own Python steps;
    FreeSurfer (`larmorx-freesurfer`: `mri_coreg`, `lta_convert`, then recon-all; its Talairach step
@@ -136,6 +149,13 @@ starts no other agent.
   then a clean-room implementer adds them to `lx.mri.hmc`'s original.
 - **A benchmark report of the mcflirt replica** (informal: fMRIPrep's call on ds000005, the
   replica 20 s at 3 threads and 36 s at one, mcflirt 70 s, on a busy machine).
+- **BET, further:** a benchmark report (FSL against the replica; bet2 and betsurf on the data
+  panel); `robustfov` (in fsl-bet2, not translated); a row in `upstream.tsv` for Arm's Optimized
+  Routines v19.11 (the source of the FSL replicas' float functions and of `pow` and `exp`; not
+  cloned).
+- **mcflirt's full tier** in an 8 GiB box: run it at `--jobs 1` (or in a larger box); at two jobs
+  the panel's ds004958 call (600 volumes) is killed by the box's limit, and alone it passes (601
+  of 601 files; BET's handoff, 2026-10-26).
 
 - **Random testing's open items** (2026-10-25, `validation/difftest/triage.toml`):
   - the heavy queue of the first night: batch 1 ran here (2026-10-25, 40 cases: 26 agree, 14
@@ -170,13 +190,15 @@ starts no other agent.
     memory proportional to the data).
   - AFNI-75's guard is in the GPL replica of 3dUnifize only: the clean-room original needs it
     through `specs/3dUnifize.md` (a spec writer), then a clean-room agent.
-- **Random testing, more**: the data panel's real crops as inputs; BET's descriptor with BET;
-  nights on a schedule (cron, boxed) once the machine is free at night.
+- **Random testing, more**: the data panel's real crops as inputs; BET in the nightly random
+  testing (its descriptor `fsl-bet` is registered; its random-testing panel goes on the site after
+  the first night that includes it); nights on a schedule (cron, boxed) once the machine is free
+  at night.
 - **Memory against the originals, the remaining tools** (user's rule of 2026-10-25): every ANTs
   image program measured so far needs at most ANTs' peak plus the Python interpreter's few MiB
   on the same call (`tests/parity/test_memory_peak.py`, 13 mid-size calls, bit for bit in
   `reproduce`; `docs/findings/ants-image-programs.md`, `ants-n4.md`, `ants-denoise.md`, "Memory
-  against ANTs"). Measure antsRegistration, antsApplyTransforms, Atropos, antsAI,
+  against ANTs"), and BET's programs at most FSL's (5 calls, 2026-10-26). Measure antsRegistration, antsApplyTransforms, Atropos, antsAI,
   antsAffineInitializer, the AFNI programs (replicas and clean-room originals), mcflirt (replica
   and original) and `lx.transforms.resample_series` the same way (`memory_pair.py`, one thread,
   mid-size calls), fix what needs more than the original, and add a `test_memory_peak.py` case
@@ -275,6 +297,11 @@ Decided 2026-10-23 (decision log): the four rules for questionable behaviours (A
 
 - **Upstream reports:** PIPE-02 and PIPE-03 are drafts in `docs/upstream-reports/`, now with
   PIPE-03's real-data numbers, ready to file (from the user's GitHub account).
+- **For the user's information, FSL-22** (2026-10-26; decision log): `reproduce` now sorts NaN
+  border values in libstdc++'s order, from an emulation written from the SGI STL (HP/SGI
+  permissive notice) with no libstdc++ text; the orchestrator accepted that licensing reading
+  (algorithms, not code, are reused). The user may prefer the earlier behaviour instead (NaNs last
+  in both modes, with a warning). No **decide** entry in the register.
 
 Decided 2026-10-22 (decision log): ANTS-106 corrected by default (follow-up below); ANTS-30's
 command line approved. Decided 2026-10-21: ANTS-78, ITK-35, ANTS-67, ANTS-68, ANTS-70, ITK-24, ITK-29

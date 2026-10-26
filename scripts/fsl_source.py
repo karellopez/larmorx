@@ -34,6 +34,10 @@ VERSIONS = {
     "fsl-miscmaths": "2203.2",
     "fsl-newnifti": "4.1.0",
     "fsl-znzlib": "2111.0",
+    "fsl-bet2": "2111.8",
+    "fsl-meshclass": "2111.0",
+    "fsl-utils": "2203.5",
+    "fsl-avwutils": "2209.3",
 }
 
 #: The original files: every file a translation in crates-nc/ comes from (see each crate's
@@ -67,6 +71,36 @@ FILES = [
     ("fsl-newnifti", "nifti2.h"),
     ("fsl-znzlib", "znzlib.h"),
     ("fsl-znzlib", "znzlib.c"),
+    # BET (larmorx-nc-bet; its libraries in larmorx-nc-core)
+    ("fsl-bet2", "bet"),
+    ("fsl-bet2", "bet2.cpp"),
+    ("fsl-bet2", "betsurf.cpp"),
+    ("fsl-bet2", "betsurf.h"),
+    ("fsl-meshclass", "meshclass.h"),
+    ("fsl-meshclass", "point.h"),
+    ("fsl-meshclass", "point.cpp"),
+    ("fsl-meshclass", "mpoint.h"),
+    ("fsl-meshclass", "mpoint.cpp"),
+    ("fsl-meshclass", "triangle.h"),
+    ("fsl-meshclass", "triangle.cpp"),
+    ("fsl-meshclass", "mesh.h"),
+    ("fsl-meshclass", "mesh.cpp"),
+    ("fsl-meshclass", "pt_special.h"),
+    ("fsl-meshclass", "pt_special.cpp"),
+    ("fsl-meshclass", "selfintersection.cpp"),
+    ("fsl-meshclass", "profile.h"),
+    ("fsl-meshclass", "profile.cpp"),
+    ("fsl-utils", "options.h"),
+    ("fsl-utils", "options.cc"),
+    ("fsl-utils", "parse.cc"),
+    ("fsl-utils", "usage.cc"),
+    ("fsl-utils", "functions.cc"),
+    ("fsl-utils", "matches.cc"),
+    ("fsl-avwutils", "fslstats.cc"),
+    ("fsl-avwutils", "fslroi.cc"),
+    ("fsl-avwutils", "fslmerge.cc"),
+    ("fsl-avwutils", "fslmaths.cc"),
+    ("fsl-avwutils", "fslval"),
 ]
 
 MANIFEST = DEST / "MANIFEST.tsv"

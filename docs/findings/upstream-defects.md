@@ -12,7 +12,8 @@ corrected, never deleted.
 > **Restricted entries (†).** The sections "Restricted: AFNI 3dTshift" and "Restricted: FSL
 > mcflirt" were written from AFNI's MCW (GPL) and FSL's (non-commercial) source, through
 > [afni-tshift.md](afni-tshift.md) and [fsl-mcflirt.md](fsl-mcflirt.md); the section "Restricted: AFNI 3dAutomask and
-> 3dUnifize" through [afni-automask.md](afni-automask.md) and [afni-unifize.md](afni-unifize.md). **Clean-room
+> 3dUnifize" through [afni-automask.md](afni-automask.md) and [afni-unifize.md](afni-unifize.md); the section
+> "Restricted: FSL BET" through [fsl-bet.md](fsl-bet.md). **Clean-room
 > implementers must not read those sections.** The summary table and the gap lists below
 > describe every entry, † included, by its observable behaviour only, as a spec would (the
 > spec writer may read the source, the implementer reads the spec; [licensing.md](../licensing.md)),
@@ -302,18 +303,37 @@ to add (since 2026-10-25: "Random testing's gaps", below); – = nothing to do. 
 | FSL-18 † | mcflirt Woods cost | squared bin counts | – (c? until 2026-10-24) | none | reproduces | – (decided 2026-10-24, rule C: not a defect; `n_b² σ_b / Σ_b` is Woods' `n_b σ_b / μ_b`) |
 | FSL-20 † | mcflirt | `.mat` directory not creatable (a missing parent): message, exit 0, nothing more written | e | none | the replica: an error by default (rule B, 2026-10-24), mcflirt's exit 0 with `reproduce`; the clean-room original: to do (the spec) | – |
 | FSL-21 † | mcflirt histogram costs | `-bins` below 8: no bins in the first stage; arbitrary matrices, `corratio` writes before its arrays and aborts | a | none | the replica: refused by default (rule B, 2026-10-24); `reproduce` gives mcflirt's matrices and, for `corratio`, its abort; the clean-room original: to do (the spec) | – |
-| FSL-22 † | `calc_bval` (newimage) | the background value sorts the 2-voxel border with `std::sort` and `operator<`: with NaN voxels not a strict weak ordering (undefined in C++); libstdc++'s introsort leaves a position-dependent order, so the pad value of mcflirt's output (and `affine_transform`'s) is arbitrary | a | none (fMRIPrep's inputs have no NaN) | NaNs sorted last in both modes (defined); `reproduce` reproduces every defined part and warns when NaN border voxels make the original's order undefined (D13, 2026-10-11; libstdc++'s order is not emulated: its code is GPL-3.0, which no FSL-licensed package may include) | – |
+| FSL-22 † | `calc_bval` (newimage) | the background value sorts the 2-voxel border with `std::sort` and `operator<`: with NaN voxels not a strict weak ordering (undefined in C++); libstdc++'s introsort leaves a position-dependent order, so the pad value of mcflirt's output (and `affine_transform`'s) is arbitrary | a | none (fMRIPrep's inputs have no NaN) | NaNs sorted last by default (defined; D13, 2026-10-11); `reproduce` exact (SGI STL's sort), 2026-10-26: libstdc++'s order of the NaN values, move for move, from the SGI STL's introsort (HP/SGI permission notice) with libstdc++'s pivot step, not from libstdc++'s code; both name FSL-22 when NaN border voxels make the original's order undefined | – |
+| FSL-40 † | bet2 | names lose their first `.hdr` wherever it stands; a name with `.img` and no `.hdr` aborts | e | none | corrected by default (`upstream_defects`, 2026-10-24): a trailing extension removed | – |
+| FSL-41 † | bet2 | no voxel strictly between the 2nd and 98th percentiles inside the initial sphere (a constant or binary image): the median read from an empty list, crash | a | none | refused by default; `reproduce` takes the median as 0, names FSL-41 and writes bet2's outputs (D13's failure case, 2026-10-25) | – |
+| FSL-42 † | bet2 | NaN `-f`/`-g`, a negative, NaN or infinite `-r`, `-w` ≤ 0, a non-finite `-c` or search depth used as given | e | none | refused by default, naming the value (rule B, 2026-10-24); `reproduce` computes with it | – |
+| FSL-43 † | bet2, betsurf | a mask's fill starts at the surface's centroid without a bounds check: outside the image (a single slice) FSL writes and reads outside the volume; far outside or at a NaN centre it crashes | a | none | the fill starts at the nearest voxel inside (rule A, 2026-10-24); `reproduce` does FSL's defined part one voxel outside, and where FSL crashes skips the fill (the mask holds the drawn surface) and names FSL-43 (2026-10-25) | – |
+| FSL-44 † | bet | arguments expanded unquoted: names with blanks split into words, an empty argument ends the options | e | none | corrected by default (`upstream_defects`, 2026-10-24) | – |
+| FSL-45 † | bet `-Z` | the crop back runs `imglob` without `${FSLDIR}/bin`: off the PATH the outputs stay padded, on it other images are cropped too | c | none (fMRIPrep's image has no `dc`: its `bet -Z` stops earlier) | corrected by default (`upstream_defects`, 2026-10-24) | – |
+| FSL-46 † | bet | the cleanup removes every `<output>_tmp*` file, also files the run did not create | c | none | corrected by default (`upstream_defects`, 2026-10-24) | – |
+| FSL-47 † | betsurf `--t1only` | the scalp mask is filled from the outer skull surface's centre, in the padded grid | c | none | corrected by default (`upstream_defects`, 2026-10-24), named when the mask changes | – |
+| FSL-48 † | betsurf | a T2 on another grid than the T1 is sampled at the T1's voxel coordinates | e | none | refused by default (rule B, 2026-10-24) | – |
+| FSL-49 † | betsurf | when the T2's scalp lies beyond the T1's, the T1's estimate is validated and kept (`outskin = outskin`, flagged "very suspicious" in FSL's source) | c (c? until 2026-10-24) | none | kept as FSL's and documented (rule C, 2026-10-24) | – |
+| FSL-50 † | betsurf | one profile with an empty search range ends the program, status 255, no message, no output | c | none | the profile dropped (rule A, 2026-10-24) | – |
+| FSL-51 † | betsurf | profile searches can read past the profile's samples (memory never set) and use it | a | none | the profile dropped; `reproduce` reads "nothing there" and warns | – |
+| FSL-52 † | betsurf | mesh files read without checks: values never set, faces naming missing vertices, an empty mesh | a | none | refused by default, naming the problem; `reproduce` takes 0 for the values FSL never sets and leaves out the faces naming missing vertices, names FSL-52 and writes the outputs (D13's failure case, 2026-10-25); an empty mesh refused in both modes | – |
+| FSL-53 † | betsurf | a matrix with fewer than the 12 numbers used: entries never set | e | none | refused by default (rule B, 2026-10-24); `reproduce` uses 0 and warns | – |
+| FSL-54 † | betsurf `--t1only` | exits 0 when it fails (too few arguments, matrix not found) | e | none | corrected by default (`upstream_defects`, 2026-10-24) | – |
+| FSL-55 † | betsurf | a NaN in the T1 inside the brain surface: the 98th percentile's selection is undefined | a | none | refused by default (rule B, 2026-10-24); `reproduce` runs libstdc++'s selection, stopped at the vector's ends | – |
+| FSL-56 † | FSL's NIfTI writer (NewNifti) | two or more extensions of different sizes: `vox_offset` counts the first one's size once per extension | c | none (extensions are dropped unless `FSL_LOAD_NIFTI_EXTENSIONS`) | corrected by default (`upstream_defects`, 2026-10-24), in every FSL replica (the switch is the core's) | – |
+| FSL-57 † | betsurf | the smoothness weight is set to 0 where a mask applies after the term was computed (no effect) | c (c? until 2026-10-24) | every betsurf run | kept as FSL's and documented (rule C, 2026-10-24) | – |
+| FSL-58 † | betsurf | no voxel of the T1 inside the brain surface (a surface outside the image, a tiny image): the 98th percentile is read from an empty list, before its start; FSL crashes or uses memory it never wrote | a | none | refused by default, naming the entry; `reproduce` takes the percentile as 0 and goes on (D13's failure case; found by random testing, 2026-10-26) | – |
 
-**Counts** (254 entries, recounted from the table on 2026-10-25, after the random-testing merge; an entry with two classes
+**Counts** (273 entries, recounted from the table on 2026-10-26, after the BET merge; an entry with two classes
 counts under its first; "c (c? until …)" entries, decided, count as (c)):
 
 | Class | Entries | of them questionable (c?) |
 |---|---|---|
-| (a) crash, undefined behaviour, out of bounds | 46 | |
+| (a) crash, undefined behaviour, out of bounds | 52 | |
 | (b) race, nondeterminism | 11 | |
-| (c) deterministic bug that changes results | 122 | 8 |
+| (c) deterministic bug that changes results | 129 | 8 |
 | (d) imprecision | 20 | |
-| (e) command-line or parsing quirk | 42 | |
+| (e) command-line or parsing quirk | 48 | |
 | (f) documentation or message only | 11 | |
 | explained, not a defect | 2 | |
 
@@ -396,6 +416,11 @@ mistakes it found were fixed the same day, each with a unit test and, where the 
 result is defined, a permanent case ([triage](../../validation/difftest/triage.toml)). No entry
 it added is **decide** or **yes**; the gaps it left (switches and notices to add, AFNI-75's guard
 in the clean-room original) are listed below ("Random testing's gaps").
+The BET replica (merged 2026-10-26) added FSL-40 to FSL-58 (19 entries: (a) FSL-41, -43, -51,
+-52, -55, -58; (c) FSL-45, -46, -47, -49, -50, -56, -57, of them FSL-49 and FSL-57 questionable
+and decided by rule C; (e) FSL-40, -42, -44, -48, -53, -54), every one settled by rules A to D or
+a D13 failure case, and completed FSL-22's `reproduce` (libstdc++'s order, 2026-10-26). No entry
+it added is **decide** or **yes** (below, "The BET replica").
 
 ## D13 gaps: what the next task switches to "correct by default"
 
@@ -480,6 +505,17 @@ switch; the new FSL-20 and FSL-21 refused by default (rule B), each with `reprod
 the clean-room original's corrections of FSL-01, -03, -05 to -10, -13 and -14. **Open:** FSL-20
 and FSL-21 in the clean-room original (a spec writer adds them to `specs/mcflirt.md`, then a
 clean-room implementer).
+
+**The BET replica** (`larmorx-nc`, built 2026-10-24, its FSL libraries joined to
+`larmorx-nc-core` 2026-10-25, merged 2026-10-26): FSL-40 to FSL-58 from fsl-bet2 2111.8,
+fsl-meshclass 2111.0 and FSL's image libraries ([fsl-bet.md](fsl-bet.md)), each settled by rules
+A to D: corrected by default FSL-40, -43, -44, -45, -46, -47, -50, -51, -54, -56; refused by
+default (rule B) FSL-42, -48, -53, -55; kept (rule C) FSL-49, -57; FSL-41 and FSL-52, where FSL
+crashes on what it leaves undefined, refused by default with `reproduce` filling the undefined
+part deterministically (D13's failure cases), as for FSL-43's crash class and FSL-58 (betsurf
+with no voxel inside the brain surface, found by BET's first random tests, 2026-10-26). FSL-22
+reproduced exactly in `reproduce` (the core's `calc_bval` with libstdc++'s order, from the SGI
+STL's introsort; 2026-10-26). **Open:** BET's clean-room original (from `specs/bet.md`).
 
 **Random testing's gaps** (2026-10-25, open; found by differential random testing,
 [validation/difftest.md](../validation/difftest.md); every default is already correct, these are
@@ -4259,6 +4295,7 @@ fMRIPrep 25.2.6 (the oracle runs) or its source at `21a490fb`, niworkflows 1.15.
   `corratio`, its abort (when the out-of-bounds write is non-zero, as at every real
   evaluation). The clean-room original: to be specified.
 - **D13 / gap:** done in the replica; the original's is open.
+
 ### FSL-22 † The background value sorts NaNs: undefined order — (a)
 - **What:** newimage's `calc_bval` (`sort(hist.begin(), hist.end()); return hist[numbins/10]`)
   sorts the 2-voxel border with `operator<`; with NaN voxels that is not a strict weak ordering,
@@ -4266,13 +4303,212 @@ fMRIPrep 25.2.6 (the oracle runs) or its source at `21a490fb`, niworkflows 1.15.
   pad value of mcflirt's output (and of `affine_transform`'s) is arbitrary.
 - **Evidence:** the NaN matrix (`validation/probes/fsl-mcflirt-affine-trace/nan_matrix.py`):
   inputs with NaN background voxels in `reproduce`, 32 of 160 cases, the output images of
-  volumes whose matrix is NaN padded with another value.
+  volumes whose matrix is NaN padded with another value (2026-10-25); with libstdc++'s order
+  reproduced, 160 of 160 give mcflirt's bytes (2026-10-26). The sort equals libstdc++'s
+  `std::sort` on 768 seeded vectors with and without NaNs (GCC 11.4 and 14.3;
+  `validation/probes/libstdcxx-sort/`).
 - **fMRIPrep:** none (its inputs have no NaN).
-- **larmorx:** NaNs sorted last in both modes (defined, the same on every platform). By D13's
-  rule for undefined behaviour (2026-10-11), `reproduce` reproduces every defined part and warns
-  when NaN border voxels make the original's order undefined. libstdc++'s order is not emulated:
-  its introsort is GPL-3.0 code, which the FSL-licensed package may not include (decided by the
-  orchestrator, 2026-10-25).
-- **D13 / gap:** the warning in `reproduce` (to add with BET's merge, where `calc_bval` moves
-  into `larmorx-nc-core`).
+- **larmorx:** NaNs sorted last by default (defined, the same on every platform; D13: undefined
+  behaviour is never reproduced by default). `reproduce` exact (SGI STL's sort), 2026-10-26:
+  `calc_bval` sorts as libstdc++'s `std::sort` does, move for move
+  (`larmorx_nc_core::stdsort::sort_f32_checked`, written from the SGI STL's introsort, under its
+  HP/SGI permission notice, with libstdc++'s pivot step and every index checked; where
+  libstdc++'s loops would leave the vector, NaNs last, named). The decision of 2026-10-25 ("not
+  emulated": libstdc++'s code is GPL-3.0) rested on copying libstdc++; the emulation copies none
+  of it (orchestrator, 2026-10-26).
+- **D13 / gap:** done (2026-10-26): both modes name FSL-22 where NaN border voxels make the
+  order undefined (mcflirt's final resampling and `-meanvol`).
 
+## Restricted: FSL BET (source-derived)
+
+> **Clean-room implementers: do not read this section.** Written from FSL 6.0.7.17's source
+> (FSL Licence) through [fsl-bet.md](fsl-bet.md), which has the `file:line` references
+> (fsl-bet2 2111.8, fsl-meshclass 2111.0 and FSL's image libraries); clean-room implementers
+> read `specs/bet.md` instead.
+
+### FSL-40 † Names lose their first `.hdr` — (e)
+- **What:** bet2 erases `.hdr` wherever it appears in the input and output names (a directory
+  `x.hdr/` is read as `x/`), and for a name containing `.img` erases at `.hdr` again: with `.img`
+  and no `.hdr` that throws `std::out_of_range`, uncaught.
+- **Evidence:** read; verified (`defects/hdr-in-name`, `bet2/img-output`).
+- **fMRIPrep:** none.
+- **larmorx:** removes a trailing image extension only; `reproduce` erases as FSL does and,
+  where FSL aborts, refuses with FSL's message.
+- **D13 / gap:** rule A. No gap.
+
+### FSL-41 † No voxel for the median intensity — (a)
+- **What:** the median within-brain intensity is the largest of the lower half of the voxels
+  strictly between `t2` and `t98` inside the initial sphere; with none (a constant or binary
+  image) FSL dereferences an empty vector and crashes.
+- **Evidence:** read; verified (`bet2/constant`: FSL ends by SIGSEGV).
+- **fMRIPrep:** none.
+- **larmorx:** refused by default, after FSL's messages; `reproduce` takes the median as 0
+  (FSL's defined part: everything before and after the read), names FSL-41 and writes bet2's
+  outputs (D13's rule for failure cases, 2026-10-11; done 2026-10-25).
+- **D13 / gap:** No gap.
+
+### FSL-42 † Meaningless numeric options are used — (e)
+- **What:** bet2 checks `-f` and `-g` against their ranges only (NaN passes); `-r`, `-w`, `-c`
+  and `--parameter_d1/d2` not at all: NaN or infinite values, a negative radius or a smoothness
+  of 0 or less are computed with (the surface diverges or FSL crashes).
+- **Evidence:** read; verified (`defects/nan-f`, `defects/negative-r`, `defects/zero-w`).
+- **fMRIPrep:** none.
+- **larmorx:** refused by default, naming the value; `reproduce` computes as FSL does (where FSL
+  then crashes in its fill: FSL-43's crash class).
+- **D13 / gap:** rule B (decided 2026-10-24). No gap.
+
+### FSL-43 † A mask's fill starts outside the image — (a)
+- **What:** the fill of the brain mask (bet2) and of every surface's mask (betsurf) starts at the
+  truncated centroid of the vertices, written without a bounds check; on a single slice the
+  centroid lies one voxel below it and FSL writes and reads beside the volume's buffer (and goes
+  on); far outside, or at a NaN centroid (a diverged surface), it writes far from the buffer and
+  crashes.
+- **Evidence:** read; verified (`defects/2d`: voxel `47 55 -1`, FSL's outputs written;
+  `defects/nan-f`, `defects/zero-w`: FSL crashes).
+- **fMRIPrep:** none.
+- **larmorx:** the fill starts at the nearest voxel inside the image (on `defects/2d`, FSL's
+  outputs bit for bit); `reproduce` does FSL's defined part one voxel outside (no write outside,
+  the start's neighbours inside the image examined) and warns; where FSL crashes, `reproduce`
+  skips that fill (the mask holds the drawn surface only), names FSL-43 and goes on; the default
+  refuses there.
+- **D13 / gap:** rule A (decided 2026-10-24); the failure case's fill 2026-10-25. No gap.
+
+### FSL-44 † bet expands its arguments unquoted — (e)
+- **What:** the `bet` script uses `$1`, `$2`, `$IN`, `$OUT` unquoted: a name with a blank becomes
+  several words (an input is "not valid", an output name writes other files), and its option
+  loop ends at an empty argument.
+- **Evidence:** read; verified (`defects/blank-in-output`, `defects/empty-argument`).
+- **fMRIPrep:** none (nipype's names have no blanks).
+- **larmorx:** each argument is one word; `reproduce` splits as bash does.
+- **D13 / gap:** rule A. No gap.
+
+### FSL-45 † `bet -Z` crops with `imglob` from the PATH — (c)
+- **What:** after padding, the script crops `for f in \`imglob ${OUT}*\``, calling `imglob`
+  without `${FSLDIR}/bin`: with FSL's programs off the PATH, "imglob: command not found" and the
+  outputs stay padded (26 slices for 18); with them on it, every image whose name starts with
+  the output's is cropped, other images included.
+- **Evidence:** read; verified (`bet/small-fov`, `bet/small-fov-verbose`, `bet/debug`).
+- **fMRIPrep:** none (fMRIPrep's image lacks `dc`, so its `bet -Z` and `-R` stop before).
+- **larmorx:** crops exactly its own outputs; `reproduce` looks for `imglob` on the PATH and
+  does what FSL's script would (the Python API never puts FSL on the PATH).
+- **D13 / gap:** rule A. No gap.
+
+### FSL-46 † bet's cleanup removes other files — (c)
+- **What:** `rm -f ${OUT}_tmp*` removes files the run did not create.
+- **Evidence:** read; verified (`defects/cleanup`).
+- **fMRIPrep:** none.
+- **larmorx:** removes only the files the run created; `reproduce` the glob.
+- **D13 / gap:** rule A. No gap.
+
+### FSL-47 † `--t1only` fills the scalp mask from the wrong surface — (c)
+- **What:** `t1only_main` fills the scalp mask from the outer skull mesh's centroid, still in the
+  padded working grid, instead of the scalp mesh's (the T1+T2 path uses the scalp's).
+- **Evidence:** read; the masks rarely differ (the centroid falls inside the scalp).
+- **fMRIPrep:** none (`bet -A` is not used).
+- **larmorx:** fills from the scalp surface's centre, named when the mask changes.
+- **D13 / gap:** rule A. No gap.
+
+### FSL-48 † A T2 on another grid — (e)
+- **What:** betsurf samples the T2 at the T1's voxel coordinates without checking its grid.
+- **Evidence:** read; verified (`defects/t2-other-grid`).
+- **fMRIPrep:** none.
+- **larmorx:** refused by default (other dimensions or voxel sizes); `reproduce` samples as FSL.
+- **D13 / gap:** rule B (decided 2026-10-24). No gap.
+
+### FSL-49 † The T1's scalp kept when the T2's lies further out — (c, decided: kept)
+- **What:** when the T1's and T2's scalp estimates differ by more than 5 mm and the T2's lies
+  further out, betsurf validates the T1's against a T2 search and keeps it; FSL's own source
+  calls that line "very suspicious". The other branch replaces the T1's estimate.
+- **Evidence:** read.
+- **fMRIPrep:** none.
+- **larmorx:** kept (rule C: keeping the nearer, validated estimate is sensible, possibly
+  deliberate; nothing to measure a change against).
+- **D13 / gap:** – (decided 2026-10-24).
+
+### FSL-50 † One bad profile ends betsurf — (c)
+- **What:** in the T1+T2 profile search, when the outer skull search range is empty FSL sets the
+  profile aside and then calls `exit(-1)`: status 255, no message, no output, the run lost.
+- **Evidence:** read.
+- **fMRIPrep:** none.
+- **larmorx:** the profile dropped (what the line before the exit intends), named.
+- **D13 / gap:** rule A. No gap.
+
+### FSL-51 † Profile searches read past their samples — (a)
+- **What:** the profile class's forward searches dereference the end of its samples, and an empty
+  region of interest at the profile's end reads one sample past it, from the vector's unused
+  capacity (memory never set).
+- **Evidence:** read.
+- **fMRIPrep:** none.
+- **larmorx:** such profiles dropped by default; `reproduce` reads "nothing there" (+∞, NaN) and
+  warns that FSL's result depends on memory contents.
+- **D13 / gap:** the memory never set is not reproduced; every defined part is. No gap.
+
+### FSL-52 † Mesh files read without checks — (a)
+- **What:** betsurf reads OFF, VTK and FreeSurfer meshes with unchecked `>>`: a number that does
+  not read leaves later values never set; a face naming a missing vertex reads out of range; an
+  empty mesh divides by 0.
+- **Evidence:** read; verified (`defects/mesh-unread`, `defects/mesh-missing-vertex`,
+  `defects/mesh-truncated`: FSL ends by SIGSEGV).
+- **fMRIPrep:** none.
+- **larmorx:** refused by default, naming the problem; `reproduce` takes 0 for the values FSL
+  never sets, leaves out the faces that name missing vertices, names FSL-52 and writes betsurf's
+  outputs (D13's failure case, 2026-10-25); an empty mesh is refused in both modes (nothing to
+  fill: the mesh's size is FSL's divisor).
+- **D13 / gap:** No gap.
+
+### FSL-53 † A short matrix file — (e)
+- **What:** betsurf reads 16 numbers unchecked into an uninitialised matrix; it uses 12.
+- **Evidence:** read; verified (`defects/short-matrix`).
+- **fMRIPrep:** none.
+- **larmorx:** refused by default with fewer than 12 readable numbers; `reproduce` uses 0 for the
+  missing ones and warns.
+- **D13 / gap:** rule B (decided 2026-10-24). No gap.
+
+### FSL-54 † `--t1only` exits 0 on failure — (e)
+- **What:** `main` drops `t1only_main`'s status and exits 0 (a failure FSL's libraries end with
+  `exit` themselves, such as an unknown `FSLOUTPUTTYPE`, still exits 1).
+- **Evidence:** read; verified (`defects/too-few-t1only`, `defects/no-matrix-t1only`; random
+  testing's `difftest/betsurf-t1only-output-type`).
+- **fMRIPrep:** none.
+- **larmorx:** exits with the failure's status (255); `reproduce` exits 0 where FSL does.
+- **D13 / gap:** rule A. No gap.
+
+### FSL-55 † NaN in the 98th percentile — (a)
+- **What:** `nth_element` over values that include NaN has no strict weak order; libstdc++'s
+  unguarded loops can run outside the vector.
+- **Evidence:** read.
+- **fMRIPrep:** none.
+- **larmorx:** refused by default; `reproduce` runs libstdc++'s algorithm (the core's `stdsort`,
+  written from the SGI STL's published introselect, not from libstdc++) with its loops stopped
+  at the vector's ends, and warns.
+- **D13 / gap:** rule B (decided 2026-10-24). No gap.
+
+### FSL-56 † NewNifti's `vox_offset` with several extensions — (c)
+- **What:** the data offset adds the first extension's size once per extension: with two or more
+  of different sizes the data start inside the extensions or after a gap.
+- **Evidence:** read; verified (`defects/extensions`: FSL's file cannot be read by nibabel).
+- **fMRIPrep:** none (FSL drops extensions unless `FSL_LOAD_NIFTI_EXTENSIONS` is set).
+- **larmorx:** the correct offset; `reproduce` FSL's. The switch is `larmorx-nc-core`'s
+  (`SaveOptions::reproduce_offset`), so every FSL replica has it (mcflirt's outputs included).
+- **D13 / gap:** rule A. No gap.
+
+### FSL-57 † betsurf's smoothness weight set to 0 after its use — (c, decided: kept)
+- **What:** where a mask applies, betsurf sets the smoothness weight to 0 after the smoothness term
+  was computed: a dead store; the intent was probably to switch the term off there.
+- **Evidence:** read.
+- **fMRIPrep:** none.
+- **larmorx:** kept (rule C: changing it would change every skull and scalp surface, with nothing
+  to measure the change against).
+- **D13 / gap:** – (decided 2026-10-24).
+
+### FSL-58 † No voxel inside the brain surface — (a)
+- **What:** betsurf's robust maximum is the 98th percentile of the T1's values inside the brain
+  surface (`nth_element`, then `brain_hist[e98 - 1]`); with no voxel inside (a surface outside the
+  image, a tiny image) the list is empty, `e98` is 0, and FSL reads the element before the list's
+  start: it crashes (SIGSEGV on a one-voxel constant image) or uses memory it never wrote.
+- **Evidence:** read; found by random testing (2026-10-26, `difftest/betsurf-empty-brain`: FSL
+  ends by SIGSEGV; the replica had panicked).
+- **fMRIPrep:** none.
+- **larmorx:** refused by default, naming the entry; `reproduce` takes the percentile as 0 and goes
+  on, naming it (D13's failure case).
+- **D13 / gap:** No gap.

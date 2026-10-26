@@ -36,6 +36,8 @@ One record per validated tool: larmorx compared, case by case, with the referenc
 | [ants-atropos](ants-atropos.md) | `lx.ants.atropos`, `larmorx ants Atropos` (every initialization, likelihood model, posterior formulation, MRF, ICM, outlier and partial-volume option; 2D, 3D, 4D) | Atropos (ANTs 2.6.5 binary, one thread; exact reference with CORE-MATH preloaded) | `validated` (full tier: [ants-atropos-full](ants-atropos-full.md); sMRIPrep's call on the five oracle runs; expected divergences: ANTs' aborts and crashes, its clock seed); partial-volume classes with the MRF on a phantom of known fractions (ANTS-106 corrected: Dice 0.86 and 0.81 where ANTs gives 0.30 and 0.41) |
 | [mri-hmc](mri-hmc.md) | `lx.mri.hmc`, `larmorx mri hmc` (clean-room) | mcflirt (FSL 6.0.7.17, the recorded runs in `oracles/fsl-6.0.7/mcflirt/`) | `experimental` (1 of 122 compared cases misses its threshold) |
 | [fsl-mcflirt-replica](fsl-mcflirt-replica.md) | `larmorx-nc fsl mcflirt`, `lx.mri.hmc(implementation="replica")` (the replica, FSL Licence) | mcflirt (FSL 6.0.7.17 as built: the recorded runs, fMRIPrep's calls, edge cases run here) | `validated` (173 of 173 compared cases bit-identical, fMRIPrep's calls on every oracle run included; 21 rejected by both, with the same messages and status) |
+| [fsl-bet-replica](fsl-bet-replica.md) | `larmorx-nc fsl bet`, `bet2`, `betsurf`; `lx.fsl.bet`, `lx.fsl.betsurf` (the replica, FSL Licence) | bet, bet2 and betsurf (FSL 6.0.7.17; fMRIPrep's calls also against fMRIPrep's own outputs and its image's FSL) | `validated` (115 of 115 compared cases bit-identical, fMRIPrep's 29 calls included; 30 rejected by both, with the same messages and status; 10 where FSL crashes and `reproduce` fills what it leaves undefined; 4 pending FLIRT and FAST) |
+| [fsl-bet-replica-full](fsl-bet-replica-full.md) | the same, full tier | the same, and the data panel's real T1w images (bet2, `bet -R`, betsurf on FLIRT's matrices) | `validated` (129 of 129 compared cases bit-identical; 30 rejected by both; 10 filled where FSL crashes; 4 pending) |
 <!-- END GENERATED: records table -->
 
 The table is generated from [validation/tools.toml](../../validation/tools.toml) and each
@@ -51,7 +53,9 @@ permanent case of the tool's suite (`difftest/<id>`, in the smoke tier). The fir
 Python interpreter's few MiB (the user, 2026-10-25): `tests/parity/test_memory_peak.py` holds 13
 mid-size calls of the ANTs image programs at ANTs' peak plus 8 MiB, bit for bit in `reproduce`
 (`docs/findings/ants-image-programs.md`, `ants-n4.md`, `ants-denoise.md`, "Memory against
-ANTs"); the other tools are still to measure ([next-steps](../next-steps.md)).
+ANTs"), and five calls of BET's programs (bet2 with its outputs, `bet -R`, `bet -F` on a series,
+betsurf; 2026-10-26) at FSL's peak, FSL's bytes in `reproduce`; the other tools are still to
+measure ([next-steps](../next-steps.md)).
 
 **Against a real fMRIPrep run.** [fmriprep-stages](fmriprep-stages.md) runs larmorx's tools,
 step by step, on the inputs and parameters fMRIPrep 25.2.6 itself used (read from nipype's
@@ -134,8 +138,10 @@ python -m larmorx_validation parity ants-n4 --tier standard --out docs/validatio
 python -m larmorx_validation parity ants-denoise --tier standard --out docs/validation   # about an hour (ANTs at four thread counts on whole T1w images)
 python -m larmorx_validation.parity.mri_hmc_band --mcflirt ~/fsl/bin/mcflirt   # mcflirt's variability band (needs FSL)
 python -m larmorx_validation parity mri-hmc --tier standard --out docs/validation   # needs the recorded mcflirt runs
-(cd crates-nc && cargo build --release)   # the FSL replica, run as a separate program
+(cd crates-nc && cargo build --release)   # the FSL replicas (mcflirt, BET), run as a separate program
 python -m larmorx_validation parity fsl-mcflirt-replica --tier full --out docs/validation   # needs FSL at ~/fsl
+python -m larmorx_validation parity fsl-bet --implementation replica --tier standard --out docs/validation   # needs FSL at ~/fsl and fMRIPrep's image
+python -m larmorx_validation parity fsl-bet --implementation replica --tier full --out <dir>   # then <dir>/fsl-bet-replica.* -> docs/validation/fsl-bet-replica-full.*
 python -m larmorx_validation pipeline-stages --oracle <workspace>/oracles/fmriprep-25.2.6/ds000005-sub-01-noreconall --out docs/validation   # needs the fMRIPrep oracle run (scripts/run_fmriprep_oracle.sh), its image and Apptainer; about an hour
 ```
 

@@ -1,0 +1,206 @@
+{
+ "defect": null,
+ "description": "bet -F on a series stored as double: fslmaths -mas computes in double and writes double for a double input; the replica had written float (fixed 2026-10-26)",
+ "expect": "pass",
+ "found": {
+  "detail": "out.nii.gz: the header differs; 4 of 4 values differ",
+  "n": 86,
+  "seed": "bettrial2",
+  "shrink_moves": [
+   "dropped -v (-v)",
+   "dropped -m (-m)",
+   "dropped -g (-g 0.2)",
+   "dropped -f (-f 0.2)",
+   "input: axis 2 31 -> 15 voxels",
+   "input: axis 0 16 -> 8 voxels",
+   "input: axis 2 15 -> 7 voxels",
+   "input: axis 1 9 -> 4 voxels",
+   "input: axis 0 8 -> 4 voxels",
+   "input: axis 2 7 -> 3 voxels",
+   "input: axis 0 4 -> 2 voxels",
+   "input: axis 1 4 -> 2 voxels",
+   "input: axis 2 3 -> 1 voxels",
+   "input: axis 0 2 -> 1 voxels",
+   "input: 5 -> 2 volumes",
+   "input (and its grid): plumb orientation",
+   "input (and its grid): unit spacing",
+   "input (and its grid): origin at 0",
+   "input (and its grid): qform and sform codes 1",
+   "input (and its grid): millimetres",
+   "input: no slice timing"
+  ],
+  "signature": [
+   "out.nii.gz"
+  ]
+ },
+ "id": "bet-F-double-series",
+ "implementations": [
+  "replica"
+ ],
+ "reason": "",
+ "recipe": {
+  "extra": {
+   "output_type": "NIFTI_GZ",
+   "tool": "bet"
+  },
+  "features": {
+   "-c": false,
+   "-d": false,
+   "-e": false,
+   "-f": true,
+   "-g": true,
+   "-m": true,
+   "-n": false,
+   "-o": false,
+   "-r": false,
+   "-s": false,
+   "-t": false,
+   "-v": true,
+   "-w": false,
+   "FSLOUTPUTTYPE": "NIFTI_GZ",
+   "axis0": 1.15,
+   "axis1": 1.2,
+   "axis2": 1.15,
+   "bias0": -0.01,
+   "bias1": -0.0025,
+   "bias2": -0.0075,
+   "bias3": -0.0075,
+   "centre0": 1.0,
+   "centre1": -0.5,
+   "centre2": -4.0,
+   "content": "head",
+   "dtype": "float64",
+   "extreme": true,
+   "f": "0.2",
+   "g": "0.2",
+   "noise": 3.0,
+   "orientation": "axes+oblique",
+   "origin0": -21.75,
+   "origin1": 32.25,
+   "origin2": 19.5,
+   "qfac": 1,
+   "qform_code": 0,
+   "range": "plain",
+   "sform": "same",
+   "sform_code": 1,
+   "shape": "16x9x31x5",
+   "size": 15.0,
+   "slice_code": 4,
+   "spacing0": 0.8,
+   "spacing1": 1.0,
+   "spacing2": 50.0,
+   "suffix": ".nii",
+   "tissues": "t1",
+   "tool": "bet",
+   "tr": 0.5,
+   "tunits": "sec",
+   "units": "um",
+   "variation": "-F"
+  },
+  "groups": [
+   {
+    "args": [
+     "{in:input}",
+     "out"
+    ],
+    "name": "input",
+    "optional": false
+   },
+   {
+    "args": [
+     "-F"
+    ],
+    "name": "variation",
+    "optional": false
+   }
+  ],
+  "inputs": {
+   "input": {
+    "content": {
+     "axes": [
+      1.15,
+      1.2,
+      1.15
+     ],
+     "bias": [
+      -0.01,
+      -0.0025,
+      -0.0075,
+      -0.0075
+     ],
+     "centre": [
+      1.0,
+      -0.5,
+      -4.0
+     ],
+     "noise": 3.0,
+     "seed": 1708086262,
+     "size": 15.0,
+     "tissues": "t1",
+     "type": "head"
+    },
+    "dtype": "float64",
+    "geometry": {
+     "origin": [
+      0.0,
+      0.0,
+      0.0
+     ],
+     "qfac": 1,
+     "qform_code": 1,
+     "quaternion": [
+      1,
+      0,
+      0,
+      0
+     ],
+     "sform": "same",
+     "sform_code": 1,
+     "spacing": [
+      1.0,
+      1.0,
+      1.0
+     ],
+     "units": "mm"
+    },
+    "scaling": null,
+    "shape": [
+     1,
+     2,
+     1,
+     2
+    ],
+    "suffix": ".nii",
+    "timing": {
+     "slice_code": 0,
+     "slice_duration": 0.0161,
+     "slice_end": 0,
+     "slice_start": 0,
+     "tr": 0.5,
+     "tunits": "sec"
+    },
+    "values": {
+     "offset": 0.0,
+     "scale": 1.0
+    }
+   }
+  },
+  "n": 86,
+  "options": [
+   "-F",
+   "-f",
+   "-g",
+   "-m",
+   "-v",
+   "FSLOUTPUTTYPE=NIFTI_GZ",
+   "bet"
+  ],
+  "seed": "bettrial2",
+  "tool": "fsl-bet"
+ },
+ "rule": null,
+ "status": "fixed",
+ "suite": "fsl-bet-replica",
+ "tier": "standard",
+ "tool": "fsl-bet"
+}

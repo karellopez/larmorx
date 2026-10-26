@@ -607,3 +607,53 @@ implementation = "replica"
 signature = ["DN fix pass"]
 status = "fixed"
 explanation = "the default renamed the -meanvol image (FSL-08's correction, <stem>_mean_reg) without naming FSL-08: the replica's own part names it there now (d196995, on main), and its shrunk case is that part's permanent case meanvol-name-notice"
+
+# ---------------------------------------------------------------- BET (2026-10-26, BET's merge)
+
+[[difference]]
+tool = "fsl-bet"
+implementation = "replica"
+signature = ["messages: FSL's, byte for byte"]
+status = "fixed"
+explanation = "fslstats -C printed no warning where newimage's calc_cog writes 'WARNING::in calculating COG, total = 0.0' to cerr (an empty brain under bet -R): larmorx-nc-core's fslstats_cog returns it"
+link = "validation/difftest/cases/fsl-bet/cog-warning-empty-brain.json"
+
+[[difference]]
+tool = "fsl-bet"
+implementation = "replica"
+signature = ["messages before FSL's crash"]
+status = "fixed"
+explanation = "bet on an image where FSL's bet2 crashes (FSL-41): the replica's bet filled bet2's undefined median and went on; inside bet, reproduce now gives the script's failure message and status, FSL's defined outcome (bet2 alone still fills); and the suite compares what FSL printed before its crash as the start of a filled run's output (FSL's buffered output is lost at its crash)"
+link = "validation/difftest/cases/fsl-bet/bet-script-failure-constant.json"
+
+[[difference]]
+tool = "fsl-bet"
+implementation = "replica"
+signature = ["exit status"]
+status = "register"
+explanation = "betsurf with no voxel of the T1 inside the brain surface: FSL reads the 98th percentile from an empty list and crashes (FSL-58, a new entry); the replica had panicked; the default refuses, naming FSL-58, and reproduce takes the percentile as 0 (D13's failure case)"
+link = "validation/difftest/cases/fsl-bet/betsurf-empty-brain.json"
+
+[[difference]]
+tool = "fsl-bet"
+implementation = "replica"
+signature = ["out.nii.gz"]
+status = "fixed"
+explanation = "bet -F on a series stored as double: fslmaths -mas computes and writes double for a double input (newimage's dtype of the file); larmorx-nc-core's fslmaths_mas wrote float"
+link = "validation/difftest/cases/fsl-bet/bet-F-double-series.json"
+
+[[difference]]
+tool = "fsl-bet"
+implementation = "replica"
+signature = ["exit status"]
+status = "fixed"
+explanation = "betsurf --t1only with an FSLOUTPUTTYPE FSL does not know: FSL exits 1 from FslGetEnvOutputType itself, so FSL-54's dropped status does not apply; the replica's reproduce gave 0"
+link = "validation/difftest/cases/fsl-bet/betsurf-t1only-output-type.json"
+
+[[difference]]
+tool = "fsl-bet"
+implementation = "replica"
+signature = ["messages before FSL's crash"]
+status = "harness"
+explanation = "a filled run (FSL crashes, reproduce fills) that then meets a failure FSL never reaches (an unknown FSLOUTPUTTYPE at the first save): the suite now judges it as filled, its later failure allowed"
+link = "validation/difftest/cases/fsl-bet/bet2-filled-then-output-type.json"

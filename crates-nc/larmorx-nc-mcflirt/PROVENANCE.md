@@ -42,4 +42,6 @@ The libraries mcflirt uses (newimage, miscmaths, NewNifti, znzlib, armawrap) are
   with `reproduce`; each case prints a notice line `larmorx-nc: upstream defect FSL-nn (mcflirt)
   corrected|reproduced: ...` to standard error. Decided to keep: FSL-02 (rule C, decided
   2026-10-23), FSL-11's `.nii.gz` default when `FSLOUTPUTTYPE` is unset (decided 2026-10-23),
-  FSL-15, FSL-18 and FSL-22 (rule C; `docs/findings/fsl-mcflirt.md`).
+  FSL-15 and FSL-18 (rule C; `docs/findings/fsl-mcflirt.md`). FSL-22 (NaN values in the
+  background value's sort, an order C++ leaves undefined): sorted last by default, libstdc++'s
+  order with `reproduce` (2026-10-26), each named.

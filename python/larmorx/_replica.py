@@ -190,7 +190,7 @@ def select(family: str, tool: str, implementation: str) -> Selected | None:
         if not replica.original:
             raise NotImplementedError(
                 f"larmorx has no clean-room original of {family} {tool} yet (it is to be "
-                f"written from specs/{tool}.md); its bit-exact replica is in the "
+                f"written from its spec in specs/); its bit-exact replica is in the "
                 f"{replica.package} package ({replica.licence}): install it with "
                 f"{replica.install} and use implementation='auto' or 'replica'"
             )

@@ -53,12 +53,25 @@ command-line binary. Code from different families is never linked into one binar
   `crates-gpl/larmorx-gpl-cli/tests/notices.rs`, because maturin takes licence files only from
   below `crates-gpl/`). `larmorx-nc` is packaged the same way (`crates-nc/pyproject.toml`, licence
   `LicenseRef-FSL`): its wheel carries the FSL Licence (`crates-nc/LICENSE`), the FSL,
-  Armadillo, fdlibm and Arm notices (`crates-nc/NOTICE`), the Apache-2.0 text and `NOTICE` of
-  the larmorx crate it includes and Arm's MIT licence (`crates-nc/LICENSES/`), and, because the
+  Armadillo, fslpy, fdlibm, Arm and SGI STL (HP/SGI) notices (`crates-nc/NOTICE`), the
+  Apache-2.0 text and `NOTICE` of the larmorx crate it includes and Arm's MIT licence
+  (`crates-nc/LICENSES/`), and, because the
   FSL Licence requires "all original and amended source code" in every transmitted product,
   FSL's original source of the replicated parts (`crates-nc/fsl-source/`, with `MANIFEST.tsv`)
   and the Rust translation itself, all as licence files. `crates-nc/larmorx-nc-cli/tests/notices.rs`
   checks the copies and the source manifest.
+  BET (merged 2026-10-26) is the second FSL replica: `larmorx-nc fsl bet`, `bet2` and `betsurf`,
+  translated from FSL 6.0.7.17's fsl-bet2, fsl-meshclass, fsl-newimage, fsl-newnifti,
+  fsl-miscmaths, fsl-utils, fsl-znzlib and fsl-avwutils, whose original source is in
+  `crates-nc/fsl-source/` beside mcflirt's (one `MANIFEST.tsv`). Also translated, each with its
+  notice in `crates-nc/NOTICE`: fslpy 3.21.1's `imtest`, `remove_ext` and `imglob` (Apache-2.0),
+  fdlibm's `tanh` and `expm1` (Sun's notice), glibc 2.35's `pow` and `exp` from Arm's Optimized
+  Routines v19.11 (MIT: the code glibc ships, as for the float functions; no LGPL code), and
+  bet2's `--ct` conversion, which FSL adapted from Chris Rorden's BSD-2-clause `clinical_h2c.m`.
+  The core's `std::sort` and `std::nth_element` emulation (FSL-22, FSL-55; the mesh sweep) is
+  written from the SGI STL's introsort and introselect under the HP/SGI permission notice, with
+  the one step where libstdc++'s order differs written from that step's description: no
+  libstdc++ (GPL-3.0) text (decision log, 2026-10-26).
 - **Nothing is on PyPI yet.** Build the wheels locally:
   ```bash
   maturin build --release --locked --out dist                    # larmorx (repository root)

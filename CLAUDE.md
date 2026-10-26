@@ -36,7 +36,7 @@ Phase L1 in progress. History: [docs/status-log.md](docs/status-log.md) (to 2026
 | I/O and transforms | NIfTI-1/2 I/O (`lx.load`, `lx.save`, `lx.Image`); ITK transform files, HDF5 included, read and written in pure Rust (`larmorx-hdf5`); fMRIPrep's one-shot BOLD resampler (`lx.transforms.resample_series`) | `nifti-io`, `itk-hdf5`, `resample-series` |
 | ANTs and ITK (ports) | antsApplyTransforms (`--float 1`, transform outputs, B-spline transforms), N4BiasFieldCorrection, DenoiseImage, ImageMath (every operation fMRIPrep, sMRIPrep and sdcflows call), ThresholdImage, MultiplyImages, SmoothImage, ResampleImage(BySpacing), antsRegistration (every stage: linear, SyN, BSplineSyN, BSpline, displacement-field, Exponential, BSplineExponential and time-varying velocity-field; image and point-set metrics; the corrections of 2026-10-21 on by default), antsAI (every option, the blob alignment included), antsAffineInitializer, Atropos (every option; sMRIPrep's call bit-identical with correctly rounded maths on the five oracle runs) | `ants-*` |
 | AFNI | 3dTshift, 3dAutomask, 3dUnifize, complete: clean-room originals (`crates/larmorx-afni`) and GPL replicas (`crates-gpl/`) | `afni-tshift`, `afni-tshift-replica`, `afni-automask`, `afni-automask-replica`, `afni-unifize`, `afni-unifize-replica` |
-| FSL | head-motion correction with mcflirt-style options, clean-room original, `experimental` (`lx.mri.hmc`); the mcflirt replica (`crates-nc/`, package `larmorx-nc`, FSL Licence: non-commercial, FSL's source in `crates-nc/fsl-source/`), bit-identical to mcflirt as built (173 of 173 compared cases of its record, fMRIPrep's 22 calls on the twelve oracle runs with BOLD runs included, and fMRIPrep's own matrices identical); `larmorx-nc-core` is the shared core of the next FSL replicas | `mri-hmc`, `fsl-mcflirt-replica` |
+| FSL | head-motion correction with mcflirt-style options, clean-room original, `experimental` (`lx.mri.hmc`); the mcflirt replica (`crates-nc/`, package `larmorx-nc`, FSL Licence: non-commercial, FSL's source in `crates-nc/fsl-source/`), bit-identical to mcflirt as built (173 of 173 compared cases of its record, fMRIPrep's 22 calls on the twelve oracle runs with BOLD runs included, and fMRIPrep's own matrices identical); `larmorx-nc-core` is the shared core of the next FSL replicas; the **BET** replica (`larmorx-nc fsl bet`, `bet2`, `betsurf`; `lx.fsl.bet`, `lx.fsl.betsurf`; `bet -S`, `-B`, `-A`, `-A2` pending FLIRT and FAST): every file FSL 6.0.7.17 writes byte for byte in every compared case (129 of 129, 364 files, fMRIPrep's 29 BET calls on the twelve oracle runs with BOLD runs included); its FSL libraries are the core's, shared with mcflirt | `mri-hmc`, `fsl-mcflirt-replica`, `fsl-bet-replica`, `fsl-bet-replica-full` |
 
 Golden tests cover every tool on all six platforms (`docs/validation/golden.md`); CI has been green at every merge. Stage-by-stage comparisons with fMRIPrep 25.2.6 were run on four oracle runs (`docs/validation/fmriprep-stages*.md`); further fMRIPrep comparisons wait until every tool is ported (user, 2026-10-16).
 
@@ -103,13 +103,24 @@ a computation before allocating). Of the 76 heavy cases, 40 ran here (26 agree, 
 changed no value), 11 are beyond any machine (guard cases) and 25 wait for a larger machine. The
 same part brought every ANTs image program measured to at most ANTs' peak memory on the same call
 (the user's rule of 2026-10-25; `tests/parity/test_memory_peak.py`, 13 calls, bit for bit).
-**Next:** BET's merge (its FSL library code moved into `larmorx-nc-core`, one translation of each
-FSL library), then a clean stop to plan the next stage. After it: the evidence infrastructure's
-last item (decision log 2026-10-23), every finished tool re-validated on the data panel (the
-oracle-output cache, the data panel, differential random testing and the generated tables are
-done; the nights run by `scripts/orchestration/difftest-nightly.sh`); and FSL (BET's clean-room
-original, FLIRT with BBR, FAST, topup). Then field maps, FreeSurfer, surfaces, confounds, larmorprepx (`docs/next-steps.md`). Each a bounded agent run with a stop after it, each bringing its evidence.
-**Build-cache seed** for the next agent: the newest merged worktree's `target/` (now the mcflirt replica's, `.claude/worktrees/agent-a5874ac3558d79d85/`, with `crates-nc/target/`).
+**The BET replica merged** (2026-10-26; built 2026-10-24 and 25; FSL, item 7): `larmorx-nc fsl
+bet|bet2|betsurf`, bit-identical to FSL 6.0.7.17 (115 of 115 compared cases in the standard tier,
+129 of 129 and 364 of 364 files in the full tier); BET's and mcflirt's FSL libraries joined in
+`larmorx-nc-core` (one translation of each, its API in the core's `PROVENANCE.md`); FSL-40 to
+FSL-58 by rules A to D, FSL-41, -52, -58 and FSL-43's crash class as D13 failure cases; NaN and
+infinite voxels with SSE's bits on every platform (BET's NaN matrix); under random testing
+(`fsl-bet`; four trial runs, every difference fixed, seven permanent cases) and below FSL's peak
+memory in every measured call; `pow` and `exp` from Arm's MIT routines; FSL-22's `reproduce` made
+exact (libstdc++'s order from the SGI STL's introsort, no libstdc++ text; decision log
+2026-10-26); `specs/bet.md` for the clean-room original.
+**Next:** this round is complete (BET merged). Next comes a clean stop, then the move to the new
+main machine, then every finished tool re-validated on the data panel (the oracle-output cache,
+the data panel, differential random testing and the generated tables are done; the nights run by
+`scripts/orchestration/difftest-nightly.sh`), then BET's clean-room original (from
+`specs/bet.md`) and the next FSL tools (FLIRT with BBR, FAST, topup). Then field maps,
+FreeSurfer, surfaces, confounds, larmorprepx (`docs/next-steps.md`). Each a bounded agent run
+with a stop after it, each bringing its evidence.
+**Build-cache seed** for the next agent: the newest merged worktree's `target/` (now BET's, `.claude/worktrees/agent-a38ebb82788afa285/`, with `crates-nc/target/`; built with the joined core, release and debug, the dev profile at opt-level 1 for the FSL crates).
 
 **fMRIPrep oracle runs** (`oracles/fmriprep-25.2.6/<run>/`, fMRIPrep 25.2.6 through Apptainer, `scripts/run_fmriprep_oracle.sh`; settings in each run's `RUN_INFO.txt`): `ds000005-sub-01-noreconall` (no field maps, no slice timing), `ds001600-sub-1-noreconall` (anatomy only: its BOLD runs have 5 volumes), `ds005040-sub-002-noreconall` (PEPOLAR, slice timing), `ds005454-sub-16-noreconall` (phase difference, multiband, 280 volumes), `ds005752-sub-ON01016-noreconall` (a direct field map fMRIPrep does not use: no `IntendedFor`); and the data panel's nine (2026-10-24 and 25, `validation/investigations/panel-oracle-runs/`, every one finished with exit status 0): `ds000228-sub-pixar008-noreconall` (a 3.5-year-old), `ds005003-sub-RS001-noreconall` (a glioma), `ds004173-sub-603309-noreconall` (anatomy only, strong motion), `ds002422-sub-02-noreconall` (1.5 T, two field-map estimators), `ds000256-sub-CTS203-noreconall` (a child's three motion levels), `ds004884-sub-M2079-noreconall` (a stroke, with its lesion mask resampled onto the T1w's grid), `ds003592-sub-280-noreconall` (multi-echo), `ds002603-sub-01-noreconall` (Philips multiband, a field map), `ds004958-sub-fsm64ps-noreconall` (multiband-8, 600 volumes; field maps not linked).
 
@@ -174,7 +185,7 @@ larmorx/scripts/bootstrap_workspace.sh --venv .venv --install-rust
      - AFNI's MCW files and Workbench (GPL-2.0-or-later): `larmorx-gpl` (GPL-3.0-or-later, `crates-gpl/`);
      - FSL: `larmorx-nc` (the FSL Licence's non-commercial terms, `crates-nc/`);
      - FreeSurfer: `larmorx-freesurfer`.
-   - **Original:** a strict clean-room implementation with the same behaviour, Apache-2.0, in the main package. It is needed wherever the replica is not Apache-compatible. The implementer works only from `specs/<tool>.md`, documentation, papers and black-box runs of the upstream binary; never the upstream source, the replica crates or source-derived findings (`docs/findings/afni-tshift.md`, `afni-automask.md`, `afni-unifize.md`, `afni-licence-routines.md`, `fsl-mcflirt.md`, the sections of `upstream-defects.md` marked restricted), nor `docs/parts/` (other parts' briefs, reports and handoffs, some source-derived). Who may read what: `docs/porting-guide.md` §1.
+   - **Original:** a strict clean-room implementation with the same behaviour, Apache-2.0, in the main package. It is needed wherever the replica is not Apache-compatible. The implementer works only from `specs/<tool>.md`, documentation, papers and black-box runs of the upstream binary; never the upstream source, the replica crates or source-derived findings (`docs/findings/afni-tshift.md`, `afni-automask.md`, `afni-unifize.md`, `afni-licence-routines.md`, `fsl-mcflirt.md`, `fsl-bet.md`, the sections of `upstream-defects.md` marked restricted), nor `docs/parts/` (other parts' briefs, reports and handoffs, some source-derived). Who may read what: `docs/porting-guide.md` §1.
    - **Never** move replica code into the main package, even renamed. Never link code from different licence families into one binary: `larmorx-gpl` and `larmorx-nc` are incompatible with each other.
    - **MSM_HOCR:** no replica can be published (its ELC library forbids public distribution of derivatives, and its FastPD optimiser is patented). Its original must avoid those optimisation methods.
    - **Every file records its origin** with an SPDX header and in its crate's `PROVENANCE.md`.

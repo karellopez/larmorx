@@ -101,6 +101,25 @@ pub const REPLICAS: &[Replica] = &[
         package: &LARMORX_NC,
         original: true,
     },
+    // FSL's BET: the clean-room original is to be written from specs/bet.md.
+    Replica {
+        family: "fsl",
+        tool: "bet",
+        package: &LARMORX_NC,
+        original: false,
+    },
+    Replica {
+        family: "fsl",
+        tool: "bet2",
+        package: &LARMORX_NC,
+        original: false,
+    },
+    Replica {
+        family: "fsl",
+        tool: "betsurf",
+        package: &LARMORX_NC,
+        original: false,
+    },
 ];
 
 /// The tools of `family` that have a replica and no clean-room original yet: the command line
@@ -469,10 +488,24 @@ mod tests {
             e.to_string().starts_with("LARMORX_IMPLEMENTATION=original"),
             "{e}"
         );
-        // Every registered tool has its original: `auto` without the replica runs it.
-        assert!(REPLICAS.iter().all(|r| r.original));
+        // The AFNI tools have their originals: `auto` without the replica runs them. FSL's
+        // BET has only its replica so far.
+        assert!(
+            REPLICAS
+                .iter()
+                .filter(|r| r.family == "afni")
+                .all(|r| r.original)
+        );
         assert_eq!(replica_only("afni").count(), 0);
         assert_eq!(replica_only("ants").count(), 0);
+        assert_eq!(
+            replica_only("fsl").collect::<Vec<_>>(),
+            ["bet", "bet2", "betsurf"]
+        );
+        let bet = lookup("fsl", "bet").unwrap();
+        assert_eq!(bet.package.env, "LARMORX_NC_BIN");
+        let e = choose_with(Implementation::Auto, bet, missing).unwrap_err();
+        assert!(e.to_string().contains("pip install larmorx-nc"), "{e}");
         let automask = lookup("afni", "3dAutomask").unwrap();
         assert!(matches!(
             choose_with(Implementation::Auto, automask, missing),

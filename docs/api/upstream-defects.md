@@ -116,9 +116,26 @@ changed it (`reproduce`); nothing is said when the two would agree.
 | FSL-04 | mcflirt | `larmorx fsl mcflirt` (the replica; the original refuses `-gdt` in both modes) | `-gdt` registers each volume's gradient image to the reference's plain image | refused (exit 1); `reproduce` registers the gradient images as mcflirt does |
 | FSL-20 | mcflirt | `larmorx fsl mcflirt` (the replica) | when the `.mat` directory cannot be created for another reason than its permissions, mcflirt prints "Error!: Unknown Log directory return value" and exits with status 0, writing nothing more | an error (exit 1) |
 | FSL-21 | mcflirt | `larmorx fsl mcflirt` (the replica) | with a histogram cost and `-bins` below 8, the first stage's histogram has no bins: arbitrary matrices, and `corratio` aborts | an error before any work (exit 1) |
+| FSL-40 | bet2 | `larmorx fsl bet2`, `bet`, `lx.fsl.bet` | the first `.hdr` of a name is removed wherever it stands; a name with `.img` and no `.hdr` aborts | a trailing image extension removed |
+| FSL-41 | bet2 | `larmorx fsl bet2`, `bet`, `lx.fsl.bet` | a constant or binary image: FSL crashes reading the median of an empty list | an error naming FSL-41; `reproduce` takes the median as 0 and writes the outputs |
+| FSL-42 | bet2 | `larmorx fsl bet2`, `bet`, `lx.fsl.bet` | NaN `-f`/`-g`, a negative, NaN or infinite `-r`, `-w` ≤ 0, a non-finite `-c` or search depth used as given | an error naming the value (exit 1; decided 2026-10-24, rule B) |
+| FSL-43 | bet2, betsurf | both programs | a mask's fill starts at the surface's centroid unchecked: one voxel outside the image (a single slice) FSL writes and reads outside the volume; further out it crashes | the fill starts at the nearest voxel inside; `reproduce` does FSL's defined part and warns, and skips a fill FSL crashes on |
+| FSL-44 | bet | `larmorx fsl bet` | names with blanks split into words; an empty argument ends the options | each argument one word |
+| FSL-45 | bet `-Z` | `larmorx fsl bet -Z`, `lx.fsl.bet(variation="small_fov")` | the outputs cropped back by `imglob` from the PATH: left padded when FSL is not on it | exactly its outputs cropped |
+| FSL-46 | bet | `larmorx fsl bet` | every `<output>_tmp*` file removed | only the run's own |
+| FSL-47 | betsurf `--t1only` | `larmorx fsl betsurf -1 -m`, `lx.fsl.betsurf(masks=True)` | the scalp mask filled from the outer skull surface's centre in the padded grid | from the scalp surface's |
+| FSL-48 | betsurf | `larmorx fsl betsurf`, `lx.fsl.betsurf(t2=...)` | a T2 on another grid sampled at the T1's voxel coordinates | an error (decided 2026-10-24, rule B) |
+| FSL-50 | betsurf | both | one profile with an empty search range ends the program (255, no message, no output) | the profile dropped |
+| FSL-51 | betsurf | both | profile searches read past the samples, into memory never set | the profile dropped; `reproduce` reads "nothing there" and warns |
+| FSL-52 | betsurf | both | a mesh file read without checks: FSL crashes on values it never set or faces naming missing vertices | an error naming the problem; `reproduce` takes 0 for the values never set, leaves out those faces and writes the outputs |
+| FSL-53 | betsurf | both | a matrix with fewer than 12 readable numbers: entries never set | an error (decided 2026-10-24, rule B); `reproduce` uses 0 |
+| FSL-54 | betsurf `--t1only` | `larmorx fsl betsurf -1` | exit status 0 after a failure | the failure's status (255) |
+| FSL-55 | betsurf | both | NaN inside the brain surface: the 98th percentile undefined | an error (decided 2026-10-24, rule B) |
+| FSL-56 | FSL's NIfTI writer | every FSL replica (`larmorx fsl bet2`, `bet`, `betsurf`, `mcflirt`) with `FSL_LOAD_NIFTI_EXTENSIONS` | several extensions of different sizes: a wrong `vox_offset` | the correct offset |
+| FSL-58 | betsurf | both | no voxel of the T1 inside the brain surface: FSL reads the 98th percentile of an empty list and crashes | an error naming FSL-58; `reproduce` takes it as 0 |
 | SCI-02 | SciPy `ndimage` | `lx.ndimage.*` | NaN results written to a signed integer output, and a `cval` an integer input cannot hold, are converted as x86-64 converts them (C leaves it undefined) | NaN is 0, `cval` clamped |
 
-Rows naming `larmorx fsl mcflirt` are the replica's (`larmorx-nc`, `lx.mri.hmc(implementation="replica")`); it shares the clean-room original's corrections of FSL-01, -03, -05 to -10, -13 and -14.
+Rows naming `larmorx fsl mcflirt` are the replica's (`larmorx-nc`, `lx.mri.hmc(implementation="replica")`); it shares the clean-room original's corrections of FSL-01, -03, -05 to -10, -13 and -14. Rows FSL-40 to FSL-58 are BET's replica's (`larmorx-nc`: `larmorx fsl bet`, `bet2`, `betsurf`, `lx.fsl.bet`, `lx.fsl.betsurf`; there "both" means the command line and the Python function); BET has no clean-room original yet. FSL-49 and FSL-57 are kept as FSL's (rule C).
 
 **ANTs and ITK** (2026-10-12; the tables of each tool's page say which apply to it:
 [ImageMath](ants-image-math.md#upstream-defects-d13),

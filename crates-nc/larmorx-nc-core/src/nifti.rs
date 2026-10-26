@@ -21,9 +21,8 @@ use std::fs::File;
 use std::io::{self, Read, Write};
 use std::path::Path;
 
-use flate2::Compression;
 use flate2::read::MultiGzDecoder;
-use flate2::write::GzEncoder;
+use flate2::{Compression, GzBuilder};
 
 use crate::x87;
 
@@ -1377,19 +1376,44 @@ pub fn load_image(path: &Path) -> Result<Loaded, NiftiError> {
     })
 }
 
-/// `saveImage(filename, buffer, extensions, header, useCompression)`.
+/// The data of an image being saved: its bytes as the file holds them, written in turn (a
+/// volume converts its values chunk by chunk, so that saving holds no copy of the image).
+pub trait ImageBytes {
+    /// The number of bytes.
+    fn byte_len(&self) -> usize;
+    /// Writes the first `limit` bytes to `w`.
+    fn write_bytes(&self, w: &mut dyn Write, limit: usize) -> io::Result<()>;
+}
+
+impl ImageBytes for [u8] {
+    fn byte_len(&self) -> usize {
+        self.len()
+    }
+
+    fn write_bytes(&self, w: &mut dyn Write, limit: usize) -> io::Result<()> {
+        w.write_all(&self[..limit.min(self.len())])
+    }
+}
+
+/// `saveImage(filename, buffer, extensions, header, useCompression)`. `reproduce_offset` keeps
+/// NewNifti's `vox_offset` for two or more extensions (FSL-56: the first extension's size is
+/// added once per extension); otherwise each extension's own size is added.
 pub fn save_image(
     filename: &str,
-    data: &[u8],
+    data: &dyn ImageBytes,
     extensions: &[NiftiExtension],
     header: &NiftiHeader,
     use_compression: bool,
+    reproduce_offset: bool,
 ) -> Result<(), NiftiError> {
     let mut header = header.clone();
     let mut size_of_extensions = 4usize;
-    for _ in extensions {
-        // FSL adds the size of the first extension once per extension.
-        size_of_extensions += extensions[0].extension_size();
+    for e in extensions {
+        size_of_extensions += if reproduce_offset {
+            extensions[0].extension_size()
+        } else {
+            e.extension_size()
+        };
     }
     header.vox_offset = i64::from(header.sizeof_hdr) + size_of_extensions as i64;
     if !header.single_file() {
@@ -1422,32 +1446,53 @@ pub fn save_image(
         }
     }
     let n = header.n_elements() * header.datum_byte_width();
+    let values = (data, n.min(data.byte_len()));
     if header.single_file() {
-        first.extend_from_slice(&data[..n.min(data.len())]);
-        write_file(filename, &first, use_compression)
+        // the header, then the data, written in turn as znzlib writes them: no copy of the data
+        write_file(filename, &first, Some(values), use_compression)
     } else {
-        write_file(filename, &first, use_compression)?;
+        write_file(filename, &first, None, use_compression)?;
         let pos = filename
             .rfind(".hdr")
             .expect("a pair's header name ends in .hdr");
         let img = format!("{}.img{}", &filename[..pos], &filename[pos + 4..]);
-        write_file(&img, &data[..n.min(data.len())], use_compression)
+        write_file(&img, &[], Some(values), use_compression)
     }
 }
 
-fn write_file(name: &str, bytes: &[u8], compress: bool) -> Result<(), NiftiError> {
+/// Writes `head`, then the first `n` bytes of `data`, to `name`, gzip-compressed with
+/// znzlib's `gzopen(name, "wb")` settings (zlib's default level 6 and the gzip header of a Unix
+/// zlib: no name, no time, OS 3), or NewNifti's message when the file cannot be created. The
+/// decompressed bytes are FSL's; the compressed stream is zlib-rs's (its blocks need not be
+/// zlib's, and depend on how the data is fed), so it is compared decompressed, as every
+/// compressed output (decision log, 2026-10-16).
+fn write_file(
+    name: &str,
+    head: &[u8],
+    data: Option<(&dyn ImageBytes, usize)>,
+    compress: bool,
+) -> Result<(), NiftiError> {
     let open_err = || err(format!("Error: cant open file {name}"));
     let f = File::create(name).map_err(|_| open_err())?;
     let short = |_: io::Error| err("Error: short write, output file will be truncated");
+    let mut w = io::BufWriter::new(f);
+    let body = |out: &mut dyn Write| -> io::Result<()> {
+        out.write_all(head)?;
+        if let Some((d, n)) = data {
+            d.write_bytes(out, n)?;
+        }
+        Ok(())
+    };
     if compress {
-        let mut enc = GzEncoder::new(f, Compression::default());
-        enc.write_all(bytes).map_err(short)?;
+        let mut enc = GzBuilder::new()
+            .operating_system(3)
+            .write(&mut w, Compression::new(6));
+        body(&mut enc).map_err(short)?;
         enc.finish().map_err(short)?;
     } else {
-        let mut f = f;
-        f.write_all(bytes).map_err(short)?;
+        body(&mut w).map_err(short)?;
     }
-    Ok(())
+    w.flush().map_err(short)
 }
 
 #[cfg(test)]

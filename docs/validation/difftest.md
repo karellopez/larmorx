@@ -53,7 +53,7 @@ forms its parity cases use, and more), the input generators, which implementatio
 of the suite's reported checks must be exact. It turns the drawn recipe into a case of the tool's
 own parity suite, so **the same runners and comparators** decide it as decide the records
 (header, values bit for bit, messages, exit status, files, the D13 fix pass). Adding a tool is one
-short module; FSL's BET will be one.
+short module; FSL's BET is one (`tools/fsl_bet.py`, 2026-10-26).
 
 **Inputs** (`difftest/gen.py`) come from seeded random numbers and plain arithmetic only (the golden
 tests' rule: no transcendental function, so a recipe gives the same bytes on every machine),
@@ -105,6 +105,7 @@ and `::test_the_sizing_laws_and_a_case_predicted_over_the_limit`.
 | `afni-automask`, `afni-unifize` | `parity.afni_replica` | clean-room original, replica | every option of each |
 | `mri-hmc` | `parity.mri_hmc` (a run recorded live) | clean-room original vs mcflirt | moved phantoms, mcflirt's options |
 | `fsl-mcflirt` | `parity.fsl_mcflirt_replica` | replica vs mcflirt | the same |
+| `fsl-bet` | `parity.fsl_bet` (`expect="random"`: a case where FSL crashes and `reproduce` fills is judged as the record's crash-filled cases) | replica vs bet2, bet, betsurf | bet2's options, bet's variations (`-R`, `-F` on a series, `-Z` on a slab) with them, betsurf with and without a T2 on a closed surface made by the descriptor; every stored type, FSL's output types |
 | `resample-series` | `parity.resample_series` | port vs fMRIPrep's `ResampleSeries` | series, head motion, coregistration, targets, field maps, orders, modes |
 
 **Verdicts** (`difftest/core.py`): *agree* (the parity runner passed, or both programs rejected the

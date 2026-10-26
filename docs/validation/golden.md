@@ -13,9 +13,9 @@ Replicas and clean-room originals are covered alike. Written 2026-10-11.
 
 ## Where they are
 
-| | `larmorx` (Apache-2.0) | `larmorx-gpl` (the GPL replica) | `larmorx-nc` (the FSL replica) |
+| | `larmorx` (Apache-2.0) | `larmorx-gpl` (the GPL replica) | `larmorx-nc` (the FSL replicas) |
 |---|---|---|---|
-| Cases | [`tests/golden/registry.py`](../../tests/golden/registry.py): 152 cases, 890 outputs | [`crates-gpl/larmorx-gpl-cli/tests/golden.rs`](../../crates-gpl/larmorx-gpl-cli/tests/golden.rs): 25 cases, 50 outputs | [`crates-nc/larmorx-nc-cli/tests/golden.rs`](../../crates-nc/larmorx-nc-cli/tests/golden.rs): 23 cases, 179 outputs |
+| Cases | [`tests/golden/registry.py`](../../tests/golden/registry.py): 153 cases, 892 outputs | [`crates-gpl/larmorx-gpl-cli/tests/golden.rs`](../../crates-gpl/larmorx-gpl-cli/tests/golden.rs): 25 cases, 50 outputs | [`crates-nc/larmorx-nc-cli/tests/golden.rs`](../../crates-nc/larmorx-nc-cli/tests/golden.rs): 33 cases, 242 outputs |
 | Checksums | [`tests/golden/golden.json`](../../tests/golden/golden.json) | [`crates-gpl/larmorx-gpl-cli/tests/golden.tsv`](../../crates-gpl/larmorx-gpl-cli/tests/golden.tsv) | [`crates-nc/larmorx-nc-cli/tests/golden.tsv`](../../crates-nc/larmorx-nc-cli/tests/golden.tsv) |
 | Test | `tests/golden/test_golden.py` (pytest) | `cargo test` | `cargo test` |
 | Runs in CI | job `test`, on the release wheel, Python 3.12 only (the Python 3.14 run skips `tests/golden`) | job `gpl`, `cargo test --workspace --locked` (debug) | job `gpl`, as steps of their own: `cargo test --workspace --locked` in `crates-nc` |
@@ -29,6 +29,14 @@ checksum changed, `mcflirt.nonfinite.reproduce`'s `.par` (`b08d9de2…` → `0f3
 6.0.7.17 mcflirt's own output for the same input; the old value came from a debug build whose
 `atan2f` passed on the other of two NaNs.
 
+`larmorx-nc`'s checksums: BET's 10 cases recorded at BET's merge (from ee72d36, then again from
+bb72fb6 after the memory and random-testing fixes, every checksum unchanged); mcflirt's 179
+unchanged, also after FSL-22's exact `reproduce` (82e4f9e). The FSL core and BET are built at
+`opt-level = 1` in the dev profile so that the debug `cargo test` of CI runs BET's cases in about
+30 s (130 s unoptimised). The main package's `py.fsl.read_vtk` (BET's part 1, recorded without
+parity) was re-recorded with the parity smoke tier: from `d54d773` (commit `04dd94d`), the parity
+smoke tier passing (2461 passed), every checksum unchanged.
+
 ## What is covered
 
 A coverage test fails when anything below has no case; its message says what to do.
@@ -40,6 +48,7 @@ A coverage test fails when anything below has no case; its message says what to 
 | `lx.ants` | 31 | all 43 functions: the generic `image_math`, arithmetic, intensity, thresholds and Otsu with a mask, the Gaussian group, morphology, components and distance maps, `resample_image` with each interpolator (nearest, Gaussian, windowed sinc, B-spline, linear 4D), `apply_transforms` with each of its 11 interpolators, an integer output type and a 4D series, `apply_transforms_to_points`; `n4_bias_field_correction` with ANTs' defaults, a weight image with a mesh and quadratic splines, quintic splines, a mask with rescaling and a threshold that ends the level, a spline distance in 2D, a 4D series; `denoise_image` with the Rician model, the Gaussian model with a mask, shrink 2, 2D with per-axis patch radii, 4D with shrink 2; the division, the masked N4 and the Rician denoising again with `upstream_defects="reproduce"`; `registration` on an in-memory moving image, from an initial centre alignment: a rigid stage (Mattes, a fixed mask) then an affine stage (mean squares, random sampling), not collapsed, with both warped images and the parsed iterations; `registration` with a SyN stage (A5 part 1); `registration` with B-spline SyN, a Gaussian displacement field and a `BSpline` stage, not collapsed (A5 part 2) |
 | `lx.afni` | 5 | `tshift` with each of its 7 methods; a scaled int16 file, uint8 data, `-ignore`, `restore`, `detrend=False`, `slice`; `detrend=False` with `upstream_defects="reproduce"`; `afni_settings` in the clean-room original (`AFNI_NIFTI_SCALE=NO`, NIfTI-2); `fmriprep_slice_timing` |
 | `lx.mri` | 4 | `hmc` with the default, each other cost function, the mean volume with sinc interpolation, a separate reference with splines and 12 degrees of freedom, the in-plane mode with nearest neighbour and an initial matrix; the reference and in-plane cases with `upstream_defects="reproduce"`, and `normcorr_count="weights"`; `HmcResult.save_mats`/`save_par`/`save_itk`, `read_mats` |
+| `lx.fsl` | 1 | `read_vtk` (a VTK mesh as FSL writes it, read back); `lx.fsl.bet` and `lx.fsl.betsurf` run only the replica: their cases are `larmorx-nc`'s |
 | `lx.transforms` | 8 | ITK files written and read (text, MATLAB, HDF5); ITK's HDF5 layout written in Rust (`py.transforms.write_h5`, 2026-10-16): a composite of an affine and a displacement field of 32³ vectors (deflate-compressed chunks), the same uncompressed, and a dense group of 11 affines (fractal heap, v2 B-tree), each by its bytes and by what is read back; `load_itk_linear`, `load_itk_composite`, `load_transforms`, and a composite of 11 transforms in both orders (PIPE-04); `Affine.map`, `DenseField.map` (on and off its grid), `TransformChain.map`/`steps`; `ensure_positive_cosines`; `resample_series` with head motion and coregistration, and with distortion correction (also with `upstream_defects="reproduce"`) |
 | `lx.ndimage` | 3 | `map_coordinates` with each spline order (0-5) and each boundary mode, an integer input; `spline_filter`, `spline_filter1d`; the reflect modes with `upstream_defects="reproduce"` |
 | HDF5 reader | 1 | `hdf5.fixtures` (2026-10-16): larmorx's HDF5 reader on the five committed [HDF5 fixtures](#hdf5-fixtures), every path its own writer never produces; each file fingerprinted by what larmorx reads back (groups, datasets, types, shapes, strings, values, integers' stored bytes), the members of three groups through soft links, and the shared-message file's transforms as `lx.transforms.read` reads them |
@@ -48,24 +57,27 @@ A coverage test fails when anything below has no case; its message says what to 
 | `larmorx-gpl afni 3dAutomask`, `3dUnifize` | 16 | 3dAutomask: fMRIPrep's call on an int16 head phantom with `-apply_prefix` and `-depth`; `-eclip -nograd -NN1 -erode`; a 4D series with `-SI`; a 2D slice; `-peels 0` (AFNI-43) in both modes. 3dUnifize: the default on int16 with `-ssave` and `-amsave`; fMRIPrep's `-T2` call; `-GM -nosquash`; `-T2 -T2`; `-EPI` on a series, and on one with a negative scale factor in both modes (AFNI-01); `-T2up 100` in both modes (AFNI-45); a 2D slice |
 | `larmorx afni 3dAutomask`, `3dUnifize`, `lx.afni.automask`, `lx.afni.unifize` (clean-room originals) | 8 | 3dAutomask: fMRIPrep's call (`-apply_prefix -dilate 1`) with `-depth` on the oblique float32 volume; a 4D series averaged with `-nograd -eclip -clfrac 0.3 -peels 2 -NN3 -dilate 2 -erode 1 -SI 20`, and the 2D method on a plane; `-peels 0 -nbhrs 12` on a series with a negative scale factor in both modes (AFNI-43, AFNI-01); the Python API in memory with `exterior_clip`, `erode`, `nn=1`, the masked input and the depth. 3dUnifize: the defaults with `-ssave` and `-amsave`; fMRIPrep's `-T2` call; `-T2 -T2 -GM`; `-EPI` on a series; `-T2 -T2up 100` in both modes (AFNI-45); the Python API in memory with `t2`, the scale and the automasked input. The half-size path (more than a million voxels) is covered by the parity suites and the Rust unit tests of `unifize::duplo` |
 | `larmorx-nc fsl mcflirt` | 23 | int16 (the default outputs, int16 written), float32 with a reference file, `-stages 4` and `-sinc_final`, `-meanvol` with `-spline_final` and `-dof 12`, every cost (`mutualinfo` with `-nn_final` and `-bins 64`, `normmi`, `corratio`, `woods`, `leastsquares` with `-smooth 0`), `-init` with `-fudge` and `-rotation 2`, the in-plane mode on a 3-slice slab (and `-2d`), `-stats`, `-gdt`, uint8 and int8 input, NaN and infinite voxels, big-endian float32 in the neurological order written as NIfTI-2, a TR in milliseconds; mcflirt's defects corrected (the default) and, in 7 `*.reproduce` cases, reproduced (FSL-03, -04, -08, -09, -10, -14); every file written fingerprinted (images by header and data, `.mat`, `.par`, `.rms`); each case checks the defects named on standard error |
+| `larmorx-nc fsl bet`, `bet2`, `betsurf` | 10 | bet2's outputs (brain, mask, outline, skull, VTK mesh; `-f 0.4`), its threshold, gradient, centre and smoothness options (NIFTI_GZ), `--ct` (NIFTI_PAIR; the self-intersection passes), FSL-40 reproduced; `bet -R`, `-F` (4D), `-Z` corrected and reproduced (FSL-45); `betsurf --t1only -o -m -s` and with the T2 and `-p 1`. The inputs: a head of 32 x 32 x 24 voxels of 2 mm (brain, CSF, skull, scalp) from SplitMix64 and integer arithmetic, its T2 contrast, 4 volumes of it, a slab of 10 slices, and bet2's own mesh of the head; every file written fingerprinted (images by header and data, meshes as text); each case checks the defects named on standard error. `PATH` is emptied for the runs (FSL-45's branch looks for `imglob` on it) |
 
 What the coverage test enumerates:
 
 - **CLI tools:** `_core.cli_tools()`, which returns `larmorx_cli::FAMILIES`, the same list the
-  command line dispatches and prints in `--help` (11 tools). For the replica, the families and
-  tools printed by `larmorx-gpl --help`.
+  command line dispatches and prints in `--help` (21 tools on 2026-10-26). For the replicas, the
+  families and tools printed by `larmorx-gpl --help` and `larmorx-nc --help`.
 - **ImageMath operations:** `lx.ants.image_math_operations()`, built from the operation
   registry (`GROUPS`), 38 operations.
-- **Public functions:** every function in the `__all__` of `lx.ants`, `lx.afni`, `lx.mri`,
-  `lx.transforms`, `lx.ndimage`, `lx.io` and `lx`, and every public method defined on the
-  classes they export (73). Aliases count once (`lx.save` is `lx.io.save`). Properties and
-  constants are not functions and are not enforced; the I/O cases read the computed ones
+- **Public functions:** every function in the `__all__` of `lx.ants`, `lx.afni`, `lx.fsl`,
+  `lx.mri`, `lx.transforms`, `lx.ndimage`, `lx.io` and `lx`, and every public method defined on
+  the classes they export (85 on 2026-10-26). Aliases count once (`lx.save` is `lx.io.save`).
+  Properties and constants are not functions and are not enforced; the I/O cases read the computed ones
   (`NiftiHeader.affine`, `qform`, `sform`, `itk_geometry`).
 
 - **Tools with a replica and an original** (3dTshift, 3dAutomask, 3dUnifize): the cases in
   `tests/golden/registry.py` run the clean-room original (`implementation="original"`); the
-  replica has its own in `crates-gpl/larmorx-gpl-cli/tests/golden.rs`. No tool has only a
-  replica now (`REPLICA_ONLY_FUNCTIONS` is empty). 3dUnifize's half-size path (more than a
+  replica has its own in `crates-gpl/larmorx-gpl-cli/tests/golden.rs`. BET has only a replica
+  (2026-10-26): `larmorx fsl bet`, `bet2`, `betsurf` and `lx.fsl.bet`, `lx.fsl.betsurf`
+  (`REPLICA_ONLY_FUNCTIONS`) have their cases in `crates-nc/larmorx-nc-cli/tests/golden.rs`, and a
+  test checks that each such tool has one there (`REPLICA_GOLDEN`). 3dUnifize's half-size path (more than a
   million voxels) and AFNI-47 are beyond the golden tests' 32³ limit: the parity suites and
   the Rust unit tests (`unifize::duplo`, `unifize::wmi` against the spec's method) cover them.
 

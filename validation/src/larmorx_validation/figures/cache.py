@@ -212,15 +212,21 @@ def provenance(e: Entry) -> dict:
 #: (``.claude/worktrees/<name>``), followed by one of the repository's own directories.
 _CHECKOUT = re.compile(
     r"(?<![\w.~<>-])/(?:[^\s,\[\]\"'=@:;]+/)*?(?:larmorx|\.claude/worktrees/[^/\s,\[\]\"'=@:;]+)"
-    r"(?=/(?:crates-gpl|crates|target|python|validation|scripts|tests)/)"
+    r"(?=/(?:crates-gpl|crates-nc|crates|target|python|validation|scripts|tests)/)"
 )
 
 
 def checkout_paths(text: str) -> str:
     """``text`` with any larmorx checkout's path replaced by ``<larmorx>``: a program built in
-    a checkout (the replica, ``crates-gpl/target/release/larmorx-gpl``) or a file of one is
-    named alike whichever checkout or worktree ran it, so a re-export from another checkout
-    gives the same bytes."""
+    a checkout (the replicas, ``crates-gpl/target/release/larmorx-gpl``,
+    ``crates-nc/target/release/larmorx-nc``) or a file of one is named alike whichever checkout
+    or worktree ran it, so a re-export from another checkout gives the same bytes.
+
+    >>> checkout_paths("/w/larmorx/.claude/worktrees/a1/crates-nc/target/release/larmorx-nc")
+    '<larmorx>/crates-nc/target/release/larmorx-nc'
+    >>> checkout_paths("/w/larmorx/crates-gpl/target/release/larmorx-gpl x")
+    '<larmorx>/crates-gpl/target/release/larmorx-gpl x'
+    """
     return _CHECKOUT.sub("<larmorx>", text)
 
 

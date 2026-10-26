@@ -144,6 +144,19 @@ def _unifize(doc: dict) -> dict[str, int]:
     return {"written": written, "identical": identical, "with_crmath": crmath}
 
 
+def _bet(doc: dict) -> dict[str, int]:
+    """BET's replica: fMRIPrep's calls (the category ``fmriprep``) and the two kinds of
+    expected divergence: FSL crashes and ``reproduce`` fills what it leaves undefined
+    (``filled``), options that run FSL programs not replicated yet (``pending``)."""
+    res = doc["results"]
+    expected = [r for r in res if r["status"] == "expected-divergence"]
+    return {
+        "fmriprep": sum(r["category"] == "fmriprep" for r in res),
+        "filled": sum(r["reason"].startswith("FSL crashes (status") for r in expected),
+        "pending": sum(r["reason"].startswith("needs FSL programs") for r in expected),
+    }
+
+
 #: record -> its metrics beyond the common ones.
 METRICS: dict[str, Callable[[dict], dict[str, int]]] = {
     "ants-apply-transforms": _bit_identical(),
@@ -160,6 +173,8 @@ METRICS: dict[str, Callable[[dict], dict[str, int]]] = {
     "afni-tshift": _bit_identical(),
     "afni-tshift-replica": _bit_identical(),
     "afni-unifize": _unifize,
+    "fsl-bet-replica": _bet,
+    "fsl-bet-replica-full": _bet,
 }
 
 

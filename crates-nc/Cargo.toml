@@ -14,6 +14,8 @@ members = [
     "larmorx-nc-core/tools/glibc-float-verify",
     "larmorx-nc-core/tools/affine-trace-replay",
     "larmorx-nc-mcflirt",
+    "larmorx-nc-bet",
+    "larmorx-nc-core/tools/libm-verify",
     "larmorx-nc-cli",
 ]
 
@@ -28,6 +30,7 @@ repository = "https://github.com/karellopez/larmorx"
 larmorx-core = { path = "../crates/larmorx-core", version = "0.0.1" }
 larmorx-nc-core = { path = "larmorx-nc-core", version = "0.0.1" }
 larmorx-nc-mcflirt = { path = "larmorx-nc-mcflirt", version = "0.0.1" }
+larmorx-nc-bet = { path = "larmorx-nc-bet", version = "0.0.1" }
 # zlib-rs: the pure-Rust zlib implementation (no C zlib), as the root workspace.
 flate2 = { version = "1.1.10", default-features = false, features = ["zlib-rs", "runtime_detection"] }
 rayon = "1.12.0"
@@ -35,3 +38,16 @@ thiserror = "2.0.21"
 tempfile = "3.27.0"
 # Test-only: SHA-256 for the golden tests (larmorx-nc-cli/tests/golden.rs).
 sha2 = { version = "0.11.0", default-features = false }
+
+# The golden tests run the debug build (CI's `cargo test`, docs/validation/golden.md). BET's
+# surface deformation (1000 iterations over 2,562 vertices, up to 11 passes, several bet2 runs per
+# `bet` case) took 130 s of them unoptimised and 28 s at opt-level 1 on Linux x86_64; so the FSL
+# core and BET are built at opt-level 1 in the dev profile. Debug assertions and overflow checks
+# stay on (separate settings); the bits are the same (no fast-math; the NaN matrices of
+# validation/probes/ compare release builds with unoptimised debug builds, made with
+# `--config 'profile.dev.package.larmorx-nc-core.opt-level=0'` and the same for larmorx-nc-bet).
+[profile.dev.package.larmorx-nc-core]
+opt-level = 1
+
+[profile.dev.package.larmorx-nc-bet]
+opt-level = 1

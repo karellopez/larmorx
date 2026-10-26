@@ -400,6 +400,42 @@ defects! {
         "with a histogram cost (corratio, mutualinfo, normmi, woods) and -bins below 8, the first stage's histogram has no bins (-bins divided by the 8 mm scale): the costs are degenerate and the matrices arbitrary, and corratio writes before its arrays and aborts";
     FSL_20 = "FSL-20", "mcflirt", true,
         "when the .mat directory cannot be created for another reason than its permissions (a missing parent directory), mcflirt prints an error and exits with status 0, writing neither the matrices, the .par and .rms files nor the corrected series";
+    FSL_22 = "FSL-22", "FSL", true,
+        "the background value (calc_bval) sorts the 2-voxel border with std::sort and operator<: with NaN voxels the order is undefined in C++, so the padding value of a resampled volume is arbitrary";
+    FSL_40 = "FSL-40", "bet2", true,
+        "the input and output names lose their first '.hdr' wherever it stands (a directory named x.hdr is read as x), and a name with '.img' but no '.hdr' aborts the program";
+    FSL_41 = "FSL-41", "bet2", true,
+        "with no voxel strictly between the 2nd and 98th percentiles inside the initial sphere (a constant or binary image), the median brain intensity is read from the end of an empty list: FSL crashes";
+    FSL_42 = "FSL-42", "bet2", true,
+        "numeric options without meaning are used as given: a NaN threshold (-f, -g), a negative, NaN or infinite radius (-r), a smoothness of 0 or less (-w), a centre (-c) or search depth (--parameter_d1/d2) that is not finite";
+    FSL_43 = "FSL-43", "bet2, betsurf", true,
+        "the fill of a surface's mask starts at the vertices' centroid without a bounds check: a centroid outside the image (a single slice, a surface leaving the grid) writes and reads outside the volume";
+    FSL_44 = "FSL-44", "bet", true,
+        "the script expands its arguments unquoted: a name with a blank is split into words (an input with a blank is reported not valid, an output with a blank writes other files), and an empty argument ends the options";
+    FSL_45 = "FSL-45", "bet", true,
+        "-Z crops its outputs back with imglob, called without ${FSLDIR}/bin: with FSL's programs off the PATH the outputs stay padded, and with them on every other image whose name starts with the output's is cropped too";
+    FSL_46 = "FSL-46", "bet", true,
+        "the cleanup removes every file whose name starts with <output>_tmp, also files the run did not create";
+    FSL_47 = "FSL-47", "betsurf", true,
+        "--t1only fills the scalp mask from the centre of the outer skull surface, taken in the padded working grid, instead of the scalp surface's";
+    FSL_48 = "FSL-48", "betsurf", true,
+        "a T2 image on another grid than the T1 (other dimensions or voxel sizes) is sampled at the T1's voxel coordinates";
+    FSL_50 = "FSL-50", "betsurf", true,
+        "one skull profile whose search range is empty ends the program with status 255 and no message, before any output is written";
+    FSL_51 = "FSL-51", "betsurf", true,
+        "a profile search can read past the profile's last sample, into memory FSL never set, and use it";
+    FSL_52 = "FSL-52", "betsurf", true,
+        "mesh files are read without checks: a number that does not read leaves values never set, and a face naming a vertex the file does not have reads past the vertices";
+    FSL_53 = "FSL-53", "betsurf", true,
+        "a matrix file with fewer than the 12 numbers betsurf uses leaves the missing entries at values never set (the first that does not read is 0)";
+    FSL_54 = "FSL-54", "betsurf", true,
+        "--t1only exits with status 0 also when it fails (too few arguments, a matrix file it cannot open)";
+    FSL_55 = "FSL-55", "betsurf", true,
+        "a NaN in the T1 inside the brain surface makes the 98th percentile (std::nth_element) undefined";
+    FSL_58 = "FSL-58", "betsurf", true,
+        "with no voxel of the T1 inside the brain surface, the 98th percentile of the brain's intensities is read from an empty list (std::nth_element, then the element before the list's start): FSL crashes or uses memory it never wrote";
+    FSL_56 = "FSL-56", "FSL", true,
+        "an image saved with two or more NIfTI extensions of different sizes gets the wrong vox_offset (NewNifti adds the first extension's size once per extension): the data start inside the extensions or after a gap";
     ITK_50 = "ITK-50", "ITK", true,
         "KdTreeBasedKmeansEstimator never counts the point a k-d tree node is split at when it divides the node between centres: those points are left out of the pass's new centres";
     ITK_51 = "ITK-51", "ITK", true,

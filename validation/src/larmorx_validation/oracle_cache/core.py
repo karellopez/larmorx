@@ -611,13 +611,17 @@ def run(
     policy: Policy | None = None,
     timeout: float | None = None,
     runner: str = "",
+    inputs: Sequence[Path] = (),
 ) -> Completed:
     """Run ``argv`` (an original program and its arguments), or replay it from the cache.
 
     ``env`` is the whole environment (default: this process's); ``cwd`` the working directory;
     ``outputs`` directories (or files) the program writes, beyond those its arguments name;
     ``policy`` whether the run may be cached (:mod:`~larmorx_validation.oracle_cache.policy`);
-    ``runner`` the suite's name for the entry. The result is a :class:`Completed`."""
+    ``runner`` the suite's name for the entry; ``inputs`` files the program reads that its
+    arguments do not name as files (FSL's images named without their extension, found by the
+    program: ``bet in out`` reads ``in.nii.gz``), keyed by their content like the named ones.
+    The result is a :class:`Completed`."""
     argv = [str(a) for a in argv]
     env = dict(os.environ if env is None else env)
     policy = policy or Policy()
@@ -642,6 +646,7 @@ def run(
         runner,
         {"kind": "exec", "program": str(program)},
         lambda: _execute(argv, env, cwd, timeout),
+        inputs,
     )
 
 
@@ -657,10 +662,11 @@ def run_apptainer(
     policy: Policy | None = None,
     timeout: float | None = None,
     runner: str = "",
+    inputs: Sequence[Path] = (),
 ) -> Completed:
     """``program`` of the container ``image``, run by ``command`` (the whole ``apptainer exec``
     command line the suite builds), keyed by the image's SHA-256, the program, its arguments
-    and the environment set inside (``inner_env``)."""
+    and the environment set inside (``inner_env``); ``inputs`` as for :func:`run`."""
     args = [str(a) for a in args]
     command = [str(c) for c in command]
     env = dict(os.environ)
@@ -682,6 +688,7 @@ def run_apptainer(
         runner,
         {"kind": "apptainer", "image": str(image), "program": program},
         lambda: _execute(command, env, cwd, timeout),
+        inputs,
     )
 
 
@@ -698,6 +705,7 @@ def _run(
     runner: str,
     launcher: dict,
     execute: Callable[[], Completed],
+    inputs: Sequence[Path] = (),
 ) -> Completed:
     current = mode()
     if current == "off":
@@ -717,6 +725,7 @@ def _run(
             outputs=outputs,
             threads_known=policy.threads is not None,
             family=policy.family,
+            inputs=inputs,
         )
     except Uncacheable as e:
         _fresh(f"not keyable: {e}")

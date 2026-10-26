@@ -33,12 +33,15 @@ WORKFLOW = "fmriprep_25_2_wf"
 
 @functools.cache
 def root() -> Path | None:
-    """``oracles/fmriprep-25.2.6`` of the workspace (``LARMORX_FMRIPREP_RUNS`` overrides)."""
+    """``oracles/fmriprep-25.2.6`` of the workspace (``LARMORX_FMRIPREP_RUNS`` overrides), its
+    links resolved: the runs' recorded mounts are real paths, and a node's directory must be
+    named the same way (a checkout beside a link to ``oracles/`` found the runs through it, and
+    the template registration's inputs were then not recognised as the node's)."""
     if env := os.environ.get("LARMORX_FMRIPREP_RUNS"):
-        return Path(env)
+        return Path(env).resolve()
     for parent in Path(__file__).resolve().parents:
         if (parent / ORACLE_RUNS).is_dir():
-            return parent / ORACLE_RUNS
+            return (parent / ORACLE_RUNS).resolve()
     return None
 
 

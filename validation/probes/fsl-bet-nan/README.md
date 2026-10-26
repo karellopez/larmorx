@@ -26,12 +26,19 @@ crashes, `reproduce` fills what FSL leaves undefined and only the replica's buil
 and in both modes with the release build's.
 
 ```bash
-cd crates-nc && cargo build -p larmorx-nc-cli && cargo build --release -p larmorx-nc-cli
+# the debug build unoptimised (the dev profile builds the FSL core and BET at opt-level 1)
+cd crates-nc && cargo build -p larmorx-nc-cli \
+  --config 'profile.dev.package.larmorx-nc-core.opt-level=0' \
+  --config 'profile.dev.package.larmorx-nc-bet.opt-level=0' && cargo build --release -p larmorx-nc-cli
 gcc -O2 -shared -fPIC -o /tmp/nan/libnan_trap.so validation/probes/fsl-mcflirt-affine-trace/nan_trap.c -lm
 PYTHONPATH=python:validation/src python -P validation/probes/fsl-bet-nan/nan_matrix.py /tmp/nan/work \
   --release crates-nc/target/release/larmorx-nc --debug crates-nc/target/debug/larmorx-nc \
   --trap /tmp/nan/libnan_trap.so
 ```
 
-The result of the run for BET's merge (2026-10-25) is in the API page's "Known last-bit
-differences" (`docs/api/fsl-bet.md`) and the findings (`docs/findings/fsl-bet.md`).
+The result for BET's merge (2026-10-25): the first run found one case, `brain-payload-neginf`
+with `bet2 -m -s -o -e` in `reproduce`, whose mesh printed `-nan` on x86-64 and `nan` with ARM's
+NaN (`0 * inf` in newimage's robust range, then a NaN centre of gravity); after the fix (SSE's
+rules in `find_thresholds`, meshclass and both deformation steps) the full matrix gives
+60 cases, 0 differ, FSL crashing in 18 of them (compared among the replica's
+builds). Details: the findings (`docs/findings/fsl-bet.md`, "NaN and infinite voxels").

@@ -857,6 +857,8 @@ def case_verdict(r: dict, desc: str, s) -> tuple[str, str]:
     variability are reported."""
     import re
 
+    from larmorx_validation.parity.fsl_bet import FILLED, PENDING
+
     st = r["status"]
     refuses = getattr(s, "fix_refuses", None)
     if refuses in REFUSED and st == "pass":
@@ -875,11 +877,18 @@ def case_verdict(r: dict, desc: str, s) -> tuple[str, str]:
                 "the replica prints FSL's messages before it and stops: ",
             )
         )
-    if st == "expected-divergence":
+    if st == "expected-divergence" and r["reason"].startswith(FILLED):
+        status = r["reason"].removeprefix(FILLED).split(")", 1)[0]
         return "divergence", common.clip(
-            "Pending: "
-            + r["reason"].removeprefix("needs FSL programs larmorx does not replicate yet: ")
+            f"FSL crashes here (status {status}) on what it leaves undefined ({refuses}). The "
+            "replica's default refuses with the reason; with reproduce it keeps every part FSL "
+            "defines, fills the rest deterministically, names the entry and writes its outputs "
+            "(run twice: the same bytes; D13's rule for failure cases). FSL's messages before "
+            "the crash are compared; it writes no output to compare.",
+            400,
         )
+    if st == "expected-divergence":
+        return "divergence", common.clip("Pending: " + r["reason"].removeprefix(PENDING))
     v = common.outcome_verdict(r)
     if v is not None:
         return v

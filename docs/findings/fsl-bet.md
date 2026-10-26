@@ -205,6 +205,31 @@ Each is in the register (`docs/findings/upstream-defects.md`); the switch is
   operands' decimals in sums and products: the replica's `dc` does the same for the expressions
   the script uses.
 
+## NaN and infinite voxels (BET's merge, 2026-10-25)
+
+FSL's Linux build computes with SSE: a NaN made from numbers (`0 * inf`, `inf - inf`, `0 / 0`)
+has the sign set (printed `-nan` in a VTK mesh), AArch64's has it clear, and when two NaNs meet
+the operand order decides which one passes on (porting guide, "NaN bits are part of the output").
+BET's NaN matrix (`validation/probes/fsl-bet-nan`) runs a head with NaN voxels (quiet, negative,
+with a payload), infinite voxels and NaN voxels in the 2-voxel border through bet2, `bet -R` and
+`betsurf --t1only`, in both modes, by FSL, a release and an unoptimised debug build, and the
+release build with AArch64's default NaN emulated (`libnan_trap.so`).
+
+- **Found on its first run:** `brain-payload-neginf` (a NaN with a payload and a -inf voxel),
+  `bet2 -m -s -o -e` in `reproduce`: the mesh printed `-nan` on x86-64 and `nan` with ARM's NaN.
+  The -inf voxel made the robust range's `max - min` infinite, `0 * inf` in the histogram's bin
+  position (`newimage`'s `find_thresholds`), and a NaN centre of gravity (`0 / 0` in bet2's
+  initial mesh) then reached every vertex. FSL itself crashes in its fill there (FSL-43's crash
+  class), so `reproduce` writes what FSL defines and the fill is skipped.
+- **Fixed** by computing, in the source's order, with the core's SSE rules (`sse::S32`, `S64`):
+  `find_thresholds`, meshclass's point and vector arithmetic, bet2's initial mesh and
+  deformation step, betsurf's deformation step. The profile searches compare only (a NaN
+  threshold compares false on every platform) and need nothing.
+- **Result** (the final run, 2026-10-25): 60 cases, 0 differ: every output identical
+  across the release build, the debug build and the release build with ARM's NaN, and identical
+  to FSL's wherever FSL finishes (FSL crashed in 18; those are compared among the
+  replica's builds). BET's golden files and every parity case were unchanged by the fix.
+
 ## Pending (not replicated yet)
 
 `bet -S` (standard_space_roi, FLIRT, fslmaths' morphology, fslstats), `-B` (standard_space_roi,

@@ -13,6 +13,8 @@ as nipype writes it) on T1-weighted images, and the same options on other MR ima
 
 from __future__ import annotations
 
+import os
+
 import numpy as np
 
 from larmorx_validation.parity import ants_inputs, ants_threaded, fmriprep_nodes
@@ -38,8 +40,11 @@ from larmorx_validation.parity.harness import Case, CaseResult, CheckList, Suite
 
 PROGRAM = "DenoiseImage"
 LX_THREADS = ants_threaded.LX_THREADS
-#: ANTs' thread counts that define its own variability.
-BAND_THREADS = (2, 4, 12)
+#: ANTs' thread band: 2, 4, 12 threads unless ``LARMORX_PARITY_BAND_THREADS``
+#: (e.g. ``2,3`` on a shared machine) says otherwise.
+BAND_THREADS = tuple(
+    int(v) for v in os.environ.get("LARMORX_PARITY_BAND_THREADS", "2,4,12").split(",") if v
+)
 NCC_MIN = ants_threaded.NCC_MIN
 AFFINE_ATOL = ants_threaded.AFFINE_ATOL
 

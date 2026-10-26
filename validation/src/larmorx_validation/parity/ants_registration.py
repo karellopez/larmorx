@@ -84,10 +84,17 @@ HANG_SECONDS = 30
 #: How long any other ANTs run may take: sMRIPrep's full-size template registration takes ANTs
 #: hours at one thread.
 ANTS_TIMEOUT = 12 * 3600
-LX_THREADS = 4
+#: larmorx's thread count (its result does not depend on it): 4 unless
+#: ``LARMORX_PARITY_LX_THREADS`` says otherwise (a shared machine: parallel jobs times threads
+#: stay within the machine's share).
+LX_THREADS = int(os.environ.get("LARMORX_PARITY_LX_THREADS", "4"))
 #: The real cases' small versions keep every SMALL-th voxel of their images.
 SMALL = 3
-BAND_THREADS = (2, 4, 8)
+#: ANTs' thread band: 2, 4, 8 threads unless ``LARMORX_PARITY_BAND_THREADS``
+#: (e.g. ``2,3`` on a shared machine) says otherwise.
+BAND_THREADS = tuple(
+    int(v) for v in os.environ.get("LARMORX_PARITY_BAND_THREADS", "2,4,8").split(",") if v
+)
 ORACLE_RUNS = "oracles/fmriprep-25.2.6"
 #: The threshold of a check against ANTs as built that only reports (ANTs with CORE-MATH decides).
 GLIBC = "reported (glibc's maths; ANTs with CORE-MATH decides)"

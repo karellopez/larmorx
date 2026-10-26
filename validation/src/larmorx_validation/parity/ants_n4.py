@@ -23,6 +23,7 @@ nipype writes them (``[ 200 ]`` with spaces).
 
 from __future__ import annotations
 
+import os
 from pathlib import Path
 
 import numpy as np
@@ -51,8 +52,11 @@ from larmorx_validation.parity.harness import Case, CaseResult, CheckList, Suite
 
 PROGRAM = "N4BiasFieldCorrection"
 LX_THREADS = ants_threaded.LX_THREADS
-#: ANTs' thread counts that define its own variability.
-BAND_THREADS = (2, 3, 4, 8, 12)
+#: ANTs' thread band: 2, 3, 4, 8, 12 threads unless ``LARMORX_PARITY_BAND_THREADS``
+#: (e.g. ``2,3`` on a shared machine) says otherwise.
+BAND_THREADS = tuple(
+    int(v) for v in os.environ.get("LARMORX_PARITY_BAND_THREADS", "2,3,4,8,12").split(",") if v
+)
 NCC_MIN = ants_threaded.NCC_MIN
 AFFINE_ATOL = ants_threaded.AFFINE_ATOL
 

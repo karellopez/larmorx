@@ -72,7 +72,10 @@ from larmorx_validation.parity.harness import (
 from larmorx_validation.report import table
 
 PROGRAM = "Atropos"
-LX_THREADS = 4
+#: larmorx's thread count (its result does not depend on it): 4 unless
+#: ``LARMORX_PARITY_LX_THREADS`` says otherwise (a shared machine: parallel jobs times threads
+#: stay within the machine's share).
+LX_THREADS = int(os.environ.get("LARMORX_PARITY_LX_THREADS", "4"))
 #: ANTs' thread band: 2, 4 and 8 threads unless ``LARMORX_PARITY_BAND_THREADS`` (e.g.
 #: ``2,4,6`` on a shared machine) says otherwise.
 BAND_THREADS = tuple(

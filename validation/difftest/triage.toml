@@ -625,3 +625,19 @@ signature = ["messages before FSL's crash"]
 status = "fixed"
 explanation = "bet on an image where FSL's bet2 crashes (FSL-41): the replica's bet filled bet2's undefined median and went on; inside bet, reproduce now gives the script's failure message and status, FSL's defined outcome (bet2 alone still fills); and the suite compares what FSL printed before its crash as the start of a filled run's output (FSL's buffered output is lost at its crash)"
 link = "validation/difftest/cases/fsl-bet/bet-script-failure-constant.json"
+
+[[difference]]
+tool = "fsl-bet"
+implementation = "replica"
+signature = ["exit status"]
+status = "register"
+explanation = "betsurf with no voxel of the T1 inside the brain surface: FSL reads the 98th percentile from an empty list and crashes (FSL-58, a new entry); the replica had panicked; the default refuses, naming FSL-58, and reproduce takes the percentile as 0 (D13's failure case)"
+link = "validation/difftest/cases/fsl-bet/betsurf-empty-brain.json"
+
+[[difference]]
+tool = "fsl-bet"
+implementation = "replica"
+signature = ["out.nii.gz"]
+status = "fixed"
+explanation = "bet -F on a series stored as double: fslmaths -mas computes and writes double for a double input (newimage's dtype of the file); larmorx-nc-core's fslmaths_mas wrote float"
+link = "validation/difftest/cases/fsl-bet/bet-F-double-series.json"

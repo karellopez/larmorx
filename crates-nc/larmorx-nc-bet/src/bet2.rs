@@ -617,8 +617,7 @@ pub fn fill_mask(mask: &mut Volume<i16>, start: [i64; 3], from: i16, to: i16, fi
             Fill::Skipped(start)
         };
     }
-    let mut current: Vec<[i64; 3]> = Vec::new();
-    let neighbours = |[x, y, z]: [i64; 3]| {
+    let neighbours = move |[x, y, z]: [i64; 3]| {
         [
             (x > 0).then_some([x - 1, y, z]),
             (y > 0).then_some([x, y - 1, z]),
@@ -628,35 +627,64 @@ pub fn fill_mask(mask: &mut Volume<i16>, start: [i64; 3], from: i16, to: i16, fi
             (nz > z + 1).then_some([x, y, z + 1]),
         ]
     };
-    if inside || fix {
+    let flood = |mask: &mut Volume<i16>, mut current: Vec<[i64; 3]>| {
+        while let Some(p) = current.pop() {
+            for [x, y, z] in neighbours(p).into_iter().flatten() {
+                if mask.value(x, y, z) == from {
+                    mask.set(x, y, z, to);
+                    current.push([x, y, z]);
+                }
+            }
+        }
+    };
+    // from the nearest voxel inside the image (the start itself when it is inside)
+    let from_nearest = |mask: &mut Volume<i16>| {
         let s = [
             start[0].clamp(0, nx - 1),
             start[1].clamp(0, ny - 1),
             start[2].clamp(0, nz - 1),
         ];
         mask.set(s[0], s[1], s[2], to);
-        current.push(s);
-    } else {
+        flood(mask, vec![s]);
+    };
+    // FSL's defined part one voxel outside: the start's neighbours inside the image
+    let from_neighbours = |mask: &mut Volume<i16>| {
+        let mut current = Vec::new();
         for [x, y, z] in neighbours(start).into_iter().flatten() {
             if mask.in_bounds(x, y, z) && mask.value(x, y, z) == from {
                 mask.set(x, y, z, to);
                 current.push([x, y, z]);
             }
         }
+        flood(mask, current);
+    };
+    if inside {
+        from_nearest(mask);
+        return Fill::Inside;
     }
-    while let Some(p) = current.pop() {
-        for [x, y, z] in neighbours(p).into_iter().flatten() {
-            if mask.value(x, y, z) == from {
-                mask.set(x, y, z, to);
-                current.push([x, y, z]);
-            }
+    if !fix {
+        from_neighbours(mask);
+        return Fill::Outside(start);
+    }
+    if near {
+        // the correction is named only where it changes the mask (D13): FSL's fill as well,
+        // on a copy (a start one voxel outside: a single slice)
+        let mut theirs = mask.clone();
+        from_neighbours(&mut theirs);
+        from_nearest(mask);
+        if theirs.data == mask.data {
+            return Fill::Inside;
+        }
+    } else {
+        // reproduced, nothing is filled here (FSL crashes): named only where the fill changes
+        // the mask
+        let before = mask.data.clone();
+        from_nearest(mask);
+        if before == mask.data {
+            return Fill::Inside;
         }
     }
-    if inside {
-        Fill::Inside
-    } else {
-        Fill::Outside(start)
-    }
+    Fill::Outside(start)
 }
 
 /// How [`fill_mask`] started.
@@ -1425,7 +1453,12 @@ pub fn compute(
     let (outside, start) = make_mask_from_mesh(testvol, &m, notices.fix() || !fill);
     match start {
         Fill::Inside => {}
-        Fill::Outside(s) => outside_notice(notices, s, "the fill of the brain mask"),
+        // named only where an output shows the mask (the brain, `-m`): with `-n` and no `-m`
+        // the correction changes nothing written (D13: a notice where the result differs)
+        Fill::Outside(s) if !a.no_output || a.mask => {
+            outside_notice(notices, s, "the fill of the brain mask")
+        }
+        Fill::Outside(_) => {}
         Fill::Skipped(s) => skipped_notice(notices, s, "the fill of the brain mask"),
         Fill::Crash(s) => {
             let _ = writeln!(err, "{}", crash_message("bet2", s));

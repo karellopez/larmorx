@@ -263,6 +263,9 @@ def case(
         else:
             words.append(w)
     kw.setdefault("expect", "random")
+    # FSL-43's notice is about where a fill starts, whose effect the outputs may not show (a
+    # constant image; as the record's single-slice case): named without a change is no finding
+    kw.setdefault("silent_ok", ("FSL-43",))
     s = fb.Scenario(
         recipe["extra"]["tool"],
         tuple(words),

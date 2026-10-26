@@ -1142,7 +1142,25 @@ fn surfaces(
         }
         let size = hist.len() as i32;
         let e98 = ceil_i(0.98 * f64::from(size));
-        let nth = (e98 - 1) as usize;
+        if hist.is_empty() {
+            // FSL selects within an empty list and reads the element before its start (FSL-58,
+            // found by random testing 2026-10-26): it crashes, or uses memory it never wrote.
+            let what = "no voxel of the T1 lies inside the brain surface, so FSL's 98th \
+                        percentile of the brain's intensities is read from an empty list";
+            if notices.fix() || !run.fill {
+                notices.add(&defects::FSL_58, format!("{what}: refused"));
+                return Err(Fail::Refused(format!("{what} (FSL-58)")));
+            }
+            notices.add(
+                &defects::FSL_58,
+                format!(
+                    "{what} (FSL crashes or uses memory it never wrote): it is taken as 0 and the \
+                     run goes on; every other value is FSL's"
+                ),
+            );
+            hist.push(0.0);
+        }
+        let nth = (e98 - 1).max(0) as usize;
         if hist.iter().any(|v| v.is_nan()) {
             let what = "the T1 holds NaN inside the brain surface, which makes FSL's 98th \
                         percentile undefined";

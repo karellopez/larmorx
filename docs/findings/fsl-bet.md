@@ -154,6 +154,12 @@ Each is in the register (`docs/findings/upstream-defects.md`); the switch is
   brain (`betsurf.cpp:629`, `1420`) has no strict weak order when a value is NaN: libstdc++'s
   unguarded partitions can then run outside the vector. The default refuses; `reproduce` runs
   libstdc++'s algorithm (translated) with its loops stopped at the vector's ends and warns.
+- **FSL-58** (class a, found by random testing 2026-10-26): with no voxel of the T1 inside the
+  brain surface (a surface outside the image, a tiny image), `brain_hist` is empty
+  (`betsurf.cpp:621-630`, and `1411-1421` in `t1only_main`): `e98` is 0, `nth_element` gets
+  `begin() - 1` and `thr = brain_hist[-1]` reads before the vector's start: FSL crashes (SIGSEGV on
+  a one-voxel constant image) or uses memory it never wrote. The default refuses, naming the
+  entry; `reproduce` takes that percentile as 0 (D13's failure case) and goes on.
 - **FSL-56** (rule A, corrected): NewNifti's `vox_offset` (`NewNifti.cc:890`) adds
   `extensions[0].extensionSize()` once per extension instead of each extension's size: with two
   or more extensions of different sizes (kept with `FSL_LOAD_NIFTI_EXTENSIONS`) the header points

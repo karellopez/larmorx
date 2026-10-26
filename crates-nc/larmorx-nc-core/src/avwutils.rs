@@ -545,8 +545,10 @@ pub fn fslmaths_dilf(
 }
 
 /// `fslmaths <in> -mas <mask> <out>`: the input times the mask binarised (above 0, below its
-/// maximum plus one), in float with SSE's NaNs (an infinite voxel outside the mask is SSE's
-/// default NaN); float output, display range 0 0.
+/// maximum plus one), with SSE's NaNs (an infinite voxel outside the mask is SSE's default NaN);
+/// display range 0 0. As fslmaths, in double with a double output when the input is stored as
+/// double (newimage's `dtype` of the file), else in float with a float output (found by random
+/// testing, 2026-10-26: `bet -F` on a double series).
 pub fn fslmaths_mas(
     input: &str,
     mask: &str,
@@ -554,17 +556,34 @@ pub fn fslmaths_mas(
     fsl: &Settings,
     reproduce_offset: bool,
 ) -> Result<(), ToolFailure> {
-    let (mut v, _, _) = volume::read_volume4d::<f32>(input, fsl).map_err(failed)?;
-    let (mut m, _, _) = volume::read_volume4d::<f32>(mask, fsl).map_err(failed)?;
+    if volume::file_dtype(input).map_err(failed)? == dt::DOUBLE {
+        fslmaths_mas_t::<f64>(input, mask, output, fsl, reproduce_offset, sse::mul_f64)
+    } else {
+        fslmaths_mas_t::<f32>(input, mask, output, fsl, reproduce_offset, sse::mul_f32)
+    }
+}
+
+fn fslmaths_mas_t<T: Elem>(
+    input: &str,
+    mask: &str,
+    output: &str,
+    fsl: &Settings,
+    reproduce_offset: bool,
+    mul: fn(T, T) -> T,
+) -> Result<(), ToolFailure> {
+    let (mut v, _, _) = volume::read_volume4d::<T>(input, fsl).map_err(failed)?;
+    let (mut m, _, _) = volume::read_volume4d::<T>(mask, fsl).map_err(failed)?;
     let mut err = String::new();
     if v.tsize() == 1 && v.tsize() < m.tsize() {
         let one = v.data.clone();
         v.data = (0..m.tsize()).flat_map(|_| one.iter().copied()).collect();
         v.dims[3] = m.tsize();
     }
-    let hi = m.max() + 1.0;
+    // max() + 1 in T: exact in double for a float's maximum, then rounded as float addition
+    let hi = T::from_f64(m.max().to_f64() + 1.0);
+    let (zero, one) = (T::from_f64(0.0), T::from_f64(1.0));
     for x in m.data.iter_mut() {
-        *x = if *x > 0.0 && *x < hi { 1.0 } else { 0.0 };
+        *x = if *x > zero && *x < hi { one } else { zero };
     }
     if v.dimensionality() < m.dimensionality()
         || v.xsize() != m.xsize()
@@ -577,7 +596,7 @@ pub fn fslmaths_mas(
     }
     let n = m.data.len();
     for (i, x) in v.data.iter_mut().enumerate() {
-        *x = sse::mul_f32(*x, m.data[i % n]);
+        *x = mul(*x, m.data[i % n]);
     }
     v.display_max = 0.0;
     v.display_min = 0.0;

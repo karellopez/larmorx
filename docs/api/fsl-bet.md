@@ -147,7 +147,9 @@ Where FSL crashes on what it leaves undefined, the default refuses with the reas
 failure cases): **FSL-41** (no voxel strictly between the 2nd and 98th percentiles inside the
 initial sphere, a constant or binary image: FSL reads the median from an empty list; `reproduce`
 takes it as 0) and **FSL-52** (a mesh file FSL reads without checks: `reproduce` takes 0 for the
-values FSL never sets and leaves out the faces that name missing vertices). Inside `bet`, where FSL's
+values FSL never sets and leaves out the faces that name missing vertices) and **FSL-58** (no voxel of
+the T1 inside the brain surface: betsurf reads its 98th percentile from an empty list; `reproduce`
+takes it as 0). Inside `bet`, where FSL's
 bet2 crashes, the script's ERR trap reports the failure and exits 1: that is FSL's defined outcome,
 and `reproduce` gives it (bet2 alone fills instead). Kept as FSL's and
 documented (rule C):

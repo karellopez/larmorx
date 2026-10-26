@@ -432,6 +432,8 @@ defects! {
         "--t1only exits with status 0 also when it fails (too few arguments, a matrix file it cannot open)";
     FSL_55 = "FSL-55", "betsurf", true,
         "a NaN in the T1 inside the brain surface makes the 98th percentile (std::nth_element) undefined";
+    FSL_58 = "FSL-58", "betsurf", true,
+        "with no voxel of the T1 inside the brain surface, the 98th percentile of the brain's intensities is read from an empty list (std::nth_element, then the element before the list's start): FSL crashes or uses memory it never wrote";
     FSL_56 = "FSL-56", "FSL", true,
         "an image saved with two or more NIfTI extensions of different sizes gets the wrong vox_offset (NewNifti adds the first extension's size once per extension): the data start inside the extensions or after a gap";
     ITK_50 = "ITK-50", "ITK", true,

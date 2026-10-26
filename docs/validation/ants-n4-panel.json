@@ -1,0 +1,1601 @@
+{
+ "environment": {
+  "cpu": "Intel(R) Core(TM) i7-8750H CPU @ 2.20GHz",
+  "larmorx": "0.0.1",
+  "larmorx_commit": "6e810bc5e2f9",
+  "larmorx_testdata_commit": "52124bc98f9f",
+  "logical_cpus": 12,
+  "os": "Linux-6.8.0-124-generic-x86_64-with-glibc2.35",
+  "packages": {
+   "nibabel": "5.4.2",
+   "numpy": "2.3.5",
+   "scipy": "1.15.3"
+  },
+  "platform": "Linux x86_64",
+  "python": "3.12.10"
+ },
+ "oracle_cache": {
+  "differences": 0,
+  "fresh": {
+   "above one thread: not yet 3 identical runs": 7,
+   "ended by a signal, SIGABRT (never stored)": 1,
+   "not in the cache yet": 2
+  },
+  "location": "<workspace>/oracles/cache",
+  "mode": "use",
+  "ran": 10,
+  "saved_seconds": 7152.3,
+  "served": 137
+ },
+ "reference": "N4BiasFieldCorrection from ANTs v2.6.5 (fdce4d2f84) on ITK v5.4.5 (f51594ad88), x86_64-conda-linux-gnu-g++ (conda-forge gcc 14.3.0-20) 14.3.0, the binary built by `scripts/build_ants_oracle.sh`, run with one thread",
+ "results": [
+  {
+   "case": "panel/fmriprep/ds000005-sub-01/anat_fit/brain_extraction/atropos/inu_n4_final[0]",
+   "category": "panel-fmriprep",
+   "checks_passed": 20,
+   "checks_total": 20,
+   "failed_checks": [],
+   "measured": {
+    "bias field: NCC with ANTs as built": "1.0000000000",
+    "bias field: affine": "0.0e+00",
+    "bias field: bit-identical to ANTs with correctly rounded math": 0,
+    "bias field: header (every field)": 0,
+    "corrected: NCC with ANTs as built": "1.0000000000",
+    "corrected: affine": "0.0e+00",
+    "corrected: bit-identical to ANTs with correctly rounded math": 0,
+    "corrected: header (every field)": 0,
+    "larmorx: 1 threads and 1 thread give the same bits": "True"
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 11278547,
+    "bias field: 1 - NCC vs ANTs' thread band": "4.38e-12",
+    "bias field: bit-identical to ANTs as built": 5842682,
+    "bias field: max |diff| vs ANTs' thread band": "5.78e-06",
+    "corrected: 1 - NCC vs ANTs' thread band": "3.27e-12",
+    "corrected: bit-identical to ANTs as built": 5327635,
+    "corrected: max |diff| vs ANTs' thread band": "0.0312"
+   },
+   "seconds": 33.072,
+   "status": "pass"
+  },
+  {
+   "case": "panel/fmriprep/ds000005-sub-01/anat_fit/brain_extraction/inu_n4[40]",
+   "category": "panel-fmriprep",
+   "checks_passed": 12,
+   "checks_total": 12,
+   "failed_checks": [],
+   "measured": {
+    "corrected: NCC with ANTs as built": "1.0000000000",
+    "corrected: affine": "0.0e+00",
+    "corrected: bit-identical to ANTs with correctly rounded math": 0,
+    "corrected: header (every field)": 0,
+    "larmorx: 1 threads and 1 thread give the same bits": "True"
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0,
+    "corrected: 1 - NCC vs ANTs' thread band": "3.33e-12",
+    "corrected: bit-identical to ANTs as built": 5815826,
+    "corrected: max |diff| vs ANTs' thread band": "0.0094"
+   },
+   "seconds": 97.139,
+   "status": "pass"
+  },
+  {
+   "case": "panel/fmriprep/ds000005-sub-01/bold[task_mixedgamblestask_run_01]/bold_fit/enhance_and_skullstrip_bold/n4_correct",
+   "category": "panel-fmriprep",
+   "checks_passed": 12,
+   "checks_total": 12,
+   "failed_checks": [],
+   "measured": {
+    "corrected: NCC with ANTs as built": "1.0000000000",
+    "corrected: affine": "0.0e+00",
+    "corrected: bit-identical to ANTs with correctly rounded math": 0,
+    "corrected: header (every field)": 0,
+    "larmorx: 1 threads and 1 thread give the same bits": "True"
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 76707,
+    "corrected: 1 - NCC vs ANTs' thread band": "2.45e-12",
+    "corrected: bit-identical to ANTs as built": 76229,
+    "corrected: max |diff| vs ANTs' thread band": "0.0114"
+   },
+   "seconds": 1.141,
+   "status": "pass"
+  },
+  {
+   "case": "panel/fmriprep/ds000005-sub-01/bold[task_mixedgamblestask_run_02]/bold_fit/enhance_and_skullstrip_bold/n4_correct",
+   "category": "panel-fmriprep",
+   "checks_passed": 10,
+   "checks_total": 10,
+   "failed_checks": [],
+   "measured": {
+    "corrected: NCC with ANTs as built": "0.9999999981",
+    "corrected: affine": "0.0e+00",
+    "corrected: bit-identical to ANTs with correctly rounded math": 0,
+    "corrected: header (every field)": 0,
+    "larmorx: 1 threads and 1 thread give the same bits": "True"
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0,
+    "corrected: bit-identical to ANTs as built": 137886
+   },
+   "seconds": 0.49,
+   "status": "pass"
+  },
+  {
+   "case": "panel/fmriprep/ds000005-sub-01/bold[task_mixedgamblestask_run_03]/bold_fit/enhance_and_skullstrip_bold/n4_correct",
+   "category": "panel-fmriprep",
+   "checks_passed": 10,
+   "checks_total": 10,
+   "failed_checks": [],
+   "measured": {
+    "corrected: NCC with ANTs as built": "0.9999999437",
+    "corrected: affine": "0.0e+00",
+    "corrected: bit-identical to ANTs with correctly rounded math": 0,
+    "corrected: header (every field)": 0,
+    "larmorx: 1 threads and 1 thread give the same bits": "True"
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0,
+    "corrected: bit-identical to ANTs as built": 138068
+   },
+   "seconds": 0.466,
+   "status": "pass"
+  },
+  {
+   "case": "panel/fmriprep/ds000228-sub-pixar008/anat_fit/brain_extraction/atropos/inu_n4_final[0]",
+   "category": "panel-fmriprep",
+   "checks_passed": 16,
+   "checks_total": 16,
+   "failed_checks": [],
+   "measured": {
+    "bias field: NCC with ANTs as built": "0.9999999999",
+    "bias field: affine": "0.0e+00",
+    "bias field: bit-identical to ANTs with correctly rounded math": 0,
+    "bias field: header (every field)": 0,
+    "corrected: NCC with ANTs as built": "1.0000000000",
+    "corrected: affine": "0.0e+00",
+    "corrected: bit-identical to ANTs with correctly rounded math": 0,
+    "corrected: header (every field)": 0,
+    "larmorx: 1 threads and 1 thread give the same bits": "True"
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0,
+    "bias field: bit-identical to ANTs as built": 6460236,
+    "corrected: bit-identical to ANTs as built": 4073942
+   },
+   "seconds": 13.838,
+   "status": "pass"
+  },
+  {
+   "case": "panel/fmriprep/ds000228-sub-pixar008/anat_fit/brain_extraction/inu_n4[40]",
+   "category": "panel-fmriprep",
+   "checks_passed": 10,
+   "checks_total": 10,
+   "failed_checks": [],
+   "measured": {
+    "corrected: NCC with ANTs as built": "1.0000000000",
+    "corrected: affine": "0.0e+00",
+    "corrected: bit-identical to ANTs with correctly rounded math": 0,
+    "corrected: header (every field)": 0,
+    "larmorx: 1 threads and 1 thread give the same bits": "True"
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0,
+    "corrected: bit-identical to ANTs as built": 6364257
+   },
+   "seconds": 31.062,
+   "status": "pass"
+  },
+  {
+   "case": "panel/fmriprep/ds000228-sub-pixar008/bold[task_pixar]/bold_fit/enhance_and_skullstrip_bold/n4_correct",
+   "category": "panel-fmriprep",
+   "checks_passed": 9,
+   "checks_total": 9,
+   "failed_checks": [],
+   "measured": {
+    "corrected: affine": "0.0e+00",
+    "corrected: bit-identical to ANTs with correctly rounded math": 0,
+    "corrected: header (every field)": 0,
+    "larmorx: 1 threads and 1 thread give the same bits": "True"
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0,
+    "corrected: bit-identical to ANTs as built": 0
+   },
+   "seconds": 0.485,
+   "status": "pass"
+  },
+  {
+   "case": "panel/fmriprep/ds000256-sub-CTS203/anat_fit/brain_extraction/atropos/inu_n4_final[0]",
+   "category": "panel-fmriprep",
+   "checks_passed": 16,
+   "checks_total": 16,
+   "failed_checks": [],
+   "measured": {
+    "bias field: NCC with ANTs as built": "1.0000000000",
+    "bias field: affine": "0.0e+00",
+    "bias field: bit-identical to ANTs with correctly rounded math": 0,
+    "bias field: header (every field)": 0,
+    "corrected: NCC with ANTs as built": "1.0000000000",
+    "corrected: affine": "0.0e+00",
+    "corrected: bit-identical to ANTs with correctly rounded math": 0,
+    "corrected: header (every field)": 0,
+    "larmorx: 1 threads and 1 thread give the same bits": "True"
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0,
+    "bias field: bit-identical to ANTs as built": 14472799,
+    "corrected: bit-identical to ANTs as built": 11205019
+   },
+   "seconds": 50.387,
+   "status": "pass"
+  },
+  {
+   "case": "panel/fmriprep/ds000256-sub-CTS203/anat_fit/brain_extraction/inu_n4[40]",
+   "category": "panel-fmriprep",
+   "checks_passed": 10,
+   "checks_total": 10,
+   "failed_checks": [],
+   "measured": {
+    "corrected: NCC with ANTs as built": "1.0000000000",
+    "corrected: affine": "0.0e+00",
+    "corrected: bit-identical to ANTs with correctly rounded math": 0,
+    "corrected: header (every field)": 0,
+    "larmorx: 1 threads and 1 thread give the same bits": "True"
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0,
+    "corrected: bit-identical to ANTs as built": 13619162
+   },
+   "seconds": 111.468,
+   "status": "pass"
+  },
+  {
+   "case": "panel/fmriprep/ds000256-sub-CTS203/bold[task_restbaseline]/bold_fit/enhance_and_skullstrip_bold/n4_correct",
+   "category": "panel-fmriprep",
+   "checks_passed": 9,
+   "checks_total": 9,
+   "failed_checks": [],
+   "measured": {
+    "corrected: affine": "0.0e+00",
+    "corrected: bit-identical to ANTs with correctly rounded math": 0,
+    "corrected: header (every field)": 0,
+    "larmorx: 1 threads and 1 thread give the same bits": "True"
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0,
+    "corrected: bit-identical to ANTs as built": 0
+   },
+   "seconds": 0.455,
+   "status": "pass"
+  },
+  {
+   "case": "panel/fmriprep/ds000256-sub-CTS203/bold[task_restfixationfixed]/bold_fit/enhance_and_skullstrip_bold/n4_correct",
+   "category": "panel-fmriprep",
+   "checks_passed": 10,
+   "checks_total": 10,
+   "failed_checks": [],
+   "measured": {
+    "corrected: NCC with ANTs as built": "1.0000000000",
+    "corrected: affine": "0.0e+00",
+    "corrected: bit-identical to ANTs with correctly rounded math": 0,
+    "corrected: header (every field)": 0,
+    "larmorx: 1 threads and 1 thread give the same bits": "True"
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0,
+    "corrected: bit-identical to ANTs as built": 127762
+   },
+   "seconds": 0.444,
+   "status": "pass"
+  },
+  {
+   "case": "panel/fmriprep/ds000256-sub-CTS203/bold[task_restfixationnofeedback]/bold_fit/enhance_and_skullstrip_bold/n4_correct",
+   "category": "panel-fmriprep",
+   "checks_passed": 10,
+   "checks_total": 10,
+   "failed_checks": [],
+   "measured": {
+    "corrected: NCC with ANTs as built": "0.9999995820",
+    "corrected: affine": "0.0e+00",
+    "corrected: bit-identical to ANTs with correctly rounded math": 0,
+    "corrected: header (every field)": 0,
+    "larmorx: 1 threads and 1 thread give the same bits": "True"
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 127751,
+    "corrected: bit-identical to ANTs as built": 127751
+   },
+   "seconds": 0.45,
+   "status": "pass"
+  },
+  {
+   "case": "panel/fmriprep/ds001600-sub-1/anat_fit/brain_extraction/atropos/inu_n4_final[0]",
+   "category": "panel-fmriprep",
+   "checks_passed": 16,
+   "checks_total": 16,
+   "failed_checks": [],
+   "measured": {
+    "bias field: NCC with ANTs as built": "1.0000000000",
+    "bias field: affine": "0.0e+00",
+    "bias field: bit-identical to ANTs with correctly rounded math": 0,
+    "bias field: header (every field)": 0,
+    "corrected: NCC with ANTs as built": "1.0000000000",
+    "corrected: affine": "0.0e+00",
+    "corrected: bit-identical to ANTs with correctly rounded math": 0,
+    "corrected: header (every field)": 0,
+    "larmorx: 1 threads and 1 thread give the same bits": "True"
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 17126750,
+    "bias field: bit-identical to ANTs as built": 9084014,
+    "corrected: bit-identical to ANTs as built": 4321765
+   },
+   "seconds": 24.0,
+   "status": "pass"
+  },
+  {
+   "case": "panel/fmriprep/ds001600-sub-1/anat_fit/brain_extraction/inu_n4[40]",
+   "category": "panel-fmriprep",
+   "checks_passed": 10,
+   "checks_total": 10,
+   "failed_checks": [],
+   "measured": {
+    "corrected: NCC with ANTs as built": "1.0000000000",
+    "corrected: affine": "0.0e+00",
+    "corrected: bit-identical to ANTs with correctly rounded math": 0,
+    "corrected: header (every field)": 0,
+    "larmorx: 1 threads and 1 thread give the same bits": "True"
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0,
+    "corrected: bit-identical to ANTs as built": 11534336
+   },
+   "seconds": 57.671,
+   "status": "pass"
+  },
+  {
+   "case": "panel/fmriprep/ds001600-sub-1/fmap_preproc/wf_auto_00000/magnitude/brainextraction/n4",
+   "category": "panel-fmriprep",
+   "checks_passed": 12,
+   "checks_total": 12,
+   "failed_checks": [],
+   "measured": {
+    "corrected: NCC with ANTs as built": "1.0000000000",
+    "corrected: affine": "0.0e+00",
+    "corrected: bit-identical to ANTs with correctly rounded math": 0,
+    "corrected: header (every field)": 0,
+    "larmorx: 1 threads and 1 thread give the same bits": "True"
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 97519,
+    "corrected: 1 - NCC vs ANTs' thread band": "1.96e-12",
+    "corrected: bit-identical to ANTs as built": 95243,
+    "corrected: max |diff| vs ANTs' thread band": "0.00185"
+   },
+   "seconds": 0.988,
+   "status": "pass"
+  },
+  {
+   "case": "panel/fmriprep/ds001600-sub-1/fmap_preproc/wf_auto_00001/magnitude/brainextraction/n4",
+   "category": "panel-fmriprep",
+   "checks_passed": 9,
+   "checks_total": 9,
+   "failed_checks": [],
+   "measured": {
+    "corrected: affine": "0.0e+00",
+    "corrected: bit-identical to ANTs with correctly rounded math": 0,
+    "corrected: header (every field)": 0,
+    "larmorx: 1 threads and 1 thread give the same bits": "True"
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 96545,
+    "corrected: bit-identical to ANTs as built": 0
+   },
+   "seconds": 0.948,
+   "status": "pass"
+  },
+  {
+   "case": "panel/fmriprep/ds001600-sub-1/fmap_preproc/wf_auto_00002/magnitude/brainextraction/n4",
+   "category": "panel-fmriprep",
+   "checks_passed": 9,
+   "checks_total": 9,
+   "failed_checks": [],
+   "measured": {
+    "corrected: affine": "0.0e+00",
+    "corrected: bit-identical to ANTs with correctly rounded math": 0,
+    "corrected: header (every field)": 0,
+    "larmorx: 1 threads and 1 thread give the same bits": "True"
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 93817,
+    "corrected: bit-identical to ANTs as built": 0
+   },
+   "seconds": 0.98,
+   "status": "pass"
+  },
+  {
+   "case": "panel/fmriprep/ds001600-sub-1/fmap_preproc/wf_auto_00003/brainextraction/n4",
+   "category": "panel-fmriprep",
+   "checks_passed": 9,
+   "checks_total": 9,
+   "failed_checks": [],
+   "measured": {
+    "corrected: affine": "0.0e+00",
+    "corrected: bit-identical to ANTs with correctly rounded math": 0,
+    "corrected: header (every field)": 0,
+    "larmorx: 1 threads and 1 thread give the same bits": "True"
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 194460,
+    "corrected: bit-identical to ANTs as built": 0
+   },
+   "seconds": 1.767,
+   "status": "pass"
+  },
+  {
+   "case": "panel/fmriprep/ds002422-sub-02/anat_fit/brain_extraction/atropos/inu_n4_final[0]",
+   "category": "panel-fmriprep",
+   "checks_passed": 16,
+   "checks_total": 16,
+   "failed_checks": [],
+   "measured": {
+    "bias field: NCC with ANTs as built": "1.0000000000",
+    "bias field: affine": "0.0e+00",
+    "bias field: bit-identical to ANTs with correctly rounded math": 0,
+    "bias field: header (every field)": 0,
+    "corrected: NCC with ANTs as built": "1.0000000000",
+    "corrected: affine": "0.0e+00",
+    "corrected: bit-identical to ANTs with correctly rounded math": 0,
+    "corrected: header (every field)": 0,
+    "larmorx: 1 threads and 1 thread give the same bits": "True"
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 20354340,
+    "bias field: bit-identical to ANTs as built": 11533730,
+    "corrected: bit-identical to ANTs as built": 8813882
+   },
+   "seconds": 17.509,
+   "status": "pass"
+  },
+  {
+   "case": "panel/fmriprep/ds002422-sub-02/anat_fit/brain_extraction/inu_n4[40]",
+   "category": "panel-fmriprep",
+   "checks_passed": 10,
+   "checks_total": 10,
+   "failed_checks": [],
+   "measured": {
+    "corrected: NCC with ANTs as built": "1.0000000000",
+    "corrected: affine": "0.0e+00",
+    "corrected: bit-identical to ANTs with correctly rounded math": 0,
+    "corrected: header (every field)": 0,
+    "larmorx: 1 threads and 1 thread give the same bits": "True"
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0,
+    "corrected: bit-identical to ANTs as built": 11357777
+   },
+   "seconds": 68.855,
+   "status": "pass"
+  },
+  {
+   "case": "panel/fmriprep/ds002422-sub-02/bold[task_arithm_run_01]/bold_fit/enhance_and_skullstrip_bold/n4_correct",
+   "category": "panel-fmriprep",
+   "checks_passed": 10,
+   "checks_total": 10,
+   "failed_checks": [],
+   "measured": {
+    "corrected: NCC with ANTs as built": "0.9999990835",
+    "corrected: affine": "0.0e+00",
+    "corrected: bit-identical to ANTs with correctly rounded math": 0,
+    "corrected: header (every field)": 0,
+    "larmorx: 1 threads and 1 thread give the same bits": "True"
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0,
+    "corrected: bit-identical to ANTs as built": 97325
+   },
+   "seconds": 0.454,
+   "status": "pass"
+  },
+  {
+   "case": "panel/fmriprep/ds002422-sub-02/bold[task_arithm_run_02]/bold_fit/enhance_and_skullstrip_bold/n4_correct",
+   "category": "panel-fmriprep",
+   "checks_passed": 9,
+   "checks_total": 9,
+   "failed_checks": [],
+   "measured": {
+    "corrected: affine": "0.0e+00",
+    "corrected: bit-identical to ANTs with correctly rounded math": 0,
+    "corrected: header (every field)": 0,
+    "larmorx: 1 threads and 1 thread give the same bits": "True"
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0,
+    "corrected: bit-identical to ANTs as built": 0
+   },
+   "seconds": 0.379,
+   "status": "pass"
+  },
+  {
+   "case": "panel/fmriprep/ds002422-sub-02/bold[task_rest]/bold_fit/enhance_and_skullstrip_bold/n4_correct",
+   "category": "panel-fmriprep",
+   "checks_passed": 9,
+   "checks_total": 9,
+   "failed_checks": [],
+   "measured": {
+    "corrected: affine": "0.0e+00",
+    "corrected: bit-identical to ANTs with correctly rounded math": 0,
+    "corrected: header (every field)": 0,
+    "larmorx: 1 threads and 1 thread give the same bits": "True"
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0,
+    "corrected: bit-identical to ANTs as built": 0
+   },
+   "seconds": 0.593,
+   "status": "pass"
+  },
+  {
+   "case": "panel/fmriprep/ds002422-sub-02/fmap_preproc/wf_auto_00000/magnitude/brainextraction/n4",
+   "category": "panel-fmriprep",
+   "checks_passed": 9,
+   "checks_total": 9,
+   "failed_checks": [],
+   "measured": {
+    "corrected: affine": "0.0e+00",
+    "corrected: bit-identical to ANTs with correctly rounded math": 0,
+    "corrected: header (every field)": 0,
+    "larmorx: 1 threads and 1 thread give the same bits": "True"
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 62914,
+    "corrected: bit-identical to ANTs as built": 0
+   },
+   "seconds": 0.755,
+   "status": "pass"
+  },
+  {
+   "case": "panel/fmriprep/ds002422-sub-02/fmap_preproc/wf_auto_00001/magnitude/brainextraction/n4",
+   "category": "panel-fmriprep",
+   "checks_passed": 10,
+   "checks_total": 10,
+   "failed_checks": [],
+   "measured": {
+    "corrected: NCC with ANTs as built": "1.0000000000",
+    "corrected: affine": "0.0e+00",
+    "corrected: bit-identical to ANTs with correctly rounded math": 0,
+    "corrected: header (every field)": 0,
+    "larmorx: 1 threads and 1 thread give the same bits": "True"
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 91339,
+    "corrected: bit-identical to ANTs as built": 86612
+   },
+   "seconds": 1.096,
+   "status": "pass"
+  },
+  {
+   "case": "panel/fmriprep/ds002603-sub-01/anat_fit/brain_extraction/atropos/inu_n4_final[0]",
+   "category": "panel-fmriprep",
+   "checks_passed": 16,
+   "checks_total": 16,
+   "failed_checks": [],
+   "measured": {
+    "bias field: NCC with ANTs as built": "1.0000000000",
+    "bias field: affine": "0.0e+00",
+    "bias field: bit-identical to ANTs with correctly rounded math": 0,
+    "bias field: header (every field)": 0,
+    "corrected: NCC with ANTs as built": "1.0000000000",
+    "corrected: affine": "0.0e+00",
+    "corrected: bit-identical to ANTs with correctly rounded math": 0,
+    "corrected: header (every field)": 0,
+    "larmorx: 1 threads and 1 thread give the same bits": "True"
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 21233171,
+    "bias field: bit-identical to ANTs as built": 16069774,
+    "corrected: bit-identical to ANTs as built": 4803389
+   },
+   "seconds": 40.237,
+   "status": "pass"
+  },
+  {
+   "case": "panel/fmriprep/ds002603-sub-01/anat_fit/brain_extraction/inu_n4[40]",
+   "category": "panel-fmriprep",
+   "checks_passed": 10,
+   "checks_total": 10,
+   "failed_checks": [],
+   "measured": {
+    "corrected: NCC with ANTs as built": "0.9999999988",
+    "corrected: affine": "0.0e+00",
+    "corrected: bit-identical to ANTs with correctly rounded math": 0,
+    "corrected: header (every field)": 0,
+    "larmorx: 1 threads and 1 thread give the same bits": "True"
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0,
+    "corrected: bit-identical to ANTs as built": 16383554
+   },
+   "seconds": 89.434,
+   "status": "pass"
+  },
+  {
+   "case": "panel/fmriprep/ds002603-sub-01/bold[task_wm_acq_Mb4Mm3Tr550]/bold_fit/enhance_and_skullstrip_bold/n4_correct",
+   "category": "panel-fmriprep",
+   "checks_passed": 10,
+   "checks_total": 10,
+   "failed_checks": [],
+   "measured": {
+    "corrected: NCC with ANTs as built": "1.0000000000",
+    "corrected: affine": "0.0e+00",
+    "corrected: bit-identical to ANTs with correctly rounded math": 0,
+    "corrected: header (every field)": 0,
+    "larmorx: 1 threads and 1 thread give the same bits": "True"
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0,
+    "corrected: bit-identical to ANTs as built": 193271
+   },
+   "seconds": 0.795,
+   "status": "pass"
+  },
+  {
+   "case": "panel/fmriprep/ds002603-sub-01/bold[task_wm_acq_SeqMm3Tr2000]/bold_fit/enhance_and_skullstrip_bold/n4_correct",
+   "category": "panel-fmriprep",
+   "checks_passed": 9,
+   "checks_total": 9,
+   "failed_checks": [],
+   "measured": {
+    "corrected: affine": "0.0e+00",
+    "corrected: bit-identical to ANTs with correctly rounded math": 0,
+    "corrected: header (every field)": 0,
+    "larmorx: 1 threads and 1 thread give the same bits": "True"
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0,
+    "corrected: bit-identical to ANTs as built": 0
+   },
+   "seconds": 0.775,
+   "status": "pass"
+  },
+  {
+   "case": "panel/fmriprep/ds002603-sub-01/fmap_preproc/wf_auto_00000/magnitude/brainextraction/n4",
+   "category": "panel-fmriprep",
+   "checks_passed": 9,
+   "checks_total": 9,
+   "failed_checks": [],
+   "measured": {
+    "corrected: affine": "0.0e+00",
+    "corrected: bit-identical to ANTs with correctly rounded math": 0,
+    "corrected: header (every field)": 0,
+    "larmorx: 1 threads and 1 thread give the same bits": "True"
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 708035,
+    "corrected: bit-identical to ANTs as built": 0
+   },
+   "seconds": 8.337,
+   "status": "pass"
+  },
+  {
+   "case": "panel/fmriprep/ds003592-sub-280/anat_fit/brain_extraction/atropos/inu_n4_final[0]",
+   "category": "panel-fmriprep",
+   "checks_passed": 16,
+   "checks_total": 16,
+   "failed_checks": [],
+   "measured": {
+    "bias field: NCC with ANTs as built": "1.0000000000",
+    "bias field: affine": "0.0e+00",
+    "bias field: bit-identical to ANTs with correctly rounded math": 0,
+    "bias field: header (every field)": 0,
+    "corrected: NCC with ANTs as built": "1.0000000000",
+    "corrected: affine": "0.0e+00",
+    "corrected: bit-identical to ANTs with correctly rounded math": 0,
+    "corrected: header (every field)": 0,
+    "larmorx: 1 threads and 1 thread give the same bits": "True"
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 22088260,
+    "bias field: bit-identical to ANTs as built": 11970141,
+    "corrected: bit-identical to ANTs as built": 8779543
+   },
+   "seconds": 44.498,
+   "status": "pass"
+  },
+  {
+   "case": "panel/fmriprep/ds003592-sub-280/anat_fit/brain_extraction/inu_n4[40]",
+   "category": "panel-fmriprep",
+   "checks_passed": 10,
+   "checks_total": 10,
+   "failed_checks": [],
+   "measured": {
+    "corrected: NCC with ANTs as built": "1.0000000000",
+    "corrected: affine": "0.0e+00",
+    "corrected: bit-identical to ANTs with correctly rounded math": 0,
+    "corrected: header (every field)": 0,
+    "larmorx: 1 threads and 1 thread give the same bits": "True"
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0,
+    "corrected: bit-identical to ANTs as built": 12208723
+   },
+   "seconds": 88.737,
+   "status": "pass"
+  },
+  {
+   "case": "panel/fmriprep/ds003592-sub-280/bold[ses_1_task_rest_echo_1]/bold_fit/enhance_and_skullstrip_bold/n4_correct",
+   "category": "panel-fmriprep",
+   "checks_passed": 9,
+   "checks_total": 9,
+   "failed_checks": [],
+   "measured": {
+    "corrected: affine": "0.0e+00",
+    "corrected: bit-identical to ANTs with correctly rounded math": 0,
+    "corrected: header (every field)": 0,
+    "larmorx: 1 threads and 1 thread give the same bits": "True"
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0,
+    "corrected: bit-identical to ANTs as built": 0
+   },
+   "seconds": 0.657,
+   "status": "pass"
+  },
+  {
+   "case": "panel/fmriprep/ds004173-sub-603309/anat_fit/anat_template/n4_correct[0]",
+   "category": "panel-fmriprep",
+   "checks_passed": 12,
+   "checks_total": 12,
+   "failed_checks": [],
+   "measured": {
+    "corrected: NCC with ANTs as built": "1.0000000000",
+    "corrected: affine": "0.0e+00",
+    "corrected: bit-identical to ANTs with correctly rounded math": 0,
+    "corrected: header (every field)": 0,
+    "larmorx: 1 threads and 1 thread give the same bits": "True"
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 9304245,
+    "corrected: 1 - NCC vs ANTs' thread band": "2.04e-13",
+    "corrected: bit-identical to ANTs as built": 9240964,
+    "corrected: max |diff| vs ANTs' thread band": "0.00269"
+   },
+   "seconds": 189.83,
+   "status": "pass"
+  },
+  {
+   "case": "panel/fmriprep/ds004173-sub-603309/anat_fit/anat_template/n4_correct[1]",
+   "category": "panel-fmriprep",
+   "checks_passed": 10,
+   "checks_total": 10,
+   "failed_checks": [],
+   "measured": {
+    "corrected: NCC with ANTs as built": "1.0000000000",
+    "corrected: affine": "0.0e+00",
+    "corrected: bit-identical to ANTs with correctly rounded math": 0,
+    "corrected: header (every field)": 0,
+    "larmorx: 1 threads and 1 thread give the same bits": "True"
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 9295545,
+    "corrected: bit-identical to ANTs as built": 4055291
+   },
+   "seconds": 56.819,
+   "status": "pass"
+  },
+  {
+   "case": "panel/fmriprep/ds004173-sub-603309/anat_fit/anat_template/n4_correct[2]",
+   "category": "panel-fmriprep",
+   "checks_passed": 10,
+   "checks_total": 10,
+   "failed_checks": [],
+   "measured": {
+    "corrected: NCC with ANTs as built": "1.0000000000",
+    "corrected: affine": "0.0e+00",
+    "corrected: bit-identical to ANTs with correctly rounded math": 0,
+    "corrected: header (every field)": 0,
+    "larmorx: 1 threads and 1 thread give the same bits": "True"
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 9224308,
+    "corrected: bit-identical to ANTs as built": 5702824
+   },
+   "seconds": 67.343,
+   "status": "pass"
+  },
+  {
+   "case": "panel/fmriprep/ds004173-sub-603309/anat_fit/brain_extraction/atropos/inu_n4_final[0]",
+   "category": "panel-fmriprep",
+   "checks_passed": 16,
+   "checks_total": 16,
+   "failed_checks": [],
+   "measured": {
+    "bias field: NCC with ANTs as built": "1.0000000000",
+    "bias field: affine": "0.0e+00",
+    "bias field: bit-identical to ANTs with correctly rounded math": 0,
+    "bias field: header (every field)": 0,
+    "corrected: NCC with ANTs as built": "1.0000000000",
+    "corrected: affine": "0.0e+00",
+    "corrected: bit-identical to ANTs with correctly rounded math": 0,
+    "corrected: header (every field)": 0,
+    "larmorx: 1 threads and 1 thread give the same bits": "True"
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0,
+    "bias field: bit-identical to ANTs as built": 7709761,
+    "corrected: bit-identical to ANTs as built": 7252668
+   },
+   "seconds": 46.691,
+   "status": "pass"
+  },
+  {
+   "case": "panel/fmriprep/ds004173-sub-603309/anat_fit/brain_extraction/inu_n4[40]",
+   "category": "panel-fmriprep",
+   "checks_passed": 10,
+   "checks_total": 10,
+   "failed_checks": [],
+   "measured": {
+    "corrected: NCC with ANTs as built": "1.0000000000",
+    "corrected: affine": "0.0e+00",
+    "corrected: bit-identical to ANTs with correctly rounded math": 0,
+    "corrected: header (every field)": 0,
+    "larmorx: 1 threads and 1 thread give the same bits": "True"
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0,
+    "corrected: bit-identical to ANTs as built": 12582912
+   },
+   "seconds": 67.651,
+   "status": "pass"
+  },
+  {
+   "case": "panel/fmriprep/ds004884-sub-M2079/anat_fit/brain_extraction/atropos/inu_n4_final[0]",
+   "category": "panel-fmriprep",
+   "checks_passed": 16,
+   "checks_total": 16,
+   "failed_checks": [],
+   "measured": {
+    "bias field: NCC with ANTs as built": "1.0000000000",
+    "bias field: affine": "0.0e+00",
+    "bias field: bit-identical to ANTs with correctly rounded math": 0,
+    "bias field: header (every field)": 0,
+    "corrected: NCC with ANTs as built": "1.0000000000",
+    "corrected: affine": "0.0e+00",
+    "corrected: bit-identical to ANTs with correctly rounded math": 0,
+    "corrected: header (every field)": 0,
+    "larmorx: 1 threads and 1 thread give the same bits": "True"
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 15200123,
+    "bias field: bit-identical to ANTs as built": 12328289,
+    "corrected: bit-identical to ANTs as built": 2583089
+   },
+   "seconds": 24.965,
+   "status": "pass"
+  },
+  {
+   "case": "panel/fmriprep/ds004884-sub-M2079/anat_fit/brain_extraction/inu_n4[40]",
+   "category": "panel-fmriprep",
+   "checks_passed": 10,
+   "checks_total": 10,
+   "failed_checks": [],
+   "measured": {
+    "corrected: NCC with ANTs as built": "1.0000000000",
+    "corrected: affine": "0.0e+00",
+    "corrected: bit-identical to ANTs with correctly rounded math": 0,
+    "corrected: header (every field)": 0,
+    "larmorx: 1 threads and 1 thread give the same bits": "True"
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0,
+    "corrected: bit-identical to ANTs as built": 7337632
+   },
+   "seconds": 72.255,
+   "status": "pass"
+  },
+  {
+   "case": "panel/fmriprep/ds004884-sub-M2079/bold[ses_217_task_naming40_acq_epfid2_dir_AP_run_2]/bold_fit/enhance_and_skullstrip_bold/n4_correct",
+   "category": "panel-fmriprep",
+   "checks_passed": 9,
+   "checks_total": 9,
+   "failed_checks": [],
+   "measured": {
+    "corrected: affine": "0.0e+00",
+    "corrected: bit-identical to ANTs with correctly rounded math": 0,
+    "corrected: header (every field)": 0,
+    "larmorx: 1 threads and 1 thread give the same bits": "True"
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0,
+    "corrected: bit-identical to ANTs as built": 0
+   },
+   "seconds": 0.8,
+   "status": "pass"
+  },
+  {
+   "case": "panel/fmriprep/ds004884-sub-M2079/bold[ses_217_task_rest_acq_epfidp2p2_dir_AP_run_9]/bold_fit/enhance_and_skullstrip_bold/n4_correct",
+   "category": "panel-fmriprep",
+   "checks_passed": 9,
+   "checks_total": 9,
+   "failed_checks": [],
+   "measured": {
+    "corrected: affine": "0.0e+00",
+    "corrected: bit-identical to ANTs with correctly rounded math": 0,
+    "corrected: header (every field)": 0,
+    "larmorx: 1 threads and 1 thread give the same bits": "True"
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0,
+    "corrected: bit-identical to ANTs as built": 0
+   },
+   "seconds": 0.93,
+   "status": "pass"
+  },
+  {
+   "case": "panel/fmriprep/ds004958-sub-fsm64ps/anat_fit/brain_extraction/atropos/inu_n4_final[0]",
+   "category": "panel-fmriprep",
+   "checks_passed": 16,
+   "checks_total": 16,
+   "failed_checks": [],
+   "measured": {
+    "bias field: NCC with ANTs as built": "1.0000000000",
+    "bias field: affine": "0.0e+00",
+    "bias field: bit-identical to ANTs with correctly rounded math": 0,
+    "bias field: header (every field)": 0,
+    "corrected: NCC with ANTs as built": "1.0000000000",
+    "corrected: affine": "0.0e+00",
+    "corrected: bit-identical to ANTs with correctly rounded math": 0,
+    "corrected: header (every field)": 0,
+    "larmorx: 1 threads and 1 thread give the same bits": "True"
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 22607236,
+    "bias field: bit-identical to ANTs as built": 11534336,
+    "corrected: bit-identical to ANTs as built": 11074293
+   },
+   "seconds": 31.445,
+   "status": "pass"
+  },
+  {
+   "case": "panel/fmriprep/ds004958-sub-fsm64ps/anat_fit/brain_extraction/inu_n4[40]",
+   "category": "panel-fmriprep",
+   "checks_passed": 10,
+   "checks_total": 10,
+   "failed_checks": [],
+   "measured": {
+    "corrected: NCC with ANTs as built": "1.0000000000",
+    "corrected: affine": "0.0e+00",
+    "corrected: bit-identical to ANTs with correctly rounded math": 0,
+    "corrected: header (every field)": 0,
+    "larmorx: 1 threads and 1 thread give the same bits": "True"
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0,
+    "corrected: bit-identical to ANTs as built": 11486735
+   },
+   "seconds": 58.817,
+   "status": "pass"
+  },
+  {
+   "case": "panel/fmriprep/ds004958-sub-fsm64ps/bold[task_rest]/bold_fit/enhance_and_skullstrip_bold/n4_correct",
+   "category": "panel-fmriprep",
+   "checks_passed": 9,
+   "checks_total": 9,
+   "failed_checks": [],
+   "measured": {
+    "corrected: affine": "0.0e+00",
+    "corrected: bit-identical to ANTs with correctly rounded math": 0,
+    "corrected: header (every field)": 0,
+    "larmorx: 1 threads and 1 thread give the same bits": "True"
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0,
+    "corrected: bit-identical to ANTs as built": 0
+   },
+   "seconds": 2.221,
+   "status": "pass"
+  },
+  {
+   "case": "panel/fmriprep/ds005003-sub-RS001/anat_fit/brain_extraction/atropos/inu_n4_final[0]",
+   "category": "panel-fmriprep",
+   "checks_passed": 16,
+   "checks_total": 16,
+   "failed_checks": [],
+   "measured": {
+    "bias field: NCC with ANTs as built": "1.0000000000",
+    "bias field: affine": "0.0e+00",
+    "bias field: bit-identical to ANTs with correctly rounded math": 0,
+    "bias field: header (every field)": 0,
+    "corrected: NCC with ANTs as built": "1.0000000000",
+    "corrected: affine": "0.0e+00",
+    "corrected: bit-identical to ANTs with correctly rounded math": 0,
+    "corrected: header (every field)": 0,
+    "larmorx: 1 threads and 1 thread give the same bits": "True"
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 17141296,
+    "bias field: bit-identical to ANTs as built": 9128052,
+    "corrected: bit-identical to ANTs as built": 7487867
+   },
+   "seconds": 23.688,
+   "status": "pass"
+  },
+  {
+   "case": "panel/fmriprep/ds005003-sub-RS001/anat_fit/brain_extraction/inu_n4[40]",
+   "category": "panel-fmriprep",
+   "checks_passed": 10,
+   "checks_total": 10,
+   "failed_checks": [],
+   "measured": {
+    "corrected: NCC with ANTs as built": "1.0000000000",
+    "corrected: affine": "0.0e+00",
+    "corrected: bit-identical to ANTs with correctly rounded math": 0,
+    "corrected: header (every field)": 0,
+    "larmorx: 1 threads and 1 thread give the same bits": "True"
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0,
+    "corrected: bit-identical to ANTs as built": 9051972
+   },
+   "seconds": 47.64,
+   "status": "pass"
+  },
+  {
+   "case": "panel/fmriprep/ds005003-sub-RS001/bold[ses_1_task_motor]/bold_fit/enhance_and_skullstrip_bold/n4_correct",
+   "category": "panel-fmriprep",
+   "checks_passed": 9,
+   "checks_total": 9,
+   "failed_checks": [],
+   "measured": {
+    "corrected: affine": "0.0e+00",
+    "corrected: bit-identical to ANTs with correctly rounded math": 0,
+    "corrected: header (every field)": 0,
+    "larmorx: 1 threads and 1 thread give the same bits": "True"
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0,
+    "corrected: bit-identical to ANTs as built": 0
+   },
+   "seconds": 0.384,
+   "status": "pass"
+  },
+  {
+   "case": "panel/fmriprep/ds005003-sub-RS001/bold[ses_1_task_rest]/bold_fit/enhance_and_skullstrip_bold/n4_correct",
+   "category": "panel-fmriprep",
+   "checks_passed": 10,
+   "checks_total": 10,
+   "failed_checks": [],
+   "measured": {
+    "corrected: NCC with ANTs as built": "0.9999999987",
+    "corrected: affine": "0.0e+00",
+    "corrected: bit-identical to ANTs with correctly rounded math": 0,
+    "corrected: header (every field)": 0,
+    "larmorx: 1 threads and 1 thread give the same bits": "True"
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0,
+    "corrected: bit-identical to ANTs as built": 145497
+   },
+   "seconds": 0.479,
+   "status": "pass"
+  },
+  {
+   "case": "panel/fmriprep/ds005040-sub-002/anat_fit/brain_extraction/atropos/inu_n4_final[0]",
+   "category": "panel-fmriprep",
+   "checks_passed": 16,
+   "checks_total": 16,
+   "failed_checks": [],
+   "measured": {
+    "bias field: NCC with ANTs as built": "1.0000000000",
+    "bias field: affine": "0.0e+00",
+    "bias field: bit-identical to ANTs with correctly rounded math": 0,
+    "bias field: header (every field)": 0,
+    "corrected: NCC with ANTs as built": "1.0000000000",
+    "corrected: affine": "0.0e+00",
+    "corrected: bit-identical to ANTs with correctly rounded math": 0,
+    "corrected: header (every field)": 0,
+    "larmorx: 1 threads and 1 thread give the same bits": "True"
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 22246455,
+    "bias field: bit-identical to ANTs as built": 15735809,
+    "corrected: bit-identical to ANTs as built": 6301102
+   },
+   "seconds": 54.377,
+   "status": "pass"
+  },
+  {
+   "case": "panel/fmriprep/ds005040-sub-002/anat_fit/brain_extraction/inu_n4[40]",
+   "category": "panel-fmriprep",
+   "checks_passed": 10,
+   "checks_total": 10,
+   "failed_checks": [],
+   "measured": {
+    "corrected: NCC with ANTs as built": "1.0000000000",
+    "corrected: affine": "0.0e+00",
+    "corrected: bit-identical to ANTs with correctly rounded math": 0,
+    "corrected: header (every field)": 0,
+    "larmorx: 1 threads and 1 thread give the same bits": "True"
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0,
+    "corrected: bit-identical to ANTs as built": 15842295
+   },
+   "seconds": 119.318,
+   "status": "pass"
+  },
+  {
+   "case": "panel/fmriprep/ds005040-sub-002/bold[task_clip_run_1]/bold_fit/enhance_and_skullstrip_bold/n4_correct",
+   "category": "panel-fmriprep",
+   "checks_passed": 9,
+   "checks_total": 9,
+   "failed_checks": [],
+   "measured": {
+    "corrected: affine": "0.0e+00",
+    "corrected: bit-identical to ANTs with correctly rounded math": 0,
+    "corrected: header (every field)": 0,
+    "larmorx: 1 threads and 1 thread give the same bits": "True"
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0,
+    "corrected: bit-identical to ANTs as built": 0
+   },
+   "seconds": 0.536,
+   "status": "pass"
+  },
+  {
+   "case": "panel/fmriprep/ds005040-sub-002/fmap_preproc/wf_auto_00000/brainextraction/n4",
+   "category": "panel-fmriprep",
+   "checks_passed": 9,
+   "checks_total": 9,
+   "failed_checks": [],
+   "measured": {
+    "corrected: affine": "0.0e+00",
+    "corrected: bit-identical to ANTs with correctly rounded math": 0,
+    "corrected: header (every field)": 0,
+    "larmorx: 1 threads and 1 thread give the same bits": "True"
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 98545,
+    "corrected: bit-identical to ANTs as built": 0
+   },
+   "seconds": 0.916,
+   "status": "pass"
+  },
+  {
+   "case": "panel/fmriprep/ds005454-sub-16/anat_fit/anat_template/n4_correct[0]",
+   "category": "panel-fmriprep",
+   "checks_passed": 10,
+   "checks_total": 10,
+   "failed_checks": [],
+   "measured": {
+    "corrected: NCC with ANTs as built": "1.0000000000",
+    "corrected: affine": "0.0e+00",
+    "corrected: bit-identical to ANTs with correctly rounded math": 0,
+    "corrected: header (every field)": 0,
+    "larmorx: 1 threads and 1 thread give the same bits": "True"
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 10935901,
+    "corrected: bit-identical to ANTs as built": 10778341
+   },
+   "seconds": 74.26,
+   "status": "pass"
+  },
+  {
+   "case": "panel/fmriprep/ds005454-sub-16/anat_fit/anat_template/n4_correct[1]",
+   "category": "panel-fmriprep",
+   "checks_passed": 10,
+   "checks_total": 10,
+   "failed_checks": [],
+   "measured": {
+    "corrected: NCC with ANTs as built": "1.0000000000",
+    "corrected: affine": "0.0e+00",
+    "corrected: bit-identical to ANTs with correctly rounded math": 0,
+    "corrected: header (every field)": 0,
+    "larmorx: 1 threads and 1 thread give the same bits": "True"
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 12380266,
+    "corrected: bit-identical to ANTs as built": 12380266
+   },
+   "seconds": 104.434,
+   "status": "pass"
+  },
+  {
+   "case": "panel/fmriprep/ds005454-sub-16/anat_fit/brain_extraction/atropos/inu_n4_final[0]",
+   "category": "panel-fmriprep",
+   "checks_passed": 16,
+   "checks_total": 16,
+   "failed_checks": [],
+   "measured": {
+    "bias field: NCC with ANTs as built": "0.9972643052",
+    "bias field: affine": "0.0e+00",
+    "bias field: bit-identical to ANTs with correctly rounded math": 0,
+    "bias field: header (every field)": 0,
+    "corrected: NCC with ANTs as built": "1.0000000000",
+    "corrected: affine": "0.0e+00",
+    "corrected: bit-identical to ANTs with correctly rounded math": 0,
+    "corrected: header (every field)": 0,
+    "larmorx: 1 threads and 1 thread give the same bits": "True"
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 34926670,
+    "bias field: bit-identical to ANTs as built": 12476998,
+    "corrected: bit-identical to ANTs as built": 12470213
+   },
+   "seconds": 45.579,
+   "status": "pass"
+  },
+  {
+   "case": "panel/fmriprep/ds005454-sub-16/anat_fit/brain_extraction/inu_n4[40]",
+   "category": "panel-fmriprep",
+   "checks_passed": 10,
+   "checks_total": 10,
+   "failed_checks": [],
+   "measured": {
+    "corrected: NCC with ANTs as built": "1.0000000000",
+    "corrected: affine": "0.0e+00",
+    "corrected: bit-identical to ANTs with correctly rounded math": 0,
+    "corrected: header (every field)": 0,
+    "larmorx: 1 threads and 1 thread give the same bits": "True"
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0,
+    "corrected: bit-identical to ANTs as built": 17540037
+   },
+   "seconds": 96.465,
+   "status": "pass"
+  },
+  {
+   "case": "panel/fmriprep/ds005454-sub-16/bold[task_rest]/bold_fit/enhance_and_skullstrip_bold/n4_correct",
+   "category": "panel-fmriprep",
+   "checks_passed": 10,
+   "checks_total": 10,
+   "failed_checks": [],
+   "measured": {
+    "corrected: NCC with ANTs as built": "1.0000000000",
+    "corrected: affine": "0.0e+00",
+    "corrected: bit-identical to ANTs with correctly rounded math": 0,
+    "corrected: header (every field)": 0,
+    "larmorx: 1 threads and 1 thread give the same bits": "True"
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0,
+    "corrected: bit-identical to ANTs as built": 1982438
+   },
+   "seconds": 6.116,
+   "status": "pass"
+  },
+  {
+   "case": "panel/fmriprep/ds005454-sub-16/fmap_preproc/wf_gre16/magnitude/brainextraction/n4",
+   "category": "panel-fmriprep",
+   "checks_passed": 9,
+   "checks_total": 9,
+   "failed_checks": [],
+   "measured": {
+    "corrected: affine": "0.0e+00",
+    "corrected: bit-identical to ANTs with correctly rounded math": 0,
+    "corrected: header (every field)": 0,
+    "larmorx: 1 threads and 1 thread give the same bits": "True"
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 461919,
+    "corrected: bit-identical to ANTs as built": 0
+   },
+   "seconds": 3.677,
+   "status": "pass"
+  },
+  {
+   "case": "panel/fmriprep/ds005752-sub-ON01016/anat_fit/brain_extraction/atropos/inu_n4_final[0]",
+   "category": "panel-fmriprep",
+   "checks_passed": 16,
+   "checks_total": 16,
+   "failed_checks": [],
+   "measured": {
+    "bias field: NCC with ANTs as built": "0.9999999999",
+    "bias field: affine": "0.0e+00",
+    "bias field: bit-identical to ANTs with correctly rounded math": 0,
+    "bias field: header (every field)": 0,
+    "corrected: NCC with ANTs as built": "0.9999999999",
+    "corrected: affine": "0.0e+00",
+    "corrected: bit-identical to ANTs with correctly rounded math": 0,
+    "corrected: header (every field)": 0,
+    "larmorx: 1 threads and 1 thread give the same bits": "True"
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 17567099,
+    "bias field: bit-identical to ANTs as built": 11033687,
+    "corrected: bit-identical to ANTs as built": 4316144
+   },
+   "seconds": 32.471,
+   "status": "pass"
+  },
+  {
+   "case": "panel/fmriprep/ds005752-sub-ON01016/anat_fit/brain_extraction/inu_n4[40]",
+   "category": "panel-fmriprep",
+   "checks_passed": 10,
+   "checks_total": 10,
+   "failed_checks": [],
+   "measured": {
+    "corrected: NCC with ANTs as built": "1.0000000000",
+    "corrected: affine": "0.0e+00",
+    "corrected: bit-identical to ANTs with correctly rounded math": 0,
+    "corrected: header (every field)": 0,
+    "larmorx: 1 threads and 1 thread give the same bits": "True"
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0,
+    "corrected: bit-identical to ANTs as built": 12845056
+   },
+   "seconds": 80.288,
+   "status": "pass"
+  },
+  {
+   "case": "panel/fmriprep/ds005752-sub-ON01016/bold[ses_01_task_rest_dir_forward]/bold_fit/enhance_and_skullstrip_bold/n4_correct",
+   "category": "panel-fmriprep",
+   "checks_passed": 10,
+   "checks_total": 10,
+   "failed_checks": [],
+   "measured": {
+    "corrected: NCC with ANTs as built": "0.9999999946",
+    "corrected: affine": "0.0e+00",
+    "corrected: bit-identical to ANTs with correctly rounded math": 0,
+    "corrected: header (every field)": 0,
+    "larmorx: 1 threads and 1 thread give the same bits": "True"
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 193144,
+    "corrected: bit-identical to ANTs as built": 193141
+   },
+   "seconds": 0.632,
+   "status": "pass"
+  },
+  {
+   "case": "panel/fmriprep/ds005752-sub-ON01016/bold[ses_01_task_rest_dir_reverse]/bold_fit/enhance_and_skullstrip_bold/n4_correct",
+   "category": "panel-fmriprep",
+   "checks_passed": 10,
+   "checks_total": 10,
+   "failed_checks": [],
+   "measured": {
+    "corrected: NCC with ANTs as built": "0.9999999965",
+    "corrected: affine": "0.0e+00",
+    "corrected: bit-identical to ANTs with correctly rounded math": 0,
+    "corrected: header (every field)": 0,
+    "larmorx: 1 threads and 1 thread give the same bits": "True"
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 192978,
+    "corrected: bit-identical to ANTs as built": 192977
+   },
+   "seconds": 0.62,
+   "status": "pass"
+  },
+  {
+   "case": "panel/images/final/7t-mp2rage",
+   "category": "panel-images",
+   "checks_passed": 20,
+   "checks_total": 20,
+   "failed_checks": [],
+   "measured": {
+    "bias field: NCC with ANTs as built": "0.9999999999",
+    "bias field: affine": "0.0e+00",
+    "bias field: bit-identical to ANTs with correctly rounded math": 0,
+    "bias field: header (every field)": 0,
+    "corrected: NCC with ANTs as built": "1.0000000000",
+    "corrected: affine": "0.0e+00",
+    "corrected: bit-identical to ANTs with correctly rounded math": 0,
+    "corrected: header (every field)": 0,
+    "larmorx: 1 threads and 1 thread give the same bits": "True"
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 29951429,
+    "bias field: 1 - NCC vs ANTs' thread band": "1.06e-10",
+    "bias field: bit-identical to ANTs as built": 17503900,
+    "bias field: max |diff| vs ANTs' thread band": "9.42e-06",
+    "corrected: 1 - NCC vs ANTs' thread band": "2.04e-12",
+    "corrected: bit-identical to ANTs as built": 12354443,
+    "corrected: max |diff| vs ANTs' thread band": "0.0413"
+   },
+   "seconds": 355.96,
+   "status": "pass"
+  },
+  {
+   "case": "panel/images/final/3t-unit1",
+   "category": "panel-images",
+   "checks_passed": 20,
+   "checks_total": 20,
+   "failed_checks": [],
+   "measured": {
+    "bias field: NCC with ANTs as built": "1.0000000000",
+    "bias field: affine": "0.0e+00",
+    "bias field: bit-identical to ANTs with correctly rounded math": 0,
+    "bias field: header (every field)": 0,
+    "corrected: NCC with ANTs as built": "1.0000000000",
+    "corrected: affine": "0.0e+00",
+    "corrected: bit-identical to ANTs with correctly rounded math": 0,
+    "corrected: header (every field)": 0,
+    "larmorx: 1 threads and 1 thread give the same bits": "True"
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0,
+    "bias field: 1 - NCC vs ANTs' thread band": "4.81e-12",
+    "bias field: bit-identical to ANTs as built": 10803732,
+    "bias field: max |diff| vs ANTs' thread band": "4.05e-06",
+    "corrected: 1 - NCC vs ANTs' thread band": "2.12e-12",
+    "corrected: bit-identical to ANTs as built": 10713781,
+    "corrected: max |diff| vs ANTs' thread band": "0.0151"
+   },
+   "seconds": 234.85,
+   "status": "pass"
+  },
+  {
+   "case": "panel/images/final/flair",
+   "category": "panel-images",
+   "checks_passed": 14,
+   "checks_total": 14,
+   "failed_checks": [],
+   "measured": {
+    "bias field: affine": "0.0e+00",
+    "bias field: bit-identical to ANTs with correctly rounded math": 0,
+    "bias field: header (every field)": 0,
+    "corrected: affine": "0.0e+00",
+    "corrected: bit-identical to ANTs with correctly rounded math": 0,
+    "corrected: header (every field)": 0,
+    "larmorx: 1 threads and 1 thread give the same bits": "True"
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 17078916,
+    "bias field: bit-identical to ANTs as built": 0,
+    "corrected: bit-identical to ANTs as built": 0
+   },
+   "seconds": 67.754,
+   "status": "pass"
+  },
+  {
+   "case": "panel/images/final/tumour-t2w",
+   "category": "panel-images",
+   "checks_passed": 20,
+   "checks_total": 20,
+   "failed_checks": [],
+   "measured": {
+    "bias field: NCC with ANTs as built": "0.9999999994",
+    "bias field: affine": "0.0e+00",
+    "bias field: bit-identical to ANTs with correctly rounded math": 0,
+    "bias field: header (every field)": 0,
+    "corrected: NCC with ANTs as built": "1.0000000000",
+    "corrected: affine": "0.0e+00",
+    "corrected: bit-identical to ANTs with correctly rounded math": 0,
+    "corrected: header (every field)": 0,
+    "larmorx: 1 threads and 1 thread give the same bits": "True"
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 5446419,
+    "bias field: 1 - NCC vs ANTs' thread band": "6.02e-10",
+    "bias field: bit-identical to ANTs as built": 3071975,
+    "bias field: max |diff| vs ANTs' thread band": "7.15e-05",
+    "corrected: 1 - NCC vs ANTs' thread band": "6.16e-12",
+    "corrected: bit-identical to ANTs as built": 2374386,
+    "corrected: max |diff| vs ANTs' thread band": "0.0192"
+   },
+   "seconds": 71.086,
+   "status": "pass"
+  },
+  {
+   "case": "panel/images/final-mask/stroke-t2w",
+   "category": "panel-images",
+   "checks_passed": 14,
+   "checks_total": 14,
+   "failed_checks": [],
+   "measured": {
+    "bias field: affine": "0.0e+00",
+    "bias field: bit-identical to ANTs with correctly rounded math": 0,
+    "bias field: header (every field)": 0,
+    "corrected: affine": "0.0e+00",
+    "corrected: bit-identical to ANTs with correctly rounded math": 0,
+    "corrected: header (every field)": 0,
+    "larmorx: 1 threads and 1 thread give the same bits": "True"
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0,
+    "bias field: bit-identical to ANTs as built": 0,
+    "corrected: bit-identical to ANTs as built": 0
+   },
+   "seconds": 125.255,
+   "status": "pass"
+  },
+  {
+   "case": "panel/images/final-mask/stroke-t2w-mask-from-affine",
+   "category": "panel-images",
+   "checks_passed": 1,
+   "checks_total": 1,
+   "failed_checks": [],
+   "reason": "ANTs exit -6: 't occupy the same physical space! \\nInputImage Spacing: [9.9999797e-01, 1.0000000e+00, 1.0000000e+00], InputImagePrimary Spacing: [1.0000000e+00, 1.0000000e+00, 1.0000000e+00]\\n\\tTolerance: 9.9999797e-07'; larmorx exit 1: \"larmorx: N4BiasFieldCorrection: the mask is not on the image's grid (ITK: Inputs do not occupy the same physical space!; ANTs aborts)\"",
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 0.713,
+   "status": "both-error"
+  }
+ ],
+ "suite": "ants-n4",
+ "summary": {
+  "both-error": 1,
+  "expected-divergence": 0,
+  "fail": 0,
+  "pass": 69,
+  "skipped": 0
+ },
+ "tier": "panel"
+}

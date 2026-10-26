@@ -26,6 +26,17 @@ larmorx computes what ITK's C++ source defines. ANTs built by GCC 11.4 at `-O3` 
 such a build gives slightly different N4 results
 ([findings](../findings/ants-n4.md), "GCC 11 miscompiles the fit").
 
+**On the data panel** ([record](../validation/ants-n4-panel.md), 2026-10-26): all 64 N4 nodes of
+the fourteen finished fMRIPrep oracle runs (the BOLD references, the brain extraction's and the
+final anatomical corrections, the field maps' magnitudes; the 3.5-year-old, the glioma, the
+stroke, strong motion, 1.5 T, 7 T, multiband-8 and multi-echo among them), each replayed from its
+node with its inputs, and sMRIPrep's final options on five images fMRIPrep never corrects (the
+7 T MP2RAGE, a 3 T MP2RAGE UNIT1, the 82-year-old's FLAIR, a glioma's T2w of 6 mm slices, the
+stroke's T2w fitted outside its lesion): **69 of 69 bit-identical with CORE-MATH** (20 to the
+unmodified ANTs; the others within 0.042 of ANTs' own difference between one thread and two or
+three). The panel also checked the input-geometry check: a mask written from the T2w's affine
+(2e-6 mm off) is refused by both.
+
 **Speed** ([benchmark](../benchmarks/ants-n4.md)): sMRIPrep's N4 before the anatomical template (ANTs'
 defaults) on a raw T1w (160×192×192) takes 8.7 s on one thread and 2.4 s on 12, against
 55.2 s and 10.7 s for ANTs; fMRIPrep's BOLD reference 135 ms against 1.00 s. On the six

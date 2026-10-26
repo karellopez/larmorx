@@ -149,7 +149,10 @@ Each is in the register (`docs/findings/upstream-defects.md`); the switch is
   (never set in FSL) and warns.
 - **FSL-54** (rule A, corrected): `main` calls `t1only_main(...)` and then `exit(0)`
   (`betsurf.cpp:1347-1350`), dropping its return value: `--t1only` exits 0 after "too few
-  arguments" or "unable to open". The default exits with the failure's status (255).
+  arguments" or "unable to open". The default exits with the failure's status (255). A failure
+  that ends the program inside FSL's libraries is not dropped: an unknown `FSLOUTPUTTYPE` makes
+  `FslGetEnvOutputType` call `exit(1)` itself, as the replica does in both modes (random testing,
+  2026-10-26).
 - **FSL-55** (rule B, refused by default): betsurf's `nth_element` over the T1's values in the
   brain (`betsurf.cpp:629`, `1420`) has no strict weak order when a value is NaN: libstdc++'s
   unguarded partitions can then run outside the vector. The default refuses; `reproduce` runs

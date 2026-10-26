@@ -180,6 +180,7 @@ fn main_inner(
         match surfaces(&names, &a, run, out, err, notices) {
             Ok(()) => 0,
             Err(Fail::Exit(c)) => c,
+            Err(Fail::ExitNow(c)) => return c,
             Err(Fail::Abort(e)) => return report_abort(&e, "betsurf", err),
             Err(Fail::Refused(why)) => {
                 let _ = writeln!(err, "betsurf: {why} (larmorx)");
@@ -218,6 +219,9 @@ struct Names {
 enum Fail {
     /// FSL returns or exits with this status (its message printed already).
     Exit(u8),
+    /// FSL ends the program itself (`exit` in a library: `FslGetEnvOutputType`'s for an
+    /// unknown `FSLOUTPUTTYPE`), so `t1only_main`'s dropped status (FSL-54) does not apply.
+    ExitNow(u8),
     /// An uncaught exception of the image layer.
     Abort(FslError),
     /// A case without a defined result in FSL (a crash, memory never set, a hang).
@@ -1021,7 +1025,8 @@ fn save(
             for l in &o.printed {
                 let _ = writeln!(err, "{l}");
             }
-            Err(Fail::Exit(1))
+            // FslGetEnvOutputType's exit(EXIT_FAILURE), found by random testing 2026-10-26
+            Err(Fail::ExitNow(1))
         }
         Err(SaveError::Exception(e)) => Err(Fail::Abort(e)),
     }

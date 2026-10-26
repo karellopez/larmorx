@@ -641,3 +641,11 @@ signature = ["out.nii.gz"]
 status = "fixed"
 explanation = "bet -F on a series stored as double: fslmaths -mas computes and writes double for a double input (newimage's dtype of the file); larmorx-nc-core's fslmaths_mas wrote float"
 link = "validation/difftest/cases/fsl-bet/bet-F-double-series.json"
+
+[[difference]]
+tool = "fsl-bet"
+implementation = "replica"
+signature = ["exit status"]
+status = "fixed"
+explanation = "betsurf --t1only with an FSLOUTPUTTYPE FSL does not know: FSL exits 1 from FslGetEnvOutputType itself, so FSL-54's dropped status does not apply; the replica's reproduce gave 0"
+link = "validation/difftest/cases/fsl-bet/betsurf-t1only-output-type.json"

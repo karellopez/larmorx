@@ -17,6 +17,11 @@ lists what larmorx's default changes.
 one thread and 80 ms on 12, against 496 ms and 151 ms for ANTs; the 1 mm MNI template to
 3 mm 252 ms against 629 ms on one thread.
 
+**On the data panel** ([record](../validation/ants-resample-image-by-spacing-panel.md),
+2026-10-26): fMRIPrep 25.2.6 never calls `ResampleImageBySpacing`; on the panel's images (the 7 T
+MP2RAGE to 2 mm, the 82-year-old's FLAIR to 1 mm, the 3.5-year-old's T1w to 1.5 mm): **3 of 3
+bit-identical, header bytes included**.
+
 ## Quick start
 
 ```python

@@ -12,6 +12,13 @@ default changes.
 **Speed** ([benchmark](../benchmarks/ants-programs.md)): T1w × brain mask 128 ms on one thread,
 62 ms on 12 (ANTs: 157 ms either way).
 
+**On the data panel** ([record](../validation/ants-multiply-images-panel.md), 2026-10-26): all
+42 `MultiplyImages` nodes of the fourteen finished oracle runs (the three of sMRIPrep's brain
+extraction after Atropos, `08_mult_gm`, `09_relabel_wm` and `12_relabel_gm`, in every run), each
+replayed from its node with its inputs, and two calls fMRIPrep never makes (the stroke's T2w times
+its lesion mask, a 588-volume multiband series times a scalar): **44 of 44 bit-identical, header
+bytes included**.
+
 ## Quick start
 
 ```python

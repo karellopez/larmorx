@@ -14,6 +14,12 @@ lists what larmorx's default changes.
 map 100 ms on one thread, 49 ms on 12 (ANTs: 115 ms and 103 ms); `Otsu 3` with a mask on
 fMRIPrep's T1w 205 ms and 125 ms (ANTs: 558 ms and 315 ms).
 
+**On the data panel** ([record](../validation/ants-threshold-image-panel.md), 2026-10-26):
+sMRIPrep's `ThresholdImage` in the brain extraction of all fourteen finished oracle runs, each
+replayed from its node with its inputs, and four calls fMRIPrep never makes (Otsu with 4, 3 and 2
+thresholds on the 7 T MP2RAGE, the 82-year-old's FLAIR and the 1.5 T T1w as float; a range on the
+stroke's lesion mask): **18 of 18 bit-identical, header bytes included**.
+
 ## Quick start
 
 ```python

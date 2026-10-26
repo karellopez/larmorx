@@ -654,8 +654,13 @@ mod tests {
             mesh: BSplineMesh::Distance(20.0),
             ..N4Options::default()
         };
+        // The limit given explicitly: the test depends on no machine's memory (2026-10-26).
+        let limit = 64u64 << 30;
         let start = std::time::Instant::now();
-        let e = n4_bias_field_correction(&input, None, None, &options, 1, None).unwrap_err();
+        let e = larmorx_core::alloc::with_memory_limit(limit, || {
+            n4_bias_field_correction(&input, None, None, &options, 1, None)
+        })
+        .unwrap_err();
         let message = e.to_string();
         assert!(matches!(e, N4Error::BeyondMemory(_)), "{message}");
         assert!(message.contains("an error (ANTS-162)") || message.contains("An error (ANTS-162)"));
@@ -666,6 +671,10 @@ mod tests {
         assert!(message.contains("4000 x 1000 x 1000 x 3 mm"), "{message}");
         assert!(message.contains("52000 x 27000 x 22000 x 18"), "{message}");
         assert!(message.contains("metres or micrometres"), "{message}");
+        assert!(
+            message.contains("64.0 GiB given to this computation"),
+            "{message}"
+        );
         assert!(start.elapsed().as_secs() < 5, "refused before any work");
         // The same image in millimetres: a few control points, no refusal (the work is tiny).
         let mut small = input.clone();
@@ -674,7 +683,12 @@ mod tests {
             iterations: vec![2],
             ..options
         };
-        assert!(n4_bias_field_correction(&small, None, None, &options, 1, None).is_ok());
+        assert!(
+            larmorx_core::alloc::with_memory_limit(limit, || {
+                n4_bias_field_correction(&small, None, None, &options, 1, None)
+            })
+            .is_ok()
+        );
     }
 
     #[test]

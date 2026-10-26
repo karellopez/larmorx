@@ -946,16 +946,20 @@ mod tests {
         .map(|s| (*s).to_owned())
         .collect();
         let (mut o, mut e) = (Vec::new(), Vec::new());
-        let code = main_with(
-            &args,
-            UpstreamDefects::Fix,
-            Settings::empty(),
-            &mut o,
-            &mut e,
-        );
+        // The limit given explicitly: the test depends on no machine's memory (2026-10-26).
+        let code = larmorx_core::alloc::with_memory_limit(64 << 30, || {
+            main_with(
+                &args,
+                UpstreamDefects::Fix,
+                Settings::empty(),
+                &mut o,
+                &mut e,
+            )
+        });
         let err = String::from_utf8(e).unwrap();
         assert_ne!(code, 0, "{err}");
         assert!(err.contains("(AFNI-75)") && err.contains("GiB"), "{err}");
+        assert!(err.contains("64.0 GiB given to this computation"), "{err}");
         assert!(err.contains("radius 6100.0 voxels"), "{err}");
         assert!(!out.exists());
         // A ball of the default -Urad needs a few megabytes.

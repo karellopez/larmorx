@@ -60,3 +60,16 @@ Conflicts resolved (evidence `OTHER` gains `difftest`; README and the validation
 by `tables`; `validation/tools.toml`'s mcflirt template keeps the details the hand-written rows
 had). The handoff was integrated by a helper agent and reviewed (ITK-96 kept as its own entry: it
 is a separate switch in the code; the register recounted: 254 entries).
+
+## Follow-up (2026-10-26): the memory guards on Windows ARM
+
+After the publication (f86ce4f), `test (windows-arm64)` failed: N4's guard test refused correctly
+but took over 5 s, because the guard learned the machine's memory from a PowerShell process. The
+agent made every guard (`larmorx_core::alloc::check_plan`: N4, both resamplers, AFNI-75 in the GPL
+3dUnifize) platform-independent: a limit given to the computation first
+(`with_memory_limit`, which the guard tests now use), then `LARMORX_MEMORY_LIMIT`, then the
+machine's memory, then a fail-safe 1 TiB with a clear message. A first version read Windows'
+memory with a kernel32 call in an `unsafe` block; the orchestrator declined it (CLAUDE.md rule 5:
+`unsafe` only in audited hot loops), so the machine is now queried only for a plan above 4 GiB
+with no limit given, once per process, by the safe process query with a 20 s limit (254f9c6).
+A test proves a small plan never queries the machine.

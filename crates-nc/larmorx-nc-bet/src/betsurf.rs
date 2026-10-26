@@ -1234,9 +1234,18 @@ fn surfaces(
     say(out, "blurring");
     const BLURRING: f32 = 3.0;
     const SMOOTHNESS: f32 = 1.0;
-    let write0 = newimagefns::smooth(&counts.inskull, BLURRING, run.threads);
-    let write2 = newimagefns::smooth(&counts.outskin, BLURRING, run.threads);
-    let mut write1 = counts.outskull;
+    // Each count image replaced by its smoothed version as FSL assigns them (`write0 =
+    // smooth(write0, ...)`): no count image kept beside its smoothed one.
+    let Counts {
+        inskull,
+        outskull,
+        outskin,
+    } = counts;
+    let write0 = newimagefns::smooth(&inskull, BLURRING, run.threads);
+    drop(inskull);
+    let write2 = newimagefns::smooth(&outskin, BLURRING, run.threads);
+    drop(outskin);
+    let mut write1 = outskull;
     say(out, "computation");
     for p in &mut m.points {
         p.data.push(0.0);
@@ -1320,7 +1329,10 @@ fn surfaces(
             *w = 0.0;
         }
     }
-    let write1 = newimagefns::smooth(&write1, BLURRING, run.threads);
+    let write1 = {
+        let unsmoothed = write1;
+        newimagefns::smooth(&unsmoothed, BLURRING, run.threads)
+    };
 
     // outer skull
     say(out, " outer skull");

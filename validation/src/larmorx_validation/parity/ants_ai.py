@@ -2038,6 +2038,24 @@ def _regrid_builder(image):
     return build
 
 
+#: The panel images the brain extraction's antsAI command runs on: (case id, image, what).
+def _panel_regrids():
+    from larmorx_validation.parity import panel_images as P
+
+    return (
+        ("flair", P.FLAIR_OLDER, "a FLAIR whose 44 slices of 3 mm cover part of the head"),
+        ("tumour-t2w", P.TUMOUR_T2W, "a T2w of 6 mm slices with a tumour"),
+        ("t2w-older", P.T2W_OLDER, "an older adult's T2w (T2 contrast against a T1 template)"),
+        ("7t-mp2rage", P.MP2RAGE_7T, "the raw 7 T MP2RAGE, its noisy background as bright as "
+         "the head"),
+    )  # fmt: skip
+
+
+# Registered at import, so that a worker process (``--jobs``) knows them too.
+for _cid, _image, _what in _panel_regrids():
+    ants_inputs.builder(f"ai-panel-regrid-{_cid}")(_regrid_builder(_image))
+
+
 def _panel_cases() -> list[AiCase]:
     """The data panel's tier: every antsAI node of the fourteen fMRIPrep oracle runs (the brain
     extraction's and each BOLD reference's, with fMRIPrep's seed; fMRIPrep's own transform
@@ -2069,16 +2087,8 @@ def _panel_cases() -> list[AiCase]:
     if brain is None:
         return out
     seed = "50495"  # fMRIPrep's --random-seed 0 (docs/findings/fmriprep-oracle.md)
-    for cid, image, what in (
-        ("flair", P.FLAIR_OLDER, "a FLAIR whose 44 slices of 3 mm cover part of the head"),
-        ("tumour-t2w", P.TUMOUR_T2W, "a T2w of 6 mm slices with a tumour"),
-        ("t2w-older", P.T2W_OLDER, "an older adult's T2w (T2 contrast against a T1 template)"),
-        ("7t-mp2rage", P.MP2RAGE_7T, "the raw 7 T MP2RAGE, its noisy background as bright as "
-         "the head"),
-    ):  # fmt: skip
+    for cid, image, what in _panel_regrids():
         name = f"ai-panel-regrid-{cid}"
-        if name not in ants_inputs.BUILDERS:
-            ants_inputs.builder(name)(_regrid_builder(image))
         args = []
         for a in brain.args:
             if a.startswith("Mattes["):

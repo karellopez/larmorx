@@ -1,23 +1,23 @@
 # Parity: BET (replica)
 
-**All cases agree.** 166 cases on the `full` tier: 127 pass, 29 rejected by both, 10 expected divergences, 0 failures.
+**All cases agree.** 173 cases on the `full` tier: 129 pass, 30 rejected by both, 14 expected divergences, 0 failures.
 
 - **Validated:** `larmorx-nc fsl bet`, `bet2` and `betsurf` (larmorx-nc 0.0.1; crate larmorx-nc-bet, the replica translated from FSL 6.0.7.17's source under the FSL Licence), run by larmorx as a separate process: `larmorx fsl <tool>` and `lx.fsl.bet` / `lx.fsl.betsurf`
 - **Reference:** bet, bet2 and betsurf from FSL 6.0.7.17 (fsl-bet2 2111.8, fsl-newimage 2203.12, fsl-meshclass 2111.0), the conda installation in `~/fsl`
 - **Test data:** larmorx-testdata `52124bc98f9f`, tier `full`
 - **Generated:** 2026-10-26 on Linux x86_64, with `python -m larmorx_validation parity fsl-bet --tier full --implementation replica`
-- **Original programs:** 240 runs: 229 from the oracle cache, 11 run (3 never cached: the original varies); cache `<workspace>/oracles/cache`, mode `use`
+- **Original programs:** 247 runs: 229 from the oracle cache, 18 run (10 never cached: the original varies); cache `<workspace>/oracles/cache`, mode `use`
 
-- **127 of 166 cases bit-identical to FSL** (exit status, messages, every file); 29 where both refuse or FSL crashes and the replica refuses; 6 where FSL crashes and the replica's `reproduce` fills what FSL leaves undefined (D13's failure cases: deterministic, named, the default refusing); 4 pending (options that run FSL programs larmorx does not replicate yet).
-- **360 of 360 files** written byte for byte as FSL writes them.
+- **129 of 173 cases bit-identical to FSL** (exit status, messages, every file); 30 where both refuse or FSL crashes and the replica refuses; 10 where FSL crashes and the replica's `reproduce` fills what FSL leaves undefined (D13's failure cases: deterministic, named, the default refusing); 4 pending (options that run FSL programs larmorx does not replicate yet).
+- **364 of 364 files** written byte for byte as FSL writes them.
 - fMRIPrep's own BET outputs: 58 of 58 with the same values as the replica's.
 - FSL run again: 38 of 38 runs bit-identical (FSL is deterministic).
 - fMRIPrep 25.2.6's FSL (fsl-newimage 2501.4, fsl-miscmaths 2412.4): 38 of 38 runs with the oracle's values.
 - **D13 fix pass** (larmorx's default, `upstream_defects="fix"`; the comparison above runs `reproduce`): the corrections met
   - FSL-40: 2 case(s) named it, 0 with changed values (largest difference 0), 2 with other changes (exit status N became N; files ['ab.nii.gz', 'ab_mask.nii.gz'] became ['a.hdrb.nii.gz', 'a.hdrb_mask.nii.gz']; files [] became ['out.nii.gz']): `bet2/img-output`, `defects/hdr-in-name`
-  - FSL-41: 1 case(s) named it, 1 with changed values (largest difference 0): `bet2/constant`
+  - FSL-41: 4 case(s) named it, 1 with changed values (largest difference 0), 1 with other changes (exit status N became N; files ['out.nii.gz'] became []): `bet2/constant`, `difftest/bet-script-failure-constant`, `difftest/bet2-filled-then-output-type`, `difftest/bet2-verbose-constant-filled`
   - FSL-42: 3 case(s) named it, 3 with changed values (largest difference 0): `defects/nan-f`, `defects/negative-r`, `defects/zero-w`
-  - FSL-43: 1 case(s) named it, 0 with changed values (largest difference 0): `defects/2d`
+  - FSL-43: 1 case(s) named it, 0 with changed values (largest difference 0): `difftest/betsurf-empty-brain`
   - FSL-44: 1 case(s) named it, 0 with changed values (largest difference 0), 1 with other changes (exit status N became N; files [] became ['my out.nii.gz', 'my out_mask.nii.gz']): `defects/blank-in-output`
   - FSL-45: 3 case(s) named it, 3 with changed values (largest difference inf): `bet/small-fov`, `bet/small-fov-verbose`, `bet/debug`
   - FSL-46: 1 case(s) named it, 0 with changed values (largest difference 0), 1 with other changes (the files present before the run: [] kept, ['out_tmp_notes.txt'] by the default): `defects/cleanup`
@@ -43,6 +43,7 @@
 | bet2 | 33 | 20 | 12 | 1 | 0 |
 | betsurf | 14 | 8 | 6 | 0 | 0 |
 | defects | 16 | 10 | 1 | 5 | 0 |
+| difftest | 7 | 2 | 1 | 4 | 0 |
 | fmriprep | 29 | 29 | 0 | 0 | 0 |
 | formats | 27 | 23 | 4 | 0 | 0 |
 | real | 25 | 25 | 0 | 0 | 0 |
@@ -61,6 +62,10 @@
 | `defects/mesh-unread` | FSL crashes (status -11); with upstream_defects='reproduce' larmorx fills what FSL leaves undefined deterministically, names FSL-52 and writes its outputs; the default refuses |
 | `defects/mesh-missing-vertex` | FSL crashes (status -11); with upstream_defects='reproduce' larmorx fills what FSL leaves undefined deterministically, names FSL-52 and writes its outputs; the default refuses |
 | `defects/mesh-truncated` | FSL crashes (status -11); with upstream_defects='reproduce' larmorx fills what FSL leaves undefined deterministically, names FSL-52 and writes its outputs; the default refuses |
+| `difftest/bet-script-failure-constant` | FSL crashes (status 1); with upstream_defects='reproduce' larmorx fills what FSL leaves undefined deterministically, names FSL-41 and then stops where FSL never gets (bet2: stopped: no voxel inside the initial sphere has an intensity strictly between the 2nd and 98th percentiles, so the median brai… |
+| `difftest/bet2-filled-then-output-type` | FSL crashes (status -11); with upstream_defects='reproduce' larmorx fills what FSL leaves undefined deterministically, names FSL-41 and then stops where FSL never gets (larmorx-nc: upstream defect FSL-43 (bet2, betsurf) reproduced: the fill of the brain mask starts at voxel -2147483648 -2147483648 … |
+| `difftest/bet2-verbose-constant-filled` | FSL crashes (status -11); with upstream_defects='reproduce' larmorx fills what FSL leaves undefined deterministically, names FSL-41 and writes its outputs; the default corrects it |
+| `difftest/betsurf-empty-brain` | FSL crashes (status -11); with upstream_defects='reproduce' larmorx fills what FSL leaves undefined deterministically, names FSL-43 and writes its outputs; the default corrects it |
 
 ## Rejected by both
 
@@ -95,12 +100,13 @@
 | `betsurf/dash-argument` | a word starting with - among the files | both refuse (exit 255) with FSL's usage |
 | `betsurf/bad-option` | an unknown option | both refuse (exit 1) with FSL's usage |
 | `betsurf/p-bad` | -p with a word | both refuse (exit 1) with FSL's usage |
+| `difftest/betsurf-t1only-output-type` | betsurf --t1only with an FSLOUTPUTTYPE FSL does not know (ANALYZE): FSL's FslGetEnvOutputType prints its message and calls exit(1) itself, so t1only_main's dropped status (FSL-54) does not apply; the replica's reproduce had exited 0 (fixed 2026-10-26) | both refuse (exit 1) with Legal values are: NIFTI, NIFTI_PAIR, NIFTI_GZ, NIFTI_PAIR_GZ |
 
 ## Environment
 
 | Component | Version |
 |---|---|
-| larmorx | 0.0.1 (c3b17f2ff7e8) |
+| larmorx | 0.0.1 (8e0059a97a02) |
 | larmorx-testdata | 52124bc98f9f |
 | Python | 3.12.10 |
 | Platform | Linux x86_64 (Linux-6.8.0-124-generic-x86_64-with-glibc2.35) |
@@ -282,3 +288,10 @@ Both programs run in directories of their own on the same input files, with `PAT
 | `real/philips-surf-t2` | pass | 14/14 | a Philips scanner (ds002603): betsurf -o -m -s with the T2 FLIRT registered |
 | `real/bold-F` | pass | 6/6 | a BOLD series (ds000005): bet -F |
 | `real/bold-first` | pass | 6/6 | a BOLD series (ds000005): bet2 on its first volume (FSL's warning) |
+| `difftest/bet-F-double-series` | pass | 6/6 | bet -F on a series stored as double: fslmaths -mas computes in double and writes double for a double input; the replica… |
+| `difftest/bet-script-failure-constant` | expected-divergence | 5/5 | bet on a constant one-voxel image: FSL's bet2 crashes (FSL-41) and the bet script's ERR trap prints 'bet failed during … |
+| `difftest/bet2-filled-then-output-type` | expected-divergence | 5/5 | bet2 on a constant image with an FSLOUTPUTTYPE FSL does not know: FSL crashes first (FSL-41); reproduce fills the media… |
+| `difftest/bet2-verbose-constant-filled` | expected-divergence | 6/6 | bet2 -v on a constant one-voxel image: FSL crashes (FSL-41) and its buffered verbose lines are lost; reproduce fills th… |
+| `difftest/betsurf-empty-brain` | expected-divergence | 6/6 | betsurf --t1only on a constant one-voxel image: no voxel of the T1 lies inside the brain surface, and FSL reads the 98t… |
+| `difftest/betsurf-t1only-output-type` | both-error | 5/5 | betsurf --t1only with an FSLOUTPUTTYPE FSL does not know (ANALYZE): FSL's FslGetEnvOutputType prints its message and ca… |
+| `difftest/cog-warning-empty-brain` | pass | 5/5 | bet -R on a small head whose brain comes out empty: FSL's fslstats -C prints newimage's 'WARNING::in calculating COG, t… |

@@ -1440,7 +1440,7 @@ def highlights(results: list[CaseResult]) -> list[str]:
         f"- **{passed} of {n} cases bit-identical to FSL** (exit status, messages, every file); "
         f"{both} where both refuse or FSL crashes and the replica refuses; {filled} where FSL "
         "crashes and the replica's `reproduce` fills what FSL leaves undefined (D13's failure "
-        f"cases: deterministic, named, the default refusing); {pending} pending (options that "
+        f"cases: deterministic, named; the default refuses or corrects); {pending} pending (options that "
         "run FSL programs larmorx does not replicate yet).",
         f"- **{same} of {files} files** written byte for byte as FSL writes them.",
     ]

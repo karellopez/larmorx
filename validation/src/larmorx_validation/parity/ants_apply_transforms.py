@@ -35,7 +35,9 @@ rounded functions preloaded (``scripts/build_crmath_preload.sh``), which larmorx
 from __future__ import annotations
 
 import contextlib
+import functools
 import io
+import itertools
 import os
 import subprocess
 import tempfile
@@ -1012,13 +1014,32 @@ def _identical(r: CaseResult, name: str) -> bool | None:
     return None
 
 
+@functools.cache
+def _panel_float_ids() -> frozenset[str]:
+    """The panel cases whose command line has ``--float 1`` (fMRIPrep's own calls as written,
+    and the panel's own)."""
+
+    def single(words) -> bool:
+        return any(a == "--float" and b == "1" for a, b in itertools.pairwise(words))
+
+    return frozenset(
+        cid
+        for cid, _cat, _desc, sc in _panel_scenarios()
+        if single(sc.raw or ()) or single(sc.extra)
+    )
+
+
 def _highlights(results: list[CaseResult]) -> list[str]:
     produced = [r for r in results if r.case.startswith("transform-output/") and r.status == PASS]
     compared = [
         r for r in results if r.status == PASS and not r.case.startswith("transform-output/")
     ]
     single = [
-        r for r in compared if r.case.startswith("float/") or r.case.startswith("output/float-")
+        r
+        for r in compared
+        if r.case.startswith("float/")
+        or r.case.startswith("output/float-")
+        or r.case in _panel_float_ids()
     ]
     lines = []
     for label, group in (("all cases", compared), ("`--float 1` cases", single)):

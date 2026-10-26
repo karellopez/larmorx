@@ -1364,7 +1364,8 @@ its clear error), never run.
   from the main machine, never with passwords. The move is the next stage's first part, proven by
   re-running every record there before new work starts.
 - **Ways of working** (2026-10-25, after 13 % of the weekly limit went in 13 hours): plain, simple
-  words; milestone updates only; at most two agents unless the user asks; a lean CLAUDE.md; a fresh
+  words; milestone updates only; at most two agents unless the user asks (and from 2026-10-26, one
+  agent at a time: "I would like to continue the development but with 1 agent at a time"); a lean CLAUDE.md; a fresh
   orchestrator session at each clean stop; large handoffs integrated by a helper agent and reviewed.
   The user finished this round (BET included) before the stop.
 - **Memory boxes** (2026-10-25, after a random N4 case filled the machine and VS Code went down):

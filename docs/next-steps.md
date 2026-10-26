@@ -51,7 +51,8 @@ of CLAUDE.md, the working agreements in it). Next, in order:
   Linux reference), the Windows laptop and, for the 25 heavy cases and later FreeSurfer batches,
   the lab's server (originals in an Ubuntu 22.04 container: its glibc is 2.39).
 - **Meanwhile, here, and then:** every finished tool re-validated on the data panel (item 6; the
-  ANTs tools, then AFNI, FSL and I/O), with BET's clean-room original beside it (item 7); then
+  ANTs tools, then AFNI, FSL and I/O), then BET's clean-room original (item 7; one agent at a
+  time, user 2026-10-26); then
   the clean-room additions mcflirt FSL-20/21 and 3dUnifize AFNI-75 (specs first); then FLIRT with
   BBR, FAST, topup (item 7).
 

@@ -1353,6 +1353,25 @@ its clear error), never run.
   before). The same reading already covered meshclass's sweep in BET's replica, which uses the
   same pivot step.
 
+## 2026-10-26: Machines and ways of working (decided by the user)
+
+- **Machines** (2026-10-25): development moves to a new main machine (16 cores / 32 threads,
+  128 GB, RTX 4090, Ubuntu 22.04 like the current laptop, so the originals' results stay the same
+  without a container); the current laptop becomes the quiet benchmark machine and a second Linux
+  reference; a Windows laptop serves Windows checks and benchmarks; the lab's server (1 TB RAM,
+  128 threads, shared and busy, Ubuntu 24.04) runs only giant jobs, its originals in an Ubuntu
+  22.04 container (glibc 2.39 there); macOS stays with CI. Helpers are reached by key-based SSH
+  from the main machine, never with passwords. The move is the next stage's first part, proven by
+  re-running every record there before new work starts.
+- **Ways of working** (2026-10-25, after 13 % of the weekly limit went in 13 hours): plain, simple
+  words; milestone updates only; at most two agents unless the user asks; a lean CLAUDE.md; a fresh
+  orchestrator session at each clean stop; large handoffs integrated by a helper agent and reviewed.
+  The user finished this round (BET included) before the stop.
+- **Memory boxes** (2026-10-25, after a random N4 case filled the machine and VS Code went down):
+  every heavy job in `scripts/orchestration/boxed.sh`; the user also asked that random tests stay
+  of reasonable size and that larmorx never need more memory than the original (the 2026-10-25
+  entries above).
+
 ## Open decisions (PLAN.md §16)
 
 | # | Decision | Recommended default (used until decided) | Status |

@@ -26,8 +26,8 @@ The FreeSurfer port is a separate wheel, `larmorx-freesurfer` (exposed as `lx.fr
 
 **Targets:** native wheels for Windows x64/arm64, Linux x64/aarch64 and macOS x64/arm64. No Docker, no external neuroimaging installs, no admin rights.
 
-## Where things are (2026-10-20)
-Phase L1 in progress. History: [docs/status-log.md](docs/status-log.md) (to 2026-10-20) and the merge commits; decisions: [docs/decision-log.md](docs/decision-log.md); **the plan, its order, the follow-ups and the decisions waiting for the user: [docs/next-steps.md](docs/next-steps.md)** (keep it current).
+## Where things are (2026-10-26)
+Phase L1 in progress. History: [docs/status-log.md](docs/status-log.md) (to 2026-10-26) and the merge commits; decisions: [docs/decision-log.md](docs/decision-log.md); **the plan, its order, the follow-ups and the decisions waiting for the user: [docs/next-steps.md](docs/next-steps.md)** (keep it current).
 
 **Ported and validated** (one record per tool in `docs/validation/`, each leading with the results against the unmodified original):
 
@@ -40,79 +40,14 @@ Phase L1 in progress. History: [docs/status-log.md](docs/status-log.md) (to 2026
 
 Golden tests cover every tool on all six platforms (`docs/validation/golden.md`); CI has been green at every merge. Stage-by-stage comparisons with fMRIPrep 25.2.6 were run on four oracle runs (`docs/validation/fmriprep-stages*.md`); further fMRIPrep comparisons wait until every tool is ported (user, 2026-10-16).
 
-**A5 part 2 merged** (2026-10-21; its agent had worked in a clone of larmorx inside `larmorx_documentation/.claude/worktrees/agent-a8e1b12f07e8dd9e9/larmorx`, after being launched from the documentation repository).
-**Visual reports done** (2026-10-21): `python -m larmorx_validation figures <tool>|all` (`validation/src/larmorx_validation/figures/`, guide [docs/figures.md](docs/figures.md)) draws every tool's figures from the records, the benchmark reports and real-data runs cached in `oracles/figures-cache/<tool>/` (outside git); the site has one page per tool under Tools.
-**Visual reports, part 2a (pilot) merged** (2026-10-21): interactive evidence, `python -m larmorx_validation evidence <tool>|summary|all --site <site checkout>` (`validation/src/larmorx_validation/evidence/`; [docs/figures.md](docs/figures.md)) exports worked examples (input, the original's and larmorx's outputs, differences, metrics computed offline, a verdict with its reason), the cases and the summary into the site's `static/evidence/` (content-addressed, byte-deterministic blobs); the site's viewer, charts and case explorer are `static/js/evidence.js`, the verdict taxonomy `data/verdicts.yml`. Pilot pages: N4BiasFieldCorrection, 3dTshift, the Validation guide; **approved by the user** (2026-10-21).
-**Part 2b merged** (2026-10-21): every tool page is interactive evidence, every case has a verdict (no "not yet classified" left).
-**A5 part 3 merged** (2026-10-23): `antsRegistration` complete (every stage ANTs accepts), the corrections decided 2026-10-21 on by default (and ITK-42), `antsApplyTransforms` with `BSplineTransform` files, both evidence pages. **A6 (Atropos) merged** (2026-10-22, with its evidence page); A5 part 3 and A6 ran in parallel at the user's request.
-**The decisions of 2026-10-23 implemented** (2026-10-24): ANTS-17, -22, -23, -32, -44, -116
-corrected by default, ANTS-40 measured on fMRIPrep's 25 N4 calls and corrected, ITK-06 measured
-and kept, AFNI-41 and AFNI-48 refused by default in the GPL replicas; the register has no
-**decide** and no **yes** left. Each correction with its known-result parity case, fix pass,
-re-recorded golden checksums and evidence on the site.
-**AFNI 3dAutomask and 3dUnifize merged** (2026-10-23): GPL replicas, bit-identical to AFNI 25.2.09 in every compared case (fMRIPrep's calls on every oracle run included); specs for the clean-room originals; evidence pages. **`antsAI -b` merged** (2026-10-23): the blob alignment, ANTS-106 corrected in Atropos, the ANTs run-to-run variation explained (ANTS-72); both parts ran in parallel at the user's request.
-**The clean-room originals of 3dAutomask and 3dUnifize merged** (2026-10-23): from the specs,
-built for speed; `implementation=` as 3dTshift.
-**The oracle-output cache merged** (2026-10-25; the evidence infrastructure's first item): every
-run of an original program the parity suites make goes through a content-addressed cache
-(`<workspace>/oracles/cache`, `LARMORX_ORACLE_CACHE`; `validation/src/larmorx_validation/oracle_cache/`,
-[docs/validation/oracle-cache.md](docs/validation/oracle-cache.md)), so re-running a record runs
-only larmorx; runs the original varies (the clock, races, thread bands of programs that vary,
-memory it never wrote) always run, and a run above one thread is served once three runs agreed.
-`--oracle-cache use|refresh|off`; `python -m larmorx_validation oracle-cache verify --sample N`
-re-runs entries to catch drift. Each record's header names its runs from the cache. The parity
-smoke tier leaves a marker that `scripts/record_golden.py` reuses (no second smoke run).
-**The mcflirt replica merged** (2026-10-25; FSL, item 7): `crates-nc/` (`larmorx-nc`, FSL
-Licence, FSL's original source included), its shared core `larmorx-nc-core`, and mcflirt
-bit-identical to FSL 6.0.7.17's (173 of 173 compared cases; 21 rejected by both alike); new
-FSL-20 and FSL-21 (rule B); `lx.mri.hmc(implementation=...)` and `larmorx fsl mcflirt`. Its follow-up
-(2026-10-25): one constant of the C library's `atanf` (fdlibm's `aT[0]`, taken from a source comment)
-explained the two panel calls and 58 of the first 59 random-testing findings (all 61 bit-identical after the fixes); FSL-08's notice now also
-covers the `-meanvol` image's name.
-**The data panel and evidence that scales merged** (2026-10-25; built 2026-10-24): fourteen
-OpenNeuro subjects in larmorx-testdata (`panel.toml`, `docs/panel.md`; `python -m larmorx_testdata
-fetch --tier full --tag panel`, 219 files, 2.35 GB; every file hash-verified and checked against its
-snapshot's content key, every anatomical image checked for defacing); the evidence exporter ships a
-per-example view (every existing example a whole volume, as before; new panel cases may be three
-full-resolution slices through the largest difference, cropped only where every array is constant),
-keeps integer types, credits every dataset from the catalog, guards the site's size (500 MB; 40 MB
-per page, raised with a reason, never by removing content: N4 60 MB; `evidence sizes`), and the
-site's images moved to the orphan branch `evidence-blobs` (`tools/blobs.py`;
-`static/evidence/blobs.sha256` on `main`); the site has a Data panel page, and 3dAutomask's page the
-first panel case (ds000256's extreme-motion child run). The panel's nine new fMRIPrep oracle runs all
-finished (exit 0; `docs/validation/oracle-runs.md`), and the pipeline-stage catalogue classifies
-every program node of the fourteen runs (multi-echo included).
-**Differential random testing and the generated tables merged** (2026-10-25; the evidence
-infrastructure's items 4 and 2): `python -m larmorx_validation difftest` draws random valid
-inputs (seeded plain arithmetic, ≤ 32³) and option combinations for every finished tool (21
-descriptors in `validation/src/larmorx_validation/difftest/tools/`), runs the original and
-larmorx through the tool's own parity runner, shrinks each difference to its smallest input and
-fewest options, and keeps what was done about it in `validation/difftest/triage.toml`; a fixed
-difference becomes a permanent parity case (`validation/difftest/cases/<tool>/<id>.json`, loaded
-by the suites as `difftest/<id>`). Nightly: `scripts/orchestration/difftest-nightly.sh`
-(`oracles/difftest/<date>/`: `report.md`, `summary.json`, the findings); the first night
-(6.2 h, 3 jobs): 34 880 cases, 31790 agree, 3 explained, 1350 notice, 394 undefined, 1227 differ, 76 memory, 38 timeout; 58 groups of differences: 34 fixed in larmorx, 6 defects of the originals in the register, 17 open for the clean-room originals' agents, 1 the harness's own; 76 heavy cases queued
-([docs/validation/difftest.md](docs/validation/difftest.md)). `python -m larmorx_validation
-tables [--check]` generates the README's tool table, the validation index and the site's status
-table from `validation/tools.toml` and the records (a test fails when a committed table differs).
-Random testing runs in a memory box (`boxed.sh 8`; each worker a cgroup leaf of 3 GiB without
-swap); a case over its limit is the verdict *memory*, queued in the night's `heavy.jsonl` and run
-to its end later by `difftest --heavy` in a box of 24 GiB with 48 GiB of swap when the machine is
-quiet (the first night's N4 case that filled the machine is ANTS-162: larmorx's guard stops such
-a computation before allocating). Of the 76 heavy cases, 40 ran here (26 agree, 14 notices that
-changed no value), 11 are beyond any machine (guard cases) and 25 wait for a larger machine. The
-same part brought every ANTs image program measured to at most ANTs' peak memory on the same call
-(the user's rule of 2026-10-25; `tests/parity/test_memory_peak.py`, 13 calls, bit for bit).
-**The BET replica merged** (2026-10-26; built 2026-10-24 and 25; FSL, item 7): `larmorx-nc fsl
-bet|bet2|betsurf`, bit-identical to FSL 6.0.7.17 (115 of 115 compared cases in the standard tier,
-129 of 129 and 364 of 364 files in the full tier); BET's and mcflirt's FSL libraries joined in
-`larmorx-nc-core` (one translation of each, its API in the core's `PROVENANCE.md`); FSL-40 to
-FSL-58 by rules A to D, FSL-41, -52, -58 and FSL-43's crash class as D13 failure cases; NaN and
-infinite voxels with SSE's bits on every platform (BET's NaN matrix); under random testing
-(`fsl-bet`; four trial runs, every difference fixed, seven permanent cases) and below FSL's peak
-memory in every measured call; `pow` and `exp` from Arm's MIT routines; FSL-22's `reproduce` made
-exact (libstdc++'s order from the SGI STL's introsort, no libstdc++ text; decision log
-2026-10-26); `specs/bet.md` for the clean-room original.
+**In place** (how each came about: [docs/status-log.md](docs/status-log.md), 2026-10-21 to 26; why: the decision log):
+- **Interactive evidence** for every tool: `python -m larmorx_validation evidence <tool>|summary|all --site <site>` ([docs/figures.md](docs/figures.md)); the site's images on its orphan branch `evidence-blobs` (`tools/blobs.py`), a size guard that never removes content, credits from the test-data catalog.
+- **The oracle-output cache** ([docs/validation/oracle-cache.md](docs/validation/oracle-cache.md)): every original program's run computed once; `--oracle-cache use|refresh|off`; runs the original varies always run.
+- **The data panel:** fourteen OpenNeuro subjects (larmorx-testdata `docs/panel.md`, `fetch --tier full --tag panel`), and fourteen fMRIPrep oracle runs (below).
+- **Differential random testing** ([docs/validation/difftest.md](docs/validation/difftest.md)): `python -m larmorx_validation difftest`, nightly by `scripts/orchestration/difftest-nightly.sh`, in memory boxes; heavy cases queued (25 wait for a larger machine, 11 are beyond any machine and checked as guard cases).
+- **Generated tables:** `python -m larmorx_validation tables [--check]` writes the README's tool table, the validation index and the site's status from `validation/tools.toml` and the records.
+- **Memory:** heavy jobs in boxes (`scripts/orchestration/boxed.sh`); larmorx never above the original's peak (`tests/parity/test_memory_peak.py`); guards stop impossible sizes before allocating (ANTS-162, AFNI-75).
+- **FSL:** `crates-nc/` (`larmorx-nc`, FSL Licence) with its shared core `larmorx-nc-core`; the mcflirt and BET replicas.
 **Next:** this round is complete (BET merged). Next comes a clean stop, then the move to the new
 main machine, then every finished tool re-validated on the data panel (the oracle-output cache,
 the data panel, differential random testing and the generated tables are done; the nights run by
@@ -148,6 +83,7 @@ with a stop after it, each bringing its evidence.
 - **CI stays as it is** (user, 2026-10-16): every push to `main` that is not docs-only runs the full six-platform workflow.
 - **Very strong evidence** (user, 2026-10-23: "reliable programs replicas, clean room, and very very strong evidence"): besides the parity suites against the originals (as built, with correctly rounded maths, in fMRIPrep's image, at several thread counts) and the explained differences, (1) shared documents go through the orchestrator (above), (2) the tables that repeat facts (README tools, validation index, the site's status) are generated from the records, (3) every tool is validated on one fixed **data panel** (3T and 7T, multiband and single-band, children and older adults, a lesion, low quality and motion), (4) **differential random testing** against the original runs overnight for every tool, and (5) large ports get an **independent review** before merging (decision log 2026-10-23).
 - **Speed at the same quality** (user, 2026-10-23): oracle outputs are cached by content and never computed twice (the oracle-output cache, since 2026-10-25: verification re-runs only larmorx; variation is still measured fresh), no duplicate runs (the golden recording reuses the parity smoke result through its marker; the long tier once, at the end), small questions decided in batches. **Agents run on the model the user chooses** (now the session's): never launch an agent with a different or cheaper model.
+- **Working with the user** (user, 2026-10-23 to 26): explain in plain, simple words; report at milestones (a merge published, a decision needed), not at every agent wake-up; decide what the rules settle and bring only the rest, in one batch with a recommendation. To spare the weekly usage limit (2026-10-25: 13 % in 13 hours with five agents and a crash): at most two agents unless the user asks; agents read a lean CLAUDE.md (history in `docs/status-log.md`); a fresh orchestrator session at each clean stop (the state is in the files: `ORCHESTRATOR-STATE.md`, this file, the decision log); large handoffs integrated by a helper agent with a small context, then reviewed. Never ask for passwords, tokens or sudo; GitHub sign-in happens through VS Code only.
 - **Never more memory than the original** (user, 2026-10-25): for the same call larmorx's peak
   memory is at most the original program's, plus the Python interpreter's few MiB; no full-size
   copies where the original holds none, and no speed cache that raises the peak.
@@ -271,6 +207,8 @@ Every agent reads this file first, then `docs/porting-guide.md`, its section of 
   - Record the exact command, image tag/version, seeds and thread counts next to the outputs.
 - **Every heavy job runs in a memory box** (2026-10-25): `scripts/orchestration/boxed.sh <GiB> <command>` (a systemd user scope, hard memory limit, no swap), for parity tiers, random testing, fMRIPrep oracle runs, benchmarks, `record_golden.py` and `verify-merge.sh`; a harness that runs original programs on generated inputs also caps each process. On 2026-10-25 one random N4BiasFieldCorrection case grew to 28 GB; the machine swapped until VS Code's terminal host stopped answering, and the editor and every agent in it went down. Boxes of parallel agents together stay under about 24 GiB (the machine has 31).
 - Never commit image data or oracle outputs to git. Use content-addressed storage (PLAN.md §11.1).
+- The FreeSurfer licence file (`/usr/local/freesurfer/license.txt`) is only mounted read-only into containers; never copied or committed.
+- **Machines** (user, 2026-10-25): development moves to a new main machine (16 cores / 32 threads, 128 GB, RTX 4090, Ubuntu 22.04 like this laptop); this laptop becomes the quiet benchmark machine and a second Linux reference; a Windows laptop serves Windows checks; the lab's server (1 TB RAM, shared, Ubuntu 24.04: originals in an Ubuntu 22.04 container) only giant jobs. Helpers are reached by key-based SSH from the main machine, never with passwords; macOS stays with CI. The move is the next stage's first part (`docs/next-steps.md`).
 - **Run one agent at a time** (user, 2026-10-10; a two-agent trial on 2026-10-11 was stopped the same evening to stay within usage limits). Four parallel agents once exhausted the session limit and were killed mid-task. Brief every agent to commit as soon as its work passes the gates; when pausing one, ask for a WIP checkpoint commit and a NOTES file first.
 - **The ANTs oracle is built with conda-forge GCC 14.3** (`oracles/toolchains/gcc-14.3`, user-level). Ubuntu 22.04's GCC 11.4 and 12.3 miscompile float roundings at `-O3` (GCC bug 110182); `scripts/build_ants_oracle.sh` probes for it and refuses such a compiler. The old GCC 11 build is kept as evidence in `oracles/ants-2.6.5-gcc11-O3`; validate registration (A4/A5) against the new build only.
 - **Wait loops must not match themselves.** `until ! pgrep -f "larmorx_validation bench"` also matches its own command line, so it never ends (four such loops ran for a day, 2026-10-11). Use a bracket: `pgrep -f "[l]armorx_validation bench"`.

@@ -34,9 +34,23 @@ starts no other agent.
 
 ## The order from here
 
-**Now (2026-10-26):** this round is complete (BET merged, item 7). Next: a clean stop, then the
-move to the new main machine, then every finished tool re-validated on the data panel (item 6),
-then BET's clean-room original and the next FSL tools (item 7).
+**Now (2026-10-26):** this round is complete (BET merged, item 7; the clean stop made: history out
+of CLAUDE.md, the working agreements in it). Next, in order:
+
+- **M. The move to the new main machine** (user, 2026-10-25; CLAUDE.md "Machines"), one bounded
+  part: on the new laptop (Ubuntu 22.04, 32 threads, 128 GB) clone the three repositories and run
+  `scripts/bootstrap_workspace.sh`; copy what is costly to remake (the fourteen fMRIPrep oracle
+  runs, 75 GB; the fMRIPrep image; `~/.cache/larmorx-testdata`; `~/fsl`; the oracle builds in
+  `oracles/` and their toolchains; the oracle cache; the session's memory notes and
+  `ORCHESTRATOR-STATE.md`), check that glibc is the same point release (2.35) so the originals'
+  results are unchanged, rebuild everything else; then the proof: every record's standard tier,
+  `pytest tests/parity` and the golden suite re-run there and compared case by case with the
+  committed records (`compare_records.py`), and a sample of the oracle cache verified. Only then
+  does new work run there. Then the helpers: key-based SSH to this laptop (benchmarks, a second
+  Linux reference), the Windows laptop and, for the 25 heavy cases and later FreeSurfer batches,
+  the lab's server (originals in an Ubuntu 22.04 container: its glibc is 2.39).
+- **Then** every finished tool re-validated on the data panel (item 6), then BET's clean-room
+  original and the next FSL tools (item 7).
 
 1. **Visual reports, part 2: interactive evidence** (user, 2026-10-21; decision log). Part 2a, a
    pilot (merged and approved by the user, 2026-10-21): the Validation guide (method, terms,

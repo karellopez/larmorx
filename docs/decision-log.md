@@ -1418,6 +1418,18 @@ quality. It should be the best software, not a generic, faulty or incomplete one
   that sMRIPrep's recon-all calls run unchanged on 8.2.0 and reports any difference.
 - **D6, the atlas data:** downloaded on first use from FreeSurfer's official distribution,
   hash-verified, never bundled in a wheel (as the Talairach atlas, 2026-10-19).
+- **Memory: both ways, never above FreeSurfer's peak** (the user's point, the same day: "Sometimes,
+  the intermediate writes in disk are intentional to be memory efficient ... what do you think
+  about to have both options?"). A one-process pipeline must not keep everything in memory.
+  Three modes: `low`, recon-all's way (each step reads its inputs from disk, writes its outputs,
+  frees everything; resumable from the last finished step); `auto`, the default (the step order
+  is fixed, so each intermediate is kept in memory only until its last use and only while the
+  total stays within the budget, otherwise read back from disk; the two hemispheres run side by
+  side only when the budget allows both); and a larger budget on request for big machines. The
+  default budget is FreeSurfer's own peak for the same subject (the largest single program's,
+  measured on the panel in the oracle runs: the memory rule of 2026-10-25). The subject
+  directory's files are always written (they are FreeSurfer's outputs, which fMRIPrep and users
+  read), in the background so the next step need not wait; they also make every run resumable.
 
 ## Open decisions (PLAN.md §16)
 

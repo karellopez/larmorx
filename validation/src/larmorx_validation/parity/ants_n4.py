@@ -23,6 +23,7 @@ nipype writes them (``[ 200 ]`` with spaces).
 
 from __future__ import annotations
 
+import dataclasses
 import os
 from pathlib import Path
 
@@ -989,18 +990,30 @@ def panel_cases() -> list[AntsCase]:
     from larmorx_validation.parity import fmriprep_nodes
     from larmorx_validation.parity import panel_images as P
 
-    nodes = fmriprep_nodes.ants_cases(PROGRAM, band_once=True)
+    def tuned(c: AntsCase) -> AntsCase:
+        # ANTS-40's correction leaves the zero and negative voxels out of the histogram, so the
+        # range loop's first voxel differs between the modes: ANTS-38 (a first-voxel minimum
+        # dropped) may be met in one mode only. And the suite's rule for `-r` without a mask
+        # (ANTS-36, named in both modes, no effect), as `n` applies it to the other tiers.
+        kw: dict = {"one_mode": ("ANTS-38",)}
+        if "-r" in c.args and "-x" not in c.args and "--mask-image" not in c.args:
+            kw["silent_ok"] = ("ANTS-36",)
+        return dataclasses.replace(c, **kw)
+
+    nodes = [tuned(c) for c in fmriprep_nodes.ants_cases(PROGRAM, band_once=True)]
     final = ("-d", "3", "--bspline-fitting", "[", "200", "]", "--convergence", "[",
              "50x50x50x50x50,", "1e-07", "]", "--shrink-factor", "4")  # fmt: skip
 
     def n(cid, description, image, *extra, images=()):
-        return P.ants_case(
-            PROGRAM,
-            cid,
-            description,
-            (*final, "--input-image", image, "--output", "[", "{out},", "{out2}", "]", *extra),
-            images or [image],
-            outputs=("{out}", "{out2}"),
+        return tuned(
+            P.ants_case(
+                PROGRAM,
+                cid,
+                description,
+                (*final, "--input-image", image, "--output", "[", "{out},", "{out2}", "]", *extra),
+                images or [image],
+                outputs=("{out}", "{out2}"),
+            )
         )
 
     return [

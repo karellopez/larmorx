@@ -572,3 +572,24 @@ from `validation/investigations/difftest/rss_timeline.py`:
   a mask of ones was made and kept for the whole run, the shrink with factor 1 copied, and the
   corrected image and bias field were cropped into new images while the padded ones lived: now
   they are borrowed, made only to be shrunk, computed in place of the log field and moved.
+
+## On the data panel (2026-10-26)
+
+The panel record ([ants-n4-panel](../validation/ants-n4-panel.md)) replays all 64 N4 nodes of the
+fourteen finished fMRIPrep oracle runs and sMRIPrep's final options on five panel images: 69 of
+69 bit-identical with CORE-MATH, 20 to the unmodified ANTs. Two things it showed:
+
+- **ANTS-38 can be met in one mode only.** ANTS-40's correction (larmorx's default) leaves the
+  zero and negative voxels out of the histogram, so the histogram range's loop sees another first
+  voxel than ANTs' (`reproduce`): on ds002422's and ds005040's field-map magnitudes ANTS-38's
+  condition (a first-voxel minimum the `else if` drops) is met in the default mode only, on the
+  7 T MP2RAGE in `reproduce` only. Each mode names what it meets; the suite lists ANTS-38 as a
+  defect one mode may meet without the other (`one_mode`). ANTS-36 (`-r` without a mask, which
+  fMRIPrep's BOLD references pass) is named in both modes and changes nothing, as the standard
+  tier already allows.
+- **A mask written from the image's affine** (nibabel's `Nifti1Image(data, affine)`, which
+  recomputes pixdim from the affine: 0.99999797 mm against the T2w's 1) is 2e-6 mm off the
+  image's grid, beyond ITK's tolerance (1e-6 of the first spacing): ANTs aborts in
+  `VerifyInputInformation` and larmorx refuses, as its geometry check already did. The panel's
+  case writes the mask with the image's own header; the affine-written mask is kept as an error
+  case (`final-mask/stroke-t2w-mask-from-affine`).

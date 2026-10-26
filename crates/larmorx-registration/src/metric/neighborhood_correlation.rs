@@ -192,6 +192,17 @@ impl NeighborhoodCorrelation {
         compute_derivative: bool,
         floor: &IndexFloor,
     ) -> Result<Reduced<R>, ItkException> {
+        // Its parallel loops in the call's pool (the metric's thread count).
+        m.in_pool(|| self.evaluate_in_pool(m, transform, compute_derivative, floor))?
+    }
+
+    fn evaluate_in_pool<R: Real, const D: usize>(
+        &self,
+        m: &ImageMetricv4<R, D>,
+        transform: &Composite<R, D>,
+        compute_derivative: bool,
+        floor: &IndexFloor,
+    ) -> Result<Reduced<R>, ItkException> {
         let np = m.local_parameters(transform);
         let space = &m.virtual_space;
         let none = GradientSource {

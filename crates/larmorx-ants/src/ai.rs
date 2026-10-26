@@ -1006,6 +1006,7 @@ pub fn search<const D: usize>(
         pixel_f32: true,
         local_support: false,
         outside: Default::default(),
+        n_threads: Some(n_threads),
     };
     let StartPoints {
         mut list,

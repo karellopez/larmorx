@@ -35,6 +35,26 @@ use crate::{Image, ItkException, Real, Space};
 /// Points evaluated in parallel before they are consumed in order.
 const CHUNK: usize = 1 << 14;
 
+/// `f` run in a pool of `n_threads` threads (0: every logical CPU), or in the current pool
+/// when `None` (the caller installed the call's pool): never rayon's global pool, whose size
+/// is the machine's, not the call's.
+pub fn in_pool<T: Send>(
+    n_threads: Option<usize>,
+    f: impl FnOnce() -> T + Send,
+) -> Result<T, ItkException> {
+    match n_threads {
+        None => Ok(f()),
+        Some(n) => larmorx_core::parallel::with_threads(n, f).map_err(|e| {
+            ItkException::new(
+                "Modules/Core/Common/src/itkMultiThreaderBase.cxx",
+                0,
+                "MultiThreaderBase",
+                e.to_string(),
+            )
+        }),
+    }
+}
+
 /// The inputs of an image metric for one level.
 #[derive(Clone, Debug)]
 pub struct ImageMetricv4<R, const D: usize> {
@@ -68,6 +88,11 @@ pub struct ImageMetricv4<R, const D: usize> {
     /// What becomes of the derivative of a sample point outside the virtual region
     /// (ITK-97, ITK-99), and how many there were.
     pub outside: OutsideDerivatives,
+    /// The call's thread count: the metric's parallel loops run in a pool of that many
+    /// threads (`larmorx_core::parallel::with_threads`; 0: every logical CPU). `None` when the
+    /// caller already runs it inside its own pool (SyN, the velocity fields), which the loops
+    /// then use. Never rayon's global pool, whose size is the machine's, not the call's.
+    pub n_threads: Option<usize>,
 }
 
 /// The derivative of a sample point whose virtual index lies outside the virtual region
@@ -392,6 +417,12 @@ impl<R: Real, const D: usize> ImageMetricv4<R, D> {
         }
     }
 
+    /// Runs `f` in the call's pool (`n_threads`), or in the current one when the caller
+    /// installed it (`None`).
+    pub fn in_pool<T: Send>(&self, f: impl FnOnce() -> T + Send) -> Result<T, ItkException> {
+        in_pool(self.n_threads, f)
+    }
+
     /// Evaluates `f` on every domain point in parallel, chunk by chunk, and passes the
     /// results that are `Some` to `consume` in domain order.
     pub fn for_each_sample<T: Send>(
@@ -405,10 +436,11 @@ impl<R: Real, const D: usize> ImageMetricv4<R, D> {
         while start < n {
             let end = (start + CHUNK).min(n);
             buffer.clear();
-            (start..end)
-                .into_par_iter()
-                .map(&f)
-                .collect_into_vec(&mut buffer);
+            let f = &f;
+            let chunk = &mut buffer;
+            self.in_pool(move || {
+                (start..end).into_par_iter().map(f).collect_into_vec(chunk);
+            })?;
             for r in buffer.drain(..).flatten() {
                 consume(r)?;
             }

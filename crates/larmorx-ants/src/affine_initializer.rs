@@ -337,6 +337,7 @@ pub fn search<const D: usize>(
         pixel_f32: true,
         local_support: false,
         outside: Default::default(),
+        n_threads: Some(n_threads),
     };
     // The scales, estimated once for the search transform as it is then: centred at 0, with
     // the initial transform's parameters.

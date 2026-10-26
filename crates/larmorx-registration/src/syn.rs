@@ -302,6 +302,8 @@ fn initialize_metric<R: Real, const D: usize>(
         pixel_f32: false,
         local_support: true,
         outside: outside.clone(),
+        // SyN's level runs inside its stage's pool (`pooled`).
+        n_threads: None,
     };
     let state = match kind {
         MetricKind::Demons => {
@@ -1145,6 +1147,7 @@ pub fn full_scale_cc<R: Real, const D: usize>(
             pixel_f32: false,
             local_support: true,
             outside: Default::default(),
+            n_threads: None,
         };
         crate::metric::neighborhood_correlation::NeighborhoodCorrelation { radius: 4 }.evaluate(
             &metric,

@@ -2291,9 +2291,10 @@ def highlights(results: list[CaseResult]) -> list[str]:
         for r in results
         if r.case.startswith(fmriprep_nodes.PREFIX) and r.case.endswith("/small")
     }
-    why = "full size not run in this record (hours of ANTs at one thread each)" + (
-        f"; compared on every {SMALL}rd voxel instead ({len(small)} small cases)" if small else ""
-    )
+    why = (
+        "full size not run in this record (hours of ANTs at one thread each, as built and with "
+        "CORE-MATH: the next part, on a larger machine)"
+    ) + (f"; compared on every {SMALL}rd voxel instead ({len(small)} small cases)" if small else "")
     return lines + fmriprep_nodes.record_lines(
         PROGRAM, results, why_not=dict.fromkeys(HEAVY_NODES, why)
     )

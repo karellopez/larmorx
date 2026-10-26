@@ -40,7 +40,35 @@ def cases() -> dict[str, tuple[str, bool, list[str]]]:
     a_args = list(atropos.args)
     i = a_args.index("--output")
     a_args[i + 1] = "[{out}/seg.nii.gz,{out}/POSTERIOR_%02d.nii.gz]"
-    return {
+    from larmorx_validation.parity import ants_ai, niworkflows_inputs
+    from larmorx_validation.parity import ants_registration as reg
+
+    keep = Path(sys.argv[1]) / "inputs"
+    keep.mkdir(parents=True, exist_ok=True)
+
+    def registration(cid: str) -> list[str]:
+        c = next(x for x in reg.all_cases() if x.id == cid)
+        return reg._resolve(c, Path("{out}"), keep)
+
+    tpl = "panel/fmriprep/ds005454-sub-16/anat_fit/register_template[MNI152NLin2009cAsym]/registration"
+    be = "panel/fmriprep/ds005454-sub-16/anat_fit/brain_extraction/norm"
+    files = niworkflows_inputs.masked("ds005454-sub-16-noreconall")
+    ai_bold = next(
+        c
+        for c in ants_ai._panel_cases()
+        if c.id.startswith("panel/fmriprep/ds005454") and "bold" in c.id
+    )
+    _w, ai_args, _seed = ants_ai._fmriprep_node(ai_bold.args[0][10:-1])
+    ai_args[ai_args.index("-o") + 1] = "{out}/initialization.mat"
+    extra = {
+        "registration-template-small-7t": ("antsRegistration", True, registration(tpl + "/small")),
+        "registration-brain-extraction-small-7t": ("antsRegistration", True, registration(be + "/small")),
+        "registration-brain-extraction-7t": ("antsRegistration", True, registration(be)),
+        "ai-bold-7t": ("antsAI", True, ai_args),
+        "affine-initializer-7t": ("antsAffineInitializer", True, niworkflows_inputs.affine_initializer_args(
+            files["fixed_masked.nii.gz"], files["moving_masked.nii.gz"], Path("{out}/transform.mat"))),
+    }  # fmt: skip
+    return extra | {
         "imagemath-truncate-7t": ("ImageMath", False, ["3", "{out}/o.nii.gz",
             "TruncateImageIntensity", f(P.MP2RAGE_7T), "0.01", "0.999", "256"]),
         "imagemath-m-bold-mb8": ("ImageMath", False, ["4", "{out}/o.nii.gz", "m",

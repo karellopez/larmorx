@@ -54,6 +54,8 @@ def same_outputs(a: Path, b: Path) -> tuple[bool, str]:
             x = gzip.decompress(x)
         if y[:2] == b"\x1f\x8b":
             y = gzip.decompress(y)
+        if name.endswith(".h5"):
+            continue  # ITK stamps HDF5 objects with times (ITK-09): the parity suite compares them
         if name.endswith((".nii", ".nii.gz")):
             if x[:348] != y[:348] or x[352:] != y[352:]:
                 return False, f"{name} differs"

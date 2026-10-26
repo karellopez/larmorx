@@ -245,7 +245,10 @@ def _named(e: fcache.Entry) -> list[str]:
     """The defects larmorx's default named in this entry's run (its standard error)."""
     log = e.dir / "larmorx-fix.log"
     text = log.read_text(encoding="utf-8") if log.is_file() else ""
-    return sorted(set(re.findall(r"\((ANTS-\d+|ITK-\d+)\)", text)))
+    # larmorx's notices: "upstream defect ITK-50 (ITK) corrected: ..." (and a bare "(ANTS-36)").
+    found = re.findall(r"upstream defect ((?:ANTS|ITK)-\d+)", text)
+    found += re.findall(r"\(((?:ANTS|ITK)-\d+)\)", text)
+    return sorted(set(found))
 
 
 def _window_of(ex, pid: str) -> list[float]:

@@ -1114,11 +1114,19 @@ def run_case(case: Case, checks: CheckList) -> None:
         ours = run_larmorx(s.tool, args, "reproduce", env, r_dir)
         crash = crashed(fsl)
         fill_entry = s.fix_refuses if s.expect == "crash-filled" else None
+        # a random case whose filled run then meets a failure FSL never reaches (an unknown
+        # FSLOUTPUTTYPE at the first save)
+        late_failure = False
         if crash and s.expect == "random" and (entry := named_entry(ours)):
-            if ours.code == 0 and (fill_entry := filled_entry(ours)):
+            if fill_entry := filled_entry(ours):
                 # a random case that met a failure case: judged as the record's crash-filled
                 # cases (the default's own pass decides what it does: refuse or correct)
                 s = replace(s, expect="crash-filled")
+                late_failure = ours.code != 0
+                if late_failure:
+                    # the default refuses there, and reproduce fails later: both stop, the
+                    # default naming the entry with nothing written to compare
+                    s = replace(s, silent_ok=(*s.silent_ok, fill_entry))
             else:
                 # stopped where FSL crashes (inside bet: the script's failure, as FSL's); the
                 # default stops there too, naming the entry
@@ -1127,9 +1135,10 @@ def run_case(case: Case, checks: CheckList) -> None:
         if filled:
             checks(
                 EXIT,
-                ours.code == 0,
+                ours.code == 0 or late_failure,
                 detail=f"FSL crashed ({fsl.code}); larmorx fills what FSL leaves undefined and "
-                f"finishes ({ours.code})",
+                f"finishes ({ours.code}"
+                + (", a later failure FSL never reaches)" if late_failure else ")"),
             )
         elif crash:
             checks(EXIT, ours.code == 1, detail=f"FSL crashed ({fsl.code}), larmorx {ours.code}")
@@ -1137,7 +1146,7 @@ def run_case(case: Case, checks: CheckList) -> None:
             checks(EXIT, fsl.code == ours.code, detail=f"FSL {fsl.code}, larmorx {ours.code}")
         check_messages(checks, fsl, ours, crash, filled)
         if filled:
-            _filled(checks, s, fill_entry or "", args, env, ours, r_dir, root, inputs)
+            _filled(checks, s, fill_entry or "", args, env, ours, r_dir, root, inputs, late_failure)
         else:
             compare_dirs(checks, f_dir, r_dir, inputs)
         identical = all(c.passed for c in checks.checks)
@@ -1157,8 +1166,13 @@ def run_case(case: Case, checks: CheckList) -> None:
             raise Outcome(
                 EXPECTED,
                 f"{FILLED}{fsl.code}); with upstream_defects='reproduce' larmorx fills what FSL "
-                f"leaves undefined deterministically, names {fill_entry} and writes its "
-                "outputs; the default " + ("refuses" if s.fix_refuses else "corrects it"),
+                f"leaves undefined deterministically, names {fill_entry} and "
+                + (
+                    f"then stops where FSL never gets ({larmorx_err_line(ours)})"
+                    if late_failure
+                    else "writes its outputs; the default "
+                    + ("refuses" if s.fix_refuses else "corrects it")
+                ),
             )
         if crash and all(c.passed for c in checks.checks):
             raise Outcome(BOTH_ERROR, f"FSL crashes, larmorx refuses: {larmorx_err_line(ours)}")
@@ -1176,10 +1190,12 @@ def _filled(
     r_dir: Path,
     root: Path,
     inputs: tuple[str, ...],
+    late_failure: bool = False,
 ) -> None:
     """Where FSL crashes on what it leaves undefined and ``reproduce`` fills it (D13's failure
-    cases): the replica names the defect as reproduced, writes its outputs, and gives the same
-    bytes when run again (the fill is deterministic). FSL's outputs are not compared: it wrote
+    cases): the replica names the defect as reproduced, writes its outputs (unless the filled run
+    then fails where FSL never gets: ``late_failure``), and gives the same bytes when run again
+    (the fill is deterministic). FSL's outputs are not compared: it wrote
     none, or ones that depend on memory it never set."""
     named = f"upstream defect {entry} (" in ours.err and ") reproduced: " in ours.err
     checks(
@@ -1191,7 +1207,8 @@ def _filled(
         ),
     )
     written = sorted(p.name for p in r_dir.iterdir() if p.name not in inputs)
-    checks("outputs written", bool(written), detail=", ".join(written) or "none")
+    if not late_failure:
+        checks("outputs written", bool(written), detail=", ".join(written) or "none")
     again = root / "larmorx-again"
     _prepare(again, s)
     run_larmorx(s.tool, args, "reproduce", env, again)

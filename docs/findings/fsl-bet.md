@@ -214,6 +214,31 @@ Each is in the register (`docs/findings/upstream-defects.md`); the switch is
   operands' decimals in sums and products: the replica's `dc` does the same for the expressions
   the script uses.
 
+## Random testing (BET's merge, 2026-10-26)
+
+BET's descriptor (`validation/src/larmorx_validation/difftest/tools/fsl_bet.py`) draws bet2's
+options, bet's variations and betsurf's (with a closed surface it makes) on heads of up to 32
+voxels per axis of every stored type, through BET's own parity runner. Four trial runs (seeds
+`bettrial1` to `bettrial4`; 34, 324, an interrupted one and 201 cases) found seven differences,
+each fixed and kept as a permanent case (`validation/difftest/cases/fsl-bet/`, `triage.toml`):
+
+- `fslstats -C` prints newimage's `WARNING::in calculating COG, total = 0.0` itself
+  (`newimage.cc:1586`, `cerr`): the replica had dropped it (an empty brain under `bet -R`).
+- Inside `bet`, where FSL's bet2 crashes (FSL-41), the script's ERR trap prints its failure and
+  exits 1: FSL's defined outcome, which `reproduce` now gives (it had filled and gone on).
+- A filled run's messages: FSL's buffered standard output is lost at its crash (`-v` on a constant
+  image), so the suite compares what FSL printed as the start of the replica's.
+- **FSL-58**: betsurf with no voxel of the T1 inside the brain surface (above); the replica had
+  panicked.
+- `fslmaths -mas` (bet `-F`) computes in double and writes double for a double input
+  (`fslmaths.cc:1414-1440`, newimage's `dtype` of the file); the replica wrote float.
+- FSL-43's correction was named where it changed nothing: now compared with FSL's own fill (a
+  start one voxel outside) or with no fill (further out, where FSL crashes), and named only where
+  an output shows the mask (not under `-n` without `-m`).
+- betsurf `--t1only` with an unknown `FSLOUTPUTTYPE`: `FslGetEnvOutputType` calls `exit(1)`
+  itself, so FSL-54's dropped status does not apply.
+- (The suite's own) a filled run that then meets a failure FSL never reaches is judged as filled.
+
 ## NaN and infinite voxels (BET's merge, 2026-10-25)
 
 FSL's Linux build computes with SSE: a NaN made from numbers (`0 * inf`, `inf - inf`, `0 / 0`)

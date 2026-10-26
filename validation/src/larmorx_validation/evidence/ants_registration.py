@@ -692,10 +692,10 @@ def _short(command: str, ex_id: str) -> str:
 # ------------------------------------------------------------------------------------ cases
 
 
-def _cases(ctx: core.Context) -> list[dict]:
+def _cases(ctx: core.Context, rec=None) -> list[dict]:
     from larmorx_validation.parity import ants_registration as suite
 
-    rec = records.load(ctx.repo, TOOL)
+    rec = rec or records.load(ctx.repo, TOOL)
     defs = {c.id: c for c in suite.all_cases()}
     examples = {v[1]: f"template-{k}" for k, v in EXAMPLES.items()}
     out = []
@@ -747,6 +747,16 @@ def _case_command(c) -> str:
         a = re.sub(
             r"\{(?:missing|gen-points|gen-syn|gen-bsp|gen-transform):([^}]+)\}",
             lambda m: m.group(1),
+            a,
+        )
+        a = re.sub(
+            r"\{panel-node(-small)?:([^}]+)\}",
+            lambda m: (
+                f"<fMRIPrep 25.2.6's command.txt of {m.group(2).split('/')[0]}: "
+                f"{'/'.join(m.group(2).split('/')[-2:])}"
+                + (", every third voxel" if m.group(1) else "")
+                + ">"
+            ),
             a,
         )
         a = re.sub(
@@ -949,7 +959,13 @@ def export(ctx: core.Context) -> dict:
     reg = core.register(ctx.repo)
     rec = records.load(ctx.repo, TOOL)
     cases = _cases(ctx)
-    examples = [_example(ctx, k, reg) for k in EXAMPLES]
+    from larmorx_validation.evidence import ants_panel
+
+    prec = ants_panel.panel_record(ctx.repo, TOOL)
+    if prec is not None:
+        cases += ants_panel.panel_cases_tidy(_cases(ctx, prec))
+    inventory = ants_panel.inventory_table(prec, "panel-nodes", "antsRegistration")
+    examples = [_example(ctx, k, reg) for k in EXAMPLES] + ants_panel.examples(ctx, TOOL)
     corrections, corrections_source = _corrections_tables(ctx)
     return {
         "schema": 1,
@@ -957,9 +973,12 @@ def export(ctx: core.Context) -> dict:
         "title": "antsRegistration",
         "provenance": {
             "exporter": core.tree_hash(ctx.repo, "validation/src/larmorx_validation/evidence"),
-            "records": rec.source() + corrections_source,
+            "records": rec.source()
+            + corrections_source
+            + (prec.source() if prec is not None else []),
             "benchmarks": [],
-            "cache": [fcache.provenance(entry(ctx, k)) for k in EXAMPLES],
+            "cache": [fcache.provenance(entry(ctx, k)) for k in EXAMPLES]
+            + [fcache.provenance(x) for x in ants_panel.entries(ctx, TOOL)],
             "command": f"python -m larmorx_validation evidence {TOOL} --site <site>",
         },
         "implementations": [
@@ -970,7 +989,7 @@ def export(ctx: core.Context) -> dict:
         "cases": cases,
         "cases_total": len(cases),
         "dots": {"band": _band(rec)},
-        "tables": corrections,
+        "tables": corrections + ([inventory] if inventory else []) + ants_panel.tables(ctx, TOOL),
         "examples": examples,
     }
 

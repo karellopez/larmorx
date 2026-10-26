@@ -798,7 +798,7 @@ def export(ctx: core.Context) -> dict:
 
     prec = ants_panel.panel_record(ctx.repo, TOOL)
     if prec is not None:
-        cases += _cases(ctx, prec)
+        cases += ants_panel.panel_cases_tidy(_cases(ctx, prec))
     inventory = ants_panel.inventory_table(prec, "panel-nodes", "DenoiseImage")
     bench = records.load_bench(ctx.repo, TOOL)
     from larmorx_validation.figures.ants_denoise import SPEED_LABELS

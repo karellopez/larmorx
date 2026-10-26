@@ -352,7 +352,71 @@ def _ai() -> list[Spec]:
     ]  # fmt: skip
 
 
+def _registration() -> list[Spec]:
+    """fMRIPrep's BOLD-reference registrations (affine to MNI's BOLD reference; rigid to a
+    field map's magnitude): each run's transform places the moving image on the fixed grid."""
+
+    def reg(c: fmriprep_nodes.NodeCall) -> tuple[tuple[str, ...], str, str]:
+        args = list(c.args)
+        i = args.index("--output")
+        args[i + 1] = "{out:transform}"
+        metric = args[args.index("--metric") + 1 :]
+        words = " ".join(metric).split("]", 1)[0]
+        fixed, moving = (w.strip() for w in words.split("[", 1)[1].split(",")[:2])
+        return tuple(args), fixed, moving
+
+    out = []
+    seven = next(
+        c for c in fmriprep_nodes.calls("antsRegistration")
+        if c.run == RUN_7T and c.norm.endswith("enhance_and_skullstrip_bold_wf/norm")
+    )  # fmt: skip
+    args, fixed, moving = reg(seven)
+    out.append(
+        Spec("ants-registration", "panel-fmriprep-boldref-7t", "panel-boldref-7t",
+             "Data panel: fMRIPrep's BOLD reference to MNI at 7 T",
+             "fMRIPrep 25.2.6's own call (the BOLD reference's registration to MNI152NLin2009cAsym's "
+             "fMRIPrep BOLD reference at 2 mm: Affine, Mattes with random sampling from fMRIPrep's "
+             "seed) on ds005454 sub-16's 7 T multiband BOLD reference (1.4 mm): each run's "
+             "transform places the BOLD reference on the template's grid (ANTs' "
+             "antsApplyTransforms, linear). A key dataset, shown as a whole volume; every run's "
+             "parameters are in the table below it.",
+             "antsRegistration", args, (("placed", "transform0GenericAffine.mat",
+                                         "BOLD reference placed", ""),), fixed,
+             (("template", fixed, "MNI152NLin2009cAsym's BOLD reference, 2 mm"),),
+             (data("ds005454"),), view="volume", seed=seven.environ("ANTS_RANDOM_SEED"),
+             band=(8,), place=(moving, fixed, "transform0GenericAffine.mat"),
+             command=_cmd("antsRegistration", seven.command().split()[1:]),
+             node=f"`{fmriprep_nodes.label(seven.node)}` of the oracle run {RUN_7T}")
+    )  # fmt: skip
+    philips = next(
+        (c for c in fmriprep_nodes.calls("antsRegistration")
+         if c.run.startswith("ds002603") and c.norm.endswith("fmapreg_wf/coregister")
+         and "Mb4" in c.node),
+        None,
+    )  # fmt: skip
+    if philips is not None:
+        args, fixed, moving = reg(philips)
+        out.append(
+            Spec("ants-registration", "panel-fmriprep-coregister-philips",
+                 "panel-coregister-philips",
+                 "Data panel: fMRIPrep's field map to a Philips multiband BOLD reference",
+                 "fMRIPrep 25.2.6's own call (sdcflows' coregistration of the field map's "
+                 "magnitude and the BOLD reference: two Rigid stages, Mattes with random "
+                 "sampling, masks) on ds002603 sub-01's multiband-4 run (Philips, 588 volumes): "
+                 "each run's transform places the BOLD reference on the magnitude's grid.",
+                 "antsRegistration", args, (("placed", "transform0GenericAffine.mat",
+                                             "BOLD reference placed", ""),), fixed,
+                 (("magnitude", fixed, "the field map's magnitude (fMRIPrep's)"),),
+                 (data("ds002603"),), seed=philips.environ("ANTS_RANDOM_SEED"), band=(8,),
+                 place=(moving, fixed, "transform0GenericAffine.mat"),
+                 command=_cmd("antsRegistration", philips.command().split()[1:]),
+                 node=f"`{fmriprep_nodes.label(philips.node)}` of the oracle run {philips.run}")
+        )  # fmt: skip
+    return out
+
+
 SPECS = {
+    "ants-registration": _registration,
     "ants-programs": _programs,
     "ants-n4": _n4,
     "ants-denoise": _denoise,
@@ -388,6 +452,29 @@ def entries(ctx: core.Context, tool: str) -> list:
 
 
 # ------------------------------------------------------------------- records and the inventory
+
+
+def tidy(text: str) -> str:
+    """A command as a reader needs it: no machine's paths (an oracle run's files named from the
+    run, the test data's from the catalog, outputs by their names)."""
+    import re
+
+    text = re.sub(r"\{out:([^}]+)\}", r"\1", text)
+    root = fmriprep_nodes.root()
+    if root is not None:
+        text = text.replace(str(root) + "/", "<fMRIPrep oracle run>/")
+    text = re.sub(r"[^\s\[,]*/larmorx-testdata/data/", "", text)
+    text = re.sub(r"[^\s\[,]*/oracles/templateflow/", "templateflow/", text)
+    text = re.sub(r"[^\s\[,]*/oracles/inputs/", "<oracles/inputs>/", text)
+    return text
+
+
+def panel_cases_tidy(cases: list[dict]) -> list[dict]:
+    """The panel record's cases with their commands :func:`tidy`."""
+    for c in cases:
+        if c.get("command"):
+            c["command"] = tidy(c["command"])
+    return cases
 
 
 def panel_record(repo, name: str):

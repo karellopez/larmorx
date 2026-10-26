@@ -507,7 +507,7 @@ def _cases(ctx: core.Context) -> list[dict]:
             defs.update({c.id: c for c in mod.panel_cases()})
         recs = [records.load(ctx.repo, name), ants_panel.panel_record(ctx.repo, name)]
         for rec in (r for r in recs if r is not None):
-            out += _record_cases(rec, impl, program, defs, within)
+            out += ants_panel.panel_cases_tidy(_record_cases(rec, impl, program, defs, within))
     return out
 
 

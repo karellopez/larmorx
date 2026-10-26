@@ -24,7 +24,6 @@ HERE = Path(__file__).resolve().parent
 def cases() -> dict[str, tuple[str, bool, list[str]]]:
     """case -> (program, CORE-MATH preloaded for ANTs, arguments with ``{out}``)."""
     import larmorx_testdata as td
-
     from larmorx_validation.parity import fmriprep_nodes
     from larmorx_validation.parity import panel_images as P
 

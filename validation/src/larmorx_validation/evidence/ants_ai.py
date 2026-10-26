@@ -695,7 +695,7 @@ def _cases(ctx: core.Context) -> list[dict]:
     for impl, (program, name, module) in IMPLS.items():
         for rec in (records.load(ctx.repo, name), ants_panel.panel_record(ctx.repo, name)):
             if rec is not None:
-                out += _record_cases(rec, impl, program, module)
+                out += ants_panel.panel_cases_tidy(_record_cases(rec, impl, program, module))
     return out
 
 

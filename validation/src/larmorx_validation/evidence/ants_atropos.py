@@ -756,7 +756,7 @@ def export(ctx: core.Context) -> dict:
 
     prec = ants_panel.panel_record(ctx.repo, TOOL)
     if prec is not None:
-        cases += _cases(prec)
+        cases += ants_panel.panel_cases_tidy(_cases(prec))
     inventory = ants_panel.inventory_table(prec, "panel-nodes", "Atropos")
     e, p = entry(ctx), priors_entry(ctx)
     return {

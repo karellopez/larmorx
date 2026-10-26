@@ -1060,7 +1060,7 @@ def export(ctx: core.Context) -> dict:
 
     prec = ants_panel.panel_record(ctx.repo, TOOL)
     if prec is not None:
-        cases += _cases(ctx, prec, reg)[0]
+        cases += ants_panel.panel_cases_tidy(_cases(ctx, prec, reg)[0])
     inventory = ants_panel.inventory_table(prec, "panel-nodes", "N4BiasFieldCorrection")
     agreement = core.agreement(cases_for(cases, "port"))
     totals: dict[str, int] = {}

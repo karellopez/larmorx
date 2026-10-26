@@ -30,6 +30,13 @@ pub const MEMORY_LIMIT_ENV: &str = "LARMORX_MEMORY_LIMIT";
 /// on has; a plan above it is refused at once with its error).
 pub const DEFAULT_LIMIT: u64 = 1 << 40;
 
+/// Plans up to this size never need the machine's memory (every machine larmorx supports has
+/// it): the machine is queried only for a larger plan, with no limit given or set (2026-10-26).
+pub const QUERY_ABOVE: u64 = 4 << 30;
+
+/// How long the Windows query of the machine's memory may take before the fail-safe default.
+pub const QUERY_TIMEOUT: std::time::Duration = std::time::Duration::from_secs(20);
+
 /// Where a [`MemoryLimit`] comes from.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum LimitSource {
@@ -116,7 +123,8 @@ pub fn parse_bytes(text: &str) -> Option<u64> {
 }
 
 /// The machine's physical memory (Linux: `/proc/meminfo`; macOS: `sysctl hw.memsize`;
-/// Windows: `GlobalMemoryStatusEx`), or `None` where it cannot be read. Read once.
+/// Windows: the computer system's `TotalPhysicalMemory`, from PowerShell within
+/// [`QUERY_TIMEOUT`]), or `None` where it cannot be read. Read once per process.
 pub fn physical_memory() -> Option<u64> {
     static MEMORY: OnceLock<Option<u64>> = OnceLock::new();
     *MEMORY.get_or_init(read_physical_memory)
@@ -140,43 +148,43 @@ fn read_physical_memory() -> Option<u64> {
 }
 
 #[cfg(windows)]
-#[allow(unsafe_code)]
 fn read_physical_memory() -> Option<u64> {
-    // Audited (CLAUDE.md rule 5): one call of a kernel32 function every Windows process links,
-    // on a structure of plain integers this function owns; nothing is kept. A PowerShell query
-    // took over 5 s on the windows-arm64 runner (CI, 2026-10-26).
-    #[repr(C)]
-    #[allow(dead_code)] // MEMORYSTATUSEX's layout: only the total is read
-    struct MemoryStatusEx {
-        length: u32,
-        memory_load: u32,
-        total_phys: u64,
-        avail_phys: u64,
-        total_page_file: u64,
-        avail_page_file: u64,
-        total_virtual: u64,
-        avail_virtual: u64,
-        avail_extended_virtual: u64,
+    // The computer system's `TotalPhysicalMemory` from PowerShell's CIM query, with a time
+    // limit: the process took over 5 s on the windows-arm64 runner (CI, 2026-10-26). No unsafe
+    // code and no dependency (CLAUDE.md rule 5); where it fails or times out, `None`, and the
+    // limit is the fail-safe default. It runs at most once per process, and only for a plan
+    // above `QUERY_ABOVE`.
+    use std::io::Read;
+    use std::process::{Command, Stdio};
+    let mut child = Command::new("powershell")
+        .args([
+            "-NoProfile",
+            "-NonInteractive",
+            "-Command",
+            "(Get-CimInstance Win32_ComputerSystem).TotalPhysicalMemory",
+        ])
+        .stdin(Stdio::null())
+        .stdout(Stdio::piped())
+        .stderr(Stdio::null())
+        .spawn()
+        .ok()?;
+    let deadline = std::time::Instant::now() + QUERY_TIMEOUT;
+    loop {
+        match child.try_wait() {
+            Ok(Some(status)) if status.success() => break,
+            Ok(None) if std::time::Instant::now() < deadline => {
+                std::thread::sleep(std::time::Duration::from_millis(20));
+            }
+            _ => {
+                let _ = child.kill();
+                let _ = child.wait();
+                return None;
+            }
+        }
     }
-    #[link(name = "kernel32")]
-    unsafe extern "system" {
-        fn GlobalMemoryStatusEx(buffer: *mut MemoryStatusEx) -> i32;
-    }
-    let mut status = MemoryStatusEx {
-        length: std::mem::size_of::<MemoryStatusEx>() as u32,
-        memory_load: 0,
-        total_phys: 0,
-        avail_phys: 0,
-        total_page_file: 0,
-        avail_page_file: 0,
-        total_virtual: 0,
-        avail_virtual: 0,
-        avail_extended_virtual: 0,
-    };
-    // SAFETY: `status` is a valid, writable MEMORYSTATUSEX with `dwLength` set, as the API
-    // requires; the call writes only within it.
-    let ok = unsafe { GlobalMemoryStatusEx(&mut status) };
-    (ok != 0 && status.total_phys > 0).then_some(status.total_phys)
+    let mut out = String::new();
+    child.stdout.take()?.read_to_string(&mut out).ok()?;
+    out.trim().parse().ok().filter(|&bytes: &u64| bytes > 0)
 }
 
 #[cfg(not(any(
@@ -241,19 +249,50 @@ pub fn memory_limit() -> MemoryLimit {
 }
 
 /// `Err(limit)` when a computation that needs `needed` bytes exceeds the [`memory_limit`].
-/// Below 1 GiB, with no limit given or set, the machine's memory is not even read (every
-/// machine larmorx runs on has it).
+/// Up to [`QUERY_ABOVE`], with no limit given or set, the machine's memory is not read.
 pub fn check_plan(needed: f64) -> Result<(), MemoryLimit> {
-    let chosen = GIVEN.with(Cell::get).is_some() || std::env::var_os(MEMORY_LIMIT_ENV).is_some();
-    if !chosen && needed < (1u64 << 30) as f64 {
+    plan_against(needed, physical_memory)
+}
+
+/// [`check_plan`] with the machine's memory from `physical`, called only where the plan needs
+/// it (a plan above [`QUERY_ABOVE`] with no limit given or set).
+fn plan_against(needed: f64, physical: impl FnOnce() -> Option<u64>) -> Result<(), MemoryLimit> {
+    let within = |limit: MemoryLimit| {
+        if needed > limit.bytes as f64 {
+            Err(limit)
+        } else {
+            Ok(())
+        }
+    };
+    if let Some(bytes) = GIVEN.with(Cell::get) {
+        return within(MemoryLimit {
+            bytes,
+            source: LimitSource::Given,
+        });
+    }
+    if let Some(bytes) = std::env::var(MEMORY_LIMIT_ENV)
+        .ok()
+        .as_deref()
+        .and_then(parse_bytes)
+    {
+        return within(MemoryLimit {
+            bytes,
+            source: LimitSource::Environment,
+        });
+    }
+    if needed <= QUERY_ABOVE as f64 {
         return Ok(());
     }
-    let limit = memory_limit();
-    if needed > limit.bytes as f64 {
-        Err(limit)
-    } else {
-        Ok(())
-    }
+    within(match physical() {
+        Some(bytes) => MemoryLimit {
+            bytes,
+            source: LimitSource::Physical,
+        },
+        None => MemoryLimit {
+            bytes: DEFAULT_LIMIT,
+            source: LimitSource::Default,
+        },
+    })
 }
 
 /// An allocation the machine cannot make.
@@ -343,6 +382,28 @@ mod tests {
             source: LimitSource::Default,
         };
         assert!(default.to_string().contains("could not be read"));
+    }
+
+    #[test]
+    fn a_small_plan_never_queries_the_machine() {
+        if std::env::var_os(MEMORY_LIMIT_ENV).is_some() {
+            return; // a limit set for the whole run comes first
+        }
+        let never = || -> Option<u64> { panic!("the machine's memory was queried") };
+        assert!(plan_against(1.0e6, never).is_ok());
+        assert!(plan_against(QUERY_ABOVE as f64, never).is_ok());
+        // Above it, the machine's memory, or the fail-safe default where it cannot be read.
+        let eight = || Some(8u64 << 30);
+        assert!(plan_against(6.0 * (1u64 << 30) as f64, eight).is_ok());
+        let e = plan_against(16.0 * (1u64 << 30) as f64, eight).unwrap_err();
+        assert_eq!((e.bytes, e.source), (8 << 30, LimitSource::Physical));
+        assert!(plan_against(512.0 * (1u64 << 30) as f64, || None).is_ok());
+        let e = plan_against(2.0 * DEFAULT_LIMIT as f64, || None).unwrap_err();
+        assert_eq!(e.source, LimitSource::Default);
+        // A given limit is never the machine's.
+        with_memory_limit(1 << 20, || {
+            assert!(plan_against(4.0 * (1 << 20) as f64, never).is_err());
+        });
     }
 
     #[test]

@@ -526,10 +526,10 @@ cause (the voxels' size and the extent they give, against the spline distance), 
 ANTS-162; every case that fits is unchanged, bit for bit; `reproduce` attempts it as ANTs does.
 The limit is, in order: one given to the computation (`larmorx_core::alloc::with_memory_limit`,
 which the guards' tests use, so they depend on no machine), `LARMORX_MEMORY_LIMIT`, the
-machine's physical memory (Linux `/proc/meminfo`, macOS `sysctl`, Windows `GlobalMemoryStatusEx`),
-and, where that cannot be read, a fail-safe 1 TiB (2026-10-26: a PowerShell query of the
-memory took over 5 s on the windows-arm64 runner, where the N4 test's refusal must come within
-5 s). The same guard covers ResampleImage's and ResampleImageBySpacing's output grids (7.5 bytes per
+machine's physical memory (Linux `/proc/meminfo`, macOS `sysctl`, Windows PowerShell's CIM
+query within 20 s), read once per process and only for a plan above 4 GiB, and, where it cannot
+be read, a fail-safe 1 TiB (2026-10-26: the PowerShell query took over 5 s on the windows-arm64
+runner, where the N4 test's refusal must come within 5 s). The same guard covers ResampleImage's and ResampleImageBySpacing's output grids (7.5 bytes per
 output voxel). **A D11 option:** a control point without data in its support gets phi = 0 (and so do
 its refinements), so the lattice is zero away from the data; a sparse lattice, with the
 padding kept virtual (its voxels have weight 0 and are cropped at the end), gives the same

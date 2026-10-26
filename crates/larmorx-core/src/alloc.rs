@@ -9,10 +9,12 @@
 //! [`filled`] and refuses with ITK's message (D13 class (a): a crash defines nothing; larmorx
 //! exits 1 in both modes). Found by differential random testing (2026-10-25).
 
+use std::cell::Cell;
 use std::sync::OnceLock;
 
-/// The memory larmorx plans a computation for: `LARMORX_MEMORY_LIMIT` (bytes, or with a binary
-/// suffix: `512M`, `64G`, `2T`) when set, else the machine's physical memory.
+/// The memory larmorx plans a computation for: a limit given to this thread's computations
+/// ([`with_memory_limit`]), else `LARMORX_MEMORY_LIMIT` (bytes, or with a binary suffix: `512M`,
+/// `64G`, `2T`) when set, else the machine's physical memory, else [`DEFAULT_LIMIT`].
 ///
 /// An allocation larger than the address space fails at once ([`filled`]), but one that fits it
 /// and not the machine succeeds and fills the memory while it is written (Linux overcommits):
@@ -24,13 +26,21 @@ use std::sync::OnceLock;
 /// one); `reproduce` attempts it as the original does.
 pub const MEMORY_LIMIT_ENV: &str = "LARMORX_MEMORY_LIMIT";
 
+/// The limit where the machine's memory cannot be read (fail-safe: what no machine larmorx runs
+/// on has; a plan above it is refused at once with its error).
+pub const DEFAULT_LIMIT: u64 = 1 << 40;
+
 /// Where a [`MemoryLimit`] comes from.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum LimitSource {
+    /// Given to this thread's computations ([`with_memory_limit`]).
+    Given,
     /// `LARMORX_MEMORY_LIMIT`.
     Environment,
     /// The machine's physical memory.
     Physical,
+    /// [`DEFAULT_LIMIT`]: the machine's memory could not be read.
+    Default,
 }
 
 /// The memory a computation may plan for.
@@ -43,6 +53,17 @@ pub struct MemoryLimit {
 impl std::fmt::Display for MemoryLimit {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self.source {
+            LimitSource::Given => write!(
+                f,
+                "the {} given to this computation",
+                gib(self.bytes as f64)
+            ),
+            LimitSource::Default => write!(
+                f,
+                "larmorx's default of {} (this machine's memory could not be read; \
+                 {MEMORY_LIMIT_ENV} sets a limit)",
+                gib(self.bytes as f64)
+            ),
             LimitSource::Environment => {
                 write!(f, "the {} of {MEMORY_LIMIT_ENV}", gib(self.bytes as f64))
             }
@@ -95,8 +116,7 @@ pub fn parse_bytes(text: &str) -> Option<u64> {
 }
 
 /// The machine's physical memory (Linux: `/proc/meminfo`; macOS: `sysctl hw.memsize`;
-/// Windows: the computer system's `TotalPhysicalMemory`), or `None` where it cannot be read.
-/// Read once.
+/// Windows: `GlobalMemoryStatusEx`), or `None` where it cannot be read. Read once.
 pub fn physical_memory() -> Option<u64> {
     static MEMORY: OnceLock<Option<u64>> = OnceLock::new();
     *MEMORY.get_or_init(read_physical_memory)
@@ -120,17 +140,43 @@ fn read_physical_memory() -> Option<u64> {
 }
 
 #[cfg(windows)]
+#[allow(unsafe_code)]
 fn read_physical_memory() -> Option<u64> {
-    let out = std::process::Command::new("powershell")
-        .args([
-            "-NoProfile",
-            "-NonInteractive",
-            "-Command",
-            "(Get-CimInstance Win32_ComputerSystem).TotalPhysicalMemory",
-        ])
-        .output()
-        .ok()?;
-    String::from_utf8(out.stdout).ok()?.trim().parse().ok()
+    // Audited (CLAUDE.md rule 5): one call of a kernel32 function every Windows process links,
+    // on a structure of plain integers this function owns; nothing is kept. A PowerShell query
+    // took over 5 s on the windows-arm64 runner (CI, 2026-10-26).
+    #[repr(C)]
+    #[allow(dead_code)] // MEMORYSTATUSEX's layout: only the total is read
+    struct MemoryStatusEx {
+        length: u32,
+        memory_load: u32,
+        total_phys: u64,
+        avail_phys: u64,
+        total_page_file: u64,
+        avail_page_file: u64,
+        total_virtual: u64,
+        avail_virtual: u64,
+        avail_extended_virtual: u64,
+    }
+    #[link(name = "kernel32")]
+    unsafe extern "system" {
+        fn GlobalMemoryStatusEx(buffer: *mut MemoryStatusEx) -> i32;
+    }
+    let mut status = MemoryStatusEx {
+        length: std::mem::size_of::<MemoryStatusEx>() as u32,
+        memory_load: 0,
+        total_phys: 0,
+        avail_phys: 0,
+        total_page_file: 0,
+        avail_page_file: 0,
+        total_virtual: 0,
+        avail_virtual: 0,
+        avail_extended_virtual: 0,
+    };
+    // SAFETY: `status` is a valid, writable MEMORYSTATUSEX with `dwLength` set, as the API
+    // requires; the call writes only within it.
+    let ok = unsafe { GlobalMemoryStatusEx(&mut status) };
+    (ok != 0 && status.total_phys > 0).then_some(status.total_phys)
 }
 
 #[cfg(not(any(
@@ -143,35 +189,70 @@ fn read_physical_memory() -> Option<u64> {
     None
 }
 
-/// The memory larmorx may plan for ([`MEMORY_LIMIT_ENV`], else the physical memory), or `None`
-/// where neither is known (no limit).
-pub fn memory_limit() -> Option<MemoryLimit> {
+thread_local! {
+    static GIVEN: Cell<Option<u64>> = const { Cell::new(None) };
+}
+
+/// Runs `f` with `bytes` as the memory limit of this thread's plans, before
+/// [`MEMORY_LIMIT_ENV`] and the machine's memory: a caller that knows its budget, and the tests
+/// of the guards, which then depend on no machine (2026-10-26). The previous limit comes back
+/// when `f` returns or panics.
+pub fn with_memory_limit<R>(bytes: u64, f: impl FnOnce() -> R) -> R {
+    struct Restore(Option<u64>);
+    impl Drop for Restore {
+        fn drop(&mut self) {
+            GIVEN.with(|g| g.set(self.0));
+        }
+    }
+    let _restore = Restore(GIVEN.with(|g| g.replace(Some(bytes))));
+    f()
+}
+
+/// The memory larmorx may plan for: the limit given to this thread ([`with_memory_limit`]),
+/// else [`MEMORY_LIMIT_ENV`], else the physical memory, else [`DEFAULT_LIMIT`] (fail-safe: a
+/// guard always has a limit).
+pub fn memory_limit() -> MemoryLimit {
+    if let Some(bytes) = GIVEN.with(Cell::get) {
+        return MemoryLimit {
+            bytes,
+            source: LimitSource::Given,
+        };
+    }
     if let Some(bytes) = std::env::var(MEMORY_LIMIT_ENV)
         .ok()
         .as_deref()
         .and_then(parse_bytes)
     {
-        return Some(MemoryLimit {
+        return MemoryLimit {
             bytes,
             source: LimitSource::Environment,
-        });
+        };
     }
-    physical_memory().map(|bytes| MemoryLimit {
-        bytes,
-        source: LimitSource::Physical,
-    })
+    match physical_memory() {
+        Some(bytes) => MemoryLimit {
+            bytes,
+            source: LimitSource::Physical,
+        },
+        None => MemoryLimit {
+            bytes: DEFAULT_LIMIT,
+            source: LimitSource::Default,
+        },
+    }
 }
 
 /// `Err(limit)` when a computation that needs `needed` bytes exceeds the [`memory_limit`].
-/// Below 1 GiB the machine's memory is not even read (every machine larmorx runs on has it).
+/// Below 1 GiB, with no limit given or set, the machine's memory is not even read (every
+/// machine larmorx runs on has it).
 pub fn check_plan(needed: f64) -> Result<(), MemoryLimit> {
-    let env = std::env::var_os(MEMORY_LIMIT_ENV).is_some();
-    if !env && needed < (1u64 << 30) as f64 {
+    let chosen = GIVEN.with(Cell::get).is_some() || std::env::var_os(MEMORY_LIMIT_ENV).is_some();
+    if !chosen && needed < (1u64 << 30) as f64 {
         return Ok(());
     }
-    match memory_limit() {
-        Some(limit) if needed > limit.bytes as f64 => Err(limit),
-        _ => Ok(()),
+    let limit = memory_limit();
+    if needed > limit.bytes as f64 {
+        Err(limit)
+    } else {
+        Ok(())
     }
 }
 
@@ -229,6 +310,39 @@ mod tests {
                 check_plan(m as f64 * 2.0).is_err() || std::env::var_os(MEMORY_LIMIT_ENV).is_some()
             );
         }
+    }
+
+    #[test]
+    fn a_given_limit_comes_first_and_is_restored() {
+        let limit = with_memory_limit(64 << 30, memory_limit);
+        assert_eq!(limit.bytes, 64 << 30);
+        assert_eq!(limit.source, LimitSource::Given);
+        assert!(
+            limit
+                .to_string()
+                .contains("64.0 GiB given to this computation")
+        );
+        with_memory_limit(1 << 20, || {
+            // A given limit is read even below 1 GiB.
+            assert_eq!(
+                check_plan(4.0 * (1 << 20) as f64).unwrap_err().bytes,
+                1 << 20
+            );
+            assert!(check_plan(1000.0).is_ok());
+            let inner = with_memory_limit(2 << 20, memory_limit);
+            assert_eq!(inner.bytes, 2 << 20);
+            assert_eq!(memory_limit().bytes, 1 << 20);
+        });
+        assert_ne!(memory_limit().source, LimitSource::Given);
+        let caught = std::panic::catch_unwind(|| with_memory_limit(5, || panic!("inside")));
+        assert!(caught.is_err());
+        assert_ne!(memory_limit().source, LimitSource::Given);
+        // Fail-safe: every source gives a limit, the default where nothing can be read.
+        let default = MemoryLimit {
+            bytes: DEFAULT_LIMIT,
+            source: LimitSource::Default,
+        };
+        assert!(default.to_string().contains("could not be read"));
     }
 
     #[test]

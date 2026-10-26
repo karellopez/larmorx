@@ -544,9 +544,13 @@ mod tests {
             "0.001x0.001x0.001",
             "0",
         ];
-        let (code, _, err) = run_capture(&args, UpstreamDefects::Fix);
+        // The limit given explicitly: the test depends on no machine's memory (2026-10-26).
+        let (code, _, err) = larmorx_core::alloc::with_memory_limit(64 << 30, || {
+            run_capture(&args, UpstreamDefects::Fix)
+        });
         assert_eq!(code, 1, "{err}");
         assert!(err.contains("(ANTS-162)") && err.contains("GiB"), "{err}");
+        assert!(err.contains("64.0 GiB given to this computation"), "{err}");
         assert!(err.contains("2000000 x 2000000 x 2000000 voxels"), "{err}");
         assert!(!b.exists());
     }

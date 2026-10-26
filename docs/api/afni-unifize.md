@@ -96,7 +96,8 @@ Corrected by default, reproduced with `upstream_defects="reproduce"`, by both im
   -Urad to N voxels"); on micrometre voxels N is thousands and the ball of neighbours AFNI
   builds first needs terabytes, so AFNI fills the machine until it is stopped. By default the
   replica computes that memory before building the ball and, when it exceeds the machine's
-  physical memory (or `LARMORX_MEMORY_LIMIT`), stops at once with the GiB needed and the likely
+  physical memory (or `LARMORX_MEMORY_LIMIT`; 1 TiB where the machine's memory cannot be read),
+  stops at once with the GiB needed and the likely
   cause, naming AFNI-75 (exit 1); every case that fits is unchanged; `reproduce` attempts it
   as AFNI does.
 - **AFNI-01**: `-EPI`'s median volume drops a negative `scl_slope`, so its sign is wrong and the

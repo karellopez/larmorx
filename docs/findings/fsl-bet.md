@@ -219,15 +219,17 @@ Each is in the register (`docs/findings/upstream-defects.md`); the switch is
 BET's descriptor (`validation/src/larmorx_validation/difftest/tools/fsl_bet.py`) draws bet2's
 options, bet's variations and betsurf's (with a closed surface it makes) on heads of up to 32
 voxels per axis of every stored type, through BET's own parity runner. Four trial runs (seeds
-`bettrial1` to `bettrial4`; 34, 324, an interrupted one and 201 cases) found seven differences,
-each fixed and kept as a permanent case (`validation/difftest/cases/fsl-bet/`, `triage.toml`):
+`bettrial1` to `bettrial4`; 34, 324, an interrupted one and 201 cases) found eight kinds of
+difference (two of them in the suite's own comparison), each fixed, seven kept as permanent cases
+(`validation/difftest/cases/fsl-bet/`, `triage.toml`):
 
 - `fslstats -C` prints newimage's `WARNING::in calculating COG, total = 0.0` itself
   (`newimage.cc:1586`, `cerr`): the replica had dropped it (an empty brain under `bet -R`).
 - Inside `bet`, where FSL's bet2 crashes (FSL-41), the script's ERR trap prints its failure and
   exits 1: FSL's defined outcome, which `reproduce` now gives (it had filled and gone on).
-- A filled run's messages: FSL's buffered standard output is lost at its crash (`-v` on a constant
-  image), so the suite compares what FSL printed as the start of the replica's.
+- (The suite's own) a filled run's messages: FSL's buffered standard output is lost at its crash
+  (`-v` on a constant image), so the suite compares what FSL printed as the start of the
+  replica's.
 - **FSL-58**: betsurf with no voxel of the T1 inside the brain surface (above); the replica had
   panicked.
 - `fslmaths -mas` (bet `-F`) computes in double and writes double for a double input

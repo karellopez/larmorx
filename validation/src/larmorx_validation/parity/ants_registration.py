@@ -1044,6 +1044,8 @@ def _panel_cases() -> list[RegCase]:
     for c in fmriprep_nodes.calls(PROGRAM):
         spec = f"{c.run}/{c.node}"
         heavy = c.norm in HEAVY_NODES
+        # fMRIPrep's seed (its --random-seed 0), as the node's environment records it.
+        seed = c.environ("ANTS_RANDOM_SEED") or SEED
         out.append(
             RegCase(
                 fmriprep_nodes.PREFIX + c.id,
@@ -1052,6 +1054,7 @@ def _panel_cases() -> list[RegCase]:
                 (f"{{panel-node:{spec}}}",),
                 tier="panel",
                 band=not heavy and c.norm not in banded,
+                seed=seed,
             )
         )
         if heavy:
@@ -1064,6 +1067,7 @@ def _panel_cases() -> list[RegCase]:
                     (f"{{panel-node-small:{spec}}}",),
                     tier="panel",
                     band=c.norm not in banded,
+                    seed=seed,
                 )
             )
         banded.add(c.norm)
@@ -2275,7 +2279,17 @@ def highlights(results: list[CaseResult]) -> list[str]:
     lines += defects.summary(results)
     from larmorx_validation.parity import fmriprep_nodes
 
-    return lines + fmriprep_nodes.record_lines(PROGRAM, results)
+    small = {
+        r.case[len(fmriprep_nodes.PREFIX) : -len("/small")]: r.status
+        for r in results
+        if r.case.startswith(fmriprep_nodes.PREFIX) and r.case.endswith("/small")
+    }
+    why = "full size not run in this record (hours of ANTs at one thread each)" + (
+        f"; compared on every {SMALL}rd voxel instead ({len(small)} small cases)" if small else ""
+    )
+    return lines + fmriprep_nodes.record_lines(
+        PROGRAM, results, why_not=dict.fromkeys(HEAVY_NODES, why)
+    )
 
 
 def suite() -> Suite:

@@ -138,11 +138,17 @@ class NodeCall:
 
     def nslots(self) -> int | None:
         """The threads fMRIPrep gave the node (``NSLOTS`` in nipype's report)."""
+        value = self.environ("NSLOTS")
+        return int(value) if value and value.isdigit() else None
+
+    def environ(self, name: str) -> str | None:
+        """A variable of the node's environment as nipype's report records it (``NSLOTS``,
+        ``ANTS_RANDOM_SEED``)."""
         report = self.directory / "_report" / "report.rst"
         if not report.is_file():
             return None
-        m = re.search(r"^\* NSLOTS : (\d+)", report.read_text(errors="replace"), re.M)
-        return int(m.group(1)) if m else None
+        m = re.search(rf"^\* {re.escape(name)} : (\S+)", report.read_text(errors="replace"), re.M)
+        return m.group(1) if m else None
 
     def missing(self) -> list[str]:
         """The input files the command names that the working directory no longer holds."""

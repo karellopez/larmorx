@@ -589,12 +589,13 @@ def _example(ctx: core.Context, reg: dict) -> dict:
 
 
 def _cases(ctx: core.Context, rec) -> list[dict]:
-    from larmorx_validation.parity.ants_denoise import all_cases
+    from larmorx_validation.parity.ants_denoise import all_cases, panel_cases
 
-    defs = {c.id: c for c in all_cases()}
-    t = rec.table("Case", "Output", "Difference from ANTs as built")
+    defs = {c.id: c for c in [*all_cases(), *panel_cases()]}
+    cols = ("Case", "Output", "Difference from ANTs as built")
+    t = rec.table(*cols) if rec.has_table(*cols) else None
     rows: dict[str, list[dict]] = {}
-    for r in t.rows:
+    for r in t.rows if t is not None else []:
         rows.setdefault(records.strip_code(r["Case"]), []).append(r)
     out = []
     for r in rec.results:
@@ -793,6 +794,12 @@ def export(ctx: core.Context) -> dict:
     a44 = _a44_spec(ctx)
     rec = records.load(ctx.repo, TOOL)
     cases = _cases(ctx, rec)
+    from larmorx_validation.evidence import ants_panel
+
+    prec = ants_panel.panel_record(ctx.repo, TOOL)
+    if prec is not None:
+        cases += _cases(ctx, prec)
+    inventory = ants_panel.inventory_table(prec, "panel-nodes", "DenoiseImage")
     bench = records.load_bench(ctx.repo, TOOL)
     from larmorx_validation.figures.ants_denoise import SPEED_LABELS
 
@@ -818,12 +825,13 @@ def export(ctx: core.Context) -> dict:
         "title": "DenoiseImage",
         "provenance": {
             "exporter": core.tree_hash(ctx.repo, "validation/src/larmorx_validation/evidence"),
-            "records": rec.source(),
+            "records": rec.source() + (prec.source() if prec is not None else []),
             "benchmarks": bench.source() if bench else [],
             "cache": [
                 fcache.provenance(e),
                 fcache.provenance(repeats_entry(ctx)),
                 fcache.provenance(corrections.entry(ctx, a44)),
+                *(fcache.provenance(x) for x in ants_panel.entries(ctx, TOOL)),
             ],
             "command": f"python -m larmorx_validation evidence {TOOL} --site <site>",
         },
@@ -836,7 +844,12 @@ def export(ctx: core.Context) -> dict:
         "cases_total": len(cases),
         "band": _band(rec),
         "speed": speed,
-        "examples": [_example(ctx, reg), corrections.example(ctx, a44, reg)],
+        "examples": [
+            _example(ctx, reg),
+            corrections.example(ctx, a44, reg),
+            *ants_panel.examples(ctx, TOOL),
+        ],
+        **({"tables": [inventory]} if inventory else {}),
     }
 
 

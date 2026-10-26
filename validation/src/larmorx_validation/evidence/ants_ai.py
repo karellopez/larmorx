@@ -688,70 +688,80 @@ IMPLS = {
 
 
 def _cases(ctx: core.Context) -> list[dict]:
-    import importlib
+
+    from larmorx_validation.evidence import ants_panel
 
     out = []
     for impl, (program, name, module) in IMPLS.items():
-        rec = records.load(ctx.repo, name)
-        mod = importlib.import_module(f"larmorx_validation.parity.{module}")
-        defs = {
-            c.id: c
-            for c in (
-                mod.all_cases()
-                if hasattr(mod, "all_cases")
-                else [x.payload for x in mod.cases_for("full")]
-            )
-        }
-        for r in rec.results:
-            c = defs.get(r["case"])
-            v = common.outcome_verdict(r)
-            rep = r.get("reported", {})
-            if v is None:
-                glibc = sorted(k for k in rep if k.startswith("unmodified ANTs"))
-                band = rep.get("thread band")
-                if glibc:
-                    v = (
-                        "identical-cr",
-                        "differs from ANTs as built in "
-                        + ", ".join(g.removeprefix("unmodified ANTs: ") for g in glibc[:3])
-                        + "; identical to ANTs with CORE-MATH preloaded",
-                    )
-                else:
-                    v = (
-                        "bit-identical",
-                        "exit status, standard output, standard error, every file",
-                    )
-                if band is not None:
-                    v = (v[0], v[1] + f"; larmorx − ANTs at 1 thread: {band} in a parameter")
-                if "alignment error" in rep:
-                    v = (
-                        v[0],
-                        v[1]
-                        + f"; from the known transform: ANTs {rep.get('alignment error: ANTs')}, "
-                        f"larmorx's default {rep['alignment error']}",
-                    )
-            out.append(
-                {
-                    "id": f"{program}/{r['case']}",
-                    "category": r["category"],
-                    "description": c.description if c else "",
-                    "command": "",
-                    "results": {
-                        impl: {
-                            "outcome": r["status"],
-                            "verdict": v[0],
-                            "checks": f"{r['checks_passed']}/{r['checks_total']}",
-                            "reason": common.clip(v[1], 400),
-                        }
-                    },
-                    **(
-                        {"example": BLOB_EXAMPLES.get(r["case"], "init-aff")}
-                        if r["case"] == "real/ds000005-sub-01/brain-extraction"
-                        or r["case"] in BLOB_EXAMPLES
-                        else {}
-                    ),
-                }
-            )
+        for rec in (records.load(ctx.repo, name), ants_panel.panel_record(ctx.repo, name)):
+            if rec is not None:
+                out += _record_cases(rec, impl, program, module)
+    return out
+
+
+def _record_cases(rec, impl: str, program: str, module: str) -> list[dict]:
+    """The cases of one record of a program, with their verdicts."""
+    import importlib
+
+    out = []
+    mod = importlib.import_module(f"larmorx_validation.parity.{module}")
+    defs = {
+        c.id: c
+        for c in (
+            mod.all_cases()
+            if hasattr(mod, "all_cases")
+            else [x.payload for x in mod.cases_for("full")]
+        )
+    }
+    for r in rec.results:
+        c = defs.get(r["case"])
+        v = common.outcome_verdict(r)
+        rep = r.get("reported", {})
+        if v is None:
+            glibc = sorted(k for k in rep if k.startswith("unmodified ANTs"))
+            band = rep.get("thread band")
+            if glibc:
+                v = (
+                    "identical-cr",
+                    "differs from ANTs as built in "
+                    + ", ".join(g.removeprefix("unmodified ANTs: ") for g in glibc[:3])
+                    + "; identical to ANTs with CORE-MATH preloaded",
+                )
+            else:
+                v = (
+                    "bit-identical",
+                    "exit status, standard output, standard error, every file",
+                )
+            if band is not None:
+                v = (v[0], v[1] + f"; larmorx − ANTs at 1 thread: {band} in a parameter")
+            if "alignment error" in rep:
+                v = (
+                    v[0],
+                    v[1] + f"; from the known transform: ANTs {rep.get('alignment error: ANTs')}, "
+                    f"larmorx's default {rep['alignment error']}",
+                )
+        out.append(
+            {
+                "id": f"{program}/{r['case']}",
+                "category": r["category"],
+                "description": c.description if c else "",
+                "command": "",
+                "results": {
+                    impl: {
+                        "outcome": r["status"],
+                        "verdict": v[0],
+                        "checks": f"{r['checks_passed']}/{r['checks_total']}",
+                        "reason": common.clip(v[1], 400),
+                    }
+                },
+                **(
+                    {"example": BLOB_EXAMPLES.get(r["case"], "init-aff")}
+                    if r["case"] == "real/ds000005-sub-01/brain-extraction"
+                    or r["case"] in BLOB_EXAMPLES
+                    else {}
+                ),
+            }
+        )
     return out
 
 
@@ -759,10 +769,16 @@ def export(ctx: core.Context) -> dict:
     reg = core.register(ctx.repo)
     cases = _cases(ctx)
     a116, a116_sources = ants_ai_blobs.a116_table(ctx)
+    from larmorx_validation.evidence import ants_panel
+
     impls, sources = [], []
+    prec = ants_panel.panel_record(ctx.repo, "ants-ai")
+    inventory = ants_panel.inventory_table(prec, "panel-nodes", "antsAI")
     for impl, (program, name, _m) in IMPLS.items():
         rec = records.load(ctx.repo, name)
         sources += rec.source()
+        if (p := ants_panel.panel_record(ctx.repo, name)) is not None:
+            sources += p.source()
         impls.append(
             common.implementation(
                 cases,
@@ -786,6 +802,7 @@ def export(ctx: core.Context) -> dict:
                 fcache.provenance(entry(ctx)),
                 fcache.provenance(placed_entry(ctx)),
                 ants_ai_blobs.provenance(ctx),
+                *(fcache.provenance(x) for x in ants_panel.entries(ctx, TOOL)),
             ],
             "measurements": a116_sources,
             "command": f"python -m larmorx_validation evidence {TOOL} --site <site>",
@@ -794,8 +811,12 @@ def export(ctx: core.Context) -> dict:
         "cases_per_impl": True,
         "cases": cases,
         "cases_total": len(cases),
-        "tables": [a116],
-        "examples": [_example(ctx, reg), *ants_ai_blobs.examples(ctx)],
+        "tables": [a116, *([inventory] if inventory else []), *ants_panel.tables(ctx, TOOL)],
+        "examples": [
+            _example(ctx, reg),
+            *ants_ai_blobs.examples(ctx),
+            *ants_panel.examples(ctx, TOOL),
+        ],
     }
 
 

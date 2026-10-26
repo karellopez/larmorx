@@ -496,54 +496,62 @@ def _within(ctx: core.Context) -> dict[str, tuple[str, str]]:
 def _cases(ctx: core.Context) -> list[dict]:
     import importlib
 
+    from larmorx_validation.evidence import ants_panel
+
     within = _within(ctx)
     out = []
     for impl, (program, name, module) in PROGRAMS.items():
-        rec = records.load(ctx.repo, name)
         mod = importlib.import_module(f"larmorx_validation.parity.{module}")
         defs = {c.id: c for c in mod.all_cases()}
-        nb = set()
-        m = re.search(r"Not bit-identical[^:]*: (.*)$", rec.text, re.M)
-        if m:
-            nb = set(records.case_list(m.group(0)))
-        for r in rec.results:
-            c = defs.get(r["case"])
-            v = common.outcome_verdict(r) or common.known_correction(c, r, program)
-            rep = r.get("reported", {})
-            if v is None:
-                if r["case"] in within and impl == "image-math":
-                    v = within[r["case"]]
-                elif "values not compared" in rep or (c is not None and c.undefined_values):
-                    v = (
-                        "divergence",
-                        "Values not compared: ANTs' depend on memory it never "
-                        "wrote; exit status, header, type, shape and affine are ANTs'"
-                        + (
-                            f" ({c.undefined_values})"
-                            if c is not None and c.undefined_values
-                            else ""
-                        ),
-                    )
-                elif r["case"] in nb:
-                    v = ("open", "within the record's tolerance, not classified")
-                else:
-                    v = ("bit-identical", "values and header bytes")
-            out.append(
-                {
-                    "id": f"{program}/{r['case']}",
-                    "category": r["category"],
-                    "description": c.description if c else "",
-                    "command": _command(c) if c else "",
-                    "results": {
-                        impl: {
-                            "outcome": r["status"],
-                            "verdict": v[0],
-                            "checks": f"{r['checks_passed']}/{r['checks_total']}",
-                            "reason": common.clip(v[1], 400),
-                        }
-                    },
-                }
-            )
+        if hasattr(mod, "panel_cases"):
+            defs.update({c.id: c for c in mod.panel_cases()})
+        recs = [records.load(ctx.repo, name), ants_panel.panel_record(ctx.repo, name)]
+        for rec in (r for r in recs if r is not None):
+            out += _record_cases(rec, impl, program, defs, within)
+    return out
+
+
+def _record_cases(rec, impl: str, program: str, defs: dict, within: dict) -> list[dict]:
+    """The cases of one record of a program, with their verdicts."""
+    out = []
+    nb = set()
+    m = re.search(r"Not bit-identical[^:]*: (.*)$", rec.text, re.M)
+    if m:
+        nb = set(records.case_list(m.group(0)))
+    for r in rec.results:
+        c = defs.get(r["case"])
+        v = common.outcome_verdict(r) or common.known_correction(c, r, program)
+        rep = r.get("reported", {})
+        if v is None:
+            if r["case"] in within and impl == "image-math":
+                v = within[r["case"]]
+            elif "values not compared" in rep or (c is not None and c.undefined_values):
+                v = (
+                    "divergence",
+                    "Values not compared: ANTs' depend on memory it never "
+                    "wrote; exit status, header, type, shape and affine are ANTs'"
+                    + (f" ({c.undefined_values})" if c is not None and c.undefined_values else ""),
+                )
+            elif r["case"] in nb:
+                v = ("open", "within the record's tolerance, not classified")
+            else:
+                v = ("bit-identical", "values and header bytes")
+        out.append(
+            {
+                "id": f"{program}/{r['case']}",
+                "category": r["category"],
+                "description": c.description if c else "",
+                "command": _command(c) if c else "",
+                "results": {
+                    impl: {
+                        "outcome": r["status"],
+                        "verdict": v[0],
+                        "checks": f"{r['checks_passed']}/{r['checks_total']}",
+                        "reason": common.clip(v[1], 400),
+                    }
+                },
+            }
+        )
     return out
 
 
@@ -675,10 +683,18 @@ def export(ctx: core.Context) -> dict:
     cases = _cases(ctx)
     a17 = _a17_spec(ctx)
     ents = entries(ctx)
-    impls, sources = [], []
+    from larmorx_validation.evidence import ants_panel
+
+    impls, sources, inventory = [], [], []
     for impl, (program, name, _m) in PROGRAMS.items():
         rec = records.load(ctx.repo, name)
         sources += rec.source()
+        prec = ants_panel.panel_record(ctx.repo, name)
+        if prec is not None:
+            sources += prec.source()
+            t = ants_panel.inventory_table(prec, f"panel-nodes-{impl}", program)
+            if t is not None:
+                inventory.append(t)
         impls.append(
             common.implementation(
                 cases,
@@ -703,6 +719,7 @@ def export(ctx: core.Context) -> dict:
             "cache": [
                 *(fcache.provenance(e) for e in ents.values()),
                 fcache.provenance(corrections.entry(ctx, a17)),
+                *(fcache.provenance(e) for e in ants_panel.entries(ctx, TOOL)),
             ],
             "command": f"python -m larmorx_validation evidence {TOOL} --site <site>",
         },
@@ -715,7 +732,9 @@ def export(ctx: core.Context) -> dict:
             _example(ctx, ents["t1w"], T1W_NODES, "t1w", reg),
             _example(ctx, ents["pad"], PAD_NODES, "pad", reg),
             corrections.example(ctx, a17, reg),
+            *ants_panel.examples(ctx, TOOL),
         ],
+        "tables": inventory,
     }
 
 

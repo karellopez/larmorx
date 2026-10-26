@@ -566,7 +566,14 @@ def _cases(ctx: core.Context, rec) -> list[dict]:
     from larmorx_validation.parity import ants_apply_transforms as suite
     from larmorx_validation.parity import ants_transform_output as outputs
 
-    defs = {cid: (desc, s) for cid, _cat, desc, s in [*suite._scenarios(), *outputs.scenarios()]}
+    defs = {
+        cid: (desc, s)
+        for cid, _cat, desc, s in [
+            *suite._scenarios(),
+            *outputs.scenarios(),
+            *suite._panel_scenarios(),
+        ]
+    }
     defs.update({f"float/{cid}": v for cid, v in list(defs.items())})
     out = []
     for r in rec.results:
@@ -666,6 +673,12 @@ def _case_command(s) -> str:
 def export(ctx: core.Context) -> dict:
     rec = records.load(ctx.repo, TOOL)
     cases = _cases(ctx, rec)
+    from larmorx_validation.evidence import ants_panel
+
+    prec = ants_panel.panel_record(ctx.repo, TOOL)
+    if prec is not None:
+        cases += _cases(ctx, prec)
+    inventory = ants_panel.inventory_table(prec, "panel-nodes", "antsApplyTransforms")
     bench = records.load_bench(ctx.repo, TOOL)
     from larmorx_validation.figures.ants_apply_transforms import SPEED_LABELS
 
@@ -707,9 +720,13 @@ def export(ctx: core.Context) -> dict:
         "title": "antsApplyTransforms",
         "provenance": {
             "exporter": core.tree_hash(ctx.repo, "validation/src/larmorx_validation/evidence"),
-            "records": rec.source(),
+            "records": rec.source() + (prec.source() if prec is not None else []),
             "benchmarks": bench.source() if bench else [],
-            "cache": [fcache.provenance(e), fcache.provenance(bspline.entry(ctx))],
+            "cache": [
+                fcache.provenance(e),
+                fcache.provenance(bspline.entry(ctx)),
+                *(fcache.provenance(x) for x in ants_panel.entries(ctx, TOOL)),
+            ],
             "command": f"python -m larmorx_validation evidence {TOOL} --site <site>",
         },
         "implementations": [
@@ -720,7 +737,8 @@ def export(ctx: core.Context) -> dict:
         "cases": cases,
         "cases_total": len(cases),
         "speed": speed,
-        "examples": [_example(ctx), bspline.example(ctx)],
+        "examples": [_example(ctx), bspline.example(ctx), *ants_panel.examples(ctx, TOOL)],
+        **({"tables": [inventory]} if inventory else {}),
     }
 
 

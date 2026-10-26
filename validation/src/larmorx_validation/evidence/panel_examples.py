@@ -136,8 +136,10 @@ def _compute(spec: Spec):
             env = dict(env)
             if label.endswith("-cr"):
                 env["LD_PRELOAD"] = str(lib)
-            argv = [str(b / spec.program), *args] if is_ants else fcache.larmorx_cli(
-                "ants", spec.program, *args
+            argv = (
+                [str(b / spec.program), *args]
+                if is_ants
+                else fcache.larmorx_cli("ants", spec.program, *args)
             )
             e.run(label, argv, env=env, unset=common.CLEAN_ENV)
             if spec.place is not None:
@@ -159,7 +161,11 @@ def _compute(spec: Spec):
             f"with CORE-MATH) and at {', '.join(map(str, spec.band)) or 'no other'} threads; "
             f"larmorx in reproduce mode at {LX_THREADS} and 1 threads, in its default mode at "
             f"{LX_THREADS}"
-            + ("; each transform placed by ANTs' antsApplyTransforms (linear)" if spec.place else ""),
+            + (
+                "; each transform placed by ANTs' antsApplyTransforms (linear)"
+                if spec.place
+                else ""
+            ),
         )
 
     return compute

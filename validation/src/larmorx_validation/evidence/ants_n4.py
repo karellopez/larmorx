@@ -892,12 +892,13 @@ def _cases(ctx: core.Context, rec, reg: dict) -> tuple[list[dict], dict]:
     """Every case of the record, with its verdict: bit-identical to ANTs as built unless the
     record's table lists it as differing (then identical with correctly rounded maths, which
     the record checks for every case), rejected by both, ..."""
-    from larmorx_validation.parity.ants_n4 import all_cases
+    from larmorx_validation.parity.ants_n4 import all_cases, panel_cases
 
-    defs = {c.id: c for c in all_cases()}
-    t = rec.table("Case", "Output", "Difference from ANTs as built")
+    defs = {c.id: c for c in [*all_cases(), *panel_cases()]}
+    cols = ("Case", "Output", "Difference from ANTs as built")
+    t = rec.table(*cols) if rec.has_table(*cols) else None
     rows: dict[str, list[dict]] = {}
-    for r in t.rows:
+    for r in t.rows if t is not None else []:
         rows.setdefault(records.strip_code(r["Case"]), []).append(r)
     out = []
     for r in rec.results:
@@ -1055,6 +1056,12 @@ def export(ctx: core.Context) -> dict:
     rec = records.load(ctx.repo, TOOL)
     reg = core.register(ctx.repo)
     cases, _ = _cases(ctx, rec, reg)
+    from larmorx_validation.evidence import ants_panel
+
+    prec = ants_panel.panel_record(ctx.repo, TOOL)
+    if prec is not None:
+        cases += _cases(ctx, prec, reg)[0]
+    inventory = ants_panel.inventory_table(prec, "panel-nodes", "N4BiasFieldCorrection")
     agreement = core.agreement(cases_for(cases, "port"))
     totals: dict[str, int] = {}
     for c in cases:
@@ -1072,9 +1079,13 @@ def export(ctx: core.Context) -> dict:
         "title": "N4BiasFieldCorrection",
         "provenance": {
             "exporter": core.tree_hash(ctx.repo, "validation/src/larmorx_validation/evidence"),
-            "records": rec.source(),
+            "records": rec.source() + (prec.source() if prec is not None else []),
             "benchmarks": bench.source() if bench else [],
-            "cache": [fcache.provenance(e), fcache.provenance(corrections.entry(ctx, a40))],
+            "cache": [
+                fcache.provenance(e),
+                fcache.provenance(corrections.entry(ctx, a40)),
+                *(fcache.provenance(x) for x in ants_panel.entries(ctx, TOOL)),
+            ],
             "measurements": table_sources,
             "command": f"python -m larmorx_validation evidence {TOOL} --site <site>",
         },
@@ -1093,8 +1104,8 @@ def export(ctx: core.Context) -> dict:
         "cases_total": len(cases),
         "band": _band(rec),
         "speed": _speed(bench),
-        "tables": tables,
-        "examples": [_example(ctx, e), a40_example],
+        "tables": tables + ([inventory] if inventory else []),
+        "examples": [_example(ctx, e), a40_example, *ants_panel.examples(ctx, TOOL)],
     }
 
 

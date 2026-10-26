@@ -680,9 +680,10 @@ def _cases(rec) -> list[dict]:
     from larmorx_validation.parity.ants_atropos import all_cases
 
     defs = {c.id: c for c in all_cases()}
-    t = rec.table("Case", "Output", "Difference from ANTs as built")
+    cols = ("Case", "Output", "Difference from ANTs as built")
+    t = rec.table(*cols) if rec.has_table(*cols) else None
     rows: dict[str, list[dict]] = {}
-    for r in t.rows:
+    for r in t.rows if t is not None else []:
         rows.setdefault(records.strip_code(r["Case"]), []).append(r)
     examples = {
         "real/ds000005-sub-01/smriprep": "fmriprep-atropos",
@@ -751,6 +752,12 @@ def export(ctx: core.Context) -> dict:
     reg = core.register(ctx.repo)
     rec = records.load(ctx.repo, TOOL)
     cases = _cases(rec)
+    from larmorx_validation.evidence import ants_panel
+
+    prec = ants_panel.panel_record(ctx.repo, TOOL)
+    if prec is not None:
+        cases += _cases(prec)
+    inventory = ants_panel.inventory_table(prec, "panel-nodes", "Atropos")
     e, p = entry(ctx), priors_entry(ctx)
     return {
         "schema": 1,
@@ -758,12 +765,13 @@ def export(ctx: core.Context) -> dict:
         "title": "Atropos",
         "provenance": {
             "exporter": core.tree_hash(ctx.repo, "validation/src/larmorx_validation/evidence"),
-            "records": rec.source(),
+            "records": rec.source() + (prec.source() if prec is not None else []),
             "benchmarks": [],
             "cache": [
                 fcache.provenance(e),
                 fcache.provenance(p),
                 ants_atropos_pv.provenance(ctx),
+                *(fcache.provenance(x) for x in ants_panel.entries(ctx, TOOL)),
             ],
             "command": f"python -m larmorx_validation evidence {TOOL} --site <site>",
         },
@@ -774,8 +782,13 @@ def export(ctx: core.Context) -> dict:
         ],
         "cases": cases,
         "cases_total": len(cases),
-        "examples": [_example(ctx, reg), _priors_example(ctx), ants_atropos_pv.example(ctx)],
-        "tables": [ants_atropos_pv.table(ctx)],
+        "examples": [
+            _example(ctx, reg),
+            _priors_example(ctx),
+            ants_atropos_pv.example(ctx),
+            *ants_panel.examples(ctx, TOOL),
+        ],
+        "tables": [ants_atropos_pv.table(ctx), *([inventory] if inventory else [])],
     }
 
 

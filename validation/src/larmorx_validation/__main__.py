@@ -307,7 +307,13 @@ def main(argv: Sequence[str] | None = None) -> int:
     sub = parser.add_subparsers(dest="command", required=True)
     p = sub.add_parser("parity", help="compare larmorx with a reference implementation")
     p.add_argument("suite", choices=PARITY_SUITES)
-    p.add_argument("--tier", default="smoke", choices=("smoke", "standard", "full"))
+    p.add_argument(
+        "--tier",
+        default="smoke",
+        choices=("smoke", "standard", "full", "panel"),
+        help="smoke, standard and full each include the tiers before them; panel runs the data "
+        "panel's cases alone (fMRIPrep's calls on every oracle run, the panel's images)",
+    )
     p.add_argument(
         "--case",
         help="only cases whose id this regular expression matches (a plain text: the ids that "

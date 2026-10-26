@@ -64,6 +64,7 @@ from larmorx_validation.parity.harness import (
     CheckList,
     Outcome,
     Suite,
+    in_tier,
 )
 from larmorx_validation.parity.itk_geometry import _quiet_stderr
 
@@ -126,6 +127,10 @@ class Scenario:
     tier: str = "smoke"
     expect_error: bool = False
     files: tuple[str, ...] = field(default=(), compare=False)
+    #: The whole command line as given (the data panel's tier: fMRIPrep's nodes, the panel's
+    #: images): ``{out:<name>}`` the output, ``{in:<path>}`` a catalog file; ``image``,
+    #: ``reference`` and ``transforms`` are then not used.
+    raw: tuple[str, ...] = ()
 
 
 def _scenarios() -> list[tuple[str, str, str, Scenario]]:
@@ -588,15 +593,119 @@ def _scenarios() -> list[tuple[str, str, str, Scenario]]:
     return out
 
 
-_TIERS = ("smoke", "standard", "full")
+def _interpolation(args) -> str:
+    """The ``-n``/``--interpolation`` value of a command line (ANTs' default: Linear)."""
+    for i, a in enumerate(args[:-1]):
+        if a in ("-n", "--interpolation"):
+            return args[i + 1]
+    return "Linear"
+
+
+def _panel_scenarios() -> list[tuple[str, str, str, Scenario]]:
+    """The data panel's tier: every antsApplyTransforms node of the fourteen fMRIPrep oracle
+    runs (their command lines as written), and fMRIPrep's transforms applied to panel images
+    it never resamples."""
+    from larmorx_validation.parity import fmriprep_nodes
+    from larmorx_validation.parity import panel_images as P
+
+    out = []
+    for c in fmriprep_nodes.calls("antsApplyTransforms"):
+        out.append(
+            (
+                fmriprep_nodes.PREFIX + c.id,
+                fmriprep_nodes.CATEGORY,
+                fmriprep_nodes.describe(c),
+                Scenario("", "", interpolation=_interpolation(c.args), tier="panel", raw=c.args),
+            )
+        )
+    root = fmriprep_nodes.root()
+    if root is None:
+        return out
+
+    def run_file(run: str, pattern: str) -> str | None:
+        found = sorted((root / run / "out").glob(pattern))
+        return str(found[0]) if found else None
+
+    mb8 = "ds004958-sub-fsm64ps-noreconall"
+    seven = "ds005454-sub-16-noreconall"
+    stroke = "ds004884-sub-M2079-noreconall"
+    older = "ds003592-sub-280-noreconall"
+    tpl = "{in:templateflow/tpl-MNI152NLin2009cAsym/tpl-MNI152NLin2009cAsym_res-01_T1w.nii.gz}"
+    specs = [
+        (
+            "bold-series-to-T1w/mb8-600",
+            "fMRIPrep's classic BOLD resampling (-e 3, Lanczos, --float 1) of a 600-volume "
+            "multiband-8 series (fMRIPrep's preprocessed BOLD in its boldref space) onto its "
+            "T1w-space reference through fMRIPrep's coregistration transform: the panel's "
+            "largest series",
+            [P.BOLD_MB8],
+            [
+                ("-i", run_file(mb8, "sub-*/func/*_task-rest_desc-preproc_bold.nii.gz")),
+                ("-r", run_file(mb8, "sub-*/func/*_task-rest_space-T1w_boldref.nii.gz")),
+                ("-t", run_file(mb8, "sub-*/func/*_from-boldref_to-T1w_mode-image_desc-coreg_xfm.txt")),
+            ],
+            ("-e", "3", "-n", "LanczosWindowedSinc", "--float", "1"),
+        ),
+        (
+            "raw-to-MNI/7t-mp2rage",
+            "the raw 7 T MP2RAGE into MNI152NLin2009cAsym at 1 mm in one interpolation "
+            "(Lanczos): fMRIPrep's T1w-to-MNI composite after its raw-to-T1w transform",
+            [P.MP2RAGE_7T],
+            [
+                ("-i", P.MP2RAGE_7T.arg),
+                ("-r", tpl),
+                ("-t", run_file(seven, "sub-*/anat/*_from-T1w_to-MNI152NLin2009cAsym_mode-image_xfm.h5")),
+                ("-t", run_file(seven, "sub-*/anat/*_acq-mp2rage_from-orig_to-T1w_mode-image_xfm.txt")),
+            ],
+            ("-n", "LanczosWindowedSinc"),
+        ),
+        (
+            "lesion-to-MNI/stroke",
+            "the stroke's manual lesion mask (on its T1w's grid, as fMRIPrep read it) into "
+            "MNI152NLin2009cAsym at 2 mm through fMRIPrep's composite, GenericLabel -u uchar",
+            [P.STROKE_LESION],
+            [
+                ("-i", str(next(iter(sorted(fmriprep_nodes.oracle_run(stroke).mounts["/data"].glob(
+                    "sub-*/ses-*/anat/*_label-lesion_roi.nii.gz"))), "")) or None),
+                ("-r", run_file(stroke, "sub-*/ses-*/anat/*_space-MNI152NLin2009cAsym_res-2_desc-preproc_T1w.nii.gz")),
+                ("-t", run_file(stroke, "sub-*/ses-*/anat/*_from-T1w_to-MNI152NLin2009cAsym_mode-image_xfm.h5")),
+            ],
+            ("-n", "GenericLabel", "-u", "uchar"),
+        ),
+        (
+            "flair-to-T1w/identity",
+            "an 82-year-old's FLAIR of 0.42 x 0.42 x 3 mm voxels onto her T1w's 1 mm grid "
+            "through the scanner's coordinates (identity), Lanczos",
+            [P.FLAIR_OLDER],
+            [
+                ("-i", P.FLAIR_OLDER.arg),
+                ("-r", run_file(older, "sub-*/ses-*/anat/*_desc-preproc_T1w.nii.gz")),
+                ("-t", "identity"),
+            ],
+            ("-n", "LanczosWindowedSinc"),
+        ),
+    ]  # fmt: skip
+    for cid, description, images, pairs, extra in specs:
+        if any(v is None for _, v in pairs):
+            continue
+        raw = ("-d", "3", *(w for pair in pairs for w in pair), *extra, "-o", "{out:out.nii.gz}")
+        out.append(
+            (
+                P.PREFIX + cid,
+                P.CATEGORY,
+                P.describe(description, *images),
+                Scenario("", "", interpolation=_interpolation(raw), tier="panel", raw=raw),
+            )
+        )
+    return out
 
 
 def cases(tier: str) -> list[Case]:
-    rank = _TIERS.index(tier)
+    panel = _panel_scenarios() if tier == "panel" else []
     return [
         Case(cid, category, desc, scenario)
-        for cid, category, desc, scenario in [*_scenarios(), *outputs.scenarios()]
-        if _TIERS.index(scenario.tier) <= rank
+        for cid, category, desc, scenario in [*_scenarios(), *outputs.scenarios(), *panel]
+        if in_tier(scenario.tier, tier)
     ]
 
 
@@ -660,6 +769,18 @@ def _catalog(path: str) -> Path:
 
 
 def _args(s: Scenario, tmp: Path, output: Path) -> list[str]:
+    if s.raw:
+        import re
+
+        def sub(m: re.Match[str]) -> str:
+            key = m.group(1)
+            if key.startswith("out:"):
+                return str(output)
+            if key.startswith("in:"):
+                return str(td.get(key[3:]))
+            raise KeyError(f"unknown placeholder {{{key}}}")
+
+        return [re.sub(r"\{([^{}]+)\}", sub, a) for a in s.raw]
     args = ["-d", "3", "-i", str(_catalog(s.image)), "-r", str(_catalog(s.reference))]
     for path, invert in s.transforms:
         resolved = _resolve(path, tmp)
@@ -959,7 +1080,9 @@ def _highlights(results: list[CaseResult]) -> list[str]:
             + "."
         )
     lines += defects.summary(results)
-    return lines
+    from larmorx_validation.parity import fmriprep_nodes
+
+    return lines + fmriprep_nodes.record_lines("antsApplyTransforms", results)
 
 
 def suite() -> Suite:

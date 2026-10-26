@@ -251,6 +251,8 @@ def compare(
                 value=f"{1.0 - m['one_minus_ncc']:.10f}",
                 threshold=f"> {NCC_MIN}",
             )
+            if not c.band:
+                continue
             w = band(i)
             for key, name in (("max_abs", "max |diff|"), ("one_minus_ncc", "1 - NCC")):
                 ratio = m[key] / w[key] if w[key] > 0 else (0.0 if m[key] == 0 else float("inf"))

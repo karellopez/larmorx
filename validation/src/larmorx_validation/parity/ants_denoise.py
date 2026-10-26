@@ -15,7 +15,7 @@ from __future__ import annotations
 
 import numpy as np
 
-from larmorx_validation.parity import ants_inputs, ants_threaded
+from larmorx_validation.parity import ants_inputs, ants_threaded, fmriprep_nodes
 from larmorx_validation.parity.ants_image_math.common import (
     BOLDREF,
     CONSTANT,
@@ -842,6 +842,39 @@ def all_cases() -> list[AntsCase]:
 
 
 # ------------------------------------------------------------------------------------------------
+# The data panel's tier
+
+
+def panel_cases() -> list[AntsCase]:
+    """The data panel's tier: every DenoiseImage node of the fourteen fMRIPrep oracle runs
+    (sMRIPrep's denoising of each T1w; ANTs' thread band on the first), and sMRIPrep's command
+    on panel images it never denoises."""
+    from larmorx_validation.parity import panel_images as P
+
+    def d(cid, description, image, noise="Rician"):
+        return P.ants_case(
+            PROGRAM,
+            cid,
+            description,
+            ("-i", image, "-n", noise, "-o", "[", "{out},", "{out2}", "]", "-s", "1"),
+            [image],
+            outputs=("{out}", "{out2}"),
+        )
+
+    return [
+        *fmriprep_nodes.ants_cases(PROGRAM, band_once=True),
+        d("rician/7t-mp2rage", "sMRIPrep's command (-n Rician -s 1, the noise saved) on the raw "
+          "7 T MP2RAGE: the panel's largest anatomical image, its noisy background",
+          P.MP2RAGE_7T),
+        d("rician/flair", "the same on a FLAIR of 0.42 x 0.42 x 3 mm voxels (384 x 512 x 44)",
+          P.FLAIR_OLDER),
+        d("rician/child-t2w", "the same on a child's 0.8 mm T2w", P.CHILD_T2W),
+        d("gaussian/1.5t-float32", "-n Gaussian on a float32 1.5 T MPRAGE stored uncompressed",
+          P.MPRAGE_15T, noise="Gaussian"),
+    ]  # fmt: skip
+
+
+# ------------------------------------------------------------------------------------------------
 # Running, comparing and the report (ants_threaded)
 
 
@@ -852,7 +885,9 @@ def run_case(case: Case, checks: CheckList) -> None:
 
 
 def highlights(results: list[CaseResult]) -> list[str]:
-    return ants_threaded.highlights(results, "`expf` (or `exp`)", BAND_THREADS)
+    return ants_threaded.highlights(
+        results, "`expf` (or `exp`)", BAND_THREADS
+    ) + fmriprep_nodes.record_lines(PROGRAM, results)
 
 
 def suite():
@@ -881,7 +916,7 @@ def suite():
                 f"{', '.join(map(str, BAND_THREADS))} threads vs 1 thread)",
             ),
         ],
-        cases=lambda tier: cases_for(tier, all_cases()),
+        cases=lambda tier: cases_for(tier, [*all_cases(), *panel_cases()]),
         run_case=run_case,
         packages=("nibabel",),
         highlights=highlights,

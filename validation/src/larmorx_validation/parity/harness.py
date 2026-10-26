@@ -28,6 +28,22 @@ PASS, BOTH_ERROR, EXPECTED, FAIL, SKIPPED = (
 STATUSES = (PASS, BOTH_ERROR, EXPECTED, FAIL, SKIPPED)
 OK_STATUSES = (PASS, BOTH_ERROR, EXPECTED, SKIPPED)
 
+#: The tiers, each including the ones before it.
+TIERS = ("smoke", "standard", "full")
+#: The data panel's tier (``docs/next-steps.md``, item 6): fMRIPrep's own calls on every oracle
+#: run and the panel's images, run by themselves (``--tier panel``), never with the others, so
+#: the smoke, standard and full records keep their cases.
+PANEL = "panel"
+ALL_TIERS = (*TIERS, PANEL)
+
+
+def in_tier(case_tier: str, tier: str) -> bool:
+    """Whether a case of ``case_tier`` runs in ``tier``: the ordered tiers include the ones
+    before them; the panel tier holds its own cases only."""
+    if tier == PANEL or case_tier == PANEL:
+        return case_tier == tier
+    return TIERS.index(case_tier) <= TIERS.index(tier)
+
 
 @dataclass(frozen=True)
 class Check:

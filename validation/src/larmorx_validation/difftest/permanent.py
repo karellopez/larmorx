@@ -53,6 +53,8 @@ def _kw(tool_name: str, p: dict) -> dict:
 def cases(tool_name: str, tier: str = "full", implementation: str | None = None) -> list[Case]:
     """The permanent cases of ``tool_name`` in ``tier`` (and the tiers below it), for
     ``implementation`` (``None``: the tool's first)."""
+    if tier not in TIERS:
+        return []  # the data panel's tier holds no permanent case of random testing
     t = tools.get(tool_name)
     impl = implementation or t.implementations[0]
     rank = TIERS.index(tier)

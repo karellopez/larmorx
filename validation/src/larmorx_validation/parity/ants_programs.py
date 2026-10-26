@@ -64,6 +64,7 @@ from larmorx_validation.parity.harness import (
     CheckList,
     Outcome,
     Suite,
+    in_tier,
 )
 from larmorx_validation.report import table
 
@@ -71,7 +72,6 @@ ORACLE = "oracles/ants-2.6.5/bin"
 #: Threads for both programs (ITK_GLOBAL_DEFAULT_NUMBER_OF_THREADS).
 THREADS = 4
 AFFINE_ATOL = 1e-6
-_TIERS = ("smoke", "standard", "full")
 #: The check of a correction against a result known independently (``AntsCase.fix_expect``).
 FIX_EXPECT = "D13 correction: the known result"
 
@@ -146,16 +146,17 @@ class AntsCase:
     nondeterministic: str = ""
     silent_ok: tuple[str, ...] = ()
     one_mode: tuple[str, ...] = ()
+    #: Whether a program whose result depends on its thread count (N4, DenoiseImage) runs its
+    #: thread band where the result differs from ANTs as built; the data panel's tier measures
+    #: it on one call of each kind of node (:mod:`~larmorx_validation.parity.ants_threaded`).
+    band: bool = True
     fix_expect: Callable[[list[str], list[Path], Path], tuple[bool, str, object]] | None = field(
         default=None, compare=False
     )
 
 
 def cases_for(tier: str, all_cases: Sequence[AntsCase]) -> list[Case]:
-    rank = _TIERS.index(tier)
-    return [
-        Case(c.id, c.category, c.description, c) for c in all_cases if _TIERS.index(c.tier) <= rank
-    ]
+    return [Case(c.id, c.category, c.description, c) for c in all_cases if in_tier(c.tier, tier)]
 
 
 # ------------------------------------------------------------------------------------------------
@@ -165,6 +166,9 @@ def cases_for(tier: str, all_cases: Sequence[AntsCase]) -> list[Case]:
 def _resolve(arg: str, tmp: Path, outdir: Path) -> str:
     def sub(m: re.Match[str]) -> str:
         key = m.group(1)
+        if key.startswith("out:"):
+            # An output named as the original call names it (fMRIPrep's nodes).
+            return str(outdir / key[4:])
         if key.startswith("out"):
             return str(outdir / f"{key}.nii.gz")
         if key == "tmp":
@@ -818,8 +822,22 @@ def make_suite(
     tool: str,
     all_cases: Callable[[], Sequence[AntsCase]],
     notes: str = "",
+    *,
+    panel: Callable[[], Sequence[AntsCase]] | None = None,
 ) -> Suite:
-    """A parity suite over ``all_cases()``."""
+    """A parity suite over ``all_cases()``; ``panel`` gives the data panel's cases (the panel
+    tier: fMRIPrep's calls on every oracle run, :mod:`~larmorx_validation.parity.fmriprep_nodes`,
+    and the panel's images), whose record lists every node of the program in the oracle runs."""
+    program = title.split()[0]
+
+    def cases() -> list[AntsCase]:
+        return [*all_cases(), *(panel() if panel is not None else ())]
+
+    def lines(results: list[CaseResult]) -> list[str]:
+        from larmorx_validation.parity import fmriprep_nodes
+
+        return highlights(results) + fmriprep_nodes.record_lines(program, results)
+
     return Suite(
         name=name,
         title=title,
@@ -837,10 +855,10 @@ def make_suite(
             ),
             ("stdout (where compared)", "identical text"),
         ],
-        cases=lambda tier: cases_for(tier, all_cases()),
+        cases=lambda tier: cases_for(tier, cases()),
         run_case=run_case,
         packages=("nibabel",),
-        highlights=highlights,
+        highlights=lines,
         notes=(
             "Both programs get the same arguments and files; ANTs runs as its own binary and "
             "larmorx in-process through its Python console entry point, both with "

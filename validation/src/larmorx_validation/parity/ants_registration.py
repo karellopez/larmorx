@@ -74,6 +74,7 @@ from larmorx_validation.parity.harness import (
     CheckList,
     Outcome,
     Suite,
+    in_tier,
 )
 
 PROGRAM = "antsRegistration"
@@ -87,7 +88,6 @@ LX_THREADS = 4
 #: The real cases' small versions keep every SMALL-th voxel of their images.
 SMALL = 3
 BAND_THREADS = (2, 4, 8)
-_TIERS = ("smoke", "standard", "full")
 ORACLE_RUNS = "oracles/fmriprep-25.2.6"
 #: The threshold of a check against ANTs as built that only reports (ANTs with CORE-MATH decides).
 GLIBC = "reported (glibc's maths; ANTs with CORE-MATH decides)"
@@ -1227,12 +1227,7 @@ def _point_set_cases() -> list[RegCase]:
 
 
 def cases_for(tier: str) -> list[Case]:
-    rank = _TIERS.index(tier)
-    return [
-        Case(c.id, c.category, c.description, c)
-        for c in all_cases()
-        if _TIERS.index(c.tier) <= rank
-    ]
+    return [Case(c.id, c.category, c.description, c) for c in all_cases() if in_tier(c.tier, tier)]
 
 
 # ------------------------------------------------------------------------------------------------

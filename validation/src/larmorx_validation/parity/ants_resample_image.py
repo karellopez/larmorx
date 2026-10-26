@@ -336,6 +336,26 @@ def all_cases() -> list[AntsCase]:
     return cases
 
 
+def panel_cases() -> list[AntsCase]:
+    """The data panel's tier (no fMRIPrep node runs ResampleImage): panel images to other
+    grids with each interpolation larmorx supports in 3D."""
+    from larmorx_validation.parity import panel_images as P
+
+    def r(cid, description, image, *args):
+        return P.ants_case("ResampleImage", cid, description, ("3", image, "{out}", *args), [image])
+
+    return [
+        r("1mm-linear/flair", "a FLAIR of 0.42 x 0.42 x 3 mm voxels to 1 mm, linear",
+          P.FLAIR_OLDER, "1", "0", "0"),
+        r("1mm-bspline/7t-mp2rage", "the raw 7 T MP2RAGE to 1 mm, B-spline",
+          P.MP2RAGE_7T, "1", "0", "4"),
+        r("0.8mm-sinc/tumour-t2w", "a T2w of 6 mm slices to 0.8 mm, windowed sinc",
+          P.TUMOUR_T2W, "0.8", "0", "3"),
+        r("size-nearest/stroke-lesion", "a manual lesion mask to 128 x 128 x 128 voxels, "
+          "nearest neighbour", P.STROKE_LESION, "128x128x128", "1", "1"),
+    ]  # fmt: skip
+
+
 def suite():
     return make_suite(
         "ants-resample-image",
@@ -343,6 +363,7 @@ def suite():
         "`larmorx ants ResampleImage` / `lx.ants.resample_image` (crates larmorx-ants, "
         "larmorx-interp)",
         all_cases,
+        panel=panel_cases,
         notes="Real images come from `larmorx-testdata` (OpenNeuro ds000005, its fMRIPrep "
         "derivatives, TemplateFlow).",
     )

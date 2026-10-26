@@ -330,17 +330,21 @@ fn coefficients<T: RealElement, const D: usize>(
         let starts: Vec<usize> = (0..c.len())
             .filter(|&o| (o / stride).is_multiple_of(n))
             .collect();
-        let lines: Vec<Vec<f64>> = starts
-            .par_iter()
-            .map(|&s| {
-                let mut line: Vec<f64> = (0..n).map(|i| c[s + i * stride]).collect();
-                bspline::line_to_coefficients(&mut line, &poles);
-                line
-            })
-            .collect();
-        for (&s, line) in starts.iter().zip(lines) {
-            for (i, v) in line.into_iter().enumerate() {
-                c[s + i * stride] = v;
+        // A block of lines at a time (all of them at once held a second copy of the image;
+        // memory, the user's rule of 2026-10-25): each line is independent, the values the same.
+        for block in starts.chunks(1 << 12) {
+            let lines: Vec<Vec<f64>> = block
+                .par_iter()
+                .map(|&s| {
+                    let mut line: Vec<f64> = (0..n).map(|i| c[s + i * stride]).collect();
+                    bspline::line_to_coefficients(&mut line, &poles);
+                    line
+                })
+                .collect();
+            for (&s, line) in block.iter().zip(lines) {
+                for (i, v) in line.into_iter().enumerate() {
+                    c[s + i * stride] = v;
+                }
             }
         }
     }

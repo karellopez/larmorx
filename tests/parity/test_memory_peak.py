@@ -56,6 +56,11 @@ CASES = [
         "-d 3 -i {in} -o {out} -s 4 -c [20x20,0]",
     ),
     ("DenoiseImage", "96x96x64", "2,2,2", "-d 3 -i {in} -o {out}"),
+    # The data panel's re-validation (2026-10-26): B-spline coefficients of a large input (their
+    # z columns were all held at once), and strided axes of short rows (their task list was
+    # 16 bytes per row piece for the whole image: a 588-volume series' SmoothImage).
+    ("ResampleImage", "192x224x160", "1,1,1", "3 {in} {out} 2x2x2 0 4"),
+    ("SmoothImage", "16x1024x1024", "1,1,1", "3 {in} 1.5 {out}"),
 ]
 
 #: The programs whose records compare with ANTs built with correctly rounded maths (their

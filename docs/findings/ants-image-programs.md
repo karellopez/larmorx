@@ -281,3 +281,44 @@ wait for a larger machine with the night's other heavy cases.
 
 N4BiasFieldCorrection and DenoiseImage: [ants-n4.md](ants-n4.md) and
 [ants-denoise.md](ants-denoise.md), "Memory against ANTs".
+
+## Memory on the data panel's largest inputs (2026-10-26)
+
+Each tool's largest call on the data panel, ANTs 2.6.5 (with CORE-MATH preloaded where its record
+compares so) and larmorx's command at one thread, every output compared byte for byte
+(`validation/investigations/panel-ants/memory_largest.py`; the 7 T MP2RAGE is 224 × 272 × 288,
+ds004958's multiband-8 series 600 volumes, ds002603's multiband-4 series 588 volumes of
+80 × 80 × 36):
+
+| Call | ANTs | larmorx before | larmorx | ANTs s | larmorx s |
+|---|---|---|---|---|---|
+| ImageMath `TruncateImageIntensity`, 7 T | 190 MiB | | 154 MiB | 3.6 | 2.5 |
+| ImageMath `m`, the 600-volume series | 3589 MiB | | 3588 MiB | 80.5 | 34.8 |
+| ThresholdImage Otsu 4, 7 T | 186 MiB | | 158 MiB | 2.9 | 1.8 |
+| MultiplyImages, the 588-volume series | 1570 MiB | | 1057 MiB | 13.6 | 8.4 |
+| SmoothImage `2x2x2x0.55`, the 588-volume series | 1052 MiB | 1081 MiB | 1058 MiB | 26.1 | 17.7 |
+| ResampleImage to 1 mm, B-spline, 7 T | 256 MiB | 384 MiB | 257 MiB | 4.7 | 3.6 |
+| ResampleImageBySpacing to 2 mm, 7 T | 219 MiB | | 222 MiB | 2.3 | 1.0 |
+| N4BiasFieldCorrection, sMRIPrep's final options, 7 T | 1814 MiB | | 814 MiB | 232.8 | 38.4 |
+| DenoiseImage `-n Rician`, 7 T | 689 MiB | | 682 MiB | 273.7 | 37.0 |
+| Atropos, sMRIPrep's call on ds005454 (7 T) | 1275 MiB | | 565 MiB | 42.9 | 17.3 |
+| antsApplyTransforms `-e 3`, Lanczos, the 600-volume series to the T1w | 6501 MiB | | 4710 MiB | 850.7 | 399.7 |
+| antsApplyTransforms, the 7 T MP2RAGE to MNI (fMRIPrep's `.h5`) | 722 MiB | | 536 MiB | 41.0 | 17.7 |
+| antsRegistration, sMRIPrep's brain extraction, 7 T, whole | 2884 MiB | | 2394 MiB | 2431 | 1165 |
+| antsRegistration, the same on every third voxel | 149 MiB | | 113 MiB | 83.7 | 33.5 |
+| antsRegistration, the template registration on every third voxel, 7 T | 136 MiB | | 116 MiB | 432.1 | 94.6 |
+| antsAI, the BOLD reference's `init_aff`, 7 T | 117 MiB | | 156 MiB | 157.8 | 287.3 |
+| antsAffineInitializer, niworkflows' call, 7 T | 688 MiB | | 844 MiB | 331.8 | 1211.6 |
+
+- **ResampleImage's B-spline coefficients** held their z columns all at once, a second copy of
+  the volume (128 MiB more than ITK on the 7 T head); they are filtered a block of 4096 columns
+  at a time now (`larmorx_interp`, the 3D and n-D decompositions).
+- **The separable filters' strided axes** listed a reference per row piece for the whole image
+  before filtering: where rows are shorter than a task's group (the y axis of an 80-voxel-wide
+  series), 0.2 byte per voxel, 27 MB on the 588-volume series; the tasks are made and run a
+  batch at a time now (`larmorx_image::lines`).
+- **antsAI and antsAffineInitializer stay above ANTs** (their metric holds the images in double
+  where ANTs holds them in float: `ants-ai.md`, "Memory and speed against ANTs"), a follow-up.
+- New cases in `tests/parity/test_memory_peak.py`: ResampleImage B-spline of a 192 × 224 × 160
+  input, SmoothImage of a 16 × 1024 × 1024 image. Every output above is bit-identical in
+  `reproduce`; the golden checksums are unchanged.

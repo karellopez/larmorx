@@ -34,10 +34,10 @@ def main() -> None:
     ap = argparse.ArgumentParser(
         description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter
     )
-    ap.add_argument("--workspace", type=Path, default=Path(__file__).resolve().parents[4])
+    ap.add_argument("--workspace", type=Path, help="default: the workspace this script is in")
     ap.add_argument("--quick", action="store_true", help="skip counting the trees (minutes)")
     a = ap.parse_args()
-    ws = a.workspace.resolve()
+    ws = (a.workspace or Path(__file__).resolve().parents[4]).resolve()
     old = json.loads((ws / "MOVE-MANIFEST.json").read_text())
 
     say(

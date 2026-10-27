@@ -118,6 +118,23 @@ def main() -> None:
         say(status, key, f"{got or 'missing'} (old {want})" + ("" if got else f"; {fix}"))
     for exe in ("rsync", "tmux", "systemd-run"):
         say("OK" if shutil.which(exe) else "WARN", exe, "" if shutil.which(exe) else "missing")
+    # The repositories: copied (not cloned: they hold commits not yet on GitHub), so each must be
+    # at the old laptop's latest commit with the same working-tree state.
+    for repo in ("larmorx", "larmorx_documentation", "larmorx-testdata"):
+        state = ["git", "-C", str(ws / repo), "log", "-1", "--format=%H"]
+        dirty = ["git", "-C", str(ws / repo), "status", "--porcelain"]
+        here = (mf.run(state), mf.run(dirty))
+        remote = ["ssh", "-o", "BatchMode=yes", "-o", "ConnectTimeout=20", "old-laptop"]
+        there = (mf.run(remote + state), mf.run(remote + dirty))
+        if not there[0]:
+            say("WARN", f"repository {repo}", "the old laptop is not reachable as old-laptop")
+            continue
+        say(
+            "OK" if here == there else "FAIL",
+            f"repository {repo} at the old laptop's latest commit",
+            f"{here[0][:7]} (old {there[0][:7]})"
+            + ("" if here[1] == there[1] else "; working trees differ: run pull.sh --verify"),
+        )
     # The usage tool (tools/claude-usage/, docs/machine-move.md step 8) reads the plan's limits
     # with Claude Code's own program: on PATH, the native install, or the VS Code extension's.
     usage = ws / "tools/claude-usage/usage.py"

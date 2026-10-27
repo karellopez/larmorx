@@ -52,7 +52,12 @@ copy "$WS/" "$WS/" \
   --exclude='/larmorx/.claude/worktrees/*/target/' \
   --exclude='/larmorx/.claude/worktrees/*/crates-gpl/target/' \
   --exclude='/larmorx/.claude/worktrees/*/crates-nc/target/' \
-  --exclude='__pycache__/'
+  --exclude='__pycache__/' \
+  --exclude='/archive/' --exclude='/oracles/compare/' --exclude='/oracles/ants-2.6.5-gcc11-O3/'
+# Left on the old laptop (2026-10-27, to save transfer time; fetched over SSH if ever needed;
+# manifest.py LEFT_ON_OLD): archive/ (old session
+# scratch, 55 GB), oracles/compare/ (the 2026-10-12 fMRIPrep stage comparisons, 22 GB; the final
+# comparisons are made again at the end) and the GCC 11 ANTs build kept as evidence (4.3 GB).
 copy "$H/.cache/larmorx-testdata/" "$H/.cache/larmorx-testdata/"
 # 3. Claude Code: this project's memory notes and transcripts (the same path gives the same
 #    project folder); the old settings.json beside the new one.

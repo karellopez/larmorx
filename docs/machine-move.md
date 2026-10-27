@@ -10,9 +10,9 @@ The scripts are in `scripts/orchestration/move/`.
 `/home/karelo/VScode_projects/super_fmriprep`. Every absolute path in the scripts, records,
 worktrees, the oracle-output cache and Claude Code's memory notes then stays valid.
 
-**What moves** (about 270 GB without build caches; measured 2026-10-27 in `MOVE-MANIFEST.json`):
-the workspace (`oracles/` 177 GB: the fourteen fMRIPrep runs, the oracle builds and toolchains,
-the oracle-output cache, the fMRIPrep image; `archive/` 56 GB; the repositories with their git
+**What moves** (about 176 GiB without build caches; measured 2026-10-27 in `MOVE-MANIFEST.json`):
+the workspace (`oracles/` 151 GiB: the fourteen fMRIPrep runs, the oracle builds and toolchains,
+the oracle-output cache, the fMRIPrep image; the repositories with their git
 state and agent worktrees; the upstream clones and `tags/`; the Python environment `.venv`; the
 usage tool `tools/claude-usage/`), FSL 6.0.7.17 as installed (`~/fsl`, the FSL replicas'
 oracle), the test data (`~/.cache/larmorx-testdata`), Rust as pinned (`~/.cargo`, `~/.rustup`),
@@ -21,7 +21,10 @@ Claude Code's memory notes and transcripts of this project, and the usage tool's
 Claude Code's own program (`claude -p /usage`, no model call); on the new laptop that is the
 program inside the VS Code extension (the tool finds it), working once Claude Code is signed in
 (step 7). Build caches (`target/`) are not
-copied: the new machine rebuilds them in minutes. Nothing is deleted on either machine; the old
+copied: the new machine rebuilds them in minutes. Left on the old laptop, to save transfer time (fetched over SSH
+if ever needed; `manifest.py` `LEFT_ON_OLD`): `archive/` (55 GB of old session scratch),
+`oracles/compare/` (the 2026-10-12 fMRIPrep stage comparisons, 22 GB) and the GCC 11 ANTs build
+kept as evidence (4.3 GB). Nothing is deleted on either machine; the old
 laptop keeps its copy untouched until the proof (step 8) has passed.
 
 ## The user's steps
@@ -64,7 +67,7 @@ laptop keeps its copy untouched until the proof (step 8) has passed.
    2026-10-27 a `.venv` on uv's Python and FSL 6.0.7.10 in `~/fsl`) is moved aside to
    `~/archive-before-move-<date>/`, never merged with the copy (rsync adds and replaces files,
    it does not remove the old ones, so two installations would mix). Over Wi-Fi the copy runs
-   at about 5 MB/s (15 to 20 hours); with both laptops on a cable, about an hour.
+   at about 4 MB/s (about 12 hours for 176 GiB); with both laptops on a cable, about an hour.
 6. **Check the new laptop:**
    ```bash
    python3 /home/karelo/VScode_projects/super_fmriprep/larmorx/scripts/orchestration/move/check.py

@@ -152,13 +152,16 @@ def main() -> None:
             if not root.exists():
                 say("FAIL", f"tree {d}", "missing")
                 continue
-            now = mf.tree_stats(root)
+            now = mf.tree_stats(root, mf.left_on_old(ws))
             ok = now["files"] >= st["files"] and now["bytes"] >= st["bytes"] * 0.999
             say(
                 "OK" if ok else "FAIL",
                 f"tree {d}",
                 f"{now['files']} files, {now['bytes'] / 2**30:.1f} GiB (old {st['files']}, {st['bytes'] / 2**30:.1f} GiB)",
             )
+
+    for d in mf.LEFT_ON_OLD:
+        say("OK", f"left on the old laptop: {d}", "fetch with rsync -a old-laptop:<path>/ <path>/")
 
     fails = sum(1 for s, _, _ in results if s == "FAIL")
     warns = sum(1 for s, _, _ in results if s == "WARN")

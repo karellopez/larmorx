@@ -37,7 +37,6 @@ SYSTEM_LIBS = ["libm.so.6", "libc.so.6", "libstdc++.so.6", "libgomp.so.1"]
 #: The trees pull.sh copies (relative to the workspace or to $HOME), counted without build caches.
 TREES = [
     "oracles",
-    "archive",
     "larmorx",
     "larmorx_documentation",
     "larmorx-testdata",
@@ -46,6 +45,9 @@ TREES = [
 ]
 HOME_TREES = ["fsl", ".cache/larmorx-testdata"]
 SKIP_DIRS = {"target", "__pycache__"}
+#: Left on the old laptop (2026-10-27, to save transfer time; fetched over SSH if ever needed):
+#: old session scratch, the 2026-10-12 fMRIPrep stage comparisons, the GCC 11 ANTs build.
+LEFT_ON_OLD = ["archive", "oracles/compare", "oracles/ants-2.6.5-gcc11-O3"]
 
 
 def sha256(path: Path) -> str:
@@ -71,10 +73,13 @@ def system_lib(name: str) -> Path | None:
     return None
 
 
-def tree_stats(root: Path) -> dict:
+def tree_stats(root: Path, skip: frozenset[str] = frozenset()) -> dict:
+    """Files and bytes under root, without build caches and without the absolute paths in skip."""
     files = size = 0
     for dirpath, dirnames, filenames in os.walk(root):
-        dirnames[:] = [d for d in dirnames if d not in SKIP_DIRS]
+        dirnames[:] = [
+            d for d in dirnames if d not in SKIP_DIRS and os.path.join(dirpath, d) not in skip
+        ]
         for f in filenames:
             p = os.path.join(dirpath, f)
             try:
@@ -84,6 +89,10 @@ def tree_stats(root: Path) -> dict:
             files += 1
             size += st.st_size
     return {"files": files, "bytes": size}
+
+
+def left_on_old(ws: Path) -> frozenset[str]:
+    return frozenset(str(ws / d) for d in LEFT_ON_OLD)
 
 
 def binaries(root: Path) -> dict[str, str]:
@@ -145,7 +154,7 @@ def main() -> None:
         m["binaries"]["~/" + d] = binaries(HOME / d)
     for d in TREES:
         if (ws / d).exists():
-            m["trees"][d] = tree_stats(ws / d)
+            m["trees"][d] = tree_stats(ws / d, left_on_old(ws))
             print(f"  {d}: {m['trees'][d]}", flush=True)
     for d in HOME_TREES:
         if (HOME / d).exists():

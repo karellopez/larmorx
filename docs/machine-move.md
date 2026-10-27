@@ -63,6 +63,9 @@ laptop keeps its copy untouched until the proof (step 8) has passed.
    bash /tmp/pull.sh karelo@<old address>
    ```
    It ends with `done` (or `NOT COMPLETE`: run it again). Its log is `~/move-pull-<date>.log`.
+   On 2026-10-27 `second-pass.sh` (tmux session `move2`) waited for it, copied again what
+   changed meanwhile, set up the shell (Rust, Node 22) and ran `check.py` (step 6): its summary
+   is `~/MOVE-READY.txt`.
    Before it: anything the new laptop already has at the copied places and that differs (on
    2026-10-27 a `.venv` on uv's Python and FSL 6.0.7.10 in `~/fsl`) is moved aside to
    `~/archive-before-move-<date>/`, never merged with the copy (rsync adds and replaces files,

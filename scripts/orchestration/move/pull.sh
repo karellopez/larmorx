@@ -71,8 +71,10 @@ copy "$WS/" "$WS/" \
 
 # 3. The archive's documents only: notes, reports, READMEs, scripts, source drafts, logs, tables,
 #    the agents' conversation records (*.output): text files under 1 MB, about 1 GB. Its bulky
-#    temporary data (test outputs, cache copies, clones, large reference tables) stays behind.
+#    temporary data (test outputs, cache copies, clones, large reference tables) and the copies of
+#    third-party code (AFNI's and fMRIPrep's sources, Python environments, SciPy) stay behind.
 copy "$WS/archive/" "$WS/archive/" --prune-empty-dirs --max-size=1024k --exclude='.git/' \
+  --exclude='afni-build/' --exclude='src-25.2.6/' --exclude='venv*/' --exclude='dl-scipy*/' \
   --include='*/' \
   --include='*.md' --include='*.txt' --include='README*' --include='NOTES*' --include='DONE*' \
   --include='BUILD_INFO*' --include='*.output' --include='*.py' --include='*.sh' --include='*.rs' \

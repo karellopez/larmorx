@@ -299,6 +299,16 @@ of CLAUDE.md, the working agreements in it). Next, in order:
 - Temporary directories `/tmp/lx-ants-inputs-*` and `/tmp/lx-reg-*` left by earlier agents
   (temporary artefacts; may be cleaned).
 
+- **The agents' scripts into the repository** (found 2026-10-27, the move; the rule of
+  2026-10-23: every tool that produced a finding or a record is committed under
+  `validation/investigations/<topic>/` with a README, or `validation/probes/`): the archive holds
+  2,332 distinct scripts the agents wrote (in their scratch directories, archived) that are in no
+  repository, against 12 investigation topics and 4 probes committed. Triage, on the new laptop
+  (the archive's documents are copied there, `machine-move.md`): for each finding
+  (`docs/findings/`) and record (`docs/validation/`), find the scripts that produced it; commit
+  those not yet in the repository, each topic with a README (what it shows, how to run it); the
+  rest (one-off edits, superseded drafts) stays in the archive. One bounded part, early, since
+  the briefs' rule is meant to prevent exactly this.
 - **The oracle cache across CPUs** (found 2026-10-27, the move): the key includes the CPU's model
   and the hash of all its flags, so the old laptop's 40 GB of entries are never hits on the new
   AMD machine. After the move's `verify` sample: if the originals give identical outputs on both

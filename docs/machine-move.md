@@ -50,7 +50,7 @@ valid. Nothing is cloned again: the repositories move with their history and unp
 | The GCC 11 ANTs build's programs, build info, logs and thread band | 0.9 GB | the evidence of the compiler bug (GCC bug 110182) |
 | Test inputs (`bids-views`, `inputs`, `downloads`, `templateflow`, `difftest`, `logs`) | 2 GB | inputs of the suites |
 | Code and environments | 16 GB | the three repositories (history, branches, unpushed commits), `tags/` (the exact sources ported), the upstream clones, `.venv`, Rust, Node 22, the test data (`~/.cache/larmorx-testdata`), `tools/`, `CLAUDE.md`, `ORCHESTRATOR-STATE.md`, Claude Code's memory notes and transcripts of this project, the usage tool's records |
-| The archive's documents | 1 GB | from `archive/`, only the documents: notes, reports, READMEs, scripts, source drafts, logs, tables and the agents' conversation records (text files under 1 MB) |
+| The archive's documents | under 1 GB | from `archive/`, only the documents: notes, reports, READMEs, scripts, source drafts, logs, tables and the agents' conversation records (text files under 1 MB; without the copies of third-party code: AFNI's and fMRIPrep's sources, Python environments, SciPy). Among them 2,332 distinct scripts of the agents that are in no repository: triaged into `validation/investigations/` after the move (next-steps) |
 
 **Not copied** (`manifest.py` `LEFT_ON_OLD`; deleted from the old laptop in phase 4 if approved):
 
@@ -132,8 +132,8 @@ Only after phase 3's proof has passed, and only what the user approved. The new 
 the deletions as a script with this exact list, runs it first as a dry run (it prints every path
 and size), then for real, and records what it freed.
 
-**Deleted from the old laptop** (about 206 GB; approval asked 2026-10-27, see
-`ORCHESTRATOR-STATE.md`):
+**Deleted from the old laptop** (about 206 GB; **approved by the user on 2026-10-27**, with the two
+choices below):
 
 | What | Size | Why it can go |
 |---|---|---|
@@ -148,7 +148,8 @@ and size), then for real, and records what it freed.
 **What the old laptop keeps** (its helper kit): the `larmorx` main checkout and its build,
 `.venv`, Rust and Node; every original program (ANTs, AFNI, FSL, CORE-MATH, the toolchain, the
 fMRIPrep image); the test data; its own oracle cache (keyed to its CPU, so tests there reuse it);
-the fMRIPrep runs (so it can run any test, the data panel included). Never touched: the user's
+the fMRIPrep runs (so it can run any test, the data panel included). (Approved 2026-10-27, as is keeping FSL 6.0.7.17 on the
+new laptop until the version update has compared it with the newest.) Never touched: the user's
 own files outside the workspace (other projects, conda, `~/ants`, ...).
 
 ## Phase 5: the newest versions

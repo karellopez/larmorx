@@ -2246,13 +2246,15 @@ def run_case(case: Case, checks: CheckList) -> None:
             change = defects.Change.of(pb, pa)
         # ANTS-62's extra record repeats the last point: in a moving point set it may change
         # no nearest neighbour. ITK-41's notice is about the next use of a transform that never
-        # integrated, which a run without warped images or later stages does not make.
+        # integrated, which a run without warped images or later stages does not make. ITK-96
+        # is named in both modes, which write the same files (no inverse composite where a
+        # displacement field has no inverse; reproduce does not make ITK's part-written file).
         defects.add_fix_check(
             checks,
             defects.notices_in(fx[2]),
             change,
             other_changes="; ".join(other),
-            silent_ok=("ANTS-62", "ITK-41", *c.silent_ok),
+            silent_ok=("ANTS-62", "ITK-41", "ITK-96", *c.silent_ok),
         )
 
 

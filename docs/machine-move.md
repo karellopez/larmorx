@@ -88,10 +88,11 @@ The new session starts here, in this order, whatever the user's first message sa
    GO, SLOW DOWN or PAUSE with the windows read "0 min ago"; "could not read the limits" means
    Claude Code's program was not found or is not signed in. SLOW DOWN or PAUSE: do 3 to 5
    (machine time, few tokens) and leave 8 for later.
-3. **Claude Code's settings.** Merge `~/.claude/settings.json.from-old-laptop` into
-   `~/.claude/settings.json`: keep the new machine's own keys and add `statusLine` (the command
-   path is the same) and `subagentPromptCacheTtl: "1h"`. Both were the user's choice on
-   2026-10-27; tell the user in one line, and that they take effect in the next session.
+3. **Claude Code's settings.** Done by the old laptop's session on 2026-10-27 (the user asked):
+   `~/.claude/settings.json` there keeps its own keys and has `statusLine`,
+   `subagentPromptCacheTtl: "1h"` and the attribution off (`"attribution": {"commit": "", "pr": "",
+   "sessionUrl": false}`); its earlier version is in `~/archive-before-move-2026-10-27/`. check.py
+   verifies the attribution and the commit-msg guard in each repository.
 4. **The copy's result.** Read `~/MOVE-READY.txt` and `~/move-check.log`: every FAIL fixed, each
    WARN fixed or named in the proof as a possible cause. `git worktree prune` in `larmorx/`.
 5. **Build and prove** (machine time; boxes up to about 100 GiB on this machine):

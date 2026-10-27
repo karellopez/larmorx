@@ -16,7 +16,11 @@ the oracle-output cache, the fMRIPrep image; `archive/` 56 GB; the repositories 
 state and agent worktrees; the upstream clones and `tags/`; the Python environment `.venv`; the
 usage tool `tools/claude-usage/`), FSL 6.0.7.17 as installed (`~/fsl`, the FSL replicas'
 oracle), the test data (`~/.cache/larmorx-testdata`), Rust as pinned (`~/.cargo`, `~/.rustup`),
-and Claude Code's memory notes and transcripts of this project. Build caches (`target/`) are not
+Claude Code's memory notes and transcripts of this project, and the usage tool's records
+(`~/.cache/claude-usage/`). The usage tool reads the plan's 5-hour and weekly windows with
+Claude Code's own program (`claude -p /usage`, no model call); on the new laptop that is the
+program inside the VS Code extension (the tool finds it), working once Claude Code is signed in
+(step 7). Build caches (`target/`) are not
 copied: the new machine rebuilds them in minutes. Nothing is deleted on either machine; the old
 laptop keeps its copy untouched until the proof (step 8) has passed.
 
@@ -69,7 +73,9 @@ laptop keeps its copy untouched until the proof (step 8) has passed.
 
 ## Step 8: the orchestrator's first session on the new machine
 
-1. `python3 tools/claude-usage/usage.py check` (the usage limits, as before every part); merge
+1. `python3 tools/claude-usage/usage.py check` (the usage limits, as before every part; it must
+   print GO, SLOW DOWN or PAUSE with the windows read "0 min ago": "could not read the limits"
+   means the extension's program was not found or Claude Code is not signed in); merge
    `~/.claude/settings.json.from-old-laptop` into `~/.claude/settings.json` (keep the new
    machine's own keys; add `statusLine` and `subagentPromptCacheTtl`), with the user's OK.
 2. **Build:** `source scripts/orchestration/env.sh`, `maturin develop --release` (main checkout

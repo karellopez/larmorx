@@ -118,6 +118,27 @@ def main() -> None:
         say(status, key, f"{got or 'missing'} (old {want})" + ("" if got else f"; {fix}"))
     for exe in ("rsync", "tmux", "systemd-run"):
         say("OK" if shutil.which(exe) else "WARN", exe, "" if shutil.which(exe) else "missing")
+    # The usage tool (tools/claude-usage/, docs/machine-move.md step 8) reads the plan's limits
+    # with Claude Code's own program: on PATH, the native install, or the VS Code extension's.
+    usage = ws / "tools/claude-usage/usage.py"
+    say("OK" if usage.is_file() else "FAIL", "usage tool", str(usage))
+    claude = shutil.which("claude") or next(
+        (
+            str(p)
+            for p in sorted(
+                (Path.home() / ".vscode/extensions").glob(
+                    "anthropic.claude-code-*/resources/native-binary/claude"
+                )
+            )
+            if p.is_file()
+        ),
+        None,
+    )
+    say(
+        "OK" if claude else "WARN",
+        "Claude Code program for the usage tool",
+        claude or "missing: install VS Code's Claude Code extension (step 1)",
+    )
     lic = Path("/usr/local/freesurfer/license.txt")
     say(
         "OK" if lic.is_file() else "FAIL",

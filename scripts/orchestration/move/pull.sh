@@ -52,6 +52,12 @@ copy "$H/.rustup/" "$H/.rustup/"
 copy "$H/.claude/projects/-home-karelo-VScode-projects-super-fmriprep/" \
      "$H/.claude/projects/-home-karelo-VScode-projects-super-fmriprep/"
 copy "$H/.claude/settings.json" "$H/.claude/settings.json.from-old-laptop"
+# 4. The usage tool's records (the workspace's tools/claude-usage/ reads them): the plan's windows
+#    as last read and its parse cache; its settings file only where one was written.
+copy "$H/.cache/claude-usage/" "$H/.cache/claude-usage/"
+if ssh -o BatchMode=yes "$OLD" test -e "$H/.config/claude-usage.json"; then
+  copy "$H/.config/claude-usage.json" "$H/.config/claude-usage.json"
+fi
 
 if [ ${#FAILED[@]} -gt 0 ]; then echo "NOT COMPLETE: ${FAILED[*]} (run pull.sh again); log: $LOG"; exit 1; fi
 echo "done; log: $LOG"

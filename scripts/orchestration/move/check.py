@@ -97,7 +97,10 @@ def main() -> None:
             ["apptainer", "--version"],
             "sudo apt install apptainer (or the .deb of the old version)",
         ),
-        "python3.12": (["/usr/bin/python3.12", "--version"], "deadsnakes: sudo apt install python3.12 python3.12-venv python3.12-dev"),
+        "python3.12": (
+            ["/usr/bin/python3.12", "--version"],
+            "deadsnakes: sudo apt install python3.12 python3.12-venv python3.12-dev",
+        ),
         "rustc": (
             [str(Path.home() / ".cargo/bin/rustc"), "--version"],
             "copied with ~/.rustup and ~/.cargo",

@@ -299,6 +299,13 @@ of CLAUDE.md, the working agreements in it). Next, in order:
 - Temporary directories `/tmp/lx-ants-inputs-*` and `/tmp/lx-reg-*` left by earlier agents
   (temporary artefacts; may be cleaned).
 
+- **The oracle cache across CPUs** (found 2026-10-27, the move): the key includes the CPU's model
+  and the hash of all its flags, so the old laptop's 40 GB of entries are never hits on the new
+  AMD machine. After the move's `verify` sample: if the originals give identical outputs on both
+  CPUs, narrow the machine part to what glibc's kernel selection reads (the ISA features its
+  `ifunc` resolvers test: FMA, AVX2, AVX-512 ...), measured first (rule D), so entries are shared
+  between machines whose originals compute alike.
+
 ## Before the first release on PyPI
 
 Checked 2026-10-13: the binaries need no other library than the system's own (on Linux:

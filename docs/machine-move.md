@@ -113,6 +113,12 @@ session starts here, in this order, whatever the user's first message says:
        (`scripts/orchestration/compare_records.py`): identical results, timings aside.
      - The originals themselves: a sample of the oracle-output cache re-run and compared
        (`python -m larmorx_validation oracle-cache verify`), so a different libm would show.
+       The cache's key includes the CPU (model and flags: glibc picks its maths kernels by
+       them), so on the new machine the old laptop's entries are never hits: every original
+       runs again there and fills its own entries. `verify` re-runs an entry whatever the
+       machine, so it is the direct check that the originals compute the same on the AMD CPU.
+       If a large sample is identical, propose (next-steps) narrowing the key's machine part to
+       what glibc's choice of kernels depends on, so both machines share entries.
      - Any difference is a finding (`docs/findings/`), explained before new work.
      - The new machine is AMD (Ryzen 9 7945HX, AVX-512), the old one Intel (AVX2): runtime SIMD
        dispatch takes other paths here, so the proof covers that too.

@@ -79,19 +79,18 @@ def _programs() -> list[Spec]:
              "the brain extraction's first call) on the panel's largest anatomical image, the raw "
              "7 T MP2RAGE uniform image of ds005454 sub-16 (0.8 mm, 224 × 272 × 288), whose noisy "
              "background is as bright as the head: the histogram the quantiles come from is "
-             "mostly noise. A key dataset of the panel, shown as a whole volume.",
+             "mostly noise.",
              "ImageMath", trunc, (("out", "out.nii.gz", "truncated", ""),), P.MP2RAGE_7T.arg,
              (("input", P.MP2RAGE_7T.arg, "ds005454 sub-16, raw 7 T MP2RAGE"),),
-             (data("ds005454"),), view="volume", band=(), command=_cmd("ImageMath", trunc)),
+             (data("ds005454"),), band=(), command=_cmd("ImageMath", trunc)),
         Spec(T, "panel-smooth-flair", "panel-smooth-flair",
              "Data panel: SmoothImage on a FLAIR of 3 mm slices",
              "SmoothImage with a Gaussian of 1.5 mm on an 82-year-old's FLAIR (ds003592 sub-280: "
              "0.42 × 0.42 × 3 mm voxels, 384 × 512 × 44): ITK's recursive Gaussian with a sigma "
-             "of 3.6 voxels in-plane and half a voxel across the slices. A key dataset, shown as a "
-             "whole volume.",
+             "of 3.6 voxels in-plane and half a voxel across the slices.",
              "SmoothImage", smooth, (("out", "out.nii.gz", "smoothed", ""),), P.FLAIR_OLDER.arg,
              (("input", P.FLAIR_OLDER.arg, "ds003592 sub-280, FLAIR"),),
-             (data("ds003592"),), view="volume", band=(), command=_cmd("SmoothImage", smooth)),
+             (data("ds003592"),), band=(), command=_cmd("SmoothImage", smooth)),
         Spec(T, "panel-otsu-7t-mp2rage", "panel-otsu-7t",
              "Data panel: Otsu's thresholds of the raw 7 T MP2RAGE",
              "ThresholdImage's Otsu with 4 thresholds on the raw 7 T MP2RAGE (five classes, the "
@@ -136,25 +135,43 @@ def _n4() -> list[Spec]:
     final = node_call("N4BiasFieldCorrection", RUN_TUMOUR,
                       "anat_fit_wf/brain_extraction_wf/atropos_wf/inu_n4_final")  # fmt: skip
     f_in = final.args[final.args.index("--input-image") + 1]
+    bold = node_call(
+        "N4BiasFieldCorrection",
+        "ds004958-sub-fsm64ps-noreconall",
+        "bold_wf/bold_fit_wf/enhance_and_skullstrip_bold_wf/n4_correct",
+    )
+    b_in = bold.args[bold.args.index("--input-image") + 1]
     return [
+        Spec("ants-n4", "panel-fmriprep-boldref-mb8", "panel-boldref-mb8",
+             "Data panel: fMRIPrep's N4 of a multiband-8 BOLD reference",
+             "fMRIPrep 25.2.6's own call (the BOLD reference's correction before its skull "
+             "stripping, n4_correct: -b [200], -r without a mask, its weight image) on ds004958 "
+             "sub-fsm64ps's multiband-8 run (600 volumes of 104 × 104 × 72 at 2 mm): its "
+             "command.txt and inputs from the oracle run. A key dataset, shown as a whole volume.",
+             "N4BiasFieldCorrection", bold.args,
+             tuple(("corrected", o[5:-1], "corrected", "") for o in bold.outputs[:1]),
+             b_in, (("input", b_in, "ds004958 sub-fsm64ps, BOLD reference (fMRIPrep's)"),),
+             (data("ds004958"),), view="volume", band=(8,),
+             command=_cmd("N4BiasFieldCorrection", bold.command().split()[1:]),
+             node=f"`{fmriprep_nodes.label(bold.node)}` of the oracle run {bold.run}"),
         _n4_spec("panel-final-7t-mp2rage", "panel-7t",
                  "Data panel: sMRIPrep's final N4 options on the raw 7 T MP2RAGE",
                  "N4 with sMRIPrep's final options (-b [200] -c [50x50x50x50x50,1e-7] -s 4, the "
                  "bias field saved) on the raw 7 T MP2RAGE uniform image of ds005454 sub-16, the "
                  "panel's largest anatomical image: its background noise as bright as the head, "
-                 "fitted with it (no mask). A key dataset, shown as a whole volume.",
-                 P.MP2RAGE_7T, view="volume"),
+                 "fitted with it (no mask).",
+                 P.MP2RAGE_7T),
         Spec("ants-n4", "panel-fmriprep-final-tumour", "panel-tumour",
              "Data panel: fMRIPrep's final N4 of a brain with a tumour",
              "fMRIPrep 25.2.6's own call (sMRIPrep's final N4, inu_n4_final, its white-matter "
              "weight image) on ds005003 sub-RS001, a 70 mL right frontal oligodendroglioma: its "
-             "command.txt and inputs from the oracle run. A key dataset, shown as a whole volume.",
+             "command.txt and inputs from the oracle run.",
              "N4BiasFieldCorrection", final.args,
              tuple((o[5:-1].split("_")[-1].removesuffix(".nii.gz"), o[5:-1],
                     "corrected" if "corrected" in o else "bias field", "")
                    for o in final.outputs),
              f_in, (("input", f_in, "ds005003 sub-RS001, denoised T1w (fMRIPrep's)"),),
-             (data("ds005003"),), view="volume", band=(8,),
+             (data("ds005003"),), band=(8,),
              command=_cmd("N4BiasFieldCorrection", final.command().split()[1:]),
              node=f"`{fmriprep_nodes.label(final.node)}` of the oracle run {RUN_TUMOUR}"),
         _n4_spec("panel-final-flair", "panel-flair",
@@ -194,17 +211,16 @@ def _denoise() -> list[Spec]:
           "Data panel: sMRIPrep's denoising of the raw 7 T MP2RAGE",
           "sMRIPrep's DenoiseImage command (-n Rician -s 1, the noise saved) on the raw 7 T "
           "MP2RAGE of ds005454 sub-16, the panel's largest anatomical image (17.5 million voxels, "
-          "a noisy background). A key dataset, shown as a whole volume.", P.MP2RAGE_7T,
-          view="volume"),
+          "a noisy background).", P.MP2RAGE_7T),
         Spec("ants-denoise", "panel-fmriprep-motion", "panel-motion",
              "Data panel: fMRIPrep's denoising of a T1w with strong head motion",
              "fMRIPrep 25.2.6's own call (sMRIPrep's denoise of each T1w) on ds004173 "
              "sub-603309's MPRAGE acquired with strong instructed head motion (rated 3): its "
-             "command.txt and input from the oracle run. A key dataset, shown as a whole volume.",
+             "command.txt and input from the oracle run.",
              "DenoiseImage", motion.args,
              (("denoised", motion.outputs[0][5:-1], "denoised", ""),), m_in,
              (("input", m_in, "ds004173 sub-603309, MPRAGE with strong motion"),),
-             (data("ds004173"),), view="volume", band=(8,),
+             (data("ds004173"),), band=(8,),
              command=_cmd("DenoiseImage", motion.command().split()[1:]),
              node=f"`{fmriprep_nodes.label(motion.node)}` of the oracle run {motion.run}"),
         d("panel-rician-flair", "panel-flair", "Data panel: denoising a FLAIR of 3 mm slices",
@@ -235,11 +251,10 @@ def _atropos() -> list[Spec]:
              "fMRIPrep 25.2.6's own call (sMRIPrep's brain extraction, 01_atropos: K-means "
              "initialisation, 3 classes, MRF 0.1, 3 iterations) on ds005003 sub-RS001's "
              "N4-corrected T1w with a 70 mL right frontal oligodendroglioma, in the brain "
-             "extraction's mask: its command.txt and inputs from the oracle run. A key dataset, "
-             "shown as a whole volume.",
+             "extraction's mask: its command.txt and inputs from the oracle run.",
              "Atropos", tuple(args), outs, image,
              (("input", image, "ds005003 sub-RS001, N4-corrected T1w (fMRIPrep's)"),),
-             (data("ds005003"),), view="volume", band=(8,), labels=("seg",),
+             (data("ds005003"),), band=(8,), labels=("seg",),
              command=_cmd("Atropos", call.command().split()[1:]),
              node=f"`{fmriprep_nodes.label(call.node)}` of the oracle run {RUN_TUMOUR}"),
         Spec("ants-atropos", "panel-fmriprep-stroke", "panel-stroke",
@@ -284,18 +299,19 @@ def _apply_transforms() -> list[Spec]:
              "affine, then its T1w-to-MNI152NLin2009cAsym composite: an affine and a SyN "
              "displacement field) and windowed-sinc (Lanczos) interpolation onto the 1 mm "
              "template: the panel's largest anatomical image resampled once. Shown beside the "
-             "template it lands on; a key dataset, shown as a whole volume.",
+             "template it lands on.",
              "antsApplyTransforms", seven, (("out", "out.nii.gz", "resampled", ""),), tpl,
              (("template", tpl, "MNI152NLin2009cAsym, 1 mm (the reference grid)"),),
-             (data("ds005454"),), view="volume", band=(), command=_cmd("antsApplyTransforms", seven)),
+             (data("ds005454"),), band=(), command=_cmd("antsApplyTransforms", seven)),
         Spec(T, "panel-lesion-to-mni", "panel-lesion-to-mni",
              "Data panel: a manual stroke mask into MNI space",
              "The stroke's manual lesion mask (ds004884 sub-M2079, on its T1w's grid, as "
              "fMRIPrep read it) through fMRIPrep's T1w-to-MNI composite, GenericLabel, onto the "
-             "2 mm grid of fMRIPrep's MNI-space T1w, drawn over it.",
+             "2 mm grid of fMRIPrep's MNI-space T1w, drawn over it. A key dataset, shown as a whole "
+             "volume.",
              "antsApplyTransforms", lesion, (("out", "out.nii.gz", "lesion in MNI space", ""),),
              mni2, (("t1w-mni", mni2, "ds004884 sub-M2079, T1w in MNI space (fMRIPrep's)"),),
-             (data("ds004884"),), band=(), labels=("out",),
+             (data("ds004884"),), view="volume", band=(), labels=("out",),
              command=_cmd("antsApplyTransforms", lesion)),
         Spec(T, "panel-flair-to-t1w", "panel-flair-to-t1w",
              "Data panel: a FLAIR of 3 mm slices onto its T1w's grid",

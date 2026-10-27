@@ -1521,6 +1521,11 @@ small part, before part (b).
   (`~/fsl-<version>`); the mcflirt and BET packages compared (`src/<package>`) and the replicas
   brought up to date. The old oracles stay (never deleted), so each record can show the step
   from one version to the next. Rule 2 in CLAUDE.md and `UPSTREAM.md` move with it.
+- **The Python numerics behind `resample_series`** (fMRIPrep's one-shot resampler) were matched to
+  fMRIPrep's lockfile: SciPy 1.15.2 (newest 1.18.1), NumPy 2.3.5 (newest 2.5.4), OpenBLAS 0.3.30
+  (newest 0.3.34); nibabel 5.4.2 and nitransforms 25.1.0 are the newest. The update part checks
+  whether the newer releases change the routines larmorx reproduces (`ndimage` spline
+  interpolation, the BLAS/LAPACK paths of the 4x4 operations) and brings them in the same way.
 - **FSL's own build** (user, 2026-10-27): the newest FSL is the official build its installer
   gives, as 6.0.7.17 was (its source ships with it in `src/<package>`); larmorx does not compile
   FSL. ANTs and AFNI stay compiled from their release tags (the GCC 14.3 toolchain).

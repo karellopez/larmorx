@@ -1431,6 +1431,29 @@ quality. It should be the best software, not a generic, faulty or incomplete one
   directory's files are always written (they are FreeSurfer's outputs, which fMRIPrep and users
   read), in the background so the next step need not wait; they also make every run resumable.
 
+## 2026-10-27: Memory similar to the original's, not exactly at or below it (decided by the user)
+
+"Programs should have just similar memory usage than the oracles, not exact because that is
+imposible" (the user, after the data panel showed antsAI and antsAffineInitializer above ANTs on
+the 7 T image). The rule of 2026-10-25 becomes: for the same call larmorx's peak is **similar** to
+the original's, at most **10 % above it plus the interpreter's 8 MiB**
+(`tests/parity/test_memory_peak.py`: `peak <= 1.10 * original + 8`; the orchestrator's number
+for "similar", which the user may change); full-size copies the original does not hold, and speed
+caches that raise the peak beyond that, are still not allowed. Being below is welcome, not
+required.
+
+The two cases that started it: antsAI and antsAffineInitializer hold the metric's two images in
+double where ANTs holds them in float. The values are float already (the images are read as
+float and `pixel_f32` rounds every value), and both ANTs and larmorx compute the metric in double,
+so storing them in float changes no result: the fix is the storage, not a precision option. The
+user suggested offering single and double; where ANTs itself offers that choice (`--float` of
+antsRegistration and antsApplyTransforms) larmorx already has both. A double mode with more
+precision than ANTs' float input would be a new method (D11), added only if it is measured to
+help (rule D). antsAffineInitializer is also slower than ANTs at one thread (73 s against 277 s
+on the memory test's head, 332 s against 1212 s on the 7 T image), partly because the D13 check of
+ITK-21 runs each start point's local search twice: both, the storage and the speed, are the next
+small part, before part (b).
+
 ## Open decisions (PLAN.md §16)
 
 | # | Decision | Recommended default (used until decided) | Status |

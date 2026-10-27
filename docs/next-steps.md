@@ -52,8 +52,9 @@ of CLAUDE.md, the working agreements in it). Next, in order:
   the lab's server (originals in an Ubuntu 22.04 container: its glibc is 2.39).
 - **Meanwhile, here, and then:** every finished tool re-validated on the data panel (item 6; **the ANTs tools: done**, part a,
   2026-10-27; next a small part for antsAI and antsAffineInitializer (their metric's images in float, the
-  initializer's speed; decision log 2026-10-27), then **the version update** (AFNI to its newest
-  release, 26.3.x today, and FSL to its newest 6.0.7.x; user 2026-10-27, decision log), then AFNI, FSL and I/O, part b; the fourteen whole template
+  initializer's speed; decision log 2026-10-27), then **the version update** (first the upstream watch, below; AFNI to its
+  newest release, 26.3.x today, FSL to its newest 6.0.7.x, SciPy, NumPy and OpenBLAS checked; user 2026-10-27,
+  decision log), then AFNI, FSL and I/O, part b; the fourteen whole template
   registrations run in the background meanwhile), then BET's clean-room original (item 7; one agent at a
   time, user 2026-10-26); then
   the clean-room additions mcflirt FSL-20/21 and 3dUnifize AFNI-75 (specs first); then FLIRT with
@@ -303,6 +304,13 @@ of CLAUDE.md, the working agreements in it). Next, in order:
 Checked 2026-10-13: the binaries need no other library than the system's own (on Linux:
 `libc`, `libgcc_s`, and for `larmorx-gpl` glibc's `libm`, `libpthread`, `libdl`, `librt`).
 Still to do:
+- **A clean-machine check** (user, 2026-10-27): CI's runners have compilers and runtimes
+  installed, which can hide a missing piece. Install and test on truly clean machines: Windows
+  Sandbox on the Windows laptop (a throwaway clean Windows), a minimal Linux container here
+  (`apptainer` with a slim Python image); and test `larmorx-gpl` and `larmorx-nc` as installed
+  Python packages on the six platforms (today CI runs only their `cargo test`). Requirements
+  stated for users: Python 3.12 or newer; Linux with glibc 2.28 or newer; templates (and later
+  FreeSurfer's atlases) downloaded once on first use.
 - **Windows' C runtime:** nothing sets `+crt-static`, so the `.exe` programs (`larmorx-gpl`,
   the standalone `larmorx`) need `vcruntime140.dll`. Python's own copy serves the extension,
   but a separate program may not find one on a clean Windows. Link the C runtime statically

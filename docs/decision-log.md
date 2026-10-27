@@ -1539,6 +1539,29 @@ small part, before part (b).
   comparisons with fMRIPrep (when every tool is ported, 2026-10-16) use the newest fMRIPrep of
   that time, run then on the panel's fourteen subjects on the new machine.
 
+## 2026-10-27: How versions are handled from now on; a clean-machine check
+- **User decisions** (both recommended options, after asking how versions will be handled and
+  whether users need to install anything else):
+- **The upstream watch:** a script (`scripts/orchestration/upstream_watch.py`, built at the start
+  of the version-update part) run weekly by the nightly job (`difftest-nightly.sh`; no usage):
+  for every upstream in `UPSTREAM.md` it finds the newest release (git tags, PyPI, AFNI's
+  `AFNI.version`, FSL's changelog) and, for each newer one, lists which of the files named in the
+  crates' `PROVENANCE.md` changed. The orchestrator reads its report at the start of a session.
+  - A new release that changes ported code: a planned update part (the changes ported, the new
+    original installed or compiled beside the old one, the records re-made, the site showing the
+    step from one version to the next).
+  - A release that changes nothing larmorx uses: a cheap re-check, then the version recorded.
+  - AFNI, which releases several times a month, is updated in batches unless a release fixes
+    something that changes results.
+  - Each tool states the upstream version it reproduces (its API page, the generated tool table,
+    and at run time from Python); older behaviour is had by installing an older larmorx release,
+    which stays available (FAIR4RS reproducibility, README).
+- **A clean-machine check before the first release:** install and test on truly clean machines
+  (Windows Sandbox, a minimal Linux container) and the companion packages `larmorx-gpl` and
+  `larmorx-nc` as installed Python packages on the six platforms (`docs/next-steps.md`, "Before the
+  first release on PyPI"). By design users install nothing else: numpy is the only dependency, no
+  external programs or C/C++ libraries; Python 3.12 or newer; Linux with glibc 2.28 or newer.
+
 ## Open decisions (PLAN.md §16)
 
 | # | Decision | Recommended default (used until decided) | Status |

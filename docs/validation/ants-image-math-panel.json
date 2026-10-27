@@ -1,0 +1,7891 @@
+{
+ "environment": {
+  "cpu": "Intel(R) Core(TM) i7-8750H CPU @ 2.20GHz",
+  "larmorx": "0.0.1",
+  "larmorx_commit": "6e810bc5e2f9",
+  "larmorx_testdata_commit": "52124bc98f9f",
+  "logical_cpus": 12,
+  "os": "Linux-6.8.0-124-generic-x86_64-with-glibc2.35",
+  "packages": {
+   "nibabel": "5.4.2",
+   "numpy": "2.3.5"
+  },
+  "platform": "Linux x86_64",
+  "python": "3.12.10"
+ },
+ "oracle_cache": {
+  "differences": 0,
+  "fresh": {},
+  "location": "<workspace>/oracles/cache",
+  "mode": "use",
+  "ran": 0,
+  "saved_seconds": 654.9,
+  "served": 374
+ },
+ "reference": "ImageMath from ANTs v2.6.5 (fdce4d2f84) on ITK v5.4.5 (f51594ad88), x86_64-conda-linux-gnu-g++ (conda-forge gcc 14.3.0-20) 14.3.0, the binary built by `scripts/build_ants_oracle.sh`",
+ "results": [
+  {
+   "case": "panel/fmriprep/ds000005-sub-01/anat_fit/brain_extraction/atropos/02_pad_segm",
+   "category": "panel-fmriprep",
+   "checks_passed": 9,
+   "checks_total": 9,
+   "failed_checks": [],
+   "measured": {
+    "affine": "0.0e+00",
+    "data type": "float32",
+    "header (every field)": 0,
+    "values (bit-identical)": 0
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0,
+    "bit-identical": 0,
+    "header bytes identical": "True"
+   },
+   "seconds": 0.983,
+   "status": "pass"
+  },
+  {
+   "case": "panel/fmriprep/ds000005-sub-01/anat_fit/brain_extraction/atropos/03_pad_mask",
+   "category": "panel-fmriprep",
+   "checks_passed": 9,
+   "checks_total": 9,
+   "failed_checks": [],
+   "measured": {
+    "affine": "0.0e+00",
+    "data type": "float32",
+    "header (every field)": 0,
+    "values (bit-identical)": 0
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0,
+    "bit-identical": 0,
+    "header bytes identical": "True"
+   },
+   "seconds": 0.954,
+   "status": "pass"
+  },
+  {
+   "case": "panel/fmriprep/ds000005-sub-01/anat_fit/brain_extraction/atropos/05_get_wm",
+   "category": "panel-fmriprep",
+   "checks_passed": 9,
+   "checks_total": 9,
+   "failed_checks": [],
+   "measured": {
+    "affine": "0.0e+00",
+    "data type": "float32",
+    "header (every field)": 0,
+    "values (bit-identical)": 0
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0,
+    "bit-identical": 0,
+    "header bytes identical": "True"
+   },
+   "seconds": 0.616,
+   "status": "pass"
+  },
+  {
+   "case": "panel/fmriprep/ds000005-sub-01/anat_fit/brain_extraction/atropos/06_get_gm",
+   "category": "panel-fmriprep",
+   "checks_passed": 9,
+   "checks_total": 9,
+   "failed_checks": [],
+   "measured": {
+    "affine": "0.0e+00",
+    "data type": "float32",
+    "header (every field)": 0,
+    "values (bit-identical)": 0
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0,
+    "bit-identical": 0,
+    "header bytes identical": "True"
+   },
+   "seconds": 0.625,
+   "status": "pass"
+  },
+  {
+   "case": "panel/fmriprep/ds000005-sub-01/anat_fit/brain_extraction/atropos/07_fill_gm",
+   "category": "panel-fmriprep",
+   "checks_passed": 9,
+   "checks_total": 9,
+   "failed_checks": [],
+   "measured": {
+    "affine": "0.0e+00",
+    "data type": "float32",
+    "header (every field)": 0,
+    "values (bit-identical)": 0
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0,
+    "bit-identical": 0,
+    "header bytes identical": "True"
+   },
+   "seconds": 0.855,
+   "status": "pass"
+  },
+  {
+   "case": "panel/fmriprep/ds000005-sub-01/anat_fit/brain_extraction/atropos/10_me_csf",
+   "category": "panel-fmriprep",
+   "checks_passed": 9,
+   "checks_total": 9,
+   "failed_checks": [],
+   "measured": {
+    "affine": "0.0e+00",
+    "data type": "float32",
+    "header (every field)": 0,
+    "values (bit-identical)": 0
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0,
+    "bit-identical": 0,
+    "header bytes identical": "True"
+   },
+   "seconds": 0.823,
+   "status": "pass"
+  },
+  {
+   "case": "panel/fmriprep/ds000005-sub-01/anat_fit/brain_extraction/atropos/11_add_gm",
+   "category": "panel-fmriprep",
+   "checks_passed": 9,
+   "checks_total": 9,
+   "failed_checks": [],
+   "measured": {
+    "affine": "0.0e+00",
+    "data type": "float32",
+    "header (every field)": 0,
+    "values (bit-identical)": 0
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0,
+    "bit-identical": 0,
+    "header bytes identical": "True"
+   },
+   "seconds": 0.899,
+   "status": "pass"
+  },
+  {
+   "case": "panel/fmriprep/ds000005-sub-01/anat_fit/brain_extraction/atropos/13_add_gm_wm",
+   "category": "panel-fmriprep",
+   "checks_passed": 9,
+   "checks_total": 9,
+   "failed_checks": [],
+   "measured": {
+    "affine": "0.0e+00",
+    "data type": "float32",
+    "header (every field)": 0,
+    "values (bit-identical)": 0
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0,
+    "bit-identical": 0,
+    "header bytes identical": "True"
+   },
+   "seconds": 0.936,
+   "status": "pass"
+  },
+  {
+   "case": "panel/fmriprep/ds000005-sub-01/anat_fit/brain_extraction/atropos/15_add_7",
+   "category": "panel-fmriprep",
+   "checks_passed": 9,
+   "checks_total": 9,
+   "failed_checks": [],
+   "measured": {
+    "affine": "0.0e+00",
+    "data type": "float32",
+    "header (every field)": 0,
+    "values (bit-identical)": 0
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0,
+    "bit-identical": 0,
+    "header bytes identical": "True"
+   },
+   "seconds": 0.599,
+   "status": "pass"
+  },
+  {
+   "case": "panel/fmriprep/ds000005-sub-01/anat_fit/brain_extraction/atropos/16_me_7",
+   "category": "panel-fmriprep",
+   "checks_passed": 9,
+   "checks_total": 9,
+   "failed_checks": [],
+   "measured": {
+    "affine": "0.0e+00",
+    "data type": "float32",
+    "header (every field)": 0,
+    "values (bit-identical)": 0
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0,
+    "bit-identical": 0,
+    "header bytes identical": "True"
+   },
+   "seconds": 0.913,
+   "status": "pass"
+  },
+  {
+   "case": "panel/fmriprep/ds000005-sub-01/anat_fit/brain_extraction/atropos/17_comp_7",
+   "category": "panel-fmriprep",
+   "checks_passed": 9,
+   "checks_total": 9,
+   "failed_checks": [],
+   "measured": {
+    "affine": "0.0e+00",
+    "data type": "float32",
+    "header (every field)": 0,
+    "values (bit-identical)": 0
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0,
+    "bit-identical": 0,
+    "header bytes identical": "True"
+   },
+   "seconds": 0.786,
+   "status": "pass"
+  },
+  {
+   "case": "panel/fmriprep/ds000005-sub-01/anat_fit/brain_extraction/atropos/18_md_7",
+   "category": "panel-fmriprep",
+   "checks_passed": 9,
+   "checks_total": 9,
+   "failed_checks": [],
+   "measured": {
+    "affine": "0.0e+00",
+    "data type": "float32",
+    "header (every field)": 0,
+    "values (bit-identical)": 0
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0,
+    "bit-identical": 0,
+    "header bytes identical": "True"
+   },
+   "seconds": 0.784,
+   "status": "pass"
+  },
+  {
+   "case": "panel/fmriprep/ds000005-sub-01/anat_fit/brain_extraction/atropos/19_fill_7",
+   "category": "panel-fmriprep",
+   "checks_passed": 9,
+   "checks_total": 9,
+   "failed_checks": [],
+   "measured": {
+    "affine": "0.0e+00",
+    "data type": "float32",
+    "header (every field)": 0,
+    "values (bit-identical)": 0
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0,
+    "bit-identical": 0,
+    "header bytes identical": "True"
+   },
+   "seconds": 0.835,
+   "status": "pass"
+  },
+  {
+   "case": "panel/fmriprep/ds000005-sub-01/anat_fit/brain_extraction/atropos/20_add_7_2",
+   "category": "panel-fmriprep",
+   "checks_passed": 9,
+   "checks_total": 9,
+   "failed_checks": [],
+   "measured": {
+    "affine": "0.0e+00",
+    "data type": "float32",
+    "header (every field)": 0,
+    "values (bit-identical)": 0
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0,
+    "bit-identical": 0,
+    "header bytes identical": "True"
+   },
+   "seconds": 0.968,
+   "status": "pass"
+  },
+  {
+   "case": "panel/fmriprep/ds000005-sub-01/anat_fit/brain_extraction/atropos/21_md_7_2",
+   "category": "panel-fmriprep",
+   "checks_passed": 9,
+   "checks_total": 9,
+   "failed_checks": [],
+   "measured": {
+    "affine": "0.0e+00",
+    "data type": "float32",
+    "header (every field)": 0,
+    "values (bit-identical)": 0
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0,
+    "bit-identical": 0,
+    "header bytes identical": "True"
+   },
+   "seconds": 0.792,
+   "status": "pass"
+  },
+  {
+   "case": "panel/fmriprep/ds000005-sub-01/anat_fit/brain_extraction/atropos/22_me_7_2",
+   "category": "panel-fmriprep",
+   "checks_passed": 9,
+   "checks_total": 9,
+   "failed_checks": [],
+   "measured": {
+    "affine": "0.0e+00",
+    "data type": "float32",
+    "header (every field)": 0,
+    "values (bit-identical)": 0
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0,
+    "bit-identical": 0,
+    "header bytes identical": "True"
+   },
+   "seconds": 0.867,
+   "status": "pass"
+  },
+  {
+   "case": "panel/fmriprep/ds000005-sub-01/anat_fit/brain_extraction/atropos/23_depad_mask",
+   "category": "panel-fmriprep",
+   "checks_passed": 9,
+   "checks_total": 9,
+   "failed_checks": [],
+   "measured": {
+    "affine": "0.0e+00",
+    "data type": "float32",
+    "header (every field)": 0,
+    "values (bit-identical)": 0
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0,
+    "bit-identical": 0,
+    "header bytes identical": "True"
+   },
+   "seconds": 0.719,
+   "status": "pass"
+  },
+  {
+   "case": "panel/fmriprep/ds000005-sub-01/anat_fit/brain_extraction/atropos/24_depad_segm",
+   "category": "panel-fmriprep",
+   "checks_passed": 9,
+   "checks_total": 9,
+   "failed_checks": [],
+   "measured": {
+    "affine": "0.0e+00",
+    "data type": "float32",
+    "header (every field)": 0,
+    "values (bit-identical)": 0
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0,
+    "bit-identical": 0,
+    "header bytes identical": "True"
+   },
+   "seconds": 0.742,
+   "status": "pass"
+  },
+  {
+   "case": "panel/fmriprep/ds000005-sub-01/anat_fit/brain_extraction/atropos/25_depad_gm",
+   "category": "panel-fmriprep",
+   "checks_passed": 9,
+   "checks_total": 9,
+   "failed_checks": [],
+   "measured": {
+    "affine": "0.0e+00",
+    "data type": "float32",
+    "header (every field)": 0,
+    "values (bit-identical)": 0
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0,
+    "bit-identical": 0,
+    "header bytes identical": "True"
+   },
+   "seconds": 0.718,
+   "status": "pass"
+  },
+  {
+   "case": "panel/fmriprep/ds000005-sub-01/anat_fit/brain_extraction/atropos/26_depad_wm",
+   "category": "panel-fmriprep",
+   "checks_passed": 9,
+   "checks_total": 9,
+   "failed_checks": [],
+   "measured": {
+    "affine": "0.0e+00",
+    "data type": "float32",
+    "header (every field)": 0,
+    "values (bit-identical)": 0
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0,
+    "bit-identical": 0,
+    "header bytes identical": "True"
+   },
+   "seconds": 0.576,
+   "status": "pass"
+  },
+  {
+   "case": "panel/fmriprep/ds000005-sub-01/anat_fit/brain_extraction/atropos/27_depad_csf",
+   "category": "panel-fmriprep",
+   "checks_passed": 9,
+   "checks_total": 9,
+   "failed_checks": [],
+   "measured": {
+    "affine": "0.0e+00",
+    "data type": "float32",
+    "header (every field)": 0,
+    "values (bit-identical)": 0
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0,
+    "bit-identical": 0,
+    "header bytes identical": "True"
+   },
+   "seconds": 0.617,
+   "status": "pass"
+  },
+  {
+   "case": "panel/fmriprep/ds000005-sub-01/anat_fit/brain_extraction/atropos/dil_brainmask",
+   "category": "panel-fmriprep",
+   "checks_passed": 9,
+   "checks_total": 9,
+   "failed_checks": [],
+   "measured": {
+    "affine": "0.0e+00",
+    "data type": "float32",
+    "header (every field)": 0,
+    "values (bit-identical)": 0
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0,
+    "bit-identical": 0,
+    "header bytes identical": "True"
+   },
+   "seconds": 0.528,
+   "status": "pass"
+  },
+  {
+   "case": "panel/fmriprep/ds000005-sub-01/anat_fit/brain_extraction/atropos/get_brainmask",
+   "category": "panel-fmriprep",
+   "checks_passed": 9,
+   "checks_total": 9,
+   "failed_checks": [],
+   "measured": {
+    "affine": "0.0e+00",
+    "data type": "float32",
+    "header (every field)": 0,
+    "values (bit-identical)": 0
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0,
+    "bit-identical": 0,
+    "header bytes identical": "True"
+   },
+   "seconds": 0.496,
+   "status": "pass"
+  },
+  {
+   "case": "panel/fmriprep/ds000005-sub-01/anat_fit/brain_extraction/lap_target",
+   "category": "panel-fmriprep",
+   "checks_passed": 9,
+   "checks_total": 9,
+   "failed_checks": [],
+   "measured": {
+    "affine": "0.0e+00",
+    "data type": "float32",
+    "header (every field)": 0,
+    "values (bit-identical)": 0
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0,
+    "bit-identical": 0,
+    "header bytes identical": "True"
+   },
+   "seconds": 2.226,
+   "status": "pass"
+  },
+  {
+   "case": "panel/fmriprep/ds000005-sub-01/anat_fit/brain_extraction/lap_tmpl",
+   "category": "panel-fmriprep",
+   "checks_passed": 9,
+   "checks_total": 9,
+   "failed_checks": [],
+   "measured": {
+    "affine": "0.0e+00",
+    "data type": "float32",
+    "header (every field)": 0,
+    "values (bit-identical)": 0
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0,
+    "bit-identical": 0,
+    "header bytes identical": "True"
+   },
+   "seconds": 3.403,
+   "status": "pass"
+  },
+  {
+   "case": "panel/fmriprep/ds000005-sub-01/anat_fit/brain_extraction/truncate_images[0]",
+   "category": "panel-fmriprep",
+   "checks_passed": 9,
+   "checks_total": 9,
+   "failed_checks": [],
+   "measured": {
+    "affine": "0.0e+00",
+    "data type": "float32",
+    "header (every field)": 0,
+    "values (bit-identical)": 0
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0,
+    "bit-identical": 0,
+    "header bytes identical": "True"
+   },
+   "seconds": 2.035,
+   "status": "pass"
+  },
+  {
+   "case": "panel/fmriprep/ds000005-sub-01/anat_fit/register_template[MNI152NLin2009cAsym]/trunc_mov",
+   "category": "panel-fmriprep",
+   "checks_passed": 9,
+   "checks_total": 9,
+   "failed_checks": [],
+   "measured": {
+    "affine": "0.0e+00",
+    "data type": "float32",
+    "header (every field)": 0,
+    "values (bit-identical)": 0
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0,
+    "bit-identical": 0,
+    "header bytes identical": "True"
+   },
+   "seconds": 2.09,
+   "status": "pass"
+  },
+  {
+   "case": "panel/fmriprep/ds000228-sub-pixar008/anat_fit/brain_extraction/atropos/02_pad_segm",
+   "category": "panel-fmriprep",
+   "checks_passed": 9,
+   "checks_total": 9,
+   "failed_checks": [],
+   "measured": {
+    "affine": "0.0e+00",
+    "data type": "float32",
+    "header (every field)": 0,
+    "values (bit-identical)": 0
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0,
+    "bit-identical": 0,
+    "header bytes identical": "True"
+   },
+   "seconds": 0.86,
+   "status": "pass"
+  },
+  {
+   "case": "panel/fmriprep/ds000228-sub-pixar008/anat_fit/brain_extraction/atropos/03_pad_mask",
+   "category": "panel-fmriprep",
+   "checks_passed": 9,
+   "checks_total": 9,
+   "failed_checks": [],
+   "measured": {
+    "affine": "0.0e+00",
+    "data type": "float32",
+    "header (every field)": 0,
+    "values (bit-identical)": 0
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0,
+    "bit-identical": 0,
+    "header bytes identical": "True"
+   },
+   "seconds": 0.818,
+   "status": "pass"
+  },
+  {
+   "case": "panel/fmriprep/ds000228-sub-pixar008/anat_fit/brain_extraction/atropos/05_get_wm",
+   "category": "panel-fmriprep",
+   "checks_passed": 9,
+   "checks_total": 9,
+   "failed_checks": [],
+   "measured": {
+    "affine": "0.0e+00",
+    "data type": "float32",
+    "header (every field)": 0,
+    "values (bit-identical)": 0
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0,
+    "bit-identical": 0,
+    "header bytes identical": "True"
+   },
+   "seconds": 0.65,
+   "status": "pass"
+  },
+  {
+   "case": "panel/fmriprep/ds000228-sub-pixar008/anat_fit/brain_extraction/atropos/06_get_gm",
+   "category": "panel-fmriprep",
+   "checks_passed": 9,
+   "checks_total": 9,
+   "failed_checks": [],
+   "measured": {
+    "affine": "0.0e+00",
+    "data type": "float32",
+    "header (every field)": 0,
+    "values (bit-identical)": 0
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0,
+    "bit-identical": 0,
+    "header bytes identical": "True"
+   },
+   "seconds": 0.668,
+   "status": "pass"
+  },
+  {
+   "case": "panel/fmriprep/ds000228-sub-pixar008/anat_fit/brain_extraction/atropos/07_fill_gm",
+   "category": "panel-fmriprep",
+   "checks_passed": 9,
+   "checks_total": 9,
+   "failed_checks": [],
+   "measured": {
+    "affine": "0.0e+00",
+    "data type": "float32",
+    "header (every field)": 0,
+    "values (bit-identical)": 0
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0,
+    "bit-identical": 0,
+    "header bytes identical": "True"
+   },
+   "seconds": 0.858,
+   "status": "pass"
+  },
+  {
+   "case": "panel/fmriprep/ds000228-sub-pixar008/anat_fit/brain_extraction/atropos/10_me_csf",
+   "category": "panel-fmriprep",
+   "checks_passed": 9,
+   "checks_total": 9,
+   "failed_checks": [],
+   "measured": {
+    "affine": "0.0e+00",
+    "data type": "float32",
+    "header (every field)": 0,
+    "values (bit-identical)": 0
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0,
+    "bit-identical": 0,
+    "header bytes identical": "True"
+   },
+   "seconds": 0.858,
+   "status": "pass"
+  },
+  {
+   "case": "panel/fmriprep/ds000228-sub-pixar008/anat_fit/brain_extraction/atropos/11_add_gm",
+   "category": "panel-fmriprep",
+   "checks_passed": 9,
+   "checks_total": 9,
+   "failed_checks": [],
+   "measured": {
+    "affine": "0.0e+00",
+    "data type": "float32",
+    "header (every field)": 0,
+    "values (bit-identical)": 0
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0,
+    "bit-identical": 0,
+    "header bytes identical": "True"
+   },
+   "seconds": 0.921,
+   "status": "pass"
+  },
+  {
+   "case": "panel/fmriprep/ds000228-sub-pixar008/anat_fit/brain_extraction/atropos/13_add_gm_wm",
+   "category": "panel-fmriprep",
+   "checks_passed": 9,
+   "checks_total": 9,
+   "failed_checks": [],
+   "measured": {
+    "affine": "0.0e+00",
+    "data type": "float32",
+    "header (every field)": 0,
+    "values (bit-identical)": 0
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0,
+    "bit-identical": 0,
+    "header bytes identical": "True"
+   },
+   "seconds": 1.066,
+   "status": "pass"
+  },
+  {
+   "case": "panel/fmriprep/ds000228-sub-pixar008/anat_fit/brain_extraction/atropos/15_add_7",
+   "category": "panel-fmriprep",
+   "checks_passed": 9,
+   "checks_total": 9,
+   "failed_checks": [],
+   "measured": {
+    "affine": "0.0e+00",
+    "data type": "float32",
+    "header (every field)": 0,
+    "values (bit-identical)": 0
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0,
+    "bit-identical": 0,
+    "header bytes identical": "True"
+   },
+   "seconds": 0.674,
+   "status": "pass"
+  },
+  {
+   "case": "panel/fmriprep/ds000228-sub-pixar008/anat_fit/brain_extraction/atropos/16_me_7",
+   "category": "panel-fmriprep",
+   "checks_passed": 9,
+   "checks_total": 9,
+   "failed_checks": [],
+   "measured": {
+    "affine": "0.0e+00",
+    "data type": "float32",
+    "header (every field)": 0,
+    "values (bit-identical)": 0
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0,
+    "bit-identical": 0,
+    "header bytes identical": "True"
+   },
+   "seconds": 1.028,
+   "status": "pass"
+  },
+  {
+   "case": "panel/fmriprep/ds000228-sub-pixar008/anat_fit/brain_extraction/atropos/17_comp_7",
+   "category": "panel-fmriprep",
+   "checks_passed": 9,
+   "checks_total": 9,
+   "failed_checks": [],
+   "measured": {
+    "affine": "0.0e+00",
+    "data type": "float32",
+    "header (every field)": 0,
+    "values (bit-identical)": 0
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0,
+    "bit-identical": 0,
+    "header bytes identical": "True"
+   },
+   "seconds": 0.81,
+   "status": "pass"
+  },
+  {
+   "case": "panel/fmriprep/ds000228-sub-pixar008/anat_fit/brain_extraction/atropos/18_md_7",
+   "category": "panel-fmriprep",
+   "checks_passed": 9,
+   "checks_total": 9,
+   "failed_checks": [],
+   "measured": {
+    "affine": "0.0e+00",
+    "data type": "float32",
+    "header (every field)": 0,
+    "values (bit-identical)": 0
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0,
+    "bit-identical": 0,
+    "header bytes identical": "True"
+   },
+   "seconds": 0.829,
+   "status": "pass"
+  },
+  {
+   "case": "panel/fmriprep/ds000228-sub-pixar008/anat_fit/brain_extraction/atropos/19_fill_7",
+   "category": "panel-fmriprep",
+   "checks_passed": 9,
+   "checks_total": 9,
+   "failed_checks": [],
+   "measured": {
+    "affine": "0.0e+00",
+    "data type": "float32",
+    "header (every field)": 0,
+    "values (bit-identical)": 0
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0,
+    "bit-identical": 0,
+    "header bytes identical": "True"
+   },
+   "seconds": 0.849,
+   "status": "pass"
+  },
+  {
+   "case": "panel/fmriprep/ds000228-sub-pixar008/anat_fit/brain_extraction/atropos/20_add_7_2",
+   "category": "panel-fmriprep",
+   "checks_passed": 9,
+   "checks_total": 9,
+   "failed_checks": [],
+   "measured": {
+    "affine": "0.0e+00",
+    "data type": "float32",
+    "header (every field)": 0,
+    "values (bit-identical)": 0
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0,
+    "bit-identical": 0,
+    "header bytes identical": "True"
+   },
+   "seconds": 0.946,
+   "status": "pass"
+  },
+  {
+   "case": "panel/fmriprep/ds000228-sub-pixar008/anat_fit/brain_extraction/atropos/21_md_7_2",
+   "category": "panel-fmriprep",
+   "checks_passed": 9,
+   "checks_total": 9,
+   "failed_checks": [],
+   "measured": {
+    "affine": "0.0e+00",
+    "data type": "float32",
+    "header (every field)": 0,
+    "values (bit-identical)": 0
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0,
+    "bit-identical": 0,
+    "header bytes identical": "True"
+   },
+   "seconds": 0.844,
+   "status": "pass"
+  },
+  {
+   "case": "panel/fmriprep/ds000228-sub-pixar008/anat_fit/brain_extraction/atropos/22_me_7_2",
+   "category": "panel-fmriprep",
+   "checks_passed": 9,
+   "checks_total": 9,
+   "failed_checks": [],
+   "measured": {
+    "affine": "0.0e+00",
+    "data type": "float32",
+    "header (every field)": 0,
+    "values (bit-identical)": 0
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0,
+    "bit-identical": 0,
+    "header bytes identical": "True"
+   },
+   "seconds": 0.967,
+   "status": "pass"
+  },
+  {
+   "case": "panel/fmriprep/ds000228-sub-pixar008/anat_fit/brain_extraction/atropos/23_depad_mask",
+   "category": "panel-fmriprep",
+   "checks_passed": 9,
+   "checks_total": 9,
+   "failed_checks": [],
+   "measured": {
+    "affine": "0.0e+00",
+    "data type": "float32",
+    "header (every field)": 0,
+    "values (bit-identical)": 0
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0,
+    "bit-identical": 0,
+    "header bytes identical": "True"
+   },
+   "seconds": 0.832,
+   "status": "pass"
+  },
+  {
+   "case": "panel/fmriprep/ds000228-sub-pixar008/anat_fit/brain_extraction/atropos/24_depad_segm",
+   "category": "panel-fmriprep",
+   "checks_passed": 9,
+   "checks_total": 9,
+   "failed_checks": [],
+   "measured": {
+    "affine": "0.0e+00",
+    "data type": "float32",
+    "header (every field)": 0,
+    "values (bit-identical)": 0
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0,
+    "bit-identical": 0,
+    "header bytes identical": "True"
+   },
+   "seconds": 0.794,
+   "status": "pass"
+  },
+  {
+   "case": "panel/fmriprep/ds000228-sub-pixar008/anat_fit/brain_extraction/atropos/25_depad_gm",
+   "category": "panel-fmriprep",
+   "checks_passed": 9,
+   "checks_total": 9,
+   "failed_checks": [],
+   "measured": {
+    "affine": "0.0e+00",
+    "data type": "float32",
+    "header (every field)": 0,
+    "values (bit-identical)": 0
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0,
+    "bit-identical": 0,
+    "header bytes identical": "True"
+   },
+   "seconds": 0.651,
+   "status": "pass"
+  },
+  {
+   "case": "panel/fmriprep/ds000228-sub-pixar008/anat_fit/brain_extraction/atropos/26_depad_wm",
+   "category": "panel-fmriprep",
+   "checks_passed": 9,
+   "checks_total": 9,
+   "failed_checks": [],
+   "measured": {
+    "affine": "0.0e+00",
+    "data type": "float32",
+    "header (every field)": 0,
+    "values (bit-identical)": 0
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0,
+    "bit-identical": 0,
+    "header bytes identical": "True"
+   },
+   "seconds": 0.681,
+   "status": "pass"
+  },
+  {
+   "case": "panel/fmriprep/ds000228-sub-pixar008/anat_fit/brain_extraction/atropos/27_depad_csf",
+   "category": "panel-fmriprep",
+   "checks_passed": 9,
+   "checks_total": 9,
+   "failed_checks": [],
+   "measured": {
+    "affine": "0.0e+00",
+    "data type": "float32",
+    "header (every field)": 0,
+    "values (bit-identical)": 0
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0,
+    "bit-identical": 0,
+    "header bytes identical": "True"
+   },
+   "seconds": 0.679,
+   "status": "pass"
+  },
+  {
+   "case": "panel/fmriprep/ds000228-sub-pixar008/anat_fit/brain_extraction/atropos/dil_brainmask",
+   "category": "panel-fmriprep",
+   "checks_passed": 9,
+   "checks_total": 9,
+   "failed_checks": [],
+   "measured": {
+    "affine": "0.0e+00",
+    "data type": "float32",
+    "header (every field)": 0,
+    "values (bit-identical)": 0
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0,
+    "bit-identical": 0,
+    "header bytes identical": "True"
+   },
+   "seconds": 0.502,
+   "status": "pass"
+  },
+  {
+   "case": "panel/fmriprep/ds000228-sub-pixar008/anat_fit/brain_extraction/atropos/get_brainmask",
+   "category": "panel-fmriprep",
+   "checks_passed": 9,
+   "checks_total": 9,
+   "failed_checks": [],
+   "measured": {
+    "affine": "0.0e+00",
+    "data type": "float32",
+    "header (every field)": 0,
+    "values (bit-identical)": 0
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0,
+    "bit-identical": 0,
+    "header bytes identical": "True"
+   },
+   "seconds": 0.55,
+   "status": "pass"
+  },
+  {
+   "case": "panel/fmriprep/ds000228-sub-pixar008/anat_fit/brain_extraction/lap_target",
+   "category": "panel-fmriprep",
+   "checks_passed": 9,
+   "checks_total": 9,
+   "failed_checks": [],
+   "measured": {
+    "affine": "0.0e+00",
+    "data type": "float32",
+    "header (every field)": 0,
+    "values (bit-identical)": 0
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0,
+    "bit-identical": 0,
+    "header bytes identical": "True"
+   },
+   "seconds": 2.067,
+   "status": "pass"
+  },
+  {
+   "case": "panel/fmriprep/ds000228-sub-pixar008/anat_fit/brain_extraction/truncate_images[0]",
+   "category": "panel-fmriprep",
+   "checks_passed": 9,
+   "checks_total": 9,
+   "failed_checks": [],
+   "measured": {
+    "affine": "0.0e+00",
+    "data type": "float32",
+    "header (every field)": 0,
+    "values (bit-identical)": 0
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0,
+    "bit-identical": 0,
+    "header bytes identical": "True"
+   },
+   "seconds": 1.55,
+   "status": "pass"
+  },
+  {
+   "case": "panel/fmriprep/ds000228-sub-pixar008/anat_fit/register_template[MNI152NLin2009cAsym]/trunc_mov",
+   "category": "panel-fmriprep",
+   "checks_passed": 9,
+   "checks_total": 9,
+   "failed_checks": [],
+   "measured": {
+    "affine": "0.0e+00",
+    "data type": "float32",
+    "header (every field)": 0,
+    "values (bit-identical)": 0
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0,
+    "bit-identical": 0,
+    "header bytes identical": "True"
+   },
+   "seconds": 1.491,
+   "status": "pass"
+  },
+  {
+   "case": "panel/fmriprep/ds000256-sub-CTS203/anat_fit/brain_extraction/atropos/02_pad_segm",
+   "category": "panel-fmriprep",
+   "checks_passed": 9,
+   "checks_total": 9,
+   "failed_checks": [],
+   "measured": {
+    "affine": "0.0e+00",
+    "data type": "float32",
+    "header (every field)": 0,
+    "values (bit-identical)": 0
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0,
+    "bit-identical": 0,
+    "header bytes identical": "True"
+   },
+   "seconds": 1.887,
+   "status": "pass"
+  },
+  {
+   "case": "panel/fmriprep/ds000256-sub-CTS203/anat_fit/brain_extraction/atropos/03_pad_mask",
+   "category": "panel-fmriprep",
+   "checks_passed": 9,
+   "checks_total": 9,
+   "failed_checks": [],
+   "measured": {
+    "affine": "0.0e+00",
+    "data type": "float32",
+    "header (every field)": 0,
+    "values (bit-identical)": 0
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0,
+    "bit-identical": 0,
+    "header bytes identical": "True"
+   },
+   "seconds": 1.799,
+   "status": "pass"
+  },
+  {
+   "case": "panel/fmriprep/ds000256-sub-CTS203/anat_fit/brain_extraction/atropos/05_get_wm",
+   "category": "panel-fmriprep",
+   "checks_passed": 9,
+   "checks_total": 9,
+   "failed_checks": [],
+   "measured": {
+    "affine": "0.0e+00",
+    "data type": "float32",
+    "header (every field)": 0,
+    "values (bit-identical)": 0
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0,
+    "bit-identical": 0,
+    "header bytes identical": "True"
+   },
+   "seconds": 1.348,
+   "status": "pass"
+  },
+  {
+   "case": "panel/fmriprep/ds000256-sub-CTS203/anat_fit/brain_extraction/atropos/06_get_gm",
+   "category": "panel-fmriprep",
+   "checks_passed": 9,
+   "checks_total": 9,
+   "failed_checks": [],
+   "measured": {
+    "affine": "0.0e+00",
+    "data type": "float32",
+    "header (every field)": 0,
+    "values (bit-identical)": 0
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0,
+    "bit-identical": 0,
+    "header bytes identical": "True"
+   },
+   "seconds": 1.352,
+   "status": "pass"
+  },
+  {
+   "case": "panel/fmriprep/ds000256-sub-CTS203/anat_fit/brain_extraction/atropos/07_fill_gm",
+   "category": "panel-fmriprep",
+   "checks_passed": 9,
+   "checks_total": 9,
+   "failed_checks": [],
+   "measured": {
+    "affine": "0.0e+00",
+    "data type": "float32",
+    "header (every field)": 0,
+    "values (bit-identical)": 0
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0,
+    "bit-identical": 0,
+    "header bytes identical": "True"
+   },
+   "seconds": 1.823,
+   "status": "pass"
+  },
+  {
+   "case": "panel/fmriprep/ds000256-sub-CTS203/anat_fit/brain_extraction/atropos/10_me_csf",
+   "category": "panel-fmriprep",
+   "checks_passed": 9,
+   "checks_total": 9,
+   "failed_checks": [],
+   "measured": {
+    "affine": "0.0e+00",
+    "data type": "float32",
+    "header (every field)": 0,
+    "values (bit-identical)": 0
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0,
+    "bit-identical": 0,
+    "header bytes identical": "True"
+   },
+   "seconds": 1.72,
+   "status": "pass"
+  },
+  {
+   "case": "panel/fmriprep/ds000256-sub-CTS203/anat_fit/brain_extraction/atropos/11_add_gm",
+   "category": "panel-fmriprep",
+   "checks_passed": 9,
+   "checks_total": 9,
+   "failed_checks": [],
+   "measured": {
+    "affine": "0.0e+00",
+    "data type": "float32",
+    "header (every field)": 0,
+    "values (bit-identical)": 0
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0,
+    "bit-identical": 0,
+    "header bytes identical": "True"
+   },
+   "seconds": 1.951,
+   "status": "pass"
+  },
+  {
+   "case": "panel/fmriprep/ds000256-sub-CTS203/anat_fit/brain_extraction/atropos/13_add_gm_wm",
+   "category": "panel-fmriprep",
+   "checks_passed": 9,
+   "checks_total": 9,
+   "failed_checks": [],
+   "measured": {
+    "affine": "0.0e+00",
+    "data type": "float32",
+    "header (every field)": 0,
+    "values (bit-identical)": 0
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0,
+    "bit-identical": 0,
+    "header bytes identical": "True"
+   },
+   "seconds": 2.101,
+   "status": "pass"
+  },
+  {
+   "case": "panel/fmriprep/ds000256-sub-CTS203/anat_fit/brain_extraction/atropos/15_add_7",
+   "category": "panel-fmriprep",
+   "checks_passed": 9,
+   "checks_total": 9,
+   "failed_checks": [],
+   "measured": {
+    "affine": "0.0e+00",
+    "data type": "float32",
+    "header (every field)": 0,
+    "values (bit-identical)": 0
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0,
+    "bit-identical": 0,
+    "header bytes identical": "True"
+   },
+   "seconds": 1.326,
+   "status": "pass"
+  },
+  {
+   "case": "panel/fmriprep/ds000256-sub-CTS203/anat_fit/brain_extraction/atropos/16_me_7",
+   "category": "panel-fmriprep",
+   "checks_passed": 9,
+   "checks_total": 9,
+   "failed_checks": [],
+   "measured": {
+    "affine": "0.0e+00",
+    "data type": "float32",
+    "header (every field)": 0,
+    "values (bit-identical)": 0
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0,
+    "bit-identical": 0,
+    "header bytes identical": "True"
+   },
+   "seconds": 2.049,
+   "status": "pass"
+  },
+  {
+   "case": "panel/fmriprep/ds000256-sub-CTS203/anat_fit/brain_extraction/atropos/17_comp_7",
+   "category": "panel-fmriprep",
+   "checks_passed": 9,
+   "checks_total": 9,
+   "failed_checks": [],
+   "measured": {
+    "affine": "0.0e+00",
+    "data type": "float32",
+    "header (every field)": 0,
+    "values (bit-identical)": 0
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0,
+    "bit-identical": 0,
+    "header bytes identical": "True"
+   },
+   "seconds": 1.752,
+   "status": "pass"
+  },
+  {
+   "case": "panel/fmriprep/ds000256-sub-CTS203/anat_fit/brain_extraction/atropos/18_md_7",
+   "category": "panel-fmriprep",
+   "checks_passed": 9,
+   "checks_total": 9,
+   "failed_checks": [],
+   "measured": {
+    "affine": "0.0e+00",
+    "data type": "float32",
+    "header (every field)": 0,
+    "values (bit-identical)": 0
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0,
+    "bit-identical": 0,
+    "header bytes identical": "True"
+   },
+   "seconds": 1.815,
+   "status": "pass"
+  },
+  {
+   "case": "panel/fmriprep/ds000256-sub-CTS203/anat_fit/brain_extraction/atropos/19_fill_7",
+   "category": "panel-fmriprep",
+   "checks_passed": 9,
+   "checks_total": 9,
+   "failed_checks": [],
+   "measured": {
+    "affine": "0.0e+00",
+    "data type": "float32",
+    "header (every field)": 0,
+    "values (bit-identical)": 0
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0,
+    "bit-identical": 0,
+    "header bytes identical": "True"
+   },
+   "seconds": 1.776,
+   "status": "pass"
+  },
+  {
+   "case": "panel/fmriprep/ds000256-sub-CTS203/anat_fit/brain_extraction/atropos/20_add_7_2",
+   "category": "panel-fmriprep",
+   "checks_passed": 9,
+   "checks_total": 9,
+   "failed_checks": [],
+   "measured": {
+    "affine": "0.0e+00",
+    "data type": "float32",
+    "header (every field)": 0,
+    "values (bit-identical)": 0
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0,
+    "bit-identical": 0,
+    "header bytes identical": "True"
+   },
+   "seconds": 1.975,
+   "status": "pass"
+  },
+  {
+   "case": "panel/fmriprep/ds000256-sub-CTS203/anat_fit/brain_extraction/atropos/21_md_7_2",
+   "category": "panel-fmriprep",
+   "checks_passed": 9,
+   "checks_total": 9,
+   "failed_checks": [],
+   "measured": {
+    "affine": "0.0e+00",
+    "data type": "float32",
+    "header (every field)": 0,
+    "values (bit-identical)": 0
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0,
+    "bit-identical": 0,
+    "header bytes identical": "True"
+   },
+   "seconds": 1.635,
+   "status": "pass"
+  },
+  {
+   "case": "panel/fmriprep/ds000256-sub-CTS203/anat_fit/brain_extraction/atropos/22_me_7_2",
+   "category": "panel-fmriprep",
+   "checks_passed": 9,
+   "checks_total": 9,
+   "failed_checks": [],
+   "measured": {
+    "affine": "0.0e+00",
+    "data type": "float32",
+    "header (every field)": 0,
+    "values (bit-identical)": 0
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0,
+    "bit-identical": 0,
+    "header bytes identical": "True"
+   },
+   "seconds": 1.922,
+   "status": "pass"
+  },
+  {
+   "case": "panel/fmriprep/ds000256-sub-CTS203/anat_fit/brain_extraction/atropos/23_depad_mask",
+   "category": "panel-fmriprep",
+   "checks_passed": 9,
+   "checks_total": 9,
+   "failed_checks": [],
+   "measured": {
+    "affine": "0.0e+00",
+    "data type": "float32",
+    "header (every field)": 0,
+    "values (bit-identical)": 0
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0,
+    "bit-identical": 0,
+    "header bytes identical": "True"
+   },
+   "seconds": 1.829,
+   "status": "pass"
+  },
+  {
+   "case": "panel/fmriprep/ds000256-sub-CTS203/anat_fit/brain_extraction/atropos/24_depad_segm",
+   "category": "panel-fmriprep",
+   "checks_passed": 9,
+   "checks_total": 9,
+   "failed_checks": [],
+   "measured": {
+    "affine": "0.0e+00",
+    "data type": "float32",
+    "header (every field)": 0,
+    "values (bit-identical)": 0
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0,
+    "bit-identical": 0,
+    "header bytes identical": "True"
+   },
+   "seconds": 1.835,
+   "status": "pass"
+  },
+  {
+   "case": "panel/fmriprep/ds000256-sub-CTS203/anat_fit/brain_extraction/atropos/25_depad_gm",
+   "category": "panel-fmriprep",
+   "checks_passed": 9,
+   "checks_total": 9,
+   "failed_checks": [],
+   "measured": {
+    "affine": "0.0e+00",
+    "data type": "float32",
+    "header (every field)": 0,
+    "values (bit-identical)": 0
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0,
+    "bit-identical": 0,
+    "header bytes identical": "True"
+   },
+   "seconds": 1.482,
+   "status": "pass"
+  },
+  {
+   "case": "panel/fmriprep/ds000256-sub-CTS203/anat_fit/brain_extraction/atropos/26_depad_wm",
+   "category": "panel-fmriprep",
+   "checks_passed": 9,
+   "checks_total": 9,
+   "failed_checks": [],
+   "measured": {
+    "affine": "0.0e+00",
+    "data type": "float32",
+    "header (every field)": 0,
+    "values (bit-identical)": 0
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0,
+    "bit-identical": 0,
+    "header bytes identical": "True"
+   },
+   "seconds": 1.422,
+   "status": "pass"
+  },
+  {
+   "case": "panel/fmriprep/ds000256-sub-CTS203/anat_fit/brain_extraction/atropos/27_depad_csf",
+   "category": "panel-fmriprep",
+   "checks_passed": 9,
+   "checks_total": 9,
+   "failed_checks": [],
+   "measured": {
+    "affine": "0.0e+00",
+    "data type": "float32",
+    "header (every field)": 0,
+    "values (bit-identical)": 0
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0,
+    "bit-identical": 0,
+    "header bytes identical": "True"
+   },
+   "seconds": 1.478,
+   "status": "pass"
+  },
+  {
+   "case": "panel/fmriprep/ds000256-sub-CTS203/anat_fit/brain_extraction/atropos/dil_brainmask",
+   "category": "panel-fmriprep",
+   "checks_passed": 9,
+   "checks_total": 9,
+   "failed_checks": [],
+   "measured": {
+    "affine": "0.0e+00",
+    "data type": "float32",
+    "header (every field)": 0,
+    "values (bit-identical)": 0
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0,
+    "bit-identical": 0,
+    "header bytes identical": "True"
+   },
+   "seconds": 1.146,
+   "status": "pass"
+  },
+  {
+   "case": "panel/fmriprep/ds000256-sub-CTS203/anat_fit/brain_extraction/atropos/get_brainmask",
+   "category": "panel-fmriprep",
+   "checks_passed": 9,
+   "checks_total": 9,
+   "failed_checks": [],
+   "measured": {
+    "affine": "0.0e+00",
+    "data type": "float32",
+    "header (every field)": 0,
+    "values (bit-identical)": 0
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0,
+    "bit-identical": 0,
+    "header bytes identical": "True"
+   },
+   "seconds": 1.287,
+   "status": "pass"
+  },
+  {
+   "case": "panel/fmriprep/ds000256-sub-CTS203/anat_fit/brain_extraction/lap_target",
+   "category": "panel-fmriprep",
+   "checks_passed": 9,
+   "checks_total": 9,
+   "failed_checks": [],
+   "measured": {
+    "affine": "0.0e+00",
+    "data type": "float32",
+    "header (every field)": 0,
+    "values (bit-identical)": 0
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0,
+    "bit-identical": 0,
+    "header bytes identical": "True"
+   },
+   "seconds": 5.195,
+   "status": "pass"
+  },
+  {
+   "case": "panel/fmriprep/ds000256-sub-CTS203/anat_fit/brain_extraction/truncate_images[0]",
+   "category": "panel-fmriprep",
+   "checks_passed": 9,
+   "checks_total": 9,
+   "failed_checks": [],
+   "measured": {
+    "affine": "0.0e+00",
+    "data type": "float32",
+    "header (every field)": 0,
+    "values (bit-identical)": 0
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0,
+    "bit-identical": 0,
+    "header bytes identical": "True"
+   },
+   "seconds": 4.362,
+   "status": "pass"
+  },
+  {
+   "case": "panel/fmriprep/ds000256-sub-CTS203/anat_fit/register_template[MNI152NLin2009cAsym]/trunc_mov",
+   "category": "panel-fmriprep",
+   "checks_passed": 9,
+   "checks_total": 9,
+   "failed_checks": [],
+   "measured": {
+    "affine": "0.0e+00",
+    "data type": "float32",
+    "header (every field)": 0,
+    "values (bit-identical)": 0
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0,
+    "bit-identical": 0,
+    "header bytes identical": "True"
+   },
+   "seconds": 4.195,
+   "status": "pass"
+  },
+  {
+   "case": "panel/fmriprep/ds001600-sub-1/anat_fit/brain_extraction/atropos/02_pad_segm",
+   "category": "panel-fmriprep",
+   "checks_passed": 9,
+   "checks_total": 9,
+   "failed_checks": [],
+   "measured": {
+    "affine": "0.0e+00",
+    "data type": "float32",
+    "header (every field)": 0,
+    "values (bit-identical)": 0
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0,
+    "bit-identical": 0,
+    "header bytes identical": "True"
+   },
+   "seconds": 1.411,
+   "status": "pass"
+  },
+  {
+   "case": "panel/fmriprep/ds001600-sub-1/anat_fit/brain_extraction/atropos/03_pad_mask",
+   "category": "panel-fmriprep",
+   "checks_passed": 9,
+   "checks_total": 9,
+   "failed_checks": [],
+   "measured": {
+    "affine": "0.0e+00",
+    "data type": "float32",
+    "header (every field)": 0,
+    "values (bit-identical)": 0
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0,
+    "bit-identical": 0,
+    "header bytes identical": "True"
+   },
+   "seconds": 1.48,
+   "status": "pass"
+  },
+  {
+   "case": "panel/fmriprep/ds001600-sub-1/anat_fit/brain_extraction/atropos/05_get_wm",
+   "category": "panel-fmriprep",
+   "checks_passed": 9,
+   "checks_total": 9,
+   "failed_checks": [],
+   "measured": {
+    "affine": "0.0e+00",
+    "data type": "float32",
+    "header (every field)": 0,
+    "values (bit-identical)": 0
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0,
+    "bit-identical": 0,
+    "header bytes identical": "True"
+   },
+   "seconds": 1.055,
+   "status": "pass"
+  },
+  {
+   "case": "panel/fmriprep/ds001600-sub-1/anat_fit/brain_extraction/atropos/06_get_gm",
+   "category": "panel-fmriprep",
+   "checks_passed": 9,
+   "checks_total": 9,
+   "failed_checks": [],
+   "measured": {
+    "affine": "0.0e+00",
+    "data type": "float32",
+    "header (every field)": 0,
+    "values (bit-identical)": 0
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0,
+    "bit-identical": 0,
+    "header bytes identical": "True"
+   },
+   "seconds": 1.092,
+   "status": "pass"
+  },
+  {
+   "case": "panel/fmriprep/ds001600-sub-1/anat_fit/brain_extraction/atropos/07_fill_gm",
+   "category": "panel-fmriprep",
+   "checks_passed": 9,
+   "checks_total": 9,
+   "failed_checks": [],
+   "measured": {
+    "affine": "0.0e+00",
+    "data type": "float32",
+    "header (every field)": 0,
+    "values (bit-identical)": 0
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0,
+    "bit-identical": 0,
+    "header bytes identical": "True"
+   },
+   "seconds": 1.469,
+   "status": "pass"
+  },
+  {
+   "case": "panel/fmriprep/ds001600-sub-1/anat_fit/brain_extraction/atropos/10_me_csf",
+   "category": "panel-fmriprep",
+   "checks_passed": 9,
+   "checks_total": 9,
+   "failed_checks": [],
+   "measured": {
+    "affine": "0.0e+00",
+    "data type": "float32",
+    "header (every field)": 0,
+    "values (bit-identical)": 0
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0,
+    "bit-identical": 0,
+    "header bytes identical": "True"
+   },
+   "seconds": 1.397,
+   "status": "pass"
+  },
+  {
+   "case": "panel/fmriprep/ds001600-sub-1/anat_fit/brain_extraction/atropos/11_add_gm",
+   "category": "panel-fmriprep",
+   "checks_passed": 9,
+   "checks_total": 9,
+   "failed_checks": [],
+   "measured": {
+    "affine": "0.0e+00",
+    "data type": "float32",
+    "header (every field)": 0,
+    "values (bit-identical)": 0
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0,
+    "bit-identical": 0,
+    "header bytes identical": "True"
+   },
+   "seconds": 1.586,
+   "status": "pass"
+  },
+  {
+   "case": "panel/fmriprep/ds001600-sub-1/anat_fit/brain_extraction/atropos/13_add_gm_wm",
+   "category": "panel-fmriprep",
+   "checks_passed": 9,
+   "checks_total": 9,
+   "failed_checks": [],
+   "measured": {
+    "affine": "0.0e+00",
+    "data type": "float32",
+    "header (every field)": 0,
+    "values (bit-identical)": 0
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0,
+    "bit-identical": 0,
+    "header bytes identical": "True"
+   },
+   "seconds": 1.671,
+   "status": "pass"
+  },
+  {
+   "case": "panel/fmriprep/ds001600-sub-1/anat_fit/brain_extraction/atropos/15_add_7",
+   "category": "panel-fmriprep",
+   "checks_passed": 9,
+   "checks_total": 9,
+   "failed_checks": [],
+   "measured": {
+    "affine": "0.0e+00",
+    "data type": "float32",
+    "header (every field)": 0,
+    "values (bit-identical)": 0
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0,
+    "bit-identical": 0,
+    "header bytes identical": "True"
+   },
+   "seconds": 1.056,
+   "status": "pass"
+  },
+  {
+   "case": "panel/fmriprep/ds001600-sub-1/anat_fit/brain_extraction/atropos/16_me_7",
+   "category": "panel-fmriprep",
+   "checks_passed": 9,
+   "checks_total": 9,
+   "failed_checks": [],
+   "measured": {
+    "affine": "0.0e+00",
+    "data type": "float32",
+    "header (every field)": 0,
+    "values (bit-identical)": 0
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0,
+    "bit-identical": 0,
+    "header bytes identical": "True"
+   },
+   "seconds": 1.615,
+   "status": "pass"
+  },
+  {
+   "case": "panel/fmriprep/ds001600-sub-1/anat_fit/brain_extraction/atropos/17_comp_7",
+   "category": "panel-fmriprep",
+   "checks_passed": 9,
+   "checks_total": 9,
+   "failed_checks": [],
+   "measured": {
+    "affine": "0.0e+00",
+    "data type": "float32",
+    "header (every field)": 0,
+    "values (bit-identical)": 0
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0,
+    "bit-identical": 0,
+    "header bytes identical": "True"
+   },
+   "seconds": 1.367,
+   "status": "pass"
+  },
+  {
+   "case": "panel/fmriprep/ds001600-sub-1/anat_fit/brain_extraction/atropos/18_md_7",
+   "category": "panel-fmriprep",
+   "checks_passed": 9,
+   "checks_total": 9,
+   "failed_checks": [],
+   "measured": {
+    "affine": "0.0e+00",
+    "data type": "float32",
+    "header (every field)": 0,
+    "values (bit-identical)": 0
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0,
+    "bit-identical": 0,
+    "header bytes identical": "True"
+   },
+   "seconds": 1.337,
+   "status": "pass"
+  },
+  {
+   "case": "panel/fmriprep/ds001600-sub-1/anat_fit/brain_extraction/atropos/19_fill_7",
+   "category": "panel-fmriprep",
+   "checks_passed": 9,
+   "checks_total": 9,
+   "failed_checks": [],
+   "measured": {
+    "affine": "0.0e+00",
+    "data type": "float32",
+    "header (every field)": 0,
+    "values (bit-identical)": 0
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0,
+    "bit-identical": 0,
+    "header bytes identical": "True"
+   },
+   "seconds": 1.423,
+   "status": "pass"
+  },
+  {
+   "case": "panel/fmriprep/ds001600-sub-1/anat_fit/brain_extraction/atropos/20_add_7_2",
+   "category": "panel-fmriprep",
+   "checks_passed": 9,
+   "checks_total": 9,
+   "failed_checks": [],
+   "measured": {
+    "affine": "0.0e+00",
+    "data type": "float32",
+    "header (every field)": 0,
+    "values (bit-identical)": 0
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0,
+    "bit-identical": 0,
+    "header bytes identical": "True"
+   },
+   "seconds": 1.603,
+   "status": "pass"
+  },
+  {
+   "case": "panel/fmriprep/ds001600-sub-1/anat_fit/brain_extraction/atropos/21_md_7_2",
+   "category": "panel-fmriprep",
+   "checks_passed": 9,
+   "checks_total": 9,
+   "failed_checks": [],
+   "measured": {
+    "affine": "0.0e+00",
+    "data type": "float32",
+    "header (every field)": 0,
+    "values (bit-identical)": 0
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0,
+    "bit-identical": 0,
+    "header bytes identical": "True"
+   },
+   "seconds": 1.318,
+   "status": "pass"
+  },
+  {
+   "case": "panel/fmriprep/ds001600-sub-1/anat_fit/brain_extraction/atropos/22_me_7_2",
+   "category": "panel-fmriprep",
+   "checks_passed": 9,
+   "checks_total": 9,
+   "failed_checks": [],
+   "measured": {
+    "affine": "0.0e+00",
+    "data type": "float32",
+    "header (every field)": 0,
+    "values (bit-identical)": 0
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0,
+    "bit-identical": 0,
+    "header bytes identical": "True"
+   },
+   "seconds": 1.662,
+   "status": "pass"
+  },
+  {
+   "case": "panel/fmriprep/ds001600-sub-1/anat_fit/brain_extraction/atropos/23_depad_mask",
+   "category": "panel-fmriprep",
+   "checks_passed": 9,
+   "checks_total": 9,
+   "failed_checks": [],
+   "measured": {
+    "affine": "0.0e+00",
+    "data type": "float32",
+    "header (every field)": 0,
+    "values (bit-identical)": 0
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0,
+    "bit-identical": 0,
+    "header bytes identical": "True"
+   },
+   "seconds": 1.424,
+   "status": "pass"
+  },
+  {
+   "case": "panel/fmriprep/ds001600-sub-1/anat_fit/brain_extraction/atropos/24_depad_segm",
+   "category": "panel-fmriprep",
+   "checks_passed": 9,
+   "checks_total": 9,
+   "failed_checks": [],
+   "measured": {
+    "affine": "0.0e+00",
+    "data type": "float32",
+    "header (every field)": 0,
+    "values (bit-identical)": 0
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0,
+    "bit-identical": 0,
+    "header bytes identical": "True"
+   },
+   "seconds": 1.401,
+   "status": "pass"
+  },
+  {
+   "case": "panel/fmriprep/ds001600-sub-1/anat_fit/brain_extraction/atropos/25_depad_gm",
+   "category": "panel-fmriprep",
+   "checks_passed": 9,
+   "checks_total": 9,
+   "failed_checks": [],
+   "measured": {
+    "affine": "0.0e+00",
+    "data type": "float32",
+    "header (every field)": 0,
+    "values (bit-identical)": 0
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0,
+    "bit-identical": 0,
+    "header bytes identical": "True"
+   },
+   "seconds": 1.145,
+   "status": "pass"
+  },
+  {
+   "case": "panel/fmriprep/ds001600-sub-1/anat_fit/brain_extraction/atropos/26_depad_wm",
+   "category": "panel-fmriprep",
+   "checks_passed": 9,
+   "checks_total": 9,
+   "failed_checks": [],
+   "measured": {
+    "affine": "0.0e+00",
+    "data type": "float32",
+    "header (every field)": 0,
+    "values (bit-identical)": 0
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0,
+    "bit-identical": 0,
+    "header bytes identical": "True"
+   },
+   "seconds": 1.135,
+   "status": "pass"
+  },
+  {
+   "case": "panel/fmriprep/ds001600-sub-1/anat_fit/brain_extraction/atropos/27_depad_csf",
+   "category": "panel-fmriprep",
+   "checks_passed": 9,
+   "checks_total": 9,
+   "failed_checks": [],
+   "measured": {
+    "affine": "0.0e+00",
+    "data type": "float32",
+    "header (every field)": 0,
+    "values (bit-identical)": 0
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0,
+    "bit-identical": 0,
+    "header bytes identical": "True"
+   },
+   "seconds": 1.101,
+   "status": "pass"
+  },
+  {
+   "case": "panel/fmriprep/ds001600-sub-1/anat_fit/brain_extraction/atropos/dil_brainmask",
+   "category": "panel-fmriprep",
+   "checks_passed": 9,
+   "checks_total": 9,
+   "failed_checks": [],
+   "measured": {
+    "affine": "0.0e+00",
+    "data type": "float32",
+    "header (every field)": 0,
+    "values (bit-identical)": 0
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0,
+    "bit-identical": 0,
+    "header bytes identical": "True"
+   },
+   "seconds": 1.028,
+   "status": "pass"
+  },
+  {
+   "case": "panel/fmriprep/ds001600-sub-1/anat_fit/brain_extraction/atropos/get_brainmask",
+   "category": "panel-fmriprep",
+   "checks_passed": 9,
+   "checks_total": 9,
+   "failed_checks": [],
+   "measured": {
+    "affine": "0.0e+00",
+    "data type": "float32",
+    "header (every field)": 0,
+    "values (bit-identical)": 0
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0,
+    "bit-identical": 0,
+    "header bytes identical": "True"
+   },
+   "seconds": 0.962,
+   "status": "pass"
+  },
+  {
+   "case": "panel/fmriprep/ds001600-sub-1/anat_fit/brain_extraction/lap_target",
+   "category": "panel-fmriprep",
+   "checks_passed": 9,
+   "checks_total": 9,
+   "failed_checks": [],
+   "measured": {
+    "affine": "0.0e+00",
+    "data type": "float32",
+    "header (every field)": 0,
+    "values (bit-identical)": 0
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0,
+    "bit-identical": 0,
+    "header bytes identical": "True"
+   },
+   "seconds": 2.404,
+   "status": "pass"
+  },
+  {
+   "case": "panel/fmriprep/ds001600-sub-1/anat_fit/brain_extraction/truncate_images[0]",
+   "category": "panel-fmriprep",
+   "checks_passed": 9,
+   "checks_total": 9,
+   "failed_checks": [],
+   "measured": {
+    "affine": "0.0e+00",
+    "data type": "float32",
+    "header (every field)": 0,
+    "values (bit-identical)": 0
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0,
+    "bit-identical": 0,
+    "header bytes identical": "True"
+   },
+   "seconds": 1.677,
+   "status": "pass"
+  },
+  {
+   "case": "panel/fmriprep/ds001600-sub-1/anat_fit/register_template[MNI152NLin2009cAsym]/trunc_mov",
+   "category": "panel-fmriprep",
+   "checks_passed": 9,
+   "checks_total": 9,
+   "failed_checks": [],
+   "measured": {
+    "affine": "0.0e+00",
+    "data type": "float32",
+    "header (every field)": 0,
+    "values (bit-identical)": 0
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0,
+    "bit-identical": 0,
+    "header bytes identical": "True"
+   },
+   "seconds": 1.633,
+   "status": "pass"
+  },
+  {
+   "case": "panel/fmriprep/ds002422-sub-02/anat_fit/brain_extraction/atropos/02_pad_segm",
+   "category": "panel-fmriprep",
+   "checks_passed": 9,
+   "checks_total": 9,
+   "failed_checks": [],
+   "measured": {
+    "affine": "0.0e+00",
+    "data type": "float32",
+    "header (every field)": 0,
+    "values (bit-identical)": 0
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0,
+    "bit-identical": 0,
+    "header bytes identical": "True"
+   },
+   "seconds": 0.979,
+   "status": "pass"
+  },
+  {
+   "case": "panel/fmriprep/ds002422-sub-02/anat_fit/brain_extraction/atropos/03_pad_mask",
+   "category": "panel-fmriprep",
+   "checks_passed": 9,
+   "checks_total": 9,
+   "failed_checks": [],
+   "measured": {
+    "affine": "0.0e+00",
+    "data type": "float32",
+    "header (every field)": 0,
+    "values (bit-identical)": 0
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0,
+    "bit-identical": 0,
+    "header bytes identical": "True"
+   },
+   "seconds": 1.37,
+   "status": "pass"
+  },
+  {
+   "case": "panel/fmriprep/ds002422-sub-02/anat_fit/brain_extraction/atropos/05_get_wm",
+   "category": "panel-fmriprep",
+   "checks_passed": 9,
+   "checks_total": 9,
+   "failed_checks": [],
+   "measured": {
+    "affine": "0.0e+00",
+    "data type": "float32",
+    "header (every field)": 0,
+    "values (bit-identical)": 0
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0,
+    "bit-identical": 0,
+    "header bytes identical": "True"
+   },
+   "seconds": 0.612,
+   "status": "pass"
+  },
+  {
+   "case": "panel/fmriprep/ds002422-sub-02/anat_fit/brain_extraction/atropos/06_get_gm",
+   "category": "panel-fmriprep",
+   "checks_passed": 9,
+   "checks_total": 9,
+   "failed_checks": [],
+   "measured": {
+    "affine": "0.0e+00",
+    "data type": "float32",
+    "header (every field)": 0,
+    "values (bit-identical)": 0
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0,
+    "bit-identical": 0,
+    "header bytes identical": "True"
+   },
+   "seconds": 0.683,
+   "status": "pass"
+  },
+  {
+   "case": "panel/fmriprep/ds002422-sub-02/anat_fit/brain_extraction/atropos/07_fill_gm",
+   "category": "panel-fmriprep",
+   "checks_passed": 9,
+   "checks_total": 9,
+   "failed_checks": [],
+   "measured": {
+    "affine": "0.0e+00",
+    "data type": "float32",
+    "header (every field)": 0,
+    "values (bit-identical)": 0
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0,
+    "bit-identical": 0,
+    "header bytes identical": "True"
+   },
+   "seconds": 0.957,
+   "status": "pass"
+  },
+  {
+   "case": "panel/fmriprep/ds002422-sub-02/anat_fit/brain_extraction/atropos/10_me_csf",
+   "category": "panel-fmriprep",
+   "checks_passed": 9,
+   "checks_total": 9,
+   "failed_checks": [],
+   "measured": {
+    "affine": "0.0e+00",
+    "data type": "float32",
+    "header (every field)": 0,
+    "values (bit-identical)": 0
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0,
+    "bit-identical": 0,
+    "header bytes identical": "True"
+   },
+   "seconds": 1.026,
+   "status": "pass"
+  },
+  {
+   "case": "panel/fmriprep/ds002422-sub-02/anat_fit/brain_extraction/atropos/11_add_gm",
+   "category": "panel-fmriprep",
+   "checks_passed": 9,
+   "checks_total": 9,
+   "failed_checks": [],
+   "measured": {
+    "affine": "0.0e+00",
+    "data type": "float32",
+    "header (every field)": 0,
+    "values (bit-identical)": 0
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0,
+    "bit-identical": 0,
+    "header bytes identical": "True"
+   },
+   "seconds": 1.416,
+   "status": "pass"
+  },
+  {
+   "case": "panel/fmriprep/ds002422-sub-02/anat_fit/brain_extraction/atropos/13_add_gm_wm",
+   "category": "panel-fmriprep",
+   "checks_passed": 9,
+   "checks_total": 9,
+   "failed_checks": [],
+   "measured": {
+    "affine": "0.0e+00",
+    "data type": "float32",
+    "header (every field)": 0,
+    "values (bit-identical)": 0
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0,
+    "bit-identical": 0,
+    "header bytes identical": "True"
+   },
+   "seconds": 1.663,
+   "status": "pass"
+  },
+  {
+   "case": "panel/fmriprep/ds002422-sub-02/anat_fit/brain_extraction/atropos/15_add_7",
+   "category": "panel-fmriprep",
+   "checks_passed": 9,
+   "checks_total": 9,
+   "failed_checks": [],
+   "measured": {
+    "affine": "0.0e+00",
+    "data type": "float32",
+    "header (every field)": 0,
+    "values (bit-identical)": 0
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0,
+    "bit-identical": 0,
+    "header bytes identical": "True"
+   },
+   "seconds": 1.061,
+   "status": "pass"
+  },
+  {
+   "case": "panel/fmriprep/ds002422-sub-02/anat_fit/brain_extraction/atropos/16_me_7",
+   "category": "panel-fmriprep",
+   "checks_passed": 9,
+   "checks_total": 9,
+   "failed_checks": [],
+   "measured": {
+    "affine": "0.0e+00",
+    "data type": "float32",
+    "header (every field)": 0,
+    "values (bit-identical)": 0
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0,
+    "bit-identical": 0,
+    "header bytes identical": "True"
+   },
+   "seconds": 1.611,
+   "status": "pass"
+  },
+  {
+   "case": "panel/fmriprep/ds002422-sub-02/anat_fit/brain_extraction/atropos/17_comp_7",
+   "category": "panel-fmriprep",
+   "checks_passed": 9,
+   "checks_total": 9,
+   "failed_checks": [],
+   "measured": {
+    "affine": "0.0e+00",
+    "data type": "float32",
+    "header (every field)": 0,
+    "values (bit-identical)": 0
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0,
+    "bit-identical": 0,
+    "header bytes identical": "True"
+   },
+   "seconds": 1.272,
+   "status": "pass"
+  },
+  {
+   "case": "panel/fmriprep/ds002422-sub-02/anat_fit/brain_extraction/atropos/18_md_7",
+   "category": "panel-fmriprep",
+   "checks_passed": 9,
+   "checks_total": 9,
+   "failed_checks": [],
+   "measured": {
+    "affine": "0.0e+00",
+    "data type": "float32",
+    "header (every field)": 0,
+    "values (bit-identical)": 0
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0,
+    "bit-identical": 0,
+    "header bytes identical": "True"
+   },
+   "seconds": 1.351,
+   "status": "pass"
+  },
+  {
+   "case": "panel/fmriprep/ds002422-sub-02/anat_fit/brain_extraction/atropos/19_fill_7",
+   "category": "panel-fmriprep",
+   "checks_passed": 9,
+   "checks_total": 9,
+   "failed_checks": [],
+   "measured": {
+    "affine": "0.0e+00",
+    "data type": "float32",
+    "header (every field)": 0,
+    "values (bit-identical)": 0
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0,
+    "bit-identical": 0,
+    "header bytes identical": "True"
+   },
+   "seconds": 1.302,
+   "status": "pass"
+  },
+  {
+   "case": "panel/fmriprep/ds002422-sub-02/anat_fit/brain_extraction/atropos/20_add_7_2",
+   "category": "panel-fmriprep",
+   "checks_passed": 9,
+   "checks_total": 9,
+   "failed_checks": [],
+   "measured": {
+    "affine": "0.0e+00",
+    "data type": "float32",
+    "header (every field)": 0,
+    "values (bit-identical)": 0
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0,
+    "bit-identical": 0,
+    "header bytes identical": "True"
+   },
+   "seconds": 1.72,
+   "status": "pass"
+  },
+  {
+   "case": "panel/fmriprep/ds002422-sub-02/anat_fit/brain_extraction/atropos/21_md_7_2",
+   "category": "panel-fmriprep",
+   "checks_passed": 9,
+   "checks_total": 9,
+   "failed_checks": [],
+   "measured": {
+    "affine": "0.0e+00",
+    "data type": "float32",
+    "header (every field)": 0,
+    "values (bit-identical)": 0
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0,
+    "bit-identical": 0,
+    "header bytes identical": "True"
+   },
+   "seconds": 1.47,
+   "status": "pass"
+  },
+  {
+   "case": "panel/fmriprep/ds002422-sub-02/anat_fit/brain_extraction/atropos/22_me_7_2",
+   "category": "panel-fmriprep",
+   "checks_passed": 9,
+   "checks_total": 9,
+   "failed_checks": [],
+   "measured": {
+    "affine": "0.0e+00",
+    "data type": "float32",
+    "header (every field)": 0,
+    "values (bit-identical)": 0
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0,
+    "bit-identical": 0,
+    "header bytes identical": "True"
+   },
+   "seconds": 1.579,
+   "status": "pass"
+  },
+  {
+   "case": "panel/fmriprep/ds002422-sub-02/anat_fit/brain_extraction/atropos/23_depad_mask",
+   "category": "panel-fmriprep",
+   "checks_passed": 9,
+   "checks_total": 9,
+   "failed_checks": [],
+   "measured": {
+    "affine": "0.0e+00",
+    "data type": "float32",
+    "header (every field)": 0,
+    "values (bit-identical)": 0
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0,
+    "bit-identical": 0,
+    "header bytes identical": "True"
+   },
+   "seconds": 1.328,
+   "status": "pass"
+  },
+  {
+   "case": "panel/fmriprep/ds002422-sub-02/anat_fit/brain_extraction/atropos/24_depad_segm",
+   "category": "panel-fmriprep",
+   "checks_passed": 9,
+   "checks_total": 9,
+   "failed_checks": [],
+   "measured": {
+    "affine": "0.0e+00",
+    "data type": "float32",
+    "header (every field)": 0,
+    "values (bit-identical)": 0
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0,
+    "bit-identical": 0,
+    "header bytes identical": "True"
+   },
+   "seconds": 1.364,
+   "status": "pass"
+  },
+  {
+   "case": "panel/fmriprep/ds002422-sub-02/anat_fit/brain_extraction/atropos/25_depad_gm",
+   "category": "panel-fmriprep",
+   "checks_passed": 9,
+   "checks_total": 9,
+   "failed_checks": [],
+   "measured": {
+    "affine": "0.0e+00",
+    "data type": "float32",
+    "header (every field)": 0,
+    "values (bit-identical)": 0
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0,
+    "bit-identical": 0,
+    "header bytes identical": "True"
+   },
+   "seconds": 1.119,
+   "status": "pass"
+  },
+  {
+   "case": "panel/fmriprep/ds002422-sub-02/anat_fit/brain_extraction/atropos/26_depad_wm",
+   "category": "panel-fmriprep",
+   "checks_passed": 9,
+   "checks_total": 9,
+   "failed_checks": [],
+   "measured": {
+    "affine": "0.0e+00",
+    "data type": "float32",
+    "header (every field)": 0,
+    "values (bit-identical)": 0
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0,
+    "bit-identical": 0,
+    "header bytes identical": "True"
+   },
+   "seconds": 1.132,
+   "status": "pass"
+  },
+  {
+   "case": "panel/fmriprep/ds002422-sub-02/anat_fit/brain_extraction/atropos/27_depad_csf",
+   "category": "panel-fmriprep",
+   "checks_passed": 9,
+   "checks_total": 9,
+   "failed_checks": [],
+   "measured": {
+    "affine": "0.0e+00",
+    "data type": "float32",
+    "header (every field)": 0,
+    "values (bit-identical)": 0
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0,
+    "bit-identical": 0,
+    "header bytes identical": "True"
+   },
+   "seconds": 0.792,
+   "status": "pass"
+  },
+  {
+   "case": "panel/fmriprep/ds002422-sub-02/anat_fit/brain_extraction/atropos/dil_brainmask",
+   "category": "panel-fmriprep",
+   "checks_passed": 9,
+   "checks_total": 9,
+   "failed_checks": [],
+   "measured": {
+    "affine": "0.0e+00",
+    "data type": "float32",
+    "header (every field)": 0,
+    "values (bit-identical)": 0
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0,
+    "bit-identical": 0,
+    "header bytes identical": "True"
+   },
+   "seconds": 1.029,
+   "status": "pass"
+  },
+  {
+   "case": "panel/fmriprep/ds002422-sub-02/anat_fit/brain_extraction/atropos/get_brainmask",
+   "category": "panel-fmriprep",
+   "checks_passed": 9,
+   "checks_total": 9,
+   "failed_checks": [],
+   "measured": {
+    "affine": "0.0e+00",
+    "data type": "float32",
+    "header (every field)": 0,
+    "values (bit-identical)": 0
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0,
+    "bit-identical": 0,
+    "header bytes identical": "True"
+   },
+   "seconds": 0.999,
+   "status": "pass"
+  },
+  {
+   "case": "panel/fmriprep/ds002422-sub-02/anat_fit/brain_extraction/lap_target",
+   "category": "panel-fmriprep",
+   "checks_passed": 9,
+   "checks_total": 9,
+   "failed_checks": [],
+   "measured": {
+    "affine": "0.0e+00",
+    "data type": "float32",
+    "header (every field)": 0,
+    "values (bit-identical)": 0
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0,
+    "bit-identical": 0,
+    "header bytes identical": "True"
+   },
+   "seconds": 1.044,
+   "status": "pass"
+  },
+  {
+   "case": "panel/fmriprep/ds002422-sub-02/anat_fit/brain_extraction/truncate_images[0]",
+   "category": "panel-fmriprep",
+   "checks_passed": 9,
+   "checks_total": 9,
+   "failed_checks": [],
+   "measured": {
+    "affine": "0.0e+00",
+    "data type": "float32",
+    "header (every field)": 0,
+    "values (bit-identical)": 0
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0,
+    "bit-identical": 0,
+    "header bytes identical": "True"
+   },
+   "seconds": 0.912,
+   "status": "pass"
+  },
+  {
+   "case": "panel/fmriprep/ds002422-sub-02/anat_fit/register_template[MNI152NLin2009cAsym]/trunc_mov",
+   "category": "panel-fmriprep",
+   "checks_passed": 9,
+   "checks_total": 9,
+   "failed_checks": [],
+   "measured": {
+    "affine": "0.0e+00",
+    "data type": "float32",
+    "header (every field)": 0,
+    "values (bit-identical)": 0
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0,
+    "bit-identical": 0,
+    "header bytes identical": "True"
+   },
+   "seconds": 0.851,
+   "status": "pass"
+  },
+  {
+   "case": "panel/fmriprep/ds002603-sub-01/anat_fit/brain_extraction/atropos/02_pad_segm",
+   "category": "panel-fmriprep",
+   "checks_passed": 9,
+   "checks_total": 9,
+   "failed_checks": [],
+   "measured": {
+    "affine": "0.0e+00",
+    "data type": "float32",
+    "header (every field)": 0,
+    "values (bit-identical)": 0
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0,
+    "bit-identical": 0,
+    "header bytes identical": "True"
+   },
+   "seconds": 2.007,
+   "status": "pass"
+  },
+  {
+   "case": "panel/fmriprep/ds002603-sub-01/anat_fit/brain_extraction/atropos/03_pad_mask",
+   "category": "panel-fmriprep",
+   "checks_passed": 9,
+   "checks_total": 9,
+   "failed_checks": [],
+   "measured": {
+    "affine": "0.0e+00",
+    "data type": "float32",
+    "header (every field)": 0,
+    "values (bit-identical)": 0
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0,
+    "bit-identical": 0,
+    "header bytes identical": "True"
+   },
+   "seconds": 1.94,
+   "status": "pass"
+  },
+  {
+   "case": "panel/fmriprep/ds002603-sub-01/anat_fit/brain_extraction/atropos/05_get_wm",
+   "category": "panel-fmriprep",
+   "checks_passed": 9,
+   "checks_total": 9,
+   "failed_checks": [],
+   "measured": {
+    "affine": "0.0e+00",
+    "data type": "float32",
+    "header (every field)": 0,
+    "values (bit-identical)": 0
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0,
+    "bit-identical": 0,
+    "header bytes identical": "True"
+   },
+   "seconds": 1.453,
+   "status": "pass"
+  },
+  {
+   "case": "panel/fmriprep/ds002603-sub-01/anat_fit/brain_extraction/atropos/06_get_gm",
+   "category": "panel-fmriprep",
+   "checks_passed": 9,
+   "checks_total": 9,
+   "failed_checks": [],
+   "measured": {
+    "affine": "0.0e+00",
+    "data type": "float32",
+    "header (every field)": 0,
+    "values (bit-identical)": 0
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0,
+    "bit-identical": 0,
+    "header bytes identical": "True"
+   },
+   "seconds": 1.436,
+   "status": "pass"
+  },
+  {
+   "case": "panel/fmriprep/ds002603-sub-01/anat_fit/brain_extraction/atropos/07_fill_gm",
+   "category": "panel-fmriprep",
+   "checks_passed": 9,
+   "checks_total": 9,
+   "failed_checks": [],
+   "measured": {
+    "affine": "0.0e+00",
+    "data type": "float32",
+    "header (every field)": 0,
+    "values (bit-identical)": 0
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0,
+    "bit-identical": 0,
+    "header bytes identical": "True"
+   },
+   "seconds": 1.855,
+   "status": "pass"
+  },
+  {
+   "case": "panel/fmriprep/ds002603-sub-01/anat_fit/brain_extraction/atropos/10_me_csf",
+   "category": "panel-fmriprep",
+   "checks_passed": 9,
+   "checks_total": 9,
+   "failed_checks": [],
+   "measured": {
+    "affine": "0.0e+00",
+    "data type": "float32",
+    "header (every field)": 0,
+    "values (bit-identical)": 0
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0,
+    "bit-identical": 0,
+    "header bytes identical": "True"
+   },
+   "seconds": 1.816,
+   "status": "pass"
+  },
+  {
+   "case": "panel/fmriprep/ds002603-sub-01/anat_fit/brain_extraction/atropos/11_add_gm",
+   "category": "panel-fmriprep",
+   "checks_passed": 9,
+   "checks_total": 9,
+   "failed_checks": [],
+   "measured": {
+    "affine": "0.0e+00",
+    "data type": "float32",
+    "header (every field)": 0,
+    "values (bit-identical)": 0
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0,
+    "bit-identical": 0,
+    "header bytes identical": "True"
+   },
+   "seconds": 2.331,
+   "status": "pass"
+  },
+  {
+   "case": "panel/fmriprep/ds002603-sub-01/anat_fit/brain_extraction/atropos/13_add_gm_wm",
+   "category": "panel-fmriprep",
+   "checks_passed": 9,
+   "checks_total": 9,
+   "failed_checks": [],
+   "measured": {
+    "affine": "0.0e+00",
+    "data type": "float32",
+    "header (every field)": 0,
+    "values (bit-identical)": 0
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0,
+    "bit-identical": 0,
+    "header bytes identical": "True"
+   },
+   "seconds": 2.487,
+   "status": "pass"
+  },
+  {
+   "case": "panel/fmriprep/ds002603-sub-01/anat_fit/brain_extraction/atropos/15_add_7",
+   "category": "panel-fmriprep",
+   "checks_passed": 9,
+   "checks_total": 9,
+   "failed_checks": [],
+   "measured": {
+    "affine": "0.0e+00",
+    "data type": "float32",
+    "header (every field)": 0,
+    "values (bit-identical)": 0
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0,
+    "bit-identical": 0,
+    "header bytes identical": "True"
+   },
+   "seconds": 1.534,
+   "status": "pass"
+  },
+  {
+   "case": "panel/fmriprep/ds002603-sub-01/anat_fit/brain_extraction/atropos/16_me_7",
+   "category": "panel-fmriprep",
+   "checks_passed": 9,
+   "checks_total": 9,
+   "failed_checks": [],
+   "measured": {
+    "affine": "0.0e+00",
+    "data type": "float32",
+    "header (every field)": 0,
+    "values (bit-identical)": 0
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0,
+    "bit-identical": 0,
+    "header bytes identical": "True"
+   },
+   "seconds": 2.334,
+   "status": "pass"
+  },
+  {
+   "case": "panel/fmriprep/ds002603-sub-01/anat_fit/brain_extraction/atropos/17_comp_7",
+   "category": "panel-fmriprep",
+   "checks_passed": 9,
+   "checks_total": 9,
+   "failed_checks": [],
+   "measured": {
+    "affine": "0.0e+00",
+    "data type": "float32",
+    "header (every field)": 0,
+    "values (bit-identical)": 0
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0,
+    "bit-identical": 0,
+    "header bytes identical": "True"
+   },
+   "seconds": 1.859,
+   "status": "pass"
+  },
+  {
+   "case": "panel/fmriprep/ds002603-sub-01/anat_fit/brain_extraction/atropos/18_md_7",
+   "category": "panel-fmriprep",
+   "checks_passed": 9,
+   "checks_total": 9,
+   "failed_checks": [],
+   "measured": {
+    "affine": "0.0e+00",
+    "data type": "float32",
+    "header (every field)": 0,
+    "values (bit-identical)": 0
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0,
+    "bit-identical": 0,
+    "header bytes identical": "True"
+   },
+   "seconds": 1.84,
+   "status": "pass"
+  },
+  {
+   "case": "panel/fmriprep/ds002603-sub-01/anat_fit/brain_extraction/atropos/19_fill_7",
+   "category": "panel-fmriprep",
+   "checks_passed": 9,
+   "checks_total": 9,
+   "failed_checks": [],
+   "measured": {
+    "affine": "0.0e+00",
+    "data type": "float32",
+    "header (every field)": 0,
+    "values (bit-identical)": 0
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0,
+    "bit-identical": 0,
+    "header bytes identical": "True"
+   },
+   "seconds": 1.854,
+   "status": "pass"
+  },
+  {
+   "case": "panel/fmriprep/ds002603-sub-01/anat_fit/brain_extraction/atropos/20_add_7_2",
+   "category": "panel-fmriprep",
+   "checks_passed": 9,
+   "checks_total": 9,
+   "failed_checks": [],
+   "measured": {
+    "affine": "0.0e+00",
+    "data type": "float32",
+    "header (every field)": 0,
+    "values (bit-identical)": 0
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0,
+    "bit-identical": 0,
+    "header bytes identical": "True"
+   },
+   "seconds": 2.254,
+   "status": "pass"
+  },
+  {
+   "case": "panel/fmriprep/ds002603-sub-01/anat_fit/brain_extraction/atropos/21_md_7_2",
+   "category": "panel-fmriprep",
+   "checks_passed": 9,
+   "checks_total": 9,
+   "failed_checks": [],
+   "measured": {
+    "affine": "0.0e+00",
+    "data type": "float32",
+    "header (every field)": 0,
+    "values (bit-identical)": 0
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0,
+    "bit-identical": 0,
+    "header bytes identical": "True"
+   },
+   "seconds": 1.919,
+   "status": "pass"
+  },
+  {
+   "case": "panel/fmriprep/ds002603-sub-01/anat_fit/brain_extraction/atropos/22_me_7_2",
+   "category": "panel-fmriprep",
+   "checks_passed": 9,
+   "checks_total": 9,
+   "failed_checks": [],
+   "measured": {
+    "affine": "0.0e+00",
+    "data type": "float32",
+    "header (every field)": 0,
+    "values (bit-identical)": 0
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0,
+    "bit-identical": 0,
+    "header bytes identical": "True"
+   },
+   "seconds": 2.158,
+   "status": "pass"
+  },
+  {
+   "case": "panel/fmriprep/ds002603-sub-01/anat_fit/brain_extraction/atropos/23_depad_mask",
+   "category": "panel-fmriprep",
+   "checks_passed": 9,
+   "checks_total": 9,
+   "failed_checks": [],
+   "measured": {
+    "affine": "0.0e+00",
+    "data type": "float32",
+    "header (every field)": 0,
+    "values (bit-identical)": 0
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0,
+    "bit-identical": 0,
+    "header bytes identical": "True"
+   },
+   "seconds": 2.101,
+   "status": "pass"
+  },
+  {
+   "case": "panel/fmriprep/ds002603-sub-01/anat_fit/brain_extraction/atropos/24_depad_segm",
+   "category": "panel-fmriprep",
+   "checks_passed": 9,
+   "checks_total": 9,
+   "failed_checks": [],
+   "measured": {
+    "affine": "0.0e+00",
+    "data type": "float32",
+    "header (every field)": 0,
+    "values (bit-identical)": 0
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0,
+    "bit-identical": 0,
+    "header bytes identical": "True"
+   },
+   "seconds": 2.101,
+   "status": "pass"
+  },
+  {
+   "case": "panel/fmriprep/ds002603-sub-01/anat_fit/brain_extraction/atropos/25_depad_gm",
+   "category": "panel-fmriprep",
+   "checks_passed": 9,
+   "checks_total": 9,
+   "failed_checks": [],
+   "measured": {
+    "affine": "0.0e+00",
+    "data type": "float32",
+    "header (every field)": 0,
+    "values (bit-identical)": 0
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0,
+    "bit-identical": 0,
+    "header bytes identical": "True"
+   },
+   "seconds": 2.122,
+   "status": "pass"
+  },
+  {
+   "case": "panel/fmriprep/ds002603-sub-01/anat_fit/brain_extraction/atropos/26_depad_wm",
+   "category": "panel-fmriprep",
+   "checks_passed": 9,
+   "checks_total": 9,
+   "failed_checks": [],
+   "measured": {
+    "affine": "0.0e+00",
+    "data type": "float32",
+    "header (every field)": 0,
+    "values (bit-identical)": 0
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0,
+    "bit-identical": 0,
+    "header bytes identical": "True"
+   },
+   "seconds": 1.805,
+   "status": "pass"
+  },
+  {
+   "case": "panel/fmriprep/ds002603-sub-01/anat_fit/brain_extraction/atropos/27_depad_csf",
+   "category": "panel-fmriprep",
+   "checks_passed": 9,
+   "checks_total": 9,
+   "failed_checks": [],
+   "measured": {
+    "affine": "0.0e+00",
+    "data type": "float32",
+    "header (every field)": 0,
+    "values (bit-identical)": 0
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0,
+    "bit-identical": 0,
+    "header bytes identical": "True"
+   },
+   "seconds": 1.738,
+   "status": "pass"
+  },
+  {
+   "case": "panel/fmriprep/ds002603-sub-01/anat_fit/brain_extraction/atropos/dil_brainmask",
+   "category": "panel-fmriprep",
+   "checks_passed": 9,
+   "checks_total": 9,
+   "failed_checks": [],
+   "measured": {
+    "affine": "0.0e+00",
+    "data type": "float32",
+    "header (every field)": 0,
+    "values (bit-identical)": 0
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0,
+    "bit-identical": 0,
+    "header bytes identical": "True"
+   },
+   "seconds": 1.623,
+   "status": "pass"
+  },
+  {
+   "case": "panel/fmriprep/ds002603-sub-01/anat_fit/brain_extraction/atropos/get_brainmask",
+   "category": "panel-fmriprep",
+   "checks_passed": 9,
+   "checks_total": 9,
+   "failed_checks": [],
+   "measured": {
+    "affine": "0.0e+00",
+    "data type": "float32",
+    "header (every field)": 0,
+    "values (bit-identical)": 0
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0,
+    "bit-identical": 0,
+    "header bytes identical": "True"
+   },
+   "seconds": 1.58,
+   "status": "pass"
+  },
+  {
+   "case": "panel/fmriprep/ds002603-sub-01/anat_fit/brain_extraction/lap_target",
+   "category": "panel-fmriprep",
+   "checks_passed": 9,
+   "checks_total": 9,
+   "failed_checks": [],
+   "measured": {
+    "affine": "0.0e+00",
+    "data type": "float32",
+    "header (every field)": 0,
+    "values (bit-identical)": 0
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0,
+    "bit-identical": 0,
+    "header bytes identical": "True"
+   },
+   "seconds": 3.359,
+   "status": "pass"
+  },
+  {
+   "case": "panel/fmriprep/ds002603-sub-01/anat_fit/brain_extraction/truncate_images[0]",
+   "category": "panel-fmriprep",
+   "checks_passed": 9,
+   "checks_total": 9,
+   "failed_checks": [],
+   "measured": {
+    "affine": "0.0e+00",
+    "data type": "float32",
+    "header (every field)": 0,
+    "values (bit-identical)": 0
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0,
+    "bit-identical": 0,
+    "header bytes identical": "True"
+   },
+   "seconds": 1.981,
+   "status": "pass"
+  },
+  {
+   "case": "panel/fmriprep/ds002603-sub-01/anat_fit/register_template[MNI152NLin2009cAsym]/trunc_mov",
+   "category": "panel-fmriprep",
+   "checks_passed": 9,
+   "checks_total": 9,
+   "failed_checks": [],
+   "measured": {
+    "affine": "0.0e+00",
+    "data type": "float32",
+    "header (every field)": 0,
+    "values (bit-identical)": 0
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0,
+    "bit-identical": 0,
+    "header bytes identical": "True"
+   },
+   "seconds": 1.986,
+   "status": "pass"
+  },
+  {
+   "case": "panel/fmriprep/ds003592-sub-280/anat_fit/brain_extraction/atropos/02_pad_segm",
+   "category": "panel-fmriprep",
+   "checks_passed": 9,
+   "checks_total": 9,
+   "failed_checks": [],
+   "measured": {
+    "affine": "0.0e+00",
+    "data type": "float32",
+    "header (every field)": 0,
+    "values (bit-identical)": 0
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0,
+    "bit-identical": 0,
+    "header bytes identical": "True"
+   },
+   "seconds": 1.57,
+   "status": "pass"
+  },
+  {
+   "case": "panel/fmriprep/ds003592-sub-280/anat_fit/brain_extraction/atropos/03_pad_mask",
+   "category": "panel-fmriprep",
+   "checks_passed": 9,
+   "checks_total": 9,
+   "failed_checks": [],
+   "measured": {
+    "affine": "0.0e+00",
+    "data type": "float32",
+    "header (every field)": 0,
+    "values (bit-identical)": 0
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0,
+    "bit-identical": 0,
+    "header bytes identical": "True"
+   },
+   "seconds": 1.604,
+   "status": "pass"
+  },
+  {
+   "case": "panel/fmriprep/ds003592-sub-280/anat_fit/brain_extraction/atropos/05_get_wm",
+   "category": "panel-fmriprep",
+   "checks_passed": 9,
+   "checks_total": 9,
+   "failed_checks": [],
+   "measured": {
+    "affine": "0.0e+00",
+    "data type": "float32",
+    "header (every field)": 0,
+    "values (bit-identical)": 0
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0,
+    "bit-identical": 0,
+    "header bytes identical": "True"
+   },
+   "seconds": 1.088,
+   "status": "pass"
+  },
+  {
+   "case": "panel/fmriprep/ds003592-sub-280/anat_fit/brain_extraction/atropos/06_get_gm",
+   "category": "panel-fmriprep",
+   "checks_passed": 9,
+   "checks_total": 9,
+   "failed_checks": [],
+   "measured": {
+    "affine": "0.0e+00",
+    "data type": "float32",
+    "header (every field)": 0,
+    "values (bit-identical)": 0
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0,
+    "bit-identical": 0,
+    "header bytes identical": "True"
+   },
+   "seconds": 1.11,
+   "status": "pass"
+  },
+  {
+   "case": "panel/fmriprep/ds003592-sub-280/anat_fit/brain_extraction/atropos/07_fill_gm",
+   "category": "panel-fmriprep",
+   "checks_passed": 9,
+   "checks_total": 9,
+   "failed_checks": [],
+   "measured": {
+    "affine": "0.0e+00",
+    "data type": "float32",
+    "header (every field)": 0,
+    "values (bit-identical)": 0
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0,
+    "bit-identical": 0,
+    "header bytes identical": "True"
+   },
+   "seconds": 1.525,
+   "status": "pass"
+  },
+  {
+   "case": "panel/fmriprep/ds003592-sub-280/anat_fit/brain_extraction/atropos/10_me_csf",
+   "category": "panel-fmriprep",
+   "checks_passed": 9,
+   "checks_total": 9,
+   "failed_checks": [],
+   "measured": {
+    "affine": "0.0e+00",
+    "data type": "float32",
+    "header (every field)": 0,
+    "values (bit-identical)": 0
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0,
+    "bit-identical": 0,
+    "header bytes identical": "True"
+   },
+   "seconds": 1.596,
+   "status": "pass"
+  },
+  {
+   "case": "panel/fmriprep/ds003592-sub-280/anat_fit/brain_extraction/atropos/11_add_gm",
+   "category": "panel-fmriprep",
+   "checks_passed": 9,
+   "checks_total": 9,
+   "failed_checks": [],
+   "measured": {
+    "affine": "0.0e+00",
+    "data type": "float32",
+    "header (every field)": 0,
+    "values (bit-identical)": 0
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0,
+    "bit-identical": 0,
+    "header bytes identical": "True"
+   },
+   "seconds": 1.712,
+   "status": "pass"
+  },
+  {
+   "case": "panel/fmriprep/ds003592-sub-280/anat_fit/brain_extraction/atropos/13_add_gm_wm",
+   "category": "panel-fmriprep",
+   "checks_passed": 9,
+   "checks_total": 9,
+   "failed_checks": [],
+   "measured": {
+    "affine": "0.0e+00",
+    "data type": "float32",
+    "header (every field)": 0,
+    "values (bit-identical)": 0
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0,
+    "bit-identical": 0,
+    "header bytes identical": "True"
+   },
+   "seconds": 1.781,
+   "status": "pass"
+  },
+  {
+   "case": "panel/fmriprep/ds003592-sub-280/anat_fit/brain_extraction/atropos/15_add_7",
+   "category": "panel-fmriprep",
+   "checks_passed": 9,
+   "checks_total": 9,
+   "failed_checks": [],
+   "measured": {
+    "affine": "0.0e+00",
+    "data type": "float32",
+    "header (every field)": 0,
+    "values (bit-identical)": 0
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0,
+    "bit-identical": 0,
+    "header bytes identical": "True"
+   },
+   "seconds": 1.149,
+   "status": "pass"
+  },
+  {
+   "case": "panel/fmriprep/ds003592-sub-280/anat_fit/brain_extraction/atropos/16_me_7",
+   "category": "panel-fmriprep",
+   "checks_passed": 9,
+   "checks_total": 9,
+   "failed_checks": [],
+   "measured": {
+    "affine": "0.0e+00",
+    "data type": "float32",
+    "header (every field)": 0,
+    "values (bit-identical)": 0
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0,
+    "bit-identical": 0,
+    "header bytes identical": "True"
+   },
+   "seconds": 1.753,
+   "status": "pass"
+  },
+  {
+   "case": "panel/fmriprep/ds003592-sub-280/anat_fit/brain_extraction/atropos/17_comp_7",
+   "category": "panel-fmriprep",
+   "checks_passed": 9,
+   "checks_total": 9,
+   "failed_checks": [],
+   "measured": {
+    "affine": "0.0e+00",
+    "data type": "float32",
+    "header (every field)": 0,
+    "values (bit-identical)": 0
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0,
+    "bit-identical": 0,
+    "header bytes identical": "True"
+   },
+   "seconds": 1.48,
+   "status": "pass"
+  },
+  {
+   "case": "panel/fmriprep/ds003592-sub-280/anat_fit/brain_extraction/atropos/18_md_7",
+   "category": "panel-fmriprep",
+   "checks_passed": 9,
+   "checks_total": 9,
+   "failed_checks": [],
+   "measured": {
+    "affine": "0.0e+00",
+    "data type": "float32",
+    "header (every field)": 0,
+    "values (bit-identical)": 0
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0,
+    "bit-identical": 0,
+    "header bytes identical": "True"
+   },
+   "seconds": 1.475,
+   "status": "pass"
+  },
+  {
+   "case": "panel/fmriprep/ds003592-sub-280/anat_fit/brain_extraction/atropos/19_fill_7",
+   "category": "panel-fmriprep",
+   "checks_passed": 9,
+   "checks_total": 9,
+   "failed_checks": [],
+   "measured": {
+    "affine": "0.0e+00",
+    "data type": "float32",
+    "header (every field)": 0,
+    "values (bit-identical)": 0
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0,
+    "bit-identical": 0,
+    "header bytes identical": "True"
+   },
+   "seconds": 1.481,
+   "status": "pass"
+  },
+  {
+   "case": "panel/fmriprep/ds003592-sub-280/anat_fit/brain_extraction/atropos/20_add_7_2",
+   "category": "panel-fmriprep",
+   "checks_passed": 9,
+   "checks_total": 9,
+   "failed_checks": [],
+   "measured": {
+    "affine": "0.0e+00",
+    "data type": "float32",
+    "header (every field)": 0,
+    "values (bit-identical)": 0
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0,
+    "bit-identical": 0,
+    "header bytes identical": "True"
+   },
+   "seconds": 1.707,
+   "status": "pass"
+  },
+  {
+   "case": "panel/fmriprep/ds003592-sub-280/anat_fit/brain_extraction/atropos/21_md_7_2",
+   "category": "panel-fmriprep",
+   "checks_passed": 9,
+   "checks_total": 9,
+   "failed_checks": [],
+   "measured": {
+    "affine": "0.0e+00",
+    "data type": "float32",
+    "header (every field)": 0,
+    "values (bit-identical)": 0
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0,
+    "bit-identical": 0,
+    "header bytes identical": "True"
+   },
+   "seconds": 1.374,
+   "status": "pass"
+  },
+  {
+   "case": "panel/fmriprep/ds003592-sub-280/anat_fit/brain_extraction/atropos/22_me_7_2",
+   "category": "panel-fmriprep",
+   "checks_passed": 9,
+   "checks_total": 9,
+   "failed_checks": [],
+   "measured": {
+    "affine": "0.0e+00",
+    "data type": "float32",
+    "header (every field)": 0,
+    "values (bit-identical)": 0
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0,
+    "bit-identical": 0,
+    "header bytes identical": "True"
+   },
+   "seconds": 1.75,
+   "status": "pass"
+  },
+  {
+   "case": "panel/fmriprep/ds003592-sub-280/anat_fit/brain_extraction/atropos/23_depad_mask",
+   "category": "panel-fmriprep",
+   "checks_passed": 9,
+   "checks_total": 9,
+   "failed_checks": [],
+   "measured": {
+    "affine": "0.0e+00",
+    "data type": "float32",
+    "header (every field)": 0,
+    "values (bit-identical)": 0
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0,
+    "bit-identical": 0,
+    "header bytes identical": "True"
+   },
+   "seconds": 1.533,
+   "status": "pass"
+  },
+  {
+   "case": "panel/fmriprep/ds003592-sub-280/anat_fit/brain_extraction/atropos/24_depad_segm",
+   "category": "panel-fmriprep",
+   "checks_passed": 9,
+   "checks_total": 9,
+   "failed_checks": [],
+   "measured": {
+    "affine": "0.0e+00",
+    "data type": "float32",
+    "header (every field)": 0,
+    "values (bit-identical)": 0
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0,
+    "bit-identical": 0,
+    "header bytes identical": "True"
+   },
+   "seconds": 1.551,
+   "status": "pass"
+  },
+  {
+   "case": "panel/fmriprep/ds003592-sub-280/anat_fit/brain_extraction/atropos/25_depad_gm",
+   "category": "panel-fmriprep",
+   "checks_passed": 9,
+   "checks_total": 9,
+   "failed_checks": [],
+   "measured": {
+    "affine": "0.0e+00",
+    "data type": "float32",
+    "header (every field)": 0,
+    "values (bit-identical)": 0
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0,
+    "bit-identical": 0,
+    "header bytes identical": "True"
+   },
+   "seconds": 1.293,
+   "status": "pass"
+  },
+  {
+   "case": "panel/fmriprep/ds003592-sub-280/anat_fit/brain_extraction/atropos/26_depad_wm",
+   "category": "panel-fmriprep",
+   "checks_passed": 9,
+   "checks_total": 9,
+   "failed_checks": [],
+   "measured": {
+    "affine": "0.0e+00",
+    "data type": "float32",
+    "header (every field)": 0,
+    "values (bit-identical)": 0
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0,
+    "bit-identical": 0,
+    "header bytes identical": "True"
+   },
+   "seconds": 1.254,
+   "status": "pass"
+  },
+  {
+   "case": "panel/fmriprep/ds003592-sub-280/anat_fit/brain_extraction/atropos/27_depad_csf",
+   "category": "panel-fmriprep",
+   "checks_passed": 9,
+   "checks_total": 9,
+   "failed_checks": [],
+   "measured": {
+    "affine": "0.0e+00",
+    "data type": "float32",
+    "header (every field)": 0,
+    "values (bit-identical)": 0
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0,
+    "bit-identical": 0,
+    "header bytes identical": "True"
+   },
+   "seconds": 1.269,
+   "status": "pass"
+  },
+  {
+   "case": "panel/fmriprep/ds003592-sub-280/anat_fit/brain_extraction/atropos/dil_brainmask",
+   "category": "panel-fmriprep",
+   "checks_passed": 9,
+   "checks_total": 9,
+   "failed_checks": [],
+   "measured": {
+    "affine": "0.0e+00",
+    "data type": "float32",
+    "header (every field)": 0,
+    "values (bit-identical)": 0
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0,
+    "bit-identical": 0,
+    "header bytes identical": "True"
+   },
+   "seconds": 1.02,
+   "status": "pass"
+  },
+  {
+   "case": "panel/fmriprep/ds003592-sub-280/anat_fit/brain_extraction/atropos/get_brainmask",
+   "category": "panel-fmriprep",
+   "checks_passed": 9,
+   "checks_total": 9,
+   "failed_checks": [],
+   "measured": {
+    "affine": "0.0e+00",
+    "data type": "float32",
+    "header (every field)": 0,
+    "values (bit-identical)": 0
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0,
+    "bit-identical": 0,
+    "header bytes identical": "True"
+   },
+   "seconds": 1.124,
+   "status": "pass"
+  },
+  {
+   "case": "panel/fmriprep/ds003592-sub-280/anat_fit/brain_extraction/lap_target",
+   "category": "panel-fmriprep",
+   "checks_passed": 9,
+   "checks_total": 9,
+   "failed_checks": [],
+   "measured": {
+    "affine": "0.0e+00",
+    "data type": "float32",
+    "header (every field)": 0,
+    "values (bit-identical)": 0
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0,
+    "bit-identical": 0,
+    "header bytes identical": "True"
+   },
+   "seconds": 3.439,
+   "status": "pass"
+  },
+  {
+   "case": "panel/fmriprep/ds003592-sub-280/anat_fit/brain_extraction/truncate_images[0]",
+   "category": "panel-fmriprep",
+   "checks_passed": 9,
+   "checks_total": 9,
+   "failed_checks": [],
+   "measured": {
+    "affine": "0.0e+00",
+    "data type": "float32",
+    "header (every field)": 0,
+    "values (bit-identical)": 0
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0,
+    "bit-identical": 0,
+    "header bytes identical": "True"
+   },
+   "seconds": 2.812,
+   "status": "pass"
+  },
+  {
+   "case": "panel/fmriprep/ds003592-sub-280/anat_fit/register_template[MNI152NLin2009cAsym]/trunc_mov",
+   "category": "panel-fmriprep",
+   "checks_passed": 9,
+   "checks_total": 9,
+   "failed_checks": [],
+   "measured": {
+    "affine": "0.0e+00",
+    "data type": "float32",
+    "header (every field)": 0,
+    "values (bit-identical)": 0
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0,
+    "bit-identical": 0,
+    "header bytes identical": "True"
+   },
+   "seconds": 2.571,
+   "status": "pass"
+  },
+  {
+   "case": "panel/fmriprep/ds004173-sub-603309/anat_fit/brain_extraction/atropos/02_pad_segm",
+   "category": "panel-fmriprep",
+   "checks_passed": 9,
+   "checks_total": 9,
+   "failed_checks": [],
+   "measured": {
+    "affine": "0.0e+00",
+    "data type": "float32",
+    "header (every field)": 0,
+    "values (bit-identical)": 0
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0,
+    "bit-identical": 0,
+    "header bytes identical": "True"
+   },
+   "seconds": 1.655,
+   "status": "pass"
+  },
+  {
+   "case": "panel/fmriprep/ds004173-sub-603309/anat_fit/brain_extraction/atropos/03_pad_mask",
+   "category": "panel-fmriprep",
+   "checks_passed": 9,
+   "checks_total": 9,
+   "failed_checks": [],
+   "measured": {
+    "affine": "0.0e+00",
+    "data type": "float32",
+    "header (every field)": 0,
+    "values (bit-identical)": 0
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0,
+    "bit-identical": 0,
+    "header bytes identical": "True"
+   },
+   "seconds": 1.501,
+   "status": "pass"
+  },
+  {
+   "case": "panel/fmriprep/ds004173-sub-603309/anat_fit/brain_extraction/atropos/05_get_wm",
+   "category": "panel-fmriprep",
+   "checks_passed": 9,
+   "checks_total": 9,
+   "failed_checks": [],
+   "measured": {
+    "affine": "0.0e+00",
+    "data type": "float32",
+    "header (every field)": 0,
+    "values (bit-identical)": 0
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0,
+    "bit-identical": 0,
+    "header bytes identical": "True"
+   },
+   "seconds": 1.133,
+   "status": "pass"
+  },
+  {
+   "case": "panel/fmriprep/ds004173-sub-603309/anat_fit/brain_extraction/atropos/06_get_gm",
+   "category": "panel-fmriprep",
+   "checks_passed": 9,
+   "checks_total": 9,
+   "failed_checks": [],
+   "measured": {
+    "affine": "0.0e+00",
+    "data type": "float32",
+    "header (every field)": 0,
+    "values (bit-identical)": 0
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0,
+    "bit-identical": 0,
+    "header bytes identical": "True"
+   },
+   "seconds": 1.194,
+   "status": "pass"
+  },
+  {
+   "case": "panel/fmriprep/ds004173-sub-603309/anat_fit/brain_extraction/atropos/07_fill_gm",
+   "category": "panel-fmriprep",
+   "checks_passed": 9,
+   "checks_total": 9,
+   "failed_checks": [],
+   "measured": {
+    "affine": "0.0e+00",
+    "data type": "float32",
+    "header (every field)": 0,
+    "values (bit-identical)": 0
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0,
+    "bit-identical": 0,
+    "header bytes identical": "True"
+   },
+   "seconds": 1.52,
+   "status": "pass"
+  },
+  {
+   "case": "panel/fmriprep/ds004173-sub-603309/anat_fit/brain_extraction/atropos/10_me_csf",
+   "category": "panel-fmriprep",
+   "checks_passed": 9,
+   "checks_total": 9,
+   "failed_checks": [],
+   "measured": {
+    "affine": "0.0e+00",
+    "data type": "float32",
+    "header (every field)": 0,
+    "values (bit-identical)": 0
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0,
+    "bit-identical": 0,
+    "header bytes identical": "True"
+   },
+   "seconds": 1.455,
+   "status": "pass"
+  },
+  {
+   "case": "panel/fmriprep/ds004173-sub-603309/anat_fit/brain_extraction/atropos/11_add_gm",
+   "category": "panel-fmriprep",
+   "checks_passed": 9,
+   "checks_total": 9,
+   "failed_checks": [],
+   "measured": {
+    "affine": "0.0e+00",
+    "data type": "float32",
+    "header (every field)": 0,
+    "values (bit-identical)": 0
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0,
+    "bit-identical": 0,
+    "header bytes identical": "True"
+   },
+   "seconds": 1.726,
+   "status": "pass"
+  },
+  {
+   "case": "panel/fmriprep/ds004173-sub-603309/anat_fit/brain_extraction/atropos/13_add_gm_wm",
+   "category": "panel-fmriprep",
+   "checks_passed": 9,
+   "checks_total": 9,
+   "failed_checks": [],
+   "measured": {
+    "affine": "0.0e+00",
+    "data type": "float32",
+    "header (every field)": 0,
+    "values (bit-identical)": 0
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0,
+    "bit-identical": 0,
+    "header bytes identical": "True"
+   },
+   "seconds": 1.768,
+   "status": "pass"
+  },
+  {
+   "case": "panel/fmriprep/ds004173-sub-603309/anat_fit/brain_extraction/atropos/15_add_7",
+   "category": "panel-fmriprep",
+   "checks_passed": 9,
+   "checks_total": 9,
+   "failed_checks": [],
+   "measured": {
+    "affine": "0.0e+00",
+    "data type": "float32",
+    "header (every field)": 0,
+    "values (bit-identical)": 0
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0,
+    "bit-identical": 0,
+    "header bytes identical": "True"
+   },
+   "seconds": 1.144,
+   "status": "pass"
+  },
+  {
+   "case": "panel/fmriprep/ds004173-sub-603309/anat_fit/brain_extraction/atropos/16_me_7",
+   "category": "panel-fmriprep",
+   "checks_passed": 9,
+   "checks_total": 9,
+   "failed_checks": [],
+   "measured": {
+    "affine": "0.0e+00",
+    "data type": "float32",
+    "header (every field)": 0,
+    "values (bit-identical)": 0
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0,
+    "bit-identical": 0,
+    "header bytes identical": "True"
+   },
+   "seconds": 1.8,
+   "status": "pass"
+  },
+  {
+   "case": "panel/fmriprep/ds004173-sub-603309/anat_fit/brain_extraction/atropos/17_comp_7",
+   "category": "panel-fmriprep",
+   "checks_passed": 9,
+   "checks_total": 9,
+   "failed_checks": [],
+   "measured": {
+    "affine": "0.0e+00",
+    "data type": "float32",
+    "header (every field)": 0,
+    "values (bit-identical)": 0
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0,
+    "bit-identical": 0,
+    "header bytes identical": "True"
+   },
+   "seconds": 1.54,
+   "status": "pass"
+  },
+  {
+   "case": "panel/fmriprep/ds004173-sub-603309/anat_fit/brain_extraction/atropos/18_md_7",
+   "category": "panel-fmriprep",
+   "checks_passed": 9,
+   "checks_total": 9,
+   "failed_checks": [],
+   "measured": {
+    "affine": "0.0e+00",
+    "data type": "float32",
+    "header (every field)": 0,
+    "values (bit-identical)": 0
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0,
+    "bit-identical": 0,
+    "header bytes identical": "True"
+   },
+   "seconds": 1.422,
+   "status": "pass"
+  },
+  {
+   "case": "panel/fmriprep/ds004173-sub-603309/anat_fit/brain_extraction/atropos/19_fill_7",
+   "category": "panel-fmriprep",
+   "checks_passed": 9,
+   "checks_total": 9,
+   "failed_checks": [],
+   "measured": {
+    "affine": "0.0e+00",
+    "data type": "float32",
+    "header (every field)": 0,
+    "values (bit-identical)": 0
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0,
+    "bit-identical": 0,
+    "header bytes identical": "True"
+   },
+   "seconds": 1.491,
+   "status": "pass"
+  },
+  {
+   "case": "panel/fmriprep/ds004173-sub-603309/anat_fit/brain_extraction/atropos/20_add_7_2",
+   "category": "panel-fmriprep",
+   "checks_passed": 9,
+   "checks_total": 9,
+   "failed_checks": [],
+   "measured": {
+    "affine": "0.0e+00",
+    "data type": "float32",
+    "header (every field)": 0,
+    "values (bit-identical)": 0
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0,
+    "bit-identical": 0,
+    "header bytes identical": "True"
+   },
+   "seconds": 1.739,
+   "status": "pass"
+  },
+  {
+   "case": "panel/fmriprep/ds004173-sub-603309/anat_fit/brain_extraction/atropos/21_md_7_2",
+   "category": "panel-fmriprep",
+   "checks_passed": 9,
+   "checks_total": 9,
+   "failed_checks": [],
+   "measured": {
+    "affine": "0.0e+00",
+    "data type": "float32",
+    "header (every field)": 0,
+    "values (bit-identical)": 0
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0,
+    "bit-identical": 0,
+    "header bytes identical": "True"
+   },
+   "seconds": 1.398,
+   "status": "pass"
+  },
+  {
+   "case": "panel/fmriprep/ds004173-sub-603309/anat_fit/brain_extraction/atropos/22_me_7_2",
+   "category": "panel-fmriprep",
+   "checks_passed": 9,
+   "checks_total": 9,
+   "failed_checks": [],
+   "measured": {
+    "affine": "0.0e+00",
+    "data type": "float32",
+    "header (every field)": 0,
+    "values (bit-identical)": 0
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0,
+    "bit-identical": 0,
+    "header bytes identical": "True"
+   },
+   "seconds": 1.745,
+   "status": "pass"
+  },
+  {
+   "case": "panel/fmriprep/ds004173-sub-603309/anat_fit/brain_extraction/atropos/23_depad_mask",
+   "category": "panel-fmriprep",
+   "checks_passed": 9,
+   "checks_total": 9,
+   "failed_checks": [],
+   "measured": {
+    "affine": "0.0e+00",
+    "data type": "float32",
+    "header (every field)": 0,
+    "values (bit-identical)": 0
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0,
+    "bit-identical": 0,
+    "header bytes identical": "True"
+   },
+   "seconds": 1.611,
+   "status": "pass"
+  },
+  {
+   "case": "panel/fmriprep/ds004173-sub-603309/anat_fit/brain_extraction/atropos/24_depad_segm",
+   "category": "panel-fmriprep",
+   "checks_passed": 9,
+   "checks_total": 9,
+   "failed_checks": [],
+   "measured": {
+    "affine": "0.0e+00",
+    "data type": "float32",
+    "header (every field)": 0,
+    "values (bit-identical)": 0
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0,
+    "bit-identical": 0,
+    "header bytes identical": "True"
+   },
+   "seconds": 1.609,
+   "status": "pass"
+  },
+  {
+   "case": "panel/fmriprep/ds004173-sub-603309/anat_fit/brain_extraction/atropos/25_depad_gm",
+   "category": "panel-fmriprep",
+   "checks_passed": 9,
+   "checks_total": 9,
+   "failed_checks": [],
+   "measured": {
+    "affine": "0.0e+00",
+    "data type": "float32",
+    "header (every field)": 0,
+    "values (bit-identical)": 0
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0,
+    "bit-identical": 0,
+    "header bytes identical": "True"
+   },
+   "seconds": 1.675,
+   "status": "pass"
+  },
+  {
+   "case": "panel/fmriprep/ds004173-sub-603309/anat_fit/brain_extraction/atropos/26_depad_wm",
+   "category": "panel-fmriprep",
+   "checks_passed": 9,
+   "checks_total": 9,
+   "failed_checks": [],
+   "measured": {
+    "affine": "0.0e+00",
+    "data type": "float32",
+    "header (every field)": 0,
+    "values (bit-identical)": 0
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0,
+    "bit-identical": 0,
+    "header bytes identical": "True"
+   },
+   "seconds": 1.323,
+   "status": "pass"
+  },
+  {
+   "case": "panel/fmriprep/ds004173-sub-603309/anat_fit/brain_extraction/atropos/27_depad_csf",
+   "category": "panel-fmriprep",
+   "checks_passed": 9,
+   "checks_total": 9,
+   "failed_checks": [],
+   "measured": {
+    "affine": "0.0e+00",
+    "data type": "float32",
+    "header (every field)": 0,
+    "values (bit-identical)": 0
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0,
+    "bit-identical": 0,
+    "header bytes identical": "True"
+   },
+   "seconds": 1.286,
+   "status": "pass"
+  },
+  {
+   "case": "panel/fmriprep/ds004173-sub-603309/anat_fit/brain_extraction/atropos/dil_brainmask",
+   "category": "panel-fmriprep",
+   "checks_passed": 9,
+   "checks_total": 9,
+   "failed_checks": [],
+   "measured": {
+    "affine": "0.0e+00",
+    "data type": "float32",
+    "header (every field)": 0,
+    "values (bit-identical)": 0
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0,
+    "bit-identical": 0,
+    "header bytes identical": "True"
+   },
+   "seconds": 1.015,
+   "status": "pass"
+  },
+  {
+   "case": "panel/fmriprep/ds004173-sub-603309/anat_fit/brain_extraction/atropos/get_brainmask",
+   "category": "panel-fmriprep",
+   "checks_passed": 9,
+   "checks_total": 9,
+   "failed_checks": [],
+   "measured": {
+    "affine": "0.0e+00",
+    "data type": "float32",
+    "header (every field)": 0,
+    "values (bit-identical)": 0
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0,
+    "bit-identical": 0,
+    "header bytes identical": "True"
+   },
+   "seconds": 1.093,
+   "status": "pass"
+  },
+  {
+   "case": "panel/fmriprep/ds004173-sub-603309/anat_fit/brain_extraction/lap_target",
+   "category": "panel-fmriprep",
+   "checks_passed": 9,
+   "checks_total": 9,
+   "failed_checks": [],
+   "measured": {
+    "affine": "0.0e+00",
+    "data type": "float32",
+    "header (every field)": 0,
+    "values (bit-identical)": 0
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0,
+    "bit-identical": 0,
+    "header bytes identical": "True"
+   },
+   "seconds": 3.262,
+   "status": "pass"
+  },
+  {
+   "case": "panel/fmriprep/ds004173-sub-603309/anat_fit/brain_extraction/truncate_images[0]",
+   "category": "panel-fmriprep",
+   "checks_passed": 9,
+   "checks_total": 9,
+   "failed_checks": [],
+   "measured": {
+    "affine": "0.0e+00",
+    "data type": "float32",
+    "header (every field)": 0,
+    "values (bit-identical)": 0
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0,
+    "bit-identical": 0,
+    "header bytes identical": "True"
+   },
+   "seconds": 2.781,
+   "status": "pass"
+  },
+  {
+   "case": "panel/fmriprep/ds004173-sub-603309/anat_fit/register_template[MNI152NLin2009cAsym]/trunc_mov",
+   "category": "panel-fmriprep",
+   "checks_passed": 9,
+   "checks_total": 9,
+   "failed_checks": [],
+   "measured": {
+    "affine": "0.0e+00",
+    "data type": "float32",
+    "header (every field)": 0,
+    "values (bit-identical)": 0
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0,
+    "bit-identical": 0,
+    "header bytes identical": "True"
+   },
+   "seconds": 2.6,
+   "status": "pass"
+  },
+  {
+   "case": "panel/fmriprep/ds004884-sub-M2079/anat_fit/brain_extraction/atropos/02_pad_segm",
+   "category": "panel-fmriprep",
+   "checks_passed": 9,
+   "checks_total": 9,
+   "failed_checks": [],
+   "measured": {
+    "affine": "0.0e+00",
+    "data type": "float32",
+    "header (every field)": 0,
+    "values (bit-identical)": 0
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0,
+    "bit-identical": 0,
+    "header bytes identical": "True"
+   },
+   "seconds": 1.652,
+   "status": "pass"
+  },
+  {
+   "case": "panel/fmriprep/ds004884-sub-M2079/anat_fit/brain_extraction/atropos/03_pad_mask",
+   "category": "panel-fmriprep",
+   "checks_passed": 9,
+   "checks_total": 9,
+   "failed_checks": [],
+   "measured": {
+    "affine": "0.0e+00",
+    "data type": "float32",
+    "header (every field)": 0,
+    "values (bit-identical)": 0
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0,
+    "bit-identical": 0,
+    "header bytes identical": "True"
+   },
+   "seconds": 1.564,
+   "status": "pass"
+  },
+  {
+   "case": "panel/fmriprep/ds004884-sub-M2079/anat_fit/brain_extraction/atropos/05_get_wm",
+   "category": "panel-fmriprep",
+   "checks_passed": 9,
+   "checks_total": 9,
+   "failed_checks": [],
+   "measured": {
+    "affine": "0.0e+00",
+    "data type": "float32",
+    "header (every field)": 0,
+    "values (bit-identical)": 0
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0,
+    "bit-identical": 0,
+    "header bytes identical": "True"
+   },
+   "seconds": 1.083,
+   "status": "pass"
+  },
+  {
+   "case": "panel/fmriprep/ds004884-sub-M2079/anat_fit/brain_extraction/atropos/06_get_gm",
+   "category": "panel-fmriprep",
+   "checks_passed": 9,
+   "checks_total": 9,
+   "failed_checks": [],
+   "measured": {
+    "affine": "0.0e+00",
+    "data type": "float32",
+    "header (every field)": 0,
+    "values (bit-identical)": 0
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0,
+    "bit-identical": 0,
+    "header bytes identical": "True"
+   },
+   "seconds": 1.14,
+   "status": "pass"
+  },
+  {
+   "case": "panel/fmriprep/ds004884-sub-M2079/anat_fit/brain_extraction/atropos/07_fill_gm",
+   "category": "panel-fmriprep",
+   "checks_passed": 9,
+   "checks_total": 9,
+   "failed_checks": [],
+   "measured": {
+    "affine": "0.0e+00",
+    "data type": "float32",
+    "header (every field)": 0,
+    "values (bit-identical)": 0
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0,
+    "bit-identical": 0,
+    "header bytes identical": "True"
+   },
+   "seconds": 1.473,
+   "status": "pass"
+  },
+  {
+   "case": "panel/fmriprep/ds004884-sub-M2079/anat_fit/brain_extraction/atropos/10_me_csf",
+   "category": "panel-fmriprep",
+   "checks_passed": 9,
+   "checks_total": 9,
+   "failed_checks": [],
+   "measured": {
+    "affine": "0.0e+00",
+    "data type": "float32",
+    "header (every field)": 0,
+    "values (bit-identical)": 0
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0,
+    "bit-identical": 0,
+    "header bytes identical": "True"
+   },
+   "seconds": 1.47,
+   "status": "pass"
+  },
+  {
+   "case": "panel/fmriprep/ds004884-sub-M2079/anat_fit/brain_extraction/atropos/11_add_gm",
+   "category": "panel-fmriprep",
+   "checks_passed": 9,
+   "checks_total": 9,
+   "failed_checks": [],
+   "measured": {
+    "affine": "0.0e+00",
+    "data type": "float32",
+    "header (every field)": 0,
+    "values (bit-identical)": 0
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0,
+    "bit-identical": 0,
+    "header bytes identical": "True"
+   },
+   "seconds": 1.708,
+   "status": "pass"
+  },
+  {
+   "case": "panel/fmriprep/ds004884-sub-M2079/anat_fit/brain_extraction/atropos/13_add_gm_wm",
+   "category": "panel-fmriprep",
+   "checks_passed": 9,
+   "checks_total": 9,
+   "failed_checks": [],
+   "measured": {
+    "affine": "0.0e+00",
+    "data type": "float32",
+    "header (every field)": 0,
+    "values (bit-identical)": 0
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0,
+    "bit-identical": 0,
+    "header bytes identical": "True"
+   },
+   "seconds": 1.792,
+   "status": "pass"
+  },
+  {
+   "case": "panel/fmriprep/ds004884-sub-M2079/anat_fit/brain_extraction/atropos/15_add_7",
+   "category": "panel-fmriprep",
+   "checks_passed": 9,
+   "checks_total": 9,
+   "failed_checks": [],
+   "measured": {
+    "affine": "0.0e+00",
+    "data type": "float32",
+    "header (every field)": 0,
+    "values (bit-identical)": 0
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0,
+    "bit-identical": 0,
+    "header bytes identical": "True"
+   },
+   "seconds": 1.151,
+   "status": "pass"
+  },
+  {
+   "case": "panel/fmriprep/ds004884-sub-M2079/anat_fit/brain_extraction/atropos/16_me_7",
+   "category": "panel-fmriprep",
+   "checks_passed": 9,
+   "checks_total": 9,
+   "failed_checks": [],
+   "measured": {
+    "affine": "0.0e+00",
+    "data type": "float32",
+    "header (every field)": 0,
+    "values (bit-identical)": 0
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0,
+    "bit-identical": 0,
+    "header bytes identical": "True"
+   },
+   "seconds": 1.773,
+   "status": "pass"
+  },
+  {
+   "case": "panel/fmriprep/ds004884-sub-M2079/anat_fit/brain_extraction/atropos/17_comp_7",
+   "category": "panel-fmriprep",
+   "checks_passed": 9,
+   "checks_total": 9,
+   "failed_checks": [],
+   "measured": {
+    "affine": "0.0e+00",
+    "data type": "float32",
+    "header (every field)": 0,
+    "values (bit-identical)": 0
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0,
+    "bit-identical": 0,
+    "header bytes identical": "True"
+   },
+   "seconds": 1.481,
+   "status": "pass"
+  },
+  {
+   "case": "panel/fmriprep/ds004884-sub-M2079/anat_fit/brain_extraction/atropos/18_md_7",
+   "category": "panel-fmriprep",
+   "checks_passed": 9,
+   "checks_total": 9,
+   "failed_checks": [],
+   "measured": {
+    "affine": "0.0e+00",
+    "data type": "float32",
+    "header (every field)": 0,
+    "values (bit-identical)": 0
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0,
+    "bit-identical": 0,
+    "header bytes identical": "True"
+   },
+   "seconds": 1.378,
+   "status": "pass"
+  },
+  {
+   "case": "panel/fmriprep/ds004884-sub-M2079/anat_fit/brain_extraction/atropos/19_fill_7",
+   "category": "panel-fmriprep",
+   "checks_passed": 9,
+   "checks_total": 9,
+   "failed_checks": [],
+   "measured": {
+    "affine": "0.0e+00",
+    "data type": "float32",
+    "header (every field)": 0,
+    "values (bit-identical)": 0
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0,
+    "bit-identical": 0,
+    "header bytes identical": "True"
+   },
+   "seconds": 1.444,
+   "status": "pass"
+  },
+  {
+   "case": "panel/fmriprep/ds004884-sub-M2079/anat_fit/brain_extraction/atropos/20_add_7_2",
+   "category": "panel-fmriprep",
+   "checks_passed": 9,
+   "checks_total": 9,
+   "failed_checks": [],
+   "measured": {
+    "affine": "0.0e+00",
+    "data type": "float32",
+    "header (every field)": 0,
+    "values (bit-identical)": 0
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0,
+    "bit-identical": 0,
+    "header bytes identical": "True"
+   },
+   "seconds": 1.793,
+   "status": "pass"
+  },
+  {
+   "case": "panel/fmriprep/ds004884-sub-M2079/anat_fit/brain_extraction/atropos/21_md_7_2",
+   "category": "panel-fmriprep",
+   "checks_passed": 9,
+   "checks_total": 9,
+   "failed_checks": [],
+   "measured": {
+    "affine": "0.0e+00",
+    "data type": "float32",
+    "header (every field)": 0,
+    "values (bit-identical)": 0
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0,
+    "bit-identical": 0,
+    "header bytes identical": "True"
+   },
+   "seconds": 1.489,
+   "status": "pass"
+  },
+  {
+   "case": "panel/fmriprep/ds004884-sub-M2079/anat_fit/brain_extraction/atropos/22_me_7_2",
+   "category": "panel-fmriprep",
+   "checks_passed": 9,
+   "checks_total": 9,
+   "failed_checks": [],
+   "measured": {
+    "affine": "0.0e+00",
+    "data type": "float32",
+    "header (every field)": 0,
+    "values (bit-identical)": 0
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0,
+    "bit-identical": 0,
+    "header bytes identical": "True"
+   },
+   "seconds": 1.689,
+   "status": "pass"
+  },
+  {
+   "case": "panel/fmriprep/ds004884-sub-M2079/anat_fit/brain_extraction/atropos/23_depad_mask",
+   "category": "panel-fmriprep",
+   "checks_passed": 9,
+   "checks_total": 9,
+   "failed_checks": [],
+   "measured": {
+    "affine": "0.0e+00",
+    "data type": "float32",
+    "header (every field)": 0,
+    "values (bit-identical)": 0
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0,
+    "bit-identical": 0,
+    "header bytes identical": "True"
+   },
+   "seconds": 1.566,
+   "status": "pass"
+  },
+  {
+   "case": "panel/fmriprep/ds004884-sub-M2079/anat_fit/brain_extraction/atropos/24_depad_segm",
+   "category": "panel-fmriprep",
+   "checks_passed": 9,
+   "checks_total": 9,
+   "failed_checks": [],
+   "measured": {
+    "affine": "0.0e+00",
+    "data type": "float32",
+    "header (every field)": 0,
+    "values (bit-identical)": 0
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0,
+    "bit-identical": 0,
+    "header bytes identical": "True"
+   },
+   "seconds": 1.554,
+   "status": "pass"
+  },
+  {
+   "case": "panel/fmriprep/ds004884-sub-M2079/anat_fit/brain_extraction/atropos/25_depad_gm",
+   "category": "panel-fmriprep",
+   "checks_passed": 9,
+   "checks_total": 9,
+   "failed_checks": [],
+   "measured": {
+    "affine": "0.0e+00",
+    "data type": "float32",
+    "header (every field)": 0,
+    "values (bit-identical)": 0
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0,
+    "bit-identical": 0,
+    "header bytes identical": "True"
+   },
+   "seconds": 1.276,
+   "status": "pass"
+  },
+  {
+   "case": "panel/fmriprep/ds004884-sub-M2079/anat_fit/brain_extraction/atropos/26_depad_wm",
+   "category": "panel-fmriprep",
+   "checks_passed": 9,
+   "checks_total": 9,
+   "failed_checks": [],
+   "measured": {
+    "affine": "0.0e+00",
+    "data type": "float32",
+    "header (every field)": 0,
+    "values (bit-identical)": 0
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0,
+    "bit-identical": 0,
+    "header bytes identical": "True"
+   },
+   "seconds": 1.263,
+   "status": "pass"
+  },
+  {
+   "case": "panel/fmriprep/ds004884-sub-M2079/anat_fit/brain_extraction/atropos/27_depad_csf",
+   "category": "panel-fmriprep",
+   "checks_passed": 9,
+   "checks_total": 9,
+   "failed_checks": [],
+   "measured": {
+    "affine": "0.0e+00",
+    "data type": "float32",
+    "header (every field)": 0,
+    "values (bit-identical)": 0
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0,
+    "bit-identical": 0,
+    "header bytes identical": "True"
+   },
+   "seconds": 1.264,
+   "status": "pass"
+  },
+  {
+   "case": "panel/fmriprep/ds004884-sub-M2079/anat_fit/brain_extraction/atropos/dil_brainmask",
+   "category": "panel-fmriprep",
+   "checks_passed": 9,
+   "checks_total": 9,
+   "failed_checks": [],
+   "measured": {
+    "affine": "0.0e+00",
+    "data type": "float32",
+    "header (every field)": 0,
+    "values (bit-identical)": 0
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0,
+    "bit-identical": 0,
+    "header bytes identical": "True"
+   },
+   "seconds": 1.034,
+   "status": "pass"
+  },
+  {
+   "case": "panel/fmriprep/ds004884-sub-M2079/anat_fit/brain_extraction/atropos/get_brainmask",
+   "category": "panel-fmriprep",
+   "checks_passed": 9,
+   "checks_total": 9,
+   "failed_checks": [],
+   "measured": {
+    "affine": "0.0e+00",
+    "data type": "float32",
+    "header (every field)": 0,
+    "values (bit-identical)": 0
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0,
+    "bit-identical": 0,
+    "header bytes identical": "True"
+   },
+   "seconds": 1.116,
+   "status": "pass"
+  },
+  {
+   "case": "panel/fmriprep/ds004884-sub-M2079/anat_fit/brain_extraction/lap_target",
+   "category": "panel-fmriprep",
+   "checks_passed": 9,
+   "checks_total": 9,
+   "failed_checks": [],
+   "measured": {
+    "affine": "0.0e+00",
+    "data type": "float32",
+    "header (every field)": 0,
+    "values (bit-identical)": 0
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0,
+    "bit-identical": 0,
+    "header bytes identical": "True"
+   },
+   "seconds": 2.263,
+   "status": "pass"
+  },
+  {
+   "case": "panel/fmriprep/ds004884-sub-M2079/anat_fit/brain_extraction/truncate_images[0]",
+   "category": "panel-fmriprep",
+   "checks_passed": 9,
+   "checks_total": 9,
+   "failed_checks": [],
+   "measured": {
+    "affine": "0.0e+00",
+    "data type": "float32",
+    "header (every field)": 0,
+    "values (bit-identical)": 0
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0,
+    "bit-identical": 0,
+    "header bytes identical": "True"
+   },
+   "seconds": 1.156,
+   "status": "pass"
+  },
+  {
+   "case": "panel/fmriprep/ds004884-sub-M2079/anat_fit/register_template[MNI152NLin2009cAsym]/trunc_mov",
+   "category": "panel-fmriprep",
+   "checks_passed": 9,
+   "checks_total": 9,
+   "failed_checks": [],
+   "measured": {
+    "affine": "0.0e+00",
+    "data type": "float32",
+    "header (every field)": 0,
+    "values (bit-identical)": 0
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0,
+    "bit-identical": 0,
+    "header bytes identical": "True"
+   },
+   "seconds": 1.192,
+   "status": "pass"
+  },
+  {
+   "case": "panel/fmriprep/ds004958-sub-fsm64ps/anat_fit/brain_extraction/atropos/02_pad_segm",
+   "category": "panel-fmriprep",
+   "checks_passed": 9,
+   "checks_total": 9,
+   "failed_checks": [],
+   "measured": {
+    "affine": "0.0e+00",
+    "data type": "float32",
+    "header (every field)": 0,
+    "values (bit-identical)": 0
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0,
+    "bit-identical": 0,
+    "header bytes identical": "True"
+   },
+   "seconds": 1.468,
+   "status": "pass"
+  },
+  {
+   "case": "panel/fmriprep/ds004958-sub-fsm64ps/anat_fit/brain_extraction/atropos/03_pad_mask",
+   "category": "panel-fmriprep",
+   "checks_passed": 9,
+   "checks_total": 9,
+   "failed_checks": [],
+   "measured": {
+    "affine": "0.0e+00",
+    "data type": "float32",
+    "header (every field)": 0,
+    "values (bit-identical)": 0
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0,
+    "bit-identical": 0,
+    "header bytes identical": "True"
+   },
+   "seconds": 1.334,
+   "status": "pass"
+  },
+  {
+   "case": "panel/fmriprep/ds004958-sub-fsm64ps/anat_fit/brain_extraction/atropos/05_get_wm",
+   "category": "panel-fmriprep",
+   "checks_passed": 9,
+   "checks_total": 9,
+   "failed_checks": [],
+   "measured": {
+    "affine": "0.0e+00",
+    "data type": "float32",
+    "header (every field)": 0,
+    "values (bit-identical)": 0
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0,
+    "bit-identical": 0,
+    "header bytes identical": "True"
+   },
+   "seconds": 1.006,
+   "status": "pass"
+  },
+  {
+   "case": "panel/fmriprep/ds004958-sub-fsm64ps/anat_fit/brain_extraction/atropos/06_get_gm",
+   "category": "panel-fmriprep",
+   "checks_passed": 9,
+   "checks_total": 9,
+   "failed_checks": [],
+   "measured": {
+    "affine": "0.0e+00",
+    "data type": "float32",
+    "header (every field)": 0,
+    "values (bit-identical)": 0
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0,
+    "bit-identical": 0,
+    "header bytes identical": "True"
+   },
+   "seconds": 1.004,
+   "status": "pass"
+  },
+  {
+   "case": "panel/fmriprep/ds004958-sub-fsm64ps/anat_fit/brain_extraction/atropos/07_fill_gm",
+   "category": "panel-fmriprep",
+   "checks_passed": 9,
+   "checks_total": 9,
+   "failed_checks": [],
+   "measured": {
+    "affine": "0.0e+00",
+    "data type": "float32",
+    "header (every field)": 0,
+    "values (bit-identical)": 0
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0,
+    "bit-identical": 0,
+    "header bytes identical": "True"
+   },
+   "seconds": 1.465,
+   "status": "pass"
+  },
+  {
+   "case": "panel/fmriprep/ds004958-sub-fsm64ps/anat_fit/brain_extraction/atropos/10_me_csf",
+   "category": "panel-fmriprep",
+   "checks_passed": 9,
+   "checks_total": 9,
+   "failed_checks": [],
+   "measured": {
+    "affine": "0.0e+00",
+    "data type": "float32",
+    "header (every field)": 0,
+    "values (bit-identical)": 0
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0,
+    "bit-identical": 0,
+    "header bytes identical": "True"
+   },
+   "seconds": 1.387,
+   "status": "pass"
+  },
+  {
+   "case": "panel/fmriprep/ds004958-sub-fsm64ps/anat_fit/brain_extraction/atropos/11_add_gm",
+   "category": "panel-fmriprep",
+   "checks_passed": 9,
+   "checks_total": 9,
+   "failed_checks": [],
+   "measured": {
+    "affine": "0.0e+00",
+    "data type": "float32",
+    "header (every field)": 0,
+    "values (bit-identical)": 0
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0,
+    "bit-identical": 0,
+    "header bytes identical": "True"
+   },
+   "seconds": 1.577,
+   "status": "pass"
+  },
+  {
+   "case": "panel/fmriprep/ds004958-sub-fsm64ps/anat_fit/brain_extraction/atropos/13_add_gm_wm",
+   "category": "panel-fmriprep",
+   "checks_passed": 9,
+   "checks_total": 9,
+   "failed_checks": [],
+   "measured": {
+    "affine": "0.0e+00",
+    "data type": "float32",
+    "header (every field)": 0,
+    "values (bit-identical)": 0
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0,
+    "bit-identical": 0,
+    "header bytes identical": "True"
+   },
+   "seconds": 1.652,
+   "status": "pass"
+  },
+  {
+   "case": "panel/fmriprep/ds004958-sub-fsm64ps/anat_fit/brain_extraction/atropos/15_add_7",
+   "category": "panel-fmriprep",
+   "checks_passed": 9,
+   "checks_total": 9,
+   "failed_checks": [],
+   "measured": {
+    "affine": "0.0e+00",
+    "data type": "float32",
+    "header (every field)": 0,
+    "values (bit-identical)": 0
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0,
+    "bit-identical": 0,
+    "header bytes identical": "True"
+   },
+   "seconds": 1.119,
+   "status": "pass"
+  },
+  {
+   "case": "panel/fmriprep/ds004958-sub-fsm64ps/anat_fit/brain_extraction/atropos/16_me_7",
+   "category": "panel-fmriprep",
+   "checks_passed": 9,
+   "checks_total": 9,
+   "failed_checks": [],
+   "measured": {
+    "affine": "0.0e+00",
+    "data type": "float32",
+    "header (every field)": 0,
+    "values (bit-identical)": 0
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0,
+    "bit-identical": 0,
+    "header bytes identical": "True"
+   },
+   "seconds": 1.689,
+   "status": "pass"
+  },
+  {
+   "case": "panel/fmriprep/ds004958-sub-fsm64ps/anat_fit/brain_extraction/atropos/17_comp_7",
+   "category": "panel-fmriprep",
+   "checks_passed": 9,
+   "checks_total": 9,
+   "failed_checks": [],
+   "measured": {
+    "affine": "0.0e+00",
+    "data type": "float32",
+    "header (every field)": 0,
+    "values (bit-identical)": 0
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0,
+    "bit-identical": 0,
+    "header bytes identical": "True"
+   },
+   "seconds": 1.361,
+   "status": "pass"
+  },
+  {
+   "case": "panel/fmriprep/ds004958-sub-fsm64ps/anat_fit/brain_extraction/atropos/18_md_7",
+   "category": "panel-fmriprep",
+   "checks_passed": 9,
+   "checks_total": 9,
+   "failed_checks": [],
+   "measured": {
+    "affine": "0.0e+00",
+    "data type": "float32",
+    "header (every field)": 0,
+    "values (bit-identical)": 0
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0,
+    "bit-identical": 0,
+    "header bytes identical": "True"
+   },
+   "seconds": 1.295,
+   "status": "pass"
+  },
+  {
+   "case": "panel/fmriprep/ds004958-sub-fsm64ps/anat_fit/brain_extraction/atropos/19_fill_7",
+   "category": "panel-fmriprep",
+   "checks_passed": 9,
+   "checks_total": 9,
+   "failed_checks": [],
+   "measured": {
+    "affine": "0.0e+00",
+    "data type": "float32",
+    "header (every field)": 0,
+    "values (bit-identical)": 0
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0,
+    "bit-identical": 0,
+    "header bytes identical": "True"
+   },
+   "seconds": 1.378,
+   "status": "pass"
+  },
+  {
+   "case": "panel/fmriprep/ds004958-sub-fsm64ps/anat_fit/brain_extraction/atropos/20_add_7_2",
+   "category": "panel-fmriprep",
+   "checks_passed": 9,
+   "checks_total": 9,
+   "failed_checks": [],
+   "measured": {
+    "affine": "0.0e+00",
+    "data type": "float32",
+    "header (every field)": 0,
+    "values (bit-identical)": 0
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0,
+    "bit-identical": 0,
+    "header bytes identical": "True"
+   },
+   "seconds": 1.642,
+   "status": "pass"
+  },
+  {
+   "case": "panel/fmriprep/ds004958-sub-fsm64ps/anat_fit/brain_extraction/atropos/21_md_7_2",
+   "category": "panel-fmriprep",
+   "checks_passed": 9,
+   "checks_total": 9,
+   "failed_checks": [],
+   "measured": {
+    "affine": "0.0e+00",
+    "data type": "float32",
+    "header (every field)": 0,
+    "values (bit-identical)": 0
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0,
+    "bit-identical": 0,
+    "header bytes identical": "True"
+   },
+   "seconds": 1.29,
+   "status": "pass"
+  },
+  {
+   "case": "panel/fmriprep/ds004958-sub-fsm64ps/anat_fit/brain_extraction/atropos/22_me_7_2",
+   "category": "panel-fmriprep",
+   "checks_passed": 9,
+   "checks_total": 9,
+   "failed_checks": [],
+   "measured": {
+    "affine": "0.0e+00",
+    "data type": "float32",
+    "header (every field)": 0,
+    "values (bit-identical)": 0
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0,
+    "bit-identical": 0,
+    "header bytes identical": "True"
+   },
+   "seconds": 1.619,
+   "status": "pass"
+  },
+  {
+   "case": "panel/fmriprep/ds004958-sub-fsm64ps/anat_fit/brain_extraction/atropos/23_depad_mask",
+   "category": "panel-fmriprep",
+   "checks_passed": 9,
+   "checks_total": 9,
+   "failed_checks": [],
+   "measured": {
+    "affine": "0.0e+00",
+    "data type": "float32",
+    "header (every field)": 0,
+    "values (bit-identical)": 0
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0,
+    "bit-identical": 0,
+    "header bytes identical": "True"
+   },
+   "seconds": 1.342,
+   "status": "pass"
+  },
+  {
+   "case": "panel/fmriprep/ds004958-sub-fsm64ps/anat_fit/brain_extraction/atropos/24_depad_segm",
+   "category": "panel-fmriprep",
+   "checks_passed": 9,
+   "checks_total": 9,
+   "failed_checks": [],
+   "measured": {
+    "affine": "0.0e+00",
+    "data type": "float32",
+    "header (every field)": 0,
+    "values (bit-identical)": 0
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0,
+    "bit-identical": 0,
+    "header bytes identical": "True"
+   },
+   "seconds": 1.346,
+   "status": "pass"
+  },
+  {
+   "case": "panel/fmriprep/ds004958-sub-fsm64ps/anat_fit/brain_extraction/atropos/25_depad_gm",
+   "category": "panel-fmriprep",
+   "checks_passed": 9,
+   "checks_total": 9,
+   "failed_checks": [],
+   "measured": {
+    "affine": "0.0e+00",
+    "data type": "float32",
+    "header (every field)": 0,
+    "values (bit-identical)": 0
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0,
+    "bit-identical": 0,
+    "header bytes identical": "True"
+   },
+   "seconds": 1.382,
+   "status": "pass"
+  },
+  {
+   "case": "panel/fmriprep/ds004958-sub-fsm64ps/anat_fit/brain_extraction/atropos/26_depad_wm",
+   "category": "panel-fmriprep",
+   "checks_passed": 9,
+   "checks_total": 9,
+   "failed_checks": [],
+   "measured": {
+    "affine": "0.0e+00",
+    "data type": "float32",
+    "header (every field)": 0,
+    "values (bit-identical)": 0
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0,
+    "bit-identical": 0,
+    "header bytes identical": "True"
+   },
+   "seconds": 1.11,
+   "status": "pass"
+  },
+  {
+   "case": "panel/fmriprep/ds004958-sub-fsm64ps/anat_fit/brain_extraction/atropos/27_depad_csf",
+   "category": "panel-fmriprep",
+   "checks_passed": 9,
+   "checks_total": 9,
+   "failed_checks": [],
+   "measured": {
+    "affine": "0.0e+00",
+    "data type": "float32",
+    "header (every field)": 0,
+    "values (bit-identical)": 0
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0,
+    "bit-identical": 0,
+    "header bytes identical": "True"
+   },
+   "seconds": 1.095,
+   "status": "pass"
+  },
+  {
+   "case": "panel/fmriprep/ds004958-sub-fsm64ps/anat_fit/brain_extraction/atropos/dil_brainmask",
+   "category": "panel-fmriprep",
+   "checks_passed": 9,
+   "checks_total": 9,
+   "failed_checks": [],
+   "measured": {
+    "affine": "0.0e+00",
+    "data type": "float32",
+    "header (every field)": 0,
+    "values (bit-identical)": 0
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0,
+    "bit-identical": 0,
+    "header bytes identical": "True"
+   },
+   "seconds": 0.803,
+   "status": "pass"
+  },
+  {
+   "case": "panel/fmriprep/ds004958-sub-fsm64ps/anat_fit/brain_extraction/atropos/get_brainmask",
+   "category": "panel-fmriprep",
+   "checks_passed": 9,
+   "checks_total": 9,
+   "failed_checks": [],
+   "measured": {
+    "affine": "0.0e+00",
+    "data type": "float32",
+    "header (every field)": 0,
+    "values (bit-identical)": 0
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0,
+    "bit-identical": 0,
+    "header bytes identical": "True"
+   },
+   "seconds": 0.973,
+   "status": "pass"
+  },
+  {
+   "case": "panel/fmriprep/ds004958-sub-fsm64ps/anat_fit/brain_extraction/lap_target",
+   "category": "panel-fmriprep",
+   "checks_passed": 9,
+   "checks_total": 9,
+   "failed_checks": [],
+   "measured": {
+    "affine": "0.0e+00",
+    "data type": "float32",
+    "header (every field)": 0,
+    "values (bit-identical)": 0
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0,
+    "bit-identical": 0,
+    "header bytes identical": "True"
+   },
+   "seconds": 3.079,
+   "status": "pass"
+  },
+  {
+   "case": "panel/fmriprep/ds004958-sub-fsm64ps/anat_fit/brain_extraction/truncate_images[0]",
+   "category": "panel-fmriprep",
+   "checks_passed": 9,
+   "checks_total": 9,
+   "failed_checks": [],
+   "measured": {
+    "affine": "0.0e+00",
+    "data type": "float32",
+    "header (every field)": 0,
+    "values (bit-identical)": 0
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0,
+    "bit-identical": 0,
+    "header bytes identical": "True"
+   },
+   "seconds": 2.953,
+   "status": "pass"
+  },
+  {
+   "case": "panel/fmriprep/ds004958-sub-fsm64ps/anat_fit/register_template[MNI152NLin2009cAsym]/trunc_mov",
+   "category": "panel-fmriprep",
+   "checks_passed": 9,
+   "checks_total": 9,
+   "failed_checks": [],
+   "measured": {
+    "affine": "0.0e+00",
+    "data type": "float32",
+    "header (every field)": 0,
+    "values (bit-identical)": 0
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0,
+    "bit-identical": 0,
+    "header bytes identical": "True"
+   },
+   "seconds": 2.766,
+   "status": "pass"
+  },
+  {
+   "case": "panel/fmriprep/ds005003-sub-RS001/anat_fit/brain_extraction/atropos/02_pad_segm",
+   "category": "panel-fmriprep",
+   "checks_passed": 9,
+   "checks_total": 9,
+   "failed_checks": [],
+   "measured": {
+    "affine": "0.0e+00",
+    "data type": "float32",
+    "header (every field)": 0,
+    "values (bit-identical)": 0
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0,
+    "bit-identical": 0,
+    "header bytes identical": "True"
+   },
+   "seconds": 1.279,
+   "status": "pass"
+  },
+  {
+   "case": "panel/fmriprep/ds005003-sub-RS001/anat_fit/brain_extraction/atropos/03_pad_mask",
+   "category": "panel-fmriprep",
+   "checks_passed": 9,
+   "checks_total": 9,
+   "failed_checks": [],
+   "measured": {
+    "affine": "0.0e+00",
+    "data type": "float32",
+    "header (every field)": 0,
+    "values (bit-identical)": 0
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0,
+    "bit-identical": 0,
+    "header bytes identical": "True"
+   },
+   "seconds": 1.209,
+   "status": "pass"
+  },
+  {
+   "case": "panel/fmriprep/ds005003-sub-RS001/anat_fit/brain_extraction/atropos/05_get_wm",
+   "category": "panel-fmriprep",
+   "checks_passed": 9,
+   "checks_total": 9,
+   "failed_checks": [],
+   "measured": {
+    "affine": "0.0e+00",
+    "data type": "float32",
+    "header (every field)": 0,
+    "values (bit-identical)": 0
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0,
+    "bit-identical": 0,
+    "header bytes identical": "True"
+   },
+   "seconds": 0.865,
+   "status": "pass"
+  },
+  {
+   "case": "panel/fmriprep/ds005003-sub-RS001/anat_fit/brain_extraction/atropos/06_get_gm",
+   "category": "panel-fmriprep",
+   "checks_passed": 9,
+   "checks_total": 9,
+   "failed_checks": [],
+   "measured": {
+    "affine": "0.0e+00",
+    "data type": "float32",
+    "header (every field)": 0,
+    "values (bit-identical)": 0
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0,
+    "bit-identical": 0,
+    "header bytes identical": "True"
+   },
+   "seconds": 0.85,
+   "status": "pass"
+  },
+  {
+   "case": "panel/fmriprep/ds005003-sub-RS001/anat_fit/brain_extraction/atropos/07_fill_gm",
+   "category": "panel-fmriprep",
+   "checks_passed": 9,
+   "checks_total": 9,
+   "failed_checks": [],
+   "measured": {
+    "affine": "0.0e+00",
+    "data type": "float32",
+    "header (every field)": 0,
+    "values (bit-identical)": 0
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0,
+    "bit-identical": 0,
+    "header bytes identical": "True"
+   },
+   "seconds": 1.19,
+   "status": "pass"
+  },
+  {
+   "case": "panel/fmriprep/ds005003-sub-RS001/anat_fit/brain_extraction/atropos/10_me_csf",
+   "category": "panel-fmriprep",
+   "checks_passed": 9,
+   "checks_total": 9,
+   "failed_checks": [],
+   "measured": {
+    "affine": "0.0e+00",
+    "data type": "float32",
+    "header (every field)": 0,
+    "values (bit-identical)": 0
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0,
+    "bit-identical": 0,
+    "header bytes identical": "True"
+   },
+   "seconds": 1.178,
+   "status": "pass"
+  },
+  {
+   "case": "panel/fmriprep/ds005003-sub-RS001/anat_fit/brain_extraction/atropos/11_add_gm",
+   "category": "panel-fmriprep",
+   "checks_passed": 9,
+   "checks_total": 9,
+   "failed_checks": [],
+   "measured": {
+    "affine": "0.0e+00",
+    "data type": "float32",
+    "header (every field)": 0,
+    "values (bit-identical)": 0
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0,
+    "bit-identical": 0,
+    "header bytes identical": "True"
+   },
+   "seconds": 1.354,
+   "status": "pass"
+  },
+  {
+   "case": "panel/fmriprep/ds005003-sub-RS001/anat_fit/brain_extraction/atropos/13_add_gm_wm",
+   "category": "panel-fmriprep",
+   "checks_passed": 9,
+   "checks_total": 9,
+   "failed_checks": [],
+   "measured": {
+    "affine": "0.0e+00",
+    "data type": "float32",
+    "header (every field)": 0,
+    "values (bit-identical)": 0
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0,
+    "bit-identical": 0,
+    "header bytes identical": "True"
+   },
+   "seconds": 1.298,
+   "status": "pass"
+  },
+  {
+   "case": "panel/fmriprep/ds005003-sub-RS001/anat_fit/brain_extraction/atropos/15_add_7",
+   "category": "panel-fmriprep",
+   "checks_passed": 9,
+   "checks_total": 9,
+   "failed_checks": [],
+   "measured": {
+    "affine": "0.0e+00",
+    "data type": "float32",
+    "header (every field)": 0,
+    "values (bit-identical)": 0
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0,
+    "bit-identical": 0,
+    "header bytes identical": "True"
+   },
+   "seconds": 0.927,
+   "status": "pass"
+  },
+  {
+   "case": "panel/fmriprep/ds005003-sub-RS001/anat_fit/brain_extraction/atropos/16_me_7",
+   "category": "panel-fmriprep",
+   "checks_passed": 9,
+   "checks_total": 9,
+   "failed_checks": [],
+   "measured": {
+    "affine": "0.0e+00",
+    "data type": "float32",
+    "header (every field)": 0,
+    "values (bit-identical)": 0
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0,
+    "bit-identical": 0,
+    "header bytes identical": "True"
+   },
+   "seconds": 1.411,
+   "status": "pass"
+  },
+  {
+   "case": "panel/fmriprep/ds005003-sub-RS001/anat_fit/brain_extraction/atropos/17_comp_7",
+   "category": "panel-fmriprep",
+   "checks_passed": 9,
+   "checks_total": 9,
+   "failed_checks": [],
+   "measured": {
+    "affine": "0.0e+00",
+    "data type": "float32",
+    "header (every field)": 0,
+    "values (bit-identical)": 0
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0,
+    "bit-identical": 0,
+    "header bytes identical": "True"
+   },
+   "seconds": 1.111,
+   "status": "pass"
+  },
+  {
+   "case": "panel/fmriprep/ds005003-sub-RS001/anat_fit/brain_extraction/atropos/18_md_7",
+   "category": "panel-fmriprep",
+   "checks_passed": 9,
+   "checks_total": 9,
+   "failed_checks": [],
+   "measured": {
+    "affine": "0.0e+00",
+    "data type": "float32",
+    "header (every field)": 0,
+    "values (bit-identical)": 0
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0,
+    "bit-identical": 0,
+    "header bytes identical": "True"
+   },
+   "seconds": 1.052,
+   "status": "pass"
+  },
+  {
+   "case": "panel/fmriprep/ds005003-sub-RS001/anat_fit/brain_extraction/atropos/19_fill_7",
+   "category": "panel-fmriprep",
+   "checks_passed": 9,
+   "checks_total": 9,
+   "failed_checks": [],
+   "measured": {
+    "affine": "0.0e+00",
+    "data type": "float32",
+    "header (every field)": 0,
+    "values (bit-identical)": 0
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0,
+    "bit-identical": 0,
+    "header bytes identical": "True"
+   },
+   "seconds": 1.085,
+   "status": "pass"
+  },
+  {
+   "case": "panel/fmriprep/ds005003-sub-RS001/anat_fit/brain_extraction/atropos/20_add_7_2",
+   "category": "panel-fmriprep",
+   "checks_passed": 9,
+   "checks_total": 9,
+   "failed_checks": [],
+   "measured": {
+    "affine": "0.0e+00",
+    "data type": "float32",
+    "header (every field)": 0,
+    "values (bit-identical)": 0
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0,
+    "bit-identical": 0,
+    "header bytes identical": "True"
+   },
+   "seconds": 1.258,
+   "status": "pass"
+  },
+  {
+   "case": "panel/fmriprep/ds005003-sub-RS001/anat_fit/brain_extraction/atropos/21_md_7_2",
+   "category": "panel-fmriprep",
+   "checks_passed": 9,
+   "checks_total": 9,
+   "failed_checks": [],
+   "measured": {
+    "affine": "0.0e+00",
+    "data type": "float32",
+    "header (every field)": 0,
+    "values (bit-identical)": 0
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0,
+    "bit-identical": 0,
+    "header bytes identical": "True"
+   },
+   "seconds": 1.132,
+   "status": "pass"
+  },
+  {
+   "case": "panel/fmriprep/ds005003-sub-RS001/anat_fit/brain_extraction/atropos/22_me_7_2",
+   "category": "panel-fmriprep",
+   "checks_passed": 9,
+   "checks_total": 9,
+   "failed_checks": [],
+   "measured": {
+    "affine": "0.0e+00",
+    "data type": "float32",
+    "header (every field)": 0,
+    "values (bit-identical)": 0
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0,
+    "bit-identical": 0,
+    "header bytes identical": "True"
+   },
+   "seconds": 1.238,
+   "status": "pass"
+  },
+  {
+   "case": "panel/fmriprep/ds005003-sub-RS001/anat_fit/brain_extraction/atropos/23_depad_mask",
+   "category": "panel-fmriprep",
+   "checks_passed": 9,
+   "checks_total": 9,
+   "failed_checks": [],
+   "measured": {
+    "affine": "0.0e+00",
+    "data type": "float32",
+    "header (every field)": 0,
+    "values (bit-identical)": 0
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0,
+    "bit-identical": 0,
+    "header bytes identical": "True"
+   },
+   "seconds": 1.121,
+   "status": "pass"
+  },
+  {
+   "case": "panel/fmriprep/ds005003-sub-RS001/anat_fit/brain_extraction/atropos/24_depad_segm",
+   "category": "panel-fmriprep",
+   "checks_passed": 9,
+   "checks_total": 9,
+   "failed_checks": [],
+   "measured": {
+    "affine": "0.0e+00",
+    "data type": "float32",
+    "header (every field)": 0,
+    "values (bit-identical)": 0
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0,
+    "bit-identical": 0,
+    "header bytes identical": "True"
+   },
+   "seconds": 1.134,
+   "status": "pass"
+  },
+  {
+   "case": "panel/fmriprep/ds005003-sub-RS001/anat_fit/brain_extraction/atropos/25_depad_gm",
+   "category": "panel-fmriprep",
+   "checks_passed": 9,
+   "checks_total": 9,
+   "failed_checks": [],
+   "measured": {
+    "affine": "0.0e+00",
+    "data type": "float32",
+    "header (every field)": 0,
+    "values (bit-identical)": 0
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0,
+    "bit-identical": 0,
+    "header bytes identical": "True"
+   },
+   "seconds": 1.216,
+   "status": "pass"
+  },
+  {
+   "case": "panel/fmriprep/ds005003-sub-RS001/anat_fit/brain_extraction/atropos/26_depad_wm",
+   "category": "panel-fmriprep",
+   "checks_passed": 9,
+   "checks_total": 9,
+   "failed_checks": [],
+   "measured": {
+    "affine": "0.0e+00",
+    "data type": "float32",
+    "header (every field)": 0,
+    "values (bit-identical)": 0
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0,
+    "bit-identical": 0,
+    "header bytes identical": "True"
+   },
+   "seconds": 0.87,
+   "status": "pass"
+  },
+  {
+   "case": "panel/fmriprep/ds005003-sub-RS001/anat_fit/brain_extraction/atropos/27_depad_csf",
+   "category": "panel-fmriprep",
+   "checks_passed": 9,
+   "checks_total": 9,
+   "failed_checks": [],
+   "measured": {
+    "affine": "0.0e+00",
+    "data type": "float32",
+    "header (every field)": 0,
+    "values (bit-identical)": 0
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0,
+    "bit-identical": 0,
+    "header bytes identical": "True"
+   },
+   "seconds": 0.924,
+   "status": "pass"
+  },
+  {
+   "case": "panel/fmriprep/ds005003-sub-RS001/anat_fit/brain_extraction/atropos/dil_brainmask",
+   "category": "panel-fmriprep",
+   "checks_passed": 9,
+   "checks_total": 9,
+   "failed_checks": [],
+   "measured": {
+    "affine": "0.0e+00",
+    "data type": "float32",
+    "header (every field)": 0,
+    "values (bit-identical)": 0
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0,
+    "bit-identical": 0,
+    "header bytes identical": "True"
+   },
+   "seconds": 0.857,
+   "status": "pass"
+  },
+  {
+   "case": "panel/fmriprep/ds005003-sub-RS001/anat_fit/brain_extraction/atropos/get_brainmask",
+   "category": "panel-fmriprep",
+   "checks_passed": 9,
+   "checks_total": 9,
+   "failed_checks": [],
+   "measured": {
+    "affine": "0.0e+00",
+    "data type": "float32",
+    "header (every field)": 0,
+    "values (bit-identical)": 0
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0,
+    "bit-identical": 0,
+    "header bytes identical": "True"
+   },
+   "seconds": 0.861,
+   "status": "pass"
+  },
+  {
+   "case": "panel/fmriprep/ds005003-sub-RS001/anat_fit/brain_extraction/lap_target",
+   "category": "panel-fmriprep",
+   "checks_passed": 9,
+   "checks_total": 9,
+   "failed_checks": [],
+   "measured": {
+    "affine": "0.0e+00",
+    "data type": "float32",
+    "header (every field)": 0,
+    "values (bit-identical)": 0
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0,
+    "bit-identical": 0,
+    "header bytes identical": "True"
+   },
+   "seconds": 2.301,
+   "status": "pass"
+  },
+  {
+   "case": "panel/fmriprep/ds005003-sub-RS001/anat_fit/brain_extraction/truncate_images[0]",
+   "category": "panel-fmriprep",
+   "checks_passed": 9,
+   "checks_total": 9,
+   "failed_checks": [],
+   "measured": {
+    "affine": "0.0e+00",
+    "data type": "float32",
+    "header (every field)": 0,
+    "values (bit-identical)": 0
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0,
+    "bit-identical": 0,
+    "header bytes identical": "True"
+   },
+   "seconds": 2.055,
+   "status": "pass"
+  },
+  {
+   "case": "panel/fmriprep/ds005003-sub-RS001/anat_fit/register_template[MNI152NLin2009cAsym]/trunc_mov",
+   "category": "panel-fmriprep",
+   "checks_passed": 9,
+   "checks_total": 9,
+   "failed_checks": [],
+   "measured": {
+    "affine": "0.0e+00",
+    "data type": "float32",
+    "header (every field)": 0,
+    "values (bit-identical)": 0
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0,
+    "bit-identical": 0,
+    "header bytes identical": "True"
+   },
+   "seconds": 2.042,
+   "status": "pass"
+  },
+  {
+   "case": "panel/fmriprep/ds005040-sub-002/anat_fit/brain_extraction/atropos/02_pad_segm",
+   "category": "panel-fmriprep",
+   "checks_passed": 9,
+   "checks_total": 9,
+   "failed_checks": [],
+   "measured": {
+    "affine": "0.0e+00",
+    "data type": "float32",
+    "header (every field)": 0,
+    "values (bit-identical)": 0
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0,
+    "bit-identical": 0,
+    "header bytes identical": "True"
+   },
+   "seconds": 2.06,
+   "status": "pass"
+  },
+  {
+   "case": "panel/fmriprep/ds005040-sub-002/anat_fit/brain_extraction/atropos/03_pad_mask",
+   "category": "panel-fmriprep",
+   "checks_passed": 9,
+   "checks_total": 9,
+   "failed_checks": [],
+   "measured": {
+    "affine": "0.0e+00",
+    "data type": "float32",
+    "header (every field)": 0,
+    "values (bit-identical)": 0
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0,
+    "bit-identical": 0,
+    "header bytes identical": "True"
+   },
+   "seconds": 1.937,
+   "status": "pass"
+  },
+  {
+   "case": "panel/fmriprep/ds005040-sub-002/anat_fit/brain_extraction/atropos/05_get_wm",
+   "category": "panel-fmriprep",
+   "checks_passed": 9,
+   "checks_total": 9,
+   "failed_checks": [],
+   "measured": {
+    "affine": "0.0e+00",
+    "data type": "float32",
+    "header (every field)": 0,
+    "values (bit-identical)": 0
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0,
+    "bit-identical": 0,
+    "header bytes identical": "True"
+   },
+   "seconds": 1.358,
+   "status": "pass"
+  },
+  {
+   "case": "panel/fmriprep/ds005040-sub-002/anat_fit/brain_extraction/atropos/06_get_gm",
+   "category": "panel-fmriprep",
+   "checks_passed": 9,
+   "checks_total": 9,
+   "failed_checks": [],
+   "measured": {
+    "affine": "0.0e+00",
+    "data type": "float32",
+    "header (every field)": 0,
+    "values (bit-identical)": 0
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0,
+    "bit-identical": 0,
+    "header bytes identical": "True"
+   },
+   "seconds": 1.388,
+   "status": "pass"
+  },
+  {
+   "case": "panel/fmriprep/ds005040-sub-002/anat_fit/brain_extraction/atropos/07_fill_gm",
+   "category": "panel-fmriprep",
+   "checks_passed": 9,
+   "checks_total": 9,
+   "failed_checks": [],
+   "measured": {
+    "affine": "0.0e+00",
+    "data type": "float32",
+    "header (every field)": 0,
+    "values (bit-identical)": 0
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0,
+    "bit-identical": 0,
+    "header bytes identical": "True"
+   },
+   "seconds": 1.978,
+   "status": "pass"
+  },
+  {
+   "case": "panel/fmriprep/ds005040-sub-002/anat_fit/brain_extraction/atropos/10_me_csf",
+   "category": "panel-fmriprep",
+   "checks_passed": 9,
+   "checks_total": 9,
+   "failed_checks": [],
+   "measured": {
+    "affine": "0.0e+00",
+    "data type": "float32",
+    "header (every field)": 0,
+    "values (bit-identical)": 0
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0,
+    "bit-identical": 0,
+    "header bytes identical": "True"
+   },
+   "seconds": 1.945,
+   "status": "pass"
+  },
+  {
+   "case": "panel/fmriprep/ds005040-sub-002/anat_fit/brain_extraction/atropos/11_add_gm",
+   "category": "panel-fmriprep",
+   "checks_passed": 9,
+   "checks_total": 9,
+   "failed_checks": [],
+   "measured": {
+    "affine": "0.0e+00",
+    "data type": "float32",
+    "header (every field)": 0,
+    "values (bit-identical)": 0
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0,
+    "bit-identical": 0,
+    "header bytes identical": "True"
+   },
+   "seconds": 2.106,
+   "status": "pass"
+  },
+  {
+   "case": "panel/fmriprep/ds005040-sub-002/anat_fit/brain_extraction/atropos/13_add_gm_wm",
+   "category": "panel-fmriprep",
+   "checks_passed": 9,
+   "checks_total": 9,
+   "failed_checks": [],
+   "measured": {
+    "affine": "0.0e+00",
+    "data type": "float32",
+    "header (every field)": 0,
+    "values (bit-identical)": 0
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0,
+    "bit-identical": 0,
+    "header bytes identical": "True"
+   },
+   "seconds": 2.254,
+   "status": "pass"
+  },
+  {
+   "case": "panel/fmriprep/ds005040-sub-002/anat_fit/brain_extraction/atropos/15_add_7",
+   "category": "panel-fmriprep",
+   "checks_passed": 9,
+   "checks_total": 9,
+   "failed_checks": [],
+   "measured": {
+    "affine": "0.0e+00",
+    "data type": "float32",
+    "header (every field)": 0,
+    "values (bit-identical)": 0
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0,
+    "bit-identical": 0,
+    "header bytes identical": "True"
+   },
+   "seconds": 1.406,
+   "status": "pass"
+  },
+  {
+   "case": "panel/fmriprep/ds005040-sub-002/anat_fit/brain_extraction/atropos/16_me_7",
+   "category": "panel-fmriprep",
+   "checks_passed": 9,
+   "checks_total": 9,
+   "failed_checks": [],
+   "measured": {
+    "affine": "0.0e+00",
+    "data type": "float32",
+    "header (every field)": 0,
+    "values (bit-identical)": 0
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0,
+    "bit-identical": 0,
+    "header bytes identical": "True"
+   },
+   "seconds": 2.245,
+   "status": "pass"
+  },
+  {
+   "case": "panel/fmriprep/ds005040-sub-002/anat_fit/brain_extraction/atropos/17_comp_7",
+   "category": "panel-fmriprep",
+   "checks_passed": 9,
+   "checks_total": 9,
+   "failed_checks": [],
+   "measured": {
+    "affine": "0.0e+00",
+    "data type": "float32",
+    "header (every field)": 0,
+    "values (bit-identical)": 0
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0,
+    "bit-identical": 0,
+    "header bytes identical": "True"
+   },
+   "seconds": 1.872,
+   "status": "pass"
+  },
+  {
+   "case": "panel/fmriprep/ds005040-sub-002/anat_fit/brain_extraction/atropos/18_md_7",
+   "category": "panel-fmriprep",
+   "checks_passed": 9,
+   "checks_total": 9,
+   "failed_checks": [],
+   "measured": {
+    "affine": "0.0e+00",
+    "data type": "float32",
+    "header (every field)": 0,
+    "values (bit-identical)": 0
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0,
+    "bit-identical": 0,
+    "header bytes identical": "True"
+   },
+   "seconds": 1.758,
+   "status": "pass"
+  },
+  {
+   "case": "panel/fmriprep/ds005040-sub-002/anat_fit/brain_extraction/atropos/19_fill_7",
+   "category": "panel-fmriprep",
+   "checks_passed": 9,
+   "checks_total": 9,
+   "failed_checks": [],
+   "measured": {
+    "affine": "0.0e+00",
+    "data type": "float32",
+    "header (every field)": 0,
+    "values (bit-identical)": 0
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0,
+    "bit-identical": 0,
+    "header bytes identical": "True"
+   },
+   "seconds": 1.819,
+   "status": "pass"
+  },
+  {
+   "case": "panel/fmriprep/ds005040-sub-002/anat_fit/brain_extraction/atropos/20_add_7_2",
+   "category": "panel-fmriprep",
+   "checks_passed": 9,
+   "checks_total": 9,
+   "failed_checks": [],
+   "measured": {
+    "affine": "0.0e+00",
+    "data type": "float32",
+    "header (every field)": 0,
+    "values (bit-identical)": 0
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0,
+    "bit-identical": 0,
+    "header bytes identical": "True"
+   },
+   "seconds": 2.17,
+   "status": "pass"
+  },
+  {
+   "case": "panel/fmriprep/ds005040-sub-002/anat_fit/brain_extraction/atropos/21_md_7_2",
+   "category": "panel-fmriprep",
+   "checks_passed": 9,
+   "checks_total": 9,
+   "failed_checks": [],
+   "measured": {
+    "affine": "0.0e+00",
+    "data type": "float32",
+    "header (every field)": 0,
+    "values (bit-identical)": 0
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0,
+    "bit-identical": 0,
+    "header bytes identical": "True"
+   },
+   "seconds": 1.732,
+   "status": "pass"
+  },
+  {
+   "case": "panel/fmriprep/ds005040-sub-002/anat_fit/brain_extraction/atropos/22_me_7_2",
+   "category": "panel-fmriprep",
+   "checks_passed": 9,
+   "checks_total": 9,
+   "failed_checks": [],
+   "measured": {
+    "affine": "0.0e+00",
+    "data type": "float32",
+    "header (every field)": 0,
+    "values (bit-identical)": 0
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0,
+    "bit-identical": 0,
+    "header bytes identical": "True"
+   },
+   "seconds": 2.144,
+   "status": "pass"
+  },
+  {
+   "case": "panel/fmriprep/ds005040-sub-002/anat_fit/brain_extraction/atropos/23_depad_mask",
+   "category": "panel-fmriprep",
+   "checks_passed": 9,
+   "checks_total": 9,
+   "failed_checks": [],
+   "measured": {
+    "affine": "0.0e+00",
+    "data type": "float32",
+    "header (every field)": 0,
+    "values (bit-identical)": 0
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0,
+    "bit-identical": 0,
+    "header bytes identical": "True"
+   },
+   "seconds": 1.891,
+   "status": "pass"
+  },
+  {
+   "case": "panel/fmriprep/ds005040-sub-002/anat_fit/brain_extraction/atropos/24_depad_segm",
+   "category": "panel-fmriprep",
+   "checks_passed": 9,
+   "checks_total": 9,
+   "failed_checks": [],
+   "measured": {
+    "affine": "0.0e+00",
+    "data type": "float32",
+    "header (every field)": 0,
+    "values (bit-identical)": 0
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0,
+    "bit-identical": 0,
+    "header bytes identical": "True"
+   },
+   "seconds": 1.9,
+   "status": "pass"
+  },
+  {
+   "case": "panel/fmriprep/ds005040-sub-002/anat_fit/brain_extraction/atropos/25_depad_gm",
+   "category": "panel-fmriprep",
+   "checks_passed": 9,
+   "checks_total": 9,
+   "failed_checks": [],
+   "measured": {
+    "affine": "0.0e+00",
+    "data type": "float32",
+    "header (every field)": 0,
+    "values (bit-identical)": 0
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0,
+    "bit-identical": 0,
+    "header bytes identical": "True"
+   },
+   "seconds": 1.909,
+   "status": "pass"
+  },
+  {
+   "case": "panel/fmriprep/ds005040-sub-002/anat_fit/brain_extraction/atropos/26_depad_wm",
+   "category": "panel-fmriprep",
+   "checks_passed": 9,
+   "checks_total": 9,
+   "failed_checks": [],
+   "measured": {
+    "affine": "0.0e+00",
+    "data type": "float32",
+    "header (every field)": 0,
+    "values (bit-identical)": 0
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0,
+    "bit-identical": 0,
+    "header bytes identical": "True"
+   },
+   "seconds": 1.513,
+   "status": "pass"
+  },
+  {
+   "case": "panel/fmriprep/ds005040-sub-002/anat_fit/brain_extraction/atropos/27_depad_csf",
+   "category": "panel-fmriprep",
+   "checks_passed": 9,
+   "checks_total": 9,
+   "failed_checks": [],
+   "measured": {
+    "affine": "0.0e+00",
+    "data type": "float32",
+    "header (every field)": 0,
+    "values (bit-identical)": 0
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0,
+    "bit-identical": 0,
+    "header bytes identical": "True"
+   },
+   "seconds": 1.53,
+   "status": "pass"
+  },
+  {
+   "case": "panel/fmriprep/ds005040-sub-002/anat_fit/brain_extraction/atropos/dil_brainmask",
+   "category": "panel-fmriprep",
+   "checks_passed": 9,
+   "checks_total": 9,
+   "failed_checks": [],
+   "measured": {
+    "affine": "0.0e+00",
+    "data type": "float32",
+    "header (every field)": 0,
+    "values (bit-identical)": 0
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0,
+    "bit-identical": 0,
+    "header bytes identical": "True"
+   },
+   "seconds": 1.529,
+   "status": "pass"
+  },
+  {
+   "case": "panel/fmriprep/ds005040-sub-002/anat_fit/brain_extraction/atropos/get_brainmask",
+   "category": "panel-fmriprep",
+   "checks_passed": 9,
+   "checks_total": 9,
+   "failed_checks": [],
+   "measured": {
+    "affine": "0.0e+00",
+    "data type": "float32",
+    "header (every field)": 0,
+    "values (bit-identical)": 0
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0,
+    "bit-identical": 0,
+    "header bytes identical": "True"
+   },
+   "seconds": 1.406,
+   "status": "pass"
+  },
+  {
+   "case": "panel/fmriprep/ds005040-sub-002/anat_fit/brain_extraction/lap_target",
+   "category": "panel-fmriprep",
+   "checks_passed": 9,
+   "checks_total": 9,
+   "failed_checks": [],
+   "measured": {
+    "affine": "0.0e+00",
+    "data type": "float32",
+    "header (every field)": 0,
+    "values (bit-identical)": 0
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0,
+    "bit-identical": 0,
+    "header bytes identical": "True"
+   },
+   "seconds": 3.531,
+   "status": "pass"
+  },
+  {
+   "case": "panel/fmriprep/ds005040-sub-002/anat_fit/brain_extraction/truncate_images[0]",
+   "category": "panel-fmriprep",
+   "checks_passed": 9,
+   "checks_total": 9,
+   "failed_checks": [],
+   "measured": {
+    "affine": "0.0e+00",
+    "data type": "float32",
+    "header (every field)": 0,
+    "values (bit-identical)": 0
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0,
+    "bit-identical": 0,
+    "header bytes identical": "True"
+   },
+   "seconds": 2.753,
+   "status": "pass"
+  },
+  {
+   "case": "panel/fmriprep/ds005040-sub-002/anat_fit/register_template[MNI152NLin2009cAsym]/trunc_mov",
+   "category": "panel-fmriprep",
+   "checks_passed": 9,
+   "checks_total": 9,
+   "failed_checks": [],
+   "measured": {
+    "affine": "0.0e+00",
+    "data type": "float32",
+    "header (every field)": 0,
+    "values (bit-identical)": 0
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0,
+    "bit-identical": 0,
+    "header bytes identical": "True"
+   },
+   "seconds": 2.758,
+   "status": "pass"
+  },
+  {
+   "case": "panel/fmriprep/ds005454-sub-16/anat_fit/brain_extraction/atropos/02_pad_segm",
+   "category": "panel-fmriprep",
+   "checks_passed": 9,
+   "checks_total": 9,
+   "failed_checks": [],
+   "measured": {
+    "affine": "0.0e+00",
+    "data type": "float32",
+    "header (every field)": 0,
+    "values (bit-identical)": 0
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0,
+    "bit-identical": 0,
+    "header bytes identical": "True"
+   },
+   "seconds": 2.283,
+   "status": "pass"
+  },
+  {
+   "case": "panel/fmriprep/ds005454-sub-16/anat_fit/brain_extraction/atropos/03_pad_mask",
+   "category": "panel-fmriprep",
+   "checks_passed": 9,
+   "checks_total": 9,
+   "failed_checks": [],
+   "measured": {
+    "affine": "0.0e+00",
+    "data type": "float32",
+    "header (every field)": 0,
+    "values (bit-identical)": 0
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0,
+    "bit-identical": 0,
+    "header bytes identical": "True"
+   },
+   "seconds": 2.108,
+   "status": "pass"
+  },
+  {
+   "case": "panel/fmriprep/ds005454-sub-16/anat_fit/brain_extraction/atropos/05_get_wm",
+   "category": "panel-fmriprep",
+   "checks_passed": 9,
+   "checks_total": 9,
+   "failed_checks": [],
+   "measured": {
+    "affine": "0.0e+00",
+    "data type": "float32",
+    "header (every field)": 0,
+    "values (bit-identical)": 0
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0,
+    "bit-identical": 0,
+    "header bytes identical": "True"
+   },
+   "seconds": 1.508,
+   "status": "pass"
+  },
+  {
+   "case": "panel/fmriprep/ds005454-sub-16/anat_fit/brain_extraction/atropos/06_get_gm",
+   "category": "panel-fmriprep",
+   "checks_passed": 9,
+   "checks_total": 9,
+   "failed_checks": [],
+   "measured": {
+    "affine": "0.0e+00",
+    "data type": "float32",
+    "header (every field)": 0,
+    "values (bit-identical)": 0
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0,
+    "bit-identical": 0,
+    "header bytes identical": "True"
+   },
+   "seconds": 1.609,
+   "status": "pass"
+  },
+  {
+   "case": "panel/fmriprep/ds005454-sub-16/anat_fit/brain_extraction/atropos/07_fill_gm",
+   "category": "panel-fmriprep",
+   "checks_passed": 9,
+   "checks_total": 9,
+   "failed_checks": [],
+   "measured": {
+    "affine": "0.0e+00",
+    "data type": "float32",
+    "header (every field)": 0,
+    "values (bit-identical)": 0
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0,
+    "bit-identical": 0,
+    "header bytes identical": "True"
+   },
+   "seconds": 2.208,
+   "status": "pass"
+  },
+  {
+   "case": "panel/fmriprep/ds005454-sub-16/anat_fit/brain_extraction/atropos/10_me_csf",
+   "category": "panel-fmriprep",
+   "checks_passed": 9,
+   "checks_total": 9,
+   "failed_checks": [],
+   "measured": {
+    "affine": "0.0e+00",
+    "data type": "float32",
+    "header (every field)": 0,
+    "values (bit-identical)": 0
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0,
+    "bit-identical": 0,
+    "header bytes identical": "True"
+   },
+   "seconds": 2.09,
+   "status": "pass"
+  },
+  {
+   "case": "panel/fmriprep/ds005454-sub-16/anat_fit/brain_extraction/atropos/11_add_gm",
+   "category": "panel-fmriprep",
+   "checks_passed": 9,
+   "checks_total": 9,
+   "failed_checks": [],
+   "measured": {
+    "affine": "0.0e+00",
+    "data type": "float32",
+    "header (every field)": 0,
+    "values (bit-identical)": 0
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0,
+    "bit-identical": 0,
+    "header bytes identical": "True"
+   },
+   "seconds": 2.395,
+   "status": "pass"
+  },
+  {
+   "case": "panel/fmriprep/ds005454-sub-16/anat_fit/brain_extraction/atropos/13_add_gm_wm",
+   "category": "panel-fmriprep",
+   "checks_passed": 9,
+   "checks_total": 9,
+   "failed_checks": [],
+   "measured": {
+    "affine": "0.0e+00",
+    "data type": "float32",
+    "header (every field)": 0,
+    "values (bit-identical)": 0
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0,
+    "bit-identical": 0,
+    "header bytes identical": "True"
+   },
+   "seconds": 2.462,
+   "status": "pass"
+  },
+  {
+   "case": "panel/fmriprep/ds005454-sub-16/anat_fit/brain_extraction/atropos/15_add_7",
+   "category": "panel-fmriprep",
+   "checks_passed": 9,
+   "checks_total": 9,
+   "failed_checks": [],
+   "measured": {
+    "affine": "0.0e+00",
+    "data type": "float32",
+    "header (every field)": 0,
+    "values (bit-identical)": 0
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0,
+    "bit-identical": 0,
+    "header bytes identical": "True"
+   },
+   "seconds": 1.586,
+   "status": "pass"
+  },
+  {
+   "case": "panel/fmriprep/ds005454-sub-16/anat_fit/brain_extraction/atropos/16_me_7",
+   "category": "panel-fmriprep",
+   "checks_passed": 9,
+   "checks_total": 9,
+   "failed_checks": [],
+   "measured": {
+    "affine": "0.0e+00",
+    "data type": "float32",
+    "header (every field)": 0,
+    "values (bit-identical)": 0
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0,
+    "bit-identical": 0,
+    "header bytes identical": "True"
+   },
+   "seconds": 2.568,
+   "status": "pass"
+  },
+  {
+   "case": "panel/fmriprep/ds005454-sub-16/anat_fit/brain_extraction/atropos/17_comp_7",
+   "category": "panel-fmriprep",
+   "checks_passed": 9,
+   "checks_total": 9,
+   "failed_checks": [],
+   "measured": {
+    "affine": "0.0e+00",
+    "data type": "float32",
+    "header (every field)": 0,
+    "values (bit-identical)": 0
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0,
+    "bit-identical": 0,
+    "header bytes identical": "True"
+   },
+   "seconds": 2.144,
+   "status": "pass"
+  },
+  {
+   "case": "panel/fmriprep/ds005454-sub-16/anat_fit/brain_extraction/atropos/18_md_7",
+   "category": "panel-fmriprep",
+   "checks_passed": 9,
+   "checks_total": 9,
+   "failed_checks": [],
+   "measured": {
+    "affine": "0.0e+00",
+    "data type": "float32",
+    "header (every field)": 0,
+    "values (bit-identical)": 0
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0,
+    "bit-identical": 0,
+    "header bytes identical": "True"
+   },
+   "seconds": 2.14,
+   "status": "pass"
+  },
+  {
+   "case": "panel/fmriprep/ds005454-sub-16/anat_fit/brain_extraction/atropos/19_fill_7",
+   "category": "panel-fmriprep",
+   "checks_passed": 9,
+   "checks_total": 9,
+   "failed_checks": [],
+   "measured": {
+    "affine": "0.0e+00",
+    "data type": "float32",
+    "header (every field)": 0,
+    "values (bit-identical)": 0
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0,
+    "bit-identical": 0,
+    "header bytes identical": "True"
+   },
+   "seconds": 2.118,
+   "status": "pass"
+  },
+  {
+   "case": "panel/fmriprep/ds005454-sub-16/anat_fit/brain_extraction/atropos/20_add_7_2",
+   "category": "panel-fmriprep",
+   "checks_passed": 9,
+   "checks_total": 9,
+   "failed_checks": [],
+   "measured": {
+    "affine": "0.0e+00",
+    "data type": "float32",
+    "header (every field)": 0,
+    "values (bit-identical)": 0
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0,
+    "bit-identical": 0,
+    "header bytes identical": "True"
+   },
+   "seconds": 2.385,
+   "status": "pass"
+  },
+  {
+   "case": "panel/fmriprep/ds005454-sub-16/anat_fit/brain_extraction/atropos/21_md_7_2",
+   "category": "panel-fmriprep",
+   "checks_passed": 9,
+   "checks_total": 9,
+   "failed_checks": [],
+   "measured": {
+    "affine": "0.0e+00",
+    "data type": "float32",
+    "header (every field)": 0,
+    "values (bit-identical)": 0
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0,
+    "bit-identical": 0,
+    "header bytes identical": "True"
+   },
+   "seconds": 2.022,
+   "status": "pass"
+  },
+  {
+   "case": "panel/fmriprep/ds005454-sub-16/anat_fit/brain_extraction/atropos/22_me_7_2",
+   "category": "panel-fmriprep",
+   "checks_passed": 9,
+   "checks_total": 9,
+   "failed_checks": [],
+   "measured": {
+    "affine": "0.0e+00",
+    "data type": "float32",
+    "header (every field)": 0,
+    "values (bit-identical)": 0
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0,
+    "bit-identical": 0,
+    "header bytes identical": "True"
+   },
+   "seconds": 2.251,
+   "status": "pass"
+  },
+  {
+   "case": "panel/fmriprep/ds005454-sub-16/anat_fit/brain_extraction/atropos/23_depad_mask",
+   "category": "panel-fmriprep",
+   "checks_passed": 9,
+   "checks_total": 9,
+   "failed_checks": [],
+   "measured": {
+    "affine": "0.0e+00",
+    "data type": "float32",
+    "header (every field)": 0,
+    "values (bit-identical)": 0
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0,
+    "bit-identical": 0,
+    "header bytes identical": "True"
+   },
+   "seconds": 2.114,
+   "status": "pass"
+  },
+  {
+   "case": "panel/fmriprep/ds005454-sub-16/anat_fit/brain_extraction/atropos/24_depad_segm",
+   "category": "panel-fmriprep",
+   "checks_passed": 9,
+   "checks_total": 9,
+   "failed_checks": [],
+   "measured": {
+    "affine": "0.0e+00",
+    "data type": "float32",
+    "header (every field)": 0,
+    "values (bit-identical)": 0
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0,
+    "bit-identical": 0,
+    "header bytes identical": "True"
+   },
+   "seconds": 2.192,
+   "status": "pass"
+  },
+  {
+   "case": "panel/fmriprep/ds005454-sub-16/anat_fit/brain_extraction/atropos/25_depad_gm",
+   "category": "panel-fmriprep",
+   "checks_passed": 9,
+   "checks_total": 9,
+   "failed_checks": [],
+   "measured": {
+    "affine": "0.0e+00",
+    "data type": "float32",
+    "header (every field)": 0,
+    "values (bit-identical)": 0
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0,
+    "bit-identical": 0,
+    "header bytes identical": "True"
+   },
+   "seconds": 1.728,
+   "status": "pass"
+  },
+  {
+   "case": "panel/fmriprep/ds005454-sub-16/anat_fit/brain_extraction/atropos/26_depad_wm",
+   "category": "panel-fmriprep",
+   "checks_passed": 9,
+   "checks_total": 9,
+   "failed_checks": [],
+   "measured": {
+    "affine": "0.0e+00",
+    "data type": "float32",
+    "header (every field)": 0,
+    "values (bit-identical)": 0
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0,
+    "bit-identical": 0,
+    "header bytes identical": "True"
+   },
+   "seconds": 1.707,
+   "status": "pass"
+  },
+  {
+   "case": "panel/fmriprep/ds005454-sub-16/anat_fit/brain_extraction/atropos/27_depad_csf",
+   "category": "panel-fmriprep",
+   "checks_passed": 9,
+   "checks_total": 9,
+   "failed_checks": [],
+   "measured": {
+    "affine": "0.0e+00",
+    "data type": "float32",
+    "header (every field)": 0,
+    "values (bit-identical)": 0
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0,
+    "bit-identical": 0,
+    "header bytes identical": "True"
+   },
+   "seconds": 1.719,
+   "status": "pass"
+  },
+  {
+   "case": "panel/fmriprep/ds005454-sub-16/anat_fit/brain_extraction/atropos/dil_brainmask",
+   "category": "panel-fmriprep",
+   "checks_passed": 9,
+   "checks_total": 9,
+   "failed_checks": [],
+   "measured": {
+    "affine": "0.0e+00",
+    "data type": "float32",
+    "header (every field)": 0,
+    "values (bit-identical)": 0
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0,
+    "bit-identical": 0,
+    "header bytes identical": "True"
+   },
+   "seconds": 1.615,
+   "status": "pass"
+  },
+  {
+   "case": "panel/fmriprep/ds005454-sub-16/anat_fit/brain_extraction/atropos/get_brainmask",
+   "category": "panel-fmriprep",
+   "checks_passed": 9,
+   "checks_total": 9,
+   "failed_checks": [],
+   "measured": {
+    "affine": "0.0e+00",
+    "data type": "float32",
+    "header (every field)": 0,
+    "values (bit-identical)": 0
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0,
+    "bit-identical": 0,
+    "header bytes identical": "True"
+   },
+   "seconds": 1.588,
+   "status": "pass"
+  },
+  {
+   "case": "panel/fmriprep/ds005454-sub-16/anat_fit/brain_extraction/lap_target",
+   "category": "panel-fmriprep",
+   "checks_passed": 9,
+   "checks_total": 9,
+   "failed_checks": [],
+   "measured": {
+    "affine": "0.0e+00",
+    "data type": "float32",
+    "header (every field)": 0,
+    "values (bit-identical)": 0
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0,
+    "bit-identical": 0,
+    "header bytes identical": "True"
+   },
+   "seconds": 4.954,
+   "status": "pass"
+  },
+  {
+   "case": "panel/fmriprep/ds005454-sub-16/anat_fit/brain_extraction/truncate_images[0]",
+   "category": "panel-fmriprep",
+   "checks_passed": 9,
+   "checks_total": 9,
+   "failed_checks": [],
+   "measured": {
+    "affine": "0.0e+00",
+    "data type": "float32",
+    "header (every field)": 0,
+    "values (bit-identical)": 0
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0,
+    "bit-identical": 0,
+    "header bytes identical": "True"
+   },
+   "seconds": 5.31,
+   "status": "pass"
+  },
+  {
+   "case": "panel/fmriprep/ds005454-sub-16/anat_fit/register_template[MNI152NLin2009cAsym]/trunc_mov",
+   "category": "panel-fmriprep",
+   "checks_passed": 9,
+   "checks_total": 9,
+   "failed_checks": [],
+   "measured": {
+    "affine": "0.0e+00",
+    "data type": "float32",
+    "header (every field)": 0,
+    "values (bit-identical)": 0
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0,
+    "bit-identical": 0,
+    "header bytes identical": "True"
+   },
+   "seconds": 5.117,
+   "status": "pass"
+  },
+  {
+   "case": "panel/fmriprep/ds005752-sub-ON01016/anat_fit/brain_extraction/atropos/02_pad_segm",
+   "category": "panel-fmriprep",
+   "checks_passed": 9,
+   "checks_total": 9,
+   "failed_checks": [],
+   "measured": {
+    "affine": "0.0e+00",
+    "data type": "float32",
+    "header (every field)": 0,
+    "values (bit-identical)": 0
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0,
+    "bit-identical": 0,
+    "header bytes identical": "True"
+   },
+   "seconds": 1.613,
+   "status": "pass"
+  },
+  {
+   "case": "panel/fmriprep/ds005752-sub-ON01016/anat_fit/brain_extraction/atropos/03_pad_mask",
+   "category": "panel-fmriprep",
+   "checks_passed": 9,
+   "checks_total": 9,
+   "failed_checks": [],
+   "measured": {
+    "affine": "0.0e+00",
+    "data type": "float32",
+    "header (every field)": 0,
+    "values (bit-identical)": 0
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0,
+    "bit-identical": 0,
+    "header bytes identical": "True"
+   },
+   "seconds": 1.596,
+   "status": "pass"
+  },
+  {
+   "case": "panel/fmriprep/ds005752-sub-ON01016/anat_fit/brain_extraction/atropos/05_get_wm",
+   "category": "panel-fmriprep",
+   "checks_passed": 9,
+   "checks_total": 9,
+   "failed_checks": [],
+   "measured": {
+    "affine": "0.0e+00",
+    "data type": "float32",
+    "header (every field)": 0,
+    "values (bit-identical)": 0
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0,
+    "bit-identical": 0,
+    "header bytes identical": "True"
+   },
+   "seconds": 1.142,
+   "status": "pass"
+  },
+  {
+   "case": "panel/fmriprep/ds005752-sub-ON01016/anat_fit/brain_extraction/atropos/06_get_gm",
+   "category": "panel-fmriprep",
+   "checks_passed": 9,
+   "checks_total": 9,
+   "failed_checks": [],
+   "measured": {
+    "affine": "0.0e+00",
+    "data type": "float32",
+    "header (every field)": 0,
+    "values (bit-identical)": 0
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0,
+    "bit-identical": 0,
+    "header bytes identical": "True"
+   },
+   "seconds": 1.168,
+   "status": "pass"
+  },
+  {
+   "case": "panel/fmriprep/ds005752-sub-ON01016/anat_fit/brain_extraction/atropos/07_fill_gm",
+   "category": "panel-fmriprep",
+   "checks_passed": 9,
+   "checks_total": 9,
+   "failed_checks": [],
+   "measured": {
+    "affine": "0.0e+00",
+    "data type": "float32",
+    "header (every field)": 0,
+    "values (bit-identical)": 0
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0,
+    "bit-identical": 0,
+    "header bytes identical": "True"
+   },
+   "seconds": 1.493,
+   "status": "pass"
+  },
+  {
+   "case": "panel/fmriprep/ds005752-sub-ON01016/anat_fit/brain_extraction/atropos/10_me_csf",
+   "category": "panel-fmriprep",
+   "checks_passed": 9,
+   "checks_total": 9,
+   "failed_checks": [],
+   "measured": {
+    "affine": "0.0e+00",
+    "data type": "float32",
+    "header (every field)": 0,
+    "values (bit-identical)": 0
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0,
+    "bit-identical": 0,
+    "header bytes identical": "True"
+   },
+   "seconds": 1.493,
+   "status": "pass"
+  },
+  {
+   "case": "panel/fmriprep/ds005752-sub-ON01016/anat_fit/brain_extraction/atropos/11_add_gm",
+   "category": "panel-fmriprep",
+   "checks_passed": 9,
+   "checks_total": 9,
+   "failed_checks": [],
+   "measured": {
+    "affine": "0.0e+00",
+    "data type": "float32",
+    "header (every field)": 0,
+    "values (bit-identical)": 0
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0,
+    "bit-identical": 0,
+    "header bytes identical": "True"
+   },
+   "seconds": 1.745,
+   "status": "pass"
+  },
+  {
+   "case": "panel/fmriprep/ds005752-sub-ON01016/anat_fit/brain_extraction/atropos/13_add_gm_wm",
+   "category": "panel-fmriprep",
+   "checks_passed": 9,
+   "checks_total": 9,
+   "failed_checks": [],
+   "measured": {
+    "affine": "0.0e+00",
+    "data type": "float32",
+    "header (every field)": 0,
+    "values (bit-identical)": 0
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0,
+    "bit-identical": 0,
+    "header bytes identical": "True"
+   },
+   "seconds": 1.793,
+   "status": "pass"
+  },
+  {
+   "case": "panel/fmriprep/ds005752-sub-ON01016/anat_fit/brain_extraction/atropos/15_add_7",
+   "category": "panel-fmriprep",
+   "checks_passed": 9,
+   "checks_total": 9,
+   "failed_checks": [],
+   "measured": {
+    "affine": "0.0e+00",
+    "data type": "float32",
+    "header (every field)": 0,
+    "values (bit-identical)": 0
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0,
+    "bit-identical": 0,
+    "header bytes identical": "True"
+   },
+   "seconds": 1.195,
+   "status": "pass"
+  },
+  {
+   "case": "panel/fmriprep/ds005752-sub-ON01016/anat_fit/brain_extraction/atropos/16_me_7",
+   "category": "panel-fmriprep",
+   "checks_passed": 9,
+   "checks_total": 9,
+   "failed_checks": [],
+   "measured": {
+    "affine": "0.0e+00",
+    "data type": "float32",
+    "header (every field)": 0,
+    "values (bit-identical)": 0
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0,
+    "bit-identical": 0,
+    "header bytes identical": "True"
+   },
+   "seconds": 1.878,
+   "status": "pass"
+  },
+  {
+   "case": "panel/fmriprep/ds005752-sub-ON01016/anat_fit/brain_extraction/atropos/17_comp_7",
+   "category": "panel-fmriprep",
+   "checks_passed": 9,
+   "checks_total": 9,
+   "failed_checks": [],
+   "measured": {
+    "affine": "0.0e+00",
+    "data type": "float32",
+    "header (every field)": 0,
+    "values (bit-identical)": 0
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0,
+    "bit-identical": 0,
+    "header bytes identical": "True"
+   },
+   "seconds": 1.563,
+   "status": "pass"
+  },
+  {
+   "case": "panel/fmriprep/ds005752-sub-ON01016/anat_fit/brain_extraction/atropos/18_md_7",
+   "category": "panel-fmriprep",
+   "checks_passed": 9,
+   "checks_total": 9,
+   "failed_checks": [],
+   "measured": {
+    "affine": "0.0e+00",
+    "data type": "float32",
+    "header (every field)": 0,
+    "values (bit-identical)": 0
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0,
+    "bit-identical": 0,
+    "header bytes identical": "True"
+   },
+   "seconds": 1.427,
+   "status": "pass"
+  },
+  {
+   "case": "panel/fmriprep/ds005752-sub-ON01016/anat_fit/brain_extraction/atropos/19_fill_7",
+   "category": "panel-fmriprep",
+   "checks_passed": 9,
+   "checks_total": 9,
+   "failed_checks": [],
+   "measured": {
+    "affine": "0.0e+00",
+    "data type": "float32",
+    "header (every field)": 0,
+    "values (bit-identical)": 0
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0,
+    "bit-identical": 0,
+    "header bytes identical": "True"
+   },
+   "seconds": 1.501,
+   "status": "pass"
+  },
+  {
+   "case": "panel/fmriprep/ds005752-sub-ON01016/anat_fit/brain_extraction/atropos/20_add_7_2",
+   "category": "panel-fmriprep",
+   "checks_passed": 9,
+   "checks_total": 9,
+   "failed_checks": [],
+   "measured": {
+    "affine": "0.0e+00",
+    "data type": "float32",
+    "header (every field)": 0,
+    "values (bit-identical)": 0
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0,
+    "bit-identical": 0,
+    "header bytes identical": "True"
+   },
+   "seconds": 1.793,
+   "status": "pass"
+  },
+  {
+   "case": "panel/fmriprep/ds005752-sub-ON01016/anat_fit/brain_extraction/atropos/21_md_7_2",
+   "category": "panel-fmriprep",
+   "checks_passed": 9,
+   "checks_total": 9,
+   "failed_checks": [],
+   "measured": {
+    "affine": "0.0e+00",
+    "data type": "float32",
+    "header (every field)": 0,
+    "values (bit-identical)": 0
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0,
+    "bit-identical": 0,
+    "header bytes identical": "True"
+   },
+   "seconds": 1.463,
+   "status": "pass"
+  },
+  {
+   "case": "panel/fmriprep/ds005752-sub-ON01016/anat_fit/brain_extraction/atropos/22_me_7_2",
+   "category": "panel-fmriprep",
+   "checks_passed": 9,
+   "checks_total": 9,
+   "failed_checks": [],
+   "measured": {
+    "affine": "0.0e+00",
+    "data type": "float32",
+    "header (every field)": 0,
+    "values (bit-identical)": 0
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0,
+    "bit-identical": 0,
+    "header bytes identical": "True"
+   },
+   "seconds": 1.751,
+   "status": "pass"
+  },
+  {
+   "case": "panel/fmriprep/ds005752-sub-ON01016/anat_fit/brain_extraction/atropos/23_depad_mask",
+   "category": "panel-fmriprep",
+   "checks_passed": 9,
+   "checks_total": 9,
+   "failed_checks": [],
+   "measured": {
+    "affine": "0.0e+00",
+    "data type": "float32",
+    "header (every field)": 0,
+    "values (bit-identical)": 0
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0,
+    "bit-identical": 0,
+    "header bytes identical": "True"
+   },
+   "seconds": 1.477,
+   "status": "pass"
+  },
+  {
+   "case": "panel/fmriprep/ds005752-sub-ON01016/anat_fit/brain_extraction/atropos/24_depad_segm",
+   "category": "panel-fmriprep",
+   "checks_passed": 9,
+   "checks_total": 9,
+   "failed_checks": [],
+   "measured": {
+    "affine": "0.0e+00",
+    "data type": "float32",
+    "header (every field)": 0,
+    "values (bit-identical)": 0
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0,
+    "bit-identical": 0,
+    "header bytes identical": "True"
+   },
+   "seconds": 1.505,
+   "status": "pass"
+  },
+  {
+   "case": "panel/fmriprep/ds005752-sub-ON01016/anat_fit/brain_extraction/atropos/25_depad_gm",
+   "category": "panel-fmriprep",
+   "checks_passed": 9,
+   "checks_total": 9,
+   "failed_checks": [],
+   "measured": {
+    "affine": "0.0e+00",
+    "data type": "float32",
+    "header (every field)": 0,
+    "values (bit-identical)": 0
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0,
+    "bit-identical": 0,
+    "header bytes identical": "True"
+   },
+   "seconds": 1.246,
+   "status": "pass"
+  },
+  {
+   "case": "panel/fmriprep/ds005752-sub-ON01016/anat_fit/brain_extraction/atropos/26_depad_wm",
+   "category": "panel-fmriprep",
+   "checks_passed": 9,
+   "checks_total": 9,
+   "failed_checks": [],
+   "measured": {
+    "affine": "0.0e+00",
+    "data type": "float32",
+    "header (every field)": 0,
+    "values (bit-identical)": 0
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0,
+    "bit-identical": 0,
+    "header bytes identical": "True"
+   },
+   "seconds": 1.171,
+   "status": "pass"
+  },
+  {
+   "case": "panel/fmriprep/ds005752-sub-ON01016/anat_fit/brain_extraction/atropos/27_depad_csf",
+   "category": "panel-fmriprep",
+   "checks_passed": 9,
+   "checks_total": 9,
+   "failed_checks": [],
+   "measured": {
+    "affine": "0.0e+00",
+    "data type": "float32",
+    "header (every field)": 0,
+    "values (bit-identical)": 0
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0,
+    "bit-identical": 0,
+    "header bytes identical": "True"
+   },
+   "seconds": 1.199,
+   "status": "pass"
+  },
+  {
+   "case": "panel/fmriprep/ds005752-sub-ON01016/anat_fit/brain_extraction/atropos/dil_brainmask",
+   "category": "panel-fmriprep",
+   "checks_passed": 9,
+   "checks_total": 9,
+   "failed_checks": [],
+   "measured": {
+    "affine": "0.0e+00",
+    "data type": "float32",
+    "header (every field)": 0,
+    "values (bit-identical)": 0
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0,
+    "bit-identical": 0,
+    "header bytes identical": "True"
+   },
+   "seconds": 0.943,
+   "status": "pass"
+  },
+  {
+   "case": "panel/fmriprep/ds005752-sub-ON01016/anat_fit/brain_extraction/atropos/get_brainmask",
+   "category": "panel-fmriprep",
+   "checks_passed": 9,
+   "checks_total": 9,
+   "failed_checks": [],
+   "measured": {
+    "affine": "0.0e+00",
+    "data type": "float32",
+    "header (every field)": 0,
+    "values (bit-identical)": 0
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0,
+    "bit-identical": 0,
+    "header bytes identical": "True"
+   },
+   "seconds": 1.019,
+   "status": "pass"
+  },
+  {
+   "case": "panel/fmriprep/ds005752-sub-ON01016/anat_fit/brain_extraction/lap_target",
+   "category": "panel-fmriprep",
+   "checks_passed": 9,
+   "checks_total": 9,
+   "failed_checks": [],
+   "measured": {
+    "affine": "0.0e+00",
+    "data type": "float32",
+    "header (every field)": 0,
+    "values (bit-identical)": 0
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0,
+    "bit-identical": 0,
+    "header bytes identical": "True"
+   },
+   "seconds": 2.873,
+   "status": "pass"
+  },
+  {
+   "case": "panel/fmriprep/ds005752-sub-ON01016/anat_fit/brain_extraction/truncate_images[0]",
+   "category": "panel-fmriprep",
+   "checks_passed": 9,
+   "checks_total": 9,
+   "failed_checks": [],
+   "measured": {
+    "affine": "0.0e+00",
+    "data type": "float32",
+    "header (every field)": 0,
+    "values (bit-identical)": 0
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0,
+    "bit-identical": 0,
+    "header bytes identical": "True"
+   },
+   "seconds": 2.189,
+   "status": "pass"
+  },
+  {
+   "case": "panel/fmriprep/ds005752-sub-ON01016/anat_fit/register_template[MNI152NLin2009cAsym]/trunc_mov",
+   "category": "panel-fmriprep",
+   "checks_passed": 9,
+   "checks_total": 9,
+   "failed_checks": [],
+   "measured": {
+    "affine": "0.0e+00",
+    "data type": "float32",
+    "header (every field)": 0,
+    "values (bit-identical)": 0
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0,
+    "bit-identical": 0,
+    "header bytes identical": "True"
+   },
+   "seconds": 2.099,
+   "status": "pass"
+  },
+  {
+   "case": "panel/images/truncate/7t-mp2rage",
+   "category": "panel-images",
+   "checks_passed": 9,
+   "checks_total": 9,
+   "failed_checks": [],
+   "measured": {
+    "affine": "0.0e+00",
+    "data type": "float32",
+    "header (every field)": 0,
+    "values (bit-identical)": 0
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0,
+    "bit-identical": 0,
+    "header bytes identical": "True"
+   },
+   "seconds": 3.876,
+   "status": "pass"
+  },
+  {
+   "case": "panel/images/truncate/flair",
+   "category": "panel-images",
+   "checks_passed": 9,
+   "checks_total": 9,
+   "failed_checks": [],
+   "measured": {
+    "affine": "0.0e+00",
+    "data type": "float32",
+    "header (every field)": 0,
+    "values (bit-identical)": 0
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0,
+    "bit-identical": 0,
+    "header bytes identical": "True"
+   },
+   "seconds": 1.948,
+   "status": "pass"
+  },
+  {
+   "case": "panel/images/truncate/1.5t-float32",
+   "category": "panel-images",
+   "checks_passed": 9,
+   "checks_total": 9,
+   "failed_checks": [],
+   "measured": {
+    "affine": "0.0e+00",
+    "data type": "float32",
+    "header (every field)": 0,
+    "values (bit-identical)": 0
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0,
+    "bit-identical": 0,
+    "header bytes identical": "True"
+   },
+   "seconds": 2.558,
+   "status": "pass"
+  },
+  {
+   "case": "panel/images/laplacian/tumour-t2w",
+   "category": "panel-images",
+   "checks_passed": 9,
+   "checks_total": 9,
+   "failed_checks": [],
+   "measured": {
+    "affine": "0.0e+00",
+    "data type": "float32",
+    "header (every field)": 0,
+    "values (bit-identical)": 0
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0,
+    "bit-identical": 0,
+    "header bytes identical": "True"
+   },
+   "seconds": 1.075,
+   "status": "pass"
+  },
+  {
+   "case": "panel/images/laplacian/t2w-older",
+   "category": "panel-images",
+   "checks_passed": 9,
+   "checks_total": 9,
+   "failed_checks": [],
+   "measured": {
+    "affine": "0.0e+00",
+    "data type": "float32",
+    "header (every field)": 0,
+    "values (bit-identical)": 0
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0,
+    "bit-identical": 0,
+    "header bytes identical": "True"
+   },
+   "seconds": 3.547,
+   "status": "pass"
+  },
+  {
+   "case": "panel/images/getlargestcomponent/stroke-lesion",
+   "category": "panel-images",
+   "checks_passed": 9,
+   "checks_total": 9,
+   "failed_checks": [],
+   "measured": {
+    "affine": "0.0e+00",
+    "data type": "float32",
+    "header (every field)": 0,
+    "values (bit-identical)": 0
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0,
+    "bit-identical": 0,
+    "header bytes identical": "True"
+   },
+   "seconds": 0.77,
+   "status": "pass"
+  },
+  {
+   "case": "panel/images/me/stroke-lesion",
+   "category": "panel-images",
+   "checks_passed": 9,
+   "checks_total": 9,
+   "failed_checks": [],
+   "measured": {
+    "affine": "0.0e+00",
+    "data type": "float32",
+    "header (every field)": 0,
+    "values (bit-identical)": 0
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0,
+    "bit-identical": 0,
+    "header bytes identical": "True"
+   },
+   "seconds": 1.09,
+   "status": "pass"
+  },
+  {
+   "case": "panel/images/fillholes/stroke-lesion",
+   "category": "panel-images",
+   "checks_passed": 9,
+   "checks_total": 9,
+   "failed_checks": [],
+   "measured": {
+    "affine": "0.0e+00",
+    "data type": "float32",
+    "header (every field)": 0,
+    "values (bit-identical)": 0
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0,
+    "bit-identical": 0,
+    "header bytes identical": "True"
+   },
+   "seconds": 0.763,
+   "status": "pass"
+  },
+  {
+   "case": "panel/images/m/bold-mb8",
+   "category": "panel-images",
+   "checks_passed": 9,
+   "checks_total": 9,
+   "failed_checks": [],
+   "measured": {
+    "affine": "0.0e+00",
+    "data type": "float32",
+    "header (every field)": 0,
+    "values (bit-identical)": 0
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0,
+    "bit-identical": 0,
+    "header bytes identical": "True"
+   },
+   "seconds": 77.588,
+   "status": "pass"
+  }
+ ],
+ "suite": "ants-image-math",
+ "summary": {
+  "both-error": 0,
+  "expected-divergence": 0,
+  "fail": 0,
+  "pass": 374,
+  "skipped": 0
+ },
+ "tier": "panel"
+}

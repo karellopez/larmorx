@@ -59,6 +59,14 @@ raw T1w 170 ms against 1.84 s.
 All of them run in 2, 3 and 4 dimensions, as in ANTs; the Gaussian and morphology operations
 work in all of the image's dimensions (a 4D image along time too).
 
+**On the data panel** ([record](../validation/ants-image-math-panel.md), 2026-10-27): every
+ImageMath node of the fourteen finished fMRIPrep oracle runs (378 nodes, 365 distinct calls:
+sMRIPrep's brain extraction and template steps, the BOLD references' and field maps' masks),
+each replayed from its node with its inputs, and nine calls on the panel's images (truncation of
+the 7 T MP2RAGE, a FLAIR and a 1.5 T float T1w, Laplacians of a glioma's and an older adult's
+T2w, the stroke lesion mask's components, morphology and holes, a 600-volume multiband-8 series
+times a scalar): **374 of 374 bit-identical, header bytes included**.
+
 ## Quick start
 
 ```python

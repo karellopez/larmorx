@@ -46,8 +46,17 @@ TREES = [
 HOME_TREES = ["fsl", ".cache/larmorx-testdata"]
 SKIP_DIRS = {"target", "__pycache__"}
 #: Left on the old laptop (2026-10-27, to save transfer time; fetched over SSH if ever needed):
-#: old session scratch, the 2026-10-12 fMRIPrep stage comparisons, the GCC 11 ANTs build.
-LEFT_ON_OLD = ["archive", "oracles/compare", "oracles/ants-2.6.5-gcc11-O3"]
+#: old session scratch, the 2026-10-12 fMRIPrep stage comparisons, the GCC 11 ANTs build, mcflirt's
+#: raw band runs.
+LEFT_ON_OLD = [
+    "archive",
+    "oracles/compare",
+    "oracles/ants-2.6.5-gcc11-O3",
+    # mcflirt's perturbed runs behind band/band.json (the records read only that summary; the
+    # FSL update re-measures the band)
+    "oracles/fsl-6.0.7/mcflirt/band/real",
+    "oracles/fsl-6.0.7/mcflirt/band/syn",
+]
 
 
 def sha256(path: Path) -> str:

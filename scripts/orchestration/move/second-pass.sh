@@ -1,15 +1,15 @@
 #!/usr/bin/env bash
 # SPDX-License-Identifier: Apache-2.0
 # The move's final pass (2026-10-27), on the NEW laptop, in tmux session "move2": waits until the
-# first copy (pull.sh, tmux session "move") has ended, copies again (only what changed since:
-# the notes and commits made during the copy), sets up the shell, then runs check.py.
+# first copy (pull.sh, tmux session "move") has ended, copies again with --verify (every file's
+# content compared; brings what changed meanwhile), sets up the shell, then runs check.py.
 # Results: ~/move-check.log (check.py's full output) and ~/MOVE-READY.txt (a summary).
 WS=/home/karelo/VScode_projects/super_fmriprep
 while pgrep -f '^bash /tmp/pull.sh' >/dev/null; do sleep 120; done
 
 ok=""
 for attempt in 1 2 3; do
-  if bash /tmp/pull.sh old-laptop; then ok=yes; break; fi
+  if bash /tmp/pull.sh old-laptop --verify; then ok=yes; break; fi
   sleep 60
 done
 
@@ -30,6 +30,6 @@ echo "CHECK-EXIT $rc" >> "$HOME/move-check.log"
   echo "Check (check.py, full output in ~/move-check.log):"
   grep -E '^(FAIL|WARN)' "$HOME/move-check.log" | sed 's/^/  /'
   grep -E 'checks:' "$HOME/move-check.log" | sed 's/^/  /'
-  echo "Next: open VS Code in $WS, start Claude Code (any first message): it does docs/machine-move.md step 8."
+  echo "Next: open VS Code in $WS, start Claude Code (any first message): it follows docs/machine-move.md, phase 3."
 } > "$HOME/MOVE-READY.txt"
 cat "$HOME/MOVE-READY.txt"

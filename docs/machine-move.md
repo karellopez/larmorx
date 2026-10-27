@@ -1,107 +1,99 @@
-# Moving the workspace to the new main machine
+# Moving to the new main machine: the plan
 
-The new laptop (16 cores / 32 threads, 128 GB, RTX 4090, Ubuntu 22.04) becomes the main machine;
-the current laptop becomes the quiet benchmark machine and a second Linux reference (decision log,
-2026-10-25 and 26). This page is the move, step by step: what the user does (steps 1 to 7, a few
-commands, some with `sudo`), and what the orchestrator does in its first session there (step 8).
-The scripts are in `scripts/orchestration/move/`.
+From 2026-10-27 the new laptop (Alienware m18 R1: AMD Ryzen 9 7945HX, 32 threads, 124 GiB,
+Ubuntu 22.04) is the main machine. The old laptop (MSI GE75: Intel i7-8750H, 12 threads, 31 GiB)
+becomes a lean helper for speed measurements and extra tests when the main machine is busy
+(`docs/helper-machines.md`). The scripts are in `scripts/orchestration/move/`.
 
-**Same user, same paths** (the user, 2026-10-27): user `karelo`, workspace
-`/home/karelo/VScode_projects/super_fmriprep`. Every absolute path in the scripts, records,
-worktrees, the oracle-output cache and Claude Code's memory notes then stays valid.
+**Same user, same paths:** user `karelo`, workspace `/home/karelo/VScode_projects/super_fmriprep`,
+so every absolute path in the scripts, records, the oracle cache and Claude Code's notes stays
+valid. Nothing is cloned again: the repositories move with their history and unpushed commits.
 
-**What moves** (about 160 GiB without build caches; measured 2026-10-27 in `MOVE-MANIFEST.json`):
-the workspace (`oracles/` 134 GiB: the fourteen fMRIPrep runs, the oracle builds and toolchains,
-the oracle-output cache, the fMRIPrep image; the repositories with their git
-state and agent worktrees; the upstream clones and `tags/`; the Python environment `.venv`; the
-usage tool `tools/claude-usage/`), FSL 6.0.7.17 as installed (`~/fsl`, the FSL replicas'
-oracle), the test data (`~/.cache/larmorx-testdata`), Rust as pinned (`~/.cargo`, `~/.rustup`),
-Claude Code's memory notes and transcripts of this project, and the usage tool's records
-(`~/.cache/claude-usage/`). The usage tool reads the plan's 5-hour and weekly windows with
-Claude Code's own program (`claude -p /usage`, no model call); on the new laptop that is the
-program inside the VS Code extension (the tool finds it), working once Claude Code is signed in
-(step 7). Build caches (`target/`) are not
-copied: the new machine rebuilds them in minutes. Left on the old laptop, to save transfer time (fetched over SSH
-if ever needed; `manifest.py` `LEFT_ON_OLD`): `archive/` (55 GB of old session scratch),
-`oracles/compare/` (the 2026-10-12 fMRIPrep stage comparisons, 22 GB), the GCC 11 ANTs build
-kept as evidence (4.3 GB) and mcflirt's raw band runs (18 GB; the records read only
-`band/band.json`, which is copied, and the FSL update re-measures the band). Nothing is deleted on either machine; the old
-laptop keeps its copy untouched until the proof (step 8) has passed.
+## The plan at a glance
 
-## The user's steps
+| Phase | What | Who, when | Status (2026-10-27) |
+|---|---|---|---|
+| 1 | Prepare both laptops: SSH keys both ways, packages, the FreeSurfer licence, glibc | the user (`sudo` lines) and the old laptop's session | **done** |
+| 2 | The copy: what the work needs (below), about 160 GiB; a final pass that compares every file's content; the check | by itself on the new laptop, over Wi-Fi (about 11 hours) | running |
+| 3 | The new laptop's first session: settings, build, the proof that results do not depend on the machine, CLAUDE.md, push | the new session ("step 8" below), whatever the first message says | after 2 |
+| 4 | The old laptop cleaned to a helper (the list below, approved by the user) | the new session over SSH, only after the proof | after 3 |
+| 5 | The newest versions: FSL's newest official build and AFNI's newest release installed on the new laptop, SciPy, NumPy and OpenBLAS checked (the version-update part, decision log 2026-10-27); the old laptop gets them afterwards for its speed measurements | an agent part on the new laptop | after 4 |
 
-1. **Prepare the new laptop** (as the old one: Ubuntu 22.04, glibc 2.35):
-   ```bash
-   sudo apt update && sudo apt install -y rsync git tmux build-essential pkg-config openssh-client
-   sudo add-apt-repository -y ppa:deadsnakes/ppa
-   sudo apt install -y python3.12 python3.12-venv python3.12-dev   # the venv's base: /usr/bin/python3.12
-   ```
-   - **Apptainer 1.4.5** (the version the fMRIPrep oracle runs used): the `.deb` from
-     github.com/apptainer/apptainer/releases (`apptainer_1.4.5_amd64.deb`), `sudo apt install ./apptainer_1.4.5_amd64.deb`.
-   - **VS Code** with the Claude Code extension; sign in to GitHub in VS Code (pushes go through
-     it; no tokens or passwords through Claude). Node 22 and Google Chrome (the site's
-     screenshots and JavaScript check: the old laptop has node v22.23.2, Chrome 135).
-   - Do not start Claude Code in the workspace until step 7.
-2. **Let the new laptop reach the old one by SSH key** (once; the user types the old laptop's
-   password once, to `ssh-copy-id`, never to Claude):
-   - on the old laptop: `sudo apt install -y openssh-server` (it is already running there on
-     2026-10-27), and `hostname -I` gives its address (on 2026-10-27: 10.2.167.242);
-   - on the new laptop: `ssh-keygen -t ed25519` (Enter for the defaults), then
-     `ssh-copy-id karelo@<old address>`, then `ssh karelo@<old address> true` must work without
-     a password. A network cable between the two (or the same wired network) makes the copy
-     much faster than Wi-Fi (about an hour at 1 Gbit/s, several over Wi-Fi).
-3. **On the old laptop, make sure nothing runs** (no agent, no parity run): the copy must see a
-   still workspace. The orchestrator ends its session at a clean stop before the move.
-4. **The FreeSurfer licence** for the fMRIPrep oracle runs (only mounted into the container,
-   never committed; the user copies it):
-   ```bash
-   scp karelo@<old address>:/usr/local/freesurfer/license.txt /tmp/fs-license.txt
-   sudo mkdir -p /usr/local/freesurfer && sudo mv /tmp/fs-license.txt /usr/local/freesurfer/license.txt
-   ```
-5. **Copy everything** (resumable: if it stops, run the same command again):
-   ```bash
-   scp karelo@<old address>:/home/karelo/VScode_projects/super_fmriprep/larmorx/scripts/orchestration/move/pull.sh /tmp/
-   bash /tmp/pull.sh karelo@<old address>
-   ```
-   It ends with `done` (or `NOT COMPLETE`: run it again). Its log is `~/move-pull-<date>.log`.
-   On 2026-10-27 `second-pass.sh` (tmux session `move2`) waited for it, copied again what
-   changed meanwhile, set up the shell (Rust, Node 22) and ran `check.py` (step 6): its summary
-   is `~/MOVE-READY.txt`.
-   Before it: anything the new laptop already has at the copied places and that differs (on
-   2026-10-27 a `.venv` on uv's Python and FSL 6.0.7.10 in `~/fsl`) is moved aside to
-   `~/archive-before-move-<date>/`, never merged with the copy (rsync adds and replaces files,
-   it does not remove the old ones, so two installations would mix). Over Wi-Fi the copy runs
-   at about 4 MB/s (about 11 hours for 160 GiB); with both laptops on a cable, about an hour.
-6. **Check the new laptop:**
-   ```bash
-   python3 /home/karelo/VScode_projects/super_fmriprep/larmorx/scripts/orchestration/move/check.py
-   ```
-   Every line should be OK. A WARN on `libm` or `glibc` means the originals could compute
-   differently there: the proof (step 8) measures it. A FAIL says what to fix.
-7. **Start Claude Code** in VS Code in the folder `/home/karelo/VScode_projects/super_fmriprep`.
-   Its settings: `~/.claude/settings.json.from-old-laptop` is the old laptop's (the status line,
-   agents' caches kept an hour); Claude merges it in step 8. Then say: **"continue with the move:
-   docs/machine-move.md, step 8"**.
+## Phase 1: done
 
-## Step 8: the orchestrator's first session on the new machine
+- SSH with keys, no passwords stored: new -> old as `old-laptop` (10.2.167.242, Wi-Fi; in the new
+  laptop's `~/.ssh/config`), old -> new as `karelo@10.2.165.26` (the new laptop's wired address).
+- On the new laptop the user installed (sudo): openssh-server, tmux, git, rsync, build tools,
+  Apptainer 1.4.5, python3.12 from deadsnakes (`/usr/bin/python3.12`, the copied `.venv`'s base:
+  3.12.16 there, 3.12.10 here), glibc upgraded to the old laptop's 2.35-0ubuntu3.15, the
+  FreeSurfer licence (`/usr/local/freesurfer/license.txt`, never committed). The deadsnakes source
+  and key were copied from the old laptop (`add-apt-repository` hung on Launchpad).
+- On the new laptop, moved aside (never deleted) to `~/archive-before-move-2026-10-27/` (README
+  inside): the user's own `.venv` (uv's Python, pip only) and FSL 6.0.7.10 in `~/fsl`; the
+  workspace's `.vscode/settings.json` kept.
+- A first copy was stopped and its partial pieces that the plan does not copy were removed from
+  the new laptop (a fragment of `archive/`, the agents' worktrees); its correct parts stay and are
+  checked by the final pass.
 
-On 2026-10-27 the old laptop's session did steps 2 to 6 itself over SSH (the user ran only the
-`sudo` lines); what it did and found is in the workspace's `ORCHESTRATOR-STATE.md`. The new
-session starts here, in this order, whatever the user's first message says:
+## Phase 2: the copy
+
+**Copied** (about 160 GiB; `pull.sh`):
+
+| What | Size | Why |
+|---|---|---|
+| fMRIPrep 25.2.6's fourteen runs (`oracles/fmriprep-25.2.6`) | 75 GB | the tests take fMRIPrep's real images and commands from them (the data panel); the proof re-runs the ANTs panel records on them; about two days to compute again and not exactly repeatable |
+| The oracle cache (`oracles/cache`) | 40 GB | the stored runs of the originals; on the new CPU they are not hits (the key includes the CPU), but `verify` re-runs them there: the direct proof that the originals compute the same on the AMD CPU |
+| The website's evidence data (`oracles/figures-cache`) | 8 GB | needed to update the tools' pages without computing everything again |
+| fMRIPrep's container (`oracles/images`) | 4.8 GB | one comparison mode runs the originals inside fMRIPrep's own image; byte-identical copy (a new pull could differ) |
+| The original programs | 12.6 GB | ANTs 2.6.5 (GCC 14.3 build), AFNI 25.2.09, CORE-MATH preload, the GCC 14.3 toolchain, FSL 6.0.7.17 (`~/fsl`, the current records' FSL: kept until the version update has compared it with the newest) |
+| mcflirt's comparison runs (`oracles/fsl-6.0.7/mcflirt`, without the raw band runs) | 1.8 GB | read by the mcflirt replica's and hmc's records; `band/band.json` included |
+| The GCC 11 ANTs build's programs, build info, logs and thread band | 0.9 GB | the evidence of the compiler bug (GCC bug 110182) |
+| Test inputs (`bids-views`, `inputs`, `downloads`, `templateflow`, `difftest`, `logs`) | 2 GB | inputs of the suites |
+| Code and environments | 16 GB | the three repositories (history, branches, unpushed commits), `tags/` (the exact sources ported), the upstream clones, `.venv`, Rust, Node 22, the test data (`~/.cache/larmorx-testdata`), `tools/`, `CLAUDE.md`, `ORCHESTRATOR-STATE.md`, Claude Code's memory notes and transcripts of this project, the usage tool's records |
+| The archive's documents | 1 GB | from `archive/`, only the documents: notes, reports, READMEs, scripts, source drafts, logs, tables and the agents' conversation records (text files under 1 MB) |
+
+**Not copied** (`manifest.py` `LEFT_ON_OLD`; deleted from the old laptop in phase 4 if approved):
+
+| What | Size | Why not |
+|---|---|---|
+| Build caches (`target/`) | 41 GB | rebuilt in minutes on the new laptop |
+| The agents' worktrees (`larmorx/.claude/worktrees`) | 2 GB | all 46 are clean and merged into main (checked 2026-10-27): their work is in git; `git worktree prune` on the new laptop removes their entries |
+| `archive/`'s bulky temporary data | 54 GB | test outputs, copies of the cache, clones and large reference tables of past sessions; their results are committed |
+| `oracles/compare` | 22 GB | the 2026-10-12 stage comparisons with fMRIPrep, partly made with the GCC 11 ANTs build; redone at the end with the newest fMRIPrep |
+| mcflirt's raw band runs | 18 GB | the records read only their summary `band/band.json` (copied); the FSL update measures the band again |
+| The GCC 11 build's build folders | 3.4 GB | object files; its programs are copied |
+
+**Commands** (on the new laptop; resumable):
+
+```bash
+bash /tmp/pull.sh old-laptop            # the copy (tmux session "move"); run again if it stops
+bash /tmp/pull.sh old-laptop --verify   # the final pass: compares every file's content
+python3 /home/karelo/VScode_projects/super_fmriprep/larmorx/scripts/orchestration/move/check.py
+```
+
+`second-pass.sh` (tmux session `move2`) does the last two by itself when the copy ends, sets up the
+shell (Rust on `PATH`, Node 22 as nvm's default) and writes `~/MOVE-READY.txt` (the copy's and
+the check's result) and `~/move-check.log`. `check.py` compares the new laptop with
+`MOVE-MANIFEST.json`: every original program's SHA-256 (1,452), the system libraries the originals'
+maths depends on, the tools' versions, each copied tree's files and size.
+
+## Phase 3 ("step 8"): the new laptop's first session
+
+The new session starts here, in this order, whatever the user's first message says:
 
 1. **Where am I.** `hostname` must print `karelo-Alienware-m18-R1-AMD` (the old laptop is
    `karelo-GE75-Raider-8SF`). The session-start checks of CLAUDE.md: `uname -m`, `nproc`, free
    memory, `apptainer --version`, `rustc --version`.
 2. **Usage.** `python3 tools/claude-usage/usage.py check` (as before every part). It must print
    GO, SLOW DOWN or PAUSE with the windows read "0 min ago"; "could not read the limits" means
-   Claude Code's program was not found or is not signed in. SLOW DOWN or PAUSE: do steps 3 to 5
-   (machine time, few tokens) and leave the queued work (8) for later.
+   Claude Code's program was not found or is not signed in. SLOW DOWN or PAUSE: do 3 to 5
+   (machine time, few tokens) and leave 8 for later.
 3. **Claude Code's settings.** Merge `~/.claude/settings.json.from-old-laptop` into
    `~/.claude/settings.json`: keep the new machine's own keys and add `statusLine` (the command
    path is the same) and `subagentPromptCacheTtl: "1h"`. Both were the user's choice on
    2026-10-27; tell the user in one line, and that they take effect in the next session.
-4. **The check, again.** `python3 larmorx/scripts/orchestration/move/check.py`: every FAIL fixed;
-   each WARN either fixed or named in the proof (5) as a possible cause.
+4. **The copy's result.** Read `~/MOVE-READY.txt` and `~/move-check.log`: every FAIL fixed, each
+   WARN fixed or named in the proof as a possible cause. `git worktree prune` in `larmorx/`.
 5. **Build and prove** (machine time; boxes up to about 100 GiB on this machine):
    - **Build:** `source larmorx/scripts/orchestration/env.sh`, then in `larmorx/`:
      `maturin develop --release` (main checkout only), `scripts/orchestration/build-gpl.sh .`,
@@ -111,36 +103,66 @@ session starts here, in this order, whatever the user's first message says:
      - Every record's standard tier re-run (`python -m larmorx_validation parity <suite> --tier
        standard`, boxed), compared case by case with the committed records
        (`scripts/orchestration/compare_records.py`): identical results, timings aside.
-     - The originals themselves: a sample of the oracle-output cache re-run and compared
-       (`python -m larmorx_validation oracle-cache verify`), so a different libm would show.
-       The cache's key includes the CPU (model and flags: glibc picks its maths kernels by
-       them), so on the new machine the old laptop's entries are never hits: every original
-       runs again there and fills its own entries. `verify` re-runs an entry whatever the
-       machine, so it is the direct check that the originals compute the same on the AMD CPU.
-       If a large sample is identical, propose (next-steps) narrowing the key's machine part to
-       what glibc's choice of kernels depends on, so both machines share entries.
+     - The originals themselves: a sample of the oracle cache re-run and compared
+       (`python -m larmorx_validation oracle-cache verify`). The cache's key includes the CPU
+       (model and flags: glibc picks its maths kernels by them), so the old laptop's entries are
+       never hits here: every original runs again and fills its own entries. `verify` re-runs an
+       entry whatever the machine: the direct check that the originals compute the same on the
+       AMD CPU. If a large sample is identical, propose narrowing the key's machine part
+       (next-steps, "The oracle cache across CPUs").
      - Any difference is a finding (`docs/findings/`), explained before new work.
-     - The new machine is AMD (Ryzen 9 7945HX, AVX-512), the old one Intel (AVX2): runtime SIMD
-       dispatch takes other paths here, so the proof covers that too.
-6. **The machine's settings in CLAUDE.md** ("Working on this machine", "Machines"): 32 threads and
-   124 GiB (one agent may use up to 28 threads, parity `--jobs` to match; boxes together up to
-   about 100 GiB); the old laptop as the benchmark machine and second reference, reached by SSH
-   (`docs/helper-machines.md`; add the `old-laptop` git remote there).
+     - The new machine is AMD (AVX-512), the old one Intel (AVX2): runtime SIMD dispatch takes
+       other paths here, so the proof covers that too.
+6. **The machine's settings in CLAUDE.md** ("Working on this machine", "Machines", the build-cache
+   seed line): 32 threads and 124 GiB (one agent may use up to 28 threads, parity `--jobs` to
+   match; boxes together up to about 100 GiB); the old laptop as the helper, reached by SSH
+   (`docs/helper-machines.md`; add the `old-laptop` git remote).
 7. **Push** what the old laptop committed and did not push (named in `ORCHESTRATOR-STATE.md`),
    after the gates and the proof: GitHub sign-in through VS Code (the askpass socket, as before).
-8. **The queued work:** the panel's fourteen whole template registrations
+8. **Then phase 4**, then the queued work: the panel's fourteen whole template registrations
    (`parity ants-registration --tier panel --case 'register_template.*/registration$'`, about 67
-   hours of CPU, several at once) and antsRegistration's standard record re-made (513 cases since
-   random testing's permanent cases); the 25 heavy random-testing cases that waited for a larger
-   machine; then the small part for antsAI and antsAffineInitializer; then the data panel's
-   part (b) (AFNI, FSL and I/O) (`docs/next-steps.md`). The Windows laptop's SSH when the user
-   asks (`docs/helper-machines.md`).
+   hours of CPU, several at once) and antsRegistration's standard record re-made (513 cases); the
+   25 heavy random-testing cases; the small part for antsAI and antsAffineInitializer; the version
+   update (phase 5); the data panel's part (b) on the new versions (`docs/next-steps.md`). The
+   Windows laptop's SSH when the user asks (`docs/helper-machines.md`).
+
+## Phase 4: the old laptop cleaned to a helper
+
+Only after phase 3's proof has passed, and only what the user approved. The new session writes
+the deletions as a script with this exact list, runs it first as a dry run (it prints every path
+and size), then for real, and records what it freed.
+
+**Deleted from the old laptop** (about 206 GB; approval asked 2026-10-27, see
+`ORCHESTRATOR-STATE.md`):
+
+| What | Size | Why it can go |
+|---|---|---|
+| The agents' worktrees and their build caches (`larmorx/.claude/worktrees`) | 43 GB | all clean and merged into main; the main checkout keeps its own build |
+| The sessions' scratch in `/tmp/claude-1000/-home-karelo-VScode-projects-super-fmriprep/` | 56 GB | temporary files; what mattered is committed or in the archive's documents |
+| `archive/` | 55 GB | its documents are on the new laptop; the rest is temporary data |
+| `oracles/compare` | 22 GB | superseded stage comparisons, redone at the end |
+| mcflirt's raw band runs | 18 GB | summarised in `band.json`; re-measured by the FSL update |
+| The GCC 11 ANTs build (`oracles/ants-2.6.5-gcc11-O3`) | 4.3 GB | its evidence is on the new laptop |
+| The website's evidence data (`oracles/figures-cache`) | 8 GB | site work happens on the new laptop |
+
+**What the old laptop keeps** (its helper kit): the `larmorx` main checkout and its build,
+`.venv`, Rust and Node; every original program (ANTs, AFNI, FSL, CORE-MATH, the toolchain, the
+fMRIPrep image); the test data; its own oracle cache (keyed to its CPU, so tests there reuse it);
+the fMRIPrep runs (so it can run any test, the data panel included). Never touched: the user's
+own files outside the workspace (other projects, conda, `~/ants`, ...).
+
+## Phase 5: the newest versions
+
+The version-update part (decision log 2026-10-27), on the new laptop: the upstream watch first;
+FSL's newest official build installed with FSL's installer beside 6.0.7.17; AFNI's newest release
+compiled from its tag beside 25.2.09; SciPy, NumPy and OpenBLAS checked against their newest;
+changes ported; records re-made. Then the old versions leave the new laptop (FSL 6.0.7.17 once the
+update has compared the two), and the old laptop receives the new programs for its speed
+measurements (`rsync` from the new laptop).
 
 ## Afterwards
 
-- The helper machines (the old laptop for speed measurements and as a second Linux reference,
-  the Windows laptop, later the lab's server): `docs/helper-machines.md`.
-- Work continues only on the new machine; the old laptop's workspace stays as it was (a frozen
-  copy) until the proof has passed, then serves the benchmarks.
+- Work continues only on the new machine; the old laptop serves speed measurements and extra
+  tests (`docs/helper-machines.md`).
 - `MOVE-MANIFEST.json` (workspace root, not in git) records the old machine's facts and every
   oracle program's SHA-256; `check.py` can be run again at any time.

@@ -15,10 +15,13 @@ name in the main machine's `~/.ssh/config`:
 
 ### What it holds
 
-It keeps the whole workspace as it was on the day of the move (the frozen copy; nothing deleted):
-the originals (ANTs, AFNI, FSL 6.0.7.17, the CORE-MATH preload), the oracle-output cache, the
-fMRIPrep runs, the test data, the Python environment and Rust. So it can run any benchmark or
-parity suite on its own; only larmorx's code has to be brought up to date.
+Its helper kit, once the move's phase 4 has cleaned it (`docs/machine-move.md`): the `larmorx`
+main checkout and its build, `.venv`, Rust and Node; every original program (ANTs, AFNI, FSL,
+the CORE-MATH preload, the toolchain, the fMRIPrep image); the test data; its own oracle cache
+(keyed to its CPU, so tests there reuse it); the fMRIPrep runs (so it can run any test, the data
+panel included). So it can run any benchmark or parity suite on its own; only larmorx's code has
+to be brought up to date, and new original programs (the newest FSL and AFNI after the version
+update, FLIRT, FreeSurfer, ...) are copied to it from the main machine.
 
 ### Bringing a commit to it
 
@@ -85,10 +88,10 @@ A difference between the two machines is a finding (`docs/findings/`), explained
 
 ### Keeping it current
 
-Only larmorx's repository changes there (by the pushes above). The oracles, the cache and the
-fMRIPrep runs stay as they were; a new original program built on the main machine (FLIRT,
-FreeSurfer, ...) is copied over with `rsync -a <dir>/ old-laptop:<same dir>/` before the old
-laptop measures it.
+Only larmorx's repository changes there (by the pushes above). A new original program installed
+or built on the main machine (the newest FSL and AFNI, FLIRT, FreeSurfer, ...) is copied over with
+`rsync -a <dir>/ old-laptop:<same dir>/` before the old laptop measures it. Nothing else is
+kept there: no agent sessions, no scratch, no archive.
 
 ## The Windows laptop (to set up after the move)
 

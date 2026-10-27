@@ -142,6 +142,35 @@ def main() -> None:
             f"(old {there[3] or '?'})"
             + ("" if here[1] == there[1] else "; working trees differ: run pull.sh --verify"),
         )
+    # No AI attribution (CLAUDE.md rule 9): the commit-msg guard in each repository, and Claude
+    # Code's own attribution turned off.
+    guard = ws / "larmorx/scripts/orchestration/git-hooks/commit-msg"
+    for repo in ("larmorx", "larmorx_documentation", "larmorx-testdata"):
+        hook = ws / repo / ".git/hooks/commit-msg"
+        same = hook.is_file() and guard.is_file() and hook.read_bytes() == guard.read_bytes()
+        say(
+            "OK" if same and os.access(hook, os.X_OK) else "FAIL",
+            f"no-AI-attribution guard in {repo}",
+            "" if same else "run larmorx/scripts/orchestration/git-hooks/install.sh",
+        )
+    try:
+        settings = json.loads((Path.home() / ".claude/settings.json").read_text())
+    except (OSError, ValueError):
+        settings = {}
+    attribution = settings.get("attribution")
+    off = attribution is False or (
+        isinstance(attribution, dict)
+        and attribution.get("commit") == ""
+        and attribution.get("pr") == ""
+    )
+    say(
+        "OK" if off else "FAIL",
+        "Claude Code's commit attribution off",
+        ""
+        if off
+        else 'add "attribution": {"commit": "", "pr": "", "sessionUrl": false}'
+        " to ~/.claude/settings.json",
+    )
     # The usage tool (tools/claude-usage/, docs/machine-move.md step 8) reads the plan's limits
     # with Claude Code's own program: on PATH, the native install, or the VS Code extension's.
     usage = ws / "tools/claude-usage/usage.py"

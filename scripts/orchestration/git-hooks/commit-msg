@@ -1,0 +1,13 @@
+#!/bin/sh
+# SPDX-License-Identifier: Apache-2.0
+# Refuses a commit whose message names an AI as co-author or generator (larmorx CLAUDE.md
+# rule 9: no AI attribution, the user's instruction). Installed into each repository's
+# .git/hooks by install.sh; it covers the repository's worktrees too. Never bypass it with
+# --no-verify.
+PATTERN='^[[:space:]]*co-authored-by:.*(claude|anthropic|openai|chatgpt|copilot|gemini)|generated (with|by) \[?(claude|chatgpt|copilot|gemini)|noreply@anthropic\.com|claude\.com/claude-code'
+if grep -qiE "$PATTERN" "$1"; then
+  echo "commit refused: the message names an AI as co-author or generator (larmorx CLAUDE.md rule 9):" >&2
+  grep -inE "$PATTERN" "$1" | sed 's/^/  line /' >&2
+  exit 1
+fi
+exit 0

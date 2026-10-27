@@ -48,7 +48,7 @@ Golden tests cover every tool on all six platforms (`docs/validation/golden.md`)
 - **Generated tables:** `python -m larmorx_validation tables [--check]` writes the README's tool table, the validation index and the site's status from `validation/tools.toml` and the records.
 - **Memory:** heavy jobs in boxes (`scripts/orchestration/boxed.sh`); larmorx's peak similar to the original's (at most 10 % above plus 8 MiB, `tests/parity/test_memory_peak.py`); the thread pools exact (every call's parallel work in its own pool of `n_threads`: `tests/parity/test_thread_pools.py`, 74 paths); guards stop impossible sizes before allocating (ANTS-162, AFNI-75).
 - **FSL:** `crates-nc/` (`larmorx-nc`, FSL Licence) with its shared core `larmorx-nc-core`; the mcflirt and BET replicas.
-**Next:** this round is complete (BET merged). Next comes a clean stop, then the move to the new
+**Next:** the move to the new main machine ([docs/machine-move.md](docs/machine-move.md): the user's steps 1-7, then the orchestrator's step 8 there). Before it: this round is complete (BET merged). Next comes a clean stop, then the move to the new
 main machine, then the data panel's re-validation of AFNI, FSL and I/O (part b; the ANTs tools' part a is done, 2026-10-27; first a small part for antsAI and antsAffineInitializer) (the oracle-output cache,
 the data panel, differential random testing and the generated tables are done; the nights run by
 `scripts/orchestration/difftest-nightly.sh`), then BET's clean-room original (from

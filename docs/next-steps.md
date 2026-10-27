@@ -37,8 +37,9 @@ starts no other agent.
 **Now (2026-10-26):** this round is complete (BET merged, item 7; the clean stop made: history out
 of CLAUDE.md, the working agreements in it). Next, in order:
 
-- **M. The move to the new main machine** (user, 2026-10-25; CLAUDE.md "Machines"; waiting until the new
-  laptop is ready: meanwhile the work continues on the current laptop, user 2026-10-26), one bounded
+- **M. The move to the new main machine** (user, 2026-10-25; CLAUDE.md "Machines"; **next**: the new
+  laptop is almost ready, 2026-10-27; the steps, the user's and the orchestrator's:
+  [machine-move.md](machine-move.md), scripts in `scripts/orchestration/move/`), one bounded
   part: on the new laptop (Ubuntu 22.04, 32 threads, 128 GB) clone the three repositories and run
   `scripts/bootstrap_workspace.sh`; copy what is costly to remake (the fourteen fMRIPrep oracle
   runs, 75 GB; the fMRIPrep image; `~/.cache/larmorx-testdata`; `~/fsl`; the oracle builds in

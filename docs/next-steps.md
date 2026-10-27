@@ -40,12 +40,11 @@ of CLAUDE.md, the working agreements in it). Next, in order:
 - **M. The move to the new main machine** (user, 2026-10-25; CLAUDE.md "Machines"; **next**: the new
   laptop is almost ready, 2026-10-27; the steps, the user's and the orchestrator's:
   [machine-move.md](machine-move.md), scripts in `scripts/orchestration/move/`), one bounded
-  part: on the new laptop (Ubuntu 22.04, 32 threads, 128 GB) clone the three repositories and run
-  `scripts/bootstrap_workspace.sh`; copy what is costly to remake (the fourteen fMRIPrep oracle
-  runs, 75 GB; the fMRIPrep image; `~/.cache/larmorx-testdata`; `~/fsl`; the oracle builds in
-  `oracles/` and their toolchains; the oracle cache; the session's memory notes and
-  `ORCHESTRATOR-STATE.md`), check that glibc is the same point release (2.35) so the originals'
-  results are unchanged, rebuild everything else; then the proof: every record's standard tier,
+  part: the whole workspace copied over SSH to the new laptop (Ubuntu 22.04, 32 threads, 124 GiB)
+  with its repositories as they are (history, worktrees, unpushed commits), the oracle builds and
+  their outputs (the same bits the records were made with, checked by SHA-256 against
+  `MOVE-MANIFEST.json`), `~/fsl`, Rust and the test data; only the build caches rebuilt; glibc the
+  same point release (2.35); then the proof: every record's standard tier,
   `pytest tests/parity` and the golden suite re-run there and compared case by case with the
   committed records (`compare_records.py`), and a sample of the oracle cache verified. Only then
   does new work run there. Then the helpers: key-based SSH to this laptop (benchmarks, a second
@@ -53,7 +52,8 @@ of CLAUDE.md, the working agreements in it). Next, in order:
   the lab's server (originals in an Ubuntu 22.04 container: its glibc is 2.39).
 - **Meanwhile, here, and then:** every finished tool re-validated on the data panel (item 6; **the ANTs tools: done**, part a,
   2026-10-27; next a small part for antsAI and antsAffineInitializer (their metric's images in float, the
-  initializer's speed; decision log 2026-10-27), then AFNI, FSL and I/O, part b; the fourteen whole template
+  initializer's speed; decision log 2026-10-27), then **the version update** (AFNI to its newest
+  release, 26.3.x today, and FSL to its newest 6.0.7.x; user 2026-10-27, decision log), then AFNI, FSL and I/O, part b; the fourteen whole template
   registrations run in the background meanwhile), then BET's clean-room original (item 7; one agent at a
   time, user 2026-10-26); then
   the clean-room additions mcflirt FSL-20/21 and 3dUnifize AFNI-75 (specs first); then FLIRT with

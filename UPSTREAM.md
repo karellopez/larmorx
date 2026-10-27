@@ -4,6 +4,8 @@ Exact upstream releases that larmorx ports from or is validated against. Ported 
 
 Checked 2026-10-09 with `git ls-remote --tags` and fMRIPrep's lockfile (`fmriprep/pixi.lock` at `21a490fb`).
 
+**Policy from 2026-10-27 (user):** the newest upstream releases, brought in by planned update parts. On 2026-10-27 ANTs 2.6.5 and FreeSurfer 8.2.0 were the newest; AFNI (newest 26.3.05) and FSL (newest 6.0.7.23) wait for the update part after the move (`docs/decision-log.md`, 2026-10-27). The tables below name the versions the current records were made with.
+
 ## Ported sources
 
 | Project | Licence | Port from (tag → commit) | Version in fMRIPrep's image | Notes |

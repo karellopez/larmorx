@@ -1497,6 +1497,31 @@ small part, before part (b).
   32-thread machine; this record compares them on every third voxel (the `/small` cases) and runs
   every other registration of the runs whole.
 
+## 2026-10-27: Newest upstream versions, updated in steps
+- **User decision** (the user asked why larmorx was not on the newest versions and chose the
+  recommended option): larmorx follows the **newest upstream releases**. Each new tool is ported
+  from the newest release at the time of its port. A version already ported moves to a newer one
+  in a planned, bounded part: what changed in the source between the two releases, those changes
+  ported, every record re-made against the new original. The versions inside fMRIPrep 25.2.6 stay
+  an extra reference for the final comparisons with fMRIPrep (port all, then compare: 2026-10-16),
+  not the target.
+- **Where we stand** (checked 2026-10-27 with `git ls-remote --tags` and FSL's changelog):
+  ANTs 2.6.5 (newest); ITK 5.4.5 (the version ANTs 2.6.5 builds with; ITK 5.4.7 is used by no
+  ANTs release, so ITK follows ANTs); FreeSurfer 8.2.0 (newest, D5); **AFNI 25.2.09 against
+  26.3.05** (973 commits; `3dTshift.c` and many `cs_*` and `edt_*` library files changed, more
+  than the 300 files GitHub's comparison lists; 25.2.09 had been chosen to match fMRIPrep's
+  image); **FSL 6.0.7.17 against 6.0.7.23** (6.0.7.17 was the installation already on the
+  machine, never a choice).
+- **The update part** (after the move's proof and the small antsAI part, before the data panel's
+  part (b), so part (b) validates the new versions once): AFNI's newest release at that time: its
+  oracle built from the tag (`scripts/build_afni_oracle.sh`) beside 25.2.09's; the changes to the
+  three programs and their libraries reviewed and ported to the GPL replicas; the clean-room
+  originals' specs updated from behaviour only (by a spec writer) and their code by a clean-room
+  agent where the behaviour changed. FSL's newest 6.0.7.x installed beside 6.0.7.17
+  (`~/fsl-<version>`); the mcflirt and BET packages compared (`src/<package>`) and the replicas
+  brought up to date. The old oracles stay (never deleted), so each record can show the step
+  from one version to the next. Rule 2 in CLAUDE.md and `UPSTREAM.md` move with it.
+
 ## Open decisions (PLAN.md §16)
 
 | # | Decision | Recommended default (used until decided) | Status |

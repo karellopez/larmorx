@@ -60,6 +60,11 @@ laptop keeps its copy untouched until the proof (step 8) has passed.
    bash /tmp/pull.sh karelo@<old address>
    ```
    It ends with `done` (or `NOT COMPLETE`: run it again). Its log is `~/move-pull-<date>.log`.
+   Before it: anything the new laptop already has at the copied places and that differs (on
+   2026-10-27 a `.venv` on uv's Python and FSL 6.0.7.10 in `~/fsl`) is moved aside to
+   `~/archive-before-move-<date>/`, never merged with the copy (rsync adds and replaces files,
+   it does not remove the old ones, so two installations would mix). Over Wi-Fi the copy runs
+   at about 5 MB/s (15 to 20 hours); with both laptops on a cable, about an hour.
 6. **Check the new laptop:**
    ```bash
    python3 /home/karelo/VScode_projects/super_fmriprep/larmorx/scripts/orchestration/move/check.py
@@ -73,33 +78,55 @@ laptop keeps its copy untouched until the proof (step 8) has passed.
 
 ## Step 8: the orchestrator's first session on the new machine
 
-1. `python3 tools/claude-usage/usage.py check` (the usage limits, as before every part; it must
-   print GO, SLOW DOWN or PAUSE with the windows read "0 min ago": "could not read the limits"
-   means the extension's program was not found or Claude Code is not signed in); merge
-   `~/.claude/settings.json.from-old-laptop` into `~/.claude/settings.json` (keep the new
-   machine's own keys; add `statusLine` and `subagentPromptCacheTtl`), with the user's OK.
-2. **Build:** `source scripts/orchestration/env.sh`, `maturin develop --release` (main checkout
-   only), `scripts/orchestration/build-gpl.sh .`, `scripts/orchestration/build-nc.sh .`; the gates
-   (`gates-rust.sh . all`, `gates-python.sh .`).
-3. **The proof** (next-steps, item M): the results do not depend on the machine.
-   - `pytest tests/parity` (the smoke tier) and the golden suite: unchanged checksums.
-   - Every record's standard tier re-run (`python -m larmorx_validation parity <suite> --tier
-     standard`, boxed), compared case by case with the committed records
-     (`scripts/orchestration/compare_records.py`): identical results, timings aside.
-   - The originals themselves: a sample of the oracle-output cache re-run and compared
-     (`python -m larmorx_validation oracle-cache verify`), so a different libm would show.
-   - Any difference is a finding (`docs/findings/`), explained before new work.
-4. **The machine's settings in CLAUDE.md** ("Working on this machine", "Machines"): 32 threads and
-   128 GB (one agent may use up to 28 threads, parity `--jobs` to match; boxes together up to
-   about 100 GiB); the old laptop as the benchmark machine and second reference, reached by SSH.
-5. **The queued work:** the panel's fourteen whole template registrations
+On 2026-10-27 the old laptop's session did steps 2 to 6 itself over SSH (the user ran only the
+`sudo` lines); what it did and found is in the workspace's `ORCHESTRATOR-STATE.md`. The new
+session starts here, in this order, whatever the user's first message says:
+
+1. **Where am I.** `hostname` must print `karelo-Alienware-m18-R1-AMD` (the old laptop is
+   `karelo-GE75-Raider-8SF`). The session-start checks of CLAUDE.md: `uname -m`, `nproc`, free
+   memory, `apptainer --version`, `rustc --version`.
+2. **Usage.** `python3 tools/claude-usage/usage.py check` (as before every part). It must print
+   GO, SLOW DOWN or PAUSE with the windows read "0 min ago"; "could not read the limits" means
+   Claude Code's program was not found or is not signed in. SLOW DOWN or PAUSE: do steps 3 to 5
+   (machine time, few tokens) and leave the queued work (8) for later.
+3. **Claude Code's settings.** Merge `~/.claude/settings.json.from-old-laptop` into
+   `~/.claude/settings.json`: keep the new machine's own keys and add `statusLine` (the command
+   path is the same) and `subagentPromptCacheTtl: "1h"`. Both were the user's choice on
+   2026-10-27; tell the user in one line, and that they take effect in the next session.
+4. **The check, again.** `python3 larmorx/scripts/orchestration/move/check.py`: every FAIL fixed;
+   each WARN either fixed or named in the proof (5) as a possible cause.
+5. **Build and prove** (machine time; boxes up to about 100 GiB on this machine):
+   - **Build:** `source larmorx/scripts/orchestration/env.sh`, then in `larmorx/`:
+     `maturin develop --release` (main checkout only), `scripts/orchestration/build-gpl.sh .`,
+     `scripts/orchestration/build-nc.sh .`; the gates (`gates-rust.sh . all`, `gates-python.sh .`).
+   - **The proof** (next-steps, item M): the results do not depend on the machine.
+     - `pytest tests/parity` (the smoke tier) and the golden suite: unchanged checksums.
+     - Every record's standard tier re-run (`python -m larmorx_validation parity <suite> --tier
+       standard`, boxed), compared case by case with the committed records
+       (`scripts/orchestration/compare_records.py`): identical results, timings aside.
+     - The originals themselves: a sample of the oracle-output cache re-run and compared
+       (`python -m larmorx_validation oracle-cache verify`), so a different libm would show.
+     - Any difference is a finding (`docs/findings/`), explained before new work.
+     - The new machine is AMD (Ryzen 9 7945HX, AVX-512), the old one Intel (AVX2): runtime SIMD
+       dispatch takes other paths here, so the proof covers that too.
+6. **The machine's settings in CLAUDE.md** ("Working on this machine", "Machines"): 32 threads and
+   124 GiB (one agent may use up to 28 threads, parity `--jobs` to match; boxes together up to
+   about 100 GiB); the old laptop as the benchmark machine and second reference, reached by SSH
+   (`docs/helper-machines.md`; add the `old-laptop` git remote there).
+7. **Push** what the old laptop committed and did not push (named in `ORCHESTRATOR-STATE.md`),
+   after the gates and the proof: GitHub sign-in through VS Code (the askpass socket, as before).
+8. **The queued work:** the panel's fourteen whole template registrations
    (`parity ants-registration --tier panel --case 'register_template.*/registration$'`, about 67
    hours of CPU, several at once) and antsRegistration's standard record re-made (513 cases since
-   random testing's permanent cases); then the small part for antsAI and antsAffineInitializer;
-   then the data panel's part (b) (AFNI, FSL and I/O) (`docs/next-steps.md`).
+   random testing's permanent cases); the 25 heavy random-testing cases that waited for a larger
+   machine; then the small part for antsAI and antsAffineInitializer; then the data panel's
+   part (b) (AFNI, FSL and I/O) (`docs/next-steps.md`). The Windows laptop's SSH when the user
+   asks (`docs/helper-machines.md`).
 
 ## Afterwards
 
+- The helper machines (the old laptop for speed measurements and as a second Linux reference,
+  the Windows laptop, later the lab's server): `docs/helper-machines.md`.
 - Work continues only on the new machine; the old laptop's workspace stays as it was (a frozen
   copy) until the proof has passed, then serves the benchmarks.
 - `MOVE-MANIFEST.json` (workspace root, not in git) records the old machine's facts and every

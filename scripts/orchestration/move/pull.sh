@@ -34,19 +34,26 @@ copy() {  # copy <source path on OLD> <destination> [rsync options...]
   [ "$rc" = 0 ] || { echo "   FAILED (rsync exit $rc)" | tee -a "$LOG"; FAILED+=("$src"); }
 }
 
-# 1. The workspace: repositories (with their git state and worktrees), upstream clones, tags,
+# 1. The smaller trees first: FSL 6.0.7.17 as installed (the FSL replicas' oracle; a different FSL
+#    already in ~/fsl is moved aside first, never merged with it), Rust as pinned, Node 22 (nvm:
+#    the site's screenshots and JavaScript check; versions already there are kept).
+copy "$H/fsl/" "$H/fsl/"
+copy "$H/.cargo/" "$H/.cargo/"
+copy "$H/.rustup/" "$H/.rustup/"
+if ssh -o BatchMode=yes "$OLD" test -d "$H/.nvm/versions/node"; then
+  copy "$H/.nvm/versions/node/" "$H/.nvm/versions/node/"
+fi
+# 2. The workspace: repositories (with their git state and worktrees), upstream clones, tags,
 #    oracles (fMRIPrep runs, builds, toolchains, the oracle cache), archive, the venv, tools.
+#    A .venv made on the new machine is moved aside first (the copied one is built on
+#    /usr/bin/python3.12 with the packages the records were made with).
 copy "$WS/" "$WS/" \
   --exclude='/larmorx/target/' --exclude='/larmorx/crates-gpl/target/' --exclude='/larmorx/crates-nc/target/' \
   --exclude='/larmorx/.claude/worktrees/*/target/' \
   --exclude='/larmorx/.claude/worktrees/*/crates-gpl/target/' \
   --exclude='/larmorx/.claude/worktrees/*/crates-nc/target/' \
   --exclude='__pycache__/'
-# 2. FSL 6.0.7.17 as installed (the FSL replicas' oracle), the test data, Rust as pinned.
-copy "$H/fsl/" "$H/fsl/"
 copy "$H/.cache/larmorx-testdata/" "$H/.cache/larmorx-testdata/"
-copy "$H/.cargo/" "$H/.cargo/"
-copy "$H/.rustup/" "$H/.rustup/"
 # 3. Claude Code: this project's memory notes and transcripts (the same path gives the same
 #    project folder); the old settings.json beside the new one.
 copy "$H/.claude/projects/-home-karelo-VScode-projects-super-fmriprep/" \
@@ -59,6 +66,6 @@ if ssh -o BatchMode=yes "$OLD" test -e "$H/.config/claude-usage.json"; then
   copy "$H/.config/claude-usage.json" "$H/.config/claude-usage.json"
 fi
 
-if [ ${#FAILED[@]} -gt 0 ]; then echo "NOT COMPLETE: ${FAILED[*]} (run pull.sh again); log: $LOG"; exit 1; fi
-echo "done; log: $LOG"
-echo "next: python3 $WS/larmorx/scripts/orchestration/move/check.py   (docs/machine-move.md, step 5)"
+if [ ${#FAILED[@]} -gt 0 ]; then echo "NOT COMPLETE: ${FAILED[*]} (run pull.sh again); log: $LOG" | tee -a "$LOG"; exit 1; fi
+echo "done; log: $LOG" | tee -a "$LOG"
+echo "next: python3 $WS/larmorx/scripts/orchestration/move/check.py   (docs/machine-move.md, step 6)"

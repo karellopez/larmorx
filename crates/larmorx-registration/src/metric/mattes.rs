@@ -526,7 +526,12 @@ impl<R: Real> Mattes<R> {
                 cols,
             })
         };
-        m.for_each_sample(process, |c| {
+        let width = if compute_derivative {
+            m.sample_width(transform)
+        } else {
+            0
+        };
+        m.for_each_sample_of(width, process, |c| {
             fixed_marginal[c.fixed_index] = fixed_marginal[c.fixed_index] + R::ONE;
             let row = c.fixed_index * bins;
             for b in 0..4 {

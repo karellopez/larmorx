@@ -74,6 +74,7 @@ from larmorx_validation.parity.harness import (
     CheckList,
     Outcome,
     Suite,
+    in_tier,
 )
 
 PROGRAM = "antsRegistration"
@@ -83,11 +84,17 @@ HANG_SECONDS = 30
 #: How long any other ANTs run may take: sMRIPrep's full-size template registration takes ANTs
 #: hours at one thread.
 ANTS_TIMEOUT = 12 * 3600
-LX_THREADS = 4
+#: larmorx's thread count (its result does not depend on it): 4 unless
+#: ``LARMORX_PARITY_LX_THREADS`` says otherwise (a shared machine: parallel jobs times threads
+#: stay within the machine's share).
+LX_THREADS = int(os.environ.get("LARMORX_PARITY_LX_THREADS", "4"))
 #: The real cases' small versions keep every SMALL-th voxel of their images.
 SMALL = 3
-BAND_THREADS = (2, 4, 8)
-_TIERS = ("smoke", "standard", "full")
+#: ANTs' thread band: 2, 4, 8 threads unless ``LARMORX_PARITY_BAND_THREADS``
+#: (e.g. ``2,3`` on a shared machine) says otherwise.
+BAND_THREADS = tuple(
+    int(v) for v in os.environ.get("LARMORX_PARITY_BAND_THREADS", "2,4,8").split(",") if v
+)
 ORACLE_RUNS = "oracles/fmriprep-25.2.6"
 #: The threshold of a check against ANTs as built that only reports (ANTs with CORE-MATH decides).
 GLIBC = "reported (glibc's maths; ANTs with CORE-MATH decides)"
@@ -879,6 +886,7 @@ def all_cases() -> list[RegCase]:
     cases += syn_cases(_syn_case)
     cases += bspline_cases(_syn_case)
     cases += velocity_cases(_syn_case)
+    cases += _panel_cases()
     # Real cases: fMRIPrep's command lines in the oracle runs.
     for run, node, band in (
         (
@@ -1020,6 +1028,87 @@ def all_cases() -> list[RegCase]:
                             )
                         )
     return cases
+
+
+#: The two whole-head registrations of sMRIPrep (hours at one thread at full size).
+HEAVY_NODES = (
+    "anat_fit_wf/brain_extraction_wf/norm",
+    "anat_fit_wf/register_template_wf/registration",
+)
+
+
+def _panel_cases() -> list[RegCase]:
+    """The data panel's tier: every antsRegistration node of the fourteen fMRIPrep oracle runs,
+    its ``command.txt`` replayed exactly (the template registration's inputs that nipype did not
+    keep made again exactly, its initial transform by the ANTs oracle at one thread:
+    :mod:`~larmorx_validation.parity.niworkflows_inputs`); the two whole-head registrations
+    again on one voxel in :data:`SMALL` along each axis of their images (``.../small``). ANTs'
+    thread band on the first call of each kind (the small versions for the whole-head ones)."""
+    from larmorx_validation.parity import fmriprep_nodes
+
+    out = []
+    banded: set[str] = set()
+    for c in fmriprep_nodes.calls(PROGRAM):
+        spec = f"{c.run}/{c.node}"
+        heavy = c.norm in HEAVY_NODES
+        # fMRIPrep's seed (its --random-seed 0), as the node's environment records it.
+        seed = c.environ("ANTS_RANDOM_SEED") or SEED
+        out.append(
+            RegCase(
+                fmriprep_nodes.PREFIX + c.id,
+                fmriprep_nodes.CATEGORY,
+                fmriprep_nodes.describe(c) + (", full size" if heavy else ""),
+                (f"{{panel-node:{spec}}}",),
+                tier="panel",
+                band=not heavy and c.norm not in banded,
+                seed=seed,
+            )
+        )
+        if heavy:
+            out.append(
+                RegCase(
+                    fmriprep_nodes.PREFIX + c.id + "/small",
+                    "panel-fmriprep-small",
+                    fmriprep_nodes.describe(c)
+                    + f", on one voxel in {SMALL} along each axis of its images",
+                    (f"{{panel-node-small:{spec}}}",),
+                    tier="panel",
+                    band=c.norm not in banded,
+                    seed=seed,
+                )
+            )
+        banded.add(c.norm)
+    return out
+
+
+def _panel_args(spec: str, out: Path, tmp: Path, small: int = 0) -> list[str]:
+    """An oracle run's node (``run/node``, the node below ``work/``) as it ran: its arguments
+    (:mod:`~larmorx_validation.parity.fmriprep_nodes`), the files nipype did not keep made
+    again, with ``small`` every image replaced by its every ``small``-th voxel, the output
+    prefix moved to ``out``."""
+    from larmorx_validation.parity import fmriprep_nodes, niworkflows_inputs
+
+    run, node = spec.split("/", 1)
+    calls = [c for c in fmriprep_nodes.calls(PROGRAM) if c.run == run and c.node == node]
+    if not calls:
+        raise Outcome(SKIPPED, f"the fMRIPrep oracle node {spec} is not here")
+    c = calls[0]
+    args = niworkflows_inputs.mapped_args(c) if c.norm == niworkflows_inputs.NODE else list(c.args)
+    args = " ".join(args).replace("[ ", "[").replace(" ]", "]").replace(", ", ",").split()
+    if small:
+        args = _small(args, tmp, small)
+    i = args.index("--output")
+    value = args[i + 1]
+    if value.startswith("["):
+        parts = value[1:-1].split(",")
+        args[i + 1] = (
+            "["
+            + ",".join([f"{out}/transform"] + [f"{out}/{Path(p).name}" for p in parts[1:]])
+            + "]"
+        )
+    else:
+        args[i + 1] = f"{out}/transform"
+    return [*args, "-v", "1"]
 
 
 def _message_cases() -> list[RegCase]:
@@ -1227,12 +1316,7 @@ def _point_set_cases() -> list[RegCase]:
 
 
 def cases_for(tier: str) -> list[Case]:
-    rank = _TIERS.index(tier)
-    return [
-        Case(c.id, c.category, c.description, c)
-        for c in all_cases()
-        if _TIERS.index(c.tier) <= rank
-    ]
+    return [Case(c.id, c.category, c.description, c) for c in all_cases() if in_tier(c.tier, tier)]
 
 
 # ------------------------------------------------------------------------------------------------
@@ -1689,6 +1773,10 @@ def _dimension_cases() -> list[RegCase]:
 
 
 def _resolve(c: RegCase, out: Path, tmp: Path) -> list[str]:
+    if len(c.args) == 1 and c.args[0].startswith("{panel-node:"):
+        return _panel_args(c.args[0][12:-1], out, tmp)
+    if len(c.args) == 1 and c.args[0].startswith("{panel-node-small:"):
+        return _panel_args(c.args[0][18:-1], out, tmp, small=SMALL)
     if len(c.args) == 1 and c.args[0].startswith("{fmriprep:"):
         return _fmriprep_args(c.args[0][10:-1], out)
     if len(c.args) == 1 and c.args[0].startswith("{fmriprep-linear:"):
@@ -2196,7 +2284,20 @@ def highlights(results: list[CaseResult]) -> list[str]:
         )
     lines.append("")
     lines += defects.summary(results)
-    return lines
+    from larmorx_validation.parity import fmriprep_nodes
+
+    small = {
+        r.case[len(fmriprep_nodes.PREFIX) : -len("/small")]: r.status
+        for r in results
+        if r.case.startswith(fmriprep_nodes.PREFIX) and r.case.endswith("/small")
+    }
+    why = (
+        "full size not run in this record (hours of ANTs at one thread each, as built and with "
+        "CORE-MATH: the next part, on a larger machine)"
+    ) + (f"; compared on every {SMALL}rd voxel instead ({len(small)} small cases)" if small else "")
+    return lines + fmriprep_nodes.record_lines(
+        PROGRAM, results, why_not=dict.fromkeys(HEAVY_NODES, why)
+    )
 
 
 def suite() -> Suite:

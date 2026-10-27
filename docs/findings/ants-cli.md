@@ -187,3 +187,52 @@ image programs, 8 for DenoiseImage and the anatomical N4s; [fmriprep-oracle.md](
 *Read; verified* in fMRIPrep's working directory. *larmorx:* every `larmorx ants` program reads
 them the same way (`larmorx_ants::cli::itk_threads_from`, tested); before this, a larmorx
 program run by nipype would have used every core.
+
+## larmorx's own threads: some loops ran on rayon's global pool (2026-10-26, fixed)
+
+*Found during the data panel's re-validation (part a), verified, fixed in the same part.* larmorx
+runs a call's parallel work in a pool of exactly the call's thread count
+(`larmorx_core::parallel::with_threads`, threads named `larmorx-<n>-<i>`; CLAUDE.md rule 5,
+explicit `n_threads`). Some loops were reached outside such a pool and so ran on rayon's global
+pool, which has as many threads as the CPUs the process may use (or `RAYON_NUM_THREADS`), whatever
+the call asked for. The results never depended on it (every reduction is fixed-order); only the
+number of threads did.
+
+- **How it showed:** the panel tier's antsAI runs (`ITK_GLOBAL_DEFAULT_NUMBER_OF_THREADS=3`, three
+  parallel cases on ten CPUs) each had its idle `larmorx-3` pool and ten busy unnamed threads;
+  the machine's load average reached 31 on 12 CPUs.
+- **The probe:** `larmorx_validation.parity.thread_pools` runs every registered program over its
+  distinct code paths at one thread (`ITK_GLOBAL_DEFAULT_NUMBER_OF_THREADS=1` for the ANTs
+  programs, `OMP_NUM_THREADS=1` for the others) on small seeded inputs and lists every thread of
+  its processes from `/proc/<pid>/task` every 10 ms; `validation/investigations/panel-ants/
+  global_pool_probe.py` prints the table. 74 paths: 63 of the ANTs programs (every
+  antsRegistration stage and metric, the point-set metrics, masks with an image-based initial
+  transform and a composite output; antsApplyTransforms with a field, on a series, a field and
+  label output; antsAI with masks, principal axes and blobs; antsAffineInitializer; Atropos'
+  k-means, two channels, priors, Otsu with Parzen windows and a prior label image; N4 with
+  weights; DenoiseImage's two models; twenty ImageMath operations; ThresholdImage,
+  MultiplyImages, SmoothImage, ResampleImage(BySpacing)), the three AFNI clean-room originals and
+  their GPL replicas, the clean-room head-motion correction and the FSL replicas (mcflirt, bet2,
+  bet, betsurf).
+- **Before the fix:** threads outside the pool in antsAffineInitializer, antsAI, the linear
+  antsRegistration stages (every image metric), the BSpline and TimeVaryingBSplineVelocityField
+  stages and Atropos (its k-means initialisation and its Parzen-window likelihoods, which reach
+  larmorx-interp's B-spline coefficients); none in the AFNI, FSL and head-motion programs (the
+  clean-room crates need no change), nor in N4, DenoiseImage, antsApplyTransforms, ImageMath and
+  the other image programs.
+- **The fix:** the image metric carries the call's thread count (`ImageMetricv4::n_threads`; its
+  sampled values, `for_each_sample`, and the neighbourhood correlation run in that pool), and so
+  do the level's problem (the update, the scales and the step's scale), the field and B-spline
+  adaptors at each level, the TimeVaryingBSplineVelocityField stage's time samples, antsAI's and
+  antsAffineInitializer's searches and the helper's full-scale CC; Atropos' public entry points
+  (`run`, `posterior`, `likelihood`, `distance_prior`, `smooth_intensity`) and its k-means
+  classification install the call's pool. After it, the probe finds no thread outside a
+  `larmorx-<n>` pool on any of the 74 paths.
+- **Tests:** `tests/parity/test_thread_pools.py` (every path, Linux) and
+  `larmorx_registration::method::tests::metric_samples_run_in_the_calls_pool`; the results are
+  unchanged (the golden suite's checksums and the thread-count invariance tests pass as before).
+- **Records:** the panel records were made before the fix, with `RAYON_NUM_THREADS=3` (their
+  larmorx thread count), so their larmorx runs used the call's count either way; their results are
+  the same after the fix. Speeds measured before the fix at "one thread" may have used more
+  threads in those programs (the BSpline stage's "20 times faster than ANTs at one thread" in the
+  porting guide among them; re-measured below where it matters).

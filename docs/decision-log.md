@@ -1454,6 +1454,49 @@ on the memory test's head, 332 s against 1212 s on the 7 T image), partly becaus
 ITK-21 runs each start point's local search twice: both, the storage and the speed, are the next
 small part, before part (b).
 
+## 2026-10-26: The ANTs tools on the data panel (re-validation, part a)
+
+- **The panel tier** (`--tier panel`, beside smoke, standard and full; never in CI): every ANTs
+  suite replays each call fMRIPrep 25.2.6 made of its program in the fourteen finished oracle runs
+  (`larmorx_validation.parity.fmriprep_nodes`: each node's own `command.txt`, its inputs from the
+  run's working directory, calls repeated word for word compared once) and runs the program on the
+  panel's images where fMRIPrep's calls do not reach (`parity.panel_images`: the 7 T MP2RAGE, the
+  glioma, the stroke with its lesion mask, the 3.5-year-old, the 82-year-old's FLAIR, the 1.5 T
+  MPRAGE, the child's low-quality T1w). The template registration's inputs, which niworkflows
+  writes for itself and nipype does not keep, are made again exactly from the node's recorded
+  inputs (`parity.niworkflows_inputs`), its initial transform by the ANTs oracle's
+  antsAffineInitializer at one thread (fMRIPrep runs it inside that node: it is not a node of its
+  own). The records are `docs/validation/<suite>-panel.md`; the standard and full records are
+  unchanged.
+- **n_threads exact** (the user, 2026-10-26, during the part): some loops ran on rayon's global
+  pool (sized by the machine's CPUs) instead of the call's pool: the image metric's samples
+  (antsAI, antsAffineInitializer, the linear stages), the BSpline and TimeVaryingBSplineVelocity
+  stages' adaptors and time samples, Atropos' k-means and its Parzen-window likelihoods. Fixed in
+  this part (results unchanged: golden checksums, the thread-count invariance tests); a probe of 74
+  code paths of every registered program (ANTs, AFNI originals and GPL replicas, the head-motion
+  correction, the FSL replicas) finds no thread outside the call's pool
+  (`tests/parity/test_thread_pools.py`; `docs/findings/ants-cli.md`). The clean-room crates
+  needed nothing. Records made before the fix stay valid (results unchanged; the panel records
+  made then ran with `RAYON_NUM_THREADS` equal to their thread count).
+- **Memory** (the user's rule of 2026-10-25, measured on the panel's kinds of call and on every
+  tool's largest panel input): the metric's chunks are sized by what a point keeps (the BSpline
+  stage held 329 MiB where ANTs holds 35), the neighbourhood correlation, the gradient images,
+  ResampleImage's B-spline coefficients and the separable filters' strided axes no longer hold
+  whole-image temporaries; results unchanged. antsAI and antsAffineInitializer stay above ANTs
+  (their metric holds the images in double, ANTs in float): a follow-up, their two cases
+  strict-xfail in `tests/parity/test_memory_peak.py`.
+- **Atropos' input check** (found on the panel): ITK's `VerifyInputInformation` was missing from
+  the port; larmorx now throws as ANTs does when an input is on another grid (a mask written from
+  the image's affine is 2.9e-6 mm off, beyond ITK's tolerance).
+- **antsAI against fMRIPrep's files:** five of fMRIPrep's 36 transforms are up to 6.8 mm from
+  ANTs' (and larmorx's) one-thread result; repeated runs show ANTs' own spread above one thread
+  (fMRIPrep's ANTs at one thread gives larmorx's transform exactly): within the original's
+  variability, nothing to correct.
+- **The whole template registrations** (14 cases, about 2.4 hours of ANTs at one thread each, as
+  built and with CORE-MATH: some 67 hours of CPU) are left for the next part, on the new
+  32-thread machine; this record compares them on every third voxel (the `/small` cases) and runs
+  every other registration of the runs whole.
+
 ## Open decisions (PLAN.md §16)
 
 | # | Decision | Recommended default (used until decided) | Status |

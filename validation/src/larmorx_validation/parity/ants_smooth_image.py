@@ -174,12 +174,38 @@ def all_cases() -> list[AntsCase]:
     ]
 
 
+def panel_cases() -> list[AntsCase]:
+    """The data panel's tier (no fMRIPrep node runs SmoothImage): Gaussian and median filters
+    on panel images: the largest anatomical image, the most anisotropic voxels, a long
+    series."""
+    from larmorx_validation.parity import panel_images as P
+
+    def s(cid, description, image, *args, dim="3", **kw):
+        return P.ants_case("SmoothImage", cid, description, (dim, image, *args), [image], **kw)
+
+    return [
+        s("gaussian-2mm/7t-mp2rage", "sigma 2 mm on the raw 7 T MP2RAGE", P.MP2RAGE_7T,
+          "2", "{out}", "1"),
+        s("gaussian-1.5mm/flair", "sigma 1.5 mm on 0.42 x 0.42 x 3 mm voxels", P.FLAIR_OLDER,
+          "1.5", "{out}", "1"),
+        s("median-1/child-t1w", "a median filter of radius 1 on a child's low-quality T1w",
+          P.CHILD_T1W, "1", "{out}", "0", "1"),
+        s("gaussian-4d/bold-mb4-philips", "sigmas 2x2x2 mm and 0.55 s (one TR) on a "
+          "588-volume series (SmoothImage 4)", P.BOLD_MB4_PHILIPS, "2x2x2x0.55", "{out}", "1",
+          dim="4"),
+        s("gaussian-4d-zero-time/bold-mb4-philips", "sigmas 2x2x2x0 on the same series: a sigma "
+          "of 0 along time, which ITK's recursive Gaussian refuses (ANTs aborts, larmorx exits "
+          "1)", P.BOLD_MB4_PHILIPS, "2x2x2x0", "{out}", "1", dim="4", expect="error"),
+    ]  # fmt: skip
+
+
 def suite():
     return make_suite(
         "ants-smooth-image",
         "SmoothImage",
         "`larmorx ants SmoothImage` / `lx.ants.smooth_image` (crates larmorx-ants, larmorx-image)",
         all_cases,
+        panel=panel_cases,
         notes="Real images come from `larmorx-testdata` (OpenNeuro ds000005 and its fMRIPrep "
         "derivatives).",
     )

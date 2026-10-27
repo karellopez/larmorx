@@ -24,6 +24,7 @@ once more in its default mode for the fix pass (:mod:`~larmorx_validation.parity
 
 from __future__ import annotations
 
+import os
 import tempfile
 from collections.abc import Callable, Sequence
 from pathlib import Path
@@ -57,8 +58,10 @@ from larmorx_validation.parity.harness import (
 )
 from larmorx_validation.report import table
 
-#: larmorx's thread count (its result does not depend on it).
-LX_THREADS = 4
+#: larmorx's thread count (its result does not depend on it): 4 unless
+#: ``LARMORX_PARITY_LX_THREADS`` says otherwise (a shared machine: parallel jobs times threads
+#: stay within the machine's share).
+LX_THREADS = int(os.environ.get("LARMORX_PARITY_LX_THREADS", "4"))
 NCC_MIN = 0.995
 AFFINE_ATOL = 1e-6
 
@@ -251,6 +254,8 @@ def compare(
                 value=f"{1.0 - m['one_minus_ncc']:.10f}",
                 threshold=f"> {NCC_MIN}",
             )
+            if not c.band:
+                continue
             w = band(i)
             for key, name in (("max_abs", "max |diff|"), ("one_minus_ncc", "1 - NCC")):
                 ratio = m[key] / w[key] if w[key] > 0 else (0.0 if m[key] == 0 else float("inf"))

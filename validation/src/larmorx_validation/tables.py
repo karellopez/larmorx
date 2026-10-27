@@ -175,6 +175,21 @@ METRICS: dict[str, Callable[[dict], dict[str, int]]] = {
     "afni-unifize": _unifize,
     "fsl-bet-replica": _bet,
     "fsl-bet-replica-full": _bet,
+    # The data panel's records of the ANTs tools (2026-10-26): the same metrics as their
+    # standard records.
+    "ants-apply-transforms-panel": _bit_identical(),
+    "ants-n4-panel": _as_built("corrected"),
+    "ants-denoise-panel": _as_built("denoised"),
+    "ants-image-math-panel": _image_math,
+    "ants-threshold-image-panel": _bit_identical(),
+    "ants-multiply-images-panel": _bit_identical(),
+    "ants-smooth-image-panel": _bit_identical(),
+    "ants-resample-image-panel": _bit_identical(),
+    "ants-resample-image-by-spacing-panel": _bit_identical(),
+    "ants-registration-panel": _unmodified,
+    "ants-ai-panel": _unmodified,
+    "ants-affine-initializer-panel": _unmodified,
+    "ants-atropos-panel": _as_built("seg"),
 }
 
 

@@ -339,6 +339,16 @@ impl<R: Real, const D: usize> Composite<R, D> {
         self.position_products(p, out, np);
     }
 
+    /// The number of columns [`Composite::sparse_jacobian`] gives at a point inside the active
+    /// B-spline transform's domain (`D` times its support's control points); `None` for another
+    /// active transform.
+    pub fn sparse_jacobian_width(&self) -> Option<usize> {
+        match self.active() {
+            Xfm::BSpline(_) => Some(D * (crate::transform::bspline::ORDER + 1).pow(D as u32)),
+            _ => None,
+        }
+    }
+
     /// [`Composite::jacobian`] for a B-spline transform being optimised: only the columns of
     /// the parameters whose control points support `p` (every other column is zero), as
     /// `(parameters, D × k values row by row)`; `None` for another active transform.

@@ -29,6 +29,16 @@ comparison runs larmorx with ANTs' defects reproduced (`reproduce`); every case 
 larmorx's default mode, where ANTS-54 and ITK-21 (below) are named exactly where they change
 the transform (the fix pass of each case).
 
+**On the data panel** ([record](../validation/ants-affine-initializer-panel.md), 2026-10-26):
+fMRIPrep's own call in the template registration of all fourteen finished oracle runs (no node
+of its own: niworkflows runs it inside `register_template_wf/.../registration`, with nipype's
+`15 0.1 0 10`), on the masked images remade exactly from each node's recorded inputs
+(`larmorx_validation.parity.niworkflows_inputs`; the 3.5-year-old, the glioma, the stroke, the
+7 T MP2RAGE, the 1.5 T MPRAGE, the 82-year-old among them): **14 of
+14 identical to the unmodified ANTs 2.6.5 at one thread**, ANTs' own band at 2 and 3 threads
+6.5e-9 in a parameter. fMRIPrep did not keep the transform it made (at the node's six or eight
+threads); its effect is in the registration's record.
+
 **Results do not depend on threads.** larmorx gives ANTs' one-thread result at any thread
 count.
 

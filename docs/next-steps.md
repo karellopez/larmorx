@@ -50,8 +50,10 @@ of CLAUDE.md, the working agreements in it). Next, in order:
   does new work run there. Then the helpers: key-based SSH to this laptop (benchmarks, a second
   Linux reference), the Windows laptop and, for the 25 heavy cases and later FreeSurfer batches,
   the lab's server (originals in an Ubuntu 22.04 container: its glibc is 2.39).
-- **Meanwhile, here, and then:** every finished tool re-validated on the data panel (item 6; the
-  ANTs tools, then AFNI, FSL and I/O), then BET's clean-room original (item 7; one agent at a
+- **Meanwhile, here, and then:** every finished tool re-validated on the data panel (item 6; **the ANTs tools: done**, part a,
+  2026-10-27; next a small part for antsAI and antsAffineInitializer (their metric's images in float, the
+  initializer's speed; decision log 2026-10-27), then AFNI, FSL and I/O, part b; the fourteen whole template
+  registrations run in the background meanwhile), then BET's clean-room original (item 7; one agent at a
   time, user 2026-10-26); then
   the clean-room additions mcflirt FSL-20/21 and 3dUnifize AFNI-75 (specs first); then FLIRT with
   BBR, FAST, topup (item 7).
@@ -119,7 +121,13 @@ of CLAUDE.md, the working agreements in it). Next, in order:
    re-validated on the panel, with its evidence page updated. Each tool: its existing examples
    unchanged; the panel's cases added beside them, two or three key datasets as whole volumes,
    the rest as slices (`docs/figures.md`, Views); a page over its budget gets a raised one with
-   its reason, never less content (the user, 2026-10-24).
+   its reason, never less content (the user, 2026-10-24). **The ANTs tools: done** (part a, 2026-10-26 and 27):
+   panel records for every ANTs suite (`docs/validation/ants-*-panel.md`: ImageMath 374/374,
+   ThresholdImage 18/18, MultiplyImages 44/44, SmoothImage 4/4, ResampleImage 4/4,
+   ResampleImageBySpacing 3/3 bit-identical; N4 69/69, DenoiseImage 21/21, Atropos 17/17,
+   antsApplyTransforms 425/425 bit-identical with CORE-MATH; antsAI 40/40, antsAffineInitializer
+   14/14, antsRegistration 71/71 identical to ANTs at one thread), each ANTs page with its panel
+   section; n_threads made exact; memory fixes; Atropos' input check.
 7. **FSL:** the mcflirt replica, BET, FAST, FLIRT with BBR, topup: a replica in `larmorx-nc` (FSL
    licence, with FSL's source as its terms require) and a clean-room original each. In progress
    (started 2026-10-24, beside item 6 at the user's request). **The mcflirt replica: done**
@@ -216,15 +224,23 @@ of CLAUDE.md, the working agreements in it). Next, in order:
   testing (its descriptor `fsl-bet` is registered; its random-testing panel goes on the site after
   the first night that includes it); nights on a schedule (cron, boxed) once the machine is free
   at night.
-- **Memory against the originals, the remaining tools** (user's rule of 2026-10-25): every ANTs
-  image program measured so far needs at most ANTs' peak plus the Python interpreter's few MiB
-  on the same call (`tests/parity/test_memory_peak.py`, 13 mid-size calls, bit for bit in
-  `reproduce`; `docs/findings/ants-image-programs.md`, `ants-n4.md`, `ants-denoise.md`, "Memory
-  against ANTs"), and BET's programs at most FSL's (5 calls, 2026-10-26). Measure antsRegistration, antsApplyTransforms, Atropos, antsAI,
-  antsAffineInitializer, the AFNI programs (replicas and clean-room originals), mcflirt (replica
-  and original) and `lx.transforms.resample_series` the same way (`memory_pair.py`, one thread,
-  mid-size calls), fix what needs more than the original, and add a `test_memory_peak.py` case
-  for each.
+- **Memory, the rest** (the rule as refined 2026-10-27: similar, at most 10 % above the original plus
+  8 MiB): antsRegistration, antsApplyTransforms, Atropos, N4, DenoiseImage and the image programs
+  measured on the panel's largest inputs and kept at or below ANTs
+  (`docs/findings/ants-image-programs.md`, "Memory on the data panel's largest inputs");
+  **antsAI and antsAffineInitializer still above** (127 and 110 MiB against 92 and 91 on a
+  128 × 128 × 96 head; +40 and +156 MiB on the 7 T): their metric holds the images in double, ANTs
+  in float; store them in float (the next small part; strict-xfail cases in
+  `tests/parity/test_memory_peak.py`); the AFNI programs, mcflirt and `resample_series` remain to
+  measure (part b: `larmorx_interp::ndimage`'s spline filter copies the volume on its last axis).
+- **The fourteen whole template registrations** of the panel (about 67 hours of CPU):
+  `python -m larmorx_validation parity ants-registration --tier panel --case
+  'register_template.*/registration$'`, boxed, in the background.
+- **antsAffineInitializer's speed**: larmorx 277 s against ANTs' 73 s at one thread on a
+  128 × 128 × 96 head, 1212 s against 332 s on the 7 T (the D13 notice of ITK-21 runs every local
+  search twice; the rest is the metric's speed): the next small part.
+- **ImageMath's panel run in a box**: its 600-volume `m` case needs about 8 GiB in the harness
+  (both outputs and larmorx in-process): two jobs in a 20 GiB box.
 - **ResampleImage's speed** with nearest-neighbour resampling to `unsigned char` (3D, most voxels
   beyond the input): 2.4 times ANTs' time (15.2 s against 6.4 s on 756 million output voxels,
   `ants-resample-image:20261025:556` at half its spacing; the same memory).

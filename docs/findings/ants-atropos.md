@@ -252,3 +252,23 @@ exception's text; larmorx prints the same text, adds one line and exits 1.
   `maximum_number_of_icm_terations` (`nipype/interfaces/ants/segmentation.py:219-223`): the
   bracketed form ANTs 2.6.5 aborts on (ANTS-102), and `True` writes 1, which Atropos reads as
   *asynchronous* updating (ICM), the opposite of the trait's name. sMRIPrep sets neither.
+
+## Inputs on another grid: ITK's check, missing from the port until 2026-10-26
+
+*Found on the data panel (re-validation, part a), fixed.* `AtroposSegmentationImageFilter` is an
+`ImageToImageFilter`: at `Update`, before anything is read, `VerifyInputInformation`
+(`itkImageToImageFilter.hxx:147-216`, ITK v5.4.5) compares its inputs (the first intensity image,
+`Primary`; the mask, `_1`; the prior label image, `_2`; the other intensity images, `_3`, ...;
+the prior probability images are not inputs), in the order of their names, with the first: an
+origin or spacing further than `1e-6 × spacing[0]` from it, or a direction further than 1e-6,
+throws "Inputs do not occupy the same physical space!" with the values that differ. ANTs exits 1
+and prints the exception only with `--verbose 1` (ANTS-45); the panel case was the FLAIR's head
+mask written by nibabel from the FLAIR's affine, whose recomputed pixdim (0.42187503 × 0.421875
+× 2.9999971 mm against 0.421875 × 0.421875 × 3) is 2.9e-6 mm off, beyond the 4.2e-7 tolerance.
+larmorx ran such calls (it compared sizes only). It now makes the same check and prints the same
+exception (`cli::atropos::input_information_error`; a larmorx line without `--verbose`, as for
+ANTs' other silent exceptions). Permanent cases: the standard suite's `geometry/*` (the mask's
+spacing, origin and direction, without `--verbose`, the prior label image and a second intensity
+image) and the panel's `flair/mask-from-affine`, besides the Rust test
+`a_mask_on_another_grid_is_itks_exception`. The panel's `flair/kmeans-3` now writes the mask with
+the FLAIR's own header, and segments it bit for bit.

@@ -390,6 +390,9 @@ pub struct LevelProblem<'a, R, const D: usize> {
     bspline_jacobian: bool,
     /// Warnings ITK's output window would print (`itkWarningMacro`).
     pub warnings: Vec<String>,
+    /// The call's thread count: the transform's updates and the scales run in a pool of that
+    /// size (`None`: the caller's pool).
+    n_threads: Option<usize>,
 }
 
 impl<'a, R: Real, const D: usize> LevelProblem<'a, R, D> {
@@ -449,6 +452,7 @@ impl<'a, R: Real, const D: usize> LevelProblem<'a, R, D> {
         let state = LevelMetric::initialize(kind, &metric)?;
         let samples = scales::corners(&metric.virtual_space);
         let virtual_space = metric.virtual_space.clone();
+        let n_threads = metric.n_threads;
         Ok(LevelProblem {
             metrics: vec![LevelEntry::Image(metric, state)],
             weights: vec![R::ONE],
@@ -459,6 +463,7 @@ impl<'a, R: Real, const D: usize> LevelProblem<'a, R, D> {
             floor,
             bspline_jacobian: false,
             warnings: Vec::new(),
+            n_threads,
         })
     }
 
@@ -608,6 +613,20 @@ impl<R: Real, const D: usize> LevelProblem<'_, R, D> {
         }
         Ok(())
     }
+
+    fn estimate_step_scale_inner(&mut self, step: &mut [R]) -> Result<R, ItkException> {
+        self.check_samples()?;
+        if self.moving.active().has_local_support() || self.moving.active().is_bspline() {
+            // FullDomainSampling (the point set with a point-set metric first).
+            let samples = if self.point_set_samples {
+                self.samples.clone()
+            } else {
+                scales::full_domain(&self.virtual_space)
+            };
+            return scales::estimate_local_step_scale(&mut self.moving, &samples, step);
+        }
+        scales::estimate_step_scale(&mut self.moving, &self.samples, step)
+    }
 }
 
 impl<R: Real, const D: usize> Problem<R> for LevelProblem<'_, R, D> {
@@ -628,7 +647,10 @@ impl<R: Real, const D: usize> Problem<R> for LevelProblem<'_, R, D> {
     }
 
     fn update(&mut self, update: &mut [R]) -> Result<(), ItkException> {
-        self.moving.active_mut().update_in_place(update, R::ONE)
+        let moving = &mut self.moving;
+        crate::metric::in_pool(self.n_threads, || {
+            moving.active_mut().update_in_place(update, R::ONE)
+        })?
     }
 
     fn number_of_local_parameters(&self) -> usize {
@@ -643,7 +665,10 @@ impl<R: Real, const D: usize> Problem<R> for LevelProblem<'_, R, D> {
         // ITK warns when no parameter moves a voxel (found by differential random testing,
         // 2026-10-25: antsAI's start points outside the images).
         let mut no_shift = false;
-        let scales = self.estimate_scales_inner(&mut no_shift);
+        let n_threads = self.n_threads;
+        let scales =
+            crate::metric::in_pool(n_threads, || self.estimate_scales_inner(&mut no_shift))
+                .and_then(|r| r);
         if no_shift {
             self.warnings.push(scales::NO_SHIFT_WARNING.to_owned());
         }
@@ -651,17 +676,8 @@ impl<R: Real, const D: usize> Problem<R> for LevelProblem<'_, R, D> {
     }
 
     fn estimate_step_scale(&mut self, step: &mut [R]) -> Result<R, ItkException> {
-        self.check_samples()?;
-        if self.moving.active().has_local_support() || self.moving.active().is_bspline() {
-            // FullDomainSampling (the point set with a point-set metric first).
-            let samples = if self.point_set_samples {
-                self.samples.clone()
-            } else {
-                scales::full_domain(&self.virtual_space)
-            };
-            return scales::estimate_local_step_scale(&mut self.moving, &samples, step);
-        }
-        scales::estimate_step_scale(&mut self.moving, &self.samples, step)
+        let n_threads = self.n_threads;
+        crate::metric::in_pool(n_threads, || self.estimate_step_scale_inner(step))?
     }
 
     fn estimate_maximum_step(&self) -> R {
@@ -818,7 +834,7 @@ pub fn gradient_image_with<R: Real, const D: usize>(
     n_threads: usize,
 ) -> Result<Image<[f64; D], D>, ItkException> {
     let space = &image.space;
-    let components = R::gradient(
+    let mut data = R::gradient::<D>(
         &image.data,
         &space.size,
         &space.spacing,
@@ -834,12 +850,9 @@ pub fn gradient_image_with<R: Real, const D: usize>(
             e.to_string(),
         )
     })?;
-    let data = (0..space.len())
-        .map(|o| {
-            let local: [f64; D] = std::array::from_fn(|k| components[k][o]);
-            space.local_to_physical_vector(&local)
-        })
-        .collect();
+    for v in &mut data {
+        *v = space.local_to_physical_vector(v);
+    }
     Ok(Image::new(space.clone(), data))
 }
 
@@ -854,6 +867,7 @@ pub fn full_scale_cc<R: Real, const D: usize>(
     fixed_transform: Option<Composite<R, D>>,
     moving_transform: &Composite<R, D>,
     floor: &IndexFloor,
+    n_threads: usize,
     warnings: &mut Vec<String>,
 ) -> Result<R, ItkException> {
     let metric = ImageMetricv4 {
@@ -869,6 +883,7 @@ pub fn full_scale_cc<R: Real, const D: usize>(
         pixel_f32: false,
         local_support: false,
         outside: Default::default(),
+        n_threads: Some(n_threads),
     };
     let r =
         NeighborhoodCorrelation { radius: 4 }.evaluate(&metric, moving_transform, false, floor)?;
@@ -1006,7 +1021,10 @@ where
         // (DisplacementFieldTransformParametersAdaptor), a B-spline field given the level's
         // numbers of control points.
         if let Xfm::Field(f) = &mut output {
-            *f = crate::field::adapt(f, &virtual_space, floor);
+            let adapted = crate::metric::in_pool(Some(stage.n_threads), || {
+                crate::field::adapt(f, &virtual_space, floor)
+            })?;
+            *f = adapted;
             if let (
                 Some(meshes),
                 Some(crate::field::FieldSmoothing::BSpline {
@@ -1042,7 +1060,9 @@ where
                 &m.physical,
                 &virtual_space.direction,
             );
-            crate::transform::bspline::adapt(b, &required, floor)?;
+            crate::metric::in_pool(Some(stage.n_threads), || {
+                crate::transform::bspline::adapt(b, &required, floor)
+            })??;
         }
         let local_support = output.has_local_support();
         let sigma = stage.smoothing_sigmas[level];
@@ -1070,6 +1090,7 @@ where
                     pixel_f32: false,
                     local_support,
                     outside: stage.outside.clone(),
+                    n_threads: Some(stage.n_threads),
                 }),
                 StageMetric::PointSet(_) => None,
             });
@@ -1233,6 +1254,7 @@ where
             floor,
             bspline_jacobian: stage.correct_bspline_jacobian,
             warnings: level_warnings,
+            n_threads: Some(stage.n_threads),
         };
         let outcome = optimizer.start_level(&mut problem, observer);
         warnings.append(&mut problem.warnings);
@@ -1296,6 +1318,61 @@ mod tests {
         Image::new(space, data)
     }
 
+    /// The metric's parallel loops run in a pool of the call's thread count, never on rayon's
+    /// global pool (sized by the machine: the data panel's re-validation, 2026-10-26); with
+    /// `None` they run in the caller's pool.
+    #[test]
+    fn metric_samples_run_in_the_calls_pool() {
+        let fixed = Arc::new(blob(40, 0.0, [20.0; 3]));
+        let pool_of = |n_threads: Option<usize>| {
+            let metric = ImageMetricv4 {
+                fixed: Arc::clone(&fixed),
+                moving: Arc::clone(&fixed),
+                fixed_mask: None,
+                moving_mask: None,
+                fixed_transform: None,
+                virtual_space: fixed.space.clone(),
+                samples: None,
+                fixed_gradient_image: None,
+                moving_gradient_image: None,
+                pixel_f32: false,
+                local_support: false,
+                outside: Default::default(),
+                n_threads,
+            };
+            let mut seen = std::collections::BTreeSet::new();
+            metric
+                .for_each_sample(
+                    |_| {
+                        Some((
+                            rayon::current_num_threads(),
+                            std::thread::current().name().map(str::to_string),
+                        ))
+                    },
+                    |x| {
+                        seen.insert(x);
+                        Ok(())
+                    },
+                )
+                .unwrap();
+            seen
+        };
+        for n in [1, 3] {
+            let seen = pool_of(Some(n));
+            assert!(!seen.is_empty());
+            for (threads, name) in &seen {
+                assert_eq!(*threads, n);
+                let name = name.as_deref().unwrap_or("");
+                assert!(name.starts_with(&format!("larmorx-{n}-")), "{name}");
+            }
+        }
+        // `None`: the pool the caller installed.
+        let seen = larmorx_core::parallel::with_threads(2, || pool_of(None)).unwrap();
+        assert!(seen.iter().all(|(t, name)| {
+            *t == 2 && name.as_deref().is_some_and(|s| s.starts_with("larmorx-2-"))
+        }));
+    }
+
     /// ITK-97 and ITK-99 (differential random testing, 2026-10-25): the parameter offset of a
     /// virtual index outside the region, as ITK computes it (the region's linear offset): a
     /// voxel of the array (aliased, kept only with `alias`) or none (past the array).
@@ -1316,6 +1393,7 @@ mod tests {
                 pixel_f32: false,
                 local_support: true,
                 outside: crate::metric::OutsideDerivatives::new(alias),
+                n_threads: Some(1),
             };
             assert_eq!(metric.voxel_of(&[1, 2, 3]), Some(1 + 4 * 2 + 16 * 3));
             // One past the end of the first axis: the next row's first voxel.
@@ -1347,6 +1425,7 @@ mod tests {
             pixel_f32: false,
             local_support: false,
             outside: Default::default(),
+            n_threads: Some(1),
         };
         let floor = IndexFloor::new(larmorx_core::defects::UpstreamDefects::Fix);
         let mut problem =

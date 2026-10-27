@@ -524,6 +524,7 @@ struct FullScale<R, const D: usize> {
     interval: u32,
     fixed: Arc<Image<R, D>>,
     moving: Arc<Image<R, D>>,
+    n_threads: usize,
 }
 
 /// The observer's copy of a composite's transforms (`CreateAnother()`, `SetParameters`, then
@@ -667,6 +668,7 @@ impl<'p, R: Compute, const D: usize> Observer<R, LevelProblem<'p, R, D>>
                 self.fixed_initial.clone(),
                 &_problem.moving,
                 self.floor,
+                f.n_threads,
                 &mut printed,
             )?;
             for w in printed {
@@ -1643,6 +1645,7 @@ impl<R: Compute, const D: usize> RegistrationHelper<R, D> {
                     interval,
                     fixed: Arc::clone(f),
                     moving: Arc::clone(m),
+                    n_threads: self.n_threads,
                 }),
                 _ => None,
             };

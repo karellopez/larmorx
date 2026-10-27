@@ -59,7 +59,13 @@ def render(
         "",
         f"- **Validated:** {suite.tool}",
         f"- **Reference:** {suite.reference}",
-        f"- **Test data:** larmorx-testdata `{env['larmorx_testdata_commit']}`, tier `{tier}`",
+        f"- **Test data:** larmorx-testdata `{env['larmorx_testdata_commit']}`, "
+        + (
+            "the data panel (tier `full`, tag `panel`) and the fMRIPrep 25.2.6 oracle runs "
+            "(`oracles/fmriprep-25.2.6`)"
+            if tier == "panel"
+            else f"tier `{tier}`"
+        ),
         f"- **Generated:** {dt.date.today().isoformat()} on {env['platform']}, with `{command}`",
     ]
     if oracle is not None:

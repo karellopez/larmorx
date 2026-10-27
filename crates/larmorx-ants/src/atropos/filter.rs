@@ -421,7 +421,15 @@ impl<'a> Atropos<'a> {
     // GenerateData
 
     /// `GenerateData`: the initial labelling and model, then the iterations until convergence.
+    /// Every public entry point runs in the call's pool of `n_threads` (the models' B-spline
+    /// coefficients and smoothing included), never rayon's global one.
     pub fn run(&mut self) -> Result<(), AtroposError> {
+        let n_threads = self.n_threads;
+        larmorx_core::parallel::with_threads(n_threads, || self.run_in_pool())
+            .map_err(|e| AtroposError::Refused(e.to_string()))?
+    }
+
+    fn run_in_pool(&mut self) -> Result<(), AtroposError> {
         self.generate_initial_class_labeling()?;
         self.compute_mrf_neighborhood();
         let mut converged = false;
@@ -751,22 +759,26 @@ impl<'a> Atropos<'a> {
         let centers = self.kmeans(&sample, 1, &initial)?;
         let mut sorted: Vec<f32> = centers.iter().map(|&c| c as f32).collect();
         sorted.sort_by(|a, b| a.total_cmp(b));
-        // SampleClassifierFilter with MinimumDecisionRule: the first nearest centre.
-        let labels1: Vec<u32> = sample
-            .par_iter()
-            .map(|&x| {
-                let mut best = 0usize;
-                let mut min = 0.0f64;
-                for (k, &c) in sorted.iter().enumerate() {
-                    let d = (f64::from(c) - f64::from(x)).abs();
-                    if k == 0 || d < min {
-                        min = d;
-                        best = k;
+        // SampleClassifierFilter with MinimumDecisionRule: the first nearest centre (in the
+        // call's pool, never rayon's global one).
+        let labels1: Vec<u32> = larmorx_core::parallel::with_threads(self.n_threads, || {
+            sample
+                .par_iter()
+                .map(|&x| {
+                    let mut best = 0usize;
+                    let mut min = 0.0f64;
+                    for (k, &c) in sorted.iter().enumerate() {
+                        let d = (f64::from(c) - f64::from(x)).abs();
+                        if k == 0 || d < min {
+                            min = d;
+                            best = k;
+                        }
                     }
-                }
-                best as u32 + 1
-            })
-            .collect();
+                    best as u32 + 1
+                })
+                .collect()
+        })
+        .map_err(|e| AtroposError::Refused(e.to_string()))?;
         for (i, &v) in sample_voxels.iter().enumerate() {
             self.labels[v] = labels1[i];
         }
@@ -805,26 +817,29 @@ impl<'a> Atropos<'a> {
                 }
             }
             let centers2 = self.kmeans(&sample2, m, &initial2)?;
-            let labels2: Vec<u32> = sample2
-                .par_chunks(m)
-                .map(|x| {
-                    let mut best = 0usize;
-                    let mut min = 0.0f64;
-                    for k in 0..classes {
-                        let mut s = 0.0f64;
-                        for i in 0..m {
-                            let t = centers2[m * k + i] - f64::from(x[i]);
-                            s += t * t;
+            let labels2: Vec<u32> = larmorx_core::parallel::with_threads(self.n_threads, || {
+                sample2
+                    .par_chunks(m)
+                    .map(|x| {
+                        let mut best = 0usize;
+                        let mut min = 0.0f64;
+                        for k in 0..classes {
+                            let mut s = 0.0f64;
+                            for i in 0..m {
+                                let t = centers2[m * k + i] - f64::from(x[i]);
+                                s += t * t;
+                            }
+                            let d = s.sqrt();
+                            if k == 0 || d < min {
+                                min = d;
+                                best = k;
+                            }
                         }
-                        let d = s.sqrt();
-                        if k == 0 || d < min {
-                            min = d;
-                            best = k;
-                        }
-                    }
-                    best as u32 + 1
-                })
-                .collect();
+                        best as u32 + 1
+                    })
+                    .collect()
+            })
+            .map_err(|e| AtroposError::Refused(e.to_string()))?;
             if labels2 != labels1 {
                 if fix {
                     for (i, &v) in sample_voxels.iter().enumerate() {
@@ -1490,6 +1505,12 @@ impl<'a> Atropos<'a> {
     /// it, in class order: class 1 computes and normalizes every class (stored unless memory
     /// is minimized); later classes are read back, or computed alone.
     pub fn posterior(&mut self, c: usize) -> Result<Vec<f32>, AtroposError> {
+        let n_threads = self.n_threads;
+        larmorx_core::parallel::with_threads(n_threads, || self.posterior_in_pool(c))
+            .map_err(|e| AtroposError::Refused(e.to_string()))?
+    }
+
+    fn posterior_in_pool(&mut self, c: usize) -> Result<Vec<f32>, AtroposError> {
         let total = self.total_classes();
         if c >= total {
             return Err(itk(
@@ -1731,6 +1752,12 @@ impl<'a> Atropos<'a> {
     /// `GetDistancePriorProbabilityImage(c + 1)`: `None` without prior-based initialization or
     /// for a partial-volume class.
     pub fn distance_prior(&mut self, c: usize) -> Result<Option<Vec<f32>>, AtroposError> {
+        let n_threads = self.n_threads;
+        larmorx_core::parallel::with_threads(n_threads, || self.distance_prior_in_pool(c))
+            .map_err(|e| AtroposError::Refused(e.to_string()))?
+    }
+
+    fn distance_prior_in_pool(&mut self, c: usize) -> Result<Option<Vec<f32>>, AtroposError> {
         let classes = self.classes();
         if !self.uses_priors() || c >= classes {
             return Ok(None);
@@ -1872,6 +1899,12 @@ impl<'a> Atropos<'a> {
 
     /// `GetSmoothIntensityImageFromPriorImage(i, c + 1)`.
     pub fn smooth_intensity(&mut self, i: usize, c: usize) -> Result<Vec<f32>, AtroposError> {
+        let n_threads = self.n_threads;
+        larmorx_core::parallel::with_threads(n_threads, || self.smooth_intensity_in_pool(i, c))
+            .map_err(|e| AtroposError::Refused(e.to_string()))?
+    }
+
+    fn smooth_intensity_in_pool(&mut self, i: usize, c: usize) -> Result<Vec<f32>, AtroposError> {
         let order = self.options.spline_order as usize;
         let smoothing_error = |e: super::smoothing::SmoothingError| AtroposError::Itk {
             file: "Modules/Filtering/ImageGrid/include/itkBSplineScatteredDataPointSetToImageFilter.hxx",
@@ -1940,6 +1973,12 @@ impl<'a> Atropos<'a> {
 
     /// `GetLikelihoodImage(c + 1)`.
     pub fn likelihood(&mut self, c: usize) -> Result<Vec<f32>, AtroposError> {
+        let n_threads = self.n_threads;
+        larmorx_core::parallel::with_threads(n_threads, || self.likelihood_in_pool(c))
+            .map_err(|e| AtroposError::Refused(e.to_string()))?
+    }
+
+    fn likelihood_in_pool(&mut self, c: usize) -> Result<Vec<f32>, AtroposError> {
         let m = self.intensities.len();
         let smooth = if self.uses_priors() {
             self.smooth_images_for_any(c)?

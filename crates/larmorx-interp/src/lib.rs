@@ -906,6 +906,9 @@ pub fn bspline_line_to_coefficients(line: &mut [f64], order: u32) {
 mod bspline {
     use super::*;
 
+    /// The z columns filtered together before they are written back (a few MiB).
+    const COLUMN_BLOCK: usize = 1 << 12;
+
     const TOLERANCE: f64 = 1e-10;
 
     pub(super) fn poles(order: u32) -> Vec<f64> {
@@ -999,20 +1002,28 @@ mod bspline {
                 }
             }
         });
-        // z lines: across planes; process columns of the (x, y) plane in parallel.
+        // z lines: across planes; columns of the (x, y) plane in parallel, a block of them at a
+        // time (all of them at once held a second copy of the volume: on a 7 T head, 140 MB
+        // more than ITK, the user's memory rule of 2026-10-25). Each column is independent: the
+        // values are the same.
         let plane = nx * ny;
-        let columns: Vec<Vec<f64>> = (0..plane)
-            .into_par_iter()
-            .map(|xy| {
-                let mut line: Vec<f64> = (0..nz).map(|k| c[xy + plane * k]).collect();
-                line_to_coefficients(&mut line, &poles);
-                line
-            })
-            .collect();
-        for (xy, line) in columns.into_iter().enumerate() {
-            for (k, v) in line.into_iter().enumerate() {
-                c[xy + plane * k] = v;
+        let mut start = 0;
+        while start < plane {
+            let end = (start + COLUMN_BLOCK).min(plane);
+            let columns: Vec<Vec<f64>> = (start..end)
+                .into_par_iter()
+                .map(|xy| {
+                    let mut line: Vec<f64> = (0..nz).map(|k| c[xy + plane * k]).collect();
+                    line_to_coefficients(&mut line, &poles);
+                    line
+                })
+                .collect();
+            for (xy, line) in (start..end).zip(columns) {
+                for (k, v) in line.into_iter().enumerate() {
+                    c[xy + plane * k] = v;
+                }
             }
+            start = end;
         }
         c
     }

@@ -558,275 +558,283 @@ fn run_levels<R: Real, const D: usize, const E: usize>(
             // GetMetricDerivativePointSetForAllTimePoints.
             let mut scattered = Scattered::<R, E, D>::default();
             let mut value_sum = R::ZERO;
-            for tp in 0..samples {
-                let t = if samples > 1 {
-                    R::from_i64(tp as i64) / R::from_i64(samples as i64 - 1)
-                } else {
-                    R::ZERO
-                };
-                // The fixed flow, from t back to 0 (zero at the first sample: the field is
-                // filled with zeros, its inverse is the previous integration's, ITK-37).
-                if tp == 0 {
-                    transform.field = zero_field(&transform.field.space);
-                    if transform.inverse.is_some() && need_inverses {
-                        stale_inverses = true;
-                    }
-                    if stage.correct_stale_inverses {
-                        transform.inverse = Some(zero_field(&transform.field.space));
-                    }
-                } else {
-                    transform.lower = t;
-                    transform.upper = R::ZERO;
-                    transform.steps = steps;
-                    let tr = &mut transform;
-                    pooled(stage.n_threads, || tr.integrate(floor, need_inverses))??;
-                }
-                let fixed_field = FieldXfm::new(
-                    transform.field.clone(),
-                    transform.inverse.clone(),
-                    stage.exact_floor,
-                );
-                let mut fixed: Vec<Xfm<R, D>> = stage
-                    .fixed_initial
-                    .as_ref()
-                    .map(|c| c.transforms.clone())
-                    .unwrap_or_default();
-                fixed.push(Xfm::Field(fixed_field));
-                let fixed_composite = Composite::new(fixed);
-                // The moving flow, from t to 1 (zero at the last sample, its inverse ITK-37's).
-                if tp == samples - 1 {
-                    transform.field = zero_field(&transform.field.space);
-                    if transform.inverse.is_some() && need_inverses {
-                        stale_inverses = true;
-                    }
-                    if stage.correct_stale_inverses {
-                        transform.inverse = Some(zero_field(&transform.field.space));
-                    }
-                } else {
-                    transform.lower = t;
-                    transform.upper = R::ONE;
-                    transform.steps = steps;
-                    let tr = &mut transform;
-                    pooled(stage.n_threads, || tr.integrate(floor, need_inverses))??;
-                }
-                let moving_field = FieldXfm::new(
-                    transform.field.clone(),
-                    transform.inverse.clone(),
-                    stage.exact_floor,
-                );
-                let mut moving = stage.moving_initial.clone();
-                moving.push(Xfm::Field(moving_field));
-                let moving_composite = Composite::new(moving);
-                let first_new = scattered.points.len();
-                let time = t.to_f64() as f32;
-                if point_set_only {
-                    // The point-set metric alone: each fixed point's derivative at its virtual
-                    // position, then the boundary of the fixed flow's domain, pinned.
-                    let p = point_sets[0].as_mut().expect("a point-set metric");
-                    let call = TangentCall {
-                        swapped: false,
-                        fixed_transform: &fixed_composite,
-                        moving_transform: &moving_composite,
-                        virtual_space: &virtual_space,
-                        sparse: false,
+            // Every time sample's flows, resampled images and metric gradients in the call's
+            // pool (never rayon's global one).
+            pooled(stage.n_threads, || -> Result<(), ItkException> {
+                for tp in 0..samples {
+                    let t = if samples > 1 {
+                        R::from_i64(tp as i64) / R::from_i64(samples as i64 - 1)
+                    } else {
+                        R::ZERO
                     };
-                    let (value, mut derivative) =
-                        pooled(stage.n_threads, || -> Result<_, ItkException> {
-                            p.tangent_initialize(&call, warnings)?;
-                            p.tangent_evaluate(warnings)
-                        })??;
-                    value_sum = value_sum + value;
-                    if let Some(w) = settings.optimizer_weights
-                        && w.len() == D
-                        && !weights_are_identity(w)
-                    {
-                        for chunk in derivative.as_chunks_mut::<D>().0 {
-                            for d in 0..D {
-                                chunk[d] = chunk[d] * w[d];
+                    // The fixed flow, from t back to 0 (zero at the first sample: the field is
+                    // filled with zeros, its inverse is the previous integration's, ITK-37).
+                    if tp == 0 {
+                        transform.field = zero_field(&transform.field.space);
+                        if transform.inverse.is_some() && need_inverses {
+                            stale_inverses = true;
+                        }
+                        if stage.correct_stale_inverses {
+                            transform.inverse = Some(zero_field(&transform.field.space));
+                        }
+                    } else {
+                        transform.lower = t;
+                        transform.upper = R::ZERO;
+                        transform.steps = steps;
+                        let tr = &mut transform;
+                        pooled(stage.n_threads, || tr.integrate(floor, need_inverses))??;
+                    }
+                    let fixed_field = FieldXfm::new(
+                        transform.field.clone(),
+                        transform.inverse.clone(),
+                        stage.exact_floor,
+                    );
+                    let mut fixed: Vec<Xfm<R, D>> = stage
+                        .fixed_initial
+                        .as_ref()
+                        .map(|c| c.transforms.clone())
+                        .unwrap_or_default();
+                    fixed.push(Xfm::Field(fixed_field));
+                    let fixed_composite = Composite::new(fixed);
+                    // The moving flow, from t to 1 (zero at the last sample, its inverse ITK-37's).
+                    if tp == samples - 1 {
+                        transform.field = zero_field(&transform.field.space);
+                        if transform.inverse.is_some() && need_inverses {
+                            stale_inverses = true;
+                        }
+                        if stage.correct_stale_inverses {
+                            transform.inverse = Some(zero_field(&transform.field.space));
+                        }
+                    } else {
+                        transform.lower = t;
+                        transform.upper = R::ONE;
+                        transform.steps = steps;
+                        let tr = &mut transform;
+                        pooled(stage.n_threads, || tr.integrate(floor, need_inverses))??;
+                    }
+                    let moving_field = FieldXfm::new(
+                        transform.field.clone(),
+                        transform.inverse.clone(),
+                        stage.exact_floor,
+                    );
+                    let mut moving = stage.moving_initial.clone();
+                    moving.push(Xfm::Field(moving_field));
+                    let moving_composite = Composite::new(moving);
+                    let first_new = scattered.points.len();
+                    let time = t.to_f64() as f32;
+                    if point_set_only {
+                        // The point-set metric alone: each fixed point's derivative at its virtual
+                        // position, then the boundary of the fixed flow's domain, pinned.
+                        let p = point_sets[0].as_mut().expect("a point-set metric");
+                        let call = TangentCall {
+                            swapped: false,
+                            fixed_transform: &fixed_composite,
+                            moving_transform: &moving_composite,
+                            virtual_space: &virtual_space,
+                            sparse: false,
+                        };
+                        let (value, mut derivative) =
+                            pooled(stage.n_threads, || -> Result<_, ItkException> {
+                                p.tangent_initialize(&call, warnings)?;
+                                p.tangent_evaluate(warnings)
+                            })??;
+                        value_sum = value_sum + value;
+                        if let Some(w) = settings.optimizer_weights
+                            && w.len() == D
+                            && !weights_are_identity(w)
+                        {
+                            for chunk in derivative.as_chunks_mut::<D>().0 {
+                                for d in 0..D {
+                                    chunk[d] = chunk[d] * w[d];
+                                }
                             }
                         }
-                    }
-                    let points = p.tangent_fixed_points();
-                    let oblique = virtual_space.direction != parametric.direction;
-                    if oblique {
-                        physical_points = true;
-                    }
-                    let correct = stage.correct_point_positions && oblique;
-                    for (k, q) in points.iter().enumerate() {
-                        let mut st = [0f32; E];
-                        if correct {
-                            let qd: [f64; D] = std::array::from_fn(|d| f64::from(q[d]));
-                            let c: [f64; D] = virtual_space.point_to_cindex(&qd);
-                            let r = parametric.cindex_to_point(&c);
-                            for d in 0..D {
-                                st[d] = r[d] as f32;
-                            }
-                        } else {
-                            st[..D].copy_from_slice(q);
+                        let points = p.tangent_fixed_points();
+                        let oblique = virtual_space.direction != parametric.direction;
+                        if oblique {
+                            physical_points = true;
                         }
-                        st[D] = time;
-                        scattered.points.push(st);
-                        scattered
-                            .data
-                            .push(std::array::from_fn(|d| derivative[k * D + d]));
-                        scattered.weights.push(1.0);
-                    }
-                    let fs = &transform.field.space;
-                    for o in 0..fs.len() {
-                        let idx = fs.index_of(o);
-                        let boundary = (0..D).any(|d| {
-                            idx[d] == fs.start[d] || idx[d] == fs.start[d] + fs.size[d] as i64 - 1
-                        });
-                        if boundary {
-                            let q = if correct {
-                                let c: [f64; D] = std::array::from_fn(|d| idx[d] as f64);
-                                parametric.cindex_to_point(&c)
+                        let correct = stage.correct_point_positions && oblique;
+                        for (k, q) in points.iter().enumerate() {
+                            let mut st = [0f32; E];
+                            if correct {
+                                let qd: [f64; D] = std::array::from_fn(|d| f64::from(q[d]));
+                                let c: [f64; D] = virtual_space.point_to_cindex(&qd);
+                                let r = parametric.cindex_to_point(&c);
+                                for d in 0..D {
+                                    st[d] = r[d] as f32;
+                                }
                             } else {
-                                fs.index_to_point(&idx)
+                                st[..D].copy_from_slice(q);
+                            }
+                            st[D] = time;
+                            scattered.points.push(st);
+                            scattered
+                                .data
+                                .push(std::array::from_fn(|d| derivative[k * D + d]));
+                            scattered.weights.push(1.0);
+                        }
+                        let fs = &transform.field.space;
+                        for o in 0..fs.len() {
+                            let idx = fs.index_of(o);
+                            let boundary = (0..D).any(|d| {
+                                idx[d] == fs.start[d]
+                                    || idx[d] == fs.start[d] + fs.size[d] as i64 - 1
+                            });
+                            if boundary {
+                                let q = if correct {
+                                    let c: [f64; D] = std::array::from_fn(|d| idx[d] as f64);
+                                    parametric.cindex_to_point(&c)
+                                } else {
+                                    fs.index_to_point(&idx)
+                                };
+                                let mut st = [0f32; E];
+                                for d in 0..D {
+                                    st[d] = q[d] as f32;
+                                }
+                                st[D] = time;
+                                scattered.points.push(st);
+                                scattered.data.push([R::ZERO; D]);
+                                scattered.weights.push(BOUNDARY_WEIGHT);
+                            }
+                        }
+                    } else {
+                        // AttachMetricGradientPointSetAtSpecificTimePoint.
+                        // ITK-40's notice: whether moving the masks changes them.
+                        if !masks_not_moved {
+                            masks_not_moved = level_metrics.iter().flatten().any(|lm| {
+                                crate::time_varying::masks_move(
+                                    &lm.fixed_mask,
+                                    &lm.moving_mask,
+                                    &virtual_space,
+                                    &fixed_composite,
+                                    &moving_composite,
+                                )
+                            });
+                        }
+                        let mut resampled: Vec<Option<Resampled<R, D>>> =
+                            Vec::with_capacity(level_metrics.len());
+                        for lm in &level_metrics {
+                            resampled.push(lm.as_ref().map(|lm| {
+                                let (fixed_mask, moving_mask) =
+                                    crate::time_varying::evaluation_masks(
+                                        &lm.fixed_mask,
+                                        &lm.moving_mask,
+                                        stage.correct_masks,
+                                        &virtual_space,
+                                        &fixed_composite,
+                                        &moving_composite,
+                                    );
+                                Resampled {
+                                    fixed: Arc::new(resample_image(
+                                        &lm.fixed,
+                                        &virtual_space,
+                                        &fixed_composite,
+                                        floor,
+                                    )),
+                                    moving: Arc::new(resample_image(
+                                        &lm.moving,
+                                        &virtual_space,
+                                        &moving_composite,
+                                        floor,
+                                    )),
+                                    fixed_mask,
+                                    moving_mask,
+                                    fixed_gradient: None,
+                                    moving_gradient: None,
+                                }
+                            }));
+                        }
+                        // ITK-36: the transforms the last metric set apply to every metric.
+                        let last_is_point_set =
+                            matches!(stage.metrics.last(), Some(StageMetric::PointSet(_)));
+                        let identity_field = Composite::new(vec![Xfm::Field(FieldXfm::new(
+                            zero_field(&virtual_space),
+                            Some(zero_field(&virtual_space)),
+                            stage.exact_floor,
+                        ))]);
+                        let reproduce_itk_36 =
+                            multi && has_point_sets && !stage.correct_multi_metric_transforms;
+                        if multi && has_point_sets {
+                            multi_metric_transforms = true;
+                        }
+                        let identity =
+                            (reproduce_itk_36 && !last_is_point_set).then_some(&identity_field);
+                        let images_through = (reproduce_itk_36 && last_is_point_set)
+                            .then_some((&fixed_composite, &moving_composite));
+                        let mut call = GradientCall {
+                            metrics: &level_metrics,
+                            resampled: &mut resampled,
+                            point_sets: &mut *point_sets,
+                            fixed_composite: &fixed_composite,
+                            moving_composite: &moving_composite,
+                            identity,
+                            virtual_space: &virtual_space,
+                            weights: &mut weights,
+                            multi,
+                            settings,
+                            floor,
+                            masks: &mut masks,
+                            stale_masks: false,
+                            joint_pdfs: &joint_pdfs,
+                            through: images_through,
+                            outside: &crate::metric::OutsideDerivatives::default(),
+                        };
+                        let (value, derivative) = call.gradient_field(false, warnings)?;
+                        value_sum = value_sum + value;
+                        let mask_weights = fixed_mask
+                            .as_ref()
+                            .map(|m| weighted_mask(m, &virtual_space, &fixed_composite, floor));
+                        let vs = &virtual_space;
+                        for o in 0..vs.len() {
+                            let idx = vs.index_of(o);
+                            let boundary = (0..D).any(|d| {
+                                idx[d] == vs.start[d]
+                                    || idx[d] == vs.start[d] + vs.size[d] as i64 - 1
+                            });
+                            let weight: f32 = if boundary {
+                                BOUNDARY_WEIGHT
+                            } else if let Some(w) = &mask_weights {
+                                R::from_f64(f64::from(w[o])).to_f64() as f32
+                            } else {
+                                1.0
                             };
+                            let c: [f64; D] = std::array::from_fn(|d| idx[d] as f64);
+                            let q = parametric.cindex_to_point(&c);
                             let mut st = [0f32; E];
                             for d in 0..D {
                                 st[d] = q[d] as f32;
                             }
                             st[D] = time;
                             scattered.points.push(st);
-                            scattered.data.push([R::ZERO; D]);
-                            scattered.weights.push(BOUNDARY_WEIGHT);
+                            scattered.data.push(derivative.data[o]);
+                            scattered.weights.push(weight);
                         }
                     }
-                } else {
-                    // AttachMetricGradientPointSetAtSpecificTimePoint.
-                    // ITK-40's notice: whether moving the masks changes them.
-                    if !masks_not_moved {
-                        masks_not_moved = level_metrics.iter().flatten().any(|lm| {
-                            crate::time_varying::masks_move(
-                                &lm.fixed_mask,
-                                &lm.moving_mask,
-                                &virtual_space,
-                                &fixed_composite,
-                                &moving_composite,
-                            )
-                        });
+                    // This time sample's vectors scaled to a largest norm of 1.
+                    let mut max_squared = R::ZERO;
+                    for v in &scattered.data[first_new..] {
+                        let mut s = 0.0f64;
+                        for c in v {
+                            let x = c.to_f64();
+                            s += x * x;
+                        }
+                        let s = R::from_f64(s);
+                        if s > max_squared {
+                            max_squared = s;
+                        }
                     }
-                    let mut resampled: Vec<Option<Resampled<R, D>>> =
-                        Vec::with_capacity(level_metrics.len());
-                    for lm in &level_metrics {
-                        resampled.push(lm.as_ref().map(|lm| {
-                            let (fixed_mask, moving_mask) = crate::time_varying::evaluation_masks(
-                                &lm.fixed_mask,
-                                &lm.moving_mask,
-                                stage.correct_masks,
-                                &virtual_space,
-                                &fixed_composite,
-                                &moving_composite,
-                            );
-                            Resampled {
-                                fixed: Arc::new(resample_image(
-                                    &lm.fixed,
-                                    &virtual_space,
-                                    &fixed_composite,
-                                    floor,
-                                )),
-                                moving: Arc::new(resample_image(
-                                    &lm.moving,
-                                    &virtual_space,
-                                    &moving_composite,
-                                    floor,
-                                )),
-                                fixed_mask,
-                                moving_mask,
-                                fixed_gradient: None,
-                                moving_gradient: None,
+                    if max_squared > R::ZERO {
+                        let factor = R::from_f64(1.0 / max_squared.sqrt().to_f64());
+                        for v in &mut scattered.data[first_new..] {
+                            for c in v.iter_mut() {
+                                *c = factor * *c;
                             }
-                        }));
-                    }
-                    // ITK-36: the transforms the last metric set apply to every metric.
-                    let last_is_point_set =
-                        matches!(stage.metrics.last(), Some(StageMetric::PointSet(_)));
-                    let identity_field = Composite::new(vec![Xfm::Field(FieldXfm::new(
-                        zero_field(&virtual_space),
-                        Some(zero_field(&virtual_space)),
-                        stage.exact_floor,
-                    ))]);
-                    let reproduce_itk_36 =
-                        multi && has_point_sets && !stage.correct_multi_metric_transforms;
-                    if multi && has_point_sets {
-                        multi_metric_transforms = true;
-                    }
-                    let identity =
-                        (reproduce_itk_36 && !last_is_point_set).then_some(&identity_field);
-                    let images_through = (reproduce_itk_36 && last_is_point_set)
-                        .then_some((&fixed_composite, &moving_composite));
-                    let mut call = GradientCall {
-                        metrics: &level_metrics,
-                        resampled: &mut resampled,
-                        point_sets: &mut *point_sets,
-                        fixed_composite: &fixed_composite,
-                        moving_composite: &moving_composite,
-                        identity,
-                        virtual_space: &virtual_space,
-                        weights: &mut weights,
-                        multi,
-                        settings,
-                        floor,
-                        masks: &mut masks,
-                        stale_masks: false,
-                        joint_pdfs: &joint_pdfs,
-                        through: images_through,
-                        outside: &crate::metric::OutsideDerivatives::default(),
-                    };
-                    let (value, derivative) = call.gradient_field(false, warnings)?;
-                    value_sum = value_sum + value;
-                    let mask_weights = fixed_mask
-                        .as_ref()
-                        .map(|m| weighted_mask(m, &virtual_space, &fixed_composite, floor));
-                    let vs = &virtual_space;
-                    for o in 0..vs.len() {
-                        let idx = vs.index_of(o);
-                        let boundary = (0..D).any(|d| {
-                            idx[d] == vs.start[d] || idx[d] == vs.start[d] + vs.size[d] as i64 - 1
-                        });
-                        let weight: f32 = if boundary {
-                            BOUNDARY_WEIGHT
-                        } else if let Some(w) = &mask_weights {
-                            R::from_f64(f64::from(w[o])).to_f64() as f32
-                        } else {
-                            1.0
-                        };
-                        let c: [f64; D] = std::array::from_fn(|d| idx[d] as f64);
-                        let q = parametric.cindex_to_point(&c);
-                        let mut st = [0f32; E];
-                        for d in 0..D {
-                            st[d] = q[d] as f32;
-                        }
-                        st[D] = time;
-                        scattered.points.push(st);
-                        scattered.data.push(derivative.data[o]);
-                        scattered.weights.push(weight);
-                    }
-                }
-                // This time sample's vectors scaled to a largest norm of 1.
-                let mut max_squared = R::ZERO;
-                for v in &scattered.data[first_new..] {
-                    let mut s = 0.0f64;
-                    for c in v {
-                        let x = c.to_f64();
-                        s += x * x;
-                    }
-                    let s = R::from_f64(s);
-                    if s > max_squared {
-                        max_squared = s;
-                    }
-                }
-                if max_squared > R::ZERO {
-                    let factor = R::from_f64(1.0 / max_squared.sqrt().to_f64());
-                    for v in &mut scattered.data[first_new..] {
-                        for c in v.iter_mut() {
-                            *c = factor * *c;
                         }
                     }
                 }
-            }
+                Ok(())
+            })??;
             // Averaging with the previous iteration's vectors (the previous ones as they were
             // before their own averaging).
             match &mut previous {

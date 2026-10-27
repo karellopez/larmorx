@@ -235,7 +235,12 @@ pub fn evaluate<R: Real, const D: usize>(
         Some((value, local, voxel, cols))
     };
     let mut reduction = BaseReduction::for_metric(m, transform, compute_derivative);
-    m.for_each_sample(process, |(v, l, voxel, cols)| {
+    let width = if compute_derivative {
+        m.sample_width(transform)
+    } else {
+        0
+    };
+    m.for_each_sample_of(width, process, |(v, l, voxel, cols)| {
         reduction.add_point_cols(v, &l, cols.as_deref(), voxel);
         Ok(())
     })?;

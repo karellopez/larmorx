@@ -319,6 +319,25 @@ def all_cases() -> list[AntsCase]:
     ]
 
 
+def panel_cases() -> list[AntsCase]:
+    """The data panel's tier (no fMRIPrep node runs ResampleImageBySpacing): panel images to
+    coarser grids, smoothed as the program does by default."""
+    from larmorx_validation.parity import panel_images as P
+
+    def r(cid, description, image, *args):
+        return P.ants_case(
+            PROGRAM, cid, description, ("3", image, "{out}", *args), [image], stdout=True
+        )
+
+    return [
+        r("2mm/7t-mp2rage", "the raw 7 T MP2RAGE to 2 mm, smoothed", P.MP2RAGE_7T, "2", "2", "2"),
+        r("1mm/flair", "a FLAIR of 0.42 x 0.42 x 3 mm to 1 x 1 x 3 mm", P.FLAIR_OLDER,
+          "1", "1", "3"),
+        r("1.5mm/toddler", "a 3.5-year-old's T1w to 1.5 mm without smoothing", P.TODDLER_T1W,
+          "1.5", "1.5", "1.5", "0"),
+    ]  # fmt: skip
+
+
 def suite():
     return make_suite(
         "ants-resample-image-by-spacing",
@@ -326,6 +345,7 @@ def suite():
         "`larmorx ants ResampleImageBySpacing` / `lx.ants.resample_image_by_spacing` "
         "(crates larmorx-ants, larmorx-image)",
         all_cases,
+        panel=panel_cases,
         notes="Real images come from `larmorx-testdata` (OpenNeuro ds000005, its fMRIPrep "
         "derivatives, TemplateFlow). Standard output is compared on every passing case.",
     )

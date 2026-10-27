@@ -188,7 +188,12 @@ pub fn evaluate<R: Real, const D: usize>(
     let mut fdm = vec![R::ZERO; if compute_derivative { np } else { 0 }];
     let mut mdm = fdm.clone();
     let mut valid: usize = 0;
-    m.for_each_sample(process, |(f1, m1, projected, cols)| {
+    let width = if compute_derivative {
+        m.sample_width(transform)
+    } else {
+        0
+    };
+    m.for_each_sample_of(width, process, |(f1, m1, projected, cols)| {
         f2 = f2 + f1 * f1;
         m2 = m2 + m1 * m1;
         fm = fm + f1 * m1;

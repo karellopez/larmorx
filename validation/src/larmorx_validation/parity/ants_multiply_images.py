@@ -89,10 +89,36 @@ def all_cases() -> list[AntsCase]:
     ]
 
 
+def panel_cases() -> list[AntsCase]:
+    """The data panel's tier: every MultiplyImages node of the fourteen fMRIPrep oracle runs
+    (sMRIPrep's relabelling in the brain extraction), and products on panel images."""
+    from larmorx_validation.parity import fmriprep_nodes
+    from larmorx_validation.parity import panel_images as P
+
+    return [
+        *fmriprep_nodes.ants_cases("MultiplyImages"),
+        P.ants_case(
+            "MultiplyImages",
+            "lesion/stroke-t2w",
+            "a T2w times its manual lesion mask (uint8)",
+            ("3", P.STROKE_T2W, P.STROKE_LESION, "{out}"),
+            [P.STROKE_T2W, P.STROKE_LESION],
+        ),
+        P.ants_case(
+            "MultiplyImages",
+            "scalar/bold-mb4-philips",
+            "a 588-volume float32 series times 0.5 (MultiplyImages 4)",
+            ("4", P.BOLD_MB4_PHILIPS, "0.5", "{out}"),
+            [P.BOLD_MB4_PHILIPS],
+        ),
+    ]
+
+
 def suite():
     return make_suite(
         "ants-multiply-images",
         "MultiplyImages",
         "`larmorx ants MultiplyImages` / `lx.ants.multiply_images` (crate larmorx-ants)",
         all_cases,
+        panel=panel_cases,
     )

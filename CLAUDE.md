@@ -26,7 +26,7 @@ The FreeSurfer port is a separate wheel, `larmorx-freesurfer` (exposed as `lx.fr
 
 **Targets:** native wheels for Windows x64/arm64, Linux x64/aarch64 and macOS x64/arm64. No Docker, no external neuroimaging installs, no admin rights.
 
-## Where things are (2026-10-26)
+## Where things are (2026-10-27)
 Phase L1 in progress. History: [docs/status-log.md](docs/status-log.md) (to 2026-10-26) and the merge commits; decisions: [docs/decision-log.md](docs/decision-log.md); **the plan, its order, the follow-ups and the decisions waiting for the user: [docs/next-steps.md](docs/next-steps.md)** (keep it current).
 
 **Ported and validated** (one record per tool in `docs/validation/`, each leading with the results against the unmodified original):
@@ -34,7 +34,7 @@ Phase L1 in progress. History: [docs/status-log.md](docs/status-log.md) (to 2026
 | Family | Tools | Records |
 |---|---|---|
 | I/O and transforms | NIfTI-1/2 I/O (`lx.load`, `lx.save`, `lx.Image`); ITK transform files, HDF5 included, read and written in pure Rust (`larmorx-hdf5`); fMRIPrep's one-shot BOLD resampler (`lx.transforms.resample_series`) | `nifti-io`, `itk-hdf5`, `resample-series` |
-| ANTs and ITK (ports) | antsApplyTransforms (`--float 1`, transform outputs, B-spline transforms), N4BiasFieldCorrection, DenoiseImage, ImageMath (every operation fMRIPrep, sMRIPrep and sdcflows call), ThresholdImage, MultiplyImages, SmoothImage, ResampleImage(BySpacing), antsRegistration (every stage: linear, SyN, BSplineSyN, BSpline, displacement-field, Exponential, BSplineExponential and time-varying velocity-field; image and point-set metrics; the corrections of 2026-10-21 on by default), antsAI (every option, the blob alignment included), antsAffineInitializer, Atropos (every option; sMRIPrep's call bit-identical with correctly rounded maths on the five oracle runs) | `ants-*` |
+| ANTs and ITK (ports) | antsApplyTransforms (`--float 1`, transform outputs, B-spline transforms), N4BiasFieldCorrection, DenoiseImage, ImageMath (every operation fMRIPrep, sMRIPrep and sdcflows call), ThresholdImage, MultiplyImages, SmoothImage, ResampleImage(BySpacing), antsRegistration (every stage: linear, SyN, BSplineSyN, BSpline, displacement-field, Exponential, BSplineExponential and time-varying velocity-field; image and point-set metrics; the corrections of 2026-10-21 on by default), antsAI (every option, the blob alignment included), antsAffineInitializer, Atropos (every option; sMRIPrep's call bit-identical with correctly rounded maths on the five oracle runs); **re-validated on the data panel** (2026-10-27: every ANTs node of fMRIPrep's fourteen oracle runs and the panel's own images, records `ants-*-panel`) | `ants-*` |
 | AFNI | 3dTshift, 3dAutomask, 3dUnifize, complete: clean-room originals (`crates/larmorx-afni`) and GPL replicas (`crates-gpl/`) | `afni-tshift`, `afni-tshift-replica`, `afni-automask`, `afni-automask-replica`, `afni-unifize`, `afni-unifize-replica` |
 | FSL | head-motion correction with mcflirt-style options, clean-room original, `experimental` (`lx.mri.hmc`); the mcflirt replica (`crates-nc/`, package `larmorx-nc`, FSL Licence: non-commercial, FSL's source in `crates-nc/fsl-source/`), bit-identical to mcflirt as built (173 of 173 compared cases of its record, fMRIPrep's 22 calls on the twelve oracle runs with BOLD runs included, and fMRIPrep's own matrices identical); `larmorx-nc-core` is the shared core of the next FSL replicas; the **BET** replica (`larmorx-nc fsl bet`, `bet2`, `betsurf`; `lx.fsl.bet`, `lx.fsl.betsurf`; `bet -S`, `-B`, `-A`, `-A2` pending FLIRT and FAST): every file FSL 6.0.7.17 writes byte for byte in every compared case (129 of 129, 364 files, fMRIPrep's 29 BET calls on the twelve oracle runs with BOLD runs included); its FSL libraries are the core's, shared with mcflirt | `mri-hmc`, `fsl-mcflirt-replica`, `fsl-bet-replica`, `fsl-bet-replica-full` |
 
@@ -46,10 +46,10 @@ Golden tests cover every tool on all six platforms (`docs/validation/golden.md`)
 - **The data panel:** fourteen OpenNeuro subjects (larmorx-testdata `docs/panel.md`, `fetch --tier full --tag panel`), and fourteen fMRIPrep oracle runs (below).
 - **Differential random testing** ([docs/validation/difftest.md](docs/validation/difftest.md)): `python -m larmorx_validation difftest`, nightly by `scripts/orchestration/difftest-nightly.sh`, in memory boxes; heavy cases queued (25 wait for a larger machine, 11 are beyond any machine and checked as guard cases).
 - **Generated tables:** `python -m larmorx_validation tables [--check]` writes the README's tool table, the validation index and the site's status from `validation/tools.toml` and the records.
-- **Memory:** heavy jobs in boxes (`scripts/orchestration/boxed.sh`); larmorx never above the original's peak (`tests/parity/test_memory_peak.py`); guards stop impossible sizes before allocating (ANTS-162, AFNI-75).
+- **Memory:** heavy jobs in boxes (`scripts/orchestration/boxed.sh`); larmorx's peak similar to the original's (at most 10 % above plus 8 MiB, `tests/parity/test_memory_peak.py`); the thread pools exact (every call's parallel work in its own pool of `n_threads`: `tests/parity/test_thread_pools.py`, 74 paths); guards stop impossible sizes before allocating (ANTS-162, AFNI-75).
 - **FSL:** `crates-nc/` (`larmorx-nc`, FSL Licence) with its shared core `larmorx-nc-core`; the mcflirt and BET replicas.
 **Next:** this round is complete (BET merged). Next comes a clean stop, then the move to the new
-main machine, then every finished tool re-validated on the data panel (the oracle-output cache,
+main machine, then the data panel's re-validation of AFNI, FSL and I/O (part b; the ANTs tools' part a is done, 2026-10-27; first a small part for antsAI and antsAffineInitializer) (the oracle-output cache,
 the data panel, differential random testing and the generated tables are done; the nights run by
 `scripts/orchestration/difftest-nightly.sh`), then BET's clean-room original (from
 `specs/bet.md`) and the next FSL tools (FLIRT with BBR, FAST, topup). Then field maps,

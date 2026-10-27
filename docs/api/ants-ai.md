@@ -35,6 +35,18 @@ per work unit); larmorx always gives ANTs' one-thread result. **`Random` samplin
 repeatable in ANTs** (its voxels are drawn from the clock, whatever the seed; so are `Regular`
 sampling's perturbations with `--random-seed 0`, ANTS-58); larmorx seeds them from the seed.
 
+**On the data panel** ([record](../validation/ants-ai-panel.md), 2026-10-26): all 36 antsAI
+nodes of the fourteen finished fMRIPrep oracle runs (the brain extraction's `init_aff` in every
+run, the BOLD reference's in 22 runs; the 3.5-year-old, the glioma, the stroke, 1.5 T, 7 T,
+multiband-8 and multi-echo among them), with fMRIPrep's seed, and four images fMRIPrep never gives
+it (a FLAIR, a glioma's T2w, an older adult's T2w, the 7 T MP2RAGE, with sMRIPrep's options):
+**40 of 40 identical to ANTs 2.6.5 at one thread** (38 as built, 2 with CORE-MATH). Against
+fMRIPrep's own transforms (ANTs 2.6.2 at 6 or 8 threads): 31 within 1e-8 in a parameter, five
+further, by up to 6.8 mm over a 100 mm cube. Those five are ANTs' own spread above one thread:
+fMRIPrep's ANTs at one thread gives exactly larmorx's transform, and both ANTs builds at
+fMRIPrep's thread count land, run to run, on fMRIPrep's file, on the one-thread result or
+elsewhere ([findings](../findings/ants-ai.md), "On the data panel").
+
 ## Quick start
 
 ```python

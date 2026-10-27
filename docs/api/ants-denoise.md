@@ -25,6 +25,15 @@ outputs):
   threads a fifth of the voxels of a T1w change, by up to 97; with 8 or 12 the result also
   changes from run to run. larmorx always gives ANTs' one-thread result.
 
+**On the data panel** ([record](../validation/ants-denoise-panel.md), 2026-10-26): sMRIPrep's
+command on every T1w of the fourteen finished oracle runs (17 calls: the 3.5-year-old, the
+glioma, the stroke, strong motion, 1.5 T and 7 T among them, and the runs with several T1w), each
+replayed from its node with the node's inputs, and four images fMRIPrep never denoises (the 7 T
+MP2RAGE, the 82-year-old's FLAIR, a child's T2w with `-n Rician`, the 1.5 T T1w as float with
+`-n Gaussian`): **21 of 21 bit-identical to ANTs with CORE-MATH**; against the unmodified ANTs,
+glibc's `expf` changes voxels in all 21, by at most 0.0015 of ANTs' own difference between one
+thread and two or three, 1 − NCC below 2e-17.
+
 **Speed** ([benchmark](../benchmarks/ants-denoise.md)): sMRIPrep's command on a raw T1w
 (160×192×192) takes 13.0 s on one thread and 2.9 s on 12, against 217 s and 45 s for ANTs. On
 the six command lines measured, larmorx is 10.7–17× faster than ANTs on one thread, and

@@ -28,10 +28,12 @@ PAGE_BUDGET = 40_000_000
 #: raised one here, its reason printed with the sizes.
 PAGE_BUDGETS: dict[str, tuple[int, str]] = {
     "ants-n4": (
-        60_000_000,
+        75_000_000,
         "the ANTS-40 example, fMRIPrep's final N4 of ds005454's 0.8 mm 7T T1w template, is a "
         "whole volume (172 x 214 x 172 voxels shown, about 40 MB) beside the ds000005 example "
-        "(10 MB): an existing 3D view, kept at full resolution",
+        "(10 MB): an existing 3D view, kept at full resolution; and the data panel's six "
+        "examples (2026-10-26: fMRIPrep's N4 of a multiband-8 BOLD reference as a whole "
+        "volume, 4.8 MB, and five images as three full-resolution slices each, about 13 MB)",
     ),
 }
 

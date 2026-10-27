@@ -33,6 +33,17 @@ byte for byte, NIfTI fields bit for bit, HDF5 dataset for dataset. All 14 of fMR
 (`LARMORX_UPSTREAM_DEFECTS=reproduce`); the record's "D13 fix pass" lists what larmorx's
 default changes.
 
+**On the data panel** ([record](../validation/ants-apply-transforms-panel.md), 2026-10-26):
+every antsApplyTransforms node of the fourteen finished fMRIPrep oracle runs, each replayed from
+its own command line with its inputs (421 calls: masks, references, tissue maps and
+segmentations to the templates and the T1w, the confounds' masks, the reports' images; 179
+through fMRIPrep's `.h5` composites, 166 with `--float 1`; `Gaussian`, `MultiLabel`,
+`LanczosWindowedSinc`, `Linear` and `NearestNeighbor`), and four
+calls fMRIPrep never makes (the 600-volume multiband-8 series to the T1w, the raw 7 T MP2RAGE to
+MNI, the stroke's lesion mask to MNI, the 82-year-old's FLAIR onto its T1w): **425 of 425
+bit-identical with CORE-MATH, 329 to the unmodified ANTs**, all 167 `--float 1` calls among them
+(the others where ITK calls glibc's `exp`, `log`, `sin` or `cos` in double).
+
 ## Quick start
 
 ```python

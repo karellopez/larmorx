@@ -238,6 +238,38 @@ def all_cases() -> list[AntsCase]:
     return cases
 
 
+def panel_cases() -> list[AntsCase]:
+    """The data panel's tier: every ThresholdImage node of the fourteen fMRIPrep oracle runs
+    (sMRIPrep's brain-mask threshold), and Otsu's thresholds on panel images."""
+    from larmorx_validation.parity import fmriprep_nodes
+    from larmorx_validation.parity import panel_images as P
+
+    def t(cid, description, image, *args):
+        return P.ants_case(
+            "ThresholdImage", cid, description, ("3", image, "{out}", *args), [image]
+        )
+
+    return [
+        *fmriprep_nodes.ants_cases("ThresholdImage"),
+        t("otsu-4/7t-mp2rage", "Otsu 4 on the raw 7 T MP2RAGE", P.MP2RAGE_7T, "Otsu", "4"),
+        t("otsu-3/flair", "Otsu 3 on a FLAIR of 3 mm slices", P.FLAIR_OLDER, "Otsu", "3"),
+        t(
+            "otsu-2/1.5t-float32",
+            "Otsu 2 on a float32 MPRAGE stored uncompressed",
+            P.MPRAGE_15T,
+            "Otsu",
+            "2",
+        ),
+        t(
+            "range/stroke-lesion",
+            "0.5 1 (sMRIPrep's) on a manual stroke mask",
+            P.STROKE_LESION,
+            "0.5",
+            "1",
+        ),
+    ]
+
+
 def suite():
     return make_suite(
         "ants-threshold-image",
@@ -245,4 +277,5 @@ def suite():
         "`larmorx ants ThresholdImage` / `lx.ants.threshold_image`, `lx.ants.otsu_threshold` "
         "(crates larmorx-ants, larmorx-image)",
         all_cases,
+        panel=panel_cases,
     )

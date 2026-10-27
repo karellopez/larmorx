@@ -67,11 +67,15 @@ from larmorx_validation.parity.harness import (
     CheckList,
     Outcome,
     Suite,
+    in_tier,
 )
 from larmorx_validation.report import table
 
 PROGRAM = "Atropos"
-LX_THREADS = 4
+#: larmorx's thread count (its result does not depend on it): 4 unless
+#: ``LARMORX_PARITY_LX_THREADS`` says otherwise (a shared machine: parallel jobs times threads
+#: stay within the machine's share).
+LX_THREADS = int(os.environ.get("LARMORX_PARITY_LX_THREADS", "4"))
 #: ANTs' thread band: 2, 4 and 8 threads unless ``LARMORX_PARITY_BAND_THREADS`` (e.g.
 #: ``2,4,6`` on a shared machine) says otherwise.
 BAND_THREADS = tuple(
@@ -79,7 +83,6 @@ BAND_THREADS = tuple(
 )
 NCC_MIN = 0.995
 AFFINE_ATOL = 1e-6
-_TIERS = ("smoke", "standard", "full")
 ORACLE_RUNS = "oracles/fmriprep-25.2.6"
 TEMPLATEFLOW = "oracles/templateflow"
 #: The standard outputs: the classified image and three posteriors.
@@ -333,6 +336,44 @@ for _q in range(6):
         _save(_phantom()["tensors"][..., q], t)
 
 
+def _moved_affine(kind: str) -> np.ndarray:
+    """The phantom's affine just beyond ITK's VerifyInputInformation tolerance (1e-6 of the
+    first spacing, 1e-6 for the direction): a third spacing 1e-5 larger, an origin 1e-4 mm
+    away, or a rotation of 1e-4 rad about the third axis."""
+    a = _affine()
+    if kind == "spacing":
+        a[2, 2] *= 1.0 + 1e-5
+    elif kind == "origin":
+        a[0, 3] += 1e-4
+    else:
+        c, s = np.cos(1e-4), np.sin(1e-4)
+        a[:3, :3] = np.array([[c, -s, 0.0], [s, c, 0.0], [0.0, 0.0, 1.0]]) @ a[:3, :3]
+    return a
+
+
+for _kind in ("spacing", "origin", "direction"):
+
+    @ants_inputs.builder(f"atropos-mask-{_kind}")
+    def _(t, kind=_kind):
+        """The phantom's mask on a grid just beyond ITK's tolerance (its {kind})."""
+        _save(_phantom()["mask"], t, affine=_moved_affine(kind))
+
+
+@ants_inputs.builder("atropos-prior-label-origin")
+def _(t):
+    """The prior label image (``atropos-prior-label``) 1e-4 mm away."""
+    ph = _phantom()
+    idx = np.indices(SHAPE).sum(axis=0)
+    labels = np.where(idx % 7 == 0, 0, ph["labels"]).astype(np.int16)
+    _save(labels, t, affine=_moved_affine("origin"))
+
+
+@ants_inputs.builder("atropos-t2-origin")
+def _(t):
+    """The second contrast 1e-4 mm away."""
+    _save(_phantom()["t2"], t, affine=_moved_affine("origin"))
+
+
 @ants_inputs.builder("atropos-mrf-coefficients")
 def _(t):
     """An MRF coefficient image rising from 0.05 to 0.25 along the first axis."""
@@ -415,10 +456,18 @@ ATROPOS_NODE = BRAIN_EXTRACTION + "/atropos_wf/01_atropos"
 
 
 def _work(run: str) -> Path:
+    """The subject's workflow directory of an oracle run (any finished run: the data panel's
+    tier reads all fourteen)."""
     root = _oracle_root()
     if root is None or not (root / run / "work").is_dir():
         raise Outcome(SKIPPED, f"the fMRIPrep oracle run {run} is not here")
-    return root / run / "work" / "fmriprep_25_2_wf" / RUNS[run]
+    wf = root / run / "work" / "fmriprep_25_2_wf"
+    if run in RUNS:
+        return wf / RUNS[run]
+    found = sorted(p for p in wf.glob("sub_*_wf") if p.is_dir())
+    if len(found) != 1:
+        raise Outcome(SKIPPED, f"{run}: {len(found)} subject workflows in its working directory")
+    return found[0]
 
 
 def _node_args(run: str, node: str, out: Path) -> list[str]:
@@ -1218,7 +1267,79 @@ def _message_cases() -> list[AtroposCase]:
     X = ("-x", MASK)
     A = ("-a", T1)
     run = ("-d", "3", "-i", "KMeans[3]", *A, *X)
+    # ITK's VerifyInputInformation (found on the data panel, 2026-10-26): an input on another
+    # grid throws at Update; ANTs prints it with --verbose 1 only.
+    km = ("-d", "3", "-i", "KMeans[3]", "-c", "[2,0]")
+    geometry = [
+        _c(
+            f"geometry/mask-{kind}",
+            E,
+            f"the mask on a grid just beyond ITK's tolerance (its {kind})",
+            *km,
+            *A,
+            "-x",
+            f"{{gen:atropos-mask-{kind}}}",
+            "-v",
+            "1",
+            *O3,
+            outputs=(),
+            expect="error",
+            stdout=True,
+        )
+        for kind in ("spacing", "origin", "direction")
+    ]
+    geometry += [
+        _c(
+            "geometry/mask-spacing-silent",
+            E,
+            "the mask on another grid without --verbose: ANTs exits 1 silently",
+            *km,
+            *A,
+            "-x",
+            "{gen:atropos-mask-spacing}",
+            *O3,
+            outputs=(),
+            expect="error",
+            stdout=True,
+        ),
+        _c(
+            "geometry/prior-label-origin",
+            E,
+            "the prior label image (input _2) on another grid",
+            "-d",
+            "3",
+            "-i",
+            "PriorLabelImage[3,{gen:atropos-prior-label-origin},0.5]",
+            "-c",
+            "[2,0]",
+            *A,
+            *X,
+            "-v",
+            "1",
+            *O3,
+            outputs=(),
+            expect="error",
+            stdout=True,
+        ),
+        _c(
+            "geometry/second-image-origin",
+            E,
+            "the second intensity image (input _3) on another grid",
+            *km,
+            *A,
+            "-a",
+            "{gen:atropos-t2-origin}",
+            *X,
+            "-v",
+            "1",
+            *O3,
+            outputs=(),
+            expect="error",
+            stdout=True,
+        ),
+    ]
     cases = [
+        *geometry,
         _c(
             "no-arguments",
             E,
@@ -1914,17 +2035,213 @@ def _real_cases() -> list[AtroposCase]:
     return out
 
 
+STROKE_RUN = "ds004884-sub-M2079-noreconall"
+CHILD_RUN = "ds000256-sub-CTS203-noreconall"
+
+
+@ants_inputs.builder("atropos-panel-stroke-mask")
+def _(t):
+    """sMRIPrep's Atropos mask of ds004884 sub-M2079 (the brain extraction's) without the
+    stroke's manual lesion mask (the oracle run's ``label-lesion_roi``, on the T1w's grid)."""
+    import nibabel as nib
+
+    from larmorx_validation.parity import fmriprep_nodes
+
+    mask_path = _node_inputs(STROKE_RUN)[1]
+    roi = sorted(
+        Path(fmriprep_nodes.oracle_run(STROKE_RUN).mounts["/data"]).glob(
+            "sub-*/ses-*/anat/*_label-lesion_roi.nii.gz"
+        )
+    )
+    if not roi:
+        raise Outcome(SKIPPED, f"{STROKE_RUN}'s lesion mask is not here")
+    m = nib.load(mask_path)
+    lesion = np.asanyarray(nib.load(roi[0]).dataobj) > 0
+    data = (np.asanyarray(m.dataobj) > 0) & ~lesion
+    out = nib.Nifti1Image(data.astype(np.uint8), m.affine, m.header)
+    out.set_data_dtype(np.uint8)
+    nib.save(out, t)
+
+
+@ants_inputs.builder("atropos-panel-child-t2w")
+def _(t):
+    """ds000256 sub-CTS203's T2w on its N4-corrected T1w's grid (the brain extraction's): larmorx's
+    antsApplyTransforms, linear, identity (reproduce mode), float32: Atropos' second channel."""
+    import larmorx_testdata as td
+
+    import larmorx as lx
+    from larmorx_validation.parity import panel_images as P
+
+    image = _node_inputs(CHILD_RUN)[0]
+    out = lx.ants.apply_transforms(
+        td.get(P.CHILD_T2W.path),
+        reference=image,
+        transforms=[],
+        interpolation="linear",
+        upstream_defects="reproduce",
+    )
+    lx.save(out, t)
+
+
+def _flair_head():
+    """ds003592 sub-280's FLAIR (its image) and head: the largest connected component of the
+    voxels above 10 % of its 99th percentile, holes filled slice by slice."""
+    import larmorx_testdata as td
+    import nibabel as nib
+    from scipy import ndimage
+
+    from larmorx_validation.parity import panel_images as P
+
+    img = nib.load(td.get(P.FLAIR_OLDER.path))
+    data = np.asanyarray(img.dataobj).astype(np.float64)
+    above = data > 0.1 * np.percentile(data, 99)
+    labels, n = ndimage.label(above)
+    sizes = np.bincount(labels.ravel())
+    sizes[0] = 0
+    head = labels == int(np.argmax(sizes)) if n else above
+    for k in range(head.shape[2]):
+        head[..., k] = ndimage.binary_fill_holes(head[..., k])
+    return img, head.astype(np.uint8)
+
+
+@ants_inputs.builder("atropos-panel-flair-mask")
+def _(t):
+    """ds003592 sub-280's FLAIR head (``_flair_head``) as uint8 with the FLAIR's own header
+    (its pixdim, qform and sform unchanged: exactly the FLAIR's grid)."""
+    import nibabel as nib
+
+    img, head = _flair_head()
+    hdr = img.header.copy()
+    hdr.set_data_dtype(np.uint8)
+    hdr["scl_slope"], hdr["scl_inter"] = 1.0, 0.0
+    nib.save(nib.Nifti1Image(head, None, header=hdr), t)
+
+
+@ants_inputs.builder("atropos-panel-flair-mask-affine")
+def _(t):
+    """The same head written from the FLAIR's affine (nibabel's ``Nifti1Image(data, affine)``):
+    its pixdim recomputed from the affine (0.42187503 x 0.421875 x 2.9999971 mm against the
+    FLAIR's 0.421875 x 0.421875 x 3), beyond ITK's tolerance of 1e-6 of the first spacing."""
+    import nibabel as nib
+
+    img, head = _flair_head()
+    out = nib.Nifti1Image(head, img.affine)
+    out.header.set_qform(img.affine, code=int(img.header["qform_code"]))
+    out.header.set_sform(img.affine, code=int(img.header["sform_code"]))
+    nib.save(out, t)
+
+
+def _panel_cases() -> list[AtroposCase]:
+    """The data panel's tier: sMRIPrep's Atropos node of every finished fMRIPrep oracle run
+    (fMRIPrep's own outputs compared too; ANTs' thread band on the first), and the same options
+    on what fMRIPrep's calls do not isolate: a lesion left out of the mask, a second contrast,
+    a FLAIR of 3 mm slices."""
+    from larmorx_validation.parity import fmriprep_nodes
+    from larmorx_validation.parity import panel_images as P
+
+    out = []
+    for n, call in enumerate(fmriprep_nodes.calls(PROGRAM)):
+        node = call.node.split("/", 2)[2]  # below the subject's workflow directory
+        out.append(
+            _c(
+                fmriprep_nodes.PREFIX + call.id,
+                fmriprep_nodes.CATEGORY,
+                fmriprep_nodes.describe(call),
+                f"{{fmriprep:{call.run}/{node}}}",
+                tier="panel",
+                band=n == 0,
+                fmriprep=f"{call.run}/{node}",
+            )
+        )
+    smriprep = ("-i", "KMeans[3]", "-k", "Gaussian", "-m", "[0.1,1x1x1]", "-c", "[3,0]",
+                "-r", "0", *O3)  # fmt: skip
+    out += [
+        _c(
+            P.PREFIX + "stroke/outside-lesion",
+            P.CATEGORY,
+            P.describe(
+                "sMRIPrep's options on the stroke's N4-corrected T1w (the oracle run's), its "
+                "brain mask without the manual lesion mask",
+                P.STROKE_T1W,
+                P.STROKE_LESION,
+            ),
+            "-d",
+            "3",
+            "-a",
+            f"{{node-image:{STROKE_RUN}}}",
+            "-x",
+            "{gen:atropos-panel-stroke-mask}",
+            *smriprep,
+            tier="panel",
+        ),
+        _c(
+            P.PREFIX + "child/t1w-t2w",
+            P.CATEGORY,
+            P.describe(
+                "sMRIPrep's options with two channels: a child's N4-corrected T1w (the oracle "
+                "run's) and its T2w on the same grid, in its brain mask",
+                P.CHILD_T1W,
+                P.CHILD_T2W,
+            ),
+            "-d",
+            "3",
+            "-a",
+            f"{{node-image:{CHILD_RUN}}}",
+            "-a",
+            "{gen:atropos-panel-child-t2w}",
+            "-x",
+            f"{{node-mask:{CHILD_RUN}}}",
+            *smriprep,
+            tier="panel",
+        ),
+        _c(
+            P.PREFIX + "flair/kmeans-3",
+            P.CATEGORY,
+            P.describe(
+                "sMRIPrep's options on a FLAIR of 0.42 x 0.42 x 3 mm voxels, in its head mask",
+                P.FLAIR_OLDER,
+            ),
+            "-d",
+            "3",
+            "-a",
+            P.FLAIR_OLDER.arg,
+            "-x",
+            "{gen:atropos-panel-flair-mask}",
+            *smriprep,
+            tier="panel",
+        ),
+        _c(
+            P.PREFIX + "flair/mask-from-affine",
+            P.CATEGORY,
+            P.describe(
+                "the same with the head mask written from the FLAIR's affine (its spacing "
+                "recomputed, 3e-6 mm off): ITK's VerifyInputInformation throws, ANTs exits 1",
+                P.FLAIR_OLDER,
+            ),
+            "-d",
+            "3",
+            "-a",
+            P.FLAIR_OLDER.arg,
+            "-x",
+            "{gen:atropos-panel-flair-mask-affine}",
+            *smriprep,
+            "-v",
+            "1",
+            outputs=(),
+            expect="error",
+            stdout=True,
+            tier="panel",
+        ),
+    ]
+    return out
+
+
 def all_cases() -> list[AtroposCase]:
-    return _phantom_cases() + _message_cases() + _random_cases() + _real_cases()
+    return _phantom_cases() + _message_cases() + _random_cases() + _real_cases() + _panel_cases()
 
 
 def cases_for(tier: str) -> list[Case]:
-    rank = _TIERS.index(tier)
-    return [
-        Case(c.id, c.category, c.description, c)
-        for c in all_cases()
-        if _TIERS.index(c.tier) <= rank
-    ]
+    return [Case(c.id, c.category, c.description, c) for c in all_cases() if in_tier(c.tier, tier)]
 
 
 # ------------------------------------------------------------------------------------------------
@@ -1951,6 +2268,10 @@ def _resolve(c: AtroposCase, out: Path, tmp: Path) -> list[str]:
             return str(out)
         if key.startswith("gen:"):
             return str(ants_inputs.path(key[4:]))
+        if key.startswith("in:"):
+            import larmorx_testdata as td
+
+            return str(td.get(key[3:]))
         if key.startswith("series:"):
             return _series(key[7:])
         if key.startswith("missing:"):
@@ -2526,7 +2847,9 @@ def highlights(results: list[CaseResult]) -> list[str]:
             "",
             table(("Case", "ANTs", "larmorx's default: voxels per class"), real),
         ]
-    return lines
+    from larmorx_validation.parity import fmriprep_nodes
+
+    return lines + fmriprep_nodes.record_lines(PROGRAM, results)
 
 
 def suite() -> Suite:

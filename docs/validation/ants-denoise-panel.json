@@ -1,0 +1,519 @@
+{
+ "environment": {
+  "cpu": "Intel(R) Core(TM) i7-8750H CPU @ 2.20GHz",
+  "larmorx": "0.0.1",
+  "larmorx_commit": "b7ba0d395cee",
+  "larmorx_testdata_commit": "52124bc98f9f",
+  "logical_cpus": 12,
+  "os": "Linux-6.8.0-124-generic-x86_64-with-glibc2.35",
+  "packages": {
+   "nibabel": "5.4.2",
+   "numpy": "2.3.5"
+  },
+  "platform": "Linux x86_64",
+  "python": "3.12.10"
+ },
+ "oracle_cache": {
+  "differences": 0,
+  "fresh": {
+   "never cached: DenoiseImage above one thread: ANTS-42: its slabs race above one thread (docs/findings/ants-denoise.md)": 10,
+   "not in the cache yet": 42
+  },
+  "location": "<workspace>/oracles/cache",
+  "mode": "use",
+  "ran": 52,
+  "saved_seconds": 0.0,
+  "served": 0
+ },
+ "reference": "DenoiseImage from ANTs v2.6.5 (fdce4d2f84) on ITK v5.4.5 (f51594ad88), x86_64-conda-linux-gnu-g++ (conda-forge gcc 14.3.0-20) 14.3.0, the binary built by `scripts/build_ants_oracle.sh` (with ITK's remote module AdaptiveDenoising at `24825c8d`), run with one thread",
+ "results": [
+  {
+   "case": "panel/fmriprep/ds000005-sub-01/anat_fit/anat_template/denoise[0]",
+   "category": "panel-fmriprep",
+   "checks_passed": 12,
+   "checks_total": 12,
+   "failed_checks": [],
+   "measured": {
+    "denoised: NCC with ANTs as built": "1.0000000000",
+    "denoised: affine": "0.0e+00",
+    "denoised: bit-identical to ANTs with correctly rounded math": 0,
+    "denoised: header (every field)": 0,
+    "larmorx: 3 threads and 1 thread give the same bits": "True"
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 437915,
+    "denoised: 1 - NCC vs ANTs' thread band": "6.42e-18",
+    "denoised: bit-identical to ANTs as built": 5522,
+    "denoised: max |diff| vs ANTs' thread band": "0.000198"
+   },
+   "seconds": 805.07,
+   "status": "pass"
+  },
+  {
+   "case": "panel/fmriprep/ds000228-sub-pixar008/anat_fit/anat_template/denoise[0]",
+   "category": "panel-fmriprep",
+   "checks_passed": 10,
+   "checks_total": 10,
+   "failed_checks": [],
+   "measured": {
+    "denoised: NCC with ANTs as built": "1.0000000000",
+    "denoised: affine": "0.0e+00",
+    "denoised: bit-identical to ANTs with correctly rounded math": 0,
+    "denoised: header (every field)": 0,
+    "larmorx: 3 threads and 1 thread give the same bits": "True"
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 1007963,
+    "denoised: bit-identical to ANTs as built": 3530
+   },
+   "seconds": 354.305,
+   "status": "pass"
+  },
+  {
+   "case": "panel/fmriprep/ds000256-sub-CTS203/anat_fit/anat_template/denoise[0]",
+   "category": "panel-fmriprep",
+   "checks_passed": 10,
+   "checks_total": 10,
+   "failed_checks": [],
+   "measured": {
+    "denoised: NCC with ANTs as built": "1.0000000000",
+    "denoised: affine": "0.0e+00",
+    "denoised: bit-identical to ANTs with correctly rounded math": 0,
+    "denoised: header (every field)": 0,
+    "larmorx: 3 threads and 1 thread give the same bits": "True"
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 1201366,
+    "denoised: bit-identical to ANTs as built": 11766
+   },
+   "seconds": 1176.636,
+   "status": "pass"
+  },
+  {
+   "case": "panel/fmriprep/ds001600-sub-1/anat_fit/anat_template/denoise[0]",
+   "category": "panel-fmriprep",
+   "checks_passed": 10,
+   "checks_total": 10,
+   "failed_checks": [],
+   "measured": {
+    "denoised: NCC with ANTs as built": "1.0000000000",
+    "denoised: affine": "0.0e+00",
+    "denoised: bit-identical to ANTs with correctly rounded math": 0,
+    "denoised: header (every field)": 0,
+    "larmorx: 3 threads and 1 thread give the same bits": "True"
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 1219857,
+    "denoised: bit-identical to ANTs as built": 5374
+   },
+   "seconds": 533.249,
+   "status": "pass"
+  },
+  {
+   "case": "panel/fmriprep/ds002422-sub-02/anat_fit/anat_template/denoise[0]",
+   "category": "panel-fmriprep",
+   "checks_passed": 10,
+   "checks_total": 10,
+   "failed_checks": [],
+   "measured": {
+    "denoised: NCC with ANTs as built": "1.0000000000",
+    "denoised: affine": "0.0e+00",
+    "denoised: bit-identical to ANTs with correctly rounded math": 0,
+    "denoised: header (every field)": 0,
+    "larmorx: 3 threads and 1 thread give the same bits": "True"
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 1090025,
+    "denoised: bit-identical to ANTs as built": 9076
+   },
+   "seconds": 832.627,
+   "status": "pass"
+  },
+  {
+   "case": "panel/fmriprep/ds002603-sub-01/anat_fit/anat_template/denoise[0]",
+   "category": "panel-fmriprep",
+   "checks_passed": 10,
+   "checks_total": 10,
+   "failed_checks": [],
+   "measured": {
+    "denoised: NCC with ANTs as built": "1.0000000000",
+    "denoised: affine": "0.0e+00",
+    "denoised: bit-identical to ANTs with correctly rounded math": 0,
+    "denoised: header (every field)": 0,
+    "larmorx: 3 threads and 1 thread give the same bits": "True"
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 711120,
+    "denoised: bit-identical to ANTs as built": 4179
+   },
+   "seconds": 442.568,
+   "status": "pass"
+  },
+  {
+   "case": "panel/fmriprep/ds003592-sub-280/anat_fit/anat_template/denoise[0]",
+   "category": "panel-fmriprep",
+   "checks_passed": 10,
+   "checks_total": 10,
+   "failed_checks": [],
+   "measured": {
+    "denoised: NCC with ANTs as built": "1.0000000000",
+    "denoised: affine": "0.0e+00",
+    "denoised: bit-identical to ANTs with correctly rounded math": 0,
+    "denoised: header (every field)": 0,
+    "larmorx: 3 threads and 1 thread give the same bits": "True"
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 1072995,
+    "denoised: bit-identical to ANTs as built": 9087
+   },
+   "seconds": 833.985,
+   "status": "pass"
+  },
+  {
+   "case": "panel/fmriprep/ds004173-sub-603309/anat_fit/anat_template/denoise[0]",
+   "category": "panel-fmriprep",
+   "checks_passed": 10,
+   "checks_total": 10,
+   "failed_checks": [],
+   "measured": {
+    "denoised: NCC with ANTs as built": "1.0000000000",
+    "denoised: affine": "0.0e+00",
+    "denoised: bit-identical to ANTs with correctly rounded math": 0,
+    "denoised: header (every field)": 0,
+    "larmorx: 3 threads and 1 thread give the same bits": "True"
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 1264359,
+    "denoised: bit-identical to ANTs as built": 9363
+   },
+   "seconds": 802.021,
+   "status": "pass"
+  },
+  {
+   "case": "panel/fmriprep/ds004173-sub-603309/anat_fit/anat_template/denoise[1]",
+   "category": "panel-fmriprep",
+   "checks_passed": 10,
+   "checks_total": 10,
+   "failed_checks": [],
+   "measured": {
+    "denoised: NCC with ANTs as built": "1.0000000000",
+    "denoised: affine": "0.0e+00",
+    "denoised: bit-identical to ANTs with correctly rounded math": 0,
+    "denoised: header (every field)": 0,
+    "larmorx: 3 threads and 1 thread give the same bits": "True"
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 1037637,
+    "denoised: bit-identical to ANTs as built": 9043
+   },
+   "seconds": 829.899,
+   "status": "pass"
+  },
+  {
+   "case": "panel/fmriprep/ds004173-sub-603309/anat_fit/anat_template/denoise[2]",
+   "category": "panel-fmriprep",
+   "checks_passed": 10,
+   "checks_total": 10,
+   "failed_checks": [],
+   "measured": {
+    "denoised: NCC with ANTs as built": "1.0000000000",
+    "denoised: affine": "0.0e+00",
+    "denoised: bit-identical to ANTs with correctly rounded math": 0,
+    "denoised: header (every field)": 0,
+    "larmorx: 3 threads and 1 thread give the same bits": "True"
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 1245492,
+    "denoised: bit-identical to ANTs as built": 9224
+   },
+   "seconds": 809.293,
+   "status": "pass"
+  },
+  {
+   "case": "panel/fmriprep/ds004884-sub-M2079/anat_fit/anat_template/denoise[0]",
+   "category": "panel-fmriprep",
+   "checks_passed": 10,
+   "checks_total": 10,
+   "failed_checks": [],
+   "measured": {
+    "denoised: NCC with ANTs as built": "1.0000000000",
+    "denoised: affine": "0.0e+00",
+    "denoised: bit-identical to ANTs with correctly rounded math": 0,
+    "denoised: header (every field)": 0,
+    "larmorx: 3 threads and 1 thread give the same bits": "True"
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 788709,
+    "denoised: bit-identical to ANTs as built": 2260
+   },
+   "seconds": 223.586,
+   "status": "pass"
+  },
+  {
+   "case": "panel/fmriprep/ds004958-sub-fsm64ps/anat_fit/anat_template/denoise[0]",
+   "category": "panel-fmriprep",
+   "checks_passed": 10,
+   "checks_total": 10,
+   "failed_checks": [],
+   "measured": {
+    "denoised: NCC with ANTs as built": "1.0000000000",
+    "denoised: affine": "0.0e+00",
+    "denoised: bit-identical to ANTs with correctly rounded math": 0,
+    "denoised: header (every field)": 0,
+    "larmorx: 3 threads and 1 thread give the same bits": "True"
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 676572,
+    "denoised: bit-identical to ANTs as built": 11755
+   },
+   "seconds": 1123.841,
+   "status": "pass"
+  },
+  {
+   "case": "panel/fmriprep/ds005003-sub-RS001/anat_fit/anat_template/denoise[0]",
+   "category": "panel-fmriprep",
+   "checks_passed": 10,
+   "checks_total": 10,
+   "failed_checks": [],
+   "measured": {
+    "denoised: NCC with ANTs as built": "1.0000000000",
+    "denoised: affine": "0.0e+00",
+    "denoised: bit-identical to ANTs with correctly rounded math": 0,
+    "denoised: header (every field)": 0,
+    "larmorx: 3 threads and 1 thread give the same bits": "True"
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 1486636,
+    "denoised: bit-identical to ANTs as built": 7785
+   },
+   "seconds": 699.808,
+   "status": "pass"
+  },
+  {
+   "case": "panel/fmriprep/ds005040-sub-002/anat_fit/anat_template/denoise[0]",
+   "category": "panel-fmriprep",
+   "checks_passed": 10,
+   "checks_total": 10,
+   "failed_checks": [],
+   "measured": {
+    "denoised: NCC with ANTs as built": "1.0000000000",
+    "denoised: affine": "0.0e+00",
+    "denoised: bit-identical to ANTs with correctly rounded math": 0,
+    "denoised: header (every field)": 0,
+    "larmorx: 3 threads and 1 thread give the same bits": "True"
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 2148311,
+    "denoised: bit-identical to ANTs as built": 5205
+   },
+   "seconds": 510.103,
+   "status": "pass"
+  },
+  {
+   "case": "panel/fmriprep/ds005454-sub-16/anat_fit/anat_template/denoise[0]",
+   "category": "panel-fmriprep",
+   "checks_passed": 10,
+   "checks_total": 10,
+   "failed_checks": [],
+   "measured": {
+    "denoised: NCC with ANTs as built": "1.0000000000",
+    "denoised: affine": "0.0e+00",
+    "denoised: bit-identical to ANTs with correctly rounded math": 0,
+    "denoised: header (every field)": 0,
+    "larmorx: 3 threads and 1 thread give the same bits": "True"
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 1742679,
+    "denoised: bit-identical to ANTs as built": 8446
+   },
+   "seconds": 731.28,
+   "status": "pass"
+  },
+  {
+   "case": "panel/fmriprep/ds005454-sub-16/anat_fit/anat_template/denoise[1]",
+   "category": "panel-fmriprep",
+   "checks_passed": 10,
+   "checks_total": 10,
+   "failed_checks": [],
+   "measured": {
+    "denoised: NCC with ANTs as built": "1.0000000000",
+    "denoised: affine": "0.0e+00",
+    "denoised: bit-identical to ANTs with correctly rounded math": 0,
+    "denoised: header (every field)": 0,
+    "larmorx: 3 threads and 1 thread give the same bits": "True"
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 1858030,
+    "denoised: bit-identical to ANTs as built": 10951
+   },
+   "seconds": 577.339,
+   "status": "pass"
+  },
+  {
+   "case": "panel/fmriprep/ds005752-sub-ON01016/anat_fit/anat_template/denoise[0]",
+   "category": "panel-fmriprep",
+   "checks_passed": 10,
+   "checks_total": 10,
+   "failed_checks": [],
+   "measured": {
+    "denoised: NCC with ANTs as built": "1.0000000000",
+    "denoised: affine": "0.0e+00",
+    "denoised: bit-identical to ANTs with correctly rounded math": 0,
+    "denoised: header (every field)": 0,
+    "larmorx: 3 threads and 1 thread give the same bits": "True"
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 664399,
+    "denoised: bit-identical to ANTs as built": 4286
+   },
+   "seconds": 407.62,
+   "status": "pass"
+  },
+  {
+   "case": "panel/images/rician/7t-mp2rage",
+   "category": "panel-images",
+   "checks_passed": 20,
+   "checks_total": 20,
+   "failed_checks": [],
+   "measured": {
+    "denoised: NCC with ANTs as built": "1.0000000000",
+    "denoised: affine": "0.0e+00",
+    "denoised: bit-identical to ANTs with correctly rounded math": 0,
+    "denoised: header (every field)": 0,
+    "larmorx: 3 threads and 1 thread give the same bits": "True",
+    "noise: NCC with ANTs as built": "1.0000000000",
+    "noise: affine": "0.0e+00",
+    "noise: bit-identical to ANTs with correctly rounded math": 0,
+    "noise: header (every field)": 0
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 3749856,
+    "denoised: 1 - NCC vs ANTs' thread band": "1.59e-17",
+    "denoised: bit-identical to ANTs as built": 10951,
+    "denoised: max |diff| vs ANTs' thread band": "0.0015",
+    "noise: 1 - NCC vs ANTs' thread band": "2.2e-16",
+    "noise: bit-identical to ANTs as built": 11205,
+    "noise: max |diff| vs ANTs' thread band": "0.0015"
+   },
+   "seconds": 872.12,
+   "status": "pass"
+  },
+  {
+   "case": "panel/images/rician/flair",
+   "category": "panel-images",
+   "checks_passed": 20,
+   "checks_total": 20,
+   "failed_checks": [],
+   "measured": {
+    "denoised: NCC with ANTs as built": "1.0000000000",
+    "denoised: affine": "0.0e+00",
+    "denoised: bit-identical to ANTs with correctly rounded math": 0,
+    "denoised: header (every field)": 0,
+    "larmorx: 3 threads and 1 thread give the same bits": "True",
+    "noise: NCC with ANTs as built": "1.0000000000",
+    "noise: affine": "0.0e+00",
+    "noise: bit-identical to ANTs with correctly rounded math": 0,
+    "noise: header (every field)": 0
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 2127429,
+    "denoised: 1 - NCC vs ANTs' thread band": "1.05e-17",
+    "denoised: bit-identical to ANTs as built": 7787,
+    "denoised: max |diff| vs ANTs' thread band": "0.000318",
+    "noise: 1 - NCC vs ANTs' thread band": "1.85e-15",
+    "noise: bit-identical to ANTs as built": 7913,
+    "noise: max |diff| vs ANTs' thread band": "0.000318"
+   },
+   "seconds": 947.98,
+   "status": "pass"
+  },
+  {
+   "case": "panel/images/rician/child-t2w",
+   "category": "panel-images",
+   "checks_passed": 20,
+   "checks_total": 20,
+   "failed_checks": [],
+   "measured": {
+    "denoised: NCC with ANTs as built": "1.0000000000",
+    "denoised: affine": "0.0e+00",
+    "denoised: bit-identical to ANTs with correctly rounded math": 0,
+    "denoised: header (every field)": 0,
+    "larmorx: 3 threads and 1 thread give the same bits": "True",
+    "noise: NCC with ANTs as built": "1.0000000000",
+    "noise: affine": "0.0e+00",
+    "noise: bit-identical to ANTs with correctly rounded math": 0,
+    "noise: header (every field)": 0
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 890332,
+    "denoised: 1 - NCC vs ANTs' thread band": "9.08e-18",
+    "denoised: bit-identical to ANTs as built": 10119,
+    "denoised: max |diff| vs ANTs' thread band": "7.15e-05",
+    "noise: 1 - NCC vs ANTs' thread band": "4.42e-16",
+    "noise: bit-identical to ANTs as built": 10285,
+    "noise: max |diff| vs ANTs' thread band": "7.15e-05"
+   },
+   "seconds": 1467.478,
+   "status": "pass"
+  },
+  {
+   "case": "panel/images/gaussian/1.5t-float32",
+   "category": "panel-images",
+   "checks_passed": 20,
+   "checks_total": 20,
+   "failed_checks": [],
+   "measured": {
+    "denoised: NCC with ANTs as built": "1.0000000000",
+    "denoised: affine": "0.0e+00",
+    "denoised: bit-identical to ANTs with correctly rounded math": 0,
+    "denoised: header (every field)": 0,
+    "larmorx: 3 threads and 1 thread give the same bits": "True",
+    "noise: NCC with ANTs as built": "1.0000000000",
+    "noise: affine": "0.0e+00",
+    "noise: bit-identical to ANTs with correctly rounded math": 0,
+    "noise: header (every field)": 0
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0,
+    "denoised: 1 - NCC vs ANTs' thread band": "7.68e-18",
+    "denoised: bit-identical to ANTs as built": 8150,
+    "denoised: max |diff| vs ANTs' thread band": "0.000122",
+    "noise: 1 - NCC vs ANTs' thread band": "6.56e-16",
+    "noise: bit-identical to ANTs as built": 8370,
+    "noise: max |diff| vs ANTs' thread band": "0.000122"
+   },
+   "seconds": 1130.789,
+   "status": "pass"
+  }
+ ],
+ "suite": "ants-denoise",
+ "summary": {
+  "both-error": 0,
+  "expected-divergence": 0,
+  "fail": 0,
+  "pass": 21,
+  "skipped": 0
+ },
+ "tier": "panel"
+}

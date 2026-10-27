@@ -23,10 +23,9 @@ from larmorx_validation.parity import ants_ai
 from larmorx_validation.parity import ants_registration as reg
 from larmorx_validation.parity.ants_ai import AiCase
 from larmorx_validation.parity.ants_programs import ants_version
-from larmorx_validation.parity.harness import Case, Suite
+from larmorx_validation.parity.harness import Case, Suite, in_tier
 
 PROGRAM = "antsAffineInitializer"
-_TIERS = ("smoke", "standard", "full")
 
 F, M, K = reg.F, reg.M, reg.K
 F2, M2 = reg.F2, reg.M2
@@ -49,6 +48,10 @@ def case(cid: str, category: str, description: str, *args: str, **kw) -> AiCase:
 
 
 def all_cases() -> list[AiCase]:
+    return _cases() + panel_cases()
+
+
+def _cases() -> list[AiCase]:
     out = "{out}/t.mat"
     return [
         case("messages/no-arguments", "messages", "No arguments: the usage, exit 0", tier="smoke"),
@@ -481,13 +484,66 @@ def all_cases() -> list[AiCase]:
     ]
 
 
-def cases_for(tier: str) -> list[Case]:
-    rank = _TIERS.index(tier)
-    return [
-        Case(c.id, c.category, c.description, c)
-        for c in all_cases()
-        if _TIERS.index(c.tier) <= rank
+def panel_cases() -> list[AiCase]:
+    """The data panel's tier: sMRIPrep's antsAffineInitializer call of every finished fMRIPrep
+    oracle run. It has no node of its own: niworkflows' ``SpatialNormalization`` runs it inside
+    the template registration's node (no initial transform given), on the masked template and
+    the masked T1w it writes there and does not keep; both are made again exactly from the
+    node's recorded inputs (:mod:`~larmorx_validation.parity.niworkflows_inputs`)."""
+    from larmorx_validation.parity import fmriprep_nodes, niworkflows_inputs
+
+    out = []
+    for call in fmriprep_nodes.calls("antsRegistration"):
+        if call.norm != niworkflows_inputs.NODE:
+            continue
+        threads = call.nslots()
+        out.append(
+            case(
+                f"{fmriprep_nodes.PREFIX}{call.id}/antsAffineInitializer",
+                fmriprep_nodes.CATEGORY,
+                f"sMRIPrep's antsAffineInitializer inside the template registration node "
+                f"`{fmriprep_nodes.label(call.node)}` of {fmriprep_nodes.short(call.run)} "
+                "(nipype's AffineInitializer arguments; the masked template and T1w made again "
+                "exactly from the node's inputs"
+                + (f"; fMRIPrep ran it at {threads} threads" if threads else "")
+                + ")",
+                "3",
+                f"{{nwx-fixed:{call.run}}}",
+                f"{{nwx-moving:{call.run}}}",
+                "{out}/transform.mat",
+                *niworkflows_inputs.AFFINE_INITIALIZER,
+                tier="panel",
+                band=not out,
+            )
+        )
+    return out
+
+
+def affine_lines(results) -> list[str]:
+    """The record's inventory of antsAffineInitializer's calls in the oracle runs."""
+    from larmorx_validation.parity import fmriprep_nodes, niworkflows_inputs
+
+    panel = [r for r in results if r.case.startswith(fmriprep_nodes.PREFIX)]
+    if not panel:
+        return []
+    regs = [
+        c for c in fmriprep_nodes.calls("antsRegistration") if c.norm == niworkflows_inputs.NODE
     ]
+    statuses: dict[str, int] = {}
+    for r in panel:
+        statuses[r.status] = statuses.get(r.status, 0) + 1
+    return [
+        "",
+        f"**fMRIPrep's antsAffineInitializer calls in the {len(fmriprep_nodes.finished_runs())} "
+        f"finished oracle runs:** no node of its own; one call inside each template registration "
+        f"node ({len(regs)} in {len({c.run for c in regs})} runs), each compared: "
+        + ", ".join(f"{v} {k}" for k, v in sorted(statuses.items()))
+        + ".",
+    ]
+
+
+def cases_for(tier: str) -> list[Case]:
+    return [Case(c.id, c.category, c.description, c) for c in all_cases() if in_tier(c.tier, tier)]
 
 
 def suite() -> Suite:
@@ -515,7 +571,7 @@ def suite() -> Suite:
         cases=cases_for,
         run_case=ants_ai.run_case,
         packages=("nibabel", "scipy"),
-        highlights=ants_ai.highlights,
+        highlights=lambda results: ants_ai.highlights(results) + affine_lines(results),
         notes="Inputs named `gen:<name>` are built by the suites (seeded phantoms).",
     )
 

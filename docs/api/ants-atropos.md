@@ -26,6 +26,18 @@ the five fMRIPrep oracle runs' T1w images (standard tier: 93 cases, 56 compared)
   (smallest Dice 0.99942) and on posteriors by up to 0.28; larmorx, with its fixed seed,
   is as far from them (294 and 327 labels).
 
+**On the data panel** ([record](../validation/ants-atropos-panel.md), 2026-10-26): sMRIPrep's
+call in all fourteen finished oracle runs (the 3.5-year-old, the glioma, the stroke, strong
+motion, 1.5 T, 7 T and the 82-year-old among them), its inputs from each run's working directory,
+and three calls fMRIPrep never makes (the stroke outside its manual lesion mask, a child's T1w and
+T2w as two channels, a FLAIR of 3 mm slices): **17 of 17 compared cases bit-identical with
+CORE-MATH, the classified image identical in all 17** (3 bit-identical to the unmodified ANTs).
+Against fMRIPrep's own files (ANTs 2.6.2, glibc's maths): the same segmentation in every run,
+the posteriors different in 0 to 4,175 voxels (their last bits, as above). The panel found a
+missing check, now ported: an input on another grid (the FLAIR's mask written from its affine,
+2.9e-6 mm off) makes ITK throw, as ANTs does ([findings](../findings/ants-atropos.md), "Inputs
+on another grid").
+
 ## Quick start
 
 ```python

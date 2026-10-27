@@ -120,51 +120,81 @@ pub(crate) fn filter_lines<T: LinePixel, F: LineFilter>(
         } else {
             // Strided lines: each task owns the pieces of up to `GROUP` neighbouring lines, one
             // piece per position along the axis, and filters them `LANES` lines at a time (each
-            // line is filtered alone, so the grouping changes no value). One reference per
-            // `GROUP` voxels of a row, not per `LANES`: the task list was 0.5 byte per voxel
-            // (random testing, 2026-10-25: SmoothImage's peak memory against ANTs').
+            // line is filtered alone, so the grouping changes no value). The tasks are made and
+            // run a batch at a time: a reference (16 bytes) per piece for the whole image was
+            // up to 0.2 byte per voxel where the rows are shorter than `GROUP` (27 MB on a
+            // 588-volume series: the data panel, 2026-10-26, SmoothImage's peak against ANTs').
+            let groups = inner.div_ceil(GROUP);
+            let budget = (rayon::current_num_threads() * 16).max(16);
             let mut tasks: Vec<Vec<&mut [T]>> = Vec::new();
             for block in data.chunks_mut(inner * n) {
-                let first = tasks.len();
-                tasks.extend((0..inner.div_ceil(GROUP)).map(|_| Vec::with_capacity(n)));
-                for row in block.chunks_mut(inner) {
-                    for (c, piece) in row.chunks_mut(GROUP).enumerate() {
-                        tasks[first + c].push(piece);
+                if groups <= budget {
+                    let first = tasks.len();
+                    tasks.extend((0..groups).map(|_| Vec::with_capacity(n)));
+                    for row in block.chunks_mut(inner) {
+                        for (c, piece) in row.chunks_mut(GROUP).enumerate() {
+                            tasks[first + c].push(piece);
+                        }
+                    }
+                    if tasks.len() >= budget {
+                        run_strided(std::mem::take(&mut tasks), n, filter);
+                    }
+                } else {
+                    // A block of many columns (the last axis of a large image): its rows'
+                    // regions of `budget` groups, one batch each.
+                    let mut g0 = 0;
+                    while g0 < groups {
+                        let g1 = (g0 + budget).min(groups);
+                        let (lo, hi) = (g0 * GROUP, (g1 * GROUP).min(inner));
+                        let mut batch: Vec<Vec<&mut [T]>> =
+                            (g0..g1).map(|_| Vec::with_capacity(n)).collect();
+                        for row in block.chunks_mut(inner) {
+                            for (c, piece) in row[lo..hi].chunks_mut(GROUP).enumerate() {
+                                batch[c].push(piece);
+                            }
+                        }
+                        run_strided(batch, n, filter);
+                        g0 = g1;
                     }
                 }
             }
-            tasks.into_par_iter().for_each_init(
-                || Buffers::new(n * LANES),
-                |b, mut rows| {
-                    let width = rows[0].len();
-                    for start in (0..width).step_by(LANES) {
-                        let w = LANES.min(width - start);
-                        let len = n * w;
-                        for (i, row) in rows.iter().enumerate() {
-                            let src = &row[start..start + w];
-                            for (x, &v) in b.input[i * w..(i + 1) * w].iter_mut().zip(src) {
-                                *x = v.to_f64();
-                            }
-                        }
-                        filter.filter(
-                            &b.input[..len],
-                            &mut b.output[..len],
-                            &mut b.scratch[..len],
-                            n,
-                            w,
-                        );
-                        for (i, row) in rows.iter_mut().enumerate() {
-                            let dst = &mut row[start..start + w];
-                            for (v, &x) in dst.iter_mut().zip(b.output[i * w..(i + 1) * w].iter()) {
-                                *v = T::from_f64(x);
-                            }
-                        }
-                    }
-                },
-            );
+            run_strided(tasks, n, filter);
         }
     })?;
     Ok(())
+}
+
+/// One batch of a strided axis's tasks (see [`filter_lines`]), in parallel on the current pool.
+fn run_strided<T: LinePixel, F: LineFilter>(tasks: Vec<Vec<&mut [T]>>, n: usize, filter: &F) {
+    tasks.into_par_iter().for_each_init(
+        || Buffers::new(n * LANES),
+        |b, mut rows| {
+            let width = rows[0].len();
+            for start in (0..width).step_by(LANES) {
+                let w = LANES.min(width - start);
+                let len = n * w;
+                for (i, row) in rows.iter().enumerate() {
+                    let src = &row[start..start + w];
+                    for (x, &v) in b.input[i * w..(i + 1) * w].iter_mut().zip(src) {
+                        *x = v.to_f64();
+                    }
+                }
+                filter.filter(
+                    &b.input[..len],
+                    &mut b.output[..len],
+                    &mut b.scratch[..len],
+                    n,
+                    w,
+                );
+                for (i, row) in rows.iter_mut().enumerate() {
+                    let dst = &mut row[start..start + w];
+                    for (v, &x) in dst.iter_mut().zip(b.output[i * w..(i + 1) * w].iter()) {
+                        *v = T::from_f64(x);
+                    }
+                }
+            }
+        },
+    );
 }
 
 /// Where a line lies in the image: its first voxel's index and the distance in memory between

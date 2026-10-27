@@ -302,7 +302,7 @@ pub fn search<const D: usize>(
     init: &InitialAffine<D>,
     fixed: &Arc<Image<f64, D>>,
     moving: &Arc<Image<f64, D>>,
-    moving_f32: &Image<f32, D>,
+    moving_f32: Image<f32, D>,
     mask: Option<Mask<D>>,
     notices: &mut Notices,
     warnings: &mut Vec<String>,
@@ -323,7 +323,9 @@ pub fn search<const D: usize>(
     // MapFixedSampledPointSetToVirtual (points whose nearest index is outside are skipped).
     points.retain(|p| space.contains(&space.point_to_index(p)));
     let moving_gradient =
-        Arc::new(gradient_image::<f32, D>(moving_f32, n_threads).map_err(AiError::Uncaught)?);
+        Arc::new(gradient_image::<f32, D>(&moving_f32, n_threads).map_err(AiError::Uncaught)?);
+    // The float image served only the gradient (memory: the search holds the double ones).
+    drop(moving_f32);
     let metric = ImageMetricv4 {
         fixed: Arc::clone(fixed),
         moving: Arc::clone(moving),
@@ -337,6 +339,7 @@ pub fn search<const D: usize>(
         pixel_f32: true,
         local_support: false,
         outside: Default::default(),
+        n_threads: Some(n_threads),
     };
     // The scales, estimated once for the search transform as it is then: centred at 0, with
     // the initial transform's parameters.

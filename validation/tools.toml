@@ -30,7 +30,7 @@ eco = "ants"
 page = "/tools/ants-apply-transforms/"
 use = ["larmorx ants antsApplyTransforms", "lx.ants.apply_transforms"]
 how = "port (ANTs/ITK)"
-validation = "[{ants-apply-transforms.cases} cases](record:ants-apply-transforms): {ants-apply-transforms.identical} of {ants-apply-transforms.compared} compared bit-identical to ANTs, the rest differ only through glibc's maths; B-spline transforms included"
+validation = "[{ants-apply-transforms.cases} cases](record:ants-apply-transforms): {ants-apply-transforms.identical} of {ants-apply-transforms.compared} compared bit-identical to ANTs, the rest differ only through glibc's maths; B-spline transforms included; data panel: [{ants-apply-transforms-panel.identical} of {ants-apply-transforms-panel.compared}](record:ants-apply-transforms-panel) as built, all with correctly rounded maths (fMRIPrep's 421 calls on the fourteen oracle runs)"
 
 [[tool]]
 id = "itk-hdf5"
@@ -48,7 +48,7 @@ eco = "ants"
 page = "/tools/ants-n4/"
 use = ["larmorx ants N4BiasFieldCorrection", "lx.ants.n4_bias_field_correction"]
 how = "port"
-validation = "[{ants-n4.identical} of {ants-n4.compared}](record:ants-n4) bit-identical to ANTs, {ants-n4.compared} of {ants-n4.compared} with correctly rounded maths; ANTS-40 corrected by default"
+validation = "[{ants-n4.identical} of {ants-n4.compared}](record:ants-n4) bit-identical to ANTs, {ants-n4.compared} of {ants-n4.compared} with correctly rounded maths; ANTS-40 corrected by default; data panel: [{ants-n4-panel.identical} of {ants-n4-panel.compared}](record:ants-n4-panel) as built, {ants-n4-panel.compared} of {ants-n4-panel.compared} with correctly rounded maths"
 
 [[tool]]
 id = "ants-denoise"
@@ -57,7 +57,7 @@ eco = "ants"
 page = "/tools/ants-denoise/"
 use = ["larmorx ants DenoiseImage", "lx.ants.denoise_image"]
 how = "port"
-validation = "[{ants-denoise.identical} of {ants-denoise.compared}](record:ants-denoise) bit-identical to ANTs, {ants-denoise.compared} of {ants-denoise.compared} with correctly rounded maths; ANTS-43 and ANTS-44 corrected by default"
+validation = "[{ants-denoise.identical} of {ants-denoise.compared}](record:ants-denoise) bit-identical to ANTs, {ants-denoise.compared} of {ants-denoise.compared} with correctly rounded maths; ANTS-43 and ANTS-44 corrected by default; data panel: [{ants-denoise-panel.identical} of {ants-denoise-panel.compared}](record:ants-denoise-panel) as built, {ants-denoise-panel.compared} of {ants-denoise-panel.compared} with correctly rounded maths"
 
 [[tool]]
 id = "ants-image-math"
@@ -66,7 +66,7 @@ eco = "ants"
 page = "/tools/ants-programs/"
 use = ["larmorx ants ImageMath", "lx.ants.image_math"]
 how = "port"
-validation = "[{ants-image-math.cases} cases](record:ants-image-math): values bit-identical in {ants-image-math.identical} of {ants-image-math.compared}, headers in {ants-image-math.headers} of {ants-image-math.compared}; ANTS-17, -22 and -23 corrected, checked against known results"
+validation = "[{ants-image-math.cases} cases](record:ants-image-math): values bit-identical in {ants-image-math.identical} of {ants-image-math.compared}, headers in {ants-image-math.headers} of {ants-image-math.compared}; ANTS-17, -22 and -23 corrected, checked against known results; data panel: [{ants-image-math-panel.identical} of {ants-image-math-panel.compared}](record:ants-image-math-panel) bit-identical"
 
 [[tool]]
 id = "ants-programs"
@@ -77,7 +77,7 @@ use = ["larmorx ants ..."]
 how = "port"
 # The records of the first four predate the reported values in their JSON: "bit-identical"
 # is their records' own statement (their Markdown highlights), kept here.
-validation = "bit-identical in every compared case ([threshold](record:ants-threshold-image), [multiply](record:ants-multiply-images), [smooth](record:ants-smooth-image), [resample](record:ants-resample-image), [by spacing](record:ants-resample-image-by-spacing))"
+validation = "bit-identical in every compared case ([threshold](record:ants-threshold-image), [multiply](record:ants-multiply-images), [smooth](record:ants-smooth-image), [resample](record:ants-resample-image), [by spacing](record:ants-resample-image-by-spacing)); data panel: [threshold](record:ants-threshold-image-panel), [multiply](record:ants-multiply-images-panel), [smooth](record:ants-smooth-image-panel), [resample](record:ants-resample-image-panel), [by spacing](record:ants-resample-image-by-spacing-panel), every compared case bit-identical"
 
 [[tool]]
 id = "ants-registration"
@@ -86,7 +86,7 @@ eco = "ants"
 page = "/tools/ants-registration/"
 use = ["larmorx ants antsRegistration", "lx.ants.registration"]
 how = "port"
-validation = "[{ants-registration.cases} cases](record:ants-registration): {ants-registration.as_built} of {ants-registration.compared} compared identical to ANTs (outputs and messages), {ants-registration.with_crmath} more with correctly rounded maths; [the corrections' effects](record:ants-registration-corrections)"
+validation = "[{ants-registration.cases} cases](record:ants-registration): {ants-registration.as_built} of {ants-registration.compared} compared identical to ANTs (outputs and messages), {ants-registration.with_crmath} more with correctly rounded maths; [the corrections' effects](record:ants-registration-corrections); data panel: [{ants-registration-panel.compared} compared](record:ants-registration-panel), {ants-registration-panel.as_built} identical as built, {ants-registration-panel.with_crmath} more with correctly rounded maths (the whole template registrations on every third voxel)"
 
 [[tool]]
 id = "ants-ai"
@@ -95,7 +95,7 @@ eco = "ants"
 page = "/tools/ants-ai/"
 use = ["larmorx ants antsAI", "larmorx ants antsAffineInitializer"]
 how = "port"
-validation = "[antsAI](record:ants-ai): {ants-ai.compared} of {ants-ai.compared} compared identical ({ants-ai.as_built} as built, {ants-ai.with_crmath} with correctly rounded maths), the blob alignment (`-b`) included (its corrections, ANTS-116 among them, by default); [antsAffineInitializer](record:ants-affine-initializer): {ants-affine-initializer.compared} of {ants-affine-initializer.compared}"
+validation = "[antsAI](record:ants-ai): {ants-ai.compared} of {ants-ai.compared} compared identical ({ants-ai.as_built} as built, {ants-ai.with_crmath} with correctly rounded maths), the blob alignment (`-b`) included (its corrections, ANTS-116 among them, by default); [antsAffineInitializer](record:ants-affine-initializer): {ants-affine-initializer.compared} of {ants-affine-initializer.compared}; data panel: [antsAI](record:ants-ai-panel) {ants-ai-panel.compared} of {ants-ai-panel.compared}, [antsAffineInitializer](record:ants-affine-initializer-panel) {ants-affine-initializer-panel.compared} of {ants-affine-initializer-panel.compared}"
 
 [[tool]]
 id = "ants-atropos"
@@ -104,7 +104,7 @@ eco = "ants"
 page = "/tools/ants-atropos/"
 use = ["larmorx ants Atropos", "lx.ants.atropos"]
 how = "port"
-validation = "[{ants-atropos.cases} cases](record:ants-atropos): {ants-atropos.identical} of {ants-atropos.compared} compared bit-identical to ANTs, {ants-atropos.compared} of {ants-atropos.compared} with correctly rounded maths, sMRIPrep's call on the five oracle runs included; partial-volume classes with the MRF corrected (ANTS-106)"
+validation = "[{ants-atropos.cases} cases](record:ants-atropos): {ants-atropos.identical} of {ants-atropos.compared} compared bit-identical to ANTs, {ants-atropos.compared} of {ants-atropos.compared} with correctly rounded maths, sMRIPrep's call on the five oracle runs included; partial-volume classes with the MRF corrected (ANTS-106); data panel: [{ants-atropos-panel.identical} of {ants-atropos-panel.compared}](record:ants-atropos-panel) as built, {ants-atropos-panel.compared} of {ants-atropos-panel.compared} with correctly rounded maths, the classes identical in all"
 
 [[tool]]
 id = "resample-series"
@@ -175,7 +175,7 @@ status = "`validated`"
 id = "ants-apply-transforms"
 larmorx = "`lx.ants.apply_transforms`, `larmorx ants antsApplyTransforms` (double, and single precision as `--float 1`; B-spline transforms since A5 part 3)"
 reference = "antsApplyTransforms (ANTs 2.6.5 binary, as built and with CORE-MATH preloaded; ANTsPy in-process if the binary is missing)"
-status = "`validated`"
+status = "`validated` Data panel: [ants-apply-transforms-panel](record:ants-apply-transforms-panel), {ants-apply-transforms-panel.cases} cases."
 
 [[record]]
 id = "itk-hdf5"
@@ -259,55 +259,55 @@ status = "`validated` ({numpy-linalg.expected} expected divergence: exactly 45°
 id = "ants-image-math"
 larmorx = "`lx.ants.image_math` and its typed wrappers, `larmorx ants ImageMath` (arithmetic, `Neg`, `TruncateImageIntensity`, `Normalize`, `RescaleImage`, `G`, `Laplacian`, `Grad`, `UnsharpMask`, `MD`, `ME`, `MO`, `MC`, `GD`, `GE`, `GO`, `GC`, `FillHoles`, `PadImage`, `GetLargestComponent`, `D`, `MaurerDistance`, `ExtractContours`, `ThresholdAtMean`, `ReplaceVoxelValue`)"
 reference = "ImageMath (ANTs 2.6.5 binary)"
-status = "`validated`"
+status = "`validated` Data panel: [ants-image-math-panel](record:ants-image-math-panel), {ants-image-math-panel.cases} cases."
 
 [[record]]
 id = "ants-threshold-image"
 larmorx = "`lx.ants.threshold_image`, `lx.ants.otsu_threshold`, `larmorx ants ThresholdImage` (no `Kmeans` yet)"
 reference = "ThresholdImage (ANTs 2.6.5 binary)"
-status = "`validated`"
+status = "`validated` Data panel: [ants-threshold-image-panel](record:ants-threshold-image-panel)."
 
 [[record]]
 id = "ants-multiply-images"
 larmorx = "`lx.ants.multiply_images`, `larmorx ants MultiplyImages`"
 reference = "MultiplyImages (ANTs 2.6.5 binary)"
-status = "`validated`"
+status = "`validated` Data panel: [ants-multiply-images-panel](record:ants-multiply-images-panel)."
 
 [[record]]
 id = "ants-smooth-image"
 larmorx = "`lx.ants.smooth_image`, `larmorx ants SmoothImage` (recursive Gaussian and median)"
 reference = "SmoothImage (ANTs 2.6.5 binary)"
-status = "`validated`"
+status = "`validated` Data panel: [ants-smooth-image-panel](record:ants-smooth-image-panel)."
 
 [[record]]
 id = "ants-resample-image-by-spacing"
 larmorx = "`lx.ants.resample_image_by_spacing`, `larmorx ants ResampleImageBySpacing`"
 reference = "ResampleImageBySpacing (ANTs 2.6.5 binary)"
-status = "`validated` ({ants-resample-image-by-spacing.cases} cases: {ants-resample-image-by-spacing.identical} of {ants-resample-image-by-spacing.compared} compared bit-identical, values and headers; {ants-resample-image-by-spacing.both} rejected by both; ANTs' values not compared where it resamples memory it never wrote, ANTS-28; ANTS-32 corrected by default, checked against known results)"
+status = "`validated` ({ants-resample-image-by-spacing.cases} cases: {ants-resample-image-by-spacing.identical} of {ants-resample-image-by-spacing.compared} compared bit-identical, values and headers; {ants-resample-image-by-spacing.both} rejected by both; ANTs' values not compared where it resamples memory it never wrote, ANTS-28; ANTS-32 corrected by default, checked against known results) Data panel: [ants-resample-image-by-spacing-panel](record:ants-resample-image-by-spacing-panel)."
 
 [[record]]
 id = "ants-resample-image"
 larmorx = "`lx.ants.resample_image`, `larmorx ants ResampleImage`"
 reference = "ResampleImage (ANTs 2.6.5 binary)"
-status = "`validated` (B-spline, Gaussian and windowed sinc in 3D only; 2 expected divergences)"
+status = "`validated` (B-spline, Gaussian and windowed sinc in 3D only; 2 expected divergences) Data panel: [ants-resample-image-panel](record:ants-resample-image-panel)."
 
 [[record]]
 id = "ants-n4"
 larmorx = "`lx.ants.n4_bias_field_correction`, `larmorx ants N4BiasFieldCorrection`"
 reference = "N4BiasFieldCorrection (ANTs 2.6.5 binary, one thread; exact reference with CORE-MATH preloaded, `scripts/build_crmath_preload.sh`)"
-status = "`validated`"
+status = "`validated` Data panel: [ants-n4-panel](record:ants-n4-panel), {ants-n4-panel.cases} cases."
 
 [[record]]
 id = "ants-denoise"
 larmorx = "`lx.ants.denoise_image`, `larmorx ants DenoiseImage`"
 reference = "DenoiseImage (ANTs 2.6.5 binary with ITK's AdaptiveDenoising at `24825c8d`, one thread; exact reference with CORE-MATH preloaded)"
-status = "`validated`"
+status = "`validated` Data panel: [ants-denoise-panel](record:ants-denoise-panel), {ants-denoise-panel.cases} cases."
 
 [[record]]
 id = "ants-registration"
 larmorx = "`lx.ants.registration`, `larmorx ants antsRegistration` (linear stages: `Translation`, `Rigid`, `Similarity`, `Affine`, `CompositeAffine`; SyN stages (A5 part 1); BSplineSyN, GaussianDisplacementField, BSplineDisplacementField and BSpline stages (A5 part 2); Exponential, BSplineExponential, TimeVaryingVelocityField and TimeVaryingBSplineVelocityField stages (A5 part 3); every image metric, `Demons` included, and every point-set metric, `ICP`, `PSE`, `JHCT`, `IGDM`; displacement fields among the initial transforms; 2D, 3D, 4D, double and float)"
 reference = "antsRegistration (ANTs 2.6.5 binary, one thread, `ANTS_RANDOM_SEED=42`; exact reference with CORE-MATH preloaded)"
-status = "`validated` (full tier: [ants-registration-full](record:ants-registration-full), with sMRIPrep's brain extraction and template registration, whole, on the five oracle runs, and [ants-registration-velocity-full](record:ants-registration-velocity-full); {ants-registration.expected} expected divergences: no seed, ANTS-51's crash, `--version`, ANTS-45, MINC transforms, in the point-set metrics a random fraction seeded from the clock, IGDM's reads before its arrays and a reader that never ends, linear stages after a field or a velocity field (ANTS-72), ANTS-77's B-spline meshes, and the velocity-field stages' samplings seeded from the clock (ANTS-82))"
+status = "`validated` (full tier: [ants-registration-full](record:ants-registration-full), with sMRIPrep's brain extraction and template registration, whole, on the five oracle runs, and [ants-registration-velocity-full](record:ants-registration-velocity-full); {ants-registration.expected} expected divergences: no seed, ANTS-51's crash, `--version`, ANTS-45, MINC transforms, in the point-set metrics a random fraction seeded from the clock, IGDM's reads before its arrays and a reader that never ends, linear stages after a field or a velocity field (ANTS-72), ANTS-77's B-spline meshes, and the velocity-field stages' samplings seeded from the clock (ANTS-82)) Data panel: [ants-registration-panel](record:ants-registration-panel), {ants-registration-panel.cases} cases (fMRIPrep's calls on the fourteen oracle runs; the whole template registrations on every third voxel)."
 
 [[record]]
 id = "ants-registration-corrections"
@@ -325,19 +325,19 @@ status = "`validated` ({ants-registration-velocity-full.cases} cases: {ants-regi
 id = "ants-ai"
 larmorx = "`lx.ants.ai`, `larmorx ants antsAI` (initial alignments, principal axes, the blob alignment, the multi-start search with `Mattes`, `GC`, `MI`; 2D and 3D)"
 reference = "antsAI (ANTs 2.6.5 binary, one thread; exact reference with CORE-MATH preloaded)"
-status = "`validated` ({ants-ai.cases} cases: {ants-ai.compared} compared, {ants-ai.as_built} identical as built and {ants-ai.with_crmath} with CORE-MATH, {ants-ai.both} rejected by both, {ants-ai.expected} expected divergences; full tier [ants-ai-full](record:ants-ai-full): {ants-ai-full.cases} cases, the blob alignment on all five oracle runs' T1w against MNI; with fMRIPrep's own `init_aff` command lines; aborts compared up to the abort; ANTs' `-b` crashes above one thread, ANTS-60; the blob alignment's corrections, ANTS-116 included, in the fix pass)"
+status = "`validated` ({ants-ai.cases} cases: {ants-ai.compared} compared, {ants-ai.as_built} identical as built and {ants-ai.with_crmath} with CORE-MATH, {ants-ai.both} rejected by both, {ants-ai.expected} expected divergences; full tier [ants-ai-full](record:ants-ai-full): {ants-ai-full.cases} cases, the blob alignment on all five oracle runs' T1w against MNI; with fMRIPrep's own `init_aff` command lines; aborts compared up to the abort; ANTs' `-b` crashes above one thread, ANTS-60; the blob alignment's corrections, ANTS-116 included, in the fix pass) Data panel: [ants-ai-panel](record:ants-ai-panel), {ants-ai-panel.cases} cases."
 
 [[record]]
 id = "ants-affine-initializer"
 larmorx = "`lx.ants.affine_initializer`, `larmorx ants antsAffineInitializer` (2D, 3D, 4D)"
 reference = "antsAffineInitializer (ANTs 2.6.5 binary, one thread)"
-status = "`validated`"
+status = "`validated` Data panel: [ants-affine-initializer-panel](record:ants-affine-initializer-panel), {ants-affine-initializer-panel.cases} cases."
 
 [[record]]
 id = "ants-atropos"
 larmorx = "`lx.ants.atropos`, `larmorx ants Atropos` (every initialization, likelihood model, posterior formulation, MRF, ICM, outlier and partial-volume option; 2D, 3D, 4D)"
 reference = "Atropos (ANTs 2.6.5 binary, one thread; exact reference with CORE-MATH preloaded)"
-status = "`validated` (full tier: [ants-atropos-full](record:ants-atropos-full); sMRIPrep's call on the five oracle runs; expected divergences: ANTs' aborts and crashes, its clock seed); partial-volume classes with the MRF on a phantom of known fractions (ANTS-106 corrected: Dice 0.86 and 0.81 where ANTs gives 0.30 and 0.41)"
+status = "`validated` (full tier: [ants-atropos-full](record:ants-atropos-full); sMRIPrep's call on the five oracle runs; expected divergences: ANTs' aborts and crashes, its clock seed); partial-volume classes with the MRF on a phantom of known fractions (ANTS-106 corrected: Dice 0.86 and 0.81 where ANTs gives 0.30 and 0.41) Data panel: [ants-atropos-panel](record:ants-atropos-panel), {ants-atropos-panel.cases} cases."
 
 [[record]]
 id = "mri-hmc"

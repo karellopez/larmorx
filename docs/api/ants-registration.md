@@ -117,6 +117,19 @@ glibc's maths moves the fields as far). larmorx gives the one-thread result at a
 gives ANTs' one-thread result. **Without a seed ANTs is not repeatable** (its sampling is seeded
 from the clock); larmorx then uses a fixed seed (121212).
 
+**On the data panel** ([record](../validation/ants-registration-panel.md), 2026-10-27): every
+antsRegistration node of the fourteen finished fMRIPrep oracle runs, each replayed from its node
+with its inputs and fMRIPrep's seed (the BOLD references' registrations to the template, the
+field maps' coregistrations, sMRIPrep's brain extraction at full size: 3.5-year-old, glioma,
+stroke, strong motion, 1.5 T, 7 T, multiband-8 and multi-echo among them), and the template
+registrations on every third voxel: **71 of 71 cases identical to ANTs 2.6.5 at one thread, 16 as
+built and 55 more with CORE-MATH** (warped images, transforms, standard output). The template
+registration's inputs, which niworkflows writes for itself and nipype does not keep, are made
+again exactly from each node's recorded inputs; its fourteen whole-size runs (about 2.4 hours of
+ANTs at one thread each, as built and with CORE-MATH) are left for a larger machine. sMRIPrep's
+brain extraction of the 7 T head at full size: ANTs 2884 MiB and 2431 s at one thread, larmorx
+2394 MiB and 1165 s, its four files identical.
+
 ## Quick start
 
 ```python

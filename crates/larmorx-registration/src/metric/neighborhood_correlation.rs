@@ -192,6 +192,17 @@ impl NeighborhoodCorrelation {
         compute_derivative: bool,
         floor: &IndexFloor,
     ) -> Result<Reduced<R>, ItkException> {
+        // Its parallel loops in the call's pool (the metric's thread count).
+        m.in_pool(|| self.evaluate_in_pool(m, transform, compute_derivative, floor))?
+    }
+
+    fn evaluate_in_pool<R: Real, const D: usize>(
+        &self,
+        m: &ImageMetricv4<R, D>,
+        transform: &Composite<R, D>,
+        compute_derivative: bool,
+        floor: &IndexFloor,
+    ) -> Result<Reduced<R>, ItkException> {
         let np = m.local_parameters(transform);
         let space = &m.virtual_space;
         let none = GradientSource {
@@ -222,77 +233,95 @@ impl NeighborhoodCorrelation {
                 };
                 let line_len = space.size[0];
                 let n_lines = space.len() / line_len.max(1);
-                let lines: Vec<Vec<PointResult<R>>> = (0..n_lines)
-                    .into_par_iter()
-                    .map(|line| {
-                        let first = space.index_of(line * line_len);
-                        let mut queue: std::collections::VecDeque<Column<R>> =
-                            std::collections::VecDeque::with_capacity(2 * self.radius + 1);
-                        let mut out = Vec::with_capacity(line_len);
-                        for x in 0..line_len {
-                            let mut center = first;
-                            center[0] += x as i64;
-                            if x == 0 {
-                                queue.clear();
-                                for _ in 0..self.radius {
-                                    queue.push_back(Column::default_zero());
-                                }
-                                for dx in 0..=r {
-                                    queue.push_back(self.column(&center, dx, &value));
-                                }
-                            } else {
-                                queue.push_back(self.column(&center, r, &value));
-                                queue.pop_front();
+                // The lines' results reduced chunk by chunk, in line order: a chunk holds about
+                // the metric's chunk of points (never every voxel's derivative at once).
+                let width = if compute_derivative {
+                    m.sample_width(transform)
+                } else {
+                    0
+                };
+                let lines_per_chunk = (m.sample_chunk(width) / line_len.max(1)).max(1);
+                let scan_line = |line: usize| -> Vec<PointResult<R>> {
+                    let first = space.index_of(line * line_len);
+                    let mut queue: std::collections::VecDeque<Column<R>> =
+                        std::collections::VecDeque::with_capacity(2 * self.radius + 1);
+                    let mut out = Vec::with_capacity(line_len);
+                    for x in 0..line_len {
+                        let mut center = first;
+                        center[0] += x as i64;
+                        if x == 0 {
+                            queue.clear();
+                            for _ in 0..self.radius {
+                                queue.push_back(Column::default_zero());
                             }
-                            let q: Vec<Column<R>> = queue.iter().copied().collect();
-                            out.push(self.point(
-                                m,
-                                transform,
-                                &q,
-                                &center,
-                                compute_derivative,
-                                floor,
-                                np,
-                            ));
+                            for dx in 0..=r {
+                                queue.push_back(self.column(&center, dx, &value));
+                            }
+                        } else {
+                            queue.push_back(self.column(&center, r, &value));
+                            queue.pop_front();
                         }
-                        out
-                    })
-                    .collect();
-                for line in lines {
-                    for (cc, d, voxel, cols, used) in line.into_iter().flatten() {
-                        jacobian_used |= used;
-                        reduction.add_point_cols(-cc, &d, cols.as_deref(), voxel);
+                        let q: Vec<Column<R>> = queue.iter().copied().collect();
+                        out.push(self.point(
+                            m,
+                            transform,
+                            &q,
+                            &center,
+                            compute_derivative,
+                            floor,
+                            np,
+                        ));
                     }
+                    out
+                };
+                let mut first = 0;
+                while first < n_lines {
+                    let last = (first + lines_per_chunk).min(n_lines);
+                    let lines: Vec<Vec<PointResult<R>>> =
+                        (first..last).into_par_iter().map(scan_line).collect();
+                    for line in lines {
+                        for (cc, d, voxel, cols, used) in line.into_iter().flatten() {
+                            jacobian_used |= used;
+                            reduction.add_point_cols(-cc, &d, cols.as_deref(), voxel);
+                        }
+                    }
+                    first = last;
                 }
             }
             Some(samples) => {
                 let start0 = space.start[0];
-                let results: Vec<PointResult<R>> = samples
-                    .par_iter()
-                    .map(|p| {
-                        let center = space.point_to_index(p);
-                        let value = |idx: &[i64; D]| -> Values<R> {
-                            if !space.contains(idx) {
-                                return None;
-                            }
-                            let q = space.index_to_point(idx);
-                            m.sample_at(idx, &q, transform, none, false, floor)
-                                .map(|s| (s.fixed_value, s.moving_value))
-                        };
-                        let fill = (start0 - (center[0] - r)).max(0);
-                        let mut queue = Vec::with_capacity(2 * self.radius + 1);
-                        for _ in 0..fill {
-                            queue.push(Column::default_zero());
+                let width = if compute_derivative {
+                    m.sample_width(transform)
+                } else {
+                    0
+                };
+                let chunk = m.sample_chunk(width);
+                let at_sample = |p: &[f64; D]| -> PointResult<R> {
+                    let center = space.point_to_index(p);
+                    let value = |idx: &[i64; D]| -> Values<R> {
+                        if !space.contains(idx) {
+                            return None;
                         }
-                        for i in fill..=2 * r {
-                            queue.push(self.column(&center, i - r, &value));
-                        }
-                        self.point(m, transform, &queue, &center, compute_derivative, floor, np)
-                    })
-                    .collect();
-                for (cc, d, voxel, cols, used) in results.into_iter().flatten() {
-                    jacobian_used |= used;
-                    reduction.add_point_cols(-cc, &d, cols.as_deref(), voxel);
+                        let q = space.index_to_point(idx);
+                        m.sample_at(idx, &q, transform, none, false, floor)
+                            .map(|s| (s.fixed_value, s.moving_value))
+                    };
+                    let fill = (start0 - (center[0] - r)).max(0);
+                    let mut queue = Vec::with_capacity(2 * self.radius + 1);
+                    for _ in 0..fill {
+                        queue.push(Column::default_zero());
+                    }
+                    for i in fill..=2 * r {
+                        queue.push(self.column(&center, i - r, &value));
+                    }
+                    self.point(m, transform, &queue, &center, compute_derivative, floor, np)
+                };
+                for part in samples.chunks(chunk) {
+                    let results: Vec<PointResult<R>> = part.par_iter().map(at_sample).collect();
+                    for (cc, d, voxel, cols, used) in results.into_iter().flatten() {
+                        jacobian_used |= used;
+                        reduction.add_point_cols(-cc, &d, cols.as_deref(), voxel);
+                    }
                 }
             }
         }

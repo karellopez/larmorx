@@ -298,6 +298,40 @@ def test_registration_deformable_stages_do_not_depend_on_threads(transform, extr
         )
 
 
+@pytest.mark.parametrize("metric", ["MI", "Mattes", "GC", "MeanSquares", "CC"])
+def test_registration_linear_stages_and_initializers_do_not_depend_on_threads(metric):
+    """A linear stage with each image metric, antsAI's search and antsAffineInitializer's: the
+    same transform at one and three threads (the metric's samples run in the call's own pool,
+    ``docs/findings/ants-cli.md``)."""
+    rng = np.random.default_rng(8)
+    fixed = 100.0 + 20.0 * rng.random((16, 14, 12))
+    fixed[4:11, 3:10, 3:8] += 200.0
+    moving = np.roll(fixed, 1, axis=0)
+    affine = np.diag([2.0, 2.0, 2.5, 1.0])
+    f = lx.Image(fixed.astype(np.float32), affine)
+    m = lx.Image(moving.astype(np.float32), affine)
+    stage = lx.ants.RegistrationStage(
+        "Affine", 0.1, lx.ants.RegistrationMetric(metric, f, m, radius=2),
+        iterations=[4, 2], shrink_factors=[2, 1], smoothing_sigmas=[1, 0],
+        convergence_window=3,
+    )  # fmt: skip
+    one = lx.ants.registration([stage], n_threads=1)
+    many = lx.ants.registration([stage], n_threads=3)
+    for name in one.files:
+        a = np.asarray(one.files[name][0].parameters)
+        assert np.array_equal(a, np.asarray(many.files[name][0].parameters)), name
+    if metric in ("MI", "Mattes", "GC"):
+        kw = {"metric": metric, "search_factor": 30.0, "arc_fraction": 0.25, "iterations": 3}
+        a = lx.ants.ai(f, m, n_threads=1, **kw).transform
+        b = lx.ants.ai(f, m, n_threads=3, **kw).transform
+        assert np.array_equal(np.asarray(a.parameters), np.asarray(b.parameters))
+    if metric == "MI":
+        kw = {"search_factor": 30.0, "radian_fraction": 0.1}
+        a = lx.ants.affine_initializer(f, m, n_threads=1, **kw)
+        b = lx.ants.affine_initializer(f, m, n_threads=3, **kw)
+        assert np.array_equal(np.asarray(a.parameters), np.asarray(b.parameters))
+
+
 def _blocks() -> tuple[lx.Image, lx.Image]:
     rng = np.random.default_rng(7)
     fixed = 100.0 + 20.0 * rng.random((14, 12, 10))

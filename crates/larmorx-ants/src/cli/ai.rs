@@ -474,6 +474,8 @@ fn ants_ai<const D: usize>(ctx: &mut Context<'_, '_>, log: &mut Log<'_>) -> Resu
         ctx.n_threads,
     )
     .map_err(|e| ai_failure(log, e))?;
+    // The fixed float image served the initialisation only (memory).
+    drop(fixed32);
     // The output's name.
     let output = last(p, "output").map(|o| {
         if o.parameters.is_empty() {
@@ -556,7 +558,7 @@ fn ants_ai<const D: usize>(ctx: &mut Context<'_, '_>, log: &mut Log<'_>) -> Resu
         &init,
         &fixed64,
         &moving64,
-        &moving32,
+        moving32,
         fixed_mask,
         moving_mask,
         log,

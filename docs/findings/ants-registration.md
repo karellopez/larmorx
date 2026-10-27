@@ -303,3 +303,39 @@ composed with `Compose(·, pre = true)` (a `TranslationTransform` through its of
 - **Transforms of four dimensions:** the parity runner reads a 4D displacement-field composite
   (`DisplacementFieldTransform_double_4_4`, which `lx.transforms.read` does not hold) by its HDF5
   parameters (`ants-registration:20261025:379`).
+
+## Memory against ANTs (2026-10-26, the data panel's re-validation)
+
+The user's rule (2026-10-25): larmorx never needs more memory than ANTs for the same call.
+Measured as for the image programs (`docs/findings/ants-image-programs.md`, "Memory against
+ANTs"): each process's peak resident memory (`/usr/bin/time -v`), one thread, ANTs 2.6.5 with
+CORE-MATH preloaded, larmorx's command in both D13 modes, every output ANTs' byte for byte in
+`reproduce`; the cases in `tests/parity/test_memory_peak.py` (`MORE_CASES`) on a head of
+128 × 128 × 96 voxels, the 4D ones on the standard tier's 4D phantoms
+(`validation/investigations/panel-ants/time_registration.py`).
+
+| Call (one thread) | ANTs | larmorx before | larmorx |
+|---|---|---|---|
+| `BSpline[0.2,2x2x2x1]`, `MeanSquares`, 4D (`bspline/4d`) | 34.9 MiB, 668 s | 329.0 MiB, 32.6 s | 38.1 MiB, 27.1 s |
+| `TimeVaryingBSplineVelocityField`, 4D (`time-varying-bspline/4d`) | 47.6 MiB, 7.9 s | 50.8 MiB, 7.0 s | 50.7 MiB |
+| `BSpline[0.1,4x4x4]`, `MeanSquares`, 3D head | 161.7 MiB | | 156.3 MiB |
+| `Rigid` `MI` then `SyN` `CC`, 3D head | 887.4 MiB | | 676.0 MiB |
+| `Atropos` k-means, MRF, mask (`ants-atropos.md`) | 169.1 MiB | | 113.3 MiB |
+| `antsApplyTransforms -e 3`, 20 volumes through a field | 651.2 MiB | | 572.7 MiB |
+| `antsAI` (`ants-ai.md`, "Memory") | 92.1 MiB | 157.2 MiB | 127.3 MiB |
+| `antsAffineInitializer` (`ants-ai.md`, "Memory") | 90.4 MiB | 139.7 MiB | 110 MiB |
+
+- **The image metric's samples:** each chunk of points (16384) was evaluated in parallel and kept
+  until it was reduced in order. A B-spline transform's point keeps its whole support's
+  derivative (`D·4^D` values and their columns: 1024 of each in 4D), so a chunk held 256 MiB
+  where ITK holds one point per thread. The chunk is now sized by what a point keeps
+  (`ImageMetricv4::sample_chunk`: about 1 MiB of results per thread, at least 64 points per
+  thread; `for_each_sample_of`), and the whole loop enters the call's pool once.
+- **The neighbourhood correlation (`CC`)** kept every voxel's derivative of the level before
+  reducing it; it now reduces its lines (or sampled points) chunk by chunk, in the same order.
+- **The gradient images** (`GradientRecursiveGaussianImageFilter`, antsAI's and
+  antsAffineInitializer's metrics, `useGradientFilter`) were made as one image per axis and then
+  copied into vectors, both held at once; they are now written into the vectors axis by axis
+  (`larmorx_image::gaussian::gradient_recursive_gaussian_vectors`).
+- None of this changes a result: every point is still reduced in domain order (golden
+  checksums, the thread-count invariance tests and every output above unchanged).

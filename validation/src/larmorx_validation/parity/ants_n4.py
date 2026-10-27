@@ -23,11 +23,13 @@ nipype writes them (``[ 200 ]`` with spaces).
 
 from __future__ import annotations
 
+import dataclasses
+import os
 from pathlib import Path
 
 import numpy as np
 
-from larmorx_validation.parity import ants_inputs, ants_threaded
+from larmorx_validation.parity import ants_inputs, ants_threaded, fmriprep_nodes
 from larmorx_validation.parity import known_results as known
 from larmorx_validation.parity.ants_image_math.common import (
     BOLD_MASK,
@@ -51,8 +53,11 @@ from larmorx_validation.parity.harness import Case, CaseResult, CheckList, Suite
 
 PROGRAM = "N4BiasFieldCorrection"
 LX_THREADS = ants_threaded.LX_THREADS
-#: ANTs' thread counts that define its own variability.
-BAND_THREADS = (2, 3, 4, 8, 12)
+#: ANTs' thread band: 2, 3, 4, 8, 12 threads unless ``LARMORX_PARITY_BAND_THREADS``
+#: (e.g. ``2,3`` on a shared machine) says otherwise.
+BAND_THREADS = tuple(
+    int(v) for v in os.environ.get("LARMORX_PARITY_BAND_THREADS", "2,3,4,8,12").split(",") if v
+)
 NCC_MIN = ants_threaded.NCC_MIN
 AFFINE_ATOL = ants_threaded.AFFINE_ATOL
 
@@ -956,6 +961,111 @@ def all_cases() -> list[AntsCase]:
 
 
 # ------------------------------------------------------------------------------------------------
+# The data panel's tier
+
+
+def _stroke_nonlesion():
+    """ds004884 sub-M2079's T2w (its image) and its head (values above 5 % of its 99th
+    percentile) without the stroke's manual lesion mask."""
+    import larmorx_testdata as td
+    import nibabel as nib
+
+    from larmorx_validation.parity import panel_images as P
+
+    img = nib.load(td.get(P.STROKE_T2W.path))
+    data = np.asanyarray(img.dataobj).astype(np.float64)
+    lesion = np.asanyarray(nib.load(td.get(P.STROKE_LESION.path)).dataobj) > 0
+    head = data > 0.05 * np.percentile(data, 99)
+    return img, (head & ~lesion).astype(np.uint8)
+
+
+@ants_inputs.builder("panel-stroke-nonlesion-mask")
+def _(t):
+    """The stroke's T2w head without its lesion (``_stroke_nonlesion``), uint8 with the T2w's
+    own header (pixdim, qform and sform unchanged: exactly the T2w's grid): N4 fitted outside
+    the lesion."""
+    import nibabel as nib
+
+    img, mask = _stroke_nonlesion()
+    hdr = img.header.copy()
+    hdr.set_data_dtype(np.uint8)
+    hdr["scl_slope"], hdr["scl_inter"] = 1.0, 0.0
+    nib.save(nib.Nifti1Image(mask, None, header=hdr), t)
+
+
+@ants_inputs.builder("panel-stroke-nonlesion-mask-affine")
+def _(t):
+    """The same mask written from the T2w's affine (nibabel's ``Nifti1Image(data, affine)``):
+    its pixdim recomputed (0.99999797 mm against 1), beyond ITK's tolerance."""
+    import nibabel as nib
+
+    img, mask = _stroke_nonlesion()
+    out = nib.Nifti1Image(mask, img.affine)
+    out.header.set_qform(img.affine, code=int(img.header["qform_code"]))
+    out.header.set_sform(img.affine, code=int(img.header["sform_code"]))
+    nib.save(out, t)
+
+
+def panel_cases() -> list[AntsCase]:
+    """The data panel's tier: every N4 node of the fourteen fMRIPrep oracle runs (ANTs' thread
+    band measured on the first call of each kind of node), and sMRIPrep's final N4 options on
+    panel images fMRIPrep never corrects."""
+    from larmorx_validation.parity import fmriprep_nodes
+    from larmorx_validation.parity import panel_images as P
+
+    def tuned(c: AntsCase) -> AntsCase:
+        # ANTS-40's correction leaves the zero and negative voxels out of the histogram, so the
+        # range loop's first voxel differs between the modes: ANTS-38 (a first-voxel minimum
+        # dropped) may be met in one mode only. And the suite's rule for `-r` without a mask
+        # (ANTS-36, named in both modes, no effect), as `n` applies it to the other tiers.
+        kw: dict = {"one_mode": ("ANTS-38",)}
+        if "-r" in c.args and "-x" not in c.args and "--mask-image" not in c.args:
+            kw["silent_ok"] = ("ANTS-36",)
+        return dataclasses.replace(c, **kw)
+
+    nodes = [tuned(c) for c in fmriprep_nodes.ants_cases(PROGRAM, band_once=True)]
+    final = ("-d", "3", "--bspline-fitting", "[", "200", "]", "--convergence", "[",
+             "50x50x50x50x50,", "1e-07", "]", "--shrink-factor", "4")  # fmt: skip
+
+    def n(cid, description, image, *extra, images=()):
+        return tuned(
+            P.ants_case(
+                PROGRAM,
+                cid,
+                description,
+                (*final, "--input-image", image, "--output", "[", "{out},", "{out2}", "]", *extra),
+                images or [image],
+                outputs=("{out}", "{out2}"),
+            )
+        )
+
+    return [
+        *nodes,
+        n("final/7t-mp2rage", "sMRIPrep's final N4 options (-b [200] -c [50x50x50x50x50,1e-7] "
+          "-s 4, the bias field saved) on the raw 7 T MP2RAGE: the panel's largest anatomical "
+          "image, a noisy background as bright as the head", P.MP2RAGE_7T),
+        n("final/3t-unit1", "the same options on a 3 T MP2RAGE UNIT1 (its salt-and-pepper "
+          "background)", P.UNIT1_3T),
+        n("final/flair", "the same options on a FLAIR of 3 mm slices (shrink 4: 11 slices)",
+          P.FLAIR_OLDER),
+        n("final/tumour-t2w", "the same options on a T2w of 6 mm slices (shrink 4: 7 slices) "
+          "with a tumour", P.TUMOUR_T2W),
+        n("final-mask/stroke-t2w", "the same options on a stroke's T2w, -x the head without "
+          "the manual lesion mask (N4 fitted outside the lesion)", P.STROKE_T2W,
+          "--mask-image", "{gen:panel-stroke-nonlesion-mask}",
+          images=[P.STROKE_T2W, P.STROKE_LESION]),
+        dataclasses.replace(
+            n("final-mask/stroke-t2w-mask-from-affine", "the same with the mask written from "
+              "the T2w's affine (its spacing recomputed, 2e-6 mm off): ITK's "
+              "VerifyInputInformation throws, ANTs aborts and larmorx refuses",
+              P.STROKE_T2W, "--mask-image", "{gen:panel-stroke-nonlesion-mask-affine}",
+              images=[P.STROKE_T2W, P.STROKE_LESION]),
+            expect="error",
+        ),
+    ]  # fmt: skip
+
+
+# ------------------------------------------------------------------------------------------------
 # Running, comparing and the report (shared with DenoiseImage: ants_threaded)
 
 
@@ -966,7 +1076,9 @@ def run_case(case: Case, checks: CheckList) -> None:
 
 
 def highlights(results: list[CaseResult]) -> list[str]:
-    return ants_threaded.highlights(results, "`expf`, `logf`, `exp` or `sincos`", BAND_THREADS)
+    return ants_threaded.highlights(
+        results, "`expf`, `logf`, `exp` or `sincos`", BAND_THREADS
+    ) + fmriprep_nodes.record_lines(PROGRAM, results)
 
 
 def suite():
@@ -994,7 +1106,7 @@ def suite():
                 f"{', '.join(map(str, BAND_THREADS))} threads vs 1 thread)",
             ),
         ],
-        cases=lambda tier: cases_for(tier, all_cases()),
+        cases=lambda tier: cases_for(tier, [*all_cases(), *panel_cases()]),
         run_case=run_case,
         packages=("nibabel", "scipy"),
         highlights=highlights,

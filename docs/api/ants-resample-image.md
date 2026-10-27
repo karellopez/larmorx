@@ -19,6 +19,11 @@ takes 91 ms against 431 ms for ANTs; a raw T1w to 1 mm by B-spline as `unsigned 
 on one thread and 334 ms on 12, against 3.17 s and 947 ms; a boldref to 1.5 mm by windowed sinc
 1.80 s and 329 ms, against 7.05 s and 1.21 s.
 
+**On the data panel** ([record](../validation/ants-resample-image-panel.md), 2026-10-26): fMRIPrep
+25.2.6 never calls `ResampleImage`; on the panel's images (the 82-year-old's FLAIR to 1 mm,
+linear; the 7 T MP2RAGE to 1 mm, B-spline; a glioma's T2w to 0.8 mm, windowed sinc; the stroke's
+lesion mask to a size, nearest): **4 of 4 bit-identical, header bytes included**.
+
 ## Quick start
 
 ```python

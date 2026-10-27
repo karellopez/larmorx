@@ -51,16 +51,19 @@ from larmorx_validation.parity.harness import (
     CheckList,
     Outcome,
     Suite,
+    in_tier,
 )
 
 PROGRAM = "antsAI"
-LX_THREADS = 4
+#: larmorx's thread count (its result does not depend on it): 4 unless
+#: ``LARMORX_PARITY_LX_THREADS`` says otherwise (a shared machine: parallel jobs times threads
+#: stay within the machine's share).
+LX_THREADS = int(os.environ.get("LARMORX_PARITY_LX_THREADS", "4"))
 #: ANTs' thread band: 2, 4 and 8 threads unless ``LARMORX_PARITY_BAND_THREADS`` (e.g.
 #: ``2,4,6`` when the machine is shared) says otherwise.
 BAND_THREADS = tuple(
     int(v) for v in os.environ.get("LARMORX_PARITY_BAND_THREADS", "2,4,8").split(",") if v
 )
-_TIERS = ("smoke", "standard", "full")
 GLIBC = reg.GLIBC
 #: How long a case whose ANTs never finishes lets it run.
 HANG_SECONDS = 20
@@ -2000,17 +2003,135 @@ def _real_cases() -> list[AiCase]:
     return out
 
 
+@ants_inputs.builder("ai-panel-template-regrid")
+def _(t):
+    """sMRIPrep's brain-extraction ``res_tmpl``: OASIS30ANTs' T1w regridded to 4 mm by
+    niworkflows' ``resample_by_spacing`` (order 3, clipped, smoothed), as fMRIPrep made it in
+    every run (taken from the first finished run's working directory)."""
+    import shutil
+
+    from larmorx_validation.parity import fmriprep_nodes
+
+    for c in fmriprep_nodes.calls(PROGRAM):
+        if c.norm.endswith("brain_extraction_wf/init_aff"):
+            for a in c.args:
+                if "res_tmpl/" in a:
+                    path = a.split("[", 1)[1].split(",", 1)[0]
+                    shutil.copyfile(path, t)
+                    return
+    raise Outcome(SKIPPED, "no brain-extraction antsAI node in the oracle runs")
+
+
+def _regrid_builder(image):
+    """A builder: ``image`` (a panel image) regridded to 4 mm as sMRIPrep's ``res_target``
+    regrids the N4-corrected T1w (niworkflows' ``resample_by_spacing``: order 3, clipped,
+    smoothed)."""
+
+    def build(t):
+        import larmorx_testdata as td
+
+        try:
+            from niworkflows.utils.images import resample_by_spacing
+        except ImportError as e:
+            raise Outcome(SKIPPED, f"niworkflows is not importable ({e})") from e
+        resample_by_spacing(
+            str(td.get(image.path)), (4.0, 4.0, 4.0), order=3, clip=True, smooth=True
+        ).to_filename(t)
+
+    return build
+
+
+#: The panel images the brain extraction's antsAI command runs on: (case id, image, what).
+def _panel_regrids():
+    from larmorx_validation.parity import panel_images as P
+
+    return (
+        ("flair", P.FLAIR_OLDER, "a FLAIR whose 44 slices of 3 mm cover part of the head"),
+        ("tumour-t2w", P.TUMOUR_T2W, "a T2w of 6 mm slices with a tumour"),
+        ("t2w-older", P.T2W_OLDER, "an older adult's T2w (T2 contrast against a T1 template)"),
+        ("7t-mp2rage", P.MP2RAGE_7T, "the raw 7 T MP2RAGE, its noisy background as bright as "
+         "the head"),
+    )  # fmt: skip
+
+
+# Registered at import, so that a worker process (``--jobs``) knows them too.
+for _cid, _image, _what in _panel_regrids():
+    ants_inputs.builder(f"ai-panel-regrid-{_cid}")(_regrid_builder(_image))
+
+
+def _panel_cases() -> list[AiCase]:
+    """The data panel's tier: every antsAI node of the fourteen fMRIPrep oracle runs (the brain
+    extraction's and each BOLD reference's, with fMRIPrep's seed; fMRIPrep's own transform
+    compared too; ANTs' thread band on the first of each kind), and the brain extraction's
+    command on panel images fMRIPrep never registers (each regridded to 4 mm as sMRIPrep
+    regrids its T1w)."""
+    from larmorx_validation.parity import fmriprep_nodes
+    from larmorx_validation.parity import panel_images as P
+
+    out = []
+    banded: set[str] = set()
+    brain = None
+    for call in fmriprep_nodes.calls(PROGRAM):
+        node = call.node.split("/", 1)[1]  # below fmriprep_25_2_wf
+        out.append(
+            AiCase(
+                fmriprep_nodes.PREFIX + call.id,
+                fmriprep_nodes.CATEGORY,
+                fmriprep_nodes.describe(call),
+                (f"{{fmriprep:{call.run}/{node}}}",),
+                tier="panel",
+                band=call.norm not in banded,
+                fmriprep=f"{call.run}/{node}",
+            )
+        )
+        banded.add(call.norm)
+        if brain is None and call.norm.endswith("brain_extraction_wf/init_aff"):
+            brain = call
+    if brain is None:
+        return out
+    seed = "50495"  # fMRIPrep's --random-seed 0 (docs/findings/fmriprep-oracle.md)
+    for cid, image, what in _panel_regrids():
+        name = f"ai-panel-regrid-{cid}"
+        args = []
+        for a in brain.args:
+            if a.startswith("Mattes["):
+                parts = a[len("Mattes[") : -1].split(",")
+                parts[0] = "{gen:ai-panel-template-regrid}"
+                parts[1] = "{gen:" + name + "}"
+                a = "Mattes[" + ",".join(parts) + "]"
+            elif a == "{out:initialization.mat}":
+                a = "{out}/initialization.mat"
+            args.append(a)
+        out.append(
+            AiCase(
+                P.PREFIX + f"brain-extraction/{cid}",
+                P.CATEGORY,
+                P.describe(
+                    "sMRIPrep's brain-extraction antsAI (OASIS30ANTs, Mattes, an Affine search, "
+                    f"fMRIPrep's seed) on {what}",
+                    image,
+                ),
+                tuple(args),
+                tier="panel",
+                seed=seed,
+            )
+        )
+    return out
+
+
 def all_cases() -> list[AiCase]:
-    return _search_cases() + _message_cases() + _random_cases() + _real_cases() + _blob_cases()
+    return (
+        _search_cases()
+        + _message_cases()
+        + _random_cases()
+        + _real_cases()
+        + _blob_cases()
+        + _panel_cases()
+    )
 
 
 def cases_for(tier: str) -> list[Case]:
-    rank = _TIERS.index(tier)
-    return [
-        Case(c.id, c.category, c.description, c)
-        for c in all_cases()
-        if _TIERS.index(c.tier) <= rank
-    ]
+    return [Case(c.id, c.category, c.description, c) for c in all_cases() if in_tier(c.tier, tier)]
 
 
 # ------------------------------------------------------------------------------------------------
@@ -2033,6 +2154,11 @@ def _fmriprep_node(spec: str) -> tuple[Path, list[str], str | None]:
         "/out/", f"{root / run / 'out'}/"
     )
     text = re.sub(r"/templateflow/[^\s,\]]+", lambda m: str(td.get(m.group(0)[1:])), text)
+    # The run's other mounts (/data: its BIDS input; ds004958's BOLD reference is its sbref, read
+    # straight from the dataset).
+    from larmorx_validation.parity import fmriprep_nodes
+
+    text = fmriprep_nodes.oracle_run(run).host_text(text)
     seed = None
     report = work / "_report" / "report.rst"
     if report.is_file():
@@ -2064,6 +2190,15 @@ def _resolve(c: AiCase, out: Path, tmp: Path) -> tuple[list[str], str | None]:
             return str(td.get("templateflow/" + key[3:]))
         if key == "nw-fixed" or key.startswith("nw-moving:"):
             return str(_niworkflows_input(key, tmp))
+        if key.startswith(("nwx-fixed:", "nwx-moving:")):
+            # The exact images niworkflows made in the run (made again from its inputs).
+            from larmorx_validation.parity import niworkflows_inputs
+
+            which, run = key.split(":", 1)
+            files = niworkflows_inputs.masked(run)
+            return str(
+                files["fixed_masked.nii.gz" if which == "nwx-fixed" else "moving_masked.nii.gz"]
+            )
         if key.startswith("oracle:"):
             root = reg._oracle_root()
             target = None if root is None else root / key[7:]
@@ -2574,7 +2709,9 @@ def highlights(results: list[CaseResult]) -> list[str]:
             + ", ".join(f"{d} (`{case}`)" for case, d in real)
             + " of them."
         )
-    return lines
+    from larmorx_validation.parity import fmriprep_nodes
+
+    return lines + fmriprep_nodes.record_lines(PROGRAM, results)
 
 
 def suite() -> Suite:

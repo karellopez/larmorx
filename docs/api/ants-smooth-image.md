@@ -16,6 +16,12 @@ what larmorx's default changes.
 ANTs; fMRIPrep's BOLD series smoothed in 4D 641 ms against 1.84 s on one thread; the median
 filter (radius 1) 1.26 s and 259 ms against 2.00 s and 361 ms.
 
+**On the data panel** ([record](../validation/ants-smooth-image-panel.md), 2026-10-26): fMRIPrep
+25.2.6 never calls `SmoothImage`; on the panel's images (a 2 mm Gaussian of the 7 T MP2RAGE, 1.5
+mm of the 82-year-old's FLAIR, a median of a child's T1w, a 4D Gaussian of a 588-volume multiband
+series): **4 of 4 bit-identical, header bytes included**; a zero sigma along time is refused by
+both.
+
 ## Quick start
 
 ```python

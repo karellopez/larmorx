@@ -370,9 +370,75 @@ any of the five oracle runs: the patch matching rarely pairs the same anatomy ac
 - The best start point is written over the initial transform, centred at the fixed centre of
   mass. Nothing is printed on success but the determinant lines.
 
-## Not found in fMRIPrep's runs
+## Inside fMRIPrep's template registration, not a node of its own
 
-`antsAffineInitializer` runs inside niworkflows' `RobustMNINormalization` only when it gets no
-initial transform (`niworkflows/interfaces/norm.py:174-190`, nipype's defaults: `15 0.1 0 10`);
-fMRIPrep 25.2.6 gives it one, so the oracle runs have no `antsAffineInitializer` node. The
-parity suite runs niworkflows' call on the MNI template and fMRIPrep's preprocessed T1w instead.
+`antsAffineInitializer` runs inside niworkflows' `RobustMNINormalization` when it gets no
+initial transform (`niworkflows/interfaces/norm.py:174-190`, nipype's defaults: `15 0.1 0 10`,
+the node's thread count). fMRIPrep 25.2.6 gives it none (`initial_moving_transform :
+<undefined>` in every run's `register_template_wf/.../registration/_report/report.rst`), so it
+runs once in each run's template registration, as part of that node: the oracle runs have no
+`antsAffineInitializer` node and keep neither its inputs (niworkflows' masked images) nor its
+transform. *Corrected 2026-10-26 (data panel, part a): an earlier version of this paragraph
+said fMRIPrep gives the registration an initial transform.* The panel tier remakes the call
+exactly in each of the fourteen runs (`larmorx_validation.parity.niworkflows_inputs`: the masked
+images from the node's recorded inputs, then the initializer), and the standard tier runs
+niworkflows' call on the MNI template and fMRIPrep's preprocessed T1w.
+
+## Memory and speed against ANTs (2026-10-26, the data panel's re-validation)
+
+On `tests/parity/test_memory_peak.py`'s head of 128 × 128 × 96 voxels at one thread
+(`ants-registration.md`, "Memory against ANTs", has the table):
+
+- **antsAI** (`Mattes`, `Regular` 25 %, `Rigid`, 30° steps): ANTs 92.1 MiB, larmorx 157.2 MiB
+  before this part, 127.3 MiB now; **antsAffineInitializer** (niworkflows' `15 0.1 0 10`): ANTs
+  90.4 MiB, larmorx 139.7 then 110 MiB. Fixed here: the moving image's gradient is written into
+  its vectors axis by axis (it was held twice, as components and as vectors), the float copies
+  are dropped once read (the fixed one after the initial transform, the moving one after its
+  gradient).
+- **Still above ANTs, a follow-up:** the metric holds the two images in double (`Image<f64>`,
+  16 bytes a voxel for both) where ANTs holds them in float (8), and larmorx's interpreter and
+  its allocator's retained pages add about as much again on this size; the gap grows with the
+  image (about 8 bytes a voxel: some 170 MiB on the 7 T MP2RAGE). Closing it means storing the
+  metric's images in their pixel type (`pixel_f32` already rounds every value to float). The
+  two cases are marked `xfail(strict=True)` in the test until then.
+- **Speed at one thread:** antsAffineInitializer on that head takes ANTs 73 s and larmorx 277 s
+  (312 s with the build before the thread-pool fix and rayon's global pool held to one thread:
+  the port's own time, not the fix's). Before the fix, larmorx's metric loop ran on rayon's
+  global pool, every CPU, at any thread count (`ants-cli.md`, "larmorx's own threads"), which hid
+  this. Part of it is the D13 notice of ITK-21: larmorx runs the start points' local searches
+  both ways, to say where ITK's carried-over learning rate changes the result. A follow-up.
+
+## On the data panel: fMRIPrep's transforms and ANTs' own spread (2026-10-26)
+
+The panel record ([ants-ai-panel](../validation/ants-ai-panel.md)) replays all 36 antsAI nodes of
+the fourteen finished oracle runs (sMRIPrep's brain extraction `init_aff` in every run, the BOLD
+reference's in 22 runs of 12 subjects) with fMRIPrep's seed, and four panel images fMRIPrep never
+gives it: **40 of 40 identical to ANTs 2.6.5 at one thread** (38 as built, 2 with CORE-MATH).
+Against fMRIPrep's own transforms (ANTs 2.6.2 at the node's 6 or 8 threads), 29 calls are within
+1.4e-12 of a parameter and two within 1e-8; five are further: up to 6.8 mm over a 100 mm cube.
+`validation/investigations/panel-ants/ai_variability.py` runs each of these calls again with the
+ANTs 2.6.5 oracle (once at one thread, three times at 8) and with fMRIPrep's own image (once at
+one thread, twice at the node's count), every transform measured as the largest displacement of
+a 100 mm cube's corners (`results/ai_variability.json`):
+
+| Call | fMRIPrep's file vs one thread | fMRIPrep's image, one thread | ANTs at 8 threads (3 runs) | fMRIPrep's image at N threads (2 runs) |
+|---|---|---|---|---|
+| ds002422 `arithm` run 1, BOLD (N = 6) | 5.44 mm | 0 | 2 runs give fMRIPrep's file (5e-12), 1 the one-thread result | both give fMRIPrep's file |
+| ds004884 `rest` run 9, BOLD (6) | 6.76 mm | 0 | 1 run 0.21 mm away, 2 the one-thread result | 1 run 0.21 mm, 1 the one-thread result |
+| ds004958 brain extraction (6) | 0.61 mm | 0 | 1 run gives fMRIPrep's file, 2 the one-thread result | both the one-thread result |
+| ds004958 `rest`, BOLD (6) | 1.2 mm | 0 | all 3 give fMRIPrep's file (3e-10) | 1 fMRIPrep's file, 1 the one-thread result |
+| ds005752 `rest` reverse, BOLD (8) | 0.68 mm | 0 | all 3 give fMRIPrep's file (5e-14) | both give fMRIPrep's file |
+| ds002422 `arithm` run 2, BOLD (6) | 1.6e-8 mm | 0 | 2e-11 to 8e-7 | both give fMRIPrep's file |
+| ds005454 `rest`, BOLD (8) | 2.4e-9 mm | 0 | 4e-7 to 8e-7 | 3e-8 |
+
+- **Cause: ANTs' own thread variability**, not a difference of builds or of larmorx: fMRIPrep's
+  own ANTs at one thread gives exactly the oracle's (and larmorx's) one-thread transform in all
+  seven, and both builds at fMRIPrep's thread count land, run to run, either on fMRIPrep's file,
+  on the one-thread result or elsewhere. Above one thread the Mattes metric's per-thread sums move
+  its values by about 1e-13 (`ants-ai` record's thread band); the multi-start search compares
+  start points by those values, so a near tie can be broken the other way and the search ends in
+  another start point's optimum, millimetres away. larmorx gives ANTs' one-thread result at any
+  thread count (its sums are fixed-order), which is one of the transforms ANTs itself produces.
+- **Verdict:** within the original's variability (no larmorx change, no defect entry: the
+  nondeterminism is ANTs' by thread count; larmorx never reproduces nondeterminism, D13). The
+  record gives every call's distance to fMRIPrep's file.

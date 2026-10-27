@@ -1521,6 +1521,18 @@ small part, before part (b).
   (`~/fsl-<version>`); the mcflirt and BET packages compared (`src/<package>`) and the replicas
   brought up to date. The old oracles stay (never deleted), so each record can show the step
   from one version to the next. Rule 2 in CLAUDE.md and `UPSTREAM.md` move with it.
+- **FSL's own build** (user, 2026-10-27): the newest FSL is the official build its installer
+  gives, as 6.0.7.17 was (its source ships with it in `src/<package>`); larmorx does not compile
+  FSL. ANTs and AFNI stay compiled from their release tags (the GCC 14.3 toolchain).
+- **Nothing is recomputed for the move**: the copied programs and results are the same bits
+  (SHA-256 against `MOVE-MANIFEST.json`); the move's proof re-runs a sample. Only what a version
+  update changes is computed again (the oracle cache keys a new program by its content, so the
+  new version's runs are made once and the old version's entries stay).
+- **fMRIPrep:** the fourteen 25.2.6 runs stay (75 GB, about two days of computing); they serve
+  the comparisons through fMRIPrep's real calls, which run both the original program and larmorx
+  and do not depend on fMRIPrep's version. fMRIPrep 25.2.7 is out (2026-10-27); the final
+  comparisons with fMRIPrep (when every tool is ported, 2026-10-16) use the newest fMRIPrep of
+  that time, run then on the panel's fourteen subjects on the new machine.
 
 ## Open decisions (PLAN.md §16)
 

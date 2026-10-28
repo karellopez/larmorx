@@ -1575,6 +1575,53 @@ its box and is never refused what the box allows. Measured first (rule D):
 queued as a heavy case, not counted as an agreement (the user's rule of 2026-10-25, heavy cases
 are run, not avoided): a follow-up in next-steps.
 
+## 2026-10-28: Ports first with decent testing; the very extensive testing at the end (decided by the user)
+
+"I have the feeling that we are doing excessive testing too soon. Don't you think is better to port
+tools to the last version first with a decent but not heavily extensive testing, and then, once we
+have the whole picture with all these amount of ports we can run the very extensive testing? ...
+the point of a test is just to use data cases smartly to prove how the program behaves in different
+situations; if we run a similar test so many times, we only waste time and money. Those repeated
+tests may be worth it at the very end as the cherry in the cake." Asked whether the fixes and the
+version update should then wait as well: "No, the fixes and the new versions you can make it still
+with the faster testing, do not postpone them. Just fix and make sure they align [with] their
+oracles' last versions. Same for the ants memory problems."
+
+What a part brings from now on (a port, a fix, a version update):
+- **Unchanged:** the port complete (every option, message, exit status and failure case, D13
+  switches: 2026-10-12); bit-identity as the target; the replica and clean-room tracks and their
+  licences; golden cases on six platforms; the gates and CI; records from clean commits; findings
+  and the defect register; the oracle cache; memory similar to the original's.
+- **Testing per part:** parity against the newest original on cases chosen to cover each code path
+  once (each option, image type, data type, odd header and size; one case per distinct path, not
+  one per image), fMRIPrep's real calls on about three distinct oracle runs, the edge cases of the
+  defects found; a new tool's random-testing descriptor and short trial; the standard tier
+  and the smoke tier at the merge.
+- **The site, per new program** (the user, the same day: "after you finish a new program, you can
+  still publish that into the website with figures and metrics about that smart testing. Then, at
+  the end when we do the heavy one we can update each tool validation entry with all the extensive
+  new info"): every new port and clean-room original gets its page when it is finished, with
+  figures and metrics from its smart tests (agreement, differences and their reasons, the cases
+  covered, the site's style; `docs/figures.md`); the final phase adds the extensive evidence to
+  each tool's page. Nothing the site shows is removed.
+- **Moved to one final validation phase**, after all tools are ported: the data panel for every
+  tool (the ANTs tools' part (a) is done; part (b), AFNI, FSL and I/O, waits), full tiers, heavy and
+  nightly random testing, thread-band studies, the extensive evidence on the site, speed and
+  memory studies beyond the rule's check, independent reviews, and the comparisons with fMRIPrep
+  (already at the end, 2026-10-16). Machine-only runs that need no agent (the heavy random-testing
+  cases running now) may continue in the background.
+- **The order now:** antsAI and antsAffineInitializer's memory and speed; the clean-room fixes; the
+  version update (AFNI 26.3.05, FSL 6.0.7.23, each tool aligned with its newest oracle); then the
+  ports: BET's clean-room original, FLIRT with BBR, FAST, topup, field maps, FreeSurfer (replica
+  and clean-room), surfaces, confounds, larmorprepx. The scripts triage moves to the final phase.
+
+Why: the 14 subjects were chosen to cover distinct difficulties, but a replica does the same
+arithmetic on any image, so beyond one case per code path more images rarely find anything (the
+fourteen whole template registrations, 2026-10-28: 14 of 14 identical, as the small versions
+predicted). Usage and time go to porting; the panel is most informative for the clean-room
+originals and the improved algorithms, whose results are not bit-identical, and they are judged
+together at the end.
+
 ## Open decisions (PLAN.md §16)
 
 | # | Decision | Recommended default (used until decided) | Status |

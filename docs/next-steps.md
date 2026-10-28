@@ -9,7 +9,11 @@ parts, as they were planned, are in [status-log.md](status-log.md).
 completeness** for every tool: every option, message and failure case, with D13 switches (user,
 2026-10-12); brief each agent for it from the start, so a tool takes one pass. **One agent at a
 time, in bounded parts with a stop after each**, for the user's usage check (user, 2026-10-10 and
-2026-10-17). Every tool's contract includes its figures (CLAUDE.md rule 7). Each merge goes
+2026-10-17). Every tool's contract includes its figures (CLAUDE.md rule 7). **Testing depth**
+(user, 2026-10-28; decision log): each part tests smartly (every code path once, fMRIPrep's real
+calls on about three oracle runs, the defects' edge cases, the standard and smoke tiers) and
+publishes its tool's page with figures and metrics from those tests; the very extensive testing
+waits for **the final validation phase** (below), once every tool is ported. Each merge goes
 through CLAUDE.md's checklist. While an agent runs, the orchestrator prepares the next task but
 starts no other agent.
 
@@ -34,8 +38,30 @@ starts no other agent.
 
 ## The order from here
 
-**Now (2026-10-26):** this round is complete (BET merged, item 7; the clean stop made: history out
-of CLAUDE.md, the working agreements in it). Next, in order:
+**Now (2026-10-28):** the move is done (M, below); the ANTs tools' data panel (part a) and the
+fourteen whole template registrations are done (14 of 14 identical with correctly rounded maths).
+The order from here, by the user's decision on testing depth (2026-10-28, decision log), one agent
+at a time:
+
+1. **antsAI and antsAffineInitializer: memory and speed** (a small part: their metric's images in
+   float, the initializer's speed; decision log 2026-10-27).
+2. **The clean-room fixes** found behaviourally (the thread probe, the D13 corrections, 3dAutomask's
+   obliquity-message number), by an agent that has never read the source.
+3. **The version update** (user 2026-10-27, decision log; the upstream watch with it): AFNI to its
+   newest release (26.3.05 today), FSL to its newest 6.0.7.x (6.0.7.23 today), SciPy, NumPy and
+   OpenBLAS checked; each tool aligned with its newest original, with the per-part testing.
+4. **The ports:** BET's clean-room original (item 7), the clean-room additions mcflirt FSL-20/21
+   and 3dUnifize AFNI-75 (specs first), FLIRT with BBR, FAST, topup (item 7); field maps,
+   FreeSurfer, surfaces, confounds (item 8); larmorprepx (item 9). Each with its site page from
+   its smart tests.
+5. **The final validation phase** (after every tool is ported): the data panel for every tool
+   (part b: AFNI, FSL and I/O; the new tools), full tiers, heavy and nightly random testing,
+   thread-band studies, the extensive evidence on each tool's page (added to what it shows),
+   speed and memory studies beyond the rule's check, independent reviews, the agents' scripts
+   triage (follow-ups), then the comparisons with fMRIPrep (item 9). Machine-only runs that need
+   no agent (the heavy random-testing cases) may run before, in the background.
+
+The items below keep their history.
 
 - **M. The move to the new main machine** (user, 2026-10-25; CLAUDE.md "Machines"; **the copy and
   the proof done, 2026-10-28**: neither larmorx nor any original computes differently there, numpy's
@@ -52,15 +78,10 @@ of CLAUDE.md, the working agreements in it). Next, in order:
   does new work run there. Then the helpers: key-based SSH to this laptop (benchmarks, a second
   Linux reference), the Windows laptop and, for the 25 heavy cases and later FreeSurfer batches,
   the lab's server (originals in an Ubuntu 22.04 container: its glibc is 2.39).
-- **Meanwhile, here, and then:** every finished tool re-validated on the data panel (item 6; **the ANTs tools: done**, part a,
-  2026-10-27; next a small part for antsAI and antsAffineInitializer (their metric's images in float, the
-  initializer's speed; decision log 2026-10-27), then **the version update** (first the upstream watch, below; AFNI to its
-  newest release, 26.3.x today, FSL to its newest 6.0.7.x, SciPy, NumPy and OpenBLAS checked; user 2026-10-27,
-  decision log), then AFNI, FSL and I/O, part b; the fourteen whole template
-  registrations: done, 2026-10-28, 14 of 14 identical with correctly rounded maths), then BET's clean-room original (item 7; one agent at a
-  time, user 2026-10-26); then
-  the clean-room additions mcflirt FSL-20/21 and 3dUnifize AFNI-75 (specs first); then FLIRT with
-  BBR, FAST, topup (item 7).
+- **Meanwhile, here, and then** (until 2026-10-28; the order above replaces it): every finished
+  tool re-validated on the data panel (item 6; **the ANTs tools: done**, part a, 2026-10-27; the
+  fourteen whole template registrations: done, 2026-10-28, 14 of 14 identical with correctly
+  rounded maths; part b, AFNI, FSL and I/O, moved to the final validation phase).
 
 1. **Visual reports, part 2: interactive evidence** (user, 2026-10-21; decision log). Part 2a, a
    pilot (merged and approved by the user, 2026-10-21): the Validation guide (method, terms,
@@ -131,7 +152,8 @@ of CLAUDE.md, the working agreements in it). Next, in order:
    ResampleImageBySpacing 3/3 bit-identical; N4 69/69, DenoiseImage 21/21, Atropos 17/17,
    antsApplyTransforms 425/425 bit-identical with CORE-MATH; antsAI 40/40, antsAffineInitializer
    14/14, antsRegistration 71/71 identical to ANTs at one thread), each ANTs page with its panel
-   section; n_threads made exact; memory fixes; Atropos' input check.
+   section; n_threads made exact; memory fixes; Atropos' input check. Part b (AFNI, FSL and I/O) and the
+   new tools: in the final validation phase (user, 2026-10-28).
 7. **FSL:** the mcflirt replica, BET, FAST, FLIRT with BBR, topup: a replica in `larmorx-nc` (FSL
    licence, with FSL's source as its terms require) and a clean-room original each. In progress
    (started 2026-10-24, beside item 6 at the user's request). **The mcflirt replica: done**
@@ -317,8 +339,9 @@ of CLAUDE.md, the working agreements in it). Next, in order:
   (the archive's documents are copied there, `machine-move.md`): for each finding
   (`docs/findings/`) and record (`docs/validation/`), find the scripts that produced it; commit
   those not yet in the repository, each topic with a README (what it shows, how to run it); the
-  rest (one-off edits, superseded drafts) stays in the archive. One bounded part, early, since
-  the briefs' rule is meant to prevent exactly this.
+  rest (one-off edits, superseded drafts) stays in the archive. One bounded part, in the final
+  validation phase (user, 2026-10-28: testing depth); the briefs' rule keeps new scripts in the
+  repository meanwhile.
 - **The oracle cache across CPUs** (found 2026-10-27, the move): the key includes the CPU's model
   and the hash of all its flags, so the old laptop's 40 GB of entries are never hits on the new
   AMD machine. After the move's `verify` sample: if the originals give identical outputs on both

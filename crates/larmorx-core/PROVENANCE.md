@@ -50,7 +50,10 @@ It is bit-exact with `itk::Matrix::GetInverse` on 2,000 random matrices
 built on x86-64 (`Modules/Core/Common/include/itkMathDetail.h`, the SSE2 branch:
 `round_half_to_even(2x ∓ 0.5) >> 1`, computed in the argument's type), and
 `itk::Matrix<T, 3, 3>::GetInverse` (`itkMatrix.h`: vnl's determinant compared with 0, then
-`vnl_matrix_inverse<T>`). The trait itself is larmorx's own.
+`vnl_matrix_inverse<T>`). The trait itself is larmorx's own, and so is the way the rounding
+to an integer is computed below 2^51 in magnitude (one addition of 1.5·2^52 and the result's
+bits, the same integer as `cvtsd2si`'s round to nearest, ties to even; tested against the
+general method).
 
 ## vnl's float SVD (`src/vnl_svd_f32.rs`)
 

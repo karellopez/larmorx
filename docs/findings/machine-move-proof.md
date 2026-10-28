@@ -84,6 +84,56 @@ laptop's `oracles/logs/move-proof-oldlaptop.log`.
   the clean-room original `20.646889`; the masks agree. Code, not the machine: it goes to the
   clean-room fixes part as a behaviour-only description.
 
+## Fixed (2026-10-28)
+
+The tests that depended on the machine or failed at random, and the cache's replay gaps, fixed in
+one part (commits 831c754, e682a7e, efb8536, 224bbac, 051d7ef and this document's; validation
+code only, nothing larmorx computes changed):
+
+- **Allocations refused alike on every machine.** Every original program the harness runs
+  (through the oracle cache's runner: the parity suites, `verify`, random testing) runs under
+  `RLIMIT_AS` = 64 GiB, inherited by what it starts; larmorx's in-process runs of the ANTs image
+  programs run with the harness's soft limit lowered to it
+  (`validation/src/larmorx_validation/address_space.py`, `LARMORX_ADDRESS_SPACE_LIMIT`). The
+  refused requests (`strace`): ImageMath's `MD -1` 96.0 GiB, ResampleImage's and
+  ResampleImageBySpacing's `allocation-refused` 109.2 and 110.9 GiB, N4's 3.2·10¹⁶ bytes; the
+  largest real call, mcflirt on the 600-volume multiband-8 BOLD series, 9.4 GiB of address space
+  (antsApplyTransforms on it 6.7, ImageMath 3.6, 3dTshift at 32 OpenMP threads 2.6, sMRIPrep's
+  registrations 2.6, fMRIPrep's `bet` through Apptainer 1.8 GiB), every one the same result under
+  the limit; the harness with larmorx in-process at most 19.3 GiB
+  (`validation/investigations/address-space/`). The four cases fail as recorded here
+  (*both-error*: ANTs aborts on `std::bad_alloc` or ITK's `MemoryAllocationError`, larmorx
+  refuses), as on the old laptop. Random testing
+  derives the limit from each case's memory budget (twice it, never below 64 GiB), so
+  `difftest --heavy` runs under twice its box and a heavy case is never refused what its box
+  allows.
+- **`bet2/one-argument`.** BET's temporary folders are `lx-fsl-gen_<random>` and
+  `lx-fsl_<random>` (random testing's inputs `lx-difftest-inputs_<random>`): mkdtemp's random part
+  never follows a dash, and the suite refuses a temporary root holding `-h`. The cache key keeps
+  the text a program reads in a path where a replaced path holds it (`policy.path_text`:
+  whitespace for every program, `-h` and `--help` for bet2 with one argument), and only there:
+  no stored entry changes key for it (bet2's one-argument entries stored its error).
+- **The replay gaps**, each reproduced or never cached ([oracle-cache.md](../validation/oracle-cache.md),
+  "Keyed since 2026-10-28"): Atropos' priors named by a pattern are inputs (68 entries re-keyed),
+  a path with a blank is one path (14), mcflirt's working directory's files are inputs (1),
+  `verify` starts a container with every variable the suite set (the 38 Apptainer runs), compares
+  NIfTI-2 files without their extensions (AFNI's history note, 6) and masks a shell's process ID
+  (BET's crash, 1); the cache applies ANTs' program-level rules to every ITK run, so the
+  random-testing runs that varied are never cached (ANTS-82's velocity-field stages, ANTS-07's
+  smaller operand, ANTS-28's smoothed thin axis: 23 entries never served again). `oracle-cache
+  verify --keys` on a copy of the 89 entries: **45 identical, 44 skipped with their reason**
+  (log `oracles/logs/machine-tests-verify89b.log`).
+- **The smoke tier passes in full here**, without `-k "not allocation-refused"`: `pytest
+  tests/parity` from the clean commit 224bbac, twice (in a 28 GiB box): 2547 passed and the 2
+  expected failures of `test_memory_peak.py` both times (26 and 24 minutes), no run differing from
+  its cache entry, the smoke marker written. The standard tiers of the suites the part touched
+  (fsl-bet, fsl-mcflirt-replica, ants-atropos, afni-tshift, afni-automask, afni-unifize,
+  ants-image-math, ants-multiply-images, ants-resample-image, ants-resample-image-by-spacing,
+  ants-n4; 1,515 cases at 051d7ef): no status changed against the committed records
+  (`compare_records.py`); the new cases since those records are the permanent random-testing cases
+  and the panel's fMRIPrep calls, among them 3dAutomask's 5 known failures (above). The 24 entries
+  the new rules stored verify identical.
+
 ## What follows
 
 - `scripts/orchestration/env.sh` sets `OPENBLAS_CORETYPE=Haswell` (unless already set), so the

@@ -30,6 +30,11 @@ The largest real calls, each the same as its stored result under the limit (`vm_
 | MultiplyImages, SmoothImage on a 4D Philips multiband series | 1.57, 1.32 GiB |
 | Atropos (the child's T1w and T2w), betsurf with a T2, 3dUnifize, ResampleImage (7 T), bet, DenoiseImage, antsAI, antsAffineInitializer | 0.25 to 1.46 GiB |
 
+The harness itself while larmorx runs in-process (`harness_peak.py`; its whole life, the
+comparison of the outputs included): ImageMath `m` on the 600-volume series 19.3 GiB (17.9 GiB
+resident), SmoothImage and MultiplyImages on the 4D Philips series 6.6 GiB, ResampleImage on the
+7 T image 1.8 GiB; sMRIPrep's registrations in the panel run's workers 5.3 GiB.
+
 The allocations the records expect to be refused (`refused_sizes.py`):
 
 | Case | Refused request |
@@ -39,5 +44,6 @@ The allocations the records expect to be refused (`refused_sizes.py`):
 | ResampleImageBySpacing `difftest/allocation-refused` | 110.9 GiB |
 | N4BiasFieldCorrection `difftest/allocation-refused` | 3.2·10¹⁶ bytes (beyond any address space) |
 
-64 GiB is 6.8 times the largest real call and 32 GiB below the smallest refusal; the old laptop's
-RAM plus swap (94 GiB), which decided the records, lies between the two as well.
+64 GiB is 6.8 times the largest original's call, 3.3 times the harness's largest peak, and 32 GiB
+below the smallest refusal; the old laptop's RAM plus swap (94 GiB), which decided the records,
+lies between the two as well.

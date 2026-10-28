@@ -26,7 +26,8 @@ the largest real call measured (2026-10-28, ``validation/investigations/address-
 largest virtual peak of any original program on the data panel's largest inputs is 9.4 GiB
 (mcflirt on the 600-volume multiband-8 BOLD series; antsApplyTransforms on it 6.7 GiB, ImageMath
 3.6 GiB, 3dTshift with OpenMP at 32 threads 2.6 GiB, sMRIPrep's registrations 2.6 GiB, fMRIPrep's
-``bet`` through Apptainer 1.8 GiB), and the harness with larmorx in-process stays near 5 GiB.
+``bet`` through Apptainer 1.8 GiB); the harness with larmorx in-process peaks at 19.3 GiB
+(ImageMath on that series, the comparison of its outputs included).
 ``difftest --heavy`` raises it to twice its box (memory and swap), whose cases are run to their
 end.
 """

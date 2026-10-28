@@ -1,0 +1,985 @@
+{
+ "environment": {
+  "larmorx": "0.0.1",
+  "larmorx_commit": "ec2910367e8d",
+  "larmorx_testdata_commit": "52124bc98f9f",
+  "python": "3.12.16",
+  "platform": "Linux x86_64",
+  "os": "Linux-6.8.0-124-generic-x86_64-with-glibc2.35",
+  "cpu": "AMD Ryzen 9 7945HX with Radeon Graphics",
+  "logical_cpus": 32,
+  "packages": {
+   "numpy": "2.3.5",
+   "nibabel": "5.4.2"
+  },
+  "load_average_before": [
+   4.05859375,
+   3.81103515625,
+   5.1650390625
+  ],
+  "date": "2026-10-28"
+ },
+ "repeats": 3,
+ "results": [
+  {
+   "job": "antsAffineInitializer, the memory test's head",
+   "program": "antsAffineInitializer",
+   "inputs": "head",
+   "tool": "ANTs 2.6.5 (CORE-MATH)",
+   "mode": "ants",
+   "threads": 1,
+   "runs": [
+    {
+     "exit": 0,
+     "wall": 33.48,
+     "cpu": 33.47,
+     "peak_mib": 88.79296875,
+     "load": [
+      3.66943359375,
+      3.73681640625,
+      5.08837890625
+     ]
+    },
+    {
+     "exit": 0,
+     "wall": 33.51,
+     "cpu": 33.5,
+     "peak_mib": 89.4609375,
+     "load": [
+      3.42529296875,
+      3.66943359375,
+      5.01513671875
+     ]
+    },
+    {
+     "exit": 0,
+     "wall": 33.34,
+     "cpu": 33.33,
+     "peak_mib": 89.15234375,
+     "load": [
+      3.3037109375,
+      3.6103515625,
+      4.9443359375
+     ]
+    }
+   ],
+   "wall": 33.48,
+   "cpu": 33.47,
+   "peak_mib": 89.15234375,
+   "exit": 0,
+   "same_as_ants": null
+  },
+  {
+   "job": "antsAffineInitializer, the memory test's head",
+   "program": "antsAffineInitializer",
+   "inputs": "head",
+   "tool": "larmorx, reproduce",
+   "mode": "reproduce",
+   "threads": 1,
+   "runs": [
+    {
+     "exit": 0,
+     "wall": 40.15,
+     "cpu": 40.230000000000004,
+     "peak_mib": 91.2734375,
+     "load": [
+      3.21728515625,
+      3.54833984375,
+      4.86572265625
+     ]
+    },
+    {
+     "exit": 0,
+     "wall": 39.95,
+     "cpu": 40.04,
+     "peak_mib": 90.23046875,
+     "load": [
+      3.1591796875,
+      3.49462890625,
+      4.7900390625
+     ]
+    },
+    {
+     "exit": 0,
+     "wall": 39.86,
+     "cpu": 39.970000000000006,
+     "peak_mib": 90.53515625,
+     "load": [
+      3.1474609375,
+      3.44775390625,
+      4.7177734375
+     ]
+    }
+   ],
+   "wall": 39.95,
+   "cpu": 40.04,
+   "peak_mib": 90.53515625,
+   "exit": 0,
+   "same_as_ants": true
+  },
+  {
+   "job": "antsAffineInitializer, the memory test's head",
+   "program": "antsAffineInitializer",
+   "inputs": "head",
+   "tool": "larmorx, default",
+   "mode": "fix",
+   "threads": 1,
+   "runs": [
+    {
+     "exit": 0,
+     "wall": 20.93,
+     "cpu": 20.97,
+     "peak_mib": 90.80078125,
+     "load": [
+      3.03662109375,
+      3.40185546875,
+      4.67529296875
+     ]
+    },
+    {
+     "exit": 0,
+     "wall": 21.44,
+     "cpu": 21.479999999999997,
+     "peak_mib": 90.90625,
+     "load": [
+      3.08740234375,
+      3.39111328125,
+      4.64404296875
+     ]
+    },
+    {
+     "exit": 0,
+     "wall": 20.9,
+     "cpu": 20.95,
+     "peak_mib": 91.0390625,
+     "load": [
+      3.13525390625,
+      3.38134765625,
+      4.61376953125
+     ]
+    }
+   ],
+   "wall": 20.93,
+   "cpu": 20.97,
+   "peak_mib": 90.90625,
+   "exit": 0,
+   "same_as_ants": null
+  },
+  {
+   "job": "antsAffineInitializer, the memory test's head",
+   "program": "antsAffineInitializer",
+   "inputs": "head",
+   "tool": "larmorx, reproduce",
+   "mode": "reproduce",
+   "threads": 8,
+   "runs": [
+    {
+     "exit": 0,
+     "wall": 8.66,
+     "cpu": 56.47,
+     "peak_mib": 91.5625,
+     "load": [
+      3.876953125,
+      3.53369140625,
+      4.650390625
+     ]
+    },
+    {
+     "exit": 0,
+     "wall": 8.82,
+     "cpu": 57.0,
+     "peak_mib": 92.65625,
+     "load": [
+      4.41845703125,
+      3.6640625,
+      4.68115234375
+     ]
+    },
+    {
+     "exit": 0,
+     "wall": 8.63,
+     "cpu": 56.59,
+     "peak_mib": 92.9921875,
+     "load": [
+      4.94580078125,
+      3.7861328125,
+      4.71533203125
+     ]
+    }
+   ],
+   "wall": 8.66,
+   "cpu": 56.59,
+   "peak_mib": 92.65625,
+   "exit": 0,
+   "same_as_ants": true
+  },
+  {
+   "job": "antsAffineInitializer, the memory test's head",
+   "program": "antsAffineInitializer",
+   "inputs": "head",
+   "tool": "larmorx, default",
+   "mode": "fix",
+   "threads": 8,
+   "runs": [
+    {
+     "exit": 0,
+     "wall": 4.75,
+     "cpu": 30.14,
+     "peak_mib": 90.77734375,
+     "load": [
+      5.4306640625,
+      3.90625,
+      4.74951171875
+     ]
+    },
+    {
+     "exit": 0,
+     "wall": 4.81,
+     "cpu": 30.11,
+     "peak_mib": 92.47265625,
+     "load": [
+      5.796875,
+      4.0078125,
+      4.77783203125
+     ]
+    },
+    {
+     "exit": 0,
+     "wall": 5.01,
+     "cpu": 31.580000000000002,
+     "peak_mib": 92.625,
+     "load": [
+      6.1337890625,
+      4.107421875,
+      4.80615234375
+     ]
+    }
+   ],
+   "wall": 4.81,
+   "cpu": 30.14,
+   "peak_mib": 92.47265625,
+   "exit": 0,
+   "same_as_ants": null
+  },
+  {
+   "job": "antsAI, the memory test's head",
+   "program": "antsAI",
+   "inputs": "head",
+   "tool": "ANTs 2.6.5 (CORE-MATH)",
+   "mode": "ants",
+   "threads": 1,
+   "runs": [
+    {
+     "exit": 0,
+     "wall": 31.56,
+     "cpu": 31.55,
+     "peak_mib": 95.80859375,
+     "load": [
+      4.8681640625,
+      4.0146484375,
+      4.74853515625
+     ]
+    },
+    {
+     "exit": 0,
+     "wall": 31.15,
+     "cpu": 31.14,
+     "peak_mib": 95.89453125,
+     "load": [
+      4.12158203125,
+      3.916015625,
+      4.69140625
+     ]
+    },
+    {
+     "exit": 0,
+     "wall": 31.21,
+     "cpu": 31.21,
+     "peak_mib": 95.234375,
+     "load": [
+      3.62109375,
+      3.81103515625,
+      4.63037109375
+     ]
+    }
+   ],
+   "wall": 31.21,
+   "cpu": 31.21,
+   "peak_mib": 95.80859375,
+   "exit": 0,
+   "same_as_ants": null
+  },
+  {
+   "job": "antsAI, the memory test's head",
+   "program": "antsAI",
+   "inputs": "head",
+   "tool": "larmorx, reproduce",
+   "mode": "reproduce",
+   "threads": 1,
+   "runs": [
+    {
+     "exit": 0,
+     "wall": 17.52,
+     "cpu": 17.53,
+     "peak_mib": 95.53125,
+     "load": [
+      3.38134765625,
+      3.74169921875,
+      4.58984375
+     ]
+    },
+    {
+     "exit": 0,
+     "wall": 17.46,
+     "cpu": 17.47,
+     "peak_mib": 95.3671875,
+     "load": [
+      3.228515625,
+      3.6884765625,
+      4.55810546875
+     ]
+    },
+    {
+     "exit": 0,
+     "wall": 17.55,
+     "cpu": 17.56,
+     "peak_mib": 95.28515625,
+     "load": [
+      3.09521484375,
+      3.62646484375,
+      4.5185546875
+     ]
+    }
+   ],
+   "wall": 17.52,
+   "cpu": 17.53,
+   "peak_mib": 95.3671875,
+   "exit": 0,
+   "same_as_ants": true
+  },
+  {
+   "job": "antsAI, the memory test's head",
+   "program": "antsAI",
+   "inputs": "head",
+   "tool": "larmorx, default",
+   "mode": "fix",
+   "threads": 1,
+   "runs": [
+    {
+     "exit": 0,
+     "wall": 17.51,
+     "cpu": 17.52,
+     "peak_mib": 95.59765625,
+     "load": [
+      2.9931640625,
+      3.57861328125,
+      4.48828125
+     ]
+    },
+    {
+     "exit": 0,
+     "wall": 17.82,
+     "cpu": 17.84,
+     "peak_mib": 96.04296875,
+     "load": [
+      2.9892578125,
+      3.54052734375,
+      4.455078125
+     ]
+    },
+    {
+     "exit": 0,
+     "wall": 18.07,
+     "cpu": 18.08,
+     "peak_mib": 95.8125,
+     "load": [
+      2.9921875,
+      3.51318359375,
+      4.43115234375
+     ]
+    }
+   ],
+   "wall": 17.82,
+   "cpu": 17.84,
+   "peak_mib": 95.8125,
+   "exit": 0,
+   "same_as_ants": null
+  },
+  {
+   "job": "antsAI, the memory test's head",
+   "program": "antsAI",
+   "inputs": "head",
+   "tool": "larmorx, reproduce",
+   "mode": "reproduce",
+   "threads": 8,
+   "runs": [
+    {
+     "exit": 0,
+     "wall": 4.99,
+     "cpu": 25.700000000000003,
+     "peak_mib": 103.85546875,
+     "load": [
+      3.0732421875,
+      3.521484375,
+      4.4287109375
+     ]
+    },
+    {
+     "exit": 0,
+     "wall": 4.87,
+     "cpu": 25.51,
+     "peak_mib": 107.234375,
+     "load": [
+      3.3876953125,
+      3.57958984375,
+      4.44287109375
+     ]
+    },
+    {
+     "exit": 0,
+     "wall": 5.07,
+     "cpu": 26.13,
+     "peak_mib": 106.203125,
+     "load": [
+      3.83740234375,
+      3.669921875,
+      4.4677734375
+     ]
+    }
+   ],
+   "wall": 4.99,
+   "cpu": 25.700000000000003,
+   "peak_mib": 106.203125,
+   "exit": 0,
+   "same_as_ants": true
+  },
+  {
+   "job": "antsAI, the memory test's head",
+   "program": "antsAI",
+   "inputs": "head",
+   "tool": "larmorx, default",
+   "mode": "fix",
+   "threads": 8,
+   "runs": [
+    {
+     "exit": 0,
+     "wall": 4.9,
+     "cpu": 25.709999999999997,
+     "peak_mib": 103.6796875,
+     "load": [
+      3.8505859375,
+      3.67578125,
+      4.46484375
+     ]
+    },
+    {
+     "exit": 0,
+     "wall": 4.82,
+     "cpu": 25.64,
+     "peak_mib": 102.96484375,
+     "load": [
+      3.94287109375,
+      3.6982421875,
+      4.4677734375
+     ]
+    },
+    {
+     "exit": 0,
+     "wall": 4.82,
+     "cpu": 25.55,
+     "peak_mib": 101.10546875,
+     "load": [
+      4.26806640625,
+      3.77001953125,
+      4.48681640625
+     ]
+    }
+   ],
+   "wall": 4.82,
+   "cpu": 25.64,
+   "peak_mib": 102.96484375,
+   "exit": 0,
+   "same_as_ants": null
+  },
+  {
+   "job": "antsAffineInitializer, the 7 T MP2RAGE and the MNI template (niworkflows' call)",
+   "program": "antsAffineInitializer",
+   "inputs": "7t",
+   "tool": "ANTs 2.6.5 (CORE-MATH)",
+   "mode": "ants",
+   "threads": 1,
+   "runs": [
+    {
+     "exit": 0,
+     "wall": 257.06,
+     "cpu": 257.04,
+     "peak_mib": 687.96875,
+     "load": [
+      2.25537109375,
+      3.0703125,
+      4.0263671875
+     ]
+    },
+    {
+     "exit": 0,
+     "wall": 252.24,
+     "cpu": 252.22,
+     "peak_mib": 687.41796875,
+     "load": [
+      2.060546875,
+      2.4814453125,
+      3.54638671875
+     ]
+    },
+    {
+     "exit": 0,
+     "wall": 250.58,
+     "cpu": 250.57,
+     "peak_mib": 687.76953125,
+     "load": [
+      2.04052734375,
+      2.24169921875,
+      3.18896484375
+     ]
+    }
+   ],
+   "wall": 252.24,
+   "cpu": 252.22,
+   "peak_mib": 687.76953125,
+   "exit": 0,
+   "same_as_ants": null
+  },
+  {
+   "job": "antsAffineInitializer, the 7 T MP2RAGE and the MNI template (niworkflows' call)",
+   "program": "antsAffineInitializer",
+   "inputs": "7t",
+   "tool": "larmorx, reproduce",
+   "mode": "reproduce",
+   "threads": 1,
+   "runs": [
+    {
+     "exit": 0,
+     "wall": 254.9,
+     "cpu": 254.97,
+     "peak_mib": 676.3515625,
+     "load": [
+      2.8056640625,
+      2.50048828125,
+      3.052734375
+     ]
+    },
+    {
+     "exit": 0,
+     "wall": 254.5,
+     "cpu": 254.58,
+     "peak_mib": 676.0390625,
+     "load": [
+      2.84716796875,
+      2.76171875,
+      3.02099609375
+     ]
+    },
+    {
+     "exit": 0,
+     "wall": 253.71,
+     "cpu": 253.79000000000002,
+     "peak_mib": 675.08203125,
+     "load": [
+      2.84814453125,
+      2.83154296875,
+      2.9892578125
+     ]
+    }
+   ],
+   "wall": 254.5,
+   "cpu": 254.58,
+   "peak_mib": 676.0390625,
+   "exit": 0,
+   "same_as_ants": true
+  },
+  {
+   "job": "antsAffineInitializer, the 7 T MP2RAGE and the MNI template (niworkflows' call)",
+   "program": "antsAffineInitializer",
+   "inputs": "7t",
+   "tool": "larmorx, default",
+   "mode": "fix",
+   "threads": 1,
+   "runs": [
+    {
+     "exit": 0,
+     "wall": 124.65,
+     "cpu": 124.68,
+     "peak_mib": 675.93359375,
+     "load": [
+      3.0390625,
+      2.91796875,
+      3.00341796875
+     ]
+    },
+    {
+     "exit": 0,
+     "wall": 124.79,
+     "cpu": 124.82000000000001,
+     "peak_mib": 675.40234375,
+     "load": [
+      2.3525390625,
+      2.73974609375,
+      2.931640625
+     ]
+    },
+    {
+     "exit": 0,
+     "wall": 124.6,
+     "cpu": 124.64,
+     "peak_mib": 676.26171875,
+     "load": [
+      2.205078125,
+      2.5400390625,
+      2.830078125
+     ]
+    }
+   ],
+   "wall": 124.65,
+   "cpu": 124.68,
+   "peak_mib": 675.93359375,
+   "exit": 0,
+   "same_as_ants": null
+  },
+  {
+   "job": "antsAffineInitializer, the 7 T MP2RAGE and the MNI template (niworkflows' call)",
+   "program": "antsAffineInitializer",
+   "inputs": "7t",
+   "tool": "larmorx, reproduce",
+   "mode": "reproduce",
+   "threads": 8,
+   "runs": [
+    {
+     "exit": 0,
+     "wall": 51.24,
+     "cpu": 345.2,
+     "peak_mib": 677.05859375,
+     "load": [
+      4.330078125,
+      3.04931640625,
+      2.98876953125
+     ]
+    },
+    {
+     "exit": 0,
+     "wall": 51.56,
+     "cpu": 345.58000000000004,
+     "peak_mib": 676.60546875,
+     "load": [
+      5.5400390625,
+      3.58154296875,
+      3.17578125
+     ]
+    },
+    {
+     "exit": 0,
+     "wall": 51.67,
+     "cpu": 347.27000000000004,
+     "peak_mib": 678.30078125,
+     "load": [
+      6.2119140625,
+      4.134765625,
+      3.39111328125
+     ]
+    }
+   ],
+   "wall": 51.56,
+   "cpu": 345.58000000000004,
+   "peak_mib": 677.05859375,
+   "exit": 0,
+   "same_as_ants": true
+  },
+  {
+   "job": "antsAffineInitializer, the 7 T MP2RAGE and the MNI template (niworkflows' call)",
+   "program": "antsAffineInitializer",
+   "inputs": "7t",
+   "tool": "larmorx, default",
+   "mode": "fix",
+   "threads": 8,
+   "runs": [
+    {
+     "exit": 0,
+     "wall": 26.11,
+     "cpu": 172.35,
+     "peak_mib": 677.83203125,
+     "load": [
+      6.048828125,
+      4.2802734375,
+      3.4599609375
+     ]
+    },
+    {
+     "exit": 0,
+     "wall": 26.2,
+     "cpu": 172.45,
+     "peak_mib": 677.87890625,
+     "load": [
+      5.9853515625,
+      4.4033203125,
+      3.5224609375
+     ]
+    },
+    {
+     "exit": 0,
+     "wall": 26.0,
+     "cpu": 171.79,
+     "peak_mib": 677.59765625,
+     "load": [
+      6.51220703125,
+      4.6337890625,
+      3.62158203125
+     ]
+    }
+   ],
+   "wall": 26.11,
+   "cpu": 172.35,
+   "peak_mib": 677.83203125,
+   "exit": 0,
+   "same_as_ants": null
+  },
+  {
+   "job": "antsAI, the 7 T MP2RAGE and the MNI template",
+   "program": "antsAI",
+   "inputs": "7t",
+   "tool": "ANTs 2.6.5 (CORE-MATH)",
+   "mode": "ants",
+   "threads": 1,
+   "runs": [
+    {
+     "exit": 0,
+     "wall": 155.8,
+     "cpu": 155.78,
+     "peak_mib": 752.6328125,
+     "load": [
+      3.517578125,
+      4.0419921875,
+      3.54638671875
+     ]
+    },
+    {
+     "exit": 0,
+     "wall": 155.84,
+     "cpu": 155.82999999999998,
+     "peak_mib": 753.59375,
+     "load": [
+      3.47412109375,
+      3.822265625,
+      3.5400390625
+     ]
+    },
+    {
+     "exit": 0,
+     "wall": 153.82999999999998,
+     "cpu": 153.81,
+     "peak_mib": 753.50390625,
+     "load": [
+      2.9140625,
+      3.42724609375,
+      3.4296875
+     ]
+    }
+   ],
+   "wall": 155.8,
+   "cpu": 155.78,
+   "peak_mib": 753.50390625,
+   "exit": 0,
+   "same_as_ants": null
+  },
+  {
+   "job": "antsAI, the 7 T MP2RAGE and the MNI template",
+   "program": "antsAI",
+   "inputs": "7t",
+   "tool": "larmorx, reproduce",
+   "mode": "reproduce",
+   "threads": 1,
+   "runs": [
+    {
+     "exit": 0,
+     "wall": 78.89,
+     "cpu": 78.89,
+     "peak_mib": 716.77734375,
+     "load": [
+      10.08447265625,
+      5.38671875,
+      4.10595703125
+     ]
+    },
+    {
+     "exit": 0,
+     "wall": 79.05,
+     "cpu": 79.04,
+     "peak_mib": 716.68359375,
+     "load": [
+      12.56787109375,
+      7.28271484375,
+      4.8798828125
+     ]
+    },
+    {
+     "exit": 0,
+     "wall": 79.6,
+     "cpu": 79.60000000000001,
+     "peak_mib": 716.76953125,
+     "load": [
+      13.10888671875,
+      8.71533203125,
+      5.583984375
+     ]
+    }
+   ],
+   "wall": 79.05,
+   "cpu": 79.04,
+   "peak_mib": 716.76953125,
+   "exit": 0,
+   "same_as_ants": true
+  },
+  {
+   "job": "antsAI, the 7 T MP2RAGE and the MNI template",
+   "program": "antsAI",
+   "inputs": "7t",
+   "tool": "larmorx, default",
+   "mode": "fix",
+   "threads": 1,
+   "runs": [
+    {
+     "exit": 0,
+     "wall": 80.01,
+     "cpu": 80.0,
+     "peak_mib": 715.99609375,
+     "load": [
+      11.7900390625,
+      9.35302734375,
+      6.07080078125
+     ]
+    },
+    {
+     "exit": 0,
+     "wall": 79.86,
+     "cpu": 79.85000000000001,
+     "peak_mib": 717.73828125,
+     "load": [
+      9.14208984375,
+      9.16064453125,
+      6.283203125
+     ]
+    },
+    {
+     "exit": 0,
+     "wall": 79.76,
+     "cpu": 79.75999999999999,
+     "peak_mib": 717.7109375,
+     "load": [
+      6.11083984375,
+      8.2861328125,
+      6.21826171875
+     ]
+    }
+   ],
+   "wall": 79.86,
+   "cpu": 79.85000000000001,
+   "peak_mib": 717.7109375,
+   "exit": 0,
+   "same_as_ants": null
+  },
+  {
+   "job": "antsAI, the 7 T MP2RAGE and the MNI template",
+   "program": "antsAI",
+   "inputs": "7t",
+   "tool": "larmorx, reproduce",
+   "mode": "reproduce",
+   "threads": 8,
+   "runs": [
+    {
+     "exit": 0,
+     "wall": 20.64,
+     "cpu": 111.8,
+     "peak_mib": 717.8046875,
+     "load": [
+      6.49462890625,
+      8.23486328125,
+      6.24609375
+     ]
+    },
+    {
+     "exit": 0,
+     "wall": 21.79,
+     "cpu": 114.83,
+     "peak_mib": 717.8984375,
+     "load": [
+      6.734375,
+      8.18505859375,
+      6.2734375
+     ]
+    },
+    {
+     "exit": 0,
+     "wall": 21.84,
+     "cpu": 115.58999999999999,
+     "peak_mib": 718.3359375,
+     "load": [
+      6.40283203125,
+      7.9794921875,
+      6.255859375
+     ]
+    }
+   ],
+   "wall": 21.79,
+   "cpu": 114.83,
+   "peak_mib": 717.8984375,
+   "exit": 0,
+   "same_as_ants": true
+  },
+  {
+   "job": "antsAI, the 7 T MP2RAGE and the MNI template",
+   "program": "antsAI",
+   "inputs": "7t",
+   "tool": "larmorx, default",
+   "mode": "fix",
+   "threads": 8,
+   "runs": [
+    {
+     "exit": 0,
+     "wall": 20.71,
+     "cpu": 113.38000000000001,
+     "peak_mib": 717.56640625,
+     "load": [
+      6.15380859375,
+      7.818359375,
+      6.240234375
+     ]
+    },
+    {
+     "exit": 0,
+     "wall": 21.31,
+     "cpu": 114.97,
+     "peak_mib": 717.65625,
+     "load": [
+      6.04541015625,
+      7.67138671875,
+      6.224609375
+     ]
+    },
+    {
+     "exit": 0,
+     "wall": 20.94,
+     "cpu": 112.67,
+     "peak_mib": 717.9921875,
+     "load": [
+      6.03271484375,
+      7.5625,
+      6.2197265625
+     ]
+    }
+   ],
+   "wall": 20.94,
+   "cpu": 113.38000000000001,
+   "peak_mib": 717.65625,
+   "exit": 0,
+   "same_as_ants": null
+  }
+ ]
+}

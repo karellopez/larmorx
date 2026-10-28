@@ -205,6 +205,32 @@ def run_job(job: Job, work: Path, threads: list[int], repeats: int) -> list[dict
     return rows
 
 
+NOTES = [
+    "- **Where the time goes.** Both programs spend nearly all their time in the Mattes metric "
+    "over the sampled points: on the head, antsAffineInitializer's search makes about 2,200 "
+    "value-only and 300 value-and-derivative evaluations of 157,000 points (16 start points, "
+    "20 iterations of golden-section line searches). larmorx computes each point's fixed side "
+    "once (ITK at every evaluation, to the same value) and the moving side in batches, operation "
+    "for operation: at one thread a search takes it about 0.6 of ANTs' time (antsAI shows it "
+    "directly).",
+    "- **antsAffineInitializer in `reproduce`.** To say where ITK-21 (the learning rate carried "
+    "from one start point to the next) changes the result, larmorx runs the search a second time, "
+    "the other way; at one thread the second search reuses the first one's evaluations where the "
+    "two ask the same question (the first start point, each start point's first evaluation: 1/16 "
+    "of it here), so the two together take ANTs' time on the 7 T and about 1.2 times it on the "
+    "head; at more threads they run at once. "
+    "In the default mode the call's own 10 iterations run (ANTs always 20, ANTS-54).",
+    "- **Memory.** The images are kept in float, as ANTs keeps them; the rule (at most 1.10 times "
+    "ANTs' peak plus 8 MiB, at one thread) holds on every input. At eight threads each thread "
+    "adds a few MiB of buffers.",
+    "- **The 7 T.** The moving image is 224 x 272 x 288 voxels (70 MB in float, its gradient "
+    "420 MB): both programs wait on memory; larmorx reads the corners of a batch of 64 points in "
+    "one loop, many reads in flight, so its gain is larger there.",
+    '- **Details:** `docs/findings/ants-ai.md`, "Memory and speed (2026-10-28)"; the tools: '
+    "`validation/investigations/ants-ai-speed/`.",
+]
+
+
 def render(rows: list[dict], env_info: dict, repeats: int, command: str) -> str:
     load = env_info.get("load_average_before")
     loads = [x for r in rows for s in r["runs"] for x in s["load"][:1]]
@@ -259,7 +285,20 @@ def render(rows: list[dict], env_info: dict, repeats: int, command: str) -> str:
                 f"{r['peak_mib']:.0f} MiB | {ratio:.2f}x | {same} |"
             )
         lines.append("")
+    lines += ["## Notes", "", *NOTES, ""]
     return "\n".join(lines) + "\n"
+
+
+def render_json(path: Path) -> str:
+    """The report of a saved ``ants-ai.json`` (``python -m larmorx_validation.bench.ants_ai
+    <json>``), e.g. after a change of the notes."""
+    doc = json.loads(path.read_text(encoding="utf-8"))
+    threads = sorted({r["threads"] for r in doc["results"] if r["mode"] != "ants"})
+    command = (
+        f"python -m larmorx_validation bench ants-ai --repeats {doc['repeats']} "
+        f"--threads {' '.join(map(str, threads))}"
+    )
+    return render(doc["results"], doc["environment"], doc["repeats"], command)
 
 
 def main(args: argparse.Namespace) -> int:
@@ -297,3 +336,7 @@ def main(args: argparse.Namespace) -> int:
     else:
         print(report)
     return 0
+
+
+if __name__ == "__main__":
+    print(render_json(Path(sys.argv[1])), end="")

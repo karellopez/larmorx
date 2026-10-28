@@ -44,11 +44,12 @@ count.
 
 **Memory and speed** (2026-10-28, [benchmark](../benchmarks/ants-ai.md)): the images are kept
 in float, as ANTs keeps them, so the peak is ANTs' (90 MiB against 90 on a 128 × 128 × 96
-head, 675 against 687 on the 7 T MP2RAGE and the 1 mm MNI template). In `reproduce` larmorx
-takes about ANTs' time at one thread (its search is about 1.7 times as fast, but the ITK-21
-notice needs a second search); in the default mode, which runs the iterations the call asks
-for (niworkflows: 10; ANTs always 20, ANTS-54), about half; at more threads the two searches
-run at once (eight threads: about 4 to 5 times as fast as ANTs at one). The
+head, 676 against 688 on the 7 T MP2RAGE and the 1 mm MNI template). In `reproduce`, at one
+thread, larmorx takes ANTs' time on the 7 T and 1.2 times it on the head (its search takes 0.6
+of ANTs' time, but the ITK-21 notice needs a second search); in the default mode, which runs
+the iterations the call asks for (niworkflows: 10; ANTs always 20, ANTS-54), half ANTs' time
+or less; at more threads the two searches run at once (eight threads: 3.9 to 4.9 times as fast
+as ANTs at one in `reproduce`, 7 to 9.7 in the default mode). The
 [findings](../findings/ants-ai.md), "Memory and speed (2026-10-28)", say where the time goes.
 
 ## Quick start

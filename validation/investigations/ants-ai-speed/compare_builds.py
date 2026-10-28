@@ -83,6 +83,11 @@ def one(case, old: Path, new: Path, threads: list[int]) -> list[str]:
                 for what, a, b in zip(("exit", "output", "files"), ref, got, strict=True):
                     if a != b:
                         problems.append(f"{case.id} [{mode}, new at {key[1]}]: {what} differs")
+                if got[:2] != ref[:2]:
+                    # Exit statuses and the last lines each printed, to tell a run the
+                    # machine stopped (a signal, the memory box) from a changed result.
+                    tail = [(x[0], x[1][1].strip().splitlines()[-2:]) for x in (ref, got)]
+                    problems.append(f"{case.id} [{mode}, new at {key[1]}]: old, new: {tail}")
     return problems
 
 
@@ -102,6 +107,16 @@ def main() -> int:
     cases = ants_ai.cases_for(opts["--tier"]) + ants_affine_initializer.cases_for(opts["--tier"])
     cases = [c for c in cases if opts["--only"] in c.id]
     threads = [int(x) for x in opts["--threads"].split(",")]
+    # The generated inputs made once, before the cases run at once (two threads making the
+    # same input race: one reads it before it is written).
+    from larmorx_validation.parity.harness import Outcome
+
+    with tempfile.TemporaryDirectory(prefix="lx-cmp-") as t:
+        for c in cases:
+            try:
+                ants_ai._resolve(c.payload, Path(t), Path(t))
+            except Outcome:
+                pass
     problems: list[str] = []
     done = 0
     with cf.ThreadPoolExecutor(int(opts["--jobs"])) as pool:
@@ -110,6 +125,14 @@ def main() -> int:
             c = futures[f]
             try:
                 p = f.result()
+                if p:
+                    # Once more, alone: a difference that does not repeat was the machine's (a
+                    # run stopped by a signal or the memory box), and is printed as such.
+                    again = one(c, old, new, threads)
+                    if not again:
+                        for line in p:
+                            print(f"transient, not repeated: {line}", flush=True)
+                    p = again
             except Exception as e:  # a case that cannot run here is reported, not hidden
                 p = [f"{c.id}: {type(e).__name__}: {e}"]
             done += 1

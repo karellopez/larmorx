@@ -28,13 +28,7 @@ import subprocess
 import sys
 from pathlib import Path
 
-WORKSPACE = Path(os.environ.get("LARMORX_WORKSPACE", Path(__file__).resolve().parents[4]))
-
-AI_ARGS = (
-    "-d 3 -m Mattes[{fixed},{moving},32,Regular,0.25] -t Rigid[0.1] -s [30,0.12] -c 10 "
-    "-o {out}/ai.mat"
-)
-INIT_ARGS = "3 {fixed} {moving} {out}/init.mat 15 0.1 0 10"
+from larmorx_validation.bench.ants_ai import AI_ARGS, INIT_ARGS
 
 FIELDS = {
     "wall": r"Elapsed \(wall clock\) time \(h:mm:ss or m:ss\): ([\d:.]+)",
@@ -48,33 +42,15 @@ FIELDS = {
 
 
 def head_inputs(d: Path) -> dict[str, str]:
-    """``test_memory_peak.py``'s head (``_more_inputs``): fixed, moving two voxels apart."""
-    import nibabel as nib
-    import numpy as np
+    from larmorx_validation.bench.ants_ai import head_inputs as make
 
-    d.mkdir(parents=True, exist_ok=True)
-    out = {"fixed": str(d / "fixed.nii.gz"), "moving": str(d / "moving.nii.gz")}
-    if all(Path(p).is_file() for p in out.values()):
-        return out
-    rng = np.random.default_rng(11)
-    shape = (128, 128, 96)
-    i, j, k = np.indices(shape, dtype=np.float64)
-    r = np.sqrt((i - 64) ** 2 + (j - 64) ** 2 + ((k - 48) * 1.3) ** 2)
-    head = np.where(r < 50, 400 + i, 20) + np.where(r < 25, 300, 0) + np.where(r < 12, 150, 0)
-    img = (head + rng.normal(0, 10, shape)).astype(np.float32)
-    a = np.diag([1.5, 1.5, 1.5, 1.0])
-    nib.save(nib.Nifti1Image(img, a), out["fixed"])
-    nib.save(nib.Nifti1Image(np.roll(img, 2, axis=0), a), out["moving"])
-    return out
+    return make(d)
 
 
 def seven_t_inputs() -> dict[str, str]:
-    d = WORKSPACE / "oracles" / "inputs" / "fmriprep-registration" / "ds005454-sub-16-noreconall"
-    out = {"fixed": str(d / "fixed_masked.nii.gz"), "moving": str(d / "moving_masked.nii.gz")}
-    for p in out.values():
-        if not Path(p).is_file():
-            sys.exit(f"{p} is missing: made by larmorx_validation.parity.niworkflows_inputs")
-    return out
+    from larmorx_validation.bench.ants_ai import seven_t_inputs as make
+
+    return make()
 
 
 def case(name: str, work: Path) -> tuple[str, str, dict[str, str]]:

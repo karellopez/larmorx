@@ -28,7 +28,7 @@ pub fn normalizer<R: Real, const D: usize>(m: &ImageMetricv4<R, D>) -> Result<R,
         ));
     }
     let mut k = R::ZERO;
-    for &s in &m.fixed.space.spacing {
+    for &s in &m.fixed.space().spacing {
         k = R::from_f64(k.to_f64() + s * s);
     }
     Ok(k / R::from_i64(D as i64))

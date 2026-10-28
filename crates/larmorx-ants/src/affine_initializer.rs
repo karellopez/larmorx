@@ -30,8 +30,8 @@
 //!   begins where the previous one's line search left it. The search runs both ways to say
 //!   whether the correction changed the result (and whether it chose another start point).
 //!
-//! The images are `itk::Image<float, D>` (their values are kept as doubles, which represent
-//! them exactly); the transforms and every computation are in double.
+//! The images are `itk::Image<float, D>`, kept in float as ANTs keeps them (each value read
+//! as a double, exactly); the transforms and every computation are in double.
 
 // ITK's loops index several arrays at once; they are kept as written.
 #![allow(clippy::needless_range_loop, clippy::manual_memcpy)]
@@ -44,7 +44,7 @@ use larmorx_core::vnl_fixed;
 use larmorx_registration::format::OStream;
 use larmorx_registration::mask::Mask;
 use larmorx_registration::method::{LevelProblem, MetricKind, gradient_image};
-use larmorx_registration::metric::ImageMetricv4;
+use larmorx_registration::metric::{ImageMetricv4, MetricImage};
 use larmorx_registration::moments::{self, Moments};
 use larmorx_registration::optimizer::ConjugateGradientLineSearch;
 use larmorx_registration::optimizer::multistart;
@@ -176,8 +176,8 @@ fn wahba<const D: usize>(b: &Matrix<f64, D>, log: &mut Log<'_>) -> Result<Matrix
 /// makes ANTs print ` zero image1 error ` (or `2`) and then abort on the second calculator's
 /// `GetTotalMass()`.
 pub fn image_moments<const D: usize>(
-    fixed: Option<&Image<f64, D>>,
-    moving: Option<&Image<f64, D>>,
+    fixed: Option<&Image<f32, D>>,
+    moving: Option<&Image<f32, D>>,
     log: &mut Log<'_>,
 ) -> Result<(Moments<D>, Moments<D>), AiError> {
     let get_total_mass = || {
@@ -188,7 +188,7 @@ pub fn image_moments<const D: usize>(
             "GetTotalMass() invoked, but the moments have not been computed. Call Compute() first.",
         ))
     };
-    let compute = |image: Option<&Image<f64, D>>| -> Result<Option<Moments<D>>, AiError> {
+    let compute = |image: Option<&Image<f32, D>>| -> Result<Option<Moments<D>>, AiError> {
         match image {
             None => Ok(None),
             Some(img) => match moments::compute(img) {
@@ -294,15 +294,13 @@ fn angles(p: f64, step: f64, limit: usize) -> Option<Vec<f64>> {
 }
 
 /// The search (`antsAffineInitializer.cxx:373-565`), in 2D and 3D: the best affine transform,
-/// centred at the fixed image's centre of mass. `moving_f32` is the moving image as read (for
-/// its gradient image).
+/// centred at the fixed image's centre of mass, on the images as read (float).
 #[allow(clippy::too_many_arguments)]
 pub fn search<const D: usize>(
     s: &AffineInitializerSettings,
     init: &InitialAffine<D>,
-    fixed: &Arc<Image<f64, D>>,
-    moving: &Arc<Image<f64, D>>,
-    moving_f32: Image<f32, D>,
+    fixed: Arc<Image<f32, D>>,
+    moving: Arc<Image<f32, D>>,
     mask: Option<Mask<D>>,
     notices: &mut Notices,
     warnings: &mut Vec<String>,
@@ -323,16 +321,15 @@ pub fn search<const D: usize>(
     // MapFixedSampledPointSetToVirtual (points whose nearest index is outside are skipped).
     points.retain(|p| space.contains(&space.point_to_index(p)));
     let moving_gradient =
-        Arc::new(gradient_image::<f32, D>(&moving_f32, n_threads).map_err(AiError::Uncaught)?);
-    // The float image served only the gradient (memory: the search holds the double ones).
-    drop(moving_f32);
+        Arc::new(gradient_image::<f32, D>(&moving, n_threads).map_err(AiError::Uncaught)?);
+    let corners = scales::corners(&fixed.space);
     let metric = ImageMetricv4 {
-        fixed: Arc::clone(fixed),
-        moving: Arc::clone(moving),
+        virtual_space: fixed.space.clone(),
+        fixed: MetricImage::Float(fixed),
+        moving: MetricImage::Float(moving),
         fixed_mask: mask,
         moving_mask: None,
         fixed_transform: None,
-        virtual_space: fixed.space.clone(),
         samples: Some(Arc::new(points)),
         fixed_gradient_image: None,
         moving_gradient_image: Some(moving_gradient),
@@ -349,8 +346,7 @@ pub fn search<const D: usize>(
         .map_err(AiError::Uncaught)?;
     let mut scales_composite = Composite::new(vec![Xfm::Linear(scales_transform)]);
     let moving_scales =
-        scales::estimate_scales(&mut scales_composite, &scales::corners(&fixed.space))
-            .map_err(AiError::Uncaught)?;
+        scales::estimate_scales(&mut scales_composite, &corners).map_err(AiError::Uncaught)?;
     // The start points.
     let never = || {
         AiError::Refused(format!(

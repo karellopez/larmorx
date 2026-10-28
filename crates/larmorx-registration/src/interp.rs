@@ -194,7 +194,28 @@ pub fn central_difference<R: Real, const D: usize>(
     p: &[R; D],
     floor: &IndexFloor,
 ) -> [f64; D] {
-    let spacing = interp.image.space.spacing;
+    central_difference_on(interp.image, p, floor)
+}
+
+/// [`central_difference`] on an image of any pixel type `P` (its values read as doubles), the
+/// coordinates of type `R`: a `float` image's (`antsAI`) as the interpolator of
+/// `itk::Image<float, D>` with double coordinates evaluates it.
+pub fn central_difference_on<P: Real, R: Real, const D: usize>(
+    image: &Image<P, D>,
+    p: &[R; D],
+    floor: &IndexFloor,
+) -> [f64; D] {
+    let space = &image.space;
+    let is_inside = |q: &[f64; D]| {
+        let c: [R; D] = space.point_to_cindex(q);
+        space.is_inside_buffer(&c)
+    };
+    let evaluate = |q: &[f64; D]| {
+        let c: [R; D] = space.point_to_cindex(q);
+        let data = &image.data;
+        at_cindex_with(space, &c, floor, |o| data[o].to_f64())
+    };
+    let spacing = space.spacing;
     let mut out = [0.0f64; D];
     let mut n1 = *p;
     let mut n2 = *p;
@@ -202,14 +223,14 @@ pub fn central_difference<R: Real, const D: usize>(
     for d in 0..D {
         let offset = R::from_f64(0.5 * spacing[d]);
         n1[d] = p[d] - offset;
-        if !interp.is_inside(&to64(&n1)) {
+        if !is_inside(&to64(&n1)) {
             out[d] = 0.0;
             n1[d] = p[d];
             n2[d] = p[d];
             continue;
         }
         n2[d] = p[d] + offset;
-        if !interp.is_inside(&to64(&n2)) {
+        if !is_inside(&to64(&n2)) {
             out[d] = 0.0;
             n1[d] = p[d];
             n2[d] = p[d];
@@ -217,8 +238,7 @@ pub fn central_difference<R: Real, const D: usize>(
         }
         let delta = n2[d] - n1[d];
         out[d] = if delta > R::from_f64(10.0) * R::EPSILON {
-            (interp.evaluate(&to64(&n2), floor) - interp.evaluate(&to64(&n1), floor))
-                / delta.to_f64()
+            (evaluate(&to64(&n2)) - evaluate(&to64(&n1))) / delta.to_f64()
         } else {
             0.0
         };

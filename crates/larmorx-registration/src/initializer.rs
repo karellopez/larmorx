@@ -73,6 +73,17 @@ pub fn initialize<R: Real, const D: usize>(
     moving: &Image<R, D>,
     feature: Feature,
 ) -> Result<([R; D], [R; D]), ItkException> {
+    initialize_pixels(fixed, moving, feature)
+}
+
+/// [`initialize`] of images of pixel type `P` for a transform of type `R` (`antsAI`'s
+/// `CenteredTransformInitializer<AffineTransform<double>, Image<float>, Image<float>>`): the
+/// moments are summed in double whatever the pixel type.
+pub fn initialize_pixels<R: Real, P: Real, const D: usize>(
+    fixed: &Image<P, D>,
+    moving: &Image<P, D>,
+    feature: Feature,
+) -> Result<([R; D], [R; D]), ItkException> {
     Ok(match feature {
         Feature::Moments => {
             let f = center_of_gravity(fixed)?;

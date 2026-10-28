@@ -122,8 +122,8 @@ impl<R: Real> Mattes<R> {
                         None => local,
                     };
                     let q: [f64; D] = std::array::from_fn(|k| q[k].to_f64());
-                    let idx = fixed.space.point_to_index(&q);
-                    if fixed.space.contains(&idx) {
+                    let idx = fixed.space().point_to_index(&q);
+                    if fixed.space().contains(&idx) {
                         let v = fixed.at(&idx);
                         take(v, &mut fmin, &mut fmax);
                     }
@@ -131,18 +131,15 @@ impl<R: Real> Mattes<R> {
             }
             None => match &m.fixed_mask {
                 Some(mask) => {
-                    for (o, &v) in fixed.data.iter().enumerate() {
-                        let p = fixed.space.index_to_point(&fixed.space.index_of(o));
+                    let space = fixed.space();
+                    fixed.for_each_value(|o, v| {
+                        let p = space.index_to_point(&space.index_of(o));
                         if mask.is_inside(&p) {
                             take(v, &mut fmin, &mut fmax);
                         }
-                    }
+                    });
                 }
-                None => {
-                    for &v in &fixed.data {
-                        take(v, &mut fmin, &mut fmax);
-                    }
-                }
+                None => fixed.for_each_value(|_, v| take(v, &mut fmin, &mut fmax)),
             },
         }
         let mut mmin = pixel_max;
@@ -150,18 +147,15 @@ impl<R: Real> Mattes<R> {
         let moving = &m.moving;
         match &m.moving_mask {
             Some(mask) => {
-                for (o, &v) in moving.data.iter().enumerate() {
-                    let p = moving.space.index_to_point(&moving.space.index_of(o));
+                let space = moving.space();
+                moving.for_each_value(|o, v| {
+                    let p = space.index_to_point(&space.index_of(o));
                     if mask.is_inside(&p) {
                         take(v, &mut mmin, &mut mmax);
                     }
-                }
+                });
             }
-            None => {
-                for &v in &moving.data {
-                    take(v, &mut mmin, &mut mmax);
-                }
-            }
+            None => moving.for_each_value(|_, v| take(v, &mut mmin, &mut mmax)),
         }
         let padding = R::from_f64(2.0);
         let denominator = R::from_i64(bins as i64 - 4);

@@ -1,6 +1,6 @@
 {
  "defect": null,
- "description": "Mattes on images with NaN values (a time-varying velocity field stage): the joint histogram's NaN bin size makes vnl's SVD fail and print its warning, once per stage (larmorx printed none)",
+ "description": "Mattes on images with NaN values (a time-varying velocity field stage): the joint histogram's NaN bin size makes vnl's SVD fail and print its warning, once per stage (larmorx printed none). Dense sampling (`None`) since 2026-10-28: this stage seeds `Random` and `Regular` sampling from the clock in ANTs (ANTS-82), and its metric values then vary from run to run (0 or ±2.2e-16 here); found with `Random,0.25`",
  "expect": "pass",
  "found": {
   "detail": "ANTs with CORE-MATH: standard error: ANTs 5 lines, larmorx 0",
@@ -177,7 +177,7 @@
      "-t",
      "TimeVaryingVelocityField[0.5,2,3,0,0.5,0]",
      "-m",
-     "Mattes[{in:fixed},{in:moving},1,8,Random,0.25]",
+     "Mattes[{in:fixed},{in:moving},1,8,None]",
      "-c",
      "[3,1e-6,10]",
      "-f",

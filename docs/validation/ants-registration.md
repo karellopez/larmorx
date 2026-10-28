@@ -1,18 +1,19 @@
 # Parity: antsRegistration (every stage: linear, SyN, B-spline, displacement-field and velocity-field)
 
-**All cases agree.** 505 cases on the `standard` tier: 391 pass, 93 rejected by both, 21 expected divergences, 0 failures.
+**All cases agree.** 513 cases on the `standard` tier: 399 pass, 93 rejected by both, 21 expected divergences, 0 failures.
 
 - **Validated:** `larmorx ants antsRegistration` / `lx.ants.registration` (crates larmorx-registration, larmorx-ants)
 - **Reference:** antsRegistration from ANTs v2.6.5 (fdce4d2f84) on ITK v5.4.5 (f51594ad88), x86_64-conda-linux-gnu-g++ (conda-forge gcc 14.3.0-20) 14.3.0, the binary built by `scripts/build_ants_oracle.sh`, run with one thread and ANTS_RANDOM_SEED=42
-- **Test data:** larmorx-testdata `00b862132e9c`, tier `standard`
-- **Generated:** 2026-10-23 on Linux x86_64, with `python -m larmorx_validation parity ants-registration --tier standard`
+- **Test data:** larmorx-testdata `52124bc98f9f`, tier `standard`
+- **Generated:** 2026-10-28 on Linux x86_64, with `python -m larmorx_validation parity ants-registration --tier standard`
+- **Original programs:** 665 runs: 0 from the oracle cache, 665 run (124 never cached: the original varies); cache `<workspace>/oracles/cache`, mode `use`
 
-391 cases compared: 347 identical to the unmodified ANTs (exit status, standard output with every DIAGNOSTIC line, standard error, every file), 44 identical once ANTs uses CORE-MATH's correctly rounded `exp`, `log`, `sin` and `cos` (glibc's are not always correctly rounded).
+399 cases compared: 355 identical to the unmodified ANTs (exit status, standard output with every DIAGNOSTIC line, standard error, every file), 44 identical once ANTs uses CORE-MATH's correctly rounded `exp`, `log`, `sin` and `cos` (glibc's are not always correctly rounded).
 
-Thread band, 36 cases: ANTs at 2, 4, 8 threads differs from its own one-thread result by up to 1.5 in a transform parameter (`smoke/rigid` 8.11e-13, `smoke/affine-float` 0.00488, `metrics/mattes-mi-alias` 8.11e-13, `metrics/mi2` 3.01e-14, `metrics/mi2-dense` 9.71e-17, `metrics/meansquares` 8.67e-14, `metrics/gc` 1.61e-12, `metrics/gc-dense` 1.45e-13, `metrics/cc-sampled` 2.47e-13, `metrics/cc-dense` 5.47e-14, `metrics/mattes-gradient-filter` 8.88e-16, `metrics/cc-gradient-filter` 9.42e-14, `point-sets/icp` 0, `point-sets/pse` 1.11e-16, `point-sets/jhct` 1.11e-16, `point-sets/igdm` 2.12e-22, `syn/cc` 0, `syn/meansquares-total` 0, `syn/mattes` 3.55e-14, `syn-point-sets/icp` 0.0829, `bspline-syn/cc` 2.33e-06, `bspline-syn/knot-spacing` 6.65e-07, `displacement-field/gaussian-cc` 0, `displacement-field/bspline-meansquares` 8.87e-07, `bspline/meansquares` 8.88e-16, `exponential/meansquares` 0, `bspline-exponential/meansquares` 3.21e-08, `time-varying/meansquares` 0, `time-varying-bspline/meansquares` 1.91e-06, `real/ds000005-sub-01/boldref-affine` 5.39e-10, `real/ds005040-sub-002/coregister` 1.46e-12, `real-syn-small/ds000005-sub-01/brain-extraction` 1.5, `real-syn-small/ds000005-sub-01/template` 1.35, `real-bsplinesyn-small/ds000005-sub-01/template` 0.833, `real-exponential-small/ds000005-sub-01/template` 0.276, `real-time-varying-small/ds000005-sub-01/template` 0.959); larmorx gives the one-thread result at any thread count, within 1.63 of ANTs at one thread.
+Thread band, 36 cases: ANTs at 2, 4, 8 threads differs from its own one-thread result by up to 1.7 in a transform parameter (`smoke/rigid` 6.96e-13, `smoke/affine-float` 0.00488, `metrics/mattes-mi-alias` 9.08e-13, `metrics/mi2` 3.01e-14, `metrics/mi2-dense` 9.71e-17, `metrics/meansquares` 8.67e-14, `metrics/gc` 1.61e-12, `metrics/gc-dense` 1.45e-13, `metrics/cc-sampled` 2.47e-13, `metrics/cc-dense` 5.47e-14, `metrics/mattes-gradient-filter` 4.37e-16, `metrics/cc-gradient-filter` 9.42e-14, `point-sets/icp` 0, `point-sets/pse` 1.11e-16, `point-sets/jhct` 1.11e-16, `point-sets/igdm` 2.12e-22, `syn/cc` 0, `syn/meansquares-total` 0, `syn/mattes` 3.55e-14, `syn-point-sets/icp` 0.0543, `bspline-syn/cc` 2.33e-06, `bspline-syn/knot-spacing` 6.65e-07, `displacement-field/gaussian-cc` 0, `displacement-field/bspline-meansquares` 8.87e-07, `bspline/meansquares` 8.88e-16, `exponential/meansquares` 0, `bspline-exponential/meansquares` 3.21e-08, `time-varying/meansquares` 0, `time-varying-bspline/meansquares` 1.91e-06, `real/ds000005-sub-01/boldref-affine` 9.95e-10, `real/ds005040-sub-002/coregister` 1.68e-12, `real-syn-small/ds000005-sub-01/brain-extraction` 1.7, `real-syn-small/ds000005-sub-01/template` 1.45, `real-bsplinesyn-small/ds000005-sub-01/template` 1.17, `real-exponential-small/ds000005-sub-01/template` 0.39, `real-time-varying-small/ds000005-sub-01/template` 0.603); larmorx gives the one-thread result at any thread count, within 1.63 of ANTs at one thread.
 
 - **D13 fix pass** (larmorx's default, `upstream_defects="fix"`; the comparison above runs `reproduce`): the corrections met
-  - ANTS-49: 5 case(s) named it, 0 with changed values (largest difference 0), 5 with other changes (exit N -> N; files ['rNGenericAffine.mat']): `metrics/demons`, `metrics/no-overlap`, `point-sets/icp-vtk-no-scalars`, `point-sets/icp-empty`, `point-sets/pse-sigma-zero`
+  - ANTS-49: 7 case(s) named it, 0 with changed values (largest difference 0), 7 with other changes (exit N -> N; files ['rNGenericAffine.mat']; files ['rNTranslation.mat']): `metrics/demons`, `metrics/no-overlap`, `point-sets/icp-vtk-no-scalars`, `point-sets/icp-empty`, `point-sets/pse-sigma-zero`, `difftest/empty-sample-set-exception`, `difftest/field-under-a-mat-name`
   - ANTS-61: 2 case(s) named it, 2 with changed values (largest difference 0.431): `point-sets/icp-then-igdm`, `point-sets/mattes-then-igdm`
   - ANTS-62: 4 case(s) named it, 3 with changed values (largest difference 0.736): `point-sets/icp-text`, `point-sets/icp-text-no-final-newline`, `point-sets/pse-text-2d`, `point-sets/jhct-text`
   - ANTS-63: 1 case(s) named it, 1 with changed values (largest difference 1.66): `point-sets/icp-vtk-binary`
@@ -22,26 +23,29 @@ Thread band, 36 cases: ANTs at 2, 4, 8 threads differs from its own one-thread r
   - ANTS-70: 9 case(s) named it, 9 with changed values (largest difference 3.23): `point-sets/igdm`, `point-sets/igdm-fixed-initial`, `point-sets/igdm-2d-radius-0`, `point-sets/igdm-then-mattes`, `point-sets/icp-then-igdm`, `point-sets/mattes-then-igdm`, `bspline-syn/igdm`, `time-varying-bspline/igdm` …
   - ANTS-73: 3 case(s) named it, 0 with changed values (largest difference 0), 3 with other changes (exit N -> N; files ['rNWarp.nii.gz', 'rNInverseWarp.nii.gz', 'rNWarp.nii.gz']): `syn/initial-scalar`, `syn/initial-scalar-2d`, `syn/initial-field-2d-in-3d`
   - ANTS-76: 7 case(s) named it, 0 with changed values (largest difference 0), 7 with other changes (files ['rNGenericAffine.mat']; files ['rNInverseWarp.nii.gz', 'rNWarp.nii.gz']): `bspline-syn/initial-bspline`, `bspline/then-affine`, `bspline/initial-bspline-syn`, `bspline/initial-bspline-affine`, `bspline/restore-bspline`, `corrections/bspline-then-affine`, `corrections/initial-bspline-then-rigid`
-  - ANTS-78: 20 case(s) named it, 20 with changed values (largest difference 3.34): `displacement-field/bspline-meansquares`, `displacement-field/bspline-cc`, `displacement-field/bspline-total-mesh`, `displacement-field/bspline-order-2`, `displacement-field/bspline-knot`, `displacement-field/bspline-mattes`, `displacement-field/bspline-masks`, `displacement-field/bspline-float` …
+  - ANTS-78: 23 case(s) named it, 22 with changed values (largest difference 3.34): `displacement-field/bspline-meansquares`, `displacement-field/bspline-cc`, `displacement-field/bspline-total-mesh`, `displacement-field/bspline-order-2`, `displacement-field/bspline-knot`, `displacement-field/bspline-mattes`, `displacement-field/bspline-masks`, `displacement-field/bspline-float` …
   - ANTS-79: 2 case(s) named it, 2 with changed values (largest difference 0.000366): `time-varying/two-stages`, `time-varying/then-syn`
-  - ANTS-80: 25 case(s) named it, 25 with changed values (largest difference 0.42): `syn/exponential`, `exponential/meansquares`, `exponential/no-collapse`, `exponential/short-name`, `exponential/collapse`, `exponential/composite`, `exponential/integration-steps`, `exponential/cc` …
+  - ANTS-80: 26 case(s) named it, 26 with changed values (largest difference 0.42): `syn/exponential`, `exponential/meansquares`, `exponential/no-collapse`, `exponential/short-name`, `exponential/collapse`, `exponential/composite`, `exponential/integration-steps`, `exponential/cc` …
   - ANTS-81: 1 case(s) named it, 1 with changed values (largest difference 0.00372): `exponential/short-name`
+  - ITK-100: 1 case(s) named it, 0 with changed values (largest difference 0), 1 with other changes (exit N -> N; files ['rComposite.hN', 'w.nii.gz']): `difftest/mattes-later-level-one-intensity`
   - ITK-18: 10 case(s) named it, 10 with changed values (largest difference 2.8): `metrics/mi2`, `metrics/mi2-dense`, `metrics/mi2-2d`, `metrics/mi2-4d-gradient-filter`, `metrics/mi2-float`, `syn/mi2`, `bspline-syn/mi2`, `displacement-field/gaussian-mi2` …
   - ITK-22: 2 case(s) named it, 1 with changed values (largest difference 2.19e-06), 1 with other changes (exit N -> N; files ['rNGenericAffine.mat']): `point-sets/icp-vtk-no-scalars`, `point-sets/icp-not-bijective`
   - ITK-23: 3 case(s) named it, 3 with changed values (largest difference 1.35e-14): `point-sets/jhct-isotropic`, `point-sets/jhct-alpha-1`, `point-sets/jhct-alpha-2`
   - ITK-24: 12 case(s) named it, 12 with changed values (largest difference 2.89): `point-sets/jhct`, `point-sets/jhct-isotropic`, `point-sets/jhct-alpha-1`, `point-sets/jhct-alpha-2`, `point-sets/jhct-sigma-2`, `point-sets/jhct-anisotropic-sigma-2`, `point-sets/jhct-text`, `point-sets/jhct-2d` …
   - ITK-26: 6 case(s) named it, 6 with changed values (largest difference 2.89): `point-sets/jhct`, `point-sets/jhct-anisotropic-sigma-2`, `point-sets/jhct-text`, `point-sets/jhct-2d`, `syn-point-sets/jhct`, `corrections/jhct-anisotropic`
   - ITK-29: 6 case(s) named it, 6 with changed values (largest difference 2.89): `point-sets/jhct`, `point-sets/jhct-anisotropic-sigma-2`, `point-sets/jhct-text`, `point-sets/jhct-2d`, `syn-point-sets/jhct`, `corrections/jhct-anisotropic`
-  - ITK-30: 4 case(s) named it, 4 with changed values (largest difference 3.2): `syn/gc`, `bspline-syn/gc`, `displacement-field/gaussian-gc`, `exponential/gc`
-  - ITK-31: 8 case(s) named it, 8 with changed values (largest difference 2.24): `syn/fixed-mask-only`, `syn/moving-mask-only`, `syn/float-mattes-mask`, `syn-point-sets/cc-and-icp`, `syn-point-sets/icp-and-cc`, `bspline-syn/fixed-mask-only`, `bspline-syn/cc-and-icp`, `real-syn-small/ds000005-sub-01/brain-extraction`
+  - ITK-30: 6 case(s) named it, 5 with changed values (largest difference 3.2): `syn/gc`, `bspline-syn/gc`, `displacement-field/gaussian-gc`, `exponential/gc`, `difftest/float-field-jacobian-index`, `difftest/syn-float-metric-sum-overflow`
+  - ITK-31: 9 case(s) named it, 8 with changed values (largest difference 2.24): `syn/fixed-mask-only`, `syn/moving-mask-only`, `syn/float-mattes-mask`, `syn-point-sets/cc-and-icp`, `syn-point-sets/icp-and-cc`, `bspline-syn/fixed-mask-only`, `bspline-syn/cc-and-icp`, `real-syn-small/ds000005-sub-01/brain-extraction` …
   - ITK-32: 16 case(s) named it, 16 with changed values (largest difference 3.19): `syn-point-sets/icp`, `syn-point-sets/pse`, `syn-point-sets/jhct`, `syn-point-sets/icp-float`, `syn-point-sets/icp-moving-initial`, `syn-point-sets/icp-fixed-initial`, `syn-point-sets/cc-and-icp`, `syn-point-sets/icp-and-cc` …
   - ITK-33: 3 case(s) named it, 3 with changed values (largest difference 2.24): `syn-point-sets/cc-and-icp`, `syn-point-sets/icp-and-cc`, `bspline-syn/cc-and-icp`
-  - ITK-35: 4 case(s) named it, 0 with changed values (largest difference 0), 4 with other changes (files ['rNGenericAffine.mat']): `bspline/then-affine`, `bspline/initial-bspline-affine`, `corrections/bspline-then-affine`, `corrections/initial-bspline-then-rigid`
+  - ITK-35: 5 case(s) named it, 0 with changed values (largest difference 0), 4 with other changes (files ['rNGenericAffine.mat']): `bspline/then-affine`, `bspline/initial-bspline-affine`, `corrections/bspline-then-affine`, `corrections/initial-bspline-then-rigid`, `difftest/syn-float-metric-sum-overflow`
   - ITK-36: 2 case(s) named it, 2 with changed values (largest difference 2.17e-05): `time-varying-bspline/cc-and-icp`, `time-varying-bspline/meansquares-icp-cc`
   - ITK-37: 6 case(s) named it, 6 with changed values (largest difference 0.0965): `time-varying-bspline/icp`, `time-varying-bspline/pse`, `time-varying-bspline/jhct`, `time-varying-bspline/igdm`, `time-varying-bspline/cc-and-icp`, `time-varying-bspline/meansquares-icp-cc`
   - ITK-39: 1 case(s) named it, 1 with changed values (largest difference 0.213): `time-varying/fixed-initial`
   - ITK-41: 2 case(s) named it, 0 with changed values (largest difference 0), 1 with other changes (files ['rNInverseWarp.nii.gz']): `exponential/zero-iterations-prefix`, `time-varying/zero-iterations-prefix`
-  - ITK-42: 7 case(s) named it, 7 with changed values (largest difference 2.68): `displacement-field/bspline-meansquares`, `displacement-field/bspline-cc`, `displacement-field/bspline-mattes`, `displacement-field/bspline-masks`, `displacement-field/bspline-2d`, `displacement-field/gaussian-then-bspline`, `corrections/bspline-field-coarse`
+  - ITK-42: 8 case(s) named it, 8 with changed values (largest difference 2.68): `displacement-field/bspline-meansquares`, `displacement-field/bspline-cc`, `displacement-field/bspline-mattes`, `displacement-field/bspline-masks`, `displacement-field/bspline-2d`, `displacement-field/gaussian-then-bspline`, `corrections/bspline-field-coarse`, `difftest/sampled-derivatives-aliased`
+  - ITK-96: 4 case(s) named it, 2 with changed values (largest difference 0.56): `bspline-syn/per-stage`, `displacement-field/gaussian-composite`, `difftest/four-dimensional-field-parameters`, `difftest/sampled-derivatives-aliased`
+  - ITK-97: 1 case(s) named it, 1 with changed values (largest difference 0.556): `difftest/sampled-derivatives-aliased`
 
 ## Thresholds
 
@@ -62,6 +66,7 @@ Thread band, 36 cases: ANTs at 2, 4, 8 threads differs from its own one-thread r
 | bspline-exponential | 10 | 8 | 1 | 1 | 0 |
 | bspline-syn | 31 | 27 | 4 | 0 | 0 |
 | corrections | 9 | 8 | 1 | 0 | 0 |
+| difftest | 8 | 8 | 0 | 0 | 0 |
 | dimensions-2d | 24 | 22 | 2 | 0 | 0 |
 | dimensions-4d | 10 | 10 | 0 | 0 | 0 |
 | displacement-field | 38 | 29 | 9 | 0 | 0 |
@@ -123,7 +128,7 @@ Thread band, 36 cases: ANTs at 2, 4, 8 threads differs from its own one-thread r
 | `errors/no-arguments` | no arguments: the short menu | 1 |
 | `errors/bad-number` | -c [1x,1e-6,5]: a number that does not convert | 1 |
 | `errors/levels-mismatch` | two shrink factors for one level | 1 |
-| `errors/missing-image` | a metric image that does not exist: ANTs uses the null image and crashes (ANTS-02) | file /tmp/lx-reg-5aiwzoxb/none.nii.gz does not exist . |
+| `errors/missing-image` | a metric image that does not exist: ANTs uses the null image and crashes (ANTS-02) | file /tmp/lx-reg-anr9n5ej/none.nii.gz does not exist . |
 | `errors/unknown-transform` | an unknown transform name | Unknown registration method "foo" |
 | `errors/save-state-without-composite` | --save-state without -a 1 | because the the output transform will contain the this processes initializer |
 | `errors/per-stage-with-collapse` | -i 1 -a 1 with collapsing | ERROR: initialize-transforms-per-stage & collapse-output-transforms options are mutually exclusive. |
@@ -146,15 +151,15 @@ Thread band, 36 cases: ANTs at 2, 4, 8 threads differs from its own one-thread r
 | `errors/bad-sampling` | an unknown sampling strategy | ERROR: invalid sampling strategy specified: sparse |
 | `errors/sigmas-mismatch` | three sigmas for two levels | 1 |
 | `errors/stage-without-metric` | a second -t without its -m | The number of transforms is 2 and the last stage ID as determined by the metrics is 0. |
-| `errors/sampling-above-1` | a sampling percentage of 1.5 | Description: ITK ERROR: ImageRegistrationMethodv4(0x5f5b5ffb7bc0): sampling percentage outside expected (0,1] range |
-| `errors/missing-initial` | -r a transform file that does not exist | Transform file does not exist: /tmp/lx-reg-u0oktzj3/none.mat |
+| `errors/sampling-above-1` | a sampling percentage of 1.5 | Description: ITK ERROR: ImageRegistrationMethodv4(0x62cd28a33bc0): sampling percentage outside expected (0,1] range |
+| `errors/missing-initial` | -r a transform file that does not exist | Transform file does not exist: /tmp/lx-reg-e4ldfnfe/none.mat |
 | `point-sets/igdm-few-parameters` | IGDM with three parameters | The expected number of parameters aren't specified. Please see help menu. |
 | `point-sets/igdm-radius-dimension` | IGDM with a 2D radius in 3D | The neighborhood size must equal the dimension. |
-| `point-sets/icp-percentage-above-1` | A sampling percentage of 1.5 | Description: ITK ERROR: ImageRegistrationMethodv4(0x62c6d0552e60): sampling percentage outside expected (0,1] range |
+| `point-sets/icp-percentage-above-1` | A sampling percentage of 1.5 | Description: ITK ERROR: ImageRegistrationMethodv4(0x5a2048a17e60): sampling percentage outside expected (0,1] range |
 | `point-sets/icp-no-mask` | Point-set metrics without a fixed mask: no virtual domain | larmorx: antsRegistration: a stage of point-set metrics needs a fixed mask (-x) to define its virtual domain: ANTs reads the spacing of a null image; ANTs cras… |
 | `point-sets/icp-missing` | A point set that does not exist | larmorx: antsRegistration: a labelled point set could not be read: ANTs goes on with a null point set and crashes |
 | `point-sets/icp-short-name` | A point set named with fewer than 3 characters | larmorx: antsRegistration: a labelled point set could not be read: ANTs goes on with a null point set and crashes |
-| `point-sets/icp-unreadable` | A point set no reader takes (ITK's image reader throws) | larmorx: upstream defect ANTS-62 (antsRegistration) reproduced: '/tmp/lx-reg-nqsl8td1/moving.txt' ends with a newline: an extra point, a copy of the last one, … |
+| `point-sets/icp-unreadable` | A point set no reader takes (ITK's image reader throws) | larmorx: upstream defect ANTS-62 (antsRegistration) reproduced: '/tmp/lx-reg-4d3i0_bn/moving.txt' ends with a newline: an extra point, a copy of the last one, … |
 | `point-sets/icp-vtk-no-points` | A VTK file without POINTS: libstdc++'s out_of_range | larmorx: antsRegistration: ANTs aborts here (an uncaught exception); larmorx stops with exit 1 |
 | `point-sets/igdm-missing-mask` | An IGDM mask that does not exist | larmorx: upstream defect ANTS-68 (antsRegistration) reproduced: IGDM's derivative lacks the 1/sigma^2 factors of its two terms, as in ANTs [LARMORX_UPSTREAM_DE… |
 | `point-sets/icp-warped` | Warped images with a point-set metric first | larmorx: antsRegistration: warped images with a point-set metric first: ANTs resamples null images and crashes, larmorx stops |
@@ -167,8 +172,8 @@ Thread band, 36 cases: ANTs at 2, 4, 8 threads differs from its own one-thread r
 | `syn/initial-composite-inverse` | -r [composite,1]: its field has no inverse | 1 |
 | `syn/igdm` | IGDM first in a SyN stage: not implemented in ANTs | 1 |
 | `syn/bad-variance` | SyN[0.2,3x]: a variance that does not convert | ERROR: Unable to convert '3x' to type 'f' as float |
-| `syn-point-sets/icp-not-bijective` | a fixed label the moving set lacks: ITK throws at the first such point (ITK-22) | LabeledPointSetToPointSetMetricv4 (0x563d094079d0): The label sets are not bijective. |
-| `syn-point-sets/icp-moving-extra-label` | a moving label the fixed set lacks: ITK throws in the moving-to-middle update (ITK-22) | LabeledPointSetToPointSetMetricv4 (0x55b5783403b0): The label sets are not bijective. |
+| `syn-point-sets/icp-not-bijective` | a fixed label the moving set lacks: ITK throws at the first such point (ITK-22) | LabeledPointSetToPointSetMetricv4 (0x63b1c4fb59d0): The label sets are not bijective. |
+| `syn-point-sets/icp-moving-extra-label` | a moving label the fixed set lacks: ITK throws in the moving-to-middle update (ITK-22) | LabeledPointSetToPointSetMetricv4 (0x62024e39e3b0): The label sets are not bijective. |
 | `syn-point-sets/cc-and-igdm` | CC and IGDM: SyN holds labelled point sets only, IGDM gets no input (ANTS-61) | 1 |
 | `syn-point-sets/cc-igdm-icp` | CC, IGDM and ICP: IGDM without point sets before a metric with them (ANTS-61) | larmorx: upstream defect ANTS-68 (antsRegistration) reproduced: IGDM's derivative lacks the 1/sigma^2 factors of its two terms, as in ANTs [LARMORX_UPSTREAM_DE… |
 | `syn-point-sets/cc-regular-and-icp` | CC sampled (Regular) and ICP: ANTs gives ICP's sample points to a null image metric | larmorx: antsRegistration: a stage that samples its metrics (Regular or Random) with a point-set metric: ANTs gives the sample points to a null image metric an… |
@@ -197,7 +202,7 @@ Thread band, 36 cases: ANTs at 2, 4, 8 threads differs from its own one-thread r
 | `exponential/print-similarity` | --print-similarity-measure-interval: the observer's copy of the field fails (ANTS-75) | 1 |
 | `exponential/interval-volumes` | --write-interval-volumes: the observer's copy of the field fails (ANTS-75) | 1 |
 | `exponential/save-state` | --save-state: no state (ANTS-50) | because the the output transform will contain the this processes initializer |
-| `exponential/zero-iterations` | no iteration and one level: the transform never integrates, its inverse has no field (ITK-41) | Description: ITK ERROR: ConstantVelocityFieldTransform(0x63a4590e1680): No displacement field is specified. |
+| `exponential/zero-iterations` | no iteration and one level: the transform never integrates, its inverse has no field (ITK-41) | Description: ITK ERROR: ConstantVelocityFieldTransform(0x6223b4403680): No displacement field is specified. |
 | `exponential/icp-first` | ICP first: ANTs allocates the velocity field on a null image | larmorx: antsRegistration: an Exponential stage whose first metric is a point-set metric: ANTs allocates the velocity field on the null image of its first metr… |
 | `exponential/missing-parameter` | Exponential[0.5,3]: the velocity variance is required | ERROR: Unable to convert '' to type 'f' as float |
 | `bspline-exponential/mesh-dimension` | a 2D mesh in 3D: ERROR | 1 |
@@ -215,11 +220,11 @@ Thread band, 36 cases: ANTs at 2, 4, 8 threads differs from its own one-thread r
 
 | Component | Version |
 |---|---|
-| larmorx | 0.0.1 (a9401a69f759) |
-| larmorx-testdata | 00b862132e9c |
-| Python | 3.12.10 |
+| larmorx | 0.0.1 (f15b00a335f4) |
+| larmorx-testdata | 52124bc98f9f |
+| Python | 3.12.16 |
 | Platform | Linux x86_64 (Linux-6.8.0-124-generic-x86_64-with-glibc2.35) |
-| CPU | Intel(R) Core(TM) i7-8750H CPU @ 2.20GHz, 12 logical CPUs |
+| CPU | AMD Ryzen 9 7945HX with Radeon Graphics, 32 logical CPUs |
 | numpy | 2.3.5 |
 | nibabel | 5.4.2 |
 | scipy | 1.15.3 |
@@ -737,3 +742,11 @@ Inputs named `gen:<name>` are built by this suite (seeded phantoms); the real ca
 | `real-bspline-exponential-small/ds000005-sub-01/template` | pass | 15/15 | fMRIPrep 25.2.6's registration of ds000005-sub-01-noreconall with BSplineExponential[0.25,26,0,0,3] for its SyN stage, … |
 | `real-time-varying-small/ds000005-sub-01/template` | pass | 16/16 | fMRIPrep 25.2.6's registration of ds000005-sub-01-noreconall with TimeVaryingVelocityField[0.5,4,3,0,0,0] for its SyN s… |
 | `real-time-varying-bspline-small/ds000005-sub-01/template` | pass | 15/15 | fMRIPrep 25.2.6's registration of ds000005-sub-01-noreconall with TimeVaryingBSplineVelocityField[0.5,4x4x4x2,4,3] for … |
+| `difftest/empty-sample-set-exception` | pass | 6/6 | a stage whose sampled point set is empty: ITK's exception at itkImageToImageMetricv4.hxx:263 with the metric's class (l… |
+| `difftest/field-under-a-mat-name` | pass | 7/7 | -z 0 with a Translation stage whose Demons metric throws (no transform added) before a Gaussian displacement-field stag… |
+| `difftest/float-field-jacobian-index` | pass | 7/7 | an Exponential stage after a deformable one with --float 1: the displacement field's Jacobian at the voxel nearest a fl… |
+| `difftest/four-dimensional-field-parameters` | pass | 7/7 | a 4D B-spline displacement-field stage: the runner reads the 4D composite by its HDF5 parameters |
+| `difftest/mattes-later-level-one-intensity` | pass | 7/7 | a BSpline stage with MI and a sparse mask where the full-resolution fixed image has one intensity: ITK keeps the first … |
+| `difftest/mattes-nan-bin-svd-warning` | pass | 7/7 | Mattes on images with NaN values (a time-varying velocity field stage): the joint histogram's NaN bin size makes vnl's … |
+| `difftest/sampled-derivatives-aliased` | pass | 7/7 | a sampled B-spline displacement-field stage with a shrink factor: the derivatives of sample points outside the shrunk v… |
+| `difftest/syn-float-metric-sum-overflow` | pass | 9/9 | B-spline SyN with --float 1 and a mask leaving no valid point: ITK sums the two halves' FLT_MAX metric values in float … |

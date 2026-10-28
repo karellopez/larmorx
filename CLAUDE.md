@@ -51,8 +51,8 @@ Golden tests cover every tool on all six platforms (`docs/validation/golden.md`)
 **Next:** the move to the new main machine is done (2026-10-28: the copy, the build and the proof
 that results do not depend on the machine, [docs/findings/machine-move-proof.md](docs/findings/machine-move-proof.md));
 the old laptop cleaned to a helper (phase 4 of [docs/machine-move.md](docs/machine-move.md)). Then, one
-agent at a time (`docs/next-steps.md`): antsRegistration's standard record re-made (the panel's
-fourteen whole template registrations done, 2026-10-28), the 25 heavy random-testing cases, the small part for
+agent at a time (`docs/next-steps.md`) (the panel's fourteen whole template registrations and
+antsRegistration's standard record re-made: done, 2026-10-28): the 25 heavy random-testing cases, the small part for
 the tests that depend on the machine, a small part for antsAI and antsAffineInitializer, the
 scripts triage, the clean-room fixes, the version update (AFNI 26.3.05 and FSL 6.0.7.23 already
 installed beside the old ones), the data panel's re-validation of AFNI, FSL and I/O (part b; the

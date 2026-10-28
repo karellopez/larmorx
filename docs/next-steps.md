@@ -244,6 +244,10 @@ of CLAUDE.md, the working agreements in it). Next, in order:
   [ants-registration-panel-template](validation/ants-registration-panel-template.md). Every
   antsRegistration node of the fourteen runs is now compared at full size. Their evidence on the
   site (the whole registrations beside the small ones) waits for the next site part.
+  **antsRegistration's standard record re-made** the same day (at `f15b00a`, 35 minutes): 513 cases,
+  399 pass (355 identical as built, 44 with CORE-MATH), 93 rejected by both, 21 expected
+  divergences; against the record of 2026-10-23 no status or detail changed, and the 8 cases added
+  since (permanent cases from random testing) pass.
 - **antsAffineInitializer's speed**: larmorx 277 s against ANTs' 73 s at one thread on a
   128 × 128 × 96 head, 1212 s against 332 s on the 7 T (the D13 notice of ITK-21 runs every local
   search twice; the rest is the metric's speed): the next small part.

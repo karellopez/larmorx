@@ -28,7 +28,10 @@
 //! - ITK-21: every start point's local optimization begins at the configured learning rate
 //!   (0.1). Without a scales estimator ITK never estimates the rate again, so each start point
 //!   begins where the previous one's line search left it. The search runs both ways to say
-//!   whether the correction changed the result (and whether it chose another start point).
+//!   whether the correction changed the result (and whether it chose another start point):
+//!   at one thread the second search takes the first one's evaluations where the two ask the
+//!   metric the same question (the first start point, and every start point's first step), at
+//!   more threads the two run at once ([`search`]).
 //!
 //! The images are `itk::Image<float, D>`, kept in float as ANTs keeps them (each value read
 //! as a double, exactly); the transforms and every computation are in double.
@@ -36,6 +39,8 @@
 // ITK's loops index several arrays at once; they are kept as written.
 #![allow(clippy::needless_range_loop, clippy::manual_memcpy)]
 
+use std::cell::RefCell;
+use std::collections::HashMap;
 use std::sync::Arc;
 
 use larmorx_core::IndexFloor;
@@ -46,9 +51,9 @@ use larmorx_registration::mask::Mask;
 use larmorx_registration::method::{LevelProblem, MetricKind, gradient_image};
 use larmorx_registration::metric::{ImageMetricv4, MetricImage};
 use larmorx_registration::moments::{self, Moments};
-use larmorx_registration::optimizer::ConjugateGradientLineSearch;
 use larmorx_registration::optimizer::multistart;
 use larmorx_registration::optimizer::scales;
+use larmorx_registration::optimizer::{ConjugateGradientLineSearch, Problem};
 use larmorx_registration::transform::{Composite, Kind, LinearXfm, Xfm};
 use larmorx_registration::{Image, ItkException, Matrix};
 
@@ -400,21 +405,152 @@ pub fn search<const D: usize>(
         iterations,
         skip_failed,
     };
-    let (best_index, best) = search.run(notices.fix(), mode, notices, warnings)?;
+    let fix = notices.fix();
     // ITK-21 (corrected by default): the search again the other way, to say whether the
     // correction changed the result. Only a local optimization has a learning rate, and only
-    // a second start point can inherit one.
-    if iterations > 0 && n > 1 {
+    // a second start point can inherit one. The two searches are the same up to where the
+    // learning rates part: the first start point (both begin at the configured rate) and each
+    // later start point's first evaluation (at the start point, before any step). At one thread
+    // the second search takes those from the first one's evaluations (kept by their parameters,
+    // bit for bit); at more, the two run at once, sharing the call's threads. Either way each
+    // gives what it gives alone.
+    let check = iterations > 0 && n > 1;
+    let threads = larmorx_core::parallel::resolve_threads(n_threads);
+    let (main, other) = if check && threads > 1 {
         let mut scratch = Notices::new(mode);
-        let other = search.run(!notices.fix(), mode, &mut scratch, &mut Vec::new());
-        if let Some(detail) = itk_21_detail(notices.fix(), n, best_index, &best, &other) {
-            notices.add(&defects::ITK_21, detail);
-        }
+        let mut lost = Vec::new();
+        larmorx_registration::metric::in_pool(Some(n_threads), || {
+            rayon::join(
+                || search.run(fix, mode, notices, warnings, Evaluations::None),
+                || search.run(!fix, mode, &mut scratch, &mut lost, Evaluations::None),
+            )
+        })
+        .map_err(AiError::Uncaught)?
+    } else {
+        let kept = RefCell::new(HashMap::new());
+        let keep = if check {
+            Evaluations::Keep(&kept)
+        } else {
+            Evaluations::None
+        };
+        let main = search.run(fix, mode, notices, warnings, keep);
+        let other = if check && main.is_ok() {
+            let mut scratch = Notices::new(mode);
+            search.run(
+                !fix,
+                mode,
+                &mut scratch,
+                &mut Vec::new(),
+                Evaluations::Reuse(&kept),
+            )
+        } else {
+            Err(AiError::Exit(0))
+        };
+        (main, other)
+    };
+    let (best_index, best) = main?;
+    if check && let Some(detail) = itk_21_detail(fix, n, best_index, &best, &other) {
+        notices.add(&defects::ITK_21, detail);
     }
     let mut out = LinearXfm::<f64, D>::new(Kind::Affine);
     out.set_center(init.center);
     out.set_parameters(&best).map_err(AiError::Uncaught)?;
     Ok(out)
+}
+
+/// The metric's results by question (whether the derivative was asked, the parameters' bits).
+type Kept = RefCell<HashMap<(bool, Vec<u64>), Result<(f64, Vec<f64>), ItkException>>>;
+
+/// What a search does with the metric's results: nothing, keep them all, or take a kept one
+/// for the same question instead of evaluating again (the same result, bit for bit: the
+/// metric is a function of the parameters).
+#[derive(Clone, Copy)]
+enum Evaluations<'k> {
+    None,
+    Keep(&'k Kept),
+    Reuse(&'k Kept),
+}
+
+/// A problem whose evaluations are kept or reused ([`Evaluations`]); everything else is the
+/// problem's own.
+struct Remembering<'k, P> {
+    problem: P,
+    evaluations: Evaluations<'k>,
+}
+
+impl<P: Problem<f64>> Remembering<'_, P> {
+    fn evaluate(
+        &mut self,
+        derivative: bool,
+    ) -> Result<(f64, Vec<f64>), larmorx_registration::ItkException> {
+        let key = || {
+            let p = self.problem.parameters();
+            (
+                derivative,
+                p.iter().map(|v| v.to_bits()).collect::<Vec<_>>(),
+            )
+        };
+        let compute = |problem: &mut P| {
+            if derivative {
+                problem.value_and_derivative()
+            } else {
+                problem.value().map(|v| (v, Vec::new()))
+            }
+        };
+        match self.evaluations {
+            Evaluations::None => compute(&mut self.problem),
+            Evaluations::Keep(kept) => {
+                let k = key();
+                let r = compute(&mut self.problem);
+                kept.borrow_mut().insert(k, r.clone());
+                r
+            }
+            Evaluations::Reuse(kept) => {
+                if let Some(r) = kept.borrow().get(&key()) {
+                    return r.clone();
+                }
+                compute(&mut self.problem)
+            }
+        }
+    }
+}
+
+impl<P: Problem<f64>> Problem<f64> for Remembering<'_, P> {
+    fn value_and_derivative(
+        &mut self,
+    ) -> Result<(f64, Vec<f64>), larmorx_registration::ItkException> {
+        self.evaluate(true)
+    }
+    fn value(&mut self) -> Result<f64, larmorx_registration::ItkException> {
+        self.evaluate(false).map(|(v, _)| v)
+    }
+    fn parameters(&self) -> Vec<f64> {
+        self.problem.parameters()
+    }
+    fn set_parameters(&mut self, p: &[f64]) -> Result<(), larmorx_registration::ItkException> {
+        self.problem.set_parameters(p)
+    }
+    fn update(&mut self, update: &mut [f64]) -> Result<(), larmorx_registration::ItkException> {
+        self.problem.update(update)
+    }
+    fn number_of_local_parameters(&self) -> usize {
+        self.problem.number_of_local_parameters()
+    }
+    fn estimate_scales(&mut self) -> Result<Vec<f64>, larmorx_registration::ItkException> {
+        self.problem.estimate_scales()
+    }
+    fn estimate_step_scale(
+        &mut self,
+        step: &mut [f64],
+    ) -> Result<f64, larmorx_registration::ItkException> {
+        self.problem.estimate_step_scale(step)
+    }
+    fn estimate_maximum_step(&self) -> f64 {
+        self.problem.estimate_maximum_step()
+    }
+    fn take_warnings(&mut self) -> Vec<String> {
+        self.problem.take_warnings()
+    }
 }
 
 /// The search's multi-start optimization, run on a fresh problem each time.
@@ -438,15 +574,20 @@ impl<const D: usize> Search<'_, D> {
         mode: larmorx_core::defects::UpstreamDefects,
         notices: &mut Notices,
         warnings: &mut Vec<String>,
+        evaluations: Evaluations<'_>,
     ) -> Result<(usize, Vec<f64>), AiError> {
         let floor = IndexFloor::new(mode);
-        let mut problem = LevelProblem::single(
+        let problem = LevelProblem::single(
             self.metric.clone(),
             MetricKind::Mattes { bins: 32 },
             Composite::new(vec![Xfm::Linear(self.transform.clone())]),
             &floor,
         )
         .map_err(AiError::Uncaught)?;
+        let mut problem = Remembering {
+            problem,
+            evaluations,
+        };
         let mut local = ConjugateGradientLineSearch {
             learning_rate: LOCAL_LEARNING_RATE,
             maximum_step_size: LOCAL_LEARNING_RATE,
@@ -479,7 +620,7 @@ impl<const D: usize> Search<'_, D> {
             },
         )
         .map_err(AiError::Uncaught)?;
-        warnings.append(&mut problem.warnings);
+        warnings.append(&mut problem.problem.warnings);
         crash_after_failure(&outcome)?;
         let best = best_start_point(&outcome, notices, self.skip_failed)?;
         Ok((outcome.best_index, best))

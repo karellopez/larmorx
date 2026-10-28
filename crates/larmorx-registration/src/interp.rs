@@ -82,7 +82,7 @@ fn optimized<R: Real, const D: usize>(
 /// axis is skipped) and each axis's distance. One cell serves every image on the same grid
 /// (a value and its gradient's components), each [`Cell::eval`] the interpolation
 /// [`at_cindex_with`] computes, operation for operation.
-#[derive(Clone, Copy, Debug)]
+#[derive(Clone, Copy, Debug, Default)]
 pub struct Cell {
     origin: usize,
     step: [usize; 3],
@@ -157,6 +157,98 @@ impl Cell {
         let a = along_y(origin);
         if step[2] != 0 {
             lerp(a, along_y(origin + step[2]), dist[2])
+        } else {
+            a
+        }
+    }
+
+    /// [`Cell::eval`] of each of `K` components at once (a gradient image's vectors): each
+    /// component interpolated by the same operations, in the same order, as a scalar image of
+    /// that component, every voxel read once.
+    #[inline]
+    pub fn eval_n<const K: usize>(&self, v: impl Fn(usize) -> [f64; K]) -> [f64; K] {
+        let (step, dist, origin) = (&self.step, &self.dist, self.origin);
+        let lerp = |a: [f64; K], b: [f64; K], t: f64| -> [f64; K] {
+            std::array::from_fn(|k| a[k] + (b[k] - a[k]) * t)
+        };
+        let along_x = |o: usize| {
+            let a = v(o);
+            if step[0] != 0 {
+                lerp(a, v(o + step[0]), dist[0])
+            } else {
+                a
+            }
+        };
+        if self.dims == 1 {
+            return along_x(origin);
+        }
+        let along_y = |o: usize| {
+            let a = along_x(o);
+            if step[1] != 0 {
+                lerp(a, along_x(o + step[1]), dist[1])
+            } else {
+                a
+            }
+        };
+        if self.dims == 2 {
+            return along_y(origin);
+        }
+        let a = along_y(origin);
+        if step[2] != 0 {
+            lerp(a, along_y(origin + step[2]), dist[2])
+        } else {
+            a
+        }
+    }
+
+    /// The buffer offsets of the cell's corners, corner `b` offset by the steps of the bits of
+    /// `b` (x: 1, y: 2, z: 4); a skipped axis's step is 0, so its upper corners repeat the lower
+    /// ones (read, never used). Every offset lies inside the buffer.
+    #[inline]
+    pub fn corners(&self) -> [usize; 8] {
+        let s = &self.step;
+        std::array::from_fn(|b| {
+            self.origin
+                + if b & 1 != 0 { s[0] } else { 0 }
+                + if b & 2 != 0 { s[1] } else { 0 }
+                + if b & 4 != 0 { s[2] } else { 0 }
+        })
+    }
+
+    /// [`Cell::eval_n`] of the values at the cell's [`Cell::corners`], read beforehand (by a
+    /// loop that only reads, so that many reads are in flight): the same operations in the
+    /// same order.
+    #[inline]
+    pub fn eval_corners<const K: usize>(&self, v: &[[f64; K]; 8]) -> [f64; K] {
+        let (step, dist) = (&self.step, &self.dist);
+        let lerp = |a: [f64; K], b: [f64; K], t: f64| -> [f64; K] {
+            std::array::from_fn(|k| a[k] + (b[k] - a[k]) * t)
+        };
+        let along_x = |b: usize| {
+            let a = v[b];
+            if step[0] != 0 {
+                lerp(a, v[b | 1], dist[0])
+            } else {
+                a
+            }
+        };
+        if self.dims == 1 {
+            return along_x(0);
+        }
+        let along_y = |b: usize| {
+            let a = along_x(b);
+            if step[1] != 0 {
+                lerp(a, along_x(b | 2), dist[1])
+            } else {
+                a
+            }
+        };
+        if self.dims == 2 {
+            return along_y(0);
+        }
+        let a = along_y(0);
+        if step[2] != 0 {
+            lerp(a, along_y(4), dist[2])
         } else {
             a
         }

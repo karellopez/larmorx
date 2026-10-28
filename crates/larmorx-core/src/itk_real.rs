@@ -99,6 +99,23 @@ pub trait ItkReal:
 /// even), NaN and values out of range giving `i64::MIN`.
 #[inline]
 fn round_to_i64(r: f64) -> i64 {
+    // Below 2^51 in magnitude (every index of an image), `r + 1.5·2^52` lies in [2^52, 2^53),
+    // where the representable numbers are the integers and consecutive integers have
+    // consecutive bit patterns: the addition rounds `r` to the nearest integer, ties to even
+    // (1.5·2^52 is even), and the bits give it back. Two operations on the path to the index,
+    // where the general method takes five (the image metrics' interpolation spends much of its
+    // time there); the same integer for every such `r` (`round_to_i64_general`, tested).
+    const MAGIC: f64 = 6_755_399_441_055_744.0; // 1.5 · 2^52
+    const LIMIT: f64 = 2_251_799_813_685_248.0; // 2^51
+    if r.abs() < LIMIT {
+        return (r + MAGIC).to_bits() as i64 - MAGIC.to_bits() as i64;
+    }
+    round_to_i64_general(r)
+}
+
+/// [`round_to_i64`] for any value.
+#[inline]
+fn round_to_i64_general(r: f64) -> i64 {
     // Round to nearest, ties to even, by adding and subtracting 2^52 (exact below 2^52;
     // larger values are integers already). `f64::round_ties_even` would be a call into the C
     // library on baseline x86-64, which lacks SSE4.1's `roundsd`.
@@ -350,6 +367,53 @@ pub fn same_value<V: PartialEq>(a: &V, b: &V) -> bool {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// The fast rounding below 2^51 gives the general method's integer: ties, values next to
+    /// them, signed zeros, the edges of the fast range and random values of every magnitude.
+    #[test]
+    fn rounding_to_integers_takes_the_general_path_value() {
+        let mut values = vec![
+            0.0f64, -0.0, 0.5, -0.5, 1.5, -1.5, 2.5, -2.5, 1e-300, -1e-300,
+        ];
+        for k in -40i64..40 {
+            let x = k as f64 * 0.5;
+            values.extend([
+                x,
+                f64::from_bits(x.to_bits() + 1),
+                f64::from_bits(x.to_bits().wrapping_sub(1)),
+            ]);
+        }
+        let limit = 2_251_799_813_685_248.0f64;
+        for x in [
+            limit,
+            -limit,
+            limit - 0.5,
+            -(limit - 0.5),
+            limit - 1.0,
+            1e300,
+            -1e300,
+        ] {
+            values.extend([
+                x,
+                f64::from_bits(x.to_bits() - 1),
+                f64::from_bits(x.to_bits() + 1),
+            ]);
+        }
+        values.extend([f64::NAN, f64::INFINITY, f64::NEG_INFINITY, 9.3e18, -9.3e18]);
+        let mut state = 0x9e37_79b9_7f4a_7c15u64;
+        for _ in 0..200_000 {
+            state ^= state << 13;
+            state ^= state >> 7;
+            state ^= state << 17;
+            let mantissa = (state >> 11) as f64 / (1u64 << 53) as f64;
+            let exponent = (state % 120) as i32 - 60;
+            let x = (mantissa - 0.5) * 2f64.powi(exponent);
+            values.extend([x, x + 0.5, (x * 2.0).round() / 2.0]);
+        }
+        for x in values {
+            assert_eq!(round_to_i64(x), round_to_i64_general(x), "{x:e}");
+        }
+    }
 
     #[test]
     fn itk_floor_and_rounding() {

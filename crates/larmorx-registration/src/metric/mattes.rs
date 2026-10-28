@@ -93,8 +93,37 @@ pub const REJECTED: u32 = u32::MAX;
 /// The sampled points evaluated together per thread of the call (the sampled path's chunks).
 const SAMPLED_CHUNK: usize = 4096;
 
-/// The sampled points one parallel task evaluates.
-const SAMPLED_TASK: usize = 512;
+/// The sampled points computed together, stage by stage.
+const BATCH: usize = 64;
+
+/// The sampled points one parallel task computes (whole batches).
+const SAMPLED_TASK: usize = 8 * BATCH;
+
+/// A batch's room on the sampled path: the points' cells, virtual and moving points, the
+/// corners' values and gradients, and a Jacobian.
+struct Scratch<R, const D: usize> {
+    cells: [Cell; BATCH],
+    locals: [[R; D]; BATCH],
+    points: [[f64; D]; BATCH],
+    inside: [bool; BATCH],
+    values: [[[f64; 1]; 8]; BATCH],
+    vectors: Box<[[[f64; D]; 8]; BATCH]>,
+    jac: Vec<R>,
+}
+
+impl<R: Real, const D: usize> Scratch<R, D> {
+    fn new(jacobian: usize) -> Self {
+        Scratch {
+            cells: [Cell::default(); BATCH],
+            locals: [[R::ZERO; D]; BATCH],
+            points: [[0.0; D]; BATCH],
+            inside: [false; BATCH],
+            values: [[[0.0]; 8]; BATCH],
+            vectors: Box::new([[[0.0; D]; 8]; BATCH]),
+            jac: vec![R::ZERO; jacobian],
+        }
+    }
+}
 
 /// One point's bins and weights on the sampled path (its derivative terms aside).
 #[derive(Clone, Copy, Debug)]
@@ -156,10 +185,20 @@ impl<R: Real> Accumulator<R> {
             if self.compute_derivative {
                 // Plain sums: a B-spline transform's zero columns add nothing.
                 let offset = fixed_index * np * bins + (moving_index + b) * np;
-                for (k, &ip) in inner.iter().enumerate() {
-                    let mu = cols.map_or(k, |cols| cols[k]);
-                    let cell = &mut self.joint_derivatives[offset + mu];
-                    *cell = *cell + ip * derivatives[b];
+                match cols {
+                    // Every parameter's own column: the cells in a row.
+                    None => {
+                        let cells = &mut self.joint_derivatives[offset..offset + inner.len()];
+                        for (cell, &ip) in cells.iter_mut().zip(inner) {
+                            *cell = *cell + ip * derivatives[b];
+                        }
+                    }
+                    Some(cols) => {
+                        for (k, &ip) in inner.iter().enumerate() {
+                            let cell = &mut self.joint_derivatives[offset + cols[k]];
+                            *cell = *cell + ip * derivatives[b];
+                        }
+                    }
                 }
             }
         }
@@ -697,9 +736,11 @@ impl<R: Real> Mattes<R> {
     /// interpolated value stored in the pixel type, its range, the Parzen window; with the
     /// derivative, the gradient image interpolated in the value's cell when it shares the
     /// moving image's grid, the transform's Jacobian and their products), and added to the
-    /// histogram in the points' order: at one thread one point at a time, at more each chunk
-    /// of points computed in parallel and then added in order. The result is the generic
-    /// path's, bit for bit, at any thread count.
+    /// histogram in the points' order. The points are computed in batches of [`BATCH`], stage
+    /// by stage (the cells, then the values and windows, then the derivative terms), so that
+    /// the processor overlaps the points of a batch, whose arithmetic is independent; at more
+    /// than one thread, chunks of batches are computed in parallel and then added in order. The
+    /// result is the generic path's, bit for bit, at any thread count.
     fn evaluate_sampled<const D: usize>(
         &self,
         m: &ImageMetricv4<R, D>,
@@ -728,57 +769,110 @@ impl<R: Real> Mattes<R> {
         };
         let space = &moving.space;
         let data = &moving.data;
-        // One point: its bins and weights, and its derivative terms in `inner` (`jac`: room
-        // for the Jacobian).
-        let point = |i: usize, inner: &mut [R], jac: &mut [R]| -> Option<PointBins<R>> {
-            let fixed_index = fixed_bins[i];
-            if fixed_index == REJECTED {
-                return None;
-            }
-            let p = &samples[i];
-            let local: [R; D] = std::array::from_fn(|k| R::from_f64(p[k]));
-            let moving_r = match linear {
-                Some(l) => matrix_point(&l.matrix, &local, &l.offset),
-                None => transform.transform_point(&local),
-            };
-            let moving_point: [f64; D] = std::array::from_fn(|k| moving_r[k].to_f64());
-            if let Some(mask) = &m.moving_mask
-                && !mask.is_inside(&moving_point)
-            {
-                return None;
-            }
-            let c: [R; D] = space.point_to_cindex(&moving_point);
-            if !space.is_inside_buffer(&c) {
-                return None;
-            }
-            let cell = Cell::new(space, &c);
-            let mv = R::from_f64(m.pixel(cell.eval(|o| f64::from(data[o]))));
-            if mv < self.moving_true_min || mv > self.moving_true_max {
-                return None;
-            }
-            let term = mv / self.moving_bin_size - self.moving_normalized_min;
-            let parzen = self.parzen_index(term);
-            let moving_index = parzen - 1;
-            let mut arg = R::from_i64(moving_index as i64) - term;
-            let mut weights = [R::ZERO; 4];
-            let mut derivatives = [R::ZERO; 4];
-            for b in 0..4 {
-                weights[b] = cubic(arg);
-                if compute_derivative {
-                    derivatives[b] = cubic_derivative(arg);
+        // IsInsideBuffer's bounds, `start − 0.5` and `end + 0.5` in R (as
+        // `Space::is_inside_buffer` computes them).
+        let lo: [R; D] = std::array::from_fn(|j| R::from_f64(space.start[j] as f64 - 0.5));
+        let hi: [R; D] = std::array::from_fn(|j| {
+            R::from_f64((space.start[j] + space.size[j] as i64 - 1) as f64 + 0.5)
+        });
+        // The points `first..first + out.len()` (at most BATCH): their bins and weights in
+        // `out`, their derivative terms in `inner` (`width` each); `w`: the batch's room.
+        let batch = |first: usize,
+                     out: &mut [Option<PointBins<R>>],
+                     inner: &mut [R],
+                     w: &mut Scratch<R, D>| {
+            let len = out.len();
+            // The cells: the transform, the moving mask, the continuous index in the buffer.
+            for j in 0..len {
+                w.inside[j] = false;
+                if fixed_bins[first + j] == REJECTED {
+                    continue;
                 }
-                arg = R::from_f64(arg.to_f64() + 1.0);
-            }
-            if let Some(g) = gradient {
-                let grad: [R; D] = if shared_grid {
-                    let gd = &g.data;
-                    std::array::from_fn(|k| R::from_f64(cell.eval(|o| gd[o][k])))
-                } else {
-                    crate::interp::vector_linear(g, &moving_point, floor)
+                let p = &samples[first + j];
+                let local: [R; D] = std::array::from_fn(|k| R::from_f64(p[k]));
+                let moving_r = match linear {
+                    Some(l) => matrix_point(&l.matrix, &local, &l.offset),
+                    None => transform.transform_point(&local),
                 };
+                let moving_point: [f64; D] = std::array::from_fn(|k| moving_r[k].to_f64());
+                if let Some(mask) = &m.moving_mask
+                    && !mask.is_inside(&moving_point)
+                {
+                    continue;
+                }
+                let c: [R; D] = space.point_to_cindex(&moving_point);
+                if !(0..D).all(|k| c[k] >= lo[k] && c[k] < hi[k]) {
+                    continue;
+                }
+                w.cells[j] = Cell::new(space, &c);
+                w.locals[j] = local;
+                w.points[j] = moving_point;
+                w.inside[j] = true;
+            }
+            // The corners' values, read first (a loop of reads only: many in flight).
+            for j in 0..len {
+                if w.inside[j] {
+                    let c = w.cells[j].corners();
+                    w.values[j] = std::array::from_fn(|b| [f64::from(data[c[b]])]);
+                }
+            }
+            // The values and the Parzen windows.
+            for j in 0..len {
+                out[j] = None;
+                if !w.inside[j] {
+                    continue;
+                }
+                let mv = R::from_f64(m.pixel(w.cells[j].eval_corners(&w.values[j])[0]));
+                if mv < self.moving_true_min || mv > self.moving_true_max {
+                    continue;
+                }
+                let term = mv / self.moving_bin_size - self.moving_normalized_min;
+                let parzen = self.parzen_index(term);
+                let moving_index = parzen - 1;
+                let mut arg = R::from_i64(moving_index as i64) - term;
+                let mut weights = [R::ZERO; 4];
+                let mut derivatives = [R::ZERO; 4];
+                for b in 0..4 {
+                    weights[b] = cubic(arg);
+                    if compute_derivative {
+                        derivatives[b] = cubic_derivative(arg);
+                    }
+                    arg = R::from_f64(arg.to_f64() + 1.0);
+                }
+                out[j] = Some(PointBins {
+                    fixed_index: fixed_bins[first + j] as usize,
+                    moving_index,
+                    weights,
+                    derivatives,
+                });
+            }
+            // The derivative terms: the gradient, the Jacobian, their products.
+            let Some(g) = gradient else {
+                return;
+            };
+            if shared_grid {
+                let gd = &g.data;
+                for j in 0..len {
+                    if out[j].is_some() {
+                        let c = w.cells[j].corners();
+                        w.vectors[j] = std::array::from_fn(|b| gd[c[b]]);
+                    }
+                }
+            }
+            for j in 0..len {
+                if out[j].is_none() {
+                    continue;
+                }
+                let grad: [R; D] = if shared_grid {
+                    let v = w.cells[j].eval_corners(&w.vectors[j]);
+                    std::array::from_fn(|k| R::from_f64(v[k]))
+                } else {
+                    crate::interp::vector_linear(g, &w.points[j], floor)
+                };
+                let jac = &mut w.jac;
                 jac.fill(R::ZERO);
-                transform.jacobian(&local, jac);
-                for (mu, out) in inner.iter_mut().enumerate() {
+                transform.jacobian(&w.locals[j], jac);
+                for (mu, out) in inner[j * width..(j + 1) * width].iter_mut().enumerate() {
                     let mut ip = R::ZERO;
                     for dim in 0..D {
                         ip = ip + jac[dim * np + mu] * grad[dim];
@@ -786,33 +880,52 @@ impl<R: Real> Mattes<R> {
                     *out = ip;
                 }
             }
-            Some(PointBins {
-                fixed_index: fixed_index as usize,
-                moving_index,
-                weights,
-                derivatives,
-            })
         };
         let mut acc = Accumulator::new(self.bins, np, compute_derivative);
-        let threads = match m.n_threads {
-            Some(t) => larmorx_core::parallel::resolve_threads(t),
-            None => rayon::current_num_threads(),
-        };
-        if threads <= 1 {
-            // One point at a time, on the calling thread.
-            let mut inner = vec![R::ZERO; width];
-            let mut jac = vec![R::ZERO; D * width];
-            for i in 0..n {
-                if let Some(b) = point(i, &mut inner, &mut jac) {
+        let add = |acc: &mut Accumulator<R>, found: &[Option<PointBins<R>>], terms: &[R]| {
+            for (j, b) in found.iter().enumerate() {
+                if let Some(b) = b {
                     acc.add(
                         b.fixed_index,
                         b.moving_index,
                         &b.weights,
                         &b.derivatives,
-                        &inner,
+                        &terms[j * width..(j + 1) * width],
                         None,
                     );
                 }
+            }
+        };
+        // The points `first..first + out.len()`, batch by batch.
+        let batches = |first: usize, out: &mut [Option<PointBins<R>>], inner: &mut [R]| {
+            let mut w = Scratch::<R, D>::new(D * width);
+            let mut j = 0;
+            while j < out.len() {
+                let len = BATCH.min(out.len() - j);
+                batch(
+                    first + j,
+                    &mut out[j..j + len],
+                    &mut inner[j * width..(j + len) * width],
+                    &mut w,
+                );
+                j += len;
+            }
+        };
+        let threads = match m.n_threads {
+            Some(t) => larmorx_core::parallel::resolve_threads(t),
+            None => rayon::current_num_threads(),
+        };
+        if threads <= 1 {
+            // One batch at a time, on the calling thread.
+            let mut found = [None; BATCH];
+            let mut terms = vec![R::ZERO; BATCH * width];
+            let mut w = Scratch::<R, D>::new(D * width);
+            let mut first = 0;
+            while first < n {
+                let len = BATCH.min(n - first);
+                batch(first, &mut found[..len], &mut terms[..len * width], &mut w);
+                add(&mut acc, &found[..len], &terms[..len * width]);
+                first += len;
             }
             return self.results(acc);
         }
@@ -827,37 +940,21 @@ impl<R: Real> Mattes<R> {
                 found.resize(end - start, None);
                 terms.clear();
                 terms.resize((end - start) * width, R::ZERO);
-                let task = |t: usize, out: &mut [Option<PointBins<R>>], inner: &mut [R]| {
-                    let mut jac = vec![R::ZERO; D * width];
-                    let first = start + t * SAMPLED_TASK;
-                    for (j, slot) in out.iter_mut().enumerate() {
-                        *slot = point(first + j, &mut inner[j * width..(j + 1) * width], &mut jac);
-                    }
-                };
                 if width == 0 {
                     found
                         .par_chunks_mut(SAMPLED_TASK)
                         .enumerate()
-                        .for_each(|(t, out)| task(t, out, &mut []));
+                        .for_each(|(t, out)| batches(start + t * SAMPLED_TASK, out, &mut []));
                 } else {
                     found
                         .par_chunks_mut(SAMPLED_TASK)
                         .zip(terms.par_chunks_mut(SAMPLED_TASK * width))
                         .enumerate()
-                        .for_each(|(t, (out, inner))| task(t, out, inner));
+                        .for_each(|(t, (out, inner))| {
+                            batches(start + t * SAMPLED_TASK, out, inner)
+                        });
                 }
-                for (j, b) in found.iter().enumerate() {
-                    if let Some(b) = b {
-                        acc.add(
-                            b.fixed_index,
-                            b.moving_index,
-                            &b.weights,
-                            &b.derivatives,
-                            &terms[j * width..(j + 1) * width],
-                            None,
-                        );
-                    }
-                }
+                add(&mut acc, &found, &terms);
                 start = end;
             }
         })?;

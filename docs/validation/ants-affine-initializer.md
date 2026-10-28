@@ -4,12 +4,18 @@
 
 - **Validated:** `larmorx ants antsAffineInitializer` / `lx.ants.affine_initializer` (crates larmorx-ants, larmorx-registration)
 - **Reference:** antsAffineInitializer from ANTs v2.6.5 (fdce4d2f84) on ITK v5.4.5 (f51594ad88), x86_64-conda-linux-gnu-g++ (conda-forge gcc 14.3.0-20) 14.3.0, the binary built by `scripts/build_ants_oracle.sh`, run with one thread
-- **Test data:** larmorx-testdata `00b862132e9c`, tier `standard`
-- **Generated:** 2026-10-17 on Linux x86_64, with `python -m larmorx_validation parity ants-affine-initializer --tier standard`
+- **Test data:** larmorx-testdata `52124bc98f9f`, tier `standard`
+- **Generated:** 2026-10-28 on Linux x86_64, with `python -m larmorx_validation parity ants-affine-initializer --tier standard`
+- **Original programs:** 53 runs: 26 from the oracle cache, 27 run (14 never cached: the original varies); cache `<workspace>/oracles/cache`, mode `use`
 
 26 cases compared: 26 identical to the unmodified ANTs (exit status, standard output, standard error, every file), 0 identical once ANTs uses CORE-MATH's correctly rounded functions (glibc's are not always correctly rounded).
 
-Thread band, 4 cases: ANTs at 2, 4, 8 threads differs from its own one-thread result by up to 1.32e-06 in a transform parameter (`search/defaults` 0, `search/principal-axes` 5.55e-16, `search/2d` 5.55e-17, `real/mni-2mm` 1.32e-06); larmorx gives the one-thread result at any thread count, within 0 of ANTs at one thread.
+Thread band, 4 cases: ANTs at 2, 4, 8 threads differs from its own one-thread result by up to 1.24e-06 in a transform parameter (`search/defaults` 0, `search/principal-axes` 5.55e-16, `search/2d` 5.55e-17, `real/mni-2mm` 1.24e-06); larmorx gives the one-thread result at any thread count, within 0 of ANTs at one thread.
+
+- **D13 fix pass** (larmorx's default, `upstream_defects="fix"`; the comparison above runs `reproduce`): the corrections met
+  - ANTS-54: 9 case(s) named it, 7 with changed values (largest difference 7.18), 2 with other changes (a transform written by one only; exit N -> N; files ['t.mat']): `search/niworkflows`, `search/principal-axes`, `search/principal-axes-mask`, `search/missing-mask`, `search/local-search-text`, `search/local-search-zero`, `search/local-search-negative`, `search/extra-arguments` …
+  - ANTS-56: 2 case(s) named it, 0 with changed values (largest difference 0), 2 with other changes (a transform written by one only; exit N -> N; files ['t.mat']): `messages/dimension-5`, `messages/dimension-1`
+  - ITK-21: 16 case(s) named it, 16 with changed values (largest difference 7.18): `search/defaults`, `search/niworkflows`, `search/principal-axes`, `search/principal-axes-mask`, `search/missing-mask`, `search/fraction-above-one`, `search/local-search-20`, `search/principal-axes-2` …
 
 ## Thresholds
 
@@ -59,11 +65,11 @@ Thread band, 4 cases: ANTs at 2, 4, 8 threads differs from its own one-thread re
 
 | Component | Version |
 |---|---|
-| larmorx | 0.0.1 (61309dd10e0e) |
-| larmorx-testdata | 00b862132e9c |
-| Python | 3.12.10 |
+| larmorx | 0.0.1 (9b9fe9aa5232) |
+| larmorx-testdata | 52124bc98f9f |
+| Python | 3.12.16 |
 | Platform | Linux x86_64 (Linux-6.8.0-124-generic-x86_64-with-glibc2.35) |
-| CPU | Intel(R) Core(TM) i7-8750H CPU @ 2.20GHz, 12 logical CPUs |
+| CPU | AMD Ryzen 9 7945HX with Radeon Graphics, 32 logical CPUs |
 | numpy | 2.3.5 |
 | nibabel | 5.4.2 |
 | scipy | 1.15.3 |

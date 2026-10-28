@@ -14,6 +14,7 @@ Speed of larmorx against the tools it replaces, on real data from `larmorx-testd
 | [ants-n4](ants-n4.md) | N4BiasFieldCorrection (ANTs 2.6.5 binary) on fMRIPrep's, sMRIPrep's and sdcflows' command lines |
 | [ants-denoise](ants-denoise.md) | DenoiseImage (ANTs 2.6.5 binary) on sMRIPrep's command line and the same options on other images |
 | [mri-hmc](mri-hmc.md) | mcflirt (FSL 6.0.7.17 binary) |
+| [ants-ai](ants-ai.md) | antsAI and antsAffineInitializer (ANTs 2.6.5 binaries with CORE-MATH): time, CPU time and peak memory, larmorx in both D13 modes at 1 and 8 threads |
 
 Reproduce a report (build larmorx in release mode first):
 
@@ -29,4 +30,5 @@ python -m larmorx_validation bench ants-morphology --repeats 5 --threads 1 4 0 -
 python -m larmorx_validation bench ants-n4 --repeats 3 --threads 1 4 0 --out docs/benchmarks
 python -m larmorx_validation bench ants-denoise --repeats 3 --threads 1 4 0 --out docs/benchmarks
 python -m larmorx_validation bench mri-hmc --repeats 3 --threads 1 4 0 --out docs/benchmarks   # needs FSL
+python -m larmorx_validation bench ants-ai --repeats 3 --threads 1 8 --out docs/benchmarks   # in a memory box
 ```

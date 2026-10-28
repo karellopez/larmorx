@@ -35,6 +35,12 @@ per work unit); larmorx always gives ANTs' one-thread result. **`Random` samplin
 repeatable in ANTs** (its voxels are drawn from the clock, whatever the seed; so are `Regular`
 sampling's perturbations with `--random-seed 0`, ANTS-58); larmorx seeds them from the seed.
 
+**Memory and speed** (2026-10-28, [benchmark](../benchmarks/ants-ai.md)): the images are kept
+in float, as ANTs keeps them, so the peak is ANTs' (96 MiB against 91 on a 128 × 128 × 96
+head; it was 126). With `Mattes` (fMRIPrep's metric) the search computes each sampled point's
+fixed side once and its moving side in batches: about 1.5 times as fast as ANTs at one thread,
+and faster with more ([findings](../findings/ants-ai.md), "Memory and speed (2026-10-28)").
+
 **On the data panel** ([record](../validation/ants-ai-panel.md), 2026-10-26): all 36 antsAI
 nodes of the fourteen finished fMRIPrep oracle runs (the brain extraction's `init_aff` in every
 run, the BOLD reference's in 22 runs; the 3.5-year-old, the glioma, the stroke, 1.5 T, 7 T,

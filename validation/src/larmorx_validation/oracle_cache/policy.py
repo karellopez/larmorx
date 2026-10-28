@@ -230,18 +230,30 @@ IMAGE_MATH_VOXELWISE = frozenset(
 )  # fmt: skip
 
 
-def _grid(path: str, dim: int) -> tuple[int, ...] | None:
-    """A NIfTI image's voxel grid as an ITK program of ``dim`` dimensions reads it (its first
-    ``dim`` axes, missing ones 1), from its header; ``None`` if it is not one."""
+def _header(path: str, dim: int) -> tuple[tuple[int, ...], tuple[float, ...]] | None:
+    """A NIfTI image's voxel grid and spacing as an ITK program of ``dim`` dimensions reads them
+    (its first ``dim`` axes, missing ones 1; the spacing in millimetres and seconds, as ITK
+    converts the header's units), from its header; ``None`` if it is not one."""
     if not path.endswith((".nii", ".nii.gz", ".hdr", ".img")):
         return None
     try:
         import nibabel as nib
 
-        shape = tuple(int(n) for n in nib.load(path).shape)
+        header = nib.load(path).header
+        shape = tuple(int(n) for n in header.get_data_shape())
+        zooms = tuple(float(z) for z in header.get_zooms())
+        space, time = header.get_xyzt_units()
     except Exception:
         return None
-    return (shape + (1,) * dim)[:dim]
+    scale = {"meter": 1000.0, "micron": 0.001}.get(space, 1.0)
+    tscale = {"msec": 0.001, "usec": 1e-6}.get(time, 1.0)
+    spacing = tuple(z * (scale if k < 3 else tscale) for k, z in enumerate(zooms))
+    return (shape + (1,) * dim)[:dim], (spacing + (1.0,) * dim)[:dim]
+
+
+def _grid(path: str, dim: int) -> tuple[int, ...] | None:
+    got = _header(path, dim)
+    return None if got is None else got[0]
 
 
 def read_past_end(first: tuple[int, ...], second: tuple[int, ...]) -> bool:
@@ -282,13 +294,27 @@ def ants_memory_never(program: str, args: list[str]) -> str:
         if a is not None and b is not None and a != b and read_past_end(a, b):
             return f"ANTS-07: {VARYING_DEFECTS['ANTS-07']} ({b} read at the indices of {a})"
         return ""
-    if program == "ResampleImageBySpacing" and len(args) > 1:
-        smooth = args[2 + dim + 1] if len(args) > 3 + dim else "1"
-        grid = _grid(args[1], dim)
-        if grid is not None and smooth.strip() != "0" and min(grid[: min(dim, 3)]) < 4:
+    if program == "ResampleImageBySpacing" and len(args) > 3:
+        smooth = args[3 + dim] if len(args) > 3 + dim else "1"
+        got = _header(args[1], dim)
+        if got is None or smooth.strip() == "0":
+            return ""
+        import numpy as np
+
+        grid, spacing = got
+        thin = []
+        for k in range(dim):
+            try:
+                out = float(args[3 + k])
+            except (IndexError, ValueError):
+                return ""
+            # the axis is smoothed when its sigma, float(out / in - 1), is above 0
+            if grid[k] < 4 and spacing[k] > 0 and float(np.float32(out / spacing[k] - 1.0)) > 0:
+                thin.append(k)
+        if thin:
             return (
-                f"ANTS-28: smoothing an axis of fewer than 4 voxels ({grid}) resamples a buffer "
-                "ITK never wrote"
+                f"ANTS-28: smoothing an axis of fewer than 4 voxels (axes {thin} of {grid}) "
+                "resamples a buffer ITK never wrote"
             )
     return ""
 

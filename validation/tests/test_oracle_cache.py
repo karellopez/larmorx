@@ -1143,6 +1143,8 @@ def test_ants_rules_of_the_clock_and_of_memory_never_written(tmp_path):
     thin = ["3", wide, "o.nii", "2", "2", "2"]
     assert p.ants_memory_never("ResampleImageBySpacing", thin).startswith("ANTS-28")
     assert p.ants_memory_never("ResampleImageBySpacing", [*thin, "0"]) == ""  # no smoothing
+    # a thin axis whose sigma, out / in - 1, is 0 is not smoothed (spacing/thin-unsmoothed-axis)
+    assert p.ants_memory_never("ResampleImageBySpacing", ["3", wide, "o.nii", "1", "1", "1"]) == ""
     assert p.ants_never("ResampleImageBySpacing", thin, {}).startswith("ANTS-28")
 
 

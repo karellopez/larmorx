@@ -30,7 +30,9 @@ directories in a form the cache cannot map back is never stored either.
 from __future__ import annotations
 
 import re
+from collections.abc import Sequence
 from dataclasses import dataclass, field, replace
+from pathlib import Path
 
 #: Identical runs needed before a run above one thread is served from the cache.
 CONFIRMATIONS = 3
@@ -53,6 +55,7 @@ VARIES_ABOVE_ONE_THREAD: dict[str, str] = {
 #: description, reason or ``nondeterministic`` text names one of them never keeps the original's
 #: runs in the cache (``never_for``).
 VARYING_DEFECTS: dict[str, str] = {
+    "ANTS-07": "a smaller second image is read past its end (the heap)",
     "ANTS-28": "uninitialised values reach ANTs' output",
     "ANTS-42": "DenoiseImage races above one thread",
     "ANTS-58": "antsAI draws from the clock",
@@ -158,11 +161,37 @@ def itk_threads(env: dict[str, str]) -> int | None:
     return found
 
 
+#: antsRegistration's stages that never seed their metric's sampling (ANTS-82): with ``Regular``
+#: or ``Random`` sampling they draw from the clock whatever the seed.
+CLOCK_SAMPLED_STAGES = ("Exponential", "BSplineExponential", "TimeVaryingVelocityField")
+_STAGE = re.compile(r"^([A-Za-z]+)\[")
+
+
+def _clock_sampled(args: list[str]) -> str:
+    """The first stage of ``CLOCK_SAMPLED_STAGES`` whose metric samples ``Regular`` or
+    ``Random`` points (``""``: none). A stage is a ``-t``/``--transform`` and the ``-m``/
+    ``--metric`` options after it."""
+    stage = ""
+    for i, a in enumerate(args[:-1]):
+        value = args[i + 1]
+        if a in ("-t", "--transform"):
+            m = _STAGE.match(value)
+            stage = m.group(1) if m else value
+        elif a in ("-m", "--metric") and stage in CLOCK_SAMPLED_STAGES:
+            fields = [f.strip(" []") for f in value.split(",")]
+            if any(f in ("Regular", "Random") for f in fields):
+                return stage
+    return ""
+
+
 def ants_seed_never(program: str, args: list[str], env: dict[str, str]) -> str:
     """The clock rules of ANTs' programs: why a run reads the clock, or ``""``.
 
     - ``antsRegistration``: no ``ANTS_RANDOM_SEED`` and no ``--random-seed`` seed its samplers
-      from the clock (docs/findings/ants-registration.md).
+      from the clock (docs/findings/ants-registration.md); and whatever the seed, the
+      ``Exponential``, ``BSplineExponential`` and ``TimeVaryingVelocityField`` stages sample
+      their metric (``Regular`` or ``Random``) from the clock (ANTS-82; random testing's runs of
+      2026-10-25 varied on their own machine, machine-move-proof.md).
     - ``antsAI``: seeds with 1234 unless told otherwise, but ``--random-seed 0`` and ``Random``
       sampling draw from the clock (ANTS-58).
     - ``Atropos``: ``--use-random-seed 1`` (its default) seeds from the clock.
@@ -174,6 +203,8 @@ def ants_seed_never(program: str, args: list[str], env: dict[str, str]) -> str:
     if program == "antsRegistration":
         if seed is None and "ANTS_RANDOM_SEED" not in env:
             return "no seed: antsRegistration seeds its samplers from the clock"
+        if stage := _clock_sampled(args):
+            return f"ANTS-82: {stage} samples its metric from the clock, whatever the seed"
         return ""
     if program == "antsAI":
         if seed is not None and seed.strip() == "0":
@@ -191,15 +222,118 @@ def ants_seed_never(program: str, args: list[str], env: dict[str, str]) -> str:
     return ""
 
 
+#: ImageMath's voxel-wise operations that read their second image at the first image's indices
+#: (``ImageMath_Templates.hxx:5583-5762``; ANTS-07).
+IMAGE_MATH_VOXELWISE = frozenset(
+    ("m", "+", "-", "/", "^", "exp", "max", "abs", "addtozero", "overadd", "Decision", "total",
+     "mean", "vtotal")
+)  # fmt: skip
+
+
+def _grid(path: str, dim: int) -> tuple[int, ...] | None:
+    """A NIfTI image's voxel grid as an ITK program of ``dim`` dimensions reads it (its first
+    ``dim`` axes, missing ones 1), from its header; ``None`` if it is not one."""
+    if not path.endswith((".nii", ".nii.gz", ".hdr", ".img")):
+        return None
+    try:
+        import nibabel as nib
+
+        shape = tuple(int(n) for n in nib.load(path).shape)
+    except Exception:
+        return None
+    return (shape + (1,) * dim)[:dim]
+
+
+def read_past_end(first: tuple[int, ...], second: tuple[int, ...]) -> bool:
+    """Whether reading ``second`` at each voxel index of ``first`` with ``second``'s own strides
+    (``image2->GetPixel(index)``, ANTS-07) reads past the end of its buffer."""
+    stride, last, size = 1, 0, 1
+    for f, s in zip(first, second, strict=True):
+        last += (f - 1) * stride
+        stride *= s
+        size *= s
+    return last >= size
+
+
+def ants_memory_never(program: str, args: list[str]) -> str:
+    """Why a run of an ANTs program reads memory it never wrote, decided from its arguments and
+    its images' headers (``""``: it does not):
+
+    - ImageMath's voxel-wise operations and MultiplyImages with a second image read past its end
+      at the first image's indices (ANTS-07);
+    - ResampleImageBySpacing smoothing an axis of fewer than 4 voxels: ITK throws, ANTs catches
+      it and resamples the filter's never-written buffer (ANTS-28).
+
+    Random testing's runs of 2026-10-25 met them without naming them, and varied on their own
+    machine (machine-move-proof.md); the suites' own cases name them in their texts."""
+    try:
+        dim = int(args[0])
+    except (IndexError, ValueError):
+        return ""
+    if not 1 <= dim <= 6:
+        return ""
+    pair = None
+    if program == "ImageMath" and len(args) > 4 and args[2] in IMAGE_MATH_VOXELWISE:
+        pair = (args[3], args[4])
+    elif program == "MultiplyImages" and len(args) > 2:
+        pair = (args[1], args[2])
+    if pair is not None:
+        a, b = _grid(pair[0], dim), _grid(pair[1], dim)
+        if a is not None and b is not None and a != b and read_past_end(a, b):
+            return f"ANTS-07: {VARYING_DEFECTS['ANTS-07']} ({b} read at the indices of {a})"
+        return ""
+    if program == "ResampleImageBySpacing" and len(args) > 1:
+        smooth = args[2 + dim + 1] if len(args) > 3 + dim else "1"
+        grid = _grid(args[1], dim)
+        if grid is not None and smooth.strip() != "0" and min(grid[: min(dim, 3)]) < 4:
+            return (
+                f"ANTS-28: smoothing an axis of fewer than 4 voxels ({grid}) resamples a buffer "
+                "ITK never wrote"
+            )
+    return ""
+
+
+def ants_never(program: str, args: list[str], env: dict[str, str]) -> str:
+    """The program-level rules of ANTs' programs (the clock, memory never written): why a run of
+    ``program`` is never cached, or ``""``. The suites' ANTs runners apply them to every run;
+    ``oracle-cache verify`` skips an entry they now reach."""
+    return ants_seed_never(program, args, env) or ants_memory_never(program, args)
+
+
+#: Whitespace in a path: every program may read it as text (a shell script expanding its
+#: arguments unquoted, FSL's ``bet``: ``bet2 $IN $OUT``; AFNI without ``AFNI_PATH_SPACES_OK``).
+WHITESPACE = (" ", "\t", "\n")
+
+
+def path_text(program: str, args: Sequence[str]) -> tuple[str, ...]:
+    """The text a run of ``program`` may read in its arguments' paths, beyond the files they
+    name: the cache key keeps whichever of these a path holds (``prepare(..., text=...)``).
+    Whitespace for every program; ``-h`` and ``--help`` for bet2 with one argument, which then
+    prints its usage when either is anywhere in it (``bet2.cpp:811-818``, docs/findings/
+    fsl-bet.md; the cache served one run for both, and ``bet2/one-argument`` failed at random,
+    machine-move-proof.md)."""
+    texts = list(WHITESPACE)
+    if Path(program).name == "bet2" and len(args) < 2:
+        texts += ["-h", "--help"]
+    return tuple(texts)
+
+
 __all__ = [
+    "CLOCK_SAMPLED_STAGES",
     "CONFIRMATIONS",
+    "IMAGE_MATH_VOXELWISE",
     "VARIES_ABOVE_ONE_THREAD",
     "VARYING_DEFECTS",
+    "WHITESPACE",
     "Decision",
     "Policy",
+    "ants_memory_never",
+    "ants_never",
     "ants_seed_never",
     "decide",
     "itk_threads",
     "never_for",
+    "path_text",
+    "read_past_end",
     "threads_from_env",
 ]

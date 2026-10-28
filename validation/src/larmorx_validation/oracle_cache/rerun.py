@@ -15,6 +15,7 @@ from __future__ import annotations
 import hashlib
 import os
 import re
+import shlex
 import tempfile
 from dataclasses import dataclass
 from pathlib import Path
@@ -51,6 +52,9 @@ def _layout(store: Store, entry: dict, root: Path) -> tuple[Prepared, dict[str, 
     for p in entry["places"]:
         if p["kind"] == "directory":
             d = root / p["name"]
+            if any(c.isspace() for c in p.get("basename", "")):
+                # a folder with a blank in its name, made so again (the program may read it)
+                d = d / p["basename"]
             d.mkdir(parents=True, exist_ok=True)
             places.append((p["name"], d))
             values[p["name"]] = str(d)
@@ -105,6 +109,100 @@ def _fill(text: str, values: dict[str, str]) -> str:
     return _PLACEHOLDER.sub(lambda m: values[m.group(1)], text)
 
 
+#: A place's path followed by a blank and more of the path, in an entry's arguments: a path with
+#: a blank the key took apart before 2026-10-28.
+_SPLIT_BLANK = re.compile(r"\{(?:cwd|out\d+p?|d\d+)\}/[^\s,\[\];=:@'\"(){}<>|]*\s+[^\s,\[\]]")
+#: A printf pattern of a number in a place, in an entry's arguments (``{d0}/prior%02d.nii.gz``).
+_PATTERN = re.compile(r"\{(cwd|out\d+p?|d\d+)\}/([^\s,\[\];]*%0?\d*d[^\s,\[\];]*)")
+
+
+def _read_patterns(entry: dict) -> list[str]:
+    """The printf patterns in ``entry``'s arguments that name files it read: those none of its
+    stored outputs match (``post%02d.nii.gz`` names what Atropos writes, ``prior%02d.nii.gz``
+    what it reads)."""
+    written = [(o["place"], o["path"]) for o in entry.get("result", {}).get("outputs", [])]
+    out = []
+    for a in entry.get("template", []):
+        for m in _PATTERN.finditer(a):
+            place, rel = m.group(1), m.group(2)
+            p = re.search(r"%0?\d*d", rel)
+            assert p is not None
+            name = re.compile(re.escape(rel[: p.start()]) + r" *\d+" + re.escape(rel[p.end() :]))
+            if not any(w == place and name.fullmatch(path) for w, path in written):
+                out.append(m.group(0))
+    return out
+
+
+#: Entries superseded by a correction of their suite's key that the entry itself cannot show
+#: (full key -> why): their suite keys the run differently now, so they are never reached.
+SUPERSEDED: dict[str, str] = {
+    # fsl-mcflirt-replica/edge/mat-exists (machine-move-proof.md)
+    "51a04ae5838e3f0c3ea0ec835491fa7245e9da6a8dc48ae5fc4809f8ee9004d7": (
+        "keyed before the files in mcflirt's working directory were inputs (2026-10-28): the "
+        "file out.mat, which sends the matrices to out.mat+, is not among the entry's inputs"
+    ),
+}
+
+
+def stale(entry: dict) -> str:
+    """Why ``entry`` was keyed by rules the cache has since corrected, so that it cannot be run
+    again as its suite would run it now (``""``: it can). Its suite's next run keys the run
+    anew and stores a new entry; this one stays (nothing is deleted) and is never reached."""
+    if why := SUPERSEDED.get(entry.get("key", "")):
+        return why
+    if entry.get("rules", 1) >= core.RULES:
+        return ""  # stored by the current rules
+    args = entry.get("template", [])
+    parts = entry.get("parts", {})
+    if _read_patterns(entry) and not any("series" in i for i in parts.get("inputs", [])):
+        return (
+            "keyed before files named by a pattern (prior%02d.nii.gz) were inputs "
+            "(2026-10-28): the entry holds none of them"
+        )
+    if any(_SPLIT_BLANK.search(a) for a in args) and "text" not in parts:
+        return (
+            "keyed before a path with a blank was one path (2026-10-28): the file it names is "
+            "not among the entry's inputs"
+        )
+    return ""
+
+
+def never_now(entry: dict, args: list[str], env: dict[str, str]) -> str:
+    """Why the run of ``entry`` (its arguments ``args`` as this rerun fills them) is never cached
+    under the current rules (``""``: it may be): ANTs' clock and memory rules, which the cache
+    applies to every run of an ITK program (``policy.ants_never``)."""
+    from larmorx_validation.oracle_cache.policy import ants_never
+
+    if entry.get("policy", {}).get("family") != "itk":
+        return ""
+    program = str(entry["parts"]["oracle"].get("program", ""))
+    return ants_never(Path(program).name, args, env)
+
+
+def _container_env(entry: dict) -> dict[str, str]:
+    """The variables the suite set inside the container (``--env``), as placeholders: from the
+    launcher (entries since 2026-10-28), else from the command as it ran (``--env K=V``: ``HOME``
+    as ``{home}``, a variable of the key as the key's, the rest as written)."""
+    launcher = entry.get("launcher", {})
+    if "env" in launcher:
+        return dict(launcher["env"])
+    keyed = entry.get("rerun_env", {})
+    out = dict(keyed)
+    try:
+        words = shlex.split(entry.get("command", ""))
+    except ValueError:
+        return out
+    home = str(Path.home())
+    for k, w in enumerate(words[:-1]):
+        if w == "--env" and "=" in words[k + 1]:
+            name, value = words[k + 1].split("=", 1)
+            if name == "HOME":
+                out[name] = "{home}"
+            elif name not in keyed:
+                out[name] = home + value[1:] if value.startswith("~") else value
+    return out
+
+
 def rerun(store: Store, entry: dict, *, timeout: float | None = 4 * 3600) -> Outcome:
     """Run ``entry`` again and compare its result with the stored one (a difference is kept as
     a dispute and logged as a finding)."""
@@ -114,7 +212,9 @@ def rerun(store: Store, entry: dict, *, timeout: float | None = 4 * 3600) -> Out
     home = entry["parts"].get("env", {}).get("HOME")
     if home is not None and home != f"<directory {hashlib.sha256(b'').hexdigest()}>":
         return Outcome(key, "skipped", "its HOME held files (only an empty one is made again)")
-    with tempfile.TemporaryDirectory(prefix="lx-oracle-rerun-") as t:
+    if why := stale(entry):
+        return Outcome(key, "skipped", why)
+    with tempfile.TemporaryDirectory(prefix="lx-oracle-rerun_") as t:
         root = Path(t)
         prep, values = _layout(store, entry, root)
         args = [_fill(a, values) for a in entry["template"]]
@@ -122,6 +222,8 @@ def rerun(store: Store, entry: dict, *, timeout: float | None = 4 * 3600) -> Out
         env = {k: v for k, v in os.environ.items() if not env_matters(k, family, os.environ)}
         for k, v in entry.get("rerun_env", {}).items():
             env[k] = _fill(v, values)
+        if why := never_now(entry, args, env):
+            return Outcome(key, "skipped", f"never cached under the current rules: {why}")
         cwd = Path(values["cwd"]) if entry["parts"].get("cwd") else None
         if launcher.get("kind") == "exec":
             program = Path(launcher["program"])
@@ -135,7 +237,7 @@ def rerun(store: Store, entry: dict, *, timeout: float | None = 4 * 3600) -> Out
             image = Path(launcher["image"])
             if not image.is_file() or image_identity(image, launcher["program"]) != oracle:
                 return Outcome(key, "skipped", "the container image changed or is not here")
-            inner = {k: _fill(v, values) for k, v in entry.get("rerun_env", {}).items()}
+            inner = {k: _fill(v, values) for k, v in _container_env(entry).items()}
             argv = _apptainer(image, launcher["program"], args, inner, cwd, root)
             run_env = dict(os.environ)
         else:
@@ -239,4 +341,4 @@ def rerun_many(
         return out
 
 
-__all__ = ["Outcome", "rerun", "rerun_many"]
+__all__ = ["Outcome", "never_now", "rerun", "rerun_many", "stale"]

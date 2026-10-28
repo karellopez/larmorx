@@ -35,6 +35,13 @@ VOLATILE = (
     # antsRegistration's DIAGNOSTIC lines: the 4th and 5th fields after the word are times
     # (ITERATION_TIME_INDEX, SINCE_LAST), which the registration suite masks too
     (r"(DIAGNOSTIC,(?:[^,\n]*,){3})[^,\n]*,[^,\n]*,", r"\1…,…,"),
+    # a shell's report of a command a script ran that ended by a signal names its process ID
+    # ("bet: line 399: 1915072 Segmentation fault ${FSLDIR}/bin/bet2 ...": FSL's bet script)
+    (
+        r"(: line \d+: +)\d+( +(?:Segmentation fault|Aborted|Killed|Bus error|Floating point "
+        r"exception|Illegal instruction|Terminated|Trace/breakpoint trap))",
+        r"\1…\2",
+    ),
 )
 
 
@@ -90,13 +97,19 @@ def _h5_content(path: Path) -> list:
 
 
 def without_extensions(data: bytes) -> bytes | None:
-    """A NIfTI-1 file's header (without ``vox_offset``) and data, its extensions left out;
-    ``None`` if ``data`` is not a single-file NIfTI-1."""
-    if len(data) < 352 or data[344:348] != b"n+1\x00":
-        return None
-    order = "<" if int.from_bytes(data[:4], "little") == 348 else ">"
-    offset = int(np.frombuffer(data[108:112], dtype=f"{order}f4")[0])
-    return data[:108] + data[112:348] + data[offset:]
+    """A NIfTI-1 or NIfTI-2 file's header (without ``vox_offset``) and data, its extensions
+    left out; ``None`` if ``data`` is not a single-file NIfTI. (NIfTI-2 since 2026-10-28: AFNI
+    writes it with ``AFNI_NIFTI_WRITE_TYPE=2``, and its history note's length follows the run's
+    paths, machine-move-proof.md.)"""
+    if len(data) >= 352 and data[344:348] == b"n+1\x00":
+        order = "<" if int.from_bytes(data[:4], "little") == 348 else ">"
+        offset = int(np.frombuffer(data[108:112], dtype=f"{order}f4")[0])
+        return data[:108] + data[112:348] + data[offset:]
+    if len(data) >= 544 and data[4:8] == b"n+2\x00":
+        order = "<" if int.from_bytes(data[:4], "little") == 540 else ">"
+        offset = int(np.frombuffer(data[168:176], dtype=f"{order}i8")[0])
+        return data[:168] + data[176:540] + data[offset:]
+    return None
 
 
 def same_file(stored: Path, fresh: Path, *, nifti_extensions: bool = True) -> tuple[bool, str]:

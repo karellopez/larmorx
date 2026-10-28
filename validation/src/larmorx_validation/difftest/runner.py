@@ -40,6 +40,7 @@ import traceback
 from multiprocessing.connection import Connection, wait
 from pathlib import Path
 
+from larmorx_validation import address_space
 from larmorx_validation.difftest import core, gen, inputs, limits, tools
 from larmorx_validation.difftest.core import DIFFER, EXPLAINED, NOTICE, SKIP, Judgement
 from larmorx_validation.parity import harness
@@ -1064,6 +1065,11 @@ def run_heavy(
     # larmorx's ANTS-162 guard plans for the heavy box (memory and swap), not the machine's
     # physical memory: what fits the box runs in both modes.
     os.environ["LARMORX_MEMORY_LIMIT"] = str(int((memory_gib + swap_gib) * limits.GIB))
+    # and the address-space limit the originals run under fits it too (heavy cases run to their
+    # end; an explicit LARMORX_ADDRESS_SPACE_LIMIT is kept)
+    os.environ.setdefault(
+        address_space.ENV, str(address_space.for_memory(int((memory_gib + swap_gib) * limits.GIB)))
+    )
     done = []
     for k, h in enumerate(heavy_queue(out, only)):
         tool = tools.get(h["tool"])

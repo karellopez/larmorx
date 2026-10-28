@@ -17,6 +17,7 @@ from __future__ import annotations
 
 import argparse
 import random
+import re
 import sys
 from collections import Counter
 from pathlib import Path
@@ -43,15 +44,43 @@ def _print(o: Outcome) -> None:
     print(text + (f"  {o.detail}" if o.detail else ""), flush=True)
 
 
+def _named(store: Store, names: list[str]) -> list[dict]:
+    """The entries whose keys start with one of ``names`` (``@file``: one per line, the first
+    word of each), disputed or not."""
+    prefixes: list[str] = []
+    for n in names:
+        if n.startswith("@"):
+            # one per line: the first word that is a key (a verify log's lines start with
+            # their status: "DIFFERS  e31916d11348aa28  0.0 s ...")
+            for ln in Path(n[1:]).read_text(encoding="utf-8").splitlines():
+                words = [w for w in ln.split() if re.fullmatch(r"[0-9a-f]{8,64}", w)]
+                prefixes += words[:1]
+        else:
+            prefixes.append(n)
+    found = {}
+    for e in store.entries():
+        if any(e["key"].startswith(p) for p in prefixes):
+            found[e["key"]] = e
+    missing = [p for p in prefixes if not any(k.startswith(p) for k in found)]
+    if missing:
+        print(f"no entry for {len(missing)} key(s): {' '.join(missing[:10])}", file=sys.stderr)
+    return sorted(found.values(), key=lambda e: e["key"])
+
+
 def cmd_verify(args: argparse.Namespace) -> int:
     store = _store(args)
-    entries = _complete(store)
+    # named entries, disputed ones too: does a dispute still reproduce? (a rerun that agrees
+    # adds "verified" to its history; the dispute stays until `resolve`)
+    entries = _named(store, args.keys) if args.keys else _complete(store)
     if args.program:
         entries = [e for e in entries if e["parts"]["oracle"].get("program") in args.program]
     if args.max_seconds is not None:
         entries = [e for e in entries if e.get("seconds", 0.0) <= args.max_seconds]
     rng = random.Random(args.seed)
-    chosen = rng.sample(entries, min(args.sample, len(entries)))
+    if args.keys and args.sample is None:
+        chosen = entries
+    else:
+        chosen = rng.sample(entries, min(args.sample or 10, len(entries)))
     print(f"oracle cache {store.root}: {len(entries)} entries served; re-running {len(chosen)}")
     outcomes = rerun_many(
         store, [e["key"] for e in chosen], jobs=args.jobs, timeout=args.timeout, progress=_print
@@ -177,7 +206,13 @@ def add_arguments(parser: argparse.ArgumentParser) -> None:
     )
     sub = parser.add_subparsers(dest="oracle_command", required=True)
     v = sub.add_parser("verify", help="re-run random cached entries; any difference is a finding")
-    v.add_argument("--sample", type=int, default=10)
+    v.add_argument("--sample", type=int, default=None, help="how many (default 10)")
+    v.add_argument(
+        "--keys",
+        nargs="+",
+        help="these entries instead of a sample (key prefixes, or @file with one per line), "
+        "disputed ones included",
+    )
     v.add_argument("--seed", type=int, default=None, help="the sample's seed (default: random)")
     v.add_argument("--program", nargs="+", help="only these programs (their names)")
     v.add_argument(

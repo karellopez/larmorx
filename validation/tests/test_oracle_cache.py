@@ -11,6 +11,7 @@ import os
 import stat
 import subprocess
 import sys
+import tempfile
 import textwrap
 from pathlib import Path
 
@@ -943,3 +944,282 @@ def test_record_golden_reuses_the_smoke_marker_of_this_commit_and_build(cache):
     assert rg.smoke_marker() is None
     store.write_atomic(path, store.dumps(marker | {"result": "failed"}))
     assert rg.smoke_marker() is None
+
+
+# ------------------------------------------------------------------------------------------------
+# The corrections of 2026-10-28 (docs/findings/machine-move-proof.md, "Fixed")
+
+#: bet2's one-argument rule (``bet2.cpp:811-818``): an argument holding ``-h`` prints the usage
+#: and exits 0, any other single argument is an error.
+BET2 = """\
+    import sys
+    args = sys.argv[1:]
+    if len(args) < 2:
+        if "-h" in args[0] or "--help" in args[0]:
+            print("usage")
+            sys.exit(0)
+        print("error: not enough arguments", file=sys.stderr)
+        sys.exit(255)
+    open(args[1], "wb").write(open(args[0], "rb").read())
+"""
+
+
+def test_the_key_keeps_a_paths_text_where_the_program_reads_it(cache, tmp_path_factory, fake):
+    """bet2 with one argument reads its text (``-h`` anywhere prints the usage): the key keeps
+    what it reads where a path holds it, so the run whose temporary folder held ``-h`` is not
+    served the other's result (``bet2/one-argument`` failed at random). Every other run keeps
+    its key."""
+    bet2 = make_program(tmp_path_factory.mktemp("bin"), BET2, "bet2")
+    plain = tmp_path_factory.mktemp("lx-gen_") / "head.nii"
+    dashed = tmp_path_factory.mktemp("lx-gen-h") / "head.nii"
+    for p in (plain, dashed):
+        p.write_bytes(b"the same head")
+    oc.begin_case("plain")
+    first = oc.run([bet2, plain], env=env_for(), policy=ONE)
+    oc.begin_case("dashed")
+    second = oc.run([bet2, dashed], env=env_for(), policy=ONE)
+    assert (first.returncode, second.returncode) == (255, 0)
+    assert not second.cached and second.stdout == "usage\n"
+    texts = sorted(str(e["parts"].get("text")) for e in entries(cache))
+    assert texts == ["None", "{'0': ['-h']}"]
+    oc.begin_case("served")
+    again = oc.run([bet2, plain], env=env_for(), policy=ONE)
+    assert again.cached and again.returncode == 255
+    # two arguments: bet2 parses them whole, the text is not read and not in the key
+    d = tmp_path_factory.mktemp("two")
+
+    def two(src: Path) -> key.Prepared:
+        args = [str(src), str(d / "o")]
+        text = oc.policy.path_text("bet2", args)
+        return key.prepare(key.program_identity(bet2, env_for()), args, env_for(), text=text)
+
+    assert two(plain).key == two(dashed).key and "text" not in two(dashed).parts
+    # a program that does not read it: the same key whatever the folder's name
+    e1, e2 = (prepared(fake, p, d / "out.nii") for p in (plain, dashed))
+    assert e1.key == e2.key and "text" not in e1.parts
+
+
+def test_bet_temporary_folders_hold_no_option_text(tmp_path):
+    pytest.importorskip("larmorx_testdata")
+    from larmorx_validation.parity import fsl_bet
+
+    folders = [fsl_bet.temporary_dir("lx-fsl-gen_") for _ in range(300)]
+    assert not [f for f in folders if any(t in str(f) for t in fsl_bet.BET2_HELP_TEXT)]
+    assert all(f.name.startswith("lx-fsl-gen_") for f in folders)
+    for f in folders:
+        f.rmdir()
+    with pytest.raises(ValueError):
+        fsl_bet.temporary_dir("lx-fsl-gen-")
+    with pytest.raises(RuntimeError, match="-h"):
+        fsl_bet.option_free(tmp_path / "my-home" / "x")
+    assert fsl_bet.generated_dir().name.startswith("lx-fsl-gen_")
+
+
+def test_a_path_with_a_blank_is_one_input_and_verify_replays_it(cache, fake, tmp_path_factory):
+    """``/tmp/x/with blank/in.nii`` was taken apart at its blank: the file it names was not an
+    input (its content not in the key), and ``verify`` could not make it again."""
+    from larmorx_validation.oracle_cache import rerun
+
+    d = tmp_path_factory.mktemp("lx-blank_")
+    (d / "with blank").mkdir()
+    src = d / "with blank" / "in.nii"
+    src.write_bytes(b"blank content")
+    r = run(fake, src, d / "out.nii")
+    assert r.returncode == 0
+    (e,) = entries(cache)
+    assert e["template"][0] == "{in0}" and e["parts"]["text"] == {"0": [" "]}
+    assert e["inputs"][0]["at"] == "{d0}/in.nii" and e["rules"] == core.RULES
+    assert {"name": "d0", "kind": "directory", "basename": "with blank"} in e["places"]
+    assert rerun.rerun(cache, e).status == "same"
+    # verify makes the folder with its blank again
+    with tempfile.TemporaryDirectory() as t:
+        _prep, values = rerun._layout(cache, e, Path(t))
+        assert values["d0"].endswith("/d0/with blank") and " " in values["in0"]
+    src.write_bytes(b"other content")  # the content counts now
+    assert prepared(fake, src, d / "out.nii").key != e["key"]
+    # an output named with a blank, in an existing folder: one path, its text kept
+    plain = tmp_path_factory.mktemp("lx-plain_") / "in.nii"
+    plain.write_bytes(b"plain")
+    p = prepared(fake, plain, d / "with blank" / "out.nii", text=(" ",))
+    assert p.template == ["{in0}", "{d1}/out.nii"] and p.parts["text"] == {"1": [" "]}
+    assert "text" not in prepared(fake, plain, d / "out.nii", text=(" ",)).parts
+    # an entry keyed before: skipped by verify, with its reason
+    old = dict(e, template=["{d0}/with blank/in.nii", "{d0}/out.nii"], inputs=[], rules=1)
+    old["parts"] = {k: v for k, v in e["parts"].items() if k != "text"}
+    assert "a path with a blank" in rerun.stale(old)
+
+
+#: An original that reads files named by a pattern, as Atropos reads its priors
+#: (``PriorProbabilityImages[3,prior%02d.nii.gz,0.5]``): ``priors PATTERN N OUT``.
+PRIORS = """\
+    import sys
+    pattern, n, out = sys.argv[1], int(sys.argv[2]), sys.argv[3]
+    data = b"".join(open(pattern % i, "rb").read() for i in range(1, n + 1))
+    open(out, "wb").write(data[::-1])
+"""
+
+
+def test_files_named_by_a_pattern_are_inputs_and_verify_restores_them(cache, tmp_path_factory):
+    from larmorx_validation.oracle_cache import rerun
+
+    prog = make_program(tmp_path_factory.mktemp("bin"), PRIORS, "priors")
+
+    def go(contents: list[bytes]):
+        d = tmp_path_factory.mktemp("lx-priors_")
+        for i, c in enumerate(contents, 1):
+            (d / f"prior{i:02d}.nii").write_bytes(c)
+        (d / "out").mkdir()
+        oc.begin_case(f"case-{len(entries(cache))}")
+        argv = [prog, f"{d}/prior%02d.nii", str(len(contents)), d / "out" / "o.nii"]
+        return oc.run(argv, env=env_for(), policy=ONE)
+
+    assert go([b"a", b"b", b"c"]).returncode == 0
+    (e,) = entries(cache)
+    assert [i.get("series") for i in e["parts"]["inputs"]] == [1, 2, 3]
+    assert [i["at"] for i in e["inputs"]] == [f"{{d0}}/prior{i:02d}.nii" for i in (1, 2, 3)]
+    assert rerun.rerun(cache, e).status == "same"  # the priors made again
+    assert go([b"a", b"b", b"c"]).cached
+    assert not go([b"a", b"B", b"c"]).cached  # a prior's content is in the key
+    assert key.series(Path("/nonexistent/prior%02d.nii")) == []
+    assert key.series(tmp_path_factory.mktemp("none") / "plain.nii") == []
+    old = dict(e, rules=1)
+    old["parts"] = dict(e["parts"], inputs=[{"content": "x", "suffix": ".nii"}])
+    assert "named by a pattern" in rerun.stale(old)
+    # a pattern the run writes (Atropos' posteriors) is not one it reads
+    written = dict(old, template=["{d0}/post%02d.nii"])
+    written["result"] = dict(e["result"], outputs=[{"place": "d0", "path": "post01.nii"}])
+    assert rerun.stale(written) == ""
+
+
+def test_verify_skips_what_the_rules_now_never_cache():
+    from larmorx_validation.oracle_cache import rerun
+
+    entry = {"policy": {"family": "itk"}, "parts": {"oracle": {"program": "antsRegistration"}}}
+    stage = ["-t", "Exponential[0.25,3,0.5]", "-m", "MeanSquares[f,m,1,0,Regular,0.3]"]
+    assert "ANTS-82" in rerun.never_now(entry, stage, {"ANTS_RANDOM_SEED": "42"})
+    assert rerun.never_now(entry, ["-t", "SyN[0.1]", *stage[2:]], {"ANTS_RANDOM_SEED": "1"}) == ""
+    assert rerun.never_now({**entry, "policy": {"family": "fsl"}}, stage, {}) == ""
+    superseded = next(iter(rerun.SUPERSEDED))
+    assert "out.mat" in rerun.stale({"key": superseded})
+
+
+def _nifti(path: Path, shape: tuple[int, ...]) -> str:
+    import nibabel as nib
+    import numpy as np
+
+    nib.save(nib.Nifti1Image(np.zeros(shape, "f4"), np.eye(4)), path)
+    return str(path)
+
+
+def test_ants_rules_of_the_clock_and_of_memory_never_written(tmp_path):
+    p = oc.policy
+    seed = {"ANTS_RANDOM_SEED": "42"}
+    stages = (
+        "Exponential[0.25,3,0.5]",
+        "BSplineExponential[0.5,4x4x4,0,0,3]",
+        "TimeVaryingVelocityField[0.5,2,3,0,0.5,0]",
+    )
+    for stage in stages:
+        for sampling in ("Regular", "Random"):
+            args = ["-t", stage, "-m", f"Mattes[f,m,1,16,{sampling},0.1]"]
+            assert p.ants_seed_never("antsRegistration", args, seed).startswith("ANTS-82")
+        assert p.ants_seed_never("antsRegistration", ["-t", stage, "-m", "CC[f,m,1,4]"], seed) == ""
+    tvb = ["-t", "TimeVaryingBSplineVelocityField[0.5,8,1]", "-m", "Mattes[f,m,1,16,Random,0.1]"]
+    assert p.ants_seed_never("antsRegistration", tvb, seed) == ""  # it reseeds (ANTS-82)
+    later = ["-t", "Rigid[0.1]", "-m", "Mattes[f,m,1,32,Regular,0.25]"]
+    later += ["-t", "Exponential[0.25,3,0.5]", "-m", "CC[f,m,1,4]"]
+    assert p.ants_seed_never("antsRegistration", later, seed) == ""
+    big = _nifti(tmp_path / "big.nii.gz", (3, 1, 1))
+    small = _nifti(tmp_path / "small.nii.gz", (1, 1, 1))
+    wide = _nifti(tmp_path / "wide.nii.gz", (5, 2, 1))
+    assert p.ants_memory_never("ImageMath", ["3", "o.nii", "+", big, small]).startswith("ANTS-07")
+    assert p.ants_memory_never("ImageMath", ["3", "o.nii", "+", small, big]) == ""
+    assert p.ants_memory_never("ImageMath", ["3", "o.nii", "+", big, big]) == ""
+    assert p.ants_memory_never("ImageMath", ["3", "o.nii", "MD", big, "1"]) == ""
+    assert p.ants_memory_never("MultiplyImages", ["3", big, small, "o.nii"]).startswith("ANTS-07")
+    assert p.ants_memory_never("MultiplyImages", ["3", big, "2.5", "o.nii"]) == ""
+    # a smaller second image read inside its buffer (its rows wrap) is no read past its end
+    assert not p.read_past_end((3, 1), (2, 2)) and p.read_past_end((2, 2), (4, 1))
+    thin = ["3", wide, "o.nii", "2", "2", "2"]
+    assert p.ants_memory_never("ResampleImageBySpacing", thin).startswith("ANTS-28")
+    assert p.ants_memory_never("ResampleImageBySpacing", [*thin, "0"]) == ""  # no smoothing
+    assert p.ants_never("ResampleImageBySpacing", thin, {}).startswith("ANTS-28")
+
+
+def test_the_itk_rules_apply_to_every_run_through_the_cache(cache, tmp_path_factory, workdir):
+    """Whichever suite runs an ANTs program, the cache applies ANTs' program-level rules."""
+    reg = make_program(tmp_path_factory.mktemp("bin"), FAKE, "antsRegistration")
+    _d, src, dst = workdir()
+    stage = ["-t", "Exponential[0.25,3,0.5]", "-m", "Mattes[f,m,1,16,Regular,0.1]"]
+    oc.run([reg, src, dst, *stage], env=env_for(ANTS_RANDOM_SEED="42"), policy=ONE)
+    tally = oc.end_case()
+    assert entries(cache) == [] and "ANTS-82" in next(iter(tally.fresh))
+
+
+def test_verify_runs_a_container_with_the_suites_variables():
+    """Apptainer warns about ``--env HOME=...``: ``verify`` starts the container with every
+    variable the suite set inside, not only those of the key (the 38 fMRIPrep ``bet`` runs)."""
+    from larmorx_validation.oracle_cache import rerun
+
+    new = {"launcher": {"kind": "apptainer", "env": {"HOME": "{home}", "FSLDIR": "/app"}}}
+    assert rerun._container_env(new) == {"HOME": "{home}", "FSLDIR": "/app"}
+    old = {
+        "launcher": {"kind": "apptainer"},
+        "rerun_env": {"FSLDIR": "/app", "FSLOUTPUTTYPE": "{cwd}/x"},
+        "command": "apptainer exec --cleanenv --no-home --pwd /tmp/a --bind /tmp/a:/tmp/a "
+        "--env HOME=/tmp/g/home --env FSLDIR=/app --env FSLOUTPUTTYPE=/tmp/a/x "
+        "--env PATH=/usr/bin:/bin img.sif /app/bin/bet '{in0}' out -m",
+    }
+    assert rerun._container_env(old) == {
+        "FSLDIR": "/app",
+        "FSLOUTPUTTYPE": "{cwd}/x",
+        "HOME": "{home}",
+        "PATH": "/usr/bin:/bin",
+    }
+    prep = key.Prepared({}, [("cwd", Path("/tmp/a"))], [], [])
+    env = {"HOME": "/tmp/g/home", "X": "/tmp/a/y", "P": "/tmp/ab"}
+    launcher = {"kind": "apptainer", "env": env}
+    roles = core._launcher_roles(prep, launcher)["env"]
+    assert roles == {"HOME": "{home}", "X": "{cwd}/y", "P": "/tmp/ab"}
+
+
+def test_nifti2_extensions_are_left_out_when_the_policy_says_so(tmp_path):
+    """AFNI's history note holds the run's paths: its length follows them (NIfTI-2 too)."""
+    import numpy as np
+
+    def nifti2(ext: bytes, voxels: bytes = b"VOXELS") -> bytes:
+        h = bytearray(540)
+        h[:4] = (540).to_bytes(4, "little")
+        h[4:12] = b"n+2\x00\r\n\x1a\n"
+        h[168:176] = np.array([544 + len(ext)], "<i8").tobytes()
+        return bytes(h) + b"\x01\x00\x00\x00" + ext + voxels
+
+    x, y, z = tmp_path / "x.nii", tmp_path / "y.nii", tmp_path / "z.nii"
+    x.write_bytes(nifti2(b"/tmp/short/path\x00"))
+    y.write_bytes(nifti2(b"/tmp/a-much-longer-path/than/that" + b"\x00" * 15))
+    z.write_bytes(nifti2(b"/tmp/short/path\x00", b"VOXELZ"))
+    assert not compare.same_file(x, y)[0]
+    assert compare.same_file(x, y, nifti_extensions=False)[0]
+    assert not compare.same_file(x, z, nifti_extensions=False)[0]
+
+
+def test_a_shells_report_of_a_signal_masks_its_process_id():
+    line = b"/home/u/fsl/bin/bet: line %d: %d Segmentation fault      ${FSLDIR}/bin/bet2 $IN\n"
+    a, b, c = line % (399, 1915072), line % (399, 2186484), line % (400, 2186484)
+    assert compare.mask(a) == compare.mask(b) != compare.mask(c)
+
+
+def test_verify_named_entries_disputed_ones_too(cache, fake, workdir, capsys):
+    from larmorx_validation.__main__ import main
+
+    run(fake, *workdir()[1:])
+    (e,) = entries(cache)
+    cache.write(dict(e, disputed={"date": "then", "differences": ["a false alarm"]}))
+    assert main(["oracle-cache", "verify", "--sample", "5"]) == 0
+    assert "re-running 0" in capsys.readouterr().out  # a sample leaves disputed entries out
+    listing = cache.root / "keys.txt"
+    listing.write_text(f"DIFFERS  {e['key'][:16]}  0.0 s  why\n")
+    assert main(["oracle-cache", "verify", "--keys", f"@{listing}"]) == 0
+    out = capsys.readouterr().out
+    assert "re-running 1" in out and "1 same" in out
+    assert cache.read(e["key"])["disputed"]  # resolving it stays `resolve`'s

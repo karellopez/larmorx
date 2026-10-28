@@ -21,8 +21,8 @@ valid. Nothing is cloned again: the repositories move with their history and unp
 
 ## Phase 1: done
 
-- SSH with keys, no passwords stored: new -> old as `old-laptop` (10.2.167.242, Wi-Fi; in the new
-  laptop's `~/.ssh/config`), old -> new as `karelo@10.2.165.26` (the new laptop's wired address).
+- SSH with keys, no passwords stored: new -> old as `old-laptop` (its address in the new laptop's
+  `~/.ssh/config`), old -> new by the new laptop's wired address.
 - On the new laptop the user installed (sudo): openssh-server, tmux, git, rsync, build tools,
   Apptainer 1.4.5, python3.12 from deadsnakes (`/usr/bin/python3.12`, the copied `.venv`'s base:
   3.12.16 there, 3.12.10 here), glibc upgraded to the old laptop's 2.35-0ubuntu3.15, the

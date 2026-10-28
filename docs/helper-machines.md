@@ -93,57 +93,64 @@ or built on the main machine (the newest FSL and AFNI, FLIRT, FreeSurfer, ...) i
 `rsync -a <dir>/ old-laptop:<same dir>/` before the old laptop measures it. Nothing else is
 kept there: no agent sessions, no scratch, no archive.
 
-## The Windows laptop (to set up after the move)
+## The Windows laptop
 
-What the user does once, on the Windows laptop (Windows 10 or 11), in **PowerShell run as
-administrator** (Start menu, type PowerShell, right-click, "Run as administrator"):
+Set up on 2026-10-28: Windows 11 (German), Intel i5-1335U (x64, 12 threads), 16 GiB; a domain
+account that is a local administrator; on the same local network as the main machine. Git and
+`uv` are installed there; `python` is only the Microsoft Store's stub; no Rust. In the main
+machine's `~/.ssh/config` (the real address and account are only there, never in a repository):
+
+```
+Host win-laptop
+    HostName <windows address>
+    User <user>@<domain>
+    ServerAliveInterval 30
+```
+
+Its address comes from the network's DHCP: if `ssh win-laptop` times out, `ipconfig | findstr IPv4`
+there gives the new one for `HostName`.
+
+How it was set up (to redo it on another Windows machine), on the Windows laptop in **PowerShell
+run as administrator** (Start menu, type PowerShell, right-click, "Run as administrator"):
 
 ```powershell
 # 1. The OpenSSH server (part of Windows)
 Add-WindowsCapability -Online -Name OpenSSH.Server~~~~0.0.1.0
 Start-Service sshd
 Set-Service -Name sshd -StartupType Automatic
-# 2. Its address, and the Windows user name
+# 2. The main machine's public key (`cat ~/.ssh/id_ed25519.pub` there), for an administrator account.
+#    The groups by their SIDs, not their names: a German Windows calls them "Administratoren".
+Add-Content -Force -Path "$env:ProgramData\ssh\administrators_authorized_keys" -Value 'PASTE-THE-KEY-HERE'
+icacls.exe "$env:ProgramData\ssh\administrators_authorized_keys" /inheritance:r /grant "*S-1-5-32-544:F" /grant "*S-1-5-18:F"
+# 3. The firewall: the installation's rule covers only "Private" networks, and a domain laptop
+#    is on a "DomainAuthenticated" one. Every profile, but only from the local network:
+Set-NetFirewallRule -Name OpenSSH-Server-In-TCP -Profile Any -RemoteAddress <local network, e.g. 192.168.1.0/24>
+# 4. Keys only, no passwords over SSH (a copy of the settings kept beside them):
+$f = "$env:ProgramData\ssh\sshd_config"
+Copy-Item $f "$f.before-larmorx"
+(Get-Content $f) -replace '^#PasswordAuthentication yes$', 'PasswordAuthentication no' | Set-Content $f -Encoding ascii
+Restart-Service sshd
+# The address and the user name for the main machine's ~/.ssh/config
 ipconfig | findstr IPv4
 whoami
 ```
 
-Windows keeps the keys of administrator accounts in one shared file, not in the user's folder.
-On the main machine, print its public key:
+(For an account that is not an administrator, `whoami /groups | findstr S-1-5-32-544` prints
+nothing, and the key goes into `C:\Users\<user>\.ssh\authorized_keys` instead, with no `icacls`
+step.) Then, on the main machine, `ssh -o BatchMode=yes win-laptop hostname` must print the
+Windows laptop's name without asking for a password. PowerShell over SSH: the login shell is
+`cmd.exe`, whose quoting breaks most PowerShell lines; send them encoded instead:
 
 ```bash
-cat ~/.ssh/id_ed25519.pub
+winps() { ssh -o BatchMode=yes win-laptop "powershell -NoProfile -NonInteractive -EncodedCommand $(printf '%s' "$1" | iconv -t UTF-16LE | base64 -w0)"; }
+winps 'Get-CimInstance Win32_OperatingSystem | Select-Object Caption, Version'
 ```
 
-and paste that one line into this command on the Windows laptop (the same administrator
-PowerShell; replace `PASTE-THE-KEY-HERE`, keep the quotes):
+Claude Code's auto mode refused to change the Windows laptop's SSH settings from the main machine
+(2026-10-28: step 4 above); such steps go to the user as commands to run there.
 
-```powershell
-Add-Content -Force -Path "$env:ProgramData\ssh\administrators_authorized_keys" -Value 'PASTE-THE-KEY-HERE'
-icacls.exe "$env:ProgramData\ssh\administrators_authorized_keys" /inheritance:r /grant "Administrators:F" /grant "SYSTEM:F"
-```
-
-(For a Windows account that is not an administrator, the line goes into
-`C:\Users\<user>\.ssh\authorized_keys` instead, with no `icacls` step.)
-
-Then, on the main machine (with the address and user name from step 2):
-
-```bash
-cat >> ~/.ssh/config <<'EOF'
-Host win-laptop
-    HostName <windows address>
-    User <windows user>
-    ServerAliveInterval 30
-EOF
-ssh -o BatchMode=yes win-laptop hostname
-```
-
-It must print the Windows laptop's name without asking for a password. If it times out, the
-Windows firewall or the network blocks port 22: `Get-NetFirewallRule -Name *OpenSSH*` on the
-Windows laptop must show the rule `OpenSSH-Server-In-TCP` enabled (the installation adds it).
-
-What the orchestrator then sets up over SSH (no administrator rights needed): Python 3.12 and
-`uv` for the user, git, Rust (rustup, the MSVC toolchain needs the Visual Studio Build Tools,
+What the orchestrator then sets up over SSH, when a Windows check is first needed (no
+administrator rights needed): Python 3.12 through `uv` (`uv python install 3.12`), Rust (rustup, the MSVC toolchain needs the Visual Studio Build Tools,
 which the user installs once if a local build is wanted), a clone of the repository, and a
 check that the CI's Windows wheel installs and passes `pytest tests/golden` there. Windows
 checks never replace CI's Windows jobs; they reproduce a CI failure on a real machine.

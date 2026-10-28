@@ -187,6 +187,8 @@ METRICS: dict[str, Callable[[dict], dict[str, int]]] = {
     "ants-resample-image-panel": _bit_identical(),
     "ants-resample-image-by-spacing-panel": _bit_identical(),
     "ants-registration-panel": _unmodified,
+    # The fourteen whole template registrations, run on their own (2026-10-28).
+    "ants-registration-panel-template": _unmodified,
     "ants-ai-panel": _unmodified,
     "ants-affine-initializer-panel": _unmodified,
     "ants-atropos-panel": _as_built("seg"),

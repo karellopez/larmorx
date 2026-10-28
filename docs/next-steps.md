@@ -57,7 +57,7 @@ of CLAUDE.md, the working agreements in it). Next, in order:
   initializer's speed; decision log 2026-10-27), then **the version update** (first the upstream watch, below; AFNI to its
   newest release, 26.3.x today, FSL to its newest 6.0.7.x, SciPy, NumPy and OpenBLAS checked; user 2026-10-27,
   decision log), then AFNI, FSL and I/O, part b; the fourteen whole template
-  registrations run in the background meanwhile), then BET's clean-room original (item 7; one agent at a
+  registrations: done, 2026-10-28, 14 of 14 identical with correctly rounded maths), then BET's clean-room original (item 7; one agent at a
   time, user 2026-10-26); then
   the clean-room additions mcflirt FSL-20/21 and 3dUnifize AFNI-75 (specs first); then FLIRT with
   BBR, FAST, topup (item 7).
@@ -237,9 +237,13 @@ of CLAUDE.md, the working agreements in it). Next, in order:
   in float; store them in float (the next small part; strict-xfail cases in
   `tests/parity/test_memory_peak.py`); the AFNI programs, mcflirt and `resample_series` remain to
   measure (part b: `larmorx_interp::ndimage`'s spline filter copies the volume on its last axis).
-- **The fourteen whole template registrations** of the panel (about 67 hours of CPU):
-  `python -m larmorx_validation parity ants-registration --tier panel --case
-  'register_template.*/registration$'`, boxed, in the background.
+- **The fourteen whole template registrations** of the panel: **done** (2026-10-28, on the new
+  machine at `c223e64`, 14 at once in 2.9 hours, about 40 hours of CPU in all): every one
+  identical to ANTs with CORE-MATH (exit status, every DIAGNOSTIC line, every file), none to ANTs
+  as built (glibc's `exp` and `log`, as in the small versions); record
+  [ants-registration-panel-template](validation/ants-registration-panel-template.md). Every
+  antsRegistration node of the fourteen runs is now compared at full size. Their evidence on the
+  site (the whole registrations beside the small ones) waits for the next site part.
 - **antsAffineInitializer's speed**: larmorx 277 s against ANTs' 73 s at one thread on a
   128 × 128 × 96 head, 1212 s against 332 s on the 7 T (the D13 notice of ITK-21 runs every local
   search twice; the rest is the metric's speed): the next small part.

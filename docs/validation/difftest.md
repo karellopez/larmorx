@@ -160,10 +160,14 @@ the machine swapped until the editor and every agent running in it went down. Si
   lowered to it: an allocation beyond it is refused at once on every machine, whatever its RAM
   and swap (Linux refuses one only above about RAM plus swap: the old laptop refused the 96 to
   111 GiB the permanent cases `allocation-refused` and ImageMath's `MD -1` ask for, the new
-  machine granted them, machine-move-proof.md). A case asking for more than 64 GiB of address
-  space is therefore refused by both programs alike (*agree*, as the permanent cases record),
-  not queued as heavy; `--heavy` raises the limit to twice its box (memory and swap), so its
-  cases run to their end.
+  machine granted them, machine-move-proof.md). Random testing derives the limit from the
+  case's own memory budget, keeping the measured margin of address space over resident memory
+  (threads' and OpenMP's stacks): twice the budget, never below 64 GiB. A night (3 GiB a case)
+  runs under 64 GiB, so a case asking for more address space is refused by both programs alike
+  (*agree*, as the permanent cases record); `--heavy` runs under twice its box (memory and swap:
+  144 GiB for 24 + 48 GiB, about 2.2 TiB for the largest pending prediction, 1140 GiB, on the
+  1 TB server), so the limit never refuses what a heavy case's box allows and its cases run to
+  their end. An explicit `LARMORX_ADDRESS_SPACE_LIMIT` is kept.
 
 **Heavy cases are run, not avoided** (user, 2026-10-25). Every case with a *memory* verdict is
 queued in the night's `heavy.jsonl`. `python -m larmorx_validation difftest --heavy

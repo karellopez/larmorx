@@ -86,8 +86,8 @@ ANTS-82, 2 ANTS-07, 1 ANTS-28).
 
 ## The address-space limit
 
-Every original program the harness runs (served or not: the cache's runner, `verify`, random
-testing) runs under `RLIMIT_AS` = 64 GiB (`LARMORX_ADDRESS_SPACE_LIMIT`, e.g. `96G`, `off`),
+Every original program the harness runs (through the cache's runner in every mode, `verify` and
+random testing alike) runs under `RLIMIT_AS` = 64 GiB (`LARMORX_ADDRESS_SPACE_LIMIT`, e.g. `96G`, `off`),
 inherited by everything it starts; larmorx's in-process runs of the ANTs image programs run with
 the harness's soft limit lowered to it (`larmorx_validation.address_space`). Linux refuses an
 allocation only above about RAM plus swap: the cases that expect ANTs to fail to allocate (96 to
@@ -96,8 +96,9 @@ ResampleImageBySpacing) failed as recorded on the old laptop (94 GiB) and were g
 machine (323 GiB), where the box killed them; under the limit they fail alike on every machine.
 The largest real call measured, mcflirt on the 600-volume multiband-8 BOLD series, peaks at 9.4
 GiB of address space; the harness with larmorx in-process at 19.3 GiB (ImageMath on that series,
-its comparison included) (`validation/investigations/address-space/`). `difftest --heavy` raises
-the limit to twice its box.
+its comparison included) (`validation/investigations/address-space/`). Random testing derives
+the limit from each case's memory budget: twice it, never below 64 GiB (`difftest --heavy`: twice
+its box, so a heavy case is never refused what its box allows; [difftest.md](difftest.md)).
 
 ## What is never cached, and why
 

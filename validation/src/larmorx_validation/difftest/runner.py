@@ -849,6 +849,13 @@ def night(
             )
         box.nest()
         leaves = [box.leaf(f"worker-{k}", int(memory_gib * limits.GIB)) for k in range(jobs)]
+    # the address-space limit of the originals (and of larmorx's in-process ANTs runs) follows the
+    # case's memory limit: twice it, never below the measured 64 GiB (threads' and OpenMP's
+    # stacks make the virtual size far larger than the resident one); an explicit
+    # LARMORX_ADDRESS_SPACE_LIMIT is kept
+    os.environ.setdefault(
+        address_space.ENV, str(address_space.for_memory(int((memory_gib or 0) * limits.GIB)))
+    )
     out.mkdir(parents=True, exist_ok=True)
     selected = []
     skipped = {}

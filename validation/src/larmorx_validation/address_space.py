@@ -28,8 +28,9 @@ largest virtual peak of any original program on the data panel's largest inputs 
 3.6 GiB, 3dTshift with OpenMP at 32 threads 2.6 GiB, sMRIPrep's registrations 2.6 GiB, fMRIPrep's
 ``bet`` through Apptainer 1.8 GiB); the harness with larmorx in-process peaks at 19.3 GiB
 (ImageMath on that series, the comparison of its outputs included).
-``difftest --heavy`` raises it to twice its box (memory and swap), whose cases are run to their
-end.
+Random testing derives it from each case's memory budget (:func:`for_memory`: twice it, never
+below :data:`DEFAULT`): a night's 3 GiB cases run under 64 GiB, ``difftest --heavy`` under twice
+its box (memory and swap), so a heavy case is never refused what its box allows.
 """
 
 from __future__ import annotations

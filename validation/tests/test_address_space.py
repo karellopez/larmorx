@@ -141,3 +141,21 @@ def test_the_ants_programs_larmorx_runner_uses_it(monkeypatch):
     from larmorx_validation.parity import ants_programs
 
     assert "address_space.limited()" in inspect.getsource(ants_programs._run_larmorx)
+
+
+def test_random_testing_follows_the_cases_memory_limit():
+    """A night (each case's limit, 3 GiB by default) and ``--heavy`` (its box: memory and swap,
+    up to about 60 GiB here and a 1 TB server's later) set the limit from their memory budget:
+    twice it, never below :data:`DEFAULT`; an explicit ``LARMORX_ADDRESS_SPACE_LIMIT`` is kept.
+    The fixed limit never refuses what a heavy case's box allows."""
+    import inspect
+
+    from larmorx_validation.difftest import limits, runner
+
+    for function in (runner.night, runner.run_heavy):
+        source = inspect.getsource(function)
+        assert "os.environ.setdefault(" in source and "address_space.for_memory(" in source
+    heavy = int((limits.HEAVY_GIB + limits.HEAVY_SWAP_GIB) * limits.GIB)
+    assert address_space.for_memory(heavy) == 2 * heavy > address_space.DEFAULT
+    assert address_space.for_memory(int(limits.CASE_GIB * limits.GIB)) == address_space.DEFAULT
+    assert address_space.for_memory(1140 * GIB) == 2280 * GIB  # the largest pending prediction

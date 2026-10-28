@@ -19,6 +19,7 @@ summary; exits 1 when anything differs.
 from __future__ import annotations
 
 import concurrent.futures as cf
+import contextlib
 import gzip
 import os
 import subprocess
@@ -113,10 +114,8 @@ def main() -> int:
 
     with tempfile.TemporaryDirectory(prefix="lx-cmp-") as t:
         for c in cases:
-            try:
+            with contextlib.suppress(Outcome):
                 ants_ai._resolve(c.payload, Path(t), Path(t))
-            except Outcome:
-                pass
     problems: list[str] = []
     done = 0
     with cf.ThreadPoolExecutor(int(opts["--jobs"])) as pool:

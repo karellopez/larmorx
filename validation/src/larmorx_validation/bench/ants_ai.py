@@ -55,7 +55,9 @@ class Job:
 
 
 JOBS = [
-    Job("antsAffineInitializer, the memory test's head", "antsAffineInitializer", "head", INIT_ARGS),
+    Job(
+        "antsAffineInitializer, the memory test's head", "antsAffineInitializer", "head", INIT_ARGS
+    ),
     Job("antsAI, the memory test's head", "antsAI", "head", AI_ARGS),
     Job(
         "antsAffineInitializer, the 7 T MP2RAGE and the MNI template (niworkflows' call)",

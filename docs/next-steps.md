@@ -40,7 +40,7 @@ of CLAUDE.md, the working agreements in it). Next, in order:
 - **M. The move to the new main machine** (user, 2026-10-25; CLAUDE.md "Machines"; **the copy and
   the proof done, 2026-10-28**: neither larmorx nor any original computes differently there, numpy's
   OpenBLAS kernel aside, now pinned for the validation: [machine-move-proof.md](findings/machine-move-proof.md);
-  the old laptop's clean-up (phase 4) next; the steps, the user's and the orchestrator's:
+  the old laptop cleaned to a helper the same day (phase 4, 204 GB freed); the steps, the user's and the orchestrator's:
   [machine-move.md](machine-move.md), scripts in `scripts/orchestration/move/`), one bounded
   part: the whole workspace copied over SSH to the new laptop (Ubuntu 22.04, 32 threads, 124 GiB)
   with its repositories as they are (history, worktrees, unpushed commits), the oracle builds and

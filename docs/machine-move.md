@@ -133,6 +133,14 @@ Only after phase 3's proof has passed, and only what the user approved. The new 
 the deletions as a script with this exact list, runs it first as a dry run (it prints every path
 and size), then for real, and records what it freed.
 
+**Done 2026-10-28** (`scripts/orchestration/move/phase4-clean.sh`; its log on the old laptop,
+`oracles/logs/phase4-clean.log`): the dry run listed exactly the paths below (204.4 GB) and its
+checks passed (every worktree clean and merged into main, `band.json` in place); then deleted, and
+the worktrees' entries pruned (their 48 branches kept). The old laptop's free space went from
+284 GB to 488 GB. Before it, the sessions' scratch's text files (notes, scripts, logs, the agents'
+records, under 1 MB: 866 MB) were copied to the new laptop's
+`archive/2026-10-28-old-laptop-session-scratch/`, with the filter of the archive's documents.
+
 **Deleted from the old laptop** (about 206 GB; **approved by the user on 2026-10-27**, with the two
 choices below):
 

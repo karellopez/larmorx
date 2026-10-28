@@ -50,7 +50,7 @@ Golden tests cover every tool on all six platforms (`docs/validation/golden.md`)
 - **FSL:** `crates-nc/` (`larmorx-nc`, FSL Licence) with its shared core `larmorx-nc-core`; the mcflirt and BET replicas.
 **Next:** the move to the new main machine is done (2026-10-28: the copy, the build and the proof
 that results do not depend on the machine, [docs/findings/machine-move-proof.md](docs/findings/machine-move-proof.md));
-the old laptop's clean-up (phase 4 of [docs/machine-move.md](docs/machine-move.md)) follows. Then, one
+the old laptop cleaned to a helper (phase 4 of [docs/machine-move.md](docs/machine-move.md)). Then, one
 agent at a time (`docs/next-steps.md`): the panel's fourteen template registrations and
 antsRegistration's standard record re-made, the 25 heavy random-testing cases, the small part for
 the tests that depend on the machine, a small part for antsAI and antsAffineInitializer, the

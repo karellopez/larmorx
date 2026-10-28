@@ -92,7 +92,10 @@ that line and the timings, to one made without it. Measured on a busy machine (o
 beside it; load average 8 to 31): the smoke tier's records took 2021 s without the cache and
 694 s warm, `pytest tests/parity` 94 minutes and 27, `ants-registration`'s standard record 2.0
 hours and 49 minutes (509 of its 657 original runs from the cache); details and the proof in
-[oracle-cache.md](oracle-cache.md).
+[oracle-cache.md](oracle-cache.md). Since 2026-10-28 the key keeps the text a program reads in a
+path, files named by a pattern and paths with blanks; the cache applies ANTs' clock and memory
+rules to every run; and the originals run under a 64 GiB address-space limit
+([oracle-cache.md](oracle-cache.md)).
 
 **The ANTs oracle** is ITK 5.4.5 and ANTs 2.6.5 built from the pinned tags by
 `scripts/build_ants_oracle.sh` into `<workspace>/oracles/ants-2.6.5`. The records compare

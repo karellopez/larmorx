@@ -15,6 +15,7 @@ from __future__ import annotations
 import contextlib
 import gzip
 import os
+import re
 import shutil
 import signal
 import subprocess
@@ -34,13 +35,23 @@ from larmorx_validation.oracle_cache.key import (
     temp_root,
     under,
 )
-from larmorx_validation.oracle_cache.policy import CONFIRMATIONS, Policy, decide
+from larmorx_validation.oracle_cache.policy import (
+    CONFIRMATIONS,
+    Policy,
+    ants_never,
+    decide,
+    path_text,
+)
 from larmorx_validation.oracle_cache.store import Store, now
 
 ENV_MODE = "LARMORX_ORACLE_CACHE_MODE"
 MODES = ("use", "refresh", "off")
 #: What a replayed stream holds in place of a path: ``\0LX:<name>\0``.
 _OPEN, _CLOSE = b"\x00LX:", b"\x00"
+#: The rules an entry is stored by (``rules`` in the entry, not in its key): 2 since
+#: 2026-10-28 (a path's text, a path with a blank, files named by a pattern; machine-move-
+#: proof.md). ``verify`` knows an older entry the corrections re-keyed (``rerun.stale``).
+RULES = 2
 
 
 def mode() -> str:
@@ -177,6 +188,12 @@ class Completed:
 def _execute(
     argv: Sequence[str], env: dict[str, str], cwd: Path | None, timeout: float | None
 ) -> Completed:
+    """Runs ``argv``: every original program the harness runs, served or not (the cache's
+    modes, ``verify``, random testing), runs here, under the fixed address-space limit
+    (:mod:`larmorx_validation.address_space`: an impossible allocation is refused alike on every
+    machine)."""
+    from larmorx_validation import address_space
+
     start = time.perf_counter()
     try:
         p = subprocess.run(
@@ -186,6 +203,7 @@ def _execute(
             cwd=None if cwd is None else str(cwd),
             timeout=timeout,
             check=False,
+            preexec_fn=address_space.child_setup(),
         )
         code, out, err = p.returncode, p.stdout, p.stderr
     except subprocess.TimeoutExpired as e:
@@ -470,7 +488,7 @@ def _new_entry(
         "rerun_env": prep.rerun_env,
         "template": prep.template,
         "watch": [[w, r] for w, r in prep.watch_roles()],
-        "launcher": launcher,
+        "launcher": _launcher_roles(prep, launcher),
         "command": provenance.display(display),
         "runner": runner,
         "case": _case.name,
@@ -482,11 +500,29 @@ def _new_entry(
         },
         "required": required,
         "confirmations": 1,
+        "rules": RULES,
         "seconds": round(done.seconds, 3),
         "date": now(),
         "larmorx_commit": provenance.commit(),
         "history": [],
     }
+
+
+def _launcher_roles(prep: Prepared, launcher: dict) -> dict:
+    """The launcher as ``verify`` starts it again: a container's variables (``env``) with this
+    run's places written by their roles, ``HOME`` as ``{home}`` (``verify`` makes an empty one)."""
+    if "env" not in launcher:
+        return launcher
+    places = sorted(prep.places, key=lambda np: -len(str(np[1])))
+    env = {}
+    for name, value in launcher["env"].items():
+        if name == "HOME":
+            env[name] = "{home}"
+            continue
+        for n, p in places:
+            value = re.sub(re.escape(str(p)) + r"(?=/|:|$)", "{" + n + "}", value)
+        env[name] = value
+    return dict(launcher, env=env)
 
 
 def _store_inputs(store: Store, prep: Prepared) -> None:
@@ -629,6 +665,9 @@ def run(
     if not program.is_absolute():
         found = shutil.which(argv[0], path=env.get("PATH"))
         program = Path(found) if found else program
+    if policy.family == "itk":
+        # ANTs' program-level rules, whichever suite runs it: the clock, memory never written
+        policy = policy.but_never(ants_never(program.name, argv[1:], env))
 
     def oracle() -> dict:
         return program_identity(program, env)
@@ -686,7 +725,9 @@ def run_apptainer(
         policy,
         timeout,
         runner,
-        {"kind": "apptainer", "image": str(image), "program": program},
+        # every variable set inside (not only those in the key): verify runs the container with
+        # the same --env options (the suite's HOME=... makes Apptainer warn, machine-move-proof.md)
+        {"kind": "apptainer", "image": str(image), "program": program, "env": dict(inner_env)},
         lambda: _execute(command, env, cwd, timeout),
         inputs,
     )
@@ -726,6 +767,7 @@ def _run(
             threads_known=policy.threads is not None,
             family=policy.family,
             inputs=inputs,
+            text=path_text(program, args),
         )
     except Uncacheable as e:
         _fresh(f"not keyable: {e}")

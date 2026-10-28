@@ -265,8 +265,12 @@ def _run_larmorx(
 ) -> tuple[int, str, str]:
     """Run ``larmorx ants <program>`` in-process; ``mode`` is D13's
     ``LARMORX_UPSTREAM_DEFECTS``: ``reproduce`` for the comparison with ANTs. ``threads``:
-    :data:`THREADS` unless given (read when called, so a caller may lower it)."""
+    :data:`THREADS` unless given (read when called, so a caller may lower it). It runs under the
+    address-space limit ANTs runs under (:mod:`larmorx_validation.address_space`), so an output
+    grid that cannot be allocated is refused alike on every machine (``difftest/allocation-
+    refused``: larmorx reproducing ANTs attempts the allocation)."""
     from larmorx.cli import run
+    from larmorx_validation import address_space
 
     threads = THREADS if threads is None else threads
     out, err = io.StringIO(), io.StringIO()
@@ -274,6 +278,7 @@ def _run_larmorx(
     os.environ["ITK_GLOBAL_DEFAULT_NUMBER_OF_THREADS"] = str(threads)
     try:
         with (
+            address_space.limited(),
             defects.mode(mode),
             contextlib.redirect_stdout(out),
             contextlib.redirect_stderr(err),

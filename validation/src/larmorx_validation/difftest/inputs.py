@@ -36,7 +36,10 @@ _REGISTERED: dict[str, dict] = {}
 
 @functools.cache
 def _dir() -> Path:
-    return Path(tempfile.mkdtemp(prefix="lx-difftest-inputs-"))
+    # The prefix ends in "_": mkdtemp's random part (letters, digits, "_") then never follows a
+    # dash, so the inputs' paths hold no option-like text such as "-h" (bet2 reads the text of
+    # its one argument: parity.fsl_bet.BET2_HELP_TEXT; machine-move-proof.md).
+    return Path(tempfile.mkdtemp(prefix="lx-difftest-inputs_"))
 
 
 def register(inputs: dict[str, dict]) -> str:

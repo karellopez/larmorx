@@ -1562,6 +1562,19 @@ small part, before part (b).
   first release on PyPI"). By design users install nothing else: numpy is the only dependency, no
   external programs or C/C++ libraries; Python 3.12 or newer; Linux with glibc 2.28 or newer.
 
+## 2026-10-28: The originals run under a fixed address-space limit (orchestrator, by measurement)
+Linux refuses an allocation only above about RAM plus swap, so the cases that expect ANTs to fail
+to allocate (96 to 111 GiB) passed on the old laptop (94 GiB) and filled the new machine (323 GiB)
+until its box killed them. Every original program the harness runs, and larmorx's in-process runs
+of the ANTs image programs, now run under `RLIMIT_AS` = 64 GiB: 6.8 times the largest real call
+measured (mcflirt on the 600-volume BOLD series, 9.4 GiB of address space), 3.3 times the
+harness's own largest peak (19.3 GiB), 32 GiB below the smallest refusal. Random testing derives
+it from each case's memory budget (twice it, never below 64 GiB): a heavy case runs under twice
+its box and is never refused what the box allows. Measured first (rule D):
+`validation/investigations/address-space/`. A night's case refused under the limit must still be
+queued as a heavy case, not counted as an agreement (the user's rule of 2026-10-25, heavy cases
+are run, not avoided): a follow-up in next-steps.
+
 ## Open decisions (PLAN.md §16)
 
 | # | Decision | Recommended default (used until decided) | Status |

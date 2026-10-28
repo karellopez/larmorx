@@ -330,20 +330,30 @@ of CLAUDE.md, the working agreements in it). Next, in order:
   machine too, 17 long ones identical; so the originals compute alike on these two CPUs. The
   narrowing must follow what each program's dispatchers read: numpy's OpenBLAS picks other
   kernels on AVX-512 (inverses differ), glibc's `libm` does not.
-- **Tests that depend on the machine, from the move's proof** (2026-10-28,
-  [machine-move-proof.md](findings/machine-move-proof.md)); one small part, before the next merge
-  needs `pytest tests/parity` on the new machine:
-  - `difftest/allocation-refused` (ResampleImage, ResampleImageBySpacing) and ImageMath's `MD`
-    with radius -1: the originals run under a fixed address-space limit (`RLIMIT_AS`), so they
-    fail alike whatever the machine's memory (on the new one ANTs gets 119 GB and its box kills
-    it). Until then the smoke tier there runs with `-k "not allocation-refused"`.
-  - `bet2/one-argument` fails at random (a temporary folder containing `-h`): the prefix
-    `lx-fsl-gen_`, and the cache key keeps a path's text where the program reads it.
-  - The oracle cache's replay gaps: Atropos priors by a `%02d` pattern, a blank in a path,
-    mcflirt's `out.mat+`, Apptainer's `HOME` warning, AFNI's history note, a crash message's
-    process ID; and the random-testing entries that vary on their own machine
-    (antsRegistration with `Random` sampling; three small ImageMath, MultiplyImages and
-    ResampleImageBySpacing runs) marked never-cached.
+- **Tests that depend on the machine, from the move's proof**: **done 2026-10-28**
+  ([machine-move-proof.md](findings/machine-move-proof.md), "Fixed"; part
+  `docs/parts/2026-10-28-machine-tests/`). The originals run under a
+  fixed address-space limit (64 GiB, `LARMORX_ADDRESS_SPACE_LIMIT`; the largest real call 9.4 GiB,
+  the smallest refusal the records expect 96 GiB; random testing derives it from each case's
+  memory budget, so `--heavy` runs under twice its box), so `allocation-refused` and `MD -1` fail
+  alike on every machine; BET's temporary folders hold no option text and the cache key keeps
+  the text a program reads in a path (`bet2/one-argument`); the replay gaps are reproduced or
+  never cached (`oracle-cache verify` on the 89: 45 identical, 44 skipped with their reason). The
+  smoke tier passes here in full, twice; the 45 entries that verify identically resolved at the
+  merge.
+- **Random testing: a run refused by the address-space limit is not an agreement** (found at the
+  merge of 2026-10-28): since the limit, a night's case whose original asks for more than 64 GiB
+  at once is refused by both programs and counted *agree*, where before it was killed by its
+  memory limit and queued as a heavy case. The user's rule (2026-10-25: heavy cases are run, not
+  avoided) wants it queued: a refusal under the harness's own limit becomes a *memory* verdict
+  (queued, with its prediction), except in the permanent cases that expect the refusal
+  (`allocation-refused`, `MD -1`). No night runs before this fix (the nights are not scheduled
+  yet). Small; with the next random-testing or harness part.
+- **Random testing's heavy comparison holds both outputs** (found 2026-10-28): the heavy case
+  `ants-resample-image:20261025:556` (6·10⁹ output voxels) was stopped at the 60 GiB box here
+  because the process that runs larmorx and compares also holds ANTs' output (about 41 GiB each);
+  compare in blocks (memory-mapped) so the comparison adds little to larmorx's own peak. Until
+  then that case runs again in a box of about 110 GiB when the machine is otherwise free.
 - **3dAutomask's clean-room original, the panel's cases** (found 2026-10-28): five fMRIPrep calls
   of the panel runs (added after its record) fail on the obliquity message's number (AFNI
   `20.646870`, the original `20.646889`; the masks agree). To the clean-room fixes part, as a

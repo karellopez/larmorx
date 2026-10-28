@@ -153,7 +153,21 @@ the machine swapped until the editor and every agent running in it went down. Si
   `selftest-memory` and the test `test_a_case_over_the_memory_limit_is_recorded_and_the_night_goes_on`
   prove it on a real boxed night);
 - **time**: each run has its alarm (the tool's timeout) and each case its deadline, past which
-  its worker's process group is killed (*timeout*).
+  its worker's process group is killed (*timeout*);
+- **address space** (2026-10-28): every original program runs under `RLIMIT_AS` = 64 GiB
+  (`larmorx_validation.address_space`, `LARMORX_ADDRESS_SPACE_LIMIT`), inherited by what it
+  starts, and larmorx's in-process runs of the ANTs image programs with the worker's soft limit
+  lowered to it: an allocation beyond it is refused at once on every machine, whatever its RAM
+  and swap (Linux refuses one only above about RAM plus swap: the old laptop refused the 96 to
+  111 GiB the permanent cases `allocation-refused` and ImageMath's `MD -1` ask for, the new
+  machine granted them, machine-move-proof.md). Random testing derives the limit from the
+  case's own memory budget, keeping the measured margin of address space over resident memory
+  (threads' and OpenMP's stacks): twice the budget, never below 64 GiB. A night (3 GiB a case)
+  runs under 64 GiB, so a case asking for more address space is refused by both programs alike
+  (*agree*, as the permanent cases record); `--heavy` runs under twice its box (memory and swap:
+  144 GiB for 24 + 48 GiB, about 2.2 TiB for the largest pending prediction, 1140 GiB, on the
+  1 TB server), so the limit never refuses what a heavy case's box allows and its cases run to
+  their end. An explicit `LARMORX_ADDRESS_SPACE_LIMIT` is kept.
 
 **Heavy cases are run, not avoided** (user, 2026-10-25). Every case with a *memory* verdict is
 queued in the night's `heavy.jsonl`. `python -m larmorx_validation difftest --heavy
@@ -224,6 +238,15 @@ Random inputs must not make the cache grow without bound, and every finding must
   runs are stored (one entry per run, a few kilobytes of tiny inputs and outputs), so its replay
   and the permanent case built from it are served from the cache;
 - so the cache grows only by the findings, a few per night at most; nothing is ever deleted.
+- a run whose original varies on its own machine is never cached, whatever the case's texts say:
+  the cache applies ANTs' program-level rules to every ITK run (`policy.ants_never`: the
+  velocity-field stages' clock-seeded sampling, ANTS-82; a smaller second image read past its
+  end, ANTS-07; a thin axis smoothed, ANTS-28). The trial runs of 2026-10-25 had stored 22 such
+  runs (18 of them differed when the move's verify ran them again, machine-move-proof.md); they
+  are never served again.
+- the inputs' folder is `lx-difftest-inputs_<random>`: its prefix ends in `_`, so its random
+  part never makes option-like text (`-h`) that a program reading its argument's text sees
+  (bet2 with one argument; `policy.path_text`).
 
 ## Before the first night: three trial runs
 

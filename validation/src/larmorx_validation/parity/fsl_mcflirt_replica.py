@@ -158,6 +158,10 @@ def run_oracle(args: list[str], *, cwd: Path, settings: dict[str, str | None]) -
         outputs=[cwd],
         policy=oracle_cache.Policy(threads=1, family="fsl"),
         runner="fsl-mcflirt-replica",
+        # Every file already in the working directory counts by its content, named or not:
+        # mcflirt looks for some it is not given (a file `out.mat` sends the matrices to
+        # `out.mat+`, edge/mat-exists), and the cache's replay restores them (2026-10-28).
+        inputs=[p for p in sorted(cwd.iterdir()) if p.is_file()],
     )
     return Completed(p.returncode, p.stdout, p.stderr)
 

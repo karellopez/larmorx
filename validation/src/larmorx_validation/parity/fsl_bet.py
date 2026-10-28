@@ -138,9 +138,38 @@ def fmriprep_image() -> Path | None:
     return image if image is not None and image.is_file() and shutil.which("apptainer") else None
 
 
+#: What bet2 reads in the text of its one argument: either one anywhere in it prints the usage
+#: and exits 0 (``bet2.cpp:811-818``; docs/findings/fsl-bet.md). The suite's temporary paths
+#: must hold neither (:func:`temporary_dir`).
+BET2_HELP_TEXT = ("-h", "--help")
+
+
+def option_free(path: Path) -> Path:
+    """``path`` itself, after checking that its text holds none of :data:`BET2_HELP_TEXT`: the
+    suite's temporary folders end their prefix in ``_``, so mkdtemp's random part (letters,
+    digits and ``_``) never follows a dash; a temporary root (``TMPDIR``) holding ``-h`` would
+    make every one-argument case print bet2's usage, and is refused with a clear error."""
+    text = str(path)
+    if found := [t for t in BET2_HELP_TEXT if t in text]:
+        raise RuntimeError(
+            f"the temporary folder {text} holds {found[0]!r}, which bet2 reads as a request for "
+            "its usage (docs/findings/fsl-bet.md): set TMPDIR to a folder without it"
+        )
+    return path
+
+
+def temporary_dir(prefix: str) -> Path:
+    """A new temporary folder named ``<prefix><random>``, its prefix ending in ``_`` (until
+    2026-10-28 ``lx-fsl-gen-``: a random part starting with ``h`` made ``-h``, and
+    ``bet2/one-argument`` printed bet2's usage at random, machine-move-proof.md)."""
+    if not prefix.endswith("_"):
+        raise ValueError(f"a temporary prefix that ends in '_', not {prefix!r}")
+    return option_free(Path(tempfile.mkdtemp(prefix=prefix)))
+
+
 @functools.cache
 def generated_dir() -> Path:
-    return Path(tempfile.mkdtemp(prefix="lx-fsl-gen-"))
+    return temporary_dir("lx-fsl-gen_")
 
 
 @functools.cache
@@ -1100,8 +1129,8 @@ def run_case(case: Case, checks: CheckList) -> None:
     args = _arguments(s, paths)
     env = environment(s.output_type, s.env)
     inputs = tuple(name for name, _ in s.files)
-    with tempfile.TemporaryDirectory(prefix="lx-fsl-") as tmp:
-        root = Path(tmp)
+    with tempfile.TemporaryDirectory(prefix="lx-fsl_") as tmp:
+        root = option_free(Path(tmp))
         f_dir, r_dir = root / "fsl", root / "larmorx"
         _prepare(f_dir, s)
         _prepare(r_dir, s)

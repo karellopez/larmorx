@@ -286,6 +286,9 @@ class Input:
     #: the argument as written, by its place, when it named the file by a path that is not
     #: normal (``{d0}/sub/../x.nii``: the program prints it so)
     written: str | None = None
+    #: its number, when an argument names it by a pattern (``prior%02d.nii.gz``: Atropos'
+    #: priors), not by its path
+    series: int | None = None
 
 
 @dataclass
@@ -334,10 +337,36 @@ class Prepared:
         return hashlib.sha256(blob.encode()).hexdigest()
 
 
+#: A printf pattern of a number in a file name (``prior%02d.nii.gz``, ``post%d.nii``): the
+#: program reads the files it names (Atropos' ``PriorProbabilityImages[3,prior%02d.nii.gz,w]``).
+_PRINTF = re.compile(r"%(0?)(\d*)d")
+#: The most files of one pattern the key counts (Atropos' classes: a few).
+_SERIES_MAX = 1000
+
+
+def series(pattern: Path) -> list[tuple[int, Path]]:
+    """The existing files a printf pattern names (``prior%02d.nii.gz``: ``prior01.nii.gz``,
+    ...), by their numbers, in order; ``[]`` when the name holds no pattern (or several)."""
+    name = pattern.name
+    found = _PRINTF.findall(name)
+    if len(found) != 1 or "%" in _PRINTF.sub("", name) or not pattern.parent.is_dir():
+        return []
+    m = _PRINTF.search(name)
+    assert m is not None
+    regex = re.compile(re.escape(name[: m.start()]) + r" *(\d+)" + re.escape(name[m.end() :]))
+    out = []
+    with os.scandir(pattern.parent) as it:
+        for entry in it:
+            hit = regex.fullmatch(entry.name)
+            if hit and entry.is_file() and name % int(hit.group(1)) == entry.name:
+                out.append((int(hit.group(1)), Path(entry.path)))
+    return sorted(out)[:_SERIES_MAX]
+
+
 class _Mapper:
     """Assigns placeholders to the paths of one run."""
 
-    def __init__(self, cwd: Path | None, outputs: Sequence[Path]):
+    def __init__(self, cwd: Path | None, outputs: Sequence[Path], text: Sequence[str] = ()):
         self.places: list[tuple[str, Path]] = []
         self.inputs: list[Input] = []
         self._input_index: dict[Path, int] = {}
@@ -347,6 +376,10 @@ class _Mapper:
         self.home: Path | None = None
         self.cwd = cwd
         self.tmp = temp_root()
+        #: the text the program reads in a path (``policy.path_text``) ...
+        self.text = tuple(text)
+        #: ... and where it was found in a path the key replaces: argument -> texts
+        self.found: dict[int, set[str]] = {}
         if cwd is not None:
             self._place("cwd", cwd, recursive=True)
         else:
@@ -454,8 +487,15 @@ class _Mapper:
             self.dirs.add("{" + best[0] + "}/" + d.relative_to(best[1]).as_posix())
             d = d.parent
 
-    def token(self, text: str) -> str:
-        """One path-like piece of an argument, with its path replaced."""
+    def token(self, text: str, index: int = 0) -> str:
+        """One path-like piece of argument ``index``, with its path replaced; the text the
+        program reads in it (:attr:`text`) is noted where the key replaces it."""
+        out = self._token(text)
+        if out != text and (seen := {t for t in self.text if t in text}):
+            self.found.setdefault(index, set()).update(seen)
+        return out
+
+    def _token(self, text: str) -> str:
         if not text:
             return text
         relative = not text.startswith("/")
@@ -467,6 +507,12 @@ class _Mapper:
                 return text  # a relative name, no working directory: kept as written
         else:
             return text
+        if not path.is_file():
+            # files named by a pattern (Atropos' prior%02d.nii.gz) are inputs, by their content
+            # and number; the pattern stays in the arguments like any path the run may write
+            for n, f in series(Path(os.path.abspath(path))):
+                k = int(self._input(f)[2:])
+                self.inputs[k] = replace(self.inputs[k], series=n)
         if path.is_file():
             name = self._input(path)
             i = int(name[2:])
@@ -506,9 +552,43 @@ class _Mapper:
                 best = (name, p)
         return None if best is None else "{" + best[0] + "}" + text[len(str(best[1])) :]
 
-    def argument(self, arg: str) -> str:
+    def argument(self, arg: str, index: int = 0) -> str:
+        """Argument ``index`` with its paths replaced. A path with blanks in it (``/tmp/x/with
+        blank/in.nii``) is one path where the joined pieces name an existing file or directory,
+        or a file in an existing directory (until 2026-10-28 its pieces were taken apart, and
+        the file it named was not an input: machine-move-proof.md)."""
         pieces = _SPLIT.split(arg)
-        return "".join(p if i % 2 else self.token(p) for i, p in enumerate(pieces))
+        out, i = [], 0
+        while i < len(pieces):
+            if i % 2:
+                out.append(pieces[i])
+                i += 1
+                continue
+            j = self._blanks(pieces, i)
+            out.append(self.token("".join(pieces[i : j + 1]), index))
+            i = j + 1
+        return "".join(out)
+
+    def _blanks(self, pieces: list[str], i: int) -> int:
+        """The last piece of the longest path starting at piece ``i`` whose pieces are joined by
+        blanks only (``i`` itself when there is none)."""
+        first = pieces[i]
+        if not (first.startswith("/") or os.sep in first):
+            return i
+
+        def at(text: str) -> Path:
+            return Path(text) if text.startswith("/") else (self.cwd or Path.cwd()) / text
+
+        # a piece that names something by itself is never joined to a path the run may create
+        alone = at(first).exists()
+        best = i
+        k = i + 2
+        while k < len(pieces) and pieces[k - 1].isspace() and pieces[k]:
+            path = at("".join(pieces[i : k + 1]))
+            if path.exists() or (not alone and path.parent.is_dir()):
+                best = k
+            k += 2
+        return best
 
 
 def _existing_ancestor(path: Path) -> Path | None:
@@ -564,13 +644,17 @@ def prepare(
     family: str | None = None,
     extra: dict | None = None,
     inputs: Sequence[Path] = (),
+    text: Sequence[str] = (),
 ) -> Prepared:
     """The key's parts of running the oracle ``oracle`` (``program_identity`` or
     ``image_identity``) with ``args`` in ``env``; ``family`` names the variables that matter
     (:data:`ENV_FAMILIES`; ``None``: every family's); ``inputs`` the files the program reads
-    without the arguments naming them (after the named ones, in the order given)."""
-    mapper = _Mapper(Path(os.path.abspath(cwd)) if cwd is not None else None, outputs)
-    template = [mapper.argument(str(a)) for a in args]
+    without the arguments naming them (after the named ones, in the order given); ``text`` what
+    the program may read in a path's text (``policy.path_text``): where a path the key replaces
+    by its role holds it, the key keeps it (``parts["text"]``, only then: every other run keeps
+    its key)."""
+    mapper = _Mapper(Path(os.path.abspath(cwd)) if cwd is not None else None, outputs, text)
+    template = [mapper.argument(str(a), i) for i, a in enumerate(args)]
     for path in inputs:
         if not Path(path).is_file():
             raise Uncacheable(f"an input that is not a file: {path}")
@@ -599,6 +683,8 @@ def prepare(
                     if i.written
                     else {}
                 ),
+                # a file named by a pattern, by its number (prior%02d.nii.gz: 1, 2, ...)
+                **({"series": i.series} if i.series is not None else {}),
             }
             for i in mapper.inputs
         ],
@@ -607,6 +693,8 @@ def prepare(
         "directories": sorted(mapper.dirs),
         "machine": machine() | ({} if threads_known else {"cpus": _cpus()}),
     }
+    if mapper.found:
+        parts["text"] = {str(i): sorted(t) for i, t in sorted(mapper.found.items())}
     if extra:
         parts["extra"] = extra
     return Prepared(
@@ -643,6 +731,7 @@ __all__ = [
     "machine",
     "prepare",
     "program_identity",
+    "series",
     "suffix",
     "temp_root",
 ]

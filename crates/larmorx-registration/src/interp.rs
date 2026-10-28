@@ -74,58 +74,92 @@ fn optimized<R: Real, const D: usize>(
     c: &[R; D],
     v: impl Fn(usize) -> f64,
 ) -> f64 {
-    let mut base = [0usize; 3];
-    let mut dist = [0.0f64; 3];
-    let mut step = [0usize; 3];
-    let mut stride = 1usize;
-    for k in 0..D {
-        let start = space.start[k];
-        let b = c[k].itk_floor().max(start);
-        dist[k] = (c[k] - R::from_i64(b)).to_f64();
-        let rel = (b - start) as usize;
-        base[k] = rel;
-        // The upper neighbour along the axis, or none.
-        step[k] = if dist[k] > 0.0 && rel + 1 < space.size[k] {
-            stride
-        } else {
-            0
+    Cell::new(space, c).eval(v)
+}
+
+/// The cell of a continuous index that `EvaluateOptimized` (1 to 3 dimensions) interpolates
+/// in: its first voxel's offset, the step to the upper neighbour along each axis (0 when the
+/// axis is skipped) and each axis's distance. One cell serves every image on the same grid
+/// (a value and its gradient's components), each [`Cell::eval`] the interpolation
+/// [`at_cindex_with`] computes, operation for operation.
+#[derive(Clone, Copy, Debug)]
+pub struct Cell {
+    origin: usize,
+    step: [usize; 3],
+    dist: [f64; 3],
+    dims: usize,
+}
+
+impl Cell {
+    /// The cell of `c` (1 to 3 dimensions).
+    #[inline]
+    pub fn new<R: Real, const D: usize>(space: &crate::Space<D>, c: &[R; D]) -> Cell {
+        debug_assert!((1..=3).contains(&D));
+        let mut base = [0usize; 3];
+        let mut dist = [0.0f64; 3];
+        let mut step = [0usize; 3];
+        let mut stride = 1usize;
+        for k in 0..D {
+            let start = space.start[k];
+            let b = c[k].itk_floor().max(start);
+            dist[k] = (c[k] - R::from_i64(b)).to_f64();
+            let rel = (b - start) as usize;
+            base[k] = rel;
+            // The upper neighbour along the axis, or none.
+            step[k] = if dist[k] > 0.0 && rel + 1 < space.size[k] {
+                stride
+            } else {
+                0
+            };
+            stride *= space.size[k];
+        }
+        let mut origin = 0usize;
+        let mut s = 1usize;
+        for k in 0..D {
+            origin += base[k] * s;
+            s *= space.size[k];
+        }
+        Cell {
+            origin,
+            step,
+            dist,
+            dims: D,
+        }
+    }
+
+    /// The interpolated value of the image whose voxel at offset `o` is `v(o)`.
+    #[inline]
+    pub fn eval(&self, v: impl Fn(usize) -> f64) -> f64 {
+        let (step, dist, origin) = (&self.step, &self.dist, self.origin);
+        let lerp = |a: f64, b: f64, t: f64| a + (b - a) * t;
+        let along_x = |o: usize| {
+            let a = v(o);
+            if step[0] != 0 {
+                lerp(a, v(o + step[0]), dist[0])
+            } else {
+                a
+            }
         };
-        stride *= space.size[k];
-    }
-    let mut origin = 0usize;
-    let mut s = 1usize;
-    for k in 0..D {
-        origin += base[k] * s;
-        s *= space.size[k];
-    }
-    let lerp = |a: f64, b: f64, t: f64| a + (b - a) * t;
-    let along_x = |o: usize| {
-        let a = v(o);
-        if step[0] != 0 {
-            lerp(a, v(o + step[0]), dist[0])
+        if self.dims == 1 {
+            return along_x(origin);
+        }
+        let along_y = |o: usize| {
+            let a = along_x(o);
+            if step[1] != 0 {
+                lerp(a, along_x(o + step[1]), dist[1])
+            } else {
+                a
+            }
+        };
+        if self.dims == 2 {
+            return along_y(origin);
+        }
+        let a = along_y(origin);
+        if step[2] != 0 {
+            lerp(a, along_y(origin + step[2]), dist[2])
         } else {
             a
         }
-    };
-    if D == 1 {
-        return along_x(origin);
-    }
-    let along_y = |o: usize| {
-        let a = along_x(o);
-        if step[1] != 0 {
-            lerp(a, along_x(o + step[1]), dist[1])
-        } else {
-            a
-        }
-    };
-    if D == 2 {
-        return along_y(origin);
-    }
-    let a = along_y(origin);
-    if step[2] != 0 {
-        lerp(a, along_y(origin + step[2]), dist[2])
-    } else {
-        a
     }
 }
 

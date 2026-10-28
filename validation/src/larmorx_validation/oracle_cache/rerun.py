@@ -161,8 +161,8 @@ def stale(entry: dict) -> str:
         )
     if any(_SPLIT_BLANK.search(a) for a in args) and "text" not in parts:
         return (
-            "keyed before a path with a blank was one path (2026-10-28): the file it names is "
-            "not among the entry's inputs"
+            "keyed before a path with a blank was one path, its blank in the key (2026-10-28): "
+            "an input so named is not among the entry's inputs"
         )
     return ""
 

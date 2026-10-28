@@ -775,14 +775,9 @@ impl<R: Real> Mattes<R> {
         let hi: [R; D] = std::array::from_fn(|j| {
             R::from_f64((space.start[j] + space.size[j] as i64 - 1) as f64 + 0.5)
         });
-        // The points `first..first + out.len()` (at most BATCH): their bins and weights in
-        // `out`, their derivative terms in `inner` (`width` each); `w`: the batch's room.
-        let batch = |first: usize,
-                     out: &mut [Option<PointBins<R>>],
-                     inner: &mut [R],
-                     w: &mut Scratch<R, D>| {
-            let len = out.len();
-            // The cells: the transform, the moving mask, the continuous index in the buffer.
+        // The cells of the points `first..first + len` (at most BATCH) and their corners'
+        // values, in `w`: the transform, the moving mask, the continuous index in the buffer.
+        let cells = |first: usize, len: usize, w: &mut Scratch<R, D>| {
             for j in 0..len {
                 w.inside[j] = false;
                 if fixed_bins[first + j] == REJECTED {
@@ -819,35 +814,46 @@ impl<R: Real> Mattes<R> {
                     }
                 }
             }
-            // The values and the Parzen windows.
+        };
+        // The value and the Parzen window of point `first + j` of a batch.
+        let window = |first: usize, j: usize, w: &Scratch<R, D>| -> Option<PointBins<R>> {
+            if !w.inside[j] {
+                return None;
+            }
+            let mv = R::from_f64(m.pixel(w.cells[j].eval_corners(&w.values[j])[0]));
+            if mv < self.moving_true_min || mv > self.moving_true_max {
+                return None;
+            }
+            let term = mv / self.moving_bin_size - self.moving_normalized_min;
+            let parzen = self.parzen_index(term);
+            let moving_index = parzen - 1;
+            let mut arg = R::from_i64(moving_index as i64) - term;
+            let mut weights = [R::ZERO; 4];
+            let mut derivatives = [R::ZERO; 4];
+            for b in 0..4 {
+                weights[b] = cubic(arg);
+                if compute_derivative {
+                    derivatives[b] = cubic_derivative(arg);
+                }
+                arg = R::from_f64(arg.to_f64() + 1.0);
+            }
+            Some(PointBins {
+                fixed_index: fixed_bins[first + j] as usize,
+                moving_index,
+                weights,
+                derivatives,
+            })
+        };
+        // The points `first..first + out.len()` (at most BATCH): their bins and weights in
+        // `out`, their derivative terms in `inner` (`width` each); `w`: the batch's room.
+        let batch = |first: usize,
+                     out: &mut [Option<PointBins<R>>],
+                     inner: &mut [R],
+                     w: &mut Scratch<R, D>| {
+            let len = out.len();
+            cells(first, len, w);
             for j in 0..len {
-                out[j] = None;
-                if !w.inside[j] {
-                    continue;
-                }
-                let mv = R::from_f64(m.pixel(w.cells[j].eval_corners(&w.values[j])[0]));
-                if mv < self.moving_true_min || mv > self.moving_true_max {
-                    continue;
-                }
-                let term = mv / self.moving_bin_size - self.moving_normalized_min;
-                let parzen = self.parzen_index(term);
-                let moving_index = parzen - 1;
-                let mut arg = R::from_i64(moving_index as i64) - term;
-                let mut weights = [R::ZERO; 4];
-                let mut derivatives = [R::ZERO; 4];
-                for b in 0..4 {
-                    weights[b] = cubic(arg);
-                    if compute_derivative {
-                        derivatives[b] = cubic_derivative(arg);
-                    }
-                    arg = R::from_f64(arg.to_f64() + 1.0);
-                }
-                out[j] = Some(PointBins {
-                    fixed_index: fixed_bins[first + j] as usize,
-                    moving_index,
-                    weights,
-                    derivatives,
-                });
+                out[j] = window(first, j, w);
             }
             // The derivative terms: the gradient, the Jacobian, their products.
             let Some(g) = gradient else {
@@ -922,6 +928,29 @@ impl<R: Real> Mattes<R> {
             Some(t) => larmorx_core::parallel::resolve_threads(t),
             None => rayon::current_num_threads(),
         };
+        if threads <= 1 && !compute_derivative {
+            // One batch at a time, on the calling thread, each point added as it is computed.
+            let mut w = Scratch::<R, D>::new(0);
+            let mut first = 0;
+            while first < n {
+                let len = BATCH.min(n - first);
+                cells(first, len, &mut w);
+                for j in 0..len {
+                    if let Some(b) = window(first, j, &w) {
+                        acc.add(
+                            b.fixed_index,
+                            b.moving_index,
+                            &b.weights,
+                            &b.derivatives,
+                            &[],
+                            None,
+                        );
+                    }
+                }
+                first += len;
+            }
+            return self.results(acc);
+        }
         if threads <= 1 {
             // One batch at a time, on the calling thread.
             let mut found = [None; BATCH];

@@ -9,3 +9,8 @@ export LARMORX_VENV=${LARMORX_VENV:-$LARMORX_WORKSPACE/.venv}
 # Cargo first; FSL kept off the path (its programs shadow nothing of ours, but the rule is explicit).
 export PATH=$LARMORX_VENV/bin:$HOME/.cargo/bin:$(echo "$PATH" | tr ':' '\n' | grep -v /fsl | paste -sd:)
 export PYO3_PYTHON=$LARMORX_VENV/bin/python
+# numpy's OpenBLAS on its Haswell kernels, the reference larmorx reproduces (decision log 2026-10-11):
+# on an AVX-512 CPU it would pick SkylakeX, whose 4x4 inverses differ (docs/findings/numpy-blas.md),
+# and the parity suites comparing with numpy, nibabel and nitransforms would not reproduce their records.
+# fMRIPrep's oracle runs use `apptainer --cleanenv`, so it does not reach them (machine-move-proof.md).
+export OPENBLAS_CORETYPE=${OPENBLAS_CORETYPE:-Haswell}

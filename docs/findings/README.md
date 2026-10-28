@@ -52,6 +52,7 @@ sections marked restricted ([porting guide](../porting-guide.md) §1).
 | [fmriprep-resampling.md](fmriprep-resampling.md) | fMRIPrep's one-shot resampler and nitransforms: float32 coordinates, BLAS fused products, voxel-shift map, Jacobian, displacement fields |
 | [fmriprep-oracle.md](fmriprep-oracle.md) | fMRIPrep 25.2.6 as it actually ran (the first oracle run): the tools and versions in its image, thread counts (`NSLOTS`), seeds, the parameters nipype passes or drops, headers it rewrites, what reproduces run to run; its N4 binary follows the C++ source where the GCC 11 oracle does not; its one-shot resampler races with multi-threaded OpenBLAS |
 | [numpy-blas.md](numpy-blas.md) | numpy's 4×4 products and inverses: which BLAS/LAPACK routine, OpenBLAS's kernels per CPU, the Haswell operation order larmorx reproduces, how often the kernels differ |
+| [machine-move-proof.md](machine-move-proof.md) | the move to the new main machine (AMD, AVX-512): the originals and larmorx compute alike on both machines; numpy's OpenBLAS kernel pinned for the validation; the tests that depend on the machine's memory |
 | [afni-masks-original.md](afni-masks-original.md) | the clean-room originals of 3dAutomask and 3dUnifize: what black-box runs showed (AFNI's own header extension in fMRIPrep's input, AFNI-10; glibc's `tanhf` and 3dUnifize's squash; messages), and how the original computes the same results faster (unrestricted) |
 
 Defects that affect an upstream project's users and are solid enough to file are written up as

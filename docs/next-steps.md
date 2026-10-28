@@ -37,8 +37,10 @@ starts no other agent.
 **Now (2026-10-26):** this round is complete (BET merged, item 7; the clean stop made: history out
 of CLAUDE.md, the working agreements in it). Next, in order:
 
-- **M. The move to the new main machine** (user, 2026-10-25; CLAUDE.md "Machines"; **next**: the new
-  laptop is almost ready, 2026-10-27; the steps, the user's and the orchestrator's:
+- **M. The move to the new main machine** (user, 2026-10-25; CLAUDE.md "Machines"; **the copy and
+  the proof done, 2026-10-28**: neither larmorx nor any original computes differently there, numpy's
+  OpenBLAS kernel aside, now pinned for the validation: [machine-move-proof.md](findings/machine-move-proof.md);
+  the old laptop's clean-up (phase 4) next; the steps, the user's and the orchestrator's:
   [machine-move.md](machine-move.md), scripts in `scripts/orchestration/move/`), one bounded
   part: the whole workspace copied over SSH to the new laptop (Ubuntu 22.04, 32 threads, 124 GiB)
   with its repositories as they are (history, worktrees, unpushed commits), the oracle builds and
@@ -314,7 +316,40 @@ of CLAUDE.md, the working agreements in it). Next, in order:
   AMD machine. After the move's `verify` sample: if the originals give identical outputs on both
   CPUs, narrow the machine part to what glibc's kernel selection reads (the ISA features its
   `ifunc` resolvers test: FMA, AVX2, AVX-512 ...), measured first (rule D), so entries are shared
-  between machines whose originals compute alike.
+  between machines whose originals compute alike. **Measured 2026-10-28** (the move's proof,
+  [machine-move-proof.md](findings/machine-move-proof.md)): of the old laptop's 4,953 short
+  entries, 4,541 identical on the AMD machine, the other 89 replay differently on their own
+  machine too, 17 long ones identical; so the originals compute alike on these two CPUs. The
+  narrowing must follow what each program's dispatchers read: numpy's OpenBLAS picks other
+  kernels on AVX-512 (inverses differ), glibc's `libm` does not.
+- **Tests that depend on the machine, from the move's proof** (2026-10-28,
+  [machine-move-proof.md](findings/machine-move-proof.md)); one small part, before the next merge
+  needs `pytest tests/parity` on the new machine:
+  - `difftest/allocation-refused` (ResampleImage, ResampleImageBySpacing) and ImageMath's `MD`
+    with radius -1: the originals run under a fixed address-space limit (`RLIMIT_AS`), so they
+    fail alike whatever the machine's memory (on the new one ANTs gets 119 GB and its box kills
+    it). Until then the smoke tier there runs with `-k "not allocation-refused"`.
+  - `bet2/one-argument` fails at random (a temporary folder containing `-h`): the prefix
+    `lx-fsl-gen_`, and the cache key keeps a path's text where the program reads it.
+  - The oracle cache's replay gaps: Atropos priors by a `%02d` pattern, a blank in a path,
+    mcflirt's `out.mat+`, Apptainer's `HOME` warning, AFNI's history note, a crash message's
+    process ID; and the random-testing entries that vary on their own machine
+    (antsRegistration with `Random` sampling; three small ImageMath, MultiplyImages and
+    ResampleImageBySpacing runs) marked never-cached.
+- **3dAutomask's clean-room original, the panel's cases** (found 2026-10-28): five fMRIPrep calls
+  of the panel runs (added after its record) fail on the obliquity message's number (AFNI
+  `20.646870`, the original `20.646889`; the masks agree). To the clean-room fixes part, as a
+  behaviour-only description.
+- **The version update, what changed in the numerics** (the newest releases fetched 2026-10-28
+  beside the old ones in the workspace's `tags/`; FSL 6.0.7.23 installed in `~/fsl-6.0.7.23`,
+  `~/fsl` still 6.0.7.17; AFNI 26.3.05 built in `oracles/afni-26.3.05`): SciPy 1.15.2 → 1.18.1
+  changes `_interpolation.py` (66 lines), `ni_interpolation.c` (56), `ni_splines.c` (9),
+  `ni_support.c` (2); NumPy 2.3.5 → 2.5.4 changes `cblasfuncs.c` (5), `matmul.c.src` (23),
+  `umath_linalg.cpp` (239); OpenBLAS 0.3.30 → 0.3.34 leaves every kernel larmorx reproduces
+  unchanged (the Haswell `dgemm`/`dgemv` kernels, `idamax`, `getf2_k`, `getrs`, `laswp`, the
+  `trsm` kernels, `KERNEL.HASWELL`, `KERNEL.ZEN`) and changes `interface/gemm.c` (86),
+  `level3.c` (25), `param.h` (322), `KERNEL.SKYLAKEX` (15), `cpuid_x86.c` (3,457),
+  `dynamic.c` (18). The part reads each change and re-runs the suites on the new versions.
 
 ## Before the first release on PyPI
 

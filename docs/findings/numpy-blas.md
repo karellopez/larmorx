@@ -129,10 +129,21 @@ differ from them:
   AVX-512 small-matrix `dgemm` kernels for these sizes (`dgemm_small_kernel_permit_skylakex.c`:
   M·N·K ≤ 10⁶, except transposed-A with K < 32), and in numpy's library the inverse's kernels
   for this core are contracted: `dgemv_n_SKYLAKEX` and the `dtrsm_kernel_L*_SKYLAKEX` solves
-  contain `vfmadd`/`vfnmadd` instructions where the Haswell ones round separately. Not
-  measured: this CPU cannot run them. The golden tests' Windows x64 failure in CI run
-  38095330520 (a different runner CPU than in the previous run) fits this. *Read*
-  (disassembly).
+  contain `vfmadd`/`vfnmadd` instructions where the Haswell ones round separately. *Read*
+  (disassembly). **Measured** on 2026-10-28 on the new main machine (AMD, AVX-512; numpy 2.3.5,
+  OpenBLAS 0.3.30, the same 200,000 seeded matrices per family as the table above,
+  [numpy-linalg-kernels-skylakex.json](../validation/numpy-linalg-kernels-skylakex.json)):
+  every product family is identical to larmorx and to numpy-Haswell (100 %), but the inverses
+  are not: identical in 0.86 % of random matrices, 14.1 % of affines, 52.1 % of rigid
+  transforms, 0.17 % with exponents from 2^±300, 23.7 % near-singular, 98.0 % near-permutations,
+  56.9 % with tied pivots, 22.4 % triangular, 58.2 % with a subnormal column, 85.7 % singular
+  or nearly, 72.2 % with NaN or ±∞. So fMRIPrep's own last bits wherever an affine is inverted
+  (nitransforms' inverse mappings, nibabel's qform and orientation) differ between an AVX-512
+  machine and an AVX2 one. *Verified*. The golden tests' Windows x64 failure in CI run
+  38095330520 (a different runner CPU than in the previous run) fits this. On an AVX-512
+  machine the parity suites compare with numpy's Haswell kernels (`OPENBLAS_CORETYPE=Haswell`,
+  set by `scripts/orchestration/env.sh`), the reference larmorx reproduces
+  ([machine-move-proof.md](machine-move-proof.md)).
 - **SandyBridge, Nehalem, Prescott** (x86-64 CPUs without FMA, or `OPENBLAS_CORETYPE`): the
   table above.
 - **macOS (Accelerate) and aarch64 OpenBLAS** (Linux aarch64, Windows arm64): other kernels;

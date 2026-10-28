@@ -813,7 +813,10 @@ impl<R: Real> Mattes<R> {
             for j in 0..len {
                 if w.inside[j] {
                     let c = w.cells[j].corners();
-                    w.values[j] = std::array::from_fn(|b| [f64::from(data[c[b]])]);
+                    let v = &mut w.values[j];
+                    for b in 0..8 {
+                        v[b] = [f64::from(data[c[b]])];
+                    }
                 }
             }
             // The values and the Parzen windows.
@@ -855,7 +858,10 @@ impl<R: Real> Mattes<R> {
                 for j in 0..len {
                     if out[j].is_some() {
                         let c = w.cells[j].corners();
-                        w.vectors[j] = std::array::from_fn(|b| gd[c[b]]);
+                        let v = &mut w.vectors[j];
+                        for b in 0..8 {
+                            v[b] = gd[c[b]];
+                        }
                     }
                 }
             }
@@ -869,8 +875,9 @@ impl<R: Real> Mattes<R> {
                 } else {
                     crate::interp::vector_linear(g, &w.points[j], floor)
                 };
+                // Every entry written (the active transform's Jacobian starts from zeros),
+                // as into the generic path's new array.
                 let jac = &mut w.jac;
-                jac.fill(R::ZERO);
                 transform.jacobian(&w.locals[j], jac);
                 for (mu, out) in inner[j * width..(j + 1) * width].iter_mut().enumerate() {
                     let mut ip = R::ZERO;

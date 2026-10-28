@@ -92,7 +92,7 @@ pub struct Cell {
 
 impl Cell {
     /// The cell of `c` (1 to 3 dimensions).
-    #[inline]
+    #[inline(always)]
     pub fn new<R: Real, const D: usize>(space: &crate::Space<D>, c: &[R; D]) -> Cell {
         debug_assert!((1..=3).contains(&D));
         let mut base = [0usize; 3];

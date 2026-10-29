@@ -1,44 +1,88 @@
-# Provenance: larmorx-gpl-afni
+# Provenance: larmorx-afni-replica
 
 **Replica: translated from AFNI's source.** This crate is a step-by-step Rust translation of
 AFNI 26.3.05 (tag `AFNI_26.3.05`, commit `07c1dcfb5fdc`), written to give AFNI's output bit for
 bit. It was translated from AFNI 25.2.09 (tag `AFNI_25.2.09`, commit `b1e12b26dae2`) in
 2026-10 and brought to 26.3.05 on 2026-10-29 (below, "AFNI 26.3.05"): the files it translates
 are the same text in both releases apart from their licence headers and the two changes listed
-there, which the replica now follows. It is distributed under the GNU General Public License, version 3
-or later (`../LICENSE`), as part of the `larmorx-gpl` package (`docs/licensing.md`). The
-Apache-2.0 clean-room original of the same tool is `crates/larmorx-afni`; neither crate uses
-the other's code.
+there, which the replica now follows.
 
-## Licences of the translated sources
+**Licence (since 2026-10-29):** the Apache License, Version 2.0, with CC BY 4.0's attribution
+for the Medical College of Wisconsin's code (below); it is part of the main `larmorx` package
+and runs inside it (the `larmorx` command line and the Python extension; `implementation=`
+chooses between it and the clean-room original, `crates/larmorx-afni`, built for speed).
+Neither crate uses the other's code. From 2026-10 to 2026-10-29 the crate was
+`crates-gpl/larmorx-gpl-afni`, distributed under the GNU GPL version 3 or later as the separate
+program `larmorx-gpl` (git history keeps it: `git log --follow` on any file here); it moved
+when AFNI 26.3.05 released MCW's code under CC BY 4.0 (`docs/findings/afni-relicensing-26.md`,
+the user's decision of 2026-10-29).
+
+## Licences of the translated sources, and the attribution
 
 - **AFNI files copyrighted by the Medical College of Wisconsin.** In AFNI 26.3.05 their header
   reads "Major portions of this software are copyrighted by the Medical College of Wisconsin,
   1994-2000, and are released under the Creative Commons Attribution License (CC BY 4.0)", and
   `doc/README/README.copyright` says: "These portions were originally available publicly with
   GPL-2.0 license. As of May 12, 2026, MCW has granted NIH a Creative Commons Attribution
-  License (CC BY 4.0) for all of the code under its copyright." CC BY 4.0 allows adaptations
-  under another licence with attribution; the translation stays GPL-3.0-or-later here (no move
-  without the user's decision: `docs/findings/afni-relicensing-26.md`). In AFNI 25.2.09, which
-  the translation was first made from, the header read "Major
-  portions of this software are copyrighted by the Medical College of Wisconsin, 1994-2000,
-  and are released under the Gnu General Public License, Version 2", and
-  `doc/README/README.copyright` says: "The MCW-copyrighted part of this software is released
-  to the public under the GNU General Public License, Version 2 (or any later edition)." AFNI's
-  `LICENSE.txt` lists them as an exception to its public-domain notice ("Major portions of
-  this software are copyrighted by the Medical College of Wisconsin; Authors: Robert W. Cox,
-  et al.; License: GNU General Public License 2").
-- **AFNI files written at the NIH** (no MCW header): public domain, a "United States
-  Government Work" (`LICENSE.txt`). The NIfTI library (`src/nifti/`) states "This code is
-  released to the public domain."
-- **The GNU C Library 2.35** (`glibc_sincosf.rs`): "Copyright (C) 2018-2022 Free Software
-  Foundation, Inc.", licensed under the GNU Lesser General Public License version 2.1 or any
-  later version. Section 3 of the LGPL-2.1 allows applying the GNU GPL (version 2 or later)
-  instead, so the translation is part of this GPL-3.0-or-later crate. Source: the release
-  tarball `https://ftp.gnu.org/gnu/glibc/glibc-2.35.tar.xz` (SHA-256 in `upstream.tsv`).
+  License (CC BY 4.0) for all of the code under its copyright." AFNI's `LICENSE.txt` lists them
+  as "Major portions of this software are copyrighted by the Medical College of Wisconsin;
+  Authors: Robert W. Cox, et al.; License: Creative Commons Attribution License (CC BY 4.0)".
+  In AFNI 25.2.09, which the translation was first made from, the same files were released
+  under the GNU General Public License, Version 2 (or any later edition); MCW's grant covers the
+  code under its copyright whatever release it came in.
 
-Every source file starts with an SPDX header naming its licence and the files it translates.
-Changes from the originals are listed below and in each module's documentation.
+  **Attribution (CC BY 4.0, section 3(a)):**
+  - *Creator:* Robert W. Cox et al., Medical College of Wisconsin (the radix-2 FFT code by
+    Andrzej Jesmanowicz).
+  - *Copyright notice:* Major portions Copyright (C) 1994-2000 Medical College of Wisconsin.
+  - *Licence:* Creative Commons Attribution 4.0 International,
+    https://creativecommons.org/licenses/by/4.0/ (legal code: `LICENSES/CC-BY-4.0.txt` at the
+    repository's root). The material is provided as is, without warranties of any kind (its
+    section 5).
+  - *Source:* https://github.com/afni/afni, tag `AFNI_26.3.05` (and `AFNI_25.2.09`, the release
+    first translated).
+  - *Modified:* translated into Rust, with the changes listed below ("Changes from the
+    originals", "AFNI 26.3.05"); distributed under the Apache License, Version 2.0, which does
+    not prevent recipients from complying with CC BY 4.0 (its section 3(a)(4)).
+
+  The same attribution is in the header of every MCW-derived file (SPDX
+  `Apache-2.0 AND CC-BY-4.0`) and in the repository's `NOTICE`.
+- **AFNI files written at the NIH** (no MCW header): public domain, a "United States
+  Government Work" (`LICENSE.txt`, which asks to "provide appropriate attribution and cite the
+  authors in any work or product based on this material"). The NIfTI library (`src/nifti/`)
+  states "This code is released to the public domain." Their translations carry SPDX
+  `Apache-2.0` and the request to cite.
+- **The C library's single-precision `sinf` and `cosf`** (`sincosf.rs`, SPDX `Apache-2.0 AND
+  MIT`): translated from Arm's Optimized Routines v19.11 (MIT, "Copyright (c) 1999-2019, Arm
+  Limited"; the licence in `LICENSES/MIT-arm-optimized-routines.txt` at the repository's root),
+  the code glibc 2.35 ships; both of glibc's x86-64 builds (FMA and SSE2). Proved equal, on all
+  2^32 inputs of each function and build, to the translation from glibc 2.35 the crate used
+  until 2026-10-29 and to glibc itself (below, "Verification").
+- **fdlibm's `tanhf` and `expm1f`** (`fdlibm.rs`, SPDX `Apache-2.0 AND SunPro`), from glibc 2.35's
+  copies (`sysdeps/ieee754/flt-32/s_tanhf.c`, `s_expm1f.c`), which carry only fdlibm's notice:
+  "Copyright (C) 1993 by Sun Microsystems, Inc. All rights reserved. Developed at SunPro, a Sun
+  Microsystems, Inc. business. Permission to use, copy, modify, and distribute this software is
+  freely granted, provided that this notice is preserved."
+- **No LGPL code.** glibc's own `cbrtf` (LGPL-2.1-or-later), which 3dUnifize `-EPI` calls for
+  its radius, is not part of the crate: `unifize::epi_radius` takes CORE-MATH's correctly
+  rounded `cbrtf` (MIT, `larmorx_core::math`). glibc's result is one unit in the last place from
+  it on 453,492,162 of the 2^32 inputs; measured on every float32 voxel volume
+  (`crates-gpl/tools/cbrtf-measure`), that last bit changes `-EPI`'s ball of neighbours on
+  1,449,010 volumes and its printed radius on 65,145,681 (8,794 and 552 of them at volumes of at
+  least 0.001 mm^3, 80 and 43 in [1, 100) mm^3), so the replica warns (a line ending in
+  `(larmorx)`) wherever a cube root one unit away would change the ball or the message: every
+  volume where glibc's would is warned about (0 missed). The earlier glibc translations
+  (`glibc_sincosf.rs`, `glibc_floatmath.rs`) are kept, unchanged and GPL-3.0-or-later AND
+  LGPL-2.1-or-later, as the verification tools' reference in `crates-gpl/tools/glibc-reference`.
+- **larmorx's own code written for `larmorx-gpl`** (`x87`, `cnum`, `cli::output`, the command
+  lines' dispatch, `cli::mod`; the tests and golden cases now in `crates/larmorx-cli/tests/`):
+  relicensed to Apache-2.0 by its author, Karel Lopez Vilaret, on 2026-10-29, when the user
+  decided the move.
+
+Every source file starts with an SPDX header naming its licence and the files it translates
+(`scripts/check_spdx.py` checks that every file whose header names MCW's code carries
+`Apache-2.0 AND CC-BY-4.0`). Changes from the originals are listed below and in each module's
+documentation.
 
 ## AFNI files and functions translated
 
@@ -123,31 +167,26 @@ from `specs/3dAutomask.md` and `specs/3dUnifize.md`.
 | `environ` | `src/afni_environ.c`, `src/Aomp.h` | the variables of 3dAutomask and 3dUnifize (`environ::AUTOMASK`, `UNIFIZE`; `AFNI_SETUP_OMP`'s `OMP_NUM_THREADS`) | MCW 1994-2000 |
 | `dataset` | `src/thd_niftiread.c` | `THD_load_nifti`'s brick factor of a loaded dataset (`read_loaded`) | NIH, public domain |
 
-Not translations (written for larmorx-gpl, GPL-3.0-or-later): `x87` (the arithmetic of x86-64's
-`long double`, for the formulas of `nifti2_io.c` that use it) and `cli::output` (writing the
-output through a temporary file and a rename; `cannot_open`, whether AFNI's NIfTI writer could
-open the output, for AFNI-26).
+Not translations (written for larmorx-gpl, relicensed to Apache-2.0 on 2026-10-29): `x87` (the
+arithmetic of x86-64's `long double`, for the formulas of `nifti2_io.c` that use it) and
+`cli::output` (writing the output through a temporary file and a rename; `cannot_open`,
+whether AFNI's NIfTI writer could open the output, for AFNI-26).
 
-## glibc files translated (`glibc_sincosf`)
+## The C library's functions
 
-| glibc 2.35 file | What |
-|---|---|
-| `sysdeps/ieee754/flt-32/s_sinf.c`, `s_cosf.c` | `sinf`, `cosf` |
-| `sysdeps/ieee754/flt-32/s_sincosf.h` | `abstop12`, `reduce_fast`, `reduce_large`, `pi63`, `pio4` |
-| `sysdeps/x86/fpu/sincosf_poly.h` | `sinf_poly` (x86 version) |
-| `sysdeps/x86/fpu/s_sincosf_data.c` | `__sincosf_table`, `__inv_pio4` |
-| `sysdeps/x86_64/fpu/multiarch/s_sinf-fma.c`, `s_cosf-fma.c`, `s_sinf-sse2.c`, `s_cosf-sse2.c` | the FMA and SSE2 builds selected at run time |
+| Module | What | Translated from | Licence |
+|---|---|---|---|
+| `sincosf` (2026-10-29) | `sinf`, `cosf` (both x86-64 builds, `FUSED`) | Arm's Optimized Routines v19.11: `math/sincosf.h` (`abstop12`, `sinf_poly`, `reduce_fast`, `reduce_large`, `pi63`, `pio4`), `math/sinf.c`, `math/cosf.c`, `math/sincosf_data.c` (`__sincosf_table`, `__inv_pio4`) | MIT (Arm) |
+| `fdlibm` (2026-10-23, its own module since 2026-10-29) | `tanhf`, `expm1f` | glibc 2.35's `sysdeps/ieee754/flt-32/s_tanhf.c`, `s_expm1f.c` (fdlibm) | Sun's notice |
+| `unifize::epi_radius` (2026-10-29) | `-EPI`'s radius | 3dUnifize's `main`, with CORE-MATH's `cbrtf` (`larmorx_core::math`) | NIH (public domain); CORE-MATH: MIT |
 
-## glibc files translated (`glibc_floatmath`, 2026-10-23)
-
-| glibc 2.35 file | What |
-|---|---|
-| `sysdeps/ieee754/flt-32/s_tanhf.c` | `tanhf` (from fdlibm: "Copyright (C) 1993 by Sun Microsystems, Inc. ... Permission to use, copy, modify, and distribute this software is freely granted, provided that this notice is preserved", kept in the module's header) |
-| `sysdeps/ieee754/flt-32/s_expm1f.c` | `expm1f` (fdlibm, the same notice) |
-| `sysdeps/ieee754/flt-32/s_cbrtf.c` | `cbrtf` (Copyright (C) 1997-2022 Free Software Foundation, Inc.) |
-
-On x86-64 these have one build each (no FMA variant). `frexpf` and `ldexpf` are written as
-their exact definitions.
+Until 2026-10-29: `glibc_sincosf` (glibc 2.35's `s_sinf.c`, `s_cosf.c`, `s_sincosf.h`,
+`sysdeps/x86/fpu/sincosf_poly.h`, `s_sincosf_data.c`, the FMA and SSE2 builds of
+`sysdeps/x86_64/fpu/multiarch/`) and `glibc_floatmath` (`s_tanhf.c`, `s_expm1f.c`, `s_cbrtf.c`),
+LGPL-2.1-or-later, distributed under the GPL 3 as section 3 of the LGPL-2.1 allows; they are
+now `crates-gpl/tools/glibc-reference` (`sincosf.rs`, `floatmath.rs`), the reference of the
+verification tools. On x86-64 `tanhf`, `expm1f` and `cbrtf` have one build each (no FMA
+variant). `frexpf` and `ldexpf` are written as their exact definitions.
 
 ## Changes from the originals
 
@@ -262,7 +301,7 @@ macros and inlined routines of files not named here.
 |---|---|---|
 | Header slice code 2 read from `slice_end` down to `slice_start` (AFNI-03 fixed) | `src/thd_niftiread.c` (`THD_open_nifti`) | `dataset::slice_offsets`: one path in both modes; the AFNI-03 notices of 3dTshift, 3dAutomask and 3dUnifize removed |
 | `-no_detrend` de-means the second voxel with its own mean (AFNI-05 fixed) | `src/3dTshift.c` (`main`) | `tshift::shift_pair`: one path in both modes; the AFNI-05 notice removed |
-| The MCW licence headers, GPL-2 → CC BY 4.0 | 27 of the files above | the licence statements here and in `../NOTICE`; the code's own licence unchanged (GPL-3.0-or-later) |
+| The MCW licence headers, GPL-2 → CC BY 4.0 | 27 of the files above | the licence statements here and in `NOTICE`; on 2026-10-29 the crate moved into the main package (Apache-2.0 with CC BY 4.0's attribution, above) |
 | `THD_mask_erode2D` added; two declarations in `3ddata.h`; an include in `mrilib.h`; new atlases in `AFNI_atlas_spaces.niml`; a macOS check in `machdep`; five help-search routines | `src/thd_automask.c`, `3ddata.h`, `mrilib.h`, `AFNI_atlas_spaces.niml`, `machdep.c`, `thd_getpathprogs.c`, `thd_ttatlas_query.c`, `thd_niml.c` | nothing: none of the three programs reaches them, or (the atlases) no template space changed |
 
 The two D13 corrections AFNI adopted were already larmorx's defaults, computed the same way, so
@@ -277,12 +316,16 @@ it.
 | What | How | Result (2026-10-10) |
 |---|---|---|
 | `csfft` | `tools/csfft-verify/run.sh`: AFNI's compiled `csfft_cox` (from the oracle build's `libmri.a`) and its general radix-2 loop on 3,336 + 160 input records, every length AFNI computes itself | 36,950,784 + 2,621,400 float values, 0 differ |
-| `glibc_sincosf` | `tools/sincosf-verify`: all 2^32 float inputs against glibc 2.35 on an x86-64 CPU with FMA | 0 differ for `sinf` and for `cosf` |
+| `glibc_sincosf` (until 2026-10-29) | `tools/sincosf-verify`: all 2^32 float inputs against glibc 2.35 on an x86-64 CPU with FMA | 0 differ for `sinf` and for `cosf` |
 | `glibc_floatmath` (2026-10-23) | `tools/floatmath-verify`: `tanhf` on all 2^32 inputs against glibc 2.35, input by input; both functions as a hash of all 2^32 results, against `glibc_reference.c` (a C program calling glibc) | 0 `tanhf` inputs differ; the hashes equal (`3c6bad00ea34c387`, `c679cb92d4402e33`) |
+| `sincosf` (2026-10-29) | `crates-gpl/tools/sincosf-verify`: all 2^32 inputs of each function, the FMA and the SSE2 build, against the earlier glibc translation (`crates-gpl/tools/glibc-reference`), and against glibc 2.35 itself: its FMA build, and its SSE2 build forced by `GLIBC_TUNABLES=glibc.cpu.hwcaps=-AVX2,-FMA` (the two builds differ from each other on 12 `sinf` and 22 `cosf` inputs) | 0 differ, for each function, build and comparison (`<workspace>/oracles/logs/afni-move-sincosf-verify-{fma,sse2}.log`) |
+| `fdlibm` (2026-10-29) | `crates-gpl/tools/floatmath-verify`: `tanhf` on all 2^32 inputs against glibc 2.35, input by input; the reference `cbrtf`'s hash | 0 differ; `cbrtf` hash `c679cb92d4402e33`, glibc's |
+| `unifize::epi_radius` (2026-10-29) | `crates-gpl/tools/cbrtf-measure`: every non-negative float32 voxel volume (2^31), the radius, its message and its ball of neighbours with CORE-MATH's and glibc's `cbrtf` (the ball's offsets derived exactly while every float sum of squares is an integer, radius up to 2364, and cross-checked by building both balls on 1,303 sampled cases) | the two cube roots at most one unit in the last place apart; the ball differs on 1,449,010 volumes, the message on 65,145,681 (from 0.001 mm^3: 8,794 and 552); the replica warns on 917,292,437 (from 0.001 mm^3: 206,626; in [1, 100) mm^3: 2,953), every difference among them; its radius is CORE-MATH's everywhere |
 | 3dAutomask, 3dUnifize (2026-10-23) | `python -m larmorx_validation parity afni-automask` and `afni-unifize` against the AFNI 25.2.09 binary | see `docs/validation/afni-automask.md`, `afni-unifize.md` |
 | The three replicas against AFNI 26.3.05 (2026-10-29) | `python -m larmorx_validation parity afni-tshift`, `afni-automask`, `afni-unifize` `--implementation replica` (AFNI 26.3.05 is the replicas' default build; each case also runs 25.2.09: "AFNI's own step") | `docs/validation/afni-tshift-replica.md`, `afni-automask-replica.md`, `afni-unifize-replica.md` |
 | 3dTshift | `python -m larmorx_validation parity afni-tshift --implementation replica` against the AFNI 25.2.09 binary | 217 of 217 compared cases bit-identical (`docs/validation/afni-tshift-replica.md`) |
 | 3dTshift with D13 (2026-10-12) | the same suite, in `reproduce` mode, with a fix pass and the replica's default against the clean-room original's | see `docs/validation/afni-tshift-replica.md` (from `c479c1a`: 279 of 279 compared cases bit-identical, 3 expected divergences) |
 | `x87` (2026-10-12) | the emulated operations against GCC's `long double` on x86-64: 3 million quotients of the kind `nifti_dmat44_to_quatern` forms, and 2 million random sums, products and quotients (scratch C programs) | 0 differ (1,071 of them differ from plain double arithmetic) |
 | Global options and environment variables (2026-10-12) | the parity categories `global` and `environment`: exit status, standard output and error byte for byte, and the output files, against the AFNI binary in a clean environment; NIfTI-2 headers of 120 random oblique inputs and 160 qform-only, near-180° and trace-near-0 ones | 60 of 60 identical: exit status, messages and outputs (from `c479c1a`, AFNI-23's cases included; `environment/one-row-dataset`'s output is an expected divergence, AFNI-20); the headers identical except `vox_offset` |
-| The geometry AFNI writes (2026-10-12) | AFNI's and the replica's (`reproduce`) outputs compared byte for byte on plumb, oblique, nearly plumb, qform-only, sform-only and form-less inputs, in millimetres, metres and micrometres, on AFNI-01, -02, -03, -05, -08 inputs, and on five real BOLD runs (ds000210 with AFNI's extension, ds001600, ds003345, ds005454, ds006736) | the 348-byte headers identical except `vox_offset` (AFNI's extension), the data identical; `tests/oracle.rs` checks 20 cases the same way |
+| The geometry AFNI writes (2026-10-12) | AFNI's and the replica's (`reproduce`) outputs compared byte for byte on plumb, oblique, nearly plumb, qform-only, sform-only and form-less inputs, in millimetres, metres and micrometres, on AFNI-01, -02, -03, -05, -08 inputs, and on five real BOLD runs (ds000210 with AFNI's extension, ds001600, ds003345, ds005454, ds006736) | the 348-byte headers identical except `vox_offset` (AFNI's extension), the data identical; `crates/larmorx-cli/tests/afni_replica_oracle.rs` checks 20 cases the same way |
+| The move into the main package (2026-10-29) | the golden cases (`crates/larmorx-cli/tests/afni_replica_golden.rs`, 40 cases, 90 outputs, the checksums recorded from `larmorx-gpl` unchanged), the three standard-tier records re-made in-process and compared with the earlier ones (`validation/investigations/afni-move/README.md`) | see `docs/findings/afni-relicensing-26.md`, "The move" |

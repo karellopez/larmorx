@@ -335,3 +335,114 @@ def test_larmorx_needs_no_more_memory_than_ants_more(tmp_path, program, args):
         )
         if mode == "reproduce":
             assert _stored(a_dir) == _stored(r_dir), program
+
+
+#: AFNI's programs (26.3.05, the replicas' build) against larmorx's command with the replica
+#: (built into larmorx since 2026-10-29: ``python -m larmorx afni <program>`` with
+#: ``LARMORX_IMPLEMENTATION=replica``, in the same process), at one thread, on fMRIPrep's calls:
+#: 3dTshift on a BOLD series of 64 x 64 x 40 voxels and 160 volumes (``{bold}``), 3dAutomask on
+#: its mean (``{mean}``), 3dUnifize ``-T2`` on a head of 160 x 192 x 160 voxels (``{t1}``) and
+#: ``-EPI`` on the series. Every output is AFNI's byte for byte in ``reproduce`` (the header's
+#: four extension bytes aside: larmorx writes no AFNI history extension).
+#:
+#: Measured on 2026-10-29 (``validation/investigations/afni-move/memory.py``: AFNI, the Python entry
+#: point, the standalone ``larmorx`` binary and the earlier ``larmorx-gpl`` program): the move into
+#: larmorx adds nothing (the binary within 1.2 MiB of ``larmorx-gpl``), but two calls exceed the
+#: rule, as they did before the move, and are strict expected failures until a part fixes them
+#: (``docs/next-steps.md``, follow-ups): 3dAutomask's image is so small that the Python entry
+#: point's own 13 MiB (the interpreter and numpy) exceed the allowance (the replica itself: 8.2 MiB
+#: against AFNI's 7.5), and the replica's 3dUnifize holds 1.5 (``-T2``) and 2.8 (``-EPI``) times
+#: AFNI's peak.
+_SMALL = "the Python entry point's own 13 MiB exceed the allowance on this small image (follow-up)"
+_UNIFIZE = "the replica's 3dUnifize holds 1.5 to 2.8 times AFNI's peak (follow-up)"
+AFNI_CASES = [
+    ("3dTshift", "-ignore 0 -tzero 1.0 -TR 2s -tpattern alt+z -prefix {out}/ts.nii.gz {bold}"),
+    pytest.param(
+        "3dAutomask",
+        "-apply_prefix {out}/masked.nii.gz -dilate 1 -prefix {out}/mask.nii.gz {mean}",
+        marks=pytest.mark.xfail(strict=True, reason=_SMALL),
+    ),
+    pytest.param(
+        "3dUnifize",
+        "-T2 -clfrac 0.2 -prefix {out}/uni.nii.gz -input {t1}",
+        marks=pytest.mark.xfail(strict=True, reason=_UNIFIZE),
+    ),
+    pytest.param(
+        "3dUnifize",
+        "-EPI -prefix {out}/epi.nii.gz -input {bold}",
+        marks=pytest.mark.xfail(strict=True, reason=_UNIFIZE),
+    ),
+]
+
+
+def _afni_inputs(d: Path) -> dict[str, str]:
+    rng = np.random.default_rng(7)
+    out = {}
+
+    def save(name: str, data, zooms) -> None:
+        im = nib.Nifti1Image(data, np.diag([*zooms[:3], 1.0]))
+        im.header.set_zooms(zooms)
+        im.header.set_xyzt_units("mm", "sec")
+        nib.save(im, d / name)
+        out[name.split(".")[0]] = str(d / name)
+
+    shape = (64, 64, 40)
+    i, j, k = np.indices(shape, dtype=np.float64)
+    r = np.sqrt((i - 32) ** 2 + (j - 32) ** 2 + ((k - 20) * 1.2) ** 2)
+    brain = np.where(r < 26, 900.0 + 3 * i, 30.0) + np.where(r < 12, 250.0, 0.0)
+    t = np.arange(160)
+    bold = brain[..., None] * (1 + 0.01 * np.sin(t / 7.0)) + rng.normal(0, 8, (*shape, 160))
+    save("bold.nii.gz", bold.astype(np.float32), (3.0, 3.0, 3.5, 2.0))
+    save("mean.nii.gz", bold.mean(axis=-1).astype(np.float32), (3.0, 3.0, 3.5))
+    shape = (160, 192, 160)
+    i, j, k = np.indices(shape, dtype=np.float32)
+    r = np.sqrt((i - 80) ** 2 + (j - 96) ** 2 + ((k - 80) * 1.1) ** 2)
+    head = np.where(r < 70, 600.0 + i, 15.0) + np.where(r < 40, 400.0, 0.0)
+    head = head + np.where(r < 18, -300.0, 0.0)
+    save("t1.nii.gz", (head + rng.normal(0, 12, shape)).astype(np.float32), (1.0, 1.0, 1.0))
+    return out
+
+
+@pytest.mark.parametrize(("program", "args"), AFNI_CASES)
+def test_larmorx_needs_no_more_memory_than_afni(tmp_path, program, args):
+    ar = pytest.importorskip("larmorx_validation.parity.afni_replica")
+    afni = ar.afni_binary(program, "26.3.05")
+    if afni is None:
+        pytest.skip(f"the AFNI 26.3.05 {program} oracle was not found")
+    if not Path("/usr/bin/time").is_file():
+        pytest.skip("/usr/bin/time was not found")
+    inputs = tmp_path / "in"
+    inputs.mkdir()
+    paths = _afni_inputs(inputs)
+    home = tmp_path / "home"
+    home.mkdir()
+    env = {
+        **{k: v for k, v in os.environ.items() if not k.upper().startswith(("AFNI_", "NIML_"))},
+        "OMP_NUM_THREADS": "1",
+        "HOME": str(home),
+        "AFNI_DONT_LOGFILE": "YES",
+        "AFNI_NIFTI_NOEXT": "YES",
+    }
+
+    def argv(out: Path) -> list[str]:
+        return [w.format(**paths, out=out) for w in args.split()]
+
+    a_dir = tmp_path / "afni"
+    a_dir.mkdir()
+    code, afni_mib = _peak([str(afni), *argv(a_dir)], env, a_dir)
+    assert code == 0
+    for mode in ("reproduce", "fix"):
+        r_dir = tmp_path / f"larmorx-{mode}"
+        r_dir.mkdir()
+        code, mib = _peak(
+            [sys.executable, "-m", "larmorx", "afni", program, *argv(r_dir)],
+            {**env, "LARMORX_UPSTREAM_DEFECTS": mode, "LARMORX_IMPLEMENTATION": "replica"},
+            r_dir,
+        )
+        assert code == 0
+        print(f"{program} ({mode}): larmorx {mib:.1f} MiB, AFNI {afni_mib:.1f} MiB")
+        assert mib <= RATIO * afni_mib + OVERHEAD_MIB, (
+            f"{program} {args} ({mode}): larmorx {mib:.0f} MiB, AFNI {afni_mib:.0f} MiB"
+        )
+        if mode == "reproduce":
+            assert _stored(a_dir) == _stored(r_dir), f"{program} {args}"

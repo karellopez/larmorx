@@ -20,7 +20,7 @@
  "implementations": [
   "original"
  ],
- "reason": "-cost normmi: larmorx aligns this phantom worse than mcflirt (temporal SD 1.38 of mcflirt's); over the night's 91 normmi findings the median ratio is 1.033; cause open (the spec describes the histogram costs in outline only; docs/findings/mri-hmc-original.md)",
+ "reason": "-cost normmi: larmorx aligns this phantom worse than mcflirt (temporal SD 1.38 of mcflirt's); over the 91 normmi findings of the first long random-testing run (2026-10-25) the median ratio is 1.033; cause open (the spec describes the histogram costs in outline only; docs/findings/mri-hmc-original.md)",
  "recipe": {
   "extra": {
    "keep_inputs": [

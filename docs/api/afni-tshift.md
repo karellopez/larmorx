@@ -10,9 +10,10 @@ written from the behaviour spec [`specs/3dTshift.md`](../../specs/3dTshift.md), 
 text and black-box runs of the AFNI binary, without AFNI's source code
 ([provenance](../../crates/larmorx-afni/PROVENANCE.md)).
 
-**Status: `validated`** against AFNI 25.2.09 itself, the clean-room original (see the
-[validation record](../validation/afni-tshift.md)); the replica against AFNI 26.3.05
-([replica record](../validation/afni-tshift-replica.md)). The record covers 314 cases:
+**Status: `validated`** against AFNI 26.3.05 itself, both: the clean-room original (see the
+[validation record](../validation/afni-tshift.md); against AFNI 25.2.09 until 2026-10-29)
+and the replica ([replica record](../validation/afni-tshift-replica.md)). The record covers
+315 cases:
 - every file of `larmorx-testdata` `synthetic/tshift/` (every FFT length class, every data
   type AFNI reads, edge content);
 - every method, option and `-tpattern` form, slice timing from NIfTI headers, the "copy of
@@ -22,15 +23,15 @@ text and black-box runs of the AFNI binary, without AFNI's source code
 - AFNI's global options and environment variables (60 cases), where exit statuses and
   messages are compared byte for byte too.
 
-All 314 agree: 279 compared, 32 rejected by both, and 3 documented divergences (AFNI's own
+All 315 agree: 280 compared, 32 rejected by both, and 3 documented divergences (AFNI's own
 output format and `-voxshift`, which larmorx does not support, and a dataset of one row,
-which AFNI writes as a text file with a random identifier, AFNI-20). 176 of the 279 compared
+which AFNI writes as a text file with a random identifier, AFNI-20). 178 of the 280 compared
 are byte-identical in their data; in every compared case the header fields are AFNI's and the
 geometry agrees to 1e-6 mm (the whole header byte for byte where the record compares it), and
 in the 60 cases of the global options and variables and the 3 failed writes, where exit
 statuses and both output streams are compared byte for byte too, all 63 are identical
 (2026-10-12, completing 3dTshift, part 2b, and AFNI-26's switch). The Lagrange and weighted-sinc methods and the
-copies give **the same bytes** as AFNI (129 of 132). The Fourier method (the default) differs
+copies give **the same bytes** as AFNI (131 of 133). The Fourier method (the default) differs
 in the last float32 bits, at most 4.3e-7 of the largest value, because AFNI's FFT is float32
 and larmorx's is double; integer outputs then differ by at most 1, in a few values per million
 on the real runs (up to 0.2 % on a synthetic series built to clip). The known last-bit

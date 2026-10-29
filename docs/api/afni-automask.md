@@ -16,7 +16,7 @@ AFNI only ([PROVENANCE](../../crates/larmorx-afni/PROVENANCE.md)). `implementati
 `"original"` (`LARMORX_IMPLEMENTATION`) forces one. Each image's `implementation` names the one
 that ran.
 
-**Status: `validated`**, both: the original against AFNI 25.2.09 itself, the replica against AFNI 26.3.05:
+**Status: `validated`**, both, against AFNI 26.3.05 itself (the original against AFNI 25.2.09 until 2026-10-29):
 - the original ([record](../validation/afni-automask.md)): every output of 80 of the 81 compared
   cases that write one is AFNI's, bit for bit (data and NIfTI header), with AFNI's exit status and
   messages in every case; the other one, fMRIPrep's call on ds005454's BOLD reference, has AFNI's

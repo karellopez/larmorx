@@ -127,3 +127,33 @@ findings stay *memory*),
 and the standard records are re-made: 3dTshift 315 cases, 3dAutomask 130 (with the data
 panel's 15 fMRIPrep calls, all passing; 14 inputs carry AFNI's extension), 3dUnifize 117, with
 no change of status in any earlier case.
+
+## AFNI 26.3.05 (2026-10-29)
+
+The clean-room originals of 3dTshift, 3dAutomask and 3dUnifize follow AFNI 26.3.05 since
+2026-10-29 (next-steps item 3b), from the specs' lines marked "(AFNI 26.3.05)" only. AFNI 26.3.05
+changed these programs in two places, both corrections larmorx already made by default: header
+slice code 2 is read as NIfTI defines it (`slice_end` down to `slice_start`; AFNI 25.2.09 gave
+every slice time 0: AFNI-03), and 3dTshift's `-no_detrend` de-means every voxel (AFNI 25.2.09
+left the second voxel of each pair raw: AFNI-05). So `reproduce` now gives the default's result
+there, and neither defect is named: in 3dTshift's shift, in the slice fields 3dAutomask's
+`-apply_prefix` and 3dUnifize's `-EPI` keep, and in their notices (AFNI-08 is still named where
+the kept times are all within 3 ms of 0, in both modes).
+
+- **The records against AFNI 26.3.05** (standard tier, `--afni-version 26.3.05`): 3dTshift 315
+  cases, 280 pass, 32 rejected by both, 3 expected divergences, none failing (178 of the 280
+  bit-identical in their data); 3dAutomask 130 cases, 110 pass, 19 rejected by both, 1 expected
+  divergence (92 of the 106 compared cases that write outputs bit-identical, the other 14 AFNI-10's
+  header extension); 3dUnifize 117 cases, 96 pass, 19 rejected by both, 2 expected divergences
+  (37 of 92 bit-identical, the other 55 bit-identical to AFNI with correctly rounded maths). Before
+  the alignment, against 26.3.05: 3dTshift 6 cases failed (`-no_detrend` and header slice code 2),
+  3dAutomask 1 and 3dUnifize 2 (the permanent cases of header slice code 2); every other case
+  agreed as against 25.2.09. fMRIPrep's calls meet neither change: AFNI 26.3.05 gives 25.2.09's
+  bytes on them, and the original's outputs on them are unchanged.
+- **The three permanent cases of header slice code 2** (`afni-automask/slice-code-2-masked-notices`,
+  `afni-unifize/epi-slice-code-2-fix-notice`, `epi-slice-code-2-reproduce-notices`) are
+  re-described for 26.3.05: the code-2 times kept in both modes, AFNI-03 never named.
+- **Speed** (`validation/investigations/cleanroom-align/speed.py`, ds000005's BOLD run): the
+  default mode takes the time it took; `reproduce` on a header with slice code 2 now shifts the
+  slices, as AFNI 26.3.05 does, where it copied them before (0.45 s against 0.07 s at one thread),
+  and `-no_detrend` de-means every voxel (0.30 s against 0.29 s).

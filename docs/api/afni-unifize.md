@@ -18,7 +18,7 @@ when it is installed (`pip install "larmorx[exact]"`), else the original; `"repl
 `"original"` (`LARMORX_IMPLEMENTATION`) forces one. Each image's `implementation` names the one
 that ran.
 
-**Status: `validated`**, both: the original against AFNI 25.2.09 itself, the replica against AFNI 26.3.05:
+**Status: `validated`**, both, against AFNI 26.3.05 itself (the original against AFNI 25.2.09 until 2026-10-29):
 - the original ([record](../validation/afni-unifize.md), 99 cases, none failing): AFNI's exit
   status and messages in every case; in 32 of the 72 compared cases that write outputs every
   output is AFNI's, bit for bit (data and NIfTI header); in the other 40 the headers are AFNI's

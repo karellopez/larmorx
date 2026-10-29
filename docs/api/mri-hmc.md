@@ -31,7 +31,8 @@ named by what it does, not after the tool it is compatible with (decision D4).
 
 **Status: `experimental`** until the one case below that misses its threshold is resolved
 (CLAUDE.md rule 8: no equivalence claim while a parity case fails). It is compared with
-mcflirt itself: every recorded oracle run is replayed and compared ([validation record](../validation/mri-hmc.md)). On fMRIPrep's command the matrices
+mcflirt itself, FSL 6.0.7.23's since 2026-10-29 (FSL 6.0.7.17's before): every recorded
+oracle run is replayed and compared ([validation record](../validation/mri-hmc.md)). On fMRIPrep's command the matrices
 differ from mcflirt's by less than mcflirt differs from itself when its input is perturbed
 slightly (half an intensity unit of noise, the volume order reversed, one slice cropped): for
 nine real runs, the 95th percentile of the matrix RMS deviation is **0.014–0.030 mm**

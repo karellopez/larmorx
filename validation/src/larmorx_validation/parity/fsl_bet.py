@@ -1305,7 +1305,7 @@ def _run_case(case: Case, checks: CheckList) -> None:
         _prepare(fix_dir, s)
         fixed = run_larmorx(s.tool, args, "fix", env, fix_dir)
         _fix_pass(checks, s, ours, fixed, r_dir, fix_dir, inputs)
-        _fsl_step(checks, s, args, env, fsl, f_dir, root, inputs)
+        _fsl_step(checks, s, args, env, fsl, f_dir, root, inputs, ours)
         if s.python is not None and identical and fsl.code == 0:
             _python(checks, s, paths, f_dir)
         if filled and all(c.passed for c in checks.checks):
@@ -1355,12 +1355,14 @@ def _fsl_step(
     f_dir: Path,
     root: Path,
     inputs: tuple[str, ...],
+    ours: Run | None = None,
 ) -> None:
     """FSL's own step from the previous version to the one compared (:mod:`fsl_versions`): the
     previous installation on the same arguments, in a directory set up alike (served from the
     oracle cache when an earlier record ran it); its exit status, messages and outputs against
     the compared one's. Reported, never a failure; a change without a known reason is a
-    finding."""
+    finding. Where the replica (``ours``) named FSL-43's reads beyond the volume, what FSL does
+    there depends on memory: a known reason."""
     old = fsl_versions.step_from("replica")
     if old is None or fsl_dir(old) is None:
         return
@@ -1383,8 +1385,11 @@ def _fsl_step(
         re.sub(r"(line \d+: +)\d+ ", r"\1<pid> ", fsl_text(r.out + r.err).replace(str(d), "<dir>"))
         for r, d in ((prev, p_dir), (fsl, f_dir))
     )
+    why = fsl_versions.reasons(args, env)
+    if ours is not None and reads_memory(ours):
+        why = sorted({*why, "FSL-43-memory"})
     changed, detail = fsl_versions.step_detail(
-        (prev.code, fsl.code), msgs, (pa, na), differences, fsl_versions.reasons(args, env)
+        (prev.code, fsl.code), msgs, (pa, na), differences, why
     )
     from larmorx_validation.parity.harness import Check
 

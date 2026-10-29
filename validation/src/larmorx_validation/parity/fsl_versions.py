@@ -77,6 +77,9 @@ CHANGES = {
     "('2601.0 2025-12-08T15:20:57Z'; 2203.12 wrote '2203.12-dirty 2024-02-01T16:17:47+00:00')",
     "usage-id": "utils 2412.6 prints its build ID in every usage text ('Part of FSL (ID: "
     "2412.6-dirty)'; 2203.5 printed an empty pair of quotes)",
+    "FSL-43-memory": "the mask's fill starts outside the image and FSL reads memory beyond the "
+    "volume (FSL-43): what it finds there, and whether it crashes, depends on the memory each "
+    "build lays out",
     "arma-lapack": "FSL 6.0.7.23's Armadillo 14.2.1 inverts 4 x 4 matrices and solves with them "
     "through LAPACK (OpenBLAS), where Armadillo 10.5.1 used its closed-form inverse: the last "
     "bits of values computed from nearly equal matrices change",

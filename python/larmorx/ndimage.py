@@ -2,7 +2,8 @@
 """SciPy-compatible spline interpolation: ``lx.ndimage``.
 
 A replica of ``scipy.ndimage``'s ``map_coordinates``, ``spline_filter`` and
-``spline_filter1d`` (SciPy 1.15.2), in Rust. Results are bit-identical to SciPy's on x86-64
+``spline_filter1d`` (SciPy 1.18.1; first ported from 1.15.2), in Rust. Results are
+bit-identical to SciPy's on x86-64
 Linux for every order (0-5) and boundary mode, and the same on every platform. The work runs
 on ``n_threads`` threads with the GIL released; the result does not depend on the thread
 count.
@@ -10,14 +11,14 @@ count.
 Differences from SciPy: complex inputs and ``output`` arrays are not supported (pass a dtype),
 and arrays have 1 to 4 dimensions. See ``docs/api/resample-series.md``.
 
-One SciPy defect is corrected by default (D13, ``docs/api/upstream-defects.md``): the spline
-prefilter's ``reflect`` boundary (modes ``reflect``, ``grid-mirror`` and ``nearest``) reads a
-coefficient it has already updated, so SciPy's splines do not pass through the samples on short
-axes (SCI-03). ``upstream_defects="reproduce"`` gives SciPy's result; a
-:class:`~larmorx.UpstreamDefectWarning` says when the correction changed one.
+The spline prefilter's ``reflect`` boundary (modes ``reflect``, ``grid-mirror`` and
+``nearest``) is SciPy 1.18.1's: SciPy 1.15 read a coefficient it had already updated, so its
+splines did not pass through the samples on short axes (SCI-03, ``docs/api/upstream-defects.md``);
+SciPy 1.18 fixed it, and larmorx follows the fix in both modes of ``upstream_defects``.
 
 The argument checks and their messages follow ``scipy/ndimage/_interpolation.py`` (SciPy
-1.15.2, BSD-3-Clause; the notice is in the NOTICE file of larmorx).
+1.18.1, unchanged there from 1.15.2; BSD-3-Clause; the notice is in the NOTICE file of
+larmorx).
 """
 
 from __future__ import annotations

@@ -1086,7 +1086,10 @@ pub mod dc {
         fn minus_zero_is_a_subtraction() {
             let mut e = Vec::new();
             assert_eq!(eval("0 k 1.0 -0.000000 - 2 ^ p", &mut e), "1.000000\n");
-            assert_eq!(eval("100.0 4.000000  / -0.000000  - 2 / 1 + p", &mut e), "13\n");
+            assert_eq!(
+                eval("100.0 4.000000  / -0.000000  - 2 / 1 + p", &mut e),
+                "13\n"
+            );
             assert_eq!(String::from_utf8(e).unwrap(), "dc: stack empty\n".repeat(2));
         }
     }

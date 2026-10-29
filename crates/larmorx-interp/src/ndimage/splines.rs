@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0 AND BSD-3-Clause
 //! B-spline prefilter poles, interpolation weights and the recursive prefilter, ported from
-//! SciPy 1.15.2 `scipy/ndimage/src/ni_splines.c` (BSD-3-Clause; notice below and in NOTICE).
+//! SciPy 1.15.2 `scipy/ndimage/src/ni_splines.c`, following SciPy 1.18.1 since 2026-10-29 (its
+//! reflect initialisation; BSD-3-Clause; notice below and in NOTICE).
 //!
 //! Every expression keeps SciPy's operation order: the weights and the filter recursions are
 //! bit-identical to SciPy's C code compiled without floating-point contraction (x86-64).

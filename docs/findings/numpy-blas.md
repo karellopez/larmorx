@@ -177,3 +177,33 @@ run 1 (seeded motion and field map), median of 5: native 4.70 s → 4.65 s on 1 
 0.936 s → 0.948 s on 12; T1w 3.55 s → 3.57 s and 0.732 s → 0.741 s (before → after; noise
 level on this machine), outputs identical. The [benchmark report](../benchmarks/resample-series.md)
 stands.
+
+## numpy 2.5.4 and OpenBLAS 0.3.34 (the version update, 2026-10-29)
+
+numpy 2.3.5 → 2.5.4 (`<workspace>/tags/numpy-2.3.5`, `numpy-2.5.4`) and the OpenBLAS its wheels
+bundle, 0.3.30 → 0.3.34 (scipy-openblas64 0.3.34.106.0; `<workspace>/tags/OpenBLAS-0.3.30`,
+`OpenBLAS-0.3.34`), every file `crates/larmorx-transform/PROVENANCE.md` names, read line by line,
+and the wheel's own library (`oracles/python-newest`, made by
+`validation/investigations/version-numerics/make_python_newest.sh`, whose `ENVIRONMENT.txt`
+records `numpy.show_config()` and threadpoolctl):
+
+| File (changed lines) | Change | Class |
+|---|---|---|
+| numpy `cblasfuncs.c` (5) | `cblas_matrixproduct` takes the output's descriptor instead of its type number | no effect |
+| numpy `matmul.c.src` (23) | which operand counts as transposed is decided on the strides' magnitudes (negative strides); the copy buffer from `PyMem_RawMalloc`; an object matmul of size 0 returns 0 | no effect on float64 4 × 4 products (contiguous: the same BLAS call) |
+| numpy `umath_linalg.cpp` (239) | memory from `PyMem_RawMalloc`; the SVD (`gesdd`) and least squares (`gelsd`) check their input is finite before calling LAPACK (`all_finite`); module initialisation by slots | allocation: no effect; `inv` (`gesv`) unchanged; the SVD of a matrix holding ±∞ now raises `LinAlgError` where 2.3.5 returned NaN singular values (a change of errors), while nibabel's `io_orientation`, which fMRIPrep reaches through sdcflows' `ensure_positive_cosines`, raised for NaN and ±∞ in both (`svd_nonfinite.py`): no effect on the ported paths |
+| OpenBLAS `interface/gemm.c` (86) | the half-precision types (`BGEMM`, `HFLOAT16`); the single-precision direct kernel moved after the size checks; an early return for empty matrices | no effect on `dgemm` |
+| OpenBLAS `driver/level3/level3.c` (25) | the bfloat16 alignment macros | no effect |
+| OpenBLAS `interface/lapack/gesv.c` (0.3.33) | the thread count from `m·m` (was `m·n`); no solve for `NRHS = 0` | no effect (one thread for 4 × 4; numpy's `inv` has 4 right-hand sides) |
+| OpenBLAS `param.h` (322) | the new cores' parameters; `GEMM_PREFERED_SIZE` spelled `GEMM_PREFERRED_SIZE` | no effect on Haswell's (`DGEMM_UNROLL_M` 4, `N` 8, the same `P`, `Q`) |
+| OpenBLAS `KERNEL.SKYLAKEX` (15), `cpuid_x86.c`, `dynamic.c` | kernels chosen by compiler on Windows; new CPUs recognised | no effect on Linux x86-64's Haswell core |
+
+Every kernel larmorx reproduces is the same source in 0.3.34 (`dgemm_kernel_4x8_haswell.S`,
+`dgemv_t_4.c`, `dgemv_t_microk_haswell-4.c`, `dgemv_n_4.c`, `ddot.c`, `dscal.c`, `iamax_sse2.S`,
+`getf2_k.c`, `getrs_single.c`, `laswp_k_4.c`, the `trsm` kernels and copies, `KERNEL.HASWELL`,
+`KERNEL.ZEN`), and the wheel's library compiled them alike: its Haswell `dgemv_n`, `ddot`,
+`dscal`, `daxpy` and triangular solves hold no fused multiply-add, its `dgemv_t` the same 47 as
+0.3.30's (`openblas_kernels.py`), and its cores are still Prescott, Nehalem, SandyBridge, Haswell
+and SkylakeX. Measured: the `numpy-linalg` suite against numpy 2.5.4 on the Haswell kernels
+(`--python newest`): every case as against 2.3.5 (27 pass, the same expected divergence), so
+`larmorx_transform::openblas` needs no change.

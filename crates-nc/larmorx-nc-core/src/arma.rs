@@ -1,24 +1,29 @@
 // SPDX-License-Identifier: LicenseRef-FSL AND Apache-2.0
-// Translated from Armadillo 10.5.1 as bundled by fsl-armawrap 0.6.0 (Apache-2.0; Copyright
-// 2008-2016 Conrad Sanderson, 2008-2016 National ICT Australia (NICTA), 2017-2020 Arroyo
-// Consortium, 2017-2020 Data61, CSIRO): mul_gemm.hpp, mul_gemv.hpp, op_dot_meat.hpp,
-// op_inv_meat.hpp, op_det_meat.hpp, auxlib_meat.hpp (solve_square_tiny), fn_trace.hpp,
+// Translated from Armadillo 14.2.1 as bundled by fsl-armawrap 0.7.0 (FSL 6.0.7.23) and Armadillo
+// 10.5.1 as bundled by fsl-armawrap 0.6.0 (FSL 6.0.7.17) (Apache-2.0; Copyright 2008-2021 Conrad
+// Sanderson, 2008-2016 National ICT Australia (NICTA), 2017-2020 Arroyo Consortium, 2017-2021
+// Data61 / CSIRO): mul_gemm.hpp, mul_gemv.hpp, op_dot_meat.hpp, op_inv_gen_meat.hpp (14.2.1),
+// op_inv_meat.hpp (10.5.1), op_det_meat.hpp, auxlib_meat.hpp (inv, inv_tr, det,
+// solve_square_fast; 10.5.1's solve_square_tiny), trimat_helper.hpp, sym_helper.hpp, fn_trace.hpp,
 // fn_accu.hpp, glue_times_meat.hpp. Part of larmorx-nc (FSL Licence terms; see LICENSE).
 //! The small dense matrices of FSL's NEWMAT layer, evaluated the way FSL's binaries evaluate
 //! them.
 //!
-//! FSL 6.0.7's `NEWMAT::Matrix` is `armawrap`, a thin layer over Armadillo 10.5.1; every
-//! matrix expression in newimage, miscmaths, FLIRT and mcflirt is an Armadillo expression
-//! template, and the order of its floating-point operations is Armadillo's. This module gives
-//! those operations, one function per Armadillo code path, so that a translation of FSL code
-//! can say exactly which path an expression takes:
+//! FSL 6.0.7.23's `NEWMAT::Matrix` is `armawrap` 0.7.0, a thin layer over Armadillo 14.2.1
+//! (6.0.7.17's was 0.6.0 over Armadillo 10.5.1); every matrix expression in newimage,
+//! miscmaths, FLIRT and mcflirt is an Armadillo expression template, and the order of its
+//! floating-point operations is Armadillo's. This module gives those operations, one function
+//! per Armadillo code path, so that a translation of FSL code can say exactly which path an
+//! expression takes:
 //!
 //! - products of square matrices up to 4 × 4 ([`mul_tinysq`]), of a square matrix and a vector
 //!   up to 4 ([`gemv_tinysq`]) and the general small product of Armadillo's emulation
-//!   ([`gemm_emul_large`]);
-//! - `inv()` ([`inv`]: the closed-form cofactor inverse up to 4 × 4, then Armadillo's fallbacks),
-//!   `det()` ([`det`]) and `solve()` ([`solve`]: `inv(A)*B` is rewritten by Armadillo as
-//!   `solve(A, B)`, which for 4 × 4 multiplies by the cofactor inverse);
+//!   ([`gemm_emul_large`]) (the same in both releases);
+//! - `inv()` ([`inv`]: closed forms for 2 × 2 and 3 × 3, then a diagonal matrix's reciprocals,
+//!   LAPACK's triangular inverse, or its LU inverse), `det()` ([`det`]) and `inv(A)*B` ([`solve`]:
+//!   rewritten by Armadillo as a solve, LAPACK `dgesv`), the LAPACK routines as FSL 6.0.7.23's
+//!   OpenBLAS computes them ([`crate::lapack`]); Armadillo 10.5.1's closed-form rules are kept
+//!   in [`armadillo_10_5_1`];
 //! - `dot()` ([`dot`]: two interleaved accumulators), `accu()` ([`accu`]), `trace()` ([`trace`]).
 //!
 //! The rules that decide which path an expression takes, as Armadillo applies them, are
@@ -26,8 +31,9 @@
 //! `A.i() * B * C` is `solve(A, B * C)`, `A * B.i() * C` is `A * solve(B, C)`, and `A * B * C`
 //! of equal square sizes is `(A * B) * C`).
 //!
-//! FSL's binaries were built with GCC 13.2 at `-O2 -march=nocona`: no fused multiply-adds and
-//! no reassociation, so every `a*b + c` below is two roundings, in the order written.
+//! FSL's binaries were built with GCC at `-O2 -march=nocona` (13.2 for 6.0.7.17, 15.2 for
+//! 6.0.7.23): no fused multiply-adds and no reassociation, so every `a*b + c` below is two
+//! roundings, in the order written.
 
 use std::fmt;
 

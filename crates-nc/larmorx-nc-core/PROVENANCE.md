@@ -5,10 +5,11 @@ FSL libraries FSL's tools share, from FSL 6.0.7.23 since 2026-10-29 (the conda p
 fsl-newimage 2601.0, fsl-miscmaths 2412.6, fsl-newnifti 5.0.0, fsl-znzlib 2511.3, fsl-meshclass
 2111.0, fsl-utils 2412.6, fsl-avwutils 2209.6; first translated from FSL 6.0.7.17's 2203.12,
 2203.2, 4.1.0, 2111.0, 2111.0, 2203.5, 2209.3), with Armadillo's matrix rules as fsl-armawrap
-0.6.0 (Armadillo 10.5.1) evaluates them (FSL 6.0.7.23's 0.7.0 bundles Armadillo 14.2.1, whose
-LAPACK path for 4 × 4 inverses and solves is not followed yet: `docs/findings/fsl-mcflirt.md`,
-"FSL 6.0.7.23") and the parts of the C and C++ libraries FSL's Linux binaries rely on, written to
-give FSL's results bit for bit. It is distributed under the
+0.7.0 (Armadillo 14.2.1) evaluates them, its 4 × 4 inverses, solves and determinants through the
+LAPACK FSL 6.0.7.23 links (OpenBLAS 0.3.33 on its Haswell kernels, since 2026-10-29: `lapack`;
+fsl-armawrap 0.6.0's Armadillo 10.5.1 rules kept beside them, `arma::armadillo_10_5_1`;
+`docs/findings/fsl-mcflirt.md`, "Armadillo 14.2.1's LAPACK path"), and the parts of the C and
+C++ libraries FSL's Linux binaries rely on, written to give FSL's results bit for bit. It is distributed under the
 FSL Licence (`../LICENSE`), as part of the `larmorx-nc` package (`docs/licensing.md`). The FSL
 files it was translated from are in `../fsl-source/`, unchanged (`MANIFEST.tsv`). No Apache-2.0
 crate uses it, and it uses no GPL crate.
@@ -45,8 +46,11 @@ the joined version.
   public domain by their authors.
 - **fslpy 3.27.0** (`avwutils.rs`: the file-name rules of `imtest`, `remove_ext`, `imglob`, which
   FSL's scripts run): Apache-2.0, Copyright 2016-2024 University of Oxford (Paul McCarthy).
-- **Armadillo 10.5.1** as bundled by **fsl-armawrap 0.6.0** (`arma.rs`): Apache-2.0
-  (`../LICENSES/Apache-2.0.txt`; notices in `../NOTICE`).
+- **Armadillo 14.2.1** as bundled by **fsl-armawrap 0.7.0**, and **Armadillo 10.5.1** as bundled
+  by **fsl-armawrap 0.6.0** (`arma.rs`): Apache-2.0 (`../LICENSES/Apache-2.0.txt`; notices in
+  `../NOTICE`).
+- **OpenBLAS 0.3.33** (BSD-3-Clause) and the **reference LAPACK 3.12.0** it bundles (modified BSD)
+  (`lapack.rs`): their notices in the file and in `../NOTICE`.
 - **fdlibm**, as the GNU C Library 2.35 ships `atan2f`, `atanf`, `tanh` and `expm1` (`fdlibm.rs`):
   only Sun's permissive notice (`SunPro`), reproduced in the file and in `../NOTICE`. Source:
   glibc 2.35's `sysdeps/ieee754/flt-32/e_atan2f.c`, `s_atanf.c`, `sysdeps/ieee754/dbl-64/s_tanh.c`,
@@ -95,7 +99,8 @@ Every source file starts with an SPDX header naming its licence and the files it
 | `optimise` | fsl-miscmaths `optimise.{h,cc}` | `optimise`, `optimise1d`, `findinitialbound`, `estquadmin`, `extrapolatept`, `nextpt`, `along` |
 | `miscmaths` | fsl-miscmaths `miscmaths.{h,cc}` | `make_rot`, `construct_rotmat_euler`, `compose_aff`, `decompose_aff`, `rotmat2euler`, `rms_deviation`, `read_ascii_matrix` (`skip_alpha`, `isNumber`), `norm2`, `dot`, `cross` |
 | `newimagefns` | fsl-newimage `newimagefns.{h,cc}` | `isotropic_resample`, `affine_transform`, `raw_affine_transform`, `affine_transform_mask`, `make_grad_masks`, `gradient`, `smooth`, `convolve_separable`, `convolve`, `gaussian_kernel1D` |
-| `arma` | Armadillo 10.5.1 (fsl-armawrap 0.6.0) | the evaluation of `*` chains (`glue_times` with `inv` and `solve` rewriting), `gemv`/`gemm_emul_tinysq`, `gemm_emul_large`, `op_dot::direct_dot_arma`, `accu`, `max`, `op_inv::apply_tiny`, `op_det`, `auxlib::solve_square_tiny`, `trace` |
+| `arma` | Armadillo 14.2.1 (fsl-armawrap 0.7.0): `glue_times_meat.hpp`, `op_inv_gen_meat.hpp`, `op_det_meat.hpp`, `auxlib_meat.hpp`, `trimat_helper.hpp`, `sym_helper.hpp`; Armadillo 10.5.1 (fsl-armawrap 0.6.0) for the products and for `armadillo_10_5_1` | the evaluation of `*` chains (`glue_times` with `inv` and `solve` rewriting: `inv(A)*B`, `inv(A)*B*C`, `A*inv(B)*C`), `gemv`/`gemm_emul_tinysq`, `gemm_emul_large`, `op_dot::direct_dot_arma`, `accu`, `max`, `trace`; Armadillo 14.2.1's `op_inv_gen_full::apply_direct` (`apply_tiny_2x2`, `apply_tiny_3x3`, the diagonal, triangular and LAPACK paths), `auxlib::solve_square_fast`, `op_det::apply_direct`, `auxlib::det`, `is_triu`/`is_tril`, `is_approx_sym` (its 100-row minimum); 10.5.1's `op_inv::apply_tiny`, `op_det`, `auxlib::solve_square_tiny` |
+| `lapack` | OpenBLAS 0.3.33 (BSD-3-Clause; release tarball SHA-256 `6761af1d9f5d…`): `interface/lapack/getrf.c`, `gesv.c`, `trtri.c`, `interface/gemv.c`, `lapack/getrf/getrf_single.c`, `lapack/getf2/getf2_k.c`, `lapack/getrs/getrs_single.c`, `lapack/laswp/generic/laswp_k_4.c`, `lapack/trtri/trtri_{U,L}_single.c`, `lapack/trti2/trti2_{U,L}.c`, `driver/level2/trmv_{U,L}.c`, `trsv_{L,U}.c`, `driver/level3/trsm_L.c`, `kernel/generic/trsm_kernel_{LT,LN}.c`, `trsm_{lt,ut}copy_4.c`, `kernel/x86_64/ddot.c`, `daxpy.c`, `dscal.c`, `dgemv_n_4.c`, `dgemv_n_microk_haswell-4.c`, `dgemm_kernel_4x8_haswell.S` (the 2 × N and 1 × N tiles), `iamax_sse2.S`, `amax_sse2.S`, `param.h`; reference LAPACK 3.12.0 as OpenBLAS bundles it (modified BSD): `SRC/dgetri.f` | `getrf` (`getf2_k`), `getrs`, `gesv`, `trtri` (the diagonal's zero check, `trti2`), `getri` (unblocked), for matrices up to 4 × 4, on the Haswell kernels; which operand's NaN each instruction passes on measured on FSL's own library (`validation/investigations/version-numerics/blas_nan_probe.py`); checked bit for bit against `~/fsl-6.0.7.23/lib/liblapack.so.3` (`lapack_probe.py`, `tools/lapack-probe`) |
 | `mesh` | fsl-meshclass `point.{cpp,h}`, `mpoint.{cpp,h}`, `triangle.{cpp,h}`, `mesh.{cpp,h}`, `pt_special.{cpp,h}`, `selfintersection.cpp`, `meshclass.h` | `Pt`, `Vec` and their operators, `Mpoint`, `Triangle` (the constructor's neighbour bookkeeping, `normal`, `centroid`, `intersect`), `Mesh` (copy constructor, `operator=`, `update`, `translation`, `rescale`, `retessellate`, `self_intersection`, `real_self_intersection`, `stream_mesh` type 3, `save`), `make_mesh_from_icosa` |
 | `mesh::load` | fsl-meshclass `mesh.cpp` | `Mesh::load`, `load_off`, `load_vtk_ASCII`, `load_fs` |
 | `mesh::profile` | fsl-meshclass `profile.{cpp,h}` | `Profile`, `pro_pair` |
@@ -123,7 +128,9 @@ Every source file starts with an SPDX header naming its licence and the files it
   (`larmorx_core::math`), which glibc's agree with on every argument the replicas use
   (`tools/glibc-float-verify kernel`); x87 `long double` arithmetic is emulated (`x87`);
   Armadillo's BLAS-backed paths (matrices larger than 4 x 4) are not reached by the replicas and
-  panic if they ever are. Where NaN or infinite voxels can reach a result, it is computed with
+  panic if they ever are; its LAPACK path for 4 x 4 and smaller matrices is OpenBLAS's Haswell
+  order (`lapack`), the core the validation pins (FSL's own results depend on the core OpenBLAS
+  picks for the CPU: FSL-64). Where NaN or infinite voxels can reach a result, it is computed with
   SSE's NaN rules (`sse`): the centre of gravity, the trilinear interpolation, the gradient, the
   Gaussian smoothing, `fslmaths -mas` and `fslstats`'s threshold, newimage's robust range
   (`find_thresholds`: the histogram's range and the 2 and 98 % thresholds) and meshclass's

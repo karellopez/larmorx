@@ -3,8 +3,10 @@
 How `scipy.ndimage.map_coordinates` and its spline prefilter really compute, at SciPy 1.15.2
 (fMRIPrep's lockfile; the development venv runs 1.15.3, whose `scipy/ndimage` interpolation
 code is identical: *verified*, `diff -r` of the two tags shows changes only in
-`_rank_filter_1d.cpp`, `_ndimage_api.py` and a test). larmorx's replica is
-`larmorx_interp::ndimage` (`lx.ndimage`). File references are to the `v1.15.2` tag.
+`_rank_filter_1d.cpp`, `_ndimage_api.py` and a test), and what SciPy 1.18.1 changed (the last
+section): larmorx follows 1.18.1 since 2026-10-29. larmorx's replica is
+`larmorx_interp::ndimage` (`lx.ndimage`). File references are to the `v1.15.2` tag unless a
+section says otherwise.
 
 ## What decides the result
 
@@ -85,3 +87,29 @@ larmorx follows x86-64's casts and wrapping arithmetic, so it matches SciPy wher
 stays inside its array (all the NaN cases above), and returns NaN where SciPy would read
 outside it. fMRIPrep never produces such coordinates (displacement-field NaNs are replaced
 before interpolation). The validation record lists this as an expected divergence.
+
+## SciPy 1.18.1 (the version update, 2026-10-29)
+
+SciPy 1.15.2 → 1.18.1 (`<workspace>/tags/scipy-v1.15.2`, `scipy-1.18.1`), every file
+`crates/larmorx-interp/PROVENANCE.md` names, read line by line
+(`validation/investigations/version-numerics/README.md`):
+
+| File (changed lines) | Change | Class | larmorx |
+|---|---|---|---|
+| `src/ni_splines.c` (9) | `_init_causal_reflect`: the sum in a variable of its own (`sum = c[0] + z_n·c[n-1]; sum += z_i·(c[i] + z_n·c[n-1-i])`), then `c[0] += sum·z/(1 − z_n·z_n)`: the last term reads the original `c[0]` | **a change of results**: SCI-03 fixed upstream, with its own rounding (`(sum·z)/d + c0`, where larmorx's correction computed `sum·(z/d) + c0`) | followed in both modes (`splines.rs`: `init_causal_reflect`, `apply_rows`); SCI-03 no longer named (the notice kept for the API); modes `nearest`, `reflect`, `grid-mirror`, orders 2 to 5 |
+| `src/ni_interpolation.c` (56) | `NI_GeometricTransform`'s matrix mapping sums `shift` first, two terms per step (`affine_transform`); order 0 skips the weights it never multiplies by (`if (order > 0) coeff *= …` was already there); memory errors checked separately; `icoor` zeroed; a missing mapping raises `RuntimeError` | the matrix path: a change of results, not ported (larmorx follows the coordinate-array path, `map_coordinates`); the rest: no effect, messages only | none |
+| `src/ni_support.c` (2) | the line-buffer offsets set to `NULL` on an allocation failure | no effect (memory errors) | none |
+| `_interpolation.py` (66) | `affine_transform`'s documentation and examples; its warning for a 1-D matrix removed; `zoom` returns its input unchanged for zoom 1 with `prefilter=True` | no effect on the ported functions (`map_coordinates`, `spline_filter`, `spline_filter1d`, `_prepad_for_spline_filter` unchanged) | none |
+| `_ni_support.py` (6) | `isinstance(output, type \| np.dtype)` (the same test); `_skip_if_int` removed | no effect | none |
+
+Measured: the resample-series suite against SciPy 1.18.1 (`oracles/python-newest`,
+`docs/validation/resample-series.md`), with the originals' own step from SciPy 1.15.3 per case:
+of 136 compared cases SciPy's own outputs changed in 14, all of the reflect initialisation: the
+12 `ndimage/*` cases with `nearest`, `reflect` and `grid-mirror` at orders 2 to 5, and
+fMRIPrep's resampler itself with `reflect` and `grid-mirror` at order 5
+(`interpolation/order5-*`); every other output is the same under both releases. Under SciPy 1.15
+(the shared environment) those cases are expected divergences: larmorx follows 1.18.1.
+
+**On short axes** 1.18.1's reflect prefilter is an interpolant again: the 6 × 5 × 4 array of
+the section above returns its samples to 1e-14 at the integer coordinates in every mode (1.15's
+`reflect` was off by up to 1e-2 there, order 5; `crates/larmorx-interp/src/ndimage/tests.rs`).

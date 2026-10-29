@@ -48,7 +48,11 @@ fMRIPrep's expressions by the Python layer (`python/larmorx/transforms/`), throu
 
 **Ported** from the OpenBLAS 0.3.30 release tarball (SHA-256 `27342cff5186…`, tag `v0.3.30` →
 `993fad6aebbc`, BSD-3-Clause; notice in the file and in NOTICE), the version numpy 2.3.5's
-wheels bundle (scipy-openblas64 0.3.30, `numpy.show_config()`). Only the operation order of
+wheels bundle (scipy-openblas64 0.3.30, `numpy.show_config()`); **checked against numpy 2.5.4
+and the OpenBLAS 0.3.34 its wheels bundle** (scipy-openblas64 0.3.34.106.0, 2026-10-29): every
+file below is the same source in 0.3.34 or changes nothing for float64 4 × 4 matrices, the
+wheel's Haswell kernels are compiled alike, and the `numpy-linalg` suite agrees as before
+(`docs/findings/numpy-blas.md`, "numpy 2.5.4 and OpenBLAS 0.3.34"). Only the operation order of
 the kernels `kernel/x86_64/KERNEL.HASWELL` selects is reproduced, for 4×4 float64 matrices; it
 was checked against the disassembly of numpy's `libscipy_openblas64_` (GCC 10 compiled the C
 kernels with `-mavx2` but without `-mfma`, except `dgemv_t_4.c`) and validated bit for bit

@@ -7,8 +7,10 @@ a target space to a BOLD series in a single cubic interpolation. With it:
 `lx.ndimage`, SciPy's `map_coordinates` and spline prefilter underneath.
 
 **Replica.** Ported from fMRIPrep (`fmriprep/interfaces/resampling.py`, `utils/transforms.py`,
-commit `21a490fb`, Apache-2.0), nitransforms 25.1.0 (MIT), SciPy 1.15.2's `scipy/ndimage`
-(BSD-3-Clause) and nibabel 5.4.2 (MIT), with their notices
+commit `21a490fb`, Apache-2.0), nitransforms 25.1.0 (MIT), SciPy's `scipy/ndimage` (1.15.2,
+following SciPy 1.18.1 since 2026-10-29; BSD-3-Clause) and nibabel 5.4.2 (MIT), and numpy's 4 × 4
+arithmetic on OpenBLAS's Haswell kernels (numpy 2.5.4 with OpenBLAS 0.3.34, unchanged from 2.3.5
+with 0.3.30), with their notices
 ([NOTICE](../../NOTICE); provenance:
 [larmorx-transform](../../crates/larmorx-transform/PROVENANCE.md),
 [larmorx-interp](../../crates/larmorx-interp/PROVENANCE.md)).
@@ -87,8 +89,8 @@ affine and a float32 header: the target's, with the source's time step.
 | `jacobian` (mandatory) | `jacobian` (default `True`, `resample_image`'s default) | |
 | `num_threads` | `n_threads` | 0 = all; the result does not depend on it |
 | `output_data_type` (`float32`) | `output_dtype` | `float32` or `float64` |
-| `order` (3), `mode` (`grid-constant`), `cval` (0), `prefilter` (True) | the same | SciPy's `map_coordinates` settings; every SciPy mode and order 0–5 (`reflect`, `grid-mirror` and `nearest` with the exact boundary by default, SCI-03) |
-| – | `upstream_defects` | `"fix"` (default) corrects PIPE-03, PIPE-04 and SCI-03; `"reproduce"` gives fMRIPrep's result bit for bit |
+| `order` (3), `mode` (`grid-constant`), `cval` (0), `prefilter` (True) | the same | SciPy's `map_coordinates` settings; every SciPy mode and order 0–5 (`reflect`, `grid-mirror` and `nearest` with SciPy 1.18.1's exact boundary, SCI-03 fixed upstream) |
+| – | `upstream_defects` | `"fix"` (default) corrects PIPE-03 and PIPE-04; `"reproduce"` gives fMRIPrep's result bit for bit (with SciPy 1.18.1) |
 | – (output file `*_resampled.nii.gz`) | – | the image is returned; `lx.save` writes it |
 
 ### Transforms (`lx.transforms`)
@@ -133,7 +135,7 @@ the result, in both modes ([upstream-defects.md](upstream-defects.md); register 
 |---|---|---|
 | PIPE-03 | `ResampleSeries` multiplies by `1 + np.gradient(vsm, axis=pe)`: the gradient along the *target* array axis whose index is the source's phase-encoding axis, in target voxels. It is the Jacobian only when the target's axes are the source's (the native boldref); in T1w or standard space it is taken along another direction (a target whose axes are permuted or flipped relative to the BOLD grid) or at another scale (a target voxel smaller than the source's: the derivative per target voxel is a fraction of the derivative per source voxel) | `1 + ∇_t vsm · ∂t/∂s_pe`, the Jacobian determinant of the corrected mapping relative to the uncorrected one (the matrix determinant lemma), with `∂t/∂s_pe` column `pe` of the inverse Jacobian of the map from target voxels to source voxels: exact for a chain of affines, by central differences (±0.5 voxel) through a displacement field. Where the target's axes are the source's, it is fMRIPrep's float32 value bit for bit. Head motion is left out, as in fMRIPrep |
 | PIPE-04 | nitransforms reads the transforms of a composite `.h5` file in h5py's name order, so a composite of 10 or more transforms is applied out of order (`"10"` before `"2"`) | numeric order |
-| SCI-03 | SciPy's spline prefilter, for the reflect boundary (modes `reflect`, `grid-mirror`, `nearest`), reads a coefficient it has already updated, so its splines miss the samples on short axes (by up to 1e-2 on a 6-voxel axis, order 5) | the exact half-sample-symmetric initialisation: the splines pass through the samples |
+| SCI-03 | SciPy 1.15's spline prefilter, for the reflect boundary (modes `reflect`, `grid-mirror`, `nearest`), read a coefficient it had already updated, so its splines missed the samples on short axes (by up to 1e-2 on a 6-voxel axis, order 5) | fixed in SciPy 1.18, whose exact half-sample-symmetric initialisation larmorx follows in both modes since 2026-10-29 (no notice) |
 | SCI-02 | `lx.ndimage`: a NaN result written to a signed integer output, and a `cval` an integer input type cannot hold, are converted as x86-64 converts them (C leaves it undefined): `INT32_MIN` for int32, 0 once narrowed to int8 or int16 | NaN is 0, `cval` clamped to the type (NaN to 0), with a warning |
 
 fMRIPrep's own calls (`grid-constant`, composites of two or three transforms) meet only PIPE-03,

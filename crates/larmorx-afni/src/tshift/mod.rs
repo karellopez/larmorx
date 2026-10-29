@@ -163,11 +163,7 @@ pub fn tshift(bricks: &mut Bricks, params: &TshiftParams) -> Result<Vec<Notice>,
 }
 
 /// The notices of [`tshift`]: AFNI-01 when a shifted slice has a negative brick factor.
-fn notices(
-    factors: &[f32],
-    kernels: &[Option<Kernel>],
-    params: &TshiftParams,
-) -> Vec<Notice> {
+fn notices(factors: &[f32], kernels: &[Option<Kernel>], params: &TshiftParams) -> Vec<Notice> {
     let mode = params.upstream_defects;
     let shifted = kernels.iter().filter(|k| k.is_some()).count();
     let mut out = Vec::new();
@@ -500,14 +496,18 @@ mod tests {
         let mut a0 = vec![1000.0; nt];
         (a0[7], a0[8], a0[15]) = (1002.5, 1007.5, 1000.15625);
         let mut b0 = vec![5000.0; nt];
-        (b0[3], b0[4], b0[15]) = (5002.5, 5007.5, 5000.15625);
+        (b0[3], b0[4], b0[15]) = (5002.5, 5007.5, 5000.0 + 0.15625);
         let mut a1 = vec![1000.0; nt];
         (a1[0], a1[8], a1[9]) = (1000.15625, 1007.5, 1002.5);
         let mut b1 = vec![5000.0; nt];
-        (b1[0], b1[4], b1[5]) = (5000.15625, 5007.5, 5002.5);
+        (b1[0], b1[4], b1[5]) = (5000.0 + 0.15625, 5007.5, 5002.5);
         for mode in [UpstreamDefects::Fix, UpstreamDefects::Reproduce] {
             let (out, notices) = no_detrend_pairs(mode);
-            assert_eq!(out, [a0.clone(), b0.clone(), a1.clone(), b1.clone()], "{mode}");
+            assert_eq!(
+                out,
+                [a0.clone(), b0.clone(), a1.clone(), b1.clone()],
+                "{mode}"
+            );
             assert!(notices.is_empty(), "{mode}: {notices:?}");
         }
     }

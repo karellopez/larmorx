@@ -12,6 +12,11 @@ larmorx-io.workspace = true
 # atan2 only: larmorx_core::math has no correctly rounded port of it yet (CLAUDE.md rule 5).
 libm.workspace = true
 rayon.workspace = true
+# FSL 6.0.7.23's compressed images (specs/mcflirt.md §4.1, §10.1): gzip, zstd and bzip2, pure Rust.
+flate2.workspace = true
+bytemuck.workspace = true
+ruzstd.workspace = true
+bzip2.workspace = true
 thiserror.workspace = true
 
 [dev-dependencies]

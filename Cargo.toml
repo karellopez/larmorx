@@ -34,5 +34,8 @@ libm = "0.2.16"
 # zlib-rs: the pure-Rust zlib implementation (no C zlib).
 flate2 = { version = "1.1.10", default-features = false, features = ["zlib-rs", "runtime_detection"] }
 crc32fast = "1.5.2"
+# Pure-Rust zstd and bzip2 (libbz2-rs-sys, bzip2's default backend): FSL 6.0.7.23's output types.
+ruzstd = "0.9.1"
+bzip2 = "0.6.1"
 proptest = "1.11.0"
 tempfile = "3.27.0"

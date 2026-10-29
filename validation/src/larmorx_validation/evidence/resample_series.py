@@ -104,6 +104,63 @@ def _fmriprep_out() -> Path:
     return p[0]
 
 
+#: The entry of fMRIPrep's resampler run in each kept Python environment (the version update's
+#: part 3, 2026-10-29: numpy 2.5.4 and SciPy 1.18.1 beside numpy 2.3.5 and SciPy 1.15.3).
+NUMERICS_CASE = "fmriprep-ds005040-native-numerics"
+
+
+def _compute_numerics(e: fcache.Entry) -> None:
+    import json
+
+    from larmorx_validation.parity import python_versions as pv
+
+    run, _nd, inputs = _node()
+    spec = dict(inputs)
+    for k in ("in_file", "ref_file", "fieldmap"):
+        spec[k] = str(e.input(f"the node's {k}", Path(run.host(inputs[k]))))
+    spec["transforms"] = [
+        str(e.input(f"the node's transforms[{i}]", Path(run.host(t))))
+        for i, t in enumerate(inputs["transforms"])
+    ]
+    spec.pop("num_threads", None)
+    (e.dir / "inputs.json").write_text(json.dumps(spec, indent=1), encoding="utf-8")
+    for name in (pv.NEWEST, pv.SHARED):
+        py = pv.prefix(name)
+        if py is None:
+            raise FileNotFoundError(f"the {name} Python environment ({pv.ENVS[name]})")
+        e.run(
+            f"fmriprep-{name}",
+            [
+                str(py / "bin" / "python"),
+                "-m",
+                "larmorx_validation.evidence.resample_series_run",
+                str(e.dir / "inputs.json"),
+                str(e.dir / f"fmriprep-{name}.nii.gz"),
+            ],
+            env={
+                "PYTHONPATH": str(e.ctx.repo / "validation" / "src"),
+                "OPENBLAS_CORETYPE": "Haswell",
+            },
+        )
+    e.finish(
+        settings="fMRIPrep's ResampleSeries (nipype, fMRIPrep at 21a490fb as installed in each "
+        "environment) on the node's own inputs, in oracles/python-newest (numpy 2.5.4 with "
+        "OpenBLAS 0.3.34, SciPy 1.18.1) and in the shared .venv (numpy 2.3.5 with OpenBLAS "
+        "0.3.30, SciPy 1.15.3), OpenBLAS's Haswell kernels",
+    )
+
+
+def numerics_entry(ctx: core.Context) -> fcache.Entry:
+    return fcache.entry(
+        ctx.figures_context(),
+        TOOL,
+        NUMERICS_CASE,
+        "fMRIPrep's resampler on ds005040 sub-002's native node, with the newest numerical "
+        "releases and with the shared environment's",
+        _compute_numerics,
+    )
+
+
 def entry(ctx: core.Context) -> fcache.Entry:
     return fcache.entry(
         ctx.figures_context(),
@@ -211,6 +268,26 @@ def _native(ctx: core.Context, reg: dict) -> dict:
         ),
     ]:
         ex.add(exm.Panel(pid, role, label, sub, {"series": vols(src)}))
+    # fMRIPrep's resampler on this machine with the newest numerical releases and with the
+    # shared environment's (the version update's part 3).
+    ne = numerics_entry(ctx)
+    newest = common.load(str(ne.dir / "fmriprep-newest.nii.gz"))
+    shared = common.load(str(ne.dir / "fmriprep-shared.nii.gz"))
+    for pid, src, label, sub in [
+        (
+            "fmriprep-newest",
+            newest,
+            "fMRIPrep's resampler, numpy 2.5.4 / SciPy 1.18.1",
+            "ResampleSeries here, the newest releases (oracles/python-newest), larmorx's reference",
+        ),
+        (
+            "fmriprep-shared",
+            shared,
+            "fMRIPrep's resampler, numpy 2.3.5 / SciPy 1.15.3",
+            "ResampleSeries here, the shared environment's releases",
+        ),
+    ]:
+        ex.add(exm.Panel(pid, "fmriprep", label, sub, {"series": vols(src)}))
     dd = common.d
     diffs = [
         dd(
@@ -237,6 +314,22 @@ def _native(ctx: core.Context, reg: dict) -> dict:
             "larmorx: 1 thread − 8 threads",
             common.ROLE_SELF,
         ),
+        dd(
+            "lx-newest",
+            "larmorx",
+            "fmriprep-newest",
+            "main",
+            "larmorx − fMRIPrep's resampler, numpy 2.5.4 / SciPy 1.18.1",
+            common.ROLE_FMRIPREP,
+        ),
+        dd(
+            "newest-shared",
+            "fmriprep-newest",
+            "fmriprep-shared",
+            "variability",
+            "numpy 2.5.4 / SciPy 1.18.1 − numpy 2.3.5 / SciPy 1.15.3 (fMRIPrep's resampler)",
+            "the original against itself: the version step",
+        ),
     ]
     outputs = [{"id": "series", "label": "Resampled series", "unit": ""}]
     full = {
@@ -244,6 +337,8 @@ def _native(ctx: core.Context, reg: dict) -> dict:
         "larmorx-1": {"series": lx["larmorx-1-reproduce"]},
         "larmorx-fix": {"series": lx["larmorx-8"]},
         "fmriprep": {"series": fdata},
+        "fmriprep-newest": {"series": newest},
+        "fmriprep-shared": {"series": shared},
     }
     # every volume compared (the panels hold a few), over the files
     for x in diffs:
@@ -254,6 +349,22 @@ def _native(ctx: core.Context, reg: dict) -> dict:
     warned = (e.dir / "larmorx-8.warnings.txt").read_text(encoding="utf-8")
     for x in diffs:
         i, links = x["id"], []
+        if i == "newest-shared":
+            x["verdict"] = None
+            x["reason"] = (
+                "The version step, a reference row (the original against itself): with numpy "
+                "2.5.4 and SciPy 1.18.1 fMRIPrep's resampler gives "
+                + (
+                    "the same values as with numpy 2.3.5 and SciPy 1.15.3, every one: this call "
+                    "(mode `grid-constant`) meets none of the newest releases' changes (SciPy "
+                    "1.18 changed only the reflect boundary's initialisation, SCI-03)."
+                    if same[i]
+                    else "other values than with numpy 2.3.5 and SciPy 1.15.3."
+                )
+            )
+            links.append({"label": "the record", "href": f"docs/validation/{TOOL}.md"})
+            x["links"] = links
+            continue
         if same[i]:
             x["verdict"] = "bit-identical"
             x["reason"] = {
@@ -262,6 +373,9 @@ def _native(ctx: core.Context, reg: dict) -> dict:
                 "fix-lx": "On the BOLD's own grid PIPE-03's Jacobian and the corrected one agree "
                 "(the target's axes are the source's): the default mode gives the same bytes.",
                 "lx1-lx8": "The same bytes on any number of threads.",
+                "lx-newest": "Every value is that of fMRIPrep's resampler with the newest "
+                "releases, numpy 2.5.4 (OpenBLAS 0.3.34) and SciPy 1.18.1, which larmorx "
+                "follows since 2026-10-29.",
             }[i]
             if i == "fix-lx":
                 links.append({"label": "PIPE-03", "href": reg["PIPE-03"]["link"]})
@@ -280,7 +394,7 @@ def _native(ctx: core.Context, reg: dict) -> dict:
         "voxel": at,
         "t": t0,
         "panels": ["bold", "fmriprep", "larmorx", "larmorx-fix"],
-        "diffs": ["lx-fmriprep", "fix-lx"],
+        "diffs": ["lx-fmriprep", "fix-lx", "lx-newest"],
         "compare": {"a": "bold", "b": "larmorx"},
     }
     out = common.finish(
@@ -331,6 +445,14 @@ def _native(ctx: core.Context, reg: dict) -> dict:
                 f"`lx.transforms.resample_series` at commit `{info['larmorx_commit'][:12]}`",
             },
             {"label": "Volumes", "text": "shown: file volumes " + ", ".join(map(str, shown))},
+            {
+                "label": "Versions",
+                "text": "fMRIPrep's own output ran in its 25.2.6 image; fMRIPrep's resampler ran "
+                "here too on the node's inputs, with the newest numerical releases (numpy 2.5.4 "
+                "with OpenBLAS 0.3.34, SciPy 1.18.1: larmorx's reference since 2026-10-29) and "
+                "with the shared environment's (numpy 2.3.5, SciPy 1.15.3), the version step a "
+                "reference row",
+            },
         ],
         **out,
         "chain": None,

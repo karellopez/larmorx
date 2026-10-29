@@ -175,6 +175,13 @@ dependencies = [
 ]
 
 [[package]]
+name = "lapack-probe"
+version = "0.0.0"
+dependencies = [
+ "larmorx-nc-core",
+]
+
+[[package]]
 name = "larmorx-core"
 version = "0.0.1"
 dependencies = [

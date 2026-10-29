@@ -70,6 +70,13 @@ ENV_FAMILIES = {
     "afni": ("AFNI_", "NIML_", "OMP_", "GOMP_", "HOME"),
     "fsl": ("FSL*", "OMP_", "GOMP_"),
 }
+#: Variables in the key of a program of one family only, not of a run that names no family:
+#: OpenBLAS's variables choose the kernels of FSL 6.0.7.23's matrix arithmetic
+#: (``OPENBLAS_CORETYPE``: the last bits of its inverses and solves;
+#: ``parity.fsl_versions.OPENBLAS_CORE``, since 2026-10-29), while the harness's own environment
+#: sets ``OPENBLAS_CORETYPE`` for numpy (``scripts/orchestration/env.sh``), which no program of
+#: the other families reads.
+FAMILY_ONLY_ENV = {"fsl": ("OPENBLAS_",)}
 
 
 #: Files programs write into ``HOME`` and never read (left out of its digest): AFNI's crash log
@@ -81,7 +88,7 @@ def env_names(family: str | None) -> tuple[str, ...]:
     """The variables in the key of a program of ``family`` (``None``: of any family)."""
     if family is None:
         return COMMON_ENV + tuple(n for names in ENV_FAMILIES.values() for n in names)
-    return COMMON_ENV + ENV_FAMILIES[family]
+    return COMMON_ENV + ENV_FAMILIES[family] + FAMILY_ONLY_ENV.get(family, ())
 
 
 def env_matters(name: str, family: str | None = None, env: dict[str, str] | None = None) -> bool:

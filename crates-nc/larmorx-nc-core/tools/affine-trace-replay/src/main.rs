@@ -10,11 +10,14 @@
 //! doubles. Each differing call is explained down to `rotmat2euler`'s `atan2f` arguments, with
 //! the port's and the platform's `atan2f` side by side.
 //!
+//! The `RMS` lines of `nan_rms.cc` (FSL's `rms_deviation` on pairs of affines) are replayed
+//! through `larmorx_nc_core::miscmaths::rms_deviation` the same way.
+//!
 //! Usage: `affine-trace-replay <trace.txt>`. Exits 0 when every call agrees.
 
 use larmorx_nc_core::arma::{self, Mat};
 use larmorx_nc_core::fdlibm::atan2f;
-use larmorx_nc_core::miscmaths::{decompose_aff, dot_f, norm2};
+use larmorx_nc_core::miscmaths::{decompose_aff, dot_f, norm2, rms_deviation};
 use std::io::BufRead;
 
 fn hex(s: &str) -> Vec<f64> {
@@ -88,8 +91,38 @@ fn main() {
         .expect("usage: affine-trace-replay <trace.txt>");
     let f = std::io::BufReader::new(std::fs::File::open(&path).expect("trace file"));
     let (mut n, mut bad) = (0usize, 0usize);
+    let (mut nr, mut badr) = (0usize, 0usize);
     for line in f.lines() {
         let line = line.expect("trace line");
+        if let Some(pos) = line.find("RMS ") {
+            // RMS <a1> <a2> <centre> <rmax float> -> <rms float> (nan_rms.cc)
+            let p: Vec<&str> = line[pos..].split_whitespace().collect();
+            let to_mat = |v: Vec<f64>| {
+                let mut rows = [0.0f64; 16];
+                for r in 0..4 {
+                    for col in 0..4 {
+                        rows[r * 4 + col] = v[col * 4 + r];
+                    }
+                }
+                Mat::from_rows(4, 4, &rows)
+            };
+            let f32x = |h: &str| f32::from_bits(u32::from_str_radix(h, 16).expect("hex float"));
+            let (a1, a2, c) = (to_mat(hex(p[1])), to_mat(hex(p[2])), hex(p[3]));
+            let (rmax, want) = (f32x(p[4]), f32x(p[6]));
+            let got = rms_deviation(&a1, &a2, &Mat::col(&c), rmax).unwrap_or(f32::NAN);
+            if got.to_bits() != want.to_bits() {
+                badr += 1;
+                if badr <= 20 {
+                    println!(
+                        "rms {nr} (0-based): FSL {want:e} ({:#010x}), replica {got:e} ({:#010x})",
+                        want.to_bits(),
+                        got.to_bits()
+                    );
+                }
+            }
+            nr += 1;
+            continue;
+        }
         let Some(pos) = line.find("DEC ") else {
             continue;
         };
@@ -129,5 +162,8 @@ fn main() {
         n += 1;
     }
     println!("{n} decompose_aff calls, {bad} differ");
-    std::process::exit(i32::from(bad > 0));
+    if nr > 0 {
+        println!("{nr} rms_deviation calls, {badr} differ");
+    }
+    std::process::exit(i32::from(bad + badr > 0));
 }

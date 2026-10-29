@@ -1,0 +1,10 @@
+[package]
+name = "lapack-probe"
+description = "Runs larmorx-nc-core's LAPACK port and Armadillo 14.2.1 rules on the records of validation/investigations/version-numerics/lapack_probe.py, which compares them bit for bit with FSL 6.0.7.23's own LAPACK (development tool)"
+version = "0.0.0"
+edition.workspace = true
+license.workspace = true
+publish = false
+
+[dependencies]
+larmorx-nc-core.workspace = true

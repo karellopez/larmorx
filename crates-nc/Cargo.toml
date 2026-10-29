@@ -13,6 +13,7 @@ members = [
     "larmorx-nc-core",
     "larmorx-nc-core/tools/glibc-float-verify",
     "larmorx-nc-core/tools/affine-trace-replay",
+    "larmorx-nc-core/tools/lapack-probe",
     "larmorx-nc-mcflirt",
     "larmorx-nc-bet",
     "larmorx-nc-core/tools/libm-verify",

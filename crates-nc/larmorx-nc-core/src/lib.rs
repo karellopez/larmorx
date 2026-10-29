@@ -47,6 +47,7 @@ pub mod glibc_float;
 pub mod interp;
 pub mod istream;
 pub mod kernel;
+pub mod lapack;
 pub mod mesh;
 pub mod miscmaths;
 pub mod newimagefns;

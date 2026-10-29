@@ -192,7 +192,8 @@ def environment(
     version: str | None = None,
 ) -> dict[str, str]:
     """The environment both programs run in: no FSL program on the PATH, ``FSLDIR`` for the
-    ``bet`` script, an empty ``HOME``, the case's ``FSLOUTPUTTYPE`` and variables."""
+    ``bet`` script, an empty ``HOME``, the case's ``FSLOUTPUTTYPE`` and variables, and
+    OpenBLAS's Haswell core (``fsl_versions.OPENBLAS_CORE``)."""
     env = {
         "HOME": str(home()),
         "PATH": "/usr/bin:/bin",
@@ -200,6 +201,8 @@ def environment(
         "FSLOUTPUTTYPE": output_type,
         "LC_ALL": "C",
         "OMP_NUM_THREADS": "2",
+        # FSL 6.0.7.23's matrix arithmetic on OpenBLAS's Haswell kernels (fsl_versions).
+        **fsl_versions.openblas_env(),
     }
     for name, value in extra:
         if value is None:

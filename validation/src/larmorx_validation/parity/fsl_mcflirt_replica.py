@@ -142,12 +142,14 @@ class Completed:
 def _environment(settings: dict[str, str | None], version: str | None = None) -> dict[str, str]:
     """mcflirt's clean environment (``oracles/fsl-6.0.7/mcflirt/README.md``): ``HOME``, a
     ``PATH`` without FSL, ``FSLDIR``, ``FSLOUTPUTTYPE=NIFTI_GZ`` unless ``settings`` change it
-    (``None`` unsets a variable)."""
+    (``None`` unsets a variable), and OpenBLAS's Haswell core (``fsl_versions.OPENBLAS_CORE``:
+    FSL 6.0.7.23's matrix arithmetic depends on the core)."""
     env = {
         "HOME": os.environ.get("HOME", str(Path.home())),
         "PATH": "/usr/bin:/bin",
         "FSLDIR": str(fsldir(version)),
         "FSLOUTPUTTYPE": "NIFTI_GZ",
+        **fsl_versions.openblas_env(),
     }
     for k, v in settings.items():
         if v is None:

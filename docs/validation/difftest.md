@@ -153,7 +153,9 @@ the machine swapped until the editor and every agent running in it went down. Si
   `selftest-memory` and the test `test_a_case_over_the_memory_limit_is_recorded_and_the_night_goes_on`
   prove it on a real boxed night);
 - **time**: each run has its alarm (the tool's timeout) and each case its deadline, past which
-  its worker's process group is killed (*timeout*);
+  its worker's process group is killed (*timeout*); then every other process of the worker's
+  leaf is stopped as well (`Leaf.stop_others`, 2026-10-29: killing a program kills that process
+  only, and a script's own children, FSL's `bet` running `bet2`, had lived on for hours);
 - **address space** (2026-10-28): every original program runs under `RLIMIT_AS` = 64 GiB
   (`larmorx_validation.address_space`, `LARMORX_ADDRESS_SPACE_LIMIT`), inherited by what it
   starts, and larmorx's in-process runs of the ANTs image programs with the worker's soft limit

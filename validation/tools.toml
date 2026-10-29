@@ -160,7 +160,7 @@ eco = "fsl"
 page = "/tools/fsl-bet/"
 use = ["larmorx fsl bet", "larmorx fsl bet2", "larmorx fsl betsurf", "lx.fsl.bet", "lx.fsl.betsurf"]
 how = "exact replica in `larmorx-nc` (FSL Licence, non-commercial); clean-room original planned (`specs/bet.md`)"
-validation = "[{fsl-bet-replica.pass} of {fsl-bet-replica.compared}](record:fsl-bet-replica) compared cases bit-identical to FSL 6.0.7.23, every file, exit status and message ([{fsl-bet-replica-full.pass} of {fsl-bet-replica-full.compared}](record:fsl-bet-replica-full) in the full tier against FSL 6.0.7.17, the data panel's T1w images included), fMRIPrep's {fsl-bet-replica.fmriprep} BET calls on every oracle run with BOLD runs included; {fsl-bet-replica.both} more rejected by both, alike; {fsl-bet-replica.filled} where FSL crashes and `reproduce` fills what it leaves undefined; `bet -S`, `-B`, `-A`, `-A2` pending (FLIRT, FAST)"
+validation = "[{fsl-bet-replica.pass} of {fsl-bet-replica.compared}](record:fsl-bet-replica) compared cases bit-identical to FSL 6.0.7.23, every file, exit status and message ([{fsl-bet-replica-full.pass} of {fsl-bet-replica-full.compared}](record:fsl-bet-replica-full) in the full tier against FSL 6.0.7.17, the data panel's T1w images included), fMRIPrep's {fsl-bet-replica.fmriprep} BET calls on every oracle run with BOLD runs included; {fsl-bet-replica.both} more rejected by both, alike; {fsl-bet-replica.filled} where FSL crashes and `reproduce` fills what it leaves undefined; {fsl-bet-replica.memory} where FSL's fill reads memory beyond the volume (FSL-43, undefined); `bet -S`, `-B`, `-A`, `-A2` pending (FLIRT, FAST)"
 
 # ------------------------------------------------------------------------------------------------
 # Records: the validation index's table (docs/validation/README.md), in this order.
@@ -361,7 +361,7 @@ status = "`validated` ({fsl-mcflirt-replica-full.pass} of {fsl-mcflirt-replica-f
 id = "fsl-bet-replica"
 larmorx = "`larmorx-nc fsl bet`, `bet2`, `betsurf`; `lx.fsl.bet`, `lx.fsl.betsurf` (the replica, FSL Licence)"
 reference = "bet, bet2 and betsurf (FSL 6.0.7.23 since 2026-10-29, FSL's own step from 6.0.7.17 in every case; fMRIPrep's calls also against fMRIPrep's own outputs and its image's FSL)"
-status = "`validated` ({fsl-bet-replica.pass} of {fsl-bet-replica.compared} compared cases bit-identical, fMRIPrep's {fsl-bet-replica.fmriprep} calls included; {fsl-bet-replica.both} rejected by both, with the same messages and status; {fsl-bet-replica.filled} where FSL crashes and `reproduce` fills what it leaves undefined; {fsl-bet-replica.pending} pending FLIRT and FAST)"
+status = "`validated` ({fsl-bet-replica.pass} of {fsl-bet-replica.compared} compared cases bit-identical, fMRIPrep's {fsl-bet-replica.fmriprep} calls included; {fsl-bet-replica.both} rejected by both, with the same messages and status; {fsl-bet-replica.filled} where FSL crashes and `reproduce` fills what it leaves undefined; {fsl-bet-replica.memory} where FSL's fill reads memory beyond the volume (FSL-43); {fsl-bet-replica.pending} pending FLIRT and FAST)"
 
 [[record]]
 id = "fsl-bet-replica-full"

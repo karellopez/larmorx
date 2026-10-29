@@ -145,15 +145,18 @@ def _unifize(doc: dict) -> dict[str, int]:
 
 
 def _bet(doc: dict) -> dict[str, int]:
-    """BET's replica: fMRIPrep's calls (the category ``fmriprep``) and the two kinds of
+    """BET's replica: fMRIPrep's calls (the category ``fmriprep``) and the three kinds of
     expected divergence: FSL crashes and ``reproduce`` fills what it leaves undefined
-    (``filled``), options that run FSL programs not replicated yet (``pending``)."""
+    (``filled``), options that run FSL programs not replicated yet (``pending``), FSL's fill
+    reading memory beyond the volume (``memory``, FSL-43)."""
     res = doc["results"]
     expected = [r for r in res if r["status"] == "expected-divergence"]
     return {
         "fmriprep": sum(r["category"] == "fmriprep" for r in res),
         "filled": sum(r["reason"].startswith("FSL crashes (status") for r in expected),
         "pending": sum(r["reason"].startswith("needs FSL programs") for r in expected),
+        # FSL-43's fill reading memory beyond the volume (2026-10-29): FSL's values undefined
+        "memory": sum(r["reason"].startswith("FSL-43: ") for r in expected),
     }
 
 

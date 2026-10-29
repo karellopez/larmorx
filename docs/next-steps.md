@@ -274,6 +274,14 @@ The items below keep their history.
     before a fix; N4 #777, which passed the suite's 30-minute run limit while swapping); each with
     its prediction and command line in the night's `heavy-results.jsonl` (verdict "pending:
     larger machine"; `validation/investigations/difftest/heavy_pending.py` prints them).
+    **The 17 that fit the new main machine ran on 2026-10-28 and 29** (one at a time, 60 GiB and
+    48 GiB of swap; `oracles/difftest/2026-10-25/run-heavy-here.sh`, `run-heavy-here-2.sh`): 13
+    agree (N4 #650 after 17.6 h), 2 notices that change no value (ResampleImageBySpacing #1278,
+    ANTS-32; N4 #473, ANTS-35), and ResampleImage #556 and ResampleImageBySpacing #938 exceed
+    60 GiB (their comparison holds both outputs: about 110 GiB, later). No difference. The run
+    stopped once starting a case (a `PermissionError` writing the case's cgroup `memory.max`; no
+    system change; the restart ran the last four without it): if it recurs, look at
+    `difftest/limits.py`'s leaf creation. The 8 beyond this machine wait for the lab's server.
   - ITK-01's notice is missing where the exact floor reaches antsRegistration's
     displacement-field lookups (`FieldXfm`): a value changes in its last bit by default with no
     notice (`reproduce` is exact; `ants-registration:20261025:428`).

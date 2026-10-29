@@ -99,3 +99,11 @@ black-box runs of mcflirt (`~/fsl-6.0.7.23/bin/mcflirt`), the replica program an
   its data file under the name given; the `.mat` directory and `.par` never renamed). FSL-59:
   `-sinc_final` and `-nn_final` give the default run's series with `reproduce`, as mcflirt
   6.0.7.23's do, and are named where the two series differ.
+- **Random testing against FSL 6.0.7.23** (a trial of 0.5 h, 2,826 cases, 2026-10-29): 1,732
+  phantoms beyond the record's thresholds, as well aligned as mcflirt's for every cost (median
+  ratio of the temporal standard deviations 0.999 to 1.001 per cost; `normmi` 1.085 before this
+  part): the several-minima class of the first long run. One case names FSL-01 in `reproduce`
+  only (`mri-hmc:20261029:45`: `-cost corratio` on a thin slab, where the default's FSL-03
+  correction leaves the previous volume's matrix at the identity, so FSL-01 changes nothing
+  there): reported, not changed in this part
+  ([`validation/investigations/cleanroom-align/README.md`](../../validation/investigations/cleanroom-align/README.md)).

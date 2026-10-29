@@ -73,3 +73,37 @@ it: `-nn_final` and `-sinc_final` resample trilinearly as mcflirt 6.0.7.23 does 
 check that names FSL-59 stops at the first value that differs), and header slice code 2 is
 shifted as AFNI 26.3.05 shifts it (AFNI 25.2.09 copied the slices unshifted). The default mode,
 whose output did not change, takes the same time.
+
+## The random-testing trial against the newest originals (2026-10-29)
+
+`difftest --tools afni-tshift,afni-automask,afni-unifize,mri-hmc --budget 0.5 --afni-version
+26.3.05 --fsl-version 6.0.7.23` (8 jobs, a box of 26 GiB; `<workspace>/oracles/difftest/2026-10-29-cleanroom-align/`):
+15,264 cases in 0.51 h.
+
+| Tool | Cases | Agree | Notice | Undefined | Differ | Memory |
+|---|---|---|---|---|---|---|
+| afni-automask | 4,727 | 4,723 | 4 | 0 | 0 | 0 |
+| afni-tshift | 5,676 | 5,607 | 36 | 33 | 0 | 0 |
+| afni-unifize | 2,035 | 2,019 | 5 | 0 | 0 | 11 |
+| mri-hmc | 2,826 | 1,094 | 0 | 0 | 1,732 | 0 |
+
+- The AFNI tools: no difference. Before the alignment, random testing against AFNI 26.3.05 had
+  found 190 findings and 62 notices, every one AFNI-03 or AFNI-05; none now. The notices are
+  corrections named where this input shows no change (AFNI-01, -07, -16, -45, as the report
+  lists them); the undefined cases are AFNI-20 (a one-row dataset AFNI writes as text with a
+  random identifier; the record's documented divergence); the memory cases are 3dUnifize `-EPI`
+  balls of neighbours beyond any machine, which the clean-room original has no guard for yet
+  (AFNI-75's addition, next-steps), queued as heavy cases.
+- The head-motion correction: 1,732 phantoms beyond the record's thresholds, the class the
+  permanent case `difftest/phantom-several-minima` explains (small phantoms moved by large
+  rotations: the cost has several minima). Measured on all 1,732 with `hmc_alignment_bin.py`
+  ([`results/hmc-alignment-trial-2026-10-29.jsonl`](results/hmc-alignment-trial-2026-10-29.jsonl)),
+  larmorx in `reproduce` against mcflirt 6.0.7.23, median ratio of the temporal standard
+  deviations: `normcorr` 1.000 (1,163; 821 within 1 %), `normmi` 1.001 (126; 57 within 1 %;
+  1.085 before), `mutualinfo` 0.999 (161; 63), `corratio` 1.000 (186; 81), `leastsquares` 0.999
+  (96; 70): as well aligned as mcflirt's for every cost. The worst ratios (up to 1.76, rotations
+  of 10° to 16°) are the same before and after this part. One case's notices differ between the
+  modes (`mri-hmc:20261029:45`, `-cost corratio -reffile` on a thin slab: by default FSL-01 is
+  not named, because the in-plane mode's FSL-03 correction leaves the previous volume at the
+  identity; reproduced, it is): a clean-room difference, reported for a later part (replay:
+  `python -m larmorx_validation difftest --replay <run>/findings/mri-hmc/20261029-00045-original.json`).

@@ -22,7 +22,7 @@ from pathlib import Path
 
 import numpy as np
 
-from larmorx_validation.evidence import common, core
+from larmorx_validation.evidence import common, core, fsl_step
 from larmorx_validation.figures import cache as fcache
 from larmorx_validation.figures import records
 
@@ -31,8 +31,15 @@ CASE = "fmriprep-ds000005-run-01"
 #: The replica's runs of the same command, a cache entry of their own (the entry above, with
 #: mcflirt's runs, stays as it was computed).
 CASE_REPLICA = "fmriprep-ds000005-run-01-replica"
-#: The replica's record (``python -m larmorx_validation parity fsl-mcflirt-replica``).
-REPLICA_RECORD = "fsl-mcflirt-replica"
+#: The replica's records: the full tier against FSL 6.0.7.17 (every case the site showed before
+#: the version update) and the standard tier against FSL 6.0.7.23 (``python -m
+#: larmorx_validation parity fsl-mcflirt-replica``; its full tier waits for the final validation
+#: phase).
+REPLICA_RECORD = "fsl-mcflirt-replica-full"
+REPLICA_RECORD_NEW = "fsl-mcflirt-replica"
+#: FSL 6.0.7.23's mcflirt and the replica's run compared with it, an entry of their own
+#: (``fsl_step``: the entries above stay as they were computed, with FSL 6.0.7.17).
+CASE_NEW = fsl_step.case(CASE)
 #: The replica's runs: label, D13 mode, threads (at most 3: the machine is shared).
 REPLICA_RUNS = (
     ("replica", "reproduce", "3"),
@@ -205,6 +212,64 @@ def replica_entry(ctx: core.Context) -> fcache.Entry:
     )
 
 
+def _compute_new(e: fcache.Entry) -> None:
+    """FSL 6.0.7.23's mcflirt and the replica (reproduce mode) on fMRIPrep's command, as the
+    FSL 6.0.7.17 entry ran it."""
+    import larmorx_testdata as td
+
+    from larmorx_validation.parity import fsl_versions
+    from larmorx_validation.parity.fsl_mcflirt_replica import replica_binary, replica_version
+
+    run = common.fmriprep_run(RUN)
+    fsl = fsl_versions.fsldir(fsl_step.NEW)
+    mcflirt = fsl / "bin" / "mcflirt"
+    exe = replica_binary()
+    if not mcflirt.is_file() or exe is None:
+        raise FileNotFoundError(f"{fsl_step.NEW_LABEL}'s mcflirt ({mcflirt}) or the replica")
+    command = (run / NODE / "command.txt").read_text(encoding="utf-8").strip()
+    bold = e.input("BOLD", Path(td.get(BOLD)))
+    ref = e.input("HMC reference (fMRIPrep's desc-hmc_boldref)", run / REF)
+    unset = (*common.CLEAN_ENV, "FSLDIR", "FSLOUTPUTTYPE", "LARMORX_UPSTREAM_DEFECTS")
+    for label, argv0, env in (
+        ("mcflirt23", [str(mcflirt)], {"FSLDIR": str(fsl), "FSLOUTPUTTYPE": "NIFTI_GZ"}),
+        (
+            "replica23",
+            [str(exe), "fsl", "mcflirt"],
+            {
+                "LARMORX_UPSTREAM_DEFECTS": "reproduce",
+                "FSLOUTPUTTYPE": "NIFTI_GZ",
+                "OMP_NUM_THREADS": "3",
+            },
+        ),
+    ):
+        (e.dir / label).mkdir(exist_ok=True)
+        out = str(e.dir / label / "out_mcf.nii.gz")
+        e.run(label, [*argv0, *_argv(command, str(bold), out, str(ref))], env=env, unset=unset)
+    e.finish(
+        versions={
+            "fsl": f"FSL {fsl_versions.version_of(fsl)} (mcflirt)",
+            "larmorx-nc": replica_version(),
+        },
+        command=command,
+        threads={"mcflirt": 1, "larmorx-nc": 3},
+        settings=f"fMRIPrep 25.2.6's mcflirt node of ds000005 sub-01 run 1 (its command.txt and "
+        f"its HMC reference), as the FSL 6.0.7.17 entry ran it: {fsl_step.NEW_LABEL}'s mcflirt "
+        "(~/fsl-6.0.7.23, never on the PATH) and the larmorx-nc replica in reproduce mode, 3 "
+        "threads",
+    )
+
+
+def entry_new(ctx: core.Context) -> fcache.Entry:
+    return fcache.entry(
+        ctx.figures_context(),
+        TOOL,
+        CASE_NEW,
+        f"fMRIPrep's head-motion correction of ds000005 sub-01 run 1: {fsl_step.NEW_LABEL}'s "
+        "mcflirt and the larmorx-nc replica",
+        _compute_new,
+    )
+
+
 def entry(ctx: core.Context) -> fcache.Entry:
     return fcache.entry(
         ctx.figures_context(),
@@ -263,6 +328,9 @@ def _example(ctx: core.Context, reg: dict) -> dict:
     re_ = replica_entry(ctx)
     rinfo = re_.info()
     rd = re_.dir
+    ne = entry_new(ctx)
+    ninfo = ne.info()
+    nd = ne.dir
     run = common.fmriprep_run(RUN)
     d = e.dir
     ref_path = run / REF
@@ -275,6 +343,7 @@ def _example(ctx: core.Context, reg: dict) -> dict:
         "larmorx-fix": _mats(d / "larmorx-fix" / "out_mcf.nii.gz.mat"),
         "fmriprep": _mats(run / NODE / FMRIPREP_MATS),
         **{k: _mats(rd / k / "out_mcf.nii.gz.mat") for k, _, _ in REPLICA_RUNS},
+        **{k: _mats(nd / k / "out_mcf.nii.gz.mat") for k in ("mcflirt23", "replica23")},
         **{
             f"mcflirt-{k}": _mats(d / f"mcflirt-{k}" / "out_mcf.nii.gz.mat", reverse=k == "reverse")
             for k in PERTURB
@@ -287,6 +356,8 @@ def _example(ctx: core.Context, reg: dict) -> dict:
     texts["fmriprep"] = [p.read_text() for p in sorted((run / NODE / FMRIPREP_MATS).glob("MAT_*"))]
     for k, _, _ in REPLICA_RUNS:
         texts[k] = [p.read_text() for p in sorted((rd / k / "out_mcf.nii.gz.mat").glob("MAT_*"))]
+    for k in ("mcflirt23", "replica23"):
+        texts[k] = [p.read_text() for p in sorted((nd / k / "out_mcf.nii.gz.mat").glob("MAT_*"))]
     cmp = {
         "larmorx": _compare_mats(mats["larmorx"], mats["mcflirt"], centre),
         "larmorx-fix": _compare_mats(mats["larmorx-fix"], mats["mcflirt"], centre),
@@ -300,6 +371,8 @@ def _example(ctx: core.Context, reg: dict) -> dict:
         "replica-fix-repro": _compare_mats(mats["replica-fix"], mats["replica"], centre),
         "replica-1": _compare_mats(mats["replica-1"], mats["replica"], centre),
         "lx-replica-fix": _compare_mats(mats["larmorx-fix"], mats["replica-fix"], centre),
+        "replica23": _compare_mats(mats["replica23"], mats["mcflirt23"], centre),
+        "mcflirt23": _compare_mats(mats["mcflirt23"], mats["mcflirt"], centre),
     }
     same_text = {k: texts[k] == texts["mcflirt"] for k in ("mcflirt-2", "fmriprep", "larmorx")}
     same_text["larmorx-1"] = texts["larmorx-1"] == texts["larmorx"]
@@ -309,6 +382,8 @@ def _example(ctx: core.Context, reg: dict) -> dict:
     n_ident_fix = sum(
         a == b for a, b in zip(texts["replica-fix"], texts["larmorx-fix"], strict=True)
     )
+    n_ident_23 = sum(a == b for a, b in zip(texts["replica23"], texts["mcflirt23"], strict=True))
+    n_ident_step = sum(a == b for a, b in zip(texts["mcflirt23"], texts["mcflirt"], strict=True))
     band = {
         k: max(cmp[p][k] for p in PERTURB)
         for k in ("rms_median", "rms_p95", "rms_max", "mm_median", "deg_median")
@@ -379,13 +454,13 @@ def _example(ctx: core.Context, reg: dict) -> dict:
         ),
         ("larmorx-1", "larmorx-1", "larmorx", "larmorx clean-room original", "reproduce, 1 thread"),
         ("larmorx-fix", "larmorx-fix", "larmorx", "larmorx clean-room original", "default mode"),
-        ("mcflirt", "mcflirt", "original", "mcflirt, FSL 6.0.7", "fMRIPrep's command"),
-        ("mcflirt-2", "mcflirt-2", "original", "mcflirt, FSL 6.0.7", "the same command again"),
+        ("mcflirt", "mcflirt", "original", "mcflirt, FSL 6.0.7.17", "fMRIPrep's command"),
+        ("mcflirt-2", "mcflirt-2", "original", "mcflirt, FSL 6.0.7.17", "the same command again"),
         (
             "mcflirt-reverse",
             "mcflirt-reverse",
             "original",
-            "mcflirt, FSL 6.0.7",
+            "mcflirt, FSL 6.0.7.17",
             "the volumes in reverse order (put back)",
         ),
     ]:
@@ -401,6 +476,14 @@ def _example(ctx: core.Context, reg: dict) -> dict:
     ):
         series[pid] = vols(common.load(str(rd / pid / "out_mcf.nii.gz")))
         ex.add(exm.Panel(pid, "larmorx", "larmorx-nc replica", sub, {"series": series[pid]}))
+    for pid, role, text, sub in (
+        ("mcflirt23", "original", f"mcflirt, {fsl_step.NEW_LABEL}",
+         f"fMRIPrep's command; {fsl_step.REFERENCE}"),
+        ("replica23", "larmorx", "larmorx-nc replica",
+         f"reproduce mode, 3 threads, following {fsl_step.NEW_LABEL}"),
+    ):  # fmt: skip
+        series[pid] = vols(common.load(str(nd / pid / "out_mcf.nii.gz")))
+        ex.add(exm.Panel(pid, role, text, sub, {"series": series[pid]}))
     dd = common.d
     diffs = [
         dd(
@@ -443,7 +526,14 @@ def _example(ctx: core.Context, reg: dict) -> dict:
             "mcflirt: reversed input − unperturbed",
             common.ROLE_ORIG,
         ),
-        dd("replica-mcflirt", "replica", "mcflirt", "main", "replica − mcflirt", common.ROLE_LX),
+        dd(
+            "replica-mcflirt",
+            "replica",
+            "mcflirt",
+            "main",
+            f"replica − mcflirt {fsl_step.OLD}",
+            common.ROLE_LX,
+        ),
         dd(
             "replica-fix-replica",
             "replica-fix",
@@ -468,6 +558,8 @@ def _example(ctx: core.Context, reg: dict) -> dict:
             "clean-room original − replica, both in their default mode",
             "the two implementations of the corrections",
         ),
+        fsl_step.replica_diff("replica23", "mcflirt23"),
+        fsl_step.step_diff("mcflirt23", "mcflirt"),
     ]
     outputs = [{"id": "series", "label": "Realigned series", "unit": ""}]
     common.compare_all(ex, diffs, outputs)
@@ -478,7 +570,7 @@ def _example(ctx: core.Context, reg: dict) -> dict:
 
     for x in diffs:
         i, links = x["id"], []
-        if x["kind"] == "variability":
+        if x["kind"] == "variability" and i != "mcflirt23-mcflirt":
             x["verdict"] = None
             x["reason"] = {
                 "mc2-mc": "mcflirt is deterministic: the same command gives the same bytes."
@@ -507,12 +599,29 @@ def _example(ctx: core.Context, reg: dict) -> dict:
             x["verdict"] = "bit-identical" if same[i] else "open"
             x["reason"] = (
                 f"The replica gives mcflirt's bytes: the realigned series and {n_ident_replica} of "
-                f"{n} matrices identical as text ({rv}, a translation of FSL 6.0.7's source with "
-                "glibc 2.35's float functions)."
+                f"{n} matrices identical as text ({rv} at the time, a translation of FSL "
+                "6.0.7.17's source with glibc 2.35's float functions)."
                 if same[i]
                 else "The replica should give mcflirt's bytes here; it does not (see the record)."
             )
             links += [{"label": "replica record", "href": f"docs/validation/{REPLICA_RECORD}.md"}]
+        elif i == "replica23-mcflirt23":
+            x["verdict"] = "bit-identical" if same[i] else "open"
+            x["reason"] = fsl_step.replica_reason(
+                same[i],
+                f" The realigned series and {n_ident_23} of {n} matrices identical as text "
+                f"({ninfo.get('versions', {}).get('larmorx-nc', 'larmorx-nc')}, following FSL "
+                f"{fsl_step.NEW}'s source).",
+            )
+            links += [
+                {"label": "replica record", "href": f"docs/validation/{REPLICA_RECORD_NEW}.md"}
+            ]
+        elif i == "mcflirt23-mcflirt":
+            x["verdict"] = None
+            x["reason"] = (
+                fsl_step.step_reason(same[i], "fMRIPrep's command", None)
+                + f" {n_ident_step} of {n} matrices identical as text."
+            )
         elif i == "replica-fix-replica":
             x["verdict"] = "d13" if not same[i] else "bit-identical"
             x["reason"] = (
@@ -692,7 +801,7 @@ def _example(ctx: core.Context, reg: dict) -> dict:
             row("mcflirt: noise3 − unperturbed", cmp["noise3"], "is-yardstick"),
             row("mcflirt: reversed − unperturbed", cmp["reverse"], "is-yardstick"),
             row(
-                "fMRIPrep's own matrices − mcflirt 6.0.7",
+                "fMRIPrep's own matrices − mcflirt 6.0.7.17",
                 cmp["fmriprep"],
                 "is-sep",
                 sub="identical as text" if same_text["fmriprep"] else "fMRIPrep's FSL in its image",
@@ -720,6 +829,18 @@ def _example(ctx: core.Context, reg: dict) -> dict:
                 cmp["lx-replica-fix"],
                 sub=f"{n_ident_fix} of {n} matrices identical as text",
             ),
+            row(
+                f"replica (reproduce) − mcflirt {fsl_step.NEW}",
+                cmp["replica23"],
+                "is-sep",
+                sub=f"{n_ident_23} of {n} matrices identical as text",
+            ),
+            row(
+                f"mcflirt {fsl_step.NEW} − {fsl_step.OLD}",
+                cmp["mcflirt23"],
+                "is-yardstick",
+                sub=f"the version step; {n_ident_step} of {n} matrices identical as text",
+            ),
         ],
         note="The record's thresholds: 95th percentile ≤ 0.1 mm, median parameter differences ≤ "
         "0.05 mm and 0.05°, FD r ≥ 0.99 where FD reaches 0.5 mm, each widened to mcflirt's own "
@@ -732,7 +853,7 @@ def _example(ctx: core.Context, reg: dict) -> dict:
             "x_label": "volume",
             "x": list(range(n)),
             "key": [
-                {"label": "mcflirt, FSL 6.0.7", "mark": "original"},
+                {"label": "mcflirt, FSL 6.0.7.17", "mark": "original"},
                 {"label": "larmorx clean-room original (reproduce)", "mark": "larmorx"},
                 {"label": "larmorx-nc replica (reproduce: mcflirt's bytes)", "mark": "replica"},
                 {
@@ -759,8 +880,10 @@ def _example(ctx: core.Context, reg: dict) -> dict:
         "title": "fMRIPrep's head-motion estimation of a real BOLD run, by mcflirt and larmorx",
         "summary": (
             "The mcflirt node fMRIPrep 25.2.6 ran on OpenNeuro ds000005 sub-01's first BOLD run "
-            "(240 volumes, its own HMC reference): its command given to FSL 6.0.7's mcflirt, to "
-            "the bit-exact replica (larmorx-nc) and to larmorx's clean-room original. fMRIPrep "
+            "(240 volumes, its own HMC reference): its command given to FSL 6.0.7.17's mcflirt, "
+            "to the bit-exact replica (larmorx-nc) and to larmorx's clean-room original, and to "
+            "FSL 6.0.7.23's mcflirt with the replica compared with it (the replica's reference "
+            "since the version update of 2026-10-29). fMRIPrep "
             "keeps only the matrices; the realigned "
             f"series are shown at {len(shown)} of the {n} volumes (where larmorx deviates most, "
             "the largest motion, the ends)."
@@ -785,6 +908,16 @@ def _example(ctx: core.Context, reg: dict) -> dict:
                 "label": "Volumes",
                 "text": "shown: file volumes " + ", ".join(map(str, shown)),
             },
+            fsl_step.fact(
+                same["mcflirt23-mcflirt"],
+                "fMRIPrep's command",
+                f"{ninfo.get('versions', {}).get('fsl', fsl_step.NEW_LABEL)} and "
+                f"{ninfo.get('versions', {}).get('larmorx-nc', 'larmorx-nc')} at commit "
+                f"`{(ninfo.get('larmorx_commit') or '')[:12]}`. The case explorer below shows the "
+                "replica's full-tier record (against FSL 6.0.7.17) and its standard record "
+                "(against FSL 6.0.7.23) side by side; the clean-room original's record runs "
+                "against 6.0.7.17's recorded runs until it is aligned with 6.0.7.23.",
+            ),
         ],
         **out,
         "lines": lines,
@@ -797,6 +930,7 @@ def _example(ctx: core.Context, reg: dict) -> dict:
             *common.provenance(info, f"{TOOL}/{CASE}", [common.DS000005]),
             # the replica's runs (the same data: its first line, "Data: ...", left out)
             *common.provenance(rinfo, f"{TOOL}/{CASE_REPLICA}", [common.DS000005])[1:],
+            *common.provenance(ninfo, f"{TOOL}/{CASE_NEW}", [common.DS000005])[1:],
         ],
     }
 
@@ -915,16 +1049,23 @@ def _cases(ctx: core.Context, rec) -> list[dict]:
     return out
 
 
-def _replica_cases(ctx: core.Context, cases: list[dict]) -> bool:
-    """The replica's record (``docs/validation/fsl-mcflirt-replica.json``) in the case explorer:
-    its replay of a recorded mcflirt run joins that run's case; its edge cases and fMRIPrep's
-    calls are cases of their own. False when the record is not there."""
-    path = ctx.repo / "docs" / "validation" / f"{REPLICA_RECORD}.json"
+def _replica_cases(
+    ctx: core.Context,
+    cases: list[dict],
+    record: str = REPLICA_RECORD,
+    impl: str = "replica",
+    version: str = fsl_step.OLD,
+) -> bool:
+    """A replica record (``docs/validation/<record>.json``, against FSL ``version``) in the
+    case explorer, as ``impl``'s results: its replay of a recorded mcflirt run joins that run's
+    case; its edge cases and fMRIPrep's calls are cases of their own (joined by the next record).
+    False when the record is not there."""
+    path = ctx.repo / "docs" / "validation" / f"{record}.json"
     if not path.is_file():
         return False
     rec = json.loads(path.read_text(encoding="utf-8"))
     by_id = {c["id"]: c for c in cases}
-    md = ctx.repo / "docs" / "validation" / f"{REPLICA_RECORD}.md"
+    md = ctx.repo / "docs" / "validation" / f"{record}.md"
     descs: dict[str, str] = {}
     if md.is_file():
         for line in md.read_text(encoding="utf-8").splitlines():
@@ -947,7 +1088,7 @@ def _replica_cases(ctx: core.Context, cases: list[dict]) -> bool:
             reason = (
                 "Every file mcflirt writes"
                 + (f" ({files})" if files else "")
-                + ", its exit status and both streams identical to mcflirt's (FSL 6.0.7.17 as "
+                + f", its exit status and both streams identical to mcflirt's (FSL {version} as "
                 "built), with the replica in reproduce mode."
             )
         elif r["status"] == "both-error":
@@ -957,6 +1098,9 @@ def _replica_cases(ctx: core.Context, cases: list[dict]) -> bool:
                 + r["reason"],
                 400,
             )
+        elif r["status"] == "expected-divergence":
+            verdict = "divergence"
+            reason = common.clip(r["reason"], 400)
         elif r["status"] == "skipped":
             continue
         else:
@@ -975,7 +1119,10 @@ def _replica_cases(ctx: core.Context, cases: list[dict]) -> bool:
             "reason": common.clip(reason, 400),
         }
         if kind == "recorded" and name in by_id:
-            by_id[name]["results"]["replica"] = result
+            by_id[name]["results"][impl] = result
+            continue
+        if kind != "recorded" and r["case"] in by_id:
+            by_id[r["case"]]["results"][impl] = result
             continue
         # A recorded run the original's record does not have (its full tier) keeps the
         # original's names: its run name and category.
@@ -983,15 +1130,15 @@ def _replica_cases(ctx: core.Context, cases: list[dict]) -> bool:
             "edge": "replica: edge cases",
             "fmriprep": "replica: fMRIPrep's calls",
         }.get(kind, r["category"].removeprefix("recorded: "))
-        cases.append(
-            {
-                "id": name if kind == "recorded" else r["case"],
-                "category": category,
-                "description": descs.get(r["case"], ""),
-                "command": "",
-                "results": {"replica": result},
-            }
-        )
+        c = {
+            "id": name if kind == "recorded" else r["case"],
+            "category": category,
+            "description": descs.get(r["case"], ""),
+            "command": "",
+            "results": {impl: result},
+        }
+        cases.append(c)
+        by_id[c["id"]] = c
     return True
 
 
@@ -1047,10 +1194,12 @@ def _open_table(cases: list[dict]) -> dict:
 
 
 def _replica_source(ctx: core.Context) -> list:
-    """The replica's record, as the provenance names a record (none before it is made)."""
-    if not (ctx.repo / "docs" / "validation" / f"{REPLICA_RECORD}.json").is_file():
-        return []
-    return records.load(ctx.repo, REPLICA_RECORD).source()
+    """The replica's records, as the provenance names a record (none before they are made)."""
+    out = []
+    for name in (REPLICA_RECORD, REPLICA_RECORD_NEW):
+        if (ctx.repo / "docs" / "validation" / f"{name}.json").is_file():
+            out += records.load(ctx.repo, name).source()
+    return out
 
 
 def export(ctx: core.Context) -> dict:
@@ -1059,6 +1208,7 @@ def export(ctx: core.Context) -> dict:
     cases = _cases(ctx, rec)
     open_table = _open_table(cases)
     has_replica = _replica_cases(ctx, cases)
+    has_replica_new = _replica_cases(ctx, cases, REPLICA_RECORD_NEW, "replica-23", fsl_step.NEW)
     bench = records.load_bench(ctx.repo, TOOL)
     from larmorx_validation.figures.mri_hmc import SPEED_LABELS
 
@@ -1090,7 +1240,11 @@ def export(ctx: core.Context) -> dict:
             "exporter": core.tree_hash(ctx.repo, "validation/src/larmorx_validation/evidence"),
             "records": rec.source() + _replica_source(ctx),
             "benchmarks": bench.source() if bench else [],
-            "cache": [fcache.provenance(e)],
+            "cache": [
+                fcache.provenance(e),
+                fcache.provenance(replica_entry(ctx)),
+                fcache.provenance(entry_new(ctx)),
+            ],
             "command": f"python -m larmorx_validation evidence {TOOL} --site <site>",
         },
         "implementations": [
@@ -1107,7 +1261,7 @@ def export(ctx: core.Context) -> dict:
                     common.implementation(
                         cases,
                         "replica",
-                        "larmorx-nc replica",
+                        "larmorx-nc replica, against FSL 6.0.7.17 (full tier)",
                         "replica",
                         f"docs/validation/{REPLICA_RECORD}.md",
                         "validated",
@@ -1115,6 +1269,21 @@ def export(ctx: core.Context) -> dict:
                     )
                 ]
                 if has_replica
+                else []
+            ),
+            *(
+                [
+                    common.implementation(
+                        cases,
+                        "replica-23",
+                        "larmorx-nc replica, against FSL 6.0.7.23 (standard tier)",
+                        "replica, 6.0.7.23",
+                        f"docs/validation/{REPLICA_RECORD_NEW}.md",
+                        "validated",
+                        name=REPLICA_RECORD_NEW,
+                    )
+                ]
+                if has_replica_new
                 else []
             ),
         ],

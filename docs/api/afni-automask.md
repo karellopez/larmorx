@@ -5,15 +5,13 @@ a skull-stripped anatomical, as AFNI's `3dAutomask` makes it (26.3.05; first 25.
 
 **AFNI versions** (2026-10-29): both implementations follow AFNI 26.3.05 and are validated against it (the clean-room original since its alignment the same day). The two releases differ, for these programs, in two corrections larmorx already made by default (AFNI-03, header slice code 2; AFNI-05, 3dTshift's `-no_detrend`): AFNI 26.3.05 behaves as larmorx corrected them, so `reproduce` now gives the same result as the default where they apply, and neither is named ([findings](../findings/afni-relicensing-26.md) for the new licence).
 
-**Two implementations.** 3dAutomask's results depend on AFNI library routines copyrighted by the
-Medical College of Wisconsin (GPL-2), so larmorx has the bit-exact **replica**
-`larmorx-gpl afni 3dAutomask` (package `larmorx-gpl`, `crates-gpl/`, GPL-3.0-or-later; translated
-from AFNI's source) and the clean-room **original** in the main package (`crates/larmorx-afni`,
-Apache-2.0), written from [`specs/3dAutomask.md`](../../specs/3dAutomask.md) and black-box runs of
-AFNI only ([PROVENANCE](../../crates/larmorx-afni/PROVENANCE.md)). `implementation="auto"` (and
-`larmorx afni 3dAutomask`) runs the replica, as a separate program, when it is installed
-(`pip install "larmorx[exact]"`), else the original; `implementation="replica"` or
-`"original"` (`LARMORX_IMPLEMENTATION`) forces one. Each image's `implementation` names the one
+**Two implementations, both in `pip install larmorx`.** The bit-exact **replica**, translated
+from AFNI's source (`crates/larmorx-afni-replica`; Apache-2.0, with CC BY 4.0's attribution for the code of the Medical College of Wisconsin, which AFNI 26.3.05 releases under CC BY 4.0 ([NOTICE](../../NOTICE), [licensing](../licensing.md)); until 2026-10-29 the separate GPL
+package `larmorx-gpl`), and the clean-room **original** (`crates/larmorx-afni`, Apache-2.0),
+built for speed and written from [`specs/3dAutomask.md`](../../specs/3dAutomask.md) and black-box
+runs of AFNI only ([PROVENANCE](../../crates/larmorx-afni/PROVENANCE.md)). `implementation="auto"`
+(the default, and `larmorx afni 3dAutomask`) runs the replica, in the same process;
+`implementation="replica"` or `"original"` (`LARMORX_IMPLEMENTATION`) forces one. Each image's `implementation` names the one
 that ran.
 
 **Status: `validated`**, both, against AFNI 26.3.05 itself (the original against AFNI 25.2.09 until 2026-10-29):
@@ -33,7 +31,7 @@ import larmorx as lx
 r = lx.afni.automask("uni_xform.nii.gz", dilate=1, apply=True)
 r.mask      # uint8, 1 inside the brain
 r.masked    # the input, 0 outside the mask
-r.mask.implementation   # Implementation(kind='original', ...) without larmorx-gpl
+r.mask.implementation   # Implementation(kind='replica', package='larmorx', ...)
 ```
 
 ```bash
@@ -151,4 +149,5 @@ The original's Rust API is `larmorx_afni::automask`: `run(image, options, mode, 
 n_threads)` on an `AfniImage` (`larmorx_afni::dataset::read_as`), with `AutomaskOptions`; the mask
 of a float image is `form_mask(v, dims, settings, log)` (3dUnifize uses it), its steps in
 `automask::{clip, cluster, morph, program}`; the command line is `cli::automask::main`. The
-replica's Rust API is in the GPL crate `larmorx-gpl-afni`; the Apache-2.0 crates cannot use it.
+replica's Rust API is `larmorx_afni_replica` (`automask`, `mask`; the command line
+`cli::automask::main`, and `cli::run_in` for a run inside a caller's process).

@@ -7,15 +7,25 @@ first 25.2.09).
 
 **AFNI versions** (2026-10-29): both implementations follow AFNI 26.3.05 and are validated against it (the clean-room original since its alignment the same day). The two releases differ, for these programs, in two corrections larmorx already made by default (AFNI-03, header slice code 2; AFNI-05, 3dTshift's `-no_detrend`): AFNI 26.3.05 behaves as larmorx corrected them, so `reproduce` now gives the same result as the default where they apply, and neither is named ([findings](../findings/afni-relicensing-26.md) for the new licence).
 
-**Two implementations.** 3dUnifize's results depend on AFNI library routines copyrighted by the
-Medical College of Wisconsin (GPL-2), so larmorx has the bit-exact **replica**
-`larmorx-gpl afni 3dUnifize` (package `larmorx-gpl`, GPL-3.0-or-later, with a port of glibc
-2.35's `tanhf` and `cbrtf`) and the clean-room **original** in the main package
-(`crates/larmorx-afni`, Apache-2.0), written from [`specs/3dUnifize.md`](../../specs/3dUnifize.md)
-and black-box runs of AFNI only ([PROVENANCE](../../crates/larmorx-afni/PROVENANCE.md)).
-`implementation="auto"` (and `larmorx afni 3dUnifize`) runs the replica, as a separate program,
-when it is installed (`pip install "larmorx[exact]"`), else the original; `"replica"` or
-`"original"` (`LARMORX_IMPLEMENTATION`) forces one. Each image's `implementation` names the one
+**Two implementations, both in `pip install larmorx`.** The bit-exact **replica**, translated
+from AFNI's source (`crates/larmorx-afni-replica`; Apache-2.0, with CC BY 4.0's attribution for the code of the Medical College of Wisconsin, which AFNI 26.3.05 releases under CC BY 4.0 ([NOTICE](../../NOTICE), [licensing](../licensing.md)); with fdlibm's `tanhf` as glibc 2.35 runs
+it; until 2026-10-29 the separate GPL package `larmorx-gpl`), and the clean-room **original**
+(`crates/larmorx-afni`, Apache-2.0), built for speed and written from
+[`specs/3dUnifize.md`](../../specs/3dUnifize.md) and black-box runs of AFNI only
+([PROVENANCE](../../crates/larmorx-afni/PROVENANCE.md)). `implementation="auto"` (the default, and
+`larmorx afni 3dUnifize`) runs the replica, in the same process; `"replica"` or `"original"`
+(`LARMORX_IMPLEMENTATION`) forces one.
+
+**`-EPI`'s radius and the cube root's last bit** (2026-10-29). `-EPI` sets its radius from the
+voxel volume with the C library's `cbrtf`; AFNI's Linux builds take glibc's, whose code is
+LGPL-2.1 and not part of larmorx, and whose result is one unit in the last place from the
+correctly rounded one on about one input in ten. The replica uses a correctly rounded `cbrtf`.
+For most voxel sizes nothing changes; where one unit in the last place of the cube root would
+change the ball of neighbours or the printed radius (measured on every float32 voxel volume: 2,953
+of the volumes in [1, 100) mm³), the replica warns that its result may differ from AFNI's (a
+warning ending in `(larmorx)`). On those, glibc's last bit changes the ball for 80 volumes and the
+printed radius for 43 in [1, 100) mm³ ([findings](../findings/afni-relicensing-26.md), "The C
+library's maths"). How to keep AFNI's exact result there is the user's decision. Each image's `implementation` names the one
 that ran.
 
 **Status: `validated`**, both, against AFNI 26.3.05 itself (the original against AFNI 25.2.09 until 2026-10-29):
@@ -94,7 +104,7 @@ Corrected by default, reproduced with `upstream_defects="reproduce"`, by both im
   or twice (also clip the bright edges) (AFNI-48; ...)`, exit 1); `reproduce` gives AFNI's
   result and names AFNI-48 after the output. With `-EPI` (which implies one `-T2`) any number
   of `-T2` runs as in AFNI. Both implementations word it the same.
-- **AFNI-75** (random testing, 2026-10-25; the GPL replica, the clean-room original to follow):
+- **AFNI-75** (random testing, 2026-10-25; the replica, the clean-room original to follow):
   `-EPI` sets the radius from the voxel size with no upper bound (AFNI prints "-EPI changes
   -Urad to N voxels"); on micrometre voxels N is thousands and the ball of neighbours AFNI
   builds first needs terabytes, so AFNI fills the machine until it is stopped. By default the
@@ -148,5 +158,6 @@ the replica 39 s and 8.7 s, the original 3.8 s and 0.94 s; a T1w (half-size path
 The original's Rust API is `larmorx_afni::unifize`: `run(image, options, mode, settings,
 n_threads)` on an `AfniImage` with `UnifizeOptions`; its steps `unifize::{wmi, duplo}`,
 `invert`, `grey_matter`, `clip_edges`, `median_volume`; the command line is
-`cli::unifize::main`. The replica's Rust API is in the GPL crate `larmorx-gpl-afni`; the
-Apache-2.0 crates cannot use it.
+`cli::unifize::main`. The replica's Rust API is `larmorx_afni_replica` (`unifize`, with
+`epi_radius`; the command line `cli::unifize::main`, and `cli::run_in` for a run inside a
+caller's process).

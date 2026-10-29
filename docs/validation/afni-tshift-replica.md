@@ -2,10 +2,10 @@
 
 **All cases agree.** 315 cases on the `standard` tier: 280 pass, 32 rejected by both, 3 expected divergences, 0 failures.
 
-- **Validated:** `larmorx-gpl afni 3dTshift` (larmorx-gpl 0.0.1; crate larmorx-gpl-afni, the GPL-3.0-or-later replica translated from AFNI 26.3.05's source), run by larmorx as a separate process: `larmorx afni 3dTshift` with `LARMORX_IMPLEMENTATION=replica` and `lx.afni.tshift(..., implementation="replica")`
+- **Validated:** the bit-exact replica (larmorx 0.0.1 (crate larmorx-afni-replica, built in): the translation of AFNI 26.3.05's source, Apache-2.0 with CC BY 4.0's attribution, part of larmorx since 2026-10-29), in-process: `larmorx afni 3dTshift` with `LARMORX_IMPLEMENTATION=replica` and `lx.afni.tshift(..., implementation="replica")`
 - **Reference:** 3dTshift from AFNI (AFNI_26.3.05), the binary built by `scripts/build_afni_oracle.sh`
 - **Test data:** larmorx-testdata `52124bc98f9f`, tier `standard`
-- **Generated:** 2026-10-29 on Linux x86_64, with `python -m larmorx_validation parity afni-tshift --tier standard --implementation replica`
+- **Generated:** 2026-10-30 on Linux x86_64, with `python -m larmorx_validation parity afni-tshift --tier standard --implementation replica`
 - **Original programs:** 630 runs: 624 from the oracle cache, 6 run (2 never cached: the original varies); cache `<workspace>/oracles/cache`, mode `use`
 
 **Bit-identical: 280 of 280 passing cases** produce exactly the bytes of AFNI's output data.
@@ -120,7 +120,7 @@
 
 | Component | Version |
 |---|---|
-| larmorx | 0.0.1 (bd39a5d04bbe) |
+| larmorx | 0.0.1 (3d76a31e4ac7-dirty) |
 | larmorx-testdata | 52124bc98f9f |
 | Python | 3.12.16 |
 | Platform | Linux x86_64 (Linux-6.8.0-124-generic-x86_64-with-glibc2.35) |
@@ -130,7 +130,7 @@
 
 ## Notes
 
-Both programs read the same files with the same arguments; outputs are read with nibabel and compared as stored (before `scl_slope`). Real runs pass the BIDS `SliceTiming` as fMRIPrep does: a tab-separated `-tpattern` file of `str(float)` values (reversed when `SliceEncodingDirection` ends in `-`) and `-tzero round(min + 0.5 * (max - min), 3)`. Header-timing inputs are generated from the synthetic float32 file by setting `slice_code`, `slice_start`, `slice_end`, `slice_duration`, `dim_info` and the time unit. larmorx-gpl uses all logical CPUs (`OMP_NUM_THREADS` unset) on the command line and 1 thread through the Python API (its default); its results do not depend on the thread count. The Python API runs every passing case it can express (a `-tpattern` name or fMRIPrep's slice timing, options in seconds; not the header's timing, AFNI 1D files or copies of the input) and must give the command line's output: the same values and the same header bytes (`vox_offset` aside); for unscaled `uint8`, `int16` and `float32` inputs it also runs on the image loaded in memory. Both programs run without AFNI's environment variables of this process and with `HOME` an empty directory (no `.afnirc`), `AFNI_DONT_LOGFILE=YES` and `AFNI_NIFTI_TYPE_WARN=NO`, plus each case's variables. The cases of AFNI's global options and environment variables run each program in a directory of its own and compare exit statuses and messages too. AFNI version: 26.3.05 (`--afni-version`, `LARMORX_AFNI_VERSION`; builds: 26.3.05, 25.2.09). Each case also ran AFNI 25.2.09 on the same arguments (from the oracle-output cache where an earlier record ran it): the check 'AFNI's own step: 25.2.09 → 26.3.05' says whether AFNI's own exit status, messages and outputs changed, and why.
+Both programs read the same files with the same arguments; outputs are read with nibabel and compared as stored (before `scl_slope`). Real runs pass the BIDS `SliceTiming` as fMRIPrep does: a tab-separated `-tpattern` file of `str(float)` values (reversed when `SliceEncodingDirection` ends in `-`) and `-tzero round(min + 0.5 * (max - min), 3)`. Header-timing inputs are generated from the synthetic float32 file by setting `slice_code`, `slice_start`, `slice_end`, `slice_duration`, `dim_info` and the time unit. the replica uses all logical CPUs (`OMP_NUM_THREADS` unset) on the command line and 1 thread through the Python API (its default); its results do not depend on the thread count. The Python API runs every passing case it can express (a `-tpattern` name or fMRIPrep's slice timing, options in seconds; not the header's timing, AFNI 1D files or copies of the input) and must give the command line's output: the same values and the same header bytes (`vox_offset` aside); for unscaled `uint8`, `int16` and `float32` inputs it also runs on the image loaded in memory. Both programs run without AFNI's environment variables of this process and with `HOME` an empty directory (no `.afnirc`), `AFNI_DONT_LOGFILE=YES` and `AFNI_NIFTI_TYPE_WARN=NO`, plus each case's variables. The cases of AFNI's global options and environment variables run each program in a directory of its own and compare exit statuses and messages too. AFNI version: 26.3.05 (`--afni-version`, `LARMORX_AFNI_VERSION`; builds: 26.3.05, 25.2.09). Each case also ran AFNI 25.2.09 on the same arguments (from the oracle-output cache where an earlier record ran it): the check 'AFNI's own step: 25.2.09 → 26.3.05' says whether AFNI's own exit status, messages and outputs changed, and why.
 
 ## All cases
 

@@ -5,10 +5,11 @@ slice-timing correction, compatible with AFNI's `3dTshift` (26.3.05; first 25.2.
 
 **AFNI versions** (2026-10-29): both implementations follow AFNI 26.3.05 and are validated against it (the clean-room original since its alignment the same day). The two releases differ, for these programs, in two corrections larmorx already made by default (AFNI-03, header slice code 2; AFNI-05, 3dTshift's `-no_detrend`): AFNI 26.3.05 behaves as larmorx corrected them, so `reproduce` now gives the same result as the default where they apply, and neither is named ([findings](../findings/afni-relicensing-26.md) for the new licence).
 
-**Clean-room re-implementation.** AFNI is GPL-2, so larmorx did not port it: the code was
-written from the behaviour spec [`specs/3dTshift.md`](../../specs/3dTshift.md), AFNI's help
-text and black-box runs of the AFNI binary, without AFNI's source code
-([provenance](../../crates/larmorx-afni/PROVENANCE.md)).
+**Clean-room re-implementation.** AFNI's 3dTshift was GPL-2 code until AFNI 26.3.05, so
+larmorx wrote its original without it: from the behaviour spec
+[`specs/3dTshift.md`](../../specs/3dTshift.md), AFNI's help text and black-box runs of the AFNI
+binary, without AFNI's source code ([provenance](../../crates/larmorx-afni/PROVENANCE.md)). It is
+built for speed.
 
 **Status: `validated`** against AFNI 26.3.05 itself, both: the clean-room original (see the
 [validation record](../validation/afni-tshift.md); against AFNI 25.2.09 until 2026-10-29)
@@ -37,15 +38,16 @@ and larmorx's is double; integer outputs then differ by at most 1, in a few valu
 on the real runs (up to 0.2 % on a synthetic series built to clip). The known last-bit
 differences are listed at the end of this page.
 
-**Bit-exact replica.** `larmorx-gpl afni 3dTshift` (package `larmorx-gpl`, `crates-gpl/`,
-GPL-3.0-or-later) is a translation of AFNI's own source, with AFNI's float32 FFT and a port of
-glibc's `sinf`/`cosf`. It takes the same arguments as `larmorx afni 3dTshift`, follows the
+**Bit-exact replica.** `larmorx afni 3dTshift` with `LARMORX_IMPLEMENTATION=replica` (the
+default; `crates/larmorx-afni-replica`, part of `pip install larmorx`: Apache-2.0, with CC BY 4.0's attribution for the code of the Medical College of Wisconsin, which AFNI 26.3.05 releases under CC BY 4.0 ([NOTICE](../../NOTICE), [licensing](../licensing.md))) is a translation
+of AFNI's own source, with AFNI's float32 FFT and glibc 2.35's `sinf`/`cosf` translated from Arm's
+Optimized Routines (MIT), proved equal to glibc's on every input. Until 2026-10-29 it was the
+separate GPL program `larmorx-gpl`. It takes the same arguments as the original, follows the
 same conventions (NIfTI output only, an existing output is an error), corrects the same AFNI
 defects by default, and with `LARMORX_UPSTREAM_DEFECTS=reproduce` gives AFNI's output bytes
 on every compared parity case ([replica record](../validation/afni-tshift-replica.md); see
 [Upstream defects](#upstream-defects-d13)).
-It is a separate program because of its licence ([licensing](../licensing.md)). When it is
-installed, `lx.afni.tshift` and `larmorx afni 3dTshift` run it by default (see
+`lx.afni.tshift` and `larmorx afni 3dTshift` run it by default, in the same process (see
 [Choosing the implementation](#choosing-the-implementation)).
 
 ## Quick start
@@ -127,47 +129,38 @@ and `tzero` fMRIPrep passes: `SliceTiming` reversed when the direction ends in `
 ```python
 img = lx.afni.tshift("bold.nii.gz", slice_times="alt+z")   # implementation="auto"
 img.implementation
-# Implementation(kind='replica', package='larmorx-gpl', version='0.0.1',
-#                licence='GPL-3.0-or-later', program='/.../venv/bin/larmorx-gpl')
+# Implementation(kind='replica', package='larmorx', version='0.0.1',
+#                licence='Apache-2.0 AND CC-BY-4.0', program=None)
 lx.afni.tshift("bold.nii.gz", slice_times="alt+z", implementation="original")
 ```
 
-- **`"auto"`** (the default) runs the bit-exact replica when the `larmorx-gpl` program is
-  installed, and the clean-room original otherwise. **`"replica"`** and **`"original"`** force
-  one; `"replica"` without the program raises `lx.ReplicaNotFoundError`, which names the
-  install command.
-- **Installing the replica:** `pip install "larmorx[exact]"`. Neither package is on PyPI yet;
-  build them from the repository (`docs/licensing.md`, "Packages").
-- **How it runs** (`docs/licensing.md`, "Choosing at run time"): as a separate program, on
-  files in a temporary directory. A path is passed as it is; an in-memory image is written
+- **`"auto"`** (the default) runs the bit-exact replica; **`"replica"`** and **`"original"`**
+  force one. Both are part of `pip install larmorx` (not on PyPI yet: build it from the
+  repository, `docs/licensing.md`, "Packages"); until 2026-10-29 the replica was the separate
+  `larmorx-gpl` package, and `"auto"` ran the original without it.
+- **How it runs** (`docs/licensing.md`, "Choosing at run time"): in the same process (without
+  the GIL), on files in a temporary directory, exactly as the command line runs it. A path is passed as it is; an in-memory image is written
   first, with its data as they are (no scaling). The keyword arguments become `3dTshift`
   options with the same meaning; `slice_times` as numbers become a `-tpattern` file, and
   `detrend=False` with `method="fourier"` becomes `-linear -no_detrend -Fourier`, the order
   AFNI accepts. `n_threads` reaches it as `OMP_NUM_THREADS`, AFNI's variables only from
   `afni_settings` ([AFNI's settings in Python](#afnis-settings-in-python)); its warnings come
-  back as Python warnings. The extra cost per call is one program start, the output written and read back,
-  and for in-memory images the input written as well. Measured on this project's development
-  machine (2026-10-11, median of 5) on two real runs called as fMRIPrep calls 3dTshift
-  (ds001600, 64×64×44×5, and ds003345, 64×64×34×216, both int16 `.nii.gz`), on 1 thread and
-  all 12: `lx.afni.tshift(path, implementation="replica")` took 0-15 ms longer than running
-  the program directly and reading its output with `lx.load`; from the image in memory it took
-  2-133 ms less, because the input is then written uncompressed instead of read from gzip.
+  back as Python warnings. The extra cost per call is the output written and read back, and
+  for in-memory images the input written as well (until 2026-10-29 also a program start:
+  0-15 ms more than the program run by hand on two real runs, measured 2026-10-11).
 - **The two differ only in the last bits** of some values (Fourier, quintic, heptic,
   weighted sinc and `-no_detrend` cases; see the [validation record](../validation/afni-tshift.md)).
-  So larmorx never falls back from one to the other: a replica that is found but fails
-  raises `lx.ReplicaError`, with its exit code and messages.
+  So larmorx never falls back from one to the other: a replica that fails raises
+  `lx.ReplicaError`, with its exit code and messages.
 - **Errors.** Both implementations check the arguments that do not need the image the same
   way (`ValueError`). The checks that need the image (the number of slice times, their range,
   `slice`, `ignore`) come from the implementation that runs: a `ValueError` from the original,
   an `lx.ReplicaError` with AFNI's message from the replica.
-- **Where the program is looked for:** `LARMORX_GPL_BIN` (the path of the program), then the
-  Python environment's scripts directory, then `PATH`, once per call.
 - **Command line:** `larmorx afni 3dTshift` follows the same rule; `LARMORX_IMPLEMENTATION`
-  overrides it. The replica's output, output files and exit code are passed on unchanged;
-  127 means `replica` was asked for and the program is missing. With `-verbose`, the first
-  line names the implementation: `++ implementation: original (larmorx 0.0.1, Apache-2.0),
-  clean-room 3dTshift` or `++ implementation: replica (larmorx-gpl 0.0.1, GPL-3.0-or-later),
-  bit-exact translation of AFNI 26.3.05's 3dTshift`.
+  overrides it. With `-verbose`, the first line names the implementation:
+  `++ implementation: original (larmorx 0.0.1, Apache-2.0), clean-room 3dTshift` or
+  `++ implementation: replica (larmorx 0.0.1, Apache-2.0 AND CC-BY-4.0), bit-exact translation
+  of AFNI 26.3.05's 3dTshift`.
 
 ## How AFNI reads and writes NIfTI (reproduced)
 
@@ -229,8 +222,8 @@ where it keeps the input's grid and AFNI writes a plumb one. The
 parity records' "D13 fix pass" lists what the corrections change, case by case.
 
 **The two implementations.** Both correct the same defects by default and, with
-`reproduce`, give AFNI's output: the replica (`larmorx-gpl`, which receives the choice as
-`LARMORX_UPSTREAM_DEFECTS`) byte for byte, the clean-room original within its thresholds for
+`reproduce`, give AFNI's output: the replica (which reads the choice from
+`LARMORX_UPSTREAM_DEFECTS` on the command line) byte for byte, the clean-room original within its thresholds for
 the values (the last bits of its Fourier, quintic, heptic, weighted-sinc and `-no_detrend`
 numerics) and as AFNI otherwise: identical header fields and file names, the geometry to
 1e-6 mm (byte for byte where the header is compared whole), and exit statuses and messages
@@ -248,7 +241,7 @@ colour codes, also into files and pipes (AFNI-21, messages only); larmorx does s
 
 AFNI programs take *global options* out of the command line before reading their own, wherever
 they stand, and read many environment variables. Both implementations do the same since
-2026-10-12 (`larmorx afni 3dTshift`, whichever runs, and `larmorx-gpl afni 3dTshift`), on
+2026-10-12 (`larmorx afni 3dTshift`, whichever runs), on
 Linux, macOS and Windows alike (decided 2026-10-12; behaviour in `specs/3dTshift.md` §7.1).
 
 ```
@@ -339,7 +332,7 @@ img = lx.afni.tshift(
 - **Checked:** names are case-sensitive; a name 3dTshift does not read (`AFNI_NIFTI_SCAL`,
   `PATH`), one of the five above, or an empty value is a `ValueError`; anything but a mapping
   of strings to strings a `TypeError`.
-- **The command line** (`larmorx afni 3dTshift`, `larmorx-gpl afni 3dTshift`) reads the
+- **The command line** (`larmorx afni 3dTshift`, either implementation) reads the
   process environment, and `-Dname=value`, as AFNI does (above).
 - **Checked against the command line:** both parity suites run every case of AFNI's variables
   and global options that the Python API can express with the case's variables as

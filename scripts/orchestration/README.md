@@ -13,7 +13,7 @@ repository), `LARMORX_VENV` (default: `<workspace>/.venv`), cargo first on the p
 |---|---|
 | `gates-rust.sh <checkout> [root\|gpl\|nc\|both\|all]` | fmt, clippy `-D warnings`, tests, in the root workspace, `crates-gpl` and `crates-nc` (`both`: root and gpl; `all`: the three) |
 | `gates-python.sh <checkout> [--no-build]` | `maturin develop --release` (main checkout only), `pytest tests/python tests/golden`, ruff, SPDX |
-| `build-gpl.sh <checkout>` | the `larmorx-gpl` replica program (release) |
+| `build-gpl.sh <checkout>` | the GPL workspace's verification tools (release; the AFNI replicas are in the main package since 2026-10-29) |
 | `build-nc.sh <checkout>` | the `larmorx-nc` replica program (release) |
 | `boxed.sh <GiB> <command>` | runs a heavy job in its own memory box (a systemd user scope, no swap): a runaway process is killed inside it and nothing else is touched; use it for every parity, random-testing, oracle, benchmark or merge-verification run |
 | `lxv.sh <checkout> <args>` | `python -m larmorx_validation <args>` from that checkout |

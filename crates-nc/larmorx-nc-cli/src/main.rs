@@ -3,7 +3,7 @@
 //! The `larmorx-nc` command line: the bit-exact replicas of FSL tools, with the original
 //! programs' arguments (`larmorx-nc fsl <tool> [original arguments]`).
 //!
-//! It mirrors `larmorx` (the Apache-2.0 command line) and `larmorx-gpl`: the same family and
+//! It mirrors `larmorx` (the Apache-2.0 command line): the same family and
 //! tool names, its own exit codes 0 (success) and 2 (a usage error of this program), and the
 //! tool's own statuses otherwise. The programs are separate so that the licences stay separate
 //! (`docs/licensing.md`).

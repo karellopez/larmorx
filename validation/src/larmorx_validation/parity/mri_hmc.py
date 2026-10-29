@@ -54,6 +54,10 @@ from larmorx_validation.report import table
 ORACLE = "oracles/fsl-6.0.7/mcflirt"
 RECORDED = "/oracles/fsl-6.0.7/mcflirt/"
 TESTDATA = "larmorx-testdata/data/"
+#: larmorx's threads in each replayed run (``LARMORX_PARITY_LX_THREADS``, 4 by default, as the
+#: ANTs suites; random testing sets its own): with ``--jobs`` the suite stays within the
+#: machine's budget. The results do not depend on the thread count.
+LX_THREADS = int(os.environ.get("LARMORX_PARITY_LX_THREADS", "4"))
 
 #: specs/mcflirt.md §14 and PLAN.md §11.3 ("Motion parameters").
 P95_RMS_MM = 0.1
@@ -175,11 +179,12 @@ def _resolve(arg: str) -> str:
 def _run_larmorx(
     args: list[str], env: dict[str, str], mode: str = defects.REPRODUCE
 ) -> tuple[int, str, str]:
-    """``larmorx mri hmc`` in process with the run's ``FSLOUTPUTTYPE``; ``mode`` is D13's
-    ``LARMORX_UPSTREAM_DEFECTS`` (``reproduce`` for the comparison with mcflirt)."""
+    """``larmorx mri hmc`` in process with the run's ``FSLOUTPUTTYPE`` at ``LX_THREADS``
+    threads (the CLI's ``OMP_NUM_THREADS``); ``mode`` is D13's ``LARMORX_UPSTREAM_DEFECTS``
+    (``reproduce`` for the comparison with mcflirt)."""
     from larmorx.cli import run
 
-    saved = {k: os.environ.get(k) for k in ("FSLOUTPUTTYPE",)}
+    saved = {k: os.environ.get(k) for k in ("FSLOUTPUTTYPE", "OMP_NUM_THREADS")}
     out, err = io.StringIO(), io.StringIO()
     try:
         for k in saved:
@@ -187,6 +192,7 @@ def _run_larmorx(
                 os.environ[k] = env[k]
             else:
                 os.environ.pop(k, None)
+        os.environ["OMP_NUM_THREADS"] = str(max(1, LX_THREADS))
         with (
             defects.mode(mode),
             contextlib.redirect_stderr(err),
@@ -971,8 +977,8 @@ def suite() -> Suite:
             "outputs are read with nibabel. Parameters are decomposed about the centre of the "
             "reference's field of view (FSL-mm) for the comparison; the `.par` files are "
             "compared as written (about the reference's intensity-weighted centre). The `descrip` "
-            "header field differs by design (larmorx writes its own name). larmorx uses all "
-            "logical CPUs; its results do not depend on the thread count. "
-            + fsl_versions.record_line("original", with_step=False)
+            "header field differs by design (larmorx writes its own name). larmorx runs at "
+            f"{LX_THREADS} threads (`LARMORX_PARITY_LX_THREADS`); its results do not depend on "
+            "the thread count. " + fsl_versions.record_line("original", with_step=False)
         ),
     )

@@ -20,6 +20,10 @@ builds `<workspace>/oracles/afni-25.2.09` and `afni-26.3.05` (`scripts/build_afn
 | `licence_inventory.py [--markdown]` | the licence statement of every AFNI file the replicas derive from, in both releases, word for word | 30 MCW files GPL-2 → CC BY 4.0; 24 without a notice (NIH) and the NIfTI library's public domain unchanged; none GPL in 26.3.05 |
 | `glibc_permissive/` | glibc 2.35's `sinf` and `cosf` against Arm's Optimized Routines v19.11 (MIT), compiled as glibc compiles its x86-64 builds, on all 2^32 inputs (`run.sh <work>`, which fetches Arm's files with `fetch_aor.sh`) | not run here (compiling downloaded source needs the user's permission); the source comparison and the FMA build's exhaustive check (`crates-nc`) are in the relicensing finding |
 
+| `make_permanent_cases.py` | the replicas' permanent cases of AFNI 26.3.05's AFNI-03 fix in 3dAutomask and 3dUnifize, from the clean-room originals' recipes | `validation/difftest/cases/afni-automask/slice-code-2-masked-afni26.json`, `afni-unifize/epi-slice-code-2-afni26.json`: both replicas bit-identical to AFNI 26.3.05, AFNI's own step changed by AFNI-03 |
+| `triage_trial.py <night>` | a random-testing night's AFNI findings sorted by AFNI's own step: the clean-room alignment (AFNI-03, AFNI-05) or anything else | the trial of 2026-10-29 (`<workspace>/oracles/difftest/2026-10-29-version-afni`): see the part's report |
+| `site_shots.sh <before> <after> <out>` | before/after screenshots of the three AFNI pages (desktop and phone, both themes) and the site's number check on each | every shown number agrees, before and after |
+
 The parity suites' **version step** (`larmorx_validation.parity.afni_versions`) runs AFNI 25.2.09
 beside 26.3.05 on every case of the replica records and names each case whose AFNI output changed,
 with its reason; the records carry it.

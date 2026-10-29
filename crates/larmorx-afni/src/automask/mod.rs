@@ -50,6 +50,9 @@ pub struct AutomaskOptions {
     pub apply: bool,
     /// `-depth`: the depth is wanted.
     pub depth: bool,
+    /// Whether the progress messages are shown (not `-q`): AFNI-43 is named where only the
+    /// clustering messages differ only when they are shown (the replica's, observed).
+    pub messages_shown: bool,
 }
 
 impl Default for AutomaskOptions {
@@ -63,6 +66,7 @@ impl Default for AutomaskOptions {
             si: None,
             apply: false,
             depth: false,
+            messages_shown: true,
         }
     }
 }
@@ -266,14 +270,20 @@ fn run_here(
                 "-peels 0: the mask is peeled once, as AFNI does (its help says 0 turns the \
                  peeling off)",
             ),
-            (UpstreamDefects::Fix, false) if other_log != clustering => Some(
-                "-peels 0: the mask is not peeled, as the help says (AFNI peels it once): the \
+            (UpstreamDefects::Fix, false) if options.messages_shown && other_log != clustering => {
+                Some(
+                    "-peels 0: the mask is not peeled, as the help says (AFNI peels it once): the \
                  same mask, but the clustering messages count other voxels",
-            ),
-            (UpstreamDefects::Reproduce, false) if other_log != clustering => Some(
-                "-peels 0: the mask is peeled once, as AFNI does: the same mask as without \
-                 peeling, but the clustering messages count other voxels",
-            ),
+                )
+            }
+            (UpstreamDefects::Reproduce, false)
+                if options.messages_shown && other_log != clustering =>
+            {
+                Some(
+                    "-peels 0: the mask is peeled once, as AFNI does: the same mask as without \
+                     peeling, but the clustering messages count other voxels",
+                )
+            }
             _ => None,
         };
         if let Some(detail) = detail {

@@ -358,6 +358,7 @@ fn execute<'a>(
     let mut options = o.options;
     options.apply = o.apply_prefix.is_some();
     options.depth = o.depth.is_some();
+    options.messages_shown = !o.quiet;
     let run =
         automask::run(&mut image, &options, mode, settings, n_threads).map_err(Failure::Fatal)?;
     for m in run.messages {

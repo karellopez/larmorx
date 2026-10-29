@@ -133,7 +133,7 @@ use = ["larmorx afni 3dAutomask", "lx.afni.automask"]
 how = "clean-room original; exact replica in `larmorx-gpl`"
 # "92 of 106" and "85 of 85" are the records' own statements (their JSON keeps no per-case
 # identity for this suite).
-validation = "original: [{afni-automask.cases} cases](record:afni-automask), 92 of 106 compared cases that write outputs bit-identical to AFNI (the other 14: inputs carrying AFNI's own header extension, AFNI-10: the data bit-identical, the header and messages AFNI's for the input without it), fMRIPrep's call on every oracle run's BOLD reference included, the data panel's too; replica: [85 of 85](record:afni-automask-replica) bit-identical"
+validation = "original: [{afni-automask.cases} cases](record:afni-automask), 92 of 106 compared cases that write outputs bit-identical to AFNI (the other 14: inputs carrying AFNI's own header extension, AFNI-10: the data bit-identical, the header and messages AFNI's for the input without it), fMRIPrep's call on every oracle run's BOLD reference included, the data panel's too; replica: [{afni-automask-replica.identical} of {afni-automask-replica.written}](record:afni-automask-replica) compared cases that write outputs bit-identical"
 
 [[tool]]
 id = "afni-unifize"
@@ -142,7 +142,7 @@ eco = "afni"
 page = "/tools/afni-unifize/"
 use = ["larmorx afni 3dUnifize", "lx.afni.unifize"]
 how = "clean-room original; exact replica in `larmorx-gpl`"
-validation = "original: [{afni-unifize.cases} cases](record:afni-unifize), none failing: {afni-unifize.identical} of {afni-unifize.written} compared cases that write outputs bit-identical to AFNI, the other {afni-unifize.with_crmath} within 1e-5 (at most 8.7e-8 of the largest value) and bit-identical to AFNI run with correctly rounded maths (glibc's `tanhf` in AFNI's squash), fMRIPrep's call on every oracle run included; 4 to 25 times faster than AFNI (informal timings); replica: [{afni-unifize.written} of {afni-unifize.written}](record:afni-unifize-replica) bit-identical at 1, 2 and 6 threads"
+validation = "original: [{afni-unifize.cases} cases](record:afni-unifize), none failing: {afni-unifize.identical} of {afni-unifize.written} compared cases that write outputs bit-identical to AFNI, the other {afni-unifize.with_crmath} within 1e-5 (at most 8.7e-8 of the largest value) and bit-identical to AFNI run with correctly rounded maths (glibc's `tanhf` in AFNI's squash), fMRIPrep's call on every oracle run included; 4 to 25 times faster than AFNI (informal timings); replica: [{afni-unifize-replica.identical} of {afni-unifize-replica.written}](record:afni-unifize-replica) compared cases that write outputs bit-identical at 1, 2 and 6 threads"
 
 [[tool]]
 id = "mri-hmc"

@@ -173,6 +173,9 @@ METRICS: dict[str, Callable[[dict], dict[str, int]]] = {
     "afni-tshift": _bit_identical(),
     "afni-tshift-replica": _bit_identical(),
     "afni-unifize": _unifize,
+    # The GPL replicas of 3dAutomask and 3dUnifize: the same counts from their own records.
+    "afni-automask-replica": _unifize,
+    "afni-unifize-replica": _unifize,
     "fsl-bet-replica": _bet,
     "fsl-bet-replica-full": _bet,
     # The data panel's records of the ANTs tools (2026-10-26): the same metrics as their

@@ -1,15 +1,16 @@
 # Parity: 3dTshift (replica)
 
-**All cases agree.** 314 cases on the `standard` tier: 279 pass, 32 rejected by both, 3 expected divergences, 0 failures.
+**All cases agree.** 315 cases on the `standard` tier: 280 pass, 32 rejected by both, 3 expected divergences, 0 failures.
 
 - **Validated:** `larmorx-gpl afni 3dTshift` (larmorx-gpl 0.0.1; crate larmorx-gpl-afni, the GPL-3.0-or-later replica translated from AFNI 25.2.09's source), run by larmorx as a separate process: `larmorx afni 3dTshift` with `LARMORX_IMPLEMENTATION=replica` and `lx.afni.tshift(..., implementation="replica")`
 - **Reference:** 3dTshift from AFNI (AFNI_25.2.09), the binary built by `scripts/build_afni_oracle.sh`
-- **Test data:** larmorx-testdata `b0999a9e0c31`, tier `standard`
-- **Generated:** 2026-10-24 on Linux x86_64, with `python -m larmorx_validation parity afni-tshift --tier standard --implementation replica`
+- **Test data:** larmorx-testdata `52124bc98f9f`, tier `standard`
+- **Generated:** 2026-10-29 on Linux x86_64, with `python -m larmorx_validation parity afni-tshift --tier standard --implementation replica`
+- **Original programs:** 315 runs: 312 from the oracle cache, 3 run (1 never cached: the original varies); cache `<workspace>/oracles/cache`, mode `use`
 
-**Bit-identical: 279 of 279 passing cases** produce exactly the bytes of AFNI's output data.
+**Bit-identical: 280 of 280 passing cases** produce exactly the bytes of AFNI's output data.
 - Fourier: 147 of 147 bit-identical.
-- Lagrange and weighted-sinc methods and copies: 132 of 132 bit-identical.
+- Lagrange and weighted-sinc methods and copies: 133 of 133 bit-identical.
 - The clean-room original (`larmorx afni 3dTshift`, Apache-2.0) has its own record: [afni-tshift.md](afni-tshift.md).
 - Python API (`lx.afni.tshift(..., implementation="replica")`): run on the 194 passing cases it can express; 194 give the command line's output bit for bit (data and header). From an image in memory: 149 of 149 give the same values.
 - Python API with AFNI's variables (`afni_settings=`, the case's variables and `-D` options), on the 28 cases of AFNI's environment variables and global options it can express: 28 give the command line's output bit for bit (data and header), with AFNI variables in the process environment that would change it if the call read the environment (AFNI_NIFTI_WRITE_TYPE, AFNI_NIFTI_SCALE, AFNI_NIFTI_VIEW, AFNI_NIFTI_PRIORITY).
@@ -19,18 +20,19 @@
   - AFNI-02: 2 case(s) named it, 0 with changed values (largest difference 0), 2 with other changes (header scl_slope): `defects/f32-slope-inter`, `defects/f32-slope-inter-copy`
   - AFNI-03: 2 case(s) named it, 1 with changed values (largest difference 27.8), 1 with other changes (header slice_code): `header-timing/code2-seq-dec`, `header-timing/code2-beyond-tr`
   - AFNI-05: 4 case(s) named it, 4 with changed values (largest difference 122): `options/float32-no-detrend`, `options/float32-no-detrend-fourier`, `options/int16-no-detrend`, `options/int16-no-detrend-fourier`
-  - AFNI-07: 5 case(s) named it, 0 with changed values (largest difference 0), 5 with other changes (header qoffset_x, srow_x; header srow_x): `defects/metre`, `defects/micron-copy`, `defects/oblique-metre`, `geometry/slightly-oblique-metre`, `defects/oblique-metre-zero-origin`
+  - AFNI-07: 6 case(s) named it, 0 with changed values (largest difference 0), 6 with other changes (header qoffset_x, srow_x; header srow_x): `defects/metre`, `defects/micron-copy`, `defects/oblique-metre`, `geometry/slightly-oblique-metre`, `defects/oblique-metre-zero-origin`, `difftest/metre-oblique-default-steps`
   - AFNI-08: 1 case(s) named it, 0 with changed values (largest difference 0), 1 with other changes (header slice_end): `defects/tiny-offsets-copy`
   - AFNI-16: 3 case(s) named it, 0 with changed values (largest difference 0), 3 with other changes (header qoffset_x, srow_x; header srow_x): `geometry/slightly-oblique`, `geometry/slightly-oblique-qform`, `geometry/slightly-oblique-metre`
   - AFNI-19: 1 case(s) named it, 0 with changed values (largest difference 0), 1 with other changes (toffset): `environment/allow-milliseconds`
   - AFNI-22: 1 case(s) named it, 0 with changed values (largest difference 0), 1 with other changes (messages): `global/D-message-prefix-with-blank`
   - AFNI-23: 4 case(s) named it, 1 with changed values (largest difference 2.34e+03), 4 with other changes (datatype, scl_slope; scl_inter): `environment/nifti-scale-no`, `environment/nifti-scale-no-copy`, `environment/nifti-scale-no-rlt-ignore`, `global/D-nifti-scale-no`
-- **D13 defaults, replica against the clean-room original** (`upstream_defects="fix"`, the 24 cases where a correction applies or that test one): 17 bit-identical, 7 within the original's thresholds (Fourier and other last bits, as in the original's own record), 0 where the original is known to diverge from AFNI, 0 disagreeing.
+- **D13 defaults, replica against the clean-room original** (`upstream_defects="fix"`, the 25 cases where a correction applies or that test one): 18 bit-identical, 7 within the original's thresholds (Fourier and other last bits, as in the original's own record), 0 where the original is known to diverge from AFNI, 0 disagreeing.
 
 | Category | Compared | Bit-identical | Worst float diff (× max AFNI) | Worst integer diff | Most values differing (fraction) |
 |---|---|---|---|---|---|
 | copy | 8 | 8 | 0.0e+00 | 0 | 0.0e+00 |
 | defects | 8 | 8 | 0.0e+00 | 0 | 0.0e+00 |
+| difftest | 1 | 1 | 0.0e+00 | – | 0.0e+00 |
 | environment | 29 | 29 | 0.0e+00 | 0 | 0.0e+00 |
 | geometry | 3 | 3 | 0.0e+00 | – | 0.0e+00 |
 | global | 19 | 19 | 0.0e+00 | 0 | 0.0e+00 |
@@ -57,6 +59,7 @@
 |---|---|---|---|---|---|
 | copy | 8 | 8 | 0 | 0 | 0 |
 | defects | 8 | 8 | 0 | 0 | 0 |
+| difftest | 1 | 1 | 0 | 0 | 0 |
 | divergence | 2 | 0 | 0 | 2 | 0 |
 | environment | 34 | 29 | 4 | 1 | 0 |
 | errors | 21 | 0 | 21 | 0 | 0 |
@@ -118,11 +121,11 @@
 
 | Component | Version |
 |---|---|
-| larmorx | 0.0.1 (bd2ca21ddea8) |
-| larmorx-testdata | b0999a9e0c31 |
-| Python | 3.12.10 |
+| larmorx | 0.0.1 (62a8a8fc6705) |
+| larmorx-testdata | 52124bc98f9f |
+| Python | 3.12.16 |
 | Platform | Linux x86_64 (Linux-6.8.0-124-generic-x86_64-with-glibc2.35) |
-| CPU | Intel(R) Core(TM) i7-8750H CPU @ 2.20GHz, 12 logical CPUs |
+| CPU | AMD Ryzen 9 7945HX with Radeon Graphics, 32 logical CPUs |
 | numpy | 2.3.5 |
 | nibabel | 5.4.2 |
 
@@ -448,3 +451,4 @@ Both programs read the same files with the same arguments; outputs are read with
 | `real/ds003345-ignore-4` | pass | 14/14 | fMRIPrep's call with -ignore 4 (non-steady-state volumes) |
 | `real/ds000210-header-timing` | pass | 12/12 | no -tpattern: the slice timing in the header (slice_code 3, ALT_INC) |
 | `real/ds001600-header-zero-duration` | pass | 12/12 | no -tpattern: slice_code 5 with slice_duration 0, so a copy of the input |
+| `difftest/metre-oblique-default-steps` | pass | 13/13 | AFNI-07's default on an oblique metre grid: the replica's steps (from the file's matrix, then converted) and the conver… |

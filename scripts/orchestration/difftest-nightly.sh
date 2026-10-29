@@ -6,6 +6,9 @@
 # and logs to <workspace>/oracles/logs/difftest-<date>.log; the log's last line is
 # "DIFFTEST NIGHTLY FINISHED <status>". Run from cron or by hand; never in CI.
 #
+# Once a week (by the date of its last report) it first runs the upstream watch
+# (upstream_watch.py: <workspace>/oracles/logs/upstream-watch/upstream-watch-<date>.md and .json).
+#
 # Usage: difftest-nightly.sh <checkout> [hours (6)] [jobs (4)] [seed (YYYYMMDD)] [tools (all)]
 # The checkout's python/larmorx needs its built _core (maturin build; never `maturin develop`
 # in an agent's worktree) and the replica programs (build-gpl.sh, build-nc.sh).
@@ -40,6 +43,15 @@ cd "$W" || exit 1
 {
   echo "difftest nightly: $(date -Is) checkout $W ($(git -C "$W" describe --always --dirty --abbrev=12)) hours $HOURS jobs $JOBS seed $SEED tools $TOOLS"
   echo "memory box: $(sed -n 's/^0:://p' /proc/self/cgroup) memory.max $(cat "/sys/fs/cgroup$(sed -n 's/^0:://p' /proc/self/cgroup)/memory.max")"
+  # The upstream watch, once a week (decision log 2026-10-27): newer upstream releases and the
+  # files of the crates' PROVENANCE.md they changed; no agent, a few network requests. It runs
+  # when its newest report is 7 days old or more, and never stops the night.
+  WATCH=${LARMORX_UPSTREAM_WATCH_OUT:-$LARMORX_WORKSPACE/oracles/logs/upstream-watch}
+  if [ -z "$(find "$WATCH" -name 'upstream-watch-*.md' -mtime -7 2>/dev/null | head -1)" ]; then
+    echo "upstream watch: $(date -Is)"
+    timeout 1800 python -P "$W/scripts/orchestration/upstream_watch.py" --out "$WATCH" >/dev/null \
+      && echo "upstream watch: $WATCH/upstream-watch-$DAY.md" || echo "upstream watch failed ($?)"
+  fi
   python -m larmorx_validation difftest --tools "$TOOLS" --budget "$HOURS" --jobs "$JOBS" --seed "$SEED" --out "$OUT" \
     --memory-gib "${LARMORX_DIFFTEST_CASE_GIB:-3}"
   status=$?

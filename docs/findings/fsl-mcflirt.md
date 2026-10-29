@@ -530,8 +530,8 @@ its relative `.rms`, 8.07227e−15 mm on Cooperlake, 7.97627e−15 mm on Haswell
 (`validation/investigations/version-numerics/lapack_probe.py` and the `lapack-probe` tool): every
 output word (factors, pivots, `info`, solutions, inverses) of `dgetrf`, `dgetri`, `dtrtri` (upper
 and lower), `dgesv` (4 × 1, 4 × 4, 3 × 1, 3 × 3) and Armadillo's `inv()` and `inv(A)·B` for 4 × 4
-and 3 × 3, on 100,000 seeded matrices of each of 18 families (302 pairs of routine and
-family, 30,200,000 records) (random, affine, rigid, small
+and 3 × 3 (18 routines and calls), on 100,000 seeded matrices of each of 22 families (302 pairs
+of routine and family, 30,200,000 records) (random, affine, rigid, small
 rotations, FSL's sampling, swap and swap-sampled matrices, sform-like, translations, upper and
 lower triangular, near-singular, singular, tied pivots, small integers with signed zeros,
 extreme scales 2^±600, a subnormal column, NaN and ±∞ entries, NaNs above a triangle's

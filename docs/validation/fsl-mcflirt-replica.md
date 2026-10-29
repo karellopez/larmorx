@@ -223,7 +223,7 @@ The three columns of the head-motion validation (the clean-room original's numbe
 
 | Component | Version |
 |---|---|
-| larmorx | 0.0.1 (1281f57a806f-dirty) |
+| larmorx | 0.0.1 (59243251aa28) |
 | larmorx-testdata | 52124bc98f9f |
 | Python | 3.12.16 |
 | Platform | Linux x86_64 (Linux-6.8.0-124-generic-x86_64-with-glibc2.35) |

@@ -442,6 +442,8 @@ defects! {
         "--binaryMask with an input on another grid than the mask: the brain mask made on the mask's grid is applied over the input's dimensions, reading and writing outside it (FSL 6.0.7.23)";
     FSL_62 = "FSL-62", "bet2", true,
         "--ct with --binaryMask converts the mask instead of the CT image and writes the mask, masked, as the brain image (FSL 6.0.7.23)";
+    FSL_63 = "FSL-63", "bet", true,
+        "bet -R passes bet2's options through bash's echo, which takes leading words made of -n, -e and -E as its own options: a leading -e (bet2's mesh) is dropped, and the other options' backslashes are read as escapes";
     FSL_56 = "FSL-56", "FSL", true,
         "an image saved with two or more NIfTI extensions of different sizes gets the wrong vox_offset (NewNifti adds the first extension's size once per extension): the data start inside the extensions or after a gap";
     ITK_50 = "ITK-50", "ITK", true,

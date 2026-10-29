@@ -596,16 +596,19 @@ pub fn draw_mesh_bis(image: &Volume<f32>, m: &Mesh) -> Volume<f32> {
 /// voxel each time it is seen with `from` and sets it when popped; marking it when pushed fills the
 /// same voxels with far less memory.)
 ///
-/// A start outside the image is FSL-43: FSL writes `to` there, outside the volume, and reads its
-/// neighbours outside it too. One voxel outside (a single slice: the centroid falls just below
-/// it), FSL's write lands beside the volume's buffer and the run goes on: corrected (`fix`), the
-/// fill starts at the nearest voxel inside the image; reproduced, only what FSL defines is done:
-/// no write outside, and of the start's neighbours FSL's bounds allow, those inside the image are
-/// examined (those outside count as not `from`). Further outside (a centroid that is not a number
-/// truncates to `INT_MIN`) FSL writes far from the volume and crashes: `fix` fills from the
-/// nearest voxel when the start is a real position, and refuses otherwise ([`Fill::Crash`]);
-/// reproduced, the write FSL crashes on is not done and nothing is filled ([`Fill::Skipped`]:
-/// D13's failure cases, what FSL defines kept, the rest left as it was).
+/// A start outside the image is FSL-43. FSL checks each neighbour's coordinate against the image's
+/// bounds along its own axis only, and reaches a point by its linear index `(z * ny + y) * nx +
+/// x`: from a start outside, a point outside the image is another voxel of the volume (its index
+/// inside the buffer: FSL's arithmetic on its own data, defined) or memory beyond the volume (its
+/// index outside: FSL writes there and reads what lies there). Corrected (`fix`), the fill starts
+/// at the nearest voxel inside the image (named where that changes FSL's mask). Reproduced, FSL's
+/// fill is done point by point as FSL does it ([`fill_by_index`]): inside the volume exactly,
+/// beyond it no write, and what FSL reads there, memory FSL's fill never set, read as not `from`
+/// ([`Fill::Indexed`] counts those reads: FSL's result may depend on them, and FSL may crash on
+/// them). A centroid that is not a number truncates to `INT_MIN`: FSL writes far from the volume
+/// and crashes; `fix` refuses ([`Fill::Crash`]); reproduced, the write FSL crashes on is not done
+/// and nothing is filled ([`Fill::Skipped`]: D13's failure cases, what FSL defines kept, the rest
+/// left as it was).
 pub fn fill_mask(mask: &mut Volume<i16>, start: [i64; 3], from: i16, to: i16, fix: bool) -> Fill {
     let (nx, ny, nz) = (mask.xsize(), mask.ysize(), mask.zsize());
     if nx <= 0 || ny <= 0 || nz <= 0 {
@@ -617,13 +620,7 @@ pub fn fill_mask(mask: &mut Volume<i16>, start: [i64; 3], from: i16, to: i16, fi
     }
     let inside = mask.in_bounds(start[0], start[1], start[2]);
     let real = start.iter().all(|&c| c != i64::from(i32::MIN));
-    let near = start[0] >= -1
-        && start[1] >= -1
-        && start[2] >= -1
-        && start[0] <= nx
-        && start[1] <= ny
-        && start[2] <= nz;
-    if !inside && !(if fix { real } else { near }) {
+    if !inside && !real {
         return if fix {
             Fill::Crash(start)
         } else {
@@ -660,52 +657,91 @@ pub fn fill_mask(mask: &mut Volume<i16>, start: [i64; 3], from: i16, to: i16, fi
         mask.set(s[0], s[1], s[2], to);
         flood(mask, vec![s]);
     };
-    // FSL's defined part one voxel outside: the start's neighbours inside the image
-    let from_neighbours = |mask: &mut Volume<i16>| {
-        let mut current = Vec::new();
-        for [x, y, z] in neighbours(start).into_iter().flatten() {
-            if mask.in_bounds(x, y, z) && mask.value(x, y, z) == from {
-                mask.set(x, y, z, to);
-                current.push([x, y, z]);
-            }
-        }
-        flood(mask, current);
-    };
     if inside {
         from_nearest(mask);
         return Fill::Inside;
     }
     if !fix {
-        from_neighbours(mask);
-        return Fill::Outside(start);
+        let unknown = fill_by_index(mask, start, from, to);
+        return Fill::Indexed(start, unknown);
     }
-    if near {
-        // the correction is named only where it changes the mask (D13): FSL's fill as well,
-        // on a copy (a start one voxel outside: a single slice)
-        let mut theirs = mask.clone();
-        from_neighbours(&mut theirs);
-        from_nearest(mask);
-        if theirs.data == mask.data {
-            return Fill::Inside;
-        }
-    } else {
-        // reproduced, nothing is filled here (FSL crashes): named only where the fill changes
-        // the mask
-        let before = mask.data.clone();
-        from_nearest(mask);
-        if before == mask.data {
-            return Fill::Inside;
-        }
+    // the correction is named only where it changes the mask (D13): FSL's fill as well, on a
+    // copy
+    let mut theirs = mask.clone();
+    fill_by_index(&mut theirs, start, from, to);
+    from_nearest(mask);
+    if theirs.data == mask.data {
+        return Fill::Inside;
     }
     Fill::Outside(start)
+}
+
+/// FSL's fill from a start outside the image, point by point (FSL-43, reproduced): a stack of
+/// points, from the start; each point taken from its end is set to `to`, then each of its six
+/// neighbours in FSL's order (x - 1, y - 1, z - 1, x + 1, y + 1, z + 1) that FSL's bound along
+/// that axis allows is pushed when the value at its place is `from`. A point's place is FSL's
+/// linear index of the volume's buffer, so a point outside the image may be another voxel of it.
+/// Beyond the buffer FSL writes and reads memory of its process: no write is done here, a place
+/// FSL's fill wrote reads `to`, and any other reads as not `from`. Returns the number of those
+/// other reads (memory FSL's fill never set, on which FSL's result may depend).
+pub fn fill_by_index(mask: &mut Volume<i16>, start: [i64; 3], from: i16, to: i16) -> u64 {
+    let (nx, ny, nz) = (mask.xsize(), mask.ysize(), mask.zsize());
+    let len = mask.data.len() as i64;
+    let place = |[x, y, z]: [i64; 3]| -> i64 {
+        z.saturating_mul(ny)
+            .saturating_add(y)
+            .saturating_mul(nx)
+            .saturating_add(x)
+    };
+    let mut written_beyond: std::collections::BTreeSet<i64> = std::collections::BTreeSet::new();
+    let mut unknown = 0u64;
+    let mut current = vec![start];
+    while let Some(p @ [x, y, z]) = current.pop() {
+        let i = place(p);
+        if (0..len).contains(&i) {
+            mask.data[i as usize] = to;
+        } else {
+            written_beyond.insert(i);
+        }
+        let candidates = [
+            (x > 0, [x - 1, y, z]),
+            (y > 0, [x, y - 1, z]),
+            (z > 0, [x, y, z - 1]),
+            (nx > x + 1, [x + 1, y, z]),
+            (ny > y + 1, [x, y + 1, z]),
+            (nz > z + 1, [x, y, z + 1]),
+        ];
+        for (allowed, q) in candidates {
+            if !allowed {
+                continue;
+            }
+            let j = place(q);
+            let value = if (0..len).contains(&j) {
+                Some(mask.data[j as usize])
+            } else if written_beyond.contains(&j) {
+                Some(to)
+            } else {
+                unknown += 1;
+                None
+            };
+            if value == Some(from) {
+                current.push(q);
+            }
+        }
+    }
+    unknown
 }
 
 /// How [`fill_mask`] started.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Fill {
     Inside,
-    /// Outside the image, handled (FSL-43's notice).
+    /// Outside the image, corrected: filled from the nearest voxel inside it, which changes
+    /// FSL's mask (FSL-43's notice).
     Outside([i64; 3]),
+    /// Outside the image, reproduced: FSL's fill by its linear index ([`fill_by_index`]), with
+    /// the number of its reads of memory beyond the volume (FSL-43's notice).
+    Indexed([i64; 3], u64),
     /// Where FSL writes far outside the volume and crashes, corrected: nothing filled, refused.
     Crash([i64; 3]),
     /// The same, reproduced: the write FSL crashes on is not done and nothing is filled
@@ -735,19 +771,32 @@ pub(crate) fn crash_message(prog: &str, start: [i64; 3]) -> String {
     )
 }
 
-/// The FSL-43 notice of a fill that started outside the image.
-pub(crate) fn outside_notice(notices: &mut Notices, start: [i64; 3], what: &str) {
-    let detail = if notices.fix() {
-        format!(
+/// The FSL-43 notice of a fill that started outside the image: corrected ([`Fill::Outside`]) or
+/// reproduced by FSL's linear index ([`Fill::Indexed`]).
+pub(crate) fn outside_notice(notices: &mut Notices, fill: Fill, what: &str) {
+    let detail = match fill {
+        Fill::Indexed(s, unknown) => {
+            let memory = if unknown == 0 {
+                "every place it reaches lies in the volume".to_owned()
+            } else {
+                format!(
+                    "FSL also reads memory beyond the volume {unknown} times, memory its fill \
+                     never set (its result may depend on it, and FSL may crash there): read here \
+                     as not part of the mask, and nothing written beyond the volume"
+                )
+            };
+            format!(
+                "{what} starts at voxel {} {} {}, outside the image, where FSL reaches each point \
+                 by its linear index (a point outside the image is another voxel of it, or memory \
+                 beyond it): filled point by point as FSL does; {memory}",
+                s[0], s[1], s[2]
+            )
+        }
+        Fill::Outside(s) | Fill::Crash(s) | Fill::Skipped(s) => format!(
             "{what} starts at voxel {} {} {}, outside the image: filled from the nearest voxel inside it",
-            start[0], start[1], start[2]
-        )
-    } else {
-        format!(
-            "{what} starts at voxel {} {} {}, outside the image, where FSL writes and reads outside \
-             the volume: filled from the start's neighbours inside it",
-            start[0], start[1], start[2]
-        )
+            s[0], s[1], s[2]
+        ),
+        Fill::Inside => return,
     };
     notices.add(&defects::FSL_43, detail);
 }
@@ -1537,17 +1586,19 @@ pub fn compute(
             self_intersection = false;
         }
     }
-    let (outside, start) = make_mask_from_mesh(testvol, &m, notices.fix() || !fill);
+    let (outside, start) = make_mask_from_mesh(testvol, &m, notices.fix());
     match start {
         Fill::Inside => {}
         // named only where an output shows the mask (the brain, `-m`): with `-n` and no `-m`
         // the correction changes nothing written (D13: a notice where the result differs)
-        Fill::Outside(s) if !a.no_output || a.mask => {
-            outside_notice(notices, s, "the fill of the brain mask")
+        f @ (Fill::Outside(_) | Fill::Indexed(..)) if !a.no_output || a.mask => {
+            outside_notice(notices, f, "the fill of the brain mask")
         }
-        Fill::Outside(_) => {}
-        Fill::Skipped(s) => skipped_notice(notices, s, "the fill of the brain mask"),
-        Fill::Crash(s) => {
+        Fill::Outside(_) | Fill::Indexed(..) => {}
+        // bet2 alone: the write FSL crashes on is skipped; inside the `bet` script, reproduce
+        // stops where FSL crashes, so that the script's failure follows as FSL's (`fill`)
+        Fill::Skipped(s) if fill => skipped_notice(notices, s, "the fill of the brain mask"),
+        Fill::Crash(s) | Fill::Skipped(s) => {
             // the first defect a constant image meets since fsl-bet2 2111.9 fixed FSL-41
             notices.add(
                 &defects::FSL_43,
@@ -1671,5 +1722,63 @@ pub(crate) fn save_output<T: Elem>(
         Ok(Saved::Written) => None,
         Ok(Saved::Nothing) => Some(255),
         Err(e) => Some(report_save(&e, "bet2", err)),
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn ones(nx: i64, ny: i64, nz: i64) -> Volume<i16> {
+        let mut v: Volume<i16> = Volume::new(nx, ny, nz, 1);
+        for x in v.data.iter_mut() {
+            *x = 1;
+        }
+        v
+    }
+
+    #[test]
+    fn a_start_outside_reaches_voxels_by_their_linear_index() {
+        // FSL-43, the version trial's case 661: a start four rows before the image; its point
+        // one slice up has the index of voxel (1, 2, 0), from which FSL's fill reaches every
+        // voxel (FSL 6.0.7.17 and 6.0.7.23 alike); the start's own place and some neighbours'
+        // lie before the volume
+        let mut m = ones(3, 6, 4);
+        let unknown = fill_by_index(&mut m, [1, -4, 0], 1, 0);
+        assert!(m.data.iter().all(|&v| v == 0));
+        assert!(unknown > 0);
+        let mut r = ones(3, 6, 4);
+        assert_eq!(
+            fill_mask(&mut r, [1, -4, 0], 1, 0, false),
+            Fill::Indexed([1, -4, 0], unknown)
+        );
+        assert_eq!(r.data, m.data);
+    }
+
+    #[test]
+    fn a_single_slice_fills_from_the_voxel_above_the_start() {
+        // the centroid of a single slice's surface one voxel below it: only the point above it
+        // lies in the volume
+        let mut m = ones(4, 4, 1);
+        m.set(0, 1, 0, 0);
+        m.set(1, 0, 0, 0);
+        let mut by_index = m.clone();
+        fill_by_index(&mut by_index, [2, 2, -1], 1, 0);
+        // the drawn surface (0) cuts voxel (0, 0) off; every other voxel is reached
+        assert_eq!(by_index.value(0, 0, 0), 1);
+        assert_eq!(by_index.data.iter().filter(|&&v| v == 1).count(), 1);
+        let mut fixed = m.clone();
+        // fix: the nearest voxel inside, (2, 2, 0): the same voxels, so nothing to name
+        assert_eq!(fill_mask(&mut fixed, [2, 2, -1], 1, 0, true), Fill::Inside);
+        assert_eq!(fixed.data, by_index.data);
+    }
+
+    #[test]
+    fn not_a_number_is_fsls_crash() {
+        let start = [i64::from(i32::MIN); 3];
+        let mut m = ones(3, 3, 3);
+        assert_eq!(fill_mask(&mut m, start, 1, 0, false), Fill::Skipped(start));
+        assert_eq!(fill_mask(&mut m, start, 1, 0, true), Fill::Crash(start));
+        assert!(m.data.iter().all(|&v| v == 1));
     }
 }

@@ -434,9 +434,39 @@ impl Script<'_, '_> {
 
     /// `-R`.
     fn robust(&mut self, ins: &[String], outs: &[String], bet2opts: &str) -> Result<(), Stop> {
-        // bet2opts=`echo $bet2opts | sed 's/-n//g'`
-        let cleaned = split_words(bet2opts).join(" ").replace("-n", "");
-        let opts = split_words(&cleaned);
+        // bet2opts=`echo $bet2opts | sed 's/-n//g'`: bash's echo takes leading words of `-n`,
+        // `-e` and `-E` as its own options (FSL-63); the command substitution drops the
+        // trailing newline
+        let words = split_words(bet2opts);
+        let given = split_words(&words.join(" ").replace("-n", ""));
+        let (printed, taken) = echo::run(&words);
+        let theirs = split_words(printed.replace("-n", "").trim_end_matches('\n'));
+        let opts = if theirs == given {
+            given
+        } else if self.reproduce() {
+            self.notices.add(
+                &defects::FSL_63,
+                format!(
+                    "-R passes bet2's options through bash's echo, which takes '{}' as its own: \
+                     bet2 gets '{}', as in FSL",
+                    taken.join(" "),
+                    theirs.join(" ")
+                ),
+            );
+            theirs
+        } else {
+            self.notices.add(
+                &defects::FSL_63,
+                format!(
+                    "-R passes bet2's options through bash's echo, which takes '{}' as its own \
+                     (FSL's bet2 gets '{}'): bet2 gets '{}', the options given",
+                    taken.join(" "),
+                    theirs.join(" "),
+                    given.join(" ")
+                ),
+            );
+            given
+        };
         let out = outs.join(" ");
         // get_dims $IN: fslval runs (their values are unused by -R)
         let mut i: i64 = 1;
@@ -681,6 +711,147 @@ fn which(name: &str) -> bool {
         let p = d.join(name);
         p.is_file()
     })
+}
+
+/// bash's builtin `echo` (without `xpg_echo`) for the script's `echo $bet2opts` (FSL-63): the
+/// leading words made only of `n`, `e` and `E` after a `-` are its own options (`-n`: no newline;
+/// `-e` and `-E`: backslash escapes read or not, the last one deciding), the others printed
+/// separated by blanks.
+pub mod echo {
+    /// What `echo words...` prints, and the words it took as its own options.
+    pub fn run(words: &[String]) -> (String, Vec<String>) {
+        let mut newline = true;
+        let mut escapes = false;
+        let mut taken = Vec::new();
+        let mut rest = words;
+        while let Some((w, tail)) = rest.split_first() {
+            let flags = w.strip_prefix('-').unwrap_or("");
+            if flags.is_empty() || !flags.chars().all(|c| matches!(c, 'n' | 'e' | 'E')) {
+                break;
+            }
+            for c in flags.chars() {
+                match c {
+                    'n' => newline = false,
+                    'e' => escapes = true,
+                    _ => escapes = false,
+                }
+            }
+            taken.push(w.clone());
+            rest = tail;
+        }
+        let mut out = String::new();
+        for (k, w) in rest.iter().enumerate() {
+            if k > 0 {
+                out.push(' ');
+            }
+            if escapes {
+                let (text, stop) = unescape(w);
+                out.push_str(&text);
+                if stop {
+                    return (out, taken);
+                }
+            } else {
+                out.push_str(w);
+            }
+        }
+        if newline {
+            out.push('\n');
+        }
+        (out, taken)
+    }
+
+    /// `echo -e`'s escapes in one word (bash's `ansicstr` for echo): the text, and whether `\c`
+    /// stopped all further output.
+    fn unescape(w: &str) -> (String, bool) {
+        let b: Vec<char> = w.chars().collect();
+        let mut out = String::new();
+        let mut i = 0;
+        let digits = |i: &mut usize, max: usize, radix: u32| -> Option<u32> {
+            let mut v: Option<u32> = None;
+            let mut n = 0;
+            while n < max {
+                let Some(d) = b.get(*i).and_then(|c| c.to_digit(radix)) else {
+                    break;
+                };
+                v = Some(v.unwrap_or(0) * radix + d);
+                *i += 1;
+                n += 1;
+            }
+            v
+        };
+        while i < b.len() {
+            let c = b[i];
+            i += 1;
+            if c != '\\' || i >= b.len() {
+                out.push(c);
+                continue;
+            }
+            let e = b[i];
+            i += 1;
+            match e {
+                'a' => out.push('\u{7}'),
+                'b' => out.push('\u{8}'),
+                'e' | 'E' => out.push('\u{1b}'),
+                'f' => out.push('\u{c}'),
+                'n' => out.push('\n'),
+                'r' => out.push('\r'),
+                't' => out.push('\t'),
+                'v' => out.push('\u{b}'),
+                '\\' => out.push('\\'),
+                'c' => return (out, true),
+                '0' => {
+                    let v = digits(&mut i, 3, 8).unwrap_or(0) & 0xff;
+                    out.push(char::from(v as u8));
+                }
+                'x' => match digits(&mut i, 2, 16) {
+                    Some(v) => out.push(char::from(v as u8)),
+                    None => out.push_str("\\x"),
+                },
+                'u' | 'U' => match digits(&mut i, if e == 'u' { 4 } else { 8 }, 16) {
+                    Some(v) => out.push(char::from_u32(v).unwrap_or('\u{fffd}')),
+                    None => {
+                        out.push('\\');
+                        out.push(e);
+                    }
+                },
+                other => {
+                    out.push('\\');
+                    out.push(other);
+                }
+            }
+        }
+        (out, false)
+    }
+
+    #[cfg(test)]
+    mod tests {
+        use super::run;
+
+        fn words(s: &str) -> Vec<String> {
+            s.split(' ')
+                .filter(|w| !w.is_empty())
+                .map(str::to_owned)
+                .collect()
+        }
+
+        #[test]
+        fn leading_flag_words_are_echos_options() {
+            assert_eq!(run(&words("-e -v")), ("-v\n".into(), words("-e")));
+            assert_eq!(run(&words("-v -e")), ("-v -e\n".into(), vec![]));
+            assert_eq!(run(&words("-n -e")), (String::new(), words("-n -e")));
+            assert_eq!(run(&words("-ne -f 0.5")), ("-f 0.5".into(), words("-ne")));
+            assert_eq!(run(&words("-E -m")), ("-m\n".into(), words("-E")));
+            assert_eq!(run(&words("- -e")), ("- -e\n".into(), vec![]));
+        }
+
+        #[test]
+        fn escapes_under_e() {
+            assert_eq!(run(&words("-e a\\tb")).0, "a\tb\n");
+            assert_eq!(run(&words("-e a\\cb -m")).0, "a");
+            assert_eq!(run(&words("-e \\0101\\x41\\1\\q")).0, "AA\\1\\q\n");
+            assert_eq!(run(&words("-E a\\tb")).0, "a\\tb\n");
+        }
+    }
 }
 
 /// GNU dc for the expressions the script computes: numbers (`_` for a minus), `k`, `+ - * / ^`

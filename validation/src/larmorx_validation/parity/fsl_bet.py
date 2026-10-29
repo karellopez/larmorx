@@ -374,6 +374,8 @@ _TERMINATE = re.compile(
     r"terminate called after throwing an instance of [^\n]*\n(?:  what\(\): [^\n]*\n)?"
 )
 _BASH_SIGNAL = re.compile(r"^[^\n]*: line \d+: +\d+ (?:Aborted|Segmentation fault)[^\n]*\n", re.M)
+#: The ``bet`` script's ``ERR`` trap, on its standard output after a program it runs crashed.
+_BET_FAILED = re.compile(r"^bet failed during command:[^\n]*\n", re.M)
 
 
 def larmorx_own(line: str) -> bool:
@@ -433,6 +435,9 @@ def check_messages(
     else:
         name = MESSAGES
     if filled:
+        # the script's failure line follows the crash (its ERR trap): not printed before it
+        if crash:
+            a_out = _BET_FAILED.sub("", a_out)
         same = b_out.startswith(a_out) and b_err.startswith(a_err)
     else:
         same = a_out == b_out and a_err == b_err
@@ -1263,8 +1268,30 @@ def _run_case(case: Case, checks: CheckList) -> None:
         else:
             checks(EXIT, fsl.code == ours.code, detail=f"FSL {fsl.code}, larmorx {ours.code}")
         check_messages(checks, fsl, ours, crash, filled)
+        memory = ""
         if filled:
             _filled(checks, s, fill_entry or "", args, env, ours, r_dir, root, inputs, late_failure)
+        elif reads_memory(ours) and not crash:
+            # FSL's fill read memory beyond the volume (FSL-43): where its outputs differ from
+            # the replica's, they depend on that memory (the replica reads it as not part of
+            # the mask); identical outputs are compared as usual
+            sub = CheckList()
+            files = compare_dirs(sub, f_dir, r_dir, inputs)
+
+            def values_differ(c) -> bool:
+                f = files.get(c.name)
+                return f is not None and (f.differing is None or f.differing > 0)
+
+            for c in sub.checks:
+                if c.passed or not values_differ(c):
+                    checks.add(c)
+            memory = "; ".join(f"{c.name}: {c.detail}" for c in sub.checks if values_differ(c))
+            if memory:
+                checks(
+                    "outputs (FSL's fill read memory beyond the volume: FSL-43)",
+                    True,
+                    detail=memory[:600],
+                )
         else:
             compare_dirs(checks, f_dir, r_dir, inputs)
         identical = all(c.passed for c in checks.checks)
@@ -1292,6 +1319,14 @@ def _run_case(case: Case, checks: CheckList) -> None:
                     else "writes its outputs; the default "
                     + ("refuses" if s.fix_refuses else "corrects it")
                 ),
+            )
+        if memory and all(c.passed for c in checks.checks):
+            raise Outcome(
+                EXPECTED,
+                "FSL-43: the mask's fill starts outside the image and FSL reads memory beyond "
+                "the volume, on which its outputs depend; with upstream_defects='reproduce' "
+                "larmorx does FSL's fill inside the volume and reads that memory as not part of "
+                f"the mask ({memory[:200]})",
             )
         if crash and all(c.passed for c in checks.checks):
             raise Outcome(BOTH_ERROR, f"FSL crashes, larmorx refuses: {larmorx_err_line(ours)}")
@@ -1393,7 +1428,13 @@ def _filled(
     )
     written = sorted(p.name for p in r_dir.iterdir() if p.name not in inputs)
     if not late_failure:
-        checks("outputs written", bool(written), detail=", ".join(written) or "none")
+        asked = asks_outputs(s.tool, args)
+        checks(
+            "outputs written",
+            bool(written) or not asked,
+            detail=", ".join(written)
+            or ("none" if asked else "none, as the call asks (-n and no other output)"),
+        )
     again = root / "larmorx-again"
     _prepare(again, s)
     run_larmorx(s.tool, args, "reproduce", env, again)
@@ -1405,6 +1446,30 @@ def _filled(
         same,
         detail="bit-identical" if same else "; ".join(c.detail for c in sub.checks if not c.passed),
     )
+
+
+#: bet2's options that write an output besides the brain image (which ``-n`` leaves out).
+_OUTPUT_OPTIONS = ("-m", "-o", "-s", "-e")
+
+
+def asks_outputs(tool: str, args: list[str]) -> bool:
+    """Whether a call writes any output when it succeeds: betsurf always; bet2 and bet unless
+    ``-n`` (no brain image) comes without another output option (``bet -R`` removes ``-n``)."""
+    if tool == "betsurf" or "-n" not in args:
+        return True
+    if tool == "bet" and "-R" in args:
+        return True
+    return any(o in args for o in _OUTPUT_OPTIONS)
+
+
+#: The replica's FSL-43 notice of a fill FSL makes by its linear index from a start outside the
+#: image, reading memory beyond the volume: FSL's values there depend on that memory.
+MEMORY_READ = "FSL also reads memory beyond the volume"
+
+
+def reads_memory(run: Run) -> bool:
+    """Whether the replica named FSL-43's fill reading memory beyond the volume."""
+    return "upstream defect FSL-43 (" in run.err and MEMORY_READ in run.err
 
 
 def larmorx_err_line(run: Run) -> str:

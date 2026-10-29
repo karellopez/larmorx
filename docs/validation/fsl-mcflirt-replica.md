@@ -1,14 +1,14 @@
 # Parity: mcflirt replica (bit-exact, FSL Licence)
 
-**All cases agree.** 203 cases on the `standard` tier: 176 pass, 22 rejected by both, 5 expected divergences, 0 failures.
+**All cases agree.** 203 cases on the `standard` tier: 181 pass, 22 rejected by both, 0 expected divergences, 0 failures.
 
 - **Validated:** `larmorx-nc fsl mcflirt` (crate larmorx-nc-mcflirt, translated from FSL 6.0.7.23's source; `lx.mri.hmc(implementation="replica")`)
-- **Reference:** mcflirt from FSL 6.0.7.23 (fsl-mcflirt 2111.0, the conda build at `~/fsl-6.0.7.23`, as built: glibc 2.35's maths): the recorded runs in `oracles/fsl-6.0.7.23/mcflirt/` and runs made here
+- **Reference:** mcflirt from FSL 6.0.7.23 (fsl-mcflirt 2111.0, the conda build at `~/fsl-6.0.7.23`, as built: glibc 2.35's maths): the recorded runs in `oracles/fsl-6.0.7.23/mcflirt-haswell/` and runs made here
 - **Test data:** larmorx-testdata `52124bc98f9f`, tier `standard`
 - **Generated:** 2026-10-29 on Linux x86_64, with `python -m larmorx_validation parity fsl-mcflirt-replica --tier standard`
 - **Original programs:** 132 runs: 115 from the oracle cache, 17 run; cache `<workspace>/oracles/cache`, mode `use`
 
-- **Bit-identical to mcflirt as built** (every file, the exit status and both streams; the replica in `reproduce` mode): 176 of 176 compared cases; 22 where both end with the same error.
+- **Bit-identical to mcflirt as built** (every file, the exit status and both streams; the replica in `reproduce` mode): 181 of 181 compared cases; 22 where both end with the same error.
 
 The three columns of the head-motion validation (the clean-room original's numbers from its record, `docs/validation/mri-hmc.md`, not computed again):
 
@@ -19,13 +19,13 @@ The three columns of the head-motion validation (the clean-room original's numbe
 | `real/ds000005/fmriprep-repeat2` | pass (241/241 files) | pass: p95 RMS 0.0262 mm, MAT identical 0/240 |
 | `real/ds000005/fmriprep-repeat3` | pass (241/241 files) | pass: p95 RMS 0.0262 mm, MAT identical 0/240 |
 | `real/ds000005/fmriprep-reports` | pass (246/246 files) | pass: p95 RMS 0.0262 mm, MAT identical 0/240 |
-| `real/ds000005/opt-2d` | pass (246/246 files) | pass: p95 RMS 0.0143 mm, MAT identical 0/240 |
+| `real/ds000005/opt-2d` | pass (246/246 files) | pass: p95 RMS 0.0133 mm, MAT identical 0/240 |
 | `real/ds000005/opt-bins64` | pass (246/246 files) | pass: p95 RMS 0.0262 mm, MAT identical 0/240 |
 | `real/ds000005/opt-cost-corratio` | pass (246/246 files) | pass: p95 RMS 0.0662 mm, MAT identical 0/240 |
 | `real/ds000005/opt-cost-leastsquares` | pass (246/246 files) | pass: p95 RMS 0.0220 mm, MAT identical 0/240 |
-| `real/ds000005/opt-cost-mutualinfo` | pass (246/246 files) | pass: p95 RMS 0.0489 mm, MAT identical 0/240 |
+| `real/ds000005/opt-cost-mutualinfo` | pass (246/246 files) | pass: p95 RMS 0.0048 mm, MAT identical 1/240 |
 | `real/ds000005/opt-cost-normcorr` | pass (246/246 files) | pass: p95 RMS 0.0262 mm, MAT identical 0/240 |
-| `real/ds000005/opt-cost-normmi` | pass (246/246 files) | pass: p95 RMS 0.0653 mm, MAT identical 0/240 |
+| `real/ds000005/opt-cost-normmi` | pass (246/246 files) | pass: p95 RMS 0.0108 mm, MAT identical 0/240 |
 | `real/ds000005/opt-cost-woods` | pass (246/246 files) | pass: p95 RMS – mm, MAT identical – |
 | `real/ds000005/opt-dof12` | pass (246/246 files) | pass: p95 RMS 0.0220 mm, MAT identical 0/240 |
 | `real/ds000005/opt-dof7` | pass (246/246 files) | pass: p95 RMS 0.0208 mm, MAT identical 0/240 |
@@ -41,7 +41,7 @@ The three columns of the head-motion validation (the clean-room original's numbe
 | `real/ds000005/opt-smooth0` | pass (246/246 files) | pass: p95 RMS 0.0247 mm, MAT identical 3/240 |
 | `real/ds000005/opt-smooth2` | pass (246/246 files) | pass: p95 RMS 0.0247 mm, MAT identical 0/240 |
 | `real/ds000005/opt-spline_final` | pass (246/246 files) | pass: p95 RMS 0.0262 mm, MAT identical 0/240 |
-| `real/ds000005/opt-stages1` | expected-divergence (245/246 files) | pass: p95 RMS 0.0271 mm, MAT identical 3/240 |
+| `real/ds000005/opt-stages1` | pass (246/246 files) | pass: p95 RMS 0.0271 mm, MAT identical 3/240 |
 | `real/ds000005/opt-stages2` | pass (246/246 files) | pass: p95 RMS 0.0308 mm, MAT identical 0/240 |
 | `real/ds000005/opt-stats` | pass (249/249 files) | pass: p95 RMS 0.0262 mm, MAT identical 0/240 |
 | `real/ds000117/default` | pass (214/214 files) | pass: p95 RMS 0.0220 mm, MAT identical 1/208 |
@@ -82,8 +82,8 @@ The three columns of the head-motion validation (the clean-room original's numbe
 | `syn/cli/unknown-option-middle` | both-error (0/0 files) | both-error: p95 RMS – mm, MAT identical – |
 | `syn/content/background/default` | pass (12/12 files) | pass: p95 RMS 0.0864 mm, MAT identical 1/6 |
 | `syn/content/background/reffile` | pass (12/12 files) | pass: p95 RMS 0.0870 mm, MAT identical 1/6 |
-| `syn/content/nan/default` | expected-divergence (17/18 files) | pass: p95 RMS 0.0567 mm, MAT identical 2/12 |
-| `syn/content/nan/reffile` | expected-divergence (17/18 files) | pass: p95 RMS 0.0585 mm, MAT identical 1/12 |
+| `syn/content/nan/default` | pass (18/18 files) | pass: p95 RMS 0.0567 mm, MAT identical 2/12 |
+| `syn/content/nan/reffile` | pass (18/18 files) | pass: p95 RMS 0.0585 mm, MAT identical 1/12 |
 | `syn/content/ramp/reffile` | pass (11/11 files) | pass: p95 RMS – mm, MAT identical – |
 | `syn/content/ramp/reffile-smooth0` | pass (11/11 files) | pass: p95 RMS – mm, MAT identical – |
 | `syn/dtypes/float32/default` | pass (18/18 files) | pass: p95 RMS 0.0488 mm, MAT identical 1/12 |
@@ -100,18 +100,18 @@ The three columns of the head-motion validation (the clean-room original's numbe
 | `syn/geometry/single-volume-3d/reffile` | pass (7/7 files) | pass: p95 RMS 0.0104 mm, MAT identical 0/1 |
 | `syn/geometry/single-volume/default` | pass (7/7 files) | pass: p95 RMS 0.0000 mm, MAT identical 1/1 |
 | `syn/geometry/single-volume/reffile` | pass (7/7 files) | pass: p95 RMS 0.0104 mm, MAT identical 0/1 |
-| `syn/geometry/thin-slab/default` | pass (14/14 files) | pass: p95 RMS 0.0347 mm, MAT identical 1/8 |
-| `syn/geometry/thin-slab/fov10` | pass (14/14 files) | pass: p95 RMS 0.0347 mm, MAT identical 1/8 |
-| `syn/geometry/thin-slab/rotation2` | pass (14/14 files) | pass: p95 RMS 0.0550 mm, MAT identical 1/8 |
+| `syn/geometry/thin-slab/default` | pass (14/14 files) | pass: p95 RMS 0.0407 mm, MAT identical 1/8 |
+| `syn/geometry/thin-slab/fov10` | pass (14/14 files) | pass: p95 RMS 0.0407 mm, MAT identical 1/8 |
+| `syn/geometry/thin-slab/rotation2` | pass (14/14 files) | pass: p95 RMS 0.0308 mm, MAT identical 2/8 |
 | `syn/geometry/tiny/default` | pass (12/12 files) | pass: p95 RMS 0.1130 mm, MAT identical 1/6 |
 | `syn/geometry/two-volumes/default` | pass (8/8 files) | pass: p95 RMS 0.0514 mm, MAT identical 1/2 |
 | `syn/geometry/two-volumes/reffile` | pass (8/8 files) | pass: p95 RMS 0.0578 mm, MAT identical 0/2 |
-| `syn/motion/identical-copies/default` | expected-divergence (11/12 files) | pass: p95 RMS 0.0000 mm, MAT identical 6/6 |
+| `syn/motion/identical-copies/default` | pass (12/12 files) | pass: p95 RMS 0.0000 mm, MAT identical 6/6 |
 | `syn/motion/identical-copies/reffile` | pass (12/12 files) | pass: p95 RMS 0.0575 mm, MAT identical 0/6 |
-| `syn/motion/identical-copies/reffile-fudge` | expected-divergence (10/12 files) | pass: p95 RMS 0.0228 mm, MAT identical 0/6 |
+| `syn/motion/identical-copies/reffile-fudge` | pass (12/12 files) | pass: p95 RMS 0.0228 mm, MAT identical 0/6 |
 | `syn/motion/large/default` | pass (18/18 files) | pass: p95 RMS 0.0463 mm, MAT identical 1/12 |
 | `syn/motion/large/reffile` | pass (18/18 files) | pass: p95 RMS 0.0646 mm, MAT identical 0/12 |
-| `syn/motion/small/2d` | pass (18/18 files) | pass: p95 RMS 0.0667 mm, MAT identical 0/12 |
+| `syn/motion/small/2d` | pass (18/18 files) | pass: p95 RMS 0.0360 mm, MAT identical 0/12 |
 | `syn/motion/small/default` | pass (18/18 files) | pass: p95 RMS 0.0488 mm, MAT identical 1/12 |
 | `syn/motion/small/default-report` | pass (18/18 files) | pass: p95 RMS 0.0488 mm, MAT identical 1/12 |
 | `syn/motion/small/dof12` | pass (18/18 files) | pass: p95 RMS 0.1252 mm, MAT identical 0/12 |
@@ -164,7 +164,7 @@ The three columns of the head-motion validation (the clean-room original's numbe
   - FSL-21: 2 case(s) named it, 0 with changed values (largest difference 0), 2 with other changes (exit N -> N; files ['out.nii.gz']): `edge/bins4-mutualinfo`, `edge/bins1-normmi`
   - FSL-59: 4 case(s) named it, 4 with changed values (largest difference 391), 4 with other changes (files ['out.nii.gz_mean_reg.nii.gz', 'out.nii.gz_meanvol.nii.gz', 'out.nii.gz_sigma.nii.gz', 'out.nii.gz_variance.nii.gz']; out.nii.gz header; out_mcf.nii.gz header): `recorded/real/ds000005/opt-nn_final`, `recorded/syn/motion/small/nn_final`, `recorded/syn/motion/small/sinc_final`, `edge/meanvol-reffile-sinc-stats`
   - FSL-60: 1 case(s) named it, 1 with changed values (largest difference 0.0133), 1 with other changes (files ['a.hdr.d/out.nii.gz', 'a.img.d/out.nii.gz']): `edge/img-in-output-directory`
-- **FSL's own step, FSL 6.0.7.17 → 6.0.7.23** (both installations on the same arguments; the previous one's runs from the oracle-output cache or its recording where an earlier record made them): 179 of 197 cases identical (exit status, messages, every output); 18 changed: 4 by FSL-59 (FSL 6.0.7.23's mcflirt applies -sinc_final and -nn_final with trilinear interpolation (newimage 2601.0 keeps each volume's interpolation method from its first access); 6.0.7.17 used the method asked for): `recorded/real/ds000005/opt-nn_final`, `recorded/syn/motion/small/nn_final`, `recorded/syn/motion/small/sinc_final`, `edge/meanvol-reffile-sinc-stats`; 2 by FSL-60 (FSL 6.0.7.23 opens an image whose path holds '.img' or '.hdr' before its extension under another name (NewNifti 5.0.0's replaceSuffix)): `edge/img-in-directory`, `edge/img-in-output-directory`; 5 by arma-lapack (FSL 6.0.7.23's Armadillo 14.2.1 inverts 4 x 4 matrices and solves with them through LAPACK (OpenBLAS), where Armadillo 10.5.1 used its closed-form inverse: the last bits of values computed from nearly equal matrices change): `recorded/real/ds000005/opt-stages1`, `recorded/syn/content/nan/default`, `recorded/syn/content/nan/reffile`, `recorded/syn/motion/identical-copies/default`, `recorded/syn/motion/identical-copies/reffile-fudge`; 2 by compressed-input (FSL 6.0.7.23 reads zstd and bzip2 compressed images): `edge/input-zst`, `edge/input-bz2-plain-name`; 5 by output-types (FSL 6.0.7.23 adds the zstd and bzip2 output types (FSLOUTPUTTYPE NIFTI_ZST, NIFTI_BZ2, ...) and lists every type in the message for an unknown one): `edge/fsloutputtype-analyze`, `edge/fsloutputtype-zst`, `edge/fsloutputtype-pair-bz2`, `edge/fsloutputtype-nifti2-zst`, `edge/fsloutputtype-bogus`.
+- **FSL's own step, FSL 6.0.7.17 → 6.0.7.23** (both installations on the same arguments; the previous one's runs from the oracle-output cache or its recording where an earlier record made them): 179 of 197 cases identical (exit status, messages, every output); 18 changed: 4 by FSL-59 (FSL 6.0.7.23's mcflirt applies -sinc_final and -nn_final with trilinear interpolation (newimage 2601.0 keeps each volume's interpolation method from its first access); 6.0.7.17 used the method asked for): `recorded/real/ds000005/opt-nn_final`, `recorded/syn/motion/small/nn_final`, `recorded/syn/motion/small/sinc_final`, `edge/meanvol-reffile-sinc-stats`; 2 by FSL-60 (FSL 6.0.7.23 opens an image whose path holds '.img' or '.hdr' before its extension under another name (NewNifti 5.0.0's replaceSuffix)): `edge/img-in-directory`, `edge/img-in-output-directory`; 5 by arma-lapack (FSL 6.0.7.23's Armadillo 14.2.1 inverts 4 x 4 matrices and solves with them through LAPACK (OpenBLAS), where Armadillo 10.5.1 used its closed-form inverse: the last bits of values computed from nearly equal matrices change, and the sign of NaN parameters): `recorded/real/ds000005/opt-stages1`, `recorded/syn/content/nan/default`, `recorded/syn/content/nan/reffile`, `recorded/syn/motion/identical-copies/default`, `recorded/syn/motion/identical-copies/reffile-fudge`; 2 by compressed-input (FSL 6.0.7.23 reads zstd and bzip2 compressed images): `edge/input-zst`, `edge/input-bz2-plain-name`; 5 by output-types (FSL 6.0.7.23 adds the zstd and bzip2 output types (FSLOUTPUTTYPE NIFTI_ZST, NIFTI_BZ2, ...) and lists every type in the message for an unknown one): `edge/fsloutputtype-analyze`, `edge/fsloutputtype-zst`, `edge/fsloutputtype-pair-bz2`, `edge/fsloutputtype-nifti2-zst`, `edge/fsloutputtype-bogus`.
 
 ## Thresholds
 
@@ -183,24 +183,14 @@ The three columns of the head-motion validation (the clean-room original's numbe
 | difftest | 6 | 6 | 0 | 0 | 0 |
 | edge cases | 42 | 32 | 10 | 0 | 0 |
 | fMRIPrep's calls | 21 | 21 | 0 | 0 | 0 |
-| recorded: options (ds000005) | 25 | 23 | 1 | 1 | 0 |
+| recorded: options (ds000005) | 25 | 24 | 1 | 0 | 0 |
 | recorded: real | 30 | 29 | 1 | 0 | 0 |
 | recorded: synthetic/cli | 11 | 6 | 5 | 0 | 0 |
-| recorded: synthetic/content | 6 | 4 | 0 | 2 | 0 |
+| recorded: synthetic/content | 6 | 6 | 0 | 0 | 0 |
 | recorded: synthetic/dtypes | 10 | 10 | 0 | 0 | 0 |
 | recorded: synthetic/geometry | 10 | 10 | 0 | 0 | 0 |
-| recorded: synthetic/motion | 36 | 29 | 5 | 2 | 0 |
+| recorded: synthetic/motion | 36 | 31 | 5 | 0 | 0 |
 | recorded: synthetic/orientation | 6 | 6 | 0 | 0 | 0 |
-
-## Expected divergences
-
-| Case | Reason |
-|---|---|
-| `recorded/real/ds000005/opt-stages1` | out_mcf.nii.gz_rel.rms: numbers differ by at most 1e-12 mm or in a NaN's sign, from FSL 6.0.7.23's Armadillo 14.2.1 (4 x 4 inverses and solves through LAPACK); the replica keeps Armadillo 10.5.1's closed-form inverse (docs/findings/fsl-mcflirt.md) |
-| `recorded/syn/content/nan/default` | out_mcf.nii.gz.par: numbers differ by at most 1e-12 mm or in a NaN's sign, from FSL 6.0.7.23's Armadillo 14.2.1 (4 x 4 inverses and solves through LAPACK); the replica keeps Armadillo 10.5.1's closed-form inverse (docs/findings/fsl-mcflirt.md) |
-| `recorded/syn/content/nan/reffile` | out_mcf.nii.gz.par: numbers differ by at most 1e-12 mm or in a NaN's sign, from FSL 6.0.7.23's Armadillo 14.2.1 (4 x 4 inverses and solves through LAPACK); the replica keeps Armadillo 10.5.1's closed-form inverse (docs/findings/fsl-mcflirt.md) |
-| `recorded/syn/motion/identical-copies/default` | out_mcf.nii.gz_rel.rms: numbers differ by at most 1e-12 mm or in a NaN's sign, from FSL 6.0.7.23's Armadillo 14.2.1 (4 x 4 inverses and solves through LAPACK); the replica keeps Armadillo 10.5.1's closed-form inverse (docs/findings/fsl-mcflirt.md) |
-| `recorded/syn/motion/identical-copies/reffile-fudge` | out_mcf.nii.gz_rel.rms, out_mcf.nii.gz_rel_mean.rms: numbers differ by at most 1e-12 mm or in a NaN's sign, from FSL 6.0.7.23's Armadillo 14.2.1 (4 x 4 inverses and solves through LAPACK); the replica keeps Armadillo 10.5.1's closed-form inverse (docs/findings/fsl-mcflirt.md) |
 
 ## Rejected by both
 
@@ -233,7 +223,7 @@ The three columns of the head-motion validation (the clean-room original's numbe
 
 | Component | Version |
 |---|---|
-| larmorx | 0.0.1 (09dd455cac3f) |
+| larmorx | 0.0.1 (1281f57a806f-dirty) |
 | larmorx-testdata | 52124bc98f9f |
 | Python | 3.12.16 |
 | Platform | Linux x86_64 (Linux-6.8.0-124-generic-x86_64-with-glibc2.35) |
@@ -276,7 +266,7 @@ The replica runs as a separate program, the FSL replica package's (`larmorx-nc`)
 | `recorded/real/ds000005/opt-smooth0` | pass | 7/7 | real/ds000005/opt-smooth0 |
 | `recorded/real/ds000005/opt-smooth2` | pass | 7/7 | real/ds000005/opt-smooth2 |
 | `recorded/real/ds000005/opt-spline_final` | pass | 7/7 | real/ds000005/opt-spline_final |
-| `recorded/real/ds000005/opt-stages1` | expected-divergence | 6/7 | real/ds000005/opt-stages1 |
+| `recorded/real/ds000005/opt-stages1` | pass | 7/7 | real/ds000005/opt-stages1 |
 | `recorded/real/ds000005/opt-stages2` | pass | 7/7 | real/ds000005/opt-stages2 |
 | `recorded/real/ds000005/opt-stats` | pass | 7/7 | real/ds000005/opt-stats |
 | `recorded/real/ds000117/default` | pass | 7/7 | real/ds000117/default |
@@ -317,8 +307,8 @@ The replica runs as a separate program, the FSL replica package's (`larmorx-nc`)
 | `recorded/syn/cli/unknown-option-middle` | both-error | 6/6 | syn/cli/unknown-option-middle |
 | `recorded/syn/content/background/default` | pass | 7/7 | syn/content/background/default |
 | `recorded/syn/content/background/reffile` | pass | 7/7 | syn/content/background/reffile |
-| `recorded/syn/content/nan/default` | expected-divergence | 6/7 | syn/content/nan/default |
-| `recorded/syn/content/nan/reffile` | expected-divergence | 6/7 | syn/content/nan/reffile |
+| `recorded/syn/content/nan/default` | pass | 7/7 | syn/content/nan/default |
+| `recorded/syn/content/nan/reffile` | pass | 7/7 | syn/content/nan/reffile |
 | `recorded/syn/content/ramp/reffile` | pass | 7/7 | syn/content/ramp/reffile |
 | `recorded/syn/content/ramp/reffile-smooth0` | pass | 7/7 | syn/content/ramp/reffile-smooth0 |
 | `recorded/syn/dtypes/float32/default` | pass | 7/7 | syn/dtypes/float32/default |
@@ -341,9 +331,9 @@ The replica runs as a separate program, the FSL replica package's (`larmorx-nc`)
 | `recorded/syn/geometry/tiny/default` | pass | 7/7 | syn/geometry/tiny/default |
 | `recorded/syn/geometry/two-volumes/default` | pass | 7/7 | syn/geometry/two-volumes/default |
 | `recorded/syn/geometry/two-volumes/reffile` | pass | 7/7 | syn/geometry/two-volumes/reffile |
-| `recorded/syn/motion/identical-copies/default` | expected-divergence | 6/7 | syn/motion/identical-copies/default |
+| `recorded/syn/motion/identical-copies/default` | pass | 7/7 | syn/motion/identical-copies/default |
 | `recorded/syn/motion/identical-copies/reffile` | pass | 7/7 | syn/motion/identical-copies/reffile |
-| `recorded/syn/motion/identical-copies/reffile-fudge` | expected-divergence | 6/7 | syn/motion/identical-copies/reffile-fudge |
+| `recorded/syn/motion/identical-copies/reffile-fudge` | pass | 7/7 | syn/motion/identical-copies/reffile-fudge |
 | `recorded/syn/motion/large/default` | pass | 7/7 | syn/motion/large/default |
 | `recorded/syn/motion/large/reffile` | pass | 7/7 | syn/motion/large/reffile |
 | `recorded/syn/motion/small/2d` | pass | 7/7 | syn/motion/small/2d |

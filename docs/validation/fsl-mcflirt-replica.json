@@ -2,7 +2,7 @@
  "environment": {
   "cpu": "AMD Ryzen 9 7945HX with Radeon Graphics",
   "larmorx": "0.0.1",
-  "larmorx_commit": "09dd455cac3f",
+  "larmorx_commit": "1281f57a806f-dirty",
   "larmorx_testdata_commit": "52124bc98f9f",
   "logical_cpus": 32,
   "os": "Linux-6.8.0-124-generic-x86_64-with-glibc2.35",
@@ -21,10 +21,10 @@
   "location": "<workspace>/oracles/cache",
   "mode": "use",
   "ran": 17,
-  "saved_seconds": 1339.1,
+  "saved_seconds": 1352.4,
   "served": 115
  },
- "reference": "mcflirt from FSL 6.0.7.23 (fsl-mcflirt 2111.0, the conda build at `~/fsl-6.0.7.23`, as built: glibc 2.35's maths): the recorded runs in `oracles/fsl-6.0.7.23/mcflirt/` and runs made here",
+ "reference": "mcflirt from FSL 6.0.7.23 (fsl-mcflirt 2111.0, the conda build at `~/fsl-6.0.7.23`, as built: glibc 2.35's maths): the recorded runs in `oracles/fsl-6.0.7.23/mcflirt-haswell/` and runs made here",
  "results": [
   {
    "case": "recorded/real/ds000005/default",
@@ -40,7 +40,7 @@
     "D13 fix pass": 5877045,
     "FSL's own step: 6.0.7.17 \u2192 6.0.7.23": "identical"
    },
-   "seconds": 49.65,
+   "seconds": 34.046,
    "status": "pass"
   },
   {
@@ -57,7 +57,7 @@
     "D13 fix pass": 5861044,
     "FSL's own step: 6.0.7.17 \u2192 6.0.7.23": "identical"
    },
-   "seconds": 42.092,
+   "seconds": 34.073,
    "status": "pass"
   },
   {
@@ -74,7 +74,7 @@
     "D13 fix pass": 5861044,
     "FSL's own step: 6.0.7.17 \u2192 6.0.7.23": "identical"
    },
-   "seconds": 43.081,
+   "seconds": 31.861,
    "status": "pass"
   },
   {
@@ -91,7 +91,7 @@
     "D13 fix pass": 5861044,
     "FSL's own step: 6.0.7.17 \u2192 6.0.7.23": "identical"
    },
-   "seconds": 46.341,
+   "seconds": 32.451,
    "status": "pass"
   },
   {
@@ -108,7 +108,7 @@
     "D13 fix pass": 5861054,
     "FSL's own step: 6.0.7.17 \u2192 6.0.7.23": "identical"
    },
-   "seconds": 44.189,
+   "seconds": 32.864,
    "status": "pass"
   },
   {
@@ -125,7 +125,7 @@
     "D13 fix pass": 5881100,
     "FSL's own step: 6.0.7.17 \u2192 6.0.7.23": "identical"
    },
-   "seconds": 32.217,
+   "seconds": 22.374,
    "status": "pass"
   },
   {
@@ -142,7 +142,7 @@
     "D13 fix pass": 5861054,
     "FSL's own step: 6.0.7.17 \u2192 6.0.7.23": "identical"
    },
-   "seconds": 48.131,
+   "seconds": 31.268,
    "status": "pass"
   },
   {
@@ -159,7 +159,7 @@
     "D13 fix pass": 5935751,
     "FSL's own step: 6.0.7.17 \u2192 6.0.7.23": "identical"
    },
-   "seconds": 42.326,
+   "seconds": 32.031,
    "status": "pass"
   },
   {
@@ -176,7 +176,7 @@
     "D13 fix pass": 6158818,
     "FSL's own step: 6.0.7.17 \u2192 6.0.7.23": "identical"
    },
-   "seconds": 47.223,
+   "seconds": 36.897,
    "status": "pass"
   },
   {
@@ -193,7 +193,7 @@
     "D13 fix pass": 5892972,
     "FSL's own step: 6.0.7.17 \u2192 6.0.7.23": "identical"
    },
-   "seconds": 75.116,
+   "seconds": 58.144,
    "status": "pass"
   },
   {
@@ -210,7 +210,7 @@
     "D13 fix pass": 5861054,
     "FSL's own step: 6.0.7.17 \u2192 6.0.7.23": "identical"
    },
-   "seconds": 42.308,
+   "seconds": 32.386,
    "status": "pass"
   },
   {
@@ -227,7 +227,7 @@
     "D13 fix pass": 5922250,
     "FSL's own step: 6.0.7.17 \u2192 6.0.7.23": "identical"
    },
-   "seconds": 79.992,
+   "seconds": 60.266,
    "status": "pass"
   },
   {
@@ -244,7 +244,7 @@
     "D13 fix pass": 5075566,
     "FSL's own step: 6.0.7.17 \u2192 6.0.7.23": "identical"
    },
-   "seconds": 29.656,
+   "seconds": 23.303,
    "status": "pass"
   },
   {
@@ -261,7 +261,7 @@
     "D13 fix pass": 6447901,
     "FSL's own step: 6.0.7.17 \u2192 6.0.7.23": "identical"
    },
-   "seconds": 71.634,
+   "seconds": 69.813,
    "status": "pass"
   },
   {
@@ -278,7 +278,7 @@
     "D13 fix pass": 6466991,
     "FSL's own step: 6.0.7.17 \u2192 6.0.7.23": "identical"
    },
-   "seconds": 47.199,
+   "seconds": 37.88,
    "status": "pass"
   },
   {
@@ -295,7 +295,7 @@
     "D13 fix pass": 6453422,
     "FSL's own step: 6.0.7.17 \u2192 6.0.7.23": "identical"
    },
-   "seconds": 64.748,
+   "seconds": 49.892,
    "status": "pass"
   },
   {
@@ -312,7 +312,7 @@
     "D13 fix pass": 5814506,
     "FSL's own step: 6.0.7.17 \u2192 6.0.7.23": "identical"
    },
-   "seconds": 39.274,
+   "seconds": 32.86,
    "status": "pass"
   },
   {
@@ -328,7 +328,7 @@
    "reported": {
     "FSL's own step: 6.0.7.17 \u2192 6.0.7.23": "identical"
    },
-   "seconds": 0.668,
+   "seconds": 0.401,
    "status": "both-error"
   },
   {
@@ -345,7 +345,7 @@
     "D13 fix pass": 6312630,
     "FSL's own step: 6.0.7.17 \u2192 6.0.7.23": "identical"
    },
-   "seconds": 77.047,
+   "seconds": 71.616,
    "status": "pass"
   },
   {
@@ -362,7 +362,7 @@
     "D13 fix pass": 6254039,
     "FSL's own step: 6.0.7.17 \u2192 6.0.7.23": "identical"
    },
-   "seconds": 79.677,
+   "seconds": 75.713,
    "status": "pass"
   },
   {
@@ -379,7 +379,7 @@
     "D13 fix pass": 9585591,
     "FSL's own step: 6.0.7.17 \u2192 6.0.7.23": "changed"
    },
-   "seconds": 43.167,
+   "seconds": 35.229,
    "status": "pass"
   },
   {
@@ -396,7 +396,7 @@
     "D13 fix pass": 5997690,
     "FSL's own step: 6.0.7.17 \u2192 6.0.7.23": "identical"
    },
-   "seconds": 40.68,
+   "seconds": 35.333,
    "status": "pass"
   },
   {
@@ -413,7 +413,7 @@
     "D13 fix pass": 5850708,
     "FSL's own step: 6.0.7.17 \u2192 6.0.7.23": "identical"
    },
-   "seconds": 45.415,
+   "seconds": 33.431,
    "status": "pass"
   },
   {
@@ -430,7 +430,7 @@
     "D13 fix pass": 5861054,
     "FSL's own step: 6.0.7.17 \u2192 6.0.7.23": "identical"
    },
-   "seconds": 40.963,
+   "seconds": 35.18,
    "status": "pass"
   },
   {
@@ -447,7 +447,7 @@
     "D13 fix pass": 5986157,
     "FSL's own step: 6.0.7.17 \u2192 6.0.7.23": "identical"
    },
-   "seconds": 36.447,
+   "seconds": 35.105,
    "status": "pass"
   },
   {
@@ -464,7 +464,7 @@
     "D13 fix pass": 5862281,
     "FSL's own step: 6.0.7.17 \u2192 6.0.7.23": "identical"
    },
-   "seconds": 41.489,
+   "seconds": 36.305,
    "status": "pass"
   },
   {
@@ -481,34 +481,25 @@
     "D13 fix pass": 6866357,
     "FSL's own step: 6.0.7.17 \u2192 6.0.7.23": "identical"
    },
-   "seconds": 49.214,
+   "seconds": 52.068,
    "status": "pass"
   },
   {
    "case": "recorded/real/ds000005/opt-stages1",
    "category": "recorded: options (ds000005)",
-   "checks_passed": 6,
+   "checks_passed": 7,
    "checks_total": 7,
-   "failed_checks": [
-    {
-     "detail": "out_mcf.nii.gz_rel.rms",
-     "metric": "files",
-     "name": "every file bit-identical",
-     "passed": false,
-     "threshold": "all",
-     "value": "245/246"
-    }
-   ],
+   "failed_checks": [],
    "measured": {
-    "every file bit-identical": "245/246"
+    "every file bit-identical": "246/246"
    },
-   "reason": "out_mcf.nii.gz_rel.rms: numbers differ by at most 1e-12 mm or in a NaN's sign, from FSL 6.0.7.23's Armadillo 14.2.1 (4 x 4 inverses and solves through LAPACK); the replica keeps Armadillo 10.5.1's closed-form inverse (docs/findings/fsl-mcflirt.md)",
+   "reason": "",
    "reported": {
     "D13 fix pass": 5888017,
     "FSL's own step: 6.0.7.17 \u2192 6.0.7.23": "changed"
    },
-   "seconds": 12.219,
-   "status": "expected-divergence"
+   "seconds": 10.678,
+   "status": "pass"
   },
   {
    "case": "recorded/real/ds000005/opt-stages2",
@@ -524,7 +515,7 @@
     "D13 fix pass": 5878723,
     "FSL's own step: 6.0.7.17 \u2192 6.0.7.23": "identical"
    },
-   "seconds": 24.351,
+   "seconds": 22.604,
    "status": "pass"
   },
   {
@@ -541,7 +532,7 @@
     "D13 fix pass": 5861054,
     "FSL's own step: 6.0.7.17 \u2192 6.0.7.23": "identical"
    },
-   "seconds": 40.003,
+   "seconds": 42.611,
    "status": "pass"
   },
   {
@@ -558,7 +549,7 @@
     "D13 fix pass": 13685924,
     "FSL's own step: 6.0.7.17 \u2192 6.0.7.23": "identical"
    },
-   "seconds": 32.346,
+   "seconds": 34.207,
    "status": "pass"
   },
   {
@@ -575,7 +566,7 @@
     "D13 fix pass": 13888827,
     "FSL's own step: 6.0.7.17 \u2192 6.0.7.23": "identical"
    },
-   "seconds": 34.305,
+   "seconds": 40.39,
    "status": "pass"
   },
   {
@@ -592,7 +583,7 @@
     "D13 fix pass": 13888837,
     "FSL's own step: 6.0.7.17 \u2192 6.0.7.23": "identical"
    },
-   "seconds": 36.192,
+   "seconds": 38.138,
    "status": "pass"
   },
   {
@@ -609,7 +600,7 @@
     "D13 fix pass": 13470720,
     "FSL's own step: 6.0.7.17 \u2192 6.0.7.23": "identical"
    },
-   "seconds": 37.4,
+   "seconds": 41.796,
    "status": "pass"
   },
   {
@@ -626,7 +617,7 @@
     "D13 fix pass": 13622680,
     "FSL's own step: 6.0.7.17 \u2192 6.0.7.23": "identical"
    },
-   "seconds": 41.355,
+   "seconds": 44.761,
    "status": "pass"
   },
   {
@@ -643,7 +634,7 @@
     "D13 fix pass": 13622690,
     "FSL's own step: 6.0.7.17 \u2192 6.0.7.23": "identical"
    },
-   "seconds": 35.754,
+   "seconds": 45.088,
    "status": "pass"
   },
   {
@@ -660,7 +651,7 @@
     "D13 fix pass": 22409663,
     "FSL's own step: 6.0.7.17 \u2192 6.0.7.23": "identical"
    },
-   "seconds": 49.155,
+   "seconds": 59.816,
    "status": "pass"
   },
   {
@@ -677,7 +668,7 @@
     "D13 fix pass": 22728286,
     "FSL's own step: 6.0.7.17 \u2192 6.0.7.23": "identical"
    },
-   "seconds": 46.044,
+   "seconds": 61.747,
    "status": "pass"
   },
   {
@@ -694,7 +685,7 @@
     "D13 fix pass": 22728296,
     "FSL's own step: 6.0.7.17 \u2192 6.0.7.23": "identical"
    },
-   "seconds": 46.142,
+   "seconds": 63.622,
    "status": "pass"
   },
   {
@@ -711,7 +702,7 @@
     "D13 fix pass": 13937868,
     "FSL's own step: 6.0.7.17 \u2192 6.0.7.23": "identical"
    },
-   "seconds": 55.457,
+   "seconds": 72.249,
    "status": "pass"
   },
   {
@@ -728,7 +719,7 @@
     "D13 fix pass": 14247773,
     "FSL's own step: 6.0.7.17 \u2192 6.0.7.23": "identical"
    },
-   "seconds": 53.717,
+   "seconds": 66.178,
    "status": "pass"
   },
   {
@@ -745,7 +736,7 @@
     "D13 fix pass": 14247783,
     "FSL's own step: 6.0.7.17 \u2192 6.0.7.23": "identical"
    },
-   "seconds": 49.398,
+   "seconds": 63.814,
    "status": "pass"
   },
   {
@@ -762,7 +753,7 @@
     "D13 fix pass": 13917341,
     "FSL's own step: 6.0.7.17 \u2192 6.0.7.23": "identical"
    },
-   "seconds": 36.153,
+   "seconds": 44.754,
    "status": "pass"
   },
   {
@@ -779,7 +770,7 @@
     "D13 fix pass": 14106697,
     "FSL's own step: 6.0.7.17 \u2192 6.0.7.23": "identical"
    },
-   "seconds": 37.928,
+   "seconds": 44.657,
    "status": "pass"
   },
   {
@@ -796,7 +787,7 @@
     "D13 fix pass": 14106707,
     "FSL's own step: 6.0.7.17 \u2192 6.0.7.23": "identical"
    },
-   "seconds": 38.983,
+   "seconds": 43.804,
    "status": "pass"
   },
   {
@@ -812,7 +803,7 @@
    "reported": {
     "FSL's own step: 6.0.7.17 \u2192 6.0.7.23": "identical"
    },
-   "seconds": 0.007,
+   "seconds": 0.006,
    "status": "both-error"
   },
   {
@@ -829,7 +820,7 @@
     "D13 fix pass": 155779,
     "FSL's own step: 6.0.7.17 \u2192 6.0.7.23": "identical"
    },
-   "seconds": 14.118,
+   "seconds": 17.413,
    "status": "pass"
   },
   {
@@ -846,7 +837,7 @@
     "D13 fix pass": 155509,
     "FSL's own step: 6.0.7.17 \u2192 6.0.7.23": "identical"
    },
-   "seconds": 13.723,
+   "seconds": 16.23,
    "status": "pass"
   },
   {
@@ -863,7 +854,7 @@
     "D13 fix pass": 155519,
     "FSL's own step: 6.0.7.17 \u2192 6.0.7.23": "identical"
    },
-   "seconds": 13.372,
+   "seconds": 16.416,
    "status": "pass"
   },
   {
@@ -880,7 +871,7 @@
     "D13 fix pass": 35569111,
     "FSL's own step: 6.0.7.17 \u2192 6.0.7.23": "identical"
    },
-   "seconds": 55.796,
+   "seconds": 66.139,
    "status": "pass"
   },
   {
@@ -897,7 +888,7 @@
     "D13 fix pass": 35790524,
     "FSL's own step: 6.0.7.17 \u2192 6.0.7.23": "identical"
    },
-   "seconds": 53.364,
+   "seconds": 65.497,
    "status": "pass"
   },
   {
@@ -914,7 +905,7 @@
     "D13 fix pass": 35790534,
     "FSL's own step: 6.0.7.17 \u2192 6.0.7.23": "identical"
    },
-   "seconds": 51.604,
+   "seconds": 65.401,
    "status": "pass"
   },
   {
@@ -931,7 +922,7 @@
     "D13 fix pass": 8272727,
     "FSL's own step: 6.0.7.17 \u2192 6.0.7.23": "identical"
    },
-   "seconds": 21.338,
+   "seconds": 23.685,
    "status": "pass"
   },
   {
@@ -948,7 +939,7 @@
     "D13 fix pass": 8417000,
     "FSL's own step: 6.0.7.17 \u2192 6.0.7.23": "identical"
    },
-   "seconds": 19.67,
+   "seconds": 21.347,
    "status": "pass"
   },
   {
@@ -965,7 +956,7 @@
     "D13 fix pass": 8417010,
     "FSL's own step: 6.0.7.17 \u2192 6.0.7.23": "identical"
    },
-   "seconds": 18.356,
+   "seconds": 21.495,
    "status": "pass"
   },
   {
@@ -982,7 +973,7 @@
     "D13 fix pass": 172975,
     "FSL's own step: 6.0.7.17 \u2192 6.0.7.23": "identical"
    },
-   "seconds": 2.075,
+   "seconds": 2.365,
    "status": "pass"
   },
   {
@@ -999,7 +990,7 @@
     "D13 fix pass": 193564,
     "FSL's own step: 6.0.7.17 \u2192 6.0.7.23": "identical"
    },
-   "seconds": 1.885,
+   "seconds": 1.94,
    "status": "pass"
   },
   {
@@ -1032,7 +1023,7 @@
     "D13 fix pass": 0,
     "FSL's own step: 6.0.7.17 \u2192 6.0.7.23": "identical"
    },
-   "seconds": 0.006,
+   "seconds": 0.012,
    "status": "pass"
   },
   {
@@ -1048,7 +1039,7 @@
    "reported": {
     "FSL's own step: 6.0.7.17 \u2192 6.0.7.23": "identical"
    },
-   "seconds": 0.006,
+   "seconds": 0.011,
    "status": "both-error"
   },
   {
@@ -1065,7 +1056,7 @@
     "D13 fix pass": 172970,
     "FSL's own step: 6.0.7.17 \u2192 6.0.7.23": "identical"
    },
-   "seconds": 2.212,
+   "seconds": 2.296,
    "status": "pass"
   },
   {
@@ -1082,7 +1073,7 @@
     "D13 fix pass": 172985,
     "FSL's own step: 6.0.7.17 \u2192 6.0.7.23": "identical"
    },
-   "seconds": 2.525,
+   "seconds": 2.26,
    "status": "pass"
   },
   {
@@ -1098,7 +1089,7 @@
    "reported": {
     "FSL's own step: 6.0.7.17 \u2192 6.0.7.23": "identical"
    },
-   "seconds": 0.017,
+   "seconds": 0.018,
    "status": "both-error"
   },
   {
@@ -1115,7 +1106,7 @@
     "D13 fix pass": 172966,
     "FSL's own step: 6.0.7.17 \u2192 6.0.7.23": "identical"
    },
-   "seconds": 2.186,
+   "seconds": 2.181,
    "status": "pass"
   },
   {
@@ -1131,7 +1122,7 @@
    "reported": {
     "FSL's own step: 6.0.7.17 \u2192 6.0.7.23": "identical"
    },
-   "seconds": 0.058,
+   "seconds": 0.044,
    "status": "both-error"
   },
   {
@@ -1147,7 +1138,7 @@
    "reported": {
     "FSL's own step: 6.0.7.17 \u2192 6.0.7.23": "identical"
    },
-   "seconds": 0.01,
+   "seconds": 0.005,
    "status": "both-error"
   },
   {
@@ -1164,7 +1155,7 @@
     "D13 fix pass": 194139,
     "FSL's own step: 6.0.7.17 \u2192 6.0.7.23": "identical"
    },
-   "seconds": 1.755,
+   "seconds": 1.445,
    "status": "pass"
   },
   {
@@ -1181,60 +1172,42 @@
     "D13 fix pass": 204001,
     "FSL's own step: 6.0.7.17 \u2192 6.0.7.23": "identical"
    },
-   "seconds": 1.053,
+   "seconds": 1.444,
    "status": "pass"
   },
   {
    "case": "recorded/syn/content/nan/default",
    "category": "recorded: synthetic/content",
-   "checks_passed": 6,
+   "checks_passed": 7,
    "checks_total": 7,
-   "failed_checks": [
-    {
-     "detail": "out_mcf.nii.gz.par",
-     "metric": "files",
-     "name": "every file bit-identical",
-     "passed": false,
-     "threshold": "all",
-     "value": "17/18"
-    }
-   ],
+   "failed_checks": [],
    "measured": {
-    "every file bit-identical": "17/18"
+    "every file bit-identical": "18/18"
    },
-   "reason": "out_mcf.nii.gz.par: numbers differ by at most 1e-12 mm or in a NaN's sign, from FSL 6.0.7.23's Armadillo 14.2.1 (4 x 4 inverses and solves through LAPACK); the replica keeps Armadillo 10.5.1's closed-form inverse (docs/findings/fsl-mcflirt.md)",
+   "reason": "",
    "reported": {
     "D13 fix pass": 166513,
     "FSL's own step: 6.0.7.17 \u2192 6.0.7.23": "changed"
    },
-   "seconds": 1.89,
-   "status": "expected-divergence"
+   "seconds": 2.279,
+   "status": "pass"
   },
   {
    "case": "recorded/syn/content/nan/reffile",
    "category": "recorded: synthetic/content",
-   "checks_passed": 6,
+   "checks_passed": 7,
    "checks_total": 7,
-   "failed_checks": [
-    {
-     "detail": "out_mcf.nii.gz.par",
-     "metric": "files",
-     "name": "every file bit-identical",
-     "passed": false,
-     "threshold": "all",
-     "value": "17/18"
-    }
-   ],
+   "failed_checks": [],
    "measured": {
-    "every file bit-identical": "17/18"
+    "every file bit-identical": "18/18"
    },
-   "reason": "out_mcf.nii.gz.par: numbers differ by at most 1e-12 mm or in a NaN's sign, from FSL 6.0.7.23's Armadillo 14.2.1 (4 x 4 inverses and solves through LAPACK); the replica keeps Armadillo 10.5.1's closed-form inverse (docs/findings/fsl-mcflirt.md)",
+   "reason": "",
    "reported": {
     "D13 fix pass": 301128,
     "FSL's own step: 6.0.7.17 \u2192 6.0.7.23": "changed"
    },
-   "seconds": 2.494,
-   "status": "expected-divergence"
+   "seconds": 1.859,
+   "status": "pass"
   },
   {
    "case": "recorded/syn/content/ramp/reffile",
@@ -1250,7 +1223,7 @@
     "D13 fix pass": 70439,
     "FSL's own step: 6.0.7.17 \u2192 6.0.7.23": "identical"
    },
-   "seconds": 2.036,
+   "seconds": 1.417,
    "status": "pass"
   },
   {
@@ -1267,7 +1240,7 @@
     "D13 fix pass": 71705,
     "FSL's own step: 6.0.7.17 \u2192 6.0.7.23": "identical"
    },
-   "seconds": 1.404,
+   "seconds": 1.111,
    "status": "pass"
   },
   {
@@ -1284,7 +1257,7 @@
     "D13 fix pass": 33396,
     "FSL's own step: 6.0.7.17 \u2192 6.0.7.23": "identical"
    },
-   "seconds": 2.425,
+   "seconds": 2.133,
    "status": "pass"
   },
   {
@@ -1301,7 +1274,7 @@
     "D13 fix pass": 33539,
     "FSL's own step: 6.0.7.17 \u2192 6.0.7.23": "identical"
    },
-   "seconds": 2.036,
+   "seconds": 1.723,
    "status": "pass"
   },
   {
@@ -1318,7 +1291,7 @@
     "D13 fix pass": 33396,
     "FSL's own step: 6.0.7.17 \u2192 6.0.7.23": "identical"
    },
-   "seconds": 2.551,
+   "seconds": 2.285,
    "status": "pass"
   },
   {
@@ -1335,7 +1308,7 @@
     "D13 fix pass": 33539,
     "FSL's own step: 6.0.7.17 \u2192 6.0.7.23": "identical"
    },
-   "seconds": 2.169,
+   "seconds": 2.17,
    "status": "pass"
   },
   {
@@ -1352,7 +1325,7 @@
     "D13 fix pass": 33396,
     "FSL's own step: 6.0.7.17 \u2192 6.0.7.23": "identical"
    },
-   "seconds": 2.109,
+   "seconds": 2.355,
    "status": "pass"
   },
   {
@@ -1369,7 +1342,7 @@
     "D13 fix pass": 33539,
     "FSL's own step: 6.0.7.17 \u2192 6.0.7.23": "identical"
    },
-   "seconds": 1.419,
+   "seconds": 1.95,
    "status": "pass"
   },
   {
@@ -1386,7 +1359,7 @@
     "D13 fix pass": 172985,
     "FSL's own step: 6.0.7.17 \u2192 6.0.7.23": "identical"
    },
-   "seconds": 1.542,
+   "seconds": 2.36,
    "status": "pass"
   },
   {
@@ -1403,7 +1376,7 @@
     "D13 fix pass": 193564,
     "FSL's own step: 6.0.7.17 \u2192 6.0.7.23": "identical"
    },
-   "seconds": 1.428,
+   "seconds": 2.095,
    "status": "pass"
   },
   {
@@ -1420,7 +1393,7 @@
     "D13 fix pass": 163842,
     "FSL's own step: 6.0.7.17 \u2192 6.0.7.23": "identical"
    },
-   "seconds": 1.567,
+   "seconds": 2.061,
    "status": "pass"
   },
   {
@@ -1437,7 +1410,7 @@
     "D13 fix pass": 181073,
     "FSL's own step: 6.0.7.17 \u2192 6.0.7.23": "identical"
    },
-   "seconds": 1.504,
+   "seconds": 2.006,
    "status": "pass"
   },
   {
@@ -1454,7 +1427,7 @@
     "D13 fix pass": 0,
     "FSL's own step: 6.0.7.17 \u2192 6.0.7.23": "identical"
    },
-   "seconds": 0.044,
+   "seconds": 0.057,
    "status": "pass"
   },
   {
@@ -1471,7 +1444,7 @@
     "D13 fix pass": 15732,
     "FSL's own step: 6.0.7.17 \u2192 6.0.7.23": "identical"
    },
-   "seconds": 0.257,
+   "seconds": 0.377,
    "status": "pass"
   },
   {
@@ -1488,7 +1461,7 @@
     "D13 fix pass": 0,
     "FSL's own step: 6.0.7.17 \u2192 6.0.7.23": "identical"
    },
-   "seconds": 0.039,
+   "seconds": 0.045,
    "status": "pass"
   },
   {
@@ -1505,7 +1478,7 @@
     "D13 fix pass": 15732,
     "FSL's own step: 6.0.7.17 \u2192 6.0.7.23": "identical"
    },
-   "seconds": 0.408,
+   "seconds": 0.364,
    "status": "pass"
   },
   {
@@ -1522,7 +1495,7 @@
     "D13 fix pass": 22809,
     "FSL's own step: 6.0.7.17 \u2192 6.0.7.23": "identical"
    },
-   "seconds": 0.139,
+   "seconds": 0.227,
    "status": "pass"
   },
   {
@@ -1539,7 +1512,7 @@
     "D13 fix pass": 22809,
     "FSL's own step: 6.0.7.17 \u2192 6.0.7.23": "identical"
    },
-   "seconds": 0.244,
+   "seconds": 0.206,
    "status": "pass"
   },
   {
@@ -1556,7 +1529,7 @@
     "D13 fix pass": 23454,
     "FSL's own step: 6.0.7.17 \u2192 6.0.7.23": "identical"
    },
-   "seconds": 0.142,
+   "seconds": 0.289,
    "status": "pass"
   },
   {
@@ -1573,7 +1546,7 @@
     "D13 fix pass": 821,
     "FSL's own step: 6.0.7.17 \u2192 6.0.7.23": "identical"
    },
-   "seconds": 0.072,
+   "seconds": 0.044,
    "status": "pass"
   },
   {
@@ -1590,7 +1563,7 @@
     "D13 fix pass": 15712,
     "FSL's own step: 6.0.7.17 \u2192 6.0.7.23": "identical"
    },
-   "seconds": 0.196,
+   "seconds": 0.424,
    "status": "pass"
   },
   {
@@ -1607,34 +1580,25 @@
     "D13 fix pass": 34022,
     "FSL's own step: 6.0.7.17 \u2192 6.0.7.23": "identical"
    },
-   "seconds": 0.586,
+   "seconds": 0.718,
    "status": "pass"
   },
   {
    "case": "recorded/syn/motion/identical-copies/default",
    "category": "recorded: synthetic/motion",
-   "checks_passed": 6,
+   "checks_passed": 7,
    "checks_total": 7,
-   "failed_checks": [
-    {
-     "detail": "out_mcf.nii.gz_rel.rms",
-     "metric": "files",
-     "name": "every file bit-identical",
-     "passed": false,
-     "threshold": "all",
-     "value": "11/12"
-    }
-   ],
+   "failed_checks": [],
    "measured": {
-    "every file bit-identical": "11/12"
+    "every file bit-identical": "12/12"
    },
-   "reason": "out_mcf.nii.gz_rel.rms: numbers differ by at most 1e-12 mm or in a NaN's sign, from FSL 6.0.7.23's Armadillo 14.2.1 (4 x 4 inverses and solves through LAPACK); the replica keeps Armadillo 10.5.1's closed-form inverse (docs/findings/fsl-mcflirt.md)",
+   "reason": "",
    "reported": {
     "D13 fix pass": 74170,
     "FSL's own step: 6.0.7.17 \u2192 6.0.7.23": "changed"
    },
-   "seconds": 1.642,
-   "status": "expected-divergence"
+   "seconds": 1.581,
+   "status": "pass"
   },
   {
    "case": "recorded/syn/motion/identical-copies/reffile",
@@ -1650,34 +1614,25 @@
     "D13 fix pass": 97085,
     "FSL's own step: 6.0.7.17 \u2192 6.0.7.23": "identical"
    },
-   "seconds": 1.078,
+   "seconds": 1.168,
    "status": "pass"
   },
   {
    "case": "recorded/syn/motion/identical-copies/reffile-fudge",
    "category": "recorded: synthetic/motion",
-   "checks_passed": 6,
+   "checks_passed": 7,
    "checks_total": 7,
-   "failed_checks": [
-    {
-     "detail": "out_mcf.nii.gz_rel.rms; out_mcf.nii.gz_rel_mean.rms",
-     "metric": "files",
-     "name": "every file bit-identical",
-     "passed": false,
-     "threshold": "all",
-     "value": "10/12"
-    }
-   ],
+   "failed_checks": [],
    "measured": {
-    "every file bit-identical": "10/12"
+    "every file bit-identical": "12/12"
    },
-   "reason": "out_mcf.nii.gz_rel.rms, out_mcf.nii.gz_rel_mean.rms: numbers differ by at most 1e-12 mm or in a NaN's sign, from FSL 6.0.7.23's Armadillo 14.2.1 (4 x 4 inverses and solves through LAPACK); the replica keeps Armadillo 10.5.1's closed-form inverse (docs/findings/fsl-mcflirt.md)",
+   "reason": "",
    "reported": {
     "D13 fix pass": 95448,
     "FSL's own step: 6.0.7.17 \u2192 6.0.7.23": "changed"
    },
-   "seconds": 1.082,
-   "status": "expected-divergence"
+   "seconds": 1.157,
+   "status": "pass"
   },
   {
    "case": "recorded/syn/motion/large/default",
@@ -1693,7 +1648,7 @@
     "D13 fix pass": 176107,
     "FSL's own step: 6.0.7.17 \u2192 6.0.7.23": "identical"
    },
-   "seconds": 2.115,
+   "seconds": 2.111,
    "status": "pass"
   },
   {
@@ -1710,7 +1665,7 @@
     "D13 fix pass": 191798,
     "FSL's own step: 6.0.7.17 \u2192 6.0.7.23": "identical"
    },
-   "seconds": 1.86,
+   "seconds": 2.132,
    "status": "pass"
   },
   {
@@ -1727,7 +1682,7 @@
     "D13 fix pass": 207371,
     "FSL's own step: 6.0.7.17 \u2192 6.0.7.23": "identical"
    },
-   "seconds": 1.165,
+   "seconds": 1.263,
    "status": "pass"
   },
   {
@@ -1744,7 +1699,7 @@
     "D13 fix pass": 172985,
     "FSL's own step: 6.0.7.17 \u2192 6.0.7.23": "identical"
    },
-   "seconds": 1.444,
+   "seconds": 2.117,
    "status": "pass"
   },
   {
@@ -1761,7 +1716,7 @@
     "D13 fix pass": 172985,
     "FSL's own step: 6.0.7.17 \u2192 6.0.7.23": "identical"
    },
-   "seconds": 1.397,
+   "seconds": 2.117,
    "status": "pass"
   },
   {
@@ -1778,7 +1733,7 @@
     "D13 fix pass": 202254,
     "FSL's own step: 6.0.7.17 \u2192 6.0.7.23": "identical"
    },
-   "seconds": 2.72,
+   "seconds": 3.321,
    "status": "pass"
   },
   {
@@ -1795,7 +1750,7 @@
     "D13 fix pass": 190852,
     "FSL's own step: 6.0.7.17 \u2192 6.0.7.23": "identical"
    },
-   "seconds": 1.425,
+   "seconds": 2.291,
    "status": "pass"
   },
   {
@@ -1812,7 +1767,7 @@
     "D13 fix pass": 193564,
     "FSL's own step: 6.0.7.17 \u2192 6.0.7.23": "identical"
    },
-   "seconds": 1.165,
+   "seconds": 1.666,
    "status": "pass"
   },
   {
@@ -1829,7 +1784,7 @@
     "D13 fix pass": 190151,
     "FSL's own step: 6.0.7.17 \u2192 6.0.7.23": "identical"
    },
-   "seconds": 1.368,
+   "seconds": 1.746,
    "status": "pass"
   },
   {
@@ -1846,7 +1801,7 @@
     "D13 fix pass": 194756,
     "FSL's own step: 6.0.7.17 \u2192 6.0.7.23": "identical"
    },
-   "seconds": 1.582,
+   "seconds": 1.75,
    "status": "pass"
   },
   {
@@ -1863,7 +1818,7 @@
     "D13 fix pass": 216012,
     "FSL's own step: 6.0.7.17 \u2192 6.0.7.23": "identical"
    },
-   "seconds": 3.857,
+   "seconds": 3.896,
    "status": "pass"
   },
   {
@@ -1880,7 +1835,7 @@
     "D13 fix pass": 193564,
     "FSL's own step: 6.0.7.17 \u2192 6.0.7.23": "identical"
    },
-   "seconds": 2.009,
+   "seconds": 1.825,
    "status": "pass"
   },
   {
@@ -1897,7 +1852,7 @@
     "D13 fix pass": 356853,
     "FSL's own step: 6.0.7.17 \u2192 6.0.7.23": "changed"
    },
-   "seconds": 2.004,
+   "seconds": 2.002,
    "status": "pass"
   },
   {
@@ -1913,7 +1868,7 @@
    "reported": {
     "FSL's own step: 6.0.7.17 \u2192 6.0.7.23": "identical"
    },
-   "seconds": 0.765,
+   "seconds": 0.764,
    "status": "both-error"
   },
   {
@@ -1929,7 +1884,7 @@
    "reported": {
     "FSL's own step: 6.0.7.17 \u2192 6.0.7.23": "identical"
    },
-   "seconds": 0.004,
+   "seconds": 0.003,
    "status": "both-error"
   },
   {
@@ -1946,7 +1901,7 @@
     "D13 fix pass": 172981,
     "FSL's own step: 6.0.7.17 \u2192 6.0.7.23": "identical"
    },
-   "seconds": 2.526,
+   "seconds": 2.109,
    "status": "pass"
   },
   {
@@ -1963,7 +1918,7 @@
     "D13 fix pass": 193564,
     "FSL's own step: 6.0.7.17 \u2192 6.0.7.23": "identical"
    },
-   "seconds": 1.856,
+   "seconds": 2.196,
    "status": "pass"
   },
   {
@@ -1979,7 +1934,7 @@
    "reported": {
     "FSL's own step: 6.0.7.17 \u2192 6.0.7.23": "identical"
    },
-   "seconds": 1.84,
+   "seconds": 1.795,
    "status": "pass"
   },
   {
@@ -1996,7 +1951,7 @@
     "D13 fix pass": 193564,
     "FSL's own step: 6.0.7.17 \u2192 6.0.7.23": "identical"
    },
-   "seconds": 1.717,
+   "seconds": 1.774,
    "status": "pass"
   },
   {
@@ -2013,7 +1968,7 @@
     "D13 fix pass": 192109,
     "FSL's own step: 6.0.7.17 \u2192 6.0.7.23": "identical"
    },
-   "seconds": 2.465,
+   "seconds": 1.944,
    "status": "pass"
   },
   {
@@ -2029,7 +1984,7 @@
    "reported": {
     "FSL's own step: 6.0.7.17 \u2192 6.0.7.23": "identical"
    },
-   "seconds": 1.058,
+   "seconds": 0.909,
    "status": "both-error"
   },
   {
@@ -2046,7 +2001,7 @@
     "D13 fix pass": 193564,
     "FSL's own step: 6.0.7.17 \u2192 6.0.7.23": "identical"
    },
-   "seconds": 2.289,
+   "seconds": 1.945,
    "status": "pass"
   },
   {
@@ -2063,7 +2018,7 @@
     "D13 fix pass": 177324,
     "FSL's own step: 6.0.7.17 \u2192 6.0.7.23": "identical"
    },
-   "seconds": 2.276,
+   "seconds": 1.728,
    "status": "pass"
   },
   {
@@ -2079,7 +2034,7 @@
    "reported": {
     "FSL's own step: 6.0.7.17 \u2192 6.0.7.23": "identical"
    },
-   "seconds": 0.048,
+   "seconds": 0.016,
    "status": "both-error"
   },
   {
@@ -2096,7 +2051,7 @@
     "D13 fix pass": 193564,
     "FSL's own step: 6.0.7.17 \u2192 6.0.7.23": "identical"
    },
-   "seconds": 2.495,
+   "seconds": 1.666,
    "status": "pass"
   },
   {
@@ -2113,7 +2068,7 @@
     "D13 fix pass": 373364,
     "FSL's own step: 6.0.7.17 \u2192 6.0.7.23": "changed"
    },
-   "seconds": 3.486,
+   "seconds": 3.091,
    "status": "pass"
   },
   {
@@ -2130,7 +2085,7 @@
     "D13 fix pass": 189780,
     "FSL's own step: 6.0.7.17 \u2192 6.0.7.23": "identical"
    },
-   "seconds": 1.774,
+   "seconds": 1.909,
    "status": "pass"
   },
   {
@@ -2147,7 +2102,7 @@
     "D13 fix pass": 227269,
     "FSL's own step: 6.0.7.17 \u2192 6.0.7.23": "identical"
    },
-   "seconds": 2.183,
+   "seconds": 2.168,
    "status": "pass"
   },
   {
@@ -2164,7 +2119,7 @@
     "D13 fix pass": 199455,
     "FSL's own step: 6.0.7.17 \u2192 6.0.7.23": "identical"
    },
-   "seconds": 0.394,
+   "seconds": 0.522,
    "status": "pass"
   },
   {
@@ -2181,7 +2136,7 @@
     "D13 fix pass": 190521,
     "FSL's own step: 6.0.7.17 \u2192 6.0.7.23": "identical"
    },
-   "seconds": 13.038,
+   "seconds": 23.029,
    "status": "pass"
   },
   {
@@ -2198,7 +2153,7 @@
     "D13 fix pass": 193564,
     "FSL's own step: 6.0.7.17 \u2192 6.0.7.23": "identical"
    },
-   "seconds": 1.602,
+   "seconds": 1.838,
    "status": "pass"
   },
   {
@@ -2215,7 +2170,7 @@
     "D13 fix pass": 0,
     "FSL's own step: 6.0.7.17 \u2192 6.0.7.23": "identical"
    },
-   "seconds": 0.685,
+   "seconds": 1.102,
    "status": "pass"
   },
   {
@@ -2231,7 +2186,7 @@
    "reported": {
     "FSL's own step: 6.0.7.17 \u2192 6.0.7.23": "identical"
    },
-   "seconds": 0.003,
+   "seconds": 0.01,
    "status": "both-error"
   },
   {
@@ -2248,7 +2203,7 @@
     "D13 fix pass": 172985,
     "FSL's own step: 6.0.7.17 \u2192 6.0.7.23": "identical"
    },
-   "seconds": 1.203,
+   "seconds": 2.04,
    "status": "pass"
   },
   {
@@ -2265,7 +2220,7 @@
     "D13 fix pass": 193564,
     "FSL's own step: 6.0.7.17 \u2192 6.0.7.23": "identical"
    },
-   "seconds": 0.981,
+   "seconds": 1.559,
    "status": "pass"
   },
   {
@@ -2282,7 +2237,7 @@
     "D13 fix pass": 173047,
     "FSL's own step: 6.0.7.17 \u2192 6.0.7.23": "identical"
    },
-   "seconds": 1.266,
+   "seconds": 2.089,
    "status": "pass"
   },
   {
@@ -2299,7 +2254,7 @@
     "D13 fix pass": 195215,
     "FSL's own step: 6.0.7.17 \u2192 6.0.7.23": "identical"
    },
-   "seconds": 1.266,
+   "seconds": 1.768,
    "status": "pass"
   },
   {
@@ -2316,7 +2271,7 @@
     "D13 fix pass": 172985,
     "FSL's own step: 6.0.7.17 \u2192 6.0.7.23": "identical"
    },
-   "seconds": 1.46,
+   "seconds": 1.934,
    "status": "pass"
   },
   {
@@ -2333,7 +2288,7 @@
     "D13 fix pass": 193564,
     "FSL's own step: 6.0.7.17 \u2192 6.0.7.23": "identical"
    },
-   "seconds": 1.358,
+   "seconds": 1.642,
    "status": "pass"
   },
   {
@@ -2350,7 +2305,7 @@
     "D13 fix pass": 0,
     "FSL's own step: 6.0.7.17 \u2192 6.0.7.23": "identical"
    },
-   "seconds": 1.224,
+   "seconds": 1.57,
    "status": "pass"
   },
   {
@@ -2367,7 +2322,7 @@
     "D13 fix pass": 0,
     "FSL's own step: 6.0.7.17 \u2192 6.0.7.23": "identical"
    },
-   "seconds": 0.553,
+   "seconds": 0.684,
    "status": "pass"
   },
   {
@@ -2384,7 +2339,7 @@
     "D13 fix pass": 0,
     "FSL's own step: 6.0.7.17 \u2192 6.0.7.23": "identical"
    },
-   "seconds": 0.3,
+   "seconds": 0.557,
    "status": "pass"
   },
   {
@@ -2400,7 +2355,7 @@
    "reported": {
     "FSL's own step: 6.0.7.17 \u2192 6.0.7.23": "identical"
    },
-   "seconds": 0.252,
+   "seconds": 0.315,
    "status": "both-error"
   },
   {
@@ -2416,7 +2371,7 @@
    "reported": {
     "FSL's own step: 6.0.7.17 \u2192 6.0.7.23": "identical"
    },
-   "seconds": 0.373,
+   "seconds": 0.213,
    "status": "both-error"
   },
   {
@@ -2432,7 +2387,7 @@
    "reported": {
     "FSL's own step: 6.0.7.17 \u2192 6.0.7.23": "identical"
    },
-   "seconds": 2.458,
+   "seconds": 3.529,
    "status": "both-error"
   },
   {
@@ -2448,7 +2403,7 @@
    "reported": {
     "FSL's own step: 6.0.7.17 \u2192 6.0.7.23": "identical"
    },
-   "seconds": 2.388,
+   "seconds": 3.673,
    "status": "both-error"
   },
   {
@@ -2464,7 +2419,7 @@
    "reported": {
     "FSL's own step: 6.0.7.17 \u2192 6.0.7.23": "identical"
    },
-   "seconds": 2.504,
+   "seconds": 3.935,
    "status": "both-error"
   },
   {
@@ -2481,7 +2436,7 @@
     "D13 fix pass": 800,
     "FSL's own step: 6.0.7.17 \u2192 6.0.7.23": "identical"
    },
-   "seconds": 0.207,
+   "seconds": 0.274,
    "status": "pass"
   },
   {
@@ -2498,7 +2453,7 @@
     "D13 fix pass": 805,
     "FSL's own step: 6.0.7.17 \u2192 6.0.7.23": "identical"
    },
-   "seconds": 0.138,
+   "seconds": 0.361,
    "status": "pass"
   },
   {
@@ -2515,7 +2470,7 @@
     "D13 fix pass": 0,
     "FSL's own step: 6.0.7.17 \u2192 6.0.7.23": "identical"
    },
-   "seconds": 1.333,
+   "seconds": 2.531,
    "status": "pass"
   },
   {
@@ -2531,7 +2486,7 @@
    "reported": {
     "FSL's own step: 6.0.7.17 \u2192 6.0.7.23": "identical"
    },
-   "seconds": 1.684,
+   "seconds": 3.704,
    "status": "both-error"
   },
   {
@@ -2548,7 +2503,7 @@
     "D13 fix pass": 172964,
     "FSL's own step: 6.0.7.17 \u2192 6.0.7.23": "identical"
    },
-   "seconds": 1.048,
+   "seconds": 2.512,
    "status": "pass"
   },
   {
@@ -2565,7 +2520,7 @@
     "D13 fix pass": 172964,
     "FSL's own step: 6.0.7.17 \u2192 6.0.7.23": "identical"
    },
-   "seconds": 0.957,
+   "seconds": 2.254,
    "status": "pass"
   },
   {
@@ -2582,7 +2537,7 @@
     "D13 fix pass": 172964,
     "FSL's own step: 6.0.7.17 \u2192 6.0.7.23": "identical"
    },
-   "seconds": 1.1,
+   "seconds": 2.483,
    "status": "pass"
   },
   {
@@ -2599,7 +2554,7 @@
     "D13 fix pass": 172964,
     "FSL's own step: 6.0.7.17 \u2192 6.0.7.23": "identical"
    },
-   "seconds": 1.178,
+   "seconds": 2.427,
    "status": "pass"
   },
   {
@@ -2615,7 +2570,7 @@
    "reported": {
     "FSL's own step: 6.0.7.17 \u2192 6.0.7.23": "changed"
    },
-   "seconds": 0.4,
+   "seconds": 1.172,
    "status": "both-error"
   },
   {
@@ -2632,7 +2587,7 @@
     "D13 fix pass": 273386,
     "FSL's own step: 6.0.7.17 \u2192 6.0.7.23": "changed"
    },
-   "seconds": 1.563,
+   "seconds": 2.439,
    "status": "pass"
   },
   {
@@ -2649,7 +2604,7 @@
     "D13 fix pass": 172964,
     "FSL's own step: 6.0.7.17 \u2192 6.0.7.23": "changed"
    },
-   "seconds": 1.801,
+   "seconds": 2.551,
    "status": "pass"
   },
   {
@@ -2666,7 +2621,7 @@
     "D13 fix pass": 172964,
     "FSL's own step: 6.0.7.17 \u2192 6.0.7.23": "changed"
    },
-   "seconds": 1.598,
+   "seconds": 2.425,
    "status": "pass"
   },
   {
@@ -2683,7 +2638,7 @@
     "D13 fix pass": 172964,
     "FSL's own step: 6.0.7.17 \u2192 6.0.7.23": "changed"
    },
-   "seconds": 1.685,
+   "seconds": 2.577,
    "status": "pass"
   },
   {
@@ -2700,7 +2655,7 @@
     "D13 fix pass": 172964,
     "FSL's own step: 6.0.7.17 \u2192 6.0.7.23": "changed"
    },
-   "seconds": 2.013,
+   "seconds": 2.978,
    "status": "pass"
   },
   {
@@ -2716,7 +2671,7 @@
    "reported": {
     "FSL's own step: 6.0.7.17 \u2192 6.0.7.23": "changed"
    },
-   "seconds": 0.148,
+   "seconds": 0.277,
    "status": "both-error"
   },
   {
@@ -2733,7 +2688,7 @@
     "D13 fix pass": 11,
     "FSL's own step: 6.0.7.17 \u2192 6.0.7.23": "changed"
    },
-   "seconds": 1.612,
+   "seconds": 2.285,
    "status": "pass"
   },
   {
@@ -2749,7 +2704,7 @@
    "reported": {
     "FSL's own step: 6.0.7.17 \u2192 6.0.7.23": "changed"
    },
-   "seconds": 0.804,
+   "seconds": 1.348,
    "status": "both-error"
   },
   {
@@ -2766,7 +2721,7 @@
     "D13 fix pass": 0,
     "FSL's own step: 6.0.7.17 \u2192 6.0.7.23": "identical"
    },
-   "seconds": 0.486,
+   "seconds": 0.546,
    "status": "pass"
   },
   {
@@ -2783,7 +2738,7 @@
     "D13 fix pass": 0,
     "FSL's own step: 6.0.7.17 \u2192 6.0.7.23": "identical"
    },
-   "seconds": 0.323,
+   "seconds": 0.547,
    "status": "pass"
   },
   {
@@ -2800,7 +2755,7 @@
     "D13 fix pass": 178651,
     "FSL's own step: 6.0.7.17 \u2192 6.0.7.23": "identical"
    },
-   "seconds": 0.609,
+   "seconds": 0.769,
    "status": "pass"
   },
   {
@@ -2817,7 +2772,7 @@
     "D13 fix pass": 878592,
     "FSL's own step: 6.0.7.17 \u2192 6.0.7.23": "identical"
    },
-   "seconds": 1.319,
+   "seconds": 2.496,
    "status": "pass"
   },
   {
@@ -2834,7 +2789,7 @@
     "D13 fix pass": 183683,
     "FSL's own step: 6.0.7.17 \u2192 6.0.7.23": "identical"
    },
-   "seconds": 1.473,
+   "seconds": 2.957,
    "status": "pass"
   },
   {
@@ -2851,7 +2806,7 @@
     "D13 fix pass": 173028,
     "FSL's own step: 6.0.7.17 \u2192 6.0.7.23": "identical"
    },
-   "seconds": 1.253,
+   "seconds": 2.687,
    "status": "pass"
   },
   {
@@ -2867,7 +2822,7 @@
    "reported": {
     "FSL's own step: 6.0.7.17 \u2192 6.0.7.23": "identical"
    },
-   "seconds": 0.166,
+   "seconds": 0.193,
    "status": "both-error"
   },
   {
@@ -2884,7 +2839,7 @@
     "D13 fix pass": 357640,
     "FSL's own step: 6.0.7.17 \u2192 6.0.7.23": "identical"
    },
-   "seconds": 1.367,
+   "seconds": 2.885,
    "status": "pass"
   },
   {
@@ -2901,7 +2856,7 @@
     "D13 fix pass": 172117,
     "FSL's own step: 6.0.7.17 \u2192 6.0.7.23": "identical"
    },
-   "seconds": 1.133,
+   "seconds": 2.078,
    "status": "pass"
   },
   {
@@ -2918,7 +2873,7 @@
     "D13 fix pass": 382647,
     "FSL's own step: 6.0.7.17 \u2192 6.0.7.23": "changed"
    },
-   "seconds": 2.812,
+   "seconds": 5.188,
    "status": "pass"
   },
   {
@@ -2935,7 +2890,7 @@
     "D13 fix pass": 1967,
     "FSL's own step: 6.0.7.17 \u2192 6.0.7.23": "identical"
    },
-   "seconds": 0.155,
+   "seconds": 0.239,
    "status": "pass"
   },
   {
@@ -2952,7 +2907,7 @@
     "D13 fix pass": 1881,
     "FSL's own step: 6.0.7.17 \u2192 6.0.7.23": "identical"
    },
-   "seconds": 0.143,
+   "seconds": 0.32,
    "status": "pass"
   },
   {
@@ -2969,7 +2924,7 @@
     "D13 fix pass": 1914,
     "FSL's own step: 6.0.7.17 \u2192 6.0.7.23": "identical"
    },
-   "seconds": 0.187,
+   "seconds": 0.229,
    "status": "pass"
   },
   {
@@ -2986,7 +2941,7 @@
     "D13 fix pass": 173869,
     "FSL's own step: 6.0.7.17 \u2192 6.0.7.23": "identical"
    },
-   "seconds": 0.379,
+   "seconds": 0.502,
    "status": "pass"
   },
   {
@@ -3003,7 +2958,7 @@
     "D13 fix pass": 175496,
     "FSL's own step: 6.0.7.17 \u2192 6.0.7.23": "identical"
    },
-   "seconds": 0.416,
+   "seconds": 0.785,
    "status": "pass"
   },
   {
@@ -3020,7 +2975,7 @@
     "D13 fix pass": 174277,
     "FSL's own step: 6.0.7.17 \u2192 6.0.7.23": "identical"
    },
-   "seconds": 0.447,
+   "seconds": 0.747,
    "status": "pass"
   },
   {
@@ -3037,7 +2992,7 @@
     "D13 fix pass": 312788,
     "FSL's own step: 6.0.7.17 \u2192 6.0.7.23": "identical"
    },
-   "seconds": 0.354,
+   "seconds": 0.573,
    "status": "pass"
   },
   {
@@ -3055,7 +3010,7 @@
     "FSL's own step: 6.0.7.17 \u2192 6.0.7.23": "identical",
     "fMRIPrep's matrices (its container's FSL) identical as text": "240/240"
    },
-   "seconds": 33.073,
+   "seconds": 54.241,
    "status": "pass"
   },
   {
@@ -3073,7 +3028,7 @@
     "FSL's own step: 6.0.7.17 \u2192 6.0.7.23": "identical",
     "fMRIPrep's matrices (its container's FSL) identical as text": "240/240"
    },
-   "seconds": 32.035,
+   "seconds": 52.986,
    "status": "pass"
   },
   {
@@ -3091,7 +3046,7 @@
     "FSL's own step: 6.0.7.17 \u2192 6.0.7.23": "identical",
     "fMRIPrep's matrices (its container's FSL) identical as text": "240/240"
    },
-   "seconds": 34.623,
+   "seconds": 53.164,
    "status": "pass"
   },
   {
@@ -3109,7 +3064,7 @@
     "FSL's own step: 6.0.7.17 \u2192 6.0.7.23": "identical",
     "fMRIPrep's matrices (its container's FSL) identical as text": "168/168"
    },
-   "seconds": 20.187,
+   "seconds": 30.654,
    "status": "pass"
   },
   {
@@ -3127,7 +3082,7 @@
     "FSL's own step: 6.0.7.17 \u2192 6.0.7.23": "identical",
     "fMRIPrep's matrices (its container's FSL) identical as text": "164/164"
    },
-   "seconds": 30.933,
+   "seconds": 52.555,
    "status": "pass"
   },
   {
@@ -3145,7 +3100,7 @@
     "FSL's own step: 6.0.7.17 \u2192 6.0.7.23": "identical",
     "fMRIPrep's matrices (its container's FSL) identical as text": "164/164"
    },
-   "seconds": 30.964,
+   "seconds": 49.354,
    "status": "pass"
   },
   {
@@ -3163,7 +3118,7 @@
     "FSL's own step: 6.0.7.17 \u2192 6.0.7.23": "identical",
     "fMRIPrep's matrices (its container's FSL) identical as text": "164/164"
    },
-   "seconds": 30.256,
+   "seconds": 54.916,
    "status": "pass"
   },
   {
@@ -3181,7 +3136,7 @@
     "FSL's own step: 6.0.7.17 \u2192 6.0.7.23": "identical",
     "fMRIPrep's matrices (its container's FSL) identical as text": "210/210"
    },
-   "seconds": 18.217,
+   "seconds": 27.737,
    "status": "pass"
   },
   {
@@ -3199,7 +3154,7 @@
     "FSL's own step: 6.0.7.17 \u2192 6.0.7.23": "identical",
     "fMRIPrep's matrices (its container's FSL) identical as text": "210/210"
    },
-   "seconds": 13.243,
+   "seconds": 28.824,
    "status": "pass"
   },
   {
@@ -3217,7 +3172,7 @@
     "FSL's own step: 6.0.7.17 \u2192 6.0.7.23": "identical",
     "fMRIPrep's matrices (its container's FSL) identical as text": "200/200"
    },
-   "seconds": 23.895,
+   "seconds": 53.911,
    "status": "pass"
   },
   {
@@ -3235,7 +3190,7 @@
     "FSL's own step: 6.0.7.17 \u2192 6.0.7.23": "identical",
     "fMRIPrep's matrices (its container's FSL) identical as text": "588/588"
    },
-   "seconds": 78.359,
+   "seconds": 153.416,
    "status": "pass"
   },
   {
@@ -3253,7 +3208,7 @@
     "FSL's own step: 6.0.7.17 \u2192 6.0.7.23": "identical",
     "fMRIPrep's matrices (its container's FSL) identical as text": "160/160"
    },
-   "seconds": 27.131,
+   "seconds": 56.281,
    "status": "pass"
   },
   {
@@ -3271,7 +3226,7 @@
     "FSL's own step: 6.0.7.17 \u2192 6.0.7.23": "identical",
     "fMRIPrep's matrices (its container's FSL) identical as text": "200/200"
    },
-   "seconds": 23.969,
+   "seconds": 49.747,
    "status": "pass"
   },
   {
@@ -3289,7 +3244,7 @@
     "FSL's own step: 6.0.7.17 \u2192 6.0.7.23": "identical",
     "fMRIPrep's matrices (its container's FSL) identical as text": "60/60"
    },
-   "seconds": 5.182,
+   "seconds": 12.068,
    "status": "pass"
   },
   {
@@ -3307,7 +3262,7 @@
     "FSL's own step: 6.0.7.17 \u2192 6.0.7.23": "identical",
     "fMRIPrep's matrices (its container's FSL) identical as text": "196/196"
    },
-   "seconds": 18.538,
+   "seconds": 39.294,
    "status": "pass"
   },
   {
@@ -3325,7 +3280,7 @@
     "FSL's own step: 6.0.7.17 \u2192 6.0.7.23": "identical",
     "fMRIPrep's matrices (its container's FSL) identical as text": "600/600"
    },
-   "seconds": 189.876,
+   "seconds": 298.138,
    "status": "pass"
   },
   {
@@ -3343,7 +3298,7 @@
     "FSL's own step: 6.0.7.17 \u2192 6.0.7.23": "identical",
     "fMRIPrep's matrices (its container's FSL) identical as text": "80/80"
    },
-   "seconds": 11.209,
+   "seconds": 27.086,
    "status": "pass"
   },
   {
@@ -3361,7 +3316,7 @@
     "FSL's own step: 6.0.7.17 \u2192 6.0.7.23": "identical",
     "fMRIPrep's matrices (its container's FSL) identical as text": "80/80"
    },
-   "seconds": 12.859,
+   "seconds": 26.143,
    "status": "pass"
   },
   {
@@ -3379,7 +3334,7 @@
     "FSL's own step: 6.0.7.17 \u2192 6.0.7.23": "identical",
     "fMRIPrep's matrices (its container's FSL) identical as text": "63/63"
    },
-   "seconds": 9.231,
+   "seconds": 16.058,
    "status": "pass"
   },
   {
@@ -3397,7 +3352,7 @@
     "FSL's own step: 6.0.7.17 \u2192 6.0.7.23": "identical",
     "fMRIPrep's matrices (its container's FSL) identical as text": "200/200"
    },
-   "seconds": 25.02,
+   "seconds": 50.057,
    "status": "pass"
   },
   {
@@ -3415,7 +3370,7 @@
     "FSL's own step: 6.0.7.17 \u2192 6.0.7.23": "identical",
     "fMRIPrep's matrices (its container's FSL) identical as text": "10/10"
    },
-   "seconds": 2.449,
+   "seconds": 3.758,
    "status": "pass"
   },
   {
@@ -3431,7 +3386,7 @@
    "reported": {
     "D13 fix pass": 932
    },
-   "seconds": 0.03,
+   "seconds": 0.083,
    "status": "pass"
   },
   {
@@ -3447,7 +3402,7 @@
    "reported": {
     "D13 fix pass": 20456
    },
-   "seconds": 0.3,
+   "seconds": 0.472,
    "status": "pass"
   },
   {
@@ -3463,7 +3418,7 @@
    "reported": {
     "D13 fix pass": 4048
    },
-   "seconds": 0.055,
+   "seconds": 0.213,
    "status": "pass"
   },
   {
@@ -3479,7 +3434,7 @@
    "reported": {
     "D13 fix pass": 29859
    },
-   "seconds": 0.13,
+   "seconds": 0.272,
    "status": "pass"
   },
   {
@@ -3495,7 +3450,7 @@
    "reported": {
     "D13 fix pass": 8247
    },
-   "seconds": 0.024,
+   "seconds": 0.09,
    "status": "pass"
   },
   {
@@ -3511,16 +3466,16 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 0.026,
+   "seconds": 0.105,
    "status": "pass"
   }
  ],
  "suite": "fsl-mcflirt-replica",
  "summary": {
   "both-error": 22,
-  "expected-divergence": 5,
+  "expected-divergence": 0,
   "fail": 0,
-  "pass": 176,
+  "pass": 181,
   "skipped": 0
  },
  "tier": "standard"

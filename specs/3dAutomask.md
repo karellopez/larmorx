@@ -403,7 +403,8 @@ default and words both implementations share:
 - **AFNI-43** concerns a value read as 0 (`-peels 0`, `-peels 0.7`): a negative value peels
   once in both modes, as in AFNI, without a notice. The notice is named where the mask differs
   from the other mode's, or, with the same mask, where the clustering messages count other
-  voxels (the random-testing case `afni-automask:20261025:118`: 405 against 406 voxels): by
+  voxels and are shown (not with `-q`; the random-testing case `afni-automask:20261025:118`:
+  405 against 406 voxels; `afni-automask:20261029:3425` with `-q`, no notice): by
   default `-peels 0: the mask is not peeled, as the help says; AFNI peels it once`, or `-peels
   0: the mask is not peeled, as the help says (AFNI peels it once): the same mask, but the
   clustering messages count other voxels`; with `reproduce` `-peels 0: the mask is peeled

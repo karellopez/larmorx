@@ -1,25 +1,31 @@
 # SPDX-License-Identifier: Apache-2.0
 """Choosing between a tool's clean-room original and its bit-exact replica.
 
-Some tools have two implementations (``docs/licensing.md``): the clean-room original in this
-Apache-2.0 package, and a replica translated from the upstream's source, in a package of the
-upstream's licence family (``larmorx-gpl``, ``larmorx-nc``). larmorx never imports, loads or
-links a replica. It runs the replica package's program as a separate process and exchanges
-files with it, so the licences stay separate. This module knows the program's name and
+Some tools have two implementations (``docs/licensing.md``): the clean-room original, and a
+replica translated from the upstream's source. Where the upstream's licence allows it, the
+replica is part of this Apache-2.0 package and runs in this process, through
+:mod:`larmorx._core` (*built in*: AFNI's 3dTshift, 3dAutomask and 3dUnifize since 2026-10-29,
+when AFNI 26.3.05 released the Medical College of Wisconsin's code under CC BY 4.0). Otherwise
+it is in a package of the upstream's licence family (``larmorx-nc``), which larmorx never
+imports, loads or links: it runs that package's program as a separate process and exchanges
+files with it, so the licences stay separate, and this module knows the program's name and
 arguments, nothing more.
 
-The registry of tools with a replica and the search for the program are shared with the
+The registry of tools with a replica and the search for a separate program are shared with the
 command line (``larmorx_cli::replica`` in Rust, through :mod:`larmorx._core`). The search
-order is the program's environment variable (``LARMORX_GPL_BIN``, ``LARMORX_NC_BIN``), then
-this Python environment's scripts directory, then ``PATH``. It is done once per call; nothing
-is cached.
+order is the program's environment variable (``LARMORX_NC_BIN``), then this Python
+environment's scripts directory, then ``PATH``. It is done once per call; nothing is cached.
 
-A tool's wrapper uses it in three steps (see ``larmorx.afni.tshift``)::
+A tool's wrapper uses it in three steps, the same for both kinds (see ``larmorx.afni.tshift``)::
 
     selected = _replica.select("afni", "3dTshift", implementation)  # None: run the original
     if selected is not None:
         process = _replica.run(selected, args, cwd=tmp, n_threads=n_threads)
         ...  # read the output files; the result records selected.implementation()
+
+A built-in replica runs with the arguments, the directory and the environment a separate
+program would get (the environment as a table, never this process's own), and gives the same
+files, messages and exit status.
 """
 
 from __future__ import annotations
@@ -62,16 +68,18 @@ class Implementation:
     Attributes
     ----------
     kind
-        ``"original"``: larmorx's own code, in this process; ``"replica"``: the bit-exact
-        replica, run as a separate program.
+        ``"original"``: larmorx's clean-room code; ``"replica"``: the bit-exact replica, built in
+        (in this process) or run as a separate program.
     package
-        The distribution that provides it: ``"larmorx"``, or the replica's (``"larmorx-gpl"``).
+        The distribution that provides it: ``"larmorx"`` (the originals and the built-in
+        replicas), or the replica's (``"larmorx-nc"``).
     version
-        That distribution's version (for a replica, what its program reports).
+        That distribution's version (for a separate replica, what its program reports).
     licence
-        Its licence, as an SPDX expression.
+        Its code's licence, as an SPDX expression (a built-in AFNI replica:
+        ``"Apache-2.0 AND CC-BY-4.0"``).
     program
-        The replica's program, or ``None`` for the original.
+        A separate replica's program, or ``None`` (the original, a built-in replica).
     """
 
     kind: Literal["original", "replica"]
@@ -86,11 +94,12 @@ ORIGINAL = Implementation("original", "larmorx", _core.__version__, "Apache-2.0"
 
 
 class ReplicaNotFoundError(RuntimeError):
-    """``implementation="replica"`` was asked for, and the replica's program was not found."""
+    """``implementation="replica"`` was asked for, and the separate replica's program was not
+    found."""
 
 
 class ReplicaError(RuntimeError):
-    """The replica's program was found, but it failed.
+    """The replica ran (built in, or its program was found), but it failed.
 
     larmorx never falls back to the original then: the two differ in the last bits, so a
     silent fallback would change results without notice.
@@ -114,18 +123,20 @@ class ReplicaError(RuntimeError):
 
 @dataclass(frozen=True)
 class Replica:
-    """A tool with a replica: ``<program> <family> <tool> <the tool's original arguments>``.
+    """A tool with a replica: built in (``builtin``: in this process, ``program``, ``env`` and
+    ``install`` ``None``), or ``<program> <family> <tool> <the tool's original arguments>``.
     ``original`` is false for a tool whose clean-room original is still to be written: the
     replica is then its only implementation."""
 
     family: str
     tool: str
     package: str
-    program: str
-    env: str
+    program: str | None
+    env: str | None
     licence: str
-    install: str
+    install: str | None
     original: bool = True
+    builtin: bool = False
 
 
 def registry() -> dict[tuple[str, str], Replica]:
@@ -141,22 +152,26 @@ def search_dirs() -> list[str]:
 
 
 def find(family: str, tool: str) -> str | None:
-    """The path of the replica program of ``family tool``, or ``None``. ``ValueError`` if the
-    program's environment variable names something that is not a file."""
+    """The path of the replica program of ``family tool``, or ``None`` (not found, or built in).
+    ``ValueError`` if the program's environment variable names something that is not a file."""
     found = _core.replica_find(family, tool, search_dirs())
     return None if found is None else os.fspath(found)
 
 
 @dataclass(frozen=True)
 class Selected:
-    """A replica chosen to run, and the path of its program."""
+    """A replica chosen to run, and the path of its program (``None``: built in)."""
 
     replica: Replica
-    program: str
+    program: str | None
 
     def implementation(self) -> Implementation:
-        """What :attr:`larmorx.Image.implementation` records: the package and the version its
-        program reports (``<package> <version>`` from ``--version``)."""
+        """What :attr:`larmorx.Image.implementation` records: for a built-in replica, larmorx
+        and its version; else the package and the version its program reports
+        (``<package> <version>`` from ``--version``)."""
+        r = self.replica
+        if self.program is None:
+            return Implementation("replica", "larmorx", _core.__version__, r.licence)
         command = [self.program, "--version"]
         process = _run(command)
         words = process.stdout.split()
@@ -168,18 +183,17 @@ class Selected:
                 returncode=process.returncode,
                 stderr=process.stderr,
             )
-        r = self.replica
         return Implementation("replica", r.package, words[1], r.licence, self.program)
 
 
 def select(family: str, tool: str, implementation: str) -> Selected | None:
     """The replica of ``family tool`` to run, or ``None`` to run the original.
 
-    ``"auto"``: the replica if its program is found, else ``None``; ``"replica"``: the replica,
-    or :class:`ReplicaNotFoundError` with the command that installs it; ``"original"``:
-    ``None``. A tool without a clean-room original (:attr:`Replica.original` false) has only
-    its replica: ``"auto"`` without its program raises :class:`ReplicaNotFoundError`, and
-    ``"original"`` raises ``NotImplementedError``.
+    ``"auto"``: the replica if it is built in or its program is found, else ``None``;
+    ``"replica"``: the replica, or :class:`ReplicaNotFoundError` with the command that installs
+    it; ``"original"``: ``None``. A tool without a clean-room original
+    (:attr:`Replica.original` false) has only its replica: ``"auto"`` without its program raises
+    :class:`ReplicaNotFoundError`, and ``"original"`` raises ``NotImplementedError``.
     """
     if implementation not in IMPLEMENTATIONS:
         raise ValueError(
@@ -188,13 +202,20 @@ def select(family: str, tool: str, implementation: str) -> Selected | None:
     replica = registry()[(family, tool)]
     if implementation == "original":
         if not replica.original:
+            where = (
+                "is built in"
+                if replica.builtin
+                else f"is in the {replica.package} package ({replica.licence}): install it "
+                f"with {replica.install}"
+            )
             raise NotImplementedError(
                 f"larmorx has no clean-room original of {family} {tool} yet (it is to be "
-                f"written from its spec in specs/); its bit-exact replica is in the "
-                f"{replica.package} package ({replica.licence}): install it with "
-                f"{replica.install} and use implementation='auto' or 'replica'"
+                f"written from its spec in specs/); its bit-exact replica {where} and use "
+                f"implementation='auto' or 'replica'"
             )
         return None
+    if replica.builtin:
+        return Selected(replica, None)
     program = find(family, tool)
     if program is not None:
         return Selected(replica, program)
@@ -225,7 +246,8 @@ def run(
     env: Mapping[str, str | None] | None = None,
     exclude: Callable[[str], bool] | None = None,
 ) -> subprocess.CompletedProcess[str]:
-    """Run ``<program> <family> <tool> args...`` in ``cwd``; :class:`ReplicaError` unless it
+    """Run ``<program> <family> <tool> args...`` in ``cwd`` (a built-in replica: the same, in this
+    process, with that environment and directory given to it); :class:`ReplicaError` unless it
     exits with 0.
 
     The program gets this process's environment without the variables ``exclude`` names
@@ -252,7 +274,10 @@ def run(
         child_env.pop("OMP_NUM_THREADS", None)
     if upstream_defects is not None:
         child_env[_defects.ENV] = upstream_defects
-    process = _run(command, cwd=cwd, env=child_env)
+    if selected.program is None:
+        process = _run_builtin(r, list(args), cwd=cwd, env=child_env)
+    else:
+        process = _run(command, cwd=cwd, env=child_env)
     if process.returncode != 0:
         tail = "\n".join(process.stderr.strip().splitlines()[-20:])
         raise ReplicaError(
@@ -263,6 +288,23 @@ def run(
             stderr=process.stderr,
         )
     return process
+
+
+def _run_builtin(
+    replica: Replica,
+    args: list[str],
+    *,
+    cwd: str | os.PathLike[str],
+    env: dict[str, str],
+) -> subprocess.CompletedProcess[str]:
+    """A built-in replica's run, as :func:`subprocess.run` would report a separate program's:
+    in this process (without the GIL), with ``env`` as its environment and ``cwd`` as the
+    directory relative names start in."""
+    code, out, err = _core.replica_run_builtin(
+        replica.family, replica.tool, args, sorted(env.items()), os.fspath(cwd)
+    )
+    command = ["larmorx", replica.family, replica.tool, *args]
+    return subprocess.CompletedProcess(command, code, out, err)
 
 
 def _run(

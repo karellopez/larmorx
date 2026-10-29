@@ -1,0 +1,13 @@
+[package]
+name = "floatmath-verify"
+description = "Compares the AFNI replica's tanhf (fdlibm) and the reference glibc cbrtf with the platform's C library, exhaustively (development tool)"
+version = "0.0.0"
+edition.workspace = true
+license.workspace = true
+publish = false
+
+[dependencies]
+larmorx-core.workspace = true
+larmorx-afni-replica.workspace = true
+glibc-reference.workspace = true
+rayon.workspace = true

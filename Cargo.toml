@@ -1,7 +1,9 @@
 [workspace]
 resolver = "3"
-members = ["crates/*"]
-# The GPL and FSL replicas are their own workspaces (docs/licensing.md); this one never builds them.
+members = ["crates/*", "crates/larmorx-afni-replica/tools/csfft-verify"]
+# The GPL and FSL replica workspaces are their own (docs/licensing.md); this one never builds them.
+# The AFNI replicas are in this one since 2026-10-29 (crates/larmorx-afni-replica, CC BY 4.0's
+# attribution in NOTICE); crates-gpl holds only verification tools that keep glibc's LGPL code.
 exclude = ["crates-gpl", "crates-nc"]
 
 [workspace.package]
@@ -21,6 +23,7 @@ larmorx-interp = { path = "crates/larmorx-interp", version = "0.0.1" }
 larmorx-image = { path = "crates/larmorx-image", version = "0.0.1" }
 larmorx-ants = { path = "crates/larmorx-ants", version = "0.0.1" }
 larmorx-afni = { path = "crates/larmorx-afni", version = "0.0.1" }
+larmorx-afni-replica = { path = "crates/larmorx-afni-replica", version = "0.0.1" }
 larmorx-mri = { path = "crates/larmorx-mri", version = "0.0.1" }
 larmorx-registration = { path = "crates/larmorx-registration", version = "0.0.1" }
 pyo3 = { version = "0.29.3", features = ["abi3-py312"] }
@@ -39,3 +42,5 @@ ruzstd = "0.9.1"
 bzip2 = "0.6.1"
 proptest = "1.11.0"
 tempfile = "3.27.0"
+# Test-only: SHA-256 for the AFNI replicas' golden tests (larmorx-cli/tests/afni_replica_golden.rs).
+sha2 = { version = "0.11.0", default-features = false }

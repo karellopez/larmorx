@@ -1,11 +1,9 @@
 # SPDX-License-Identifier: Apache-2.0
 """``3dAutomask``: a brain mask from an EPI series or a skull-stripped anatomical (the
-clean-room original of AFNI 26.3.05's program, or its bit-exact replica from ``larmorx-gpl``,
-run as a separate program).
+bit-exact replica of AFNI 26.3.05's program, or its clean-room original).
 
-``implementation="auto"`` runs the replica when the ``larmorx-gpl`` package is installed
-(``pip install "larmorx[exact]"``), else the clean-room original; ``"replica"`` and
-``"original"`` force one. Both give AFNI's masks bit for bit on the parity cases
+``implementation="auto"`` (the default) runs the replica (part of larmorx, in this process);
+``"replica"`` and ``"original"`` force one. Both give AFNI's masks bit for bit on the parity cases
 (``docs/validation/afni-automask.md``).
 
 AFNI's deterministic defects are corrected by default (D13, ``docs/api/upstream-defects.md``):
@@ -114,9 +112,8 @@ def automask(
     n_threads
         Threads (0 = all); the result does not depend on it.
     implementation
-        ``"auto"`` (default): the replica in ``larmorx-gpl`` when it is installed, else the
-        clean-room original; ``"replica"`` (:class:`~larmorx.ReplicaNotFoundError` without
-        it) or ``"original"`` force one.
+        ``"auto"`` (default) and ``"replica"``: the bit-exact replica; ``"original"``: the
+        clean-room original.
     upstream_defects
         ``"fix"`` (default) or ``"reproduce"`` (AFNI's output); a
         :class:`~larmorx.UpstreamDefectWarning` names each defect that changed the result.

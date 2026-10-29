@@ -17,8 +17,8 @@
 //! every comparison agrees on every input.
 #![forbid(unsafe_code)]
 
-use larmorx_gpl_afni::glibc_sincosf as glibc;
-use larmorx_gpl_afni::sincosf as arm;
+use glibc_reference::sincosf as glibc;
+use larmorx_afni_replica::sincosf as arm;
 use rayon::prelude::*;
 
 /// What is compared, input by input: (new FMA, earlier FMA), (new SSE2, earlier SSE2), and

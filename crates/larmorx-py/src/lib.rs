@@ -20,9 +20,10 @@ mod resample;
 
 /// Runs the `larmorx` command line with `argv` (program name first).
 ///
-/// Tools with a replica run it as a separate program when `implementation` (`"auto"`,
-/// `"replica"`, `"original"`; `None` reads `LARMORX_IMPLEMENTATION`) says so; its program is
-/// looked for through its environment variable, then in `replica_dirs`, then on `PATH`.
+/// Tools with a replica run it when `implementation` (`"auto"`, `"replica"`, `"original"`;
+/// `None` reads `LARMORX_IMPLEMENTATION`) says so: built in, in this process (AFNI's
+/// programs), or as a separate program, looked for through its environment variable, then in
+/// `replica_dirs`, then on `PATH`.
 ///
 /// Returns `(exit_code, stdout, stderr)`; the Python caller writes the streams so that they go
 /// through `sys.stdout` and `sys.stderr`. The GIL is released while the command runs.

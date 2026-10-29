@@ -1,0 +1,25 @@
+[package]
+name = "larmorx-afni-replica"
+description = "Bit-exact replicas of AFNI tools (3dTshift, 3dAutomask, 3dUnifize) for larmorx, translated from AFNI 26.3.05"
+version.workspace = true
+edition.workspace = true
+# The Medical College of Wisconsin's code is released by AFNI 26.3.05 under CC BY 4.0 (its
+# attribution in each file, PROVENANCE.md and NOTICE); Arm's sinf/cosf are MIT, fdlibm's tanhf is
+# under Sun's notice; the rest is AFNI's public-domain NIH code and larmorx's own (Apache-2.0).
+license = "Apache-2.0 AND CC-BY-4.0 AND MIT AND SunPro"
+repository.workspace = true
+
+[dependencies]
+larmorx-core.workspace = true
+larmorx-io.workspace = true
+libm.workspace = true
+rayon.workspace = true
+thiserror.workspace = true
+
+[features]
+# Exposes private routines to the bit-exactness harnesses (tools/csfft-verify and
+# crates-gpl/tools/): not an API.
+verification = []
+
+[dev-dependencies]
+tempfile.workspace = true

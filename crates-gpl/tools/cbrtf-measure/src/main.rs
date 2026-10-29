@@ -31,8 +31,8 @@
 #![forbid(unsafe_code)]
 
 use larmorx_core::math::cbrtf as cbrtf_core;
-use larmorx_gpl_afni::glibc_floatmath::cbrtf as cbrtf_glibc;
-use larmorx_gpl_afni::unifize::sphere;
+use glibc_reference::floatmath::cbrtf as cbrtf_glibc;
+use larmorx_afni_replica::unifize::{epi_radius, sphere};
 use rayon::prelude::*;
 
 /// 3dUnifize `-EPI`'s radius from the cube root of the voxel volume (the replica's
@@ -144,6 +144,13 @@ struct Found {
     sensitive: [u64; 3],
     /// Inputs where the ball or the message differs but `sensitive` is false (must be none).
     unflagged: Vec<u32>,
+    /// Inputs the replica's `epi_radius` flags (`may_differ`): all, from 0.001 mm^3, in
+    /// [1, 100) mm^3.
+    replica_flagged: [u64; 3],
+    /// Inputs where the ball or the message differs but the replica does not warn (must be
+    /// none), and where its radius is not CORE-MATH's (must be none).
+    replica_unflagged: Vec<u32>,
+    replica_radius_wrong: Vec<u32>,
 }
 
 impl Found {
@@ -170,6 +177,11 @@ impl Found {
             *a += b;
         }
         self.unflagged.extend(o.unflagged);
+        for (a, b) in self.replica_flagged.iter_mut().zip(o.replica_flagged) {
+            *a += b;
+        }
+        self.replica_unflagged.extend(o.replica_unflagged);
+        self.replica_radius_wrong.extend(o.replica_radius_wrong);
         self
     }
 }
@@ -202,6 +214,19 @@ fn check(bits: u32, f: &mut Found) {
     let x = f32::from_bits(bits);
     let (cg, cm) = (cbrtf_glibc(x), cbrtf_core(x));
     let flagged = sensitive(cm);
+    let epi = epi_radius(x);
+    if epi.radius.to_bits() != radius(cm).to_bits() && !(epi.radius.is_nan() && cm.is_nan()) {
+        f.replica_radius_wrong.push(bits);
+    }
+    if epi.may_differ {
+        f.replica_flagged[0] += 1;
+        if x >= 1e-3 {
+            f.replica_flagged[1] += 1;
+        }
+        if (1.0..100.0).contains(&x) {
+            f.replica_flagged[2] += 1;
+        }
+    }
     if flagged {
         f.sensitive[0] += 1;
         if x >= 1e-3 {
@@ -216,8 +241,13 @@ fn check(bits: u32, f: &mut Found) {
     }
     f.cbrtf_differ += 1;
     f.max_ulps = f.max_ulps.max(cg.to_bits().abs_diff(cm.to_bits()));
-    if !flagged && observable_differ(radius(cg), radius(cm)) {
-        f.unflagged.push(bits);
+    if observable_differ(radius(cg), radius(cm)) {
+        if !flagged {
+            f.unflagged.push(bits);
+        }
+        if !epi.may_differ {
+            f.replica_unflagged.push(bits);
+        }
     }
     let (rg, rm) = (radius(cg), radius(cm));
     if rg.to_bits() == rm.to_bits() {
@@ -419,6 +449,19 @@ fn main() {
         found.unflagged.len()
     );
     for &b in found.unflagged.iter().take(list) {
+        println!("  {}", show(b));
+    }
+    println!(
+        "the replica (unifize::epi_radius): its radius is CORE-MATH's on every input except {}; it warns \
+         on {} inputs (from 0.001 mm^3: {}; in [1, 100) mm^3: {}), and {} differences go unwarned \
+         (must be 0)",
+        found.replica_radius_wrong.len(),
+        found.replica_flagged[0],
+        found.replica_flagged[1],
+        found.replica_flagged[2],
+        found.replica_unflagged.len()
+    );
+    for &b in found.replica_unflagged.iter().chain(&found.replica_radius_wrong).take(list) {
         println!("  {}", show(b));
     }
     let none = message.is_empty() && ball.is_empty() && found.cross_check_failed.is_empty();

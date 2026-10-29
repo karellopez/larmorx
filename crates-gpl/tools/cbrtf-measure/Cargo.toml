@@ -8,5 +8,6 @@ publish = false
 
 [dependencies]
 larmorx-core.workspace = true
-larmorx-gpl-afni.workspace = true
+larmorx-afni-replica.workspace = true
+glibc-reference.workspace = true
 rayon.workspace = true

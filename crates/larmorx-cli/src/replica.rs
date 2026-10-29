@@ -1,23 +1,26 @@
 // SPDX-License-Identifier: Apache-2.0
 //! Replicas: choosing between a tool's clean-room original and its bit-exact replica, and
-//! running the replica as a separate program (`docs/licensing.md`, "Choosing at run time").
+//! running the replica (`docs/licensing.md`, "Choosing at run time").
 //!
-//! Some tools have two implementations: the clean-room original in this Apache-2.0 package,
-//! and a replica translated from the upstream source, in a package of the upstream's licence
-//! family (`larmorx-gpl`, `larmorx-nc`). This crate never links a replica. It finds the
-//! replica package's program and runs it as a child process, with the tool's original
-//! arguments; the two exchange files only. So the licences stay separate. This module knows
-//! the replica's program name and arguments, nothing more.
+//! Some tools have two implementations: the clean-room original, and a replica translated from
+//! the upstream source. Where the upstream's licence allows it, the replica is part of this
+//! Apache-2.0 package and runs in the same process ([`Location::Builtin`]: AFNI's 3dTshift,
+//! 3dAutomask and 3dUnifize since 2026-10-29, when AFNI 26.3.05 released the Medical College of
+//! Wisconsin's code under CC BY 4.0). Otherwise it is in a package of the upstream's licence
+//! family (`larmorx-nc`; [`Location::Program`]), which this crate never links: it finds that
+//! package's program and runs it as a child process, with the tool's original arguments; the
+//! two exchange files only, so the licences stay separate, and this module knows the program's
+//! name and arguments, nothing more.
 //!
 //! The same rules serve the command line (`larmorx afni 3dTshift ...`) and the Python wrappers
 //! (`lx.afni.tshift(..., implementation="auto")`, through `larmorx._core`):
 //! - [`REPLICAS`] lists every tool that has a replica: adding one is one line;
-//! - [`find`] looks for the program: the package's environment variable (`LARMORX_GPL_BIN`,
-//!   `LARMORX_NC_BIN`),
-//!   then the directories the caller gives (the Python environment's scripts directory, or the
-//!   directory of the `larmorx` binary), then `PATH`;
+//! - [`find`] looks for a separate replica's program: the package's environment variable
+//!   (`LARMORX_NC_BIN`), then the directories the caller gives (the Python environment's
+//!   scripts directory, or the directory of the `larmorx` binary), then `PATH`;
 //! - [`choose`] applies `auto`, `replica` or `original`;
-//! - [`run`] runs the program and passes its output and exit code on unchanged.
+//! - [`run`] runs a separate replica's program and passes its output and exit code on
+//!   unchanged; [`run_builtin`] and [`run_builtin_in`] run a built-in replica.
 
 use std::ffi::OsString;
 use std::fmt;
@@ -40,15 +43,6 @@ pub struct Package {
     pub install: &'static str,
 }
 
-/// The GPL-3.0-or-later replicas (`crates-gpl/`): AFNI's MCW files, Connectome Workbench.
-pub const LARMORX_GPL: Package = Package {
-    name: "larmorx-gpl",
-    program: "larmorx-gpl",
-    env: "LARMORX_GPL_BIN",
-    licence: "GPL-3.0-or-later",
-    install: "pip install \"larmorx[exact]\"",
-};
-
 /// The replicas of FSL tools (`crates-nc/`), under the FSL Licence's terms: non-commercial use
 /// only. Installed by name, so that its licence is accepted knowingly (`docs/licensing.md`).
 pub const LARMORX_NC: Package = Package {
@@ -59,38 +53,77 @@ pub const LARMORX_NC: Package = Package {
     install: "pip install larmorx-nc (FSL Licence: non-commercial use only)",
 };
 
-/// A tool with a replica: `larmorx <family> <tool> ...` runs
-/// `<package.program> <family> <tool> ...`.
+/// The licence of the AFNI replicas' code (`crates/larmorx-afni-replica`): Apache-2.0, with CC
+/// BY 4.0's attribution for the Medical College of Wisconsin's code (`NOTICE`).
+pub const AFNI_REPLICA_LICENCE: &str = "Apache-2.0 AND CC-BY-4.0";
+
+/// Where a replica's code is.
+#[derive(Debug, PartialEq, Eq)]
+pub enum Location {
+    /// Part of this package (`larmorx`), run in the same process ([`run_builtin`]); `licence`
+    /// is its code's licence.
+    Builtin { licence: &'static str },
+    /// In a package of its own, run as its program ([`run`]).
+    Program(&'static Package),
+}
+
+/// A tool with a replica: `larmorx <family> <tool> ...` runs it in this process
+/// ([`Location::Builtin`]) or as `<package.program> <family> <tool> ...`.
 #[derive(Debug)]
 pub struct Replica {
     pub family: &'static str,
     pub tool: &'static str,
-    pub package: &'static Package,
+    pub location: Location,
     /// Whether larmorx has a clean-room original of the tool. Without one (a tool whose
     /// original is still to be written from its spec), the replica is the only implementation:
     /// `auto` runs it or fails like `replica`, and `original` is an error.
     pub original: bool,
 }
 
-/// Every tool that has a replica in another package. Add one line per replica (and the
-/// Python wrapper's `implementation` argument; see `docs/architecture.md`, "Adding a replica").
+impl Replica {
+    /// The package of a replica run as a separate program; `None` for a built-in one.
+    pub fn package(&self) -> Option<&'static Package> {
+        match self.location {
+            Location::Program(p) => Some(p),
+            Location::Builtin { .. } => None,
+        }
+    }
+
+    /// The licence of the replica's code (an SPDX expression).
+    pub fn licence(&self) -> &'static str {
+        match self.location {
+            Location::Program(p) => p.licence,
+            Location::Builtin { licence } => licence,
+        }
+    }
+}
+
+/// Every tool that has a replica. Add one line per replica (and the Python wrapper's
+/// `implementation` argument; see `docs/architecture.md`, "Adding a replica").
 pub const REPLICAS: &[Replica] = &[
+    // AFNI 26.3.05's programs, built in since 2026-10-29 (crates/larmorx-afni-replica).
     Replica {
         family: "afni",
         tool: "3dTshift",
-        package: &LARMORX_GPL,
+        location: Location::Builtin {
+            licence: AFNI_REPLICA_LICENCE,
+        },
         original: true,
     },
     Replica {
         family: "afni",
         tool: "3dAutomask",
-        package: &LARMORX_GPL,
+        location: Location::Builtin {
+            licence: AFNI_REPLICA_LICENCE,
+        },
         original: true,
     },
     Replica {
         family: "afni",
         tool: "3dUnifize",
-        package: &LARMORX_GPL,
+        location: Location::Builtin {
+            licence: AFNI_REPLICA_LICENCE,
+        },
         original: true,
     },
     // The clean-room original is `larmorx mri hmc` (`lx.mri.hmc`), which takes mcflirt's
@@ -98,26 +131,26 @@ pub const REPLICAS: &[Replica] = &[
     Replica {
         family: "fsl",
         tool: "mcflirt",
-        package: &LARMORX_NC,
+        location: Location::Program(&LARMORX_NC),
         original: true,
     },
     // FSL's BET: the clean-room original is to be written from specs/bet.md.
     Replica {
         family: "fsl",
         tool: "bet",
-        package: &LARMORX_NC,
+        location: Location::Program(&LARMORX_NC),
         original: false,
     },
     Replica {
         family: "fsl",
         tool: "bet2",
-        package: &LARMORX_NC,
+        location: Location::Program(&LARMORX_NC),
         original: false,
     },
     Replica {
         family: "fsl",
         tool: "betsurf",
-        package: &LARMORX_NC,
+        location: Location::Program(&LARMORX_NC),
         original: false,
     },
 ];
@@ -141,9 +174,10 @@ pub fn lookup(family: &str, tool: &str) -> Option<&'static Replica> {
 /// Which implementation runs a tool that has both.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Implementation {
-    /// The replica when its program is found, the original otherwise (the default).
+    /// The replica when it is built in or its program is found, the original otherwise (the
+    /// default).
     Auto,
-    /// The replica; an error if its program is not found.
+    /// The replica; an error if it is a separate program that is not found.
     Replica,
     /// The clean-room original, always.
     Original,
@@ -198,11 +232,11 @@ pub enum Error {
         package: &'static Package,
     },
     /// The tool has no clean-room original yet, and its replica's program was not found (or
-    /// `original` was asked for).
+    /// `original` was asked for). `package` is `None` for a built-in replica.
     NoOriginal {
         family: &'static str,
         tool: &'static str,
-        package: &'static Package,
+        package: Option<&'static Package>,
         /// `original` was asked for explicitly.
         asked: bool,
     },
@@ -246,6 +280,14 @@ impl fmt::Display for Error {
                 package,
                 asked,
             } => {
+                let Some(package) = package else {
+                    return write!(
+                        f,
+                        "{IMPLEMENTATION_ENV}=original was asked for, but larmorx has no \
+                         clean-room original of {family} {tool} yet; its bit-exact replica is \
+                         built in: use {IMPLEMENTATION_ENV}=auto or replica"
+                    );
+                };
                 let start = if *asked {
                     format!(
                         "{IMPLEMENTATION_ENV}=original was asked for, but larmorx has no \
@@ -346,16 +388,21 @@ pub enum Choice {
     Original,
     /// The replica, with the path of its program.
     Replica(PathBuf),
+    /// The built-in replica, in this process ([`run_builtin`]).
+    Builtin,
 }
 
-/// Applies `implementation` to `replica`, looking for its program (see [`find`]) unless the
-/// original is asked for.
+/// Applies `implementation` to `replica`, looking for its program (see [`find`]) when it is a
+/// separate one and the original is not asked for.
 pub fn choose(
     implementation: Implementation,
     replica: &Replica,
     dirs: &[PathBuf],
 ) -> Result<Choice, Error> {
-    choose_with(implementation, replica, || find(replica.package, dirs))
+    choose_with(implementation, replica, || match replica.location {
+        Location::Program(package) => find(package, dirs),
+        Location::Builtin { .. } => Ok(None),
+    })
 }
 
 /// [`choose`] with another way to look for the program.
@@ -367,7 +414,7 @@ pub fn choose_with(
     let no_original = |asked: bool| Error::NoOriginal {
         family: replica.family,
         tool: replica.tool,
-        package: replica.package,
+        package: replica.package(),
         asked,
     };
     if implementation == Implementation::Original {
@@ -377,15 +424,53 @@ pub fn choose_with(
             Err(no_original(true))
         };
     }
+    let Location::Program(package) = replica.location else {
+        // Built in: always available.
+        return Ok(Choice::Builtin);
+    };
     match (find()?, implementation) {
         (Some(program), _) => Ok(Choice::Replica(program)),
         (None, Implementation::Replica) => Err(Error::NotFound {
             family: replica.family,
             tool: replica.tool,
-            package: replica.package,
+            package,
         }),
         (None, _) if !replica.original => Err(no_original(false)),
         (None, _) => Ok(Choice::Original),
+    }
+}
+
+/// Runs the built-in replica of `family tool` with `args`, with this process's environment and
+/// working directory; `None` if it has none.
+pub fn run_builtin(
+    family: &str,
+    tool: &str,
+    args: &[String],
+    out: &mut dyn Write,
+    err: &mut dyn Write,
+) -> Option<u8> {
+    match family {
+        "afni" => larmorx_afni_replica::cli::run(tool, args, out, err),
+        _ => None,
+    }
+}
+
+/// [`run_builtin`] inside a caller's process that must not depend on its own environment or
+/// directory (the Python wrappers): `env` stands for the process environment (D13's
+/// `LARMORX_UPSTREAM_DEFECTS`, the upstream's variables, `OMP_NUM_THREADS`), and relative file
+/// names start in `dir` when one is given.
+pub fn run_builtin_in(
+    family: &str,
+    tool: &str,
+    args: &[String],
+    env: Vec<(String, String)>,
+    dir: Option<PathBuf>,
+    out: &mut dyn Write,
+    err: &mut dyn Write,
+) -> Option<u8> {
+    match family {
+        "afni" => larmorx_afni_replica::cli::run_in(tool, args, env, dir, out, err),
+        _ => None,
     }
 }
 
@@ -459,18 +544,19 @@ mod tests {
     use super::*;
 
     const TSHIFT: &Replica = &REPLICAS[0];
+    const MCFLIRT: &Replica = &REPLICAS[3];
 
     #[test]
     fn tools_without_an_original() {
-        // A replica without an original: `auto` runs it or fails like `replica`; `original`
-        // is an error. No tool is in that state now; the rule is checked on a stand-in.
+        // A separate replica without an original: `auto` runs it or fails like `replica`;
+        // `original` is an error. BET is in that state; the rule is also checked on a stand-in.
         const ONLY: Replica = Replica {
-            family: "afni",
-            tool: "3dSomething",
-            package: &LARMORX_GPL,
+            family: "fsl",
+            tool: "something",
+            location: Location::Program(&LARMORX_NC),
             original: false,
         };
-        let found = || Ok(Some(PathBuf::from("bin/larmorx-gpl")));
+        let found = || Ok(Some(PathBuf::from("bin/larmorx-nc")));
         let missing = || Ok(None);
         assert!(matches!(
             choose_with(Implementation::Auto, &ONLY, found),
@@ -480,7 +566,7 @@ mod tests {
         assert_eq!(e.exit_code(), EXIT_NOT_FOUND);
         assert!(
             e.to_string()
-                .contains("no clean-room original of afni 3dSomething"),
+                .contains("no clean-room original of fsl something"),
             "{e}"
         );
         let e = choose_with(Implementation::Original, &ONLY, found).unwrap_err();
@@ -488,13 +574,29 @@ mod tests {
             e.to_string().starts_with("LARMORX_IMPLEMENTATION=original"),
             "{e}"
         );
-        // The AFNI tools have their originals: `auto` without the replica runs them. FSL's
-        // BET has only its replica so far.
+        // A built-in replica without an original: `original` is an error that says so.
+        const BUILTIN_ONLY: Replica = Replica {
+            family: "afni",
+            tool: "3dSomething",
+            location: Location::Builtin {
+                licence: AFNI_REPLICA_LICENCE,
+            },
+            original: false,
+        };
+        let never = || -> Result<Option<PathBuf>, Error> { panic!("not searched") };
+        assert_eq!(
+            choose_with(Implementation::Auto, &BUILTIN_ONLY, never),
+            Ok(Choice::Builtin)
+        );
+        let e = choose_with(Implementation::Original, &BUILTIN_ONLY, never).unwrap_err();
+        assert!(e.to_string().contains("built in"), "{e}");
+        // The AFNI tools have their originals and their replicas built in. FSL's BET has only
+        // its replica so far.
         assert!(
             REPLICAS
                 .iter()
                 .filter(|r| r.family == "afni")
-                .all(|r| r.original)
+                .all(|r| r.original && r.package().is_none())
         );
         assert_eq!(replica_only("afni").count(), 0);
         assert_eq!(replica_only("ants").count(), 0);
@@ -503,20 +605,25 @@ mod tests {
             ["bet", "bet2", "betsurf"]
         );
         let bet = lookup("fsl", "bet").unwrap();
-        assert_eq!(bet.package.env, "LARMORX_NC_BIN");
+        assert_eq!(bet.package().unwrap().env, "LARMORX_NC_BIN");
         let e = choose_with(Implementation::Auto, bet, missing).unwrap_err();
         assert!(e.to_string().contains("pip install larmorx-nc"), "{e}");
         let automask = lookup("afni", "3dAutomask").unwrap();
-        assert!(matches!(
-            choose_with(Implementation::Auto, automask, missing),
-            Ok(Choice::Original)
-        ));
+        assert_eq!(
+            choose_with(Implementation::Auto, automask, never),
+            Ok(Choice::Builtin)
+        );
+        assert_eq!(automask.licence(), "Apache-2.0 AND CC-BY-4.0");
     }
 
     #[test]
     fn the_registry_names_each_tool_once() {
         let r = lookup("afni", "3dTshift").unwrap();
-        assert_eq!(r.package.program, "larmorx-gpl");
+        assert!(matches!(r.location, Location::Builtin { .. }));
+        assert_eq!(
+            lookup("fsl", "mcflirt").unwrap().package().unwrap().program,
+            "larmorx-nc"
+        );
         assert!(lookup("afni", "3dvolreg").is_none());
         assert!(lookup("ants", "3dTshift").is_none());
         for (i, a) in REPLICAS.iter().enumerate() {
@@ -543,40 +650,51 @@ mod tests {
 
     #[test]
     fn choices() {
-        let found = || Ok(Some(PathBuf::from("bin/larmorx-gpl")));
+        let found = || Ok(Some(PathBuf::from("bin/larmorx-nc")));
         let missing = || Ok(None);
         let never = || -> Result<Option<PathBuf>, Error> { panic!("not searched") };
-        let replica = Choice::Replica(PathBuf::from("bin/larmorx-gpl"));
+        // A built-in replica: never searched for, always chosen unless the original is asked
+        // for.
+        for implementation in [Implementation::Auto, Implementation::Replica] {
+            assert_eq!(
+                choose_with(implementation, TSHIFT, never),
+                Ok(Choice::Builtin)
+            );
+        }
         assert_eq!(
-            choose_with(Implementation::Auto, TSHIFT, found),
+            choose_with(Implementation::Original, TSHIFT, never),
+            Ok(Choice::Original)
+        );
+        assert_eq!(choose(Implementation::Auto, TSHIFT, &[]), Ok(Choice::Builtin));
+        // A separate program.
+        let replica = Choice::Replica(PathBuf::from("bin/larmorx-nc"));
+        assert_eq!(
+            choose_with(Implementation::Auto, MCFLIRT, found),
             Ok(replica.clone())
         );
         assert_eq!(
-            choose_with(Implementation::Auto, TSHIFT, missing),
+            choose_with(Implementation::Auto, MCFLIRT, missing),
             Ok(Choice::Original)
         );
         assert_eq!(
-            choose_with(Implementation::Replica, TSHIFT, found),
+            choose_with(Implementation::Replica, MCFLIRT, found),
             Ok(replica)
         );
-        let e = choose_with(Implementation::Replica, TSHIFT, missing).unwrap_err();
+        let e = choose_with(Implementation::Replica, MCFLIRT, missing).unwrap_err();
         assert_eq!(e.exit_code(), EXIT_NOT_FOUND);
-        assert!(
-            e.to_string().contains("pip install \"larmorx[exact]\""),
-            "{e}"
-        );
+        assert!(e.to_string().contains("pip install larmorx-nc"), "{e}");
         assert_eq!(
-            choose_with(Implementation::Original, TSHIFT, never),
+            choose_with(Implementation::Original, MCFLIRT, never),
             Ok(Choice::Original)
         );
         // A broken explicit path is an error, not a silent fallback.
         let bad = || {
             Err(Error::BadPath {
-                env: "LARMORX_GPL_BIN",
+                env: "LARMORX_NC_BIN",
                 value: "nowhere".into(),
             })
         };
-        assert!(choose_with(Implementation::Auto, TSHIFT, bad).is_err());
+        assert!(choose_with(Implementation::Auto, MCFLIRT, bad).is_err());
     }
 
     #[test]
@@ -589,12 +707,12 @@ mod tests {
         });
         let empty = tmp.path().join("empty");
         std::fs::create_dir(&empty).unwrap();
-        let p = &LARMORX_GPL;
+        let p = &LARMORX_NC;
         let put = |dir: &Path| {
             let name = if cfg!(windows) {
-                "larmorx-gpl.exe"
+                "larmorx-nc.exe"
             } else {
-                "larmorx-gpl"
+                "larmorx-nc"
             };
             let file = dir.join(name);
             std::fs::write(&file, "").unwrap();
@@ -649,10 +767,10 @@ mod tests {
     fn files_that_cannot_be_executed_are_not_found() {
         use std::os::unix::fs::PermissionsExt;
         let tmp = tempfile::tempdir().unwrap();
-        let file = tmp.path().join("larmorx-gpl");
+        let file = tmp.path().join("larmorx-nc");
         std::fs::write(&file, "").unwrap();
         std::fs::set_permissions(&file, std::fs::Permissions::from_mode(0o644)).unwrap();
         let dirs = [tmp.path().to_path_buf()];
-        assert_eq!(find_with(&LARMORX_GPL, None, &dirs, None), Ok(None));
+        assert_eq!(find_with(&LARMORX_NC, None, &dirs, None), Ok(None));
     }
 }

@@ -1,6 +1,6 @@
 # SPDX-License-Identifier: Apache-2.0
-"""``3dTshift``: slice-timing correction (clean-room re-implementation of AFNI 26.3.05, or its
-bit-exact replica from ``larmorx-gpl``, run as a separate program).
+"""``3dTshift``: slice-timing correction (the bit-exact replica of AFNI 26.3.05's program, or its
+clean-room re-implementation).
 
 AFNI's deterministic defects are corrected by default (D13, ``docs/api/upstream-defects.md``),
 by either implementation: a negative ``scl_slope`` (AFNI-01), float32 data with a slope and an
@@ -260,11 +260,10 @@ def tshift(
     n_threads
         Worker threads (0 = all). The result does not depend on it.
     implementation
-        ``"auto"`` (default): the bit-exact replica when the ``larmorx-gpl`` package is
-        installed (``pip install "larmorx[exact]"``), else the clean-room original.
-        ``"replica"`` or ``"original"`` force one. The replica runs as a separate program on
-        temporary NIfTI files (``docs/licensing.md``). The two differ only in the last bits of
-        some values (``docs/validation/afni-tshift.md``).
+        ``"auto"`` (default) and ``"replica"``: the bit-exact replica (part of larmorx, run in
+        this process on temporary NIfTI files, with the arguments AFNI's program takes);
+        ``"original"``: the clean-room original. The two differ only in the last bits of some
+        values (``docs/validation/afni-tshift.md``).
     upstream_defects
         ``"fix"`` (default) corrects AFNI's defects (AFNI-01, -02, -07, -16, and with
         ``afni_settings`` AFNI-23); ``"reproduce"`` gives AFNI's output. A
@@ -304,10 +303,9 @@ def tshift(
         :class:`~larmorx.ReplicaError`.
     TypeError
         ``afni_settings`` is not a mapping of strings to strings.
-    larmorx.ReplicaNotFoundError
-        ``implementation="replica"`` without ``larmorx-gpl`` installed.
     larmorx.ReplicaError
-        The replica was found but failed. larmorx does not fall back to the original then.
+        The replica failed (an error AFNI's program reports). larmorx does not fall back to the
+        original then.
     """
     _check(slice_times, tr, tzero, slice, ignore, method, restore, detrend)
     _defects.check(upstream_defects)
@@ -415,7 +413,7 @@ def _tshift_replica(
     options: dict[str, Any],
     settings: dict[str, str],
 ) -> Image:
-    """``larmorx-gpl afni 3dTshift`` on files in a temporary directory, with the options
+    """The replica's ``3dTshift`` on files in a temporary directory, with the options
     ``lx.afni.tshift`` has (they mean what the same options mean on the command line), and
     AFNI's environment variables ``settings`` and :data:`_SETTINGS_FIXED` in place of this
     process's."""

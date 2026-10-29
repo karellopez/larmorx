@@ -5,9 +5,9 @@
 //! argument syntax of the program it replaces. Parsing lives here, once, and is shared by the
 //! standalone binaries and the Python console scripts (through `larmorx._core`).
 //!
-//! Tools with a bit-exact replica in another package (`larmorx-gpl`, `larmorx-nc`) run that package's
-//! program as a separate process when it is found, and the clean-room original otherwise
-//! ([`replica`], `docs/licensing.md`).
+//! Tools with a bit-exact replica run it by default: built in (AFNI's programs, in this
+//! process), or as the program of its own package when that is found (`larmorx-nc`), else the
+//! clean-room original ([`replica`], `docs/licensing.md`).
 #![forbid(unsafe_code)]
 
 pub mod replica;
@@ -41,9 +41,8 @@ pub const FAMILIES: &[(&str, &[&str])] = &[
 /// programs have no clean-room original yet ([`replica::replica_only`]; a test checks the list).
 const FSL_TOOLS: &[&str] = &["mcflirt", "bet", "bet2", "betsurf"];
 
-/// The AFNI tools: the clean-room originals' (`larmorx_afni::cli::TOOLS`) and those with a
-/// replica only, which run when the `larmorx-gpl` program is installed
-/// ([`replica::replica_only`]; a test checks the list).
+/// The AFNI tools: the clean-room originals' (`larmorx_afni::cli::TOOLS`), each with its
+/// built-in replica (`larmorx_afni_replica::cli::TOOLS`; a test checks the lists).
 const AFNI_TOOLS: &[&str] = &["3dTshift", "3dAutomask", "3dUnifize"];
 
 /// How a command line runs, besides its arguments.
@@ -148,8 +147,8 @@ where
     if written.is_ok() { code } else { EXIT_IO_ERROR }
 }
 
-/// Runs `tool` of `family`: its replica as a separate program when [`replica::choose`] says
-/// so, else the original. `None` if there is no such tool.
+/// Runs `tool` of `family`: its replica (built in, or as a separate program) when
+/// [`replica::choose`] says so, else the original. `None` if there is no such tool.
 fn run_tool(
     family: &str,
     tool: &str,
@@ -167,6 +166,9 @@ fn run_tool(
             });
         match choice {
             Ok(replica::Choice::Original) => {}
+            Ok(replica::Choice::Builtin) => {
+                return replica::run_builtin(family, tool, args, out, err);
+            }
             Ok(replica::Choice::Replica(program)) => {
                 return Some(replica::run(
                     &program,
@@ -239,17 +241,23 @@ fn usage(prog: &str) -> String {
         .collect();
     let replicas: String = replica::REPLICAS
         .iter()
-        .map(|r| {
-            format!(
-                "  {} {}: {} ({})\n",
-                r.family, r.tool, r.package.name, r.package.licence
-            )
+        .map(|r| match r.package() {
+            None => format!(
+                "  {} {}: built in ({})\n",
+                r.family,
+                r.tool,
+                r.licence()
+            ),
+            Some(p) => format!(
+                "  {} {}: {} ({}), a separate program\n",
+                r.family, r.tool, p.name, p.licence
+            ),
         })
         .collect();
     let mut packages: Vec<&replica::Package> = Vec::new();
-    for r in replica::REPLICAS {
-        if !packages.contains(&r.package) {
-            packages.push(r.package);
+    for p in replica::REPLICAS.iter().filter_map(replica::Replica::package) {
+        if !packages.contains(&p) {
+            packages.push(p);
         }
     }
     let programs: String = packages
@@ -268,11 +276,12 @@ Options:
   -h, --help     Print this help
   -V, --version  Print the version
 
-Bit-exact replicas, in separate packages, run as separate programs (docs/licensing.md):
+Bit-exact replicas (docs/licensing.md):
 {replicas}
 Environment:
-  {env:<23} auto (default): a tool's replica if its program is found, else the
-  {pad:<23} original; replica: the replica or exit 127; original: the original
+  {env:<23} auto (default): a tool's replica if it is built in or its program is
+  {pad:<23} found, else the original; replica: the replica or exit 127; original:
+  {pad:<23} the original
 {programs}",
         version = larmorx_core::VERSION,
         env = replica::IMPLEMENTATION_ENV,
@@ -318,9 +327,12 @@ mod tests {
         let (code, out, _) = run_capture(&["larmorx", "--help"]);
         assert_eq!(code, 0);
         assert!(out.contains("Usage: larmorx <family> <tool>"), "{out}");
-        assert!(out.contains("afni 3dTshift: larmorx-gpl"), "{out}");
+        assert!(
+            out.contains("afni 3dTshift: built in (Apache-2.0 AND CC-BY-4.0)"),
+            "{out}"
+        );
         assert!(out.contains("LARMORX_IMPLEMENTATION"), "{out}");
-        assert!(out.contains("LARMORX_GPL_BIN"), "{out}");
+        assert!(!out.contains("LARMORX_GPL_BIN"), "{out}");
 
         let (code, out, _) = run_capture(&["some/dir/lx.exe", "-h"]);
         assert_eq!(code, 0);
@@ -357,8 +369,17 @@ mod tests {
             .chain(replica::replica_only("afni"))
             .collect();
         assert_eq!(listed, AFNI_TOOLS);
-        // Every AFNI tool has its clean-room original.
+        // Every AFNI tool has its clean-room original and its built-in replica.
         assert_eq!(replica::replica_only("afni").count(), 0);
+        assert_eq!(larmorx_afni_replica::cli::TOOLS, AFNI_TOOLS);
+        let replica = Options {
+            implementation: Some(Implementation::Replica),
+            ..Options::default()
+        };
+        let (code, _, err) =
+            run_options(&["lx", "afni", "3dTshift", "-bogus", "in.nii"], &replica);
+        assert_eq!(code, 1);
+        assert!(err.contains("Unknown option: -bogus"), "{err}");
         for tool in ["3dAutomask", "3dUnifize"] {
             let (code, out, _) = run_capture(&["lx", "afni", tool]);
             assert_eq!(code, 0);
@@ -372,7 +393,7 @@ mod tests {
         assert_eq!(code, 0);
         assert!(out.contains("fsl    mcflirt, bet, bet2, betsurf"), "{out}");
         assert!(
-            out.contains("fsl bet: larmorx-nc (LicenseRef-FSL)"),
+            out.contains("fsl bet: larmorx-nc (LicenseRef-FSL), a separate program"),
             "{out}"
         );
         assert!(out.contains("LARMORX_NC_BIN"), "{out}");
@@ -391,10 +412,10 @@ mod tests {
     #[test]
     fn a_replica_that_cannot_start_exits_126() {
         let tmp = tempfile::tempdir().unwrap();
-        let replica = replica::lookup("afni", "3dTshift").unwrap();
+        let replica = replica::lookup("fsl", "mcflirt").unwrap();
         let (mut out, mut err) = (Vec::new(), Vec::new());
         let code = replica::run(
-            &tmp.path().join("larmorx-gpl"),
+            &tmp.path().join("larmorx-nc"),
             replica,
             &[],
             replica::Output::Capture,
@@ -404,7 +425,7 @@ mod tests {
         assert_eq!(code, replica::EXIT_CANNOT_RUN);
         let err = String::from_utf8(err).unwrap();
         assert!(
-            err.contains("cannot run the replica of afni 3dTshift"),
+            err.contains("cannot run the replica of fsl mcflirt"),
             "{err}"
         );
     }

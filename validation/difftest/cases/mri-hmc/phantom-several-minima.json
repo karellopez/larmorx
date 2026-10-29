@@ -1,0 +1,290 @@
+{
+ "defect": null,
+ "description": "Head-motion correction on a random phantom with large motion: an explained divergence (item 13, 2026-10-29)",
+ "expect": "divergence",
+ "found": {
+  "detail": "out_mcf.nii.gz.mat: matrix RMS deviation, 95th percentile: median 0.0322, max 0.1911 mm over 6 volumes",
+  "n": 37,
+  "seed": "20261025",
+  "shrink_moves": [],
+  "signature": [
+   "out_mcf.nii.gz.mat: matrix RMS deviation, Nth percentile"
+  ]
+ },
+ "id": "phantom-several-minima",
+ "implementations": [
+  "original"
+ ],
+ "reason": "A small phantom moved by up to 15 degrees: the normalised correlation has several minima, and larmorx's estimates end in other ones than mcflirt's beyond the record's thresholds, aligning the series as well (temporal SD 0.999 of mcflirt's here; over the night's 782 findings median ratio 1.000, docs/findings/mri-hmc-original.md)",
+ "recipe": {
+  "extra": {
+   "keep_inputs": [
+    "in"
+   ],
+   "min_size": 12,
+   "min_volumes": 4
+  },
+  "features": {
+   "-mats": true,
+   "-plots": true,
+   "-rmsabs": true,
+   "-rmsrel": true,
+   "bins": false,
+   "cost": false,
+   "dof": false,
+   "dtype": "float32",
+   "final": false,
+   "first at rest": true,
+   "fudge": false,
+   "gdt": false,
+   "meanvol": false,
+   "noise": 3.0,
+   "nx": 16,
+   "ny": 24,
+   "nz": 20,
+   "oblique": false,
+   "reffile": false,
+   "refvol": false,
+   "rot b": -1,
+   "rot c": 0,
+   "rot d": 1,
+   "rot scale": 3,
+   "rotation": false,
+   "scaling": false,
+   "shift0": 0.5,
+   "shift1": 0.25,
+   "shift2": -0.5,
+   "shift3": 1.0,
+   "shift4": 1.0,
+   "shift5": 1.0,
+   "slice spacing": 3.0,
+   "smooth": false,
+   "spacing": 4.0,
+   "stages": false,
+   "stats": false,
+   "tissues": "epi",
+   "volumes": 6
+  },
+  "groups": [
+   {
+    "args": [
+     "-in",
+     "{in:in}"
+    ],
+    "name": "input",
+    "optional": false
+   },
+   {
+    "args": [
+     "-out",
+     "{run}/out_mcf.nii.gz"
+    ],
+    "name": "output",
+    "optional": false
+   },
+   {
+    "args": [
+     "-mats",
+     "-plots",
+     "-rmsrel",
+     "-rmsabs"
+    ],
+    "name": "outputs",
+    "optional": true
+   }
+  ],
+  "inputs": {
+   "in": {
+    "content": {
+     "axes": [
+      1.0,
+      1.1,
+      0.9
+     ],
+     "bias": [
+      0.0,
+      0.0,
+      0.0,
+      0.0
+     ],
+     "centre": [
+      0.0,
+      0.0,
+      0.0
+     ],
+     "noise": 3.0,
+     "seed": 1350011766,
+     "size": 26.88,
+     "tissues": "epi",
+     "type": "head"
+    },
+    "dtype": "float32",
+    "geometry": {
+     "origin": [
+      -30.0,
+      -46.0,
+      -38.0
+     ],
+     "qfac": 1,
+     "qform_code": 1,
+     "quaternion": [
+      1,
+      0,
+      0,
+      0
+     ],
+     "sform": "same",
+     "sform_code": 1,
+     "spacing": [
+      4.0,
+      4.0,
+      3.0
+     ],
+     "units": "mm"
+    },
+    "keep_content": true,
+    "motion": [
+     {
+      "centre": [
+       0.0,
+       0.0,
+       0.0
+      ],
+      "quaternion": [
+       1,
+       0,
+       0,
+       0
+      ],
+      "translation": [
+       0.0,
+       0.0,
+       0.0
+      ]
+     },
+     {
+      "centre": [
+       0.0,
+       0.0,
+       0.0
+      ],
+      "quaternion": [
+       17,
+       1,
+       0,
+       -2
+      ],
+      "translation": [
+       0.25,
+       -0.25,
+       0.75
+      ]
+     },
+     {
+      "centre": [
+       0.0,
+       0.0,
+       0.0
+      ],
+      "quaternion": [
+       19,
+       -2,
+       -1,
+       -1
+      ],
+      "translation": [
+       0.5,
+       -2.0,
+       0.5
+      ]
+     },
+     {
+      "centre": [
+       0.0,
+       0.0,
+       0.0
+      ],
+      "quaternion": [
+       46,
+       2,
+       2,
+       1
+      ],
+      "translation": [
+       -1.0,
+       0.25,
+       -0.5
+      ]
+     },
+     {
+      "centre": [
+       0.0,
+       0.0,
+       0.0
+      ],
+      "quaternion": [
+       33,
+       -2,
+       2,
+       2
+      ],
+      "translation": [
+       0.0,
+       0.5,
+       -1.0
+      ]
+     },
+     {
+      "centre": [
+       0.0,
+       0.0,
+       0.0
+      ],
+      "quaternion": [
+       24,
+       -1,
+       0,
+       1
+      ],
+      "translation": [
+       0.5,
+       0.25,
+       -0.5
+      ]
+     }
+    ],
+    "scaling": null,
+    "shape": [
+     16,
+     24,
+     20,
+     6
+    ],
+    "suffix": ".nii.gz",
+    "timing": {
+     "slice_code": 0,
+     "tr": 2.0,
+     "tunits": "sec"
+    },
+    "values": {
+     "offset": 0.0,
+     "scale": 1.0
+    }
+   }
+  },
+  "n": 37,
+  "options": [
+   "-mats",
+   "-plots",
+   "-rmsabs",
+   "-rmsrel"
+  ],
+  "seed": "20261025",
+  "tool": "mri-hmc"
+ },
+ "rule": null,
+ "status": "fixed",
+ "suite": "mri-hmc",
+ "tier": "smoke",
+ "tool": "mri-hmc"
+}

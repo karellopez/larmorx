@@ -98,3 +98,32 @@ sort at every voxel); on the half-size path the ball works on an eighth of the v
 reading and writing the full-size compressed images takes a larger share of the time. 3dAutomask's time is
 mostly reading and writing compressed NIfTI: the three programs are within a few tenths of a
 second, the original faster at 6 threads.
+
+## The fixes of 2026-10-29 (random testing's and the data panel's differences)
+
+Found by random testing (2026-10-25) and the data panel (2026-10-28), settled by black-box runs
+of AFNI 25.2.09 and of the replica program, by an implementer who had never read either's
+source; the tools are in
+[`validation/investigations/cleanroom-fixes/`](../../validation/investigations/cleanroom-fixes/)
+(its README), the rules in the specs (observed by the clean-room implementer, 2026-10-29).
+
+| Difference | Cause found | Fix (all three tools unless named) |
+|---|---|---|
+| Header bytes of tiny oblique images (3dAutomask `mask.nii`, `.nii.gz`; 3dUnifize `uni.nii`, `-amsave`) | the quaternion's rounding residue: AFNI forms the polar decomposition's `1/det` in extended precision (1,200 of 1,200 quaternions read as doubles from NIfTI-2 outputs) | `geometry::inverse` |
+| 3dAutomask's `[from ?]`; a one-slice oblique image's mask with `-SI` | the orientation letters are the NIfTI library's closest plumb orientation, in double (1,604 of 1,604 matrices), not each column's largest entry | `automask::program::orientation` |
+| 3dTshift's `toffset` 0.35999995 against 0.36000001 | header slice times in ms: a float32 sum of the step kept in double (every time of 16 headers read back with `-slice k`) | `timing::header_timing` |
+| 3dTshift's default on metre and micrometre grids, 5.5e-5 to 2.4e-4 from the replica's | AFNI-07's default (shared with the replica): the steps from the file's matrix then converted; a qform's matrix computed with millimetre voxel sizes and offsets, rounded once (100 of 100) | `geometry::output_geometry`, `qform_matrix_scaled` |
+| 3dAutomask's `-apply_prefix` writes +0 where AFNI keeps −0 | float64 (and int8, uint16, int32, uint32) data without a usable slope are only converted | `dataset::read_as` |
+| AFNI-03 not named, AFNI-08 in `reproduce` only (3dAutomask `-apply_prefix`, 3dUnifize `-EPI`, header slice code 2) | the replica names AFNI-03 in both modes and AFNI-08 where the kept times are all within 3 ms of 0 | `automask::copy_timing`, the replica's words |
+| AFNI-43 not named where only the clustering messages differ (`-peels 0`) | the replica names it there; its default peels once for a negative value | `automask`, the replica's words |
+| AFNI-07's and AFNI-16's words and order | the replica's | `geometry::output_geometry` |
+| The data panel's obliquity angles (five 3dAutomask calls, 20.646870 against 20.646889) | AFNI reports the obliquity of its own header extension's 7-digit matrix (AFNI-10); on the input without the extension it prints the original's angle | none in the original (it ignores the extension, AFNI-10); the parity suite explains such messages by AFNI-10 |
+
+After the fixes every one of the night's findings of the three tools' originals, and the 83 of
+the replicas' default against the original's, replays as *agree* (the masks harness accepts
+AFNI-08 named in `reproduce` only for header slice code 2, `one_mode`; one 3dTshift replica
+finding replays as *notice*, the replica's own AFNI-01 notice, and five 3dUnifize replica
+findings stay *memory*),
+and the standard records are re-made: 3dTshift 315 cases, 3dAutomask 130 (with the data
+panel's 15 fMRIPrep calls, all passing; 14 inputs carry AFNI's extension), 3dUnifize 117, with
+no change of status in any earlier case.

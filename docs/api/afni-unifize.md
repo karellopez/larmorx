@@ -102,6 +102,10 @@ Corrected by default, reproduced with `upstream_defects="reproduce"`, by both im
   as AFNI does.
 - **AFNI-01**: `-EPI`'s median volume drops a negative `scl_slope`, so its sign is wrong and the
   output is all zeros; the default applies the factor.
+- **AFNI-03 and AFNI-08**: `-EPI`'s output keeps the input's time axis and slice timing: header
+  slice code 2 keeps its corrected slice fields by default and is named in both modes; AFNI-08
+  is named where the kept times are all within 3 ms of 0 (in `reproduce`, every code-2 input),
+  as in 3dAutomask's masked input (since 2026-10-29 in the original, in the replica's words).
 - **AFNI-40**, **AFNI-46**: `-T2up` without its value as the last argument, and `-T2` on a 2D
   image smaller than 16 × 16, crash AFNI; larmorx refuses (exit 1) in both modes.
 - The defects of AFNI's dataset reading and writing (AFNI-02, -07, -11, -12, -16, -18, -20, -22,

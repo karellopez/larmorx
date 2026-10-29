@@ -1,0 +1,194 @@
+{
+ "defect": null,
+ "description": "A float64 input without a usable scl_slope: a -0 inside the mask is kept by -apply_prefix (item 8, 2026-10-29)",
+ "expect": "pass",
+ "found": {
+  "detail": "masked.nii: data: 0 of 294 values differ, max |diff| 0",
+  "n": 1305,
+  "seed": "20261025",
+  "shrink_moves": [],
+  "signature": [
+   "masked.nii: data"
+  ]
+ },
+ "id": "float64-negative-zero",
+ "implementations": [
+  "original"
+ ],
+ "reason": "",
+ "recipe": {
+  "extra": {
+   "outputs": [
+    "mask.nii.gz",
+    "masked.nii"
+   ]
+  },
+  "features": {
+   "NN": false,
+   "SI": true,
+   "SI value": "20",
+   "apply_prefix": true,
+   "clfrac": false,
+   "content": "crop",
+   "corner0": 32,
+   "corner1": 60,
+   "corner2": 57,
+   "crop source": "templateflow/tpl-MNI152NLin2009cAsym/tpl-MNI152NLin2009cAsym_res-02_T1w.nii.gz",
+   "crop stride": 2,
+   "depth": false,
+   "dilate": true,
+   "dilate value": "3",
+   "dtype": "float64",
+   "eclip": false,
+   "erode": false,
+   "nbhrs": false,
+   "ndim": 3,
+   "nograd": true,
+   "orientation": "oblique",
+   "origin0": -43.5,
+   "origin1": -38.0,
+   "origin2": 18.0,
+   "output": "mask.nii.gz",
+   "peels": true,
+   "peels value": "3",
+   "qfac": 1,
+   "qform_code": 1,
+   "quiet": false,
+   "range": "plain",
+   "sform": "same",
+   "sform_code": 1,
+   "shape": "6x7x7",
+   "spacing0": 0.8,
+   "spacing1": 2.5,
+   "spacing2": 1.2,
+   "specials": 1,
+   "suffix": ".nii.gz",
+   "units": "mm"
+  },
+  "groups": [
+   {
+    "args": [
+     "-nograd"
+    ],
+    "name": "nograd",
+    "optional": true
+   },
+   {
+    "args": [
+     "-peels",
+     "3"
+    ],
+    "name": "peels",
+    "optional": true
+   },
+   {
+    "args": [
+     "-dilate",
+     "3"
+    ],
+    "name": "dilate",
+    "optional": true
+   },
+   {
+    "args": [
+     "-SI",
+     "20"
+    ],
+    "name": "SI",
+    "optional": true
+   },
+   {
+    "args": [
+     "-apply_prefix",
+     "masked.nii"
+    ],
+    "name": "apply_prefix",
+    "optional": true
+   },
+   {
+    "args": [
+     "-prefix",
+     "mask.nii.gz"
+    ],
+    "name": "prefix",
+    "optional": false
+   },
+   {
+    "args": [
+     "{in:input}"
+    ],
+    "name": "input",
+    "optional": false
+   }
+  ],
+  "inputs": {
+   "input": {
+    "content": {
+     "corner": [
+      32,
+      60,
+      57
+     ],
+     "seed": 1456329077,
+     "source": "templateflow/tpl-MNI152NLin2009cAsym/tpl-MNI152NLin2009cAsym_res-02_T1w.nii.gz",
+     "stride": 2,
+     "type": "crop"
+    },
+    "dtype": "float64",
+    "geometry": {
+     "origin": [
+      -43.5,
+      -38.0,
+      18.0
+     ],
+     "qfac": 1,
+     "qform_code": 1,
+     "quaternion": [
+      19,
+      -1,
+      -2,
+      1
+     ],
+     "sform": "same",
+     "sform_code": 1,
+     "spacing": [
+      0.8,
+      0.8,
+      0.8
+     ],
+     "units": "mm"
+    },
+    "scaling": null,
+    "shape": [
+     6,
+     7,
+     7
+    ],
+    "suffix": ".nii.gz",
+    "values": {
+     "offset": 0.0,
+     "scale": 1.0,
+     "specials": [
+      "-0"
+     ]
+    }
+   }
+  },
+  "n": 1305,
+  "options": [
+   "-SI",
+   "-apply_prefix",
+   "-dilate",
+   "-nograd",
+   "-peels",
+   "3D input"
+  ],
+  "seed": "20261025",
+  "tool": "afni-automask"
+ },
+ "rule": null,
+ "status": "fixed",
+ "suite": "afni-automask",
+ "tier": "smoke",
+ "tool": "afni-automask"
+}

@@ -52,16 +52,16 @@ Golden tests cover every tool on all six platforms (`docs/validation/golden.md`)
 that results do not depend on the machine, [docs/findings/machine-move-proof.md](docs/findings/machine-move-proof.md));
 the old laptop is a helper (phase 4 of [docs/machine-move.md](docs/machine-move.md)). Ports first,
 with smart testing per part; the very extensive testing in one final validation phase (user,
-2026-10-28; decision log). One agent at a time (`docs/next-steps.md`, "The order from here"):
-the clean-room fixes (antsAI and antsAffineInitializer's memory and speed: done, 2026-10-28), the
-version update (AFNI 26.3.05 and FSL 6.0.7.23, installed beside the old ones), then BET's
-clean-room original (from `specs/bet.md`) and the next FSL tools (FLIRT with BBR, FAST, topup),
+2026-10-28; decision log). One agent at a time (`docs/next-steps.md`, "The order from here").
+Done: antsAI and antsAffineInitializer's memory and speed (2026-10-28), the clean-room fixes
+(2026-10-29, `-cost normmi` left open). Next: the version update (AFNI 26.3.05 and FSL 6.0.7.23,
+installed beside the old ones), then BET's clean-room original (from `specs/bet.md`) and the next FSL tools (FLIRT with BBR, FAST, topup),
 field maps, FreeSurfer, surfaces, confounds, larmorprepx; each a bounded agent run with a stop
 after it, each with its site page from its tests. Then the final validation phase (the data
 panel's part b and every new tool, full tiers, heavy and nightly random testing, the extensive
 evidence, reviews, the scripts triage) and the comparisons with fMRIPrep. Machine-only runs
 continue meanwhile: the 25 heavy random-testing cases (17 running here, 8 for the lab's server).
-**Build-cache seed** for the next agent: on the new machine, the main checkout's `target/`, `crates-gpl/target/` and `crates-nc/target/` (built by the move's gates at `faa4f31`, release and test profiles); from the first merge on, the newest merged worktree's.
+**Build-cache seed** for the next agent: on the new machine, the main checkout's `target/`, `crates-gpl/target/` and `crates-nc/target/` (rebuilt by `verify-merge.sh` at each merge, release and test profiles).
 
 **fMRIPrep oracle runs** (`oracles/fmriprep-25.2.6/<run>/`, fMRIPrep 25.2.6 through Apptainer, `scripts/run_fmriprep_oracle.sh`; settings in each run's `RUN_INFO.txt`): `ds000005-sub-01-noreconall` (no field maps, no slice timing), `ds001600-sub-1-noreconall` (anatomy only: its BOLD runs have 5 volumes), `ds005040-sub-002-noreconall` (PEPOLAR, slice timing), `ds005454-sub-16-noreconall` (phase difference, multiband, 280 volumes), `ds005752-sub-ON01016-noreconall` (a direct field map fMRIPrep does not use: no `IntendedFor`); and the data panel's nine (2026-10-24 and 25, `validation/investigations/panel-oracle-runs/`, every one finished with exit status 0): `ds000228-sub-pixar008-noreconall` (a 3.5-year-old), `ds005003-sub-RS001-noreconall` (a glioma), `ds004173-sub-603309-noreconall` (anatomy only, strong motion), `ds002422-sub-02-noreconall` (1.5 T, two field-map estimators), `ds000256-sub-CTS203-noreconall` (a child's three motion levels), `ds004884-sub-M2079-noreconall` (a stroke, with its lesion mask resampled onto the T1w's grid), `ds003592-sub-280-noreconall` (multi-echo), `ds002603-sub-01-noreconall` (Philips multiband, a field map), `ds004958-sub-fsm64ps-noreconall` (multiband-8, 600 volumes; field maps not linked).
 

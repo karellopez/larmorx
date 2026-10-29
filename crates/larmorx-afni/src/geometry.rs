@@ -49,6 +49,10 @@ pub struct InputGeometry {
     pub mm_per_unit: f64,
     /// The code both output forms get (`qform_code` = `sform_code`).
     pub out_code: i32,
+    /// For a qform in metres or micrometres, its matrix computed with the voxel sizes and
+    /// offsets in millimetres (AFNI-07's default); `None` converts [`InputGeometry::m`] entry
+    /// by entry.
+    pub qform_mm: Option<M34>,
 }
 
 /// Millimetres per spatial unit of a header: 1000 for metres, 0.001 for micrometres, else 1.
@@ -70,6 +74,15 @@ fn size(p: f64) -> f32 {
 /// from the header's fields (spec §6.1), with the steps AFNI evaluates in extended precision
 /// (§7.1), then rounded to float32.
 pub fn qform_matrix(hdr: &NiftiHeader) -> M34 {
+    qform_matrix_scaled(hdr, 1.0)
+}
+
+/// [`qform_matrix`] with the voxel sizes and offsets multiplied by `mm` in double before the
+/// one rounding to float32: the matrix AFNI-07's correction writes for a qform in metres or
+/// micrometres (observed by the clean-room implementer: the replica program's default on 100
+/// qform-only headers in metres and micrometres, bit for bit; converting the float32 matrix
+/// after its rounding differs in the last bit of most).
+fn qform_matrix_scaled(hdr: &NiftiHeader, mm: f64) -> M34 {
     let (mut b, mut c, mut d) = (hdr.quatern_b, hdr.quatern_c, hdr.quatern_d);
     let s = (b * b + c * c) + d * d;
     let mut a = x87::add(1.0, -s);
@@ -82,31 +95,40 @@ pub fn qform_matrix(hdr: &NiftiHeader) -> M34 {
     } else {
         a = a.sqrt();
     }
-    let xd = f64::from(size(hdr.pixdim[1]));
-    let yd = f64::from(size(hdr.pixdim[2]));
-    let mut zd = f64::from(size(hdr.pixdim[3]));
+    let xd = f64::from(size(hdr.pixdim[1])) * mm;
+    let yd = f64::from(size(hdr.pixdim[2])) * mm;
+    let mut zd = f64::from(size(hdr.pixdim[3])) * mm;
     if hdr.pixdim[0] < 0.0 {
         zd = -zd;
     }
     let f = |v: f64| v as f32;
+    // The offset as float32, then (converted) times `mm` in double, rounded again.
+    let offset = |v: f64| {
+        let v = v as f32;
+        if mm == 1.0 {
+            v
+        } else {
+            (f64::from(v) * mm) as f32
+        }
+    };
     [
         [
             f((a * a + b * b - c * c - d * d) * xd),
             f(x87::mul(2.0 * (b * c - a * d), yd)),
             f(x87::mul(2.0 * (b * d + a * c), zd)),
-            hdr.qoffset_x as f32,
+            offset(hdr.qoffset_x),
         ],
         [
             f(x87::mul(2.0 * (b * c + a * d), xd)),
             f((a * a + c * c - b * b - d * d) * yd),
             f(x87::mul(2.0 * (c * d - a * b), zd)),
-            hdr.qoffset_y as f32,
+            offset(hdr.qoffset_y),
         ],
         [
             f(x87::mul(2.0 * (b * d - a * c), xd)),
             f(x87::mul(2.0 * (c * d + a * b), yd)),
             f((a * a + d * d - c * c - b * b) * zd),
-            hdr.qoffset_z as f32,
+            offset(hdr.qoffset_z),
         ],
     ]
 }
@@ -236,13 +258,17 @@ pub fn read_geometry(
             cfmt::f(f64::from(angle))
         )));
     }
+    let mm_per_unit = millimetres_per_unit(hdr);
+    let qform_mm = (source == Source::Qform && mm_per_unit != 1.0)
+        .then(|| qform_matrix_scaled(hdr, mm_per_unit));
     let geometry = InputGeometry {
         m,
         source,
         code,
         pixdim,
-        mm_per_unit: millimetres_per_unit(hdr),
+        mm_per_unit,
         out_code,
+        qform_mm,
     };
     (geometry, messages)
 }
@@ -313,18 +339,27 @@ pub fn output_geometry(g: &InputGeometry, mode: UpstreamDefects) -> (OutputGeome
     let mut notices = Vec::new();
     // The default converts the whole matrix first (AFNI-07 corrected).
     let m = if mode.fix() && convert {
-        g.m.map(|row| row.map(|v| (f64::from(v) * mm) as f32))
+        g.qform_mm
+            .unwrap_or_else(|| g.m.map(|row| row.map(|v| (f64::from(v) * mm) as f32)))
     } else {
         g.m
     };
+    // The steps in both modes: from the matrix in the file's units, then converted (spec §6.1,
+    // step 2). Observed by the clean-room implementer: the replica program's default writes
+    // these steps with the converted matrix (a 1 m column is a 1000 mm step, where the length
+    // of the converted column can be 999.99994).
     let mut steps = match g.source {
         Source::Sform => [0, 1, 2].map(|j| {
-            let (x, y, z) = (f64::from(m[0][j]), f64::from(m[1][j]), f64::from(m[2][j]));
+            let (x, y, z) = (
+                f64::from(g.m[0][j]),
+                f64::from(g.m[1][j]),
+                f64::from(g.m[2][j]),
+            );
             ((x * x + y * y) + z * z).sqrt() as f32
         }),
         Source::Qform | Source::Pixdim => g.pixdim,
     };
-    if convert && !(mode.fix() && g.source == Source::Sform) {
+    if convert {
         steps = steps.map(|s| (f64::from(s) * mm) as f32);
     }
     let (plumb, rows, _) = plumb_test(&m);
@@ -347,38 +382,73 @@ pub fn output_geometry(g: &InputGeometry, mode: UpstreamDefects) -> (OutputGeome
     } else {
         m
     };
+    // The notices, in the replica program's words and order (AFNI-07, then AFNI-16; observed
+    // by the clean-room implementer).
+    let mut tilt_notice = None;
     if tilt {
+        // The largest angle between a column and its axis (double), and how far the plumb
+        // matrix's entries are from the matrix it replaces (in reproduce, the file's matrix).
+        let angle = (0..3)
+            .map(|j| {
+                let col = [0, 1, 2].map(|i| f64::from(m[i][j]));
+                let len = ((col[0] * col[0] + col[1] * col[1]) + col[2] * col[2]).sqrt();
+                (col[rows[j]].abs() / len).min(1.0).acos().to_degrees()
+            })
+            .fold(0.0f64, f64::max);
+        let mut c: M34 = [[0.0; 4]; 3];
+        for j in 0..3 {
+            c[rows[j]][j] = if m[rows[j]][j] < 0.0 {
+                -steps[j]
+            } else {
+                steps[j]
+            };
+        }
+        let base = if mode.fix() { &m } else { &g.m };
+        let apart = (0..3)
+            .flat_map(|i| (0..3).map(move |j| (i, j)))
+            .map(|(i, j)| (f64::from(c[i][j]) - f64::from(base[i][j])).abs())
+            .fold(0.0f64, f64::max);
+        let (a, d) = (cfmt::g(angle), cfmt::g(apart));
         let detail = match mode {
-            UpstreamDefects::Fix => "the grid is within about 0.01° to 0.024° of plumb (AFNI's \
-                 single-precision test): its matrix is kept, tilt included; AFNI writes the \
-                 exactly plumb matrix of its axes"
-                .to_owned(),
-            UpstreamDefects::Reproduce => "the grid is within about 0.01° to 0.024° of plumb \
-                 (AFNI's single-precision test): written as the exactly plumb matrix of its axes, \
-                 its tilt discarded, as AFNI does"
-                .to_owned(),
+            UpstreamDefects::Fix => format!(
+                "the input's matrix is {a} degrees from plumb: kept, in the sform and the qform; \
+                 AFNI writes the plumb matrix of its axes instead (entries up to {d} apart)"
+            ),
+            UpstreamDefects::Reproduce => format!(
+                "the input's matrix is {a} degrees from plumb: written as the plumb matrix of \
+                 its axes, as AFNI does (entries up to {d} from the input's)"
+            ),
         };
-        notices.push(Notice::new(&defects::AFNI_16, mode, detail));
+        tilt_notice = Some(Notice::new(&defects::AFNI_16, mode, detail));
     }
     if convert {
-        let (_, file_rows, _) = plumb_test(&g.m);
+        let (file_plumb, file_rows, _) = plumb_test(&g.m);
         let offsets = (0..3).any(|i| g.m[i][3] != 0.0);
         if offsets || off_row(&g.m, &file_rows) {
             let unit = if mm > 1.0 { "metres" } else { "micrometres" };
-            let detail = match mode {
-                UpstreamDefects::Fix => format!(
-                    "the input's units are {unit}: its whole matrix is converted to \
-                     millimetres; AFNI converts only the voxel sizes (and leaves an oblique \
-                     matrix unconverted)"
+            let detail = match (mode, file_plumb) {
+                (UpstreamDefects::Fix, false) => format!(
+                    "the input's units are {unit}: its oblique matrix and origin are converted \
+                     to millimetres with its voxel sizes; AFNI converts only the voxel sizes and \
+                     writes the matrix (sform) in {unit}"
                 ),
-                UpstreamDefects::Reproduce => format!(
-                    "the input's units are {unit}: the voxel sizes are converted to \
-                     millimetres, and not the origin or an oblique matrix, as AFNI does"
+                (UpstreamDefects::Fix, true) => format!(
+                    "the input's units are {unit}: its origin is converted to millimetres with \
+                     its voxel sizes; AFNI converts only the voxel sizes"
+                ),
+                (UpstreamDefects::Reproduce, false) => format!(
+                    "the input's units are {unit}: its voxel sizes are converted to millimetres \
+                     and its oblique matrix (sform) and origin are not, as AFNI does"
+                ),
+                (UpstreamDefects::Reproduce, true) => format!(
+                    "the input's units are {unit}: its voxel sizes are converted to millimetres \
+                     and its origin is not, as AFNI does"
                 ),
             };
             notices.push(Notice::new(&defects::AFNI_07, mode, detail));
         }
     }
+    notices.extend(tilt_notice);
     let linear: M33 = [0, 1, 2].map(|i| [0, 1, 2].map(|j| f64::from(written[i][j])));
     let (quatern, qfac) = quaternion(linear);
     let out = OutputGeometry {
@@ -400,11 +470,17 @@ fn det(r: &M33) -> f64 {
         - r31 * r22 * r13
 }
 
+/// The inverse by cofactors. The reciprocal of the determinant is taken in x87 extended
+/// precision and stored as a double (spec §6.1, observed by the clean-room implementer on
+/// 1,200 matrices whose quaternion AFNI wrote as doubles, NIfTI-2: the only way all 1,200
+/// came out bit for bit; a direct double reciprocal missed 100, mostly in the rounding
+/// residue of components that are 0 or of a rotation's `a` near 0, whose sign decides the
+/// quaternion's).
 fn inverse(r: &M33) -> M33 {
     let [[r11, r12, r13], [r21, r22, r23], [r31, r32, r33]] = *r;
     let mut deti = det(r);
     if deti != 0.0 {
-        deti = 1.0 / deti;
+        deti = x87::div(1.0, deti);
     }
     [
         [
@@ -811,5 +887,56 @@ mod tests {
         let (c, s) = (0.8, 0.6);
         let (q, _) = quaternion([[c, 0.0, -s], [0.0, 1.0, 0.0], [s, 0.0, c]]);
         assert!((q[1] + (0.1f64).sqrt()).abs() < 1e-15, "{q:?}");
+    }
+
+    /// AFNI's quaternions where only the rounding residue of the polar decomposition decides
+    /// the written bits (observed by the clean-room implementer, random-testing findings
+    /// `afni-automask` 20261025-00242 and -01428): a component that is 0 in exact arithmetic,
+    /// and a rotation of 180° whose `a` is 0 and whose sign decides the quaternion's.
+    #[test]
+    fn quaternion_rounding_residue_as_afni() {
+        let f = |rows: [[f32; 3]; 3]| rows.map(|r| r.map(f64::from));
+        let (q, _) = quaternion(f([
+            [0.934_664_25, -0.228_675_14, 0.272_232_3],
+            [0.228_675_14, -0.199_637_03, -0.952_813_1],
+            [0.272_232_3, 0.952_813_1, -0.134_301_28],
+        ]));
+        assert_eq!(
+            q.map(|v| v as f32),
+            [0.753_094, 4.387_546_6e-17, 0.180_742_56]
+        );
+        let (q, qfac) = quaternion(f([
+            [-0.836_734_7, -0.979_591_85, -0.244_897_96],
+            [-0.489_795_92, 0.938_775_54, 0.734_693_9],
+            [-0.244_897_96, 1.469_387_8, -0.632_653_06],
+        ]));
+        assert_eq!(qfac, 1.0);
+        assert_eq!(
+            q.map(|v| v as f32),
+            [0.285_714_27, -0.857_142_87, -0.428_571_43]
+        );
+    }
+
+    /// AFNI-07's default on a qform in metres: the qform's matrix computed with the voxel sizes
+    /// and offsets in millimetres, rounded once (the replica program's default, observed).
+    #[test]
+    fn qform_in_metres_converted_before_rounding() {
+        let mut h = NiftiHeader::new(NiftiVersion::V1, &[2, 2, 2], DataType::F32).unwrap();
+        h.qform_code = 1;
+        h.sform_code = 0;
+        h.xyzt_units = 1 | 8;
+        (h.quatern_b, h.quatern_c, h.quatern_d) = (0.1, -0.2, 0.3);
+        h.pixdim[1..4].copy_from_slice(&[0.0031, 0.0024, 0.0031]);
+        (h.qoffset_x, h.qoffset_y, h.qoffset_z) = (-0.1, 0.05, 0.02);
+        let (g, _) = read_geometry(&h, &AfniSettings::new(), "in.nii");
+        let scaled = qform_matrix_scaled(&h, 1000.0);
+        assert_eq!(g.qform_mm, Some(scaled));
+        let (out, _) = output_geometry(&g, FIX);
+        assert_eq!(out.srow, scaled);
+        // The steps: from the file's voxel sizes, then converted.
+        assert_eq!(
+            out.pixdim,
+            [0.0031f32, 0.0024, 0.0031].map(|p| (f64::from(p) * 1000.0) as f32)
+        );
     }
 }

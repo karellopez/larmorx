@@ -137,7 +137,13 @@ pub fn header_timing(
 ) -> Option<HeaderTiming> {
     let slice_dim = (hdr.dim_info >> 4) & 3;
     let code = i32::from(hdr.slice_code as u8 as i8);
-    let duration = to_seconds(hdr.slice_duration, time_units_per_second(hdr));
+    // The step in seconds stays a double (the header's value divided in double); each time is a
+    // float32 running sum of it (observed by the clean-room implementer: 16 headers in seconds,
+    // milliseconds and microseconds, every slice time read back exactly with `-slice k`,
+    // `validation/investigations/cleanroom-fixes/tshift_times.py`; a step rounded to float32
+    // first differs in the last bit from the fourth slice on in milliseconds).
+    let step = hdr.slice_duration / time_units_per_second(hdr);
+    let duration = step as f32;
     let (start, end) = (hdr.slice_start, hdr.slice_end);
     if slice_dim != 3 || code <= 0 || duration.is_nan() || duration <= 0.0 {
         return None;
@@ -159,7 +165,11 @@ pub fn header_timing(
         _ => Vec::new(),
     };
     let mut times = vec![0f32; nz];
-    assign(&mut times, &order, duration);
+    let mut t = 0f32;
+    for &k in &order {
+        times[k] = t;
+        t = (f64::from(t) + step) as f32;
+    }
     Some(HeaderTiming {
         code,
         start,
@@ -452,5 +462,27 @@ mod tests {
             sum += t;
         }
         assert_eq!(mean_time(&times).to_bits(), (sum / 6.0).to_bits());
+    }
+
+    /// A header in milliseconds: the step 90.8 ms is 0.0908 s in double, and each time a float32
+    /// running sum of it (AFNI's times read back exactly with `-slice k`, observed by the
+    /// clean-room implementer); a float32 step gives 0.36320001 for the fifth slice.
+    #[test]
+    fn milliseconds_step_stays_double() {
+        let mut h = header(1, 0, 8, f64::from(90.8f32), 48);
+        h.xyzt_units = 2 | 16;
+        let t = header_timing(&h, 9, FIX).unwrap().times;
+        let afni: [f32; 9] = [
+            0.0,
+            0.0908,
+            0.1816,
+            0.272_400_02,
+            0.363_200_04,
+            0.454_000_06,
+            0.544_800_04,
+            0.635_600_03,
+            0.7264,
+        ];
+        assert_eq!(t, afni.to_vec());
     }
 }

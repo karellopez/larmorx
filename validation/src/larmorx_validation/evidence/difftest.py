@@ -16,6 +16,7 @@ from __future__ import annotations
 
 import json
 import os
+import re
 import tomllib
 from pathlib import Path
 
@@ -72,7 +73,13 @@ def latest_night(repo: Path) -> Path | None:
     root = None if ws is None else ws / "oracles" / "difftest"
     if root is None or not root.is_dir():
         return None
-    nights = sorted(p.parent for p in root.glob("*/summary.json"))
+    # A night's folder is named by its date alone; a part's short trial (``<date>-<topic>``)
+    # covers only its own tools and never replaces the night the site shows.
+    nights = sorted(
+        p.parent
+        for p in root.glob("*/summary.json")
+        if re.fullmatch(r"\d{4}-\d{2}-\d{2}", p.parent.name)
+    )
     return nights[-1] if nights else None
 
 

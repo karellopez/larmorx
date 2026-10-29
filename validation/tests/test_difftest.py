@@ -663,3 +663,18 @@ def test_outputs_too_large_to_load_are_compared_from_their_files(tmp_path, monke
         ap.compare_outputs(checks, paths[0], paths[1], "out", None)
         results[limit] = [(c.name, c.passed, c.value, c.detail) for c in checks.checks]
     assert results[1 << 28] == results[10]
+
+
+def test_the_site_shows_the_newest_dated_night_not_a_trial(tmp_path, monkeypatch):
+    # A part's short trial (``<date>-<topic>``) covers only its own tools: the site's panels
+    # keep the newest full night.
+    from larmorx_validation.evidence import difftest as ev
+    from larmorx_validation.oracle_cache import store
+
+    for name in ("2026-10-25", "2026-10-29-cleanroom-trial", "2026-10-25-oom"):
+        (tmp_path / "oracles" / "difftest" / name).mkdir(parents=True)
+    for name in ("2026-10-25", "2026-10-29-cleanroom-trial"):
+        (tmp_path / "oracles" / "difftest" / name / "summary.json").write_text("{}")
+    monkeypatch.delenv("LARMORX_DIFFTEST_NIGHT", raising=False)
+    monkeypatch.setattr(store, "workspace", lambda: tmp_path)
+    assert ev.latest_night(tmp_path) == tmp_path / "oracles" / "difftest" / "2026-10-25"

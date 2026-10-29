@@ -1,0 +1,170 @@
+{
+ "defect": null,
+ "description": "A 1 x 1 x 2 oblique image: the quaternion's rounding residue as AFNI's (1/det of the polar decomposition's inverse in extended precision; item 3, 2026-10-29)",
+ "expect": "pass",
+ "found": {
+  "detail": "mask.nii: header bytes: differ",
+  "n": 242,
+  "seed": "20261025",
+  "shrink_moves": [
+   "dropped quiet (-q)",
+   "dropped NN (-NN1)",
+   "dropped nbhrs (-nbhrs 12)",
+   "dropped peels (-peels 1)",
+   "dropped clfrac (-clfrac 0.1)",
+   "input: axis 2 21 -> 10 voxels",
+   "input: axis 1 16 -> 8 voxels",
+   "input: axis 2 10 -> 5 voxels",
+   "input: axis 1 8 -> 4 voxels",
+   "input: axis 2 5 -> 2 voxels",
+   "input: axis 1 4 -> 2 voxels",
+   "input: axis 0 2 -> 1 voxels",
+   "input: axis 1 2 -> 1 voxels",
+   "input (and its grid): unit spacing",
+   "input (and its grid): origin at 0",
+   "input (and its grid): qform and sform codes 1",
+   "input: content head -> constant"
+  ],
+  "signature": [
+   "mask.nii: header bytes"
+  ]
+ },
+ "id": "tiny-oblique-quaternion-residue",
+ "implementations": [
+  "original"
+ ],
+ "reason": "",
+ "recipe": {
+  "extra": {
+   "outputs": [
+    "mask.nii"
+   ]
+  },
+  "features": {
+   "NN": true,
+   "SI": false,
+   "apply_prefix": false,
+   "axis0": 1.2,
+   "axis1": 1.2,
+   "axis2": 0.75,
+   "bias0": -0.0075,
+   "bias1": -0.0025,
+   "bias2": -0.01,
+   "bias3": 0.0,
+   "centre0": -5.5,
+   "centre1": 0.0,
+   "centre2": 1.0,
+   "clfrac": true,
+   "clfrac value": "0.1",
+   "content": "head",
+   "depth": false,
+   "dilate": false,
+   "dtype": "float32",
+   "eclip": false,
+   "erode": false,
+   "nbhrs": true,
+   "nbhrs value": "12",
+   "ndim": 3,
+   "neighbourhood": "-NN1",
+   "nograd": false,
+   "noise": 6.0,
+   "orientation": "axes+oblique",
+   "origin0": 19.25,
+   "origin1": -27.25,
+   "origin2": -19.0,
+   "output": "mask.nii",
+   "peels": true,
+   "peels value": "1",
+   "qfac": 1,
+   "qform_code": 3,
+   "quiet": true,
+   "range": "plain",
+   "sform": "same",
+   "sform_code": 1,
+   "shape": "2x16x21",
+   "size": 15.0,
+   "spacing0": 1.0,
+   "spacing1": 4.0,
+   "spacing2": 4.0,
+   "suffix": ".nii.gz",
+   "tissues": "t2",
+   "units": "mm"
+  },
+  "groups": [
+   {
+    "args": [
+     "-prefix",
+     "mask.nii"
+    ],
+    "name": "prefix",
+    "optional": false
+   },
+   {
+    "args": [
+     "{in:input}"
+    ],
+    "name": "input",
+    "optional": false
+   }
+  ],
+  "inputs": {
+   "input": {
+    "content": {
+     "seed": 677220847,
+     "type": "constant"
+    },
+    "dtype": "float32",
+    "geometry": {
+     "origin": [
+      0.0,
+      0.0,
+      0.0
+     ],
+     "qfac": 1,
+     "qform_code": 1,
+     "quaternion": [
+      21,
+      25,
+      0,
+      6
+     ],
+     "sform": "same",
+     "sform_code": 1,
+     "spacing": [
+      1.0,
+      1.0,
+      1.0
+     ],
+     "units": "mm"
+    },
+    "scaling": null,
+    "shape": [
+     1,
+     1,
+     2
+    ],
+    "suffix": ".nii.gz",
+    "values": {
+     "offset": 0.0,
+     "scale": 1.0
+    }
+   }
+  },
+  "n": 242,
+  "options": [
+   "-NN1",
+   "-clfrac",
+   "-nbhrs",
+   "-peels",
+   "-q",
+   "3D input"
+  ],
+  "seed": "20261025",
+  "tool": "afni-automask"
+ },
+ "rule": null,
+ "status": "fixed",
+ "suite": "afni-automask",
+ "tier": "smoke",
+ "tool": "afni-automask"
+}

@@ -33,6 +33,7 @@ fn input(path: &Path) {
         pixdim: [3.0, 3.0, 3.5],
         mm_per_unit: 1.0,
         out_code: 1,
+        qform_mm: None,
     };
     let timing = OutputTiming {
         tr: 2.0,

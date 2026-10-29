@@ -173,6 +173,9 @@ def case(
 
     prefix = _ants.prefix_of(recipe, case_prefix)
     payload = {"recipe": recipe, "prefix": prefix, "impl": impl}
+    # A permanent case's expectation (2026-10-29): an expected divergence and its reason.
+    if kw.get("expect") == "divergence":
+        payload.update(expect="divergence", reason=kw.get("reason", ""))
     return Case(
         cid or _ants.case_id(recipe), "difftest", description or _ants.describe(recipe), payload
     )
@@ -233,6 +236,10 @@ def _run_original(case, checks) -> None:
         mri_hmc.manifest.cache_clear()
         try:
             mri_hmc.run_case(Case(name, "difftest", "", name), checks)
+            if p.get("expect") == "divergence" and not all(c.passed for c in checks.checks):
+                from larmorx_validation.parity.harness import EXPECTED, Outcome
+
+                raise Outcome(EXPECTED, p.get("reason", ""))
         finally:
             if saved is None:
                 os.environ.pop("LARMORX_MCFLIRT_ORACLE", None)
@@ -311,7 +318,7 @@ ORIGINAL = Tool(
     weight=1.0,
     unavailable=_unavailable_mcflirt,
     family="fsl",
-    payload_fields=(),
+    payload_fields=("expect", "reason"),
 )
 REPLICA = Tool(
     name="fsl-mcflirt",

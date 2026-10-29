@@ -1,0 +1,185 @@
+{
+ "defect": null,
+ "description": "Header slice code 2 with -apply_prefix: AFNI-03 named in both modes, AFNI-08 in reproduce, in the replica's words (item 6, 2026-10-29)",
+ "expect": "pass",
+ "found": {
+  "detail": "D13 fix pass: no defect named: no values; masked.nii header changed; D13 notices in both modes: fix: []; reproduce: ['AFNI-08']",
+  "n": 184,
+  "seed": "20261025",
+  "shrink_moves": [
+   "dropped depth (-depth depth.nii)",
+   "dropped erode (-erode 2)",
+   "dropped eclip (-eclip)",
+   "input: axis 0 28 -> 14 voxels",
+   "input: axis 1 19 -> 9 voxels",
+   "input: axis 2 17 -> 8 voxels",
+   "input: axis 0 14 -> 7 voxels",
+   "input: axis 1 9 -> 4 voxels",
+   "input: axis 2 8 -> 4 voxels",
+   "input: axis 0 7 -> 3 voxels",
+   "input: axis 1 4 -> 2 voxels",
+   "input: axis 2 4 -> 2 voxels",
+   "input: axis 0 3 -> 1 voxels",
+   "input: axis 1 2 -> 1 voxels",
+   "input: 4 -> 2 volumes",
+   "input (and its grid): plumb orientation",
+   "input (and its grid): unit spacing",
+   "input (and its grid): origin at 0",
+   "input: float32 storage",
+   "input: plain value range",
+   "input: content crop -> constant"
+  ],
+  "signature": [
+   "DN fix pass",
+   "DN notices in both modes"
+  ]
+ },
+ "id": "slice-code-2-masked-notices",
+ "implementations": [
+  "original"
+ ],
+ "reason": "",
+ "recipe": {
+  "extra": {
+   "outputs": [
+    "mask.nii.gz",
+    "masked.nii",
+    "depth.nii"
+   ]
+  },
+  "features": {
+   "NN": false,
+   "SI": false,
+   "apply_prefix": true,
+   "clfrac": false,
+   "content": "crop",
+   "corner0": 26,
+   "corner1": 41,
+   "corner2": 26,
+   "crop source": "templateflow/tpl-MNI152NLin2009cAsym/tpl-MNI152NLin2009cAsym_res-02_desc-fMRIPrep_boldref.nii.gz",
+   "crop stride": 1,
+   "depth": true,
+   "dilate": false,
+   "dtype": "int16",
+   "eclip": true,
+   "erode": true,
+   "erode value": "2",
+   "nbhrs": false,
+   "ndim": 4,
+   "nograd": false,
+   "orientation": "axes",
+   "origin0": -11.0,
+   "origin1": 37.25,
+   "origin2": 58.5,
+   "output": "mask.nii.gz",
+   "peels": false,
+   "qfac": 1,
+   "qform_code": 1,
+   "quiet": false,
+   "range": "huge",
+   "sform": "same",
+   "sform_code": 1,
+   "shape": "28x19x17x4",
+   "slice_code": 2,
+   "spacing0": 1.0,
+   "spacing1": 3.0,
+   "spacing2": 2.5,
+   "suffix": ".nii.gz",
+   "tr": 3.0,
+   "tunits": "sec",
+   "units": "mm"
+  },
+  "groups": [
+   {
+    "args": [
+     "-apply_prefix",
+     "masked.nii"
+    ],
+    "name": "apply_prefix",
+    "optional": true
+   },
+   {
+    "args": [
+     "-prefix",
+     "mask.nii.gz"
+    ],
+    "name": "prefix",
+    "optional": false
+   },
+   {
+    "args": [
+     "{in:input}"
+    ],
+    "name": "input",
+    "optional": false
+   }
+  ],
+  "inputs": {
+   "input": {
+    "content": {
+     "seed": 158439667,
+     "type": "constant"
+    },
+    "dtype": "float32",
+    "geometry": {
+     "origin": [
+      0.0,
+      0.0,
+      0.0
+     ],
+     "qfac": 1,
+     "qform_code": 1,
+     "quaternion": [
+      1,
+      0,
+      0,
+      0
+     ],
+     "sform": "same",
+     "sform_code": 1,
+     "spacing": [
+      1.0,
+      1.0,
+      1.0
+     ],
+     "units": "mm"
+    },
+    "scaling": null,
+    "shape": [
+     1,
+     1,
+     2,
+     2
+    ],
+    "suffix": ".nii.gz",
+    "timing": {
+     "slice_code": 2,
+     "slice_duration": 0.1765,
+     "slice_end": 1,
+     "slice_start": 0,
+     "tr": 3.0,
+     "tunits": "sec"
+    },
+    "values": {
+     "offset": 0.0,
+     "scale": 1.0
+    }
+   }
+  },
+  "n": 184,
+  "options": [
+   "-apply_prefix",
+   "-depth",
+   "-eclip",
+   "-erode",
+   "4D input"
+  ],
+  "seed": "20261025",
+  "tool": "afni-automask"
+ },
+ "rule": null,
+ "status": "fixed",
+ "suite": "afni-automask",
+ "tier": "smoke",
+ "tool": "afni-automask"
+}

@@ -386,17 +386,22 @@ pub fn read_as(
         ),
         other => {
             let stored = other.data_type();
-            let (s, i) = if slope != 0.0 {
-                (slope, inter)
-            } else {
-                (1.0, 0.0)
+            // Without a slope (0 or not finite) the values are only converted, so a float64
+            // -0 stays -0; with one, `slope·x + inter` makes it +0 (observed by the clean-room
+            // implementer: `validation/investigations/cleanroom-fixes/signed_zero.py`).
+            let convert = |v: Vec<f32>| -> Vec<f32> {
+                if slope != 0.0 {
+                    scaled_f32(v, |x| x, slope, inter)
+                } else {
+                    v.into_iter().map(clean).collect()
+                }
             };
             let v = match other {
-                DynArray::I8(a) => scaled_f32(into_vec(a), f32::from, s, i),
-                DynArray::U16(a) => scaled_f32(into_vec(a), f32::from, s, i),
-                DynArray::I32(a) => scaled_f32(into_vec(a), |x| x as f32, s, i),
-                DynArray::U32(a) => scaled_f32(into_vec(a), |x| x as f32, s, i),
-                DynArray::F64(a) => scaled_f32(into_vec(a), |x| x as f32, s, i),
+                DynArray::I8(a) => convert(into_vec(a).into_iter().map(f32::from).collect()),
+                DynArray::U16(a) => convert(into_vec(a).into_iter().map(f32::from).collect()),
+                DynArray::I32(a) => convert(into_vec(a).into_iter().map(|x| x as f32).collect()),
+                DynArray::U32(a) => convert(into_vec(a).into_iter().map(|x| x as f32).collect()),
+                DynArray::F64(a) => convert(into_vec(a).into_iter().map(|x| x as f32).collect()),
                 _ => {
                     return Err(unsupported(format!(
                         "{stored} data are not supported by 3dTshift"

@@ -1,0 +1,164 @@
+{
+ "defect": null,
+ "description": "An oblique series: the '[from L]' letters of the closest plumb orientation, never '?' (item 5, 2026-10-29)",
+ "expect": "pass",
+ "found": {
+  "detail": "messages: AFNI's, byte for byte: stderr line 16: AFNI '++ first   0 x-planes are zero [from L]', larmorx '++ first   0 x-planes are zero [from ?]'",
+  "n": 41,
+  "seed": "20261025",
+  "shrink_moves": [
+   "dropped dilate (-dilate 2)",
+   "dropped eclip (-eclip)",
+   "dropped peels (-peels 0)",
+   "dropped nograd (-nograd)",
+   "input: axis 0 30 -> 15 voxels",
+   "input: axis 0 15 -> 7 voxels",
+   "input: axis 0 7 -> 3 voxels",
+   "input: axis 2 7 -> 3 voxels",
+   "input: axis 0 3 -> 1 voxels",
+   "input: axis 1 2 -> 1 voxels",
+   "input (and its grid): unit spacing",
+   "input (and its grid): origin at 0",
+   "input (and its grid): qform and sform codes 1",
+   "input: content head -> constant"
+  ],
+  "signature": [
+   "messages: AFNI's, byte for byte"
+  ]
+ },
+ "id": "oblique-orientation-letters",
+ "implementations": [
+  "original"
+ ],
+ "reason": "",
+ "recipe": {
+  "extra": {
+   "outputs": [
+    "mask.nii.gz"
+   ]
+  },
+  "features": {
+   "NN": false,
+   "SI": false,
+   "apply_prefix": false,
+   "axis0": 0.85,
+   "axis1": 0.8,
+   "axis2": 1.05,
+   "bias0": -0.0075,
+   "bias1": -0.0025,
+   "bias2": -0.0075,
+   "bias3": 0.0,
+   "centre0": -3.5,
+   "centre1": -2.5,
+   "centre2": 3.0,
+   "clfrac": false,
+   "content": "head",
+   "depth": false,
+   "dilate": true,
+   "dilate value": "2",
+   "dtype": "float32",
+   "eclip": true,
+   "erode": false,
+   "nbhrs": false,
+   "ndim": 3,
+   "nograd": true,
+   "noise": 0.0,
+   "orientation": "oblique",
+   "origin0": 46.0,
+   "origin1": -13.0,
+   "origin2": 12.0,
+   "output": "mask.nii.gz",
+   "peels": true,
+   "peels value": "0",
+   "qfac": 1,
+   "qform_code": 3,
+   "quiet": false,
+   "range": "plain",
+   "sform": "same",
+   "sform_code": 1,
+   "shape": "30x2x7",
+   "size": 15.5,
+   "spacing0": 3.0,
+   "spacing1": 0.8,
+   "spacing2": 4.0,
+   "suffix": ".nii",
+   "tissues": "t2",
+   "units": "mm"
+  },
+  "groups": [
+   {
+    "args": [
+     "-prefix",
+     "mask.nii.gz"
+    ],
+    "name": "prefix",
+    "optional": false
+   },
+   {
+    "args": [
+     "{in:input}"
+    ],
+    "name": "input",
+    "optional": false
+   }
+  ],
+  "inputs": {
+   "input": {
+    "content": {
+     "seed": 209233095,
+     "type": "constant"
+    },
+    "dtype": "float32",
+    "geometry": {
+     "origin": [
+      0.0,
+      0.0,
+      0.0
+     ],
+     "qfac": 1,
+     "qform_code": 1,
+     "quaternion": [
+      5,
+      3,
+      -1,
+      2
+     ],
+     "sform": "same",
+     "sform_code": 1,
+     "spacing": [
+      1.0,
+      1.0,
+      1.0
+     ],
+     "units": "mm"
+    },
+    "scaling": null,
+    "shape": [
+     1,
+     1,
+     3
+    ],
+    "suffix": ".nii",
+    "values": {
+     "offset": 0.0,
+     "scale": 1.0
+    }
+   }
+  },
+  "n": 41,
+  "options": [
+   "-dilate",
+   "-eclip",
+   "-nograd",
+   "-peels",
+   "3D input"
+  ],
+  "seed": "20261025",
+  "tool": "afni-automask"
+ },
+ "rule": null,
+ "status": "fixed",
+ "suite": "afni-automask",
+ "tier": "smoke",
+ "tool": "afni-automask"
+}

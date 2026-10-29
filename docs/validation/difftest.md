@@ -42,7 +42,7 @@ A night writes `oracles/difftest/<date>/` (outside git, like every oracle output
 | `run.json` | the command, seed, budget, jobs, threads, larmorx commit, the tools run and those that could not run |
 | `results.jsonl` | one line per case as it ends: tool, case number, verdict per implementation, the options and input features it covered, seconds, its findings' files |
 | `findings/<tool>/<seed>-<n>-<implementation>.json` | each difference: the drawn recipe, the shrunk recipe, the moves that shrank it, the checks that failed (both), how to replay it |
-| `report.md`, `summary.json` | the morning report and its numbers (the site's exporter reads `summary.json`) |
+| `report.md`, `summary.json` | the morning report and its numbers (the site's exporter reads the newest night's `summary.json`: a folder named by its date alone; a part's short trial, `--out <date>-<topic>`, never replaces it) |
 | `heavy.jsonl`, `heavy-results.jsonl`, `heavy-prediction.json` | the cases over the memory limit, their results once `--heavy` ran them, their predicted memory and time |
 
 ## What a case is

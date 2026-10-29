@@ -52,8 +52,16 @@ at a time:
    it on the head, half of it by default; 4 to 10 times as fast at eight threads; bit for bit as
    before ([benchmark](benchmarks/ants-ai.md), [findings](findings/ants-ai.md), "Memory and speed
    (2026-10-28)").
-2. **The clean-room fixes** found behaviourally (the thread probe, the D13 corrections, 3dAutomask's
-   obliquity-message number), by an agent that has never read the source.
+2. **The clean-room fixes: done** (2026-10-29, `docs/parts/2026-10-29-cleanroom-fixes/`): 12 of
+   the 13 differences random testing and the data panel found in the clean-room originals of
+   3dTshift, 3dAutomask, 3dUnifize and the head-motion correction fixed or explained by black-box
+   runs (the quaternion's `1/det` in extended precision, the closest-orientation letters,
+   millisecond slice times, AFNI-07's default steps and qform as the replica's, a float64 −0 kept,
+   the notices of AFNI-03, -08, -43, -07 and -16 in the replica's words; the panel's obliquity
+   angles explained by AFNI-10; the head-motion differences explained on all 782 findings) with 13
+   permanent cases; one left open: `-cost normmi` aligns worse (below, follow-ups). The thread
+   probe needed nothing in the clean-room crates (`docs/findings/ants-cli.md`: no thread outside
+   the call's pool).
 3. **The version update** (user 2026-10-27, decision log; the upstream watch with it): AFNI to its
    newest release (26.3.05 today), FSL to its newest 6.0.7.x (6.0.7.23 today), SciPy, NumPy and
    OpenBLAS checked; each tool aligned with its newest original, with the per-part testing.
@@ -389,10 +397,18 @@ The items below keep their history.
   because the process that runs larmorx and compares also holds ANTs' output (about 41 GiB each);
   compare in blocks (memory-mapped) so the comparison adds little to larmorx's own peak. Until
   then that case runs again in a box of about 110 GiB when the machine is otherwise free.
-- **3dAutomask's clean-room original, the panel's cases** (found 2026-10-28): five fMRIPrep calls
-  of the panel runs (added after its record) fail on the obliquity message's number (AFNI
-  `20.646870`, the original `20.646889`; the masks agree). To the clean-room fixes part, as a
-  behaviour-only description.
+- **3dAutomask's clean-room original, the panel's cases: done** (2026-10-29): AFNI reports the
+  obliquity of its own header extension's 7-digit matrix (AFNI-10); AFNI on the inputs without the
+  extension prints the original's angle, and the parity suite now explains such messages by
+  AFNI-10 (22 of 22 fMRIPrep cases pass).
+- **The head-motion correction's `-cost normmi`** (found 2026-10-29,
+  `docs/findings/mri-hmc-original.md`): on 91 random phantoms larmorx's corrected series is less
+  aligned than mcflirt's (median temporal-SD ratio 1.033; 26 above 1.10), while `mutualinfo` is
+  better (0.981). The spec describes the histogram costs in outline only (its open question 4):
+  the spec writer describes `normmi` exactly (histogram, fuzzy binning, entropy correction, the
+  normalised form), then a clean-room fix measured with
+  `validation/investigations/cleanroom-fixes/hmc_alignment.py`. Permanent case
+  `mri-hmc/normmi-aligns-worse` (open).
 - **The version update, what changed in the numerics** (the newest releases fetched 2026-10-28
   beside the old ones in the workspace's `tags/`; FSL 6.0.7.23 installed in `~/fsl-6.0.7.23`,
   `~/fsl` still 6.0.7.17; AFNI 26.3.05 built in `oracles/afni-26.3.05`): SciPy 1.15.2 → 1.18.1

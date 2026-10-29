@@ -233,6 +233,7 @@ to add (since 2026-10-25: "Random testing's gaps", below); – = nothing to do. 
 | SCI-02 | SciPy `map_coordinates` | undefined conversions answered as x86-64 does | a | none | clamps and warns by default; `reproduce` gives x86-64's answers (2026-10-12) | – |
 | SCI-03 | SciPy splines | `reflect`, `grid-mirror` do not interpolate on short axes (SciPy up to 1.17) | c | none | fixed in SciPy 1.18, whose initialisation larmorx follows in both modes since 2026-10-29 (corrected by default from 2026-10-11 until then) | – |
 | SCI-04 | SciPy on aarch64 | fused multiply-adds change last bits | d | ARM machines | never fuses | – |
+| SCI-05 | SciPy 1.15 `map_coordinates` | mode `nearest` without prefiltering, 3D float32: the output varies between runs on the same inputs (SciPy 1.15.3; not in SciPy 1.18.1) | b | none known (fMRIPrep's resampling uses other modes) | deterministic (larmorx follows SciPy 1.18.1, bit for bit); not reproduced | – |
 | NP-01 | numpy, OpenBLAS, Accelerate | 4×4 products and inverses depend on the CPU's kernel | d | every run | one order everywhere | – |
 | NP-02 | nibabel, numpy SVD | axis choice at exactly 45° follows the SVD's rounding | d | none | vnl's SVD | – |
 | NIB-01 | nibabel | compression decided by the file name | e | none | decided by content | – (decided 2026-10-23: larmorx's behaviour kept) |
@@ -3270,6 +3271,22 @@ fMRIPrep 25.2.6 (the oracle runs) or its source at `21a490fb`, niworkflows 1.15.
 - **fMRIPrep:** ARM machines.
 - **larmorx:** never contracts: SciPy's x86-64 bits everywhere.
 - **D13 / gap:** not D13.
+
+### SCI-05 `map_coordinates` varies between runs (SciPy 1.15.3) — (b)
+- **What:** `scipy.ndimage.map_coordinates` with `mode="nearest"`, `prefilter=False` and order 5
+  on the resample-series suite's 3D float32 input (`ndimage/nearest-order5`: the comparisons
+  `map_coordinates 3D float32 -> float32, prefilter=False` and `-> float64`) returns other values
+  in two runs on the same inputs in SciPy 1.15.3; SciPy 1.18.1 returns the same values every run.
+  Cause not looked for (a read of memory the call never wrote is the likely kind).
+- **Evidence:** measured (2026-10-29, at the version update's part 3 merge): the case run twice
+  in the shared environment (SciPy 1.15.3) recorded different digests for those two
+  comparisons, twice in `oracles/python-newest` (SciPy 1.18.1) the same 92 of 92; found because
+  the resample-series record's "originals' own step" detail differed between the agent's run and
+  the merge's re-run (no status changed).
+- **fMRIPrep:** none known (its resampling calls other modes).
+- **larmorx:** deterministic, bit for bit SciPy 1.18.1's; the step from SciPy 1.15.3 to 1.18.1 on
+  those comparisons is not reproducible (next-steps follow-up).
+- **D13 / gap:** class (b), never reproduced.
 
 ### NP-01 numpy's matrices depend on the CPU — (d)
 - **What:** numpy's 4×4 products and inverses run in BLAS and LAPACK kernels chosen at run time:

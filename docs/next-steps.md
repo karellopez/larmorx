@@ -455,6 +455,12 @@ The items below keep their history.
   obliquity of its own header extension's 7-digit matrix (AFNI-10); AFNI on the inputs without the
   extension prints the original's angle, and the parity suite now explains such messages by
   AFNI-10 (22 of 22 fMRIPrep cases pass).
+- **The resample-series step and SciPy 1.15.3's varying outputs (SCI-05)** (found 2026-10-29 at the
+  part 3 merge): SciPy 1.15.3's `map_coordinates` (mode `nearest`, `prefilter=False`, 3D float32)
+  varies between runs, so the record's "originals' own step" detail of `ndimage/nearest-order*`
+  flips between runs (no status changes). Make the step check mark such comparisons as varying
+  in the old release (or compare the old release against itself first), then re-make the
+  resample-series record; look for SCI-05's cause if it is cheap (permissive source).
 - **The shared environment's numpy and SciPy** (2026-10-29): keep the shared `.venv` at numpy
   2.3.5 / SciPy 1.15.3 until the final comparisons with fMRIPrep (`docs/parts/2026-10-29-version-numerics/handoff.md`
   §13: nothing else needs the move, it is the step's baseline, and antspyx and smriprep ask for

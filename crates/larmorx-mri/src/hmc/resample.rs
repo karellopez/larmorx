@@ -189,6 +189,44 @@ pub fn series_differ(
     })
 }
 
+/// `f` of each volume of `series` resampled with `interpolation` (as [`resample_series`] would
+/// give it), the volumes in parallel but none kept, summed in volume order: what a series that
+/// is not written would hold (FSL-59: the integer conversion of mcflirt 6.0.7.23's trilinear
+/// series where larmorx writes another one).
+#[allow(clippy::too_many_arguments)]
+pub fn fold_resampled<T: Send + Default + std::ops::Add<Output = T>>(
+    series: &[Volume],
+    matrices: &[Mat4],
+    init: Option<&Mat4>,
+    shape: [usize; 3],
+    voxel_size: [f32; 3],
+    interpolation: Interpolation,
+    n_threads: usize,
+    f: impl Fn(&Volume) -> T + Sync + Send,
+) -> Result<T, ThreadPoolError> {
+    parallel::with_threads(n_threads, || {
+        let parts: Vec<T> = series
+            .par_iter()
+            .zip(matrices)
+            .map(|(v, m)| {
+                let m = match init {
+                    Some(i) => rigid::mul(m, i),
+                    None => *m,
+                };
+                f(&resample(
+                    v,
+                    &m,
+                    shape,
+                    voxel_size,
+                    interpolation,
+                    v.background(),
+                ))
+            })
+            .collect();
+        parts.into_iter().fold(T::default(), |a, b| a + b)
+    })
+}
+
 /// The mean of the series resampled by `matrices` onto the grid of `reference` (trilinear):
 /// a float32 sum in volume order divided by `N` (§8).
 pub fn mean_volume(

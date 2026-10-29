@@ -33,7 +33,7 @@ use crate::hmc::image::{
 };
 use crate::hmc::pipeline::{self, HmcOptions, HmcOutput, ReferenceChoice};
 use crate::hmc::report::{self, mat_text, par_text, rms_text};
-use crate::hmc::resample::Interpolation;
+use crate::hmc::resample::{self, Interpolation};
 use crate::hmc::rigid::IDENTITY;
 use crate::hmc::volume::Volume;
 use crate::hmc::{CostFunction, stats};
@@ -689,7 +689,16 @@ fn execute(
         let _ = writeln!(out, "refnum = {r}\nOriginal_refvol = {}", o.refvol);
     }
     for n in write_outputs(
-        o, mode, &out_name, &ext, version, &series, &result, n_threads, err,
+        o,
+        mode,
+        &out_name,
+        &ext,
+        version,
+        &series,
+        &result,
+        options.init.as_ref(),
+        n_threads,
+        err,
     )? {
         print_notice(err, &n);
     }
@@ -727,6 +736,7 @@ fn write_outputs(
     version: larmorx_io::nifti::NiftiVersion,
     series: &Series,
     result: &HmcOutput,
+    init: Option<&crate::hmc::rigid::Mat4>,
     n_threads: usize,
     err: &mut dyn Write,
 ) -> Result<Vec<Notice>, String> {
@@ -847,6 +857,33 @@ fn write_outputs(
             ),
         };
         notices.push(Notice::new(&defects::FSL_08, mode, detail));
+    }
+    // FSL-59 corrected: the series written is the interpolation asked for, mcflirt 6.0.7.23's
+    // the trilinear one. FSL-09 (mcflirt's truncation to an integer type) is named as it
+    // applies to mcflirt's series, so in both modes alike, also where the series written (a
+    // nearest-neighbour one) holds only integers.
+    let fsl59 = est.notices.iter().any(|n| n.defect.id == "FSL-59");
+    let named09 = notices.iter().any(|n| n.defect.id == "FSL-09");
+    if mode.fix()
+        && fsl59
+        && !named09
+        && let (Some((lo, hi)), Some(first)) = (image::integer_range(data_type), corrected.first())
+    {
+        let c = resample::fold_resampled(
+            &series.volumes,
+            &est.matrices,
+            init,
+            first.shape,
+            first.voxel_size,
+            Interpolation::Trilinear,
+            n_threads,
+            |v| image::conversion_counts(&v.data, lo, hi),
+        )
+        .map_err(|e| e.to_string())?;
+        if c != image::Conversion::default() {
+            let path = format!("{stem}{ext}");
+            notices.push(image::fsl09_notice(Path::new(&path), c, data_type, mode));
+        }
     }
     Ok(notices)
 }

@@ -463,6 +463,16 @@ pub struct Conversion {
     pub out_of_range: usize,
 }
 
+impl std::ops::Add for Conversion {
+    type Output = Conversion;
+    fn add(self, o: Conversion) -> Conversion {
+        Conversion {
+            rounded: self.rounded + o.rounded,
+            out_of_range: self.out_of_range + o.out_of_range,
+        }
+    }
+}
+
 /// Converts float32 values to an integer output type (§9.4, FSL-09). mcflirt truncates toward
 /// zero and does not clamp: on x86-64 a value beyond the type's range wraps around (through a
 /// 32-bit integer), which [`UpstreamDefects::Reproduce`] reproduces. [`UpstreamDefects::Fix`]
@@ -479,16 +489,7 @@ pub fn convert_values<T>(
 where
     T: Copy + Send + Sync,
 {
-    let stats = values
-        .par_iter()
-        .with_min_len(1 << 16)
-        .map(|&v| {
-            let r = f64::from(v).round_ties_even();
-            let t = f64::from(v).trunc();
-            let out = !(lo..=hi).contains(&t) || v.is_nan();
-            (usize::from(r != t && !out), usize::from(out))
-        })
-        .reduce(|| (0, 0), |a, b| (a.0 + b.0, a.1 + b.1));
+    let stats = conversion_counts(values, lo, hi);
     let data = if defects.fix() {
         convert(values, |v| {
             if v.is_nan() {
@@ -500,13 +501,65 @@ where
     } else {
         convert(values, |v| from_i32(x86_i32(v)))
     };
-    (
-        data,
-        Conversion {
-            rounded: stats.0,
-            out_of_range: stats.1,
-        },
-    )
+    (data, stats)
+}
+
+/// What rounding and truncation disagree on when `values` are converted to an integer type of
+/// range `lo..=hi` ([`convert_values`]).
+pub fn conversion_counts(values: &[f32], lo: f64, hi: f64) -> Conversion {
+    let (rounded, out_of_range) = values
+        .par_iter()
+        .with_min_len(1 << 16)
+        .map(|&v| {
+            let r = f64::from(v).round_ties_even();
+            let t = f64::from(v).trunc();
+            let out = !(lo..=hi).contains(&t) || v.is_nan();
+            (usize::from(r != t && !out), usize::from(out))
+        })
+        .reduce(|| (0, 0), |a, b| (a.0 + b.0, a.1 + b.1));
+    Conversion {
+        rounded,
+        out_of_range,
+    }
+}
+
+/// The range of an integer output type (`None` for a float type).
+pub fn integer_range(data_type: DataType) -> Option<(f64, f64)> {
+    match data_type {
+        DataType::U8 => Some((0.0, 255.0)),
+        DataType::I8 => Some((-128.0, 127.0)),
+        DataType::I16 => Some((-32768.0, 32767.0)),
+        DataType::I32 => Some((-2_147_483_648.0, 2_147_483_647.0)),
+        _ => None,
+    }
+}
+
+/// The FSL-09 notice for the integer output `path` of `data_type`, whose conversion of the series
+/// mcflirt writes rounds and truncates differently as `conversion` says.
+pub fn fsl09_notice(
+    path: &Path,
+    conversion: Conversion,
+    data_type: DataType,
+    defects: UpstreamDefects,
+) -> Notice {
+    let what = format!(
+        "{} of its values convert differently when rounded than when truncated, {} lie outside \
+         the {data_type} range",
+        conversion.rounded, conversion.out_of_range
+    );
+    let detail = match defects {
+        UpstreamDefects::Fix => format!(
+            "{}: integer output is rounded to the nearest and clamped; mcflirt truncates and \
+             wraps around ({what})",
+            path.display()
+        ),
+        UpstreamDefects::Reproduce => format!(
+            "{}: integer output is truncated and wraps around beyond its range, as mcflirt does \
+             on x86-64 ({what})",
+            path.display()
+        ),
+    };
+    Notice::new(&defects::FSL_09, defects, detail)
 }
 
 /// The `xyzt_units` of an output written like an input with `units`: mcflirt always writes
@@ -754,24 +807,10 @@ pub fn write_like_files(
     )
     .map_err(|e| ImageError::Invalid(e.to_string()))??;
     if conversion != Conversion::default() {
-        let what = format!(
-            "{} of its values convert differently when rounded than when truncated, {} lie \
-             outside the {data_type} range",
-            conversion.rounded, conversion.out_of_range
+        defects::push_once(
+            &mut notices,
+            fsl09_notice(path, conversion, data_type, defects),
         );
-        let detail = match defects {
-            UpstreamDefects::Fix => format!(
-                "{}: integer output is rounded to the nearest and clamped; mcflirt truncates and \
-                 wraps around ({what})",
-                path.display()
-            ),
-            UpstreamDefects::Reproduce => format!(
-                "{}: integer output is truncated and wraps around beyond its range, as mcflirt \
-                 does on x86-64 ({what})",
-                path.display()
-            ),
-        };
-        defects::push_once(&mut notices, Notice::new(&defects::FSL_09, defects, detail));
     }
     let compression = Compression::of_name(&path.to_string_lossy());
     if files.standard_names() && matches!(compression, Compression::None | Compression::Gzip) {

@@ -34,3 +34,10 @@ author wrote while reading it (`scripts/run_mcflirt_oracle.py`,
 Transcendental functions come from `larmorx_core::math` (correctly rounded CORE-MATH ports);
 `atan2` comes from the `libm` crate, which has no port in `larmorx_core::math` yet. The parity
 record is [docs/validation/mri-hmc.md](../../docs/validation/mri-hmc.md).
+
+**2026-10-29 (the clean-room fixes): no change to this crate.** The 782 random-testing
+differences against mcflirt were measured by a clean-room implementer who had never opened
+FSL's source, the replica crates or the restricted findings, from black-box runs of mcflirt
+(`~/fsl/bin/mcflirt`, FSL 6.0.7.17) and `larmorx mri hmc` on the findings' recipes
+(`validation/investigations/cleanroom-fixes/hmc_alignment.py`): explained for every cost but
+`normmi`, which is left open ([docs/findings/mri-hmc-original.md](../../docs/findings/mri-hmc-original.md)).

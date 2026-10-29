@@ -119,6 +119,16 @@ warning ("already aligned in time").
 The slices `slice_start..=slice_end` then get 0, d, d+d, … (float32 additions of the
 duration `d`) in the order of the code; slices outside the range get 0:
 
+**(observed** by the clean-room implementer, 2026-10-29: the duration in seconds `d` is the
+header's value divided by 1000 or 10⁶ in double and **kept as a double**; each time is the
+float32 running sum `t ← (float)(t + d)`. In seconds this is the float32 sum of the float32
+duration; in milliseconds it differs from adding `d` rounded to float32 from about the fourth
+slice on: 90.8 ms gives 0.36320004 s for the fifth slice, not 0.36320001, and ten slices of
+80 ms a `toffset` (their mean, §3.3) of 0.36000001, not 0.35999995. Every slice time of 16
+headers in seconds, milliseconds and microseconds, read back exactly with `-slice k` (the
+output's `toffset`), matches; dividing by 1000 and multiplying by its reciprocal could not be
+told apart (`validation/investigations/cleanroom-fixes/tshift_times.py`).**)**
+
 | `slice_code` | Order |
 |---|---|
 | 1 (`SEQ_INC`) | start, start+1, … |
@@ -308,6 +318,12 @@ functions differ in the last bit of about 1 % of the values.
 Non-finite float values become 0, and so do scaled values that overflow. Non-finite
 `scl_slope`/`scl_inter` are ignored.
 
+**(observed** by the clean-room implementer, 2026-10-29: for int8, uint16, int32, uint32 and
+float64 data without a finite, non-zero slope (0, NaN) the values are only converted, so a
+float64 −0 stays −0 (3dAutomask's `-apply_prefix` keeps it inside the mask); with one, also
+slope 1 and intercept 0, `slope·x + inter` makes it +0;
+`validation/investigations/cleanroom-fixes/signed_zero.py`.**)**
+
 **(observed)** `slope·x + inter` is computed by converting the stored value to float32
 first, then multiplying and adding in double (with the float32 slope and intercept), and
 rounding to float32. (Pure float32 arithmetic differs in 0.5–35 % of the values; this
@@ -476,7 +492,17 @@ For the matrix written (`C` or `M`):
   from `1 + r33 − r11 − r22`, with `(b, c, d)` negated when the `a` so found is negative.
   (AFNI forms the quotients, and the sum of 1 and `r11 + r22 + r33`, in extended precision,
   §7.1; this changes the last bit of a double at most, which the float32 fields practically
-  never show.) For `C` the components are exact
+  never show.) **(observed** by the clean-room implementer, 2026-10-29: in each Newton step's
+  inverse `X⁻¹` (by cofactors), the reciprocal of the determinant is formed in extended
+  precision too and stored as a double. This decides the rounding residue of a component
+  that is 0 in exact arithmetic, which the float32 field shows (3dAutomask on a 1 × 1 × 2
+  image rotated by the quaternion (21, 25, 0, 6)/√1102 writes `quatern_c` 4.3875466e-17), and
+  the sign of a 180° rotation's quaternion, whose `a` is such a residue (AFNI writes
+  (0.28571427, −0.85714287, −0.42857143) where the other sign of the residue gives the negated
+  triple). On 1,200 random matrices AFNI's quaternions, read as doubles from NIfTI-2 outputs
+  (`AFNI_NIFTI_WRITE_TYPE=2`), are this computation's bit for bit, and 100 differ with a
+  double reciprocal (`validation/investigations/cleanroom-fixes/geometry_probe.py quat`).**)**
+  For `C` the components are exact
   (0, ±½, ±√½ or ±1), and the signs of their zeros follow IEEE arithmetic on `C`'s signed
   zeros: a diagonal `C` with positive entries gives (0, −0, 0);
 - `qoffset_x`, `qoffset_y`, `qoffset_z` are `M`'s offsets (the same as the sform's),
@@ -506,13 +532,36 @@ gets a linear part in millimetres and an origin in metres: the two forms disagre
   matrix either way (`C` and `M` then differ at most in the signs of their zeros).
 - AFNI-07 corrected: for metres and micrometres every entry of `M`, linear part and offsets,
   is multiplied by 1000 or 0.001 in double and rounded to float32 first, and everything above
-  follows from the converted `M` (the steps as in 2.).
+  follows from the converted `M` (the steps as in 2.). **(observed** by the clean-room
+  implementer, 2026-10-29, from the replica program's default, which both implementations
+  share: the steps are step 2's in both modes, the column lengths of the file's matrix then
+  multiplied by 1000 or 0.001 (a 1 m column is a 1000 mm step, where the length of the
+  converted column can be 999.99994); and a **qform's** converted matrix is step 1's computed
+  with the voxel sizes and the offsets multiplied by 1000 or 0.001 in double, rounded to
+  float32 once (100 qform-only headers in metres and micrometres bit for bit; converting the
+  float32 matrix again differs in the last bit of most;
+  `validation/investigations/cleanroom-fixes/geometry_probe.py qform-units`).**)**
 
 **The notices** (in both modes):
 - AFNI-16 when the grid is plumb by the test and has a non-zero entry off its rows `r_j` (no
   entry being NaN or infinite);
 - AFNI-07 when the units are metres or micrometres and `M`'s offsets are not all 0 or it has
   a non-zero entry off its rows `r_j`; otherwise the conversion changes nothing.
+
+**(observed** by the clean-room implementer, 2026-10-29: the replica program's words, which
+both implementations print, AFNI-07 before AFNI-16. AFNI-07, for an oblique matrix by the
+test on the file's matrix: `the input's units are <metres|micrometres>: its oblique matrix
+and origin are converted to millimetres with its voxel sizes; AFNI converts only the voxel
+sizes and writes the matrix (sform) in <unit>` (`reproduce`: `... its voxel sizes are
+converted to millimetres and its oblique matrix (sform) and origin are not, as AFNI does`);
+otherwise `... its origin is converted to millimetres with its voxel sizes; AFNI converts
+only the voxel sizes` (`reproduce`: `... its voxel sizes are converted to millimetres and its
+origin is not, as AFNI does`). AFNI-16: `the input's matrix is <a> degrees from plumb: kept,
+in the sform and the qform; AFNI writes the plumb matrix of its axes instead (entries up to
+<d> apart)` (`reproduce`: `... written as the plumb matrix of its axes, as AFNI does (entries
+up to <d> from the input's)`), `<a>` the largest angle between a column and its axis and
+`<d>` the largest difference between the plumb matrix's entries and the matrix it replaces
+(in `reproduce`, the file's), both `%g`.)**
 
 ### 6.2 The slice fields of a copy (AFNI-08)
 
@@ -939,6 +988,16 @@ prints after reading the header, unless `AFNI_NO_OBLIQUE_WARNING` is yes:
     ++ Oblique dataset:<input> is 36.869896 degrees from plumb.
 
 (Two lines end with a blank; the angle with 6 decimals.)
+
+**(observed** by the clean-room implementer, 2026-10-29: the matrix is the one AFNI reads, so
+on an input that carries AFNI's own header extension (AFNI-10) it is the extension's
+7-digit matrix: on the data panel's 3dAutomask inputs (3dUnifize's outputs) the angle differs
+from the NIfTI header's in its last digits (ds000228: 20.646870 against 20.646889), and AFNI
+run on the same file without its extension prints 20.646889. With both forms present and
+different, the angle is the sform's (12 headers whose qform is rotated otherwise), computed as
+above. An original that ignores the extension prints the NIfTI header's angle; the parity
+suites explain such messages by AFNI-10 when AFNI on the input without its extension prints
+the original's.)**
 
 **`AFNI_NIFTI_WRITE_TYPE`** (observed). Its value is read as a number with an optional
 multiplier (`k`, `m`, `g`: 1024, 1024², 1024³) and cut to an integer: 2 (also `2.9`) writes

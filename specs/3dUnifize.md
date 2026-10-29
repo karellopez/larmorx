@@ -283,6 +283,12 @@ it is unset); it changes no result.
 | AFNI-49 | the help's `-clfrac` default (0.1; the code uses 0.2) | – (text) | – |
 | AFNI-02, -07, -11, -12, -16, -18, -20, -22, -23, -26 | dataset reading and writing | as for 3dAutomask | AFNI's |
 
+**(observed** by the clean-room implementer, 2026-10-29: `-EPI`'s output keeps the input's
+header slice timing, so header slice code 2 names AFNI-03 in both modes and AFNI-08 where the
+kept times are all within 3 ms of 0, in the words of `specs/3dAutomask.md` §9 (the replica
+program's); tiny oblique inputs' headers follow `specs/3dTshift.md` §6.1's quaternion, with its
+extended-precision `1/det`.)**
+
 **The rule-B refusals in detail** (added 2026-10-24 from the replicas' observable behaviour and black-box
 runs of AFNI 25.2.09; the clean-room original refuses the same way):
 

@@ -83,3 +83,28 @@ One exposure, recorded for the audit: after both programs were complete (2026-10
 search over `docs/licensing.md` printed a few rows of its table of
 AFNI routine names (names only, no code), a table the implementer had not opened before. No
 line of this crate was written or changed from it; the implementer did not open the table.
+
+## The clean-room fixes (2026-10-29)
+
+Made by one implementer who had never opened AFNI's or FSL's source, the replica crates
+(`crates-gpl/`, `crates-nc/`), the restricted findings, the register's restricted sections,
+`docs/parts/`, the licensing routine table, `validation/difftest/triage.toml` or the replica
+authors' permanent cases, from these inputs only:
+
+| Input | What it gave |
+|---|---|
+| [`specs/3dTshift.md`](../../specs/3dTshift.md) §3.2, §6, §6.1, §7.1; [`specs/3dAutomask.md`](../../specs/3dAutomask.md); [`specs/3dUnifize.md`](../../specs/3dUnifize.md) | the behaviour each fix completes; what black-box runs added is in them, marked observed by the clean-room implementer, 2026-10-29 |
+| The random-testing findings of 2026-10-25 (`oracles/difftest/2026-10-25/findings/afni-*`: their recipes and failed checks) and the data panel's parity cases | the differences to fix, run again with `difftest --replay` and side by side with [`validation/investigations/cleanroom-fixes/probe.py`](../../validation/investigations/cleanroom-fixes/probe.py) |
+| Black-box runs of AFNI 25.2.09's `3dAutomask` and `3dTshift` (`oracles/afni-25.2.09/bin/`) on headers built for the purpose | the quaternion's `1/det` in extended precision (its doubles read from NIfTI-2 outputs, 1,200 matrices); the orientation letters (1,604 matrices); the obliquity angle's matrix (AFNI-10's extension); the slice times of headers in ms and µs (every time read back with `-slice k`); a float64 −0 (`geometry_probe.py`, `tshift_times.py`, `signed_zero.py`) |
+| Black-box runs of the replica program (`larmorx-gpl afni 3dTshift`, `3dAutomask`, `3dUnifize`, built in `crates-gpl/target/release/`; its source not opened) | the shared default of AFNI-07 (the steps, and a qform's matrix with millimetre voxel sizes: 100 qform-only headers, `geometry_probe.py qform-units`), AFNI-43's default for a negative `-peels`, and the words and order of the notices of AFNI-03, -07, -08, -16 and -43 |
+| The NIfTI reference library's public-domain `nifti1_io.c`, as bundled in ITK 5.4.5 (`Modules/ThirdParty/NIFTI/src/nifti/niftilib/nifti1_io.c`: `nifti_mat44_to_orientation`, and the inverse, determinant, norms and polar decomposition the spec names for the quaternion) | the closest-orientation method, carried out in double as AFNI's letters showed (`automask::program::orientation`), and the steps of the inverse where the extended-precision reciprocal goes |
+| The defect register's summary table and the public defect pages (`docs/api/upstream-defects.md`) | which corrections apply and their switches |
+
+| larmorx | Behaviour reproduced | Source |
+|---|---|---|
+| `geometry::inverse` (`1/det` in x87 extended precision) | AFNI 25.2.09's quaternion residues and signs | spec §6.1 (observed), black-box runs |
+| `geometry::qform_matrix_scaled`, `output_geometry`'s steps and notices | AFNI-07's default as the replica's; the notices' words | spec §6.1 (observed), the replica program |
+| `automask::program::orientation` | AFNI 25.2.09 3dAutomask's orientation letters and `-SI`'s axis | spec 3dAutomask §6.2 (observed), nifti_clib's method |
+| `timing::header_timing` (a float32 sum of a double step) | AFNI's header slice times in ms and µs | spec 3dTshift §3.2 (observed) |
+| `dataset::read_as` (no arithmetic without a slope) | AFNI's conversion of int8, uint16, int32, uint32 and float64 data | spec 3dTshift §6 (observed) |
+| `automask::copy_timing`, AFNI-43's notices | the notices of AFNI-03, -08 and -43 as the replica's | spec 3dAutomask §9 (observed), the replica program |

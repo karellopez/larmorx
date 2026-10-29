@@ -233,6 +233,23 @@ dilation; ` + Eroded   %d voxels` only for an erosion that cleared something.**)
   the trailing ones, `c` the first and second letter of the axis's orientation code (`R` and `L`
   for an axis running right to left, `L`/`R`, `P`/`A`, `A`/`P`, `I`/`S`, `S`/`I`; `??` for an
   axis AFNI could not orient).
+  **(observed** by the clean-room implementer, 2026-10-29: the orientation of each axis is the
+  closest plumb orientation of the matrix AFNI reads, by the method of the NIfTI reference
+  library (nifti_clib, public domain: `nifti_mat44_to_orientation`) carried out in double: the
+  columns made unit vectors; the second made orthogonal to the first, and the third to the
+  first and then the second, each only when their dot product exceeds 1e-4 in magnitude, then
+  made a unit vector again (a zero third column becomes the cross product of the first two);
+  then, of the signed permutation matrices `P` whose determinant has the sign of that matrix
+  `Q`'s, the first with the largest trace of `P·Q`, trying the columns for rows 1, 2 and 3 in
+  increasing order and, for each, the signs −1 before +1 of rows 1, 2 and 3; a voxel axis is
+  along the world axis its row of `P` picks, toward the end its sign gives. On 1,604 random
+  matrices (rotations from rational quaternions with zero components, scaled and reflected;
+  random and nearly plumb sheared matrices; four 45° rotations) every letter 3dAutomask
+  printed is this method's; in single precision 6 differ (ties), and each column's largest
+  entry gives 396 others, among them `??` where two columns share a row (an oblique series
+  printed `[from ?]` before 2026-10-29). `-SI` uses this orientation: on a one-slice oblique
+  constant image it clears the planes of the axis this method finds superior
+  (`validation/investigations/cleanroom-fixes/geometry_probe.py orient`).)**
 - `-SI h` (millimetres): on the axis whose orientation's first letter is `S` (the first planes
   are superior), every plane from `a + trunc(h / |step| + 0.5)` to the last is cleared; on an
   axis whose second letter is `S`, every plane from 0 to `L - trunc(h / |step| + 0.5)`, `L` the
@@ -380,6 +397,30 @@ runs of AFNI 25.2.09; the clean-room original refuses the same way):
 
 Every correction is named on standard error as `*+ WARNING: upstream defect <ID> (<tool>)
 corrected: ...` (the notice line of `docs/api/upstream-defects.md`).
+
+**(observed** by the clean-room implementer, 2026-10-29, from the replica program, whose
+default and words both implementations share:
+- **AFNI-43** concerns a value read as 0 (`-peels 0`, `-peels 0.7`): a negative value peels
+  once in both modes, as in AFNI, without a notice. The notice is named where the mask differs
+  from the other mode's, or, with the same mask, where the clustering messages count other
+  voxels (the random-testing case `afni-automask:20261025:118`: 405 against 406 voxels): by
+  default `-peels 0: the mask is not peeled, as the help says; AFNI peels it once`, or `-peels
+  0: the mask is not peeled, as the help says (AFNI peels it once): the same mask, but the
+  clustering messages count other voxels`; with `reproduce` `-peels 0: the mask is peeled
+  once, as AFNI does (its help says 0 turns the peeling off)`, or `-peels 0: the mask is
+  peeled once, as AFNI does: the same mask as without peeling, but the clustering messages
+  count other voxels`.
+- **AFNI-03 and AFNI-08** in an output that keeps the input's time axis (`-apply_prefix`'s
+  masked input; 3dUnifize `-EPI`) and its header slice timing (`specs/3dTshift.md` §6.2):
+  header slice code 2 is named as AFNI-03 in both modes, by default `header slice code 2
+  (sequential decreasing): the output keeps slices <end>..<start>'s times (slice code <c>,
+  slice_end <e>); AFNI reads every slice time as 0 and writes slice code 0, slice_end 0` (`<c>`,
+  `<e>` the fields written), with `reproduce` `header slice code 2 (sequential decreasing) read
+  as every slice time 0, as AFNI does`; AFNI-08 where the kept times are all within 3 ms of 0
+  (with `reproduce`, every code-2 input; by default only where the corrected times are), by
+  default `the <nz> slice times kept in the output are all within 0.003 of 0: no slice timing,
+  slice_end <nz − 1>; AFNI writes slice_end 0`, with `reproduce` `the slice times kept in the
+  output are all within 0.003 of 0: slice_end 0, as AFNI writes it`. AFNI-03 comes first.)**
 
 ## 10. Validation
 

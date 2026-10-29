@@ -79,7 +79,14 @@ result is named as an `lx.UpstreamDefectWarning` (on the command line `*+ WARNIN
 defect <ID> ...`):
 
 - **AFNI-43**: `-peels 0` peels once in AFNI; its help says 0 turns the peeling off, which the
-  default does (named when the mask changes).
+  default does (named when the mask changes, or, with the same mask, when the clustering
+  messages count other voxels). A negative value peels once in both modes, as in AFNI
+  (2026-10-29, the replica's default).
+- **AFNI-03 and AFNI-08** in the masked input (`-apply_prefix`), which keeps the input's time
+  axis and slice timing: header slice code 2 keeps its corrected slice fields by default and
+  is named in both modes; AFNI-08 is named where the kept times are all within 3 ms of 0 (in
+  `reproduce`, every code-2 input), as in 3dTshift (since 2026-10-29 in the original, in the
+  replica's words).
 - **AFNI-41** (decided 2026-10-23, rule B): `-nbhrs` outside 6..26 (a value that is not a
   number reads as 0) is silently 17 in AFNI, or what a `-NN1/2/3` says. The default refuses it
   before any input is read, whether or not a `-NN` option follows (the last `-nbhrs` decides):

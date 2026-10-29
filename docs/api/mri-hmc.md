@@ -277,6 +277,13 @@ other) and wander differently elsewhere. Woods' cost registers no BOLD run for e
 program. The other histogram costs (`corratio`, `mutualinfo`, `normmi`) and `leastsquares`
 agree within the thresholds on ds000005, although the spec describes them only in outline.
 
+**Random phantoms** (2026-10-29, [findings](../findings/mri-hmc-original.md)): on the 782
+random phantoms where random testing found the estimates beyond the thresholds (small images
+moved by 5° to 30°: a cost with several minima), the corrected series is as well aligned as
+mcflirt's for every cost but one (temporal standard deviation, median ratio 1.000). With
+`cost="normmi"` it is the less aligned one (median ratio 1.033 on 91 phantoms; `mutualinfo`
+0.981): an open item until the spec describes that cost exactly.
+
 **Better algorithms (decision D11).** None is the default: the uncentred correlation, the
 single sweep and the tolerance quantisation decide mcflirt's numbers, and changing them moves
 the results beyond mcflirt's band. `fudge=True` (mcflirt's `-fudge`) starts every volume's

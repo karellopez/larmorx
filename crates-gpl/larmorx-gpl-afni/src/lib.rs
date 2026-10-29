@@ -42,6 +42,7 @@ pub mod mask;
 pub mod message;
 pub mod oned;
 pub mod shift;
+pub mod sincosf;
 pub mod tpattern;
 pub mod tshift;
 pub mod unifize;

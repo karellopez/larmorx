@@ -1,0 +1,12 @@
+[package]
+name = "cbrtf-measure"
+description = "Measures whether glibc's cbrtf last bit can change 3dUnifize -EPI's radius, ball or messages (development tool)"
+version = "0.0.0"
+edition.workspace = true
+license.workspace = true
+publish = false
+
+[dependencies]
+larmorx-core.workspace = true
+larmorx-gpl-afni.workspace = true
+rayon.workspace = true

@@ -8,8 +8,9 @@ members = [
     "larmorx-gpl-afni",
     "larmorx-gpl-afni/tools/csfft-verify",
     "larmorx-gpl-afni/tools/floatmath-verify",
-    "larmorx-gpl-afni/tools/sincosf-verify",
     "larmorx-gpl-cli",
+    "tools/cbrtf-measure",
+    "tools/sincosf-verify",
 ]
 
 [workspace.package]

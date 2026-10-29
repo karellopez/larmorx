@@ -24,3 +24,5 @@ and behind the replicas' records against 6.0.7.23. FSL is never on the `PATH`: e
 | `cog_sign_probe.py` | `fslstats -C` of both versions on small images: 6.0.7.23 prints `-0.000000` for a centre on voxel 0 of an image stored neurologically (case 141's `dc: stack empty`) | `python -P cog_sign_probe.py <dir>` |
 | `replay_bet_findings.sh` | the trial's BET findings replayed against both versions, each in a memory box | `replay_bet_findings.sh <log dir> <finding.json>...` |
 | `make_permanent_cases.sh` | the six permanent cases of the triage (`validation/difftest/cases/fsl-bet/`) | `make_permanent_cases.sh <findings/fsl-bet> <141's drawn finding>` |
+| `export_site.sh` | the BET and head-motion pages' evidence and the summary exported into a site checkout (FSL 6.0.7.23's figures-cache entries computed on the way: `evidence/fsl_step.py`), then `tables --site` | `export_site.sh <site> <log dir>` |
+| `site_shots.sh` | before/after screenshots of the two pages (desktop and phone, light and dark) and the number check (`LX_EVIDENCE.check()`), the Validation page after | `site_shots.sh <site before> <site after> <out dir>` |

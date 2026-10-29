@@ -1,13 +1,13 @@
 # SPDX-License-Identifier: Apache-2.0
-"""``3dTshift``: slice-timing correction (clean-room re-implementation of AFNI 25.2.09, or its
+"""``3dTshift``: slice-timing correction (clean-room re-implementation of AFNI 26.3.05, or its
 bit-exact replica from ``larmorx-gpl``, run as a separate program).
 
 AFNI's deterministic defects are corrected by default (D13, ``docs/api/upstream-defects.md``),
 by either implementation: a negative ``scl_slope`` (AFNI-01), float32 data with a slope and an
-intercept (AFNI-02), header slice code 2 (AFNI-03, command line only), ``-no_detrend``'s voxel
-pairs (AFNI-05), metre or micron units (AFNI-07), nearly plumb grids (AFNI-16) and the
+intercept (AFNI-02), metre or micron units (AFNI-07), nearly plumb grids (AFNI-16) and the
 intercept ``AFNI_NIFTI_SCALE=NO`` drops (AFNI-23). ``upstream_defects="reproduce"`` gives
-AFNI's output.
+AFNI's output. Header slice code 2 (AFNI-03) and ``-no_detrend``'s voxel pairs (AFNI-05) were
+AFNI 25.2.09's; AFNI 26.3.05 behaves as larmorx corrected them, so both modes give that result.
 
 AFNI's environment variables are settings of the call (``afni_settings``), never read from the
 process environment (CLAUDE.md rule 6); the command line reads them from it, as AFNI does."""
@@ -223,7 +223,7 @@ def tshift(
     """Align every slice of a 4D image to one time origin (AFNI's ``3dTshift``).
 
     Each voxel's time series is detrended, shifted so that its slice refers to ``tzero``,
-    clipped to its own range and given its trend back, as AFNI 25.2.09 does, with AFNI's
+    clipped to its own range and given its trend back, as AFNI 26.3.05 does, with AFNI's
     defects corrected unless ``upstream_defects="reproduce"``.
 
     Parameters
@@ -254,10 +254,9 @@ def tshift(
         its input range), ``none`` (``-rlt``) or ``intercept`` (``-rlt+``, the fitted
         trend's value at the first time point used).
     detrend
-        ``False`` is ``-no_detrend``: the mean instead of the trend is removed and restored.
-        Needs ``restore="trend"``. AFNI 25.2.09 does that only to the first voxel of each
-        pair (in index order within a slice) and shifts the second as raw values (AFNI-05;
-        ``upstream_defects="reproduce"``).
+        ``False`` is ``-no_detrend``: the mean instead of the trend is removed and restored,
+        for every voxel, in both modes, as AFNI 26.3.05 does. Needs ``restore="trend"``.
+        (AFNI 25.2.09 did that only to the first voxel of each pair: AFNI-05.)
     n_threads
         Worker threads (0 = all). The result does not depend on it.
     implementation
@@ -267,7 +266,7 @@ def tshift(
         temporary NIfTI files (``docs/licensing.md``). The two differ only in the last bits of
         some values (``docs/validation/afni-tshift.md``).
     upstream_defects
-        ``"fix"`` (default) corrects AFNI's defects (AFNI-01, -02, -05, -07, -16, and with
+        ``"fix"`` (default) corrects AFNI's defects (AFNI-01, -02, -07, -16, and with
         ``afni_settings`` AFNI-23); ``"reproduce"`` gives AFNI's output. A
         :class:`~larmorx.UpstreamDefectWarning` names each defect that changed the result (or,
         reproduced, would have been corrected). The replica receives the choice as

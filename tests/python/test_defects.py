@@ -248,10 +248,10 @@ def test_no_detrend(tmp_path):
         detrend=False,
         upstream_defects=REPRODUCE,
     )
-    # The first voxel of each pair is treated the same; the second differs.
-    np.testing.assert_array_equal(fixed.data[0, 0], afni.data[0, 0])
-    assert not np.array_equal(fixed.data[1, 0], afni.data[1, 0])
-    assert wf == [("AFNI-05", FIX)] and wr == [("AFNI-05", REPRODUCE)]
+    # AFNI 26.3.05 de-means every voxel, as larmorx corrected AFNI 25.2.09's pairs (AFNI-05):
+    # both modes give the same result and name nothing.
+    np.testing.assert_array_equal(fixed.data, afni.data)
+    assert wf == [] and wr == []
 
 
 def test_metre_units(tmp_path):
@@ -281,10 +281,12 @@ def test_header_slice_code_2(tmp_path):
     for env in ("fix", "reproduce"):
         out = tmp_path / f"{env}.nii"
         code, err = _cli("afni", "3dTshift", "-linear", "-prefix", out, src, env=env)
-        assert code == 0 and "upstream defect AFNI-03" in err
+        # AFNI 26.3.05 reads code 2 as NIfTI defines it, as larmorx corrected AFNI 25.2.09's
+        # zeros (AFNI-03): both modes shift by the header's times and name nothing.
+        assert code == 0 and "AFNI-03" not in err
         outs[env] = np.asanyarray(nib.load(out).dataobj)
-    np.testing.assert_array_equal(outs["reproduce"], np.asanyarray(nib.load(src).dataobj))
-    assert not np.array_equal(outs["fix"], outs["reproduce"])
+    np.testing.assert_array_equal(outs["fix"], outs["reproduce"])
+    assert not np.array_equal(outs["reproduce"], np.asanyarray(nib.load(src).dataobj))
 
 
 # --- Head-motion correction (FSL-01, -02, -03, -05 to -10, -13, -14) -----------------------------

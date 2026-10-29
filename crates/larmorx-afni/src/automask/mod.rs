@@ -138,9 +138,9 @@ pub fn intercept_correction(
 /// The time fields of an output that keeps the input's time axis (the masked input, `-EPI`'s
 /// output): the input's TR and `toffset`, and the slice fields of its header's slice timing.
 ///
-/// Header slice code 2 changes the written fields in both modes (AFNI-03: AFNI reads every
-/// slice time as 0, so it writes slice code 0 and, by AFNI-08, `slice_end` 0), so AFNI-03 is
-/// named whenever such an output is written, and AFNI-08 whenever the kept times are all
+/// Header slice code 2's times (`slice_end` down to `slice_start`) are kept in both modes, as
+/// AFNI 26.3.05 keeps them (AFNI 25.2.09 read every slice time as 0: AFNI-03, no longer a
+/// defect of the reference, never named). AFNI-08 is named whenever the kept times are all
 /// within 3 ms of 0; the notices' words are the replica program's for the same call
 /// (`specs/3dAutomask.md` §9, observed by the clean-room implementer).
 pub fn copy_timing(
@@ -150,20 +150,6 @@ pub fn copy_timing(
 ) -> OutputTiming {
     let slices = image.slice_timing.as_ref().map(|h| {
         let (fields, zero) = timing::copy_slice_fields(&h.times, mode);
-        if h.code == 2 {
-            let detail = match mode {
-                UpstreamDefects::Fix => format!(
-                    "header slice code 2 (sequential decreasing): the output keeps slices \
-                     {}..{}'s times (slice code {}, slice_end {}); AFNI reads every slice time \
-                     as 0 and writes slice code 0, slice_end 0",
-                    h.end, h.start, fields.code, fields.end
-                ),
-                UpstreamDefects::Reproduce => "header slice code 2 (sequential decreasing) read \
-                     as every slice time 0, as AFNI does"
-                    .to_owned(),
-            };
-            notices.push(Notice::new(&defects::AFNI_03, mode, detail));
-        }
         if zero {
             let detail = match mode {
                 UpstreamDefects::Fix => format!(

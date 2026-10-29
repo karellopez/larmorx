@@ -1,6 +1,6 @@
 {
  "defect": null,
- "description": "Header slice code 2 with -apply_prefix: AFNI-03 named in both modes, AFNI-08 in reproduce, in the replica's words (item 6, 2026-10-29)",
+ "description": "Header slice code 2 with -apply_prefix, AFNI 26.3.05: the masked output keeps the header's code-2 times (slice_end down to slice_start) in both modes and AFNI-03 is never named; AFNI-08 only where those times are all within 3 ms of 0 (found against AFNI 25.2.09 on 2026-10-25, item 6 of the 2026-10-29 fixes; re-described for AFNI 26.3.05 on 2026-10-29)",
  "expect": "pass",
  "found": {
   "detail": "D13 fix pass: no defect named: no values; masked.nii header changed; D13 notices in both modes: fix: []; reproduce: ['AFNI-08']",

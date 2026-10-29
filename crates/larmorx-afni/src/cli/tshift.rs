@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: Apache-2.0
-//! `3dTshift` with its original arguments (the behaviour of AFNI 25.2.09,
+//! `3dTshift` with its original arguments (the behaviour of AFNI 26.3.05,
 //! `specs/3dTshift.md` §3, §6 and §7), AFNI's global options and environment variables
 //! included (§7.1).
 //!
@@ -545,10 +545,6 @@ fn execute(
         None => match image.slice_timing.clone() {
             Some(h) => {
                 log.progress(&format!("++ using tpattern = {} {unit}", list(&h.times)));
-                // AFNI-03 is named whenever the header's code-2 timing is used (§6.4).
-                if let Some(n) = timing::seq_dec_notice(&h, mode) {
-                    log.notice(&n);
-                }
                 if h.times.iter().any(|&t| t < 0.0 || t > tr) {
                     log.warning(&format!(
                         "some value in tpattern is outside range 0..TR={}",

@@ -2887,8 +2887,8 @@ def _(ctx: Context) -> dict[str, Any]:
 
 @case("cli.afni.3dTshift.reproduce", covers=("cli:afni 3dTshift",))
 def _(ctx: Context) -> dict[str, Any]:
-    """AFNI's defects reproduced: -no_detrend's voxel pairs (AFNI-05) and a negative
-    scl_slope (AFNI-01)."""
+    """AFNI's defects reproduced: a negative scl_slope (AFNI-01), with -no_detrend (every voxel
+    de-meaned in both modes since AFNI 26.3.05; AFNI 25.2.09's voxel pairs were AFNI-05)."""
     out = ctx.out("out.nii")
     cli("afni", "3dTshift", "-tpattern", "alt-z", "-cubic", "-no_detrend", "-prefix", out, ctx.file("series_negative.nii"), upstream_defects=REPRODUCE)  # fmt: skip
     return {"out": Nifti(out)}
@@ -2896,7 +2896,8 @@ def _(ctx: Context) -> dict[str, Any]:
 
 @case("py.afni.tshift.reproduce", covers=("lx.afni.tshift",))
 def _(ctx: Context) -> dict[str, Any]:
-    """``py.afni.tshift.options``' uint8 series without detrending, AFNI-05 reproduced."""
+    """``py.afni.tshift.options``' uint8 series without detrending, reproduced: every voxel
+    de-meaned, as AFNI 26.3.05 does (AFNI 25.2.09's voxel pairs were AFNI-05)."""
     u8 = series().with_data(np.asfortranarray((_series_values() // 8 - 80).astype(np.uint8)))
     with warnings.catch_warnings():
         warnings.simplefilter("ignore")

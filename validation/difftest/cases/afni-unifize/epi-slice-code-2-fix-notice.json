@@ -1,6 +1,6 @@
 {
  "defect": null,
- "description": "-EPI on a series with header slice code 2: AFNI-03 named by the default (item 10, 2026-10-29)",
+ "description": "-EPI on a series with header slice code 2, AFNI 26.3.05: the output keeps the header's code-2 times in both modes and AFNI-03 is never named (found against AFNI 25.2.09 on 2026-10-25, item 10 of the 2026-10-29 fixes; re-described for AFNI 26.3.05 on 2026-10-29)",
  "expect": "pass",
  "found": {
   "detail": "D13 fix pass: no defect named: no values; uni.nii header changed; D13 notices in both modes: fix: []; reproduce: ['AFNI-08']",

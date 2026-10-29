@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: LicenseRef-FSL
 // Copyright 2026 Karel Lopez Vilaret.
-//! Bit-exact replicas of FSL's BET (FSL 6.0.7.17: fsl-bet2 2111.8): the `bet` script, `bet2`
+//! Bit-exact replicas of FSL's BET (FSL 6.0.7.23: fsl-bet2 2111.9; first translated from FSL 6.0.7.17's 2111.8): the `bet` script, `bet2`
 //! and `betsurf`, translated from FSL's source under the FSL Licence's terms (non-commercial;
 //! the licence and FSL's original source travel with it: `crates-nc/LICENSE`,
 //! `crates-nc/fsl-source/`). FSL's libraries (newimage, NewNifti, meshclass, utils, avwutils)

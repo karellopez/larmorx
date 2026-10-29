@@ -1,8 +1,9 @@
 // SPDX-License-Identifier: LicenseRef-FSL
-// Translated to Rust from FSL 6.0.7.17 (fsl-newimage 2203.12, fsl-miscmaths 2203.2,
-// fsl-newnifti 4.1.0, fsl-znzlib 2111.0, fsl-meshclass 2111.0, fsl-utils 2203.5,
-// fsl-avwutils 2209.3), from Armadillo 10.5.1 as fsl-armawrap 0.6.0 bundles it, from fslpy
-// 3.21.1's file-name rules, and from the C library routines FSL's binaries call (glibc 2.35:
+// Translated to Rust from FSL 6.0.7.23 (fsl-newimage 2601.0, fsl-miscmaths 2412.6,
+// fsl-newnifti 5.0.0, fsl-znzlib 2511.3, fsl-meshclass 2111.0, fsl-utils 2412.6,
+// fsl-avwutils 2209.6; first translated from FSL 6.0.7.17), from Armadillo 10.5.1 as
+// fsl-armawrap 0.6.0 bundles it (FSL 6.0.7.23's 0.7.0 bundles 14.2.1, whose LAPACK path for
+// 4 x 4 inverses is not followed yet), from fslpy 3.27.0's file-name rules, and from the C library routines FSL's binaries call (glibc 2.35:
 // fdlibm's `atan2f`, `atanf`, `tanh`, `expm1`; `pow`, `exp`, `sinf`, `cosf`, `logf`); see
 // PROVENANCE.md for the files and functions. FSL is Copyright (C) 1999-2018 University of Oxford.
 // Rust translation Copyright 2026 Karel Lopez Vilaret; modified from the originals. Distributed
@@ -59,4 +60,4 @@ pub mod volume;
 pub mod x87;
 
 /// The version of the FSL release these translations follow.
-pub const FSL_VERSION: &str = "6.0.7.17";
+pub const FSL_VERSION: &str = "6.0.7.23";

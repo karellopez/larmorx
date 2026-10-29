@@ -28,8 +28,8 @@ relate, is in [docs/licensing.md](../docs/licensing.md):
 | Crate | What |
 |---|---|
 | `larmorx-nc-core` | the FSL libraries the replicas share, each translated once: NIfTI I/O as FSL does it (NewNifti, znzlib, `FSLOUTPUTTYPE`), `volume<T>` (newimage, every element type it is instantiated with), interpolation (trilinear, sinc, splines), smoothing, FLIRT's cost functions (`costfns`), the optimiser (`optimise`), the transform algebra and `.mat` files (miscmaths), triangle meshes (meshclass: `mesh`), utils' option parser (`options`), what FSL's scripts run of avwutils and fslpy (`avwutils`), Armadillo's matrix rules as armawrap evaluates them (`arma`), x87 extended precision where FSL's NIfTI code uses `long double` (`x87`), SSE's NaN rules (`sse`), and the C and C++ libraries as FSL's Linux build calls them (glibc 2.35's `sinf`, `cosf`, `sincosf`, `logf`, `atan2f`, `tanh`, `pow`, `exp`: `glibc_float`, `fdlibm`, `glibc_double`; libstdc++'s formatted input, `std::sort`, `std::nth_element`: `istream`, `stdsort`). Its API: `larmorx-nc-core/PROVENANCE.md` |
-| `larmorx-nc-mcflirt` | the `mcflirt` replica (head-motion correction): every option, message, exit status and output file of mcflirt 2111.0 (FSL 6.0.7.17). Provenance: `larmorx-nc-mcflirt/PROVENANCE.md` |
-| `larmorx-nc-bet` | the BET replicas (brain extraction): `bet` (its variations `-R`, `-F`, `-Z`), `bet2` and `betsurf` of fsl-bet2 2111.8 (FSL 6.0.7.17), every option, message, exit status and output file; `-S`, `-B`, `-A`, `-A2` wait for FLIRT and FAST. Provenance: `larmorx-nc-bet/PROVENANCE.md` |
+| `larmorx-nc-mcflirt` | the `mcflirt` replica (head-motion correction): every option, message, exit status and output file of mcflirt 2111.0 (FSL 6.0.7.23; first made for 6.0.7.17). Provenance: `larmorx-nc-mcflirt/PROVENANCE.md` |
+| `larmorx-nc-bet` | the BET replicas (brain extraction): `bet` (its variations `-R`, `-F`, `-Z`), `bet2` and `betsurf` of fsl-bet2 2111.9 (FSL 6.0.7.23; first made for 2111.8, FSL 6.0.7.17), every option, message, exit status and output file; `-S`, `-B`, `-A`, `-A2` wait for FLIRT and FAST. Provenance: `larmorx-nc-bet/PROVENANCE.md` |
 | `larmorx-nc-cli` | the `larmorx-nc` command line: `larmorx-nc fsl mcflirt|bet|bet2|betsurf <the original's arguments>` |
 | `larmorx-nc-core/tools/glibc-float-verify` | compares the glibc float functions (`sinf`, `cosf`, `sincosf`, `logf`, `atanf`; `atan2f` on seeded random pairs) with the platform's C library on all 2^32 inputs, and the C library with correctly rounded maths at mcflirt's arguments (Linux x86-64) |
 | `larmorx-nc-core/tools/libm-verify` | compares glibc's `pow`, `exp` and `tanh` and the x87 `long double` operations of FSL's NIfTI layer with this machine's C library and x87 unit, on BET's arguments and random operands (Linux x86-64) |
@@ -63,7 +63,8 @@ golden checksums, on Linux x86_64 only, from a committed tree whose replica pari
 LARMORX_GOLDEN_RECORD=1 cargo test --locked -p larmorx-nc-cli --test golden
 ```
 
-Parity with FSL's mcflirt and BET (needs FSL 6.0.7.17 at `~/fsl`, never on the `PATH`, and
+Parity with FSL's mcflirt and BET (needs FSL 6.0.7.23 at `~/fsl-6.0.7.23`, or 6.0.7.17 at `~/fsl` with
+`--fsl-version 6.0.7.17`, never on the `PATH`, and
 the test data):
 
 ```bash

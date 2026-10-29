@@ -15,7 +15,6 @@ by its suite's comparator (``larmorx_validation.parity.fsl_mcflirt_replica``).
 
 from __future__ import annotations
 
-import functools
 import json
 import os
 import shutil

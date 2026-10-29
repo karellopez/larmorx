@@ -1343,8 +1343,10 @@ def _fsl_step(
                 if _descrip_only(p_dir / name, f_dir / name)
                 else c.detail
             )
+    # bash's report of a crashed program names its process ID: masked
     msgs = tuple(
-        fsl_text(r.out + r.err).replace(str(d), "<dir>") for r, d in ((prev, p_dir), (fsl, f_dir))
+        re.sub(r"(line \d+: +)\d+ ", r"\1<pid> ", fsl_text(r.out + r.err).replace(str(d), "<dir>"))
+        for r, d in ((prev, p_dir), (fsl, f_dir))
     )
     changed, detail = fsl_versions.step_detail(
         (prev.code, fsl.code), msgs, (pa, na), differences, fsl_versions.reasons(args, env)

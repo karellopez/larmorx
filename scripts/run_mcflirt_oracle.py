@@ -80,6 +80,8 @@ def use(version: str) -> None:
     found = (FSL / "etc" / "fslversion").read_text().split(":")[0].strip()
     if found != version:
         raise SystemExit(f"{FSL} is FSL {found}, not {version}")
+
+
 SYN = "synthetic/hmc/"
 
 

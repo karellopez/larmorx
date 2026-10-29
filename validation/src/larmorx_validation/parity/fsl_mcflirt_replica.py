@@ -284,6 +284,14 @@ def _image_values(path: Path) -> np.ndarray | None:
     import nibabel as nib
 
     try:
+        if path.name.endswith((".hdr.zst", ".hdr.bz2")):
+            # a compressed pair: both files decompressed beside each other, then read
+            img = path.with_name(path.name.replace(".hdr", ".img"))
+            with tempfile.TemporaryDirectory(prefix="lx-nc-pair-") as t:
+                for src, ext in ((path, ".hdr"), (img, ".img")):
+                    with _open_stream(src) as f:
+                        (Path(t) / f"x{ext}").write_bytes(f.read())
+                return np.asanyarray(nib.load(Path(t) / "x.hdr").dataobj).copy()
         if path.name.endswith((".zst", ".bz2")):
             with _open_stream(path) as f:
                 raw = f.read()
@@ -565,7 +573,7 @@ def fsl_step(
         (_masked(prev.stdout + prev.stderr), _masked(new.stdout + new.stderr)),
         (sorted(pa), sorted(na)),
         differences,
-        fsl_versions.reasons(args, env),
+        fsl_versions.reasons(args, env, cwd=new_dir),
     )
     checks.add(
         Check(

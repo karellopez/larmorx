@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: LicenseRef-FSL
-// Translated to Rust from FSL 6.0.7.17: fsl-mcflirt 2111.0 (mcflirt.cc, Globaloptions.{h,cc},
+// Translated to Rust from FSL 6.0.7.23 (first from 6.0.7.17; the same source): fsl-mcflirt 2111.0 (mcflirt.cc, Globaloptions.{h,cc},
 // Log.{h,cc}); see PROVENANCE.md. Copyright (C) 1999-2001 University of Oxford (Peter
 // Bannister). Rust translation Copyright 2026 Karel Lopez Vilaret; modified from the originals.
 // Distributed under the FSL Licence (LICENSE): non-commercial use only, these conditions passed

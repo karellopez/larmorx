@@ -21,10 +21,11 @@ University Innovation (fsl@innovation.ox.ac.uk, Reference Project 9564, FSL).
 Translated works
 ================
 
-FSL 6.0.7.17 (FMRIB Software Library), The University of Oxford - the FSL Licence (LICENSE)
+FSL 6.0.7.23 (FMRIB Software Library), The University of Oxford - the FSL Licence (LICENSE)
   Translated: the mcflirt program (fsl-mcflirt 2111.0); bet, bet2 and betsurf (fsl-bet2
-  2111.8); and the parts of fsl-newimage 2203.12, fsl-miscmaths 2203.2, fsl-newnifti 4.1.0,
-  fsl-znzlib 2111.0, fsl-meshclass 2111.0, fsl-utils 2203.5 and fsl-avwutils 2209.3 they use
+  2111.9); and the parts of fsl-newimage 2601.0, fsl-miscmaths 2412.6, fsl-newnifti 5.0.0,
+  fsl-znzlib 2511.3, fsl-meshclass 2111.0, fsl-utils 2412.6 and fsl-avwutils 2209.6 they use
+  (first translated from FSL 6.0.7.17's packages)
   (crates larmorx-nc-mcflirt, larmorx-nc-bet and larmorx-nc-core).
   BET: "BETv1 Steve Smith; BETv2 Mickael Pechaud, Mark Jenkinson, Steve Smith; FMRIB Image
   Analysis Group; Copyright (C) 1999-2003 University of Oxford". bet2's head-CT conversion is,
@@ -45,7 +46,7 @@ Armadillo 10.5.1, as bundled by fsl-armawrap 0.6.0 - Apache License, Version 2.0
   Copyright 2016-2020 University of Oxford, licensed under the Apache License, Version 2.0.
   The licence text is LICENSES/Apache-2.0.txt.
 
-fslpy 3.21.1 (the file-name rules of imtest, remove_ext and imglob, which FSL's bet script
+fslpy 3.27.0 (the file-name rules of imtest, remove_ext and imglob, which FSL's bet script
 runs) - Apache License, Version 2.0
   Copyright 2016-2024 University of Oxford, Oxford, UK (Paul McCarthy).
   Translated in larmorx-nc-core/src/avwutils.rs, modified from the originals. The licence text

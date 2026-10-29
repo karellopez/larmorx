@@ -238,6 +238,8 @@ def cmd_parity(args: argparse.Namespace) -> int:
             command += f" --implementation {args.implementation}"
         if args.afni_version:
             command += f" --afni-version {args.afni_version}"
+        if getattr(args, "fsl_version", None):
+            command += f" --fsl-version {args.fsl_version}"
         out = Path(args.out)
         out.mkdir(parents=True, exist_ok=True)
         (out / f"{suite.name}.md").write_text(

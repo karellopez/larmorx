@@ -221,13 +221,15 @@ def step_label() -> str:
 STEP_CHECK = "FSL's own step: " + f"{PREVIOUS} → {NEWEST}"
 
 
-def reasons(args: list[str], env: dict[str, str] | None = None) -> list[str]:
-    """The known changes (:data:`CHANGES`) a call may meet, from its arguments and
-    environment."""
+def reasons(
+    args: list[str], env: dict[str, str] | None = None, cwd: Path | None = None
+) -> list[str]:
+    """The known changes (:data:`CHANGES`) a call may meet, from its arguments, environment and
+    (with ``cwd``) the files it names: a zstd or bzip2 file, whatever its name."""
     out = []
     if "-sinc_final" in args or "-nn_final" in args:
         out.append("FSL-59")
-    if "--binaryMask" in args:
+    if any(a.startswith("--binaryMask") for a in args):
         out.append("binary-mask")
     otype = (env or {}).get("FSLOUTPUTTYPE")
     if otype is not None and not otype.endswith(("NIFTI", "NIFTI_PAIR", "NIFTI2", "_GZ")):
@@ -236,6 +238,14 @@ def reasons(args: list[str], env: dict[str, str] | None = None) -> list[str]:
         out.append("output-types")
     if any(a.endswith((".zst", ".bz2")) for a in args):
         out.append("compressed-input")
+    for a in args:
+        p = Path(a) if Path(a).is_absolute() or cwd is None else cwd / a
+        try:
+            magic = p.read_bytes()[:4] if p.is_file() else b""
+        except OSError:
+            magic = b""
+        if magic == b"\x28\xb5\x2f\xfd" or magic[:3] == b"BZh":
+            out.append("compressed-input")
     if any(re.search(r"\.(img|hdr)[^/]*/", a) for a in args):
         out.append("FSL-60")
     return sorted(set(out))
@@ -255,10 +265,13 @@ ARMA_ONLY = "numbers within 1e-12 or NaN signs only (Armadillo 14.2.1's LAPACK a
 #: A difference that only FSL's build string makes: an image header whose ``descrip`` alone
 #: changed (newimage writes its build string there).
 BUILD_STRING_ONLY = "descrip only (FSL's build string)"
-#: Changes that are explained by what they are, whatever the call.
+#: Message lines that are explained by what they are, whatever the call: a line holding the
+#: text, on either side, belongs to the change named.
 _MESSAGE_REASONS = (
     ("Part of FSL (ID:", "usage-id"),
     ("Legal values are:", "output-types"),
+    ("--binaryMask", "binary-mask"),
+    ("median within-brain intensity", "FSL-41"),
 )
 
 
@@ -285,14 +298,19 @@ def step_detail(
         k = min(len(xs), len(ys)) if k is None else k
         x = xs[k] if k < len(xs) else "(nothing)"
         y = ys[k] if k < len(ys) else "(nothing)"
-        own = [r for pattern, r in _MESSAGE_REASONS if pattern in x or pattern in y]
-        # the lines after the first difference are explained too only if they all are
-        rest = [
-            (a, b)
-            for a, b in zip(xs[k + 1 :], ys[k + 1 :], strict=False)
-            if a != b and not any(p in a or p in b for p, _ in _MESSAGE_REASONS)
-        ]
-        reasons_here = own if own and not rest and len(xs) == len(ys) else []
+        # explained when the messages are the same once the lines of known changes are set
+        # aside (a line added or changed by one of them, on either side)
+        known = [p for p, _ in _MESSAGE_REASONS]
+
+        def plain(lines: list[str]) -> list[str]:
+            return [ln for ln in lines if not any(p in ln for p in known)]
+
+        met = sorted(
+            {r for p, r in _MESSAGE_REASONS if any(p in ln for ln in xs + ys)}
+            & {r for p, r in _MESSAGE_REASONS if any(p in ln for ln in set(xs) ^ set(ys))}
+        )
+        # FSL-41: 6.0.7.17's bet2 crashed before its verbose lines, 6.0.7.23's prints them
+        reasons_here = met if met and (plain(xs) == plain(ys) or "FSL-41" in met) else []
         changes.append(
             (f"messages, line {k + 1}: {x[:160]!r} → {y[:160]!r}", reasons_here or list(why))
         )

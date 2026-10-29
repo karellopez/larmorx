@@ -20,7 +20,7 @@ A worker enters its leaf before it runs anything, so every process it starts is 
 Whether a process of a leaf was stopped is read from the leaf's ``memory.events`` (``oom_kill``,
 counted whichever limit, the leaf's or the box's, was reached); which one, from the exits this
 module records (:func:`watch_exits`): a killed child is the original program (or a larmorx
-program run as a separate process, the GPL and FSL replicas); a killed worker is larmorx running
+program run as a separate process, the FSL replicas); a killed worker is larmorx running
 in it.
 """
 

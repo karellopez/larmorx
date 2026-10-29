@@ -7,11 +7,10 @@ in-process through its Python console entry point, with the implementation force
 (``larmorx.cli.run(..., implementation="original")``). The outputs are read with nibabel, a
 reader independent of both, and compared value by value and field by field.
 
-``suite("replica")`` runs the same cases against the GPL-3.0-or-later replica
-(``larmorx-gpl afni 3dTshift``, ``crates-gpl/``) instead, the way users reach it: through
-larmorx's own dispatch (``implementation="replica"``), which runs the replica's program as a
-separate process. This package is Apache-2.0 and never loads the replica. The program under
-test is ``LARMORX_GPL_BIN``, else the ``crates-gpl`` build, else ``larmorx-gpl`` on the PATH.
+``suite("replica")`` runs the same cases against the bit-exact replica
+(``crates/larmorx-afni-replica``, part of larmorx since 2026-10-29; until then the GPL program
+``larmorx-gpl``) instead, the way users reach it: through larmorx's own dispatch
+(``implementation="replica"``), in-process as well.
 
 Both implementations are compared with AFNI in D13's ``reproduce`` mode; a fix pass then runs
 larmorx's default on the same arguments and reports what the corrections change. In the
@@ -43,8 +42,8 @@ import io
 import json
 import os
 import re
-import shutil
 import subprocess
+import sys
 import tempfile
 import warnings
 from collections.abc import Iterator
@@ -1345,26 +1344,6 @@ def _run_larmorx(
     return code, err.strip()
 
 
-@contextlib.contextmanager
-def _replica_program(implementation: str):
-    """For the replica, larmorx's dispatch finds the program under test through
-    ``LARMORX_GPL_BIN`` (:func:`replica_binary`)."""
-    if implementation != "replica":
-        yield
-        return
-    previous = os.environ.get("LARMORX_GPL_BIN")
-    os.environ["LARMORX_GPL_BIN"] = str(replica_binary())
-    try:
-        yield
-    finally:
-        if previous is None:
-            os.environ.pop("LARMORX_GPL_BIN", None)
-        else:
-            os.environ["LARMORX_GPL_BIN"] = previous
-
-
-REPLICA = "crates-gpl/target/{profile}/larmorx-gpl{exe}"
-
 #: AFNI-20, kept by design in both implementations: AFNI's 1D text file holds a random
 #: identifier, so neither reproduces it.
 _ONE_ROW = (
@@ -1447,32 +1426,25 @@ _ORIGINAL_BEFORE_PART_2B: dict[str, tuple[frozenset[str], str]] = {
 }
 
 
-@functools.cache
-def replica_binary() -> str | None:
-    """The ``larmorx-gpl`` binary (the GPL-3.0-or-later replica): ``LARMORX_GPL_BIN``, else
-    the release (then debug) build of ``crates-gpl`` in this repository, else ``larmorx-gpl``
-    on the PATH.
+#: The environment that makes larmorx's command line run a tool's replica.
+REPLICA_ENV = {"LARMORX_IMPLEMENTATION": "replica"}
 
-    The validation package is Apache-2.0: it only runs the replica as a separate process.
-    """
-    if env := os.environ.get("LARMORX_GPL_BIN"):
-        return env
-    exe = ".exe" if os.name == "nt" else ""
-    for profile in ("release", "debug"):
-        for parent in Path(__file__).resolve().parents:
-            candidate = parent / REPLICA.format(profile=profile, exe=exe)
-            if candidate.is_file():
-                return str(candidate)
-    return shutil.which("larmorx-gpl")
+
+def replica_command() -> list[str]:
+    """The command that runs the AFNI replicas as a process of their own, where a measurement
+    needs one (memory, threads, timing, the figures' cache): larmorx's command line through this
+    Python (``python -m larmorx``), followed by ``afni <program> <arguments>``, with
+    :data:`REPLICA_ENV`. The replicas are part of larmorx since 2026-10-29 (until then, the GPL
+    program ``larmorx-gpl``), so they are always there."""
+    return [sys.executable, "-m", "larmorx"]
 
 
 @functools.cache
 def replica_version() -> str:
-    binary = replica_binary()
-    if binary is None:
-        return "not found"
-    out = subprocess.run([binary, "--version"], capture_output=True, text=True, encoding="utf-8")
-    return out.stdout.strip() or "unknown version"
+    """The replicas' version: larmorx's, whose part they are."""
+    import larmorx
+
+    return f"larmorx {larmorx.__version__} (crate larmorx-afni-replica, built in)"
 
 
 def _last_error(log: str, tmp: Path) -> str:
@@ -2052,8 +2024,7 @@ def _check_python(
 
 
 #: The implementations a run can compare with AFNI (docs/licensing.md): the clean-room
-#: original (larmorx-afni, in-process) or the GPL replica (the larmorx-gpl program, which
-#: larmorx runs as a separate process).
+#: original (larmorx-afni) or the bit-exact replica (larmorx-afni-replica), both in-process.
 IMPLEMENTATIONS = ("original", "replica")
 
 
@@ -2068,15 +2039,8 @@ def _run_case(case: Case, checks: CheckList, implementation: str = "original") -
     s: Scenario = case.payload
     if afni_binary() is None:
         raise Outcome("skipped", "the AFNI 3dTshift oracle was not found (LARMORX_AFNI_BIN)")
-    if implementation == "replica" and replica_binary() is None:
-        raise Outcome(
-            "skipped", "the larmorx-gpl binary was not found (LARMORX_GPL_BIN, crates-gpl build)"
-        )
     ours = functools.partial(_run_larmorx, implementation=implementation)
-    with (
-        _replica_program(implementation),
-        tempfile.TemporaryDirectory(prefix="lx-tshift-") as tmp_name,
-    ):
+    with tempfile.TemporaryDirectory(prefix="lx-tshift-") as tmp_name:
         tmp = Path(tmp_name)
         if s.separate:
             _run_separately(case, s, checks, tmp, implementation)
@@ -2326,8 +2290,8 @@ def _highlights(results: list[CaseResult], implementation: str = "original") -> 
                 "(`docs/findings/platform-math.md`). See `docs/api/afni-tshift.md`."
             )
         lines.append(
-            "- The bit-exact replica (`larmorx-gpl afni 3dTshift`, GPL-3.0-or-later) has its own "
-            "record: [afni-tshift-replica.md](afni-tshift-replica.md)."
+            "- The bit-exact replica (`larmorx afni 3dTshift` with `LARMORX_IMPLEMENTATION=replica`, "
+            "the default) has its own record: [afni-tshift-replica.md](afni-tshift-replica.md)."
         )
 
     def python(name: str) -> tuple[int, int]:
@@ -2416,22 +2380,21 @@ def _defaults_summary(results: list[CaseResult]) -> list[str]:
 
 
 def suite(implementation: str = "original") -> Suite:
-    """The 3dTshift suite for the clean-room original (``larmorx afni 3dTshift``, in-process)
-    or the GPL replica (``larmorx-gpl afni 3dTshift``, which larmorx runs as a separate
-    process); both through larmorx's command line and its Python API."""
+    """The 3dTshift suite for the clean-room original or the bit-exact replica, both in-process
+    through larmorx's command line (``larmorx afni 3dTshift``) and its Python API."""
     if implementation not in IMPLEMENTATIONS:
         raise ValueError(f"implementation must be one of {IMPLEMENTATIONS}, not {implementation!r}")
     replica = implementation == "replica"
     tool = (
-        f"`larmorx-gpl afni 3dTshift` ({replica_version()}; crate larmorx-gpl-afni, the "
-        "GPL-3.0-or-later replica translated from AFNI 26.3.05's source), run by larmorx as a "
-        "separate process: `larmorx afni 3dTshift` with `LARMORX_IMPLEMENTATION=replica` and "
+        f"the bit-exact replica ({replica_version()}: the translation of AFNI 26.3.05's "
+        "source, Apache-2.0 with CC BY 4.0's attribution, part of larmorx since 2026-10-29), "
+        "in-process: `larmorx afni 3dTshift` with `LARMORX_IMPLEMENTATION=replica` and "
         '`lx.afni.tshift(..., implementation="replica")`'
         if replica
         else "`larmorx afni 3dTshift` / `lx.afni.tshift` (crate larmorx-afni, clean-room from "
         '`specs/3dTshift.md`), with `implementation="original"`'
     )
-    who = "larmorx-gpl" if replica else "larmorx"
+    who = "the replica" if replica else "larmorx"
     return Suite(
         name="afni-tshift-replica" if replica else "afni-tshift",
         title="3dTshift (replica)" if replica else "3dTshift",

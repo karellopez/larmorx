@@ -1,12 +1,12 @@
 # SPDX-License-Identifier: Apache-2.0
 """3dUnifize's evidence: fMRIPrep's call on a real BOLD reference (``-T2``) by AFNI 25.2.09 at 1
-and 6 OpenMP threads, fMRIPrep's own output, and the larmorx-gpl replica at 1 and 6 threads in
+and 6 OpenMP threads, fMRIPrep's own output, and the larmorx replica at 1 and 6 threads in
 its default and ``reproduce`` modes; AFNI's default on a real T1w (more than a million voxels:
 the half-size path), with its scale image, by AFNI at 1 and 6 threads, fMRIPrep's build of AFNI
 and the replica; a deliberate correction (AFNI-45, ``-T2up 100``) on the BOLD reference; the
 record's cases.
 
-The replica (``larmorx-gpl``, GPL-3.0-or-later) runs as a separate program; the clean-room
+The replica (part of larmorx since 2026-10-29: ``larmorx afni <program>`` with ``LARMORX_IMPLEMENTATION=replica``; until then the GPL program ``larmorx-gpl``) runs; the clean-room
 original (``larmorx afni 3dUnifize``, ``LARMORX_IMPLEMENTATION=original``) has cache entries of
 its own beside the replica's, with AFNI run again with CORE-MATH's correctly rounded functions
 preloaded (the original's squash calls a correctly rounded ``tanhf``, AFNI glibc's).
@@ -65,7 +65,7 @@ def _compute(e: fcache.Entry) -> None:
         threads={"afni": list(THREADS), "larmorx": list(THREADS)},
         settings="fMRIPrep 25.2.6's 3dUnifize node (unifize) of ds005040 sub-002 task-clip "
         "run-1, its arguments from command.txt, its input from the run's working directory; "
-        "AFNI 25.2.09 (OMP_NUM_THREADS 1 and 6) and the larmorx-gpl replica (1 and 6, both "
+        "AFNI 25.2.09 (OMP_NUM_THREADS 1 and 6) and the larmorx replica (1 and 6, both "
         "modes); the same with -T2up 100 (AFNI-45)",
     )
 
@@ -83,7 +83,7 @@ def _compute_t1w(e: fcache.Entry) -> None:
         threads={"afni": list(THREADS), "larmorx": list(THREADS), "afni_in_fmriprep_image": 6},
         settings="AFNI's default on OpenNeuro ds000005 sub-01's T1w (160 × 192 × 192: the "
         "half-size path), with its scale image; AFNI 25.2.09 at 1 and 6 OpenMP threads, "
-        "fMRIPrep's build of AFNI at 6, the larmorx-gpl replica at 1 and 6 (both modes)",
+        "fMRIPrep's build of AFNI at 6, the larmorx replica at 1 and 6 (both modes)",
     )
 
 
@@ -201,9 +201,9 @@ REF_PANELS = [
     ("afni-1", "afni-1", "original", "AFNI 25.2.09, 3dUnifize", "the repository's build, 1 thread"),
     ("afni-6", "afni-6", "original", "AFNI 25.2.09, 3dUnifize", "the repository's build, 6 threads"),
     ("fmriprep", None, "fmriprep", "fMRIPrep 25.2.6, as it ran", "AFNI 25.2.09 in its image"),
-    ("replica-1", "replica-1", "larmorx", "larmorx-gpl replica", "default mode, 1 thread"),
-    ("replica-6", "replica-6", "larmorx", "larmorx-gpl replica", "default mode, 6 threads"),
-    ("replica-reproduce", "replica-reproduce", "larmorx", "larmorx-gpl replica",
+    ("replica-1", "replica-1", "larmorx", "larmorx replica", "default mode, 1 thread"),
+    ("replica-6", "replica-6", "larmorx", "larmorx replica", "default mode, 6 threads"),
+    ("replica-reproduce", "replica-reproduce", "larmorx", "larmorx replica",
      "reproduce mode, 6 threads"),
 ]  # fmt: skip
 #: The clean-room original's panels and AFNI with correctly rounded maths.
@@ -443,7 +443,7 @@ def _example_ref(ctx: core.Context, e: fcache.Entry, o: fcache.Entry, step: dict
             "sub-002 (task clip, run 1), N4-corrected and skull-stripped once: its arguments "
             "(-T2: the contrast inverted, unifized, inverted back) given to AFNI 25.2.09 at 1 "
             "and 6 OpenMP threads, to AFNI 26.3.05 at 1 (both implementations' reference since "
-            "2026-10-29), to the larmorx-gpl replica and to LARMORX's clean-room original at 1 "
+            "2026-10-29), to the larmorx replica and to LARMORX's clean-room original at 1 "
             "and 6 threads in both modes. fMRIPrep's own output is the panel it produced in its "
             "run."
         ),
@@ -463,8 +463,8 @@ def _example_ref(ctx: core.Context, e: fcache.Entry, o: fcache.Entry, step: dict
                 "label": "Programs",
                 "text": f"{vers.get('afni', '?')} (the repository's oracle build; OpenMP); AFNI "
                 f"{vers.get('afni_in_fmriprep_image', '?')} in fMRIPrep's image; "
-                f"{vers.get('larmorx-gpl', '?')} (the replica, with a port of glibc 2.35's "
-                f"tanhf), from larmorx at commit `{info['larmorx_commit'][:12]}`; "
+                f"{(vers.get('larmorx-replica') or vers.get('larmorx-gpl', '?'))} (the replica, with fdlibm's "
+                f"tanhf as glibc 2.35 runs it), from larmorx at commit `{info['larmorx_commit'][:12]}`; "
                 f"{o.info().get('versions', {}).get('larmorx', 'larmorx')} at commit "
                 f"`{o.info()['larmorx_commit'][:12]}` (a correctly rounded tanhf)",
             },
@@ -504,9 +504,9 @@ def _example_t1w(ctx: core.Context, e: fcache.Entry, o: fcache.Entry, step: dict
         ("afni-1", "afni-1", "original", "AFNI 25.2.09, 3dUnifize", "the repository's build, 1 thread"),
         ("afni-6", "afni-6", "original", "AFNI 25.2.09, 3dUnifize", "the repository's build, 6 threads"),
         ("image", "image", "original", "AFNI 25.2.09 in fMRIPrep's image", "fMRIPrep 25.2.6's build, 6 threads"),
-        ("replica-1", "replica-1", "larmorx", "larmorx-gpl replica", "default mode, 1 thread"),
-        ("replica-6", "replica-6", "larmorx", "larmorx-gpl replica", "default mode, 6 threads"),
-        ("replica-reproduce", "replica-reproduce", "larmorx", "larmorx-gpl replica",
+        ("replica-1", "replica-1", "larmorx", "larmorx replica", "default mode, 1 thread"),
+        ("replica-6", "replica-6", "larmorx", "larmorx replica", "default mode, 6 threads"),
+        ("replica-reproduce", "replica-reproduce", "larmorx", "larmorx replica",
          "reproduce mode, 6 threads"),
     ]  # fmt: skip
     _panels(ex, exm, e, panels, OUTPUTS_T1W)
@@ -569,7 +569,7 @@ def _example_t1w(ctx: core.Context, e: fcache.Entry, o: fcache.Entry, step: dict
             {
                 "label": "Programs",
                 "text": f"{vers.get('afni', '?')}; AFNI {vers.get('afni_in_fmriprep_image', '?')} "
-                f"in fMRIPrep's image; {vers.get('larmorx-gpl', '?')}; "
+                f"in fMRIPrep's image; {(vers.get('larmorx-replica') or vers.get('larmorx-gpl', '?'))}; "
                 f"{o.info().get('versions', {}).get('larmorx', 'larmorx')}",
             },
             {"label": "Grid", "text": common.describe_grid(img, grid.shape)},
@@ -605,10 +605,10 @@ def _example_t2up(
         ("afni", "t2up100-afni", "original", "AFNI 25.2.09, -T2up 100", "the repository's build"),
         ("afni26", "t2up100-afni26", "original", "AFNI 26.3.05, -T2up 100",
          "the repository's build; both implementations' reference"),
-        ("replica", "t2up100-replica", "larmorx", "larmorx-gpl replica, -T2up 100",
+        ("replica", "t2up100-replica", "larmorx", "larmorx replica, -T2up 100",
          "default mode: corrected"),
         ("replica-reproduce", "t2up100-replica-reproduce", "larmorx",
-         "larmorx-gpl replica, -T2up 100", "reproduce mode"),
+         "larmorx replica, -T2up 100", "reproduce mode"),
         ("afni-default", "afni-6", "original", "AFNI 25.2.09, fMRIPrep's call",
          "-T2up 98.5, the default"),
     ]  # fmt: skip

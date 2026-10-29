@@ -226,8 +226,7 @@ def _unavailable(program: str):
 
         if ar.afni_binary(program) is None:
             return f"the AFNI {program} oracle was not found"
-        if ar.replica_binary() is None:
-            return "the larmorx-gpl program was not found"
+        # The replica is part of larmorx (since 2026-10-29): always there.
         return ""
 
     return unavailable

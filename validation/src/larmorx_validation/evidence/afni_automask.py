@@ -1,11 +1,11 @@
 # SPDX-License-Identifier: Apache-2.0
 """3dAutomask's evidence: fMRIPrep's call on a real BOLD reference (its second skull strip) by
-AFNI 25.2.09, by fMRIPrep's own AFNI, by the larmorx-gpl replica in its default and
+AFNI 25.2.09, by fMRIPrep's own AFNI, by the larmorx replica in its default and
 ``reproduce`` modes and by the clean-room original (both modes, 1 and 6 threads); AFNI's default
 on the raw BOLD series it came from (the functional path: the series averaged first); a
 deliberate correction (AFNI-43, ``-peels 0``) on the same reference; the cases of both records.
 
-The replica (``larmorx-gpl``, GPL-3.0-or-later) runs as a separate program, as everywhere in
+The replica (part of larmorx since 2026-10-29: ``larmorx afni <program>`` with ``LARMORX_IMPLEMENTATION=replica``; until then the GPL program ``larmorx-gpl``) runs, as everywhere in
 the validation package (Apache-2.0); the original (``larmorx afni 3dAutomask`` with
 ``LARMORX_IMPLEMENTATION=original``) has a cache entry of its own, beside the replica's. The
 masks are drawn over the image they were made from.
@@ -71,12 +71,12 @@ def binaries(program: str) -> tuple[str, str, Path]:
 
     # AFNI 25.2.09, as the entries were first computed; 26.3.05 is added by ``afni_step``
     afni = ar.afni_binary(program, afni_step.OLD)
-    gpl, sif = ar.replica_binary(), ar.fmriprep_image()
-    if afni is None or gpl is None or sif is None:
-        raise FileNotFoundError(
-            f"the AFNI {program} oracle, the larmorx-gpl replica or fMRIPrep's image"
-        )
-    return afni, gpl, sif
+    sif = ar.fmriprep_image()
+    if afni is None or sif is None:
+        raise FileNotFoundError(f"the AFNI {program} oracle or fMRIPrep's image")
+    # The replica: larmorx's command line with LARMORX_IMPLEMENTATION=replica (built into
+    # larmorx since 2026-10-29; the entries computed before ran the larmorx-gpl program).
+    return afni, " ".join(ar.replica_command()), sif
 
 
 def run_all(
@@ -91,7 +91,9 @@ def run_all(
     """``program`` with ``args`` (``{out}``: the run's output stem) by each runner, into the
     entry's directory: ``<tag><label>.nii.gz`` (and the other names ``args`` derive from
     ``{out}``)."""
-    afni, gpl, sif = binaries(program)
+    from larmorx_validation.parity import afni_replica as ar
+
+    afni, _, sif = binaries(program)
     add, unset = environment()
     home = e.dir / ".home"
     home.mkdir(exist_ok=True)
@@ -113,7 +115,9 @@ def run_all(
             e.run(f"{tag}{label}", [*cmd, str(sif), program, *argv], unset=unset)
         else:
             env["LARMORX_UPSTREAM_DEFECTS"] = mode
-            e.run(f"{tag}{label}", [gpl, "afni", program, *argv], env=env, unset=unset)
+            env.update(ar.REPLICA_ENV)
+            cmd = [*ar.replica_command(), "afni", program, *argv]
+            e.run(f"{tag}{label}", cmd, env=env, unset=unset)
 
 
 def image_version(program: str) -> str:
@@ -139,7 +143,7 @@ def versions(program: str) -> dict[str, str]:
     return {
         "afni": ar.afni_build(program, version=afni_step.OLD),
         "afni_in_fmriprep_image": image_version(program),
-        "larmorx-gpl": ar.replica_version(),
+        "larmorx-replica": ar.replica_version(),
         "fmriprep_image": (common.oracles() / "images" / "fmriprep-25.2.6.sif.sha256")
         .read_text(encoding="utf-8")
         .split()[0],
@@ -193,7 +197,7 @@ def _compute(e: fcache.Entry) -> None:
         settings="fMRIPrep 25.2.6's 3dAutomask node (skullstrip_second_pass) of ds005040 sub-002 "
         "task-clip run-1, its arguments from command.txt; AFNI's default on the run's raw BOLD "
         "series; fMRIPrep's arguments with -peels 0 (AFNI-43). AFNI 25.2.09 (the repository's "
-        "build and fMRIPrep's), the larmorx-gpl replica in both modes; 3dAutomask is "
+        "build and fMRIPrep's), the larmorx replica in both modes; 3dAutomask is "
         "single-threaded",
     )
 
@@ -297,8 +301,8 @@ MASK_ONLY = OUTPUTS[:1]
 PANELS = [
     ("afni", "afni", "original", "AFNI 25.2.09, 3dAutomask", "the repository's oracle build"),
     ("image", "image", "original", "AFNI 25.2.09 in fMRIPrep's image", "fMRIPrep 25.2.6's build"),
-    ("replica", "replica", "larmorx", "larmorx-gpl replica", "default mode"),
-    ("replica-reproduce", "replica-reproduce", "larmorx", "larmorx-gpl replica", "reproduce mode"),
+    ("replica", "replica", "larmorx", "larmorx replica", "default mode"),
+    ("replica-reproduce", "replica-reproduce", "larmorx", "larmorx replica", "reproduce mode"),
 ]  # fmt: skip
 
 
@@ -533,7 +537,7 @@ def _example_ref(ctx: core.Context, e: fcache.Entry, o: fcache.Entry, step: dict
             "The 3dAutomask node fMRIPrep 25.2.6 ran on the unifized BOLD reference of OpenNeuro "
             "ds005040 sub-002 (task clip, run 1): its arguments given to AFNI 25.2.09, to AFNI "
             "26.3.05 (both implementations' reference since 2026-10-29), to fMRIPrep's own build of AFNI "
-            "in its image, to the larmorx-gpl replica and to LARMORX's clean-room original "
+            "in its image, to the larmorx replica and to LARMORX's clean-room original "
             "(compared with AFNI 25.2.09, its reference until it follows 26.3.05), each in its "
             "default and reproduce modes. The masks are drawn over the input; choose *Masked "
             "input* for -apply_prefix's output."
@@ -555,7 +559,7 @@ def _example_ref(ctx: core.Context, e: fcache.Entry, o: fcache.Entry, step: dict
                 "label": "Programs",
                 "text": f"{vers.get('afni', '?')} (the repository's oracle build); AFNI "
                 f"{vers.get('afni_in_fmriprep_image', '?')} in fMRIPrep's image; "
-                f"{vers.get('larmorx-gpl', '?')} (the replica), from larmorx at commit "
+                f"{(vers.get('larmorx-replica') or vers.get('larmorx-gpl', '?'))} (the replica), from larmorx at commit "
                 f"`{info['larmorx_commit'][:12]}`; "
                 f"{oinfo.get('versions', {}).get('larmorx', 'larmorx')} at commit "
                 f"`{oinfo['larmorx_commit'][:12]}`",
@@ -665,7 +669,7 @@ def _example_bold(ctx: core.Context, e: fcache.Entry, o: fcache.Entry, step: dic
             {
                 "label": "Programs",
                 "text": f"{vers.get('afni', '?')}; AFNI {vers.get('afni_in_fmriprep_image', '?')} "
-                f"in fMRIPrep's image; {vers.get('larmorx-gpl', '?')}; "
+                f"in fMRIPrep's image; {(vers.get('larmorx-replica') or vers.get('larmorx-gpl', '?'))}; "
                 f"{o.info().get('versions', {}).get('larmorx', 'larmorx')}",
             },
             {"label": "Mask", "text": f"{int(np.count_nonzero(a)):,} of {a.size:,} voxels"},
@@ -709,7 +713,7 @@ def _compute_panel(e: fcache.Entry) -> None:
         threads={"larmorx": ["1", "3"]},
         settings="AFNI's default (3dAutomask -prefix) on a data-panel run: ds000256 sub-CTS203, "
         "restfixationnofeedback (164 volumes, extreme head motion); AFNI 25.2.09 (the "
-        "repository's build and fMRIPrep's), the larmorx-gpl replica and the clean-room original "
+        "repository's build and fMRIPrep's), the larmorx replica and the clean-room original "
         "in both modes (the original also at 3 threads); 3dAutomask is single-threaded",
     )
 
@@ -821,7 +825,7 @@ def _example_panel(ctx: core.Context, pe: fcache.Entry, step: dict) -> dict:
             {
                 "label": "Programs",
                 "text": f"{vers.get('afni', '?')}; AFNI {vers.get('afni_in_fmriprep_image', '?')} "
-                f"in fMRIPrep's image; {vers.get('larmorx-gpl', '?')}; "
+                f"in fMRIPrep's image; {(vers.get('larmorx-replica') or vers.get('larmorx-gpl', '?'))}; "
                 f"{vers.get('larmorx', 'larmorx')}",
             },
             {"label": "Mask", "text": f"{int(np.count_nonzero(a)):,} of {a.size:,} voxels"},
@@ -865,8 +869,8 @@ def _example_peels(
     over = {"mask": {"on": "uni", "window": window_of(ex, "uni")}}
     panels = [
         ("afni", "original", "AFNI 25.2.09, -peels 0", "the repository's oracle build"),
-        ("replica", "larmorx", "larmorx-gpl replica, -peels 0", "default mode: corrected"),
-        ("replica-reproduce", "larmorx", "larmorx-gpl replica, -peels 0", "reproduce mode"),
+        ("replica", "larmorx", "larmorx replica, -peels 0", "default mode: corrected"),
+        ("replica-reproduce", "larmorx", "larmorx replica, -peels 0", "reproduce mode"),
         ("original", "larmorx", "LARMORX clean-room original, -peels 0", "default mode: corrected"),
         ("original-reproduce", "larmorx", "LARMORX clean-room original, -peels 0",
          "reproduce mode"),
@@ -1240,7 +1244,7 @@ def cases(recs: dict, scenarios, program: str, examples: dict[str, str]) -> list
 #: The implementations of the two tools' pages: id, label, record suffix.
 IMPLEMENTATIONS = [
     ("original", "LARMORX clean-room original", ""),
-    ("replica", "larmorx-gpl replica", "-replica"),
+    ("replica", "larmorx replica", "-replica"),
 ]
 
 

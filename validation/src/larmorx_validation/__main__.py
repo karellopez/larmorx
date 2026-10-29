@@ -7,7 +7,7 @@ with a real fMRIPrep run, stage by stage (:mod:`larmorx_validation.stages`).
 ``python -m larmorx_validation figures <tool>|all --out DIR`` draws a tool's figures from the
 committed records and the figures cache (:mod:`larmorx_validation.figures`, ``docs/figures.md``).
 
-``--implementation replica`` runs a suite against the GPL replica (``larmorx-gpl``, which
+``--implementation replica`` runs a suite against the bit-exact replica (built into larmorx, which
 larmorx runs as a separate process) instead of the clean-room original, where a suite has one.
 The FSL replica (``larmorx-nc``) has its own suite, ``fsl-mcflirt-replica``.
 
@@ -387,9 +387,9 @@ def main(argv: Sequence[str] | None = None) -> int:
         "--implementation",
         default="original",
         choices=("original", "replica"),
-        help="the clean-room original (in-process) or the GPL replica (the larmorx-gpl binary, "
-        "found through LARMORX_GPL_BIN or the crates-gpl build, which larmorx runs as a "
-        "separate process)",
+        help="the clean-room original or the bit-exact replica (the AFNI replicas are part of "
+        "larmorx since 2026-10-29 and run in-process; the FSL replicas are the larmorx-nc "
+        "program, which larmorx runs as a separate process)",
     )
     p.add_argument(
         "--oracle-cache",

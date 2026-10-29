@@ -125,7 +125,7 @@ PAGES = [
         "afni",
         [
             ("clean-room original", "afni-tshift", "validated", None, None),
-            ("larmorx-gpl replica", "afni-tshift-replica", "validated", None, None),
+            ("larmorx replica", "afni-tshift-replica", "validated", None, None),
         ],
     ),
     (
@@ -134,7 +134,7 @@ PAGES = [
         "afni",
         [
             ("clean-room original", "afni-automask", "validated", None, None),
-            ("larmorx-gpl replica", "afni-automask-replica", "validated", None, None),
+            ("larmorx replica", "afni-automask-replica", "validated", None, None),
         ],
     ),
     (
@@ -143,7 +143,7 @@ PAGES = [
         "afni",
         [
             ("clean-room original", "afni-unifize", "validated", None, None),
-            ("larmorx-gpl replica", "afni-unifize-replica", "validated", None, None),
+            ("larmorx replica", "afni-unifize-replica", "validated", None, None),
         ],
     ),
     (

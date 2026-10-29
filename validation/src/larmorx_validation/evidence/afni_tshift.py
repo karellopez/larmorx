@@ -5,7 +5,7 @@ by fMRIPrep's own AFNI, and by both larmorx implementations (the clean-room orig
 GPL replica, each in its default and ``reproduce`` mode); a deliberate correction (AFNI-01) on
 the same run; the two records' cases; speed.
 
-The replica (``larmorx-gpl``, GPL-3.0-or-later) runs as a separate program, as everywhere in
+The replica (part of larmorx since 2026-10-29: ``larmorx afni <program>`` with ``LARMORX_IMPLEMENTATION=replica``; until then the GPL program ``larmorx-gpl``) runs, as everywhere in
 the validation package (Apache-2.0).
 """
 
@@ -85,18 +85,19 @@ def _compute(e: fcache.Entry) -> None:
     import larmorx_testdata as td
 
     from larmorx_validation.parity.afni_tshift import (
+        REPLICA_ENV,
         _environment,
         afni_binary,
-        replica_binary,
+        replica_command,
         replica_version,
     )
 
     ora = _oracles()
     run = ora / "fmriprep-25.2.6" / RUN
     # AFNI 25.2.09, as the entry was first computed; 26.3.05 is added by ``afni_step``
-    afni, gpl = afni_binary(afni_step.OLD), replica_binary()
-    if afni is None or gpl is None or not run.is_dir():
-        raise FileNotFoundError("the AFNI oracle, the larmorx-gpl replica or the fMRIPrep run")
+    afni = afni_binary(afni_step.OLD)
+    if afni is None or not run.is_dir():
+        raise FileNotFoundError("the AFNI oracle or the fMRIPrep run")
     command = (run / NODE / "command.txt").read_text(encoding="utf-8").strip()
     bold = e.input("BOLD", Path(td.get(BOLD)))
     e.input("fMRIPrep's output", run / NODE / FMRIPREP_OUT)
@@ -136,13 +137,16 @@ def _compute(e: fcache.Entry) -> None:
                 env["OMP_NUM_THREADS"] = threads
             out = str(e.dir / f"{tag}{label}.nii.gz")
             if impl == "replica":
-                cmd = [gpl, "afni", "3dTshift", *argv(out, inp)]
+                # Built into larmorx since 2026-10-29 (the entry was first computed with the
+                # larmorx-gpl program).
+                env.update(REPLICA_ENV)
+                cmd = [*replica_command(), "afni", "3dTshift", *argv(out, inp)]
             else:
                 env["LARMORX_IMPLEMENTATION"] = "original"
                 cmd = fcache.larmorx_cli("afni", "3dTshift", *argv(out, inp))
             e.run(f"{tag}{label}", cmd, env=env, unset=unset)
     e.finish(
-        versions={"afni": f"AFNI_{afni_step.OLD}", "larmorx-gpl": replica_version()},
+        versions={"afni": f"AFNI_{afni_step.OLD}", "larmorx-replica": replica_version()},
         command=command,
         slice_timing=times,
         tr=float(side["RepetitionTime"]),
@@ -174,7 +178,7 @@ DATA = {
 IMPLS = [
     {
         "id": "replica",
-        "label": "larmorx-gpl replica",
+        "label": "larmorx replica",
         "short": "replica",
         "record": "docs/validation/afni-tshift-replica.md",
         "name": "afni-tshift-replica",
@@ -198,13 +202,13 @@ FOURIER_WHY = (
 RUNS = [
     ("afni", "afni", "original", "AFNI 25.2.09, 3dTshift", "the repository's oracle build"),
     ("fmriprep", None, "fmriprep", "fMRIPrep 25.2.6, as it ran", "AFNI 25.2.09 in its image"),
-    ("replica", "replica", "larmorx", "larmorx-gpl replica", "default mode, 12 threads"),
-    ("replica-1", "replica-1", "larmorx", "larmorx-gpl replica", "default mode, 1 thread"),
+    ("replica", "replica", "larmorx", "larmorx replica", "default mode, 12 threads"),
+    ("replica-1", "replica-1", "larmorx", "larmorx replica", "default mode, 1 thread"),
     (
         "replica-reproduce",
         "replica-reproduce",
         "larmorx",
-        "larmorx-gpl replica",
+        "larmorx replica",
         "reproduce mode, 12 threads",
     ),
     ("original", "original", "larmorx", "larmorx clean-room original", "default mode, 12 threads"),
@@ -250,12 +254,12 @@ NEG_RUNS = [
         "the result the data call for",
     ),
     ("afni-neg", "neg-afni", "original", "AFNI 25.2.09", "on the negative scale factor"),
-    ("replica-neg", "neg-replica", "larmorx", "larmorx-gpl replica", "default mode: corrected"),
+    ("replica-neg", "neg-replica", "larmorx", "larmorx replica", "default mode: corrected"),
     (
         "replica-neg-reproduce",
         "neg-replica-reproduce",
         "larmorx",
-        "larmorx-gpl replica",
+        "larmorx replica",
         "reproduce mode",
     ),
     (
@@ -710,7 +714,7 @@ def _example_run(ctx: core.Context, e: fcache.Entry, reg: dict, step: dict) -> d
                 "label": "Programs",
                 "text": f"{vers.get('afni', '?').replace('AFNI_', 'AFNI ')} and "
                 f"{info.get('versions', {}).get('afni_26', 'AFNI 26.3.05').split(',')[0].replace('AFNI_', 'AFNI ')} "
-                f"(the repository's oracle builds); {vers.get('larmorx-gpl', '?')} (the replica); "
+                f"(the repository's oracle builds); {(vers.get('larmorx-replica') or vers.get('larmorx-gpl', '?'))} (the replica); "
                 f"larmorx's clean-room original at commit `{info['larmorx_commit'][:12]}`",
             },
             afni_step.fact(step, "fMRIPrep's call"),
@@ -736,7 +740,7 @@ def _example_run(ctx: core.Context, e: fcache.Entry, reg: dict, step: dict) -> d
                             "role": "original",
                         },
                         {
-                            "label": "larmorx-gpl replica",
+                            "label": "larmorx replica",
                             "sub": "1 and 12 threads, both modes",
                             "role": "larmorx",
                         },
@@ -773,7 +777,7 @@ def _example_run(ctx: core.Context, e: fcache.Entry, reg: dict, step: dict) -> d
             },
             {
                 "panel": "replica",
-                "label": "larmorx-gpl replica",
+                "label": "larmorx replica",
                 "color": "replica",
                 "marker": "x",
                 "compare": True,
@@ -1072,7 +1076,7 @@ def _provenance(info: dict) -> list[str]:
         "Inputs: " + "; ".join(f"{k} (sha256 {v}…)" for k, v in sha.items()),
         f"Runs: figures cache entry `{TOOL}/{CASE}`, computed {info['computed']} with larmorx "
         f"`{info['larmorx_commit'][:12]}`, {vers.get('afni', '?').replace('AFNI_', 'AFNI ')}, "
-        f"{vers.get('larmorx-gpl', '?')}; every command, its environment, threads and exit "
+        f"{(vers.get('larmorx-replica') or vers.get('larmorx-gpl', '?'))}; every command, its environment, threads and exit "
         "status are in its `RUN_INFO.json`",
     ]
 

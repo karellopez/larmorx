@@ -1,6 +1,6 @@
 # SPDX-License-Identifier: Apache-2.0
-"""The GPL replica of 3dTshift (``larmorx-gpl``, run as a separate process) against AFNI
-itself, through the AFNI 25.2.09 binary (see validation/)."""
+"""The replica of 3dTshift (built into larmorx; until 2026-10-29 the GPL program
+``larmorx-gpl``) against AFNI itself, through the AFNI 26.3.05 binary (see validation/)."""
 
 import os
 
@@ -12,8 +12,6 @@ from larmorx_validation.parity import afni_tshift  # noqa: E402
 
 if afni_tshift.afni_binary() is None:
     pytest.skip("the AFNI 3dTshift oracle is not available", allow_module_level=True)
-if afni_tshift.replica_binary() is None:
-    pytest.skip("the larmorx-gpl binary is not built (crates-gpl)", allow_module_level=True)
 
 TIER = os.environ.get("LARMORX_PARITY_TIER", "smoke")
 SUITE = afni_tshift.suite("replica")

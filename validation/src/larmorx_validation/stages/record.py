@@ -417,8 +417,8 @@ def render(s, payload: dict, versions: dict, env: dict, command: str) -> str:
         + (
             "; AFNI 25.2.09 built by `scripts/build_afni_oracle.sh` (one thread, `HOME` an "
             "empty directory). 3dTshift runs in both larmorx implementations: the bit-exact "
-            "replica (`larmorx-gpl afni 3dTshift`, GPL-3.0-or-later, the `crates-gpl` release "
-            "build, which `larmorx afni 3dTshift` runs as a separate program) and the "
+            "replica (`LARMORX_IMPLEMENTATION=replica`, built into larmorx since 2026-10-29; "
+            "the earlier records ran it as the separate GPL program `larmorx-gpl`) and the "
             "clean-room original (`LARMORX_IMPLEMENTATION=original`)"
             if any(r["stage"] == "F02" for r in results)
             else ""
@@ -511,7 +511,6 @@ def render(s, payload: dict, versions: dict, env: dict, command: str) -> str:
         f"{participant} {run.name} {extra}   # the oracle run (about an hour)",
         "scripts/build_ants_oracle.sh && scripts/build_crmath_preload.sh   # the references",
         "scripts/build_afni_oracle.sh   # AFNI 25.2.09 (3dTshift)",
-        "(cd crates-gpl && cargo build --release -p larmorx-gpl-cli)   # the 3dTshift replica",
         f"{command}",
         "```",
         "",

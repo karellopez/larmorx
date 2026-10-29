@@ -22,14 +22,13 @@ def main() -> int:
 
     args = sys.argv[1:]
     d = Path(args.pop(0)).resolve()
-    gpl = args[args.index("--gpl") + 1] if "--gpl" in args else None
     nc = args[args.index("--nc") + 1] if "--nc" in args else None
     d.mkdir(parents=True, exist_ok=True)
     print(f"CPUs this process may use: {len(os.sched_getaffinity(0))}")
     print("| Program and path | exit | `larmorx-<n>` pool threads | other threads (by name) |")
     print("|---|---|---|---|")
     bad = total = 0
-    for p in thread_pools.programs(d, gpl, nc):
+    for p in thread_pools.programs(d, nc):
         code, pool, other, err = thread_pools.probe(p, d)
         names = ", ".join(f"{k} x{v}" for k, v in sorted(other.items())) or "none"
         total += 1

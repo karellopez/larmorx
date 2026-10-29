@@ -1,6 +1,7 @@
 # SPDX-License-Identifier: Apache-2.0
-"""Parity of the 3dUnifize replica (``larmorx-gpl afni 3dUnifize``, run by larmorx as a separate
-process) with AFNI's ``3dUnifize`` (26.3.05; 25.2.09 kept): exit status, messages and every output (the
+"""Parity of the 3dUnifize replica (``larmorx afni 3dUnifize`` with
+``LARMORX_IMPLEMENTATION=replica``, in-process; until 2026-10-29 the GPL program
+``larmorx-gpl``) with AFNI's ``3dUnifize`` (26.3.05; 25.2.09 kept): exit status, messages and every output (the
 unifized image, ``-ssave``'s scale factors, ``-amsave``'s automasked input), byte for byte
 (:mod:`larmorx_validation.parity.afni_replica`).
 
@@ -158,7 +159,7 @@ def _scenarios() -> list[tuple[str, str, str, ar.Scenario]]:
             S(args, (t1,), (U,), expect=expect, tier="smoke" if cid in ("unknown-option", "T2up-missing") else "standard"))
     add("default-prefix", "divergences", "no -prefix: AFNI writes its own format (Unifized+orig)",
         S(("{0}",), (t1,), ("Unifized+orig.HEAD",), expect="divergence", tier="standard",
-          reason="AFNI's default prefix 'Unifized' is its own dataset format, which larmorx-gpl does "
+          reason="AFNI's default prefix 'Unifized' is its own dataset format, which larmorx does "
           "not write: it refuses (NIfTI only)."))
 
     # --- AFNI's global options and environment variables --------------------------------------
@@ -238,8 +239,8 @@ def cases(tier: str) -> list[Case]:
 
 def suite(implementation: str = "original") -> Suite:
     """The 3dUnifize suite for the clean-room original (``larmorx afni 3dUnifize``, in
-    process) or the GPL replica (``larmorx-gpl afni 3dUnifize``, which larmorx runs as a
-    separate process); both through larmorx's command line and its Python API."""
+    process) or the bit-exact replica (in process as well); both through larmorx's command line
+    and its Python API."""
     tool_spec = spec(implementation)
     replica = implementation == "replica"
     who = "replica" if replica else "original"
@@ -248,9 +249,9 @@ def suite(implementation: str = "original") -> Suite:
         ar.run_case(tool_spec, case, checks)
 
     tool = (
-        f"`larmorx-gpl afni 3dUnifize` ({ar.replica_version()}; crate larmorx-gpl-afni, the "
-        "GPL-3.0-or-later replica translated from AFNI 26.3.05's source), run by larmorx as a "
-        "separate process: `larmorx afni 3dUnifize` with `LARMORX_IMPLEMENTATION=replica` and "
+        f"the bit-exact replica ({ar.replica_version()}: the translation of AFNI 26.3.05's "
+        "source, Apache-2.0 with CC BY 4.0's attribution, part of larmorx since 2026-10-29), "
+        "in-process: `larmorx afni 3dUnifize` with `LARMORX_IMPLEMENTATION=replica` and "
         '`lx.afni.unifize(..., implementation="replica")`'
         if replica
         else "`larmorx afni 3dUnifize` / `lx.afni.unifize` (crate larmorx-afni, the Apache-2.0 "

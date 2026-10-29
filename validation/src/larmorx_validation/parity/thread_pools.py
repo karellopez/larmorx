@@ -10,8 +10,8 @@ in the data panel's re-validation (2026-10-26, ``docs/findings/ants-cli.md``).
 
 :func:`programs` lists every registered program (``larmorx --help``: ANTs, AFNI, FSL, mri) over
 its distinct code paths (each registration stage and metric, warps, the filters, Atropos'
-initialisations), the AFNI originals in-process and the GPL and FSL replicas as their own
-programs when built; :func:`probe` runs one at one thread (``ITK_GLOBAL_DEFAULT_NUMBER_OF_THREADS
+initialisations), the AFNI originals and replicas (both in-process: the replicas are part of
+larmorx since 2026-10-29) and the FSL replicas as their own program when built; :func:`probe` runs one at one thread (``ITK_GLOBAL_DEFAULT_NUMBER_OF_THREADS
 =1`` for the ANTs programs, ``OMP_NUM_THREADS=1`` for the others) on small seeded inputs
 (:func:`inputs`) and lists every thread of its processes from ``/proc/<pid>/task`` every 10 ms:
 any thread but a process's main thread and its ``larmorx-<n>`` pools is work outside the call's
@@ -139,9 +139,7 @@ INPUTS = ("fixed", "moving", "mask", "labels", "prior01", "prior02", "prior03", 
           "warp")  # fmt: skip
 
 
-def programs(
-    d: Path, gpl: str | None = None, nc: str | None = None, *, make: bool = True
-) -> list[Program]:
+def programs(d: Path, nc: str | None = None, *, make: bool = True) -> list[Program]:
     """Every registered program over its distinct code paths, on :func:`inputs` in ``d``
     (``make=False``: the list only, the inputs not written)."""
     x = inputs(d) if make else {k: str(d / f"{k}.nii.gz") for k in INPUTS}
@@ -285,11 +283,9 @@ def programs(
     for name, a in afni.items():
         env = (*omp, ("LARMORX_IMPLEMENTATION", "original"))
         out.append(Program(f"afni {name} (clean-room original)", (*lx, "afni", name, *a), env))
-        if gpl:
-            a2 = [w.replace(o, o + "_gpl") for w in a]
-            out.append(
-                Program(f"afni {name} (replica, larmorx-gpl)", (gpl, "afni", name, *a2), omp)
-            )
+        a2 = [w.replace(o, o + "_replica") for w in a]
+        replica = (*omp, ("LARMORX_IMPLEMENTATION", "replica"))
+        out.append(Program(f"afni {name} (replica)", (*lx, "afni", name, *a2), replica))
     out.append(Program("mri hmc (clean-room original)",
                        (*lx, "mri", "hmc", "-in", s, "-out", o + "_hmc"), omp))  # fmt: skip
     # The mutual-information costs (stage 1 samples their slices in parallel, appendix B), FSL-59's

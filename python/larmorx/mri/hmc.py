@@ -5,13 +5,16 @@ the bit-exact replica from ``larmorx-nc``, run as a separate program).
 Every volume of a 4D series is registered to a reference volume with a rigid-body transform,
 by the schedule of line searches ``mcflirt`` uses (8 mm, 4 mm, 4 mm with a tighter tolerance),
 and the series is resampled with those transforms. The clean-room original's numbers follow
-``mcflirt`` (FSL 6.0.7) closely; the replica (``implementation="replica"``, or ``"auto"`` when
+``mcflirt`` (FSL 6.0.7.23) closely; the replica (``implementation="replica"``, or ``"auto"`` when
 ``larmorx-nc`` is installed) gives ``mcflirt``'s files bit for bit. See ``docs/api/mri-hmc.md``
 and the validation records ``docs/validation/mri-hmc.md`` and ``fsl-mcflirt-replica.md``.
 
 mcflirt's deterministic defects are corrected by default (D13, ``docs/api/upstream-defects.md``):
-the last volume's start (FSL-01), the in-plane mode's padding (FSL-03) and NaN voxels (FSL-14).
-``upstream_defects="reproduce"`` gives mcflirt's matrices.
+the last volume's start (FSL-01), the in-plane mode's padding (FSL-03), NaN voxels (FSL-14) and
+FSL 6.0.7.23's final interpolation (FSL-59: ``final="sinc"`` and ``"nearest"`` resample
+trilinearly in mcflirt 6.0.7.23). ``upstream_defects="reproduce"`` gives mcflirt's matrices and
+series. A path is read by its content (gzip, zstd, bzip2 or uncompressed) and, without an image
+extension, completed as FSL completes it.
 """
 
 from __future__ import annotations

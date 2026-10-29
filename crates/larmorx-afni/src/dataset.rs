@@ -246,7 +246,7 @@ fn type_name(code: i16) -> &'static str {
     }
 }
 
-/// Reads a NIfTI file as AFNI 25.2.09 does (`specs/3dTshift.md` §6), with AFNI's variables
+/// Reads a NIfTI file as AFNI 26.3.05 does (`specs/3dTshift.md` §6), with AFNI's variables
 /// `settings` (§7.1: `AFNI_NIFTI_PRIORITY`, `AFNI_NIFTI_SCALE`, `AFNI_NIFTI_TYPE_WARN`,
 /// `AFNI_NIFTI_VIEW`, `AFNI_DEFAULT_STD_SPACE`, `AFNI_NO_OBLIQUE_WARNING`). `shown` is the
 /// input's name in messages.

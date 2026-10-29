@@ -39,7 +39,7 @@ starts no other agent.
 ## The order from here
 
 **Now (2026-10-29):** the version update's AFNI and FSL parts are done (the replicas follow AFNI
-26.3.05 and FSL 6.0.7.23); next, item 3b, the clean-room originals follow them. Before: the move
+26.3.05 and FSL 6.0.7.23); the clean-room originals follow them too (item 3b, done the same day); next, part 3. Before: the move
 (M, below), the ANTs tools' data panel (part a) and the fourteen whole template registrations
 (14 of 14 identical with correctly rounded maths). The public summary of this order is the site's
 Roadmap page, updated at every completed step.
@@ -79,14 +79,22 @@ at a time:
    NumPy and OpenBLAS checked against their newest (resample-series and what follows numpy's
    inverses), and the FSL replicas follow Armadillo 14.2.1's LAPACK inverses (the follow-up
    below); each tool aligned with its newest original, with the per-part testing.
-   - **3b. The clean-room originals follow the newest versions** (user, 2026-10-29: "the clean
-     rooms should be compliant with the new versions"; right after part 2): one clean-room agent,
-     from the specs only (lines marked "AFNI 26.3.05" and "FSL 6.0.7.23"): 3dTshift, 3dAutomask and
-     3dUnifize aligned with AFNI 26.3.05 (the follow-up "The clean-room originals follow AFNI
-     26.3.05" below, its five points), the head-motion correction with mcflirt 6.0.7.23 (the follow-up
-     "The clean-room head-motion correction follows FSL 6.0.7.23" below, its five points), with
-     `-cost normmi` from `specs/mcflirt.md` appendix B; their
-     records, permanent cases and defaults moved to the newest originals.
+   - **3b. The clean-room originals follow the newest versions: done** (2026-10-29,
+     `docs/parts/2026-10-29-cleanroom-align/`): 3dTshift, 3dAutomask and 3dUnifize follow AFNI
+     26.3.05 (header slice code 2 and `-no_detrend` as 26.3.05 in both modes, AFNI-03 and
+     AFNI-05 never named; records against 26.3.05: 3dTshift 315 cases, 280 pass, 32 rejected by both, 3 expected
+     divergences, none failing; 3dAutomask 130 (110, 19, 1, none failing); 3dUnifize 117 (96, 19,
+     2, none failing)); the head-motion correction
+     follows mcflirt 6.0.7.23 (FSL-59, FSL-60, every `FSLOUTPUTTYPE` with zstd and bzip2 in pure
+     Rust, files read by content, names completed with FSL's errors; record against 6.0.7.23:
+     136 cases, 121 pass, 11 rejected by both, 3 expected divergences, 1 failing: `real/ds003345/default`,
+     as against 6.0.7.17; ds000005's `-cost mutualinfo` and `normmi` runs now 0.0048 and 0.011 mm
+     at the 95th percentile, FD r 0.984 and 0.953, from 0.049 and 0.065 mm, 0.64 and 0.54) and computes `-cost mutualinfo` and `normmi` exactly as `specs/mcflirt.md`
+     appendix B (on the 169 findings of the first long random-testing run, median ratio to
+     mcflirt 6.0.7.23 1.000 for both, `normmi` 55 of 91 within 1 % (before 1.051, 13 within 1 %),
+     `mutualinfo` 54 of 78 (before 0.983, 11); with `-fudge -stages 1` mcflirt's evaluated
+     matrices on 22 of 30 phantoms); the in-plane mode's centre is the padded volume's (found by
+     `-verbose 20` traces). Both originals' defaults moved to the newest originals at the merge.
    - **3c. The AFNI replicas move into the main package** (user, 2026-10-29; AFNI 26.3.05 releases
      MCW's code under CC BY 4.0: [findings/afni-relicensing-26.md](findings/afni-relicensing-26.md)):
      a replica author's part after part 3: `cbrtf` measured first (rule D: does 3dUnifize `-EPI`'s
@@ -444,15 +452,28 @@ The items below keep their history.
   obliquity of its own header extension's 7-digit matrix (AFNI-10); AFNI on the inputs without the
   extension prints the original's angle, and the parity suite now explains such messages by
   AFNI-10 (22 of 22 fMRIPrep cases pass).
-- **The head-motion correction's `-cost normmi`** (found 2026-10-29,
-  `docs/findings/mri-hmc-original.md`): on 91 random phantoms larmorx's corrected series is less
-  aligned than mcflirt's (median temporal-SD ratio 1.033; 26 above 1.10), while `mutualinfo` is
-  better (0.981). The spec describes the histogram costs in outline only (its open question 4):
-  the spec writer describes `normmi` exactly (histogram, fuzzy binning, entropy correction, the
-  normalised form), then a clean-room fix measured with
-  `validation/investigations/cleanroom-fixes/hmc_alignment.py`. Permanent case
-  `mri-hmc/normmi-aligns-worse` (open). The spec's appendix B describes `normmi` and `mutualinfo`
-  exactly since 2026-10-29 (the FSL version part): the fix is item 3b's.
+- **The spec's in-plane centre and the clean-room original's remaining last bits** (found
+  2026-10-29, `docs/findings/mri-hmc-original.md`): in the in-plane mode mcflirt rotates about the
+  padded test volume's centre of mass (observed with `-verbose 20` traces; the original does so
+  since 2026-10-29): the spec writer adds it to `specs/mcflirt.md` §12. With `-fudge -stages 1`
+  8 of 30 random phantoms still part from mcflirt's evaluated matrices after 19 to 224
+  evaluations, in the 5th or 6th decimal, as `normcorr` does (spec §17, open question 1): one
+  cause shared by every cost, for a later clean-room part with the traces of
+  `validation/investigations/cleanroom-align/mi_trace.py`.
+  Also for the spec writer (observed by the clean-room implementer, 2026-10-29, `validation/investigations/cleanroom-align/fsl_io_probe.py`): §4.1 and §10.1, `-out` drops any image
+  extension, the new ones included, before FSLOUTPUTTYPE's is added, and `-reffile` is completed
+  like `-in`; the unknown-type message comes after the estimation and the `.mat` and `.par` files
+  (exit 1); FSL-60's renaming applies to a pair's header only, never to the `.mat` directory or
+  the `.par`/`.rms` files; the completion errors' words (`Multiple possible filenames detected for
+  basename: <name>`, `No image files match: <name>`; signal 6). Open question 4 can record:
+  settled for `mutualinfo` and `normmi` by appendix B.
+- **The head-motion correction's FSL-01 notice in the in-plane mode** (found 2026-10-29 by the
+  clean-room alignment's random-testing trial, `mri-hmc:20261029:45`): with `-cost corratio` and a
+  separate reference on a thin slab, FSL-01 is named in `reproduce` only, because the default's
+  FSL-03 correction leaves the previous volume's stage-1 matrix at the identity (so starting the
+  last volume from it changes nothing). Decide by the notice rule (named where the two modes'
+  results differ): name FSL-01 in both modes where mcflirt's chain would have changed the last
+  volume, or declare the interplay; a clean-room agent.
 - **The replicas follow Armadillo 14.2.1's LAPACK inverses** (FSL 6.0.7.23; replica author):
   4 × 4 `inv()` (diagonal `1/x`; triangular `dtrtri`; symmetric `dsytrf`/`dsytri`; else
   `dgetrf` + `dgetri`), `inv(A)·B` (`dgesv`; symmetric `dsysv`), `det()` by LU, in OpenBLAS
@@ -471,30 +492,6 @@ The items below keep their history.
   the unblocked `dgetf2`/`dtrti2` paths), and check them bit for bit against
   `~/fsl-6.0.7.23/lib/liblapack.so.3` through a ctypes probe on random and FSL-typical matrices
   (swap, sampling, rigid, affine), before switching `arma.rs`.
-- **The clean-room head-motion correction follows FSL 6.0.7.23** (a clean-room agent; from
-  `specs/mcflirt.md`, lines marked "(FSL 6.0.7.23)"): (1) FSL-59: `reproduce` resamples
-  `-sinc_final` and `-nn_final` trilinearly, the default keeps the method asked for, both name
-  FSL-59 where they differ (§9.3); (2) the zstd and bzip2 output types and their message (§10.1),
-  reading by content (§4.1); (3) FSL-60 (§4.1); (4) its record against 6.0.7.23 and
-  `DEFAULT["original"]` in `validation/src/larmorx_validation/parity/fsl_versions.py` set to
-  6.0.7.23; (5) `-cost normmi` and `mutualinfo` from appendix B (the follow-up of 2026-10-29).
-  Against 6.0.7.23 today: the standard tier (136 cases) against mcflirt 6.0.7.23 gives 120 pass, 11 rejected by both, 3 expected divergences, 2 failures: the known `real/ds003345/default` and `syn/motion/small/nn_final` (FSL-59); every other case as against 6.0.7.17 (`validation/investigations/version-fsl/mri-hmc-6.0.7.23.md`); its record and default stay on 6.0.7.17.
-- **The clean-room originals follow AFNI 26.3.05** (item 3b; a clean-room agent; from the specs only,
-  lines marked "AFNI 26.3.05"): (1) 3dTshift `-no_detrend`: `reproduce` de-means every voxel
-  with its own mean, as `fix` does, and AFNI-05 is never named (`specs/3dTshift.md` §4); (2)
-  header slice code 2 in 3dTshift, 3dAutomask (`-apply_prefix`) and 3dUnifize (`-EPI`):
-  `reproduce` reads the times `end, end−1, …, start` as `fix` does, a copy where they exceed the
-  TR, and AFNI-03 is never named (`specs/3dTshift.md` §3.2, §6.4, §6.5; `specs/3dAutomask.md`
-  §9; `specs/3dUnifize.md`); (3) the permanent cases `difftest/slice-code-2-masked-notices`,
-  `epi-slice-code-2-fix-notice`, `epi-slice-code-2-reproduce-notices` re-described for 26.3.05;
-  (4) their records re-made against 26.3.05 and `DEFAULT["original"]` in
-  `validation/src/larmorx_validation/parity/afni_versions.py` set to 26.3.05; (5) version strings
-  (`PROVENANCE.md`: black-box runs of `oracles/afni-26.3.05`). Against 26.3.05 today
-  (`--afni-version 26.3.05`, standard tier): 3dTshift 6 of 315 cases fail (`options/*-no-detrend`
-  ×4, `header-timing/code2-seq-dec`, `header-timing/code2-beyond-tr`), 3dAutomask 1 of 130
-  (`difftest/slice-code-2-masked-notices`), 3dUnifize 2 of 117 (`difftest/epi-slice-code-2-*`);
-  every other case agrees as against 25.2.09; random testing against 26.3.05: 190 findings and 62
-  notices, every one AFNI-03 or AFNI-05.
 - **The version update, what changed in the numerics** (the newest releases fetched 2026-10-28
   beside the old ones in the workspace's `tags/`; FSL 6.0.7.23 installed in `~/fsl-6.0.7.23`,
   `~/fsl` still 6.0.7.17; AFNI 26.3.05 built in `oracles/afni-26.3.05`): SciPy 1.15.2 → 1.18.1

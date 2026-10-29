@@ -373,6 +373,9 @@ def _example(ctx: core.Context, reg: dict) -> dict:
         "lx-replica-fix": _compare_mats(mats["larmorx-fix"], mats["replica-fix"], centre),
         "replica23": _compare_mats(mats["replica23"], mats["mcflirt23"], centre),
         "mcflirt23": _compare_mats(mats["mcflirt23"], mats["mcflirt"], centre),
+        # The clean-room original against FSL 6.0.7.23, its reference since 2026-10-29: its run
+        # of the entry above (fMRIPrep's command meets none of the alignment's changes).
+        "larmorx23": _compare_mats(mats["larmorx"], mats["mcflirt23"], centre),
     }
     same_text = {k: texts[k] == texts["mcflirt"] for k in ("mcflirt-2", "fmriprep", "larmorx")}
     same_text["larmorx-1"] = texts["larmorx-1"] == texts["larmorx"]
@@ -384,6 +387,7 @@ def _example(ctx: core.Context, reg: dict) -> dict:
     )
     n_ident_23 = sum(a == b for a, b in zip(texts["replica23"], texts["mcflirt23"], strict=True))
     n_ident_step = sum(a == b for a, b in zip(texts["mcflirt23"], texts["mcflirt"], strict=True))
+    n_ident_lx23 = sum(a == b for a, b in zip(texts["larmorx"], texts["mcflirt23"], strict=True))
     band = {
         k: max(cmp[p][k] for p in PERTURB)
         for k in ("rms_median", "rms_p95", "rms_max", "mm_median", "deg_median")
@@ -560,6 +564,16 @@ def _example(ctx: core.Context, reg: dict) -> dict:
         ),
         fsl_step.replica_diff("replica23", "mcflirt23"),
         fsl_step.step_diff("mcflirt23", "mcflirt"),
+        # The clean-room original against FSL 6.0.7.23 (2026-10-29), last: the earlier
+        # comparisons keep their places.
+        dd(
+            "lx-mcflirt23",
+            "larmorx",
+            "mcflirt23",
+            "main",
+            f"clean-room original − mcflirt {fsl_step.NEW}",
+            "larmorx against the original (both implementations' reference)",
+        ),
     ]
     outputs = [{"id": "series", "label": "Realigned series", "unit": ""}]
     common.compare_all(ex, diffs, outputs)
@@ -616,6 +630,26 @@ def _example(ctx: core.Context, reg: dict) -> dict:
             links += [
                 {"label": "replica record", "href": f"docs/validation/{REPLICA_RECORD_NEW}.md"}
             ]
+        elif i == "lx-mcflirt23":
+            l23 = cmp["larmorx23"]
+            ok = (
+                l23["rms_p95"] <= band["rms_p95"]
+                and l23["mm_median"] <= band["mm_median"]
+                and l23["deg_median"] <= band["deg_median"]
+                and l23["fd_r"] >= band["fd_r"]
+            )
+            x["verdict"] = "bit-identical" if same[i] else ("within-variability" if ok else "open")
+            x["reason"] = (
+                f"FSL {fsl_step.NEW}'s mcflirt is the clean-room original's reference since "
+                "2026-10-29 (its record is against it). On fMRIPrep's command the original's "
+                f"matrices against it: 95th-percentile RMS deviation {l23['rms_p95']:.3g} mm, "
+                f"against mcflirt's own {band['rms_p95']:.3g} mm under the perturbations; "
+                f"{n_ident_lx23} of {n} matrices identical as text. The original's run is the "
+                "one above: fMRIPrep's command meets none of the changes of the alignment "
+                "(FSL-59's final interpolations, the zstd and bzip2 files, FSL-60's names, the "
+                "histogram costs)."
+            )
+            links += [{"label": "record", "href": f"docs/validation/{TOOL}.md"}]
         elif i == "mcflirt23-mcflirt":
             x["verdict"] = None
             x["reason"] = (
@@ -841,6 +875,13 @@ def _example(ctx: core.Context, reg: dict) -> dict:
                 "is-yardstick",
                 sub=f"the version step; {n_ident_step} of {n} matrices identical as text",
             ),
+            row(
+                f"clean-room original (reproduce) − mcflirt {fsl_step.NEW}",
+                cmp["larmorx23"],
+                "is-sep",
+                sub=f"its reference since 2026-10-29; {n_ident_lx23} of {n} matrices identical "
+                "as text",
+            ),
         ],
         note="The record's thresholds: 95th percentile ≤ 0.1 mm, median parameter differences ≤ "
         "0.05 mm and 0.05°, FD r ≥ 0.99 where FD reaches 0.5 mm, each widened to mcflirt's own "
@@ -916,7 +957,7 @@ def _example(ctx: core.Context, reg: dict) -> dict:
                 f"`{(ninfo.get('larmorx_commit') or '')[:12]}`. The case explorer below shows the "
                 "replica's full-tier record (against FSL 6.0.7.17) and its standard record "
                 "(against FSL 6.0.7.23) side by side; the clean-room original's record runs "
-                "against 6.0.7.17's recorded runs until it is aligned with 6.0.7.23.",
+                "against 6.0.7.23's recorded runs since its alignment (2026-10-29).",
             ),
         ],
         **out,
@@ -1251,7 +1292,7 @@ def export(ctx: core.Context) -> dict:
             common.implementation(
                 cases,
                 "original",
-                "larmorx clean-room original",
+                f"larmorx clean-room original, against FSL {fsl_step.NEW} (standard tier)",
                 "original",
                 f"docs/validation/{TOOL}.md",
                 "experimental",

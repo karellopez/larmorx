@@ -8,9 +8,15 @@
 //! reference file) are errors reported before any work, with exit code 1 (mcflirt aborts);
 //! `-gdt` is not supported.
 //!
-//! mcflirt's defects FSL-01, -03, -05 to -10, -13 and -14 are corrected unless the environment
-//! variable `LARMORX_UPSTREAM_DEFECTS` is `reproduce` (D13, `docs/api/upstream-defects.md`); a
-//! line on standard error names each one that changed (or would have changed) the outputs.
+//! mcflirt's defects FSL-01, -03, -05 to -10, -13, -14, -59 and -60 are corrected unless the
+//! environment variable `LARMORX_UPSTREAM_DEFECTS` is `reproduce` (D13,
+//! `docs/api/upstream-defects.md`); a line on standard error names each one that changed (or
+//! would have changed) the outputs.
+//!
+//! Files follow FSL 6.0.7.23 (`specs/mcflirt.md` §4.1, §10.1): read by their content (gzip,
+//! zstd, bzip2 or uncompressed), names without an image extension completed in FSL's order,
+//! and every `FSLOUTPUTTYPE` written, the zstd and bzip2 types included; an unknown one is
+//! reported in FSL's words before any work.
 
 use std::fs;
 use std::io::Write;
@@ -21,10 +27,13 @@ use larmorx_core::element::DataType;
 
 use super::{atof, atoi};
 use crate::hmc::estimate::{EstimateParams, InPlane};
-use crate::hmc::image::{self, Series, output_name, output_type, read_reference, read_series};
+use crate::hmc::files::{self as image_files, ImageFiles};
+use crate::hmc::image::{
+    self, Series, output_name, output_type, read_reference_files, read_series_files,
+};
 use crate::hmc::pipeline::{self, HmcOptions, HmcOutput, ReferenceChoice};
 use crate::hmc::report::{self, mat_text, par_text, rms_text};
-use crate::hmc::resample::Interpolation;
+use crate::hmc::resample::{self, Interpolation};
 use crate::hmc::rigid::IDENTITY;
 use crate::hmc::volume::Volume;
 use crate::hmc::{CostFunction, stats};
@@ -467,10 +476,11 @@ pub fn main_with(
     }
     match execute(&o, mode, out, err) {
         Ok(()) => 0,
-        Err(message) => {
+        Err(Failure::Error(message)) => {
             let _ = writeln!(err, "Error: {message}");
             1
         }
+        Err(Failure::Printed) => 1,
     }
 }
 
@@ -500,12 +510,73 @@ fn write_text(path: impl AsRef<Path>, text: &str) -> Result<(), String> {
     fs::write(path, text).map_err(|e| format!("cannot write {}: {e}", path.display()))
 }
 
+/// Why [`execute`] stopped: an error to print as `Error: <message>`, or a message already
+/// printed in the original's words.
+enum Failure {
+    Error(String),
+    Printed,
+}
+
+impl From<String> for Failure {
+    fn from(message: String) -> Failure {
+        Failure::Error(message)
+    }
+}
+
+impl From<&str> for Failure {
+    fn from(message: &str) -> Failure {
+        Failure::Error(message.to_owned())
+    }
+}
+
+/// FSL-60: the files of the image file name `name` (with its extension) as opened: by default
+/// the name given; with `reproduce`, the header (or single) file under FSL 6.0.7.23's name, the
+/// last `.img` of `name` made `.hdr` (§4.1). Named in both modes where the two differ.
+fn opened_files(
+    name: &str,
+    files: ImageFiles,
+    mode: UpstreamDefects,
+    err: &mut dyn Write,
+) -> ImageFiles {
+    let Some(renamed) = image_files::fsl60_header(name) else {
+        return files;
+    };
+    let detail = match mode {
+        UpstreamDefects::Fix => {
+            format!("{name} opened as given; FSL 6.0.7.23 opens {renamed} instead")
+        }
+        UpstreamDefects::Reproduce => {
+            format!("{name} opened as {renamed}, as FSL 6.0.7.23 opens it")
+        }
+    };
+    print_notice(err, &Notice::new(&defects::FSL_60, mode, detail));
+    if mode.fix() {
+        return files;
+    }
+    ImageFiles {
+        header: PathBuf::from(renamed),
+        data: files.data,
+    }
+}
+
+/// The files of the input image `name` (§4.1): completed when it has no image extension (FSL's
+/// errors), then [`opened_files`].
+fn input_files(
+    name: &str,
+    mode: UpstreamDefects,
+    err: &mut dyn Write,
+) -> Result<ImageFiles, String> {
+    let resolved = image_files::resolve_input(name)?;
+    let files = ImageFiles::of(&resolved).ok_or_else(|| format!("{resolved}: not an image"))?;
+    Ok(opened_files(&resolved, files, mode, err))
+}
+
 fn execute(
     o: &Options,
     mode: UpstreamDefects,
     out: &mut dyn Write,
     err: &mut dyn Write,
-) -> Result<(), String> {
+) -> Result<(), Failure> {
     let n_threads = threads();
     let input = o.input.as_deref().unwrap_or_default();
     let out_name = o
@@ -513,8 +584,12 @@ fn execute(
         .clone()
         .unwrap_or_else(|| format!("{}_mcf", image::strip_image_extension(input)));
     let output_type = std::env::var("FSLOUTPUTTYPE").unwrap_or_else(|_| "NIFTI_GZ".into());
-    let (image_path, version) = output_name(&out_name, &output_type)
-        .ok_or_else(|| format!("unknown FSLOUTPUTTYPE {output_type:?}"))?;
+    // An unknown FSLOUTPUTTYPE: FSL 6.0.7.23's message, before any work (mcflirt prints it after
+    // the estimation and the .mat and .par files, and exits 1).
+    let Some((image_path, version)) = output_name(&out_name, &output_type) else {
+        let _ = writeln!(err, "{}", image::unknown_output_type_message(&output_type));
+        return Err(Failure::Printed);
+    };
     let ext = image_path[image::strip_image_extension(&image_path).len()..].to_owned();
     if o.gdt {
         return Err("-gdt (registration of gradient images) is not supported".into());
@@ -526,7 +601,8 @@ fn execute(
     );
     note(o, err, "larmorx mri hmc - head-motion correction\n");
     note(o, err, "Reading time series... ");
-    let series = read_series(Path::new(input), n_threads).map_err(|e| e.to_string())?;
+    let files = input_files(input, mode, err)?;
+    let series = read_series_files(&files, n_threads).map_err(|e| e.to_string())?;
     let n = series.volumes.len();
     let reference_volume;
     let choice = if o.meanvol && o.reffile.is_none() {
@@ -535,8 +611,9 @@ fn execute(
         if o.stages <= 0 {
             return Err("-stages 0 with a reference file: nothing would be registered".into());
         }
+        let files = input_files(path, mode, err)?;
         let (vol, s, multiple) =
-            read_reference(Path::new(path), n_threads).map_err(|e| e.to_string())?;
+            read_reference_files(&files, n_threads).map_err(|e| e.to_string())?;
         if multiple {
             let _ = writeln!(
                 err,
@@ -612,7 +689,16 @@ fn execute(
         let _ = writeln!(out, "refnum = {r}\nOriginal_refvol = {}", o.refvol);
     }
     for n in write_outputs(
-        o, mode, &out_name, &ext, version, &series, &result, n_threads,
+        o,
+        mode,
+        &out_name,
+        &ext,
+        version,
+        &series,
+        &result,
+        options.init.as_ref(),
+        n_threads,
+        err,
     )? {
         print_notice(err, &n);
     }
@@ -639,7 +725,8 @@ fn reference_index(refvol: i64, n: usize) -> Result<usize, String> {
 
 /// Writes the files of §10: the `.mat` directory, `.par`, `.rms`, the corrected series, the
 /// `-stats` images and the mean of `-meanvol`. Returns the upstream defects that changed them
-/// (FSL-08, -09, -10, -13), or would have.
+/// (FSL-08, -09, -10, -13), or would have; FSL-60's notices (an image name holding `.img`) are
+/// printed on `err` as each image is opened.
 #[allow(clippy::too_many_arguments)]
 fn write_outputs(
     o: &Options,
@@ -649,7 +736,9 @@ fn write_outputs(
     version: larmorx_io::nifti::NiftiVersion,
     series: &Series,
     result: &HmcOutput,
+    init: Option<&crate::hmc::rigid::Mat4>,
     n_threads: usize,
+    err: &mut dyn Write,
 ) -> Result<Vec<Notice>, String> {
     let est = &result.estimate;
     let mut notices = Vec::new();
@@ -706,8 +795,10 @@ fn write_outputs(
     // Only the corrected series gets its own cal_min/cal_max (§10.1); the others keep the
     // input's (observed: -stats and -meanvol images carry the input's values).
     let mut write = |path: &str, vols: &[Volume], dt: DataType, cal: bool| {
-        let written = image::write_like(
-            Path::new(path),
+        let files = ImageFiles::of(path).ok_or_else(|| format!("{path}: not an image"))?;
+        let files = opened_files(path, files, mode, err);
+        let written = image::write_like_files(
+            &files,
             &series.header,
             version,
             series.flipped,
@@ -766,6 +857,33 @@ fn write_outputs(
             ),
         };
         notices.push(Notice::new(&defects::FSL_08, mode, detail));
+    }
+    // FSL-59 corrected: the series written is the interpolation asked for, mcflirt 6.0.7.23's
+    // the trilinear one. FSL-09 (mcflirt's truncation to an integer type) is named as it
+    // applies to mcflirt's series, so in both modes alike, also where the series written (a
+    // nearest-neighbour one) holds only integers.
+    let fsl59 = est.notices.iter().any(|n| n.defect.id == "FSL-59");
+    let named09 = notices.iter().any(|n| n.defect.id == "FSL-09");
+    if mode.fix()
+        && fsl59
+        && !named09
+        && let (Some((lo, hi)), Some(first)) = (image::integer_range(data_type), corrected.first())
+    {
+        let c = resample::fold_resampled(
+            &series.volumes,
+            &est.matrices,
+            init,
+            first.shape,
+            first.voxel_size,
+            Interpolation::Trilinear,
+            n_threads,
+            |v| image::conversion_counts(&v.data, lo, hi),
+        )
+        .map_err(|e| e.to_string())?;
+        if c != image::Conversion::default() {
+            let path = format!("{stem}{ext}");
+            notices.push(image::fsl09_notice(Path::new(&path), c, data_type, mode));
+        }
     }
     Ok(notices)
 }

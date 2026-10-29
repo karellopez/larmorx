@@ -9,6 +9,7 @@
 
 pub mod cost;
 pub mod estimate;
+pub mod files;
 pub mod grid;
 pub mod image;
 pub mod interp;

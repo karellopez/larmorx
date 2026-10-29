@@ -3,9 +3,9 @@
 `lx.afni.unifize` (command line `larmorx afni 3dUnifize`): the white-matter intensity of a
 T1-weighted volume made uniform across space and scaled to about 1000 (or, with `-T2`, of a
 T2-weighted one; with `-EPI`, of an EPI series), as AFNI's `3dUnifize` computes it (26.3.05;
-25.2.09 for the clean-room original until it is aligned, below).
+first 25.2.09).
 
-**AFNI versions** (2026-10-29): the replica follows AFNI 26.3.05 and is validated against it; the clean-room original is validated against AFNI 25.2.09 until a clean-room agent aligns it with 26.3.05. The two releases differ, for these programs, in two corrections larmorx already made by default (AFNI-03, header slice code 2; AFNI-05, 3dTshift's `-no_detrend`): the default output is the same with either; only `reproduce` differs where they apply ([findings](../findings/afni-relicensing-26.md) for the new licence).
+**AFNI versions** (2026-10-29): both implementations follow AFNI 26.3.05 and are validated against it (the clean-room original since its alignment the same day). The two releases differ, for these programs, in two corrections larmorx already made by default (AFNI-03, header slice code 2; AFNI-05, 3dTshift's `-no_detrend`): AFNI 26.3.05 behaves as larmorx corrected them, so `reproduce` now gives the same result as the default where they apply, and neither is named ([findings](../findings/afni-relicensing-26.md) for the new licence).
 
 **Two implementations.** 3dUnifize's results depend on AFNI library routines copyrighted by the
 Medical College of Wisconsin (GPL-2), so larmorx has the bit-exact **replica**
@@ -18,7 +18,7 @@ when it is installed (`pip install "larmorx[exact]"`), else the original; `"repl
 `"original"` (`LARMORX_IMPLEMENTATION`) forces one. Each image's `implementation` names the one
 that ran.
 
-**Status: `validated`**, both: the original against AFNI 25.2.09 itself, the replica against AFNI 26.3.05:
+**Status: `validated`**, both, against AFNI 26.3.05 itself (the original against AFNI 25.2.09 until 2026-10-29):
 - the original ([record](../validation/afni-unifize.md), 99 cases, none failing): AFNI's exit
   status and messages in every case; in 32 of the 72 compared cases that write outputs every
   output is AFNI's, bit for bit (data and NIfTI header); in the other 40 the headers are AFNI's
@@ -106,9 +106,9 @@ Corrected by default, reproduced with `upstream_defects="reproduce"`, by both im
 - **AFNI-01**: `-EPI`'s median volume drops a negative `scl_slope`, so its sign is wrong and the
   output is all zeros; the default applies the factor.
 - **AFNI-03 and AFNI-08**: `-EPI`'s output keeps the input's time axis and slice timing: header
-  slice code 2 keeps its corrected slice fields by default and is named in both modes; AFNI-08
-  is named where the kept times are all within 3 ms of 0 (in `reproduce`, every code-2 input),
-  as in 3dAutomask's masked input (since 2026-10-29 in the original, in the replica's words).
+  slice code 2 keeps its slice fields in both modes, as AFNI 26.3.05 does, and AFNI-03 is not
+  named (AFNI 25.2.09 read every slice time as 0); AFNI-08 is named where the kept times are all
+  within 3 ms of 0, in both modes, as in 3dAutomask's masked input.
 - **AFNI-40**, **AFNI-46**: `-T2up` without its value as the last argument, and `-T2` on a 2D
   image smaller than 16 × 16, crash AFNI; larmorx refuses (exit 1) in both modes.
 - The defects of AFNI's dataset reading and writing (AFNI-02, -07, -11, -12, -16, -18, -20, -22,

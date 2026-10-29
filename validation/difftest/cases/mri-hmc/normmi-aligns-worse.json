@@ -1,9 +1,9 @@
 {
  "defect": null,
- "description": "Head-motion correction with -cost normmi: the subset that aligns worse, left open (item 13, 2026-10-29)",
+ "description": "Head-motion correction with -cost normmi on a random phantom with large motion: once the subset that aligned worse (item 13, 2026-10-29), explained since the exact histogram costs (specs/mcflirt.md appendix B, next-steps item 3b, 2026-10-29)",
  "expect": "divergence",
  "found": {
-  "detail": "out_mcf.nii.gz.mat: matrix RMS deviation, 95th percentile: median 3.8174, max 18.6447 mm over 7 volumes; out_mcf.nii.gz.mat: median parameter difference: max 3.5499 mm, 20.7965\u00b0; FD (Power, 50 mm) correlation: max |\u0394FD| 24.6897 mm, max FD 25.110 mm; out_mcf.nii.gz: voxel values: max |diff| 164 (max |mcflirt| 167); 21989 of 31941 values differ; out_mcf.nii.gz_abs.rms: values: ; out_mcf.nii.gz_abs_mean.rms: values: ",
+  "detail": "out_mcf.nii.gz.mat: matrix RMS deviation, 95th percentile: median 3.8174, max 18.6447 mm over 7 volumes; out_mcf.nii.gz.mat: median parameter difference: max 3.5499 mm, 20.7965°; FD (Power, 50 mm) correlation: max |ΔFD| 24.6897 mm, max FD 25.110 mm; out_mcf.nii.gz: voxel values: max |diff| 164 (max |mcflirt| 167); 21989 of 31941 values differ; out_mcf.nii.gz_abs.rms: values: ; out_mcf.nii.gz_abs_mean.rms: values: ",
   "n": 1040,
   "seed": "20261025",
   "shrink_moves": [],
@@ -20,7 +20,7 @@
  "implementations": [
   "original"
  ],
- "reason": "-cost normmi: larmorx aligns this phantom worse than mcflirt (temporal SD 1.38 of mcflirt's); over the 91 normmi findings of the first long random-testing run (2026-10-25) the median ratio is 1.033; cause open (the spec describes the histogram costs in outline only; docs/findings/mri-hmc-original.md)",
+ "reason": "-cost normmi, computed exactly as specs/mcflirt.md appendix B describes it since 2026-10-29: larmorx now aligns this phantom better than mcflirt 6.0.7.23 (temporal SD 0.93 of mcflirt's; 1.38 before), its estimates ending in other minima of a phantom moved by large rotations, beyond the record's thresholds. Over the 91 normmi findings of the first long random-testing run (2026-10-25) the median ratio is now 1.000 (55 within 1 %; 1.051 before, against 6.0.7.23), and with -fudge -stages 1 mcflirt's evaluated matrices are larmorx's, evaluation by evaluation, on 11 of 15 such phantoms (docs/findings/mri-hmc-original.md)",
  "recipe": {
   "extra": {
    "keep_inputs": [
@@ -326,7 +326,7 @@
   "tool": "mri-hmc"
  },
  "rule": null,
- "status": "open",
+ "status": "fixed",
  "suite": "mri-hmc",
  "tier": "smoke",
  "tool": "mri-hmc"

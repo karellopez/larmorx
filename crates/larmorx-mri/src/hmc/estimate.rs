@@ -213,8 +213,19 @@ fn evaluate(stage: &Stage<'_>, tv: &TestVolume<'_>, m: &Mat4) -> f32 {
     }
 }
 
-/// Registers `test` (with centre `centre`) to the stage's grid from `start`.
+/// Registers `test` (with centre `centre`) to the stage's grid from `start`. In the in-plane
+/// mode the test volume is padded (§12) and its centre is the padded volume's (observed by the
+/// clean-room implementer, 2026-10-29: with the unpadded volume's centre the evaluated matrices
+/// of mcflirt 6.0.7.23's `-verbose 20` trace differ from the first rotation step on;
+/// `validation/investigations/cleanroom-align/mi_trace.py`).
 fn register(test: &Volume, centre: [f64; 3], start: &Mat4, stage: &Stage<'_>) -> Mat4 {
+    let padded = stage.in_plane.then(|| pad_z(test, 1));
+    let vol = padded.as_ref().unwrap_or(test);
+    let centre = match &padded {
+        Some(v) if stage.skip_non_finite => v.centre_of_mass_finite(),
+        Some(v) => v.centre_of_mass(),
+        None => centre,
+    };
     let mut p: Params = rigid::decompose(start, centre);
     if !rigid::is_finite(&p) {
         p = IDENTITY_PARAMS;
@@ -226,16 +237,13 @@ fn register(test: &Volume, centre: [f64; 3], start: &Mat4, stage: &Stage<'_>) ->
         p[5] = 0.0;
         p[6..].copy_from_slice(&IDENTITY_PARAMS[6..]);
     }
-    let padded;
-    let vol = if stage.in_plane {
-        padded = pad_z(test, 1);
-        &padded
-    } else {
-        test
-    };
     let mut tv = TestVolume::new(vol, stage.smooth);
     tv.skip_non_finite = stage.skip_non_finite;
     tv.count = stage.count;
+    if matches!(stage.cost, CostFunction::MutualInfo | CostFunction::NormMi) {
+        // The test bins come from the whole volume, padded as the cost sees it (appendix B).
+        tv.test_bins = Some(cost::TestBins::new(vol, stage.bins));
+    }
     if stage.sinc {
         tv.interpolation = CostInterpolation::Sinc {
             background: test.background(),
@@ -426,10 +434,13 @@ fn run_stages(
                 } else {
                     grid.clone()
                 };
-                let grid = if params.cost.is_histogram() {
-                    cost::bin_grid(&grid, bins)
-                } else {
-                    grid
+                let grid = match params.cost {
+                    // The mutual-information costs bin as appendix B describes.
+                    CostFunction::MutualInfo | CostFunction::NormMi => {
+                        cost::bin_grid_mi(&grid, bins, skip_non_finite)
+                    }
+                    c if c.is_histogram() => cost::bin_grid(&grid, bins),
+                    _ => grid,
                 };
                 let (order, ncompose) = if in_plane {
                     (vec![2, 3, 4], 6)

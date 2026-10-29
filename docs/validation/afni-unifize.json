@@ -2,7 +2,7 @@
  "environment": {
   "cpu": "AMD Ryzen 9 7945HX with Radeon Graphics",
   "larmorx": "0.0.1",
-  "larmorx_commit": "e82f16ee2f72",
+  "larmorx_commit": "add33449f82f",
   "larmorx_testdata_commit": "52124bc98f9f",
   "logical_cpus": 32,
   "os": "Linux-6.8.0-124-generic-x86_64-with-glibc2.35",
@@ -16,24 +16,24 @@
  "oracle_cache": {
   "differences": 0,
   "fresh": {
-   "above one thread: not yet 3 identical runs": 39,
+   "above one thread: not yet 3 identical runs": 55,
    "never cached: AFNI reads memory it never wrote (AFNI-47)": 1,
-   "not storable: its output Unifized+orig.HEAD holds a temporary path (lx-afni-gen-v1nv9zh8)": 1,
-   "not storable: its standard error names a temporary path (lx-afni-gen-v1nv9zh8) in a form the cache cannot map": 1
+   "not storable: its output Unifized+orig.HEAD holds a temporary path (lx-afni-gen-hybp8643)": 2,
+   "not storable: its standard error names a temporary path (lx-afni-gen-c5lqw0mi) in a form the cache cannot map": 2
   },
   "location": "<workspace>/oracles/cache",
   "mode": "use",
-  "ran": 42,
-  "saved_seconds": 6445.0,
-  "served": 200
+  "ran": 60,
+  "saved_seconds": 9367.8,
+  "served": 298
  },
- "reference": "3dUnifize from AFNI (AFNI_25.2.09, gcc (Ubuntu 11.4.0-1ubuntu1~22.04.3) 11.4.0, with OpenMP), the binary built by `scripts/build_afni_oracle.sh`",
+ "reference": "3dUnifize from AFNI (AFNI_26.3.05, gcc (Ubuntu 11.4.0-1ubuntu1~22.04.3) 11.4.0, with OpenMP), the binary built by `scripts/build_afni_oracle.sh`",
  "results": [
   {
    "case": "options/default",
    "category": "options",
-   "checks_passed": 9,
-   "checks_total": 9,
+   "checks_passed": 10,
+   "checks_total": 10,
    "failed_checks": [],
    "measured": {
     "exit status": 0,
@@ -41,18 +41,19 @@
    },
    "reason": "",
    "reported": {
+    "AFNI's own step: 25.2.09 \u2192 26.3.05": "identical",
     "D13 fix pass": 0,
     "uni.nii: values bit-identical to AFNI's": 1,
     "values bit-identical to AFNI's with correctly rounded maths": 0
    },
-   "seconds": 5.119,
+   "seconds": 51.887,
    "status": "pass"
   },
   {
    "case": "options/fmriprep-call",
    "category": "options",
-   "checks_passed": 7,
-   "checks_total": 7,
+   "checks_passed": 8,
+   "checks_total": 8,
    "failed_checks": [],
    "measured": {
     "exit status": 0,
@@ -60,16 +61,17 @@
    },
    "reason": "",
    "reported": {
+    "AFNI's own step: 25.2.09 \u2192 26.3.05": "identical",
     "D13 fix pass": 0
    },
-   "seconds": 7.224,
+   "seconds": 4.83,
    "status": "pass"
   },
   {
    "case": "options/Urad-5",
    "category": "options",
-   "checks_passed": 9,
-   "checks_total": 9,
+   "checks_passed": 10,
+   "checks_total": 10,
    "failed_checks": [],
    "measured": {
     "exit status": 0,
@@ -77,18 +79,19 @@
    },
    "reason": "",
    "reported": {
+    "AFNI's own step: 25.2.09 \u2192 26.3.05": "identical",
     "D13 fix pass": 0,
     "uni.nii: values bit-identical to AFNI's": 3,
     "values bit-identical to AFNI's with correctly rounded maths": 0
    },
-   "seconds": 1.019,
+   "seconds": 1.245,
    "status": "pass"
   },
   {
    "case": "options/Urad-12",
    "category": "options",
-   "checks_passed": 6,
-   "checks_total": 6,
+   "checks_passed": 7,
+   "checks_total": 7,
    "failed_checks": [],
    "measured": {
     "exit status": 0,
@@ -96,16 +99,17 @@
    },
    "reason": "",
    "reported": {
+    "AFNI's own step: 25.2.09 \u2192 26.3.05": "identical",
     "D13 fix pass": 0
    },
-   "seconds": 0.979,
+   "seconds": 0.973,
    "status": "pass"
   },
   {
    "case": "options/Urad-30",
    "category": "options",
-   "checks_passed": 6,
-   "checks_total": 6,
+   "checks_passed": 7,
+   "checks_total": 7,
    "failed_checks": [],
    "measured": {
     "exit status": 0,
@@ -113,16 +117,17 @@
    },
    "reason": "",
    "reported": {
+    "AFNI's own step: 25.2.09 \u2192 26.3.05": "identical",
     "D13 fix pass": 0
    },
-   "seconds": 5.31,
+   "seconds": 3.806,
    "status": "pass"
   },
   {
    "case": "options/rbt",
    "category": "options",
-   "checks_passed": 9,
-   "checks_total": 9,
+   "checks_passed": 10,
+   "checks_total": 10,
    "failed_checks": [],
    "measured": {
     "exit status": 0,
@@ -130,18 +135,19 @@
    },
    "reason": "",
    "reported": {
+    "AFNI's own step: 25.2.09 \u2192 26.3.05": "identical",
     "D13 fix pass": 0,
     "uni.nii: values bit-identical to AFNI's": 326,
     "values bit-identical to AFNI's with correctly rounded maths": 0
    },
-   "seconds": 2.59,
+   "seconds": 8.205,
    "status": "pass"
   },
   {
    "case": "options/param",
    "category": "options",
-   "checks_passed": 8,
-   "checks_total": 8,
+   "checks_passed": 9,
+   "checks_total": 9,
    "failed_checks": [],
    "measured": {
     "exit status": 0,
@@ -149,18 +155,19 @@
    },
    "reason": "",
    "reported": {
+    "AFNI's own step: 25.2.09 \u2192 26.3.05": "identical",
     "D13 fix pass": 0,
     "uni.nii: values bit-identical to AFNI's": 1,
     "values bit-identical to AFNI's with correctly rounded maths": 0
    },
-   "seconds": 27.88,
+   "seconds": 21.466,
    "status": "pass"
   },
   {
    "case": "options/clfrac-0.1",
    "category": "options",
-   "checks_passed": 8,
-   "checks_total": 8,
+   "checks_passed": 9,
+   "checks_total": 9,
    "failed_checks": [],
    "measured": {
     "exit status": 0,
@@ -168,18 +175,19 @@
    },
    "reason": "",
    "reported": {
+    "AFNI's own step: 25.2.09 \u2192 26.3.05": "identical",
     "D13 fix pass": 0,
     "uni.nii: values bit-identical to AFNI's": 1,
     "values bit-identical to AFNI's with correctly rounded maths": 0
    },
-   "seconds": 59.918,
+   "seconds": 49.461,
    "status": "pass"
   },
   {
    "case": "options/clfrac-0.5",
    "category": "options",
-   "checks_passed": 6,
-   "checks_total": 6,
+   "checks_passed": 7,
+   "checks_total": 7,
    "failed_checks": [],
    "measured": {
     "exit status": 0,
@@ -187,16 +195,17 @@
    },
    "reason": "",
    "reported": {
+    "AFNI's own step: 25.2.09 \u2192 26.3.05": "identical",
     "D13 fix pass": 0
    },
-   "seconds": 1.854,
+   "seconds": 1.496,
    "status": "pass"
   },
   {
    "case": "options/clfrac-0.9",
    "category": "options",
-   "checks_passed": 8,
-   "checks_total": 8,
+   "checks_passed": 9,
+   "checks_total": 9,
    "failed_checks": [],
    "measured": {
     "exit status": 0,
@@ -204,18 +213,19 @@
    },
    "reason": "",
    "reported": {
+    "AFNI's own step: 25.2.09 \u2192 26.3.05": "identical",
     "D13 fix pass": 0,
     "uni.nii: values bit-identical to AFNI's": 4,
     "values bit-identical to AFNI's with correctly rounded maths": 0
    },
-   "seconds": 17.764,
+   "seconds": 14.602,
    "status": "pass"
   },
   {
    "case": "options/mfrac",
    "category": "options",
-   "checks_passed": 8,
-   "checks_total": 8,
+   "checks_passed": 9,
+   "checks_total": 9,
    "failed_checks": [],
    "measured": {
     "exit status": 0,
@@ -223,18 +233,19 @@
    },
    "reason": "",
    "reported": {
+    "AFNI's own step: 25.2.09 \u2192 26.3.05": "identical",
     "D13 fix pass": 0,
     "uni.nii: values bit-identical to AFNI's": 1,
     "values bit-identical to AFNI's with correctly rounded maths": 0
    },
-   "seconds": 61.034,
+   "seconds": 48.271,
    "status": "pass"
   },
   {
    "case": "options/T2",
    "category": "options",
-   "checks_passed": 7,
-   "checks_total": 7,
+   "checks_passed": 8,
+   "checks_total": 8,
    "failed_checks": [],
    "measured": {
     "exit status": 0,
@@ -242,16 +253,17 @@
    },
    "reason": "",
    "reported": {
+    "AFNI's own step: 25.2.09 \u2192 26.3.05": "identical",
     "D13 fix pass": 0
    },
-   "seconds": 4.491,
+   "seconds": 3.419,
    "status": "pass"
   },
   {
    "case": "options/T2-T2",
    "category": "options",
-   "checks_passed": 7,
-   "checks_total": 7,
+   "checks_passed": 8,
+   "checks_total": 8,
    "failed_checks": [],
    "measured": {
     "exit status": 0,
@@ -259,16 +271,17 @@
    },
    "reason": "",
    "reported": {
+    "AFNI's own step: 25.2.09 \u2192 26.3.05": "identical",
     "D13 fix pass": 0
    },
-   "seconds": 4.682,
+   "seconds": 3.491,
    "status": "pass"
   },
   {
    "case": "options/T2-T2-T2",
    "category": "options",
-   "checks_passed": 6,
-   "checks_total": 6,
+   "checks_passed": 7,
+   "checks_total": 7,
    "failed_checks": [],
    "measured": {
     "exit status": 0,
@@ -276,47 +289,14 @@
    },
    "reason": "",
    "reported": {
+    "AFNI's own step: 25.2.09 \u2192 26.3.05": "identical",
     "D13 fix pass": 0
    },
-   "seconds": 1.361,
+   "seconds": 0.888,
    "status": "pass"
   },
   {
    "case": "options/T2-x4",
-   "category": "options",
-   "checks_passed": 6,
-   "checks_total": 6,
-   "failed_checks": [],
-   "measured": {
-    "exit status": 0,
-    "uni.nii: data": 0
-   },
-   "reason": "",
-   "reported": {
-    "D13 fix pass": 0
-   },
-   "seconds": 1.374,
-   "status": "pass"
-  },
-  {
-   "case": "options/T2-x3-EPI",
-   "category": "options",
-   "checks_passed": 6,
-   "checks_total": 6,
-   "failed_checks": [],
-   "measured": {
-    "exit status": 0,
-    "uni.nii: data": 0
-   },
-   "reason": "",
-   "reported": {
-    "D13 fix pass": 0
-   },
-   "seconds": 1.541,
-   "status": "pass"
-  },
-  {
-   "case": "options/T2up-95",
    "category": "options",
    "checks_passed": 7,
    "checks_total": 7,
@@ -327,16 +307,53 @@
    },
    "reason": "",
    "reported": {
+    "AFNI's own step: 25.2.09 \u2192 26.3.05": "identical",
     "D13 fix pass": 0
    },
-   "seconds": 4.609,
+   "seconds": 0.817,
+   "status": "pass"
+  },
+  {
+   "case": "options/T2-x3-EPI",
+   "category": "options",
+   "checks_passed": 7,
+   "checks_total": 7,
+   "failed_checks": [],
+   "measured": {
+    "exit status": 0,
+    "uni.nii: data": 0
+   },
+   "reason": "",
+   "reported": {
+    "AFNI's own step: 25.2.09 \u2192 26.3.05": "identical",
+    "D13 fix pass": 0
+   },
+   "seconds": 0.387,
+   "status": "pass"
+  },
+  {
+   "case": "options/T2up-95",
+   "category": "options",
+   "checks_passed": 8,
+   "checks_total": 8,
+   "failed_checks": [],
+   "measured": {
+    "exit status": 0,
+    "uni.nii: data": 0
+   },
+   "reason": "",
+   "reported": {
+    "AFNI's own step: 25.2.09 \u2192 26.3.05": "identical",
+    "D13 fix pass": 0
+   },
+   "seconds": 3.271,
    "status": "pass"
   },
   {
    "case": "options/GM",
    "category": "options",
-   "checks_passed": 9,
-   "checks_total": 9,
+   "checks_passed": 10,
+   "checks_total": 10,
    "failed_checks": [],
    "measured": {
     "exit status": 0,
@@ -344,32 +361,16 @@
    },
    "reason": "",
    "reported": {
+    "AFNI's own step: 25.2.09 \u2192 26.3.05": "identical",
     "D13 fix pass": 0,
     "uni.nii: values bit-identical to AFNI's": 1,
     "values bit-identical to AFNI's with correctly rounded maths": 0
    },
-   "seconds": 4.022,
+   "seconds": 51.232,
    "status": "pass"
   },
   {
    "case": "options/GM-T2",
-   "category": "options",
-   "checks_passed": 6,
-   "checks_total": 6,
-   "failed_checks": [],
-   "measured": {
-    "exit status": 0,
-    "uni.nii: data": 0
-   },
-   "reason": "",
-   "reported": {
-    "D13 fix pass": 0
-   },
-   "seconds": 2.306,
-   "status": "pass"
-  },
-  {
-   "case": "options/nosquash",
    "category": "options",
    "checks_passed": 7,
    "checks_total": 7,
@@ -380,16 +381,17 @@
    },
    "reason": "",
    "reported": {
+    "AFNI's own step: 25.2.09 \u2192 26.3.05": "identical",
     "D13 fix pass": 0
    },
-   "seconds": 3.926,
+   "seconds": 1.737,
    "status": "pass"
   },
   {
-   "case": "options/oink",
+   "case": "options/nosquash",
    "category": "options",
-   "checks_passed": 6,
-   "checks_total": 6,
+   "checks_passed": 8,
+   "checks_total": 8,
    "failed_checks": [],
    "measured": {
     "exit status": 0,
@@ -397,16 +399,35 @@
    },
    "reason": "",
    "reported": {
+    "AFNI's own step: 25.2.09 \u2192 26.3.05": "identical",
     "D13 fix pass": 0
    },
-   "seconds": 2.035,
+   "seconds": 3.336,
+   "status": "pass"
+  },
+  {
+   "case": "options/oink",
+   "category": "options",
+   "checks_passed": 7,
+   "checks_total": 7,
+   "failed_checks": [],
+   "measured": {
+    "exit status": 0,
+    "uni.nii: data": 0
+   },
+   "reason": "",
+   "reported": {
+    "AFNI's own step: 25.2.09 \u2192 26.3.05": "identical",
+    "D13 fix pass": 0
+   },
+   "seconds": 1.8,
    "status": "pass"
   },
   {
    "case": "options/ssave-amsave",
    "category": "options",
-   "checks_passed": 13,
-   "checks_total": 13,
+   "checks_passed": 14,
+   "checks_total": 14,
    "failed_checks": [],
    "measured": {
     "am.nii: data": 0,
@@ -416,18 +437,19 @@
    },
    "reason": "",
    "reported": {
+    "AFNI's own step: 25.2.09 \u2192 26.3.05": "identical",
     "D13 fix pass": 0,
     "uni.nii: values bit-identical to AFNI's": 1,
     "values bit-identical to AFNI's with correctly rounded maths": 0
    },
-   "seconds": 4.412,
+   "seconds": 52.193,
    "status": "pass"
   },
   {
    "case": "options/quiet",
    "category": "options",
-   "checks_passed": 8,
-   "checks_total": 8,
+   "checks_passed": 9,
+   "checks_total": 9,
    "failed_checks": [],
    "measured": {
     "exit status": 0,
@@ -435,18 +457,19 @@
    },
    "reason": "",
    "reported": {
+    "AFNI's own step: 25.2.09 \u2192 26.3.05": "identical",
     "D13 fix pass": 0,
     "uni.nii: values bit-identical to AFNI's": 1,
     "values bit-identical to AFNI's with correctly rounded maths": 0
    },
-   "seconds": 2.273,
+   "seconds": 49.076,
    "status": "pass"
   },
   {
    "case": "options/verb",
    "category": "options",
-   "checks_passed": 8,
-   "checks_total": 8,
+   "checks_passed": 9,
+   "checks_total": 9,
    "failed_checks": [],
    "measured": {
     "exit status": 0,
@@ -454,18 +477,19 @@
    },
    "reason": "",
    "reported": {
+    "AFNI's own step: 25.2.09 \u2192 26.3.05": "identical",
     "D13 fix pass": 0,
     "uni.nii: values bit-identical to AFNI's": 1,
     "values bit-identical to AFNI's with correctly rounded maths": 0
    },
-   "seconds": 2.853,
+   "seconds": 48.5,
    "status": "pass"
   },
   {
    "case": "options/verb-verb",
    "category": "options",
-   "checks_passed": 8,
-   "checks_total": 8,
+   "checks_passed": 9,
+   "checks_total": 9,
    "failed_checks": [],
    "measured": {
     "exit status": 0,
@@ -473,18 +497,19 @@
    },
    "reason": "",
    "reported": {
+    "AFNI's own step: 25.2.09 \u2192 26.3.05": "identical",
     "D13 fix pass": 0,
     "uni.nii: values bit-identical to AFNI's": 1,
     "values bit-identical to AFNI's with correctly rounded maths": 0
    },
-   "seconds": 60.517,
+   "seconds": 49.719,
    "status": "pass"
   },
   {
    "case": "options/useall",
    "category": "options",
-   "checks_passed": 8,
-   "checks_total": 8,
+   "checks_passed": 9,
+   "checks_total": 9,
    "failed_checks": [],
    "measured": {
     "exit status": 0,
@@ -492,18 +517,19 @@
    },
    "reason": "",
    "reported": {
+    "AFNI's own step: 25.2.09 \u2192 26.3.05": "identical",
     "D13 fix pass": 0,
     "uni.nii: values bit-identical to AFNI's": 1,
     "values bit-identical to AFNI's with correctly rounded maths": 0
    },
-   "seconds": 60.01,
+   "seconds": 49.879,
    "status": "pass"
   },
   {
    "case": "options/inset",
    "category": "options",
-   "checks_passed": 8,
-   "checks_total": 8,
+   "checks_passed": 9,
+   "checks_total": 9,
    "failed_checks": [],
    "measured": {
     "exit status": 0,
@@ -511,18 +537,19 @@
    },
    "reason": "",
    "reported": {
+    "AFNI's own step: 25.2.09 \u2192 26.3.05": "identical",
     "D13 fix pass": 0,
     "uni.nii: values bit-identical to AFNI's": 1,
     "values bit-identical to AFNI's with correctly rounded maths": 0
    },
-   "seconds": 59.49,
+   "seconds": 49.505,
    "status": "pass"
   },
   {
    "case": "options/case-insensitive",
    "category": "options",
-   "checks_passed": 6,
-   "checks_total": 6,
+   "checks_passed": 7,
+   "checks_total": 7,
    "failed_checks": [],
    "measured": {
     "exit status": 0,
@@ -530,16 +557,17 @@
    },
    "reason": "",
    "reported": {
+    "AFNI's own step: 25.2.09 \u2192 26.3.05": "identical",
     "D13 fix pass": 0
    },
-   "seconds": 2.06,
+   "seconds": 1.669,
    "status": "pass"
   },
   {
    "case": "options/duplo",
    "category": "options",
-   "checks_passed": 8,
-   "checks_total": 8,
+   "checks_passed": 9,
+   "checks_total": 9,
    "failed_checks": [],
    "measured": {
     "exit status": 0,
@@ -547,18 +575,19 @@
    },
    "reason": "",
    "reported": {
+    "AFNI's own step: 25.2.09 \u2192 26.3.05": "identical",
     "D13 fix pass": 0,
     "uni.nii.gz: values bit-identical to AFNI's": 5,
     "values bit-identical to AFNI's with correctly rounded maths": 0
    },
-   "seconds": 1.897,
+   "seconds": 6.394,
    "status": "pass"
   },
   {
    "case": "options/noduplo",
    "category": "options",
-   "checks_passed": 9,
-   "checks_total": 9,
+   "checks_passed": 10,
+   "checks_total": 10,
    "failed_checks": [],
    "measured": {
     "exit status": 0,
@@ -566,18 +595,19 @@
    },
    "reason": "",
    "reported": {
+    "AFNI's own step: 25.2.09 \u2192 26.3.05": "identical",
     "D13 fix pass": 0,
     "uni.nii.gz: values bit-identical to AFNI's": 10,
     "values bit-identical to AFNI's with correctly rounded maths": 0
    },
-   "seconds": 392.404,
+   "seconds": 349.222,
    "status": "pass"
   },
   {
    "case": "options/duplo-T2",
    "category": "options",
-   "checks_passed": 8,
-   "checks_total": 8,
+   "checks_passed": 9,
+   "checks_total": 9,
    "failed_checks": [],
    "measured": {
     "exit status": 0,
@@ -586,13 +616,32 @@
    },
    "reason": "",
    "reported": {
+    "AFNI's own step: 25.2.09 \u2192 26.3.05": "identical",
     "D13 fix pass": 0
    },
-   "seconds": 4.038,
+   "seconds": 2.591,
    "status": "pass"
   },
   {
    "case": "options/EPI",
+   "category": "options",
+   "checks_passed": 8,
+   "checks_total": 8,
+   "failed_checks": [],
+   "measured": {
+    "exit status": 0,
+    "uni.nii: data": 0
+   },
+   "reason": "",
+   "reported": {
+    "AFNI's own step: 25.2.09 \u2192 26.3.05": "identical",
+    "D13 fix pass": 0
+   },
+   "seconds": 0.789,
+   "status": "pass"
+  },
+  {
+   "case": "options/EPI-GM",
    "category": "options",
    "checks_passed": 7,
    "checks_total": 7,
@@ -603,33 +652,17 @@
    },
    "reason": "",
    "reported": {
+    "AFNI's own step: 25.2.09 \u2192 26.3.05": "identical",
     "D13 fix pass": 0
    },
-   "seconds": 0.893,
-   "status": "pass"
-  },
-  {
-   "case": "options/EPI-GM",
-   "category": "options",
-   "checks_passed": 6,
-   "checks_total": 6,
-   "failed_checks": [],
-   "measured": {
-    "exit status": 0,
-    "uni.nii: data": 0
-   },
-   "reason": "",
-   "reported": {
-    "D13 fix pass": 0
-   },
-   "seconds": 0.524,
+   "seconds": 0.36,
    "status": "pass"
   },
   {
    "case": "options/EPI-3D",
    "category": "options",
-   "checks_passed": 6,
-   "checks_total": 6,
+   "checks_passed": 7,
+   "checks_total": 7,
    "failed_checks": [],
    "measured": {
     "exit status": 0,
@@ -637,16 +670,17 @@
    },
    "reason": "",
    "reported": {
+    "AFNI's own step: 25.2.09 \u2192 26.3.05": "identical",
     "D13 fix pass": 0
    },
-   "seconds": 0.367,
+   "seconds": 0.34,
    "status": "pass"
   },
   {
    "case": "options/4D-without-EPI",
    "category": "options",
-   "checks_passed": 8,
-   "checks_total": 8,
+   "checks_passed": 9,
+   "checks_total": 9,
    "failed_checks": [],
    "measured": {
     "exit status": 0,
@@ -654,18 +688,19 @@
    },
    "reason": "",
    "reported": {
+    "AFNI's own step: 25.2.09 \u2192 26.3.05": "identical",
     "D13 fix pass": 0,
     "uni.nii: values bit-identical to AFNI's": 9,
     "values bit-identical to AFNI's with correctly rounded maths": 0
    },
-   "seconds": 1.609,
+   "seconds": 43.87,
    "status": "pass"
   },
   {
    "case": "datatypes/head-i16",
    "category": "datatypes",
-   "checks_passed": 10,
-   "checks_total": 10,
+   "checks_passed": 11,
+   "checks_total": 11,
    "failed_checks": [],
    "measured": {
     "exit status": 0,
@@ -674,18 +709,19 @@
    },
    "reason": "",
    "reported": {
+    "AFNI's own step: 25.2.09 \u2192 26.3.05": "identical",
     "D13 fix pass": 0,
     "uni.nii: values bit-identical to AFNI's": 1,
     "values bit-identical to AFNI's with correctly rounded maths": 0
    },
-   "seconds": 1.651,
+   "seconds": 44.389,
    "status": "pass"
   },
   {
    "case": "datatypes/head-u8",
    "category": "datatypes",
-   "checks_passed": 8,
-   "checks_total": 8,
+   "checks_passed": 9,
+   "checks_total": 9,
    "failed_checks": [],
    "measured": {
     "exit status": 0,
@@ -694,16 +730,17 @@
    },
    "reason": "",
    "reported": {
+    "AFNI's own step: 25.2.09 \u2192 26.3.05": "identical",
     "D13 fix pass": 0
    },
-   "seconds": 1.427,
+   "seconds": 1.285,
    "status": "pass"
   },
   {
    "case": "datatypes/head-i16-slope2",
    "category": "datatypes",
-   "checks_passed": 8,
-   "checks_total": 8,
+   "checks_passed": 9,
+   "checks_total": 9,
    "failed_checks": [],
    "measured": {
     "exit status": 0,
@@ -712,16 +749,17 @@
    },
    "reason": "",
    "reported": {
+    "AFNI's own step: 25.2.09 \u2192 26.3.05": "identical",
     "D13 fix pass": 0
    },
-   "seconds": 1.873,
+   "seconds": 1.279,
    "status": "pass"
   },
   {
    "case": "datatypes/head-i16-slope1",
    "category": "datatypes",
-   "checks_passed": 10,
-   "checks_total": 10,
+   "checks_passed": 11,
+   "checks_total": 11,
    "failed_checks": [],
    "measured": {
     "exit status": 0,
@@ -730,18 +768,19 @@
    },
    "reason": "",
    "reported": {
+    "AFNI's own step: 25.2.09 \u2192 26.3.05": "identical",
     "D13 fix pass": 0,
     "uni.nii: values bit-identical to AFNI's": 1,
     "values bit-identical to AFNI's with correctly rounded maths": 0
    },
-   "seconds": 57.071,
+   "seconds": 45.936,
    "status": "pass"
   },
   {
    "case": "datatypes/head-f64",
    "category": "datatypes",
-   "checks_passed": 10,
-   "checks_total": 10,
+   "checks_passed": 11,
+   "checks_total": 11,
    "failed_checks": [],
    "measured": {
     "exit status": 0,
@@ -750,18 +789,19 @@
    },
    "reason": "",
    "reported": {
+    "AFNI's own step: 25.2.09 \u2192 26.3.05": "identical",
     "D13 fix pass": 0,
     "uni.nii: values bit-identical to AFNI's": 1,
     "values bit-identical to AFNI's with correctly rounded maths": 0
    },
-   "seconds": 64.647,
+   "seconds": 50.07,
    "status": "pass"
   },
   {
    "case": "datatypes/head-i8",
    "category": "datatypes",
-   "checks_passed": 8,
-   "checks_total": 8,
+   "checks_passed": 9,
+   "checks_total": 9,
    "failed_checks": [],
    "measured": {
     "exit status": 0,
@@ -770,16 +810,17 @@
    },
    "reason": "",
    "reported": {
+    "AFNI's own step: 25.2.09 \u2192 26.3.05": "identical",
     "D13 fix pass": 0
    },
-   "seconds": 1.888,
+   "seconds": 1.213,
    "status": "pass"
   },
   {
    "case": "datatypes/head-nan",
    "category": "datatypes",
-   "checks_passed": 8,
-   "checks_total": 8,
+   "checks_passed": 9,
+   "checks_total": 9,
    "failed_checks": [],
    "measured": {
     "exit status": 0,
@@ -788,16 +829,17 @@
    },
    "reason": "",
    "reported": {
+    "AFNI's own step: 25.2.09 \u2192 26.3.05": "identical",
     "D13 fix pass": 0
    },
-   "seconds": 3.545,
+   "seconds": 1.732,
    "status": "pass"
   },
   {
    "case": "datatypes/head-oblique",
    "category": "datatypes",
-   "checks_passed": 10,
-   "checks_total": 10,
+   "checks_passed": 11,
+   "checks_total": 11,
    "failed_checks": [],
    "measured": {
     "exit status": 0,
@@ -806,18 +848,19 @@
    },
    "reason": "",
    "reported": {
+    "AFNI's own step: 25.2.09 \u2192 26.3.05": "identical",
     "D13 fix pass": 0,
     "uni.nii: values bit-identical to AFNI's": 1,
     "values bit-identical to AFNI's with correctly rounded maths": 0
    },
-   "seconds": 4.079,
+   "seconds": 47.726,
    "status": "pass"
   },
   {
    "case": "datatypes/head-qform-only",
    "category": "datatypes",
-   "checks_passed": 10,
-   "checks_total": 10,
+   "checks_passed": 11,
+   "checks_total": 11,
    "failed_checks": [],
    "measured": {
     "exit status": 0,
@@ -826,18 +869,19 @@
    },
    "reason": "",
    "reported": {
+    "AFNI's own step: 25.2.09 \u2192 26.3.05": "identical",
     "D13 fix pass": 0,
     "uni.nii: values bit-identical to AFNI's": 1,
     "values bit-identical to AFNI's with correctly rounded maths": 0
    },
-   "seconds": 59.7,
+   "seconds": 51.043,
    "status": "pass"
   },
   {
    "case": "datatypes/head-las",
    "category": "datatypes",
-   "checks_passed": 10,
-   "checks_total": 10,
+   "checks_passed": 11,
+   "checks_total": 11,
    "failed_checks": [],
    "measured": {
     "exit status": 0,
@@ -846,87 +890,16 @@
    },
    "reason": "",
    "reported": {
+    "AFNI's own step: 25.2.09 \u2192 26.3.05": "identical",
     "D13 fix pass": 0,
     "uni.nii: values bit-identical to AFNI's": 1,
     "values bit-identical to AFNI's with correctly rounded maths": 0
    },
-   "seconds": 58.266,
+   "seconds": 49.178,
    "status": "pass"
   },
   {
    "case": "defects/head-f32-slope-inter",
-   "category": "defects",
-   "checks_passed": 6,
-   "checks_total": 6,
-   "failed_checks": [],
-   "measured": {
-    "exit status": 0,
-    "uni.nii: data": 0
-   },
-   "reason": "",
-   "reported": {
-    "D13 fix pass": 55249
-   },
-   "seconds": 1.914,
-   "status": "pass"
-  },
-  {
-   "case": "defects/head-metre",
-   "category": "defects",
-   "checks_passed": 8,
-   "checks_total": 8,
-   "failed_checks": [],
-   "measured": {
-    "exit status": 0,
-    "uni.nii: data": 8.139054111687356e-08
-   },
-   "reason": "",
-   "reported": {
-    "D13 fix pass": 0,
-    "uni.nii: values bit-identical to AFNI's": 1,
-    "values bit-identical to AFNI's with correctly rounded maths": 0
-   },
-   "seconds": 4.468,
-   "status": "pass"
-  },
-  {
-   "case": "defects/head-nearly-plumb",
-   "category": "defects",
-   "checks_passed": 8,
-   "checks_total": 8,
-   "failed_checks": [],
-   "measured": {
-    "exit status": 0,
-    "uni.nii: data": 8.139054111687356e-08
-   },
-   "reason": "",
-   "reported": {
-    "D13 fix pass": 0,
-    "uni.nii: values bit-identical to AFNI's": 1,
-    "values bit-identical to AFNI's with correctly rounded maths": 0
-   },
-   "seconds": 1.789,
-   "status": "pass"
-  },
-  {
-   "case": "defects/nifti-scale-no",
-   "category": "defects",
-   "checks_passed": 6,
-   "checks_total": 6,
-   "failed_checks": [],
-   "measured": {
-    "exit status": 0,
-    "uni.nii: data": 0
-   },
-   "reason": "",
-   "reported": {
-    "D13 fix pass": 58184
-   },
-   "seconds": 2.105,
-   "status": "pass"
-  },
-  {
-   "case": "defects/T2up-100",
    "category": "defects",
    "checks_passed": 7,
    "checks_total": 7,
@@ -937,16 +910,93 @@
    },
    "reason": "",
    "reported": {
+    "AFNI's own step: 25.2.09 \u2192 26.3.05": "identical",
+    "D13 fix pass": 55249
+   },
+   "seconds": 1.793,
+   "status": "pass"
+  },
+  {
+   "case": "defects/head-metre",
+   "category": "defects",
+   "checks_passed": 9,
+   "checks_total": 9,
+   "failed_checks": [],
+   "measured": {
+    "exit status": 0,
+    "uni.nii: data": 8.139054111687356e-08
+   },
+   "reason": "",
+   "reported": {
+    "AFNI's own step: 25.2.09 \u2192 26.3.05": "identical",
+    "D13 fix pass": 0,
+    "uni.nii: values bit-identical to AFNI's": 1,
+    "values bit-identical to AFNI's with correctly rounded maths": 0
+   },
+   "seconds": 50.745,
+   "status": "pass"
+  },
+  {
+   "case": "defects/head-nearly-plumb",
+   "category": "defects",
+   "checks_passed": 9,
+   "checks_total": 9,
+   "failed_checks": [],
+   "measured": {
+    "exit status": 0,
+    "uni.nii: data": 8.139054111687356e-08
+   },
+   "reason": "",
+   "reported": {
+    "AFNI's own step: 25.2.09 \u2192 26.3.05": "identical",
+    "D13 fix pass": 0,
+    "uni.nii: values bit-identical to AFNI's": 1,
+    "values bit-identical to AFNI's with correctly rounded maths": 0
+   },
+   "seconds": 49.746,
+   "status": "pass"
+  },
+  {
+   "case": "defects/nifti-scale-no",
+   "category": "defects",
+   "checks_passed": 7,
+   "checks_total": 7,
+   "failed_checks": [],
+   "measured": {
+    "exit status": 0,
+    "uni.nii: data": 0
+   },
+   "reason": "",
+   "reported": {
+    "AFNI's own step: 25.2.09 \u2192 26.3.05": "identical",
+    "D13 fix pass": 58184
+   },
+   "seconds": 1.379,
+   "status": "pass"
+  },
+  {
+   "case": "defects/T2up-100",
+   "category": "defects",
+   "checks_passed": 8,
+   "checks_total": 8,
+   "failed_checks": [],
+   "measured": {
+    "exit status": 0,
+    "uni.nii: data": 0
+   },
+   "reason": "",
+   "reported": {
+    "AFNI's own step: 25.2.09 \u2192 26.3.05": "identical",
     "D13 fix pass": 53571
    },
-   "seconds": 3.227,
+   "seconds": 2.025,
    "status": "pass"
   },
   {
    "case": "defects/T2up-99.99",
    "category": "defects",
-   "checks_passed": 6,
-   "checks_total": 6,
+   "checks_passed": 7,
+   "checks_total": 7,
    "failed_checks": [],
    "measured": {
     "exit status": 0,
@@ -954,16 +1004,17 @@
    },
    "reason": "",
    "reported": {
+    "AFNI's own step: 25.2.09 \u2192 26.3.05": "identical",
     "D13 fix pass": 2569
    },
-   "seconds": 0.021,
+   "seconds": 0.033,
    "status": "pass"
   },
   {
    "case": "defects/EPI-negative-slope",
    "category": "defects",
-   "checks_passed": 6,
-   "checks_total": 6,
+   "checks_passed": 7,
+   "checks_total": 7,
    "failed_checks": [],
    "measured": {
     "exit status": 0,
@@ -971,9 +1022,10 @@
    },
    "reason": "",
    "reported": {
+    "AFNI's own step: 25.2.09 \u2192 26.3.05": "identical",
     "D13 fix pass": 337232
    },
-   "seconds": 0.941,
+   "seconds": 0.314,
    "status": "pass"
   },
   {
@@ -986,14 +1038,14 @@
    "reported": {
     "D13 fix pass": 211604
    },
-   "seconds": 3.767,
+   "seconds": 1.887,
    "status": "expected-divergence"
   },
   {
    "case": "dimensions/slice",
    "category": "dimensions",
-   "checks_passed": 6,
-   "checks_total": 6,
+   "checks_passed": 7,
+   "checks_total": 7,
    "failed_checks": [],
    "measured": {
     "exit status": 0,
@@ -1001,16 +1053,17 @@
    },
    "reason": "",
    "reported": {
+    "AFNI's own step: 25.2.09 \u2192 26.3.05": "identical",
     "D13 fix pass": 0
    },
-   "seconds": 0.038,
+   "seconds": 0.033,
    "status": "pass"
   },
   {
    "case": "dimensions/two-slices",
    "category": "dimensions",
-   "checks_passed": 6,
-   "checks_total": 6,
+   "checks_passed": 7,
+   "checks_total": 7,
    "failed_checks": [],
    "measured": {
     "exit status": 0,
@@ -1018,16 +1071,17 @@
    },
    "reason": "",
    "reported": {
+    "AFNI's own step: 25.2.09 \u2192 26.3.05": "identical",
     "D13 fix pass": 0
    },
-   "seconds": 0.079,
+   "seconds": 0.044,
    "status": "pass"
   },
   {
    "case": "dimensions/tiny",
    "category": "dimensions",
-   "checks_passed": 6,
-   "checks_total": 6,
+   "checks_passed": 7,
+   "checks_total": 7,
    "failed_checks": [],
    "measured": {
     "exit status": 0,
@@ -1035,16 +1089,17 @@
    },
    "reason": "",
    "reported": {
+    "AFNI's own step: 25.2.09 \u2192 26.3.05": "identical",
     "D13 fix pass": 0
    },
-   "seconds": 0.024,
+   "seconds": 0.01,
    "status": "pass"
   },
   {
    "case": "dimensions/zeros",
    "category": "dimensions",
-   "checks_passed": 6,
-   "checks_total": 6,
+   "checks_passed": 7,
+   "checks_total": 7,
    "failed_checks": [],
    "measured": {
     "exit status": 0,
@@ -1052,16 +1107,17 @@
    },
    "reason": "",
    "reported": {
+    "AFNI's own step: 25.2.09 \u2192 26.3.05": "identical",
     "D13 fix pass": 0
    },
-   "seconds": 1.1,
+   "seconds": 0.79,
    "status": "pass"
   },
   {
    "case": "dimensions/constant",
    "category": "dimensions",
-   "checks_passed": 6,
-   "checks_total": 6,
+   "checks_passed": 7,
+   "checks_total": 7,
    "failed_checks": [],
    "measured": {
     "exit status": 0,
@@ -1069,16 +1125,17 @@
    },
    "reason": "",
    "reported": {
+    "AFNI's own step: 25.2.09 \u2192 26.3.05": "identical",
     "D13 fix pass": 0
    },
-   "seconds": 2.502,
+   "seconds": 1.519,
    "status": "pass"
   },
   {
    "case": "dimensions/series-one",
    "category": "dimensions",
-   "checks_passed": 8,
-   "checks_total": 8,
+   "checks_passed": 9,
+   "checks_total": 9,
    "failed_checks": [],
    "measured": {
     "exit status": 0,
@@ -1086,184 +1143,208 @@
    },
    "reason": "",
    "reported": {
+    "AFNI's own step: 25.2.09 \u2192 26.3.05": "identical",
     "D13 fix pass": 0,
     "uni.nii: values bit-identical to AFNI's": 7,
     "values bit-identical to AFNI's with correctly rounded maths": 0
    },
-   "seconds": 54.109,
+   "seconds": 49.423,
    "status": "pass"
   },
   {
    "case": "errors/slice-small",
    "category": "errors",
-   "checks_passed": 3,
-   "checks_total": 3,
+   "checks_passed": 4,
+   "checks_total": 4,
    "failed_checks": [],
    "measured": {
     "exit status": 1
    },
    "reason": "AFNI exit 1: ** FATAL ERROR: Can't compute Unifize-d dataset for some reason :-(; larmorx exit 1: ** FATAL ERROR: Can't compute Unifize-d dataset for some reason :-( (the same messages)",
-   "seconds": 0.014,
+   "reported": {
+    "AFNI's own step: 25.2.09 \u2192 26.3.05": "identical"
+   },
+   "seconds": 0.005,
    "status": "both-error"
   },
   {
    "case": "errors/slice-small-T2",
    "category": "errors",
-   "checks_passed": 2,
-   "checks_total": 2,
+   "checks_passed": 3,
+   "checks_total": 3,
    "failed_checks": [],
    "measured": {
     "exit status": 1
    },
    "reason": "AFNI crashes (exit 1, Fatal Signal 11 (SIGSEGV) received); larmorx refuses (exit 1: ** FATAL ERROR: the automask of a 2D image smaller than 16 x 16 is empty (NULL): AFNI crashes inverting the contrast with it (AFNI-46)), after the same messages",
-   "seconds": 0.009,
+   "reported": {
+    "AFNI's own step: 25.2.09 \u2192 26.3.05": "identical"
+   },
+   "seconds": 0.004,
    "status": "both-error"
   },
   {
    "case": "errors/Urad-low",
    "category": "errors",
-   "checks_passed": 3,
-   "checks_total": 3,
+   "checks_passed": 4,
+   "checks_total": 4,
    "failed_checks": [],
    "measured": {
     "exit status": 1
    },
    "reason": "AFNI exit 1: ** FATAL ERROR: Illegal value 3.000000 after option -Urad; larmorx exit 1: ** FATAL ERROR: Illegal value 3.000000 after option -Urad (the same messages)",
-   "seconds": 0.007,
+   "reported": {
+    "AFNI's own step: 25.2.09 \u2192 26.3.05": "identical"
+   },
+   "seconds": 0.004,
    "status": "both-error"
   },
   {
    "case": "errors/Urad-high",
    "category": "errors",
-   "checks_passed": 3,
-   "checks_total": 3,
+   "checks_passed": 4,
+   "checks_total": 4,
    "failed_checks": [],
    "measured": {
     "exit status": 1
    },
    "reason": "AFNI exit 1: ** FATAL ERROR: Illegal value 120.000000 after option -Urad; larmorx exit 1: ** FATAL ERROR: Illegal value 120.000000 after option -Urad (the same messages)",
-   "seconds": 0.006,
+   "reported": {
+    "AFNI's own step: 25.2.09 \u2192 26.3.05": "identical"
+   },
+   "seconds": 0.004,
    "status": "both-error"
   },
   {
    "case": "errors/rbt-bottom",
    "category": "errors",
-   "checks_passed": 3,
-   "checks_total": 3,
+   "checks_passed": 4,
+   "checks_total": 4,
    "failed_checks": [],
    "measured": {
     "exit status": 1
    },
    "reason": "AFNI exit 1: ** FATAL ERROR: Illegal values (R pb pt) after '-rbt'; larmorx exit 1: ** FATAL ERROR: Illegal values (R pb pt) after '-rbt' (the same messages)",
-   "seconds": 0.006,
+   "reported": {
+    "AFNI's own step: 25.2.09 \u2192 26.3.05": "identical"
+   },
+   "seconds": 0.004,
    "status": "both-error"
   },
   {
    "case": "errors/rbt-order",
    "category": "errors",
-   "checks_passed": 3,
-   "checks_total": 3,
+   "checks_passed": 4,
+   "checks_total": 4,
    "failed_checks": [],
    "measured": {
     "exit status": 1
    },
    "reason": "AFNI exit 1: ** FATAL ERROR: Illegal values (R pb pt) after '-rbt'; larmorx exit 1: ** FATAL ERROR: Illegal values (R pb pt) after '-rbt' (the same messages)",
-   "seconds": 0.006,
+   "reported": {
+    "AFNI's own step: 25.2.09 \u2192 26.3.05": "identical"
+   },
+   "seconds": 0.004,
    "status": "both-error"
   },
   {
    "case": "errors/rbt-top",
    "category": "errors",
-   "checks_passed": 3,
-   "checks_total": 3,
+   "checks_passed": 4,
+   "checks_total": 4,
    "failed_checks": [],
    "measured": {
     "exit status": 1
    },
    "reason": "AFNI exit 1: ** FATAL ERROR: Illegal values (R pb pt) after '-rbt'; larmorx exit 1: ** FATAL ERROR: Illegal values (R pb pt) after '-rbt' (the same messages)",
-   "seconds": 0.006,
+   "reported": {
+    "AFNI's own step: 25.2.09 \u2192 26.3.05": "identical"
+   },
+   "seconds": 0.004,
    "status": "both-error"
   },
   {
    "case": "errors/rbt-missing",
    "category": "errors",
-   "checks_passed": 3,
-   "checks_total": 3,
+   "checks_passed": 4,
+   "checks_total": 4,
    "failed_checks": [],
    "measured": {
     "exit status": 1
    },
    "reason": "AFNI exit 1: ** FATAL ERROR: Need 3 arguments (R pb pt) after '-rbt'; larmorx exit 1: ** FATAL ERROR: Need 3 arguments (R pb pt) after '-rbt' (the same messages)",
-   "seconds": 0.006,
+   "reported": {
+    "AFNI's own step: 25.2.09 \u2192 26.3.05": "identical"
+   },
+   "seconds": 0.004,
    "status": "both-error"
   },
   {
    "case": "errors/clfrac-low",
    "category": "errors",
-   "checks_passed": 3,
-   "checks_total": 3,
+   "checks_passed": 4,
+   "checks_total": 4,
    "failed_checks": [],
    "measured": {
     "exit status": 1
    },
    "reason": "AFNI exit 1: ** FATAL ERROR: -clfrac value 0.050000 is illegal!; larmorx exit 1: ** FATAL ERROR: -clfrac value 0.050000 is illegal! (the same messages)",
-   "seconds": 0.006,
+   "reported": {
+    "AFNI's own step: 25.2.09 \u2192 26.3.05": "identical"
+   },
+   "seconds": 0.004,
    "status": "both-error"
   },
   {
    "case": "errors/clfrac-missing",
    "category": "errors",
-   "checks_passed": 3,
-   "checks_total": 3,
+   "checks_passed": 4,
+   "checks_total": 4,
    "failed_checks": [],
    "measured": {
     "exit status": 1
    },
    "reason": "AFNI exit 1: ** FATAL ERROR: Need argument after '-clfrac'; larmorx exit 1: ** FATAL ERROR: Need argument after '-clfrac' (the same messages)",
+   "reported": {
+    "AFNI's own step: 25.2.09 \u2192 26.3.05": "identical"
+   },
    "seconds": 0.004,
    "status": "both-error"
   },
   {
    "case": "errors/T2up-low",
    "category": "errors",
-   "checks_passed": 3,
-   "checks_total": 3,
+   "checks_passed": 4,
+   "checks_total": 4,
    "failed_checks": [],
    "measured": {
     "exit status": 1
    },
    "reason": "AFNI exit 1: ** FATAL ERROR: -T2up value is out of range 90..100 :-(; larmorx exit 1: ** FATAL ERROR: -T2up value is out of range 90..100 :-( (the same messages)",
-   "seconds": 0.006,
+   "reported": {
+    "AFNI's own step: 25.2.09 \u2192 26.3.05": "identical"
+   },
+   "seconds": 0.004,
    "status": "both-error"
   },
   {
    "case": "errors/T2up-high",
    "category": "errors",
-   "checks_passed": 3,
-   "checks_total": 3,
+   "checks_passed": 4,
+   "checks_total": 4,
    "failed_checks": [],
    "measured": {
     "exit status": 1
    },
    "reason": "AFNI exit 1: ** FATAL ERROR: -T2up value is out of range 90..100 :-(; larmorx exit 1: ** FATAL ERROR: -T2up value is out of range 90..100 :-( (the same messages)",
-   "seconds": 0.006,
+   "reported": {
+    "AFNI's own step: 25.2.09 \u2192 26.3.05": "identical"
+   },
+   "seconds": 0.004,
    "status": "both-error"
   },
   {
    "case": "errors/T2up-missing",
-   "category": "errors",
-   "checks_passed": 2,
-   "checks_total": 2,
-   "failed_checks": [],
-   "measured": {
-    "exit status": 1
-   },
-   "reason": "AFNI crashes (exit 1, Fatal Signal 11 (SIGSEGV) received); larmorx refuses (exit 1: ** FATAL ERROR: -T2up needs a value: AFNI crashes (Fatal Signal 11) when an option's value is missing (AFNI-40)), after the same messages",
-   "seconds": 0.005,
-   "status": "both-error"
-  },
-  {
-   "case": "errors/prefix-missing",
    "category": "errors",
    "checks_passed": 3,
    "checks_total": 3,
@@ -1271,106 +1352,144 @@
    "measured": {
     "exit status": 1
    },
+   "reason": "AFNI crashes (exit 1, Fatal Signal 11 (SIGSEGV) received); larmorx refuses (exit 1: ** FATAL ERROR: -T2up needs a value: AFNI crashes (Fatal Signal 11) when an option's value is missing (AFNI-40)), after the same messages",
+   "reported": {
+    "AFNI's own step: 25.2.09 \u2192 26.3.05": "identical"
+   },
+   "seconds": 0.004,
+   "status": "both-error"
+  },
+  {
+   "case": "errors/prefix-missing",
+   "category": "errors",
+   "checks_passed": 4,
+   "checks_total": 4,
+   "failed_checks": [],
+   "measured": {
+    "exit status": 1
+   },
    "reason": "AFNI exit 1: ** FATAL ERROR: Need argument after '-prefix'; larmorx exit 1: ** FATAL ERROR: Need argument after '-prefix' (the same messages)",
+   "reported": {
+    "AFNI's own step: 25.2.09 \u2192 26.3.05": "identical"
+   },
    "seconds": 0.004,
    "status": "both-error"
   },
   {
    "case": "errors/ssave-missing",
    "category": "errors",
-   "checks_passed": 3,
-   "checks_total": 3,
+   "checks_passed": 4,
+   "checks_total": 4,
    "failed_checks": [],
    "measured": {
     "exit status": 1
    },
    "reason": "AFNI exit 1: ** FATAL ERROR: Need argument after '-ssave'; larmorx exit 1: ** FATAL ERROR: Need argument after '-ssave' (the same messages)",
-   "seconds": 0.003,
+   "reported": {
+    "AFNI's own step: 25.2.09 \u2192 26.3.05": "identical"
+   },
+   "seconds": 0.004,
    "status": "both-error"
   },
   {
    "case": "errors/input-twice",
    "category": "errors",
-   "checks_passed": 3,
-   "checks_total": 3,
+   "checks_passed": 4,
+   "checks_total": 4,
    "failed_checks": [],
    "measured": {
     "exit status": 1
    },
    "reason": "AFNI exit 1: ** FATAL ERROR: Can't use '-input' twice; larmorx exit 1: ** FATAL ERROR: Can't use '-input' twice (the same messages)",
-   "seconds": 0.003,
+   "reported": {
+    "AFNI's own step: 25.2.09 \u2192 26.3.05": "identical"
+   },
+   "seconds": 0.005,
    "status": "both-error"
   },
   {
    "case": "errors/unknown-option",
    "category": "errors",
-   "checks_passed": 3,
-   "checks_total": 3,
+   "checks_passed": 4,
+   "checks_total": 4,
    "failed_checks": [],
    "measured": {
     "exit status": 1
    },
    "reason": "AFNI exit 1: ** FATAL ERROR: Unknown option: -bogus; larmorx exit 1: ** FATAL ERROR: Unknown option: -bogus (the same messages)",
-   "seconds": 0.003,
+   "reported": {
+    "AFNI's own step: 25.2.09 \u2192 26.3.05": "identical"
+   },
+   "seconds": 0.004,
    "status": "both-error"
   },
   {
    "case": "errors/no-dataset",
    "category": "errors",
-   "checks_passed": 3,
-   "checks_total": 3,
+   "checks_passed": 4,
+   "checks_total": 4,
    "failed_checks": [],
    "measured": {
     "exit status": 1
    },
    "reason": "AFNI exit 1: ** FATAL ERROR: No dataset name on command line?; larmorx exit 1: ** FATAL ERROR: No dataset name on command line? (the same messages)",
-   "seconds": 0.003,
+   "reported": {
+    "AFNI's own step: 25.2.09 \u2192 26.3.05": "identical"
+   },
+   "seconds": 0.004,
    "status": "both-error"
   },
   {
    "case": "errors/missing-input",
    "category": "errors",
-   "checks_passed": 3,
-   "checks_total": 3,
+   "checks_passed": 4,
+   "checks_total": 4,
    "failed_checks": [],
    "measured": {
     "exit status": 1
    },
    "reason": "AFNI exit 1: ** FATAL ERROR: Can't open dataset '/nonexistent/x.nii'; larmorx exit 1: ** FATAL ERROR: Can't open dataset '/nonexistent/x.nii' (the same messages)",
-   "seconds": 0.003,
+   "reported": {
+    "AFNI's own step: 25.2.09 \u2192 26.3.05": "identical"
+   },
+   "seconds": 0.004,
    "status": "both-error"
   },
   {
    "case": "divergences/default-prefix",
    "category": "divergences",
-   "checks_passed": 1,
-   "checks_total": 1,
+   "checks_passed": 2,
+   "checks_total": 2,
    "failed_checks": [],
    "reason": "AFNI's default prefix 'Unifized' is its own dataset format, which larmorx-gpl does not write: it refuses (NIfTI only).",
-   "seconds": 52.734,
+   "reported": {
+    "AFNI's own step: 25.2.09 \u2192 26.3.05": "identical"
+   },
+   "seconds": 95.443,
    "status": "expected-divergence"
   },
   {
    "case": "global/exists",
    "category": "global",
-   "checks_passed": 4,
-   "checks_total": 4,
+   "checks_passed": 5,
+   "checks_total": 5,
    "failed_checks": [],
    "measured": {
     "exit status": 0
    },
    "reason": "",
    "reported": {
+    "AFNI's own step: 25.2.09 \u2192 26.3.05": "identical",
     "D13 fix pass": 0
    },
-   "seconds": 0.98,
+   "seconds": 0.816,
    "status": "pass"
   },
   {
    "case": "global/overwrite",
    "category": "global",
-   "checks_passed": 8,
-   "checks_total": 8,
+   "checks_passed": 9,
+   "checks_total": 9,
    "failed_checks": [],
    "measured": {
     "exit status": 0,
@@ -1378,18 +1497,19 @@
    },
    "reason": "",
    "reported": {
+    "AFNI's own step: 25.2.09 \u2192 26.3.05": "identical",
     "D13 fix pass": 0,
     "uni.nii: values bit-identical to AFNI's": 1,
     "values bit-identical to AFNI's with correctly rounded maths": 0
    },
-   "seconds": 2.88,
+   "seconds": 49.776,
    "status": "pass"
   },
   {
    "case": "global/deconflict-yes",
    "category": "global",
-   "checks_passed": 8,
-   "checks_total": 8,
+   "checks_passed": 9,
+   "checks_total": 9,
    "failed_checks": [],
    "measured": {
     "exit status": 0,
@@ -1397,18 +1517,19 @@
    },
    "reason": "",
    "reported": {
+    "AFNI's own step: 25.2.09 \u2192 26.3.05": "identical",
     "D13 fix pass": 0,
     "uni_AA1.nii: values bit-identical to AFNI's": 1,
     "values bit-identical to AFNI's with correctly rounded maths": 0
    },
-   "seconds": 2.122,
+   "seconds": 48.491,
    "status": "pass"
   },
   {
    "case": "global/ssave-exists",
    "category": "global",
-   "checks_passed": 8,
-   "checks_total": 8,
+   "checks_passed": 9,
+   "checks_total": 9,
    "failed_checks": [],
    "measured": {
     "exit status": 0,
@@ -1416,18 +1537,19 @@
    },
    "reason": "",
    "reported": {
+    "AFNI's own step: 25.2.09 \u2192 26.3.05": "identical",
     "D13 fix pass": 0,
     "uni.nii: values bit-identical to AFNI's": 1,
     "values bit-identical to AFNI's with correctly rounded maths": 0
    },
-   "seconds": 53.024,
+   "seconds": 48.346,
    "status": "pass"
   },
   {
    "case": "global/D-write-type-2",
    "category": "global",
-   "checks_passed": 8,
-   "checks_total": 8,
+   "checks_passed": 9,
+   "checks_total": 9,
    "failed_checks": [],
    "measured": {
     "exit status": 0,
@@ -1435,18 +1557,19 @@
    },
    "reason": "",
    "reported": {
+    "AFNI's own step: 25.2.09 \u2192 26.3.05": "identical",
     "D13 fix pass": 0,
     "uni.nii: values bit-identical to AFNI's": 1,
     "values bit-identical to AFNI's with correctly rounded maths": 0
    },
-   "seconds": 54.27,
+   "seconds": 50.571,
    "status": "pass"
   },
   {
    "case": "environment/quiet-startup",
    "category": "environment",
-   "checks_passed": 8,
-   "checks_total": 8,
+   "checks_passed": 9,
+   "checks_total": 9,
    "failed_checks": [],
    "measured": {
     "exit status": 0,
@@ -1454,18 +1577,19 @@
    },
    "reason": "",
    "reported": {
+    "AFNI's own step: 25.2.09 \u2192 26.3.05": "identical",
     "D13 fix pass": 0,
     "uni.nii: values bit-identical to AFNI's": 1,
     "values bit-identical to AFNI's with correctly rounded maths": 0
    },
-   "seconds": 1.943,
+   "seconds": 49.351,
    "status": "pass"
   },
   {
    "case": "environment/message-prefix",
    "category": "environment",
-   "checks_passed": 8,
-   "checks_total": 8,
+   "checks_passed": 9,
+   "checks_total": 9,
    "failed_checks": [],
    "measured": {
     "exit status": 0,
@@ -1473,18 +1597,19 @@
    },
    "reason": "",
    "reported": {
+    "AFNI's own step: 25.2.09 \u2192 26.3.05": "identical",
     "D13 fix pass": 0,
     "uni.nii: values bit-identical to AFNI's": 1,
     "values bit-identical to AFNI's with correctly rounded maths": 0
    },
-   "seconds": 55.413,
+   "seconds": 50.192,
    "status": "pass"
   },
   {
    "case": "environment/echo-commandline",
    "category": "environment",
-   "checks_passed": 8,
-   "checks_total": 8,
+   "checks_passed": 9,
+   "checks_total": 9,
    "failed_checks": [],
    "measured": {
     "exit status": 0,
@@ -1492,66 +1617,70 @@
    },
    "reason": "",
    "reported": {
+    "AFNI's own step: 25.2.09 \u2192 26.3.05": "identical",
     "D13 fix pass": 0,
     "uni.nii: values bit-identical to AFNI's": 1,
     "values bit-identical to AFNI's with correctly rounded maths": 0
    },
-   "seconds": 54.092,
+   "seconds": 48.87,
    "status": "pass"
   },
   {
    "case": "global/prefix-with-blank",
    "category": "global",
-   "checks_passed": 4,
-   "checks_total": 4,
+   "checks_passed": 5,
+   "checks_total": 5,
    "failed_checks": [],
    "measured": {
     "exit status": 1
    },
    "reason": "",
    "reported": {
+    "AFNI's own step: 25.2.09 \u2192 26.3.05": "identical",
     "D13 fix pass": 0
    },
-   "seconds": 0.646,
+   "seconds": 0.897,
    "status": "pass"
   },
   {
    "case": "global/input-dir-with-blank",
    "category": "global",
-   "checks_passed": 4,
-   "checks_total": 4,
+   "checks_passed": 5,
+   "checks_total": 5,
    "failed_checks": [],
    "measured": {
     "exit status": 1
    },
    "reason": "",
    "reported": {
+    "AFNI's own step: 25.2.09 \u2192 26.3.05": "identical",
     "D13 fix pass": 0
    },
-   "seconds": 1.013,
+   "seconds": 0.859,
    "status": "pass"
   },
   {
    "case": "global/missing-directory",
    "category": "global",
-   "checks_passed": 4,
-   "checks_total": 4,
+   "checks_passed": 5,
+   "checks_total": 5,
    "failed_checks": [],
    "measured": {
     "exit status": 0
    },
    "reason": "",
    "reported": {
+    "AFNI's own step: 25.2.09 \u2192 26.3.05": "identical",
     "D13 fix pass": 0
    },
-   "seconds": 2.01,
+   "seconds": 1.669,
    "status": "pass"
   },
   {
    "case": "fmriprep/ds000005-task_mixedgamblestask_run_01",
    "category": "fmriprep",
-   "checks_passed": 11,
-   "checks_total": 11,
+   "checks_passed": 12,
+   "checks_total": 12,
    "failed_checks": [],
    "measured": {
     "exit status": 0,
@@ -1560,19 +1689,20 @@
    },
    "reason": "",
    "reported": {
+    "AFNI's own step: 25.2.09 \u2192 26.3.05": "identical",
     "D13 fix pass": 0,
     "band: AFNI at 1 thread(s)": 0,
     "band: AFNI at 6 thread(s)": 0,
     "band: fMRIPrep 25.2.6's AFNI": 0
    },
-   "seconds": 3.966,
+   "seconds": 3.441,
    "status": "pass"
   },
   {
    "case": "fmriprep/ds000005-task_mixedgamblestask_run_02",
    "category": "fmriprep",
-   "checks_passed": 14,
-   "checks_total": 14,
+   "checks_passed": 15,
+   "checks_total": 15,
    "failed_checks": [],
    "measured": {
     "exit status": 0,
@@ -1581,6 +1711,7 @@
    },
    "reason": "",
    "reported": {
+    "AFNI's own step: 25.2.09 \u2192 26.3.05": "identical",
     "D13 fix pass": 0,
     "band: AFNI at 1 thread(s)": 0,
     "band: AFNI at 6 thread(s)": 0,
@@ -1589,14 +1720,14 @@
     "uni.nii.gz: values bit-identical to AFNI's": 2,
     "values bit-identical to AFNI's with correctly rounded maths": 0
    },
-   "seconds": 35.907,
+   "seconds": 32.642,
    "status": "pass"
   },
   {
    "case": "fmriprep/ds000005-task_mixedgamblestask_run_03",
    "category": "fmriprep",
-   "checks_passed": 14,
-   "checks_total": 14,
+   "checks_passed": 15,
+   "checks_total": 15,
    "failed_checks": [],
    "measured": {
     "exit status": 0,
@@ -1605,6 +1736,7 @@
    },
    "reason": "",
    "reported": {
+    "AFNI's own step: 25.2.09 \u2192 26.3.05": "identical",
     "D13 fix pass": 0,
     "band: AFNI at 1 thread(s)": 0,
     "band: AFNI at 6 thread(s)": 0,
@@ -1613,14 +1745,14 @@
     "uni.nii.gz: values bit-identical to AFNI's": 2,
     "values bit-identical to AFNI's with correctly rounded maths": 0
    },
-   "seconds": 35.449,
+   "seconds": 33.651,
    "status": "pass"
   },
   {
    "case": "fmriprep/ds000228-task_pixar",
    "category": "fmriprep",
-   "checks_passed": 14,
-   "checks_total": 14,
+   "checks_passed": 15,
+   "checks_total": 15,
    "failed_checks": [],
    "measured": {
     "exit status": 0,
@@ -1629,6 +1761,7 @@
    },
    "reason": "",
    "reported": {
+    "AFNI's own step: 25.2.09 \u2192 26.3.05": "identical",
     "D13 fix pass": 0,
     "band: AFNI at 1 thread(s)": 0,
     "band: AFNI at 6 thread(s)": 0,
@@ -1637,14 +1770,14 @@
     "uni.nii.gz: values bit-identical to AFNI's": 4,
     "values bit-identical to AFNI's with correctly rounded maths": 0
    },
-   "seconds": 39.211,
+   "seconds": 35.303,
    "status": "pass"
   },
   {
    "case": "fmriprep/ds000256-task_restbaseline",
    "category": "fmriprep",
-   "checks_passed": 14,
-   "checks_total": 14,
+   "checks_passed": 15,
+   "checks_total": 15,
    "failed_checks": [],
    "measured": {
     "exit status": 0,
@@ -1653,6 +1786,7 @@
    },
    "reason": "",
    "reported": {
+    "AFNI's own step: 25.2.09 \u2192 26.3.05": "identical",
     "D13 fix pass": 0,
     "band: AFNI at 1 thread(s)": 0,
     "band: AFNI at 6 thread(s)": 0,
@@ -1661,14 +1795,14 @@
     "uni.nii.gz: values bit-identical to AFNI's": 1,
     "values bit-identical to AFNI's with correctly rounded maths": 0
    },
-   "seconds": 28.64,
+   "seconds": 24.911,
    "status": "pass"
   },
   {
    "case": "fmriprep/ds000256-task_restfixationfixed",
    "category": "fmriprep",
-   "checks_passed": 14,
-   "checks_total": 14,
+   "checks_passed": 15,
+   "checks_total": 15,
    "failed_checks": [],
    "measured": {
     "exit status": 0,
@@ -1677,6 +1811,7 @@
    },
    "reason": "",
    "reported": {
+    "AFNI's own step: 25.2.09 \u2192 26.3.05": "identical",
     "D13 fix pass": 0,
     "band: AFNI at 1 thread(s)": 0,
     "band: AFNI at 6 thread(s)": 0,
@@ -1685,14 +1820,14 @@
     "uni.nii.gz: values bit-identical to AFNI's": 2,
     "values bit-identical to AFNI's with correctly rounded maths": 0
    },
-   "seconds": 27.753,
+   "seconds": 25.281,
    "status": "pass"
   },
   {
    "case": "fmriprep/ds000256-task_restfixationnofeedback",
    "category": "fmriprep",
-   "checks_passed": 14,
-   "checks_total": 14,
+   "checks_passed": 15,
+   "checks_total": 15,
    "failed_checks": [],
    "measured": {
     "exit status": 0,
@@ -1701,6 +1836,7 @@
    },
    "reason": "",
    "reported": {
+    "AFNI's own step: 25.2.09 \u2192 26.3.05": "identical",
     "D13 fix pass": 0,
     "band: AFNI at 1 thread(s)": 0,
     "band: AFNI at 6 thread(s)": 0,
@@ -1709,14 +1845,14 @@
     "uni.nii.gz: values bit-identical to AFNI's": 4,
     "values bit-identical to AFNI's with correctly rounded maths": 0
    },
-   "seconds": 29.522,
+   "seconds": 26.372,
    "status": "pass"
   },
   {
    "case": "fmriprep/ds002422-task_arithm_run_01",
    "category": "fmriprep",
-   "checks_passed": 14,
-   "checks_total": 14,
+   "checks_passed": 15,
+   "checks_total": 15,
    "failed_checks": [],
    "measured": {
     "exit status": 0,
@@ -1725,6 +1861,7 @@
    },
    "reason": "",
    "reported": {
+    "AFNI's own step: 25.2.09 \u2192 26.3.05": "identical",
     "D13 fix pass": 0,
     "band: AFNI at 1 thread(s)": 0,
     "band: AFNI at 6 thread(s)": 0,
@@ -1733,14 +1870,14 @@
     "uni.nii.gz: values bit-identical to AFNI's": 13,
     "values bit-identical to AFNI's with correctly rounded maths": 0
    },
-   "seconds": 29.876,
+   "seconds": 28.549,
    "status": "pass"
   },
   {
    "case": "fmriprep/ds002422-task_arithm_run_02",
    "category": "fmriprep",
-   "checks_passed": 14,
-   "checks_total": 14,
+   "checks_passed": 15,
+   "checks_total": 15,
    "failed_checks": [],
    "measured": {
     "exit status": 0,
@@ -1749,6 +1886,7 @@
    },
    "reason": "",
    "reported": {
+    "AFNI's own step: 25.2.09 \u2192 26.3.05": "identical",
     "D13 fix pass": 0,
     "band: AFNI at 1 thread(s)": 0,
     "band: AFNI at 6 thread(s)": 0,
@@ -1757,14 +1895,14 @@
     "uni.nii.gz: values bit-identical to AFNI's": 7,
     "values bit-identical to AFNI's with correctly rounded maths": 0
    },
-   "seconds": 29.996,
+   "seconds": 28.657,
    "status": "pass"
   },
   {
    "case": "fmriprep/ds002422-task_rest",
    "category": "fmriprep",
-   "checks_passed": 14,
-   "checks_total": 14,
+   "checks_passed": 15,
+   "checks_total": 15,
    "failed_checks": [],
    "measured": {
     "exit status": 0,
@@ -1773,6 +1911,7 @@
    },
    "reason": "",
    "reported": {
+    "AFNI's own step: 25.2.09 \u2192 26.3.05": "identical",
     "D13 fix pass": 0,
     "band: AFNI at 1 thread(s)": 0,
     "band: AFNI at 6 thread(s)": 0,
@@ -1781,14 +1920,14 @@
     "uni.nii.gz: values bit-identical to AFNI's": 4,
     "values bit-identical to AFNI's with correctly rounded maths": 0
    },
-   "seconds": 32.055,
+   "seconds": 30.119,
    "status": "pass"
   },
   {
    "case": "fmriprep/ds002603-task_wm_acq_Mb4Mm3Tr550",
    "category": "fmriprep",
-   "checks_passed": 14,
-   "checks_total": 14,
+   "checks_passed": 15,
+   "checks_total": 15,
    "failed_checks": [],
    "measured": {
     "exit status": 0,
@@ -1797,6 +1936,7 @@
    },
    "reason": "",
    "reported": {
+    "AFNI's own step: 25.2.09 \u2192 26.3.05": "identical",
     "D13 fix pass": 0,
     "band: AFNI at 1 thread(s)": 0,
     "band: AFNI at 6 thread(s)": 0,
@@ -1805,14 +1945,14 @@
     "uni.nii.gz: values bit-identical to AFNI's": 7,
     "values bit-identical to AFNI's with correctly rounded maths": 0
    },
-   "seconds": 51.874,
+   "seconds": 51.216,
    "status": "pass"
   },
   {
    "case": "fmriprep/ds002603-task_wm_acq_SeqMm3Tr2000",
    "category": "fmriprep",
-   "checks_passed": 14,
-   "checks_total": 14,
+   "checks_passed": 15,
+   "checks_total": 15,
    "failed_checks": [],
    "measured": {
     "exit status": 0,
@@ -1821,6 +1961,7 @@
    },
    "reason": "",
    "reported": {
+    "AFNI's own step: 25.2.09 \u2192 26.3.05": "identical",
     "D13 fix pass": 0,
     "band: AFNI at 1 thread(s)": 0,
     "band: AFNI at 6 thread(s)": 0,
@@ -1829,14 +1970,14 @@
     "uni.nii.gz: values bit-identical to AFNI's": 10,
     "values bit-identical to AFNI's with correctly rounded maths": 0
    },
-   "seconds": 50.272,
+   "seconds": 51.989,
    "status": "pass"
   },
   {
    "case": "fmriprep/ds003592-ses_1_task_rest_echo_1",
    "category": "fmriprep",
-   "checks_passed": 14,
-   "checks_total": 14,
+   "checks_passed": 15,
+   "checks_total": 15,
    "failed_checks": [],
    "measured": {
     "exit status": 0,
@@ -1845,6 +1986,7 @@
    },
    "reason": "",
    "reported": {
+    "AFNI's own step: 25.2.09 \u2192 26.3.05": "identical",
     "D13 fix pass": 0,
     "band: AFNI at 1 thread(s)": 0,
     "band: AFNI at 6 thread(s)": 0,
@@ -1853,14 +1995,14 @@
     "uni.nii.gz: values bit-identical to AFNI's": 6,
     "values bit-identical to AFNI's with correctly rounded maths": 0
    },
-   "seconds": 41.721,
+   "seconds": 40.429,
    "status": "pass"
   },
   {
    "case": "fmriprep/ds004884-ses_217_task_naming40_acq_epfid2_dir_AP_run_2",
    "category": "fmriprep",
-   "checks_passed": 14,
-   "checks_total": 14,
+   "checks_passed": 15,
+   "checks_total": 15,
    "failed_checks": [],
    "measured": {
     "exit status": 0,
@@ -1869,6 +2011,7 @@
    },
    "reason": "",
    "reported": {
+    "AFNI's own step: 25.2.09 \u2192 26.3.05": "identical",
     "D13 fix pass": 0,
     "band: AFNI at 1 thread(s)": 0,
     "band: AFNI at 6 thread(s)": 0,
@@ -1877,14 +2020,14 @@
     "uni.nii.gz: values bit-identical to AFNI's": 2,
     "values bit-identical to AFNI's with correctly rounded maths": 0
    },
-   "seconds": 37.56,
+   "seconds": 38.401,
    "status": "pass"
   },
   {
    "case": "fmriprep/ds004884-ses_217_task_rest_acq_epfidp2p2_dir_AP_run_9",
    "category": "fmriprep",
-   "checks_passed": 14,
-   "checks_total": 14,
+   "checks_passed": 15,
+   "checks_total": 15,
    "failed_checks": [],
    "measured": {
     "exit status": 0,
@@ -1893,6 +2036,7 @@
    },
    "reason": "",
    "reported": {
+    "AFNI's own step: 25.2.09 \u2192 26.3.05": "identical",
     "D13 fix pass": 0,
     "band: AFNI at 1 thread(s)": 0,
     "band: AFNI at 6 thread(s)": 0,
@@ -1901,14 +2045,14 @@
     "uni.nii.gz: values bit-identical to AFNI's": 2,
     "values bit-identical to AFNI's with correctly rounded maths": 0
    },
-   "seconds": 33.148,
+   "seconds": 34.423,
    "status": "pass"
   },
   {
    "case": "fmriprep/ds004958-task_rest",
    "category": "fmriprep",
-   "checks_passed": 14,
-   "checks_total": 14,
+   "checks_passed": 15,
+   "checks_total": 15,
    "failed_checks": [],
    "measured": {
     "exit status": 0,
@@ -1917,6 +2061,7 @@
    },
    "reason": "",
    "reported": {
+    "AFNI's own step: 25.2.09 \u2192 26.3.05": "identical",
     "D13 fix pass": 0,
     "band: AFNI at 1 thread(s)": 0,
     "band: AFNI at 6 thread(s)": 0,
@@ -1925,14 +2070,14 @@
     "uni.nii.gz: values bit-identical to AFNI's": 1,
     "values bit-identical to AFNI's with correctly rounded maths": 0
    },
-   "seconds": 148.206,
+   "seconds": 161.456,
    "status": "pass"
   },
   {
    "case": "fmriprep/ds005003-ses_1_task_motor",
    "category": "fmriprep",
-   "checks_passed": 14,
-   "checks_total": 14,
+   "checks_passed": 15,
+   "checks_total": 15,
    "failed_checks": [],
    "measured": {
     "exit status": 0,
@@ -1941,6 +2086,7 @@
    },
    "reason": "",
    "reported": {
+    "AFNI's own step: 25.2.09 \u2192 26.3.05": "identical",
     "D13 fix pass": 0,
     "band: AFNI at 1 thread(s)": 0,
     "band: AFNI at 6 thread(s)": 0,
@@ -1949,14 +2095,14 @@
     "uni.nii.gz: values bit-identical to AFNI's": 3,
     "values bit-identical to AFNI's with correctly rounded maths": 0
    },
-   "seconds": 25.255,
+   "seconds": 30.136,
    "status": "pass"
   },
   {
    "case": "fmriprep/ds005003-ses_1_task_rest",
    "category": "fmriprep",
-   "checks_passed": 14,
-   "checks_total": 14,
+   "checks_passed": 15,
+   "checks_total": 15,
    "failed_checks": [],
    "measured": {
     "exit status": 0,
@@ -1965,6 +2111,7 @@
    },
    "reason": "",
    "reported": {
+    "AFNI's own step: 25.2.09 \u2192 26.3.05": "identical",
     "D13 fix pass": 0,
     "band: AFNI at 1 thread(s)": 0,
     "band: AFNI at 6 thread(s)": 0,
@@ -1973,14 +2120,14 @@
     "uni.nii.gz: values bit-identical to AFNI's": 8,
     "values bit-identical to AFNI's with correctly rounded maths": 0
    },
-   "seconds": 25.282,
+   "seconds": 31.499,
    "status": "pass"
   },
   {
    "case": "fmriprep/ds005040-task_clip_run_1",
    "category": "fmriprep",
-   "checks_passed": 14,
-   "checks_total": 14,
+   "checks_passed": 15,
+   "checks_total": 15,
    "failed_checks": [],
    "measured": {
     "exit status": 0,
@@ -1989,6 +2136,7 @@
    },
    "reason": "",
    "reported": {
+    "AFNI's own step: 25.2.09 \u2192 26.3.05": "identical",
     "D13 fix pass": 0,
     "band: AFNI at 1 thread(s)": 0,
     "band: AFNI at 6 thread(s)": 0,
@@ -1997,14 +2145,14 @@
     "uni.nii.gz: values bit-identical to AFNI's": 7,
     "values bit-identical to AFNI's with correctly rounded maths": 0
    },
-   "seconds": 38.891,
+   "seconds": 42.768,
    "status": "pass"
   },
   {
    "case": "fmriprep/ds005454-task_rest",
    "category": "fmriprep",
-   "checks_passed": 14,
-   "checks_total": 14,
+   "checks_passed": 15,
+   "checks_total": 15,
    "failed_checks": [],
    "measured": {
     "exit status": 0,
@@ -2013,6 +2161,7 @@
    },
    "reason": "",
    "reported": {
+    "AFNI's own step: 25.2.09 \u2192 26.3.05": "identical",
     "D13 fix pass": 0,
     "band: AFNI at 1 thread(s)": 0,
     "band: AFNI at 6 thread(s)": 0,
@@ -2021,14 +2170,14 @@
     "uni.nii.gz: values bit-identical to AFNI's": 14,
     "values bit-identical to AFNI's with correctly rounded maths": 0
    },
-   "seconds": 9.793,
+   "seconds": 12.58,
    "status": "pass"
   },
   {
    "case": "fmriprep/ds005752-ses_01_task_rest_dir_forward",
    "category": "fmriprep",
-   "checks_passed": 14,
-   "checks_total": 14,
+   "checks_passed": 15,
+   "checks_total": 15,
    "failed_checks": [],
    "measured": {
     "exit status": 0,
@@ -2037,6 +2186,7 @@
    },
    "reason": "",
    "reported": {
+    "AFNI's own step: 25.2.09 \u2192 26.3.05": "identical",
     "D13 fix pass": 0,
     "band: AFNI at 1 thread(s)": 0,
     "band: AFNI at 6 thread(s)": 0,
@@ -2045,14 +2195,14 @@
     "uni.nii.gz: values bit-identical to AFNI's": 1,
     "values bit-identical to AFNI's with correctly rounded maths": 0
    },
-   "seconds": 34.054,
+   "seconds": 37.824,
    "status": "pass"
   },
   {
    "case": "fmriprep/ds005752-ses_01_task_rest_dir_reverse",
    "category": "fmriprep",
-   "checks_passed": 14,
-   "checks_total": 14,
+   "checks_passed": 15,
+   "checks_total": 15,
    "failed_checks": [],
    "measured": {
     "exit status": 0,
@@ -2061,6 +2211,7 @@
    },
    "reason": "",
    "reported": {
+    "AFNI's own step: 25.2.09 \u2192 26.3.05": "identical",
     "D13 fix pass": 0,
     "band: AFNI at 1 thread(s)": 0,
     "band: AFNI at 6 thread(s)": 0,
@@ -2069,14 +2220,14 @@
     "uni.nii.gz: values bit-identical to AFNI's": 2,
     "values bit-identical to AFNI's with correctly rounded maths": 0
    },
-   "seconds": 33.829,
+   "seconds": 36.119,
    "status": "pass"
   },
   {
    "case": "real/T1w-ds000005",
    "category": "real",
-   "checks_passed": 12,
-   "checks_total": 12,
+   "checks_passed": 13,
+   "checks_total": 13,
    "failed_checks": [],
    "measured": {
     "exit status": 0,
@@ -2085,20 +2236,21 @@
    },
    "reason": "",
    "reported": {
+    "AFNI's own step: 25.2.09 \u2192 26.3.05": "identical",
     "D13 fix pass": 0,
     "band: AFNI at 6 thread(s)": 0,
     "band: fMRIPrep 25.2.6's AFNI": 0,
     "uni.nii.gz: values bit-identical to AFNI's": 1633,
     "values bit-identical to AFNI's with correctly rounded maths": 0
    },
-   "seconds": 30.872,
+   "seconds": 33.523,
    "status": "pass"
   },
   {
    "case": "real/EPI-ds000005",
    "category": "real",
-   "checks_passed": 8,
-   "checks_total": 8,
+   "checks_passed": 9,
+   "checks_total": 9,
    "failed_checks": [],
    "measured": {
     "exit status": 0,
@@ -2106,18 +2258,19 @@
    },
    "reason": "",
    "reported": {
+    "AFNI's own step: 25.2.09 \u2192 26.3.05": "identical",
     "D13 fix pass": 0,
     "band: AFNI at 6 thread(s)": 0,
     "band: fMRIPrep 25.2.6's AFNI": 0
    },
-   "seconds": 16.525,
+   "seconds": 18.302,
    "status": "pass"
   },
   {
    "case": "difftest/epi-slice-code-2-fix-notice",
    "category": "difftest",
-   "checks_passed": 6,
-   "checks_total": 6,
+   "checks_passed": 7,
+   "checks_total": 7,
    "failed_checks": [],
    "measured": {
     "exit status": 0,
@@ -2125,16 +2278,17 @@
    },
    "reason": "",
    "reported": {
+    "AFNI's own step: 25.2.09 \u2192 26.3.05": "changed",
     "D13 fix pass": 0
    },
-   "seconds": 0.008,
+   "seconds": 0.012,
    "status": "pass"
   },
   {
    "case": "difftest/epi-slice-code-2-reproduce-notices",
    "category": "difftest",
-   "checks_passed": 6,
-   "checks_total": 6,
+   "checks_passed": 7,
+   "checks_total": 7,
    "failed_checks": [],
    "measured": {
     "exit status": 0,
@@ -2142,16 +2296,17 @@
    },
    "reason": "",
    "reported": {
+    "AFNI's own step: 25.2.09 \u2192 26.3.05": "changed",
     "D13 fix pass": 0
    },
-   "seconds": 0.007,
+   "seconds": 0.012,
    "status": "pass"
   },
   {
    "case": "difftest/tiny-oblique-header",
    "category": "difftest",
-   "checks_passed": 6,
-   "checks_total": 6,
+   "checks_passed": 7,
+   "checks_total": 7,
    "failed_checks": [],
    "measured": {
     "exit status": 0,
@@ -2159,9 +2314,10 @@
    },
    "reason": "",
    "reported": {
+    "AFNI's own step: 25.2.09 \u2192 26.3.05": "identical",
     "D13 fix pass": 0
    },
-   "seconds": 0.007,
+   "seconds": 0.011,
    "status": "pass"
   }
  ],

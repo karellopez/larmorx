@@ -15,7 +15,7 @@ use std::path::Path;
 
 use larmorx_core::affine::Affine;
 use larmorx_core::defects::{self, Notice, UpstreamDefects};
-use larmorx_core::element::{DataType, RealElement};
+use larmorx_core::element::{DataType, Element, RealElement};
 use larmorx_core::linalg::det3;
 use larmorx_core::ndarray::{ArrayD, IxDyn, ShapeBuilder};
 use larmorx_core::parallel;
@@ -23,6 +23,7 @@ use larmorx_core::{DynArray, dispatch_real_dyn_array};
 use larmorx_io::nifti::{self, NiftiHeader, NiftiVersion, ReadOptions, Scaling, WriteOptions};
 use rayon::prelude::*;
 
+use super::files::{self, Compression, ImageFiles};
 use super::volume::Volume;
 
 /// Reading or writing an image failed.
@@ -161,17 +162,151 @@ pub fn storage_values(volumes: &[Volume], flipped: bool) -> Vec<f32> {
 }
 
 /// Reads a series: a 3D image is a series of one volume; dimensions beyond the fourth count
-/// as more volumes.
+/// as more volumes. The name is resolved as FSL 6.0.7.23 resolves it (§4.1: completed by
+/// [`files::resolve_input`] when it has no image extension) and its files are read by their
+/// content (gzip, zstd, bzip2 or uncompressed), whatever their names.
 pub fn read_series(path: &Path, n_threads: usize) -> Result<Series, ImageError> {
-    let img = nifti::read(
-        path,
-        &ReadOptions {
-            scaling: Scaling::Raw,
-            n_threads,
-        },
-    )?;
-    let header = img.header;
-    let shape = img.data.shape().to_vec();
+    read_series_files(&input_files(path)?, n_threads)
+}
+
+/// The files of the input image `path` (§4.1): its name completed when it has no image
+/// extension ([`files::resolve_input`]'s errors are FSL's words).
+pub fn input_files(path: &Path) -> Result<ImageFiles, ImageError> {
+    let name = files::resolve_input(&path.to_string_lossy()).map_err(ImageError::Invalid)?;
+    ImageFiles::of(&name)
+        .ok_or_else(|| ImageError::Invalid(format!("{name}: not an image file name")))
+}
+
+/// The header and the stored values of an image whose files are not what larmorx's NIfTI
+/// reader reads (zstd or bzip2 content, `.zst` or `.bz2` names, or FSL-60's renamed header of
+/// a pair): every file decompressed in memory and parsed.
+fn read_decompressed(
+    files: &ImageFiles,
+    compression: (Compression, Option<Compression>),
+) -> Result<(NiftiHeader, DynArray), ImageError> {
+    let path = files.header.as_path();
+    let invalid = |p: &Path, m: String| ImageError::Invalid(format!("{}: {m}", p.display()));
+    let load = |p: &Path, c: Compression| {
+        std::fs::read(p)
+            .and_then(|raw| c.decompress(raw))
+            .map_err(|e| invalid(p, e.to_string()))
+    };
+    let head = load(path, compression.0)?;
+    let version = if head.len() >= 4 {
+        NiftiHeader::sniff_version(&head[..4]).map_err(|e| invalid(path, e.to_string()))?
+    } else {
+        return Err(invalid(path, "the file ends inside the header".into()));
+    };
+    let size = match version {
+        NiftiVersion::V1 => larmorx_io::nifti::header::NIFTI1_HEADER_SIZE,
+        NiftiVersion::V2 => larmorx_io::nifti::header::NIFTI2_HEADER_SIZE,
+    };
+    if head.len() < size {
+        return Err(invalid(path, "the file ends inside the header".into()));
+    }
+    let mut header = NiftiHeader::parse(&head[..size]).map_err(|e| invalid(path, e.to_string()))?;
+    header
+        .apply_load_fixes()
+        .map_err(|e| invalid(path, e.to_string()))?;
+    let shape = header.shape().map_err(|e| invalid(path, e.to_string()))?;
+    let data_type = header
+        .data_type()
+        .map_err(|e| invalid(path, e.to_string()))?;
+    let offset = header.vox_offset;
+    if !(offset >= 0.0 && offset.is_finite()) {
+        return Err(invalid(path, format!("invalid vox_offset {offset}")));
+    }
+    let offset = offset as usize;
+    let (bytes, data_path) = match (&files.data, compression.1) {
+        (Some(d), Some(c)) => (load(d, c)?, d.as_path()),
+        _ => {
+            if offset == 0 {
+                return Err(invalid(
+                    path,
+                    "vox_offset is 0 in a single-file image".into(),
+                ));
+            }
+            (head, path)
+        }
+    };
+    let n = shape
+        .iter()
+        .try_fold(1usize, |a, &d| a.checked_mul(d))
+        .and_then(|n| n.checked_mul(data_type.size()))
+        .ok_or_else(|| invalid(path, format!("shape {shape:?} is too large")))?;
+    let available = bytes.len().saturating_sub(offset);
+    if available < n {
+        return Err(invalid(
+            data_path,
+            format!("expected {n} bytes of voxel data, found {available}"),
+        ));
+    }
+    let raw = &bytes[offset..offset + n];
+    let swap = !header.byte_order.is_native();
+    fn typed<T: larmorx_core::element::Element>(
+        raw: &[u8],
+        swap: bool,
+        shape: &[usize],
+    ) -> Result<DynArray, String> {
+        let mut v = vec![T::default(); raw.len() / std::mem::size_of::<T>()];
+        bytemuck::cast_slice_mut(&mut v).copy_from_slice(raw);
+        if swap {
+            v.par_iter_mut()
+                .with_min_len(1 << 16)
+                .for_each(|x| *x = x.swap_bytes());
+        }
+        ArrayD::from_shape_vec(IxDyn(shape).f(), v)
+            .map(T::into_dyn_array)
+            .map_err(|e| e.to_string())
+    }
+    let data = match data_type {
+        DataType::U8 => typed::<u8>(raw, swap, &shape),
+        DataType::I8 => typed::<i8>(raw, swap, &shape),
+        DataType::U16 => typed::<u16>(raw, swap, &shape),
+        DataType::I16 => typed::<i16>(raw, swap, &shape),
+        DataType::U32 => typed::<u32>(raw, swap, &shape),
+        DataType::I32 => typed::<i32>(raw, swap, &shape),
+        DataType::U64 => typed::<u64>(raw, swap, &shape),
+        DataType::I64 => typed::<i64>(raw, swap, &shape),
+        DataType::F32 => typed::<f32>(raw, swap, &shape),
+        DataType::F64 => typed::<f64>(raw, swap, &shape),
+        DataType::C64 | DataType::C128 => {
+            return Err(invalid(path, "complex images are not supported".into()));
+        }
+    }
+    .map_err(|m| invalid(path, m))?;
+    Ok((header, data))
+}
+
+/// Reads a series from its files ([`ImageFiles`]: a header file and, for a pair, a data
+/// file), each by its content.
+pub fn read_series_files(files: &ImageFiles, n_threads: usize) -> Result<Series, ImageError> {
+    let path = files.header.as_path();
+    let compression_of = |p: &Path| {
+        Compression::of_file(p).map_err(|e| ImageError::Invalid(format!("{}: {e}", p.display())))
+    };
+    let compression = (
+        compression_of(path)?,
+        files.data.as_deref().map(compression_of).transpose()?,
+    );
+    let plain_or_gzip = |c: Compression| matches!(c, Compression::None | Compression::Gzip);
+    let standard = files.standard_names()
+        && plain_or_gzip(compression.0)
+        && compression.1.is_none_or(plain_or_gzip);
+    let (header, data) = if standard {
+        let img = nifti::read(
+            path,
+            &ReadOptions {
+                scaling: Scaling::Raw,
+                n_threads,
+            },
+        )?;
+        (img.header, img.data)
+    } else {
+        parallel::with_threads(n_threads, || read_decompressed(files, compression))
+            .map_err(|e| ImageError::Invalid(e.to_string()))??
+    };
+    let shape = data.shape().to_vec();
     if shape.is_empty() || shape.iter().product::<usize>() == 0 {
         return Err(ImageError::Invalid(format!(
             "{}: the image has no voxels",
@@ -179,9 +314,9 @@ pub fn read_series(path: &Path, n_threads: usize) -> Result<Series, ImageError> 
         )));
     }
     let dims: [usize; 3] = [0, 1, 2].map(|k| shape.get(k).copied().unwrap_or(1));
-    let stored = img.data.data_type();
+    let stored = data.data_type();
     let scale = scaling(&header);
-    let values = dispatch_real_dyn_array!(&img.data, a => to_f32_vec(a, scale, n_threads), complex => {
+    let values = dispatch_real_dyn_array!(&data, a => to_f32_vec(a, scale, n_threads), complex => {
         return Err(ImageError::Invalid(format!("{}: complex images are not supported", path.display())));
     });
     let flipped = is_neurological(&header);
@@ -205,7 +340,15 @@ pub fn read_series(path: &Path, n_threads: usize) -> Result<Series, ImageError> 
 /// Reads a reference image: the first volume of a 3D or 4D image. Returns the volume and
 /// whether the file had more than one volume.
 pub fn read_reference(path: &Path, n_threads: usize) -> Result<(Volume, Series, bool), ImageError> {
-    let mut s = read_series(path, n_threads)?;
+    read_reference_files(&input_files(path)?, n_threads)
+}
+
+/// [`read_reference`] from the image's files.
+pub fn read_reference_files(
+    files: &ImageFiles,
+    n_threads: usize,
+) -> Result<(Volume, Series, bool), ImageError> {
+    let mut s = read_series_files(files, n_threads)?;
     let multiple = s.volumes.len() > 1;
     let first = s.volumes.swap_remove(0);
     s.volumes.clear();
@@ -229,33 +372,66 @@ pub fn output_type(stored: DataType, header: &NiftiHeader, defects: UpstreamDefe
     }
 }
 
-/// The output file name for `out` (any image extension removed) with the extension of
-/// `output_type` (`FSLOUTPUTTYPE`: `NIFTI_GZ`, `NIFTI`, `NIFTI2_GZ`, `NIFTI2`, `NIFTI_PAIR`,
-/// `NIFTI_PAIR_GZ`, `NIFTI2_PAIR`, `NIFTI2_PAIR_GZ`). Returns the name and the NIfTI version.
-pub fn output_name(out: &str, output_type: &str) -> Option<(String, NiftiVersion)> {
-    let (ext, version) = match output_type {
-        "NIFTI_GZ" => (".nii.gz", NiftiVersion::V1),
-        "NIFTI" => (".nii", NiftiVersion::V1),
-        "NIFTI2_GZ" => (".nii.gz", NiftiVersion::V2),
-        "NIFTI2" => (".nii", NiftiVersion::V2),
-        "NIFTI_PAIR" => (".hdr", NiftiVersion::V1),
-        "NIFTI_PAIR_GZ" => (".hdr.gz", NiftiVersion::V1),
-        "NIFTI2_PAIR" => (".hdr", NiftiVersion::V2),
-        "NIFTI2_PAIR_GZ" => (".hdr.gz", NiftiVersion::V2),
-        _ => return None,
-    };
-    Some((format!("{}{ext}", strip_image_extension(out)), version))
+/// The values of `FSLOUTPUTTYPE` FSL 6.0.7.23 accepts, in the order of its message (§10.1).
+pub const OUTPUT_TYPES: [&str; 16] = [
+    "NIFTI",
+    "NIFTI_PAIR",
+    "NIFTI2",
+    "NIFTI2_PAIR",
+    "NIFTI_GZ",
+    "NIFTI_PAIR_GZ",
+    "NIFTI2_GZ",
+    "NIFTI2_PAIR_GZ",
+    "NIFTI_ZST",
+    "NIFTI_PAIR_ZST",
+    "NIFTI2_ZST",
+    "NIFTI2_PAIR_ZST",
+    "NIFTI_BZ2",
+    "NIFTI_PAIR_BZ2",
+    "NIFTI2_BZ2",
+    "NIFTI2_PAIR_BZ2",
+];
+
+/// FSL 6.0.7.23's message for an `FSLOUTPUTTYPE` it does not know (§10.1, observed).
+pub fn unknown_output_type_message(value: &str) -> String {
+    format!(
+        "ERROR:: Unrecognised value ({value}) of environment variable FSLOUTPUTTYPE\nLegal values \
+         are: {}",
+        OUTPUT_TYPES.join(", ")
+    )
 }
 
-/// `name` without a trailing image extension (`.nii`, `.nii.gz`, `.hdr`, `.hdr.gz`, `.img`,
-/// `.img.gz`).
-pub fn strip_image_extension(name: &str) -> &str {
-    for ext in [".nii.gz", ".hdr.gz", ".img.gz", ".nii", ".hdr", ".img"] {
-        if let Some(stem) = name.strip_suffix(ext) {
-            return stem;
-        }
+/// The output file name for `out` (any image extension removed) with the extension of
+/// `output_type` (`FSLOUTPUTTYPE`, one of [`OUTPUT_TYPES`]: `NIFTI` `.nii`, `NIFTI_PAIR` `.hdr`
+/// and `.img`, `NIFTI2` likewise in NIfTI-2, each optionally `_GZ` `.gz`, `_ZST` `.zst` or
+/// `_BZ2` `.bz2`). Returns the name (the header's for a pair) and the NIfTI version.
+pub fn output_name(out: &str, output_type: &str) -> Option<(String, NiftiVersion)> {
+    if !OUTPUT_TYPES.contains(&output_type) {
+        return None;
     }
-    name
+    let (kind, suffix) = match output_type.rsplit_once('_') {
+        Some((k, "GZ")) => (k, ".gz"),
+        Some((k, "ZST")) => (k, ".zst"),
+        Some((k, "BZ2")) => (k, ".bz2"),
+        _ => (output_type, ""),
+    };
+    let (ext, version) = match kind {
+        "NIFTI" => (".nii", NiftiVersion::V1),
+        "NIFTI2" => (".nii", NiftiVersion::V2),
+        "NIFTI_PAIR" => (".hdr", NiftiVersion::V1),
+        "NIFTI2_PAIR" => (".hdr", NiftiVersion::V2),
+        _ => return None,
+    };
+    Some((
+        format!("{}{ext}{suffix}", strip_image_extension(out)),
+        version,
+    ))
+}
+
+/// `name` without a trailing image extension (`.nii`, `.hdr`, `.img`, each optionally `.gz`,
+/// `.zst` or `.bz2`).
+pub fn strip_image_extension(name: &str) -> &str {
+    files::strip_image_extension(name)
 }
 
 fn convert<T: Copy + Send + Sync>(values: &[f32], f: impl Fn(f32) -> T + Sync + Send) -> Vec<T> {
@@ -287,6 +463,16 @@ pub struct Conversion {
     pub out_of_range: usize,
 }
 
+impl std::ops::Add for Conversion {
+    type Output = Conversion;
+    fn add(self, o: Conversion) -> Conversion {
+        Conversion {
+            rounded: self.rounded + o.rounded,
+            out_of_range: self.out_of_range + o.out_of_range,
+        }
+    }
+}
+
 /// Converts float32 values to an integer output type (§9.4, FSL-09). mcflirt truncates toward
 /// zero and does not clamp: on x86-64 a value beyond the type's range wraps around (through a
 /// 32-bit integer), which [`UpstreamDefects::Reproduce`] reproduces. [`UpstreamDefects::Fix`]
@@ -303,16 +489,7 @@ pub fn convert_values<T>(
 where
     T: Copy + Send + Sync,
 {
-    let stats = values
-        .par_iter()
-        .with_min_len(1 << 16)
-        .map(|&v| {
-            let r = f64::from(v).round_ties_even();
-            let t = f64::from(v).trunc();
-            let out = !(lo..=hi).contains(&t) || v.is_nan();
-            (usize::from(r != t && !out), usize::from(out))
-        })
-        .reduce(|| (0, 0), |a, b| (a.0 + b.0, a.1 + b.1));
+    let stats = conversion_counts(values, lo, hi);
     let data = if defects.fix() {
         convert(values, |v| {
             if v.is_nan() {
@@ -324,13 +501,65 @@ where
     } else {
         convert(values, |v| from_i32(x86_i32(v)))
     };
-    (
-        data,
-        Conversion {
-            rounded: stats.0,
-            out_of_range: stats.1,
-        },
-    )
+    (data, stats)
+}
+
+/// What rounding and truncation disagree on when `values` are converted to an integer type of
+/// range `lo..=hi` ([`convert_values`]).
+pub fn conversion_counts(values: &[f32], lo: f64, hi: f64) -> Conversion {
+    let (rounded, out_of_range) = values
+        .par_iter()
+        .with_min_len(1 << 16)
+        .map(|&v| {
+            let r = f64::from(v).round_ties_even();
+            let t = f64::from(v).trunc();
+            let out = !(lo..=hi).contains(&t) || v.is_nan();
+            (usize::from(r != t && !out), usize::from(out))
+        })
+        .reduce(|| (0, 0), |a, b| (a.0 + b.0, a.1 + b.1));
+    Conversion {
+        rounded,
+        out_of_range,
+    }
+}
+
+/// The range of an integer output type (`None` for a float type).
+pub fn integer_range(data_type: DataType) -> Option<(f64, f64)> {
+    match data_type {
+        DataType::U8 => Some((0.0, 255.0)),
+        DataType::I8 => Some((-128.0, 127.0)),
+        DataType::I16 => Some((-32768.0, 32767.0)),
+        DataType::I32 => Some((-2_147_483_648.0, 2_147_483_647.0)),
+        _ => None,
+    }
+}
+
+/// The FSL-09 notice for the integer output `path` of `data_type`, whose conversion of the series
+/// mcflirt writes rounds and truncates differently as `conversion` says.
+pub fn fsl09_notice(
+    path: &Path,
+    conversion: Conversion,
+    data_type: DataType,
+    defects: UpstreamDefects,
+) -> Notice {
+    let what = format!(
+        "{} of its values convert differently when rounded than when truncated, {} lie outside \
+         the {data_type} range",
+        conversion.rounded, conversion.out_of_range
+    );
+    let detail = match defects {
+        UpstreamDefects::Fix => format!(
+            "{}: integer output is rounded to the nearest and clamped; mcflirt truncates and \
+             wraps around ({what})",
+            path.display()
+        ),
+        UpstreamDefects::Reproduce => format!(
+            "{}: integer output is truncated and wraps around beyond its range, as mcflirt does \
+             on x86-64 ({what})",
+            path.display()
+        ),
+    };
+    Notice::new(&defects::FSL_09, defects, detail)
 }
 
 /// The `xyzt_units` of an output written like an input with `units`: mcflirt always writes
@@ -377,6 +606,9 @@ pub fn output_units(units: i32, defects: UpstreamDefects) -> (i32, Option<Notice
 /// [`output_units`], little-endian, 3D for a single volume (the other `pixdim` entries kept);
 /// the data flipped back to storage order and converted to `data_type` ([`convert_values`]).
 /// Returns the upstream defects that changed the file (FSL-09, FSL-10), or would have.
+///
+/// `path` names the file (the header's for a pair) with any image extension of
+/// [`files::image_extension`]; its compression follows the extension (§10.1).
 #[allow(clippy::too_many_arguments)]
 pub fn write_like(
     path: &Path,
@@ -390,6 +622,63 @@ pub fn write_like(
     n_threads: usize,
     defects: UpstreamDefects,
 ) -> Result<Vec<Notice>, ImageError> {
+    let name = path.to_string_lossy();
+    let files = ImageFiles::of(&name)
+        .ok_or_else(|| ImageError::Invalid(format!("{name}: not an image file name")))?;
+    write_like_files(
+        &files, template, version, flipped, volumes, data_type, descrip, cal, n_threads, defects,
+    )
+}
+
+/// The header block of a file written as `files` (what larmorx's NIfTI writer sets: the data
+/// type, the shape, the magic string, NIfTI-2's line-ending check, `vox_offset`; the extender
+/// of a single file), for [`write_like_files`]' own writer.
+fn header_block(
+    h: &NiftiHeader,
+    data_type: DataType,
+    shape: &[usize],
+    single: bool,
+) -> Result<Vec<u8>, ImageError> {
+    let invalid = |e: larmorx_io::nifti::HeaderError| ImageError::Invalid(e.to_string());
+    let mut h = h.clone();
+    h.set_data_type(data_type);
+    if h.shape().ok().as_deref() != Some(shape) {
+        h.set_shape(shape).map_err(invalid)?;
+    }
+    h.magic = h.version.magic(single);
+    if h.version == NiftiVersion::V2 {
+        h.nifti2.eol_check = *b"\r\n\x1a\n";
+    }
+    h.vox_offset = if single {
+        h.version.min_vox_offset() as f64
+    } else {
+        0.0
+    };
+    let mut out = h.to_bytes();
+    if single {
+        out.extend_from_slice(&[0; 4]);
+    }
+    Ok(out)
+}
+
+/// [`write_like`] to the files `files`, which may be any of FSL 6.0.7.23's names: gzip and
+/// uncompressed files named as larmorx's NIfTI writer names them are written by it; zstd and
+/// bzip2 files, and a pair whose header is not named after its data file (FSL-60 reproduced),
+/// by this module's own writer, each file compressed as its name says.
+#[allow(clippy::too_many_arguments)]
+pub fn write_like_files(
+    files: &ImageFiles,
+    template: &NiftiHeader,
+    version: NiftiVersion,
+    flipped: bool,
+    volumes: &[Volume],
+    data_type: DataType,
+    descrip: &str,
+    cal: bool,
+    n_threads: usize,
+    defects: UpstreamDefects,
+) -> Result<Vec<Notice>, ImageError> {
+    let path = files.header.as_path();
     let Some(first) = volumes.first() else {
         return Err(ImageError::Invalid("no volumes to write".into()));
     };
@@ -518,27 +807,49 @@ pub fn write_like(
     )
     .map_err(|e| ImageError::Invalid(e.to_string()))??;
     if conversion != Conversion::default() {
-        let what = format!(
-            "{} of its values convert differently when rounded than when truncated, {} lie \
-             outside the {data_type} range",
-            conversion.rounded, conversion.out_of_range
+        defects::push_once(
+            &mut notices,
+            fsl09_notice(path, conversion, data_type, defects),
         );
-        let detail = match defects {
-            UpstreamDefects::Fix => format!(
-                "{}: integer output is rounded to the nearest and clamped; mcflirt truncates and \
-                 wraps around ({what})",
-                path.display()
-            ),
-            UpstreamDefects::Reproduce => format!(
-                "{}: integer output is truncated and wraps around beyond its range, as mcflirt \
-                 does on x86-64 ({what})",
-                path.display()
-            ),
-        };
-        defects::push_once(&mut notices, Notice::new(&defects::FSL_09, defects, detail));
     }
-    // Not inside the pool above: the writer runs its own parallel compression.
-    nifti::write_dyn(path, &h, &array, &options)?;
+    let compression = Compression::of_name(&path.to_string_lossy());
+    if files.standard_names() && matches!(compression, Compression::None | Compression::Gzip) {
+        // Not inside the pool above: the writer runs its own parallel compression.
+        nifti::write_dyn(path, &h, &array, &options)?;
+        return Ok(notices);
+    }
+    // FSL 6.0.7.23's other names: the header block and the data, each file compressed as its
+    // name says (little-endian data, as `h` says on every supported platform).
+    let head = header_block(&h, data_type, &shape, files.data.is_none())?;
+    let swap = !h.byte_order.is_native();
+    let write = |p: &Path, pieces: &[&[u8]]| -> Result<(), ImageError> {
+        let io = |e: std::io::Error| ImageError::Invalid(format!("{}: {e}", p.display()));
+        let file = std::fs::File::create(p).map_err(io)?;
+        let w = std::io::BufWriter::with_capacity(1 << 16, file);
+        Compression::of_name(&p.to_string_lossy())
+            .write_pieces(pieces, w)
+            .map_err(io)
+    };
+    let write_data = |data: &[u8]| {
+        parallel::with_threads(n_threads, || match &files.data {
+            None => write(path, &[&head, data]),
+            Some(d) => {
+                write(path, &[&head])?;
+                write(d, &[data])
+            }
+        })
+        .map_err(|e| ImageError::Invalid(e.to_string()))?
+    };
+    // The data as stored, without a copy unless the bytes must be swapped.
+    larmorx_core::dispatch_dyn_array!(&array, a => {
+        let s = a.as_slice_memory_order().expect("arrays built here are contiguous");
+        if swap {
+            let swapped: Vec<_> = s.iter().map(|v| v.swap_bytes()).collect();
+            write_data(bytemuck::cast_slice(&swapped))
+        } else {
+            write_data(bytemuck::cast_slice(s))
+        }
+    })?;
     Ok(notices)
 }
 
@@ -577,6 +888,153 @@ mod tests {
         assert_eq!(i16s, [32767, -32768, 25536]);
         assert_eq!(x86_i32(3e9), i32::MIN);
         assert_eq!(x86_i32(-2.9), -2);
+    }
+
+    /// FSL 6.0.7.23's output types (§10.1): the zstd and bzip2 ones included, any image
+    /// extension of `out` removed; an unknown type has none.
+    #[test]
+    fn output_names_of_every_type() {
+        let name = |t: &str| output_name("dir/x.nii.zst", t);
+        assert_eq!(
+            name("NIFTI_GZ"),
+            Some(("dir/x.nii.gz".into(), NiftiVersion::V1))
+        );
+        assert_eq!(
+            name("NIFTI_ZST"),
+            Some(("dir/x.nii.zst".into(), NiftiVersion::V1))
+        );
+        assert_eq!(
+            name("NIFTI2_BZ2"),
+            Some(("dir/x.nii.bz2".into(), NiftiVersion::V2))
+        );
+        assert_eq!(
+            name("NIFTI_PAIR_ZST"),
+            Some(("dir/x.hdr.zst".into(), NiftiVersion::V1))
+        );
+        assert_eq!(
+            name("NIFTI2_PAIR"),
+            Some(("dir/x.hdr".into(), NiftiVersion::V2))
+        );
+        assert_eq!(
+            name("NIFTI2_PAIR_BZ2"),
+            Some(("dir/x.hdr.bz2".into(), NiftiVersion::V2))
+        );
+        for t in OUTPUT_TYPES {
+            assert!(name(t).is_some(), "{t}");
+        }
+        assert_eq!(name("NIFTI_XZ"), None);
+        assert_eq!(name("nifti_gz"), None);
+        assert_eq!(name(""), None);
+        assert!(unknown_output_type_message("X").starts_with(
+            "ERROR:: Unrecognised value (X) of environment variable FSLOUTPUTTYPE\nLegal values \
+             are: NIFTI, NIFTI_PAIR, NIFTI2, NIFTI2_PAIR, NIFTI_GZ,"
+        ));
+    }
+
+    /// Every output type written and read back by content, a pair whose header FSL-60 renamed
+    /// included: the same header fields and values as the `.nii.gz` file.
+    #[test]
+    fn compressed_types_round_trip() {
+        let dir = tempfile::tempdir().unwrap();
+        let mut h = NiftiHeader::new(NiftiVersion::V1, &[4, 3, 2, 2], DataType::I16).unwrap();
+        h.pixdim[1..5].copy_from_slice(&[2.0, 2.0, 3.0, 1.5]);
+        h.xyzt_units = 10;
+        let vols: Vec<Volume> = (0..2)
+            .map(|t| {
+                let data = (0..24).map(|i| (i * 7 + t * 3) as f32 - 20.0).collect();
+                Volume::new([4, 3, 2], [2.0, 2.0, 3.0], data)
+            })
+            .collect();
+        let write = |files: &ImageFiles| {
+            write_like_files(
+                files,
+                &h,
+                NiftiVersion::V1,
+                false,
+                &vols,
+                DataType::I16,
+                "t",
+                true,
+                2,
+                FIX,
+            )
+            .unwrap();
+            read_series_files(files, 2).unwrap()
+        };
+        let at = |name: &str| dir.path().join(name).to_string_lossy().into_owned();
+        let reference = write(&ImageFiles::of(&at("a.nii.gz")).unwrap());
+        assert_eq!(reference.volumes, vols);
+        for t in OUTPUT_TYPES {
+            let (name, version) = output_name(&at(t), t).unwrap();
+            let files = ImageFiles::of(&name).unwrap();
+            write_like_files(
+                &files,
+                &h,
+                version,
+                false,
+                &vols,
+                DataType::I16,
+                "t",
+                true,
+                2,
+                FIX,
+            )
+            .unwrap();
+            let back = read_series_files(&files, 2).unwrap();
+            assert_eq!(back.volumes, vols, "{t}");
+            assert_eq!(back.header.version, version, "{t}");
+            assert_eq!(back.header.cal_max, reference.header.cal_max, "{t}");
+            // And by the name alone, completed (§4.1).
+            assert_eq!(
+                read_series(Path::new(&at(t)), 1).unwrap().volumes,
+                vols,
+                "{t}"
+            );
+        }
+        // FSL-60 reproduced: the header under another name, the data under the pair's own.
+        std::fs::create_dir(dir.path().join("p.hdr.d")).unwrap();
+        std::fs::create_dir(dir.path().join("p.img.d")).unwrap();
+        let split = ImageFiles {
+            header: dir.path().join("p.hdr.d/o.hdr.zst"),
+            data: Some(dir.path().join("p.img.d/o.img.zst")),
+        };
+        assert_eq!(write(&split).volumes, vols);
+        // A bzip2 file named .nii is read by its content.
+        let bz = at("b.nii.bz2");
+        write_like_files(
+            &ImageFiles::of(&bz).unwrap(),
+            &h,
+            NiftiVersion::V1,
+            false,
+            &vols,
+            DataType::I16,
+            "t",
+            true,
+            1,
+            FIX,
+        )
+        .unwrap();
+        std::fs::rename(&bz, at("renamed.nii")).unwrap();
+        assert_eq!(
+            read_series(Path::new(&at("renamed.nii")), 1)
+                .unwrap()
+                .volumes,
+            vols
+        );
+        // Two completions: FSL's error.
+        std::fs::copy(at("a.nii.gz"), at("two.nii.gz")).unwrap();
+        std::fs::copy(at("NIFTI_ZST.nii.zst"), at("two.nii.zst")).unwrap();
+        let e = read_series(Path::new(&at("two")), 1)
+            .unwrap_err()
+            .to_string();
+        assert!(
+            e.contains("Multiple possible filenames detected for basename"),
+            "{e}"
+        );
+        let e = read_series(Path::new(&at("none")), 1)
+            .unwrap_err()
+            .to_string();
+        assert!(e.contains("No image files match"), "{e}");
     }
 
     /// FSL-09: int8 input stays int8 when corrected; mcflirt writes uint8.

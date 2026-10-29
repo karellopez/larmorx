@@ -2,12 +2,13 @@
 //! The whole correction as one call: estimation, the matrices in every convention, the motion
 //! parameters, RMS displacements and (optionally) the corrected series.
 
+use larmorx_core::defects::{self, Notice, UpstreamDefects};
 use larmorx_core::parallel::ThreadPoolError;
 
 use super::estimate::{Estimate, EstimateError, EstimateParams, Reference, estimate};
 use super::image::Series;
 use super::report::{motion_parameters, rms_series};
-use super::resample::{Interpolation, resample_series};
+use super::resample::{Interpolation, resample_series, series_differ};
 use super::rigid::Mat4;
 use super::volume::Volume;
 use super::world::{Geometry, itk_transform, ras_transform};
@@ -30,7 +31,10 @@ pub enum ReferenceChoice<'a> {
 #[derive(Clone, Debug, PartialEq)]
 pub struct HmcOptions {
     pub estimate: EstimateParams,
-    /// The final interpolation (`-sinc_final`, `-spline_final`, `-nn_final`).
+    /// The final interpolation (`-sinc_final`, `-spline_final`, `-nn_final`). FSL 6.0.7.23's
+    /// mcflirt resamples `-sinc_final` and `-nn_final` trilinearly (FSL-59, `specs/mcflirt.md`
+    /// §9.3): larmorx uses the method asked for, and trilinear with
+    /// [`UpstreamDefects::Reproduce`].
     pub interpolation: Interpolation,
     /// A matrix applied before every volume's matrix in the final resampling only (`-init`).
     pub init: Option<Mat4>,
@@ -132,7 +136,7 @@ pub fn run(
             (Reference::Volume((*v).clone()), *g)
         }
     };
-    let est = estimate(&series.volumes, &reference, &options.estimate)?;
+    let mut est = estimate(&series.volumes, &reference, &options.estimate)?;
     let params = motion_parameters(
         &est.matrices,
         &est.reference,
@@ -158,15 +162,47 @@ pub fn run(
             },
             Reference::Index(_) => (geometry.shape, geometry.voxel_size),
         };
-        Some(resample_series(
+        let asked = options.interpolation;
+        let mode = options.estimate.upstream_defects;
+        // FSL-59: mcflirt 6.0.7.23 resamples -sinc_final and -nn_final trilinearly.
+        let ignored = matches!(asked, Interpolation::Sinc | Interpolation::Nearest);
+        let used = if ignored && mode.reproduce() {
+            Interpolation::Trilinear
+        } else {
+            asked
+        };
+        let n_threads = options.estimate.n_threads;
+        let init = options.init.as_ref();
+        let out = resample_series(
             &series.volumes,
             &est.matrices,
-            options.init.as_ref(),
+            init,
             shape,
             voxel,
-            options.interpolation,
-            options.estimate.n_threads,
-        )?)
+            used,
+            n_threads,
+        )?;
+        if ignored {
+            let other = if used == asked {
+                Interpolation::Trilinear
+            } else {
+                asked
+            };
+            let differ = series_differ(
+                &series.volumes,
+                &est.matrices,
+                init,
+                shape,
+                voxel,
+                other,
+                &out,
+                n_threads,
+            )?;
+            if differ {
+                defects::push_once(&mut est.notices, final_interpolation_notice(asked, mode));
+            }
+        }
+        Some(out)
     } else {
         None
     };
@@ -180,6 +216,26 @@ pub fn run(
         itk,
         corrected,
     })
+}
+
+/// The FSL-59 notice: mcflirt 6.0.7.23 resamples `-sinc_final` and `-nn_final` (`asked`)
+/// trilinearly; named where the two series differ.
+fn final_interpolation_notice(asked: Interpolation, mode: UpstreamDefects) -> Notice {
+    let option = match asked {
+        Interpolation::Sinc => "-sinc_final",
+        _ => "-nn_final",
+    };
+    let detail = match mode {
+        UpstreamDefects::Fix => format!(
+            "{option}: the series resampled with the interpolation asked for; FSL 6.0.7.23's \
+             mcflirt resamples with trilinear interpolation"
+        ),
+        UpstreamDefects::Reproduce => format!(
+            "{option}: the series resampled with trilinear interpolation, as FSL 6.0.7.23's \
+             mcflirt does"
+        ),
+    };
+    Notice::new(&defects::FSL_59, mode, detail)
 }
 
 /// Power's framewise displacement from motion parameters: the sum of the absolute
@@ -198,6 +254,82 @@ pub fn framewise_displacement(params: &[[f64; 6]], radius: f64) -> Vec<f64> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use larmorx_core::element::DataType;
+    use larmorx_io::nifti::{NiftiHeader, NiftiVersion};
+
+    /// A blob series: volume `t` shifted by `shift · t` voxels along x.
+    fn series(shift: f32) -> Series {
+        let shape = [16usize, 14, 10];
+        let mut values = Vec::new();
+        for t in 0..3 {
+            for z in 0..shape[2] {
+                for y in 0..shape[1] {
+                    for x in 0..shape[0] {
+                        let d = [
+                            x as f32 - 7.5 - shift * t as f32,
+                            y as f32 - 6.5,
+                            z as f32 - 4.5,
+                        ];
+                        let r2 = d[0] * d[0] / 9.0 + d[1] * d[1] / 7.0 + d[2] * d[2] / 4.0;
+                        values.push(1000.0 / (1.0 + r2 * r2) + 20.0);
+                    }
+                }
+            }
+        }
+        let mut h = NiftiHeader::new(NiftiVersion::V1, &[16, 14, 10, 3], DataType::F32).unwrap();
+        h.pixdim[1..4].copy_from_slice(&[3.0, 3.0, 4.0]);
+        Series::from_values([16, 14, 10, 3], &values, h)
+    }
+
+    /// FSL-59: `-sinc_final` and `-nn_final` resampled as asked (default) or trilinearly
+    /// (reproduced), named where the two series differ; not named for a still series, whose
+    /// identity matrices give the same values both ways.
+    #[test]
+    fn final_interpolation_both_modes() {
+        let correct = |s: &Series, interpolation, mode| {
+            let options = HmcOptions {
+                estimate: EstimateParams {
+                    stages: 1,
+                    upstream_defects: mode,
+                    n_threads: 2,
+                    ..Default::default()
+                },
+                interpolation,
+                ..Default::default()
+            };
+            let out = run(s, &ReferenceChoice::Index(None), &options).unwrap();
+            let named = out.estimate.notices.iter().any(|n| n.defect.id == "FSL-59");
+            (out.corrected.unwrap(), named)
+        };
+        let moving = series(0.75);
+        let (trilinear, named) = correct(&moving, Interpolation::Trilinear, UpstreamDefects::Fix);
+        assert!(!named);
+        for interpolation in [Interpolation::Nearest, Interpolation::Sinc] {
+            let (asked, named_fix) = correct(&moving, interpolation, UpstreamDefects::Fix);
+            let (afni, named_reproduce) =
+                correct(&moving, interpolation, UpstreamDefects::Reproduce);
+            let (reproduced_trilinear, _) = correct(
+                &moving,
+                Interpolation::Trilinear,
+                UpstreamDefects::Reproduce,
+            );
+            assert!(named_fix && named_reproduce, "{interpolation:?}");
+            assert_ne!(asked, trilinear, "{interpolation:?}");
+            assert_eq!(afni, reproduced_trilinear, "{interpolation:?}");
+        }
+        // No registration (-stages 0): identity matrices, the same values both ways.
+        let options = HmcOptions {
+            estimate: EstimateParams {
+                stages: 0,
+                upstream_defects: UpstreamDefects::Reproduce,
+                ..Default::default()
+            },
+            interpolation: Interpolation::Nearest,
+            ..Default::default()
+        };
+        let out = run(&moving, &ReferenceChoice::Index(None), &options).unwrap();
+        assert!(out.estimate.notices.iter().all(|n| n.defect.id != "FSL-59"));
+    }
 
     #[test]
     fn fd_of_known_motion() {

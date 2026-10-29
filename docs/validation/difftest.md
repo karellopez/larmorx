@@ -219,7 +219,8 @@ reproducer (an agent that has read the upstream source never edits a clean-room 
 of the original goes into the register, decided by rules A-D with the D13 switch where one is
 required; anything else is listed for the orchestrator. What was done about each is written in
 `validation/difftest/triage.toml` (tool, implementation, the failed checks, `status` fixed |
-register | open | harness | unclear, the explanation, the permanent case or finding it links to);
+register | open | harness | explained (an expected difference, measured and explained: no mistake
+and no defect) | unclear, the explanation, the permanent case or finding it links to);
 the site's "Random testing" panels show it beside each night's differences.
 
 The tools behind the findings are in `validation/investigations/difftest/` (its README): replaying

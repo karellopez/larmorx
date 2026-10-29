@@ -144,8 +144,8 @@ link = "validation/difftest/cases/afni-automask/tiny-oblique-quaternion-residue.
 tool = "mri-hmc"
 implementation = "original"
 signature = ["out_mcf.nii.gz: voxel values", "out_mcf.nii.gz.mat: matrix RMS deviation, Nth percentile", "FD (Power, N mm) correlation", "out_mcf.nii.gz_abs.rms: values", "out_mcf.nii.gz_rel.rms: values", "out_mcf.nii.gz_sigma.nii.gz: voxel values"]
-status = "open"
-explanation = "measured on 2026-10-29 on all 782 findings of the first long random-testing run (2026-10-25; `validation/investigations/cleanroom-fixes/hmc_alignment.py`, the corrected series' temporal standard deviation, larmorx over mcflirt): every cost but `-cost normmi` explained (691 findings: median ratio 1.000, better in 150, within 1 % in 441, worse in 100; large motions on small phantoms, a cost with several minima; permanent case `mri-hmc/phantom-several-minima`, an expected divergence); with `-cost normmi` larmorx aligns worse (91 findings: median 1.033, worse in 62, 26 above 1.10) and the cause is open: the spec writer describes `normmi` exactly, then a clean-room fix (`docs/findings/mri-hmc-original.md`; permanent case `mri-hmc/normmi-aligns-worse`)"
+status = "explained"
+explanation = "measured on 2026-10-29 on all 782 findings of the first long random-testing run (2026-10-25; `validation/investigations/cleanroom-fixes/hmc_alignment.py`, the corrected series' temporal standard deviation, larmorx over mcflirt): every cost but `-cost normmi` explained (691 findings: median ratio 1.000, better in 150, within 1 % in 441, worse in 100; large motions on small phantoms, a cost with several minima; permanent case `mri-hmc/phantom-several-minima`, an expected divergence); with `-cost normmi` larmorx aligns worse (91 findings: median 1.033, worse in 62, 26 above 1.10) and the cause is open: the spec writer describes `normmi` exactly, then a clean-room fix (`docs/findings/mri-hmc-original.md`; permanent case `mri-hmc/normmi-aligns-worse`); 2026-10-29, the clean-room alignment (next-steps 3b): -cost normmi and mutualinfo now computed exactly as specs/mcflirt.md appendix B (the first long run's 91 normmi findings: median ratio 1.051 -> 1.000 against mcflirt 6.0.7.23, 55 within 1 %; mutualinfo's 78: 0.983 -> 1.000); the rest of the class is the several-minima class of the permanent case mri-hmc/phantom-several-minima: in that part's trial 1,732 phantoms beyond the record's thresholds, as well aligned as mcflirt for every cost (median ratios 0.999 to 1.001)"
 link = "docs/findings/mri-hmc-original.md"
 
 [[difference]]
@@ -486,8 +486,8 @@ explanation = "the mcflirt replica's atanf held fdlibm's commented value of aT[0
 tool = "mri-hmc"
 implementation = "original"
 signature = ["out_mcf.nii.gz.mat: matrix RMS deviation, Nth percentile", "out_mcf.nii.gz.par: median difference", "out_mcf.nii.gz: voxel values"]
-status = "open"
-explanation = "measured on 2026-10-29 on all 782 findings of the first long random-testing run (2026-10-25; `validation/investigations/cleanroom-fixes/hmc_alignment.py`, the corrected series' temporal standard deviation, larmorx over mcflirt): every cost but `-cost normmi` explained (691 findings: median ratio 1.000, better in 150, within 1 % in 441, worse in 100; large motions on small phantoms, a cost with several minima; permanent case `mri-hmc/phantom-several-minima`, an expected divergence); with `-cost normmi` larmorx aligns worse (91 findings: median 1.033, worse in 62, 26 above 1.10) and the cause is open: the spec writer describes `normmi` exactly, then a clean-room fix (`docs/findings/mri-hmc-original.md`; permanent case `mri-hmc/normmi-aligns-worse`)"
+status = "explained"
+explanation = "measured on 2026-10-29 on all 782 findings of the first long random-testing run (2026-10-25; `validation/investigations/cleanroom-fixes/hmc_alignment.py`, the corrected series' temporal standard deviation, larmorx over mcflirt): every cost but `-cost normmi` explained (691 findings: median ratio 1.000, better in 150, within 1 % in 441, worse in 100; large motions on small phantoms, a cost with several minima; permanent case `mri-hmc/phantom-several-minima`, an expected divergence); with `-cost normmi` larmorx aligns worse (91 findings: median 1.033, worse in 62, 26 above 1.10) and the cause is open: the spec writer describes `normmi` exactly, then a clean-room fix (`docs/findings/mri-hmc-original.md`; permanent case `mri-hmc/normmi-aligns-worse`); 2026-10-29, the clean-room alignment (next-steps 3b): -cost normmi and mutualinfo now computed exactly as specs/mcflirt.md appendix B (the first long run's 91 normmi findings: median ratio 1.051 -> 1.000 against mcflirt 6.0.7.23, 55 within 1 %; mutualinfo's 78: 0.983 -> 1.000); the rest of the class is the several-minima class of the permanent case mri-hmc/phantom-several-minima: in that part's trial 1,732 phantoms beyond the record's thresholds, as well aligned as mcflirt for every cost (median ratios 0.999 to 1.001)"
 link = "docs/findings/mri-hmc-original.md"
 
 [[difference]]
@@ -686,32 +686,32 @@ link = "validation/difftest/cases/fsl-bet/bet2-filled-then-output-type.json"
 tool = "afni-tshift"
 implementation = "original"
 signature = ["values", "values (integer output)", "notice: AFNI-05"]
-status = "open"
-explanation = "AFNI 26.3.05 fixed AFNI-05 (-no_detrend de-means every voxel); the clean-room original's `reproduce` still gives 25.2.09's pairs and names AFNI-05 (the trial against 26.3.05: 75 findings, 59 notices); its alignment is the clean-room agent's (specs/3dTshift.md §4, marked AFNI 26.3.05)"
+status = "fixed"
+explanation = "AFNI 26.3.05 fixed AFNI-05 (-no_detrend de-means every voxel); the clean-room original's `reproduce` still gives 25.2.09's pairs and names AFNI-05 (the trial against 26.3.05: 75 findings, 59 notices); its alignment is the clean-room agent's (specs/3dTshift.md §4, marked AFNI 26.3.05); fixed 2026-10-29 by the clean-room alignment (next-steps 3b): both modes follow AFNI 26.3.05 and never name the defect; none in that part's trial against 26.3.05 (oracles/difftest/2026-10-29-cleanroom-align)"
 link = "validation/investigations/version-afni/README.md"
 
 [[difference]]
 tool = "afni-tshift"
 implementation = "original"
 signature = ["header fields (scaling, timing, slice fields, units, xform codes)", "DN fix pass", "TR (pixdim[N])", "notice: AFNI-03"]
-status = "open"
-explanation = "AFNI 26.3.05 fixed AFNI-03 (header slice code 2 read end..start); the clean-room original's `reproduce` still reads 25.2.09's zeros and names AFNI-03 (the trial against 26.3.05: 73 findings, 4 with AFNI-05 too); its alignment is the clean-room agent's (specs/3dTshift.md §3.2, §6.4)"
+status = "fixed"
+explanation = "AFNI 26.3.05 fixed AFNI-03 (header slice code 2 read end..start); the clean-room original's `reproduce` still reads 25.2.09's zeros and names AFNI-03 (the trial against 26.3.05: 73 findings, 4 with AFNI-05 too); its alignment is the clean-room agent's (specs/3dTshift.md §3.2, §6.4); fixed 2026-10-29 by the clean-room alignment (next-steps 3b): both modes follow AFNI 26.3.05 and never name the defect; none in that part's trial against 26.3.05 (oracles/difftest/2026-10-29-cleanroom-align)"
 link = "validation/investigations/version-afni/README.md"
 
 [[difference]]
 tool = "afni-automask"
 implementation = "original"
 signature = ["masked.nii: header bytes"]
-status = "open"
-explanation = "AFNI 26.3.05 fixed AFNI-03: -apply_prefix's output keeps a code-2 series' slice timing; the clean-room original's `reproduce` writes 25.2.09's (25 findings against 26.3.05); its alignment is the clean-room agent's (specs/3dAutomask.md §9)"
+status = "fixed"
+explanation = "AFNI 26.3.05 fixed AFNI-03: -apply_prefix's output keeps a code-2 series' slice timing; the clean-room original's `reproduce` writes 25.2.09's (25 findings against 26.3.05); its alignment is the clean-room agent's (specs/3dAutomask.md §9); fixed 2026-10-29 by the clean-room alignment (next-steps 3b): both modes follow AFNI 26.3.05 and never name the defect; none in that part's trial against 26.3.05 (oracles/difftest/2026-10-29-cleanroom-align)"
 link = "validation/difftest/cases/afni-automask/slice-code-2-masked-notices.json"
 
 [[difference]]
 tool = "afni-unifize"
 implementation = "original"
 signature = ["uni.nii: header bytes", "uni.nii.gz: header bytes"]
-status = "open"
-explanation = "AFNI 26.3.05 fixed AFNI-03: -EPI's output keeps a code-2 series' slice timing; the clean-room original's `reproduce` writes 25.2.09's (21 findings against 26.3.05); its alignment is the clean-room agent's (specs/3dUnifize.md)"
+status = "fixed"
+explanation = "AFNI 26.3.05 fixed AFNI-03: -EPI's output keeps a code-2 series' slice timing; the clean-room original's `reproduce` writes 25.2.09's (21 findings against 26.3.05); its alignment is the clean-room agent's (specs/3dUnifize.md); fixed 2026-10-29 by the clean-room alignment (next-steps 3b): both modes follow AFNI 26.3.05 and never name the defect; none in that part's trial against 26.3.05 (oracles/difftest/2026-10-29-cleanroom-align)"
 link = "validation/difftest/cases/afni-unifize/epi-slice-code-2-fix-notice.json"
 
 # ---------------------------------------------------------------- the version update (FSL, 2026-10-29)
@@ -776,6 +776,16 @@ link = "validation/difftest/cases/fsl-bet/bet2-fill-memory-beyond.json"
 tool = "mri-hmc"
 implementation = "original"
 signature = ["out_mcf.nii.gz: voxel values"]
-status = "open"
-explanation = "FSL-59: mcflirt 6.0.7.23 resamples -sinc_final and -nn_final trilinearly; the clean-room original follows the option (about 260 findings of the version trial against 6.0.7.23); its alignment is the clean-room agent's (specs/mcflirt.md §9.3, marked FSL 6.0.7.23); its default stays on 6.0.7.17 until then"
+status = "fixed"
+explanation = "FSL-59: mcflirt 6.0.7.23 resamples -sinc_final and -nn_final trilinearly; the clean-room original follows the option (about 260 findings of the version trial against 6.0.7.23); its alignment is the clean-room agent's (specs/mcflirt.md §9.3, marked FSL 6.0.7.23); its default stays on 6.0.7.17 until then; fixed 2026-10-29 by the clean-room alignment (next-steps 3b): the default keeps the interpolation asked for, reproduce resamples trilinearly as mcflirt 6.0.7.23, FSL-59 named where they differ"
 link = "validation/investigations/version-fsl/mri-hmc-6.0.7.23.md"
+
+# ---------------------------------------------------------------- the clean-room alignment (2026-10-29)
+
+[[difference]]
+tool = "mri-hmc"
+implementation = "original"
+signature = ["D13 notices in both modes"]
+status = "open"
+explanation = "FSL-01 named in reproduce only (mri-hmc:20261029:45: -cost corratio with a separate reference on a thin slab): the default's FSL-03 correction leaves the previous volume's stage-1 matrix at the identity, so starting the last volume from it changes nothing there; decide by the notice rule (next-steps follow-up 'The head-motion correction's FSL-01 notice in the in-plane mode'); reported by the clean-room alignment's trial (oracles/difftest/2026-10-29-cleanroom-align)"
+link = "validation/investigations/cleanroom-align/README.md"

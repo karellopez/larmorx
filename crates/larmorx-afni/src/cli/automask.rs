@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: Apache-2.0
-//! `3dAutomask` with its original arguments (the behaviour of AFNI 25.2.09,
+//! `3dAutomask` with its original arguments (the behaviour of AFNI 26.3.05,
 //! `specs/3dAutomask.md` §8), AFNI's global options and environment variables included.
 //!
 //! Differences from AFNI, all deliberate: the outputs must be NIfTI files; AFNI's default

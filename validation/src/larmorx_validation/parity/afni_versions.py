@@ -42,11 +42,9 @@ BUILDS = {
 NEWEST = "26.3.05"
 PREVIOUS = "25.2.09"
 ENV = "LARMORX_AFNI_VERSION"
-#: The version each implementation is validated against by default. The clean-room originals
-#: agree with AFNI 26.3.05 on every case their standard tiers hold except where 26.3.05 fixed a
-#: defect they reproduce (AFNI-03, AFNI-05: `reproduce` gives 25.2.09's behaviour), so they stay
-#: on 25.2.09 until a clean-room agent aligns them (docs/next-steps.md).
-DEFAULT = {"replica": NEWEST, "original": PREVIOUS}
+#: The version each implementation is validated against by default: both follow the newest
+#: release (the clean-room originals since their alignment, 2026-10-29: next-steps 3b).
+DEFAULT = {"replica": NEWEST, "original": NEWEST}
 
 #: What changed between AFNI 25.2.09 and 26.3.05 in the code these programs run (the source
 #: diff and the machine code of both builds: ``validation/investigations/version-afni/``).

@@ -3,9 +3,9 @@
 **1 case(s) fail.** 136 cases on the `standard` tier: 121 pass, 11 rejected by both, 3 expected divergences, 1 failures.
 
 - **Validated:** `larmorx mri hmc` / `lx.mri.hmc` (crate larmorx-mri, clean-room from `specs/mcflirt.md`, Apache-2.0)
-- **Reference:** mcflirt from FSL 6.0.7.17 (fsl-mcflirt 2111.0), the recorded runs in `oracles/fsl-6.0.7/mcflirt/`
+- **Reference:** mcflirt from FSL 6.0.7.23 (fsl-mcflirt 2111.0), the recorded runs in `oracles/fsl-6.0.7.23/mcflirt/`
 - **Test data:** larmorx-testdata `52124bc98f9f`, tier `standard`
-- **Generated:** 2026-10-29 on Linux x86_64, with `python -m larmorx_validation parity mri-hmc --tier standard`
+- **Generated:** 2026-10-29 on Linux x86_64, with `python -m larmorx_validation parity mri-hmc --tier standard --fsl-version 6.0.7.23`
 - **Original programs:** 2 runs: 2 from the oracle cache, 0 run; cache `<workspace>/oracles/cache`, mode `use`
 
 
@@ -184,7 +184,7 @@ mcflirt's defaults (middle volume as reference)
 | Case | Reason |
 |---|---|
 | `syn/motion/small/no-fsloutputtype` | Without FSLOUTPUTTYPE, mcflirt writes the .mat files and fails (exit 1); larmorx writes every output as .nii.gz (its default). |
-| `difftest/normmi-aligns-worse` | -cost normmi: larmorx aligns this phantom worse than mcflirt (temporal SD 1.38 of mcflirt's); over the night's 91 normmi findings the median ratio is 1.033; cause open (the spec describes the histogram costs in outline only; docs/findings/mri-hmc-original.md) |
+| `difftest/normmi-aligns-worse` | -cost normmi, computed exactly as specs/mcflirt.md appendix B describes it since 2026-10-29: larmorx now aligns this phantom better than mcflirt 6.0.7.23 (temporal SD 0.93 of mcflirt's; 1.38 before), its estimates ending in other minima of a phantom moved by large rotations, beyond the record's thr… |
 | `difftest/phantom-several-minima` | A small phantom moved by up to 15 degrees: the normalised correlation has several minima, and larmorx's estimates end in other ones than mcflirt's beyond the record's thresholds, aligning the series as well (temporal SD 0.999 of mcflirt's here; over the night's 782 findings median ratio 1.000, docs… |
 
 ## Rejected by both
@@ -207,7 +207,7 @@ mcflirt's defaults (middle volume as reference)
 
 | Component | Version |
 |---|---|
-| larmorx | 0.0.1 (e82f16ee2f72) |
+| larmorx | 0.0.1 (bb36e15a24bb) |
 | larmorx-testdata | 52124bc98f9f |
 | Python | 3.12.16 |
 | Platform | Linux x86_64 (Linux-6.8.0-124-generic-x86_64-with-glibc2.35) |
@@ -217,7 +217,7 @@ mcflirt's defaults (middle volume as reference)
 
 ## Notes
 
-Each recorded mcflirt run is replayed with the same arguments and FSLOUTPUTTYPE; outputs are read with nibabel. Parameters are decomposed about the centre of the reference's field of view (FSL-mm) for the comparison; the `.par` files are compared as written (about the reference's intensity-weighted centre). The `descrip` header field differs by design (larmorx writes its own name). larmorx uses all logical CPUs; its results do not depend on the thread count.
+Each recorded mcflirt run is replayed with the same arguments and FSLOUTPUTTYPE; outputs are read with nibabel. Parameters are decomposed about the centre of the reference's field of view (FSL-mm) for the comparison; the `.par` files are compared as written (about the reference's intensity-weighted centre). The `descrip` header field differs by design (larmorx writes its own name). larmorx runs at 4 threads (`LARMORX_PARITY_LX_THREADS`); its results do not depend on the thread count. FSL version: 6.0.7.23 (`--fsl-version`, `LARMORX_FSL_VERSION`; installations: 6.0.7.23 `~/fsl-6.0.7.23`, 6.0.7.17 `~/fsl`).
 
 ## All cases
 
@@ -357,5 +357,5 @@ Each recorded mcflirt run is replayed with the same arguments and FSLOUTPUTTYPE;
 | `syn/orientation/ras-unflipped/reffile` | pass | 16/16 | -reffile phantom/ref |
 | `syn/orientation/ras/default` | pass | 16/16 | defaults |
 | `syn/orientation/ras/reffile` | pass | 17/17 | -reffile phantom/ref |
-| `difftest/normmi-aligns-worse` | expected-divergence | 7/13 | Head-motion correction with -cost normmi: the subset that aligns worse, left open (item 13, 2026-10-29) |
+| `difftest/normmi-aligns-worse` | expected-divergence | 7/13 | Head-motion correction with -cost normmi on a random phantom with large motion: once the subset that aligned worse (ite… |
 | `difftest/phantom-several-minima` | expected-divergence | 15/16 | Head-motion correction on a random phantom with large motion: an explained divergence (item 13, 2026-10-29) |

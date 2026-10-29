@@ -1,0 +1,29 @@
+The trace mi_trace.py reads: every matrix larmorx's clean-room head-motion correction evaluates,
+appended to the file $LARMORX_HMC_TRACE in the format of mcflirt's `-verbose 20`. A local build
+only (never committed to the crate): apply with `git apply validation/investigations/cleanroom-align/trace.patch`
+from the repository, build `cargo build --release -p larmorx-cli`, copy the binary aside, then
+`git apply -R` the patch.
+
+--- a/crates/larmorx-mri/src/hmc/estimate.rs
++++ b/crates/larmorx-mri/src/hmc/estimate.rs
+@@ -249,7 +249,19 @@
+             background: test.background(),
+         };
+     }
+-    let mut cost = |q: &Params| evaluate(stage, &tv, &rigid::compose(q, stage.ncompose, centre));
++    let mut cost = |q: &Params| {
++        let m = rigid::compose(q, stage.ncompose, centre);
++        if let Some(path) = std::env::var_os("LARMORX_HMC_TRACE") {
++            use std::io::Write as _;
++            let mut f = std::fs::OpenOptions::new()
++                .create(true)
++                .append(true)
++                .open(path)
++                .unwrap();
++            write!(f, "Cost::affmat = \n{}\n", super::report::mat_text(&m)).unwrap();
++        }
++        evaluate(stage, &tv, &m)
++    };
+     let (p, _) = sweep(&mut cost, &p, &stage.order, &stage.tolerances);
+     rigid::compose(&p, stage.ncompose, centre)
+ }

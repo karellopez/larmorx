@@ -3,10 +3,10 @@
 **All cases agree.** 130 cases on the `standard` tier: 110 pass, 19 rejected by both, 1 expected divergences, 0 failures.
 
 - **Validated:** `larmorx afni 3dAutomask` / `lx.afni.automask` (crate larmorx-afni, the Apache-2.0 clean-room original written from `specs/3dAutomask.md`), with `implementation="original"`
-- **Reference:** 3dAutomask from AFNI (AFNI_25.2.09, gcc (Ubuntu 11.4.0-1ubuntu1~22.04.3) 11.4.0), the binary built by `scripts/build_afni_oracle.sh`
+- **Reference:** 3dAutomask from AFNI (AFNI_26.3.05, gcc (Ubuntu 11.4.0-1ubuntu1~22.04.3) 11.4.0), the binary built by `scripts/build_afni_oracle.sh`
 - **Test data:** larmorx-testdata `52124bc98f9f`, tier `standard`
-- **Generated:** 2026-10-29 on Linux x86_64, with `python -m larmorx_validation parity afni-automask --tier standard`
-- **Original programs:** 216 runs: 214 from the oracle cache, 2 run; cache `<workspace>/oracles/cache`, mode `use`
+- **Generated:** 2026-10-29 on Linux x86_64, with `python -m larmorx_validation parity afni-automask --tier standard --afni-version 26.3.05`
+- **Original programs:** 346 runs: 328 from the oracle cache, 18 run; cache `<workspace>/oracles/cache`, mode `use`
 
 **Bit-identical to AFNI: 92 of 106 compared cases that write outputs**: every output the same bytes (data and NIfTI header), with the same exit status and messages. The other 4 compared case(s) write no output in either program (an existing output, a name with a blank, a directory that does not exist) and agree on the exit status and messages; the default mode's corrections there are in the D13 lines below.
 - Messages (standard output and error, byte for byte; AFNI's version banner and compile date, and larmorx's own lines, set aside): 118 of 123 identical, in every case that ran both programs; 5 explained by AFNI-10 (below: AFNI reports the obliquity of its header extension's matrix, and AFNI run on the input without its extension prints the original's messages byte for byte).
@@ -17,10 +17,10 @@
 - AFNI's own variability, AFNI at 6 thread(s): 22 of 22 runs give the oracle's output bit for bit.
 - AFNI's own variability, fMRIPrep 25.2.6's AFNI: 25 of 25 runs give the oracle's output bit for bit.
 - Python API (`lx.afni.automask(..., implementation="original")`): 35 of 35 cases give the command line's outputs bit for bit.
+- **AFNI's own step, AFNI 25.2.09 → 26.3.05** (both builds on the same arguments; the previous one's runs from the oracle-output cache where an earlier record made them): 129 of 130 cases identical (exit status, messages, every output); 1 changed: 1 by AFNI-03 (AFNI 26.3.05 reads header slice code 2 (sequential decreasing) as NIfTI defines it, from slice_end down to slice_start; 25.2.09 gave every slice time 0): `difftest/slice-code-2-masked-notices`.
 - **D13 fix pass** (larmorx's default, `upstream_defects="fix"`; the comparison above runs `reproduce`): the corrections met
   - AFNI-01: 1 case(s) named it, 0 with changed values (largest difference 0), 1 with other changes (messages): `defects/negative-slope-4d`
   - AFNI-02: 1 case(s) named it, 0 with changed values (largest difference 0), 1 with other changes (masked.nii header, messages): `defects/head-f32-slope-inter`
-  - AFNI-03: 1 case(s) named it, 0 with changed values (largest difference 0), 1 with other changes (masked.nii header): `difftest/slice-code-2-masked-notices`
   - AFNI-07: 1 case(s) named it, 0 with changed values (largest difference 0), 1 with other changes (mask.nii header): `defects/head-metre`
   - AFNI-11: 1 case(s) named it, 0 with changed values (largest difference 0): `global/exists`
   - AFNI-12: 1 case(s) named it, 0 with changed values (largest difference 0), 1 with other changes (the outputs written where AFNI refuses (a b.nii, exit N)): `global/prefix-with-blank`
@@ -89,7 +89,7 @@
 
 | Component | Version |
 |---|---|
-| larmorx | 0.0.1 (5130e08c6b18) |
+| larmorx | 0.0.1 (291722a29aba) |
 | larmorx-testdata | 52124bc98f9f |
 | Python | 3.12.16 |
 | Platform | Linux x86_64 (Linux-6.8.0-124-generic-x86_64-with-glibc2.35) |
@@ -99,139 +99,139 @@
 
 ## Notes
 
-Both programs run in directories of their own on the same input files, in the same environment (no AFNI variables of this process, `HOME` an empty directory, `AFNI_DONT_LOGFILE=YES`, `AFNI_NIFTI_NOEXT=YES`, plus each case's variables); outputs are compared as stored (data bytes, header bytes decompressed). The original is compared in `reproduce` mode; the fix pass runs its default. The real cases also run AFNI at other thread counts and fMRIPrep 25.2.6's own AFNI (in its image) and report how far they are from the oracle (AFNI's own variability); the fMRIPrep cases compare the original with fMRIPrep's own output of the node as well.
+Both programs run in directories of their own on the same input files, in the same environment (no AFNI variables of this process, `HOME` an empty directory, `AFNI_DONT_LOGFILE=YES`, `AFNI_NIFTI_NOEXT=YES`, plus each case's variables); outputs are compared as stored (data bytes, header bytes decompressed). The original is compared in `reproduce` mode; the fix pass runs its default. The real cases also run AFNI at other thread counts and fMRIPrep 25.2.6's own AFNI (in its image) and report how far they are from the oracle (AFNI's own variability); the fMRIPrep cases compare the original with fMRIPrep's own output of the node as well. AFNI version: 26.3.05 (`--afni-version`, `LARMORX_AFNI_VERSION`; builds: 26.3.05, 25.2.09). Each case also ran AFNI 25.2.09 on the same arguments (from the oracle-output cache where an earlier record ran it): the check 'AFNI's own step: 25.2.09 → 26.3.05' says whether AFNI's own exit status, messages and outputs changed, and why.
 
 ## All cases
 
 | Case | Status | Checks passed | What it tests |
 |---|---|---|---|
-| `options/default` | pass | 7/7 | the defaults (gradual clip level 0.5, 1 peel, NN2) |
-| `options/fmriprep-call` | pass | 9/9 | fMRIPrep's options: -apply_prefix, -dilate 1 |
-| `options/clfrac-0.1` | pass | 7/7 | -clfrac 0.1 |
-| `options/clfrac-0.3` | pass | 7/7 | -clfrac 0.3 |
-| `options/clfrac-0.9` | pass | 7/7 | -clfrac 0.9 |
-| `options/mfrac` | pass | 6/6 | -mfrac, the same as -clfrac |
-| `options/nograd` | pass | 7/7 | -nograd: one clip level |
-| `options/nogr-prefix` | pass | 6/6 | -nogr: AFNI compares 5 characters |
-| `options/peels-2` | pass | 7/7 | -peels 2 |
-| `options/peels-3` | pass | 7/7 | -peels 3 |
-| `options/nbhrs-6` | pass | 6/6 | -nbhrs 6 (AFNI uses 17 outside 6..26, AFNI-41) |
-| `options/nbhrs-15` | pass | 6/6 | -nbhrs 15 (AFNI uses 17 outside 6..26, AFNI-41) |
-| `options/nbhrs-18` | pass | 6/6 | -nbhrs 18 (AFNI uses 17 outside 6..26, AFNI-41) |
-| `options/nbhrs-26` | pass | 6/6 | -nbhrs 26 (AFNI uses 17 outside 6..26, AFNI-41) |
-| `options/nbhrs-40` | pass | 6/6 | -nbhrs 40 (AFNI uses 17 outside 6..26, AFNI-41) |
-| `options/nbhrs-5` | pass | 6/6 | -nbhrs 5: outside 6..26, refused by default (AFNI-41) |
-| `options/nbhrs-27` | pass | 6/6 | -nbhrs 27: outside 6..26, refused by default (AFNI-41) |
-| `options/nbhrs-0` | pass | 6/6 | -nbhrs 0: outside 6..26, refused by default (AFNI-41) |
-| `options/nbhrs-40-then-NN1` | pass | 6/6 | -nbhrs 40 then -NN1: AFNI peels as -NN1 says; refused by default (AFNI-41) |
-| `options/NN1-dilate-erode-depth` | pass | 8/8 | -NN1 with -dilate 2, -erode 1 and -depth (and the peeling count it sets, AFNI-42) |
-| `options/NN2-dilate-erode-depth` | pass | 8/8 | -NN2 with -dilate 2, -erode 1 and -depth (and the peeling count it sets, AFNI-42) |
-| `options/NN3-dilate-erode-depth` | pass | 8/8 | -NN3 with -dilate 2, -erode 1 and -depth (and the peeling count it sets, AFNI-42) |
-| `options/nbhrs-then-NN2` | pass | 6/6 | -nbhrs 12 then -NN2: -NN2 sets 18 (AFNI-42) |
-| `options/eclip` | pass | 7/7 | -eclip |
-| `options/eclip-nograd-clfrac` | pass | 6/6 | -eclip -nograd -clfrac 0.2 |
-| `options/dilate-3` | pass | 6/6 | -dilate 3 |
-| `options/erode-2` | pass | 7/7 | -erode 2 |
-| `options/depth` | pass | 9/9 | -depth alone |
-| `options/apply-only` | pass | 6/6 | -apply_prefix without -prefix: the only output |
-| `options/quiet` | pass | 6/6 | -q |
-| `options/SI-head-f32` | pass | 7/7 | -SI 60 along z, superior last |
-| `options/SI-head-superior-first` | pass | 6/6 | -SI 60 along z, superior first |
-| `options/SI-head-coronal` | pass | 6/6 | -SI 60 along y |
-| `options/SI-head-las` | pass | 6/6 | -SI 60 along z, LAS storage |
-| `options/SI-everything` | pass | 6/6 | -SI 1: clipping beyond the mask |
-| `options/t2-contrast` | pass | 6/6 | the T2-like phantom |
-| `options/big` | pass | 8/8 | a volume of 1.2 million voxels |
-| `datatypes/head-i16` | pass | 10/10 | head-i16: the mask, the masked input and the depth |
-| `datatypes/head-u8` | pass | 10/10 | head-u8: the mask, the masked input and the depth |
-| `datatypes/head-i16-slope2` | pass | 10/10 | head-i16-slope2: the mask, the masked input and the depth |
-| `datatypes/head-i16-slope1` | pass | 10/10 | head-i16-slope1: the mask, the masked input and the depth |
-| `datatypes/head-f64` | pass | 10/10 | head-f64: the mask, the masked input and the depth |
-| `datatypes/head-i8` | pass | 10/10 | head-i8: the mask, the masked input and the depth |
-| `datatypes/head-u16` | pass | 10/10 | head-u16: the mask, the masked input and the depth |
-| `datatypes/head-i32` | pass | 10/10 | head-i32: the mask, the masked input and the depth |
-| `datatypes/head-nan` | pass | 10/10 | head-nan: the mask, the masked input and the depth |
-| `datatypes/head-oblique` | pass | 10/10 | head-oblique: the mask, the masked input and the depth |
-| `datatypes/head-qform-only` | pass | 10/10 | head-qform-only: the mask, the masked input and the depth |
-| `datatypes/head-sform-only` | pass | 10/10 | head-sform-only: the mask, the masked input and the depth |
-| `datatypes/head-las` | pass | 10/10 | head-las: the mask, the masked input and the depth |
-| `defects/head-f32-slope-inter` | pass | 8/8 | float32 with scl_slope and scl_inter (AFNI-02) |
-| `defects/head-metre` | pass | 6/6 | a grid in metres (AFNI-07) |
-| `defects/head-nearly-plumb` | pass | 6/6 | a grid 0.009 degrees from plumb (AFNI-16) |
-| `defects/nifti-scale-no` | pass | 8/8 | AFNI_NIFTI_SCALE=NO on int16 with an intercept (AFNI-23) |
-| `defects/peels-0` | pass | 7/7 | -peels 0 (AFNI-43: AFNI peels once) |
-| `defects/peels-0-fmriprep` | pass | 8/8 | -peels 0 added to fMRIPrep's call on its BOLD reference of ds005040 (AFNI-43) |
-| `defects/negative-slope-4d` | pass | 8/8 | a 4D series with scl_slope -2 (AFNI-01) |
-| `dimensions/series-i16` | pass | 8/8 | a 4D int16 series: the mean of \|values\| |
-| `dimensions/series-f32` | pass | 8/8 | a 4D float32 series |
-| `dimensions/series-slope` | pass | 8/8 | a 4D series with scl_slope 2 |
-| `dimensions/series-one` | pass | 8/8 | a 4D file of one volume |
-| `dimensions/slice` | pass | 8/8 | a 2D slice (64 x 64 x 1): AFNI's 2D path |
-| `dimensions/two-slices` | pass | 8/8 | two slices (64 x 64 x 2) |
-| `dimensions/tiny` | pass | 8/8 | 2 x 2 x 2 voxels: nothing to cluster |
-| `dimensions/zeros` | pass | 8/8 | an image of zeros: the clip level is 0 |
-| `dimensions/constant` | pass | 8/8 | a constant image |
-| `errors/slice-small` | both-error | 3/3 | a 2D slice smaller than 16 x 16: no mask |
-| `errors/row` | both-error | 3/3 | one row (64 x 1 x 1): no mask |
-| `errors/missing-value-peels` | both-error | 2/2 | -peels as the last argument: AFNI crashes (AFNI-40) |
-| `errors/missing-value-nbhrs` | both-error | 2/2 | -nbhrs as the last argument: AFNI crashes (AFNI-40) |
-| `errors/missing-value-clfrac` | both-error | 2/2 | -clfrac as the last argument: AFNI crashes (AFNI-40) |
-| `errors/missing-value-SI` | both-error | 2/2 | -SI as the last argument: AFNI crashes (AFNI-40) |
-| `errors/missing-value-dilate` | both-error | 2/2 | -dilate as the last argument: AFNI crashes (AFNI-40) |
-| `errors/missing-value-erode` | both-error | 2/2 | -erode as the last argument: AFNI crashes (AFNI-40) |
-| `errors/missing-name-prefix` | both-error | 3/3 | -prefix as the last argument: '(null) is illegal' |
-| `errors/missing-name-depth` | both-error | 3/3 | -depth as the last argument: '(null) is illegal' |
-| `errors/missing-name-apply_prefix` | both-error | 3/3 | -apply_prefix as the last argument: '(null) is illegal' |
-| `errors/clfrac-high` | both-error | 3/3 | -clfrac 0.95 |
-| `errors/clfrac-low` | both-error | 3/3 | -clfrac 0.05 |
-| `errors/SI-negative` | both-error | 3/3 | -SI -3 |
-| `errors/dilate-negative` | both-error | 3/3 | -dilate -1 |
-| `errors/erode-negative` | both-error | 3/3 | -erode -2 |
-| `errors/unknown-option` | both-error | 3/3 | an unknown option |
-| `errors/no-dataset` | both-error | 3/3 | no dataset |
-| `errors/missing-input` | both-error | 3/3 | a missing input |
-| `divergences/default-prefix` | expected-divergence | 1/1 | no -prefix: AFNI writes its own format (automask+orig) |
-| `global/exists` | pass | 4/4 | an existing output (AFNI-11) |
-| `global/overwrite` | pass | 6/6 | -overwrite |
-| `global/deconflict-yes` | pass | 6/6 | AFNI_DECONFLICT=YES: renamed |
-| `global/D-deconflict-overwrite` | pass | 6/6 | -DAFNI_DECONFLICT=OVERWRITE |
-| `global/D-write-type-2` | pass | 6/6 | -DAFNI_NIFTI_WRITE_TYPE=2: NIfTI-2 |
-| `environment/quiet-startup` | pass | 6/6 | AFNI_QUIET_STARTUP=YES: no author or output lines |
-| `environment/message-prefix` | pass | 6/6 | AFNI_MESSAGE_PREFIX |
-| `environment/echo-commandline` | pass | 6/6 | AFNI_ECHO_COMMANDLINE=YES |
-| `environment/colorize-no` | pass | 6/6 | AFNI_MESSAGE_COLORIZE=NO with a warning |
-| `environment/nifti-priority-q` | pass | 6/6 | AFNI_NIFTI_PRIORITY=Q on an oblique input |
-| `global/prefix-with-blank` | pass | 4/4 | a -prefix with a blank (AFNI-12) |
-| `global/input-dir-with-blank` | pass | 4/4 | an input in a directory with a blank (AFNI-18) |
-| `global/missing-directory` | pass | 4/4 | an output in a missing directory (AFNI-26) |
-| `fmriprep/ds000005-task_mixedgamblestask_run_01` | pass | 13/13 | fMRIPrep's call on the input of its BOLD reference's second skull strip (ds000005-task_mixedgamblestask_run_01) |
-| `fmriprep/ds000005-task_mixedgamblestask_run_02` | pass | 13/13 | fMRIPrep's call on the input of its BOLD reference's second skull strip (ds000005-task_mixedgamblestask_run_02) |
-| `fmriprep/ds000005-task_mixedgamblestask_run_03` | pass | 13/13 | fMRIPrep's call on the input of its BOLD reference's second skull strip (ds000005-task_mixedgamblestask_run_03) |
-| `fmriprep/ds000228-task_pixar` | pass | 13/13 | fMRIPrep's call on the input of its BOLD reference's second skull strip (ds000228-task_pixar) |
-| `fmriprep/ds000256-task_restbaseline` | pass | 13/13 | fMRIPrep's call on the input of its BOLD reference's second skull strip (ds000256-task_restbaseline) |
-| `fmriprep/ds000256-task_restfixationfixed` | pass | 13/13 | fMRIPrep's call on the input of its BOLD reference's second skull strip (ds000256-task_restfixationfixed) |
-| `fmriprep/ds000256-task_restfixationnofeedback` | pass | 13/13 | fMRIPrep's call on the input of its BOLD reference's second skull strip (ds000256-task_restfixationnofeedback) |
-| `fmriprep/ds002422-task_arithm_run_01` | pass | 13/13 | fMRIPrep's call on the input of its BOLD reference's second skull strip (ds002422-task_arithm_run_01) |
-| `fmriprep/ds002422-task_arithm_run_02` | pass | 13/13 | fMRIPrep's call on the input of its BOLD reference's second skull strip (ds002422-task_arithm_run_02) |
-| `fmriprep/ds002422-task_rest` | pass | 13/13 | fMRIPrep's call on the input of its BOLD reference's second skull strip (ds002422-task_rest) |
-| `fmriprep/ds002603-task_wm_acq_Mb4Mm3Tr550` | pass | 13/13 | fMRIPrep's call on the input of its BOLD reference's second skull strip (ds002603-task_wm_acq_Mb4Mm3Tr550) |
-| `fmriprep/ds002603-task_wm_acq_SeqMm3Tr2000` | pass | 13/13 | fMRIPrep's call on the input of its BOLD reference's second skull strip (ds002603-task_wm_acq_SeqMm3Tr2000) |
-| `fmriprep/ds003592-ses_1_task_rest_echo_1` | pass | 13/13 | fMRIPrep's call on the input of its BOLD reference's second skull strip (ds003592-ses_1_task_rest_echo_1) |
-| `fmriprep/ds004884-ses_217_task_naming40_acq_epfid2_dir_AP_run_2` | pass | 13/13 | fMRIPrep's call on the input of its BOLD reference's second skull strip (ds004884-ses_217_task_naming40_acq_epfid2_dir_… |
-| `fmriprep/ds004884-ses_217_task_rest_acq_epfidp2p2_dir_AP_run_9` | pass | 13/13 | fMRIPrep's call on the input of its BOLD reference's second skull strip (ds004884-ses_217_task_rest_acq_epfidp2p2_dir_A… |
-| `fmriprep/ds004958-task_rest` | pass | 13/13 | fMRIPrep's call on the input of its BOLD reference's second skull strip (ds004958-task_rest) |
-| `fmriprep/ds005003-ses_1_task_motor` | pass | 13/13 | fMRIPrep's call on the input of its BOLD reference's second skull strip (ds005003-ses_1_task_motor) |
-| `fmriprep/ds005003-ses_1_task_rest` | pass | 13/13 | fMRIPrep's call on the input of its BOLD reference's second skull strip (ds005003-ses_1_task_rest) |
-| `fmriprep/ds005040-task_clip_run_1` | pass | 13/13 | fMRIPrep's call on the input of its BOLD reference's second skull strip (ds005040-task_clip_run_1) |
-| `fmriprep/ds005454-task_rest` | pass | 13/13 | fMRIPrep's call on the input of its BOLD reference's second skull strip (ds005454-task_rest) |
-| `fmriprep/ds005752-ses_01_task_rest_dir_forward` | pass | 13/13 | fMRIPrep's call on the input of its BOLD reference's second skull strip (ds005752-ses_01_task_rest_dir_forward) |
-| `fmriprep/ds005752-ses_01_task_rest_dir_reverse` | pass | 13/13 | fMRIPrep's call on the input of its BOLD reference's second skull strip (ds005752-ses_01_task_rest_dir_reverse) |
-| `real/sub-01_task-mixedgamblestask_run-01` | pass | 8/8 | AFNI's default on a BOLD series (sub-01_task-mixedgamblestask_run-01) |
-| `real/sub-1_task-rest_acq-v4` | pass | 8/8 | AFNI's default on a BOLD series (sub-1_task-rest_acq-v4) |
-| `real/t1w-brain` | pass | 8/8 | the skull-stripped T1w of an fMRIPrep run (ds000005, sMRIPrep's desc-brain) |
-| `difftest/float64-negative-zero` | pass | 8/8 | A float64 input without a usable scl_slope: a -0 inside the mask is kept by -apply_prefix (item 8, 2026-10-29) |
-| `difftest/oblique-orientation-letters` | pass | 6/6 | An oblique series: the '[from L]' letters of the closest plumb orientation, never '?' (item 5, 2026-10-29) |
-| `difftest/peels-0-clustering-messages` | pass | 6/6 | -peels 0 where the mask is the same but the clustering messages differ: AFNI-43 named (item 7, 2026-10-29) |
-| `difftest/plane-oblique-si-orientation` | pass | 6/6 | A one-slice oblique constant image with -SI: the axis AFNI orients as superior (the closest plumb orientation), so the … |
-| `difftest/slice-code-2-masked-notices` | pass | 8/8 | Header slice code 2 with -apply_prefix: AFNI-03 named in both modes, AFNI-08 in reproduce, in the replica's words (item… |
-| `difftest/tiny-oblique-quaternion-residue` | pass | 6/6 | A 1 x 1 x 2 oblique image: the quaternion's rounding residue as AFNI's (1/det of the polar decomposition's inverse in e… |
+| `options/default` | pass | 8/8 | the defaults (gradual clip level 0.5, 1 peel, NN2) |
+| `options/fmriprep-call` | pass | 10/10 | fMRIPrep's options: -apply_prefix, -dilate 1 |
+| `options/clfrac-0.1` | pass | 8/8 | -clfrac 0.1 |
+| `options/clfrac-0.3` | pass | 8/8 | -clfrac 0.3 |
+| `options/clfrac-0.9` | pass | 8/8 | -clfrac 0.9 |
+| `options/mfrac` | pass | 7/7 | -mfrac, the same as -clfrac |
+| `options/nograd` | pass | 8/8 | -nograd: one clip level |
+| `options/nogr-prefix` | pass | 7/7 | -nogr: AFNI compares 5 characters |
+| `options/peels-2` | pass | 8/8 | -peels 2 |
+| `options/peels-3` | pass | 8/8 | -peels 3 |
+| `options/nbhrs-6` | pass | 7/7 | -nbhrs 6 (AFNI uses 17 outside 6..26, AFNI-41) |
+| `options/nbhrs-15` | pass | 7/7 | -nbhrs 15 (AFNI uses 17 outside 6..26, AFNI-41) |
+| `options/nbhrs-18` | pass | 7/7 | -nbhrs 18 (AFNI uses 17 outside 6..26, AFNI-41) |
+| `options/nbhrs-26` | pass | 7/7 | -nbhrs 26 (AFNI uses 17 outside 6..26, AFNI-41) |
+| `options/nbhrs-40` | pass | 7/7 | -nbhrs 40 (AFNI uses 17 outside 6..26, AFNI-41) |
+| `options/nbhrs-5` | pass | 7/7 | -nbhrs 5: outside 6..26, refused by default (AFNI-41) |
+| `options/nbhrs-27` | pass | 7/7 | -nbhrs 27: outside 6..26, refused by default (AFNI-41) |
+| `options/nbhrs-0` | pass | 7/7 | -nbhrs 0: outside 6..26, refused by default (AFNI-41) |
+| `options/nbhrs-40-then-NN1` | pass | 7/7 | -nbhrs 40 then -NN1: AFNI peels as -NN1 says; refused by default (AFNI-41) |
+| `options/NN1-dilate-erode-depth` | pass | 9/9 | -NN1 with -dilate 2, -erode 1 and -depth (and the peeling count it sets, AFNI-42) |
+| `options/NN2-dilate-erode-depth` | pass | 9/9 | -NN2 with -dilate 2, -erode 1 and -depth (and the peeling count it sets, AFNI-42) |
+| `options/NN3-dilate-erode-depth` | pass | 9/9 | -NN3 with -dilate 2, -erode 1 and -depth (and the peeling count it sets, AFNI-42) |
+| `options/nbhrs-then-NN2` | pass | 7/7 | -nbhrs 12 then -NN2: -NN2 sets 18 (AFNI-42) |
+| `options/eclip` | pass | 8/8 | -eclip |
+| `options/eclip-nograd-clfrac` | pass | 7/7 | -eclip -nograd -clfrac 0.2 |
+| `options/dilate-3` | pass | 7/7 | -dilate 3 |
+| `options/erode-2` | pass | 8/8 | -erode 2 |
+| `options/depth` | pass | 10/10 | -depth alone |
+| `options/apply-only` | pass | 7/7 | -apply_prefix without -prefix: the only output |
+| `options/quiet` | pass | 7/7 | -q |
+| `options/SI-head-f32` | pass | 8/8 | -SI 60 along z, superior last |
+| `options/SI-head-superior-first` | pass | 7/7 | -SI 60 along z, superior first |
+| `options/SI-head-coronal` | pass | 7/7 | -SI 60 along y |
+| `options/SI-head-las` | pass | 7/7 | -SI 60 along z, LAS storage |
+| `options/SI-everything` | pass | 7/7 | -SI 1: clipping beyond the mask |
+| `options/t2-contrast` | pass | 7/7 | the T2-like phantom |
+| `options/big` | pass | 9/9 | a volume of 1.2 million voxels |
+| `datatypes/head-i16` | pass | 11/11 | head-i16: the mask, the masked input and the depth |
+| `datatypes/head-u8` | pass | 11/11 | head-u8: the mask, the masked input and the depth |
+| `datatypes/head-i16-slope2` | pass | 11/11 | head-i16-slope2: the mask, the masked input and the depth |
+| `datatypes/head-i16-slope1` | pass | 11/11 | head-i16-slope1: the mask, the masked input and the depth |
+| `datatypes/head-f64` | pass | 11/11 | head-f64: the mask, the masked input and the depth |
+| `datatypes/head-i8` | pass | 11/11 | head-i8: the mask, the masked input and the depth |
+| `datatypes/head-u16` | pass | 11/11 | head-u16: the mask, the masked input and the depth |
+| `datatypes/head-i32` | pass | 11/11 | head-i32: the mask, the masked input and the depth |
+| `datatypes/head-nan` | pass | 11/11 | head-nan: the mask, the masked input and the depth |
+| `datatypes/head-oblique` | pass | 11/11 | head-oblique: the mask, the masked input and the depth |
+| `datatypes/head-qform-only` | pass | 11/11 | head-qform-only: the mask, the masked input and the depth |
+| `datatypes/head-sform-only` | pass | 11/11 | head-sform-only: the mask, the masked input and the depth |
+| `datatypes/head-las` | pass | 11/11 | head-las: the mask, the masked input and the depth |
+| `defects/head-f32-slope-inter` | pass | 9/9 | float32 with scl_slope and scl_inter (AFNI-02) |
+| `defects/head-metre` | pass | 7/7 | a grid in metres (AFNI-07) |
+| `defects/head-nearly-plumb` | pass | 7/7 | a grid 0.009 degrees from plumb (AFNI-16) |
+| `defects/nifti-scale-no` | pass | 9/9 | AFNI_NIFTI_SCALE=NO on int16 with an intercept (AFNI-23) |
+| `defects/peels-0` | pass | 8/8 | -peels 0 (AFNI-43: AFNI peels once) |
+| `defects/peels-0-fmriprep` | pass | 9/9 | -peels 0 added to fMRIPrep's call on its BOLD reference of ds005040 (AFNI-43) |
+| `defects/negative-slope-4d` | pass | 9/9 | a 4D series with scl_slope -2 (AFNI-01) |
+| `dimensions/series-i16` | pass | 9/9 | a 4D int16 series: the mean of \|values\| |
+| `dimensions/series-f32` | pass | 9/9 | a 4D float32 series |
+| `dimensions/series-slope` | pass | 9/9 | a 4D series with scl_slope 2 |
+| `dimensions/series-one` | pass | 9/9 | a 4D file of one volume |
+| `dimensions/slice` | pass | 9/9 | a 2D slice (64 x 64 x 1): AFNI's 2D path |
+| `dimensions/two-slices` | pass | 9/9 | two slices (64 x 64 x 2) |
+| `dimensions/tiny` | pass | 9/9 | 2 x 2 x 2 voxels: nothing to cluster |
+| `dimensions/zeros` | pass | 9/9 | an image of zeros: the clip level is 0 |
+| `dimensions/constant` | pass | 9/9 | a constant image |
+| `errors/slice-small` | both-error | 4/4 | a 2D slice smaller than 16 x 16: no mask |
+| `errors/row` | both-error | 4/4 | one row (64 x 1 x 1): no mask |
+| `errors/missing-value-peels` | both-error | 3/3 | -peels as the last argument: AFNI crashes (AFNI-40) |
+| `errors/missing-value-nbhrs` | both-error | 3/3 | -nbhrs as the last argument: AFNI crashes (AFNI-40) |
+| `errors/missing-value-clfrac` | both-error | 3/3 | -clfrac as the last argument: AFNI crashes (AFNI-40) |
+| `errors/missing-value-SI` | both-error | 3/3 | -SI as the last argument: AFNI crashes (AFNI-40) |
+| `errors/missing-value-dilate` | both-error | 3/3 | -dilate as the last argument: AFNI crashes (AFNI-40) |
+| `errors/missing-value-erode` | both-error | 3/3 | -erode as the last argument: AFNI crashes (AFNI-40) |
+| `errors/missing-name-prefix` | both-error | 4/4 | -prefix as the last argument: '(null) is illegal' |
+| `errors/missing-name-depth` | both-error | 4/4 | -depth as the last argument: '(null) is illegal' |
+| `errors/missing-name-apply_prefix` | both-error | 4/4 | -apply_prefix as the last argument: '(null) is illegal' |
+| `errors/clfrac-high` | both-error | 4/4 | -clfrac 0.95 |
+| `errors/clfrac-low` | both-error | 4/4 | -clfrac 0.05 |
+| `errors/SI-negative` | both-error | 4/4 | -SI -3 |
+| `errors/dilate-negative` | both-error | 4/4 | -dilate -1 |
+| `errors/erode-negative` | both-error | 4/4 | -erode -2 |
+| `errors/unknown-option` | both-error | 4/4 | an unknown option |
+| `errors/no-dataset` | both-error | 4/4 | no dataset |
+| `errors/missing-input` | both-error | 4/4 | a missing input |
+| `divergences/default-prefix` | expected-divergence | 2/2 | no -prefix: AFNI writes its own format (automask+orig) |
+| `global/exists` | pass | 5/5 | an existing output (AFNI-11) |
+| `global/overwrite` | pass | 7/7 | -overwrite |
+| `global/deconflict-yes` | pass | 7/7 | AFNI_DECONFLICT=YES: renamed |
+| `global/D-deconflict-overwrite` | pass | 7/7 | -DAFNI_DECONFLICT=OVERWRITE |
+| `global/D-write-type-2` | pass | 7/7 | -DAFNI_NIFTI_WRITE_TYPE=2: NIfTI-2 |
+| `environment/quiet-startup` | pass | 7/7 | AFNI_QUIET_STARTUP=YES: no author or output lines |
+| `environment/message-prefix` | pass | 7/7 | AFNI_MESSAGE_PREFIX |
+| `environment/echo-commandline` | pass | 7/7 | AFNI_ECHO_COMMANDLINE=YES |
+| `environment/colorize-no` | pass | 7/7 | AFNI_MESSAGE_COLORIZE=NO with a warning |
+| `environment/nifti-priority-q` | pass | 7/7 | AFNI_NIFTI_PRIORITY=Q on an oblique input |
+| `global/prefix-with-blank` | pass | 5/5 | a -prefix with a blank (AFNI-12) |
+| `global/input-dir-with-blank` | pass | 5/5 | an input in a directory with a blank (AFNI-18) |
+| `global/missing-directory` | pass | 5/5 | an output in a missing directory (AFNI-26) |
+| `fmriprep/ds000005-task_mixedgamblestask_run_01` | pass | 14/14 | fMRIPrep's call on the input of its BOLD reference's second skull strip (ds000005-task_mixedgamblestask_run_01) |
+| `fmriprep/ds000005-task_mixedgamblestask_run_02` | pass | 14/14 | fMRIPrep's call on the input of its BOLD reference's second skull strip (ds000005-task_mixedgamblestask_run_02) |
+| `fmriprep/ds000005-task_mixedgamblestask_run_03` | pass | 14/14 | fMRIPrep's call on the input of its BOLD reference's second skull strip (ds000005-task_mixedgamblestask_run_03) |
+| `fmriprep/ds000228-task_pixar` | pass | 14/14 | fMRIPrep's call on the input of its BOLD reference's second skull strip (ds000228-task_pixar) |
+| `fmriprep/ds000256-task_restbaseline` | pass | 14/14 | fMRIPrep's call on the input of its BOLD reference's second skull strip (ds000256-task_restbaseline) |
+| `fmriprep/ds000256-task_restfixationfixed` | pass | 14/14 | fMRIPrep's call on the input of its BOLD reference's second skull strip (ds000256-task_restfixationfixed) |
+| `fmriprep/ds000256-task_restfixationnofeedback` | pass | 14/14 | fMRIPrep's call on the input of its BOLD reference's second skull strip (ds000256-task_restfixationnofeedback) |
+| `fmriprep/ds002422-task_arithm_run_01` | pass | 14/14 | fMRIPrep's call on the input of its BOLD reference's second skull strip (ds002422-task_arithm_run_01) |
+| `fmriprep/ds002422-task_arithm_run_02` | pass | 14/14 | fMRIPrep's call on the input of its BOLD reference's second skull strip (ds002422-task_arithm_run_02) |
+| `fmriprep/ds002422-task_rest` | pass | 14/14 | fMRIPrep's call on the input of its BOLD reference's second skull strip (ds002422-task_rest) |
+| `fmriprep/ds002603-task_wm_acq_Mb4Mm3Tr550` | pass | 14/14 | fMRIPrep's call on the input of its BOLD reference's second skull strip (ds002603-task_wm_acq_Mb4Mm3Tr550) |
+| `fmriprep/ds002603-task_wm_acq_SeqMm3Tr2000` | pass | 14/14 | fMRIPrep's call on the input of its BOLD reference's second skull strip (ds002603-task_wm_acq_SeqMm3Tr2000) |
+| `fmriprep/ds003592-ses_1_task_rest_echo_1` | pass | 14/14 | fMRIPrep's call on the input of its BOLD reference's second skull strip (ds003592-ses_1_task_rest_echo_1) |
+| `fmriprep/ds004884-ses_217_task_naming40_acq_epfid2_dir_AP_run_2` | pass | 14/14 | fMRIPrep's call on the input of its BOLD reference's second skull strip (ds004884-ses_217_task_naming40_acq_epfid2_dir_… |
+| `fmriprep/ds004884-ses_217_task_rest_acq_epfidp2p2_dir_AP_run_9` | pass | 14/14 | fMRIPrep's call on the input of its BOLD reference's second skull strip (ds004884-ses_217_task_rest_acq_epfidp2p2_dir_A… |
+| `fmriprep/ds004958-task_rest` | pass | 14/14 | fMRIPrep's call on the input of its BOLD reference's second skull strip (ds004958-task_rest) |
+| `fmriprep/ds005003-ses_1_task_motor` | pass | 14/14 | fMRIPrep's call on the input of its BOLD reference's second skull strip (ds005003-ses_1_task_motor) |
+| `fmriprep/ds005003-ses_1_task_rest` | pass | 14/14 | fMRIPrep's call on the input of its BOLD reference's second skull strip (ds005003-ses_1_task_rest) |
+| `fmriprep/ds005040-task_clip_run_1` | pass | 14/14 | fMRIPrep's call on the input of its BOLD reference's second skull strip (ds005040-task_clip_run_1) |
+| `fmriprep/ds005454-task_rest` | pass | 14/14 | fMRIPrep's call on the input of its BOLD reference's second skull strip (ds005454-task_rest) |
+| `fmriprep/ds005752-ses_01_task_rest_dir_forward` | pass | 14/14 | fMRIPrep's call on the input of its BOLD reference's second skull strip (ds005752-ses_01_task_rest_dir_forward) |
+| `fmriprep/ds005752-ses_01_task_rest_dir_reverse` | pass | 14/14 | fMRIPrep's call on the input of its BOLD reference's second skull strip (ds005752-ses_01_task_rest_dir_reverse) |
+| `real/sub-01_task-mixedgamblestask_run-01` | pass | 9/9 | AFNI's default on a BOLD series (sub-01_task-mixedgamblestask_run-01) |
+| `real/sub-1_task-rest_acq-v4` | pass | 9/9 | AFNI's default on a BOLD series (sub-1_task-rest_acq-v4) |
+| `real/t1w-brain` | pass | 9/9 | the skull-stripped T1w of an fMRIPrep run (ds000005, sMRIPrep's desc-brain) |
+| `difftest/float64-negative-zero` | pass | 9/9 | A float64 input without a usable scl_slope: a -0 inside the mask is kept by -apply_prefix (item 8, 2026-10-29) |
+| `difftest/oblique-orientation-letters` | pass | 7/7 | An oblique series: the '[from L]' letters of the closest plumb orientation, never '?' (item 5, 2026-10-29) |
+| `difftest/peels-0-clustering-messages` | pass | 7/7 | -peels 0 where the mask is the same but the clustering messages differ: AFNI-43 named (item 7, 2026-10-29) |
+| `difftest/plane-oblique-si-orientation` | pass | 7/7 | A one-slice oblique constant image with -SI: the axis AFNI orients as superior (the closest plumb orientation), so the … |
+| `difftest/slice-code-2-masked-notices` | pass | 9/9 | Header slice code 2 with -apply_prefix, AFNI 26.3.05: the masked output keeps the header's code-2 times (slice_end down… |
+| `difftest/tiny-oblique-quaternion-residue` | pass | 7/7 | A 1 x 1 x 2 oblique image: the quaternion's rounding residue as AFNI's (1/det of the polar decomposition's inverse in e… |

@@ -2,7 +2,7 @@
  "environment": {
   "cpu": "AMD Ryzen 9 7945HX with Radeon Graphics",
   "larmorx": "0.0.1",
-  "larmorx_commit": "e82f16ee2f72",
+  "larmorx_commit": "bb36e15a24bb",
   "larmorx_testdata_commit": "52124bc98f9f",
   "logical_cpus": 32,
   "os": "Linux-6.8.0-124-generic-x86_64-with-glibc2.35",
@@ -19,10 +19,10 @@
   "location": "<workspace>/oracles/cache",
   "mode": "use",
   "ran": 0,
-  "saved_seconds": 0.1,
+  "saved_seconds": 0.2,
   "served": 2
  },
- "reference": "mcflirt from FSL 6.0.7.17 (fsl-mcflirt 2111.0), the recorded runs in `oracles/fsl-6.0.7/mcflirt/`",
+ "reference": "mcflirt from FSL 6.0.7.23 (fsl-mcflirt 2111.0), the recorded runs in `oracles/fsl-6.0.7.23/mcflirt/`",
  "results": [
   {
    "case": "real/ds000005/default",
@@ -46,7 +46,7 @@
     "FD (Power, 50 mm) correlation": "0.8855",
     "out_mcf.nii.gz.mat: matrices identical as text": "1/240"
    },
-   "seconds": 22.952,
+   "seconds": 36.674,
    "status": "pass"
   },
   {
@@ -66,7 +66,7 @@
     "FD (Power, 50 mm) correlation": "0.8869",
     "out_mcf.nii.gz.mat: matrices identical as text": "0/240"
    },
-   "seconds": 27.078,
+   "seconds": 33.387,
    "status": "pass"
   },
   {
@@ -86,7 +86,7 @@
     "FD (Power, 50 mm) correlation": "0.8869",
     "out_mcf.nii.gz.mat: matrices identical as text": "0/240"
    },
-   "seconds": 28.665,
+   "seconds": 34.433,
    "status": "pass"
   },
   {
@@ -106,7 +106,7 @@
     "FD (Power, 50 mm) correlation": "0.8869",
     "out_mcf.nii.gz.mat: matrices identical as text": "0/240"
    },
-   "seconds": 32.02,
+   "seconds": 36.624,
    "status": "pass"
   },
   {
@@ -131,7 +131,7 @@
     "FD (Power, 50 mm) correlation": "0.8869",
     "out_mcf.nii.gz.mat: matrices identical as text": "0/240"
    },
-   "seconds": 20.018,
+   "seconds": 35.793,
    "status": "pass"
   },
   {
@@ -141,22 +141,22 @@
    "checks_total": 16,
    "failed_checks": [],
    "measured": {
-    "out_mcf.nii.gz.mat: matrix RMS deviation, 95th percentile": "0.0143",
+    "out_mcf.nii.gz.mat: matrix RMS deviation, 95th percentile": "0.0133",
     "out_mcf.nii.gz.mat: median parameter difference": "0.0004 / 0.0000",
     "out_mcf.nii.gz.par: median difference": "0.0002 / 0.0000",
     "out_mcf.nii.gz: voxel values": "0.999999",
-    "out_mcf.nii.gz_abs.rms: values": "0.0187",
-    "out_mcf.nii.gz_abs_mean.rms: values": "0.0007",
-    "out_mcf.nii.gz_rel.rms: values": "0.0197",
+    "out_mcf.nii.gz_abs.rms: values": "0.0212",
+    "out_mcf.nii.gz_abs_mean.rms: values": "0.0009",
+    "out_mcf.nii.gz_rel.rms: values": "0.0192",
     "out_mcf.nii.gz_rel_mean.rms: values": "0.0004"
    },
    "reason": "",
    "reported": {
-    "D13 fix pass": 5932575,
-    "FD (Power, 50 mm) correlation": "0.8984",
+    "D13 fix pass": 5919130,
+    "FD (Power, 50 mm) correlation": "0.9052",
     "out_mcf.nii.gz.mat: matrices identical as text": "0/240"
    },
-   "seconds": 17.842,
+   "seconds": 24.701,
    "status": "pass"
   },
   {
@@ -181,7 +181,7 @@
     "FD (Power, 50 mm) correlation": "0.8869",
     "out_mcf.nii.gz.mat: matrices identical as text": "0/240"
    },
-   "seconds": 22.666,
+   "seconds": 39.731,
    "status": "pass"
   },
   {
@@ -206,7 +206,7 @@
     "FD (Power, 50 mm) correlation": "0.5782",
     "out_mcf.nii.gz.mat: matrices identical as text": "0/240"
    },
-   "seconds": 19.276,
+   "seconds": 43.318,
    "status": "pass"
   },
   {
@@ -231,7 +231,7 @@
     "D13 fix pass": 6158618,
     "out_mcf.nii.gz.mat: matrices identical as text": "0/240"
    },
-   "seconds": 17.398,
+   "seconds": 36.784,
    "status": "pass"
   },
   {
@@ -241,22 +241,22 @@
    "checks_total": 16,
    "failed_checks": [],
    "measured": {
-    "out_mcf.nii.gz.mat: matrix RMS deviation, 95th percentile": "0.0489",
-    "out_mcf.nii.gz.mat: median parameter difference": "0.0069 / 0.0045",
-    "out_mcf.nii.gz.par: median difference": "0.0069 / 0.0044",
-    "out_mcf.nii.gz: voxel values": "0.999995",
-    "out_mcf.nii.gz_abs.rms: values": "0.0253",
-    "out_mcf.nii.gz_abs_mean.rms: values": "0.0086",
-    "out_mcf.nii.gz_rel.rms: values": "0.0244",
-    "out_mcf.nii.gz_rel_mean.rms: values": "0.0015"
+    "out_mcf.nii.gz.mat: matrix RMS deviation, 95th percentile": "0.0048",
+    "out_mcf.nii.gz.mat: median parameter difference": "0.0001 / 0.0001",
+    "out_mcf.nii.gz.par: median difference": "0.0001 / 0.0001",
+    "out_mcf.nii.gz: voxel values": "1.000000",
+    "out_mcf.nii.gz_abs.rms: values": "0.0047",
+    "out_mcf.nii.gz_abs_mean.rms: values": "0.0000",
+    "out_mcf.nii.gz_rel.rms: values": "0.0080",
+    "out_mcf.nii.gz_rel_mean.rms: values": "0.0002"
    },
    "reason": "",
    "reported": {
-    "D13 fix pass": 5918333,
-    "FD (Power, 50 mm) correlation": "0.6358",
-    "out_mcf.nii.gz.mat: matrices identical as text": "0/240"
+    "D13 fix pass": 5894514,
+    "FD (Power, 50 mm) correlation": "0.9841",
+    "out_mcf.nii.gz.mat: matrices identical as text": "1/240"
    },
-   "seconds": 35.129,
+   "seconds": 53.205,
    "status": "pass"
   },
   {
@@ -281,7 +281,7 @@
     "FD (Power, 50 mm) correlation": "0.8869",
     "out_mcf.nii.gz.mat: matrices identical as text": "0/240"
    },
-   "seconds": 21.773,
+   "seconds": 37.097,
    "status": "pass"
   },
   {
@@ -291,22 +291,22 @@
    "checks_total": 16,
    "failed_checks": [],
    "measured": {
-    "out_mcf.nii.gz.mat: matrix RMS deviation, 95th percentile": "0.0653",
-    "out_mcf.nii.gz.mat: median parameter difference": "0.0103 / 0.0083",
-    "out_mcf.nii.gz.par: median difference": "0.0073 / 0.0083",
-    "out_mcf.nii.gz: voxel values": "0.999990",
-    "out_mcf.nii.gz_abs.rms: values": "0.0416",
-    "out_mcf.nii.gz_abs_mean.rms: values": "0.0224",
-    "out_mcf.nii.gz_rel.rms: values": "0.0304",
-    "out_mcf.nii.gz_rel_mean.rms: values": "0.0136"
+    "out_mcf.nii.gz.mat: matrix RMS deviation, 95th percentile": "0.0108",
+    "out_mcf.nii.gz.mat: median parameter difference": "0.0002 / 0.0002",
+    "out_mcf.nii.gz.par: median difference": "0.0002 / 0.0001",
+    "out_mcf.nii.gz: voxel values": "1.000000",
+    "out_mcf.nii.gz_abs.rms: values": "0.0082",
+    "out_mcf.nii.gz_abs_mean.rms: values": "0.0000",
+    "out_mcf.nii.gz_rel.rms: values": "0.0075",
+    "out_mcf.nii.gz_rel_mean.rms: values": "0.0002"
    },
    "reason": "",
    "reported": {
-    "D13 fix pass": 5733033,
-    "FD (Power, 50 mm) correlation": "0.5358",
+    "D13 fix pass": 5924451,
+    "FD (Power, 50 mm) correlation": "0.9534",
     "out_mcf.nii.gz.mat: matrices identical as text": "0/240"
    },
-   "seconds": 40.102,
+   "seconds": 54.198,
    "status": "pass"
   },
   {
@@ -320,7 +320,7 @@
     "D13 fix pass": 4365570,
     "no parameter is identifiable": "48.21 / 50.64"
    },
-   "seconds": 9.247,
+   "seconds": 17.462,
    "status": "pass"
   },
   {
@@ -345,7 +345,7 @@
     "FD (Power, 50 mm) correlation": "0.8329",
     "out_mcf.nii.gz.mat: matrices identical as text": "0/240"
    },
-   "seconds": 28.473,
+   "seconds": 50.212,
    "status": "pass"
   },
   {
@@ -370,7 +370,7 @@
     "FD (Power, 50 mm) correlation": "0.8562",
     "out_mcf.nii.gz.mat: matrices identical as text": "0/240"
    },
-   "seconds": 25.119,
+   "seconds": 31.884,
    "status": "pass"
   },
   {
@@ -395,7 +395,7 @@
     "FD (Power, 50 mm) correlation": "0.9008",
     "out_mcf.nii.gz.mat: matrices identical as text": "0/240"
    },
-   "seconds": 27.292,
+   "seconds": 43.243,
    "status": "pass"
   },
   {
@@ -420,7 +420,7 @@
     "FD (Power, 50 mm) correlation": "0.9658",
     "out_mcf.nii.gz.mat: matrices identical as text": "0/240"
    },
-   "seconds": 18.599,
+   "seconds": 29.627,
    "status": "pass"
   },
   {
@@ -456,7 +456,7 @@
     "FD (Power, 50 mm) correlation": "0.9061",
     "out_mcf.nii.gz.mat: matrices identical as text": "0/240"
    },
-   "seconds": 36.328,
+   "seconds": 55.128,
    "status": "pass"
   },
   {
@@ -482,7 +482,7 @@
     "FD (Power, 50 mm) correlation": "0.8801",
     "out_mcf.nii.gz.mat: matrices identical as text": "0/240"
    },
-   "seconds": 30.693,
+   "seconds": 55.44,
    "status": "pass"
   },
   {
@@ -495,7 +495,7 @@
     "out_mcf.nii.gz.mat: matrix RMS deviation, 95th percentile": "0.0262",
     "out_mcf.nii.gz.mat: median parameter difference": "0.0017 / 0.0005",
     "out_mcf.nii.gz.par: median difference": "0.0016 / 0.0005",
-    "out_mcf.nii.gz: voxel values": "1.000000",
+    "out_mcf.nii.gz: voxel values": "0.999999",
     "out_mcf.nii.gz_abs.rms: values": "0.0280",
     "out_mcf.nii.gz_abs_mean.rms: values": "0.0030",
     "out_mcf.nii.gz_rel.rms: values": "0.0197",
@@ -503,11 +503,11 @@
    },
    "reason": "",
    "reported": {
-    "D13 fix pass": 0,
+    "D13 fix pass": 9540638,
     "FD (Power, 50 mm) correlation": "0.8869",
     "out_mcf.nii.gz.mat: matrices identical as text": "0/240"
    },
-   "seconds": 26.182,
+   "seconds": 34.05,
    "status": "pass"
   },
   {
@@ -532,7 +532,7 @@
     "FD (Power, 50 mm) correlation": "0.8876",
     "out_mcf.nii.gz.mat: matrices identical as text": "1/240"
    },
-   "seconds": 25.124,
+   "seconds": 34.237,
    "status": "pass"
   },
   {
@@ -557,7 +557,7 @@
     "FD (Power, 50 mm) correlation": "0.9141",
     "out_mcf.nii.gz.mat: matrices identical as text": "0/240"
    },
-   "seconds": 20.248,
+   "seconds": 29.47,
    "status": "pass"
   },
   {
@@ -582,7 +582,7 @@
     "FD (Power, 50 mm) correlation": "0.8869",
     "out_mcf.nii.gz.mat: matrices identical as text": "0/240"
    },
-   "seconds": 24.103,
+   "seconds": 36.118,
    "status": "pass"
   },
   {
@@ -607,7 +607,7 @@
     "FD (Power, 50 mm) correlation": "0.9393",
     "out_mcf.nii.gz.mat: matrices identical as text": "3/240"
    },
-   "seconds": 17.284,
+   "seconds": 31.37,
    "status": "pass"
   },
   {
@@ -632,7 +632,7 @@
     "FD (Power, 50 mm) correlation": "0.8842",
     "out_mcf.nii.gz.mat: matrices identical as text": "0/240"
    },
-   "seconds": 21.792,
+   "seconds": 33.509,
    "status": "pass"
   },
   {
@@ -657,7 +657,7 @@
     "FD (Power, 50 mm) correlation": "0.8869",
     "out_mcf.nii.gz.mat: matrices identical as text": "0/240"
    },
-   "seconds": 18.451,
+   "seconds": 31.437,
    "status": "pass"
   },
   {
@@ -682,7 +682,7 @@
     "FD (Power, 50 mm) correlation": "0.9845",
     "out_mcf.nii.gz.mat: matrices identical as text": "3/240"
    },
-   "seconds": 16.07,
+   "seconds": 16.137,
    "status": "pass"
   },
   {
@@ -707,7 +707,7 @@
     "FD (Power, 50 mm) correlation": "0.9463",
     "out_mcf.nii.gz.mat: matrices identical as text": "0/240"
    },
-   "seconds": 13.135,
+   "seconds": 24.794,
    "status": "pass"
   },
   {
@@ -735,7 +735,7 @@
     "FD (Power, 50 mm) correlation": "0.8869",
     "out_mcf.nii.gz.mat: matrices identical as text": "0/240"
    },
-   "seconds": 19.243,
+   "seconds": 29.192,
    "status": "pass"
   },
   {
@@ -760,7 +760,7 @@
     "FD (Power, 50 mm) correlation": "0.8763",
     "out_mcf.nii.gz.mat: matrices identical as text": "1/208"
    },
-   "seconds": 17.104,
+   "seconds": 27.455,
    "status": "pass"
   },
   {
@@ -780,7 +780,7 @@
     "FD (Power, 50 mm) correlation": "0.8991",
     "out_mcf.nii.gz.mat: matrices identical as text": "0/208"
    },
-   "seconds": 19.105,
+   "seconds": 30.807,
    "status": "pass"
   },
   {
@@ -805,7 +805,7 @@
     "FD (Power, 50 mm) correlation": "0.8991",
     "out_mcf.nii.gz.mat: matrices identical as text": "0/208"
    },
-   "seconds": 19.084,
+   "seconds": 30.864,
    "status": "pass"
   },
   {
@@ -830,7 +830,7 @@
     "D13 fix pass": 13472005,
     "out_mcf.nii.gz.mat: matrices identical as text": "1/258"
    },
-   "seconds": 13.506,
+   "seconds": 26.637,
    "status": "pass"
   },
   {
@@ -850,7 +850,7 @@
     "D13 fix pass": 13626067,
     "out_mcf.nii.gz.mat: matrices identical as text": "0/258"
    },
-   "seconds": 15.31,
+   "seconds": 27.78,
    "status": "pass"
   },
   {
@@ -875,7 +875,7 @@
     "D13 fix pass": 13626067,
     "out_mcf.nii.gz.mat: matrices identical as text": "0/258"
    },
-   "seconds": 15.043,
+   "seconds": 30.66,
    "status": "pass"
   },
   {
@@ -900,7 +900,7 @@
     "D13 fix pass": 22400000,
     "out_mcf.nii.gz.mat: matrices identical as text": "1/204"
    },
-   "seconds": 23.603,
+   "seconds": 33.06,
    "status": "pass"
   },
   {
@@ -920,7 +920,7 @@
     "D13 fix pass": 22719460,
     "out_mcf.nii.gz.mat: matrices identical as text": "0/204"
    },
-   "seconds": 22.451,
+   "seconds": 34.412,
    "status": "pass"
   },
   {
@@ -945,7 +945,7 @@
     "D13 fix pass": 22719460,
     "out_mcf.nii.gz.mat: matrices identical as text": "0/204"
    },
-   "seconds": 20.569,
+   "seconds": 34.444,
    "status": "pass"
   },
   {
@@ -970,7 +970,7 @@
     "D13 fix pass": 13938331,
     "out_mcf.nii.gz.mat: matrices identical as text": "1/239"
    },
-   "seconds": 22.751,
+   "seconds": 34.361,
    "status": "pass"
   },
   {
@@ -990,7 +990,7 @@
     "D13 fix pass": 14245902,
     "out_mcf.nii.gz.mat: matrices identical as text": "0/239"
    },
-   "seconds": 19.09,
+   "seconds": 34.756,
    "status": "pass"
   },
   {
@@ -1015,7 +1015,7 @@
     "D13 fix pass": 14245902,
     "out_mcf.nii.gz.mat: matrices identical as text": "0/239"
    },
-   "seconds": 21.743,
+   "seconds": 36.677,
    "status": "pass"
   },
   {
@@ -1049,7 +1049,7 @@
     "D13 fix pass": 13922149,
     "out_mcf.nii.gz.mat: matrices identical as text": "1/216"
    },
-   "seconds": 16.264,
+   "seconds": 28.672,
    "status": "fail"
   },
   {
@@ -1069,7 +1069,7 @@
     "D13 fix pass": 14107184,
     "out_mcf.nii.gz.mat: matrices identical as text": "0/216"
    },
-   "seconds": 15.748,
+   "seconds": 27.877,
    "status": "pass"
   },
   {
@@ -1094,7 +1094,7 @@
     "D13 fix pass": 14107184,
     "out_mcf.nii.gz.mat: matrices identical as text": "0/216"
    },
-   "seconds": 19.434,
+   "seconds": 27.57,
    "status": "pass"
   },
   {
@@ -1104,7 +1104,7 @@
    "checks_total": 0,
    "failed_checks": [],
    "reason": "mcflirt exit [-6]: Image Exception : #22 :: Failed to read volume <testdata-cache>/openneuro/ds003763/sub-16111/func/sub-16111_task-heart_bold.nii.gz Erro; larmorx exit [1]: Error: <testdata-cache>/openneuro/ds003763/sub-16111/func/sub-16111_task-heart_bold.nii.gz: incomplete deflate stream",
-   "seconds": 0.001,
+   "seconds": 0.003,
    "status": "both-error"
   },
   {
@@ -1129,7 +1129,7 @@
     "FD (Power, 50 mm) correlation": "0.7816",
     "out_mcf.nii.gz.mat: matrices identical as text": "1/63"
    },
-   "seconds": 5.495,
+   "seconds": 9.08,
    "status": "pass"
   },
   {
@@ -1149,7 +1149,7 @@
     "FD (Power, 50 mm) correlation": "0.8539",
     "out_mcf.nii.gz.mat: matrices identical as text": "0/63"
    },
-   "seconds": 6.176,
+   "seconds": 9.279,
    "status": "pass"
   },
   {
@@ -1174,7 +1174,7 @@
     "FD (Power, 50 mm) correlation": "0.8539",
     "out_mcf.nii.gz.mat: matrices identical as text": "0/63"
    },
-   "seconds": 7.398,
+   "seconds": 10.135,
    "status": "pass"
   },
   {
@@ -1199,7 +1199,7 @@
     "FD (Power, 50 mm) correlation": "0.9012",
     "out_mcf.nii.gz.mat: matrices identical as text": "1/113"
    },
-   "seconds": 34.533,
+   "seconds": 37.232,
    "status": "pass"
   },
   {
@@ -1219,7 +1219,7 @@
     "FD (Power, 50 mm) correlation": "0.9263",
     "out_mcf.nii.gz.mat: matrices identical as text": "0/113"
    },
-   "seconds": 34.461,
+   "seconds": 37.106,
    "status": "pass"
   },
   {
@@ -1244,7 +1244,7 @@
     "FD (Power, 50 mm) correlation": "0.9263",
     "out_mcf.nii.gz.mat: matrices identical as text": "0/113"
    },
-   "seconds": 32.633,
+   "seconds": 36.941,
    "status": "pass"
   },
   {
@@ -1269,7 +1269,7 @@
     "D13 fix pass": 8276506,
     "out_mcf.nii.gz.mat: matrices identical as text": "1/69"
    },
-   "seconds": 7.355,
+   "seconds": 14.02,
    "status": "pass"
   },
   {
@@ -1289,7 +1289,7 @@
     "D13 fix pass": 8423431,
     "out_mcf.nii.gz.mat: matrices identical as text": "0/69"
    },
-   "seconds": 8.179,
+   "seconds": 14.424,
    "status": "pass"
   },
   {
@@ -1314,7 +1314,7 @@
     "D13 fix pass": 8423431,
     "out_mcf.nii.gz.mat: matrices identical as text": "0/69"
    },
-   "seconds": 8.769,
+   "seconds": 15.066,
    "status": "pass"
   },
   {
@@ -1334,7 +1334,7 @@
     "D13 fix pass": 172287,
     "out_mcf.nii.gz.mat: matrices identical as text": "1/12"
    },
-   "seconds": 0.572,
+   "seconds": 1.201,
    "status": "pass"
   },
   {
@@ -1360,7 +1360,7 @@
     "D13 fix pass": 193139,
     "out_mcf.nii.gz.mat: matrices identical as text": "0/12"
    },
-   "seconds": 0.525,
+   "seconds": 1.125,
    "status": "pass"
   },
   {
@@ -1383,7 +1383,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 0.022,
+   "seconds": 0.026,
    "status": "pass"
   },
   {
@@ -1410,7 +1410,7 @@
    "reported": {
     "D13 fix pass": 172287
    },
-   "seconds": 0.559,
+   "seconds": 0.866,
    "status": "pass"
   },
   {
@@ -1435,7 +1435,7 @@
     "D13 fix pass": 172287,
     "out_mcf.nii.gz.mat: matrices identical as text": "1/12"
    },
-   "seconds": 0.571,
+   "seconds": 0.901,
    "status": "pass"
   },
   {
@@ -1445,7 +1445,7 @@
    "checks_total": 0,
    "failed_checks": [],
    "reason": "mcflirt exit [-6]: Image Exception : #61 :: Invalid t index in [] operator terminate called after throwing an instance of 'std::runtime_error' what(): Invalid t index in [] operat; larmorx exit [1]: Error: -refvol -2: invalid volume index for a series of 12 volumes",
-   "seconds": 0.008,
+   "seconds": 0.009,
    "status": "both-error"
   },
   {
@@ -1466,7 +1466,7 @@
     "D13 fix pass": 172287,
     "out_mcf.nii.gz.mat: matrices identical as text": "1/1"
    },
-   "seconds": 0.556,
+   "seconds": 0.772,
    "status": "pass"
   },
   {
@@ -1476,7 +1476,7 @@
    "checks_total": 0,
    "failed_checks": [],
    "reason": "mcflirt exit [-6]: Image Exception : #8 :: Attempted to use affine transform with no voxels in vout terminate called after throwing an instance of 'std::runtime_error' what(): Att; larmorx exit [1]: Error: -stages 0 with a reference file: nothing would be registered",
-   "seconds": 0.004,
+   "seconds": 0.007,
    "status": "both-error"
   },
   {
@@ -1511,7 +1511,7 @@
     "D13 fix pass": 194047,
     "out_mcf.nii.gz.mat: matrices identical as text": "1/6"
    },
-   "seconds": 0.34,
+   "seconds": 0.491,
    "status": "pass"
   },
   {
@@ -1537,7 +1537,7 @@
     "D13 fix pass": 204094,
     "out_mcf.nii.gz.mat: matrices identical as text": "1/6"
    },
-   "seconds": 0.381,
+   "seconds": 0.532,
    "status": "pass"
   },
   {
@@ -1562,7 +1562,7 @@
     "D13 fix pass": 166364,
     "out_mcf.nii.gz.mat: matrices identical as text": "2/12"
    },
-   "seconds": 0.794,
+   "seconds": 0.955,
    "status": "pass"
   },
   {
@@ -1587,7 +1587,7 @@
     "D13 fix pass": 300837,
     "out_mcf.nii.gz.mat: matrices identical as text": "1/12"
    },
-   "seconds": 0.846,
+   "seconds": 0.89,
    "status": "pass"
   },
   {
@@ -1603,7 +1603,7 @@
    "reported": {
     "D13 fix pass": 71616
    },
-   "seconds": 0.535,
+   "seconds": 0.545,
    "status": "pass"
   },
   {
@@ -1617,7 +1617,7 @@
     "D13 fix pass": 71683,
     "no parameter is identifiable": "10.82 / 2.56"
    },
-   "seconds": 0.417,
+   "seconds": 0.482,
    "status": "pass"
   },
   {
@@ -1642,7 +1642,7 @@
     "D13 fix pass": 33357,
     "out_mcf.nii.gz.mat: matrices identical as text": "1/12"
    },
-   "seconds": 0.728,
+   "seconds": 1.024,
    "status": "pass"
   },
   {
@@ -1667,7 +1667,7 @@
     "D13 fix pass": 33483,
     "out_mcf.nii.gz.mat: matrices identical as text": "0/12"
    },
-   "seconds": 0.77,
+   "seconds": 0.914,
    "status": "pass"
   },
   {
@@ -1692,7 +1692,7 @@
     "D13 fix pass": 33357,
     "out_mcf.nii.gz.mat: matrices identical as text": "1/12"
    },
-   "seconds": 0.763,
+   "seconds": 1.054,
    "status": "pass"
   },
   {
@@ -1717,7 +1717,7 @@
     "D13 fix pass": 33483,
     "out_mcf.nii.gz.mat: matrices identical as text": "0/12"
    },
-   "seconds": 0.944,
+   "seconds": 0.925,
    "status": "pass"
   },
   {
@@ -1742,7 +1742,7 @@
     "D13 fix pass": 33357,
     "out_mcf.nii.gz.mat: matrices identical as text": "1/12"
    },
-   "seconds": 0.863,
+   "seconds": 0.842,
    "status": "pass"
   },
   {
@@ -1767,7 +1767,7 @@
     "D13 fix pass": 33483,
     "out_mcf.nii.gz.mat: matrices identical as text": "0/12"
    },
-   "seconds": 0.737,
+   "seconds": 0.852,
    "status": "pass"
   },
   {
@@ -1792,7 +1792,7 @@
     "D13 fix pass": 172287,
     "out_mcf.nii.gz.mat: matrices identical as text": "1/12"
    },
-   "seconds": 0.579,
+   "seconds": 0.931,
    "status": "pass"
   },
   {
@@ -1817,7 +1817,7 @@
     "D13 fix pass": 193139,
     "out_mcf.nii.gz.mat: matrices identical as text": "0/12"
    },
-   "seconds": 0.758,
+   "seconds": 0.952,
    "status": "pass"
   },
   {
@@ -1842,7 +1842,7 @@
     "D13 fix pass": 163689,
     "out_mcf.nii.gz.mat: matrices identical as text": "1/12"
    },
-   "seconds": 0.508,
+   "seconds": 0.743,
    "status": "pass"
   },
   {
@@ -1867,7 +1867,7 @@
     "D13 fix pass": 180934,
     "out_mcf.nii.gz.mat: matrices identical as text": "0/12"
    },
-   "seconds": 0.577,
+   "seconds": 0.749,
    "status": "pass"
   },
   {
@@ -1891,7 +1891,7 @@
     "D13 fix pass": 0,
     "out_mcf.nii.gz.mat: matrices identical as text": "1/1"
    },
-   "seconds": 0.038,
+   "seconds": 0.046,
    "status": "pass"
   },
   {
@@ -1915,7 +1915,7 @@
     "D13 fix pass": 15784,
     "out_mcf.nii.gz.mat: matrices identical as text": "0/1"
    },
-   "seconds": 0.239,
+   "seconds": 0.173,
    "status": "pass"
   },
   {
@@ -1939,7 +1939,7 @@
     "D13 fix pass": 0,
     "out_mcf.nii.gz.mat: matrices identical as text": "1/1"
    },
-   "seconds": 0.038,
+   "seconds": 0.045,
    "status": "pass"
   },
   {
@@ -1964,7 +1964,7 @@
     "D13 fix pass": 15784,
     "out_mcf.nii.gz.mat: matrices identical as text": "0/1"
    },
-   "seconds": 0.24,
+   "seconds": 0.173,
    "status": "pass"
   },
   {
@@ -1974,22 +1974,22 @@
    "checks_total": 17,
    "failed_checks": [],
    "measured": {
-    "FD (Power, 50 mm) correlation": "0.9998",
-    "out_mcf.nii.gz.mat: matrix RMS deviation, 95th percentile": "0.0347",
-    "out_mcf.nii.gz.mat: median parameter difference": "0.0007 / 0.0000",
-    "out_mcf.nii.gz.par: median difference": "0.0002 / 0.0000",
-    "out_mcf.nii.gz: voxel values": "1.000000",
-    "out_mcf.nii.gz_abs.rms: values": "0.0083",
-    "out_mcf.nii.gz_abs_mean.rms: values": "0.0004",
-    "out_mcf.nii.gz_rel.rms: values": "0.0176",
-    "out_mcf.nii.gz_rel_mean.rms: values": "0.0026"
+    "FD (Power, 50 mm) correlation": "0.9996",
+    "out_mcf.nii.gz.mat: matrix RMS deviation, 95th percentile": "0.0407",
+    "out_mcf.nii.gz.mat: median parameter difference": "0.0013 / 0.0000",
+    "out_mcf.nii.gz.par: median difference": "0.0001 / 0.0000",
+    "out_mcf.nii.gz: voxel values": "0.999999",
+    "out_mcf.nii.gz_abs.rms: values": "0.0220",
+    "out_mcf.nii.gz_abs_mean.rms: values": "0.0008",
+    "out_mcf.nii.gz_rel.rms: values": "0.0304",
+    "out_mcf.nii.gz_rel_mean.rms: values": "0.0007"
    },
    "reason": "",
    "reported": {
-    "D13 fix pass": 22502,
+    "D13 fix pass": 22321,
     "out_mcf.nii.gz.mat: matrices identical as text": "1/8"
    },
-   "seconds": 0.061,
+   "seconds": 0.088,
    "status": "pass"
   },
   {
@@ -1999,22 +1999,22 @@
    "checks_total": 16,
    "failed_checks": [],
    "measured": {
-    "FD (Power, 50 mm) correlation": "0.9998",
-    "out_mcf.nii.gz.mat: matrix RMS deviation, 95th percentile": "0.0347",
-    "out_mcf.nii.gz.mat: median parameter difference": "0.0007 / 0.0000",
-    "out_mcf.nii.gz.par: median difference": "0.0002 / 0.0000",
-    "out_mcf.nii.gz: voxel values": "1.000000",
-    "out_mcf.nii.gz_abs.rms: values": "0.0083",
-    "out_mcf.nii.gz_abs_mean.rms: values": "0.0004",
-    "out_mcf.nii.gz_rel.rms: values": "0.0176",
-    "out_mcf.nii.gz_rel_mean.rms: values": "0.0026"
+    "FD (Power, 50 mm) correlation": "0.9996",
+    "out_mcf.nii.gz.mat: matrix RMS deviation, 95th percentile": "0.0407",
+    "out_mcf.nii.gz.mat: median parameter difference": "0.0013 / 0.0000",
+    "out_mcf.nii.gz.par: median difference": "0.0001 / 0.0000",
+    "out_mcf.nii.gz: voxel values": "0.999999",
+    "out_mcf.nii.gz_abs.rms: values": "0.0220",
+    "out_mcf.nii.gz_abs_mean.rms: values": "0.0008",
+    "out_mcf.nii.gz_rel.rms: values": "0.0304",
+    "out_mcf.nii.gz_rel_mean.rms: values": "0.0007"
    },
    "reason": "",
    "reported": {
-    "D13 fix pass": 22502,
+    "D13 fix pass": 22321,
     "out_mcf.nii.gz.mat: matrices identical as text": "1/8"
    },
-   "seconds": 0.067,
+   "seconds": 0.089,
    "status": "pass"
   },
   {
@@ -2024,22 +2024,22 @@
    "checks_total": 16,
    "failed_checks": [],
    "measured": {
-    "FD (Power, 50 mm) correlation": "0.9997",
-    "out_mcf.nii.gz.mat: matrix RMS deviation, 95th percentile": "0.0550",
-    "out_mcf.nii.gz.mat: median parameter difference": "0.0005 / 0.0000",
-    "out_mcf.nii.gz.par: median difference": "0.0002 / 0.0000",
-    "out_mcf.nii.gz: voxel values": "0.999999",
-    "out_mcf.nii.gz_abs.rms: values": "0.0144",
-    "out_mcf.nii.gz_abs_mean.rms: values": "0.0009",
-    "out_mcf.nii.gz_rel.rms: values": "0.0143",
-    "out_mcf.nii.gz_rel_mean.rms: values": "0.0010"
+    "FD (Power, 50 mm) correlation": "0.9999",
+    "out_mcf.nii.gz.mat: matrix RMS deviation, 95th percentile": "0.0308",
+    "out_mcf.nii.gz.mat: median parameter difference": "0.0000 / 0.0000",
+    "out_mcf.nii.gz.par: median difference": "0.0000 / 0.0000",
+    "out_mcf.nii.gz: voxel values": "1.000000",
+    "out_mcf.nii.gz_abs.rms: values": "0.0208",
+    "out_mcf.nii.gz_abs_mean.rms: values": "0.0015",
+    "out_mcf.nii.gz_rel.rms: values": "0.0281",
+    "out_mcf.nii.gz_rel_mean.rms: values": "0.0031"
    },
    "reason": "",
    "reported": {
-    "D13 fix pass": 22611,
-    "out_mcf.nii.gz.mat: matrices identical as text": "1/8"
+    "D13 fix pass": 22315,
+    "out_mcf.nii.gz.mat: matrices identical as text": "2/8"
    },
-   "seconds": 0.062,
+   "seconds": 0.079,
    "status": "pass"
   },
   {
@@ -2064,7 +2064,7 @@
     "D13 fix pass": 799,
     "out_mcf.nii.gz.mat: matrices identical as text": "1/6"
    },
-   "seconds": 0.028,
+   "seconds": 0.023,
    "status": "pass"
   },
   {
@@ -2088,7 +2088,7 @@
     "D13 fix pass": 15778,
     "out_mcf.nii.gz.mat: matrices identical as text": "1/2"
    },
-   "seconds": 0.202,
+   "seconds": 0.293,
    "status": "pass"
   },
   {
@@ -2113,7 +2113,7 @@
     "D13 fix pass": 34233,
     "out_mcf.nii.gz.mat: matrices identical as text": "0/2"
    },
-   "seconds": 0.258,
+   "seconds": 0.324,
    "status": "pass"
   },
   {
@@ -2138,7 +2138,7 @@
     "FD (Power, 50 mm) correlation": "1.0000",
     "out_mcf.nii.gz.mat: matrices identical as text": "6/6"
    },
-   "seconds": 0.447,
+   "seconds": 0.464,
    "status": "pass"
   },
   {
@@ -2164,7 +2164,7 @@
     "FD (Power, 50 mm) correlation": "0.8368",
     "out_mcf.nii.gz.mat: matrices identical as text": "0/6"
    },
-   "seconds": 0.433,
+   "seconds": 0.456,
    "status": "pass"
   },
   {
@@ -2190,7 +2190,7 @@
     "FD (Power, 50 mm) correlation": "1.0000",
     "out_mcf.nii.gz.mat: matrices identical as text": "0/6"
    },
-   "seconds": 0.487,
+   "seconds": 0.537,
    "status": "pass"
   },
   {
@@ -2215,7 +2215,7 @@
     "D13 fix pass": 175179,
     "out_mcf.nii.gz.mat: matrices identical as text": "1/12"
    },
-   "seconds": 0.747,
+   "seconds": 0.893,
    "status": "pass"
   },
   {
@@ -2241,7 +2241,7 @@
     "D13 fix pass": 191396,
     "out_mcf.nii.gz.mat: matrices identical as text": "0/12"
    },
-   "seconds": 0.787,
+   "seconds": 1.115,
    "status": "pass"
   },
   {
@@ -2251,23 +2251,23 @@
    "checks_total": 17,
    "failed_checks": [],
    "measured": {
-    "FD (Power, 50 mm) correlation": "0.9967",
-    "accuracy against the synthetic truth (mean RMS deviation)": "1.3423",
-    "out_mcf.nii.gz.mat: matrix RMS deviation, 95th percentile": "0.0667",
-    "out_mcf.nii.gz.mat: median parameter difference": "0.0008 / 0.0000",
-    "out_mcf.nii.gz.par: median difference": "0.0004 / 0.0000",
-    "out_mcf.nii.gz: voxel values": "0.999999",
-    "out_mcf.nii.gz_abs.rms: values": "0.0250",
-    "out_mcf.nii.gz_abs_mean.rms: values": "0.0029",
-    "out_mcf.nii.gz_rel.rms: values": "0.0630",
-    "out_mcf.nii.gz_rel_mean.rms: values": "0.0157"
+    "FD (Power, 50 mm) correlation": "0.9966",
+    "accuracy against the synthetic truth (mean RMS deviation)": "1.3422",
+    "out_mcf.nii.gz.mat: matrix RMS deviation, 95th percentile": "0.0360",
+    "out_mcf.nii.gz.mat: median parameter difference": "0.0009 / 0.0000",
+    "out_mcf.nii.gz.par: median difference": "0.0005 / 0.0000",
+    "out_mcf.nii.gz: voxel values": "1.000000",
+    "out_mcf.nii.gz_abs.rms: values": "0.0101",
+    "out_mcf.nii.gz_abs_mean.rms: values": "0.0004",
+    "out_mcf.nii.gz_rel.rms: values": "0.0316",
+    "out_mcf.nii.gz_rel_mean.rms: values": "0.0039"
    },
    "reason": "",
    "reported": {
-    "D13 fix pass": 208736,
+    "D13 fix pass": 205738,
     "out_mcf.nii.gz.mat: matrices identical as text": "0/12"
    },
-   "seconds": 0.651,
+   "seconds": 0.774,
    "status": "pass"
   },
   {
@@ -2292,7 +2292,7 @@
     "D13 fix pass": 172287,
     "out_mcf.nii.gz.mat: matrices identical as text": "1/12"
    },
-   "seconds": 0.675,
+   "seconds": 0.845,
    "status": "pass"
   },
   {
@@ -2317,7 +2317,7 @@
     "D13 fix pass": 172287,
     "out_mcf.nii.gz.mat: matrices identical as text": "1/12"
    },
-   "seconds": 0.728,
+   "seconds": 0.85,
    "status": "pass"
   },
   {
@@ -2343,7 +2343,7 @@
     "D13 fix pass": 202281,
     "out_mcf.nii.gz.mat: matrices identical as text": "0/12"
    },
-   "seconds": 1.397,
+   "seconds": 1.759,
    "status": "pass"
   },
   {
@@ -2369,7 +2369,7 @@
     "D13 fix pass": 192701,
     "out_mcf.nii.gz.mat: matrices identical as text": "0/12"
    },
-   "seconds": 0.988,
+   "seconds": 1.069,
    "status": "pass"
   },
   {
@@ -2395,7 +2395,7 @@
     "D13 fix pass": 193139,
     "out_mcf.nii.gz.mat: matrices identical as text": "0/12"
    },
-   "seconds": 1.027,
+   "seconds": 0.699,
    "status": "pass"
   },
   {
@@ -2421,7 +2421,7 @@
     "D13 fix pass": 189810,
     "out_mcf.nii.gz.mat: matrices identical as text": "0/12"
    },
-   "seconds": 0.781,
+   "seconds": 0.795,
    "status": "pass"
   },
   {
@@ -2447,7 +2447,7 @@
     "D13 fix pass": 194807,
     "out_mcf.nii.gz.mat: matrices identical as text": "0/12"
    },
-   "seconds": 0.957,
+   "seconds": 0.983,
    "status": "pass"
   },
   {
@@ -2473,7 +2473,7 @@
     "D13 fix pass": 215508,
     "out_mcf.nii.gz.mat: matrices identical as text": "0/12"
    },
-   "seconds": 1.73,
+   "seconds": 1.484,
    "status": "pass"
   },
   {
@@ -2499,7 +2499,7 @@
     "D13 fix pass": 193139,
     "out_mcf.nii.gz.mat: matrices identical as text": "0/12"
    },
-   "seconds": 0.917,
+   "seconds": 0.842,
    "status": "pass"
   },
   {
@@ -2514,7 +2514,7 @@
     "out_mcf.nii.gz.mat: matrix RMS deviation, 95th percentile": "0.0713",
     "out_mcf.nii.gz.mat: median parameter difference": "0.0027 / 0.0164",
     "out_mcf.nii.gz.par: median difference": "0.0012 / 0.0165",
-    "out_mcf.nii.gz: voxel values": "0.999862",
+    "out_mcf.nii.gz: voxel values": "0.999999",
     "out_mcf.nii.gz_abs.rms: values": "0.0367",
     "out_mcf.nii.gz_abs_mean.rms: values": "0.0000",
     "out_mcf.nii.gz_rel.rms: values": "0.0843",
@@ -2522,10 +2522,10 @@
    },
    "reason": "",
    "reported": {
-    "D13 fix pass": 642,
+    "D13 fix pass": 357012,
     "out_mcf.nii.gz.mat: matrices identical as text": "0/12"
    },
-   "seconds": 0.886,
+   "seconds": 0.893,
    "status": "pass"
   },
   {
@@ -2535,7 +2535,7 @@
    "checks_total": 1,
    "failed_checks": [],
    "reason": "Without FSLOUTPUTTYPE, mcflirt writes the .mat files and fails (exit 1); larmorx writes every output as .nii.gz (its default).",
-   "seconds": 0.422,
+   "seconds": 0.36,
    "status": "expected-divergence"
   },
   {
@@ -2566,7 +2566,7 @@
     "D13 fix pass": 172287,
     "small_mcf.mat: matrices identical as text": "1/12"
    },
-   "seconds": 0.804,
+   "seconds": 0.844,
    "status": "pass"
   },
   {
@@ -2592,7 +2592,7 @@
     "D13 fix pass": 193139,
     "plain.mat: matrices identical as text": "0/12"
    },
-   "seconds": 0.828,
+   "seconds": 0.92,
    "status": "pass"
   },
   {
@@ -2621,7 +2621,7 @@
     "out_mcf.nii.gz.mat+: matrices identical as text": "0/12",
     "out_mcf.nii.gz.mat: matrices identical as text": "0/12"
    },
-   "seconds": 1.686,
+   "seconds": 1.653,
    "status": "pass"
   },
   {
@@ -2647,7 +2647,7 @@
     "D13 fix pass": 193139,
     "out_mcf.nii.gz.mat: matrices identical as text": "0/12"
    },
-   "seconds": 0.896,
+   "seconds": 0.887,
    "status": "pass"
   },
   {
@@ -2672,7 +2672,7 @@
     "D13 fix pass": 191010,
     "out_mcf.nii.gz.mat: matrices identical as text": "0/12"
    },
-   "seconds": 0.907,
+   "seconds": 0.857,
    "status": "pass"
   },
   {
@@ -2682,7 +2682,7 @@
    "checks_total": 0,
    "failed_checks": [],
    "reason": "mcflirt exit [-6]: Image Exception : #2 :: Attempted to copydata with non-matching sizes terminate called after throwing an instance of 'std::runtime_error' what(): Attempted to c; larmorx exit [1]: Error: the reference has 57600 voxels and the volumes of the series 73216: the corrected series would not fit (resample=False estimates only)",
-   "seconds": 0.009,
+   "seconds": 0.006,
    "status": "both-error"
   },
   {
@@ -2707,7 +2707,7 @@
     "D13 fix pass": 193139,
     "out_mcf.nii.gz.mat: matrices identical as text": "0/12"
    },
-   "seconds": 0.83,
+   "seconds": 0.862,
    "status": "pass"
   },
   {
@@ -2732,7 +2732,7 @@
     "D13 fix pass": 176016,
     "out_mcf.nii.gz.mat: matrices identical as text": "1/12"
    },
-   "seconds": 0.944,
+   "seconds": 0.827,
    "status": "pass"
   },
   {
@@ -2742,7 +2742,7 @@
    "checks_total": 0,
    "failed_checks": [],
    "reason": "mcflirt exit [-6]: Image Exception : #61 :: Invalid t index in [] operator terminate called after throwing an instance of 'std::runtime_error' what(): Invalid t index in [] operat; larmorx exit [1]: Error: -refvol 12: invalid volume index for a series of 12 volumes",
-   "seconds": 0.007,
+   "seconds": 0.006,
    "status": "both-error"
   },
   {
@@ -2768,7 +2768,7 @@
     "D13 fix pass": 193139,
     "out_mcf.nii.gz.mat: matrices identical as text": "0/12"
    },
-   "seconds": 0.972,
+   "seconds": 0.906,
    "status": "pass"
   },
   {
@@ -2791,10 +2791,10 @@
    },
    "reason": "",
    "reported": {
-    "D13 fix pass": 206100,
+    "D13 fix pass": 373892,
     "out_mcf.nii.gz.mat: matrices identical as text": "0/12"
    },
-   "seconds": 1.009,
+   "seconds": 0.915,
    "status": "pass"
   },
   {
@@ -2820,7 +2820,7 @@
     "D13 fix pass": 190876,
     "out_mcf.nii.gz.mat: matrices identical as text": "0/12"
    },
-   "seconds": 0.873,
+   "seconds": 0.763,
    "status": "pass"
   },
   {
@@ -2846,7 +2846,7 @@
     "D13 fix pass": 228063,
     "out_mcf.nii.gz.mat: matrices identical as text": "0/12"
    },
-   "seconds": 0.855,
+   "seconds": 0.834,
    "status": "pass"
   },
   {
@@ -2872,7 +2872,7 @@
     "D13 fix pass": 199922,
     "out_mcf.nii.gz.mat: matrices identical as text": "0/12"
    },
-   "seconds": 0.317,
+   "seconds": 0.269,
    "status": "pass"
   },
   {
@@ -2898,7 +2898,7 @@
     "D13 fix pass": 190882,
     "out_mcf.nii.gz.mat: matrices identical as text": "0/12"
    },
-   "seconds": 3.819,
+   "seconds": 5.018,
    "status": "pass"
   },
   {
@@ -2927,7 +2927,7 @@
     "D13 fix pass": 193139,
     "out_mcf.nii.gz.mat: matrices identical as text": "0/12"
    },
-   "seconds": 0.98,
+   "seconds": 0.863,
    "status": "pass"
   },
   {
@@ -2953,7 +2953,7 @@
     "D13 fix pass": 0,
     "out_mcf.nii.gz.mat: matrices identical as text": "0/12"
    },
-   "seconds": 0.41,
+   "seconds": 0.501,
    "status": "pass"
   },
   {
@@ -2988,7 +2988,7 @@
     "D13 fix pass": 172287,
     "out_mcf.nii.gz.mat: matrices identical as text": "1/12"
    },
-   "seconds": 1.042,
+   "seconds": 0.805,
    "status": "pass"
   },
   {
@@ -3013,7 +3013,7 @@
     "D13 fix pass": 193139,
     "out_mcf.nii.gz.mat: matrices identical as text": "0/12"
    },
-   "seconds": 0.954,
+   "seconds": 0.729,
    "status": "pass"
   },
   {
@@ -3038,7 +3038,7 @@
     "D13 fix pass": 172919,
     "out_mcf.nii.gz.mat: matrices identical as text": "1/12"
    },
-   "seconds": 0.991,
+   "seconds": 0.755,
    "status": "pass"
   },
   {
@@ -3063,7 +3063,7 @@
     "D13 fix pass": 196646,
     "out_mcf.nii.gz.mat: matrices identical as text": "0/12"
    },
-   "seconds": 0.768,
+   "seconds": 0.847,
    "status": "pass"
   },
   {
@@ -3088,7 +3088,7 @@
     "D13 fix pass": 172287,
     "out_mcf.nii.gz.mat: matrices identical as text": "1/12"
    },
-   "seconds": 0.7,
+   "seconds": 0.774,
    "status": "pass"
   },
   {
@@ -3114,7 +3114,7 @@
     "D13 fix pass": 193139,
     "out_mcf.nii.gz.mat: matrices identical as text": "0/12"
    },
-   "seconds": 0.655,
+   "seconds": 0.777,
    "status": "pass"
   },
   {
@@ -3124,36 +3124,36 @@
    "checks_total": 13,
    "failed_checks": [
     {
-     "detail": "median 3.8174, max 18.6447 mm over 7 volumes",
+     "detail": "median 1.4451, max 3.3416 mm over 7 volumes",
      "metric": "mm",
      "name": "out_mcf.nii.gz.mat: matrix RMS deviation, 95th percentile",
      "passed": false,
      "threshold": "\u2264 0.1 (spec)",
-     "value": "14.8064"
+     "value": "3.1771"
     },
     {
-     "detail": "max 3.5499 mm, 20.7965\u00b0",
+     "detail": "max 1.6253 mm, 2.9435\u00b0",
      "metric": "mm / deg",
      "name": "out_mcf.nii.gz.mat: median parameter difference",
      "passed": false,
      "threshold": "\u2264 0.05 / 0.05 (spec)",
-     "value": "1.3841 / 1.0397"
+     "value": "0.0214 / 0.1139"
     },
     {
-     "detail": "max |\u0394FD| 24.6897 mm, max FD 25.110 mm",
+     "detail": "max |\u0394FD| 3.8653 mm, max FD 25.110 mm",
      "metric": "r",
      "name": "FD (Power, 50 mm) correlation",
      "passed": false,
      "threshold": "\u2265 0.99 (spec)",
-     "value": "0.0524"
+     "value": "0.9859"
     },
     {
-     "detail": "max |diff| 164 (max |mcflirt| 167); 21989 of 31941 values differ",
+     "detail": "max |diff| 129 (max |mcflirt| 167); 10615 of 31941 values differ",
      "metric": "NCC",
      "name": "out_mcf.nii.gz: voxel values",
      "passed": false,
      "threshold": "\u2265 0.999",
-     "value": "0.825167"
+     "value": "0.976369"
     },
     {
      "detail": "",
@@ -3161,7 +3161,7 @@
      "name": "out_mcf.nii.gz_abs.rms: values",
      "passed": false,
      "threshold": "\u2264 0.1 (spec)",
-     "value": "18.6386"
+     "value": "2.5181"
     },
     {
      "detail": "",
@@ -3169,23 +3169,23 @@
      "name": "out_mcf.nii.gz_abs_mean.rms: values",
      "passed": false,
      "threshold": "\u2264 0.1 (spec)",
-     "value": "5.4251"
+     "value": "0.2674"
     }
    ],
    "measured": {
-    "FD (Power, 50 mm) correlation": "0.0524",
-    "out_mcf.nii.gz.mat: matrix RMS deviation, 95th percentile": "14.8064",
-    "out_mcf.nii.gz.mat: median parameter difference": "1.3841 / 1.0397",
-    "out_mcf.nii.gz: voxel values": "0.825167",
-    "out_mcf.nii.gz_abs.rms: values": "18.6386",
-    "out_mcf.nii.gz_abs_mean.rms: values": "5.4251"
+    "FD (Power, 50 mm) correlation": "0.9859",
+    "out_mcf.nii.gz.mat: matrix RMS deviation, 95th percentile": "3.1771",
+    "out_mcf.nii.gz.mat: median parameter difference": "0.0214 / 0.1139",
+    "out_mcf.nii.gz: voxel values": "0.976369",
+    "out_mcf.nii.gz_abs.rms: values": "2.5181",
+    "out_mcf.nii.gz_abs_mean.rms: values": "0.2674"
    },
-   "reason": "-cost normmi: larmorx aligns this phantom worse than mcflirt (temporal SD 1.38 of mcflirt's); over the night's 91 normmi findings the median ratio is 1.033; cause open (the spec describes the histogram costs in outline only; docs/findings/mri-hmc-original.md)",
+   "reason": "-cost normmi, computed exactly as specs/mcflirt.md appendix B describes it since 2026-10-29: larmorx now aligns this phantom better than mcflirt 6.0.7.23 (temporal SD 0.93 of mcflirt's; 1.38 before), its estimates ending in other minima of a phantom moved by large rotations, beyond the record's thresholds. Over the 91 normmi findings of the first long random-testing run (2026-10-25) the median ratio is now 1.000 (55 within 1 %; 1.051 before, against 6.0.7.23), and with -fudge -stages 1 mcflirt's evaluated matrices are larmorx's, evaluation by evaluation, on 11 of 15 such phantoms (docs/findings/mri-hmc-original.md)",
    "reported": {
-    "D13 fix pass": 13403,
+    "D13 fix pass": 14067,
     "out_mcf.nii.gz.mat: matrices identical as text": "1/7"
    },
-   "seconds": 0.127,
+   "seconds": 0.118,
    "status": "expected-divergence"
   },
   {
@@ -3219,7 +3219,7 @@
     "D13 fix pass": 7590,
     "out_mcf.nii.gz.mat: matrices identical as text": "1/6"
    },
-   "seconds": 0.289,
+   "seconds": 0.16,
    "status": "expected-divergence"
   }
  ],

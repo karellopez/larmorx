@@ -41,20 +41,22 @@ fn output_map(m: &Mat4, src_voxel: [f32; 3], out_voxel: [f32; 3]) -> [[f32; 4]; 
     [0, 1, 2].map(|i| [0, 1, 2, 3].map(|j| a[i][j] as f32))
 }
 
-/// Resamples `src` by `m` (source FSL-mm → output FSL-mm) onto a grid of `shape` and
-/// `voxel_size`, filling positions outside `[−1, n]` with `background`.
-pub fn resample(
+/// Visits the output voxels whose source position lies inside `src`'s extended grid
+/// (`[−1, n]` per axis), in mcflirt's order (z outermost, then x, then y innermost; §9.1), with
+/// their linear index and interpolated value; stops early when `f` returns `false`. Returns
+/// whether every visit returned `true`. Nothing is visited for a non-finite matrix.
+fn visit(
     src: &Volume,
     m: &Mat4,
     shape: [usize; 3],
     voxel_size: [f32; 3],
     interpolation: Interpolation,
     background: f32,
-) -> Volume {
+    mut f: impl FnMut(usize, f32) -> bool,
+) -> bool {
     let [nx, ny, nz] = shape;
-    let mut data = vec![background; nx * ny * nz];
     if m.iter().flatten().any(|v| !v.is_finite()) {
-        return Volume::new(shape, voxel_size, data);
+        return true;
     }
     let a = output_map(m, src.voxel_size, voxel_size);
     let n = src.shape.map(|n| n as f32);
@@ -67,7 +69,7 @@ pub fn resample(
             for y in 0..ny {
                 let inside = (0..3).all(|k| p[k] >= -1.0 && p[k] <= n[k]);
                 if inside {
-                    data[x + nx * (y + ny * z)] = match interpolation {
+                    let value = match interpolation {
                         Interpolation::Trilinear => trilinear_extended(src, p[0], p[1], p[2]),
                         Interpolation::Nearest => super::kernels::nearest(src, p),
                         Interpolation::Sinc => super::kernels::sinc_final(src, p),
@@ -75,11 +77,41 @@ pub fn resample(
                             .as_ref()
                             .map_or(background, |s| s.value(p, background)),
                     };
+                    if !f(x + nx * (y + ny * z), value) {
+                        return false;
+                    }
                 }
                 p = [p[0] + a[0][1], p[1] + a[1][1], p[2] + a[2][1]];
             }
         }
     }
+    true
+}
+
+/// Resamples `src` by `m` (source FSL-mm → output FSL-mm) onto a grid of `shape` and
+/// `voxel_size`, filling positions outside `[−1, n]` with `background`.
+pub fn resample(
+    src: &Volume,
+    m: &Mat4,
+    shape: [usize; 3],
+    voxel_size: [f32; 3],
+    interpolation: Interpolation,
+    background: f32,
+) -> Volume {
+    let [nx, ny, nz] = shape;
+    let mut data = vec![background; nx * ny * nz];
+    visit(
+        src,
+        m,
+        shape,
+        voxel_size,
+        interpolation,
+        background,
+        |i, v| {
+            data[i] = v;
+            true
+        },
+    );
     Volume::new(shape, voxel_size, data)
 }
 
@@ -106,6 +138,92 @@ pub fn resample_series(
                 resample(v, &m, shape, voxel_size, interpolation, v.background())
             })
             .collect()
+    })
+}
+
+/// Whether resampling `series` with `interpolation` gives any value (bit for bit) other than
+/// `done`, the same series already resampled by [`resample_series`] with another method: each
+/// volume is compared voxel by voxel and the search stops at the first difference, so the
+/// answer costs little where the two differ (FSL-59: mcflirt 6.0.7.23 resamples `-sinc_final`
+/// and `-nn_final` trilinearly, `specs/mcflirt.md` §9.3). The answer does not depend on the
+/// thread count.
+#[allow(clippy::too_many_arguments)]
+pub fn series_differ(
+    series: &[Volume],
+    matrices: &[Mat4],
+    init: Option<&Mat4>,
+    shape: [usize; 3],
+    voxel_size: [f32; 3],
+    interpolation: Interpolation,
+    done: &[Volume],
+    n_threads: usize,
+) -> Result<bool, ThreadPoolError> {
+    parallel::with_threads(n_threads, || {
+        series
+            .par_iter()
+            .zip(matrices)
+            .zip(done)
+            .any(|((v, m), d)| {
+                let m = match init {
+                    Some(i) => rigid::mul(m, i),
+                    None => *m,
+                };
+                // Only the spline reads the background inside the grid; outside it both series
+                // hold the background.
+                let background = if interpolation == Interpolation::Spline {
+                    v.background()
+                } else {
+                    0.0
+                };
+                let same = visit(
+                    v,
+                    &m,
+                    shape,
+                    voxel_size,
+                    interpolation,
+                    background,
+                    |i, x| x.to_bits() == d.data[i].to_bits(),
+                );
+                !same
+            })
+    })
+}
+
+/// `f` of each volume of `series` resampled with `interpolation` (as [`resample_series`] would
+/// give it), the volumes in parallel but none kept, summed in volume order: what a series that
+/// is not written would hold (FSL-59: the integer conversion of mcflirt 6.0.7.23's trilinear
+/// series where larmorx writes another one).
+#[allow(clippy::too_many_arguments)]
+pub fn fold_resampled<T: Send + Default + std::ops::Add<Output = T>>(
+    series: &[Volume],
+    matrices: &[Mat4],
+    init: Option<&Mat4>,
+    shape: [usize; 3],
+    voxel_size: [f32; 3],
+    interpolation: Interpolation,
+    n_threads: usize,
+    f: impl Fn(&Volume) -> T + Sync + Send,
+) -> Result<T, ThreadPoolError> {
+    parallel::with_threads(n_threads, || {
+        let parts: Vec<T> = series
+            .par_iter()
+            .zip(matrices)
+            .map(|(v, m)| {
+                let m = match init {
+                    Some(i) => rigid::mul(m, i),
+                    None => *m,
+                };
+                f(&resample(
+                    v,
+                    &m,
+                    shape,
+                    voxel_size,
+                    interpolation,
+                    v.background(),
+                ))
+            })
+            .collect();
+        parts.into_iter().fold(T::default(), |a, b| a + b)
     })
 }
 

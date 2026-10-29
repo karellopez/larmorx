@@ -1,19 +1,19 @@
 # 3dTshift
 
 `lx.afni.tshift` (command line `larmorx afni 3dTshift`; Rust crate `larmorx-afni`):
-slice-timing correction, compatible with AFNI's `3dTshift` (26.3.05; 25.2.09 for the
-clean-room original until it is aligned, below).
+slice-timing correction, compatible with AFNI's `3dTshift` (26.3.05; first 25.2.09).
 
-**AFNI versions** (2026-10-29): the replica follows AFNI 26.3.05 and is validated against it; the clean-room original is validated against AFNI 25.2.09 until a clean-room agent aligns it with 26.3.05. The two releases differ, for these programs, in two corrections larmorx already made by default (AFNI-03, header slice code 2; AFNI-05, 3dTshift's `-no_detrend`): the default output is the same with either; only `reproduce` differs where they apply ([findings](../findings/afni-relicensing-26.md) for the new licence).
+**AFNI versions** (2026-10-29): both implementations follow AFNI 26.3.05 and are validated against it (the clean-room original since its alignment the same day). The two releases differ, for these programs, in two corrections larmorx already made by default (AFNI-03, header slice code 2; AFNI-05, 3dTshift's `-no_detrend`): AFNI 26.3.05 behaves as larmorx corrected them, so `reproduce` now gives the same result as the default where they apply, and neither is named ([findings](../findings/afni-relicensing-26.md) for the new licence).
 
 **Clean-room re-implementation.** AFNI is GPL-2, so larmorx did not port it: the code was
 written from the behaviour spec [`specs/3dTshift.md`](../../specs/3dTshift.md), AFNI's help
 text and black-box runs of the AFNI binary, without AFNI's source code
 ([provenance](../../crates/larmorx-afni/PROVENANCE.md)).
 
-**Status: `validated`** against AFNI 25.2.09 itself, the clean-room original (see the
-[validation record](../validation/afni-tshift.md)); the replica against AFNI 26.3.05
-([replica record](../validation/afni-tshift-replica.md)). The record covers 314 cases:
+**Status: `validated`** against AFNI 26.3.05 itself, both: the clean-room original (see the
+[validation record](../validation/afni-tshift.md); against AFNI 25.2.09 until 2026-10-29)
+and the replica ([replica record](../validation/afni-tshift-replica.md)). The record covers
+315 cases:
 - every file of `larmorx-testdata` `synthetic/tshift/` (every FFT length class, every data
   type AFNI reads, edge content);
 - every method, option and `-tpattern` form, slice timing from NIfTI headers, the "copy of
@@ -23,15 +23,15 @@ text and black-box runs of the AFNI binary, without AFNI's source code
 - AFNI's global options and environment variables (60 cases), where exit statuses and
   messages are compared byte for byte too.
 
-All 314 agree: 279 compared, 32 rejected by both, and 3 documented divergences (AFNI's own
+All 315 agree: 280 compared, 32 rejected by both, and 3 documented divergences (AFNI's own
 output format and `-voxshift`, which larmorx does not support, and a dataset of one row,
-which AFNI writes as a text file with a random identifier, AFNI-20). 176 of the 279 compared
+which AFNI writes as a text file with a random identifier, AFNI-20). 178 of the 280 compared
 are byte-identical in their data; in every compared case the header fields are AFNI's and the
 geometry agrees to 1e-6 mm (the whole header byte for byte where the record compares it), and
 in the 60 cases of the global options and variables and the 3 failed writes, where exit
 statuses and both output streams are compared byte for byte too, all 63 are identical
 (2026-10-12, completing 3dTshift, part 2b, and AFNI-26's switch). The Lagrange and weighted-sinc methods and the
-copies give **the same bytes** as AFNI (129 of 132). The Fourier method (the default) differs
+copies give **the same bytes** as AFNI (131 of 133). The Fourier method (the default) differs
 in the last float32 bits, at most 4.3e-7 of the largest value, because AFNI's FFT is float32
 and larmorx's is double; integer outputs then differ by at most 1, in a few values per million
 on the real runs (up to 0.2 % on a synthetic series built to clip). The known last-bit
@@ -113,7 +113,7 @@ and `tzero` fMRIPrep passes: `SliceTiming` reversed when the direction ends in `
 | `-ignore n` | `ignore=n` | at most nt − 5 |
 | `-Fourier` `-linear` `-cubic` `-quintic` `-heptic` `-wsinc5` `-wsinc9` | `method="fourier"` (default), `"linear"`, … | the CLI compares 4 characters (`-cub`), 7 for `-wsinc5/9` (any case) |
 | `-rlt` / `-rlt+` | `restore="none"` / `"intercept"` | `-rlt+` adds back the fitted intercept, not the mean |
-| `-no_detrend` | `detrend=False` | every voxel's mean removed and restored; AFNI's voxel pairs with `upstream_defects="reproduce"` (AFNI-05, below) |
+| `-no_detrend` | `detrend=False` | every voxel's mean removed and restored, in both modes, as AFNI 26.3.05 does (AFNI 25.2.09's voxel pairs: AFNI-05, below) |
 | `-verbose` | – | progress on stderr |
 | `-voxshift dset` | – | not supported |
 | (threads: `OMP_NUM_THREADS`) | `n_threads=1` (0 = all CPUs) | AFNI is single-threaded; the result does not depend on the thread count |
@@ -208,8 +208,8 @@ warning names each one that changed the output, in both modes
 |---|---|---|---|
 | AFNI-01 | a negative `scl_slope` is applied when values are stored but not when they are read: shifted slices come out sign-flipped and scaled (int16 with slope −0.5: a mean of 942 comes out −1884) | the factor is applied when reading too, so the output has the input's values | files with a negative `scl_slope`; slices left unshifted and copies are the same in both modes |
 | AFNI-02 | float32 data with a slope and an intercept are scaled when read, and the slope is also kept as the output's `scl_slope`: the output reads back scaled twice | scaled once, written without a factor | float32 files with both fields set |
-| AFNI-03 | header slice code 2 (`NIFTI_SLICE_SEQ_DEC`) gives every slice time 0: nothing is shifted (**fixed in AFNI 26.3.05**: the replica follows it in both modes) | slices `slice_end` down to `slice_start`, as NIfTI defines the code | the command line without `-tpattern` |
-| AFNI-05 | `-no_detrend` removes and restores the mean of the first voxel of each pair (index order within a slice) only; the second is shifted raw, its edges falling toward 0 (**fixed in AFNI 26.3.05**: the replica follows it in both modes) | every voxel's mean is removed and restored | `detrend=False`, `-no_detrend` |
+| AFNI-03 | header slice code 2 (`NIFTI_SLICE_SEQ_DEC`) gives every slice time 0: nothing is shifted (**fixed in AFNI 26.3.05**: both implementations follow it in both modes and name it no more) | slices `slice_end` down to `slice_start`, as NIfTI defines the code | the command line without `-tpattern` |
+| AFNI-05 | `-no_detrend` removes and restores the mean of the first voxel of each pair (index order within a slice) only; the second is shifted raw, its edges falling toward 0 (**fixed in AFNI 26.3.05**: both implementations follow it in both modes and name it no more) | every voxel's mean is removed and restored | `detrend=False`, `-no_detrend` |
 | AFNI-07 | metre and micron units: the voxel sizes are converted to millimetres, the origin is not (a plumb grid), or the whole sform is not (an oblique grid) | the whole matrix is converted | files whose `xyzt_units` give metres or micrometres |
 | AFNI-08 | a copy of the input whose kept slice times are all within 3 ms of 0 gets `slice_end` 0 | no slice code, `slice_end` = nz − 1 | the command line: header slice times beyond the TR, e.g. 0.5 ms apart with a 1 ms TR |
 | AFNI-11 | an existing output is not written, and the exit status is 0 | an error (exit 1) | the command line |
@@ -238,9 +238,9 @@ byte for byte in the cases of AFNI's global options and variables. So `implement
 whichever runs. The replica's record compares its default with the original's on every case
 where a correction applies: they agree in every header field, the geometry, the scaling and
 the slice fields of copies (AFNI-08's included), and in the values up to those last bits. The
-original follows AFNI's geometry, the slice fields of copies, the output-name rules and
-AFNI-03's notice for a copy since 2026-10-12 (completing 3dTshift, part 2b; before, these were
-expected divergences in its record). Warning and error labels: AFNI writes them in terminal
+original follows AFNI's geometry, the slice fields of copies and the output-name rules since
+2026-10-12 (completing 3dTshift, part 2b; before, these were expected divergences in its record),
+and AFNI 26.3.05's header slice code 2 and `-no_detrend` since 2026-10-29. Warning and error labels: AFNI writes them in terminal
 colour codes, also into files and pipes (AFNI-21, messages only); larmorx does so in
 `reproduce` mode only.
 
@@ -367,11 +367,11 @@ The spec left these open; each was settled by running AFNI 25.2.09 (details in
   the series.
 - **Scaling** to float32 multiplies and adds in double after converting the stored value to
   float32.
-- **`-no_detrend`**: within each slice, voxels are taken in pairs in index order (x fastest);
-  the first of a pair has its mean removed and restored, the second is shifted as raw values
-  (zeros beyond the ends, clipped to its range); reproduced with
-  `upstream_defects="reproduce"` (AFNI-05). The last bits of these cases are not bit-identical
-  yet.
+- **`-no_detrend`**: AFNI 25.2.09 took the voxels of each slice in pairs in index order (x
+  fastest): the first of a pair had its mean removed and restored, the second was shifted as
+  raw values (zeros beyond the ends, clipped to its range; AFNI-05). AFNI 26.3.05 removes and
+  restores every voxel's mean, as larmorx always did by default; `reproduce` gives that too
+  since 2026-10-29.
 - **`-TR … ms`** switches every time to milliseconds (header offsets, `-tzero`, `@file`
   values are taken as milliseconds); the output is written in seconds.
 - **`@file`**: AFNI 1D text read column by column (one line reads left to right); `#`
@@ -435,7 +435,8 @@ values; integer outputs only where a value sits on a rounding boundary):
   is the only cause.
 - **Quintic and heptic**: for some fractions (real slice times), a few weights differ from
   AFNI's by an ulp or more; linear and cubic are exact. Unresolved.
-- **`-no_detrend`**: the pair structure is reproduced, its rounding not yet.
+- **`-no_detrend`**: AFNI 25.2.09's pair structure was reproduced, its rounding not; AFNI
+  26.3.05 de-means every voxel, as both modes now do.
 
 ## Rust
 

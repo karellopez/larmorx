@@ -6,6 +6,7 @@ from __future__ import annotations
 
 import contextlib
 import io
+import warnings
 
 import nibabel as nib
 import numpy as np
@@ -129,8 +130,12 @@ def test_ignored_points_and_restore_modes(tmp_path):
     np.testing.assert_array_equal(shifted.data[..., :3], original[..., :3])
     residual = lx.afni.tshift(src, slice_times="alt+z", restore="none", method="cubic")
     assert abs(float(residual.data[..., 1:3, :].mean())) < 5  # detrended: about zero
-    with pytest.warns(UserWarning, match="first voxel of each pair"):
+    # AFNI 26.3.05 de-means every voxel, as larmorx always did: no defect is named (AFNI-05 was
+    # AFNI 25.2.09's voxel pairs).
+    with warnings.catch_warnings(record=True) as caught:
+        warnings.simplefilter("always")
         mean_kept = lx.afni.tshift(src, slice_times="alt+z", detrend=False, method="cubic")
+    assert not [w for w in caught if "AFNI-05" in str(w.message)]
     assert abs(float(mean_kept.data.mean() - original.mean())) < 1
 
 

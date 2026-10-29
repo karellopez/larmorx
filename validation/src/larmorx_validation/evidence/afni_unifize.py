@@ -219,18 +219,19 @@ ORIGINAL_PANELS = [
 ]  # fmt: skip
 
 
-#: AFNI 26.3.05 on fMRIPrep's call at 1 thread (the replica's reference since 2026-10-29).
+#: AFNI 26.3.05 on fMRIPrep's call at 1 thread (both implementations' reference since 2026-10-29).
 PANEL_26 = (
     "afni26-1",
     "afni26-1",
     "original",
     "AFNI 26.3.05, 3dUnifize",
-    "the repository's build, 1 thread; the replica's reference",
+    "the repository's build, 1 thread; both implementations' reference",
 )
 
 
 def afni26_diffs() -> list[dict]:
-    """The replica against AFNI 26.3.05, and AFNI's own step from 25.2.09 (1 thread each)."""
+    """The replica and the clean-room original against AFNI 26.3.05, and AFNI's own step
+    from 25.2.09 (1 thread each)."""
     d = common.d
     return [
         d("replica-afni26", "replica-1", "afni26-1", "main",
@@ -238,6 +239,9 @@ def afni26_diffs() -> list[dict]:
         d("afni26-afni", "afni26-1", "afni-1", "variability",
           "AFNI 26.3.05 − AFNI 25.2.09, 1 thread each",
           "the original against itself: the version step"),
+        # The clean-room original against AFNI 26.3.05 too, since its alignment (2026-10-29).
+        d("original-afni26", "original-1", "afni26-1", "main",
+          "original − AFNI 26.3.05, 1 thread each", common.ROLE_LX),
     ]  # fmt: skip
 
 
@@ -299,6 +303,22 @@ def original_verdicts(diffs: list[dict], same: dict[str, bool]) -> None:
                 "No correction of the register applies to this input: both modes give the "
                 "same bytes."
             )
+
+    # The clean-room original against AFNI 26.3.05, its reference since 2026-10-29: where AFNI
+    # 26.3.05 gives 25.2.09's bytes, the comparison with 25.2.09 above, with its verdict.
+    by = {x["id"]: x for x in diffs}
+    x26, x25 = by.get("original-afni26"), by.get("original-afni")
+    if (
+        x26 is not None
+        and x25 is not None
+        and not same["original-afni26"]
+        and same.get("afni26-afni")
+    ):
+        x26["verdict"] = x25["verdict"]
+        x26["reason"] = (
+            "AFNI 26.3.05 gives AFNI 25.2.09's bytes on this call, so this is the comparison "
+            "with 25.2.09: " + str(x25.get("reason", ""))
+        )
 
 
 def _verdict(x: dict, same: dict[str, bool]) -> None:
@@ -422,7 +442,7 @@ def _example_ref(ctx: core.Context, e: fcache.Entry, o: fcache.Entry, step: dict
             "The 3dUnifize node fMRIPrep 25.2.6 ran on the BOLD reference of OpenNeuro ds005040 "
             "sub-002 (task clip, run 1), N4-corrected and skull-stripped once: its arguments "
             "(-T2: the contrast inverted, unifized, inverted back) given to AFNI 25.2.09 at 1 "
-            "and 6 OpenMP threads, to AFNI 26.3.05 at 1 (the replica's reference since "
+            "and 6 OpenMP threads, to AFNI 26.3.05 at 1 (both implementations' reference since "
             "2026-10-29), to the larmorx-gpl replica and to LARMORX's clean-room original at 1 "
             "and 6 threads in both modes. fMRIPrep's own output is the panel it produced in its "
             "run."
@@ -584,7 +604,7 @@ def _example_t2up(
     panels = [
         ("afni", "t2up100-afni", "original", "AFNI 25.2.09, -T2up 100", "the repository's build"),
         ("afni26", "t2up100-afni26", "original", "AFNI 26.3.05, -T2up 100",
-         "the repository's build; the replica's reference"),
+         "the repository's build; both implementations' reference"),
         ("replica", "t2up100-replica", "larmorx", "larmorx-gpl replica, -T2up 100",
          "default mode: corrected"),
         ("replica-reproduce", "t2up100-replica-reproduce", "larmorx",

@@ -1,6 +1,6 @@
 # SPDX-License-Identifier: Apache-2.0
 """``3dUnifize``: white-matter intensity uniformization of a T1- or T2-weighted volume (or, with
-``epi=True``, an EPI series): the clean-room original of AFNI 25.2.09's program, or its
+``epi=True``, an EPI series): the clean-room original of AFNI 26.3.05's program, or its
 bit-exact replica from ``larmorx-gpl``, run as a separate program.
 
 ``implementation="auto"`` runs the replica when the ``larmorx-gpl`` package is installed

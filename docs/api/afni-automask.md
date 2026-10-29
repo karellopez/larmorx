@@ -1,10 +1,9 @@
 # 3dAutomask
 
 `lx.afni.automask` (command line `larmorx afni 3dAutomask`): a brain mask from an EPI series or
-a skull-stripped anatomical, as AFNI's `3dAutomask` makes it (26.3.05; 25.2.09 for the
-clean-room original until it is aligned, below).
+a skull-stripped anatomical, as AFNI's `3dAutomask` makes it (26.3.05; first 25.2.09).
 
-**AFNI versions** (2026-10-29): the replica follows AFNI 26.3.05 and is validated against it; the clean-room original is validated against AFNI 25.2.09 until a clean-room agent aligns it with 26.3.05. The two releases differ, for these programs, in two corrections larmorx already made by default (AFNI-03, header slice code 2; AFNI-05, 3dTshift's `-no_detrend`): the default output is the same with either; only `reproduce` differs where they apply ([findings](../findings/afni-relicensing-26.md) for the new licence).
+**AFNI versions** (2026-10-29): both implementations follow AFNI 26.3.05 and are validated against it (the clean-room original since its alignment the same day). The two releases differ, for these programs, in two corrections larmorx already made by default (AFNI-03, header slice code 2; AFNI-05, 3dTshift's `-no_detrend`): AFNI 26.3.05 behaves as larmorx corrected them, so `reproduce` now gives the same result as the default where they apply, and neither is named ([findings](../findings/afni-relicensing-26.md) for the new licence).
 
 **Two implementations.** 3dAutomask's results depend on AFNI library routines copyrighted by the
 Medical College of Wisconsin (GPL-2), so larmorx has the bit-exact **replica**
@@ -17,7 +16,7 @@ AFNI only ([PROVENANCE](../../crates/larmorx-afni/PROVENANCE.md)). `implementati
 `"original"` (`LARMORX_IMPLEMENTATION`) forces one. Each image's `implementation` names the one
 that ran.
 
-**Status: `validated`**, both: the original against AFNI 25.2.09 itself, the replica against AFNI 26.3.05:
+**Status: `validated`**, both, against AFNI 26.3.05 itself (the original against AFNI 25.2.09 until 2026-10-29):
 - the original ([record](../validation/afni-automask.md)): every output of 80 of the 81 compared
   cases that write one is AFNI's, bit for bit (data and NIfTI header), with AFNI's exit status and
   messages in every case; the other one, fMRIPrep's call on ds005454's BOLD reference, has AFNI's
@@ -86,10 +85,10 @@ defect <ID> ...`):
   messages count other voxels). A negative value peels once in both modes, as in AFNI
   (2026-10-29, the replica's default).
 - **AFNI-03 and AFNI-08** in the masked input (`-apply_prefix`), which keeps the input's time
-  axis and slice timing: header slice code 2 keeps its corrected slice fields by default and
-  is named in both modes; AFNI-08 is named where the kept times are all within 3 ms of 0 (in
-  `reproduce`, every code-2 input), as in 3dTshift (since 2026-10-29 in the original, in the
-  replica's words).
+  axis and slice timing: header slice code 2 keeps its slice fields (`slice_end` down to
+  `slice_start`) in both modes, as AFNI 26.3.05 does, and AFNI-03 is not named (AFNI 25.2.09
+  read every slice time as 0); AFNI-08 is named where the kept times are all within 3 ms of 0,
+  in both modes, in the replica's words.
 - **AFNI-41** (decided 2026-10-23, rule B): `-nbhrs` outside 6..26 (a value that is not a
   number reads as 0) is silently 17 in AFNI, or what a `-NN1/2/3` says. The default refuses it
   before any input is read, whether or not a `-NN` option follows (the last `-nbhrs` decides):

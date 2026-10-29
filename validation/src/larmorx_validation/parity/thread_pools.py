@@ -292,6 +292,18 @@ def programs(
             )
     out.append(Program("mri hmc (clean-room original)",
                        (*lx, "mri", "hmc", "-in", s, "-out", o + "_hmc"), omp))  # fmt: skip
+    # The mutual-information costs (stage 1 samples their slices in parallel, appendix B), FSL-59's
+    # comparison of the final interpolations, and FSL 6.0.7.23's zstd and bzip2 outputs
+    # (2026-10-29).
+    out.append(Program("mri hmc -cost normmi (clean-room original)",
+                       (*lx, "mri", "hmc", "-in", s, "-out", o + "_hmc_nmi", "-cost", "normmi",
+                        "-sinc_final"), omp))  # fmt: skip
+    out.append(Program("mri hmc -cost mutualinfo, zstd (clean-room original)",
+                       (*lx, "mri", "hmc", "-in", s, "-out", o + "_hmc_mi", "-cost", "mutualinfo",
+                        "-nn_final"), (*omp, ("FSLOUTPUTTYPE", "NIFTI_ZST"))))  # fmt: skip
+    out.append(Program("mri hmc bzip2 (clean-room original)",
+                       (*lx, "mri", "hmc", "-in", s, "-out", o + "_hmc_bz", "-stages", "1"),
+                       (*omp, ("FSLOUTPUTTYPE", "NIFTI_PAIR_BZ2"))))  # fmt: skip
     if nc:
         mat = d / "identity.mat"
         if make:

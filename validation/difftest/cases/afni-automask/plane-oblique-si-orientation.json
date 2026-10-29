@@ -1,0 +1,218 @@
+{
+ "defect": null,
+ "description": "A one-slice oblique constant image with -SI: the axis AFNI orients as superior (the closest plumb orientation), so the same planes cleared (item 4, 2026-10-29)",
+ "expect": "pass",
+ "found": {
+  "detail": "messages: AFNI's, byte for byte: stderr line 13: AFNI '++ first   0 x-planes are zero [from L]', larmorx '++ first   0 x-planes are zero [from ?]'",
+  "n": 13,
+  "seed": "20261025",
+  "shrink_moves": [
+   "dropped SI (-SI 20)",
+   "dropped dilate (-dilate 2)",
+   "dropped eclip (-eclip)",
+   "dropped nograd (-nograd)",
+   "dropped clfrac (-clfrac 0.9)",
+   "input (and its grid): unit spacing",
+   "input (and its grid): origin at 0",
+   "input (and its grid): sform = qform",
+   "input (and its grid): qform and sform codes 1",
+   "input: plain value range",
+   "input: content blobs -> constant"
+  ],
+  "signature": [
+   "mask.nii.gz: data",
+   "messages: AFNI's, byte for byte"
+  ]
+ },
+ "id": "plane-oblique-si-orientation",
+ "implementations": [
+  "original"
+ ],
+ "reason": "",
+ "recipe": {
+  "extra": {
+   "outputs": [
+    "mask.nii.gz"
+   ]
+  },
+  "features": {
+   "NN": false,
+   "SI": true,
+   "SI value": "20",
+   "apply_prefix": false,
+   "axis0": 0.85,
+   "axis1": 1.0,
+   "axis2": 0.85,
+   "blobs": 3,
+   "centre0": 5.5,
+   "centre1": 2.5,
+   "centre2": 6.0,
+   "clfrac": true,
+   "clfrac value": "0.9",
+   "content": "blobs",
+   "depth": false,
+   "dilate": true,
+   "dilate value": "2",
+   "dtype": "float32",
+   "eclip": true,
+   "erode": false,
+   "nbhrs": false,
+   "ndim": 2,
+   "nograd": true,
+   "nx": 26,
+   "ny": 29,
+   "orientation": "oblique",
+   "origin0": 30.25,
+   "origin1": 48.5,
+   "origin2": 41.5,
+   "output": "mask.nii.gz",
+   "peels": false,
+   "qfac": 1,
+   "qform_code": 0,
+   "quiet": false,
+   "range": "huge",
+   "sform": "other",
+   "sform_code": 3,
+   "shear0": 0.1,
+   "shear1": 0.075,
+   "shear2": 0.1,
+   "size": 14.5,
+   "spacing0": 2.5,
+   "spacing1": 1.0,
+   "spacing2": 2.0,
+   "suffix": ".nii",
+   "units": "mm"
+  },
+  "groups": [
+   {
+    "args": [
+     "-clfrac",
+     "0.9"
+    ],
+    "name": "clfrac",
+    "optional": true
+   },
+   {
+    "args": [
+     "-nograd"
+    ],
+    "name": "nograd",
+    "optional": true
+   },
+   {
+    "args": [
+     "-eclip"
+    ],
+    "name": "eclip",
+    "optional": true
+   },
+   {
+    "args": [
+     "-dilate",
+     "2"
+    ],
+    "name": "dilate",
+    "optional": true
+   },
+   {
+    "args": [
+     "-SI",
+     "20"
+    ],
+    "name": "SI",
+    "optional": true
+   },
+   {
+    "args": [
+     "-prefix",
+     "mask.nii.gz"
+    ],
+    "name": "prefix",
+    "optional": false
+   },
+   {
+    "args": [
+     "{in:input}"
+    ],
+    "name": "input",
+    "optional": false
+   }
+  ],
+  "inputs": {
+   "input": {
+    "content": {
+     "axes": [
+      0.85,
+      1.0,
+      0.85
+     ],
+     "centre": [
+      5.5,
+      2.5,
+      6.0
+     ],
+     "n": 3,
+     "seed": 2075742163,
+     "size": 14.5,
+     "type": "blobs"
+    },
+    "dtype": "float32",
+    "geometry": {
+     "origin": [
+      30.25,
+      48.5,
+      41.5
+     ],
+     "qfac": 1,
+     "qform_code": 0,
+     "quaternion": [
+      5,
+      1,
+      2,
+      -2
+     ],
+     "sform": "other",
+     "sform_code": 3,
+     "shear": [
+      0.1,
+      0.075,
+      0.1
+     ],
+     "spacing": [
+      2.5,
+      1.0,
+      2.0
+     ],
+     "units": "mm"
+    },
+    "scaling": null,
+    "shape": [
+     26,
+     29,
+     1
+    ],
+    "suffix": ".nii",
+    "values": {
+     "offset": 0.0,
+     "scale": 1e+30
+    }
+   }
+  },
+  "n": 13,
+  "options": [
+   "-SI",
+   "-clfrac",
+   "-dilate",
+   "-eclip",
+   "-nograd",
+   "2D input"
+  ],
+  "seed": "20261025",
+  "tool": "afni-automask"
+ },
+ "rule": null,
+ "status": "fixed",
+ "suite": "afni-automask",
+ "tier": "smoke",
+ "tool": "afni-automask"
+}

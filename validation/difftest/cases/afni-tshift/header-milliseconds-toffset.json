@@ -1,0 +1,180 @@
+{
+ "defect": null,
+ "description": "Header slice timing in milliseconds: the times a float32 sum of the double step in seconds, so toffset is AFNI's 0.36000001 (item 2, 2026-10-29)",
+ "expect": "pass",
+ "found": {
+  "detail": "header fields (scaling, timing, slice fields, units, xform codes): toffset: AFNI 0.36000001430511475, larmorx 0.35999995470046997",
+  "n": 320,
+  "seed": "20261025",
+  "shrink_moves": [
+   "series: axis 1 18 -> 9 voxels",
+   "series: axis 0 10 -> 5 voxels",
+   "series: axis 1 9 -> 4 voxels",
+   "series: axis 0 5 -> 2 voxels",
+   "series: axis 1 4 -> 2 voxels",
+   "series: axis 0 2 -> 1 voxels",
+   "series: axis 1 2 -> 1 voxels",
+   "series (and its grid): plumb orientation",
+   "series (and its grid): origin at 0",
+   "series (and its grid): qform and sform codes 1",
+   "series (and its grid): millimetres",
+   "series: float32 storage",
+   "series: content head -> constant"
+  ],
+  "signature": [
+   "header fields (scaling, timing, slice fields, units, xform codes)"
+  ]
+ },
+ "id": "header-milliseconds-toffset",
+ "implementations": [
+  "original"
+ ],
+ "reason": "",
+ "recipe": {
+  "extra": {
+   "files": [],
+   "min_volumes": 4
+  },
+  "features": {
+   "TR": false,
+   "axis0": 1.15,
+   "axis1": 1.2,
+   "axis2": 0.85,
+   "bias0": 0.0025,
+   "bias1": 0.0025,
+   "bias2": -0.0075,
+   "bias3": 0.0075,
+   "centre0": -4.5,
+   "centre1": 2.0,
+   "centre2": 0.0,
+   "content": "head",
+   "dtype": "uint8",
+   "ignore": 1,
+   "inter": -5.0,
+   "method": "-wsinc9",
+   "noise": 6.0,
+   "orientation": "axes+oblique",
+   "origin0": 51.5,
+   "origin1": 5.75,
+   "origin2": 34.75,
+   "period": 3,
+   "qfac": -1,
+   "qform_code": 2,
+   "range": "plain",
+   "sform": "same",
+   "sform_code": 4,
+   "shape": "10x18x10x6",
+   "signal": 0.05,
+   "size": 27.0,
+   "slice_code": 1,
+   "slope": 0.5,
+   "spacing0": 1.0,
+   "spacing1": 1.0,
+   "spacing2": 2.0,
+   "suffix": ".nii.gz",
+   "tissues": "t1",
+   "tpattern": false,
+   "tr": 0.8,
+   "trend": true,
+   "trend option": "-rlt+",
+   "tunits": "msec",
+   "tzero or slice": false,
+   "units": "um",
+   "verbose": false
+  },
+  "groups": [
+   {
+    "args": [
+     "-wsinc9"
+    ],
+    "name": "method",
+    "optional": true
+   },
+   {
+    "args": [
+     "-ignore",
+     "1"
+    ],
+    "name": "ignore",
+    "optional": true
+   },
+   {
+    "args": [
+     "-rlt+"
+    ],
+    "name": "trend",
+    "optional": true
+   }
+  ],
+  "inputs": {
+   "series": {
+    "content": {
+     "seed": 361496919,
+     "type": "constant"
+    },
+    "dtype": "float32",
+    "geometry": {
+     "origin": [
+      0.0,
+      0.0,
+      0.0
+     ],
+     "qfac": 1,
+     "qform_code": 1,
+     "quaternion": [
+      1,
+      0,
+      0,
+      0
+     ],
+     "sform": "same",
+     "sform_code": 1,
+     "spacing": [
+      1.0,
+      1.0,
+      1.0
+     ],
+     "units": "mm"
+    },
+    "scaling": null,
+    "shape": [
+     1,
+     1,
+     10,
+     6
+    ],
+    "signal": {
+     "amplitude": 0.05,
+     "period": 3
+    },
+    "suffix": ".nii.gz",
+    "timing": {
+     "slice_code": 1,
+     "slice_duration": 80.0,
+     "slice_end": 9,
+     "slice_start": 0,
+     "tr": 800.0,
+     "tunits": "msec"
+    },
+    "values": {
+     "offset": 0.0,
+     "scale": 1.0
+    }
+   }
+  },
+  "n": 320,
+  "options": [
+   "-ignore",
+   "-rlt+",
+   "-wsinc9",
+   "header slice timing"
+  ],
+  "seed": "20261025",
+  "tool": "afni-tshift"
+ },
+ "rule": null,
+ "status": "fixed",
+ "suite": "afni-tshift",
+ "tier": "smoke",
+ "tool": "afni-tshift"
+}

@@ -1,0 +1,189 @@
+{
+ "defect": null,
+ "description": "-EPI on a series with header slice code 2: AFNI-03 and AFNI-08 named in reproduce, AFNI-03 by the default, as the replica (item 11, 2026-10-29)",
+ "expect": "pass",
+ "found": {
+  "detail": "D13 fix pass: no defect named: no values; uni.nii header changed; D13 notices in both modes: fix: []; reproduce: ['AFNI-08']",
+  "n": 127,
+  "seed": "20261025",
+  "shrink_moves": [
+   "dropped ssave (-ssave scale.nii)",
+   "input: axis 0 24 -> 12 voxels",
+   "input: axis 2 22 -> 11 voxels",
+   "input: axis 1 16 -> 8 voxels",
+   "input: axis 0 12 -> 6 voxels",
+   "input: axis 2 11 -> 5 voxels",
+   "input: axis 1 8 -> 4 voxels",
+   "input: axis 0 6 -> 4 voxels",
+   "input: axis 2 5 -> 4 voxels",
+   "input: 6 -> 3 volumes",
+   "input: 3 -> 2 volumes",
+   "input (and its grid): unit spacing",
+   "input (and its grid): origin at 0",
+   "input (and its grid): sform = qform",
+   "input (and its grid): qform and sform codes 1",
+   "input (and its grid): millimetres",
+   "input: content head -> constant"
+  ],
+  "signature": [
+   "DN fix pass",
+   "DN notices in both modes"
+  ]
+ },
+ "id": "epi-slice-code-2-reproduce-notices",
+ "implementations": [
+  "original"
+ ],
+ "reason": "",
+ "recipe": {
+  "extra": {
+   "min_size": 4,
+   "outputs": [
+    "uni.nii",
+    "scale.nii"
+   ]
+  },
+  "features": {
+   "-input": false,
+   "EPI": true,
+   "GM": false,
+   "T2": false,
+   "T2up": false,
+   "Urad": false,
+   "amsave": false,
+   "axis0": 1.2,
+   "axis1": 1.15,
+   "axis2": 0.75,
+   "bias0": -0.0075,
+   "bias1": -0.01,
+   "bias2": -0.0075,
+   "bias3": 0.0,
+   "centre0": 4.0,
+   "centre1": -4.0,
+   "centre2": -1.5,
+   "clfrac": false,
+   "content": "head",
+   "dtype": "float32",
+   "noduplo": false,
+   "noise": 6.0,
+   "nosquash": false,
+   "orientation": "plumb",
+   "origin0": -37.25,
+   "origin1": 27.5,
+   "origin2": -47.5,
+   "output": "uni.nii",
+   "qfac": 1,
+   "qform_code": 4,
+   "quiet": false,
+   "range": "plain",
+   "rbt": false,
+   "sform": "other",
+   "sform_code": 2,
+   "shape": "24x16x22x6",
+   "shear0": 0.05,
+   "shear1": -0.05,
+   "shear2": 0.05,
+   "size": 28.5,
+   "slice_code": 2,
+   "spacing0": 4.0,
+   "spacing1": 1.0,
+   "spacing2": 3.0,
+   "ssave": true,
+   "suffix": ".nii.gz",
+   "tissues": "epi",
+   "tr": 0.5,
+   "tunits": "sec",
+   "units": "unknown",
+   "useall": false
+  },
+  "groups": [
+   {
+    "args": [
+     "-EPI"
+    ],
+    "name": "EPI",
+    "optional": true
+   },
+   {
+    "args": [
+     "-prefix",
+     "uni.nii"
+    ],
+    "name": "prefix",
+    "optional": false
+   },
+   {
+    "args": [
+     "{in:input}"
+    ],
+    "name": "input",
+    "optional": false
+   }
+  ],
+  "inputs": {
+   "input": {
+    "content": {
+     "seed": 541829658,
+     "type": "constant"
+    },
+    "dtype": "float32",
+    "geometry": {
+     "origin": [
+      0.0,
+      0.0,
+      0.0
+     ],
+     "qfac": 1,
+     "qform_code": 1,
+     "quaternion": [
+      1,
+      0,
+      0,
+      0
+     ],
+     "sform": "same",
+     "sform_code": 1,
+     "spacing": [
+      1.0,
+      1.0,
+      1.0
+     ],
+     "units": "mm"
+    },
+    "scaling": null,
+    "shape": [
+     4,
+     4,
+     4,
+     2
+    ],
+    "suffix": ".nii.gz",
+    "timing": {
+     "slice_code": 2,
+     "slice_duration": 0.0227,
+     "slice_end": 3,
+     "slice_start": 0,
+     "tr": 0.5,
+     "tunits": "sec"
+    },
+    "values": {
+     "offset": 0.0,
+     "scale": 1.0
+    }
+   }
+  },
+  "n": 127,
+  "options": [
+   "-EPI",
+   "-ssave",
+   "4D input"
+  ],
+  "seed": "20261025",
+  "tool": "afni-unifize"
+ },
+ "rule": null,
+ "status": "fixed",
+ "suite": "afni-unifize",
+ "tier": "smoke",
+ "tool": "afni-unifize"
+}

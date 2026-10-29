@@ -23,6 +23,7 @@ WORKSPACE = Path(os.environ.get("LARMORX_WORKSPACE", REPO.parent))
 AFNI = Path(os.environ.get("AFNI_BIN", WORKSPACE / "oracles/afni-25.2.09/bin"))
 f32 = np.float32
 
+
 # NIfTI's slice orders: the position of each slice (start..end) in acquisition order.
 def order(code: int, n: int) -> list[int]:
     idx = list(range(n))
@@ -115,7 +116,9 @@ def main(work: Path) -> None:
         code = int(rng.choice([1, 3, 4, 5, 6]))
         tr_s = float(rng.choice([0.8, 1.0, 2.0, 2.5]))
         dur_s = float(np.round(tr_s / (end - start + 1) * rng.uniform(0.7, 1.0), 4))
-        cases.append((units, per_second, nz, start, end, code, tr_s * per_second, dur_s * per_second))
+        cases.append(
+            (units, per_second, nz, start, end, code, tr_s * per_second, dur_s * per_second)
+        )
     rows = []
     for c, (units, per_second, nz, start, end, code, tr, dur) in enumerate(cases):
         h = nib.Nifti1Header()
@@ -146,9 +149,13 @@ def main(work: Path) -> None:
                 s = f32(s + x)
             means[k] = f32(s / f32(nz)) == mean
         rows.append((units, code, nz, start, end, dur, hits, means))
-        print(units, "code", code, "nz", nz, "range", start, end, "dur", dur, "AFNI mean", repr(mean))
+        print(
+            units, "code", code, "nz", nz, "range", start, end, "dur", dur, "AFNI mean", repr(mean)
+        )
         for k in cand:
-            print(f"   {k:44s} times {'yes' if hits[k] else 'no ':3s} mean {'yes' if means[k] else 'no'}")
+            print(
+                f"   {k:44s} times {'yes' if hits[k] else 'no ':3s} mean {'yes' if means[k] else 'no'}"
+            )
         if not hits["accumulate seconds"]:
             print("   AFNI      ", [float(v) for v in got])
             print("   accumulate", [float(v) for v in cand["accumulate seconds"]])

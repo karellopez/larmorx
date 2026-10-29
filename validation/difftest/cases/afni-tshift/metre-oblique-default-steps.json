@@ -1,0 +1,174 @@
+{
+ "defect": null,
+ "description": "AFNI-07's default on an oblique metre grid: the replica's steps (from the file's matrix, then converted) and the converted matrix (item 1, 2026-10-29)",
+ "expect": "pass",
+ "found": {
+  "detail": "D13 defaults: replica = original: differ: geometry (qform): 5.5e-05",
+  "n": 24,
+  "seed": "20261025",
+  "shrink_moves": [
+   "series: axis 0 23 -> 11 voxels",
+   "series: axis 1 17 -> 8 voxels",
+   "series: axis 2 14 -> 7 voxels",
+   "series: axis 0 11 -> 5 voxels",
+   "series: axis 1 8 -> 4 voxels",
+   "series: axis 2 7 -> 3 voxels",
+   "series: axis 0 5 -> 2 voxels",
+   "series: axis 1 4 -> 2 voxels",
+   "series: axis 2 3 -> 1 voxels",
+   "series: axis 0 2 -> 1 voxels",
+   "series (and its grid): unit spacing",
+   "series (and its grid): origin at 0",
+   "series (and its grid): qform and sform codes 1",
+   "series: content head -> constant"
+  ],
+  "signature": [
+   "DN defaults: replica = original"
+  ]
+ },
+ "id": "metre-oblique-default-steps",
+ "implementations": [
+  "replica"
+ ],
+ "reason": "",
+ "recipe": {
+  "extra": {
+   "files": [],
+   "min_volumes": 4
+  },
+  "features": {
+   "TR": false,
+   "axis0": 1.0,
+   "axis1": 1.2,
+   "axis2": 0.85,
+   "bias0": 0.0075,
+   "bias1": 0.005,
+   "bias2": 0.0,
+   "bias3": -0.005,
+   "centre0": -2.5,
+   "centre1": 5.0,
+   "centre2": -0.5,
+   "content": "head",
+   "dtype": "float32",
+   "ignore": false,
+   "method": "-wsinc9",
+   "noise": 0.0,
+   "orientation": "oblique",
+   "origin0": -43.0,
+   "origin1": -11.0,
+   "origin2": -21.75,
+   "pattern beyond TR": true,
+   "pattern form": "inline",
+   "period": 6,
+   "qfac": 1,
+   "qform_code": 0,
+   "range": "plain",
+   "sform": "same",
+   "sform_code": 1,
+   "shape": "23x17x14x8",
+   "signal": 0.2,
+   "size": 27.5,
+   "spacing0": 2.0,
+   "spacing1": 0.8,
+   "spacing2": 4.0,
+   "suffix": ".nii.gz",
+   "tissues": "t1",
+   "tpattern": true,
+   "tr": 2.0,
+   "trend": false,
+   "tunits": "sec",
+   "tzero or slice": false,
+   "units": "m",
+   "verbose": true
+  },
+  "groups": [
+   {
+    "args": [
+     "-tpattern",
+     "@1D: 2 1 0 1 0 1 0 1 0 1 0 1 0 1"
+    ],
+    "name": "tpattern",
+    "optional": true
+   },
+   {
+    "args": [
+     "-wsinc9"
+    ],
+    "name": "method",
+    "optional": true
+   },
+   {
+    "args": [
+     "-verbose"
+    ],
+    "name": "verbose",
+    "optional": true
+   }
+  ],
+  "inputs": {
+   "series": {
+    "content": {
+     "seed": 1585366313,
+     "type": "constant"
+    },
+    "dtype": "float32",
+    "geometry": {
+     "origin": [
+      0.0,
+      0.0,
+      0.0
+     ],
+     "qfac": 1,
+     "qform_code": 1,
+     "quaternion": [
+      15,
+      -2,
+      -3,
+      -3
+     ],
+     "sform": "same",
+     "sform_code": 1,
+     "spacing": [
+      1.0,
+      1.0,
+      1.0
+     ],
+     "units": "m"
+    },
+    "scaling": null,
+    "shape": [
+     1,
+     2,
+     1,
+     8
+    ],
+    "signal": {
+     "amplitude": 0.2,
+     "period": 6
+    },
+    "suffix": ".nii.gz",
+    "timing": {
+     "slice_code": 0,
+     "tr": 2.0,
+     "tunits": "sec"
+    },
+    "values": {
+     "offset": 0.0,
+     "scale": 1.0
+    }
+   }
+  },
+  "n": 24,
+  "options": [
+   "-tpattern @1D",
+   "-wsinc9"
+  ],
+  "seed": "20261025",
+  "tool": "afni-tshift"
+ },
+ "rule": null,
+ "status": "fixed",
+ "suite": "afni-tshift",
+ "tier": "smoke",
+ "tool": "afni-tshift"
+}

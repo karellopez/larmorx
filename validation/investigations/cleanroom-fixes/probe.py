@@ -80,7 +80,7 @@ def header(path: Path) -> dict:
     img = nib.load(str(path))
     h = img.header
     out = {}
-    for k in h.keys():
+    for k in h:
         v = h[k]
         out[k] = v.tolist() if hasattr(v, "tolist") else v
     data = np.asanyarray(img.dataobj.get_unscaled())
@@ -126,7 +126,7 @@ def run_one(who: str, recipe: dict, words: list[str], work: Path, mode: str, env
         if f.name.endswith((".nii", ".nii.gz")):
             try:
                 files[f.name] = header(f)
-            except Exception as e:  # noqa: BLE001 - a probe: show what failed
+            except Exception as e:
                 files[f.name] = {"_error": str(e)}
     return {"exit": p.returncode, "stdout": p.stdout.decode("utf-8", "replace"), "stderr": err,
             "files": files}  # fmt: skip

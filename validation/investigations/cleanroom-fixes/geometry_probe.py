@@ -327,7 +327,7 @@ def orientation_nifti(m33: np.ndarray, precision=np.float32) -> list[str]:
         xk, yk, zk = yi * zj - zi * yj, zi * xj - zj * xi, xi * yj - yi * xj
     else:
         xk, yk, zk = xk / val, yk / val, zk / val
-    for (u, v_, w) in ((xi, yi, zi), (xj, yj, zj)):
+    for u, v_, w in ((xi, yi, zi), (xj, yj, zj)):
         val = u * xk + v_ * yk + w * zk
         if abs(val) > 1.0e-4:
             xk, yk, zk = xk - val * u, yk - val * v_, zk - val * w
@@ -408,7 +408,11 @@ def orient(work: Path, n: int) -> None:
         ("nifti method, double", lambda m: orientation_nifti(m, np.float64)),
         ("largest entry per column", orientation_rows),
     ):
-        miss = [t for t, g in enumerate(got) if [x[0] for x in fn(cases[t][:, :3].astype(np.float64))] != [x[0] for x in g]]
+        miss = [
+            t
+            for t, g in enumerate(got)
+            if [x[0] for x in fn(cases[t][:, :3].astype(np.float64))] != [x[0] for x in g]
+        ]
         print(f"{name:28s} {len(cases) - len(miss):4d} of {len(cases)}   misses {miss[:10]}")
     print("AFNI on the 45-degree matrices:", got[:4])
 
@@ -526,15 +530,17 @@ def angle(work: Path) -> None:
     def cand(m):
         c = plumb_cos(m)
         return {
-            "acos(float cos), float": "%f" % np.float32(acos(np.float64(c)) * 180 / 3.141592653),
+            "acos(float cos), float": f"{np.float32(acos(np.float64(c)) * 180 / 3.141592653):f}",
         }
 
     rng = np.random.default_rng(3)
     for t in range(12):
         th = rng.uniform(0.05, 0.6)
         ph = th + rng.uniform(-0.01, 0.01)
+
         def rot(a):
             return np.array([[1, 0, 0], [0, np.cos(a), -np.sin(a)], [0, np.sin(a), np.cos(a)]])
+
         ms = np.zeros((3, 4), np.float32)
         ms[:, :3] = rot(th) * [2.0, 2.0, 3.0]
         # qform: a rotation by ph about x

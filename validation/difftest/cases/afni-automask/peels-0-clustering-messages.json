@@ -1,0 +1,188 @@
+{
+ "defect": null,
+ "description": "-peels 0 where the mask is the same but the clustering messages differ: AFNI-43 named (item 7, 2026-10-29)",
+ "expect": "pass",
+ "found": {
+  "detail": "D13 fix pass: no defect named: no values; messages changed",
+  "n": 118,
+  "seed": "20261025",
+  "shrink_moves": [
+   "input: axis 1 30 -> 15 voxels",
+   "input: axis 2 17 -> 8 voxels",
+   "input: 5 -> 2 volumes",
+   "input (and its grid): origin at 0",
+   "input: axis 0 22 -> 11 voxels",
+   "input: axis 1 15 -> 7 voxels",
+   "input: float32 storage"
+  ],
+  "signature": [
+   "DN fix pass"
+  ]
+ },
+ "id": "peels-0-clustering-messages",
+ "implementations": [
+  "original"
+ ],
+ "reason": "",
+ "recipe": {
+  "extra": {
+   "outputs": [
+    "mask.nii.gz"
+   ]
+  },
+  "features": {
+   "NN": false,
+   "SI": false,
+   "apply_prefix": false,
+   "axis0": 1.1,
+   "axis1": 1.1,
+   "axis2": 0.95,
+   "bias0": -0.005,
+   "bias1": 0.0,
+   "bias2": 0.01,
+   "bias3": -0.005,
+   "centre0": 5.5,
+   "centre1": 1.5,
+   "centre2": -3.0,
+   "clfrac": false,
+   "content": "head",
+   "depth": false,
+   "dilate": false,
+   "dtype": "float64",
+   "eclip": false,
+   "erode": false,
+   "nbhrs": false,
+   "ndim": 4,
+   "nograd": false,
+   "noise": 0.0,
+   "orientation": "axes",
+   "origin0": 37.25,
+   "origin1": 45.75,
+   "origin2": -19.5,
+   "output": "mask.nii.gz",
+   "peels": true,
+   "peels value": "0",
+   "qfac": 1,
+   "qform_code": 1,
+   "quiet": false,
+   "range": "plain",
+   "sform": "same",
+   "sform_code": 1,
+   "shape": "22x30x17x5",
+   "size": 26.0,
+   "spacing0": 2.0,
+   "spacing1": 1.0,
+   "spacing2": 1.2,
+   "suffix": ".nii",
+   "tissues": "t1",
+   "tr": 0.8,
+   "tunits": "sec",
+   "units": "mm"
+  },
+  "groups": [
+   {
+    "args": [
+     "-peels",
+     "0"
+    ],
+    "name": "peels",
+    "optional": true
+   },
+   {
+    "args": [
+     "-prefix",
+     "mask.nii.gz"
+    ],
+    "name": "prefix",
+    "optional": false
+   },
+   {
+    "args": [
+     "{in:input}"
+    ],
+    "name": "input",
+    "optional": false
+   }
+  ],
+  "inputs": {
+   "input": {
+    "content": {
+     "axes": [
+      1.1,
+      1.1,
+      0.95
+     ],
+     "bias": [
+      -0.005,
+      0.0,
+      0.01,
+      -0.005
+     ],
+     "centre": [
+      5.5,
+      1.5,
+      -3.0
+     ],
+     "noise": 0.0,
+     "seed": 1733310553,
+     "size": 26.0,
+     "tissues": "t1",
+     "type": "head"
+    },
+    "dtype": "float32",
+    "geometry": {
+     "origin": [
+      0.0,
+      0.0,
+      0.0
+     ],
+     "qfac": 1,
+     "qform_code": 1,
+     "quaternion": [
+      1,
+      1,
+      -1,
+      -1
+     ],
+     "sform": "same",
+     "sform_code": 1,
+     "spacing": [
+      2.0,
+      1.0,
+      1.2
+     ],
+     "units": "mm"
+    },
+    "scaling": null,
+    "shape": [
+     11,
+     7,
+     8,
+     2
+    ],
+    "suffix": ".nii",
+    "timing": {
+     "slice_code": 0,
+     "tr": 0.8,
+     "tunits": "sec"
+    },
+    "values": {
+     "offset": 0.0,
+     "scale": 1.0
+    }
+   }
+  },
+  "n": 118,
+  "options": [
+   "-peels",
+   "4D input"
+  ],
+  "seed": "20261025",
+  "tool": "afni-automask"
+ },
+ "rule": null,
+ "status": "fixed",
+ "suite": "afni-automask",
+ "tier": "smoke",
+ "tool": "afni-automask"
+}

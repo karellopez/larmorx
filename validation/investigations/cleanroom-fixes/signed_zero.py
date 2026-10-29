@@ -42,7 +42,10 @@ def main(work: Path) -> None:
                 raw[112:120] = np.array([np.nan, np.nan], "<f4").tobytes()
                 p.write_bytes(bytes(raw))
             row = []
-            for who, cmd in (("afni", [str(AFNI / "3dAutomask")]), ("lx", [LX, "afni", "3dAutomask"])):
+            for who, cmd in (
+                ("afni", [str(AFNI / "3dAutomask")]),
+                ("lx", [LX, "afni", "3dAutomask"]),
+            ):
                 d = work / f"{who}-{p.stem}"
                 d.mkdir(exist_ok=True)
                 for f in d.iterdir():

@@ -1,0 +1,146 @@
+{
+ "defect": null,
+ "description": "A tiny oblique constant image: the output header's quaternion as AFNI's (item 12, 2026-10-29)",
+ "expect": "pass",
+ "found": {
+  "detail": "uni.nii: header bytes: differ",
+  "n": 163,
+  "seed": "20261025",
+  "shrink_moves": [
+   "dropped noduplo (-noduplo)",
+   "input: axis 1 31 -> 15 voxels",
+   "input: axis 2 21 -> 10 voxels",
+   "input: axis 1 15 -> 7 voxels",
+   "input: axis 2 10 -> 5 voxels",
+   "input: axis 1 7 -> 4 voxels",
+   "input: axis 0 5 -> 4 voxels",
+   "input: axis 2 5 -> 4 voxels",
+   "input (and its grid): origin at 0",
+   "input (and its grid): qform and sform codes 1",
+   "input (and its grid): millimetres",
+   "input: content noise -> constant"
+  ],
+  "signature": [
+   "uni.nii: header bytes"
+  ]
+ },
+ "id": "tiny-oblique-header",
+ "implementations": [
+  "original"
+ ],
+ "reason": "",
+ "recipe": {
+  "extra": {
+   "min_size": 4,
+   "outputs": [
+    "uni.nii"
+   ]
+  },
+  "features": {
+   "-input": false,
+   "EPI": false,
+   "GM": false,
+   "T2": false,
+   "T2up": false,
+   "Urad": false,
+   "amsave": false,
+   "clfrac": false,
+   "content": "noise",
+   "dtype": "float32",
+   "noduplo": true,
+   "nosquash": false,
+   "orientation": "oblique",
+   "origin0": 20.0,
+   "origin1": 50.0,
+   "origin2": -14.25,
+   "output": "uni.nii",
+   "qfac": 1,
+   "qform_code": 1,
+   "quiet": false,
+   "range": "plain",
+   "rbt": false,
+   "sform": "same",
+   "sform_code": 2,
+   "shape": "5x31x21",
+   "spacing0": 2.5,
+   "spacing1": 2.0,
+   "spacing2": 0.8,
+   "ssave": false,
+   "suffix": ".nii.gz",
+   "units": "um",
+   "useall": false
+  },
+  "groups": [
+   {
+    "args": [
+     "-prefix",
+     "uni.nii"
+    ],
+    "name": "prefix",
+    "optional": false
+   },
+   {
+    "args": [
+     "{in:input}"
+    ],
+    "name": "input",
+    "optional": false
+   }
+  ],
+  "inputs": {
+   "input": {
+    "content": {
+     "seed": 281088122,
+     "type": "constant"
+    },
+    "dtype": "float32",
+    "geometry": {
+     "origin": [
+      0.0,
+      0.0,
+      0.0
+     ],
+     "qfac": 1,
+     "qform_code": 1,
+     "quaternion": [
+      4,
+      -2,
+      1,
+      0
+     ],
+     "sform": "same",
+     "sform_code": 1,
+     "spacing": [
+      2.5,
+      2.0,
+      0.8
+     ],
+     "units": "mm"
+    },
+    "scaling": null,
+    "shape": [
+     4,
+     4,
+     4
+    ],
+    "suffix": ".nii.gz",
+    "values": {
+     "offset": 0.0,
+     "scale": 1.0
+    }
+   }
+  },
+  "n": 163,
+  "options": [
+   "-noduplo",
+   "3D input"
+  ],
+  "seed": "20261025",
+  "tool": "afni-unifize"
+ },
+ "rule": null,
+ "status": "fixed",
+ "suite": "afni-unifize",
+ "tier": "smoke",
+ "tool": "afni-unifize"
+}

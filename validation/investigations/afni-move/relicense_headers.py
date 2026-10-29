@@ -58,13 +58,12 @@ def rewrite(path: Path) -> str | None:
     )
     mcw = "Medical College of Wisconsin" in body and "Major portions" in body
     afni = "AFNI" in body and "Translated" in body
-    if mcw:
-        spdx = "Apache-2.0 AND CC-BY-4.0"
-    else:
-        spdx = "Apache-2.0"
+    spdx = "Apache-2.0 AND CC-BY-4.0" if mcw else "Apache-2.0"
     body = re.sub(r"\s+", " ", body)
     body = GPL.sub(CCBY, body)
-    body = body.replace(" This translation is part of the GPL-3.0-or-later larmorx-gpl package.", "")
+    body = body.replace(
+        " This translation is part of the GPL-3.0-or-later larmorx-gpl package.", ""
+    )
     body = body.replace(
         "Written for larmorx-gpl (not a translation):",
         "Written for larmorx-gpl (not a translation) and relicensed to Apache-2.0 by its author "
@@ -90,7 +89,7 @@ def rewrite(path: Path) -> str | None:
     out = []
     for p in paragraphs:
         out += [f"{prefix} {w}" for w in textwrap.wrap(p, 98 - len(prefix), break_on_hyphens=False)]
-    head = lines[: start - 1] + [f"{prefix} SPDX-License-Identifier: {spdx}"]
+    head = [*lines[: start - 1], f"{prefix} SPDX-License-Identifier: {spdx}"]
     return "\n".join(head + out + lines[end:])
 
 

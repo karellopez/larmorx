@@ -1,6 +1,6 @@
 # SPDX-License-Identifier: Apache-2.0
 """``bet`` and ``betsurf``: FSL's brain extraction and its skull and scalp surfaces (FSL
-6.0.7.17's ``bet``, ``bet2`` and ``betsurf``), run by their bit-exact replica from
+6.0.7.23's ``bet``, ``bet2`` and ``betsurf``), run by their bit-exact replica from
 ``larmorx-nc`` as a separate program (``docs/licensing.md``); the clean-room original is still
 to be written (``specs/bet.md``).
 

@@ -1,7 +1,9 @@
 # BET (`bet`, `bet2`, `betsurf`)
 
 `lx.fsl.bet` and `lx.fsl.betsurf` (command line `larmorx fsl bet`, `larmorx fsl bet2`,
-`larmorx fsl betsurf`): FSL 6.0.7.17's brain extraction and its skull and scalp surfaces.
+`larmorx fsl betsurf`): FSL 6.0.7.23's brain extraction and its skull and scalp surfaces (FSL
+6.0.7.17's until 2026-10-29: what changed, `bet2 --binaryMask` among it, in
+[findings/fsl-bet.md](../findings/fsl-bet.md), "FSL 6.0.7.23").
 
 **Two implementations, one so far.** FSL is distributed under the FSL Licence (non-commercial use
 only), so larmorx keeps its FSL tools in two implementations ([licensing](../licensing.md)): the
@@ -15,10 +17,11 @@ under the FSL Licence's terms; translated from FSL's source:
 `implementation="original"` raises `NotImplementedError`. Each image's `implementation` names the
 replica that ran.
 
-**Status: `validated`** (the replica), against FSL 6.0.7.17 itself
-([record](../validation/fsl-bet-replica.md), standard tier: 159 cases, 115 compared, every one
-bit-identical; [full tier](../validation/fsl-bet-replica-full.md): 173 cases, 129 compared, 364
-of 364 files byte for byte): every compared case gives FSL's exit status, messages and files byte
+**Status: `validated`** (the replica), against FSL 6.0.7.23 itself
+([record](../validation/fsl-bet-replica.md), standard tier: 170 cases, 125 compared, every one
+bit-identical, 310 of 310 files byte for byte, FSL's own step from 6.0.7.17 in every case;
+[full tier](../validation/fsl-bet-replica-full.md), against FSL 6.0.7.17: 173 cases, 129
+compared, 364 of 364 files byte for byte): every compared case gives FSL's exit status, messages and files byte
 for byte (images: header and data; meshes as text), fMRIPrep's 29 BET calls on its twelve oracle
 runs with BOLD runs included (the data panel's), whose outputs also have the values of fMRIPrep's
 own (and of fMRIPrep's build of FSL in its image). 30 cases are rejected by both alike; in 10, FSL

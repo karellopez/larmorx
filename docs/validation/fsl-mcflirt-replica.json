@@ -1,2722 +1,3050 @@
 {
  "environment": {
-  "cpu": "Intel(R) Core(TM) i7-8750H CPU @ 2.20GHz",
+  "cpu": "AMD Ryzen 9 7945HX with Radeon Graphics",
   "larmorx": "0.0.1",
-  "larmorx_commit": "205bee40f36f",
-  "larmorx_testdata_commit": "b0999a9e0c31",
-  "logical_cpus": 12,
+  "larmorx_commit": "09dd455cac3f",
+  "larmorx_testdata_commit": "52124bc98f9f",
+  "logical_cpus": 32,
   "os": "Linux-6.8.0-124-generic-x86_64-with-glibc2.35",
   "packages": {
    "nibabel": "5.4.2",
    "numpy": "2.3.5"
   },
   "platform": "Linux x86_64",
-  "python": "3.12.10"
+  "python": "3.12.16"
  },
  "oracle_cache": {
   "differences": 0,
   "fresh": {
-   "ended by a signal, SIGABRT (never stored)": 7
+   "ended by a signal, SIGABRT (never stored)": 17
   },
   "location": "<workspace>/oracles/cache",
   "mode": "use",
-  "ran": 7,
-  "saved_seconds": 1736.3,
-  "served": 50
+  "ran": 17,
+  "saved_seconds": 1339.1,
+  "served": 115
  },
- "reference": "mcflirt from FSL 6.0.7.17 (fsl-mcflirt 2111.0, the conda build at `~/fsl`, as built: glibc 2.35's maths): the recorded runs in `oracles/fsl-6.0.7/mcflirt/` and runs made here",
+ "reference": "mcflirt from FSL 6.0.7.23 (fsl-mcflirt 2111.0, the conda build at `~/fsl-6.0.7.23`, as built: glibc 2.35's maths): the recorded runs in `oracles/fsl-6.0.7.23/mcflirt/` and runs made here",
  "results": [
   {
    "case": "recorded/real/ds000005/default",
    "category": "recorded: real",
-   "checks_passed": 6,
-   "checks_total": 6,
+   "checks_passed": 7,
+   "checks_total": 7,
    "failed_checks": [],
    "measured": {
     "every file bit-identical": "246/246"
    },
    "reason": "",
    "reported": {
-    "D13 fix pass": 5877045
+    "D13 fix pass": 5877045,
+    "FSL's own step: 6.0.7.17 \u2192 6.0.7.23": "identical"
    },
-   "seconds": 45.743,
+   "seconds": 49.65,
    "status": "pass"
   },
   {
    "case": "recorded/real/ds000005/fmriprep",
    "category": "recorded: real",
-   "checks_passed": 6,
-   "checks_total": 6,
+   "checks_passed": 7,
+   "checks_total": 7,
    "failed_checks": [],
    "measured": {
     "every file bit-identical": "241/241"
    },
    "reason": "",
    "reported": {
-    "D13 fix pass": 5861044
+    "D13 fix pass": 5861044,
+    "FSL's own step: 6.0.7.17 \u2192 6.0.7.23": "identical"
    },
-   "seconds": 34.18,
+   "seconds": 42.092,
    "status": "pass"
   },
   {
    "case": "recorded/real/ds000005/fmriprep-repeat2",
    "category": "recorded: real",
-   "checks_passed": 6,
-   "checks_total": 6,
+   "checks_passed": 7,
+   "checks_total": 7,
    "failed_checks": [],
    "measured": {
     "every file bit-identical": "241/241"
    },
    "reason": "",
    "reported": {
-    "D13 fix pass": 5861044
+    "D13 fix pass": 5861044,
+    "FSL's own step: 6.0.7.17 \u2192 6.0.7.23": "identical"
    },
-   "seconds": 42.777,
+   "seconds": 43.081,
    "status": "pass"
   },
   {
    "case": "recorded/real/ds000005/fmriprep-repeat3",
    "category": "recorded: real",
-   "checks_passed": 6,
-   "checks_total": 6,
+   "checks_passed": 7,
+   "checks_total": 7,
    "failed_checks": [],
    "measured": {
     "every file bit-identical": "241/241"
    },
    "reason": "",
    "reported": {
-    "D13 fix pass": 5861044
+    "D13 fix pass": 5861044,
+    "FSL's own step: 6.0.7.17 \u2192 6.0.7.23": "identical"
    },
-   "seconds": 44.926,
+   "seconds": 46.341,
    "status": "pass"
   },
   {
    "case": "recorded/real/ds000005/fmriprep-reports",
    "category": "recorded: real",
-   "checks_passed": 6,
-   "checks_total": 6,
+   "checks_passed": 7,
+   "checks_total": 7,
    "failed_checks": [],
    "measured": {
     "every file bit-identical": "246/246"
    },
    "reason": "",
    "reported": {
-    "D13 fix pass": 5861054
+    "D13 fix pass": 5861054,
+    "FSL's own step: 6.0.7.17 \u2192 6.0.7.23": "identical"
    },
-   "seconds": 45.448,
+   "seconds": 44.189,
    "status": "pass"
   },
   {
    "case": "recorded/real/ds000005/opt-2d",
    "category": "recorded: options (ds000005)",
-   "checks_passed": 6,
-   "checks_total": 6,
+   "checks_passed": 7,
+   "checks_total": 7,
    "failed_checks": [],
    "measured": {
     "every file bit-identical": "246/246"
    },
    "reason": "",
    "reported": {
-    "D13 fix pass": 5881100
+    "D13 fix pass": 5881100,
+    "FSL's own step: 6.0.7.17 \u2192 6.0.7.23": "identical"
    },
-   "seconds": 32.043,
+   "seconds": 32.217,
    "status": "pass"
   },
   {
    "case": "recorded/real/ds000005/opt-bins64",
    "category": "recorded: options (ds000005)",
-   "checks_passed": 6,
-   "checks_total": 6,
+   "checks_passed": 7,
+   "checks_total": 7,
    "failed_checks": [],
    "measured": {
     "every file bit-identical": "246/246"
    },
    "reason": "",
    "reported": {
-    "D13 fix pass": 5861054
+    "D13 fix pass": 5861054,
+    "FSL's own step: 6.0.7.17 \u2192 6.0.7.23": "identical"
    },
-   "seconds": 43.242,
+   "seconds": 48.131,
    "status": "pass"
   },
   {
    "case": "recorded/real/ds000005/opt-cost-corratio",
    "category": "recorded: options (ds000005)",
-   "checks_passed": 6,
-   "checks_total": 6,
+   "checks_passed": 7,
+   "checks_total": 7,
    "failed_checks": [],
    "measured": {
     "every file bit-identical": "246/246"
    },
    "reason": "",
    "reported": {
-    "D13 fix pass": 5935751
+    "D13 fix pass": 5935751,
+    "FSL's own step: 6.0.7.17 \u2192 6.0.7.23": "identical"
    },
-   "seconds": 40.644,
+   "seconds": 42.326,
    "status": "pass"
   },
   {
    "case": "recorded/real/ds000005/opt-cost-leastsquares",
    "category": "recorded: options (ds000005)",
-   "checks_passed": 6,
-   "checks_total": 6,
+   "checks_passed": 7,
+   "checks_total": 7,
    "failed_checks": [],
    "measured": {
     "every file bit-identical": "246/246"
    },
    "reason": "",
    "reported": {
-    "D13 fix pass": 6158818
+    "D13 fix pass": 6158818,
+    "FSL's own step: 6.0.7.17 \u2192 6.0.7.23": "identical"
    },
-   "seconds": 45.833,
+   "seconds": 47.223,
    "status": "pass"
   },
   {
    "case": "recorded/real/ds000005/opt-cost-mutualinfo",
    "category": "recorded: options (ds000005)",
-   "checks_passed": 6,
-   "checks_total": 6,
+   "checks_passed": 7,
+   "checks_total": 7,
    "failed_checks": [],
    "measured": {
     "every file bit-identical": "246/246"
    },
    "reason": "",
    "reported": {
-    "D13 fix pass": 5892972
+    "D13 fix pass": 5892972,
+    "FSL's own step: 6.0.7.17 \u2192 6.0.7.23": "identical"
    },
-   "seconds": 88.187,
+   "seconds": 75.116,
    "status": "pass"
   },
   {
    "case": "recorded/real/ds000005/opt-cost-normcorr",
    "category": "recorded: options (ds000005)",
-   "checks_passed": 6,
-   "checks_total": 6,
+   "checks_passed": 7,
+   "checks_total": 7,
    "failed_checks": [],
    "measured": {
     "every file bit-identical": "246/246"
    },
    "reason": "",
    "reported": {
-    "D13 fix pass": 5861054
+    "D13 fix pass": 5861054,
+    "FSL's own step: 6.0.7.17 \u2192 6.0.7.23": "identical"
    },
-   "seconds": 45.456,
+   "seconds": 42.308,
    "status": "pass"
   },
   {
    "case": "recorded/real/ds000005/opt-cost-normmi",
    "category": "recorded: options (ds000005)",
-   "checks_passed": 6,
-   "checks_total": 6,
+   "checks_passed": 7,
+   "checks_total": 7,
    "failed_checks": [],
    "measured": {
     "every file bit-identical": "246/246"
    },
    "reason": "",
    "reported": {
-    "D13 fix pass": 5922250
+    "D13 fix pass": 5922250,
+    "FSL's own step: 6.0.7.17 \u2192 6.0.7.23": "identical"
    },
-   "seconds": 82.013,
+   "seconds": 79.992,
    "status": "pass"
   },
   {
    "case": "recorded/real/ds000005/opt-cost-woods",
    "category": "recorded: options (ds000005)",
-   "checks_passed": 6,
-   "checks_total": 6,
+   "checks_passed": 7,
+   "checks_total": 7,
    "failed_checks": [],
    "measured": {
     "every file bit-identical": "246/246"
    },
    "reason": "",
    "reported": {
-    "D13 fix pass": 5075566
+    "D13 fix pass": 5075566,
+    "FSL's own step: 6.0.7.17 \u2192 6.0.7.23": "identical"
    },
-   "seconds": 31.019,
+   "seconds": 29.656,
    "status": "pass"
   },
   {
    "case": "recorded/real/ds000005/opt-dof12",
    "category": "recorded: options (ds000005)",
-   "checks_passed": 6,
-   "checks_total": 6,
+   "checks_passed": 7,
+   "checks_total": 7,
    "failed_checks": [],
    "measured": {
     "every file bit-identical": "246/246"
    },
    "reason": "",
    "reported": {
-    "D13 fix pass": 6447901
+    "D13 fix pass": 6447901,
+    "FSL's own step: 6.0.7.17 \u2192 6.0.7.23": "identical"
    },
-   "seconds": 73.389,
+   "seconds": 71.634,
    "status": "pass"
   },
   {
    "case": "recorded/real/ds000005/opt-dof7",
    "category": "recorded: options (ds000005)",
-   "checks_passed": 6,
-   "checks_total": 6,
+   "checks_passed": 7,
+   "checks_total": 7,
    "failed_checks": [],
    "measured": {
     "every file bit-identical": "246/246"
    },
    "reason": "",
    "reported": {
-    "D13 fix pass": 6466991
+    "D13 fix pass": 6466991,
+    "FSL's own step: 6.0.7.17 \u2192 6.0.7.23": "identical"
    },
-   "seconds": 42.559,
+   "seconds": 47.199,
    "status": "pass"
   },
   {
    "case": "recorded/real/ds000005/opt-dof9",
    "category": "recorded: options (ds000005)",
-   "checks_passed": 6,
-   "checks_total": 6,
+   "checks_passed": 7,
+   "checks_total": 7,
    "failed_checks": [],
    "measured": {
     "every file bit-identical": "246/246"
    },
    "reason": "",
    "reported": {
-    "D13 fix pass": 6453422
+    "D13 fix pass": 6453422,
+    "FSL's own step: 6.0.7.17 \u2192 6.0.7.23": "identical"
    },
-   "seconds": 59.109,
+   "seconds": 64.748,
    "status": "pass"
   },
   {
    "case": "recorded/real/ds000005/opt-fudge",
    "category": "recorded: options (ds000005)",
-   "checks_passed": 6,
-   "checks_total": 6,
+   "checks_passed": 7,
+   "checks_total": 7,
    "failed_checks": [],
    "measured": {
     "every file bit-identical": "246/246"
    },
    "reason": "",
    "reported": {
-    "D13 fix pass": 5814506
+    "D13 fix pass": 5814506,
+    "FSL's own step: 6.0.7.17 \u2192 6.0.7.23": "identical"
    },
-   "seconds": 43.355,
+   "seconds": 39.274,
    "status": "pass"
   },
   {
    "case": "recorded/real/ds000005/opt-gdt",
    "category": "recorded: options (ds000005)",
-   "checks_passed": 5,
-   "checks_total": 5,
+   "checks_passed": 6,
+   "checks_total": 6,
    "failed_checks": [],
    "measured": {
     "every file bit-identical": "0/0"
    },
    "reason": "mcflirt exits [-6]; the same from the replica. ",
-   "seconds": 0.579,
+   "reported": {
+    "FSL's own step: 6.0.7.17 \u2192 6.0.7.23": "identical"
+   },
+   "seconds": 0.668,
    "status": "both-error"
   },
   {
    "case": "recorded/real/ds000005/opt-meanvol",
    "category": "recorded: options (ds000005)",
-   "checks_passed": 6,
-   "checks_total": 6,
+   "checks_passed": 7,
+   "checks_total": 7,
    "failed_checks": [],
    "measured": {
     "every file bit-identical": "247/247"
    },
    "reason": "",
    "reported": {
-    "D13 fix pass": 6312630
+    "D13 fix pass": 6312630,
+    "FSL's own step: 6.0.7.17 \u2192 6.0.7.23": "identical"
    },
-   "seconds": 76.621,
+   "seconds": 77.047,
    "status": "pass"
   },
   {
    "case": "recorded/real/ds000005/opt-meanvol-noref",
    "category": "recorded: options (ds000005)",
-   "checks_passed": 6,
-   "checks_total": 6,
+   "checks_passed": 7,
+   "checks_total": 7,
    "failed_checks": [],
    "measured": {
     "every file bit-identical": "247/247"
    },
    "reason": "",
    "reported": {
-    "D13 fix pass": 6254039
+    "D13 fix pass": 6254039,
+    "FSL's own step: 6.0.7.17 \u2192 6.0.7.23": "identical"
    },
-   "seconds": 79.525,
+   "seconds": 79.677,
    "status": "pass"
   },
   {
    "case": "recorded/real/ds000005/opt-nn_final",
    "category": "recorded: options (ds000005)",
-   "checks_passed": 6,
-   "checks_total": 6,
+   "checks_passed": 7,
+   "checks_total": 7,
    "failed_checks": [],
    "measured": {
     "every file bit-identical": "246/246"
    },
    "reason": "",
    "reported": {
-    "D13 fix pass": 21
+    "D13 fix pass": 9585591,
+    "FSL's own step: 6.0.7.17 \u2192 6.0.7.23": "changed"
    },
-   "seconds": 36.72,
+   "seconds": 43.167,
    "status": "pass"
   },
   {
    "case": "recorded/real/ds000005/opt-refvol0",
    "category": "recorded: options (ds000005)",
-   "checks_passed": 6,
-   "checks_total": 6,
+   "checks_passed": 7,
+   "checks_total": 7,
    "failed_checks": [],
    "measured": {
     "every file bit-identical": "246/246"
    },
    "reason": "",
    "reported": {
-    "D13 fix pass": 5997690
+    "D13 fix pass": 5997690,
+    "FSL's own step: 6.0.7.17 \u2192 6.0.7.23": "identical"
    },
-   "seconds": 41.472,
+   "seconds": 40.68,
    "status": "pass"
   },
   {
    "case": "recorded/real/ds000005/opt-rotation2",
    "category": "recorded: options (ds000005)",
-   "checks_passed": 6,
-   "checks_total": 6,
+   "checks_passed": 7,
+   "checks_total": 7,
    "failed_checks": [],
    "measured": {
     "every file bit-identical": "246/246"
    },
    "reason": "",
    "reported": {
-    "D13 fix pass": 5850708
+    "D13 fix pass": 5850708,
+    "FSL's own step: 6.0.7.17 \u2192 6.0.7.23": "identical"
    },
-   "seconds": 39.457,
+   "seconds": 45.415,
    "status": "pass"
   },
   {
    "case": "recorded/real/ds000005/opt-scaling3",
    "category": "recorded: options (ds000005)",
-   "checks_passed": 6,
-   "checks_total": 6,
+   "checks_passed": 7,
+   "checks_total": 7,
    "failed_checks": [],
    "measured": {
     "every file bit-identical": "246/246"
    },
    "reason": "",
    "reported": {
-    "D13 fix pass": 5861054
+    "D13 fix pass": 5861054,
+    "FSL's own step: 6.0.7.17 \u2192 6.0.7.23": "identical"
    },
-   "seconds": 37.024,
-   "status": "pass"
-  },
-  {
-   "case": "recorded/real/ds000005/opt-sinc_final",
-   "category": "recorded: options (ds000005)",
-   "checks_passed": 6,
-   "checks_total": 6,
-   "failed_checks": [],
-   "measured": {
-    "every file bit-identical": "246/246"
-   },
-   "reason": "",
-   "reported": {
-    "D13 fix pass": 6368155
-   },
-   "seconds": 87.461,
+   "seconds": 40.963,
    "status": "pass"
   },
   {
    "case": "recorded/real/ds000005/opt-smooth0",
    "category": "recorded: options (ds000005)",
-   "checks_passed": 6,
-   "checks_total": 6,
+   "checks_passed": 7,
+   "checks_total": 7,
    "failed_checks": [],
    "measured": {
     "every file bit-identical": "246/246"
    },
    "reason": "",
    "reported": {
-    "D13 fix pass": 5986157
+    "D13 fix pass": 5986157,
+    "FSL's own step: 6.0.7.17 \u2192 6.0.7.23": "identical"
    },
-   "seconds": 42.279,
+   "seconds": 36.447,
    "status": "pass"
   },
   {
    "case": "recorded/real/ds000005/opt-smooth2",
    "category": "recorded: options (ds000005)",
-   "checks_passed": 6,
-   "checks_total": 6,
+   "checks_passed": 7,
+   "checks_total": 7,
    "failed_checks": [],
    "measured": {
     "every file bit-identical": "246/246"
    },
    "reason": "",
    "reported": {
-    "D13 fix pass": 5862281
+    "D13 fix pass": 5862281,
+    "FSL's own step: 6.0.7.17 \u2192 6.0.7.23": "identical"
    },
-   "seconds": 42.427,
+   "seconds": 41.489,
    "status": "pass"
   },
   {
    "case": "recorded/real/ds000005/opt-spline_final",
    "category": "recorded: options (ds000005)",
-   "checks_passed": 6,
-   "checks_total": 6,
+   "checks_passed": 7,
+   "checks_total": 7,
    "failed_checks": [],
    "measured": {
     "every file bit-identical": "246/246"
    },
    "reason": "",
    "reported": {
-    "D13 fix pass": 6866357
+    "D13 fix pass": 6866357,
+    "FSL's own step: 6.0.7.17 \u2192 6.0.7.23": "identical"
    },
-   "seconds": 40.463,
+   "seconds": 49.214,
    "status": "pass"
   },
   {
    "case": "recorded/real/ds000005/opt-stages1",
    "category": "recorded: options (ds000005)",
    "checks_passed": 6,
-   "checks_total": 6,
-   "failed_checks": [],
+   "checks_total": 7,
+   "failed_checks": [
+    {
+     "detail": "out_mcf.nii.gz_rel.rms",
+     "metric": "files",
+     "name": "every file bit-identical",
+     "passed": false,
+     "threshold": "all",
+     "value": "245/246"
+    }
+   ],
    "measured": {
-    "every file bit-identical": "246/246"
+    "every file bit-identical": "245/246"
    },
-   "reason": "",
+   "reason": "out_mcf.nii.gz_rel.rms: numbers differ by at most 1e-12 mm or in a NaN's sign, from FSL 6.0.7.23's Armadillo 14.2.1 (4 x 4 inverses and solves through LAPACK); the replica keeps Armadillo 10.5.1's closed-form inverse (docs/findings/fsl-mcflirt.md)",
    "reported": {
-    "D13 fix pass": 5888017
+    "D13 fix pass": 5888017,
+    "FSL's own step: 6.0.7.17 \u2192 6.0.7.23": "changed"
    },
-   "seconds": 14.375,
-   "status": "pass"
+   "seconds": 12.219,
+   "status": "expected-divergence"
   },
   {
    "case": "recorded/real/ds000005/opt-stages2",
    "category": "recorded: options (ds000005)",
-   "checks_passed": 6,
-   "checks_total": 6,
+   "checks_passed": 7,
+   "checks_total": 7,
    "failed_checks": [],
    "measured": {
     "every file bit-identical": "246/246"
    },
    "reason": "",
    "reported": {
-    "D13 fix pass": 5878723
+    "D13 fix pass": 5878723,
+    "FSL's own step: 6.0.7.17 \u2192 6.0.7.23": "identical"
    },
-   "seconds": 24.261,
-   "status": "pass"
-  },
-  {
-   "case": "recorded/real/ds000005/opt-stages4",
-   "category": "recorded: options (ds000005)",
-   "checks_passed": 6,
-   "checks_total": 6,
-   "failed_checks": [],
-   "measured": {
-    "every file bit-identical": "246/246"
-   },
-   "reason": "",
-   "reported": {
-    "D13 fix pass": 6020875
-   },
-   "seconds": 562.014,
-   "status": "pass"
-  },
-  {
-   "case": "recorded/real/ds000005/opt-stages4-sinc_final",
-   "category": "recorded: options (ds000005)",
-   "checks_passed": 6,
-   "checks_total": 6,
-   "failed_checks": [],
-   "measured": {
-    "every file bit-identical": "246/246"
-   },
-   "reason": "",
-   "reported": {
-    "D13 fix pass": 6744003
-   },
-   "seconds": 681.618,
+   "seconds": 24.351,
    "status": "pass"
   },
   {
    "case": "recorded/real/ds000005/opt-stats",
    "category": "recorded: options (ds000005)",
-   "checks_passed": 6,
-   "checks_total": 6,
+   "checks_passed": 7,
+   "checks_total": 7,
    "failed_checks": [],
    "measured": {
     "every file bit-identical": "249/249"
    },
    "reason": "",
    "reported": {
-    "D13 fix pass": 5861054
+    "D13 fix pass": 5861054,
+    "FSL's own step: 6.0.7.17 \u2192 6.0.7.23": "identical"
    },
-   "seconds": 48.124,
+   "seconds": 40.003,
    "status": "pass"
   },
   {
    "case": "recorded/real/ds000117/default",
    "category": "recorded: real",
-   "checks_passed": 6,
-   "checks_total": 6,
+   "checks_passed": 7,
+   "checks_total": 7,
    "failed_checks": [],
    "measured": {
     "every file bit-identical": "214/214"
    },
    "reason": "",
    "reported": {
-    "D13 fix pass": 13685924
+    "D13 fix pass": 13685924,
+    "FSL's own step: 6.0.7.17 \u2192 6.0.7.23": "identical"
    },
-   "seconds": 36.517,
+   "seconds": 32.346,
    "status": "pass"
   },
   {
    "case": "recorded/real/ds000117/fmriprep",
    "category": "recorded: real",
-   "checks_passed": 6,
-   "checks_total": 6,
+   "checks_passed": 7,
+   "checks_total": 7,
    "failed_checks": [],
    "measured": {
     "every file bit-identical": "209/209"
    },
    "reason": "",
    "reported": {
-    "D13 fix pass": 13888827
+    "D13 fix pass": 13888827,
+    "FSL's own step: 6.0.7.17 \u2192 6.0.7.23": "identical"
    },
-   "seconds": 37.37,
+   "seconds": 34.305,
    "status": "pass"
   },
   {
    "case": "recorded/real/ds000117/fmriprep-reports",
    "category": "recorded: real",
-   "checks_passed": 6,
-   "checks_total": 6,
+   "checks_passed": 7,
+   "checks_total": 7,
    "failed_checks": [],
    "measured": {
     "every file bit-identical": "214/214"
    },
    "reason": "",
    "reported": {
-    "D13 fix pass": 13888837
+    "D13 fix pass": 13888837,
+    "FSL's own step: 6.0.7.17 \u2192 6.0.7.23": "identical"
    },
-   "seconds": 38.438,
+   "seconds": 36.192,
    "status": "pass"
   },
   {
    "case": "recorded/real/ds000122/default",
    "category": "recorded: real",
-   "checks_passed": 6,
-   "checks_total": 6,
+   "checks_passed": 7,
+   "checks_total": 7,
    "failed_checks": [],
    "measured": {
     "every file bit-identical": "264/264"
    },
    "reason": "",
    "reported": {
-    "D13 fix pass": 13470720
+    "D13 fix pass": 13470720,
+    "FSL's own step: 6.0.7.17 \u2192 6.0.7.23": "identical"
    },
-   "seconds": 39.606,
+   "seconds": 37.4,
    "status": "pass"
   },
   {
    "case": "recorded/real/ds000122/fmriprep",
    "category": "recorded: real",
-   "checks_passed": 6,
-   "checks_total": 6,
+   "checks_passed": 7,
+   "checks_total": 7,
    "failed_checks": [],
    "measured": {
     "every file bit-identical": "259/259"
    },
    "reason": "",
    "reported": {
-    "D13 fix pass": 13622680
+    "D13 fix pass": 13622680,
+    "FSL's own step: 6.0.7.17 \u2192 6.0.7.23": "identical"
    },
-   "seconds": 41.955,
+   "seconds": 41.355,
    "status": "pass"
   },
   {
    "case": "recorded/real/ds000122/fmriprep-reports",
    "category": "recorded: real",
-   "checks_passed": 6,
-   "checks_total": 6,
+   "checks_passed": 7,
+   "checks_total": 7,
    "failed_checks": [],
    "measured": {
     "every file bit-identical": "264/264"
    },
    "reason": "",
    "reported": {
-    "D13 fix pass": 13622690
+    "D13 fix pass": 13622690,
+    "FSL's own step: 6.0.7.17 \u2192 6.0.7.23": "identical"
    },
-   "seconds": 44.9,
+   "seconds": 35.754,
    "status": "pass"
   },
   {
    "case": "recorded/real/ds000210-rest-echo2/default",
    "category": "recorded: real",
-   "checks_passed": 6,
-   "checks_total": 6,
+   "checks_passed": 7,
+   "checks_total": 7,
    "failed_checks": [],
    "measured": {
     "every file bit-identical": "210/210"
    },
    "reason": "",
    "reported": {
-    "D13 fix pass": 22409663
+    "D13 fix pass": 22409663,
+    "FSL's own step: 6.0.7.17 \u2192 6.0.7.23": "identical"
    },
-   "seconds": 56.109,
+   "seconds": 49.155,
    "status": "pass"
   },
   {
    "case": "recorded/real/ds000210-rest-echo2/fmriprep",
    "category": "recorded: real",
-   "checks_passed": 6,
-   "checks_total": 6,
+   "checks_passed": 7,
+   "checks_total": 7,
    "failed_checks": [],
    "measured": {
     "every file bit-identical": "205/205"
    },
    "reason": "",
    "reported": {
-    "D13 fix pass": 22728286
+    "D13 fix pass": 22728286,
+    "FSL's own step: 6.0.7.17 \u2192 6.0.7.23": "identical"
    },
-   "seconds": 50.482,
+   "seconds": 46.044,
    "status": "pass"
   },
   {
    "case": "recorded/real/ds000210-rest-echo2/fmriprep-reports",
    "category": "recorded: real",
-   "checks_passed": 6,
-   "checks_total": 6,
+   "checks_passed": 7,
+   "checks_total": 7,
    "failed_checks": [],
    "measured": {
     "every file bit-identical": "210/210"
    },
    "reason": "",
    "reported": {
-    "D13 fix pass": 22728296
+    "D13 fix pass": 22728296,
+    "FSL's own step: 6.0.7.17 \u2192 6.0.7.23": "identical"
    },
-   "seconds": 52.227,
+   "seconds": 46.142,
    "status": "pass"
   },
   {
    "case": "recorded/real/ds000258-bigendian/default",
    "category": "recorded: real",
-   "checks_passed": 6,
-   "checks_total": 6,
+   "checks_passed": 7,
+   "checks_total": 7,
    "failed_checks": [],
    "measured": {
     "every file bit-identical": "245/245"
    },
    "reason": "",
    "reported": {
-    "D13 fix pass": 13937868
+    "D13 fix pass": 13937868,
+    "FSL's own step: 6.0.7.17 \u2192 6.0.7.23": "identical"
    },
-   "seconds": 51.98,
+   "seconds": 55.457,
    "status": "pass"
   },
   {
    "case": "recorded/real/ds000258-bigendian/fmriprep",
    "category": "recorded: real",
-   "checks_passed": 6,
-   "checks_total": 6,
+   "checks_passed": 7,
+   "checks_total": 7,
    "failed_checks": [],
    "measured": {
     "every file bit-identical": "240/240"
    },
    "reason": "",
    "reported": {
-    "D13 fix pass": 14247773
+    "D13 fix pass": 14247773,
+    "FSL's own step: 6.0.7.17 \u2192 6.0.7.23": "identical"
    },
-   "seconds": 53.533,
+   "seconds": 53.717,
    "status": "pass"
   },
   {
    "case": "recorded/real/ds000258-bigendian/fmriprep-reports",
    "category": "recorded: real",
-   "checks_passed": 6,
-   "checks_total": 6,
+   "checks_passed": 7,
+   "checks_total": 7,
    "failed_checks": [],
    "measured": {
     "every file bit-identical": "245/245"
    },
    "reason": "",
    "reported": {
-    "D13 fix pass": 14247783
+    "D13 fix pass": 14247783,
+    "FSL's own step: 6.0.7.17 \u2192 6.0.7.23": "identical"
    },
-   "seconds": 56.367,
+   "seconds": 49.398,
    "status": "pass"
   },
   {
    "case": "recorded/real/ds003345/default",
    "category": "recorded: real",
-   "checks_passed": 6,
-   "checks_total": 6,
+   "checks_passed": 7,
+   "checks_total": 7,
    "failed_checks": [],
    "measured": {
     "every file bit-identical": "222/222"
    },
    "reason": "",
    "reported": {
-    "D13 fix pass": 13917341
+    "D13 fix pass": 13917341,
+    "FSL's own step: 6.0.7.17 \u2192 6.0.7.23": "identical"
    },
-   "seconds": 43.756,
+   "seconds": 36.153,
    "status": "pass"
   },
   {
    "case": "recorded/real/ds003345/fmriprep",
    "category": "recorded: real",
-   "checks_passed": 6,
-   "checks_total": 6,
+   "checks_passed": 7,
+   "checks_total": 7,
    "failed_checks": [],
    "measured": {
     "every file bit-identical": "217/217"
    },
    "reason": "",
    "reported": {
-    "D13 fix pass": 14106697
+    "D13 fix pass": 14106697,
+    "FSL's own step: 6.0.7.17 \u2192 6.0.7.23": "identical"
    },
-   "seconds": 38.195,
+   "seconds": 37.928,
    "status": "pass"
   },
   {
    "case": "recorded/real/ds003345/fmriprep-reports",
    "category": "recorded: real",
-   "checks_passed": 6,
-   "checks_total": 6,
+   "checks_passed": 7,
+   "checks_total": 7,
    "failed_checks": [],
    "measured": {
     "every file bit-identical": "222/222"
    },
    "reason": "",
    "reported": {
-    "D13 fix pass": 14106707
+    "D13 fix pass": 14106707,
+    "FSL's own step: 6.0.7.17 \u2192 6.0.7.23": "identical"
    },
-   "seconds": 32.112,
+   "seconds": 38.983,
    "status": "pass"
   },
   {
    "case": "recorded/real/ds003763-truncated/default",
    "category": "recorded: real",
-   "checks_passed": 5,
-   "checks_total": 5,
+   "checks_passed": 6,
+   "checks_total": 6,
    "failed_checks": [],
    "measured": {
     "every file bit-identical": "0/0"
    },
    "reason": "mcflirt exits [-6]; the same from the replica. ",
-   "seconds": 0.006,
+   "reported": {
+    "FSL's own step: 6.0.7.17 \u2192 6.0.7.23": "identical"
+   },
+   "seconds": 0.007,
    "status": "both-error"
   },
   {
    "case": "recorded/real/ds005040/default",
    "category": "recorded: real",
-   "checks_passed": 6,
-   "checks_total": 6,
+   "checks_passed": 7,
+   "checks_total": 7,
    "failed_checks": [],
    "measured": {
     "every file bit-identical": "69/69"
    },
    "reason": "",
    "reported": {
-    "D13 fix pass": 155779
+    "D13 fix pass": 155779,
+    "FSL's own step: 6.0.7.17 \u2192 6.0.7.23": "identical"
    },
-   "seconds": 14.347,
+   "seconds": 14.118,
    "status": "pass"
   },
   {
    "case": "recorded/real/ds005040/fmriprep",
    "category": "recorded: real",
-   "checks_passed": 6,
-   "checks_total": 6,
+   "checks_passed": 7,
+   "checks_total": 7,
    "failed_checks": [],
    "measured": {
     "every file bit-identical": "64/64"
    },
    "reason": "",
    "reported": {
-    "D13 fix pass": 155509
+    "D13 fix pass": 155509,
+    "FSL's own step: 6.0.7.17 \u2192 6.0.7.23": "identical"
    },
-   "seconds": 14.223,
+   "seconds": 13.723,
    "status": "pass"
   },
   {
    "case": "recorded/real/ds005040/fmriprep-reports",
    "category": "recorded: real",
-   "checks_passed": 6,
-   "checks_total": 6,
+   "checks_passed": 7,
+   "checks_total": 7,
    "failed_checks": [],
    "measured": {
     "every file bit-identical": "69/69"
    },
    "reason": "",
    "reported": {
-    "D13 fix pass": 155519
+    "D13 fix pass": 155519,
+    "FSL's own step: 6.0.7.17 \u2192 6.0.7.23": "identical"
    },
-   "seconds": 12.93,
+   "seconds": 13.372,
    "status": "pass"
   },
   {
    "case": "recorded/real/ds006010/default",
    "category": "recorded: real",
-   "checks_passed": 6,
-   "checks_total": 6,
+   "checks_passed": 7,
+   "checks_total": 7,
    "failed_checks": [],
    "measured": {
     "every file bit-identical": "119/119"
    },
    "reason": "",
    "reported": {
-    "D13 fix pass": 35569111
+    "D13 fix pass": 35569111,
+    "FSL's own step: 6.0.7.17 \u2192 6.0.7.23": "identical"
    },
-   "seconds": 58.959,
+   "seconds": 55.796,
    "status": "pass"
   },
   {
    "case": "recorded/real/ds006010/fmriprep",
    "category": "recorded: real",
-   "checks_passed": 6,
-   "checks_total": 6,
+   "checks_passed": 7,
+   "checks_total": 7,
    "failed_checks": [],
    "measured": {
     "every file bit-identical": "114/114"
    },
    "reason": "",
    "reported": {
-    "D13 fix pass": 35790524
+    "D13 fix pass": 35790524,
+    "FSL's own step: 6.0.7.17 \u2192 6.0.7.23": "identical"
    },
-   "seconds": 54.868,
+   "seconds": 53.364,
    "status": "pass"
   },
   {
    "case": "recorded/real/ds006010/fmriprep-reports",
    "category": "recorded: real",
-   "checks_passed": 6,
-   "checks_total": 6,
+   "checks_passed": 7,
+   "checks_total": 7,
    "failed_checks": [],
    "measured": {
     "every file bit-identical": "119/119"
    },
    "reason": "",
    "reported": {
-    "D13 fix pass": 35790534
+    "D13 fix pass": 35790534,
+    "FSL's own step: 6.0.7.17 \u2192 6.0.7.23": "identical"
    },
-   "seconds": 65.986,
+   "seconds": 51.604,
    "status": "pass"
   },
   {
    "case": "recorded/real/ds006736/default",
    "category": "recorded: real",
-   "checks_passed": 6,
-   "checks_total": 6,
+   "checks_passed": 7,
+   "checks_total": 7,
    "failed_checks": [],
    "measured": {
     "every file bit-identical": "75/75"
    },
    "reason": "",
    "reported": {
-    "D13 fix pass": 8272727
+    "D13 fix pass": 8272727,
+    "FSL's own step: 6.0.7.17 \u2192 6.0.7.23": "identical"
    },
-   "seconds": 20.476,
+   "seconds": 21.338,
    "status": "pass"
   },
   {
    "case": "recorded/real/ds006736/fmriprep",
    "category": "recorded: real",
-   "checks_passed": 6,
-   "checks_total": 6,
+   "checks_passed": 7,
+   "checks_total": 7,
    "failed_checks": [],
    "measured": {
     "every file bit-identical": "70/70"
    },
    "reason": "",
    "reported": {
-    "D13 fix pass": 8417000
+    "D13 fix pass": 8417000,
+    "FSL's own step: 6.0.7.17 \u2192 6.0.7.23": "identical"
    },
-   "seconds": 20.392,
+   "seconds": 19.67,
    "status": "pass"
   },
   {
    "case": "recorded/real/ds006736/fmriprep-reports",
    "category": "recorded: real",
-   "checks_passed": 6,
-   "checks_total": 6,
+   "checks_passed": 7,
+   "checks_total": 7,
    "failed_checks": [],
    "measured": {
     "every file bit-identical": "75/75"
    },
    "reason": "",
    "reported": {
-    "D13 fix pass": 8417010
+    "D13 fix pass": 8417010,
+    "FSL's own step: 6.0.7.17 \u2192 6.0.7.23": "identical"
    },
-   "seconds": 20.131,
+   "seconds": 18.356,
    "status": "pass"
   },
   {
    "case": "recorded/syn/cli/bare-input",
    "category": "recorded: synthetic/cli",
-   "checks_passed": 6,
-   "checks_total": 6,
+   "checks_passed": 7,
+   "checks_total": 7,
    "failed_checks": [],
    "measured": {
     "every file bit-identical": "13/13"
    },
    "reason": "",
    "reported": {
-    "D13 fix pass": 172975
+    "D13 fix pass": 172975,
+    "FSL's own step: 6.0.7.17 \u2192 6.0.7.23": "identical"
    },
-   "seconds": 1.859,
+   "seconds": 2.075,
    "status": "pass"
   },
   {
    "case": "recorded/syn/cli/dof5",
    "category": "recorded: synthetic/cli",
-   "checks_passed": 6,
-   "checks_total": 6,
+   "checks_passed": 7,
+   "checks_total": 7,
    "failed_checks": [],
    "measured": {
     "every file bit-identical": "18/18"
    },
    "reason": "",
    "reported": {
-    "D13 fix pass": 193564
+    "D13 fix pass": 193564,
+    "FSL's own step: 6.0.7.17 \u2192 6.0.7.23": "identical"
    },
-   "seconds": 1.757,
+   "seconds": 1.885,
    "status": "pass"
   },
   {
    "case": "recorded/syn/cli/help",
    "category": "recorded: synthetic/cli",
-   "checks_passed": 5,
-   "checks_total": 5,
+   "checks_passed": 6,
+   "checks_total": 6,
    "failed_checks": [],
    "measured": {
     "every file bit-identical": "0/0"
    },
    "reason": "mcflirt exits [1]; the same from the replica. ",
+   "reported": {
+    "FSL's own step: 6.0.7.17 \u2192 6.0.7.23": "identical"
+   },
    "seconds": 0.003,
    "status": "both-error"
   },
   {
    "case": "recorded/syn/cli/help-with-input",
    "category": "recorded: synthetic/cli",
-   "checks_passed": 6,
-   "checks_total": 6,
+   "checks_passed": 7,
+   "checks_total": 7,
    "failed_checks": [],
    "measured": {
     "every file bit-identical": "0/0"
    },
    "reason": "",
    "reported": {
-    "D13 fix pass": 0
+    "D13 fix pass": 0,
+    "FSL's own step: 6.0.7.17 \u2192 6.0.7.23": "identical"
    },
-   "seconds": 0.005,
+   "seconds": 0.006,
    "status": "pass"
   },
   {
    "case": "recorded/syn/cli/no-arguments",
    "category": "recorded: synthetic/cli",
-   "checks_passed": 5,
-   "checks_total": 5,
+   "checks_passed": 6,
+   "checks_total": 6,
    "failed_checks": [],
    "measured": {
     "every file bit-identical": "0/0"
    },
    "reason": "mcflirt exits [1]; the same from the replica. ",
-   "seconds": 0.003,
+   "reported": {
+    "FSL's own step: 6.0.7.17 \u2192 6.0.7.23": "identical"
+   },
+   "seconds": 0.006,
    "status": "both-error"
   },
   {
    "case": "recorded/syn/cli/plots-only",
    "category": "recorded: synthetic/cli",
-   "checks_passed": 6,
-   "checks_total": 6,
+   "checks_passed": 7,
+   "checks_total": 7,
    "failed_checks": [],
    "measured": {
     "every file bit-identical": "2/2"
    },
    "reason": "",
    "reported": {
-    "D13 fix pass": 172970
+    "D13 fix pass": 172970,
+    "FSL's own step: 6.0.7.17 \u2192 6.0.7.23": "identical"
    },
-   "seconds": 1.789,
+   "seconds": 2.212,
    "status": "pass"
   },
   {
    "case": "recorded/syn/cli/refvol-minus1",
    "category": "recorded: synthetic/cli",
-   "checks_passed": 6,
-   "checks_total": 6,
+   "checks_passed": 7,
+   "checks_total": 7,
    "failed_checks": [],
    "measured": {
     "every file bit-identical": "18/18"
    },
    "reason": "",
    "reported": {
-    "D13 fix pass": 172985
+    "D13 fix pass": 172985,
+    "FSL's own step: 6.0.7.17 \u2192 6.0.7.23": "identical"
    },
-   "seconds": 1.587,
+   "seconds": 2.525,
    "status": "pass"
   },
   {
    "case": "recorded/syn/cli/refvol-minus2",
    "category": "recorded: synthetic/cli",
-   "checks_passed": 5,
-   "checks_total": 5,
+   "checks_passed": 6,
+   "checks_total": 6,
    "failed_checks": [],
    "measured": {
     "every file bit-identical": "0/0"
    },
    "reason": "mcflirt exits [-6]; the same from the replica. ",
-   "seconds": 0.018,
+   "reported": {
+    "FSL's own step: 6.0.7.17 \u2192 6.0.7.23": "identical"
+   },
+   "seconds": 0.017,
    "status": "both-error"
   },
   {
    "case": "recorded/syn/cli/rmsrel-only",
    "category": "recorded: synthetic/cli",
-   "checks_passed": 6,
-   "checks_total": 6,
+   "checks_passed": 7,
+   "checks_total": 7,
    "failed_checks": [],
    "measured": {
     "every file bit-identical": "4/4"
    },
    "reason": "",
    "reported": {
-    "D13 fix pass": 172966
+    "D13 fix pass": 172966,
+    "FSL's own step: 6.0.7.17 \u2192 6.0.7.23": "identical"
    },
-   "seconds": 1.612,
+   "seconds": 2.186,
    "status": "pass"
   },
   {
    "case": "recorded/syn/cli/stages0",
    "category": "recorded: synthetic/cli",
-   "checks_passed": 5,
-   "checks_total": 5,
+   "checks_passed": 6,
+   "checks_total": 6,
    "failed_checks": [],
    "measured": {
     "every file bit-identical": "0/0"
    },
    "reason": "mcflirt exits [-6]; the same from the replica. ",
-   "seconds": 0.022,
+   "reported": {
+    "FSL's own step: 6.0.7.17 \u2192 6.0.7.23": "identical"
+   },
+   "seconds": 0.058,
    "status": "both-error"
   },
   {
    "case": "recorded/syn/cli/unknown-option-middle",
    "category": "recorded: synthetic/cli",
-   "checks_passed": 5,
-   "checks_total": 5,
+   "checks_passed": 6,
+   "checks_total": 6,
    "failed_checks": [],
    "measured": {
     "every file bit-identical": "0/0"
    },
    "reason": "mcflirt exits [255]; the same from the replica. ",
-   "seconds": 0.003,
+   "reported": {
+    "FSL's own step: 6.0.7.17 \u2192 6.0.7.23": "identical"
+   },
+   "seconds": 0.01,
    "status": "both-error"
   },
   {
    "case": "recorded/syn/content/background/default",
    "category": "recorded: synthetic/content",
-   "checks_passed": 6,
-   "checks_total": 6,
+   "checks_passed": 7,
+   "checks_total": 7,
    "failed_checks": [],
    "measured": {
     "every file bit-identical": "12/12"
    },
    "reason": "",
    "reported": {
-    "D13 fix pass": 194139
+    "D13 fix pass": 194139,
+    "FSL's own step: 6.0.7.17 \u2192 6.0.7.23": "identical"
    },
-   "seconds": 0.938,
+   "seconds": 1.755,
    "status": "pass"
   },
   {
    "case": "recorded/syn/content/background/reffile",
    "category": "recorded: synthetic/content",
-   "checks_passed": 6,
-   "checks_total": 6,
+   "checks_passed": 7,
+   "checks_total": 7,
    "failed_checks": [],
    "measured": {
     "every file bit-identical": "12/12"
    },
    "reason": "",
    "reported": {
-    "D13 fix pass": 204001
+    "D13 fix pass": 204001,
+    "FSL's own step: 6.0.7.17 \u2192 6.0.7.23": "identical"
    },
-   "seconds": 1.082,
+   "seconds": 1.053,
    "status": "pass"
   },
   {
    "case": "recorded/syn/content/nan/default",
    "category": "recorded: synthetic/content",
    "checks_passed": 6,
-   "checks_total": 6,
-   "failed_checks": [],
+   "checks_total": 7,
+   "failed_checks": [
+    {
+     "detail": "out_mcf.nii.gz.par",
+     "metric": "files",
+     "name": "every file bit-identical",
+     "passed": false,
+     "threshold": "all",
+     "value": "17/18"
+    }
+   ],
    "measured": {
-    "every file bit-identical": "18/18"
+    "every file bit-identical": "17/18"
    },
-   "reason": "",
+   "reason": "out_mcf.nii.gz.par: numbers differ by at most 1e-12 mm or in a NaN's sign, from FSL 6.0.7.23's Armadillo 14.2.1 (4 x 4 inverses and solves through LAPACK); the replica keeps Armadillo 10.5.1's closed-form inverse (docs/findings/fsl-mcflirt.md)",
    "reported": {
-    "D13 fix pass": 166513
+    "D13 fix pass": 166513,
+    "FSL's own step: 6.0.7.17 \u2192 6.0.7.23": "changed"
    },
-   "seconds": 1.666,
-   "status": "pass"
+   "seconds": 1.89,
+   "status": "expected-divergence"
   },
   {
    "case": "recorded/syn/content/nan/reffile",
    "category": "recorded: synthetic/content",
    "checks_passed": 6,
-   "checks_total": 6,
-   "failed_checks": [],
+   "checks_total": 7,
+   "failed_checks": [
+    {
+     "detail": "out_mcf.nii.gz.par",
+     "metric": "files",
+     "name": "every file bit-identical",
+     "passed": false,
+     "threshold": "all",
+     "value": "17/18"
+    }
+   ],
    "measured": {
-    "every file bit-identical": "18/18"
+    "every file bit-identical": "17/18"
    },
-   "reason": "",
+   "reason": "out_mcf.nii.gz.par: numbers differ by at most 1e-12 mm or in a NaN's sign, from FSL 6.0.7.23's Armadillo 14.2.1 (4 x 4 inverses and solves through LAPACK); the replica keeps Armadillo 10.5.1's closed-form inverse (docs/findings/fsl-mcflirt.md)",
    "reported": {
-    "D13 fix pass": 301128
+    "D13 fix pass": 301128,
+    "FSL's own step: 6.0.7.17 \u2192 6.0.7.23": "changed"
    },
-   "seconds": 1.434,
-   "status": "pass"
+   "seconds": 2.494,
+   "status": "expected-divergence"
   },
   {
    "case": "recorded/syn/content/ramp/reffile",
    "category": "recorded: synthetic/content",
-   "checks_passed": 6,
-   "checks_total": 6,
+   "checks_passed": 7,
+   "checks_total": 7,
    "failed_checks": [],
    "measured": {
     "every file bit-identical": "11/11"
    },
    "reason": "",
    "reported": {
-    "D13 fix pass": 70439
+    "D13 fix pass": 70439,
+    "FSL's own step: 6.0.7.17 \u2192 6.0.7.23": "identical"
    },
-   "seconds": 0.983,
+   "seconds": 2.036,
    "status": "pass"
   },
   {
    "case": "recorded/syn/content/ramp/reffile-smooth0",
    "category": "recorded: synthetic/content",
-   "checks_passed": 6,
-   "checks_total": 6,
+   "checks_passed": 7,
+   "checks_total": 7,
    "failed_checks": [],
    "measured": {
     "every file bit-identical": "11/11"
    },
    "reason": "",
    "reported": {
-    "D13 fix pass": 71705
+    "D13 fix pass": 71705,
+    "FSL's own step: 6.0.7.17 \u2192 6.0.7.23": "identical"
    },
-   "seconds": 0.966,
+   "seconds": 1.404,
    "status": "pass"
   },
   {
    "case": "recorded/syn/dtypes/float32/default",
    "category": "recorded: synthetic/dtypes",
-   "checks_passed": 6,
-   "checks_total": 6,
+   "checks_passed": 7,
+   "checks_total": 7,
    "failed_checks": [],
    "measured": {
     "every file bit-identical": "18/18"
    },
    "reason": "",
    "reported": {
-    "D13 fix pass": 33396
+    "D13 fix pass": 33396,
+    "FSL's own step: 6.0.7.17 \u2192 6.0.7.23": "identical"
    },
-   "seconds": 1.718,
+   "seconds": 2.425,
    "status": "pass"
   },
   {
    "case": "recorded/syn/dtypes/float32/reffile",
    "category": "recorded: synthetic/dtypes",
-   "checks_passed": 6,
-   "checks_total": 6,
+   "checks_passed": 7,
+   "checks_total": 7,
    "failed_checks": [],
    "measured": {
     "every file bit-identical": "18/18"
    },
    "reason": "",
    "reported": {
-    "D13 fix pass": 33539
+    "D13 fix pass": 33539,
+    "FSL's own step: 6.0.7.17 \u2192 6.0.7.23": "identical"
    },
-   "seconds": 1.558,
+   "seconds": 2.036,
    "status": "pass"
   },
   {
    "case": "recorded/syn/dtypes/float64/default",
    "category": "recorded: synthetic/dtypes",
-   "checks_passed": 6,
-   "checks_total": 6,
+   "checks_passed": 7,
+   "checks_total": 7,
    "failed_checks": [],
    "measured": {
     "every file bit-identical": "18/18"
    },
    "reason": "",
    "reported": {
-    "D13 fix pass": 33396
+    "D13 fix pass": 33396,
+    "FSL's own step: 6.0.7.17 \u2192 6.0.7.23": "identical"
    },
-   "seconds": 2.061,
+   "seconds": 2.551,
    "status": "pass"
   },
   {
    "case": "recorded/syn/dtypes/float64/reffile",
    "category": "recorded: synthetic/dtypes",
-   "checks_passed": 6,
-   "checks_total": 6,
+   "checks_passed": 7,
+   "checks_total": 7,
    "failed_checks": [],
    "measured": {
     "every file bit-identical": "18/18"
    },
    "reason": "",
    "reported": {
-    "D13 fix pass": 33539
+    "D13 fix pass": 33539,
+    "FSL's own step: 6.0.7.17 \u2192 6.0.7.23": "identical"
    },
-   "seconds": 1.861,
+   "seconds": 2.169,
    "status": "pass"
   },
   {
    "case": "recorded/syn/dtypes/int16-scaled/default",
    "category": "recorded: synthetic/dtypes",
-   "checks_passed": 6,
-   "checks_total": 6,
+   "checks_passed": 7,
+   "checks_total": 7,
    "failed_checks": [],
    "measured": {
     "every file bit-identical": "18/18"
    },
    "reason": "",
    "reported": {
-    "D13 fix pass": 33396
+    "D13 fix pass": 33396,
+    "FSL's own step: 6.0.7.17 \u2192 6.0.7.23": "identical"
    },
-   "seconds": 1.761,
+   "seconds": 2.109,
    "status": "pass"
   },
   {
    "case": "recorded/syn/dtypes/int16-scaled/reffile",
    "category": "recorded: synthetic/dtypes",
-   "checks_passed": 6,
-   "checks_total": 6,
+   "checks_passed": 7,
+   "checks_total": 7,
    "failed_checks": [],
    "measured": {
     "every file bit-identical": "18/18"
    },
    "reason": "",
    "reported": {
-    "D13 fix pass": 33539
+    "D13 fix pass": 33539,
+    "FSL's own step: 6.0.7.17 \u2192 6.0.7.23": "identical"
    },
-   "seconds": 1.704,
+   "seconds": 1.419,
    "status": "pass"
   },
   {
    "case": "recorded/syn/dtypes/uint16/default",
    "category": "recorded: synthetic/dtypes",
-   "checks_passed": 6,
-   "checks_total": 6,
+   "checks_passed": 7,
+   "checks_total": 7,
    "failed_checks": [],
    "measured": {
     "every file bit-identical": "18/18"
    },
    "reason": "",
    "reported": {
-    "D13 fix pass": 172985
+    "D13 fix pass": 172985,
+    "FSL's own step: 6.0.7.17 \u2192 6.0.7.23": "identical"
    },
-   "seconds": 1.651,
+   "seconds": 1.542,
    "status": "pass"
   },
   {
    "case": "recorded/syn/dtypes/uint16/reffile",
    "category": "recorded: synthetic/dtypes",
-   "checks_passed": 6,
-   "checks_total": 6,
+   "checks_passed": 7,
+   "checks_total": 7,
    "failed_checks": [],
    "measured": {
     "every file bit-identical": "18/18"
    },
    "reason": "",
    "reported": {
-    "D13 fix pass": 193564
+    "D13 fix pass": 193564,
+    "FSL's own step: 6.0.7.17 \u2192 6.0.7.23": "identical"
    },
-   "seconds": 1.765,
+   "seconds": 1.428,
    "status": "pass"
   },
   {
    "case": "recorded/syn/dtypes/uint8/default",
    "category": "recorded: synthetic/dtypes",
-   "checks_passed": 6,
-   "checks_total": 6,
+   "checks_passed": 7,
+   "checks_total": 7,
    "failed_checks": [],
    "measured": {
     "every file bit-identical": "18/18"
    },
    "reason": "",
    "reported": {
-    "D13 fix pass": 163842
+    "D13 fix pass": 163842,
+    "FSL's own step: 6.0.7.17 \u2192 6.0.7.23": "identical"
    },
-   "seconds": 1.633,
+   "seconds": 1.567,
    "status": "pass"
   },
   {
    "case": "recorded/syn/dtypes/uint8/reffile",
    "category": "recorded: synthetic/dtypes",
-   "checks_passed": 6,
-   "checks_total": 6,
+   "checks_passed": 7,
+   "checks_total": 7,
    "failed_checks": [],
    "measured": {
     "every file bit-identical": "18/18"
    },
    "reason": "",
    "reported": {
-    "D13 fix pass": 181073
+    "D13 fix pass": 181073,
+    "FSL's own step: 6.0.7.17 \u2192 6.0.7.23": "identical"
    },
-   "seconds": 1.626,
+   "seconds": 1.504,
    "status": "pass"
   },
   {
    "case": "recorded/syn/geometry/single-volume-3d/default",
    "category": "recorded: synthetic/geometry",
-   "checks_passed": 6,
-   "checks_total": 6,
+   "checks_passed": 7,
+   "checks_total": 7,
    "failed_checks": [],
    "measured": {
     "every file bit-identical": "7/7"
    },
    "reason": "",
    "reported": {
-    "D13 fix pass": 0
+    "D13 fix pass": 0,
+    "FSL's own step: 6.0.7.17 \u2192 6.0.7.23": "identical"
    },
-   "seconds": 0.039,
+   "seconds": 0.044,
    "status": "pass"
   },
   {
    "case": "recorded/syn/geometry/single-volume-3d/reffile",
    "category": "recorded: synthetic/geometry",
-   "checks_passed": 6,
-   "checks_total": 6,
+   "checks_passed": 7,
+   "checks_total": 7,
    "failed_checks": [],
    "measured": {
     "every file bit-identical": "7/7"
    },
    "reason": "",
    "reported": {
-    "D13 fix pass": 15732
+    "D13 fix pass": 15732,
+    "FSL's own step: 6.0.7.17 \u2192 6.0.7.23": "identical"
    },
-   "seconds": 0.292,
+   "seconds": 0.257,
    "status": "pass"
   },
   {
    "case": "recorded/syn/geometry/single-volume/default",
    "category": "recorded: synthetic/geometry",
-   "checks_passed": 6,
-   "checks_total": 6,
+   "checks_passed": 7,
+   "checks_total": 7,
    "failed_checks": [],
    "measured": {
     "every file bit-identical": "7/7"
    },
    "reason": "",
    "reported": {
-    "D13 fix pass": 0
+    "D13 fix pass": 0,
+    "FSL's own step: 6.0.7.17 \u2192 6.0.7.23": "identical"
    },
-   "seconds": 0.042,
+   "seconds": 0.039,
    "status": "pass"
   },
   {
    "case": "recorded/syn/geometry/single-volume/reffile",
    "category": "recorded: synthetic/geometry",
-   "checks_passed": 6,
-   "checks_total": 6,
+   "checks_passed": 7,
+   "checks_total": 7,
    "failed_checks": [],
    "measured": {
     "every file bit-identical": "7/7"
    },
    "reason": "",
    "reported": {
-    "D13 fix pass": 15732
+    "D13 fix pass": 15732,
+    "FSL's own step: 6.0.7.17 \u2192 6.0.7.23": "identical"
    },
-   "seconds": 0.243,
+   "seconds": 0.408,
    "status": "pass"
   },
   {
    "case": "recorded/syn/geometry/thin-slab/default",
    "category": "recorded: synthetic/geometry",
-   "checks_passed": 6,
-   "checks_total": 6,
+   "checks_passed": 7,
+   "checks_total": 7,
    "failed_checks": [],
    "measured": {
     "every file bit-identical": "14/14"
    },
    "reason": "",
    "reported": {
-    "D13 fix pass": 22809
+    "D13 fix pass": 22809,
+    "FSL's own step: 6.0.7.17 \u2192 6.0.7.23": "identical"
    },
-   "seconds": 0.133,
+   "seconds": 0.139,
    "status": "pass"
   },
   {
    "case": "recorded/syn/geometry/thin-slab/fov10",
    "category": "recorded: synthetic/geometry",
-   "checks_passed": 6,
-   "checks_total": 6,
+   "checks_passed": 7,
+   "checks_total": 7,
    "failed_checks": [],
    "measured": {
     "every file bit-identical": "14/14"
    },
    "reason": "",
    "reported": {
-    "D13 fix pass": 22809
+    "D13 fix pass": 22809,
+    "FSL's own step: 6.0.7.17 \u2192 6.0.7.23": "identical"
    },
-   "seconds": 0.145,
+   "seconds": 0.244,
    "status": "pass"
   },
   {
    "case": "recorded/syn/geometry/thin-slab/rotation2",
    "category": "recorded: synthetic/geometry",
-   "checks_passed": 6,
-   "checks_total": 6,
+   "checks_passed": 7,
+   "checks_total": 7,
    "failed_checks": [],
    "measured": {
     "every file bit-identical": "14/14"
    },
    "reason": "",
    "reported": {
-    "D13 fix pass": 23454
+    "D13 fix pass": 23454,
+    "FSL's own step: 6.0.7.17 \u2192 6.0.7.23": "identical"
    },
-   "seconds": 0.132,
+   "seconds": 0.142,
    "status": "pass"
   },
   {
    "case": "recorded/syn/geometry/tiny/default",
    "category": "recorded: synthetic/geometry",
-   "checks_passed": 6,
-   "checks_total": 6,
+   "checks_passed": 7,
+   "checks_total": 7,
    "failed_checks": [],
    "measured": {
     "every file bit-identical": "12/12"
    },
    "reason": "",
    "reported": {
-    "D13 fix pass": 821
+    "D13 fix pass": 821,
+    "FSL's own step: 6.0.7.17 \u2192 6.0.7.23": "identical"
    },
-   "seconds": 0.05,
+   "seconds": 0.072,
    "status": "pass"
   },
   {
    "case": "recorded/syn/geometry/two-volumes/default",
    "category": "recorded: synthetic/geometry",
-   "checks_passed": 6,
-   "checks_total": 6,
+   "checks_passed": 7,
+   "checks_total": 7,
    "failed_checks": [],
    "measured": {
     "every file bit-identical": "8/8"
    },
    "reason": "",
    "reported": {
-    "D13 fix pass": 15712
+    "D13 fix pass": 15712,
+    "FSL's own step: 6.0.7.17 \u2192 6.0.7.23": "identical"
    },
-   "seconds": 0.246,
+   "seconds": 0.196,
    "status": "pass"
   },
   {
    "case": "recorded/syn/geometry/two-volumes/reffile",
    "category": "recorded: synthetic/geometry",
-   "checks_passed": 6,
-   "checks_total": 6,
+   "checks_passed": 7,
+   "checks_total": 7,
    "failed_checks": [],
    "measured": {
     "every file bit-identical": "8/8"
    },
    "reason": "",
    "reported": {
-    "D13 fix pass": 34022
+    "D13 fix pass": 34022,
+    "FSL's own step: 6.0.7.17 \u2192 6.0.7.23": "identical"
    },
-   "seconds": 0.429,
+   "seconds": 0.586,
    "status": "pass"
   },
   {
    "case": "recorded/syn/motion/identical-copies/default",
    "category": "recorded: synthetic/motion",
    "checks_passed": 6,
-   "checks_total": 6,
-   "failed_checks": [],
+   "checks_total": 7,
+   "failed_checks": [
+    {
+     "detail": "out_mcf.nii.gz_rel.rms",
+     "metric": "files",
+     "name": "every file bit-identical",
+     "passed": false,
+     "threshold": "all",
+     "value": "11/12"
+    }
+   ],
    "measured": {
-    "every file bit-identical": "12/12"
+    "every file bit-identical": "11/12"
    },
-   "reason": "",
+   "reason": "out_mcf.nii.gz_rel.rms: numbers differ by at most 1e-12 mm or in a NaN's sign, from FSL 6.0.7.23's Armadillo 14.2.1 (4 x 4 inverses and solves through LAPACK); the replica keeps Armadillo 10.5.1's closed-form inverse (docs/findings/fsl-mcflirt.md)",
    "reported": {
-    "D13 fix pass": 74170
+    "D13 fix pass": 74170,
+    "FSL's own step: 6.0.7.17 \u2192 6.0.7.23": "changed"
    },
-   "seconds": 1.066,
-   "status": "pass"
+   "seconds": 1.642,
+   "status": "expected-divergence"
   },
   {
    "case": "recorded/syn/motion/identical-copies/reffile",
    "category": "recorded: synthetic/motion",
-   "checks_passed": 6,
-   "checks_total": 6,
+   "checks_passed": 7,
+   "checks_total": 7,
    "failed_checks": [],
    "measured": {
     "every file bit-identical": "12/12"
    },
    "reason": "",
    "reported": {
-    "D13 fix pass": 97085
+    "D13 fix pass": 97085,
+    "FSL's own step: 6.0.7.17 \u2192 6.0.7.23": "identical"
    },
-   "seconds": 0.833,
+   "seconds": 1.078,
    "status": "pass"
   },
   {
    "case": "recorded/syn/motion/identical-copies/reffile-fudge",
    "category": "recorded: synthetic/motion",
    "checks_passed": 6,
-   "checks_total": 6,
-   "failed_checks": [],
+   "checks_total": 7,
+   "failed_checks": [
+    {
+     "detail": "out_mcf.nii.gz_rel.rms; out_mcf.nii.gz_rel_mean.rms",
+     "metric": "files",
+     "name": "every file bit-identical",
+     "passed": false,
+     "threshold": "all",
+     "value": "10/12"
+    }
+   ],
    "measured": {
-    "every file bit-identical": "12/12"
+    "every file bit-identical": "10/12"
    },
-   "reason": "",
+   "reason": "out_mcf.nii.gz_rel.rms, out_mcf.nii.gz_rel_mean.rms: numbers differ by at most 1e-12 mm or in a NaN's sign, from FSL 6.0.7.23's Armadillo 14.2.1 (4 x 4 inverses and solves through LAPACK); the replica keeps Armadillo 10.5.1's closed-form inverse (docs/findings/fsl-mcflirt.md)",
    "reported": {
-    "D13 fix pass": 95448
+    "D13 fix pass": 95448,
+    "FSL's own step: 6.0.7.17 \u2192 6.0.7.23": "changed"
    },
-   "seconds": 0.884,
-   "status": "pass"
+   "seconds": 1.082,
+   "status": "expected-divergence"
   },
   {
    "case": "recorded/syn/motion/large/default",
    "category": "recorded: synthetic/motion",
-   "checks_passed": 6,
-   "checks_total": 6,
+   "checks_passed": 7,
+   "checks_total": 7,
    "failed_checks": [],
    "measured": {
     "every file bit-identical": "18/18"
    },
    "reason": "",
    "reported": {
-    "D13 fix pass": 176107
+    "D13 fix pass": 176107,
+    "FSL's own step: 6.0.7.17 \u2192 6.0.7.23": "identical"
    },
-   "seconds": 1.755,
+   "seconds": 2.115,
    "status": "pass"
   },
   {
    "case": "recorded/syn/motion/large/reffile",
    "category": "recorded: synthetic/motion",
-   "checks_passed": 6,
-   "checks_total": 6,
+   "checks_passed": 7,
+   "checks_total": 7,
    "failed_checks": [],
    "measured": {
     "every file bit-identical": "18/18"
    },
    "reason": "",
    "reported": {
-    "D13 fix pass": 191798
+    "D13 fix pass": 191798,
+    "FSL's own step: 6.0.7.17 \u2192 6.0.7.23": "identical"
    },
-   "seconds": 1.54,
+   "seconds": 1.86,
    "status": "pass"
   },
   {
    "case": "recorded/syn/motion/small/2d",
    "category": "recorded: synthetic/motion",
-   "checks_passed": 6,
-   "checks_total": 6,
+   "checks_passed": 7,
+   "checks_total": 7,
    "failed_checks": [],
    "measured": {
     "every file bit-identical": "18/18"
    },
    "reason": "",
    "reported": {
-    "D13 fix pass": 207371
+    "D13 fix pass": 207371,
+    "FSL's own step: 6.0.7.17 \u2192 6.0.7.23": "identical"
    },
-   "seconds": 1.139,
+   "seconds": 1.165,
    "status": "pass"
   },
   {
    "case": "recorded/syn/motion/small/default",
    "category": "recorded: synthetic/motion",
-   "checks_passed": 6,
-   "checks_total": 6,
+   "checks_passed": 7,
+   "checks_total": 7,
    "failed_checks": [],
    "measured": {
     "every file bit-identical": "18/18"
    },
    "reason": "",
    "reported": {
-    "D13 fix pass": 172985
+    "D13 fix pass": 172985,
+    "FSL's own step: 6.0.7.17 \u2192 6.0.7.23": "identical"
    },
-   "seconds": 1.713,
+   "seconds": 1.444,
    "status": "pass"
   },
   {
    "case": "recorded/syn/motion/small/default-report",
    "category": "recorded: synthetic/motion",
-   "checks_passed": 6,
-   "checks_total": 6,
+   "checks_passed": 7,
+   "checks_total": 7,
    "failed_checks": [],
    "measured": {
     "every file bit-identical": "18/18"
    },
    "reason": "",
    "reported": {
-    "D13 fix pass": 172985
+    "D13 fix pass": 172985,
+    "FSL's own step: 6.0.7.17 \u2192 6.0.7.23": "identical"
    },
-   "seconds": 1.627,
+   "seconds": 1.397,
    "status": "pass"
   },
   {
    "case": "recorded/syn/motion/small/dof12",
    "category": "recorded: synthetic/motion",
-   "checks_passed": 6,
-   "checks_total": 6,
+   "checks_passed": 7,
+   "checks_total": 7,
    "failed_checks": [],
    "measured": {
     "every file bit-identical": "18/18"
    },
    "reason": "",
    "reported": {
-    "D13 fix pass": 202254
+    "D13 fix pass": 202254,
+    "FSL's own step: 6.0.7.17 \u2192 6.0.7.23": "identical"
    },
-   "seconds": 3.066,
+   "seconds": 2.72,
    "status": "pass"
   },
   {
    "case": "recorded/syn/motion/small/dof7",
    "category": "recorded: synthetic/motion",
-   "checks_passed": 6,
-   "checks_total": 6,
+   "checks_passed": 7,
+   "checks_total": 7,
    "failed_checks": [],
    "measured": {
     "every file bit-identical": "18/18"
    },
    "reason": "",
    "reported": {
-    "D13 fix pass": 190852
+    "D13 fix pass": 190852,
+    "FSL's own step: 6.0.7.17 \u2192 6.0.7.23": "identical"
    },
-   "seconds": 2.408,
+   "seconds": 1.425,
    "status": "pass"
   },
   {
    "case": "recorded/syn/motion/small/fsloutputtype-nifti",
    "category": "recorded: synthetic/motion",
-   "checks_passed": 6,
-   "checks_total": 6,
+   "checks_passed": 7,
+   "checks_total": 7,
    "failed_checks": [],
    "measured": {
     "every file bit-identical": "18/18"
    },
    "reason": "",
    "reported": {
-    "D13 fix pass": 193564
+    "D13 fix pass": 193564,
+    "FSL's own step: 6.0.7.17 \u2192 6.0.7.23": "identical"
    },
-   "seconds": 1.564,
+   "seconds": 1.165,
    "status": "pass"
   },
   {
    "case": "recorded/syn/motion/small/fudge",
    "category": "recorded: synthetic/motion",
-   "checks_passed": 6,
-   "checks_total": 6,
+   "checks_passed": 7,
+   "checks_total": 7,
    "failed_checks": [],
    "measured": {
     "every file bit-identical": "18/18"
    },
    "reason": "",
    "reported": {
-    "D13 fix pass": 190151
+    "D13 fix pass": 190151,
+    "FSL's own step: 6.0.7.17 \u2192 6.0.7.23": "identical"
    },
-   "seconds": 1.498,
+   "seconds": 1.368,
    "status": "pass"
   },
   {
    "case": "recorded/syn/motion/small/init",
    "category": "recorded: synthetic/motion",
-   "checks_passed": 6,
-   "checks_total": 6,
+   "checks_passed": 7,
+   "checks_total": 7,
    "failed_checks": [],
    "measured": {
     "every file bit-identical": "18/18"
    },
    "reason": "",
    "reported": {
-    "D13 fix pass": 194756
+    "D13 fix pass": 194756,
+    "FSL's own step: 6.0.7.17 \u2192 6.0.7.23": "identical"
    },
-   "seconds": 1.478,
+   "seconds": 1.582,
    "status": "pass"
   },
   {
    "case": "recorded/syn/motion/small/meanvol",
    "category": "recorded: synthetic/motion",
-   "checks_passed": 6,
-   "checks_total": 6,
+   "checks_passed": 7,
+   "checks_total": 7,
    "failed_checks": [],
    "measured": {
     "every file bit-identical": "19/19"
    },
    "reason": "",
    "reported": {
-    "D13 fix pass": 216012
+    "D13 fix pass": 216012,
+    "FSL's own step: 6.0.7.17 \u2192 6.0.7.23": "identical"
    },
-   "seconds": 3.298,
+   "seconds": 3.857,
    "status": "pass"
   },
   {
    "case": "recorded/syn/motion/small/nifti2",
    "category": "recorded: synthetic/motion",
-   "checks_passed": 6,
-   "checks_total": 6,
+   "checks_passed": 7,
+   "checks_total": 7,
    "failed_checks": [],
    "measured": {
     "every file bit-identical": "18/18"
    },
    "reason": "",
    "reported": {
-    "D13 fix pass": 193564
+    "D13 fix pass": 193564,
+    "FSL's own step: 6.0.7.17 \u2192 6.0.7.23": "identical"
    },
-   "seconds": 1.623,
+   "seconds": 2.009,
    "status": "pass"
   },
   {
    "case": "recorded/syn/motion/small/nn_final",
    "category": "recorded: synthetic/motion",
-   "checks_passed": 6,
-   "checks_total": 6,
+   "checks_passed": 7,
+   "checks_total": 7,
    "failed_checks": [],
    "measured": {
     "every file bit-identical": "18/18"
    },
    "reason": "",
    "reported": {
-    "D13 fix pass": 431
+    "D13 fix pass": 356853,
+    "FSL's own step: 6.0.7.17 \u2192 6.0.7.23": "changed"
    },
-   "seconds": 1.592,
+   "seconds": 2.004,
    "status": "pass"
   },
   {
    "case": "recorded/syn/motion/small/no-fsloutputtype",
    "category": "recorded: synthetic/motion",
-   "checks_passed": 5,
-   "checks_total": 5,
+   "checks_passed": 6,
+   "checks_total": 6,
    "failed_checks": [],
    "measured": {
     "every file bit-identical": "12/12"
    },
    "reason": "mcflirt exits [1]; the same from the replica. ",
-   "seconds": 0.77,
+   "reported": {
+    "FSL's own step: 6.0.7.17 \u2192 6.0.7.23": "identical"
+   },
+   "seconds": 0.765,
    "status": "both-error"
   },
   {
    "case": "recorded/syn/motion/small/no-input",
    "category": "recorded: synthetic/motion",
-   "checks_passed": 5,
-   "checks_total": 5,
+   "checks_passed": 6,
+   "checks_total": 6,
    "failed_checks": [],
    "measured": {
     "every file bit-identical": "0/0"
    },
    "reason": "mcflirt exits [2]; the same from the replica. ",
-   "seconds": 0.003,
+   "reported": {
+    "FSL's own step: 6.0.7.17 \u2192 6.0.7.23": "identical"
+   },
+   "seconds": 0.004,
    "status": "both-error"
   },
   {
    "case": "recorded/syn/motion/small/no-out",
    "category": "recorded: synthetic/motion",
-   "checks_passed": 6,
-   "checks_total": 6,
+   "checks_passed": 7,
+   "checks_total": 7,
    "failed_checks": [],
    "measured": {
     "every file bit-identical": "14/14"
    },
    "reason": "",
    "reported": {
-    "D13 fix pass": 172981
+    "D13 fix pass": 172981,
+    "FSL's own step: 6.0.7.17 \u2192 6.0.7.23": "identical"
    },
-   "seconds": 1.643,
+   "seconds": 2.526,
    "status": "pass"
   },
   {
    "case": "recorded/syn/motion/small/out-no-ext",
    "category": "recorded: synthetic/motion",
-   "checks_passed": 6,
-   "checks_total": 6,
+   "checks_passed": 7,
+   "checks_total": 7,
    "failed_checks": [],
    "measured": {
     "every file bit-identical": "18/18"
    },
    "reason": "",
    "reported": {
-    "D13 fix pass": 193564
+    "D13 fix pass": 193564,
+    "FSL's own step: 6.0.7.17 \u2192 6.0.7.23": "identical"
    },
-   "seconds": 1.587,
+   "seconds": 1.856,
    "status": "pass"
   },
   {
    "case": "recorded/syn/motion/small/out-twice",
    "category": "recorded: synthetic/motion",
-   "checks_passed": 6,
-   "checks_total": 6,
+   "checks_passed": 7,
+   "checks_total": 7,
    "failed_checks": [],
    "measured": {
     "every file bit-identical": "30/30"
    },
    "reason": "",
-   "seconds": 1.552,
+   "reported": {
+    "FSL's own step: 6.0.7.17 \u2192 6.0.7.23": "identical"
+   },
+   "seconds": 1.84,
    "status": "pass"
   },
   {
    "case": "recorded/syn/motion/small/reffile",
    "category": "recorded: synthetic/motion",
-   "checks_passed": 6,
-   "checks_total": 6,
+   "checks_passed": 7,
+   "checks_total": 7,
    "failed_checks": [],
    "measured": {
     "every file bit-identical": "18/18"
    },
    "reason": "",
    "reported": {
-    "D13 fix pass": 193564
+    "D13 fix pass": 193564,
+    "FSL's own step: 6.0.7.17 \u2192 6.0.7.23": "identical"
    },
-   "seconds": 1.624,
+   "seconds": 1.717,
    "status": "pass"
   },
   {
    "case": "recorded/syn/motion/small/reffile-4d",
    "category": "recorded: synthetic/motion",
-   "checks_passed": 6,
-   "checks_total": 6,
+   "checks_passed": 7,
+   "checks_total": 7,
    "failed_checks": [],
    "measured": {
     "every file bit-identical": "18/18"
    },
    "reason": "",
    "reported": {
-    "D13 fix pass": 192109
+    "D13 fix pass": 192109,
+    "FSL's own step: 6.0.7.17 \u2192 6.0.7.23": "identical"
    },
-   "seconds": 1.802,
+   "seconds": 2.465,
    "status": "pass"
   },
   {
    "case": "recorded/syn/motion/small/reffile-grid2",
    "category": "recorded: synthetic/motion",
-   "checks_passed": 5,
-   "checks_total": 5,
+   "checks_passed": 6,
+   "checks_total": 6,
    "failed_checks": [],
    "measured": {
     "every file bit-identical": "0/0"
    },
    "reason": "mcflirt exits [-6]; the same from the replica. ",
-   "seconds": 0.705,
+   "reported": {
+    "FSL's own step: 6.0.7.17 \u2192 6.0.7.23": "identical"
+   },
+   "seconds": 1.058,
    "status": "both-error"
   },
   {
    "case": "recorded/syn/motion/small/reffile-ras",
    "category": "recorded: synthetic/motion",
-   "checks_passed": 6,
-   "checks_total": 6,
+   "checks_passed": 7,
+   "checks_total": 7,
    "failed_checks": [],
    "measured": {
     "every file bit-identical": "18/18"
    },
    "reason": "",
    "reported": {
-    "D13 fix pass": 193564
+    "D13 fix pass": 193564,
+    "FSL's own step: 6.0.7.17 \u2192 6.0.7.23": "identical"
    },
-   "seconds": 1.66,
+   "seconds": 2.289,
    "status": "pass"
   },
   {
    "case": "recorded/syn/motion/small/refvol-0",
    "category": "recorded: synthetic/motion",
-   "checks_passed": 6,
-   "checks_total": 6,
+   "checks_passed": 7,
+   "checks_total": 7,
    "failed_checks": [],
    "measured": {
     "every file bit-identical": "18/18"
    },
    "reason": "",
    "reported": {
-    "D13 fix pass": 177324
+    "D13 fix pass": 177324,
+    "FSL's own step: 6.0.7.17 \u2192 6.0.7.23": "identical"
    },
-   "seconds": 1.474,
+   "seconds": 2.276,
    "status": "pass"
   },
   {
    "case": "recorded/syn/motion/small/refvol-out-of-range",
    "category": "recorded: synthetic/motion",
-   "checks_passed": 5,
-   "checks_total": 5,
+   "checks_passed": 6,
+   "checks_total": 6,
    "failed_checks": [],
    "measured": {
     "every file bit-identical": "0/0"
    },
    "reason": "mcflirt exits [-6]; the same from the replica. ",
-   "seconds": 0.02,
+   "reported": {
+    "FSL's own step: 6.0.7.17 \u2192 6.0.7.23": "identical"
+   },
+   "seconds": 0.048,
    "status": "both-error"
   },
   {
    "case": "recorded/syn/motion/small/report",
    "category": "recorded: synthetic/motion",
-   "checks_passed": 6,
-   "checks_total": 6,
+   "checks_passed": 7,
+   "checks_total": 7,
    "failed_checks": [],
    "measured": {
     "every file bit-identical": "18/18"
    },
    "reason": "",
    "reported": {
-    "D13 fix pass": 193564
+    "D13 fix pass": 193564,
+    "FSL's own step: 6.0.7.17 \u2192 6.0.7.23": "identical"
    },
-   "seconds": 1.571,
+   "seconds": 2.495,
    "status": "pass"
   },
   {
    "case": "recorded/syn/motion/small/sinc_final",
    "category": "recorded: synthetic/motion",
-   "checks_passed": 6,
-   "checks_total": 6,
+   "checks_passed": 7,
+   "checks_total": 7,
    "failed_checks": [],
    "measured": {
     "every file bit-identical": "18/18"
    },
    "reason": "",
    "reported": {
-    "D13 fix pass": 205760
+    "D13 fix pass": 373364,
+    "FSL's own step: 6.0.7.17 \u2192 6.0.7.23": "changed"
    },
-   "seconds": 3.196,
+   "seconds": 3.486,
    "status": "pass"
   },
   {
    "case": "recorded/syn/motion/small/smooth0",
    "category": "recorded: synthetic/motion",
-   "checks_passed": 6,
-   "checks_total": 6,
+   "checks_passed": 7,
+   "checks_total": 7,
    "failed_checks": [],
    "measured": {
     "every file bit-identical": "18/18"
    },
    "reason": "",
    "reported": {
-    "D13 fix pass": 189780
+    "D13 fix pass": 189780,
+    "FSL's own step: 6.0.7.17 \u2192 6.0.7.23": "identical"
    },
-   "seconds": 1.452,
+   "seconds": 1.774,
    "status": "pass"
   },
   {
    "case": "recorded/syn/motion/small/spline_final",
    "category": "recorded: synthetic/motion",
-   "checks_passed": 6,
-   "checks_total": 6,
+   "checks_passed": 7,
+   "checks_total": 7,
    "failed_checks": [],
    "measured": {
     "every file bit-identical": "18/18"
    },
    "reason": "",
    "reported": {
-    "D13 fix pass": 227269
+    "D13 fix pass": 227269,
+    "FSL's own step: 6.0.7.17 \u2192 6.0.7.23": "identical"
    },
-   "seconds": 1.852,
+   "seconds": 2.183,
    "status": "pass"
   },
   {
    "case": "recorded/syn/motion/small/stages1",
    "category": "recorded: synthetic/motion",
-   "checks_passed": 6,
-   "checks_total": 6,
+   "checks_passed": 7,
+   "checks_total": 7,
    "failed_checks": [],
    "measured": {
     "every file bit-identical": "18/18"
    },
    "reason": "",
    "reported": {
-    "D13 fix pass": 199455
+    "D13 fix pass": 199455,
+    "FSL's own step: 6.0.7.17 \u2192 6.0.7.23": "identical"
    },
-   "seconds": 0.402,
+   "seconds": 0.394,
    "status": "pass"
   },
   {
    "case": "recorded/syn/motion/small/stages4",
    "category": "recorded: synthetic/motion",
-   "checks_passed": 6,
-   "checks_total": 6,
+   "checks_passed": 7,
+   "checks_total": 7,
    "failed_checks": [],
    "measured": {
     "every file bit-identical": "18/18"
    },
    "reason": "",
    "reported": {
-    "D13 fix pass": 190521
+    "D13 fix pass": 190521,
+    "FSL's own step: 6.0.7.17 \u2192 6.0.7.23": "identical"
    },
-   "seconds": 22.533,
+   "seconds": 13.038,
    "status": "pass"
   },
   {
    "case": "recorded/syn/motion/small/stats",
    "category": "recorded: synthetic/motion",
-   "checks_passed": 6,
-   "checks_total": 6,
+   "checks_passed": 7,
+   "checks_total": 7,
    "failed_checks": [],
    "measured": {
     "every file bit-identical": "21/21"
    },
    "reason": "",
    "reported": {
-    "D13 fix pass": 193564
+    "D13 fix pass": 193564,
+    "FSL's own step: 6.0.7.17 \u2192 6.0.7.23": "identical"
    },
-   "seconds": 1.926,
+   "seconds": 1.602,
    "status": "pass"
   },
   {
    "case": "recorded/syn/motion/small/unknown-cost",
    "category": "recorded: synthetic/motion",
-   "checks_passed": 6,
-   "checks_total": 6,
+   "checks_passed": 7,
+   "checks_total": 7,
    "failed_checks": [],
    "measured": {
     "every file bit-identical": "18/18"
    },
    "reason": "",
    "reported": {
-    "D13 fix pass": 0
+    "D13 fix pass": 0,
+    "FSL's own step: 6.0.7.17 \u2192 6.0.7.23": "identical"
    },
-   "seconds": 1.079,
+   "seconds": 0.685,
    "status": "pass"
   },
   {
    "case": "recorded/syn/motion/small/unknown-option",
    "category": "recorded: synthetic/motion",
-   "checks_passed": 5,
-   "checks_total": 5,
+   "checks_passed": 6,
+   "checks_total": 6,
    "failed_checks": [],
    "measured": {
     "every file bit-identical": "0/0"
    },
    "reason": "mcflirt exits [255]; the same from the replica. ",
+   "reported": {
+    "FSL's own step: 6.0.7.17 \u2192 6.0.7.23": "identical"
+   },
    "seconds": 0.003,
    "status": "both-error"
   },
   {
    "case": "recorded/syn/orientation/oblique/default",
    "category": "recorded: synthetic/orientation",
-   "checks_passed": 6,
-   "checks_total": 6,
+   "checks_passed": 7,
+   "checks_total": 7,
    "failed_checks": [],
    "measured": {
     "every file bit-identical": "18/18"
    },
    "reason": "",
    "reported": {
-    "D13 fix pass": 172985
+    "D13 fix pass": 172985,
+    "FSL's own step: 6.0.7.17 \u2192 6.0.7.23": "identical"
    },
-   "seconds": 1.658,
+   "seconds": 1.203,
    "status": "pass"
   },
   {
    "case": "recorded/syn/orientation/oblique/reffile",
    "category": "recorded: synthetic/orientation",
-   "checks_passed": 6,
-   "checks_total": 6,
+   "checks_passed": 7,
+   "checks_total": 7,
    "failed_checks": [],
    "measured": {
     "every file bit-identical": "18/18"
    },
    "reason": "",
    "reported": {
-    "D13 fix pass": 193564
+    "D13 fix pass": 193564,
+    "FSL's own step: 6.0.7.17 \u2192 6.0.7.23": "identical"
    },
-   "seconds": 1.644,
+   "seconds": 0.981,
    "status": "pass"
   },
   {
    "case": "recorded/syn/orientation/ras-unflipped/default",
    "category": "recorded: synthetic/orientation",
-   "checks_passed": 6,
-   "checks_total": 6,
+   "checks_passed": 7,
+   "checks_total": 7,
    "failed_checks": [],
    "measured": {
     "every file bit-identical": "18/18"
    },
    "reason": "",
    "reported": {
-    "D13 fix pass": 173047
+    "D13 fix pass": 173047,
+    "FSL's own step: 6.0.7.17 \u2192 6.0.7.23": "identical"
    },
-   "seconds": 2.706,
+   "seconds": 1.266,
    "status": "pass"
   },
   {
    "case": "recorded/syn/orientation/ras-unflipped/reffile",
    "category": "recorded: synthetic/orientation",
-   "checks_passed": 6,
-   "checks_total": 6,
+   "checks_passed": 7,
+   "checks_total": 7,
    "failed_checks": [],
    "measured": {
     "every file bit-identical": "18/18"
    },
    "reason": "",
    "reported": {
-    "D13 fix pass": 195215
+    "D13 fix pass": 195215,
+    "FSL's own step: 6.0.7.17 \u2192 6.0.7.23": "identical"
    },
-   "seconds": 2.541,
+   "seconds": 1.266,
    "status": "pass"
   },
   {
    "case": "recorded/syn/orientation/ras/default",
    "category": "recorded: synthetic/orientation",
-   "checks_passed": 6,
-   "checks_total": 6,
+   "checks_passed": 7,
+   "checks_total": 7,
    "failed_checks": [],
    "measured": {
     "every file bit-identical": "18/18"
    },
    "reason": "",
    "reported": {
-    "D13 fix pass": 172985
+    "D13 fix pass": 172985,
+    "FSL's own step: 6.0.7.17 \u2192 6.0.7.23": "identical"
    },
-   "seconds": 2.536,
+   "seconds": 1.46,
    "status": "pass"
   },
   {
    "case": "recorded/syn/orientation/ras/reffile",
    "category": "recorded: synthetic/orientation",
-   "checks_passed": 6,
-   "checks_total": 6,
+   "checks_passed": 7,
+   "checks_total": 7,
    "failed_checks": [],
    "measured": {
     "every file bit-identical": "18/18"
    },
    "reason": "",
    "reported": {
-    "D13 fix pass": 193564
+    "D13 fix pass": 193564,
+    "FSL's own step: 6.0.7.17 \u2192 6.0.7.23": "identical"
    },
-   "seconds": 1.555,
+   "seconds": 1.358,
    "status": "pass"
   },
   {
    "case": "edge/gdt",
    "category": "edge cases",
-   "checks_passed": 6,
-   "checks_total": 6,
+   "checks_passed": 7,
+   "checks_total": 7,
    "failed_checks": [],
    "measured": {
     "every file bit-identical": "3/3"
    },
    "reason": "",
    "reported": {
-    "D13 fix pass": 0
+    "D13 fix pass": 0,
+    "FSL's own step: 6.0.7.17 \u2192 6.0.7.23": "identical"
    },
-   "seconds": 1.398,
+   "seconds": 1.224,
    "status": "pass"
   },
   {
    "case": "edge/bins4-mutualinfo",
    "category": "edge cases",
-   "checks_passed": 6,
-   "checks_total": 6,
+   "checks_passed": 7,
+   "checks_total": 7,
    "failed_checks": [],
    "measured": {
     "every file bit-identical": "1/1"
    },
    "reason": "",
    "reported": {
-    "D13 fix pass": 0
+    "D13 fix pass": 0,
+    "FSL's own step: 6.0.7.17 \u2192 6.0.7.23": "identical"
    },
-   "seconds": 0.42,
+   "seconds": 0.553,
    "status": "pass"
   },
   {
    "case": "edge/bins1-normmi",
    "category": "edge cases",
-   "checks_passed": 6,
-   "checks_total": 6,
+   "checks_passed": 7,
+   "checks_total": 7,
    "failed_checks": [],
    "measured": {
     "every file bit-identical": "1/1"
    },
    "reason": "",
    "reported": {
-    "D13 fix pass": 0
+    "D13 fix pass": 0,
+    "FSL's own step: 6.0.7.17 \u2192 6.0.7.23": "identical"
    },
-   "seconds": 0.543,
+   "seconds": 0.3,
    "status": "pass"
   },
   {
    "case": "edge/bins2-corratio",
    "category": "edge cases",
-   "checks_passed": 5,
-   "checks_total": 5,
+   "checks_passed": 6,
+   "checks_total": 6,
    "failed_checks": [],
    "measured": {
     "every file bit-identical": "0/0"
    },
    "reason": "mcflirt exits [-6]; the same from the replica. double free or corruption (out)",
-   "seconds": 0.154,
+   "reported": {
+    "FSL's own step: 6.0.7.17 \u2192 6.0.7.23": "identical"
+   },
+   "seconds": 0.252,
    "status": "both-error"
   },
   {
    "case": "edge/in-missing",
    "category": "edge cases",
-   "checks_passed": 5,
-   "checks_total": 5,
+   "checks_passed": 6,
+   "checks_total": 6,
    "failed_checks": [],
    "measured": {
     "every file bit-identical": "0/0"
    },
    "reason": "mcflirt exits [-6]; the same from the replica. Image Exception : #63 :: No image files match: nosuch Image Exception : #22 :: Failed to read volume nosuch Error : No image files match: nosuch terminate called after throwing an instance of 'std::ru",
-   "seconds": 0.087,
+   "reported": {
+    "FSL's own step: 6.0.7.17 \u2192 6.0.7.23": "identical"
+   },
+   "seconds": 0.373,
    "status": "both-error"
   },
   {
    "case": "edge/init-missing",
    "category": "edge cases",
-   "checks_passed": 5,
-   "checks_total": 5,
+   "checks_passed": 6,
+   "checks_total": 6,
    "failed_checks": [],
    "measured": {
     "every file bit-identical": "0/0"
    },
    "reason": "mcflirt exits [-6]; the same from the replica. Could not open matrix file nosuch.mat terminate called after throwing an instance of 'std::logic_error' what(): matrix multiplication: incompatible matrix dimensions: 4x4 and 0x0",
-   "seconds": 2.396,
+   "reported": {
+    "FSL's own step: 6.0.7.17 \u2192 6.0.7.23": "identical"
+   },
+   "seconds": 2.458,
    "status": "both-error"
   },
   {
    "case": "edge/init-short",
    "category": "edge cases",
-   "checks_passed": 5,
-   "checks_total": 5,
+   "checks_passed": 6,
+   "checks_total": 6,
    "failed_checks": [],
    "measured": {
     "every file bit-identical": "0/0"
    },
    "reason": "mcflirt exits [-6]; the same from the replica. terminate called after throwing an instance of 'std::logic_error' what(): matrix multiplication: incompatible matrix dimensions: 4x4 and 1x3",
-   "seconds": 1.756,
+   "reported": {
+    "FSL's own step: 6.0.7.17 \u2192 6.0.7.23": "identical"
+   },
+   "seconds": 2.388,
    "status": "both-error"
   },
   {
    "case": "edge/init-3x3",
    "category": "edge cases",
-   "checks_passed": 5,
-   "checks_total": 5,
+   "checks_passed": 6,
+   "checks_total": 6,
    "failed_checks": [],
    "measured": {
     "every file bit-identical": "0/0"
    },
    "reason": "mcflirt exits [-6]; the same from the replica. terminate called after throwing an instance of 'std::logic_error' what(): matrix multiplication: incompatible matrix dimensions: 4x4 and 3x3",
-   "seconds": 1.746,
+   "reported": {
+    "FSL's own step: 6.0.7.17 \u2192 6.0.7.23": "identical"
+   },
+   "seconds": 2.504,
    "status": "both-error"
   },
   {
    "case": "edge/verbose20",
    "category": "edge cases",
-   "checks_passed": 6,
-   "checks_total": 6,
+   "checks_passed": 7,
+   "checks_total": 7,
    "failed_checks": [],
    "measured": {
     "every file bit-identical": "1/1"
    },
    "reason": "",
    "reported": {
-    "D13 fix pass": 800
+    "D13 fix pass": 800,
+    "FSL's own step: 6.0.7.17 \u2192 6.0.7.23": "identical"
    },
-   "seconds": 0.137,
+   "seconds": 0.207,
    "status": "pass"
   },
   {
    "case": "edge/verbose20-report",
    "category": "edge cases",
-   "checks_passed": 6,
-   "checks_total": 6,
+   "checks_passed": 7,
+   "checks_total": 7,
    "failed_checks": [],
    "measured": {
     "every file bit-identical": "2/2"
    },
    "reason": "",
    "reported": {
-    "D13 fix pass": 805
+    "D13 fix pass": 805,
+    "FSL's own step: 6.0.7.17 \u2192 6.0.7.23": "identical"
    },
-   "seconds": 0.131,
+   "seconds": 0.138,
    "status": "pass"
   },
   {
    "case": "edge/out-dir-missing",
    "category": "edge cases",
-   "checks_passed": 6,
-   "checks_total": 6,
+   "checks_passed": 7,
+   "checks_total": 7,
    "failed_checks": [],
    "measured": {
     "every file bit-identical": "0/0"
    },
    "reason": "",
    "reported": {
-    "D13 fix pass": 0
+    "D13 fix pass": 0,
+    "FSL's own step: 6.0.7.17 \u2192 6.0.7.23": "identical"
    },
-   "seconds": 1.856,
+   "seconds": 1.333,
    "status": "pass"
   },
   {
    "case": "edge/out-dir-readonly",
    "category": "edge cases",
-   "checks_passed": 5,
-   "checks_total": 5,
+   "checks_passed": 6,
+   "checks_total": 6,
    "failed_checks": [],
    "measured": {
     "every file bit-identical": "0/0"
    },
    "reason": "mcflirt exits [-6]; the same from the replica. Error! Could not create directory: <larmorx-testdata>/data/synthetic/hmc/motion/ro/out.mat. No write permission terminate called after throwing an instance of",
-   "seconds": 2.085,
+   "reported": {
+    "FSL's own step: 6.0.7.17 \u2192 6.0.7.23": "identical"
+   },
+   "seconds": 1.684,
    "status": "both-error"
   },
   {
    "case": "edge/mat-exists",
    "category": "edge cases",
-   "checks_passed": 6,
-   "checks_total": 6,
+   "checks_passed": 7,
+   "checks_total": 7,
    "failed_checks": [],
    "measured": {
     "every file bit-identical": "2/2"
    },
    "reason": "",
    "reported": {
-    "D13 fix pass": 172964
+    "D13 fix pass": 172964,
+    "FSL's own step: 6.0.7.17 \u2192 6.0.7.23": "identical"
    },
-   "seconds": 1.815,
+   "seconds": 1.048,
    "status": "pass"
   },
   {
    "case": "edge/fsloutputtype-pair",
    "category": "edge cases",
-   "checks_passed": 6,
-   "checks_total": 6,
+   "checks_passed": 7,
+   "checks_total": 7,
    "failed_checks": [],
    "measured": {
     "every file bit-identical": "2/2"
    },
    "reason": "",
    "reported": {
-    "D13 fix pass": 172964
+    "D13 fix pass": 172964,
+    "FSL's own step: 6.0.7.17 \u2192 6.0.7.23": "identical"
    },
-   "seconds": 1.656,
+   "seconds": 0.957,
    "status": "pass"
   },
   {
    "case": "edge/fsloutputtype-pair-gz",
    "category": "edge cases",
-   "checks_passed": 6,
-   "checks_total": 6,
+   "checks_passed": 7,
+   "checks_total": 7,
    "failed_checks": [],
    "measured": {
     "every file bit-identical": "2/2"
    },
    "reason": "",
    "reported": {
-    "D13 fix pass": 172964
+    "D13 fix pass": 172964,
+    "FSL's own step: 6.0.7.17 \u2192 6.0.7.23": "identical"
    },
-   "seconds": 1.547,
+   "seconds": 1.1,
    "status": "pass"
   },
   {
    "case": "edge/fsloutputtype-nifti2-gz",
    "category": "edge cases",
-   "checks_passed": 6,
-   "checks_total": 6,
+   "checks_passed": 7,
+   "checks_total": 7,
    "failed_checks": [],
    "measured": {
     "every file bit-identical": "1/1"
    },
    "reason": "",
    "reported": {
-    "D13 fix pass": 172964
+    "D13 fix pass": 172964,
+    "FSL's own step: 6.0.7.17 \u2192 6.0.7.23": "identical"
    },
-   "seconds": 1.732,
+   "seconds": 1.178,
    "status": "pass"
   },
   {
    "case": "edge/fsloutputtype-analyze",
    "category": "edge cases",
-   "checks_passed": 5,
-   "checks_total": 5,
+   "checks_passed": 6,
+   "checks_total": 6,
    "failed_checks": [],
    "measured": {
     "every file bit-identical": "0/0"
    },
-   "reason": "mcflirt exits [1]; the same from the replica. ERROR:: Unrecognised value (ANALYZE) of environment variable FSLOUTPUTTYPE Legal values are: NIFTI, NIFTI_PAIR, NIFTI_GZ, NIFTI_PAIR_GZ",
-   "seconds": 0.791,
+   "reason": "mcflirt exits [1]; the same from the replica. ERROR:: Unrecognised value (ANALYZE) of environment variable FSLOUTPUTTYPE Legal values are: NIFTI, NIFTI_PAIR, NIFTI2, NIFTI2_PAIR, NIFTI_GZ, NIFTI_PAIR_GZ, NIFTI2_GZ, NIFTI2_PAIR_GZ, NIFTI_ZST, NIFT",
+   "reported": {
+    "FSL's own step: 6.0.7.17 \u2192 6.0.7.23": "changed"
+   },
+   "seconds": 0.4,
    "status": "both-error"
+  },
+  {
+   "case": "edge/fsloutputtype-zst",
+   "category": "edge cases",
+   "checks_passed": 7,
+   "checks_total": 7,
+   "failed_checks": [],
+   "measured": {
+    "every file bit-identical": "4/4"
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 273386,
+    "FSL's own step: 6.0.7.17 \u2192 6.0.7.23": "changed"
+   },
+   "seconds": 1.563,
+   "status": "pass"
+  },
+  {
+   "case": "edge/fsloutputtype-pair-bz2",
+   "category": "edge cases",
+   "checks_passed": 7,
+   "checks_total": 7,
+   "failed_checks": [],
+   "measured": {
+    "every file bit-identical": "2/2"
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 172964,
+    "FSL's own step: 6.0.7.17 \u2192 6.0.7.23": "changed"
+   },
+   "seconds": 1.801,
+   "status": "pass"
+  },
+  {
+   "case": "edge/fsloutputtype-nifti2-zst",
+   "category": "edge cases",
+   "checks_passed": 7,
+   "checks_total": 7,
+   "failed_checks": [],
+   "measured": {
+    "every file bit-identical": "1/1"
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 172964,
+    "FSL's own step: 6.0.7.17 \u2192 6.0.7.23": "changed"
+   },
+   "seconds": 1.598,
+   "status": "pass"
+  },
+  {
+   "case": "edge/input-zst",
+   "category": "edge cases",
+   "checks_passed": 7,
+   "checks_total": 7,
+   "failed_checks": [],
+   "measured": {
+    "every file bit-identical": "1/1"
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 172964,
+    "FSL's own step: 6.0.7.17 \u2192 6.0.7.23": "changed"
+   },
+   "seconds": 1.685,
+   "status": "pass"
+  },
+  {
+   "case": "edge/input-bz2-plain-name",
+   "category": "edge cases",
+   "checks_passed": 7,
+   "checks_total": 7,
+   "failed_checks": [],
+   "measured": {
+    "every file bit-identical": "1/1"
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 172964,
+    "FSL's own step: 6.0.7.17 \u2192 6.0.7.23": "changed"
+   },
+   "seconds": 2.013,
+   "status": "pass"
+  },
+  {
+   "case": "edge/img-in-directory",
+   "category": "edge cases",
+   "checks_passed": 6,
+   "checks_total": 6,
+   "failed_checks": [],
+   "measured": {
+    "every file bit-identical": "1/1"
+   },
+   "reason": "mcflirt exits [-6]; the same from the replica. Image Exception : #22 :: Failed to read volume a.img.d/in.nii.gz Error : Error: cant open file a.hdr.d/in.nii.gz terminate called after throwing an instance of 'std::runtime_error' what(): Failed to r",
+   "reported": {
+    "FSL's own step: 6.0.7.17 \u2192 6.0.7.23": "changed"
+   },
+   "seconds": 0.148,
+   "status": "both-error"
+  },
+  {
+   "case": "edge/img-in-output-directory",
+   "category": "edge cases",
+   "checks_passed": 7,
+   "checks_total": 7,
+   "failed_checks": [],
+   "measured": {
+    "every file bit-identical": "13/13"
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 11,
+    "FSL's own step: 6.0.7.17 \u2192 6.0.7.23": "changed"
+   },
+   "seconds": 1.612,
+   "status": "pass"
   },
   {
    "case": "edge/fsloutputtype-bogus",
    "category": "edge cases",
-   "checks_passed": 5,
-   "checks_total": 5,
+   "checks_passed": 6,
+   "checks_total": 6,
    "failed_checks": [],
    "measured": {
     "every file bit-identical": "0/0"
    },
-   "reason": "mcflirt exits [1]; the same from the replica. ERROR:: Unrecognised value (BOGUS) of environment variable FSLOUTPUTTYPE Legal values are: NIFTI, NIFTI_PAIR, NIFTI_GZ, NIFTI_PAIR_GZ",
-   "seconds": 0.767,
+   "reason": "mcflirt exits [1]; the same from the replica. ERROR:: Unrecognised value (BOGUS) of environment variable FSLOUTPUTTYPE Legal values are: NIFTI, NIFTI_PAIR, NIFTI2, NIFTI2_PAIR, NIFTI_GZ, NIFTI_PAIR_GZ, NIFTI2_GZ, NIFTI2_PAIR_GZ, NIFTI_ZST, NIFTI_",
+   "reported": {
+    "FSL's own step: 6.0.7.17 \u2192 6.0.7.23": "changed"
+   },
+   "seconds": 0.804,
    "status": "both-error"
   },
   {
    "case": "edge/stages0-meanvol",
    "category": "edge cases",
-   "checks_passed": 6,
-   "checks_total": 6,
+   "checks_passed": 7,
+   "checks_total": 7,
    "failed_checks": [],
    "measured": {
     "every file bit-identical": "2/2"
    },
    "reason": "",
    "reported": {
-    "D13 fix pass": 0
+    "D13 fix pass": 0,
+    "FSL's own step: 6.0.7.17 \u2192 6.0.7.23": "identical"
    },
-   "seconds": 0.334,
+   "seconds": 0.486,
    "status": "pass"
   },
   {
    "case": "edge/stages0-refvol",
    "category": "edge cases",
-   "checks_passed": 6,
-   "checks_total": 6,
+   "checks_passed": 7,
+   "checks_total": 7,
    "failed_checks": [],
    "measured": {
     "every file bit-identical": "3/3"
    },
    "reason": "",
    "reported": {
-    "D13 fix pass": 0
+    "D13 fix pass": 0,
+    "FSL's own step: 6.0.7.17 \u2192 6.0.7.23": "identical"
    },
-   "seconds": 0.31,
+   "seconds": 0.323,
    "status": "pass"
   },
   {
    "case": "edge/dof13",
    "category": "edge cases",
-   "checks_passed": 6,
-   "checks_total": 6,
+   "checks_passed": 7,
+   "checks_total": 7,
    "failed_checks": [],
    "measured": {
     "every file bit-identical": "1/1"
    },
    "reason": "",
    "reported": {
-    "D13 fix pass": 178651
+    "D13 fix pass": 178651,
+    "FSL's own step: 6.0.7.17 \u2192 6.0.7.23": "identical"
    },
-   "seconds": 0.635,
+   "seconds": 0.609,
    "status": "pass"
   },
   {
    "case": "edge/int8",
    "category": "edge cases",
-   "checks_passed": 6,
-   "checks_total": 6,
+   "checks_passed": 7,
+   "checks_total": 7,
    "failed_checks": [],
    "measured": {
     "every file bit-identical": "1/1"
    },
    "reason": "",
    "reported": {
-    "D13 fix pass": 878592
+    "D13 fix pass": 878592,
+    "FSL's own step: 6.0.7.17 \u2192 6.0.7.23": "identical"
    },
-   "seconds": 2.076,
+   "seconds": 1.319,
    "status": "pass"
   },
   {
    "case": "edge/int32",
    "category": "edge cases",
-   "checks_passed": 6,
-   "checks_total": 6,
+   "checks_passed": 7,
+   "checks_total": 7,
    "failed_checks": [],
    "measured": {
     "every file bit-identical": "1/1"
    },
    "reason": "",
    "reported": {
-    "D13 fix pass": 183683
+    "D13 fix pass": 183683,
+    "FSL's own step: 6.0.7.17 \u2192 6.0.7.23": "identical"
    },
-   "seconds": 2.13,
+   "seconds": 1.473,
    "status": "pass"
   },
   {
    "case": "edge/analyze-input",
    "category": "edge cases",
-   "checks_passed": 6,
-   "checks_total": 6,
+   "checks_passed": 7,
+   "checks_total": 7,
    "failed_checks": [],
    "measured": {
     "every file bit-identical": "1/1"
    },
    "reason": "",
    "reported": {
-    "D13 fix pass": 173028
+    "D13 fix pass": 173028,
+    "FSL's own step: 6.0.7.17 \u2192 6.0.7.23": "identical"
    },
-   "seconds": 1.809,
+   "seconds": 1.253,
    "status": "pass"
   },
   {
    "case": "edge/rgb-input",
    "category": "edge cases",
-   "checks_passed": 5,
-   "checks_total": 5,
+   "checks_passed": 6,
+   "checks_total": 6,
    "failed_checks": [],
    "measured": {
     "every file bit-identical": "0/0"
    },
    "reason": "mcflirt exits [-6]; the same from the replica. Image Exception : #8 :: Fslread: DT 128 not supported terminate called after throwing an instance of 'std::runtime_error' what(): Fslread: DT 128 not supported",
-   "seconds": 0.107,
+   "reported": {
+    "FSL's own step: 6.0.7.17 \u2192 6.0.7.23": "identical"
+   },
+   "seconds": 0.166,
    "status": "both-error"
   },
   {
    "case": "edge/nan-reffile",
    "category": "edge cases",
-   "checks_passed": 6,
-   "checks_total": 6,
+   "checks_passed": 7,
+   "checks_total": 7,
    "failed_checks": [],
    "measured": {
     "every file bit-identical": "2/2"
    },
    "reason": "",
    "reported": {
-    "D13 fix pass": 357640
+    "D13 fix pass": 357640,
+    "FSL's own step: 6.0.7.17 \u2192 6.0.7.23": "identical"
    },
-   "seconds": 2.185,
+   "seconds": 1.367,
    "status": "pass"
   },
   {
    "case": "edge/refvol-last",
    "category": "edge cases",
-   "checks_passed": 6,
-   "checks_total": 6,
+   "checks_passed": 7,
+   "checks_total": 7,
    "failed_checks": [],
    "measured": {
     "every file bit-identical": "3/3"
    },
    "reason": "",
    "reported": {
-    "D13 fix pass": 172117
+    "D13 fix pass": 172117,
+    "FSL's own step: 6.0.7.17 \u2192 6.0.7.23": "identical"
    },
-   "seconds": 1.686,
+   "seconds": 1.133,
    "status": "pass"
   },
   {
    "case": "edge/meanvol-reffile-sinc-stats",
    "category": "edge cases",
-   "checks_passed": 6,
-   "checks_total": 6,
+   "checks_passed": 7,
+   "checks_total": 7,
    "failed_checks": [],
    "measured": {
     "every file bit-identical": "17/17"
    },
    "reason": "",
    "reported": {
-    "D13 fix pass": 221835
+    "D13 fix pass": 382647,
+    "FSL's own step: 6.0.7.17 \u2192 6.0.7.23": "changed"
    },
-   "seconds": 4.763,
+   "seconds": 2.812,
    "status": "pass"
   },
   {
    "case": "edge/atanf-phantom-2",
    "category": "edge cases",
-   "checks_passed": 6,
-   "checks_total": 6,
+   "checks_passed": 7,
+   "checks_total": 7,
    "failed_checks": [],
    "measured": {
     "every file bit-identical": "2/2"
    },
    "reason": "",
    "reported": {
-    "D13 fix pass": 1967
+    "D13 fix pass": 1967,
+    "FSL's own step: 6.0.7.17 \u2192 6.0.7.23": "identical"
    },
-   "seconds": 0.176,
+   "seconds": 0.155,
    "status": "pass"
   },
   {
    "case": "edge/atanf-phantom-11",
    "category": "edge cases",
-   "checks_passed": 6,
-   "checks_total": 6,
+   "checks_passed": 7,
+   "checks_total": 7,
    "failed_checks": [],
    "measured": {
     "every file bit-identical": "2/2"
    },
    "reason": "",
    "reported": {
-    "D13 fix pass": 1881
+    "D13 fix pass": 1881,
+    "FSL's own step: 6.0.7.17 \u2192 6.0.7.23": "identical"
    },
-   "seconds": 0.173,
+   "seconds": 0.143,
    "status": "pass"
   },
   {
    "case": "edge/atanf-phantom-27",
    "category": "edge cases",
-   "checks_passed": 6,
-   "checks_total": 6,
+   "checks_passed": 7,
+   "checks_total": 7,
    "failed_checks": [],
    "measured": {
     "every file bit-identical": "2/2"
    },
    "reason": "",
    "reported": {
-    "D13 fix pass": 1914
+    "D13 fix pass": 1914,
+    "FSL's own step: 6.0.7.17 \u2192 6.0.7.23": "identical"
    },
-   "seconds": 0.158,
+   "seconds": 0.187,
    "status": "pass"
   },
   {
    "case": "edge/rotation0",
    "category": "edge cases",
-   "checks_passed": 6,
-   "checks_total": 6,
+   "checks_passed": 7,
+   "checks_total": 7,
    "failed_checks": [],
    "measured": {
     "every file bit-identical": "1/1"
    },
    "reason": "",
    "reported": {
-    "D13 fix pass": 173869
+    "D13 fix pass": 173869,
+    "FSL's own step: 6.0.7.17 \u2192 6.0.7.23": "identical"
    },
-   "seconds": 0.411,
+   "seconds": 0.379,
    "status": "pass"
   },
   {
    "case": "edge/smooth-negative",
    "category": "edge cases",
-   "checks_passed": 6,
-   "checks_total": 6,
+   "checks_passed": 7,
+   "checks_total": 7,
    "failed_checks": [],
    "measured": {
     "every file bit-identical": "1/1"
    },
    "reason": "",
    "reported": {
-    "D13 fix pass": 175496
+    "D13 fix pass": 175496,
+    "FSL's own step: 6.0.7.17 \u2192 6.0.7.23": "identical"
    },
-   "seconds": 0.479,
+   "seconds": 0.416,
    "status": "pass"
   },
   {
    "case": "edge/scaling-hist",
    "category": "edge cases",
-   "checks_passed": 6,
-   "checks_total": 6,
+   "checks_passed": 7,
+   "checks_total": 7,
    "failed_checks": [],
    "measured": {
     "every file bit-identical": "1/1"
    },
    "reason": "",
    "reported": {
-    "D13 fix pass": 174277
+    "D13 fix pass": 174277,
+    "FSL's own step: 6.0.7.17 \u2192 6.0.7.23": "identical"
    },
-   "seconds": 0.481,
+   "seconds": 0.447,
    "status": "pass"
   },
   {
    "case": "edge/fov0-2d",
    "category": "edge cases",
-   "checks_passed": 6,
-   "checks_total": 6,
+   "checks_passed": 7,
+   "checks_total": 7,
    "failed_checks": [],
    "measured": {
     "every file bit-identical": "2/2"
    },
    "reason": "",
    "reported": {
-    "D13 fix pass": 312788
+    "D13 fix pass": 312788,
+    "FSL's own step: 6.0.7.17 \u2192 6.0.7.23": "identical"
    },
-   "seconds": 0.714,
+   "seconds": 0.354,
    "status": "pass"
   },
   {
    "case": "fmriprep/ds000005-sub-01-noreconall/task_mixedgamblestask_run_01",
    "category": "fMRIPrep's calls",
-   "checks_passed": 7,
-   "checks_total": 7,
+   "checks_passed": 8,
+   "checks_total": 8,
    "failed_checks": [],
    "measured": {
     "every file bit-identical": "241/241"
@@ -2724,16 +3052,17 @@
    "reason": "",
    "reported": {
     "D13 fix pass": 5945481,
+    "FSL's own step: 6.0.7.17 \u2192 6.0.7.23": "identical",
     "fMRIPrep's matrices (its container's FSL) identical as text": "240/240"
    },
-   "seconds": 52.939,
+   "seconds": 33.073,
    "status": "pass"
   },
   {
    "case": "fmriprep/ds000005-sub-01-noreconall/task_mixedgamblestask_run_02",
    "category": "fMRIPrep's calls",
-   "checks_passed": 7,
-   "checks_total": 7,
+   "checks_passed": 8,
+   "checks_total": 8,
    "failed_checks": [],
    "measured": {
     "every file bit-identical": "241/241"
@@ -2741,16 +3070,17 @@
    "reason": "",
    "reported": {
     "D13 fix pass": 16155136,
+    "FSL's own step: 6.0.7.17 \u2192 6.0.7.23": "identical",
     "fMRIPrep's matrices (its container's FSL) identical as text": "240/240"
    },
-   "seconds": 54.514,
+   "seconds": 32.035,
    "status": "pass"
   },
   {
    "case": "fmriprep/ds000005-sub-01-noreconall/task_mixedgamblestask_run_03",
    "category": "fMRIPrep's calls",
-   "checks_passed": 7,
-   "checks_total": 7,
+   "checks_passed": 8,
+   "checks_total": 8,
    "failed_checks": [],
    "measured": {
     "every file bit-identical": "241/241"
@@ -2758,16 +3088,17 @@
    "reason": "",
    "reported": {
     "D13 fix pass": 16394783,
+    "FSL's own step: 6.0.7.17 \u2192 6.0.7.23": "identical",
     "fMRIPrep's matrices (its container's FSL) identical as text": "240/240"
    },
-   "seconds": 41.27,
+   "seconds": 34.623,
    "status": "pass"
   },
   {
    "case": "fmriprep/ds000228-sub-pixar008-noreconall/task_pixar",
    "category": "fMRIPrep's calls",
-   "checks_passed": 7,
-   "checks_total": 7,
+   "checks_passed": 8,
+   "checks_total": 8,
    "failed_checks": [],
    "measured": {
     "every file bit-identical": "169/169"
@@ -2775,16 +3106,17 @@
    "reason": "",
    "reported": {
     "D13 fix pass": 10893161,
+    "FSL's own step: 6.0.7.17 \u2192 6.0.7.23": "identical",
     "fMRIPrep's matrices (its container's FSL) identical as text": "168/168"
    },
-   "seconds": 23.293,
+   "seconds": 20.187,
    "status": "pass"
   },
   {
    "case": "fmriprep/ds000256-sub-CTS203-noreconall/task_restbaseline",
    "category": "fMRIPrep's calls",
-   "checks_passed": 7,
-   "checks_total": 7,
+   "checks_passed": 8,
+   "checks_total": 8,
    "failed_checks": [],
    "measured": {
     "every file bit-identical": "165/165"
@@ -2792,16 +3124,17 @@
    "reason": "",
    "reported": {
     "D13 fix pass": 10320147,
+    "FSL's own step: 6.0.7.17 \u2192 6.0.7.23": "identical",
     "fMRIPrep's matrices (its container's FSL) identical as text": "164/164"
    },
-   "seconds": 50.884,
+   "seconds": 30.933,
    "status": "pass"
   },
   {
    "case": "fmriprep/ds000256-sub-CTS203-noreconall/task_restfixationfixed",
    "category": "fMRIPrep's calls",
-   "checks_passed": 7,
-   "checks_total": 7,
+   "checks_passed": 8,
+   "checks_total": 8,
    "failed_checks": [],
    "measured": {
     "every file bit-identical": "165/165"
@@ -2809,16 +3142,17 @@
    "reason": "",
    "reported": {
     "D13 fix pass": 10245424,
+    "FSL's own step: 6.0.7.17 \u2192 6.0.7.23": "identical",
     "fMRIPrep's matrices (its container's FSL) identical as text": "164/164"
    },
-   "seconds": 50.588,
+   "seconds": 30.964,
    "status": "pass"
   },
   {
    "case": "fmriprep/ds000256-sub-CTS203-noreconall/task_restfixationnofeedback",
    "category": "fMRIPrep's calls",
-   "checks_passed": 7,
-   "checks_total": 7,
+   "checks_passed": 8,
+   "checks_total": 8,
    "failed_checks": [],
    "measured": {
     "every file bit-identical": "165/165"
@@ -2826,16 +3160,17 @@
    "reason": "",
    "reported": {
     "D13 fix pass": 10269331,
+    "FSL's own step: 6.0.7.17 \u2192 6.0.7.23": "identical",
     "fMRIPrep's matrices (its container's FSL) identical as text": "164/164"
    },
-   "seconds": 57.365,
+   "seconds": 30.256,
    "status": "pass"
   },
   {
    "case": "fmriprep/ds002422-sub-02-noreconall/task_arithm_run_01",
    "category": "fMRIPrep's calls",
-   "checks_passed": 7,
-   "checks_total": 7,
+   "checks_passed": 8,
+   "checks_total": 8,
    "failed_checks": [],
    "measured": {
     "every file bit-identical": "211/211"
@@ -2843,16 +3178,17 @@
    "reason": "",
    "reported": {
     "D13 fix pass": 10183730,
+    "FSL's own step: 6.0.7.17 \u2192 6.0.7.23": "identical",
     "fMRIPrep's matrices (its container's FSL) identical as text": "210/210"
    },
-   "seconds": 23.714,
+   "seconds": 18.217,
    "status": "pass"
   },
   {
    "case": "fmriprep/ds002422-sub-02-noreconall/task_arithm_run_02",
    "category": "fMRIPrep's calls",
-   "checks_passed": 7,
-   "checks_total": 7,
+   "checks_passed": 8,
+   "checks_total": 8,
    "failed_checks": [],
    "measured": {
     "every file bit-identical": "211/211"
@@ -2860,16 +3196,17 @@
    "reason": "",
    "reported": {
     "D13 fix pass": 10134789,
+    "FSL's own step: 6.0.7.17 \u2192 6.0.7.23": "identical",
     "fMRIPrep's matrices (its container's FSL) identical as text": "210/210"
    },
-   "seconds": 26.952,
+   "seconds": 13.243,
    "status": "pass"
   },
   {
    "case": "fmriprep/ds002422-sub-02-noreconall/task_rest",
    "category": "fMRIPrep's calls",
-   "checks_passed": 7,
-   "checks_total": 7,
+   "checks_passed": 8,
+   "checks_total": 8,
    "failed_checks": [],
    "measured": {
     "every file bit-identical": "201/201"
@@ -2877,16 +3214,17 @@
    "reason": "",
    "reported": {
     "D13 fix pass": 14596002,
+    "FSL's own step: 6.0.7.17 \u2192 6.0.7.23": "identical",
     "fMRIPrep's matrices (its container's FSL) identical as text": "200/200"
    },
-   "seconds": 43.328,
+   "seconds": 23.895,
    "status": "pass"
   },
   {
    "case": "fmriprep/ds002603-sub-01-noreconall/task_wm_acq_Mb4Mm3Tr550",
    "category": "fMRIPrep's calls",
-   "checks_passed": 7,
-   "checks_total": 7,
+   "checks_passed": 8,
+   "checks_total": 8,
    "failed_checks": [],
    "measured": {
     "every file bit-identical": "589/589"
@@ -2894,16 +3232,17 @@
    "reason": "",
    "reported": {
     "D13 fix pass": 183306,
+    "FSL's own step: 6.0.7.17 \u2192 6.0.7.23": "identical",
     "fMRIPrep's matrices (its container's FSL) identical as text": "588/588"
    },
-   "seconds": 156.187,
+   "seconds": 78.359,
    "status": "pass"
   },
   {
    "case": "fmriprep/ds002603-sub-01-noreconall/task_wm_acq_SeqMm3Tr2000",
    "category": "fMRIPrep's calls",
-   "checks_passed": 7,
-   "checks_total": 7,
+   "checks_passed": 8,
+   "checks_total": 8,
    "failed_checks": [],
    "measured": {
     "every file bit-identical": "161/161"
@@ -2911,16 +3250,17 @@
    "reason": "",
    "reported": {
     "D13 fix pass": 224870,
+    "FSL's own step: 6.0.7.17 \u2192 6.0.7.23": "identical",
     "fMRIPrep's matrices (its container's FSL) identical as text": "160/160"
    },
-   "seconds": 46.184,
+   "seconds": 27.131,
    "status": "pass"
   },
   {
    "case": "fmriprep/ds003592-sub-280-noreconall/ses_1_task_rest_echo_1",
    "category": "fMRIPrep's calls",
-   "checks_passed": 7,
-   "checks_total": 7,
+   "checks_passed": 8,
+   "checks_total": 8,
    "failed_checks": [],
    "measured": {
     "every file bit-identical": "201/201"
@@ -2928,16 +3268,17 @@
    "reason": "",
    "reported": {
     "D13 fix pass": 17229279,
+    "FSL's own step: 6.0.7.17 \u2192 6.0.7.23": "identical",
     "fMRIPrep's matrices (its container's FSL) identical as text": "200/200"
    },
-   "seconds": 37.13,
+   "seconds": 23.969,
    "status": "pass"
   },
   {
    "case": "fmriprep/ds004884-sub-M2079-noreconall/ses_217_task_naming40_acq_epfid2_dir_AP_run_2",
    "category": "fMRIPrep's calls",
-   "checks_passed": 7,
-   "checks_total": 7,
+   "checks_passed": 8,
+   "checks_total": 8,
    "failed_checks": [],
    "measured": {
     "every file bit-identical": "61/61"
@@ -2945,16 +3286,17 @@
    "reason": "",
    "reported": {
     "D13 fix pass": 3979199,
+    "FSL's own step: 6.0.7.17 \u2192 6.0.7.23": "identical",
     "fMRIPrep's matrices (its container's FSL) identical as text": "60/60"
    },
-   "seconds": 9.046,
+   "seconds": 5.182,
    "status": "pass"
   },
   {
    "case": "fmriprep/ds004884-sub-M2079-noreconall/ses_217_task_rest_acq_epfidp2p2_dir_AP_run_9",
    "category": "fMRIPrep's calls",
-   "checks_passed": 7,
-   "checks_total": 7,
+   "checks_passed": 8,
+   "checks_total": 8,
    "failed_checks": [],
    "measured": {
     "every file bit-identical": "197/197"
@@ -2962,16 +3304,17 @@
    "reason": "",
    "reported": {
     "D13 fix pass": 13404914,
+    "FSL's own step: 6.0.7.17 \u2192 6.0.7.23": "identical",
     "fMRIPrep's matrices (its container's FSL) identical as text": "196/196"
    },
-   "seconds": 31.662,
+   "seconds": 18.538,
    "status": "pass"
   },
   {
    "case": "fmriprep/ds004958-sub-fsm64ps-noreconall/task_rest",
    "category": "fMRIPrep's calls",
-   "checks_passed": 7,
-   "checks_total": 7,
+   "checks_passed": 8,
+   "checks_total": 8,
    "failed_checks": [],
    "measured": {
     "every file bit-identical": "601/601"
@@ -2979,16 +3322,17 @@
    "reason": "",
    "reported": {
     "D13 fix pass": 232215654,
+    "FSL's own step: 6.0.7.17 \u2192 6.0.7.23": "identical",
     "fMRIPrep's matrices (its container's FSL) identical as text": "600/600"
    },
-   "seconds": 372.057,
+   "seconds": 189.876,
    "status": "pass"
   },
   {
    "case": "fmriprep/ds005003-sub-RS001-noreconall/ses_1_task_motor",
    "category": "fMRIPrep's calls",
-   "checks_passed": 7,
-   "checks_total": 7,
+   "checks_passed": 8,
+   "checks_total": 8,
    "failed_checks": [],
    "measured": {
     "every file bit-identical": "81/81"
@@ -2996,16 +3340,17 @@
    "reason": "",
    "reported": {
     "D13 fix pass": 5601010,
+    "FSL's own step: 6.0.7.17 \u2192 6.0.7.23": "identical",
     "fMRIPrep's matrices (its container's FSL) identical as text": "80/80"
    },
-   "seconds": 31.199,
+   "seconds": 11.209,
    "status": "pass"
   },
   {
    "case": "fmriprep/ds005003-sub-RS001-noreconall/ses_1_task_rest",
    "category": "fMRIPrep's calls",
-   "checks_passed": 7,
-   "checks_total": 7,
+   "checks_passed": 8,
+   "checks_total": 8,
    "failed_checks": [],
    "measured": {
     "every file bit-identical": "81/81"
@@ -3013,16 +3358,17 @@
    "reason": "",
    "reported": {
     "D13 fix pass": 5608726,
+    "FSL's own step: 6.0.7.17 \u2192 6.0.7.23": "identical",
     "fMRIPrep's matrices (its container's FSL) identical as text": "80/80"
    },
-   "seconds": 23.909,
+   "seconds": 12.859,
    "status": "pass"
   },
   {
    "case": "fmriprep/ds005040-sub-002-noreconall/task_clip_run_1",
    "category": "fMRIPrep's calls",
-   "checks_passed": 7,
-   "checks_total": 7,
+   "checks_passed": 8,
+   "checks_total": 8,
    "failed_checks": [],
    "measured": {
     "every file bit-identical": "64/64"
@@ -3030,33 +3376,17 @@
    "reason": "",
    "reported": {
     "D13 fix pass": 156069,
+    "FSL's own step: 6.0.7.17 \u2192 6.0.7.23": "identical",
     "fMRIPrep's matrices (its container's FSL) identical as text": "63/63"
    },
-   "seconds": 14.096,
-   "status": "pass"
-  },
-  {
-   "case": "fmriprep/ds005454-sub-16-noreconall/task_rest",
-   "category": "fMRIPrep's calls",
-   "checks_passed": 7,
-   "checks_total": 7,
-   "failed_checks": [],
-   "measured": {
-    "every file bit-identical": "281/281"
-   },
-   "reason": "",
-   "reported": {
-    "D13 fix pass": 333492307,
-    "fMRIPrep's matrices (its container's FSL) identical as text": "280/280"
-   },
-   "seconds": 267.066,
+   "seconds": 9.231,
    "status": "pass"
   },
   {
    "case": "fmriprep/ds005752-sub-ON01016-noreconall/ses_01_task_rest_dir_forward",
    "category": "fMRIPrep's calls",
-   "checks_passed": 7,
-   "checks_total": 7,
+   "checks_passed": 8,
+   "checks_total": 8,
    "failed_checks": [],
    "measured": {
     "every file bit-identical": "201/201"
@@ -3064,16 +3394,17 @@
    "reason": "",
    "reported": {
     "D13 fix pass": 19274089,
+    "FSL's own step: 6.0.7.17 \u2192 6.0.7.23": "identical",
     "fMRIPrep's matrices (its container's FSL) identical as text": "200/200"
    },
-   "seconds": 54.941,
+   "seconds": 25.02,
    "status": "pass"
   },
   {
    "case": "fmriprep/ds005752-sub-ON01016-noreconall/ses_01_task_rest_dir_reverse",
    "category": "fMRIPrep's calls",
-   "checks_passed": 7,
-   "checks_total": 7,
+   "checks_passed": 8,
+   "checks_total": 8,
    "failed_checks": [],
    "measured": {
     "every file bit-identical": "11/11"
@@ -3081,19 +3412,116 @@
    "reason": "",
    "reported": {
     "D13 fix pass": 967668,
+    "FSL's own step: 6.0.7.17 \u2192 6.0.7.23": "identical",
     "fMRIPrep's matrices (its container's FSL) identical as text": "10/10"
    },
-   "seconds": 3.336,
+   "seconds": 2.449,
+   "status": "pass"
+  },
+  {
+   "case": "difftest/atanf-default-call",
+   "category": "difftest",
+   "checks_passed": 6,
+   "checks_total": 6,
+   "failed_checks": [],
+   "measured": {
+    "every file bit-identical": "1/1"
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 932
+   },
+   "seconds": 0.03,
+   "status": "pass"
+  },
+  {
+   "case": "difftest/atanf-matrices-from-0",
+   "category": "difftest",
+   "checks_passed": 6,
+   "checks_total": 6,
+   "failed_checks": [],
+   "measured": {
+    "every file bit-identical": "11/11"
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 20456
+   },
+   "seconds": 0.3,
+   "status": "pass"
+  },
+  {
+   "case": "difftest/atanf-matrices-from-4",
+   "category": "difftest",
+   "checks_passed": 6,
+   "checks_total": 6,
+   "failed_checks": [],
+   "measured": {
+    "every file bit-identical": "9/9"
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 4048
+   },
+   "seconds": 0.055,
+   "status": "pass"
+  },
+  {
+   "case": "difftest/atanf-par-only",
+   "category": "difftest",
+   "checks_passed": 6,
+   "checks_total": 6,
+   "failed_checks": [],
+   "measured": {
+    "every file bit-identical": "12/12"
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 29859
+   },
+   "seconds": 0.13,
+   "status": "pass"
+  },
+  {
+   "case": "difftest/atanf-printed-params",
+   "category": "difftest",
+   "checks_passed": 6,
+   "checks_total": 6,
+   "failed_checks": [],
+   "measured": {
+    "every file bit-identical": "1/1"
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 8247
+   },
+   "seconds": 0.024,
+   "status": "pass"
+  },
+  {
+   "case": "difftest/meanvol-name-notice",
+   "category": "difftest",
+   "checks_passed": 6,
+   "checks_total": 6,
+   "failed_checks": [],
+   "measured": {
+    "every file bit-identical": "2/2"
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 0.026,
    "status": "pass"
   }
  ],
  "suite": "fsl-mcflirt-replica",
  "summary": {
-  "both-error": 21,
-  "expected-divergence": 0,
+  "both-error": 22,
+  "expected-divergence": 5,
   "fail": 0,
-  "pass": 173,
+  "pass": 176,
   "skipped": 0
  },
- "tier": "full"
+ "tier": "standard"
 }

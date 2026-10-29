@@ -8,7 +8,7 @@ translated from FSL's source, in the separate package ``larmorx-nc`` (FSL's lice
 a behaviour spec without FSL's code. The same programs run from the command line as
 ``larmorx fsl <program> ...`` with their original arguments.
 
-``bet`` and ``betsurf`` have their replica (FSL 6.0.7.17's ``bet``, ``bet2`` and ``betsurf``);
+``bet`` and ``betsurf`` have their replica (FSL 6.0.7.23's ``bet``, ``bet2`` and ``betsurf``);
 their clean-room originals are still to be written (``specs/bet.md``). Until then they need
 ``larmorx-nc``: with ``implementation="auto"`` (the default) or ``"replica"`` they run its
 program as a separate process (nothing of it is imported), and without it they raise

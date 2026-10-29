@@ -141,7 +141,7 @@ stages run the volumes in parallel. The result does not depend on the thread cou
 ## The bit-exact replica (`larmorx-nc`)
 
 The replica is a translation of mcflirt's source (fsl-mcflirt 2111.0 and the libraries it
-uses, FSL 6.0.7.17) in the `larmorx-nc` package (`crates-nc/`), under the FSL Licence's terms:
+uses, FSL 6.0.7.23 since 2026-10-29; first FSL 6.0.7.17) in the `larmorx-nc` package (`crates-nc/`), under the FSL Licence's terms:
 **non-commercial use only**, FSL's original source included ([licensing](../licensing.md)).
 It is installed by name, so that its licence is accepted knowingly:
 

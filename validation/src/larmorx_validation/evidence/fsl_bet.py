@@ -1,6 +1,6 @@
 # SPDX-License-Identifier: Apache-2.0
 """BET's evidence: fMRIPrep's call (``bet <boldref> <out> -f 0.20 -m``) on a real BOLD reference
-by FSL 6.0.7.17, by fMRIPrep's own FSL (its image) and by the larmorx-nc replica in its default
+by FSL 6.0.7.23, by fMRIPrep's own FSL (its image) and by the larmorx-nc replica in its default
 and ``reproduce`` modes; ``bet -R -m`` on a real T1w; ``betsurf`` (T1 and T2) on the synthetic
 head of the parity suite, whose skull and scalp surfaces can be shown whole without a face; the
 cases of the record.
@@ -88,7 +88,9 @@ def binaries() -> tuple[Path, str, Path]:
 
     fsl, nc, sif = fb.fsl_dir(), fb.replica_binary(), fb.fmriprep_image()
     if fsl is None or nc is None or sif is None:
-        raise FileNotFoundError("FSL 6.0.7.17 (~/fsl), the larmorx-nc replica or fMRIPrep's image")
+        raise FileNotFoundError(
+            "FSL 6.0.7.23 (~/fsl-6.0.7.23), the larmorx-nc replica or fMRIPrep's image"
+        )
     return fsl, nc, sif
 
 
@@ -170,7 +172,7 @@ def _compute(e: fcache.Entry) -> None:
         command=command,
         settings="fMRIPrep 25.2.6's BET node (skullstrip_first_pass) of ds000005 sub-01 "
         "task-mixedgamblestask run-01, its arguments from command.txt; bet -R -m on the "
-        "subject's raw T1w. FSL 6.0.7.17 (~/fsl, never on the PATH) and fMRIPrep's FSL in its "
+        "subject's raw T1w. FSL 6.0.7.23 (~/fsl-6.0.7.23, never on the PATH) and fMRIPrep's FSL in its "
         "image (not for bet -R: the image has no dc, which the bet script's -R needs), the "
         "larmorx-nc replica in both modes; FSL is single-threaded, the replica ran "
         "with OMP_NUM_THREADS=2",
@@ -223,7 +225,7 @@ def _compute_panel(e: fcache.Entry) -> None:
         command=command,
         settings="fMRIPrep 25.2.6's BET node (skullstrip_first_pass) of the data panel's "
         "ds000228 sub-pixar008 (3.5 years), task pixar, its arguments from command.txt. FSL "
-        "6.0.7.17 (~/fsl, never on the PATH), fMRIPrep's FSL in its image and the larmorx-nc "
+        "6.0.7.23 (~/fsl-6.0.7.23, never on the PATH), fMRIPrep's FSL in its image and the larmorx-nc "
         "replica in both modes; FSL is single-threaded, the replica ran with OMP_NUM_THREADS=2",
     )
 
@@ -253,7 +255,7 @@ def _compute_surf(e: fcache.Entry) -> None:
         versions=versions(),
         command="betsurf -o -m -s <t1> <t2> <bet_mesh.vtk> <t1_to_standard.mat> <out>",
         settings="betsurf with the T2 (bet -A2's call) on the parity suite's synthetic head: "
-        "FSL 6.0.7.17, fMRIPrep's FSL and the replica in both modes",
+        "FSL 6.0.7.23, fMRIPrep's FSL and the replica in both modes",
     )
 
 
@@ -280,7 +282,7 @@ SURF_OUTPUTS = [
     {"id": "skull", "label": "Skull mask (-s)", "unit": ""},
 ]
 PANELS = [
-    ("fsl", "fsl", "original", "FSL 6.0.7.17, bet", "the conda installation, as run"),
+    ("fsl", "fsl", "original", "FSL 6.0.7.23, bet", "the conda installation, as run"),
     ("image", "image", "original", "FSL in fMRIPrep's image", "fMRIPrep 25.2.6's build"),
     ("replica", "replica", "larmorx", "larmorx-nc replica", "default mode"),
     ("replica-reproduce", "replica-reproduce", "larmorx", "larmorx-nc replica", "reproduce mode"),
@@ -343,10 +345,10 @@ def window_of(ex, pid: str) -> list[float]:
 def _diffs() -> list[dict]:
     d = common.d
     return [
-        d("replica-fsl", "replica", "fsl", "main", "replica − FSL 6.0.7.17", common.ROLE_LX),
-        d("repro-fsl", "replica-reproduce", "fsl", "main", "replica (reproduce) − FSL 6.0.7.17",
+        d("replica-fsl", "replica", "fsl", "main", "replica − FSL 6.0.7.23", common.ROLE_LX),
+        d("repro-fsl", "replica-reproduce", "fsl", "main", "replica (reproduce) − FSL 6.0.7.23",
           common.ROLE_LX),
-        d("image-fsl", "image", "fsl", "variability", "fMRIPrep's FSL − FSL 6.0.7.17",
+        d("image-fsl", "image", "fsl", "variability", "fMRIPrep's FSL − FSL 6.0.7.23",
           common.ROLE_ORIG),
         d("replica-image", "replica", "image", "fmriprep", "replica − fMRIPrep's FSL",
           common.ROLE_FMRIPREP),
@@ -483,7 +485,7 @@ def _example_fmriprep(ctx: core.Context, e: fcache.Entry) -> dict:
         "summary": (
             "The BET node fMRIPrep 25.2.6 ran on the N4-corrected BOLD reference of OpenNeuro "
             "ds000005 sub-01 (task mixed gambles, run 1): `bet <boldref> <out> -f 0.20 -m`, given "
-            "to FSL 6.0.7.17, to fMRIPrep's own build of FSL in its image and to the larmorx-nc "
+            "to FSL 6.0.7.23, to fMRIPrep's own build of FSL in its image and to the larmorx-nc "
             "replica in its default and reproduce modes, beside the outputs fMRIPrep's node "
             "wrote. The masks are drawn over the input; choose *Brain* for the extracted brain."
         ),
@@ -596,7 +598,7 @@ def _example_panel(ctx: core.Context, pe: fcache.Entry) -> dict:
             "The data panel's youngest subject: the BET node fMRIPrep 25.2.6 ran on the "
             "N4-corrected BOLD reference of OpenNeuro ds000228 sub-pixar008, aged 3.5 (a small "
             "head, an oblique field of view; task pixar), `bet <boldref> <out> -f 0.20 -m`, "
-            "given to FSL 6.0.7.17, fMRIPrep's build of FSL and the replica in both modes, "
+            "given to FSL 6.0.7.23, fMRIPrep's build of FSL and the replica in both modes, "
             "beside the outputs fMRIPrep's node wrote. As a panel case beside the examples "
             "above, it is stored as three full-resolution slices."
         ),
@@ -763,7 +765,7 @@ def _example_surf(ctx: core.Context, e: fcache.Entry) -> dict:
             "synthetic head, from FSL bet2's surface of it: profiles along the surface's normals "
             "through both images find the inner skull, the outer skull and the scalp; three "
             "surfaces are deformed onto them in turn. A synthetic head shows them whole: on a "
-            "real head the scalp would show a face. FSL 6.0.7.17, fMRIPrep's FSL and the replica "
+            "real head the scalp would show a face. FSL 6.0.7.23, fMRIPrep's FSL and the replica "
             "in both modes; choose the mask above the panels."
         ),
         "facts": [

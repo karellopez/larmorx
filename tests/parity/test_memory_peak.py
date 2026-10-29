@@ -127,7 +127,7 @@ def test_larmorx_needs_no_more_memory_than_ants(tmp_path, program, size, spacing
             assert a.tobytes() == b.tobytes(), program
 
 
-#: FSL's BET programs (FSL 6.0.7.17, ``~/fsl``) against larmorx's command (``python -m larmorx
+#: FSL's BET programs (FSL 6.0.7.23, ``~/fsl-6.0.7.23``) against larmorx's command (``python -m larmorx
 #: fsl <tool>``, which runs the ``larmorx-nc`` replica as a separate process; ``/usr/bin/time``
 #: reports the larger of the two processes): bet2 with each output, bet's ``-R`` (bet2 run
 #: repeatedly, fslstats) and ``-F`` (a 4D series: fslroi, bet2, fslmaths ``-mas``), betsurf on
@@ -179,7 +179,7 @@ def _contents(d: Path) -> dict[str, bytes]:
 def test_larmorx_needs_no_more_memory_than_fsl(tmp_path, tool, args):
     fb = pytest.importorskip("larmorx_validation.parity.fsl_bet")
     if fb.fsl_dir() is None:
-        pytest.skip("FSL 6.0.7.17 (~/fsl, LARMORX_FSL_DIR) was not found")
+        pytest.skip("FSL (~/fsl-6.0.7.23, LARMORX_FSLDIR) was not found")
     if fb.replica_binary() is None:
         pytest.skip("the larmorx-nc program is not built (crates-nc)")
     if not Path("/usr/bin/time").is_file():

@@ -342,7 +342,7 @@ status = "`validated` (full tier: [ants-atropos-full](record:ants-atropos-full);
 [[record]]
 id = "mri-hmc"
 larmorx = "`lx.mri.hmc`, `larmorx mri hmc` (clean-room)"
-reference = "mcflirt (FSL 6.0.7.23 since 2026-10-29, the recorded runs in `oracles/fsl-6.0.7.23/mcflirt/`; 6.0.7.17's in `oracles/fsl-6.0.7/mcflirt/`)"
+reference = "mcflirt (FSL 6.0.7.17, the recorded runs in `oracles/fsl-6.0.7/mcflirt/`; against FSL 6.0.7.23 it fails one case more, FSL-59, until a clean-room agent aligns it)"
 status = "`experimental` ({mri-hmc.fail} of {mri-hmc.compared} compared cases misses its threshold)"
 
 [[record]]

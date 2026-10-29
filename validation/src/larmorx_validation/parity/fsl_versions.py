@@ -47,9 +47,11 @@ DIR_ENV = "LARMORX_FSLDIR"
 #: The BET suite's earlier name for :data:`DIR_ENV`, still read.
 DIR_ENV_OLD = "LARMORX_FSL_DIR"
 #: The version each implementation is validated against by default: the replicas follow the
-#: newest release; the clean-room head-motion correction too (it agrees with mcflirt 6.0.7.23 as
-#: with 6.0.7.17 wherever 6.0.7.23 changed nothing it implements: docs/validation/mri-hmc.md).
-DEFAULT = {"replica": NEWEST, "original": NEWEST}
+#: newest release; the clean-room head-motion correction stays on 6.0.7.17 until a clean-room
+#: agent aligns it (against 6.0.7.23 it fails `syn/motion/small/nn_final` too: FSL-59, mcflirt
+#: 6.0.7.23 resampling -nn_final trilinearly; every other case as against 6.0.7.17:
+#: validation/investigations/version-fsl/mri-hmc-6.0.7.23.md).
+DEFAULT = {"replica": NEWEST, "original": PREVIOUS}
 #: mcflirt's recorded runs, per version (under the workspace).
 RECORDINGS = {
     "6.0.7.23": "oracles/fsl-6.0.7.23/mcflirt",

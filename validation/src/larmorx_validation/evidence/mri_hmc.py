@@ -48,11 +48,8 @@ NODE = (
 REF = "out/sub-01/func/sub-01_task-mixedgamblestask_run-01_desc-hmc_boldref.nii.gz"
 MASK = "out/sub-01/func/sub-01_task-mixedgamblestask_run-01_desc-brain_mask.nii.gz"
 FMRIPREP_MATS = "sub-01_task-mixedgamblestask_run-01_bold_mcf.nii.gz.mat"
-#: FSL's installation: the newest kept (6.0.7.23 since 2026-10-29), as the replica's record
-#: (``larmorx_validation.parity.fsl_versions``); its mcflirt gives 6.0.7.17's outputs on this run
-#: byte for byte (the recordings' ``real/ds000005/fmriprep``).
-FSL = Path.home() / "fsl-6.0.7.23"
-MCFLIRT = FSL / "bin" / "mcflirt"
+FSL = Path.home() / "fsl"
+MCFLIRT = FSL / "share" / "fsl" / "bin" / "mcflirt"
 PERTURB = ("noise", "noise2", "noise3", "reverse")
 #: volumes of the series shown in the viewer (a subset keeps the page light)
 N_SHOWN = 6
@@ -80,7 +77,7 @@ def _compute(e: fcache.Entry) -> None:
 
     run = common.fmriprep_run(RUN)
     if not MCFLIRT.is_file():
-        raise FileNotFoundError(f"FSL 6.0.7.23's mcflirt ({MCFLIRT})")
+        raise FileNotFoundError(f"FSL 6.0.7's mcflirt ({MCFLIRT})")
     command = (run / NODE / "command.txt").read_text(encoding="utf-8").strip()
     bold = e.input("BOLD", Path(td.get(BOLD)))
     ref = e.input("HMC reference (fMRIPrep's desc-hmc_boldref)", run / REF)
@@ -762,7 +759,7 @@ def _example(ctx: core.Context, reg: dict) -> dict:
         "title": "fMRIPrep's head-motion estimation of a real BOLD run, by mcflirt and larmorx",
         "summary": (
             "The mcflirt node fMRIPrep 25.2.6 ran on OpenNeuro ds000005 sub-01's first BOLD run "
-            "(240 volumes, its own HMC reference): its command given to FSL 6.0.7.23's mcflirt (6.0.7.17's gives the same bytes), to "
+            "(240 volumes, its own HMC reference): its command given to FSL 6.0.7's mcflirt, to "
             "the bit-exact replica (larmorx-nc) and to larmorx's clean-room original. fMRIPrep "
             "keeps only the matrices; the realigned "
             f"series are shown at {len(shown)} of the {n} volumes (where larmorx deviates most, "

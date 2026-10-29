@@ -4,7 +4,7 @@ fMRIPrep's `ResampleSeries` multiplies the distortion-corrected BOLD by `1 + np.
 
 Geometry from the fMRIPrep 25.2.6 run `oracles/fmriprep-25.2.6/ds000005-sub-01-noreconall/out/sub-01`: its BOLD reference (native grid), its T1w and MNI152NLin2009cAsym res-2 grids, its boldref→T1w affine and its T1w→MNI warp. The field map is synthetic, shaped like a 3 T susceptibility field (an orbitofrontal lobe of +120 Hz, sigma 16 mm, and two temporal lobes of -80 Hz, sigma 14 mm), defined in the BOLD reference's world space and carried to each target grid through the run's transforms, as `ReconstructFieldmap` does; the readout is 30 ms along `j`, so shifts reach 3.6 voxels. The source is a volume of ones, so the output is the Jacobian factor itself: a difference of 0.01 is a 1 % difference in the corrected signal. Voxels inside each grid's brain mask.
 
-Generated with `python -m larmorx_validation.parity.resample_jacobian --run <run>/out/<subject> --oracle <workspace>/oracles/fmriprep-25.2.6/ds005040-sub-002-noreconall --oracle <workspace>/oracles/fmriprep-25.2.6/ds005454-sub-16-noreconall --out docs/validation` (2026-10-12).
+Generated with `python -m larmorx_validation.parity.resample_jacobian --run <run>/out/<subject> --oracle <workspace>/oracles/fmriprep-25.2.6/ds005040-sub-002-noreconall --oracle <workspace>/oracles/fmriprep-25.2.6/ds005454-sub-16-noreconall --out docs/validation` (2026-10-29), in numpy 2.5.4 (OpenBLAS 0.3.34.106.0 (Haswell)), SciPy 1.18.1 (oracles/python-newest).
 
 ## Corrected against fMRIPrep
 

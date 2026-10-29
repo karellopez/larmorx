@@ -334,6 +334,42 @@ def case_final(work: Path, who: list[str], mode: str) -> None:
             )
 
 
+def case_outext(work: Path, who: list[str], mode: str) -> None:
+    """`-out` names with the new extensions (dropped before FSLOUTPUTTYPE's), and a `-reffile`
+    name without an extension (completed)."""
+    raw = gzip.decompress(SERIES.read_bytes())
+    for w in who:
+        for label, args in (
+            ("out-nii-zst", ["-in", "in.nii.gz", "-out", "o1.nii.zst"]),
+            ("out-hdr-bz2", ["-in", "in.nii.gz", "-out", "o2.hdr.bz2"]),
+            ("out-img-gz", ["-in", "in.nii.gz", "-out", "o3.img.gz"]),
+            ("reffile-noext", ["-in", "in.nii.gz", "-out", "o4", "-reffile", "ref"]),
+        ):
+            d = work / "outext" / w / label
+            if d.exists():
+                shutil.rmtree(d)
+            d.mkdir(parents=True)
+            (d / "in.nii.gz").write_bytes(SERIES.read_bytes())
+            # The reference: the series' first volume, zstd, named .nii.zst.
+            hdr = bytearray(raw[:352])
+            hdr[40:42] = np.int16(3).tobytes()
+            hdr[48:50] = np.int16(1).tobytes()
+            nvox = int(np.prod(np.frombuffer(bytes(raw[42:48]), "<i2")))
+            bpv = int(np.frombuffer(bytes(raw[72:74]), "<i2")[0]) // 8
+            vol = raw[352 : 352 + nvox * bpv]
+            zst = subprocess.run(
+                [str(FSL / "bin" / "zstd"), "-q", "-c", "-"],
+                input=bytes(hdr) + vol,
+                capture_output=True,
+                check=True,
+            ).stdout
+            (d / "ref.nii.zst").write_bytes(zst)
+            before = {p for p in d.rglob("*")}
+            code, msg = run(w, args, d, "NIFTI_GZ", mode)
+            new = sorted(str(p.relative_to(d)) for p in d.rglob("*") if p not in before)
+            print(f"{w:8s} {label:14s} exit {code} new: {new} {msg[:200]!r}")
+
+
 CASES = {
     "types": case_types,
     "read": case_read,
@@ -341,6 +377,7 @@ CASES = {
     "unknown": case_unknown,
     "fsl60": case_fsl60,
     "final": case_final,
+    "outext": case_outext,
 }
 
 

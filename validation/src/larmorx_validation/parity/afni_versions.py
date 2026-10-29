@@ -255,9 +255,27 @@ def compare_nifti(a: Path, b: Path) -> str | None:
     return "; ".join(out) or None
 
 
-#: The lines that name AFNI's build (its version banner, its compile date), which differ
-#: between any two builds and say nothing of what the program did.
-_BUILD_LINE = re.compile(r"AFNI version=|[Cc]ompile date = ")
+def compare_output(a: Path, b: Path) -> str | None:
+    """:func:`compare_nifti` for NIfTI files; for AFNI's own format (``+orig.HEAD``) the data
+    (the ``.BRIK`` beside it: the ``.HEAD`` holds a random identifier and the history); any
+    other file byte for byte."""
+    name = a.name
+    if name.endswith((".nii", ".nii.gz")):
+        return compare_nifti(a, b)
+    if name.endswith(".HEAD"):
+        for ext in (".BRIK", ".BRIK.gz"):
+            ba, bb = a.with_name(name[:-5] + ext), b.with_name(name[:-5] + ext)
+            if ba.is_file() or bb.is_file():
+                if not (ba.is_file() and bb.is_file()):
+                    return f"{ext} written by one build only"
+                return None if ba.read_bytes() == bb.read_bytes() else f"{ext} data differ"
+        return None  # the .HEAD alone: its identifier and history only
+    return None if a.read_bytes() == b.read_bytes() else "the file differs"
+
+
+#: The lines that name AFNI's build (its version banner, its compile date, the build named in
+#: its crash banner), which differ between any two builds and say nothing of what it did.
+_BUILD_LINE = re.compile(r"AFNI version=|[Cc]ompile date = |\[\[Precompiled binary ")
 
 
 def _without_build_lines(text: str) -> str:

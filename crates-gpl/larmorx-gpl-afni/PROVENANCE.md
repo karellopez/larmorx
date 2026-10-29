@@ -1,15 +1,26 @@
 # Provenance: larmorx-gpl-afni
 
 **Replica: translated from AFNI's source.** This crate is a step-by-step Rust translation of
-AFNI 25.2.09 (tag `AFNI_25.2.09`, commit `b1e12b26dae2`, see `upstream.tsv`), written to give
-AFNI's output bit for bit. It is distributed under the GNU General Public License, version 3
+AFNI 26.3.05 (tag `AFNI_26.3.05`, commit `07c1dcfb5fdc`), written to give AFNI's output bit for
+bit. It was translated from AFNI 25.2.09 (tag `AFNI_25.2.09`, commit `b1e12b26dae2`) in
+2026-10 and brought to 26.3.05 on 2026-10-29 (below, "AFNI 26.3.05"): the files it translates
+are the same text in both releases apart from their licence headers and the two changes listed
+there, which the replica now follows. It is distributed under the GNU General Public License, version 3
 or later (`../LICENSE`), as part of the `larmorx-gpl` package (`docs/licensing.md`). The
 Apache-2.0 clean-room original of the same tool is `crates/larmorx-afni`; neither crate uses
 the other's code.
 
 ## Licences of the translated sources
 
-- **AFNI files copyrighted by the Medical College of Wisconsin.** Their header reads "Major
+- **AFNI files copyrighted by the Medical College of Wisconsin.** In AFNI 26.3.05 their header
+  reads "Major portions of this software are copyrighted by the Medical College of Wisconsin,
+  1994-2000, and are released under the Creative Commons Attribution License (CC BY 4.0)", and
+  `doc/README/README.copyright` says: "These portions were originally available publicly with
+  GPL-2.0 license. As of May 12, 2026, MCW has granted NIH a Creative Commons Attribution
+  License (CC BY 4.0) for all of the code under its copyright." CC BY 4.0 allows adaptations
+  under another licence with attribution; the translation stays GPL-3.0-or-later here (no move
+  without the user's decision: `docs/findings/afni-relicensing-26.md`). In AFNI 25.2.09, which
+  the translation was first made from, the header read "Major
   portions of this software are copyrighted by the Medical College of Wisconsin, 1994-2000,
   and are released under the Gnu General Public License, Version 2", and
   `doc/README/README.copyright` says: "The MCW-copyrighted part of this software is released
@@ -31,7 +42,7 @@ Changes from the originals are listed below and in each module's documentation.
 
 ## AFNI files and functions translated
 
-| Rust module | AFNI 25.2.09 file | Functions, macros | Copyright |
+| Rust module | AFNI file (26.3.05; 25.2.09 alike but where noted) | Functions, macros | Copyright |
 |---|---|---|---|
 | `csfft` | `src/csfft.c` | `csfft_cox` (with its `fftn` routing test), `csfft_trigconsts`, the `fft2`/`fft4` macros, `fft8`, `fft16`, `fft32` (generated code, as one loop), `fft64`, `fft128`, `fft256`, `fft512`, `fft_4dec`, `fft_3dec`, `fft_5dec`, `csfft_nextup`, `csfft_nextup_one35`, `csfft_nextup_even` | MCW 1994-2000 (radix-2 code by Andrzej Jesmanowicz, the rest by Robert W. Cox) |
 | `shift` | `src/thd_shift2.c` | `SHIFT_set_method`, `SHIFT_get_method`, `SHIFT_two_rows`, `fft_shift2` (with `ZFILL`, `RECUR`), `lin_shift`, `cub_shift`, `quint_shift`, `hept_shift`, `wsinc5_shift`, `wsinc9_shift`, `nn_shift`, `ts_shift` and their `*_shift2` wrappers; the `P_*`, `Q_*`, `S_*`, `FINS`, `sinc`, `M3`, `wwsinc5`, `wwsinc9` macros | MCW 1994-2000 |
@@ -48,7 +59,7 @@ Changes from the originals are listed below and in each module's documentation.
 | `afni_ext` | `src/thd_zblock.c` | `THD_unzblock` | MCW 1994-2000 |
 | `afni_ext` | `src/niml/niml_elemio.c` | the text decoding of `NI_read_element`, `NI_decode_one_double`, `NI_decode_one_string`, `header_stuff_is_group` | NIH, public domain |
 | `dataset` | `src/thd_atlas.c`, `src/AFNI_atlas_spaces.niml` | `THD_get_generic_space` (the generic space of each standard template space) | NIH, public domain |
-| `dataset` | `src/thd_niftiread.c` | `THD_open_nifti` (datum, brick factors, time axis, slice offsets, the choice of qform or sform, the geometry it keeps), `THD_load_nifti` (conversion to float, scaling, float scan), `NIFTI_code_to_view`, `NIFTI_code_to_space` | NIH, public domain |
+| `dataset` | `src/thd_niftiread.c` | `THD_open_nifti` (datum, brick factors, time axis, slice offsets (26.3.05's code 2, AFNI-03 fixed), the choice of qform or sform, the geometry it keeps), `THD_load_nifti` (conversion to float, scaling, float scan), `NIFTI_code_to_view`, `NIFTI_code_to_space` | NIH, public domain |
 | `dataset` | `src/thd_niftiwrite.c` | `populate_nifti_image` (datum, scaling, geometry, dimensions, time and slice-timing fields, units, codes), `get_slice_timing_pattern`, `space_to_NIFTI_code` | NIH, public domain |
 | `dataset` | `src/nifti/nifti2/nifti2_io.c` | the header conversion of `nifti_image_read` (`nifti_convert_n1hdr2nim`, `nifti_convert_n2hdr2nim`: dimension and spacing fixes, `FIXED_FLOAT`), `nifti_quatern_to_dmat44` | NIH, public domain |
 | `dataset` | `src/thd_floatscan.c` | `thd_floatscan` | MCW 1994-2000 |
@@ -73,7 +84,7 @@ Changes from the originals are listed below and in each module's documentation.
 | `dataset` | `src/thd_writedset.c` | the `AFNI_ALLOW_MILLISECONDS` and one-row (`AFNI_WRITE_1D_AS_PREFIX`) tests of `THD_write_3dim_dataset` | MCW 1994-2000 |
 | `dataset` | `src/edt_fullcopy.c` | `EDIT_full_copy` (the order of copying and loading) | MCW 1994-2000 |
 | `dataset` | `src/3ddata.h` | `DSET_UNMSEC` | MCW 1994-2000 |
-| `tshift` | `src/3dTshift.c` | the slice and voxel-pair loop of `main` | MCW 1994-2000 |
+| `tshift` | `src/3dTshift.c` | the slice and voxel-pair loop of `main` (26.3.05's `-no_detrend`, AFNI-05 fixed) | MCW 1994-2000 |
 | `tshift` | `src/thd_dsetto1D.c` | `THD_extract_series`, `THD_extract_array` | MCW 1994-2000 |
 | `tshift` | `src/thd_1Dtodset.c` | `THD_insert_series` | MCW 1994-2000 |
 | `tshift` | `src/thd_initdblk.c` | `THD_need_brick_factor` | MCW 1994-2000 |
@@ -89,7 +100,7 @@ The licence of every routine that shapes their results is in
 library code is involved, so both are replicas here, and clean-room originals are to follow
 from `specs/3dAutomask.md` and `specs/3dUnifize.md`.
 
-| Rust module | AFNI 25.2.09 file | Functions, macros | Copyright |
+| Rust module | AFNI file (26.3.05; 25.2.09 alike but where noted) | Functions, macros | Copyright |
 |---|---|---|---|
 | `mask` | `src/thd_automask.c` | `THD_automask_verbose`, `_extclip`, `_set_clipfrac`, `_set_peelcounts`, `_set_gradualize` (as `MaskSettings`), `mask_count`, `mri_automask_image`, `mri_automask_image2D`, `THD_mask_clip_neighbors`, `THD_mask_fillin_once`, `THD_mask_fillin_completely`, `THD_mask_clust`, `THD_mask_clust2D`, `THD_mask_erode` (without `redilate`), `THD_mask_erodemany`, `THD_mask_erodemany2D`, `THD_mask_dilate`, `THD_mask_depth` | NIH, public domain |
 | `mask` | `src/thd_cliplevel.c` | `THD_cliplevel` (float images), `THD_cliplevel_partial`, `get_octant_clips`, `pointclip`, `THD_cliplevel_gradual` | NIH, public domain |
@@ -189,9 +200,11 @@ their exact definitions.
   - AFNI-02 (`dataset::read`): float32 data with a slope and an intercept, scaled when loaded,
     get no brick factor; AFNI keeps the slope as one.
   - AFNI-03 (`dataset::slice_offsets`): header slice code 2 visits `slice_end` down to
-    `slice_start`; AFNI's loop visits `slice_end` only.
+    `slice_start`; AFNI 25.2.09's loop visited `slice_end` only. **Fixed in AFNI 26.3.05** the
+    same way: both modes now follow 26.3.05, and no notice is printed (2026-10-29).
   - AFNI-05 (`tshift::shift_pair`): `-no_detrend` de-means the second voxel of each pair with
-    its own mean; AFNI de-means the first voxel twice.
+    its own mean; AFNI 25.2.09 de-meaned the first voxel twice. **Fixed in AFNI 26.3.05** the
+    same way: both modes now follow 26.3.05, and no notice is printed (2026-10-29).
   - AFNI-07 (`dataset::geometry`): a metre or micrometre header's matrix and origins are
     converted to millimetres with its steps; AFNI converts only the steps.
   - AFNI-08 (`dataset::slice_fields`): the "all zeros" test of `populate_nifti_image` is what
@@ -237,6 +250,28 @@ their exact definitions.
   zero or repeated column): AFNI indexes its orientation tables out of bounds there; the
   replica writes the matrix as read.
 
+## AFNI 26.3.05 (2026-10-29)
+
+How the crate was brought from 25.2.09 to 26.3.05 (`validation/investigations/version-afni/`):
+every file named above diffed between the two release trees (`diff_tags.py`), and every function
+of the three programs' binaries, built from both tags by `scripts/build_afni_oracle.sh` with the
+same compiler and flags, compared by machine code (`function_diff.py`), which also covers the
+macros and inlined routines of files not named here.
+
+| What changed in AFNI | Where | In the replica |
+|---|---|---|
+| Header slice code 2 read from `slice_end` down to `slice_start` (AFNI-03 fixed) | `src/thd_niftiread.c` (`THD_open_nifti`) | `dataset::slice_offsets`: one path in both modes; the AFNI-03 notices of 3dTshift, 3dAutomask and 3dUnifize removed |
+| `-no_detrend` de-means the second voxel with its own mean (AFNI-05 fixed) | `src/3dTshift.c` (`main`) | `tshift::shift_pair`: one path in both modes; the AFNI-05 notice removed |
+| The MCW licence headers, GPL-2 → CC BY 4.0 | 27 of the files above | the licence statements here and in `../NOTICE`; the code's own licence unchanged (GPL-3.0-or-later) |
+| `THD_mask_erode2D` added; two declarations in `3ddata.h`; an include in `mrilib.h`; new atlases in `AFNI_atlas_spaces.niml`; a macOS check in `machdep`; five help-search routines | `src/thd_automask.c`, `3ddata.h`, `mrilib.h`, `AFNI_atlas_spaces.niml`, `machdep.c`, `thd_getpathprogs.c`, `thd_ttatlas_query.c`, `thd_niml.c` | nothing: none of the three programs reaches them, or (the atlases) no template space changed |
+
+The two D13 corrections AFNI adopted were already larmorx's defaults, computed the same way, so
+the replica's default output does not change; its `reproduce` mode changes where it met them
+(it now gives 26.3.05's result; 25.2.09's is that of earlier larmorx releases). The golden cases
+`3dTshift.cubic.float32-defects.reproduce` (re-recorded) and
+`3dTshift.heptic.uint8.no_detrend.reproduce` (removed: the same path as the default) changed with
+it.
+
 ## Verification
 
 | What | How | Result (2026-10-10) |
@@ -245,6 +280,7 @@ their exact definitions.
 | `glibc_sincosf` | `tools/sincosf-verify`: all 2^32 float inputs against glibc 2.35 on an x86-64 CPU with FMA | 0 differ for `sinf` and for `cosf` |
 | `glibc_floatmath` (2026-10-23) | `tools/floatmath-verify`: `tanhf` on all 2^32 inputs against glibc 2.35, input by input; both functions as a hash of all 2^32 results, against `glibc_reference.c` (a C program calling glibc) | 0 `tanhf` inputs differ; the hashes equal (`3c6bad00ea34c387`, `c679cb92d4402e33`) |
 | 3dAutomask, 3dUnifize (2026-10-23) | `python -m larmorx_validation parity afni-automask` and `afni-unifize` against the AFNI 25.2.09 binary | see `docs/validation/afni-automask.md`, `afni-unifize.md` |
+| The three replicas against AFNI 26.3.05 (2026-10-29) | `python -m larmorx_validation parity afni-tshift`, `afni-automask`, `afni-unifize` `--implementation replica` (AFNI 26.3.05 is the replicas' default build; each case also runs 25.2.09: "AFNI's own step") | `docs/validation/afni-tshift-replica.md`, `afni-automask-replica.md`, `afni-unifize-replica.md` |
 | 3dTshift | `python -m larmorx_validation parity afni-tshift --implementation replica` against the AFNI 25.2.09 binary | 217 of 217 compared cases bit-identical (`docs/validation/afni-tshift-replica.md`) |
 | 3dTshift with D13 (2026-10-12) | the same suite, in `reproduce` mode, with a fix pass and the replica's default against the clean-room original's | see `docs/validation/afni-tshift-replica.md` (from `c479c1a`: 279 of 279 compared cases bit-identical, 3 expected divergences) |
 | `x87` (2026-10-12) | the emulated operations against GCC's `long double` on x86-64: 3 million quotients of the kind `nifti_dmat44_to_quatern` forms, and 2 million random sums, products and quotients (scratch C programs) | 0 differ (1,071 of them differ from plain double arithmetic) |

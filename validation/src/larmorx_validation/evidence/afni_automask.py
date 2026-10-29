@@ -23,7 +23,7 @@ from pathlib import Path
 
 import numpy as np
 
-from larmorx_validation.evidence import common, core
+from larmorx_validation.evidence import afni_step, common, core
 from larmorx_validation.figures import cache as fcache
 from larmorx_validation.figures import records
 
@@ -69,7 +69,9 @@ def environment() -> tuple[dict[str, str], tuple[str, ...]]:
 def binaries(program: str) -> tuple[str, str, Path]:
     from larmorx_validation.parity import afni_replica as ar
 
-    afni, gpl, sif = ar.afni_binary(program), ar.replica_binary(), ar.fmriprep_image()
+    # AFNI 25.2.09, as the entries were first computed; 26.3.05 is added by ``afni_step``
+    afni = ar.afni_binary(program, afni_step.OLD)
+    gpl, sif = ar.replica_binary(), ar.fmriprep_image()
     if afni is None or gpl is None or sif is None:
         raise FileNotFoundError(
             f"the AFNI {program} oracle, the larmorx-gpl replica or fMRIPrep's image"
@@ -135,7 +137,7 @@ def versions(program: str) -> dict[str, str]:
     from larmorx_validation.parity import afni_replica as ar
 
     return {
-        "afni": ar.afni_build(program),
+        "afni": ar.afni_build(program, version=afni_step.OLD),
         "afni_in_fmriprep_image": image_version(program),
         "larmorx-gpl": ar.replica_version(),
         "fmriprep_image": (common.oracles() / "images" / "fmriprep-25.2.6.sif.sha256")
@@ -341,6 +343,33 @@ def window_of(ex, pid: str) -> list[float]:
     return [w["lo"], w["hi"]]
 
 
+#: AFNI 26.3.05 on the same calls (the replica's reference since 2026-10-29; ``afni_step``).
+PANEL_26 = (
+    "afni26",
+    "afni26",
+    "original",
+    "AFNI 26.3.05, 3dAutomask",
+    "the repository's oracle build; the replica's reference",
+)
+
+
+def afni26_diffs(what: str = "") -> list[dict]:
+    """The replica against AFNI 26.3.05, and AFNI's own step from 25.2.09."""
+    d = common.d
+    return [
+        d("replica-afni26", "replica", "afni26", "main", f"replica − AFNI 26.3.05{what}",
+          common.ROLE_LX),
+        d("afni26-afni", "afni26", "afni", "variability", f"AFNI 26.3.05 − AFNI 25.2.09{what}",
+          "the original against itself: the version step"),
+    ]  # fmt: skip
+
+
+AFNI26_SAME = (
+    "AFNI 26.3.05 gives AFNI 25.2.09's bytes on this call: the version step changes nothing here "
+    "(its two changes, AFNI-03 and AFNI-05, need header slice code 2 or 3dTshift's -no_detrend)."
+)
+
+
 #: The clean-room original's panels (and its run at 6 threads, compared but not shown).
 ORIGINAL_PANELS = [
     ("original", "original", "larmorx", "LARMORX clean-room original", "default mode, 1 thread"),
@@ -410,7 +439,7 @@ def original_verdicts(diffs: list[dict], same: dict[str, bool]) -> None:
             )
 
 
-def _example_ref(ctx: core.Context, e: fcache.Entry, o: fcache.Entry) -> dict:
+def _example_ref(ctx: core.Context, e: fcache.Entry, o: fcache.Entry, step: dict) -> dict:
     import nibabel as nib
     from scipy import ndimage
 
@@ -420,6 +449,7 @@ def _example_ref(ctx: core.Context, e: fcache.Entry, o: fcache.Entry) -> dict:
     run = common.fmriprep_run(RUN)
     img = nib.load(str(run / INPUT))
     arrays = runs(e, "", OUTPUTS)
+    arrays.update(runs(e, "", OUTPUTS, [PANEL_26]))
     arrays.update(runs(o, "", OUTPUTS, ORIGINAL_PANELS + ORIGINAL_6))
     node = common.load(str(run / FMRIPREP_MASK))
     masks = [a["mask"] for a in arrays.values()]
@@ -432,12 +462,13 @@ def _example_ref(ctx: core.Context, e: fcache.Entry, o: fcache.Entry) -> dict:
                      "3dAutomask's input in fMRIPrep's BOLD reference workflow (float32)",
                      {"all": np.asanyarray(img.dataobj)}))  # fmt: skip
     over = {"mask": {"on": "uni", "window": window_of(ex, "uni")}}
-    for pid, _stem, role, label, sub in PANELS + ORIGINAL_PANELS:
+    for pid, _stem, role, label, sub in [*PANELS, PANEL_26, *ORIGINAL_PANELS]:
         ex.add(exm.Panel(pid, role, label, sub, arrays[pid], overlay=over))
     d = common.d
     diffs = [
         *original_diffs()[:1],
         d("replica-afni", "replica", "afni", "main", "replica − AFNI 25.2.09", common.ROLE_LX),
+        *afni26_diffs(),
         d("image-afni", "image", "afni", "variability",
           "fMRIPrep's AFNI − the repository's AFNI build", common.ROLE_ORIG),
         d("original-image", "original", "image", "fmriprep", "original − fMRIPrep's AFNI",
@@ -480,10 +511,12 @@ def _example_ref(ctx: core.Context, e: fcache.Entry, o: fcache.Entry) -> dict:
         "title": "fMRIPrep's second skull strip of a real BOLD reference",
         "summary": (
             "The 3dAutomask node fMRIPrep 25.2.6 ran on the unifized BOLD reference of OpenNeuro "
-            "ds005040 sub-002 (task clip, run 1): its arguments given to AFNI 25.2.09, to "
-            "fMRIPrep's own build of AFNI in its image, to the larmorx-gpl replica and to "
-            "LARMORX's clean-room original, each in its default and reproduce modes. The masks "
-            "are drawn over the input; choose *Masked input* for -apply_prefix's output."
+            "ds005040 sub-002 (task clip, run 1): its arguments given to AFNI 25.2.09, to AFNI "
+            "26.3.05 (the replica's reference since 2026-10-29), to fMRIPrep's own build of AFNI "
+            "in its image, to the larmorx-gpl replica and to LARMORX's clean-room original "
+            "(compared with AFNI 25.2.09, its reference until it follows 26.3.05), each in its "
+            "default and reproduce modes. The masks are drawn over the input; choose *Masked "
+            "input* for -apply_prefix's output."
         ),
         "facts": [
             {
@@ -525,6 +558,7 @@ def _example_ref(ctx: core.Context, e: fcache.Entry, o: fcache.Entry) -> dict:
                 else "the mask its node wrote differs from its AFNI's run here",
             },
             {"label": "Grid", "text": common.describe_grid(img, grid.shape)},
+            afni_step.fact({"afni": step["afni"]}, "fMRIPrep's call"),
         ],
         **out,
         "chain": None,
@@ -533,7 +567,7 @@ def _example_ref(ctx: core.Context, e: fcache.Entry, o: fcache.Entry) -> dict:
     }
 
 
-def _example_bold(ctx: core.Context, e: fcache.Entry, o: fcache.Entry) -> dict:
+def _example_bold(ctx: core.Context, e: fcache.Entry, o: fcache.Entry, step: dict) -> dict:
     import larmorx_testdata as td
     import nibabel as nib
     from scipy import ndimage
@@ -543,6 +577,7 @@ def _example_bold(ctx: core.Context, e: fcache.Entry, o: fcache.Entry) -> dict:
     info = e.info()
     img = nib.load(td.get(BOLD))
     arrays = runs(e, "bold-", MASK_ONLY)
+    arrays.update(runs(e, "bold-", MASK_ONLY, [PANEL_26]))
     arrays.update(runs(o, "bold-", MASK_ONLY, ORIGINAL_PANELS + ORIGINAL_6))
     show = ndimage.binary_dilation(
         np.logical_or.reduce([a["mask"] != 0 for a in arrays.values()]), iterations=2
@@ -556,12 +591,13 @@ def _example_bold(ctx: core.Context, e: fcache.Entry, o: fcache.Entry) -> dict:
                      "page in float64, shown as float32): what 3dAutomask masks",
                      {"all": mean}))  # fmt: skip
     over = {"mask": {"on": "bold-mean", "window": window_of(ex, "bold-mean")}}
-    for pid, _stem, role, label, sub in PANELS + ORIGINAL_PANELS:
+    for pid, _stem, role, label, sub in [*PANELS, PANEL_26, *ORIGINAL_PANELS]:
         ex.add(exm.Panel(pid, role, label, sub, arrays[pid], overlay=over))
     d = common.d
     diffs = [
         *original_diffs()[:1],
         d("replica-afni", "replica", "afni", "main", "replica − AFNI 25.2.09", common.ROLE_LX),
+        *afni26_diffs(),
         d("image-afni", "image", "afni", "variability",
           "fMRIPrep's AFNI − the repository's AFNI build", common.ROLE_ORIG),
         *original_diffs()[1:],
@@ -594,8 +630,9 @@ def _example_bold(ctx: core.Context, e: fcache.Entry, o: fcache.Entry) -> dict:
         "summary": (
             "3dAutomask's usual use: a brain mask of an EPI series. With no options it averages "
             f"the absolute values of the {img.shape[3]} volumes, then masks the average. The "
-            "same run as above, before fMRIPrep touched it, given to AFNI 25.2.09, fMRIPrep's "
-            "AFNI, the replica and the clean-room original in both modes."
+            "same run as above, before fMRIPrep touched it, given to AFNI 25.2.09, AFNI 26.3.05 "
+            "(the replica's reference), fMRIPrep's AFNI, the replica and the clean-room original "
+            "in both modes."
         ),
         "facts": [
             {
@@ -613,6 +650,7 @@ def _example_bold(ctx: core.Context, e: fcache.Entry, o: fcache.Entry) -> dict:
             },
             {"label": "Mask", "text": f"{int(np.count_nonzero(a)):,} of {a.size:,} voxels"},
             {"label": "Grid", "text": common.describe_grid(img, grid.shape)},
+            afni_step.fact({"bold-afni": step["bold-afni"]}, "the call"),
         ],
         **out,
         "chain": None,
@@ -667,7 +705,7 @@ def panel_entry(ctx: core.Context) -> fcache.Entry:
     )
 
 
-def _example_panel(ctx: core.Context, pe: fcache.Entry) -> dict:
+def _example_panel(ctx: core.Context, pe: fcache.Entry, step: dict) -> dict:
     """A data-panel case as three full-resolution slices (``view="slices"``), the whole field of
     view shown (nothing masked; only margins where every array is exactly 0 are left out)."""
     import larmorx_testdata as td
@@ -677,8 +715,8 @@ def _example_panel(ctx: core.Context, pe: fcache.Entry) -> dict:
 
     info = pe.info()
     img = nib.load(td.get(PANEL_BOLD))
-    runs_here = PANELS + ORIGINAL_PANELS
     extra = [("original-3", "original-3", "larmorx", "LARMORX clean-room original", "3 threads")]
+    runs_here = [*PANELS, PANEL_26, *ORIGINAL_PANELS]
     arrays = runs(pe, "", MASK_ONLY, runs_here + extra)
     raw = np.asanyarray(img.dataobj, dtype=np.float64)
     mean = np.abs(raw).mean(axis=3).astype(np.float32)
@@ -696,6 +734,7 @@ def _example_panel(ctx: core.Context, pe: fcache.Entry) -> dict:
     diffs = [
         d("original-afni", "original", "afni", "main", "original − AFNI 25.2.09", common.ROLE_LX),
         d("replica-afni", "replica", "afni", "main", "replica − AFNI 25.2.09", common.ROLE_LX),
+        *afni26_diffs(),
         d("image-afni", "image", "afni", "variability",
           "fMRIPrep's AFNI − the repository's AFNI build", common.ROLE_ORIG),
         d("original-replica", "original", "replica", "check",
@@ -772,6 +811,7 @@ def _example_panel(ctx: core.Context, pe: fcache.Entry) -> dict:
                 f"{' × '.join(f'{z:.3g}' for z in img.header.get_zooms()[:3])} mm; shown: the whole field of "
                 f"view ({' × '.join(map(str, grid.shape))}), only margins where every array is 0 left out",
             },
+            afni_step.fact(step, "the call"),
         ],
         **out,
         "chain": None,
@@ -780,7 +820,9 @@ def _example_panel(ctx: core.Context, pe: fcache.Entry) -> dict:
     }
 
 
-def _example_peels(ctx: core.Context, e: fcache.Entry, o: fcache.Entry, reg: dict) -> dict:
+def _example_peels(
+    ctx: core.Context, e: fcache.Entry, o: fcache.Entry, reg: dict, step: dict
+) -> dict:
     import nibabel as nib
     from scipy import ndimage
 
@@ -790,6 +832,7 @@ def _example_peels(ctx: core.Context, e: fcache.Entry, o: fcache.Entry, reg: dic
     run = common.fmriprep_run(RUN)
     img = nib.load(str(run / INPUT))
     arrays = runs(e, "peels0-", OUTPUTS)
+    arrays.update(runs(e, "peels0-", OUTPUTS, [PANEL_26]))
     arrays.update(runs(o, "peels0-", OUTPUTS, ORIGINAL_PANELS))
     arrays["afni-peels1"] = runs(e, "", OUTPUTS)["afni"]
     show = ndimage.binary_dilation(
@@ -802,6 +845,7 @@ def _example_peels(ctx: core.Context, e: fcache.Entry, o: fcache.Entry, reg: dic
     over = {"mask": {"on": "uni", "window": window_of(ex, "uni")}}
     panels = [
         ("afni", "original", "AFNI 25.2.09, -peels 0", "the repository's oracle build"),
+        ("afni26", "original", "AFNI 26.3.05, -peels 0", "the replica's reference"),
         ("replica", "larmorx", "larmorx-gpl replica, -peels 0", "default mode: corrected"),
         ("replica-reproduce", "larmorx", "larmorx-gpl replica, -peels 0", "reproduce mode"),
         ("original", "larmorx", "LARMORX clean-room original, -peels 0", "default mode: corrected"),
@@ -823,6 +867,10 @@ def _example_peels(ctx: core.Context, e: fcache.Entry, o: fcache.Entry, reg: dic
           "original (reproduce) − AFNI, -peels 0", common.ROLE_LX),
         d("afni-peels", "afni", "afni-peels1", "variability", "AFNI: -peels 0 − -peels 1",
           "the defect, in AFNI"),
+        d("repro-afni26", "replica-reproduce", "afni26", "main",
+          "replica (reproduce) − AFNI 26.3.05, -peels 0", common.ROLE_LX),
+        d("afni26-afni", "afni26", "afni", "variability", "AFNI 26.3.05 − AFNI 25.2.09, -peels 0",
+          "the original against itself: the version step"),
     ]  # fmt: skip
     common.compare_all(ex, diffs, OUTPUTS)
     same = common.identical(diffs)
@@ -897,6 +945,7 @@ def _example_peels(ctx: core.Context, e: fcache.Entry, o: fcache.Entry, reg: dic
                 "text": f"the corrected mask differs from AFNI's in {m['differ']:,} of "
                 f"{m['voxels']:,} voxels",
             },
+            afni_step.fact({"peels0-afni": step["peels0-afni"]}, "the call with -peels 0"),
         ],
         **out,
         "chain": None,
@@ -914,7 +963,10 @@ def _link(reg: dict, rid: str) -> dict:
 def _verdict(x: dict, same: dict[str, bool]) -> None:
     i = x["id"]
     x.setdefault("links", [])
-    if x["kind"] == "variability":
+    if i == "afni26-afni":
+        x["verdict"] = None
+        x["reason"] = AFNI26_SAME if same[i] else "AFNI 26.3.05 and 25.2.09 differ on this call."
+    elif x["kind"] == "variability":
         x["verdict"] = None
         x["reason"] = (
             "Two builds of AFNI 25.2.09 (fMRIPrep's image and the repository's) give the same "
@@ -1261,6 +1313,9 @@ def export(ctx: core.Context) -> dict:
     cs = cases(recs, _scenario_list(), PROGRAM, examples)
     e = entry(ctx)
     o = original_entry(ctx)
+    pe = panel_entry(ctx)
+    step = afni_step.ensure(e, ["afni", "bold-afni", "peels0-afni"], ctx.compute)
+    pstep = afni_step.ensure(pe, ["afni"], ctx.compute)
     return {
         "schema": 1,
         "tool": TOOL,
@@ -1279,10 +1334,10 @@ def export(ctx: core.Context) -> dict:
         "cases_total": len(cs),
         "speed": informal_speed(ctx.repo, PROGRAM),
         "examples": [
-            _example_ref(ctx, e, o),
-            _example_bold(ctx, e, o),
-            _example_peels(ctx, e, o, reg),
-            _example_panel(ctx, panel_entry(ctx)),
+            _example_ref(ctx, e, o, step),
+            _example_bold(ctx, e, o, step),
+            _example_peels(ctx, e, o, reg, step),
+            _example_panel(ctx, pe, pstep),
         ],
     }
 

@@ -88,10 +88,11 @@ def afni_binary(program: str, version: str | None = None) -> str | None:
 
 
 @functools.cache
-def afni_build(program: str, implementation: str | None = None) -> str:
-    """The oracle's version and compiler, from its build record."""
-    binary = afni_binary(program, None)
-    if implementation is not None and not os.environ.get("LARMORX_AFNI_BIN"):
+def afni_build(program: str, implementation: str | None = None, version: str | None = None) -> str:
+    """The oracle's version and compiler, from its build record: the build ``implementation``'s
+    cases run, or the build of ``version``."""
+    binary = afni_binary(program, version)
+    if version is None and implementation is not None and not os.environ.get("LARMORX_AFNI_BIN"):
         binary = afni_binary(program, afni_versions.selected(implementation))
     if binary is None:
         return "not found"
@@ -1004,7 +1005,7 @@ def _step(
     differences = {}
     for name in sorted(set(o_out) & set(a_out)):
         try:
-            d = afni_versions.compare_nifti(o_dir / name, a_dir / name)
+            d = afni_versions.compare_output(o_dir / name, a_dir / name)
         except Exception as e:  # an output nibabel cannot read is reported
             d = f"not compared ({type(e).__name__})"
         if d is not None:

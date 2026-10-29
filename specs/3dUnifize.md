@@ -1,4 +1,4 @@
-# Spec: `lx.afni.unifize` (behaviour of AFNI 3dUnifize 25.2.09)
+# Spec: `lx.afni.unifize` (behaviour of AFNI 3dUnifize 25.2.09 and 26.3.05)
 
 The input for a clean-room **original** of larmorx's intensity uniformization (to be written in
 `crates/larmorx-afni`, Apache-2.0). AFNI's 3dUnifize program file is NIH public domain, but its
@@ -17,6 +17,13 @@ rule 1):
 or the findings written from the source (`docs/findings/afni-unifize.md`, the restricted
 sections of the defect register). It may read `specs/3dAutomask.md` (the automask and the clip
 level used here are 3dAutomask's).
+
+**AFNI 26.3.05 (the reference from 2026-10-29).** (AFNI 26.3.05) larmorx follows AFNI's newest
+release (decision log 2026-10-27). AFNI 26.3.05's 3dUnifize behaves as 25.2.09's, as this spec
+describes it, except where a line is marked "(AFNI 26.3.05)": header slice code 2 is read as NIfTI defines it (`specs/3dTshift.md` §3.2), so the slice timing an output keeps from such a series is the header's in both modes and AFNI-03 is never named (`specs/3dAutomask.md` §9). (AFNI 26.3.05) The black-box
+runs are of `oracles/afni-26.3.05/bin/3dUnifize` (built the same way from the tag `AFNI_26.3.05`);
+`oracles/afni-25.2.09` stays for the earlier records. A clean-room implementer must not open
+`tags/AFNI-26.3.05/` or `oracles/afni-26.3.05/build/` either.
 
 This spec describes behaviour and the numeric conventions that decide the bits; it holds no
 code. **(observed)** marks what black-box runs confirmed.
@@ -287,7 +294,9 @@ it is unset); it changes no result.
 header slice timing, so header slice code 2 names AFNI-03 in both modes and AFNI-08 where the
 kept times are all within 3 ms of 0, in the words of `specs/3dAutomask.md` §9 (the replica
 program's); tiny oblique inputs' headers follow `specs/3dTshift.md` §6.1's quaternion, with its
-extended-precision `1/det`.)**
+extended-precision `1/det`.)** **(AFNI 26.3.05)** AFNI 26.3.05 keeps the header's code-2 times
+(`specs/3dAutomask.md` §9): (AFNI 26.3.05) `-EPI`'s output writes them in both modes and no
+AFNI-03 is named.
 
 **The rule-B refusals in detail** (added 2026-10-24 from the replicas' observable behaviour and black-box
 runs of AFNI 25.2.09; the clean-room original refuses the same way):

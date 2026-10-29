@@ -186,6 +186,33 @@ def rerun(e: Entry, labels: Sequence[str], why: str, cpus: int | None = None) ->
     return info
 
 
+def add_runs(e: Entry, runs: Sequence[tuple[str, list[str], dict[str, str]]], why: str) -> dict:
+    """Add the runs ``(label, argv, env)`` to the complete entry ``e`` (a new version of an
+    original program beside the old one's runs, which stay), keeping everything else:
+    ``RUN_INFO.json`` lists them after the entry's runs, with what was added and why
+    (``added``)."""
+    info = e.info()
+    have = {r["label"] for r in info["runs"]}
+    e.runs = []
+    for label, argv, env in runs:
+        if label in have:
+            continue
+        e.run(label, argv, env=env, unset=("LD_PRELOAD", "OMP_NUM_THREADS"))
+    if not e.runs:
+        return info
+    info["runs"] += [r.__dict__ for r in e.runs]
+    info.setdefault("added", []).append(
+        {
+            "computed": dt.datetime.now(dt.UTC).isoformat(timespec="seconds"),
+            "labels": [r.label for r in e.runs],
+            "larmorx_commit": git_commit(e.ctx.repo),
+            "why": why,
+        }
+    )
+    e.info_path.write_text(json.dumps(info, indent=1) + "\n", encoding="utf-8")
+    return info
+
+
 def provenance(e: Entry) -> dict:
     """How a figure's provenance names a cache entry (paths relative to the cache)."""
     info = e.info()

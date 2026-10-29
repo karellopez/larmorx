@@ -1271,18 +1271,21 @@ def _step(
     checks: CheckList,
     prev: tuple[int, str, Path | None],
     new: tuple[int, str, Path | None],
-    dirs: tuple[Path, Path],
+    dirs: tuple[tuple[Path, ...], tuple[Path, ...]],
     args: list[str],
     inputs: list[Path],
 ) -> None:
     """AFNI's own step from the previous version to the one compared (:mod:`afni_versions`):
     ``(exit status, messages, output or None)`` of each, run on the same arguments in
-    directories set up alike (``dirs``). Reported, never a failure; a change without a known
+    directories set up alike (``dirs``: the places each run's messages name, masked). Reported, never a failure; a change without a known
     reason is a finding."""
-    msgs = tuple(
-        _afni_lines(m).replace(str(d), "<dir>")
-        for (_, m, _), d in zip((prev, new), dirs, strict=True)
-    )
+
+    def masked(text: str, places: tuple[Path, ...]) -> str:
+        for d in places:  # the deeper first: the step's directory sits in the case's
+            text = text.replace(str(d), "<dir>")
+        return _afni_lines(text)
+
+    msgs = (masked(prev[1], dirs[0]), masked(new[1], dirs[1]))
     outs = ([prev[2].name] if prev[2] else [], [new[2].name] if new[2] else [])
     differences = {}
     if prev[2] is not None and new[2] is not None and _is_nifti(prev[2]) and _is_nifti(new[2]):
@@ -1749,7 +1752,7 @@ def _run_separately(
             checks,
             (code, out + err, produced(code, d)),
             (ca, oa + ea, pa),
-            (d, tmp / "afni"),
+            ((d, tmp), (tmp / "afni", tmp)),
             step_args,
             _inputs_of(step_args, image),
         )
@@ -2113,7 +2116,7 @@ def _run_case(case: Case, checks: CheckList, implementation: str = "original") -
                     logs["afni"],
                     outputs["afni"] if produced["afni"] and outputs["afni"].is_file() else None,
                 ),
-                (step_dir, tmp),
+                ((step_dir, tmp), (tmp,)),
                 args,
                 _inputs_of(args, image),
             )

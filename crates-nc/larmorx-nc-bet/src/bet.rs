@@ -926,12 +926,39 @@ pub mod dc {
         }
     }
 
+    /// dc's lexemes: a number is digits and points (with `_` before it for a minus); every other
+    /// character but white space is a command of its own, so `-0.000000` (what FSL 6.0.7.23's
+    /// `fslstats -C` prints for a centre that is minus zero: Armadillo 14.2.1's solve through
+    /// LAPACK) is the subtraction `-` followed by `0.000000`, as GNU dc reads it.
+    fn lexemes(expr: &str) -> Vec<String> {
+        let mut out = Vec::new();
+        let mut num = String::new();
+        let flush = |num: &mut String, out: &mut Vec<String>| {
+            if !num.is_empty() {
+                out.push(std::mem::take(num));
+            }
+        };
+        for c in expr.chars() {
+            if c.is_ascii_digit() || c == '.' || (c == '_' && num.is_empty()) {
+                num.push(c);
+            } else {
+                flush(&mut num, &mut out);
+                if !c.is_whitespace() {
+                    out.push(c.to_string());
+                }
+            }
+        }
+        flush(&mut num, &mut out);
+        out
+    }
+
     /// Evaluates `expr` and returns what `p` printed (dc's own messages to `err`).
     pub fn eval(expr: &str, err: &mut dyn Write) -> String {
         let mut stack: Vec<Num> = Vec::new();
         let mut k: u32 = 0;
         let mut out = String::new();
-        for tok in expr.split_whitespace() {
+        for tok in lexemes(expr) {
+            let tok = tok.as_str();
             let op = |stack: &mut Vec<Num>, err: &mut dyn Write| -> Option<(Num, Num)> {
                 if stack.len() < 2 {
                     let _ = writeln!(err, "dc: stack empty");
@@ -1051,6 +1078,16 @@ pub mod dc {
                 "3\n"
             );
             assert!(e.is_empty());
+        }
+
+        /// A centre printed as `-0.000000` (FSL 6.0.7.23's `fslstats -C`): dc reads the `-` as a
+        /// subtraction (GNU dc 1.4.1's outputs and messages, run 2026-10-29).
+        #[test]
+        fn minus_zero_is_a_subtraction() {
+            let mut e = Vec::new();
+            assert_eq!(eval("0 k 1.0 -0.000000 - 2 ^ p", &mut e), "1.000000\n");
+            assert_eq!(eval("100.0 4.000000  / -0.000000  - 2 / 1 + p", &mut e), "13\n");
+            assert_eq!(String::from_utf8(e).unwrap(), "dc: stack empty\n".repeat(2));
         }
     }
 }

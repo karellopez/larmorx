@@ -1,21 +1,22 @@
 # Parity: 3dUnifize (replica)
 
-**All cases agree.** 115 cases on the `standard` tier: 94 pass, 19 rejected by both, 2 expected divergences, 0 failures.
+**All cases agree.** 116 cases on the `standard` tier: 95 pass, 19 rejected by both, 2 expected divergences, 0 failures.
 
-- **Validated:** `larmorx-gpl afni 3dUnifize` (larmorx-gpl 0.0.1; crate larmorx-gpl-afni, the GPL-3.0-or-later replica translated from AFNI 25.2.09's source), run by larmorx as a separate process: `larmorx afni 3dUnifize` with `LARMORX_IMPLEMENTATION=replica` and `lx.afni.unifize(..., implementation="replica")`
-- **Reference:** 3dUnifize from AFNI (AFNI_25.2.09, gcc (Ubuntu 11.4.0-1ubuntu1~22.04.3) 11.4.0, with OpenMP), the binary built by `scripts/build_afni_oracle.sh`
+- **Validated:** `larmorx-gpl afni 3dUnifize` (larmorx-gpl 0.0.1; crate larmorx-gpl-afni, the GPL-3.0-or-later replica translated from AFNI 26.3.05's source), run by larmorx as a separate process: `larmorx afni 3dUnifize` with `LARMORX_IMPLEMENTATION=replica` and `lx.afni.unifize(..., implementation="replica")`
+- **Reference:** 3dUnifize from AFNI (AFNI_26.3.05, gcc (Ubuntu 11.4.0-1ubuntu1~22.04.3) 11.4.0, with OpenMP), the binary built by `scripts/build_afni_oracle.sh`
 - **Test data:** larmorx-testdata `52124bc98f9f`, tier `standard`
 - **Generated:** 2026-10-29 on Linux x86_64, with `python -m larmorx_validation parity afni-unifize --tier standard --implementation replica`
-- **Original programs:** 184 runs: 181 from the oracle cache, 3 run (1 never cached: the original varies); cache `<workspace>/oracles/cache`, mode `use`
+- **Original programs:** 299 runs: 159 from the oracle cache, 140 run (1 never cached: the original varies); cache `<workspace>/oracles/cache`, mode `use`
 
-**Bit-identical to AFNI: 89 of 89 compared cases that write outputs**: every output the same bytes (data and NIfTI header), with the same exit status and messages. The other 5 compared case(s) write no output in either program (an existing output, a name with a blank, a directory that does not exist) and agree on the exit status and messages; the default mode's corrections there are in the D13 lines below.
-- Messages (standard output and error, byte for byte; AFNI's version banner and compile date, and larmorx's own lines, set aside): 110 of 110 identical, in every case that ran both programs.
+**Bit-identical to AFNI: 90 of 90 compared cases that write outputs**: every output the same bytes (data and NIfTI header), with the same exit status and messages. The other 5 compared case(s) write no output in either program (an existing output, a name with a blank, a directory that does not exist) and agree on the exit status and messages; the default mode's corrections there are in the D13 lines below.
+- Messages (standard output and error, byte for byte; AFNI's version banner and compile date, and larmorx's own lines, set aside): 111 of 111 identical, in every case that ran both programs.
 - 3 case(s) where AFNI crashes (a missing option value, AFNI-40; an empty automask dereferenced, AFNI-46): larmorx prints AFNI's messages up to the crash, then refuses with one line and exit status 1.
 - **fMRIPrep's own outputs** (the oracle runs' node outputs, as fMRIPrep 25.2.6 ran them in its image): 22 of 22 bit-identical to the replica's.
 - AFNI's own variability, AFNI at 1 thread(s): 22 of 22 runs give the oracle's output bit for bit.
 - AFNI's own variability, AFNI at 6 thread(s): 24 of 24 runs give the oracle's output bit for bit.
 - AFNI's own variability, fMRIPrep 25.2.6's AFNI: 24 of 24 runs give the oracle's output bit for bit.
 - Python API (`lx.afni.unifize(..., implementation="replica")`): 35 of 35 cases give the command line's outputs bit for bit.
+- **AFNI's own step, AFNI 25.2.09 → 26.3.05** (both builds on the same arguments; the previous one's runs from the oracle-output cache where an earlier record made them): 113 of 114 cases identical (exit status, messages, every output); 1 changed: 1 by AFNI-03 (AFNI 26.3.05 reads header slice code 2 (sequential decreasing) as NIfTI defines it, from slice_end down to slice_start; 25.2.09 gave every slice time 0): `difftest/epi-slice-code-2-afni26`.
 - **D13 fix pass** (larmorx's default, `upstream_defects="fix"`; the comparison above runs `reproduce`): the corrections met
   - AFNI-01: 1 case(s) named it, 1 with changed values (largest difference 1.67e+03), 1 with other changes (messages): `defects/EPI-negative-slope`
   - AFNI-02: 1 case(s) named it, 1 with changed values (largest difference 0.00427): `defects/head-f32-slope-inter`
@@ -44,7 +45,7 @@
 |---|---|---|---|---|---|
 | datatypes | 10 | 10 | 0 | 0 | 0 |
 | defects | 8 | 7 | 0 | 1 | 0 |
-| difftest | 1 | 1 | 0 | 0 | 0 |
+| difftest | 2 | 2 | 0 | 0 | 0 |
 | dimensions | 6 | 6 | 0 | 0 | 0 |
 | divergences | 1 | 0 | 0 | 1 | 0 |
 | environment | 3 | 3 | 0 | 0 | 0 |
@@ -89,7 +90,7 @@
 
 | Component | Version |
 |---|---|
-| larmorx | 0.0.1 (62a8a8fc6705) |
+| larmorx | 0.0.1 (bd39a5d04bbe) |
 | larmorx-testdata | 52124bc98f9f |
 | Python | 3.12.16 |
 | Platform | Linux x86_64 (Linux-6.8.0-124-generic-x86_64-with-glibc2.35) |
@@ -99,124 +100,125 @@
 
 ## Notes
 
-Both programs run in directories of their own on the same input files, in the same environment (no AFNI variables of this process, `HOME` an empty directory, `AFNI_DONT_LOGFILE=YES`, `AFNI_NIFTI_NOEXT=YES`, plus each case's variables); outputs are compared as stored (data bytes, header bytes decompressed). AFNI runs with OpenMP at this machine's default thread count unless a case sets `OMP_NUM_THREADS`; the replica with its own threads (results do not depend on them). The replica is compared in `reproduce` mode; the fix pass runs its default. The real cases also run AFNI at other OpenMP thread counts and fMRIPrep 25.2.6's own AFNI (in its image) and report how far they are from the oracle; the fMRIPrep cases compare the replica with fMRIPrep's own output of the node as well.
+Both programs run in directories of their own on the same input files, in the same environment (no AFNI variables of this process, `HOME` an empty directory, `AFNI_DONT_LOGFILE=YES`, `AFNI_NIFTI_NOEXT=YES`, plus each case's variables); outputs are compared as stored (data bytes, header bytes decompressed). AFNI runs with OpenMP at this machine's default thread count unless a case sets `OMP_NUM_THREADS`; the replica with its own threads (results do not depend on them). The replica is compared in `reproduce` mode; the fix pass runs its default. The real cases also run AFNI at other OpenMP thread counts and fMRIPrep 25.2.6's own AFNI (in its image) and report how far they are from the oracle; the fMRIPrep cases compare the replica with fMRIPrep's own output of the node as well. AFNI version: 26.3.05 (`--afni-version`, `LARMORX_AFNI_VERSION`; builds: 26.3.05, 25.2.09). Each case also ran AFNI 25.2.09 on the same arguments (from the oracle-output cache where an earlier record ran it): the check 'AFNI's own step: 25.2.09 → 26.3.05' says whether AFNI's own exit status, messages and outputs changed, and why.
 
 ## All cases
 
 | Case | Status | Checks passed | What it tests |
 |---|---|---|---|
-| `options/default` | pass | 7/7 | the defaults on the T1-like phantom |
-| `options/fmriprep-call` | pass | 7/7 | fMRIPrep's options on the T2-like phantom: -clfrac 0.2 -rbt 18.3 65 90 -T2 |
-| `options/Urad-5` | pass | 7/7 | -Urad 5 |
-| `options/Urad-12` | pass | 6/6 | -Urad 12 |
-| `options/Urad-30` | pass | 6/6 | -Urad 30 |
-| `options/rbt` | pass | 7/7 | -rbt 10 30 60 |
-| `options/param` | pass | 6/6 | -param, the same as -rbt |
-| `options/clfrac-0.1` | pass | 6/6 | -clfrac 0.1 |
-| `options/clfrac-0.5` | pass | 6/6 | -clfrac 0.5 |
-| `options/clfrac-0.9` | pass | 6/6 | -clfrac 0.9 |
-| `options/mfrac` | pass | 6/6 | -mfrac, the same as -clfrac |
-| `options/T2` | pass | 7/7 | -T2 on the T2-like phantom |
-| `options/T2-T2` | pass | 7/7 | -T2 -T2: no second inversion, bright edges clipped |
-| `options/T2-T2-T2` | pass | 6/6 | -T2 three times: AFNI neither inverts back nor clips; refused by default (AFNI-48) |
-| `options/T2-x4` | pass | 6/6 | -T2 four times: as three (AFNI-48) |
-| `options/T2-x3-EPI` | pass | 6/6 | -T2 three times with -EPI: -EPI sets one -T2, nothing refused |
-| `options/T2up-95` | pass | 7/7 | -T2 -T2up 95 |
-| `options/GM` | pass | 7/7 | -GM |
-| `options/GM-T2` | pass | 6/6 | -GM -T2 |
-| `options/nosquash` | pass | 7/7 | -nosquash |
-| `options/oink` | pass | 6/6 | -oink, the same as -nosquash |
-| `options/ssave-amsave` | pass | 11/11 | -ssave and -amsave |
-| `options/quiet` | pass | 6/6 | -quiet |
-| `options/verb` | pass | 6/6 | -verb: the automask's messages too |
-| `options/verb-verb` | pass | 6/6 | -verb -verb |
-| `options/useall` | pass | 6/6 | -useall: disabled, a warning |
-| `options/inset` | pass | 6/6 | -inset |
-| `options/case-insensitive` | pass | 6/6 | -t2 -gm -NOSQUASH: AFNI's strcasecmp options |
-| `options/duplo` | pass | 6/6 | 1.2 million voxels: the half-size path |
-| `options/noduplo` | pass | 7/7 | 1.2 million voxels with -noduplo |
-| `options/duplo-T2` | pass | 8/8 | the half-size path with -T2 and -ssave |
-| `options/EPI` | pass | 7/7 | -EPI on a 4D series |
-| `options/EPI-GM` | pass | 6/6 | -EPI -GM: -GM turned off |
-| `options/EPI-3D` | pass | 6/6 | -EPI on one volume: a warning, -T2 kept |
-| `options/4D-without-EPI` | pass | 6/6 | a 4D series without -EPI: sub-brick #0 only |
-| `datatypes/head-i16` | pass | 8/8 | head-i16, with -ssave |
-| `datatypes/head-u8` | pass | 8/8 | head-u8, with -ssave |
-| `datatypes/head-i16-slope2` | pass | 8/8 | head-i16-slope2, with -ssave |
-| `datatypes/head-i16-slope1` | pass | 8/8 | head-i16-slope1, with -ssave |
-| `datatypes/head-f64` | pass | 8/8 | head-f64, with -ssave |
-| `datatypes/head-i8` | pass | 8/8 | head-i8, with -ssave |
-| `datatypes/head-nan` | pass | 8/8 | head-nan, with -ssave |
-| `datatypes/head-oblique` | pass | 8/8 | head-oblique, with -ssave |
-| `datatypes/head-qform-only` | pass | 8/8 | head-qform-only, with -ssave |
-| `datatypes/head-las` | pass | 8/8 | head-las, with -ssave |
-| `defects/head-f32-slope-inter` | pass | 6/6 | float32 with scl_slope and scl_inter (AFNI-02) |
-| `defects/head-metre` | pass | 6/6 | a grid in metres (AFNI-07) |
-| `defects/head-nearly-plumb` | pass | 6/6 | a grid 0.009 degrees from plumb (AFNI-16) |
-| `defects/nifti-scale-no` | pass | 6/6 | AFNI_NIFTI_SCALE=NO on int16 with an intercept (AFNI-23) |
-| `defects/T2up-100` | pass | 7/7 | -T2 -T2up 100: one past the sorted values (AFNI-45) |
-| `defects/T2up-99.99` | pass | 6/6 | -T2 -T2up 99.99 on a small mask: one past the values too (AFNI-45) |
-| `defects/EPI-negative-slope` | pass | 6/6 | -EPI on a series with scl_slope -2 (AFNI-01) |
+| `options/default` | pass | 8/8 | the defaults on the T1-like phantom |
+| `options/fmriprep-call` | pass | 8/8 | fMRIPrep's options on the T2-like phantom: -clfrac 0.2 -rbt 18.3 65 90 -T2 |
+| `options/Urad-5` | pass | 8/8 | -Urad 5 |
+| `options/Urad-12` | pass | 7/7 | -Urad 12 |
+| `options/Urad-30` | pass | 7/7 | -Urad 30 |
+| `options/rbt` | pass | 8/8 | -rbt 10 30 60 |
+| `options/param` | pass | 7/7 | -param, the same as -rbt |
+| `options/clfrac-0.1` | pass | 7/7 | -clfrac 0.1 |
+| `options/clfrac-0.5` | pass | 7/7 | -clfrac 0.5 |
+| `options/clfrac-0.9` | pass | 7/7 | -clfrac 0.9 |
+| `options/mfrac` | pass | 7/7 | -mfrac, the same as -clfrac |
+| `options/T2` | pass | 8/8 | -T2 on the T2-like phantom |
+| `options/T2-T2` | pass | 8/8 | -T2 -T2: no second inversion, bright edges clipped |
+| `options/T2-T2-T2` | pass | 7/7 | -T2 three times: AFNI neither inverts back nor clips; refused by default (AFNI-48) |
+| `options/T2-x4` | pass | 7/7 | -T2 four times: as three (AFNI-48) |
+| `options/T2-x3-EPI` | pass | 7/7 | -T2 three times with -EPI: -EPI sets one -T2, nothing refused |
+| `options/T2up-95` | pass | 8/8 | -T2 -T2up 95 |
+| `options/GM` | pass | 8/8 | -GM |
+| `options/GM-T2` | pass | 7/7 | -GM -T2 |
+| `options/nosquash` | pass | 8/8 | -nosquash |
+| `options/oink` | pass | 7/7 | -oink, the same as -nosquash |
+| `options/ssave-amsave` | pass | 12/12 | -ssave and -amsave |
+| `options/quiet` | pass | 7/7 | -quiet |
+| `options/verb` | pass | 7/7 | -verb: the automask's messages too |
+| `options/verb-verb` | pass | 7/7 | -verb -verb |
+| `options/useall` | pass | 7/7 | -useall: disabled, a warning |
+| `options/inset` | pass | 7/7 | -inset |
+| `options/case-insensitive` | pass | 7/7 | -t2 -gm -NOSQUASH: AFNI's strcasecmp options |
+| `options/duplo` | pass | 7/7 | 1.2 million voxels: the half-size path |
+| `options/noduplo` | pass | 8/8 | 1.2 million voxels with -noduplo |
+| `options/duplo-T2` | pass | 9/9 | the half-size path with -T2 and -ssave |
+| `options/EPI` | pass | 8/8 | -EPI on a 4D series |
+| `options/EPI-GM` | pass | 7/7 | -EPI -GM: -GM turned off |
+| `options/EPI-3D` | pass | 7/7 | -EPI on one volume: a warning, -T2 kept |
+| `options/4D-without-EPI` | pass | 7/7 | a 4D series without -EPI: sub-brick #0 only |
+| `datatypes/head-i16` | pass | 9/9 | head-i16, with -ssave |
+| `datatypes/head-u8` | pass | 9/9 | head-u8, with -ssave |
+| `datatypes/head-i16-slope2` | pass | 9/9 | head-i16-slope2, with -ssave |
+| `datatypes/head-i16-slope1` | pass | 9/9 | head-i16-slope1, with -ssave |
+| `datatypes/head-f64` | pass | 9/9 | head-f64, with -ssave |
+| `datatypes/head-i8` | pass | 9/9 | head-i8, with -ssave |
+| `datatypes/head-nan` | pass | 9/9 | head-nan, with -ssave |
+| `datatypes/head-oblique` | pass | 9/9 | head-oblique, with -ssave |
+| `datatypes/head-qform-only` | pass | 9/9 | head-qform-only, with -ssave |
+| `datatypes/head-las` | pass | 9/9 | head-las, with -ssave |
+| `defects/head-f32-slope-inter` | pass | 7/7 | float32 with scl_slope and scl_inter (AFNI-02) |
+| `defects/head-metre` | pass | 7/7 | a grid in metres (AFNI-07) |
+| `defects/head-nearly-plumb` | pass | 7/7 | a grid 0.009 degrees from plumb (AFNI-16) |
+| `defects/nifti-scale-no` | pass | 7/7 | AFNI_NIFTI_SCALE=NO on int16 with an intercept (AFNI-23) |
+| `defects/T2up-100` | pass | 8/8 | -T2 -T2up 100: one past the sorted values (AFNI-45) |
+| `defects/T2up-99.99` | pass | 7/7 | -T2 -T2up 99.99 on a small mask: one past the values too (AFNI-45) |
+| `defects/EPI-negative-slope` | pass | 7/7 | -EPI on a series with scl_slope -2 (AFNI-01) |
 | `defects/slab` | expected-divergence | 3/3 | 1 million voxels with an axis of 2: the half-size grid keeps 1 (AFNI-47) |
-| `dimensions/slice` | pass | 6/6 | a 2D slice (64 x 64 x 1) |
-| `dimensions/two-slices` | pass | 6/6 | two slices |
-| `dimensions/tiny` | pass | 6/6 | 2 x 2 x 2 voxels |
-| `dimensions/zeros` | pass | 6/6 | an image of zeros |
-| `dimensions/constant` | pass | 6/6 | a constant image |
-| `dimensions/series-one` | pass | 6/6 | a 4D file of one volume |
-| `errors/slice-small` | both-error | 3/3 | a 2D slice smaller than 16 x 16: no automask |
-| `errors/slice-small-T2` | both-error | 2/2 | -T2 on a 2D slice smaller than 16 x 16: AFNI crashes (AFNI-46) |
-| `errors/Urad-low` | both-error | 3/3 | -Urad 3 <input> |
-| `errors/Urad-high` | both-error | 3/3 | -Urad 120 <input> |
-| `errors/rbt-bottom` | both-error | 3/3 | -rbt 18 20 80 <input> |
-| `errors/rbt-order` | both-error | 3/3 | -rbt 18 70 60 <input> |
-| `errors/rbt-top` | both-error | 3/3 | -rbt 18 70 95 <input> |
-| `errors/rbt-missing` | both-error | 3/3 | -rbt 18 60 |
-| `errors/clfrac-low` | both-error | 3/3 | -clfrac 0.05 <input> |
-| `errors/clfrac-missing` | both-error | 3/3 | -clfrac |
-| `errors/T2up-low` | both-error | 3/3 | -T2up 89 <input> |
-| `errors/T2up-high` | both-error | 3/3 | -T2up 101 <input> |
-| `errors/T2up-missing` | both-error | 2/2 | -T2up |
-| `errors/prefix-missing` | both-error | 3/3 | -prefix |
-| `errors/ssave-missing` | both-error | 3/3 | -ssave |
-| `errors/input-twice` | both-error | 3/3 | -input <input> -input <input> |
-| `errors/unknown-option` | both-error | 3/3 | -bogus <input> |
-| `errors/no-dataset` | both-error | 3/3 | -quiet |
-| `errors/missing-input` | both-error | 3/3 | -prefix uni.nii /nonexistent/x.nii |
-| `divergences/default-prefix` | expected-divergence | 1/1 | no -prefix: AFNI writes its own format (Unifized+orig) |
-| `global/exists` | pass | 4/4 | an existing output (AFNI-11) |
-| `global/overwrite` | pass | 6/6 | -overwrite |
-| `global/deconflict-yes` | pass | 6/6 | AFNI_DECONFLICT=YES: renamed |
-| `global/ssave-exists` | pass | 6/6 | an existing -ssave output (AFNI-11) |
-| `global/D-write-type-2` | pass | 6/6 | -DAFNI_NIFTI_WRITE_TYPE=2 |
-| `environment/quiet-startup` | pass | 6/6 | AFNI_QUIET_STARTUP=YES |
-| `environment/message-prefix` | pass | 6/6 | AFNI_MESSAGE_PREFIX |
-| `environment/echo-commandline` | pass | 6/6 | AFNI_ECHO_COMMANDLINE=YES |
-| `global/prefix-with-blank` | pass | 4/4 | a -prefix with a blank (AFNI-12) |
-| `global/input-dir-with-blank` | pass | 4/4 | an input in a directory with a blank (AFNI-18) |
-| `global/missing-directory` | pass | 4/4 | an output in a missing directory (AFNI-26) |
-| `fmriprep/ds000005-task_mixedgamblestask_run_01` | pass | 11/11 | fMRIPrep's call on its BOLD reference's input (ds000005-task_mixedgamblestask_run_01) |
-| `fmriprep/ds000005-task_mixedgamblestask_run_02` | pass | 11/11 | fMRIPrep's call on its BOLD reference's input (ds000005-task_mixedgamblestask_run_02) |
-| `fmriprep/ds000005-task_mixedgamblestask_run_03` | pass | 11/11 | fMRIPrep's call on its BOLD reference's input (ds000005-task_mixedgamblestask_run_03) |
-| `fmriprep/ds000228-task_pixar` | pass | 11/11 | fMRIPrep's call on its BOLD reference's input (ds000228-task_pixar) |
-| `fmriprep/ds000256-task_restbaseline` | pass | 11/11 | fMRIPrep's call on its BOLD reference's input (ds000256-task_restbaseline) |
-| `fmriprep/ds000256-task_restfixationfixed` | pass | 11/11 | fMRIPrep's call on its BOLD reference's input (ds000256-task_restfixationfixed) |
-| `fmriprep/ds000256-task_restfixationnofeedback` | pass | 11/11 | fMRIPrep's call on its BOLD reference's input (ds000256-task_restfixationnofeedback) |
-| `fmriprep/ds002422-task_arithm_run_01` | pass | 11/11 | fMRIPrep's call on its BOLD reference's input (ds002422-task_arithm_run_01) |
-| `fmriprep/ds002422-task_arithm_run_02` | pass | 11/11 | fMRIPrep's call on its BOLD reference's input (ds002422-task_arithm_run_02) |
-| `fmriprep/ds002422-task_rest` | pass | 11/11 | fMRIPrep's call on its BOLD reference's input (ds002422-task_rest) |
-| `fmriprep/ds002603-task_wm_acq_Mb4Mm3Tr550` | pass | 11/11 | fMRIPrep's call on its BOLD reference's input (ds002603-task_wm_acq_Mb4Mm3Tr550) |
-| `fmriprep/ds002603-task_wm_acq_SeqMm3Tr2000` | pass | 11/11 | fMRIPrep's call on its BOLD reference's input (ds002603-task_wm_acq_SeqMm3Tr2000) |
-| `fmriprep/ds003592-ses_1_task_rest_echo_1` | pass | 11/11 | fMRIPrep's call on its BOLD reference's input (ds003592-ses_1_task_rest_echo_1) |
-| `fmriprep/ds004884-ses_217_task_naming40_acq_epfid2_dir_AP_run_2` | pass | 11/11 | fMRIPrep's call on its BOLD reference's input (ds004884-ses_217_task_naming40_acq_epfid2_dir_AP_run_2) |
-| `fmriprep/ds004884-ses_217_task_rest_acq_epfidp2p2_dir_AP_run_9` | pass | 11/11 | fMRIPrep's call on its BOLD reference's input (ds004884-ses_217_task_rest_acq_epfidp2p2_dir_AP_run_9) |
-| `fmriprep/ds004958-task_rest` | pass | 11/11 | fMRIPrep's call on its BOLD reference's input (ds004958-task_rest) |
-| `fmriprep/ds005003-ses_1_task_motor` | pass | 11/11 | fMRIPrep's call on its BOLD reference's input (ds005003-ses_1_task_motor) |
-| `fmriprep/ds005003-ses_1_task_rest` | pass | 11/11 | fMRIPrep's call on its BOLD reference's input (ds005003-ses_1_task_rest) |
-| `fmriprep/ds005040-task_clip_run_1` | pass | 11/11 | fMRIPrep's call on its BOLD reference's input (ds005040-task_clip_run_1) |
-| `fmriprep/ds005454-task_rest` | pass | 11/11 | fMRIPrep's call on its BOLD reference's input (ds005454-task_rest) |
-| `fmriprep/ds005752-ses_01_task_rest_dir_forward` | pass | 11/11 | fMRIPrep's call on its BOLD reference's input (ds005752-ses_01_task_rest_dir_forward) |
-| `fmriprep/ds005752-ses_01_task_rest_dir_reverse` | pass | 11/11 | fMRIPrep's call on its BOLD reference's input (ds005752-ses_01_task_rest_dir_reverse) |
-| `real/T1w-ds000005` | pass | 10/10 | AFNI's default on the T1w of ds000005 (the half-size path) |
-| `real/EPI-ds000005` | pass | 8/8 | -EPI on the BOLD series of ds000005 |
+| `dimensions/slice` | pass | 7/7 | a 2D slice (64 x 64 x 1) |
+| `dimensions/two-slices` | pass | 7/7 | two slices |
+| `dimensions/tiny` | pass | 7/7 | 2 x 2 x 2 voxels |
+| `dimensions/zeros` | pass | 7/7 | an image of zeros |
+| `dimensions/constant` | pass | 7/7 | a constant image |
+| `dimensions/series-one` | pass | 7/7 | a 4D file of one volume |
+| `errors/slice-small` | both-error | 4/4 | a 2D slice smaller than 16 x 16: no automask |
+| `errors/slice-small-T2` | both-error | 3/3 | -T2 on a 2D slice smaller than 16 x 16: AFNI crashes (AFNI-46) |
+| `errors/Urad-low` | both-error | 4/4 | -Urad 3 <input> |
+| `errors/Urad-high` | both-error | 4/4 | -Urad 120 <input> |
+| `errors/rbt-bottom` | both-error | 4/4 | -rbt 18 20 80 <input> |
+| `errors/rbt-order` | both-error | 4/4 | -rbt 18 70 60 <input> |
+| `errors/rbt-top` | both-error | 4/4 | -rbt 18 70 95 <input> |
+| `errors/rbt-missing` | both-error | 4/4 | -rbt 18 60 |
+| `errors/clfrac-low` | both-error | 4/4 | -clfrac 0.05 <input> |
+| `errors/clfrac-missing` | both-error | 4/4 | -clfrac |
+| `errors/T2up-low` | both-error | 4/4 | -T2up 89 <input> |
+| `errors/T2up-high` | both-error | 4/4 | -T2up 101 <input> |
+| `errors/T2up-missing` | both-error | 3/3 | -T2up |
+| `errors/prefix-missing` | both-error | 4/4 | -prefix |
+| `errors/ssave-missing` | both-error | 4/4 | -ssave |
+| `errors/input-twice` | both-error | 4/4 | -input <input> -input <input> |
+| `errors/unknown-option` | both-error | 4/4 | -bogus <input> |
+| `errors/no-dataset` | both-error | 4/4 | -quiet |
+| `errors/missing-input` | both-error | 4/4 | -prefix uni.nii /nonexistent/x.nii |
+| `divergences/default-prefix` | expected-divergence | 2/2 | no -prefix: AFNI writes its own format (Unifized+orig) |
+| `global/exists` | pass | 5/5 | an existing output (AFNI-11) |
+| `global/overwrite` | pass | 7/7 | -overwrite |
+| `global/deconflict-yes` | pass | 7/7 | AFNI_DECONFLICT=YES: renamed |
+| `global/ssave-exists` | pass | 7/7 | an existing -ssave output (AFNI-11) |
+| `global/D-write-type-2` | pass | 7/7 | -DAFNI_NIFTI_WRITE_TYPE=2 |
+| `environment/quiet-startup` | pass | 7/7 | AFNI_QUIET_STARTUP=YES |
+| `environment/message-prefix` | pass | 7/7 | AFNI_MESSAGE_PREFIX |
+| `environment/echo-commandline` | pass | 7/7 | AFNI_ECHO_COMMANDLINE=YES |
+| `global/prefix-with-blank` | pass | 5/5 | a -prefix with a blank (AFNI-12) |
+| `global/input-dir-with-blank` | pass | 5/5 | an input in a directory with a blank (AFNI-18) |
+| `global/missing-directory` | pass | 5/5 | an output in a missing directory (AFNI-26) |
+| `fmriprep/ds000005-task_mixedgamblestask_run_01` | pass | 12/12 | fMRIPrep's call on its BOLD reference's input (ds000005-task_mixedgamblestask_run_01) |
+| `fmriprep/ds000005-task_mixedgamblestask_run_02` | pass | 12/12 | fMRIPrep's call on its BOLD reference's input (ds000005-task_mixedgamblestask_run_02) |
+| `fmriprep/ds000005-task_mixedgamblestask_run_03` | pass | 12/12 | fMRIPrep's call on its BOLD reference's input (ds000005-task_mixedgamblestask_run_03) |
+| `fmriprep/ds000228-task_pixar` | pass | 12/12 | fMRIPrep's call on its BOLD reference's input (ds000228-task_pixar) |
+| `fmriprep/ds000256-task_restbaseline` | pass | 12/12 | fMRIPrep's call on its BOLD reference's input (ds000256-task_restbaseline) |
+| `fmriprep/ds000256-task_restfixationfixed` | pass | 12/12 | fMRIPrep's call on its BOLD reference's input (ds000256-task_restfixationfixed) |
+| `fmriprep/ds000256-task_restfixationnofeedback` | pass | 12/12 | fMRIPrep's call on its BOLD reference's input (ds000256-task_restfixationnofeedback) |
+| `fmriprep/ds002422-task_arithm_run_01` | pass | 12/12 | fMRIPrep's call on its BOLD reference's input (ds002422-task_arithm_run_01) |
+| `fmriprep/ds002422-task_arithm_run_02` | pass | 12/12 | fMRIPrep's call on its BOLD reference's input (ds002422-task_arithm_run_02) |
+| `fmriprep/ds002422-task_rest` | pass | 12/12 | fMRIPrep's call on its BOLD reference's input (ds002422-task_rest) |
+| `fmriprep/ds002603-task_wm_acq_Mb4Mm3Tr550` | pass | 12/12 | fMRIPrep's call on its BOLD reference's input (ds002603-task_wm_acq_Mb4Mm3Tr550) |
+| `fmriprep/ds002603-task_wm_acq_SeqMm3Tr2000` | pass | 12/12 | fMRIPrep's call on its BOLD reference's input (ds002603-task_wm_acq_SeqMm3Tr2000) |
+| `fmriprep/ds003592-ses_1_task_rest_echo_1` | pass | 12/12 | fMRIPrep's call on its BOLD reference's input (ds003592-ses_1_task_rest_echo_1) |
+| `fmriprep/ds004884-ses_217_task_naming40_acq_epfid2_dir_AP_run_2` | pass | 12/12 | fMRIPrep's call on its BOLD reference's input (ds004884-ses_217_task_naming40_acq_epfid2_dir_AP_run_2) |
+| `fmriprep/ds004884-ses_217_task_rest_acq_epfidp2p2_dir_AP_run_9` | pass | 12/12 | fMRIPrep's call on its BOLD reference's input (ds004884-ses_217_task_rest_acq_epfidp2p2_dir_AP_run_9) |
+| `fmriprep/ds004958-task_rest` | pass | 12/12 | fMRIPrep's call on its BOLD reference's input (ds004958-task_rest) |
+| `fmriprep/ds005003-ses_1_task_motor` | pass | 12/12 | fMRIPrep's call on its BOLD reference's input (ds005003-ses_1_task_motor) |
+| `fmriprep/ds005003-ses_1_task_rest` | pass | 12/12 | fMRIPrep's call on its BOLD reference's input (ds005003-ses_1_task_rest) |
+| `fmriprep/ds005040-task_clip_run_1` | pass | 12/12 | fMRIPrep's call on its BOLD reference's input (ds005040-task_clip_run_1) |
+| `fmriprep/ds005454-task_rest` | pass | 12/12 | fMRIPrep's call on its BOLD reference's input (ds005454-task_rest) |
+| `fmriprep/ds005752-ses_01_task_rest_dir_forward` | pass | 12/12 | fMRIPrep's call on its BOLD reference's input (ds005752-ses_01_task_rest_dir_forward) |
+| `fmriprep/ds005752-ses_01_task_rest_dir_reverse` | pass | 12/12 | fMRIPrep's call on its BOLD reference's input (ds005752-ses_01_task_rest_dir_reverse) |
+| `real/T1w-ds000005` | pass | 11/11 | AFNI's default on the T1w of ds000005 (the half-size path) |
+| `real/EPI-ds000005` | pass | 9/9 | -EPI on the BOLD series of ds000005 |
 | `difftest/epi-ball-beyond-any-machine` | pass | 1/1 | 3dUnifize -EPI on a 4D input of micrometre voxels: the ball of neighbours has a radius of about 9600 voxels (about 10^1… |
+| `difftest/epi-slice-code-2-afni26` | pass | 7/7 | -EPI on a series with header slice code 2, against the replica and AFNI 26.3.05: the output keeps the header's slice ti… |

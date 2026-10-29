@@ -60,7 +60,7 @@ SHA-256 equal the version-afni part's copy), `fetch_ccby.sh` CC BY 4.0's legal c
 
 ## Results
 
-### Records (re-made in-process from 3d76a31, compared with main's)
+### Records (re-made in-process from b6c7066, compared with main's)
 
 | Suite | Cases | Status differs | Details differ |
 |---|---|---|---|

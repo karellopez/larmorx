@@ -147,6 +147,29 @@ with an error naming AFNI-75 (unit test `epi_ball_beyond_any_machine_is_refused`
 `validation/difftest/cases/afni-unifize/epi-ball-beyond-any-machine.json`); `reproduce` attempts
 it. The `-Urad` and `-rbt` radii are limited to 5 to 99 voxels and never reach the guard.
 
+## AFNI 26.3.05 (2026-10-29)
+
+The replicas follow AFNI 26.3.05 since 2026-10-29 (decision log 2026-10-27, "Newest upstream
+versions, updated in steps"). What changed between 25.2.09 and 26.3.05 in the code the three
+programs run was found two ways (`validation/investigations/version-afni/`): the source of every
+file `PROVENANCE.md` names diffed between the release trees, and every function of the three
+binaries (both builds from GCC 11.4 at `-O2`) compared by machine code, which also catches a
+changed macro or inlined routine in a file not listed. *Read* and *measured*.
+
+| Change | Where | What it does to 3dUnifize |
+|---|---|---|
+| AFNI-03 fixed: header slice code 2 (sequential decreasing) visits `slice_end` down to `slice_start` (25.2.09's loop stopped at `slice_end`, so every slice time stayed 0) | `THD_open_nifti` (`thd_niftiread.c:652`) | the slice timing an output copies from a code-2 series (found by random testing 2026-10-25 for 3dUnifize): 26.3.05 keeps the header's times, as larmorx's correction did; the replica does so in both modes and names no defect |
+| The MCW licence headers (GPL-2 → CC BY 4.0) | 27 of the named files (licence text only) | nothing ([afni-relicensing-26.md](afni-relicensing-26.md)) |
+| `THD_mask_erode2D`, new | `thd_automask.c`, `3ddata.h` | nothing: called only by `mri_warp3D_align.c`, which none of the three programs links (it is in the 3dAutomask and 3dUnifize binaries because `thd_automask.o` is) |
+| `isMacTahoe` in `machdep` | `machdep.c` | nothing on Linux (returns 0); a macOS version check |
+| Five help-search routines (`approx_str_sort_all_popts`, `form_C_progopt_string_from_struct`, `get_updated_help_file`, `progopt_C_array`, `unescape_unix_str`) | `thd_getpathprogs.c`, `thd_ttatlas_query.c`, `thd_niml.c` | reached only by AFNI's `-h_*` and `-all_opts` options, which the replicas treat as unknown options (as with 25.2.09); `-help` itself is unchanged but for the line naming the build |
+| New atlases in `AFNI_atlas_spaces.niml` (JulichBrain v3.1) | data | nothing: no template space and no generic space changed |
+
+Every other function of the three binaries compiles to the same instructions in both builds
+(3dTshift 3,280, 3dAutomask 3,382, 3dUnifize 3,412). The replicas' records show it case by case:
+each case also runs AFNI 25.2.09 and names the cases whose AFNI output changed, with the reason
+(`docs/validation/afni-unifize-replica.md`, "AFNI's own step").
+
 ## Verification
 
 - `docs/validation/afni-unifize.md`: the parity record against the AFNI 25.2.09 binary.

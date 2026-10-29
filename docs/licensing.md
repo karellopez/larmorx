@@ -165,6 +165,15 @@ command-line binary. Code from different families is never linked into one binar
   written for the clean-room originals. The routine-by-routine tables, with
   file:line, are in the restricted findings `docs/findings/afni-automask.md` and
   `afni-unifize.md`.
+- **AFNI 26.3.05 relicenses MCW's code** (checked 2026-10-29,
+  [findings/afni-relicensing-26.md](findings/afni-relicensing-26.md)): "As of May 12, 2026, MCW
+  has granted NIH a Creative Commons Attribution License (CC BY 4.0) for all of the code under
+  its copyright" (`doc/README/README.copyright`); every MCW file's header now says CC BY 4.0.
+  None of the 55 AFNI files the replicas derive from is GPL in 26.3.05. The AFNI replicas could
+  therefore move into the main Apache package (attribution, CC BY 4.0's text, `sinf`/`cosf`
+  re-sourced from Arm's MIT routines; glibc's LGPL `cbrtf` measured or kept apart): **the user's
+  decision**, nothing moved. Until then they stay in `larmorx-gpl` (CC BY 4.0 allows the GPL-3
+  package), and `crates-gpl/NOTICE` carries the CC BY 4.0 attribution.
 
 ## Publishing
 

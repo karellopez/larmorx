@@ -13,7 +13,7 @@
 //! `cosf`. On Linux that is glibc, whose float sine and cosine are fast but not correctly
 //! rounded (worst case 0.56 ulp), so a correctly rounded function gives a different `f32` for
 //! some arguments. To reproduce AFNI's output on every platform, larmorx-gpl carries this port
-//! of glibc 2.35's code (the version AFNI 25.2.09 runs with on Ubuntu 22.04).
+//! of glibc 2.35's code (the version AFNI runs with on Ubuntu 22.04, 25.2.09 and 26.3.05 alike).
 //!
 //! On x86-64, glibc selects one of two builds of the same C code at load time (`ifunc`):
 //! `__sinf_fma` on CPUs with FMA and AVX2, `__sinf_sse2` otherwise. The FMA build lets the

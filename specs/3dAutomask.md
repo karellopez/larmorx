@@ -1,4 +1,4 @@
-# Spec: `lx.afni.automask` (behaviour of AFNI 3dAutomask 25.2.09)
+# Spec: `lx.afni.automask` (behaviour of AFNI 3dAutomask 25.2.09 and 26.3.05)
 
 The input for a clean-room **original** of larmorx's brain-mask tool (to be written in
 `crates/larmorx-afni`, Apache-2.0). AFNI's 3dAutomask program file is NIH public domain, but
@@ -16,6 +16,13 @@ larmorx has, or will have, two implementations (CLAUDE.md rule 1):
 clone, `oracles/afni-25.2.09/build/`), the replica crates (`crates-gpl/`) or the findings
 written from the source (`docs/findings/afni-automask.md`, the sections of
 `docs/findings/upstream-defects.md` marked restricted).
+
+**AFNI 26.3.05 (the reference from 2026-10-29).** (AFNI 26.3.05) larmorx follows AFNI's newest
+release (decision log 2026-10-27). AFNI 26.3.05's 3dAutomask behaves as 25.2.09's, as this spec
+describes it, except where a line is marked "(AFNI 26.3.05)": header slice code 2 is read as NIfTI defines it (`specs/3dTshift.md` §3.2), so the slice timing an output keeps from such a series is the header's in both modes and AFNI-03 is never named (§9). (AFNI 26.3.05) The black-box
+runs are of `oracles/afni-26.3.05/bin/3dAutomask` (built the same way from the tag `AFNI_26.3.05`);
+`oracles/afni-25.2.09` stays for the earlier records. A clean-room implementer must not open
+`tags/AFNI-26.3.05/` or `oracles/afni-26.3.05/build/` either.
 
 This spec describes behaviour: what goes in, what comes out, the maths and the numeric
 conventions that decide the bits. It holds no code. Statements marked **(observed)** were
@@ -422,6 +429,11 @@ default and words both implementations share:
   default `the <nz> slice times kept in the output are all within 0.003 of 0: no slice timing,
   slice_end <nz − 1>; AFNI writes slice_end 0`, with `reproduce` `the slice times kept in the
   output are all within 0.003 of 0: slice_end 0, as AFNI writes it`. AFNI-03 comes first.)**
+  **(AFNI 26.3.05)** AFNI 26.3.05 reads header slice code 2 as `specs/3dTshift.md` §3.2 says
+  (`end, end−1, …, start`) and keeps those times in such an output: (AFNI 26.3.05) both modes
+  write the header's code-2 timing (the slice fields of `specs/3dTshift.md` §6.2) and name no
+  AFNI-03; AFNI-08 is named only where those times are all within 3 ms of 0, in both modes'
+  words above. The AFNI-03 messages above are AFNI 25.2.09's.
 
 ## 10. Validation
 

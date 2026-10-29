@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// Translated to Rust from AFNI 25.2.09: src/thd_filestuff.c (THD_filename_ok),
+// Translated to Rust from AFNI 26.3.05: src/thd_filestuff.c (THD_filename_ok),
 // src/thd_writedset.c (the AFNI_DECONFLICT part of THD_write_3dim_dataset), src/thd_opendset.c
 // (THD_deconflict_prefix, THD_deconflict_nifti), src/afni_environ.c (THD_deathcon,
 // THD_ok_overwrite), src/afni_logger.c (the AFNI_ECHO_COMMANDLINE part of AFNI_logger),

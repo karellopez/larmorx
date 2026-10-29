@@ -23,6 +23,7 @@ repository), `LARMORX_VENV` (default: `<workspace>/.venv`), cargo first on the p
 | `register_counts.py` | the defect register recounted from its table; every **decide** and **yes** listed |
 | `handoff_blocks.py <HANDOFF.md>` | an agent's handoff: each text block with its instruction |
 | `watch_ci.py <sha>`, `watch_pages.py <sha>` | wait for the six-platform CI run, or the site's deployment |
+| `upstream_watch.py [--out DIR] [--offline] [--only NAME...]` | the upstream watch: the newest release of every upstream of `UPSTREAM.md` (git tags, PyPI, AFNI's `AFNI.version`, FSL's release manifest) and, for a newer one, which files of the crates' `PROVENANCE.md` it changed (licence-only changes marked), from `<workspace>/tags/` or `~/fsl-<version>/src`; Markdown and JSON in `<workspace>/oracles/logs/upstream-watch/`. `difftest-nightly.sh` runs it once a week |
 
 ## Merging an agent's part
 

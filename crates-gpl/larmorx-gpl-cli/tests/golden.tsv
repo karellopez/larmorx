@@ -2,7 +2,7 @@
 # Golden checksums of the larmorx-gpl replicas (tests/golden.rs): SHA-256 of the NIfTI
 # header and data that larmorx-gpl writes on Linux x86_64, with sampled data values.
 # Every platform must reproduce them (docs/validation/golden.md). Do not edit by hand.
-# Recorded from 71f5223b7836ff941b3ead811d3355d843b41096 on 2026-10-23 (Linux x86_64)
+# Recorded from 8218894e03db0f927f1cf31439865f06ab72bd32 on 2026-10-29 (Linux x86_64)
 # case	output	sha256	type	sample
 3dAutomask.2d	data	8aff51b83ef2becbb88f5b2dc0a61250c4b0b649768abc311cdf1dcbea15cb82	uint8	0000000101000100
 3dAutomask.2d	header	79a6a2db8b5d92f6d6b91bc913305ef315702829030f0e96df491429d9aa63f7	-	-
@@ -28,8 +28,8 @@
 3dTshift.copy.float32-tiny-offsets.reproduce	header	0fdbe30c6a1eee7168282aab7325dddc936821d59c3bd73e8ff46b3d7f7dc957	-	-
 3dTshift.cubic.float32-defects	data	22bb358c96823551eabe43d97005ef53e542c79bc8fb28482684bafe834810bc	float32	6fedce4300a01044827137442b0802443c4a2b449115f34300201d440b3c4844
 3dTshift.cubic.float32-defects	header	74fc27ed79becd53374aadce3bd53031b38cb0a6c11c6ee324555e30f0455719	-	-
-3dTshift.cubic.float32-defects.reproduce	data	a365c1ba071853972cdd7301f2c6a5c32e3c8794295632342871c61da9554ed6	float32	0040cd4300a010440080354400e0014400002c440080f04300201d4400004944
-3dTshift.cubic.float32-defects.reproduce	header	7a11c2bf861850bfe34a29cc27c0062f6e405f71cf9e94b27947df274d66bb84	-	-
+3dTshift.cubic.float32-defects.reproduce	data	22bb358c96823551eabe43d97005ef53e542c79bc8fb28482684bafe834810bc	float32	6fedce4300a01044827137442b0802443c4a2b449115f34300201d440b3c4844
+3dTshift.cubic.float32-defects.reproduce	header	f898b773d12dc21b0cb92dea18fc79979b35376adbb1ceedb279441d98b2ff01	-	-
 3dTshift.cubic.int16.rlt+	data	a1cb86a54de3277e8b9c86c487382f32b45ea90ffcf43f0a50ae4b2bd701b267	int16	21036804a805f90346059903b8041406
 3dTshift.cubic.int16.rlt+	header	e0415b2e37ccf467d8c4bd2326d4cd7cd6f780d1fd4993bdf8f2e4fa1daa627c	-	-
 3dTshift.fourier.float32.ignore	data	b5f20014a1cb2416197c4c62d09569d2142339164b0e4dc367a6596514b31665	float32	0040484300208e430000b34300c07e43969cab43dc066743ec749b430080c643
@@ -38,8 +38,6 @@
 3dTshift.fourier.int16	header	e0415b2e37ccf467d8c4bd2326d4cd7cd6f780d1fd4993bdf8f2e4fa1daa627c	-	-
 3dTshift.heptic.uint8.no_detrend	data	3b3cfb2defd486805f0724ff2692f40d5b4781f3a93bcef9bf14ed401a316d7f	uint8	153e652f58264a75
 3dTshift.heptic.uint8.no_detrend	header	0c0c1c7d64fa8f0833b77df2b66da2ea20fc13448399301c29b433228536719f	-	-
-3dTshift.heptic.uint8.no_detrend.reproduce	data	ba23067a93d11ef054a8eac8d1b360656a4713eeb457f24084e18a82a0119581	uint8	153e652f58274a6f
-3dTshift.heptic.uint8.no_detrend.reproduce	header	0c0c1c7d64fa8f0833b77df2b66da2ea20fc13448399301c29b433228536719f	-	-
 3dTshift.linear.float32	data	d8bbe320fc73af5b40ece09fc8512daea64ed6368bcef3aef243a98cf2d4d946	float32	c6c04b4300208e43ccf0b343214f8043dbeea9431d32694300a09a43d4bdc443
 3dTshift.linear.float32	header	d0dbbb595c05bd2882d30181c155ab1c9d17b74cc1e91713c6c3ea21bfa62b7e	-	-
 3dTshift.linear.float32-nearly-plumb	data	d8bbe320fc73af5b40ece09fc8512daea64ed6368bcef3aef243a98cf2d4d946	float32	c6c04b4300208e43ccf0b343214f8043dbeea9431d32694300a09a43d4bdc443

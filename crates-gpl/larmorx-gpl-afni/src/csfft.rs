@@ -1,12 +1,12 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// Translated to Rust from AFNI 25.2.09 src/csfft.c.
+// Translated to Rust from AFNI 26.3.05 src/csfft.c.
 // Major portions Copyright (C) 1994-2000 Medical College of Wisconsin (AFNI, Robert W. Cox et al.;
 // the radix-2 code by Andrzej Jesmanowicz), released under the GNU GPL version 2 or any later
 // version.
 // Rust translation Copyright 2026 Karel Lopez Vilaret; modified from the original.
 //! AFNI's complex FFT `csfft_cox`, bit for bit.
 //!
-//! Translated from AFNI 25.2.09 `src/csfft.c` (original by Andrzej Jesmanowicz and RW Cox).
+//! Translated from AFNI 26.3.05 `src/csfft.c` (original by Andrzej Jesmanowicz and RW Cox).
 //! 3dTshift's Fourier interpolation (`fft_shift2` in `thd_shift2.c`) calls
 //! `csfft_cox(-1, nup, row)` and `csfft_cox(+1, nup, row)` with
 //! `nup = csfft_nextup_one35(ntt + 4)`; [`csfft_cox`] and [`CsfftPlan`] return the same `f32`
@@ -869,7 +869,8 @@ mod tests {
 
     #[test]
     fn nextup_values() {
-        // Values from AFNI 25.2.09's compiled csfft_nextup / csfft_nextup_one35.
+        // Values from AFNI 25.2.09's compiled csfft_nextup / csfft_nextup_one35 (csfft.c is
+        // unchanged in 26.3.05 but for its licence header).
         let nextup = [
             (0, 1),
             (1, 1),

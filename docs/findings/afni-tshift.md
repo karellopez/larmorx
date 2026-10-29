@@ -1,4 +1,4 @@
-# AFNI 3dTshift (AFNI 25.2.09)
+# AFNI 3dTshift (AFNI 25.2.09; AFNI 26.3.05 since 2026-10-29)
 
 > **Two implementations, two rules** (`docs/licensing.md`). These notes were written while
 > reading AFNI's source, which is GPL-2 or later (copyrighted by the Medical College of
@@ -137,7 +137,7 @@ each step is a double sum rounded to float, not a float sum. For `slice_code = 2
 (`:653`): only `slice_end` is visited, every offset stays 0, and 3dTshift warns "input has
 only 1 time offset, 0" and shifts nothing. *Read*, and *validated*
 (`header-timing/code2-seq-dec`). By default larmorx-gpl visits `slice_end` down to
-`slice_start`, as NIfTI defines the code (AFNI-03).
+`slice_start`, as NIfTI defines the code (AFNI-03). **AFNI 26.3.05 fixed it the same way** (`thd_niftiread.c:652`, the same arithmetic): the replica follows 26.3.05 in both modes (below, "AFNI 26.3.05").
 
 **When the output keeps slice offsets** (the "copy of input" cases), `populate_nifti_image`
 derives `slice_code`, `slice_start`, `slice_end` and `slice_duration` from them with
@@ -464,8 +464,10 @@ variables 3dTshift consults. The replica does so since 2026-10-12
   de-meaned twice. fMRIPrep does not use `-no_detrend`. *Read.* The order matters for the
   last bits: the first voxel's clipping range is recorded between its two de-meanings, and
   the second de-meaning's mean (about 0, not exactly) is what is added back to the second
-  voxel. larmorx-gpl reproduces this with the switch; *validated* (`options/*-no-detrend`). By
-  default each voxel has its own mean removed and restored (AFNI-05).
+  voxel. larmorx-gpl reproduced this with the switch; *validated* (`options/*-no-detrend`). By
+  default each voxel has its own mean removed and restored (AFNI-05). **AFNI 26.3.05 fixed it the same
+  way** (`3dTshift.c:633` passes `gar+ignore`): the replica follows 26.3.05 in both modes, and its
+  `reproduce` mode no longer gives 25.2.09's result (an older larmorx release does).
 - **A shift larger than the series crashes on odd slices.** When both shifts exceed the
   series length, `fft_shift2` writes `f[ii] = g[ii] = 0.0` (`thd_shift2.c:80`) even when
   `g` is NULL, which it is for the last voxel of a slice with an odd number of voxels. That
@@ -475,10 +477,35 @@ variables 3dTshift consults. The replica does so since 2026-10-12
   `TS_parse_tpattern` calls `ERROR_message` and 3dTshift then exits with status 1
   (`thd_timeof.c:186-188`, `3dTshift.c:422`). *Read.* larmorx-gpl prints the same.
 
+## AFNI 26.3.05 (2026-10-29)
+
+The replicas follow AFNI 26.3.05 since 2026-10-29 (decision log 2026-10-27, "Newest upstream
+versions, updated in steps"). What changed between 25.2.09 and 26.3.05 in the code the three
+programs run was found two ways (`validation/investigations/version-afni/`): the source of every
+file `PROVENANCE.md` names diffed between the release trees, and every function of the three
+binaries (both builds from GCC 11.4 at `-O2`) compared by machine code, which also catches a
+changed macro or inlined routine in a file not listed. *Read* and *measured*.
+
+| Change | Where | What it does to 3dTshift |
+|---|---|---|
+| AFNI-05 fixed: with `-no_detrend` the second voxel of each pair is de-meaned with its own mean (`THD_const_detrend(..., gar+ignore, ...)`; 25.2.09 passed `far+ignore`) | `3dTshift.c:633` | the series of every second voxel: AFNI 26.3.05 now computes what larmorx's correction computed, bit for bit; the replica follows it in both modes and names no defect |
+| AFNI-03 fixed: header slice code 2 (sequential decreasing) visits `slice_end` down to `slice_start` (25.2.09's loop stopped at `slice_end`, so every slice time stayed 0) | `THD_open_nifti` (`thd_niftiread.c:652`) | header-timed inputs with code 2 are shifted by their real slice times; AFNI 26.3.05 computes what larmorx's correction computed (the same float sums of a double step), so the replica reads code 2 so in both modes and names no defect |
+| The MCW licence headers (GPL-2 → CC BY 4.0) | 27 of the named files (licence text only) | nothing ([afni-relicensing-26.md](afni-relicensing-26.md)) |
+| `THD_mask_erode2D`, new | `thd_automask.c`, `3ddata.h` | nothing: called only by `mri_warp3D_align.c`, which none of the three programs links (it is in the 3dAutomask and 3dUnifize binaries because `thd_automask.o` is) |
+| `isMacTahoe` in `machdep` | `machdep.c` | nothing on Linux (returns 0); a macOS version check |
+| Five help-search routines (`approx_str_sort_all_popts`, `form_C_progopt_string_from_struct`, `get_updated_help_file`, `progopt_C_array`, `unescape_unix_str`) | `thd_getpathprogs.c`, `thd_ttatlas_query.c`, `thd_niml.c` | reached only by AFNI's `-h_*` and `-all_opts` options, which the replicas treat as unknown options (as with 25.2.09); `-help` itself is unchanged but for the line naming the build |
+| New atlases in `AFNI_atlas_spaces.niml` (JulichBrain v3.1) | data | nothing: no template space and no generic space changed |
+
+Every other function of the three binaries compiles to the same instructions in both builds
+(3dTshift 3,280, 3dAutomask 3,382, 3dUnifize 3,412). The replicas' records show it case by case:
+each case also runs AFNI 25.2.09 and names the cases whose AFNI output changed, with the reason
+(`docs/validation/afni-tshift-replica.md`, "AFNI's own step").
+
 ## The oracle
 
 AFNI publishes binaries only for its latest release. `scripts/build_afni_oracle.sh` builds
-3dTshift from the pinned 25.2.09 source with AFNI's standard Linux build
+3dTshift from the pinned source (25.2.09 in `oracles/afni-25.2.09`; 26.3.05, the replicas'
+reference since 2026-10-29, in `oracles/afni-26.3.05`, built the same way) with AFNI's standard Linux build
 (`Makefile.linux_ubuntu_16_64`, gcc -O2). The text-mode library is archived without the few
 objects that need Motif headers. Two details were needed:
 - FSL must be removed from `PATH`, because it ships its own `ld`;

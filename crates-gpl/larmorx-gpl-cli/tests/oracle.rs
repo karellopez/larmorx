@@ -5,7 +5,9 @@
 //! aside: AFNI adds its history extension).
 //!
 //! The oracle is `LARMORX_AFNI_BIN` (the binary or its directory), else the workspace's
-//! `oracles/afni-25.2.09/bin/3dTshift` (built by `scripts/build_afni_oracle.sh`). Without it the
+//! `oracles/afni-26.3.05/bin/3dTshift`, the release the replica follows (built by
+//! `scripts/build_afni_oracle.sh`; AFNI 25.2.09's build answers differently where 26.3.05
+//! fixed AFNI-03 and AFNI-05, as `-no_detrend` below). Without it the
 //! test prints why and passes, so it runs only where the oracle exists (not in CI). The full
 //! comparison is the parity suite (`python -m larmorx_validation parity afni-tshift
 //! --implementation replica`).
@@ -23,7 +25,7 @@ fn oracle() -> Option<PathBuf> {
     }
     Path::new(env!("CARGO_MANIFEST_DIR"))
         .ancestors()
-        .map(|a| a.join("oracles/afni-25.2.09/bin/3dTshift"))
+        .map(|a| a.join("oracles/afni-26.3.05/bin/3dTshift"))
         .find(|p| p.is_file())
 }
 

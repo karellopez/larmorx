@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// Translated to Rust from AFNI 25.2.09: src/thd_automask.c (THD_automask_* settings,
+// Translated to Rust from AFNI 26.3.05: src/thd_automask.c (THD_automask_* settings,
 // mask_count, THD_automask, mri_automask_image, mri_automask_image2D, THD_mask_clip_neighbors,
 // THD_mask_fillin_once, THD_mask_fillin_completely, THD_mask_clust, THD_mask_clust2D,
 // THD_mask_erode, THD_mask_erodemany, THD_mask_erodemany2D, THD_mask_dilate, THD_mask_depth,
@@ -15,7 +15,7 @@
 // GPL version 2 or any later version.
 // Rust translation Copyright 2026 Karel Lopez Vilaret; modified from the original.
 //! AFNI's automask: the clip level, the brain mask of `3dAutomask` and the mask steps
-//! `3dUnifize` uses, step by step as AFNI 25.2.09 computes them.
+//! `3dUnifize` uses, step by step as AFNI 26.3.05 computes them.
 //!
 //! - [`cliplevel`] (`THD_cliplevel`): a histogram of 10,000 bins up to the image's maximum, and
 //!   the cut where `clfrac` times the median of the values above it equals the cut;

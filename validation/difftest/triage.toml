@@ -679,3 +679,37 @@ link = "validation/difftest/cases/fsl-bet/bet2-filled-then-output-type.json"
 # 3dAutomask, 3dTshift and 3dUnifize no difference; mri-hmc the first night's family (the entries
 # above); one AFNI-43 notice with `-q` (`afni-automask:20261029:3425`), fixed in 5130e08 (the
 # `-peels 0` entry above).
+
+# ---------------------------------------------------------------- the version update (2026-10-29)
+
+[[difference]]
+tool = "afni-tshift"
+implementation = "original"
+signature = ["values", "values (integer output)", "notice: AFNI-05"]
+status = "open"
+explanation = "AFNI 26.3.05 fixed AFNI-05 (-no_detrend de-means every voxel); the clean-room original's `reproduce` still gives 25.2.09's pairs and names AFNI-05 (the trial against 26.3.05: 75 findings, 59 notices); its alignment is the clean-room agent's (specs/3dTshift.md §4, marked AFNI 26.3.05)"
+link = "validation/investigations/version-afni/README.md"
+
+[[difference]]
+tool = "afni-tshift"
+implementation = "original"
+signature = ["header fields (scaling, timing, slice fields, units, xform codes)", "DN fix pass", "TR (pixdim[N])", "notice: AFNI-03"]
+status = "open"
+explanation = "AFNI 26.3.05 fixed AFNI-03 (header slice code 2 read end..start); the clean-room original's `reproduce` still reads 25.2.09's zeros and names AFNI-03 (the trial against 26.3.05: 73 findings, 4 with AFNI-05 too); its alignment is the clean-room agent's (specs/3dTshift.md §3.2, §6.4)"
+link = "validation/investigations/version-afni/README.md"
+
+[[difference]]
+tool = "afni-automask"
+implementation = "original"
+signature = ["masked.nii: header bytes"]
+status = "open"
+explanation = "AFNI 26.3.05 fixed AFNI-03: -apply_prefix's output keeps a code-2 series' slice timing; the clean-room original's `reproduce` writes 25.2.09's (25 findings against 26.3.05); its alignment is the clean-room agent's (specs/3dAutomask.md §9)"
+link = "validation/difftest/cases/afni-automask/slice-code-2-masked-notices.json"
+
+[[difference]]
+tool = "afni-unifize"
+implementation = "original"
+signature = ["uni.nii: header bytes", "uni.nii.gz: header bytes"]
+status = "open"
+explanation = "AFNI 26.3.05 fixed AFNI-03: -EPI's output keeps a code-2 series' slice timing; the clean-room original's `reproduce` writes 25.2.09's (21 findings against 26.3.05); its alignment is the clean-room agent's (specs/3dUnifize.md)"
+link = "validation/difftest/cases/afni-unifize/epi-slice-code-2-fix-notice.json"

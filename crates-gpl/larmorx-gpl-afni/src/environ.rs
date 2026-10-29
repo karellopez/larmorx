@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// Translated to Rust from AFNI 25.2.09 src/afni_environ.c (AFNI_prefilter_args: the -Dname=val,
+// Translated to Rust from AFNI 26.3.05 src/afni_environ.c (AFNI_prefilter_args: the -Dname=val,
 // -overwrite, -ok_1D_text and -skip_afnirc options; AFNI_setenv; AFNI_yesenv, AFNI_noenv,
 // AFNI_numenv) and src/afni_environ.h (YESSISH, NOISH).
 // Major portions Copyright (C) 1994-2000 Medical College of Wisconsin (AFNI, Robert W. Cox et al.),
@@ -28,7 +28,7 @@
 //! AFNI also reads `~/.afnirc` (and `AFNI_SYSTEM_AFNIRC`) for variables not set otherwise;
 //! larmorx-gpl reads no such file, so `reproduce` is AFNI without one (`-skip_afnirc`).
 //!
-//! [`CONSULTED`] lists every variable AFNI 25.2.09's 3dTshift consults on the paths larmorx-gpl
+//! [`CONSULTED`] lists every variable AFNI 26.3.05's 3dTshift consults on the paths larmorx-gpl
 //! supports (NIfTI input and output), with what larmorx-gpl does with it; a `-D` of any other
 //! variable is accepted with a notice that it has no effect.
 
@@ -54,9 +54,9 @@ const AFNIRC: &str = "it concerns AFNI's .afnirc files, which larmorx does not r
 const AFNI_FORMAT: &str =
     "it concerns AFNI's own dataset format (a -prefix without .nii), which larmorx does not write";
 const ATLAS: &str = "it tells AFNI where to find AFNI_atlas_spaces.niml; larmorx uses the table of \
-                     template spaces of AFNI 25.2.09's own file";
+                     template spaces of AFNI 26.3.05's own file";
 
-/// Every environment variable AFNI 25.2.09's 3dTshift consults on the paths larmorx-gpl
+/// Every environment variable AFNI 26.3.05's 3dTshift consults on the paths larmorx-gpl
 /// supports: the program, and the library routines it calls to read NIfTI files, 1D slice-time
 /// files and `-tpattern` strings, to check output names, to write NIfTI files and to print
 /// messages. Found by reading the source and confirmed by tracing the oracle's `getenv` calls

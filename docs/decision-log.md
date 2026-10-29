@@ -1625,6 +1625,21 @@ predicted). Usage and time go to porting; the panel is most informative for the 
 originals and the improved algorithms, whose results are not bit-identical, and they are judged
 together at the end.
 
+## 2026-10-29: AFNI 26.3.05, the version update's first part (orchestrator, by the rules)
+- **The replicas follow AFNI 26.3.05.** Between 25.2.09 and 26.3.05 the code 3dTshift, 3dAutomask
+  and 3dUnifize run changed in two places, both fixes of defects larmorx already corrected the
+  same way (AFNI-03, header slice code 2; AFNI-05, `-no_detrend`): `reproduce` now gives
+  26.3.05's result, which is the default's; no notice in either mode (the brief's rule for a
+  registered defect the new release fixes). 25.2.09's behaviour stays available in earlier
+  larmorx releases (FAIR4RS, decision of 2026-10-27).
+- **Two oracle builds, one choice:** the harness runs AFNI 26.3.05 for the replicas, 25.2.09 for
+  the clean-room originals until a clean-room agent aligns them (`--afni-version`,
+  `LARMORX_AFNI_VERSION`); every replica case also runs the other build and its record names
+  AFNI's own step, with the reason.
+- **Waiting for the user:** AFNI 26.3.05 relicenses MCW's code under CC BY 4.0, so the AFNI
+  replicas could move into the Apache package (`docs/findings/afni-relicensing-26.md`); nothing
+  moved.
+
 ## Open decisions (PLAN.md §16)
 
 | # | Decision | Recommended default (used until decided) | Status |

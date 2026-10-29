@@ -1,5 +1,6 @@
 # SPDX-License-Identifier: Apache-2.0
-"""3dTshift's evidence: fMRIPrep's slice-timing correction of a real BOLD run by AFNI 25.2.09,
+"""3dTshift's evidence: fMRIPrep's slice-timing correction of a real BOLD run by AFNI 25.2.09
+(and 26.3.05, the replica's reference since 2026-10-29),
 by fMRIPrep's own AFNI, and by both larmorx implementations (the clean-room original and the
 GPL replica, each in its default and ``reproduce`` mode); a deliberate correction (AFNI-01) on
 the same run; the two records' cases; speed.
@@ -17,7 +18,7 @@ from pathlib import Path
 
 import numpy as np
 
-from larmorx_validation.evidence import core
+from larmorx_validation.evidence import afni_step, core
 from larmorx_validation.figures import cache as fcache
 from larmorx_validation.figures import records
 
@@ -86,14 +87,14 @@ def _compute(e: fcache.Entry) -> None:
     from larmorx_validation.parity.afni_tshift import (
         _environment,
         afni_binary,
-        afni_version,
         replica_binary,
         replica_version,
     )
 
     ora = _oracles()
     run = ora / "fmriprep-25.2.6" / RUN
-    afni, gpl = afni_binary(), replica_binary()
+    # AFNI 25.2.09, as the entry was first computed; 26.3.05 is added by ``afni_step``
+    afni, gpl = afni_binary(afni_step.OLD), replica_binary()
     if afni is None or gpl is None or not run.is_dir():
         raise FileNotFoundError("the AFNI oracle, the larmorx-gpl replica or the fMRIPrep run")
     command = (run / NODE / "command.txt").read_text(encoding="utf-8").strip()
@@ -141,7 +142,7 @@ def _compute(e: fcache.Entry) -> None:
                 cmd = fcache.larmorx_cli("afni", "3dTshift", *argv(out, inp))
             e.run(f"{tag}{label}", cmd, env=env, unset=unset)
     e.finish(
-        versions={"afni": afni_version(), "larmorx-gpl": replica_version()},
+        versions={"afni": f"AFNI_{afni_step.OLD}", "larmorx-gpl": replica_version()},
         command=command,
         slice_timing=times,
         tr=float(side["RepetitionTime"]),
@@ -222,6 +223,24 @@ RUNS = [
         "reproduce mode, 12 threads",
     ),
 ]
+#: AFNI 26.3.05 on the same calls (the replica's reference since 2026-10-29; ``afni_step``).
+RUNS_26 = [
+    (
+        "afni26",
+        "afni26",
+        "original",
+        "AFNI 26.3.05, 3dTshift",
+        "the repository's oracle build; the replica's reference",
+    ),
+]
+NEG_RUNS_26 = [
+    ("afni26-neg", "neg-afni26", "original", "AFNI 26.3.05", "on the negative scale factor"),
+]
+AFNI26_SAME = (
+    "AFNI 26.3.05 gives AFNI 25.2.09's bytes on this call: the version step changes nothing here "
+    "(its two changes, AFNI-03 and AFNI-05, need header slice code 2 or -no_detrend)."
+)
+AFNI26_DIFFER = "AFNI 26.3.05 and 25.2.09 differ on this call."
 NEG_RUNS = [
     (
         "afni",
@@ -482,7 +501,7 @@ def _note(n_vox: int, shape) -> str:
     )
 
 
-def _example_run(ctx: core.Context, e: fcache.Entry, reg: dict) -> dict:
+def _example_run(ctx: core.Context, e: fcache.Entry, reg: dict, step: dict) -> dict:
     info = e.info()
     run, img, ex, exm = _setup(ctx, e)
     braw, bslope, binter = _load_raw(Path(info["inputs"]["BOLD"].split(" (sha256")[0]))
@@ -498,6 +517,7 @@ def _example_run(ctx: core.Context, e: fcache.Entry, reg: dict) -> dict:
         )
     )
     _add_runs(ex, exm, e, run, RUNS)
+    _add_runs(ex, exm, e, run, RUNS_26)
     diffs = [
         _d(
             "replica-afni",
@@ -571,11 +591,31 @@ def _example_run(ctx: core.Context, e: fcache.Entry, reg: dict) -> dict:
             "clean-room original, default − reproduce mode",
             "larmorx against itself",
         ),
+        # AFNI 26.3.05 (2026-10-29), last: the earlier comparisons keep their places
+        _d(
+            "replica-afni26",
+            "replica",
+            "afni26",
+            "main",
+            "replica − AFNI 26.3.05",
+            "larmorx against the original (the replica's reference)",
+        ),
+        _d(
+            "afni26-afni",
+            "afni26",
+            "afni",
+            "variability",
+            "AFNI 26.3.05 − AFNI 25.2.09",
+            "the original against itself: the version step",
+        ),
     ]
 
     def verdict(d: dict, same: dict[str, bool]) -> None:
         i = d["id"]
-        if d["kind"] == "variability":
+        if i == "afni26-afni":
+            d["verdict"] = None
+            d["reason"] = AFNI26_SAME if same[i] else AFNI26_DIFFER
+        elif d["kind"] == "variability":
             d["verdict"] = None
             d["reason"] = (
                 "Two builds of AFNI 25.2.09 (fMRIPrep's image and the repository's) give the "
@@ -623,6 +663,7 @@ def _example_run(ctx: core.Context, e: fcache.Entry, reg: dict) -> dict:
         "compare": {"a": "afni", "b": "original"},
     }
     timing = _timing(info, ex.grid)
+    info = e.info()  # with AFNI 26.3.05's runs
     vers = info.get("versions", {})
     command = " ".join(info["command"].split()).replace(
         "/work/fmriprep_25_2_wf/sub_002_wf/bold_task_clip_run_1_wf/bold_native_wf/bold_stc_wf/"
@@ -634,9 +675,11 @@ def _example_run(ctx: core.Context, e: fcache.Entry, reg: dict) -> dict:
         "title": "fMRIPrep's slice-timing correction of a real BOLD run",
         "summary": (
             "The 3dTshift node fMRIPrep 25.2.6 ran on OpenNeuro ds005040 sub-002 (task clip, "
-            "run 1): its arguments and the slice times it wrote, given to AFNI 25.2.09 and to "
-            "both LARMORX implementations, each in its default and reproduce mode and at 1 and "
-            "12 threads. fMRIPrep's own output is the column it produced in its run."
+            "run 1): its arguments and the slice times it wrote, given to AFNI 25.2.09, to AFNI "
+            "26.3.05 (the replica's reference since 2026-10-29) and to both LARMORX "
+            "implementations, each in its default and reproduce mode and at 1 and 12 threads. "
+            "fMRIPrep's own output is the column it produced in its run. The clean-room original "
+            "is compared with AFNI 25.2.09, its reference until it follows 26.3.05's two fixes."
         ),
         "facts": [
             {
@@ -655,10 +698,12 @@ def _example_run(ctx: core.Context, e: fcache.Entry, reg: dict) -> dict:
             },
             {
                 "label": "Programs",
-                "text": f"{vers.get('afni', '?').replace('AFNI_', 'AFNI ')} (the repository's oracle "
-                f"build); {vers.get('larmorx-gpl', '?')} (the replica); larmorx's clean-room original "
-                f"at commit `{info['larmorx_commit'][:12]}`",
+                "text": f"{vers.get('afni', '?').replace('AFNI_', 'AFNI ')} and "
+                f"{info.get('versions', {}).get('afni_26', 'AFNI 26.3.05').split(',')[0].replace('AFNI_', 'AFNI ')} "
+                f"(the repository's oracle builds); {vers.get('larmorx-gpl', '?')} (the replica); "
+                f"larmorx's clean-room original at commit `{info['larmorx_commit'][:12]}`",
             },
+            afni_step.fact(step, "fMRIPrep's call"),
         ],
         "chain": {
             "title": "Who gives which bytes on this run",
@@ -672,6 +717,11 @@ def _example_run(ctx: core.Context, e: fcache.Entry, reg: dict) -> dict:
                         },
                         {
                             "label": "AFNI 25.2.09",
+                            "sub": "the repository's oracle build",
+                            "role": "original",
+                        },
+                        {
+                            "label": "AFNI 26.3.05",
                             "sub": "the repository's oracle build",
                             "role": "original",
                         },
@@ -734,6 +784,8 @@ def _example_run(ctx: core.Context, e: fcache.Entry, reg: dict) -> dict:
     by = {d["id"]: d for d in out["diffs"]}
     for i in (
         "fmriprep-afni",
+        "afni26-afni",
+        "replica-afni26",
         "replica-afni",
         "replica-threads",
         "replica-repro",
@@ -756,7 +808,7 @@ def _example_run(ctx: core.Context, e: fcache.Entry, reg: dict) -> dict:
     return out
 
 
-def _example_neg(ctx: core.Context, e: fcache.Entry, reg: dict) -> dict:
+def _example_neg(ctx: core.Context, e: fcache.Entry, reg: dict, step: dict) -> dict:
     info = e.info()
     run, img, ex, exm = _setup(ctx, e)
     braw, bslope, binter = _load_raw(Path(info["inputs"]["BOLD"].split(" (sha256")[0]))
@@ -784,6 +836,7 @@ def _example_neg(ctx: core.Context, e: fcache.Entry, reg: dict) -> dict:
         )
     )
     _add_runs(ex, exm, e, run, NEG_RUNS)
+    _add_runs(ex, exm, e, run, NEG_RUNS_26)
     afni01 = reg["AFNI-01"]
     link = [{"label": "AFNI-01", "href": afni01["link"]}]
     diffs = [
@@ -851,12 +904,33 @@ def _example_neg(ctx: core.Context, e: fcache.Entry, reg: dict) -> dict:
             "AFNI on the negative scale factor − AFNI on the usual encoding",
             "the defect, in AFNI",
         ),
+        _d(
+            "replica-repro-afni26-neg",
+            "replica-neg-reproduce",
+            "afni26-neg",
+            "main",
+            "replica (reproduce) − AFNI 26.3.05, same input",
+            "larmorx against the original (the replica's reference)",
+        ),
+        _d(
+            "afni26-neg-afni-neg",
+            "afni26-neg",
+            "afni-neg",
+            "variability",
+            "AFNI 26.3.05 − AFNI 25.2.09, on the negative scale factor",
+            "the original against itself: the version step",
+        ),
     ]
 
     def verdict(d: dict, same: dict[str, bool]) -> None:
         i = d["id"]
         d["links"] = link
-        if d["kind"] == "variability":
+        if i == "afni26-neg-afni-neg":
+            d["verdict"] = None
+            d["reason"] = (
+                AFNI26_SAME + " AFNI-01 is in both releases." if same[i] else AFNI26_DIFFER
+            )
+        elif d["kind"] == "variability":
             d["verdict"] = None
             d["reason"] = (
                 "The two encodings hold the same values, every one."
@@ -883,6 +957,8 @@ def _example_neg(ctx: core.Context, e: fcache.Entry, reg: dict) -> dict:
                 "original-neg-original": "The corrected result is the original's own result on "
                 "the same values stored the usual way.",
                 "replica-repro-afni-neg": "reproduce mode gives AFNI's result, defect included.",
+                "replica-repro-afni26-neg": "reproduce mode gives AFNI 26.3.05's result, defect "
+                "included (AFNI-01 is unchanged in 26.3.05).",
             }.get(i, "The same values.")
         elif i == "original-repro-afni-neg":
             m = d["metrics"]["series"]
@@ -911,8 +987,8 @@ def _example_neg(ctx: core.Context, e: fcache.Entry, reg: dict) -> dict:
         "summary": (
             "NIfTI lets integer data carry a negative scale factor: the run below holds the "
             "same values as above, its stored integers negated and its scale factor −47.67. "
-            "fMRIPrep's command, given to AFNI 25.2.09 and to both LARMORX implementations in "
-            "their default and reproduce modes."
+            "fMRIPrep's command, given to AFNI 25.2.09, to AFNI 26.3.05 and to both LARMORX "
+            "implementations in their default and reproduce modes."
         ),
         "facts": [
             {
@@ -927,6 +1003,7 @@ def _example_neg(ctx: core.Context, e: fcache.Entry, reg: dict) -> dict:
                 "corrected by default in both implementations, with a warning",
             },
             {"label": "Command", "text": "fMRIPrep's, as in the example above"},
+            afni_step.fact(step, "the call on either encoding"),
         ],
         "chain": None,
         "series": [
@@ -1037,6 +1114,7 @@ def _speed(bench) -> dict | None:
 
 def export(ctx: core.Context) -> dict:
     e = entry(ctx)
+    step = afni_step.ensure(e, ["afni", "neg-afni"], ctx.compute)
     reg = core.register(ctx.repo)
     cases = _cases(ctx)
     impls = []
@@ -1079,7 +1157,7 @@ def export(ctx: core.Context) -> dict:
         "cases": cases,
         "cases_total": len(cases),
         "speed": _speed(bench),
-        "examples": [_example_run(ctx, e, reg), _example_neg(ctx, e, reg)],
+        "examples": [_example_run(ctx, e, reg, step), _example_neg(ctx, e, reg, step)],
     }
 
 

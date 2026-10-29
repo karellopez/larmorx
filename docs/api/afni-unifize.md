@@ -2,7 +2,10 @@
 
 `lx.afni.unifize` (command line `larmorx afni 3dUnifize`): the white-matter intensity of a
 T1-weighted volume made uniform across space and scaled to about 1000 (or, with `-T2`, of a
-T2-weighted one; with `-EPI`, of an EPI series), as AFNI 25.2.09's `3dUnifize` computes it.
+T2-weighted one; with `-EPI`, of an EPI series), as AFNI's `3dUnifize` computes it (26.3.05;
+25.2.09 for the clean-room original until it is aligned, below).
+
+**AFNI versions** (2026-10-29): the replica follows AFNI 26.3.05 and is validated against it; the clean-room original is validated against AFNI 25.2.09 until a clean-room agent aligns it with 26.3.05. The two releases differ, for these programs, in two corrections larmorx already made by default (AFNI-03, header slice code 2; AFNI-05, 3dTshift's `-no_detrend`): the default output is the same with either; only `reproduce` differs where they apply ([findings](../findings/afni-relicensing-26.md) for the new licence).
 
 **Two implementations.** 3dUnifize's results depend on AFNI library routines copyrighted by the
 Medical College of Wisconsin (GPL-2), so larmorx has the bit-exact **replica**
@@ -15,7 +18,7 @@ when it is installed (`pip install "larmorx[exact]"`), else the original; `"repl
 `"original"` (`LARMORX_IMPLEMENTATION`) forces one. Each image's `implementation` names the one
 that ran.
 
-**Status: `validated`**, both, against AFNI 25.2.09 itself:
+**Status: `validated`**, both: the original against AFNI 25.2.09 itself, the replica against AFNI 26.3.05:
 - the original ([record](../validation/afni-unifize.md), 99 cases, none failing): AFNI's exit
   status and messages in every case; in 32 of the 72 compared cases that write outputs every
   output is AFNI's, bit for bit (data and NIfTI header); in the other 40 the headers are AFNI's
@@ -70,7 +73,7 @@ gives fMRIPrep's arguments. The arguments are checked before anything runs (`Val
 | `-nosquash`, `-oink` | `squash=False` | |
 | `-ssave s`, `-amsave a` | `save_scale`, `save_automask` | |
 | `-quiet`, `-verb` | (always quiet) | warnings become Python warnings |
-| `-useall` | – | disabled in AFNI 25.2.09 (a warning) |
+| `-useall` | – | disabled in AFNI 25.2.09 and 26.3.05 (a warning) |
 | global options, `AFNI_*` | `afni_settings` | as for 3dAutomask |
 | `OMP_NUM_THREADS` | `n_threads` | the result does not depend on it, in AFNI or larmorx |
 

@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// Translated to Rust from AFNI 25.2.09 src/debugtrace.c (output_message, INFO_message,
+// Translated to Rust from AFNI 26.3.05 src/debugtrace.c (output_message, INFO_message,
 // ININFO_message, WARNING_message, ERROR_message, ERROR_exit).
 // debugtrace.c carries no Medical College of Wisconsin notice: it was written at the NIH and is
 // in the public domain (AFNI's LICENSE.txt). This translation is part of the GPL-3.0-or-later

@@ -45,7 +45,8 @@ enum Input {
     /// int16 with `scl_slope` -0.25 (AFNI-01).
     Int16Negative,
     /// float32 with `scl_slope` 2 and `scl_inter` 10 (AFNI-02), an oblique sform in metres
-    /// with an origin (AFNI-07), and header slice code 2 (AFNI-03).
+    /// with an origin (AFNI-07), and header slice code 2 (AFNI 25.2.09's AFNI-03, which AFNI
+    /// 26.3.05 fixed: both modes read the slice times as NIfTI defines them).
     Float32Defects,
     /// float32 with header slice times 0.5 ms apart beyond a 1 ms TR: a copy of the input
     /// that keeps them (AFNI-08).
@@ -148,7 +149,7 @@ const CASES: &[Case] = &[
         env: &[],
         existing: false,
         outputs: &[],
-        named: &["AFNI-05"],
+        named: &[],
         mode: "fix",
         input: Input::Uint8,
         args: &["-tpattern", "seq-z", "-heptic", "-no_detrend"],
@@ -201,7 +202,7 @@ const CASES: &[Case] = &[
         env: &[],
         existing: false,
         outputs: &[],
-        named: &["AFNI-02", "AFNI-07", "AFNI-03"],
+        named: &["AFNI-02", "AFNI-07"],
         mode: "fix",
         input: Input::Float32Defects,
         args: &["-cubic"],
@@ -229,17 +230,6 @@ const CASES: &[Case] = &[
         args: &["-tpattern", "seq+z", "-linear"],
     },
     Case {
-        id: "3dTshift.heptic.uint8.no_detrend.reproduce",
-        tool: "afni 3dTshift",
-        env: &[],
-        existing: false,
-        outputs: &[],
-        named: &["AFNI-05"],
-        mode: "reproduce",
-        input: Input::Uint8,
-        args: &["-tpattern", "seq-z", "-heptic", "-no_detrend"],
-    },
-    Case {
         id: "3dTshift.linear.int16-negative-slope.reproduce",
         tool: "afni 3dTshift",
         env: &[],
@@ -256,7 +246,7 @@ const CASES: &[Case] = &[
         env: &[],
         existing: false,
         outputs: &[],
-        named: &["AFNI-02", "AFNI-07", "AFNI-03"],
+        named: &["AFNI-02", "AFNI-07"],
         mode: "reproduce",
         input: Input::Float32Defects,
         args: &["-cubic"],

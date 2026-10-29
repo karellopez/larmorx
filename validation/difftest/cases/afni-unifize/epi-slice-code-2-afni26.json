@@ -1,0 +1,185 @@
+{
+ "defect": "AFNI-03",
+ "description": "-EPI on a series with header slice code 2, against the replica and AFNI 26.3.05: the output keeps the header's slice timing in both modes and no AFNI-03 is named (AFNI-03 fixed upstream; the version update, 2026-10-29)",
+ "expect": "pass",
+ "found": {
+  "detail": "D13 fix pass: no defect named: no values; uni.nii header changed; D13 notices in both modes: fix: []; reproduce: ['AFNI-08']",
+  "from_case": "epi-slice-code-2-fix-notice",
+  "n": 90,
+  "seed": "20261025",
+  "shrink_moves": [
+   "dropped amsave (-amsave am.nii)",
+   "input: axis 2 31 -> 15 voxels",
+   "input: axis 2 15 -> 7 voxels",
+   "input: axis 1 11 -> 5 voxels",
+   "input: axis 0 8 -> 4 voxels",
+   "input: axis 2 7 -> 4 voxels",
+   "input: axis 1 5 -> 4 voxels",
+   "input: 4 -> 2 volumes",
+   "input (and its grid): plumb orientation",
+   "input (and its grid): unit spacing",
+   "input (and its grid): origin at 0",
+   "input (and its grid): qform and sform codes 1",
+   "input (and its grid): millimetres",
+   "input: float32 storage",
+   "input: content head -> constant"
+  ],
+  "signature": [
+   "DN fix pass",
+   "DN notices in both modes"
+  ]
+ },
+ "id": "epi-slice-code-2-afni26",
+ "implementations": [
+  "replica"
+ ],
+ "reason": "",
+ "recipe": {
+  "extra": {
+   "min_size": 4,
+   "outputs": [
+    "uni.nii",
+    "am.nii"
+   ]
+  },
+  "features": {
+   "-input": false,
+   "EPI": true,
+   "GM": false,
+   "T2": false,
+   "T2up": false,
+   "Urad": false,
+   "amsave": true,
+   "axis0": 1.15,
+   "axis1": 0.75,
+   "axis2": 0.8,
+   "bias0": 0.005,
+   "bias1": 0.0,
+   "bias2": -0.0025,
+   "bias3": 0.0075,
+   "centre0": -4.5,
+   "centre1": -3.0,
+   "centre2": -4.5,
+   "clfrac": false,
+   "content": "head",
+   "dtype": "uint8",
+   "noduplo": false,
+   "noise": 0.0,
+   "nosquash": false,
+   "orientation": "axes+oblique",
+   "origin0": -49.0,
+   "origin1": -3.25,
+   "origin2": 9.25,
+   "output": "uni.nii",
+   "qfac": 1,
+   "qform_code": 2,
+   "quiet": false,
+   "range": "plain",
+   "rbt": false,
+   "sform": "same",
+   "sform_code": 2,
+   "shape": "8x11x31x4",
+   "size": 17.5,
+   "slice_code": 2,
+   "spacing0": 2.0,
+   "spacing1": 1.5,
+   "spacing2": 0.8,
+   "ssave": false,
+   "suffix": ".nii.gz",
+   "tissues": "t2",
+   "tr": 2.0,
+   "tunits": "unknown",
+   "units": "unknown",
+   "useall": false
+  },
+  "groups": [
+   {
+    "args": [
+     "-EPI"
+    ],
+    "name": "EPI",
+    "optional": true
+   },
+   {
+    "args": [
+     "-prefix",
+     "uni.nii"
+    ],
+    "name": "prefix",
+    "optional": false
+   },
+   {
+    "args": [
+     "{in:input}"
+    ],
+    "name": "input",
+    "optional": false
+   }
+  ],
+  "inputs": {
+   "input": {
+    "content": {
+     "seed": 1921627964,
+     "type": "constant"
+    },
+    "dtype": "float32",
+    "geometry": {
+     "origin": [
+      0.0,
+      0.0,
+      0.0
+     ],
+     "qfac": 1,
+     "qform_code": 1,
+     "quaternion": [
+      1,
+      0,
+      0,
+      0
+     ],
+     "sform": "same",
+     "sform_code": 1,
+     "spacing": [
+      1.0,
+      1.0,
+      1.0
+     ],
+     "units": "mm"
+    },
+    "scaling": null,
+    "shape": [
+     4,
+     4,
+     4,
+     2
+    ],
+    "suffix": ".nii.gz",
+    "timing": {
+     "slice_code": 2,
+     "slice_duration": 0.0645,
+     "slice_end": 3,
+     "slice_start": 0,
+     "tr": 2.0,
+     "tunits": "unknown"
+    },
+    "values": {
+     "offset": 0.0,
+     "scale": 1.0
+    }
+   }
+  },
+  "n": 90,
+  "options": [
+   "-EPI",
+   "-amsave",
+   "4D input"
+  ],
+  "seed": "20261025",
+  "tool": "afni-unifize"
+ },
+ "rule": null,
+ "status": "register",
+ "suite": "afni-unifize",
+ "tier": "smoke",
+ "tool": "afni-unifize"
+}

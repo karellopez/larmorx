@@ -216,7 +216,7 @@ status = "reference"
 [[record]]
 id = "afni-tshift-replica"
 larmorx = "`larmorx-gpl afni 3dTshift` (GPL replica, `crates-gpl/`)"
-reference = "3dTshift (AFNI 25.2.09 binary)"
+reference = "3dTshift (AFNI 26.3.05 binary; AFNI 25.2.09 beside it, the version step)"
 status = "`validated`"
 
 [[record]]
@@ -228,7 +228,7 @@ status = "`validated`"
 [[record]]
 id = "afni-automask-replica"
 larmorx = "`larmorx-gpl afni 3dAutomask` (GPL replica, `crates-gpl/`), run by `larmorx afni 3dAutomask` and `lx.afni.automask`"
-reference = "3dAutomask (AFNI 25.2.09 binary; fMRIPrep 25.2.6's AFNI as a second build)"
+reference = "3dAutomask (AFNI 26.3.05 binary; AFNI 25.2.09 beside it, the version step; fMRIPrep 25.2.6's AFNI as a second build)"
 status = "`validated`"
 
 [[record]]
@@ -240,7 +240,7 @@ status = "`validated`"
 [[record]]
 id = "afni-unifize-replica"
 larmorx = "`larmorx-gpl afni 3dUnifize` (GPL replica), run by `larmorx afni 3dUnifize` and `lx.afni.unifize`"
-reference = "3dUnifize (AFNI 25.2.09 binary, 1, 2 and 6 OpenMP threads; fMRIPrep 25.2.6's AFNI)"
+reference = "3dUnifize (AFNI 26.3.05 binary, 1, 2 and 6 OpenMP threads; AFNI 25.2.09 beside it, the version step; fMRIPrep 25.2.6's AFNI)"
 status = "`validated`"
 
 [[record]]

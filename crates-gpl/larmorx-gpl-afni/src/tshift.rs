@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// Translated to Rust from AFNI 25.2.09: src/3dTshift.c (the shifting loop of main),
+// Translated to Rust from AFNI 26.3.05: src/3dTshift.c (the shifting loop of main),
 // src/thd_dsetto1D.c (THD_extract_series, THD_extract_array), src/thd_1Dtodset.c
 // (THD_insert_series), src/thd_initdblk.c (THD_need_brick_factor) and the SHORTIZE and
 // BYTEIZE macros of src/mrilib.h.
@@ -15,7 +15,7 @@
 //!    positive brick factor is applied);
 //! 2. the range of the used points is recorded (`-ignore` points are left out);
 //! 3. the linear trend is removed (`THD_linear_detrend`), or with `-no_detrend` the mean
-//!    (`THD_const_detrend`, applied to the *first* voxel of the pair twice: AFNI's bug);
+//!    (`THD_const_detrend`, each voxel its own: AFNI 26.3.05 fixed AFNI-05, below);
 //! 4. the detrended range is recorded;
 //! 5. both series are shifted together (`SHIFT_two_rows`);
 //! 6. each value is clipped to the detrended range, the trend (or the mean) is added back and
@@ -26,13 +26,15 @@
 //! Pairs are independent, so they run in parallel; the result does not depend on the number
 //! of threads.
 //!
-//! **Upstream defects (D13).** Two of these steps are defects that larmorx-gpl corrects by
+//! **Upstream defects (D13).** One of these steps is a defect that larmorx-gpl corrects by
 //! default ([`TshiftParams::upstream_defects`], `docs/findings/upstream-defects.md`): a
 //! negative brick factor is not applied in step 1 but is divided by in step 7, so the shifted
-//! slices come out sign-flipped and scaled (AFNI-01); and `-no_detrend` de-means the first
-//! voxel of each pair twice and the second not at all (AFNI-05). Corrected, a non-zero factor
-//! is applied in step 1 and each voxel has its own mean removed and restored.
-//! [`UpstreamDefects::Reproduce`] gives AFNI's result.
+//! slices come out sign-flipped and scaled (AFNI-01). Corrected, a non-zero factor is applied
+//! in step 1. [`UpstreamDefects::Reproduce`] gives AFNI's result.
+//!
+//! AFNI-05, `-no_detrend` de-meaning the first voxel of each pair twice and the second not at
+//! all, was AFNI 25.2.09's; AFNI 26.3.05 de-means each voxel with its own mean, as larmorx
+//! corrected it, so both modes now compute that (the replica follows 26.3.05).
 
 use larmorx_core::defects::{self, Notice, UpstreamDefects};
 use larmorx_core::parallel::{self, ThreadPoolError};
@@ -75,7 +77,7 @@ pub struct TshiftParams {
     pub bad: bool,
     /// Worker threads (0 = all logical CPUs). The result does not depend on it.
     pub n_threads: usize,
-    /// D13: correct AFNI-01 and AFNI-05 (the default) or reproduce them.
+    /// D13: correct AFNI-01 (the default) or reproduce it.
     pub upstream_defects: UpstreamDefects,
 }
 
@@ -192,10 +194,9 @@ pub fn tshift(ds: &mut Dataset, p: &TshiftParams) -> Result<Vec<Notice>, TshiftE
     Ok(notices(ds, p))
 }
 
-/// The notices of [`tshift`]: AFNI-01 when a slice with a negative brick factor is shifted,
-/// AFNI-05 when `-no_detrend` pairs voxels.
+/// The notices of [`tshift`]: AFNI-01 when a slice with a negative brick factor is shifted.
 fn notices(ds: &Dataset, p: &TshiftParams) -> Vec<Notice> {
-    let [nx, ny, nz] = ds.nxyz;
+    let nz = ds.nxyz[2];
     let mode = p.upstream_defects;
     let shifted = (0..nz)
         .filter(|&kk| !skipped(p, slice_shift(p, kk)))
@@ -218,19 +219,6 @@ fn notices(ds: &Dataset, p: &TshiftParams) -> Vec<Notice> {
             ),
         };
         out.push(Notice::new(&defects::AFNI_01, mode, detail));
-    }
-    if !p.detrend && nx * ny >= 2 {
-        let detail = match mode {
-            UpstreamDefects::Fix => "-no_detrend: every voxel has its mean removed and restored; \
-                 AFNI does that to the first voxel of each pair only, twice, and shifts the \
-                 second as raw values"
-                .to_owned(),
-            UpstreamDefects::Reproduce => "-no_detrend: as AFNI does, the first voxel of each \
-                 pair (in index order within a slice) has its mean removed twice and restored \
-                 once; the second is shifted as raw values"
-                .to_owned(),
-        };
-        out.push(Notice::new(&defects::AFNI_05, mode, detail));
     }
     out
 }
@@ -380,14 +368,11 @@ fn shift_pair(
         let g_full = full(gar);
         let g_trend = if p.detrend {
             linear_detrend(&mut gar[ig..]).unwrap_or((0.0, 0.0))
-        } else if p.upstream_defects.fix() {
-            // AFNI-05 corrected: the second voxel's own mean.
-            (const_detrend(&mut gar[ig..]).unwrap_or(0.0), 0.0)
         } else {
-            // 3dTshift.c:632-633: `THD_const_detrend( ntt-ignore , far+ignore , &g0 )`: the
-            // first voxel is de-meaned again, its new mean (about 0) becomes g0, and the second
-            // voxel keeps its mean (AFNI-05).
-            (const_detrend(&mut far[ig..]).unwrap_or(0.0), 0.0)
+            // 3dTshift.c:633 (AFNI 26.3.05): `THD_const_detrend( ntt-ignore , gar+ignore , &g0 )`,
+            // the second voxel's own mean. AFNI 25.2.09 passed `far+ignore` (AFNI-05): the first
+            // voxel was de-meaned again and the second kept its mean.
+            (const_detrend(&mut gar[ig..]).unwrap_or(0.0), 0.0)
         };
         Prep {
             full: g_full,
@@ -480,7 +465,6 @@ mod tests {
                 },
                 code: 1,
             },
-            seq_dec: None,
             dropped_inter: None,
         }
     }

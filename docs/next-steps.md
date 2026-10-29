@@ -62,9 +62,15 @@ at a time:
    permanent cases; one left open: `-cost normmi` aligns worse (below, follow-ups). The thread
    probe needed nothing in the clean-room crates (`docs/findings/ants-cli.md`: no thread outside
    the call's pool).
-3. **The version update** (user 2026-10-27, decision log; the upstream watch with it): AFNI to its
-   newest release (26.3.05 today), FSL to its newest 6.0.7.x (6.0.7.23 today), SciPy, NumPy and
-   OpenBLAS checked; each tool aligned with its newest original, with the per-part testing.
+3. **The version update** (user 2026-10-27, decision log; the upstream watch with it):
+   **part 1, AFNI: done** (2026-10-29, `docs/parts/2026-10-29-version-afni/`): AFNI 26.3.05's
+   changes to the three programs are two, both fixes of defects larmorx already corrected
+   (AFNI-03, AFNI-05); the GPL replicas follow 26.3.05 (records against it, AFNI's own step from
+   25.2.09 in each case); the clean-room originals stay on 25.2.09 until aligned (below); the
+   upstream watch runs weekly from the nightly job; the relicensing inventory waits for the user.
+   Part 2: FSL to its newest 6.0.7.x (6.0.7.23 today; the watch lists 15 of the replicas' 57 FSL
+   files changed and one removed), SciPy, NumPy and OpenBLAS checked; each tool aligned with its
+   newest original, with the per-part testing.
 4. **The ports:** BET's clean-room original (item 7), the clean-room additions mcflirt FSL-20/21
    and 3dUnifize AFNI-75 (specs first), FLIRT with BBR, FAST, topup (item 7); field maps,
    FreeSurfer, surfaces, confounds (item 8); larmorprepx (item 9). Each with its site page from
@@ -409,6 +415,22 @@ The items below keep their history.
   normalised form), then a clean-room fix measured with
   `validation/investigations/cleanroom-fixes/hmc_alignment.py`. Permanent case
   `mri-hmc/normmi-aligns-worse` (open).
+- **The clean-room originals follow AFNI 26.3.05** (a clean-room agent; from the specs only,
+  lines marked "AFNI 26.3.05"): (1) 3dTshift `-no_detrend`: `reproduce` de-means every voxel
+  with its own mean, as `fix` does, and AFNI-05 is never named (`specs/3dTshift.md` §4); (2)
+  header slice code 2 in 3dTshift, 3dAutomask (`-apply_prefix`) and 3dUnifize (`-EPI`):
+  `reproduce` reads the times `end, end−1, …, start` as `fix` does, a copy where they exceed the
+  TR, and AFNI-03 is never named (`specs/3dTshift.md` §3.2, §6.4, §6.5; `specs/3dAutomask.md`
+  §9; `specs/3dUnifize.md`); (3) the permanent cases `difftest/slice-code-2-masked-notices`,
+  `epi-slice-code-2-fix-notice`, `epi-slice-code-2-reproduce-notices` re-described for 26.3.05;
+  (4) their records re-made against 26.3.05 and `DEFAULT["original"]` in
+  `validation/src/larmorx_validation/parity/afni_versions.py` set to 26.3.05; (5) version strings
+  (`PROVENANCE.md`: black-box runs of `oracles/afni-26.3.05`). Against 26.3.05 today
+  (`--afni-version 26.3.05`, standard tier): 3dTshift 6 of 315 cases fail (`options/*-no-detrend`
+  ×4, `header-timing/code2-seq-dec`, `header-timing/code2-beyond-tr`), 3dAutomask 1 of 130
+  (`difftest/slice-code-2-masked-notices`), 3dUnifize 2 of 117 (`difftest/epi-slice-code-2-*`);
+  every other case agrees as against 25.2.09; random testing against 26.3.05: 190 findings and 62
+  notices, every one AFNI-03 or AFNI-05.
 - **The version update, what changed in the numerics** (the newest releases fetched 2026-10-28
   beside the old ones in the workspace's `tags/`; FSL 6.0.7.23 installed in `~/fsl-6.0.7.23`,
   `~/fsl` still 6.0.7.17; AFNI 26.3.05 built in `oracles/afni-26.3.05`): SciPy 1.15.2 → 1.18.1
@@ -470,6 +492,11 @@ Decided 2026-10-23 (decision log): the four rules for questionable behaviours (A
   permissive notice) with no libstdc++ text; the orchestrator accepted that licensing reading
   (algorithms, not code, are reused). The user may prefer the earlier behaviour instead (NaNs last
   in both modes, with a warning). No **decide** entry in the register.
+- **AFNI's relicensing (CC BY 4.0):** move the AFNI replicas into the main Apache package?
+  [findings/afni-relicensing-26.md](findings/afni-relicensing-26.md) lists what it needs.
+  Recommendation: yes, as its own part, once `cbrtf` (3dUnifize `-EPI`'s radius) is measured
+  (rule D) and `sinf`/`cosf` are re-sourced from Arm's MIT routines; `pip install larmorx` would
+  then give AFNI's exact bits without the GPL package.
 
 Decided 2026-10-22 (decision log): ANTS-106 corrected by default (follow-up below); ANTS-30's
 command line approved. Decided 2026-10-21: ANTS-78, ITK-35, ANTS-67, ANTS-68, ANTS-70, ITK-24, ITK-29

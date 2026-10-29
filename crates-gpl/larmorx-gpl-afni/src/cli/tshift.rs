@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// Translated to Rust from AFNI 25.2.09 src/3dTshift.c (main, TS_copy_input_to_output),
+// Translated to Rust from AFNI 26.3.05 src/3dTshift.c (main, TS_copy_input_to_output),
 // src/thd_filestuff.c (THD_filename_ok), src/thd_writedset.c (the AFNI_DECONFLICT part of
 // THD_write_3dim_dataset), src/thd_opendset.c (THD_deconflict_prefix, THD_deconflict_nifti),
 // src/afni_environ.c (THD_deathcon, THD_ok_overwrite), src/afni_logger.c (the
@@ -92,11 +92,11 @@ use super::threads;
 const IMPLEMENTATION: &str = concat!(
     "implementation: replica (larmorx-gpl ",
     env!("CARGO_PKG_VERSION"),
-    ", GPL-3.0-or-later), bit-exact translation of AFNI 25.2.09's 3dTshift"
+    ", GPL-3.0-or-later), bit-exact translation of AFNI 26.3.05's 3dTshift"
 );
 
 const USAGE: &str = "\
-Usage: 3dTshift [options] dataset   (larmorx-gpl: replica of AFNI 25.2.09's 3dTshift)
+Usage: 3dTshift [options] dataset   (larmorx-gpl: replica of AFNI 26.3.05's 3dTshift)
 
 Shifts voxel time series from the input dataset so that the separate slices are aligned
 to the same temporal origin: detrend -> interpolate -> retrend. The results are those of
@@ -565,29 +565,6 @@ fn run(pre: &Prefiltered, mode: UpstreamDefects, io: &mut Io<'_>) -> Result<(), 
             if offsets.len() != nzz {
                 io.warn("dataset temporal pattern is malformed!");
                 return copy_input_to_output(&ds, &out, &o, n_threads, settings, &mut notices, io);
-            }
-            if let Some((start, end)) = ds.seq_dec {
-                // Corrected, the times can exceed the TR: then the output is a copy (below).
-                let copy = offsets.iter().any(|&t| t < 0.0 || t > o.tr);
-                notices.add(
-                    &defects::AFNI_03,
-                    match (mode.fix(), copy) {
-                        (true, false) => format!(
-                            "header slice code 2 (sequential decreasing) orders slices \
-                             {end}..{start} from the top; AFNI gives every slice time 0 and \
-                             shifts nothing"
-                        ),
-                        (true, true) => format!(
-                            "header slice code 2 (sequential decreasing) orders slices \
-                             {end}..{start} from the top, and their times exceed the TR: the \
-                             output is a copy of the input that keeps them; AFNI gives every \
-                             slice time 0, shifts nothing and writes no slice timing"
-                        ),
-                        (false, _) => "header slice code 2 (sequential decreasing) gives every \
-                                       slice time 0, so nothing is shifted, as AFNI does"
-                            .to_owned(),
-                    },
-                );
             }
             offsets
         }

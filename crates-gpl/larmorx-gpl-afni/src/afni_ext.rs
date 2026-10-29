@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// Translated to Rust from AFNI 25.2.09: src/thd_niftiread.c (THD_nifti_process_afni_ext),
+// Translated to Rust from AFNI 26.3.05: src/thd_niftiread.c (THD_nifti_process_afni_ext),
 // src/thd_nimlatr.c (THD_dblkatr_from_niml), src/thd_initdblk.c (the time-axis, matrix and
 // template-space parts of THD_datablock_apply_atr), src/thd_zblock.c (THD_unzblock) and
 // the text decoding of the NIML library (src/niml/niml_elemio.c: NI_read_element,

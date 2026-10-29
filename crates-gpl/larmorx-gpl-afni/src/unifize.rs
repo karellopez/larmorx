@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// Translated to Rust from AFNI 25.2.09: src/3dUnifize.c (mri_clipedges_inplace, median7,
+// Translated to Rust from AFNI 26.3.05: src/3dUnifize.c (mri_clipedges_inplace, median7,
 // mri_double_down, mri_double_up, mri_local_percmean, mri_WMunifize, mri_GMunifize),
 // src/mri_invert.c (mri_invertcontrast_inplace), src/thd_dset_nbhd.c (mri_get_nbhd_array,
 // with SetSearchAboutMaskedVoxel), src/edt_buildmask.c (MCW_build_mask, MCW_spheremask),
@@ -11,7 +11,7 @@
 // Wisconsin (AFNI, Robert W. Cox et al.), released under the GNU GPL version 2 or any later
 // version.
 // Rust translation Copyright 2026 Karel Lopez Vilaret; modified from the original.
-//! The steps of `3dUnifize`, as AFNI 25.2.09 computes them.
+//! The steps of `3dUnifize`, as AFNI 26.3.05 computes them.
 //!
 //! - [`local_percmean`]: in a ball around each voxel, the mean of the automasked values
 //!   between two percentiles (70 % and 80 % by default): the local white-matter intensity

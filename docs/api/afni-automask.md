@@ -1,7 +1,10 @@
 # 3dAutomask
 
 `lx.afni.automask` (command line `larmorx afni 3dAutomask`): a brain mask from an EPI series or
-a skull-stripped anatomical, as AFNI 25.2.09's `3dAutomask` makes it.
+a skull-stripped anatomical, as AFNI's `3dAutomask` makes it (26.3.05; 25.2.09 for the
+clean-room original until it is aligned, below).
+
+**AFNI versions** (2026-10-29): the replica follows AFNI 26.3.05 and is validated against it; the clean-room original is validated against AFNI 25.2.09 until a clean-room agent aligns it with 26.3.05. The two releases differ, for these programs, in two corrections larmorx already made by default (AFNI-03, header slice code 2; AFNI-05, 3dTshift's `-no_detrend`): the default output is the same with either; only `reproduce` differs where they apply ([findings](../findings/afni-relicensing-26.md) for the new licence).
 
 **Two implementations.** 3dAutomask's results depend on AFNI library routines copyrighted by the
 Medical College of Wisconsin (GPL-2), so larmorx has the bit-exact **replica**
@@ -14,7 +17,7 @@ AFNI only ([PROVENANCE](../../crates/larmorx-afni/PROVENANCE.md)). `implementati
 `"original"` (`LARMORX_IMPLEMENTATION`) forces one. Each image's `implementation` names the one
 that ran.
 
-**Status: `validated`**, both, against AFNI 25.2.09 itself:
+**Status: `validated`**, both: the original against AFNI 25.2.09 itself, the replica against AFNI 26.3.05:
 - the original ([record](../validation/afni-automask.md)): every output of 80 of the 81 compared
   cases that write one is AFNI's, bit for bit (data and NIfTI header), with AFNI's exit status and
   messages in every case; the other one, fMRIPrep's call on ds005454's BOLD reference, has AFNI's

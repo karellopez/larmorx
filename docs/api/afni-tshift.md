@@ -1,15 +1,19 @@
 # 3dTshift
 
 `lx.afni.tshift` (command line `larmorx afni 3dTshift`; Rust crate `larmorx-afni`):
-slice-timing correction, compatible with AFNI 25.2.09's `3dTshift`.
+slice-timing correction, compatible with AFNI's `3dTshift` (26.3.05; 25.2.09 for the
+clean-room original until it is aligned, below).
+
+**AFNI versions** (2026-10-29): the replica follows AFNI 26.3.05 and is validated against it; the clean-room original is validated against AFNI 25.2.09 until a clean-room agent aligns it with 26.3.05. The two releases differ, for these programs, in two corrections larmorx already made by default (AFNI-03, header slice code 2; AFNI-05, 3dTshift's `-no_detrend`): the default output is the same with either; only `reproduce` differs where they apply ([findings](../findings/afni-relicensing-26.md) for the new licence).
 
 **Clean-room re-implementation.** AFNI is GPL-2, so larmorx did not port it: the code was
 written from the behaviour spec [`specs/3dTshift.md`](../../specs/3dTshift.md), AFNI's help
 text and black-box runs of the AFNI binary, without AFNI's source code
 ([provenance](../../crates/larmorx-afni/PROVENANCE.md)).
 
-**Status: `validated`** against AFNI 25.2.09 itself (see the
-[validation record](../validation/afni-tshift.md)). The record covers 314 cases:
+**Status: `validated`** against AFNI 25.2.09 itself, the clean-room original (see the
+[validation record](../validation/afni-tshift.md)); the replica against AFNI 26.3.05
+([replica record](../validation/afni-tshift-replica.md)). The record covers 314 cases:
 - every file of `larmorx-testdata` `synthetic/tshift/` (every FFT length class, every data
   type AFNI reads, edge content);
 - every method, option and `-tpattern` form, slice timing from NIfTI headers, the "copy of
@@ -163,7 +167,7 @@ lx.afni.tshift("bold.nii.gz", slice_times="alt+z", implementation="original")
   127 means `replica` was asked for and the program is missing. With `-verbose`, the first
   line names the implementation: `++ implementation: original (larmorx 0.0.1, Apache-2.0),
   clean-room 3dTshift` or `++ implementation: replica (larmorx-gpl 0.0.1, GPL-3.0-or-later),
-  bit-exact translation of AFNI 25.2.09's 3dTshift`.
+  bit-exact translation of AFNI 26.3.05's 3dTshift`.
 
 ## How AFNI reads and writes NIfTI (reproduced)
 
@@ -204,8 +208,8 @@ warning names each one that changed the output, in both modes
 |---|---|---|---|
 | AFNI-01 | a negative `scl_slope` is applied when values are stored but not when they are read: shifted slices come out sign-flipped and scaled (int16 with slope −0.5: a mean of 942 comes out −1884) | the factor is applied when reading too, so the output has the input's values | files with a negative `scl_slope`; slices left unshifted and copies are the same in both modes |
 | AFNI-02 | float32 data with a slope and an intercept are scaled when read, and the slope is also kept as the output's `scl_slope`: the output reads back scaled twice | scaled once, written without a factor | float32 files with both fields set |
-| AFNI-03 | header slice code 2 (`NIFTI_SLICE_SEQ_DEC`) gives every slice time 0: nothing is shifted | slices `slice_end` down to `slice_start`, as NIfTI defines the code | the command line without `-tpattern` |
-| AFNI-05 | `-no_detrend` removes and restores the mean of the first voxel of each pair (index order within a slice) only; the second is shifted raw, its edges falling toward 0 | every voxel's mean is removed and restored | `detrend=False`, `-no_detrend` |
+| AFNI-03 | header slice code 2 (`NIFTI_SLICE_SEQ_DEC`) gives every slice time 0: nothing is shifted (**fixed in AFNI 26.3.05**: the replica follows it in both modes) | slices `slice_end` down to `slice_start`, as NIfTI defines the code | the command line without `-tpattern` |
+| AFNI-05 | `-no_detrend` removes and restores the mean of the first voxel of each pair (index order within a slice) only; the second is shifted raw, its edges falling toward 0 (**fixed in AFNI 26.3.05**: the replica follows it in both modes) | every voxel's mean is removed and restored | `detrend=False`, `-no_detrend` |
 | AFNI-07 | metre and micron units: the voxel sizes are converted to millimetres, the origin is not (a plumb grid), or the whole sform is not (an oblique grid) | the whole matrix is converted | files whose `xyzt_units` give metres or micrometres |
 | AFNI-08 | a copy of the input whose kept slice times are all within 3 ms of 0 gets `slice_end` 0 | no slice code, `slice_end` = nz − 1 | the command line: header slice times beyond the TR, e.g. 0.5 ms apart with a 1 ms TR |
 | AFNI-11 | an existing output is not written, and the exit status is 0 | an error (exit 1) | the command line |

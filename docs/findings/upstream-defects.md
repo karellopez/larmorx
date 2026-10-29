@@ -248,9 +248,9 @@ to add (since 2026-10-25: "Random testing's gaps", below); – = nothing to do. 
 | ANTSPY-03 | ANTsPy 0.6.3 | header direction transposed and rounded | c | none | – | – |
 | AFNI-01 † | 3dTshift, 3dAutomask, 3dUnifize | negative `scl_slope`: output sign-flipped and scaled | c | rare | corrected by default in both implementations (replica 2026-10-12); the clean-room originals of 3dAutomask and 3dUnifize since 2026-10-23 | – |
 | AFNI-02 † | 3dTshift, 3dAutomask, 3dUnifize | float32 with slope and intercept scaled twice | c | rare | corrected by default in both implementations (scales once; replica 2026-10-12); the clean-room originals of 3dAutomask and 3dUnifize since 2026-10-23 | – |
-| AFNI-03 † | 3dTshift (3dAutomask, 3dUnifize: no slice timing written) | header slice code 2 (sequential decreasing): no shift | c | none | corrected by default in both implementations (replica 2026-10-12); the GPL replicas of 3dAutomask and 3dUnifize name it where the written header changes (2026-10-25), their clean-room originals too (2026-10-29: in both modes, with AFNI-08 in `reproduce`, in the replica's words) | – |
+| AFNI-03 † | 3dTshift (3dAutomask, 3dUnifize: no slice timing written) | header slice code 2 (sequential decreasing): no shift (AFNI 25.2.09; **fixed in AFNI 26.3.05**) | c | none | corrected by default in both implementations (replica 2026-10-12); fixed upstream in AFNI 26.3.05 exactly as larmorx corrected it: the GPL replicas follow 26.3.05 in both modes and name it no more (2026-10-29); the clean-room originals still reproduce 25.2.09's zeros in `reproduce` and name it (until aligned: next-steps) | – |
 | AFNI-04 † | 3dTshift | can crash for a shift beyond the series on odd slices | a | none | defined (zeros) | – |
-| AFNI-05 † | 3dTshift | `-no_detrend` de-means one voxel of each pair only | c | none | corrected by default in both implementations (replica 2026-10-12) | – |
+| AFNI-05 † | 3dTshift | `-no_detrend` de-means one voxel of each pair only (AFNI 25.2.09; **fixed in AFNI 26.3.05**) | c | none | corrected by default in both implementations (replica 2026-10-12); fixed upstream in AFNI 26.3.05 exactly as larmorx corrected it: the GPL replica follows 26.3.05 in both modes and names it no more (2026-10-29); the clean-room original still reproduces 25.2.09's pairs in `reproduce` (until aligned) | – |
 | AFNI-06 † | 3dTshift | `-rlt+` restores the intercept; the help says the mean | f | none | AFNI's behaviour, in both implementations and both modes; larmorx's docs say what `-rlt+` does | – (decided 2026-10-12: the help text is the error) |
 | AFNI-07 † | 3dTshift, 3dAutomask, 3dUnifize | metre or micron units: voxel sizes converted; the origin not (plumb grid) or the whole sform not (oblique grid) | c | rare | corrected by default in both implementations (converts), `reproduce` gives AFNI's geometry in both (the original since 2026-10-12, spec §6.1); the clean-room originals of 3dAutomask and 3dUnifize since 2026-10-23 | – |
 | AFNI-08 † | 3dTshift, 3dAutomask, 3dUnifize | a copy of the input whose kept slice times are all within 3 ms of 0 gets `slice_end` 0 | c | none | corrected by default in both implementations, with a switch (the original since 2026-10-12, spec §6.2); 3dAutomask's masked input and 3dUnifize `-EPI`, both implementations: named where the kept times are all within 3 ms of 0 (in `reproduce`, every header slice code 2) (2026-10-29) | – |
@@ -421,6 +421,12 @@ The BET replica (merged 2026-10-26) added FSL-40 to FSL-58 (19 entries: (a) FSL-
 and decided by rule C; (e) FSL-40, -42, -44, -48, -53, -54), every one settled by rules A to D or
 a D13 failure case, and completed FSL-22's `reproduce` (libstdc++'s order, 2026-10-26). No entry
 it added is **decide** or **yes** (below, "The BET replica").
+**2026-10-29, the version update (AFNI 25.2.09 → 26.3.05):** of the AFNI entries, AFNI-03 and
+AFNI-05 are fixed upstream in 26.3.05, the same way larmorx corrected them; the GPL replicas
+follow 26.3.05 (both modes, no notice), the clean-room originals reproduce 25.2.09 until aligned.
+No other AFNI entry changed (the source of every translated file and the machine code of every
+function of the three programs compared: `validation/investigations/version-afni/`). No new
+defect; no ID of AFNI-76 to AFNI-85 used.
 
 ## D13 gaps: what the next task switches to "correct by default"
 
@@ -3416,10 +3422,18 @@ fMRIPrep 25.2.6 (the oracle runs) or its source at `21a490fb`, niworkflows 1.15.
 - **Evidence:** read; validated (`header-timing/code2-seq-dec`); spec §3.2 (observed).
 - **fMRIPrep:** none (it passes `-tpattern`).
 - **larmorx:** both implementations visit the slices from `slice_end` down to
-  `slice_start` by default and reproduce AFNI's zeros with the switch, warning in both modes
-  (the replica since 2026-10-12: `larmorx_gpl_afni::dataset::slice_offsets`). Only the
+  `slice_start` by default and reproduced AFNI 25.2.09's zeros with the switch, warning in both
+  modes (the replica since 2026-10-12: `larmorx_gpl_afni::dataset::slice_offsets`). Only the
   command line's header-timing path meets it; the Python API requires `slice_times`.
-- **D13 / gap:** done.
+- **AFNI 26.3.05** (2026-10-29): fixed upstream, `thd_niftiread.c:652` now loops down to
+  `slice_start`, the same float sums of a double step as larmorx's correction. The GPL replicas
+  follow 26.3.05 in both modes (`reproduce` gives 26.3.05's result; 25.2.09's is that of
+  earlier larmorx releases) and print no notice; their records show it in "AFNI's own step"
+  (`header-timing/code2-*`, the permanent cases `difftest/slice-code-2-masked-afni26` and
+  `difftest/epi-slice-code-2-afni26`). The clean-room originals still reproduce 25.2.09 until a
+  clean-room agent aligns them (`specs/3dTshift.md` §3.2 and §6.4, `specs/3dAutomask.md` §9,
+  marked "AFNI 26.3.05").
+- **D13 / gap:** done (fixed upstream).
 
 ### AFNI-04 † A NULL write in the Fourier pair shift — (a)
 - **What:** when both rows' shifts exceed the series, `fft_shift2` writes
@@ -3437,10 +3451,14 @@ fMRIPrep 25.2.6 (the oracle runs) or its source at `21a490fb`, niworkflows 1.15.
 - **Evidence:** read; validated (`options/*-no-detrend`); spec §4 (observed).
 - **fMRIPrep:** none (not used).
 - **larmorx:** both implementations de-mean each voxel with its own mean by default and
-  reproduce AFNI's pairs with the switch, warning in both modes (the replica since
+  reproduced AFNI 25.2.09's pairs with the switch, warning in both modes (the replica since
   2026-10-12: `larmorx_gpl_afni::tshift`, `shift_pair`); the original's last bits are not exact
   in either mode.
-- **D13 / gap:** done.
+- **AFNI 26.3.05** (2026-10-29): fixed upstream, `3dTshift.c:633` now passes `gar+ignore`, the
+  computation larmorx's correction made. The GPL replica follows 26.3.05 in both modes (no
+  notice); its record shows the step on `options/*-no-detrend`. The clean-room original still
+  reproduces 25.2.09's pairs until aligned (`specs/3dTshift.md` §4, marked "AFNI 26.3.05").
+- **D13 / gap:** done (fixed upstream).
 
 ### AFNI-06 † `-rlt+` restores the intercept — (f; c? until 2026-10-12)
 - **What:** AFNI's help says `-rlt+` adds the mean back; 3dTshift adds the fitted trend's

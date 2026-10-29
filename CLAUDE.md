@@ -26,7 +26,7 @@ The FreeSurfer port is a separate wheel, `larmorx-freesurfer` (exposed as `lx.fr
 
 **Targets:** native wheels for Windows x64/arm64, Linux x64/aarch64 and macOS x64/arm64. No Docker, no external neuroimaging installs, no admin rights.
 
-## Where things are (2026-10-28)
+## Where things are (2026-10-29)
 Phase L1 in progress. History: [docs/status-log.md](docs/status-log.md) (to 2026-10-26) and the merge commits; decisions: [docs/decision-log.md](docs/decision-log.md); **the plan, its order, the follow-ups and the decisions waiting for the user: [docs/next-steps.md](docs/next-steps.md)** (keep it current).
 
 **Ported and validated** (one record per tool in `docs/validation/`, each leading with the results against the unmodified original):
@@ -35,7 +35,7 @@ Phase L1 in progress. History: [docs/status-log.md](docs/status-log.md) (to 2026
 |---|---|---|
 | I/O and transforms | NIfTI-1/2 I/O (`lx.load`, `lx.save`, `lx.Image`); ITK transform files, HDF5 included, read and written in pure Rust (`larmorx-hdf5`); fMRIPrep's one-shot BOLD resampler (`lx.transforms.resample_series`) | `nifti-io`, `itk-hdf5`, `resample-series` |
 | ANTs and ITK (ports) | antsApplyTransforms (`--float 1`, transform outputs, B-spline transforms), N4BiasFieldCorrection, DenoiseImage, ImageMath (every operation fMRIPrep, sMRIPrep and sdcflows call), ThresholdImage, MultiplyImages, SmoothImage, ResampleImage(BySpacing), antsRegistration (every stage: linear, SyN, BSplineSyN, BSpline, displacement-field, Exponential, BSplineExponential and time-varying velocity-field; image and point-set metrics; the corrections of 2026-10-21 on by default), antsAI (every option, the blob alignment included), antsAffineInitializer, Atropos (every option; sMRIPrep's call bit-identical with correctly rounded maths on the five oracle runs); **re-validated on the data panel** (2026-10-27: every ANTs node of fMRIPrep's fourteen oracle runs and the panel's own images, records `ants-*-panel`; the fourteen whole template registrations at full size, 2026-10-28: 14 of 14 identical with correctly rounded maths) | `ants-*` |
-| AFNI | 3dTshift, 3dAutomask, 3dUnifize, complete: clean-room originals (`crates/larmorx-afni`) and GPL replicas (`crates-gpl/`) | `afni-tshift`, `afni-tshift-replica`, `afni-automask`, `afni-automask-replica`, `afni-unifize`, `afni-unifize-replica` |
+| AFNI | 3dTshift, 3dAutomask, 3dUnifize, complete: clean-room originals (`crates/larmorx-afni`, validated against AFNI 25.2.09) and GPL replicas (`crates-gpl/`, validated against AFNI 26.3.05 since 2026-10-29) | `afni-tshift`, `afni-tshift-replica`, `afni-automask`, `afni-automask-replica`, `afni-unifize`, `afni-unifize-replica` |
 | FSL | head-motion correction with mcflirt-style options, clean-room original, `experimental` (`lx.mri.hmc`); the mcflirt replica (`crates-nc/`, package `larmorx-nc`, FSL Licence: non-commercial, FSL's source in `crates-nc/fsl-source/`), bit-identical to mcflirt as built (173 of 173 compared cases of its record, fMRIPrep's 22 calls on the twelve oracle runs with BOLD runs included, and fMRIPrep's own matrices identical); `larmorx-nc-core` is the shared core of the next FSL replicas; the **BET** replica (`larmorx-nc fsl bet`, `bet2`, `betsurf`; `lx.fsl.bet`, `lx.fsl.betsurf`; `bet -S`, `-B`, `-A`, `-A2` pending FLIRT and FAST): every file FSL 6.0.7.17 writes byte for byte in every compared case (129 of 129, 364 files, fMRIPrep's 29 BET calls on the twelve oracle runs with BOLD runs included); its FSL libraries are the core's, shared with mcflirt | `mri-hmc`, `fsl-mcflirt-replica`, `fsl-bet-replica`, `fsl-bet-replica-full` |
 
 Golden tests cover every tool on all six platforms (`docs/validation/golden.md`); CI has been green at every merge. Stage-by-stage comparisons with fMRIPrep 25.2.6 were run on four oracle runs (`docs/validation/fmriprep-stages*.md`); further fMRIPrep comparisons wait until every tool is ported (user, 2026-10-16).
@@ -54,8 +54,10 @@ the old laptop is a helper (phase 4 of [docs/machine-move.md](docs/machine-move.
 with smart testing per part; the very extensive testing in one final validation phase (user,
 2026-10-28; decision log). One agent at a time (`docs/next-steps.md`, "The order from here").
 Done: antsAI and antsAffineInitializer's memory and speed (2026-10-28), the clean-room fixes
-(2026-10-29, `-cost normmi` left open). Next: the version update (AFNI 26.3.05 and FSL 6.0.7.23,
-installed beside the old ones), then BET's clean-room original (from `specs/bet.md`) and the next FSL tools (FLIRT with BBR, FAST, topup),
+(2026-10-29, `-cost normmi` left open), the version update's AFNI part (2026-10-29: the GPL
+replicas follow AFNI 26.3.05; the upstream watch weekly). Next: its FSL part (6.0.7.23, installed
+beside 6.0.7.17; SciPy, NumPy, OpenBLAS checked), the clean-room originals aligned with AFNI
+26.3.05 (next-steps), then BET's clean-room original (from `specs/bet.md`) and the next FSL tools (FLIRT with BBR, FAST, topup),
 field maps, FreeSurfer, surfaces, confounds, larmorprepx; each a bounded agent run with a stop
 after it, each with its site page from its tests. Then the final validation phase (the data
 panel's part b and every new tool, full tiers, heavy and nightly random testing, the extensive
@@ -136,7 +138,7 @@ larmorx/scripts/bootstrap_workspace.sh --venv .venv --install-rust
 2. **Ported code records its provenance.** Each crate's `PROVENANCE.md` lists the upstream files and versions it was ported from. Port from the pinned **release tags**, not the local master/dev clones:
    - ANTs v2.6.5
    - ITK v5.4.5 (the version ANTs 2.6.5 pins; decided 2026-10-09)
-   - AFNI 25.2.09
+   - AFNI 26.3.05 (since 2026-10-29; 25.2.09 kept for the clean-room originals until they are aligned, and for the step between the two)
    - FreeSurfer v8.2.0 (pending D5)
 3. **FreeSurfer-derived code lives only in `crates/larmorx-freesurfer`** (separate wheel, carries the FreeSurfer licence text and preface). Audit each ported file for third-party code first.
 4. **Upstream clones are read-only.** Never modify them, and never vendor code from them without attribution.
@@ -237,7 +239,7 @@ Every agent reads this file first, then `docs/porting-guide.md`, its section of 
 - **Reading CI results without a login:** GitHub serves job logs only to logged-in users. Golden mismatches, failing `cargo test` tests and build errors (`scripts/ci_cargo_failures.py`, since 2026-10-12) are printed as workflow annotations, which `https://api.github.com/repos/karellopez/larmorx/check-runs/<job id>/annotations` serves without a login. Each job's step results: `https://api.github.com/repos/karellopez/larmorx/actions/jobs/<job id>`. GitHub's Windows runners give the temporary directory as an 8.3 short path (`C:\Users\RUNNER~1\...`): tests must not assume a temporary path free of `~` or blanks.
 - **Detached jobs (`nohup ... &`) send no notice when they end.** Watch their log for a final line in a tracked background command.
 - **Launch worktree agents from inside this repository** (`cd /home/karelo/VScode_projects/super_fmriprep/larmorx` right before the Agent call): the harness creates the worktree in the repository of the current directory. On 2026-10-20 A5 part 2 was launched from `larmorx_documentation` and its worktree landed there.
-- **Oracle builds:** `scripts/build_ants_oracle.sh` (GCC 14.3; `oracles/ants-2.6.5`, with `antsAI`, `antsAffineInitializer`, `Atropos`, ...), `scripts/build_afni_oracle.sh` (`oracles/afni-25.2.09`), `scripts/build_crmath_preload.sh` (`oracles/core-math-preload`, correctly rounded `exp`, `log`, `sin`, `cos`, `pow`, `asin`, `acos`, `atan2`, `cbrt` and their float versions; older preloads archived).
+- **Oracle builds:** `scripts/build_ants_oracle.sh` (GCC 14.3; `oracles/ants-2.6.5`, with `antsAI`, `antsAffineInitializer`, `Atropos`, ...), `scripts/build_afni_oracle.sh` (`oracles/afni-25.2.09`, `oracles/afni-26.3.05`), `scripts/build_crmath_preload.sh` (`oracles/core-math-preload`, correctly rounded `exp`, `log`, `sin`, `cos`, `pow`, `asin`, `acos`, `atan2`, `cbrt` and their float versions; older preloads archived).
 
 ## Repo map
 | Path | Contents |

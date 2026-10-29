@@ -16,13 +16,19 @@ when it is installed. It does not present itself as AFNI or as any other upstrea
 Translated works
 ================
 
-AFNI 25.2.09 (tag AFNI_25.2.09) - GNU General Public License, version 2 or any later version
+AFNI 26.3.05 (tag AFNI_26.3.05), first translated from AFNI 25.2.09 (tag AFNI_25.2.09)
   Translated: the 3dTshift, 3dAutomask and 3dUnifize programs and the routines they use
   (crate larmorx-gpl-afni).
   Major portions of AFNI are copyrighted by the Medical College of Wisconsin, 1994-2000
-  (Robert W. Cox et al.), and are released under the GNU General Public License, Version 2.
-  AFNI's doc/README/README.copyright: "The MCW-copyrighted part of this software is released
-  to the public under the GNU General Public License, Version 2 (or any later edition)."
+  (Robert W. Cox et al.). AFNI 26.3.05 releases them under the Creative Commons Attribution
+  License 4.0 (CC BY 4.0, https://creativecommons.org/licenses/by/4.0/); its
+  doc/README/README.copyright: "These portions were originally available publicly with GPL-2.0
+  license. As of May 12, 2026, MCW has granted NIH a Creative Commons Attribution License (CC BY
+  4.0) for all of the code under its copyright." AFNI 25.2.09 released them under the GNU
+  General Public License, Version 2 ("The MCW-copyrighted part of this software is released to
+  the public under the GNU General Public License, Version 2 (or any later edition)"). The
+  material is provided as is, without warranties (CC BY 4.0, section 5). Source:
+  https://github.com/afni/afni (tags AFNI_26.3.05 and AFNI_25.2.09).
   The translated AFNI files written at the NIH are a "United States Government Work" in the
   public domain (AFNI's LICENSE.txt); the NIfTI library states "This code is released to the
   public domain."

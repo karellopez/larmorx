@@ -20,7 +20,7 @@ from pathlib import Path
 import numpy as np
 
 from larmorx_validation.evidence import afni_automask as am
-from larmorx_validation.evidence import common, core
+from larmorx_validation.evidence import afni_step, common, core
 from larmorx_validation.figures import cache as fcache
 from larmorx_validation.figures import records
 
@@ -219,6 +219,28 @@ ORIGINAL_PANELS = [
 ]  # fmt: skip
 
 
+#: AFNI 26.3.05 on fMRIPrep's call at 1 thread (the replica's reference since 2026-10-29).
+PANEL_26 = (
+    "afni26-1",
+    "afni26-1",
+    "original",
+    "AFNI 26.3.05, 3dUnifize",
+    "the repository's build, 1 thread; the replica's reference",
+)
+
+
+def afni26_diffs() -> list[dict]:
+    """The replica against AFNI 26.3.05, and AFNI's own step from 25.2.09 (1 thread each)."""
+    d = common.d
+    return [
+        d("replica-afni26", "replica-1", "afni26-1", "main",
+          "replica − AFNI 26.3.05, 1 thread each", common.ROLE_LX),
+        d("afni26-afni", "afni26-1", "afni-1", "variability",
+          "AFNI 26.3.05 − AFNI 25.2.09, 1 thread each",
+          "the original against itself: the version step"),
+    ]  # fmt: skip
+
+
 def original_diffs() -> list[dict]:
     d = common.d
     return [
@@ -282,7 +304,10 @@ def original_verdicts(diffs: list[dict], same: dict[str, bool]) -> None:
 def _verdict(x: dict, same: dict[str, bool]) -> None:
     i = x["id"]
     x.setdefault("links", [])
-    if x["kind"] == "variability":
+    if i == "afni26-afni":
+        x["verdict"] = None
+        x["reason"] = am.AFNI26_SAME if same[i] else "AFNI 26.3.05 and 25.2.09 differ on this call."
+    elif x["kind"] == "variability":
         x["verdict"] = None
         x["reason"] = {
             "afni6-afni1": "AFNI computes every voxel's local mean independently in its OpenMP "
@@ -331,7 +356,7 @@ def _panels(
         ex.add(exm.Panel(pid, role, label, sub, arrays))
 
 
-def _example_ref(ctx: core.Context, e: fcache.Entry, o: fcache.Entry) -> dict:
+def _example_ref(ctx: core.Context, e: fcache.Entry, o: fcache.Entry, step: dict) -> dict:
     import nibabel as nib
     from scipy import ndimage
 
@@ -349,6 +374,7 @@ def _example_ref(ctx: core.Context, e: fcache.Entry, o: fcache.Entry) -> dict:
                      "skull-stripped once (float32)", {"all": data}))  # fmt: skip
     _panels(ex, exm, e, REF_PANELS, OUTPUT, run / FMRIPREP_OUT)
     _panels(ex, exm, o, ORIGINAL_PANELS[:1] + ORIGINAL_PANELS[2:3], OUTPUT)
+    _panels(ex, exm, e, [PANEL_26], OUTPUT)
     full: dict = {}
     _panels(ex, exm, o, [ORIGINAL_PANELS[1], ORIGINAL_PANELS[3]], OUTPUT, full=full)
     d = common.d
@@ -369,6 +395,7 @@ def _example_ref(ctx: core.Context, e: fcache.Entry, o: fcache.Entry) -> dict:
         d("original-fmriprep", "original-1", "fmriprep", "fmriprep",
           "original − fMRIPrep's own output", common.ROLE_FMRIPREP),
         *original_diffs()[2:],
+        *afni26_diffs(),
     ]  # fmt: skip
     common.compare_all(ex, diffs, OUTPUT, full=full)
     same = common.identical(diffs)
@@ -395,9 +422,10 @@ def _example_ref(ctx: core.Context, e: fcache.Entry, o: fcache.Entry) -> dict:
             "The 3dUnifize node fMRIPrep 25.2.6 ran on the BOLD reference of OpenNeuro ds005040 "
             "sub-002 (task clip, run 1), N4-corrected and skull-stripped once: its arguments "
             "(-T2: the contrast inverted, unifized, inverted back) given to AFNI 25.2.09 at 1 "
-            "and 6 OpenMP threads, to the larmorx-gpl replica and to LARMORX's clean-room "
-            "original at 1 and 6 threads in both modes. fMRIPrep's own output is the panel it "
-            "produced in its run."
+            "and 6 OpenMP threads, to AFNI 26.3.05 at 1 (the replica's reference since "
+            "2026-10-29), to the larmorx-gpl replica and to LARMORX's clean-room original at 1 "
+            "and 6 threads in both modes. fMRIPrep's own output is the panel it produced in its "
+            "run."
         ),
         "facts": [
             {
@@ -426,6 +454,7 @@ def _example_ref(ctx: core.Context, e: fcache.Entry, o: fcache.Entry) -> dict:
                 f"up to {float(u.max()):.6g}",
             },
             {"label": "Grid", "text": common.describe_grid(img, grid.shape)},
+            afni_step.fact(step, "fMRIPrep's call"),
         ],
         **out,
         "chain": None,
@@ -436,7 +465,7 @@ def _example_ref(ctx: core.Context, e: fcache.Entry, o: fcache.Entry) -> dict:
     }
 
 
-def _example_t1w(ctx: core.Context, e: fcache.Entry, o: fcache.Entry) -> dict:
+def _example_t1w(ctx: core.Context, e: fcache.Entry, o: fcache.Entry, step: dict) -> dict:
     import larmorx_testdata as td
     import nibabel as nib
     from scipy import ndimage
@@ -462,6 +491,7 @@ def _example_t1w(ctx: core.Context, e: fcache.Entry, o: fcache.Entry) -> dict:
     ]  # fmt: skip
     _panels(ex, exm, e, panels, OUTPUTS_T1W)
     _panels(ex, exm, o, ORIGINAL_PANELS[:1] + ORIGINAL_PANELS[2:3], OUTPUTS_T1W)
+    _panels(ex, exm, e, [PANEL_26], OUTPUTS_T1W)
     full: dict = {}
     _panels(ex, exm, o, [ORIGINAL_PANELS[1], ORIGINAL_PANELS[3]], OUTPUTS_T1W, full=full)
     d = common.d
@@ -478,6 +508,7 @@ def _example_t1w(ctx: core.Context, e: fcache.Entry, o: fcache.Entry) -> dict:
         d("replica-repro", "replica-6", "replica-reproduce", "check",
           "replica, default − reproduce mode", common.ROLE_SELF),
         *original_diffs()[2:],
+        *afni26_diffs(),
     ]  # fmt: skip
     common.compare_all(ex, diffs, OUTPUTS_T1W, full=full)
     same = common.identical(diffs)
@@ -522,6 +553,7 @@ def _example_t1w(ctx: core.Context, e: fcache.Entry, o: fcache.Entry) -> dict:
                 f"{o.info().get('versions', {}).get('larmorx', 'larmorx')}",
             },
             {"label": "Grid", "text": common.describe_grid(img, grid.shape)},
+            afni_step.fact(step, "the call"),
         ],
         **out,
         "chain": None,
@@ -532,7 +564,9 @@ def _example_t1w(ctx: core.Context, e: fcache.Entry, o: fcache.Entry) -> dict:
     }
 
 
-def _example_t2up(ctx: core.Context, e: fcache.Entry, o: fcache.Entry, reg: dict) -> dict:
+def _example_t2up(
+    ctx: core.Context, e: fcache.Entry, o: fcache.Entry, reg: dict, step: dict
+) -> dict:
     import nibabel as nib
     from scipy import ndimage
 
@@ -549,6 +583,8 @@ def _example_t2up(ctx: core.Context, e: fcache.Entry, o: fcache.Entry, reg: dict
                      "as in the first example", {"all": data}))  # fmt: skip
     panels = [
         ("afni", "t2up100-afni", "original", "AFNI 25.2.09, -T2up 100", "the repository's build"),
+        ("afni26", "t2up100-afni26", "original", "AFNI 26.3.05, -T2up 100",
+         "the repository's build; the replica's reference"),
         ("replica", "t2up100-replica", "larmorx", "larmorx-gpl replica, -T2up 100",
          "default mode: corrected"),
         ("replica-reproduce", "t2up100-replica-reproduce", "larmorx",
@@ -573,6 +609,11 @@ def _example_t2up(ctx: core.Context, e: fcache.Entry, o: fcache.Entry, reg: dict
           common.ROLE_LX),
         d("original-repro-afni", "original-reproduce", "afni", "main",
           "original (reproduce) − AFNI, -T2up 100", common.ROLE_LX),
+        d("repro-afni26", "replica-reproduce", "afni26", "main",
+          "replica (reproduce) − AFNI 26.3.05, -T2up 100", common.ROLE_LX),
+        d("afni26-afni", "afni26", "afni", "variability",
+          "AFNI 26.3.05 − AFNI 25.2.09, -T2up 100",
+          "the original against itself: the version step"),
     ]  # fmt: skip
     common.compare_all(ex, diffs, OUTPUT)
     same = common.identical(diffs)
@@ -581,7 +622,16 @@ def _example_t2up(ctx: core.Context, e: fcache.Entry, o: fcache.Entry, reg: dict
     link = [am._link(reg, "AFNI-45")]
     for x in diffs:
         x["links"] = link
-        if x["id"] in ("replica-afni", "original-afni"):
+        if x["id"] == "afni26-afni":
+            x["verdict"] = None
+            x["reason"] = (
+                "AFNI 26.3.05 gives AFNI 25.2.09's bytes on this call: the read one past the "
+                "sorted values (AFNI-45) is in both releases, and both read 0 there on this machine."
+                if same[x["id"]]
+                else "AFNI 26.3.05 and 25.2.09 differ on this call: the read one past the sorted "
+                "values (AFNI-45) is of memory neither writes."
+            )
+        elif x["id"] in ("replica-afni", "original-afni"):
             repro = "repro-afni" if x["id"] == "replica-afni" else "original-repro-afni"
             x["verdict"] = "d13" if not same[x["id"]] and same[repro] else "open"
             x["reason"] = (
@@ -619,8 +669,8 @@ def _example_t2up(ctx: core.Context, e: fcache.Entry, o: fcache.Entry, reg: dict
             "With -T2, 3dUnifize inverts the contrast about an upper percentile of the masked "
             "values (-T2up, 98.5 by default, 90 to 100 allowed). At 100 the percentile's index "
             "is one past the end of the sorted values. fMRIPrep's call with -T2up 100 added, "
-            "given to AFNI 25.2.09, to the replica and to the clean-room original in both modes, "
-            "beside fMRIPrep's own call."
+            "given to AFNI 25.2.09, to AFNI 26.3.05, to the replica and to the clean-room "
+            "original in both modes, beside fMRIPrep's own call."
         ),
         "facts": [
             {"label": "Input", "text": "the masked BOLD reference of the first example"},
@@ -641,6 +691,7 @@ def _example_t2up(ctx: core.Context, e: fcache.Entry, o: fcache.Entry, reg: dict
                 if zero
                 else f"{int(np.count_nonzero(a)):,} non-zero values",
             },
+            afni_step.fact({"t2up100-afni": step["t2up100-afni"]}, "the call with -T2up 100"),
         ],
         **out,
         "chain": None,
@@ -678,6 +729,8 @@ def export(ctx: core.Context) -> dict:
     cs = am.cases(recs, _scenario_list(), PROGRAM, examples)
     e, t = entry(ctx), t1w_entry(ctx)
     o, ot = original_entry(ctx), t1w_original_entry(ctx)
+    step = afni_step.ensure(e, ["afni-1", "t2up100-afni"], ctx.compute)
+    tstep = afni_step.ensure(t, ["afni-1"], ctx.compute)
     return {
         "schema": 1,
         "tool": TOOL,
@@ -696,9 +749,9 @@ def export(ctx: core.Context) -> dict:
         "cases_total": len(cs),
         "speed": am.informal_speed(ctx.repo, PROGRAM),
         "examples": [
-            _example_ref(ctx, e, o),
-            _example_t1w(ctx, t, ot),
-            _example_t2up(ctx, e, o, reg),
+            _example_ref(ctx, e, o, {"afni-1": step["afni-1"]}),
+            _example_t1w(ctx, t, ot, tstep),
+            _example_t2up(ctx, e, o, reg, step),
         ],
     }
 

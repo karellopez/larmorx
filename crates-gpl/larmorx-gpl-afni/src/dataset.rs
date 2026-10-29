@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// Translated to Rust from AFNI 25.2.09: src/thd_niftiread.c (THD_open_nifti, THD_load_nifti),
+// Translated to Rust from AFNI 26.3.05: src/thd_niftiread.c (THD_open_nifti, THD_load_nifti),
 // src/thd_niftiwrite.c (populate_nifti_image, get_slice_timing_pattern, space_to_NIFTI_code),
 // src/nifti/nifti2/nifti2_io.c (the header conversion of nifti_image_read and
 // nifti_quatern_to_dmat44), src/thd_floatscan.c (thd_floatscan), src/edt_fullcopy.c
@@ -47,17 +47,18 @@
 //! and `AFNI_NO_OBLIQUE_WARNING`; writing follows `AFNI_NIFTI_WRITE_TYPE` and
 //! `AFNI_ALLOW_MILLISECONDS` (AFNI-19).
 //!
-//! **Upstream defects (D13).** Five of AFNI's reading and writing rules are defects that
+//! **Upstream defects (D13).** Four of AFNI's reading and writing rules are defects that
 //! larmorx-gpl corrects by default and reproduces with [`UpstreamDefects::Reproduce`]
 //! (`docs/findings/upstream-defects.md`): float32 data with a slope and an intercept scaled
-//! twice (AFNI-02, [`read`]); header slice code 2 giving every slice time 0 (AFNI-03,
-//! [`slice_offsets`]); metre and micrometre units leaving the origin, and an oblique matrix,
-//! unconverted (AFNI-07, [`geometry`]); slice times all within 0.003 of 0 written with
+//! twice (AFNI-02, [`read`]); metre and micrometre units leaving the origin, and an oblique
+//! matrix, unconverted (AFNI-07, [`geometry`]); slice times all within 0.003 of 0 written with
 //! `slice_end` 0 (AFNI-08, [`slice_fields`]); and a matrix within about 0.01° to 0.024° of plumb
 //! written plumb (AFNI-16, [`write`], [`axes::snaps`]). A sixth comes with an environment
 //! variable: `AFNI_NIFTI_SCALE=NO` keeps uint8 and int16 data with a slope and an intercept as
 //! stored and drops the intercept (AFNI-23, [`DroppedIntercept`]); the default writes it back
-//! as the output's `scl_inter`.
+//! as the output's `scl_inter`. Header slice code 2 giving every slice time 0 (AFNI-03) was
+//! AFNI 25.2.09's; AFNI 26.3.05 reads the code as NIfTI defines it, as larmorx corrected it,
+//! and so do both modes ([`slice_offsets`]).
 
 use std::path::{Path, PathBuf};
 
@@ -155,9 +156,6 @@ pub struct Dataset {
     pub factors: Vec<f32>,
     pub taxis: Option<TimeAxis>,
     pub geometry: Geometry,
-    /// `(slice_start, slice_end)` when the time axis's slice offsets come from the header's
-    /// slice code 2 (sequential decreasing), whose offsets AFNI-03 concerns.
-    pub seq_dec: Option<(i64, i64)>,
     /// AFNI-23: the intercept `AFNI_NIFTI_SCALE=NO` dropped when the file was read, if any.
     pub dropped_inter: Option<DroppedIntercept>,
 }
@@ -642,11 +640,11 @@ fn geometry(
 /// The slice offsets `THD_open_nifti` builds from `slice_code`, `slice_start`, `slice_end`
 /// and `slice_duration` (already in seconds), or `None` if the header gives none.
 ///
-/// AFNI-03: for code 2 (`NIFTI_SLICE_SEQ_DEC`) AFNI's loop runs
-/// `for( kk=slice_end ; kk >= slice_end ; kk-- )`, so only `slice_end` gets a time (0) and
-/// every slice stays at 0. [`UpstreamDefects::Fix`] visits the slices from `slice_end` down to
-/// `slice_start`, as NIfTI defines the code.
-fn slice_offsets(nim: &Nim, nz: i64, duration: f64, defects: UpstreamDefects) -> Option<Vec<f32>> {
+/// Code 2 (`NIFTI_SLICE_SEQ_DEC`) visits the slices from `slice_end` down to `slice_start`, as
+/// NIfTI defines it and AFNI 26.3.05 reads it (`thd_niftiread.c:652`). AFNI 25.2.09's loop ran
+/// `for( kk=slice_end ; kk >= slice_end ; kk-- )`, so every slice stayed at 0 (AFNI-03, which
+/// larmorx corrected; both modes now follow 26.3.05).
+fn slice_offsets(nim: &Nim, nz: i64, duration: f64) -> Option<Vec<f32>> {
     let (start, end) = (nim.slice_start, nim.slice_end);
     if !(nim.slice_dim == 3
         && nim.slice_code > 0
@@ -669,10 +667,8 @@ fn slice_offsets(nim: &Nim, nz: i64, duration: f64, defects: UpstreamDefects) ->
     let down = |from: i64| (start..=from.max(start - 1)).rev().step_by(2);
     match nim.slice_code {
         1 => (start..=end).for_each(&mut put),
-        // NIFTI_SLICE_SEQ_DEC: AFNI's loop runs `for( kk=slice_end ; kk >= slice_end ; kk-- )`,
-        // so only slice_end gets a time (0) and every slice stays at 0 (AFNI-03).
-        2 if defects.fix() => (start..=end).rev().for_each(&mut put),
-        2 => put(end),
+        // NIFTI_SLICE_SEQ_DEC (AFNI 26.3.05: down to slice_start; AFNI-03 fixed upstream).
+        2 => (start..=end).rev().for_each(&mut put),
         3 => up(start).chain(up(start + 1)).for_each(&mut put),
         4 => down(end).chain(down(end - 1)).for_each(&mut put),
         5 => up(start + 1).chain(up(start)).for_each(&mut put),
@@ -931,7 +927,6 @@ fn read_as(
         geometry(&nim, other, priority, settings, &mut Vec::new(), &shown)
     });
     let mut geometry = geometry(&nim, mode, priority, settings, messages, &shown);
-    let mut seq_dec = None;
     let mut taxis = (ntt > 1).then(|| {
         let (mut dtt, mut toffset, mut duration) = (nim.pixdim[4], nim.toffset, nim.slice_duration);
         match nim.time_units {
@@ -947,10 +942,7 @@ fn read_as(
             }
             _ => {}
         }
-        let toff_sl = slice_offsets(&nim, nz, duration, mode);
-        if toff_sl.is_some() && nim.slice_code == 2 {
-            seq_dec = Some((nim.slice_start, nim.slice_end));
-        }
+        let toff_sl = slice_offsets(&nim, nz, duration);
         TimeAxis {
             ttdel: dtt as f32,
             ttorg: toffset as f32,
@@ -966,13 +958,9 @@ fn read_as(
         .map(|e| (e.code, e.content.as_slice()))
         .collect();
     if let Some(ext) = afni_ext::parse(&extensions) {
-        let before = taxis.clone();
         apply_afni_ext(&ext, &nim, &shown, &mut geometry, &mut taxis, messages);
         if let Some(other) = &mut other_geometry {
             apply_afni_ext(&ext, &nim, &shown, other, &mut None, &mut Vec::new());
-        }
-        if taxis != before {
-            seq_dec = None;
         }
     }
     if let Some(other) = &other_geometry
@@ -1074,7 +1062,6 @@ fn read_as(
         factors: vec![factor; nvals as usize],
         taxis,
         geometry,
-        seq_dec,
         dropped_inter,
     })
 }
@@ -1543,32 +1530,6 @@ pub fn write(
             } else {
                 UpstreamDefects::Fix
             };
-            // AFNI-03: header slice code 2 read as every slice time 0 changes the slice timing
-            // the output keeps (3dAutomask, 3dUnifize: found by random testing, 2026-10-25;
-            // 3dTshift names it where it shifts). Corrected, the times are the header's; AFNI
-            // writes what zeros give.
-            if let Some((sfirst, slast)) = ds.seq_dec {
-                let zeros = vec![0.0f32; tlist.len()];
-                let afni = slice_fields(&zeros, UpstreamDefects::Reproduce);
-                if mode.reproduce() || afni != (code, start, end, dur) {
-                    notices.add(
-                        &defects::AFNI_03,
-                        if mode.fix() {
-                            format!(
-                                "header slice code 2 (sequential decreasing): the output keeps \
-                                 slices {slast}..{sfirst}'s times (slice code {code}, \
-                                 slice_end {end}); AFNI reads every slice time as 0 and writes \
-                                 slice code {}, slice_end {}",
-                                afni.0, afni.2
-                            )
-                        } else {
-                            "header slice code 2 (sequential decreasing) read as every slice \
-                             time 0, as AFNI does"
-                                .to_owned()
-                        },
-                    );
-                }
-            }
             if slice_fields(tlist, other) != (code, start, end, dur) {
                 let n = tlist.len();
                 notices.add(
@@ -1722,7 +1683,8 @@ mod tests {
         nim.slice_duration = 0.5;
         for (code, want) in [
             (1, [0.0, 0.5, 1.0, 1.5]),
-            (2, [0.0; 4]),
+            // AFNI 26.3.05 (AFNI-03 fixed): from slice_end down to slice_start.
+            (2, [1.5, 1.0, 0.5, 0.0]),
             (3, [0.0, 1.0, 0.5, 1.5]),
             (4, [1.5, 0.5, 1.0, 0.0]),
             (5, [1.0, 0.0, 1.5, 0.5]),
@@ -1730,29 +1692,12 @@ mod tests {
             (7, [0.0; 4]),
         ] {
             nim.slice_code = code;
-            let reproduce = UpstreamDefects::Reproduce;
-            assert_eq!(
-                slice_offsets(&nim, 4, 0.5, reproduce).unwrap(),
-                want,
-                "code {code}"
-            );
-            if code != 2 {
-                let fix = UpstreamDefects::Fix;
-                assert_eq!(
-                    slice_offsets(&nim, 4, 0.5, fix).unwrap(),
-                    want,
-                    "code {code}"
-                );
-            }
+            assert_eq!(slice_offsets(&nim, 4, 0.5).unwrap(), want, "code {code}");
         }
-        // AFNI-03 corrected: code 2 from slice_end down to slice_start.
         nim.slice_code = 2;
-        let fixed = slice_offsets(&nim, 4, 0.5, UpstreamDefects::Fix).unwrap();
-        assert_eq!(fixed, [1.5, 1.0, 0.5, 0.0]);
         (nim.slice_start, nim.slice_end) = (1, 2);
-        let fixed = slice_offsets(&nim, 4, 0.5, UpstreamDefects::Fix).unwrap();
-        assert_eq!(fixed, [0.0, 0.5, 0.0, 0.0]);
+        assert_eq!(slice_offsets(&nim, 4, 0.5).unwrap(), [0.0, 0.5, 0.0, 0.0]);
         nim.slice_duration = 0.0;
-        assert_eq!(slice_offsets(&nim, 4, 0.0, UpstreamDefects::Fix), None);
+        assert_eq!(slice_offsets(&nim, 4, 0.0), None);
     }
 }

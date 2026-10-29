@@ -1,4 +1,4 @@
-# Spec: `lx.afni.tshift` (behaviour of AFNI 3dTshift 25.2.09)
+# Spec: `lx.afni.tshift` (behaviour of AFNI 3dTshift 25.2.09 and 26.3.05)
 
 The input for the clean-room **original** of larmorx's slice-timing correction
 (`crates/larmorx-afni`, Apache-2.0). AFNI's 3dTshift is GPL-2 (copyrighted by the Medical
@@ -12,6 +12,13 @@ College of Wisconsin). So larmorx has two implementations (CLAUDE.md rule 1,
 `afni/` clone, `oracles/afni-25.2.09/build/`), the replica crates (`crates-gpl/`) or
 `docs/findings/afni-tshift.md`.
 
+**AFNI 26.3.05 (the reference from 2026-10-29).** (AFNI 26.3.05) larmorx follows AFNI's newest
+release (decision log 2026-10-27). AFNI 26.3.05's 3dTshift behaves as 25.2.09's, as this spec
+describes it, except where a line is marked "(AFNI 26.3.05)": header slice code 2 is read as NIfTI defines it (§3.2, §6.4), and `-no_detrend` treats both voxels of a pair alike (§4), so AFNI-03 and AFNI-05 are no longer defects of the reference: `reproduce` gives the same result as `fix` for both, and neither is named. (AFNI 26.3.05) The black-box
+runs are of `oracles/afni-26.3.05/bin/3dTshift` (built the same way from the tag `AFNI_26.3.05`);
+`oracles/afni-25.2.09` stays for the earlier records. A clean-room implementer must not open
+`tags/AFNI-26.3.05/` or `oracles/afni-26.3.05/build/` either.
+
 This spec describes behaviour: what goes in, what comes out, and the maths. Statements
 marked **(observed)** were confirmed by running the AFNI binary. The rest come from AFNI's
 documentation and help text, or from analysis of the program's behaviour.
@@ -19,8 +26,8 @@ documentation and help text, or from analysis of the program's behaviour.
 **Defects (D13).** Some of the behaviours below are defects that larmorx corrects by default
 and reproduces with `upstream_defects="reproduce"` (`LARMORX_UPSTREAM_DEFECTS=reproduce`;
 `docs/api/upstream-defects.md`): AFNI-01 (a negative `scl_slope`, §6), AFNI-02 (float32 with a
-slope and an intercept, §6), AFNI-03 (header slice code 2, §3.2 and §6.4), AFNI-05
-(`-no_detrend`'s voxel pairs, §4), AFNI-07 (metre and micron units, §6 and §6.1), AFNI-08 (the
+slope and an intercept, §6), AFNI-03 (header slice code 2, §3.2 and §6.4; fixed in AFNI
+26.3.05), AFNI-05 (`-no_detrend`'s voxel pairs, §4; fixed in AFNI 26.3.05), AFNI-07 (metre and micron units, §6 and §6.1), AFNI-08 (the
 slice fields of a copy, §6.2), AFNI-11 and AFNI-12 (an existing output and refused output
 names, §6.3), AFNI-16 (a nearly plumb matrix written plumb, §6.1), and, with AFNI's global
 options and environment variables (§7.1), AFNI-18 (an input name with a blank), AFNI-19
@@ -136,7 +143,8 @@ told apart (`validation/investigations/cleanroom-fixes/tshift_times.py`).**)**
 | 4 (`ALT_DEC`) | end, end−2, …, then end−1, end−3, … |
 | 5 (`ALT_INC2`) | start+1, start+3, …, then start, start+2, … |
 | 6 (`ALT_DEC2`) | end−1, end−3, …, then end, end−2, … |
-| 2 (`SEQ_DEC`) and 7–127 | every slice 0 (then "only 1 time offset", §3.4). For code 2 this is a defect (AFNI-03): NIfTI defines it as `end, end−1, …, start`, which larmorx uses by default |
+| 2 (`SEQ_DEC`) | (AFNI 26.3.05) end, end−1, …, start, as NIfTI defines it; the times are float32 sums of the double duration, as for the other codes. AFNI 25.2.09 gave every slice 0 (then "only 1 time offset", §3.4): AFNI-03, which larmorx corrected the same way; (AFNI 26.3.05) both modes now give 26.3.05's times |
+| 7–127 | every slice 0 (then "only 1 time offset", §3.4) |
 
 `-tpattern` overrides the header. When `-TR` is given in milliseconds (§7), the header's
 offsets (in seconds) are taken as milliseconds, unconverted.
@@ -219,7 +227,12 @@ order (x fastest, then y, across rows): the **first** voxel of each pair has its
 removed and restored as described above; the **second** has nothing removed: its raw values
 are shifted (samples outside the series count as 0, so its edges fall toward 0), clipped to
 its own range, and nothing is added back. (This is AFNI-05: by default larmorx removes and
-restores the mean of every voxel.) A last unpaired voxel (an odd number of voxels per
+restores the mean of every voxel.) **(AFNI 26.3.05)** AFNI 26.3.05 no longer does this: with
+`-no_detrend` every voxel, the second of each pair included, has its own mean removed once
+(sum and division in float32) and restored, as the first voxel's is described above; the
+first voxel is de-meaned once. That is the result larmorx's correction gave, so (AFNI
+26.3.05) `reproduce` and `fix` are the same and AFNI-05 is never named. The pair behaviour
+in the rest of this paragraph is AFNI 25.2.09's. A last unpaired voxel (an odd number of voxels per
 slice) behaves as a first. This holds for every method. Designed inputs show the pattern
 exactly (two voxels at levels 1000 and 5000 with one impulse each, `-linear`, shifts
 ±0.25: the first's last point becomes 1000.15625, the second's stays 5000). The last float32
@@ -659,6 +672,12 @@ check.
 
 ### 6.4 Header slice code 2 whose times exceed the TR (AFNI-03)
 
+**(AFNI 26.3.05)** AFNI 26.3.05 reads code 2 as `end, end−1, …, start` (§3.2): what this
+section calls the corrected behaviour is AFNI 26.3.05's own, observed in both of the
+examples below (a shift by the header's times; a copy of the input when they exceed the
+TR, with the input's TR, `toffset` and slice fields). (AFNI 26.3.05) Both modes do that,
+and AFNI-03 is not named. The rest of this section is AFNI 25.2.09's behaviour.
+
 AFNI gives every slice of a header with `slice_code` 2 the time 0 (§3.2), so such times never
 exceed the TR. **(observed)** AFNI warns `input has only 1 time offset, 0`; `tzero` is 0
 (unless `-tzero` or `-slice` say otherwise); nothing is shifted, every slice is left as
@@ -680,7 +699,7 @@ when the warning is raised (in both modes, wherever the two modes give different
 
 | Entry | `reproduce` (AFNI) | `fix` (default) | Named when |
 |---|---|---|---|
-| AFNI-03 | code 2: every slice time 0, nothing shifted | `slice_end` down to `slice_start`; a copy when the times exceed the TR (§6.4) | the header's code-2 timing is used |
+| AFNI-03 | (AFNI 26.3.05) as `fix`; AFNI 25.2.09: code 2 every slice time 0, nothing shifted | `slice_end` down to `slice_start`; a copy when the times exceed the TR (§6.4) | (AFNI 26.3.05) never: no longer a defect of the reference |
 | AFNI-07 | the steps converted; a plumb grid's offsets, and an oblique grid's whole matrix, not (§6.1) | the whole matrix converted | metres or micrometres, and offsets not all 0 or an entry off the rows `r_j` |
 | AFNI-08 | a copy keeping times all within 3 ms of 0: `slice_end` 0 | `slice_end` nz − 1 | a copy keeps times that are all zero (§6.2) |
 | AFNI-11 | an existing output: two errors after the work, nothing written, exit 0 | an error before the work, exit 1 | the output exists |
@@ -921,10 +940,11 @@ with the same run without the variable:
   included, is lower by the intercept, to within half a stored unit (the rounding to
   integers). Int16 with slope 0.37 and intercept 12.5: 12.5 lower, ±0.185; uint8 with slope
   0.5 and intercept −20: 20 higher, ±0.25; int16 with slope 1 and intercept 100: no scale
-  factor (`scl_slope` 0), 100 lower, ±0.5. With `-no_detrend` likewise, except near the ends
-  of the second voxel of each pair, which AFNI shifts as raw values with zeros beyond the ends
-  (AFNI-05, §4): there the difference depends on the values too (7.9 to 13.9 lower for the
-  int16 input above, heptic);
+  factor (`scl_slope` 0), 100 lower, ±0.5. With `-no_detrend` likewise, except, in AFNI
+  25.2.09, near the ends of the second voxel of each pair, which it shifts as raw values with
+  zeros beyond the ends (AFNI-05, §4): there the difference depends on the values too (7.9 to
+  13.9 lower for the int16 input above, heptic); (AFNI 26.3.05) AFNI 26.3.05 de-means every
+  voxel, so this exception is 25.2.09's only;
 - `-rlt`, which removes the trend, the intercept with it, from every volume after the
   `-ignore` ones: those come out as without the variable (to within half a stored unit), and
   the `-ignore` volumes lower by the intercept.

@@ -1,12 +1,12 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// Translated to Rust from AFNI 25.2.09 (see PROVENANCE.md for the files and functions).
+// Translated to Rust from AFNI 26.3.05 (see PROVENANCE.md for the files and functions).
 // Major portions Copyright (C) 1994-2000 Medical College of Wisconsin (AFNI, Robert W. Cox et al.),
 // released under the GNU GPL version 2 or any later version.
 // Rust translation Copyright 2026 Karel Lopez Vilaret; modified from the original.
 //! Bit-exact replicas of AFNI tools for larmorx (the `larmorx-gpl` package,
 //! GPL-3.0-or-later).
 //!
-//! These are step-by-step translations of AFNI 25.2.09's C source, written to give the same
+//! These are step-by-step translations of AFNI 26.3.05's C source, written to give the same
 //! output bits as AFNI. The Apache-2.0 `larmorx` package has clean-room originals of the same
 //! tools (`larmorx-afni`); see `docs/licensing.md`.
 //!

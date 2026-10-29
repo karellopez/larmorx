@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// Translated to Rust from AFNI 25.2.09 src/mri_read.c (my_fgets, decode_linebuf,
+// Translated to Rust from AFNI 26.3.05 src/mri_read.c (my_fgets, decode_linebuf,
 // iznogood_1D, mri_read_ascii, mri_read_1D), src/cs_fgets.c (afni_fgets),
 // src/mri_fromstring.c (mri_1D_fromstring) and src/niml/niml_header.c
 // (NI_decode_string_list).

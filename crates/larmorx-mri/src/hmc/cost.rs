@@ -130,6 +130,9 @@ pub struct TestVolume<'a> {
     pub skip_non_finite: bool,
     /// The count of the normalised correlation.
     pub count: NormCorrCount,
+    /// The test bins of the mutual-information costs ([`TestBins`]), set by the caller for
+    /// them; computed from the whole volume once, as they do not change between evaluations.
+    pub test_bins: Option<TestBins>,
 }
 
 impl<'a> TestVolume<'a> {
@@ -142,6 +145,7 @@ impl<'a> TestVolume<'a> {
             interpolation: CostInterpolation::Trilinear,
             skip_non_finite: false,
             count: NormCorrCount::Mcflirt,
+            test_bins: None,
         }
     }
 
@@ -276,34 +280,46 @@ pub fn sample<A: Accumulator>(
     make: impl Fn() -> A + Sync,
 ) -> Vec<A> {
     let nz = grid.shape[2];
-    let vol = test.vol;
-    let trilinear = |p: [f32; 3]| trilinear_inside(vol, p[0], p[1], p[2]);
-    let weighted = |p: [f32; 3]| test.weight(p);
-    let unweighted = |_: [f32; 3]| 1.0f32;
     let one = |z: usize| {
         let mut acc = make();
-        match (test.interpolation, test.weighted()) {
-            (CostInterpolation::Trilinear, true) => {
-                sample_slice(grid, test, b, z, &mut acc, &trilinear, &weighted);
-            }
-            (CostInterpolation::Trilinear, false) => {
-                sample_slice(grid, test, b, z, &mut acc, &trilinear, &unweighted);
-            }
-            (CostInterpolation::Sinc { background }, w) => {
-                let sinc = |p: [f32; 3]| sinc_cost(vol, p, background);
-                if w {
-                    sample_slice(grid, test, b, z, &mut acc, &sinc, &weighted);
-                } else {
-                    sample_slice(grid, test, b, z, &mut acc, &sinc, &unweighted);
-                }
-            }
-        }
+        sample_into(grid, test, b, z, &mut acc);
         acc
     };
     if parallel {
         (0..nz).into_par_iter().map(one).collect()
     } else {
         (0..nz).map(one).collect()
+    }
+}
+
+/// Visits the contributing points of grid slice `z` into `acc` (§6.1), with the test volume's
+/// interpolation and edge weighting.
+fn sample_into<A: Accumulator>(
+    grid: &Volume,
+    test: &TestVolume<'_>,
+    b: &[[f32; 4]; 3],
+    z: usize,
+    acc: &mut A,
+) {
+    let vol = test.vol;
+    let trilinear = |p: [f32; 3]| trilinear_inside(vol, p[0], p[1], p[2]);
+    let weighted = |p: [f32; 3]| test.weight(p);
+    let unweighted = |_: [f32; 3]| 1.0f32;
+    match (test.interpolation, test.weighted()) {
+        (CostInterpolation::Trilinear, true) => {
+            sample_slice(grid, test, b, z, acc, &trilinear, &weighted);
+        }
+        (CostInterpolation::Trilinear, false) => {
+            sample_slice(grid, test, b, z, acc, &trilinear, &unweighted);
+        }
+        (CostInterpolation::Sinc { background }, w) => {
+            let sinc = |p: [f32; 3]| sinc_cost(vol, p, background);
+            if w {
+                sample_slice(grid, test, b, z, acc, &sinc, &weighted);
+            } else {
+                sample_slice(grid, test, b, z, acc, &sinc, &unweighted);
+            }
+        }
     }
 }
 
@@ -603,41 +619,230 @@ pub fn woods(
     (cost / n) as f32
 }
 
-/// A joint histogram of reference bins and test bins with fuzzy binning (appendix A).
-struct JointSlice {
-    hist: Vec<f64>,
-    bins: usize,
-    lo: f32,
-    range: f32,
-    overlap: f64,
+/// x86-64's conversion of a float32 to a 64-bit integer (`cvttss2si`): truncation toward zero,
+/// and `i64::MIN` for NaN and values outside the 64-bit range (appendix B: the test bin).
+#[inline(always)]
+fn x86_i64(v: f32) -> i64 {
+    if v.is_nan() || !(-9.223_372e18..9.223_372e18).contains(&v) {
+        i64::MIN
+    } else {
+        v as i64
+    }
 }
 
-impl Accumulator for JointSlice {
+/// x86-64's conversion of a float32 to a 32-bit integer: truncation toward zero, `i32::MIN` for
+/// NaN and values outside the 32-bit range (appendix B: the reference bins, the fraction).
+#[inline(always)]
+fn x86_i32(v: f32) -> i32 {
+    if v.is_nan() || !(-2_147_483_648.0..2_147_483_648.0).contains(&v) {
+        i32::MIN
+    } else {
+        v as i32
+    }
+}
+
+/// The reference bins of the mutual-information costs (appendix B), once per stage: with
+/// `r_min`, `r_max` the grid's smallest and largest finite values (`r_max` increased by 1 when
+/// they are equal), `a1 = B/(r_max − r_min)`, `a0 = −r_min·B/(r_max − r_min)` in float32, each
+/// point's bin `trunc(v·a1 + a0)` clamped to `0 … B−1`. Returned as a grid of bin indices,
+/// which the costs sample in place of the values. With `skip_non_finite` (FSL-14 corrected), a
+/// point whose value is NaN or infinite gets a NaN bin, so the sampling leaves it out.
+pub fn bin_grid_mi(grid: &Volume, bins: usize, skip_non_finite: bool) -> Volume {
+    let (lo, mut hi) = min_max(&grid.data);
+    if hi - lo == 0.0 {
+        hi += 1.0;
+    }
+    let b = bins.max(1) as f32;
+    let range = hi - lo;
+    let a1 = b / range;
+    let a0 = (-lo * b) / range;
+    let top = bins.max(1) as i32 - 1;
+    let data = grid
+        .data
+        .par_iter()
+        .with_min_len(1 << 14)
+        .map(|&v| {
+            if skip_non_finite && !v.is_finite() {
+                f32::NAN
+            } else {
+                x86_i32(v * a1 + a0).clamp(0, top) as f32
+            }
+        })
+        .collect();
+    Volume::new(grid.shape, grid.voxel_size, data)
+}
+
+/// The test bins of the mutual-information costs (appendix B): with `t_min`, `t_max` the
+/// smallest and largest finite values of the whole test volume (not only the sampled points),
+/// `b1 = B/(t_max − t_min)` and `b0 = −t_min·B/(t_max − t_min)` in float32. Not guarded: a
+/// constant volume gives infinite or NaN factors, as in mcflirt, and every sample then falls
+/// into bin 0.
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct TestBins {
+    pub b1: f32,
+    pub b0: f32,
+}
+
+impl TestBins {
+    pub fn new(vol: &Volume, bins: usize) -> TestBins {
+        let (lo, hi) = min_max(&vol.data);
+        let b = bins.max(1) as f32;
+        let range = hi - lo;
+        TestBins {
+            b1: b / range,
+            b0: (-lo * b) / range,
+        }
+    }
+}
+
+/// One sample's part of the histograms (appendix B): its reference bin `a`, its test bin `c`
+/// and the neighbours `cp`, `cm` (an index outside `0 … B−1` only with a zero weight), the
+/// products of the edge weight `g` with the fuzzy weights, and `g`.
+#[derive(Clone, Copy, Debug, Default)]
+struct Contribution {
+    a: u32,
+    c: i64,
+    cp: i64,
+    cm: i64,
+    gwc: f32,
+    gwp: f32,
+    gwm: f32,
+    g: f32,
+}
+
+/// The fuzzy fraction φ (fixed; mcflirt has no option for it).
+const FUZZY: f32 = 0.5;
+
+/// The contribution of a sample with reference bin `a`, interpolated test value `y` and edge
+/// weight `g` (appendix B, "Bins" and "Fuzzy binning"), every step in float32 as described.
+#[inline(always)]
+fn contribution(a: f32, y: f32, g: f32, bins: i64, t: TestBins) -> Contribution {
+    let u = y * t.b1 + t.b0;
+    let mut c = x86_i64(u);
+    let mut cp = c.wrapping_add(1);
+    let mut cm = c.wrapping_sub(1);
+    if c >= bins {
+        c = bins - 1;
+        cp = c;
+    }
+    if c < 0 {
+        c = 0;
+        cm = c;
+    }
+    if cp >= bins {
+        cp = bins - 1;
+    }
+    if cm < 0 {
+        cm = 0;
+    }
+    let f = (u - x86_i32(u) as f32).abs();
+    let (wc, wp, wm) = if f < FUZZY {
+        let wc = 0.5 + 0.5 * (f / FUZZY);
+        (wc, 0.0, 1.0 - wc)
+    } else if f > 1.0 - FUZZY {
+        let wc = 0.5 + 0.5 * ((1.0 - f) / FUZZY);
+        (wc, 1.0 - wc, 0.0)
+    } else {
+        (1.0, 0.0, 0.0)
+    };
+    Contribution {
+        a: a as u32,
+        c,
+        cp,
+        cm,
+        gwc: g * wc,
+        gwp: g * wp,
+        gwm: g * wm,
+        g,
+    }
+}
+
+/// The joint histogram and the two marginals (appendix B, "Histograms"): float32 cells, each
+/// contribution added in the sampling order.
+struct MiHistograms {
+    joint: Vec<f32>,
+    test: Vec<f32>,
+    reference: Vec<f32>,
+    bins: usize,
+    test_bins: TestBins,
+}
+
+impl MiHistograms {
+    fn new(bins: usize, test_bins: TestBins) -> MiHistograms {
+        MiHistograms {
+            joint: vec![0.0; bins * bins],
+            test: vec![0.0; bins],
+            reference: vec![0.0; bins],
+            bins,
+            test_bins,
+        }
+    }
+
+    /// Adds one contribution: the joint cell and the test marginal for `c`, `cp` and `cm` in
+    /// that order (each a separate float32 addition, also where two indices coincide), then
+    /// `g` to the reference marginal. A zero product is skipped: adding +0 to a cell, which is
+    /// never −0, leaves it as it is.
+    #[inline(always)]
+    fn add(&mut self, k: &Contribution) {
+        let row = k.a as usize * self.bins;
+        for (i, x) in [(k.c, k.gwc), (k.cp, k.gwp), (k.cm, k.gwm)] {
+            // An index outside the bins comes only with a zero weight (a NaN or an out-of-range
+            // test value, which mcflirt's conversion maps to the most negative integer).
+            if x != 0.0 && (0..self.bins as i64).contains(&i) {
+                self.joint[row + i as usize] += x;
+                self.test[i as usize] += x;
+            }
+        }
+        self.reference[k.a as usize] += k.g;
+    }
+}
+
+impl Accumulator for MiHistograms {
     #[inline(always)]
     fn point(&mut self, g: f32, v: f32, w: f32) {
-        let bins = self.bins;
-        let r = (g as usize).min(bins - 1);
-        // The sample is spread over its bin and the nearer neighbour, linearly within half a
-        // bin of the bin's centre.
-        let t = f64::from((v - self.lo) * bins as f32 / self.range);
-        let k = (t.floor().max(0.0) as usize).min(bins - 1);
-        let frac = t - k as f64 - 0.5;
-        let (other, share) = if frac >= 0.0 {
-            ((k + 1).min(bins - 1), frac.min(0.5))
-        } else {
-            (k.saturating_sub(1), (-frac).min(0.5))
-        };
-        let w = f64::from(w);
-        self.hist[r * bins + k] += w * (1.0 - share);
-        self.hist[r * bins + other] += w * share;
-        self.overlap += 1.0;
+        let k = contribution(g, v, w, self.bins as i64, self.test_bins);
+        self.add(&k);
     }
     fn end_row(&mut self) {}
 }
 
-/// The mutual-information costs (appendix A): `−MI`, or `−(H1 + H2)/H12` when `normalised`.
-/// Entropies use probabilities `count / grid points`, corrected to the overlap size by
-/// `H' = (n_grid/n_overlap)·H − log(n_grid/n_overlap)`.
+/// The contributions of one slice, in sampling order (the parallel sampling of stage 1).
+struct MiRecord {
+    points: Vec<Contribution>,
+    bins: i64,
+    test_bins: TestBins,
+}
+
+impl Accumulator for MiRecord {
+    #[inline(always)]
+    fn point(&mut self, g: f32, v: f32, w: f32) {
+        self.points
+            .push(contribution(g, v, w, self.bins, self.test_bins));
+    }
+    fn end_row(&mut self) {}
+}
+
+/// `Σ −p·ln p` over the cells with a positive count, `p = count/n`, in index order, each term
+/// rounded to float32 (single-precision logarithm), and the sum of those counts.
+fn entropy(cells: &[f32], n: f32) -> (f32, f32) {
+    let (mut h, mut total) = (0.0f32, 0.0f32);
+    for &c in cells {
+        if c > 0.0 {
+            let p = c / n;
+            h += -p * math::logf(p);
+            total += c;
+        }
+    }
+    (h, total)
+}
+
+/// The mutual-information costs exactly as `specs/mcflirt.md` appendix B describes them:
+/// `−MI` (`mutualinfo`), or `−NMI` with `NMI = (H_ref + H_test)/H_joint` (`normmi`; 0 when
+/// `|H_joint| < 1e−9`). `bin_grid` holds the reference bins ([`bin_grid_mi`]) and `test` its
+/// [`TestBins`]. The float32 histograms are filled in the sampling order (z, y, x): directly
+/// when `parallel` is false (stages 2–4, whose volumes run in parallel), and with `parallel`
+/// (stage 1) from each slice's contributions computed in parallel and then added slice by slice,
+/// so the result is the same bits at any thread count.
 pub fn mutual_info(
     bin_grid: &Volume,
     test: &TestVolume<'_>,
@@ -646,53 +851,55 @@ pub fn mutual_info(
     normalised: bool,
     parallel: bool,
 ) -> f32 {
-    let (lo, hi) = min_max(&test.vol.data);
-    let range = if hi - lo == 0.0 { 1.0 } else { hi - lo };
-    let make = || JointSlice {
-        hist: vec![0.0; bins * bins],
-        bins,
-        lo,
-        range,
-        overlap: 0.0,
-    };
-    let mut hist = vec![0.0f64; bins * bins];
-    let mut overlap = 0.0;
-    for s in sample(bin_grid, test, b, parallel, make) {
-        for (h, x) in hist.iter_mut().zip(&s.hist) {
-            *h += x;
-        }
-        overlap += s.overlap;
-    }
-    if overlap <= 0.0 {
-        return 0.0;
-    }
-    let n_grid = bin_grid.len() as f64;
-    let entropy = |counts: &mut dyn Iterator<Item = f64>| -> f64 {
-        counts
-            .filter(|&c| c > 0.0)
-            .map(|c| {
-                let q = c / n_grid;
-                -q * math::log(q)
-            })
-            .sum()
-    };
-    let ratio = n_grid / overlap;
-    let correct = |h: f64| ratio * h - math::log(ratio);
-    let h12 = correct(entropy(&mut hist.iter().copied()));
-    let h1 = correct(entropy(
-        &mut (0..bins).map(|r| hist[r * bins..(r + 1) * bins].iter().sum()),
-    ));
-    let h2 = correct(entropy(
-        &mut (0..bins).map(|t| (0..bins).map(|r| hist[r * bins + t]).sum()),
-    ));
-    if normalised {
-        if h12 > 0.0 {
-            (-(h1 + h2) / h12) as f32
-        } else {
-            0.0
+    let bins = bins.max(1);
+    let test_bins = test
+        .test_bins
+        .unwrap_or_else(|| TestBins::new(test.vol, bins));
+    let mut h = MiHistograms::new(bins, test_bins);
+    if parallel {
+        let make = || MiRecord {
+            points: Vec::new(),
+            bins: bins as i64,
+            test_bins,
+        };
+        for slice in sample(bin_grid, test, b, true, make) {
+            for k in &slice.points {
+                h.add(k);
+            }
         }
     } else {
-        (-(h1 + h2 - h12)) as f32
+        for z in 0..bin_grid.shape[2] {
+            sample_into(bin_grid, test, b, z, &mut h);
+        }
+    }
+    // N: every point of the reference grid, sampled or not, as float32.
+    let n = bin_grid.len() as f32;
+    let (mut h_joint, _) = entropy(&h.joint, n);
+    let (mut h_ref, _) = entropy(&h.reference, n);
+    let (mut h_test, overlap) = entropy(&h.test, n);
+    if overlap > 0.0 {
+        // The entropies of N points corrected to the `overlap` points that overlap.
+        let rho = n / overlap;
+        let ln_rho = math::logf(rho);
+        h_joint = rho * h_joint - ln_rho;
+        h_ref = rho * h_ref - ln_rho;
+        h_test = rho * h_test - ln_rho;
+    } else {
+        // No overlap: the values of a bad registration.
+        let ln_b = math::log(bins as f64);
+        h_joint = (2.0 * ln_b) as f32;
+        h_ref = ln_b as f32;
+        h_test = ln_b as f32;
+    }
+    if normalised {
+        let nmi = if f64::from(h_joint).abs() < 1e-9 {
+            0.0
+        } else {
+            (h_ref + h_test) / h_joint
+        };
+        -nmi
+    } else {
+        -((h_ref + h_test) - h_joint)
     }
 }
 
@@ -747,11 +954,78 @@ mod tests {
         let bg = bin_grid(&grid, 64);
         assert!(corr_ratio(&bg, &test, &b0, 64, false) < corr_ratio(&bg, &test, &b1, 64, false));
         assert!(woods(&bg, &test, &b0, 64, false) < woods(&bg, &test, &b1, 64, false));
+        let bg = bin_grid_mi(&grid, 64, false);
         for normalised in [false, true] {
             let m0 = mutual_info(&bg, &test, &b0, 64, normalised, false);
             let m1 = mutual_info(&bg, &test, &b1, 64, normalised, false);
             assert!(m0 < m1, "{normalised}: {m0} {m1}");
+            // Stage 1's parallel path gives the same bits, at any thread count.
+            for threads in [1, 3, 8] {
+                let pool = rayon::ThreadPoolBuilder::new()
+                    .num_threads(threads)
+                    .build()
+                    .unwrap();
+                let par = pool.install(|| mutual_info(&bg, &test, &b1, 64, normalised, true));
+                assert_eq!(par.to_bits(), m1.to_bits(), "{normalised} {threads}");
+            }
         }
+    }
+
+    /// Appendix B's bins and fuzzy weights, by hand: four bins over the test range [0, 4], so
+    /// `u = y`.
+    #[test]
+    fn mi_contributions_by_hand() {
+        let t = TestBins { b1: 1.0, b0: -0.0 };
+        let k = |y: f32| {
+            let k = contribution(2.0, y, 0.5, 4, t);
+            (k.c, k.cp, k.cm, k.gwc, k.gwp, k.gwm)
+        };
+        // Near the lower edge: shared with the bin below.
+        assert_eq!(k(1.25), (1, 2, 0, 0.375, 0.0, 0.125));
+        // Near the upper edge: shared with the bin above.
+        assert_eq!(k(2.75), (2, 3, 1, 0.375, 0.125, 0.0));
+        // At the centre: all in the bin.
+        assert_eq!(k(2.5), (2, 3, 1, 0.5, 0.0, 0.0));
+        // The top of the range: bin B−1 twice (the neighbour below computed before the clamp).
+        assert_eq!(k(4.0), (3, 3, 3, 0.25, 0.0, 0.25));
+        // The bottom: bin 0 twice.
+        assert_eq!(k(0.0), (0, 1, 0, 0.25, 0.0, 0.25));
+        // NaN (a constant test volume's u): all in bin 0, the neighbour above unused.
+        let n = contribution(1.0, f32::NAN, 0.5, 4, t);
+        assert_eq!((n.c, n.cm, n.gwc, n.gwp, n.gwm), (0, 0, 0.5, 0.0, 0.0));
+        assert_eq!(n.cp, i64::MIN + 1);
+        let mut h = MiHistograms::new(4, t);
+        h.add(&n);
+        assert_eq!((h.joint[4], h.test[0], h.reference[1]), (0.5, 0.5, 0.5));
+        // Reference bins: trunc(v·a1 + a0), clamped; equal extremes widened by 1.
+        let g = Volume::new([4, 1, 1], [1.0; 3], vec![10.0, 12.0, 14.0, f32::NAN]);
+        assert_eq!(bin_grid_mi(&g, 4, false).data, [0.0, 2.0, 3.0, 0.0]);
+        assert!(bin_grid_mi(&g, 4, true).data[3].is_nan());
+        let flat = Volume::new([2, 1, 1], [1.0; 3], vec![5.0, 5.0]);
+        assert_eq!(bin_grid_mi(&flat, 4, false).data, [0.0, 0.0]);
+    }
+
+    /// The entropies and the costs (appendix B): no overlap gives the values of a bad
+    /// registration; a constant test volume puts every sample in bin 0.
+    #[test]
+    fn mi_costs_at_the_extremes() {
+        let v = blob([12, 12, 8], [3.0, 3.0, 3.0]);
+        let grid = crate::hmc::grid::subsample(&v, 4.0);
+        let bg = bin_grid_mi(&grid, 16, false);
+        let test = TestVolume::new(&v, 1.0);
+        let mut far = IDENTITY;
+        far[0][3] = 1000.0;
+        let b = voxel_map(&far, v.voxel_size, grid.voxel_size);
+        let ln16 = 16f64.ln();
+        let mi = mutual_info(&bg, &test, &b, 16, false, false);
+        assert_eq!(mi, -((ln16 as f32 + ln16 as f32) - (2.0 * ln16) as f32));
+        let nmi = mutual_info(&bg, &test, &b, 16, true, false);
+        assert_eq!(nmi, -((ln16 as f32 + ln16 as f32) / (2.0 * ln16) as f32));
+        let flat = Volume::new(v.shape, v.voxel_size, vec![7.0; v.len()]);
+        let test = TestVolume::new(&flat, 1.0);
+        let b = voxel_map(&IDENTITY, v.voxel_size, grid.voxel_size);
+        let c = mutual_info(&bg, &test, &b, 16, true, false);
+        assert!(c.is_finite() && c < 0.0, "{c}");
     }
 
     #[test]

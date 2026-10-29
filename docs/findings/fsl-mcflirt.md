@@ -1,4 +1,4 @@
-# FSL mcflirt (FSL 6.0.7.17)
+# FSL mcflirt (FSL 6.0.7.17; FSL 6.0.7.23 at the end)
 
 > **Forbidden to the clean-room implementer.** These notes were written while reading FSL's
 > source, which is under the FSL Licence (non-commercial). Whoever writes the clean-room
@@ -451,6 +451,47 @@ agree among the replica's four runs.
 one line of its own, then exits with status 1), FSL's build string in `descrip`, mcflirt's
 single thread, and which NaN passes on when two NaNs of different signs meet in an affine with
 mixed NaNs (above).
+
+## FSL 6.0.7.23 (the version update, 2026-10-29)
+
+FSL 6.0.7.17 → 6.0.7.23 (`~/fsl-6.0.7.23`, FSL's official installation beside `~/fsl`). mcflirt's
+own package is unchanged (fsl-mcflirt 2111.0: the same `mcflirt.cc`, `Globaloptions.{h,cc}`,
+`Log.{h,cc}`), but it is rebuilt against fsl-newimage 2601.0 (was 2203.12), fsl-miscmaths 2412.6
+(2203.2), fsl-newnifti 5.0.0 (4.1.0), fsl-znzlib 2511.3 (2111.0), fsl-utils 2412.6 (2203.5) and
+fsl-armawrap 0.7.0 (0.6.0: Armadillo 14.2.1 instead of 10.5.1), linked with OpenBLAS 0.3.33
+(0.3.26). Every file of the manifest and every other file of those packages was compared
+(`validation/investigations/version-fsl/source_diff.py`); mcflirt's 137 recorded runs were made
+again with 6.0.7.23 (`oracles/fsl-6.0.7.23/mcflirt/`, `scripts/run_mcflirt_oracle.py
+--fsl-version 6.0.7.23`) and compared with 6.0.7.17's (`compare_recordings.py`): 127 byte for
+byte identical, 10 changed, each for one of the reasons below.
+
+| Change (file) | Class | mcflirt | The replica |
+|---|---|---|---|
+| ShadowVolume cache (`newimage.{h,cc}`): `volume4D[t]` returns a cached shadow volume whose interpolation method, kernel and extrapolation members are copied at its first access; the getters delegate to the owner, but `interpolate` switches on the shadow's own copy | defect, new (**FSL-59**, c) | `-sinc_final` and `-nn_final` resample trilinearly: the final loop sets the series' method, but each volume's shadow was cached during the registration, with trilinear (`final_interp_probe.sh`: every output of both options equals the default run's; `-spline_final` builds its own shadow from the owner and still splines) | default: the method asked for (6.0.7.17's result); `reproduce`: trilinear; FSL-59 named where the two series differ (`run.rs`). The other stale copies (extrapolation, kernel) reach nothing mcflirt computes (the getters delegate; the cost functions use none of them): no other recorded run changed |
+| `extrapparams` (`newimage.h`, `newimagefns.{h,cc}`): `affine_transform` passes its background value and `extraslice` to the interpolation instead of setting them on the input | no effect | the same values | none |
+| `convolve` and the masked convolution run per voxel in threads (`newimagefns.h`) | no effect (per voxel, no reduction) | – | – |
+| Splinterpolator (`splinterpolator.h`): coefficients outside a `Zeros` grid are 0 (were mirrored); the first index `ceil(x) − 2` (was from `(int)(x + 0.5)`); new `SoftZeros`, `CorrectConstant` | no effect on mcflirt (its final spline uses `extraslice`, i.e. `Constant`; the first index differs only at `x = −1` exactly, with a zero weight) | – | translated (`interp.rs`: `coef_at`, `value_at`), for the next replicas |
+| Armadillo 14.2.1 (`fsl-armawrap` 0.7.0): `inv()` of a 4 × 4 matrix is no longer the closed-form cofactor inverse: diagonal → `1/x`; triangular → LAPACK `dtrtri`; symmetric (to 100 ε) → `dsytrf`/`dsytri`; otherwise `dgetrf` + `dgetri` (OpenBLAS 0.3.33); `inv(A)·B` → `dgesv` (`dsysv` for a symmetric `A`, which every diagonal sampling matrix is); `det()` of 4 × 4 → LU; 2 × 2 and 3 × 3 keep closed forms | last bits (arithmetic) | the cost function's `vtest.sampling_mat().i() * aff.i() * vref.sampling_mat()`, `affine_transform`'s `aff.i()`, `rms_deviation`'s `a1*a2.i()`, `decompose_aff`'s solves: their last bits differ; mcflirt's float32 sampling hides them in 127 of 137 runs; visible: `.rms` values computed from nearly equal matrices (`identical-copies`, `opt-stages1`: values from 1e−19 to 1e−8 mm, differences ≤ 1e−14 mm) and the sign of NaN parameters in `.par` (`syn/content/nan`) | **not followed yet**: the replica keeps Armadillo 10.5.1's closed-form inverse (`arma.rs`); the five recorded runs are expected divergences in its record (`ARMA_LAPACK` in the suite: numbers within 1e−12 mm or NaN signs, checked file by file). The same results under every OpenBLAS core this CPU runs (Haswell, SkylakeX, Cooperlake, Zen, SandyBridge, Prescott: `openblas_core_probe.sh`), so the follow-up can reproduce OpenBLAS's Haswell order, as `larmorx_transform::openblas` does for numpy |
+| NewNifti 5.0.0 (`NewNifti.{h,cc}`): `replaceSuffix` | defect, new (**FSL-60**, c) | every image name passes through `replaceSuffix(name, ".img", ".hdr")` (`loadImage`, `loadHeader`, `saveImage`): a name holding `.img` before its extension opens another file (`path_suffix_probe.sh`: `-out a.img.d/out` writes `a.hdr.d/out.nii.gz`; a pair written into `x.hdr.y.img.d/` aborts on `x.hdr.y.hdr.d/o5.hdr`) | default: the name given; `reproduce`: renamed (`nifti::OpenOptions`, `Settings::reproducing_renames`); FSL-60 named by the program (`larmorx-nc-cli`) |
+| znzlib 2511.3 (`znzlib.{h,cpp}` and its plugins): C++, raw/gzip/zstd/bzip2; reading guesses the format from the first four bytes (a file shorter than four bytes: `feof` of a stream already closed, glibc's end-of-file flag, so the suffix decides); writing in the format the file type says | new formats | reads `.nii.zst`, `.nii.bz2`, and any name by its content | `nifti.rs` (`ZnzFormat`, `format_from_content`, `decode_zstd`, `decode_bzip2`, `write_file`); the compressed bytes are ruzstd's and libbz2-rs-sys's (compared decompressed) |
+| newimage 2601.0 (`generalio.cc`): `FSLOUTPUTTYPE` accepts the `*_ZST` and `*_BZ2` types; the message for an unknown one lists all 16; `fileExtensions` has 8 entries (search order `.nii.gz`, `.nii`, `.hdr`, `.hdr.gz`, `.nii.zst`, `.hdr.zst`, `.nii.bz2`, `.hdr.bz2`); `return_validimagefilename` stops at the first matching extension (no effect: one matches) | messages, new values | 2 recorded edge cases' messages | `volume.rs` (`filetype`, `znz_format`, `EXTENSIONS`) |
+| newimage's build string (`descrip`: `2601.0 2025-12-08T15:20:57Z`) | build metadata | – | `BUILDSTRING` (BET writes it; mcflirt's replica writes its own name, as before) |
+| utils 2412.6: `NoOfThreads()` defaults to `FSL_NUM_THREADS`, else 1; the usage's build ID (`Part of FSL (ID: 2412.6-dirty)`) | no effect / message | mcflirt prints its own usage (no ID line) | `options.rs` (the ID, for BET) |
+| `miscmaths.{h,cc}` (the `OUT` macros removed, a message in a routine mcflirt never calls), `kernel.h` (a const accessor) | comments, no effect | – | – |
+
+**Compilers.** FSL 6.0.7.17's `mcflirt` and `bet2` were built by conda-forge GCC 13.2, 6.0.7.23's
+by GCC 15.2 (its `libfsl-znz.so` by 16.1); neither has a fused multiply-add instruction in
+`mcflirt`, `bet2` or the libraries above (`objdump`: no `vfmadd`). The ten changed runs are all
+explained by the sources; no binary-level cause was needed. OpenBLAS picks its Cooperlake core on
+this AMD Zen 4 (`OPENBLAS_VERBOSE=2`); no recorded output depends on the core.
+
+**Not ported (follow-up).** Armadillo 14.2.1's LAPACK path for 4 × 4 inverses and solves: the
+replica would need OpenBLAS 0.3.33's `getrf_single` (`getf2`), netlib LAPACK's `dgetri`
+(unblocked: OpenBLAS's `dtrtri`, `dgemv_n`, `dswap`), `dsysv` (`dsytrf`/`dsytf2`, `dsytrs`, with
+`dsyr`, `dger`, `idamax`, `dscal`) and `dtrtri`, in the Haswell order (no FMA in OpenBLAS's C
+kernels; FMA in `dgemv_t`), with a ctypes probe against `~/fsl-6.0.7.23/lib/liblapack.so.3`. Until
+then the replica's `reproduce` differs from FSL 6.0.7.23 in those last bits (5 of 196
+standard-tier cases).
 
 ## fMRIPrep, nipype, niworkflows, nitransforms (Apache-2.0 / MIT; not restricted)
 

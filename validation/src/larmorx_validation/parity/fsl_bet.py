@@ -1,10 +1,12 @@
 # SPDX-License-Identifier: Apache-2.0
 """Parity of the BET replicas (``larmorx-nc fsl bet``, ``bet2`` and ``betsurf``, run by larmorx
-as a separate process) with FSL 6.0.7.17's ``bet``, ``bet2`` and ``betsurf``: exit status,
+as a separate process) with FSL's ``bet``, ``bet2`` and ``betsurf`` (6.0.7.23 since 2026-10-29;
+6.0.7.17 selectable, :mod:`fsl_versions`): exit status,
 messages and every output (brain, mask, outline, skull, mesh, the skull and scalp surfaces and
 their masks), byte for byte.
 
-FSL runs from its own installation (``~/fsl``, or ``LARMORX_FSL_DIR``), never on the ``PATH``:
+FSL runs from its own installation (``~/fsl-6.0.7.23`` or ``~/fsl``: ``--fsl-version``, or
+``LARMORX_FSLDIR``), never on the ``PATH``:
 both programs run with ``PATH=/usr/bin:/bin``, ``FSLDIR`` set (the ``bet`` script calls
 ``${FSLDIR}/bin/...``), an empty ``HOME`` and each case's ``FSLOUTPUTTYPE``. The replica runs the
 way users reach it: through larmorx's own dispatch (``larmorx fsl <tool>``), which runs the
@@ -52,7 +54,7 @@ from typing import Any
 
 import numpy as np
 
-from larmorx_validation.parity import defects
+from larmorx_validation.parity import defects, fsl_versions
 from larmorx_validation.parity.harness import (
     BOTH_ERROR,
     EXPECTED,
@@ -91,22 +93,27 @@ def workspace() -> Path | None:
     return None
 
 
-def fsl_dir() -> Path | None:
-    """FSL's installation: ``LARMORX_FSL_DIR``, else ``~/fsl`` (when it holds ``bin/bet2``)."""
-    for candidate in (os.environ.get("LARMORX_FSL_DIR"), str(Path.home() / "fsl")):
-        if candidate and (Path(candidate) / "bin" / "bet2").is_file():
-            return Path(candidate)
-    return None
+def fsl_dir(version: str | None = None) -> Path | None:
+    """FSL's installation (when it holds ``bin/bet2``): the one compared with
+    (:mod:`fsl_versions`: ``LARMORX_FSLDIR``, ``--fsl-version``, else the replica's default, the
+    newest), or the given ``version``'s."""
+    if version is None and not (
+        os.environ.get(fsl_versions.DIR_ENV) or os.environ.get(fsl_versions.DIR_ENV_OLD)
+    ):
+        version = fsl_versions.selected("replica")
+    d = fsl_versions.fsldir(version)
+    return d if (d / "bin" / "bet2").is_file() else None
 
 
-@functools.cache
-def fsl_version() -> str:
-    d = fsl_dir()
+def fsl_version(version: str | None = None) -> str:
+    d = fsl_dir(version)
     if d is None:
         return "not found"
-    v = d / "etc" / "fslversion"
-    version = v.read_text(encoding="utf-8").split(":")[0].strip() if v.is_file() else "unknown"
-    return f"FSL {version} (fsl-bet2 2111.8, fsl-newimage 2203.12, fsl-meshclass 2111.0)"
+    return (
+        f"FSL {fsl_versions.version_of(d)} ("
+        + fsl_versions.package_versions(d, ("fsl-bet2", "fsl-newimage", "fsl-meshclass"))
+        + ")"
+    )
 
 
 def replica_binary() -> str | None:
@@ -180,14 +187,16 @@ def home() -> Path:
 
 
 def environment(
-    output_type: str = "NIFTI_GZ", extra: tuple[tuple[str, str | None], ...] = ()
+    output_type: str = "NIFTI_GZ",
+    extra: tuple[tuple[str, str | None], ...] = (),
+    version: str | None = None,
 ) -> dict[str, str]:
     """The environment both programs run in: no FSL program on the PATH, ``FSLDIR`` for the
     ``bet`` script, an empty ``HOME``, the case's ``FSLOUTPUTTYPE`` and variables."""
     env = {
         "HOME": str(home()),
         "PATH": "/usr/bin:/bin",
-        "FSLDIR": str(fsl_dir() or ""),
+        "FSLDIR": str(fsl_dir(version) or ""),
         "FSLOUTPUTTYPE": output_type,
         "LC_ALL": "C",
         "OMP_NUM_THREADS": "2",
@@ -209,8 +218,18 @@ class Run:
 
 
 #: The extensions FSL's image layer adds to a name given without one (``bet in out`` reads
-#: ``in.nii.gz``): the header-bearing files (an ``.img`` is read beside its ``.hdr``).
-IMAGE_EXTENSIONS = (".nii.gz", ".nii", ".hdr", ".hdr.gz")
+#: ``in.nii.gz``): the header-bearing files (an ``.img`` is read beside its ``.hdr``), in
+#: newimage 2601.0's order (FSL 6.0.7.23 added the zstd and bzip2 ones).
+IMAGE_EXTENSIONS = (
+    ".nii.gz",
+    ".nii",
+    ".hdr",
+    ".hdr.gz",
+    ".nii.zst",
+    ".hdr.zst",
+    ".nii.bz2",
+    ".hdr.bz2",
+)
 
 #: Defects whose FSL result depends on memory FSL never wrote: such runs are never cached
 #: (the oracle cache's rule for undefined values).
@@ -257,6 +276,7 @@ def oracle_run(
     build: str = "oracle",
     binds: tuple[Path, ...] = (),
     never: str = "",
+    version: str | None = None,
 ) -> Run:
     """Runs FSL's ``program``: the oracle installation (``build="oracle"``) or fMRIPrep
     25.2.6's FSL in its image (``build="fmriprep"``, with ``cwd`` and ``binds`` bound at their
@@ -270,7 +290,7 @@ def oracle_run(
     policy = oracle_cache.Policy(threads=1, never=never, family="fsl")
     inputs = implicit_inputs(args, cwd)
     if build == "oracle":
-        d = fsl_dir()
+        d = fsl_dir(version)
         assert d is not None
         p = oracle_cache.run(
             [str(d / "bin" / program), *args],
@@ -354,6 +374,8 @@ _TERMINATE = re.compile(
     r"terminate called after throwing an instance of [^\n]*\n(?:  what\(\): [^\n]*\n)?"
 )
 _BASH_SIGNAL = re.compile(r"^[^\n]*: line \d+: +\d+ (?:Aborted|Segmentation fault)[^\n]*\n", re.M)
+#: The ``bet`` script's ``ERR`` trap, on its standard output after a program it runs crashed.
+_BET_FAILED = re.compile(r"^bet failed during command:[^\n]*\n", re.M)
 
 
 def larmorx_own(line: str) -> bool:
@@ -364,9 +386,9 @@ def larmorx_own(line: str) -> bool:
 
 def fsl_text(text: str) -> str:
     """FSL's messages as compared: the ``bet`` script's own path (``$0``) read as ``bet``."""
-    d = fsl_dir()
-    if d is not None:
-        text = text.replace(f"{d}/bin/bet", "bet")
+    for d in {fsl_dir(), *(fsl_dir(v) for v in fsl_versions.INSTALLS)}:
+        if d is not None:
+            text = text.replace(f"{d}/bin/bet", "bet")
     return text
 
 
@@ -413,6 +435,9 @@ def check_messages(
     else:
         name = MESSAGES
     if filled:
+        # the script's failure line follows the crash (its ERR trap): not printed before it
+        if crash:
+            a_out = _BET_FAILED.sub("", a_out)
         same = b_out.startswith(a_out) and b_err.startswith(a_err)
     else:
         same = a_out == b_out and a_err == b_err
@@ -432,18 +457,53 @@ def check_messages(
 # Outputs
 
 
+def unzstd(raw: bytes) -> bytes:
+    """A zstd file's content, by FSL 6.0.7.23's own ``zstd`` (1.5.6) called by full path: the
+    validation environment has no zstd module (Python 3.12)."""
+    zstd = fsl_versions.fsldir(fsl_versions.NEWEST) / "bin" / "zstd"
+    p = subprocess.run([str(zstd), "-dc"], input=raw, capture_output=True, check=False)
+    if p.returncode != 0:
+        raise ValueError(f"zstd -dc failed: {p.stderr[:200]!r}")
+    return p.stdout
+
+
 def content(path: Path) -> bytes:
+    """A file's bytes, decompressed as FSL's znzlib reads it (gzip; zstd and bzip2 since FSL
+    6.0.7.23)."""
     raw = path.read_bytes()
-    return gzip.decompress(raw) if raw[:2] == b"\x1f\x8b" else raw
+    if raw[:2] == b"\x1f\x8b":
+        return gzip.decompress(raw)
+    if raw[:4] == b"\x28\xb5\x2f\xfd":
+        return unzstd(raw)
+    if raw[:3] == b"BZh":
+        import bz2
+
+        return bz2.decompress(raw)
+    return raw
+
+
+#: FSL's image extensions, compressed or not.
+_IMAGE_SUFFIXES = tuple(
+    f"{stem}{c}" for stem in (".nii", ".hdr", ".img") for c in ("", ".gz", ".zst", ".bz2")
+)
 
 
 def is_image(name: str) -> bool:
-    return name.endswith((".nii", ".nii.gz", ".hdr", ".hdr.gz", ".img", ".img.gz"))
+    return name.endswith(_IMAGE_SUFFIXES)
 
 
 def image_data(path: Path) -> np.ndarray:
     import nibabel as nib
 
+    if path.name.endswith((".zst", ".bz2")):
+        # nibabel reads neither: the decompressed bytes, as a NIfTI file of their own
+        raw = content(path)
+        img = (
+            nib.Nifti1Image.from_bytes(raw)
+            if raw[:4] != b"\x1c\x02\x00\x00"
+            else (nib.Nifti2Image.from_bytes(raw))
+        )
+        return np.asanyarray(img.dataobj.get_unscaled())
     return np.asanyarray(nib.load(path).dataobj.get_unscaled())
 
 
@@ -653,8 +713,17 @@ def _scenarios() -> list[tuple[str, str, str, Scenario]]:
     add("img-output", "bet2", "an output name with .img and no .hdr (FSL-40: FSL aborts)",
         S("bet2", ("{0}", "out.img"), (h,), expect="crash"))
     add("hdr-in-name", "defects", "an output name with .hdr inside (FSL-40)", S("bet2", ("{0}", "a.hdrb", "-m"), (h,)))
-    add("constant", "bet2", "a constant image (FSL-41: FSL reads an empty list and crashes; reproduce fills the median with 0)",
-        S("bet2", ("{0}", "out", "-m"), ("constant",), expect="crash-filled", fix_refuses="FSL-41", tier="standard"))
+    add("constant", "bet2", "a constant image: FSL 6.0.7.23 takes the robust maximum as the median (FSL-41, fixed upstream; 6.0.7.17 read an empty list and crashed), then crashes in the mask's fill from the surface's NaN centre (FSL-43); reproduce does not fill",
+        S("bet2", ("{0}", "out", "-m"), ("constant",), expect="crash-filled", fix_refuses="FSL-43", tier="standard"))
+    # --- fsl-bet2 2111.9 (FSL 6.0.7.23): --binaryMask -----------------------------------------------
+    add("binary-mask", "bet2", "--binaryMask: the surface found on a brain mask, the brain, mask, outline, skull and thresholds from the input (FSL 6.0.7.23)",
+        S("bet2", ("{0}", "out", "--binaryMask={1}", "-m", "-o", "-s", "-t"), (h, "head-mask")))
+    add("binary-mask-verbose", "bet2", "--binaryMask -v: the parameters printed are the mask's",
+        S("bet2", ("{0}", "out", "--binaryMask={1}", "-v", "-e"), (h, "head-mask"), tier="standard"))
+    add("binary-mask-ct", "defects", "--ct --binaryMask: FSL cuts the brain image from the mask (FSL-62)",
+        S("bet2", ("{0}", "out", "--binaryMask={1}", "--ct", "-m"), ("head-ct", "head-mask"), tier="standard"))
+    add("binary-mask-missing", "bet2", "--binaryMask naming no image (FSL aborts)",
+        S("bet2", ("{0}", "out", "--binaryMask=/nonexistent/mask"), (h,), expect="crash", tier="standard"))
     add("nan-f", "defects", "-f nan (FSL-42; FSL crashes in its fill, FSL-43)", S("bet2", ("{0}", "out", "-f", "nan", "-m"), (h,), expect="crash-filled", fix_refuses="FSL-42", tier="standard"))
     add("negative-r", "defects", "-r -50 (FSL-42)", S("bet2", ("{0}", "out", "-r", "-50", "-m"), (h,), fix_refuses="FSL-42", tier="standard"))
     add("zero-w", "defects", "-w 0 (FSL-42; FSL crashes in its fill, FSL-43)", S("bet2", ("{0}", "out", "-w", "0", "-m"), (h,), expect="crash-filled", fix_refuses="FSL-42", tier="standard"))
@@ -662,12 +731,13 @@ def _scenarios() -> list[tuple[str, str, str, Scenario]]:
     # --- Storage types, scaling, orientation and formats ----------------------------------------
     for img in ("head-i16", "head-u8", "head-i8", "head-u16", "head-i32", "head-f64", "head-i16-scaled",
                 "head-neuro", "head-qform-only", "head-sform-only", "head-noxform", "head-oblique",
-                "head-nifti2", "head-uncompressed"):
+                "head-nifti2", "head-uncompressed", "head-zst", "head-bz2"):
         add(img, "formats", f"{img}: brain and mask", S("bet2", ("{0}", "out", "-m"), (img,),
                                                         tier="smoke" if img in ("head-i16", "head-neuro") else "standard"))
     add("pair-input", "formats", "a NIfTI pair input (.hdr/.img)", S("bet2", ("{0}", "out", "-m"), ("head-pair",), tier="standard"))
     add("analyze-input", "formats", "an ANALYZE 7.5 input", S("bet2", ("{0}", "out", "-m"), ("head-analyze",), tier="standard"))
-    for t in ("NIFTI", "NIFTI_PAIR", "NIFTI2", "NIFTI2_GZ", "NIFTI_PAIR_GZ", "ANALYZE", "ANALYZE_GZ"):
+    for t in ("NIFTI", "NIFTI_PAIR", "NIFTI2", "NIFTI2_GZ", "NIFTI_PAIR_GZ", "ANALYZE", "ANALYZE_GZ",
+              "NIFTI_ZST", "NIFTI2_PAIR_ZST", "NIFTI_BZ2", "NIFTI_PAIR_BZ2"):
         add(f"output-{t}", "formats", f"FSLOUTPUTTYPE={t}", S("bet2", ("{0}", "out", "-m", "-s"), (h,), output_type=t,
                                                                tier="smoke" if t == "NIFTI" else "standard"))
     add("output-unset", "formats", "FSLOUTPUTTYPE unset (FSL stops)", S("bet2", ("{0}", "out", "-m"), (h,), env=(("FSLOUTPUTTYPE", None),), expect="error", tier="standard"))
@@ -681,6 +751,8 @@ def _scenarios() -> list[tuple[str, str, str, Scenario]]:
 
     # --- The bet script ---------------------------------------------------------------------------
     add("default", "bet", "bet's defaults", S("bet", ("{0}", "out"), (h,)))
+    add("zst-output", "bet", "FSLOUTPUTTYPE=NIFTI_ZST through the script (fslval, fslmaths on zstd files; FSL 6.0.7.23)",
+        S("bet", ("{0}", "out", "-m", "-F"), ("head-4d",), output_type="NIFTI_ZST", tier="standard"))
     add("options", "bet", "every bet2 option bet passes on", S("bet", ("{0}", "out", "-o", "-m", "-s", "-e", "-t", "-f", "0.4", "-g", "0.1", "-r", "70", "-c", "48", "56", "38"), (h,), tier="standard"))
     add("verbose", "bet", "-v: the script's variables, then bet2's messages", S("bet", ("{0}", "out", "-m", "-v"), (h,)))
     add("robust", "bet", "-R: bet2 again from the brain's centre", S("bet", ("{0}", "out", "-R", "-m"), ("head-offcentre",),
@@ -851,6 +923,18 @@ def _phantoms() -> dict[str, Path]:
     p["truth:head"] = _save(truth, d / "head_truth.nii.gz")
     p["head-t2"] = _save(t2, d / "head-t2.nii.gz")
     p["head-uncompressed"] = _save(t1, d / "head-u.nii")
+    # FSL 6.0.7.23 reads zstd and bzip2 files (znzlib 2511.3): the same head, compressed by
+    # FSL's own zstd and Python's bz2
+    import bz2
+
+    p["head-bz2"] = d / "head-b.nii.bz2"
+    p["head-bz2"].write_bytes(bz2.compress(p["head-uncompressed"].read_bytes()))
+    p["head-zst"] = d / "head-z.nii.zst"
+    zstd = fsl_versions.fsldir(fsl_versions.NEWEST) / "bin" / "zstd"
+    subprocess.run(
+        [str(zstd), "-q", "-f", "-o", str(p["head-zst"]), str(p["head-uncompressed"])], check=True
+    )
+    p["head-mask"] = _save(truth.astype(np.float32), d / "head_mask.nii.gz")
     off, _ = _head(T1_LEVELS, 3, centre=(40.0, 50.0, 36.0))
     p["head-offcentre"] = _save(off, d / "head-off.nii.gz")
     p["head-i16"] = _save(np.round(t1).astype(np.int16), d / "head-i16.nii.gz")
@@ -991,12 +1075,15 @@ def _derived(kind: str, name: str) -> Path:
     T2 to the T1, sinc, as bet -A2 runs it)."""
     t1 = _real(name)
     d = derived_dir(t1)
-    env = environment()
-    fsl = fsl_dir()
+    # Inputs, not outputs compared: made once with FSL 6.0.7.17 (the first installation), so
+    # that every version is compared on the same files.
+    made_with = fsl_versions.PREVIOUS if fsl_dir(fsl_versions.PREVIOUS) else None
+    env = environment(version=made_with)
+    fsl = fsl_dir(made_with)
     assert fsl is not None
     if kind == "mesh":
         if not (d / "t1_mesh.vtk").is_file():
-            r = oracle_run("bet2", [str(t1), "t1", "-e", "-n"], env, d)
+            r = oracle_run("bet2", [str(t1), "t1", "-e", "-n"], env, d, version=made_with)
             assert r.code == 0, r.err
         return d / "t1_mesh.vtk"
     if kind == "mat":
@@ -1013,6 +1100,7 @@ def _derived(kind: str, name: str) -> Path:
                 ],
                 env,
                 d,
+                version=made_with,
             )
             assert r.code == 0, r.err
         return d / "t1_to_std.mat"
@@ -1035,6 +1123,7 @@ def _derived(kind: str, name: str) -> Path:
                 ],
                 env,
                 d,
+                version=made_with,
             )
             assert r.code == 0, r.err
         return d / "t2_to_t1.nii.gz"
@@ -1117,6 +1206,11 @@ def named_entry(run: Run) -> str | None:
 
 
 def run_case(case: Case, checks: CheckList) -> None:
+    with fsl_versions.using("replica"):
+        _run_case(case, checks)
+
+
+def _run_case(case: Case, checks: CheckList) -> None:
     s: Scenario = case.payload
     if fsl_dir() is None:
         raise Outcome("skipped", "FSL is not installed (~/fsl, LARMORX_FSL_DIR)")
@@ -1174,8 +1268,30 @@ def run_case(case: Case, checks: CheckList) -> None:
         else:
             checks(EXIT, fsl.code == ours.code, detail=f"FSL {fsl.code}, larmorx {ours.code}")
         check_messages(checks, fsl, ours, crash, filled)
+        memory = ""
         if filled:
             _filled(checks, s, fill_entry or "", args, env, ours, r_dir, root, inputs, late_failure)
+        elif reads_memory(ours) and not crash:
+            # FSL's fill read memory beyond the volume (FSL-43): where its outputs differ from
+            # the replica's, they depend on that memory (the replica reads it as not part of
+            # the mask); identical outputs are compared as usual
+            sub = CheckList()
+            files = compare_dirs(sub, f_dir, r_dir, inputs)
+
+            def values_differ(c) -> bool:
+                f = files.get(c.name)
+                return f is not None and (f.differing is None or f.differing > 0)
+
+            for c in sub.checks:
+                if c.passed or not values_differ(c):
+                    checks.add(c)
+            memory = "; ".join(f"{c.name}: {c.detail}" for c in sub.checks if values_differ(c))
+            if memory:
+                checks(
+                    "outputs (FSL's fill read memory beyond the volume: FSL-43)",
+                    True,
+                    detail=memory[:600],
+                )
         else:
             compare_dirs(checks, f_dir, r_dir, inputs)
         identical = all(c.passed for c in checks.checks)
@@ -1189,6 +1305,7 @@ def run_case(case: Case, checks: CheckList) -> None:
         _prepare(fix_dir, s)
         fixed = run_larmorx(s.tool, args, "fix", env, fix_dir)
         _fix_pass(checks, s, ours, fixed, r_dir, fix_dir, inputs)
+        _fsl_step(checks, s, args, env, fsl, f_dir, root, inputs, ours)
         if s.python is not None and identical and fsl.code == 0:
             _python(checks, s, paths, f_dir)
         if filled and all(c.passed for c in checks.checks):
@@ -1203,10 +1320,89 @@ def run_case(case: Case, checks: CheckList) -> None:
                     + ("refuses" if s.fix_refuses else "corrects it")
                 ),
             )
+        if memory and all(c.passed for c in checks.checks):
+            raise Outcome(
+                EXPECTED,
+                "FSL-43: the mask's fill starts outside the image and FSL reads memory beyond "
+                "the volume, on which its outputs depend; with upstream_defects='reproduce' "
+                "larmorx does FSL's fill inside the volume and reads that memory as not part of "
+                f"the mask ({memory[:200]})",
+            )
         if crash and all(c.passed for c in checks.checks):
             raise Outcome(BOTH_ERROR, f"FSL crashes, larmorx refuses: {larmorx_err_line(ours)}")
         if fsl.code != 0 and not crash and all(c.passed for c in checks.checks):
             raise Outcome(BOTH_ERROR, f"both refuse (exit {fsl.code}) with {last_line(fsl)}")
+
+
+def _descrip_only(a: Path, b: Path) -> bool:
+    """Whether two images differ only in their header's ``descrip`` (80 bytes at 148, or at 240
+    in a NIfTI-2 header)."""
+    if not is_image(a.name):
+        return False
+    ca, cb = content(a), content(b)
+    if len(ca) != len(cb) or len(ca) < 348:
+        return False
+    start = 240 if int.from_bytes(ca[:4], "little") == 540 else 148
+    return ca[:start] + ca[start + 80 :] == cb[:start] + cb[start + 80 :]
+
+
+def _fsl_step(
+    checks: CheckList,
+    s: Scenario,
+    args: list[str],
+    env: dict[str, str],
+    fsl: Run,
+    f_dir: Path,
+    root: Path,
+    inputs: tuple[str, ...],
+    ours: Run | None = None,
+) -> None:
+    """FSL's own step from the previous version to the one compared (:mod:`fsl_versions`): the
+    previous installation on the same arguments, in a directory set up alike (served from the
+    oracle cache when an earlier record ran it); its exit status, messages and outputs against
+    the compared one's. Reported, never a failure; a change without a known reason is a
+    finding. Where the replica (``ours``) named FSL-43's reads beyond the volume, what FSL does
+    there depends on memory: a known reason."""
+    old = fsl_versions.step_from("replica")
+    if old is None or fsl_dir(old) is None:
+        return
+    p_dir = root / "fsl-previous"
+    _prepare(p_dir, s)
+    p_env = {**env, "FSLDIR": str(fsl_dir(old))}
+    prev = oracle_run(s.tool, args, p_env, p_dir, never=case_never(s), version=old)
+    pa, na = written(p_dir, inputs), written(f_dir, inputs)
+    differences = {}
+    for name in sorted(set(pa) & set(na)):
+        c = compare_file(p_dir / name, f_dir / name)
+        if not c.same:
+            differences[name] = (
+                fsl_versions.BUILD_STRING_ONLY
+                if _descrip_only(p_dir / name, f_dir / name)
+                else c.detail
+            )
+    # bash's report of a crashed program names its process ID: masked
+    msgs = tuple(
+        re.sub(r"(line \d+: +)\d+ ", r"\1<pid> ", fsl_text(r.out + r.err).replace(str(d), "<dir>"))
+        for r, d in ((prev, p_dir), (fsl, f_dir))
+    )
+    why = fsl_versions.reasons(args, env)
+    if ours is not None and reads_memory(ours):
+        why = sorted({*why, "FSL-43-memory"})
+    changed, detail = fsl_versions.step_detail(
+        (prev.code, fsl.code), msgs, (pa, na), differences, why
+    )
+    from larmorx_validation.parity.harness import Check
+
+    checks.add(
+        Check(
+            fsl_versions.STEP_CHECK,
+            True,
+            metric="FSL against FSL",
+            value="changed" if changed else "identical",
+            threshold="reported",
+            detail=detail,
+        )
+    )
 
 
 def _filled(
@@ -1237,7 +1433,13 @@ def _filled(
     )
     written = sorted(p.name for p in r_dir.iterdir() if p.name not in inputs)
     if not late_failure:
-        checks("outputs written", bool(written), detail=", ".join(written) or "none")
+        asked = asks_outputs(s.tool, args)
+        checks(
+            "outputs written",
+            bool(written) or not asked,
+            detail=", ".join(written)
+            or ("none" if asked else "none, as the call asks (-n and no other output)"),
+        )
     again = root / "larmorx-again"
     _prepare(again, s)
     run_larmorx(s.tool, args, "reproduce", env, again)
@@ -1249,6 +1451,30 @@ def _filled(
         same,
         detail="bit-identical" if same else "; ".join(c.detail for c in sub.checks if not c.passed),
     )
+
+
+#: bet2's options that write an output besides the brain image (which ``-n`` leaves out).
+_OUTPUT_OPTIONS = ("-m", "-o", "-s", "-e")
+
+
+def asks_outputs(tool: str, args: list[str]) -> bool:
+    """Whether a call writes any output when it succeeds: betsurf always; bet2 and bet unless
+    ``-n`` (no brain image) comes without another output option (``bet -R`` removes ``-n``)."""
+    if tool == "betsurf" or "-n" not in args:
+        return True
+    if tool == "bet" and "-R" in args:
+        return True
+    return any(o in args for o in _OUTPUT_OPTIONS)
+
+
+#: The replica's FSL-43 notice of a fill FSL makes by its linear index from a start outside the
+#: image, reading memory beyond the volume: FSL's values there depend on that memory.
+MEMORY_READ = "FSL also reads memory beyond the volume"
+
+
+def reads_memory(run: Run) -> bool:
+    """Whether the replica named FSL-43's fill reading memory beyond the volume."""
+    return "upstream defect FSL-43 (" in run.err and MEMORY_READ in run.err
 
 
 def larmorx_err_line(run: Run) -> str:
@@ -1490,6 +1716,7 @@ def highlights(results: list[CaseResult]) -> list[str]:
             f"of {len(fm)} runs with the oracle's values."
         )
     lines += defects.summary(results)
+    lines += fsl_versions.step_highlights(results)
     return lines
 
 
@@ -1502,14 +1729,15 @@ def suite(implementation: str = "replica") -> Suite:
         )
     tool = (
         f"`larmorx-nc fsl bet`, `bet2` and `betsurf` ({replica_version()}; crate larmorx-nc-bet, the "
-        "replica translated from FSL 6.0.7.17's source under the FSL Licence), run by larmorx as a separate "
+        f"replica translated from FSL {fsl_versions.NEWEST}'s source under the FSL Licence), run by larmorx as a separate "
         "process: `larmorx fsl <tool>` and `lx.fsl.bet` / `lx.fsl.betsurf`"
     )
     return Suite(
         name="fsl-bet-replica",
         title="BET (replica)",
         tool=tool,
-        reference=f"bet, bet2 and betsurf from {fsl_version()}, the conda installation in `~/fsl`",
+        reference=f"bet, bet2 and betsurf from {fsl_version()}, the conda installation in "
+        f"`~/{fsl_versions.INSTALLS.get(fsl_versions.selected('replica'), 'fsl')}`",
         thresholds=[
             (
                 "Exit status",
@@ -1534,6 +1762,7 @@ def suite(implementation: str = "replica") -> Suite:
             "compared in `reproduce` mode; the fix pass runs its default. The fMRIPrep cases also compare the "
             "replica with fMRIPrep's own outputs of the node and run FSL again and fMRIPrep 25.2.6's FSL (FSL's "
             "own variability). The `-S`, `-B`, `-A` and `-A2` variations of `bet` run FSL programs larmorx does "
-            "not replicate yet (standard_space_roi, FLIRT, FAST): the replica refuses them, naming what is missing."
+            "not replicate yet (standard_space_roi, FLIRT, FAST): the replica refuses them, naming what is missing. "
+            + fsl_versions.record_line("replica")
         ),
     )

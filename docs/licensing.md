@@ -72,6 +72,17 @@ command-line binary. Code from different families is never linked into one binar
   written from the SGI STL's introsort and introselect under the HP/SGI permission notice, with
   the one step where libstdc++'s order differs written from that step's description: no
   libstdc++ (GPL-3.0) text (decision log, 2026-10-26).
+- **FSL 6.0.7.23** (checked 2026-10-29): the replicas follow it; `crates-nc/fsl-source/` holds
+  its original files of everything the translation now comes from (68 files, `MANIFEST.tsv`
+  with each package's version and SHA-256; fsl-znzlib 2511.3's C++ files replace 2111.0's
+  `znzlib.c`, which leaves the directory with the version it belonged to, kept in git history
+  and in `~/fsl`; FSL 6.0.7.17's copies also in `<workspace>/archive/2026-10-29-fsl-source-6.0.7.17/`).
+  Nothing is still translated from 6.0.7.17 alone: the files 6.0.7.23 did not change are the same
+  bytes. Armadillo's matrix rules (`arma.rs`) are still Armadillo 10.5.1's (fsl-armawrap 0.6.0,
+  Apache-2.0, not FSL code: notice in `crates-nc/NOTICE`). New pure-Rust dependencies of
+  `larmorx-nc-core` for zstd and bzip2: `ruzstd` 0.9.1 (MIT), `bzip2` 0.6.1 (MIT OR Apache-2.0)
+  with `libbz2-rs-sys` 0.2.5 (the bzip2-1.0.6 licence: permissive, the copyright notice kept in
+  source). No C library.
 - **Nothing is on PyPI yet.** Build the wheels locally:
   ```bash
   maturin build --release --locked --out dist                    # larmorx (repository root)

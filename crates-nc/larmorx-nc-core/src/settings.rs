@@ -9,15 +9,29 @@
 //! one; tests and the Python wrapper build the table explicitly.
 
 use std::collections::BTreeMap;
+use std::sync::Arc;
+
+use crate::nifti::{OpenOptions, Renames};
 
 /// The variables FSL's code on the replicated paths reads.
 pub const FSL_VARIABLES: &[&str] = &["FSLOUTPUTTYPE", "FSL_LOAD_NIFTI_EXTENSIONS"];
 
-/// A table of environment settings.
-#[derive(Clone, Debug, Default, PartialEq, Eq)]
+/// A table of environment settings, with how the image layer opens names (FSL-60: NewNifti
+/// 5.0.0's renaming of names holding ".img", reproduced or not, and the renames met).
+#[derive(Clone, Debug, Default)]
 pub struct Settings {
     values: BTreeMap<String, String>,
+    reproduce_renames: bool,
+    renames: Arc<Renames>,
 }
+
+impl PartialEq for Settings {
+    fn eq(&self, other: &Settings) -> bool {
+        self.values == other.values && self.reproduce_renames == other.reproduce_renames
+    }
+}
+
+impl Eq for Settings {}
 
 impl Settings {
     /// An empty table (every variable unset).
@@ -62,6 +76,25 @@ impl Settings {
     /// `getenv(name)`.
     pub fn get(&self, name: &str) -> Option<&str> {
         self.values.get(name).map(String::as_str)
+    }
+
+    /// FSL-60 in D13's `reproduce` mode: image names opened as NewNifti 5.0.0 renames them.
+    pub fn reproducing_renames(mut self, reproduce: bool) -> Settings {
+        self.reproduce_renames = reproduce;
+        self
+    }
+
+    /// How the image layer opens a name.
+    pub fn open_options(&self) -> OpenOptions<'_> {
+        OpenOptions {
+            reproduce_renames: self.reproduce_renames,
+            renames: Some(&self.renames),
+        }
+    }
+
+    /// The names NewNifti 5.0.0 would have renamed so far (FSL-60): `(given, renamed)`.
+    pub fn renames(&self) -> Vec<(String, String)> {
+        self.renames.taken()
     }
 }
 

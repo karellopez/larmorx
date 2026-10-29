@@ -33,6 +33,7 @@ from typing import Any
 import numpy as np
 
 from larmorx_validation.parity.mri_hmc import (
+    LX_THREADS,
     _fov_centre,
     _read_mats,
     _resolve,
@@ -161,7 +162,7 @@ def measure() -> dict[str, Any]:
             t0 = time.perf_counter()
             with warnings.catch_warnings():
                 warnings.simplefilter("ignore")
-                r = lx.mri.hmc(**kw, **extra, n_threads=0)
+                r = lx.mri.hmc(**kw, **extra, n_threads=LX_THREADS)
             mats[name] = r.matrices
             row[name] = {
                 **_compare(r.matrices, theirs, centre),

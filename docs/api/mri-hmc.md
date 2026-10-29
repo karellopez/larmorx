@@ -12,7 +12,10 @@ only), which gives mcflirt's output files byte for byte: 137 of the 137 recorded
 with the same messages and exit status where both fail (12 of them), fMRIPrep's own mcflirt
 calls on the 12 oracle runs with BOLD runs (22 of 22, the data panel's included; fMRIPrep's
 4,517 matrices are identical too) and 35 edge cases: 173 of 173 compared cases bit-identical,
-21 rejected alike
+21 rejected alike, against FSL 6.0.7.17 ([full tier](../validation/fsl-mcflirt-replica-full.md));
+since the version update of 2026-10-29 it follows FSL 6.0.7.23: 176 of 176 compared cases
+bit-identical, 22 rejected alike, 5 expected divergences in the last bits of 6.0.7.23's LAPACK
+inverses ([standard tier](../validation/fsl-mcflirt-replica.md))
 ([below](#the-bit-exact-replica-larmorx-nc)). `"auto"`, the default, runs the replica when
 `larmorx-nc` is installed.
 
@@ -141,7 +144,7 @@ stages run the volumes in parallel. The result does not depend on the thread cou
 ## The bit-exact replica (`larmorx-nc`)
 
 The replica is a translation of mcflirt's source (fsl-mcflirt 2111.0 and the libraries it
-uses, FSL 6.0.7.17) in the `larmorx-nc` package (`crates-nc/`), under the FSL Licence's terms:
+uses, FSL 6.0.7.23 since 2026-10-29; first FSL 6.0.7.17) in the `larmorx-nc` package (`crates-nc/`), under the FSL Licence's terms:
 **non-commercial use only**, FSL's original source included ([licensing](../licensing.md)).
 It is installed by name, so that its licence is accepted knowingly:
 

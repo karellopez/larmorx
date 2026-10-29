@@ -1,109 +1,180 @@
 #ifndef _ZNZLIB_H_
 #define _ZNZLIB_H_
 
-/*
-znzlib.h  (zipped or non-zipped library)
-
-*****            This code is released to the public domain.            *****
-
-*****  Author: Mark Jenkinson, FMRIB Centre, University of Oxford       *****
-*****  Date:   September 2004                                           *****
-
-*****  Neither the FMRIB Centre, the University of Oxford, nor any of   *****
-*****  its employees imply any warranty of usefulness of this software  *****
-*****  for any purpose, and do not assume any liability for damages,    *****
-*****  incidental or otherwise, caused by any use of this document.     *****
-
+/**
+ * znzlib.h  (zipped or non-zipped library)
+ *
+ * *****            This code is released to the public domain.            *****
+ *
+ * *****  Author: Mark Jenkinson, FMRIB Centre, University of Oxford       *****
+ * *****  Date:   September 2004                                           *****
+ *
+ * *****  Neither the FMRIB Centre, the University of Oxford, nor any of   *****
+ * *****  its employees imply any warranty of usefulness of this software  *****
+ * *****  for any purpose, and do not assume any liability for damages,    *****
+ * *****  incidental or otherwise, caused by any use of this document.     *****
+ *
+ * This library provides an interface to both compressed (gzip/zstd/bzip2) and
+ * uncompressed (normal) file IO. The znzFile class has functions which have an
+ * interface similar to the standard C-based file IO functions.
+ *
+ * Not all functionality may be available, depending on the open mode, and the
+ * compression format.
 */
 
-/*
-
-This library provides an interface to both compressed (gzip/zlib) and
-uncompressed (normal) file IO.  The functions are written to have the
-same interface as the standard file IO functions.  
-
-To use this library instead of normal file IO, the following changes
-are required:
- - replace all instances of FILE* with znzFile
- - change the name of all function calls, replacing the initial character
-   f with the znz  (e.g. fseek becomes znzseek)
- - add a third parameter to all calls to znzopen (previously fopen)
-   that specifies whether to use compression (1) or not (0)
- - use znz_isnull rather than any (pointer == NULL) comparisons in the code
- 
-NB: seeks for writable files with compression are quite restricted
-
-*/
+#include <memory>
+#include <string>
 
 
-/*=================*/
-#ifdef  __cplusplus
-extern "C" {
-#endif
-/*=================*/
+namespace znz {
 
-#include <stdio.h>
-#include <stdlib.h>
-#include <string.h>
-#include <stdarg.h>
+  /**
+   * The znzFile functions may throw a znzError whenever any error occurs.
+   */
+  class znzError : public std::exception {
+  private:
+    std::string message;
+  public:
+    znzError(const char*        msg) : message(msg) {}
+    znzError(const std::string& msg) : message(msg) {}
+    const char* what() const noexcept {
+      return message.c_str();
+    }
+  };
 
-#include "zlib.h"
+  /**
+   * Supported formats, passed to the znzFile constructor.
+   */
+  enum znzFormat {
+    ZNZ_RAW   = 0,
+    ZNZ_GZIP  = 1,
+    ZNZ_ZSTD  = 2,
+    ZNZ_BZIP2 = 3,
+    // ZNZ_ZIP = 4,
+
+    ZNZ_GUESS = 9999
+
+  };
+
+  /**
+   * Guess the compression type of a file. If the file exists, peek at its
+   * first few bytes to guess the format. If the file does not exist, guess
+   * from the file suffix.
+   */
+  znzFormat guessformat(std::string path);
 
 
-struct znzptr {
-  int withz;
-  FILE* nzfptr;
-  gzFile zfptr;
-} ;
+  /**
+   * Each supported format is implemented in a class which provides this
+   * interface. Not all formats support all operations - a znzError will
+   * be thrown at runtime if an unsupported function is called.
+   */
+  class znzPlugin {
 
-/* the type for all file pointers */
-typedef struct znzptr * znzFile;
+  public:
 
+    virtual ~znzPlugin() = default;
 
-/* int znz_isnull(znzFile f); */
-/* int znzclose(znzFile f); */
-#define znz_isnull(f) ((f) == NULL)
-#define znzclose(f)   Xznzclose(&(f))
+    // Open a file for reading or writing.
+    virtual void open(std::string path, std::string mode) = 0;
 
-/* Note extra argument (use_compression) where 
-   use_compression==0 is no compression
-   use_compression!=0 uses zlib (gzip) compression
-*/
+    // Close the file.
+    virtual void close() = 0;
 
-znzFile znzopen(const char *path, const char *mode, int use_compression);
+    // Read/uncompres bytes from file.
+    virtual size_t read(void* buf, size_t nbytes) = 0;
 
-znzFile znzdopen(int fd, const char *mode, int use_compression);
+    // Write/compress bytes to file.
+    virtual size_t write(const void* buf, size_t nbytes) = 0;
 
-int Xznzclose(znzFile * file);
+    // Seek to specified location in uncompressed stream.
+    virtual void seek(size_t pos, int whence) = 0;
 
-size_t znzread(void* buf, size_t size, size_t nmemb, znzFile file);
+    // Seek to start of uncompressed stream.
+    virtual void rewind() = 0;
 
-size_t znzwrite(const void* buf, size_t size, size_t nmemb, znzFile file);
+    // Return true if at end of uncompressed stream, false otherwise.
+    virtual bool eof() = 0;
+  };
 
-long znzseek(znzFile file, long offset, int whence);
+  /**
+   * The znzFile class can be used to read from or write to compressed files.
+   * By default the format is automatically inferred from the file contents or
+   * name (see the guessformat function), but it can also be specified via the
+   * format argument to the constructor.
+   */
+  class znzFile {
+  public:
 
-int znzrewind(znzFile stream);
+    znzFile() = default;
 
-long znztell(znzFile file);
+    // Create a znzFile.
+    znzFile(std::string path, std::string mode, znzFormat format=ZNZ_GUESS);
 
-int znzputs(const char *str, znzFile file);
+    // Copy constructor is not supported.
+    znzFile(znzFile& f) = delete;
 
-char * znzgets(char* str, int size, znzFile file);
+    // Copy assignment is not supported.
+    znzFile& operator=(znzFile& f) = delete;
 
-int znzputc(int c, znzFile file);
+    // Move constructor.
+    // Create a znzFile from another.
+    // The other znzFile will be closed.
+    znzFile(znzFile&& f);
 
-int znzeof(znzFile file);
+    // Move assignment.
+    // Initialise a znzFile from another.
+    // The other znzFile will be closed.
+    znzFile& operator=(znzFile&& f);
 
-int znzgetc(znzFile file);
+    // Close the znzFile.
+    ~znzFile();
 
-#if !defined(WIN32)
-int znzprintf(znzFile stream, const char *format, ...);
-#endif
+    // Return the file compression format.
+    znzFormat format() const;
 
-/*=================*/
-#ifdef  __cplusplus
-}
-#endif
-/*=================*/
+    // Re-initialise a znzFile to read from/write to the given path.
+    void open(std::string path, std::string mode, znzFormat format=ZNZ_GUESS);
+
+    // Close the znzFile.
+    void close();
+
+    // Read <nbytes> bytes from file.
+    // (only suported when reading).
+    size_t read(void* buf, size_t nbytes);
+
+    // Write <nbytes> bytes to file.
+    // (only suported when writing).
+    size_t write(const void* buf, size_t nbytes);
+
+    // Seek to the specified uncompressed location in the file
+    // Only suported when reading, and only SEEK_SET and SEEK_CUR
+    // are supported.
+    void seek(size_t pos, int whence);
+
+    // Seek to the beginning of the file.
+    // (only suported when writing).
+    void rewind();
+
+    // Return true if there is no more data to read
+    // (only suported when reading).
+    bool eof();
+
+  private:
+
+    // Create a plugin to read from/write to a file with the given format.
+    void _create_plugin(znzFormat format, std::string mode);
+
+    // Read/write mode.
+    std::string _mode;
+
+    // Compression format.
+    znzFormat _format;
+
+    // Plugin which does the work.
+    std::unique_ptr<znzPlugin> _plugin;
+  };
+
+} // namespace znz
 
 #endif

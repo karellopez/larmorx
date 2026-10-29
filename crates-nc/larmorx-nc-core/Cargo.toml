@@ -9,6 +9,8 @@ repository.workspace = true
 [dependencies]
 larmorx-core.workspace = true
 flate2.workspace = true
+ruzstd.workspace = true
+bzip2.workspace = true
 
 [dev-dependencies]
 tempfile.workspace = true

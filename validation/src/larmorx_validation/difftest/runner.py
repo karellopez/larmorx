@@ -83,6 +83,7 @@ def limit_threads(threads: int) -> None:
         ants_programs,
         ants_registration,
         ants_threaded,
+        mri_hmc,
     )
 
     ants_programs.THREADS = threads
@@ -90,6 +91,7 @@ def limit_threads(threads: int) -> None:
     ants_registration.LX_THREADS = threads
     ants_ai.LX_THREADS = threads
     ants_atropos.LX_THREADS = threads
+    mri_hmc.LX_THREADS = threads
     os.environ["ITK_GLOBAL_DEFAULT_NUMBER_OF_THREADS"] = str(threads)
     os.environ["OMP_NUM_THREADS"] = str(threads)
     os.environ["LARMORX_PARITY_BAND_THREADS"] = ""

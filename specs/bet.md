@@ -1,4 +1,11 @@
-# Spec: `lx.fsl.bet`, `lx.fsl.betsurf` (behaviour of FSL 6.0.7.17's `bet`, `bet2` and `betsurf`)
+# Spec: `lx.fsl.bet`, `lx.fsl.betsurf` (behaviour of FSL 6.0.7.23's `bet`, `bet2` and `betsurf`; first written for 6.0.7.17)
+
+**(FSL 6.0.7.23)** Since 2026-10-29 this spec describes FSL 6.0.7.23 (`~/fsl-6.0.7.23`:
+fsl-bet2 2111.9, fsl-newimage 2601.0, fsl-newnifti 5.0.0, fsl-znzlib 2511.3, fsl-utils 2412.6,
+fsl-avwutils 2209.6, fsl-meshclass 2111.0); lines marked "(FSL 6.0.7.23)" say where it differs
+from 6.0.7.17, for which it was first written. The `bet` script and `betsurf` are unchanged;
+`bet2` gained `--binaryMask` (§4.1, §4.7a) and no longer crashes on an empty median (§4.3); the
+image layer reads and writes zstd and bzip2 (§3.1) and renames names holding `.img` (§3.1).
 
 The input for a clean-room **original** of larmorx's brain extraction (to be written in the main
 package, Apache-2.0). FSL is distributed under the FSL Licence (non-commercial use only), so
@@ -87,7 +94,27 @@ All three take FSL's image names: a file name with or without its extension (§3
   "source ${FSLDIR}/etc/fslconf/fsl.csh"` and exits 1; an unknown value: `ERROR:: Unrecognised
   value (<value>) of environment variable FSLOUTPUTTYPE` and `Legal values are: NIFTI, NIFTI_PAIR,
   NIFTI_GZ, NIFTI_PAIR_GZ`, exit 1 **(observed)**. These are printed when the first output is
-  written, after the computation.
+  written, after the computation. **(FSL 6.0.7.23)** The accepted values are `NIFTI`, `NIFTI_PAIR`, `NIFTI2`, `NIFTI2_PAIR`, `NIFTI_GZ`, `NIFTI_PAIR_GZ`, `NIFTI2_GZ`, `NIFTI2_PAIR_GZ`, `NIFTI_ZST`, `NIFTI_PAIR_ZST`, `NIFTI2_ZST`, `NIFTI2_PAIR_ZST`, `NIFTI_BZ2`, `NIFTI_PAIR_BZ2`, `NIFTI2_BZ2`, `NIFTI2_PAIR_BZ2`
+  (`ANALYZE` and `ANALYZE_GZ` are not accepted, in either version: they get the unknown value's message **(observed)**), the
+  zstd ones written as `.nii.zst` (pairs `.hdr.zst`/`.img.zst`), the bzip2 ones as `.nii.bz2`
+  (`.hdr.bz2`/`.img.bz2`); the unknown value's second line is `Legal values are: NIFTI, NIFTI_PAIR, NIFTI2, NIFTI2_PAIR, NIFTI_GZ, NIFTI_PAIR_GZ, NIFTI2_GZ, NIFTI2_PAIR_GZ, NIFTI_ZST, NIFTI_PAIR_ZST, NIFTI2_ZST, NIFTI2_PAIR_ZST, NIFTI_BZ2, NIFTI_PAIR_BZ2, NIFTI2_BZ2, NIFTI2_PAIR_BZ2` **(observed)**.
+- **Formats and names (FSL 6.0.7.23).** A file is read by its content, whatever its name:
+  gzip (first bytes `1f 8b`), zstd (`28 b5 2f fd`), bzip2 (`42 5a 68`), otherwise uncompressed; a
+  file shorter than four bytes by its name's suffix (`.gz`, `.zst`, `.bz2`). A name without an
+  extension is completed by trying, in this order, `.nii.gz`, `.nii`, `.hdr`, `.hdr.gz`,
+  `.nii.zst`, `.hdr.zst`, `.nii.bz2`, `.hdr.bz2` (more than one match is an error, `Multiple
+  possible filenames detected for basename: <name>`); `.img`, `.img.gz`, `.img.zst`, `.img.bz2`
+  name the pair of the matching `.hdr` name. The data file of a pair is read in whatever format
+  its own bytes say. FSL 6.0.7.17 read gzip and uncompressed files only.
+- **Names holding `.img` (FSL 6.0.7.23, FSL-60).** FSL 6.0.7.23 opens every image under its name
+  with the last occurrence of `.img` anywhere in it (a directory, or the file's own stem such as
+  `sub.img2.nii.gz`) replaced by `.hdr`: it reads or writes another file, or fails with `Error:
+  cant open file <the renamed name>` **(observed:** `-out a.img.d/out` writes
+  `a.hdr.d/out.nii.gz` when that directory exists; `-in a.img.d/in.nii.gz` reads
+  `a.hdr.d/in.nii.gz`; a pair written into `x.hdr.y.img.d/` aborts on `x.hdr.y.hdr.d/o5.hdr`**)**.
+  larmorx opens the name given (default); `reproduce` renames as FSL 6.0.7.23 does, and both
+  name FSL-60. FSL 6.0.7.17 opened the name given.
+
   The Python API always writes NIfTI-1 (`FSLOUTPUTTYPE=NIFTI`) and reads the outputs back.
 
 ### 3.2 Reading
@@ -163,7 +190,7 @@ The usage (standard error), exactly:
 
 ```
 
-Part of FSL (ID: "")
+Part of FSL (ID: 2412.6-dirty)
 BET (Brain Extraction Tool) v2.1 - FMRIB Analysis Group, Oxford
 
 Usage: 
@@ -181,6 +208,7 @@ Optional arguments (You may optionally specify one or more of):
 	-c <x y z>	centre-of-gravity (voxels not mm) of initial mesh surface.
 	-t,--threshold	-apply thresholding to segmented brain image and mask
 	--ct	-treat input as CT image (default is MRI)
+	--binaryMask <image>	Generate mesh from existing mask
 	-e,--mesh	generates brain surface as mesh in vtk format
 	-v,--verbose	switch on diagnostic messages
 	-h,--help	displays this help, then exits
@@ -189,7 +217,10 @@ Optional arguments (You may optionally specify one or more of):
 ```
 
 (two hidden options, `--parameter_d1=<d1>` (default 7) and `--parameter_d2=<d2>` (default 3), are
-the search depths of §4.4; they are not listed). **(observed)**
+the search depths of §4.4; they are not listed). **(observed)** **(FSL 6.0.7.23)** The first line
+after the empty one is `Part of FSL (ID: 2412.6-dirty)` (FSL 6.0.7.17: `Part of FSL (ID: "")`),
+in every program's usage, and `--binaryMask <image>` (`--binaryMask=<image>` on the command line,
+as every long option) is new **(observed)**.
 
 Defaults: `-f 0.5`, `-g 0`, `-r` 0 (estimated), `-w 1`, `-c` unset (the centre of gravity), no
 outputs but the brain.
@@ -226,9 +257,11 @@ The verbose line (§4.9) prints these values.
   centre is `(x dx, y dy, z dz)` in the radiological frame (§3.2).
 - **The median within-brain intensity** `tm`: of the voxels with `t2 < v < t98` whose point is
   within the radius `r` of the centre (squared distance `< r²`), in storage order, `tm` is the
-  largest of the `floor(N_m / 2)` smallest values (the lower median); with no such voxel FSL reads
-  an empty list and crashes (FSL-41): larmorx refuses, and in `reproduce` takes `tm = 0` and goes
-  on, with a warning.
+  largest of the `floor(N_m / 2)` smallest values (the lower median). **(FSL 6.0.7.23)** With no
+  such voxel (a constant or binary image) `tm = t98` (FSL 6.0.7.17 read an empty list and
+  crashed, FSL-41; fixed upstream: larmorx gives `t98` in both modes and names nothing). A
+  constant image then still crashes FSL, in the mask's fill from the surface's centre, which is
+  not a number (FSL-43, §4.6) **(observed)**.
 - **The fractional threshold** is used as `b_t = f^0.275`.
 
 ### 4.4 The initial surface and its deformation
@@ -300,7 +333,17 @@ centroid of the vertices (`trunc` of the centroid in voxels); the mask is `1 - t
 outside the image (a single slice: the surface's centroid falls below it) makes FSL write and
 read outside the volume (FSL-43): the default starts the fill at the nearest voxel inside the
 image, which on a single slice gives FSL's mask **(observed)**; a centroid that is not a number
-(the surface diverged) is an error.
+(the surface diverged) is an error. How FSL fills from a start outside, for `reproduce`
+**(observed, random testing 2026-10-29)**: the fill is a stack of points, from the start; the
+point taken from the end of the stack is set to 0, then each of its six neighbours, in the order
+x − 1, y − 1, z − 1, x + 1, y + 1, z + 1, is pushed when its coordinate along that axis stays
+within the image (x − 1 ≥ 0, x + 1 < nx, and so on: each axis on its own) and the value at its
+place is 1. A point's place is its linear index `(z·ny + y)·nx + x`, so a point outside the image
+can be another voxel of it (the start four rows before a 3 × 6 × 4 image reaches every voxel
+through its neighbour one slice up), or memory beyond the volume: FSL writes there and reads what
+lies there (its outputs then depend on that memory, it may crash). `reproduce` does this point by
+point: inside the volume exactly, beyond it no write, a place the fill wrote read as 0 and any
+other read as not 1, and warns with the number of those reads.
 
 ### 4.7 Outputs
 
@@ -321,6 +364,21 @@ image, which on a single slice gives FSL's mask **(observed)**; a centroid that 
   maximum `d_max` (when above `t`), the point before it where `d/30 - I(d)/(t98 - t2)` is largest
   (from -3 mm), and from there the position of the steepest rise towards `d_max`: the skull voxel
   (`trunc` of the point).
+
+### 4.7a `--binaryMask <image>` (FSL 6.0.7.23)
+
+The surface is found on the image the option names instead of the input: that image is read
+first (as named: none of bet2's own name handling), converted by `--ct` if given, and §4.2 to §4.5
+run on it (its robust range, centre, radius and median; with a binary mask the median is `t98`,
+§4.3; `-v` prints those values). The brain mask of §4.6 is made from the surface on that image's
+grid. Then the input is read and the outputs of §4.7 are made from it: `t2`, `t98` and `t` are
+recomputed from the input (§4.2's robust range and `t = t2 + 0.1·(t98 − t2)`), and `-t`, `-s` and
+`-o` use the input's values, the mask's surface and the mask's brain mask. An image that cannot
+be read (the mask first, then the input) ends as §3.1 says, the input's after the whole surface
+search. **(FSL-61)** A mask whose dimensions differ from the input's makes FSL apply the brain
+mask over the input's dimensions, reading and writing outside it: larmorx refuses in both modes,
+naming FSL-61. **(FSL-62)** With `--ct`, FSL converts the mask and writes the mask (masked) as the
+brain image: larmorx writes the CT input masked, and `reproduce` FSL's result; both name FSL-62.
 
 ### 4.8 CT images (`--ct`)
 
@@ -358,10 +416,17 @@ and `-c <x> <y> <z>` too (a missing value prints the usage); `-R`, `-S`, `-Z`, `
 standard output: `IN=<input>`, `OUT=<output>`, `bet2opts=<the options passed, each preceded by a
 blank>`, `verbose=1`, `debug=<0|1>`, `variation=<0..7>`.
 
+Under `-R` the options passed to bet2 are first printed by bash's `echo` and every `-n` removed
+from that text (bet2 never gets `-n` there). bash's `echo` takes the leading words made only of
+`-n`, `-e` and `-E` as its own options: a leading `-e` (the mesh) is lost, so `bet <in> <out> -R
+-e` writes no mesh, and after a leading `-e` backslashes in the remaining options are read as
+`echo -e` escapes (FSL-63, **(observed, random testing 2026-10-29)**): the default passes the
+options as given, `reproduce` as FSL does, and warns where they differ.
+
 When a program the script runs fails, the script prints `<the script's path> failed during
 command:<the script's arguments, as words joined by blanks>` on standard output and exits 1 (bash's
 `ERR` trap; the replica prints `bet` for its own path). That includes bet2 crashing on an input
-it leaves undefined (a constant image, FSL-41): bash reports the signal on standard error, the
+it leaves undefined (a constant image: FSL-41 in FSL 6.0.7.17, FSL-43 in 6.0.7.23): bash reports the signal on standard error, the
 script then prints its failure and exits 1; in `reproduce` the replica's bet gives that outcome
 (its bet2 alone would fill the undefined part instead), and its default refuses with the reason. The script expands names unquoted
 (FSL-44). It ends by removing every file whose name starts with `<output>_tmp` unless `-d`
@@ -640,7 +705,8 @@ the phases above.
 | bet2 | `-f`, `-g` out of range | empty line, the message | 1 |
 | bet2 | input not found | `Image Exception` lines; FSL aborts (134); larmorx exits 1 | 1 |
 | bet2 | an output with `.img` and no `.hdr` | FSL aborts (std::out_of_range); larmorx exits 1 | 1 |
-| bet2 | a constant image (no voxel for `tm`) | FSL crashes; larmorx refuses (FSL-41); `reproduce` goes on with `tm = 0` | 1 (`reproduce`: 0) |
+| bet2 | a constant image (no voxel for `tm`) | **(FSL 6.0.7.23)** `tm = t98`, then FSL crashes in the fill (FSL-43); larmorx refuses; `reproduce` does not fill and writes its outputs | 1 (`reproduce`: 0) |
+| bet2 | `--binaryMask` on another grid | **(FSL 6.0.7.23)** FSL reads and writes outside the mask (FSL-61); larmorx refuses | 1 |
 | bet | no output name | usage (stdout) | 1 |
 | bet | input not an image | empty line, `Error: input image <in> not valid`, empty line | 1 |
 | bet | a failing step | `<path> failed during command:<args>` (stdout) | 1 |
@@ -670,10 +736,11 @@ For an original that wants to stay as close as possible to FSL (not required):
 | ID | Behaviour of FSL | Default (`fix`) | `reproduce` |
 |---|---|---|---|
 | FSL-40 | bet2 removes the first `.hdr` of each name wherever it stands (a directory `x.hdr` is read as `x`); a name with `.img` but no `.hdr` aborts | removes a trailing extension only | FSL's names (and the refusal where FSL aborts) |
-| FSL-41 | no voxel for the median intensity: FSL reads an empty list and crashes | refuses | `tm = 0`, goes on, warns |
+| FSL-41 | no voxel for the median intensity: FSL 6.0.7.17 read an empty list and crashed | **(FSL 6.0.7.23)** fixed upstream: `tm = t98` | the same |
 | FSL-42 | NaN `-f`/`-g`, a negative, NaN or infinite `-r`, `-w ≤ 0`, a non-finite `-c` or search depth are used as given | refuses, naming the value | uses them |
-| FSL-43 | the mask's fill starts outside the image (a single slice): FSL writes and reads outside the volume; further outside, or at a centroid that is not a number, it writes far outside the volume and crashes | starts at the nearest voxel inside (a centroid that is not a number: refuses) | one voxel outside: only FSL's defined steps (the start's neighbours inside the image); further: no fill (the drawn surface only); warns |
+| FSL-43 | the mask's fill starts outside the image (a single slice): FSL writes and reads outside the volume, reaching points by their linear index (other voxels of the volume, or memory beyond it); at a centroid that is not a number it writes far outside the volume and crashes | starts at the nearest voxel inside (a centroid that is not a number: refuses) | FSL's fill point by point by the linear index (§4.6): inside the volume exactly, memory beyond it read as not 1 and not written; a centroid that is not a number: no fill (the drawn surface only); warns |
 | FSL-44 | bet expands its arguments unquoted: a name with a blank becomes several words; an empty argument ends the options | quotes them | FSL's word splitting |
+| FSL-63 | `bet -R` passes bet2's options through bash's `echo`, which takes leading `-n`, `-e`, `-E` words as its own: a leading `-e` (the mesh) is dropped, escapes read after it | the options as given | FSL's `echo` |
 | FSL-45 | `-Z` crops with `imglob`, called without `${FSLDIR}/bin`: off the PATH the outputs stay padded; on it, other images named like the output are cropped too | crops exactly its outputs | FSL's behaviour for the PATH given |
 | FSL-46 | the cleanup removes every `<out>_tmp*` file, also files the run did not create | removes only its own | removes all |
 | FSL-47 | `--t1only`'s scalp mask is filled from the outer skull surface's centre in the working grid | fills from the scalp surface's | FSL's |
@@ -687,6 +754,9 @@ For an original that wants to stay as close as possible to FSL (not required):
 | FSL-55 | a NaN in the T1 inside the brain surface: the 98th percentile is undefined | refuses | libstdc++'s selection, warns |
 | FSL-56 | two or more extensions of different sizes: the data offset counts the first one's size once per extension | the correct offset | FSL's offset |
 | FSL-57 | betsurf sets the smoothness weight to 0 after it was used (no effect) | kept (rule C) | kept |
+| FSL-60 | **(FSL 6.0.7.23)** an image name holding `.img` before its extension is opened with its last `.img` made `.hdr` (§3.1) | opens the name given | FSL's renamed name |
+| FSL-61 | **(FSL 6.0.7.23)** `--binaryMask` on another grid: the brain mask applied over the input's dimensions | refuses | refuses (FSL reads and writes outside memory) |
+| FSL-62 | **(FSL 6.0.7.23)** `--ct --binaryMask` converts the mask and writes it as the brain | the CT input masked | FSL's |
 
 Each correction that changed a result is named on standard error
 (`larmorx: upstream defect <ID> (<tool>) corrected: ...`) and in Python as an

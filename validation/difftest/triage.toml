@@ -713,3 +713,69 @@ signature = ["uni.nii: header bytes", "uni.nii.gz: header bytes"]
 status = "open"
 explanation = "AFNI 26.3.05 fixed AFNI-03: -EPI's output keeps a code-2 series' slice timing; the clean-room original's `reproduce` writes 25.2.09's (21 findings against 26.3.05); its alignment is the clean-room agent's (specs/3dUnifize.md)"
 link = "validation/difftest/cases/afni-unifize/epi-slice-code-2-fix-notice.json"
+
+# ---------------------------------------------------------------- the version update (FSL, 2026-10-29)
+
+[[difference]]
+tool = "fsl-bet"
+implementation = "replica"
+signature = ["out.nii.gz", "out_mask.nii.gz"]
+status = "register"
+explanation = "FSL 6.0.7.23 does not crash on FSL-43's writes far outside the volume where 6.0.7.17 did (SIGSEGV), and writes a mask that depends on memory; the replica's reproduce fills deterministically, as for 6.0.7.17's crash (FSL-43's undefined part; the trial's case 80 agrees against 6.0.7.17)"
+link = "validation/difftest/cases/fsl-bet/bet2-fill-memory-beyond.json"
+
+[[difference]]
+tool = "fsl-bet"
+implementation = "replica"
+signature = ["outputs written"]
+status = "harness"
+explanation = "bet2 -n alone where FSL crashes in FSL-43's NaN fill (a constant image): the replica's filled run wrote nothing, which -n alone asks; the suite required an output (trial case 51; the check now asks for outputs only where the call does: asks_outputs)"
+link = "validation/difftest/cases/fsl-bet/bet2-n-crash-nothing-asked.json"
+
+[[difference]]
+tool = "fsl-bet"
+implementation = "replica"
+signature = ["files written"]
+status = "register"
+explanation = "bet -R -e: the script passes bet2's options through bash's echo, which takes the leading -e as its own option, so FSL writes no mesh (FSL-63, new, rule A; FSL 6.0.7.17 and 6.0.7.23 alike; trial case 141). Its shrunk form, a 1 x 1 x 2 image stored neurologically, also meets FSL 6.0.7.23's fslstats -C printing -0.000000 (dc: stack empty), Armadillo 14.2.1's inverse: open for the Armadillo part"
+link = "validation/difftest/cases/fsl-bet/bet-robust-mesh-echo.json"
+
+[[difference]]
+tool = "fsl-bet"
+implementation = "replica"
+signature = ["out.nii.gz", "out_mask.nii.gz"]
+status = "fixed"
+explanation = "FSL-43's fill from a start outside the image: FSL reaches each point by its linear index (other voxels of the volume), so it fills where the replica's reproduce had skipped the fill as for a crash (trial case 661, 72 of 72 values), and inside bet the replica's reproduce had corrected it (case 1297); reproduce now does FSL's fill point by point (fill_by_index), FSL's bytes in both versions"
+link = "validation/difftest/cases/fsl-bet/bet2-fill-by-index.json"
+
+[[difference]]
+tool = "fsl-bet"
+implementation = "replica"
+signature = ["out.nii.gz", "out_mask.nii.gz", "out_overlay.nii.gz"]
+status = "fixed"
+explanation = "inside the bet script, reproduce corrected FSL-43's fill from outside the image instead of reproducing it (the fix flag passed to keep the script's failure for crashes; trial case 1297, 2,160 of 8,316 values): the same fill by the linear index now"
+link = "validation/difftest/cases/fsl-bet/bet-fill-by-index.json"
+
+[[difference]]
+tool = "fsl-bet"
+implementation = "replica"
+signature = ["messages before FSL's crash"]
+status = "harness"
+explanation = "bet -R where FSL's second bet2 crashes (FSL-43's fill far above the image): the script's ERR trap prints 'bet failed during command:...' after the crash, which the suite had counted among what FSL printed before it (trial case 1308; _BET_FAILED); reproduce goes on, judged as a filled run"
+link = "validation/difftest/cases/fsl-bet/bet-robust-crash-filled.json"
+
+[[difference]]
+tool = "fsl-bet"
+implementation = "replica"
+signature = ["out.nii.gz", "out_mask.nii.gz"]
+status = "register"
+explanation = "FSL-43's fill reads memory beyond the volume (bet2 -c 22 19 8 on a 3 x 4 x 8 ramp, trial case 80 shrunk: FSL 6.0.7.17 crashes, 6.0.7.23 writes 96 values that depend on that memory): undefined, judged so by the suite (reads_memory); the replica's reproduce reads it as not part of the mask and names the reads. Case 80 as drawn (a 30 x 32 x 16 image of 1.2 x 0.8 x 1.2 mm stored neurologically, -c): 18 voxels differ between FSL 6.0.7.17 and 6.0.7.23 from -c's centre through Armadillo 14.2.1's inverse (bet2_versions.sh): open for the Armadillo part"
+link = "validation/difftest/cases/fsl-bet/bet2-fill-memory-beyond.json"
+
+[[difference]]
+tool = "mri-hmc"
+implementation = "original"
+signature = ["out_mcf.nii.gz: voxel values"]
+status = "open"
+explanation = "FSL-59: mcflirt 6.0.7.23 resamples -sinc_final and -nn_final trilinearly; the clean-room original follows the option (about 260 findings of the version trial against 6.0.7.23); its alignment is the clean-room agent's (specs/mcflirt.md §9.3, marked FSL 6.0.7.23); its default stays on 6.0.7.17 until then"
+link = "validation/investigations/version-fsl/mri-hmc-6.0.7.23.md"

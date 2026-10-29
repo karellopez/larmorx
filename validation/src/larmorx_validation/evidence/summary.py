@@ -150,13 +150,20 @@ PAGES = [
         "/tools/fsl-bet/",
         "BET",
         "fsl",
-        [("larmorx-nc replica", "fsl-bet-replica-full", "validated", None, None)],
+        [
+            ("larmorx-nc replica", "fsl-bet-replica-full", "validated", None, None),
+            ("larmorx-nc replica, FSL 6.0.7.23", "fsl-bet-replica", "validated", None, None),
+        ],
     ),
     (
         "/tools/mri-hmc/",
         "Head-motion correction",
         "fsl",
-        [("clean-room original", "mri-hmc", "experimental", None, None)],
+        [
+            ("clean-room original", "mri-hmc", "experimental", None, None),
+            ("larmorx-nc replica", "fsl-mcflirt-replica-full", "validated", None, None),
+            ("larmorx-nc replica, FSL 6.0.7.23", "fsl-mcflirt-replica", "validated", None, None),
+        ],
     ),
     (
         "/tools/resample-series/",

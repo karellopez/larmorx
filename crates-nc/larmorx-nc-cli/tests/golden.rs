@@ -78,6 +78,17 @@ macro_rules! args {
 }
 
 const CASES: &[Case] = &[
+    // FSL 6.0.7.23: -nn_final resampled trilinearly, as FSL does (FSL-59 reproduced), written
+    // as zstd (FSLOUTPUTTYPE=NIFTI_ZST, new in FSL 6.0.7.23)
+    Case {
+        id: "mcflirt.nn_final.zst.reproduce",
+        tool: "fsl mcflirt",
+        input: Input::Float32,
+        args: args!["-nn_final", "-mats", "-plots"],
+        mode: "reproduce",
+        named: &["FSL-59"],
+        output_type: "NIFTI_ZST",
+    },
     Case {
         id: "mcflirt.default.int16",
         tool: "fsl mcflirt",
@@ -111,7 +122,7 @@ const CASES: &[Case] = &[
             "-rmsabs"
         ],
         mode: "fix",
-        named: &["FSL-01"],
+        named: &["FSL-01", "FSL-59"],
         output_type: "NIFTI",
     },
     Case {
@@ -139,7 +150,7 @@ const CASES: &[Case] = &[
             "-plots"
         ],
         mode: "fix",
-        named: &["FSL-01"],
+        named: &["FSL-01", "FSL-59"],
         output_type: "NIFTI",
     },
     Case {
@@ -338,6 +349,24 @@ struct BetCase {
 /// `-Z`), betsurf with and without the T2, and the paths of FSL's defects (D13), corrected (the
 /// default) and, in the `*.reproduce` cases, reproduced.
 const BET_CASES: &[BetCase] = &[
+    // FSL 6.0.7.23's bet2 --binaryMask: the surface from a mask, the outputs from the input;
+    // written as bzip2 (FSLOUTPUTTYPE=NIFTI_BZ2, new in FSL 6.0.7.23)
+    BetCase {
+        id: "bet2.binary-mask.bz2",
+        tool: "fsl bet2",
+        args: &["{t1}", "out", "--binaryMask={mask}", "-m", "-o", "-s", "-t"],
+        mode: "fix",
+        named: &[],
+        output_type: "NIFTI_BZ2",
+    },
+    BetCase {
+        id: "bet.zst",
+        tool: "fsl bet",
+        args: &["{t1}", "out", "-m"],
+        mode: "fix",
+        named: &[],
+        output_type: "NIFTI_ZST",
+    },
     BetCase {
         id: "bet2.outputs",
         tool: "fsl bet2",
@@ -794,6 +823,9 @@ fn write_bet_inputs(dir: &Path) -> BTreeMap<&'static str, PathBuf> {
         paths.insert(name, p);
     };
     put("t1", bet_nifti(&[nx, ny, nz], 4, 16, &i16_bytes(&t1)));
+    // a brain mask (FSL 6.0.7.23's --binaryMask): the head's brain level, 1 and 0
+    let mask: Vec<i64> = t1.iter().map(|&v| i64::from(v >= 600)).collect();
+    put("mask", bet_nifti(&[nx, ny, nz], 16, 32, &f32_bytes(&mask)));
     put("t2", bet_nifti(&[nx, ny, nz], 16, 32, &f32_bytes(&t2)));
     let mut series = Vec::new();
     for t in 0..4u64 {
@@ -855,6 +887,21 @@ fn nifti_fingerprints(path: &Path) -> Vec<(String, Fingerprint)> {
         // a .nii.gz: its decompressed content (the compressed bytes are zlib's, not ours)
         let mut out = Vec::new();
         flate2::read::MultiGzDecoder::new(&raw[..])
+            .read_to_end(&mut out)
+            .unwrap();
+        raw = out;
+    } else if raw.starts_with(&[0x28, 0xb5, 0x2f, 0xfd]) {
+        // a .nii.zst (FSL 6.0.7.23): its decompressed content
+        let mut out = Vec::new();
+        ruzstd::decoding::StreamingDecoder::new(&raw[..])
+            .unwrap()
+            .read_to_end(&mut out)
+            .unwrap();
+        raw = out;
+    } else if raw.starts_with(b"BZh") {
+        // a .nii.bz2 (FSL 6.0.7.23): its decompressed content
+        let mut out = Vec::new();
+        bzip2::read::BzDecoder::new(&raw[..])
             .read_to_end(&mut out)
             .unwrap();
         raw = out;
@@ -921,7 +968,11 @@ fn case_fingerprints(dir: &Path) -> Vec<(String, Fingerprint)> {
             .unwrap()
             .to_string_lossy()
             .replace('\\', "/");
-        if name.ends_with(".nii") || name.ends_with(".nii.gz") {
+        if name.ends_with(".nii")
+            || name.ends_with(".nii.gz")
+            || name.ends_with(".nii.zst")
+            || name.ends_with(".nii.bz2")
+        {
             for (part, fp) in nifti_fingerprints(&p) {
                 out.push((format!("{name}.{part}"), fp));
             }
@@ -1192,6 +1243,7 @@ fn golden() {
             .iter()
             .map(|a| match *a {
                 "{mesh}" => mesh.display().to_string(),
+                "--binaryMask={mask}" => format!("--binaryMask={}", bet_inputs["mask"].display()),
                 a if a.starts_with('{') => bet_inputs[a.trim_matches(|c| c == '{' || c == '}')]
                     .display()
                     .to_string(),

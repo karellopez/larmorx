@@ -1,0 +1,174 @@
+{
+ "defect": "FSL-63",
+ "description": "bet -R -e: the script passes bet2's options through bash's echo, which takes the leading -e as its own option, so FSL writes no mesh (FSL-63); the default writes it, reproduce drops -e as FSL does (found by the FSL version trial, 2026-10-29)",
+ "expect": "pass",
+ "found": {
+  "detail": "files written: FSL ['out.nii.gz'], larmorx ['out.nii.gz', 'out_mesh.vtk']",
+  "n": 141,
+  "seed": "20261029",
+  "shrink_moves": [],
+  "signature": [
+   "files written"
+  ]
+ },
+ "id": "bet-robust-mesh-echo",
+ "implementations": [
+  "replica"
+ ],
+ "reason": "",
+ "recipe": {
+  "extra": {
+   "output_type": "NIFTI_GZ",
+   "tool": "bet"
+  },
+  "features": {
+   "-c": false,
+   "-d": false,
+   "-e": true,
+   "-f": false,
+   "-g": false,
+   "-m": false,
+   "-n": false,
+   "-o": false,
+   "-r": false,
+   "-s": false,
+   "-t": false,
+   "-v": false,
+   "-w": false,
+   "FSLOUTPUTTYPE": "NIFTI_GZ",
+   "axis0": 0.9,
+   "axis1": 0.8,
+   "axis2": 1.1,
+   "bias0": -0.005,
+   "bias1": 0.005,
+   "bias2": 0.0025,
+   "bias3": 0.005,
+   "centre0": -3.5,
+   "centre1": -4.0,
+   "centre2": 5.5,
+   "content": "head",
+   "dtype": "float64",
+   "extreme": false,
+   "noise": 6.0,
+   "orientation": "plumb",
+   "origin0": 9.5,
+   "origin1": -52.5,
+   "origin2": -26.25,
+   "qfac": 1,
+   "qform_code": 0,
+   "range": "plain",
+   "sform": "same",
+   "sform_code": 1,
+   "shape": "11x8x32",
+   "size": 12.0,
+   "spacing0": 2.5,
+   "spacing1": 1.0,
+   "spacing2": 4.0,
+   "suffix": ".nii",
+   "tissues": "t1",
+   "tool": "bet",
+   "units": "unknown",
+   "variation": "-R"
+  },
+  "groups": [
+   {
+    "args": [
+     "{in:input}",
+     "out"
+    ],
+    "name": "input",
+    "optional": false
+   },
+   {
+    "args": [
+     "-R"
+    ],
+    "name": "variation",
+    "optional": false
+   },
+   {
+    "args": [
+     "-e"
+    ],
+    "name": "-e",
+    "optional": true
+   }
+  ],
+  "inputs": {
+   "input": {
+    "content": {
+     "axes": [
+      0.9,
+      0.8,
+      1.1
+     ],
+     "bias": [
+      -0.005,
+      0.005,
+      0.0025,
+      0.005
+     ],
+     "centre": [
+      -3.5,
+      -4.0,
+      5.5
+     ],
+     "noise": 6.0,
+     "seed": 9309364,
+     "size": 12.0,
+     "tissues": "t1",
+     "type": "head"
+    },
+    "dtype": "float64",
+    "geometry": {
+     "origin": [
+      9.5,
+      -52.5,
+      -26.25
+     ],
+     "qfac": 1,
+     "qform_code": 0,
+     "quaternion": [
+      1,
+      0,
+      0,
+      0
+     ],
+     "sform": "same",
+     "sform_code": 1,
+     "spacing": [
+      2.5,
+      1.0,
+      4.0
+     ],
+     "units": "unknown"
+    },
+    "scaling": null,
+    "shape": [
+     11,
+     8,
+     32
+    ],
+    "suffix": ".nii",
+    "values": {
+     "offset": 0.0,
+     "scale": 1.0
+    }
+   }
+  },
+  "n": 141,
+  "options": [
+   "-R",
+   "-e",
+   "FSLOUTPUTTYPE=NIFTI_GZ",
+   "bet"
+  ],
+  "seed": "20261029",
+  "tool": "fsl-bet"
+ },
+ "rule": "A",
+ "status": "register",
+ "suite": "fsl-bet-replica",
+ "tier": "smoke",
+ "tool": "fsl-bet"
+}

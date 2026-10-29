@@ -1,10 +1,14 @@
 # Provenance: larmorx-nc-core
 
 **Replica: translated from FSL's source.** This crate is a step-by-step Rust translation of the
-FSL libraries FSL's tools share, from FSL 6.0.7.17 (the conda packages fsl-newimage 2203.12,
-fsl-miscmaths 2203.2, fsl-newnifti 4.1.0, fsl-znzlib 2111.0, fsl-meshclass 2111.0, fsl-utils
-2203.5, fsl-avwutils 2209.3, fsl-armawrap 0.6.0), with the parts of the C and C++ libraries FSL's
-Linux binaries rely on, written to give FSL's results bit for bit. It is distributed under the
+FSL libraries FSL's tools share, from FSL 6.0.7.23 since 2026-10-29 (the conda packages
+fsl-newimage 2601.0, fsl-miscmaths 2412.6, fsl-newnifti 5.0.0, fsl-znzlib 2511.3, fsl-meshclass
+2111.0, fsl-utils 2412.6, fsl-avwutils 2209.6; first translated from FSL 6.0.7.17's 2203.12,
+2203.2, 4.1.0, 2111.0, 2111.0, 2203.5, 2209.3), with Armadillo's matrix rules as fsl-armawrap
+0.6.0 (Armadillo 10.5.1) evaluates them (FSL 6.0.7.23's 0.7.0 bundles Armadillo 14.2.1, whose
+LAPACK path for 4 × 4 inverses and solves is not followed yet: `docs/findings/fsl-mcflirt.md`,
+"FSL 6.0.7.23") and the parts of the C and C++ libraries FSL's Linux binaries rely on, written to
+give FSL's results bit for bit. It is distributed under the
 FSL Licence (`../LICENSE`), as part of the `larmorx-nc` package (`docs/licensing.md`). The FSL
 files it was translated from are in `../fsl-source/`, unchanged (`MANIFEST.tsv`). No Apache-2.0
 crate uses it, and it uses no GPL crate.
@@ -39,7 +43,7 @@ the joined version.
   fsl-avwutils): Copyright (C) 1999-2023 University of Oxford, the FSL Licence. `nifti1.h`,
   `znzlib.{h,c}` and the code `legacyFunctions.cc` takes from `nifti1_io.c` were released to the
   public domain by their authors.
-- **fslpy 3.21.1** (`avwutils.rs`: the file-name rules of `imtest`, `remove_ext`, `imglob`, which
+- **fslpy 3.27.0** (`avwutils.rs`: the file-name rules of `imtest`, `remove_ext`, `imglob`, which
   FSL's scripts run): Apache-2.0, Copyright 2016-2024 University of Oxford (Paul McCarthy).
 - **Armadillo 10.5.1** as bundled by **fsl-armawrap 0.6.0** (`arma.rs`): Apache-2.0
   (`../LICENSES/Apache-2.0.txt`; notices in `../NOTICE`).
@@ -83,7 +87,7 @@ Every source file starts with an SPDX header naming its licence and the files it
 
 | Rust module | Upstream file | Functions, classes |
 |---|---|---|
-| `nifti` | fsl-newnifti `NewNifti.{h,cc}`, `legacyFunctions.{h,cc}`, `nifti1.h`, `nifti2.h`; fsl-znzlib `znzlib.c` | `NiftiHeader` (fields, `initialise`, `sformCode`/`qformCode`, `setNiftiVersion`, `niftiVersion`, `isAnalyze`, `singleFile`, `bpvOfDatatype`, `nominalVoxOffset`, origin), `NiftiExtension`, `LegacyFields`, `NiftiIO::loadImage`/`loadHeader`/`saveImage` (NIfTI-1, NIfTI-2 and ANALYZE 7.5, byte swapping, `.hdr`/`.img` pairs, extensions, gzip with zlib's header), `nifti_quatern_to_mat44`, `nifti_mat44_to_quatern`, `nifti_mat33_determ`, `nifti_mat33_inverse`, `nifti_mat44_inverse`, `nifti_mat33_polar`, `nifti_mat33_rownorm`/`colnorm`, the `znzread`/`znzwrite` semantics; FSL's messages |
+| `nifti` | fsl-newnifti 5.0.0 `NewNifti.{h,cc}` (`replaceSuffix`, FSL-60), `legacyFunctions.{h,cc}`, `nifti1.h`, `nifti2.h`; fsl-znzlib 2511.3 `znzlib.{h,cpp}` (`guessformat`), `raw_plugin`, `gzip_plugin`, `zstd_reader`, `zstd_writer`, `bzip2_plugin` (zstd through the pure-Rust `ruzstd`, bzip2 through `bzip2` with the pure-Rust `libbz2-rs-sys`; FSL links libzstd and libbz2) | `NiftiHeader` (fields, `initialise`, `sformCode`/`qformCode`, `setNiftiVersion`, `niftiVersion`, `isAnalyze`, `singleFile`, `bpvOfDatatype`, `nominalVoxOffset`, origin), `NiftiExtension`, `LegacyFields`, `NiftiIO::loadImage`/`loadHeader`/`saveImage` (NIfTI-1, NIfTI-2 and ANALYZE 7.5, byte swapping, `.hdr`/`.img` pairs, extensions, gzip with zlib's header), `nifti_quatern_to_mat44`, `nifti_mat44_to_quatern`, `nifti_mat33_determ`, `nifti_mat33_inverse`, `nifti_mat44_inverse`, `nifti_mat33_polar`, `nifti_mat33_rownorm`/`colnorm`, the `znzread`/`znzwrite` semantics; FSL's messages |
 | `volume` | fsl-newimage `newimage.{h,cc}`, `newimageio.h`, `generalio.cc` | `volume<T>`/`volume4D<T>` (sizes, voxel sizes, sform/qform, interpolation, extrapolation, pad value, `operator()` with `extrapolate`, `copyproperties`, `copyconvert`, `operator[]`, `setDisplayMaximumMinimum`), `calc_cog`/`cog("scaled_mm")`, `backgroundval` (`calc_bval`), `robustmin`/`robustmax` (`find_thresholds`, `imageHistogram`), `left_right_order`, `swapmat`, `swapdimensions`, `makeradiological`/`makeneurological`, `niftivox2newimagevox_mat`, `periodicclamp`, `mirrorclamp`, `read_volume`, `read_volume4D` (`read_general`, `ConvertAndScaleNewNiftiBuffer`, `convertbuffer` into each element type, `set_volume_properties`), `dtype`, `save_volume`, `save_volume_dtype` (`set_fsl_hdr`, `convertbuffer`), `make_basename`, `return_validimagefilename`, `find_pathname`, `FSLOUTPUTTYPE`; `imthrow` and FSL's exception texts; fsl-miscmaths `round(double)` |
 | `interp` | fsl-newimage `newimage.cc`; fsl-miscmaths `miscmaths.cc`, `splinterpolator.h` | `interpolate`, `interpolatevalue` (nearest neighbour, trilinear `q_tri`, sinc, spline), `kernelinterpolation`, `getneighbours`, `round`, `Splinterpolator<float>` (order 3: `calc_coef`, `deconv_along`, `get_wgt`, `value_at`, the boundary conditions) |
 | `kernel` | fsl-miscmaths `kernel.{h,cc}` | `sincfn`, `hanning`, `blackman`, `rectangular`, `sinckernel1D`, `kernelval`, `kernelstorage`; `definesincinterpolation` (newimage) |

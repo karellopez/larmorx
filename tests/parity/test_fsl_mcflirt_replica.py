@@ -1,6 +1,6 @@
 # SPDX-License-Identifier: Apache-2.0
 """The FSL replica of mcflirt (``larmorx-nc``, run as a separate process) against mcflirt
-itself: the recorded oracle runs and runs of FSL 6.0.7.17's binary (see validation/)."""
+itself: the recorded oracle runs and runs of FSL 6.0.7.23's binary (see validation/)."""
 
 import os
 

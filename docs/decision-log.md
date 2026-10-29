@@ -1657,6 +1657,25 @@ together at the end.
 - **Order** (orchestrator): the FSL part (running), the clean-room alignment, SciPy/NumPy/OpenBLAS,
   the move, then the ports.
 
+## 2026-10-29: FSL 6.0.7.23, the version update's second part (orchestrator, by the rules)
+- **The replicas follow FSL 6.0.7.23.** mcflirt's source is unchanged; its libraries and BET's
+  bet2 changed: FSL-41 fixed upstream (followed in both modes, as AFNI-03 and AFNI-05); four new
+  defects of 6.0.7.23 decided by the rules (FSL-59 and FSL-62 rule A, FSL-60 rule A, FSL-61
+  rule B); bet2 `--binaryMask` and the zstd and bzip2 formats ported.
+- **Not followed yet:** Armadillo 14.2.1's LAPACK 4 × 4 inverses (last bits of 5 of 203
+  mcflirt cases), a follow-up for a replica author.
+- **Two FSL installations, one choice:** `--fsl-version` / `LARMORX_FSL_VERSION` (6.0.7.23 by
+  default; `LARMORX_FSLDIR` names any installation, `LARMORX_FSL_DIR` still read); every replica
+  case also runs or reads 6.0.7.17 and its record names FSL's own step, with the reason. The
+  clean-room head-motion correction stays on 6.0.7.17 until aligned (FSL-59).
+- **The version trial's BET differences** (by the rules, 2026-10-29): FSL-63 new (`bet -R`
+  loses a leading `-e` through bash's `echo`: rule A); FSL-43's `reproduce` follows FSL's fill
+  by the linear index (a replica mistake: it had treated any start more than a voxel outside as
+  a crash); FSL's reads of memory beyond the volume there are undefined (judged so by the suite);
+  the Armadillo part also covers BET's `niftivox2newimagevox_mat` (bet2 `-c`, `fslstats -C`).
+- **The FSL pages of the site** show FSL 6.0.7.23 beside 6.0.7.17 in figures-cache entries of
+  their own, keyed with the version (`<case>-fsl-6.0.7.23`); 6.0.7.17's entries are kept.
+
 ## Open decisions (PLAN.md §16)
 
 | # | Decision | Recommended default (used until decided) | Status |

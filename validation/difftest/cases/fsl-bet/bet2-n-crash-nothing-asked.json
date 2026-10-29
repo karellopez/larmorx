@@ -1,0 +1,166 @@
+{
+ "defect": null,
+ "description": "bet2 -n alone (no output asked) where FSL crashes in the mask's fill (a constant image: the surface's centre is not a number, FSL-43): reproduce fills and writes nothing, as the call asks; the suite had required an output (found by the FSL version trial, 2026-10-29)",
+ "expect": "pass",
+ "found": {
+  "detail": "outputs written: none",
+  "n": 51,
+  "seed": "20261029",
+  "shrink_moves": [
+   "dropped -f (-f 0.7)",
+   "input: axis 2 32 -> 16 voxels",
+   "input: axis 2 16 -> 8 voxels",
+   "input: axis 1 15 -> 7 voxels",
+   "input: axis 0 9 -> 4 voxels",
+   "input: axis 2 8 -> 4 voxels",
+   "input: axis 1 7 -> 3 voxels",
+   "input: axis 0 4 -> 2 voxels",
+   "input: axis 2 4 -> 2 voxels",
+   "input: axis 1 3 -> 1 voxels",
+   "input: axis 0 2 -> 1 voxels",
+   "input: axis 2 2 -> 1 voxels",
+   "input (and its grid): plumb orientation",
+   "input (and its grid): unit spacing",
+   "input (and its grid): origin at 0",
+   "input (and its grid): qform and sform codes 1",
+   "input: content head -> constant"
+  ],
+  "signature": [
+   "outputs written"
+  ]
+ },
+ "id": "bet2-n-crash-nothing-asked",
+ "implementations": [
+  "replica"
+ ],
+ "reason": "",
+ "recipe": {
+  "extra": {
+   "output_type": "NIFTI_PAIR",
+   "tool": "bet2"
+  },
+  "features": {
+   "--ct": false,
+   "-c": false,
+   "-e": false,
+   "-f": true,
+   "-g": false,
+   "-m": false,
+   "-n": true,
+   "-o": false,
+   "-r": false,
+   "-s": false,
+   "-t": false,
+   "-v": false,
+   "-w": false,
+   "FSLOUTPUTTYPE": "NIFTI_PAIR",
+   "axis0": 0.75,
+   "axis1": 0.95,
+   "axis2": 0.8,
+   "bias0": -0.005,
+   "bias1": -0.0075,
+   "bias2": 0.005,
+   "bias3": -0.0075,
+   "centre0": 4.0,
+   "centre1": 1.0,
+   "centre2": -5.5,
+   "content": "head",
+   "dtype": "float32",
+   "extreme": false,
+   "f": "0.7",
+   "noise": 0.0,
+   "orientation": "axes+oblique",
+   "origin0": 0.5,
+   "origin1": 35.25,
+   "origin2": -37.0,
+   "qfac": 1,
+   "qform_code": 1,
+   "range": "plain",
+   "sform": "same",
+   "sform_code": 0,
+   "shape": "9x15x32",
+   "size": 17.5,
+   "spacing0": 1.5,
+   "spacing1": 4.0,
+   "spacing2": 1.0,
+   "suffix": ".nii.gz",
+   "tissues": "epi",
+   "tool": "bet2",
+   "units": "mm"
+  },
+  "groups": [
+   {
+    "args": [
+     "{in:input}",
+     "out"
+    ],
+    "name": "input",
+    "optional": false
+   },
+   {
+    "args": [
+     "-n"
+    ],
+    "name": "-n",
+    "optional": true
+   }
+  ],
+  "inputs": {
+   "input": {
+    "content": {
+     "seed": 23493453,
+     "type": "constant"
+    },
+    "dtype": "float32",
+    "geometry": {
+     "origin": [
+      0.0,
+      0.0,
+      0.0
+     ],
+     "qfac": 1,
+     "qform_code": 1,
+     "quaternion": [
+      1,
+      0,
+      0,
+      0
+     ],
+     "sform": "same",
+     "sform_code": 1,
+     "spacing": [
+      1.0,
+      1.0,
+      1.0
+     ],
+     "units": "mm"
+    },
+    "scaling": null,
+    "shape": [
+     1,
+     1,
+     1
+    ],
+    "suffix": ".nii.gz",
+    "values": {
+     "offset": 0.0,
+     "scale": 1.0
+    }
+   }
+  },
+  "n": 51,
+  "options": [
+   "-f",
+   "-n",
+   "FSLOUTPUTTYPE=NIFTI_PAIR",
+   "bet2"
+  ],
+  "seed": "20261029",
+  "tool": "fsl-bet"
+ },
+ "rule": null,
+ "status": "fixed",
+ "suite": "fsl-bet-replica",
+ "tier": "smoke",
+ "tool": "fsl-bet"
+}

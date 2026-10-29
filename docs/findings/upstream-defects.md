@@ -305,9 +305,9 @@ to add (since 2026-10-25: "Random testing's gaps", below); – = nothing to do. 
 | FSL-21 † | mcflirt histogram costs | `-bins` below 8: no bins in the first stage; arbitrary matrices, `corratio` writes before its arrays and aborts | a | none | the replica: refused by default (rule B, 2026-10-24); `reproduce` gives mcflirt's matrices and, for `corratio`, its abort; the clean-room original: to do (the spec) | – |
 | FSL-22 † | `calc_bval` (newimage) | the background value sorts the 2-voxel border with `std::sort` and `operator<`: with NaN voxels not a strict weak ordering (undefined in C++); libstdc++'s introsort leaves a position-dependent order, so the pad value of mcflirt's output (and `affine_transform`'s) is arbitrary | a | none (fMRIPrep's inputs have no NaN) | NaNs sorted last by default (defined; D13, 2026-10-11); `reproduce` exact (SGI STL's sort), 2026-10-26: libstdc++'s order of the NaN values, move for move, from the SGI STL's introsort (HP/SGI permission notice) with libstdc++'s pivot step, not from libstdc++'s code; both name FSL-22 when NaN border voxels make the original's order undefined | – |
 | FSL-40 † | bet2 | names lose their first `.hdr` wherever it stands; a name with `.img` and no `.hdr` aborts | e | none | corrected by default (`upstream_defects`, 2026-10-24): a trailing extension removed | – |
-| FSL-41 † | bet2 | no voxel strictly between the 2nd and 98th percentiles inside the initial sphere (a constant or binary image): the median read from an empty list, crash | a | none | refused by default; `reproduce` takes the median as 0, names FSL-41 and writes bet2's outputs (D13's failure case, 2026-10-25) | – |
+| FSL-41 † | bet2 | no voxel strictly between the 2nd and 98th percentiles inside the initial sphere (a constant or binary image): the median read from an empty list, crash (FSL 6.0.7.17; **fixed in FSL 6.0.7.23**: the robust maximum) | a | none | refused by default, `reproduce` took the median as 0 (2026-10-25); since FSL 6.0.7.23 (2026-10-29) both modes take 6.0.7.23's robust maximum and name nothing; a constant image then meets FSL-43's crash, which the default refuses, naming FSL-43 | – |
 | FSL-42 † | bet2 | NaN `-f`/`-g`, a negative, NaN or infinite `-r`, `-w` ≤ 0, a non-finite `-c` or search depth used as given | e | none | refused by default, naming the value (rule B, 2026-10-24); `reproduce` computes with it | – |
-| FSL-43 † | bet2, betsurf | a mask's fill starts at the surface's centroid without a bounds check: outside the image (a single slice) FSL writes and reads outside the volume; far outside or at a NaN centre it crashes | a | none | the fill starts at the nearest voxel inside (rule A, 2026-10-24); `reproduce` does FSL's defined part one voxel outside, and where FSL crashes skips the fill (the mask holds the drawn surface) and names FSL-43 (2026-10-25) | – |
+| FSL-43 † | bet2, betsurf | a mask's fill starts at the surface's centroid without a bounds check: outside the image FSL reaches each point by its linear index (other voxels of the volume, or memory beyond it, which it reads and writes, and may crash on); at a NaN centre it writes far from the volume and crashes | a | none | the fill starts at the nearest voxel inside (rule A, 2026-10-24); `reproduce` does FSL's fill point by point by the linear index, memory beyond the volume read as not part of the mask and never written, and names the number of those reads (2026-10-29; before: FSL's defined part one voxel outside only); at a NaN centre it skips the fill (the mask holds the drawn surface) and names FSL-43 (2026-10-25) | – |
 | FSL-44 † | bet | arguments expanded unquoted: names with blanks split into words, an empty argument ends the options | e | none | corrected by default (`upstream_defects`, 2026-10-24) | – |
 | FSL-45 † | bet `-Z` | the crop back runs `imglob` without `${FSLDIR}/bin`: off the PATH the outputs stay padded, on it other images are cropped too | c | none (fMRIPrep's image has no `dc`: its `bet -Z` stops earlier) | corrected by default (`upstream_defects`, 2026-10-24) | – |
 | FSL-46 † | bet | the cleanup removes every `<output>_tmp*` file, also files the run did not create | c | none | corrected by default (`upstream_defects`, 2026-10-24) | – |
@@ -323,6 +323,11 @@ to add (since 2026-10-25: "Random testing's gaps", below); – = nothing to do. 
 | FSL-56 † | FSL's NIfTI writer (NewNifti) | two or more extensions of different sizes: `vox_offset` counts the first one's size once per extension | c | none (extensions are dropped unless `FSL_LOAD_NIFTI_EXTENSIONS`) | corrected by default (`upstream_defects`, 2026-10-24), in every FSL replica (the switch is the core's) | – |
 | FSL-57 † | betsurf | the smoothness weight is set to 0 where a mask applies after the term was computed (no effect) | c (c? until 2026-10-24) | every betsurf run | kept as FSL's and documented (rule C, 2026-10-24) | – |
 | FSL-58 † | betsurf | no voxel of the T1 inside the brain surface (a surface outside the image, a tiny image): the 98th percentile is read from an empty list, before its start; FSL crashes or uses memory it never wrote | a | none | refused by default, naming the entry; `reproduce` takes the percentile as 0 and goes on (D13's failure case; found by random testing, 2026-10-26) | – |
+| FSL-59 | mcflirt | FSL 6.0.7.23 only: `-sinc_final` and `-nn_final` resample with trilinear interpolation (newimage 2601.0's cached ShadowVolume keeps each volume's interpolation method from its first access) | c | none (fMRIPrep uses the default) | corrected by default (the method asked for, FSL 6.0.7.17's result); `reproduce` trilinear; named where the two series differ (2026-10-29) | – |
+| FSL-60 | FSL's NIfTI layer (NewNifti 5.0.0) | FSL 6.0.7.23 only: an image name holding `.img` before its extension (a directory, the file's stem) is opened with its last `.img` made `.hdr`: another file is read or written, or the program aborts | c | none | corrected by default (the name given); `reproduce` renames as FSL 6.0.7.23 does; named by the program (2026-10-29) | – |
+| FSL-61 | bet2 | FSL 6.0.7.23 only: `--binaryMask` with a mask on another grid than the input: the brain mask is applied over the input's dimensions, reading and writing outside it | a | none | refused in both modes (rule B; FSL's result depends on memory), named (2026-10-29) | – |
+| FSL-62 | bet2 | FSL 6.0.7.23 only: `--ct` with `--binaryMask` converts the mask instead of the CT image and writes the mask, masked, as the brain image | c | none | corrected by default (the CT input masked; rule A); `reproduce` gives FSL's; named (2026-10-29) | – |
+| FSL-63 | bet (script) | `-R` passes bet2's options through bash's `echo`, which takes leading words of `-n`, `-e`, `-E` as its own options: a leading `-e` (the mesh) is dropped, and backslashes after it read as escapes (FSL 6.0.7.17 and 6.0.7.23) | a | none (fMRIPrep's calls do not combine `-R` and `-e`) | corrected by default (the options as given); `reproduce` passes them through bash's `echo` as FSL does; named where they differ (2026-10-29) | – |
 
 **Counts** (273 entries, recounted from the table on 2026-10-26, after the BET merge; an entry with two classes
 counts under its first; "c (c? until …)" entries, decided, count as (c)):
@@ -427,6 +432,17 @@ follow 26.3.05 (both modes, no notice), the clean-room originals reproduce 25.2.
 No other AFNI entry changed (the source of every translated file and the machine code of every
 function of the three programs compared: `validation/investigations/version-afni/`). No new
 defect; no ID of AFNI-76 to AFNI-85 used.
+**2026-10-29, the version update (FSL 6.0.7.17 → 6.0.7.23):** FSL-41 is fixed upstream
+(fsl-bet2 2111.9: the robust maximum as the median of an empty list); the replica follows it in
+both modes. Four new entries, all of FSL 6.0.7.23 only: FSL-59 (mcflirt's `-sinc_final` and
+`-nn_final` resample trilinearly), FSL-60 (NewNifti 5.0.0 renames names holding `.img`),
+FSL-61 and FSL-62 (bet2's new `--binaryMask` on another grid, and with `--ct`). No other FSL
+entry changed. Not a defect, recorded in `findings/fsl-mcflirt.md`: FSL 6.0.7.23's Armadillo
+14.2.1 inverts 4 × 4 matrices through LAPACK; the replica keeps Armadillo 10.5.1's closed form
+for now (the last bits of 5 of 203 standard-tier cases; a follow-up). Random testing of the
+update (2026-10-29) found FSL-63 (`bet -R` loses a leading `-e` through bash's `echo`), and
+corrected FSL-43's `reproduce`: FSL's fill from outside the image reaches voxels by their
+linear index (and memory beyond the volume), which the replica now does point by point.
 
 ## D13 gaps: what the next task switches to "correct by default"
 
@@ -4360,10 +4376,15 @@ fMRIPrep 25.2.6 (the oracle runs) or its source at `21a490fb`, niworkflows 1.15.
   image) FSL dereferences an empty vector and crashes.
 - **Evidence:** read; verified (`bet2/constant`: FSL ends by SIGSEGV).
 - **fMRIPrep:** none.
-- **larmorx:** refused by default, after FSL's messages; `reproduce` takes the median as 0
-  (FSL's defined part: everything before and after the read), names FSL-41 and writes bet2's
-  outputs (D13's rule for failure cases, 2026-10-11; done 2026-10-25).
-- **D13 / gap:** No gap.
+- **larmorx:** refused by default, after FSL's messages; `reproduce` took the median as 0 (FSL's
+  defined part: everything before and after the read), named FSL-41 and wrote bet2's outputs
+  (D13's rule for failure cases, 2026-10-11; done 2026-10-25).
+- **FSL 6.0.7.23** (2026-10-29): fixed upstream: fsl-bet2 2111.9 takes the robust maximum as the
+  median of an empty list ("Safe option here is to set the median to the robust max"; it lets
+  `--binaryMask` work on binary masks). The replica follows it in both modes and names FSL-41 no
+  more. A constant image still crashes FSL 6.0.7.23, later, in the mask's fill from the surface's
+  NaN centre (FSL-43): the default refuses there, naming FSL-43; `reproduce` does not fill.
+- **D13 / gap:** done (fixed upstream).
 
 ### FSL-42 † Meaningless numeric options are used — (e)
 - **What:** bet2 checks `-f` and `-g` against their ranges only (NaN passes); `-r`, `-w`, `-c`
@@ -4382,13 +4403,24 @@ fMRIPrep 25.2.6 (the oracle runs) or its source at `21a490fb`, niworkflows 1.15.
   on); far outside, or at a NaN centroid (a diverged surface), it writes far from the buffer and
   crashes.
 - **Evidence:** read; verified (`defects/2d`: voxel `47 55 -1`, FSL's outputs written;
-  `defects/nan-f`, `defects/zero-w`: FSL crashes).
+  `defects/nan-f`, `defects/zero-w`: FSL crashes);
+  random testing of the version update (2026-10-29, cases 661, 1297, 1308,
+  80): a real centroid several voxels outside does not make FSL crash as a rule; FSL's fill
+  checks each neighbour's coordinate along its own axis only and reaches a point by `value`'s
+  linear index, so a point outside the image is another voxel of the volume (the start `1 -4 0`
+  before a 3 × 6 × 4 image reaches every voxel through its neighbour one slice up: FSL 6.0.7.17
+  and 6.0.7.23 fill the whole image) or memory beyond it (case 80: 6.0.7.17 crashes, 6.0.7.23
+  writes values that depend on that memory).
 - **fMRIPrep:** none.
-- **larmorx:** the fill starts at the nearest voxel inside the image (on `defects/2d`, FSL's
-  outputs bit for bit); `reproduce` does FSL's defined part one voxel outside (no write outside,
-  the start's neighbours inside the image examined) and warns; where FSL crashes, `reproduce`
-  skips that fill (the mask holds the drawn surface only), names FSL-43 and goes on; the default
-  refuses there.
+- **larmorx:** the fill starts at the nearest voxel inside the image (rule A), named where that
+  changes FSL's mask; `reproduce` does FSL's fill point by point (FSL's stack and order, its
+  per-axis bounds, its linear index): inside the volume exactly, beyond it no write, a place the
+  fill wrote read back as its value and any other read as not part of the mask; it names FSL-43
+  with the number of reads beyond the volume (FSL's outputs may depend on them, and the suite
+  judges them undefined there). At a NaN centroid (`INT_MIN`), where FSL crashes, `reproduce`
+  skips the fill (the mask holds the drawn surface only) and the default refuses. Inside the
+  `bet` script the same (its `reproduce` had corrected the fill: case 1297). Permanent cases
+  `bet2-fill-by-index`, `bet-fill-by-index`, `bet-robust-crash-filled`, `bet2-fill-memory-beyond`.
 - **D13 / gap:** rule A (decided 2026-10-24); the failure case's fill 2026-10-25. No gap.
 
 ### FSL-44 † bet expands its arguments unquoted — (e)
@@ -4529,4 +4561,70 @@ fMRIPrep 25.2.6 (the oracle runs) or its source at `21a490fb`, niworkflows 1.15.
 - **fMRIPrep:** none.
 - **larmorx:** refused by default, naming the entry; `reproduce` takes the percentile as 0 and goes
   on, naming it (D13's failure case).
+- **D13 / gap:** No gap.
+
+### FSL-59 Final interpolation ignored (FSL 6.0.7.23) — (c)
+- **What:** in FSL 6.0.7.23 `volume4D[t]` returns a ShadowVolume cached at its first access,
+  with its own copy of the interpolation method (trilinear, during the registration); mcflirt's
+  final loop sets the series' method to sinc or nearest neighbour, but `interpolate` reads the
+  cached copy: `-sinc_final` and `-nn_final` resample trilinearly. `-spline_final` builds its own
+  shadow from the series and is unaffected. FSL 6.0.7.17 made a fresh shadow at every access.
+- **Evidence:** read (newimage 2601.0 `newimage.{h,cc}`); verified
+  (`validation/investigations/version-fsl/final_interp_probe.sh`: every output of
+  `-sinc_final` and `-nn_final` equals the default run's, byte for byte, in 6.0.7.23; the
+  recordings' `opt-nn_final`, `small/nn_final`, `small/sinc_final`).
+- **fMRIPrep:** none (its call uses the default interpolation).
+- **larmorx:** corrected by default (the interpolation asked for, as FSL 6.0.7.17); `reproduce`
+  resamples trilinearly; both name FSL-59 where the two series differ (rule A, 2026-10-29).
+- **D13 / gap:** No gap.
+
+### FSL-60 Image names holding `.img` (FSL 6.0.7.23) — (c)
+- **What:** NewNifti 5.0.0 opens every image under `replaceSuffix(name, ".img", ".hdr")`, which
+  replaces the last `.img` anywhere in the name: a directory (`a.img.d/in.nii.gz` →
+  `a.hdr.d/in.nii.gz`) or the file's own stem (`sub.img2.nii.gz`). Another file is read or
+  written, or FSL aborts with `Error: cant open file <renamed>`.
+- **Evidence:** read (`NewNifti.cc`); verified (`path_suffix_probe.sh`: mcflirt `-out a.img.d/out`
+  writes `a.hdr.d/out.nii.gz`; a pair into `x.hdr.y.img.d/` aborts); the replica's record's
+  `edge/img-in-directory` and `edge/img-in-output-directory`.
+- **fMRIPrep:** none (its names hold no `.img`).
+- **larmorx:** corrected by default (the name given); `reproduce` renames as FSL 6.0.7.23
+  does; the program names FSL-60 once (rule A, 2026-10-29). bet2's own name handling (FSL-40)
+  aborts on such names before NewNifti is reached.
+- **D13 / gap:** No gap.
+
+### FSL-61 `--binaryMask` on another grid (FSL 6.0.7.23) — (a)
+- **What:** bet2's new `--binaryMask` finds the surface on the mask and makes the brain mask on
+  the mask's grid, then applies it over the input's dimensions: with a mask of other dimensions
+  FSL reads and writes outside the brain mask's memory.
+- **Evidence:** read (`bet2.cpp`).
+- **fMRIPrep:** none.
+- **larmorx:** refused in both modes, naming FSL-61 (rule B: the input makes no sense, and what
+  FSL computes depends on memory). Gap: where the input is smaller than the mask in every
+  dimension FSL's reads stay inside the buffer and are defined; `reproduce` refuses them too.
+- **D13 / gap:** the smaller-input case above.
+
+### FSL-62 `--ct --binaryMask` cuts the brain from the mask (FSL 6.0.7.23) — (c)
+- **What:** with `--binaryMask` the mask is read first, so `--ct` converts the mask to Cormack
+  units and keeps the unconverted mask as "the CT image": the brain image written is the mask,
+  masked, instead of the CT input.
+- **Evidence:** read (`bet2.cpp`); verified (the BET record's `defects/binary-mask-ct`:
+  `reproduce` bit-identical to FSL; the default's brain image differs by up to 1e3, the CT
+  values).
+- **fMRIPrep:** none.
+- **larmorx:** corrected by default (the brain cut from the CT input; rule A); `reproduce` gives
+  FSL's; both name FSL-62.
+- **D13 / gap:** No gap (the surface is still found on the converted mask, as FSL does).
+
+### FSL-63 `bet -R` loses a leading `-e` through `echo` — (a)
+- **What:** under `-R` the script rebuilds bet2's options with ``bet2opts=`echo $bet2opts | sed
+  's/-n//g'` `` (and `-B` with `-s`). bash's builtin `echo` takes the leading words made only of
+  `-n`, `-e` and `-E` as its own options: with `bet <in> <out> -R -e` the mesh option is
+  dropped and no `_mesh.vtk` is written (bet2's verbose lines are those without a mesh); after a
+  leading `-e`, backslashes in the other options are read as escapes (`\c` ends the text). A
+  leading `-n` is dropped too, as the `sed` meant.
+- **Evidence:** read (`bet`, lines 246 and 388); verified (random testing of the version update,
+  case 141: FSL 6.0.7.17 and 6.0.7.23 write no mesh; the permanent case `bet-robust-mesh-echo`).
+- **fMRIPrep:** none (its calls do not combine `-R` with `-e`).
+- **larmorx:** the options are passed as given (the mesh written); `reproduce` runs them through
+  bash's `echo` as FSL does; both name FSL-63 where the two differ (rule A, 2026-10-29).
 - **D13 / gap:** No gap.

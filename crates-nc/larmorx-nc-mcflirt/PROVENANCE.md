@@ -1,8 +1,11 @@
 # Provenance: larmorx-nc-mcflirt
 
 **Replica: translated from FSL's source.** This crate is a step-by-step Rust translation of
-FSL's `mcflirt` (fsl-mcflirt 2111.0, FSL 6.0.7.17), written to give mcflirt's outputs, messages
-and exit statuses bit for bit. It is distributed under the FSL Licence (`../LICENSE`), as part
+FSL's `mcflirt` (fsl-mcflirt 2111.0 of FSL 6.0.7.23 since 2026-10-29; first translated from FSL
+6.0.7.17, whose fsl-mcflirt is the same source), written to give mcflirt's outputs, messages and
+exit statuses bit for bit. FSL 6.0.7.23 rebuilt mcflirt with newer libraries (newimage 2601.0,
+miscmaths 2412.6, NewNifti 5.0.0, znzlib 2511.3, armawrap 0.7.0): what that changes, and what the
+replica follows, is in `docs/findings/fsl-mcflirt.md`, "FSL 6.0.7.23". It is distributed under the FSL Licence (`../LICENSE`), as part
 of the `larmorx-nc` package (`docs/licensing.md`); the FSL files it was translated from are in
 `../fsl-source/fsl-mcflirt/`, unchanged. The Apache-2.0 clean-room original of the same tool is
 `crates/larmorx-mri` (`lx.mri.hmc`, `larmorx mri hmc`); neither crate uses the other's code.
@@ -38,10 +41,17 @@ The libraries mcflirt uses (newimage, miscmaths, NewNifti, znzlib, armawrap) are
 - **D13** (`docs/api/upstream-defects.md`; `LARMORX_UPSTREAM_DEFECTS=fix`, the default, or
   `reproduce`): mcflirt's deterministic defects are corrected by default with the same
   behaviour as the clean-room original (FSL-01, FSL-03, FSL-05 to FSL-10, FSL-12 to FSL-14,
-  FSL-20, FSL-21; `-gdt`, broken in mcflirt (FSL-04), is refused) and reproduced bit for bit
+  FSL-20, FSL-21; FSL 6.0.7.23's FSL-59, `-sinc_final` and `-nn_final` resampled trilinearly,
+  and FSL-60, image names holding `.img` opened under another name; `-gdt`, broken in mcflirt
+  (FSL-04), is refused) and reproduced bit for bit
   with `reproduce`; each case prints a notice line `larmorx-nc: upstream defect FSL-nn (mcflirt)
   corrected|reproduced: ...` to standard error. Decided to keep: FSL-02 (rule C, decided
   2026-10-23), FSL-11's `.nii.gz` default when `FSLOUTPUTTYPE` is unset (decided 2026-10-23),
   FSL-15 and FSL-18 (rule C; `docs/findings/fsl-mcflirt.md`). FSL-22 (NaN values in the
   background value's sort, an order C++ leaves undefined): sorted last by default, libstdc++'s
   order with `reproduce` (2026-10-26), each named.
+- **Not followed yet (FSL 6.0.7.23).** Armadillo 14.2.1's 4 × 4 inverses and solves through
+  LAPACK (OpenBLAS): the replica keeps Armadillo 10.5.1's closed-form inverse (`larmorx-nc-core`'s
+  `arma`), so the last bits of values computed from nearly equal matrices (`.rms` of identical
+  volumes) and the sign of NaN parameters can differ from FSL 6.0.7.23 (5 of 203 standard-tier
+  cases, its record's expected divergences).

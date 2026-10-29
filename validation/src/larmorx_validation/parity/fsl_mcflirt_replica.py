@@ -46,9 +46,10 @@ from typing import Any
 
 import numpy as np
 
-from larmorx_validation.parity import defects
+from larmorx_validation.parity import defects, fsl_versions
 from larmorx_validation.parity.harness import (
     BOTH_ERROR,
+    EXPECTED,
     Case,
     CaseResult,
     Check,
@@ -57,12 +58,12 @@ from larmorx_validation.parity.harness import (
     Suite,
 )
 from larmorx_validation.parity.mri_hmc import (
-    RECORDED,
     TESTDATA,
-    manifest,
-    oracle_dir,
+    recorded_marker,
     rms_deviation,
 )
+from larmorx_validation.parity.mri_hmc import manifest as _manifest
+from larmorx_validation.parity.mri_hmc import oracle_dir as _oracle_dir
 
 #: The replica's own lines on standard error (notices, its abort line).
 REPLICA_PREFIX = "larmorx-nc:"
@@ -85,10 +86,24 @@ def workspace() -> Path | None:
     return None
 
 
-def fsldir() -> Path:
-    """The FSL 6.0.7.17 installation: ``LARMORX_FSLDIR``, else ``~/fsl``. Never on the
-    ``PATH``."""
-    return Path(os.environ.get("LARMORX_FSLDIR") or Path.home() / "fsl")
+def fsldir(version: str | None = None) -> Path:
+    """The FSL installation compared with (:mod:`fsl_versions`: ``LARMORX_FSLDIR``,
+    ``--fsl-version``, else the replica's default, the newest), or the given ``version``'s.
+    Never on the ``PATH``."""
+    if version is None:
+        version = None if os.environ.get(fsl_versions.DIR_ENV) else fsl_versions.selected("replica")
+    return fsl_versions.fsldir(version)
+
+
+def oracle_dir(version: str | None = None) -> Path | None:
+    """mcflirt's recorded runs of the version compared with (or of ``version``)."""
+    if version is not None:
+        return fsl_versions.recording(version)
+    return _oracle_dir("replica")
+
+
+def manifest() -> dict[str, Any]:
+    return _manifest("replica")
 
 
 def replica_binary() -> Path | None:
@@ -124,14 +139,14 @@ class Completed:
     stderr: str
 
 
-def _environment(settings: dict[str, str | None]) -> dict[str, str]:
+def _environment(settings: dict[str, str | None], version: str | None = None) -> dict[str, str]:
     """mcflirt's clean environment (``oracles/fsl-6.0.7/mcflirt/README.md``): ``HOME``, a
     ``PATH`` without FSL, ``FSLDIR``, ``FSLOUTPUTTYPE=NIFTI_GZ`` unless ``settings`` change it
     (``None`` unsets a variable)."""
     env = {
         "HOME": os.environ.get("HOME", str(Path.home())),
         "PATH": "/usr/bin:/bin",
-        "FSLDIR": str(fsldir()),
+        "FSLDIR": str(fsldir(version)),
         "FSLOUTPUTTYPE": "NIFTI_GZ",
     }
     for k, v in settings.items():
@@ -142,18 +157,20 @@ def _environment(settings: dict[str, str | None]) -> dict[str, str]:
     return env
 
 
-def run_oracle(args: list[str], *, cwd: Path, settings: dict[str, str | None]) -> Completed:
-    """FSL's ``mcflirt`` with ``args`` in ``cwd`` and its clean environment. Every oracle run of
-    this suite goes through here, and through the oracle-output cache
-    (:mod:`larmorx_validation.oracle_cache`): mcflirt is single-threaded and draws no random
-    numbers, so a run is served once it ran (crashes and hangs always run); every file it writes
-    is in ``cwd``."""
+def run_oracle(
+    args: list[str], *, cwd: Path, settings: dict[str, str | None], version: str | None = None
+) -> Completed:
+    """FSL's ``mcflirt`` with ``args`` in ``cwd`` and its clean environment (the installation
+    compared with, or ``version``'s: FSL's own step). Every oracle run of this suite goes through
+    here, and through the oracle-output cache (:mod:`larmorx_validation.oracle_cache`): mcflirt
+    is single-threaded and draws no random numbers, so a run is served once it ran (crashes and
+    hangs always run); every file it writes is in ``cwd``."""
     from larmorx_validation import oracle_cache
 
-    argv = [str(fsldir() / "bin" / "mcflirt"), *args]
+    argv = [str(fsldir(version) / "bin" / "mcflirt"), *args]
     p = oracle_cache.run(
         argv,
-        env=_environment(settings),
+        env=_environment(settings, version),
         cwd=cwd,
         outputs=[cwd],
         policy=oracle_cache.Policy(threads=1, family="fsl"),
@@ -201,8 +218,57 @@ def _without_descrip(data: bytes) -> bytes:
     return data[:start] + b"\0" * 80 + data[start + 80 :]
 
 
+#: Recorded runs whose only difference from FSL 6.0.7.23 is the arithmetic of Armadillo 14.2.1's
+#: LAPACK path for 4 x 4 inverses and solves, which the replica does not follow yet (it keeps
+#: Armadillo 10.5.1's closed-form inverse): values computed from nearly equal matrices (`.rms`
+#: of identical volumes, about 1e-15 mm) and the sign of NaN parameters. FSL's own step from
+#: 6.0.7.17 changes the same outputs (docs/findings/fsl-mcflirt.md, "FSL 6.0.7.23").
+ARMA_LAPACK = {
+    "real/ds000005/opt-stages1": ("out_mcf.nii.gz_rel.rms",),
+    "syn/content/nan/default": ("out_mcf.nii.gz.par",),
+    "syn/content/nan/reffile": ("out_mcf.nii.gz.par",),
+    "syn/motion/identical-copies/default": ("out_mcf.nii.gz_rel.rms",),
+    "syn/motion/identical-copies/reffile-fudge": (
+        "out_mcf.nii.gz_rel.rms",
+        "out_mcf.nii.gz_rel_mean.rms",
+    ),
+}
+#: The largest change the LAPACK path's last bits make to the numbers above (mm): they come from
+#: nearly equal matrices (relative rms of 1e-15 to 1e-8 mm).
+ARMA_TINY = 1e-12
+
+
+def arma_only(a: Path, b: Path) -> bool:
+    """Whether two of mcflirt's text outputs differ only where Armadillo 14.2.1's LAPACK
+    arithmetic does: numbers that differ by at most :data:`ARMA_TINY`, or NaN on both sides (its
+    sign)."""
+    ta = a.read_text(errors="replace").split()
+    tb = b.read_text(errors="replace").split()
+    if len(ta) != len(tb):
+        return False
+    for x, y in zip(ta, tb, strict=True):
+        if x == y:
+            continue
+        try:
+            fx, fy = float(x), float(y)
+        except ValueError:
+            return False
+        if np.isnan(fx) and np.isnan(fy):
+            continue
+        if abs(fx - fy) <= ARMA_TINY:
+            continue
+        return False
+    return True
+
+
+#: Image files, compressed or not (zstd and bzip2 since FSL 6.0.7.23).
+_COMPRESSIONS = ("", ".gz", ".zst", ".bz2")
+_IMAGES = tuple(f"{e}{c}" for e in (".nii", ".hdr", ".img") for c in _COMPRESSIONS)
+_DATA_FILES = tuple(f".img{c}" for c in _COMPRESSIONS)
+
+
 def _is_image(name: str) -> bool:
-    return name.endswith((".nii", ".nii.gz", ".hdr", ".hdr.gz", ".img", ".img.gz"))
+    return name.endswith(_IMAGES)
 
 
 def _files(d: Path, exclude: set[str]) -> dict[str, Path]:
@@ -218,6 +284,19 @@ def _image_values(path: Path) -> np.ndarray | None:
     import nibabel as nib
 
     try:
+        if path.name.endswith((".hdr.zst", ".hdr.bz2")):
+            # a compressed pair: both files decompressed beside each other, then read
+            img = path.with_name(path.name.replace(".hdr", ".img"))
+            with tempfile.TemporaryDirectory(prefix="lx-nc-pair-") as t:
+                for src, ext in ((path, ".hdr"), (img, ".img")):
+                    with _open_stream(src) as f:
+                        (Path(t) / f"x{ext}").write_bytes(f.read())
+                return np.asanyarray(nib.load(Path(t) / "x.hdr").dataobj).copy()
+        if path.name.endswith((".zst", ".bz2")):
+            with _open_stream(path) as f:
+                raw = f.read()
+            cls = nib.Nifti2Image if raw[:4] == b"\x1c\x02\x00\x00" else nib.Nifti1Image
+            return np.asanyarray(cls.from_bytes(raw).dataobj)
         return np.asanyarray(nib.load(path).dataobj)
     except Exception:
         return None
@@ -232,10 +311,22 @@ _HEADER_BYTES = 540
 
 
 def _open_stream(path: Path):
-    """``path``'s bytes as a program reads them (a gzip file decompressed)."""
+    """``path``'s bytes as a program reads them (gzip, and since FSL 6.0.7.23 zstd and bzip2,
+    decompressed: zstd by FSL 6.0.7.23's own ``zstd``, called by full path)."""
+    import bz2
+    import io
+
     with open(path, "rb") as f:
-        gz = f.read(2) == b"\x1f\x8b"
-    return gzip.open(path, "rb") if gz else open(path, "rb")
+        magic = f.read(4)
+    if magic[:2] == b"\x1f\x8b":
+        return gzip.open(path, "rb")
+    if magic[:3] == b"BZh":
+        return bz2.open(path, "rb")
+    if magic == b"\x28\xb5\x2f\xfd":
+        zstd = fsl_versions.fsldir(fsl_versions.NEWEST) / "bin" / "zstd"
+        out = subprocess.run([str(zstd), "-dc", str(path)], capture_output=True, check=False)
+        return io.BytesIO(out.stdout)
+    return open(path, "rb")
 
 
 def _same_streams(a: Path, b: Path, *, blank_descrip: bool) -> bool:
@@ -423,7 +514,7 @@ def compare(
     for name in sorted(set(theirs) & set(ours)):
         a, b = theirs[name], ours[name]
         if _is_image(name):
-            same = _same_streams(a, b, blank_descrip=not name.endswith((".img", ".img.gz")))
+            same = _same_streams(a, b, blank_descrip=not name.endswith(_DATA_FILES))
             if not same:
                 different.append(f"{name}: {_differing_values(a, b)}")
         else:
@@ -441,6 +532,59 @@ def compare(
         detail="; ".join(different[:6]),
     )
     return identical, total
+
+
+def _masked(text: str) -> str:
+    """FSL's installation directories in a message, masked (they differ between versions)."""
+    for v in fsl_versions.INSTALLS:
+        text = text.replace(str(fsl_versions.fsldir(v)), "<FSLDIR>")
+    return text
+
+
+#: A text output whose numbers differ only below 1e-12 or in a NaN's sign (Armadillo 14.2.1).
+ARMA_ONLY = fsl_versions.ARMA_ONLY
+
+
+def fsl_step(
+    checks: CheckList,
+    prev: Completed,
+    new: Completed,
+    prev_dir: Path,
+    new_dir: Path,
+    exclude: set[str],
+    args: list[str],
+    settings: dict[str, str | None],
+) -> None:
+    """FSL's own step from the previous version to the one compared (:mod:`fsl_versions`): the
+    two runs' exit status, messages and outputs (images decompressed, ``descrip`` left out: it
+    names FSL's build). Reported, never a failure; a change without a known reason is a
+    finding."""
+    pa, na = _files(prev_dir, exclude), _files(new_dir, exclude)
+    differences = {}
+    for name in sorted(set(pa) & set(na)):
+        if _is_image(name):
+            if not _same_streams(pa[name], na[name], blank_descrip=not name.endswith(_DATA_FILES)):
+                differences[name] = _differing_values(pa[name], na[name])
+        elif not _same_bytes(pa[name], na[name]):
+            differences[name] = ARMA_ONLY if arma_only(pa[name], na[name]) else "the file differs"
+    env = {k: v for k, v in _environment(settings).items() if v is not None}
+    changed, detail = fsl_versions.step_detail(
+        (prev.code, new.code),
+        (_masked(prev.stdout + prev.stderr), _masked(new.stdout + new.stderr)),
+        (sorted(pa), sorted(na)),
+        differences,
+        fsl_versions.reasons(args, env, cwd=new_dir),
+    )
+    checks.add(
+        Check(
+            fsl_versions.STEP_CHECK,
+            True,
+            metric="FSL against FSL",
+            value="changed" if changed else "identical",
+            threshold="reported",
+            detail=detail,
+        )
+    )
 
 
 def fix_pass(
@@ -467,7 +611,7 @@ def fix_pass(
             others.append(f"files {sorted(set(a) ^ set(b))[:4]}")
         change = defects.Change(0, 0, 0.0)
         for key in sorted(set(a) & set(b)):
-            if _is_image(key) and not key.endswith((".img", ".img.gz")):
+            if _is_image(key) and not key.endswith(_DATA_FILES):
                 change = change + _change(b[key], a[key])
                 ha, hb = _head(a[key]), _head(b[key])
                 off = 352 if int.from_bytes(ha[:4], "little") == 348 else 544
@@ -513,7 +657,8 @@ def _recorded_case(name: str, checks: CheckList) -> None:
         raise Outcome("skipped", "the recorded mcflirt runs were not found")
     rdir = root / "runs" / name
     run = json.loads((rdir / "run.json").read_text(encoding="utf-8"))
-    marker = RECORDED + "runs/" + name + "/"
+    recorded = recorded_marker(root)
+    marker = recorded + "runs/" + name + "/"
     outputs = set(run.get("outputs", {}))
     settings: dict[str, str | None] = {
         k: v for k, v in run.get("env", {}).items() if k not in ("HOME", "PATH", "FSLDIR")
@@ -530,8 +675,8 @@ def _recorded_case(name: str, checks: CheckList) -> None:
             return str(tmp / rel)
         if TESTDATA in arg and arg.startswith("/"):
             return _testdata(arg.split(TESTDATA, 1)[1])
-        if RECORDED in arg and arg.startswith("/"):
-            return str(root / arg.split(RECORDED, 1)[1])
+        if recorded in arg and arg.startswith("/"):
+            return str(root / arg.split(recorded, 1)[1])
         return arg
 
     steps = []
@@ -556,6 +701,7 @@ def _recorded_case(name: str, checks: CheckList) -> None:
                 shutil.copy2(src, tmp / rel)
         return mapped
 
+    lapack_only = False
     try:
         with tempfile.TemporaryDirectory(prefix="lx-nc-") as name_:
             tmp = Path(name_)
@@ -585,13 +731,68 @@ def _recorded_case(name: str, checks: CheckList) -> None:
                     exclude = {"run.json"} | {f for f in _files(tmp, set()) if f in local_inputs}
                     exclude |= {f.name for f in rdir.iterdir() if f.name.startswith("std")}
                     compare(checks, oracle, rep, rdir, tmp, exclude)
+                    lapack_only = _lapack_divergence(checks, name, rdir, tmp)
                 else:
                     checks(f"step {k}: exit status", oracle.code == rep.code)
             if all(r.code == 0 for r in results) and len(mapped) == 1:
                 fix_pass(checks, lambda t: prepare(t)[0], settings, tmp, results[0], exclude)
+            _recorded_step(checks, name, run, rdir, exclude, steps[-1], settings)
     except FileNotFoundError as e:
         raise Outcome("skipped", f"input not available: {e}") from e
+    if lapack_only:
+        raise Outcome(
+            EXPECTED,
+            f"{', '.join(ARMA_LAPACK[name])}: numbers differ by at most {ARMA_TINY:g} mm or in a "
+            "NaN's sign, from FSL "
+            "6.0.7.23's Armadillo 14.2.1 (4 x 4 inverses and solves through LAPACK); the replica "
+            "keeps Armadillo 10.5.1's closed-form inverse (docs/findings/fsl-mcflirt.md)",
+        )
     _agree_on_errors(checks, [s["exit"] for s in run["steps"]], "")
+
+
+def _lapack_divergence(checks: CheckList, name: str, rdir: Path, tmp: Path) -> bool:
+    """Whether a recorded case of :data:`ARMA_LAPACK` fails only by that file, and only where
+    Armadillo 14.2.1's LAPACK arithmetic does (:func:`arma_only`)."""
+    if name not in ARMA_LAPACK or fsl_versions.selected("replica") != fsl_versions.NEWEST:
+        return False
+    failed = [c for c in checks.checks if not c.passed]
+    if [c.name for c in failed] != ["every file bit-identical"]:
+        return False
+    targets = ARMA_LAPACK[name]
+    named = [x.strip().split(":")[0] for x in (failed[0].detail or "").split(";") if x.strip()]
+    return all(n in targets for n in named) and all(arma_only(rdir / n, tmp / n) for n in named)
+
+
+def _recorded_streams(rdir: Path, k: int) -> tuple[str, str]:
+    out, err = rdir / f"stdout{k}.txt", rdir / f"stderr{k}.txt"
+    return (
+        out.read_text(errors="replace").replace(str(rdir), "<run>") if out.is_file() else "",
+        err.read_text(errors="replace").replace(str(rdir), "<run>") if err.is_file() else "",
+    )
+
+
+def _recorded_step(
+    checks: CheckList,
+    name: str,
+    run: dict[str, Any],
+    rdir: Path,
+    exclude: set[str],
+    args: list[str],
+    settings: dict[str, str | None],
+) -> None:
+    """FSL's own step for a recorded run: the previous version's recording of the same run
+    against the compared one's (no run needed)."""
+    old = fsl_versions.step_from("replica")
+    root = oracle_dir(old) if old else None
+    if root is None or not (root / "runs" / name / "run.json").is_file():
+        return
+    pdir = root / "runs" / name
+    prun = json.loads((pdir / "run.json").read_text(encoding="utf-8"))
+    k, j = len(prun["steps"]) - 1, len(run["steps"]) - 1
+    prev = Completed(prun["steps"][k]["exit"], *_recorded_streams(pdir, k))
+    new = Completed(run["steps"][j]["exit"], *_recorded_streams(rdir, j))
+    skip = exclude | {f.name for d in (pdir, rdir) for f in d.iterdir() if f.name.startswith("std")}
+    fsl_step(checks, prev, new, pdir, rdir, skip, args, settings)
 
 
 # ------------------------------------------------------------------------------------------------
@@ -685,6 +886,20 @@ def _fmriprep_case(payload: tuple[str, str], checks: CheckList) -> None:
             )
         if oracle.code == 0 and replica.code == 0:
             fix_pass(checks, mapped, {}, b, replica, set())
+        if (old := fsl_versions.step_from("replica")) is not None:
+            with tempfile.TemporaryDirectory(prefix="lx-nc-fp-") as c_:
+                c = Path(c_)
+                prev = run_oracle(mapped(c), cwd=c, settings={}, version=old)
+                fsl_step(
+                    checks,
+                    Completed(prev.code, prev.stdout.replace(str(c), "<run>"), prev.stderr),
+                    Completed(oracle.code, oracle.stdout.replace(str(a), "<run>"), oracle.stderr),
+                    c,
+                    a,
+                    set(),
+                    mapped(c),
+                    {},
+                )
     _agree_on_errors(checks, [oracle.code], oracle.stderr)
 
 
@@ -769,6 +984,25 @@ def _make_inputs(kind: str, d: Path) -> dict[str, str]:
     files = {"in": str(small), "ref": str(ref)}
     if kind == "tiny":
         files["in"] = _testdata("synthetic/hmc/geometry/tiny.nii.gz")
+    elif kind in ("zst", "bz2-as-nii", "img-dir", "img-out-dir"):
+        import bz2
+
+        raw = gzip.decompress(small.read_bytes())
+        if kind == "zst":
+            zstd = fsl_versions.fsldir(fsl_versions.NEWEST) / "bin" / "zstd"
+            (d / "in.nii").write_bytes(raw)
+            subprocess.run(
+                [str(zstd), "-q", "-f", "--rm", "-o", str(d / "in.nii.zst"), str(d / "in.nii")],
+                check=True,
+            )
+        elif kind == "bz2-as-nii":
+            (d / "in.nii").write_bytes(bz2.compress(raw))
+        elif kind == "img-dir":
+            (d / "a.img.d").mkdir()
+            shutil.copy(small, d / "a.img.d" / "in.nii.gz")
+        else:
+            (d / "a.img.d").mkdir()
+            (d / "a.hdr.d").mkdir()
     elif kind == "int8":
         scaled = np.clip(np.round(data / data.max() * 250 - 125), -128, 127)
         _write_like(small, d / "in.nii.gz", scaled, np.int8)
@@ -874,6 +1108,43 @@ EDGES: dict[str, Edge] = {
         ("-in", "@in", "-out", "out", "-mats"),
         (("FSLOUTPUTTYPE", "ANALYZE"),),
         description="FSLOUTPUTTYPE=ANALYZE",
+    ),
+    "fsloutputtype-zst": Edge(
+        ("-in", "@in", "-out", "out", "-mats", "-stats"),
+        (("FSLOUTPUTTYPE", "NIFTI_ZST"),),
+        description="FSLOUTPUTTYPE=NIFTI_ZST: zstd outputs (FSL 6.0.7.23)",
+    ),
+    "fsloutputtype-pair-bz2": Edge(
+        ("-in", "@in", "-out", "out", "-mats"),
+        (("FSLOUTPUTTYPE", "NIFTI_PAIR_BZ2"),),
+        description="FSLOUTPUTTYPE=NIFTI_PAIR_BZ2: a bzip2 pair (FSL 6.0.7.23)",
+    ),
+    "fsloutputtype-nifti2-zst": Edge(
+        ("-in", "@in", "-out", "out", "-mats"),
+        (("FSLOUTPUTTYPE", "NIFTI2_ZST"),),
+        description="FSLOUTPUTTYPE=NIFTI2_ZST (FSL 6.0.7.23)",
+    ),
+    "input-zst": Edge(
+        ("-in", "in.nii.zst", "-out", "out", "-mats"),
+        inputs="zst",
+        description="a zstd input, found by FSL's extension search too (FSL 6.0.7.23)",
+    ),
+    "input-bz2-plain-name": Edge(
+        ("-in", "in.nii", "-out", "out", "-mats"),
+        inputs="bz2-as-nii",
+        description="a bzip2 file named .nii: read by its content (FSL 6.0.7.23)",
+    ),
+    "img-in-directory": Edge(
+        ("-in", "a.img.d/in.nii.gz", "-out", "out", "-mats"),
+        inputs="img-dir",
+        description="an input in a directory named a.img.d: FSL 6.0.7.23 opens a.hdr.d/in.nii.gz "
+        "(FSL-60)",
+    ),
+    "img-in-output-directory": Edge(
+        ("-in", "@in", "-out", "a.img.d/out", "-mats"),
+        inputs="img-out-dir",
+        description="an output in a.img.d beside a directory a.hdr.d: FSL 6.0.7.23 writes it there "
+        "(FSL-60)",
     ),
     "fsloutputtype-bogus": Edge(
         ("-in", "@in", "-out", "out", "-mats"),
@@ -1017,6 +1288,32 @@ def _edge_case(name: str, checks: CheckList) -> None:
             )
             if replica.code == 0:
                 fix_pass(checks, prepare, settings, b, replica, exclude)
+            if (old := fsl_versions.step_from("replica")) is not None:
+                c = Path(tempfile.mkdtemp(prefix="lx-nc-edge-"))
+                try:
+                    prev = run_oracle(prepare(c), cwd=c, settings=settings, version=old)
+                    fsl_step(
+                        checks,
+                        Completed(
+                            prev.code,
+                            prev.stdout.replace(str(c), "<run>"),
+                            prev.stderr.replace(str(c), "<run>"),
+                        ),
+                        Completed(
+                            oracle.code,
+                            oracle.stdout.replace(str(a), "<run>"),
+                            oracle.stderr.replace(str(a), "<run>"),
+                        ),
+                        c,
+                        a,
+                        exclude,
+                        args,
+                        settings,
+                    )
+                finally:
+                    if (c / "ro").exists():
+                        (c / "ro").chmod(0o755)
+                    shutil.rmtree(c, ignore_errors=True)
         finally:
             for d in (a, b):
                 ro = d / "ro"
@@ -1071,6 +1368,11 @@ def cases(tier: str) -> list[Case]:
 
 
 def run_case(case: Case, checks: CheckList) -> None:
+    with fsl_versions.using("replica"):
+        _run_case(case, checks)
+
+
+def _run_case(case: Case, checks: CheckList) -> None:
     if replica_binary() is None:
         raise Outcome("skipped", "the larmorx-nc program was not found (LARMORX_NC_BIN)")
     kind, payload = case.payload
@@ -1128,18 +1430,22 @@ def _highlights(results: list[CaseResult]) -> list[str]:
             *rows,
         ]
     lines += ["", *defects.summary(results)]
+    lines += fsl_versions.step_highlights(results)
     return lines
 
 
 def suite() -> Suite:
+    v = fsl_versions.selected("replica")
+    root = oracle_dir()
+    where = f"`oracles/{root.parent.name}/{root.name}/`" if root is not None else "(not found)"
     return Suite(
         name="fsl-mcflirt-replica",
         title="mcflirt replica (bit-exact, FSL Licence)",
-        tool="`larmorx-nc fsl mcflirt` (crate larmorx-nc-mcflirt, translated from FSL 6.0.7.17's "
-        'source; `lx.mri.hmc(implementation="replica")`)',
-        reference="mcflirt from FSL 6.0.7.17 (fsl-mcflirt 2111.0, the conda build at `~/fsl`, "
-        "as built: glibc 2.35's maths): the recorded runs in `oracles/fsl-6.0.7/mcflirt/` and "
-        "runs made here",
+        tool="`larmorx-nc fsl mcflirt` (crate larmorx-nc-mcflirt, translated from FSL "
+        f'{fsl_versions.NEWEST}\'s source; `lx.mri.hmc(implementation="replica")`)',
+        reference=f"mcflirt from FSL {v} (fsl-mcflirt 2111.0, the conda build at "
+        f"`~/{fsl_versions.INSTALLS.get(v, 'fsl')}`, as built: glibc 2.35's maths): the recorded "
+        f"runs in {where} and runs made here",
         thresholds=[
             ("Exit status", "the same (an abort: the replica exits 1 after the same text)"),
             (
@@ -1159,6 +1465,6 @@ def suite() -> Suite:
             "It is compared with mcflirt in `reproduce` mode (D13); the default `fix` pass is "
             "checked against the reproduced run. fMRIPrep's own matrices come from its "
             "container's FSL (fsl-mcflirt 2111.0 with newer fsl-newimage and fsl-miscmaths) and "
-            "are reported only."
+            "are reported only. " + fsl_versions.record_line("replica")
         ),
     )

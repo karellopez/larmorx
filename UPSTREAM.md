@@ -4,7 +4,7 @@ Exact upstream releases that larmorx ports from or is validated against. Ported 
 
 Checked 2026-10-09 with `git ls-remote --tags` and fMRIPrep's lockfile (`fmriprep/pixi.lock` at `21a490fb`).
 
-**Policy from 2026-10-27 (user):** the newest upstream releases, brought in by planned update parts. On 2026-10-27 ANTs 2.6.5 and FreeSurfer 8.2.0 were the newest; AFNI moved to 26.3.05 on 2026-10-29 (part 1 of the version update); FSL (newest 6.0.7.23) waits for part 2 (`docs/decision-log.md`, 2026-10-27). The tables below name the versions the current records were made with.
+**Policy from 2026-10-27 (user):** the newest upstream releases, brought in by planned update parts. On 2026-10-27 ANTs 2.6.5 and FreeSurfer 8.2.0 were the newest; AFNI moved to 26.3.05 on 2026-10-29 (part 1 of the version update); FSL moved to 6.0.7.23 on 2026-10-29 (part 2: the replicas; the clean-room head-motion correction stays validated against 6.0.7.17 until a clean-room agent aligns it with FSL-59's behaviour) (`docs/decision-log.md`, 2026-10-27). The tables below name the versions the current records were made with.
 
 ## Ported sources
 
@@ -39,9 +39,9 @@ Validation against fMRIPrep's outputs must allow for the patch-level difference 
 | nibabel | MIT | 5.4.2 (development venv); fMRIPrep's image has 5.3.2 | NIfTI reading/writing semantics (`larmorx-io`), parity oracle |
 | NIfTI-1/2 standard | public domain | `nifti1.h` / `nifti2.h` | file format |
 
-## FSL (oracle, spec source, future `larmorx-nc` replica)
+## FSL (oracle, spec source, the `larmorx-nc` replicas)
 
-FSL is not cloned. The oracle and the source read for `specs/mcflirt.md` are the FSL 6.0.7.17
+FSL is not cloned. **Since 2026-10-29 the replicas follow FSL 6.0.7.23** (`~/fsl-6.0.7.23`, FSL's official installation; table below); 6.0.7.17 stays in `~/fsl` for the clean-room head-motion correction until it is aligned and for the step between the two. The oracle and the source read for `specs/mcflirt.md` are the FSL 6.0.7.17
 conda installation in `~/fsl` (Linux x86-64), whose packages ship their source in
 `~/fsl/src/<package>/`. Versions from `~/fsl/conda-meta/*.json` and each package's
 `metadata_conda_debug.yaml` (checked 2026-10-10):
@@ -56,6 +56,25 @@ conda installation in `~/fsl` (Linux x86-64), whose packages ship their source i
 | fsl-utils | FSL Licence | `2203.5` | `hb6de94e_0` | `99d3cc616a95…627c32f2` | start-up (threading) |
 | fsl-znzlib | FSL Licence | `2111.0` | `hdef71a4_8` | `630acf92423d…eef379e0` | gzip I/O |
 | fsl-armawrap | Apache-2.0 | `0.6.0` | `hdef71a4_5` | `40804c88739f…6292c69c` | matrix printing (`.mat` format) |
+
+FSL 6.0.7.23 (`~/fsl-6.0.7.23/conda-meta/`, checked 2026-10-29), the source of the replicas since
+2026-10-29 (`crates-nc/fsl-source/MANIFEST.tsv`):
+
+| Package | Licence | Version | Conda build | Package SHA-256 | Used for |
+|---|---|---|---|---|---|
+| fsl-mcflirt | FSL Licence | `2111.0` | `h465c9ab_11` | `dadac722951f…5c72926d8` | mcflirt (unchanged source, rebuilt) |
+| fsl-newimage | FSL Licence | `2601.0` | `h541c7df_0` | `7e27e07cc37d…1f4ac3c99` | cost functions, resampling, NIfTI I/O |
+| fsl-miscmaths | FSL Licence | `2412.6` | `hd7ab901_3` | `36b7a485161d…7f5f6f449` | optimiser, Euler maths, kernels, splines |
+| fsl-flirt | FSL Licence | `2111.4` | `h28ab0de_3` | `f12fcd76e08d…28f9bc809` | (flirt: not ported yet) |
+| fsl-newnifti | FSL Licence | `5.0.0` | `h56e42e0_0` | `b6b5305dfed3…b8f2442ad` | NIfTI I/O (FSL-60) |
+| fsl-utils | FSL Licence | `2412.6` | `hdf63e7b_1` | `b6616878217f…01c93b9e0` | start-up, usage ID |
+| fsl-znzlib | FSL Licence | `2511.3` | `hcc786c9_101_zlib` | `9722b02e530a…5ded44334` | gzip, zstd and bzip2 I/O |
+| fsl-armawrap | Apache-2.0 | `0.7.0` (Armadillo 14.2.1) | `h2bc3f7f_3` | `ff91e76239af…a4c853148` | matrix printing; 4 × 4 inverses through LAPACK (not followed yet) |
+| fsl-bet2 | FSL Licence | `2111.9` | `hcdb67c3_3` | `6ee4925e2b98…97365e40a` | bet2, betsurf, the `bet` script |
+| fsl-meshclass | FSL Licence | `2111.0` | `h8c873e0_12` | `c5e71e8f99e6…8079a54f1` | BET's mesh |
+| fsl-avwutils | FSL Licence | `2209.6` | `h6b316f4_0` | `a8ce7e16c92b…09d7cd9db` | `fslstats`, `fslmaths` in `bet` |
+| fslpy | Apache-2.0 | `3.27.0` | `pyhd8ed1ab_0` | `637448124c0b…9bf7e1776` | `imtest`, `remove_ext`, `imglob` |
+| libopenblas | BSD-3-Clause | `0.3.33` | `pthreads_h94d23a6_0` | `3d9aa85648e5…ccedc8903` | Armadillo 14.2.1's LAPACK |
 
 Full SHA-256 values are in `oracles/fsl-6.0.7/mcflirt/manifest.json`. fMRIPrep's published
 ds000005 derivatives (21.0.1) were made with FSL 6.0.5.1; fMRIPrep's current image installs FSL

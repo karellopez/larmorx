@@ -208,6 +208,7 @@ namespace MISCMATHS {
       }
 
       const kernelstorage* kernelvals() { return storedkernel; }
+      const kernelstorage* kernelvals() const { return storedkernel; }
 
   };
 

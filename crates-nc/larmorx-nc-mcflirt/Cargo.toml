@@ -1,6 +1,6 @@
 [package]
 name = "larmorx-nc-mcflirt"
-description = "The bit-exact replica of FSL's mcflirt (head-motion correction), translated from FSL 6.0.7.17 (FSL Licence: non-commercial)"
+description = "The bit-exact replica of FSL's mcflirt (head-motion correction), translated from FSL 6.0.7.23 (FSL Licence: non-commercial)"
 version.workspace = true
 edition.workspace = true
 license.workspace = true

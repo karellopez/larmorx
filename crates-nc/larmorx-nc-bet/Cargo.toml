@@ -1,6 +1,6 @@
 [package]
 name = "larmorx-nc-bet"
-description = "Bit-exact replicas of FSL's BET (bet, bet2, betsurf) for larmorx, translated from FSL 6.0.7.17's source (FSL Licence: non-commercial)"
+description = "Bit-exact replicas of FSL's BET (bet, bet2, betsurf) for larmorx, translated from FSL 6.0.7.23's source (FSL Licence: non-commercial)"
 version.workspace = true
 edition.workspace = true
 license.workspace = true

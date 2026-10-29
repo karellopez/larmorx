@@ -15,7 +15,6 @@ by its suite's comparator (``larmorx_validation.parity.fsl_mcflirt_replica``).
 
 from __future__ import annotations
 
-import functools
 import json
 import os
 import shutil
@@ -153,11 +152,16 @@ def draw(d: gen.Draw) -> dict:
     }
 
 
-@functools.cache
-def _fsl() -> Path:
-    from larmorx_validation.parity.fsl_mcflirt_replica import fsldir
+def _fsl(implementation: str = "replica") -> Path:
+    """The FSL installation ``implementation``'s cases run (``--fsl-version``,
+    :mod:`larmorx_validation.parity.fsl_versions`)."""
+    import os
 
-    return fsldir()
+    from larmorx_validation.parity import fsl_versions
+
+    if os.environ.get(fsl_versions.DIR_ENV) or os.environ.get(fsl_versions.DIR_ENV_OLD):
+        return fsl_versions.fsldir()
+    return fsl_versions.fsldir(fsl_versions.selected(implementation))
 
 
 def case(
@@ -204,27 +208,30 @@ def _run_original(case, checks) -> None:
     """mcflirt runs live into a recorded run of a temporary oracle directory, which the
     record's runner (``parity.mri_hmc.run_case``) replays larmorx against."""
     from larmorx_validation.parity import fsl_mcflirt_replica as rep
-    from larmorx_validation.parity import mri_hmc
+    from larmorx_validation.parity import fsl_versions, mri_hmc
     from larmorx_validation.parity.harness import Case
 
     p = case.payload
     name = "difftest/case"
+    version = None if _fsl("original") == _fsl("replica") else fsl_versions.selected("original")
     with tempfile.TemporaryDirectory(prefix="lx-dt-hmc-") as t:
         root = Path(t) / "oracles" / "fsl-6.0.7" / "mcflirt"
         run_dir = root / "runs" / name
         run_dir.mkdir(parents=True)
         args = _args_for(p["recipe"], p["prefix"], run_dir, copy_inputs=True)
         settings: dict[str, str | None] = {}
-        done = rep.run_oracle(args, cwd=run_dir, settings=settings)
+        done = rep.run_oracle(args, cwd=run_dir, settings=settings, version=version)
         (run_dir / "stdout0.txt").write_text(done.stdout, encoding="utf-8")
         (run_dir / "stderr0.txt").write_text(done.stderr, encoding="utf-8")
-        env = rep._environment(settings)
+        env = rep._environment(settings, version)
         run = {
             "name": name,
             "notes": "a random case of the differential tests",
             "env": env,
             "inputs": {k: {"path": str(run_dir / f"{k}.nii.gz")} for k in p["recipe"]["inputs"]},
-            "steps": [{"argv": [str(_fsl() / "bin" / "mcflirt"), *args], "exit": done.code}],
+            "steps": [
+                {"argv": [str(_fsl("original") / "bin" / "mcflirt"), *args], "exit": done.code}
+            ],
         }
         (run_dir / "run.json").write_text(json.dumps(run, indent=1), encoding="utf-8")
         (root / "manifest.json").write_text(
@@ -232,8 +239,7 @@ def _run_original(case, checks) -> None:
         )
         saved = os.environ.get("LARMORX_MCFLIRT_ORACLE")
         os.environ["LARMORX_MCFLIRT_ORACLE"] = str(root)
-        mri_hmc.oracle_dir.cache_clear()
-        mri_hmc.manifest.cache_clear()
+        mri_hmc._manifest.cache_clear()
         try:
             mri_hmc.run_case(Case(name, "difftest", "", name), checks)
             if p.get("expect") == "divergence" and not all(c.passed for c in checks.checks):
@@ -245,8 +251,7 @@ def _run_original(case, checks) -> None:
                 os.environ.pop("LARMORX_MCFLIRT_ORACLE", None)
             else:
                 os.environ["LARMORX_MCFLIRT_ORACLE"] = saved
-            mri_hmc.oracle_dir.cache_clear()
-            mri_hmc.manifest.cache_clear()
+            mri_hmc._manifest.cache_clear()
 
 
 def _run_replica(case, checks) -> None:

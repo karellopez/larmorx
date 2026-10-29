@@ -75,6 +75,7 @@
 #include <iostream>
 #include <fstream>
 #include <sstream>
+#include "znzlib/znzlib.h"
 #include "NewNifti/NewNifti.h"
 #include "armawrap/newmatio.h"
 #include "miscmaths/miscmaths.h"
@@ -87,6 +88,7 @@ bool FslIsSingleFileType(int filetype);
 int FslNiftiVersionFileType(int filetype);
 int FslFiletypeFromHeader(const NiftiIO::NiftiHeader& header);
 int fslFileType(std::string filename);
+znz::znzFormat fslZnzFormat(int ftype);
 int FslGetEnvOutputType(void);
 std::string outputExtension(const int filetype);
 
@@ -99,7 +101,7 @@ std::string make_basename(std::string& filename);
 std::string make_basename(const std::string& filename);
 std::string appendFSLfilename(const std::string inputName, const std::string addendum);
 int find_pathname(std::string& filename);
-int fslFileType(std::string filename);
+
 template <class T>
 void ConvertAndScaleNewNiftiBuffer(char* buffer, T*& tbuffer, const NiftiIO::NiftiHeader& niihdr, const size_t & imagesize);
   // read
@@ -140,7 +142,7 @@ void set_volume_properties(const NiftiIO::NiftiHeader& niihdr, volume<T>& target
 
 
 template <class T>
-int read_volume_hdr_only(volume<T>& target, const std::string& filename) 
+int read_volume_hdr_only(volume<T>& target, const std::string& filename)
 {
   int64_t nthreads = target.nthreads();
   target.destroy();

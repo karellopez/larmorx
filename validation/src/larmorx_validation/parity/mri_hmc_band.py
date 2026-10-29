@@ -45,6 +45,7 @@ from larmorx_validation.parity.mri_hmc import (
     decompose,
     framewise_displacement,
     oracle_dir,
+    recorded_marker,
     rms_deviation,
 )
 
@@ -152,7 +153,7 @@ def run_band(
                     args.append(str(new_ref))
                 elif prev in ("-out", "-o"):
                     args.append(str(out / "out_mcf.nii.gz"))
-                elif RECORDED in a:
+                elif RECORDED in a or recorded_marker(root) in a:
                     args.append(_resolve(a))
                 else:
                     args.append(a)
@@ -238,12 +239,26 @@ def summarise(out_root: Path) -> dict[str, Any]:
 THRESHOLD_PERTURBATIONS = ("noise", "noise2", "noise3", "reverse")
 
 
+def band_path() -> Path | None:
+    """The band of the recording compared with, else (a recording without its own band: FSL
+    6.0.7.23's) the band measured with FSL 6.0.7.17's mcflirt, which applies where FSL's own step
+    between the two leaves the case's outputs unchanged (the records say so)."""
+    root = oracle_dir()
+    if root is not None and (root / "band" / "band.json").is_file():
+        return root / "band" / "band.json"
+    from larmorx_validation.parity import fsl_versions
+
+    first = fsl_versions.recording(fsl_versions.PREVIOUS)
+    if first is not None and (first / "band" / "band.json").is_file():
+        return first / "band" / "band.json"
+    return None
+
+
 def band_for(case: str) -> dict[str, float] | None:
     """mcflirt's worst deviations from itself for ``case`` under the threshold perturbations
     (the lowest FD correlation for ``fd_r``)."""
-    root = oracle_dir()
-    path = None if root is None else root / "band" / "band.json"
-    if path is None or not path.is_file():
+    path = band_path()
+    if path is None:
         return None
     runs = [
         b

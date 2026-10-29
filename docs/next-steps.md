@@ -68,17 +68,21 @@ at a time:
    (AFNI-03, AFNI-05); the GPL replicas follow 26.3.05 (records against it, AFNI's own step from
    25.2.09 in each case); the clean-room originals stay on 25.2.09 until aligned (below); the
    upstream watch runs weekly from the nightly job; the relicensing inventory done (the user
-   decided the move, item 3c). **Part 2, FSL** (running from 2026-10-29): FSL to its newest 6.0.7.x
-   (6.0.7.23 today; the watch lists 15 of the replicas' 57 FSL files changed and one removed) for
-   the mcflirt and BET replicas, `specs/mcflirt.md` and `specs/bet.md` updated. **Part 3:** SciPy,
+   decided the move, item 3c). **Part 2, FSL: done** (2026-10-29, `docs/parts/2026-10-29-version-fsl/`): the replicas follow FSL
+   6.0.7.23 (FSL-59 to FSL-63 new, FSL-41 fixed upstream; the zstd and bzip2 formats; bet2
+   `--binaryMask`); records against 6.0.7.23 with FSL's own step from 6.0.7.17 in every case;
+   `specs/mcflirt.md` (with `normmi` and `mutualinfo` exactly, appendix B) and `specs/bet.md`
+   updated; Armadillo 14.2.1's LAPACK inverses not followed yet (part 3). **Part 3:** SciPy,
    NumPy and OpenBLAS checked against their newest (resample-series and what follows numpy's
-   inverses); each tool aligned with its newest original, with the per-part testing.
+   inverses), and the FSL replicas follow Armadillo 14.2.1's LAPACK inverses (the follow-up
+   below); each tool aligned with its newest original, with the per-part testing.
    - **3b. The clean-room originals follow the newest versions** (user, 2026-10-29: "the clean
      rooms should be compliant with the new versions"; right after part 2): one clean-room agent,
      from the specs only (lines marked "AFNI 26.3.05" and "FSL 6.0.7.23"): 3dTshift, 3dAutomask and
      3dUnifize aligned with AFNI 26.3.05 (the follow-up "The clean-room originals follow AFNI
-     26.3.05" below, its five points), the head-motion correction with mcflirt 6.0.7.23 where part 2
-     lists a change, and `-cost normmi` if part 2's spec writer has described it exactly; their
+     26.3.05" below, its five points), the head-motion correction with mcflirt 6.0.7.23 (the follow-up
+     "The clean-room head-motion correction follows FSL 6.0.7.23" below, its five points), with
+     `-cost normmi` from `specs/mcflirt.md` appendix B; their
      records, permanent cases and defaults moved to the newest originals.
    - **3c. The AFNI replicas move into the main package** (user, 2026-10-29; AFNI 26.3.05 releases
      MCW's code under CC BY 4.0: [findings/afni-relicensing-26.md](findings/afni-relicensing-26.md)):
@@ -99,7 +103,10 @@ at a time:
    thread-band studies, the extensive evidence on each tool's page (added to what it shows),
    speed and memory studies beyond the rule's check, independent reviews, the agents' scripts
    triage (follow-ups), then the comparisons with fMRIPrep (item 9). Machine-only runs that need
-   no agent (the heavy random-testing cases) may run before, in the background.
+   no agent (the heavy random-testing cases) may run before, in the background. The FSL replicas' full tiers against FSL 6.0.7.23
+   (`fsl-mcflirt-replica-full` and `fsl-bet-replica-full` are 6.0.7.17's: the four mcflirt cases
+   only the full tier runs, among them fMRIPrep's 280-volume multiband run of ds005454, and BET's
+   real T1w and betsurf cases).
 
 The items below keep their history.
 
@@ -433,7 +440,34 @@ The items below keep their history.
   the spec writer describes `normmi` exactly (histogram, fuzzy binning, entropy correction, the
   normalised form), then a clean-room fix measured with
   `validation/investigations/cleanroom-fixes/hmc_alignment.py`. Permanent case
-  `mri-hmc/normmi-aligns-worse` (open).
+  `mri-hmc/normmi-aligns-worse` (open). The spec's appendix B describes `normmi` and `mutualinfo`
+  exactly since 2026-10-29 (the FSL version part): the fix is item 3b's.
+- **The replicas follow Armadillo 14.2.1's LAPACK inverses** (FSL 6.0.7.23; replica author):
+  4 × 4 `inv()` (diagonal `1/x`; triangular `dtrtri`; symmetric `dsytrf`/`dsytri`; else
+  `dgetrf` + `dgetri`), `inv(A)·B` (`dgesv`; symmetric `dsysv`), `det()` by LU, in OpenBLAS
+  0.3.33's Haswell order (the same results under every core tested), checked by a ctypes probe
+  against `~/fsl-6.0.7.23/lib/liblapack.so.3`; then the mcflirt record's 5 expected divergences
+  (`ARMA_LAPACK` in the suite) become passes. `docs/findings/fsl-mcflirt.md`, "FSL 6.0.7.23".
+  It reaches BET too (`docs/findings/fsl-bet.md`, the version trial's triage):
+  `niftivox2newimagevox_mat()` inverts the sampling matrix for an image stored neurologically,
+  in bet2's `-c` (case 80: 18 of 15,360 voxels differ between 6.0.7.17 and 6.0.7.23) and in
+  `fslstats -C` (case 141 shrunk: `-0.000000`, which `bet -R`'s `dc` reads as a subtraction);
+  `bet2_versions.sh` and `cog_sign_probe.py` reproduce both. This part joins the
+  SciPy/NumPy/OpenBLAS part (coordinator, 2026-10-29). Recommendation: port the four LAPACK
+  routines Armadillo 14.2.1 calls for 4 × 4 (`dgetrf`/`dgetri`, `dgesv`, `dsytrf`/`dsytri`,
+  `dtrtri`) as reference LAPACK's algorithms with OpenBLAS 0.3.33's Haswell kernels' summation
+  order (the kernels matter only through `dgemm`/`dtrsm` blocking, which 4 × 4 does not reach:
+  the unblocked `dgetf2`/`dtrti2` paths), and check them bit for bit against
+  `~/fsl-6.0.7.23/lib/liblapack.so.3` through a ctypes probe on random and FSL-typical matrices
+  (swap, sampling, rigid, affine), before switching `arma.rs`.
+- **The clean-room head-motion correction follows FSL 6.0.7.23** (a clean-room agent; from
+  `specs/mcflirt.md`, lines marked "(FSL 6.0.7.23)"): (1) FSL-59: `reproduce` resamples
+  `-sinc_final` and `-nn_final` trilinearly, the default keeps the method asked for, both name
+  FSL-59 where they differ (§9.3); (2) the zstd and bzip2 output types and their message (§10.1),
+  reading by content (§4.1); (3) FSL-60 (§4.1); (4) its record against 6.0.7.23 and
+  `DEFAULT["original"]` in `validation/src/larmorx_validation/parity/fsl_versions.py` set to
+  6.0.7.23; (5) `-cost normmi` and `mutualinfo` from appendix B (the follow-up of 2026-10-29).
+  Against 6.0.7.23 today: the standard tier (136 cases) against mcflirt 6.0.7.23 gives 120 pass, 11 rejected by both, 3 expected divergences, 2 failures: the known `real/ds003345/default` and `syn/motion/small/nn_final` (FSL-59); every other case as against 6.0.7.17 (`validation/investigations/version-fsl/mri-hmc-6.0.7.23.md`); its record and default stay on 6.0.7.17.
 - **The clean-room originals follow AFNI 26.3.05** (item 3b; a clean-room agent; from the specs only,
   lines marked "AFNI 26.3.05"): (1) 3dTshift `-no_detrend`: `reproduce` de-means every voxel
   with its own mean, as `fix` does, and AFNI-05 is never named (`specs/3dTshift.md` §4); (2)

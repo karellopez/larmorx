@@ -658,7 +658,7 @@ impl Run<'_> {
             // FSL-22: the background value with libstdc++'s order of NaN values
             timeseries.nan_order = NanOrder::Libstdcxx;
         }
-        let datatype = volume::file_dtype(&self.o.inputfname)?;
+        let datatype = volume::file_dtype(&self.o.inputfname, self.settings)?;
         self.st.no_volumes = timeseries.tsize() as i32;
         let n = self.st.no_volumes;
         let original_refvol = self.o.refnum;
@@ -951,7 +951,7 @@ impl Run<'_> {
         }
         // The final resampling.
         timeseries.extrap = Extrapolation::Extraslice;
-        timeseries.interp = if self.o.sinc_final {
+        let requested = if self.o.sinc_final {
             Interpolation::Sinc
         } else if self.o.nn_final {
             Interpolation::NearestNeighbour
@@ -960,6 +960,7 @@ impl Run<'_> {
         } else {
             Interpolation::Trilinear
         };
+        timeseries.interp = requested;
         if self.o.sinc_final && timeseries.kernel.is_none() {
             let mut msgs = Vec::new();
             timeseries.kernel = Some(std::sync::Arc::new(kernel::sinc_kernel(
@@ -979,17 +980,67 @@ impl Run<'_> {
             .map(|m| arma::mul_tinysq(m, &init_trans))
             .collect();
         self.background_nan_notice(&timeseries)?;
-        let resampled: Vec<Result<Volume, FslError>> = with_pool(self.n_threads, || {
-            (0..n)
-                .into_par_iter()
-                .map(|i| {
-                    let src = timeseries.sub_volume(i64::from(i))?;
-                    let mut testvol = template.clone().unwrap_or_else(|| src.clone());
-                    affine_transform(&src, &mut testvol, &mats[i as usize], 1.0)?;
-                    Ok(testvol)
-                })
-                .collect()
-        });
+        let resample = |interp: Interpolation| -> Vec<Result<Volume, FslError>> {
+            with_pool(self.n_threads, || {
+                (0..n)
+                    .into_par_iter()
+                    .map(|i| {
+                        let mut src = timeseries.sub_volume(i64::from(i))?;
+                        src.interp = interp;
+                        let mut testvol = template.clone().unwrap_or_else(|| src.clone());
+                        affine_transform(&src, &mut testvol, &mats[i as usize], 1.0)?;
+                        Ok(testvol)
+                    })
+                    .collect()
+            })
+        };
+        let mut resampled = resample(requested);
+        // FSL-59: FSL 6.0.7.23's mcflirt resamples each volume through the series' cached
+        // ShadowVolume (newimage 2601.0), which keeps the interpolation method the volume had
+        // when the registration first read it (trilinear): -sinc_final and -nn_final resample
+        // with trilinear interpolation. Corrected by default (the method asked for, as FSL
+        // 6.0.7.17 did); reproduced with `reproduce`; named where the two differ.
+        if matches!(
+            requested,
+            Interpolation::Sinc | Interpolation::NearestNeighbour
+        ) {
+            let trilinear = resample(Interpolation::Trilinear);
+            let differs = resampled.iter().zip(&trilinear).any(|(a, b)| match (a, b) {
+                (Ok(a), Ok(b)) => a
+                    .data
+                    .iter()
+                    .zip(&b.data)
+                    .any(|(x, y)| x.to_bits() != y.to_bits()),
+                _ => true,
+            });
+            let option = if self.o.sinc_final {
+                "-sinc_final"
+            } else {
+                "-nn_final"
+            };
+            if differs {
+                if self.mode.reproduce() {
+                    self.notice(
+                        &defects::FSL_59,
+                        format!(
+                            "{option}: the series resampled with trilinear interpolation, as FSL \
+                             6.0.7.23's mcflirt does (newimage keeps each volume's first \
+                             interpolation method)"
+                        ),
+                    );
+                    resampled = trilinear;
+                } else {
+                    self.notice(
+                        &defects::FSL_59,
+                        format!(
+                            "{option}: the series resampled with the interpolation asked for; \
+                             FSL 6.0.7.23's mcflirt resamples with trilinear interpolation \
+                             (newimage keeps each volume's first interpolation method)"
+                        ),
+                    );
+                }
+            }
+        }
         for (i, r) in resampled.into_iter().enumerate() {
             let testvol = r?;
             timeseries.set_sub_volume(i as i64, &testvol)?;

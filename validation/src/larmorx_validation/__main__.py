@@ -176,9 +176,10 @@ def cmd_parity(args: argparse.Namespace) -> int:
 
     if args.oracle_cache:
         os.environ[oracle_cache.ENV_MODE] = args.oracle_cache  # the workers inherit it
-    from larmorx_validation.parity import afni_versions
+    from larmorx_validation.parity import afni_versions, fsl_versions
 
     afni_versions.apply(args)  # --afni-version: the workers inherit it
+    fsl_versions.apply(args)  # --fsl-version: the workers inherit it
     cache_mode = oracle_cache.mode()
     suite = _parity_suite(args.suite, args.implementation)
 
@@ -237,6 +238,8 @@ def cmd_parity(args: argparse.Namespace) -> int:
             command += f" --implementation {args.implementation}"
         if args.afni_version:
             command += f" --afni-version {args.afni_version}"
+        if getattr(args, "fsl_version", None):
+            command += f" --fsl-version {args.fsl_version}"
         out = Path(args.out)
         out.mkdir(parents=True, exist_ok=True)
         (out / f"{suite.name}.md").write_text(
@@ -304,9 +307,10 @@ def cmd_figures(args: argparse.Namespace) -> int:
 
 def cmd_evidence(args: argparse.Namespace) -> int:
     from larmorx_validation import evidence
-    from larmorx_validation.parity import afni_versions
+    from larmorx_validation.parity import afni_versions, fsl_versions
 
     afni_versions.apply(args)
+    fsl_versions.apply(args)
 
     return evidence.main(args)
 
@@ -354,9 +358,10 @@ def main(argv: Sequence[str] | None = None) -> int:
         "(LARMORX_ORACLE_CACHE_MODE; the cache is LARMORX_ORACLE_CACHE, else "
         "<workspace>/oracles/cache; docs/validation/oracle-cache.md)",
     )
-    from larmorx_validation.parity import afni_versions
+    from larmorx_validation.parity import afni_versions, fsl_versions
 
     afni_versions.add_argument(p)
+    fsl_versions.add_argument(p)
     p.set_defaults(func=cmd_parity)
     oc = sub.add_parser(
         "oracle-cache",
@@ -450,6 +455,7 @@ def main(argv: Sequence[str] | None = None) -> int:
         help="never compute a missing cache entry: skip the tools that need one",
     )
     afni_versions.add_argument(ev)
+    fsl_versions.add_argument(ev)
     ev.set_defaults(func=cmd_evidence)
     args = parser.parse_args(argv)
     return args.func(args)

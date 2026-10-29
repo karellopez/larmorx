@@ -1,10 +1,11 @@
 // SPDX-License-Identifier: LicenseRef-FSL AND Apache-2.0
 // Copyright 2026 Karel Lopez Vilaret (the translation).
 //
-// fslpy 3.21.1's file-name semantics (imtest, remove_ext, imglob; fsl/utils/path.py,
+// fslpy 3.27.0's file-name semantics (imtest, remove_ext, imglob; fsl/utils/path.py,
 // fsl/scripts/imtest.py, remove_ext.py, imglob.py) are Apache-2.0 (Copyright the University of
-// Oxford, Paul McCarthy); the rest translates FSL's avwutils (fsl-avwutils 2209.3: fslroi.cc,
-// fslmerge.cc, fslmaths.cc, fslstats.cc, fslval) under the FSL Licence.
+// Oxford, Paul McCarthy); the rest translates FSL's avwutils (fsl-avwutils 2209.6: fslroi.cc,
+// fslmerge.cc, fslmaths.cc, fslstats.cc, fslval) under the FSL Licence. FSL 6.0.7.23; first
+// translated from FSL 6.0.7.17 (fslpy 3.21.1, fsl-avwutils 2209.3).
 //! The parts of FSL's other programs that the `bet` script runs, as the script uses them:
 //! `fslval` (dimensions and voxel sizes), `fslroi` (one volume, one slice, a slab), `fslmerge -z`,
 //! `fslmaths ... -dilF` and `-mas`, `fslstats -l <t> -C`, and fslpy's `imtest`, `remove_ext` and
@@ -21,11 +22,23 @@ use crate::settings::Settings;
 use crate::sse;
 use crate::volume::{self, Elem, FslError, SaveError, SaveOptions, Volume};
 
-/// fslpy's image extensions, in its order.
-pub const FSLPY_EXTS: [&str; 8] = [
-    ".nii.gz", ".nii", ".img", ".hdr", ".img.gz", ".hdr.gz", ".mnc", ".mnc.gz",
+/// fslpy's image extensions of `imtest` and `remove_ext`, in its order (fslpy 3.27.0 added the
+/// zstd and bzip2 ones).
+pub const FSLPY_EXTS: [&str; 14] = [
+    ".nii.gz", ".nii", ".nii.zst", ".nii.bz2", ".img", ".hdr", ".img.gz", ".hdr.gz", ".img.zst",
+    ".hdr.zst", ".img.bz2", ".hdr.bz2", ".mnc", ".mnc.gz",
 ];
-const GROUPS: [[&str; 2]; 2] = [[".hdr", ".img"], [".hdr.gz", ".img.gz"]];
+/// `imglob`'s own list: the same without MINC.
+pub const IMGLOB_EXTS: [&str; 12] = [
+    ".nii.gz", ".nii", ".nii.zst", ".nii.bz2", ".img", ".hdr", ".img.gz", ".hdr.gz", ".img.zst",
+    ".hdr.zst", ".img.bz2", ".hdr.bz2",
+];
+const GROUPS: [[&str; 2]; 4] = [
+    [".hdr", ".img"],
+    [".hdr.gz", ".img.gz"],
+    [".hdr.zst", ".img.zst"],
+    [".hdr.bz2", ".img.bz2"],
+];
 
 /// fslpy's `removeExt(path, exts)`: the first extension of the list the name ends with.
 pub fn remove_ext(path: &str) -> String {
@@ -155,7 +168,7 @@ pub fn imglob(paths: &[String]) -> Vec<String> {
         let cands: Vec<String> = if !get_ext(&prefix).is_empty() {
             vec![prefix.clone()]
         } else {
-            FSLPY_EXTS.iter().map(|e| format!("{prefix}{e}")).collect()
+            IMGLOB_EXTS.iter().map(|e| format!("{prefix}{e}")).collect()
         };
         for c in cands {
             if is_file(&c) {
@@ -232,17 +245,17 @@ fn save_failed(e: SaveError) -> ToolFailure {
 }
 
 /// The header of an image named as FSL names it, or the program's failure.
-fn header_of(name: &str) -> Result<nifti::NiftiHeader, ToolFailure> {
+fn header_of(name: &str, fsl: &Settings) -> Result<nifti::NiftiHeader, ToolFailure> {
     let path = volume::return_validimagefilename(name).map_err(failed)?;
-    nifti::load_header(Path::new(&path)).map_err(|e| ToolFailure {
+    nifti::load_header(Path::new(&path), &fsl.open_options()).map_err(|e| ToolFailure {
         err: format!("{}\n", e.0),
         code: 1,
     })
 }
 
 /// `dtype(filename)` then `closestTemplatedType`: the type avwutils programs read a file as.
-pub fn template_type(name: &str) -> Result<i16, ToolFailure> {
-    let h = header_of(name)?;
+pub fn template_type(name: &str, fsl: &Settings) -> Result<i16, ToolFailure> {
+    let h = header_of(name, fsl)?;
     let t = if h.scl_slope != 1.0 || h.scl_inter != 0.0 {
         if h.scl_slope == 0.0 || h.datatype == dt::DOUBLE {
             h.datatype
@@ -275,8 +288,8 @@ pub fn template_type(name: &str) -> Result<i16, ToolFailure> {
 
 /// `fslval <name> <dimN|pixdimN>`: the header field as fslhd prints it, with a trailing blank
 /// (the script's `sed 's/-//g'` applied by the caller).
-pub fn fslval(name: &str, key: &str) -> Result<String, ToolFailure> {
-    let h = header_of(name)?;
+pub fn fslval(name: &str, key: &str, fsl: &Settings) -> Result<String, ToolFailure> {
+    let h = header_of(name, fsl)?;
     let v = if let Some(k) = key.strip_prefix("pixdim") {
         let k: usize = k.parse().unwrap_or(0);
         cnum::fmt_f(h.pixdim[k.min(7)], 6)
@@ -354,7 +367,7 @@ pub fn fslroi(
     fsl: &Settings,
     reproduce_offset: bool,
 ) -> Result<(), ToolFailure> {
-    match template_type(input)? {
+    match template_type(input, fsl)? {
         dt::UNSIGNED_CHAR => fslroi_t::<i8>(input, output, args, fsl, reproduce_offset),
         dt::SIGNED_SHORT => fslroi_t::<i16>(input, output, args, fsl, reproduce_offset),
         dt::SIGNED_INT => fslroi_t::<i32>(input, output, args, fsl, reproduce_offset),
@@ -435,7 +448,7 @@ pub fn fslmerge_z(
     reproduce_offset: bool,
 ) -> Result<(), ToolFailure> {
     let first = inputs.first().map_or("", String::as_str);
-    match template_type(first)? {
+    match template_type(first, fsl)? {
         dt::UNSIGNED_CHAR => fslmerge_z_t::<i8>(output, inputs, fsl, reproduce_offset),
         dt::SIGNED_SHORT => fslmerge_z_t::<i16>(output, inputs, fsl, reproduce_offset),
         dt::SIGNED_INT => fslmerge_z_t::<i32>(output, inputs, fsl, reproduce_offset),
@@ -450,14 +463,14 @@ fn fslmerge_z_t<T: Elem>(
     fsl: &Settings,
     reproduce_offset: bool,
 ) -> Result<(), ToolFailure> {
-    let h0 = header_of(&inputs[0])?;
+    let h0 = header_of(&inputs[0], fsl)?;
     let new_tr = h0.pixdim[4] as f32;
     let x = h0.dim[1].max(1);
     let y = h0.dim[2].max(1);
     let mut z = h0.dim[3].max(1);
     let t = h0.dim[4].max(1);
     for name in &inputs[1..] {
-        z += header_of(name)?.dim[3].max(1);
+        z += header_of(name, fsl)?.dim[3].max(1);
     }
     let mut out = Volume::<T>::new(x, y, z, t);
     let (first, _, _) = volume::read_volume4d::<T>(&inputs[0], fsl).map_err(failed)?;
@@ -556,7 +569,7 @@ pub fn fslmaths_mas(
     fsl: &Settings,
     reproduce_offset: bool,
 ) -> Result<(), ToolFailure> {
-    if volume::file_dtype(input).map_err(failed)? == dt::DOUBLE {
+    if volume::file_dtype(input, fsl).map_err(failed)? == dt::DOUBLE {
         fslmaths_mas_t::<f64>(input, mask, output, fsl, reproduce_offset, sse::mul_f64)
     } else {
         fslmaths_mas_t::<f32>(input, mask, output, fsl, reproduce_offset, sse::mul_f32)

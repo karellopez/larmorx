@@ -151,7 +151,7 @@ eco = "fsl"
 page = "/tools/mri-hmc/"
 use = ["larmorx mri hmc", "larmorx fsl mcflirt", "lx.mri.hmc"]
 how = "clean-room original, `experimental`; exact replica in `larmorx-nc` (FSL Licence, non-commercial)"
-validation = "original: [compared with FSL's mcflirt](record:mri-hmc): {mri-hmc.pass} of {mri-hmc.compared} compared cases within thresholds; [5–16× faster](repo:docs/benchmarks/mri-hmc.md) with threads; replica: [{fsl-mcflirt-replica.pass} of {fsl-mcflirt-replica.compared}](record:fsl-mcflirt-replica) compared cases bit-identical to mcflirt as built (the recorded runs, fMRIPrep's calls on every oracle run with BOLD runs, the data panel's included, and the edge cases; {fsl-mcflirt-replica.both} more rejected by both, alike), fMRIPrep's own matrices identical"
+validation = "original: [compared with FSL's mcflirt](record:mri-hmc): {mri-hmc.pass} of {mri-hmc.compared} compared cases within thresholds; [5–16× faster](repo:docs/benchmarks/mri-hmc.md) with threads; replica: [{fsl-mcflirt-replica.pass} of {fsl-mcflirt-replica.compared}](record:fsl-mcflirt-replica) compared cases bit-identical to mcflirt as built, FSL 6.0.7.23 (the recorded runs, fMRIPrep's calls on every oracle run with BOLD runs, the data panel's included, and the edge cases; {fsl-mcflirt-replica.both} more rejected by both, alike; [{fsl-mcflirt-replica-full.pass} of {fsl-mcflirt-replica-full.compared}](record:fsl-mcflirt-replica-full) in the full tier against FSL 6.0.7.17), fMRIPrep's own matrices identical"
 
 [[tool]]
 id = "fsl-bet"
@@ -160,7 +160,7 @@ eco = "fsl"
 page = "/tools/fsl-bet/"
 use = ["larmorx fsl bet", "larmorx fsl bet2", "larmorx fsl betsurf", "lx.fsl.bet", "lx.fsl.betsurf"]
 how = "exact replica in `larmorx-nc` (FSL Licence, non-commercial); clean-room original planned (`specs/bet.md`)"
-validation = "[{fsl-bet-replica.pass} of {fsl-bet-replica.compared}](record:fsl-bet-replica) compared cases bit-identical to FSL 6.0.7.17, every file, exit status and message ([{fsl-bet-replica-full.pass} of {fsl-bet-replica-full.compared}](record:fsl-bet-replica-full) in the full tier, the data panel's T1w images included), fMRIPrep's {fsl-bet-replica.fmriprep} BET calls on every oracle run with BOLD runs included; {fsl-bet-replica.both} more rejected by both, alike; {fsl-bet-replica.filled} where FSL crashes and `reproduce` fills what it leaves undefined; `bet -S`, `-B`, `-A`, `-A2` pending (FLIRT, FAST)"
+validation = "[{fsl-bet-replica.pass} of {fsl-bet-replica.compared}](record:fsl-bet-replica) compared cases bit-identical to FSL 6.0.7.23, every file, exit status and message ([{fsl-bet-replica-full.pass} of {fsl-bet-replica-full.compared}](record:fsl-bet-replica-full) in the full tier against FSL 6.0.7.17, the data panel's T1w images included), fMRIPrep's {fsl-bet-replica.fmriprep} BET calls on every oracle run with BOLD runs included; {fsl-bet-replica.both} more rejected by both, alike; {fsl-bet-replica.filled} where FSL crashes and `reproduce` fills what it leaves undefined; {fsl-bet-replica.memory} where FSL's fill reads memory beyond the volume (FSL-43, undefined); `bet -S`, `-B`, `-A`, `-A2` pending (FLIRT, FAST)"
 
 # ------------------------------------------------------------------------------------------------
 # Records: the validation index's table (docs/validation/README.md), in this order.
@@ -342,23 +342,29 @@ status = "`validated` (full tier: [ants-atropos-full](record:ants-atropos-full);
 [[record]]
 id = "mri-hmc"
 larmorx = "`lx.mri.hmc`, `larmorx mri hmc` (clean-room)"
-reference = "mcflirt (FSL 6.0.7.17, the recorded runs in `oracles/fsl-6.0.7/mcflirt/`)"
+reference = "mcflirt (FSL 6.0.7.17, the recorded runs in `oracles/fsl-6.0.7/mcflirt/`; against FSL 6.0.7.23 it fails one case more, FSL-59, until a clean-room agent aligns it)"
 status = "`experimental` ({mri-hmc.fail} of {mri-hmc.compared} compared cases misses its threshold)"
 
 [[record]]
 id = "fsl-mcflirt-replica"
 larmorx = "`larmorx-nc fsl mcflirt`, `lx.mri.hmc(implementation=\"replica\")` (the replica, FSL Licence)"
-reference = "mcflirt (FSL 6.0.7.17 as built: the recorded runs, fMRIPrep's calls, edge cases run here)"
-status = "`validated` ({fsl-mcflirt-replica.pass} of {fsl-mcflirt-replica.compared} compared cases bit-identical, fMRIPrep's calls on every oracle run included; {fsl-mcflirt-replica.both} rejected by both, with the same messages and status)"
+reference = "mcflirt (FSL 6.0.7.23 as built since 2026-10-29: the recorded runs, fMRIPrep's calls, edge cases run here; FSL's own step from 6.0.7.17 in every case)"
+status = "`validated` ({fsl-mcflirt-replica.pass} of {fsl-mcflirt-replica.compared} compared cases bit-identical, fMRIPrep's calls included; {fsl-mcflirt-replica.both} rejected by both, with the same messages and status; {fsl-mcflirt-replica.expected} expected divergences: the last bits of FSL 6.0.7.23's LAPACK 4 x 4 inverses, not followed yet)"
+
+[[record]]
+id = "fsl-mcflirt-replica-full"
+larmorx = "the same, full tier"
+reference = "FSL 6.0.7.17 (not re-made for 6.0.7.23: the full tier waits for the final validation phase); besides the standard tier's cases, fMRIPrep's call on the 280-volume multiband run of ds005454 and the sinc final interpolation of ds000005 with and without four stages"
+status = "`validated` ({fsl-mcflirt-replica-full.pass} of {fsl-mcflirt-replica-full.compared} compared cases bit-identical; {fsl-mcflirt-replica-full.both} rejected by both, with the same messages and status)"
 
 [[record]]
 id = "fsl-bet-replica"
 larmorx = "`larmorx-nc fsl bet`, `bet2`, `betsurf`; `lx.fsl.bet`, `lx.fsl.betsurf` (the replica, FSL Licence)"
-reference = "bet, bet2 and betsurf (FSL 6.0.7.17; fMRIPrep's calls also against fMRIPrep's own outputs and its image's FSL)"
-status = "`validated` ({fsl-bet-replica.pass} of {fsl-bet-replica.compared} compared cases bit-identical, fMRIPrep's {fsl-bet-replica.fmriprep} calls included; {fsl-bet-replica.both} rejected by both, with the same messages and status; {fsl-bet-replica.filled} where FSL crashes and `reproduce` fills what it leaves undefined; {fsl-bet-replica.pending} pending FLIRT and FAST)"
+reference = "bet, bet2 and betsurf (FSL 6.0.7.23 since 2026-10-29, FSL's own step from 6.0.7.17 in every case; fMRIPrep's calls also against fMRIPrep's own outputs and its image's FSL)"
+status = "`validated` ({fsl-bet-replica.pass} of {fsl-bet-replica.compared} compared cases bit-identical, fMRIPrep's {fsl-bet-replica.fmriprep} calls included; {fsl-bet-replica.both} rejected by both, with the same messages and status; {fsl-bet-replica.filled} where FSL crashes and `reproduce` fills what it leaves undefined; {fsl-bet-replica.memory} where FSL's fill reads memory beyond the volume (FSL-43); {fsl-bet-replica.pending} pending FLIRT and FAST)"
 
 [[record]]
 id = "fsl-bet-replica-full"
 larmorx = "the same, full tier"
-reference = "the same, and the data panel's real T1w images (bet2, `bet -R`, betsurf on FLIRT's matrices)"
+reference = "FSL 6.0.7.17 (not re-made for 6.0.7.23: the full tier waits for the final validation phase), and the data panel's real T1w images (bet2, `bet -R`, betsurf on FLIRT's matrices)"
 status = "`validated` ({fsl-bet-replica-full.pass} of {fsl-bet-replica-full.compared} compared cases bit-identical; {fsl-bet-replica-full.both} rejected by both; {fsl-bet-replica-full.filled} filled where FSL crashes; {fsl-bet-replica-full.pending} pending)"

@@ -1,6 +1,6 @@
 # SPDX-License-Identifier: Apache-2.0
 """The BET replicas (``larmorx-nc fsl bet|bet2|betsurf``, run as a separate process) against
-FSL 6.0.7.17 itself (``~/fsl``, see validation/)."""
+FSL itself (6.0.7.23, ``~/fsl-6.0.7.23``, or ``--fsl-version``; see validation/)."""
 
 import os
 
@@ -10,7 +10,7 @@ parity = pytest.importorskip("larmorx_validation.parity")
 from larmorx_validation.parity import fsl_bet  # noqa: E402
 
 if fsl_bet.fsl_dir() is None:
-    pytest.skip("FSL 6.0.7.17 is not installed (~/fsl, LARMORX_FSL_DIR)", allow_module_level=True)
+    pytest.skip("FSL is not installed (~/fsl-6.0.7.23, LARMORX_FSLDIR)", allow_module_level=True)
 if fsl_bet.replica_binary() is None:
     pytest.skip("the larmorx-nc program is not built (crates-nc)", allow_module_level=True)
 

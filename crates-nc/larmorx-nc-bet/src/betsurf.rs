@@ -363,7 +363,9 @@ fn fill_from(
     let mut mask = image.clone();
     match fill_mask(&mut mask, start, 0, 1, notices.fix()) {
         Fill::Inside => {}
-        Fill::Outside(s) => outside_notice(notices, s, "the fill of a surface's mask"),
+        f @ (Fill::Outside(_) | Fill::Indexed(..)) => {
+            outside_notice(notices, f, "the fill of a surface's mask")
+        }
         Fill::Skipped(s) => {
             crate::bet2::skipped_notice(notices, s, "the fill of a surface's mask");
         }

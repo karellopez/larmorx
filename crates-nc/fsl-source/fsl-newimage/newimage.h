@@ -75,13 +75,15 @@
 #include <cstdlib>
 #include <iostream>
 #include <limits>
+#include <map>
+#include <memory>
 #include <stdexcept>
 #include <string>
 #include <type_traits>
 #include <vector>
 
 #include "armawrap/newmatap.h"
-#include "positerators.h"
+#include "voxeliterator.h"
 #include "NewNifti/NewNifti.h"
 #include "miscmaths/miscmaths.h"
 #include "miscmaths/kernel.h"
@@ -91,59 +93,69 @@
 
 namespace NEWIMAGE {
 
-  #define SUBSET -1
 
-  const bool USEASSERT=false;  // used inside imthrow to determine type of action
+  // constant which may be passed to samesize to allow
+  // volumes of different dimensionality to be compared
+  const int SUBSET = -1;
+
+  // used inside imthrow to determine type of action
+  const bool USEASSERT = false;
 
   void imthrow(const std::string& msg, int nierrnum, const bool quiet=false);
 
-  enum extrapolation { zeropad, constpad, extraslice, mirror, periodic,
-                       boundsassert, boundsexception, userextrapolation };
+  enum extrapolation { zeropad, constpad, extraslice, mirror, periodic };
 
-  enum interpolation { nearestneighbour, trilinear, sinc, userkernel,
-		       userinterpolation, spline };
+  enum interpolation { nearestneighbour, trilinear, sinc, userkernel, spline };
 
   enum threshtype { inclusive , exclusive };
 
   enum constructionMode { CLONE, TEMPLATE, ALIAS };
 
-#define FSL_TYPE_ANALYZE         10
-#define FSL_TYPE_NIFTI            1
-#define FSL_TYPE_NIFTI2           2
-#define FSL_TYPE_NIFTI_PAIR      11
-#define FSL_TYPE_NIFTI2_PAIR     12
-#define FSL_TYPE_ANALYZE_GZ     100
-#define FSL_TYPE_NIFTI_GZ       101
-#define FSL_TYPE_NIFTI2_GZ      102
-#define FSL_TYPE_NIFTI_PAIR_GZ  111
-#define FSL_TYPE_NIFTI2_PAIR_GZ 112
+  // Internal identifiers for supported image file types.
+  enum fileType {
+    FSL_TYPE_ANALYZE          = 10,
+    FSL_TYPE_NIFTI            =  1,
+    FSL_TYPE_NIFTI2           =  2,
+    FSL_TYPE_NIFTI_PAIR       = 11,
+    FSL_TYPE_NIFTI2_PAIR      = 12,
+    FSL_TYPE_ANALYZE_GZ       = 100,
+    FSL_TYPE_NIFTI_GZ         = 101,
+    FSL_TYPE_NIFTI2_GZ        = 102,
+    FSL_TYPE_NIFTI_PAIR_GZ    = 111,
+    FSL_TYPE_NIFTI2_PAIR_GZ   = 112,
+    FSL_TYPE_ANALYZE_ZST      = 200,
+    FSL_TYPE_NIFTI_ZST        = 201,
+    FSL_TYPE_NIFTI2_ZST       = 202,
+    FSL_TYPE_NIFTI_PAIR_ZST   = 211,
+    FSL_TYPE_NIFTI2_PAIR_ZST  = 212,
+    FSL_TYPE_ANALYZE_BZ2      = 300,
+    FSL_TYPE_NIFTI_BZ2        = 301,
+    FSL_TYPE_NIFTI2_BZ2       = 302,
+    FSL_TYPE_NIFTI_PAIR_BZ2   = 311,
+    FSL_TYPE_NIFTI2_PAIR_BZ2  = 312
+  };
 
-class  fileFormats {
-public:
-  static const std::vector<std::pair<std::string,int> > allFormats() {
-    const std::pair<std::string,int> allOutputFormats[10] = {
-      std::pair<std::string,int>("ANALYZE",FSL_TYPE_ANALYZE),
-      std::pair<std::string,int>("ANALYZE_GZ",FSL_TYPE_ANALYZE_GZ),
-      std::pair<std::string,int>("NIFTI",FSL_TYPE_NIFTI),
-      std::pair<std::string,int>("NIFTI_GZ",FSL_TYPE_NIFTI_GZ),
-      std::pair<std::string,int>("NIFTI_PAIR",FSL_TYPE_NIFTI_PAIR),
-      std::pair<std::string,int>("NIFTI_PAIR_GZ",FSL_TYPE_NIFTI_PAIR_GZ),
-      std::pair<std::string,int>("NIFTI2",FSL_TYPE_NIFTI2),
-      std::pair<std::string,int>("NIFTI2_GZ",FSL_TYPE_NIFTI2_GZ),
-      std::pair<std::string,int>("NIFTI2_PAIR",FSL_TYPE_NIFTI2_PAIR),
-      std::pair<std::string,int>("NIFTI2_PAIR_GZ",FSL_TYPE_NIFTI2_PAIR_GZ),
-    };
-    std::vector<std::pair<std::string,int> > formats(10);
-    for(int i=0;i<10;i++)
-      formats[i]=allOutputFormats[i];
-    return formats;
-  }
-};
+  // Allowed image extensions. The first extension is the header-bearing file,
+  // the second the data-bearing file. For non-paired images these are the same,
+  // but the consistent format can make automated extension processing easier.
+  const std::vector<std::pair<const std::string, const std::string>> fileExtensions = {
+    { ".nii.gz",  ".nii.gz" },
+    { ".nii",     ".nii" },
+    { ".hdr",     ".img" },
+    { ".hdr.gz",  ".img.gz" },
+    { ".nii.zst", ".nii.zst" },
+    { ".hdr.zst", ".img.zst" },
+    { ".nii.bz2", ".nii.bz2" },
+    { ".hdr.bz2", ".img.bz2" }
+  };
 
-#define FSL_RADIOLOGICAL        -1
-#define FSL_NEUROLOGICAL         1
-#define FSL_INCONSISTENT         0
-#define FSL_ZERODET           -101
+  enum orientation {
+    FSL_RADIOLOGICAL = -1,
+    FSL_NEUROLOGICAL = 1,
+    FSL_INCONSISTENT = 0,
+    FSL_ZERODET      = -101
+  };
+
 
 template<class T> class ShadowVolume;
 template<class T> class volume;
@@ -158,11 +170,12 @@ int readGeneralVolume(volume<T>& target, const std::string& filename,
 #pragma interface
   template <class T>
   class volume {
+    friend class ShadowVolume<T>;
   private:
     T* Data;
     T* DataEnd;
-    mutable bool data_owner;
-    mutable double maskDelimiter;
+    bool data_owner;
+    double maskDelimiter;
     int64_t nElements;
     int64_t nThreads;
 
@@ -189,34 +202,170 @@ int readGeneralVolume(volume<T>& target, const std::string& filename,
     int StandardSpaceTypeCode;
     int RigidBodyTypeCode;
 
-    mutable int IntentCode;
-    mutable float IntentParam1;
-    mutable float IntentParam2;
-    mutable float IntentParam3;
+    int IntentCode;
+    float IntentParam1;
+    float IntentParam2;
+    float IntentParam3;
 
-    mutable int SliceOrderingCode;
+    int SliceOrderingCode;
 
-   int64_t no_voxels;
+    int64_t no_voxels;
 
-    mutable SPLINTERPOLATOR::Splinterpolator<T> splint;  // Object used to perform spline interpolation
-    mutable std::mutex splinecoef_mutex;                 // Used to lock recalculation of spline coefficients
-    mutable int splineorder;                             // Spline-order (typically 3 for cubic splines)
-    mutable bool splineuptodate;                         // Indicates need to recalculate spline coefficients
+    float displayMaximum;
+    float displayMinimum;
+    char auxFile[24];
 
-    mutable MISCMATHS::kernel interpkernel;
-    mutable extrapolation p_extrapmethod;
+    // Extrapolation method
+    extrapolation p_extrapmethod;
+    // Value to return for constpad, extraslice
+    T padvalue;
+    // Indicates if extrapolation can produce "valid" values.
+    std::tuple<bool, bool, bool> ep_valid;
 
-    mutable interpolation p_interpmethod;
-    mutable T (*p_userextrap)(const volume<T>& , int64_t, int64_t, int64_t);
-    mutable float (*p_userinterp)(const volume<T>& , float, float, float);
-    mutable T padvalue; // was p_padval in volume4D
+    // Interpolation method
+    interpolation p_interpmethod;
+    // Kernel used for sinc interpolation
+    MISCMATHS::kernel interpkernel;
 
-    mutable T extrapval;                 // the reference target for all extrapolations
-    mutable std::vector<bool> ep_valid;  // Indicates if extrapolation can produce "valid" values.
+    // Object used to perform spline interpolation
+    mutable SPLINTERPOLATOR::Splinterpolator<T> splint;
+    // Used to lock recalculation of spline coefficients
+    mutable std::mutex splinecoef_mutex;
+    // Indicates need to recalculate spline coefficients
+    mutable bool splineuptodate;
+    // Spline-order (typically 3 for cubic splines)
+    int splineorder;
 
-    mutable float displayMaximum;
-    mutable float displayMinimum;
-    mutable char auxFile[24];
+    // ShadowVolume cache, created on-demand on
+    // operator[timepoint] access, and cleared
+    // on all operator() writes. A cache is used
+    // to avoid unnececessary re-calculation of
+    // spline coefficients.
+    mutable std::map<int64_t, ShadowVolume<T>> sv_cache;
+    mutable std::mutex                         sv_cache_mutex;
+
+    // Struct which may be passed to interpolating functions,
+    // and which controls extrapolation behaviour. This allows
+    // calling code to customise the extrapolation settings
+    // when using a const volume, without having to mutate the
+    // volume state via the setextrapolation* functions.
+    public:
+    struct extrapparams {
+    private:
+
+      // Extrapolation method to use.
+      extrapolation _method;
+
+      // Value to return when extrapolating.
+      T _padvalue;
+
+      // Extrapolation reference target,
+      //
+      mutable T _extrapval;
+
+      // xyz validity, used by the valid() function
+      bool _xvalid;
+      bool _yvalid;
+      bool _zvalid;
+
+      // Use volume.p_extrapmethod instead
+      bool _use_default_method;
+
+      // use volume.extrapval instead
+      bool _use_default_padvalue;
+
+      // use volume.ep_valid instead
+      bool _use_default_validity;
+
+    public:
+      extrapolation method(const volume<T>& vol) const {
+        if (_use_default_method) return vol.getextrapolationmethod();
+        else                     return _method;
+      }
+      T padvalue(const volume<T>& vol) const {
+        if (_use_default_padvalue) return vol.getpadvalue();
+        else                       return _padvalue;
+      }
+      T& extrapval() const {
+        return _extrapval;
+      }
+      bool xvalid(const volume<T>& vol) const {
+        if (_use_default_validity) return vol.getextrapolationvalidity()[0];
+        else                       return _xvalid;
+      }
+      bool yvalid(const volume<T>& vol) const {
+        if (_use_default_validity) return vol.getextrapolationvalidity()[1];
+        else                       return _yvalid;
+      }
+      bool zvalid(const volume<T>& vol) const {
+        if (_use_default_validity) return vol.getextrapolationvalidity()[2];
+        else                       return _zvalid;
+      }
+
+    public:
+
+      extrapparams() :
+        _use_default_method(true),
+        _use_default_padvalue(true),
+        _use_default_validity(true) {}
+
+      extrapparams(extrapolation meth) :
+        _method(meth),
+        _use_default_method(false),
+        _use_default_padvalue(true),
+        _use_default_validity(true) {}
+
+      extrapparams(extrapolation meth, T pv) :
+        _method(meth),
+        _padvalue(pv),
+        _use_default_method(false),
+        _use_default_padvalue(false),
+        _use_default_validity(true) {}
+
+      extrapparams(extrapolation meth, T pv, bool xv, bool yv, bool zv) :
+        _method(meth),
+        _padvalue(pv),
+        _xvalid(xv),
+        _yvalid(yv),
+        _zvalid(zv),
+        _use_default_method(false),
+        _use_default_padvalue(false),
+        _use_default_validity(false) {}
+
+      extrapparams(extrapolation meth, bool xv, bool yv, bool zv) :
+        _method(meth),
+        _xvalid(xv),
+        _yvalid(yv),
+        _zvalid(zv),
+        _use_default_method(false),
+        _use_default_padvalue(true),
+        _use_default_validity(false) {}
+
+      extrapparams(bool xv, bool yv, bool zv) :
+        _xvalid(xv),
+        _yvalid(yv),
+        _zvalid(zv),
+        _use_default_method(true),
+        _use_default_padvalue(true),
+        _use_default_validity(false) {}
+    };
+
+  // initialize can be called from the ShadowVolume
+  // class, hence has protected visibility
+  protected:
+    virtual int initialize(
+      int64_t xsize, int64_t ysize, int64_t zsize,
+      int64_t tsize, int64_t d5, int64_t d6, int64_t d7,
+      T *d, bool d_owner, int64_t nthreads); //Master 7D
+
+  private:
+
+    int initialize(
+      int64_t xsize, int64_t ysize, int64_t zsize,
+      T *d, bool d_owner, int64_t nthreads); //3D
+    int initialize(
+      int64_t xsize, int64_t ysize, int64_t zsize,
+      int64_t tsize, T *d, bool d_owner, int64_t nthreads); //4D
 
     // Internal functions
     inline T* basicptr(int64_t x, int64_t y, int64_t z) {
@@ -224,19 +373,27 @@ int readGeneralVolume(volume<T>& target, const std::string& filename,
     }
     inline T* basicptr(int64_t x, int64_t y, int64_t z) const
       { return (Data + (z*RowsY + y)*ColumnsX + x); }
-    int initialize(int64_t xsize, int64_t ysize, int64_t zsize, T *d, bool d_owner, int64_t nthreads); //3D
-    int initialize(int64_t xsize, int64_t ysize, int64_t zsize, int64_t tsize, T *d, bool d_owner, int64_t nthreads); //4D
-    protected:
-    virtual int initialize(int64_t xsize, int64_t ysize, int64_t zsize, int64_t tsize, int64_t d5, int64_t d6, int64_t d7, T *d, bool d_owner, int64_t nthreads); //Master 7D
-    private:
+
     void setdefaultproperties();
     void enforcelimits(std::vector<int>& lims) const;
-    const T& extrapolate(int64_t x, int64_t y, int64_t z) const;
-    float kernelinterpolation(const float x, const float y,
-			      const float z) const;
-    float splineinterpolate(float x, float y, float z) const;
-    float spline_interp1partial(float x, float y, float z, int dir, float *deriv) const;
-    float spline_interp3partial(float x, float y, float z, float *dfdx, float *dfdy, float *dfdz) const;
+
+    const T& extrapolate(
+      int64_t x, int64_t y, int64_t z,
+      const extrapparams& ep=extrapparams()) const;
+    float kernelinterpolation(
+      float x, float y, float z,
+      const extrapparams& ep=extrapparams()) const;
+    float splineinterpolate(
+      float x, float y, float z,
+      const extrapparams& eps=extrapparams()) const;
+    float spline_interp1partial(
+      float x, float y, float z,
+      int dir, float *deriv,
+      const extrapparams& eps=extrapparams()) const;
+    float spline_interp3partial(
+      float x, float y, float z,
+      float *dfdx, float *dfdy, float *dfdz,
+      const extrapparams& eps=extrapparams()) const;
 
     template <class S, class D> friend
     void copybasicproperties(const volume<S>& source, volume<D>& dest);
@@ -271,7 +428,7 @@ int readGeneralVolume(volume<T>& target, const std::string& filename,
     int sform_code() const { return StandardSpaceTypeCode; }
     NEWMAT::Matrix qform_mat() const { return RigidBodyCoordMat; }
     int qform_code() const { return RigidBodyTypeCode; }
-    void set_data_owner(bool d_owner) const { data_owner=d_owner; }
+    void set_data_owner(bool d_owner) { data_owner=d_owner; }
     public:
     typedef T* nonsafe_fast_iterator;
     inline nonsafe_fast_iterator nsfbegin()
@@ -280,12 +437,12 @@ int readGeneralVolume(volume<T>& target, const std::string& filename,
     { return DataEnd; }
    public:
     // CONSTRUCTORS AND DESTRUCTORS (including copy, = and reinitialize)
-    volume(Utilities::NoOfThreads nt = Utilities::NoOfThreads(1));
+    volume(Utilities::NoOfThreads nt = Utilities::NoOfThreads());
     volume(const volume<T>& source, const bool copyData);
     volume(const volume<T>& source, const constructionMode mode=CLONE);
-    volume(int64_t xsize, int64_t ysize, int64_t zsize, Utilities::NoOfThreads nt = Utilities::NoOfThreads(1));
-    volume(int64_t xsize, int64_t ysize, int64_t zsize, int64_t tsize, Utilities::NoOfThreads nt = Utilities::NoOfThreads(1));
-    volume(int64_t xsize, int64_t ysize, int64_t zsize, int64_t tsize, int64_t d5, int64_t d6, int64_t d7, Utilities::NoOfThreads nt = Utilities::NoOfThreads(1));
+    volume(int64_t xsize, int64_t ysize, int64_t zsize, Utilities::NoOfThreads nt = Utilities::NoOfThreads());
+    volume(int64_t xsize, int64_t ysize, int64_t zsize, int64_t tsize, Utilities::NoOfThreads nt = Utilities::NoOfThreads());
+    volume(int64_t xsize, int64_t ysize, int64_t zsize, int64_t tsize, int64_t d5, int64_t d6, int64_t d7, Utilities::NoOfThreads nt = Utilities::NoOfThreads());
     virtual ~volume();
     void destroy();
     const volume<T>& operator=(const volume<T>& that) { return this->equals(that); }
@@ -293,9 +450,9 @@ int readGeneralVolume(volume<T>& target, const std::string& filename,
     virtual const volume<T>& equals(const volume<T>& );
 
     void reinitialize(const volume<T>& source, const constructionMode mode=CLONE);
-    int reinitialize(int64_t xsize, int64_t ysize, int64_t zsize, Utilities::NoOfThreads nt = Utilities::NoOfThreads(1));
-    int reinitialize(int64_t xsize, int64_t ysize, int64_t zsize, int64_t tsize,T *d=nullptr, bool d_owner=true, Utilities::NoOfThreads nt = Utilities::NoOfThreads(1));
-    int reinitialize(int64_t xsize, int64_t ysize, int64_t zsize, int64_t tsize, int64_t d5, int64_t d6, int64_t d7, Utilities::NoOfThreads nt = Utilities::NoOfThreads(1));
+    int reinitialize(int64_t xsize, int64_t ysize, int64_t zsize, Utilities::NoOfThreads nt = Utilities::NoOfThreads());
+    int reinitialize(int64_t xsize, int64_t ysize, int64_t zsize, int64_t tsize,T *d=nullptr, bool d_owner=true, Utilities::NoOfThreads nt = Utilities::NoOfThreads());
+    int reinitialize(int64_t xsize, int64_t ysize, int64_t zsize, int64_t tsize, int64_t d5, int64_t d6, int64_t d7, Utilities::NoOfThreads nt = Utilities::NoOfThreads());
     void copyproperties(const volume<T>& source);
     int copydata(const volume<T>& source, const bool isOwner=true);
 
@@ -360,10 +517,10 @@ int readGeneralVolume(volume<T>& target, const std::string& filename,
       { setxdim(x); setydim(y); setzdim(z); settdim(tr); }
     void setdims(float x, float y, float z, float tr, float d5, float d6, float d7)
       { setxdim(x); setydim(y); setzdim(z); settdim(tr); setd5dim(d5); setd6dim(d6); setd7dim(d7); }
-    void setDisplayMaximumMinimum(const float maximum, const float minimum) const {  displayMaximum=maximum; displayMinimum=minimum; }
-    void setDisplayMaximum(const float maximum) const { setDisplayMaximumMinimum(maximum,displayMinimum); }
-    void setDisplayMinimum(const float minimum) const { setDisplayMaximumMinimum(displayMaximum,minimum); }
-    void setAuxFile(const std::string fileName) { strncpy(auxFile,fileName.c_str(),24); }
+    void setDisplayMaximumMinimum(float maximum, float minimum) {  displayMaximum=maximum; displayMinimum=minimum; }
+    void setDisplayMaximum(float maximum) { setDisplayMaximumMinimum(maximum,displayMinimum); }
+    void setDisplayMinimum(float minimum) { setDisplayMaximumMinimum(displayMaximum,minimum); }
+    void setAuxFile(std::string fileName) { strncpy(auxFile,fileName.c_str(),24); }
     int64_t nvoxels() const { return no_voxels; }
     int64_t ntimepoints() const { return tsize(); }
     int64_t totalElements() const { return nElements; }
@@ -395,7 +552,7 @@ int readGeneralVolume(volume<T>& target, const std::string& filename,
 
     int intent_code() const { return IntentCode; }
     float intent_param(int n) const;
-    void set_intent(int intent_code, float p1, float p2, float p3) const;
+    void set_intent(int intent_code, float p1, float p2, float p3);
 
     inline double maskThreshold() const { return maskDelimiter; }
     T min() const;
@@ -433,6 +590,11 @@ int readGeneralVolume(volume<T>& target, const std::string& filename,
     NEWMAT::ColumnVector histogram(int nbins, T minval, T maxval, const volume<T>& mask)
       const;
 
+    // VOXEL COORDINATE ITERATORS
+    // see voxeliterator.h for details
+    voxelIterator vbegin() const {return voxelIterator(xsize(), ysize(), zsize(), 0); };
+    voxelIterator vend()   const {return voxelIterator(xsize(), ysize(), zsize(), nvoxels()); };
+
     // DATA ACCESS FUNCTIONS (iterators)
 
     typedef const T* fast_const_iterator;
@@ -467,43 +629,54 @@ int readGeneralVolume(volume<T>& target, const std::string& filename,
       int64_t iz=((int64_t) floor(z));
       return((ix>=-1) && (iy>=-1) && (iz>=-1) && (ix<ColumnsX) && (iy<RowsY) && (iz<SlicesZ));
     }
-    inline bool valid(int64_t x, int64_t y, int64_t z) const
+    inline bool valid(int64_t x, int64_t y, int64_t z,
+                      const extrapparams& ep=extrapparams()) const
     {
-      return((ep_valid[0] || (x>=0 && x<ColumnsX)) && (ep_valid[1] || (y>=0 && y<RowsY)) && (ep_valid[2] || (z>=0 && z<SlicesZ)));
+      bool xvalid = ep.xvalid(*this);
+      bool yvalid = ep.yvalid(*this);
+      bool zvalid = ep.zvalid(*this);
+      return((xvalid || (x>=0 && x<ColumnsX)) &&
+             (yvalid || (y>=0 && y<RowsY)) &&
+             (zvalid || (z>=0 && z<SlicesZ)));
     }
-    bool valid(float x, float y, float z, double tol=1e-8) const
+    bool valid(float x, float y, float z, double tol=1e-8,
+               const extrapparams& ep=extrapparams()) const
     {
-      // int ix=((int) floor(x));
-      // int iy=((int) floor(y));
-      // int iz=((int) floor(z));
-      return((ep_valid[0] || (x+tol >= 0.0 && x <= ColumnsX-1+tol)) &&
-             (ep_valid[1] || (y+tol >= 0.0 && y <= RowsY-1+tol)) &&
-             (ep_valid[2] || (z+tol >= 0.0 && z <= SlicesZ-1+tol)));
-      // return((ep_valid[0] || (ix>=0 && (ix+1)<ColumnsX)) && (ep_valid[1] || (iy>=0 && (iy+1)<RowsY)) && (ep_valid[2] || (iz>=0 && (iz+1)<SlicesZ)));
+      bool xvalid = ep.xvalid(*this);
+      bool yvalid = ep.yvalid(*this);
+      bool zvalid = ep.zvalid(*this);
+      return((xvalid || (x+tol >= 0.0 && x <= ColumnsX-1+tol)) &&
+             (yvalid || (y+tol >= 0.0 && y <= RowsY-1+tol)) &&
+             (zvalid || (z+tol >= 0.0 && z <= SlicesZ-1+tol)));
     }
 
-    inline T& operator()(int64_t x, int64_t y, int64_t z) {
+    inline T& operator()(int64_t x, int64_t y, int64_t z,
+                         const extrapparams& ep=extrapparams()) {
       this->invalidateSplines();
-	    if (in_bounds(x,y,z)) return *(basicptr(x,y,z));
-	    else                  return const_cast<T& > (extrapolate(x,y,z));
-    }
-
-    inline const T& operator()(int64_t x, int64_t y, int64_t z) const {
       if (in_bounds(x,y,z)) return *(basicptr(x,y,z));
-	        else                  return extrapolate(x,y,z);
+      else                  return const_cast<T& > (extrapolate(x,y,z,ep));
     }
 
-   inline T& operator()(int64_t x, int64_t y, int64_t z, int64_t t) {
+    inline const T& operator()(int64_t x, int64_t y, int64_t z,
+                               const extrapparams& ep=extrapparams()) const {
+      if (in_bounds(x,y,z)) return *(basicptr(x,y,z));
+      else                  return extrapolate(x,y,z,ep);
+    }
+
+    inline T& operator()(int64_t x, int64_t y, int64_t z, int64_t t,
+                         const extrapparams& ep=extrapparams()) {
       this->invalidateSplines();
       if (!in_bounds(t)) imthrow("Out of Bounds (time index)",5);
-      else if (!in_bounds(x,y,z)) return const_cast<T& > (operator[](t).extrapolate(x,y,z));
-	    return *(Data + ((zsize()*t + z)*ysize() + y)*xsize() + x);
+      else if (!in_bounds(x,y,z)) return const_cast<T& > (operator[](t).extrapolate(x,y,z,ep));
+      return *(Data + ((zsize()*t + z)*ysize() + y)*xsize() + x);
     }
 
-    inline const T& operator()(int64_t x, int64_t y, int64_t z, int64_t t) const
+    inline const T& operator()(int64_t x, int64_t y, int64_t z, int64_t t,
+                               const extrapparams& ep=extrapparams()) const
     { if (!in_bounds(t)) imthrow("Out of Bounds (time index)",5);
-      else if (!in_bounds(x,y,z)) return const_cast<T& > (operator[](t).extrapolate(x,y,z));
-        return *(Data + ((zsize()*t + z)*ysize() + y)*xsize() + x); }
+      else if (!in_bounds(x,y,z)) return const_cast<T& > (operator[](t).extrapolate(x,y,z,ep));
+      return *(Data + ((zsize()*t + z)*ysize() + y)*xsize() + x);
+    }
 
     inline T& operator()(int64_t x, int64_t y, int64_t z, int64_t t, int64_t d5, int64_t d6=0, int64_t d7=0) {
       this->invalidateSplines();
@@ -521,19 +694,22 @@ int readGeneralVolume(volume<T>& target, const std::string& filename,
       return(splint.Coef(static_cast<unsigned int>(x),static_cast<unsigned int>(y),static_cast<unsigned int>(z)));
     }
 
-    float interpolate(float x, float y, float z) const;
-    float interpolate(float x, float y, float z, bool *ep) const;
-    float interp1partial(// Input
-                         float x, float y, float z,  // Co-ordinates to get value for
-                         int     dir,                   // Direction for partial, 0->x, 1->y, 2->z
-                         // Output
-                         float  *pderiv                // Derivative returned here
-                         ) const;
-    float interp3partial(// Input
-                         float x, float y, float z,             // Co-ordinate to get value for
-                         // Output
-                         float *dfdx, float *dfdy, float *dfdz  // Partials
-                         ) const;
+    float interpolate(
+      float x, float y, float z,
+      const extrapparams& ep=extrapparams()) const;
+    float interp1partial(
+      // Input
+      float x, float y, float z,  // Co-ordinates to get value for
+      int dir,                    // Direction for partial, 0->x, 1->y, 2->z
+      // Output
+      float *pderiv,              // Derivative returned here
+      const extrapparams& eps=extrapparams()) const;
+    float interp3partial(
+      // Input
+      float x, float y, float z,             // Co-ordinate to get value for
+      // Output
+      float *dfdx, float *dfdy, float *dfdz, // Partials
+      const extrapparams& eps=extrapparams()) const;
 
     inline T& value(int64_t x, int64_t y, int64_t z)
       { return *(basicptr(x,y,z)); }
@@ -562,43 +738,51 @@ int readGeneralVolume(volume<T>& target, const std::string& filename,
     NEWMAT::ReturnMatrix voxelts(int64_t x, int64_t y, int64_t z) const;
     void setvoxelts(const NEWMAT::ColumnVector& ts, int64_t x, int64_t y, int64_t z);
     void copySubVolume(const int64_t t, volume<T>& newVolume);
-    ShadowVolume<T> operator[](const int64_t t);
-    const ShadowVolume<T> operator[](const int64_t t) const;
+    ShadowVolume<T>& operator[](const int64_t t);
+    const ShadowVolume<T>& operator[](const int64_t t) const;
     const volume<T> constSubVolume(const int64_t t) const;
     void replaceSubVolume(const int64_t t, const volume<T>& newVolume);
     void copyROI(const volume<T>& source,const int64_t minx, const int64_t miny, const int64_t minz, const int64_t mint, const int64_t maxx, const int64_t maxy, const int64_t maxz, const int64_t maxt);
     volume<T> ROI(const int64_t minx, const int64_t miny, const int64_t minz, const int64_t mint, const int64_t maxx, const int64_t maxy, const int64_t maxz, const int64_t maxt) const;
 
     // SECONDARY FUNCTIONS
-    void setextrapolationmethod(extrapolation extrapmethod) const { p_extrapmethod = extrapmethod; }
-    extrapolation getextrapolationmethod() const { return(p_extrapmethod); }
-
-    void setpadvalue(T padval) const { padvalue = padval; }
-    T getpadvalue() const { return padvalue; }
+    virtual void setextrapolationmethod(extrapolation extrapmethod) { p_extrapmethod = extrapmethod; }
+    virtual extrapolation getextrapolationmethod() const { return(p_extrapmethod); }
+    virtual void setpadvalue(T padval) { padvalue = padval; }
+    virtual T getpadvalue() const { return padvalue; }
     T backgroundval() const;
-
-    void defineuserextrapolation(T (*extrap)(
-             const volume<T>& , int64_t, int64_t, int64_t)) const;
-    void setinterpolationmethod(interpolation interpmethod) const;
-    interpolation getinterpolationmethod() const { return p_interpmethod; }
-    void setsplineorder(int order) const;
-    inline void invalidateSplines() const { splineuptodate = false; }
-    int getsplineorder() const { return(splineorder); }
+    virtual void setinterpolationmethod(interpolation interpmethod);
+    virtual interpolation getinterpolationmethod() const { return p_interpmethod; }
+    virtual void setsplineorder(int order);
+    inline void invalidateSplines() {
+      splineuptodate = false;
+      if (p_interpmethod == spline) {
+        std::lock_guard<std::mutex> lg(sv_cache_mutex);
+        sv_cache.clear();
+      }
+    }
+    virtual int getsplineorder() const { return(splineorder); }
     void forcesplinecoefcalculation() const;
-    void setextrapolationvalidity(bool xv, bool yv, bool zv) const { ep_valid[0]=xv; ep_valid[1]=yv; ep_valid[2]=zv; }
-    std::vector<bool> getextrapolationvalidity() const { return(ep_valid); }
-    void defineuserinterpolation(float (*interp)(
-             const volume<T>& , float, float, float)) const;
-    void definekernelinterpolation(const NEWMAT::ColumnVector& kx,
-				   const NEWMAT::ColumnVector& ky,
-				   const NEWMAT::ColumnVector& kz,
-				   int wx, int wy, int wz) const;  // full-width
-    void definekernelinterpolation(const volume<T>& vol) const;
-    void definesincinterpolation(const std::string& sincwindowtype,
-				 int w, int nstore=1201) const;  // full-width
-    void definesincinterpolation(const std::string& sincwindowtype,
-				 int wx, int wy, int wz, int nstore=1201) const;
-                                  // full-width
+
+    virtual void setextrapolationvalidity(bool xv, bool yv, bool zv) { ep_valid = {xv, yv, zv}; }
+
+    virtual std::vector<bool> getextrapolationvalidity() const {
+      std::vector<bool> vv{std::get<0>(ep_valid),
+                           std::get<1>(ep_valid),
+                           std::get<2>(ep_valid)};
+      return(vv);
+    }
+    virtual void definekernelinterpolation(
+      const NEWMAT::ColumnVector& kx,
+      const NEWMAT::ColumnVector& ky,
+      const NEWMAT::ColumnVector& kz,
+      int wx, int wy, int wz);  // full-width
+    virtual void definesincinterpolation(
+      const std::string& sincwindowtype,
+      int w, int nstore=1201);  // full-width
+    virtual void definesincinterpolation(
+      const std::string& sincwindowtype,
+      int wx, int wy, int wz, int nstore=1201); // full-width
 
     inline void getneighbours(int64_t x, int64_t y, int64_t z,
 			      T &v000, T &v001, T &v010,
@@ -607,8 +791,6 @@ int readGeneralVolume(volume<T>& target, const std::string& filename,
     inline void getneighbours(int64_t x, int64_t y, int64_t z,
 			      T &v000, T &v010,
 			      T &v100, T &v110) const;
-
-
 
     // ARITHMETIC FUNCTIONS
     T operator=(T val);
@@ -676,6 +858,24 @@ int readGeneralVolume(volume<T>& target, const std::string& filename,
     // CONVERSION FUNCTIONS
     template <class S, class D> friend
       void copyconvert(const volume<S>& source, volume<D>& dest, const bool copyData);
+
+    // Deprecated functions which change the state of a const volume
+    [[deprecated("Calling setextrapolationmethod on a const volume is not thread safe!")]]
+    void setextrapolationmethod(extrapolation extrapmethod) const {
+      const_cast<volume<T>*>(this)->setextrapolationmethod(extrapmethod);
+    }
+    [[deprecated("Calling setinterpolationmethod on a const volume is not thread safe!")]]
+    void setinterpolationmethod(interpolation interpmethod) const {
+      const_cast<volume<T>*>(this)->setinterpolationmethod(interpmethod);
+    }
+    [[deprecated("Calling setextrapolationvalidity on a const volume is not thread safe!")]]
+    void setextrapolationvalidity(bool xv, bool yv, bool zv) const {
+      const_cast<volume<T>*>(this)->setextrapolationvalidity(xv, yv, zv);
+    }
+    [[deprecated("Calling setsplineorder on a const volume is not thread safe!")]]
+    void setsplineorder(int order) const {
+      const_cast<volume<T>*>(this)->setsplineorder(order);
+    }
   };
 
 template <typename T>
@@ -683,18 +883,59 @@ const T volume<T>::smallestPositiveT = std::is_integral<T>::value ? 1 : std::num
 
 template<class T>
 class ShadowVolume : public volume<T> {
-  public:
+
+private:
+  bool             _assigned;
+  int64_t          _t;
+  const volume<T>* _owner;
+
+  const volume<T>& owner() const;
+
+protected:
+  virtual int initialize(
+    int64_t xsize, int64_t ysize, int64_t zsize,
+    int64_t tsize, int64_t d5, int64_t d6, int64_t d7,
+    T *d, bool d_owner, int64_t nt);
+
+public:
+
   using volume<T>::operator=;
-  private:
-    void setinterpolationmethod(interpolation interp) const { imthrow("Called private shadow method",101); }
-    void setextrapolationmethod(extrapolation extrapmethod) const { imthrow("Called private shadow method",101); }
-    bool assigned;
-    ShadowVolume() : assigned(false) {};
-    virtual int initialize(int64_t xsize, int64_t ysize, int64_t zsize, int64_t tsize, int64_t d5, int64_t d6, int64_t d7, T *d, bool d_owner, int64_t nt);
-  public:
-    const volume<T>& equals(const volume<T>& source);
-    ShadowVolume(const ShadowVolume<T>& source) : assigned(false) { this->reinitialize(source,ALIAS); }
-    ShadowVolume(const volume<T>& source) : assigned(false) { this->reinitialize(source,ALIAS); }
+
+  // Calling interp/extrap setting getters
+  // on a ShadowVolume will delegate to the
+  // owning volume instance
+  virtual interpolation getinterpolationmethod() const;
+  virtual extrapolation getextrapolationmethod() const;
+  virtual T getpadvalue() const;
+  virtual std::vector<bool> getextrapolationvalidity() const;
+  virtual int getsplineorder() const;
+
+  // Calling interp/extrap setting getters
+  // on a ShadowVolume will result in an error
+  [[deprecated("Calling setinterpolationmethod on a ShadowVolume will result in runtime errors!")]]
+  virtual void setinterpolationmethod(interpolation interp);
+  [[deprecated("Calling setextrapolationmethod on a ShadowVolume will result in runtime errors!")]]
+  virtual void setextrapolationmethod(extrapolation extrapmethod) const;
+  [[deprecated("Calling setextrapolationmethod on a ShadowVolume will result in runtime errors!")]]
+  virtual void setextrapolationmethod(extrapolation extrapmethod);
+  [[deprecated("Calling setpadvalue on a ShadowVolume will result in runtime errors!")]]
+  virtual void setpadvalue(T value);
+  [[deprecated("Calling setextrapolationvalidity on a ShadowVolume will result in runtime errors!")]]
+  virtual void setextrapolationvalidity(bool xv, bool yv, bool zv);
+  [[deprecated("Calling definekernelinterpolation on a ShadowVolume will result in runtime errors!")]]
+  virtual void definekernelinterpolation(const NEWMAT::ColumnVector& kx, const NEWMAT::ColumnVector& ky, const NEWMAT::ColumnVector& kz, int wx, int wy, int wz);
+  [[deprecated("Calling definesincinterpolation on a ShadowVolume will result in runtime errors!")]]
+  virtual void definesincinterpolation(const std::string& sincwindowtype, int w, int nstore=1201);
+  [[deprecated("Calling definesincinterpolation on a ShadowVolume will result in runtime errors!")]]
+  virtual void definesincinterpolation(const std::string& sincwindowtype, int wx, int wy, int wz, int nstore=1201);
+  [[deprecated("Calling setsplineorder on a ShadowVolume will result in runtime errors!")]]
+  virtual void setsplineorder(int order);
+
+  const volume<T>& equals(const volume<T>& source);
+
+  ShadowVolume();
+  ShadowVolume(const ShadowVolume<T>& source);
+  ShadowVolume(const volume<T>& source, int64_t t=0);
 };
 
 template<class T>
@@ -740,7 +981,7 @@ public:
   maskedIterator operator++(int) {maskedIterator temp(*this); operator++(); return temp;}
   inline bool operator!=(const T* oPtr) { return baseIterator<T>::ptr != oPtr;}
   maskedIterator& begin();
-  const T* const end() { return baseIterator<T>::ptrEnd; }
+  const T* end() { return baseIterator<T>::ptrEnd; }
  };
 
 template<class T, class U>

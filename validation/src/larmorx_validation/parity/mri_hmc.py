@@ -54,6 +54,10 @@ from larmorx_validation.report import table
 ORACLE = "oracles/fsl-6.0.7/mcflirt"
 RECORDED = "/oracles/fsl-6.0.7/mcflirt/"
 TESTDATA = "larmorx-testdata/data/"
+#: larmorx's threads in each replayed run (``LARMORX_PARITY_LX_THREADS``, 4 by default, as the
+#: ANTs suites; random testing sets its own): with ``--jobs`` the suite stays within the
+#: machine's budget. The results do not depend on the thread count.
+LX_THREADS = int(os.environ.get("LARMORX_PARITY_LX_THREADS", "4"))
 
 #: specs/mcflirt.md §14 and PLAN.md §11.3 ("Motion parameters").
 P95_RMS_MM = 0.1
@@ -91,26 +95,33 @@ EXPECTED_CASES = {
 }
 
 
-@functools.cache
-def oracle_dir() -> Path | None:
-    """The recorded mcflirt runs: ``LARMORX_MCFLIRT_ORACLE``, else the workspace's
-    ``oracles/fsl-6.0.7/mcflirt``."""
+def oracle_dir(implementation: str = "original") -> Path | None:
+    """The recorded mcflirt runs: ``LARMORX_MCFLIRT_ORACLE``, else the recording of the FSL
+    version ``implementation`` is validated against (:mod:`fsl_versions`: ``--fsl-version``;
+    ``oracles/fsl-6.0.7/mcflirt`` for 6.0.7.17, ``oracles/fsl-6.0.7.23/mcflirt`` for 6.0.7.23)."""
     if env := os.environ.get("LARMORX_MCFLIRT_ORACLE"):
         path = Path(env)
         return path if (path / "manifest.json").is_file() else None
-    for parent in Path(__file__).resolve().parents:
-        candidate = parent / ORACLE
-        if (candidate / "manifest.json").is_file():
-            return candidate
-    return None
+    from larmorx_validation.parity import fsl_versions
+
+    return fsl_versions.recording(fsl_versions.selected(implementation))
+
+
+def recorded_marker(root: Path) -> str:
+    """The part of a recorded run's paths that names its recording (``/oracles/fsl-6.0.7/
+    mcflirt/``, ``/oracles/fsl-6.0.7.23/mcflirt/``): mapped to ``root`` on this machine."""
+    return f"/oracles/{root.parent.name}/{root.name}/"
 
 
 @functools.cache
-def manifest() -> dict[str, Any]:
-    root = oracle_dir()
+def _manifest(root: Path | None) -> dict[str, Any]:
     if root is None:
         return {"runs": {}}
     return json.loads((root / "manifest.json").read_text(encoding="utf-8"))
+
+
+def manifest(implementation: str = "original") -> dict[str, Any]:
+    return _manifest(oracle_dir(implementation))
 
 
 def _tier(name: str) -> str:
@@ -159,19 +170,21 @@ def _resolve(arg: str) -> str:
     assert root is not None
     if TESTDATA in arg and arg.startswith("/"):
         return str(td.get(arg.split(TESTDATA, 1)[1]))
-    if RECORDED in arg and arg.startswith("/"):
-        return str(root / arg.split(RECORDED, 1)[1])
+    marker = recorded_marker(root)
+    if marker in arg and arg.startswith("/"):
+        return str(root / arg.split(marker, 1)[1])
     return arg
 
 
 def _run_larmorx(
     args: list[str], env: dict[str, str], mode: str = defects.REPRODUCE
 ) -> tuple[int, str, str]:
-    """``larmorx mri hmc`` in process with the run's ``FSLOUTPUTTYPE``; ``mode`` is D13's
-    ``LARMORX_UPSTREAM_DEFECTS`` (``reproduce`` for the comparison with mcflirt)."""
+    """``larmorx mri hmc`` in process with the run's ``FSLOUTPUTTYPE`` at ``LX_THREADS``
+    threads (the CLI's ``OMP_NUM_THREADS``); ``mode`` is D13's ``LARMORX_UPSTREAM_DEFECTS``
+    (``reproduce`` for the comparison with mcflirt)."""
     from larmorx.cli import run
 
-    saved = {k: os.environ.get(k) for k in ("FSLOUTPUTTYPE",)}
+    saved = {k: os.environ.get(k) for k in ("FSLOUTPUTTYPE", "OMP_NUM_THREADS")}
     out, err = io.StringIO(), io.StringIO()
     try:
         for k in saved:
@@ -179,6 +192,7 @@ def _run_larmorx(
                 os.environ[k] = env[k]
             else:
                 os.environ.pop(k, None)
+        os.environ["OMP_NUM_THREADS"] = str(max(1, LX_THREADS))
         with (
             defects.mode(mode),
             contextlib.redirect_stderr(err),
@@ -551,7 +565,7 @@ def run_case(case: Case, checks: CheckList) -> dict[str, Any]:
     name: str = case.payload
     rdir = root / "runs" / name
     run = json.loads((rdir / "run.json").read_text(encoding="utf-8"))
-    marker = RECORDED + "runs/" + name + "/"
+    marker = recorded_marker(root) + "runs/" + name + "/"
     copied: set[str] = set()
     metrics: dict[str, Any] = {}
 
@@ -737,9 +751,10 @@ def _run_case_recording(case: Case, checks: CheckList) -> None:
 
 
 def _band_rows() -> list[dict[str, Any]]:
-    root = oracle_dir()
-    path = None if root is None else root / "band" / "band.json"
-    if path is None or not path.is_file():
+    from larmorx_validation.parity.mri_hmc_band import band_path
+
+    path = band_path()
+    if path is None:
         return []
     return json.loads(path.read_text(encoding="utf-8"))["runs"]
 
@@ -908,14 +923,24 @@ def _highlights(results: list[CaseResult]) -> list[str]:
     return [*lines, *_band_lines()]
 
 
+def _reference() -> str:
+    from larmorx_validation.parity import fsl_versions
+
+    root = oracle_dir()
+    v = fsl_versions.selected("original")
+    where = f"`oracles/{root.parent.name}/{root.name}/`" if root is not None else "(not found)"
+    return f"mcflirt from FSL {v} (fsl-mcflirt 2111.0), the recorded runs in {where}"
+
+
 def suite() -> Suite:
+    from larmorx_validation.parity import fsl_versions
+
     return Suite(
         name="mri-hmc",
         title="Head-motion correction (mcflirt-compatible)",
         tool="`larmorx mri hmc` / `lx.mri.hmc` (crate larmorx-mri, clean-room from "
         "`specs/mcflirt.md`, Apache-2.0)",
-        reference="mcflirt from FSL 6.0.7.17 (fsl-mcflirt 2111.0), the recorded runs in "
-        "`oracles/fsl-6.0.7/mcflirt/`",
+        reference=_reference(),
         thresholds=[
             ("Exit status and files written", "the same (errors: both reject)"),
             ("Matrix RMS deviation (radius 80 mm), 95th percentile per run", f"≤ {P95_RMS_MM} mm"),
@@ -952,7 +977,8 @@ def suite() -> Suite:
             "outputs are read with nibabel. Parameters are decomposed about the centre of the "
             "reference's field of view (FSL-mm) for the comparison; the `.par` files are "
             "compared as written (about the reference's intensity-weighted centre). The `descrip` "
-            "header field differs by design (larmorx writes its own name). larmorx uses all "
-            "logical CPUs; its results do not depend on the thread count."
+            "header field differs by design (larmorx writes its own name). larmorx runs at "
+            f"{LX_THREADS} threads (`LARMORX_PARITY_LX_THREADS`); its results do not depend on "
+            "the thread count. " + fsl_versions.record_line("original", with_step=False)
         ),
     )

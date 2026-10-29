@@ -33,9 +33,10 @@ use crate::nifti::{self, NiftiExtension, NiftiHeader, dt};
 use crate::settings::Settings;
 use crate::sse;
 
-/// The build string newimage 2203.12 writes into `descrip` (FSL 6.0.7.17's conda build), for
-/// replicas whose files must be FSL's byte for byte.
-pub const BUILDSTRING: &str = "2203.12-dirty 2024-02-01T16:17:47+00:00";
+/// The build string newimage 2601.0 writes into `descrip` (FSL 6.0.7.23's conda build), for
+/// replicas whose files must be FSL's byte for byte (FSL 6.0.7.17's newimage 2203.12 wrote
+/// "2203.12-dirty 2024-02-01T16:17:47+00:00").
+pub const BUILDSTRING: &str = "2601.0 2025-12-08T15:20:57Z";
 
 /// `FSL_RADIOLOGICAL`, `FSL_NEUROLOGICAL`, `FSL_INCONSISTENT`, `FSL_ZERODET`.
 pub const RADIOLOGICAL: i32 = -1;
@@ -1043,12 +1044,17 @@ pub fn mirrorclamp(x: i64, x1: i64, x2: i64) -> i64 {
 // ------------------------------------------------------------------------------------------------
 // File names (generalio.cc)
 
-/// The image extensions FSL knows: (header-bearing, data-bearing).
-const EXTENSIONS: [(&str, &str); 4] = [
+/// The image extensions FSL knows (newimage 2601.0's `fileExtensions`, in its order):
+/// (header-bearing, data-bearing). newimage 2203.12 knew the first four.
+pub const EXTENSIONS: [(&str, &str); 8] = [
     (".nii.gz", ".nii.gz"),
     (".nii", ".nii"),
     (".hdr", ".img"),
     (".hdr.gz", ".img.gz"),
+    (".nii.zst", ".nii.zst"),
+    (".hdr.zst", ".img.zst"),
+    (".nii.bz2", ".nii.bz2"),
+    (".hdr.bz2", ".img.bz2"),
 ];
 
 /// `make_basename(filename)`: one image extension removed, if the name ends with one.
@@ -1079,6 +1085,7 @@ pub fn return_validimagefilename(filename: &str) -> Result<String, FslError> {
         for (first, second) in EXTENSIONS {
             if format!("{bname}{first}") == filename || format!("{bname}{second}") == filename {
                 validname = format!("{bname}{first}");
+                break;
             }
         }
         if is_regular_file(&validname) {
@@ -1274,7 +1281,8 @@ fn read_general<T: Elem>(
             return Err(out);
         }
     };
-    let loaded = nifti::load_image(Path::new(&valid)).map_err(|e| fail(&e.0))?;
+    let loaded =
+        nifti::load_image(Path::new(&valid), &settings.open_options()).map_err(|e| fail(&e.0))?;
     let mut header = loaded.header;
     let keep_ext = settings
         .get("FSL_LOAD_NIFTI_EXTENSIONS")
@@ -1382,12 +1390,13 @@ pub fn read_volume<T: Elem>(
 
 /// `dtype(filename)`: the file's datatype, or `DT_FLOAT` when it is scaled (unless the slope is
 /// 0 or the type is double).
-pub fn file_dtype(filename: &str) -> Result<i16, FslError> {
+pub fn file_dtype(filename: &str, settings: &Settings) -> Result<i16, FslError> {
     if filename.is_empty() {
         return Ok(-1);
     }
     let valid = return_validimagefilename(filename)?;
-    let h = nifti::load_header(Path::new(&valid)).map_err(FslError::nifti)?;
+    let h =
+        nifti::load_header(Path::new(&valid), &settings.open_options()).map_err(FslError::nifti)?;
     if h.scl_slope != 1.0 || h.scl_inter != 0.0 {
         if h.scl_slope == 0.0 || h.datatype == dt::DOUBLE {
             return Ok(h.datatype);
@@ -1415,7 +1424,7 @@ pub fn closest_templated_type(t: i16) -> Result<i16, String> {
 // ------------------------------------------------------------------------------------------------
 // Saving
 
-/// `FSL_TYPE_*`.
+/// `FSL_TYPE_*` (newimage 2601.0's `fileType`: the zstd and bzip2 types are new in it).
 pub mod filetype {
     pub const ANALYZE: i32 = 10;
     pub const NIFTI: i32 = 1;
@@ -1427,6 +1436,29 @@ pub mod filetype {
     pub const NIFTI2_GZ: i32 = 102;
     pub const NIFTI_PAIR_GZ: i32 = 111;
     pub const NIFTI2_PAIR_GZ: i32 = 112;
+    pub const ANALYZE_ZST: i32 = 200;
+    pub const NIFTI_ZST: i32 = 201;
+    pub const NIFTI2_ZST: i32 = 202;
+    pub const NIFTI_PAIR_ZST: i32 = 211;
+    pub const NIFTI2_PAIR_ZST: i32 = 212;
+    pub const ANALYZE_BZ2: i32 = 300;
+    pub const NIFTI_BZ2: i32 = 301;
+    pub const NIFTI2_BZ2: i32 = 302;
+    pub const NIFTI_PAIR_BZ2: i32 = 311;
+    pub const NIFTI2_PAIR_BZ2: i32 = 312;
+}
+
+/// `fslZnzFormat(filetype)`: how a file of this type is written (newimage 2601.0; newimage
+/// 2203.12 compressed every type from 100 up with gzip).
+pub fn znz_format(ftype: i32) -> nifti::ZnzFormat {
+    use filetype::*;
+    match ftype {
+        NIFTI_GZ | NIFTI2_GZ | NIFTI_PAIR_GZ | NIFTI2_PAIR_GZ => nifti::ZnzFormat::Gzip,
+        NIFTI_ZST | NIFTI2_ZST | NIFTI_PAIR_ZST | NIFTI2_PAIR_ZST => nifti::ZnzFormat::Zstd,
+        NIFTI_BZ2 | NIFTI2_BZ2 | NIFTI_PAIR_BZ2 | NIFTI2_PAIR_BZ2 => nifti::ZnzFormat::Bzip2,
+        // ANALYZE_GZ, _ZST, _BZ2 are not listed: written uncompressed (FSL's function)
+        _ => nifti::ZnzFormat::Raw,
+    }
 }
 
 /// Why `FslGetEnvOutputType` stopped the program: the lines it printed and its exit status
@@ -1454,19 +1486,31 @@ pub fn env_output_type(settings: &Settings) -> Result<i32, OutputTypeExit> {
     Ok(match otype {
         "NIFTI" => filetype::NIFTI,
         "NIFTI2" => filetype::NIFTI2,
-        "NIFTI_GZ" => filetype::NIFTI_GZ,
-        "NIFTI2_GZ" => filetype::NIFTI2_GZ,
         "NIFTI_PAIR" => filetype::NIFTI_PAIR,
         "NIFTI2_PAIR" => filetype::NIFTI2_PAIR,
+        "NIFTI_GZ" => filetype::NIFTI_GZ,
+        "NIFTI2_GZ" => filetype::NIFTI2_GZ,
         "NIFTI_PAIR_GZ" => filetype::NIFTI_PAIR_GZ,
         "NIFTI2_PAIR_GZ" => filetype::NIFTI2_PAIR_GZ,
+        "NIFTI_ZST" => filetype::NIFTI_ZST,
+        "NIFTI2_ZST" => filetype::NIFTI2_ZST,
+        "NIFTI_PAIR_ZST" => filetype::NIFTI_PAIR_ZST,
+        "NIFTI2_PAIR_ZST" => filetype::NIFTI2_PAIR_ZST,
+        "NIFTI_BZ2" => filetype::NIFTI_BZ2,
+        "NIFTI2_BZ2" => filetype::NIFTI2_BZ2,
+        "NIFTI_PAIR_BZ2" => filetype::NIFTI_PAIR_BZ2,
+        "NIFTI2_PAIR_BZ2" => filetype::NIFTI2_PAIR_BZ2,
         other => {
             return Err(OutputTypeExit {
                 printed: vec![
                     format!(
                         "ERROR:: Unrecognised value ({other}) of environment variable FSLOUTPUTTYPE"
                     ),
-                    "Legal values are: NIFTI, NIFTI_PAIR, NIFTI_GZ, NIFTI_PAIR_GZ".to_owned(),
+                    "Legal values are: NIFTI, NIFTI_PAIR, NIFTI2, NIFTI2_PAIR, NIFTI_GZ, \
+                     NIFTI_PAIR_GZ, NIFTI2_GZ, NIFTI2_PAIR_GZ, NIFTI_ZST, NIFTI_PAIR_ZST, \
+                     NIFTI2_ZST, NIFTI2_PAIR_ZST, NIFTI_BZ2, NIFTI_PAIR_BZ2, NIFTI2_BZ2, \
+                     NIFTI2_PAIR_BZ2"
+                        .to_owned(),
                 ],
             });
         }
@@ -1479,8 +1523,12 @@ pub fn output_extension(filetype: i32) -> &'static str {
     match filetype {
         NIFTI | NIFTI2 => ".nii",
         NIFTI_GZ | NIFTI2_GZ => ".nii.gz",
+        NIFTI_ZST | NIFTI2_ZST => ".nii.zst",
+        NIFTI_BZ2 | NIFTI2_BZ2 => ".nii.bz2",
         ANALYZE | NIFTI_PAIR | NIFTI2_PAIR => ".hdr",
         NIFTI_PAIR_GZ | NIFTI2_PAIR_GZ | ANALYZE_GZ => ".hdr.gz",
+        NIFTI_PAIR_ZST | NIFTI2_PAIR_ZST | ANALYZE_ZST => ".hdr.zst",
+        NIFTI_PAIR_BZ2 | NIFTI2_PAIR_BZ2 | ANALYZE_BZ2 => ".hdr.bz2",
         _ => "",
     }
 }
@@ -1672,8 +1720,9 @@ impl<T: Elem> Volume<T> {
             &bytes,
             &v.extensions,
             &h,
-            filetype >= 100,
+            znz_format(filetype),
             opts.reproduce_offset,
+            &settings.open_options(),
         )
         .map_err(|e| SaveError::Exception(FslError::nifti(e)))?;
         Ok(Saved::Written)

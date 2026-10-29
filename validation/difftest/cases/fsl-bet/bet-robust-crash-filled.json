@@ -1,0 +1,166 @@
+{
+ "defect": "FSL-43",
+ "description": "bet -R -g 0.5 -e: FSL's second bet2 crashes in a fill that starts far above the image, and the script's ERR trap prints its failure after the crash; reproduce goes on (FSL-43's fill by its linear index) and the suite compares what FSL printed before its crash (found by the FSL version trial, 2026-10-29)",
+ "expect": "pass",
+ "found": {
+  "detail": "messages before FSL's crash: stdout FSL 110 characters, larmorx 0: 'bet failed during command:/tmp/lx-difftest-inputs_n0y528hb/run/d04af435962853de/' / ''",
+  "n": 1308,
+  "seed": "20261029",
+  "shrink_moves": [
+   "input (and its grid): origin at 0"
+  ],
+  "signature": [
+   "messages before FSL's crash"
+  ]
+ },
+ "id": "bet-robust-crash-filled",
+ "implementations": [
+  "replica"
+ ],
+ "reason": "",
+ "recipe": {
+  "extra": {
+   "output_type": "NIFTI_PAIR_GZ",
+   "tool": "bet"
+  },
+  "features": {
+   "-c": false,
+   "-d": false,
+   "-e": true,
+   "-f": false,
+   "-g": true,
+   "-m": false,
+   "-n": false,
+   "-o": false,
+   "-r": false,
+   "-s": false,
+   "-t": false,
+   "-v": false,
+   "-w": false,
+   "FSLOUTPUTTYPE": "NIFTI_PAIR_GZ",
+   "content": "crop",
+   "corner0": 23,
+   "corner1": 27,
+   "corner2": 43,
+   "crop source": "templateflow/tpl-MNI152NLin2009cAsym/tpl-MNI152NLin2009cAsym_res-02_desc-fMRIPrep_boldref.nii.gz",
+   "crop stride": 1,
+   "dtype": "int16",
+   "extreme": true,
+   "g": "0.5",
+   "orientation": "plumb",
+   "origin0": -34.25,
+   "origin1": 31.5,
+   "origin2": 22.75,
+   "qfac": 1,
+   "qform_code": 1,
+   "range": "plain",
+   "sform": "same",
+   "sform_code": 0,
+   "shape": "28x32x28",
+   "spacing0": 1.0,
+   "spacing1": 25.0,
+   "spacing2": 0.1,
+   "suffix": ".nii.gz",
+   "tool": "bet",
+   "units": "m",
+   "variation": "-R"
+  },
+  "groups": [
+   {
+    "args": [
+     "{in:input}",
+     "out"
+    ],
+    "name": "input",
+    "optional": false
+   },
+   {
+    "args": [
+     "-R"
+    ],
+    "name": "variation",
+    "optional": false
+   },
+   {
+    "args": [
+     "-g",
+     "0.5"
+    ],
+    "name": "-g",
+    "optional": true
+   },
+   {
+    "args": [
+     "-e"
+    ],
+    "name": "-e",
+    "optional": true
+   }
+  ],
+  "inputs": {
+   "input": {
+    "content": {
+     "corner": [
+      23,
+      27,
+      43
+     ],
+     "seed": 1531844927,
+     "source": "templateflow/tpl-MNI152NLin2009cAsym/tpl-MNI152NLin2009cAsym_res-02_desc-fMRIPrep_boldref.nii.gz",
+     "stride": 1,
+     "type": "crop"
+    },
+    "dtype": "int16",
+    "geometry": {
+     "origin": [
+      0.0,
+      0.0,
+      0.0
+     ],
+     "qfac": 1,
+     "qform_code": 1,
+     "quaternion": [
+      1,
+      0,
+      0,
+      0
+     ],
+     "sform": "same",
+     "sform_code": 0,
+     "spacing": [
+      1.0,
+      25.0,
+      0.1
+     ],
+     "units": "m"
+    },
+    "scaling": null,
+    "shape": [
+     28,
+     32,
+     28
+    ],
+    "suffix": ".nii.gz",
+    "values": {
+     "offset": 0.0,
+     "scale": 1.0
+    }
+   }
+  },
+  "n": 1308,
+  "options": [
+   "-R",
+   "-e",
+   "-g",
+   "FSLOUTPUTTYPE=NIFTI_PAIR_GZ",
+   "bet"
+  ],
+  "seed": "20261029",
+  "tool": "fsl-bet"
+ },
+ "rule": null,
+ "status": "fixed",
+ "suite": "fsl-bet-replica",
+ "tier": "smoke",
+ "tool": "fsl-bet"
+}

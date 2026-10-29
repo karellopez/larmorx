@@ -1,5 +1,6 @@
 # SPDX-License-Identifier: Apache-2.0
-"""BET (``bet2``, ``bet``, ``betsurf``), the ``larmorx-nc`` replica against FSL 6.0.7.17:
+"""BET (``bet2``, ``bet``, ``betsurf``), the ``larmorx-nc`` replica against FSL (6.0.7.23, or
+6.0.7.17 with ``--fsl-version``; FSL's own step between them is the records', not run here):
 random heads and options through BET's own parity runner (``larmorx_validation.parity.fsl_bet``):
 exit status, both streams, every file written byte for byte (images decompressed), the D13 fix
 pass. The replica must be bit-identical.
@@ -25,8 +26,18 @@ from larmorx_validation.difftest.tools import _ants
 HEADS = ("head", "crop", "blobs", "noise", "ramp", "constant", "zeros")
 HEAD_WEIGHTS = (7, 2, 1, 0.4, 0.4, 0.15, 0.05)
 DTYPES = ("float32", "float32", "int16", "int16", "uint8", "float64", "int32")
-OUTPUT_TYPES = ("NIFTI_GZ", "NIFTI", "NIFTI_PAIR", "NIFTI2_GZ", "NIFTI_PAIR_GZ", "ANALYZE")
-OUTPUT_WEIGHTS = (5, 2.5, 1, 1, 0.3, 0.2)
+# FSL 6.0.7.23 added the zstd and bzip2 types (drawn rarely: NIFTI_ZST, NIFTI2_PAIR_BZ2)
+OUTPUT_TYPES = (
+    "NIFTI_GZ",
+    "NIFTI",
+    "NIFTI_PAIR",
+    "NIFTI2_GZ",
+    "NIFTI_PAIR_GZ",
+    "ANALYZE",
+    "NIFTI_ZST",
+    "NIFTI2_PAIR_BZ2",
+)
+OUTPUT_WEIGHTS = (5, 2.5, 1, 1, 0.3, 0.2, 0.4, 0.2)
 
 
 def _image(d: gen.Draw, ndim: int = 3, **kw) -> dict:
@@ -278,15 +289,20 @@ def case(
 
 def _run(impl: str):
     from larmorx_validation.parity import fsl_bet as fb
+    from larmorx_validation.parity import fsl_versions
 
-    return fb.run_case
+    def run(case, checks) -> None:
+        with fsl_versions.without_step():
+            fb.run_case(case, checks)
+
+    return run
 
 
 def _unavailable() -> str:
     from larmorx_validation.parity import fsl_bet as fb
 
     if fb.fsl_dir() is None:
-        return "FSL 6.0.7.17 (~/fsl, LARMORX_FSL_DIR) was not found"
+        return "FSL (~/fsl-6.0.7.23, ~/fsl, LARMORX_FSLDIR) was not found"
     if fb.replica_binary() is None:
         return "the larmorx-nc program was not found"
     return ""

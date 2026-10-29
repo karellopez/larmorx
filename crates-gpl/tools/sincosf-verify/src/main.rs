@@ -157,7 +157,14 @@ fn main() {
         }
     }
     let ok = total.fma == [0, 0] && total.sse2 == [0, 0] && total.c_library == [0, 0];
-    println!("{}", if ok { "EQUAL ON EVERY INPUT" } else { "DIFFERENCES FOUND" });
+    println!(
+        "{}",
+        if ok {
+            "EQUAL ON EVERY INPUT"
+        } else {
+            "DIFFERENCES FOUND"
+        }
+    );
     std::process::exit(if ok { 0 } else { 1 });
 }
 

@@ -242,12 +242,7 @@ fn usage(prog: &str) -> String {
     let replicas: String = replica::REPLICAS
         .iter()
         .map(|r| match r.package() {
-            None => format!(
-                "  {} {}: built in ({})\n",
-                r.family,
-                r.tool,
-                r.licence()
-            ),
+            None => format!("  {} {}: built in ({})\n", r.family, r.tool, r.licence()),
             Some(p) => format!(
                 "  {} {}: {} ({}), a separate program\n",
                 r.family, r.tool, p.name, p.licence
@@ -255,7 +250,10 @@ fn usage(prog: &str) -> String {
         })
         .collect();
     let mut packages: Vec<&replica::Package> = Vec::new();
-    for p in replica::REPLICAS.iter().filter_map(replica::Replica::package) {
+    for p in replica::REPLICAS
+        .iter()
+        .filter_map(replica::Replica::package)
+    {
         if !packages.contains(&p) {
             packages.push(p);
         }
@@ -376,8 +374,7 @@ mod tests {
             implementation: Some(Implementation::Replica),
             ..Options::default()
         };
-        let (code, _, err) =
-            run_options(&["lx", "afni", "3dTshift", "-bogus", "in.nii"], &replica);
+        let (code, _, err) = run_options(&["lx", "afni", "3dTshift", "-bogus", "in.nii"], &replica);
         assert_eq!(code, 1);
         assert!(err.contains("Unknown option: -bogus"), "{err}");
         for tool in ["3dAutomask", "3dUnifize"] {

@@ -1,18 +1,15 @@
 # SPDX-License-Identifier: Apache-2.0
-"""``lx.afni.automask`` and ``lx.afni.unifize`` with the replica: with a stand-in for the
-``larmorx-gpl`` program (written by the test, as in ``test_replica.py``) they pass AFNI's
-options, settings and D13's choice to it and read its outputs back; without it, ``"auto"`` runs
-the clean-room original and ``"replica"`` refuses clearly. The replica itself is checked by its
-own golden tests and by the parity suites against AFNI; the originals by
+"""``lx.afni.automask`` and ``lx.afni.unifize`` with the replica, built into larmorx since
+2026-10-29: ``"auto"`` and ``"replica"`` run it in this process, ``"original"`` the clean-room
+original; with a stand-in for the built-in replica (``builtin_stub``) the wrappers pass AFNI's
+options, settings and D13's choice to it and read its outputs back. The replica itself is
+checked by its own golden tests and by the parity suites against AFNI; the originals by
 ``test_afni_masks_original.py``, the golden tests and the parity suites."""
 
 from __future__ import annotations
 
 import contextlib
 import io
-import json
-import os
-import sys
 import warnings
 from pathlib import Path
 
@@ -20,64 +17,9 @@ import numpy as np
 import pytest
 
 import larmorx as lx
-from larmorx import _replica
 from larmorx.cli import run as cli_run
 
-STUB = """\
-import json, os, shutil, sys
-from pathlib import Path
-
-here = Path(__file__).parent
-config = json.loads((here / "config.json").read_text(encoding="utf-8"))
-args = sys.argv[1:]
-with open(here / "calls.jsonl", "a", encoding="utf-8") as f:
-    f.write(json.dumps({"args": args, "threads": os.environ.get("OMP_NUM_THREADS"),
-                        "defects": os.environ.get("LARMORX_UPSTREAM_DEFECTS"),
-                        "afni": {k: v for k, v in os.environ.items()
-                                 if k.upper().startswith(("AFNI_", "NIML_"))}}) + "\\n")
-if args == ["--version"]:
-    print("larmorx-gpl " + config["version"])
-    sys.exit(0)
-sys.stderr.write(config["stderr"])
-source = args[args.index("-input") + 1] if "-input" in args else args[-1]
-for option in ("-prefix", "-apply_prefix", "-depth", "-ssave", "-amsave"):
-    if config["exit"] == 0 and option in args:
-        shutil.copyfile(source, args[args.index(option) + 1])  # a copy of the input
-sys.exit(config["exit"])
-"""
-
-
-def stub(directory: Path, exit: int = 0, stderr: str = "") -> Path:
-    """A ``larmorx-gpl`` program in ``directory`` that records its calls and writes its input
-    to each output it is given."""
-    directory.mkdir(parents=True, exist_ok=True)
-    (directory / "stub.py").write_text(STUB, encoding="utf-8")
-    config = {"version": "9.9.9", "exit": exit, "stderr": stderr}
-    (directory / "config.json").write_text(json.dumps(config), encoding="utf-8")
-    script = directory / "stub.py"
-    if os.name == "nt":
-        program = directory / "larmorx-gpl.cmd"
-        text = f'@echo off\r\n"{sys.executable}" "{script}" %*\r\nexit /b %ERRORLEVEL%\r\n'
-        program.write_bytes(text.encode("utf-8"))
-    else:
-        program = directory / "larmorx-gpl"
-        program.write_text(f'#!/bin/sh\nexec "{sys.executable}" "{script}" "$@"\n', "utf-8")
-        program.chmod(0o755)
-    return program
-
-
-def calls(program: Path) -> list[dict]:
-    lines = (program.parent / "calls.jsonl").read_text(encoding="utf-8").splitlines()
-    return [json.loads(line) for line in lines if json.loads(line)["args"] != ["--version"]]
-
-
-@pytest.fixture
-def scripts(monkeypatch, no_replica, tmp_path) -> Path:
-    """The Python environment's scripts directory, as larmorx sees it: empty to start with."""
-    directory = tmp_path / "scripts"
-    directory.mkdir()
-    monkeypatch.setattr(_replica, "search_dirs", lambda: [str(directory)])
-    return directory
+REPLICA = lx.Implementation("replica", "larmorx", lx.__version__, "Apache-2.0 AND CC-BY-4.0")
 
 
 def volume(tmp_path: Path) -> Path:
@@ -88,39 +30,52 @@ def volume(tmp_path: Path) -> Path:
     return path
 
 
-def cli(tool: str, *args: str) -> tuple[int, str, str]:
+def cli(tool: str, *args: str, implementation: str | None = None) -> tuple[int, str, str]:
     out, err = io.StringIO(), io.StringIO()
     with contextlib.redirect_stdout(out), contextlib.redirect_stderr(err):
-        code = cli_run(["larmorx", "afni", tool, *args])
+        code = cli_run(["larmorx", "afni", tool, *args], implementation=implementation)
     return code, out.getvalue(), err.getvalue()
 
 
-def test_without_the_replica_auto_runs_the_original(scripts, tmp_path):
+def test_auto_runs_the_built_in_replica(no_replica, tmp_path):
+    """No program to install: the replica is part of larmorx, and gives what the command line's
+    replica writes; ``"original"`` runs the clean-room original."""
     path = volume(tmp_path)
-    install = r'pip install "larmorx\[exact\]"'
-    with pytest.raises(lx.ReplicaNotFoundError, match=install):
-        lx.afni.automask(path, implementation="replica")
-    with pytest.raises(lx.ReplicaNotFoundError, match=install):
-        lx.afni.unifize(path, implementation="replica")
-    with warnings.catch_warnings():
-        warnings.simplefilter("ignore")
-        for r in (lx.afni.automask(path), lx.afni.automask(path, implementation="original")):
-            assert r.mask.implementation.kind == "original"
-        u = lx.afni.unifize(path)
-    assert u.image.implementation.kind == "original"
     out = tmp_path / "out"
     out.mkdir()
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore")
+        for implementation in ("auto", "replica"):
+            r = lx.afni.automask(path, implementation=implementation)
+            assert r.mask.implementation == REPLICA
+            u = lx.afni.unifize(path, implementation=implementation)
+            assert u.image.implementation == REPLICA
+        assert lx.afni.automask(path, implementation="original").mask.implementation.kind == (
+            "original"
+        )
+        assert lx.afni.unifize(path, implementation="original").image.implementation.kind == (
+            "original"
+        )
     code, _, err = cli("3dAutomask", "-q", "-prefix", str(out / "m.nii"), str(path))
     assert code == 0, err
+    np.testing.assert_array_equal(lx.load(out / "m.nii").data, r.mask.data)
     code, _, err = cli("3dUnifize", "-quiet", "-prefix", str(out / "u.nii"), str(path))
     assert code == 0, err
-    # The help lists them.
+    np.testing.assert_array_equal(lx.load(out / "u.nii").data, u.image.data)
+    for implementation in ("original", "replica"):
+        code, _, err = cli(
+            "3dAutomask", "-q", "-prefix", str(out / f"m_{implementation}.nii"), str(path),
+            implementation=implementation,
+        )  # fmt: skip
+        assert code == 0, err
+    # The help lists them, whichever implementation runs.
     for tool in ("3dTshift", "3dAutomask", "3dUnifize"):
-        code, _, _ = cli(tool)
-        assert code == 0
+        for implementation in ("original", "replica"):
+            code, _, _ = cli(tool, implementation=implementation)
+            assert code == 0
 
 
-def test_arguments_are_checked_before_anything_runs(scripts, tmp_path):
+def test_arguments_are_checked_before_anything_runs(builtin_stub, tmp_path):
     path = volume(tmp_path)
     for kwargs in (
         {"clfrac": 0.05},
@@ -149,10 +104,10 @@ def test_arguments_are_checked_before_anything_runs(scripts, tmp_path):
         lx.afni.unifize(path, afni_settings={"AFNI_PATH_SPACES_OK": "YES"})
     with pytest.raises(ValueError, match="upstream_defects"):
         lx.afni.automask(path, upstream_defects="exact")
+    assert builtin_stub.calls == []
 
 
-def test_automask_runs_the_replica_with_the_options(scripts, monkeypatch, tmp_path):
-    program = stub(scripts)
+def test_automask_runs_the_replica_with_the_options(builtin_stub, monkeypatch, tmp_path):
     monkeypatch.setenv("AFNI_NIFTI_PRIORITY", "Q")  # must not reach the replica
     path = volume(tmp_path)
     r = lx.afni.automask(
@@ -170,7 +125,7 @@ def test_automask_runs_the_replica_with_the_options(scripts, monkeypatch, tmp_pa
         upstream_defects="reproduce",
         afni_settings={"AFNI_NIFTI_VIEW": "tlrc"},
     )
-    (call,) = calls(program)
+    (call,) = builtin_stub.calls
     args = call["args"]
     assert args[:3] == ["afni", "3dAutomask", "-q"]
     for option in ("-nograd", "-NN1", "-eclip"):
@@ -178,6 +133,8 @@ def test_automask_runs_the_replica_with_the_options(scripts, monkeypatch, tmp_pa
     assert args[args.index("-clfrac") + 1] == "0.3" and args[args.index("-peels") + 1] == "2"
     assert args[args.index("-dilate") + 1] == "1" and args[args.index("-SI") + 1] == "130.0"
     assert args[-1] == str(path.resolve()) or Path(args[-1]) == path.resolve()
+    # Outputs named relative to the call's own directory, which the replica is given.
+    assert args[args.index("-prefix") + 1] == "mask.nii" and Path(call["cwd"]).is_absolute()
     assert call["threads"] == "2" and call["defects"] == "reproduce"
     assert call["afni"]["AFNI_NIFTI_VIEW"] == "tlrc"
     assert "AFNI_NIFTI_PRIORITY" not in call["afni"]
@@ -186,19 +143,17 @@ def test_automask_runs_the_replica_with_the_options(scripts, monkeypatch, tmp_pa
     for img in (r.mask, r.masked, r.depth):
         assert img is not None
         np.testing.assert_array_equal(img.data, expected)
-        assert img.implementation.kind == "replica"
-        assert img.implementation.package == "larmorx-gpl"
+        assert img.implementation == REPLICA
     plain = lx.afni.automask(path)
     assert plain.masked is None and plain.depth is None
 
 
-def test_unifize_runs_the_replica_and_passes_its_warnings(scripts, tmp_path):
-    line = (
+def test_unifize_runs_the_replica_and_passes_its_warnings(builtin_stub, tmp_path):
+    builtin_stub.stderr = (
         "*+ WARNING: upstream defect AFNI-45 (3dUnifize) corrected: -T2up 100 points one past "
         "the sorted values [LARMORX_UPSTREAM_DEFECTS=reproduce gives 3dUnifize's result]\n"
         "*+ WARNING: Only processing sub-brick #0 (out of 3)\n"
     )
-    program = stub(scripts, stderr=line)
     path = volume(tmp_path)
     with pytest.warns(lx.UpstreamDefectWarning, match="AFNI-45"):
         r = lx.afni.unifize(
@@ -208,7 +163,7 @@ def test_unifize_runs_the_replica_and_passes_its_warnings(scripts, tmp_path):
             save_scale=True,
             save_automask=True,
         )
-    (call,) = calls(program)
+    (call,) = builtin_stub.calls
     args = call["args"]
     assert args[:3] == ["afni", "3dUnifize", "-quiet"]
     i = args.index("-rbt")
@@ -217,15 +172,17 @@ def test_unifize_runs_the_replica_and_passes_its_warnings(scripts, tmp_path):
     assert args[args.index("-clfrac") + 1] == "0.2"
     assert args[-2] == "-input"
     assert r.scale is not None and r.automasked is not None
+    builtin_stub.stderr = ""
     two = lx.afni.unifize(path, t2=2, gm=True, duplo=False, epi=True, squash=False)
-    args = calls(program)[-1]["args"]
+    args = builtin_stub.calls[-1]["args"]
     assert args.count("-T2") == 2
     for option in ("-GM", "-noduplo", "-EPI", "-nosquash"):
         assert option in args
     assert two.image.data.shape == (6, 5, 4)
 
 
-def test_a_failing_replica_raises(scripts, tmp_path):
-    stub(scripts, exit=1, stderr="** FATAL ERROR: Mask creation fails for unknown reasons!\n")
+def test_a_failing_replica_raises(builtin_stub, tmp_path):
+    builtin_stub.exit = 1
+    builtin_stub.stderr = "** FATAL ERROR: Mask creation fails for unknown reasons!\n"
     with pytest.raises(lx.ReplicaError, match="Mask creation fails"):
         lx.afni.automask(volume(tmp_path))

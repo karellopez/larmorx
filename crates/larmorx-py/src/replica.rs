@@ -93,9 +93,8 @@ fn replica_run_builtin(
         let code = replica::run_builtin_in(family, tool, &args, env, cwd, &mut out, &mut err);
         (code, out, err)
     });
-    let code = code.ok_or_else(|| {
-        PyKeyError::new_err(format!("{family} {tool} has no built-in replica"))
-    })?;
+    let code = code
+        .ok_or_else(|| PyKeyError::new_err(format!("{family} {tool} has no built-in replica")))?;
     Ok((
         code,
         String::from_utf8_lossy(&out).into_owned(),

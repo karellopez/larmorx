@@ -665,7 +665,10 @@ mod tests {
             choose_with(Implementation::Original, TSHIFT, never),
             Ok(Choice::Original)
         );
-        assert_eq!(choose(Implementation::Auto, TSHIFT, &[]), Ok(Choice::Builtin));
+        assert_eq!(
+            choose(Implementation::Auto, TSHIFT, &[]),
+            Ok(Choice::Builtin)
+        );
         // A separate program.
         let replica = Choice::Replica(PathBuf::from("bin/larmorx-nc"));
         assert_eq!(

@@ -7,6 +7,11 @@ names its licence on one of its first lines (after a shebang):
 - Apache-2.0 directories (`crates/`, `python/`, `tests/`, `validation/`, `scripts/`): the
   expression must contain `Apache-2.0` and must not contain GPL or FSL terms. Files
   translated from MIT or BSD code say so, e.g. `Apache-2.0 AND MIT`.
+- The AFNI replicas (`crates/larmorx-afni-replica/`, since 2026-10-29): `Apache-2.0`, or with
+  the licence of what a file translates: `Apache-2.0 AND CC-BY-4.0` (the Medical College of
+  Wisconsin's code, which AFNI 26.3.05 releases under CC BY 4.0: every file whose header names
+  it), `Apache-2.0 AND MIT` (Arm's routines), `Apache-2.0 AND SunPro` (fdlibm). CC BY 4.0 is
+  allowed nowhere else.
 - `crates-gpl/`: the expression must start with `GPL-3.0-or-later`.
 - `crates-nc/`: the expression must contain `LicenseRef-FSL`.
 
@@ -82,7 +87,19 @@ MIXED = {
     "python/larmorx/ndimage.py": "Apache-2.0 AND BSD-3-Clause",
     "python/larmorx/transforms/chain.py": "Apache-2.0 AND MIT",
     "python/larmorx/transforms/resample.py": "Apache-2.0 AND MIT",
+    "crates/larmorx-afni-replica/src/sincosf.rs": "Apache-2.0 AND MIT",
+    "crates/larmorx-afni-replica/src/fdlibm.rs": "Apache-2.0 AND SunPro",
 }
+
+#: The AFNI replicas' crate and the expressions its files may carry.
+AFNI_REPLICA = "crates/larmorx-afni-replica/"
+AFNI_REPLICA_EXPRESSIONS = {
+    "Apache-2.0",
+    "Apache-2.0 AND CC-BY-4.0",
+    "Apache-2.0 AND MIT",
+    "Apache-2.0 AND SunPro",
+}
+MCW = "Medical College of Wisconsin"
 
 
 def family(rel: Path) -> str | None:
@@ -117,6 +134,22 @@ def problem(fam: str, expr: str | None) -> str | None:
     return None
 
 
+def afni_replica_problem(path: Path, rel: str, expr: str | None) -> str | None:
+    """CC BY 4.0 only in the AFNI replicas' crate, and there in every file whose header names the
+    Medical College of Wisconsin's code; that crate's other expressions from its short list."""
+    if expr is None:
+        return None
+    if not rel.startswith(AFNI_REPLICA):
+        return f"'{expr}': CC BY 4.0 code belongs in {AFNI_REPLICA}" if "CC-BY" in expr else None
+    if expr not in AFNI_REPLICA_EXPRESSIONS:
+        return f"'{expr}' is not one of {sorted(AFNI_REPLICA_EXPRESSIONS)}"
+    with path.open(encoding="utf-8") as f:
+        head = "".join(line for _, line in zip(range(24), f, strict=False))
+    if MCW in head and "Major portions" in head and expr != "Apache-2.0 AND CC-BY-4.0":
+        return f"'{expr}': the header names {MCW}'s code, so 'Apache-2.0 AND CC-BY-4.0'"
+    return None
+
+
 def add_header(path: Path, expr: str) -> None:
     text = path.read_text(encoding="utf-8")
     line = f"{SUFFIXES[path.suffix]} SPDX-License-Identifier: {expr}\n"
@@ -147,6 +180,8 @@ def main() -> int:
         msg = problem(fam, expr)
         if msg is None and rel.as_posix() in MIXED and expr != MIXED[rel.as_posix()]:
             msg = f"'{expr}' should be '{MIXED[rel.as_posix()]}'"
+        if msg is None and fam == "apache":
+            msg = afni_replica_problem(path, rel.as_posix(), expr)
         if msg:
             bad.append(f"{rel.as_posix()}: {msg}")
     for line in bad:

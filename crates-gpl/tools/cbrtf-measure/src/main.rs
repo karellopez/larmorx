@@ -30,9 +30,9 @@
 //! kind (default 40). Exit status 0 when no ball and no message changes, 3 otherwise.
 #![forbid(unsafe_code)]
 
-use larmorx_core::math::cbrtf as cbrtf_core;
 use glibc_reference::floatmath::cbrtf as cbrtf_glibc;
 use larmorx_afni_replica::unifize::{epi_radius, sphere};
+use larmorx_core::math::cbrtf as cbrtf_core;
 use rayon::prelude::*;
 
 /// 3dUnifize `-EPI`'s radius from the cube root of the voxel volume (the replica's
@@ -399,12 +399,7 @@ fn main() {
         }
     }
     // MRI voxels: edges from 0.1 mm (1e-3 mm^3) up; the radius is 4.14 (both) beyond ~86 mm^3.
-    let mri = |cases: &[u32]| {
-        cases
-            .iter()
-            .filter(|&&b| f32::from_bits(b) >= 1e-3)
-            .count()
-    };
+    let mri = |cases: &[u32]| cases.iter().filter(|&&b| f32::from_bits(b) >= 1e-3).count();
     println!(
         "voxel volumes of at least 0.001 mm^3 (edges of 0.1 mm and up): radius differs {}, \
          message differs {}, ball differs {}",
@@ -461,7 +456,12 @@ fn main() {
         found.replica_flagged[2],
         found.replica_unflagged.len()
     );
-    for &b in found.replica_unflagged.iter().chain(&found.replica_radius_wrong).take(list) {
+    for &b in found
+        .replica_unflagged
+        .iter()
+        .chain(&found.replica_radius_wrong)
+        .take(list)
+    {
         println!("  {}", show(b));
     }
     let none = message.is_empty() && ball.is_empty() && found.cross_check_failed.is_empty();

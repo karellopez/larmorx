@@ -18,8 +18,8 @@ under the FSL Licence's terms; translated from FSL's source:
 replica that ran.
 
 **Status: `validated`** (the replica), against FSL 6.0.7.23 itself
-([record](../validation/fsl-bet-replica.md), standard tier: 170 cases, 125 compared, every one
-bit-identical, 310 of 310 files byte for byte, FSL's own step from 6.0.7.17 in every case;
+([record](../validation/fsl-bet-replica.md), standard tier: 176 cases, 128 compared, every one
+bit-identical, 315 of 315 files byte for byte, FSL's own step from 6.0.7.17 in every case;
 [full tier](../validation/fsl-bet-replica-full.md), against FSL 6.0.7.17: 173 cases, 129
 compared, 364 of 364 files byte for byte): every compared case gives FSL's exit status, messages and files byte
 for byte (images: header and data; meshes as text), fMRIPrep's 29 BET calls on its twelve oracle
@@ -120,13 +120,18 @@ the project's rules A to D ([register](../findings/upstream-defects.md)):
   non-finite `-c` or search depth: FSL computes with them; the default refuses (exit 1, naming the
   value).
 - **FSL-43** (A): the mask's fill starts at the surface's centroid without a bounds check; on a
-  single slice that voxel lies below the image and FSL writes and reads outside the volume; the
-  default starts at the nearest voxel inside (`reproduce` does the part FSL defines and warns).
-  Where the centroid is far outside or not a number, FSL writes far outside the volume and
-  crashes: the default fills from the nearest voxel for a real position and refuses otherwise;
+  single slice that voxel lies below the image. From a start outside, FSL reaches each point by
+  the image's linear index: a point outside is another voxel of the volume, or memory beyond it,
+  which FSL reads and writes (and may crash on). The default starts at the nearest voxel inside;
+  `reproduce` does FSL's fill point by point, the volume exactly and the memory beyond it read as
+  not part of the mask, and warns with the number of those reads (since 2026-10-29). Where the
+  centroid is not a number, FSL writes far outside the volume and crashes: the default refuses;
   `reproduce` skips the fill (the mask holds the drawn surface only) and warns.
 - **FSL-44** (A): `bet` splits names with blanks into words and stops its options at an empty
   argument; the default keeps each argument whole.
+- **FSL-63** (A): `bet -R` passes bet2's options through bash's `echo`, which takes a leading
+  `-e` (`-n`, `-E`) as its own option: `bet <in> <out> -R -e` writes no mesh in FSL. The default
+  passes the options as given (the mesh written); `reproduce` drops them as FSL does.
 - **FSL-45** (A): `bet -Z` crops its outputs with `imglob` called without `${FSLDIR}/bin`: with
   FSL off the `PATH` (always so in Python) FSL leaves them padded; the default crops exactly its
   outputs.
@@ -165,7 +170,8 @@ documented (rule C):
 
 - Where FSL aborts on an uncaught exception (a missing input, FSL-40's `.img` name), the
   replica prints FSL's messages before the abort and one line of its own, and exits 1 (FSL: 134).
-  Where it crashes on what it leaves undefined (FSL-41, FSL-52, FSL-43 far outside), the default
+  Where it crashes on what it leaves undefined (FSL-41, FSL-52, FSL-43 at a centre that is not a
+  number), the default
   refuses (exit 1) and `reproduce` finishes with the undefined part filled (exit 0, the defect
   named); FSL ends by a signal. FSL's buffered standard output before such a crash may be lost
   (with `-v`); the replica's goes on.

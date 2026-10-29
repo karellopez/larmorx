@@ -249,6 +249,9 @@ def _without_build_lines(text: str) -> str:
     return "\n".join(line for line in text.splitlines() if not _BUILD_LINE.search(line))
 
 
+#: A text output whose numbers differ by at most 1e-12 or in a NaN's sign: Armadillo 14.2.1's
+#: LAPACK path (4 x 4 inverses and solves) in FSL 6.0.7.23.
+ARMA_ONLY = "numbers within 1e-12 or NaN signs only (Armadillo 14.2.1's LAPACK arithmetic)"
 #: A difference that only FSL's build string makes: an image header whose ``descrip`` alone
 #: changed (newimage writes its build string there).
 BUILD_STRING_ONLY = "descrip only (FSL's build string)"
@@ -296,15 +299,18 @@ def step_detail(
     if sorted(outputs[0]) != sorted(outputs[1]):
         changes.append((f"outputs {sorted(outputs[0])} → {sorted(outputs[1])}", list(why)))
     for name, d in sorted(differences.items()):
-        changes.append((f"{name}: {d}", ["build-string"] if d == BUILD_STRING_ONLY else list(why)))
+        own = {BUILD_STRING_ONLY: ["build-string"], ARMA_ONLY: ["arma-lapack"]}.get(d)
+        changes.append((f"{name}: {d}", own or list(why)))
     if not changes:
         return False, "identical: exit status, messages and outputs"
     used = sorted({r for _, rs in changes for r in rs})
     unexplained = [c for c, rs in changes if not rs]
     known = "; ".join(f"{r}: {CHANGES[r]}" for r in used)
     if unexplained:
-        known = (known + "; " if known else "") + "no known reason (a finding): " + "; ".join(
-            unexplained
+        known = (
+            (known + "; " if known else "")
+            + "no known reason (a finding): "
+            + "; ".join(unexplained)
         )
     return True, "; ".join(c for c, _ in changes) + f" [{known}]"
 

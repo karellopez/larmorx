@@ -19,5 +19,7 @@ larmorx-nc-bet.workspace = true
 
 [dev-dependencies]
 flate2.workspace = true
+ruzstd.workspace = true
+bzip2.workspace = true
 sha2.workspace = true
 tempfile.workspace = true

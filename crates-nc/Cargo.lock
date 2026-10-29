@@ -199,11 +199,13 @@ dependencies = [
 name = "larmorx-nc-cli"
 version = "0.0.1"
 dependencies = [
+ "bzip2",
  "flate2",
  "larmorx-core",
  "larmorx-nc-bet",
  "larmorx-nc-core",
  "larmorx-nc-mcflirt",
+ "ruzstd",
  "sha2",
  "tempfile",
 ]

@@ -139,6 +139,9 @@ Option<bool> apply_thresholding(string("-t,--threshold"), false,
 Option<bool> ct(string("--ct"), false,
 				string("-treat input as CT image (default is MRI)"),
 				false, no_argument);
+Option<string> alternateMask(std::string("--binaryMask"), "",
+        std::string("~<image>\tGenerate mesh from existing mask"),
+        false, requires_argument);
 Option<float> fractional_threshold(string("-f"), 0.5,
 				    string("~<f>\t\tfractional intensity threshold (0->1); default=0.5; smaller values give larger brain outline estimates"), false, requires_argument);
 
@@ -430,14 +433,16 @@ bet_parameters adjust_initial_mesh(const volume<float> & image, Mesh& m, const d
     }
 	}
 
-  int med = (int) floor(vm.size()/2.);
-  //  cout<<"before sort"<<endl;
-  nth_element(vm.begin(), vm.begin() + med - 1, vm.end());
-  //partial_sort(vm.begin(), vm.begin() + med + 1, vm.end());
-  //double tm = vm[med];
-  double tm=(*max_element(vm.begin(), vm.begin() + med));
-  //  cout<<"tm "<<tm<<endl;
-  bp.tm = tm;
+  //For an input such as a binary mask, vm will be empty due to the < t98 test above
+  //Safe option here is to set the median to the robust max
+  if ( !vm.empty() ) {
+    int med = (int) floor(vm.size()/2.);
+    nth_element(vm.begin(), vm.begin() + med - 1, vm.end());
+    double tm=(*max_element(vm.begin(), vm.begin() + med));
+    bp.tm = tm;
+  } else {
+    bp.tm=bp.t98;
+  }
 
   return bp;
 }
@@ -558,7 +563,7 @@ double step_of_computation(const volume<float> & image, Mesh & m, const double b
 
 // h2c transform for CT images (specified by --ct option)
 volume <float> h2c(volume<float> & image) {
-  // convert from hounsfield units to cormack (fake unit) 
+  // convert from hounsfield units to cormack (fake unit)
   // as described here: https://pubmed.ncbi.nlm.nih.gov/22440645/
   // code adapted from: https://github.com/neurolabusc/Clinical/blob/master/clinical_h2c.m which is licensed under the BSD-2-clause license
   volume<float> result = image;
@@ -649,7 +654,7 @@ volume <float> h2c(volume<float> & image) {
 
   // return the result
   return result;
-}  
+}
 
 
 
@@ -799,6 +804,7 @@ int main(int argc, char *argv[]) {
   options.add(centerarg);
   options.add(apply_thresholding);
   options.add(ct);
+  options.add(alternateMask);
   options.add(generate_mesh);
   options.add(verbose);
   options.add(help);
@@ -884,8 +890,12 @@ int main(int argc, char *argv[]) {
 
   volume<float> testvol;
   volume<float> ctvol;
+  if ( alternateMask.set() ) {
+    read_volume(testvol,alternateMask.value());
+  } else {
+    if (read_volume(testvol,in.c_str())<0)  return -1;
+  }
 
-  if (read_volume(testvol,in.c_str())<0)  return -1;
 
   // if ct.value() is true, then we are dealing with a CT image
   if (ct.value())
@@ -993,7 +1003,17 @@ int main(int argc, char *argv[]) {
 	self_intersection=0;
     }
   //display
+
   volume<short> brainmask = make_mask_from_mesh(testvol, m);
+
+  //If an alternateMask has been used, reset testvol to original input
+  if ( alternateMask.set() ) {
+    if (read_volume(testvol,in.c_str())<0) return -1;
+    bp.t98 = testvol.robustmax();
+    bp.t2 = testvol.robustmin();
+    bp.t =  bp.t2 + 0.1 * (bp.t98 - bp.t2);
+  }
+
 
   if (apply_thresholding.value())
     {

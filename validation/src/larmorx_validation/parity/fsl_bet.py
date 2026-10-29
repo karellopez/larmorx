@@ -109,9 +109,11 @@ def fsl_version(version: str | None = None) -> str:
     d = fsl_dir(version)
     if d is None:
         return "not found"
-    return f"FSL {fsl_versions.version_of(d)} (" + fsl_versions.package_versions(
-        d, ("fsl-bet2", "fsl-newimage", "fsl-meshclass")
-    ) + ")"
+    return (
+        f"FSL {fsl_versions.version_of(d)} ("
+        + fsl_versions.package_versions(d, ("fsl-bet2", "fsl-newimage", "fsl-meshclass"))
+        + ")"
+    )
 
 
 def replica_binary() -> str | None:
@@ -216,8 +218,18 @@ class Run:
 
 
 #: The extensions FSL's image layer adds to a name given without one (``bet in out`` reads
-#: ``in.nii.gz``): the header-bearing files (an ``.img`` is read beside its ``.hdr``).
-IMAGE_EXTENSIONS = (".nii.gz", ".nii", ".hdr", ".hdr.gz")
+#: ``in.nii.gz``): the header-bearing files (an ``.img`` is read beside its ``.hdr``), in
+#: newimage 2601.0's order (FSL 6.0.7.23 added the zstd and bzip2 ones).
+IMAGE_EXTENSIONS = (
+    ".nii.gz",
+    ".nii",
+    ".hdr",
+    ".hdr.gz",
+    ".nii.zst",
+    ".hdr.zst",
+    ".nii.bz2",
+    ".hdr.bz2",
+)
 
 #: Defects whose FSL result depends on memory FSL never wrote: such runs are never cached
 #: (the oracle cache's rule for undefined values).
@@ -440,18 +452,53 @@ def check_messages(
 # Outputs
 
 
+def unzstd(raw: bytes) -> bytes:
+    """A zstd file's content, by FSL 6.0.7.23's own ``zstd`` (1.5.6) called by full path: the
+    validation environment has no zstd module (Python 3.12)."""
+    zstd = fsl_versions.fsldir(fsl_versions.NEWEST) / "bin" / "zstd"
+    p = subprocess.run([str(zstd), "-dc"], input=raw, capture_output=True, check=False)
+    if p.returncode != 0:
+        raise ValueError(f"zstd -dc failed: {p.stderr[:200]!r}")
+    return p.stdout
+
+
 def content(path: Path) -> bytes:
+    """A file's bytes, decompressed as FSL's znzlib reads it (gzip; zstd and bzip2 since FSL
+    6.0.7.23)."""
     raw = path.read_bytes()
-    return gzip.decompress(raw) if raw[:2] == b"\x1f\x8b" else raw
+    if raw[:2] == b"\x1f\x8b":
+        return gzip.decompress(raw)
+    if raw[:4] == b"\x28\xb5\x2f\xfd":
+        return unzstd(raw)
+    if raw[:3] == b"BZh":
+        import bz2
+
+        return bz2.decompress(raw)
+    return raw
+
+
+#: FSL's image extensions, compressed or not.
+_IMAGE_SUFFIXES = tuple(
+    f"{stem}{c}" for stem in (".nii", ".hdr", ".img") for c in ("", ".gz", ".zst", ".bz2")
+)
 
 
 def is_image(name: str) -> bool:
-    return name.endswith((".nii", ".nii.gz", ".hdr", ".hdr.gz", ".img", ".img.gz"))
+    return name.endswith(_IMAGE_SUFFIXES)
 
 
 def image_data(path: Path) -> np.ndarray:
     import nibabel as nib
 
+    if path.name.endswith((".zst", ".bz2")):
+        # nibabel reads neither: the decompressed bytes, as a NIfTI file of their own
+        raw = content(path)
+        img = (
+            nib.Nifti1Image.from_bytes(raw)
+            if raw[:4] != b"\x1c\x02\x00\x00"
+            else (nib.Nifti2Image.from_bytes(raw))
+        )
+        return np.asanyarray(img.dataobj.get_unscaled())
     return np.asanyarray(nib.load(path).dataobj.get_unscaled())
 
 
@@ -661,8 +708,17 @@ def _scenarios() -> list[tuple[str, str, str, Scenario]]:
     add("img-output", "bet2", "an output name with .img and no .hdr (FSL-40: FSL aborts)",
         S("bet2", ("{0}", "out.img"), (h,), expect="crash"))
     add("hdr-in-name", "defects", "an output name with .hdr inside (FSL-40)", S("bet2", ("{0}", "a.hdrb", "-m"), (h,)))
-    add("constant", "bet2", "a constant image (FSL-41: FSL reads an empty list and crashes; reproduce fills the median with 0)",
-        S("bet2", ("{0}", "out", "-m"), ("constant",), expect="crash-filled", fix_refuses="FSL-41", tier="standard"))
+    add("constant", "bet2", "a constant image: FSL 6.0.7.23 takes the robust maximum as the median (FSL-41, fixed upstream; 6.0.7.17 read an empty list and crashed), then crashes in the mask's fill from the surface's NaN centre (FSL-43); reproduce does not fill",
+        S("bet2", ("{0}", "out", "-m"), ("constant",), expect="crash-filled", fix_refuses="FSL-43", tier="standard"))
+    # --- fsl-bet2 2111.9 (FSL 6.0.7.23): --binaryMask -----------------------------------------------
+    add("binary-mask", "bet2", "--binaryMask: the surface found on a brain mask, the brain, mask, outline, skull and thresholds from the input (FSL 6.0.7.23)",
+        S("bet2", ("{0}", "out", "--binaryMask={1}", "-m", "-o", "-s", "-t"), (h, "head-mask")))
+    add("binary-mask-verbose", "bet2", "--binaryMask -v: the parameters printed are the mask's",
+        S("bet2", ("{0}", "out", "--binaryMask={1}", "-v", "-e"), (h, "head-mask"), tier="standard"))
+    add("binary-mask-ct", "defects", "--ct --binaryMask: FSL cuts the brain image from the mask (FSL-62)",
+        S("bet2", ("{0}", "out", "--binaryMask={1}", "--ct", "-m"), ("head-ct", "head-mask"), tier="standard"))
+    add("binary-mask-missing", "bet2", "--binaryMask naming no image (FSL aborts)",
+        S("bet2", ("{0}", "out", "--binaryMask=/nonexistent/mask"), (h,), expect="crash", tier="standard"))
     add("nan-f", "defects", "-f nan (FSL-42; FSL crashes in its fill, FSL-43)", S("bet2", ("{0}", "out", "-f", "nan", "-m"), (h,), expect="crash-filled", fix_refuses="FSL-42", tier="standard"))
     add("negative-r", "defects", "-r -50 (FSL-42)", S("bet2", ("{0}", "out", "-r", "-50", "-m"), (h,), fix_refuses="FSL-42", tier="standard"))
     add("zero-w", "defects", "-w 0 (FSL-42; FSL crashes in its fill, FSL-43)", S("bet2", ("{0}", "out", "-w", "0", "-m"), (h,), expect="crash-filled", fix_refuses="FSL-42", tier="standard"))
@@ -670,12 +726,13 @@ def _scenarios() -> list[tuple[str, str, str, Scenario]]:
     # --- Storage types, scaling, orientation and formats ----------------------------------------
     for img in ("head-i16", "head-u8", "head-i8", "head-u16", "head-i32", "head-f64", "head-i16-scaled",
                 "head-neuro", "head-qform-only", "head-sform-only", "head-noxform", "head-oblique",
-                "head-nifti2", "head-uncompressed"):
+                "head-nifti2", "head-uncompressed", "head-zst", "head-bz2"):
         add(img, "formats", f"{img}: brain and mask", S("bet2", ("{0}", "out", "-m"), (img,),
                                                         tier="smoke" if img in ("head-i16", "head-neuro") else "standard"))
     add("pair-input", "formats", "a NIfTI pair input (.hdr/.img)", S("bet2", ("{0}", "out", "-m"), ("head-pair",), tier="standard"))
     add("analyze-input", "formats", "an ANALYZE 7.5 input", S("bet2", ("{0}", "out", "-m"), ("head-analyze",), tier="standard"))
-    for t in ("NIFTI", "NIFTI_PAIR", "NIFTI2", "NIFTI2_GZ", "NIFTI_PAIR_GZ", "ANALYZE", "ANALYZE_GZ"):
+    for t in ("NIFTI", "NIFTI_PAIR", "NIFTI2", "NIFTI2_GZ", "NIFTI_PAIR_GZ", "ANALYZE", "ANALYZE_GZ",
+              "NIFTI_ZST", "NIFTI2_PAIR_ZST", "NIFTI_BZ2", "NIFTI_PAIR_BZ2"):
         add(f"output-{t}", "formats", f"FSLOUTPUTTYPE={t}", S("bet2", ("{0}", "out", "-m", "-s"), (h,), output_type=t,
                                                                tier="smoke" if t == "NIFTI" else "standard"))
     add("output-unset", "formats", "FSLOUTPUTTYPE unset (FSL stops)", S("bet2", ("{0}", "out", "-m"), (h,), env=(("FSLOUTPUTTYPE", None),), expect="error", tier="standard"))
@@ -689,6 +746,8 @@ def _scenarios() -> list[tuple[str, str, str, Scenario]]:
 
     # --- The bet script ---------------------------------------------------------------------------
     add("default", "bet", "bet's defaults", S("bet", ("{0}", "out"), (h,)))
+    add("zst-output", "bet", "FSLOUTPUTTYPE=NIFTI_ZST through the script (fslval, fslmaths on zstd files; FSL 6.0.7.23)",
+        S("bet", ("{0}", "out", "-m", "-F"), ("head-4d",), output_type="NIFTI_ZST", tier="standard"))
     add("options", "bet", "every bet2 option bet passes on", S("bet", ("{0}", "out", "-o", "-m", "-s", "-e", "-t", "-f", "0.4", "-g", "0.1", "-r", "70", "-c", "48", "56", "38"), (h,), tier="standard"))
     add("verbose", "bet", "-v: the script's variables, then bet2's messages", S("bet", ("{0}", "out", "-m", "-v"), (h,)))
     add("robust", "bet", "-R: bet2 again from the brain's centre", S("bet", ("{0}", "out", "-R", "-m"), ("head-offcentre",),
@@ -859,6 +918,18 @@ def _phantoms() -> dict[str, Path]:
     p["truth:head"] = _save(truth, d / "head_truth.nii.gz")
     p["head-t2"] = _save(t2, d / "head-t2.nii.gz")
     p["head-uncompressed"] = _save(t1, d / "head-u.nii")
+    # FSL 6.0.7.23 reads zstd and bzip2 files (znzlib 2511.3): the same head, compressed by
+    # FSL's own zstd and Python's bz2
+    import bz2
+
+    p["head-bz2"] = d / "head-b.nii.bz2"
+    p["head-bz2"].write_bytes(bz2.compress(p["head-uncompressed"].read_bytes()))
+    p["head-zst"] = d / "head-z.nii.zst"
+    zstd = fsl_versions.fsldir(fsl_versions.NEWEST) / "bin" / "zstd"
+    subprocess.run(
+        [str(zstd), "-q", "-f", "-o", str(p["head-zst"]), str(p["head-uncompressed"])], check=True
+    )
+    p["head-mask"] = _save(truth.astype(np.float32), d / "head_mask.nii.gz")
     off, _ = _head(T1_LEVELS, 3, centre=(40.0, 50.0, 36.0))
     p["head-offcentre"] = _save(off, d / "head-off.nii.gz")
     p["head-i16"] = _save(np.round(t1).astype(np.int16), d / "head-i16.nii.gz")

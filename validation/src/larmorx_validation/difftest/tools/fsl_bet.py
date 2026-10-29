@@ -26,8 +26,18 @@ from larmorx_validation.difftest.tools import _ants
 HEADS = ("head", "crop", "blobs", "noise", "ramp", "constant", "zeros")
 HEAD_WEIGHTS = (7, 2, 1, 0.4, 0.4, 0.15, 0.05)
 DTYPES = ("float32", "float32", "int16", "int16", "uint8", "float64", "int32")
-OUTPUT_TYPES = ("NIFTI_GZ", "NIFTI", "NIFTI_PAIR", "NIFTI2_GZ", "NIFTI_PAIR_GZ", "ANALYZE")
-OUTPUT_WEIGHTS = (5, 2.5, 1, 1, 0.3, 0.2)
+# FSL 6.0.7.23 added the zstd and bzip2 types (drawn rarely: NIFTI_ZST, NIFTI2_PAIR_BZ2)
+OUTPUT_TYPES = (
+    "NIFTI_GZ",
+    "NIFTI",
+    "NIFTI_PAIR",
+    "NIFTI2_GZ",
+    "NIFTI_PAIR_GZ",
+    "ANALYZE",
+    "NIFTI_ZST",
+    "NIFTI2_PAIR_BZ2",
+)
+OUTPUT_WEIGHTS = (5, 2.5, 1, 1, 0.3, 0.2, 0.4, 0.2)
 
 
 def _image(d: gen.Draw, ndim: int = 3, **kw) -> dict:

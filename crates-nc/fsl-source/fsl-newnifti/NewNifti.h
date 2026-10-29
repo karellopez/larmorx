@@ -67,14 +67,7 @@
 
 #include <string>
 #include <vector>
-
-#if __cplusplus >= 201103L || __clang__
-  #include <array>
-using std::array;
-#else
-  #include <tr1/array>
-using std::tr1::array;
-#endif
+#include <array>
 
 #include "nifti2.h"
 #include "legacyFunctions.h"
@@ -116,8 +109,8 @@ namespace NiftiIO {
   std::string magic;
   short datatype;
   int bitsPerVoxel;
-  array<int64_t,8> dim;
-  array<double,8> pixdim;
+  std::array<int64_t,8> dim;
+  std::array<double,8> pixdim;
   int intentCode;
   double intent_p1;
   double intent_p2;
@@ -141,9 +134,9 @@ namespace NiftiIO {
   double qX;
   double qY;
   double qZ;
-  array<double,4> sX;
-  array<double,4> sY;
-  array<double,4> sZ;
+  std::array<double,4> sX;
+  std::array<double,4> sY;
+  std::array<double,4> sZ;
   int sliceCode;
   int units;
   char sliceOrdering;
@@ -152,7 +145,7 @@ namespace NiftiIO {
   bool isStrictlyCompliant;
   bool wasWrongEndian;
   int bpvOfDatatype(void) const;
-  const size_t datumByteWidth() const;
+  size_t datumByteWidth() const;
   std::string datatypeString() const;
   std::string fileType() const;
   int leftHanded() const { return( (pixdim[0] < 0.0) ? -1.0 : 1.0 ) ; }
@@ -193,17 +186,36 @@ namespace NiftiIO {
     void writeNiftiFieldsToRaw(T& rawNiftiHeader) const;
   };
 
-    NiftiHeader loadExtensions(const std::string filename, std::vector<NiftiExtension>& extensions);
+    NiftiHeader loadExtensions(const std::string filename,
+                               std::vector<NiftiExtension>& extensions);
     NiftiHeader loadHeader(const std::string filename);
-    NiftiHeader loadImage( std::string filename, char*& buffer, std::vector<NiftiExtension>& extensions, bool allocateBuffer=true);
-    NiftiHeader loadImageROI( std::string filename, char*& buffer, std::vector<NiftiExtension>& extensions, int64_t xmin=-1, int64_t xmax=-1, int64_t ymin=-1, int64_t ymax=-1, int64_t zmin=-1, int64_t zmax=-1, int64_t tmin=-1, int64_t tmax=-1, int64_t d5min=-1, int64_t d5max=-1, int64_t d6min=-1, int64_t d6max=-1, int64_t d7min=-1, int64_t d7max=-1);
+    NiftiHeader loadImage( std::string filename,
+                           char*& buffer,
+                           std::vector<NiftiExtension>& extensions,
+                           bool allocateBuffer=true);
+    NiftiHeader loadImageROI( std::string filename,
+                              char*& buffer,
+                              std::vector<NiftiExtension>& extensions,
+                              int64_t xmin=-1, int64_t xmax=-1,
+                              int64_t ymin=-1, int64_t ymax=-1,
+                              int64_t zmin=-1, int64_t zmax=-1,
+                              int64_t tmin=-1, int64_t tmax=-1,
+                              int64_t d5min=-1, int64_t d5max=-1,
+                              int64_t d6min=-1, int64_t d6max=-1,
+                              int64_t d7min=-1, int64_t d7max=-1);
     void reportHeader(const analyzeHeader& header);
     void reportHeader(const nifti_1_header& header);
     void reportHeader(const nifti_2_header& header);
-    void saveImage(const std::string filename, const char* buffer, const std::vector<NiftiExtension>& extensions, const NiftiHeader header, const bool useCompression=true);
+    void saveImage(const std::string filename,
+                   const char* buffer,
+                   const std::vector<NiftiExtension>& extensions,
+                   const NiftiHeader header,
+                   const znz::znzFormat format=znz::ZNZ_GUESS);
     template<class T>
       void byteSwap(T& rawNiftiHeader);
-    void byteSwap(const size_t elementLength, void* buffer,const unsigned long nElements=1);
+    void byteSwap(const size_t elementLength,
+                  void* buffer,
+                  const unsigned long nElements=1);
     void byteSwapAnalyzeFields(analyzeHeader& rawHeader);
     template<class T>
       void byteSwapImageFields(T& rawHeader);
@@ -227,10 +239,12 @@ namespace NiftiIO {
   public:
     bool debug;
 
-    fileIO(const std::string& filename, const bool reading, const bool useCompression=true);
-    ~fileIO() { znzclose(fileHandle); }
-    fileIO& operator=(fileIO rhs);
-    void reset() {znzclose(fileHandle);}
+    fileIO(const std::string& filename,
+           const bool reading,
+           const znz::znzFormat format=znz::ZNZ_GUESS);
+    ~fileIO() { fileHandle.close(); }
+    fileIO& operator=(fileIO&& rhs);
+    void reset() {fileHandle.close();}
     void readData(const NiftiHeader& header,void* buffer);
     void readExtensions(const NiftiHeader& header, std::vector<NiftiExtension>& extensions );
     NiftiHeader readHeader();
@@ -238,7 +252,7 @@ namespace NiftiIO {
     size_t readRawBytes( void *buffer, size_t length );
     template <class T>
       void readRawHeader(NiftiHeader& header);
-    void seek(size_t nBytes, int mode) { znzseek(fileHandle, nBytes, mode); }
+    void seek(size_t nBytes, int mode) { fileHandle.seek(nBytes, mode); }
     void writeData(const NiftiHeader& header,const void* buffer);
     void writeExtensions(const NiftiHeader& header, const std::vector<NiftiExtension>& extensions );
     void writeHeader(const NiftiHeader& header);
@@ -246,7 +260,7 @@ namespace NiftiIO {
     template<class T>
       void writeRawHeader(const NiftiHeader& header);
   private:
-    znzFile fileHandle;
+    znz::znzFile fileHandle;
   };
 
 

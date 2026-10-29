@@ -88,38 +88,34 @@ namespace NEWIMAGE {
   // BASIC IMAGE SUPPORT FUNCTIONS
   template <class T>
   void pad(const volume<T>& vol, volume<T>& paddedvol,
-	     int offsetx, int offsety, int offsetz)
-    {
-      // Note: the voxel at (offsetx,offsety,offsetz) in PADDEDVOL
-      //       will be the same as (0,0,0) in VOL
-      paddedvol.copyproperties(vol);
+           int offsetx, int offsety, int offsetz)
+  {
+    // Note: the voxel at (offsetx,offsety,offsetz) in PADDEDVOL
+    //       will be the same as (0,0,0) in VOL
+    paddedvol.copyproperties(vol);
 
-      extrapolation oldex = vol.getextrapolationmethod();
-      if ((oldex==boundsassert) || (oldex==boundsexception))
-	{ vol.setextrapolationmethod(constpad); }
-      for (int z=0; z<paddedvol.zsize(); z++) {
-	for (int y=0; y<paddedvol.ysize(); y++) {
-	  for (int x=0; x<paddedvol.xsize(); x++) {
-	    paddedvol(x,y,z) = vol(x-offsetx,y-offsety,z-offsetz);
-	  }
-	}
+    for (int z=0; z<paddedvol.zsize(); z++) {
+      for (int y=0; y<paddedvol.ysize(); y++) {
+        for (int x=0; x<paddedvol.xsize(); x++) {
+          paddedvol(x,y,z) = vol(x-offsetx,y-offsety,z-offsetz);
+        }
       }
-      // set the sform and qform appropriately (currently equal to vol's)
-      Matrix pad2vol(4,4);
-      pad2vol = IdentityMatrix(4);
-      pad2vol(1,4) = -offsetx;
-      pad2vol(2,4) = -offsety;
-      pad2vol(3,4) = -offsetz;
-      if (paddedvol.sform_code()!=NIFTI_XFORM_UNKNOWN) {
-	paddedvol.set_sform(paddedvol.sform_code(),
-			    paddedvol.sform_mat() * pad2vol);
-      }
-      if (paddedvol.qform_code()!=NIFTI_XFORM_UNKNOWN) {
-	paddedvol.set_qform(paddedvol.qform_code(),
-			    paddedvol.qform_mat() * pad2vol);
-      }
-      vol.setextrapolationmethod(oldex);
     }
+    // set the sform and qform appropriately (currently equal to vol's)
+    Matrix pad2vol(4,4);
+    pad2vol = IdentityMatrix(4);
+    pad2vol(1,4) = -offsetx;
+    pad2vol(2,4) = -offsety;
+    pad2vol(3,4) = -offsetz;
+    if (paddedvol.sform_code()!=NIFTI_XFORM_UNKNOWN) {
+      paddedvol.set_sform(paddedvol.sform_code(),
+                          paddedvol.sform_mat() * pad2vol);
+    }
+    if (paddedvol.qform_code()!=NIFTI_XFORM_UNKNOWN) {
+      paddedvol.set_qform(paddedvol.qform_code(),
+                          paddedvol.qform_mat() * pad2vol);
+    }
+  }
 
 template void pad(const volume<char>& vol, volume<char>& paddedvol, int offsetx, int offsety, int offsetz);
 template void pad(const volume<short>& vol, volume<short>& paddedvol, int offsetx, int offsety, int offsetz);
@@ -127,106 +123,102 @@ template void pad(const volume<int>& vol, volume<int>& paddedvol, int offsetx, i
 template void pad(const volume<float>& vol, volume<float>& paddedvol, int offsetx, int offsety, int offsetz);
 template void pad(const volume<double>& vol, volume<double>& paddedvol, int offsetx, int offsety, int offsetz);
 
- template <class T>
-  void raw_affine_transform(const volume<T>& vin, volume<T>& vout,
-			    const Matrix& aff)
-    {
-      // NB: the size of vout MUST BE SET BEFORE IT IS PASSED IN!
-      // takes the volume (vin) and applies a spatial transform, given
-      //  by the 4x4 matrix (aff) in WORLD COORDINATES
-      // the result is a new volume (vout)
+  template <class T>
+  void raw_affine_transform(
+    const volume<T>& vin,
+    volume<T>& vout,
+    const Matrix& aff,
+    const typename volume<T>::extrapparams& eps)
+  {
+    // NB: the size of vout MUST BE SET BEFORE IT IS PASSED IN!
+    // takes the volume (vin) and applies a spatial transform, given
+    //  by the 4x4 matrix (aff) in WORLD COORDINATES
+    // the result is a new volume (vout)
 
 
-      // Do everything in practice via the inverse transformation
-      // That is, for every point in vout, calculate the pre-image in
-      //  vin to which it corresponds, and interpolate vin to get the
-      //  value there.
-      // Also, the sampling transformations must be accounted for:
-      //     T_vox1->vox2 = (T_samp2)^-1 * T_world * T_samp1
+    // Do everything in practice via the inverse transformation
+    // That is, for every point in vout, calculate the pre-image in
+    //  vin to which it corresponds, and interpolate vin to get the
+    //  value there.
+    // Also, the sampling transformations must be accounted for:
+    //     T_vox1->vox2 = (T_samp2)^-1 * T_world * T_samp1
 
-      // The sform/qform is unchanged if it is set in the output
-      // The qform and sform are made equal if one is unset in the output
-      // If both are unset in the output, then the sform is set to a
-      //   transformed input sform (or qform if sform is unset) and the
-      //   output qform is made equal to the output sform
+    // The sform/qform is unchanged if it is set in the output
+    // The qform and sform are made equal if one is unset in the output
+    // If both are unset in the output, then the sform is set to a
+    //   transformed input sform (or qform if sform is unset) and the
+    //   output qform is made equal to the output sform
 
-      if (vout.nvoxels() <= 0) {
-	imthrow("Attempted to use affine transform with no voxels in vout",8);
-      }
-
-      extrapolation oldex = vin.getextrapolationmethod();
-      if ((oldex==boundsassert) || (oldex==boundsexception))
-	{ vin.setextrapolationmethod(constpad); }
-
-      // iaffbig goes from output mm coords to input (reference) mm coords
-      Matrix iaffbig = aff.i();
-      // check the left-right data orientations of the images and modify
-      //   the transformation matrix to flip to radiological coords if necessary
-      if (vin.left_right_order()==FSL_NEUROLOGICAL) {
-	iaffbig = vin.swapmat(-1,2,3) * iaffbig;
-      }
-      if (vout.left_right_order()==FSL_NEUROLOGICAL) {
-	iaffbig = iaffbig * vout.swapmat(-1,2,3);
-      }
-      // convert iaffbig to go from output voxel coords to input (reference) voxel coords
-      iaffbig = vin.sampling_mat().i() * iaffbig * vout.sampling_mat();
-      Matrix iaff=iaffbig.SubMatrix(1,3,1,3);
-
-      float a11=iaff(1,1), a12=iaff(1,2), a13=iaff(1,3), a14=iaffbig(1,4),
-	a21=iaff(2,1), a22=iaff(2,2), a23=iaff(2,3), a24=iaffbig(2,4),
-	a31=iaff(3,1), a32=iaff(3,2), a33=iaff(3,3), a34=iaffbig(3,4), o1,o2,o3;
-
-      // The matrix algebra below has been hand-optimized from
-      //  [o1 o2 o3] = a * [x y z]  at each iteration
-      for (int z=0; z<vout.zsize(); z++) {
-	for (int x=0; x<vout.xsize(); x++) {
-	  o1=x*a11 + z*a13 + a14;  // y=0
-	  o2=x*a21 + z*a23 + a24;  // y=0
-	  o3=x*a31 + z*a33 + a34;  // y=0
-	  for (int y=0; y<vout.ysize(); y++) {
-	    vout(x,y,z) = (T) vin.interpolate(o1,o2,o3);
-	    o1 += a12;
-	    o2 += a22;
-	    o3 += a32;
-	  }
-	}
-      }
-
-      // Set the sform and qform appropriately (if set)
-      // That is, copy the sform from vout if it is set, otherwise use
-      //  the transformed one from vin
-      // Always copy the transformed qform (if set)
-      Matrix nmat;
-      if ( (vout.sform_code()==NIFTI_XFORM_UNKNOWN) &&
-	   (vout.qform_code()!=NIFTI_XFORM_UNKNOWN) ) {
-	vout.set_sform(vout.qform_code(), vout.qform_mat());
-      }
-      if ( (vout.qform_code()==NIFTI_XFORM_UNKNOWN) &&
-	   (vout.sform_code()!=NIFTI_XFORM_UNKNOWN) ) {
-	vout.set_qform(vout.sform_code(), vout.sform_mat());
-      }
-      if ( (vout.qform_code()==NIFTI_XFORM_UNKNOWN) &&
-	   (vout.sform_code()==NIFTI_XFORM_UNKNOWN) ) {
-	if (vin.sform_code()!=NIFTI_XFORM_UNKNOWN) {
-	  nmat = vin.sform_mat() * iaffbig;
-	  vout.set_sform(vin.sform_code(), nmat);
-	  vout.set_qform(vin.sform_code(), nmat);
-	} else if (vin.qform_code()!=NIFTI_XFORM_UNKNOWN) {
-	  nmat = vin.qform_mat() * iaffbig;
-	  vout.set_sform(vin.qform_code(), nmat);
-	  vout.set_qform(vin.qform_code(), nmat);
-	}
-      }
-
-      // restore settings and return
-      vin.setextrapolationmethod(oldex);
+    if (vout.nvoxels() <= 0) {
+      imthrow("Attempted to use affine transform with no voxels in vout",8);
     }
 
-template void raw_affine_transform(const volume<char>& vin, volume<char>& vout, const Matrix& aff);
-template void raw_affine_transform(const volume<short>& vin, volume<short>& vout, const Matrix& aff);
-template void raw_affine_transform(const volume<int>& vin, volume<int>& vout, const Matrix& aff);
-template void raw_affine_transform(const volume<float>& vin, volume<float>& vout, const Matrix& aff);
-template void raw_affine_transform(const volume<double>& vin, volume<double>& vout, const Matrix& aff);
+    // iaffbig goes from output mm coords to input (reference) mm coords
+    Matrix iaffbig = aff.i();
+    // check the left-right data orientations of the images and modify
+    //   the transformation matrix to flip to radiological coords if necessary
+    if (vin.left_right_order()==FSL_NEUROLOGICAL) {
+      iaffbig = vin.swapmat(-1,2,3) * iaffbig;
+    }
+    if (vout.left_right_order()==FSL_NEUROLOGICAL) {
+      iaffbig = iaffbig * vout.swapmat(-1,2,3);
+    }
+    // convert iaffbig to go from output voxel coords to input (reference) voxel coords
+    iaffbig = vin.sampling_mat().i() * iaffbig * vout.sampling_mat();
+    Matrix iaff=iaffbig.SubMatrix(1,3,1,3);
+
+    float a11=iaff(1,1), a12=iaff(1,2), a13=iaff(1,3), a14=iaffbig(1,4),
+      a21=iaff(2,1), a22=iaff(2,2), a23=iaff(2,3), a24=iaffbig(2,4),
+      a31=iaff(3,1), a32=iaff(3,2), a33=iaff(3,3), a34=iaffbig(3,4), o1,o2,o3;
+
+    // The matrix algebra below has been hand-optimized from
+    //  [o1 o2 o3] = a * [x y z]  at each iteration
+    for (int z=0; z<vout.zsize(); z++) {
+      for (int x=0; x<vout.xsize(); x++) {
+        o1=x*a11 + z*a13 + a14;  // y=0
+        o2=x*a21 + z*a23 + a24;  // y=0
+        o3=x*a31 + z*a33 + a34;  // y=0
+        for (int y=0; y<vout.ysize(); y++) {
+          vout(x,y,z) = (T) vin.interpolate(o1,o2,o3,eps);
+          o1 += a12;
+          o2 += a22;
+          o3 += a32;
+        }
+      }
+    }
+
+    // Set the sform and qform appropriately (if set)
+    // That is, copy the sform from vout if it is set, otherwise use
+    //  the transformed one from vin
+    // Always copy the transformed qform (if set)
+    Matrix nmat;
+    if ( (vout.sform_code()==NIFTI_XFORM_UNKNOWN) &&
+         (vout.qform_code()!=NIFTI_XFORM_UNKNOWN) ) {
+      vout.set_sform(vout.qform_code(), vout.qform_mat());
+    }
+    if ( (vout.qform_code()==NIFTI_XFORM_UNKNOWN) &&
+         (vout.sform_code()!=NIFTI_XFORM_UNKNOWN) ) {
+      vout.set_qform(vout.sform_code(), vout.sform_mat());
+    }
+    if ( (vout.qform_code()==NIFTI_XFORM_UNKNOWN) &&
+         (vout.sform_code()==NIFTI_XFORM_UNKNOWN) ) {
+      if (vin.sform_code()!=NIFTI_XFORM_UNKNOWN) {
+        nmat = vin.sform_mat() * iaffbig;
+        vout.set_sform(vin.sform_code(), nmat);
+        vout.set_qform(vin.sform_code(), nmat);
+      } else if (vin.qform_code()!=NIFTI_XFORM_UNKNOWN) {
+        nmat = vin.qform_mat() * iaffbig;
+        vout.set_sform(vin.qform_code(), nmat);
+        vout.set_qform(vin.qform_code(), nmat);
+      }
+    }
+  }
+
+template void raw_affine_transform(const volume<char>& vin, volume<char>& vout, const Matrix& aff, const volume<char>::extrapparams& eps);
+template void raw_affine_transform(const volume<short>& vin, volume<short>& vout, const Matrix& aff, const volume<short>::extrapparams& eps);
+template void raw_affine_transform(const volume<int>& vin, volume<int>& vout, const Matrix& aff, const volume<int>::extrapparams& eps);
+template void raw_affine_transform(const volume<float>& vin, volume<float>& vout, const Matrix& aff, const volume<float>::extrapparams& eps);
+template void raw_affine_transform(const volume<double>& vin, volume<double>& vout, const Matrix& aff, const volume<double>::extrapparams& eps);
 
 
  template <class T>
@@ -299,12 +291,9 @@ template void raw_affine_transform(const volume<double>& vin, volume<double>& vo
     // to an isotropic scale given by scale
     if (scale<0.0) {
       cerr << "WARNING:: Negative scale in isotropic_resample - using abs value"
-	   << endl;
+           << endl;
       scale = fabs(scale);
     }
-    extrapolation oldex = aniso.getextrapolationmethod();
-    if ((oldex==boundsassert) || (oldex==boundsexception))
-      { aniso.setextrapolationmethod(constpad); }
     float stepx, stepy, stepz;
     stepx = scale / aniso.xdim();
     stepy = scale / aniso.ydim();
@@ -318,9 +307,9 @@ template void raw_affine_transform(const volume<double>& vin, volume<double>& vo
     int x, y, z;
     for (fz=0.0, z=0; z<sz; z++, fz+=stepz) {
       for (fy=0.0, y=0; y<sy; y++, fy+=stepy) {
-	for (fx=0.0, x=0; x<sx; x++, fx+=stepx) {
-	  iso(x,y,z) = (T)aniso.interpolate(fx,fy,fz);
-	}
+        for (fx=0.0, x=0; x<sx; x++, fx+=stepx) {
+          iso(x,y,z) = (T)aniso.interpolate(fx,fy,fz);
+        }
       }
     }
     iso.copyproperties(aniso);
@@ -338,7 +327,6 @@ template void raw_affine_transform(const volume<double>& vin, volume<double>& vo
     if (aniso.qform_code()!=NIFTI_XFORM_UNKNOWN) {
       iso.set_qform(aniso.qform_code(), aniso.qform_mat() * iso2aniso);
     }
-    aniso.setextrapolationmethod(oldex);
     return iso;
   }
 
@@ -350,63 +338,58 @@ template volume<double>isotropic_resample(const volume<double>& aniso, float sca
 
   template <class T>
   int upsample_by_2(volume<T>& highresvol, const volume<T>& lowresvol,
-			  bool centred)
+                    bool centred)
   {
-      // upsamples a volume (lowresvol) to give a new volume (highresvol)
-      // note that this uses the highresvol size if it is OK but will
-      //   throw away any data previous contained therein
-      int sx, sy, sz;
-      sz=lowresvol.zsize();
-      sy=lowresvol.ysize();
-      sx=lowresvol.xsize();
+    // upsamples a volume (lowresvol) to give a new volume (highresvol)
+    // note that this uses the highresvol size if it is OK but will
+    //   throw away any data previous contained therein
+    int sx, sy, sz;
+    sz=lowresvol.zsize();
+    sy=lowresvol.ysize();
+    sx=lowresvol.xsize();
 
-      extrapolation oldex = lowresvol.getextrapolationmethod();
-      if ((oldex==boundsassert) || (oldex==boundsexception))
-	{ lowresvol.setextrapolationmethod(constpad); }
-
-      if (highresvol.nvoxels()<1) { highresvol.reinitialize(sx*2+1,sy*2+1,sz*2+1); }
-      highresvol.copyproperties(lowresvol);
-      highresvol = lowresvol.backgroundval();
-      highresvol.setdims(lowresvol.xdim() / 2.0,
-			 lowresvol.ydim() / 2.0,
-			 lowresvol.zdim() / 2.0);
-      // set sform and qform appropriately (if set)
-      // voxel 2 voxel mapping of subsampled vol -> original vol
-      Matrix sub2mat(4,4);
-      sub2mat = IdentityMatrix(4);
-      sub2mat(1,1) = 2.0;
-      sub2mat(2,2) = 2.0;
-      sub2mat(3,3) = 2.0;
-      if (!centred) {
-	sub2mat(1,4) = 0.5;
-	sub2mat(2,4) = 0.5;
-	sub2mat(3,4) = 0.5;
-      }
-      if (lowresvol.sform_code()!=NIFTI_XFORM_UNKNOWN) {
-	highresvol.set_sform(lowresvol.sform_code(),lowresvol.sform_mat() * sub2mat.i());
-      }
-      if (lowresvol.qform_code()!=NIFTI_XFORM_UNKNOWN) {
-	highresvol.set_qform(lowresvol.qform_code(),lowresvol.qform_mat() * sub2mat.i());
-      }
+    if (highresvol.nvoxels()<1) { highresvol.reinitialize(sx*2+1,sy*2+1,sz*2+1); }
+    highresvol.copyproperties(lowresvol);
+    highresvol = lowresvol.backgroundval();
+    highresvol.setdims(lowresvol.xdim() / 2.0,
+                       lowresvol.ydim() / 2.0,
+                       lowresvol.zdim() / 2.0);
+    // set sform and qform appropriately (if set)
+    // voxel 2 voxel mapping of subsampled vol -> original vol
+    Matrix sub2mat(4,4);
+    sub2mat = IdentityMatrix(4);
+    sub2mat(1,1) = 2.0;
+    sub2mat(2,2) = 2.0;
+    sub2mat(3,3) = 2.0;
+    if (!centred) {
+      sub2mat(1,4) = 0.5;
+      sub2mat(2,4) = 0.5;
+      sub2mat(3,4) = 0.5;
+    }
+    if (lowresvol.sform_code()!=NIFTI_XFORM_UNKNOWN) {
+      highresvol.set_sform(lowresvol.sform_code(),lowresvol.sform_mat() * sub2mat.i());
+    }
+    if (lowresvol.qform_code()!=NIFTI_XFORM_UNKNOWN) {
+      highresvol.set_qform(lowresvol.qform_code(),lowresvol.qform_mat() * sub2mat.i());
+    }
 
 
-      Matrix high2lowresvox(4,4);
-      high2lowresvox = sub2mat.i();
-      for (int z=0; z<highresvol.zsize(); z++) {
-	for (int y=0; y<highresvol.ysize(); y++) {
-	  for (int x=0; x<highresvol.xsize(); x++) {
-	    // Look up the (voxel) coordinate
-	    ColumnVector highrescoord(4), lowrescoord(4);
-	    highrescoord << x << y << z << 1.0;
-	    lowrescoord = high2lowresvox * highrescoord;
-	    highresvol(x,y,z) = (T) lowresvol.interpolate(lowrescoord(1),
-							  lowrescoord(2),
-							  lowrescoord(3));
-	  }
-	}
+    Matrix high2lowresvox(4,4);
+    high2lowresvox = sub2mat.i();
+    for (int z=0; z<highresvol.zsize(); z++) {
+      for (int y=0; y<highresvol.ysize(); y++) {
+        for (int x=0; x<highresvol.xsize(); x++) {
+          // Look up the (voxel) coordinate
+          ColumnVector highrescoord(4), lowrescoord(4);
+          highrescoord << x << y << z << 1.0;
+          lowrescoord = high2lowresvox * highrescoord;
+          highresvol(x,y,z) = (T) lowresvol.interpolate(lowrescoord(1),
+                                                        lowrescoord(2),
+                                                        lowrescoord(3));
+        }
       }
-      lowresvol.setextrapolationmethod(oldex);
-      return 0;
+    }
+    return 0;
   }
 
   template int upsample_by_2(volume<char>& highresvol,
@@ -422,97 +405,94 @@ template volume<double>isotropic_resample(const volume<double>& aniso, float sca
 
   template <class T>
   volume<T> subsample_by_2(const volume<T>& refvol, bool centred)
-    {
-      // subsamples a volume (refvol) by blurring and subsampling to give
-      //  a new volume
-      // note that this creates the new volume, throwing away any data
-      //  previous contained therein
-      int sx, sy, sz;
-      sz=refvol.zsize();
-      sy=refvol.ysize();
-      sx=refvol.xsize();
+  {
+    // subsamples a volume (refvol) by blurring and subsampling to give
+    //  a new volume
+    // note that this creates the new volume, throwing away any data
+    //  previous contained therein
+    int sx, sy, sz;
+    sz=refvol.zsize();
+    sy=refvol.ysize();
+    sx=refvol.xsize();
 
-      extrapolation oldex = refvol.getextrapolationmethod();
-      if ((oldex==boundsassert) || (oldex==boundsexception))
-	{ refvol.setextrapolationmethod(constpad); }
-
-      volume<T> halfvol((sx+1)/2,(sy+1)/2,(sz+1)/2);
-      halfvol.copyproperties(refvol);
-      halfvol = refvol.backgroundval();
-      halfvol.setdims(refvol.xdim() * 2.0,
-		      refvol.ydim() * 2.0,
-		      refvol.zdim() * 2.0);
-      // set sform and qform appropriately (if set)
-      // voxel 2 voxel mapping of subsampled vol -> original vol
-      Matrix sub2mat(4,4);
-      sub2mat = IdentityMatrix(4);
-      sub2mat(1,1) = 2.0;
-      sub2mat(2,2) = 2.0;
-      sub2mat(3,3) = 2.0;
-      if (!centred) {
-	sub2mat(1,4) = 0.5;
-	sub2mat(2,4) = 0.5;
-	sub2mat(3,4) = 0.5;
-      }
-      if (refvol.sform_code()!=NIFTI_XFORM_UNKNOWN) {
-	halfvol.set_sform(refvol.sform_code(),refvol.sform_mat() * sub2mat);
-      }
-      if (refvol.qform_code()!=NIFTI_XFORM_UNKNOWN) {
-	halfvol.set_qform(refvol.qform_code(),refvol.qform_mat() * sub2mat);
-      }
-
-
-      for (int64_t z=0, bz=0; z<halfvol.zsize(); z++, bz+=2) {
-	for (int64_t y=0, by=0; y<halfvol.ysize(); y++, by+=2) {
-	  for (int64_t x=0, bx=0; x<halfvol.xsize(); x++, bx+=2) {
-	    // The following includes a hand-coded smoothing kernel
-	    if (centred) {
-	      halfvol(x,y,z) = (T) (0.125 * (refvol(bx,by,bz))
-		+ 0.0625 * (refvol(bx+1,by,bz) +
-			    refvol(bx-1,by,bz) +
-			    refvol(bx,by+1,bz) +
-			    refvol(bx,by-1,bz) +
-			    refvol(bx,by,bz+1) +
-			    refvol(bx,by,bz-1))
-		+ 0.0312 * (refvol(bx+1,by+1,bz) +
-			    refvol(bx+1,by-1,bz) +
-			    refvol(bx-1,by+1,bz) +
-			    refvol(bx-1,by-1,bz) +
-			    refvol(bx+1,by,bz+1) +
-			    refvol(bx+1,by,bz-1) +
-			    refvol(bx-1,by,bz+1) +
-			    refvol(bx-1,by,bz-1) +
-			    refvol(bx,by+1,bz+1) +
-			    refvol(bx,by+1,bz-1) +
-			    refvol(bx,by-1,bz+1) +
-			    refvol(bx,by-1,bz-1))
-		+ 0.0156 * (refvol(bx+1,by+1,bz+1) +
-			    refvol(bx+1,by+1,bz-1) +
-			    refvol(bx+1,by-1,bz+1) +
-			    refvol(bx+1,by-1,bz-1) +
-			    refvol(bx-1,by+1,bz+1) +
-			    refvol(bx-1,by+1,bz-1) +
-			    refvol(bx-1,by-1,bz+1) +
-			    refvol(bx-1,by-1,bz-1)) );
-	    } else {
-	      if (refvol.in_bounds(bx+1,by+1,bz+1)) {
-		T v000,v001,v010,v011,v100,v101,v110,v111;
-		refvol.getneighbours(bx,by,bz,v000,v001,v010,v011,v100,v101,v110,v111);
-		halfvol(x,y,z)=(T) ((v000+v001+v010+v011+v100+v101+v110+v111)/8.0);
-	      } else {
-		halfvol(x,y,z) = (T) ( ( refvol(bx,by,bz) +
-		  refvol(bx+1,by,bz) + refvol(bx,by+1,bz) +
-		  refvol(bx,by,bz+1) + refvol(bx+1,by+1,bz) +
-		  refvol(bx+1,by,bz+1) + refvol(bx,by+1,bz+1) +
-					 refvol(bx+1,by+1,bz+1) )/8.0);
-	      }
-	    }
-	  }
-	}
-      }
-      refvol.setextrapolationmethod(oldex);
-      return halfvol;
+    volume<T> halfvol((sx+1)/2,(sy+1)/2,(sz+1)/2);
+    halfvol.copyproperties(refvol);
+    halfvol = refvol.backgroundval();
+    halfvol.setdims(refvol.xdim() * 2.0,
+                    refvol.ydim() * 2.0,
+                    refvol.zdim() * 2.0);
+    // set sform and qform appropriately (if set)
+    // voxel 2 voxel mapping of subsampled vol -> original vol
+    Matrix sub2mat(4,4);
+    sub2mat = IdentityMatrix(4);
+    sub2mat(1,1) = 2.0;
+    sub2mat(2,2) = 2.0;
+    sub2mat(3,3) = 2.0;
+    if (!centred) {
+      sub2mat(1,4) = 0.5;
+      sub2mat(2,4) = 0.5;
+      sub2mat(3,4) = 0.5;
     }
+    if (refvol.sform_code()!=NIFTI_XFORM_UNKNOWN) {
+      halfvol.set_sform(refvol.sform_code(),refvol.sform_mat() * sub2mat);
+    }
+    if (refvol.qform_code()!=NIFTI_XFORM_UNKNOWN) {
+      halfvol.set_qform(refvol.qform_code(),refvol.qform_mat() * sub2mat);
+    }
+
+
+    for (int64_t z=0, bz=0; z<halfvol.zsize(); z++, bz+=2) {
+      for (int64_t y=0, by=0; y<halfvol.ysize(); y++, by+=2) {
+        for (int64_t x=0, bx=0; x<halfvol.xsize(); x++, bx+=2) {
+          // The following includes a hand-coded smoothing kernel
+          if (centred) {
+            halfvol(x,y,z) = (T) (
+              0.125 * (refvol(bx,by,bz))
+              + 0.0625 * (refvol(bx+1,by,bz) +
+                          refvol(bx-1,by,bz) +
+                          refvol(bx,by+1,bz) +
+                          refvol(bx,by-1,bz) +
+                          refvol(bx,by,bz+1) +
+                          refvol(bx,by,bz-1))
+              + 0.0312 * (refvol(bx+1,by+1,bz) +
+                          refvol(bx+1,by-1,bz) +
+                          refvol(bx-1,by+1,bz) +
+                          refvol(bx-1,by-1,bz) +
+                          refvol(bx+1,by,bz+1) +
+                          refvol(bx+1,by,bz-1) +
+                          refvol(bx-1,by,bz+1) +
+                          refvol(bx-1,by,bz-1) +
+                          refvol(bx,by+1,bz+1) +
+                          refvol(bx,by+1,bz-1) +
+                          refvol(bx,by-1,bz+1) +
+                          refvol(bx,by-1,bz-1))
+              + 0.0156 * (refvol(bx+1,by+1,bz+1) +
+                          refvol(bx+1,by+1,bz-1) +
+                          refvol(bx+1,by-1,bz+1) +
+                          refvol(bx+1,by-1,bz-1) +
+                          refvol(bx-1,by+1,bz+1) +
+                          refvol(bx-1,by+1,bz-1) +
+                          refvol(bx-1,by-1,bz+1) +
+                          refvol(bx-1,by-1,bz-1)) );
+          } else {
+            if (refvol.in_bounds(bx+1,by+1,bz+1)) {
+              T v000,v001,v010,v011,v100,v101,v110,v111;
+              refvol.getneighbours(bx,by,bz,v000,v001,v010,v011,v100,v101,v110,v111);
+              halfvol(x,y,z)=(T) ((v000+v001+v010+v011+v100+v101+v110+v111)/8.0);
+            } else {
+              halfvol(x,y,z) = (T) ( (
+                refvol(bx,by,bz) +
+                refvol(bx+1,by,bz) + refvol(bx,by+1,bz) +
+                refvol(bx,by,bz+1) + refvol(bx+1,by+1,bz) +
+                refvol(bx+1,by,bz+1) + refvol(bx,by+1,bz+1) +
+                refvol(bx+1,by+1,bz+1) )/8.0);
+            }
+          }
+        }
+      }
+    }
+    return halfvol;
+  }
 
 template volume<char>  subsample_by_2(const volume<char>& refvol, bool centred);
 template volume<short> subsample_by_2(const volume<short>& refvol, bool centred);
@@ -974,22 +954,48 @@ Matrix NewimageVox2NewimageVoxMatrix(const Matrix& flirt_in2ref,
   return v2vmat;
 }
 
+// Instantiations of various templated
+// things defined in newimagefns.h
 
-template Matrix NewimageVox2NewimageVoxMatrix(const Matrix& flirt_in2ref,
-					      const volume<char>& invol,
-					      const volume<char>& refvol);
-template Matrix NewimageVox2NewimageVoxMatrix(const Matrix& flirt_in2ref,
-					      const volume<short int>& invol,
-					      const volume<short int>& refvol);
-template Matrix NewimageVox2NewimageVoxMatrix(const Matrix& flirt_in2ref,
-					      const volume<int>& invol,
-					      const volume<int>& refvol);
-template Matrix NewimageVox2NewimageVoxMatrix(const Matrix& flirt_in2ref,
-					      const volume<float>& invol,
-					      const volume<float>& refvol);
-template Matrix NewimageVox2NewimageVoxMatrix(const Matrix& flirt_in2ref,
-					      const volume<double>& invol,
-					      const volume<double>& refvol);
+
+template Matrix NewimageVox2NewimageVoxMatrix(
+  const Matrix& flirt_in2ref,
+  const volume<char>& invol,
+  const volume<char>& refvol);
+template Matrix NewimageVox2NewimageVoxMatrix(
+  const Matrix& flirt_in2ref,
+  const volume<short int>& invol,
+  const volume<short int>& refvol);
+template Matrix NewimageVox2NewimageVoxMatrix(
+  const Matrix& flirt_in2ref,
+  const volume<int>& invol,
+  const volume<int>& refvol);
+template Matrix NewimageVox2NewimageVoxMatrix(
+  const Matrix& flirt_in2ref,
+  const volume<float>& invol,
+  const volume<float>& refvol);
+template Matrix NewimageVox2NewimageVoxMatrix(
+  const Matrix& flirt_in2ref,
+  const volume<double>& invol,
+  const volume<double>& refvol);
+
+
+template volume4D<float> sparseinterpolate(
+  const volume4D<float>& sparsesamps,
+  const volume<float>& mask,
+  const std::string& interpmethod);
+
+template void tfce(
+  volume<float>& data,
+  float H, float E, int NumConn,
+  float minT, float deltaT);
+
+template void tfce_support(
+  volume<float>& VolIntn,
+  float H, float E, int NumConn,
+  float minT, float deltaT,
+  int Xoi, int Yoi, int Zoi,
+  float threshTFCE);
 
   ///////////////////////////////////////////////////////////////////////////
 

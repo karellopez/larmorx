@@ -1395,8 +1395,8 @@ pub fn file_dtype(filename: &str, settings: &Settings) -> Result<i16, FslError> 
         return Ok(-1);
     }
     let valid = return_validimagefilename(filename)?;
-    let h = nifti::load_header(Path::new(&valid), &settings.open_options())
-        .map_err(FslError::nifti)?;
+    let h =
+        nifti::load_header(Path::new(&valid), &settings.open_options()).map_err(FslError::nifti)?;
     if h.scl_slope != 1.0 || h.scl_inter != 0.0 {
         if h.scl_slope == 0.0 || h.datatype == dt::DOUBLE {
             return Ok(h.datatype);

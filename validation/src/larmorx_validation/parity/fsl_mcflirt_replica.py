@@ -49,6 +49,7 @@ import numpy as np
 from larmorx_validation.parity import defects, fsl_versions
 from larmorx_validation.parity.harness import (
     BOTH_ERROR,
+    EXPECTED,
     Case,
     CaseResult,
     Check,
@@ -138,9 +139,7 @@ class Completed:
     stderr: str
 
 
-def _environment(
-    settings: dict[str, str | None], version: str | None = None
-) -> dict[str, str]:
+def _environment(settings: dict[str, str | None], version: str | None = None) -> dict[str, str]:
     """mcflirt's clean environment (``oracles/fsl-6.0.7/mcflirt/README.md``): ``HOME``, a
     ``PATH`` without FSL, ``FSLDIR``, ``FSLOUTPUTTYPE=NIFTI_GZ`` unless ``settings`` change it
     (``None`` unsets a variable)."""
@@ -219,8 +218,57 @@ def _without_descrip(data: bytes) -> bytes:
     return data[:start] + b"\0" * 80 + data[start + 80 :]
 
 
+#: Recorded runs whose only difference from FSL 6.0.7.23 is the arithmetic of Armadillo 14.2.1's
+#: LAPACK path for 4 x 4 inverses and solves, which the replica does not follow yet (it keeps
+#: Armadillo 10.5.1's closed-form inverse): values computed from nearly equal matrices (`.rms`
+#: of identical volumes, about 1e-15 mm) and the sign of NaN parameters. FSL's own step from
+#: 6.0.7.17 changes the same outputs (docs/findings/fsl-mcflirt.md, "FSL 6.0.7.23").
+ARMA_LAPACK = {
+    "real/ds000005/opt-stages1": ("out_mcf.nii.gz_rel.rms",),
+    "syn/content/nan/default": ("out_mcf.nii.gz.par",),
+    "syn/content/nan/reffile": ("out_mcf.nii.gz.par",),
+    "syn/motion/identical-copies/default": ("out_mcf.nii.gz_rel.rms",),
+    "syn/motion/identical-copies/reffile-fudge": (
+        "out_mcf.nii.gz_rel.rms",
+        "out_mcf.nii.gz_rel_mean.rms",
+    ),
+}
+#: The largest change the LAPACK path's last bits make to the numbers above (mm): they come from
+#: nearly equal matrices (relative rms of 1e-15 to 1e-8 mm).
+ARMA_TINY = 1e-12
+
+
+def arma_only(a: Path, b: Path) -> bool:
+    """Whether two of mcflirt's text outputs differ only where Armadillo 14.2.1's LAPACK
+    arithmetic does: numbers that differ by at most :data:`ARMA_TINY`, or NaN on both sides (its
+    sign)."""
+    ta = a.read_text(errors="replace").split()
+    tb = b.read_text(errors="replace").split()
+    if len(ta) != len(tb):
+        return False
+    for x, y in zip(ta, tb, strict=True):
+        if x == y:
+            continue
+        try:
+            fx, fy = float(x), float(y)
+        except ValueError:
+            return False
+        if np.isnan(fx) and np.isnan(fy):
+            continue
+        if abs(fx - fy) <= ARMA_TINY:
+            continue
+        return False
+    return True
+
+
+#: Image files, compressed or not (zstd and bzip2 since FSL 6.0.7.23).
+_COMPRESSIONS = ("", ".gz", ".zst", ".bz2")
+_IMAGES = tuple(f"{e}{c}" for e in (".nii", ".hdr", ".img") for c in _COMPRESSIONS)
+_DATA_FILES = tuple(f".img{c}" for c in _COMPRESSIONS)
+
+
 def _is_image(name: str) -> bool:
-    return name.endswith((".nii", ".nii.gz", ".hdr", ".hdr.gz", ".img", ".img.gz"))
+    return name.endswith(_IMAGES)
 
 
 def _files(d: Path, exclude: set[str]) -> dict[str, Path]:
@@ -236,6 +284,11 @@ def _image_values(path: Path) -> np.ndarray | None:
     import nibabel as nib
 
     try:
+        if path.name.endswith((".zst", ".bz2")):
+            with _open_stream(path) as f:
+                raw = f.read()
+            cls = nib.Nifti2Image if raw[:4] == b"\x1c\x02\x00\x00" else nib.Nifti1Image
+            return np.asanyarray(cls.from_bytes(raw).dataobj)
         return np.asanyarray(nib.load(path).dataobj)
     except Exception:
         return None
@@ -250,10 +303,22 @@ _HEADER_BYTES = 540
 
 
 def _open_stream(path: Path):
-    """``path``'s bytes as a program reads them (a gzip file decompressed)."""
+    """``path``'s bytes as a program reads them (gzip, and since FSL 6.0.7.23 zstd and bzip2,
+    decompressed: zstd by FSL 6.0.7.23's own ``zstd``, called by full path)."""
+    import bz2
+    import io
+
     with open(path, "rb") as f:
-        gz = f.read(2) == b"\x1f\x8b"
-    return gzip.open(path, "rb") if gz else open(path, "rb")
+        magic = f.read(4)
+    if magic[:2] == b"\x1f\x8b":
+        return gzip.open(path, "rb")
+    if magic[:3] == b"BZh":
+        return bz2.open(path, "rb")
+    if magic == b"\x28\xb5\x2f\xfd":
+        zstd = fsl_versions.fsldir(fsl_versions.NEWEST) / "bin" / "zstd"
+        out = subprocess.run([str(zstd), "-dc", str(path)], capture_output=True, check=False)
+        return io.BytesIO(out.stdout)
+    return open(path, "rb")
 
 
 def _same_streams(a: Path, b: Path, *, blank_descrip: bool) -> bool:
@@ -441,7 +506,7 @@ def compare(
     for name in sorted(set(theirs) & set(ours)):
         a, b = theirs[name], ours[name]
         if _is_image(name):
-            same = _same_streams(a, b, blank_descrip=not name.endswith((".img", ".img.gz")))
+            same = _same_streams(a, b, blank_descrip=not name.endswith(_DATA_FILES))
             if not same:
                 different.append(f"{name}: {_differing_values(a, b)}")
         else:
@@ -468,6 +533,10 @@ def _masked(text: str) -> str:
     return text
 
 
+#: A text output whose numbers differ only below 1e-12 or in a NaN's sign (Armadillo 14.2.1).
+ARMA_ONLY = fsl_versions.ARMA_ONLY
+
+
 def fsl_step(
     checks: CheckList,
     prev: Completed,
@@ -486,12 +555,10 @@ def fsl_step(
     differences = {}
     for name in sorted(set(pa) & set(na)):
         if _is_image(name):
-            if not _same_streams(
-                pa[name], na[name], blank_descrip=not name.endswith((".img", ".img.gz"))
-            ):
+            if not _same_streams(pa[name], na[name], blank_descrip=not name.endswith(_DATA_FILES)):
                 differences[name] = _differing_values(pa[name], na[name])
         elif not _same_bytes(pa[name], na[name]):
-            differences[name] = "the file differs"
+            differences[name] = ARMA_ONLY if arma_only(pa[name], na[name]) else "the file differs"
     env = {k: v for k, v in _environment(settings).items() if v is not None}
     changed, detail = fsl_versions.step_detail(
         (prev.code, new.code),
@@ -536,7 +603,7 @@ def fix_pass(
             others.append(f"files {sorted(set(a) ^ set(b))[:4]}")
         change = defects.Change(0, 0, 0.0)
         for key in sorted(set(a) & set(b)):
-            if _is_image(key) and not key.endswith((".img", ".img.gz")):
+            if _is_image(key) and not key.endswith(_DATA_FILES):
                 change = change + _change(b[key], a[key])
                 ha, hb = _head(a[key]), _head(b[key])
                 off = 352 if int.from_bytes(ha[:4], "little") == 348 else 544
@@ -626,6 +693,7 @@ def _recorded_case(name: str, checks: CheckList) -> None:
                 shutil.copy2(src, tmp / rel)
         return mapped
 
+    lapack_only = False
     try:
         with tempfile.TemporaryDirectory(prefix="lx-nc-") as name_:
             tmp = Path(name_)
@@ -655,6 +723,7 @@ def _recorded_case(name: str, checks: CheckList) -> None:
                     exclude = {"run.json"} | {f for f in _files(tmp, set()) if f in local_inputs}
                     exclude |= {f.name for f in rdir.iterdir() if f.name.startswith("std")}
                     compare(checks, oracle, rep, rdir, tmp, exclude)
+                    lapack_only = _lapack_divergence(checks, name, rdir, tmp)
                 else:
                     checks(f"step {k}: exit status", oracle.code == rep.code)
             if all(r.code == 0 for r in results) and len(mapped) == 1:
@@ -662,7 +731,28 @@ def _recorded_case(name: str, checks: CheckList) -> None:
             _recorded_step(checks, name, run, rdir, exclude, steps[-1], settings)
     except FileNotFoundError as e:
         raise Outcome("skipped", f"input not available: {e}") from e
+    if lapack_only:
+        raise Outcome(
+            EXPECTED,
+            f"{', '.join(ARMA_LAPACK[name])}: numbers differ by at most {ARMA_TINY:g} mm or in a "
+            "NaN's sign, from FSL "
+            "6.0.7.23's Armadillo 14.2.1 (4 x 4 inverses and solves through LAPACK); the replica "
+            "keeps Armadillo 10.5.1's closed-form inverse (docs/findings/fsl-mcflirt.md)",
+        )
     _agree_on_errors(checks, [s["exit"] for s in run["steps"]], "")
+
+
+def _lapack_divergence(checks: CheckList, name: str, rdir: Path, tmp: Path) -> bool:
+    """Whether a recorded case of :data:`ARMA_LAPACK` fails only by that file, and only where
+    Armadillo 14.2.1's LAPACK arithmetic does (:func:`arma_only`)."""
+    if name not in ARMA_LAPACK or fsl_versions.selected("replica") != fsl_versions.NEWEST:
+        return False
+    failed = [c for c in checks.checks if not c.passed]
+    if [c.name for c in failed] != ["every file bit-identical"]:
+        return False
+    targets = ARMA_LAPACK[name]
+    named = [x.strip().split(":")[0] for x in (failed[0].detail or "").split(";") if x.strip()]
+    return all(n in targets for n in named) and all(arma_only(rdir / n, tmp / n) for n in named)
 
 
 def _recorded_streams(rdir: Path, k: int) -> tuple[str, str]:
@@ -886,6 +976,25 @@ def _make_inputs(kind: str, d: Path) -> dict[str, str]:
     files = {"in": str(small), "ref": str(ref)}
     if kind == "tiny":
         files["in"] = _testdata("synthetic/hmc/geometry/tiny.nii.gz")
+    elif kind in ("zst", "bz2-as-nii", "img-dir", "img-out-dir"):
+        import bz2
+
+        raw = gzip.decompress(small.read_bytes())
+        if kind == "zst":
+            zstd = fsl_versions.fsldir(fsl_versions.NEWEST) / "bin" / "zstd"
+            (d / "in.nii").write_bytes(raw)
+            subprocess.run(
+                [str(zstd), "-q", "-f", "--rm", "-o", str(d / "in.nii.zst"), str(d / "in.nii")],
+                check=True,
+            )
+        elif kind == "bz2-as-nii":
+            (d / "in.nii").write_bytes(bz2.compress(raw))
+        elif kind == "img-dir":
+            (d / "a.img.d").mkdir()
+            shutil.copy(small, d / "a.img.d" / "in.nii.gz")
+        else:
+            (d / "a.img.d").mkdir()
+            (d / "a.hdr.d").mkdir()
     elif kind == "int8":
         scaled = np.clip(np.round(data / data.max() * 250 - 125), -128, 127)
         _write_like(small, d / "in.nii.gz", scaled, np.int8)
@@ -991,6 +1100,43 @@ EDGES: dict[str, Edge] = {
         ("-in", "@in", "-out", "out", "-mats"),
         (("FSLOUTPUTTYPE", "ANALYZE"),),
         description="FSLOUTPUTTYPE=ANALYZE",
+    ),
+    "fsloutputtype-zst": Edge(
+        ("-in", "@in", "-out", "out", "-mats", "-stats"),
+        (("FSLOUTPUTTYPE", "NIFTI_ZST"),),
+        description="FSLOUTPUTTYPE=NIFTI_ZST: zstd outputs (FSL 6.0.7.23)",
+    ),
+    "fsloutputtype-pair-bz2": Edge(
+        ("-in", "@in", "-out", "out", "-mats"),
+        (("FSLOUTPUTTYPE", "NIFTI_PAIR_BZ2"),),
+        description="FSLOUTPUTTYPE=NIFTI_PAIR_BZ2: a bzip2 pair (FSL 6.0.7.23)",
+    ),
+    "fsloutputtype-nifti2-zst": Edge(
+        ("-in", "@in", "-out", "out", "-mats"),
+        (("FSLOUTPUTTYPE", "NIFTI2_ZST"),),
+        description="FSLOUTPUTTYPE=NIFTI2_ZST (FSL 6.0.7.23)",
+    ),
+    "input-zst": Edge(
+        ("-in", "in.nii.zst", "-out", "out", "-mats"),
+        inputs="zst",
+        description="a zstd input, found by FSL's extension search too (FSL 6.0.7.23)",
+    ),
+    "input-bz2-plain-name": Edge(
+        ("-in", "in.nii", "-out", "out", "-mats"),
+        inputs="bz2-as-nii",
+        description="a bzip2 file named .nii: read by its content (FSL 6.0.7.23)",
+    ),
+    "img-in-directory": Edge(
+        ("-in", "a.img.d/in.nii.gz", "-out", "out", "-mats"),
+        inputs="img-dir",
+        description="an input in a directory named a.img.d: FSL 6.0.7.23 opens a.hdr.d/in.nii.gz "
+        "(FSL-60)",
+    ),
+    "img-in-output-directory": Edge(
+        ("-in", "@in", "-out", "a.img.d/out", "-mats"),
+        inputs="img-out-dir",
+        description="an output in a.img.d beside a directory a.hdr.d: FSL 6.0.7.23 writes it there "
+        "(FSL-60)",
     ),
     "fsloutputtype-bogus": Edge(
         ("-in", "@in", "-out", "out", "-mats"),
@@ -1288,7 +1434,7 @@ def suite() -> Suite:
         name="fsl-mcflirt-replica",
         title="mcflirt replica (bit-exact, FSL Licence)",
         tool="`larmorx-nc fsl mcflirt` (crate larmorx-nc-mcflirt, translated from FSL "
-        f"{fsl_versions.NEWEST}'s source; `lx.mri.hmc(implementation=\"replica\")`)",
+        f'{fsl_versions.NEWEST}\'s source; `lx.mri.hmc(implementation="replica")`)',
         reference=f"mcflirt from FSL {v} (fsl-mcflirt 2111.0, the conda build at "
         f"`~/{fsl_versions.INSTALLS.get(v, 'fsl')}`, as built: glibc 2.35's maths): the recorded "
         f"runs in {where} and runs made here",

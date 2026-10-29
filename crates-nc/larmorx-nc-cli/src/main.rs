@@ -66,13 +66,21 @@ fn renamed_notices(settings: &Settings, mode: UpstreamDefects, err: &mut dyn Wri
             format!(
                 "{given} opened as {renamed}, as FSL 6.0.7.23 opens it (NewNifti replaces a \
                  name's last '.img' with '.hdr'){}",
-                if renames.len() > 1 { ", and other names alike" } else { "" }
+                if renames.len() > 1 {
+                    ", and other names alike"
+                } else {
+                    ""
+                }
             )
         } else {
             format!(
                 "{given} opened as given; FSL 6.0.7.23 opens {renamed} instead (NewNifti \
                  replaces a name's last '.img' with '.hdr'){}",
-                if renames.len() > 1 { ", and other names alike" } else { "" }
+                if renames.len() > 1 {
+                    ", and other names alike"
+                } else {
+                    ""
+                }
             )
         };
         let n = larmorx_core::defects::Notice::new(&larmorx_core::defects::FSL_60, mode, detail);

@@ -2,13 +2,8 @@
 //the public domain by Rober W Cox, August 2003 and modified by
 //Mark Jenkinson, August 2004 and Rick Reynolds, December 2004 and
 //Matthew Webster 2018
-#if __cplusplus >= 201103L || __clang__
-  #include <array>
-using std::array;
-#else
-  #include <tr1/array>
-using std::tr1::array;
-#endif
+
+#include <array>
 
 #include "nifti1.h"
 
@@ -85,14 +80,14 @@ namespace NiftiIO {
     void writeFieldsToRaw(analyzeHeader& rawHeader) const;
     void writeFieldsToRaw(nifti_1_header& rawHeader) const;
     //Members
-    array<char,10> data_type;
-    array<char,18> db_name;
+    std::array<char,10> data_type;
+    std::array<char,18> db_name;
     int extents;
     short int session_error;
     char regular;
     char hkey_un0;
-    array<char,4> vox_units;
-    array<char,8> cal_units;
+    std::array<char,4> vox_units;
+    std::array<char,8> cal_units;
     short int unused1;
     short int dim_un0;
     float funused1;
@@ -103,13 +98,13 @@ namespace NiftiIO {
     int glmax;
     int glmin;
     char orient;
-    array<char,10> originator;
-    array<char,10> generated;
-    array<char,10> scannum;
-    array<char,10> patient_id;
-    array<char,10> exp_date;
-    array<char,10> exp_time;
-    array<char,3> hist_un0;
+    std::array<char,10> originator;
+    std::array<char,10> generated;
+    std::array<char,10> scannum;
+    std::array<char,10> patient_id;
+    std::array<char,10> exp_date;
+    std::array<char,10> exp_time;
+    std::array<char,3> hist_un0;
     int views;
     int vols_added;
     int start_field;

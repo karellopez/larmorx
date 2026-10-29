@@ -1,4 +1,4 @@
-# Spec: `lx.mri.hmc` (behaviour of FSL mcflirt, FSL 6.0.7)
+# Spec: `lx.mri.hmc` (behaviour of FSL mcflirt, FSL 6.0.7.23; first written for 6.0.7.17)
 
 The input for the clean-room **original** of larmorx's head-motion correction (crate
 `larmorx-mri`, Apache-2.0, `lx.mri.hmc`, `larmorx mri hmc`). FSL is under the FSL Licence
@@ -20,7 +20,15 @@ running the FSL binary (oracle runs in `<workspace>/oracles/fsl-6.0.7/mcflirt/`,
 `scripts/run_mcflirt_oracle.py`, §14). The rest come from FSL's documentation and from
 analysis of the program's behaviour.
 
-**Version.** FSL 6.0.7.17 (Linux x86-64 conda build), packages:
+**Version.** FSL 6.0.7.23 (Linux x86-64 conda build) since 2026-10-29: everything below holds for
+it; the lines marked "(FSL 6.0.7.23)" say where it differs from FSL 6.0.7.17, the version this
+spec was first written for (its packages in the table; 6.0.7.23's: fsl-mcflirt 2111.0,
+fsl-newimage 2601.0, fsl-miscmaths 2412.6, fsl-newnifti 5.0.0, fsl-armawrap 0.7.0 (Armadillo
+14.2.1), fsl-utils 2412.6, fsl-znzlib 2511.3, OpenBLAS 0.3.33). **(FSL 6.0.7.23)** The black-box
+runs for it are in `<workspace>/oracles/fsl-6.0.7.23/mcflirt/` (the same runs, made by
+`scripts/run_mcflirt_oracle.py --fsl-version 6.0.7.23`): 127 of 137 give 6.0.7.17's outputs byte
+for byte; the 10 others change only as §9.3, §13 and the I/O lines below say. FSL 6.0.7.17's
+packages:
 
 | Package | Version (conda build) |
 |---|---|
@@ -144,6 +152,24 @@ converted to float32 on reading:
 - a 3D series is a series of one volume **(observed)**;
 - a 4D `-reffile` is truncated to its first volume, with a warning on stderr ("An input
   intended to be a single 3D volume has multiple timepoints...") **(observed)**.
+
+- **Formats and names (FSL 6.0.7.23).** A file is read by its content, whatever its name:
+  gzip (first bytes `1f 8b`), zstd (`28 b5 2f fd`), bzip2 (`42 5a 68`), otherwise uncompressed; a
+  file shorter than four bytes by its name's suffix (`.gz`, `.zst`, `.bz2`). A name without an
+  extension is completed by trying, in this order, `.nii.gz`, `.nii`, `.hdr`, `.hdr.gz`,
+  `.nii.zst`, `.hdr.zst`, `.nii.bz2`, `.hdr.bz2` (more than one match is an error, `Multiple
+  possible filenames detected for basename: <name>`); `.img`, `.img.gz`, `.img.zst`, `.img.bz2`
+  name the pair of the matching `.hdr` name. The data file of a pair is read in whatever format
+  its own bytes say. **(observed:** a bzip2 file named `.nii` and a zstd file named `.nii.zst`
+  read alike**)** FSL 6.0.7.17 read gzip and uncompressed files only.
+- **Names holding `.img` (FSL 6.0.7.23, FSL-60).** FSL 6.0.7.23 opens every image under its name
+  with the last occurrence of `.img` anywhere in it (a directory, or the file's own stem such as
+  `sub.img2.nii.gz`) replaced by `.hdr`: it reads or writes another file, or fails with `Error:
+  cant open file <the renamed name>` **(observed:** `-out a.img.d/out` writes
+  `a.hdr.d/out.nii.gz` when that directory exists; `-in a.img.d/in.nii.gz` reads
+  `a.hdr.d/in.nii.gz`; a pair written into `x.hdr.y.img.d/` aborts on `x.hdr.y.hdr.d/o5.hdr`**)**.
+  larmorx opens the name given (default); `reproduce` renames as FSL 6.0.7.23 does, and both
+  name FSL-60. FSL 6.0.7.17 opened the name given.
 
 Obliquity is irrelevant: the estimation works in voxel coordinates. **(observed:** the same
 array with an oblique affine gives bit-identical matrices.**)**
@@ -547,6 +573,17 @@ the BOLD grid.
 The final interpolation does not change the matrices **(observed)**. Only one option
 applies; the precedence is sinc, then nearest neighbour, then spline.
 
+**(FSL 6.0.7.23, FSL-59)** FSL 6.0.7.23's mcflirt applies `-sinc_final` and `-nn_final` with
+**trilinear** interpolation: its output with either option is byte for byte its default output,
+`.par` and `.rms` included **(observed:** a synthetic series and ds000005 run 1, every output
+identical to the default run's; `-spline_final` is still the spline**)**. The `.par` and `.rms`
+files follow from the resampled reference volume (§10.3), so they change with it. larmorx
+resamples with the interpolation asked for (default, FSL 6.0.7.17's result) and with
+`reproduce` trilinearly, as FSL 6.0.7.23 does; both name FSL-59 where the two series differ.
+**(FSL 6.0.7.23)** The spline's coefficients outside the grid: unchanged for mcflirt's final
+resampling (it extends the edge coefficient); FSL's spline code now treats coefficients outside a
+zero-padded grid as 0, which mcflirt never uses.
+
 ### 9.4 Output values
 
 The resampled series is float32. It is written in the input's storage type (§10.1),
@@ -566,7 +603,13 @@ data has the values on the left.**)**
   `FSLOUTPUTTYPE`: `NIFTI_GZ` → `.nii.gz`, `NIFTI` → `.nii`, `NIFTI2_GZ` → NIfTI-2 `.nii.gz`,
   and the pair types (`.hdr/.img`). Without `-out`, `<out>` = the input name without
   extension, plus `_mcf` **(observed)**. Unset `FSLOUTPUTTYPE` makes mcflirt fail (exit 1)
-  after the estimation, after writing the `.mat` files **(observed)**.
+  after the estimation, after writing the `.mat` files **(observed)**. **(FSL 6.0.7.23)** The
+  accepted values are `NIFTI`, `NIFTI_PAIR`, `NIFTI2`, `NIFTI2_PAIR`, `NIFTI_GZ`, `NIFTI_PAIR_GZ`, `NIFTI2_GZ`, `NIFTI2_PAIR_GZ`, `NIFTI_ZST`, `NIFTI_PAIR_ZST`, `NIFTI2_ZST`, `NIFTI2_PAIR_ZST`, `NIFTI_BZ2`, `NIFTI_PAIR_BZ2`, `NIFTI2_BZ2`, `NIFTI2_PAIR_BZ2`: the zstd types write `.nii.zst` (pairs
+  `.hdr.zst`/`.img.zst`), the bzip2 types `.nii.bz2` (`.hdr.bz2`/`.img.bz2`); FSL 6.0.7.23 writes
+  each piece of a zstd file (header, extensions, data) as a frame of its own, and bzip2 with
+  blocks of 900 kB (only the decompressed bytes matter). An unknown value prints `ERROR::
+  Unrecognised value (<value>) of environment variable FSLOUTPUTTYPE` and `Legal values are: NIFTI, NIFTI_PAIR, NIFTI2, NIFTI2_PAIR, NIFTI_GZ, NIFTI_PAIR_GZ, NIFTI2_GZ, NIFTI2_PAIR_GZ, NIFTI_ZST, NIFTI_PAIR_ZST, NIFTI2_ZST, NIFTI2_PAIR_ZST, NIFTI_BZ2, NIFTI_PAIR_BZ2, NIFTI2_BZ2, NIFTI2_PAIR_BZ2`
+  (FSL 6.0.7.17 listed `NIFTI, NIFTI_PAIR, NIFTI_GZ, NIFTI_PAIR_GZ`) **(observed)**.
 - **Type.**
 
   | Input | Output |
@@ -582,7 +625,8 @@ data has the values on the left.**)**
   codes as in the input (the stored affines are unchanged, whatever the orientation);
   `scl_slope = 1`, `scl_inter = 0`; `cal_min`/`cal_max` = the minimum and maximum of the
   float32 corrected series (before the type conversion); `descrip` = the FSL library's build
-  string (`2203.12-dirty 2024-02-01T16:17:47+00:00` here); intent fields and `aux_file` from
+  string (`2203.12-dirty 2024-02-01T16:17:47+00:00` in FSL 6.0.7.17, `2601.0
+  2025-12-08T15:20:57Z` in FSL 6.0.7.23 **(observed)**); intent fields and `aux_file` from
   the input; `dim_info`, `slice_code`, `slice_start`, `slice_end`, `slice_duration` set to 0;
   little-endian, also for big-endian input (ds000258). **(observed** by the clean-room
   implementer: a single corrected volume is written 3D (`dim[0] = 3`) with `pixdim[4]` kept;
@@ -739,6 +783,7 @@ volume and stage:
 | Euler decomposition | float32 intermediates |
 | rotation composition | the angle vector's norm is rounded to float32 before the rotation is built; the rotation matrix is therefore orthogonal only to about 1e−8. **(observed:** the translations of the evaluated matrices (`-verbose 20`) are reproduced only with each elementary rotation's cosine and sine rounded to float32, e.g. `1 − cos` off by 3.2e−8 at an angle of −0.00315; computing them in double reproduces 12 of 240 first parabola steps on ds000005, rounding them to float32 140 of 240**)** |
 | `.mat` output | 6 decimals |
+| **(FSL 6.0.7.23)** 4 × 4 inverses and solves | FSL 6.0.7.23's matrix library (Armadillo 14.2.1) inverts a general 4 × 4 matrix by an LU decomposition with partial pivoting (LAPACK `getrf` and `getri`, OpenBLAS 0.3.33), a diagonal one element by element and a triangular one by back substitution, and solves `inv(A)·B` by LU (`gesv`; for a symmetric `A`, such as a diagonal sampling matrix, by its symmetric indefinite factorisation); FSL 6.0.7.17's (Armadillo 10.5.1) used the closed-form cofactor inverse for every matrix up to 4 × 4. The difference is in the last bits: it changes no matrix, image or `.par` value in 127 of 137 recorded runs, but values computed from nearly equal matrices (the `.rms` of identical volumes, about 1e−15 mm) and the sign of NaN parameters (§12) differ **(observed:** 5 recorded runs; the same results under every OpenBLAS core this CPU runs, Haswell to Cooperlake**)** |
 
 **Determinism.** mcflirt uses no random numbers and runs single-threaded (the FSL library
 disables BLAS threading at start-up). Repeated runs give byte-identical outputs **(observed:**
@@ -880,7 +925,10 @@ report TR02MJ1 describe MCFLIRT. The implementation departs from or adds to it a
 3. `-spline_final` boundary handling (§9.3) is described from analysis only; it is tier 2
    and should be confirmed by black-box comparison before larmorx claims it.
 4. Histogram costs (`mutualinfo`, `normmi`, `corratio`, `woods`) and `leastsquares` are
-   described only in outline (appendix A); oracle runs exist for ds000005.
+   described only in outline (appendix A); oracle runs exist for ds000005. **(FSL 6.0.7.23)**
+   `mutualinfo` and `normmi` are now described exactly (appendix B), for the clean-room
+   original's `normmi` follow-up (its median temporal-SD ratio of 1.033 to mcflirt on 91 random
+   phantoms).
 5. A second FSL build for the band.
 6. Whether larmorx should default to a better optimiser (D11) once the band is known: the
    uncentred correlation, the single sweep and the tolerance quantisation are mcflirt's, not
@@ -911,9 +959,78 @@ binned once per stage: `bin = ⌊(g − g_min)·B/(g_max − g_min)⌋`, clamped
   0 if the total variance is not positive.
 - `woods`: `Σ_b n_b²·σ_b/μ_b / n` (unweighted; `σ_b/μ_b` replaced by `σ_b` when the bin mean
   is not positive); `1e10` for an empty overlap.
-- `mutualinfo` (cost `−MI`) and `normmi` (cost `−(H1 + H2)/H12`): joint histogram of the
+- `mutualinfo` (cost `−MI`) and `normmi` (cost `−(H1 + H2)/H12`), exactly in appendix B:
+  joint histogram of the
   reference bins and test bins (test values binned over the test volume's min–max), each
   sample spread over its bin and the neighbouring one with a linear "fuzzy" weight within
   half a bin of the bin edge, times the edge weight; entropies from probabilities
   `count / total grid points`, corrected to the overlap size by `H' = (n_grid/n_overlap)·H −
   log(n_grid/n_overlap)`.
+
+## Appendix B. `mutualinfo` and `normmi` exactly (FSL 6.0.7.23)
+
+Both costs are unchanged from FSL 6.0.7.17; this appendix describes them completely (FSL
+6.0.7.23). Every quantity is float32 unless said otherwise; sums are accumulated in the order
+given.
+
+**The pair.** At every stage (§5.2) the cost compares the reference grid of that stage (the
+reference resampled to the stage's scale, §5.3: "ref", `n_x × n_y × n_z` points) with the volume
+being registered at its own resolution ("test", after §12's in-plane padding where it applies).
+Each evaluation maps every reference grid point into the test volume through the inverse of the
+trial matrix, with the same positions, row ranges and bounds test as `normcorr` (§6.1), and
+interpolates the test volume trilinearly there (§6.2).
+
+**Bins.** `B = ⌊bins / s⌋` (integer division) with `bins` from `-bins` (default 256) and `s` the
+stage's scale in mm: with the default, 32 bins in stage 1 (8 mm) and 64 in stages 2 to 4 (4 mm).
+- *Reference bins*, once per stage: `r_min`, `r_max` the minimum and maximum of the reference
+  grid's values; when `r_max − r_min = 0`, `r_max` is increased by 1. `a1 = B/(r_max − r_min)`,
+  `a0 = −r_min·B/(r_max − r_min)` (float32: `−r_min·B` first, then the division). Each grid
+  point's bin is `trunc(v·a1 + a0)` (the product, then the sum, in float32; the conversion to an
+  integer truncates toward zero, and a value out of the integer range or NaN gives the most
+  negative integer), clamped to `0 … B−1`.
+- *Test bins*, at every evaluation: `t_min`, `t_max` the minimum and maximum over every voxel of
+  the test volume (not only those sampled); `b1 = B/(t_max − t_min)`, `b0 = −t_min·B/(t_max −
+  t_min)` (float32; not guarded: a constant test volume divides by 0). For a sample `y`:
+  `u = y·b1 + b0`; `c = trunc(u)` (toward zero, 64-bit); `c⁺ = c + 1`, `c⁻ = c − 1`; then, in
+  this order: if `c ≥ B`, `c = B − 1` and `c⁺ = c`; if `c < 0`, `c = 0` and `c⁻ = c`; if
+  `c⁺ ≥ B`, `c⁺ = B − 1`; if `c⁻ < 0`, `c⁻ = 0`.
+
+**Fuzzy (partial-volume) binning.** The fraction `f = |u − trunc₃₂(u)|` (`trunc₃₂`: toward zero
+through a 32-bit integer), so `f ∈ [0, 1)`, measured from the truncated value also for negative
+`u`. With the fuzzy fraction `φ = 0.5` (fixed; mcflirt has no option for it):
+- `f < φ`: centre weight `w_c = 0.5 + 0.5·(f/φ)`, `w⁻ = 1 − w_c`, `w⁺ = 0`;
+- `f > 1 − φ`: `w_c = 0.5 + 0.5·((1 − f)/φ)`, `w⁺ = 1 − w_c`, `w⁻ = 0`;
+- otherwise (`f = 0.5` exactly) `w_c = 1`, `w⁺ = w⁻ = 0`.
+So each sample is shared between its own bin and the nearer neighbour, linearly, the share
+reaching one half at the bin's edge; at the clamped ends the neighbour's share falls into the
+same bin.
+
+**Edge weight.** `g = 1`; with `σ_x = smooth/d_x`, `σ_y = smooth/d_y`, `σ_z = smooth/d_z` (`smooth`
+from `-smooth`, default 1 mm; `d` the test volume's voxel sizes) and `x_b = n_x^test − 1.0001`
+(likewise `y_b`, `z_b`, in float32), for each axis in turn (x, y, z) with `o` the sample's test
+coordinate on it: if `o < σ`, `g ← g·(o/σ)`; else if `x_b − o < σ`, `g ← g·((x_b − o)/σ)`;
+finally `g ← max(g, 0)`. With `-smooth 0` every `g` is 1 (no comparison holds). These costs
+always take this weighted, fuzzy form, whatever `-smooth` (the fuzzy fraction is never 0).
+
+**Histograms.** A joint histogram `J` of `(B+1) × (B+1)` cells and two marginals `M_ref`, `M_test`
+of `B + 1` cells, all float32 and zeroed at each evaluation (the cells of index `B` stay 0). For
+every sample, in the sampling order (z, then y, then x along each row), with `a` the reference
+bin of its grid point: `J[a][c] += g·w_c`, `M_test[c] += g·w_c`, `J[a][c⁺] += g·w⁺`,
+`M_test[c⁺] += g·w⁺`, `J[a][c⁻] += g·w⁻`, `M_test[c⁻] += g·w⁻` (each product `g·w` rounded,
+then added), then `M_ref[a] += g`.
+
+**Entropies.** `N = n_x·n_y·n_z` of the reference grid (as float32) — all grid points, sampled or
+not. `H_joint = Σ −p·ln p` over the cells of `J` with a positive count, `p = count/N`, in index
+order (reference bin major); `H_ref` likewise over `M_ref`; `H_test` over `M_test`, whose positive
+counts also sum to `n_ov` (float32). `ln` is the single-precision logarithm (glibc's `logf`),
+each term `−p·ln p` rounded to float32 and added. Then, when `n_ov > 0`: `ρ = N/n_ov` and each of
+the three is replaced by `ρ·H − ln ρ` (the logarithm once, in float32), the correction of an
+entropy measured over `N` points to the `n_ov` points that overlap. When `n_ov = 0`: `H_joint =
+2·ln B`, `H_ref = H_test = ln B` (natural logarithms in double, stored in float32): the values of
+a bad registration.
+
+**The costs.** `mutualinfo`: `MI = H_ref + H_test − H_joint`, cost `−MI`. `normmi`:
+`NMI = (H_ref + H_test)/H_joint`, or 0 when `|H_joint| < 1e−9`; cost `−NMI`. Both are minimised
+by the line searches of §7, like every cost; neither is centred or normalised further (the
+range `−2 … −1` of `−NMI` and its flatness near the optimum are what the line search sees). With
+`-bins` below 8, stage 1 has `B = 0` bins (FSL-21, §12).

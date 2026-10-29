@@ -374,7 +374,25 @@ impl SplineCoefs {
         indx as usize
     }
 
-    /// `value_at(coord)` for three dimensions, order 3.
+    /// `coef(indx)` (fsl-miscmaths 2412.6): the coefficient at `(i, j, k)`; an index outside
+    /// the grid is 0 with `Zeros` (the first dimension that is outside decides), else mapped by
+    /// `indx2indx`. 2203.2 mapped it for `Zeros` too (mirrored).
+    fn coef_at(&self, ijk: [i32; 3]) -> f64 {
+        let mut idx = [0usize; 3];
+        for d in 0..3 {
+            let inside = ijk[d] >= 0 && (ijk[d] as i64) < self.dims[d] as i64;
+            if !inside && self.zeros {
+                return 0.0;
+            }
+            idx[d] = self.indx2indx(ijk[d], d);
+        }
+        let (d0, d1) = (self.dims[0], self.dims[1]);
+        f64::from(self.coef[idx[0] + d0 * (idx[1] + d1 * idx[2])])
+    }
+
+    /// `value_at(coord)` for three dimensions, order 3 (fsl-miscmaths 2412.6: the first index
+    /// `ceil(coord) - 2`, the coefficients through `coef`, which leaves those outside a `Zeros`
+    /// grid at 0; 2203.2 started at `(int)(coord + 0.5)` minus 1 or 2 and mirrored them).
     pub fn value_at(&self, coord: [f64; 3]) -> f64 {
         if self.zeros {
             for (i, &c) in coord.iter().enumerate() {
@@ -386,12 +404,8 @@ impl SplineCoefs {
         let ni = 4usize;
         let mut inds = [0i32; 3];
         for i in 0..3 {
-            let ix = cnum::f64_to_i32(coord[i] + 0.5);
-            inds[i] = if f64::from(ix) < coord[i] {
-                ix - 1
-            } else {
-                ix - 2
-            };
+            // `std::ceil(coord[i]) - ni/2`, a double assigned to an int
+            inds[i] = cnum::f64_to_i32(coord[i].ceil() - 2.0);
         }
         let mut wgts = [[0.0f64; 4]; 3];
         for d in 0..3 {
@@ -399,17 +413,16 @@ impl SplineCoefs {
                 *w = get_wgt3(coord[d] - f64::from(inds[d] + i as i32));
             }
         }
-        let (d0, d1) = (self.dims[0], self.dims[1]);
+        let at = |i: usize, j: usize, k: usize| {
+            self.coef_at([inds[0] + i as i32, inds[1] + j as i32, inds[2] + k as i32])
+        };
         let mut val = 0.0f64;
         for k in 0..ni {
             let wgt1 = (1.0 * 1.0) * wgts[2][k];
-            let linear1 = d0 * d1 * self.indx2indx(inds[2] + k as i32, 2);
             for j in 0..ni {
                 let wgt2 = wgt1 * wgts[1][j];
-                let linear2 = linear1 + d0 * self.indx2indx(inds[1] + j as i32, 1);
                 for i in 0..ni {
-                    let c = f64::from(self.coef[linear2 + self.indx2indx(inds[0] + i as i32, 0)]);
-                    val += c * wgts[0][i] * wgt2;
+                    val += at(i, j, k) * wgts[0][i] * wgt2;
                 }
             }
         }
@@ -419,14 +432,10 @@ impl SplineCoefs {
             val = 0.0;
             for k in 0..ni {
                 let wgt1 = (1.0 * 1.0) * wgts[2][k];
-                let linear1 = d0 * d1 * self.indx2indx(inds[2] + k as i32, 2);
                 for j in 0..ni {
                     let wgt2 = wgt1 * wgts[1][j];
-                    let linear2 = linear1 + d0 * self.indx2indx(inds[1] + j as i32, 1);
                     for i in 0..ni {
-                        let c =
-                            f64::from(self.coef[linear2 + self.indx2indx(inds[0] + i as i32, 0)]);
-                        val = add(val, mul(mul(c, wgts[0][i]), wgt2));
+                        val = add(val, mul(mul(at(i, j, k), wgts[0][i]), wgt2));
                     }
                 }
             }

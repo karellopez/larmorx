@@ -1,10 +1,11 @@
 // SPDX-License-Identifier: LicenseRef-FSL AND Apache-2.0
 // Copyright 2026 Karel Lopez Vilaret (the translation).
 //
-// fslpy 3.21.1's file-name semantics (imtest, remove_ext, imglob; fsl/utils/path.py,
+// fslpy 3.27.0's file-name semantics (imtest, remove_ext, imglob; fsl/utils/path.py,
 // fsl/scripts/imtest.py, remove_ext.py, imglob.py) are Apache-2.0 (Copyright the University of
-// Oxford, Paul McCarthy); the rest translates FSL's avwutils (fsl-avwutils 2209.3: fslroi.cc,
-// fslmerge.cc, fslmaths.cc, fslstats.cc, fslval) under the FSL Licence.
+// Oxford, Paul McCarthy); the rest translates FSL's avwutils (fsl-avwutils 2209.6: fslroi.cc,
+// fslmerge.cc, fslmaths.cc, fslstats.cc, fslval) under the FSL Licence. FSL 6.0.7.23; first
+// translated from FSL 6.0.7.17 (fslpy 3.21.1, fsl-avwutils 2209.3).
 //! The parts of FSL's other programs that the `bet` script runs, as the script uses them:
 //! `fslval` (dimensions and voxel sizes), `fslroi` (one volume, one slice, a slab), `fslmerge -z`,
 //! `fslmaths ... -dilF` and `-mas`, `fslstats -l <t> -C`, and fslpy's `imtest`, `remove_ext` and
@@ -21,11 +22,23 @@ use crate::settings::Settings;
 use crate::sse;
 use crate::volume::{self, Elem, FslError, SaveError, SaveOptions, Volume};
 
-/// fslpy's image extensions, in its order.
-pub const FSLPY_EXTS: [&str; 8] = [
-    ".nii.gz", ".nii", ".img", ".hdr", ".img.gz", ".hdr.gz", ".mnc", ".mnc.gz",
+/// fslpy's image extensions of `imtest` and `remove_ext`, in its order (fslpy 3.27.0 added the
+/// zstd and bzip2 ones).
+pub const FSLPY_EXTS: [&str; 14] = [
+    ".nii.gz", ".nii", ".nii.zst", ".nii.bz2", ".img", ".hdr", ".img.gz", ".hdr.gz", ".img.zst",
+    ".hdr.zst", ".img.bz2", ".hdr.bz2", ".mnc", ".mnc.gz",
 ];
-const GROUPS: [[&str; 2]; 2] = [[".hdr", ".img"], [".hdr.gz", ".img.gz"]];
+/// `imglob`'s own list: the same without MINC.
+pub const IMGLOB_EXTS: [&str; 12] = [
+    ".nii.gz", ".nii", ".nii.zst", ".nii.bz2", ".img", ".hdr", ".img.gz", ".hdr.gz", ".img.zst",
+    ".hdr.zst", ".img.bz2", ".hdr.bz2",
+];
+const GROUPS: [[&str; 2]; 4] = [
+    [".hdr", ".img"],
+    [".hdr.gz", ".img.gz"],
+    [".hdr.zst", ".img.zst"],
+    [".hdr.bz2", ".img.bz2"],
+];
 
 /// fslpy's `removeExt(path, exts)`: the first extension of the list the name ends with.
 pub fn remove_ext(path: &str) -> String {
@@ -155,7 +168,7 @@ pub fn imglob(paths: &[String]) -> Vec<String> {
         let cands: Vec<String> = if !get_ext(&prefix).is_empty() {
             vec![prefix.clone()]
         } else {
-            FSLPY_EXTS.iter().map(|e| format!("{prefix}{e}")).collect()
+            IMGLOB_EXTS.iter().map(|e| format!("{prefix}{e}")).collect()
         };
         for c in cands {
             if is_file(&c) {

@@ -82,7 +82,17 @@
 
 namespace SPLINTERPOLATOR {
 
-enum ExtrapolationType {Zeros, Constant, Mirror, Periodic};
+// Controls how the field behaves outside of the FOV:
+//  - Zeros:           Out-of-bounds coordinates are set to zero
+//  - Constant:        Out-of-bounds coordinates are set to the boundary voxels
+//  - Mirror:          The field is mirrored in all directions
+//  - Periodic:        The field is repeated in all directions
+//  - SoftZeros:       The field boundary is set to zero, but out-of-bounds voxels
+//                     are calculated via interpolation
+//  - CorrectConstant: Out-of-bounds coordinates are set to the boundary voxels,
+//                     and the coefficient field is initialised with the correct
+//                     boundary condition.
+enum ExtrapolationType {Zeros, Constant, Mirror, Periodic, SoftZeros, CorrectConstant};
 
 class SplinterpolatorException: public std::exception
 {
@@ -105,35 +115,105 @@ class Splinterpolator
 {
 public:
   // Constructors
-  Splinterpolator() : _valid(false), _own_coef(false), _coef(0), _cptr(0), _ndim(0), _nthr(1) {}
-  Splinterpolator(const T *data, const std::vector<unsigned int>& dim, const std::vector<ExtrapolationType>& et, unsigned int order=3, bool copy_low_order=true, Utilities::NoOfThreads nthr=Utilities::NoOfThreads(1), double prec=1e-8) : _valid(false), _own_coef(false), _coef(0), _cptr(0), _ndim(0), _nthr(nthr._n)
+  Splinterpolator()
+    : _valid(false), _own_coef(false), _coef(nullptr), _cptr(nullptr), _ndim(0), _nthr(1) {}
+  Splinterpolator(const T *data_or_coefs,
+                  const std::vector<unsigned int>& dim,
+                  const std::vector<ExtrapolationType>& et,
+                  unsigned int order=3,
+                  bool copy_low_order=true,
+                  Utilities::NoOfThreads nthr=Utilities::NoOfThreads(),
+                  double prec=1e-8,
+                  bool data_are_coefs=false)
+    : _valid(false), _own_coef(false), _coef(nullptr), _cptr(nullptr), _ndim(0), _nthr(nthr._n)
   {
-    common_construction(data,dim,order,prec,et,copy_low_order);
+    common_construction(data_or_coefs,dim,order,prec,et,copy_low_order,data_are_coefs);
   }
-  Splinterpolator(const T *data, const std::vector<unsigned int>& dim, ExtrapolationType et=Zeros, unsigned int order=3, bool copy_low_order=true, Utilities::NoOfThreads nthr=Utilities::NoOfThreads(1), double prec=1e-8) : _valid(false), _own_coef(false), _coef(0), _cptr(0), _ndim(0), _nthr(nthr._n)
+  Splinterpolator(const T *data_or_coefs,
+                  const std::vector<unsigned int>& dim,
+                  ExtrapolationType et=Zeros,
+                  unsigned int order=3,
+                  bool copy_low_order=true,
+                  Utilities::NoOfThreads nthr=Utilities::NoOfThreads(),
+                  double prec=1e-8,
+                  bool data_are_coefs=false)
+    : _valid(false), _own_coef(false), _coef(nullptr), _cptr(nullptr), _ndim(0), _nthr(nthr._n)
   {
     std::vector<ExtrapolationType>   ett(dim.size(),et);
-    common_construction(data,dim,order,prec,ett,copy_low_order);
+    common_construction(data_or_coefs,dim,order,prec,ett,copy_low_order,data_are_coefs);
   }
   // Copy construction. May be removed in future
-  Splinterpolator(const Splinterpolator<T>& src) : _valid(false), _own_coef(false), _coef(0), _cptr(0), _ndim(0) { assign(src); }
+  Splinterpolator(const Splinterpolator<T>& src)
+    : _valid(false), _own_coef(false), _coef(nullptr), _cptr(nullptr), _ndim(0) {
+    assign(src);
+  }
 
   // Destructor
-  ~Splinterpolator() { if(_own_coef) delete [] _coef; }
+  ~Splinterpolator() { if(_own_coef) { delete [] _coef; }}
 
   // Assignment. May be removed in future
-  Splinterpolator& operator=(const Splinterpolator& src) { if(_own_coef) delete [] _coef; assign(src); return(*this); }
+  Splinterpolator& operator=(const Splinterpolator& src)
+  {
+    if(_own_coef) delete [] _coef;
+    assign(src);
+    return(*this);
+  }
+
+  // Move assignment
+  Splinterpolator& operator=(Splinterpolator&& src) {
+    if (this != &src) {
+      if(_own_coef) delete [] _coef;
+      assign(src, true);
+      src._own_coef = false;
+    }
+    return *this;
+  }
+
+  // Move constructor
+  Splinterpolator(Splinterpolator&& src)
+    : _valid(false), _own_coef(false), _coef(nullptr), _cptr(nullptr), _ndim(0), _nthr(1) {
+    *this = std::move(src);
+  }
+
+
+  // Copy the spline coefficients into dest.
+  void Copy(std::vector<T>& dest)
+  {
+    unsigned int N = 1;
+    for (auto d : _dim) {
+      N *= d;
+    }
+    dest.resize(N);
+
+    auto coefs = coef_ptr();
+
+    for (unsigned int i = 0; i < N; i++) {
+       dest[i] = coefs[i];
+    }
+  }
 
   // Set new data in Splinterpolator.
-  void Set(const T *data, const std::vector<unsigned int>& dim, const std::vector<ExtrapolationType>& et, unsigned int order=3, bool copy_low_order=true, double prec=1e-8)
+  void Set(const T *data_or_coefs,
+           const std::vector<unsigned int>& dim,
+           const std::vector<ExtrapolationType>& et,
+           unsigned int order=3,
+           bool copy_low_order=true,
+           double prec=1e-8,
+           bool data_are_coefs=false)
   {
     if (_own_coef) delete [] _coef;
-    common_construction(data,dim,order,prec,et,copy_low_order);
+    common_construction(data_or_coefs,dim,order,prec,et,copy_low_order,data_are_coefs);
   }
-  void Set(const T *data, const std::vector<unsigned int>& dim, ExtrapolationType et, unsigned int order=3, bool copy_low_order=true, double prec=1e-8)
+  void Set(const T *data_or_coefs,
+           const std::vector<unsigned int>& dim,
+           ExtrapolationType et,
+           unsigned int order=3,
+           bool copy_low_order=true,
+           double prec=1e-8,
+           bool data_are_coefs=false)
   {
     std::vector<ExtrapolationType>  vet(dim.size(),Zeros);
-    Set(data,dim,vet,order,copy_low_order,prec);
+    Set(data_or_coefs,dim,vet,order,copy_low_order,prec,data_are_coefs);
   }
 
   // Return interpolated value
@@ -264,12 +344,18 @@ private:
   //
   // Private helper-functions
   //
-  void common_construction(const T *data, const std::vector<unsigned int>& dim, unsigned int order, double prec, const std::vector<ExtrapolationType>& et, bool copy);
-  void assign(const Splinterpolator<T>& src);
-  bool calc_coef(const T *data, bool copy);
+  void common_construction(const T *data_or_coefs,
+                           const std::vector<unsigned int>& dim,
+                           unsigned int order,
+                           double prec,
+                           const std::vector<ExtrapolationType>& et,
+                           bool copy,
+                           bool data_are_coefs);
+  void assign(const Splinterpolator<T>& src, bool move=false);
+  bool calc_coef(const T *data_or_coefs, bool copy, bool data_are_coefs);
   void deconv_along(unsigned int dim);
-  void deconv_along_mt_helper(unsigned int dim, unsigned int mdim, unsigned int mstep, unsigned int offset, unsigned int step, 
-			      const std::vector<unsigned int>& rdim, const std::vector<unsigned int>& rstep);						
+  void deconv_along_mt_helper(unsigned int dim, unsigned int mdim, unsigned int mstep, unsigned int offset, unsigned int step,
+			      const std::vector<unsigned int>& rdim, const std::vector<unsigned int>& rstep);
   T coef(int *indx) const;
   const T* coef_ptr() const {if (_own_coef) return(_coef); else return(_cptr); }
   unsigned int indx2indx(int indx, unsigned int d) const;
@@ -664,27 +750,35 @@ double Splinterpolator<T>::value_at(const double *coord) const
 
   double       iwgt[8], jwgt[8], kwgt[8], lwgt[8], mwgt[8];
   double       *wgts[] = {iwgt, jwgt, kwgt, lwgt, mwgt};
+  int          start_inds[5];
   int          inds[5];
   unsigned int ni = 0;
   const T      *cptr = coef_ptr();
 
-  ni = get_start_indicies(coord,inds);
-  get_wgts(coord,inds,wgts);
+  ni = get_start_indicies(coord,start_inds);
+  get_wgts(coord,start_inds,wgts);
 
   double val=0.0;
   for (unsigned int m=0, me=(_ndim>4)?ni:1; m<me; m++) {
+    inds[4] = start_inds[4] + m;
+
     for (unsigned int l=0, le=(_ndim>3)?ni:1; l<le; l++) {
+      inds[3] = start_inds[3] + l;
+
       for (unsigned int k=0, ke=(_ndim>2)?ni:1; k<ke; k++) {
+        inds[2] = start_inds[2] + k;
         double wgt1 = wgts[4][m]*wgts[3][l]*wgts[2][k];
-        unsigned int linear1 = indx2linear(inds[2]+k,inds[3]+l,inds[4]+m);
+
         for (unsigned int j=0, je=(_ndim>1)?ni:1; j<je; j++) {
+          inds[1] = start_inds[1] + j;
           double wgt2 = wgt1*wgts[1][j];
-          int linear2 = add2linear(linear1,inds[1]+j);
-          double *iiwgt=iwgt;
+          double *iiwgt = iwgt;
+
           for (unsigned int i=0; i<ni; i++, iiwgt++) {
-	    val += cptr[linear2+indx2indx(inds[0]+i,0)]*(*iiwgt)*wgt2;
+            inds[0] = start_inds[0] + i;
+            val += coef(inds) * (*iiwgt) * wgt2;
           }
-	}
+        }
       }
     }
   }
@@ -703,9 +797,9 @@ double Splinterpolator<T>::value_at(const double *coord) const
 
 template<class T>
 double Splinterpolator<T>::value_and_derivatives_at(const double       *coord,
-						    const unsigned int *deriv,
-						    double             *dval)
-const
+                                                    const unsigned int *deriv,
+                                                    double             *dval)
+  const
 {
   if (should_be_zero(coord)) { memset(dval,0,n_nonzero(deriv)*sizeof(double)); return(0.0); }
 
@@ -715,38 +809,47 @@ const
   double       *dwgts[] = {diwgt, djwgt, dkwgt, dlwgt, dmwgt};
   double       dwgt1[5];
   double       dwgt2[5];
+  int          start_inds[5];
   int          inds[5];
   unsigned int dd[5];
   unsigned int nd = 0;
   unsigned int ni = 0;
   const T      *cptr = coef_ptr();
 
-  ni = get_start_indicies(coord,inds);
-  get_wgts(coord,inds,wgts);
-  get_dwgts(coord,inds,deriv,dwgts);
+  ni = get_start_indicies(coord,start_inds);
+  get_wgts(coord,start_inds,wgts);
+  get_dwgts(coord,start_inds,deriv,dwgts);
   for (unsigned int i=0; i<_ndim; i++) if (deriv[i]) { dd[nd] = i; dval[nd++] = 0.0; }
 
   double val=0.0;
   for (unsigned int m=0, me=(_ndim>4)?ni:1; m<me; m++) {
+    inds[4] = start_inds[4] + m;
+
     for (unsigned int l=0, le=(_ndim>3)?ni:1; l<le; l++) {
+      inds[3] = start_inds[3] + l;
+
       for (unsigned int k=0, ke=(_ndim>2)?ni:1; k<ke; k++) {
+        inds[2] = start_inds[2] + k;
         double wgt1 = wgts[4][m]*wgts[3][l]*wgts[2][k];
         get_dwgt1(wgts,dwgts,dd,nd,k,l,m,wgt1,dwgt1);
-        unsigned int linear1 = indx2linear(inds[2]+k,inds[3]+l,inds[4]+m);
+
         for (unsigned int j=0, je=(_ndim>1)?ni:1; j<je; j++) {
+          inds[1] = start_inds[1] + j;
           double wgt2 = wgt1*wgts[1][j];
           for (unsigned int d=0; d<nd; d++) dwgt2[d] = (dd[d]==1) ? dwgt1[d]*dwgts[1][j] : dwgt1[d]*wgts[1][j];
-          int linear2 = add2linear(linear1,inds[1]+j);
           double *iiwgt=iwgt;
+
           for (unsigned int i=0; i<ni; i++, iiwgt++) {
-            double c = cptr[linear2+indx2indx(inds[0]+i,0)];
+            inds[0] = start_inds[0] + i;
+            double c = coef(inds);
             val += c*(*iiwgt)*wgt2;
+
             for (unsigned int d=0; d<nd; d++) {
               double add = (dd[d]==0) ? c*diwgt[i]*dwgt2[d] : c*(*iiwgt)*dwgt2[d];
               dval[d] += add;
-	    }
-	  }
-	}
+            }
+          }
+        }
       }
     }
   }
@@ -819,18 +922,15 @@ unsigned int Splinterpolator<T>::get_start_indicies(const double *coord, int *si
 {
   unsigned int ni = _order+1;
 
-  if (odd(ni)) {
-    for (unsigned int i=0; i<_ndim; i++) {
-      sinds[i] = static_cast<int>(coord[i]+0.5) - ni/2;
+  for (unsigned int i=0; i<_ndim; i++) {
+    if (odd(ni)) {
+      sinds[i] = std::floor(coord[i] + 0.5) - ni/2;
+    }
+    else {
+      sinds[i] = std::ceil(coord[i]) - ni/2;
     }
   }
-  else {
-    for (unsigned int i=0; i<_ndim; i++) {
-      int ix = static_cast<int>(coord[i]+0.5);
-      if (ix < coord[i]) sinds[i] = ix - (ni-1)/2;
-      else sinds[i] = ix -ni/2;
-    }
-  }
+
   for (unsigned int i=_ndim; i<5; i++) sinds[i] = 0;
 
   return(ni);
@@ -1206,11 +1306,11 @@ inline unsigned int Splinterpolator<T>::indx2indx(int indx, unsigned int d) cons
 
   int dim = static_cast<int>(_dim[d]); // To ensure right behaviour of integer division
 
-  if (_et[d] == Constant) {
+  if (_et[d] == Constant || _et[d] == CorrectConstant) {
     if (indx < 0) indx = 0;
     else if (indx >= dim) indx = dim-1;
   }
-  else if (_et[d] == Zeros || _et[d] == Mirror) {
+  else if (_et[d] == Zeros || _et[d] == SoftZeros || _et[d] == Mirror) {
     while (indx < 0) indx = 2*dim*((indx+1)/dim) - 1 - indx;
     while (indx >= dim) indx = 2*dim*(indx/dim) - 1 - indx;
   }
@@ -1333,42 +1433,30 @@ T Splinterpolator<T>::coef(int *indx) const
   for (unsigned int i=0; i<_ndim; i++) {
     if (indx[i] < 0) {
       switch (_et[i]) {
+      case SoftZeros:
       case Zeros:
-	return(static_cast<T>(0));
-      case Constant:
-	indx[i] = 0;
-	break;
-      case Mirror:
-	indx[i] = 1-indx[i];
-	break;
-      case Periodic:
-	indx[i] = _dim[i]+indx[i];
-	break;
+        return(static_cast<T>(0));
       default:
-	break;
+        indx[i] = indx2indx(indx[i], i);
+        break;
       }
     }
     else if (indx[i] >= static_cast<int>(_dim[i])) {
       switch (_et[i]) {
+      case SoftZeros:
       case Zeros:
-	return(static_cast<T>(0));
-      case Constant:
-	indx[i] = _dim[i]-1;
-	break;
-      case Mirror:
-	indx[i] = 2*_dim[i]-indx[i]-1;
-	break;
-      case Periodic:
-	indx[i] = indx[i]-_dim[i];
-	break;
+        return(static_cast<T>(0));
       default:
-	break;
+        indx[i] = indx2indx(indx[i], i);
+        break;
       }
     }
   }
+
   // Now make linear index
   unsigned int lindx=indx[_ndim-1];
   for (int i=_ndim-2; i>=0; i--) lindx = _dim[i]*lindx + indx[i];
+
   return(coef_ptr()[lindx]);
 }
 
@@ -1397,14 +1485,21 @@ unsigned int Splinterpolator<T>::n_nonzero(const unsigned int *vec) const
 /////////////////////////////////////////////////////////////////////
 
 template<class T>
-void Splinterpolator<T>::common_construction(const T *data, const std::vector<unsigned int>& dim, unsigned int order, double prec, const std::vector<ExtrapolationType>& et, bool copy)
+void Splinterpolator<T>::common_construction(
+  const T *data_or_coefs,
+  const std::vector<unsigned int>& dim,
+  unsigned int order,
+  double prec,
+  const std::vector<ExtrapolationType>& et,
+  bool copy,
+  bool data_are_coefs)
 {
   if (!dim.size()) throw SplinterpolatorException("common_construction: data has zeros dimensions");
   if (dim.size() > 5) throw SplinterpolatorException("common_construction: data cannot have more than 5 dimensions");
   if (dim.size() != et.size()) throw SplinterpolatorException("common_construction: dim and et must have the same size");
   for (unsigned int i=0; i<dim.size(); i++) if (!dim[i]) throw SplinterpolatorException("common_construction: data cannot have zeros size in any direction");
   if (order > 7) throw SplinterpolatorException("common_construction: spline order must be lesst than 7");
-  if (!data) throw SplinterpolatorException("common_construction: zero data pointer");
+  if (!data_or_coefs) throw SplinterpolatorException("common_construction: zero data pointer");
 
   _order = order;
   _prec = prec;
@@ -1413,8 +1508,7 @@ void Splinterpolator<T>::common_construction(const T *data, const std::vector<un
   _ndim = dim.size();
   for (unsigned int i=0; i<5; i++) _dim[i]  = (i < dim.size()) ? dim[i] : 1;
 
-  _own_coef = calc_coef(data,copy);
-
+  _own_coef = calc_coef(data_or_coefs,copy,data_are_coefs);
   _valid = true;
 }
 
@@ -1426,7 +1520,7 @@ void Splinterpolator<T>::common_construction(const T *data, const std::vector<un
 /////////////////////////////////////////////////////////////////////
 
 template<class T>
-void Splinterpolator<T>::assign(const Splinterpolator<T>& src)
+void Splinterpolator<T>::assign(const Splinterpolator<T>& src, bool move)
 {
   _valid = src._valid;
   _own_coef = src._own_coef;
@@ -1438,11 +1532,17 @@ void Splinterpolator<T>::assign(const Splinterpolator<T>& src)
   _dim = src._dim;
   _et = src._et;
 
-  if (_own_coef) { // If we need to do a deep copy
-    unsigned int ts = 1;
-    for (unsigned int i=0; i<_ndim; i++) ts *= _dim[i];
-    _coef = new T[ts];
-    memcpy(_coef,src._coef,ts*sizeof(T));
+  if (_own_coef) { // If we need to do a deep copy/move
+
+    if (move) {
+      _coef = src._coef;
+    }
+    else {
+      unsigned int ts = 1;
+      for (unsigned int i=0; i<_ndim; i++) ts *= _dim[i];
+      _coef = new T[ts];
+      memcpy(_coef,src._coef,ts*sizeof(T));
+    }
   }
 }
 
@@ -1453,18 +1553,21 @@ void Splinterpolator<T>::assign(const Splinterpolator<T>& src)
 /////////////////////////////////////////////////////////////////////
 
 template<class T>
-bool Splinterpolator<T>::calc_coef(const T *data, bool copy)
+bool Splinterpolator<T>::calc_coef(const T *data_or_coefs, bool copy, bool data_are_coefs)
 {
-  if (_order < 2 && !copy) { _cptr = data; return(false); }
+  // No copy, and nearest/interp, or pre-calculated
+  // coefficients - just take a pointer to the data
+  if (_order < 2     && !copy) { _cptr = data_or_coefs; return(false); }
+  if (data_are_coefs && !copy) { _cptr = data_or_coefs; return(false); }
 
   // Allocate memory and put the original data into _coef
-  //
   unsigned int ts=1;
   for (unsigned int i=0; i<_dim.size(); i++) ts *= _dim[i];
   _coef = new T[ts];
-  memcpy(_coef,data,ts*sizeof(T));
+  memcpy(_coef,data_or_coefs,ts*sizeof(T));
 
-  if (_order < 2) return(true);  // If nearest neighbour or linear, that's all we need
+  if (_order < 2)     return(true); // If nearest neighbour or linear, that's all we need
+  if (data_are_coefs) return(true); // User has given us pre-calculated coefficients
 
   // Loop over all non-singleton dimensions and deconvolve along them
   //
@@ -1504,7 +1607,7 @@ void Splinterpolator<T>::deconv_along(unsigned int dim)
     ss *= _dim[i];
   }
 
-  if (_nthr==1) { // If we are to run single-threaded
+  if (_nthr<=1) { // If we are to run single-threaded
     SplineColumn  col(mdim,mstep);          // Column helps us do the job
     for (unsigned int l=0; l<rdim[3]; l++) {
       for (unsigned int k=0; k<rdim[2]; k++) {
@@ -1532,8 +1635,8 @@ void Splinterpolator<T>::deconv_along(unsigned int dim)
 
 template<class T>
 void Splinterpolator<T>::deconv_along_mt_helper(unsigned int                     dim,
-						unsigned int                     mdim, 
-						unsigned int                     mstep, 
+						unsigned int                     mdim,
+						unsigned int                     mstep,
 						unsigned int                     offset, // Offset into parallel dimension
 						unsigned int                     step,   // Step size in parallel dimension
 						const std::vector<unsigned int>& rdim,
@@ -1644,10 +1747,19 @@ double Splinterpolator<T>::SplineColumn::init_fwd_sweep(double z, ExtrapolationT
     double z2i=z;
     for (unsigned int i=1; i<n; i++, ptr--, z2i*=z) iv += z2i * *ptr;
   }
-  else {
+  // This approach is not ideal for Constant/Zeros,
+  // but has been in place since 2008, so preserved
+  // to keep outputs consistent.
+  else if (et == Mirror || et == Constant || et == Zeros) {
     double *ptr=&_col[1];
     double z2i=z;
     for (unsigned int i=1; i<n; i++, ptr++, z2i*=z) iv += z2i * *ptr;
+  }
+  // et == SoftZeros || CorrectConstant
+  else {
+    double *ptr=&_col[0];
+    double z2i=z;
+    for (unsigned int i=0; i<n; i++, ptr++, z2i*=z) iv += z2i * *ptr;
   }
   return(iv);
 }
@@ -1675,9 +1787,15 @@ double Splinterpolator<T>::SplineColumn::init_bwd_sweep(double z, double lv, Ext
     }
     iv /= (z2i-1.0);
   }
-  else {
+  // See comment in init_fwd_sweep
+  else if (et == Mirror || et == Constant || et == Zeros) {
     iv = -z/(1.0-z*z) * (2.0*_col[_sz-1] - lv);
   }
+  // et == SoftZeros || CorrectConstant
+  else  {
+    iv = z / (z - 1) * _col[_sz-1];
+  }
+
   return(iv);
 }
 

@@ -64,6 +64,7 @@
     fsl@innovation.ox.ac.uk quoting Reference Project 9564, FSL.*/
 
 #include <stdio.h>
+#include <string.h>
 #include <stdlib.h>
 #include <math.h>
 #include <ctype.h>
@@ -72,6 +73,7 @@
 #include <iomanip>
 #include <algorithm>
 
+#include "znzlib/znzlib.h"
 #include "NewNifti.h"
 
 using namespace std;
@@ -93,6 +95,27 @@ namespace NiftiIO {
     testUnion.c[1] = 0 ;
 
     return (testUnion.s == 1) ? LSB_FIRST : MSB_FIRST;
+  }
+
+  // Used to replace .hdr with .img and vice versa.
+  // The suffix may not be at the end of the file -
+  // e.g. compressed files may end with .img.gz.
+  string replaceSuffix(string filename, string oldSuffix, string newSuffix) {
+
+    size_t fnlen = filename.size();
+    size_t oslen = oldSuffix.size();
+    size_t idx   = filename.rfind(oldSuffix);
+
+    // Filename doesn't contain old suffix
+    // - don't try to replace it
+    if (idx == string::npos) {
+      return filename;
+
+    }
+    // Otherwise replace old suffix with new.
+    else {
+      return filename.replace(idx, oslen, newSuffix);
+    }
   }
 
 
@@ -157,7 +180,7 @@ namespace NiftiIO {
   //Some APIs have been observed which correctly set datatype but not
   //bitpix, so this method returns the datatype bit-width, but will throw
   //for inconsistent headers when the reader has strict compliance set.
-  const size_t NiftiHeader::datumByteWidth() const{
+  size_t NiftiHeader::datumByteWidth() const{
     if ( isStrictlyCompliant && bpvOfDatatype() != bitsPerVoxel )
       throw NiftiException("Error: Header fields datatype and bitpix are inconsistent.");
     return bpvOfDatatype()/8;
@@ -576,24 +599,23 @@ namespace NiftiIO {
   //************************End Of NiftiHeader definitions************************
 
 
-  fileIO::fileIO(const string& filename, const bool reading, const bool useCompression) : debug(false), fileHandle(NULL)
+  fileIO::fileIO(const string& filename, const bool reading, const znz::znzFormat format)
+    : debug(false)
   {
     if ( debug )
       cout << "filename\t" << filename << endl;
-    string options( reading ? "rb" : "wb" );
-    if ( ! znz_isnull(fileHandle) ) //close currently open file
-      znzclose(fileHandle);
-    if ( useCompression )
-      fileHandle=znzopen( filename.c_str(), options.c_str(), 1 );
-    else
-      fileHandle=znzopen( filename.c_str(), options.c_str(), 0 );
-    if( znz_isnull(fileHandle) ) {
-      throw NiftiException("Error: cant open file "+string(filename));
+    string mode( reading ? "rb" : "wb" );
+    fileHandle.close();
+    try {
+      fileHandle.open(filename, mode, format);
+    }
+    catch(std::exception e) {
+      throw NiftiException("Error: cant open file " + filename);
     }
   }
 
 
-  fileIO& fileIO::operator=(fileIO rhs) {
+  fileIO& fileIO::operator=(fileIO&& rhs) {
     std::swap(fileHandle, rhs.fileHandle);
     std::swap(debug, rhs.debug);
     return *this;
@@ -602,7 +624,7 @@ namespace NiftiIO {
 
   void fileIO::readExtensions(const NiftiHeader& header, vector<NiftiExtension>& extensions)
   {
-    znzseek(fileHandle, header.sizeof_hdr, SEEK_SET);
+    fileHandle.seek(header.sizeof_hdr, SEEK_SET);
     //To determine if extensions are present, read next 4 bytes ( if present ) if byte[0] is non-zero we have extensions
     char buffer[4];
     try { readRawBytes( buffer, 4 ); }
@@ -652,7 +674,7 @@ namespace NiftiIO {
 
   void fileIO::readData(const NiftiHeader& header, void* buffer)
   {
-    znzseek(fileHandle, header.vox_offset, SEEK_SET);
+    fileHandle.seek(header.vox_offset, SEEK_SET);
     readRawBytes(buffer, header.nElements()*header.datumByteWidth() );
     if ( header.wasWrongEndian )
       byteSwap( header.datumByteWidth(), buffer, header.nElements() );
@@ -678,7 +700,7 @@ namespace NiftiIO {
 
   HeaderType fileIO::readHeaderType() {
     nifti_1_header rawHeader;
-    znzrewind(fileHandle);
+    fileHandle.rewind();
     readRawBytes( &rawHeader, (size_t)sizeof(rawHeader) );
     return headerType(rawHeader);
   }
@@ -686,7 +708,7 @@ namespace NiftiIO {
 
   size_t fileIO::readRawBytes(void* buffer, size_t length)
   {
-    size_t bytes = (size_t)znzread( buffer, 1, (size_t)length, fileHandle );
+    size_t bytes = fileHandle.read(buffer, length);
     if ( bytes != length )
       throw NiftiException("Error: short read, file may be truncated");
     return bytes;
@@ -696,7 +718,7 @@ namespace NiftiIO {
   template<class T>
   void fileIO::readRawHeader(NiftiHeader& header) {
     T rawHeader;
-    znzrewind(fileHandle);
+    fileHandle.rewind();
     readRawBytes( &rawHeader, (size_t)sizeof(rawHeader) );
     if ( NIFTI2_NEEDS_SWAP(rawHeader) == 1 ) {
       header.wasWrongEndian=true;
@@ -746,7 +768,7 @@ namespace NiftiIO {
 
   void fileIO::writeRawBytes(const void* buffer, size_t length )
   {
-    size_t bytes = (size_t)znzwrite( buffer, 1, (size_t)length, fileHandle );
+    size_t bytes = fileHandle.write(buffer, length);
     if ( bytes != length )
       throw NiftiException("Error: short write, output file will be truncated");
   }
@@ -765,7 +787,10 @@ namespace NiftiIO {
   //The returned header will have dim[<idx>] modified to represent ROI size
   NiftiHeader loadImageROI(string filename, char*& buffer, vector<NiftiExtension>& extensions, int64_t xmin, int64_t xmax, int64_t ymin, int64_t ymax, int64_t zmin, int64_t zmax, int64_t tmin, int64_t tmax, int64_t d5min, int64_t d5max, int64_t d6min, int64_t d6max, int64_t d7min, int64_t d7max)
   {
-    fileIO reader(filename,true);
+    string hdrfile = replaceSuffix(filename, ".img", ".hdr");
+    string imgfile = replaceSuffix(filename, ".hdr", ".img");
+
+    fileIO reader(hdrfile,true);
     NiftiHeader header=reader.readHeader();
     fill(header.dim.begin()+header.dim[0]+1,header.dim.end(),1);
     reader.readExtensions(header, extensions );
@@ -797,16 +822,12 @@ namespace NiftiIO {
     size_t voxelsToRead(0);
     size_t voxelsToSeek(0);
     bool wasInROI( 0 >= xmin && 0 <= xmax && 0 >= ymin && 0 <= ymax && 0 >= zmin && 0 <= zmax && 0 >= tmin && 0 <= tmax && 0 >= d5min && 0 <= d5max && 0 >= d6min && 0 <= d6max && 0 >= d7min && 0 <= d7max );
+    // Separate header/image data files - we've
+    // loaded the heder, now load the image data.
     if ( !header.singleFile() ) {
-      //Need to check if header was compressed
-      reader=fileIO(filename,true,false);
-      nifti_1_header truncatedHeader;
-      reader.readRawBytes( &truncatedHeader, (size_t)sizeof(truncatedHeader.sizeof_hdr) );
-      //Note extra brackets required around macro to prevent invalid expansion
-      bool wasCompressed( (NIFTI2_VERSION(truncatedHeader)) == 0 );
-      reader=fileIO(filename.replace(filename.rfind(".hdr"),4,".img"), true, wasCompressed);
+      reader = fileIO(imgfile, true);
     }
-    reader.seek(header.nominalVoxOffset(),SEEK_SET);
+    reader.seek(header.nominalVoxOffset(), SEEK_SET);
     for ( int64_t d7 = 0; d7 < header.dim[7]; d7++ )
       for ( int64_t d6 = 0; d6 < header.dim[6]; d6++ )
         for ( int64_t d5 = 0; d5 < header.dim[5]; d5++ )
@@ -852,11 +873,15 @@ namespace NiftiIO {
 
   NiftiHeader loadImage(string filename, char*& buffer, vector<NiftiExtension>& extensions, bool allocateBuffer)
   {
-    fileIO reader(filename,true);
+    string hdrfile = replaceSuffix(filename, ".img", ".hdr");
+    string imgfile = replaceSuffix(filename, ".hdr", ".img");
+
+    fileIO reader(hdrfile, true);
     NiftiHeader header=reader.readHeader();
     reader.readExtensions(header, extensions );
-    if ( !header.singleFile() )
-      reader=fileIO(filename.replace(filename.rfind(".hdr"),4,".img"), true );
+    if (!header.singleFile()) {
+      reader = fileIO(imgfile, true);
+    }
     if ( allocateBuffer )
       buffer = new char[header.nElements()*header.datumByteWidth()];
     reader.readData( header, buffer);
@@ -866,24 +891,31 @@ namespace NiftiIO {
 
   NiftiHeader loadHeader(const string filename)
   {
-    fileIO reader(filename,true);
-    NiftiHeader header=reader.readHeader();
+    fileIO reader(replaceSuffix(filename, ".img", ".hdr"), true);
+    NiftiHeader header = reader.readHeader();
     return header;
   }
 
 
   NiftiHeader loadExtensions(const string filename, vector<NiftiExtension>& extensions)
   {
-    fileIO reader(filename,true);
-    NiftiHeader header=reader.readHeader();
-    reader.readExtensions(header, extensions );
+    fileIO reader(replaceSuffix(filename, ".img", ".hdr"), true);
+    NiftiHeader header = reader.readHeader();
+    reader.readExtensions(header, extensions);
     return header;
   }
 
 
-  void saveImage(string filename, const char* buffer, const vector<NiftiExtension>& extensions, NiftiHeader header, const bool useCompression)
+  void saveImage(string filename,
+                 const char* buffer,
+                 const vector<NiftiExtension>& extensions,
+                 NiftiHeader header,
+                 const znz::znzFormat format)
   {
-    fileIO writer(filename, false, useCompression);
+    string hdrfile = replaceSuffix(filename, ".img", ".hdr");
+    string imgfile = replaceSuffix(filename, ".hdr", ".img");
+
+    fileIO writer(hdrfile, false, format);
     size_t sizeOfExtensions(4);
     header.vox_offset=header.sizeof_hdr;
     for ( unsigned int i(0); i < extensions.size(); i++ )
@@ -894,8 +926,9 @@ namespace NiftiIO {
     writer.writeHeader(header);
     if ( !header.isAnalyze() )
       writer.writeExtensions(header,extensions);
-    if ( !header.singleFile() )
-      writer=fileIO(filename.replace(filename.rfind(".hdr"),4,".img"), false, useCompression);
+    if (!header.singleFile()) {
+      writer = fileIO(imgfile, false, format);
+    }
     writer.writeData(header,buffer);
   }
 

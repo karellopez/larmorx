@@ -1548,6 +1548,16 @@ pub fn compute(
         Fill::Outside(_) => {}
         Fill::Skipped(s) => skipped_notice(notices, s, "the fill of the brain mask"),
         Fill::Crash(s) => {
+            // the first defect a constant image meets since fsl-bet2 2111.9 fixed FSL-41
+            notices.add(
+                &defects::FSL_43,
+                format!(
+                    "the fill of the brain mask starts at voxel {} {} {}, far outside the image \
+                     (or not a number), where FSL writes far outside the volume and crashes: \
+                     refused",
+                    s[0], s[1], s[2]
+                ),
+            );
             let _ = writeln!(err, "{}", crash_message("bet2", s));
             return Err(1);
         }

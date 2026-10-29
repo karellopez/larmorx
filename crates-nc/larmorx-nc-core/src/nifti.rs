@@ -24,8 +24,8 @@ use std::fs::File;
 use std::io::{self, Read, Write};
 use std::path::Path;
 
-use flate2::read::MultiGzDecoder;
 use flate2::GzBuilder;
+use flate2::read::MultiGzDecoder;
 
 use crate::x87;
 

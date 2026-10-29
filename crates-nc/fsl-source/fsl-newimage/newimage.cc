@@ -70,8 +70,7 @@
 #include <cassert>
 #include <sstream>
 #include <iostream>
-#include <boost/utility/enable_if.hpp>
-#include <boost/static_assert.hpp>
+#include <memory>
 #include "armawrap/newmatio.h"
 #include "utils/threading.h"
 #include "newimage.h"
@@ -232,11 +231,7 @@ namespace NEWIMAGE {
       splineuptodate = false;
 
       padvalue = (T) 0;
-      extrapval = padvalue;
-      p_userinterp = 0;
-      p_userextrap = 0;
-      ep_valid.resize(3);
-      ep_valid[0] = false; ep_valid[1] = false; ep_valid[2] = false;
+      ep_valid = {false, false, false};
 
       displayMaximum=0;
       displayMinimum=0;
@@ -296,6 +291,7 @@ namespace NEWIMAGE {
     if ( data_owner && Data != nullptr ) delete [] Data;
     Data = nullptr;
     DataEnd = nullptr;
+    sv_cache.clear();
     data_owner=false;
     // make the volume of zero size now (to prevent access to the null data pointer)
     nElements=0;
@@ -334,21 +330,31 @@ namespace NEWIMAGE {
   }
 
   template <class T>
-  ShadowVolume<T> volume<T>::operator[](const int64_t t) {
+  ShadowVolume<T>& volume<T>::operator[](const int64_t t) {
     if ( !in_bounds(t) )
        imthrow("Invalid t index in [] operator",61);
-    ShadowVolume<T> newShadowVolume(constSubVolume(t));
-    newShadowVolume.copyproperties(*this);
-    return newShadowVolume;
+
+    std::lock_guard<std::mutex> lg(sv_cache_mutex);
+    if (sv_cache.count(t) == 0) {
+      ShadowVolume<T> newShadowVolume(*this, t);
+      sv_cache.insert(std::make_pair(t, std::move(newShadowVolume)));
+    }
+
+    return sv_cache[t];
   }
 
   template <class T>
-  const ShadowVolume<T> volume<T>::operator[](const int64_t t) const {
+  const ShadowVolume<T>& volume<T>::operator[](const int64_t t) const {
     if ( !in_bounds(t) )
        imthrow("Invalid t index in [] operator",61);
-    ShadowVolume<T> newShadowVolume(constSubVolume(t));
-    newShadowVolume.copyproperties(*this);
-    return newShadowVolume;
+
+    std::lock_guard<std::mutex> lg(sv_cache_mutex);
+    if (sv_cache.count(t) == 0) {
+      ShadowVolume<T> newShadowVolume(*this, t);
+      sv_cache.insert(std::make_pair(t, std::move(newShadowVolume)));
+    }
+
+    return sv_cache[t];
   }
 
   template <class T>
@@ -371,8 +377,6 @@ namespace NEWIMAGE {
   template <class T>
   void volume<T>::copyproperties(const volume<T>& source)
   { //the user extraps require matching template in source and dest
-    p_userextrap = source.p_userextrap;
-    p_userinterp = source.p_userinterp;
     copybasicproperties(source,*this);
   }
 
@@ -572,7 +576,7 @@ namespace NEWIMAGE {
   // EXTRAPOLATION AND INTERPOLATION
 
   template <class T>
-  void volume<T>::setinterpolationmethod(interpolation interpmethod) const
+  void volume<T>::setinterpolationmethod(interpolation interpmethod)
     {
       p_interpmethod = interpmethod;
       // define a default sinc kernel if no kernel has previously been defined
@@ -583,7 +587,7 @@ namespace NEWIMAGE {
     }
 
   template<class T>
-  void volume<T>::setsplineorder(int newOrder) const
+  void volume<T>::setsplineorder(int newOrder)
   {
     if ( newOrder > 7 ) imthrow("setsplineorder: Only splines of order up to 7 allowed",10);
     if ( splineorder != newOrder )
@@ -618,15 +622,15 @@ namespace NEWIMAGE {
   //////// Kernel Interpolation Call /////////
 
   template <class T>
-  float volume<T>::kernelinterpolation(const float x, const float y,
-				       const float z) const
+  float volume<T>::kernelinterpolation(
+    float x, float y, float z, const extrapparams& ep) const
   {
     const kernelstorage* storedkernel = interpkernel.kernelvals();
     // sanity check on kernel
     if (storedkernel==nullptr) {
       cerr << "ERROR: Must set kernel parameters before using interpolation!"
 	   << endl;
-      return (float) extrapolate(0,0,0);
+      return (float) extrapolate(0,0,0,ep);
     }
 
     // kernel half-width  (i.e. range is +/- w)
@@ -666,7 +670,7 @@ namespace NEWIMAGE {
 	  if (in_bounds(x1,y1,z1)) {
 	    xj=ix0-x1+wx;
 	    float kerfac = storex[xj] * storey[yj] * storez[zj];
-	    convsum += this->operator()(x1,y1,z1) * kerfac;
+	    convsum += this->operator()(x1,y1,z1,ep) * kerfac;
 	    kersum += kerfac;
 	  }
 	}
@@ -676,7 +680,7 @@ namespace NEWIMAGE {
     if ( (fabs(kersum)>1e-9) ) {
       interpval = convsum / kersum;
     } else {
-      interpval = (float) extrapolate(ix0,iy0,iz0);
+      interpval = (float) extrapolate(ix0,iy0,iz0,ep);
     }
     return interpval;
 
@@ -690,12 +694,13 @@ namespace NEWIMAGE {
   // Puss J
 
   template <class T>
-  float volume<T>::interp1partial(// Input
-                                  float x, float y, float z,    // Co-ordinates to get value for
-                                  int     dir,                  // Direction for partial, 0->x, 1->y, 2->z
-                                  // Output
-                                  float  *pderiv)               // Derivative returned here
-  const
+  float volume<T>::interp1partial(
+    // Input
+    float x, float y, float z,    // Co-ordinates to get value for
+    int     dir,                  // Direction for partial, 0->x, 1->y, 2->z
+    // Output
+    float  *pderiv,               // Derivative returned here
+    const extrapparams& ep) const
   {
     if (getinterpolationmethod() != trilinear && getinterpolationmethod() != spline) {
       imthrow("Derivatives only implemented for tri-linear and spline interpolation",10);
@@ -712,21 +717,21 @@ namespace NEWIMAGE {
       float dz = z - ((float) iz);
       float v000, v001, v010, v011, v100, v101, v110, v111;
       if (!in_neigh_bounds(*this,ix,iy,iz)) {   // We'll have to do some extrapolation
-	v000 = (float) this->operator()(ix,iy,iz);
-	v001 = (float) this->operator()(ix,iy,iz+1);
-	v010 = (float) this->operator()(ix,iy+1,iz);
-	v011 = (float) this->operator()(ix,iy+1,iz+1);
-	v100 = (float) this->operator()(ix+1,iy,iz);
-	v101 = (float) this->operator()(ix+1,iy,iz+1);
-	v110 = (float) this->operator()(ix+1,iy+1,iz);
-	v111 = (float) this->operator()(ix+1,iy+1,iz+1);
+        v000 = (float) this->operator()(ix,iy,iz,ep);
+        v001 = (float) this->operator()(ix,iy,iz+1,ep);
+        v010 = (float) this->operator()(ix,iy+1,iz,ep);
+        v011 = (float) this->operator()(ix,iy+1,iz+1,ep);
+        v100 = (float) this->operator()(ix+1,iy,iz,ep);
+        v101 = (float) this->operator()(ix+1,iy,iz+1,ep);
+        v110 = (float) this->operator()(ix+1,iy+1,iz,ep);
+        v111 = (float) this->operator()(ix+1,iy+1,iz+1,ep);
       }
       else {
-	T t000, t001, t010, t011, t100, t101, t110, t111;
-	this->getneighbours(ix,iy,iz,t000,t001,t010,t011,t100,t101,t110,t111);
-	v000 = ((float) t000); v001 = ((float) t001); v010 = ((float) t010);
-	v011 = ((float) t011); v100 = ((float) t100); v101 = ((float) t101);
-	v110 = ((float) t110); v111 = ((float) t111);
+        T t000, t001, t010, t011, t100, t101, t110, t111;
+        this->getneighbours(ix,iy,iz,t000,t001,t010,t011,t100,t101,t110,t111);
+        v000 = ((float) t000); v001 = ((float) t001); v010 = ((float) t010);
+        v011 = ((float) t011); v100 = ((float) t100); v101 = ((float) t101);
+        v110 = ((float) t110); v111 = ((float) t111);
       }
       // The (seemingly silly) code multiplication below is to
       // ensure that in no case does calculating one of the partials
@@ -735,51 +740,52 @@ namespace NEWIMAGE {
       float tmp11, tmp12, tmp13, tmp14;
       float tmp21, tmp22;
       if (dir == 0) {            // df/dx
-	float onemdz = 1.0-dz;
-	tmp11 = onemdz*v000 + dz*v001;
-	tmp12 = onemdz*v010 + dz*v011;
-	tmp13 = onemdz*v100 + dz*v101;
-	tmp14 = onemdz*v110 + dz*v111;
-	tmp21 = (1.0-dy)*tmp11 + dy*tmp12;
-	tmp22 = (1.0-dy)*tmp13 + dy*tmp14;
-	*pderiv = tmp22 - tmp21;
-	return((1.0-dx)*tmp21 + dx*tmp22);
+        float onemdz = 1.0-dz;
+        tmp11 = onemdz*v000 + dz*v001;
+        tmp12 = onemdz*v010 + dz*v011;
+        tmp13 = onemdz*v100 + dz*v101;
+        tmp14 = onemdz*v110 + dz*v111;
+        tmp21 = (1.0-dy)*tmp11 + dy*tmp12;
+        tmp22 = (1.0-dy)*tmp13 + dy*tmp14;
+        *pderiv = tmp22 - tmp21;
+        return((1.0-dx)*tmp21 + dx*tmp22);
       }
       else if (dir == 1) {       // df/dy
-	float onemdz = 1.0-dz;
-	tmp11 = onemdz*v000 + dz*v001;
-	tmp12 = onemdz*v010 + dz*v011;
-	tmp13 = onemdz*v100 + dz*v101;
-	tmp14 = onemdz*v110 + dz*v111;
-	tmp21 = (1.0-dx)*tmp11 + dx*tmp13;
-	tmp22 = (1.0-dx)*tmp12 + dx*tmp14;
-	*pderiv = tmp22 - tmp21;
-	return((1.0-dy)*tmp21 + dy*tmp22);
+        float onemdz = 1.0-dz;
+        tmp11 = onemdz*v000 + dz*v001;
+        tmp12 = onemdz*v010 + dz*v011;
+        tmp13 = onemdz*v100 + dz*v101;
+        tmp14 = onemdz*v110 + dz*v111;
+        tmp21 = (1.0-dx)*tmp11 + dx*tmp13;
+        tmp22 = (1.0-dx)*tmp12 + dx*tmp14;
+        *pderiv = tmp22 - tmp21;
+        return((1.0-dy)*tmp21 + dy*tmp22);
       }
       else if (dir == 2) {       // df/dz
-	float onemdy = 1.0-dy;
-	tmp11 = onemdy*v000 + dy*v010;
-	tmp12 = onemdy*v001 + dy*v011;
-	tmp13 = onemdy*v100 + dy*v110;
-	tmp14 = onemdy*v101 + dy*v111;
-	tmp21 = (1.0-dx)*tmp11 + dx*tmp13;
-	tmp22 = (1.0-dx)*tmp12 + dx*tmp14;
-	*pderiv = tmp22 - tmp21;
-	return((1.0-dz)*tmp21 + dz*tmp22);
+        float onemdy = 1.0-dy;
+        tmp11 = onemdy*v000 + dy*v010;
+        tmp12 = onemdy*v001 + dy*v011;
+        tmp13 = onemdy*v100 + dy*v110;
+        tmp14 = onemdy*v101 + dy*v111;
+        tmp21 = (1.0-dx)*tmp11 + dx*tmp13;
+        tmp22 = (1.0-dx)*tmp12 + dx*tmp14;
+        *pderiv = tmp22 - tmp21;
+        return((1.0-dz)*tmp21 + dz*tmp22);
       }
     }
     else if (getinterpolationmethod() == spline) {
-      return(spline_interp1partial(x,y,z,dir,pderiv));
+      return(spline_interp1partial(x,y,z,dir,pderiv,ep));
     }
     return(-1.0); // Should not be reached. Just to stop compiler from complaining.
   }
 
   template <class T>
-  float volume<T>::interp3partial(// Input
-                                  float x, float y, float z,              // Co-ordinates to get value for
-                                   // Output
-                                  float *dfdx, float *dfdy, float *dfdz)  // Partials
-  const
+  float volume<T>::interp3partial(
+    // Input
+    float x, float y, float z,              // Co-ordinates to get value for
+    // Output
+    float *dfdx, float *dfdy, float *dfdz,    // Partials
+    const extrapparams& ep) const
   {
     if (getinterpolationmethod() != trilinear && getinterpolationmethod() != spline) {
       imthrow("interp3partial: Derivatives only implemented for tri-linear and spline interpolation",10);
@@ -793,21 +799,21 @@ namespace NEWIMAGE {
       float dz = z - ((float) iz);
       float v000, v001, v010, v011, v100, v101, v110, v111;
       if (!in_neigh_bounds(*this,ix,iy,iz)) {   // We'll have to do some extrapolation
-	v000 = (float) this->operator()(ix,iy,iz);
-	v001 = (float) this->operator()(ix,iy,iz+1);
-	v010 = (float) this->operator()(ix,iy+1,iz);
-	v011 = (float) this->operator()(ix,iy+1,iz+1);
-	v100 = (float) this->operator()(ix+1,iy,iz);
-	v101 = (float) this->operator()(ix+1,iy,iz+1);
-	v110 = (float) this->operator()(ix+1,iy+1,iz);
-	v111 = (float) this->operator()(ix+1,iy+1,iz+1);
+        v000 = (float) this->operator()(ix,iy,iz,ep);
+        v001 = (float) this->operator()(ix,iy,iz+1,ep);
+        v010 = (float) this->operator()(ix,iy+1,iz,ep);
+        v011 = (float) this->operator()(ix,iy+1,iz+1,ep);
+        v100 = (float) this->operator()(ix+1,iy,iz,ep);
+        v101 = (float) this->operator()(ix+1,iy,iz+1,ep);
+        v110 = (float) this->operator()(ix+1,iy+1,iz,ep);
+        v111 = (float) this->operator()(ix+1,iy+1,iz+1,ep);
       }
       else {
-	T t000, t001, t010, t011, t100, t101, t110, t111;
-	this->getneighbours(ix,iy,iz,t000,t001,t010,t011,t100,t101,t110,t111);
-	v000 = ((float) t000); v001 = ((float) t001); v010 = ((float) t010);
-	v011 = ((float) t011); v100 = ((float) t100); v101 = ((float) t101);
-	v110 = ((float) t110); v111 = ((float) t111);
+        T t000, t001, t010, t011, t100, t101, t110, t111;
+        this->getneighbours(ix,iy,iz,t000,t001,t010,t011,t100,t101,t110,t111);
+        v000 = ((float) t000); v001 = ((float) t001); v010 = ((float) t010);
+        v011 = ((float) t011); v100 = ((float) t100); v101 = ((float) t101);
+        v110 = ((float) t110); v111 = ((float) t111);
       }
       //
       // And do linear interpolation with calculation of all partials
@@ -830,33 +836,32 @@ namespace NEWIMAGE {
       return(onemdz*tmp21 + dz*tmp22);
     }
     else if (getinterpolationmethod() == spline) {
-      return(spline_interp3partial(x,y,z,dfdx,dfdy,dfdz));
+      return(spline_interp3partial(x,y,z,dfdx,dfdy,dfdz,ep));
     }
     return(0.0);  // To silence compiler.
   }
 
   template <class T>
-  float volume<T>::spline_interp1partial(// Input
-                                         float x, float y, float z,    // Co-ordinates to get value for
-                                         int     dir,                  // Direction for partial, 0->x, 1->y, 2->z
-                                         // Output
-                                         float  *deriv)               // Derivative returned here
-  const
+  float volume<T>::spline_interp1partial(
+    // Input
+    float x, float y, float z,    // Co-ordinates to get value for
+    int     dir,                  // Direction for partial, 0->x, 1->y, 2->z
+    // Output
+    float  *deriv,                // Derivative returned here
+    const extrapparams& eps) const
   {
-    extrapolation ep = getextrapolationmethod();
+    extrapolation ep = eps.method(*this);
     if (!in_bounds(x,y,z)) {
-      if (ep == boundsassert) { *deriv=0.0; assert(false); extrapval = padvalue; return(extrapval); }
-      else if (ep == boundsexception) imthrow("splineinterpolate: Out of bounds",1);
-      else if (ep == zeropad) { *deriv=0.0; extrapval = static_cast<T>(0.0); return(extrapval); }
-      else if (ep == constpad) { *deriv=0.0; extrapval = padvalue; return(extrapval); }
+      if      (ep == zeropad)  { *deriv=0.0; return 0; }
+      else if (ep == constpad) { *deriv=0.0; return padvalue; }
     }
 
-    T         partial = static_cast<T>(0.0);
-    float     rval = 0.0;
+    T     partial = static_cast<T>(0.0);
+    float rval = 0.0;
     if (!splint.Valid() || !splineuptodate || translate_extrapolation_type(ep) != splint.Extrapolation(0)) {
       std::lock_guard<std::mutex> lg(splinecoef_mutex);
       if (!splint.Valid() || !splineuptodate || translate_extrapolation_type(ep) != splint.Extrapolation(0)) {
-	forcesplinecoefcalculation();
+        forcesplinecoefcalculation();
       }
     }
     rval = static_cast<float>(splint(x,y,z,dir,&partial));
@@ -865,26 +870,25 @@ namespace NEWIMAGE {
   }
 
   template<class T>
-  float volume<T>::spline_interp3partial(// Input
-                                         float x, float y, float z,              // Co-ordinates to get value for
-                                         // Output
-                                         float *dfdx, float *dfdy, float *dfdz)  // Partials
-  const
+  float volume<T>::spline_interp3partial(
+    // Input
+    float x, float y, float z,              // Co-ordinates to get value for
+    // Output
+    float *dfdx, float *dfdy, float *dfdz,  // Partials
+    const extrapparams& eps) const
   {
-    extrapolation ep = getextrapolationmethod();
+    extrapolation ep = eps.method(*this);
     if (!in_bounds(x,y,z)) {
-      if (ep == boundsassert) { *dfdx=0.0; *dfdy=0.0; *dfdz=0.0; assert(false); extrapval = padvalue; return(extrapval); }
-      else if (ep == boundsexception) imthrow("splineinterpolate: Out of bounds",1);
-      else if (ep == zeropad) { *dfdx=0.0; *dfdy=0.0; *dfdz=0.0; extrapval = static_cast<T>(0.0); return(extrapval); }
-      else if (ep == constpad) { *dfdx=0.0; *dfdy=0.0; *dfdz=0.0; extrapval = padvalue; return(extrapval); }
+      if      (ep == zeropad)  { *dfdx=0.0; *dfdy=0.0; *dfdz=0.0; return 0; }
+      else if (ep == constpad) { *dfdx=0.0; *dfdy=0.0; *dfdz=0.0; return padvalue; }
     }
 
-    std::vector<T>          partials(3,0);
-    float                   rval = 0.0;
+    std::vector<T> partials(3,0);
+    float          rval = 0.0;
     if (!splint.Valid() || !splineuptodate || translate_extrapolation_type(ep) != splint.Extrapolation(0)) {
       std::lock_guard<std::mutex> lg(splinecoef_mutex);
       if (!splint.Valid() || !splineuptodate || translate_extrapolation_type(ep) != splint.Extrapolation(0)) {
-	forcesplinecoefcalculation();
+        forcesplinecoefcalculation();
       }
     }
     rval = static_cast<float>(splint.ValAndDerivs(x,y,z,partials));
@@ -895,116 +899,105 @@ namespace NEWIMAGE {
   }
 
   template<class T>
-  float volume<T>::splineinterpolate(float x, float y, float z) const
+  float volume<T>::splineinterpolate(
+    float x, float y, float z,
+    const extrapparams& eps) const
   {
     this->throwsIfNot3D();
-    extrapolation ep = getextrapolationmethod();
+    extrapolation ep = eps.method(*this);
     if (!in_bounds(x,y,z)) {
-      if (ep == boundsassert) { assert(false); extrapval = padvalue; return(extrapval); }
-      else if (ep == boundsexception) imthrow("splineinterpolate: Out of bounds",1);
-      else if (ep == zeropad) { extrapval = static_cast<T>(0.0); return(extrapval); }
-      else if (ep == constpad) { extrapval = padvalue; return(extrapval); }
+      if      (ep == zeropad)  { return 0; }
+      else if (ep == constpad) { return padvalue; }
     }
-    if (ep == extraslice) if (!in_extraslice_bounds(x,y,z)) { extrapval = padvalue; return(extrapval); }
+    if (ep == extraslice) if (!in_extraslice_bounds(x,y,z)) { return padvalue; }
     if (!splint.Valid() || !splineuptodate || translate_extrapolation_type(ep) != splint.Extrapolation(0)) {
       std::lock_guard<std::mutex> lg(splinecoef_mutex);
       if (!splint.Valid() || !splineuptodate || translate_extrapolation_type(ep) != splint.Extrapolation(0)) {
-	forcesplinecoefcalculation();
+        forcesplinecoefcalculation();
       }
     }
     return(static_cast<float>(splint(x,y,z)));
   }
 
   template <class T>
-  float volume<T>::interpolate(float x, float y, float z) const
-    {
-      this->throwsIfNot3D();
-      int64_t ix, iy, iz;
-      switch (p_interpmethod) {
-      case userinterpolation:
-	if (p_userinterp == 0) {
-	  imthrow("No user interpolation method set",7);
-	} else {
-	  return (*p_userinterp)(*this,x,y,z);
-	}
-      case nearestneighbour:
-	ix=MISCMATHS::round(x); iy=MISCMATHS::round(y); iz=MISCMATHS::round(z);
-	return this->operator()(ix,iy,iz);
-      case trilinear:
-	{
-	  ix=(int64_t) floor(x); iy=(int64_t) floor(y); iz=(int64_t) floor(z);
-	  if (in_neigh_bounds(*this,ix,iy,iz)) return interpolatevalue(x,y,z);
-	  float dx=x-ix, dy=y-iy, dz=z-iz;
-	  float v000=0, v001=0, v010=0, v011=0, v100=0, v101=0, v110=0, v111=0;
-	  v000 = (float) this->operator()(ix,iy,iz);
-	  v001 = (float) this->operator()(ix,iy,iz+1);
-	  v010 = (float) this->operator()(ix,iy+1,iz);
-	  v011 = (float) this->operator()(ix,iy+1,iz+1);
-	  v100 = (float) this->operator()(ix+1,iy,iz);
-	  v101 = (float) this->operator()(ix+1,iy,iz+1);
-	  v110 = (float) this->operator()(ix+1,iy+1,iz);
-	  v111 = (float) this->operator()(ix+1,iy+1,iz+1);
-	  return q_tri_interpolation(v000,v001,v010,v011,v100,v101,v110,v111,
-				     dx,dy,dz);
-	}
-      case sinc:
-      case userkernel:
-	{
-	  return kernelinterpolation(x,y,z);
-	}
-      case spline:
-        {
-          return(splineinterpolate(x,y,z));
-	}
-      default:
-	imthrow("Invalid interpolation method",6);
+  float volume<T>::interpolate(float x, float y, float z,
+                               const extrapparams& ep) const
+  {
+    this->throwsIfNot3D();
+    int64_t ix, iy, iz;
+    switch (p_interpmethod) {
+    case nearestneighbour:
+      ix=MISCMATHS::round(x); iy=MISCMATHS::round(y); iz=MISCMATHS::round(z);
+      return this->operator()(ix,iy,iz,ep);
+    case trilinear:
+      {
+        ix=(int64_t) floor(x); iy=(int64_t) floor(y); iz=(int64_t) floor(z);
+        if (in_neigh_bounds(*this,ix,iy,iz)) return interpolatevalue(x,y,z);
+        float dx=x-ix, dy=y-iy, dz=z-iz;
+        float v000=0, v001=0, v010=0, v011=0, v100=0, v101=0, v110=0, v111=0;
+        v000 = (float) this->operator()(ix,iy,iz,ep);
+        v001 = (float) this->operator()(ix,iy,iz+1,ep);
+        v010 = (float) this->operator()(ix,iy+1,iz,ep);
+        v011 = (float) this->operator()(ix,iy+1,iz+1,ep);
+        v100 = (float) this->operator()(ix+1,iy,iz,ep);
+        v101 = (float) this->operator()(ix+1,iy,iz+1,ep);
+        v110 = (float) this->operator()(ix+1,iy+1,iz,ep);
+        v111 = (float) this->operator()(ix+1,iy+1,iz+1,ep);
+        return q_tri_interpolation(v000,v001,v010,v011,v100,v101,v110,v111,
+                                   dx,dy,dz);
       }
-      return 0.0;  // Should never get to here
+    case sinc:
+    case userkernel:
+      {
+        return kernelinterpolation(x,y,z,ep);
+      }
+    case spline:
+      {
+        return(splineinterpolate(x,y,z,ep));
+      }
+    default:
+      imthrow("Invalid interpolation method",6);
     }
+    return 0.0;  // Should never get to here
+  }
 
 
   template <class T>
   float volume<T>::interpolatevalue(float x, float y, float z) const
-    {
-      this->throwsIfNot3D();
-      int64_t ix, iy, iz;
-      switch (p_interpmethod) {
-      case userinterpolation:
-	if (p_userinterp == 0) {
-	  imthrow("No user interpolation method set",7);
-	} else {
-	  return (*p_userinterp)(*this,x,y,z);
-	}
-      case nearestneighbour:
-	ix=MISCMATHS::round(x); iy=MISCMATHS::round(y); iz=MISCMATHS::round(z);
-	return value(ix,iy,iz);
-      case trilinear:
-	{
-	  ix=(int64_t) floor(x); iy=(int64_t) floor(y); iz=(int64_t) floor(z);
-	  float dx=x-ix, dy=y-iy, dz=z-iz;
-	  T t000=0, t001=0, t010=0, t011=0, t100=0, t101=0, t110=0, t111=0;
-	  float v000, v001, v010, v011, v100, v101, v110, v111;
-	  this->getneighbours(ix,iy,iz,t000,t001,t010,t011,t100,t101,t110,t111);
-	  v000=(float) t000; v001=(float) t001; v010=(float) t010;
-	  v011=(float) t011; v100=(float) t100; v101=(float) t101;
-	  v110=(float) t110; v111=(float) t111;
-	  return q_tri_interpolation(v000,v001,v010,v011,v100,v101,v110,v111,
-				     dx,dy,dz);
-	}
-      case sinc:
-      case userkernel:
-	{
-	  return kernelinterpolation(x,y,z);
-	}
-      case spline:
-        {
-          return(splineinterpolate(x,y,z));
-	}
-      default:
-	imthrow("Invalid interpolation method",6);
+  {
+    this->throwsIfNot3D();
+    int64_t ix, iy, iz;
+    switch (p_interpmethod) {
+    case nearestneighbour:
+      ix=MISCMATHS::round(x); iy=MISCMATHS::round(y); iz=MISCMATHS::round(z);
+      return value(ix,iy,iz);
+    case trilinear:
+      {
+        ix=(int64_t) floor(x); iy=(int64_t) floor(y); iz=(int64_t) floor(z);
+        float dx=x-ix, dy=y-iy, dz=z-iz;
+        T t000=0, t001=0, t010=0, t011=0, t100=0, t101=0, t110=0, t111=0;
+        float v000, v001, v010, v011, v100, v101, v110, v111;
+        this->getneighbours(ix,iy,iz,t000,t001,t010,t011,t100,t101,t110,t111);
+        v000=(float) t000; v001=(float) t001; v010=(float) t010;
+        v011=(float) t011; v100=(float) t100; v101=(float) t101;
+        v110=(float) t110; v111=(float) t111;
+        return q_tri_interpolation(v000,v001,v010,v011,v100,v101,v110,v111,
+                                   dx,dy,dz);
       }
-      return 0.0;  // Should never get to here
+    case sinc:
+    case userkernel:
+      {
+        return kernelinterpolation(x,y,z);
+      }
+    case spline:
+      {
+        return(splineinterpolate(x,y,z));
+      }
+    default:
+      imthrow("Invalid interpolation method",6);
     }
+    return 0.0;  // Should never get to here
+  }
 
   template <class T>
   ColumnVector volume<T>::ExtractRow(int j, int k) const
@@ -1052,28 +1045,25 @@ namespace NEWIMAGE {
   }
 
   template <class T>
-  const T& volume<T>::extrapolate(int64_t x, int64_t y, int64_t z) const
+  const T& volume<T>::extrapolate(int64_t x, int64_t y, int64_t z,
+                                  const extrapparams& ep) const
   {
-    switch (getextrapolationmethod()) {
-    case userextrapolation:
-      if (p_userextrap == 0) {
-        imthrow("No user extrapolation method set",7);
-      } else {
-        extrapval = (*p_userextrap)(*this,x,y,z);
-        return extrapval;
-      }
+    extrapolation ext = ep.method(*this);
+    T padval          = ep.padvalue(*this);
+    T& extval         = ep.extrapval();
+    switch (ext) {
     case zeropad:
-      extrapval = (T) 0;
-      return extrapval;
+      extval = (T) 0;
+      return extval;
     case constpad:
-      extrapval = padvalue;
-      return extrapval;
+      extval = padval;
+      return extval;
     default:
       ; // do nothing
     }
     this->throwsIfNot3D();
     int64_t nx=x, ny=y, nz=z;
-    switch (getextrapolationmethod()) {
+    switch (ext) {
     case periodic:
       nx = periodicclamp(x,0,maxx());
       ny = periodicclamp(y,0,maxy());
@@ -1092,39 +1082,12 @@ namespace NEWIMAGE {
       if (nz==-1) { nz=0; }
       else { if (nz==zsize()) nz=maxz(); }
       if (in_bounds(nx,ny,nz)) { return value(nx,ny,nz); }
-      else { extrapval = padvalue; return extrapval; }
-    case boundsexception:
-      if (!in_bounds(x,y,z)) {
-        ostringstream msg;
-        msg << "Out of Bounds at ("<<x<<","<<y<<","<<z<<")";
-        imthrow(msg.str(),1);
-      } else {
-        return extrapval;
-      }
-    case boundsassert:
-      assert(in_bounds(x,y,z));
-      return extrapval;
+      else { extval = padval; return extval; }
     default:
       imthrow("Invalid extrapolation method",6);
     }
 
-    return extrapval;
-  }
-
-
-  template <class T>
-  void volume<T>::defineuserinterpolation(float (*interp)(
-                         const volume<T>& , float, float, float)) const
-  {
-    p_userinterp = interp;
-  }
-
-
-  template <class T>
-  void volume<T>::defineuserextrapolation(T (*extrap)(
-                         const volume<T>& , int64_t, int64_t, int64_t)) const
-  {
-    p_userextrap = extrap;
+    return extval;
   }
 
 
@@ -1132,7 +1095,7 @@ namespace NEWIMAGE {
   void volume<T>::definekernelinterpolation(const ColumnVector& kx,
 					    const ColumnVector& ky,
 					    const ColumnVector& kz,
-					    int wx, int wy, int wz) const
+					    int wx, int wy, int wz)
   {
     // takes full-widths and converts all to half-widths
     int hwx = (wx-1)/2;
@@ -1141,18 +1104,11 @@ namespace NEWIMAGE {
     interpkernel.setkernel(kx,ky,kz,hwx,hwy,hwz);
   }
 
-  template <class T>
-  void volume<T>::definekernelinterpolation(const volume<T>& vol) const
-  {
-    // copying like this is safe
-    interpkernel = vol.interpkernel;
-  }
-
   // Support Functions
 
   template <class T>
   void volume<T>::definesincinterpolation(const string& sincwindowtype,
-					  int w, int nstore) const
+					  int w, int nstore)
   {
     // full width
     this->definesincinterpolation(sincwindowtype,w,w,w,nstore);
@@ -1161,7 +1117,7 @@ namespace NEWIMAGE {
   template <class T>
   void volume<T>::definesincinterpolation(const string& sincwindowtype,
 					  int wx, int wy, int wz,
-					  int nstore) const
+					  int nstore)
   {
     // full widths
     if (nstore<1) nstore=1;
@@ -1204,14 +1160,8 @@ namespace NEWIMAGE {
     case periodic:
       return(SPLINTERPOLATOR::Periodic);
       break;
-    case boundsassert: case boundsexception: // We deal with this at the actual interpolation, and for now just return something
-      return(SPLINTERPOLATOR::Zeros);
-      break;
     case constpad: // Not implemented in splinterpolator, so I'll deal with this too at the actual interpolation.
       return(SPLINTERPOLATOR::Zeros);
-      break;
-    case userextrapolation:
-      imthrow("translate_extrapolation_type: userextrapolation not implemented for spline interpolation",10);
       break;
     default:
       imthrow("translate_extrapolation_type: I am lost",10);
@@ -1266,7 +1216,7 @@ namespace NEWIMAGE {
 
 
   template <class T>
-  void volume<T>::set_intent(int intent_code, float p1, float p2, float p3) const
+  void volume<T>::set_intent(int intent_code, float p1, float p2, float p3)
   {
     IntentCode = intent_code;
     IntentParam1 = p1;
@@ -2160,20 +2110,16 @@ namespace NEWIMAGE {
   Matrix volume<T>::newimagevox2mm_mat() const
   {
     Matrix vox2mm_mat;
-    short code=NIFTI_XFORM_UNKNOWN;  // not used currently, but it's nice!
     if (sform_code()!=NIFTI_XFORM_UNKNOWN) {
       vox2mm_mat = sform_mat();
-      code = sform_code();
     } else if (qform_code()!=NIFTI_XFORM_UNKNOWN) {
       vox2mm_mat = qform_mat();
-      code = qform_code();
     } else {
       /* default case - for FSLView is positive voxel to mm scalings */
       vox2mm_mat=IdentityMatrix(4);
       vox2mm_mat(1,1)=pixdim1();
       vox2mm_mat(2,2)=pixdim2();
       vox2mm_mat(3,3)=pixdim3();
-      code=NIFTI_XFORM_UNKNOWN;
     }
     return vox2mm_mat;
   }
@@ -2540,10 +2486,6 @@ vector<T> calculateExtrema(const volume<T>& inputVolume, vector<int64_t>& coordi
   template <class T>
   ReturnMatrix volume<T>::matrix(const volume<T>& mask, vector<int64_t>& voxelLabels) const
   {
-    //typename boost::enable_if<boost::is_integral<T>, T>::type foo;
-    //BOOST_STATIC_ASSERT_MSG(boost::is_integral<S>::value, "matrix only specialised for long int and int64_t");
-
-
     voxelLabels.clear();
     Matrix matv;
     if (this->totalElements()==0) return matv;
@@ -2656,13 +2598,35 @@ vector<T> calculateExtrema(const volume<T>& inputVolume, vector<int64_t>& coordi
     key.Release();
     return key;
   }
-//Shadowvolume implementations
+
+  //Shadowvolume implementation
+  template<typename T> ShadowVolume<T>::ShadowVolume()
+    : _assigned(false), _t(-1), _owner(nullptr) {}
+
+  template<typename T>
+  ShadowVolume<T>::ShadowVolume(const ShadowVolume<T>& sv)
+    : ShadowVolume(*(sv._owner), sv._t) {}
+
+  template<typename T>
+  ShadowVolume<T>::ShadowVolume(const volume<T>& source, int64_t t)
+    : _assigned(false), _t(t), _owner(&source) {
+    T* dataPtr = source.Data + t * source.nvoxels();
+    this->initialize(source.xsize(), source.ysize(), source.zsize(),
+                     1, 1, 1, 1,
+                     dataPtr, false, source.nThreads);
+    this->copyproperties(source);
+  }
+
   template <class T>
-  int ShadowVolume<T>::initialize(int64_t xsize, int64_t ysize, int64_t zsize, int64_t tsize, int64_t d5, int64_t d6, int64_t d7, T *d, bool d_owner, int64_t nt) {
-    if ( assigned )
-      imthrow("Attempted to reinitialise shadow volume",99);
-    int status=volume<T>::initialize(xsize, ysize, zsize, tsize, d5, d6, d7, d, false, nt);
-    assigned=true;
+  int ShadowVolume<T>::initialize(int64_t xsize, int64_t ysize, int64_t zsize,
+                                  int64_t tsize, int64_t d5, int64_t d6,
+                                  int64_t d7, T *d, bool d_owner, int64_t nt) {
+    if (_assigned) {
+      imthrow("Attempted to reinitialise shadow volume", 99);
+    }
+    int status=this->volume<T>::initialize(xsize, ysize, zsize, tsize,
+                                           d5, d6, d7, d, false, nt);
+    _assigned=true;
     return status;
   }
 
@@ -2671,6 +2635,48 @@ vector<T> calculateExtrema(const volume<T>& inputVolume, vector<int64_t>& coordi
     this->copydata(source,false);
     return *this;
   }
+
+  template <typename T>
+  const volume<T>& ShadowVolume<T>::owner() const {
+    // if _owner is null, it mearns we
+    // haven't been initialised yet
+    if (_owner == nullptr) { return *this; }
+    else                   { return *_owner; }
+  }
+
+  // Getting interp/extrap settings on a ShadowVolume
+  // delegates to the owning volume instance
+  template<typename T> interpolation ShadowVolume<T>::getinterpolationmethod() const
+  { return owner().volume<T>::getinterpolationmethod(); }
+  template<typename T> extrapolation ShadowVolume<T>::getextrapolationmethod() const
+  { return owner().volume<T>::getextrapolationmethod(); }
+  template<typename T> T ShadowVolume<T>::getpadvalue() const
+  { return owner().volume<T>::getpadvalue(); }
+  template<typename T> std::vector<bool> ShadowVolume<T>::getextrapolationvalidity() const
+  { return owner().volume<T>::getextrapolationvalidity(); }
+  template<typename T> int ShadowVolume<T>::getsplineorder() const
+  { return owner().volume<T>::getsplineorder(); }
+
+  // Attempts to change interp/extrap settings
+  // on a ShadowVolume will result in an error
+  template<typename T> void ShadowVolume<T>::setinterpolationmethod(interpolation interp)
+  { imthrow("Called private shadow method setinterpolationmethod", 101); }
+  template<typename T> void ShadowVolume<T>::setextrapolationmethod(extrapolation extrapmethod) const
+  { imthrow("Called private shadow method setextrapolationmethod", 101); }
+  template<typename T> void ShadowVolume<T>::setextrapolationmethod(extrapolation extrapmethod)
+  { imthrow("Called private shadow method setextrapolationmethod", 101);  }
+  template<typename T> void ShadowVolume<T>::setpadvalue(T value)
+  { imthrow("Called private shadow method setpadvalue", 101); }
+  template<typename T> void ShadowVolume<T>::setextrapolationvalidity(bool xv, bool yv, bool zv)
+  { imthrow("Called private shadow method setextrapolationvalidity", 101); }
+  template<typename T> void ShadowVolume<T>::definekernelinterpolation(const NEWMAT::ColumnVector& kx, const NEWMAT::ColumnVector& ky, const NEWMAT::ColumnVector& kz, int wx, int wy, int wz)
+  { imthrow("Called private shadow method definekernelinterpolation", 101); }
+  template<typename T> void ShadowVolume<T>::definesincinterpolation(const std::string& sincwindowtype, int w, int nstore)
+  { imthrow("Called private shadow method definesincinterpolation", 101); }
+  template<typename T> void ShadowVolume<T>::definesincinterpolation(const std::string& sincwindowtype, int wx, int wy, int wz, int nstore)
+  { imthrow("Called private shadow method definesincinterpolation", 101); }
+  template<typename T> void ShadowVolume<T>::setsplineorder(int order)
+  { imthrow("Called private shadow method setsplineorder", 101); }
 
   ///////////////////////////////////////////////////////////////////////
   ///////////////////////////////////////////////////////////////////////

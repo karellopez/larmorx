@@ -97,9 +97,6 @@ namespace MISCMATHS {
 #define M_PI            3.14159265358979323846
 #endif
 
-#define OUT(t) std::cout<<#t "="<<t<<std::endl;
-#define LOGOUT(t) Utilities::LogSingleton::getInstance().str()<<#t "="<<t<<std::endl;
-
   // IO/string stuff
   template <class T> std::string num2str(T n, int width=-1);
 

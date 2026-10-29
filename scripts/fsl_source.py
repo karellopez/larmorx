@@ -4,13 +4,16 @@
 The FSL Licence lets larmorx-nc pass its translations on only if "all original and amended
 source code is included in any transmitted product" (``crates-nc/LICENSE``): the amended
 source is the Rust translation in ``crates-nc/``, the original source the FSL files it was
-translated from, copied here unchanged from an FSL installation's ``$FSLDIR/src`` (FSL 6.0.7.17,
-the packages pinned below). ``fsl-source/MANIFEST.tsv`` lists every file with its package,
-version and SHA-256; ``--check`` verifies the copies against it (no FSL needed).
+translated from, copied here unchanged from an FSL installation's ``$FSLDIR/src`` (FSL 6.0.7.23
+since 2026-10-29, the packages pinned below; FSL 6.0.7.17's before, in git history and in its
+own installation). ``fsl-source/MANIFEST.tsv`` lists every file with its package, version and
+SHA-256; ``--check`` verifies the copies against it (no FSL needed). A copy replaces the
+directory's previous files: files no longer translated from (FSL 6.0.7.17's ``znzlib.c``) leave
+it with the version they belonged to.
 
 Usage:
-    python scripts/fsl_source.py --fsldir ~/fsl      # copy the files and write the manifest
-    python scripts/fsl_source.py --check             # verify the copies against the manifest
+    python scripts/fsl_source.py --fsldir ~/fsl-6.0.7.23   # copy the files, write the manifest
+    python scripts/fsl_source.py --check                   # verify the copies
 
 Each replica adds the files it translates to ``FILES`` (package, file).
 """
@@ -27,17 +30,19 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parent.parent
 DEST = ROOT / "crates-nc" / "fsl-source"
 
-#: The FSL packages the replicas are translated from (FSL 6.0.7.17's conda packages).
+#: The FSL packages the replicas are translated from (FSL 6.0.7.23's conda packages; FSL
+#: 6.0.7.17's were fsl-newimage 2203.12, fsl-miscmaths 2203.2, fsl-newnifti 4.1.0, fsl-znzlib
+#: 2111.0, fsl-bet2 2111.8, fsl-utils 2203.5, fsl-avwutils 2209.3, the others the same).
 VERSIONS = {
     "fsl-mcflirt": "2111.0",
-    "fsl-newimage": "2203.12",
-    "fsl-miscmaths": "2203.2",
-    "fsl-newnifti": "4.1.0",
-    "fsl-znzlib": "2111.0",
-    "fsl-bet2": "2111.8",
+    "fsl-newimage": "2601.0",
+    "fsl-miscmaths": "2412.6",
+    "fsl-newnifti": "5.0.0",
+    "fsl-znzlib": "2511.3",
+    "fsl-bet2": "2111.9",
     "fsl-meshclass": "2111.0",
-    "fsl-utils": "2203.5",
-    "fsl-avwutils": "2209.3",
+    "fsl-utils": "2412.6",
+    "fsl-avwutils": "2209.6",
 }
 
 #: The original files: every file a translation in crates-nc/ comes from (see each crate's
@@ -69,8 +74,20 @@ FILES = [
     ("fsl-newnifti", "legacyFunctions.cc"),
     ("fsl-newnifti", "nifti1.h"),
     ("fsl-newnifti", "nifti2.h"),
+    # znzlib 2511.3 (FSL 6.0.7.23) is C++ with one plugin per format; 2111.0's znzlib.c is gone
     ("fsl-znzlib", "znzlib.h"),
-    ("fsl-znzlib", "znzlib.c"),
+    ("fsl-znzlib", "znzlib.cpp"),
+    ("fsl-znzlib", "raw_plugin.h"),
+    ("fsl-znzlib", "raw_plugin.cpp"),
+    ("fsl-znzlib", "gzip_plugin.h"),
+    ("fsl-znzlib", "gzip_plugin.cpp"),
+    ("fsl-znzlib", "zlib_wrapper.h"),
+    ("fsl-znzlib", "zstd_reader.h"),
+    ("fsl-znzlib", "zstd_reader.cpp"),
+    ("fsl-znzlib", "zstd_writer.h"),
+    ("fsl-znzlib", "zstd_writer.cpp"),
+    ("fsl-znzlib", "bzip2_plugin.h"),
+    ("fsl-znzlib", "bzip2_plugin.cpp"),
     # BET (larmorx-nc-bet; its libraries in larmorx-nc-core)
     ("fsl-bet2", "bet"),
     ("fsl-bet2", "bet2.cpp"),
@@ -112,12 +129,18 @@ def sha256(path: Path) -> str:
 
 
 def installed_version(fsldir: Path, package: str) -> str | None:
-    """The version of ``package`` recorded in ``$FSLDIR/src/<package>``'s conda metadata."""
+    """The version of ``package`` recorded in ``$FSLDIR/src/<package>``'s conda metadata, else
+    (a package built without it: fsl-znzlib 2511.3) in ``$FSLDIR/conda-meta``."""
     meta = fsldir / "src" / package / "metadata_conda_debug.yaml"
-    if not meta.is_file():
-        return None
-    m = re.search(r"^\s*version:\s*'?([^'\s]+)'?", meta.read_text(encoding="utf-8"), re.M)
-    return m.group(1) if m else None
+    if meta.is_file():
+        text = meta.read_text(encoding="utf-8")
+        m = re.search(r"^\s*version:\s*'?([^'\s]+)'?", text, re.M)
+        return m.group(1) if m else None
+    for record in sorted((fsldir / "conda-meta").glob(f"{package}-[0-9]*.json")):
+        m = re.match(re.escape(package) + r"-([0-9][^-]*)-", record.name)
+        if m:
+            return m.group(1)
+    return None
 
 
 def copy(fsldir: Path) -> int:
@@ -126,6 +149,10 @@ def copy(fsldir: Path) -> int:
         if got != want:
             print(f"error: {fsldir}/src/{package} is version {got}, expected {want}")
             return 1
+    # the previous version's files leave the directory (git keeps them with their version)
+    for old in DEST.glob("*/*"):
+        if old.is_file() and (old.parent.name, old.name) not in FILES:
+            old.unlink()
     rows = []
     for package, name in FILES:
         src = fsldir / "src" / package / name
@@ -167,7 +194,7 @@ def check() -> int:
 def main() -> int:
     ap = argparse.ArgumentParser(description=__doc__.split("\n\n")[0])
     g = ap.add_mutually_exclusive_group(required=True)
-    g.add_argument("--fsldir", type=Path, help="an FSL 6.0.7.17 installation with its src/")
+    g.add_argument("--fsldir", type=Path, help="an FSL 6.0.7.23 installation with its src/")
     g.add_argument("--check", action="store_true", help="verify the copies against the manifest")
     a = ap.parse_args()
     return check() if a.check else copy(a.fsldir.expanduser())

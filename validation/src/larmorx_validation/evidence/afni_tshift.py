@@ -1,6 +1,6 @@
 # SPDX-License-Identifier: Apache-2.0
 """3dTshift's evidence: fMRIPrep's slice-timing correction of a real BOLD run by AFNI 25.2.09
-(and 26.3.05, the replica's reference since 2026-10-29),
+(and 26.3.05, both implementations' reference since 2026-10-29),
 by fMRIPrep's own AFNI, and by both larmorx implementations (the clean-room original and the
 GPL replica, each in its default and ``reproduce`` mode); a deliberate correction (AFNI-01) on
 the same run; the two records' cases; speed.
@@ -223,14 +223,14 @@ RUNS = [
         "reproduce mode, 12 threads",
     ),
 ]
-#: AFNI 26.3.05 on the same calls (the replica's reference since 2026-10-29; ``afni_step``).
+#: AFNI 26.3.05 on the same calls (both implementations' reference since 2026-10-29; ``afni_step``).
 RUNS_26 = [
     (
         "afni26",
         "afni26",
         "original",
         "AFNI 26.3.05, 3dTshift",
-        "the repository's oracle build; the replica's reference",
+        "the repository's oracle build; both implementations' reference",
     ),
 ]
 NEG_RUNS_26 = [
@@ -598,7 +598,7 @@ def _example_run(ctx: core.Context, e: fcache.Entry, reg: dict, step: dict) -> d
             "afni26",
             "main",
             "replica − AFNI 26.3.05",
-            "larmorx against the original (the replica's reference)",
+            "larmorx against the original (both implementations' reference)",
         ),
         _d(
             "afni26-afni",
@@ -607,6 +607,16 @@ def _example_run(ctx: core.Context, e: fcache.Entry, reg: dict, step: dict) -> d
             "variability",
             "AFNI 26.3.05 − AFNI 25.2.09",
             "the original against itself: the version step",
+        ),
+        # The clean-room original against AFNI 26.3.05, its reference too since its alignment
+        # (2026-10-29, next-steps item 3b): last, the earlier comparisons keep their places.
+        _d(
+            "original-afni26",
+            "original",
+            "afni26",
+            "main",
+            "clean-room original − AFNI 26.3.05",
+            "larmorx against the original (both implementations' reference)",
         ),
     ]
 
@@ -676,7 +686,7 @@ def _example_run(ctx: core.Context, e: fcache.Entry, reg: dict, step: dict) -> d
         "summary": (
             "The 3dTshift node fMRIPrep 25.2.6 ran on OpenNeuro ds005040 sub-002 (task clip, "
             "run 1): its arguments and the slice times it wrote, given to AFNI 25.2.09, to AFNI "
-            "26.3.05 (the replica's reference since 2026-10-29) and to both LARMORX "
+            "26.3.05 (both implementations' reference since 2026-10-29) and to both LARMORX "
             "implementations, each in its default and reproduce mode and at 1 and 12 threads. "
             "fMRIPrep's own output is the column it produced in its run. The clean-room original "
             "is compared with AFNI 25.2.09, its reference until it follows 26.3.05's two fixes."
@@ -910,7 +920,7 @@ def _example_neg(ctx: core.Context, e: fcache.Entry, reg: dict, step: dict) -> d
             "afni26-neg",
             "main",
             "replica (reproduce) − AFNI 26.3.05, same input",
-            "larmorx against the original (the replica's reference)",
+            "larmorx against the original (both implementations' reference)",
         ),
         _d(
             "afni26-neg-afni-neg",
@@ -919,6 +929,14 @@ def _example_neg(ctx: core.Context, e: fcache.Entry, reg: dict, step: dict) -> d
             "variability",
             "AFNI 26.3.05 − AFNI 25.2.09, on the negative scale factor",
             "the original against itself: the version step",
+        ),
+        _d(
+            "original-repro-afni26-neg",
+            "original-neg-reproduce",
+            "afni26-neg",
+            "main",
+            "clean-room original (reproduce) − AFNI 26.3.05, same input",
+            "larmorx against the original (both implementations' reference)",
         ),
     ]
 
@@ -960,12 +978,13 @@ def _example_neg(ctx: core.Context, e: fcache.Entry, reg: dict, step: dict) -> d
                 "replica-repro-afni26-neg": "reproduce mode gives AFNI 26.3.05's result, defect "
                 "included (AFNI-01 is unchanged in 26.3.05).",
             }.get(i, "The same values.")
-        elif i == "original-repro-afni-neg":
+        elif i in ("original-repro-afni-neg", "original-repro-afni26-neg"):
             m = d["metrics"]["series"]
+            which = "AFNI 26.3.05's" if "afni26" in i else "AFNI's"
             d["verdict"] = "open"
             d["reason"] = (
-                f"reproduce mode gives AFNI's result, defect included, but for {m['differ']:,} "
-                f"values off by one stored unit: {FOURIER_WHY}."
+                f"reproduce mode gives {which} result, defect included, but for "
+                f"{m['differ']:,} values off by one stored unit: {FOURIER_WHY}."
             )
         else:
             d["verdict"] = "open"

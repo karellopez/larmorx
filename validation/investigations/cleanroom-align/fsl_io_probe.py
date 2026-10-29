@@ -36,14 +36,29 @@ REPO = Path(__file__).resolve().parents[3]
 WORKSPACE = Path(os.environ.get("LARMORX_WORKSPACE", REPO.parent))
 FSL = Path(os.environ.get("FSL_623", Path.home() / "fsl-6.0.7.23"))
 LX = Path(os.environ.get("LX_BIN", REPO / "target" / "release" / "larmorx"))
-NC = Path(os.environ.get("LARMORX_NC_BIN", REPO / "crates-nc" / "target" / "release" / "larmorx-nc"))
+NC = Path(
+    os.environ.get("LARMORX_NC_BIN", REPO / "crates-nc" / "target" / "release" / "larmorx-nc")
+)
 SERIES = WORKSPACE / "larmorx-testdata" / "data" / "synthetic" / "hmc" / "motion" / "small.nii.gz"
 
-TYPES = (
-    "NIFTI_GZ NIFTI NIFTI_PAIR NIFTI_PAIR_GZ NIFTI2 NIFTI2_GZ NIFTI2_PAIR NIFTI2_PAIR_GZ "
-    "NIFTI_ZST NIFTI_PAIR_ZST NIFTI2_ZST NIFTI2_PAIR_ZST NIFTI_BZ2 NIFTI_PAIR_BZ2 NIFTI2_BZ2 "
-    "NIFTI2_PAIR_BZ2"
-).split()
+TYPES = [
+    "NIFTI_GZ",
+    "NIFTI",
+    "NIFTI_PAIR",
+    "NIFTI_PAIR_GZ",
+    "NIFTI2",
+    "NIFTI2_GZ",
+    "NIFTI2_PAIR",
+    "NIFTI2_PAIR_GZ",
+    "NIFTI_ZST",
+    "NIFTI_PAIR_ZST",
+    "NIFTI2_ZST",
+    "NIFTI2_PAIR_ZST",
+    "NIFTI_BZ2",
+    "NIFTI_PAIR_BZ2",
+    "NIFTI2_BZ2",
+    "NIFTI2_PAIR_BZ2",
+]
 
 
 GREP: str | None = None
@@ -106,7 +121,11 @@ def digest(files: list[Path]) -> str:
         if f.name.endswith((".img", ".img.gz", ".img.zst", ".img.bz2")):
             continue
         body = decompress(f)
-        tmp = f.parent / ("_probe_" + f.name.split(".")[0] + (".nii" if body[344:347] in (b"n+1", b"n+2") or body[4:7] == b"n+2" else ".hdr"))
+        tmp = f.parent / (
+            "_probe_"
+            + f.name.split(".")[0]
+            + (".nii" if body[344:347] in (b"n+1", b"n+2") or body[4:7] == b"n+2" else ".hdr")
+        )
         tmp.write_bytes(body)
         if tmp.suffix == ".hdr":
             data_name = f.name.replace(".hdr", ".img")
@@ -140,7 +159,9 @@ def case_types(work: Path, who: list[str], mode: str) -> None:
             if d.exists():
                 shutil.rmtree(d)
             code, msg = run(w, ["-in", str(SERIES), "-out", "out", "-plots"], d, t, mode)
-            imgs = sorted(p for p in d.iterdir() if p.name.startswith("out") and ".par" not in p.name)
+            imgs = sorted(
+                p for p in d.iterdir() if p.name.startswith("out") and ".par" not in p.name
+            )
             print(f"{w:8s} {t:16s} exit {code} files: {listing(d)}")
             if code == 0:
                 print(f"{'':26s}{digest(imgs)}")
@@ -159,7 +180,9 @@ def case_read(work: Path, who: list[str], mode: str) -> None:
     (src / "bz2-named.nii.gz").write_bytes(bz2.compress(raw, 9))
     (src / "bz2.nii.bz2").write_bytes(bz2.compress(raw, 9))
     zst = subprocess.run(
-        [str(FSL / "bin" / "zstd"), "-q", "-c", str(src / "plain.nii")], capture_output=True, check=True
+        [str(FSL / "bin" / "zstd"), "-q", "-c", str(src / "plain.nii")],
+        capture_output=True,
+        check=True,
     ).stdout
     (src / "zst.nii.zst").write_bytes(zst)
     (src / "zst-named.nii.gz").write_bytes(zst)
@@ -239,16 +262,34 @@ def case_fsl60(work: Path, who: list[str], mode: str) -> None:
             ("in-img-dir-both", ["a.img.d", "a.hdr.d"], ["-in", "a.img.d/in.nii.gz", "-out", "o1"]),
             ("in-img-dir-only", ["a.img.d"], ["-in", "a.img.d/in.nii.gz", "-out", "o2"]),
             ("in-img-stem", [], ["-in", "sub.img2.nii.gz", "-out", "o3"]),
-            ("out-img-dir-both", ["b.img.d", "b.hdr.d"], ["-in", "in.nii.gz", "-out", "b.img.d/out"]),
-            ("out-img-dir-only", ["b.img.d"], ["-in", "in.nii.gz", "-out", "b.img.d/out", "-plots"]),
+            (
+                "out-img-dir-both",
+                ["b.img.d", "b.hdr.d"],
+                ["-in", "in.nii.gz", "-out", "b.img.d/out"],
+            ),
+            (
+                "out-img-dir-only",
+                ["b.img.d"],
+                ["-in", "in.nii.gz", "-out", "b.img.d/out", "-plots"],
+            ),
             ("out-img-stem", [], ["-in", "in.nii.gz", "-out", "o.img7"]),
             ("in-img-ext", [], ["-in", "pair.img", "-out", "o4"]),
-            ("out-pair-img-dir-both", ["c.img.d", "c.hdr.d"], ["-in", "in.nii.gz", "-out", "c.img.d/out", "-stats"]),
+            (
+                "out-pair-img-dir-both",
+                ["c.img.d", "c.hdr.d"],
+                ["-in", "in.nii.gz", "-out", "c.img.d/out", "-stats"],
+            ),
             ("out-pair-img-dir-only", ["c.img.d"], ["-in", "in.nii.gz", "-out", "c.img.d/out"]),
             ("in-pair-img-dir", ["p.img.d", "p.hdr.d"], ["-in", "p.img.d/pair.img", "-out", "o5"]),
-            ("out-mats-img-dir", ["m.img.d", "m.hdr.d"], ["-in", "in.nii.gz", "-out", "m.img.d/out", "-mats"]),
+            (
+                "out-mats-img-dir",
+                ["m.img.d", "m.hdr.d"],
+                ["-in", "in.nii.gz", "-out", "m.img.d/out", "-mats"],
+            ),
         ):
-            otype = "NIFTI_PAIR" if "pair-img-dir" in label and label.startswith("out") else "NIFTI_GZ"
+            otype = (
+                "NIFTI_PAIR" if "pair-img-dir" in label and label.startswith("out") else "NIFTI_GZ"
+            )
             d = base / label
             d.mkdir(parents=True)
             for sub in dirs:
@@ -267,7 +308,9 @@ def case_fsl60(work: Path, who: list[str], mode: str) -> None:
                 (where / "pair.img").write_bytes(raw[352:])
             before = {p for p in d.rglob("*")}
             code, msg = run(w, args, d, otype, mode)
-            new = sorted(str(p.relative_to(d)) for p in d.rglob("*") if p not in before and p.is_file())
+            new = sorted(
+                str(p.relative_to(d)) for p in d.rglob("*") if p not in before and p.is_file()
+            )
             print(f"{w:8s} {label:18s} exit {code} new: {new} {msg[:300]!r}")
 
 
@@ -286,7 +329,9 @@ def case_final(work: Path, who: list[str], mode: str) -> None:
             if ref is None:
                 ref = x
             same = x is not None and ref is not None and np.array_equal(x, ref)
-            print(f"{w:8s} {opt or 'default':14s} exit {code} series == default: {same} {msg[:300]!r}")
+            print(
+                f"{w:8s} {opt or 'default':14s} exit {code} series == default: {same} {msg[:300]!r}"
+            )
 
 
 CASES = {

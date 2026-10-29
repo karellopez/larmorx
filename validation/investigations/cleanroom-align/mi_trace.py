@@ -73,7 +73,11 @@ def compare(
         same += 1
     print(
         f"{label}: mcflirt {len(ma)} evaluations, larmorx {len(mb)}; the first {same} identical"
-        + (f"; first difference:\n  mcflirt {ma[same]}\n  larmorx {mb[same]}" if same < min(len(ma), len(mb)) else "")
+        + (
+            f"; first difference:\n  mcflirt {ma[same]}\n  larmorx {mb[same]}"
+            if same < min(len(ma), len(mb))
+            else ""
+        )
     )
 
 

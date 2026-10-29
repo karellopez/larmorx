@@ -108,3 +108,24 @@ authors' permanent cases, from these inputs only:
 | `timing::header_timing` (a float32 sum of a double step) | AFNI's header slice times in ms and µs | spec 3dTshift §3.2 (observed) |
 | `dataset::read_as` (no arithmetic without a slope) | AFNI's conversion of int8, uint16, int32, uint32 and float64 data | spec 3dTshift §6 (observed) |
 | `automask::copy_timing`, AFNI-43's notices | the notices of AFNI-03, -08 and -43 as the replica's | spec 3dAutomask §9 (observed), the replica program |
+
+## AFNI 26.3.05 (2026-10-29)
+
+3dTshift, 3dAutomask and 3dUnifize follow AFNI 26.3.05 (`oracles/afni-26.3.05/bin/`, made by
+`scripts/build_afni_oracle.sh` from the release `AFNI_26.3.05`), changed by a clean-room
+implementer who never opened AFNI's source (any version, `oracles/afni-26.3.05/build/`
+included), the replica crates (`crates-gpl/`), the restricted findings, `docs/parts/`, the
+version probes of the replica authors (`validation/investigations/version-afni/`,
+`validation/src/larmorx_validation/parity/afni_versions.py`) or their permanent cases, from these
+inputs only:
+
+| Input | What it gave |
+|---|---|
+| [`specs/3dTshift.md`](../../specs/3dTshift.md) §3.2, §4, §6.4, §6.5, [`specs/3dAutomask.md`](../../specs/3dAutomask.md) §9, [`specs/3dUnifize.md`](../../specs/3dUnifize.md) §9: the lines marked "(AFNI 26.3.05)" | header slice code 2 read as NIfTI defines it in both modes, `-no_detrend` de-meaning every voxel in both modes; AFNI-03 and AFNI-05 never named |
+| Black-box runs of AFNI 26.3.05's `3dTshift`, `3dAutomask` and `3dUnifize` through the parity suites and random testing (`--afni-version 26.3.05`) | the records against 26.3.05 |
+
+| larmorx | Behaviour reproduced | Source |
+|---|---|---|
+| `tshift` (`-no_detrend`: every voxel's mean removed and restored) | AFNI 26.3.05 `3dTshift` | spec §4 |
+| `timing::header_timing` (code 2: `slice_end` down to `slice_start`), `timing::seq_dec_notice` (none) | AFNI 26.3.05's header slice timing | spec §3.2, §6.4 |
+| `automask::copy_timing` (the code-2 times kept, AFNI-03 not named) | AFNI 26.3.05 `3dAutomask -apply_prefix`, `3dUnifize -EPI` | spec 3dAutomask §9, 3dUnifize §9 |

@@ -3125,6 +3125,32 @@ def _(ctx: Context) -> dict[str, Any]:
     return result
 
 
+@case("cli.mri.hmc.compressed", covers=("cli:mri hmc",))
+def _(ctx: Context) -> dict[str, Any]:
+    """FSL 6.0.7.23's output types and reading (2026-10-29): a zstd pair written with
+    ``-nn_final`` (FSL-59 by default: nearest neighbour), then read back by its name without an
+    extension (completed, read by content) and written as bzip2 with ``-sinc_final`` reproduced
+    (FSL-59: trilinear). The compressed bytes are hashed: ruzstd's and libbz2-rs-sys' encoders
+    are deterministic."""
+    a, b = ctx.out("a"), ctx.out("b")
+    previous = os.environ.get("FSLOUTPUTTYPE")
+    try:
+        os.environ["FSLOUTPUTTYPE"] = "NIFTI_PAIR_ZST"
+        cli("mri", "hmc", "-in", ctx.file("bold.nii"), "-out", a, "-refvol", "1", "-stages", "1", "-nn_final")  # fmt: skip
+        os.environ["FSLOUTPUTTYPE"] = "NIFTI_BZ2"
+        cli("mri", "hmc", "-in", a, "-out", b, "-refvol", "1", "-stages", "1", "-sinc_final", upstream_defects=REPRODUCE)  # fmt: skip
+    finally:
+        if previous is None:
+            del os.environ["FSLOUTPUTTYPE"]
+        else:
+            os.environ["FSLOUTPUTTYPE"] = previous
+    return {
+        "a.hdr.zst": File(f"{a}.hdr.zst"),
+        "a.img.zst": File(f"{a}.img.zst"),
+        "b.nii.bz2": File(f"{b}.nii.bz2"),
+    }
+
+
 @case("cli.fsl.mcflirt", covers=("cli:fsl mcflirt",))
 def _(ctx: Context) -> dict[str, Any]:
     """``larmorx fsl mcflirt``: mcflirt's command line, run by the clean-room original of

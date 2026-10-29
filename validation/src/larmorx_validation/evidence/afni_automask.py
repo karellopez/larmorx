@@ -343,24 +343,28 @@ def window_of(ex, pid: str) -> list[float]:
     return [w["lo"], w["hi"]]
 
 
-#: AFNI 26.3.05 on the same calls (the replica's reference since 2026-10-29; ``afni_step``).
+#: AFNI 26.3.05 on the same calls (both implementations' reference since 2026-10-29; ``afni_step``).
 PANEL_26 = (
     "afni26",
     "afni26",
     "original",
     "AFNI 26.3.05, 3dAutomask",
-    "the repository's oracle build; the replica's reference",
+    "the repository's oracle build; both implementations' reference",
 )
 
 
 def afni26_diffs(what: str = "") -> list[dict]:
-    """The replica against AFNI 26.3.05, and AFNI's own step from 25.2.09."""
+    """The replica and the clean-room original against AFNI 26.3.05, and AFNI's own step
+    from 25.2.09."""
     d = common.d
     return [
         d("replica-afni26", "replica", "afni26", "main", f"replica − AFNI 26.3.05{what}",
           common.ROLE_LX),
         d("afni26-afni", "afni26", "afni", "variability", f"AFNI 26.3.05 − AFNI 25.2.09{what}",
           "the original against itself: the version step"),
+        # The clean-room original against AFNI 26.3.05 too, since its alignment (2026-10-29).
+        d("original-afni26", "original", "afni26", "main", f"original − AFNI 26.3.05{what}",
+          common.ROLE_LX),
     ]  # fmt: skip
 
 
@@ -438,6 +442,22 @@ def original_verdicts(diffs: list[dict], same: dict[str, bool]) -> None:
                 "source, one from a behavioural specification), give the same bytes."
             )
 
+    # The clean-room original against AFNI 26.3.05, its reference since 2026-10-29: where AFNI
+    # 26.3.05 gives 25.2.09's bytes, the comparison with 25.2.09 above, with its verdict.
+    by = {x["id"]: x for x in diffs}
+    x26, x25 = by.get("original-afni26"), by.get("original-afni")
+    if (
+        x26 is not None
+        and x25 is not None
+        and not same["original-afni26"]
+        and same.get("afni26-afni")
+    ):
+        x26["verdict"] = x25["verdict"]
+        x26["reason"] = (
+            "AFNI 26.3.05 gives AFNI 25.2.09's bytes on this call, so this is the comparison "
+            "with 25.2.09: " + str(x25.get("reason", ""))
+        )
+
 
 def _example_ref(ctx: core.Context, e: fcache.Entry, o: fcache.Entry, step: dict) -> dict:
     import nibabel as nib
@@ -512,7 +532,7 @@ def _example_ref(ctx: core.Context, e: fcache.Entry, o: fcache.Entry, step: dict
         "summary": (
             "The 3dAutomask node fMRIPrep 25.2.6 ran on the unifized BOLD reference of OpenNeuro "
             "ds005040 sub-002 (task clip, run 1): its arguments given to AFNI 25.2.09, to AFNI "
-            "26.3.05 (the replica's reference since 2026-10-29), to fMRIPrep's own build of AFNI "
+            "26.3.05 (both implementations' reference since 2026-10-29), to fMRIPrep's own build of AFNI "
             "in its image, to the larmorx-gpl replica and to LARMORX's clean-room original "
             "(compared with AFNI 25.2.09, its reference until it follows 26.3.05), each in its "
             "default and reproduce modes. The masks are drawn over the input; choose *Masked "
@@ -631,7 +651,7 @@ def _example_bold(ctx: core.Context, e: fcache.Entry, o: fcache.Entry, step: dic
             "3dAutomask's usual use: a brain mask of an EPI series. With no options it averages "
             f"the absolute values of the {img.shape[3]} volumes, then masks the average. The "
             "same run as above, before fMRIPrep touched it, given to AFNI 25.2.09, AFNI 26.3.05 "
-            "(the replica's reference), fMRIPrep's AFNI, the replica and the clean-room original "
+            "(both implementations' reference), fMRIPrep's AFNI, the replica and the clean-room original "
             "in both modes."
         ),
         "facts": [
@@ -851,7 +871,7 @@ def _example_peels(
         ("original-reproduce", "larmorx", "LARMORX clean-room original, -peels 0",
          "reproduce mode"),
         ("afni-peels1", "original", "AFNI 25.2.09, fMRIPrep's call", "-peels 1, the default"),
-        ("afni26", "original", "AFNI 26.3.05, -peels 0", "the replica's reference"),
+        ("afni26", "original", "AFNI 26.3.05, -peels 0", "both implementations' reference"),
     ]  # fmt: skip
     for pid, role, label, sub in panels:
         ex.add(exm.Panel(pid, role, label, sub, arrays[pid], overlay=over))

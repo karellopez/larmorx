@@ -305,7 +305,15 @@ def first_difference(a: str, b: str) -> str:
     return f"line {k + 1}: AFNI {x!r}, larmorx {y!r}"
 
 
-def check_messages(checks: CheckList, afni: Run, ours: Run) -> None:
+def check_messages(
+    checks: CheckList,
+    afni: Run,
+    ours: Run,
+    explain: Callable[[Run], str | None] | None = None,
+) -> None:
+    """AFNI's and larmorx's standard output and error, byte for byte. ``explain(ours)`` gives the
+    reason messages that differ are expected (AFNI-10: AFNI run on the input without its own
+    header extension prints larmorx's messages), or ``None``."""
     a_err, l_err = afni_text(afni.err), larmorx_text(ours.err)
     detail = "identical"
     if afni.out != ours.out:
@@ -314,7 +322,12 @@ def check_messages(checks: CheckList, afni: Run, ours: Run) -> None:
         detail = "stderr " + first_difference(a_err, l_err)
     for d in (afni.directory, ours.directory):
         detail = detail.replace(str(d), "<dir>")
-    checks(MESSAGES, afni.out == ours.out and a_err == l_err, detail=detail)
+    same = afni.out == ours.out and a_err == l_err
+    reason = None if same or explain is None else explain(ours)
+    if reason is not None:
+        checks(MESSAGES, True, value=AFNI_10, detail=f"{reason} ({detail} with the extension)")
+        return
+    checks(MESSAGES, same, detail=detail)
 
 
 def crashed(run: Run) -> bool:
@@ -649,8 +662,11 @@ def afni_10_explainer(
     """For a clean-room original, which ignores AFNI's own header extension (AFNI-10, as the
     3dTshift original does): when an input carries one, AFNI runs again on copies of the
     inputs without their extensions, and a header that differs is explained when that run
-    writes the original's header byte for byte."""
-    state: dict[str, Path | None] = {}
+    writes the original's header byte for byte. The returned function's ``messages(ours)``
+    explains messages that differ when that run prints the original's messages byte for byte
+    (the copies' names read as the inputs'): AFNI's obliquity report comes from the matrix it
+    reads, the extension's (2026-10-29, the data panel's 3dUnifize outputs)."""
+    state: dict = {}
 
     def run_once() -> Path | None:
         if "dir" in state:
@@ -667,7 +683,25 @@ def afni_10_explainer(
             new_args = [a.replace(str(p), str(q)) for a in new_args]
         r = run_afni(program, new_args, env, d, never=case_never(s))
         state["dir"] = d if r.code == 0 else None
+        out, err = r.out, r.err
+        for p, q in copies.items():
+            out, err = out.replace(str(q), str(p)), err.replace(str(q), str(p))
+        state["run"] = (r.code, out, err)
         return state["dir"]
+
+    def messages(ours: Run) -> str | None:
+        run_once()
+        if "run" not in state:
+            return None
+        code, out, err = state["run"]
+        if code != ours.code or out != ours.out or afni_text(err) != larmorx_text(ours.err):
+            return None
+        return (
+            "the input carries AFNI's own header extension, whose matrix (7 significant digits) "
+            "AFNI reads in place of the NIfTI header's, and so reports its obliquity from it "
+            "(AFNI-10, which the clean-room original ignores): AFNI run on the input without "
+            "its extension prints the original's messages byte for byte"
+        )
 
     def explain(name: str) -> str | None:
         d = run_once()
@@ -682,6 +716,7 @@ def afni_10_explainer(
             "its extension writes the original's header byte for byte"
         )
 
+    explain.messages = messages  # type: ignore[attr-defined]
     return explain
 
 
@@ -717,6 +752,10 @@ class Scenario:
     fmriprep: tuple[tuple[str, str], ...] = ()
     #: Defects whose notice may be named without a visible change.
     silent_ok: tuple[str, ...] = ()
+    #: Defects only one mode meets, because another correction takes the other mode down a path
+    #: where their condition does not arise (header slice code 2: AFNI-03's correction gives
+    #: slice times, so AFNI-08's all-zero times arise in ``reproduce`` only).
+    one_mode: tuple[str, ...] = ()
     #: The defect whose correction makes the default refuse what AFNI does (exit status 1,
     #: the defect named): the fix pass checks that instead of comparing outputs.
     fix_refuses: str | None = None
@@ -846,7 +885,12 @@ def run_case(spec: ToolSpec, case: Case, checks: CheckList) -> None:
         checks(
             EXIT, afni.code == ours.code, metric="exit status", value=ours.code, threshold=afni.code
         )
-        check_messages(checks, afni, ours)
+        explain = (
+            afni_10_explainer(program, s, args, env, tmp, paths, l_dir)
+            if impl == "original"
+            else None
+        )
+        check_messages(checks, afni, ours, explain.messages if explain else None)  # type: ignore[attr-defined]
         checks(
             "the same outputs written",
             a_out == l_out,
@@ -862,11 +906,6 @@ def run_case(spec: ToolSpec, case: Case, checks: CheckList) -> None:
             if afni.code == 0:
                 checks("both reject the arguments", False, detail="AFNI succeeded")
             return
-        explain = (
-            afni_10_explainer(program, s, args, env, tmp, paths, l_dir)
-            if impl == "original"
-            else None
-        )
         check_outputs(checks, a_dir, l_dir, tuple(a_out), spec.tolerance, explain)
         if spec.tolerance is not None and afni.code == 0:
             _correctly_rounded(checks, program, s, args, env, tmp, a_dir, l_dir, tuple(a_out))
@@ -1207,7 +1246,8 @@ def _fix_pass(
         checks, entries, change, other_changes=", ".join(other), silent_ok=s.silent_ok
     )
     reproduced_entries = defects.notices_in(reproduced.err)
-    if entries != reproduced_entries:
+    one_mode_only = (set(entries) ^ set(reproduced_entries)) <= set(s.one_mode)
+    if entries != reproduced_entries and not one_mode_only:
         checks(
             "D13 notices in both modes",
             False,
@@ -1233,16 +1273,20 @@ def highlights(
     def data_checks(r: CaseResult) -> list[Check]:
         return [c for c in r.checks if c.name.endswith((": data", ": header bytes"))]
 
+    def data_and_messages(r: CaseResult) -> list[Check]:
+        return [*data_checks(r), *(c for c in r.checks if c.name == MESSAGES)]
+
     def identical(r: CaseResult) -> bool:
         reported = [c for c in r.checks if c.name.endswith(": values bit-identical to AFNI's")]
-        return all(c.passed and c.value != AFNI_10 for c in data_checks(r)) and all(
+        return all(c.passed and c.value != AFNI_10 for c in data_and_messages(r)) and all(
             c.value == 0 for c in reported
         )
 
     with_outputs = [r for r in compared if data_checks(r)]
     bit = [r for r in with_outputs if identical(r)]
-    afni_10 = [r for r in with_outputs if any(c.value == AFNI_10 for c in data_checks(r))]
+    afni_10 = [r for r in with_outputs if any(c.value == AFNI_10 for c in data_and_messages(r))]
     messages = [c for r in results for c in r.checks if c.name == MESSAGES]
+    explained = [c for c in messages if c.value == AFNI_10]
     lines = [
         f"**Bit-identical to AFNI: {len(bit)} of {len(with_outputs)} compared cases that write "
         "outputs**: every output the same bytes (data and NIfTI header), with the same exit "
@@ -1256,8 +1300,16 @@ def highlights(
             else ""
         ),
         f"- Messages (standard output and error, byte for byte; AFNI's version banner and compile "
-        f"date, and larmorx's own lines, set aside): {sum(c.passed for c in messages)} of "
-        f"{len(messages)} identical, in every case that ran both programs.",
+        f"date, and larmorx's own lines, set aside): "
+        f"{sum(c.passed for c in messages) - len(explained)} of {len(messages)} identical, in "
+        "every case that ran both programs"
+        + (
+            f"; {len(explained)} explained by AFNI-10 (below: AFNI reports the obliquity of its "
+            "header extension's matrix, and AFNI run on the input without its extension prints "
+            "the original's messages byte for byte)."
+            if explained
+            else "."
+        ),
     ]
     rounded = [c for r in with_outputs for c in r.checks if c.name == CORRECTLY_ROUNDED]
     if rounded:
@@ -1274,8 +1326,8 @@ def highlights(
             f"- {len(afni_10)} case(s) whose input carries AFNI's own header extension, whose "
             "attributes AFNI reads in place of the NIfTI geometry (AFNI-10; the clean-room "
             "original ignores it, as 3dTshift's does): the data are bit-identical, and AFNI run "
-            f"on the input without its extension writes the original's header byte for byte: "
-            f"{names}."
+            "on the input without its extension writes the original's header and prints its "
+            f"messages byte for byte: {names}."
         )
     crashes = [r for r in results if any(c.name == CRASH for c in r.checks)]
     if crashes:

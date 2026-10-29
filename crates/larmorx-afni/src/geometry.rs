@@ -259,8 +259,8 @@ pub fn read_geometry(
         )));
     }
     let mm_per_unit = millimetres_per_unit(hdr);
-    let qform_mm =
-        (source == Source::Qform && mm_per_unit != 1.0).then(|| qform_matrix_scaled(hdr, mm_per_unit));
+    let qform_mm = (source == Source::Qform && mm_per_unit != 1.0)
+        .then(|| qform_matrix_scaled(hdr, mm_per_unit));
     let geometry = InputGeometry {
         m,
         source,
@@ -350,7 +350,11 @@ pub fn output_geometry(g: &InputGeometry, mode: UpstreamDefects) -> (OutputGeome
     // of the converted column can be 999.99994).
     let mut steps = match g.source {
         Source::Sform => [0, 1, 2].map(|j| {
-            let (x, y, z) = (f64::from(g.m[0][j]), f64::from(g.m[1][j]), f64::from(g.m[2][j]));
+            let (x, y, z) = (
+                f64::from(g.m[0][j]),
+                f64::from(g.m[1][j]),
+                f64::from(g.m[2][j]),
+            );
             ((x * x + y * y) + z * z).sqrt() as f32
         }),
         Source::Qform | Source::Pixdim => g.pixdim,
@@ -883,5 +887,56 @@ mod tests {
         let (c, s) = (0.8, 0.6);
         let (q, _) = quaternion([[c, 0.0, -s], [0.0, 1.0, 0.0], [s, 0.0, c]]);
         assert!((q[1] + (0.1f64).sqrt()).abs() < 1e-15, "{q:?}");
+    }
+
+    /// AFNI's quaternions where only the rounding residue of the polar decomposition decides
+    /// the written bits (observed by the clean-room implementer, random-testing findings
+    /// `afni-automask` 20261025-00242 and -01428): a component that is 0 in exact arithmetic,
+    /// and a rotation of 180° whose `a` is 0 and whose sign decides the quaternion's.
+    #[test]
+    fn quaternion_rounding_residue_as_afni() {
+        let f = |rows: [[f32; 3]; 3]| rows.map(|r| r.map(f64::from));
+        let (q, _) = quaternion(f([
+            [0.934_664_25, -0.228_675_14, 0.272_232_3],
+            [0.228_675_14, -0.199_637_03, -0.952_813_1],
+            [0.272_232_3, 0.952_813_1, -0.134_301_28],
+        ]));
+        assert_eq!(
+            q.map(|v| v as f32),
+            [0.753_094, 4.387_546_6e-17, 0.180_742_56]
+        );
+        let (q, qfac) = quaternion(f([
+            [-0.836_734_7, -0.979_591_85, -0.244_897_96],
+            [-0.489_795_92, 0.938_775_54, 0.734_693_9],
+            [-0.244_897_96, 1.469_387_8, -0.632_653_06],
+        ]));
+        assert_eq!(qfac, 1.0);
+        assert_eq!(
+            q.map(|v| v as f32),
+            [0.285_714_27, -0.857_142_87, -0.428_571_43]
+        );
+    }
+
+    /// AFNI-07's default on a qform in metres: the qform's matrix computed with the voxel sizes
+    /// and offsets in millimetres, rounded once (the replica program's default, observed).
+    #[test]
+    fn qform_in_metres_converted_before_rounding() {
+        let mut h = NiftiHeader::new(NiftiVersion::V1, &[2, 2, 2], DataType::F32).unwrap();
+        h.qform_code = 1;
+        h.sform_code = 0;
+        h.xyzt_units = 1 | 8;
+        (h.quatern_b, h.quatern_c, h.quatern_d) = (0.1, -0.2, 0.3);
+        h.pixdim[1..4].copy_from_slice(&[0.0031, 0.0024, 0.0031]);
+        (h.qoffset_x, h.qoffset_y, h.qoffset_z) = (-0.1, 0.05, 0.02);
+        let (g, _) = read_geometry(&h, &AfniSettings::new(), "in.nii");
+        let scaled = qform_matrix_scaled(&h, 1000.0);
+        assert_eq!(g.qform_mm, Some(scaled));
+        let (out, _) = output_geometry(&g, FIX);
+        assert_eq!(out.srow, scaled);
+        // The steps: from the file's voxel sizes, then converted.
+        assert_eq!(
+            out.pixdim,
+            [0.0031f32, 0.0024, 0.0031].map(|p| (f64::from(p) * 1000.0) as f32)
+        );
     }
 }

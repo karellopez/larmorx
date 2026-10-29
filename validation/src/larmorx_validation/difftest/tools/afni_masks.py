@@ -171,12 +171,17 @@ def _case(
 
     prefix = _ants.prefix_of(recipe, case_prefix)
     words = [w.replace("{in:input}", "{0}") for w in arguments(recipe)]
+    # Header slice code 2: AFNI-03's correction gives the slices times, so AFNI-08's all-zero
+    # times (and its notice) arise in `reproduce` only (2026-10-29).
+    timing = recipe["inputs"]["input"].get("timing") or {}
+    one_mode = ("AFNI-08",) if timing.get("slice_code") == 2 else ()
     s = ar.Scenario(
         tuple(words),
         ("dt:" + inputs.key(prefix, "input"),),
         tuple(recipe["extra"]["outputs"]),
         env=(("OMP_NUM_THREADS", "1"),),
         fix_refuses=_fix_refuses(recipe),
+        one_mode=one_mode,
         **kw,
     )
     return Case(cid or _ants.case_id(recipe), "difftest", description or _ants.describe(recipe), s)

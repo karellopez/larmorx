@@ -134,7 +134,8 @@ pub fn orientation(m: &[[f32; 4]; 3]) -> Option<[(usize, bool); 3]> {
                             // The trace of P·Q, each diagonal entry the sum of its three
                             // products (two of them 0).
                             let d = |row: usize| {
-                                pm[row][0] * q[0][row] + pm[row][1] * q[1][row]
+                                pm[row][0] * q[0][row]
+                                    + pm[row][1] * q[1][row]
                                     + pm[row][2] * q[2][row]
                             };
                             let trace = d(0) + d(1) + d(2);
@@ -379,5 +380,61 @@ mod tests {
             Message::Info("SI clipping mask along axis z from 0..2".into())
         );
         assert_eq!(count(&m), 1);
+    }
+
+    /// The closest plumb orientation (observed letters of AFNI's 3dAutomask): plumb grids, an
+    /// oblique one where two columns' largest entries share a row (the random-testing finding
+    /// `afni-automask` 20261025-00013: AFNI prints L, P, I where the largest entries give a
+    /// clash), and a 45° rotation, a tie the loop order breaks.
+    #[test]
+    fn orientation_as_afni() {
+        let letters = |m: [[f32; 4]; 3]| {
+            orientation(&m).map(|c| {
+                c.map(|(axis, pos)| {
+                    ["RL", "LR", "AP", "PA", "SI", "IS"][2 * axis + usize::from(pos)]
+                })
+            })
+        };
+        let diag = [
+            [2.0, 0.0, 0.0, 0.0],
+            [0.0, 2.0, 0.0, 0.0],
+            [0.0, 0.0, 3.0, 0.0],
+        ];
+        assert_eq!(letters(diag), Some(["LR", "PA", "IS"]));
+        let flipped = [
+            [-2.0, 0.0, 0.0, 0.0],
+            [0.0, 0.0, 2.0, 0.0],
+            [0.0, -3.0, 0.0, 0.0],
+        ];
+        assert_eq!(letters(flipped), Some(["RL", "SI", "PA"]));
+        // The rotation of quaternion (5, 1, 2, -2)/√34 (45° from plumb).
+        let r = |a: f64, b: f64, c: f64, d: f64| {
+            let n = a * a + b * b + c * c + d * d;
+            [
+                [
+                    a * a + b * b - c * c - d * d,
+                    2.0 * (b * c - a * d),
+                    2.0 * (b * d + a * c),
+                ],
+                [
+                    2.0 * (b * c + a * d),
+                    a * a + c * c - b * b - d * d,
+                    2.0 * (c * d - a * b),
+                ],
+                [
+                    2.0 * (b * d - a * c),
+                    2.0 * (c * d + a * b),
+                    a * a + d * d - c * c - b * b,
+                ],
+            ]
+            .map(|row| row.map(|v| (v / n) as f32))
+        };
+        let q = r(5.0, 1.0, 2.0, -2.0);
+        let m = q.map(|row| [row[0], row[1], row[2], 0.0]);
+        assert_eq!(letters(m), Some(["LR", "PA", "IS"]));
+        let s = std::f32::consts::FRAC_1_SQRT_2;
+        let m45 = [[s, -s, 0.0, 0.0], [s, s, 0.0, 0.0], [0.0, 0.0, 1.0, 0.0]];
+        assert_eq!(letters(m45), Some(["LR", "PA", "IS"]));
+        assert_eq!(orientation(&[[0.0; 4]; 3]), None);
     }
 }

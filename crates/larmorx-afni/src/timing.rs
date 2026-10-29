@@ -463,4 +463,26 @@ mod tests {
         }
         assert_eq!(mean_time(&times).to_bits(), (sum / 6.0).to_bits());
     }
+
+    /// A header in milliseconds: the step 90.8 ms is 0.0908 s in double, and each time a float32
+    /// running sum of it (AFNI's times read back exactly with `-slice k`, observed by the
+    /// clean-room implementer); a float32 step gives 0.36320001 for the fifth slice.
+    #[test]
+    fn milliseconds_step_stays_double() {
+        let mut h = header(1, 0, 8, f64::from(90.8f32), 48);
+        h.xyzt_units = 2 | 16;
+        let t = header_timing(&h, 9, FIX).unwrap().times;
+        let afni: [f32; 9] = [
+            0.0,
+            0.090_800_00,
+            0.181_600_00,
+            0.272_400_02,
+            0.363_200_04,
+            0.454_000_06,
+            0.544_800_04,
+            0.635_600_03,
+            0.726_400_02,
+        ];
+        assert_eq!(t, afni.to_vec());
+    }
 }

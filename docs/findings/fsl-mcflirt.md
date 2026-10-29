@@ -512,10 +512,12 @@ port (`larmorx-nc-core/src/lapack.rs`):
 and Zen cores compile the C kernels with `-mavx2` only (no fused multiply-adds); SkylakeX,
 Cooperlake and Sapphire Rapids with `-march=skylake-avx512`, where GCC contracts `dgemv_n`'s
 tails, `daxpy` and the triangular solves (`openblas_kernels.py`: `vfmadd` counts per kernel and
-core). On this AMD Zen 4, FSL picks Cooperlake by itself. The cores differ: on 2,000 seeded
-matrices per family, Cooperlake's inverses equal Haswell's for 0.4 % of random 4 × 4 matrices,
-4 % of affines, 23 % of rigid ones and every sampling and swap matrix
-(`lapack_probe.py --cores`). The replica follows the **Haswell** order, the validation's
+core). On this AMD Zen 4, FSL picks Cooperlake by itself. The cores differ: on 100,000 seeded
+matrices per family, Cooperlake's `inv()` equals Haswell's for 6 % of random 4 × 4 matrices,
+19 % of affines, 18 % of rigid ones, 56 % of small head motions, and every diagonal sampling,
+swap and translation matrix; its `inv(A)·B` with four columns for 0 to 2 % of the first four
+families (Zen: 100 % everywhere; `lapack_probe.py --cores`,
+`validation/investigations/version-numerics/lapack_probe_summary.json`). The replica follows the **Haswell** order, the validation's
 reference core as for numpy (`scripts/orchestration/env.sh`), and the harness runs FSL with
 `OPENBLAS_CORETYPE=Haswell` (`fsl_versions.OPENBLAS_CORE`; part of the oracle cache's key for
 FSL's programs). mcflirt's 137 recorded runs were made again on that core
@@ -528,7 +530,8 @@ its relative `.rms`, 8.07227e−15 mm on Cooperlake, 7.97627e−15 mm on Haswell
 (`validation/investigations/version-numerics/lapack_probe.py` and the `lapack-probe` tool): every
 output word (factors, pivots, `info`, solutions, inverses) of `dgetrf`, `dgetri`, `dtrtri` (upper
 and lower), `dgesv` (4 × 1, 4 × 4, 3 × 1, 3 × 3) and Armadillo's `inv()` and `inv(A)·B` for 4 × 4
-and 3 × 3, on 20,000 seeded matrices of each of 18 families (random, affine, rigid, small
+and 3 × 3, on 100,000 seeded matrices of each of 18 families (302 pairs of routine and
+family, 30,200,000 records) (random, affine, rigid, small
 rotations, FSL's sampling, swap and swap-sampled matrices, sform-like, translations, upper and
 lower triangular, near-singular, singular, tied pivots, small integers with signed zeros,
 extreme scales 2^±600, a subnormal column, NaN and ±∞ entries, NaNs above a triangle's

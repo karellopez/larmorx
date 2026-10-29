@@ -29,8 +29,18 @@ import numpy as np
 LIB = Path.home() / "fsl-6.0.7.23" / "lib" / "libblas.so.3"
 #: The (rows, lda, columns) dgemv calls of getf2 and dgetri for 4 x 4, 3 x 3 and 2 x 2 matrices.
 PATHS = [
-    (1, 4, 3), (2, 4, 2), (3, 4, 1), (1, 3, 2), (2, 3, 1),
-    (4, 4, 1), (4, 4, 2), (4, 4, 3), (3, 3, 1), (3, 3, 2), (1, 2, 1), (2, 2, 1),
+    (1, 4, 3),
+    (2, 4, 2),
+    (3, 4, 1),
+    (1, 3, 2),
+    (2, 3, 1),
+    (4, 4, 1),
+    (4, 4, 2),
+    (4, 4, 3),
+    (3, 3, 1),
+    (3, 3, 2),
+    (1, 2, 1),
+    (2, 2, 1),
 ]
 
 
@@ -59,8 +69,20 @@ def gemv(lib, d, m, n, lda, a, x, y):
     y = np.ascontiguousarray(y, dtype=np.float64).copy()
     mm, nn, ll, one = ctypes.c_int(m), ctypes.c_int(n), ctypes.c_int(lda), ctypes.c_int(1)
     al, be = ctypes.c_double(-1.0), ctypes.c_double(1.0)
-    lib.dgemv_(b"N", mm, nn, ctypes.byref(al), a.ctypes.data_as(d), ll, x.ctypes.data_as(d),
-               one, ctypes.byref(be), y.ctypes.data_as(d), one, 1)
+    lib.dgemv_(
+        b"N",
+        mm,
+        nn,
+        ctypes.byref(al),
+        a.ctypes.data_as(d),
+        ll,
+        x.ctypes.data_as(d),
+        one,
+        ctypes.byref(be),
+        y.ctypes.data_as(d),
+        one,
+        1,
+    )
     return y
 
 
@@ -87,8 +109,7 @@ def measure(m: int, lda: int, n: int) -> list[dict]:
         prod = ["a" if wins[(f"a{k}", f"x{k}")] == f"a{k}" else "x" for k in range(n)]
         later = [wins[(f"a{j}", f"a{k}")] == f"a{k}" for k in range(1, n) for j in [k - 1]]
         y_loses = all(wins[(f"a{k}", "y")] == f"a{k}" for k in range(n))
-        rows.append({"row": r, "product_first": prod, "later_term_wins": later,
-                     "y_loses": y_loses})
+        rows.append({"row": r, "product_first": prod, "later_term_wins": later, "y_loses": y_loses})
     return rows
 
 
@@ -98,9 +119,11 @@ def main() -> int:
         res = measure(m, lda, n)
         out[f"{m},{lda},{n}"] = res
         for row in res:
-            print(f"rows {m} lda {lda} cols {n} row {row['row']}: product "
-                  f"{''.join(row['product_first'])} later-wins {row['later_term_wins']} "
-                  f"y-loses {row['y_loses']}")
+            print(
+                f"rows {m} lda {lda} cols {n} row {row['row']}: product "
+                f"{''.join(row['product_first'])} later-wins {row['later_term_wins']} "
+                f"y-loses {row['y_loses']}"
+            )
     if len(sys.argv) > 1:
         Path(sys.argv[1]).write_text(json.dumps(out, indent=1), encoding="utf-8")
     return 0

@@ -30,11 +30,12 @@ from larmorx_validation.difftest import core, tools
 
 
 def add_arguments(p: argparse.ArgumentParser) -> None:
-    from larmorx_validation.parity import afni_versions, fsl_versions
+    from larmorx_validation.parity import afni_versions, fsl_versions, python_versions
 
     p.add_argument("--tools", default="all", help="'all' or a comma-separated list of tools")
     afni_versions.add_argument(p)
     fsl_versions.add_argument(p)
+    python_versions.add_argument(p)
     p.add_argument(
         "--budget", type=float, default=6.0, help="hours of random cases (a night: about 6)"
     )
@@ -128,8 +129,10 @@ def _cases_named(spec: str | None) -> set[str] | None:
 
 
 def main(args: argparse.Namespace) -> int:
-    from larmorx_validation.parity import afni_versions, fsl_versions
+    from larmorx_validation.parity import afni_versions, fsl_versions, python_versions
 
+    named = tuple(tools.names()) if args.tools == "all" else tuple(args.tools.split(","))
+    python_versions.reexec(args, named)  # --python: may start again under that interpreter
     afni_versions.apply(args)  # --afni-version: the workers inherit it
     fsl_versions.apply(args)  # --fsl-version: the workers inherit it
     if args.list:

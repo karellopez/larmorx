@@ -74,8 +74,16 @@ def test_bit_identical_to_scipy(mode, order):
     coords = rng.uniform(-4, 11, size=(3, 800))
     coords[:, :50] = np.round(coords[:, :50]) + 0.5
     coords[:, 50] = np.nan
+    scipy = pytest.importorskip("scipy")
+    if mode in ("nearest", "reflect", "grid-mirror") and order >= 2:
+        major, minor = (int(x) for x in scipy.__version__.split(".")[:2])
+        if (major, minor) < (1, 18):
+            pytest.skip(
+                "larmorx follows SciPy 1.18's reflect initialisation (SCI-03 fixed upstream); "
+                f"SciPy {scipy.__version__} is installed"
+            )
     ref = ndi.map_coordinates(data, coords, order=order, mode=mode, cval=-1.5)
-    # SciPy's reflect boundary (SCI-03) is reproduced on request only.
+    # The originals' defects reproduced (SciPy 1.18.1 fixed SCI-03: both modes agree there).
     rep = {"upstream_defects": "reproduce"}
     got = lx.ndimage.map_coordinates(data, coords, order=order, mode=mode, cval=-1.5, **rep)
     assert np.array_equal(ref, got, equal_nan=True)

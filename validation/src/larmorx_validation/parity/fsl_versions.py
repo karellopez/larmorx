@@ -71,6 +71,7 @@ def openblas_env() -> dict[str, str]:
     program's environment."""
     return {"OPENBLAS_CORETYPE": OPENBLAS_CORE}
 
+
 #: What changed between FSL 6.0.7.17 and 6.0.7.23 in the code these programs run (the source
 #: diff and the binaries: ``validation/investigations/version-fsl/``). Keys are the register's
 #: entries, or a short name where the change is not a defect.

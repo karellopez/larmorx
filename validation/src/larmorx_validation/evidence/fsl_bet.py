@@ -93,6 +93,8 @@ def environment(home: Path, version: str | None = None) -> tuple[dict[str, str],
         "FSLDIR": str(fb.fsl_dir(version or fsl_step.OLD)),
         "FSLOUTPUTTYPE": "NIFTI_GZ",
         "LC_ALL": "C",
+        # FSL 6.0.7.23's matrix arithmetic on OpenBLAS's Haswell kernels (fsl_versions).
+        **fb.fsl_versions.openblas_env(),
     }
     return add, unset
 

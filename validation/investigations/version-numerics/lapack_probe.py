@@ -121,7 +121,9 @@ def families(n: int, count: int, seed: int) -> dict[str, np.ndarray]:
         out["swap"] = swap
         # niftivox2newimagevox: samp.i() * swap * samp, and the vox2mm (sform-like) matrices
         out["swap-sampled"] = swap @ samp
-        out["sform"] = _homogeneous(rot * zooms[:, None, :], rng.uniform(-128, 128, size=(count, 3)))
+        out["sform"] = _homogeneous(
+            rot * zooms[:, None, :], rng.uniform(-128, 128, size=(count, 3))
+        )
         out["translation"] = _homogeneous(
             np.eye(3) * zooms[:, None, :], rng.uniform(-128, 128, size=(count, 3))
         )
@@ -236,42 +238,61 @@ class Lapack:
         return a.ctypes.data_as(ctypes.POINTER(t))
 
     def getrf(self, a: np.ndarray, ipiv: np.ndarray) -> int:
-        n = self.ci(a.shape[0] if a.ndim == 2 else int(round(a.size**0.5)))
+        n = self.ci(a.shape[0] if a.ndim == 2 else round(a.size**0.5))
         info = self.ci(0)
         self.lib.dgetrf_(
-            ctypes.byref(n), ctypes.byref(n), self._p(a, ctypes.c_double), ctypes.byref(n),
-            self._p(ipiv, ctypes.c_int), ctypes.byref(info),
+            ctypes.byref(n),
+            ctypes.byref(n),
+            self._p(a, ctypes.c_double),
+            ctypes.byref(n),
+            self._p(ipiv, ctypes.c_int),
+            ctypes.byref(info),
         )
         return info.value
 
     def getri(self, a: np.ndarray, ipiv: np.ndarray) -> int:
-        n = self.ci(int(round(a.size**0.5)))
+        n = self.ci(round(a.size**0.5))
         lwork = self.ci(max(16, n.value))
         work = np.zeros(lwork.value)
         info = self.ci(0)
         self.lib.dgetri_(
-            ctypes.byref(n), self._p(a, ctypes.c_double), ctypes.byref(n),
-            self._p(ipiv, ctypes.c_int), self._p(work, ctypes.c_double), ctypes.byref(lwork),
+            ctypes.byref(n),
+            self._p(a, ctypes.c_double),
+            ctypes.byref(n),
+            self._p(ipiv, ctypes.c_int),
+            self._p(work, ctypes.c_double),
+            ctypes.byref(lwork),
             ctypes.byref(info),
         )
         return info.value
 
     def trtri(self, a: np.ndarray, uplo: bytes) -> int:
-        n = self.ci(int(round(a.size**0.5)))
+        n = self.ci(round(a.size**0.5))
         info = self.ci(0)
         self.lib.dtrtri_(
-            uplo, b"N", ctypes.byref(n), self._p(a, ctypes.c_double), ctypes.byref(n),
-            ctypes.byref(info), 1, 1,
+            uplo,
+            b"N",
+            ctypes.byref(n),
+            self._p(a, ctypes.c_double),
+            ctypes.byref(n),
+            ctypes.byref(info),
+            1,
+            1,
         )
         return info.value
 
     def gesv(self, a: np.ndarray, b: np.ndarray, ipiv: np.ndarray) -> int:
-        n = self.ci(int(round(a.size**0.5)))
+        n = self.ci(round(a.size**0.5))
         nrhs = self.ci(b.size // n.value)
         info = self.ci(0)
         self.lib.dgesv_(
-            ctypes.byref(n), ctypes.byref(nrhs), self._p(a, ctypes.c_double), ctypes.byref(n),
-            self._p(ipiv, ctypes.c_int), self._p(b, ctypes.c_double), ctypes.byref(n),
+            ctypes.byref(n),
+            ctypes.byref(nrhs),
+            self._p(a, ctypes.c_double),
+            ctypes.byref(n),
+            self._p(ipiv, ctypes.c_int),
+            self._p(b, ctypes.c_double),
+            ctypes.byref(n),
             ctypes.byref(info),
         )
         return info.value
@@ -430,7 +451,7 @@ def compare(x: np.ndarray, y: np.ndarray) -> dict:
     both_nan = np.isnan(x) & np.isnan(y)
     value_diff = ((bx != by) & ~both_nan).any(axis=1)
     return {
-        "records": int(len(x)),
+        "records": len(x),
         "identical": int((~diff).sum()),
         "differ": int(diff.sum()),
         "differ_beyond_nan_bits": int(value_diff.sum()),
@@ -467,8 +488,21 @@ def main() -> int:
     procs = []
     for core in cores:
         env = {**os.environ, "OPENBLAS_CORETYPE": core, "OPENBLAS_NUM_THREADS": "1"}
-        cmd = [sys.executable, "-P", __file__, "--out", str(out), "--count", str(args.count),
-               "--seed", str(args.seed), "--ops", ",".join(args.ops), "--worker", core]
+        cmd = [
+            sys.executable,
+            "-P",
+            __file__,
+            "--out",
+            str(out),
+            "--count",
+            str(args.count),
+            "--seed",
+            str(args.seed),
+            "--ops",
+            ",".join(args.ops),
+            "--worker",
+            core,
+        ]
         procs.append(subprocess.Popen(cmd, env=env))
     if any(pr.wait() for pr in procs):
         print("a worker failed", file=sys.stderr)
@@ -476,7 +510,7 @@ def main() -> int:
     summary: dict = {"count": args.count, "seed": args.seed, "cores": cores, "results": []}
     ref = cores[0]
     for op in args.ops:
-        n, nrhs = OPS[op]
+        _n, _nrhs = OPS[op]
         for fam, recs in inputs(op, args.count, args.seed).items():
             fsl = np.load(out / f"fsl-{ref}" / f"{op}.{fam}.npy")
             row: dict = {"op": op, "family": fam}
@@ -493,8 +527,10 @@ def main() -> int:
             summary["results"].append(row)
             parts = [f"{op:15s} {fam:14s}"]
             if "port" in row:
-                parts.append(f"port {row['port']['identical']}/{row['port']['records']}"
-                             f" (beyond NaN bits {row['port']['differ_beyond_nan_bits']})")
+                parts.append(
+                    f"port {row['port']['identical']}/{row['port']['records']}"
+                    f" (beyond NaN bits {row['port']['differ_beyond_nan_bits']})"
+                )
             for core in cores[1:]:
                 parts.append(f"{core} {row[core]['identical']}/{row[core]['records']}")
             print("  ".join(parts), flush=True)

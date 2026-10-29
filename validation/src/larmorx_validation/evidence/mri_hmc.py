@@ -231,7 +231,11 @@ def _compute_new(e: fcache.Entry) -> None:
     ref = e.input("HMC reference (fMRIPrep's desc-hmc_boldref)", run / REF)
     unset = (*common.CLEAN_ENV, "FSLDIR", "FSLOUTPUTTYPE", "LARMORX_UPSTREAM_DEFECTS")
     for label, argv0, env in (
-        ("mcflirt23", [str(mcflirt)], {"FSLDIR": str(fsl), "FSLOUTPUTTYPE": "NIFTI_GZ"}),
+        (
+            "mcflirt23",
+            [str(mcflirt)],
+            {"FSLDIR": str(fsl), "FSLOUTPUTTYPE": "NIFTI_GZ", **fsl_versions.openblas_env()},
+        ),
         (
             "replica23",
             [str(exe), "fsl", "mcflirt"],

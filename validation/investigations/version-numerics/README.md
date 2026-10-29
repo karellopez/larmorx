@@ -24,6 +24,8 @@ numpy 2.3.5 and 2.5.4; Armadillo 14.2.1 and 10.5.1 as FSL installs them
 | `make_permanent_cases.sh` | the permanent cases of the FSL version trial's BET cases 80 (drawn) and 141 (shrunk), which agree with FSL 6.0.7.23 now | `make_permanent_cases.sh <findings/fsl-bet> <scratch>` |
 | `make_python_newest.sh`, `requirements-newest.txt` | the oracle environment of the newest releases, `<workspace>/oracles/python-newest` (numpy 2.5.4, SciPy 1.18.1, the shared environment's other packages), with `ENVIRONMENT.txt` (pip freeze, the build configuration, the OpenBLAS cores) | `make_python_newest.sh <workspace>` |
 | `svd_nonfinite.py` | numpy 2.5's SVD of a matrix with ±∞ raises where 2.3's returned NaN; nibabel's `io_orientation` raises in both | `python -P svd_nonfinite.py` under each environment |
+| `bet_timeouts.py` | random testing's BET cases that ran out of time (the version trial's 70, 351, 446 and 843), run to their end: FSL 6.0.7.23 and the replica timed separately, every file compared | `PYTHONPATH=python:validation/src python -P bet_timeouts.py <out> 20261029:70 ... --limit 1200` |
+| `site_shots.sh` | before/after screenshots of the site's resampler, BET and head-motion pages and the Validation page, with `LX_EVIDENCE.check()` on each | `site_shots.sh <site before> <site after> <out>` |
 
 Also: `validation/probes/fsl-mcflirt-affine-trace/nan_rms.cc` (FSL's `rms_deviation` on seeded
 pairs, or on given pairs from standard input; built against `FSLDIR=~/fsl-6.0.7.23` by its

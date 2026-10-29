@@ -83,14 +83,17 @@ def main() -> int:
             and (d / "replica" / x).is_file()
             and content(d / "fsl" / x) == content(d / "replica" / x)
         ]
+        # both streams as the suite compares them: the bet script's own path read as ``bet``,
+        # larmorx's own lines (its D13 notices) set aside
         streams = all(
-            (d / "fsl" / f).read_bytes() == (d / "replica" / f).read_bytes()
+            fb.fsl_text((d / "fsl" / f).read_text(errors="replace"))
+            == fb.larmorx_text((d / "replica" / f).read_text(errors="replace"))
             for f in ("stdout.txt", "stderr.txt")
         )
-        verdict = "agree" if fsl_code == lx_code and len(same) == len(names) else "differ"
+        ok = fsl_code == lx_code and len(same) == len(names) and streams
         print(
-            f"   {verdict}: {len(same)} of {len(names)} files byte for byte"
-            f"{'' if streams else ' (the streams differ: see the directories)'}"
+            f"   {'agree' if ok else 'differ'}: {len(same)} of {len(names)} files byte for byte; "
+            f"the streams {'the same' if streams else 'differ (see the directories)'}"
         )
     return 0
 

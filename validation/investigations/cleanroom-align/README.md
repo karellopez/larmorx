@@ -48,3 +48,28 @@ a translation, as `normcorr`'s path does (spec §17, open question 1). One thin 
 00298) differed from the first rotation step on: in the in-plane mode the centre of rotation is
 the padded volume's, which the spec does not say; with it, 154 of 154 evaluations agree
 (`normcorr` on the same series: 39 identical instead of 1).
+
+## Speed (`speed.py`, ds000005's first BOLD run, 64 × 64 × 34 × 240; best of 2, of 5 for 3dTshift)
+
+Seconds, the command line before (fa943b1) and after, on the shared main machine (a heavy job
+ran beside it, so a few percent are noise):
+
+| Case | Mode | Threads | Before | After |
+|---|---|---|---|---|
+| `mri hmc -cost normmi` | reproduce | 1 / 8 | 49.05 / 8.23 | 39.12 / 6.35 |
+| `mri hmc -cost mutualinfo` | reproduce | 1 / 8 | 46.44 / 7.89 | 38.27 / 6.26 |
+| `mri hmc -nn_final` | default | 1 / 8 | 16.01 / 3.07 | 15.93 / 3.04 |
+| `mri hmc -nn_final` | reproduce | 1 / 8 | 15.92 / 2.98 | 16.97 / 3.22 |
+| `mri hmc -sinc_final` | default | 1 / 8 | 27.05 / 4.56 | 26.68 / 4.50 |
+| `mri hmc -sinc_final` | reproduce | 1 / 8 | 26.74 / 4.47 | 16.98 / 3.18 |
+| `afni 3dTshift -no_detrend` | reproduce | 1 / 8 | 0.29 / 0.15 | 0.30 / 0.16 |
+| `afni 3dTshift`, header slice code 2 | default | 1 / 8 | 0.45 / 0.12 | 0.45 / 0.12 |
+| `afni 3dTshift`, header slice code 2 | reproduce | 1 / 8 | 0.07 / 0.07 | 0.45 / 0.12 |
+
+The histogram costs are about a fifth faster (the test bins once per volume and stage instead
+of a pass over the volume at every evaluation; float32 histograms; stage 1's slices in
+parallel). Where `reproduce` now computes what the newest original computes, the time follows
+it: `-nn_final` and `-sinc_final` resample trilinearly as mcflirt 6.0.7.23 does (FSL-59; the
+check that names FSL-59 stops at the first value that differs), and header slice code 2 is
+shifted as AFNI 26.3.05 shifts it (AFNI 25.2.09 copied the slices unshifted). The default mode,
+whose output did not change, takes the same time.

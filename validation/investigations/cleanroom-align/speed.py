@@ -5,7 +5,7 @@
 one and at eight threads, each the best of `--repeat` runs (wall time). Two builds of the
 `larmorx` command line are compared on the same inputs.
 
-    python -P speed.py <work> --before <larmorx> --after <larmorx> [--repeat 3]
+    python -P speed.py <work> --before <larmorx> --after <larmorx> [--repeat 3] [--only TEXT]
 """
 
 from __future__ import annotations
@@ -45,6 +45,9 @@ def code2_copy(work: Path) -> Path:
 def best(argv: list[str], env: dict[str, str], cwd: Path, repeat: int) -> float:
     times = []
     for _ in range(repeat):
+        for f in cwd.iterdir():
+            if f.is_file():
+                f.unlink()
         t = time.perf_counter()
         p = subprocess.run(argv, env=env, cwd=cwd, capture_output=True, text=True)
         times.append(time.perf_counter() - t)
@@ -55,7 +58,7 @@ def best(argv: list[str], env: dict[str, str], cwd: Path, repeat: int) -> float:
 
 def main(argv: list[str]) -> int:
     work = Path(argv.pop(0)).resolve()
-    opts = {"--before": "", "--after": "", "--repeat": "3"}
+    opts = {"--before": "", "--after": "", "--repeat": "3", "--only": ""}
     while argv:
         k = argv.pop(0)
         opts[k] = argv.pop(0)
@@ -82,6 +85,8 @@ def main(argv: list[str]) -> int:
     }
     print(f"{'case':26s} {'mode':9s} thr  before    after")
     for name, args in cases.items():
+        if opts["--only"] and opts["--only"] not in name:
+            continue
         modes = ("fix", "reproduce") if "final" in name or "code 2" in name else ("reproduce",)
         for mode in modes:
             for threads in ("1", "8"):

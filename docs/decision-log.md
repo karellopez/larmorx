@@ -1669,10 +1669,10 @@ together at the end.
   case also runs or reads 6.0.7.17 and its record names FSL's own step, with the reason. The
   clean-room head-motion correction stays on 6.0.7.17 until aligned (FSL-59).
 - **The version trial's BET differences** (by the rules, 2026-10-29): FSL-63 new (`bet -R`
-  loses a leading `-e` through bash's `echo`: rule A); FSL-43's `reproduce` follows FSL's fill
+  drops a leading `-e`: rule A); FSL-43's `reproduce` follows FSL's fill
   by the linear index (a replica mistake: it had treated any start more than a voxel outside as
   a crash); FSL's reads of memory beyond the volume there are undefined (judged so by the suite);
-  the Armadillo part also covers BET's `niftivox2newimagevox_mat` (bet2 `-c`, `fslstats -C`).
+  the Armadillo part also covers BET's inverse of an image's sampling matrix (bet2 `-c`, `fslstats -C`).
 - **The FSL pages of the site** show FSL 6.0.7.23 beside 6.0.7.17 in figures-cache entries of
   their own, keyed with the version (`<case>-fsl-6.0.7.23`); 6.0.7.17's entries are kept.
 

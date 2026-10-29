@@ -38,8 +38,11 @@ starts no other agent.
 
 ## The order from here
 
-**Now (2026-10-28):** the move is done (M, below); the ANTs tools' data panel (part a) and the
-fourteen whole template registrations are done (14 of 14 identical with correctly rounded maths).
+**Now (2026-10-29):** the version update's AFNI and FSL parts are done (the replicas follow AFNI
+26.3.05 and FSL 6.0.7.23); next, item 3b, the clean-room originals follow them. Before: the move
+(M, below), the ANTs tools' data panel (part a) and the fourteen whole template registrations
+(14 of 14 identical with correctly rounded maths). The public summary of this order is the site's
+Roadmap page, updated at every completed step.
 The order from here, by the user's decision on testing depth (2026-10-28, decision log), one agent
 at a time:
 
@@ -449,7 +452,7 @@ The items below keep their history.
   against `~/fsl-6.0.7.23/lib/liblapack.so.3`; then the mcflirt record's 5 expected divergences
   (`ARMA_LAPACK` in the suite) become passes. `docs/findings/fsl-mcflirt.md`, "FSL 6.0.7.23".
   It reaches BET too (`docs/findings/fsl-bet.md`, the version trial's triage):
-  `niftivox2newimagevox_mat()` inverts the sampling matrix for an image stored neurologically,
+  FSL inverts the sampling matrix of an image stored neurologically (details in that restricted file),
   in bet2's `-c` (case 80: 18 of 15,360 voxels differ between 6.0.7.17 and 6.0.7.23) and in
   `fslstats -C` (case 141 shrunk: `-0.000000`, which `bet -R`'s `dc` reads as a subtraction);
   `bet2_versions.sh` and `cog_sign_probe.py` reproduce both. This part joins the

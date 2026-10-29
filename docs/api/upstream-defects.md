@@ -137,7 +137,7 @@ changed it (`reproduce`); nothing is said when the two would agree.
 | FSL-60 | FSL's NIfTI layer | every image name of `larmorx fsl ...` holding `.img` before its extension | FSL 6.0.7.23 opens the name with its last `.img` made `.hdr` | the name given; `reproduce` FSL's renamed name |
 | FSL-61 | bet2 | `larmorx fsl bet2 --binaryMask=<mask>` with a mask on another grid | FSL reads and writes outside the mask | an error in both modes |
 | FSL-62 | bet2 | `larmorx fsl bet2 --ct --binaryMask=<mask>` | FSL writes the mask, masked, as the brain image | the CT input masked; `reproduce` FSL's |
-| FSL-63 | bet | `larmorx fsl bet <in> <out> -R -e ...`, `lx.fsl.bet(..., variation="robust", mesh=True)` | the script's `echo` drops a leading `-e`: no mesh | the options as given (the mesh written); `reproduce` FSL's |
+| FSL-63 | bet | `larmorx fsl bet <in> <out> -R -e ...`, `lx.fsl.bet(..., variation="robust", mesh=True)` | with `-R`, a leading `-e` is dropped: no mesh | the options as given (the mesh written); `reproduce` FSL's |
 | SCI-02 | SciPy `ndimage` | `lx.ndimage.*` | NaN results written to a signed integer output, and a `cval` an integer input cannot hold, are converted as x86-64 converts them (C leaves it undefined) | NaN is 0, `cval` clamped |
 
 Rows naming `larmorx fsl mcflirt` are the replica's (`larmorx-nc`, `lx.mri.hmc(implementation="replica")`); it shares the clean-room original's corrections of FSL-01, -03, -05 to -10, -13 and -14. Rows FSL-40 to FSL-58 are BET's replica's (`larmorx-nc`: `larmorx fsl bet`, `bet2`, `betsurf`, `lx.fsl.bet`, `lx.fsl.betsurf`; there "both" means the command line and the Python function); BET has no clean-room original yet. FSL-49 and FSL-57 are kept as FSL's (rule C).

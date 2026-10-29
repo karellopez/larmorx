@@ -323,11 +323,11 @@ to add (since 2026-10-25: "Random testing's gaps", below); – = nothing to do. 
 | FSL-56 † | FSL's NIfTI writer (NewNifti) | two or more extensions of different sizes: `vox_offset` counts the first one's size once per extension | c | none (extensions are dropped unless `FSL_LOAD_NIFTI_EXTENSIONS`) | corrected by default (`upstream_defects`, 2026-10-24), in every FSL replica (the switch is the core's) | – |
 | FSL-57 † | betsurf | the smoothness weight is set to 0 where a mask applies after the term was computed (no effect) | c (c? until 2026-10-24) | every betsurf run | kept as FSL's and documented (rule C, 2026-10-24) | – |
 | FSL-58 † | betsurf | no voxel of the T1 inside the brain surface (a surface outside the image, a tiny image): the 98th percentile is read from an empty list, before its start; FSL crashes or uses memory it never wrote | a | none | refused by default, naming the entry; `reproduce` takes the percentile as 0 and goes on (D13's failure case; found by random testing, 2026-10-26) | – |
-| FSL-59 | mcflirt | FSL 6.0.7.23 only: `-sinc_final` and `-nn_final` resample with trilinear interpolation (newimage 2601.0's cached ShadowVolume keeps each volume's interpolation method from its first access) | c | none (fMRIPrep uses the default) | corrected by default (the method asked for, FSL 6.0.7.17's result); `reproduce` trilinear; named where the two series differ (2026-10-29) | – |
-| FSL-60 | FSL's NIfTI layer (NewNifti 5.0.0) | FSL 6.0.7.23 only: an image name holding `.img` before its extension (a directory, the file's stem) is opened with its last `.img` made `.hdr`: another file is read or written, or the program aborts | c | none | corrected by default (the name given); `reproduce` renames as FSL 6.0.7.23 does; named by the program (2026-10-29) | – |
-| FSL-61 | bet2 | FSL 6.0.7.23 only: `--binaryMask` with a mask on another grid than the input: the brain mask is applied over the input's dimensions, reading and writing outside it | a | none | refused in both modes (rule B; FSL's result depends on memory), named (2026-10-29) | – |
-| FSL-62 | bet2 | FSL 6.0.7.23 only: `--ct` with `--binaryMask` converts the mask instead of the CT image and writes the mask, masked, as the brain image | c | none | corrected by default (the CT input masked; rule A); `reproduce` gives FSL's; named (2026-10-29) | – |
-| FSL-63 | bet (script) | `-R` passes bet2's options through bash's `echo`, which takes leading words of `-n`, `-e`, `-E` as its own options: a leading `-e` (the mesh) is dropped, and backslashes after it read as escapes (FSL 6.0.7.17 and 6.0.7.23) | a | none (fMRIPrep's calls do not combine `-R` and `-e`) | corrected by default (the options as given); `reproduce` passes them through bash's `echo` as FSL does; named where they differ (2026-10-29) | – |
+| FSL-59 † | mcflirt | FSL 6.0.7.23 only: `-sinc_final` and `-nn_final` resample with trilinear interpolation, whatever the option asks | c | none (fMRIPrep uses the default) | corrected by default (the method asked for, FSL 6.0.7.17's result); `reproduce` trilinear; named where the two series differ (2026-10-29) | – |
+| FSL-60 † | FSL's NIfTI layer (NewNifti 5.0.0) | FSL 6.0.7.23 only: an image name holding `.img` before its extension (a directory, the file's stem) is opened with its last `.img` made `.hdr`: another file is read or written, or the program aborts | c | none | corrected by default (the name given); `reproduce` renames as FSL 6.0.7.23 does; named by the program (2026-10-29) | – |
+| FSL-61 † | bet2 | FSL 6.0.7.23 only: `--binaryMask` with a mask on another grid than the input: the brain mask is applied over the input's dimensions, reading and writing outside it | a | none | refused in both modes (rule B; FSL's result depends on memory), named (2026-10-29) | – |
+| FSL-62 † | bet2 | FSL 6.0.7.23 only: `--ct` with `--binaryMask` converts the mask instead of the CT image and writes the mask, masked, as the brain image | c | none | corrected by default (the CT input masked; rule A); `reproduce` gives FSL's; named (2026-10-29) | – |
+| FSL-63 † | bet (script) | with `-R`, a leading `-e` among bet2's options (the mesh) is dropped, and backslashes in the later options are read as escapes (FSL 6.0.7.17 and 6.0.7.23) | a | none (fMRIPrep's calls do not combine `-R` and `-e`) | corrected by default (the options as given); `reproduce` passes them through bash's `echo` as FSL does; named where they differ (2026-10-29) | – |
 
 **Counts** (273 entries, recounted from the table on 2026-10-26, after the BET merge; an entry with two classes
 counts under its first; "c (c? until …)" entries, decided, count as (c)):
@@ -440,7 +440,7 @@ FSL-61 and FSL-62 (bet2's new `--binaryMask` on another grid, and with `--ct`). 
 entry changed. Not a defect, recorded in `findings/fsl-mcflirt.md`: FSL 6.0.7.23's Armadillo
 14.2.1 inverts 4 × 4 matrices through LAPACK; the replica keeps Armadillo 10.5.1's closed form
 for now (the last bits of 5 of 203 standard-tier cases; a follow-up). Random testing of the
-update (2026-10-29) found FSL-63 (`bet -R` loses a leading `-e` through bash's `echo`), and
+update (2026-10-29) found FSL-63 (`bet -R` drops a leading `-e`), and
 corrected FSL-43's `reproduce`: FSL's fill from outside the image reaches voxels by their
 linear index (and memory beyond the volume), which the replica now does point by point.
 
@@ -4563,7 +4563,7 @@ fMRIPrep 25.2.6 (the oracle runs) or its source at `21a490fb`, niworkflows 1.15.
   on, naming it (D13's failure case).
 - **D13 / gap:** No gap.
 
-### FSL-59 Final interpolation ignored (FSL 6.0.7.23) — (c)
+### FSL-59 † Final interpolation ignored (FSL 6.0.7.23) — (c)
 - **What:** in FSL 6.0.7.23 `volume4D[t]` returns a ShadowVolume cached at its first access,
   with its own copy of the interpolation method (trilinear, during the registration); mcflirt's
   final loop sets the series' method to sinc or nearest neighbour, but `interpolate` reads the
@@ -4578,7 +4578,7 @@ fMRIPrep 25.2.6 (the oracle runs) or its source at `21a490fb`, niworkflows 1.15.
   resamples trilinearly; both name FSL-59 where the two series differ (rule A, 2026-10-29).
 - **D13 / gap:** No gap.
 
-### FSL-60 Image names holding `.img` (FSL 6.0.7.23) — (c)
+### FSL-60 † Image names holding `.img` (FSL 6.0.7.23) — (c)
 - **What:** NewNifti 5.0.0 opens every image under `replaceSuffix(name, ".img", ".hdr")`, which
   replaces the last `.img` anywhere in the name: a directory (`a.img.d/in.nii.gz` →
   `a.hdr.d/in.nii.gz`) or the file's own stem (`sub.img2.nii.gz`). Another file is read or
@@ -4592,7 +4592,7 @@ fMRIPrep 25.2.6 (the oracle runs) or its source at `21a490fb`, niworkflows 1.15.
   aborts on such names before NewNifti is reached.
 - **D13 / gap:** No gap.
 
-### FSL-61 `--binaryMask` on another grid (FSL 6.0.7.23) — (a)
+### FSL-61 † `--binaryMask` on another grid (FSL 6.0.7.23) — (a)
 - **What:** bet2's new `--binaryMask` finds the surface on the mask and makes the brain mask on
   the mask's grid, then applies it over the input's dimensions: with a mask of other dimensions
   FSL reads and writes outside the brain mask's memory.
@@ -4603,7 +4603,7 @@ fMRIPrep 25.2.6 (the oracle runs) or its source at `21a490fb`, niworkflows 1.15.
   dimension FSL's reads stay inside the buffer and are defined; `reproduce` refuses them too.
 - **D13 / gap:** the smaller-input case above.
 
-### FSL-62 `--ct --binaryMask` cuts the brain from the mask (FSL 6.0.7.23) — (c)
+### FSL-62 † `--ct --binaryMask` cuts the brain from the mask (FSL 6.0.7.23) — (c)
 - **What:** with `--binaryMask` the mask is read first, so `--ct` converts the mask to Cormack
   units and keeps the unconverted mask as "the CT image": the brain image written is the mask,
   masked, instead of the CT input.
@@ -4615,7 +4615,7 @@ fMRIPrep 25.2.6 (the oracle runs) or its source at `21a490fb`, niworkflows 1.15.
   FSL's; both name FSL-62.
 - **D13 / gap:** No gap (the surface is still found on the converted mask, as FSL does).
 
-### FSL-63 `bet -R` loses a leading `-e` through `echo` — (a)
+### FSL-63 † `bet -R` loses a leading `-e` through `echo` — (a)
 - **What:** under `-R` the script rebuilds bet2's options with ``bet2opts=`echo $bet2opts | sed
   's/-n//g'` `` (and `-B` with `-s`). bash's builtin `echo` takes the leading words made only of
   `-n`, `-e` and `-E` as its own options: with `bet <in> <out> -R -e` the mesh option is

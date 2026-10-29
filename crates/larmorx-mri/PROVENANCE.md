@@ -64,4 +64,4 @@ findings (`docs/findings/fsl-mcflirt.md`, `fsl-bet.md`, the register's restricte
 | `hmc::cost` (`bin_grid_mi`, `TestBins`, the contributions, histograms and entropies of `mutual_info`) | mcflirt's `mutualinfo` and `normmi` | spec appendix B, `-verbose 20` traces |
 | `hmc::estimate::register` (the padded centre in the in-plane mode) | mcflirt's in-plane mode | spec §12, `-verbose 20` traces |
 | `hmc::pipeline` (FSL-59), `hmc::resample::series_differ` | mcflirt 6.0.7.23's `-sinc_final` and `-nn_final` | spec §9.3, black-box runs |
-| `cli::hmc` (the files opened, FSL-60's notices, the unknown-type message) | mcflirt 6.0.7.23's command line | spec §4.1, §10.1, black-box runs |
+| `cli::hmc` (the files opened, FSL-60's notices, the unknown-type message; FSL-09 named in both modes where FSL-59 applies, its counts from mcflirt's trilinear series, `resample::fold_resampled`) | mcflirt 6.0.7.23's command line | spec §4.1, §9.3, §9.4, §10.1, black-box runs, the record's check of the notices in both modes |

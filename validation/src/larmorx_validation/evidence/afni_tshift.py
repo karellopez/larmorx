@@ -520,14 +520,6 @@ def _example_run(ctx: core.Context, e: fcache.Entry, reg: dict, step: dict) -> d
     _add_runs(ex, exm, e, run, RUNS_26)
     diffs = [
         _d(
-            "replica-afni26",
-            "replica",
-            "afni26",
-            "main",
-            "replica − AFNI 26.3.05",
-            "larmorx against the original (the replica's reference)",
-        ),
-        _d(
             "replica-afni",
             "replica",
             "afni",
@@ -550,14 +542,6 @@ def _example_run(ctx: core.Context, e: fcache.Entry, reg: dict, step: dict) -> d
             "variability",
             "fMRIPrep's own AFNI − the repository's AFNI build",
             "the original against itself",
-        ),
-        _d(
-            "afni26-afni",
-            "afni26",
-            "afni",
-            "variability",
-            "AFNI 26.3.05 − AFNI 25.2.09",
-            "the original against itself: the version step",
         ),
         _d(
             "replica-fmriprep",
@@ -606,6 +590,23 @@ def _example_run(ctx: core.Context, e: fcache.Entry, reg: dict, step: dict) -> d
             "check",
             "clean-room original, default − reproduce mode",
             "larmorx against itself",
+        ),
+        # AFNI 26.3.05 (2026-10-29), last: the earlier comparisons keep their places
+        _d(
+            "replica-afni26",
+            "replica",
+            "afni26",
+            "main",
+            "replica − AFNI 26.3.05",
+            "larmorx against the original (the replica's reference)",
+        ),
+        _d(
+            "afni26-afni",
+            "afni26",
+            "afni",
+            "variability",
+            "AFNI 26.3.05 − AFNI 25.2.09",
+            "the original against itself: the version step",
         ),
     ]
 

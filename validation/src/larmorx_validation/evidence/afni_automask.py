@@ -462,13 +462,12 @@ def _example_ref(ctx: core.Context, e: fcache.Entry, o: fcache.Entry, step: dict
                      "3dAutomask's input in fMRIPrep's BOLD reference workflow (float32)",
                      {"all": np.asanyarray(img.dataobj)}))  # fmt: skip
     over = {"mask": {"on": "uni", "window": window_of(ex, "uni")}}
-    for pid, _stem, role, label, sub in [*PANELS, PANEL_26, *ORIGINAL_PANELS]:
+    for pid, _stem, role, label, sub in [*PANELS, *ORIGINAL_PANELS, PANEL_26]:
         ex.add(exm.Panel(pid, role, label, sub, arrays[pid], overlay=over))
     d = common.d
     diffs = [
         *original_diffs()[:1],
         d("replica-afni", "replica", "afni", "main", "replica − AFNI 25.2.09", common.ROLE_LX),
-        *afni26_diffs(),
         d("image-afni", "image", "afni", "variability",
           "fMRIPrep's AFNI − the repository's AFNI build", common.ROLE_ORIG),
         d("original-image", "original", "image", "fmriprep", "original − fMRIPrep's AFNI",
@@ -480,6 +479,7 @@ def _example_ref(ctx: core.Context, e: fcache.Entry, o: fcache.Entry, step: dict
           "original, default − reproduce mode", common.ROLE_SELF),
         d("replica-repro", "replica", "replica-reproduce", "check",
           "replica, default − reproduce mode", common.ROLE_SELF),
+        *afni26_diffs(),
     ]  # fmt: skip
     common.compare_all(ex, diffs, OUTPUTS, full={"original-6": arrays["original-6"]})
     same = common.identical(diffs)
@@ -591,13 +591,12 @@ def _example_bold(ctx: core.Context, e: fcache.Entry, o: fcache.Entry, step: dic
                      "page in float64, shown as float32): what 3dAutomask masks",
                      {"all": mean}))  # fmt: skip
     over = {"mask": {"on": "bold-mean", "window": window_of(ex, "bold-mean")}}
-    for pid, _stem, role, label, sub in [*PANELS, PANEL_26, *ORIGINAL_PANELS]:
+    for pid, _stem, role, label, sub in [*PANELS, *ORIGINAL_PANELS, PANEL_26]:
         ex.add(exm.Panel(pid, role, label, sub, arrays[pid], overlay=over))
     d = common.d
     diffs = [
         *original_diffs()[:1],
         d("replica-afni", "replica", "afni", "main", "replica − AFNI 25.2.09", common.ROLE_LX),
-        *afni26_diffs(),
         d("image-afni", "image", "afni", "variability",
           "fMRIPrep's AFNI − the repository's AFNI build", common.ROLE_ORIG),
         *original_diffs()[1:],
@@ -605,6 +604,7 @@ def _example_bold(ctx: core.Context, e: fcache.Entry, o: fcache.Entry, step: dic
           "original, default − reproduce mode", common.ROLE_SELF),
         d("replica-repro", "replica", "replica-reproduce", "check",
           "replica, default − reproduce mode", common.ROLE_SELF),
+        *afni26_diffs(),
     ]  # fmt: skip
     common.compare_all(ex, diffs, MASK_ONLY, full={"original-6": arrays["original-6"]})
     same = common.identical(diffs)
@@ -716,7 +716,7 @@ def _example_panel(ctx: core.Context, pe: fcache.Entry, step: dict) -> dict:
     info = pe.info()
     img = nib.load(td.get(PANEL_BOLD))
     extra = [("original-3", "original-3", "larmorx", "LARMORX clean-room original", "3 threads")]
-    runs_here = [*PANELS, PANEL_26, *ORIGINAL_PANELS]
+    runs_here = [*PANELS, *ORIGINAL_PANELS, PANEL_26]
     arrays = runs(pe, "", MASK_ONLY, runs_here + extra)
     raw = np.asanyarray(img.dataobj, dtype=np.float64)
     mean = np.abs(raw).mean(axis=3).astype(np.float32)
@@ -734,7 +734,6 @@ def _example_panel(ctx: core.Context, pe: fcache.Entry, step: dict) -> dict:
     diffs = [
         d("original-afni", "original", "afni", "main", "original − AFNI 25.2.09", common.ROLE_LX),
         d("replica-afni", "replica", "afni", "main", "replica − AFNI 25.2.09", common.ROLE_LX),
-        *afni26_diffs(),
         d("image-afni", "image", "afni", "variability",
           "fMRIPrep's AFNI − the repository's AFNI build", common.ROLE_ORIG),
         d("original-replica", "original", "replica", "check",
@@ -745,6 +744,7 @@ def _example_panel(ctx: core.Context, pe: fcache.Entry, step: dict) -> dict:
           "original, default − reproduce mode", common.ROLE_SELF),
         d("replica-repro", "replica", "replica-reproduce", "check",
           "replica, default − reproduce mode", common.ROLE_SELF),
+        *afni26_diffs(),
     ]  # fmt: skip
     common.compare_all(ex, diffs, MASK_ONLY, full={"original-3": arrays["original-3"]})
     same = common.identical(diffs)
@@ -845,13 +845,13 @@ def _example_peels(
     over = {"mask": {"on": "uni", "window": window_of(ex, "uni")}}
     panels = [
         ("afni", "original", "AFNI 25.2.09, -peels 0", "the repository's oracle build"),
-        ("afni26", "original", "AFNI 26.3.05, -peels 0", "the replica's reference"),
         ("replica", "larmorx", "larmorx-gpl replica, -peels 0", "default mode: corrected"),
         ("replica-reproduce", "larmorx", "larmorx-gpl replica, -peels 0", "reproduce mode"),
         ("original", "larmorx", "LARMORX clean-room original, -peels 0", "default mode: corrected"),
         ("original-reproduce", "larmorx", "LARMORX clean-room original, -peels 0",
          "reproduce mode"),
         ("afni-peels1", "original", "AFNI 25.2.09, fMRIPrep's call", "-peels 1, the default"),
+        ("afni26", "original", "AFNI 26.3.05, -peels 0", "the replica's reference"),
     ]  # fmt: skip
     for pid, role, label, sub in panels:
         ex.add(exm.Panel(pid, role, label, sub, arrays[pid], overlay=over))

@@ -373,8 +373,8 @@ def _example_ref(ctx: core.Context, e: fcache.Entry, o: fcache.Entry, step: dict
                      "3dUnifize's input in fMRIPrep's BOLD reference workflow: N4-corrected, "
                      "skull-stripped once (float32)", {"all": data}))  # fmt: skip
     _panels(ex, exm, e, REF_PANELS, OUTPUT, run / FMRIPREP_OUT)
-    _panels(ex, exm, e, [PANEL_26], OUTPUT)
     _panels(ex, exm, o, ORIGINAL_PANELS[:1] + ORIGINAL_PANELS[2:3], OUTPUT)
+    _panels(ex, exm, e, [PANEL_26], OUTPUT)
     full: dict = {}
     _panels(ex, exm, o, [ORIGINAL_PANELS[1], ORIGINAL_PANELS[3]], OUTPUT, full=full)
     d = common.d
@@ -382,7 +382,6 @@ def _example_ref(ctx: core.Context, e: fcache.Entry, o: fcache.Entry, step: dict
         *original_diffs()[:2],
         d("replica-afni", "replica-1", "afni-1", "main", "replica − AFNI 25.2.09, 1 thread each",
           common.ROLE_LX),
-        *afni26_diffs(),
         d("afni6-afni1", "afni-6", "afni-1", "variability", "AFNI 25.2.09, 6 threads − 1 thread",
           common.ROLE_ORIG),
         d("fmriprep-afni", "fmriprep", "afni-1", "variability",
@@ -396,6 +395,7 @@ def _example_ref(ctx: core.Context, e: fcache.Entry, o: fcache.Entry, step: dict
         d("original-fmriprep", "original-1", "fmriprep", "fmriprep",
           "original − fMRIPrep's own output", common.ROLE_FMRIPREP),
         *original_diffs()[2:],
+        *afni26_diffs(),
     ]  # fmt: skip
     common.compare_all(ex, diffs, OUTPUT, full=full)
     same = common.identical(diffs)
@@ -490,8 +490,8 @@ def _example_t1w(ctx: core.Context, e: fcache.Entry, o: fcache.Entry, step: dict
          "reproduce mode, 6 threads"),
     ]  # fmt: skip
     _panels(ex, exm, e, panels, OUTPUTS_T1W)
-    _panels(ex, exm, e, [PANEL_26], OUTPUTS_T1W)
     _panels(ex, exm, o, ORIGINAL_PANELS[:1] + ORIGINAL_PANELS[2:3], OUTPUTS_T1W)
+    _panels(ex, exm, e, [PANEL_26], OUTPUTS_T1W)
     full: dict = {}
     _panels(ex, exm, o, [ORIGINAL_PANELS[1], ORIGINAL_PANELS[3]], OUTPUTS_T1W, full=full)
     d = common.d
@@ -499,7 +499,6 @@ def _example_t1w(ctx: core.Context, e: fcache.Entry, o: fcache.Entry, step: dict
         *original_diffs()[:2],
         d("replica-afni", "replica-1", "afni-1", "main", "replica − AFNI 25.2.09, 1 thread each",
           common.ROLE_LX),
-        *afni26_diffs(),
         d("afni6-afni1", "afni-6", "afni-1", "variability", "AFNI 25.2.09, 6 threads − 1 thread",
           common.ROLE_ORIG),
         d("image-afni", "image", "afni-6", "variability",
@@ -509,6 +508,7 @@ def _example_t1w(ctx: core.Context, e: fcache.Entry, o: fcache.Entry, step: dict
         d("replica-repro", "replica-6", "replica-reproduce", "check",
           "replica, default − reproduce mode", common.ROLE_SELF),
         *original_diffs()[2:],
+        *afni26_diffs(),
     ]  # fmt: skip
     common.compare_all(ex, diffs, OUTPUTS_T1W, full=full)
     same = common.identical(diffs)

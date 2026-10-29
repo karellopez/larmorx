@@ -187,6 +187,8 @@ def execute(
     try:
         result = harness.run_one(suite, case)
     except CaseTimeout:
+        if leaf is not None:
+            leaf.stop_others()  # an original's own children, orphaned by the alarm
         return (
             Judgement(TIMEOUT, ("timeout",), f"no result within {limit} s"),
             time.monotonic() - start,
@@ -573,6 +575,8 @@ def isolated_judge(
                 check=False,
             )
         except subprocess.TimeoutExpired:
+            if leaf is not None:
+                leaf.stop_others()  # what the killed child had started
             return Judgement(TIMEOUT, ("timeout",), f"no result within {timeout:.0f} s")
     if p.returncode == -signal.SIGKILL and leaf is not None and leaf.oom_kills() > oom_before:
         # The child itself was stopped: larmorx runs in it, and so does the comparison of the
@@ -805,6 +809,9 @@ class Pool:
         with contextlib.suppress(ProcessLookupError, PermissionError):
             os.killpg(w["proc"].pid, signal.SIGKILL)
         w["proc"].join(timeout=10)
+        leaf = self.leaves[w["slot"]]
+        if leaf is not None:
+            leaf.stop_others()  # the worker's runs in other process groups
         fresh = self._start(w["slot"])
         w.update(fresh)
 

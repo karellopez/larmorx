@@ -678,3 +678,24 @@ def test_the_site_shows_the_newest_dated_night_not_a_trial(tmp_path, monkeypatch
     monkeypatch.delenv("LARMORX_DIFFTEST_NIGHT", raising=False)
     monkeypatch.setattr(store, "workspace", lambda: tmp_path)
     assert ev.latest_night(tmp_path) == tmp_path / "oracles" / "difftest" / "2026-10-25"
+
+
+@pytest.mark.skipif(not Path("/proc/self/status").is_file(), reason="Linux's /proc")
+def test_a_run_stopped_for_time_leaves_no_process_behind(tmp_path):
+    """What a timeout leaves in a worker's leaf (a script's child, orphaned) is stopped; the
+    caller and its ancestors are kept (a judge child's worker). A plain file stands for the
+    leaf's ``cgroup.procs``."""
+    import os
+    import subprocess
+    import sys
+
+    orphan = subprocess.Popen([sys.executable, "-c", "import time; time.sleep(120)"])
+    try:
+        procs = [os.getpid(), os.getppid(), orphan.pid]
+        (tmp_path / "cgroup.procs").write_text("\n".join(map(str, procs)) + "\n")
+        leaf = limits.Leaf(tmp_path, 1 << 30)
+        assert leaf.stop_others() == 1
+        assert orphan.wait(timeout=10) == -9
+    finally:
+        if orphan.poll() is None:
+            orphan.kill()

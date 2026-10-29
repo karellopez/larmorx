@@ -304,11 +304,6 @@ fn last<'p>(p: &'p Parsed, long: &str) -> Option<&'p OptionValue> {
     p.last(long)
 }
 
-/// The float image's values as doubles (exact).
-fn widened<const D: usize>(img: &Image<f32, D>) -> Image<f64, D> {
-    img.with_data(img.data.iter().map(|&v| f64::from(v)).collect())
-}
-
 /// `antsAI<D>(parser)` (`antsAI.cxx:610-1577`).
 fn ants_ai<const D: usize>(ctx: &mut Context<'_, '_>, log: &mut Log<'_>) -> Result<Exit, Exit> {
     let p = ctx.p;
@@ -399,9 +394,14 @@ fn ants_ai<const D: usize>(ctx: &mut Context<'_, '_>, log: &mut Log<'_>) -> Resu
     };
     s.transform = transform;
     // The images are used from here on: ANTs dereferences a missing one.
-    let images = |log: &mut Log<'_>, blobs: bool| -> Result<(Image<f32, D>, Image<f32, D>), Exit> {
-        match (&fixed, &moving) {
-            (Some(f), Some(m)) => Ok((f.clone(), m.clone())),
+    // The images as read are the ones the search uses (float, as in ANTs; no copies).
+    let images = |log: &mut Log<'_>,
+                  blobs: bool,
+                  fixed: Option<Image<f32, D>>,
+                  moving: Option<Image<f32, D>>|
+     -> Result<(Image<f32, D>, Image<f32, D>), Exit> {
+        match (fixed, moving) {
+            (Some(f), Some(m)) => Ok((f, m)),
             // The blob detector's Update with a null input.
             _ if blobs => Err(uncaught(
                 log,
@@ -412,7 +412,7 @@ fn ants_ai<const D: usize>(ctx: &mut Context<'_, '_>, log: &mut Log<'_>) -> Resu
                     "Input Primary is required but not set.",
                 ),
             )),
-            _ if transform.from_images() => Err(uncaught(
+            (fixed, _) if transform.from_images() => Err(uncaught(
                 log,
                 &ItkException::new(
                     "Modules/Registration/Common/include/itkCenteredTransformInitializer.hxx",
@@ -460,22 +460,9 @@ fn ants_ai<const D: usize>(ctx: &mut Context<'_, '_>, log: &mut Log<'_>) -> Resu
             s.align_principal_axes = Conv::bool(&a.name).map_err(|e| conv_err(log, e))?;
         }
     }
-    let (fixed32, moving32) = images(log, s.blobs.0 >= 3)?;
-    let fixed64 = Arc::new(widened(&fixed32));
-    let moving64 = Arc::new(widened(&moving32));
-    let init = initial(
-        &s,
-        &fixed64,
-        &moving64,
-        &fixed32,
-        &moving32,
-        log,
-        ctx.notices,
-        ctx.n_threads,
-    )
-    .map_err(|e| ai_failure(log, e))?;
-    // The fixed float image served the initialisation only (memory).
-    drop(fixed32);
+    let (fixed32, moving32) = images(log, s.blobs.0 >= 3, fixed, moving)?;
+    let init = initial(&s, &fixed32, &moving32, log, ctx.notices, ctx.n_threads)
+        .map_err(|e| ai_failure(log, e))?;
     // The output's name.
     let output = last(p, "output").map(|o| {
         if o.parameters.is_empty() {
@@ -556,9 +543,8 @@ fn ants_ai<const D: usize>(ctx: &mut Context<'_, '_>, log: &mut Log<'_>) -> Resu
     let outcome = search(
         &s,
         &init,
-        &fixed64,
-        &moving64,
-        moving32,
+        Arc::new(fixed32),
+        Arc::new(moving32),
         fixed_mask,
         moving_mask,
         log,

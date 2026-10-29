@@ -871,8 +871,8 @@ pub fn full_scale_cc<R: Real, const D: usize>(
     warnings: &mut Vec<String>,
 ) -> Result<R, ItkException> {
     let metric = ImageMetricv4 {
-        fixed: Arc::clone(fixed),
-        moving: Arc::clone(moving),
+        fixed: Arc::clone(fixed).into(),
+        moving: Arc::clone(moving).into(),
         fixed_mask: None,
         moving_mask: None,
         fixed_transform,
@@ -1078,8 +1078,8 @@ where
         for sm in &stage.metrics {
             images.push(match sm {
                 StageMetric::Image(sm) => Some(ImageMetricv4 {
-                    fixed: smooth(&sm.fixed)?,
-                    moving: smooth(&sm.moving)?,
+                    fixed: smooth(&sm.fixed)?.into(),
+                    moving: smooth(&sm.moving)?.into(),
                     fixed_mask: sm.fixed_mask.clone(),
                     moving_mask: sm.moving_mask.clone(),
                     fixed_transform: stage.fixed_initial.clone(),
@@ -1165,7 +1165,7 @@ where
                         crate::metric::demons::normalizer(&m)?;
                         if sm.use_gradient_filter {
                             m.fixed_gradient_image =
-                                Some(Arc::new(gradient_image(&m.fixed, stage.n_threads)?));
+                                Some(Arc::new(gradient_image(m.fixed.real(), stage.n_threads)?));
                         }
                         return LevelMetric::initialize(sm.kind, &m).map(|mut s| {
                             s.share_joint_pdf(&joint_pdfs[j]);
@@ -1174,7 +1174,7 @@ where
                     }
                     if sm.use_gradient_filter {
                         m.moving_gradient_image =
-                            Some(Arc::new(gradient_image(&m.moving, stage.n_threads)?));
+                            Some(Arc::new(gradient_image(m.moving.real(), stage.n_threads)?));
                     }
                     let mut state = LevelMetric::initialize(sm.kind, &m)?;
                     state.share_joint_pdf(&joint_pdfs[j]);
@@ -1326,8 +1326,8 @@ mod tests {
         let fixed = Arc::new(blob(40, 0.0, [20.0; 3]));
         let pool_of = |n_threads: Option<usize>| {
             let metric = ImageMetricv4 {
-                fixed: Arc::clone(&fixed),
-                moving: Arc::clone(&fixed),
+                fixed: Arc::clone(&fixed).into(),
+                moving: Arc::clone(&fixed).into(),
                 fixed_mask: None,
                 moving_mask: None,
                 fixed_transform: None,
@@ -1381,8 +1381,8 @@ mod tests {
         let fixed = Arc::new(blob(4, 0.0, [3.0; 3]));
         for alias in [false, true] {
             let metric = ImageMetricv4 {
-                fixed: Arc::clone(&fixed),
-                moving: Arc::clone(&fixed),
+                fixed: Arc::clone(&fixed).into(),
+                moving: Arc::clone(&fixed).into(),
                 fixed_mask: None,
                 moving_mask: None,
                 fixed_transform: None,
@@ -1413,8 +1413,8 @@ mod tests {
         let fixed = Arc::new(blob(24, 0.0, [17.0, 17.0, 17.0]));
         let moving = Arc::new(blob(40, -12.0, [18.5, 16.0, 17.5]));
         let metric = ImageMetricv4 {
-            fixed: Arc::clone(&fixed),
-            moving,
+            fixed: Arc::clone(&fixed).into(),
+            moving: moving.into(),
             fixed_mask: None,
             moving_mask: None,
             fixed_transform: None,

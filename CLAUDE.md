@@ -46,14 +46,14 @@ Golden tests cover every tool on all six platforms (`docs/validation/golden.md`)
 - **The data panel:** fourteen OpenNeuro subjects (larmorx-testdata `docs/panel.md`, `fetch --tier full --tag panel`), and fourteen fMRIPrep oracle runs (below).
 - **Differential random testing** ([docs/validation/difftest.md](docs/validation/difftest.md)): `python -m larmorx_validation difftest`, nightly by `scripts/orchestration/difftest-nightly.sh`, in memory boxes; heavy cases queued (25 wait for a larger machine, 11 are beyond any machine and checked as guard cases).
 - **Generated tables:** `python -m larmorx_validation tables [--check]` writes the README's tool table, the validation index and the site's status from `validation/tools.toml` and the records.
-- **Memory:** heavy jobs in boxes (`scripts/orchestration/boxed.sh`); larmorx's peak similar to the original's (at most 10 % above plus 8 MiB, `tests/parity/test_memory_peak.py`); the thread pools exact (every call's parallel work in its own pool of `n_threads`: `tests/parity/test_thread_pools.py`, 74 paths); guards stop impossible sizes before allocating (ANTS-162, AFNI-75). The originals the harness runs (and larmorx's in-process runs of the ANTs image programs) run under a 64 GiB address-space limit, so an impossible allocation is refused alike on every machine (`validation/src/larmorx_validation/address_space.py`, 2026-10-28; random testing: twice each case's memory budget).
+- **Memory:** heavy jobs in boxes (`scripts/orchestration/boxed.sh`); larmorx's peak similar to the original's (at most 10 % above plus 8 MiB, `tests/parity/test_memory_peak.py`, antsAI and antsAffineInitializer included since 2026-10-28: their images in float); the thread pools exact (every call's parallel work in its own pool of `n_threads`: `tests/parity/test_thread_pools.py`, 74 paths); guards stop impossible sizes before allocating (ANTS-162, AFNI-75). The originals the harness runs (and larmorx's in-process runs of the ANTs image programs) run under a 64 GiB address-space limit, so an impossible allocation is refused alike on every machine (`validation/src/larmorx_validation/address_space.py`, 2026-10-28; random testing: twice each case's memory budget).
 - **FSL:** `crates-nc/` (`larmorx-nc`, FSL Licence) with its shared core `larmorx-nc-core`; the mcflirt and BET replicas.
 **Next:** the move to the new main machine is done (2026-10-28: the copy, the build and the proof
 that results do not depend on the machine, [docs/findings/machine-move-proof.md](docs/findings/machine-move-proof.md));
 the old laptop is a helper (phase 4 of [docs/machine-move.md](docs/machine-move.md)). Ports first,
 with smart testing per part; the very extensive testing in one final validation phase (user,
 2026-10-28; decision log). One agent at a time (`docs/next-steps.md`, "The order from here"):
-a small part for antsAI and antsAffineInitializer (memory and speed), the clean-room fixes, the
+the clean-room fixes (antsAI and antsAffineInitializer's memory and speed: done, 2026-10-28), the
 version update (AFNI 26.3.05 and FSL 6.0.7.23, installed beside the old ones), then BET's
 clean-room original (from `specs/bet.md`) and the next FSL tools (FLIRT with BBR, FAST, topup),
 field maps, FreeSurfer, surfaces, confounds, larmorprepx; each a bounded agent run with a stop

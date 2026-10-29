@@ -67,6 +67,7 @@ BENCH_MODULES = {
     "ants-morphology": "ants_morphology",
     "ants-n4": "ants_n4",
     "ants-denoise": "ants_denoise",
+    "ants-ai": "ants_ai",
 }
 BENCH_SUITES = tuple(BENCH_MODULES)
 

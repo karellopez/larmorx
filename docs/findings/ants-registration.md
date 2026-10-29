@@ -322,8 +322,8 @@ CORE-MATH preloaded, larmorx's command in both D13 modes, every output ANTs' byt
 | `Rigid` `MI` then `SyN` `CC`, 3D head | 887.4 MiB | | 676.0 MiB |
 | `Atropos` k-means, MRF, mask (`ants-atropos.md`) | 169.1 MiB | | 113.3 MiB |
 | `antsApplyTransforms -e 3`, 20 volumes through a field | 651.2 MiB | | 572.7 MiB |
-| `antsAI` (`ants-ai.md`, "Memory") | 92.1 MiB | 157.2 MiB | 127.3 MiB |
-| `antsAffineInitializer` (`ants-ai.md`, "Memory") | 90.4 MiB | 139.7 MiB | 110 MiB |
+| `antsAI` (`ants-ai.md`, "Memory"; 2026-10-28: the images in float, 95 MiB) | 92.1 MiB | 157.2 MiB | 127.3 MiB |
+| `antsAffineInitializer` (`ants-ai.md`, "Memory"; 2026-10-28: the images in float, 91 MiB) | 90.4 MiB | 139.7 MiB | 110 MiB |
 
 - **The image metric's samples:** each chunk of points (16384) was evaluated in parallel and kept
   until it was reduced in order. A B-spline transform's point keeps its whole support's

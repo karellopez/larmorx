@@ -43,8 +43,15 @@ fourteen whole template registrations are done (14 of 14 identical with correctl
 The order from here, by the user's decision on testing depth (2026-10-28, decision log), one agent
 at a time:
 
-1. **antsAI and antsAffineInitializer: memory and speed** (a small part: their metric's images in
-   float, the initializer's speed; decision log 2026-10-27).
+1. **antsAI and antsAffineInitializer: memory and speed: done** (2026-10-28): the metric's images
+   in float as in ANTs (peaks at or below ANTs': 95 and 91 MiB against 92 to 96 and 89 on the
+   memory test's head, 676 against 688 on the 7 T; the two strict xfails removed); Mattes on the
+   sampled points with each point's fixed side once and the moving side in batches; ITK-21's
+   second search sharing what it can, the two at once with threads. antsAI 1.8 to 2 times as fast
+   as ANTs at one thread; antsAffineInitializer at ANTs' time in `reproduce` on the 7 T, 1.2 times
+   it on the head, half of it by default; 4 to 10 times as fast at eight threads; bit for bit as
+   before ([benchmark](benchmarks/ants-ai.md), [findings](findings/ants-ai.md), "Memory and speed
+   (2026-10-28)").
 2. **The clean-room fixes** found behaviourally (the thread probe, the D13 corrections, 3dAutomask's
    obliquity-message number), by an agent that has never read the source.
 3. **The version update** (user 2026-10-27, decision log; the upstream watch with it): AFNI to its
@@ -254,10 +261,9 @@ The items below keep their history.
   8 MiB): antsRegistration, antsApplyTransforms, Atropos, N4, DenoiseImage and the image programs
   measured on the panel's largest inputs and kept at or below ANTs
   (`docs/findings/ants-image-programs.md`, "Memory on the data panel's largest inputs");
-  **antsAI and antsAffineInitializer still above** (127 and 110 MiB against 92 and 91 on a
-  128 × 128 × 96 head; +40 and +156 MiB on the 7 T): their metric holds the images in double, ANTs
-  in float; store them in float (the next small part; strict-xfail cases in
-  `tests/parity/test_memory_peak.py`); the AFNI programs, mcflirt and `resample_series` remain to
+  **antsAI and antsAffineInitializer: done** (2026-10-28: the images in float, 95 and 91 MiB on
+  the head against ANTs' 92 to 96 and 89, 676 against 688 on the 7 T; the test's strict xfails
+  removed); the AFNI programs, mcflirt and `resample_series` remain to
   measure (part b: `larmorx_interp::ndimage`'s spline filter copies the volume on its last axis).
 - **The fourteen whole template registrations** of the panel: **done** (2026-10-28, on the new
   machine at `c223e64`, 14 at once in 2.9 hours, about 40 hours of CPU in all): every one
@@ -270,9 +276,15 @@ The items below keep their history.
   399 pass (355 identical as built, 44 with CORE-MATH), 93 rejected by both, 21 expected
   divergences; against the record of 2026-10-23 no status or detail changed, and the 8 cases added
   since (permanent cases from random testing) pass.
-- **antsAffineInitializer's speed**: larmorx 277 s against ANTs' 73 s at one thread on a
-  128 × 128 × 96 head, 1212 s against 332 s on the 7 T (the D13 notice of ITK-21 runs every local
-  search twice; the rest is the metric's speed): the next small part.
+- **antsAffineInitializer's speed: done** (2026-10-28; on the new machine, where ANTs takes 33.5 s
+  on the head and 252 s on the 7 T): `reproduce` at one thread 40.0 s and 254.5 s (the ITK-21
+  notice's second search; the search itself takes 0.6 of ANTs' time), the default mode 20.9 s and
+  124.7 s, eight threads 8.7 s and 51.6 s (`reproduce`). A further gain at one thread would need
+  SIMD over a batch's points (each point's operations unchanged): not attempted.
+- **The sampled Mattes path for antsRegistration** (a possible follow-up): `evaluate_sampled` is
+  taken only for float-stored images (antsAI, antsAffineInitializer); antsRegistration's sampled
+  Mattes stages (`Regular`/`Random`, no fixed transform, a linear stage) could take it too, with
+  its own records re-made.
 - **ImageMath's panel run in a box**: its 600-volume `m` case needs about 8 GiB in the harness
   (both outputs and larmorx in-process): two jobs in a 20 GiB box.
 - **ResampleImage's speed** with nearest-neighbour resampling to `unsigned char` (3D, most voxels
@@ -301,7 +313,7 @@ The items below keep their history.
   `BSpline[0.1,26]` (about a million parameters at the last level): ANTs at 4 threads unfinished
   after 3 h 50 min, larmorx 38 s at one thread.
 - **Figures:** every new part brings its tool's figures (`docs/figures.md`); the site's pages
-  for antsRegistration, antsAI and the HDF5 files say their benchmark is pending until the
+  for antsRegistration and the HDF5 files say their benchmark is pending until the
   reports above exist. The figures take about 12 MB of the site's repository (four SVGs each,
   text as outlines); embedded font subsets per SVG would make them smaller.
 - **Head-motion correction's open cases** (91 of the record's 134, shown as "open" on its

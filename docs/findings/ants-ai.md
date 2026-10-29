@@ -20,6 +20,11 @@ The v4 framework both programs run on (metrics, scales, the conjugate-gradient o
   (ANTs 2.6.2) at one thread, it equals the 2.6.5 oracle and larmorx bit for bit; at 8 threads
   it moves by about 1e-13 from run to run, and fMRIPrep's file is within 1.3e-13 of larmorx
   (ds000005, run 1; `oracles/logs/a43-bold-*.log`, 2026-10-17).
+- **Memory and speed (2026-10-28):** the images kept in float as in ANTs (the peak at or below
+  ANTs'), the Mattes metric's sampled points computed in batches with each fixed side once:
+  antsAI 1.8 to 2 times as fast as ANTs at one thread, antsAffineInitializer at ANTs' time in
+  `reproduce` (its ITK-21 notice runs a second search) and half of it by default; bit for bit
+  as before ("Memory and speed (2026-10-28)").
 - **`Random` sampling is never repeatable**, whatever the seed: its voxels come from the
   iterator's own generator, seeded from the clock (ANTS-58); `--random-seed 0` does the same to
   `Regular` sampling's perturbations.
@@ -395,7 +400,7 @@ On `tests/parity/test_memory_peak.py`'s head of 128 × 128 × 96 voxels at one t
   its vectors axis by axis (it was held twice, as components and as vectors), the float copies
   are dropped once read (the fixed one after the initial transform, the moving one after its
   gradient).
-- **Still above ANTs, a follow-up:** the metric holds the two images in double (`Image<f64>`,
+- **Still above ANTs, a follow-up** (done 2026-10-28, the next section): the metric holds the two images in double (`Image<f64>`,
   16 bytes a voxel for both) where ANTs holds them in float (8), and larmorx's interpreter and
   its allocator's retained pages add about as much again on this size; the gap grows with the
   image (about 8 bytes a voxel: some 170 MiB on the 7 T MP2RAGE). Closing it means storing the
@@ -406,7 +411,123 @@ On `tests/parity/test_memory_peak.py`'s head of 128 × 128 × 96 voxels at one t
   the port's own time, not the fix's). Before the fix, larmorx's metric loop ran on rayon's
   global pool, every CPU, at any thread count (`ants-cli.md`, "larmorx's own threads"), which hid
   this. Part of it is the D13 notice of ITK-21: larmorx runs the start points' local searches
-  both ways, to say where ITK's carried-over learning rate changes the result. A follow-up.
+  both ways, to say where ITK's carried-over learning rate changes the result. A follow-up
+  (done 2026-10-28, the next section).
+
+## Memory and speed (2026-10-28): ANTs' memory, faster than ANTs
+
+The follow-ups of the section above, closed without changing a bit of either program's results.
+Measured on the main machine (AMD, 32 threads, shared with other jobs: informal timings), each
+run its own process under `/usr/bin/time -v`: ANTs 2.6.5 with CORE-MATH preloaded at one thread,
+larmorx's command (`python -m larmorx ants ...`, the interpreter included); the
+[benchmark](../benchmarks/ants-ai.md) has every figure (medians of three) and
+`validation/investigations/ants-ai-speed/` the tools.
+
+**ANTs stays on one thread.** Neither program sets a thread count; ITK's global default comes
+from `ITK_GLOBAL_DEFAULT_NUMBER_OF_THREADS=1` (`itkMultiThreaderBase.cxx:266-330`). A whole run
+uses 99 % of one CPU with 3 voluntary context switches (the head, 35 s) or 59 (the 7 T, 252 s).
+
+**Memory** (peak resident, one thread; the rule: at most 1.10 × ANTs + 8 MiB):
+
+| Call | ANTs | larmorx before | larmorx now |
+|---|---|---|---|
+| antsAI, the memory test's head (128 × 128 × 96; `Mattes`, `Regular` 25 %, `Rigid`) | 92 to 96 MiB | 126 MiB | 95 MiB |
+| antsAffineInitializer, the head (niworkflows' `15 0.1 0 10`) | 89 MiB | 109 MiB | 91 MiB |
+| antsAffineInitializer, the 7 T MP2RAGE and the 1 mm MNI template | 688 MiB | 844 MiB (2026-10-26) | 676 MiB |
+| antsAI, the same pair, the memory test's options | 754 MiB | | 717 MiB |
+
+- **The images in float.** The metric's images are now kept as read, `itk::Image<float, D>`
+  (`metric::MetricImage::Float`: 4 bytes a voxel where `Image<f64>` took 8), and nothing makes a
+  double copy any more: the moments, the centred initializer and the search read the float
+  images. The bits stay: each value is read as a double, exactly (`f64::from(f32)`), which is
+  what the double copies held, and every operation after it is unchanged. ANTs holds the same
+  two float images and the moving image's gradient (24 bytes a voxel). The two
+  `xfail(strict=True)` marks of `tests/parity/test_memory_peak.py` are gone: both cases pass in
+  both modes (antsAI 96 MiB against 91, antsAffineInitializer 90 against 90). At eight threads
+  each thread adds a few MiB of buffers.
+
+**Where the time went.** `perf` is refused to users on this machine
+(`kernel.perf_event_paranoid` 4) and py-spy sees only Python threads, so `gdb_profile.py`
+samples every thread's stack with gdb (the command runs in a child that allows any tracer). On
+antsAffineInitializer and the head nearly all the time was the Mattes metric's loop over the
+sampled points: about half in the linear interpolation (the moving value and the gradient's
+three components each finding their cell again, ITK's index rounding computed in five
+dependent operations), the rest in each point's `Vec`s (the Jacobian, the derivative terms), the
+buffers of each chunk and the pool hop of every chunk. A search makes about 2,200 value-only
+and 300 value-and-derivative evaluations of the 157,000 points (16 start points, 20 iterations,
+golden-section line searches); ANTs takes 35 s for its one search.
+
+| Step (antsAffineInitializer, the head, `reproduce`, one thread) | larmorx |
+|---|---|
+| before (ANTs: 35 s) | 133 s |
+| the images in float (less to read) | 116 s |
+| the sampled path: each point's fixed bin once, the points one at a time on the calling thread | 66 s |
+| batches of 64 points stage by stage; ITK's rounding in two operations; the gradient's components in one pass; the derivative's row of cells added as a slice | 48 s |
+| the interpolation cell inlined; the corners written in place (no `memcpy`); the Jacobian's array not cleared twice | 42 s |
+| ITK-21's second search takes the first one's shared evaluations | 41 s |
+| value-only evaluations added as they are computed (no buffer) | 40 s |
+
+- **The sampled path** (`metric::mattes::Mattes::evaluate_sampled`, taken when the images are
+  float-stored, the points sampled, no fixed transform, a transform of global support, 1 to 3
+  dimensions: antsAI's and antsAffineInitializer's metric, nothing else). The fixed side of a
+  sampled point never changes (the point, the fixed mask, the fixed value interpolated and
+  stored in float, its Parzen bin): ITK computes it at every evaluation, larmorx once
+  (`Mattes::fixed_bins`, 4 bytes a point). The moving side is computed as before, operation for
+  operation, and each point is added to the joint histogram in the points' order, so every sum
+  is the same sum. The points are taken in batches of 64, stage by stage (the cells; the eight
+  corners read in a loop of reads only; the values and Parzen windows; the gradient's corners;
+  the Jacobian and the products), so that the processor overlaps the points of a batch and has
+  many reads in flight; at more threads, chunks of batches are computed in parallel and then
+  added in order. `interp::Cell::eval_corners` performs `EvaluateOptimized`'s operations in its
+  order, axis skips included; the gradient shares the value's cell when its image has the moving
+  image's grid (region, origin and index matrix checked bit for bit).
+- **ITK's index rounding** (`itk::Math::Floor`, `round_half_to_even(2x − 0.5) >> 1`;
+  `larmorx_core::itk_real`): below 2^51 in magnitude, `x + 1.5·2^52` lies where the doubles are
+  the integers and consecutive integers have consecutive bit patterns, so one addition rounds (to
+  nearest, ties to even) and the bits give the integer: the general method's integer (tested on
+  600,000 values, ties, signed zeros and the edges of the range), in two operations instead of
+  five on the path to every voxel read. Every tool's floor goes through it; the golden checksums
+  and the smoke tier are unchanged.
+- **ITK-21's notice, cheaper** (`affine_initializer::search`). The two searches ask the metric
+  the same questions up to where their learning rates part: the whole first start point (both
+  begin at 0.1) and each later start point's first evaluation (at the start point, before any
+  step). At one thread the second search takes those from the first one's results, kept by the
+  parameters' bits (the metric is a function of the parameters); at more threads the two run at
+  once in the call's pool. The notice is the same, case for case. The rest of the second search
+  cannot be shared: from the second start point on ITK begins each local search at the learning
+  rate the previous one left, the golden-section brackets scale with it, and no later
+  evaluation repeats (stopping the second search where the two agree to the bit was considered:
+  they never do once the rates part).
+
+**Speed now** (medians of three; wall time, one thread unless said):
+
+| Call | ANTs | larmorx `reproduce` | larmorx default | `reproduce`, 8 threads | default, 8 threads |
+|---|---|---|---|---|---|
+| antsAffineInitializer, the head | 33.5 s | 40.0 s | 20.9 s | 8.7 s | 4.8 s |
+| antsAI, the head | 31.2 s | 17.5 s | 17.8 s | 5.0 s | 4.8 s |
+| antsAffineInitializer, the 7 T | 252.2 s | 254.5 s | 124.7 s | 51.6 s | 26.1 s |
+| antsAI, the 7 T | 155.8 s | 79.0 s | 79.9 s | 21.8 s | 20.9 s |
+
+**The gap left: antsAffineInitializer in `reproduce` at one thread.** larmorx's search takes
+about 0.6 of ANTs' time (a value-only evaluation about 43 ns a point, one with the derivative
+about 116 ns; antsAI, which searches once, shows it: 17.5 s against 31.2 s), but the ITK-21
+notice needs the second search, which can share only the first start point and each start
+point's first evaluation (1/16 of it here): on the head about 20 s of search plus 19 s for the
+check against ANTs' 33.5 s; on the 7 T, where both programs wait on memory and larmorx's
+batched reads gain more, the two searches together take ANTs' time. In the default mode
+antsAffineInitializer runs the iterations the call asks for (niworkflows: 10; ANTs always 20,
+ANTS-54): half ANTs' time or less; at eight threads it is 4 to 10 times as fast as ANTs at one.
+A further gain at one thread would have to come from SIMD over the points of a batch (each
+point's operations unchanged); not attempted.
+
+**Bit-identity, proven.** `compare_builds.py` runs every standard case of both suites with the
+build before this part and the new one, in both D13 modes, the new one at 1 and 4 threads: 172
+cases, exit status, both streams (every notice) and every file identical. The standard records
+were re-made from the clean commit `9b9fe9aa5232` (the original's runs served by the oracle
+cache; larmorx at 4 threads, as the suites run it): every status as before
+(`compare_records.py`, `record_fields.py`: only times, ANTs' own clock-seeded spread and the
+fields the 2026-10-17 record's format lacked differ). The golden checksums are unchanged
+(`pytest tests/golden`) and the smoke tier passes (2,549 tests).
 
 ## On the data panel: fMRIPrep's transforms and ANTs' own spread (2026-10-26)
 

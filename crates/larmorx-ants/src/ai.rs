@@ -33,10 +33,10 @@ use larmorx_core::IndexFloor;
 use larmorx_core::defects::{self, Notices};
 use larmorx_core::vnl_fixed;
 use larmorx_registration::format::OStream;
-use larmorx_registration::initializer::{Feature, initialize};
+use larmorx_registration::initializer::{Feature, initialize_pixels};
 use larmorx_registration::mask::Mask;
 use larmorx_registration::method::{LevelProblem, MetricKind, gradient_image};
-use larmorx_registration::metric::ImageMetricv4;
+use larmorx_registration::metric::{ImageMetricv4, MetricImage};
 use larmorx_registration::moments::{self, MomentsError};
 use larmorx_registration::optimizer::ConjugateGradientLineSearch;
 use larmorx_registration::optimizer::multistart::{self, MultiStartObserver};
@@ -292,8 +292,6 @@ fn wahba<const D: usize>(b: &Matrix<f64, D>, log: &mut Log<'_>) -> Result<Matrix
 #[allow(clippy::too_many_arguments)]
 pub fn initial<const D: usize>(
     s: &AiSettings,
-    fixed: &Image<f64, D>,
-    moving: &Image<f64, D>,
     fixed32: &Image<f32, D>,
     moving32: &Image<f32, D>,
     log: &mut Log<'_>,
@@ -312,8 +310,8 @@ pub fn initial<const D: usize>(
         } else {
             Feature::Moments
         };
-        let (center, translation) =
-            initialize::<f64, D>(fixed, moving, feature).map_err(AiError::Uncaught)?;
+        let (center, translation) = initialize_pixels::<f64, f32, D>(fixed32, moving32, feature)
+            .map_err(AiError::Uncaught)?;
         transform.set_identity();
         transform.set_center(center);
         transform.set_translation(translation);
@@ -363,8 +361,9 @@ pub fn initial<const D: usize>(
             blobs: Some(Box::new(alignment)),
         });
     }
-    let mf = moments::compute(fixed).map_err(uncaught_moments)?;
-    let mm = moments::compute(moving).map_err(uncaught_moments)?;
+    // ImageMomentsCalculator of the float images: every value read as a double.
+    let mf = moments::compute(fixed32).map_err(uncaught_moments)?;
+    let mm = moments::compute(moving32).map_err(uncaught_moments)?;
     // antsAI's VectorType is itk::Vector<float, D>.
     let fcg: [f32; D] = std::array::from_fn(|i| mf.center_of_gravity[i] as f32);
     let mcg: [f32; D] = std::array::from_fn(|i| mm.center_of_gravity[i] as f32);
@@ -880,7 +879,8 @@ const METRIC_FILE: &str = "Modules/Registration/Metricsv4/include/itkImageToImag
 const NO_SHIFT_WARNING: &str = "WARNING: In Modules/Numerics/Optimizersv4/include/itkRegistrationParameterScalesFromShiftBase.hxx, line 91\nRegistrationParameterScalesFromPhysicalShift (0x0): Variation in any parameter won't change a voxel position. The default scales (1.0) are used to avoid division-by-zero.\n\n";
 
 /// The search (`antsAI.cxx:1125-1577`): the metric, the start points and the multi-start
-/// optimization. `moving_f32` is the moving image as read (for its gradient image).
+/// optimization, on the images as read (`itk::Image<float, D>`, kept in float as ANTs keeps
+/// them).
 /// `seed_failure`: why the sampling seed could not be read (returned where ANTs reads it,
 /// only when the metric is sampled).
 ///
@@ -891,9 +891,8 @@ const NO_SHIFT_WARNING: &str = "WARNING: In Modules/Numerics/Optimizersv4/includ
 pub fn search<const D: usize>(
     s: &AiSettings,
     init: &Initial<D>,
-    fixed: &Arc<Image<f64, D>>,
-    moving: &Arc<Image<f64, D>>,
-    moving_f32: Image<f32, D>,
+    fixed: Arc<Image<f32, D>>,
+    moving: Arc<Image<f32, D>>,
     fixed_mask: Option<Mask<D>>,
     moving_mask: Option<Mask<D>>,
     log: &mut Log<'_>,
@@ -992,16 +991,15 @@ pub fn search<const D: usize>(
         return Ok(SearchOutcome::NoStartPoint);
     }
     let moving_gradient =
-        Arc::new(gradient_image::<f32, D>(&moving_f32, n_threads).map_err(AiError::Uncaught)?);
-    // The float image served only the gradient (memory: the search holds the double ones).
-    drop(moving_f32);
+        Arc::new(gradient_image::<f32, D>(&moving, n_threads).map_err(AiError::Uncaught)?);
+    let virtual_space = fixed.space.clone();
     let metric = ImageMetricv4 {
-        fixed: Arc::clone(fixed),
-        moving: Arc::clone(moving),
+        fixed: MetricImage::Float(fixed),
+        moving: MetricImage::Float(moving),
         fixed_mask,
         moving_mask,
         fixed_transform: None,
-        virtual_space: fixed.space.clone(),
+        virtual_space,
         samples,
         fixed_gradient_image: None,
         moving_gradient_image: Some(moving_gradient),

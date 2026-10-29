@@ -300,26 +300,21 @@ fn imp<const D: usize>(ctx: &mut Context<'_, '_>, log: &mut Log<'_>) -> Result<E
     if let Some(a) = ctx.args.get(k) {
         mask = read_mask::<D>(ctx, log, a);
     }
-    let fixed64 = fixed.as_ref().map(widened);
-    // The fixed float image is not read again (memory).
-    drop(fixed);
-    let moving64 = moving.as_ref().map(widened);
     let (mf, mm) =
-        image_moments(fixed64.as_ref(), moving64.as_ref(), log).map_err(|e| failure(log, e))?;
+        image_moments(fixed.as_ref(), moving.as_ref(), log).map_err(|e| failure(log, e))?;
     let init = initial(&s, &mf, &mm, log).map_err(|e| failure(log, e))?;
     write_output(ctx, log, output, &init.transform)?;
     if D > 3 {
         return Ok(0);
     }
-    let (Some(fixed64), Some(moving64), Some(moving32)) = (fixed64, moving64, moving) else {
+    let (Some(fixed), Some(moving)) = (fixed, moving) else {
         return Err(refuse(log, "an image is missing"));
     };
     let best = search(
         &s,
         &init,
-        &Arc::new(fixed64),
-        &Arc::new(moving64),
-        moving32,
+        Arc::new(fixed),
+        Arc::new(moving),
         mask,
         ctx.notices,
         ctx.warnings,
@@ -378,11 +373,6 @@ fn local_search_iterations(
             ))
         }
     }
-}
-
-/// The float image's values as doubles (exact).
-fn widened<const D: usize>(img: &Image<f32, D>) -> Image<f64, D> {
-    img.with_data(img.data.iter().map(|&v| f64::from(v)).collect())
 }
 
 /// `TransformFileWriter::Update()` of `t` with `SetUseCompression(true)`; ITK's exceptions

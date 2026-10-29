@@ -61,11 +61,94 @@ pub fn in_pool<T: Send>(
     }
 }
 
+/// An image a metric reads: in the computation type `R` (`antsRegistration`'s images are of
+/// its computation type), or in `float` (`antsAI` and `antsAffineInitializer` read
+/// `itk::Image<float, D>` and keep it so: 4 bytes a voxel, not 8). A float value is read as a
+/// double exactly, so the interpolation and everything after it are the same either way.
+#[derive(Clone, Debug)]
+pub enum MetricImage<R, const D: usize> {
+    Real(Arc<Image<R, D>>),
+    Float(Arc<Image<f32, D>>),
+}
+
+impl<R, const D: usize> From<Arc<Image<R, D>>> for MetricImage<R, D> {
+    fn from(image: Arc<Image<R, D>>) -> Self {
+        MetricImage::Real(image)
+    }
+}
+
+impl<R: Real, const D: usize> MetricImage<R, D> {
+    /// The image's geometry.
+    #[inline]
+    pub fn space(&self) -> &Space<D> {
+        match self {
+            MetricImage::Real(i) => &i.space,
+            MetricImage::Float(i) => &i.space,
+        }
+    }
+
+    /// The image in the computation type; only `antsRegistration`'s metrics, which are never
+    /// float-stored, ask for it (a float-stored image is a programming error there).
+    pub fn real(&self) -> &Arc<Image<R, D>> {
+        match self {
+            MetricImage::Real(i) => i,
+            MetricImage::Float(_) => {
+                panic!("a float-stored metric image where the computation type is needed")
+            }
+        }
+    }
+
+    /// `GetPixel(index)` (inside the region), in `R`.
+    #[inline]
+    pub fn at(&self, idx: &[i64; D]) -> R {
+        match self {
+            MetricImage::Real(i) => i.at(idx),
+            MetricImage::Float(i) => R::from_f64(f64::from(i.at(idx))),
+        }
+    }
+
+    /// Every voxel's value in buffer order, in `R`.
+    pub fn for_each_value(&self, mut f: impl FnMut(usize, R)) {
+        match self {
+            MetricImage::Real(i) => {
+                for (o, &v) in i.data.iter().enumerate() {
+                    f(o, v);
+                }
+            }
+            MetricImage::Float(i) => {
+                for (o, &v) in i.data.iter().enumerate() {
+                    f(o, R::from_f64(f64::from(v)));
+                }
+            }
+        }
+    }
+
+    /// `LinearInterpolateImageFunction::EvaluateAtContinuousIndex` (coordinates of type `R`).
+    #[inline]
+    pub fn interpolate(&self, c: &[R; D], floor: &IndexFloor) -> f64 {
+        match self {
+            MetricImage::Real(i) => Linear::new(&**i).at_cindex(c, floor),
+            MetricImage::Float(i) => {
+                let data = &i.data;
+                crate::interp::at_cindex_with(&i.space, c, floor, |o| f64::from(data[o]))
+            }
+        }
+    }
+
+    /// `CentralDifferenceImageFunction::Evaluate(point)` (coordinates of type `R`).
+    fn central_difference(&self, p: &[R; D], floor: &IndexFloor) -> [f64; D] {
+        match self {
+            MetricImage::Real(i) => central_difference(&Linear::new(&**i), p, floor),
+            MetricImage::Float(i) => crate::interp::central_difference_on(&**i, p, floor),
+        }
+    }
+}
+
 /// The inputs of an image metric for one level.
 #[derive(Clone, Debug)]
 pub struct ImageMetricv4<R, const D: usize> {
-    pub fixed: Arc<Image<R, D>>,
-    pub moving: Arc<Image<R, D>>,
+    pub fixed: MetricImage<R, D>,
+    pub moving: MetricImage<R, D>,
     pub fixed_mask: Option<Mask<D>>,
     pub moving_mask: Option<Mask<D>>,
     /// The fixed transform (`IdentityTransform` when `None`).
@@ -359,17 +442,16 @@ impl<R: Real, const D: usize> ImageMetricv4<R, D> {
         {
             return None;
         }
-        let fixed_interp = Linear::new(&*self.fixed);
         let fixed_r = as_r(&fixed_point);
-        let fixed_c: [R; D] = self.fixed.space.point_to_cindex(&fixed_point);
-        if !self.fixed.space.is_inside_buffer(&fixed_c) {
+        let fixed_c: [R; D] = self.fixed.space().point_to_cindex(&fixed_point);
+        if !self.fixed.space().is_inside_buffer(&fixed_c) {
             return None;
         }
-        let fixed_value = R::from_f64(self.pixel(fixed_interp.at_cindex(&fixed_c, floor)));
+        let fixed_value = R::from_f64(self.pixel(self.fixed.interpolate(&fixed_c, floor)));
         let mut fixed_gradient = [R::ZERO; D];
         if compute_derivative && gradients.fixed {
             fixed_gradient =
-                self.gradient(&fixed_interp, &self.fixed_gradient_image, &fixed_r, floor);
+                self.gradient(&self.fixed, &self.fixed_gradient_image, &fixed_r, floor);
         }
         // TransformAndEvaluateMovingPoint.
         let moving_r = moving.transform_point(&local);
@@ -379,20 +461,15 @@ impl<R: Real, const D: usize> ImageMetricv4<R, D> {
         {
             return None;
         }
-        let moving_interp = Linear::new(&*self.moving);
-        let moving_c: [R; D] = self.moving.space.point_to_cindex(&moving_point);
-        if !self.moving.space.is_inside_buffer(&moving_c) {
+        let moving_c: [R; D] = self.moving.space().point_to_cindex(&moving_point);
+        if !self.moving.space().is_inside_buffer(&moving_c) {
             return None;
         }
-        let moving_value = R::from_f64(self.pixel(moving_interp.at_cindex(&moving_c, floor)));
+        let moving_value = R::from_f64(self.pixel(self.moving.interpolate(&moving_c, floor)));
         let mut moving_gradient = [R::ZERO; D];
         if compute_derivative && gradients.moving {
-            moving_gradient = self.gradient(
-                &moving_interp,
-                &self.moving_gradient_image,
-                &moving_r,
-                floor,
-            );
+            moving_gradient =
+                self.gradient(&self.moving, &self.moving_gradient_image, &moving_r, floor);
         }
         Some(Sample {
             virtual_index,
@@ -420,7 +497,7 @@ impl<R: Real, const D: usize> ImageMetricv4<R, D> {
     /// (`useGradientFilter`), else central differences, stored in `R`.
     fn gradient(
         &self,
-        interp: &Linear<'_, R, D>,
+        source: &MetricImage<R, D>,
         image: &Option<Arc<Image<[f64; D], D>>>,
         p: &[R; D],
         floor: &IndexFloor,
@@ -431,7 +508,7 @@ impl<R: Real, const D: usize> ImageMetricv4<R, D> {
                 crate::interp::vector_linear(g, &pf, floor)
             }
             None => {
-                let g = central_difference(interp, p, floor);
+                let g = source.central_difference(p, floor);
                 std::array::from_fn(|k| R::from_f64(g[k]))
             }
         }

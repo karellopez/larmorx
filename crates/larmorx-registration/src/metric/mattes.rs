@@ -16,10 +16,12 @@ use std::sync::atomic::{AtomicBool, Ordering};
 
 use crate::CompensatedSum;
 use larmorx_core::IndexFloor;
+use rayon::prelude::*;
 
-use super::{GradientSource, ImageMetricv4};
-use crate::transform::Composite;
-use crate::{ItkException, Real};
+use super::{GradientSource, ImageMetricv4, MetricImage};
+use crate::interp::Cell;
+use crate::transform::{Composite, Xfm, matrix_point};
+use crate::{Image, ItkException, Real, Space};
 
 const FILE: &str =
     "Modules/Registration/Metricsv4/include/itkMattesMutualInformationImageToImageMetricv4.hxx";
@@ -76,6 +78,143 @@ pub struct Mattes<R> {
     /// `Initialize` keeps them: [`Mattes::share_joint_pdf`] gives every level of a stage the
     /// stage's flag.
     pub joint_pdf: Arc<AtomicBool>,
+    /// The fixed side of each sampled point, for a metric whose fixed side never changes
+    /// (float images, sampled points, no fixed transform, a transform of global support, 1 to
+    /// 3 dimensions: `antsAI`, `antsAffineInitializer`): the fixed Parzen bin of the point, or
+    /// [`REJECTED`] where the point is outside the fixed mask or image. ITK computes it again
+    /// at every evaluation, to the same value; [`Mattes::evaluate`] then takes its sampled
+    /// path ([`Mattes::evaluate_sampled`]). `None` elsewhere.
+    pub fixed_bins: Option<Arc<Vec<u32>>>,
+}
+
+/// A sampled point whose fixed side rejects it ([`Mattes::fixed_bins`]).
+pub const REJECTED: u32 = u32::MAX;
+
+/// The sampled points evaluated together per thread of the call (the sampled path's chunks).
+const SAMPLED_CHUNK: usize = 4096;
+
+/// The sampled points computed together, stage by stage.
+const BATCH: usize = 64;
+
+/// The sampled points one parallel task computes (whole batches).
+const SAMPLED_TASK: usize = 8 * BATCH;
+
+/// A batch's room on the sampled path: the points' cells, virtual and moving points, the
+/// corners' values and gradients, and a Jacobian.
+struct Scratch<R, const D: usize> {
+    cells: [Cell; BATCH],
+    locals: [[R; D]; BATCH],
+    points: [[f64; D]; BATCH],
+    inside: [bool; BATCH],
+    values: [[[f64; 1]; 8]; BATCH],
+    vectors: Box<[[[f64; D]; 8]; BATCH]>,
+    jac: Vec<R>,
+}
+
+impl<R: Real, const D: usize> Scratch<R, D> {
+    fn new(jacobian: usize) -> Self {
+        Scratch {
+            cells: [Cell::default(); BATCH],
+            locals: [[R::ZERO; D]; BATCH],
+            points: [[0.0; D]; BATCH],
+            inside: [false; BATCH],
+            values: [[[0.0]; 8]; BATCH],
+            vectors: Box::new([[[0.0; D]; 8]; BATCH]),
+            jac: vec![R::ZERO; jacobian],
+        }
+    }
+}
+
+/// One point's bins and weights on the sampled path (its derivative terms aside).
+#[derive(Clone, Copy, Debug)]
+struct PointBins<R> {
+    fixed_index: usize,
+    moving_index: usize,
+    weights: [R; 4],
+    derivatives: [R; 4],
+}
+
+/// The joint histogram as the points are added to it, in the order a single ITK thread
+/// visits them.
+struct Accumulator<R> {
+    bins: usize,
+    np: usize,
+    compute_derivative: bool,
+    fixed_marginal: Vec<R>,
+    joint: Vec<R>,
+    joint_derivatives: Vec<R>,
+    valid: usize,
+}
+
+impl<R: Real> Accumulator<R> {
+    fn new(bins: usize, np: usize, compute_derivative: bool) -> Self {
+        Accumulator {
+            bins,
+            np,
+            compute_derivative,
+            fixed_marginal: vec![R::ZERO; bins],
+            joint: vec![R::ZERO; bins * bins],
+            joint_derivatives: if compute_derivative {
+                vec![R::ZERO; bins * bins * np]
+            } else {
+                Vec::new()
+            },
+            valid: 0,
+        }
+    }
+
+    /// One valid point: its fixed bin counted, its four moving bins' weights added and, with
+    /// the derivative, `inner[mu]·β′` added to each of their cells (a parameter's column in
+    /// `cols`, or its own).
+    #[inline]
+    fn add(
+        &mut self,
+        fixed_index: usize,
+        moving_index: usize,
+        weights: &[R; 4],
+        derivatives: &[R; 4],
+        inner: &[R],
+        cols: Option<&[usize]>,
+    ) {
+        let (bins, np) = (self.bins, self.np);
+        self.fixed_marginal[fixed_index] = self.fixed_marginal[fixed_index] + R::ONE;
+        let row = fixed_index * bins;
+        for b in 0..4 {
+            let bin = row + moving_index + b;
+            self.joint[bin] = self.joint[bin] + weights[b];
+            if self.compute_derivative {
+                // Plain sums: a B-spline transform's zero columns add nothing.
+                let offset = fixed_index * np * bins + (moving_index + b) * np;
+                match cols {
+                    // Every parameter's own column: the cells in a row.
+                    None => {
+                        let cells = &mut self.joint_derivatives[offset..offset + inner.len()];
+                        for (cell, &ip) in cells.iter_mut().zip(inner) {
+                            *cell = *cell + ip * derivatives[b];
+                        }
+                    }
+                    Some(cols) => {
+                        for (k, &ip) in inner.iter().enumerate() {
+                            let cell = &mut self.joint_derivatives[offset + cols[k]];
+                            *cell = *cell + ip * derivatives[b];
+                        }
+                    }
+                }
+            }
+        }
+        self.valid += 1;
+    }
+}
+
+/// Whether two grids give every physical point the same continuous index and cell (the
+/// moving image and its gradient image: their region, origin and index matrix bit for bit).
+fn same_grid<const D: usize>(a: &Space<D>, b: &Space<D>) -> bool {
+    let bits =
+        |m: &[[f64; D]; D]| -> Vec<u64> { m.iter().flatten().map(|v| v.to_bits()).collect() };
+    a.size == b.size
+        && a.start == b.start
+        && a.origin.map(f64::to_bits) == b.origin.map(f64::to_bits)
+        && bits(&a.point_to_index) == bits(&b.point_to_index)
 }
 
 /// One point's contribution, computed in parallel.
@@ -122,8 +261,8 @@ impl<R: Real> Mattes<R> {
                         None => local,
                     };
                     let q: [f64; D] = std::array::from_fn(|k| q[k].to_f64());
-                    let idx = fixed.space.point_to_index(&q);
-                    if fixed.space.contains(&idx) {
+                    let idx = fixed.space().point_to_index(&q);
+                    if fixed.space().contains(&idx) {
                         let v = fixed.at(&idx);
                         take(v, &mut fmin, &mut fmax);
                     }
@@ -131,18 +270,15 @@ impl<R: Real> Mattes<R> {
             }
             None => match &m.fixed_mask {
                 Some(mask) => {
-                    for (o, &v) in fixed.data.iter().enumerate() {
-                        let p = fixed.space.index_to_point(&fixed.space.index_of(o));
+                    let space = fixed.space();
+                    fixed.for_each_value(|o, v| {
+                        let p = space.index_to_point(&space.index_of(o));
                         if mask.is_inside(&p) {
                             take(v, &mut fmin, &mut fmax);
                         }
-                    }
+                    });
                 }
-                None => {
-                    for &v in &fixed.data {
-                        take(v, &mut fmin, &mut fmax);
-                    }
-                }
+                None => fixed.for_each_value(|_, v| take(v, &mut fmin, &mut fmax)),
             },
         }
         let mut mmin = pixel_max;
@@ -150,24 +286,21 @@ impl<R: Real> Mattes<R> {
         let moving = &m.moving;
         match &m.moving_mask {
             Some(mask) => {
-                for (o, &v) in moving.data.iter().enumerate() {
-                    let p = moving.space.index_to_point(&moving.space.index_of(o));
+                let space = moving.space();
+                moving.for_each_value(|o, v| {
+                    let p = space.index_to_point(&space.index_of(o));
                     if mask.is_inside(&p) {
                         take(v, &mut mmin, &mut mmax);
                     }
-                }
+                });
             }
-            None => {
-                for &v in &moving.data {
-                    take(v, &mut mmin, &mut mmax);
-                }
-            }
+            None => moving.for_each_value(|_, v| take(v, &mut mmin, &mut mmax)),
         }
         let padding = R::from_f64(2.0);
         let denominator = R::from_i64(bins as i64 - 4);
         let fixed_bin_size = (fmax - fmin) / denominator;
         let moving_bin_size = (mmax - mmin) / denominator;
-        Ok(Mattes {
+        let mut state = Mattes {
             bins,
             fixed_true_min: fmin,
             fixed_true_max: fmax,
@@ -178,7 +311,52 @@ impl<R: Real> Mattes<R> {
             moving_bin_size,
             moving_normalized_min: mmin / moving_bin_size - padding,
             joint_pdf: Arc::default(),
-        })
+            fixed_bins: None,
+        };
+        state.fixed_bins = state.fixed_side(m).map(Arc::new);
+        Ok(state)
+    }
+
+    /// The fixed side of every sampled point ([`Mattes::fixed_bins`]), as `ProcessVirtualPoint`
+    /// computes it at each evaluation: the point (no fixed transform: the virtual point), the
+    /// fixed mask, the continuous index inside the buffer, the interpolated value stored in
+    /// the pixel type, its Parzen bin. `None` where the sampled path does not apply.
+    fn fixed_side<const D: usize>(&self, m: &ImageMetricv4<R, D>) -> Option<Vec<u32>> {
+        let MetricImage::Float(fixed) = &m.fixed else {
+            return None;
+        };
+        let samples = m.samples.as_ref()?;
+        if !(1..=3).contains(&D)
+            || m.local_support
+            || m.fixed_transform.is_some()
+            || !matches!(m.moving, MetricImage::Float(_))
+            || self.bins >= REJECTED as usize
+        {
+            return None;
+        }
+        let space = &fixed.space;
+        let data = &fixed.data;
+        let mut out = Vec::with_capacity(samples.len());
+        for p in samples.iter() {
+            let local: [R; D] = std::array::from_fn(|k| R::from_f64(p[k]));
+            let fixed_point: [f64; D] = std::array::from_fn(|k| local[k].to_f64());
+            if let Some(mask) = &m.fixed_mask
+                && !mask.is_inside(&fixed_point)
+            {
+                out.push(REJECTED);
+                continue;
+            }
+            let c: [R; D] = space.point_to_cindex(&fixed_point);
+            if !space.is_inside_buffer(&c) {
+                out.push(REJECTED);
+                continue;
+            }
+            let value = Cell::new(space, &c).eval(|o| f64::from(data[o]));
+            let fixed_value = R::from_f64(m.pixel(value));
+            let fterm = fixed_value / self.fixed_bin_size - self.fixed_normalized_min;
+            out.push(self.parzen_index(fterm) as u32);
+        }
+        Some(out)
     }
 
     /// The metric object's joint histogram images, shared by the levels (and the calls) of
@@ -466,20 +644,27 @@ impl<R: Real> Mattes<R> {
             return self.evaluate_local(m, transform, floor, warnings);
         }
         self.check_joint_pdf_spacing(&m.outside, warnings)?;
+        if let Some(fixed_bins) = &self.fixed_bins
+            && let MetricImage::Float(moving) = &m.moving
+            && transform.sparse_jacobian_width().is_none()
+            && (!compute_derivative || m.moving_gradient_image.is_some())
+        {
+            return self.evaluate_sampled(
+                m,
+                transform,
+                compute_derivative,
+                floor,
+                fixed_bins,
+                moving,
+            );
+        }
         let bins = self.bins;
         let np = transform.number_of_parameters();
         let gradients = GradientSource {
             fixed: false,
             moving: true,
         };
-        let mut fixed_marginal = vec![R::ZERO; bins];
-        let mut joint = vec![R::ZERO; bins * bins];
-        let mut joint_derivatives = if compute_derivative {
-            vec![R::ZERO; bins * bins * np]
-        } else {
-            Vec::new()
-        };
-        let mut valid: usize = 0;
+        let mut acc = Accumulator::new(bins, np, compute_derivative);
         let process = |i: usize| -> Option<Contribution<R>> {
             let s = m.sample(i, transform, gradients, compute_derivative, floor)?;
             let mv = s.moving_value;
@@ -532,24 +717,299 @@ impl<R: Real> Mattes<R> {
             0
         };
         m.for_each_sample_of(width, process, |c| {
-            fixed_marginal[c.fixed_index] = fixed_marginal[c.fixed_index] + R::ONE;
-            let row = c.fixed_index * bins;
-            for b in 0..4 {
-                let bin = row + c.moving_index + b;
-                joint[bin] = joint[bin] + c.weights[b];
-                if compute_derivative {
-                    // Plain sums: a B-spline transform's zero columns add nothing.
-                    let offset = c.fixed_index * np * bins + (c.moving_index + b) * np;
-                    for (k, &ip) in c.inner.iter().enumerate() {
-                        let mu = c.cols.as_ref().map_or(k, |cols| cols[k]);
-                        let cell = &mut joint_derivatives[offset + mu];
-                        *cell = *cell + ip * c.derivatives[b];
+            acc.add(
+                c.fixed_index,
+                c.moving_index,
+                &c.weights,
+                &c.derivatives,
+                &c.inner,
+                c.cols.as_deref(),
+            );
+            Ok(())
+        })?;
+        self.results(acc)
+    }
+
+    /// [`Mattes::evaluate`] on the sampled path ([`Mattes::fixed_bins`]): each point's fixed
+    /// bin read, its moving side computed as `ProcessVirtualPoint` and `ProcessPoint` compute
+    /// it (the transform, the moving mask, the continuous index inside the buffer, the
+    /// interpolated value stored in the pixel type, its range, the Parzen window; with the
+    /// derivative, the gradient image interpolated in the value's cell when it shares the
+    /// moving image's grid, the transform's Jacobian and their products), and added to the
+    /// histogram in the points' order. The points are computed in batches of [`BATCH`], stage
+    /// by stage (the cells, then the values and windows, then the derivative terms), so that
+    /// the processor overlaps the points of a batch, whose arithmetic is independent; at more
+    /// than one thread, chunks of batches are computed in parallel and then added in order. The
+    /// result is the generic path's, bit for bit, at any thread count.
+    fn evaluate_sampled<const D: usize>(
+        &self,
+        m: &ImageMetricv4<R, D>,
+        transform: &Composite<R, D>,
+        compute_derivative: bool,
+        floor: &IndexFloor,
+        fixed_bins: &[u32],
+        moving: &Image<f32, D>,
+    ) -> Result<(R, Vec<R>), ItkException> {
+        let samples = m
+            .samples
+            .as_ref()
+            .expect("the sampled path has sampled points");
+        let n = samples.len();
+        let np = transform.number_of_parameters();
+        let width = if compute_derivative { np } else { 0 };
+        let gradient = if compute_derivative {
+            m.moving_gradient_image.as_deref()
+        } else {
+            None
+        };
+        let shared_grid = gradient.is_some_and(|g| same_grid(&g.space, &moving.space));
+        let linear = match transform.transforms.as_slice() {
+            [Xfm::Linear(l)] => Some(l),
+            _ => None,
+        };
+        let space = &moving.space;
+        let data = &moving.data;
+        // IsInsideBuffer's bounds, `start − 0.5` and `end + 0.5` in R (as
+        // `Space::is_inside_buffer` computes them).
+        let lo: [R; D] = std::array::from_fn(|j| R::from_f64(space.start[j] as f64 - 0.5));
+        let hi: [R; D] = std::array::from_fn(|j| {
+            R::from_f64((space.start[j] + space.size[j] as i64 - 1) as f64 + 0.5)
+        });
+        // The cells of the points `first..first + len` (at most BATCH) and their corners'
+        // values, in `w`: the transform, the moving mask, the continuous index in the buffer.
+        let cells = |first: usize, len: usize, w: &mut Scratch<R, D>| {
+            for j in 0..len {
+                w.inside[j] = false;
+                if fixed_bins[first + j] == REJECTED {
+                    continue;
+                }
+                let p = &samples[first + j];
+                let local: [R; D] = std::array::from_fn(|k| R::from_f64(p[k]));
+                let moving_r = match linear {
+                    Some(l) => matrix_point(&l.matrix, &local, &l.offset),
+                    None => transform.transform_point(&local),
+                };
+                let moving_point: [f64; D] = std::array::from_fn(|k| moving_r[k].to_f64());
+                if let Some(mask) = &m.moving_mask
+                    && !mask.is_inside(&moving_point)
+                {
+                    continue;
+                }
+                let c: [R; D] = space.point_to_cindex(&moving_point);
+                if !(0..D).all(|k| c[k] >= lo[k] && c[k] < hi[k]) {
+                    continue;
+                }
+                w.cells[j] = Cell::new(space, &c);
+                w.locals[j] = local;
+                w.points[j] = moving_point;
+                w.inside[j] = true;
+            }
+            // The corners' values, read first (a loop of reads only: many in flight).
+            for j in 0..len {
+                if w.inside[j] {
+                    let c = w.cells[j].corners();
+                    let v = &mut w.values[j];
+                    for b in 0..8 {
+                        v[b] = [f64::from(data[c[b]])];
                     }
                 }
             }
-            valid += 1;
-            Ok(())
+        };
+        // The value and the Parzen window of point `first + j` of a batch.
+        let window = |first: usize, j: usize, w: &Scratch<R, D>| -> Option<PointBins<R>> {
+            if !w.inside[j] {
+                return None;
+            }
+            let mv = R::from_f64(m.pixel(w.cells[j].eval_corners(&w.values[j])[0]));
+            if mv < self.moving_true_min || mv > self.moving_true_max {
+                return None;
+            }
+            let term = mv / self.moving_bin_size - self.moving_normalized_min;
+            let parzen = self.parzen_index(term);
+            let moving_index = parzen - 1;
+            let mut arg = R::from_i64(moving_index as i64) - term;
+            let mut weights = [R::ZERO; 4];
+            let mut derivatives = [R::ZERO; 4];
+            for b in 0..4 {
+                weights[b] = cubic(arg);
+                if compute_derivative {
+                    derivatives[b] = cubic_derivative(arg);
+                }
+                arg = R::from_f64(arg.to_f64() + 1.0);
+            }
+            Some(PointBins {
+                fixed_index: fixed_bins[first + j] as usize,
+                moving_index,
+                weights,
+                derivatives,
+            })
+        };
+        // The points `first..first + out.len()` (at most BATCH): their bins and weights in
+        // `out`, their derivative terms in `inner` (`width` each); `w`: the batch's room.
+        let batch = |first: usize,
+                     out: &mut [Option<PointBins<R>>],
+                     inner: &mut [R],
+                     w: &mut Scratch<R, D>| {
+            let len = out.len();
+            cells(first, len, w);
+            for j in 0..len {
+                out[j] = window(first, j, w);
+            }
+            // The derivative terms: the gradient, the Jacobian, their products.
+            let Some(g) = gradient else {
+                return;
+            };
+            if shared_grid {
+                let gd = &g.data;
+                for j in 0..len {
+                    if out[j].is_some() {
+                        let c = w.cells[j].corners();
+                        let v = &mut w.vectors[j];
+                        for b in 0..8 {
+                            v[b] = gd[c[b]];
+                        }
+                    }
+                }
+            }
+            for j in 0..len {
+                if out[j].is_none() {
+                    continue;
+                }
+                let grad: [R; D] = if shared_grid {
+                    let v = w.cells[j].eval_corners(&w.vectors[j]);
+                    std::array::from_fn(|k| R::from_f64(v[k]))
+                } else {
+                    crate::interp::vector_linear(g, &w.points[j], floor)
+                };
+                // Every entry written (the active transform's Jacobian starts from zeros),
+                // as into the generic path's new array.
+                let jac = &mut w.jac;
+                transform.jacobian(&w.locals[j], jac);
+                for (mu, out) in inner[j * width..(j + 1) * width].iter_mut().enumerate() {
+                    let mut ip = R::ZERO;
+                    for dim in 0..D {
+                        ip = ip + jac[dim * np + mu] * grad[dim];
+                    }
+                    *out = ip;
+                }
+            }
+        };
+        let mut acc = Accumulator::new(self.bins, np, compute_derivative);
+        let add = |acc: &mut Accumulator<R>, found: &[Option<PointBins<R>>], terms: &[R]| {
+            for (j, b) in found.iter().enumerate() {
+                if let Some(b) = b {
+                    acc.add(
+                        b.fixed_index,
+                        b.moving_index,
+                        &b.weights,
+                        &b.derivatives,
+                        &terms[j * width..(j + 1) * width],
+                        None,
+                    );
+                }
+            }
+        };
+        // The points `first..first + out.len()`, batch by batch.
+        let batches = |first: usize, out: &mut [Option<PointBins<R>>], inner: &mut [R]| {
+            let mut w = Scratch::<R, D>::new(D * width);
+            let mut j = 0;
+            while j < out.len() {
+                let len = BATCH.min(out.len() - j);
+                batch(
+                    first + j,
+                    &mut out[j..j + len],
+                    &mut inner[j * width..(j + len) * width],
+                    &mut w,
+                );
+                j += len;
+            }
+        };
+        let threads = match m.n_threads {
+            Some(t) => larmorx_core::parallel::resolve_threads(t),
+            None => rayon::current_num_threads(),
+        };
+        if threads <= 1 && !compute_derivative {
+            // One batch at a time, on the calling thread, each point added as it is computed.
+            let mut w = Scratch::<R, D>::new(0);
+            let mut first = 0;
+            while first < n {
+                let len = BATCH.min(n - first);
+                cells(first, len, &mut w);
+                for j in 0..len {
+                    if let Some(b) = window(first, j, &w) {
+                        acc.add(
+                            b.fixed_index,
+                            b.moving_index,
+                            &b.weights,
+                            &b.derivatives,
+                            &[],
+                            None,
+                        );
+                    }
+                }
+                first += len;
+            }
+            return self.results(acc);
+        }
+        if threads <= 1 {
+            // One batch at a time, on the calling thread.
+            let mut found = [None; BATCH];
+            let mut terms = vec![R::ZERO; BATCH * width];
+            let mut w = Scratch::<R, D>::new(D * width);
+            let mut first = 0;
+            while first < n {
+                let len = BATCH.min(n - first);
+                batch(first, &mut found[..len], &mut terms[..len * width], &mut w);
+                add(&mut acc, &found[..len], &terms[..len * width]);
+                first += len;
+            }
+            return self.results(acc);
+        }
+        let chunk = SAMPLED_CHUNK * threads;
+        m.in_pool(|| {
+            let mut found: Vec<Option<PointBins<R>>> = Vec::new();
+            let mut terms: Vec<R> = Vec::new();
+            let mut start = 0;
+            while start < n {
+                let end = (start + chunk).min(n);
+                found.clear();
+                found.resize(end - start, None);
+                terms.clear();
+                terms.resize((end - start) * width, R::ZERO);
+                if width == 0 {
+                    found
+                        .par_chunks_mut(SAMPLED_TASK)
+                        .enumerate()
+                        .for_each(|(t, out)| batches(start + t * SAMPLED_TASK, out, &mut []));
+                } else {
+                    found
+                        .par_chunks_mut(SAMPLED_TASK)
+                        .zip(terms.par_chunks_mut(SAMPLED_TASK * width))
+                        .enumerate()
+                        .for_each(|(t, (out, inner))| {
+                            batches(start + t * SAMPLED_TASK, out, inner)
+                        });
+                }
+                add(&mut acc, &found, &terms);
+                start = end;
+            }
         })?;
+        self.results(acc)
+    }
+
+    /// `GetValueCommonAfterThreadedExecution` and `ComputeResults`: the histogram normalised,
+    /// its marginals, the value and the derivative.
+    fn results(&self, acc: Accumulator<R>) -> Result<(R, Vec<R>), ItkException> {
+        let bins = self.bins;
+        let np = acc.np;
+        let compute_derivative = acc.compute_derivative;
+        let Accumulator {
+            mut fixed_marginal,
+            mut joint,
+            mut joint_derivatives,
+            valid,
+            ..
+        } = acc;
         // GetValueCommonAfterThreadedExecution.
         let mut sum = CompensatedSum::default();
         for &v in &joint {
@@ -652,6 +1112,7 @@ mod tests {
             moving_bin_size: 0.25,
             moving_normalized_min: -2.0,
             joint_pdf: Arc::new(AtomicBool::new(created)),
+            fixed_bins: None,
         };
         let mut w = Vec::new();
         // The first level: ITK's exception in both modes.

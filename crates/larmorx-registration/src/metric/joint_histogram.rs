@@ -68,16 +68,17 @@ struct Densities<R> {
 /// The extremes of an image's voxels inside its mask (all voxels without one), as
 /// `Initialize` scans them; `(max, nonpositive min)` of `R` when none is inside.
 fn extremes<R: Real, const D: usize>(
-    image: &Image<R, D>,
+    image: &super::MetricImage<R, D>,
     mask: Option<&crate::mask::Mask<D>>,
 ) -> (R, R) {
     let mut lo = R::MAX;
     let mut hi = -R::MAX;
-    for (o, &v) in image.data.iter().enumerate() {
+    let space = image.space();
+    image.for_each_value(|o, v| {
         if let Some(m) = mask {
-            let p = image.space.index_to_point(&image.space.index_of(o));
+            let p = space.index_to_point(&space.index_of(o));
             if !m.is_inside(&p) {
-                continue;
+                return;
             }
         }
         if v < lo {
@@ -86,7 +87,7 @@ fn extremes<R: Real, const D: usize>(
         if v > hi {
             hi = v;
         }
-    }
+    });
     (lo, hi)
 }
 

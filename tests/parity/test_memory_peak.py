@@ -219,28 +219,21 @@ def test_larmorx_needs_no_more_memory_than_fsl(tmp_path, tool, args):
 #: 128 x 128 x 96 voxels (``{fixed}``, ``{moving}`` two voxels apart, ``{mask}``), a 20-volume
 #: series (``{series}``) and a smooth displacement field (``{warp}``); ``{out}`` is the run's own
 #: output directory. Every output is ANTs' byte for byte in ``reproduce`` (images: header and
-#: values as stored). antsAI and antsAffineInitializer still need more than ANTs (127 and 110
-#: MiB against 92 and 91 on these inputs, 2026-10-26): their metric holds the two images in
-#: double where ANTs holds them in float (``docs/findings/ants-ai.md``, "Memory"); the cases
-#: fail until that is changed (strict: they then pass and must lose the mark).
-_DOUBLE_IMAGES = "the metric's images in double, ANTs' in float (docs/findings/ants-ai.md)"
+#: values as stored). antsAI and antsAffineInitializer keep their images in float, as ANTs does
+#: (2026-10-28: 96 and 91 MiB against ANTs' 92 and 90 on these inputs; they needed 127 and 110
+#: while the metric held them in double: ``docs/findings/ants-ai.md``, "Memory and speed").
 MORE_CASES = [
     (
         "Atropos",
         "-d 3 -a {fixed} -x {mask} -i KMeans[3] -c [5,0] -m [0.1,1x1x1] "
         "-o [{out}/seg.nii.gz,{out}/post%02d.nii.gz]",
     ),
-    pytest.param(
+    (
         "antsAI",
         "-d 3 -m Mattes[{fixed},{moving},32,Regular,0.25] -t Rigid[0.1] -s [30,0.12] -c 10 "
         "-o {out}/ai.mat",
-        marks=pytest.mark.xfail(strict=True, reason=_DOUBLE_IMAGES),
     ),
-    pytest.param(
-        "antsAffineInitializer",
-        "3 {fixed} {moving} {out}/init.mat 15 0.1 0 10",
-        marks=pytest.mark.xfail(strict=True, reason=_DOUBLE_IMAGES),
-    ),
+    ("antsAffineInitializer", "3 {fixed} {moving} {out}/init.mat 15 0.1 0 10"),
     (
         "antsApplyTransforms",
         "-d 3 -e 3 -i {series} -r {fixed} -t {warp} -n LanczosWindowedSinc --float 1 "

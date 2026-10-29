@@ -1,15 +1,16 @@
 # Parity: antsAI
 
-**All cases agree.** 131 cases on the `standard` tier: 75 pass, 52 rejected by both, 4 expected divergences, 0 failures.
+**All cases agree.** 132 cases on the `standard` tier: 76 pass, 52 rejected by both, 4 expected divergences, 0 failures.
 
 - **Validated:** `larmorx ants antsAI` / `lx.ants.ai` (crates larmorx-ants, larmorx-registration)
 - **Reference:** antsAI from ANTs v2.6.5 (fdce4d2f84) on ITK v5.4.5 (f51594ad88), x86_64-conda-linux-gnu-g++ (conda-forge gcc 14.3.0-20) 14.3.0, the binary built by `scripts/build_ants_oracle.sh`, run with one thread
-- **Test data:** larmorx-testdata `b0999a9e0c31`, tier `standard`
-- **Generated:** 2026-10-24 on Linux x86_64, with `python -m larmorx_validation parity ants-ai --tier standard`
+- **Test data:** larmorx-testdata `52124bc98f9f`, tier `standard`
+- **Generated:** 2026-10-28 on Linux x86_64, with `python -m larmorx_validation parity ants-ai --tier standard`
+- **Original programs:** 159 runs: 95 from the oracle cache, 64 run (31 never cached: the original varies); cache `<workspace>/oracles/cache`, mode `use`
 
-75 cases compared: 74 identical to the unmodified ANTs (exit status, standard output, standard error, every file), 1 identical once ANTs uses CORE-MATH's correctly rounded functions (glibc's are not always correctly rounded).
+76 cases compared: 75 identical to the unmodified ANTs (exit status, standard output, standard error, every file), 1 identical once ANTs uses CORE-MATH's correctly rounded functions (glibc's are not always correctly rounded).
 
-Thread band, 6 cases: ANTs at 2, 4, 8 threads differs from its own one-thread result by up to 1.85e-13 in a transform parameter (`search/rigid-grid` 4.44e-16, `search/affine-mi` 4.07e-20, `search/rigid-gc` 1.7e-14, `search/2d-affine-grid` 4.44e-16, `real/ds000005-sub-01/brain-extraction` 1.85e-13, `real/ds000005-sub-01/bold-mixedgamblestask-run-01` 1.14e-13); larmorx gives the one-thread result at any thread count, within 0 of ANTs at one thread.
+Thread band, 6 cases: ANTs at 2, 4, 8 threads differs from its own one-thread result by up to 0.137 in a transform parameter (`search/rigid-grid` 2.78e-16, `search/affine-mi` 4.07e-20, `search/rigid-gc` 1.7e-14, `search/2d-affine-grid` 4.44e-16, `real/ds000005-sub-01/brain-extraction` 1.99e-13, `real/ds000005-sub-01/bold-mixedgamblestask-run-01` 0.137); larmorx gives the one-thread result at any thread count, within 0 of ANTs at one thread.
 
 Thread band, blob alignment (2 cases: `blobs/shift-rigid`, `real/ds000005-sub-01/blobs-t1w-shift`): ANTs' `antsAI -b` crashes at 2, 4, 8 threads (ANTS-60: its blob detector indexes per-thread heaps past their end); larmorx gives ANTs' one-thread result at any thread count.
 
@@ -37,9 +38,9 @@ Thread band, blob alignment (2 cases: `blobs/shift-rigid`, `real/ds000005-sub-01
 
 - **D13 fix pass** (larmorx's default, `upstream_defects="fix"`; the comparison above runs `reproduce`): the corrections met
   - ANTS-110: 9 case(s) named it, 9 with changed values (largest difference inf): `blobs/rigid-rigid`, `blobs/rigid-affine`, `blobs/affine-rigid`, `blobs/2d-rigid-rigid`, `blobs/2d-rigid-affine`, `blobs/2d-rigid-similarity`, `blobs/rigid-affine-search-h5`, `blobs/identical-rigid` …
-  - ANTS-111: 16 case(s) named it, 10 with changed values (largest difference inf), 2 with other changes (a transform written by one only; exit N -> N; files ['t.mat']): `blobs/shift-rigid`, `blobs/shift-affine`, `blobs/shift-similarity`, `blobs/rigid-rigid`, `blobs/rigid-affine`, `blobs/2d-shift-rigid`, `blobs/2d-shift-affine`, `blobs/2d-rigid-rigid` …
-  - ANTS-112: 1 case(s) named it, 0 with changed values (largest difference 0), 1 with other changes (a transform written by one only; exit N -> N; files ['t.mat']): `blobs/constant`
-  - ANTS-114: 5 case(s) named it, 0 with changed values (largest difference 0), 5 with other changes (a transform written by one only; exit N -> N; files ['t.mat']): `blobs/no-pairs-rigid`, `blobs/2d-no-pairs-rigid`, `blobs/constant`, `blobs/noise-rigid`, `real/ds000005-sub-01/blobs-mni-rigid`
+  - ANTS-111: 17 case(s) named it, 10 with changed values (largest difference inf), 3 with other changes (a transform written by one only; exit N -> N; files ['t.mat']): `blobs/shift-rigid`, `blobs/shift-affine`, `blobs/shift-similarity`, `blobs/rigid-rigid`, `blobs/rigid-affine`, `blobs/2d-shift-rigid`, `blobs/2d-shift-affine`, `blobs/2d-rigid-rigid` …
+  - ANTS-112: 2 case(s) named it, 0 with changed values (largest difference 0), 2 with other changes (a transform written by one only; exit N -> N; files ['t.mat']): `blobs/constant`, `difftest/scales-warnings-before-multistart`
+  - ANTS-114: 6 case(s) named it, 0 with changed values (largest difference 0), 6 with other changes (a transform written by one only; exit N -> N; files ['t.mat']): `blobs/no-pairs-rigid`, `blobs/2d-no-pairs-rigid`, `blobs/constant`, `blobs/noise-rigid`, `real/ds000005-sub-01/blobs-mni-rigid`, `difftest/scales-warnings-before-multistart`
   - ANTS-116: 18 case(s) named it, 14 with changed values (largest difference inf): `blobs/shift-rigid`, `blobs/shift-affine`, `blobs/shift-similarity`, `blobs/rigid-rigid`, `blobs/rigid-affine`, `blobs/affine-rigid`, `blobs/2d-shift-rigid`, `blobs/2d-shift-affine` …
   - ANTS-53: 4 case(s) named it, 0 with changed values (largest difference 0), 4 with other changes (a transform written by one only): `search/align-with-iterations`, `search/align-with-iterations-quiet`, `search/align-with-iterations-2d-gc`, `search/align-with-iterations-no-start`
   - ANTS-55: 2 case(s) named it, 0 with changed values (largest difference 0), 2 with other changes (a transform written by one only; exit N -> N; files ['t.mat']): `search/grid-two-extents`, `search/grid-one-extent`
@@ -64,6 +65,7 @@ fMRIPrep's own transforms (ANTs 2.6.2, 8 threads, fMRIPrep's seed): larmorx is w
 | Category | Cases | Pass | Both reject | Expected divergence | Fail |
 |---|---|---|---|---|---|
 | blobs | 25 | 20 | 5 | 0 | 0 |
+| difftest | 1 | 1 | 0 | 0 | 0 |
 | initial | 9 | 9 | 0 | 0 | 0 |
 | messages | 51 | 3 | 46 | 2 | 0 |
 | random | 2 | 0 | 0 | 2 | 0 |
@@ -140,11 +142,11 @@ fMRIPrep's own transforms (ANTs 2.6.2, 8 threads, fMRIPrep's seed): larmorx is w
 
 | Component | Version |
 |---|---|
-| larmorx | 0.0.1 (6bf2860fb745) |
-| larmorx-testdata | b0999a9e0c31 |
-| Python | 3.12.10 |
+| larmorx | 0.0.1 (9b9fe9aa5232) |
+| larmorx-testdata | 52124bc98f9f |
+| Python | 3.12.16 |
 | Platform | Linux x86_64 (Linux-6.8.0-124-generic-x86_64-with-glibc2.35) |
-| CPU | Intel(R) Core(TM) i7-8750H CPU @ 2.20GHz, 12 logical CPUs |
+| CPU | AMD Ryzen 9 7945HX with Radeon Graphics, 32 logical CPUs |
 | numpy | 2.3.5 |
 | nibabel | 5.4.2 |
 | scipy | 1.15.3 |
@@ -288,3 +290,4 @@ Inputs named `gen:<name>` are built by the suites (seeded phantoms); the real ca
 | `real/ds000005-sub-01/blobs-t1w-rotated` | pass | 8/8 | fMRIPrep's T1w of ds000005 against its copy rotated by 8 degrees and shifted |
 | `real/ds000005-sub-01/blobs-t1w-rotated-affine` | both-error | 3/3 | The same with Affine (ANTs: too few landmarks) |
 | `real/ds000005-sub-01/blobs-mni-rigid` | pass | 6/6 | MNI152NLin2009cAsym (2 mm) against ds000005-sub-01's T1w, Rigid from 30 blobs |
+| `difftest/scales-warnings-before-multistart` | pass | 6/6 | antsAI's start points that throw: each start point's scales warnings before its multi-start warning, in ITK's order |

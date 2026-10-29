@@ -74,58 +74,184 @@ fn optimized<R: Real, const D: usize>(
     c: &[R; D],
     v: impl Fn(usize) -> f64,
 ) -> f64 {
-    let mut base = [0usize; 3];
-    let mut dist = [0.0f64; 3];
-    let mut step = [0usize; 3];
-    let mut stride = 1usize;
-    for k in 0..D {
-        let start = space.start[k];
-        let b = c[k].itk_floor().max(start);
-        dist[k] = (c[k] - R::from_i64(b)).to_f64();
-        let rel = (b - start) as usize;
-        base[k] = rel;
-        // The upper neighbour along the axis, or none.
-        step[k] = if dist[k] > 0.0 && rel + 1 < space.size[k] {
-            stride
-        } else {
-            0
+    Cell::new(space, c).eval(v)
+}
+
+/// The cell of a continuous index that `EvaluateOptimized` (1 to 3 dimensions) interpolates
+/// in: its first voxel's offset, the step to the upper neighbour along each axis (0 when the
+/// axis is skipped) and each axis's distance. One cell serves every image on the same grid
+/// (a value and its gradient's components), each [`Cell::eval`] the interpolation
+/// [`at_cindex_with`] computes, operation for operation.
+#[derive(Clone, Copy, Debug, Default)]
+pub struct Cell {
+    origin: usize,
+    step: [usize; 3],
+    dist: [f64; 3],
+    dims: usize,
+}
+
+impl Cell {
+    /// The cell of `c` (1 to 3 dimensions).
+    #[inline(always)]
+    pub fn new<R: Real, const D: usize>(space: &crate::Space<D>, c: &[R; D]) -> Cell {
+        debug_assert!((1..=3).contains(&D));
+        let mut base = [0usize; 3];
+        let mut dist = [0.0f64; 3];
+        let mut step = [0usize; 3];
+        let mut stride = 1usize;
+        for k in 0..D {
+            let start = space.start[k];
+            let b = c[k].itk_floor().max(start);
+            dist[k] = (c[k] - R::from_i64(b)).to_f64();
+            let rel = (b - start) as usize;
+            base[k] = rel;
+            // The upper neighbour along the axis, or none.
+            step[k] = if dist[k] > 0.0 && rel + 1 < space.size[k] {
+                stride
+            } else {
+                0
+            };
+            stride *= space.size[k];
+        }
+        let mut origin = 0usize;
+        let mut s = 1usize;
+        for k in 0..D {
+            origin += base[k] * s;
+            s *= space.size[k];
+        }
+        Cell {
+            origin,
+            step,
+            dist,
+            dims: D,
+        }
+    }
+
+    /// The interpolated value of the image whose voxel at offset `o` is `v(o)`.
+    #[inline]
+    pub fn eval(&self, v: impl Fn(usize) -> f64) -> f64 {
+        let (step, dist, origin) = (&self.step, &self.dist, self.origin);
+        let lerp = |a: f64, b: f64, t: f64| a + (b - a) * t;
+        let along_x = |o: usize| {
+            let a = v(o);
+            if step[0] != 0 {
+                lerp(a, v(o + step[0]), dist[0])
+            } else {
+                a
+            }
         };
-        stride *= space.size[k];
-    }
-    let mut origin = 0usize;
-    let mut s = 1usize;
-    for k in 0..D {
-        origin += base[k] * s;
-        s *= space.size[k];
-    }
-    let lerp = |a: f64, b: f64, t: f64| a + (b - a) * t;
-    let along_x = |o: usize| {
-        let a = v(o);
-        if step[0] != 0 {
-            lerp(a, v(o + step[0]), dist[0])
+        if self.dims == 1 {
+            return along_x(origin);
+        }
+        let along_y = |o: usize| {
+            let a = along_x(o);
+            if step[1] != 0 {
+                lerp(a, along_x(o + step[1]), dist[1])
+            } else {
+                a
+            }
+        };
+        if self.dims == 2 {
+            return along_y(origin);
+        }
+        let a = along_y(origin);
+        if step[2] != 0 {
+            lerp(a, along_y(origin + step[2]), dist[2])
         } else {
             a
         }
-    };
-    if D == 1 {
-        return along_x(origin);
     }
-    let along_y = |o: usize| {
-        let a = along_x(o);
-        if step[1] != 0 {
-            lerp(a, along_x(o + step[1]), dist[1])
+
+    /// [`Cell::eval`] of each of `K` components at once (a gradient image's vectors): each
+    /// component interpolated by the same operations, in the same order, as a scalar image of
+    /// that component, every voxel read once.
+    #[inline]
+    pub fn eval_n<const K: usize>(&self, v: impl Fn(usize) -> [f64; K]) -> [f64; K] {
+        let (step, dist, origin) = (&self.step, &self.dist, self.origin);
+        let lerp = |a: [f64; K], b: [f64; K], t: f64| -> [f64; K] {
+            std::array::from_fn(|k| a[k] + (b[k] - a[k]) * t)
+        };
+        let along_x = |o: usize| {
+            let a = v(o);
+            if step[0] != 0 {
+                lerp(a, v(o + step[0]), dist[0])
+            } else {
+                a
+            }
+        };
+        if self.dims == 1 {
+            return along_x(origin);
+        }
+        let along_y = |o: usize| {
+            let a = along_x(o);
+            if step[1] != 0 {
+                lerp(a, along_x(o + step[1]), dist[1])
+            } else {
+                a
+            }
+        };
+        if self.dims == 2 {
+            return along_y(origin);
+        }
+        let a = along_y(origin);
+        if step[2] != 0 {
+            lerp(a, along_y(origin + step[2]), dist[2])
         } else {
             a
         }
-    };
-    if D == 2 {
-        return along_y(origin);
     }
-    let a = along_y(origin);
-    if step[2] != 0 {
-        lerp(a, along_y(origin + step[2]), dist[2])
-    } else {
-        a
+
+    /// The buffer offsets of the cell's corners, corner `b` offset by the steps of the bits of
+    /// `b` (x: 1, y: 2, z: 4); a skipped axis's step is 0, so its upper corners repeat the lower
+    /// ones (read, never used). Every offset lies inside the buffer.
+    #[inline]
+    pub fn corners(&self) -> [usize; 8] {
+        let s = &self.step;
+        std::array::from_fn(|b| {
+            self.origin
+                + if b & 1 != 0 { s[0] } else { 0 }
+                + if b & 2 != 0 { s[1] } else { 0 }
+                + if b & 4 != 0 { s[2] } else { 0 }
+        })
+    }
+
+    /// [`Cell::eval_n`] of the values at the cell's [`Cell::corners`], read beforehand (by a
+    /// loop that only reads, so that many reads are in flight): the same operations in the
+    /// same order.
+    #[inline]
+    pub fn eval_corners<const K: usize>(&self, v: &[[f64; K]; 8]) -> [f64; K] {
+        let (step, dist) = (&self.step, &self.dist);
+        let lerp = |a: [f64; K], b: [f64; K], t: f64| -> [f64; K] {
+            std::array::from_fn(|k| a[k] + (b[k] - a[k]) * t)
+        };
+        let along_x = |b: usize| {
+            let a = v[b];
+            if step[0] != 0 {
+                lerp(a, v[b | 1], dist[0])
+            } else {
+                a
+            }
+        };
+        if self.dims == 1 {
+            return along_x(0);
+        }
+        let along_y = |b: usize| {
+            let a = along_x(b);
+            if step[1] != 0 {
+                lerp(a, along_x(b | 2), dist[1])
+            } else {
+                a
+            }
+        };
+        if self.dims == 2 {
+            return along_y(0);
+        }
+        let a = along_y(0);
+        if step[2] != 0 {
+            lerp(a, along_y(4), dist[2])
+        } else {
+            a
+        }
     }
 }
 
@@ -194,7 +320,28 @@ pub fn central_difference<R: Real, const D: usize>(
     p: &[R; D],
     floor: &IndexFloor,
 ) -> [f64; D] {
-    let spacing = interp.image.space.spacing;
+    central_difference_on(interp.image, p, floor)
+}
+
+/// [`central_difference`] on an image of any pixel type `P` (its values read as doubles), the
+/// coordinates of type `R`: a `float` image's (`antsAI`) as the interpolator of
+/// `itk::Image<float, D>` with double coordinates evaluates it.
+pub fn central_difference_on<P: Real, R: Real, const D: usize>(
+    image: &Image<P, D>,
+    p: &[R; D],
+    floor: &IndexFloor,
+) -> [f64; D] {
+    let space = &image.space;
+    let is_inside = |q: &[f64; D]| {
+        let c: [R; D] = space.point_to_cindex(q);
+        space.is_inside_buffer(&c)
+    };
+    let evaluate = |q: &[f64; D]| {
+        let c: [R; D] = space.point_to_cindex(q);
+        let data = &image.data;
+        at_cindex_with(space, &c, floor, |o| data[o].to_f64())
+    };
+    let spacing = space.spacing;
     let mut out = [0.0f64; D];
     let mut n1 = *p;
     let mut n2 = *p;
@@ -202,14 +349,14 @@ pub fn central_difference<R: Real, const D: usize>(
     for d in 0..D {
         let offset = R::from_f64(0.5 * spacing[d]);
         n1[d] = p[d] - offset;
-        if !interp.is_inside(&to64(&n1)) {
+        if !is_inside(&to64(&n1)) {
             out[d] = 0.0;
             n1[d] = p[d];
             n2[d] = p[d];
             continue;
         }
         n2[d] = p[d] + offset;
-        if !interp.is_inside(&to64(&n2)) {
+        if !is_inside(&to64(&n2)) {
             out[d] = 0.0;
             n1[d] = p[d];
             n2[d] = p[d];
@@ -217,8 +364,7 @@ pub fn central_difference<R: Real, const D: usize>(
         }
         let delta = n2[d] - n1[d];
         out[d] = if delta > R::from_f64(10.0) * R::EPSILON {
-            (interp.evaluate(&to64(&n2), floor) - interp.evaluate(&to64(&n1), floor))
-                / delta.to_f64()
+            (evaluate(&to64(&n2)) - evaluate(&to64(&n1))) / delta.to_f64()
         } else {
             0.0
         };

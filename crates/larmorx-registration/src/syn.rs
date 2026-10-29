@@ -290,8 +290,8 @@ fn initialize_metric<R: Real, const D: usize>(
     outside: &crate::metric::OutsideDerivatives,
 ) -> Result<Initialized<R, D>, ItkException> {
     let metric = ImageMetricv4 {
-        fixed: Arc::clone(fixed),
-        moving: Arc::clone(moving),
+        fixed: Arc::clone(fixed).into(),
+        moving: Arc::clone(moving).into(),
         fixed_mask: fixed_mask.clone(),
         moving_mask: moving_mask.clone(),
         fixed_transform,
@@ -1135,8 +1135,8 @@ pub fn full_scale_cc<R: Real, const D: usize>(
         let f = resample_image(original_fixed, grid, fixed, floor);
         let m = resample_image(original_moving, grid, moving, floor);
         let metric = ImageMetricv4 {
-            fixed: Arc::new(f),
-            moving: Arc::new(m),
+            fixed: Arc::new(f).into(),
+            moving: Arc::new(m).into(),
             fixed_mask: None,
             moving_mask: None,
             fixed_transform: None,

@@ -1454,6 +1454,9 @@ on the memory test's head, 332 s against 1212 s on the 7 T image), partly becaus
 ITK-21 runs each start point's local search twice: both, the storage and the speed, are the next
 small part, before part (b).
 
+2026-10-28: antsAI and antsAffineInitializer meet it (the metric's images in float); the memory
+test's last two strict xfails removed.
+
 ## 2026-10-26: The ANTs tools on the data panel (re-validation, part a)
 
 - **The panel tier** (`--tier panel`, beside smoke, standard and full; never in CI): every ANTs

@@ -56,7 +56,10 @@ original.
   carries a port (`glibc_floatmath`), whose results hash to glibc's over all 2^32 inputs
   (`tools/floatmath-verify`). `-EPI`'s `cbrtf` (`:1064`) likewise (453,492,162 inputs not
   correctly rounded; also ported and verified). Note: in Rust, `f32::cbrt` is the standard
-  library's own correctly rounded cube root, not glibc's (found while verifying).
+  library's own correctly rounded cube root, not glibc's (found while verifying). **Since
+  2026-10-29** (the move into the main package): `tanhf`/`expm1f` are `fdlibm.rs` (Sun's notice,
+  the same code), and `-EPI`'s radius takes CORE-MATH's `cbrtf` (`unifize::epi_radius`), glibc's
+  being LGPL; see "The cube root's last bit" below.
 - **`mri_invertcontrast_inplace`** (`mri_invert.c:10-100`) recomputes the percentile `ucut` from
   the image it inverts: the re-inversion of `-T2` (`3dUnifize.c:1195`) uses the WM-scaled
   image's percentile with the input's mask; `-EPI` inverts each volume twice (`:1159`, `:1163`),
@@ -169,6 +172,24 @@ Every other function of the three binaries compiles to the same instructions in 
 (3dTshift 3,280, 3dAutomask 3,382, 3dUnifize 3,412). The replicas' records show it case by case:
 each case also runs AFNI 25.2.09 and names the cases whose AFNI output changed, with the reason
 (`docs/validation/afni-unifize-replica.md`, "AFNI's own step").
+
+## The cube root's last bit (2026-10-29, the move into the main package)
+
+What `-EPI`'s radius feeds (`3dUnifize.c:1060-1068`): the message `-EPI changes -Urad to %.1f
+voxels`, `mri_local_percmean`'s ball (with `do_double` off under `-EPI`, the radius as it is), and
+nothing else (`percmean`'s radius test, never reached at 4.14 or more; larmorx's own AFNI-75
+memory check, continuous in the radius). The ball is `MCW_spheremask(1, 1, 1, r)` through
+`MCW_build_mask` (`edt_buildmask.c`): `idx = (int)(r / 1)` per axis, then every `(i, j, k)` within
+`±idx` with `i*i + j*j + k*k <= r*r` in float (`unifize::sphere`). While `3 idx^2 < 2^24` the float
+sums are exact integers, so the ball is fixed by `(idx, floor(fl(r*r)))`; beyond, every float sum
+of integers is still an integer-valued float, so the same pair fixes it, but the sums round
+(radii above 2364: a ball of more than 5.5e10 offsets). `crates-gpl/tools/cbrtf-measure` compared
+glibc's `s_cbrtf.c` (the earlier translation) with CORE-MATH's on every non-negative float32: the
+numbers are in `afni-relicensing-26.md`, "The move". The replica's warning
+(`unifize::epi_radius`, `may_differ`) tests the two neighbouring floats of CORE-MATH's cube root
+for a change of `(idx, floor(fl(r*r)), %.1f)`: a superset of the precise test (which also asks
+whether an integer in between is a sum of three squares), shown to hold every volume where
+glibc's last bit changes the ball or the message (0 missed; 917,292,437 flagged).
 
 ## Verification
 

@@ -1640,6 +1640,23 @@ together at the end.
   replicas could move into the Apache package (`docs/findings/afni-relicensing-26.md`); nothing
   moved.
 
+## 2026-10-29: The AFNI replicas move into the main package; the clean-room originals follow the newest versions (decided by the user)
+- **The move** (the user: "I think we can do the move"): AFNI 26.3.05 releases the Medical College
+  of Wisconsin's code under CC BY 4.0, and none of the 55 AFNI files the replicas derive from is
+  GPL any more ([findings/afni-relicensing-26.md](findings/afni-relicensing-26.md)). The AFNI
+  replicas move from `larmorx-gpl` into the main package, in a part of its own (next-steps item
+  3c) after the version update: `cbrtf` measured first (rule D), `sinf`/`cosf` from Arm's MIT
+  routines, CC BY 4.0's attribution and change statement, the licence texts, packaging and CI.
+  `pip install larmorx` then gives AFNI's exact bits; `larmorx-gpl` keeps what stays GPL
+  (Workbench, later).
+- **The clean-room originals stay and follow the newest versions** (the user: "but also the clean
+  rooms should be compliant with the new versions"): every clean-room original is aligned with the
+  newest release of its original, as its replica is, in a clean-room part right after each version
+  update (next-steps item 3b: AFNI 26.3.05 and FSL 6.0.7.23 first). They are kept for speed (the
+  user's decision of 2026-10-19), no longer only for the licence.
+- **Order** (orchestrator): the FSL part (running), the clean-room alignment, SciPy/NumPy/OpenBLAS,
+  the move, then the ports.
+
 ## Open decisions (PLAN.md §16)
 
 | # | Decision | Recommended default (used until decided) | Status |

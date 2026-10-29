@@ -55,9 +55,10 @@ with smart testing per part; the very extensive testing in one final validation 
 2026-10-28; decision log). One agent at a time (`docs/next-steps.md`, "The order from here").
 Done: antsAI and antsAffineInitializer's memory and speed (2026-10-28), the clean-room fixes
 (2026-10-29, `-cost normmi` left open), the version update's AFNI part (2026-10-29: the GPL
-replicas follow AFNI 26.3.05; the upstream watch weekly). Next: its FSL part (6.0.7.23, installed
-beside 6.0.7.17; SciPy, NumPy, OpenBLAS checked), the clean-room originals aligned with AFNI
-26.3.05 (next-steps), then BET's clean-room original (from `specs/bet.md`) and the next FSL tools (FLIRT with BBR, FAST, topup),
+replicas follow AFNI 26.3.05; the upstream watch weekly). Next: its FSL part (running: 6.0.7.23,
+installed beside 6.0.7.17), the clean-room originals aligned with the newest AFNI and FSL, SciPy,
+NumPy and OpenBLAS checked, the AFNI replicas moved into the main package (user, 2026-10-29;
+next-steps items 3 to 3c), then BET's clean-room original (from `specs/bet.md`) and the next FSL tools (FLIRT with BBR, FAST, topup),
 field maps, FreeSurfer, surfaces, confounds, larmorprepx; each a bounded agent run with a stop
 after it, each with its site page from its tests. Then the final validation phase (the data
 panel's part b and every new tool, full tiers, heavy and nightly random testing, the extensive
@@ -78,6 +79,7 @@ continue meanwhile: the 25 heavy random-testing cases (17 running here, 8 for th
 - **How to port (user, 2026-10-09):**
   - Make a faithful **replica** when the licence allows it: ANTs/ITK (Apache-2.0), AFNI's NIH public-domain code, CORE-MATH (MIT), nibabel (MIT). Bit-identical results are the target.
   - When the licence restricts it (AFNI's MCW code, Workbench, FSL), make **both**: a bit-exact replica in that licence family's package, and a clean-room original in the main package (rule 1, `docs/licensing.md`).
+  - **AFNI from 26.3.05** (user, 2026-10-29): AFNI 26.3.05 releases MCW's code under CC BY 4.0, so the AFNI replicas move into the main package (next-steps item 3c: CC BY 4.0's attribution, `sinf`/`cosf` from Arm's MIT routines, `cbrtf` measured first); the clean-room originals stay, built for speed. **Every clean-room original follows the newest version of its original**, as its replica does (user: "the clean rooms should be compliant with the new versions").
   - **FreeSurfer: both as well** (user, 2026-10-26): a replica of every program in `larmorx-freesurfer` and a clean-room original of every program in the main package, built for speed (FreeSurfer is the slowest stage), every program complete; version 8.2.0 (decision log 2026-10-26).
   - MSM: a clean-room original only, in the surfaces track, after a patent check.
 - **Each tool gets its own Python wrapper**, so other developers can build on the library.
@@ -128,7 +130,7 @@ larmorx/scripts/bootstrap_workspace.sh --venv .venv --install-rust
 1. **Licences: two tracks, kept apart** (user decision, 2026-10-09). See `docs/licensing.md`.
    - **Replica:** a bit-for-bit port of the upstream source, for the most accurate output. It carries the upstream's licence and lives in a package per licence family:
      - permissive upstreams (ANTs/ITK, AFNI's NIH files, CORE-MATH, nibabel): the main `larmorx` package (Apache-2.0);
-     - AFNI's MCW files and Workbench (GPL-2.0-or-later): `larmorx-gpl` (GPL-3.0-or-later, `crates-gpl/`);
+     - AFNI's MCW files and Workbench (GPL-2.0-or-later): `larmorx-gpl` (GPL-3.0-or-later, `crates-gpl/`); AFNI's MCW files are CC BY 4.0 from AFNI 26.3.05, and the AFNI replicas move into the main package (user, 2026-10-29; next-steps item 3c), until then they stay here;
      - FSL: `larmorx-nc` (the FSL Licence's non-commercial terms, `crates-nc/`);
      - FreeSurfer: `larmorx-freesurfer`.
    - **Original:** a strict clean-room implementation with the same behaviour, Apache-2.0, in the main package. It is needed wherever the replica is not Apache-compatible. The implementer works only from `specs/<tool>.md`, documentation, papers and black-box runs of the upstream binary; never the upstream source, the replica crates or source-derived findings (`docs/findings/afni-tshift.md`, `afni-automask.md`, `afni-unifize.md`, `afni-licence-routines.md`, `fsl-mcflirt.md`, `fsl-bet.md`, the sections of `upstream-defects.md` marked restricted), nor `docs/parts/` (other parts' briefs, reports and handoffs, some source-derived). Who may read what: `docs/porting-guide.md` §1.

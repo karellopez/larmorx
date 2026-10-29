@@ -1,8 +1,9 @@
 # AFNI 26.3.05's new licence: an inventory of the AFNI replicas (no moves)
 
-**Status:** an inventory for the user's decision (version-update part, 2026-10-29). Nothing has
-moved: the AFNI replicas stay in `larmorx-gpl` (`crates-gpl/larmorx-gpl-afni`, GPL-3.0-or-later)
-until the user decides. Unrestricted: licences, file names and function names only, nothing of the
+**Status:** an inventory for the user's decision (version-update part, 2026-10-29). **Decided the
+same day: the AFNI replicas move into the main package** (decision log 2026-10-29; next-steps item
+3c, after the version update). Until that part, they stay in `larmorx-gpl`
+(`crates-gpl/larmorx-gpl-afni`, GPL-3.0-or-later). Unrestricted: licences, file names and function names only, nothing of the
 routines' content. Not legal advice.
 
 The tools: `validation/investigations/version-afni/licence_inventory.py` (every file's licence

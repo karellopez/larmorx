@@ -169,10 +169,10 @@ command-line binary. Code from different families is never linked into one binar
   [findings/afni-relicensing-26.md](findings/afni-relicensing-26.md)): "As of May 12, 2026, MCW
   has granted NIH a Creative Commons Attribution License (CC BY 4.0) for all of the code under
   its copyright" (`doc/README/README.copyright`); every MCW file's header now says CC BY 4.0.
-  None of the 55 AFNI files the replicas derive from is GPL in 26.3.05. The AFNI replicas could
-  therefore move into the main Apache package (attribution, CC BY 4.0's text, `sinf`/`cosf`
-  re-sourced from Arm's MIT routines; glibc's LGPL `cbrtf` measured or kept apart): **the user's
-  decision**, nothing moved. Until then they stay in `larmorx-gpl` (CC BY 4.0 allows the GPL-3
+  None of the 55 AFNI files the replicas derive from is GPL in 26.3.05. The AFNI replicas
+  therefore move into the main Apache package (**decided by the user, 2026-10-29**; next-steps
+  item 3c: attribution, CC BY 4.0's text, `sinf`/`cosf` re-sourced from Arm's MIT routines;
+  glibc's LGPL `cbrtf` measured or kept apart). Until that part they stay in `larmorx-gpl` (CC BY 4.0 allows the GPL-3
   package), and `crates-gpl/NOTICE` carries the CC BY 4.0 attribution.
 
 ## Publishing

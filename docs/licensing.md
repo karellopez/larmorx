@@ -83,6 +83,12 @@ command-line binary. Code from different families is never linked into one binar
   `larmorx-nc-core` for zstd and bzip2: `ruzstd` 0.9.1 (MIT), `bzip2` 0.6.1 (MIT OR Apache-2.0)
   with `libbz2-rs-sys` 0.2.5 (the bzip2-1.0.6 licence: permissive, the copyright notice kept in
   source). No C library.
+- **Armadillo 14.2.1, OpenBLAS 0.3.33 and reference LAPACK 3.12.0** (2026-10-29): the FSL
+  replicas follow FSL 6.0.7.23's matrix layer, whose 4 × 4 inverses, solves and determinants go
+  through LAPACK; `larmorx-nc-core/src/lapack.rs` translates the routines from OpenBLAS 0.3.33
+  (BSD-3-Clause) and the reference LAPACK 3.12.0 it bundles (modified BSD), Armadillo 14.2.1's
+  rules are in `arma.rs` (Apache-2.0); their notices are in `crates-nc/NOTICE`. Permissive
+  sources, included in the FSL-licensed package as the other permissive ones are.
 - **Nothing is on PyPI yet.** Build the wheels locally:
   ```bash
   maturin build --release --locked --out dist                    # larmorx (repository root)

@@ -23,7 +23,8 @@ Needs nibabel and numpy (the workspace .venv) and an editable larmorx-testdata i
 outputs (outside git) go to ``<workspace>/oracles/fsl-6.0.7/mcflirt/`` for FSL 6.0.7.17
 (``~/fsl``, the first recording) and ``<workspace>/oracles/fsl-<version>/mcflirt/`` for a newer
 installation (``~/fsl-<version>``; FSL 6.0.7.23 since 2026-10-29, the version update:
-``larmorx_validation.parity.fsl_versions``). The same runs and inputs: the references the real
+``larmorx_validation.parity.fsl_versions``), for FSL 6.0.7.23 on OpenBLAS's Haswell core
+(``oracles/fsl-6.0.7.23/mcflirt-haswell``: :data:`INSTALLATIONS`). The same runs and inputs: the references the real
 runs use are recomputed alike (the same median of the same volumes).
 """
 
@@ -65,17 +66,30 @@ def find_workspace() -> Path:
 
 WS = find_workspace()
 OUT = WS / "oracles" / "fsl-6.0.7" / "mcflirt"
-#: The installations a recording can be made with: version -> (FSLDIR, recording directory).
+#: The installations a recording can be made with: version -> (FSLDIR, recording directory,
+#: OpenBLAS core). FSL 6.0.7.23's Armadillo 14.2.1 inverts and solves 4 x 4 matrices through
+#: OpenBLAS, whose kernels (chosen by CPU at start-up) change the last bits; its recording pins
+#: the Haswell core, the order the replica follows (``OPENBLAS_CORETYPE``,
+#: ``docs/findings/fsl-mcflirt.md``, "Armadillo 14.2.1"). The first 6.0.7.23 recording
+#: (``oracles/fsl-6.0.7.23/mcflirt``, 2026-10-29) ran on OpenBLAS's own choice for this CPU
+#: (Cooperlake on an AMD Zen 4) and is kept. FSL 6.0.7.17's Armadillo 10.5.1 used closed forms.
 INSTALLATIONS = {
-    "6.0.7.17": (Path.home() / "fsl", WS / "oracles" / "fsl-6.0.7" / "mcflirt"),
-    "6.0.7.23": (Path.home() / "fsl-6.0.7.23", WS / "oracles" / "fsl-6.0.7.23" / "mcflirt"),
+    "6.0.7.17": (Path.home() / "fsl", WS / "oracles" / "fsl-6.0.7" / "mcflirt", None),
+    "6.0.7.23": (
+        Path.home() / "fsl-6.0.7.23",
+        WS / "oracles" / "fsl-6.0.7.23" / "mcflirt-haswell",
+        "Haswell",
+    ),
 }
+#: The OpenBLAS core of the recording being made (``OPENBLAS_CORETYPE``; ``None``: FSL's own
+#: choice).
+CORE: str | None = None
 
 
 def use(version: str) -> None:
     """Record with FSL ``version`` (one of :data:`INSTALLATIONS`)."""
-    global FSL, MCFLIRT, OUT
-    FSL, OUT = INSTALLATIONS[version]
+    global FSL, MCFLIRT, OUT, CORE
+    FSL, OUT, CORE = INSTALLATIONS[version]
     MCFLIRT = FSL / "bin" / "mcflirt"
     found = (FSL / "etc" / "fslversion").read_text().split(":")[0].strip()
     if found != version:
@@ -636,6 +650,7 @@ def run_one(run: Run, force: bool) -> dict:
         "PATH": "/usr/bin:/bin",
         "FSLDIR": str(FSL),
         "FSLOUTPUTTYPE": "NIFTI_GZ",
+        **({"OPENBLAS_CORETYPE": CORE} if CORE else {}),
         **run.env,
     }
     env = {k: v for k, v in env.items() if v is not None}

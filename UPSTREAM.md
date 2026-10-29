@@ -17,9 +17,10 @@ Checked 2026-10-09 with `git ls-remote --tags` and fMRIPrep's lockfile (`fmripre
 | FreeSurfer | FreeSurfer Software License v1.0 | `v8.2.0` → `d932c45b7941` (pending D5) | 7.3.2 | fMRIPrep runs 7.3.2; D5 proposes porting 8.2.0 and validating against 7.4.x |
 | CORE-MATH | MIT | `master` → `040ee482a8ca` (no releases; 2026-10-09) | – (fMRIPrep's tools use glibc's libm) | correctly rounded `exp`, `log`, `sin`, `cos`, `asin`, `acos`, `atan2`, `cbrt`, `powf`, `expf`, `logf`, `sinf`, `cosf`, `tanhf`, `cbrtf` in `larmorx_core::math` (user decision 2026-10-09; `tanhf`, `cbrtf` 2026-10-23 for 3dUnifize) |
 | GNU C Library | LGPL-2.1-or-later | `glibc-2.35` release tarball, SHA-256 `5123732f6b67` (tag `glibc-2.35` → `f94f6d8a3572`) | – (AFNI 25.2.09 runs with Ubuntu 22.04's glibc 2.35) | `sinf`/`cosf` (x86-64 FMA build), ported in `crates-gpl/larmorx-gpl-afni` so that the 3dTshift replica's weighted sinc matches AFNI on every platform; LGPL-2.1 §3 allows the GPL-3 package to include it |
-| SciPy | BSD-3-Clause | `v1.15.2` → `0f1fd4a7268b` | 1.15.2 (fMRIPrep's lockfile, `pixi.lock`) | `scipy.ndimage` spline interpolation (`map_coordinates`, `spline_filter`) in `larmorx_interp::ndimage`; the development venv runs 1.15.3, whose `ndimage` interpolation code is identical (checked 2026-10-10) |
+| SciPy | BSD-3-Clause | `v1.15.2` → `0f1fd4a7268b`, **and 1.18.1** (sdist SHA-256 `52c4b7422442…`, `<workspace>/tags/scipy-1.18.1`; followed since 2026-10-29: the reflect initialisation, `docs/findings/scipy-ndimage.md`) | 1.15.2 (fMRIPrep's lockfile, `pixi.lock`) | `scipy.ndimage` spline interpolation (`map_coordinates`, `spline_filter`) in `larmorx_interp::ndimage`; the development venv runs 1.15.3, whose `ndimage` interpolation code is identical (checked 2026-10-10) |
 | nitransforms | MIT | `25.1.0` → `c10f63d1a1f7` | 25.1.0 (fMRIPrep's lockfile) | coordinate mapping, transform chains and ITK readers under fMRIPrep's one-shot resampler (`larmorx_transform::nitransforms`, `larmorx.transforms`); identical to the installed wheel |
-| OpenBLAS | BSD-3-Clause | `v0.3.30` release tarball, SHA-256 `27342cff5186` (tag `v0.3.30` → `993fad6aebbc`) | – (fMRIPrep's numpy calls the OpenBLAS its wheel bundles; numpy 2.3.5's is scipy-openblas64 0.3.30) | the operation order of the Haswell kernels behind numpy's 4×4 `@`/`dot` (`dgemm`, `dgemv`) and `np.linalg.inv` (`dgesv`: `getf2_k`, `getrs`, the triangular solves, `idamax`), reproduced in `larmorx_transform::openblas` so that `lx.transforms` gives the same bits on every platform (docs/findings/numpy-blas.md) |
+| OpenBLAS | BSD-3-Clause | `v0.3.30` release tarball, SHA-256 `27342cff5186` (tag `v0.3.30` → `993fad6aebbc`); 0.3.34 (numpy 2.5.4's scipy-openblas64 0.3.34.106.0; tarball SHA-256 `cd7e12986832…`): the same kernels, checked 2026-10-29 | – (fMRIPrep's numpy calls the OpenBLAS its wheel bundles; numpy 2.3.5's is scipy-openblas64 0.3.30) | the operation order of the Haswell kernels behind numpy's 4×4 `@`/`dot` (`dgemm`, `dgemv`) and `np.linalg.inv` (`dgesv`: `getf2_k`, `getrs`, the triangular solves, `idamax`), reproduced in `larmorx_transform::openblas` so that `lx.transforms` gives the same bits on every platform (docs/findings/numpy-blas.md) |
+| OpenBLAS (FSL's) | BSD-3-Clause | 0.3.33 release tarball, SHA-256 `6761af1d9f5d…` (`tags/OpenBLAS-0.3.33`) | FSL 6.0.7.23's `liblapack.so.3` / `libblas.so.3` (libopenblas 0.3.33, conda-forge) | LAPACK's 4 × 4 getrf, getri, trtri, gesv and the Haswell kernels they reach, with the reference LAPACK 3.12.0 (dgetri) it bundles: `larmorx-nc-core`'s `lapack.rs` |
 | fMRIPrep | Apache-2.0 | `master` → `21a490fb89ac` (the workspace clone; the venv runs it as 26.0.0.dev1+g21a490fb8) | – | the one-shot BOLD resampler (`fmriprep/interfaces/resampling.py`, `utils/transforms.py`) in `larmorx_transform::resample_series` and `larmorx.transforms.resample_series` |
 
 **ANTs/ITK patch level (decided 2026-10-09: ANTs v2.6.5 + ITK v5.4.5).** CLAUDE.md first said "ITK v5.4.7 (pinned by ANTs 2.6)", but no ANTs 2.6.x release pins 5.4.7, and fMRIPrep's image runs ANTs 2.6.2 linked against ITK 5.4.4. The candidates were:
@@ -35,7 +36,7 @@ Validation against fMRIPrep's outputs must allow for the patch-level difference 
 
 | Project | Licence | Version | Used for |
 |---|---|---|---|
-| numpy | BSD-3-Clause | 2.3.5 (development venv; sdist SHA-256 `784db1dcdab5`) | which BLAS and LAPACK routine each 4×4 operation calls and with which memory layout (`numpy/_core/src/umath/matmul.c.src`, `_core/src/common/cblasfuncs.c`, `linalg/umath_linalg.cpp`); read, not translated |
+| numpy | BSD-3-Clause | 2.3.5 (development venv; sdist SHA-256 `784db1dcdab5`), and 2.5.4 (sdist SHA-256 `9a94cf751c9a…`; checked 2026-10-29: no change on the paths larmorx follows) | which BLAS and LAPACK routine each 4×4 operation calls and with which memory layout (`numpy/_core/src/umath/matmul.c.src`, `_core/src/common/cblasfuncs.c`, `linalg/umath_linalg.cpp`); read, not translated |
 | nibabel | MIT | 5.4.2 (development venv); fMRIPrep's image has 5.3.2 | NIfTI reading/writing semantics (`larmorx-io`), parity oracle |
 | NIfTI-1/2 standard | public domain | `nifti1.h` / `nifti2.h` | file format |
 
@@ -69,12 +70,12 @@ FSL 6.0.7.23 (`~/fsl-6.0.7.23/conda-meta/`, checked 2026-10-29), the source of t
 | fsl-newnifti | FSL Licence | `5.0.0` | `h56e42e0_0` | `b6b5305dfed3…b8f2442ad` | NIfTI I/O (FSL-60) |
 | fsl-utils | FSL Licence | `2412.6` | `hdf63e7b_1` | `b6616878217f…01c93b9e0` | start-up, usage ID |
 | fsl-znzlib | FSL Licence | `2511.3` | `hcc786c9_101_zlib` | `9722b02e530a…5ded44334` | gzip, zstd and bzip2 I/O |
-| fsl-armawrap | Apache-2.0 | `0.7.0` (Armadillo 14.2.1) | `h2bc3f7f_3` | `ff91e76239af…a4c853148` | matrix printing; 4 × 4 inverses through LAPACK (not followed yet) |
+| fsl-armawrap | Apache-2.0 | `0.7.0` (Armadillo 14.2.1) | `h2bc3f7f_3` | `ff91e76239af…a4c853148` | matrix printing; 4 × 4 inverses, solves and determinants through LAPACK (followed since 2026-10-29) |
 | fsl-bet2 | FSL Licence | `2111.9` | `hcdb67c3_3` | `6ee4925e2b98…97365e40a` | bet2, betsurf, the `bet` script |
 | fsl-meshclass | FSL Licence | `2111.0` | `h8c873e0_12` | `c5e71e8f99e6…8079a54f1` | BET's mesh |
 | fsl-avwutils | FSL Licence | `2209.6` | `h6b316f4_0` | `a8ce7e16c92b…09d7cd9db` | `fslstats`, `fslmaths` in `bet` |
 | fslpy | Apache-2.0 | `3.27.0` | `pyhd8ed1ab_0` | `637448124c0b…9bf7e1776` | `imtest`, `remove_ext`, `imglob` |
-| libopenblas | BSD-3-Clause | `0.3.33` | `pthreads_h94d23a6_0` | `3d9aa85648e5…ccedc8903` | Armadillo 14.2.1's LAPACK |
+| libopenblas | BSD-3-Clause | `0.3.33` | `pthreads_h94d23a6_0` | `3d9aa85648e5…ccedc8903` | Armadillo 14.2.1's LAPACK (followed, Haswell kernels) |
 
 Full SHA-256 values are in `oracles/fsl-6.0.7/mcflirt/manifest.json`. fMRIPrep's published
 ds000005 derivatives (21.0.1) were made with FSL 6.0.5.1; fMRIPrep's current image installs FSL

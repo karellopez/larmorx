@@ -20,8 +20,9 @@
 //!   behaviour; larmorx reproduces x86-64's result (the integer `i64::MIN`), and where SciPy
 //!   would then read outside the array (modes `nearest`, orders ≥ 1) it returns NaN.
 //!
-//! One SciPy defect is corrected by default (D13, `docs/api/upstream-defects.md`): the
-//! prefilter's reflect boundary (SCI-03). [`UpstreamDefects::Reproduce`] gives SciPy's result.
+//! The prefilter's reflect boundary follows SciPy 1.18.1 in both modes of [`UpstreamDefects`]:
+//! SciPy up to 1.17 read a coefficient it had already updated (SCI-03,
+//! `docs/api/upstream-defects.md`), corrected by default here until SciPy 1.18 fixed it.
 #![allow(clippy::needless_range_loop)]
 
 mod geometric;
@@ -425,8 +426,8 @@ fn check_shape(len: usize, shape: &[usize]) -> Result<(), NdimageError> {
 /// Fortran-ordered float64 array, in place. Orders 0 and 1 leave the data unchanged.
 ///
 /// Lines are filtered in parallel on the current rayon pool when `parallel` is set; the result
-/// does not depend on it. `defects` chooses between the exact reflect boundary and SciPy's
-/// (SCI-03); the returned notices say whether that changed the result.
+/// does not depend on it. The reflect boundary is SciPy 1.18.1's whatever `defects` says (SCI-03,
+/// fixed upstream), so the returned notices hold none for it.
 pub fn spline_filter1d(
     data: &mut [f64],
     shape: &[usize],
@@ -473,7 +474,8 @@ pub fn spline_filter(
 }
 
 /// The SCI-03 notice when the reflect boundary's initialisation changed (fixed) or would have
-/// changed (reproduced) the prefiltered coefficients.
+/// changed (reproduced) the prefiltered coefficients: never since SciPy 1.18.1 fixed it (the
+/// mechanism kept for a boundary choice to come).
 pub fn reflect_notice(changed: bool, mode: Mode, defects: UpstreamDefects) -> Option<Notice> {
     changed.then(|| {
         let detail = match defects {
@@ -492,7 +494,8 @@ pub fn reflect_notice(changed: bool, mode: Mode, defects: UpstreamDefects) -> Op
 
 /// Filters every line along `axis`. A line `(inner, outer)` has elements
 /// `inner + stride·(t + len·outer)` for `t < len`, with `stride` the product of the earlier
-/// axes' lengths. Returns whether SCI-03 changed (or would have changed) a coefficient.
+/// axes' lengths. Returns whether SCI-03 changed (or would have changed) a coefficient: never
+/// since SciPy 1.18.1.
 pub(crate) fn filter_axis(
     data: &mut [f64],
     shape: &[usize],

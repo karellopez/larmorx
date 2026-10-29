@@ -3583,7 +3583,8 @@ def _(ctx: Context) -> dict[str, Any]:
 
 @case("py.ndimage.reproduce", covers=("lx.ndimage.map_coordinates", "lx.ndimage.spline_filter", "lx.ndimage.spline_filter1d"))  # fmt: skip
 def _(ctx: Context) -> dict[str, Any]:
-    """SciPy's reflect boundary reproduced (SCI-03): the reflect modes of
+    """The reflect modes with ``upstream_defects="reproduce"`` (SciPy 1.18.1's reflect boundary,
+    which fixed SCI-03: the same values as the default since 2026-10-29) of
     ``py.ndimage.map_coordinates`` and ``py.ndimage.spline_filter``."""
     data = _ndimage_input()
     coords = np.stack(

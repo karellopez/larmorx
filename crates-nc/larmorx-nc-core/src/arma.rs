@@ -1,24 +1,29 @@
 // SPDX-License-Identifier: LicenseRef-FSL AND Apache-2.0
-// Translated from Armadillo 10.5.1 as bundled by fsl-armawrap 0.6.0 (Apache-2.0; Copyright
-// 2008-2016 Conrad Sanderson, 2008-2016 National ICT Australia (NICTA), 2017-2020 Arroyo
-// Consortium, 2017-2020 Data61, CSIRO): mul_gemm.hpp, mul_gemv.hpp, op_dot_meat.hpp,
-// op_inv_meat.hpp, op_det_meat.hpp, auxlib_meat.hpp (solve_square_tiny), fn_trace.hpp,
+// Translated from Armadillo 14.2.1 as bundled by fsl-armawrap 0.7.0 (FSL 6.0.7.23) and Armadillo
+// 10.5.1 as bundled by fsl-armawrap 0.6.0 (FSL 6.0.7.17) (Apache-2.0; Copyright 2008-2021 Conrad
+// Sanderson, 2008-2016 National ICT Australia (NICTA), 2017-2020 Arroyo Consortium, 2017-2021
+// Data61 / CSIRO): mul_gemm.hpp, mul_gemv.hpp, op_dot_meat.hpp, op_inv_gen_meat.hpp (14.2.1),
+// op_inv_meat.hpp (10.5.1), op_det_meat.hpp, auxlib_meat.hpp (inv, inv_tr, det,
+// solve_square_fast; 10.5.1's solve_square_tiny), trimat_helper.hpp, sym_helper.hpp, fn_trace.hpp,
 // fn_accu.hpp, glue_times_meat.hpp. Part of larmorx-nc (FSL Licence terms; see LICENSE).
 //! The small dense matrices of FSL's NEWMAT layer, evaluated the way FSL's binaries evaluate
 //! them.
 //!
-//! FSL 6.0.7's `NEWMAT::Matrix` is `armawrap`, a thin layer over Armadillo 10.5.1; every
-//! matrix expression in newimage, miscmaths, FLIRT and mcflirt is an Armadillo expression
-//! template, and the order of its floating-point operations is Armadillo's. This module gives
-//! those operations, one function per Armadillo code path, so that a translation of FSL code
-//! can say exactly which path an expression takes:
+//! FSL 6.0.7.23's `NEWMAT::Matrix` is `armawrap` 0.7.0, a thin layer over Armadillo 14.2.1
+//! (6.0.7.17's was 0.6.0 over Armadillo 10.5.1); every matrix expression in newimage,
+//! miscmaths, FLIRT and mcflirt is an Armadillo expression template, and the order of its
+//! floating-point operations is Armadillo's. This module gives those operations, one function
+//! per Armadillo code path, so that a translation of FSL code can say exactly which path an
+//! expression takes:
 //!
 //! - products of square matrices up to 4 × 4 ([`mul_tinysq`]), of a square matrix and a vector
 //!   up to 4 ([`gemv_tinysq`]) and the general small product of Armadillo's emulation
-//!   ([`gemm_emul_large`]);
-//! - `inv()` ([`inv`]: the closed-form cofactor inverse up to 4 × 4, then Armadillo's fallbacks),
-//!   `det()` ([`det`]) and `solve()` ([`solve`]: `inv(A)*B` is rewritten by Armadillo as
-//!   `solve(A, B)`, which for 4 × 4 multiplies by the cofactor inverse);
+//!   ([`gemm_emul_large`]) (the same in both releases);
+//! - `inv()` ([`inv`]: closed forms for 2 × 2 and 3 × 3, then a diagonal matrix's reciprocals,
+//!   LAPACK's triangular inverse, or its LU inverse), `det()` ([`det`]) and `inv(A)*B` ([`solve`]:
+//!   rewritten by Armadillo as a solve, LAPACK `dgesv`), the LAPACK routines as FSL 6.0.7.23's
+//!   OpenBLAS computes them ([`crate::lapack`]); Armadillo 10.5.1's closed-form rules are kept
+//!   in [`armadillo_10_5_1`];
 //! - `dot()` ([`dot`]: two interleaved accumulators), `accu()` ([`accu`]), `trace()` ([`trace`]).
 //!
 //! The rules that decide which path an expression takes, as Armadillo applies them, are
@@ -26,11 +31,13 @@
 //! `A.i() * B * C` is `solve(A, B * C)`, `A * B.i() * C` is `A * solve(B, C)`, and `A * B * C`
 //! of equal square sizes is `(A * B) * C`).
 //!
-//! FSL's binaries were built with GCC 13.2 at `-O2 -march=nocona`: no fused multiply-adds and
-//! no reassociation, so every `a*b + c` below is two roundings, in the order written.
+//! FSL's binaries were built with GCC at `-O2 -march=nocona` (13.2 for 6.0.7.17, 15.2 for
+//! 6.0.7.23): no fused multiply-adds and no reassociation, so every `a*b + c` below is two
+//! roundings, in the order written.
 
 use std::fmt;
 
+use crate::lapack;
 use crate::sse::{self, S64};
 
 /// A column-major dense matrix of `f64` (Armadillo's `Mat<double>`; NEWMAT indices are 1-based,
@@ -79,6 +86,17 @@ impl Mat {
         Mat {
             rows: values.len(),
             cols: 1,
+            data: values.to_vec(),
+        }
+    }
+
+    /// A matrix from its values in column-major order (`values.len() == rows * cols`, column by
+    /// column: Armadillo's and LAPACK's own layout).
+    pub fn from_col_major(rows: usize, cols: usize, values: &[f64]) -> Mat {
+        assert_eq!(values.len(), rows * cols);
+        Mat {
+            rows,
+            cols,
             data: values.to_vec(),
         }
     }
@@ -559,21 +577,66 @@ pub fn det_tiny(x: &Mat) -> f64 {
     }
 }
 
-/// `det()` (`op_det::apply_direct`) of a square matrix: for up to 4 × 4 the closed form, unless
-/// its magnitude is below machine epsilon, then an LU decomposition (Armadillo's fallback).
+/// `det()` (Armadillo 14.2.1's `op_det::apply_direct`) of a square matrix: 0 × 0 is 1, 1 × 1
+/// its element; 2 × 2 and 3 × 3 the closed form when its magnitude lies strictly between
+/// machine epsilon and its reciprocal; otherwise a diagonal or triangular matrix the product of
+/// its diagonal from 1, and any other matrix by LAPACK `dgetrf` ([`lapack::getrf`]): the product
+/// of U's diagonal from its first element, negated for an odd number of row interchanges.
 pub fn det(x: &Mat) -> f64 {
     assert_eq!(x.rows, x.cols, "det(): given matrix must be square sized");
-    if x.rows <= 4 {
+    let n = x.rows;
+    if n == 0 {
+        return 1.0;
+    }
+    if n == 1 {
+        return x.data[0];
+    }
+    if n <= 3 {
         let d = det_tiny(x);
-        if d.abs() >= f64::EPSILON {
+        let a = d.abs();
+        if a > f64::EPSILON && a < 1.0 / f64::EPSILON {
             return d;
         }
     }
-    det_lu(x)
+    if is_diagmat(x) || is_triu(x) || is_tril(x) {
+        let mut val = S64(1.0);
+        for i in 0..n {
+            val *= x.at(i, i);
+        }
+        return val.0;
+    }
+    assert!(n <= 4, "det(): LAPACK's path is ported up to 4 x 4");
+    let mut a = x.data.clone();
+    let mut ipiv = [0i32; 4];
+    lapack::getrf(&mut a, n, &mut ipiv);
+    let mut val = S64(a[0]);
+    for i in 1..n {
+        val *= a[i * n + i];
+    }
+    let mut sign = 1;
+    for (i, &ip) in ipiv.iter().enumerate().take(n) {
+        if i as i32 != ip - 1 {
+            sign = -sign;
+        }
+    }
+    if sign < 0 { -val.0 } else { val.0 }
+}
+
+/// Armadillo 14.2.1's `trimat_helper::is_triu`: at least 2 × 2 and every element below the
+/// diagonal exactly 0 (the bottom-left one checked first).
+fn is_triu(x: &Mat) -> bool {
+    let n = x.rows;
+    n >= 2 && (0..n - 1).all(|c| (c + 1..n).all(|r| x.at(r, c) == 0.0))
+}
+
+/// `trimat_helper::is_tril`: at least 2 × 2 and every element above the diagonal exactly 0.
+fn is_tril(x: &Mat) -> bool {
+    let n = x.rows;
+    n >= 2 && (1..n).all(|c| (0..c).all(|r| x.at(r, c) == 0.0))
 }
 
 /// The determinant by LU decomposition with partial pivoting (LAPACK `dgetrf`'s pivoting and
-/// elimination order; used only below Armadillo's tiny-matrix threshold).
+/// elimination order; Armadillo 10.5.1's fallback below its tiny-matrix threshold).
 fn det_lu(x: &Mat) -> f64 {
     let n = x.rows;
     let mut a = x.clone();
@@ -816,32 +879,103 @@ pub fn inv_tiny(x: &Mat) -> Option<Mat> {
     Some(out)
 }
 
-/// `inv()` (`op_inv::apply_direct`) of a square matrix: [`inv_tiny`] for up to 4 × 4, else (or
-/// when it declines) the inverse of a diagonal matrix as reciprocals, of a triangular one by
-/// back substitution, and otherwise by LU decomposition with partial pivoting. Armadillo runs
-/// the last two in LAPACK (OpenBLAS in FSL's build); they are reached only by singular or
-/// extremely scaled matrices, and their operation order here is LAPACK's reference order.
+/// `inv()` (Armadillo 14.2.1's `op_inv_gen_full::apply_direct`, no options) of a square matrix:
+///
+/// - 1 × 1: the reciprocal (singular when the element is 0);
+/// - 2 × 2 and 3 × 3: the closed form ([`inv_tiny_2x2`], [`inv_tiny_3x3`]) unless it declines;
+/// - a diagonal matrix (every off-diagonal element exactly 0): the reciprocals of its diagonal,
+///   the zeros kept as they are (singular at the first zero);
+/// - an upper or lower triangular matrix: LAPACK `dtrtri` ([`lapack::trtri`]), the other
+///   triangle kept;
+/// - any other: LAPACK `dgetrf` then `dgetri` ([`lapack::getrf`], [`lapack::getri`]).
+///
+/// Armadillo's symmetric path (`dsytrf`/`dsytri`) needs at least 100 rows
+/// (`sym_helper::is_approx_sym(A, 100)`), so FSL's small matrices never take it. Only sizes up
+/// to 4 × 4 are ported (FSL's NEWMAT layer inverts nothing larger on the replicated paths).
+/// FSL 6.0.7.17's Armadillo 10.5.1 computed these with its closed-form cofactor inverse
+/// ([`armadillo_10_5_1::inv`]).
 pub fn inv(x: &Mat) -> Result<Mat, Singular> {
     assert_eq!(x.rows, x.cols, "inv(): given matrix must be square sized");
-    if x.rows <= 4
-        && let Some(m) = inv_tiny(x)
-    {
-        return Ok(m);
-    }
     let n = x.rows;
+    let mut out = x.clone();
+    match n {
+        0 => return Ok(out),
+        1 => {
+            let a = x.data[0];
+            out.data[0] = sse::div_f64(1.0, a);
+            return if a != 0.0 { Ok(out) } else { Err(Singular) };
+        }
+        2 => {
+            if let Some(m) = inv_tiny_2x2(x) {
+                return Ok(m);
+            }
+        }
+        3 => {
+            if let Some(m) = inv_tiny_3x3(x) {
+                return Ok(m);
+            }
+        }
+        _ => {}
+    }
     if is_diagmat(x) {
-        let mut out = Mat::zeros(n, n);
-        let mut ok = true;
         for i in 0..n {
             let v = x.at(i, i);
+            let r = sse::div_f64(1.0, v);
             if v == 0.0 {
-                ok = false;
+                return Err(Singular);
             }
-            out.set(i, i, sse::div_f64(1.0, v));
+            out.set(i, i, r);
         }
-        return if ok { Ok(out) } else { Err(Singular) };
+        return Ok(out);
     }
-    inv_lu(x)
+    assert!(n <= 4, "inv(): LAPACK's path is ported up to 4 x 4");
+    let triu = is_triu(x);
+    if triu || is_tril(x) {
+        return if lapack::trtri(&mut out.data, n, triu) == 0 {
+            Ok(out)
+        } else {
+            Err(Singular)
+        };
+    }
+    let mut ipiv = [0i32; 4];
+    if lapack::getrf(&mut out.data, n, &mut ipiv) != 0 {
+        return Err(Singular);
+    }
+    if lapack::getri(&mut out.data, n, &ipiv) != 0 {
+        return Err(Singular);
+    }
+    Ok(out)
+}
+
+/// Armadillo 14.2.1's `op_inv_gen_full::apply_tiny_2x2`: the closed form over `a d - b c`, or
+/// `None` when the determinant's magnitude is below machine epsilon, above its reciprocal or
+/// NaN.
+pub fn inv_tiny_2x2(x: &Mat) -> Option<Mat> {
+    let xm = &x.data;
+    let a = S64(xm[p(2, 0, 0)]);
+    let b = S64(xm[p(2, 0, 1)]);
+    let c = S64(xm[p(2, 1, 0)]);
+    let d = S64(xm[p(2, 1, 1)]);
+    let det_val = a * d - b * c;
+    let abs_det = det_val.0.abs();
+    if abs_det < f64::EPSILON || abs_det > 1.0 / f64::EPSILON || det_val.is_nan() {
+        return None;
+    }
+    let mut out = Mat::zeros(2, 2);
+    out.data[p(2, 0, 0)] = (d / det_val).0;
+    out.data[p(2, 0, 1)] = (-b / det_val).0;
+    out.data[p(2, 1, 0)] = (-c / det_val).0;
+    out.data[p(2, 1, 1)] = (a / det_val).0;
+    Some(out)
+}
+
+/// Armadillo 14.2.1's `op_inv_gen_full::apply_tiny_3x3`: Armadillo 10.5.1's cofactor formula
+/// ([`inv_tiny`] for 3 × 3), which now also declines a NaN determinant.
+pub fn inv_tiny_3x3(x: &Mat) -> Option<Mat> {
+    if det_tiny(x).is_nan() {
+        return None;
+    }
+    inv_tiny(x)
 }
 
 /// `Mat::is_diagmat`: every off-diagonal element is exactly 0.
@@ -904,19 +1038,92 @@ fn inv_lu(x: &Mat) -> Result<Mat, Singular> {
     Ok(b)
 }
 
-/// `solve(A, B)` as `auxlib::solve_square_fast` computes it, which is how Armadillo evaluates
-/// `inv(A) * B`: for `A` up to 4 × 4, [`inv_tiny`] of `A` times `B` by [`gemm_emul_large`];
-/// otherwise (or when the tiny inverse declines) an LU solve (LAPACK `dgesv` in FSL's build,
-/// here by the fallback [`inv`]).
+/// `inv(A) * B` as Armadillo 14.2.1 evaluates it (`glue_times_redirect2_helper`, also for
+/// `inv(A) * B * C` and `A * inv(B) * C`): `auxlib::solve_square_fast`, LAPACK `dgesv`
+/// ([`lapack::gesv`]) for every size FSL meets (the symmetric `dsytrf`/`dsytrs` path needs at
+/// least 100 rows). A zero pivot is an error ("matrix multiplication: problem with matrix
+/// inverse"). Only sizes up to 4 × 4 with up to 4 columns of `B` are ported. FSL 6.0.7.17's
+/// Armadillo 10.5.1 multiplied `B` by its closed-form inverse ([`armadillo_10_5_1::solve`]).
 pub fn solve(a: &Mat, b: &Mat) -> Result<Mat, Singular> {
     assert_eq!(a.rows, b.rows, "solve(): number of rows must be the same");
-    if a.rows <= 4
-        && let Some(ai) = inv_tiny(a)
-    {
-        return Ok(gemm_emul_large(&ai, b));
+    assert_eq!(a.rows, a.cols, "inv(): given matrix must be square sized");
+    let n = a.rows;
+    if n == 0 || b.is_empty() {
+        return Ok(Mat::zeros(a.cols, b.cols));
     }
-    let ai = inv_lu(a)?;
-    Ok(gemm_emul_large(&ai, b))
+    assert!(
+        n <= 4 && b.cols <= 4,
+        "solve(): LAPACK's path is ported up to 4 x 4"
+    );
+    let mut lu = a.data.clone();
+    let mut out = b.clone();
+    let mut ipiv = [0i32; 4];
+    if lapack::gesv(&mut lu, n, &mut ipiv, &mut out.data, b.cols) != 0 {
+        return Err(Singular);
+    }
+    Ok(out)
+}
+
+/// The rules of FSL 6.0.7.17's Armadillo 10.5.1 (fsl-armawrap 0.6.0) for `inv()`, `inv(A) * B`
+/// and `det()`, kept beside Armadillo 14.2.1's so that the step between the two FSL releases can
+/// be reproduced (`docs/findings/fsl-mcflirt.md`, "FSL 6.0.7.23"): the closed-form cofactor
+/// inverse and determinant up to 4 × 4, their fallbacks otherwise.
+pub mod armadillo_10_5_1 {
+    use super::{Mat, Singular, det_lu, det_tiny, gemm_emul_large, inv_lu, inv_tiny, is_diagmat};
+    use crate::sse;
+
+    /// `det()` (`op_det::apply_direct`): for up to 4 × 4 the closed form, unless its magnitude
+    /// is below machine epsilon, then an LU decomposition.
+    pub fn det(x: &Mat) -> f64 {
+        assert_eq!(x.rows, x.cols, "det(): given matrix must be square sized");
+        if x.rows <= 4 {
+            let d = det_tiny(x);
+            if d.abs() >= f64::EPSILON {
+                return d;
+            }
+        }
+        det_lu(x)
+    }
+
+    /// `inv()` (`op_inv::apply_direct`): [`inv_tiny`] for up to 4 × 4, else (or when it
+    /// declines) the inverse of a diagonal matrix as reciprocals, and otherwise by LU
+    /// decomposition with partial pivoting (reached only by singular or extremely scaled
+    /// matrices).
+    pub fn inv(x: &Mat) -> Result<Mat, Singular> {
+        assert_eq!(x.rows, x.cols, "inv(): given matrix must be square sized");
+        if x.rows <= 4
+            && let Some(m) = inv_tiny(x)
+        {
+            return Ok(m);
+        }
+        let n = x.rows;
+        if is_diagmat(x) {
+            let mut out = Mat::zeros(n, n);
+            let mut ok = true;
+            for i in 0..n {
+                let v = x.at(i, i);
+                if v == 0.0 {
+                    ok = false;
+                }
+                out.set(i, i, sse::div_f64(1.0, v));
+            }
+            return if ok { Ok(out) } else { Err(Singular) };
+        }
+        inv_lu(x)
+    }
+
+    /// `solve(A, B)` as `auxlib::solve_square_fast` computed it: for `A` up to 4 × 4,
+    /// [`inv_tiny`] of `A` times `B` by [`gemm_emul_large`]; otherwise an LU solve.
+    pub fn solve(a: &Mat, b: &Mat) -> Result<Mat, Singular> {
+        assert_eq!(a.rows, b.rows, "solve(): number of rows must be the same");
+        if a.rows <= 4
+            && let Some(ai) = inv_tiny(a)
+        {
+            return Ok(gemm_emul_large(&ai, b));
+        }
+        let ai = inv_lu(a)?;
+        Ok(gemm_emul_large(&ai, b))
+    }
 }
 
 /// `trace(A)` of an evaluated matrix: two interleaved partial sums of the diagonal.

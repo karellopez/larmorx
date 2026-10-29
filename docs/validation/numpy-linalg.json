@@ -1,23 +1,33 @@
 {
  "environment": {
-  "cpu": "Intel(R) Core(TM) i7-8750H CPU @ 2.20GHz",
+  "cpu": "AMD Ryzen 9 7945HX with Radeon Graphics",
   "larmorx": "0.0.1",
-  "larmorx_commit": "b4b2401c25ff",
-  "larmorx_testdata_commit": "00b862132e9c",
-  "logical_cpus": 12,
+  "larmorx_commit": "d7bd05d2fa39",
+  "larmorx_testdata_commit": "52124bc98f9f",
+  "logical_cpus": 32,
   "os": "Linux-6.8.0-124-generic-x86_64-with-glibc2.35",
   "packages": {
    "fmriprep": "26.0.0.dev1+g21a490fb8",
    "nibabel": "5.4.2",
    "nitransforms": "25.1.0",
-   "numpy": "2.3.5",
+   "numpy": "2.5.4",
    "sdcflows": "2.17.1",
    "threadpoolctl": "3.7.0"
   },
   "platform": "Linux x86_64",
-  "python": "3.12.10"
+  "python": "3.12.16",
+  "python_environment": "numpy 2.5.4 (OpenBLAS 0.3.34.106.0 (Haswell)), SciPy 1.18.1 (oracles/python-newest)"
  },
- "reference": "numpy 2.3.5 with its bundled OpenBLAS, in-process, on the Haswell kernels; nitransforms, sdcflows and fMRIPrep for the mapped points, orientations and loaded transforms",
+ "oracle_cache": {
+  "differences": 0,
+  "fresh": {},
+  "location": "<workspace>/oracles/cache",
+  "mode": "use",
+  "ran": 0,
+  "saved_seconds": 0.0,
+  "served": 0
+ },
+ "reference": "numpy 2.5.4 with its bundled OpenBLAS, in-process, on the Haswell kernels; nitransforms, sdcflows and fMRIPrep for the mapped points, orientations and loaded transforms",
  "results": [
   {
    "case": "products/general",
@@ -25,8 +35,11 @@
    "checks_passed": 1,
    "checks_total": 1,
    "failed_checks": [],
+   "measured": {
+    "a @ b (general)": "1000000 of 1000000"
+   },
    "reason": "",
-   "seconds": 1.053,
+   "seconds": 0.935,
    "status": "pass"
   },
   {
@@ -35,8 +48,11 @@
    "checks_passed": 1,
    "checks_total": 1,
    "failed_checks": [],
+   "measured": {
+    "a @ b (affine)": "1000000 of 1000000"
+   },
    "reason": "",
-   "seconds": 1.063,
+   "seconds": 1.32,
    "status": "pass"
   },
   {
@@ -45,8 +61,11 @@
    "checks_passed": 1,
    "checks_total": 1,
    "failed_checks": [],
+   "measured": {
+    "a @ b (exponents)": "1000000 of 1000000"
+   },
    "reason": "",
-   "seconds": 1.576,
+   "seconds": 1.329,
    "status": "pass"
   },
   {
@@ -55,8 +74,11 @@
    "checks_passed": 1,
    "checks_total": 1,
    "failed_checks": [],
+   "measured": {
+    "a @ b (sparse)": "1000000 of 1000000"
+   },
    "reason": "",
-   "seconds": 0.642,
+   "seconds": 0.699,
    "status": "pass"
   },
   {
@@ -65,8 +87,11 @@
    "checks_passed": 1,
    "checks_total": 1,
    "failed_checks": [],
+   "measured": {
+    "a @ b (nonfinite; NaN compared as NaN, not by its bits)": "1000000 of 1000000"
+   },
    "reason": "",
-   "seconds": 0.993,
+   "seconds": 1.075,
    "status": "pass"
   },
   {
@@ -75,8 +100,11 @@
    "checks_passed": 1,
    "checks_total": 1,
    "failed_checks": [],
+   "measured": {
+    "itk-to-ras": "1000000 of 1000000"
+   },
    "reason": "",
-   "seconds": 2.156,
+   "seconds": 1.969,
    "status": "pass"
   },
   {
@@ -85,8 +113,11 @@
    "checks_passed": 1,
    "checks_total": 1,
    "failed_checks": [],
+   "measured": {
+    "head-motion": "1000000 of 1000000"
+   },
    "reason": "",
-   "seconds": 2.177,
+   "seconds": 1.901,
    "status": "pass"
   },
   {
@@ -95,8 +126,11 @@
    "checks_passed": 1,
    "checks_total": 1,
    "failed_checks": [],
+   "measured": {
+    "np.linalg.inv (general)": "1000000 of 1000000"
+   },
    "reason": "",
-   "seconds": 0.953,
+   "seconds": 0.913,
    "status": "pass"
   },
   {
@@ -105,8 +139,11 @@
    "checks_passed": 1,
    "checks_total": 1,
    "failed_checks": [],
+   "measured": {
+    "np.linalg.inv (affine)": "1000000 of 1000000"
+   },
    "reason": "",
-   "seconds": 1.029,
+   "seconds": 0.977,
    "status": "pass"
   },
   {
@@ -115,8 +152,11 @@
    "checks_passed": 1,
    "checks_total": 1,
    "failed_checks": [],
+   "measured": {
+    "np.linalg.inv (rigid)": "1000000 of 1000000"
+   },
    "reason": "",
-   "seconds": 1.045,
+   "seconds": 0.88,
    "status": "pass"
   },
   {
@@ -125,8 +165,11 @@
    "checks_passed": 1,
    "checks_total": 1,
    "failed_checks": [],
+   "measured": {
+    "np.linalg.inv (exponents)": "1000000 of 1000000"
+   },
    "reason": "",
-   "seconds": 1.243,
+   "seconds": 0.938,
    "status": "pass"
   },
   {
@@ -135,8 +178,12 @@
    "checks_passed": 2,
    "checks_total": 2,
    "failed_checks": [],
+   "measured": {
+    "np.linalg.inv (near-singular)": "1000000 of 1000000",
+    "singular in both (numpy raises)": 6
+   },
    "reason": "",
-   "seconds": 7.803,
+   "seconds": 4.396,
    "status": "pass"
   },
   {
@@ -145,8 +192,11 @@
    "checks_passed": 1,
    "checks_total": 1,
    "failed_checks": [],
+   "measured": {
+    "np.linalg.inv (permutation)": "1000000 of 1000000"
+   },
    "reason": "",
-   "seconds": 1.229,
+   "seconds": 0.858,
    "status": "pass"
   },
   {
@@ -155,8 +205,12 @@
    "checks_passed": 2,
    "checks_total": 2,
    "failed_checks": [],
+   "measured": {
+    "np.linalg.inv (ties)": "1000000 of 1000000",
+    "singular in both (numpy raises)": 111806
+   },
    "reason": "",
-   "seconds": 8.607,
+   "seconds": 4.301,
    "status": "pass"
   },
   {
@@ -165,8 +219,11 @@
    "checks_passed": 1,
    "checks_total": 1,
    "failed_checks": [],
+   "measured": {
+    "np.linalg.inv (triangular)": "1000000 of 1000000"
+   },
    "reason": "",
-   "seconds": 1.23,
+   "seconds": 0.734,
    "status": "pass"
   },
   {
@@ -175,8 +232,11 @@
    "checks_passed": 1,
    "checks_total": 1,
    "failed_checks": [],
+   "measured": {
+    "np.linalg.inv (subnormal)": "1000000 of 1000000"
+   },
    "reason": "",
-   "seconds": 2.837,
+   "seconds": 1.002,
    "status": "pass"
   },
   {
@@ -185,8 +245,12 @@
    "checks_passed": 2,
    "checks_total": 2,
    "failed_checks": [],
+   "measured": {
+    "np.linalg.inv (singular)": "1000000 of 1000000",
+    "singular in both (numpy raises)": 856560
+   },
    "reason": "",
-   "seconds": 10.979,
+   "seconds": 4.275,
    "status": "pass"
   },
   {
@@ -195,8 +259,11 @@
    "checks_passed": 1,
    "checks_total": 1,
    "failed_checks": [],
+   "measured": {
+    "np.linalg.inv (nonfinite; NaN compared as NaN, not by its bits)": "1000000 of 1000000"
+   },
    "reason": "",
-   "seconds": 1.105,
+   "seconds": 0.892,
    "status": "pass"
   },
   {
@@ -205,8 +272,11 @@
    "checks_passed": 1,
    "checks_total": 1,
    "failed_checks": [],
+   "measured": {
+    "Affine.map, 1 point(s)": "20000 of 20000"
+   },
    "reason": "",
-   "seconds": 6.298,
+   "seconds": 2.845,
    "status": "pass"
   },
   {
@@ -215,8 +285,11 @@
    "checks_passed": 1,
    "checks_total": 1,
    "failed_checks": [],
+   "measured": {
+    "Affine.map, 2 point(s)": "20000 of 20000"
+   },
    "reason": "",
-   "seconds": 6.951,
+   "seconds": 2.698,
    "status": "pass"
   },
   {
@@ -225,8 +298,11 @@
    "checks_passed": 1,
    "checks_total": 1,
    "failed_checks": [],
+   "measured": {
+    "Affine.map, 3 point(s)": "20000 of 20000"
+   },
    "reason": "",
-   "seconds": 6.096,
+   "seconds": 2.546,
    "status": "pass"
   },
   {
@@ -235,8 +311,11 @@
    "checks_passed": 1,
    "checks_total": 1,
    "failed_checks": [],
+   "measured": {
+    "Affine.map, 5 point(s)": "20000 of 20000"
+   },
    "reason": "",
-   "seconds": 9.07,
+   "seconds": 2.681,
    "status": "pass"
   },
   {
@@ -245,8 +324,11 @@
    "checks_passed": 1,
    "checks_total": 1,
    "failed_checks": [],
+   "measured": {
+    "Affine.map, 64 point(s)": "20000 of 20000"
+   },
    "reason": "",
-   "seconds": 9.561,
+   "seconds": 2.826,
    "status": "pass"
   },
   {
@@ -255,8 +337,11 @@
    "checks_passed": 1,
    "checks_total": 1,
    "failed_checks": [],
+   "measured": {
+    "DenseField.map (1, 2 and 9 points, on and off the grid)": "1200 of 1200"
+   },
    "reason": "",
-   "seconds": 1.451,
+   "seconds": 0.925,
    "status": "pass"
   },
   {
@@ -265,8 +350,11 @@
    "checks_passed": 1,
    "checks_total": 1,
    "failed_checks": [],
+   "measured": {
+    "resample_series onto a one-voxel grid (head motion, 3 volumes)": "200 of 200"
+   },
    "reason": "",
-   "seconds": 13.396,
+   "seconds": 5.166,
    "status": "pass"
   },
   {
@@ -275,8 +363,12 @@
    "checks_passed": 2,
    "checks_total": 2,
    "failed_checks": [],
+   "measured": {
+    "axis codes and reoriented data": "20000 of 20000",
+    "new affine": "20000 of 20000"
+   },
    "reason": "",
-   "seconds": 32.69,
+   "seconds": 12.73,
    "status": "pass"
   },
   {
@@ -286,7 +378,7 @@
    "checks_total": 0,
    "failed_checks": [],
    "reason": "axis decisions agree for 4300 of 4800 grids rotated by exactly 45\u00b0: two cosines tie, and nibabel decides with numpy's LAPACK SVD, larmorx with vnl's",
-   "seconds": 5.818,
+   "seconds": 2.911,
    "status": "expected-divergence"
   },
   {
@@ -295,8 +387,13 @@
    "checks_passed": 3,
    "checks_total": 3,
    "failed_checks": [],
+   "measured": {
+    "head motion in voxel space (ras2vox @ M @ vox2ras)": "808 of 808",
+    "loaded matrices (affines, head-motion series, field grids and inverses)": "825 of 825",
+    "source affines after ensure_positive_cosines, and their inverses": "25 of 25"
+   },
    "reason": "",
-   "seconds": 2.937,
+   "seconds": 2.599,
    "status": "pass"
   }
  ],

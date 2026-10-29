@@ -65,9 +65,10 @@ fn integer_coordinates_reproduce_the_samples() {
     }
 }
 
-/// SCI-03 reproduced: SciPy's reflect prefilter is not an interpolant on short axes (up to
-/// 1e-2 here with order 5, in SciPy too; `docs/findings/scipy-ndimage.md`), and the notice
-/// says so in both modes; modes with another boundary rule are not affected.
+/// SCI-03, fixed in SciPy 1.18.1: its reflect prefilter is an interpolant on short axes again
+/// (SciPy 1.15's was off by up to 1e-2 here with order 5; `docs/findings/scipy-ndimage.md`),
+/// larmorx follows 1.18.1 in both modes and names nothing; the other boundary rules agree in
+/// both modes too.
 #[test]
 fn reflect_boundary_both_modes() {
     let shape = [6, 5, 4];
@@ -86,16 +87,13 @@ fn reflect_boundary_both_modes() {
             .fold(0.0f64, f64::max);
         (out, notices, err)
     };
-    for mode in [Mode::Reflect, Mode::GridMirror] {
+    for mode in [Mode::Reflect, Mode::GridMirror, Mode::Nearest] {
         let (scipy, notices, err) = run(5, mode, REPRODUCE);
-        assert!(err > 1e-3, "{mode}: {err}");
-        assert_eq!(notices.len(), 1);
-        assert_eq!(notices[0].defect.id, "SCI-03");
-        assert_eq!(notices[0].mode, REPRODUCE);
-        let (fixed, notices, err) = run(5, mode, FIX);
         assert!(err < 1e-9, "{mode}: {err}");
-        assert_eq!(notices[0].mode, FIX);
-        assert_ne!(scipy, fixed);
+        assert!(notices.is_empty(), "{mode}");
+        let (fixed, notices, _) = run(5, mode, FIX);
+        assert!(notices.is_empty(), "{mode}");
+        assert_eq!(scipy, fixed);
     }
     // Other boundaries: the same values and no notice in either mode.
     for mode in [
@@ -136,7 +134,7 @@ fn prefilter_is_thread_invariant() {
 }
 
 /// The two paths of the filter (contiguous lines and strided rows) give the same coefficients
-/// and the same SCI-03 decision, in both modes.
+/// and the same notices (none since SciPy 1.18.1 fixed SCI-03), in both modes.
 #[test]
 fn line_and_row_filters_agree() {
     let shape = [7, 6];
@@ -154,7 +152,7 @@ fn line_and_row_filters_agree() {
                 assert_eq!(a[(n / 6) + 7 * (n % 6)].to_bits(), t[n].to_bits());
             }
             assert_eq!(na, nt);
-            assert_eq!(na.len(), 1);
+            assert!(na.is_empty());
         }
     }
 }

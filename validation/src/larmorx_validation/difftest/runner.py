@@ -187,6 +187,8 @@ def execute(
     try:
         result = harness.run_one(suite, case)
     except CaseTimeout:
+        if leaf is not None:
+            leaf.stop_others()  # an original's own children, orphaned by the alarm
         return (
             Judgement(TIMEOUT, ("timeout",), f"no result within {limit} s"),
             time.monotonic() - start,
@@ -324,9 +326,11 @@ def run_case(
     recipe: dict | None = None,
     store_findings: bool = True,
     shrunk_enough: list | None = None,
+    timeout: float | None = None,
 ) -> dict:
     """Case ``n`` of ``tool_name`` for ``seed``: every implementation, judged; differences
-    shrunk. Returns the case's line for ``results.jsonl`` (with the findings' details)."""
+    shrunk. Returns the case's line for ``results.jsonl`` (with the findings' details).
+    ``timeout``: each run's seconds (``--case --case-timeout``; the tool's own by default)."""
     from larmorx_validation.difftest import shrink as shrinking
 
     tool = tools.get(tool_name)
@@ -352,7 +356,7 @@ def run_case(
         line["verdict"] = next((v for v in (DIFFER, MEMORY, GUARD) if v in verdicts), GUARD)
         return line
     for impl in tool.implementations:
-        j = judge_once(tool, recipe, impl)
+        j = judge_once(tool, recipe, impl, timeout=timeout)
         entry: dict = {
             "verdict": j.verdict,
             "signature": list(j.signature),
@@ -401,7 +405,7 @@ def run_case(
         elif j.verdict == DIFFER and shrink:
 
             def attempt(r: dict, impl: str = impl) -> Judgement:
-                return judge_once(tool, r, impl)
+                return judge_once(tool, r, impl, timeout=timeout)
 
             small, kept, last, runs = shrinking.shrink(
                 recipe, j.signature, attempt, budget_s=shrink_budget, extra=tool.shrink
@@ -573,6 +577,8 @@ def isolated_judge(
                 check=False,
             )
         except subprocess.TimeoutExpired:
+            if leaf is not None:
+                leaf.stop_others()  # what the killed child had started
             return Judgement(TIMEOUT, ("timeout",), f"no result within {timeout:.0f} s")
     if p.returncode == -signal.SIGKILL and leaf is not None and leaf.oom_kills() > oom_before:
         # The child itself was stopped: larmorx runs in it, and so does the comparison of the
@@ -805,6 +811,9 @@ class Pool:
         with contextlib.suppress(ProcessLookupError, PermissionError):
             os.killpg(w["proc"].pid, signal.SIGKILL)
         w["proc"].join(timeout=10)
+        leaf = self.leaves[w["slot"]]
+        if leaf is not None:
+            leaf.stop_others()  # the worker's runs in other process groups
         fresh = self._start(w["slot"])
         w.update(fresh)
 

@@ -1,0 +1,173 @@
+{
+ "defect": null,
+ "description": "bet2 -c 22 19 8 -m -w 0.5 on a 30 x 32 x 16 image of 1.2 x 0.8 x 1.2 mm stored neurologically: the centre goes through the solve of the nifti-to-newimage voxel matrix, which FSL 6.0.7.23's Armadillo 14.2.1 does by LAPACK (18 of 15,360 voxels differ from 6.0.7.17); the replica follows it since 2026-10-29 (found by the FSL version trial, case 80 as drawn)",
+ "expect": "pass",
+ "found": {
+  "detail": "out.nii.gz: the header is the same; 18 of 15360 values differ; out_mask.nii.gz: the header is the same; 18 of 15360 values differ, Dice 0.997588",
+  "n": 80,
+  "seed": "20261029",
+  "shrink_moves": [],
+  "signature": [
+   "out.nii.gz",
+   "out_mask.nii.gz"
+  ]
+ },
+ "id": "bet2-centre-neurological-solve",
+ "implementations": [
+  "replica"
+ ],
+ "reason": "",
+ "recipe": {
+  "extra": {
+   "output_type": "NIFTI2_GZ",
+   "tool": "bet2"
+  },
+  "features": {
+   "--ct": false,
+   "-c": true,
+   "-e": false,
+   "-f": false,
+   "-g": false,
+   "-m": true,
+   "-n": false,
+   "-o": false,
+   "-r": false,
+   "-s": false,
+   "-t": false,
+   "-v": false,
+   "-w": true,
+   "FSLOUTPUTTYPE": "NIFTI2_GZ",
+   "c0": 22,
+   "c1": 19,
+   "c2": 8,
+   "content": "crop",
+   "corner0": 33,
+   "corner1": 21,
+   "corner2": 42,
+   "crop source": "templateflow/tpl-MNI152NLin2009cAsym/tpl-MNI152NLin2009cAsym_res-02_T1w.nii.gz",
+   "crop stride": 1,
+   "dtype": "float32",
+   "extreme": false,
+   "orientation": "oblique",
+   "origin0": -57.75,
+   "origin1": 56.0,
+   "origin2": 13.75,
+   "qfac": 1,
+   "qform_code": 1,
+   "range": "plain",
+   "sform": "same",
+   "sform_code": 0,
+   "shape": "30x32x16",
+   "spacing0": 1.2,
+   "spacing1": 0.8,
+   "spacing2": 1.2,
+   "suffix": ".nii.gz",
+   "tool": "bet2",
+   "units": "mm",
+   "w": "0.5"
+  },
+  "groups": [
+   {
+    "args": [
+     "{in:input}",
+     "out"
+    ],
+    "name": "input",
+    "optional": false
+   },
+   {
+    "args": [
+     "-c",
+     "22",
+     "19",
+     "8"
+    ],
+    "name": "-c",
+    "optional": true
+   },
+   {
+    "args": [
+     "-m"
+    ],
+    "name": "-m",
+    "optional": true
+   },
+   {
+    "args": [
+     "-w",
+     "0.5"
+    ],
+    "name": "-w",
+    "optional": true
+   }
+  ],
+  "inputs": {
+   "input": {
+    "content": {
+     "corner": [
+      33,
+      21,
+      42
+     ],
+     "seed": 976662626,
+     "source": "templateflow/tpl-MNI152NLin2009cAsym/tpl-MNI152NLin2009cAsym_res-02_T1w.nii.gz",
+     "stride": 1,
+     "type": "crop"
+    },
+    "dtype": "float32",
+    "geometry": {
+     "origin": [
+      -57.75,
+      56.0,
+      13.75
+     ],
+     "qfac": 1,
+     "qform_code": 1,
+     "quaternion": [
+      36,
+      -3,
+      -2,
+      -2
+     ],
+     "sform": "same",
+     "sform_code": 0,
+     "spacing": [
+      1.2,
+      0.8,
+      1.2
+     ],
+     "units": "mm"
+    },
+    "scaling": null,
+    "shape": [
+     30,
+     32,
+     16
+    ],
+    "suffix": ".nii.gz",
+    "values": {
+     "offset": 0.0,
+     "scale": 1.0
+    }
+   }
+  },
+  "n": 80,
+  "options": [
+   "-c",
+   "-m",
+   "-w",
+   "FSLOUTPUTTYPE=NIFTI2_GZ",
+   "bet2"
+  ],
+  "seed": "20261029",
+  "tool": "fsl-bet"
+ },
+ "rule": null,
+ "status": "fixed",
+ "step": [
+  "arma-lapack-centre"
+ ],
+ "suite": "fsl-bet-replica",
+ "tier": "smoke",
+ "tool": "fsl-bet"
+}

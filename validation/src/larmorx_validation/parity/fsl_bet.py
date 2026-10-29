@@ -192,7 +192,8 @@ def environment(
     version: str | None = None,
 ) -> dict[str, str]:
     """The environment both programs run in: no FSL program on the PATH, ``FSLDIR`` for the
-    ``bet`` script, an empty ``HOME``, the case's ``FSLOUTPUTTYPE`` and variables."""
+    ``bet`` script, an empty ``HOME``, the case's ``FSLOUTPUTTYPE`` and variables, and
+    OpenBLAS's Haswell core (``fsl_versions.OPENBLAS_CORE``)."""
     env = {
         "HOME": str(home()),
         "PATH": "/usr/bin:/bin",
@@ -200,6 +201,8 @@ def environment(
         "FSLOUTPUTTYPE": output_type,
         "LC_ALL": "C",
         "OMP_NUM_THREADS": "2",
+        # FSL 6.0.7.23's matrix arithmetic on OpenBLAS's Haswell kernels (fsl_versions).
+        **fsl_versions.openblas_env(),
     }
     for name, value in extra:
         if value is None:
@@ -616,6 +619,9 @@ class Scenario:
     #: Known brain mask (a phantom's): the file to measure against it, and the input's name.
     truth: tuple[str, str] | None = None
     reason: str = ""
+    #: Known changes of FSL's own step (keys of ``fsl_versions.CHANGES``) the case meets
+    #: that its arguments do not show: a random case's, from its file (``step``).
+    step: tuple[str, ...] = ()
 
 
 def _fmriprep_calls() -> list[tuple[str, Path, Path]]:
@@ -1385,7 +1391,7 @@ def _fsl_step(
         re.sub(r"(line \d+: +)\d+ ", r"\1<pid> ", fsl_text(r.out + r.err).replace(str(d), "<dir>"))
         for r, d in ((prev, p_dir), (fsl, f_dir))
     )
-    why = fsl_versions.reasons(args, env)
+    why = sorted({*fsl_versions.reasons(args, env), *s.step})
     if ours is not None and reads_memory(ours):
         why = sorted({*why, "FSL-43-memory"})
     changed, detail = fsl_versions.step_detail(

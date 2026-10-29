@@ -471,7 +471,7 @@ byte identical, 10 changed, each for one of the reasons below.
 | `extrapparams` (`newimage.h`, `newimagefns.{h,cc}`): `affine_transform` passes its background value and `extraslice` to the interpolation instead of setting them on the input | no effect | the same values | none |
 | `convolve` and the masked convolution run per voxel in threads (`newimagefns.h`) | no effect (per voxel, no reduction) | – | – |
 | Splinterpolator (`splinterpolator.h`): coefficients outside a `Zeros` grid are 0 (were mirrored); the first index `ceil(x) − 2` (was from `(int)(x + 0.5)`); new `SoftZeros`, `CorrectConstant` | no effect on mcflirt (its final spline uses `extraslice`, i.e. `Constant`; the first index differs only at `x = −1` exactly, with a zero weight) | – | translated (`interp.rs`: `coef_at`, `value_at`), for the next replicas |
-| Armadillo 14.2.1 (`fsl-armawrap` 0.7.0): `inv()` of a 4 × 4 matrix is no longer the closed-form cofactor inverse: diagonal → `1/x`; triangular → LAPACK `dtrtri`; symmetric (to 100 ε) → `dsytrf`/`dsytri`; otherwise `dgetrf` + `dgetri` (OpenBLAS 0.3.33); `inv(A)·B` → `dgesv` (`dsysv` for a symmetric `A`, which every diagonal sampling matrix is); `det()` of 4 × 4 → LU; 2 × 2 and 3 × 3 keep closed forms | last bits (arithmetic) | the cost function's `vtest.sampling_mat().i() * aff.i() * vref.sampling_mat()`, `affine_transform`'s `aff.i()`, `rms_deviation`'s `a1*a2.i()`, `decompose_aff`'s solves: their last bits differ; mcflirt's float32 sampling hides them in 127 of 137 runs; visible: `.rms` values computed from nearly equal matrices (`identical-copies`, `opt-stages1`: values from 1e−19 to 1e−8 mm, differences ≤ 1e−14 mm) and the sign of NaN parameters in `.par` (`syn/content/nan`) | **not followed yet**: the replica keeps Armadillo 10.5.1's closed-form inverse (`arma.rs`); the five recorded runs are expected divergences in its record (`ARMA_LAPACK` in the suite: numbers within 1e−12 mm or NaN signs, checked file by file). The same results under every OpenBLAS core this CPU runs (Haswell, SkylakeX, Cooperlake, Zen, SandyBridge, Prescott: `openblas_core_probe.sh`), so the follow-up can reproduce OpenBLAS's Haswell order, as `larmorx_transform::openblas` does for numpy |
+| Armadillo 14.2.1 (`fsl-armawrap` 0.7.0): `inv()` of a 4 × 4 matrix is no longer the closed-form cofactor inverse: diagonal → `1/x`; triangular → LAPACK `dtrtri`; otherwise `dgetrf` + `dgetri` (OpenBLAS 0.3.33); `inv(A)·B` (and `inv(A)·B·C`, `A·inv(B)·C`) → `dgesv` for every size, 3 × 3 included (`decompose_aff`'s `scales.i()`); `det()` of 4 × 4: a diagonal or triangular matrix the product of its diagonal from 1, any other by `dgetrf`; 2 × 2 and 3 × 3 `inv()` keep their closed forms but now decline a NaN determinant. The symmetric paths (`dsytrf`/`dsytri`, `dsytrf`/`dsytrs`) need 100 rows (`sym_helper::is_approx_sym(A, 100)`: the 100 is the size, not a tolerance), so FSL never takes them | last bits (arithmetic), NaN signs | the cost function's `vtest.sampling_mat().i() * aff.i() * vref.sampling_mat()`, `affine_transform`'s `aff.i()`, `rms_deviation`'s `a1*a2.i()`, `decompose_aff`'s solves, `left_right_order`'s determinant: their last bits differ; mcflirt's float32 sampling hides them in 127 of 137 runs; visible: `.rms` values computed from nearly equal matrices (`identical-copies`, `opt-stages1`: values from 1e−19 to 1e−8 mm, differences ≤ 1e−14 mm) and the sign of NaN parameters in `.par` (`syn/content/nan`) | **followed since 2026-10-29** (the version update's part 3): `lapack.rs` ports the routines as OpenBLAS 0.3.33's Haswell kernels compute them and `arma.rs` follows Armadillo 14.2.1's rules (below, "Armadillo 14.2.1's LAPACK path"); Armadillo 10.5.1's are kept (`arma::armadillo_10_5_1`) |
 | NewNifti 5.0.0 (`NewNifti.{h,cc}`): `replaceSuffix` | defect, new (**FSL-60**, c) | every image name passes through `replaceSuffix(name, ".img", ".hdr")` (`loadImage`, `loadHeader`, `saveImage`): a name holding `.img` before its extension opens another file (`path_suffix_probe.sh`: `-out a.img.d/out` writes `a.hdr.d/out.nii.gz`; a pair written into `x.hdr.y.img.d/` aborts on `x.hdr.y.hdr.d/o5.hdr`) | default: the name given; `reproduce`: renamed (`nifti::OpenOptions`, `Settings::reproducing_renames`); FSL-60 named by the program (`larmorx-nc-cli`) |
 | znzlib 2511.3 (`znzlib.{h,cpp}` and its plugins): C++, raw/gzip/zstd/bzip2; reading guesses the format from the first four bytes (a file shorter than four bytes: `feof` of a stream already closed, glibc's end-of-file flag, so the suffix decides); writing in the format the file type says | new formats | reads `.nii.zst`, `.nii.bz2`, and any name by its content | `nifti.rs` (`ZnzFormat`, `format_from_content`, `decode_zstd`, `decode_bzip2`, `write_file`); the compressed bytes are ruzstd's and libbz2-rs-sys's (compared decompressed) |
 | newimage 2601.0 (`generalio.cc`): `FSLOUTPUTTYPE` accepts the `*_ZST` and `*_BZ2` types; the message for an unknown one lists all 16; `fileExtensions` has 8 entries (search order `.nii.gz`, `.nii`, `.hdr`, `.hdr.gz`, `.nii.zst`, `.hdr.zst`, `.nii.bz2`, `.hdr.bz2`); `return_validimagefilename` stops at the first matching extension (no effect: one matches) | messages, new values | 2 recorded edge cases' messages | `volume.rs` (`filetype`, `znz_format`, `EXTENSIONS`) |
@@ -485,13 +485,72 @@ by GCC 15.2 (its `libfsl-znz.so` by 16.1); neither has a fused multiply-add inst
 explained by the sources; no binary-level cause was needed. OpenBLAS picks its Cooperlake core on
 this AMD Zen 4 (`OPENBLAS_VERBOSE=2`); no recorded output depends on the core.
 
-**Not ported (follow-up).** Armadillo 14.2.1's LAPACK path for 4 × 4 inverses and solves: the
-replica would need OpenBLAS 0.3.33's `getrf_single` (`getf2`), netlib LAPACK's `dgetri`
-(unblocked: OpenBLAS's `dtrtri`, `dgemv_n`, `dswap`), `dsysv` (`dsytrf`/`dsytf2`, `dsytrs`, with
-`dsyr`, `dger`, `idamax`, `dscal`) and `dtrtri`, in the Haswell order (no FMA in OpenBLAS's C
-kernels; FMA in `dgemv_t`), with a ctypes probe against `~/fsl-6.0.7.23/lib/liblapack.so.3`. Until
-then the replica's `reproduce` differs from FSL 6.0.7.23 in those last bits (5 of 196
-standard-tier cases).
+### Armadillo 14.2.1's LAPACK path (the version update's part 3, 2026-10-29)
+
+FSL 6.0.7.23's `liblapack.so.3` and `libblas.so.3` are OpenBLAS 0.3.33 (conda-forge,
+`DYNAMIC_ARCH`, release tarball SHA-256 `6761af1d9f5d…`, in `<workspace>/tags/OpenBLAS-0.3.33`):
+`dgetrf`, `dgesv`, `dtrtri` are OpenBLAS's own, `dgetri` is the reference LAPACK 3.12.0 it
+bundles (Fortran), calling OpenBLAS's `dtrtri`, `dgemv` and `dswap`. Armadillo passes
+`lwork = 16`, so `dgetri` and every other routine take their unblocked code for these sizes. The
+port (`larmorx-nc-core/src/lapack.rs`):
+
+- `dgetrf`: `getrf_single` → `getf2_k` (left-looking; `ddot`'s strided tail, `dgemv_n`'s tails,
+  `idamax`, the row swap, the reciprocal's `dscal`; a NaN or subnormal pivot recorded but neither
+  swapped nor divided by);
+- `dgetrs` after `dgesv`'s factorisation: one right-hand side by `trsv_NLU`/`trsv_NUN` (`daxpy`
+  with the negated value, division by the pivot), several by `trsm_LNLU`/`trsm_LNUN` (the generic
+  kernels with Haswell's `DGEMM_UNROLL_M` 4: a 4 × 4 solve in one block, a 3 × 3 one in blocks of
+  2 and 1 joined by the Haswell `dgemm` kernel's small tiles, fused multiply-add chains from +0);
+- `dtrtri`: the diagonal's zero check (`AMIN_K`, `IAMIN_K` on the strided diagonal), then
+  `trti2_U`/`trti2_L` (`TRMV` by `daxpy` and the diagonal product, `dscal` by minus the
+  reciprocal);
+- `dgetri`: `dtrtri` of U, then each column's update by `dgemv` (Haswell's 4 × 2 kernel,
+  `fma(alpha, x1·a1 + x0·a0, y)`, and the 4 × 1 kernel; the tails for three rows), then the
+  column interchanges.
+
+**Which core.** OpenBLAS picks its kernels by CPU (`OPENBLAS_CORETYPE` overrides it). Its Haswell
+and Zen cores compile the C kernels with `-mavx2` only (no fused multiply-adds); SkylakeX,
+Cooperlake and Sapphire Rapids with `-march=skylake-avx512`, where GCC contracts `dgemv_n`'s
+tails, `daxpy` and the triangular solves (`openblas_kernels.py`: `vfmadd` counts per kernel and
+core). On this AMD Zen 4, FSL picks Cooperlake by itself. The cores differ: on 100,000 seeded
+matrices per family, Cooperlake's `inv()` equals Haswell's for 6 % of random 4 × 4 matrices,
+19 % of affines, 18 % of rigid ones, 56 % of small head motions, and every diagonal sampling,
+swap and translation matrix; its `inv(A)·B` with four columns for 0 to 2 % of the first four
+families (Zen: 100 % everywhere; `lapack_probe.py --cores`,
+`validation/investigations/version-numerics/lapack_probe_summary.json`). The replica follows the **Haswell** order, the validation's
+reference core as for numpy (`scripts/orchestration/env.sh`), and the harness runs FSL with
+`OPENBLAS_CORETYPE=Haswell` (`fsl_versions.OPENBLAS_CORE`; part of the oracle cache's key for
+FSL's programs). mcflirt's 137 recorded runs were made again on that core
+(`oracles/fsl-6.0.7.23/mcflirt-haswell`; the first 6.0.7.23 recording, on Cooperlake, is kept):
+136 are byte-identical to the Cooperlake ones, one differs (`identical-copies/reffile-fudge`:
+its relative `.rms`, 8.07227e−15 mm on Cooperlake, 7.97627e−15 mm on Haswell;
+`compare_cores.py`). FSL-64.
+
+**Checked bit for bit** against FSL's own `liblapack.so.3` through ctypes
+(`validation/investigations/version-numerics/lapack_probe.py` and the `lapack-probe` tool): every
+output word (factors, pivots, `info`, solutions, inverses) of `dgetrf`, `dgetri`, `dtrtri` (upper
+and lower), `dgesv` (4 × 1, 4 × 4, 3 × 1, 3 × 3) and Armadillo's `inv()` and `inv(A)·B` for 4 × 4
+and 3 × 3 (18 routines and calls), on 100,000 seeded matrices of each of 22 families (302 pairs
+of routine and family, 30,200,000 records) (random, affine, rigid, small
+rotations, FSL's sampling, swap and swap-sampled matrices, sform-like, translations, upper and
+lower triangular, near-singular, singular, tied pivots, small integers with signed zeros,
+extreme scales 2^±600, a subnormal column, NaN and ±∞ entries, NaNs above a triangle's
+diagonal): **identical, NaN signs and payloads included** (`det()` compared by value, its NaN
+compared as NaN: FSL only compares a determinant). Which operand's NaN an instruction passes on
+is the compiler's choice, measured on FSL's library with NaNs of distinct payloads
+(`blas_nan_probe.py`: `dgemv`'s tails per row count; the triangular solves' products; the
+multiplicands before the addend in its fused multiply-adds), as `lapack.rs` documents.
+
+**Downstream.** With the LAPACK path, an affine all of one NaN (FSL-14's matrices) gives every
+rotation the affine's NaN in FSL 6.0.7.23 (6.0.7.17's closed form gave the y rotation the other
+sign, which the replica had reproduced): `nan_decompose.cc` built against 6.0.7.23 and replayed
+through the replica (`affine-trace-replay`): the 200 uniform-NaN affines agree (0 of 200 differ);
+affines mixing NaNs of both signs or holding infinities differ in 85 of 200 (148 of 200 against
+6.0.7.17), where the replica follows the source's order, as before (FSL-14's matrices are
+uniform). `rms_deviation`: GCC adds the dot product to the trace term (`(r2·trace) + tt`, the
+trace's NaN first; the disassembly of libfsl-miscmaths 2412.6); `nan_rms.cc` (new) replays 2,000
+seeded pairs (numbers, NaNs of both signs and payloads, uniform NaN, infinities): 2,000 of 2,000
+agree.
 
 ## fMRIPrep, nipype, niworkflows, nitransforms (Apache-2.0 / MIT; not restricted)
 

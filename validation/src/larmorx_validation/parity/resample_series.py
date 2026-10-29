@@ -28,6 +28,7 @@ relative difference ≤ 1e-6 against SciPy) as the pass criterion.
 from __future__ import annotations
 
 import contextlib
+import contextvars
 import io
 import json
 import tempfile
@@ -39,6 +40,7 @@ import larmorx_testdata as td
 import numpy as np
 
 from larmorx_validation.parity import defects
+from larmorx_validation.parity import python_versions as pv
 from larmorx_validation.parity.harness import (
     BOTH_ERROR,
     EXPECTED,
@@ -83,9 +85,41 @@ def _bits(a: np.ndarray) -> np.ndarray:
     return a
 
 
+#: The spline mode and order of the case running now (the step's reasons: python_versions).
+_SPLINE: contextvars.ContextVar[tuple[str | None, int | None]] = contextvars.ContextVar(
+    "resample_spline", default=(None, None)
+)
+
+
+def _step(checks: CheckList, name: str, expected: np.ndarray) -> None:
+    """The originals' own step for comparison ``name`` (``python_versions``): recorded in a
+    ``shared`` step run, reported against that record in a ``newest`` run."""
+    pv.record(name, expected)
+    old = pv.previous(name)
+    if old is None:
+        return
+    changed = old != pv.digest(expected)
+    why = pv.reasons(*_SPLINE.get())
+    checks.add(
+        Check(
+            f"{pv.STEP_CHECK}: {name}",
+            (not changed) or bool(why),
+            metric="the original's output",
+            value="changed" if changed else "identical",
+            threshold="a change has a known reason",
+            detail=(
+                "identical"
+                if not changed
+                else "changed: " + ("; ".join(pv.CHANGES[k] for k in why) or "no known reason")
+            ),
+        )
+    )
+
+
 def compare(checks: CheckList, name: str, actual: np.ndarray, expected: np.ndarray) -> int:
     """Shape, dtype, the PLAN.md threshold and bit-identity; returns the differing count."""
     a, e = np.asarray(actual), np.asarray(expected)
+    _step(checks, name, e)
     if a.shape != e.shape or a.dtype != e.dtype:
         checks(
             f"{name}: shape and type",
@@ -809,6 +843,30 @@ def _fmriprep_case(s: Scenario, checks: CheckList) -> None:
 
 def run_case(case: Case, checks: CheckList) -> None:
     kind = case.payload[0]
+    spline: tuple[str | None, int | None] = (None, None)
+    if kind == "ndimage":
+        spline = (case.payload[1], case.payload[2])
+    elif kind == "fmriprep":
+        spline = (case.payload[1].mode, case.payload[1].order)
+    token = _SPLINE.set(spline)
+    try:
+        with pv.case(case.id):
+            _run_case(case, checks)
+    finally:
+        _SPLINE.reset(token)
+    # Under SciPy 1.15 (the shared environment) the cases SciPy 1.18's changes reach are
+    # expected divergences: larmorx follows the newest release (python_versions.CHANGES).
+    why = pv.reasons(*spline)
+    if why and pv.older_scipy() and any(not c.passed for c in checks.checks):
+        raise Outcome(
+            EXPECTED,
+            f"SciPy {pv.versions()['scipy']} runs here; larmorx follows SciPy 1.18.1: "
+            + "; ".join(pv.CHANGES[k] for k in why),
+        )
+
+
+def _run_case(case: Case, checks: CheckList) -> None:
+    kind = case.payload[0]
     if kind == "ndimage":
         _, mode, order = case.payload
         _ndimage_case(mode, order, checks)
@@ -838,7 +896,44 @@ def _highlights(results: list[CaseResult]) -> list[str]:
     ]
     if differ:
         lines.append("Cases with differing values: " + ", ".join(f"`{c}`" for c in differ) + ".")
-    return lines + defects.summary(results)
+    return lines + step_summary(results) + defects.summary(results)
+
+
+def step_summary(results: list[CaseResult]) -> list[str]:
+    """The originals' own step (``python_versions``): per case, whether the reference's
+    outputs changed from the shared environment's releases to the newest, and why."""
+    stepped = [r for r in results if any(c.name.startswith(pv.STEP_CHECK) for c in r.checks)]
+    if not stepped:
+        return []
+    changed = [
+        r
+        for r in stepped
+        if any(c.name.startswith(pv.STEP_CHECK) and c.value == "changed" for c in r.checks)
+    ]
+    line = (
+        f"**{pv.STEP_CHECK[0].upper() + pv.STEP_CHECK[1:]}:** {len(stepped)} cases compared, "
+        f"{len(stepped) - len(changed)} with the same outputs under both, {len(changed)} changed"
+    )
+    if changed:
+        reasons = sorted(
+            {
+                k
+                for r in changed
+                for c in r.checks
+                if c.name.startswith(pv.STEP_CHECK) and c.value == "changed"
+                for k in pv.CHANGES
+                if pv.CHANGES[k] in (c.detail or "")
+            }
+        )
+        line += (
+            ": "
+            + ", ".join(f"`{r.case}`" for r in changed[:12])
+            + (" …" if len(changed) > 12 else "")
+            + "; every change has a known reason ("
+            + "; ".join(f"{k}: {pv.CHANGES[k]}" for k in reasons)
+            + ")"
+        )
+    return [line + "."]
 
 
 def suite() -> Suite:

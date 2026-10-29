@@ -3,9 +3,10 @@
 **All cases agree.** 28 cases on the `standard` tier: 27 pass, 0 rejected by both, 1 expected divergences, 0 failures.
 
 - **Validated:** `larmorx_transform::openblas` (`matmul4`, `inv4`), the point products of `larmorx_transform::nitransforms`, `nitransforms::closest_orthogonal`, through `lx.transforms`
-- **Reference:** numpy 2.3.5 with its bundled OpenBLAS, in-process, on the Haswell kernels; nitransforms, sdcflows and fMRIPrep for the mapped points, orientations and loaded transforms
-- **Test data:** larmorx-testdata `00b862132e9c`, tier `standard`
-- **Generated:** 2026-10-11 on Linux x86_64, with `python -m larmorx_validation parity numpy-linalg --tier standard`
+- **Reference:** numpy 2.5.4 with its bundled OpenBLAS, in-process, on the Haswell kernels; nitransforms, sdcflows and fMRIPrep for the mapped points, orientations and loaded transforms
+- **Test data:** larmorx-testdata `52124bc98f9f`, tier `standard`
+- **Generated:** 2026-10-29 on Linux x86_64, with `python -m larmorx_validation parity numpy-linalg --tier standard --python newest`
+- **Original programs:** 0 runs: 0 from the oracle cache, 0 run; cache `<workspace>/oracles/cache`, mode `use`
 
 **18,143,058 of 18,143,058 compared results are bit-identical** to numpy's on the Haswell kernels (OpenBLAS core reported by threadpoolctl).
 
@@ -70,12 +71,12 @@
 
 | Component | Version |
 |---|---|
-| larmorx | 0.0.1 (b4b2401c25ff) |
-| larmorx-testdata | 00b862132e9c |
-| Python | 3.12.10 |
+| larmorx | 0.0.1 (d7bd05d2fa39) |
+| larmorx-testdata | 52124bc98f9f |
+| Python | 3.12.16 |
 | Platform | Linux x86_64 (Linux-6.8.0-124-generic-x86_64-with-glibc2.35) |
-| CPU | Intel(R) Core(TM) i7-8750H CPU @ 2.20GHz, 12 logical CPUs |
-| numpy | 2.3.5 |
+| CPU | AMD Ryzen 9 7945HX with Radeon Graphics, 32 logical CPUs |
+| numpy | 2.5.4 |
 | threadpoolctl | 3.7.0 |
 | nitransforms | 25.1.0 |
 | nibabel | 5.4.2 |

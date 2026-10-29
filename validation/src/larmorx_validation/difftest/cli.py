@@ -30,11 +30,12 @@ from larmorx_validation.difftest import core, tools
 
 
 def add_arguments(p: argparse.ArgumentParser) -> None:
-    from larmorx_validation.parity import afni_versions, fsl_versions
+    from larmorx_validation.parity import afni_versions, fsl_versions, python_versions
 
     p.add_argument("--tools", default="all", help="'all' or a comma-separated list of tools")
     afni_versions.add_argument(p)
     fsl_versions.add_argument(p)
+    python_versions.add_argument(p)
     p.add_argument(
         "--budget", type=float, default=6.0, help="hours of random cases (a night: about 6)"
     )
@@ -104,7 +105,13 @@ def add_arguments(p: argparse.ArgumentParser) -> None:
         help="with --heavy: the cases to run (TOOL:SEED:N, comma-separated, or a file of them, "
         "one per line); the others wait",
     )
-    p.add_argument("--case-timeout", type=float, default=None, help=argparse.SUPPRESS)
+    p.add_argument(
+        "--case-timeout",
+        type=float,
+        default=None,
+        help="with --case: each run's seconds (the tool's own limit by default), e.g. to run a "
+        "case that ran out of time to its end",
+    )
     p.add_argument("--judge-recipe", help=argparse.SUPPRESS)
     p.add_argument("--impl", help=argparse.SUPPRESS)
 
@@ -128,8 +135,10 @@ def _cases_named(spec: str | None) -> set[str] | None:
 
 
 def main(args: argparse.Namespace) -> int:
-    from larmorx_validation.parity import afni_versions, fsl_versions
+    from larmorx_validation.parity import afni_versions, fsl_versions, python_versions
 
+    named = tuple(tools.names()) if args.tools == "all" else tuple(args.tools.split(","))
+    python_versions.reexec(args, named)  # --python: may start again under that interpreter
     afni_versions.apply(args)  # --afni-version: the workers inherit it
     fsl_versions.apply(args)  # --fsl-version: the workers inherit it
     if args.list:
@@ -223,6 +232,7 @@ def main(args: argparse.Namespace) -> int:
             shrink=not args.no_shrink,
             shrink_budget=args.shrink_budget,
             store_findings=False,
+            timeout=args.case_timeout,
         )
         print(json.dumps(line, indent=1, default=str)[:20000])
         return 1 if line.get("verdict") == core.DIFFER else 0

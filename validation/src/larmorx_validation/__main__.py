@@ -176,10 +176,14 @@ def cmd_parity(args: argparse.Namespace) -> int:
 
     if args.oracle_cache:
         os.environ[oracle_cache.ENV_MODE] = args.oracle_cache  # the workers inherit it
-    from larmorx_validation.parity import afni_versions, fsl_versions
+    from larmorx_validation.parity import afni_versions, fsl_versions, python_versions
 
+    # --python (or the default for the suites of Python originals): may start the command
+    # again under that environment's interpreter.
+    python_versions.reexec(args, (args.suite,))
     afni_versions.apply(args)  # --afni-version: the workers inherit it
     fsl_versions.apply(args)  # --fsl-version: the workers inherit it
+    _python_step(args)
     cache_mode = oracle_cache.mode()
     suite = _parity_suite(args.suite, args.implementation)
 
@@ -240,6 +244,9 @@ def cmd_parity(args: argparse.Namespace) -> int:
             command += f" --afni-version {args.afni_version}"
         if getattr(args, "fsl_version", None):
             command += f" --fsl-version {args.fsl_version}"
+        if python_versions.running() is not None and args.suite in python_versions.SUITES:
+            command += f" --python {python_versions.running()}"
+            env["python_environment"] = python_versions.describe()
         out = Path(args.out)
         out.mkdir(parents=True, exist_ok=True)
         (out / f"{suite.name}.md").write_text(
@@ -264,6 +271,39 @@ def cmd_parity(args: argparse.Namespace) -> int:
         return 1
     # A difference ``refresh`` was asked to look for fails the command (a finding).
     return 1 if cache_mode == "refresh" and oracle["differences"] else 0
+
+
+def _python_step(args: argparse.Namespace) -> None:
+    """In the ``newest`` Python environment, the originals' own step: the same cases run first
+    in the ``shared`` one, which records its originals' outputs by digest
+    (``python_versions``), and every case then reports whether they changed."""
+    import os
+    import subprocess
+    import tempfile
+
+    from larmorx_validation.parity import python_versions as pv
+
+    shared = pv.prefix(pv.SHARED)
+    if (
+        args.suite not in pv.STEP_SUITES
+        or pv.running() != pv.NEWEST
+        or shared is None
+        or os.environ.get(pv.STEP_FROM)
+        or os.environ.get(pv.STEP_RECORD)
+    ):
+        return
+    step_dir = tempfile.mkdtemp(prefix="lx-python-step-")
+    cmd = [str(shared / "bin" / "python"), "-m", "larmorx_validation", "parity", args.suite]
+    cmd += ["--tier", args.tier, "--jobs", str(args.jobs), "--python", pv.SHARED]
+    if args.case:
+        cmd += ["--case", args.case]
+    env = {k: v for k, v in os.environ.items() if k != pv.STEP_FROM}
+    env |= {pv.ENV: pv.SHARED, pv.STEP_RECORD: step_dir}
+    print(f"the originals' own step: the cases in {pv.ENVS[pv.SHARED]} first", file=sys.stderr)
+    done = subprocess.run(cmd, env=env, check=False)
+    if done.returncode not in (0, 1):
+        print(f"the step run ended with status {done.returncode}", file=sys.stderr)
+    os.environ[pv.STEP_FROM] = step_dir  # the workers inherit it
 
 
 def cmd_oracle_cache(args: argparse.Namespace) -> int:
@@ -307,8 +347,11 @@ def cmd_figures(args: argparse.Namespace) -> int:
 
 def cmd_evidence(args: argparse.Namespace) -> int:
     from larmorx_validation import evidence
-    from larmorx_validation.parity import afni_versions, fsl_versions
+    from larmorx_validation.parity import afni_versions, fsl_versions, python_versions
 
+    # The resample-series evidence runs its originals in the newest Python environment (the
+    # step's panels run the shared one's interpreter themselves).
+    python_versions.reexec(args, (args.tool,))
     afni_versions.apply(args)
     fsl_versions.apply(args)
 
@@ -358,10 +401,11 @@ def main(argv: Sequence[str] | None = None) -> int:
         "(LARMORX_ORACLE_CACHE_MODE; the cache is LARMORX_ORACLE_CACHE, else "
         "<workspace>/oracles/cache; docs/validation/oracle-cache.md)",
     )
-    from larmorx_validation.parity import afni_versions, fsl_versions
+    from larmorx_validation.parity import afni_versions, fsl_versions, python_versions
 
     afni_versions.add_argument(p)
     fsl_versions.add_argument(p)
+    python_versions.add_argument(p)
     p.set_defaults(func=cmd_parity)
     oc = sub.add_parser(
         "oracle-cache",
@@ -456,6 +500,7 @@ def main(argv: Sequence[str] | None = None) -> int:
     )
     afni_versions.add_argument(ev)
     fsl_versions.add_argument(ev)
+    python_versions.add_argument(ev)
     ev.set_defaults(func=cmd_evidence)
     args = parser.parse_args(argv)
     return args.func(args)

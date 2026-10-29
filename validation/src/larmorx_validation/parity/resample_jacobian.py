@@ -180,6 +180,13 @@ def _shown(run: Path) -> str:
     return "/".join(parts[parts.index("oracles") :]) if "oracles" in parts else run.name
 
 
+def _environment() -> str:
+    """The numerical releases the record ran with (``python_versions``)."""
+    from larmorx_validation.parity import python_versions
+
+    return python_versions.describe()
+
+
 def report(rows: list[dict], run: Path) -> str:
     lines = [
         "# PIPE-03: fMRIPrep's Jacobian against the corrected one, on real geometry",
@@ -204,7 +211,8 @@ def report(rows: list[dict], run: Path) -> str:
         "Voxels inside each grid's brain mask.",
         "",
         "Generated with `python -m larmorx_validation.parity.resample_jacobian --run <run>/out/"
-        f"<subject> --out docs/validation` ({time.strftime('%Y-%m-%d')}).",
+        f"<subject> --out docs/validation` ({time.strftime('%Y-%m-%d')}), "
+        f"in {_environment()}.",
         "",
         "## Corrected against fMRIPrep",
         "",

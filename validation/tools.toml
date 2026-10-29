@@ -246,13 +246,13 @@ status = "`validated`"
 [[record]]
 id = "resample-series"
 larmorx = "`lx.transforms.resample_series`, `lx.transforms.load_transforms`, `lx.ndimage`"
-reference = "fMRIPrep's `ResampleSeries`, nitransforms 25.1.0, SciPy 1.15 (in-process)"
+reference = "fMRIPrep's `ResampleSeries`, nitransforms 25.1.0, SciPy 1.18.1 and numpy 2.5.4 (in-process, `oracles/python-newest`; the step from SciPy 1.15.3 and numpy 2.3.5 in every case)"
 status = "`validated`"
 
 [[record]]
 id = "numpy-linalg"
 larmorx = "`larmorx_transform::openblas` through `lx.transforms`: 4×4 products and inverses, point mapping, `ensure_positive_cosines`, loaded transforms"
-reference = "numpy 2.3.5 on OpenBLAS 0.3.30's Haswell kernels, nitransforms, sdcflows, fMRIPrep (in-process); other kernels in [numpy-linalg-kernels.json](repo:docs/validation/numpy-linalg-kernels.json)"
+reference = "numpy 2.5.4 on OpenBLAS 0.3.34's Haswell kernels (`oracles/python-newest`; numpy 2.3.5 on OpenBLAS 0.3.30 gave the same results), nitransforms, sdcflows, fMRIPrep (in-process); other kernels in [numpy-linalg-kernels.json](repo:docs/validation/numpy-linalg-kernels.json)"
 status = "`validated` ({numpy-linalg.expected} expected divergence: exactly 45° grids)"
 
 [[record]]
@@ -349,7 +349,7 @@ status = "`experimental` ({mri-hmc.fail} of {mri-hmc.compared} compared cases mi
 id = "fsl-mcflirt-replica"
 larmorx = "`larmorx-nc fsl mcflirt`, `lx.mri.hmc(implementation=\"replica\")` (the replica, FSL Licence)"
 reference = "mcflirt (FSL 6.0.7.23 as built since 2026-10-29: the recorded runs, fMRIPrep's calls, edge cases run here; FSL's own step from 6.0.7.17 in every case)"
-status = "`validated` ({fsl-mcflirt-replica.pass} of {fsl-mcflirt-replica.compared} compared cases bit-identical, fMRIPrep's calls included; {fsl-mcflirt-replica.both} rejected by both, with the same messages and status; {fsl-mcflirt-replica.expected} expected divergences: the last bits of FSL 6.0.7.23's LAPACK 4 x 4 inverses, not followed yet)"
+status = "`validated` ({fsl-mcflirt-replica.pass} of {fsl-mcflirt-replica.compared} compared cases bit-identical, fMRIPrep's calls included; {fsl-mcflirt-replica.both} rejected by both, with the same messages and status; FSL 6.0.7.23's LAPACK 4 x 4 inverses followed since 2026-10-29, FSL on OpenBLAS's Haswell kernels (FSL-64))"
 
 [[record]]
 id = "fsl-mcflirt-replica-full"

@@ -52,3 +52,7 @@ fslpy	https://git.fmrib.ox.ac.uk/fsl/fslpy.git	3.27.0	Apache-2.0	fsl
 glibc-2.35	https://ftp.gnu.org/gnu/glibc/glibc-2.35.tar.xz	sha256:5123732f6b67ccd319305efd399971d58592122bcc2a6518a1bd2510dd0cf52e	LGPL-2.1-or-later	tags
 OpenBLAS-0.3.30	https://github.com/OpenMathLib/OpenBLAS/releases/download/v0.3.30/OpenBLAS-0.3.30.tar.gz	sha256:27342cff518646afb4c2b976d809102e368957974c250a25ccc965e53063c95d	BSD-3-Clause	tags
 numpy-2.3.5	https://files.pythonhosted.org/packages/76/65/21b3bc86aac7b8f2862db1e808f1ea22b028e30a225a34a5ede9bf8678f2/numpy-2.3.5.tar.gz	sha256:784db1dcdab56bf0517743e746dfb0f885fc68d948aba86eeec2cba234bdf1c0	BSD-3-Clause	tags
+scipy-1.18.1	https://github.com/scipy/scipy/releases/download/v1.18.1/scipy-1.18.1.tar.gz	sha256:52c4b7422442aba924d03ad4019852b08a92e64ea187b933135687bfe2747307	BSD-3-Clause	tags
+numpy-2.5.4	https://files.pythonhosted.org/packages/source/n/numpy/numpy-2.5.4.tar.gz	sha256:9a94cf751c9ad8ebaa835bcd3d40dacf8534ad086b88c38029b65123c7999d2a	BSD-3-Clause	tags
+OpenBLAS-0.3.33	https://github.com/OpenMathLib/OpenBLAS/releases/download/v0.3.33/OpenBLAS-0.3.33.tar.gz	sha256:6761af1d9f5d353ab4f0b7497be2643313b36c8f31caec0144bfef198e71e6ab	BSD-3-Clause	tags
+OpenBLAS-0.3.34	https://github.com/OpenMathLib/OpenBLAS/releases/download/v0.3.34/OpenBLAS-0.3.34.tar.gz	sha256:cd7e129868320cc2d033afa920e31202dfe0b8066a5b66661900ccc0f197dfed	BSD-3-Clause	tags

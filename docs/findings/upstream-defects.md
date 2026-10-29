@@ -231,7 +231,7 @@ to add (since 2026-10-25: "Random testing's gaps", below); – = nothing to do. 
 | PIPE-17 | nitransforms | the first group of an `.h5` file skipped as if it were the composite: one transform fails, a list without a composite loses its first, an empty composite fails | c | none (fMRIPrep's composites) | corrected by default (`upstream_defects`, 2026-10-16) | – |
 | SCI-01 | SciPy `map_coordinates` | huge or NaN coordinates read outside the array | a | none | NaN | – |
 | SCI-02 | SciPy `map_coordinates` | undefined conversions answered as x86-64 does | a | none | clamps and warns by default; `reproduce` gives x86-64's answers (2026-10-12) | – |
-| SCI-03 | SciPy splines | `reflect`, `grid-mirror` do not interpolate on short axes | c | none | corrected by default (`upstream_defects`, 2026-10-11) | – |
+| SCI-03 | SciPy splines | `reflect`, `grid-mirror` do not interpolate on short axes (SciPy up to 1.17) | c | none | fixed in SciPy 1.18, whose initialisation larmorx follows in both modes since 2026-10-29 (corrected by default from 2026-10-11 until then) | – |
 | SCI-04 | SciPy on aarch64 | fused multiply-adds change last bits | d | ARM machines | never fuses | – |
 | NP-01 | numpy, OpenBLAS, Accelerate | 4×4 products and inverses depend on the CPU's kernel | d | every run | one order everywhere | – |
 | NP-02 | nibabel, numpy SVD | axis choice at exactly 45° follows the SVD's rounding | d | none | vnl's SVD | – |
@@ -328,6 +328,7 @@ to add (since 2026-10-25: "Random testing's gaps", below); – = nothing to do. 
 | FSL-61 † | bet2 | FSL 6.0.7.23 only: `--binaryMask` with a mask on another grid than the input: the brain mask is applied over the input's dimensions, reading and writing outside it | a | none | refused in both modes (rule B; FSL's result depends on memory), named (2026-10-29) | – |
 | FSL-62 † | bet2 | FSL 6.0.7.23 only: `--ct` with `--binaryMask` converts the mask instead of the CT image and writes the mask, masked, as the brain image | c | none | corrected by default (the CT input masked; rule A); `reproduce` gives FSL's; named (2026-10-29) | – |
 | FSL-63 † | bet (script) | with `-R`, a leading `-e` among bet2's options (the mesh) is dropped, and backslashes in the later options are read as escapes (FSL 6.0.7.17 and 6.0.7.23) | a | none (fMRIPrep's calls do not combine `-R` and `-e`) | corrected by default (the options as given); `reproduce` passes them through bash's `echo` as FSL does; named where they differ (2026-10-29) | – |
+| FSL-64 † | FSL 6.0.7.23 (Armadillo 14.2.1, OpenBLAS 0.3.33) | the last bits of its 4 × 4 inverses, solves and determinants, and so of mcflirt's and BET's results computed from them, depend on the CPU: OpenBLAS chooses its kernels at start-up, and those of AVX-512 CPUs fuse multiplications and additions that the others round separately (on this AMD Zen 4, 1 of mcflirt's 137 recorded runs changes: a relative rms of identical volumes, 8.07e-15 against 7.98e-15 mm) | d | the last bits of mcflirt's and BET's outputs depend on the machine (an AVX-512 server against an AVX2 laptop) | one order everywhere: the Haswell kernels' (as numpy's, NP-01); the harness runs FSL on that core (`OPENBLAS_CORETYPE=Haswell`, 2026-10-29) | – |
 
 **Counts** (273 entries, recounted from the table on 2026-10-26, after the BET merge; an entry with two classes
 counts under its first; "c (c? until …)" entries, decided, count as (c)):
@@ -443,6 +444,10 @@ for now (the last bits of 5 of 203 standard-tier cases; a follow-up). Random tes
 update (2026-10-29) found FSL-63 (`bet -R` drops a leading `-e`), and
 corrected FSL-43's `reproduce`: FSL's fill from outside the image reaches voxels by their
 linear index (and memory beyond the volume), which the replica now does point by point.
+**2026-10-29, the version update's part 3 (SciPy, numpy, OpenBLAS; FSL 6.0.7.23's matrix
+library):** FSL-64 new (class d: FSL 6.0.7.23's 4 × 4 arithmetic depends on the CPU; the harness
+pins FSL's OpenBLAS core); SCI-03 fixed in SciPy 1.18.1, followed in both modes. No **decide**
+entry added.
 
 ## D13 gaps: what the next task switches to "correct by default"
 
@@ -560,7 +565,7 @@ switches and notices still to add):
 |---|---|---|---|
 | PIPE-03 | `ResampleSeries`' Jacobian along the wrong target axis | `larmorx_transform::resample_series` (Jacobian), `lx.transforms.resample_series` | PEPOLAR field maps (Jacobian on by default), T1w and standard spaces |
 | PIPE-04 | `.h5` composites read in name order | `python/larmorx/transforms/chain.py:348` (`lx.transforms.load_transforms`) | latent (11+ transforms) |
-| SCI-03 | `reflect`/`grid-mirror` splines do not interpolate | `larmorx_interp::ndimage::splines` (`lx.ndimage`) | none |
+| SCI-03 | `reflect`/`grid-mirror` splines do not interpolate | `larmorx_interp::ndimage::splines` (`lx.ndimage`) | fixed upstream in SciPy 1.18 (2026-10-29) |
 
 **Head-motion correction, clean-room original (`crates/larmorx-mri`; fixes need only the
 spec, which describes each behaviour)** (done 2026-10-11; FSL-09's reproduced conversion wraps
@@ -3250,14 +3255,13 @@ fMRIPrep 25.2.6 (the oracle runs) or its source at `21a490fb`, niworkflows 1.15.
   2), 1.4e-4 (3), 2.1e-3 (4) and 1.0e-2 (5); every other mode returns the samples to 1e-14.
 - **Evidence:** verified in SciPy 1.15 ([scipy-ndimage.md](scipy-ndimage.md)).
 - **fMRIPrep:** none (`grid-constant`).
-- **larmorx:** corrected by default (2026-10-11). The cause is SciPy's causal initialisation
-  for the reflect boundary (`ni_splines.c`, used for `reflect`, `grid-mirror` and `nearest`):
-  its last term reads `c[0]` after the loop has already updated it; with the original `c[0]`
-  the sum is the exact half-sample-symmetric initialisation and the splines pass through the
-  samples (to 1e-9 on the 6 × 5 × 4 array, order 5). A warning says when a coefficient changed;
-  `upstream_defects="reproduce"` gives SciPy's (`larmorx_interp::ndimage::splines`,
-  `lx.ndimage`, `lx.transforms.resample_series(mode=...)`).
-- **D13 / gap:** done.
+- **larmorx:** corrected by default (2026-10-11 to 2026-10-28), `reproduce` giving SciPy's.
+  **SciPy 1.18 fixed it** (`ni_splines.c`: the sum in a variable of its own, then
+  `c[0] += sum·z/(1 − z^2n)`; the rounding of its scaling differs from larmorx's correction);
+  larmorx follows SciPy 1.18.1 in both modes since 2026-10-29 and names nothing
+  (`docs/findings/scipy-ndimage.md`, "SciPy 1.18.1"). Under SciPy 1.15 the resample-series
+  cases the change reaches are expected divergences (`python_versions.CHANGES`).
+- **D13 / gap:** done (fixed upstream).
 
 ### SCI-04 Fused multiply-adds on aarch64 — (d)
 - **What:** SciPy's x86-64 wheels target baseline x86-64 and cannot fuse; on aarch64 GCC
@@ -4628,3 +4632,26 @@ fMRIPrep 25.2.6 (the oracle runs) or its source at `21a490fb`, niworkflows 1.15.
 - **larmorx:** the options are passed as given (the mesh written); `reproduce` runs them through
   bash's `echo` as FSL does; both name FSL-63 where the two differ (rule A, 2026-10-29).
 - **D13 / gap:** No gap.
+
+### FSL-64 † FSL 6.0.7.23's matrix arithmetic depends on the CPU — (d)
+- **What:** FSL 6.0.7.23's Armadillo 14.2.1 inverts, solves with and takes determinants of
+  4 × 4 matrices through LAPACK (`dgetrf` + `dgetri`, `dtrtri`, `dgesv`), which is OpenBLAS
+  0.3.33 (`liblapack.so.3` → `libopenblasp-r0.3.33.so`, conda-forge, `DYNAMIC_ARCH`). OpenBLAS
+  picks its kernels by CPU at start-up: its Haswell and Zen cores compile the C kernels with
+  `-mavx2` only, its SkylakeX, Cooperlake and Sapphire Rapids cores (AVX-512 CPUs) with
+  `-march=skylake-avx512`, where GCC fuses `dgemv_n`'s tails, `daxpy` and the triangular solves
+  into multiply-adds. On 100,000 seeded matrices per family, Cooperlake's `inv()` equals
+  Haswell's for 6 % of random matrices, 19 % of affines, 18 % of rigid ones, every diagonal
+  sampling, swap and translation matrix; its `inv(A)·B` for 0 to 2 %.
+- **Evidence:** measured (`validation/investigations/version-numerics/lapack_probe.py --cores`,
+  `lapack_probe_summary.json`, `openblas_kernels.py`); mcflirt's 137 recorded runs made again on
+  the Haswell core (`oracles/fsl-6.0.7.23/mcflirt-haswell`) against the Cooperlake ones this CPU
+  chose: 136 identical, 1 changed (`identical-copies/reffile-fudge`, its relative rms:
+  `compare_cores.py`).
+- **fMRIPrep:** its mcflirt and BET (FSL 6.0.7.23 and later, when it moves to them) give other
+  last bits on an AVX-512 machine than on an AVX2 one.
+- **larmorx:** the replicas follow the Haswell order on every platform (`larmorx-nc-core`,
+  `lapack.rs`), as `larmorx_transform::openblas` does for numpy (NP-01); the harness runs FSL
+  with `OPENBLAS_CORETYPE=Haswell` (`fsl_versions.OPENBLAS_CORE`, part of the oracle cache's key
+  for FSL's programs).
+- **D13 / gap:** not D13 (no defect of FSL's code: a property of its build).

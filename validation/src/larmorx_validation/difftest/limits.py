@@ -96,6 +96,36 @@ class Leaf:
         except (OSError, ValueError):
             return None
 
+    def stop_others(self) -> int:
+        """Stops (SIGKILL) every process of this leaf but the caller and its ancestors: what a
+        run stopped for time leaves behind. Killing a program kills that process only, and a
+        script's own children (FSL's ``bet`` runs ``bet2``) live on, orphaned, in the leaf; on
+        2026-10-29 one ran for more than eight hours after its case's timeout. Returns how many
+        were stopped."""
+        keep = set()
+        pid = os.getpid()
+        while pid > 1 and pid not in keep:
+            keep.add(pid)
+            try:
+                status = Path(f"/proc/{pid}/status").read_text(encoding="ascii")
+            except OSError:
+                break
+            pid = next(
+                (int(line.split()[1]) for line in status.splitlines() if line.startswith("PPid:")),
+                0,
+            )
+        try:
+            pids = (self.path / "cgroup.procs").read_text(encoding="ascii").split()
+        except OSError:
+            return 0
+        stopped = 0
+        for p in pids:
+            if p.isdigit() and int(p) not in keep:
+                with contextlib.suppress(ProcessLookupError, PermissionError):
+                    os.kill(int(p), signal.SIGKILL)
+                    stopped += 1
+        return stopped
+
     def remove(self) -> None:
         with contextlib.suppress(OSError):
             self.path.rmdir()

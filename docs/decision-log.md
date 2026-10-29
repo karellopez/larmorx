@@ -1676,6 +1676,19 @@ together at the end.
 - **The FSL pages of the site** show FSL 6.0.7.23 beside 6.0.7.17 in figures-cache entries of
   their own, keyed with the version (`<case>-fsl-6.0.7.23`); 6.0.7.17's entries are kept.
 
+## 2026-10-29: The version update's part 3 (orchestrator, by the rules)
+- **FSL's OpenBLAS core pinned to Haswell** (the version update's part 3; rules settle it): FSL
+  6.0.7.23's 4 × 4 matrix arithmetic depends on the core OpenBLAS picks for the CPU (FSL-64,
+  class d). The replicas follow the Haswell order, as numpy's port does (NP-01); the harness
+  runs every FSL program with `OPENBLAS_CORETYPE=Haswell`, the variable is part of the oracle
+  cache's key for FSL, and mcflirt's 6.0.7.23 recordings were made again on that core
+  (`oracles/fsl-6.0.7.23/mcflirt-haswell`; the Cooperlake recording kept).
+- **The newest Python releases beside the shared environment** (the user's "newest versions,
+  updated in steps"): `oracles/python-newest` (numpy 2.5.4, SciPy 1.18.1, the shared
+  environment's other packages) is the reference of the Python originals' suites
+  (`--python newest` by default for resample-series, resample-series-jacobian, numpy-linalg);
+  the shared `.venv` is unchanged (section 13 of the handoff: the recommendation).
+
 ## Open decisions (PLAN.md §16)
 
 | # | Decision | Recommended default (used until decided) | Status |

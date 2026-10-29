@@ -1,0 +1,188 @@
+{
+ "defect": null,
+ "description": "bet -R -e on a 1 x 1 x 2 image stored neurologically: FSL 6.0.7.23's fslstats -C prints the centre -0.000000 (Armadillo 14.2.1's solve through LAPACK), which the script's dc reads as a subtraction (dc: stack empty, twice); the replica's fslstats and its dc do the same since 2026-10-29 (found by the FSL version trial, case 141 shrunk)",
+ "expect": "pass",
+ "found": {
+  "detail": "messages: FSL's, byte for byte: stderr FSL 32 characters, larmorx 0: 'dc: stack empty\\ndc: stack empty\\n' / ''; files written: FSL ['out.nii.gz'], larmorx ['out.nii.gz', 'out_mesh.vtk']",
+  "n": 141,
+  "seed": "20261029",
+  "shrink_moves": [
+   "input: axis 2 32 -> 16 voxels",
+   "input: axis 2 16 -> 8 voxels",
+   "input: axis 0 11 -> 5 voxels",
+   "input: axis 1 8 -> 4 voxels",
+   "input: axis 2 8 -> 4 voxels",
+   "input: axis 0 5 -> 2 voxels",
+   "input: axis 1 4 -> 2 voxels",
+   "input: axis 2 4 -> 2 voxels",
+   "input: axis 0 2 -> 1 voxels",
+   "input: axis 1 2 -> 1 voxels"
+  ],
+  "signature": [
+   "files written"
+  ]
+ },
+ "id": "bet-robust-cog-minus-zero",
+ "implementations": [
+  "replica"
+ ],
+ "reason": "",
+ "recipe": {
+  "extra": {
+   "output_type": "NIFTI_GZ",
+   "tool": "bet"
+  },
+  "features": {
+   "-c": false,
+   "-d": false,
+   "-e": true,
+   "-f": false,
+   "-g": false,
+   "-m": false,
+   "-n": false,
+   "-o": false,
+   "-r": false,
+   "-s": false,
+   "-t": false,
+   "-v": false,
+   "-w": false,
+   "FSLOUTPUTTYPE": "NIFTI_GZ",
+   "axis0": 0.9,
+   "axis1": 0.8,
+   "axis2": 1.1,
+   "bias0": -0.005,
+   "bias1": 0.005,
+   "bias2": 0.0025,
+   "bias3": 0.005,
+   "centre0": -3.5,
+   "centre1": -4.0,
+   "centre2": 5.5,
+   "content": "head",
+   "dtype": "float64",
+   "extreme": false,
+   "noise": 6.0,
+   "orientation": "plumb",
+   "origin0": 9.5,
+   "origin1": -52.5,
+   "origin2": -26.25,
+   "qfac": 1,
+   "qform_code": 0,
+   "range": "plain",
+   "sform": "same",
+   "sform_code": 1,
+   "shape": "11x8x32",
+   "size": 12.0,
+   "spacing0": 2.5,
+   "spacing1": 1.0,
+   "spacing2": 4.0,
+   "suffix": ".nii",
+   "tissues": "t1",
+   "tool": "bet",
+   "units": "unknown",
+   "variation": "-R"
+  },
+  "groups": [
+   {
+    "args": [
+     "{in:input}",
+     "out"
+    ],
+    "name": "input",
+    "optional": false
+   },
+   {
+    "args": [
+     "-R"
+    ],
+    "name": "variation",
+    "optional": false
+   },
+   {
+    "args": [
+     "-e"
+    ],
+    "name": "-e",
+    "optional": true
+   }
+  ],
+  "inputs": {
+   "input": {
+    "content": {
+     "axes": [
+      0.9,
+      0.8,
+      1.1
+     ],
+     "bias": [
+      -0.005,
+      0.005,
+      0.0025,
+      0.005
+     ],
+     "centre": [
+      -3.5,
+      -4.0,
+      5.5
+     ],
+     "noise": 6.0,
+     "seed": 9309364,
+     "size": 12.0,
+     "tissues": "t1",
+     "type": "head"
+    },
+    "dtype": "float64",
+    "geometry": {
+     "origin": [
+      9.5,
+      -52.5,
+      -26.25
+     ],
+     "qfac": 1,
+     "qform_code": 0,
+     "quaternion": [
+      1,
+      0,
+      0,
+      0
+     ],
+     "sform": "same",
+     "sform_code": 1,
+     "spacing": [
+      2.5,
+      1.0,
+      4.0
+     ],
+     "units": "unknown"
+    },
+    "scaling": null,
+    "shape": [
+     1,
+     1,
+     2
+    ],
+    "suffix": ".nii",
+    "values": {
+     "offset": 0.0,
+     "scale": 1.0
+    }
+   }
+  },
+  "n": 141,
+  "options": [
+   "-R",
+   "-e",
+   "FSLOUTPUTTYPE=NIFTI_GZ",
+   "bet"
+  ],
+  "seed": "20261029",
+  "tool": "fsl-bet"
+ },
+ "rule": null,
+ "status": "fixed",
+ "step": [
+  "arma-lapack-centre"
+ ],
+ "suite": "fsl-bet-replica",
+ "tier": "smoke",
+ "tool": "fsl-bet"
+}

@@ -32,13 +32,17 @@ crate. See [docs/findings/platform-math.md](../../docs/findings/platform-math.md
 ## SciPy's spline interpolation (`src/ndimage/`)
 
 **Ported** from SciPy 1.15.2 (tag `v1.15.2` → `0f1fd4a7268b`, BSD-3-Clause, `UPSTREAM.md`;
-SciPy 1.15.3, in the development venv, has the same `ndimage` interpolation code). The
-operation order is kept, so results are bit-identical to SciPy on x86-64 Linux
-(`docs/validation/resample-series.md`). Each file reproduces SciPy's notice.
+SciPy 1.15.3, in the development venv, has the same `ndimage` interpolation code) and **follows
+SciPy 1.18.1 since 2026-10-29** (the version update's part 3: of the files below, only
+`ni_splines.c`'s reflect initialisation changes a result, `_init_causal_reflect`, which SciPy
+1.18 sums into a variable of its own: SCI-03 fixed upstream; `docs/findings/scipy-ndimage.md`,
+"SciPy 1.18.1"). The operation order is kept, so results are bit-identical to SciPy 1.18.1 on
+x86-64 Linux (`docs/validation/resample-series.md`, run in `oracles/python-newest`). Each file
+reproduces SciPy's notice.
 
 | larmorx | SciPy 1.15.2 | Licence |
 |---|---|---|
-| `ndimage::splines`: `filter_poles`, `interpolation_weights`, `LineFilter` (gain, causal/anticausal initialisations for mirror, wrap and reflect, the recursions), `apply_rows` (the same per line, many lines at once) | `scipy/ndimage/src/ni_splines.c` (`get_filter_poles`, `get_spline_interpolation_weights`, `_init_*`, `_apply_filter`, `apply_filter`) | BSD-3-Clause |
+| `ndimage::splines`: `filter_poles`, `interpolation_weights`, `LineFilter` (gain, causal/anticausal initialisations for mirror, wrap and reflect, the recursions), `apply_rows` (the same per line, many lines at once) | `scipy/ndimage/src/ni_splines.c` (`get_filter_poles`, `get_spline_interpolation_weights`, `_init_*`, `_apply_filter`, `apply_filter`); `_init_causal_reflect` from SciPy 1.18.1 | BSD-3-Clause |
 | `ndimage::map_coordinate`, `Spline::sample` (the coordinate-array path), `filter_axis` (lines of an axis) | `scipy/ndimage/src/ni_interpolation.c` (`map_coordinate`, `NI_GeometricTransform`, `_get_spline_boundary_mode`, `NI_SplineFilter1D`), `ni_support.c` (line buffers) | BSD-3-Clause (Peter J. Verveer) |
 | `Mode`, `Mode::extend`, `Mode::prepad`, `pad`, `map_coordinates`, `spline_filter`, `spline_filter1d`, `Output` (`CASE_INTERP_OUT*`) | `scipy/ndimage/_interpolation.py` (`map_coordinates`, `spline_filter`, `spline_filter1d`, `_prepad_for_spline_filter`), `_ni_support.py` (`_extend_mode_to_code`, `_get_output`) | BSD-3-Clause |
 

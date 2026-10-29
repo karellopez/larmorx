@@ -49,11 +49,28 @@ DIR_ENV_OLD = "LARMORX_FSL_DIR"
 #: The version each implementation is validated against by default: both follow the newest
 #: release (the clean-room head-motion correction since its alignment, 2026-10-29: next-steps 3b).
 DEFAULT = {"replica": NEWEST, "original": NEWEST}
-#: mcflirt's recorded runs, per version (under the workspace).
+#: mcflirt's recorded runs, per version (under the workspace). FSL 6.0.7.23's are those made on
+#: OpenBLAS's Haswell core (:data:`OPENBLAS_CORE`); its first recording,
+#: ``oracles/fsl-6.0.7.23/mcflirt``, ran on OpenBLAS's own choice for the CPU and is kept.
 RECORDINGS = {
-    "6.0.7.23": "oracles/fsl-6.0.7.23/mcflirt",
+    "6.0.7.23": "oracles/fsl-6.0.7.23/mcflirt-haswell",
     "6.0.7.17": "oracles/fsl-6.0.7/mcflirt",
 }
+#: The OpenBLAS core every FSL program the harness runs computes on. FSL 6.0.7.23's Armadillo
+#: 14.2.1 inverts, solves and takes determinants of 4 x 4 matrices through OpenBLAS 0.3.33,
+#: which picks its kernels by CPU at start-up (SkylakeX, Cooperlake and Sapphire Rapids, the
+#: AVX-512 cores, contract their C kernels into fused multiply-adds; Haswell and Zen do not), so
+#: the last bits of FSL's own results depend on the machine (FSL-64). The replicas follow the
+#: Haswell order, as larmorx follows numpy's Haswell kernels (``scripts/orchestration/env.sh``);
+#: ``OPENBLAS_CORETYPE`` pins it for FSL too, and is part of the oracle cache's key.
+OPENBLAS_CORE = "Haswell"
+
+
+def openblas_env() -> dict[str, str]:
+    """The variable that pins FSL's OpenBLAS kernels (:data:`OPENBLAS_CORE`), for every FSL
+    program's environment."""
+    return {"OPENBLAS_CORETYPE": OPENBLAS_CORE}
+
 
 #: What changed between FSL 6.0.7.17 and 6.0.7.23 in the code these programs run (the source
 #: diff and the binaries: ``validation/investigations/version-fsl/``). Keys are the register's
@@ -79,7 +96,13 @@ CHANGES = {
     "build lays out",
     "arma-lapack": "FSL 6.0.7.23's Armadillo 14.2.1 inverts 4 x 4 matrices and solves with them "
     "through LAPACK (OpenBLAS), where Armadillo 10.5.1 used its closed-form inverse: the last "
-    "bits of values computed from nearly equal matrices change",
+    "bits of values computed from nearly equal matrices change, and the sign of NaN "
+    "parameters",
+    "arma-lapack-centre": "FSL 6.0.7.23's Armadillo 14.2.1 solves with an image's voxel "
+    "matrices through LAPACK (OpenBLAS), where Armadillo 10.5.1 used its closed-form "
+    "inverse: the last bits of a centre change, so bet2's start from -c moves by a fraction "
+    "of a voxel, and fslstats -C can print a zero with its sign (-0.000000), which bet -R's "
+    "dc reads as a subtraction",
 }
 
 #: The implementation whose case runs now (:func:`using`): its default version applies.

@@ -29,7 +29,12 @@ checksum changed, `mcflirt.nonfinite.reproduce`'s `.par` (`b08d9de2…` → `0f3
 6.0.7.17 mcflirt's own output for the same input; the old value came from a debug build whose
 `atan2f` passed on the other of two NaNs.
 
-`larmorx-nc`'s checksums were re-recorded on 2026-10-29 from c58a6f6 (the version update to FSL
+`larmorx-nc`'s checksums were re-recorded again on 2026-10-29 from f587288 (Armadillo 14.2.1's
+LAPACK path): 1 output changed, `mcflirt.nonfinite.reproduce.par` (the all-NaN volume's y rotation
+keeps the affine's NaN, as FSL 6.0.7.23 gives it); the rest unchanged. The main package's
+checksums were re-recorded on 2026-10-29 from 4811172: 7 of 895 outputs changed, every one
+`lx.ndimage`'s reflect-family boundary (SciPy 1.18.1's reflect initialisation in both modes,
+SCI-03 fixed upstream); the rest unchanged. Earlier: `larmorx-nc`'s checksums were re-recorded on 2026-10-29 from c58a6f6 (the version update to FSL
 6.0.7.23): 3 cases added; 28 outputs of 10 BET cases changed, every one an image header (`descrip`:
 newimage 2601.0's build string, `2601.0 2025-12-08T15:20:57Z`); no data checksum changed
 (`validation/investigations/version-fsl/golden_changes.py`); `mcflirt.reffile.sinc.stages4.float32`

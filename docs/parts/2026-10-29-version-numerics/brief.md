@@ -1,0 +1,57 @@
+You are doing **part 3 of the version update**: larmorx's numerical ports follow the newest releases of the libraries they reproduce (github.com/karellopez/larmorx; your worktree is a checkout of main). Two halves:
+- **A. FSL 6.0.7.23's matrix library.** The FSL replicas (mcflirt, BET) follow Armadillo 14.2.1's 4 × 4 inverses and solves through LAPACK, as FSL 6.0.7.23 computes them; today their 5 mcflirt "expected divergences" and BET's two places (bet2 `-c` on an image stored neurologically, `fslstats -C` in `bet -R`) wait for this.
+- **B. SciPy, NumPy and OpenBLAS.** The one-shot BOLD resampler (`lx.transforms.resample_series`, `lx.ndimage`; crates `larmorx-interp`, `larmorx-transform`) and everything that follows numpy's 4 × 4 products and inverses (`larmorx_transform::openblas`) are checked against SciPy 1.18.1, NumPy 2.5.4 and the OpenBLAS those wheels carry, and follow them.
+
+This is next-steps item 3, part 3 (the user, 2026-10-27 and 28: newest releases, updated in steps, not postponed; decision log "How versions are handled from now on"). The two earlier parts are the model: read `docs/parts/2026-10-29-version-afni/report.md` and `docs/parts/2026-10-29-version-fsl/report.md` (the version option, "the original's own step" in each record, the site's version panels). Aim for 6 to 8 hours; do A first.
+
+Read first: the repo's `CLAUDE.md` (rules 1-10, "Agent working rules", "Working on this machine"); `docs/porting-guide.md` §1, its D13 section and its per-tool checklist; `scripts/orchestration/README.md`; `docs/validation/oracle-cache.md`; `docs/validation/difftest.md`; `docs/figures.md`; next-steps item 3 and the follow-up "The replicas follow Armadillo 14.2.1's LAPACK inverses"; `docs/findings/fsl-mcflirt.md` and `fsl-bet.md` ("FSL 6.0.7.23"); `docs/findings/numpy-blas.md` and `scipy-ndimage.md`; the PROVENANCE of `crates/larmorx-transform`, `crates/larmorx-interp`, `crates-nc/larmorx-nc-core`; the records `docs/validation/resample-series*.md`, `fsl-mcflirt-replica.md`, `fsl-bet-replica.md`; the upstream watch's report (`docs/parts/2026-10-29-version-afni/handoff.md` §11) and `docs/next-steps.md` "The version update, what changed in the numerics".
+
+**Testing depth (the user, 2026-10-28):** smart, not exhaustive: every changed code path once, fMRIPrep's real calls already in the standard tiers, the edge cases, a short random-testing trial, the standard and smoke tiers.
+
+## Your role: replica author (permissive sources)
+You may read the sources: SciPy, NumPy and OpenBLAS (`<workspace>/tags/scipy-*`, `numpy-*`, `OpenBLAS-*`), reference LAPACK and Armadillo (fetch the exact versions FSL 6.0.7.23 and the numpy/SciPy wheels use; say where from), FSL's source (`~/fsl-6.0.7.23/src`, `crates-nc/fsl-source/`), the replica crates and the restricted FSL findings. Because you read FSL's source, you **never edit a clean-room crate** (`crates/larmorx-mri`, `crates/larmorx-afni`) and never write FSL routine names into unrestricted documents (the register's summary rows, `docs/api/`, next-steps, the decision log, the site): describe by behaviour there; source detail goes into the restricted findings and register sections marked †.
+
+## Tasks
+### A. Armadillo 14.2.1's LAPACK inverses (the FSL replicas, `crates-nc/`)
+- Find exactly which LAPACK routines FSL 6.0.7.23's Armadillo calls for each 4 × 4 `inv()`, `inv(A)·B` / `solve` and `det()` the replicas reproduce (by matrix kind: diagonal, triangular, symmetric, general), and through which LAPACK/BLAS build (`~/fsl-6.0.7.23/lib`, OpenBLAS 0.3.33).
+- Port them as that build computes them (reference LAPACK's algorithms with OpenBLAS's kernels' order where a kernel is reached), checked bit for bit against `~/fsl-6.0.7.23/lib/liblapack.so.3` (and its BLAS) through a ctypes probe, on random matrices and FSL-typical ones (swap, sampling, rigid, affine; singular and near-singular included), at enough cases to trust it (an exhaustive or very large random sweep where cheap).
+- Switch the replicas' matrix rules to them for FSL 6.0.7.23, keeping Armadillo 10.5.1's for FSL 6.0.7.17 where the harness runs the old version (the step between the two). Licences: Armadillo (Apache-2.0), LAPACK and OpenBLAS (BSD-3-Clause): notices in `crates-nc/NOTICE` and PROVENANCE.
+- The 5 mcflirt expected divergences (`ARMA_LAPACK` in the suite) become passes; BET's two places (the version trial's case 80 as drawn, case 141 shrunk; `validation/investigations/version-fsl/bet2_versions.sh`, `cog_sign_probe.py`) agree with FSL 6.0.7.23. Records re-made from a clean commit.
+
+### B. SciPy 1.18.1, NumPy 2.5.4, OpenBLAS (the resampler and numpy's 4 × 4 arithmetic, main package)
+- **An oracle environment of the newest releases, beside the shared one:** never change `<workspace>/.venv` (every other suite depends on it). Make `<workspace>/oracles/python-newest/` (a venv with numpy 2.5.4, scipy 1.18.1, nitransforms 25.1.0, nibabel 5.4.2 and what the suites need), recorded with its exact versions and the OpenBLAS its wheels carry; the harness picks it as it picks AFNI and FSL (one option and one environment variable; the resample-series suites, the evidence and random testing alike); every record names the versions it ran.
+- Classify every change between the old and new releases in every file the PROVENANCE files name (the upstream watch lists SciPy 5 of 5, NumPy 3 of 3, OpenBLAS 4 of 26 changed), and every routine the ports call: licence or comment only; no effect; a change of results, messages or errors.
+- Port what matters, in the main crates (permissive sources: BSD-3-Clause notices). numpy's OpenBLAS: find which kernels the new wheels' OpenBLAS uses on this machine with `OPENBLAS_CORETYPE=Haswell` (the pinned reference, `docs/findings/numpy-blas.md`), whether its 4 × 4 products and inverses changed, and follow them.
+- The resample-series records (`resample-series`, `resample-series-jacobian`) against the newest releases, with "the original's own step" (old → new versions, each change with its reason); fMRIPrep's own outputs stay compared as they are (its image's versions are a reference only).
+- Recommend in your handoff whether the shared `.venv` and `validation/requirements-lock.txt` should move to the newest releases, and what that would change for the other suites (do not change them).
+
+### Golden, memory, random testing, site
+- Golden checksums: re-record from a clean commit if outputs change (`scripts/record_golden.py`).
+- Memory: the changed calls stay within the rule (`tests/parity/test_memory_peak.py`).
+- Random testing: a 30-minute trial of the affected descriptors (`fsl-mcflirt`, `fsl-bet`, `resample-series`, and any other that uses numpy's inverses) against the newest versions, boxed (`--out <workspace>/oracles/difftest/<date>-version-numerics`); every difference triaged by the rule (a larmorx mistake fixed with a permanent case; a defect registered by rules A-D; IDs below).
+- The site: your clone of `larmorx_documentation` is ready at `<scratch>/site` (branch `version-numerics`, the no-reply identity, the commit-msg guard, the evidence images in place; commit there; if `git commit` is refused, leave the changes uncommitted and say so). The resample-series page (both versions' panels, as the AFNI and FSL pages show theirs), and the mcflirt and BET pages where their expected divergences become passes. The figures cache keys new entries with the version, never overwriting an existing entry. **Nothing the site shows is removed or reduced**: a before/after inventory per page (`validation/investigations/panel-ants/site_inventory.py`), before/after screenshots (`tools/review/shoot.mjs`; `validation/investigations/version-afni/site_shots.sh` is a model), `LX_EVIDENCE.check()` on each page and the Validation page (printed by `--eval` as a JSON string), every hand-written number in the prose your records change updated, `tables --site`, the build with 0 problems. Plain words in every text: say what a thing is (a "long random-testing run", never "a night").
+
+## Documents
+- **Your own files:** the crates you change and their PROVENANCE, `crates-nc/NOTICE`, the main package's notices for new BSD sources, the restricted FSL findings, `docs/findings/numpy-blas.md` and `scipy-ndimage.md`, the records, the API pages' version lines, permanent cases, `validation/investigations/version-numerics/` (README and probes), the evidence modules you change.
+- **Shared, through `<scratch>/HANDOFF.md` with the exact text for each:** the register (rows behaviour-only; sections with source detail marked †), `docs/api/upstream-defects.md`, `docs/licensing.md`, `UPSTREAM.md`, `upstream.tsv`, rule 2 of CLAUDE.md and the "Where things are" rows, next-steps (item 3's part 3 done; the Armadillo follow-up done; follow-ups), the decision log, `triage.toml` entries, golden.md, the site's Roadmap row, `validation/tools.toml` (then `python -m larmorx_validation tables`).
+- Defect IDs, only: FSL-64 to FSL-68, NP-03 to NP-07, SCI-05 to SCI-09.
+- Anything the rules cannot settle: report it with a recommendation, do not decide it.
+
+## Machine (shared)
+- Up to **24** threads (`cargo -j 24`, parity `--jobs` to match); memory boxes together at most **36 GiB** (`scripts/orchestration/boxed.sh`: every parity tier, random-testing run, evidence export and measurement).
+- Never touch the main checkout (`<workspace>/larmorx`), the sibling checkout `larmorx-heavy`, or `oracles/difftest/2026-10-25/`.
+- FSL stays off `PATH`; call its programs by full path or through the harness.
+
+## Git and where to work
+- Your worktree branch; commit after every meaningful step; never AI attribution, never `--no-verify`; no push, no merge.
+- Scratch: `<scratch>/version-numerics/` (this folder): NOTES.md, HANDOFF.md, builds, outputs; never write under a `.claude/` folder; commit every helper behind a result under `validation/investigations/version-numerics/`.
+- `source scripts/orchestration/env.sh`; never `maturin develop` (build the wheel into `<scratch>/wheel`, copy the `.so`: `scripts/orchestration/lxv.sh`); build-cache seed: copy the main checkout's `target/`, `crates-gpl/target/`, `crates-nc/target/`, reading only from there.
+- Gates: `scripts/orchestration/gates-rust.sh <worktree> all`, `gates-python.sh <worktree> --no-build`, `pytest tests/parity`, `python -m larmorx_validation tables --check`; records and golden checksums from clean commits only.
+- Never: delete work products; modify the oracle builds, the FSL installations, the shared `.venv`, the fMRIPrep runs, the cache's existing entries or any upstream source; ask for sudo. Downloading the exact library sources and wheels you need is fine: say what, from where, with checksums, and keep them under `<workspace>/tags/` or `<workspace>/oracles/`.
+- Public repository: no network addresses, account names, hostnames or keys; local paths as `<workspace>`, `<scratch>`, `~/fsl-<version>`.
+- Wait for long runs with one background wait on the log's final line; never stop silently.
+
+## Stop after this part; report (concise)
+- A: the routines ported, the probe's numbers, the records (mcflirt and BET) before and after, compare_records.
+- B: each changed file's class, what the ports do now, the resample-series records against the newest releases with the original's own step, the recommendation on the shared venv.
+- Defects (IDs used), golden, memory, the trial's numbers and triage, the site's inventory, screenshots and number check, gates, commits.

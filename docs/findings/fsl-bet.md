@@ -323,7 +323,7 @@ standard-tier cases differ, every one by the changes below.
 | `FSLOUTPUTTYPE` (newimage 2601.0) | new values, message | the zstd and bzip2 types; the unknown value's list of 16 | as for mcflirt |
 | fslpy 3.27.0 (`imtest`, `remove_ext`, `imglob`) | new extensions | `.nii.zst`, `.nii.bz2`, `.img.zst`, `.hdr.zst`, `.img.bz2`, `.hdr.bz2` in their lists (imtest and remove_ext keep MINC; imglob's own list has none); the pairs grouped alike | `avwutils.rs` (`FSLPY_EXTS`, `IMGLOB_EXTS`, `GROUPS`) |
 | NewNifti 5.0.0's `replaceSuffix` (FSL-60), znzlib's formats | as for mcflirt | bet2's own name handling (FSL-40) aborts on a name holding `.img` before NewNifti is reached; betsurf and the script's tools meet FSL-60 | as for mcflirt |
-| Armadillo 14.2.1's 4 × 4 inverses | as for mcflirt | BET inverts the sampling and swap matrices of `makeradiological`, and `niftivox2newimagevox_mat` (`sampling_mat().i() * swapmat * sampling_mat()`, an image stored neurologically) in bet2's `-c` and in `fslstats -C` (bet's `-R`); no recorded output changed, but random testing found both (below) | not followed (as for mcflirt) |
+| Armadillo 14.2.1's 4 × 4 inverses | as for mcflirt | BET inverts the sampling and swap matrices of `makeradiological` (a diagonal matrix's reciprocals; the swap matrix, upper triangular, by `dtrtri`), takes `left_right_order`'s determinants (a triangular sform's diagonal product, else LU), and solves `niftivox2newimagevox_mat` (`sampling_mat().i() * swapmat * sampling_mat()`, an image stored neurologically, by `dgesv`) in bet2's `-c` and in `fslstats -C` (bet's `-R`); no recorded output changed, but random testing found both (below) | **followed since 2026-10-29** (`lapack.rs`, `arma.rs`: `findings/fsl-mcflirt.md`, "Armadillo 14.2.1's LAPACK path"); both trial cases agree with FSL 6.0.7.23 |
 
 ### The version trial's BET differences, triaged (2026-10-29)
 
@@ -340,7 +340,10 @@ replica differences; each replayed against both versions (`replay_bet_findings.s
   then reads as a subtraction (`dc: stack empty`, twice): `fslstats.cc` and newimage's `cog` are
   unchanged, the centre goes through `niftivox2newimagevox_mat().i()` (Armadillo 14.2.1's
   inverse), and an image stored radiologically gives `0.000000` in both
-  (`cog_sign_probe.py`). It waits for the Armadillo part.
+  (`cog_sign_probe.py`). **Since 2026-10-29** the replica's `fslstats -C` solves as FSL
+  6.0.7.23 does (`dgesv` of the voxel matrix, whose first pivot is −1: 0 / −1 is −0)
+  and its `dc` reads a leading `-` as the subtraction GNU dc 1.4.1 makes of it (`bet.rs`,
+  `dc::lexemes`): the shrunk case agrees (permanent case `bet-robust-cog-minus-zero`).
 - **661** and **1297**: FSL-43's fill by the linear index, above (replica mistakes, fixed).
 - **1308** (`bet -R -g 0.5 -e`): FSL's second bet2 crashes in a fill starting 71 slices above the
   image; the script's `ERR` trap prints `bet failed during command:...` after the crash, which
@@ -351,5 +354,6 @@ replica differences; each replayed against both versions (`replay_bet_findings.s
   `-c 22 19 8 -m -w 0.5`): 18 of 15,360 voxels differ between FSL 6.0.7.17 (the replica's) and
   6.0.7.23; the versions agree without `-c`, and with `-c` on the same image stored
   radiologically (`bet2_versions.sh`): `-c`'s centre goes through
-  `niftivox2newimagevox_mat()`'s inverse, whose last bits Armadillo 14.2.1 changes. It waits for
-  the Armadillo part.
+  `niftivox2newimagevox_mat()`'s inverse, whose last bits Armadillo 14.2.1 changes. **Since
+  2026-10-29** the replica follows that solve: the drawn case agrees with FSL 6.0.7.23 (permanent
+  case `bet2-centre-neurological-solve`).

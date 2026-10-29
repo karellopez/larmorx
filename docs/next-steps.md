@@ -39,7 +39,7 @@ starts no other agent.
 ## The order from here
 
 **Now (2026-10-29):** the version update's AFNI and FSL parts are done (the replicas follow AFNI
-26.3.05 and FSL 6.0.7.23); the clean-room originals follow them too (item 3b, done the same day); next, part 3. Before: the move
+26.3.05 and FSL 6.0.7.23); the clean-room originals follow them too (item 3b), and part 3 (SciPy, numpy, FSL's matrix library) is done the same day; next, item 3c. Before: the move
 (M, below), the ANTs tools' data panel (part a) and the fourteen whole template registrations
 (14 of 14 identical with correctly rounded maths). The public summary of this order is the site's
 Roadmap page, updated at every completed step.
@@ -75,10 +75,13 @@ at a time:
    6.0.7.23 (FSL-59 to FSL-63 new, FSL-41 fixed upstream; the zstd and bzip2 formats; bet2
    `--binaryMask`); records against 6.0.7.23 with FSL's own step from 6.0.7.17 in every case;
    `specs/mcflirt.md` (with `normmi` and `mutualinfo` exactly, appendix B) and `specs/bet.md`
-   updated; Armadillo 14.2.1's LAPACK inverses not followed yet (part 3). **Part 3:** SciPy,
-   NumPy and OpenBLAS checked against their newest (resample-series and what follows numpy's
-   inverses), and the FSL replicas follow Armadillo 14.2.1's LAPACK inverses (the follow-up
-   below); each tool aligned with its newest original, with the per-part testing.
+   updated; Armadillo 14.2.1's LAPACK inverses not followed yet (part 3). **Part 3: done** (2026-10-29, `docs/parts/2026-10-29-version-numerics/`): the FSL
+   replicas follow Armadillo 14.2.1's LAPACK inverses, solves and determinants (OpenBLAS 0.3.33's
+   Haswell order, bit for bit against FSL's own library on 30.2 million matrices; mcflirt's five
+   expected divergences pass; BET's trial cases 80 and 141 agree; FSL-64: the harness pins FSL's
+   OpenBLAS core); the resampler follows SciPy 1.18.1 (SCI-03 fixed upstream) and is checked
+   against numpy 2.5.4 with OpenBLAS 0.3.34 (no change); the oracle environment
+   `oracles/python-newest` and the step per case in the resample-series record.
    - **3b. The clean-room originals follow the newest versions: done** (2026-10-29,
      `docs/parts/2026-10-29-cleanroom-align/`): 3dTshift, 3dAutomask and 3dUnifize follow AFNI
      26.3.05 (header slice code 2 and `-no_detrend` as 26.3.05 in both modes, AFNI-03 and
@@ -452,6 +455,20 @@ The items below keep their history.
   obliquity of its own header extension's 7-digit matrix (AFNI-10); AFNI on the inputs without the
   extension prints the original's angle, and the parity suite now explains such messages by
   AFNI-10 (22 of 22 fMRIPrep cases pass).
+- **The shared environment's numpy and SciPy** (2026-10-29): keep the shared `.venv` at numpy
+  2.3.5 / SciPy 1.15.3 until the final comparisons with fMRIPrep (`docs/parts/2026-10-29-version-numerics/handoff.md`
+  §13: nothing else needs the move, it is the step's baseline, and antspyx and smriprep ask for
+  numpy < 2.5); move it then, with `validation/requirements-lock.txt`.
+- **FSL's OpenBLAS core on other machines:** the final validation phase runs FSL's records on the
+  old laptop (AVX2: OpenBLAS picks Haswell by itself) as a check of FSL-64's pin.
+- **The stage comparisons' FSL** (`stages/runners.py`, `stages/nodes.py`) do not pin the OpenBLAS
+  core (they compare with fMRIPrep 25.2.6's container): pin it at the final comparisons if FSL
+  6.0.7.23 is used there.
+- **Affines mixing NaNs of both signs, or holding infinities, in mcflirt's decomposition into
+  rotations** (85 of 200 probe affines differ from FSL 6.0.7.23 in a NaN's sign, 148 against
+  6.0.7.17): the replica follows the source's order; FSL-14's matrices are all one NaN (no recorded
+  run meets the mixed case). Measure with the probes (`validation/probes/fsl-mcflirt-affine-trace`)
+  if a real case ever does.
 - **The spec's in-plane centre and the clean-room original's remaining last bits** (found
   2026-10-29, `docs/findings/mri-hmc-original.md`): in the in-plane mode mcflirt rotates about the
   padded test volume's centre of mass (observed with `-verbose 20` traces; the original does so
@@ -474,40 +491,11 @@ The items below keep their history.
   last volume from it changes nothing). Decide by the notice rule (named where the two modes'
   results differ): name FSL-01 in both modes where mcflirt's chain would have changed the last
   volume, or declare the interplay; a clean-room agent.
-- **The replicas follow Armadillo 14.2.1's LAPACK inverses** (FSL 6.0.7.23; replica author):
-  4 × 4 `inv()` (diagonal `1/x`; triangular `dtrtri`; symmetric `dsytrf`/`dsytri`; else
-  `dgetrf` + `dgetri`), `inv(A)·B` (`dgesv`; symmetric `dsysv`), `det()` by LU, in OpenBLAS
-  0.3.33's Haswell order (the same results under every core tested), checked by a ctypes probe
-  against `~/fsl-6.0.7.23/lib/liblapack.so.3`; then the mcflirt record's 5 expected divergences
-  (`ARMA_LAPACK` in the suite) become passes. `docs/findings/fsl-mcflirt.md`, "FSL 6.0.7.23".
-  It reaches BET too (`docs/findings/fsl-bet.md`, the version trial's triage):
-  FSL inverts the sampling matrix of an image stored neurologically (details in that restricted file),
-  in bet2's `-c` (case 80: 18 of 15,360 voxels differ between 6.0.7.17 and 6.0.7.23) and in
-  `fslstats -C` (case 141 shrunk: `-0.000000`, which `bet -R`'s `dc` reads as a subtraction);
-  `bet2_versions.sh` and `cog_sign_probe.py` reproduce both. This part joins the
-  SciPy/NumPy/OpenBLAS part (coordinator, 2026-10-29). Recommendation: port the four LAPACK
-  routines Armadillo 14.2.1 calls for 4 × 4 (`dgetrf`/`dgetri`, `dgesv`, `dsytrf`/`dsytri`,
-  `dtrtri`) as reference LAPACK's algorithms with OpenBLAS 0.3.33's Haswell kernels' summation
-  order (the kernels matter only through `dgemm`/`dtrsm` blocking, which 4 × 4 does not reach:
-  the unblocked `dgetf2`/`dtrti2` paths), and check them bit for bit against
-  `~/fsl-6.0.7.23/lib/liblapack.so.3` through a ctypes probe on random and FSL-typical matrices
-  (swap, sampling, rigid, affine), before switching `arma.rs`.
-- **The version update, what changed in the numerics** (the newest releases fetched 2026-10-28
-  beside the old ones in the workspace's `tags/`; FSL 6.0.7.23 installed in `~/fsl-6.0.7.23`,
-  `~/fsl` still 6.0.7.17; AFNI 26.3.05 built in `oracles/afni-26.3.05`): SciPy 1.15.2 → 1.18.1
-  changes `_interpolation.py` (66 lines), `ni_interpolation.c` (56), `ni_splines.c` (9),
-  `ni_support.c` (2); NumPy 2.3.5 → 2.5.4 changes `cblasfuncs.c` (5), `matmul.c.src` (23),
-  `umath_linalg.cpp` (239); OpenBLAS 0.3.30 → 0.3.34 leaves every kernel larmorx reproduces
-  unchanged (the Haswell `dgemm`/`dgemv` kernels, `idamax`, `getf2_k`, `getrs`, `laswp`, the
-  `trsm` kernels, `KERNEL.HASWELL`, `KERNEL.ZEN`) and changes `interface/gemm.c` (86),
-  `level3.c` (25), `param.h` (322), `KERNEL.SKYLAKEX` (15), `cpuid_x86.c` (3,457),
-  `dynamic.c` (18). The part reads each change and re-runs the suites on the new versions.
-
-## Before the first release on PyPI
-
-Checked 2026-10-13: the binaries need no other library than the system's own (on Linux:
-`libc`, `libgcc_s`, and for `larmorx-gpl` glibc's `libm`, `libpthread`, `libdl`, `librt`).
-Still to do:
+- **The replicas follow Armadillo 14.2.1's LAPACK inverses: done** (2026-10-29, the version update's
+  part 3: `crates-nc/larmorx-nc-core/src/lapack.rs`; mcflirt 181 of 181, BET 130 of 130).
+- **The version update, what changed in the numerics: done** (2026-10-29): every file read and
+  classified (`docs/findings/scipy-ndimage.md`, `numpy-blas.md`); one change of results (SciPy's
+  reflect initialisation, SCI-03), followed.
 - **A clean-machine check** (user, 2026-10-27): CI's runners have compilers and runtimes
   installed, which can hide a missing piece. Install and test on truly clean machines: Windows
   Sandbox on the Windows laptop (a throwaway clean Windows), a minimal Linux container here

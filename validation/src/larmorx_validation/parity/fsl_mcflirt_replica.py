@@ -49,7 +49,6 @@ import numpy as np
 from larmorx_validation.parity import defects, fsl_versions
 from larmorx_validation.parity.harness import (
     BOTH_ERROR,
-    EXPECTED,
     Case,
     CaseResult,
     Check,
@@ -142,12 +141,14 @@ class Completed:
 def _environment(settings: dict[str, str | None], version: str | None = None) -> dict[str, str]:
     """mcflirt's clean environment (``oracles/fsl-6.0.7/mcflirt/README.md``): ``HOME``, a
     ``PATH`` without FSL, ``FSLDIR``, ``FSLOUTPUTTYPE=NIFTI_GZ`` unless ``settings`` change it
-    (``None`` unsets a variable)."""
+    (``None`` unsets a variable), and OpenBLAS's Haswell core (``fsl_versions.OPENBLAS_CORE``:
+    FSL 6.0.7.23's matrix arithmetic depends on the core)."""
     env = {
         "HOME": os.environ.get("HOME", str(Path.home())),
         "PATH": "/usr/bin:/bin",
         "FSLDIR": str(fsldir(version)),
         "FSLOUTPUTTYPE": "NIFTI_GZ",
+        **fsl_versions.openblas_env(),
     }
     for k, v in settings.items():
         if v is None:
@@ -218,23 +219,11 @@ def _without_descrip(data: bytes) -> bytes:
     return data[:start] + b"\0" * 80 + data[start + 80 :]
 
 
-#: Recorded runs whose only difference from FSL 6.0.7.23 is the arithmetic of Armadillo 14.2.1's
-#: LAPACK path for 4 x 4 inverses and solves, which the replica does not follow yet (it keeps
-#: Armadillo 10.5.1's closed-form inverse): values computed from nearly equal matrices (`.rms`
-#: of identical volumes, about 1e-15 mm) and the sign of NaN parameters. FSL's own step from
-#: 6.0.7.17 changes the same outputs (docs/findings/fsl-mcflirt.md, "FSL 6.0.7.23").
-ARMA_LAPACK = {
-    "real/ds000005/opt-stages1": ("out_mcf.nii.gz_rel.rms",),
-    "syn/content/nan/default": ("out_mcf.nii.gz.par",),
-    "syn/content/nan/reffile": ("out_mcf.nii.gz.par",),
-    "syn/motion/identical-copies/default": ("out_mcf.nii.gz_rel.rms",),
-    "syn/motion/identical-copies/reffile-fudge": (
-        "out_mcf.nii.gz_rel.rms",
-        "out_mcf.nii.gz_rel_mean.rms",
-    ),
-}
-#: The largest change the LAPACK path's last bits make to the numbers above (mm): they come from
-#: nearly equal matrices (relative rms of 1e-15 to 1e-8 mm).
+#: The largest change Armadillo 14.2.1's LAPACK path makes to mcflirt's printed numbers between
+#: FSL 6.0.7.17 and 6.0.7.23 (mm; FSL's own step, ``arma_only``): they come from nearly equal
+#: matrices (relative rms of 1e-15 to 1e-8 mm). The replica follows that path since 2026-10-29
+#: (larmorx-nc-core's ``lapack.rs``), so the five recorded runs it reaches, once expected
+#: divergences, pass (docs/findings/fsl-mcflirt.md, "Armadillo 14.2.1's LAPACK path").
 ARMA_TINY = 1e-12
 
 
@@ -701,7 +690,6 @@ def _recorded_case(name: str, checks: CheckList) -> None:
                 shutil.copy2(src, tmp / rel)
         return mapped
 
-    lapack_only = False
     try:
         with tempfile.TemporaryDirectory(prefix="lx-nc-") as name_:
             tmp = Path(name_)
@@ -731,7 +719,6 @@ def _recorded_case(name: str, checks: CheckList) -> None:
                     exclude = {"run.json"} | {f for f in _files(tmp, set()) if f in local_inputs}
                     exclude |= {f.name for f in rdir.iterdir() if f.name.startswith("std")}
                     compare(checks, oracle, rep, rdir, tmp, exclude)
-                    lapack_only = _lapack_divergence(checks, name, rdir, tmp)
                 else:
                     checks(f"step {k}: exit status", oracle.code == rep.code)
             if all(r.code == 0 for r in results) and len(mapped) == 1:
@@ -739,28 +726,7 @@ def _recorded_case(name: str, checks: CheckList) -> None:
             _recorded_step(checks, name, run, rdir, exclude, steps[-1], settings)
     except FileNotFoundError as e:
         raise Outcome("skipped", f"input not available: {e}") from e
-    if lapack_only:
-        raise Outcome(
-            EXPECTED,
-            f"{', '.join(ARMA_LAPACK[name])}: numbers differ by at most {ARMA_TINY:g} mm or in a "
-            "NaN's sign, from FSL "
-            "6.0.7.23's Armadillo 14.2.1 (4 x 4 inverses and solves through LAPACK); the replica "
-            "keeps Armadillo 10.5.1's closed-form inverse (docs/findings/fsl-mcflirt.md)",
-        )
     _agree_on_errors(checks, [s["exit"] for s in run["steps"]], "")
-
-
-def _lapack_divergence(checks: CheckList, name: str, rdir: Path, tmp: Path) -> bool:
-    """Whether a recorded case of :data:`ARMA_LAPACK` fails only by that file, and only where
-    Armadillo 14.2.1's LAPACK arithmetic does (:func:`arma_only`)."""
-    if name not in ARMA_LAPACK or fsl_versions.selected("replica") != fsl_versions.NEWEST:
-        return False
-    failed = [c for c in checks.checks if not c.passed]
-    if [c.name for c in failed] != ["every file bit-identical"]:
-        return False
-    targets = ARMA_LAPACK[name]
-    named = [x.strip().split(":")[0] for x in (failed[0].detail or "").split(";") if x.strip()]
-    return all(n in targets for n in named) and all(arma_only(rdir / n, tmp / n) for n in named)
 
 
 def _recorded_streams(rdir: Path, k: int) -> tuple[str, str]:

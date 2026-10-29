@@ -98,6 +98,11 @@ CHANGES = {
     "through LAPACK (OpenBLAS), where Armadillo 10.5.1 used its closed-form inverse: the last "
     "bits of values computed from nearly equal matrices change, and the sign of NaN "
     "parameters",
+    "arma-lapack-centre": "FSL 6.0.7.23's Armadillo 14.2.1 solves with an image's voxel "
+    "matrices through LAPACK (OpenBLAS), where Armadillo 10.5.1 used its closed-form "
+    "inverse: the last bits of a centre change, so bet2's start from -c moves by a fraction "
+    "of a voxel, and fslstats -C can print a zero with its sign (-0.000000), which bet -R's "
+    "dc reads as a subtraction",
 }
 
 #: The implementation whose case runs now (:func:`using`): its default version applies.

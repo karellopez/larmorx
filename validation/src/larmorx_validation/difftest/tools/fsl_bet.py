@@ -313,6 +313,8 @@ TOOL = Tool(
     title="BET (replica)",
     suite="fsl-bet-replica",
     implementations=("replica",),
+    # a permanent case may name the known change of FSL's own step it meets (``step``)
+    payload_fields=("tier", "expect", "reason", "step"),
     draw=draw,
     case=case,
     run=_run,

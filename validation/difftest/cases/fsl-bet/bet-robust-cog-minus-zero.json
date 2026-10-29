@@ -179,6 +179,9 @@
  },
  "rule": null,
  "status": "fixed",
+ "step": [
+  "arma-lapack-centre"
+ ],
  "suite": "fsl-bet-replica",
  "tier": "smoke",
  "tool": "fsl-bet"

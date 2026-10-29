@@ -1,24 +1,26 @@
 # Parity: 3dAutomask
 
-**All cases agree.** 109 cases on the `standard` tier: 89 pass, 19 rejected by both, 1 expected divergences, 0 failures.
+**All cases agree.** 130 cases on the `standard` tier: 110 pass, 19 rejected by both, 1 expected divergences, 0 failures.
 
 - **Validated:** `larmorx afni 3dAutomask` / `lx.afni.automask` (crate larmorx-afni, the Apache-2.0 clean-room original written from `specs/3dAutomask.md`), with `implementation="original"`
 - **Reference:** 3dAutomask from AFNI (AFNI_25.2.09, gcc (Ubuntu 11.4.0-1ubuntu1~22.04.3) 11.4.0), the binary built by `scripts/build_afni_oracle.sh`
-- **Test data:** larmorx-testdata `b0999a9e0c31`, tier `standard`
-- **Generated:** 2026-10-24 on Linux x86_64, with `python -m larmorx_validation parity afni-automask --tier standard`
+- **Test data:** larmorx-testdata `52124bc98f9f`, tier `standard`
+- **Generated:** 2026-10-29 on Linux x86_64, with `python -m larmorx_validation parity afni-automask --tier standard`
+- **Original programs:** 216 runs: 214 from the oracle cache, 2 run; cache `<workspace>/oracles/cache`, mode `use`
 
-**Bit-identical to AFNI: 84 of 85 compared cases that write outputs**: every output the same bytes (data and NIfTI header), with the same exit status and messages. The other 4 compared case(s) write no output in either program (an existing output, a name with a blank, a directory that does not exist) and agree on the exit status and messages; the default mode's corrections there are in the D13 lines below.
-- Messages (standard output and error, byte for byte; AFNI's version banner and compile date, and larmorx's own lines, set aside): 102 of 102 identical, in every case that ran both programs.
-- 1 case(s) whose input carries AFNI's own header extension, whose attributes AFNI reads in place of the NIfTI geometry (AFNI-10; the clean-room original ignores it, as 3dTshift's does): the data are bit-identical, and AFNI run on the input without its extension writes the original's header byte for byte: `fmriprep/ds005454-task_rest`.
+**Bit-identical to AFNI: 92 of 106 compared cases that write outputs**: every output the same bytes (data and NIfTI header), with the same exit status and messages. The other 4 compared case(s) write no output in either program (an existing output, a name with a blank, a directory that does not exist) and agree on the exit status and messages; the default mode's corrections there are in the D13 lines below.
+- Messages (standard output and error, byte for byte; AFNI's version banner and compile date, and larmorx's own lines, set aside): 118 of 123 identical, in every case that ran both programs; 5 explained by AFNI-10 (below: AFNI reports the obliquity of its header extension's matrix, and AFNI run on the input without its extension prints the original's messages byte for byte).
+- 14 case(s) whose input carries AFNI's own header extension, whose attributes AFNI reads in place of the NIfTI geometry (AFNI-10; the clean-room original ignores it, as 3dTshift's does): the data are bit-identical, and AFNI run on the input without its extension writes the original's header and prints its messages byte for byte: `fmriprep/ds000228-task_pixar`, `fmriprep/ds000256-task_restbaseline`, `fmriprep/ds000256-task_restfixationfixed`, `fmriprep/ds000256-task_restfixationnofeedback`, `fmriprep/ds002422-task_arithm_run_01`, `fmriprep/ds002422-task_arithm_run_02`, `fmriprep/ds002422-task_rest`, `fmriprep/ds002603-task_wm_acq_Mb4Mm3Tr550`, `fmriprep/ds002603-task_wm_acq_SeqMm3Tr2000`, `fmriprep/ds003592-ses_1_task_rest_echo_1`, `fmriprep/ds004884-ses_217_task_naming40_acq_epfid2_dir_AP_run_2`, `fmriprep/ds004884-ses_217_task_rest_acq_epfidp2p2_dir_AP_run_9`, `fmriprep/ds004958-task_rest`, `fmriprep/ds005454-task_rest`.
 - 6 case(s) where AFNI crashes (a missing option value, AFNI-40): larmorx prints AFNI's messages up to the crash, then refuses with one line and exit status 1.
-- **fMRIPrep's own outputs** (the oracle runs' node outputs, as fMRIPrep 25.2.6 ran them in its image): 7 of 7 bit-identical to the original's.
-- AFNI's own variability, AFNI at 1 thread(s): 10 of 10 runs give the oracle's output bit for bit.
-- AFNI's own variability, AFNI at 6 thread(s): 7 of 7 runs give the oracle's output bit for bit.
-- AFNI's own variability, fMRIPrep 25.2.6's AFNI: 10 of 10 runs give the oracle's output bit for bit.
-- Python API (`lx.afni.automask(..., implementation="original")`): 20 of 20 cases give the command line's outputs bit for bit.
+- **fMRIPrep's own outputs** (the oracle runs' node outputs, as fMRIPrep 25.2.6 ran them in its image): 22 of 22 bit-identical to the original's.
+- AFNI's own variability, AFNI at 1 thread(s): 25 of 25 runs give the oracle's output bit for bit.
+- AFNI's own variability, AFNI at 6 thread(s): 22 of 22 runs give the oracle's output bit for bit.
+- AFNI's own variability, fMRIPrep 25.2.6's AFNI: 25 of 25 runs give the oracle's output bit for bit.
+- Python API (`lx.afni.automask(..., implementation="original")`): 35 of 35 cases give the command line's outputs bit for bit.
 - **D13 fix pass** (larmorx's default, `upstream_defects="fix"`; the comparison above runs `reproduce`): the corrections met
   - AFNI-01: 1 case(s) named it, 0 with changed values (largest difference 0), 1 with other changes (messages): `defects/negative-slope-4d`
   - AFNI-02: 1 case(s) named it, 0 with changed values (largest difference 0), 1 with other changes (masked.nii header, messages): `defects/head-f32-slope-inter`
+  - AFNI-03: 1 case(s) named it, 0 with changed values (largest difference 0), 1 with other changes (masked.nii header): `difftest/slice-code-2-masked-notices`
   - AFNI-07: 1 case(s) named it, 0 with changed values (largest difference 0), 1 with other changes (mask.nii header): `defects/head-metre`
   - AFNI-11: 1 case(s) named it, 0 with changed values (largest difference 0): `global/exists`
   - AFNI-12: 1 case(s) named it, 0 with changed values (largest difference 0), 1 with other changes (the outputs written where AFNI refuses (a b.nii, exit N)): `global/prefix-with-blank`
@@ -27,7 +29,7 @@
   - AFNI-23: 1 case(s) named it, 1 with changed values (largest difference 2.02e+03), 1 with other changes (masked.nii header, messages): `defects/nifti-scale-no`
   - AFNI-26: 1 case(s) named it, 0 with changed values (largest difference 0): `global/missing-directory`
   - AFNI-41: 5 case(s) named it, 0 with changed values (largest difference 0): `options/nbhrs-40`, `options/nbhrs-5`, `options/nbhrs-27`, `options/nbhrs-0`, `options/nbhrs-40-then-NN1`
-  - AFNI-43: 1 case(s) named it, 1 with changed values (largest difference 1e+03), 1 with other changes (messages): `defects/peels-0-fmriprep`
+  - AFNI-43: 2 case(s) named it, 1 with changed values (largest difference 1e+03), 2 with other changes (messages): `defects/peels-0-fmriprep`, `difftest/peels-0-clustering-messages`
 
 ## Thresholds
 
@@ -43,11 +45,12 @@
 |---|---|---|---|---|---|
 | datatypes | 13 | 13 | 0 | 0 | 0 |
 | defects | 7 | 7 | 0 | 0 | 0 |
+| difftest | 6 | 6 | 0 | 0 | 0 |
 | dimensions | 9 | 9 | 0 | 0 | 0 |
 | divergences | 1 | 0 | 0 | 1 | 0 |
 | environment | 5 | 5 | 0 | 0 | 0 |
 | errors | 19 | 0 | 19 | 0 | 0 |
-| fmriprep | 7 | 7 | 0 | 0 | 0 |
+| fmriprep | 22 | 22 | 0 | 0 | 0 |
 | global | 8 | 8 | 0 | 0 | 0 |
 | options | 37 | 37 | 0 | 0 | 0 |
 | real | 3 | 3 | 0 | 0 | 0 |
@@ -86,11 +89,11 @@
 
 | Component | Version |
 |---|---|
-| larmorx | 0.0.1 (bd2ca21ddea8) |
-| larmorx-testdata | b0999a9e0c31 |
-| Python | 3.12.10 |
+| larmorx | 0.0.1 (e82f16ee2f72) |
+| larmorx-testdata | 52124bc98f9f |
+| Python | 3.12.16 |
 | Platform | Linux x86_64 (Linux-6.8.0-124-generic-x86_64-with-glibc2.35) |
-| CPU | Intel(R) Core(TM) i7-8750H CPU @ 2.20GHz, 12 logical CPUs |
+| CPU | AMD Ryzen 9 7945HX with Radeon Graphics, 32 logical CPUs |
 | numpy | 2.3.5 |
 | nibabel | 5.4.2 |
 
@@ -204,6 +207,21 @@ Both programs run in directories of their own on the same input files, in the sa
 | `fmriprep/ds000005-task_mixedgamblestask_run_01` | pass | 13/13 | fMRIPrep's call on the input of its BOLD reference's second skull strip (ds000005-task_mixedgamblestask_run_01) |
 | `fmriprep/ds000005-task_mixedgamblestask_run_02` | pass | 13/13 | fMRIPrep's call on the input of its BOLD reference's second skull strip (ds000005-task_mixedgamblestask_run_02) |
 | `fmriprep/ds000005-task_mixedgamblestask_run_03` | pass | 13/13 | fMRIPrep's call on the input of its BOLD reference's second skull strip (ds000005-task_mixedgamblestask_run_03) |
+| `fmriprep/ds000228-task_pixar` | pass | 13/13 | fMRIPrep's call on the input of its BOLD reference's second skull strip (ds000228-task_pixar) |
+| `fmriprep/ds000256-task_restbaseline` | pass | 13/13 | fMRIPrep's call on the input of its BOLD reference's second skull strip (ds000256-task_restbaseline) |
+| `fmriprep/ds000256-task_restfixationfixed` | pass | 13/13 | fMRIPrep's call on the input of its BOLD reference's second skull strip (ds000256-task_restfixationfixed) |
+| `fmriprep/ds000256-task_restfixationnofeedback` | pass | 13/13 | fMRIPrep's call on the input of its BOLD reference's second skull strip (ds000256-task_restfixationnofeedback) |
+| `fmriprep/ds002422-task_arithm_run_01` | pass | 13/13 | fMRIPrep's call on the input of its BOLD reference's second skull strip (ds002422-task_arithm_run_01) |
+| `fmriprep/ds002422-task_arithm_run_02` | pass | 13/13 | fMRIPrep's call on the input of its BOLD reference's second skull strip (ds002422-task_arithm_run_02) |
+| `fmriprep/ds002422-task_rest` | pass | 13/13 | fMRIPrep's call on the input of its BOLD reference's second skull strip (ds002422-task_rest) |
+| `fmriprep/ds002603-task_wm_acq_Mb4Mm3Tr550` | pass | 13/13 | fMRIPrep's call on the input of its BOLD reference's second skull strip (ds002603-task_wm_acq_Mb4Mm3Tr550) |
+| `fmriprep/ds002603-task_wm_acq_SeqMm3Tr2000` | pass | 13/13 | fMRIPrep's call on the input of its BOLD reference's second skull strip (ds002603-task_wm_acq_SeqMm3Tr2000) |
+| `fmriprep/ds003592-ses_1_task_rest_echo_1` | pass | 13/13 | fMRIPrep's call on the input of its BOLD reference's second skull strip (ds003592-ses_1_task_rest_echo_1) |
+| `fmriprep/ds004884-ses_217_task_naming40_acq_epfid2_dir_AP_run_2` | pass | 13/13 | fMRIPrep's call on the input of its BOLD reference's second skull strip (ds004884-ses_217_task_naming40_acq_epfid2_dir_… |
+| `fmriprep/ds004884-ses_217_task_rest_acq_epfidp2p2_dir_AP_run_9` | pass | 13/13 | fMRIPrep's call on the input of its BOLD reference's second skull strip (ds004884-ses_217_task_rest_acq_epfidp2p2_dir_A… |
+| `fmriprep/ds004958-task_rest` | pass | 13/13 | fMRIPrep's call on the input of its BOLD reference's second skull strip (ds004958-task_rest) |
+| `fmriprep/ds005003-ses_1_task_motor` | pass | 13/13 | fMRIPrep's call on the input of its BOLD reference's second skull strip (ds005003-ses_1_task_motor) |
+| `fmriprep/ds005003-ses_1_task_rest` | pass | 13/13 | fMRIPrep's call on the input of its BOLD reference's second skull strip (ds005003-ses_1_task_rest) |
 | `fmriprep/ds005040-task_clip_run_1` | pass | 13/13 | fMRIPrep's call on the input of its BOLD reference's second skull strip (ds005040-task_clip_run_1) |
 | `fmriprep/ds005454-task_rest` | pass | 13/13 | fMRIPrep's call on the input of its BOLD reference's second skull strip (ds005454-task_rest) |
 | `fmriprep/ds005752-ses_01_task_rest_dir_forward` | pass | 13/13 | fMRIPrep's call on the input of its BOLD reference's second skull strip (ds005752-ses_01_task_rest_dir_forward) |
@@ -211,3 +229,9 @@ Both programs run in directories of their own on the same input files, in the sa
 | `real/sub-01_task-mixedgamblestask_run-01` | pass | 8/8 | AFNI's default on a BOLD series (sub-01_task-mixedgamblestask_run-01) |
 | `real/sub-1_task-rest_acq-v4` | pass | 8/8 | AFNI's default on a BOLD series (sub-1_task-rest_acq-v4) |
 | `real/t1w-brain` | pass | 8/8 | the skull-stripped T1w of an fMRIPrep run (ds000005, sMRIPrep's desc-brain) |
+| `difftest/float64-negative-zero` | pass | 8/8 | A float64 input without a usable scl_slope: a -0 inside the mask is kept by -apply_prefix (item 8, 2026-10-29) |
+| `difftest/oblique-orientation-letters` | pass | 6/6 | An oblique series: the '[from L]' letters of the closest plumb orientation, never '?' (item 5, 2026-10-29) |
+| `difftest/peels-0-clustering-messages` | pass | 6/6 | -peels 0 where the mask is the same but the clustering messages differ: AFNI-43 named (item 7, 2026-10-29) |
+| `difftest/plane-oblique-si-orientation` | pass | 6/6 | A one-slice oblique constant image with -SI: the axis AFNI orients as superior (the closest plumb orientation), so the … |
+| `difftest/slice-code-2-masked-notices` | pass | 8/8 | Header slice code 2 with -apply_prefix: AFNI-03 named in both modes, AFNI-08 in reproduce, in the replica's words (item… |
+| `difftest/tiny-oblique-quaternion-residue` | pass | 6/6 | A 1 x 1 x 2 oblique image: the quaternion's rounding residue as AFNI's (1/det of the polar decomposition's inverse in e… |

@@ -1,14 +1,15 @@
 # Parity: 3dTshift
 
-**All cases agree.** 314 cases on the `standard` tier: 279 pass, 32 rejected by both, 3 expected divergences, 0 failures.
+**All cases agree.** 315 cases on the `standard` tier: 280 pass, 32 rejected by both, 3 expected divergences, 0 failures.
 
 - **Validated:** `larmorx afni 3dTshift` / `lx.afni.tshift` (crate larmorx-afni, clean-room from `specs/3dTshift.md`), with `implementation="original"`
 - **Reference:** 3dTshift from AFNI (AFNI_25.2.09), the binary built by `scripts/build_afni_oracle.sh`
-- **Test data:** larmorx-testdata `b0999a9e0c31`, tier `standard`
-- **Generated:** 2026-10-24 on Linux x86_64, with `python -m larmorx_validation parity afni-tshift --tier standard`
+- **Test data:** larmorx-testdata `52124bc98f9f`, tier `standard`
+- **Generated:** 2026-10-29 on Linux x86_64, with `python -m larmorx_validation parity afni-tshift --tier standard`
+- **Original programs:** 315 runs: 312 from the oracle cache, 3 run (1 never cached: the original varies); cache `<workspace>/oracles/cache`, mode `use`
 
-**Bit-identical: 176 of 279 passing cases** produce exactly the bytes of AFNI's output data.
-- Lagrange and weighted-sinc methods and copies: 129 of 132 bit-identical.
+**Bit-identical: 177 of 280 passing cases** produce exactly the bytes of AFNI's output data.
+- Lagrange and weighted-sinc methods and copies: 130 of 133 bit-identical.
 - Fourier: 47 of 147 bit-identical. AFNI computes the FFT in float32 with its own kernels; larmorx computes it in double precision with its own FFT, so float32 outputs differ in the last bits and integer outputs occasionally round the other way (by 1).
 - Not bit-identical outside Fourier: `options/float32-no-detrend`, `real/ds003345-quintic`, `real/ds003345-heptic`. Known causes, in the last float32 bit only: `-no_detrend` (its rounding is not reproduced yet); quintic and heptic weights for some fractions (unresolved); weighted sinc, where AFNI calls glibc's float `sinf`/`cosf`, which are not correctly rounded, and larmorx uses correctly rounded functions (`docs/findings/platform-math.md`). See `docs/api/afni-tshift.md`.
 - The bit-exact replica (`larmorx-gpl afni 3dTshift`, GPL-3.0-or-later) has its own record: [afni-tshift-replica.md](afni-tshift-replica.md).
@@ -31,6 +32,7 @@
 |---|---|---|---|---|---|
 | copy | 8 | 8 | 0.0e+00 | 0 | 0.0e+00 |
 | defects | 8 | 5 | 8.5e-08 | 0 | 4.7e-02 |
+| difftest | 1 | 1 | 0.0e+00 | – | 0.0e+00 |
 | environment | 29 | 7 | 8.5e-08 | 0 | 4.7e-02 |
 | geometry | 3 | 0 | 8.5e-08 | – | 4.7e-02 |
 | global | 19 | 3 | 8.5e-08 | 0 | 4.7e-02 |
@@ -57,6 +59,7 @@
 |---|---|---|---|---|---|
 | copy | 8 | 8 | 0 | 0 | 0 |
 | defects | 8 | 8 | 0 | 0 | 0 |
+| difftest | 1 | 1 | 0 | 0 | 0 |
 | divergence | 2 | 0 | 0 | 2 | 0 |
 | environment | 34 | 29 | 4 | 1 | 0 |
 | errors | 21 | 0 | 21 | 0 | 0 |
@@ -118,11 +121,11 @@
 
 | Component | Version |
 |---|---|
-| larmorx | 0.0.1 (bd2ca21ddea8) |
-| larmorx-testdata | b0999a9e0c31 |
-| Python | 3.12.10 |
+| larmorx | 0.0.1 (e82f16ee2f72) |
+| larmorx-testdata | 52124bc98f9f |
+| Python | 3.12.16 |
 | Platform | Linux x86_64 (Linux-6.8.0-124-generic-x86_64-with-glibc2.35) |
-| CPU | Intel(R) Core(TM) i7-8750H CPU @ 2.20GHz, 12 logical CPUs |
+| CPU | AMD Ryzen 9 7945HX with Radeon Graphics, 32 logical CPUs |
 | numpy | 2.3.5 |
 | nibabel | 5.4.2 |
 
@@ -448,3 +451,4 @@ Both programs read the same files with the same arguments; outputs are read with
 | `real/ds003345-ignore-4` | pass | 14/14 | fMRIPrep's call with -ignore 4 (non-steady-state volumes) |
 | `real/ds000210-header-timing` | pass | 12/12 | no -tpattern: the slice timing in the header (slice_code 3, ALT_INC) |
 | `real/ds001600-header-zero-duration` | pass | 12/12 | no -tpattern: slice_code 5 with slice_duration 0, so a copy of the input |
+| `difftest/header-milliseconds-toffset` | pass | 12/12 | Header slice timing in milliseconds: the times a float32 sum of the double step in seconds, so toffset is AFNI's 0.3600… |

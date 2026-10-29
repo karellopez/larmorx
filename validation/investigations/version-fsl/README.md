@@ -18,3 +18,9 @@ and behind the replicas' records against 6.0.7.23. FSL is never on the `PATH`: e
 | `memory_fsl.sh` | the BET replicas' memory peaks against FSL 6.0.7.23 (5 of 5 within the rule) | `memory_fsl.sh <log>` |
 | `boxed_lxv.sh`, `pytest_parity.sh` | `python -m larmorx_validation ...` and `pytest tests/parity` of this checkout in a memory box | `boxed_lxv.sh <GiB> <log> <args>`, `pytest_parity.sh <log>` |
 | `mri-hmc-6.0.7.23.md` | the clean-room head-motion correction's standard tier against mcflirt 6.0.7.23: 2 failures (the known `real/ds003345/default` and FSL-59's `syn/motion/small/nn_final`), so its record stays on 6.0.7.17 | – |
+| `bet_triage_run.sh` | one BET call by FSL 6.0.7.23, FSL 6.0.7.17 and the replica (`reproduce`), messages and every output compared (compressed files by content): the trial's BET differences | `bet_triage_run.sh <dir with inputs> <FSLOUTPUTTYPE> <tool> <args>` |
+| `bet_repeat.sh` | one FSL BET call run several times: whether FSL's result repeats (FSL-43's memory reads) | `bet_repeat.sh <FSLDIR> <n> <dir> <FSLOUTPUTTYPE> <tool> <args>` |
+| `bet2_versions.sh` | bet2 of both versions with several option sets: case 80's difference comes with `-c` on an image stored neurologically (Armadillo 14.2.1's inverse in `niftivox2newimagevox_mat`) | `bet2_versions.sh <image> <dir> "<options>"...` |
+| `cog_sign_probe.py` | `fslstats -C` of both versions on small images: 6.0.7.23 prints `-0.000000` for a centre on voxel 0 of an image stored neurologically (case 141's `dc: stack empty`) | `python -P cog_sign_probe.py <dir>` |
+| `replay_bet_findings.sh` | the trial's BET findings replayed against both versions, each in a memory box | `replay_bet_findings.sh <log dir> <finding.json>...` |
+| `make_permanent_cases.sh` | the six permanent cases of the triage (`validation/difftest/cases/fsl-bet/`) | `make_permanent_cases.sh <findings/fsl-bet> <141's drawn finding>` |

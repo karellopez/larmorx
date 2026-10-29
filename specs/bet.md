@@ -333,7 +333,17 @@ centroid of the vertices (`trunc` of the centroid in voxels); the mask is `1 - t
 outside the image (a single slice: the surface's centroid falls below it) makes FSL write and
 read outside the volume (FSL-43): the default starts the fill at the nearest voxel inside the
 image, which on a single slice gives FSL's mask **(observed)**; a centroid that is not a number
-(the surface diverged) is an error.
+(the surface diverged) is an error. How FSL fills from a start outside, for `reproduce`
+**(observed, random testing 2026-10-29)**: the fill is a stack of points, from the start; the
+point taken from the end of the stack is set to 0, then each of its six neighbours, in the order
+x − 1, y − 1, z − 1, x + 1, y + 1, z + 1, is pushed when its coordinate along that axis stays
+within the image (x − 1 ≥ 0, x + 1 < nx, and so on: each axis on its own) and the value at its
+place is 1. A point's place is its linear index `(z·ny + y)·nx + x`, so a point outside the image
+can be another voxel of it (the start four rows before a 3 × 6 × 4 image reaches every voxel
+through its neighbour one slice up), or memory beyond the volume: FSL writes there and reads what
+lies there (its outputs then depend on that memory, it may crash). `reproduce` does this point by
+point: inside the volume exactly, beyond it no write, a place the fill wrote read as 0 and any
+other read as not 1, and warns with the number of those reads.
 
 ### 4.7 Outputs
 
@@ -405,6 +415,13 @@ and `-c <x> <y> <z>` too (a missing value prints the usage); `-R`, `-S`, `-Z`, `
 `-d` keeps the temporary files; anything else prints the usage. With `-v`, before running, on
 standard output: `IN=<input>`, `OUT=<output>`, `bet2opts=<the options passed, each preceded by a
 blank>`, `verbose=1`, `debug=<0|1>`, `variation=<0..7>`.
+
+Under `-R` the options passed to bet2 are first printed by bash's `echo` and every `-n` removed
+from that text (bet2 never gets `-n` there). bash's `echo` takes the leading words made only of
+`-n`, `-e` and `-E` as its own options: a leading `-e` (the mesh) is lost, so `bet <in> <out> -R
+-e` writes no mesh, and after a leading `-e` backslashes in the remaining options are read as
+`echo -e` escapes (FSL-63, **(observed, random testing 2026-10-29)**): the default passes the
+options as given, `reproduce` as FSL does, and warns where they differ.
 
 When a program the script runs fails, the script prints `<the script's path> failed during
 command:<the script's arguments, as words joined by blanks>` on standard output and exits 1 (bash's
@@ -721,8 +738,9 @@ For an original that wants to stay as close as possible to FSL (not required):
 | FSL-40 | bet2 removes the first `.hdr` of each name wherever it stands (a directory `x.hdr` is read as `x`); a name with `.img` but no `.hdr` aborts | removes a trailing extension only | FSL's names (and the refusal where FSL aborts) |
 | FSL-41 | no voxel for the median intensity: FSL 6.0.7.17 read an empty list and crashed | **(FSL 6.0.7.23)** fixed upstream: `tm = t98` | the same |
 | FSL-42 | NaN `-f`/`-g`, a negative, NaN or infinite `-r`, `-w ≤ 0`, a non-finite `-c` or search depth are used as given | refuses, naming the value | uses them |
-| FSL-43 | the mask's fill starts outside the image (a single slice): FSL writes and reads outside the volume; further outside, or at a centroid that is not a number, it writes far outside the volume and crashes | starts at the nearest voxel inside (a centroid that is not a number: refuses) | one voxel outside: only FSL's defined steps (the start's neighbours inside the image); further: no fill (the drawn surface only); warns |
+| FSL-43 | the mask's fill starts outside the image (a single slice): FSL writes and reads outside the volume, reaching points by their linear index (other voxels of the volume, or memory beyond it); at a centroid that is not a number it writes far outside the volume and crashes | starts at the nearest voxel inside (a centroid that is not a number: refuses) | FSL's fill point by point by the linear index (§4.6): inside the volume exactly, memory beyond it read as not 1 and not written; a centroid that is not a number: no fill (the drawn surface only); warns |
 | FSL-44 | bet expands its arguments unquoted: a name with a blank becomes several words; an empty argument ends the options | quotes them | FSL's word splitting |
+| FSL-63 | `bet -R` passes bet2's options through bash's `echo`, which takes leading `-n`, `-e`, `-E` words as its own: a leading `-e` (the mesh) is dropped, escapes read after it | the options as given | FSL's `echo` |
 | FSL-45 | `-Z` crops with `imglob`, called without `${FSLDIR}/bin`: off the PATH the outputs stay padded; on it, other images named like the output are cropped too | crops exactly its outputs | FSL's behaviour for the PATH given |
 | FSL-46 | the cleanup removes every `<out>_tmp*` file, also files the run did not create | removes only its own | removes all |
 | FSL-47 | `--t1only`'s scalp mask is filled from the outer skull surface's centre in the working grid | fills from the scalp surface's | FSL's |

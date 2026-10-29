@@ -1,0 +1,175 @@
+{
+ "defect": "FSL-43",
+ "description": "bet -f 0.7 -g -0.3 -m -o on a 22 x 18 x 21 image of 0.01 mm slices: the mask's fill starts 86 slices above the image and reaches the volume by FSL's linear index; inside bet, reproduce had corrected FSL-43 instead (found by the FSL version trial, 2026-10-29)",
+ "expect": "pass",
+ "found": {
+  "detail": "out.nii.gz: the header is the same; 2160 of 8316 values differ; out_mask.nii.gz: the header is the same; 2160 of 8316 values differ, Dice 0.471883",
+  "n": 1297,
+  "seed": "20261029",
+  "shrink_moves": [],
+  "signature": [
+   "out.nii.gz",
+   "out_mask.nii.gz"
+  ]
+ },
+ "id": "bet-fill-by-index",
+ "implementations": [
+  "replica"
+ ],
+ "reason": "",
+ "recipe": {
+  "extra": {
+   "output_type": "NIFTI_GZ",
+   "tool": "bet"
+  },
+  "features": {
+   "-c": false,
+   "-d": false,
+   "-e": false,
+   "-f": true,
+   "-g": true,
+   "-m": true,
+   "-n": false,
+   "-o": true,
+   "-r": false,
+   "-s": false,
+   "-t": false,
+   "-v": false,
+   "-w": false,
+   "FSLOUTPUTTYPE": "NIFTI_GZ",
+   "content": "crop",
+   "corner0": 24,
+   "corner1": 56,
+   "corner2": 22,
+   "crop source": "templateflow/tpl-MNI152NLin2009cAsym/tpl-MNI152NLin2009cAsym_res-02_T1w.nii.gz",
+   "crop stride": 1,
+   "dtype": "float32",
+   "extreme": true,
+   "f": "0.7",
+   "g": "-0.3",
+   "orientation": "axes",
+   "origin0": 29.0,
+   "origin1": 34.5,
+   "origin2": 30.25,
+   "qfac": -1,
+   "qform_code": 1,
+   "range": "plain",
+   "sform": "same",
+   "sform_code": 1,
+   "shape": "22x18x21",
+   "spacing0": 3.0,
+   "spacing1": 1.5,
+   "spacing2": 0.01,
+   "suffix": ".nii",
+   "tool": "bet",
+   "units": "mm",
+   "variation": "none"
+  },
+  "groups": [
+   {
+    "args": [
+     "{in:input}",
+     "out"
+    ],
+    "name": "input",
+    "optional": false
+   },
+   {
+    "args": [
+     "-f",
+     "0.7"
+    ],
+    "name": "-f",
+    "optional": true
+   },
+   {
+    "args": [
+     "-g",
+     "-0.3"
+    ],
+    "name": "-g",
+    "optional": true
+   },
+   {
+    "args": [
+     "-m"
+    ],
+    "name": "-m",
+    "optional": true
+   },
+   {
+    "args": [
+     "-o"
+    ],
+    "name": "-o",
+    "optional": true
+   }
+  ],
+  "inputs": {
+   "input": {
+    "content": {
+     "corner": [
+      24,
+      56,
+      22
+     ],
+     "seed": 514813147,
+     "source": "templateflow/tpl-MNI152NLin2009cAsym/tpl-MNI152NLin2009cAsym_res-02_T1w.nii.gz",
+     "stride": 1,
+     "type": "crop"
+    },
+    "dtype": "float32",
+    "geometry": {
+     "origin": [
+      29.0,
+      34.5,
+      30.25
+     ],
+     "qfac": -1,
+     "qform_code": 1,
+     "quaternion": [
+      0,
+      1,
+      0,
+      -1
+     ],
+     "sform": "same",
+     "sform_code": 1,
+     "spacing": [
+      3.0,
+      1.5,
+      0.01
+     ],
+     "units": "mm"
+    },
+    "scaling": null,
+    "shape": [
+     22,
+     18,
+     21
+    ],
+    "suffix": ".nii",
+    "values": {
+     "offset": 0.0,
+     "scale": 1.0
+    }
+   }
+  },
+  "n": 1297,
+  "options": [
+   "-f",
+   "-g",
+   "-m",
+   "-o",
+   "FSLOUTPUTTYPE=NIFTI_GZ",
+   "bet"
+  ],
+  "seed": "20261029",
+  "tool": "fsl-bet"
+ },
+ "rule": null,
+ "status": "fixed",
+ "suite": "fsl-bet-replica",
+ "tier": "smoke",
+ "tool": "fsl-bet"
+}

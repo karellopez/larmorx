@@ -1,0 +1,186 @@
+{
+ "defect": "FSL-43",
+ "description": "bet2 -r 60 on a 3 x 6 x 4 head: the mask's fill starts four rows before the image; FSL reaches each point by its linear index, other voxels of the volume, and fills every voxel; reproduce had skipped the fill as for a crash (FSL-43; found by the FSL version trial, 2026-10-29)",
+ "expect": "pass",
+ "found": {
+  "detail": "out.nii.gz: the header is the same; 72 of 72 values differ",
+  "n": 661,
+  "seed": "20261029",
+  "shrink_moves": [
+   "dropped -t (-t)",
+   "dropped -s (-s)",
+   "dropped -m (-m)",
+   "input: axis 1 12 -> 6 voxels",
+   "dropped -f (-f 0.3)",
+   "input: axis 0 7 -> 3 voxels",
+   "input: axis 2 19 -> 9 voxels",
+   "input: axis 2 9 -> 4 voxels",
+   "input (and its grid): plumb orientation",
+   "input (and its grid): origin at 0",
+   "input (and its grid): qform and sform codes 1",
+   "input: float32 storage"
+  ],
+  "signature": [
+   "out.nii.gz",
+   "out_mask.nii.gz"
+  ]
+ },
+ "id": "bet2-fill-by-index",
+ "implementations": [
+  "replica"
+ ],
+ "reason": "",
+ "recipe": {
+  "extra": {
+   "output_type": "NIFTI_GZ",
+   "tool": "bet2"
+  },
+  "features": {
+   "--ct": false,
+   "-c": false,
+   "-e": false,
+   "-f": true,
+   "-g": false,
+   "-m": true,
+   "-n": false,
+   "-o": false,
+   "-r": true,
+   "-s": true,
+   "-t": true,
+   "-v": false,
+   "-w": false,
+   "FSLOUTPUTTYPE": "NIFTI_GZ",
+   "axis0": 0.8,
+   "axis1": 0.95,
+   "axis2": 0.75,
+   "bias0": -0.0025,
+   "bias1": 0.01,
+   "bias2": -0.01,
+   "bias3": -0.005,
+   "centre0": -0.5,
+   "centre1": -2.0,
+   "centre2": -2.0,
+   "content": "head",
+   "dtype": "int32",
+   "extreme": false,
+   "f": "0.3",
+   "noise": 6.0,
+   "orientation": "oblique",
+   "origin0": 13.75,
+   "origin1": 39.75,
+   "origin2": -8.75,
+   "qfac": 1,
+   "qform_code": 3,
+   "r": "60",
+   "range": "plain",
+   "sform": "same",
+   "sform_code": 0,
+   "shape": "7x12x19",
+   "size": 9.0,
+   "spacing0": 2.5,
+   "spacing1": 0.5,
+   "spacing2": 2.5,
+   "suffix": ".nii.gz",
+   "tissues": "epi",
+   "tool": "bet2",
+   "units": "mm"
+  },
+  "groups": [
+   {
+    "args": [
+     "{in:input}",
+     "out"
+    ],
+    "name": "input",
+    "optional": false
+   },
+   {
+    "args": [
+     "-r",
+     "60"
+    ],
+    "name": "-r",
+    "optional": true
+   }
+  ],
+  "inputs": {
+   "input": {
+    "content": {
+     "axes": [
+      0.8,
+      0.95,
+      0.75
+     ],
+     "bias": [
+      -0.0025,
+      0.01,
+      -0.01,
+      -0.005
+     ],
+     "centre": [
+      -0.5,
+      -2.0,
+      -2.0
+     ],
+     "noise": 6.0,
+     "seed": 1082636384,
+     "size": 9.0,
+     "tissues": "epi",
+     "type": "head"
+    },
+    "dtype": "float32",
+    "geometry": {
+     "origin": [
+      0.0,
+      0.0,
+      0.0
+     ],
+     "qfac": 1,
+     "qform_code": 1,
+     "quaternion": [
+      1,
+      0,
+      0,
+      0
+     ],
+     "sform": "same",
+     "sform_code": 1,
+     "spacing": [
+      2.5,
+      0.5,
+      2.5
+     ],
+     "units": "mm"
+    },
+    "scaling": null,
+    "shape": [
+     3,
+     6,
+     4
+    ],
+    "suffix": ".nii.gz",
+    "values": {
+     "offset": 0.0,
+     "scale": 1.0
+    }
+   }
+  },
+  "n": 661,
+  "options": [
+   "-f",
+   "-m",
+   "-r",
+   "-s",
+   "-t",
+   "FSLOUTPUTTYPE=NIFTI_GZ",
+   "bet2"
+  ],
+  "seed": "20261029",
+  "tool": "fsl-bet"
+ },
+ "rule": null,
+ "status": "fixed",
+ "suite": "fsl-bet-replica",
+ "tier": "smoke",
+ "tool": "fsl-bet"
+}

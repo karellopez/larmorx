@@ -37,7 +37,7 @@ what it translates and where it departs from the original (the D13 corrections, 
 |---|---|---|
 | `bet2` | fsl-bet2 `bet2.cpp` (2111.9: `--binaryMask`, the empty median) | `main`, `bet_parameters`, `adjust_initial_mesh`, `step_of_computation`, `draw_segment`, `draw_mesh`, `draw_mesh_bis`, `make_mask_from_mesh`, `find_skull`, the head-CT conversion (`--ct`), the options, messages and exit statuses |
 | `betsurf` | fsl-bet2 `betsurf.cpp`, `betsurf.h` | `main`, `t1only_main`, `standard_step_of_computation`, `special_case`, `co_ext`, `special_extract`, `t1only_co_ext`, `t1only_special_extract`, `write_ext_skull`, `t1only_write_ext_skull`, `draw_segment`, `draw_mesh`, `make_mask_from_mesh`, `trMatrix` |
-| `bet` | fsl-bet2 `bet` (bash) | the script: its arguments, `Usage`, the option loop, variations 0 (bet2), 1 (`-R`), 3 (`-Z`), 4 (`-F`); `-S`, `-B`, `-A`, `-A2` refused as pending; the `ERR` trap, the cleanup; `dc`'s arithmetic as the script uses it |
+| `bet` | fsl-bet2 `bet` (bash) | the script: its arguments, `Usage`, the option loop, variations 0 (bet2), 1 (`-R`), 3 (`-Z`), 4 (`-F`); `-S`, `-B`, `-A`, `-A2` refused as pending; the `ERR` trap, the cleanup; `dc`'s arithmetic as the script uses it; bash's builtin `echo` (its options and `-e` escapes, from bash's manual and observed runs: FSL-63) for `-R`'s option text |
 | `cli` | — | the entry points `larmorx-nc fsl bet`, `bet2`, `betsurf` (`larmorx-nc-cli`) |
 
 Until BET's merge (2026-10-25) this crate carried its own translations of the libraries; they

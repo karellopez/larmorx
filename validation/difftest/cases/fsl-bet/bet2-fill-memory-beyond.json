@@ -1,0 +1,168 @@
+{
+ "defect": "FSL-43",
+ "description": "bet2 -c 22 19 8 on a 3 x 4 x 8 ramp: the fill starts outside the image and FSL reads memory beyond the volume (6.0.7.17 crashes, 6.0.7.23 writes values that depend on that memory); reproduce reads it as not part of the mask and names it, the suite judges FSL's values there undefined (found by the FSL version trial, 2026-10-29)",
+ "expect": "pass",
+ "found": {
+  "detail": "out.nii.gz: the header is the same; 96 of 96 values differ",
+  "n": 80,
+  "seed": "20261029",
+  "shrink_moves": [
+   "dropped -w (-w 0.5)",
+   "dropped -m (-m)",
+   "input: axis 1 32 -> 16 voxels",
+   "input: axis 0 30 -> 15 voxels",
+   "input: axis 1 16 -> 8 voxels",
+   "input: axis 0 15 -> 7 voxels",
+   "input: axis 2 16 -> 8 voxels",
+   "input: axis 1 8 -> 4 voxels",
+   "input (and its grid): plumb orientation",
+   "input (and its grid): unit spacing",
+   "input (and its grid): origin at 0",
+   "input (and its grid): qform and sform codes 1",
+   "input: content crop -> ramp",
+   "input: axis 0 7 -> 3 voxels"
+  ],
+  "signature": [
+   "out.nii.gz",
+   "out_mask.nii.gz"
+  ]
+ },
+ "id": "bet2-fill-memory-beyond",
+ "implementations": [
+  "replica"
+ ],
+ "reason": "",
+ "recipe": {
+  "extra": {
+   "output_type": "NIFTI2_GZ",
+   "tool": "bet2"
+  },
+  "features": {
+   "--ct": false,
+   "-c": true,
+   "-e": false,
+   "-f": false,
+   "-g": false,
+   "-m": true,
+   "-n": false,
+   "-o": false,
+   "-r": false,
+   "-s": false,
+   "-t": false,
+   "-v": false,
+   "-w": true,
+   "FSLOUTPUTTYPE": "NIFTI2_GZ",
+   "c0": 22,
+   "c1": 19,
+   "c2": 8,
+   "content": "crop",
+   "corner0": 33,
+   "corner1": 21,
+   "corner2": 42,
+   "crop source": "templateflow/tpl-MNI152NLin2009cAsym/tpl-MNI152NLin2009cAsym_res-02_T1w.nii.gz",
+   "crop stride": 1,
+   "dtype": "float32",
+   "extreme": false,
+   "orientation": "oblique",
+   "origin0": -57.75,
+   "origin1": 56.0,
+   "origin2": 13.75,
+   "qfac": 1,
+   "qform_code": 1,
+   "range": "plain",
+   "sform": "same",
+   "sform_code": 0,
+   "shape": "30x32x16",
+   "spacing0": 1.2,
+   "spacing1": 0.8,
+   "spacing2": 1.2,
+   "suffix": ".nii.gz",
+   "tool": "bet2",
+   "units": "mm",
+   "w": "0.5"
+  },
+  "groups": [
+   {
+    "args": [
+     "{in:input}",
+     "out"
+    ],
+    "name": "input",
+    "optional": false
+   },
+   {
+    "args": [
+     "-c",
+     "22",
+     "19",
+     "8"
+    ],
+    "name": "-c",
+    "optional": true
+   }
+  ],
+  "inputs": {
+   "input": {
+    "content": {
+     "direction": [
+      1,
+      0,
+      0
+     ],
+     "seed": 976662626,
+     "type": "ramp"
+    },
+    "dtype": "float32",
+    "geometry": {
+     "origin": [
+      0.0,
+      0.0,
+      0.0
+     ],
+     "qfac": 1,
+     "qform_code": 1,
+     "quaternion": [
+      1,
+      0,
+      0,
+      0
+     ],
+     "sform": "same",
+     "sform_code": 1,
+     "spacing": [
+      1.0,
+      1.0,
+      1.0
+     ],
+     "units": "mm"
+    },
+    "scaling": null,
+    "shape": [
+     3,
+     4,
+     8
+    ],
+    "suffix": ".nii.gz",
+    "values": {
+     "offset": 0.0,
+     "scale": 1.0
+    }
+   }
+  },
+  "n": 80,
+  "options": [
+   "-c",
+   "-m",
+   "-w",
+   "FSLOUTPUTTYPE=NIFTI2_GZ",
+   "bet2"
+  ],
+  "seed": "20261029",
+  "tool": "fsl-bet"
+ },
+ "rule": null,
+ "status": "register",
+ "suite": "fsl-bet-replica",
+ "tier": "smoke",
+ "tool": "fsl-bet"
+}

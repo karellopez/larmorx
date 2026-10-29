@@ -83,6 +83,36 @@ Each is in the register (`docs/findings/upstream-defects.md`); the switch is
   voxel when the centroid is a real position and refuses otherwise; `reproduce` does not do the
   write FSL crashes on and fills nothing (the mask holds the drawn surface only), and warns (D13's
   failure cases, since BET's merge).
+  **Corrected 2026-10-29 (the FSL version trial, cases 661, 1297, 1308, 80):** a real centroid
+  further outside does not make FSL crash as a rule. Its fill checks each neighbour's coordinate
+  against the image along that axis only (`0<=x-1`, `xsize>x+1`, ...) and reaches a point by
+  `value`'s linear index `(z*RowsY + y)*ColumnsX + x` (`basicptr`, int64): a point outside the
+  image is then another voxel of the volume (the start `1 -4 0` before a 3 × 6 × 4 image reaches
+  voxel `1 2 0` through its neighbour one slice up, and from there every voxel: FSL 6.0.7.17 and
+  6.0.7.23 fill the whole image), or memory beyond the volume, which FSL reads and writes. The
+  replica had treated any start more than one voxel outside as FSL's crash (no fill: 72 of 72
+  values differed), and inside the `bet` script its `reproduce` had corrected the fill instead
+  (it passed the fix flag to keep the script's failure for crashes: case 1297, 2,160 of 8,316
+  values). `reproduce` now does FSL's fill point by point (`fill_by_index`: FSL's stack, its
+  order, its per-axis bounds, its linear index; inside the volume exactly; beyond it no write, a
+  place the fill wrote read back as its value and any other read as not 1), in bet2 alone and
+  inside the script, and names FSL-43 with the number of reads beyond the volume; the NaN
+  centroid keeps the crash class. Cases 661 and 1297 are then FSL's bytes in both versions. Where
+  FSL's reads beyond the volume met something else (case 80 shrunk: `bet2 -c 22 19 8` on a 3 × 4
+  × 8 ramp; 6.0.7.17 crashes, 6.0.7.23 writes 96 values unlike the replica's) its outputs depend
+  on that memory: the suite judges them undefined (`parity/fsl_bet.py`, `reads_memory`), as the
+  oracle cache never caches FSL-43's runs. The default (rule A) is unchanged; it is named where
+  its mask differs from FSL's fill so computed. Permanent cases `bet2-fill-by-index`,
+  `bet-fill-by-index`, `bet-robust-crash-filled`, `bet2-fill-memory-beyond`.
+- **FSL-63** (rule A, corrected; found by the FSL version trial, case 141, 2026-10-29): under
+  `-R` the script rebuilds bet2's options as ``bet2opts=`echo $bet2opts | sed 's/-n//g'` ``
+  (`bet:246`; `-B` likewise with `-s`, `bet:388`). bash's builtin `echo` takes the leading words
+  made only of `-n`, `-e`, `-E` as its own options, so a leading `-e` (bet2's mesh: `bet <in>
+  <out> -R -e`, where `-e` is the first bet2 option) is dropped and no `_mesh.vtk` is written
+  (FSL 6.0.7.17 and 6.0.7.23 alike); after it, backslashes in the remaining options are read as
+  `echo -e`'s escapes (`\c` ends the text). The default passes the options as given (the mesh
+  written); `reproduce` runs them through bash's `echo` as FSL does (`bet.rs`, `echo`); both
+  name FSL-63 where they differ. Permanent case `bet-robust-mesh-echo`.
 - **FSL-44** (rule A, corrected): the `bet` script expands `$1`, `$2`, `$IN`, `$OUT` unquoted
   throughout (`bet:155-160` and every command): a name with a blank becomes several words (the
   input is "not valid"; an output name writes other files), and `while [ _$1 != _ ]`
@@ -293,4 +323,33 @@ standard-tier cases differ, every one by the changes below.
 | `FSLOUTPUTTYPE` (newimage 2601.0) | new values, message | the zstd and bzip2 types; the unknown value's list of 16 | as for mcflirt |
 | fslpy 3.27.0 (`imtest`, `remove_ext`, `imglob`) | new extensions | `.nii.zst`, `.nii.bz2`, `.img.zst`, `.hdr.zst`, `.img.bz2`, `.hdr.bz2` in their lists (imtest and remove_ext keep MINC; imglob's own list has none); the pairs grouped alike | `avwutils.rs` (`FSLPY_EXTS`, `IMGLOB_EXTS`, `GROUPS`) |
 | NewNifti 5.0.0's `replaceSuffix` (FSL-60), znzlib's formats | as for mcflirt | bet2's own name handling (FSL-40) aborts on a name holding `.img` before NewNifti is reached; betsurf and the script's tools meet FSL-60 | as for mcflirt |
-| Armadillo 14.2.1's 4 × 4 inverses | as for mcflirt | BET inverts no 4 × 4 matrix but the sampling and swap matrices (diagonal and triangular: `1/x`, `dtrtri`) of `makeradiological`; no recorded output changed | not followed (as for mcflirt) |
+| Armadillo 14.2.1's 4 × 4 inverses | as for mcflirt | BET inverts the sampling and swap matrices of `makeradiological`, and `niftivox2newimagevox_mat` (`sampling_mat().i() * swapmat * sampling_mat()`, an image stored neurologically) in bet2's `-c` and in `fslstats -C` (bet's `-R`); no recorded output changed, but random testing found both (below) | not followed (as for mcflirt) |
+
+### The version trial's BET differences, triaged (2026-10-29)
+
+The trial (`oracles/difftest/2026-10-29-version-fsl-2`, against FSL 6.0.7.23) left six BET
+replica differences; each replayed against both versions (`replay_bet_findings.sh`; against
+6.0.7.17 the headers' build string always differs, the replica writing 6.0.7.23's):
+- **51** (`bet2 -n`, NIFTI_PAIR; FSL crashes in FSL-43's NaN fill): the replica's filled run wrote
+  nothing, which is what `-n` alone asks; the suite required an output. Harness: the check now
+  asks for outputs only where the call does (`asks_outputs`). Permanent case
+  `bet2-n-crash-nothing-asked`.
+- **141** (`bet -R -e`): FSL-63, above; the replica now agrees with FSL 6.0.7.23 on the drawn case.
+  Its shrunk form (a 1 × 1 × 2 image stored neurologically) meets one more change: FSL 6.0.7.23's
+  `fslstats -C` prints the centre `-0.000000` where 6.0.7.17 prints `0.000000`, which `dc`
+  then reads as a subtraction (`dc: stack empty`, twice): `fslstats.cc` and newimage's `cog` are
+  unchanged, the centre goes through `niftivox2newimagevox_mat().i()` (Armadillo 14.2.1's
+  inverse), and an image stored radiologically gives `0.000000` in both
+  (`cog_sign_probe.py`). It waits for the Armadillo part.
+- **661** and **1297**: FSL-43's fill by the linear index, above (replica mistakes, fixed).
+- **1308** (`bet -R -g 0.5 -e`): FSL's second bet2 crashes in a fill starting 71 slices above the
+  image; the script's `ERR` trap prints `bet failed during command:...` after the crash, which
+  the suite had counted as printed before it (harness, fixed: `_BET_FAILED`); `reproduce` goes
+  on with FSL-43's fill (judged as a filled run).
+- **80**: shrunk (`bet2 -c 22 19 8` on a 3 × 4 × 8 ramp), FSL-43's reads beyond the volume
+  (undefined, above). Drawn (a 30 × 32 × 16 image of 1.2 × 0.8 × 1.2 mm stored neurologically,
+  `-c 22 19 8 -m -w 0.5`): 18 of 15,360 voxels differ between FSL 6.0.7.17 (the replica's) and
+  6.0.7.23; the versions agree without `-c`, and with `-c` on the same image stored
+  radiologically (`bet2_versions.sh`): `-c`'s centre goes through
+  `niftivox2newimagevox_mat()`'s inverse, whose last bits Armadillo 14.2.1 changes. It waits for
+  the Armadillo part.

@@ -1,7 +1,7 @@
 # SPDX-License-Identifier: Apache-2.0
 # What was done about each difference random testing found (docs/validation/difftest.md,
 # "Triage"). The site's "Random testing" panels read it (larmorx_validation.evidence.difftest):
-# a night's difference takes the first entry of its tool and implementation that shares one of
+# a random-testing run's difference takes the first entry of its tool and implementation that shares one of
 # its checks (`signature`, the names of the checks that failed).
 #
 # status: fixed (larmorx was wrong; fixed, with a unit test and a permanent case), register (a
@@ -296,7 +296,7 @@ status = "fixed"
 explanation = "header slice times in milliseconds or microseconds: the step in seconds stays a double and each time is a float32 running sum of it (observed: `-slice k` reads every time back); both findings replay as agree (2026-10-29)"
 link = "validation/difftest/cases/afni-tshift/header-milliseconds-toffset.json"
 
-# ---------------------------------------------------------------- the first night (2026-10-25)
+# ---------------------------------------------------------------- the first long random-testing run (2026-10-25)
 
 [[difference]]
 tool = "ants-resample-image"
@@ -480,7 +480,7 @@ tool = "fsl-mcflirt"
 implementation = "replica"
 signature = ["every file bit-identical"]
 status = "fixed"
-explanation = "the mcflirt replica's atanf held fdlibm's commented value of aT[0], not glibc's 0x3eaaaaab, and FSL-08's notice missed the -meanvol image's name (both fixed by the replica's own part, e687cd1 and aa2c28f): with them every one of the night's 100 cases so far is bit-identical"
+explanation = "the mcflirt replica's atanf held fdlibm's commented value of aT[0], not glibc's 0x3eaaaaab, and FSL-08's notice missed the -meanvol image's name (both fixed by the replica's own part, e687cd1 and aa2c28f): with them every one of the first long random-testing run's 100 cases so far is bit-identical"
 
 [[difference]]
 tool = "mri-hmc"
@@ -676,7 +676,7 @@ link = "validation/difftest/cases/fsl-bet/bet2-filled-then-output-type.json"
 
 # ---------------------------------------------------------------- the clean-room fixes' trial (2026-10-29)
 # `oracles/difftest/2026-10-29-cleanroom-trial/` (seed 20261029, 0.5 h, 17,399 cases at 308b743):
-# 3dAutomask, 3dTshift and 3dUnifize no difference; mri-hmc the first night's family (the entries
+# 3dAutomask, 3dTshift and 3dUnifize no difference; mri-hmc the first long run's family (the entries
 # above); one AFNI-43 notice with `-q` (`afni-automask:20261029:3425`), fixed in 5130e08 (the
 # `-peels 0` entry above).
 

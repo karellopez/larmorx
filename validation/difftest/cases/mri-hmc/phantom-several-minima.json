@@ -15,7 +15,7 @@
  "implementations": [
   "original"
  ],
- "reason": "A small phantom moved by up to 15 degrees: the normalised correlation has several minima, and larmorx's estimates end in other ones than mcflirt's beyond the record's thresholds, aligning the series as well (temporal SD 0.999 of mcflirt's here; over the night's 782 findings median ratio 1.000, docs/findings/mri-hmc-original.md)",
+ "reason": "A small phantom moved by up to 15 degrees: the normalised correlation has several minima, and larmorx's estimates end in other ones than mcflirt's beyond the record's thresholds, aligning the series as well (temporal SD 0.999 of mcflirt's here; over the 782 findings of the first long random-testing run (2026-10-25) median ratio 1.000, docs/findings/mri-hmc-original.md)",
  "recipe": {
   "extra": {
    "keep_inputs": [

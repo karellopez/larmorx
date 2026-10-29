@@ -528,7 +528,7 @@ impl Script<'_, '_> {
         debug: bool,
     ) -> Result<(), Stop> {
         let val = |s: &mut Self, key: &str| -> Result<String, Stop> {
-            let r = avw::fslval(in_name, key);
+            let r = avw::fslval(in_name, key, s.fsl());
             Ok(s.tool(r)?.replace('-', ""))
         };
         let xdim = val(self, "dim1")?;

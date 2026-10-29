@@ -16,10 +16,15 @@ to be fixed and recorded; it is not meant to reproduce fMRIPrep's.
 
 Usage (from anywhere; the workspace is found from this file's location)::
 
-    python scripts/run_mcflirt_oracle.py [--jobs 3] [--only SUBSTRING ...] [--list] [--force]
+    python scripts/run_mcflirt_oracle.py [--fsl-version 6.0.7.23] [--jobs 3] [--only SUBSTRING ...]
+        [--list] [--force]
 
 Needs nibabel and numpy (the workspace .venv) and an editable larmorx-testdata install. The
-outputs (outside git) go to ``<workspace>/oracles/fsl-6.0.7/mcflirt/``.
+outputs (outside git) go to ``<workspace>/oracles/fsl-6.0.7/mcflirt/`` for FSL 6.0.7.17
+(``~/fsl``, the first recording) and ``<workspace>/oracles/fsl-<version>/mcflirt/`` for a newer
+installation (``~/fsl-<version>``; FSL 6.0.7.23 since 2026-10-29, the version update:
+``larmorx_validation.parity.fsl_versions``). The same runs and inputs: the references the real
+runs use are recomputed alike (the same median of the same volumes).
 """
 
 from __future__ import annotations
@@ -60,6 +65,21 @@ def find_workspace() -> Path:
 
 WS = find_workspace()
 OUT = WS / "oracles" / "fsl-6.0.7" / "mcflirt"
+#: The installations a recording can be made with: version -> (FSLDIR, recording directory).
+INSTALLATIONS = {
+    "6.0.7.17": (Path.home() / "fsl", WS / "oracles" / "fsl-6.0.7" / "mcflirt"),
+    "6.0.7.23": (Path.home() / "fsl-6.0.7.23", WS / "oracles" / "fsl-6.0.7.23" / "mcflirt"),
+}
+
+
+def use(version: str) -> None:
+    """Record with FSL ``version`` (one of :data:`INSTALLATIONS`)."""
+    global FSL, MCFLIRT, OUT
+    FSL, OUT = INSTALLATIONS[version]
+    MCFLIRT = FSL / "bin" / "mcflirt"
+    found = (FSL / "etc" / "fslversion").read_text().split(":")[0].strip()
+    if found != version:
+        raise SystemExit(f"{FSL} is FSL {found}, not {version}")
 SYN = "synthetic/hmc/"
 
 
@@ -563,6 +583,12 @@ def median_reference(name: str, bold_rel: str) -> Path:
     if out.exists():
         return out
     out.parent.mkdir(parents=True, exist_ok=True)
+    # A later recording uses the first recording's reference file itself, so that both
+    # versions register to the same bytes.
+    first = INSTALLATIONS["6.0.7.17"][1] / "refs" / out.name
+    if first.is_file() and first != out:
+        shutil.copyfile(first, out)
+        return out
     img = nib.load(catalog_path(bold_rel))
     data = np.asarray(img.dataobj[..., :10], dtype=np.float64)
     ref = np.median(data, axis=-1).astype(np.float32)
@@ -655,11 +681,13 @@ def _expand(arg: str, subst: dict[str, str]) -> str:
 
 def main() -> int:
     ap = argparse.ArgumentParser(description=__doc__.split("\n")[0])
+    ap.add_argument("--fsl-version", choices=tuple(INSTALLATIONS), default="6.0.7.17")
     ap.add_argument("--jobs", type=int, default=3)
     ap.add_argument("--only", nargs="*", default=[])
     ap.add_argument("--list", action="store_true")
     ap.add_argument("--force", action="store_true")
     args = ap.parse_args()
+    use(args.fsl_version)
     runs = [r for r in ALL if not args.only or any(s in r.name for s in args.only)]
     if args.list:
         for r in runs:

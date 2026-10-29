@@ -356,7 +356,8 @@ impl OptionParser {
     /// `usage()` (to standard error).
     pub fn usage(&self) -> String {
         let mut s = String::new();
-        s.push_str("\nPart of FSL (ID: \"\")\n");
+        // utils 2412.6's build string (`git describe` of its build); 2203.5 printed `""`
+        s.push_str("\nPart of FSL (ID: 2412.6-dirty)\n");
         s.push_str(&self.title);
         s.push_str("\n\nUsage: \n");
         s.push_str(&self.examples);
@@ -479,7 +480,7 @@ mod tests {
     #[test]
     fn usage_text() {
         let u = parser().usage();
-        assert!(u.starts_with("\nPart of FSL (ID: \"\")\nT\n\nUsage: \nex\n"));
+        assert!(u.starts_with("\nPart of FSL (ID: 2412.6-dirty)\nT\n\nUsage: \nex\n"));
         assert!(u.contains("\t-f <f>\t\tfrac\n"));
         assert!(u.contains("\t-m,--mask\tmask\n"));
         assert!(u.ends_with("\n\n\n"));

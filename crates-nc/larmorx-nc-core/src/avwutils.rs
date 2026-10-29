@@ -232,17 +232,17 @@ fn save_failed(e: SaveError) -> ToolFailure {
 }
 
 /// The header of an image named as FSL names it, or the program's failure.
-fn header_of(name: &str) -> Result<nifti::NiftiHeader, ToolFailure> {
+fn header_of(name: &str, fsl: &Settings) -> Result<nifti::NiftiHeader, ToolFailure> {
     let path = volume::return_validimagefilename(name).map_err(failed)?;
-    nifti::load_header(Path::new(&path)).map_err(|e| ToolFailure {
+    nifti::load_header(Path::new(&path), &fsl.open_options()).map_err(|e| ToolFailure {
         err: format!("{}\n", e.0),
         code: 1,
     })
 }
 
 /// `dtype(filename)` then `closestTemplatedType`: the type avwutils programs read a file as.
-pub fn template_type(name: &str) -> Result<i16, ToolFailure> {
-    let h = header_of(name)?;
+pub fn template_type(name: &str, fsl: &Settings) -> Result<i16, ToolFailure> {
+    let h = header_of(name, fsl)?;
     let t = if h.scl_slope != 1.0 || h.scl_inter != 0.0 {
         if h.scl_slope == 0.0 || h.datatype == dt::DOUBLE {
             h.datatype
@@ -275,8 +275,8 @@ pub fn template_type(name: &str) -> Result<i16, ToolFailure> {
 
 /// `fslval <name> <dimN|pixdimN>`: the header field as fslhd prints it, with a trailing blank
 /// (the script's `sed 's/-//g'` applied by the caller).
-pub fn fslval(name: &str, key: &str) -> Result<String, ToolFailure> {
-    let h = header_of(name)?;
+pub fn fslval(name: &str, key: &str, fsl: &Settings) -> Result<String, ToolFailure> {
+    let h = header_of(name, fsl)?;
     let v = if let Some(k) = key.strip_prefix("pixdim") {
         let k: usize = k.parse().unwrap_or(0);
         cnum::fmt_f(h.pixdim[k.min(7)], 6)
@@ -354,7 +354,7 @@ pub fn fslroi(
     fsl: &Settings,
     reproduce_offset: bool,
 ) -> Result<(), ToolFailure> {
-    match template_type(input)? {
+    match template_type(input, fsl)? {
         dt::UNSIGNED_CHAR => fslroi_t::<i8>(input, output, args, fsl, reproduce_offset),
         dt::SIGNED_SHORT => fslroi_t::<i16>(input, output, args, fsl, reproduce_offset),
         dt::SIGNED_INT => fslroi_t::<i32>(input, output, args, fsl, reproduce_offset),
@@ -435,7 +435,7 @@ pub fn fslmerge_z(
     reproduce_offset: bool,
 ) -> Result<(), ToolFailure> {
     let first = inputs.first().map_or("", String::as_str);
-    match template_type(first)? {
+    match template_type(first, fsl)? {
         dt::UNSIGNED_CHAR => fslmerge_z_t::<i8>(output, inputs, fsl, reproduce_offset),
         dt::SIGNED_SHORT => fslmerge_z_t::<i16>(output, inputs, fsl, reproduce_offset),
         dt::SIGNED_INT => fslmerge_z_t::<i32>(output, inputs, fsl, reproduce_offset),
@@ -450,14 +450,14 @@ fn fslmerge_z_t<T: Elem>(
     fsl: &Settings,
     reproduce_offset: bool,
 ) -> Result<(), ToolFailure> {
-    let h0 = header_of(&inputs[0])?;
+    let h0 = header_of(&inputs[0], fsl)?;
     let new_tr = h0.pixdim[4] as f32;
     let x = h0.dim[1].max(1);
     let y = h0.dim[2].max(1);
     let mut z = h0.dim[3].max(1);
     let t = h0.dim[4].max(1);
     for name in &inputs[1..] {
-        z += header_of(name)?.dim[3].max(1);
+        z += header_of(name, fsl)?.dim[3].max(1);
     }
     let mut out = Volume::<T>::new(x, y, z, t);
     let (first, _, _) = volume::read_volume4d::<T>(&inputs[0], fsl).map_err(failed)?;
@@ -556,7 +556,7 @@ pub fn fslmaths_mas(
     fsl: &Settings,
     reproduce_offset: bool,
 ) -> Result<(), ToolFailure> {
-    if volume::file_dtype(input).map_err(failed)? == dt::DOUBLE {
+    if volume::file_dtype(input, fsl).map_err(failed)? == dt::DOUBLE {
         fslmaths_mas_t::<f64>(input, mask, output, fsl, reproduce_offset, sse::mul_f64)
     } else {
         fslmaths_mas_t::<f32>(input, mask, output, fsl, reproduce_offset, sse::mul_f32)

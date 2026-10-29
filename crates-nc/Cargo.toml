@@ -33,6 +33,10 @@ larmorx-nc-mcflirt = { path = "larmorx-nc-mcflirt", version = "0.0.1" }
 larmorx-nc-bet = { path = "larmorx-nc-bet", version = "0.0.1" }
 # zlib-rs: the pure-Rust zlib implementation (no C zlib), as the root workspace.
 flate2 = { version = "1.1.10", default-features = false, features = ["zlib-rs", "runtime_detection"] }
+# znzlib 2511.3 (FSL 6.0.7.23) also reads and writes zstd and bzip2: ruzstd (pure-Rust zstd) and
+# bzip2 with its default libbz2-rs-sys backend (a pure-Rust bzip2; no C bzip2).
+ruzstd = "0.9.1"
+bzip2 = "0.6.1"
 rayon = "1.12.0"
 thiserror = "2.0.21"
 tempfile = "3.27.0"

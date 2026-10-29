@@ -132,6 +132,15 @@ pub fn parser() -> OptionParser {
                 "-apply thresholding to segmented brain image and mask",
             ),
             b("--ct", "-treat input as CT image (default is MRI)"),
+            // fsl-bet2 2111.9 (FSL 6.0.7.23)
+            Opt {
+                key: "--binaryMask",
+                default: Value::Str(String::new()),
+                help: "~<image>\tGenerate mesh from existing mask",
+                compulsory: false,
+                flag: ArgFlag::Requires(1),
+                visible: true,
+            },
             b("-e,--mesh", "generates brain surface as mesh in vtk format"),
             b("-v,--verbose", "switch on diagnostic messages"),
             b("-h,--help", "displays this help, then exits"),
@@ -167,6 +176,9 @@ pub struct Bet2Args {
     pub centre: Option<[f32; 3]>,
     pub threshold: bool,
     pub ct: bool,
+    /// `--binaryMask <image>` (fsl-bet2 2111.9): the surface found on this mask, the outputs cut
+    /// from the input.
+    pub binary_mask: Option<String>,
     pub mesh: bool,
     pub verbose: bool,
     pub d1: f32,
@@ -187,6 +199,7 @@ impl Default for Bet2Args {
             centre: None,
             threshold: false,
             ct: false,
+            binary_mask: None,
             mesh: false,
             verbose: false,
             d1: 7.0,
@@ -206,9 +219,11 @@ pub struct Bet2Result {
 
 /// `adjust_initial_mesh`: the thresholds, the radius, the centre of gravity, the median
 /// intensity inside the initial sphere; the mesh moved and scaled there. When no voxel lies
-/// strictly between the robust limits inside the sphere (FSL-41: FSL dereferences the end of an
-/// empty list and crashes), `Err` unless `fill_undefined`, which gives that median the value 0
-/// and says so (`Ok((_, true))`): everything else is FSL's.
+/// strictly between the robust limits inside the sphere (a constant or binary image), fsl-bet2
+/// 2111.9 (FSL 6.0.7.23) takes the robust maximum as the median ("Safe option here is to set
+/// the median to the robust max"); 2111.8 read the end of the empty list and crashed (FSL-41,
+/// fixed upstream: both modes give 2111.9's value, and the `Err` and `fill_undefined` paths of
+/// the earlier translation are never taken).
 #[allow(clippy::too_many_arguments)]
 pub fn adjust_initial_mesh(
     image: &Volume<f32>,
@@ -338,12 +353,10 @@ pub fn adjust_initial_mesh(
     }
     let med = vm.len() / 2;
     if vm.is_empty() {
-        if !fill_undefined {
-            return Err(0);
-        }
-        // FSL reads `*max_element(begin, begin)` of an empty vector: no value; 0 here
-        bp.tm = 0.0;
-        return Ok((bp, true));
+        // fsl-bet2 2111.9: `bp.tm = bp.t98` (FSL-41, fixed upstream)
+        let _ = fill_undefined;
+        bp.tm = bp.t98;
+        return Ok((bp, false));
     }
     // nth_element(med - 1) then the largest of the first med values: the (med-1)-th smallest
     // value; with one value (med 0), libstdc++ returns it.
@@ -1058,6 +1071,10 @@ fn main_inner(
         centre: c.set.then(|| [c.float_at(0), c.float_at(1), c.float_at(2)]),
         threshold: get("-t,--threshold").bool(),
         ct: get("--ct").bool(),
+        binary_mask: {
+            let m = get("--binaryMask");
+            m.set.then(|| m.str().to_owned())
+        },
         mesh: get("-e,--mesh").bool(),
         verbose: get("-v,--verbose").bool(),
         d1: get("--parameter_d1").float(),
@@ -1110,7 +1127,10 @@ fn main_inner(
     } else {
         out_name
     };
-    let testvol: Volume<f32> = match volume::read_volume::<f32>(&in_name, run.fsl) {
+    // --binaryMask (fsl-bet2 2111.9): the surface is found on the mask, read as named (none of
+    // bet2's own name handling), and the outputs are cut from the input, read afterwards.
+    let first = a.binary_mask.clone().unwrap_or_else(|| in_name.clone());
+    let testvol: Volume<f32> = match volume::read_volume::<f32>(&first, run.fsl) {
         Ok((v, warning)) => {
             if let Some(w) = warning {
                 let _ = writeln!(err, "{w}");
@@ -1126,19 +1146,86 @@ fn main_inner(
     } else {
         (testvol, None)
     };
-    match compute(&testvol, &a, run.fill, out, err, notices) {
-        Ok(res) => write_outputs(
-            &testvol,
-            ctvol.as_ref(),
-            &a,
-            res,
-            &out_name,
-            run,
-            err,
-            notices,
-        ),
-        Err(code) => code,
-    }
+    let mut res = match compute(&testvol, &a, run.fill, out, err, notices) {
+        Ok(res) => res,
+        Err(code) => return code,
+    };
+    let (testvol, ctvol) = match a.binary_mask {
+        None => (testvol, ctvol),
+        Some(_) => {
+            let input: Volume<f32> = match volume::read_volume::<f32>(&in_name, run.fsl) {
+                Ok((v, warning)) => {
+                    if let Some(w) = warning {
+                        let _ = writeln!(err, "{w}");
+                    }
+                    v
+                }
+                Err(e) => return report_abort(&e, "bet2", err),
+            };
+            // FSL-61: the brain mask (the mask's grid) indexed with the input's dimensions
+            let (md, id) = (
+                [testvol.xsize(), testvol.ysize(), testvol.zsize()],
+                [input.xsize(), input.ysize(), input.zsize()],
+            );
+            if md != id {
+                notices.add(
+                    &defects::FSL_61,
+                    format!(
+                        "--binaryMask: the mask is {}x{}x{} voxels and the input {}x{}x{}: FSL's \
+                         bet2 applies the mask's surface over the input's dimensions, reading and \
+                         writing outside the mask's memory: refused",
+                        md[0], md[1], md[2], id[0], id[1], id[2]
+                    ),
+                );
+                let _ = writeln!(
+                    err,
+                    "bet2: stopped: --binaryMask needs a mask on the input's grid ({}x{}x{} \
+                     voxels, the input {}x{}x{}); FSL's bet2 reads and writes outside the mask \
+                     here (FSL-61) (larmorx)",
+                    md[0], md[1], md[2], id[0], id[1], id[2]
+                );
+                return 1;
+            }
+            // the thresholds of -t and -s from the input: robustmax, robustmin
+            let (t2f, t98f) = input.robust_limits();
+            let (t2, t98) = (f64::from(t2f), f64::from(t98f));
+            res.params.t98 = t98;
+            res.params.t2 = t2;
+            res.params.t = (S64(t2) + 0.1 * (S64(t98) - t2)).0;
+            // FSL-62: with --ct, FSL keeps the mask (before its conversion) as the image the
+            // brain is cut from
+            let ctvol = match ctvol {
+                Some(mask) if notices.reproduce() => {
+                    notices.add(
+                        &defects::FSL_62,
+                        "--ct with --binaryMask: the brain image cut from the mask, as FSL's \
+                         bet2 does",
+                    );
+                    Some(mask)
+                }
+                Some(_) => {
+                    notices.add(
+                        &defects::FSL_62,
+                        "--ct with --binaryMask: the brain image cut from the CT input (FSL's \
+                         bet2 cuts it from the mask)",
+                    );
+                    Some(input.clone())
+                }
+                None => None,
+            };
+            (input, ctvol)
+        }
+    };
+    write_outputs(
+        &testvol,
+        ctvol.as_ref(),
+        &a,
+        res,
+        &out_name,
+        run,
+        err,
+        notices,
+    )
 }
 
 /// The notice of FSL-56 for outputs that carry `n` extensions of different sizes.

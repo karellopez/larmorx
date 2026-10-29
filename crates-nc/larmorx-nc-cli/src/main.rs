@@ -57,6 +57,29 @@ fn threads() -> usize {
 }
 
 /// Runs the command line with `args` (program name first), writing to `out` and `err`.
+/// FSL-60: the image names FSL 6.0.7.23's NewNifti 5.0.0 would have opened under another name
+/// (a name holding ".img" before its extension), one notice per run.
+fn renamed_notices(settings: &Settings, mode: UpstreamDefects, err: &mut dyn Write) {
+    let renames = settings.renames();
+    if let Some((given, renamed)) = renames.first() {
+        let detail = if mode.reproduce() {
+            format!(
+                "{given} opened as {renamed}, as FSL 6.0.7.23 opens it (NewNifti replaces a \
+                 name's last '.img' with '.hdr'){}",
+                if renames.len() > 1 { ", and other names alike" } else { "" }
+            )
+        } else {
+            format!(
+                "{given} opened as given; FSL 6.0.7.23 opens {renamed} instead (NewNifti \
+                 replaces a name's last '.img' with '.hdr'){}",
+                if renames.len() > 1 { ", and other names alike" } else { "" }
+            )
+        };
+        let n = larmorx_core::defects::Notice::new(&larmorx_core::defects::FSL_60, mode, detail);
+        let _ = writeln!(err, "larmorx-nc: {}", n.line());
+    }
+}
+
 fn run<I, S>(args: I, out: &mut dyn Write, err: &mut dyn Write) -> u8
 where
     I: IntoIterator<Item = S>,
@@ -77,8 +100,11 @@ where
                 Some(tool) => match FSL_TOOLS.iter().find(|(n, _)| *n == tool) {
                     Some((_, f)) => match UpstreamDefects::from_env() {
                         Ok(mode) => {
-                            let settings = Settings::from_env(FSL_VARIABLES);
-                            (f(&rest, &settings, mode, threads(), out, err), Ok(()))
+                            let settings = Settings::from_env(FSL_VARIABLES)
+                                .reproducing_renames(mode.reproduce());
+                            let code = f(&rest, &settings, mode, threads(), out, err);
+                            renamed_notices(&settings, mode, err);
+                            (code, Ok(()))
                         }
                         Err(e) => (EXIT_BAD_MODE, writeln!(err, "Error: {e}")),
                     },

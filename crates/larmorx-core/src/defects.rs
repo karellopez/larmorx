@@ -434,6 +434,14 @@ defects! {
         "a NaN in the T1 inside the brain surface makes the 98th percentile (std::nth_element) undefined";
     FSL_58 = "FSL-58", "betsurf", true,
         "with no voxel of the T1 inside the brain surface, the 98th percentile of the brain's intensities is read from an empty list (std::nth_element, then the element before the list's start): FSL crashes or uses memory it never wrote";
+    FSL_59 = "FSL-59", "mcflirt", true,
+        "-sinc_final and -nn_final resample the series with trilinear interpolation (FSL 6.0.7.23: newimage 2601.0 keeps the interpolation method each volume of a series had when it was first accessed, so the method set for the final resampling never reaches it)";
+    FSL_60 = "FSL-60", "FSL", true,
+        "an image name holding '.img' before its extension (in a directory or in the file's own stem) is opened under another name (FSL 6.0.7.23: NewNifti 5.0.0 replaces the name's last '.img' with '.hdr'): another file is read or written, or the program aborts";
+    FSL_61 = "FSL-61", "bet2", true,
+        "--binaryMask with an input on another grid than the mask: the brain mask made on the mask's grid is applied over the input's dimensions, reading and writing outside it (FSL 6.0.7.23)";
+    FSL_62 = "FSL-62", "bet2", true,
+        "--ct with --binaryMask converts the mask instead of the CT image and writes the mask, masked, as the brain image (FSL 6.0.7.23)";
     FSL_56 = "FSL-56", "FSL", true,
         "an image saved with two or more NIfTI extensions of different sizes gets the wrong vox_offset (NewNifti adds the first extension's size once per extension): the data start inside the extensions or after a gap";
     ITK_50 = "ITK-50", "ITK", true,

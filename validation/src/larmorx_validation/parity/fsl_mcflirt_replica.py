@@ -46,7 +46,7 @@ from typing import Any
 
 import numpy as np
 
-from larmorx_validation.parity import defects
+from larmorx_validation.parity import defects, fsl_versions
 from larmorx_validation.parity.harness import (
     BOTH_ERROR,
     Case,
@@ -57,12 +57,12 @@ from larmorx_validation.parity.harness import (
     Suite,
 )
 from larmorx_validation.parity.mri_hmc import (
-    RECORDED,
     TESTDATA,
-    manifest,
-    oracle_dir,
+    recorded_marker,
     rms_deviation,
 )
+from larmorx_validation.parity.mri_hmc import manifest as _manifest
+from larmorx_validation.parity.mri_hmc import oracle_dir as _oracle_dir
 
 #: The replica's own lines on standard error (notices, its abort line).
 REPLICA_PREFIX = "larmorx-nc:"
@@ -85,10 +85,24 @@ def workspace() -> Path | None:
     return None
 
 
-def fsldir() -> Path:
-    """The FSL 6.0.7.17 installation: ``LARMORX_FSLDIR``, else ``~/fsl``. Never on the
-    ``PATH``."""
-    return Path(os.environ.get("LARMORX_FSLDIR") or Path.home() / "fsl")
+def fsldir(version: str | None = None) -> Path:
+    """The FSL installation compared with (:mod:`fsl_versions`: ``LARMORX_FSLDIR``,
+    ``--fsl-version``, else the replica's default, the newest), or the given ``version``'s.
+    Never on the ``PATH``."""
+    if version is None:
+        version = None if os.environ.get(fsl_versions.DIR_ENV) else fsl_versions.selected("replica")
+    return fsl_versions.fsldir(version)
+
+
+def oracle_dir(version: str | None = None) -> Path | None:
+    """mcflirt's recorded runs of the version compared with (or of ``version``)."""
+    if version is not None:
+        return fsl_versions.recording(version)
+    return _oracle_dir("replica")
+
+
+def manifest() -> dict[str, Any]:
+    return _manifest("replica")
 
 
 def replica_binary() -> Path | None:
@@ -124,14 +138,16 @@ class Completed:
     stderr: str
 
 
-def _environment(settings: dict[str, str | None]) -> dict[str, str]:
+def _environment(
+    settings: dict[str, str | None], version: str | None = None
+) -> dict[str, str]:
     """mcflirt's clean environment (``oracles/fsl-6.0.7/mcflirt/README.md``): ``HOME``, a
     ``PATH`` without FSL, ``FSLDIR``, ``FSLOUTPUTTYPE=NIFTI_GZ`` unless ``settings`` change it
     (``None`` unsets a variable)."""
     env = {
         "HOME": os.environ.get("HOME", str(Path.home())),
         "PATH": "/usr/bin:/bin",
-        "FSLDIR": str(fsldir()),
+        "FSLDIR": str(fsldir(version)),
         "FSLOUTPUTTYPE": "NIFTI_GZ",
     }
     for k, v in settings.items():
@@ -142,18 +158,20 @@ def _environment(settings: dict[str, str | None]) -> dict[str, str]:
     return env
 
 
-def run_oracle(args: list[str], *, cwd: Path, settings: dict[str, str | None]) -> Completed:
-    """FSL's ``mcflirt`` with ``args`` in ``cwd`` and its clean environment. Every oracle run of
-    this suite goes through here, and through the oracle-output cache
-    (:mod:`larmorx_validation.oracle_cache`): mcflirt is single-threaded and draws no random
-    numbers, so a run is served once it ran (crashes and hangs always run); every file it writes
-    is in ``cwd``."""
+def run_oracle(
+    args: list[str], *, cwd: Path, settings: dict[str, str | None], version: str | None = None
+) -> Completed:
+    """FSL's ``mcflirt`` with ``args`` in ``cwd`` and its clean environment (the installation
+    compared with, or ``version``'s: FSL's own step). Every oracle run of this suite goes through
+    here, and through the oracle-output cache (:mod:`larmorx_validation.oracle_cache`): mcflirt
+    is single-threaded and draws no random numbers, so a run is served once it ran (crashes and
+    hangs always run); every file it writes is in ``cwd``."""
     from larmorx_validation import oracle_cache
 
-    argv = [str(fsldir() / "bin" / "mcflirt"), *args]
+    argv = [str(fsldir(version) / "bin" / "mcflirt"), *args]
     p = oracle_cache.run(
         argv,
-        env=_environment(settings),
+        env=_environment(settings, version),
         cwd=cwd,
         outputs=[cwd],
         policy=oracle_cache.Policy(threads=1, family="fsl"),
@@ -443,6 +461,57 @@ def compare(
     return identical, total
 
 
+def _masked(text: str) -> str:
+    """FSL's installation directories in a message, masked (they differ between versions)."""
+    for v in fsl_versions.INSTALLS:
+        text = text.replace(str(fsl_versions.fsldir(v)), "<FSLDIR>")
+    return text
+
+
+def fsl_step(
+    checks: CheckList,
+    prev: Completed,
+    new: Completed,
+    prev_dir: Path,
+    new_dir: Path,
+    exclude: set[str],
+    args: list[str],
+    settings: dict[str, str | None],
+) -> None:
+    """FSL's own step from the previous version to the one compared (:mod:`fsl_versions`): the
+    two runs' exit status, messages and outputs (images decompressed, ``descrip`` left out: it
+    names FSL's build). Reported, never a failure; a change without a known reason is a
+    finding."""
+    pa, na = _files(prev_dir, exclude), _files(new_dir, exclude)
+    differences = {}
+    for name in sorted(set(pa) & set(na)):
+        if _is_image(name):
+            if not _same_streams(
+                pa[name], na[name], blank_descrip=not name.endswith((".img", ".img.gz"))
+            ):
+                differences[name] = _differing_values(pa[name], na[name])
+        elif not _same_bytes(pa[name], na[name]):
+            differences[name] = "the file differs"
+    env = {k: v for k, v in _environment(settings).items() if v is not None}
+    changed, detail = fsl_versions.step_detail(
+        (prev.code, new.code),
+        (_masked(prev.stdout + prev.stderr), _masked(new.stdout + new.stderr)),
+        (sorted(pa), sorted(na)),
+        differences,
+        fsl_versions.reasons(args, env),
+    )
+    checks.add(
+        Check(
+            fsl_versions.STEP_CHECK,
+            True,
+            metric="FSL against FSL",
+            value="changed" if changed else "identical",
+            threshold="reported",
+            detail=detail,
+        )
+    )
+
+
 def fix_pass(
     checks: CheckList,
     args_for: Any,
@@ -513,7 +582,8 @@ def _recorded_case(name: str, checks: CheckList) -> None:
         raise Outcome("skipped", "the recorded mcflirt runs were not found")
     rdir = root / "runs" / name
     run = json.loads((rdir / "run.json").read_text(encoding="utf-8"))
-    marker = RECORDED + "runs/" + name + "/"
+    recorded = recorded_marker(root)
+    marker = recorded + "runs/" + name + "/"
     outputs = set(run.get("outputs", {}))
     settings: dict[str, str | None] = {
         k: v for k, v in run.get("env", {}).items() if k not in ("HOME", "PATH", "FSLDIR")
@@ -530,8 +600,8 @@ def _recorded_case(name: str, checks: CheckList) -> None:
             return str(tmp / rel)
         if TESTDATA in arg and arg.startswith("/"):
             return _testdata(arg.split(TESTDATA, 1)[1])
-        if RECORDED in arg and arg.startswith("/"):
-            return str(root / arg.split(RECORDED, 1)[1])
+        if recorded in arg and arg.startswith("/"):
+            return str(root / arg.split(recorded, 1)[1])
         return arg
 
     steps = []
@@ -589,9 +659,42 @@ def _recorded_case(name: str, checks: CheckList) -> None:
                     checks(f"step {k}: exit status", oracle.code == rep.code)
             if all(r.code == 0 for r in results) and len(mapped) == 1:
                 fix_pass(checks, lambda t: prepare(t)[0], settings, tmp, results[0], exclude)
+            _recorded_step(checks, name, run, rdir, exclude, steps[-1], settings)
     except FileNotFoundError as e:
         raise Outcome("skipped", f"input not available: {e}") from e
     _agree_on_errors(checks, [s["exit"] for s in run["steps"]], "")
+
+
+def _recorded_streams(rdir: Path, k: int) -> tuple[str, str]:
+    out, err = rdir / f"stdout{k}.txt", rdir / f"stderr{k}.txt"
+    return (
+        out.read_text(errors="replace").replace(str(rdir), "<run>") if out.is_file() else "",
+        err.read_text(errors="replace").replace(str(rdir), "<run>") if err.is_file() else "",
+    )
+
+
+def _recorded_step(
+    checks: CheckList,
+    name: str,
+    run: dict[str, Any],
+    rdir: Path,
+    exclude: set[str],
+    args: list[str],
+    settings: dict[str, str | None],
+) -> None:
+    """FSL's own step for a recorded run: the previous version's recording of the same run
+    against the compared one's (no run needed)."""
+    old = fsl_versions.step_from("replica")
+    root = oracle_dir(old) if old else None
+    if root is None or not (root / "runs" / name / "run.json").is_file():
+        return
+    pdir = root / "runs" / name
+    prun = json.loads((pdir / "run.json").read_text(encoding="utf-8"))
+    k, j = len(prun["steps"]) - 1, len(run["steps"]) - 1
+    prev = Completed(prun["steps"][k]["exit"], *_recorded_streams(pdir, k))
+    new = Completed(run["steps"][j]["exit"], *_recorded_streams(rdir, j))
+    skip = exclude | {f.name for d in (pdir, rdir) for f in d.iterdir() if f.name.startswith("std")}
+    fsl_step(checks, prev, new, pdir, rdir, skip, args, settings)
 
 
 # ------------------------------------------------------------------------------------------------
@@ -685,6 +788,20 @@ def _fmriprep_case(payload: tuple[str, str], checks: CheckList) -> None:
             )
         if oracle.code == 0 and replica.code == 0:
             fix_pass(checks, mapped, {}, b, replica, set())
+        if (old := fsl_versions.step_from("replica")) is not None:
+            with tempfile.TemporaryDirectory(prefix="lx-nc-fp-") as c_:
+                c = Path(c_)
+                prev = run_oracle(mapped(c), cwd=c, settings={}, version=old)
+                fsl_step(
+                    checks,
+                    Completed(prev.code, prev.stdout.replace(str(c), "<run>"), prev.stderr),
+                    Completed(oracle.code, oracle.stdout.replace(str(a), "<run>"), oracle.stderr),
+                    c,
+                    a,
+                    set(),
+                    mapped(c),
+                    {},
+                )
     _agree_on_errors(checks, [oracle.code], oracle.stderr)
 
 
@@ -1017,6 +1134,32 @@ def _edge_case(name: str, checks: CheckList) -> None:
             )
             if replica.code == 0:
                 fix_pass(checks, prepare, settings, b, replica, exclude)
+            if (old := fsl_versions.step_from("replica")) is not None:
+                c = Path(tempfile.mkdtemp(prefix="lx-nc-edge-"))
+                try:
+                    prev = run_oracle(prepare(c), cwd=c, settings=settings, version=old)
+                    fsl_step(
+                        checks,
+                        Completed(
+                            prev.code,
+                            prev.stdout.replace(str(c), "<run>"),
+                            prev.stderr.replace(str(c), "<run>"),
+                        ),
+                        Completed(
+                            oracle.code,
+                            oracle.stdout.replace(str(a), "<run>"),
+                            oracle.stderr.replace(str(a), "<run>"),
+                        ),
+                        c,
+                        a,
+                        exclude,
+                        args,
+                        settings,
+                    )
+                finally:
+                    if (c / "ro").exists():
+                        (c / "ro").chmod(0o755)
+                    shutil.rmtree(c, ignore_errors=True)
         finally:
             for d in (a, b):
                 ro = d / "ro"
@@ -1071,6 +1214,11 @@ def cases(tier: str) -> list[Case]:
 
 
 def run_case(case: Case, checks: CheckList) -> None:
+    with fsl_versions.using("replica"):
+        _run_case(case, checks)
+
+
+def _run_case(case: Case, checks: CheckList) -> None:
     if replica_binary() is None:
         raise Outcome("skipped", "the larmorx-nc program was not found (LARMORX_NC_BIN)")
     kind, payload = case.payload
@@ -1128,18 +1276,22 @@ def _highlights(results: list[CaseResult]) -> list[str]:
             *rows,
         ]
     lines += ["", *defects.summary(results)]
+    lines += fsl_versions.step_highlights(results)
     return lines
 
 
 def suite() -> Suite:
+    v = fsl_versions.selected("replica")
+    root = oracle_dir()
+    where = f"`oracles/{root.parent.name}/{root.name}/`" if root is not None else "(not found)"
     return Suite(
         name="fsl-mcflirt-replica",
         title="mcflirt replica (bit-exact, FSL Licence)",
-        tool="`larmorx-nc fsl mcflirt` (crate larmorx-nc-mcflirt, translated from FSL 6.0.7.17's "
-        'source; `lx.mri.hmc(implementation="replica")`)',
-        reference="mcflirt from FSL 6.0.7.17 (fsl-mcflirt 2111.0, the conda build at `~/fsl`, "
-        "as built: glibc 2.35's maths): the recorded runs in `oracles/fsl-6.0.7/mcflirt/` and "
-        "runs made here",
+        tool="`larmorx-nc fsl mcflirt` (crate larmorx-nc-mcflirt, translated from FSL "
+        f"{fsl_versions.NEWEST}'s source; `lx.mri.hmc(implementation=\"replica\")`)",
+        reference=f"mcflirt from FSL {v} (fsl-mcflirt 2111.0, the conda build at "
+        f"`~/{fsl_versions.INSTALLS.get(v, 'fsl')}`, as built: glibc 2.35's maths): the recorded "
+        f"runs in {where} and runs made here",
         thresholds=[
             ("Exit status", "the same (an abort: the replica exits 1 after the same text)"),
             (
@@ -1159,6 +1311,6 @@ def suite() -> Suite:
             "It is compared with mcflirt in `reproduce` mode (D13); the default `fix` pass is "
             "checked against the reproduced run. fMRIPrep's own matrices come from its "
             "container's FSL (fsl-mcflirt 2111.0 with newer fsl-newimage and fsl-miscmaths) and "
-            "are reported only."
+            "are reported only. " + fsl_versions.record_line("replica")
         ),
     )

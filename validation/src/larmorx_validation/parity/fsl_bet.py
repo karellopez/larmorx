@@ -1,10 +1,12 @@
 # SPDX-License-Identifier: Apache-2.0
 """Parity of the BET replicas (``larmorx-nc fsl bet``, ``bet2`` and ``betsurf``, run by larmorx
-as a separate process) with FSL 6.0.7.17's ``bet``, ``bet2`` and ``betsurf``: exit status,
+as a separate process) with FSL's ``bet``, ``bet2`` and ``betsurf`` (6.0.7.23 since 2026-10-29;
+6.0.7.17 selectable, :mod:`fsl_versions`): exit status,
 messages and every output (brain, mask, outline, skull, mesh, the skull and scalp surfaces and
 their masks), byte for byte.
 
-FSL runs from its own installation (``~/fsl``, or ``LARMORX_FSL_DIR``), never on the ``PATH``:
+FSL runs from its own installation (``~/fsl-6.0.7.23`` or ``~/fsl``: ``--fsl-version``, or
+``LARMORX_FSLDIR``), never on the ``PATH``:
 both programs run with ``PATH=/usr/bin:/bin``, ``FSLDIR`` set (the ``bet`` script calls
 ``${FSLDIR}/bin/...``), an empty ``HOME`` and each case's ``FSLOUTPUTTYPE``. The replica runs the
 way users reach it: through larmorx's own dispatch (``larmorx fsl <tool>``), which runs the
@@ -52,7 +54,7 @@ from typing import Any
 
 import numpy as np
 
-from larmorx_validation.parity import defects
+from larmorx_validation.parity import defects, fsl_versions
 from larmorx_validation.parity.harness import (
     BOTH_ERROR,
     EXPECTED,
@@ -91,22 +93,25 @@ def workspace() -> Path | None:
     return None
 
 
-def fsl_dir() -> Path | None:
-    """FSL's installation: ``LARMORX_FSL_DIR``, else ``~/fsl`` (when it holds ``bin/bet2``)."""
-    for candidate in (os.environ.get("LARMORX_FSL_DIR"), str(Path.home() / "fsl")):
-        if candidate and (Path(candidate) / "bin" / "bet2").is_file():
-            return Path(candidate)
-    return None
+def fsl_dir(version: str | None = None) -> Path | None:
+    """FSL's installation (when it holds ``bin/bet2``): the one compared with
+    (:mod:`fsl_versions`: ``LARMORX_FSLDIR``, ``--fsl-version``, else the replica's default, the
+    newest), or the given ``version``'s."""
+    if version is None and not (
+        os.environ.get(fsl_versions.DIR_ENV) or os.environ.get(fsl_versions.DIR_ENV_OLD)
+    ):
+        version = fsl_versions.selected("replica")
+    d = fsl_versions.fsldir(version)
+    return d if (d / "bin" / "bet2").is_file() else None
 
 
-@functools.cache
-def fsl_version() -> str:
-    d = fsl_dir()
+def fsl_version(version: str | None = None) -> str:
+    d = fsl_dir(version)
     if d is None:
         return "not found"
-    v = d / "etc" / "fslversion"
-    version = v.read_text(encoding="utf-8").split(":")[0].strip() if v.is_file() else "unknown"
-    return f"FSL {version} (fsl-bet2 2111.8, fsl-newimage 2203.12, fsl-meshclass 2111.0)"
+    return f"FSL {fsl_versions.version_of(d)} (" + fsl_versions.package_versions(
+        d, ("fsl-bet2", "fsl-newimage", "fsl-meshclass")
+    ) + ")"
 
 
 def replica_binary() -> str | None:
@@ -180,14 +185,16 @@ def home() -> Path:
 
 
 def environment(
-    output_type: str = "NIFTI_GZ", extra: tuple[tuple[str, str | None], ...] = ()
+    output_type: str = "NIFTI_GZ",
+    extra: tuple[tuple[str, str | None], ...] = (),
+    version: str | None = None,
 ) -> dict[str, str]:
     """The environment both programs run in: no FSL program on the PATH, ``FSLDIR`` for the
     ``bet`` script, an empty ``HOME``, the case's ``FSLOUTPUTTYPE`` and variables."""
     env = {
         "HOME": str(home()),
         "PATH": "/usr/bin:/bin",
-        "FSLDIR": str(fsl_dir() or ""),
+        "FSLDIR": str(fsl_dir(version) or ""),
         "FSLOUTPUTTYPE": output_type,
         "LC_ALL": "C",
         "OMP_NUM_THREADS": "2",
@@ -257,6 +264,7 @@ def oracle_run(
     build: str = "oracle",
     binds: tuple[Path, ...] = (),
     never: str = "",
+    version: str | None = None,
 ) -> Run:
     """Runs FSL's ``program``: the oracle installation (``build="oracle"``) or fMRIPrep
     25.2.6's FSL in its image (``build="fmriprep"``, with ``cwd`` and ``binds`` bound at their
@@ -270,7 +278,7 @@ def oracle_run(
     policy = oracle_cache.Policy(threads=1, never=never, family="fsl")
     inputs = implicit_inputs(args, cwd)
     if build == "oracle":
-        d = fsl_dir()
+        d = fsl_dir(version)
         assert d is not None
         p = oracle_cache.run(
             [str(d / "bin" / program), *args],
@@ -364,9 +372,9 @@ def larmorx_own(line: str) -> bool:
 
 def fsl_text(text: str) -> str:
     """FSL's messages as compared: the ``bet`` script's own path (``$0``) read as ``bet``."""
-    d = fsl_dir()
-    if d is not None:
-        text = text.replace(f"{d}/bin/bet", "bet")
+    for d in {fsl_dir(), *(fsl_dir(v) for v in fsl_versions.INSTALLS)}:
+        if d is not None:
+            text = text.replace(f"{d}/bin/bet", "bet")
     return text
 
 
@@ -991,12 +999,15 @@ def _derived(kind: str, name: str) -> Path:
     T2 to the T1, sinc, as bet -A2 runs it)."""
     t1 = _real(name)
     d = derived_dir(t1)
-    env = environment()
-    fsl = fsl_dir()
+    # Inputs, not outputs compared: made once with FSL 6.0.7.17 (the first installation), so
+    # that every version is compared on the same files.
+    made_with = fsl_versions.PREVIOUS if fsl_dir(fsl_versions.PREVIOUS) else None
+    env = environment(version=made_with)
+    fsl = fsl_dir(made_with)
     assert fsl is not None
     if kind == "mesh":
         if not (d / "t1_mesh.vtk").is_file():
-            r = oracle_run("bet2", [str(t1), "t1", "-e", "-n"], env, d)
+            r = oracle_run("bet2", [str(t1), "t1", "-e", "-n"], env, d, version=made_with)
             assert r.code == 0, r.err
         return d / "t1_mesh.vtk"
     if kind == "mat":
@@ -1013,6 +1024,7 @@ def _derived(kind: str, name: str) -> Path:
                 ],
                 env,
                 d,
+                version=made_with,
             )
             assert r.code == 0, r.err
         return d / "t1_to_std.mat"
@@ -1035,6 +1047,7 @@ def _derived(kind: str, name: str) -> Path:
                 ],
                 env,
                 d,
+                version=made_with,
             )
             assert r.code == 0, r.err
         return d / "t2_to_t1.nii.gz"
@@ -1117,6 +1130,11 @@ def named_entry(run: Run) -> str | None:
 
 
 def run_case(case: Case, checks: CheckList) -> None:
+    with fsl_versions.using("replica"):
+        _run_case(case, checks)
+
+
+def _run_case(case: Case, checks: CheckList) -> None:
     s: Scenario = case.payload
     if fsl_dir() is None:
         raise Outcome("skipped", "FSL is not installed (~/fsl, LARMORX_FSL_DIR)")
@@ -1189,6 +1207,7 @@ def run_case(case: Case, checks: CheckList) -> None:
         _prepare(fix_dir, s)
         fixed = run_larmorx(s.tool, args, "fix", env, fix_dir)
         _fix_pass(checks, s, ours, fixed, r_dir, fix_dir, inputs)
+        _fsl_step(checks, s, args, env, fsl, f_dir, root, inputs)
         if s.python is not None and identical and fsl.code == 0:
             _python(checks, s, paths, f_dir)
         if filled and all(c.passed for c in checks.checks):
@@ -1207,6 +1226,70 @@ def run_case(case: Case, checks: CheckList) -> None:
             raise Outcome(BOTH_ERROR, f"FSL crashes, larmorx refuses: {larmorx_err_line(ours)}")
         if fsl.code != 0 and not crash and all(c.passed for c in checks.checks):
             raise Outcome(BOTH_ERROR, f"both refuse (exit {fsl.code}) with {last_line(fsl)}")
+
+
+def _descrip_only(a: Path, b: Path) -> bool:
+    """Whether two images differ only in their header's ``descrip`` (80 bytes at 148, or at 240
+    in a NIfTI-2 header)."""
+    if not is_image(a.name):
+        return False
+    ca, cb = content(a), content(b)
+    if len(ca) != len(cb) or len(ca) < 348:
+        return False
+    start = 240 if int.from_bytes(ca[:4], "little") == 540 else 148
+    return ca[:start] + ca[start + 80 :] == cb[:start] + cb[start + 80 :]
+
+
+def _fsl_step(
+    checks: CheckList,
+    s: Scenario,
+    args: list[str],
+    env: dict[str, str],
+    fsl: Run,
+    f_dir: Path,
+    root: Path,
+    inputs: tuple[str, ...],
+) -> None:
+    """FSL's own step from the previous version to the one compared (:mod:`fsl_versions`): the
+    previous installation on the same arguments, in a directory set up alike (served from the
+    oracle cache when an earlier record ran it); its exit status, messages and outputs against
+    the compared one's. Reported, never a failure; a change without a known reason is a
+    finding."""
+    old = fsl_versions.step_from("replica")
+    if old is None or fsl_dir(old) is None:
+        return
+    p_dir = root / "fsl-previous"
+    _prepare(p_dir, s)
+    p_env = {**env, "FSLDIR": str(fsl_dir(old))}
+    prev = oracle_run(s.tool, args, p_env, p_dir, never=case_never(s), version=old)
+    pa, na = written(p_dir, inputs), written(f_dir, inputs)
+    differences = {}
+    for name in sorted(set(pa) & set(na)):
+        c = compare_file(p_dir / name, f_dir / name)
+        if not c.same:
+            differences[name] = (
+                fsl_versions.BUILD_STRING_ONLY
+                if _descrip_only(p_dir / name, f_dir / name)
+                else c.detail
+            )
+    msgs = tuple(
+        fsl_text(r.out + r.err).replace(str(d), "<dir>") for r, d in ((prev, p_dir), (fsl, f_dir))
+    )
+    changed, detail = fsl_versions.step_detail(
+        (prev.code, fsl.code), msgs, (pa, na), differences, fsl_versions.reasons(args, env)
+    )
+    from larmorx_validation.parity.harness import Check
+
+    checks.add(
+        Check(
+            fsl_versions.STEP_CHECK,
+            True,
+            metric="FSL against FSL",
+            value="changed" if changed else "identical",
+            threshold="reported",
+            detail=detail,
+        )
+    )
 
 
 def _filled(
@@ -1490,6 +1573,7 @@ def highlights(results: list[CaseResult]) -> list[str]:
             f"of {len(fm)} runs with the oracle's values."
         )
     lines += defects.summary(results)
+    lines += fsl_versions.step_highlights(results)
     return lines
 
 
@@ -1502,14 +1586,15 @@ def suite(implementation: str = "replica") -> Suite:
         )
     tool = (
         f"`larmorx-nc fsl bet`, `bet2` and `betsurf` ({replica_version()}; crate larmorx-nc-bet, the "
-        "replica translated from FSL 6.0.7.17's source under the FSL Licence), run by larmorx as a separate "
+        f"replica translated from FSL {fsl_versions.NEWEST}'s source under the FSL Licence), run by larmorx as a separate "
         "process: `larmorx fsl <tool>` and `lx.fsl.bet` / `lx.fsl.betsurf`"
     )
     return Suite(
         name="fsl-bet-replica",
         title="BET (replica)",
         tool=tool,
-        reference=f"bet, bet2 and betsurf from {fsl_version()}, the conda installation in `~/fsl`",
+        reference=f"bet, bet2 and betsurf from {fsl_version()}, the conda installation in "
+        f"`~/{fsl_versions.INSTALLS.get(fsl_versions.selected('replica'), 'fsl')}`",
         thresholds=[
             (
                 "Exit status",
@@ -1534,6 +1619,7 @@ def suite(implementation: str = "replica") -> Suite:
             "compared in `reproduce` mode; the fix pass runs its default. The fMRIPrep cases also compare the "
             "replica with fMRIPrep's own outputs of the node and run FSL again and fMRIPrep 25.2.6's FSL (FSL's "
             "own variability). The `-S`, `-B`, `-A` and `-A2` variations of `bet` run FSL programs larmorx does "
-            "not replicate yet (standard_space_roi, FLIRT, FAST): the replica refuses them, naming what is missing."
+            "not replicate yet (standard_space_roi, FLIRT, FAST): the replica refuses them, naming what is missing. "
+            + fsl_versions.record_line("replica")
         ),
     )

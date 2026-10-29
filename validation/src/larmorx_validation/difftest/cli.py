@@ -105,7 +105,13 @@ def add_arguments(p: argparse.ArgumentParser) -> None:
         help="with --heavy: the cases to run (TOOL:SEED:N, comma-separated, or a file of them, "
         "one per line); the others wait",
     )
-    p.add_argument("--case-timeout", type=float, default=None, help=argparse.SUPPRESS)
+    p.add_argument(
+        "--case-timeout",
+        type=float,
+        default=None,
+        help="with --case: each run's seconds (the tool's own limit by default), e.g. to run a "
+        "case that ran out of time to its end",
+    )
     p.add_argument("--judge-recipe", help=argparse.SUPPRESS)
     p.add_argument("--impl", help=argparse.SUPPRESS)
 
@@ -226,6 +232,7 @@ def main(args: argparse.Namespace) -> int:
             shrink=not args.no_shrink,
             shrink_budget=args.shrink_budget,
             store_findings=False,
+            timeout=args.case_timeout,
         )
         print(json.dumps(line, indent=1, default=str)[:20000])
         return 1 if line.get("verdict") == core.DIFFER else 0

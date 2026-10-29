@@ -326,9 +326,11 @@ def run_case(
     recipe: dict | None = None,
     store_findings: bool = True,
     shrunk_enough: list | None = None,
+    timeout: float | None = None,
 ) -> dict:
     """Case ``n`` of ``tool_name`` for ``seed``: every implementation, judged; differences
-    shrunk. Returns the case's line for ``results.jsonl`` (with the findings' details)."""
+    shrunk. Returns the case's line for ``results.jsonl`` (with the findings' details).
+    ``timeout``: each run's seconds (``--case --case-timeout``; the tool's own by default)."""
     from larmorx_validation.difftest import shrink as shrinking
 
     tool = tools.get(tool_name)
@@ -354,7 +356,7 @@ def run_case(
         line["verdict"] = next((v for v in (DIFFER, MEMORY, GUARD) if v in verdicts), GUARD)
         return line
     for impl in tool.implementations:
-        j = judge_once(tool, recipe, impl)
+        j = judge_once(tool, recipe, impl, timeout=timeout)
         entry: dict = {
             "verdict": j.verdict,
             "signature": list(j.signature),
@@ -403,7 +405,7 @@ def run_case(
         elif j.verdict == DIFFER and shrink:
 
             def attempt(r: dict, impl: str = impl) -> Judgement:
-                return judge_once(tool, r, impl)
+                return judge_once(tool, r, impl, timeout=timeout)
 
             small, kept, last, runs = shrinking.shrink(
                 recipe, j.signature, attempt, budget_s=shrink_budget, extra=tool.shrink

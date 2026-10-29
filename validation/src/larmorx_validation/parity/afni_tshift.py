@@ -1,5 +1,5 @@
 # SPDX-License-Identifier: Apache-2.0
-"""Parity of ``larmorx afni 3dTshift`` with AFNI 25.2.09's ``3dTshift``.
+"""Parity of ``larmorx afni 3dTshift`` with AFNI's ``3dTshift`` (26.3.05; 25.2.09 kept).
 
 Both programs get the same arguments and files. AFNI runs as its own binary (built by
 ``scripts/build_afni_oracle.sh``; set ``LARMORX_AFNI_BIN`` to use another); larmorx runs
@@ -54,7 +54,7 @@ from pathlib import Path
 import larmorx_testdata as td
 import numpy as np
 
-from larmorx_validation.parity import defects
+from larmorx_validation.parity import afni_versions, defects
 from larmorx_validation.parity.harness import (
     BOTH_ERROR,
     EXPECTED,
@@ -74,7 +74,6 @@ INT_ATOL = 1
 #: Geometry is written from the same float32 header values: compare affines to 1e-6 mm.
 AFFINE_ATOL = 1e-6
 
-ORACLE = "oracles/afni-25.2.09/bin/3dTshift"
 S = "synthetic/tshift"
 F32 = f"{S}/dtypes/float32.nii.gz"
 I16 = f"{S}/dtypes/int16.nii.gz"
@@ -95,23 +94,23 @@ PATTERNS = (
 )
 
 
-@functools.cache
-def afni_binary() -> str | None:
-    """The AFNI ``3dTshift`` oracle: ``LARMORX_AFNI_BIN``, else the workspace's
-    ``oracles/afni-25.2.09`` build, else ``3dTshift`` on the PATH."""
-    if env := os.environ.get("LARMORX_AFNI_BIN"):
-        path = Path(env)
-        return str(path / "3dTshift" if path.is_dir() else path)
-    for parent in Path(__file__).resolve().parents:
-        candidate = parent / ORACLE
-        if candidate.is_file():
-            return str(candidate)
-    return shutil.which("3dTshift")
+def afni_binary(version: str | None = None) -> str | None:
+    """The AFNI ``3dTshift`` oracle: ``LARMORX_AFNI_BIN``, else the chosen version's build in
+    the workspace (:mod:`afni_versions`: ``oracles/afni-26.3.05`` or ``afni-25.2.09``), else
+    ``3dTshift`` on the PATH; ``version`` asks for that build only."""
+    return afni_versions.binary("3dTshift", version)
 
 
-@functools.cache
-def afni_version() -> str:
+def afni_version(implementation: str | None = None) -> str:
+    """The version of the oracle ``implementation``'s cases run (from ``-help``)."""
     binary = afni_binary()
+    if implementation is not None and not os.environ.get("LARMORX_AFNI_BIN"):
+        binary = afni_binary(afni_versions.selected(implementation))
+    return _help_version(binary)
+
+
+@functools.cache
+def _help_version(binary: str | None) -> str:
     if binary is None:
         return "not found"
     out = subprocess.run([binary, "-help"], capture_output=True, text=True, encoding="utf-8")
@@ -1244,23 +1243,73 @@ def case_never(case_id: str, s: Scenario, description: str = "") -> str:
 
 
 def _run_afni_streams(
-    args: list[str], env: dict[str, str], cwd: Path | None = None, never: str = ""
+    args: list[str],
+    env: dict[str, str],
+    cwd: Path | None = None,
+    never: str = "",
+    version: str | None = None,
 ) -> tuple[int, str, str]:
-    """3dTshift, through the oracle cache (one thread: it has no OpenMP loop)."""
+    """3dTshift, through the oracle cache (one thread: it has no OpenMP loop); ``version``:
+    that build (:mod:`afni_versions`), else the chosen one."""
     from larmorx_validation import oracle_cache
 
     policy = oracle_cache.Policy(
         threads=1, never=never, nifti_extensions=AFNI_EXTENSION, family="afni"
     )
     p = oracle_cache.run(
-        [afni_binary(), *args], env=env, cwd=cwd, policy=policy, runner="afni-tshift"
+        [afni_binary(version), *args], env=env, cwd=cwd, policy=policy, runner="afni-tshift"
     )
     return p.returncode, p.stdout, p.stderr
 
 
-def _run_afni(args: list[str], never: str = "") -> tuple[int, str]:
-    code, out, err = _run_afni_streams(args, _environment(), never=never)
+def _run_afni(args: list[str], never: str = "", version: str | None = None) -> tuple[int, str]:
+    code, out, err = _run_afni_streams(args, _environment(), never=never, version=version)
     return code, (out + err).strip()
+
+
+def _step(
+    checks: CheckList,
+    prev: tuple[int, str, Path | None],
+    new: tuple[int, str, Path | None],
+    dirs: tuple[Path, Path],
+    args: list[str],
+    inputs: list[Path],
+) -> None:
+    """AFNI's own step from the previous version to the one compared (:mod:`afni_versions`):
+    ``(exit status, messages, output or None)`` of each, run on the same arguments in
+    directories set up alike (``dirs``). Reported, never a failure; a change without a known
+    reason is a finding."""
+    msgs = tuple(
+        _afni_lines(m).replace(str(d), "<dir>")
+        for (_, m, _), d in zip((prev, new), dirs, strict=True)
+    )
+    outs = ([prev[2].name] if prev[2] else [], [new[2].name] if new[2] else [])
+    differences = {}
+    if prev[2] is not None and new[2] is not None and _is_nifti(prev[2]) and _is_nifti(new[2]):
+        try:
+            d = afni_versions.compare_nifti(prev[2], new[2])
+        except Exception as e:  # an output nibabel cannot read is reported
+            d = f"not compared ({type(e).__name__})"
+        if d is not None:
+            differences[new[2].name] = d
+    changed, detail = afni_versions.step_detail(
+        (prev[0], new[0]), msgs, outs, differences, afni_versions.reasons(args, inputs)
+    )
+    checks.add(
+        Check(
+            afni_versions.STEP_CHECK,
+            True,
+            metric="AFNI against AFNI",
+            value="changed" if changed else "identical",
+            threshold="reported",
+            detail=detail,
+        )
+    )
+
+
+def _inputs_of(args: list[str], image: Path) -> list[Path]:
+    """The NIfTI files a call reads: its input dataset (AFNI-03 is in its header)."""
+    return [image]
 
 
 def _run_larmorx_streams(
@@ -1690,6 +1739,20 @@ def _run_separately(
             code, out, err = _run_larmorx_streams(args, implementation, defects.REPRODUCE, env, d)
         runs[tool] = (code, out, err, produced(code, d))
     (ca, oa, ea, pa), (cl, ol, el, pl) = runs["afni"], runs["larmorx"]
+    if (old := afni_versions.step_from()) is not None:
+        d = tmp / "afni-step"
+        step_args = setup(d)
+        code, out, err = _run_afni_streams(
+            step_args, env, d, never=case_never(case.id, s, case.description), version=old
+        )
+        _step(
+            checks,
+            (code, out + err, produced(code, d)),
+            (ca, oa + ea, pa),
+            (d, tmp / "afni"),
+            step_args,
+            _inputs_of(step_args, image),
+        )
     checks("exit status", ca == cl, metric="exit status", value=cl, threshold=ca)
     _check_messages(checks, (oa, ea), (ol, el), tmp)
     if pa is None and pl is None:
@@ -1992,6 +2055,13 @@ IMPLEMENTATIONS = ("original", "replica")
 
 
 def run_case(case: Case, checks: CheckList, implementation: str = "original") -> None:
+    """One case; every AFNI run in it uses the implementation's version
+    (:func:`afni_versions.using`)."""
+    with afni_versions.using(implementation):
+        _run_case(case, checks, implementation)
+
+
+def _run_case(case: Case, checks: CheckList, implementation: str = "original") -> None:
     s: Scenario = case.payload
     if afni_binary() is None:
         raise Outcome("skipped", "the AFNI 3dTshift oracle was not found (LARMORX_AFNI_BIN)")
@@ -2021,6 +2091,32 @@ def run_case(case: Case, checks: CheckList, implementation: str = "original") ->
             codes[tool], logs[tool] = runner([*args, "-prefix", str(target), str(image)])
             outputs[tool] = target
             produced[tool] = _produced(codes[tool], target, occupied)
+        if (old := afni_versions.step_from()) is not None:
+            # AFNI's own step: the previous build, its output named as the compared one's, in
+            # a directory of its own holding the case's files (the cache's key is the same).
+            step_dir = tmp / "afni-step"
+            step_dir.mkdir()
+            for name, text in s.files:
+                (step_dir / name).write_text(text, encoding="utf-8")
+            target = step_dir / outputs["afni"].name
+            code, log = _run_afni(
+                [*args, "-prefix", str(target), str(image)],
+                never=case_never(case.id, s, case.description),
+                version=old,
+            )
+            done = _produced(code, target, occupied)
+            _step(
+                checks,
+                (code, log, target if done and target.is_file() else None),
+                (
+                    codes["afni"],
+                    logs["afni"],
+                    outputs["afni"] if produced["afni"] and outputs["afni"].is_file() else None,
+                ),
+                (step_dir, tmp),
+                args,
+                _inputs_of(args, image),
+            )
         if s.expect == "divergence":
             ok = produced["afni"] and not produced["larmorx"]
             checks(
@@ -2260,6 +2356,7 @@ def _highlights(results: list[CaseResult], implementation: str = "original") -> 
             "banner and compile date, and larmorx's own lines, set aside): "
             f"{sum(c.passed for c in messages)} of {len(messages)} identical."
         )
+    lines += afni_versions.step_highlights(results)
     lines += defects.summary(results)
     if implementation == "replica":
         lines += _defaults_summary(results)
@@ -2324,7 +2421,7 @@ def suite(implementation: str = "original") -> Suite:
     replica = implementation == "replica"
     tool = (
         f"`larmorx-gpl afni 3dTshift` ({replica_version()}; crate larmorx-gpl-afni, the "
-        "GPL-3.0-or-later replica translated from AFNI 25.2.09's source), run by larmorx as a "
+        "GPL-3.0-or-later replica translated from AFNI 26.3.05's source), run by larmorx as a "
         "separate process: `larmorx afni 3dTshift` with `LARMORX_IMPLEMENTATION=replica` and "
         '`lx.afni.tshift(..., implementation="replica")`'
         if replica
@@ -2336,7 +2433,7 @@ def suite(implementation: str = "original") -> Suite:
         name="afni-tshift-replica" if replica else "afni-tshift",
         title="3dTshift (replica)" if replica else "3dTshift",
         tool=tool,
-        reference=f"3dTshift from AFNI ({afni_version()}), the binary built by `scripts/build_afni_oracle.sh`",
+        reference=f"3dTshift from AFNI ({afni_version(implementation)}), the binary built by `scripts/build_afni_oracle.sh`",
         thresholds=[
             ("Exit status", "both succeed, or both reject the arguments"),
             (
@@ -2372,6 +2469,7 @@ def suite(implementation: str = "original") -> Suite:
             "variables of this process and with `HOME` an empty directory (no `.afnirc`), "
             "`AFNI_DONT_LOGFILE=YES` and `AFNI_NIFTI_TYPE_WARN=NO`, plus each case's variables. "
             "The cases of AFNI's global options and environment variables run each program in a "
-            "directory of its own and compare exit statuses and messages too."
+            "directory of its own and compare exit statuses and messages too. "
+            + afni_versions.record_line(implementation)
         ),
     )

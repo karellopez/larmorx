@@ -3,8 +3,9 @@
 running AFNI's program and the replica on the same files, and comparing exit statuses,
 messages and every output, byte for byte.
 
-AFNI runs as its own binary (``scripts/build_afni_oracle.sh``; ``LARMORX_AFNI_BIN`` names its
-directory or one program), the replica the way users reach it: through larmorx's own dispatch
+AFNI runs as its own binary (``scripts/build_afni_oracle.sh``; the version is chosen by
+:mod:`afni_versions`: ``LARMORX_AFNI_VERSION``, ``--afni-version``, else the implementation's
+default; ``LARMORX_AFNI_BIN`` names another build's directory or one program), the replica the way users reach it: through larmorx's own dispatch
 (``larmorx afni <program>`` with ``implementation="replica"``), which runs the ``larmorx-gpl``
 program as a separate process (``LARMORX_GPL_BIN``, else the ``crates-gpl`` build). This package
 is Apache-2.0 and never loads the replica.
@@ -46,7 +47,7 @@ from typing import Any
 
 import numpy as np
 
-from larmorx_validation.parity import defects
+from larmorx_validation.parity import afni_versions, defects
 from larmorx_validation.parity.afni_tshift import replica_binary
 from larmorx_validation.parity.afni_tshift import replica_version as replica_version
 from larmorx_validation.parity.harness import (
@@ -60,7 +61,6 @@ from larmorx_validation.parity.harness import (
     Outcome,
 )
 
-ORACLE_DIR = "oracles/afni-25.2.09/bin"
 FMRIPREP_IMAGE = "oracles/images/fmriprep-25.2.6.sif"
 FMRIPREP_RUNS = "oracles/fmriprep-25.2.6"
 TIERS = ("smoke", "standard", "full")
@@ -80,29 +80,23 @@ def workspace() -> Path | None:
     return None
 
 
-def afni_binary(program: str) -> str | None:
+def afni_binary(program: str, version: str | None = None) -> str | None:
     """The AFNI oracle ``program``: in ``LARMORX_AFNI_BIN`` (a directory, or a program whose
-    directory holds the others), else the workspace's ``oracles/afni-25.2.09`` build, else on
-    the PATH."""
-    if env := os.environ.get("LARMORX_AFNI_BIN"):
-        path = Path(env)
-        directory = path if path.is_dir() else path.parent
-        candidate = directory / program
-        return str(candidate) if candidate.is_file() else None
-    ws = workspace()
-    if ws is not None and (ws / ORACLE_DIR / program).is_file():
-        return str(ws / ORACLE_DIR / program)
-    return shutil.which(program)
+    directory holds the others), else the chosen version's build in the workspace
+    (:mod:`afni_versions`), else on the PATH; ``version`` asks for that build only."""
+    return afni_versions.binary(program, version)
 
 
 @functools.cache
-def afni_build(program: str) -> str:
-    """The oracle's version, from its build record."""
-    binary = afni_binary(program)
+def afni_build(program: str, implementation: str | None = None) -> str:
+    """The oracle's version and compiler, from its build record."""
+    binary = afni_binary(program, None)
+    if implementation is not None and not os.environ.get("LARMORX_AFNI_BIN"):
+        binary = afni_binary(program, afni_versions.selected(implementation))
     if binary is None:
         return "not found"
     info = Path(binary).parent.parent / "BUILD_INFO.txt"
-    version = "AFNI_25.2.09"
+    version = "unknown version"
     if info.is_file():
         text = info.read_text(encoding="utf-8")
         m = re.search(r"AFNI version: (\S+)", text)
@@ -190,14 +184,22 @@ def _threads(env: dict[str, str]) -> int | None:
         return None
 
 
-def run_afni(program: str, args: list[str], env: dict[str, str], cwd: Path, never: str = "") -> Run:
+def run_afni(
+    program: str,
+    args: list[str],
+    env: dict[str, str],
+    cwd: Path,
+    never: str = "",
+    version: str | None = None,
+) -> Run:
     """AFNI's ``program`` in ``cwd``, through the oracle cache (above one OpenMP thread, served
-    once three runs agree; ``never``: why it always runs, :func:`case_never`)."""
+    once three runs agree; ``never``: why it always runs, :func:`case_never`); ``version``: that
+    build (:mod:`afni_versions`), else the chosen one."""
     from larmorx_validation import oracle_cache
 
     policy = oracle_cache.Policy(threads=_threads(env), never=never, family="afni")
     p = oracle_cache.run(
-        [afni_binary(program), *args], env=env, cwd=cwd, policy=policy, runner="afni"
+        [afni_binary(program, version), *args], env=env, cwd=cwd, policy=policy, runner="afni"
     )
     return Run(p.returncode, p.stdout, p.stderr, cwd)
 
@@ -822,6 +824,13 @@ def _difftest_input(name: str) -> Path:
 
 
 def run_case(spec: ToolSpec, case: Case, checks: CheckList) -> None:
+    """One case; every AFNI run in it uses the implementation's version
+    (:func:`afni_versions.using`)."""
+    with afni_versions.using(spec.implementation):
+        _run_case(spec, case, checks)
+
+
+def _run_case(spec: ToolSpec, case: Case, checks: CheckList) -> None:
     s: Scenario = case.payload
     program = spec.program
     impl = spec.implementation
@@ -857,6 +866,7 @@ def run_case(spec: ToolSpec, case: Case, checks: CheckList) -> None:
         afni = run_afni(program, args, env, a_dir, never=case_never(s))
         ours = run_larmorx(program, args, defects.REPRODUCE, env, l_dir, impl)
         a_out, l_out = _produced(a_dir, s), _produced(l_dir, s)
+        _step(checks, program, s, args, env, tmp, afni, a_dir, a_out, paths)
 
         if s.undefined is not None:
             _undefined(checks, program, s, args, env, tmp, afni, ours, a_dir, l_dir, impl)
@@ -961,6 +971,61 @@ def run_case(spec: ToolSpec, case: Case, checks: CheckList) -> None:
         if s.python is not None:
             _python(checks, spec, s, paths[0], l_dir)
         _fix_pass(checks, program, s, args, env, tmp, l_dir, ours, impl)
+
+
+def _step(
+    checks: CheckList,
+    program: str,
+    s: Scenario,
+    args: list[str],
+    env: dict[str, str],
+    tmp: Path,
+    afni: Run,
+    a_dir: Path,
+    a_out: list[str],
+    paths: list[Path],
+) -> None:
+    """AFNI's own step from the previous version to the one compared (:mod:`afni_versions`):
+    the previous build on the same arguments, in a directory set up alike (served from the
+    oracle cache when an earlier record ran it); its exit status, messages and outputs against
+    the compared build's. Reported, never a failure; a change without a known reason is a
+    finding."""
+    old = afni_versions.step_from()
+    if old is None or s.undefined is not None:
+        return
+    o_dir = tmp / "afni-step"
+    _setup(o_dir, s)
+    prev = run_afni(program, args, env, o_dir, never=case_never(s), version=old)
+    o_out = _produced(o_dir, s)
+    msgs = tuple(
+        (r.out + afni_text(r.err)).replace(str(d), "<dir>")
+        for r, d in ((prev, o_dir), (afni, a_dir))
+    )
+    differences = {}
+    for name in sorted(set(o_out) & set(a_out)):
+        try:
+            d = afni_versions.compare_nifti(o_dir / name, a_dir / name)
+        except Exception as e:  # an output nibabel cannot read is reported
+            d = f"not compared ({type(e).__name__})"
+        if d is not None:
+            differences[name] = d
+    changed, detail = afni_versions.step_detail(
+        (prev.code, afni.code),
+        msgs,
+        (o_out, a_out),
+        differences,
+        afni_versions.reasons(args, paths),
+    )
+    checks.add(
+        Check(
+            afni_versions.STEP_CHECK,
+            True,
+            metric="AFNI against AFNI",
+            value="changed" if changed else "identical",
+            threshold="reported",
+            detail=detail,
+        )
+    )
 
 
 def _band(
@@ -1377,5 +1442,6 @@ def highlights(
             f"{sum(c.passed for c in py)} of {len(py)} cases give the command line's outputs bit "
             "for bit."
         )
+    lines += afni_versions.step_highlights(results)
     lines += defects.summary(results)
     return lines

@@ -1,6 +1,6 @@
 # SPDX-License-Identifier: Apache-2.0
 """Parity of the 3dAutomask replica (``larmorx-gpl afni 3dAutomask``, run by larmorx as a
-separate process) with AFNI 25.2.09's ``3dAutomask``: exit status, messages and every output
+separate process) with AFNI's ``3dAutomask`` (26.3.05; 25.2.09 kept): exit status, messages and every output
 (the mask, ``-apply_prefix``'s masked input, ``-depth``), byte for byte
 (:mod:`larmorx_validation.parity.afni_replica`).
 
@@ -23,6 +23,7 @@ import functools
 
 from larmorx_validation.parity import afni_phantoms as ph
 from larmorx_validation.parity import afni_replica as ar
+from larmorx_validation.parity import afni_versions
 from larmorx_validation.parity.harness import Case, CheckList, Suite
 
 PROGRAM = "3dAutomask"
@@ -287,7 +288,7 @@ def suite(implementation: str = "original") -> Suite:
 
     tool = (
         f"`larmorx-gpl afni 3dAutomask` ({ar.replica_version()}; crate larmorx-gpl-afni, the "
-        "GPL-3.0-or-later replica translated from AFNI 25.2.09's source), run by larmorx as a "
+        "GPL-3.0-or-later replica translated from AFNI 26.3.05's source), run by larmorx as a "
         "separate process: `larmorx afni 3dAutomask` with `LARMORX_IMPLEMENTATION=replica` and "
         '`lx.afni.automask(..., implementation="replica")`'
         if replica
@@ -299,7 +300,7 @@ def suite(implementation: str = "original") -> Suite:
         name="afni-automask-replica" if replica else "afni-automask",
         title="3dAutomask (replica)" if replica else "3dAutomask",
         tool=tool,
-        reference=f"3dAutomask from AFNI ({ar.afni_build(PROGRAM)}), the binary built by `scripts/build_afni_oracle.sh`",
+        reference=f"3dAutomask from AFNI ({ar.afni_build(PROGRAM, implementation)}), the binary built by `scripts/build_afni_oracle.sh`",
         thresholds=[
             (
                 "Exit status",
@@ -328,6 +329,7 @@ def suite(implementation: str = "original") -> Suite:
             "is compared in `reproduce` mode; the fix pass runs its default. The real cases also "
             "run AFNI at other thread counts and fMRIPrep 25.2.6's own AFNI (in its image) and "
             "report how far they are from the oracle (AFNI's own variability); the fMRIPrep cases "
-            f"compare the {who} with fMRIPrep's own output of the node as well."
+            f"compare the {who} with fMRIPrep's own output of the node as well. "
+            + afni_versions.record_line(implementation)
         ),
     )

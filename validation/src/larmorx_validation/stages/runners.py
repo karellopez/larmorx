@@ -515,10 +515,14 @@ def run_afni_oracle(
     thread, with fMRIPrep's arguments, in a clean AFNI environment (no AFNI variable of this
     process, ``HOME`` an empty directory, as the 3dTshift parity suite runs it). ``None`` when
     the build is missing."""
+    from larmorx_validation.parity import afni_versions
     from larmorx_validation.parity.afni_tshift import _environment, afni_binary
 
     program = os.path.basename(argv[0])
-    binary = afni_binary() if program == "3dTshift" else None
+    # The stage comparisons were made against AFNI 25.2.09 (fMRIPrep 25.2.6's own AFNI), and
+    # their directory says so: that build, unless LARMORX_AFNI_BIN names another.
+    pinned = None if os.environ.get("LARMORX_AFNI_BIN") else afni_versions.PREVIOUS
+    binary = afni_binary(pinned) if program == "3dTshift" else None
     if binary is None:
         return None
     outputs = output_names(argv)

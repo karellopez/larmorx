@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// Translated to Rust from AFNI 25.2.09 src/3dUnifize.c (main: the option scan, checks,
+// Translated to Rust from AFNI 26.3.05 src/3dUnifize.c (main: the option scan, checks,
 // messages and outputs), src/thd_dsetto3D.c (THD_extract_float_brick), src/thd_median.c
 // (THD_median_brick), src/thd_dsetto1D.c (THD_extract_array) and the WROTE_DSET macro of
 // src/mrilib.h.
@@ -14,7 +14,7 @@
 //! Messages go where AFNI sends them, all to standard error: the progress letters
 //! (` + Pre-processing: IAVUWIm`, unless `-quiet`), AFNI's labelled messages, `++ Output dataset`
 //! (also with `-quiet`, unless `AFNI_QUIET_STARTUP`) and `++ ===== Elapsed = ... sec`, with the
-//! elapsed time of this run (AFNI 25.2.09 on Linux prints the elapsed time only: its CPU clock
+//! elapsed time of this run (AFNI 26.3.05 on Linux prints the elapsed time only: its CPU clock
 //! reads 0 there).
 //!
 //! **AFNI's global options and environment variables** as for 3dTshift ([`crate::environ`],
@@ -60,11 +60,11 @@ use super::threads;
 const IMPLEMENTATION: &str = concat!(
     "implementation: replica (larmorx-gpl ",
     env!("CARGO_PKG_VERSION"),
-    ", GPL-3.0-or-later), bit-exact translation of AFNI 25.2.09's 3dUnifize"
+    ", GPL-3.0-or-later), bit-exact translation of AFNI 26.3.05's 3dUnifize"
 );
 
 const USAGE: &str = "\
-Usage: 3dUnifize [options] inputdataset   (larmorx-gpl: replica of AFNI 25.2.09's 3dUnifize)
+Usage: 3dUnifize [options] inputdataset   (larmorx-gpl: replica of AFNI 26.3.05's 3dUnifize)
 
 The input is a T1-weighted volume (or, with -T2, a T2-weighted one); the output has its white
 matter intensity uniformized across space, scaled to about 1000, as AFNI's 3dUnifize computes
@@ -95,7 +95,7 @@ Options:
   -nosquash    do not squash values above 1300; -oink is the same
   -quiet       no progress letters
   -verb        more messages
-  -useall      accepted (disabled in AFNI 25.2.09)
+  -useall      accepted (disabled in AFNI 26.3.05)
 
 AFNI's global options (anywhere on the command line):
   -overwrite      replace existing outputs (AFNI_DECONFLICT=OVERWRITE)
@@ -871,11 +871,11 @@ mod tests {
         assert!(!err.contains("AFNI-48"), "{err}");
     }
 
-    /// AFNI-03 in 3dUnifize (random testing, 2026-10-25): a series whose header says slice code
-    /// 2 keeps its slice times in the corrected output, where AFNI reads them as zeros and
-    /// writes no slice timing; both modes name it.
+    /// Header slice code 2 (random testing, 2026-10-25): AFNI 25.2.09 read its slice times as
+    /// zeros (AFNI-03); AFNI 26.3.05 reads them as NIfTI defines them, so both modes keep them
+    /// in the output and name no defect.
     #[test]
-    fn header_slice_code_2_is_named() {
+    fn header_slice_code_2_follows_afni_26() {
         use larmorx_core::element::DataType;
         use larmorx_io::nifti::{self, NiftiHeader, NiftiVersion, WriteOptions};
         let dir = tempfile::tempdir().unwrap();
@@ -908,9 +908,12 @@ mod tests {
             let code = main_with(&args, mode, Settings::empty(), &mut o, &mut e);
             let err = String::from_utf8(e).unwrap();
             assert_eq!(code, 0, "{err}");
-            assert!(
-                err.contains("upstream defect AFNI-03 (AFNI)"),
-                "{mode}: {err}"
+            assert!(!err.contains("AFNI-03"), "{mode}: {err}");
+            let h = nifti::read_header(&out).unwrap();
+            assert_eq!(
+                (h.slice_code, h.slice_start, h.slice_end),
+                (2, 0, 3),
+                "{mode}"
             );
         }
     }

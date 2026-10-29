@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// Translated to Rust from AFNI 25.2.09: src/thd_mattor.c (THD_matrix_to_orientation),
+// Translated to Rust from AFNI 26.3.05: src/thd_mattor.c (THD_matrix_to_orientation),
 // src/thd_coords.c (THD_dicom_card_xform, THD_compute_oblique_angle), src/thd_dsetatr.c (the
 // obliquity update of THD_set_dataset_attributes), src/thd_niftiwrite.c (the spatial transforms
 // of populate_nifti_image), the ORIENT_xyz, ORIENT_sign and ORIENT_xyzint tables of

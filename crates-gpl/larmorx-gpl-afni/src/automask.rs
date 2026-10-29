@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// Translated to Rust from AFNI 25.2.09: src/3dAutomask.c (the work of main after the option
+// Translated to Rust from AFNI 26.3.05: src/3dAutomask.c (the work of main after the option
 // scan: the dilation and erosion loop, the cut-plane report, the -SI clipping),
 // src/thd_automask.c (THD_automask, thd_apply_mask), src/thd_median.c (THD_aveabs_brick),
 // src/thd_dsetto1D.c (THD_extract_array), src/mri_to_float.c (mri_to_float,

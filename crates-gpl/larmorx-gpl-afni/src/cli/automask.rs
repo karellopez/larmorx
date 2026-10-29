@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// Translated to Rust from AFNI 25.2.09 src/3dAutomask.c (main: the option scan, checks,
+// Translated to Rust from AFNI 26.3.05 src/3dAutomask.c (main: the option scan, checks,
 // messages and outputs) and the AUTHOR, WROTE_DSET and CHECK_OPEN_ERROR macros of
 // src/mrilib.h.
 // 3dAutomask.c carries no Medical College of Wisconsin notice: it was written at the NIH and is
@@ -23,7 +23,7 @@
 //!   `.nii` or `.nii.gz` (AFNI writes its own format otherwise, and for its default prefix
 //!   `automask`, which larmorx-gpl therefore refuses);
 //! - AFNI's history extension is not written, and neither the version banner nor the compile
-//!   date AFNI prints after a fatal error. `CPU time = 0.000000 sec` is printed as AFNI 25.2.09
+//!   date AFNI prints after a fatal error. `CPU time = 0.000000 sec` is printed as AFNI 26.3.05
 //!   prints it on Linux (its CPU clock reads 0 there).
 //!
 //! **Upstream defects (D13)**, corrected unless `LARMORX_UPSTREAM_DEFECTS=reproduce`
@@ -52,7 +52,7 @@ use super::common::{
 use super::threads;
 
 const USAGE: &str = "\
-Usage: 3dAutomask [options] dataset   (larmorx-gpl: replica of AFNI 25.2.09's 3dAutomask)
+Usage: 3dAutomask [options] dataset   (larmorx-gpl: replica of AFNI 26.3.05's 3dAutomask)
 
 The input dataset is EPI 3D+time, or a skull-stripped anatomical; the output is a brain mask,
 1 inside and 0 outside, as AFNI's 3dAutomask computes it, bit for bit. The dataset and the
@@ -403,7 +403,6 @@ pub(crate) fn one_brick(ds: &Dataset, data: BrickData) -> Dataset {
         factors: vec![0.0],
         taxis: None,
         geometry: ds.geometry.clone(),
-        seq_dec: None,
         dropped_inter: None,
     }
 }

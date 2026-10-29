@@ -30,7 +30,10 @@ from larmorx_validation.difftest import core, tools
 
 
 def add_arguments(p: argparse.ArgumentParser) -> None:
+    from larmorx_validation.parity import afni_versions
+
     p.add_argument("--tools", default="all", help="'all' or a comma-separated list of tools")
+    afni_versions.add_argument(p)
     p.add_argument(
         "--budget", type=float, default=6.0, help="hours of random cases (a night: about 6)"
     )
@@ -124,6 +127,9 @@ def _cases_named(spec: str | None) -> set[str] | None:
 
 
 def main(args: argparse.Namespace) -> int:
+    from larmorx_validation.parity import afni_versions
+
+    afni_versions.apply(args)  # --afni-version: the workers inherit it
     if args.list:
         for name in tools.names():
             t = tools.get(name)

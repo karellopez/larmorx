@@ -16,9 +16,9 @@
 //! whose float hyperbolic tangent (fdlibm's, through `expm1f`) and cube root are not correctly
 //! rounded, so a correctly rounded function gives a different `f32` for some arguments. To
 //! reproduce AFNI's output on every platform, larmorx-gpl carries this port of glibc 2.35's code
-//! (the version AFNI 25.2.09 runs with on Ubuntu 22.04). On x86-64 these functions have one
-//! build (no FMA variant): plain single-precision arithmetic, with the double-precision steps
-//! the C source writes for `cbrtf`.
+//! (the version AFNI runs with on Ubuntu 22.04, 25.2.09 and 26.3.05 alike). On x86-64 these
+//! functions have one build (no FMA variant): plain single-precision arithmetic, with the
+//! double-precision steps the C source writes for `cbrtf`.
 //!
 //! Verified exhaustively against glibc 2.35 on x86-64: for all 2^32 inputs of each function,
 //! the hash of the port's results equals the hash of glibc's (`tools/floatmath-verify`, with

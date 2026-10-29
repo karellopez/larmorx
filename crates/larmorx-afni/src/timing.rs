@@ -137,7 +137,13 @@ pub fn header_timing(
 ) -> Option<HeaderTiming> {
     let slice_dim = (hdr.dim_info >> 4) & 3;
     let code = i32::from(hdr.slice_code as u8 as i8);
-    let duration = to_seconds(hdr.slice_duration, time_units_per_second(hdr));
+    // The step in seconds stays a double (the header's value divided in double); each time is a
+    // float32 running sum of it (observed by the clean-room implementer: 16 headers in seconds,
+    // milliseconds and microseconds, every slice time read back exactly with `-slice k`,
+    // `validation/investigations/cleanroom-fixes/tshift_times.py`; a step rounded to float32
+    // first differs in the last bit from the fourth slice on in milliseconds).
+    let step = hdr.slice_duration / time_units_per_second(hdr);
+    let duration = step as f32;
     let (start, end) = (hdr.slice_start, hdr.slice_end);
     if slice_dim != 3 || code <= 0 || duration.is_nan() || duration <= 0.0 {
         return None;
@@ -159,7 +165,11 @@ pub fn header_timing(
         _ => Vec::new(),
     };
     let mut times = vec![0f32; nz];
-    assign(&mut times, &order, duration);
+    let mut t = 0f32;
+    for &k in &order {
+        times[k] = t;
+        t = (f64::from(t) + step) as f32;
+    }
     Some(HeaderTiming {
         code,
         start,

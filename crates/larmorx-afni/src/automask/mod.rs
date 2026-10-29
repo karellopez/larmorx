@@ -133,6 +133,12 @@ pub fn intercept_correction(
 
 /// The time fields of an output that keeps the input's time axis (the masked input, `-EPI`'s
 /// output): the input's TR and `toffset`, and the slice fields of its header's slice timing.
+///
+/// Header slice code 2 changes the written fields in both modes (AFNI-03: AFNI reads every
+/// slice time as 0, so it writes slice code 0 and, by AFNI-08, `slice_end` 0), so AFNI-03 is
+/// named whenever such an output is written, and AFNI-08 whenever the kept times are all
+/// within 3 ms of 0; the notices' words are the replica program's for the same call
+/// (`specs/3dAutomask.md` §9, observed by the clean-room implementer).
 pub fn copy_timing(
     image: &AfniImage,
     mode: UpstreamDefects,
@@ -140,8 +146,33 @@ pub fn copy_timing(
 ) -> OutputTiming {
     let slices = image.slice_timing.as_ref().map(|h| {
         let (fields, zero) = timing::copy_slice_fields(&h.times, mode);
+        if h.code == 2 {
+            let detail = match mode {
+                UpstreamDefects::Fix => format!(
+                    "header slice code 2 (sequential decreasing): the output keeps slices \
+                     {}..{}'s times (slice code {}, slice_end {}); AFNI reads every slice time \
+                     as 0 and writes slice code 0, slice_end 0",
+                    h.end, h.start, fields.code, fields.end
+                ),
+                UpstreamDefects::Reproduce => "header slice code 2 (sequential decreasing) read \
+                     as every slice time 0, as AFNI does"
+                    .to_owned(),
+            };
+            notices.push(Notice::new(&defects::AFNI_03, mode, detail));
+        }
         if zero {
-            notices.push(timing::zero_times_notice(h.times.len(), mode));
+            let detail = match mode {
+                UpstreamDefects::Fix => format!(
+                    "the {} slice times kept in the output are all within 0.003 of 0: no slice \
+                     timing, slice_end {}; AFNI writes slice_end 0",
+                    h.times.len(),
+                    fields.end
+                ),
+                UpstreamDefects::Reproduce => "the slice times kept in the output are all \
+                     within 0.003 of 0: slice_end 0, as AFNI writes it"
+                    .to_owned(),
+            };
+            notices.push(Notice::new(&defects::AFNI_08, mode, detail));
         }
         fields
     });
@@ -195,15 +226,19 @@ fn run_here(
     let dims = [nx, ny, nz];
     let (v, negative) = average_abs(&image.bricks, mode);
     let mut settings_mask = options.mask;
+    // AFNI-43 concerns `-peels 0` (a value read as 0): the default does not peel; a negative
+    // value peels once in both modes, as in AFNI (observed by the clean-room implementer: the
+    // replica program's default, without a notice).
     settings_mask.peels = if options.requested_peels >= 1 {
         options.requested_peels as usize
-    } else if mode.fix() {
+    } else if options.requested_peels == 0 && mode.fix() {
         0
     } else {
         1
     };
     let mut log = Vec::new();
     let formed = form_mask(&v, dims, &settings_mask, &mut log);
+    let clustering = log.clone();
     messages.extend(log.into_iter().map(Message::More));
     let mut mask = match formed {
         Ok(m) => m,
@@ -215,25 +250,34 @@ fn run_here(
             ));
         }
     };
-    // AFNI-43: -peels below 1 (AFNI peels once).
-    if options.requested_peels < 1 {
+    // AFNI-43: -peels 0 (AFNI peels once). Named where the mask differs from the other mode's,
+    // or, with the same mask, where the clustering messages count other voxels; the words are
+    // the replica program's for the same call (observed by the clean-room implementer).
+    if options.requested_peels == 0 {
         let mut other = settings_mask;
         other.peels = if mode.fix() { 1 } else { 0 };
-        let alt = form_mask(&v, dims, &other, &mut Vec::new()).unwrap_or_default();
-        let differ = differing(&mask, &alt);
-        if differ > 0 {
-            let p = options.requested_peels;
-            let detail = match mode {
-                UpstreamDefects::Fix => format!(
-                    "-peels {p} turns the peeling off, as AFNI's help says; AFNI peels once: the \
-                     mask differs from AFNI's in {differ} voxels"
-                ),
-                UpstreamDefects::Reproduce => format!(
-                    "-peels {p} peels once, as AFNI does (its help says 0 turns the peeling off): \
-                     the mask differs in {differ} voxels from the one without peeling"
-                ),
-            };
-            notices.push(Notice::new(&defects::AFNI_43, mode, detail));
+        let mut other_log = Vec::new();
+        let alt = form_mask(&v, dims, &other, &mut other_log).unwrap_or_default();
+        let detail = match (mode, differing(&mask, &alt) > 0) {
+            (UpstreamDefects::Fix, true) => {
+                Some("-peels 0: the mask is not peeled, as the help says; AFNI peels it once")
+            }
+            (UpstreamDefects::Reproduce, true) => Some(
+                "-peels 0: the mask is peeled once, as AFNI does (its help says 0 turns the \
+                 peeling off)",
+            ),
+            (UpstreamDefects::Fix, false) if other_log != clustering => Some(
+                "-peels 0: the mask is not peeled, as the help says (AFNI peels it once): the \
+                 same mask, but the clustering messages count other voxels",
+            ),
+            (UpstreamDefects::Reproduce, false) if other_log != clustering => Some(
+                "-peels 0: the mask is peeled once, as AFNI does: the same mask as without \
+                 peeling, but the clustering messages count other voxels",
+            ),
+            _ => None,
+        };
+        if let Some(detail) = detail {
+            notices.push(Notice::new(&defects::AFNI_43, mode, detail.to_owned()));
         }
     }
     // AFNI-01: a negative factor in a series.

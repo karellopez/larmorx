@@ -2,7 +2,7 @@
 //! 3dAutomask's own steps after the mask (`specs/3dAutomask.md` §6): the depth, `-dilate` and
 //! `-erode` with their hole filling, the count, the empty planes and `-SI`.
 
-use crate::geometry::{InputGeometry, plumb_test};
+use crate::geometry::InputGeometry;
 use crate::msg::Message;
 
 use super::morph::{self, Neighbourhood};
@@ -18,33 +18,138 @@ pub struct Axis {
     pub step: f32,
 }
 
-/// The axes of a grid read as `g`: each column's direction is the world axis of its largest
-/// entry, from the negative to the positive end in NIfTI's RAS convention (an axis whose
-/// entry is positive along x runs from left to right: `L`, `R`); the step is the column's
-/// length (§6.1's steps, in millimetres). An axis whose world axis another column shares, or
-/// whose column is zero, has no orientation.
+/// The axes of a grid read as `g`: each voxel axis's world axis and direction, from the
+/// negative to the positive end in NIfTI's RAS convention (an axis running along +x runs from
+/// left to right: `L`, `R`), by [`orientation`]; the step is the column's length (§6.1's
+/// steps, in millimetres). A grid [`orientation`] cannot orient has no orientation (`??`).
 pub fn axes_of(g: &InputGeometry, steps_mm: [f32; 3]) -> [Axis; 3] {
-    let (_, rows, _) = plumb_test(&g.m);
-    let letters = |j: usize| -> Option<[char; 2]> {
-        let row = rows[j];
-        let v = g.m[row][j];
-        if v == 0.0 || !v.is_finite() || rows.iter().filter(|&&r| r == row).count() > 1 {
-            return None;
-        }
-        let pos = v > 0.0;
-        Some(match (row, pos) {
+    let codes = orientation(&g.m);
+    [0, 1, 2].map(|j| Axis {
+        letters: codes.map(|c| match c[j] {
             (0, true) => ['L', 'R'],
             (0, false) => ['R', 'L'],
             (1, true) => ['P', 'A'],
             (1, false) => ['A', 'P'],
             (_, true) => ['I', 'S'],
             (_, false) => ['S', 'I'],
-        })
-    };
-    [0, 1, 2].map(|j| Axis {
-        letters: letters(j),
+        }),
         step: steps_mm[j].abs(),
     })
+}
+
+/// The closest plumb orientation of a grid's voxel axes (`specs/3dAutomask.md` §6.2): for each
+/// column of `m`, the world axis (0, 1, 2 for x, y, z) it runs along and whether it runs
+/// toward the positive end. The method of the NIfTI reference library (nifti_clib, public
+/// domain), in double precision: the columns made unit vectors, the second made orthogonal to
+/// the first and the third to both (each only when their dot product exceeds 1e-4 in
+/// magnitude, then made a unit vector again; a zero third column becomes the cross product of
+/// the first two); then, of the signed permutation matrices `P` whose determinant has the
+/// sign of that matrix `Q`'s, the first (columns for rows 1, 2, 3 in increasing order, then
+/// signs −1 before +1 for rows 1, 2, 3) with the largest trace of `P·Q`. `None` when a column
+/// is zero or the matrix degenerate (AFNI then has no orientation for any axis).
+///
+/// Observed by the clean-room implementer: on 1,604 random matrices (rotations from rational
+/// quaternions with zero components, scaled and reflected; random and nearly plumb sheared
+/// matrices; four at 45°) 3dAutomask's letters are this method's in double precision, every
+/// one; in single precision 6 differ (ties broken by rounding), and taking each column's
+/// largest entry 396.
+pub fn orientation(m: &[[f32; 4]; 3]) -> Option<[(usize, bool); 3]> {
+    let e = |i: usize, j: usize| f64::from(m[i][j]);
+    let (mut xi, mut yi, mut zi) = (e(0, 0), e(1, 0), e(2, 0));
+    let (mut xj, mut yj, mut zj) = (e(0, 1), e(1, 1), e(2, 1));
+    let (mut xk, mut yk, mut zk) = (e(0, 2), e(1, 2), e(2, 2));
+    let norm = |x: f64, y: f64, z: f64| (x * x + y * y + z * z).sqrt();
+    let finite = [xi, yi, zi, xj, yj, zj, xk, yk, zk]
+        .iter()
+        .all(|v| v.is_finite());
+    if !finite {
+        return None;
+    }
+    let val = norm(xi, yi, zi);
+    if val == 0.0 {
+        return None;
+    }
+    (xi, yi, zi) = (xi / val, yi / val, zi / val);
+    let val = norm(xj, yj, zj);
+    if val == 0.0 {
+        return None;
+    }
+    (xj, yj, zj) = (xj / val, yj / val, zj / val);
+    let val = xi * xj + yi * yj + zi * zj;
+    if val.abs() > 1.0e-4 {
+        (xj, yj, zj) = (xj - val * xi, yj - val * yi, zj - val * zi);
+        let val = norm(xj, yj, zj);
+        if val == 0.0 {
+            return None;
+        }
+        (xj, yj, zj) = (xj / val, yj / val, zj / val);
+    }
+    let val = norm(xk, yk, zk);
+    if val == 0.0 {
+        (xk, yk, zk) = (yi * zj - zi * yj, zi * xj - zj * xi, xi * yj - yi * xj);
+    } else {
+        (xk, yk, zk) = (xk / val, yk / val, zk / val);
+    }
+    for (u, v, w) in [(xi, yi, zi), (xj, yj, zj)] {
+        let val = u * xk + v * yk + w * zk;
+        if val.abs() > 1.0e-4 {
+            (xk, yk, zk) = (xk - val * u, yk - val * v, zk - val * w);
+            let val = norm(xk, yk, zk);
+            if val == 0.0 {
+                return None;
+            }
+            (xk, yk, zk) = (xk / val, yk / val, zk / val);
+        }
+    }
+    let q = [[xi, xj, xk], [yi, yj, yk], [zi, zj, zk]];
+    let det = |r: &[[f64; 3]; 3]| {
+        r[0][0] * r[1][1] * r[2][2] - r[0][0] * r[2][1] * r[1][2] - r[1][0] * r[0][1] * r[2][2]
+            + r[1][0] * r[2][1] * r[0][2]
+            + r[2][0] * r[0][1] * r[1][2]
+            - r[2][0] * r[1][1] * r[0][2]
+    };
+    let det_q = det(&q);
+    if det_q == 0.0 || !det_q.is_finite() {
+        return None;
+    }
+    let mut best = -666.0f64;
+    let mut choice = ([0usize, 1, 2], [1.0f64, 1.0, 1.0]);
+    for i in 0..3 {
+        for j in 0..3 {
+            if i == j {
+                continue;
+            }
+            for k in 0..3 {
+                if k == i || k == j {
+                    continue;
+                }
+                for p in [-1.0f64, 1.0] {
+                    for s in [-1.0f64, 1.0] {
+                        for r in [-1.0f64, 1.0] {
+                            let mut pm = [[0.0f64; 3]; 3];
+                            (pm[0][i], pm[1][j], pm[2][k]) = (p, s, r);
+                            if det(&pm) * det_q <= 0.0 {
+                                continue;
+                            }
+                            // The trace of P·Q, each diagonal entry the sum of its three
+                            // products (two of them 0).
+                            let d = |row: usize| {
+                                pm[row][0] * q[0][row] + pm[row][1] * q[1][row]
+                                    + pm[row][2] * q[2][row]
+                            };
+                            let trace = d(0) + d(1) + d(2);
+                            if trace > best {
+                                best = trace;
+                                choice = ([i, j, k], [p, s, r]);
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+    let (cols, signs) = choice;
+    Some([0, 1, 2].map(|row| (cols[row], signs[row] > 0.0)))
 }
 
 /// The program's settings after the mask.

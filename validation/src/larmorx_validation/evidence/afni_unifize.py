@@ -622,7 +622,16 @@ def _example_t2up(
     link = [am._link(reg, "AFNI-45")]
     for x in diffs:
         x["links"] = link
-        if x["id"] in ("replica-afni", "original-afni"):
+        if x["id"] == "afni26-afni":
+            x["verdict"] = None
+            x["reason"] = (
+                "AFNI 26.3.05 gives AFNI 25.2.09's bytes on this call: the read one past the "
+                "sorted values (AFNI-45) is in both releases, and both read 0 there on this machine."
+                if same[x["id"]]
+                else "AFNI 26.3.05 and 25.2.09 differ on this call: the read one past the sorted "
+                "values (AFNI-45) is of memory neither writes."
+            )
+        elif x["id"] in ("replica-afni", "original-afni"):
             repro = "repro-afni" if x["id"] == "replica-afni" else "original-repro-afni"
             x["verdict"] = "d13" if not same[x["id"]] and same[repro] else "open"
             x["reason"] = (

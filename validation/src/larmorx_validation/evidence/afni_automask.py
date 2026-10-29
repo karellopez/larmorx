@@ -886,6 +886,14 @@ def _example_peels(
                 if same[i]
                 else "AFNI's -peels 0 and -peels 1 differ on this input."
             )
+        elif i == "afni26-afni":
+            x["links"] = []
+            x["verdict"] = None
+            x["reason"] = (
+                AFNI26_SAME + " AFNI-43 is in both releases."
+                if same[i]
+                else "AFNI 26.3.05 and 25.2.09 differ on this call."
+            )
         elif i in ("replica-afni", "original-afni"):
             repro = "repro-afni" if i == "replica-afni" else "original-repro-afni"
             x["verdict"] = "d13" if not same[i] and same[repro] else "open"

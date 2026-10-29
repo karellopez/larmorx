@@ -131,9 +131,9 @@ eco = "afni"
 page = "/tools/afni-automask/"
 use = ["larmorx afni 3dAutomask", "lx.afni.automask"]
 how = "clean-room original; exact replica in `larmorx-gpl`"
-# "84 of 85" and "85 of 85" are the records' own statements (their JSON keeps no per-case
+# "92 of 106" and "85 of 85" are the records' own statements (their JSON keeps no per-case
 # identity for this suite).
-validation = "original: [{afni-automask.cases} cases](record:afni-automask), 84 of 85 compared cases that write outputs bit-identical to AFNI (the other: AFNI-10's header, its data bit-identical), fMRIPrep's call on every oracle run's BOLD reference included; replica: [85 of 85](record:afni-automask-replica) bit-identical"
+validation = "original: [{afni-automask.cases} cases](record:afni-automask), 92 of 106 compared cases that write outputs bit-identical to AFNI (the other 14: inputs carrying AFNI's own header extension, AFNI-10: the data bit-identical, the header and messages AFNI's for the input without it), fMRIPrep's call on every oracle run's BOLD reference included, the data panel's too; replica: [85 of 85](record:afni-automask-replica) bit-identical"
 
 [[tool]]
 id = "afni-unifize"

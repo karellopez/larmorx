@@ -82,7 +82,8 @@ def map_coordinates(
     the shape ``coordinates.shape[1:]``. ``output`` is a dtype (default: the input's), not an
     array. With ``prefilter`` and ``order > 1`` the input is padded (``nearest`` and
     ``grid-constant``) and spline-filtered in float64 first, as SciPy does.
-    ``upstream_defects="reproduce"`` gives SciPy's ``reflect`` boundary (SCI-03).
+    The ``reflect`` boundary is SciPy 1.18.1's in both modes of ``upstream_defects`` (SCI-03,
+    fixed upstream).
     """
     _defects.check(upstream_defects)
     if order < 0 or order > 5:

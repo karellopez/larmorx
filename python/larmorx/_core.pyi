@@ -352,7 +352,7 @@ def resample_series(
     """fMRIPrep's ``resample_image`` after loading: a float32 3D/4D ``source`` onto the target
     grid through ``steps`` and ``ras2vox``, with per-volume voxel-to-voxel head motion ``hmc``
     (``(t, 4, 4)``), a field map in Hz and readout vectors ``pe``. Fortran-ordered result, and
-    upstream-defect notices (PIPE-03, SCI-03)."""
+    upstream-defect notices (PIPE-03)."""
 
 # --- ANTs image programs: ImageMath, ThresholdImage, MultiplyImages (larmorx/ants) -------------
 

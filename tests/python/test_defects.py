@@ -77,15 +77,17 @@ def test_warnings_and_notice_lines():
 def test_reflect_splines(mode):
     data = (np.arange(6 * 5 * 4, dtype=np.float64).reshape(6, 5, 4) * 37 % 101) / 7
     coords = np.indices(data.shape).reshape(3, -1).astype(np.float64)
+    # SciPy 1.18 fixed SCI-03: larmorx follows SciPy 1.18.1 in both modes, an interpolant on
+    # short axes, without a notice (SciPy 1.15's splines missed the samples by more than 1e-3).
     fixed, wf = defect_warnings(lx.ndimage.map_coordinates, data, coords, order=5, mode=mode)
     scipy, wr = defect_warnings(
         lx.ndimage.map_coordinates, data, coords, order=5, mode=mode, upstream_defects=REPRODUCE
     )
     np.testing.assert_allclose(fixed, data.ravel(), atol=1e-9)  # an interpolant
-    assert np.abs(scipy - data.ravel()).max() > 1e-3  # SciPy's is not, on short axes
-    assert wf == [("SCI-03", FIX)] and wr == [("SCI-03", REPRODUCE)]
+    np.testing.assert_array_equal(fixed, scipy)
+    assert wf == wr == []
     _, wf = defect_warnings(lx.ndimage.spline_filter, data, order=3, mode=mode)
-    assert wf == [("SCI-03", FIX)]
+    assert wf == []
     # Other boundaries: one result and no warning.
     a, wa = defect_warnings(lx.ndimage.map_coordinates, data, coords, order=3, mode="mirror")
     b, wb = defect_warnings(

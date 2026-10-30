@@ -476,7 +476,22 @@ The mask is what the surface encloses: every voxel 1, the surface drawn as 0 (ea
 rasterised: points along one edge every `min(dx, dy, dz)/2` mm, and from each of them to the
 opposite vertex at the same spacing, each point to the voxel `floor(p/d + 0.5)` when inside the
 image), then a flood fill of 0 through 6-connected voxels of value 1 from the voxel holding the
-centroid of the vertices (`trunc` of the centroid in voxels); the mask is `1 - that`. A centroid
+centroid of the vertices (`trunc` of the centroid in voxels); the mask is `1 - that`.
+(spec writer, 2026-10-30) **The rasterisation, exactly (observed** with FSL's own meshes: the
+masks, brains and outlines are bit-identical wherever the surface is**)**: for a triangle
+`(v0, v1, v2)` (the file's order), `s = min(dx, dy, dz)·0.5`; `u = (v0 − v1)/|v0 − v1|` (each
+component divided by the norm; a zero vector stays zero); for `j = 0, s, 2s, …` (accumulated)
+while `j ≤ |v0 − v1|`: the point `q = v1 + j·u`, and from `v2` towards it, `w = (q − v2)/|q − v2|`
+and the points `v2 + i·w` for `i = 0, s, 2s, …` (accumulated) while `i ≤ |q − v2|`; each point
+`p` marks the voxel `(floor(p_x/dx + 0.5), floor(p_y/dy + 0.5), floor(p_z/dz + 0.5))` (the
+outline: `trunc` instead of `floor`), a voxel outside the image is not marked. The triangles are
+drawn in the mesh's order. **The fill's start (observed**, random testing 2026-10-30, cases 4 and
+35**)**: the centroid is `(Σ p)·(1/V)` (the vertices summed in order, then multiplied by the
+reciprocal of their count), divided by the voxel sizes and truncated; the start voxel is set to 0
+whatever it holds and the fill goes on from it, so a surface collapsed into a sheet through the
+start voxel lets the fill reach the whole image (FSL's mask is then every voxel). The mask is made
+whatever outputs are asked for: with `-n` alone FSL still crashes at a centroid that is not a
+number (FSL-43). A centroid
 outside the image (a single slice: the surface's centroid falls below it) makes FSL write and
 read outside the volume (FSL-43): the default starts the fill at the nearest voxel inside the
 image, which on a single slice gives FSL's mask **(observed)**; a centroid that is not a number
@@ -500,6 +515,10 @@ other read as not 1, and warns with the number of those reads.
 - **`-t`**: voxels below `t` are removed from the mask (and so from the brain) as well.
 - **outline** (`<out>_overlay`, `-o`): the input with the surface drawn at the input's maximum
   (rasterised as above, but each point to the voxel `trunc(p/d + 0.5)`); float32.
+  (spec writer, 2026-10-30) With `--ct` the outline is drawn on the converted image (Cormack
+  units, §4.8; **observed**), at the converted image's maximum; `-t` and `-s` also use the converted
+  values (and `t`, `t2`, `t98` of the converted image). With `--binaryMask` they use the input as
+  read (§4.7a).
 - **mesh** (`<out>_mesh.vtk`, `-e`): the surface as VTK ASCII polydata, exactly:
   `# vtk DataFile Version 3.0`, `surface file`, `ASCII`, `DATASET POLYDATA`,
   `POINTS <n>  float` (two blanks), one line `x y z` per vertex in fixed notation with 6 decimals,
@@ -511,6 +530,45 @@ other read as not 1, and warns with the number of those reads.
   maximum `d_max` (when above `t`), the point before it where `d/30 - I(d)/(t98 - t2)` is largest
   (from -3 mm), and from there the position of the steepest rise towards `d_max`: the skull voxel
   (`trunc` of the point).
+
+  (spec writer, 2026-10-30; question 2) **The skull search, exactly.** The image starts at 0. The
+  surface is rasterised as for the mask (§4.6, `floor`) into an image of 1s, its voxels set to 0;
+  reading this image outside the volume gives 0, so **voxels outside the image count as surface
+  voxels**. `h_s = min(dx, dy, dz)`. For each vertex `p`, in order:
+  1. `n` = its unit normal (§4.4, §8.1); `ν = (n_x/dx, n_y/dy, n_z/dz)` (the normal in voxels per
+     mm); `h = ceil(max over its neighbours q of |p − q| / 2)` (mm); `m = (p_x/dx, p_y/dy,
+     p_z/dz)`.
+  2. The candidate voxels `(i, j, k)`, `k` outermost, then `j`, then `i`, each from
+     `floor(m_a − h/d_a)` to `floor(m_a + h/d_a)` inclusive (`m_a − h/d_a`, not `(p_a − h)/d_a`),
+     **not** clipped to the image.
+  3. A candidate is profiled when it is a surface voxel (above: outside the image included) and is
+     no closer to any neighbour of `p` than to `p`: with `x = (i·dx, j·dy, k·dz)`,
+     `min over neighbours q of |x − q| ≥ |x − p|`.
+  4. The profile starts at the voxel's own integer position `o = (i, j, k)` (voxel coordinates);
+     the sample at depth `s` (mm) is the trilinear value (§8.1) at `o + s·ν`, zero outside the
+     image.
+  5. **The maximum**: `M = t`, `d_max = 0`; for `s = 0, h_s/2, h_s, …` (accumulated) while
+     `s < 30`: a sample `> M` sets `M` to it and `d_max = s` (the first position of the strict
+     maximum; no bounds test: samples outside the image are 0). If `M` stayed `t`, the voxel adds
+     nothing.
+  6. **The darkest point before it**: `d_min = −3`, `J_max = −10^6`; for `s = −3, −3 + h_s/2, …`
+     (accumulated, a grid of its own) while `s < d_max`: only where `o + s·ν` lies in
+     `[0, n_a)` on every axis (as doubles: `x ≥ 0` and `x < n_a`), `J = s/30 − I(s)/(t98 − t2)`;
+     a `J > J_max` sets `J_max = J` and `d_min = s` (the first strict maximum).
+  7. **The rise**: if `o + d_min·ν` lies in the image (as in 6): `prev = I(d_min)`, `G = 0`; for
+     `s = d_min + h_s` (a full step first), then `+ h_s/2` each time (accumulated), while
+     `s < d_max`: only in the image, `g = I(s) − prev`, `prev = I(s)`; when `g > 0`: if `g > G`,
+     `G = g` and `d_skull = s`, else the scan stops (a rise smaller than the largest so far ends
+     it; falls do not). Samples outside the image are skipped without changing `prev`.
+  8. If `G > 0` and `o + d_skull·ν` lies in the image (as in 6), the voxel
+     `(trunc(x), trunc(y), trunc(z))` of that point is set to 100.
+  The image is written as int16 (100 and 0). The arithmetic: every position in double
+  (`o + s·ν` componentwise), each sample's coordinates rounded to float for the interpolation,
+  the sample as float, `J` and `g` in double. **(checked)** The replica, which follows this, is
+  bit-identical to FSL's `_skull` in every compared case of its record; the clean-room original's
+  skull search differed from it (Dice about 0.9) in steps 2 (clipped), 3 (outside voxels), 4-6
+  (one grid from −3 mm for every search, the maxima's ties, the interpolation's edge), 7 (the scan)
+  and the trilinear formula (§8.1).
 
 ### 4.7a `--binaryMask <image>` (FSL 6.0.7.23)
 
@@ -526,6 +584,8 @@ search. **(FSL-61)** A mask whose dimensions differ from the input's makes FSL a
 mask over the input's dimensions, reading and writing outside it: larmorx refuses in both modes,
 naming FSL-61. **(FSL-62)** With `--ct`, FSL converts the mask and writes the mask (masked) as the
 brain image: larmorx writes the CT input masked, and `reproduce` FSL's result; both name FSL-62.
+(spec writer, 2026-10-30) **(observed)** FSL's brain image there is the mask as read (its 0 and
+1, not the converted values), masked.
 
 ### 4.8 CT images (`--ct`)
 
@@ -562,6 +622,9 @@ and `-c <x> <y> <z>` too (a missing value prints the usage); `-R`, `-S`, `-Z`, `
 `-d` keeps the temporary files; anything else prints the usage. With `-v`, before running, on
 standard output: `IN=<input>`, `OUT=<output>`, `bet2opts=<the options passed, each preceded by a
 blank>`, `verbose=1`, `debug=<0|1>`, `variation=<0..7>`.
+(spec writer, 2026-10-30) **(observed)** The `variation=` numbers: 0 the default, 1 `-R`, 2 `-S`,
+3 `-Z`, 4 `-F`, 5 `-A`, 6 `-A2`, 7 `-B`; `bet2opts=` lists the options in the order given (`-d`
+not among them); `-h` prints the usage and exits 1.
 
 Under `-R` the options passed to bet2 are first printed by bash's `echo` and every `-n` removed
 from that text (bet2 never gets `-n` there). bash's `echo` takes the leading words made only of
@@ -576,7 +639,11 @@ command:<the script's arguments, as words joined by blanks>` on standard output 
 it leaves undefined (a constant image: FSL-41 in FSL 6.0.7.17, FSL-43 in 6.0.7.23): bash reports the signal on standard error, the
 script then prints its failure and exits 1; in `reproduce` the replica's bet gives that outcome
 (its bet2 alone would fill the undefined part instead), and its default refuses with the reason. The script expands names unquoted
-(FSL-44). It ends by removing every file whose name starts with `<output>_tmp` unless `-d`
+(FSL-44). (spec writer, 2026-10-30) **(observed)** The failure line has no blank after the colon.
+FSL-44 splits names only where the script runs bet2 (its input and output names unquoted there):
+`bet in "my out" -m` runs `bet2 in my out -m`, which reports `out:  is an unrecognised token!`, and
+the script fails; the script's own option loop sees its arguments whole and stops at an empty
+one. It ends by removing every file whose name starts with `<output>_tmp` unless `-d`
 (FSL-46).
 
 The usage, exactly (standard output):
@@ -628,6 +695,12 @@ Miscellaneous options:
   user's options (a later `-f` overrides); its mask is dilated by one voxel (the maximum over the
   3 x 3 x 3 neighbourhood, of the non-zero voxels: `fslmaths -dilF`) into `<out>_mask`, and every
   volume of the input is multiplied by it into `<out>` (float, as `fslmaths -mas` writes).
+  (spec writer, 2026-10-30) **(observed)** The files: the first volume as `<out>_tmp`, bet2's mask
+  as `<out>_tmp_brain_mask`; the dilated mask `<out>_mask` float32 and the 4D brain `<out>`
+  float32, both with the display range 0 and 0 (as `fslmaths` writes them); a float64 series gives
+  a float64 brain with the input's double values (checked on random testing 2026-10-30 case 425:
+  FSL's brain is float64 and not the float-rounded values; only bet2's first volume is read as
+  float).
 - **`-Z`** (small field of view in z): `npad = (100 / dz - nz) / 2 + 1` in `dc`'s arithmetic
   at scale 0 (each division truncated toward zero to an integer; `dz` as `fslval` prints it, the
   sign removed); if `npad ≤ 0`, the message `Image already has a greater Z FOV than 100.0 so not
@@ -636,7 +709,9 @@ Miscellaneous options:
   and each output whose name starts with `<out>` is cropped back to the original slices. The crop
   finds the outputs with `imglob`, which FSL's script calls without `${FSLDIR}/bin`: with FSL's
   programs off the `PATH` it fails (`<script>: line 329: imglob: command not found`) and the
-  outputs stay padded (FSL-45).
+  outputs stay padded (FSL-45). (spec writer, 2026-10-30) **(observed)** The temporary files:
+  `<out>_tmp` (the padded image), `<out>_tmp_bottom` and `<out>_tmp_top` (one slice each, written
+  2D, §3.2; the top one's origin moved to the top slice).
 - **`-S`, `-B`, `-A`, `-A2`**: pending in larmorx (they need standard_space_roi, FLIRT, FAST):
   refused with exit 1 and a message naming the missing program.
 

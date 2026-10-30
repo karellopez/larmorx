@@ -143,6 +143,14 @@ _TIERS = ("smoke", "standard", "full")
 
 
 def cases(tier: str) -> list[Case]:
+    """The recorded runs of ``tier``, then the failure cases of ``specs/mcflirt.md`` §14.1
+    (:mod:`mri_hmc_failures`: mcflirt runs live)."""
+    from larmorx_validation.parity import mri_hmc_failures
+
+    return [*_recorded_cases(tier), *mri_hmc_failures.cases(tier)]
+
+
+def _recorded_cases(tier: str) -> list[Case]:
     rank = _TIERS.index(tier)
     root = oracle_dir()
     out = []
@@ -743,6 +751,11 @@ _METRICS: dict[str, dict[str, Any]] = {}
 
 
 def _run_case_recording(case: Case, checks: CheckList) -> None:
+    from larmorx_validation.parity import mri_hmc_failures
+
+    if isinstance(case.payload, mri_hmc_failures.FailureCase):
+        _METRICS[case.id] = mri_hmc_failures.run_case(case, checks) or {}
+        return
     _METRICS[case.id] = run_case(case, checks) or {}
 
 

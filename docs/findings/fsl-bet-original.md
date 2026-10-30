@@ -34,7 +34,9 @@ into the spec, marked (observed).
   previous pass's; the rerun from the previous pass's surface (`variants.py`,
   `variants2.py`, with a temporary build). A scan of the first rerun's factor on the tumour
   (2, 5, 20, 50, 100, 200, 1000) has its sharp minimum at the spec's 100 (0.93 mm at 50, 0.83 mm
-  at 200): the factor is right, the remaining difference lies elsewhere in the rerun (FSL's
+  at 200), and a scan of the rerun's number of iterations its minimum at 1000 (900: 0.66 mm,
+  1100: 0.66 mm, 1250: 1.13 mm, the lowering kept on the last quarter): the factor and the
+  length are right, the remaining difference lies elsewhere in the rerun (FSL's
   rerun surface is a little smoother than the rule's on its convex parts too: mean `|s·n|`
   1.382 against 1.404 mm). A question for the spec writer; the five standard-tier cases that
   rerun are outside the record's thresholds.

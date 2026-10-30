@@ -656,7 +656,8 @@ pub fn run(
         }
         if o.outline {
             let v = bet::pooled(n_threads, || {
-                bet::outline(&found.mesh, &found.points, &input_img.vol)
+                // on the image BET ran on: --ct's Cormack units (observed)
+                bet::outline(&found.mesh, &found.points, input_vol_work)
             });
             if !write(names.stem("_overlay"), None, Values::F32(v)) {
                 return 1;

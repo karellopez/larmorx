@@ -561,16 +561,13 @@ fn fmri(
         );
     }
     drop(dilated);
-    // fslmaths -mas: the display range reset (observed)
-    if let Err(e) = write_values(
-        run,
-        output,
-        &inp,
-        shape,
-        count,
-        Values::F32(all),
-        Some((0.0, 0.0)),
-    ) {
+    // fslmaths -mas: the display range reset, float, or double for a double series (observed)
+    let values = if inp.header.datatype == 64 {
+        Values::F64(all.into_iter().map(f64::from).collect())
+    } else {
+        Values::F32(all)
+    };
+    if let Err(e) = write_values(run, output, &inp, shape, count, values, Some((0.0, 0.0))) {
         return Err(fail(e, out, err));
     }
     Ok(())
@@ -665,9 +662,12 @@ fn small_fov(
             h.quatern_d,
             [h.pixdim[0], h.pixdim[1], h.pixdim[2], h.pixdim[3]],
         );
-        h.qoffset_x = f64::from((h.qoffset_x + r[0][2] * shift) as f32);
-        h.qoffset_y = f64::from((h.qoffset_y + r[1][2] * shift) as f32);
-        h.qoffset_z = f64::from((h.qoffset_z + r[2][2] * shift) as f32);
+        // the qform moved only when it is set (observed: with code 0 its offset stays)
+        if h.qform_code > 0 {
+            h.qoffset_x = f64::from((h.qoffset_x + r[0][2] * shift) as f32);
+            h.qoffset_y = f64::from((h.qoffset_y + r[1][2] * shift) as f32);
+            h.qoffset_z = f64::from((h.qoffset_z + r[2][2] * shift) as f32);
+        }
     }
     let top_vol = Vol::new([nx, ny, 1], v.voxel, top.clone());
     write_like(

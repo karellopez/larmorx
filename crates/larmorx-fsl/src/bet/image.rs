@@ -97,6 +97,8 @@ pub fn read_first(files: &ImageFiles, n_threads: usize) -> Result<Input, ImageEr
 pub enum Values {
     F32(Vec<f32>),
     I16(Vec<i16>),
+    /// `bet -F`'s brain of a float64 series (fslmaths keeps the type, observed).
+    F64(Vec<f64>),
 }
 
 /// How an output is written.
@@ -148,8 +150,9 @@ pub fn output_header(o: &Output<'_>, version: NiftiVersion, data_type: DataType)
     if !o.extensions {
         h.extensions.clear();
     }
-    if h.qform_code > 0 {
-        // FSL writes the qform's quaternion converted to its matrix and back (§3.3)
+    {
+        // FSL writes the qform's quaternion converted to its matrix and back (§3.3), also with
+        // a qform code of 0 (observed)
         let pd = [h.pixdim[0], h.pixdim[1], h.pixdim[2], h.pixdim[3]];
         let ([b, c, d], qfac) =
             super::quatern::rewritten(h.quatern_b, h.quatern_c, h.quatern_d, pd);
@@ -210,6 +213,12 @@ pub fn write(
                 .map_err(invalid)?
                 .into(),
             DataType::I16,
+        ),
+        Values::F64(v) => (
+            ArrayD::from_shape_vec(dims, storage_order(v, nx, o.flipped))
+                .map_err(invalid)?
+                .into(),
+            DataType::F64,
         ),
     };
     let _ = per;
@@ -315,6 +324,7 @@ fn write_pieces(
     let bytes: &[u8] = match array {
         DynArray::F32(a) => bytemuck::cast_slice(a.as_slice_memory_order().unwrap_or(&[])),
         DynArray::I16(a) => bytemuck::cast_slice(a.as_slice_memory_order().unwrap_or(&[])),
+        DynArray::F64(a) => bytemuck::cast_slice(a.as_slice_memory_order().unwrap_or(&[])),
         _ => return Err(ImageError::Invalid("unexpected output type".into())),
     };
     parallel::with_threads(n_threads, || match &files.data {

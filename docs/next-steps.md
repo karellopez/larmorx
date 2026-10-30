@@ -262,11 +262,9 @@ The items below keep their history.
   when node is present): an apostrophe in a single-quoted string once broke `evidence.js` on every
   page while the build reported 0 problems; only the browser number check caught it.
 
-- **mcflirt's FSL-20, FSL-21, FSL-65 and FSL-66 in the clean-room original: ready for its
-  implementer** (specified 2026-10-30, `specs/mcflirt.md` §10.6, §12.1, the cases in §14.1; the
-  black-box probe `validation/investigations/specs-memory/mcflirt_fsl20_21.py`): a clean-room
-  implementer adds them to `lx.mri.hmc`'s original (today it errors on FSL-20 without naming it,
-  runs FSL-21's cases with one bin in both modes, and runs FSL-66's).
+- **mcflirt's FSL-20, FSL-21, FSL-65 and FSL-66 in the clean-room original: done** (2026-10-30, from
+  `specs/mcflirt.md` §10.6, §12.1; the 33 cases of §14.1 in the mri-hmc suite, `failures/<case>`,
+  mcflirt live; golden `cli.mri.hmc.unwritable` and `cli.mri.hmc.bins`; `docs/findings/mri-hmc-original.md`).
 - **The mcflirt replica's FSL-65 and FSL-66** (found 2026-10-30): its `reproduce` should end where
   mcflirt does (an unopenable `.par`: status 0 after `MAT_0000` and the `.rms` files; a negative
   `-bins`: mcflirt's crash, as an error) and its default refuse both (`specs/mcflirt.md` §10.6,
@@ -321,10 +319,10 @@ The items below keep their history.
     the orchestrator's brief (clean-room implementers do not read `docs/parts/`).
   - D11: N4's lattice as a sparse lattice with virtual padding (ANTS-162; the same result in
     memory proportional to the data).
-  - AFNI-75's guard is in the replica of 3dUnifize only: the clean-room original's is **ready for
-    its implementer** (specified 2026-10-30, `specs/3dUnifize.md` §9.1: the prediction, the limit,
-    the messages, `reproduce`; the cases in §10; the probe
-    `validation/investigations/specs-memory/unifize_epi_ball.py`).
+  - AFNI-75's guard: in both implementations of 3dUnifize (the clean-room original's since
+    2026-10-30, `specs/3dUnifize.md` §9.1, the same words as the replica's; the §10 cases in the
+    afni-unifize suite, `guard/epi-<voxels>`, the permanent case
+    `difftest/epi-ball-beyond-any-machine-original`; golden `cli.afni.3dUnifize.guard`).
 - **Random testing, more**: the data panel's real crops as inputs; BET in the nightly random
   testing (its descriptor `fsl-bet` is registered; its random-testing panel goes on the site after
   the first night that includes it); nights on a schedule (cron, boxed) once the machine is free

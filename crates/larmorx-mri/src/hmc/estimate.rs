@@ -14,8 +14,14 @@
 //! (FSL-14). [`EstimateParams::upstream_defects`] chooses; [`Estimate::notices`] says which
 //! changed the result. mcflirt's inflated correlation count (FSL-02) is corrected only on
 //! request ([`EstimateParams::normcorr_count`]), pending a decision.
+//!
+//! Bins no histogram can have (`specs/mcflirt.md` §12.1): with a histogram cost and `-bins`
+//! below 8 the first stage has none (FSL-21), and a negative `-bins` crashes mcflirt whatever the
+//! cost (FSL-66). Both are refused by default before any work (rule B, [`refused_bins`]); with
+//! `reproduce` the histogram costs run with no bins as mcflirt does, and where mcflirt crashes
+//! the estimation ends with an error saying how ([`McflirtEnd`]).
 
-use larmorx_core::defects::{self, Notice, UpstreamDefects};
+use larmorx_core::defects::{self, Defect, Notice, UpstreamDefects};
 use larmorx_core::parallel::{self, ThreadPoolError};
 use rayon::prelude::*;
 
@@ -71,8 +77,10 @@ pub struct EstimateParams {
     pub smooth: f32,
     /// The divisor of the rotation tolerances (`-rotation`, default 1).
     pub rotation: f64,
-    /// Histogram bins of the histogram costs (`-bins`, default 256).
-    pub bins: usize,
+    /// Histogram bins of the histogram costs (`-bins`, default 256): stage 1 uses `bins / 8`,
+    /// stages 2 to 4 `bins / 4` (truncated toward zero). Fewer than 8 with a histogram cost
+    /// (FSL-21) and negative values (FSL-66) are refused by default ([`refused_bins`]).
+    pub bins: i64,
     /// No previous-volume initialisation in the first stage (`-fudge`).
     pub fudge: bool,
     pub in_plane: InPlane,
@@ -121,8 +129,194 @@ pub enum EstimateError {
          defects"
     )]
     CountWithReproduce,
+    /// FSL-21 or FSL-66 corrected: bins no stage can use, refused before any work.
+    #[error("{0}")]
+    Bins(BinsRefusal),
+    /// FSL-21 or FSL-66 reproduced: where mcflirt crashes, the estimation ends.
+    #[error("{}", .0.error())]
+    McflirtEnds(McflirtEnd),
     #[error(transparent)]
     Threads(#[from] ThreadPoolError),
+}
+
+/// The bins of stage `stage` (1 to 4) for `-bins bins` (`specs/mcflirt.md` §12.1): `bins / 8`
+/// in stage 1 (8 mm), `bins / 4` in stages 2 to 4 (4 mm), truncated toward zero.
+pub fn stage_bins(bins: i64, stage: usize) -> i64 {
+    if stage <= 1 { bins / 8 } else { bins / 4 }
+}
+
+/// How mcflirt ends on bins it cannot use (`specs/mcflirt.md` §12.1), at the start of `stage`.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum McflirtEnd {
+    /// −1 bins (FSL-66): an integer division by zero while the stage prepares its tables; the
+    /// process is killed by signal 8 (SIGFPE), with no message of its own.
+    DivisionByZero { bins: i64, stage: usize },
+    /// −2 or fewer bins (FSL-66): `std::bad_array_new_length`, an abort (signal 6).
+    BadArrayLength { bins: i64, stage: usize },
+    /// `corratio` with no bins (FSL-21): it writes before its arrays and the C library aborts
+    /// when they are released (`double free or corruption (out)`, signal 6), at the stage's
+    /// first cost evaluation.
+    CorrRatioHeap { bins: i64, stage: usize },
+}
+
+impl McflirtEnd {
+    /// The defect: FSL-66 for a negative number of bins, FSL-21 for `corratio` with none.
+    pub fn defect(&self) -> &'static Defect {
+        match self {
+            McflirtEnd::CorrRatioHeap { .. } => &defects::FSL_21,
+            _ => &defects::FSL_66,
+        }
+    }
+
+    /// The lines mcflirt prints on standard error as it ends.
+    pub fn mcflirt_lines(&self) -> &'static [&'static str] {
+        match self {
+            McflirtEnd::DivisionByZero { .. } => &[],
+            McflirtEnd::BadArrayLength { .. } => &[
+                "terminate called after throwing an instance of 'std::bad_array_new_length'",
+                "  what():  std::bad_array_new_length",
+            ],
+            McflirtEnd::CorrRatioHeap { .. } => &["double free or corruption (out)"],
+        }
+    }
+
+    /// What mcflirt does, in a few words.
+    pub fn what(&self) -> String {
+        match *self {
+            McflirtEnd::DivisionByZero { bins, stage } => format!(
+                "-bins {bins} gives stage {stage} -1 bins: mcflirt is killed by signal 8 (an \
+                 integer division by zero) when the stage starts, writing nothing"
+            ),
+            McflirtEnd::BadArrayLength { bins, stage } => format!(
+                "-bins {bins} gives stage {stage} {} bins: mcflirt aborts (signal 6, \
+                 std::bad_array_new_length) when the stage starts, writing nothing",
+                stage_bins(bins, stage)
+            ),
+            McflirtEnd::CorrRatioHeap { bins, stage } => format!(
+                "-bins {bins} gives stage {stage} no bins: mcflirt's corratio writes before its \
+                 arrays and aborts (signal 6, double free or corruption) at the stage's first \
+                 cost evaluation, writing nothing"
+            ),
+        }
+    }
+
+    /// The error that ends a reproduced run here.
+    pub fn error(&self) -> String {
+        format!(
+            "{} ({}; larmorx stops where mcflirt crashes, and refuses these bins by default)",
+            self.what(),
+            self.defect().id
+        )
+    }
+
+    /// The notice of the reproduced run.
+    pub fn notice(&self) -> Notice {
+        Notice::new(
+            self.defect(),
+            UpstreamDefects::Reproduce,
+            format!("{}; larmorx stops there with an error", self.what()),
+        )
+    }
+}
+
+/// How mcflirt ends with `-bins bins`, `stages` stages and `cost` when registration runs: the
+/// first stage whose bins it cannot use (§12.1), if any.
+pub fn mcflirt_end(bins: i64, stages: usize, cost: CostFunction) -> Option<McflirtEnd> {
+    (1..=stages.min(4)).find_map(|stage| match stage_bins(bins, stage) {
+        -1 => Some(McflirtEnd::DivisionByZero { bins, stage }),
+        b if b <= -2 => Some(McflirtEnd::BadArrayLength { bins, stage }),
+        0 if cost == CostFunction::CorrRatio => Some(McflirtEnd::CorrRatioHeap { bins, stage }),
+        _ => None,
+    })
+}
+
+/// Bins larmorx refuses by default (FSL-21, FSL-66; rule B): the defect, the error and the
+/// notice's detail.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct BinsRefusal {
+    pub defect: &'static Defect,
+    pub message: String,
+    pub detail: String,
+}
+
+impl std::fmt::Display for BinsRefusal {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str(&self.message)
+    }
+}
+
+impl BinsRefusal {
+    /// The notice of the refusal (larmorx's default).
+    pub fn notice(&self) -> Notice {
+        Notice::new(self.defect, UpstreamDefects::Fix, self.detail.clone())
+    }
+}
+
+/// The default's refusal of `-bins bins` with `stages` stages and `cost` (`specs/mcflirt.md`
+/// §12.1), whatever the series: with a histogram cost and fewer than 8 bins the first stage
+/// would have none (FSL-21); a negative number of bins (FSL-66). `None` where the bins are
+/// usable or no stage runs (`-stages 0`).
+pub fn refused_bins(bins: i64, stages: usize, cost: CostFunction) -> Option<BinsRefusal> {
+    if stages == 0 {
+        return None;
+    }
+    if cost.is_histogram() && stage_bins(bins, 1) == 0 {
+        return Some(BinsRefusal {
+            defect: &defects::FSL_21,
+            message: format!(
+                "-bins {bins}: the histogram costs need at least 8 bins (the first stage uses \
+                 -bins / 8 of them; mcflirt computes them with none, FSL-21)"
+            ),
+            detail: format!(
+                "-bins {bins} is refused with this cost: the first stage's histogram would have \
+                 no bins"
+            ),
+        });
+    }
+    if bins < 0 {
+        let how = match mcflirt_end(bins, stages, cost) {
+            Some(end) => end.what(),
+            None => format!(
+                "-bins {bins} gives every stage no bins, which this cost does not use, in mcflirt"
+            ),
+        };
+        return Some(BinsRefusal {
+            defect: &defects::FSL_66,
+            message: format!(
+                "-bins {bins}: a negative number of bins (mcflirt prepares -bins / 8 and -bins / \
+                 4 bins for every cost and crashes on a negative count, FSL-66)"
+            ),
+            detail: format!("-bins {bins} (a negative number of bins) is refused: {how}"),
+        });
+    }
+    None
+}
+
+/// The notice of a reproduced run on bins larmorx refuses by default, where mcflirt does not
+/// crash (§12.1): a histogram cost with no bins in a stage (FSL-21), or a negative `-bins`
+/// with a cost that uses none (FSL-66).
+fn reproduced_bins_notice(bins: i64, stages: usize, cost: CostFunction) -> Option<Notice> {
+    let mode = UpstreamDefects::Reproduce;
+    if cost.is_histogram() && (1..=stages.min(4)).any(|s| stage_bins(bins, s) == 0) {
+        return Some(Notice::new(
+            &defects::FSL_21,
+            mode,
+            format!(
+                "-bins {bins}: the first stage's histogram has no bins, as in mcflirt; its cost \
+                 is degenerate and the matrices arbitrary"
+            ),
+        ));
+    }
+    (bins < 0).then(|| {
+        Notice::new(
+            &defects::FSL_66,
+            mode,
+            format!(
+                "-bins {bins} (a negative number of bins) gives every stage none, as in \
+                 mcflirt; this cost uses none"
+            ),
+        )
+    })
 }
 
 /// The result of the estimation.
@@ -295,6 +489,11 @@ pub fn estimate(
     reference: &Reference,
     params: &EstimateParams,
 ) -> Result<Estimate, EstimateError> {
+    if params.upstream_defects.fix()
+        && let Some(r) = refused_bins(params.bins, params.stages, params.cost)
+    {
+        return Err(EstimateError::Bins(r));
+    }
     let n = series.len();
     if n == 0 {
         return Err(EstimateError::Empty);
@@ -384,6 +583,18 @@ fn run_stages(
     if params.stages == 0 || registered.is_empty() {
         return Ok((matrices, false, notices));
     }
+    // FSL-21 and FSL-66 reproduced: mcflirt crashes when a stage starts on bins it cannot use;
+    // a histogram cost with no bins runs as mcflirt's does.
+    if mode.reproduce() {
+        if let Some(end) = mcflirt_end(params.bins, params.stages, params.cost) {
+            return Err(EstimateError::McflirtEnds(end));
+        }
+        notices.extend(reproduced_bins_notice(
+            params.bins,
+            params.stages,
+            params.cost,
+        ));
+    }
     // FSL-14: volumes (and the reference) with NaN or infinite voxels.
     let non_finite: Vec<usize> = registered
         .iter()
@@ -427,7 +638,10 @@ fn run_stages(
         };
         let mut in_plane = check(&grid8) || check(&series[0]);
         let stage_for =
-            |grid: &Volume, factor: f32, bins: usize, sinc: bool, in_plane: bool, par: bool| {
+            |grid: &Volume, factor: f32, bins: i64, sinc: bool, in_plane: bool, par: bool| {
+                // A stage's bins: none where mcflirt has none (FSL-21 reproduced); never
+                // negative here (refused by default, the end of a reproduced run).
+                let bins = bins.max(0) as usize;
                 let grid = if in_plane {
                     // mcflirt pads the stage-1 grid twice, the others once (FSL-03).
                     pad_z(grid, if par && !fix { 2 } else { 1 })
@@ -450,8 +664,14 @@ fn run_stages(
                 (grid, factor, order, ncompose, sinc, in_plane, par, bins)
             };
         // Stage 1: chains of volumes, each started from its predecessor's result.
-        let (g1, f1, order1, nc1, _, ip1, _, bins1) =
-            stage_for(&grid8, 0.8, params.bins / 8, false, in_plane, true);
+        let (g1, f1, order1, nc1, _, ip1, _, bins1) = stage_for(
+            &grid8,
+            0.8,
+            stage_bins(params.bins, 1),
+            false,
+            in_plane,
+            true,
+        );
         let stage1 = Stage {
             grid: &g1,
             tolerances: tolerances(params.rotation, f1),
@@ -459,7 +679,7 @@ fn run_stages(
             ncompose: nc1,
             smooth: if ip1 { 0.1 } else { params.smooth },
             cost: params.cost,
-            bins: bins1.max(1),
+            bins: bins1,
             sinc: false,
             in_plane: ip1,
             parallel: true,
@@ -519,8 +739,14 @@ fn run_stages(
                 break;
             }
             let sinc = stage == 4 && params.cost == CostFunction::NormCorr;
-            let (g, f, order, nc, sinc, ip, _, bins) =
-                stage_for(&grid4, factor, params.bins / 4, sinc, in_plane, false);
+            let (g, f, order, nc, sinc, ip, _, bins) = stage_for(
+                &grid4,
+                factor,
+                stage_bins(params.bins, stage),
+                sinc,
+                in_plane,
+                false,
+            );
             let s = Stage {
                 grid: &g,
                 tolerances: tolerances(params.rotation, f),
@@ -528,7 +754,7 @@ fn run_stages(
                 ncompose: nc,
                 smooth: if ip { 0.1 } else { params.smooth },
                 cost: params.cost,
-                bins: bins.max(1),
+                bins,
                 sinc,
                 in_plane: ip,
                 parallel: false,
@@ -709,6 +935,151 @@ mod tests {
                 [0.0, 0.0, 1.0, 0.0, 0.0]
             );
         }
+    }
+
+    /// `specs/mcflirt.md` §12.1: each stage's bins, how mcflirt ends, what the default refuses.
+    #[test]
+    fn bins_no_stage_can_use() {
+        use CostFunction::*;
+        use McflirtEnd::*;
+        // Truncated toward zero: -bins 7 gives 0 and 1, -bins -9 gives -1 and -2.
+        assert_eq!(
+            (stage_bins(7, 1), stage_bins(7, 2), stage_bins(7, 4)),
+            (0, 1, 1)
+        );
+        assert_eq!((stage_bins(-9, 1), stage_bins(-9, 3)), (-1, -2));
+        assert_eq!(
+            mcflirt_end(-8, 3, NormCorr),
+            Some(DivisionByZero { bins: -8, stage: 1 })
+        );
+        assert_eq!(
+            mcflirt_end(-4, 2, LeastSquares),
+            Some(DivisionByZero { bins: -4, stage: 2 })
+        );
+        assert_eq!(mcflirt_end(-4, 1, NormCorr), None);
+        assert_eq!(mcflirt_end(-3, 4, NormCorr), None);
+        assert_eq!(
+            mcflirt_end(-16, 3, MutualInfo),
+            Some(BadArrayLength {
+                bins: -16,
+                stage: 1
+            })
+        );
+        assert_eq!(
+            mcflirt_end(2, 3, CorrRatio),
+            Some(CorrRatioHeap { bins: 2, stage: 1 })
+        );
+        // corratio meets its empty first stage before the second stage's division by zero.
+        assert_eq!(
+            mcflirt_end(-4, 3, CorrRatio),
+            Some(CorrRatioHeap { bins: -4, stage: 1 })
+        );
+        assert_eq!(mcflirt_end(8, 3, CorrRatio), None);
+        assert_eq!(mcflirt_end(-16, 0, NormCorr), None);
+        let bad = BadArrayLength {
+            bins: -16,
+            stage: 1,
+        };
+        assert_eq!(bad.mcflirt_lines().len(), 2);
+        assert_eq!(bad.defect().id, "FSL-66");
+        assert!(bad.error().contains("(FSL-66;"), "{}", bad.error());
+        assert_eq!(CorrRatioHeap { bins: 2, stage: 1 }.defect().id, "FSL-21");
+        // The default's refusals.
+        let id = |b, s, c| refused_bins(b, s, c).map(|r| r.defect.id);
+        assert_eq!(id(7, 3, MutualInfo), Some("FSL-21"));
+        assert_eq!(id(0, 1, NormMi), Some("FSL-21"));
+        assert_eq!(id(-7, 3, Woods), Some("FSL-21"));
+        assert_eq!(id(-8, 3, Woods), Some("FSL-66"));
+        assert_eq!(id(-1, 3, NormCorr), Some("FSL-66"));
+        assert_eq!(id(2, 3, NormCorr), None);
+        assert_eq!(id(8, 3, CorrRatio), None);
+        assert_eq!(id(4, 0, MutualInfo), None);
+        assert_eq!(id(-16, 0, NormCorr), None);
+        assert_eq!(
+            refused_bins(4, 3, MutualInfo).unwrap().message,
+            "-bins 4: the histogram costs need at least 8 bins (the first stage uses -bins / 8 of \
+             them; mcflirt computes them with none, FSL-21)"
+        );
+    }
+
+    /// FSL-21 and FSL-66 through the estimation: refused before any work by default (one
+    /// volume included), mcflirt's end or its zero-bin costs reproduced.
+    #[test]
+    fn bins_in_both_modes() {
+        let s = series();
+        let reproduce = |bins, cost| EstimateParams {
+            bins,
+            cost,
+            stages: 1,
+            upstream_defects: UpstreamDefects::Reproduce,
+            ..EstimateParams::default()
+        };
+        let fix = |bins, cost| EstimateParams {
+            upstream_defects: UpstreamDefects::Fix,
+            ..reproduce(bins, cost)
+        };
+        let one = &s[..1];
+        for series in [&s[..], one] {
+            let e = estimate(
+                series,
+                &Reference::Index(0),
+                &fix(4, CostFunction::MutualInfo),
+            );
+            assert!(matches!(e, Err(EstimateError::Bins(_))), "{e:?}");
+        }
+        let e = estimate(&s, &Reference::Index(0), &fix(-16, CostFunction::NormCorr));
+        assert!(matches!(e, Err(EstimateError::Bins(r)) if r.defect.id == "FSL-66"));
+        let e = estimate(
+            &s,
+            &Reference::Index(0),
+            &reproduce(-8, CostFunction::NormCorr),
+        );
+        assert!(matches!(
+            e,
+            Err(EstimateError::McflirtEnds(
+                McflirtEnd::DivisionByZero { .. }
+            ))
+        ));
+        // Nothing registered: no stage starts, so nothing ends.
+        let est = estimate(
+            one,
+            &Reference::Index(0),
+            &reproduce(-8, CostFunction::NormCorr),
+        );
+        assert_eq!(est.unwrap().matrices, vec![IDENTITY]);
+        // The histogram costs with no bins run, as mcflirt's do, and name FSL-21.
+        for cost in [
+            CostFunction::MutualInfo,
+            CostFunction::NormMi,
+            CostFunction::Woods,
+        ] {
+            let est = estimate(&s, &Reference::Index(0), &reproduce(7, cost)).unwrap();
+            assert!(
+                est.matrices
+                    .iter()
+                    .flatten()
+                    .flatten()
+                    .all(|v| v.is_finite())
+            );
+            assert!(
+                est.notices.iter().any(|n| n.defect.id == "FSL-21"),
+                "{cost:?}"
+            );
+        }
+        // -bins -1 with normcorr: no bins anywhere, as mcflirt; FSL-66 named.
+        let est = estimate(
+            &s,
+            &Reference::Index(0),
+            &reproduce(-1, CostFunction::NormCorr),
+        );
+        let est = est.unwrap();
+        let plain = estimate(
+            &s,
+            &Reference::Index(0),
+            &reproduce(256, CostFunction::NormCorr),
+        );
+        assert_eq!(est.matrices, plain.unwrap().matrices);
+        assert!(est.notices.iter().any(|n| n.defect.id == "FSL-66"));
     }
 
     #[test]

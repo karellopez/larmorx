@@ -107,3 +107,51 @@ black-box runs of mcflirt (`~/fsl-6.0.7.23/bin/mcflirt`), the replica program an
   correction leaves the previous volume's matrix at the identity, so FSL-01 changes nothing
   there): reported, not changed in this part
   ([`validation/investigations/cleanroom-align/README.md`](../../validation/investigations/cleanroom-align/README.md)).
+
+## FSL-20, FSL-21, FSL-65 and FSL-66 in the clean-room original (2026-10-30)
+
+Written from `specs/mcflirt.md` §10.6, §12.1 and §14.1 (the spec writer's lines of 2026-10-30)
+and black-box runs of FSL 6.0.7.23's mcflirt, by a clean-room implementer who opened none of
+FSL's source, the replica crates or the restricted findings. The cases of §14.1 are in the
+`mri-hmc` suite (`failures/<case>`, `validation/src/larmorx_validation/parity/mri_hmc_failures.py`:
+mcflirt live, larmorx in both modes); the probes are in
+[`validation/investigations/cleanroom-additions/`](../../validation/investigations/cleanroom-additions/README.md).
+
+- **Every case of §14.1 as the spec says** (33 cases on a 24 × 24 × 16 × 5 phantom, mcflirt
+  6.0.7.23): mcflirt's exit status (0, signal 6, signal 8) as observed by the spec writer; with
+  `reproduce`, larmorx's exit status (mcflirt's, 1 where mcflirt ends by a signal), mcflirt's
+  first line of standard error (`Error!: Unknown Log directory return value`, `Error! Could not
+  create directory: <-in's directory><out>.mat. No write permission`, `error: unable to open
+  output file!`, the `terminate` lines of an image that cannot be written, `double free or
+  corruption (out)`, the `std::bad_array_new_length` lines) and the files written, name for name
+  (`MAT_0000` and the `.rms` files where the `.par` file cannot be opened; the two `.rms` files
+  that can be where two cannot); by default, exit 1 and nothing written, the defect named.
+- **What the spec left to the implementer, settled black-box:** mcflirt prints the permission
+  message and the `terminate` lines with the names as given (`-out ro/o`: `ro/o.mat`,
+  `ro/o.nii.gz`); with `-report` the FSL-20 message follows `Registering volumes ...` and the
+  volumes' indices on the same line. In the default mode the `.mat` directory mcflirt would make
+  for `-rmsrel` or `-rmsabs` without `-mats` (FSL-13 corrected: none is made) is checked, so a
+  missing parent names FSL-20 there too (with FSL-13), as §14.1's `fsl20-rmsrel` asks.
+- **Few bins, measured:** with no bins in a stage (`-bins` below 8) `mutualinfo`, `normmi` and
+  `woods` run in `reproduce` as appendix B's rules give with `B = 0`; their cost is rounding noise,
+  and so are their matrices against mcflirt's (reported, not required: 95th-percentile RMS
+  deviation 3.1 mm for `normmi -bins 0`, 4.9 to 7.4 mm for `mutualinfo`, 74 mm for `woods -bins
+  1` on the phantom; mcflirt's own are nothing like its default's, §12.1). With one bin in stage 1 (`-bins 8` to 15) the mutual
+  information is 0 but for rounding as well: on the phantom 3 of the 4 registered volumes are
+  identical to mcflirt's as text after stage 1, the others 0.4 and 2.1 mm away, and after three
+  stages up to 1.4 mm; from 16 bins on the two agree within 0.07 mm (`-bins 16`, 32, 64; probe
+  `hmc_bins_matrices.py`). So `failures/bins8-mutualinfo-s3` reports its matrices; `corratio`
+  with 8 bins agrees within the record's thresholds (0.07 mm).
+- **Random testing after the additions** (a trial of 0.5 h, 2026-10-30, larmorx `6f64291`, FSL
+  6.0.7.23, `oracles/difftest/2026-10-30-cleanroom-additions`): 2,411 cases, 882 agree, 1,528
+  beyond the record's thresholds, the several-minima class of the earlier nights (failed checks:
+  the matrices' RMS deviation in 1,105, the `.rms` values, the corrected voxels, FD), as well
+  aligned as mcflirt's: the corrected series' temporal standard deviation, larmorx's over
+  mcflirt's, median 1.000 (5 % – 95 %: 0.929 – 1.047), larmorx lower in 312, within 1 % in 973,
+  higher in 243 (`../../validation/investigations/cleanroom-fixes/hmc_alignment.py`; the per-finding
+  results in [`validation/investigations/cleanroom-additions/results/hmc-alignment-trial-2026-10-30.jsonl`](../../validation/investigations/cleanroom-additions/results/hmc-alignment-trial-2026-10-30.jsonl)).
+  One case names FSL-01, FSL-09 and FSL-59 by default only (`mri-hmc:20261030:1778`: `-cost
+  mutualinfo -bins 128 -nn_final -stages 1` on a thin slab, where FSL-03's correction changes the
+  first stage's path), the class of `mri-hmc:20261029:45`: reported, not changed in this part.
+  The random draws use 64 to 256 bins and write into existing directories, so they meet none of
+  this part's four defects; those are the suite's `failures/` cases.

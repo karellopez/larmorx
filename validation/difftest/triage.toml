@@ -787,7 +787,7 @@ tool = "mri-hmc"
 implementation = "original"
 signature = ["D13 notices in both modes"]
 status = "open"
-explanation = "FSL-01 named in reproduce only (mri-hmc:20261029:45: -cost corratio with a separate reference on a thin slab): the default's FSL-03 correction leaves the previous volume's stage-1 matrix at the identity, so starting the last volume from it changes nothing there; decide by the notice rule (next-steps follow-up 'The head-motion correction's FSL-01 notice in the in-plane mode'); reported by the clean-room alignment's trial (oracles/difftest/2026-10-29-cleanroom-align)"
+explanation = "FSL-01 named in reproduce only (mri-hmc:20261029:45: -cost corratio with a separate reference on a thin slab): the default's FSL-03 correction leaves the previous volume's stage-1 matrix at the identity, so starting the last volume from it changes nothing there; decide by the notice rule (next-steps follow-up 'The head-motion correction's FSL-01 notice in the in-plane mode'); reported by the clean-room alignment's trial (oracles/difftest/2026-10-29-cleanroom-align); the clean-room additions' trial (2026-10-30) met the same class once more (mri-hmc:20261030:1778: -cost mutualinfo -bins 128 -nn_final -stages 1 on a thin slab; FSL-01, FSL-09 and FSL-59 named by default only)"
 link = "validation/investigations/cleanroom-align/README.md"
 
 # ---------------------------------------------------------------- the version update's part 3 (2026-10-29)

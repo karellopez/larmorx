@@ -143,6 +143,14 @@ _TIERS = ("smoke", "standard", "full")
 
 
 def cases(tier: str) -> list[Case]:
+    """The recorded runs of ``tier``, then the failure cases of ``specs/mcflirt.md`` §14.1
+    (:mod:`mri_hmc_failures`: mcflirt runs live)."""
+    from larmorx_validation.parity import mri_hmc_failures
+
+    return [*_recorded_cases(tier), *mri_hmc_failures.cases(tier)]
+
+
+def _recorded_cases(tier: str) -> list[Case]:
     rank = _TIERS.index(tier)
     root = oracle_dir()
     out = []
@@ -743,6 +751,11 @@ _METRICS: dict[str, dict[str, Any]] = {}
 
 
 def _run_case_recording(case: Case, checks: CheckList) -> None:
+    from larmorx_validation.parity import mri_hmc_failures
+
+    if isinstance(case.payload, mri_hmc_failures.FailureCase):
+        _METRICS[case.id] = mri_hmc_failures.run_case(case, checks) or {}
+        return
     _METRICS[case.id] = run_case(case, checks) or {}
 
 
@@ -967,6 +980,12 @@ def suite() -> Suite:
                 f"identical; NCC ≥ {IMAGE_NCC}",
             ),
             ("Synthetic truth: mean RMS deviation", f"larmorx ≤ mcflirt + {TRUTH_SLACK_MM} mm"),
+            (
+                "Failure cases (spec §14.1: FSL-20, -21, -65, -66)",
+                "`reproduce`: mcflirt's exit status (1 where it ends by a signal), its first line "
+                "of standard error, the files written, the defects named; matrices where both run "
+                "(reported where a stage has no bin or one); the default: refused, nothing written",
+            ),
         ],
         cases=cases,
         run_case=_run_case_recording,
@@ -979,6 +998,9 @@ def suite() -> Suite:
             "compared as written (about the reference's intensity-weighted centre). The `descrip` "
             "header field differs by design (larmorx writes its own name). larmorx runs at "
             f"{LX_THREADS} threads (`LARMORX_PARITY_LX_THREADS`); its results do not depend on "
-            "the thread count. " + fsl_versions.record_line("original", with_step=False)
+            "the thread count. The failure cases of `specs/mcflirt.md` §14.1 (`failures/`) run "
+            "mcflirt live, through the oracle cache (`mri_hmc_failures`), on a 24 × 24 × 16 × 5 "
+            "phantom, each program in a run directory of its own prepared alike. "
+            + fsl_versions.record_line("original", with_step=False)
         ),
     )

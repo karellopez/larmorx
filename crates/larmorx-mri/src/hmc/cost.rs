@@ -485,6 +485,8 @@ pub fn least_squares(
 
 /// Reference bins (appendix A): `⌊(g − g_min)·B/(g_max − g_min)⌋` clamped to `0 … B−1`,
 /// returned as a grid of bin indices (the histogram costs sample it in place of the values).
+/// With no bins (`B = 0`, FSL-21 reproduced) every point is in bin 0, as with one bin
+/// (`specs/mcflirt.md` §12.1).
 pub fn bin_grid(grid: &Volume, bins: usize) -> Volume {
     let (lo, hi) = min_max(&grid.data);
     let range = if hi - lo == 0.0 { 1.0 } else { hi - lo };
@@ -517,7 +519,10 @@ struct BinSlice {
 }
 
 impl BinSlice {
+    /// `bins` cells, at least one: with no bins (FSL-21 reproduced) every sample falls into the
+    /// one cell mcflirt then has (its bin `B` = 0, §12.1).
     fn new(bins: usize) -> BinSlice {
+        let bins = bins.max(1);
         BinSlice {
             weighted: vec![[0.0; 3]; bins],
             plain: vec![[0.0; 3]; bins],
@@ -543,6 +548,7 @@ impl Accumulator for BinSlice {
 }
 
 fn merge_bins(slices: Vec<BinSlice>, bins: usize) -> BinSlice {
+    let bins = bins.max(1);
     let mut out = BinSlice::new(bins);
     for s in slices {
         for k in 0..bins {
@@ -646,17 +652,20 @@ fn x86_i32(v: f32) -> i32 {
 /// they are equal), `a1 = B/(r_max − r_min)`, `a0 = −r_min·B/(r_max − r_min)` in float32, each
 /// point's bin `trunc(v·a1 + a0)` clamped to `0 … B−1`. Returned as a grid of bin indices,
 /// which the costs sample in place of the values. With `skip_non_finite` (FSL-14 corrected), a
-/// point whose value is NaN or infinite gets a NaN bin, so the sampling leaves it out.
+/// point whose value is NaN or infinite gets a NaN bin, so the sampling leaves it out. With no
+/// bins (`B = 0`, FSL-21 reproduced: `-bins` below 8 in stage 1) `a1 = 0` and every point is in
+/// bin 0 (§12.1): the clamp lowers a bin of `B` or more to `B − 1` first, then raises a negative
+/// one to 0.
 pub fn bin_grid_mi(grid: &Volume, bins: usize, skip_non_finite: bool) -> Volume {
     let (lo, mut hi) = min_max(&grid.data);
     if hi - lo == 0.0 {
         hi += 1.0;
     }
-    let b = bins.max(1) as f32;
+    let b = bins as f32;
     let range = hi - lo;
     let a1 = b / range;
     let a0 = (-lo * b) / range;
-    let top = bins.max(1) as i32 - 1;
+    let top = bins as i32 - 1;
     let data = grid
         .data
         .par_iter()
@@ -665,7 +674,7 @@ pub fn bin_grid_mi(grid: &Volume, bins: usize, skip_non_finite: bool) -> Volume 
             if skip_non_finite && !v.is_finite() {
                 f32::NAN
             } else {
-                x86_i32(v * a1 + a0).clamp(0, top) as f32
+                x86_i32(v * a1 + a0).min(top).max(0) as f32
             }
         })
         .collect();
@@ -684,9 +693,11 @@ pub struct TestBins {
 }
 
 impl TestBins {
+    /// The factors for `bins` bins; with none (FSL-21 reproduced) `b1 = 0`, so every sample's
+    /// `u` is ±0 (§12.1).
     pub fn new(vol: &Volume, bins: usize) -> TestBins {
         let (lo, hi) = min_max(&vol.data);
-        let b = bins.max(1) as f32;
+        let b = bins as f32;
         let range = hi - lo;
         TestBins {
             b1: b / range,
@@ -759,21 +770,29 @@ fn contribution(a: f32, y: f32, g: f32, bins: i64, t: TestBins) -> Contribution 
 
 /// The joint histogram and the two marginals (appendix B, "Histograms"): float32 cells, each
 /// contribution added in the sampling order.
+///
+/// mcflirt's histograms have `B + 1` cells per axis, those of index `B` staying 0 when `B ≥ 1`;
+/// with no bins (`B = 0`, FSL-21 reproduced) the single cell of index 0 takes every sample
+/// (§12.1). So the cells kept are `max(B, 1)` per axis (`dim`), the contributions computed with
+/// `B` itself (`bins`).
 struct MiHistograms {
     joint: Vec<f32>,
     test: Vec<f32>,
     reference: Vec<f32>,
-    bins: usize,
+    dim: usize,
+    bins: i64,
     test_bins: TestBins,
 }
 
 impl MiHistograms {
     fn new(bins: usize, test_bins: TestBins) -> MiHistograms {
+        let dim = bins.max(1);
         MiHistograms {
-            joint: vec![0.0; bins * bins],
-            test: vec![0.0; bins],
-            reference: vec![0.0; bins],
-            bins,
+            joint: vec![0.0; dim * dim],
+            test: vec![0.0; dim],
+            reference: vec![0.0; dim],
+            dim,
+            bins: bins as i64,
             test_bins,
         }
     }
@@ -784,11 +803,12 @@ impl MiHistograms {
     /// never −0, leaves it as it is.
     #[inline(always)]
     fn add(&mut self, k: &Contribution) {
-        let row = k.a as usize * self.bins;
+        let row = k.a as usize * self.dim;
         for (i, x) in [(k.c, k.gwc), (k.cp, k.gwp), (k.cm, k.gwm)] {
             // An index outside the bins comes only with a zero weight (a NaN or an out-of-range
-            // test value, which mcflirt's conversion maps to the most negative integer).
-            if x != 0.0 && (0..self.bins as i64).contains(&i) {
+            // test value, which mcflirt's conversion maps to the most negative integer; with no
+            // bins, the upper neighbour -1).
+            if x != 0.0 && (0..self.dim as i64).contains(&i) {
                 self.joint[row + i as usize] += x;
                 self.test[i as usize] += x;
             }
@@ -800,7 +820,7 @@ impl MiHistograms {
 impl Accumulator for MiHistograms {
     #[inline(always)]
     fn point(&mut self, g: f32, v: f32, w: f32) {
-        let k = contribution(g, v, w, self.bins as i64, self.test_bins);
+        let k = contribution(g, v, w, self.bins, self.test_bins);
         self.add(&k);
     }
     fn end_row(&mut self) {}
@@ -851,7 +871,6 @@ pub fn mutual_info(
     normalised: bool,
     parallel: bool,
 ) -> f32 {
-    let bins = bins.max(1);
     let test_bins = test
         .test_bins
         .unwrap_or_else(|| TestBins::new(test.vol, bins));

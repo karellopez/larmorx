@@ -1,12 +1,12 @@
 # Parity: Head-motion correction (mcflirt-compatible)
 
-**1 case(s) fail.** 136 cases on the `standard` tier: 121 pass, 11 rejected by both, 3 expected divergences, 1 failures.
+**1 case(s) fail.** 169 cases on the `standard` tier: 145 pass, 20 rejected by both, 3 expected divergences, 1 failures.
 
 - **Validated:** `larmorx mri hmc` / `lx.mri.hmc` (crate larmorx-mri, clean-room from `specs/mcflirt.md`, Apache-2.0)
-- **Reference:** mcflirt from FSL 6.0.7.23 (fsl-mcflirt 2111.0), the recorded runs in `oracles/fsl-6.0.7.23/mcflirt/`
+- **Reference:** mcflirt from FSL 6.0.7.23 (fsl-mcflirt 2111.0), the recorded runs in `oracles/fsl-6.0.7.23/mcflirt-haswell/`
 - **Test data:** larmorx-testdata `52124bc98f9f`, tier `standard`
-- **Generated:** 2026-10-29 on Linux x86_64, with `python -m larmorx_validation parity mri-hmc --tier standard --fsl-version 6.0.7.23`
-- **Original programs:** 2 runs: 2 from the oracle cache, 0 run; cache `<workspace>/oracles/cache`, mode `use`
+- **Generated:** 2026-10-30 on Linux x86_64, with `python -m larmorx_validation parity mri-hmc --tier standard --fsl-version 6.0.7.23`
+- **Original programs:** 35 runs: 21 from the oracle cache, 14 run (6 never cached: the original varies); cache `<workspace>/oracles/cache`, mode `use`
 
 
 ## mcflirt's own variability band
@@ -156,12 +156,14 @@ mcflirt is deterministic, so its variability is measured by perturbing its input
 | `.par` median differences; `.rms` values | ≤ 0.05 mm / 0.05°; ≤ 0.1 mm |
 | Images: header (type, shape, voxel sizes, units, xforms); values | identical; NCC ≥ 0.999 |
 | Synthetic truth: mean RMS deviation | larmorx ≤ mcflirt + 0.05 mm |
+| Failure cases (spec §14.1: FSL-20, -21, -65, -66) | `reproduce`: mcflirt's exit status (1 where it ends by a signal), its first line of standard error, the files written, the defects named; matrices where both run (reported where a stage has no bin or one); the default: refused, nothing written |
 
 ## Results by category
 
 | Category | Cases | Pass | Both reject | Expected divergence | Fail |
 |---|---|---|---|---|---|
 | difftest | 2 | 0 | 0 | 2 | 0 |
+| failure cases (spec §14.1) | 33 | 24 | 9 | 0 | 0 |
 | options (ds000005) | 25 | 24 | 1 | 0 | 0 |
 | real | 30 | 28 | 1 | 0 | 1 |
 | synthetic/cli | 11 | 6 | 5 | 0 | 0 |
@@ -185,7 +187,7 @@ mcflirt's defaults (middle volume as reference)
 |---|---|
 | `syn/motion/small/no-fsloutputtype` | Without FSLOUTPUTTYPE, mcflirt writes the .mat files and fails (exit 1); larmorx writes every output as .nii.gz (its default). |
 | `difftest/normmi-aligns-worse` | -cost normmi, computed exactly as specs/mcflirt.md appendix B describes it since 2026-10-29: larmorx now aligns this phantom better than mcflirt 6.0.7.23 (temporal SD 0.93 of mcflirt's; 1.38 before), its estimates ending in other minima of a phantom moved by large rotations, beyond the record's thr… |
-| `difftest/phantom-several-minima` | A small phantom moved by up to 15 degrees: the normalised correlation has several minima, and larmorx's estimates end in other ones than mcflirt's beyond the record's thresholds, aligning the series as well (temporal SD 0.999 of mcflirt's here; over the night's 782 findings median ratio 1.000, docs… |
+| `difftest/phantom-several-minima` | A small phantom moved by up to 15 degrees: the normalised correlation has several minima, and larmorx's estimates end in other ones than mcflirt's beyond the record's thresholds, aligning the series as well (temporal SD 0.999 of mcflirt's here; over the 782 findings of the first long random-testing… |
 
 ## Rejected by both
 
@@ -202,12 +204,21 @@ mcflirt's defaults (middle volume as reference)
 | `syn/motion/small/reffile-grid2` | reference on a different grid | mcflirt exit [-6]: Image Exception : #2 :: Attempted to copydata with non-matching sizes terminate called after throwing an instance of 'std::runtime_error' wh… |
 | `syn/motion/small/refvol-out-of-range` | -refvol 12 with 12 volumes | mcflirt exit [-6]: Image Exception : #61 :: Invalid t index in [] operator terminate called after throwing an instance of 'std::runtime_error' what(): Invalid … |
 | `syn/motion/small/unknown-option` | -edge (offered by nipype) is not an mcflirt option | mcflirt exit [255]: Lacking argument to option -edge; larmorx exit [255]: Lacking argument to option -edge |
+| `failures/fsl20-perm` | -mats in a read-only directory: mcflirt's permission message, then it aborts | mcflirt ends by signal 6 (Error! Could not create directory: <inputs>/<run>/ro/o.mat. No write permission); larmorx exits 1 (reproduce) and 1 (default) with it… |
+| `failures/fsl20-none` | no output option, in a missing directory: the series cannot be written | mcflirt ends by signal 6 (terminate called after throwing an instance of 'NiftiIO::NiftiException'); larmorx exits 1 (reproduce) and 1 (default) with its error |
+| `failures/bins2-corratio` | corratio with -bins 2: mcflirt aborts (FSL-21) | mcflirt ends by signal 6 (double free or corruption (out)); larmorx exits 1 (reproduce) and 1 (default) with its error |
+| `failures/bins2-corratio-smooth0` | corratio, -bins 2, -smooth 0 (FSL-21) | mcflirt ends by signal 6 (double free or corruption (out)); larmorx exits 1 (reproduce) and 1 (default) with its error |
+| `failures/bins2-corratio-report` | corratio, -bins 2, -report (FSL-21) | mcflirt ends by signal 6 (Processed data will be saved as <run>/o); larmorx exits 1 (reproduce) and 1 (default) with its error |
+| `failures/binsm4-normcorr-s2` | -bins -4, two stages: mcflirt is killed by SIGFPE (FSL-66) | mcflirt ends by signal 8 (no message); larmorx exits 1 (reproduce) and 1 (default) with its error |
+| `failures/binsm8-normcorr` | -bins -8: SIGFPE in stage 1 (FSL-66) | mcflirt ends by signal 8 (no message); larmorx exits 1 (reproduce) and 1 (default) with its error |
+| `failures/binsm16-normcorr` | -bins -16: std::bad_array_new_length (FSL-66) | mcflirt ends by signal 6 (terminate called after throwing an instance of 'std::bad_array_new_length'); larmorx exits 1 (reproduce) and 1 (default) with its err… |
+| `failures/binsm16-mutualinfo` | mutualinfo, -bins -16 (FSL-66) | mcflirt ends by signal 6 (terminate called after throwing an instance of 'std::bad_array_new_length'); larmorx exits 1 (reproduce) and 1 (default) with its err… |
 
 ## Environment
 
 | Component | Version |
 |---|---|
-| larmorx | 0.0.1 (bb36e15a24bb) |
+| larmorx | 0.0.1 (7c9df9d9c8b2) |
 | larmorx-testdata | 52124bc98f9f |
 | Python | 3.12.16 |
 | Platform | Linux x86_64 (Linux-6.8.0-124-generic-x86_64-with-glibc2.35) |
@@ -217,7 +228,7 @@ mcflirt's defaults (middle volume as reference)
 
 ## Notes
 
-Each recorded mcflirt run is replayed with the same arguments and FSLOUTPUTTYPE; outputs are read with nibabel. Parameters are decomposed about the centre of the reference's field of view (FSL-mm) for the comparison; the `.par` files are compared as written (about the reference's intensity-weighted centre). The `descrip` header field differs by design (larmorx writes its own name). larmorx runs at 4 threads (`LARMORX_PARITY_LX_THREADS`); its results do not depend on the thread count. FSL version: 6.0.7.23 (`--fsl-version`, `LARMORX_FSL_VERSION`; installations: 6.0.7.23 `~/fsl-6.0.7.23`, 6.0.7.17 `~/fsl`).
+Each recorded mcflirt run is replayed with the same arguments and FSLOUTPUTTYPE; outputs are read with nibabel. Parameters are decomposed about the centre of the reference's field of view (FSL-mm) for the comparison; the `.par` files are compared as written (about the reference's intensity-weighted centre). The `descrip` header field differs by design (larmorx writes its own name). larmorx runs at 4 threads (`LARMORX_PARITY_LX_THREADS`); its results do not depend on the thread count. The failure cases of `specs/mcflirt.md` §14.1 (`failures/`) run mcflirt live, through the oracle cache (`mri_hmc_failures`), on a 24 × 24 × 16 × 5 phantom, each program in a run directory of its own prepared alike. FSL version: 6.0.7.23 (`--fsl-version`, `LARMORX_FSL_VERSION`; installations: 6.0.7.23 `~/fsl-6.0.7.23`, 6.0.7.17 `~/fsl`).
 
 ## All cases
 
@@ -357,5 +368,38 @@ Each recorded mcflirt run is replayed with the same arguments and FSLOUTPUTTYPE;
 | `syn/orientation/ras-unflipped/reffile` | pass | 16/16 | -reffile phantom/ref |
 | `syn/orientation/ras/default` | pass | 16/16 | defaults |
 | `syn/orientation/ras/reffile` | pass | 17/17 | -reffile phantom/ref |
+| `failures/fsl20-mats` | pass | 8/8 | -mats in a directory that does not exist (FSL-20) |
+| `failures/fsl20-mats-plots` | pass | 8/8 | -mats -plots in a directory that does not exist (FSL-20) |
+| `failures/fsl20-reffile` | pass | 8/8 | -mats with -reffile in a missing directory (FSL-20) |
+| `failures/fsl20-file-parent` | pass | 8/8 | -mats where the directory is a file (FSL-20) |
+| `failures/fsl20-rmsrel` | pass | 8/8 | -rmsrel without -mats in a missing directory (FSL-13, FSL-20) |
+| `failures/fsl20-rmsabs-report` | pass | 8/8 | -rmsabs -report without -mats in a missing directory (FSL-13, FSL-20) |
+| `failures/fsl20-perm` | both-error | 7/7 | -mats in a read-only directory: mcflirt's permission message, then it aborts |
+| `failures/fsl20-plots-only` | pass | 8/8 | -plots alone in a missing directory (FSL-65) |
+| `failures/fsl20-none` | both-error | 7/7 | no output option, in a missing directory: the series cannot be written |
+| `failures/par-dir-plots-mats` | pass | 9/9 | a directory named o.par, with -mats -plots -rmsrel (FSL-65) |
+| `failures/par-dir-plots` | pass | 8/8 | a directory named o.par, -plots (FSL-65) |
+| `failures/par-dir-plots-mats-ref0` | pass | 9/9 | a directory named o.par, -mats -plots -refvol 0 (FSL-65) |
+| `failures/rms-dir` | pass | 9/9 | directories named o_rel.rms and o_abs_mean.rms (FSL-65) |
+| `failures/bins7-mutualinfo` | pass | 9/9 | mutualinfo with -bins 7 (FSL-21) |
+| `failures/bins4-mutualinfo-s2` | pass | 9/9 | mutualinfo, -bins 4, two stages (FSL-21) |
+| `failures/bins4-mutualinfo-s3-plots` | pass | 9/9 | mutualinfo, -bins 4, three stages, -plots (FSL-21) |
+| `failures/bins0-normmi` | pass | 9/9 | normmi with -bins 0 (FSL-21) |
+| `failures/bins1-woods` | pass | 9/9 | woods with -bins 1 (FSL-21) |
+| `failures/binsabc-mutualinfo` | pass | 9/9 | -bins abc, read as 0 (FSL-07; FSL-21 reproduced) |
+| `failures/bins2-corratio` | both-error | 8/8 | corratio with -bins 2: mcflirt aborts (FSL-21) |
+| `failures/bins2-corratio-smooth0` | both-error | 8/8 | corratio, -bins 2, -smooth 0 (FSL-21) |
+| `failures/bins2-corratio-report` | both-error | 8/8 | corratio, -bins 2, -report (FSL-21) |
+| `failures/bins8-corratio` | pass | 7/7 | corratio with -bins 8: one bin in stage 1 |
+| `failures/bins8-mutualinfo-s3` | pass | 7/7 | mutualinfo with -bins 8: one bin in stage 1 (a cost of rounding noise) |
+| `failures/bins2-normcorr` | pass | 7/7 | normcorr with -bins 2 (it uses no bins) |
+| `failures/bins2-leastsq` | pass | 7/7 | leastsquares with -bins 2 (it uses no bins) |
+| `failures/binsm1-normcorr` | pass | 9/9 | normcorr with -bins -1: no bins anywhere (FSL-66) |
+| `failures/bins4-mutualinfo-s0` | pass | 7/7 | mutualinfo, -bins 4, -stages 0: no stage runs |
+| `failures/bins4-mutualinfo-1vol` | pass | 9/9 | mutualinfo, -bins 4, one volume: nothing is registered |
+| `failures/binsm4-normcorr-s2` | both-error | 8/8 | -bins -4, two stages: mcflirt is killed by SIGFPE (FSL-66) |
+| `failures/binsm8-normcorr` | both-error | 8/8 | -bins -8: SIGFPE in stage 1 (FSL-66) |
+| `failures/binsm16-normcorr` | both-error | 8/8 | -bins -16: std::bad_array_new_length (FSL-66) |
+| `failures/binsm16-mutualinfo` | both-error | 8/8 | mutualinfo, -bins -16 (FSL-66) |
 | `difftest/normmi-aligns-worse` | expected-divergence | 7/13 | Head-motion correction with -cost normmi on a random phantom with large motion: once the subset that aligned worse (ite… |
 | `difftest/phantom-several-minima` | expected-divergence | 15/16 | Head-motion correction on a random phantom with large motion: an explained divergence (item 13, 2026-10-29) |

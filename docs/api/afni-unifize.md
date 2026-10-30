@@ -104,15 +104,20 @@ Corrected by default, reproduced with `upstream_defects="reproduce"`, by both im
   or twice (also clip the bright edges) (AFNI-48; ...)`, exit 1); `reproduce` gives AFNI's
   result and names AFNI-48 after the output. With `-EPI` (which implies one `-T2`) any number
   of `-T2` runs as in AFNI. Both implementations word it the same.
-- **AFNI-75** (random testing, 2026-10-25; the replica, the clean-room original to follow):
-  `-EPI` sets the radius from the voxel size with no upper bound (AFNI prints "-EPI changes
-  -Urad to N voxels"); on micrometre voxels N is thousands and the ball of neighbours AFNI
-  builds first needs terabytes, so AFNI fills the machine until it is stopped. By default the
-  replica computes that memory before building the ball and, when it exceeds the machine's
-  physical memory (or `LARMORX_MEMORY_LIMIT`; 1 TiB where the machine's memory cannot be read),
-  stops at once with the GiB needed and the likely
-  cause, naming AFNI-75 (exit 1); every case that fits is unchanged; `reproduce` attempts it
-  as AFNI does.
+- **AFNI-75** (random testing, 2026-10-25; the replica, and the clean-room original since
+  2026-10-30, `specs/3dUnifize.md` §9.1): `-EPI` sets the radius from the voxel size with no
+  upper bound (AFNI prints "-EPI changes -Urad to N voxels"); on micrometre voxels N is
+  thousands and the ball of neighbours AFNI builds first needs terabytes, so AFNI fills the
+  machine until it is stopped. By default both implementations compute that memory, AFNI's
+  method's `(4/3·π·r³ + 1)·(24 + 4·w)` bytes for `w` workers (`OMP_NUM_THREADS`, `n_threads`), right
+  after the radius line and before any work (a one-volume input too), and when it exceeds the
+  limit (a limit given to the computation, `LARMORX_MEMORY_LIMIT`, above 4 GiB the machine's
+  physical memory; 1 TiB where it cannot be read) stop at once with the GiB needed, the radius,
+  the voxels and the likely cause (micrometre units), naming AFNI-75 (exit 1, nothing written;
+  the Python API raises the same message): the two refuse the same calls with the same words.
+  Every case that fits is unchanged; `reproduce` attempts it as AFNI does: the replica builds
+  the whole ball, the original only the ball's lines that reach the grid (the same values; 3 µm
+  voxels on a 24 × 24 × 16 series: 0.01 s, 5 MiB).
 - **AFNI-01**: `-EPI`'s median volume drops a negative `scl_slope`, so its sign is wrong and the
   output is all zeros; the default applies the factor.
 - **AFNI-03 and AFNI-08**: `-EPI`'s output keeps the input's time axis and slice timing: header

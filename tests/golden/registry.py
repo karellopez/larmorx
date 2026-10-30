@@ -34,6 +34,7 @@ import inspect
 import json
 import math
 import os
+import re
 import shutil
 import warnings
 from collections.abc import Callable
@@ -842,6 +843,35 @@ def cli(*argv: str, upstream_defects: str = "fix") -> str:
     if code != 0:
         raise RuntimeError(f"larmorx {' '.join(argv)} exited with {code}:\n{err}{out}")
     return out
+
+
+def cli_status(
+    *argv: str, upstream_defects: str = "fix", env: dict[str, str] | None = None
+) -> tuple[int, list[str]]:
+    """``cli`` for a call that may be refused: its exit status and the defects its standard
+    error names (in order, once each), with ``env`` set for the call."""
+    saved = dict(os.environ)
+    for name in list(os.environ):
+        if name.upper().startswith(("AFNI_", "NIML_")):
+            del os.environ[name]
+    os.environ.update(env or {})
+    os.environ["LARMORX_UPSTREAM_DEFECTS"] = upstream_defects
+    try:
+        code, _, err = _core.cli_main(["larmorx", *argv], [], "original")
+    finally:
+        os.environ.clear()
+        os.environ.update(saved)
+    named: list[str] = []
+    for d in re.findall(r"\b((?:AFNI|FSL)-\d\d)\b", err):
+        if d not in named:
+            named.append(d)
+    return code, named
+
+
+def files_under(root: str) -> str:
+    """Every file under ``root``, by its relative name with ``/``, one per line."""
+    base = Path(root)
+    return "\n".join(sorted(p.relative_to(base).as_posix() for p in base.rglob("*") if p.is_file()))
 
 
 #: D13: the cases below named ``*.reproduce`` run the original programs' defects reproduced
@@ -3050,6 +3080,27 @@ def _(ctx: Context) -> dict[str, Any]:
     return {"fix": Nifti(fixed), "reproduce": Nifti(afni)}
 
 
+@case("cli.afni.3dUnifize.guard", covers=("cli:afni 3dUnifize",))
+def _(ctx: Context) -> dict[str, Any]:
+    """AFNI-75's guard (``specs/3dUnifize.md`` §9.1): ``-EPI`` on a series whose header gives its
+    voxels in micrometres (a radius of 6100 voxels) refused by default before any work, the limit
+    given (``LARMORX_MEMORY_LIMIT=4G``, so the case depends on no machine): exit 1, AFNI-75
+    named, nothing written."""
+    img = bold()
+    data = np.asarray(img.data)
+    hdr = img.header.replace(xyzt_units=3 | 8)  # micrometres, seconds
+    path = ctx.out("um.nii")
+    lx.save(lx.Image(data, img.affine, hdr), path)
+    out = ctx.out("uni.nii")
+    env = {"LARMORX_MEMORY_LIMIT": "4G", "OMP_NUM_THREADS": "2"}
+    code, ids = cli_status("afni", "3dUnifize", "-quiet", "-EPI", "-prefix", out, path, env=env)
+    return {
+        "status": np.array([code]),
+        "named": " ".join(i for i in ids if i == "AFNI-75"),
+        "files": files_under(str(ctx.dir)),
+    }
+
+
 @case("py.afni.unifize", covers=("lx.afni.unifize",))
 def _(ctx: Context) -> dict[str, Any]:
     """The clean-room original on an image in memory, with the scale factors and the
@@ -3154,6 +3205,66 @@ def _(ctx: Context) -> dict[str, Any]:
         "a.img.zst": File(f"{a}.img.zst"),
         "b.nii.bz2": File(f"{b}.nii.bz2"),
     }
+
+
+@case("cli.mri.hmc.unwritable", covers=("cli:mri hmc",))
+def _(ctx: Context) -> dict[str, Any]:
+    """Outputs mcflirt cannot write (``specs/mcflirt.md`` §10.6): ``-mats`` in a directory that
+    does not exist (FSL-20) and a directory named like the ``.par`` file (FSL-65). By default
+    refused (exit 1, nothing written); reproduced, mcflirt's exit 0 (FSL-65: the first matrix and
+    the ``.rms`` files only)."""
+    env = {"FSLOUTPUTTYPE": "NIFTI_GZ"}
+    bold_nii = ctx.file("bold.nii")
+    missing = os.path.join(ctx.out("missing"), "o")
+    os.makedirs(ctx.out("par/o.par"))
+    par = os.path.join(ctx.out("par"), "o")
+    status, named = [], []
+    for args in (
+        ("-out", missing, "-mats", "-stages", "1"),
+        ("-out", par, "-mats", "-plots", "-rmsrel", "-refvol", "1", "-stages", "1"),
+    ):
+        for mode in ("fix", REPRODUCE):
+            code, ids = cli_status("mri", "hmc", "-in", bold_nii, *args, upstream_defects=mode, env=env)  # fmt: skip
+            status.append(code)
+            named.append(" ".join(i for i in ids if i in ("FSL-20", "FSL-65")))
+            if mode == "fix":
+                # Nothing written by the default.
+                assert files_under(ctx.out("par")) == "", files_under(ctx.out("par"))
+    return {
+        "status": np.array(status),
+        "named": "\n".join(named),
+        "files": files_under(str(ctx.dir)),
+        "MAT_0000": File(os.path.join(f"{par}.mat", "MAT_0000")),
+        "rel": File(f"{par}_rel.rms"),
+    }
+
+
+@case("cli.mri.hmc.bins", covers=("cli:mri hmc",))
+def _(ctx: Context) -> dict[str, Any]:
+    """Bins no histogram can have (``specs/mcflirt.md`` §12.1): ``mutualinfo`` with ``-bins 4``
+    (FSL-21) and ``-bins -16`` (FSL-66) refused by default (exit 1, nothing written); reproduced,
+    ``-bins -16`` stops where mcflirt aborts (exit 1) and ``mutualinfo`` with ``-bins 7`` runs
+    with no bins in its stage (its matrices hashed: the zero-bin histograms of appendix B)."""
+    env = {"FSLOUTPUTTYPE": "NIFTI_GZ"}
+    bold_nii = ctx.file("bold.nii")
+    out = ctx.out("o")
+    status, named = [], []
+    for args, mode in (
+        (("-cost", "mutualinfo", "-bins", "4", "-mats"), "fix"),
+        (("-bins", "-16", "-mats"), "fix"),
+        (("-bins", "-16", "-mats"), REPRODUCE),
+    ):
+        code, ids = cli_status("mri", "hmc", "-in", bold_nii, "-out", out, *args, upstream_defects=mode, env=env)  # fmt: skip
+        status.append(code)
+        named.append(" ".join(i for i in ids if i in ("FSL-21", "FSL-66")))
+    nothing = files_under(str(ctx.dir))
+    code, ids = cli_status("mri", "hmc", "-in", bold_nii, "-out", out, "-cost", "mutualinfo", "-bins", "7", "-stages", "1", "-refvol", "1", "-mats", upstream_defects=REPRODUCE, env=env)  # fmt: skip
+    status.append(code)
+    named.append(" ".join(i for i in ids if i == "FSL-21"))
+    result: dict[str, Any] = {"status": np.array(status), "named": "\n".join(named), "before": nothing}  # fmt: skip
+    for t in range(SHAPE4[3]):
+        result[f"MAT_{t:04d}"] = File(os.path.join(f"{out}.mat", f"MAT_{t:04d}"))
+    return result
 
 
 @case("cli.fsl.mcflirt", covers=("cli:fsl mcflirt",))

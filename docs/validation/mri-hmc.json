@@ -2,7 +2,7 @@
  "environment": {
   "cpu": "AMD Ryzen 9 7945HX with Radeon Graphics",
   "larmorx": "0.0.1",
-  "larmorx_commit": "bb36e15a24bb",
+  "larmorx_commit": "7c9df9d9c8b2",
   "larmorx_testdata_commit": "52124bc98f9f",
   "logical_cpus": 32,
   "os": "Linux-6.8.0-124-generic-x86_64-with-glibc2.35",
@@ -15,14 +15,18 @@
  },
  "oracle_cache": {
   "differences": 0,
-  "fresh": {},
+  "fresh": {
+   "ended by a signal, SIGABRT (never stored)": 6,
+   "ended by a signal, SIGFPE (never stored)": 2,
+   "never cached: the case prepares a directory, a file or a permission in the run directory, which the key does not hold": 6
+  },
   "location": "<workspace>/oracles/cache",
   "mode": "use",
-  "ran": 0,
-  "saved_seconds": 0.2,
-  "served": 2
+  "ran": 14,
+  "saved_seconds": 2.7,
+  "served": 21
  },
- "reference": "mcflirt from FSL 6.0.7.23 (fsl-mcflirt 2111.0), the recorded runs in `oracles/fsl-6.0.7.23/mcflirt/`",
+ "reference": "mcflirt from FSL 6.0.7.23 (fsl-mcflirt 2111.0), the recorded runs in `oracles/fsl-6.0.7.23/mcflirt-haswell/`",
  "results": [
   {
    "case": "real/ds000005/default",
@@ -46,7 +50,7 @@
     "FD (Power, 50 mm) correlation": "0.8855",
     "out_mcf.nii.gz.mat: matrices identical as text": "1/240"
    },
-   "seconds": 36.674,
+   "seconds": 20.324,
    "status": "pass"
   },
   {
@@ -66,7 +70,7 @@
     "FD (Power, 50 mm) correlation": "0.8869",
     "out_mcf.nii.gz.mat: matrices identical as text": "0/240"
    },
-   "seconds": 33.387,
+   "seconds": 20.581,
    "status": "pass"
   },
   {
@@ -86,7 +90,7 @@
     "FD (Power, 50 mm) correlation": "0.8869",
     "out_mcf.nii.gz.mat: matrices identical as text": "0/240"
    },
-   "seconds": 34.433,
+   "seconds": 20.5,
    "status": "pass"
   },
   {
@@ -106,7 +110,7 @@
     "FD (Power, 50 mm) correlation": "0.8869",
     "out_mcf.nii.gz.mat: matrices identical as text": "0/240"
    },
-   "seconds": 36.624,
+   "seconds": 19.242,
    "status": "pass"
   },
   {
@@ -131,7 +135,7 @@
     "FD (Power, 50 mm) correlation": "0.8869",
     "out_mcf.nii.gz.mat: matrices identical as text": "0/240"
    },
-   "seconds": 35.793,
+   "seconds": 20.503,
    "status": "pass"
   },
   {
@@ -156,7 +160,7 @@
     "FD (Power, 50 mm) correlation": "0.9052",
     "out_mcf.nii.gz.mat: matrices identical as text": "0/240"
    },
-   "seconds": 24.701,
+   "seconds": 15.754,
    "status": "pass"
   },
   {
@@ -181,7 +185,7 @@
     "FD (Power, 50 mm) correlation": "0.8869",
     "out_mcf.nii.gz.mat: matrices identical as text": "0/240"
    },
-   "seconds": 39.731,
+   "seconds": 19.173,
    "status": "pass"
   },
   {
@@ -206,7 +210,7 @@
     "FD (Power, 50 mm) correlation": "0.5782",
     "out_mcf.nii.gz.mat: matrices identical as text": "0/240"
    },
-   "seconds": 43.318,
+   "seconds": 18.696,
    "status": "pass"
   },
   {
@@ -231,7 +235,7 @@
     "D13 fix pass": 6158618,
     "out_mcf.nii.gz.mat: matrices identical as text": "0/240"
    },
-   "seconds": 36.784,
+   "seconds": 19.838,
    "status": "pass"
   },
   {
@@ -256,7 +260,7 @@
     "FD (Power, 50 mm) correlation": "0.9841",
     "out_mcf.nii.gz.mat: matrices identical as text": "1/240"
    },
-   "seconds": 53.205,
+   "seconds": 32.288,
    "status": "pass"
   },
   {
@@ -281,7 +285,7 @@
     "FD (Power, 50 mm) correlation": "0.8869",
     "out_mcf.nii.gz.mat: matrices identical as text": "0/240"
    },
-   "seconds": 37.097,
+   "seconds": 18.665,
    "status": "pass"
   },
   {
@@ -306,7 +310,7 @@
     "FD (Power, 50 mm) correlation": "0.9534",
     "out_mcf.nii.gz.mat: matrices identical as text": "0/240"
    },
-   "seconds": 54.198,
+   "seconds": 34.336,
    "status": "pass"
   },
   {
@@ -320,7 +324,7 @@
     "D13 fix pass": 4365570,
     "no parameter is identifiable": "48.21 / 50.64"
    },
-   "seconds": 17.462,
+   "seconds": 8.934,
    "status": "pass"
   },
   {
@@ -345,7 +349,7 @@
     "FD (Power, 50 mm) correlation": "0.8329",
     "out_mcf.nii.gz.mat: matrices identical as text": "0/240"
    },
-   "seconds": 50.212,
+   "seconds": 29.773,
    "status": "pass"
   },
   {
@@ -370,7 +374,7 @@
     "FD (Power, 50 mm) correlation": "0.8562",
     "out_mcf.nii.gz.mat: matrices identical as text": "0/240"
    },
-   "seconds": 31.884,
+   "seconds": 21.541,
    "status": "pass"
   },
   {
@@ -395,7 +399,7 @@
     "FD (Power, 50 mm) correlation": "0.9008",
     "out_mcf.nii.gz.mat: matrices identical as text": "0/240"
    },
-   "seconds": 43.243,
+   "seconds": 24.53,
    "status": "pass"
   },
   {
@@ -420,7 +424,7 @@
     "FD (Power, 50 mm) correlation": "0.9658",
     "out_mcf.nii.gz.mat: matrices identical as text": "0/240"
    },
-   "seconds": 29.627,
+   "seconds": 20.275,
    "status": "pass"
   },
   {
@@ -456,7 +460,7 @@
     "FD (Power, 50 mm) correlation": "0.9061",
     "out_mcf.nii.gz.mat: matrices identical as text": "0/240"
    },
-   "seconds": 55.128,
+   "seconds": 30.704,
    "status": "pass"
   },
   {
@@ -482,7 +486,7 @@
     "FD (Power, 50 mm) correlation": "0.8801",
     "out_mcf.nii.gz.mat: matrices identical as text": "0/240"
    },
-   "seconds": 55.44,
+   "seconds": 31.71,
    "status": "pass"
   },
   {
@@ -507,7 +511,7 @@
     "FD (Power, 50 mm) correlation": "0.8869",
     "out_mcf.nii.gz.mat: matrices identical as text": "0/240"
    },
-   "seconds": 34.05,
+   "seconds": 19.317,
    "status": "pass"
   },
   {
@@ -532,7 +536,7 @@
     "FD (Power, 50 mm) correlation": "0.8876",
     "out_mcf.nii.gz.mat: matrices identical as text": "1/240"
    },
-   "seconds": 34.237,
+   "seconds": 19.204,
    "status": "pass"
   },
   {
@@ -557,7 +561,7 @@
     "FD (Power, 50 mm) correlation": "0.9141",
     "out_mcf.nii.gz.mat: matrices identical as text": "0/240"
    },
-   "seconds": 29.47,
+   "seconds": 19.505,
    "status": "pass"
   },
   {
@@ -582,7 +586,7 @@
     "FD (Power, 50 mm) correlation": "0.8869",
     "out_mcf.nii.gz.mat: matrices identical as text": "0/240"
    },
-   "seconds": 36.118,
+   "seconds": 18.65,
    "status": "pass"
   },
   {
@@ -607,7 +611,7 @@
     "FD (Power, 50 mm) correlation": "0.9393",
     "out_mcf.nii.gz.mat: matrices identical as text": "3/240"
    },
-   "seconds": 31.37,
+   "seconds": 17.599,
    "status": "pass"
   },
   {
@@ -632,7 +636,7 @@
     "FD (Power, 50 mm) correlation": "0.8842",
     "out_mcf.nii.gz.mat: matrices identical as text": "0/240"
    },
-   "seconds": 33.509,
+   "seconds": 18.921,
    "status": "pass"
   },
   {
@@ -657,7 +661,7 @@
     "FD (Power, 50 mm) correlation": "0.8869",
     "out_mcf.nii.gz.mat: matrices identical as text": "0/240"
    },
-   "seconds": 31.437,
+   "seconds": 19.74,
    "status": "pass"
   },
   {
@@ -682,7 +686,7 @@
     "FD (Power, 50 mm) correlation": "0.9845",
     "out_mcf.nii.gz.mat: matrices identical as text": "3/240"
    },
-   "seconds": 16.137,
+   "seconds": 9.413,
    "status": "pass"
   },
   {
@@ -707,7 +711,7 @@
     "FD (Power, 50 mm) correlation": "0.9463",
     "out_mcf.nii.gz.mat: matrices identical as text": "0/240"
    },
-   "seconds": 24.794,
+   "seconds": 13.895,
    "status": "pass"
   },
   {
@@ -735,7 +739,7 @@
     "FD (Power, 50 mm) correlation": "0.8869",
     "out_mcf.nii.gz.mat: matrices identical as text": "0/240"
    },
-   "seconds": 29.192,
+   "seconds": 20.071,
    "status": "pass"
   },
   {
@@ -760,7 +764,7 @@
     "FD (Power, 50 mm) correlation": "0.8763",
     "out_mcf.nii.gz.mat: matrices identical as text": "1/208"
    },
-   "seconds": 27.455,
+   "seconds": 17.736,
    "status": "pass"
   },
   {
@@ -780,7 +784,7 @@
     "FD (Power, 50 mm) correlation": "0.8991",
     "out_mcf.nii.gz.mat: matrices identical as text": "0/208"
    },
-   "seconds": 30.807,
+   "seconds": 17.905,
    "status": "pass"
   },
   {
@@ -805,7 +809,7 @@
     "FD (Power, 50 mm) correlation": "0.8991",
     "out_mcf.nii.gz.mat: matrices identical as text": "0/208"
    },
-   "seconds": 30.864,
+   "seconds": 17.801,
    "status": "pass"
   },
   {
@@ -830,7 +834,7 @@
     "D13 fix pass": 13472005,
     "out_mcf.nii.gz.mat: matrices identical as text": "1/258"
    },
-   "seconds": 26.637,
+   "seconds": 16.754,
    "status": "pass"
   },
   {
@@ -850,7 +854,7 @@
     "D13 fix pass": 13626067,
     "out_mcf.nii.gz.mat: matrices identical as text": "0/258"
    },
-   "seconds": 27.78,
+   "seconds": 17.734,
    "status": "pass"
   },
   {
@@ -875,7 +879,7 @@
     "D13 fix pass": 13626067,
     "out_mcf.nii.gz.mat: matrices identical as text": "0/258"
    },
-   "seconds": 30.66,
+   "seconds": 17.125,
    "status": "pass"
   },
   {
@@ -900,7 +904,7 @@
     "D13 fix pass": 22400000,
     "out_mcf.nii.gz.mat: matrices identical as text": "1/204"
    },
-   "seconds": 33.06,
+   "seconds": 21.711,
    "status": "pass"
   },
   {
@@ -920,7 +924,7 @@
     "D13 fix pass": 22719460,
     "out_mcf.nii.gz.mat: matrices identical as text": "0/204"
    },
-   "seconds": 34.412,
+   "seconds": 20.916,
    "status": "pass"
   },
   {
@@ -945,7 +949,7 @@
     "D13 fix pass": 22719460,
     "out_mcf.nii.gz.mat: matrices identical as text": "0/204"
    },
-   "seconds": 34.444,
+   "seconds": 20.471,
    "status": "pass"
   },
   {
@@ -970,7 +974,7 @@
     "D13 fix pass": 13938331,
     "out_mcf.nii.gz.mat: matrices identical as text": "1/239"
    },
-   "seconds": 34.361,
+   "seconds": 20.155,
    "status": "pass"
   },
   {
@@ -990,7 +994,7 @@
     "D13 fix pass": 14245902,
     "out_mcf.nii.gz.mat: matrices identical as text": "0/239"
    },
-   "seconds": 34.756,
+   "seconds": 20.657,
    "status": "pass"
   },
   {
@@ -1015,7 +1019,7 @@
     "D13 fix pass": 14245902,
     "out_mcf.nii.gz.mat: matrices identical as text": "0/239"
    },
-   "seconds": 36.677,
+   "seconds": 20.932,
    "status": "pass"
   },
   {
@@ -1049,7 +1053,7 @@
     "D13 fix pass": 13922149,
     "out_mcf.nii.gz.mat: matrices identical as text": "1/216"
    },
-   "seconds": 28.672,
+   "seconds": 16.619,
    "status": "fail"
   },
   {
@@ -1069,7 +1073,7 @@
     "D13 fix pass": 14107184,
     "out_mcf.nii.gz.mat: matrices identical as text": "0/216"
    },
-   "seconds": 27.877,
+   "seconds": 17.057,
    "status": "pass"
   },
   {
@@ -1094,7 +1098,7 @@
     "D13 fix pass": 14107184,
     "out_mcf.nii.gz.mat: matrices identical as text": "0/216"
    },
-   "seconds": 27.57,
+   "seconds": 16.696,
    "status": "pass"
   },
   {
@@ -1104,7 +1108,7 @@
    "checks_total": 0,
    "failed_checks": [],
    "reason": "mcflirt exit [-6]: Image Exception : #22 :: Failed to read volume <testdata-cache>/openneuro/ds003763/sub-16111/func/sub-16111_task-heart_bold.nii.gz Erro; larmorx exit [1]: Error: <testdata-cache>/openneuro/ds003763/sub-16111/func/sub-16111_task-heart_bold.nii.gz: incomplete deflate stream",
-   "seconds": 0.003,
+   "seconds": 0.001,
    "status": "both-error"
   },
   {
@@ -1129,7 +1133,7 @@
     "FD (Power, 50 mm) correlation": "0.7816",
     "out_mcf.nii.gz.mat: matrices identical as text": "1/63"
    },
-   "seconds": 9.08,
+   "seconds": 5.469,
    "status": "pass"
   },
   {
@@ -1149,7 +1153,7 @@
     "FD (Power, 50 mm) correlation": "0.8539",
     "out_mcf.nii.gz.mat: matrices identical as text": "0/63"
    },
-   "seconds": 9.279,
+   "seconds": 5.775,
    "status": "pass"
   },
   {
@@ -1174,7 +1178,7 @@
     "FD (Power, 50 mm) correlation": "0.8539",
     "out_mcf.nii.gz.mat: matrices identical as text": "0/63"
    },
-   "seconds": 10.135,
+   "seconds": 5.978,
    "status": "pass"
   },
   {
@@ -1199,7 +1203,7 @@
     "FD (Power, 50 mm) correlation": "0.9012",
     "out_mcf.nii.gz.mat: matrices identical as text": "1/113"
    },
-   "seconds": 37.232,
+   "seconds": 28.555,
    "status": "pass"
   },
   {
@@ -1219,7 +1223,7 @@
     "FD (Power, 50 mm) correlation": "0.9263",
     "out_mcf.nii.gz.mat: matrices identical as text": "0/113"
    },
-   "seconds": 37.106,
+   "seconds": 28.857,
    "status": "pass"
   },
   {
@@ -1244,7 +1248,7 @@
     "FD (Power, 50 mm) correlation": "0.9263",
     "out_mcf.nii.gz.mat: matrices identical as text": "0/113"
    },
-   "seconds": 36.941,
+   "seconds": 28.292,
    "status": "pass"
   },
   {
@@ -1269,7 +1273,7 @@
     "D13 fix pass": 8276506,
     "out_mcf.nii.gz.mat: matrices identical as text": "1/69"
    },
-   "seconds": 14.02,
+   "seconds": 8.178,
    "status": "pass"
   },
   {
@@ -1289,7 +1293,7 @@
     "D13 fix pass": 8423431,
     "out_mcf.nii.gz.mat: matrices identical as text": "0/69"
    },
-   "seconds": 14.424,
+   "seconds": 8.543,
    "status": "pass"
   },
   {
@@ -1314,7 +1318,7 @@
     "D13 fix pass": 8423431,
     "out_mcf.nii.gz.mat: matrices identical as text": "0/69"
    },
-   "seconds": 15.066,
+   "seconds": 8.323,
    "status": "pass"
   },
   {
@@ -1334,7 +1338,7 @@
     "D13 fix pass": 172287,
     "out_mcf.nii.gz.mat: matrices identical as text": "1/12"
    },
-   "seconds": 1.201,
+   "seconds": 0.521,
    "status": "pass"
   },
   {
@@ -1360,7 +1364,7 @@
     "D13 fix pass": 193139,
     "out_mcf.nii.gz.mat: matrices identical as text": "0/12"
    },
-   "seconds": 1.125,
+   "seconds": 0.625,
    "status": "pass"
   },
   {
@@ -1370,7 +1374,7 @@
    "checks_total": 0,
    "failed_checks": [],
    "reason": "mcflirt exit [1]: ; larmorx exit [1]: larmorx: upstream defect FSL-07 (mcflirt) reproduced: -help alone exits 1, as in mcflirt [LARMORX_UPSTREAM_DEFECTS=fix corrects it]",
-   "seconds": 0.001,
+   "seconds": 0.0,
    "status": "both-error"
   },
   {
@@ -1383,7 +1387,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 0.026,
+   "seconds": 0.017,
    "status": "pass"
   },
   {
@@ -1393,7 +1397,7 @@
    "checks_total": 0,
    "failed_checks": [],
    "reason": "mcflirt exit [1]: ; larmorx exit [1]: ",
-   "seconds": 0.001,
+   "seconds": 0.0,
    "status": "both-error"
   },
   {
@@ -1410,7 +1414,7 @@
    "reported": {
     "D13 fix pass": 172287
    },
-   "seconds": 0.866,
+   "seconds": 0.59,
    "status": "pass"
   },
   {
@@ -1435,7 +1439,7 @@
     "D13 fix pass": 172287,
     "out_mcf.nii.gz.mat: matrices identical as text": "1/12"
    },
-   "seconds": 0.901,
+   "seconds": 0.671,
    "status": "pass"
   },
   {
@@ -1445,7 +1449,7 @@
    "checks_total": 0,
    "failed_checks": [],
    "reason": "mcflirt exit [-6]: Image Exception : #61 :: Invalid t index in [] operator terminate called after throwing an instance of 'std::runtime_error' what(): Invalid t index in [] operat; larmorx exit [1]: Error: -refvol -2: invalid volume index for a series of 12 volumes",
-   "seconds": 0.009,
+   "seconds": 0.004,
    "status": "both-error"
   },
   {
@@ -1466,7 +1470,7 @@
     "D13 fix pass": 172287,
     "out_mcf.nii.gz.mat: matrices identical as text": "1/1"
    },
-   "seconds": 0.772,
+   "seconds": 0.661,
    "status": "pass"
   },
   {
@@ -1476,7 +1480,7 @@
    "checks_total": 0,
    "failed_checks": [],
    "reason": "mcflirt exit [-6]: Image Exception : #8 :: Attempted to use affine transform with no voxels in vout terminate called after throwing an instance of 'std::runtime_error' what(): Att; larmorx exit [1]: Error: -stages 0 with a reference file: nothing would be registered",
-   "seconds": 0.007,
+   "seconds": 0.005,
    "status": "both-error"
   },
   {
@@ -1511,7 +1515,7 @@
     "D13 fix pass": 194047,
     "out_mcf.nii.gz.mat: matrices identical as text": "1/6"
    },
-   "seconds": 0.491,
+   "seconds": 0.36,
    "status": "pass"
   },
   {
@@ -1537,7 +1541,7 @@
     "D13 fix pass": 204094,
     "out_mcf.nii.gz.mat: matrices identical as text": "1/6"
    },
-   "seconds": 0.532,
+   "seconds": 0.433,
    "status": "pass"
   },
   {
@@ -1562,7 +1566,7 @@
     "D13 fix pass": 166364,
     "out_mcf.nii.gz.mat: matrices identical as text": "2/12"
    },
-   "seconds": 0.955,
+   "seconds": 0.56,
    "status": "pass"
   },
   {
@@ -1587,7 +1591,7 @@
     "D13 fix pass": 300837,
     "out_mcf.nii.gz.mat: matrices identical as text": "1/12"
    },
-   "seconds": 0.89,
+   "seconds": 0.754,
    "status": "pass"
   },
   {
@@ -1603,7 +1607,7 @@
    "reported": {
     "D13 fix pass": 71616
    },
-   "seconds": 0.545,
+   "seconds": 0.406,
    "status": "pass"
   },
   {
@@ -1617,7 +1621,7 @@
     "D13 fix pass": 71683,
     "no parameter is identifiable": "10.82 / 2.56"
    },
-   "seconds": 0.482,
+   "seconds": 0.343,
    "status": "pass"
   },
   {
@@ -1642,7 +1646,7 @@
     "D13 fix pass": 33357,
     "out_mcf.nii.gz.mat: matrices identical as text": "1/12"
    },
-   "seconds": 1.024,
+   "seconds": 0.712,
    "status": "pass"
   },
   {
@@ -1667,7 +1671,7 @@
     "D13 fix pass": 33483,
     "out_mcf.nii.gz.mat: matrices identical as text": "0/12"
    },
-   "seconds": 0.914,
+   "seconds": 0.765,
    "status": "pass"
   },
   {
@@ -1692,7 +1696,7 @@
     "D13 fix pass": 33357,
     "out_mcf.nii.gz.mat: matrices identical as text": "1/12"
    },
-   "seconds": 1.054,
+   "seconds": 0.772,
    "status": "pass"
   },
   {
@@ -1717,7 +1721,7 @@
     "D13 fix pass": 33483,
     "out_mcf.nii.gz.mat: matrices identical as text": "0/12"
    },
-   "seconds": 0.925,
+   "seconds": 0.662,
    "status": "pass"
   },
   {
@@ -1742,7 +1746,7 @@
     "D13 fix pass": 33357,
     "out_mcf.nii.gz.mat: matrices identical as text": "1/12"
    },
-   "seconds": 0.842,
+   "seconds": 0.571,
    "status": "pass"
   },
   {
@@ -1767,7 +1771,7 @@
     "D13 fix pass": 33483,
     "out_mcf.nii.gz.mat: matrices identical as text": "0/12"
    },
-   "seconds": 0.852,
+   "seconds": 0.688,
    "status": "pass"
   },
   {
@@ -1792,7 +1796,7 @@
     "D13 fix pass": 172287,
     "out_mcf.nii.gz.mat: matrices identical as text": "1/12"
    },
-   "seconds": 0.931,
+   "seconds": 0.655,
    "status": "pass"
   },
   {
@@ -1817,7 +1821,7 @@
     "D13 fix pass": 193139,
     "out_mcf.nii.gz.mat: matrices identical as text": "0/12"
    },
-   "seconds": 0.952,
+   "seconds": 0.667,
    "status": "pass"
   },
   {
@@ -1842,7 +1846,7 @@
     "D13 fix pass": 163689,
     "out_mcf.nii.gz.mat: matrices identical as text": "1/12"
    },
-   "seconds": 0.743,
+   "seconds": 0.457,
    "status": "pass"
   },
   {
@@ -1867,7 +1871,7 @@
     "D13 fix pass": 180934,
     "out_mcf.nii.gz.mat: matrices identical as text": "0/12"
    },
-   "seconds": 0.749,
+   "seconds": 0.652,
    "status": "pass"
   },
   {
@@ -1891,7 +1895,7 @@
     "D13 fix pass": 0,
     "out_mcf.nii.gz.mat: matrices identical as text": "1/1"
    },
-   "seconds": 0.046,
+   "seconds": 0.026,
    "status": "pass"
   },
   {
@@ -1915,7 +1919,7 @@
     "D13 fix pass": 15784,
     "out_mcf.nii.gz.mat: matrices identical as text": "0/1"
    },
-   "seconds": 0.173,
+   "seconds": 0.185,
    "status": "pass"
   },
   {
@@ -1939,7 +1943,7 @@
     "D13 fix pass": 0,
     "out_mcf.nii.gz.mat: matrices identical as text": "1/1"
    },
-   "seconds": 0.045,
+   "seconds": 0.025,
    "status": "pass"
   },
   {
@@ -1964,7 +1968,7 @@
     "D13 fix pass": 15784,
     "out_mcf.nii.gz.mat: matrices identical as text": "0/1"
    },
-   "seconds": 0.173,
+   "seconds": 0.15,
    "status": "pass"
   },
   {
@@ -1989,7 +1993,7 @@
     "D13 fix pass": 22321,
     "out_mcf.nii.gz.mat: matrices identical as text": "1/8"
    },
-   "seconds": 0.088,
+   "seconds": 0.053,
    "status": "pass"
   },
   {
@@ -2014,7 +2018,7 @@
     "D13 fix pass": 22321,
     "out_mcf.nii.gz.mat: matrices identical as text": "1/8"
    },
-   "seconds": 0.089,
+   "seconds": 0.05,
    "status": "pass"
   },
   {
@@ -2039,7 +2043,7 @@
     "D13 fix pass": 22315,
     "out_mcf.nii.gz.mat: matrices identical as text": "2/8"
    },
-   "seconds": 0.079,
+   "seconds": 0.052,
    "status": "pass"
   },
   {
@@ -2064,7 +2068,7 @@
     "D13 fix pass": 799,
     "out_mcf.nii.gz.mat: matrices identical as text": "1/6"
    },
-   "seconds": 0.023,
+   "seconds": 0.016,
    "status": "pass"
   },
   {
@@ -2088,7 +2092,7 @@
     "D13 fix pass": 15778,
     "out_mcf.nii.gz.mat: matrices identical as text": "1/2"
    },
-   "seconds": 0.293,
+   "seconds": 0.214,
    "status": "pass"
   },
   {
@@ -2113,7 +2117,7 @@
     "D13 fix pass": 34233,
     "out_mcf.nii.gz.mat: matrices identical as text": "0/2"
    },
-   "seconds": 0.324,
+   "seconds": 0.264,
    "status": "pass"
   },
   {
@@ -2138,7 +2142,7 @@
     "FD (Power, 50 mm) correlation": "1.0000",
     "out_mcf.nii.gz.mat: matrices identical as text": "6/6"
    },
-   "seconds": 0.464,
+   "seconds": 0.372,
    "status": "pass"
   },
   {
@@ -2164,7 +2168,7 @@
     "FD (Power, 50 mm) correlation": "0.8368",
     "out_mcf.nii.gz.mat: matrices identical as text": "0/6"
    },
-   "seconds": 0.456,
+   "seconds": 0.32,
    "status": "pass"
   },
   {
@@ -2190,7 +2194,7 @@
     "FD (Power, 50 mm) correlation": "1.0000",
     "out_mcf.nii.gz.mat: matrices identical as text": "0/6"
    },
-   "seconds": 0.537,
+   "seconds": 0.36,
    "status": "pass"
   },
   {
@@ -2215,7 +2219,7 @@
     "D13 fix pass": 175179,
     "out_mcf.nii.gz.mat: matrices identical as text": "1/12"
    },
-   "seconds": 0.893,
+   "seconds": 0.673,
    "status": "pass"
   },
   {
@@ -2241,7 +2245,7 @@
     "D13 fix pass": 191396,
     "out_mcf.nii.gz.mat: matrices identical as text": "0/12"
    },
-   "seconds": 1.115,
+   "seconds": 0.656,
    "status": "pass"
   },
   {
@@ -2267,7 +2271,7 @@
     "D13 fix pass": 205738,
     "out_mcf.nii.gz.mat: matrices identical as text": "0/12"
    },
-   "seconds": 0.774,
+   "seconds": 0.489,
    "status": "pass"
   },
   {
@@ -2292,7 +2296,7 @@
     "D13 fix pass": 172287,
     "out_mcf.nii.gz.mat: matrices identical as text": "1/12"
    },
-   "seconds": 0.845,
+   "seconds": 0.524,
    "status": "pass"
   },
   {
@@ -2317,7 +2321,7 @@
     "D13 fix pass": 172287,
     "out_mcf.nii.gz.mat: matrices identical as text": "1/12"
    },
-   "seconds": 0.85,
+   "seconds": 0.55,
    "status": "pass"
   },
   {
@@ -2343,7 +2347,7 @@
     "D13 fix pass": 202281,
     "out_mcf.nii.gz.mat: matrices identical as text": "0/12"
    },
-   "seconds": 1.759,
+   "seconds": 0.978,
    "status": "pass"
   },
   {
@@ -2369,7 +2373,7 @@
     "D13 fix pass": 192701,
     "out_mcf.nii.gz.mat: matrices identical as text": "0/12"
    },
-   "seconds": 1.069,
+   "seconds": 0.733,
    "status": "pass"
   },
   {
@@ -2395,7 +2399,7 @@
     "D13 fix pass": 193139,
     "out_mcf.nii.gz.mat: matrices identical as text": "0/12"
    },
-   "seconds": 0.699,
+   "seconds": 0.602,
    "status": "pass"
   },
   {
@@ -2421,7 +2425,7 @@
     "D13 fix pass": 189810,
     "out_mcf.nii.gz.mat: matrices identical as text": "0/12"
    },
-   "seconds": 0.795,
+   "seconds": 0.64,
    "status": "pass"
   },
   {
@@ -2447,7 +2451,7 @@
     "D13 fix pass": 194807,
     "out_mcf.nii.gz.mat: matrices identical as text": "0/12"
    },
-   "seconds": 0.983,
+   "seconds": 0.575,
    "status": "pass"
   },
   {
@@ -2473,7 +2477,7 @@
     "D13 fix pass": 215508,
     "out_mcf.nii.gz.mat: matrices identical as text": "0/12"
    },
-   "seconds": 1.484,
+   "seconds": 1.07,
    "status": "pass"
   },
   {
@@ -2499,7 +2503,7 @@
     "D13 fix pass": 193139,
     "out_mcf.nii.gz.mat: matrices identical as text": "0/12"
    },
-   "seconds": 0.842,
+   "seconds": 0.64,
    "status": "pass"
   },
   {
@@ -2525,7 +2529,7 @@
     "D13 fix pass": 357012,
     "out_mcf.nii.gz.mat: matrices identical as text": "0/12"
    },
-   "seconds": 0.893,
+   "seconds": 0.728,
    "status": "pass"
   },
   {
@@ -2535,7 +2539,7 @@
    "checks_total": 1,
    "failed_checks": [],
    "reason": "Without FSLOUTPUTTYPE, mcflirt writes the .mat files and fails (exit 1); larmorx writes every output as .nii.gz (its default).",
-   "seconds": 0.36,
+   "seconds": 0.217,
    "status": "expected-divergence"
   },
   {
@@ -2545,7 +2549,7 @@
    "checks_total": 0,
    "failed_checks": [],
    "reason": "mcflirt exit [2]: Input filename not found; larmorx exit [2]: Input filename not found",
-   "seconds": 0.001,
+   "seconds": 0.0,
    "status": "both-error"
   },
   {
@@ -2566,7 +2570,7 @@
     "D13 fix pass": 172287,
     "small_mcf.mat: matrices identical as text": "1/12"
    },
-   "seconds": 0.844,
+   "seconds": 0.559,
    "status": "pass"
   },
   {
@@ -2592,7 +2596,7 @@
     "D13 fix pass": 193139,
     "plain.mat: matrices identical as text": "0/12"
    },
-   "seconds": 0.92,
+   "seconds": 0.751,
    "status": "pass"
   },
   {
@@ -2621,7 +2625,7 @@
     "out_mcf.nii.gz.mat+: matrices identical as text": "0/12",
     "out_mcf.nii.gz.mat: matrices identical as text": "0/12"
    },
-   "seconds": 1.653,
+   "seconds": 1.242,
    "status": "pass"
   },
   {
@@ -2647,7 +2651,7 @@
     "D13 fix pass": 193139,
     "out_mcf.nii.gz.mat: matrices identical as text": "0/12"
    },
-   "seconds": 0.887,
+   "seconds": 0.687,
    "status": "pass"
   },
   {
@@ -2672,7 +2676,7 @@
     "D13 fix pass": 191010,
     "out_mcf.nii.gz.mat: matrices identical as text": "0/12"
    },
-   "seconds": 0.857,
+   "seconds": 0.809,
    "status": "pass"
   },
   {
@@ -2682,7 +2686,7 @@
    "checks_total": 0,
    "failed_checks": [],
    "reason": "mcflirt exit [-6]: Image Exception : #2 :: Attempted to copydata with non-matching sizes terminate called after throwing an instance of 'std::runtime_error' what(): Attempted to c; larmorx exit [1]: Error: the reference has 57600 voxels and the volumes of the series 73216: the corrected series would not fit (resample=False estimates only)",
-   "seconds": 0.006,
+   "seconds": 0.004,
    "status": "both-error"
   },
   {
@@ -2707,7 +2711,7 @@
     "D13 fix pass": 193139,
     "out_mcf.nii.gz.mat: matrices identical as text": "0/12"
    },
-   "seconds": 0.862,
+   "seconds": 0.792,
    "status": "pass"
   },
   {
@@ -2732,7 +2736,7 @@
     "D13 fix pass": 176016,
     "out_mcf.nii.gz.mat: matrices identical as text": "1/12"
    },
-   "seconds": 0.827,
+   "seconds": 0.758,
    "status": "pass"
   },
   {
@@ -2742,7 +2746,7 @@
    "checks_total": 0,
    "failed_checks": [],
    "reason": "mcflirt exit [-6]: Image Exception : #61 :: Invalid t index in [] operator terminate called after throwing an instance of 'std::runtime_error' what(): Invalid t index in [] operat; larmorx exit [1]: Error: -refvol 12: invalid volume index for a series of 12 volumes",
-   "seconds": 0.006,
+   "seconds": 0.009,
    "status": "both-error"
   },
   {
@@ -2768,7 +2772,7 @@
     "D13 fix pass": 193139,
     "out_mcf.nii.gz.mat: matrices identical as text": "0/12"
    },
-   "seconds": 0.906,
+   "seconds": 0.71,
    "status": "pass"
   },
   {
@@ -2794,7 +2798,7 @@
     "D13 fix pass": 373892,
     "out_mcf.nii.gz.mat: matrices identical as text": "0/12"
    },
-   "seconds": 0.915,
+   "seconds": 0.865,
    "status": "pass"
   },
   {
@@ -2820,7 +2824,7 @@
     "D13 fix pass": 190876,
     "out_mcf.nii.gz.mat: matrices identical as text": "0/12"
    },
-   "seconds": 0.763,
+   "seconds": 0.612,
    "status": "pass"
   },
   {
@@ -2846,7 +2850,7 @@
     "D13 fix pass": 228063,
     "out_mcf.nii.gz.mat: matrices identical as text": "0/12"
    },
-   "seconds": 0.834,
+   "seconds": 0.701,
    "status": "pass"
   },
   {
@@ -2872,7 +2876,7 @@
     "D13 fix pass": 199922,
     "out_mcf.nii.gz.mat: matrices identical as text": "0/12"
    },
-   "seconds": 0.269,
+   "seconds": 0.199,
    "status": "pass"
   },
   {
@@ -2898,7 +2902,7 @@
     "D13 fix pass": 190882,
     "out_mcf.nii.gz.mat: matrices identical as text": "0/12"
    },
-   "seconds": 5.018,
+   "seconds": 5.216,
    "status": "pass"
   },
   {
@@ -2927,7 +2931,7 @@
     "D13 fix pass": 193139,
     "out_mcf.nii.gz.mat: matrices identical as text": "0/12"
    },
-   "seconds": 0.863,
+   "seconds": 0.698,
    "status": "pass"
   },
   {
@@ -2953,7 +2957,7 @@
     "D13 fix pass": 0,
     "out_mcf.nii.gz.mat: matrices identical as text": "0/12"
    },
-   "seconds": 0.501,
+   "seconds": 0.3,
    "status": "pass"
   },
   {
@@ -2988,7 +2992,7 @@
     "D13 fix pass": 172287,
     "out_mcf.nii.gz.mat: matrices identical as text": "1/12"
    },
-   "seconds": 0.805,
+   "seconds": 0.749,
    "status": "pass"
   },
   {
@@ -3013,7 +3017,7 @@
     "D13 fix pass": 193139,
     "out_mcf.nii.gz.mat: matrices identical as text": "0/12"
    },
-   "seconds": 0.729,
+   "seconds": 0.654,
    "status": "pass"
   },
   {
@@ -3038,7 +3042,7 @@
     "D13 fix pass": 172919,
     "out_mcf.nii.gz.mat: matrices identical as text": "1/12"
    },
-   "seconds": 0.755,
+   "seconds": 0.652,
    "status": "pass"
   },
   {
@@ -3063,7 +3067,7 @@
     "D13 fix pass": 196646,
     "out_mcf.nii.gz.mat: matrices identical as text": "0/12"
    },
-   "seconds": 0.847,
+   "seconds": 0.658,
    "status": "pass"
   },
   {
@@ -3088,7 +3092,7 @@
     "D13 fix pass": 172287,
     "out_mcf.nii.gz.mat: matrices identical as text": "1/12"
    },
-   "seconds": 0.774,
+   "seconds": 0.543,
    "status": "pass"
   },
   {
@@ -3114,8 +3118,452 @@
     "D13 fix pass": 193139,
     "out_mcf.nii.gz.mat: matrices identical as text": "0/12"
    },
-   "seconds": 0.777,
+   "seconds": 0.631,
    "status": "pass"
+  },
+  {
+   "case": "failures/fsl20-mats",
+   "category": "failure cases (spec \u00a714.1)",
+   "checks_passed": 8,
+   "checks_total": 8,
+   "failed_checks": [],
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 0.029,
+   "status": "pass"
+  },
+  {
+   "case": "failures/fsl20-mats-plots",
+   "category": "failure cases (spec \u00a714.1)",
+   "checks_passed": 8,
+   "checks_total": 8,
+   "failed_checks": [],
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 0.008,
+   "status": "pass"
+  },
+  {
+   "case": "failures/fsl20-reffile",
+   "category": "failure cases (spec \u00a714.1)",
+   "checks_passed": 8,
+   "checks_total": 8,
+   "failed_checks": [],
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 0.009,
+   "status": "pass"
+  },
+  {
+   "case": "failures/fsl20-file-parent",
+   "category": "failure cases (spec \u00a714.1)",
+   "checks_passed": 8,
+   "checks_total": 8,
+   "failed_checks": [],
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 0.053,
+   "status": "pass"
+  },
+  {
+   "case": "failures/fsl20-rmsrel",
+   "category": "failure cases (spec \u00a714.1)",
+   "checks_passed": 8,
+   "checks_total": 8,
+   "failed_checks": [],
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 0.008,
+   "status": "pass"
+  },
+  {
+   "case": "failures/fsl20-rmsabs-report",
+   "category": "failure cases (spec \u00a714.1)",
+   "checks_passed": 8,
+   "checks_total": 8,
+   "failed_checks": [],
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 0.007,
+   "status": "pass"
+  },
+  {
+   "case": "failures/fsl20-perm",
+   "category": "failure cases (spec \u00a714.1)",
+   "checks_passed": 7,
+   "checks_total": 7,
+   "failed_checks": [],
+   "reason": "mcflirt ends by signal 6 (Error! Could not create directory: <inputs>/<run>/ro/o.mat. No write permission); larmorx exits 1 (reproduce) and 1 (default) with its error",
+   "seconds": 0.072,
+   "status": "both-error"
+  },
+  {
+   "case": "failures/fsl20-plots-only",
+   "category": "failure cases (spec \u00a714.1)",
+   "checks_passed": 8,
+   "checks_total": 8,
+   "failed_checks": [],
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 0.027,
+   "status": "pass"
+  },
+  {
+   "case": "failures/fsl20-none",
+   "category": "failure cases (spec \u00a714.1)",
+   "checks_passed": 7,
+   "checks_total": 7,
+   "failed_checks": [],
+   "reason": "mcflirt ends by signal 6 (terminate called after throwing an instance of 'NiftiIO::NiftiException'); larmorx exits 1 (reproduce) and 1 (default) with its error",
+   "seconds": 0.096,
+   "status": "both-error"
+  },
+  {
+   "case": "failures/par-dir-plots-mats",
+   "category": "failure cases (spec \u00a714.1)",
+   "checks_passed": 9,
+   "checks_total": 9,
+   "failed_checks": [],
+   "measured": {
+    "reproduce: matrix RMS deviation, 95th percentile": "0.0529"
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 0.071,
+   "status": "pass"
+  },
+  {
+   "case": "failures/par-dir-plots",
+   "category": "failure cases (spec \u00a714.1)",
+   "checks_passed": 8,
+   "checks_total": 8,
+   "failed_checks": [],
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 0.074,
+   "status": "pass"
+  },
+  {
+   "case": "failures/par-dir-plots-mats-ref0",
+   "category": "failure cases (spec \u00a714.1)",
+   "checks_passed": 9,
+   "checks_total": 9,
+   "failed_checks": [],
+   "measured": {
+    "reproduce: matrix RMS deviation, 95th percentile": "0.0000"
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 0.066,
+   "status": "pass"
+  },
+  {
+   "case": "failures/rms-dir",
+   "category": "failure cases (spec \u00a714.1)",
+   "checks_passed": 9,
+   "checks_total": 9,
+   "failed_checks": [],
+   "measured": {
+    "reproduce: matrix RMS deviation, 95th percentile": "0.0475"
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 0.072,
+   "status": "pass"
+  },
+  {
+   "case": "failures/bins7-mutualinfo",
+   "category": "failure cases (spec \u00a714.1)",
+   "checks_passed": 9,
+   "checks_total": 9,
+   "failed_checks": [],
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0,
+    "reproduce: matrix RMS deviation, 95th percentile": "7.3505"
+   },
+   "seconds": 0.063,
+   "status": "pass"
+  },
+  {
+   "case": "failures/bins4-mutualinfo-s2",
+   "category": "failure cases (spec \u00a714.1)",
+   "checks_passed": 9,
+   "checks_total": 9,
+   "failed_checks": [],
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0,
+    "reproduce: matrix RMS deviation, 95th percentile": "7.4394"
+   },
+   "seconds": 0.017,
+   "status": "pass"
+  },
+  {
+   "case": "failures/bins4-mutualinfo-s3-plots",
+   "category": "failure cases (spec \u00a714.1)",
+   "checks_passed": 9,
+   "checks_total": 9,
+   "failed_checks": [],
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0,
+    "reproduce: matrix RMS deviation, 95th percentile": "7.3505"
+   },
+   "seconds": 0.024,
+   "status": "pass"
+  },
+  {
+   "case": "failures/bins0-normmi",
+   "category": "failure cases (spec \u00a714.1)",
+   "checks_passed": 9,
+   "checks_total": 9,
+   "failed_checks": [],
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0,
+    "reproduce: matrix RMS deviation, 95th percentile": "3.1287"
+   },
+   "seconds": 0.021,
+   "status": "pass"
+  },
+  {
+   "case": "failures/bins1-woods",
+   "category": "failure cases (spec \u00a714.1)",
+   "checks_passed": 9,
+   "checks_total": 9,
+   "failed_checks": [],
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0,
+    "reproduce: matrix RMS deviation, 95th percentile": "73.8247"
+   },
+   "seconds": 0.02,
+   "status": "pass"
+  },
+  {
+   "case": "failures/binsabc-mutualinfo",
+   "category": "failure cases (spec \u00a714.1)",
+   "checks_passed": 9,
+   "checks_total": 9,
+   "failed_checks": [],
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0,
+    "reproduce: matrix RMS deviation, 95th percentile": "4.8809"
+   },
+   "seconds": 0.02,
+   "status": "pass"
+  },
+  {
+   "case": "failures/bins2-corratio",
+   "category": "failure cases (spec \u00a714.1)",
+   "checks_passed": 8,
+   "checks_total": 8,
+   "failed_checks": [],
+   "reason": "mcflirt ends by signal 6 (double free or corruption (out)); larmorx exits 1 (reproduce) and 1 (default) with its error",
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 0.035,
+   "status": "both-error"
+  },
+  {
+   "case": "failures/bins2-corratio-smooth0",
+   "category": "failure cases (spec \u00a714.1)",
+   "checks_passed": 8,
+   "checks_total": 8,
+   "failed_checks": [],
+   "reason": "mcflirt ends by signal 6 (double free or corruption (out)); larmorx exits 1 (reproduce) and 1 (default) with its error",
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 0.053,
+   "status": "both-error"
+  },
+  {
+   "case": "failures/bins2-corratio-report",
+   "category": "failure cases (spec \u00a714.1)",
+   "checks_passed": 8,
+   "checks_total": 8,
+   "failed_checks": [],
+   "reason": "mcflirt ends by signal 6 (Processed data will be saved as <run>/o); larmorx exits 1 (reproduce) and 1 (default) with its error",
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 0.029,
+   "status": "both-error"
+  },
+  {
+   "case": "failures/bins8-corratio",
+   "category": "failure cases (spec \u00a714.1)",
+   "checks_passed": 7,
+   "checks_total": 7,
+   "failed_checks": [],
+   "measured": {
+    "reproduce: matrix RMS deviation, 95th percentile": "0.0717"
+   },
+   "reason": "",
+   "seconds": 0.03,
+   "status": "pass"
+  },
+  {
+   "case": "failures/bins8-mutualinfo-s3",
+   "category": "failure cases (spec \u00a714.1)",
+   "checks_passed": 7,
+   "checks_total": 7,
+   "failed_checks": [],
+   "reason": "",
+   "reported": {
+    "reproduce: matrix RMS deviation, 95th percentile": "1.1486"
+   },
+   "seconds": 0.045,
+   "status": "pass"
+  },
+  {
+   "case": "failures/bins2-normcorr",
+   "category": "failure cases (spec \u00a714.1)",
+   "checks_passed": 7,
+   "checks_total": 7,
+   "failed_checks": [],
+   "measured": {
+    "reproduce: matrix RMS deviation, 95th percentile": "0.0296"
+   },
+   "reason": "",
+   "seconds": 0.021,
+   "status": "pass"
+  },
+  {
+   "case": "failures/bins2-leastsq",
+   "category": "failure cases (spec \u00a714.1)",
+   "checks_passed": 7,
+   "checks_total": 7,
+   "failed_checks": [],
+   "measured": {
+    "reproduce: matrix RMS deviation, 95th percentile": "0.0118"
+   },
+   "reason": "",
+   "seconds": 0.028,
+   "status": "pass"
+  },
+  {
+   "case": "failures/binsm1-normcorr",
+   "category": "failure cases (spec \u00a714.1)",
+   "checks_passed": 9,
+   "checks_total": 9,
+   "failed_checks": [],
+   "measured": {
+    "reproduce: matrix RMS deviation, 95th percentile": "0.0296"
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 0.014,
+   "status": "pass"
+  },
+  {
+   "case": "failures/bins4-mutualinfo-s0",
+   "category": "failure cases (spec \u00a714.1)",
+   "checks_passed": 7,
+   "checks_total": 7,
+   "failed_checks": [],
+   "measured": {
+    "reproduce: matrix RMS deviation, 95th percentile": "0.0000"
+   },
+   "reason": "",
+   "seconds": 0.01,
+   "status": "pass"
+  },
+  {
+   "case": "failures/bins4-mutualinfo-1vol",
+   "category": "failure cases (spec \u00a714.1)",
+   "checks_passed": 9,
+   "checks_total": 9,
+   "failed_checks": [],
+   "measured": {
+    "reproduce: matrix RMS deviation, 95th percentile": "0.0000"
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 0.005,
+   "status": "pass"
+  },
+  {
+   "case": "failures/binsm4-normcorr-s2",
+   "category": "failure cases (spec \u00a714.1)",
+   "checks_passed": 8,
+   "checks_total": 8,
+   "failed_checks": [],
+   "reason": "mcflirt ends by signal 8 (no message); larmorx exits 1 (reproduce) and 1 (default) with its error",
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 0.039,
+   "status": "both-error"
+  },
+  {
+   "case": "failures/binsm8-normcorr",
+   "category": "failure cases (spec \u00a714.1)",
+   "checks_passed": 8,
+   "checks_total": 8,
+   "failed_checks": [],
+   "reason": "mcflirt ends by signal 8 (no message); larmorx exits 1 (reproduce) and 1 (default) with its error",
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 0.034,
+   "status": "both-error"
+  },
+  {
+   "case": "failures/binsm16-normcorr",
+   "category": "failure cases (spec \u00a714.1)",
+   "checks_passed": 8,
+   "checks_total": 8,
+   "failed_checks": [],
+   "reason": "mcflirt ends by signal 6 (terminate called after throwing an instance of 'std::bad_array_new_length'); larmorx exits 1 (reproduce) and 1 (default) with its error",
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 0.025,
+   "status": "both-error"
+  },
+  {
+   "case": "failures/binsm16-mutualinfo",
+   "category": "failure cases (spec \u00a714.1)",
+   "checks_passed": 8,
+   "checks_total": 8,
+   "failed_checks": [],
+   "reason": "mcflirt ends by signal 6 (terminate called after throwing an instance of 'std::bad_array_new_length'); larmorx exits 1 (reproduce) and 1 (default) with its error",
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 0.04,
+   "status": "both-error"
   },
   {
    "case": "difftest/normmi-aligns-worse",
@@ -3185,7 +3633,7 @@
     "D13 fix pass": 14067,
     "out_mcf.nii.gz.mat: matrices identical as text": "1/7"
    },
-   "seconds": 0.118,
+   "seconds": 0.065,
    "status": "expected-divergence"
   },
   {
@@ -3214,21 +3662,21 @@
     "out_mcf.nii.gz_rel.rms: values": "0.0846",
     "out_mcf.nii.gz_rel_mean.rms: values": "0.0022"
    },
-   "reason": "A small phantom moved by up to 15 degrees: the normalised correlation has several minima, and larmorx's estimates end in other ones than mcflirt's beyond the record's thresholds, aligning the series as well (temporal SD 0.999 of mcflirt's here; over the night's 782 findings median ratio 1.000, docs/findings/mri-hmc-original.md)",
+   "reason": "A small phantom moved by up to 15 degrees: the normalised correlation has several minima, and larmorx's estimates end in other ones than mcflirt's beyond the record's thresholds, aligning the series as well (temporal SD 0.999 of mcflirt's here; over the 782 findings of the first long random-testing run (2026-10-25) median ratio 1.000, docs/findings/mri-hmc-original.md)",
    "reported": {
     "D13 fix pass": 7590,
     "out_mcf.nii.gz.mat: matrices identical as text": "1/6"
    },
-   "seconds": 0.16,
+   "seconds": 0.08,
    "status": "expected-divergence"
   }
  ],
  "suite": "mri-hmc",
  "summary": {
-  "both-error": 11,
+  "both-error": 20,
   "expected-divergence": 3,
   "fail": 1,
-  "pass": 121,
+  "pass": 145,
   "skipped": 0
  },
  "tier": "standard"

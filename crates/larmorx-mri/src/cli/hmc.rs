@@ -26,12 +26,12 @@ use larmorx_core::defects::{self, EXIT_BAD_MODE, Notice, UpstreamDefects};
 use larmorx_core::element::DataType;
 
 use super::{atof, atoi};
-use crate::hmc::estimate::{EstimateParams, InPlane};
+use crate::hmc::estimate::{EstimateError, EstimateParams, InPlane, refused_bins};
 use crate::hmc::files::{self as image_files, ImageFiles};
 use crate::hmc::image::{
     self, Series, output_name, output_type, read_reference_files, read_series_files,
 };
-use crate::hmc::pipeline::{self, HmcOptions, HmcOutput, ReferenceChoice};
+use crate::hmc::pipeline::{self, HmcError, HmcOptions, HmcOutput, ReferenceChoice};
 use crate::hmc::report::{self, mat_text, par_text, rms_text};
 use crate::hmc::resample::{self, Interpolation};
 use crate::hmc::rigid::IDENTITY;
@@ -481,6 +481,7 @@ pub fn main_with(
             1
         }
         Err(Failure::Printed) => 1,
+        Err(Failure::Exit(code)) => code,
     }
 }
 
@@ -492,17 +493,55 @@ fn threads() -> usize {
         .unwrap_or(0)
 }
 
+/// Why the `.mat` directory (§10.2) could not be made: its name as tried, and whether its
+/// parent refused the permission (mcflirt's message and run go on) or something else failed
+/// (FSL-20: a parent directory that does not exist or is a file).
+struct MatDirError {
+    name: String,
+    permission: bool,
+    error: std::io::Error,
+}
+
 /// `name.mat`, or the first of `name.mat+`, `name.mat++`, ... that does not exist yet.
-fn mat_directory(out: &str) -> Result<PathBuf, String> {
+fn mat_directory(out: &str) -> Result<PathBuf, MatDirError> {
     let mut name = format!("{out}.mat");
-    for _ in 0..1000 {
+    loop {
         match fs::create_dir(&name) {
             Ok(()) => return Ok(PathBuf::from(name)),
-            Err(e) if e.kind() == std::io::ErrorKind::AlreadyExists => name.push('+'),
-            Err(e) => return Err(format!("cannot create {name}: {e}")),
+            Err(e) if e.kind() == std::io::ErrorKind::AlreadyExists && name.len() < 4096 => {
+                name.push('+');
+            }
+            Err(error) => {
+                return Err(MatDirError {
+                    permission: error.kind() == std::io::ErrorKind::PermissionDenied,
+                    name,
+                    error,
+                });
+            }
         }
     }
-    Err(format!("cannot create a directory for {out}.mat"))
+}
+
+/// FSL-20 corrected without `-mats` (FSL-13 corrected: no `.mat` directory is made): whether
+/// mcflirt could make `<out>.mat`, i.e. its parent is a directory. Its permission is not
+/// checked (mcflirt then only prints a message).
+fn mat_parent_exists(out: &str) -> Result<(), MatDirError> {
+    let name = format!("{out}.mat");
+    match Path::new(&name).parent() {
+        Some(p) if !p.as_os_str().is_empty() && !p.is_dir() => Err(MatDirError {
+            name: name.clone(),
+            permission: false,
+            error: std::io::Error::new(
+                std::io::ErrorKind::NotFound,
+                if p.exists() {
+                    format!("{} is not a directory", p.display())
+                } else {
+                    format!("{} does not exist", p.display())
+                },
+            ),
+        }),
+        _ => Ok(()),
+    }
 }
 
 fn write_text(path: impl AsRef<Path>, text: &str) -> Result<(), String> {
@@ -510,11 +549,13 @@ fn write_text(path: impl AsRef<Path>, text: &str) -> Result<(), String> {
     fs::write(path, text).map_err(|e| format!("cannot write {}: {e}", path.display()))
 }
 
-/// Why [`execute`] stopped: an error to print as `Error: <message>`, or a message already
-/// printed in the original's words.
+/// Why [`execute`] stopped: an error to print as `Error: <message>`, a message already
+/// printed in the original's words (exit status 1), or mcflirt's own end of the run
+/// reproduced, its messages printed (FSL-20, FSL-65: exit status 0).
 enum Failure {
     Error(String),
     Printed,
+    Exit(u8),
 }
 
 impl From<String> for Failure {
@@ -577,6 +618,15 @@ fn execute(
     out: &mut dyn Write,
     err: &mut dyn Write,
 ) -> Result<(), Failure> {
+    // FSL-21 and FSL-66 corrected (rule B, specs/mcflirt.md §12.1): bins no stage can use are
+    // refused before any work, whatever the series.
+    let stages = o.stages.clamp(0, 4) as usize;
+    if mode.fix()
+        && let Some(r) = refused_bins(o.bins, stages, o.cost)
+    {
+        print_notice(err, &r.notice());
+        return Err(Failure::Error(r.message));
+    }
     let n_threads = threads();
     let input = o.input.as_deref().unwrap_or_default();
     let out_name = o
@@ -636,7 +686,6 @@ fn execute(
         ReferenceChoice::Index(Some(reference_index(o.refvol, n)?))
     };
     let dof = o.dof.clamp(6, 12) as usize;
-    let stages = o.stages.clamp(0, 4) as usize;
     if o.dof != dof as i64 {
         let registered = match choice {
             ReferenceChoice::Index(_) => n - 1,
@@ -661,7 +710,7 @@ fn execute(
             cost: o.cost,
             smooth: o.smooth as f32,
             rotation: o.rotation,
-            bins: o.bins.max(1) as usize,
+            bins: o.bins,
             fudge: o.fudge,
             in_plane: if o.two_d {
                 InPlane::Force
@@ -677,18 +726,24 @@ fn execute(
         resample: true,
     };
     note(o, err, "Registering volumes ...");
-    let result = pipeline::run(&series, &choice, &options).map_err(|e| e.to_string())?;
+    let result = match pipeline::run(&series, &choice, &options) {
+        Ok(r) => r,
+        // FSL-21 and FSL-66 reproduced: where mcflirt crashes, its messages, then an error
+        // (a crash is never reproduced, D13).
+        Err(HmcError::Estimate(EstimateError::McflirtEnds(end))) => {
+            for line in end.mcflirt_lines() {
+                let _ = writeln!(err, "{line}");
+            }
+            print_notice(err, &end.notice());
+            return Err(Failure::Error(end.error()));
+        }
+        Err(e) => return Err(e.to_string().into()),
+    };
     for n in &result.estimate.notices {
         print_notice(err, n);
     }
-    note(o, err, "Saving motion corrected time series... ");
-    if let Some(r) = result.estimate.reference_index
-        && o.report
-        && (o.mats || o.plots || o.rmsrel || o.rmsabs)
-    {
-        let _ = writeln!(out, "refnum = {r}\nOriginal_refvol = {}", o.refvol);
-    }
-    for n in write_outputs(
+    let mut notices = Vec::new();
+    let written = write_outputs(
         o,
         mode,
         &out_name,
@@ -698,11 +753,14 @@ fn execute(
         &result,
         options.init.as_ref(),
         n_threads,
+        out,
         err,
-    )? {
-        print_notice(err, &n);
+        &mut notices,
+    );
+    for n in &notices {
+        print_notice(err, n);
     }
-    Ok(())
+    written
 }
 
 /// A progress message on stderr with `-report`.
@@ -723,10 +781,117 @@ fn reference_index(refvol: i64, n: usize) -> Result<usize, String> {
     }
 }
 
-/// Writes the files of §10: the `.mat` directory, `.par`, `.rms`, the corrected series, the
-/// `-stats` images and the mean of `-meanvol`. Returns the upstream defects that changed them
-/// (FSL-08, -09, -10, -13), or would have; FSL-60's notices (an image name holding `.img`) are
+/// A text output of §10.2–§10.4 that could not be opened (FSL-65): its name and why.
+struct Unopened {
+    name: String,
+    error: std::io::Error,
+}
+
+/// Opens (creates) the text file `name`.
+fn open_text(name: &str) -> Result<fs::File, Unopened> {
+    fs::File::create(name).map_err(|error| Unopened {
+        name: name.to_owned(),
+        error,
+    })
+}
+
+/// The `.par` and `.rms` files (§10.3, §10.4), as `(name, text)` in mcflirt's order of writing:
+/// `_rel.rms`, `_rel_mean.rms`, `_abs.rms`, `_abs_mean.rms`.
+fn rms_files(o: &Options, out_name: &str, result: &HmcOutput) -> Vec<(String, String)> {
+    let mean = |v: &[f64]| v.iter().sum::<f64>() / v.len() as f64;
+    let mut files = Vec::new();
+    if o.rmsrel {
+        files.push((format!("{out_name}_rel.rms"), rms_text(&result.rms_rel)));
+        files.push((
+            format!("{out_name}_rel_mean.rms"),
+            rms_text(&[mean(&result.rms_rel)]),
+        ));
+    }
+    if o.rmsabs {
+        files.push((format!("{out_name}_abs.rms"), rms_text(&result.rms_abs)));
+        files.push((
+            format!("{out_name}_abs_mean.rms"),
+            rms_text(&[mean(&result.rms_abs)]),
+        ));
+    }
+    files
+}
+
+/// The prefix mcflirt puts before the `.mat` directory's name in its permission message: the
+/// `-in` string up to and including its last `/`, or, without one, its first character
+/// (`specs/mcflirt.md` §10.6).
+fn input_prefix(input: &str) -> &str {
+    match input.rfind('/') {
+        Some(i) => &input[..=i],
+        None => input
+            .char_indices()
+            .nth(1)
+            .map_or(input, |(i, _)| &input[..i]),
+    }
+}
+
+/// FSL-20 corrected: the error of a `.mat` directory that cannot be made (`specs/mcflirt.md`
+/// §10.6), with its notice where it is FSL-20's case (not the permission).
+fn mat_dir_failure(e: &MatDirError, notices: &mut Vec<Notice>) -> Failure {
+    if e.permission {
+        return Failure::Error(format!(
+            "cannot create the directory {} for the matrices: {}",
+            e.name, e.error
+        ));
+    }
+    notices.push(Notice::new(
+        &defects::FSL_20,
+        UpstreamDefects::Fix,
+        format!(
+            "the directory {} cannot be created ({}): an error (exit status 1); mcflirt prints \
+             an error and exits with status 0, writing nothing more",
+            e.name, e.error
+        ),
+    ));
+    Failure::Error(format!(
+        "cannot create the directory {} for the matrices (FSL-20: mcflirt prints \"Error!: \
+         Unknown Log directory return value\" and exits with status 0)",
+        e.name
+    ))
+}
+
+/// FSL-65 corrected: the error of a `.par` or `.rms` file that cannot be opened, with its
+/// notice.
+fn unopened_failure(u: &Unopened, par: bool, notices: &mut Vec<Notice>) -> Failure {
+    let mcflirt = if par {
+        "mcflirt prints \"error: unable to open output file!\" at the first volume and exits with \
+         status 0, after the first matrix and the .rms files"
+    } else {
+        "mcflirt silently does not write it and exits with status 0"
+    };
+    notices.push(Notice::new(
+        &defects::FSL_65,
+        UpstreamDefects::Fix,
+        format!(
+            "{} cannot be opened ({}): an error (exit status 1); {mcflirt}",
+            u.name, u.error
+        ),
+    ));
+    Failure::Error(format!(
+        "cannot open {} for writing: {} (FSL-65: {mcflirt})",
+        u.name, u.error
+    ))
+}
+
+/// Writes the files of §10 in mcflirt's order (§10.6): the mean of `-meanvol`, the `-stats`
+/// images, the `refnum` lines (`-report`), the text outputs (the `.par` file opened, the `.mat`
+/// directory made, the `.rms` files, then volume by volume its `MAT_` file and `.par` line), the
+/// corrected series last. Adds to `notices` the upstream defects that changed them (FSL-08, -09,
+/// -10, -13, -20, -65), or would have; FSL-60's notices (an image name holding `.img`) are
 /// printed on `err` as each image is opened.
+///
+/// Outputs that cannot be written (§10.6): by default every text output is opened (the `.mat`
+/// directory made) before anything is written, and one that cannot be is an error (FSL-20, FSL-65;
+/// what this step made is removed); with `reproduce`, mcflirt's run: an uncreatable `.mat`
+/// directory ends it with mcflirt's message and exit status 0 (FSL-20), an unopenable `.rms` file
+/// is not written and an unopenable `.par` file ends it at volume 0 with status 0 (FSL-65). An
+/// image that cannot be written is an error in both modes (mcflirt aborts; with `reproduce` its two
+/// lines are printed first).
 #[allow(clippy::too_many_arguments)]
 fn write_outputs(
     o: &Options,
@@ -738,10 +903,11 @@ fn write_outputs(
     result: &HmcOutput,
     init: Option<&crate::hmc::rigid::Mat4>,
     n_threads: usize,
+    out: &mut dyn Write,
     err: &mut dyn Write,
-) -> Result<Vec<Notice>, String> {
+    notices: &mut Vec<Notice>,
+) -> Result<(), Failure> {
     let est = &result.estimate;
-    let mut notices = Vec::new();
     // FSL-13: -rmsrel and -rmsabs make mcflirt create the .mat directory.
     if (o.rmsrel || o.rmsabs) && !o.mats {
         let detail = match mode {
@@ -755,34 +921,76 @@ fn write_outputs(
         };
         notices.push(Notice::new(&defects::FSL_13, mode, detail));
     }
-    if o.mats || ((o.rmsrel || o.rmsabs) && mode.reproduce()) {
-        let dir = mat_directory(out_name)?;
-        if o.mats {
-            for (t, m) in est.matrices.iter().enumerate() {
-                write_text(dir.join(format!("MAT_{t:04}")), &mat_text(m))?;
+    let text_outputs = o.mats || o.plots || o.rmsrel || o.rmsabs;
+    // mcflirt makes the .mat directory for -mats, -rmsrel and -rmsabs (FSL-13).
+    let mcflirt_mat_dir = o.mats || o.rmsrel || o.rmsabs;
+    let rms = rms_files(o, out_name, result);
+    let par_name = format!("{out_name}.par");
+
+    // The default: every text output opened before anything is written (FSL-20, FSL-65).
+    let mut prepared: Option<(Option<PathBuf>, Option<fs::File>, Vec<fs::File>)> = None;
+    if mode.fix() && text_outputs {
+        let mut made: Vec<PathBuf> = Vec::new();
+        let undo = |made: &[PathBuf]| {
+            for p in made.iter().rev() {
+                let _ = if p.is_dir() {
+                    fs::remove_dir(p)
+                } else {
+                    fs::remove_file(p)
+                };
             }
-        } else if let Some(r) = est.reference_index {
-            write_text(dir.join(format!("MAT_{r:04}")), &mat_text(&IDENTITY))?;
+        };
+        if mcflirt_mat_dir && !o.mats {
+            mat_parent_exists(out_name).map_err(|e| mat_dir_failure(&e, notices))?;
         }
+        let par = if o.plots {
+            match open_text(&par_name) {
+                Ok(f) => {
+                    made.push(PathBuf::from(&par_name));
+                    Some(f)
+                }
+                Err(u) => {
+                    // FSL-20 first where mcflirt would meet it (its .mat directory's parent is the
+                    // .par file's).
+                    if mcflirt_mat_dir && let Err(e) = mat_parent_exists(out_name) {
+                        return Err(mat_dir_failure(&e, notices));
+                    }
+                    return Err(unopened_failure(&u, true, notices));
+                }
+            }
+        } else {
+            None
+        };
+        let mut rms_handles = Vec::new();
+        for (name, _) in &rms {
+            match open_text(name) {
+                Ok(f) => {
+                    made.push(PathBuf::from(name));
+                    rms_handles.push(f);
+                }
+                Err(u) => {
+                    undo(&made);
+                    if mcflirt_mat_dir && let Err(e) = mat_parent_exists(out_name) {
+                        return Err(mat_dir_failure(&e, notices));
+                    }
+                    return Err(unopened_failure(&u, false, notices));
+                }
+            }
+        }
+        let dir = if o.mats {
+            match mat_directory(out_name) {
+                Ok(d) => Some(d),
+                Err(e) => {
+                    undo(&made);
+                    return Err(mat_dir_failure(&e, notices));
+                }
+            }
+        } else {
+            None
+        };
+        prepared = Some((dir, par, rms_handles));
     }
-    if o.plots {
-        write_text(format!("{out_name}.par"), &par_text(&result.params))?;
-    }
-    let mean = |v: &[f64]| v.iter().sum::<f64>() / v.len() as f64;
-    if o.rmsabs {
-        write_text(format!("{out_name}_abs.rms"), &rms_text(&result.rms_abs))?;
-        write_text(
-            format!("{out_name}_abs_mean.rms"),
-            &rms_text(&[mean(&result.rms_abs)]),
-        )?;
-    }
-    if o.rmsrel {
-        write_text(format!("{out_name}_rel.rms"), &rms_text(&result.rms_rel))?;
-        write_text(
-            format!("{out_name}_rel_mean.rms"),
-            &rms_text(&[mean(&result.rms_rel)]),
-        )?;
-    }
+
     // Corrected data on another grid of the same size are stored under the input's header.
     let shape = series.shape();
     let voxel = series.voxel_size();
@@ -793,8 +1001,15 @@ fn write_outputs(
         .map(|v| Volume::new(shape, voxel, v.data.clone()))
         .collect();
     // Only the corrected series gets its own cal_min/cal_max (§10.1); the others keep the
-    // input's (observed: -stats and -meanvol images carry the input's values).
-    let mut write = |path: &str, vols: &[Volume], dt: DataType, cal: bool| {
+    // input's (observed: -stats and -meanvol images carry the input's values). An image that
+    // cannot be written is an error; with `reproduce`, after mcflirt's two lines (it aborts).
+    let write = |path: &str,
+                 vols: &[Volume],
+                 dt: DataType,
+                 cal: bool,
+                 err: &mut dyn Write,
+                 notices: &mut Vec<Notice>|
+     -> Result<(), Failure> {
         let files = ImageFiles::of(path).ok_or_else(|| format!("{path}: not an image"))?;
         let files = opened_files(path, files, mode, err);
         let written = image::write_like_files(
@@ -808,16 +1023,28 @@ fn write_outputs(
             cal,
             n_threads,
             mode,
-        )
-        .map_err(|e| e.to_string())?;
-        for n in written {
-            defects::push_once(&mut notices, n);
+        );
+        match written {
+            Ok(w) => {
+                for n in w {
+                    defects::push_once(notices, n);
+                }
+                Ok(())
+            }
+            Err(e) => {
+                if mode.reproduce() {
+                    let _ = writeln!(
+                        err,
+                        "terminate called after throwing an instance of \
+                         'NiftiIO::NiftiException'\n  what():  Error: cant open file {path}"
+                    );
+                }
+                Err(Failure::Error(format!("cannot write {path}: {e}")))
+            }
         }
-        Ok::<(), String>(())
     };
     let stem = image::strip_image_extension(out_name);
     let data_type = output_type(series.stored, &series.header, mode);
-    write(&format!("{stem}{ext}"), &corrected, data_type, true)?;
     // FSL-08: mcflirt names the -stats and -meanvol images after the -out string with its
     // extension inside (`x.nii.gz_meanvol.nii.gz`), and leaves the -stats images' first and
     // last slices at 0.
@@ -825,25 +1052,6 @@ fn write_outputs(
         UpstreamDefects::Fix => format!("{stem}_{suffix}{ext}"),
         UpstreamDefects::Reproduce => format!("{out_name}_{suffix}{ext}"),
     };
-    if o.stats {
-        let [m, variance, sigma] = stats::temporal(&corrected, mode.reproduce());
-        for (suffix, vol) in [("meanvol", m), ("variance", variance), ("sigma", sigma)] {
-            write(
-                &derived(suffix),
-                std::slice::from_ref(&vol),
-                DataType::F32,
-                false,
-            )?;
-        }
-    }
-    if let Some(m) = &est.mean {
-        write(
-            &derived("mean_reg"),
-            std::slice::from_ref(m),
-            DataType::F32,
-            false,
-        )?;
-    }
     if o.stats || (est.mean.is_some() && stem != out_name) {
         let detail = match mode {
             UpstreamDefects::Fix => format!(
@@ -858,6 +1066,136 @@ fn write_outputs(
         };
         notices.push(Notice::new(&defects::FSL_08, mode, detail));
     }
+    if let Some(m) = &est.mean {
+        write(
+            &derived("mean_reg"),
+            std::slice::from_ref(m),
+            DataType::F32,
+            false,
+            err,
+            notices,
+        )?;
+    }
+    if o.stats {
+        let [m, variance, sigma] = stats::temporal(&corrected, mode.reproduce());
+        for (suffix, vol) in [("meanvol", m), ("variance", variance), ("sigma", sigma)] {
+            write(
+                &derived(suffix),
+                std::slice::from_ref(&vol),
+                DataType::F32,
+                false,
+                err,
+                notices,
+            )?;
+        }
+    }
+    if let Some(r) = est.reference_index
+        && o.report
+        && text_outputs
+    {
+        let _ = writeln!(out, "refnum = {r}\nOriginal_refvol = {}", o.refvol);
+    }
+    let n = est.matrices.len();
+    let mat_text_of = |t: usize| -> Option<String> {
+        if o.mats {
+            Some(mat_text(&est.matrices[t]))
+        } else {
+            // FSL-13 reproduced: only the reference volume's identity.
+            (est.reference_index == Some(t)).then(|| mat_text(&IDENTITY))
+        }
+    };
+    let write_handle = |f: &mut fs::File, name: &str, text: &str| -> Result<(), Failure> {
+        f.write_all(text.as_bytes())
+            .map_err(|e| Failure::Error(format!("cannot write {name}: {e}")))
+    };
+    if let Some((dir, mut par, mut rms_handles)) = prepared {
+        for ((name, text), f) in rms.iter().zip(rms_handles.iter_mut()) {
+            write_handle(f, name, text)?;
+        }
+        for t in 0..n {
+            if let Some(d) = &dir {
+                write_text(d.join(format!("MAT_{t:04}")), &mat_text(&est.matrices[t]))?;
+            }
+            if let Some(f) = par.as_mut() {
+                write_handle(f, &par_name, &par_text(&result.params[t..=t]))?;
+            }
+        }
+    } else if text_outputs {
+        // mcflirt's run (reproduce), §10.6.
+        let mut par = o.plots.then(|| open_text(&par_name));
+        let mut dir = None;
+        if mcflirt_mat_dir {
+            match mat_directory(out_name) {
+                Ok(d) => dir = Some(d),
+                Err(e) if e.permission => {
+                    let _ = writeln!(
+                        err,
+                        "Error! Could not create directory: {}{}. No write permission",
+                        input_prefix(o.input.as_deref().unwrap_or_default()),
+                        e.name
+                    );
+                }
+                Err(e) => {
+                    let _ = writeln!(err, "Error!: Unknown Log directory return value");
+                    notices.push(Notice::new(
+                        &defects::FSL_20,
+                        mode,
+                        format!(
+                            "the directory {} cannot be created ({}): mcflirt's message and exit \
+                             status 0, nothing more written",
+                            e.name, e.error
+                        ),
+                    ));
+                    return Err(Failure::Exit(0));
+                }
+            }
+        }
+        for (name, text) in &rms {
+            match open_text(name) {
+                Ok(mut f) => write_handle(&mut f, name, text)?,
+                Err(u) => notices.push(Notice::new(
+                    &defects::FSL_65,
+                    mode,
+                    format!(
+                        "{} cannot be opened ({}): not written, as in mcflirt (which says nothing \
+                         and exits with status 0)",
+                        u.name, u.error
+                    ),
+                )),
+            }
+        }
+        for t in 0..n {
+            if let (Some(d), Some(text)) = (&dir, mat_text_of(t)) {
+                write_text(d.join(format!("MAT_{t:04}")), &text)?;
+            }
+            match par.as_mut() {
+                Some(Ok(f)) => write_handle(f, &par_name, &par_text(&result.params[t..=t]))?,
+                Some(Err(u)) => {
+                    let _ = writeln!(err, "error: unable to open output file!");
+                    notices.push(Notice::new(
+                        &defects::FSL_65,
+                        mode,
+                        format!(
+                            "{} cannot be opened ({}): mcflirt's message at volume 0 and exit \
+                             status 0, nothing more written",
+                            u.name, u.error
+                        ),
+                    ));
+                    return Err(Failure::Exit(0));
+                }
+                None => {}
+            }
+        }
+    }
+    note(o, err, "Saving motion corrected time series... ");
+    write(
+        &format!("{stem}{ext}"),
+        &corrected,
+        data_type,
+        true,
+        err,
+        notices,
+    )?;
     // FSL-59 corrected: the series written is the interpolation asked for, mcflirt 6.0.7.23's
     // the trilinear one. FSL-09 (mcflirt's truncation to an integer type) is named as it
     // applies to mcflirt's series, so in both modes alike, also where the series written (a
@@ -885,7 +1223,7 @@ fn write_outputs(
             notices.push(image::fsl09_notice(Path::new(&path), c, data_type, mode));
         }
     }
-    Ok(notices)
+    Ok(())
 }
 
 /// The `descrip` field of output images.
@@ -1020,6 +1358,75 @@ mod tests {
                 [("FSL-05", mode), ("FSL-05", mode)]
             );
         }
+    }
+
+    /// FSL-20's message names the `.mat` directory after the `-in` string's directory
+    /// (`specs/mcflirt.md` §10.6); FSL-20 corrected without `-mats` checks only its parent.
+    #[test]
+    fn mat_directory_messages() {
+        assert_eq!(input_prefix("/data/run/bold.nii.gz"), "/data/run/");
+        assert_eq!(input_prefix("bold.nii.gz"), "b");
+        assert_eq!(input_prefix("dir/"), "dir/");
+        let dir = tempfile::tempdir().unwrap();
+        let base = dir.path().to_str().unwrap();
+        assert!(mat_parent_exists(&format!("{base}/o")).is_ok());
+        assert!(mat_parent_exists("o").is_ok());
+        let e = mat_parent_exists(&format!("{base}/missing/o")).unwrap_err();
+        assert!(!e.permission && e.error.to_string().ends_with("does not exist"));
+        fs::write(dir.path().join("afile"), "x").unwrap();
+        let e = mat_parent_exists(&format!("{base}/afile/o")).unwrap_err();
+        assert!(e.error.to_string().ends_with("is not a directory"));
+        // The first free name: o.mat, then o.mat+.
+        let out = format!("{base}/o");
+        assert_eq!(
+            mat_directory(&out).ok(),
+            Some(PathBuf::from(format!("{out}.mat")))
+        );
+        assert_eq!(
+            mat_directory(&out).ok(),
+            Some(PathBuf::from(format!("{out}.mat+")))
+        );
+        let e = mat_directory(&format!("{base}/missing/o")).unwrap_err();
+        assert!(!e.permission && e.name.ends_with("missing/o.mat"));
+    }
+
+    /// FSL-21 and FSL-66 corrected: refused before the input is read (it does not exist here),
+    /// with the notice and the error; `-stages 0` is not refused.
+    #[test]
+    fn bins_refused_before_any_work() {
+        for (args, id) in [
+            (
+                &["-in", "none.nii", "-cost", "mutualinfo", "-bins", "4"][..],
+                "FSL-21",
+            ),
+            (&["-in", "none.nii", "-bins", "-16"], "FSL-66"),
+            (
+                &["-in", "none.nii", "-cost", "woods", "-bins", "-3"],
+                "FSL-21",
+            ),
+        ] {
+            let (code, _, err) = run_mode(args, FIX);
+            assert_eq!(code, 1, "{args:?}");
+            let lines: Vec<&str> = err.lines().collect();
+            assert!(lines[0].contains(&format!("upstream defect {id} (mcflirt) corrected")));
+            assert!(lines[1].starts_with("Error: -bins ") && lines[1].contains(id));
+        }
+        // No stage runs: the input is read (and here does not exist).
+        let (code, _, err) = run_mode(
+            &[
+                "-in",
+                "none.nii",
+                "-cost",
+                "mutualinfo",
+                "-bins",
+                "4",
+                "-stages",
+                "0",
+            ],
+            FIX,
+        );
+        assert_eq!(code, 1);
+        assert!(!err.contains("FSL-21"), "{err}");
     }
 
     #[test]

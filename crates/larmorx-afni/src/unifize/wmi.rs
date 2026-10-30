@@ -43,11 +43,18 @@ impl Ball {
     /// The largest `d >= 0` with `(d, a, b)` in the ball, if any (the extent of the line of
     /// the ball through `(a, b)` along the third axis).
     pub fn extent(&self, a: i64, b: i64) -> Option<i64> {
+        self.extent_within(a, b, self.half)
+    }
+
+    /// [`Ball::extent`], at most `cap` (the ball is tested in float, and its sums grow with `d`,
+    /// so the extent is the first `d` whose next is outside).
+    pub fn extent_within(&self, a: i64, b: i64, cap: i64) -> Option<i64> {
         if !self.contains(0, a, b) {
             return None;
         }
+        let cap = cap.min(self.half);
         let mut d = 0;
-        while d < self.half && self.contains(d + 1, a, b) {
+        while d < cap && self.contains(d + 1, a, b) {
             d += 1;
         }
         Some(d)
@@ -254,20 +261,27 @@ pub fn local_intensity(
     let [nx, ny, nz] = dims;
     let ball = Ball::new(radius);
     let h = ball.half;
-    // The lines of the ball along x (indexed by dj, dk) and along y (by di, dk).
-    let lines = |ball: &Ball| -> Vec<(i64, i64, i64)> {
+    // The lines of the ball along x (indexed by dj, dk) and along y (by di, dk), limited to the
+    // offsets that can reach the grid: at most n - 1 voxels along an axis of n
+    // (`specs/3dUnifize.md` §9.1). An offset beyond them never lands inside the grid, and a line
+    // at least as long as its axis covers it from any voxel, so every ball holds the same values;
+    // a radius of thousands of voxels (`-EPI` on tiny voxels, AFNI-75 reproduced) needs only the
+    // grid's lines.
+    let reach = |n: usize| (n as i64 - 1).max(0);
+    let lines = |across: i64, along: i64| -> Vec<(i64, i64, i64)> {
         let mut out = Vec::new();
-        for c in -h..=h {
-            for b in -h..=h {
-                if let Some(e) = ball.extent(b, c) {
+        let (hc, hb) = (h.min(reach(nz)), h.min(across));
+        for c in -hc..=hc {
+            for b in -hb..=hb {
+                if let Some(e) = ball.extent_within(b, c, along) {
                     out.push((b, c, e));
                 }
             }
         }
         out
     };
-    let x_lines = lines(&ball);
-    let y_lines = x_lines.clone();
+    let x_lines = lines(reach(ny), reach(nx));
+    let y_lines = lines(reach(nx), reach(ny));
     let ranked = rank_values(a);
     let nranks = ranked.values.len().max(1);
     let plane = nx * ny;
@@ -443,6 +457,9 @@ mod tests {
             ([6, 9, 1], 4.1, 30.0, 31.0),
             ([1, 1, 8], 2.0, 70.0, 80.0),
             ([5, 4, 3], 9.0, 80.0, 90.0),
+            // Radii beyond the grid on every axis (the lines kept are the grid's, §9.1).
+            ([7, 5, 4], 30.0, 70.0, 80.0),
+            ([6, 3, 2], 61.0, 65.0, 90.0),
         ]
         .into_iter()
         .enumerate()

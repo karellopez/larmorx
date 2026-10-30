@@ -378,8 +378,18 @@ pub fn run(
     settings: &AfniSettings,
     n_threads: usize,
 ) -> Result<UnifizeRun, String> {
-    parallel::with_threads(n_threads, || run_here(image, options, mode, settings))
-        .map_err(|e| e.to_string())?
+    // AFNI-75's guard (spec §9.1) is decided here, on the caller's thread: a limit given to
+    // this computation (`larmorx_core::alloc::with_memory_limit`) belongs to it.
+    let refusal = if options.epi && mode.fix() {
+        let (g, _) = geometry::output_geometry(&image.geometry, mode);
+        epi_guard(g.pixdim, n_threads)
+    } else {
+        None
+    };
+    parallel::with_threads(n_threads, || {
+        run_here(image, options, mode, settings, refusal.as_deref())
+    })
+    .map_err(|e| e.to_string())?
 }
 
 /// The radius of `-EPI` (spec §7): 18.3 mm in voxels, `cbrtf` of the voxel volume, at least
@@ -387,6 +397,49 @@ pub fn run(
 pub fn epi_radius(steps: [f32; 3]) -> f32 {
     let u = math::cbrtf((steps[0] * steps[1] * steps[2]).abs());
     ((18.3 / f64::from(u)) as f32).max(4.14)
+}
+
+/// The memory AFNI's method needs for `-EPI`'s ball of neighbours (spec §9.1): with `r` the
+/// radius and `workers` the local mean's workers, `(4/3 · π · r³ + 1) · (24 + 4 · workers)`
+/// bytes, in double precision (the ball's points, 12 bytes each, counted twice while its list
+/// grows, and each worker's buffer of one 4-byte value per point). It is the prediction for
+/// AFNI's method, whatever this implementation's own memory: [`wmi::local_intensity`] keeps only
+/// the lines of the ball that reach the grid, far less.
+pub fn epi_ball_bytes(r: f32, workers: usize) -> f64 {
+    let r = f64::from(r);
+    (4.0 / 3.0 * std::f64::consts::PI * r * r * r + 1.0) * (24.0 + 4.0 * workers as f64)
+}
+
+/// A voxel size for AFNI-75's message: its magnitude with up to six decimals and no trailing
+/// zeros (`0.003`, `0.05`, `3`).
+fn voxel_size_text(v: f32) -> String {
+    let s = format!("{:.6}", f64::from(v.abs()));
+    let s = s.trim_end_matches('0').trim_end_matches('.');
+    if s.is_empty() { "0".into() } else { s.into() }
+}
+
+/// AFNI-75 corrected (spec §9.1): why `-EPI` on voxels of `steps` mm is refused, when the
+/// memory its ball of neighbours needs (`epi_ball_bytes`, with `n_threads` workers, 0 for the
+/// machine's) exceeds the limit (`larmorx_core::alloc::check_plan`: a limit given to this
+/// computation, `LARMORX_MEMORY_LIMIT`, above 4 GiB the machine's memory). `None`: it fits.
+pub fn epi_guard(steps: [f32; 3], n_threads: usize) -> Option<String> {
+    let r = epi_radius(steps);
+    let need = epi_ball_bytes(r, parallel::resolve_threads(n_threads));
+    let limit = larmorx_core::alloc::check_plan(need).err()?;
+    let hint = if steps.iter().any(|v| v.abs() < 0.01) {
+        " (a header whose units are micrometres makes the voxels 1000 times smaller than they \
+         look)"
+    } else {
+        ""
+    };
+    Some(format!(
+        "3dUnifize -EPI would need about {} for its ball of neighbours (radius {r:.1} voxels: \
+         18.3 mm over the voxels' {} x {} x {} mm), more than {limit}{hint}",
+        larmorx_core::alloc::gib(need),
+        voxel_size_text(steps[0]),
+        voxel_size_text(steps[1]),
+        voxel_size_text(steps[2]),
+    ))
 }
 
 fn progress(events: &mut Vec<Event>, text: &str) {
@@ -414,6 +467,7 @@ fn run_here(
     o: &UnifizeOptions,
     mode: UpstreamDefects,
     settings: &AfniSettings,
+    refusal: Option<&str>,
 ) -> Result<UnifizeRun, String> {
     let mut events = Vec::new();
     let mut notices = Vec::new();
@@ -435,6 +489,27 @@ fn run_here(
             "-EPI changes -Urad to {:.1} voxels",
             o.radius
         ))));
+        // AFNI-75 (spec §9.1): a ball of neighbours beyond the memory limit is refused before
+        // any work, one volume included; `reproduce` attempts it as AFNI does.
+        if let Some(why) = refusal {
+            notices.push(Notice::new(
+                &defects::AFNI_75,
+                mode,
+                format!("{why}: an error (exit status 1); AFNI fills the machine"),
+            ));
+            return Ok(UnifizeRun {
+                events,
+                notices,
+                failure: Some(format!(
+                    "{why}. An error (AFNI-75); LARMORX_UPSTREAM_DEFECTS=reproduce attempts it \
+                     as AFNI does"
+                )),
+                output: None,
+                scale: None,
+                automasked: None,
+                epi: false,
+            });
+        }
     }
     progress(&mut events, " + Pre-processing: ");
     let epi = o.epi && nt > 1;
@@ -729,6 +804,44 @@ mod tests {
         let mut w = vec![5.0f32; 50];
         invert(&mut w, &[1; 50], 2, 98.5, UpstreamDefects::Fix);
         assert!(w.iter().all(|&v| v == 5.0));
+    }
+
+    /// AFNI-75 (spec §9.1): the prediction, its words, and the limit given to the computation
+    /// first; the replica's numbers for the spec's cases (two workers).
+    #[test]
+    fn the_epi_ball_guard() {
+        use larmorx_core::alloc::with_memory_limit;
+        let um3 = [0.003f32; 3];
+        assert_eq!(epi_radius(um3), 6100.0);
+        let need = epi_ball_bytes(6100.0, 2);
+        assert_eq!(larmorx_core::alloc::gib(need), "2.834e4 GiB");
+        assert_eq!(
+            larmorx_core::alloc::gib(epi_ball_bytes(18300.0, 2)),
+            "7.651e5 GiB"
+        );
+        assert_eq!(
+            larmorx_core::alloc::gib(epi_ball_bytes(366.0, 2)),
+            "6.12 GiB"
+        );
+        assert_eq!(voxel_size_text(0.003), "0.003");
+        assert_eq!(voxel_size_text(-0.05), "0.05");
+        assert_eq!(voxel_size_text(3.0), "3");
+        let why = with_memory_limit(4 << 30, || epi_guard(um3, 2)).unwrap();
+        assert_eq!(
+            why,
+            "3dUnifize -EPI would need about 2.834e4 GiB for its ball of neighbours (radius \
+             6100.0 voxels: 18.3 mm over the voxels' 0.003 x 0.003 x 0.003 mm), more than the \
+             4.00 GiB given to this computation (a header whose units are micrometres makes the \
+             voxels 1000 times smaller than they look)"
+        );
+        let why = with_memory_limit(4 << 30, || epi_guard([0.05; 3], 2)).unwrap();
+        assert!(
+            why.contains("about 6.12 GiB") && why.ends_with("computation"),
+            "{why}"
+        );
+        // What fits is never refused: 0.3 mm (61 voxels) and 3 mm.
+        assert!(with_memory_limit(4 << 30, || epi_guard([0.3; 3], 2)).is_none());
+        assert!(with_memory_limit(4 << 30, || epi_guard([3.0; 3], 32)).is_none());
     }
 
     #[test]

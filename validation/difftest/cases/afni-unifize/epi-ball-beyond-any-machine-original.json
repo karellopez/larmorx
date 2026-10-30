@@ -1,0 +1,201 @@
+{
+ "defect": "AFNI-75",
+ "description": "3dUnifize -EPI on a 4D input of micrometre voxels: the ball of neighbours has a radius of about 9600 voxels (about 10^12 points), beyond any machine; the clean-room original's default stops before building it, as the replica's does (AFNI-75, specs/3dUnifize.md §9.1), neither AFNI nor reproduce runs",
+ "expect": "guard",
+ "found": {
+  "detail": "a process of the case exceeds 3 GiB: the kernel stopped it (no swap)",
+  "n": 89,
+  "seed": "20261025",
+  "shrink_moves": [],
+  "signature": [
+   "original exceeds the memory limit"
+  ]
+ },
+ "id": "epi-ball-beyond-any-machine-original",
+ "implementations": [
+  "original"
+ ],
+ "reason": "",
+ "recipe": {
+  "extra": {
+   "min_size": 4,
+   "outputs": [
+    "uni.nii"
+   ]
+  },
+  "features": {
+   "-input": false,
+   "EPI": true,
+   "GM": false,
+   "T2": true,
+   "T2 count": 0,
+   "T2up": false,
+   "Urad": false,
+   "amsave": false,
+   "axis0": 0.8,
+   "axis1": 1.05,
+   "axis2": 0.95,
+   "bias0": -0.0075,
+   "bias1": -0.01,
+   "bias2": 0.0075,
+   "bias3": -0.0075,
+   "centre0": 2.5,
+   "centre1": 3.5,
+   "centre2": -2.5,
+   "clfrac": false,
+   "content": "head",
+   "dtype": "float32",
+   "noduplo": true,
+   "noise": 6.0,
+   "nosquash": false,
+   "orientation": "axes",
+   "origin0": -20.0,
+   "origin1": -30.5,
+   "origin2": 44.0,
+   "output": "uni.nii",
+   "qfac": -1,
+   "qform_code": 4,
+   "quiet": false,
+   "range": "plain",
+   "rbt": true,
+   "rbt values": 0,
+   "sform": "same",
+   "sform_code": 1,
+   "shape": "25x32x23x6",
+   "size": 18.0,
+   "spacing0": 3.0,
+   "spacing1": 1.5,
+   "spacing2": 1.5,
+   "ssave": false,
+   "suffix": ".nii.gz",
+   "tissues": "t1",
+   "tr": 2.5,
+   "tunits": "msec",
+   "units": "um",
+   "useall": false
+  },
+  "groups": [
+   {
+    "args": [
+     "-EPI"
+    ],
+    "name": "EPI",
+    "optional": true
+   },
+   {
+    "args": [
+     "-rbt",
+     "18.3",
+     "65.0",
+     "90.0"
+    ],
+    "name": "rbt",
+    "optional": true
+   },
+   {
+    "args": [
+     "-noduplo"
+    ],
+    "name": "noduplo",
+    "optional": true
+   },
+   {
+    "args": [
+     "-prefix",
+     "uni.nii"
+    ],
+    "name": "prefix",
+    "optional": false
+   },
+   {
+    "args": [
+     "{in:input}"
+    ],
+    "name": "input",
+    "optional": false
+   }
+  ],
+  "inputs": {
+   "input": {
+    "content": {
+     "axes": [
+      0.8,
+      1.05,
+      0.95
+     ],
+     "bias": [
+      -0.0075,
+      -0.01,
+      0.0075,
+      -0.0075
+     ],
+     "centre": [
+      2.5,
+      3.5,
+      -2.5
+     ],
+     "noise": 6.0,
+     "seed": 251872116,
+     "size": 18.0,
+     "tissues": "t1",
+     "type": "head"
+    },
+    "dtype": "float32",
+    "geometry": {
+     "origin": [
+      -20.0,
+      -30.5,
+      44.0
+     ],
+     "qfac": -1,
+     "qform_code": 4,
+     "quaternion": [
+      1,
+      -1,
+      1,
+      1
+     ],
+     "sform": "same",
+     "sform_code": 1,
+     "spacing": [
+      3.0,
+      1.5,
+      1.5
+     ],
+     "units": "um"
+    },
+    "scaling": null,
+    "shape": [
+     25,
+     32,
+     23,
+     6
+    ],
+    "suffix": ".nii.gz",
+    "timing": {
+     "slice_code": 0,
+     "tr": 2500.0,
+     "tunits": "msec"
+    },
+    "values": {
+     "offset": 0.0,
+     "scale": 1.0
+    }
+   }
+  },
+  "n": 89,
+  "options": [
+   "-EPI",
+   "-noduplo",
+   "-rbt",
+   "4D input"
+  ],
+  "seed": "20261025",
+  "tool": "afni-unifize"
+ },
+ "rule": "C",
+ "status": "register",
+ "suite": "afni-unifize",
+ "tier": "smoke",
+ "tool": "afni-unifize"
+}

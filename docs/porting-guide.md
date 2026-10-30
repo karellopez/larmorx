@@ -68,6 +68,12 @@ learns from black-box runs goes back into the spec, marked (observed). The model
 [specs/3dTshift.md](../specs/3dTshift.md) and [specs/mcflirt.md](../specs/mcflirt.md); the
 record of what the implementer used is [crates/larmorx-afni/PROVENANCE.md](../crates/larmorx-afni/PROVENANCE.md).
 
+**Searching is opening** (2026-10-30): a clean-room implementer never searches a file that holds
+restricted sections as a whole (`grep` over `docs/findings/upstream-defects.md` prints lines of the
+sections marked †): read the register's summary table by its line range only, and search only the
+files this section allows. The replica authors' permanent cases are not read either (a clean-room
+part's own cases are named in its brief).
+
 **Why both tracks for restricted upstreams:** the replica gives the upstream's exact bits
 (3dTshift: 279 of 279 compared cases); the original keeps the main package Apache-2.0 at the
 cost of last bits wherever the upstream's own numerics decide them (3dTshift: 176 of 279

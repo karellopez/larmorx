@@ -157,3 +157,32 @@ the kept times are all within 3 ms of 0, in both modes).
   default mode takes the time it took; `reproduce` on a header with slice code 2 now shifts the
   slices, as AFNI 26.3.05 does, where it copied them before (0.45 s against 0.07 s at one thread),
   and `-no_detrend` de-means every voxel (0.30 s against 0.29 s).
+
+## AFNI-75's guard in the clean-room 3dUnifize (2026-10-30)
+
+Written from `specs/3dUnifize.md` §7, §9.1 and §10 (the spec writer's lines of 2026-10-30) by a
+clean-room implementer, with black-box runs of AFNI 26.3.05's `3dUnifize` and of the replica
+program (`LARMORX_IMPLEMENTATION=replica larmorx afni 3dUnifize`); probe
+[`validation/investigations/cleanroom-additions/unifize_guard.py`](../../validation/investigations/cleanroom-additions/unifize_guard.py).
+
+- **The same refusals, word for word:** on the spec's cases (4D and one-volume series of 3 µm
+  and 1 µm voxels, 0.05 mm voxels, `LARMORX_MEMORY_LIMIT=4G`, two workers) the original's
+  warning and fatal lines are the replica's, byte for byte (`about 2.834e4 GiB`, radius 6100.0;
+  `7.651e5 GiB`, radius 18300.0; `6.12 GiB`, radius 366.0, no hint); exit 1, nothing written.
+  0.3 mm (61 voxels) and 3 mm (6.1) are not refused, and AFNI, the replica and the original give
+  the same output, bit for bit, in both modes.
+- **The guard is decided on the caller's thread:** a limit given to the computation
+  (`larmorx_core::alloc::with_memory_limit`) is the thread's, and the local mean runs in a pool
+  of its own, so the prediction is made before the pool starts.
+- **`reproduce` without the guard needs little:** the local mean keeps only the ball's lines
+  that reach the grid (at most `n − 1` voxels along an axis of `n`, §9.1); a ball line at least
+  as long as its axis covers it from every voxel, so every ball holds the same values. 3 µm and
+  1 µm voxels on a 24 × 24 × 16 series (radii 6100 and 18300) then take 0.01 s and 5 MiB; the
+  unit tests compare the method with the spec's ball, gathered and sorted, for radii beyond the
+  grid on every axis.
+- **Random testing after the guard** (a trial of 0.5 h, 2026-10-30, larmorx `6f64291`, AFNI
+  26.3.05): 1,768 `afni-unifize` cases, 1,757 agree in both implementations, 9 over the case's
+  memory limit (3 GiB: `-EPI` on tiny voxels) where both implementations' defaults stop with
+  AFNI-75's error (verdict *guard*, since this part for the original too: `difftest/runner.py`'s
+  `GUARDED`), one *notice* (AFNI-45 in both implementations) and one *undefined* case (AFNI's
+  values from memory it never wrote), none differing.

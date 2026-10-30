@@ -65,3 +65,22 @@ findings (`docs/findings/fsl-mcflirt.md`, `fsl-bet.md`, the register's restricte
 | `hmc::estimate::register` (the padded centre in the in-plane mode) | mcflirt's in-plane mode | spec §12, `-verbose 20` traces |
 | `hmc::pipeline` (FSL-59), `hmc::resample::series_differ` | mcflirt 6.0.7.23's `-sinc_final` and `-nn_final` | spec §9.3, black-box runs |
 | `cli::hmc` (the files opened, FSL-60's notices, the unknown-type message; FSL-09 named in both modes where FSL-59 applies, its counts from mcflirt's trilinear series, `resample::fold_resampled`) | mcflirt 6.0.7.23's command line | spec §4.1, §9.3, §9.4, §10.1, black-box runs, the record's check of the notices in both modes |
+
+## FSL-20, FSL-21, FSL-65 and FSL-66 (2026-10-30)
+
+Added by a clean-room implementer who never opened FSL's source (any version), the replica
+crates (`crates-nc/`), the restricted findings (`docs/findings/fsl-mcflirt.md`, `fsl-bet.md`, the
+register's restricted sections), `docs/parts/`, the spec writer's probes
+(`validation/investigations/specs-memory/`) or the version probes, from these inputs only:
+
+| Input | What it gave |
+|---|---|
+| [`specs/mcflirt.md`](../../specs/mcflirt.md) §10.6, §12.1, §14.1 and appendix B: the lines marked "(spec writer, 2026-10-30)" | the order of mcflirt's writes, what each failure gives in both modes (messages, exit statuses, files), the bins of each stage, mcflirt's ends, appendix B with `B = 0`, the cases |
+| The defect register's summary rows of FSL-20, FSL-21, FSL-65 and FSL-66 | the defects' descriptions in `larmorx_core::defects` (FSL-65 and FSL-66 added) |
+| Black-box runs of FSL 6.0.7.23's `mcflirt` (`~/fsl-6.0.7.23/bin/mcflirt`) on a 24 × 24 × 16 × 5 phantom: the `mri-hmc` suite's `failures/` cases and [`validation/investigations/cleanroom-additions/hmc_bins_matrices.py`](../../validation/investigations/cleanroom-additions/hmc_bins_matrices.py) | the names in mcflirt's permission and `terminate` messages; the matrices of few bins |
+
+| larmorx | Behaviour reproduced | Source |
+|---|---|---|
+| `hmc::estimate` (`stage_bins`, `refused_bins`, `mcflirt_end`, `McflirtEnd`, the bins as `i64`) | mcflirt's bins per stage, its crashes (reproduced as errors) and the default's refusals | spec §12.1 |
+| `hmc::cost` (`bin_grid_mi`, `TestBins`, `MiHistograms` and the correlation-ratio cells with no bins) | appendix B and A with `B = 0` | spec §12.1, appendix B |
+| `cli::hmc` (`write_outputs` in mcflirt's order, `mat_directory`, `mat_parent_exists`, `input_prefix`, the reproduced endings with exit status 0) | mcflirt's outputs that cannot be written | spec §10.6 |

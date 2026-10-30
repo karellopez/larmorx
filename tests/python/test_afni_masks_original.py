@@ -227,3 +227,30 @@ def test_command_line_refusals(t1, t2, tmp_path):
     assert code == 1 and "NIfTI only" in err
     code, err = cli("3dUnifize", str(t2))
     assert code == 1 and "NIfTI only" in err
+
+
+def test_epi_ball_guard(tmp_path, no_replica, monkeypatch):
+    """AFNI-75 (``specs/3dUnifize.md`` §9.1): ``-EPI`` on micrometre voxels is refused by default
+    before any work, with the memory, the radius and the limit named, nothing written; the
+    Python API raises the same message; ``reproduce`` runs it (only the ball's lines that reach
+    the grid are kept)."""
+    import nibabel as nib
+
+    base = head(t2=True)
+    series = np.stack([base * (1 + 0.01 * t) for t in range(3)], axis=-1).astype(np.float32)
+    img = nib.Nifti1Image(series, affine())
+    img.header["xyzt_units"] = 3 | 8  # micrometres: 3 µm voxels
+    path = tmp_path / "um.nii"
+    img.to_filename(path)
+    monkeypatch.setenv("LARMORX_MEMORY_LIMIT", "4G")
+    monkeypatch.setenv("OMP_NUM_THREADS", "2")
+    out = tmp_path / "uni.nii"
+    code, err = cli("3dUnifize", "-EPI", "-prefix", str(out), str(path))
+    assert code == 1 and not out.exists(), err
+    assert "upstream defect AFNI-75 (3dUnifize) corrected" in err
+    assert "about 2.834e4 GiB" in err and "radius 6100.0 voxels" in err
+    assert "the 4.00 GiB of LARMORX_MEMORY_LIMIT (a header whose units are micrometres" in err
+    with pytest.raises(ValueError, match=r"radius 6100\.0 voxels.*An error \(AFNI-75\)"):
+        lx.afni.unifize(path, epi=True, n_threads=2, implementation=ORIGINAL)
+    r = lx.afni.unifize(path, epi=True, upstream_defects="reproduce", implementation=ORIGINAL)
+    assert np.asarray(r.image.data).shape == series.shape

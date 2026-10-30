@@ -22,6 +22,7 @@ thread counts, fMRIPrep's build of AFNI in its image).
 from __future__ import annotations
 
 import functools
+from pathlib import Path
 
 from larmorx_validation.parity import afni_phantoms as ph
 from larmorx_validation.parity import afni_replica as ar
@@ -218,6 +219,92 @@ def _scenario_list() -> list[tuple[str, str, str, ar.Scenario]]:
     return _scenarios()
 
 
+#: AFNI-75's cases (``specs/3dUnifize.md`` §9.1, §10): ``-EPI`` on 24 × 24 × 16 series of tiny
+#: voxels, as (name, voxel size in the header's units, NIfTI's unit code, volumes, radius).
+EPI_VOXELS = (
+    ("um3", 3.0, 3, 3, "6100.0"),
+    ("um1", 1.0, 3, 3, "18300.0"),
+    ("mm0.05", 0.05, 2, 3, "366.0"),
+    ("um3-one", 3.0, 3, 1, "6100.0"),
+    ("mm0.3", 0.3, 2, 3, "61.0"),
+    ("mm3", 3.0, 2, 3, "6.1"),
+)
+#: The memory each guarded case needs with the suite's two OpenMP threads (§9.1's formula).
+EPI_NEED = {
+    "um3": "2.834e4 GiB",
+    "um1": "7.651e5 GiB",
+    "mm0.05": "6.12 GiB",
+    "um3-one": "2.834e4 GiB",
+}
+HINT = "(a header whose units are micrometres makes the voxels 1000 times smaller than they look)"
+
+
+def _epi_voxels(name: str) -> Path:
+    """The series ``epi-voxels:<name>`` of :data:`EPI_VOXELS`: a head-like EPI phantom (plain
+    arithmetic and seeded noise), its voxel size in the header's own units."""
+    import nibabel as nib
+    import numpy as np
+
+    _, size, units, nt, _ = next(e for e in EPI_VOXELS if e[0] == name)
+    path = ar.generated_dir() / f"epi-voxels-{name}.nii"
+    if path.exists():
+        return path
+    shape = (24, 24, 16)
+    x, y, z = np.meshgrid(*(np.arange(n) for n in shape), indexing="ij")
+    r2 = ((x - 11.5) / 9) ** 2 + ((y - 11.5) / 10) ** 2 + ((z - 7.5) / 6) ** 2
+    base = 800.0 * np.clip(1.2 - r2, 0, 1) + 300.0 * (r2 < 0.5)
+    rng = np.random.default_rng(75)
+    data = np.stack([base * (1 + 0.01 * t) + rng.normal(0, 5, shape) for t in range(nt)], -1)
+    affine = np.diag([size, size, size, 1.0])
+    affine[:3, 3] = [-(n - 1) * size / 2 for n in shape]
+    img = nib.Nifti1Image(data.astype(np.float32), affine)
+    img.header["xyzt_units"] = units | 8
+    img.header["pixdim"][4] = 2.0
+    nib.save(img, path)
+    return path
+
+
+def _unifize_input(name: str) -> Path:
+    if name.startswith("epi-voxels:"):
+        return _epi_voxels(name.removeprefix("epi-voxels:"))
+    return _input(name)
+
+
+def _guard_scenarios() -> list[tuple[str, str, str, ar.Scenario]]:
+    """AFNI-75's guard (§10), for the clean-room original: the voxels whose ball exceeds the
+    limit given (``LARMORX_MEMORY_LIMIT=4G``, so the cases depend on no machine) are refused by
+    default with the memory, the radius and the voxels named, nothing written (AFNI is not run:
+    it would fill the machine); 0.3 mm and 3 mm voxels run, compared with AFNI."""
+    out = []
+    for name, size, units, nt, radius in EPI_VOXELS:
+        unit = "µm" if units == 3 else "mm"
+        vols = "one volume" if nt == 1 else f"{nt} volumes"
+        desc = f"-EPI on {vols} of {size:g} {unit} voxels (radius {radius} voxels)"
+        if name in EPI_NEED:
+            mm = f"{size / 1000 if units == 3 else size:g}"
+            text = (
+                f"about {EPI_NEED[name]}",
+                f"radius {radius} voxels",
+                f"{mm} x {mm} x {mm} mm",
+                "the 4.00 GiB of LARMORX_MEMORY_LIMIT",
+                *((HINT,) if units == 3 else ()),
+            )
+            s = S(("-EPI", "-prefix", U, "{0}"), (f"epi-voxels:{name}",), (U,),
+                  tier="smoke" if name == "um3" else "standard", expect="guard",
+                  env=(("LARMORX_MEMORY_LIMIT", "4G"),), guard_text=text)  # fmt: skip
+            out.append((f"guard/epi-{name}", "AFNI-75's guard", f"{desc}: refused (AFNI-75)", s))
+        else:
+            s = S(("-EPI", "-prefix", U, "{0}"), (f"epi-voxels:{name}",), (U,), tier="standard",
+                  env=(("LARMORX_MEMORY_LIMIT", "4G"),))  # fmt: skip
+            out.append((f"guard/epi-{name}", "AFNI-75's guard", f"{desc}: not refused", s))
+    return out
+
+
+@functools.cache
+def _original_scenario_list() -> list[tuple[str, str, str, ar.Scenario]]:
+    return [*_scenarios(), *_guard_scenarios()]
+
+
 #: The implementations this suite validates.
 IMPLEMENTATIONS = ("original", "replica")
 
@@ -230,7 +317,8 @@ def spec(implementation: str = "original") -> ar.ToolSpec:
     if implementation not in IMPLEMENTATIONS:
         raise ValueError(f"implementation must be one of {IMPLEMENTATIONS}, not {implementation!r}")
     tolerance = ar.FLOAT_RTOL if implementation == "original" else None
-    return ar.ToolSpec(PROGRAM, "unifize", _scenario_list, _input, implementation, tolerance)
+    scenarios = _original_scenario_list if implementation == "original" else _scenario_list
+    return ar.ToolSpec(PROGRAM, "unifize", scenarios, _unifize_input, implementation, tolerance)
 
 
 def cases(tier: str) -> list[Case]:

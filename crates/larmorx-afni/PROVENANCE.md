@@ -129,3 +129,20 @@ inputs only:
 | `tshift` (`-no_detrend`: every voxel's mean removed and restored) | AFNI 26.3.05 `3dTshift` | spec §4 |
 | `timing::header_timing` (code 2: `slice_end` down to `slice_start`), `timing::seq_dec_notice` (none) | AFNI 26.3.05's header slice timing | spec §3.2, §6.4 |
 | `automask::copy_timing` (the code-2 times kept, AFNI-03 not named) | AFNI 26.3.05 `3dAutomask -apply_prefix`, `3dUnifize -EPI` | spec 3dAutomask §9, 3dUnifize §9 |
+
+## AFNI-75's guard in 3dUnifize (2026-10-30)
+
+Added by a clean-room implementer who never opened AFNI's source, the replica crates
+(`crates/larmorx-afni-replica`, `crates-gpl/`), the restricted findings, `docs/parts/`, the spec
+writer's probes (`validation/investigations/specs-memory/`) or the version probes, from these
+inputs only:
+
+| Input | What it gave |
+|---|---|
+| [`specs/3dUnifize.md`](../../specs/3dUnifize.md) §7, §9, §9.1, §10: the lines marked "(spec writer, 2026-10-30)" | the guard: when, the prediction `(4/3·π·r³ + 1)·(24 + 4·w)`, the limit's order, the refusal's words, `reproduce` without it, the ball limited to the grid |
+| Black-box runs of AFNI 26.3.05's `3dUnifize` and of the replica program (`LARMORX_IMPLEMENTATION=replica larmorx afni 3dUnifize`, its source not opened): [`validation/investigations/cleanroom-additions/unifize_guard.py`](../../validation/investigations/cleanroom-additions/unifize_guard.py) | the same refusals word for word on the spec's cases; 0.3 mm and 3 mm voxels: AFNI's output in both modes |
+
+| larmorx | Behaviour reproduced | Source |
+|---|---|---|
+| `unifize::epi_guard`, `epi_ball_bytes`, `run` (the guard before the thread pool, its notice and fatal line) | the default's refusal of AFNI-75 | spec §9.1 |
+| `unifize::wmi::local_intensity` (the ball's lines that reach the grid only), `Ball::extent_within` | AFNI's local mean for any radius, with `reproduce` too | spec §4.3, §9.1 |

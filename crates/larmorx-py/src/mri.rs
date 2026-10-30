@@ -8,7 +8,7 @@
 
 use std::path::PathBuf;
 
-use larmorx_mri::hmc::estimate::{EstimateParams, InPlane};
+use larmorx_mri::hmc::estimate::{EstimateParams, InPlane, refused_bins};
 use larmorx_mri::hmc::image::{self, Series, read_reference, read_series, storage_values};
 use larmorx_mri::hmc::pipeline::{self, HmcOptions, HmcOutput, ReferenceChoice};
 use larmorx_mri::hmc::report::parse_mat;
@@ -39,7 +39,7 @@ struct Request {
     cost: String,
     smooth: f64,
     rotation: f64,
-    bins: usize,
+    bins: i64,
     fudge: bool,
     in_plane: String,
     fov: i64,
@@ -82,6 +82,12 @@ impl Request {
         {
             return Err(value_err("smooth must be >= 0 and rotation > 0"));
         }
+        // FSL-21 and FSL-66 corrected (specs/mcflirt.md §12.1): refused before any work.
+        if self.upstream_defects.fix()
+            && let Some(r) = refused_bins(self.bins, self.stages, cost)
+        {
+            return Err(value_err(r));
+        }
         Ok(HmcOptions {
             estimate: EstimateParams {
                 stages: self.stages,
@@ -89,7 +95,7 @@ impl Request {
                 cost,
                 smooth: self.smooth as f32,
                 rotation: self.rotation,
-                bins: self.bins.max(1),
+                bins: self.bins,
                 fudge: self.fudge,
                 in_plane,
                 n_threads: self.n_threads,
@@ -232,7 +238,7 @@ fn mri_hmc_file<'py>(
     cost: &str,
     smooth: f64,
     rotation: f64,
-    bins: usize,
+    bins: i64,
     fudge: bool,
     in_plane: &str,
     fov: i64,
@@ -262,6 +268,9 @@ fn mri_hmc_file<'py>(
         upstream_defects,
         normcorr_count,
     };
+    // The options are checked before the series is read (the bins' refusal comes before any
+    // work, specs/mcflirt.md §12.1).
+    request.options()?;
     let read_err = |e: image::ImageError| match e {
         image::ImageError::Nifti(e) => to_py_err(e),
         e => value_err(e),
@@ -321,7 +330,7 @@ fn mri_hmc_array<'py>(
     cost: &str,
     smooth: f64,
     rotation: f64,
-    bins: usize,
+    bins: i64,
     fudge: bool,
     in_plane: &str,
     fov: i64,

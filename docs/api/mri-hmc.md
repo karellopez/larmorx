@@ -224,10 +224,37 @@ in both modes ([upstream-defects.md](upstream-defects.md); register entries in
 | FSL-10 | the output's units are always millimetres and seconds: a TR in milliseconds is labelled seconds | the input's units are kept (millimetres and seconds where it gives none) | inputs in other units (ds003345: milliseconds) |
 | FSL-13 | `-rmsrel` and `-rmsabs` create the `.mat` directory without `-mats` (holding only the reference's identity) | no `.mat` directory without `-mats` | command line |
 | FSL-04 | `-gdt` registers each volume's gradient image to the reference's plain image (the reference's gradient is computed and discarded) | refused (the clean-room original does not support `-gdt`); the replica reproduces it with `reproduce` | `-gdt` |
-| FSL-20 | when the `.mat` directory cannot be created for another reason than its permissions (a missing parent directory), mcflirt prints "Error!: Unknown Log directory return value" and exits with status 0, writing nothing more | an error (exit 1) | the replica's command line |
-| FSL-21 | with a histogram cost (`corratio`, `mutualinfo`, `normmi`, `woods`) and `-bins` below 8, the first stage's histogram has no bins: the matrices are arbitrary, and `corratio` writes before its arrays and aborts | an error before any work (exit 1) | the replica's command line |
+| FSL-20 | when the `.mat` directory cannot be created for another reason than its permissions (a parent directory that does not exist or is a file), mcflirt prints "Error!: Unknown Log directory return value" and exits with status 0, writing nothing more | an error (exit 1) before any output of the step, nothing written; `reproduce`: mcflirt's message and exit status 0, nothing more written (since 2026-10-30) | the command line's `-mats`, `-rmsrel`, `-rmsabs` |
+| FSL-21 | with a histogram cost (`corratio`, `mutualinfo`, `normmi`, `woods`) and `-bins` below 8, the first stage's histogram has no bins: the matrices are arbitrary, and `corratio` writes before its arrays and aborts | an error before any work (exit 1; the Python API raises it), with `-stages` 1 or more, whatever the series; `reproduce`: the zero-bin costs as mcflirt computes them (`specs/mcflirt.md` §12.1), `corratio` an error where mcflirt aborts (since 2026-10-30) | `bins` below 8 with a histogram cost |
+| FSL-65 | an output text file that cannot be opened (its name a directory, its directory missing or not writable): `-plots`' `.par` file ends the run at volume 0's line with "error: unable to open output file!" and status 0, after `MAT_0000` and the `.rms` files; an `.rms` file is silently not written | an error naming the file (exit 1) before any output of the step, nothing written; `reproduce`: mcflirt's files, message and exit status 0 (since 2026-10-30) | the command line's `-plots`, `-rmsrel`, `-rmsabs` |
+| FSL-66 | a negative `-bins`: each stage has `-bins / 8` or `-bins / 4` bins (toward zero), prepared for every cost: −1 bins kill mcflirt with SIGFPE, −2 or fewer abort it (`std::bad_array_new_length`), nothing written | an error before any work (exit 1), with `-stages` 1 or more, every cost; `reproduce`: an error saying how mcflirt ends where it crashes, and mcflirt's run where no stage gets fewer than 0 bins (−3 to −1 with `normcorr` and `leastsquares`) (since 2026-10-30) | negative `bins` |
 | FSL-59 | FSL 6.0.7.23 only: `-sinc_final` and `-nn_final` resample with trilinear interpolation, whatever the option asks (the `.par` and `.rms` follow) | the interpolation asked for (FSL 6.0.7.17's result); `reproduce` trilinear; named where the two series differ (with an integer output, FSL-09 is then named in both modes, its counts from mcflirt's trilinear series) | `-sinc_final`, `-nn_final`, `final="sinc"`, `"nearest"` |
 | FSL-60 | FSL 6.0.7.23 only: an image name holding `.img` before its extension (a directory, the file's stem) is opened with its last `.img` made `.hdr`: another file is read or written, or mcflirt aborts (a pair's header renamed, its data file not) | the name given; `reproduce` opens FSL's name; named in both modes | the command line's `-in`, `-reffile`, `-out` and the images named after it (the Python API opens the name given) |
+
+### Outputs that cannot be written, and bins no histogram can have (since 2026-10-30)
+
+`specs/mcflirt.md` §10.6 and §12.1. The order of the writes is mcflirt's in both modes: the
+`-meanvol` and `-stats` images, the `refnum` lines (`-report`), then the text outputs (the `.par`
+file opened, the `.mat` directory made, the `.rms` files, then volume by volume its `MAT_` file
+and `.par` line), the corrected series last. By default every text output is opened (the `.mat`
+directory made) before anything is written, and one that cannot be is an error naming the file
+and the defect (FSL-20, FSL-65; what this step made is removed); a `.mat` directory whose parent
+refuses the permission is an error too (exit 1, not FSL-20's case). With `reproduce` the run is
+mcflirt's: an uncreatable `.mat` directory ends it with mcflirt's message and exit status 0
+(FSL-20), the permission's message is mcflirt's (its `-in` directory before the name) and the run
+goes on without matrices, an unopenable `.rms` file is not written, an unopenable `.par` file ends
+the run at volume 0 with status 0 (FSL-65). An image that cannot be written is an error in both
+modes (mcflirt aborts; with `reproduce` its two `terminate` lines are printed first).
+
+`bins` (`-bins`) below 8 with a histogram cost (FSL-21) and negative values (FSL-66) are refused
+by default before the input is read, with `-stages` 1 or more (`-stages 0` registers nothing and
+is not refused), in the command line and the Python API alike. With `reproduce`, `mutualinfo`,
+`normmi` and `woods` run with no bins in a stage as mcflirt does (appendix B with `B = 0`: their
+cost is rounding noise, their matrices arbitrary; FSL-21 named); where mcflirt crashes
+(`corratio` with no bins, −1 bins or fewer in a stage that runs) larmorx prints mcflirt's own
+lines (`double free or corruption (out)`, the two `std::bad_array_new_length` lines; none for
+SIGFPE), names the defect and exits 1, writing nothing (a crash is never reproduced). With one
+volume and no reference nothing is registered, so `reproduce` runs (identities).
 
 On fMRIPrep's command (`-reffile <boldref> -mats`) FSL-01 changes the last volume's matrix
 (the others are mcflirt's), and FSL-09 the rounding of the corrected series when the input is

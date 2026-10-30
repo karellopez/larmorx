@@ -7,8 +7,10 @@ name = "larmorx"
 description = "Neuroimaging tools in Rust (ANTs/ITK, AFNI and FreeSurfer ports; clean-room FSL- and Workbench-like tools) with Python wrappers and compatible CLIs"
 readme = "README.md"
 requires-python = ">=3.12"
+# The AFNI replicas carry CC BY 4.0's attribution for the Medical College of Wisconsin's code,
+# and Arm's MIT notice for sinf/cosf (NOTICE; their texts in LICENSES/).
 license = "Apache-2.0"
-license-files = ["LICENSE", "NOTICE"]
+license-files = ["LICENSE", "NOTICE", "LICENSES/*"]
 keywords = ["neuroimaging", "mri", "fmri", "registration", "preprocessing"]
 classifiers = [
     "Development Status :: 2 - Pre-Alpha",
@@ -28,14 +30,12 @@ dependencies = ["numpy>=1.26"]
 [project.optional-dependencies]
 # Pipeline-only dependencies (PLAN.md §2.2); library users do not need them.
 prep = ["templateflow", "matplotlib", "nilearn", "pandas", "jinja2"]
-# The bit-exact replicas of GPL-licensed tools (crates-gpl/, GPL-3.0-or-later): a separate
-# program that larmorx runs as a separate process, never imports (docs/licensing.md). Not on
-# PyPI yet: build it with `maturin build --release` in crates-gpl/.
-exact = ["larmorx-gpl"]
 # Everything (the user's decision of 2026-10-16): the pipeline's dependencies and every replica
 # package, the FSL replicas (crates-nc/, FSL Licence: non-commercial) included; larmorx-freesurfer
-# joins when it exists. Not on PyPI yet: build them with `maturin build --release`.
-all = ["larmorx[prep]", "larmorx-gpl", "larmorx-nc"]
+# joins when it exists, and larmorx-gpl with Connectome Workbench's replicas. Not on PyPI yet:
+# build them with `maturin build --release`. The AFNI replicas are part of larmorx itself since
+# 2026-10-29 (the `exact` extra, which installed them as larmorx-gpl, is gone with it).
+all = ["larmorx[prep]", "larmorx-nc"]
 
 [project.scripts]
 larmorx = "larmorx.cli:main"

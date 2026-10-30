@@ -61,8 +61,9 @@ _U64 = np.uint64
 
 def splitmix64(seed: int, n: int) -> np.ndarray:
     """``n`` pseudo-random 64-bit integers: SplitMix64 (Steele, Lea and Flood 2014) started at
-    ``seed``. Unsigned numpy arithmetic wraps modulo 2⁶⁴ on every platform. The GPL golden
-    test (``crates-gpl/larmorx-gpl-cli/tests/golden.rs``) uses the same generator."""
+    ``seed``. Unsigned numpy arithmetic wraps modulo 2⁶⁴ on every platform. The AFNI
+    replicas' golden test (``crates/larmorx-cli/tests/afni_replica_golden.rs``) uses the same
+    generator."""
     x = np.arange(1, n + 1, dtype=_U64) * _U64(0x9E3779B97F4A7C15) + _U64(seed)
     x = (x ^ (x >> _U64(30))) * _U64(0xBF58476D1CE4E5B9)
     x = (x ^ (x >> _U64(27))) * _U64(0x94D049BB133111EB)
@@ -646,8 +647,8 @@ def canonical_bytes(a: np.ndarray) -> bytes:
 
 
 def _sample_positions(n: int) -> np.ndarray:
-    """``N_SAMPLES`` evenly spread indices into ``n`` values (integer arithmetic, as the GPL
-    golden test computes them)."""
+    """``N_SAMPLES`` evenly spread indices into ``n`` values (integer arithmetic, as the AFNI
+    replicas' golden test computes them)."""
     return np.array(
         sorted({s * (n - 1) // (N_SAMPLES - 1) for s in range(N_SAMPLES)} if n else ()), np.int64
     )
@@ -823,7 +824,8 @@ def case(case_id: str, covers: tuple[str, ...] | list[str] = ()) -> Callable:
 
 def cli(*argv: str, upstream_defects: str = "fix") -> str:
     """Run ``larmorx <argv...>`` in process (``larmorx.cli``); its standard output. Tools with a
-    replica run the original (the replica has its own golden cases, in ``crates-gpl``).
+    replica run the original (the AFNI replicas have their own golden cases, in
+    ``crates/larmorx-cli/tests/afni_replica_golden.rs``; the FSL replicas in ``crates-nc``).
     ``upstream_defects`` is set as ``LARMORX_UPSTREAM_DEFECTS`` for the call (D13), and AFNI's
     variables of the test run are removed (``larmorx afni`` reads them, as AFNI does), so that
     the environment of the test run cannot change the result."""
@@ -920,18 +922,21 @@ def image_math_operations() -> list[str]:
 
 #: The public functions that run a tool which has only a replica (no clean-room original yet),
 #: with the tool: the replica's program is not installed where these tests run, so their golden
-#: cases are the replica's own (``crates-gpl/larmorx-gpl-cli/tests/golden.rs`` and
-#: ``crates-nc/larmorx-nc-cli/tests/golden.rs``, run on every platform by the replicas' jobs).
-#: ``replica_only`` checks that each tool has one there.
+#: cases are the replica's own (``crates-nc/larmorx-nc-cli/tests/golden.rs``, run on every
+#: platform by the replicas' jobs). ``replica_only`` checks that each tool has one there.
 REPLICA_ONLY_FUNCTIONS: dict[str, str] = {
     "lx.fsl.bet": "fsl bet2",
     "lx.fsl.betsurf": "fsl betsurf",
 }
 
-#: The replicas' golden cases.
-GPL_GOLDEN = Path(__file__).resolve().parents[2] / "crates-gpl/larmorx-gpl-cli/tests/golden.rs"
+#: The replicas' golden cases: the AFNI replicas' (built into larmorx since 2026-10-29, cases
+#: in the larmorx command line's tests, run by ``cargo test`` in every platform's test job) and
+#: the FSL replicas'.
+AFNI_REPLICA_GOLDEN = (
+    Path(__file__).resolve().parents[2] / "crates/larmorx-cli/tests/afni_replica_golden.rs"
+)
 NC_GOLDEN = Path(__file__).resolve().parents[2] / "crates-nc/larmorx-nc-cli/tests/golden.rs"
-REPLICA_GOLDEN = (GPL_GOLDEN, NC_GOLDEN)
+REPLICA_GOLDEN = (AFNI_REPLICA_GOLDEN, NC_GOLDEN)
 
 
 def replica_only() -> dict[str, str]:
@@ -951,7 +956,7 @@ def replica_only() -> dict[str, str]:
 def required() -> dict[str, str]:
     """Every name that needs a golden case here: ``{key: public name}``. Functions are keyed by
     identity (``fn:<id>``), so aliases (``lx.save``, ``lx.io.save``) count once. The tools and
-    functions with only a replica (:func:`replica_only`) have theirs in ``crates-gpl``."""
+    functions with only a replica (:func:`replica_only`) have theirs in ``crates-nc``."""
     out = {key: key for key in [*cli_tools(), *image_math_operations()]}
     for fn, name in public_functions().items():
         out[f"fn:{id(fn)}"] = name
@@ -2844,8 +2849,8 @@ def _(ctx: Context) -> dict[str, Any]:
 SLICE_TIMES = (0.0, 1.2, 0.4, 1.6, 0.8)
 
 
-#: ``lx.afni.tshift`` cases run the clean-room original, whatever is installed (the replica's
-#: golden cases are in ``crates-gpl/larmorx-gpl-cli/tests/golden.rs``).
+#: ``lx.afni.tshift`` cases run the clean-room original (the replica's golden cases are in
+#: ``crates/larmorx-cli/tests/afni_replica_golden.rs``).
 ORIGINAL = "original"
 
 

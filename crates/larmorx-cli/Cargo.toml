@@ -17,9 +17,12 @@ path = "src/bin/lx.rs"
 
 [dependencies]
 larmorx-afni.workspace = true
+larmorx-afni-replica.workspace = true
 larmorx-ants.workspace = true
 larmorx-core.workspace = true
 larmorx-mri.workspace = true
 
 [dev-dependencies]
+larmorx-io.workspace = true
+sha2.workspace = true
 tempfile.workspace = true

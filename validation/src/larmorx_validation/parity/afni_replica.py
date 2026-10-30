@@ -6,9 +6,8 @@ messages and every output, byte for byte.
 AFNI runs as its own binary (``scripts/build_afni_oracle.sh``; the version is chosen by
 :mod:`afni_versions`: ``LARMORX_AFNI_VERSION``, ``--afni-version``, else the implementation's
 default; ``LARMORX_AFNI_BIN`` names another build's directory or one program), the replica the way users reach it: through larmorx's own dispatch
-(``larmorx afni <program>`` with ``implementation="replica"``), which runs the ``larmorx-gpl``
-program as a separate process (``LARMORX_GPL_BIN``, else the ``crates-gpl`` build). This package
-is Apache-2.0 and never loads the replica.
+(``larmorx afni <program>`` with ``implementation="replica"``), in-process (the replicas are part
+of larmorx since 2026-10-29; until then the GPL program ``larmorx-gpl``).
 
 Each program runs in a directory of its own, with the same environment: this process's without
 AFNI's variables, ``HOME`` an empty directory (no ``.afnirc``), ``AFNI_DONT_LOGFILE=YES`` and
@@ -48,7 +47,8 @@ from typing import Any
 import numpy as np
 
 from larmorx_validation.parity import afni_versions, defects
-from larmorx_validation.parity.afni_tshift import replica_binary
+from larmorx_validation.parity.afni_tshift import REPLICA_ENV as REPLICA_ENV
+from larmorx_validation.parity.afni_tshift import replica_command as replica_command
 from larmorx_validation.parity.afni_tshift import replica_version as replica_version
 from larmorx_validation.parity.harness import (
     BOTH_ERROR,
@@ -249,13 +249,10 @@ def run_larmorx(
     cwd: Path,
     implementation: str = "replica",
 ) -> Run:
-    """``larmorx afni <program>`` in process, with ``implementation`` forced: the replica (it
-    runs the ``larmorx-gpl`` program as a separate process) or the clean-room original (in
-    process); ``mode`` is D13's choice."""
+    """``larmorx afni <program>`` in process, with ``implementation`` forced: the replica or the
+    clean-room original; ``mode`` is D13's choice."""
     from larmorx.cli import run
 
-    if implementation == "replica":
-        env = dict(env, LARMORX_GPL_BIN=str(replica_binary()))
     out, err = io.StringIO(), io.StringIO()
     with (
         process_environment(env, cwd),
@@ -780,7 +777,7 @@ class ToolSpec:
     function: str
     scenarios: Callable[[], list[tuple[str, str, str, Scenario]]]
     inputs: Callable[[str], Path]
-    #: ``replica`` (the larmorx-gpl program) or ``original`` (the clean-room original).
+    #: ``replica`` (the bit-exact replica) or ``original`` (the clean-room original).
     implementation: str = "replica"
     #: For float32 outputs that need not be bit-identical: the largest |diff| allowed, as a
     #: fraction of the largest |AFNI output| (``None``: bit-identity required).
@@ -837,10 +834,6 @@ def _run_case(spec: ToolSpec, case: Case, checks: CheckList) -> None:
     impl = spec.implementation
     if afni_binary(program) is None:
         raise Outcome("skipped", f"the AFNI {program} oracle was not found (LARMORX_AFNI_BIN)")
-    if impl == "replica" and replica_binary() is None:
-        raise Outcome(
-            "skipped", "the larmorx-gpl binary was not found (LARMORX_GPL_BIN, crates-gpl build)"
-        )
     try:
         paths = [
             _difftest_input(name) if name.startswith("dt:") else spec.inputs(name)
@@ -1108,8 +1101,6 @@ def _python(checks: CheckList, spec: ToolSpec, s: Scenario, image: Path, l_dir: 
     fn = getattr(lx.afni, spec.function)
     kwargs = dict(s.python or {})
     env = dict(os.environ)
-    if spec.implementation == "replica":
-        env["LARMORX_GPL_BIN"] = str(replica_binary())
     with process_environment(env), warnings.catch_warnings():
         warnings.simplefilter("ignore")
         result = fn(

@@ -42,7 +42,7 @@ Licences decide what may be translated and where the translation may go
 |---|---|---|---|
 | ANTs, ITK | Apache-2.0 | main package | not needed |
 | AFNI, public-domain (NIH) files | public domain | main package | not needed |
-| AFNI, files copyrighted by the Medical College of Wisconsin (e.g. 3dTshift) | GPL-2.0-or-later | `larmorx-gpl` | main package |
+| AFNI, files copyrighted by the Medical College of Wisconsin (e.g. 3dTshift) | CC BY 4.0 from AFNI 26.3.05 (GPL-2.0-or-later before) | main package (since 2026-10-29) | main package |
 | Connectome Workbench | GPL-2.0-or-later | `larmorx-gpl` | main package |
 | FSL | FSL Licence (non-commercial) | `larmorx-nc` | main package |
 | FreeSurfer | FreeSurfer Software License 1.0 | `larmorx-freesurfer` | not planned (see below) |
@@ -61,7 +61,7 @@ Nothing is on PyPI yet. All packages are precompiled wheels for the six platform
 ```bash
 pip install larmorx                  # library + `larmorx`/`lx` commands; originals for restricted tools
 pip install "larmorx[prep]"          # + what the larmorprepx pipeline needs
-pip install "larmorx[exact]"         # + larmorx-gpl: exact AFNI/Workbench replicas
+pip install larmorx                  # includes the exact AFNI replicas (since 2026-10-29)
 pip install larmorx-nc               # FSL replicas; installed by name (non-commercial licence)
 pip install "larmorx[prep,surfaces]" # pipeline + larmorx-freesurfer (surfaces)
 pip install "larmorx[all]"           # everything: every replica package too (decided 2026-10-16)
@@ -74,11 +74,12 @@ larmorprepx /data/bids /data/derivatives participant --participant-label 01
   larmorprepx's report, record which ran.
 - **The command line** works the same way: when a replica package is installed, its program
   runs as a separate process; `LARMORX_IMPLEMENTATION=original` (or `replica`) overrides.
-- **The replica is never imported.** Even from Python, larmorx runs the replica's program in
-  a separate process and exchanges files with it, so installing `larmorx[exact]` does not put
-  GPL code into your Python program ([licensing.md](licensing.md), "Choosing at run time").
+- **A restricted replica is never imported.** Even from Python, larmorx runs the replica's
+  program in a separate process and exchanges files with it, so installing `larmorx-nc` does not
+  put FSL-licensed code into your Python program; the AFNI replicas, permissive since AFNI
+  26.3.05, are part of larmorx and run in its process ([licensing.md](licensing.md), "Choosing at run time").
 - **Until the packages are on PyPI,** both wheels can be built from the repository and
-  installed with `pip install --find-links dist "larmorx[exact]"` ([licensing.md](licensing.md),
+  installed with `pip install --find-links dist larmorx` ([licensing.md](licensing.md),
   "Packages").
 - **The first pipeline run downloads data:** templates (e.g. MNI152) from TemplateFlow, and,
   with surfaces, FreeSurfer's atlas files from FreeSurfer's official site after the user
@@ -92,10 +93,10 @@ larmorprepx /data/bids /data/derivatives participant --participant-label 01
 **Published** (this repository):
 - our own code: library, wrappers, command line, pipeline, tests, docs, specs;
 - clean-room originals;
-- replicas of permissive upstreams (ANTs/ITK, AFNI's NIH files, CORE-MATH, nibabel), with
+- replicas of permissive upstreams (ANTs/ITK, AFNI's NIH and, since 26.3.05, MCW files (CC BY 4.0), Arm's Optimized Routines, CORE-MATH, nibabel), with
   their copyright notices (`NOTICE`, each crate's `PROVENANCE.md`);
-- GPL replicas in `crates-gpl/`, with the GPL text, the upstream copyright notices, and
-  changes marked. Once wheels ship, the GPL requires this source to be public anyway;
+- GPL replicas (Workbench's, to come) in `crates-gpl/`, with the GPL text, the upstream
+  copyright notices, and changes marked; it holds only verification tools today. Once wheels ship, the GPL requires this source to be public anyway;
 - FSL replicas in `crates-nc/` (decided 2026-10-10: same repository). The FSL Licence
   allows this only free of charge, with its conditions passed on, and "all original and
   amended source code" included, so FSL's own source files for the replicated parts are

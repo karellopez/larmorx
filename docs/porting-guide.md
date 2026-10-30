@@ -39,7 +39,8 @@ rule 1):
 | Upstream | Replica (translation of the source) | Clean-room original (Apache-2.0) |
 |---|---|---|
 | ANTs, ITK, AFNI's NIH files, CORE-MATH, nibabel, SciPy, numpy, nitransforms, fMRIPrep | main package (`crates/`), with the upstream's notice | not needed |
-| AFNI's MCW files, Workbench (GPL) | `larmorx-gpl` (`crates-gpl/`) | main package, from a spec |
+| AFNI's MCW files (CC BY 4.0 from 26.3.05; GPL-2 before) | main package since 2026-10-29 (`crates/larmorx-afni-replica`), with CC BY 4.0's attribution | main package, from a spec (built for speed) |
+| Workbench (GPL) | `larmorx-gpl` (`crates-gpl/`) | main package, from a spec |
 | FSL | `larmorx-nc` (`crates-nc/`) | main package, from a spec |
 | FreeSurfer | `larmorx-freesurfer` | not planned |
 | MSM_HOCR | not allowed | main package, after a patent check |
@@ -56,7 +57,8 @@ AFNI is public domain; newer NIH programs call MCW library routines
 | Clean-room implementer | the spec, the upstream's documentation and papers, black-box runs of the upstream binary, this guide, the unrestricted parts of `docs/findings/` and of the defect register | the original in `crates/`, its `PROVENANCE.md` listing exactly those inputs |
 | Replica author | everything | the replica in the licence family's workspace, with SPDX headers and the upstream's notices |
 
-The clean-room implementer must not open the upstream source, the replica crates, or
+The clean-room implementer must not open the upstream source, the replica crates
+(`crates/larmorx-afni-replica`, `crates-gpl/tools/glibc-reference`, `crates-nc/`), or
 findings written from the source: [findings/afni-tshift.md](findings/afni-tshift.md),
 [findings/afni-automask.md](findings/afni-automask.md), [findings/afni-unifize.md](findings/afni-unifize.md),
 [findings/afni-licence-routines.md](findings/afni-licence-routines.md),
@@ -69,9 +71,9 @@ record of what the implementer used is [crates/larmorx-afni/PROVENANCE.md](../cr
 **Why both tracks for restricted upstreams:** the replica gives the upstream's exact bits
 (3dTshift: 279 of 279 compared cases); the original keeps the main package Apache-2.0 at the
 cost of last bits wherever the upstream's own numerics decide them (3dTshift: 176 of 279
-bit-identical, all within thresholds). `implementation="auto"` runs the replica when it is
-installed, as a separate program, never imported ([architecture.md](architecture.md),
-"Adding a replica").
+bit-identical, all within thresholds). `implementation="auto"` runs the replica: a separate
+program, never imported, for a restricted licence (FSL); built in for AFNI since its code
+became CC BY 4.0 (2026-10-29) ([architecture.md](architecture.md), "Adding a replica").
 
 **Port from the pinned release tags** (`<workspace>/tags/ANTs-v2.6.5`, `ITK-v5.4.5`,
 `AFNI-25.2.09`, ...; versions in `upstream.tsv` and `UPSTREAM.md`), not from the `master`

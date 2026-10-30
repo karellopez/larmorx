@@ -2,11 +2,11 @@
 
 **All cases agree.** 125 cases on the `standard` tier: 105 pass, 19 rejected by both, 1 expected divergences, 0 failures.
 
-- **Validated:** `larmorx-gpl afni 3dAutomask` (larmorx-gpl 0.0.1; crate larmorx-gpl-afni, the GPL-3.0-or-later replica translated from AFNI 26.3.05's source), run by larmorx as a separate process: `larmorx afni 3dAutomask` with `LARMORX_IMPLEMENTATION=replica` and `lx.afni.automask(..., implementation="replica")`
+- **Validated:** the bit-exact replica (larmorx 0.0.1 (crate larmorx-afni-replica, built in): the translation of AFNI 26.3.05's source, Apache-2.0 with CC BY 4.0's attribution, part of larmorx since 2026-10-29), in-process: `larmorx afni 3dAutomask` with `LARMORX_IMPLEMENTATION=replica` and `lx.afni.automask(..., implementation="replica")`
 - **Reference:** 3dAutomask from AFNI (AFNI_26.3.05, gcc (Ubuntu 11.4.0-1ubuntu1~22.04.3) 11.4.0), the binary built by `scripts/build_afni_oracle.sh`
 - **Test data:** larmorx-testdata `52124bc98f9f`, tier `standard`
-- **Generated:** 2026-10-29 on Linux x86_64, with `python -m larmorx_validation parity afni-automask --tier standard --implementation replica`
-- **Original programs:** 322 runs: 175 from the oracle cache, 147 run; cache `<workspace>/oracles/cache`, mode `use`
+- **Generated:** 2026-10-30 on Linux x86_64, with `python -m larmorx_validation parity afni-automask --tier standard --implementation replica`
+- **Original programs:** 322 runs: 318 from the oracle cache, 4 run; cache `<workspace>/oracles/cache`, mode `use`
 
 **Bit-identical to AFNI: 101 of 101 compared cases that write outputs**: every output the same bytes (data and NIfTI header), with the same exit status and messages. The other 4 compared case(s) write no output in either program (an existing output, a name with a blank, a directory that does not exist) and agree on the exit status and messages; the default mode's corrections there are in the D13 lines below.
 - Messages (standard output and error, byte for byte; AFNI's version banner and compile date, and larmorx's own lines, set aside): 118 of 118 identical, in every case that ran both programs.
@@ -58,7 +58,7 @@
 
 | Case | Reason |
 |---|---|
-| `divergences/default-prefix` | AFNI's default prefix 'automask' is its own dataset format, which larmorx-gpl does not write: it refuses (NIfTI only). |
+| `divergences/default-prefix` | AFNI's default prefix 'automask' is its own dataset format, which larmorx does not write: it refuses (NIfTI only). |
 
 ## Rejected by both
 
@@ -88,7 +88,7 @@
 
 | Component | Version |
 |---|---|
-| larmorx | 0.0.1 (bd39a5d04bbe) |
+| larmorx | 0.0.1 (b6c7066c2dc2) |
 | larmorx-testdata | 52124bc98f9f |
 | Python | 3.12.16 |
 | Platform | Linux x86_64 (Linux-6.8.0-124-generic-x86_64-with-glibc2.35) |

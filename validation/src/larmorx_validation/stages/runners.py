@@ -234,8 +234,7 @@ def run_larmorx(
     ``mode`` is D13's ``LARMORX_UPSTREAM_DEFECTS``: ``reproduce`` (fMRIPrep's programs as they
     ran, their defects reproduced) or ``fix`` (larmorx's default). ``implementation`` chooses
     between a tool's replica and its clean-room original (``LARMORX_IMPLEMENTATION``; the
-    replica is the ``larmorx-gpl`` program of this repository's ``crates-gpl`` build, given
-    by ``LARMORX_GPL_BIN``). AFNI's programs run as fMRIPrep's image runs them: no AFNI
+    AFNI replicas are part of larmorx). AFNI's programs run as fMRIPrep's image runs them: no AFNI
     variable from this process, ``HOME`` an empty directory (no ``~/.afnirc``). ``files`` are
     written into ``directory`` first (:func:`prepare_inputs`)."""
     from larmorx.cli import run as cli_run
@@ -265,13 +264,6 @@ def run_larmorx(
         ]
     if implementation is not None:
         env["LARMORX_IMPLEMENTATION"] = implementation
-        if implementation == "replica":
-            from larmorx_validation.parity.afni_tshift import replica_binary
-
-            binary = replica_binary()
-            if binary is None:
-                raise FileNotFoundError("the larmorx-gpl program (crates-gpl build) is missing")
-            env["LARMORX_GPL_BIN"] = binary
     saved = {k: os.environ.get(k) for k in [*env, *removed]}
     cwd = os.getcwd()
     out, err = io.StringIO(), io.StringIO()

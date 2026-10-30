@@ -15,9 +15,10 @@ import pytest
 import larmorx as lx
 from larmorx.cli import run as cli_run
 
-# These tests are about the clean-room original; tests/python/test_replica.py covers the choice
-# of implementation.
-pytestmark = pytest.mark.usefixtures("no_replica")
+# These tests are about the clean-room original (`implementation="auto"` and the command line
+# choose it here: `clean_room`); tests/python/test_replica.py covers the choice of
+# implementation and the built-in replica.
+pytestmark = pytest.mark.usefixtures("clean_room")
 
 TR = 2.0
 AFFINE = np.array(

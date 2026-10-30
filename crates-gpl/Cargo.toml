@@ -1,15 +1,19 @@
-# The GPL-3.0-or-later replica workspace (docs/licensing.md). It is a separate Cargo
-# workspace, so the Apache-2.0 workspace at the repository root never builds it, and no
-# Apache crate can depend on it. Its crates may depend on the Apache crates (Apache-2.0 code
-# may be included in a GPL-3 work); the reverse is forbidden.
+# The GPL-3.0-or-later workspace (docs/licensing.md). It is a separate Cargo workspace, so the
+# Apache-2.0 workspace at the repository root never builds it, and no Apache crate can depend
+# on it. Its crates may depend on the Apache crates (Apache-2.0 code may be included in a GPL-3
+# work); the reverse is forbidden.
+#
+# Since 2026-10-29 it holds no package: the AFNI replicas moved into the main package
+# (crates/larmorx-afni-replica), and the `larmorx-gpl` package is reserved for Connectome
+# Workbench's replicas (GPL-2.0-or-later, still to come). What stays are the verification tools
+# that need the replicas' earlier translations of glibc's LGPL code (tools/glibc-reference).
 [workspace]
 resolver = "3"
 members = [
-    "larmorx-gpl-afni",
-    "larmorx-gpl-afni/tools/csfft-verify",
-    "larmorx-gpl-afni/tools/floatmath-verify",
-    "larmorx-gpl-afni/tools/sincosf-verify",
-    "larmorx-gpl-cli",
+    "tools/cbrtf-measure",
+    "tools/floatmath-verify",
+    "tools/glibc-reference",
+    "tools/sincosf-verify",
 ]
 
 [workspace.package]
@@ -21,13 +25,6 @@ repository = "https://github.com/karellopez/larmorx"
 # Pure-Rust dependencies only (CLAUDE.md rule 5): no C, C++, Fortran or HDF5 libraries.
 [workspace.dependencies]
 larmorx-core = { path = "../crates/larmorx-core", version = "0.0.1" }
-larmorx-io = { path = "../crates/larmorx-io", version = "0.0.1" }
-larmorx-gpl-afni = { path = "larmorx-gpl-afni", version = "0.0.1" }
+larmorx-afni-replica = { path = "../crates/larmorx-afni-replica", version = "0.0.1" }
+glibc-reference = { path = "tools/glibc-reference" }
 rayon = "1.12.0"
-# The arc cosine of an AFNI message (axes::oblique_angle); larmorx_core::math has none yet.
-libm = "0.2.16"
-thiserror = "2.0.21"
-tempfile = "3.27.0"
-# Test-only: SHA-256 for the golden tests (larmorx-gpl-cli/tests/golden.rs).
-sha2 = { version = "0.11.0", default-features = false }
-

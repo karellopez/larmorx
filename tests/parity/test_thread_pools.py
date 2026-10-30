@@ -4,7 +4,7 @@
 
 Every registered program over its distinct code paths (``larmorx_validation.parity.thread_pools``:
 each registration stage and metric, warps, filters, Atropos' initialisations, the AFNI originals,
-``mri hmc``, and the GPL and FSL replicas where their programs are built) runs at one thread on
+``mri hmc``, the AFNI replicas, and the FSL replicas where their program is built) runs at one thread on
 small seeded inputs; every thread of its processes is listed while it runs. A thread that is not a
 process's main thread and not a ``larmorx-<n>`` pool thread is parallel work outside the call's
 pool (rayon's global pool, sized by the machine's CPUs: found in the data panel's re-validation,
@@ -24,13 +24,12 @@ if not sys.platform.startswith("linux"):
     pytest.skip("threads are listed from /proc", allow_module_level=True)
 
 
-def _replicas() -> tuple[str | None, str | None]:
-    """The GPL and FSL replica programs, where they are built."""
-    from larmorx_validation.parity.afni_tshift import replica_binary as gpl_binary
+def _replicas() -> tuple[str | None]:
+    """The FSL replicas' program, where it is built (the AFNI replicas are part of larmorx)."""
     from larmorx_validation.parity.fsl_bet import replica_binary as nc_binary
 
-    gpl, nc = gpl_binary(), nc_binary()
-    return (str(gpl) if gpl else None), (str(nc) if nc else None)
+    nc = nc_binary()
+    return (str(nc) if nc else None,)
 
 
 NAMES = [p.name for p in tp.programs(Path("inputs"), *_replicas(), make=False)]

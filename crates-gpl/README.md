@@ -1,138 +1,53 @@
-# larmorx-gpl: the GPL replicas
+# larmorx-gpl: reserved for GPL replicas
 
-This directory holds `larmorx-gpl`, the package of **replicas** of GPL-licensed tools: Rust
-translations of the upstream source, written to give the upstream's output bit for bit. It is
-licensed under the **GNU General Public License, version 3 or later** (`LICENSE`).
+This directory is the place of `larmorx-gpl`, the package of **replicas** of GPL-licensed tools
+(Rust translations of the upstream source, written to give the upstream's output bit for bit),
+licensed under the **GNU General Public License, version 3 or later** (`LICENSE`). Why such
+replicas live apart from the Apache-2.0 main package is in
+[docs/licensing.md](../docs/licensing.md).
 
-The rest of larmorx is Apache-2.0. Why this directory is separate, and how the two tracks
-relate, is in [docs/licensing.md](../docs/licensing.md):
+**Today it holds no package.** It is reserved for Connectome Workbench's replicas
+(GPL-2.0-or-later upstream, still to come; their clean-room originals will be in the main
+package, `crates/`).
 
-- AFNI's files copyrighted by the Medical College of Wisconsin (3dTshift among them) and
-  Connectome Workbench are licensed under the GPL, version 2 or later. A translation of their
-  source is a derived work, so it must stay under the GPL. GPL-3.0-or-later is compatible with
-  both.
-- The main `larmorx` package has a **clean-room original** of each of these tools, written
-  without seeing the upstream source or this directory (Apache-2.0, `crates/`). The replica
-  gives the upstream's bits; the original gives the same behaviour within the validated
-  thresholds.
-- Licence families never mix in one binary. These crates may use the Apache crates
-  (`larmorx-core`, `larmorx-io`; Apache-2.0 code may be included in a GPL-3 work), but no
-  Apache crate may depend on them. `larmorx` (its command line and its Python wrappers) and
-  the validation package run the replica only as a separate program, and import nothing
-  from it.
+**The AFNI replicas left it on 2026-10-29.** From 2026-10 they were here
+(`larmorx-gpl-afni`, the `larmorx-gpl` program), because AFNI's files copyrighted by the Medical
+College of Wisconsin were GPL-2.0-or-later. AFNI 26.3.05 releases that code under CC BY 4.0, and
+the user decided the move: the replicas are now `crates/larmorx-afni-replica`, part of the main
+package (Apache-2.0 with CC BY 4.0's attribution), and run inside larmorx
+(`larmorx afni <program>`, `lx.afni.<function>(..., implementation="replica")`, the default).
+The `larmorx-gpl` program, its wheel and the `larmorx[exact]` extra went with them (git history
+keeps them: `crates-gpl/larmorx-gpl-cli`, `crates-gpl/pyproject.toml`). See
+[docs/findings/afni-relicensing-26.md](../docs/findings/afni-relicensing-26.md).
 
-## Contents
+## What stays here: verification tools
+
+The replicas' C-library functions were translated from glibc 2.35 (LGPL-2.1-or-later) while they
+were GPL code. The main package has none of that code now; the earlier translations stay here,
+unchanged, as the reference that proves the permissive ones equal, and as the tool that measured
+what the one function without a permissive equal (`cbrtf`) changes. They are development tools,
+run by hand on Linux x86-64 with glibc 2.35; nothing here is distributed in a wheel.
 
 | Crate | What |
 |---|---|
-| `larmorx-gpl-afni` | AFNI replicas: `3dTshift` (slice-timing correction), with AFNI's FFT (`csfft`), time-shift interpolators, detrending, NIfTI rules (with the axes and the geometry AFNI writes back, `axes`, and x87 extended precision where AFNI's NIfTI library uses `long double`, `x87`) and 1D reader, AFNI's global options and environment variables (`environ`) and messages (`message`), and a port of glibc's `sinf`/`cosf`; `3dAutomask` (a brain mask: `mask`, `automask`) and `3dUnifize` (white-matter uniformization: `unifize`, with a port of glibc's `tanhf` and `cbrtf`, `glibc_floatmath`), whose clean-room originals are still to be written from `specs/`. Provenance: `larmorx-gpl-afni/PROVENANCE.md` |
-| `larmorx-gpl-cli` | the `larmorx-gpl` command line: `larmorx-gpl afni 3dTshift|3dAutomask|3dUnifize <AFNI's arguments>` |
-| `larmorx-gpl-afni/tools/csfft-verify` | compares the FFT with AFNI's compiled code, bit for bit (needs the AFNI oracle build) |
-| `larmorx-gpl-afni/tools/sincosf-verify` | compares the `sinf`/`cosf` port with the C library, on all 2^32 inputs |
-| `larmorx-gpl-afni/tools/floatmath-verify` | compares the `tanhf`/`cbrtf` port with glibc, on all 2^32 inputs (with a small C program for `cbrtf`) |
-| `pyproject.toml`, `NOTICE`, `LICENSES/` | the `larmorx-gpl` wheel and the licences and notices it carries (below) |
-
-## Building and testing
-
-This is its own Cargo workspace; the root workspace does not build it.
+| `tools/glibc-reference` | the earlier translations of glibc 2.35's `sinf`, `cosf` (both x86-64 builds), `tanhf`, `expm1f` and `cbrtf`, as the replicas used them until 2026-10-29 (GPL-3.0-or-later AND LGPL-2.1-or-later; `LICENSES/LGPL-2.1.txt`) |
+| `tools/sincosf-verify` | the proof that the replicas' `sinf` and `cosf`, translated from Arm's Optimized Routines v19.11 (MIT), equal the glibc translation on all 2^32 inputs of each function and build, and glibc itself (both builds) |
+| `tools/floatmath-verify` | the replicas' `tanhf` (fdlibm) against glibc on all 2^32 inputs, and the reference `cbrtf`'s hash against glibc (`glibc_reference.c`) |
+| `tools/cbrtf-measure` | what glibc's last bit of `cbrtf` changes in 3dUnifize `-EPI` (the radius, its message, the ball of neighbours) on every float32 voxel volume, and that the replica warns wherever it can |
 
 ```bash
 cd crates-gpl
-cargo build --release          # target/release/larmorx-gpl
-cargo test
-cargo clippy --all-targets -- -D warnings
-cargo fmt --check
+cargo build --release
+target/release/sincosf-verify --threads 24
+GLIBC_TUNABLES=glibc.cpu.hwcaps=-AVX2,-FMA target/release/sincosf-verify --threads 24 --c-library sse2
+target/release/floatmath-verify --threads 24 && target/release/floatmath-verify --checksums
+target/release/cbrtf-measure --threads 24
 ```
 
-`cargo test` includes the golden tests (`larmorx-gpl-cli/tests/golden.rs`, a few hundredths
-of a second): every platform must reproduce the checksums of the replicas' Linux x86_64 output
-in `larmorx-gpl-cli/tests/golden.tsv` (CLAUDE.md rule 10, `docs/validation/golden.md`). To
-record them, on Linux x86_64 only, from a committed tree whose replica parity passes:
+The results (2026-10-29) are in `crates/larmorx-afni-replica/PROVENANCE.md`, "Verification",
+and `validation/investigations/afni-move/README.md`.
 
-```bash
-LARMORX_GOLDEN_RECORD=1 cargo test --locked -p larmorx-gpl-cli --test golden
-```
-
-Parity with AFNI (needs the AFNI oracle, `scripts/build_afni_oracle.sh`, and the test data):
-
-```bash
-python -m larmorx_validation parity afni-tshift --tier standard --implementation replica
-python -m larmorx_validation parity afni-automask --tier standard
-python -m larmorx_validation parity afni-unifize --tier standard
-```
-
-The parity suite finds the binary through `LARMORX_GPL_BIN`, else `crates-gpl/target/release`
-(or `debug`), else `larmorx-gpl` on the `PATH`. Results: `docs/validation/afni-tshift-replica.md`.
-
-## The wheel
-
-`pyproject.toml` here builds the `larmorx-gpl` wheel: the program only (maturin's `bin`
-bindings), licence `GPL-3.0-or-later`. It carries `LICENSE` (the GPL), `NOTICE` (the AFNI and
-glibc notices) and `LICENSES/`: the LGPL-2.1 of the glibc translation, and the Apache-2.0 text
-and `NOTICE` of the larmorx crates the program includes. Those two are copies of the
-repository's `LICENSE` and `NOTICE` (maturin takes licence files only from below this
-directory); `larmorx-gpl-cli/tests/notices.rs` fails when they drift.
-
-Not on PyPI yet. To build and install it next to `larmorx`:
-
-```bash
-cd crates-gpl
-maturin build --release --locked --out ../dist      # dist/larmorx_gpl-<version>-py3-none-<platform>.whl
-cd ..
-maturin build --release --locked --out dist         # the larmorx wheel
-pip install --find-links dist "larmorx[exact]"      # the exact extra pulls in larmorx-gpl
-```
-
-`pip` puts the `larmorx-gpl` program in the environment's scripts directory (`bin/`,
-`Scripts\` on Windows), where larmorx looks for it.
-
-## Using it
-
-`larmorx-gpl afni 3dTshift` accepts the same arguments as `larmorx afni 3dTshift` and AFNI's
-`3dTshift`, and writes the same NIfTI output as AFNI, with the larmorx conventions (NIfTI
-output only; an existing output file is an error; any `-prefix` path is accepted). With
-`-verbose`, its first line names the implementation and its version.
-
-**AFNI's global options and environment variables** (decided 2026-10-12): it takes
-`-overwrite`, `-Dname=value`, `-ok_1D_text` and `-skip_afnirc` anywhere on the command line,
-as AFNI does, and reads every environment variable AFNI's 3dTshift consults
-(`AFNI_DECONFLICT`, `AFNI_NIFTI_PRIORITY`, `AFNI_NIFTI_WRITE_TYPE`, ...), the same way on
-Linux, macOS and Windows. It never changes its process environment: the variables are read
-once into a table of settings (`larmorx_gpl_afni::environ`), `-D` options are applied to it
-(winning over the environment, as in AFNI), and the table is passed to every routine that
-reads one. The output is written to a temporary file in its directory and renamed over the
-target, so an existing output (with `-overwrite`) is replaced whole or not at all; on Windows
-the rename is retried for about 2 s while another program holds the file. The list of
-variables and what each does: `docs/api/afni-tshift.md` and `specs/3dTshift.md` §7.1.
-
-```bash
-larmorx-gpl afni 3dTshift -tpattern alt+z -prefix out.nii in.nii -overwrite
-larmorx-gpl afni 3dTshift -DAFNI_NIFTI_WRITE_TYPE=2 -tpattern alt+z -prefix out.nii in.nii
-```
-
-**AFNI's defects** (D13, `docs/api/upstream-defects.md`): like the clean-room original, the
-replica corrects AFNI's deterministic defects by default (a negative `scl_slope`, float32
-data scaled twice, header slice code 2, `-no_detrend`'s voxel pairs, metre and micrometre
-units, slice times all within 3 ms of 0 in a copy, an existing output, refused output names,
-a grid within about 0.01° to 0.024° of plumb written plumb, an input name with a blank read as
-a list, `AFNI_ALLOW_MILLISECONDS`' time offset, a one-row dataset written as text, and `-D`
-values with blanks; register entries AFNI-01, -02, -03, -05, -07, -08, -11, -12, -16, -18,
--19, -20, -22 in `docs/findings/upstream-defects.md`) and names each one
-that changed the output in a warning
-on standard error (`*+ WARNING: upstream defect AFNI-01 (AFNI) corrected: ...`), which
-the Python wrappers turn into `larmorx.UpstreamDefectWarning`. With the environment variable
-`LARMORX_UPSTREAM_DEFECTS=reproduce` it gives AFNI's output bytes, the AFNI header extension
-aside, and AFNI's messages (AFNI's version banner and compile date aside; a one-row dataset
-is still written as NIfTI, AFNI-20); any value other than `fix`, `reproduce` or empty exits
-with status 2:
-
-```bash
-larmorx-gpl afni 3dTshift -tpattern alt+z -prefix out.nii in.nii                 # corrected
-LARMORX_UPSTREAM_DEFECTS=reproduce larmorx-gpl afni 3dTshift -tpattern alt+z -prefix afni.nii in.nii
-```
-
-Users seldom call it directly. When it is installed, `larmorx afni 3dTshift` and
-`lx.afni.tshift(..., implementation="auto")` run it as a separate process
-(`LARMORX_IMPLEMENTATION` or `implementation=` choose; `docs/licensing.md`, "Choosing at run
-time"). They find it through `LARMORX_GPL_BIN`, then the Python environment's scripts
-directory, then `PATH`.
+This is its own Cargo workspace; the root workspace does not build it, and no Apache crate may
+depend on it (its tools may depend on the Apache crates: Apache-2.0 code may be included in a
+GPL-3 work). `scripts/orchestration/gates-rust.sh <checkout> gpl` runs its format, lint and
+tests; CI does not (no package code is left here).

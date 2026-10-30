@@ -148,12 +148,11 @@ def run(impl: str):
 
 
 def unavailable() -> str:
-    from larmorx_validation.parity.afni_tshift import afni_binary, replica_binary
+    from larmorx_validation.parity.afni_tshift import afni_binary
 
     if afni_binary() is None:
         return "the AFNI 3dTshift oracle was not found"
-    if replica_binary() is None:
-        return "the larmorx-gpl program was not found"
+    # The replica is part of larmorx (since 2026-10-29): always there.
     return ""
 
 

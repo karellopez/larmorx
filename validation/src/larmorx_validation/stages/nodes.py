@@ -357,8 +357,8 @@ def explain(
 # Slice timing: 3dTshift, both implementations
 
 #: 3dTshift's implementations in larmorx (docs/licensing.md): the bit-exact replica, a
-#: translation of AFNI's source run as the ``larmorx-gpl`` program, and the clean-room
-#: original of the main package, written from ``specs/3dTshift.md``.
+#: translation of AFNI's source (built into larmorx since 2026-10-29; until then the
+#: ``larmorx-gpl`` program), and the clean-room original, written from ``specs/3dTshift.md``.
 TSHIFT_IMPLEMENTATIONS = ("replica", "original")
 
 _NOTICE = re.compile(r"\b(?:AFNI|ANTS|ITK|FSL|PIPE|SCI)-\d+\b")

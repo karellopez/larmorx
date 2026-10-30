@@ -38,10 +38,11 @@ module and commands are spelled `larmorx` (and `larmorprepx` for the planned pip
 - **Two ways of reimplementing, kept apart by licence** ([licensing](docs/licensing.md)):
   - tools with permissive licences (ANTs and ITK, Apache-2.0) are ported from their source,
     with each Rust function's origin recorded in the crate's `PROVENANCE.md`;
-  - where the licence is restrictive (AFNI's GPL code, FSL), a **clean-room original** is
+  - where the licence is restrictive (FSL, Workbench), a **clean-room original** is
     written from a behavioural specification, documentation and runs of the original program,
     never from its source; an exact replica, where one exists, is a separate package under the
-    upstream's licence (e.g. `larmorx-gpl`) that runs as a separate program. Tools with both
+    upstream's licence (e.g. `larmorx-nc`) that runs as a separate program. AFNI's tools have
+    both inside larmorx since AFNI 26.3.05 released its MCW code under CC BY 4.0. Tools with both
     take `implementation="auto" | "replica" | "original"`.
 - **Validated, with documented differences.** Every tool has a validation record comparing it
   case by case with the original program ([docs/validation](docs/validation/)). Defects found
@@ -78,7 +79,7 @@ distribution ([overview](docs/overview.md)):
 
 ```bash
 pip install larmorx                  # the library and the larmorx / lx commands   (planned)
-pip install "larmorx[exact]"         # + exact replicas of GPL-licensed tools       (planned)
+pip install larmorx                  # the exact AFNI replicas included (CC BY 4.0's attribution)
 pip install "larmorx[prep]"          # + the larmorprepx pipeline                   (planned)
 ```
 
@@ -126,9 +127,9 @@ original with random valid inputs and options, a night at a time
 | antsAI, antsAffineInitializer | `larmorx ants antsAI`, `larmorx ants antsAffineInitializer` | port | [antsAI](docs/validation/ants-ai.md): 76 of 76 compared identical (75 as built, 1 with correctly rounded maths), the blob alignment (`-b`) included (its corrections, ANTS-116 among them, by default); [antsAffineInitializer](docs/validation/ants-affine-initializer.md): 26 of 26; data panel: [antsAI](docs/validation/ants-ai-panel.md) 40 of 40, [antsAffineInitializer](docs/validation/ants-affine-initializer-panel.md) 14 of 14 |
 | Atropos (every initialization, likelihood model, MRF, outlier and partial-volume option) | `larmorx ants Atropos`, `lx.ants.atropos` | port | [97 cases](docs/validation/ants-atropos.md): 27 of 58 compared bit-identical to ANTs, 58 of 58 with correctly rounded maths, sMRIPrep's call on the five oracle runs included; partial-volume classes with the MRF corrected (ANTS-106); data panel: [3 of 17](docs/validation/ants-atropos-panel.md) as built, 17 of 17 with correctly rounded maths, the classes identical in all |
 | fMRIPrep's one-shot BOLD resampler | `lx.transforms.resample_series` | port (fMRIPrep, nitransforms, SciPy) | [139 cases](docs/validation/resample-series.md): 136 of 136 compared bit-identical |
-| 3dTshift (slice timing) | `larmorx afni 3dTshift`, `lx.afni.tshift` | clean-room original; exact replica in `larmorx-gpl` | original: [280 of 280](docs/validation/afni-tshift.md) compared agree, 178 bit-identical, [2–6× faster](docs/benchmarks/afni-tshift.md); replica: [280 of 280](docs/validation/afni-tshift-replica.md) bit-identical |
-| 3dAutomask (brain mask) | `larmorx afni 3dAutomask`, `lx.afni.automask` | clean-room original; exact replica in `larmorx-gpl` | original: [130 cases](docs/validation/afni-automask.md), 92 of 106 compared cases that write outputs bit-identical to AFNI (the other 14: inputs carrying AFNI's own header extension, AFNI-10: the data bit-identical, the header and messages AFNI's for the input without it), fMRIPrep's call on every oracle run's BOLD reference included, the data panel's too; replica: [101 of 101](docs/validation/afni-automask-replica.md) compared cases that write outputs bit-identical |
-| 3dUnifize (intensity uniformization) | `larmorx afni 3dUnifize`, `lx.afni.unifize` | clean-room original; exact replica in `larmorx-gpl` | original: [117 cases](docs/validation/afni-unifize.md), none failing: 37 of 92 compared cases that write outputs bit-identical to AFNI, the other 55 within 1e-5 (at most 8.7e-8 of the largest value) and bit-identical to AFNI run with correctly rounded maths (glibc's `tanhf` in AFNI's squash), fMRIPrep's call on every oracle run included; 4 to 25 times faster than AFNI (informal timings); replica: [90 of 90](docs/validation/afni-unifize-replica.md) compared cases that write outputs bit-identical at 1, 2 and 6 threads |
+| 3dTshift (slice timing) | `larmorx afni 3dTshift`, `lx.afni.tshift` | clean-room original and exact replica, both in larmorx (the replica with CC BY 4.0's attribution) | original: [280 of 280](docs/validation/afni-tshift.md) compared agree, 178 bit-identical, [2–6× faster](docs/benchmarks/afni-tshift.md); replica: [280 of 280](docs/validation/afni-tshift-replica.md) bit-identical |
+| 3dAutomask (brain mask) | `larmorx afni 3dAutomask`, `lx.afni.automask` | clean-room original and exact replica, both in larmorx (the replica with CC BY 4.0's attribution) | original: [130 cases](docs/validation/afni-automask.md), 92 of 106 compared cases that write outputs bit-identical to AFNI (the other 14: inputs carrying AFNI's own header extension, AFNI-10: the data bit-identical, the header and messages AFNI's for the input without it), fMRIPrep's call on every oracle run's BOLD reference included, the data panel's too; replica: [101 of 101](docs/validation/afni-automask-replica.md) compared cases that write outputs bit-identical |
+| 3dUnifize (intensity uniformization) | `larmorx afni 3dUnifize`, `lx.afni.unifize` | clean-room original and exact replica, both in larmorx (the replica with CC BY 4.0's attribution) | original: [117 cases](docs/validation/afni-unifize.md), none failing: 37 of 92 compared cases that write outputs bit-identical to AFNI, the other 55 within 1e-5 (at most 8.7e-8 of the largest value) and bit-identical to AFNI run with correctly rounded maths (glibc's `tanhf` in AFNI's squash), fMRIPrep's call on every oracle run included; 4 to 25 times faster than AFNI (informal timings); replica: [90 of 90](docs/validation/afni-unifize-replica.md) compared cases that write outputs bit-identical at 1, 2 and 6 threads |
 | Head-motion correction (mcflirt) | `larmorx mri hmc`, `larmorx fsl mcflirt`, `lx.mri.hmc` | clean-room original, `experimental`; exact replica in `larmorx-nc` (FSL Licence, non-commercial) | original: [compared with FSL's mcflirt](docs/validation/mri-hmc.md): 121 of 122 compared cases within thresholds; [5–16× faster](docs/benchmarks/mri-hmc.md) with threads; replica: [181 of 181](docs/validation/fsl-mcflirt-replica.md) compared cases bit-identical to mcflirt as built, FSL 6.0.7.23 (the recorded runs, fMRIPrep's calls on every oracle run with BOLD runs, the data panel's included, and the edge cases; 22 more rejected by both, alike; [173 of 173](docs/validation/fsl-mcflirt-replica-full.md) in the full tier against FSL 6.0.7.17), fMRIPrep's own matrices identical |
 | BET (brain extraction; the skull and scalp surfaces) | `larmorx fsl bet`, `larmorx fsl bet2`, `larmorx fsl betsurf`, `lx.fsl.bet`, `lx.fsl.betsurf` | exact replica in `larmorx-nc` (FSL Licence, non-commercial); clean-room original planned (`specs/bet.md`) | [130 of 130](docs/validation/fsl-bet-replica.md) compared cases bit-identical to FSL 6.0.7.23, every file, exit status and message ([129 of 129](docs/validation/fsl-bet-replica-full.md) in the full tier against FSL 6.0.7.17, the data panel's T1w images included), fMRIPrep's 29 BET calls on every oracle run with BOLD runs included; 31 more rejected by both, alike; 12 where FSL crashes and `reproduce` fills what it leaves undefined; 1 where FSL's fill reads memory beyond the volume (FSL-43, undefined); `bet -S`, `-B`, `-A`, `-A2` pending (FLIRT, FAST) |
 <!-- END GENERATED: tools table -->
@@ -189,7 +190,7 @@ cargo fmt --all --check && cargo clippy --workspace --all-targets -- -D warnings
 ruff check && ruff format --check
 ```
 
-The GPL replicas are a separate Cargo workspace: `cd crates-gpl && cargo test --workspace`
+The FSL replicas are a separate Cargo workspace: `cd crates-nc && cargo test --workspace`; `crates-gpl` holds only verification tools (`crates-gpl/README.md`)
 (build its wheel with `maturin build --release`).
 
 Parity checks and benchmarks need the test data (`larmorx-testdata`, github.com/karellopez/larmorx-testdata, kept next to this one; its data panel, `docs/panel.md` there, is the fixed set every tool is validated on), the validation package and the original programs as oracles (`scripts/build_ants_oracle.sh`, `scripts/build_afni_oracle.sh`):
@@ -209,7 +210,8 @@ python -m larmorx_validation tables --check                     # the generated 
 | `crates/larmorx-transform`, `crates/larmorx-interp`, `crates/larmorx-image` | ITK transforms, interpolators and image filters |
 | `crates/larmorx-registration`, `crates/larmorx-ants` | ITK's v4 registration framework; the ANTs programs |
 | `crates/larmorx-afni`, `crates/larmorx-mri` | clean-room originals: 3dTshift, 3dAutomask, 3dUnifize; head-motion correction |
-| `crates-gpl/` | the GPL-3.0-or-later replicas (`larmorx-gpl`: 3dTshift, 3dAutomask, 3dUnifize), a separate Cargo workspace |
+| `crates-gpl/` | the GPL-3.0-or-later workspace, reserved for Workbench's replicas; today the AFNI replicas' verification tools (`crates-gpl/README.md`) |
+| `crates/larmorx-afni-replica` | the AFNI replicas (3dTshift, 3dAutomask, 3dUnifize), Apache-2.0 with CC BY 4.0's attribution |
 | `crates-nc/` | the FSL replicas (`larmorx-nc`, FSL Licence, non-commercial: mcflirt, BET; the shared core `larmorx-nc-core`), a separate Cargo workspace with FSL's original source in `fsl-source/` |
 | `crates/larmorx-cli` | the multicall CLI; standalone `larmorx` and `lx` binaries |
 | `crates/larmorx-py` | the `larmorx._core` extension module (PyO3, abi3 for CPython ≥ 3.12) |
@@ -223,7 +225,8 @@ python -m larmorx_validation tables --check                     # the generated 
 ## Licence
 
 Apache-2.0 for LARMORX itself. Replicas of restrictively licensed tools are separate packages
-under their upstream's licence (`larmorx-gpl`: GPL-3.0-or-later); see
+under their upstream's licence (`larmorx-nc`: the FSL Licence). The AFNI replicas carry CC BY
+4.0's attribution for the Medical College of Wisconsin's code ([NOTICE](NOTICE), `LICENSES/`); see
 [docs/licensing.md](docs/licensing.md). LARMORX is an independent project, not affiliated with
 or endorsed by the developers of ANTs, AFNI, FSL, FreeSurfer or fMRIPrep.
 

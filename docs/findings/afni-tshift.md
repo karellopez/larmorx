@@ -253,12 +253,19 @@ the output if it is done any other way; the replica does each as AFNI does.
   `cosf` on 28.2 million (0.70 million in [0, 32]). On x86-64, glibc chooses at load time
   between an FMA build (CPUs with FMA and AVX2) and an SSE2 build of the same C code; they
   differ on 12 `sinf` and 22 `cosf` inputs. *Verified* (`tools/sincosf-verify`).
-  **larmorx-gpl carries a port of glibc 2.35's `sinf`/`cosf`** (FMA build, the one this
+  **The replica carries glibc 2.35's `sinf`/`cosf`** (until 2026-10-29 as `larmorx-gpl`'s port; FMA build, the one this
   machine's AFNI runs; `glibc_sincosf.rs`), with the fused multiply-adds as `f64::mul_add`,
   which is correctly rounded on every platform. It matches glibc on all 2^32 inputs of both
   functions, so the weighted-sinc output is AFNI's on every platform larmorx supports.
   (AFNI itself, run on an x86-64 CPU without FMA, would use the SSE2 build and could differ
-  from this in the last bit of a weight, for 34 inputs in all.)
+  from this in the last bit of a weight, for 34 inputs in all.) **Since 2026-10-29** (the move
+  into the main package) the replica's `sinf`/`cosf` are `sincosf.rs`, translated afresh from
+  Arm's Optimized Routines v19.11 (MIT), the code glibc 2.35 ships (`s_sinf.c`, `s_cosf.c`,
+  `s_sincosf.h` and `sysdeps/x86/fpu/sincosf_poly.h` are Arm's `sinf.c`, `cosf.c`, `sincosf.h`
+  with glibc's x86 table pairing its constants for the vector form, the same eleven numbers): the
+  FMA and the SSE2 build, each 0 differing inputs of all 2^32 against the glibc translation (kept
+  in `crates-gpl/tools/glibc-reference`) and against glibc itself (`crates-gpl/tools/sincosf-verify`;
+  the SSE2 build by `GLIBC_TUNABLES=glibc.cpu.hwcaps=-AVX2,-FMA`).
 - **The FFT is AFNI's own, in float** (`csfft.c`; next section). Its tables and 3dTshift's
   phase factors (`CEXPIT`, `thd_shift2.c:132`) take double `cos`/`sin` and keep them as float.
   The replica uses correctly rounded `cos`/`sin` (`larmorx_core::math`); they differ from

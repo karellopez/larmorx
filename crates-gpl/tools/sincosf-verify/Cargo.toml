@@ -1,0 +1,13 @@
+[package]
+name = "sincosf-verify"
+description = "Proves the replica sinf/cosf from Arm Optimized Routines equal to the earlier glibc translation and the C library, exhaustively (development tool)"
+version = "0.0.0"
+edition.workspace = true
+license.workspace = true
+publish = false
+
+[dependencies]
+larmorx-core.workspace = true
+larmorx-afni-replica = { workspace = true, features = ["verification"] }
+glibc-reference.workspace = true
+rayon.workspace = true

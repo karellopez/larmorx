@@ -21,16 +21,30 @@ def cli_main(
 def cli_tools() -> list[tuple[str, list[str]]]:
     """The command line's tool families and their tools: ``[(family, [tool, ...]), ...]``."""
 
-# --- Replicas in other packages, run as separate programs (larmorx/_replica.py) ----------------
+# --- Replicas: built in, or in other packages and run as programs (larmorx/_replica.py) ------
 
-def replica_registry() -> list[dict[str, str | bool]]:
-    """Every tool with a replica: ``family``, ``tool``, ``package``, ``program``, ``env``,
-    ``licence``, ``install`` and ``original`` (whether larmorx has a clean-room original)."""
+def replica_registry() -> list[dict[str, str | bool | None]]:
+    """Every tool with a replica: ``family``, ``tool``, ``builtin`` (part of larmorx, run in this
+    process), ``package``, ``program``, ``env``, ``licence``, ``install`` and ``original``
+    (whether larmorx has a clean-room original); a built-in replica's ``package`` is
+    ``"larmorx"`` and its ``program``, ``env`` and ``install`` are ``None``."""
 
 def replica_find(family: str, tool: str, dirs: list[str]) -> Path | None:
     """The replica program of ``family tool`` (its environment variable, then ``dirs``, then
-    ``PATH``), or ``None``; ``ValueError`` if the variable names no file, ``KeyError`` if the
-    tool has no replica."""
+    ``PATH``), or ``None`` (not found, or built in); ``ValueError`` if the variable names no
+    file, ``KeyError`` if the tool has no replica."""
+
+def replica_run_builtin(
+    family: str,
+    tool: str,
+    args: list[str],
+    env: list[tuple[str, str]],
+    cwd: str | None = None,
+) -> tuple[int, str, str]:
+    """Run the built-in replica of ``family tool`` in this process (without the GIL):
+    ``(exit code, standard output, standard error)``. ``env`` stands for the process environment
+    (never read or changed); relative names start in ``cwd``. ``KeyError`` if the tool has no
+    built-in replica."""
 
 # --- Upstream defects, D13 (larmorx/_defects.py) -----------------------------------------------
 

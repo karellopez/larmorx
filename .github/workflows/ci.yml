@@ -47,10 +47,14 @@ jobs:
       - name: SPDX licence headers (docs/licensing.md)
         run: python scripts/check_spdx.py
 
-  # The replica workspaces, each a Cargo workspace of its own (docs/licensing.md): the
-  # GPL-3.0-or-later replicas (crates-gpl/) and the FSL Licence's (crates-nc/). Format, lint,
-  # build and test on the same six platforms as the wheels, in one job per platform. Tests that
-  # need an oracle skip where it is absent.
+  # The FSL replica workspace (crates-nc/, the FSL Licence's larmorx-nc), a Cargo workspace of
+  # its own (docs/licensing.md): format, lint, build and test on the same six platforms as the
+  # wheels, in one job per platform. Its tests include the golden tests
+  # (larmorx-nc-cli/tests/golden.rs) and the check of FSL's original source, which the FSL Licence
+  # requires in every copy (fsl-source/, tests/notices.rs). Tests that need an oracle skip where
+  # it is absent. Until 2026-10-29 the job also built and tested crates-gpl (the AFNI replicas,
+  # now crates/larmorx-afni-replica in the main workspace, tested by the test job); crates-gpl
+  # holds only verification tools run by hand, so CI no longer builds it. The job keeps its name.
   gpl:
     name: gpl (${{ matrix.platform }})
     runs-on: ${{ matrix.runner }}
@@ -67,7 +71,7 @@ jobs:
     defaults:
       run:
         shell: bash
-        working-directory: crates-gpl
+        working-directory: crates-nc
     steps:
       - uses: actions/checkout@v7
       - uses: dtolnay/rust-toolchain@stable
@@ -76,36 +80,13 @@ jobs:
       - uses: Swatinem/rust-cache@v2
         with:
           workspaces: |
-            crates-gpl
             crates-nc
-      - name: rustfmt
-        run: cargo fmt --all --check
-      - name: clippy
-        run: cargo clippy --workspace --all-targets --locked -- -D warnings
-      # Includes the golden tests (larmorx-gpl-cli/tests/golden.rs, docs/validation/golden.md).
-      # Failures are also printed as annotations, which GitHub shows without a login.
-      - name: cargo test
-        run: |
-          cargo test --workspace --locked 2>&1 | tee cargo-test.log || {
-            "$(command -v python || command -v python3)" ../scripts/ci_cargo_failures.py cargo-test.log
-            exit 1
-          }
-        env:
-          LARMORX_GOLDEN_MISMATCHES: ${{ github.workspace }}/golden-mismatches
-      # The FSL replicas (crates-nc/, larmorx-nc): the same three steps. Its tests include the
-      # golden tests (larmorx-nc-cli/tests/golden.rs) and the check of FSL's original source,
-      # which the FSL Licence requires in every copy (fsl-source/, tests/notices.rs).
       - name: rustfmt (crates-nc)
-        if: ${{ !cancelled() }}
-        working-directory: crates-nc
         run: cargo fmt --all --check
       - name: clippy (crates-nc)
-        if: ${{ !cancelled() }}
-        working-directory: crates-nc
         run: cargo clippy --workspace --all-targets --locked -- -D warnings
+      # Failures are also printed as annotations, which GitHub shows without a login.
       - name: cargo test (crates-nc)
-        if: ${{ !cancelled() }}
-        working-directory: crates-nc
         run: |
           cargo test --workspace --locked 2>&1 | tee cargo-test.log || {
             "$(command -v python || command -v python3)" ../scripts/ci_cargo_failures.py cargo-test.log
@@ -146,13 +127,16 @@ jobs:
           python-version: "3.12"
       - uses: dtolnay/rust-toolchain@stable
       - uses: Swatinem/rust-cache@v2
-      # Failures are also printed as annotations, which GitHub shows without a login.
+      # Failures are also printed as annotations, which GitHub shows without a login. Includes
+      # the AFNI replicas' golden tests (crates/larmorx-cli/tests/afni_replica_golden.rs).
       - name: cargo test
         run: |
           cargo test --workspace --locked 2>&1 | tee cargo-test.log || {
             python scripts/ci_cargo_failures.py cargo-test.log
             exit 1
           }
+        env:
+          LARMORX_GOLDEN_MISMATCHES: ${{ github.workspace }}/golden-mismatches
       - name: Build wheel
         uses: PyO3/maturin-action@v1
         with:

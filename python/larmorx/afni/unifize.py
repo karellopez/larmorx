@@ -1,11 +1,10 @@
 # SPDX-License-Identifier: Apache-2.0
 """``3dUnifize``: white-matter intensity uniformization of a T1- or T2-weighted volume (or, with
-``epi=True``, an EPI series): the clean-room original of AFNI 26.3.05's program, or its
-bit-exact replica from ``larmorx-gpl``, run as a separate program.
+``epi=True``, an EPI series): the bit-exact replica of AFNI 26.3.05's program, or its
+clean-room original.
 
-``implementation="auto"`` runs the replica when the ``larmorx-gpl`` package is installed
-(``pip install "larmorx[exact]"``), else the clean-room original; ``"replica"`` and
-``"original"`` force one. The original's squash uses a correctly rounded ``tanhf`` where AFNI
+``implementation="auto"`` (the default) runs the replica (part of larmorx, in this process);
+``"replica"`` and ``"original"`` force one. The original's squash uses a correctly rounded ``tanhf`` where AFNI
 calls glibc's, so squashed values (above 1300) can differ in their last bit
 (``docs/validation/afni-unifize.md``).
 

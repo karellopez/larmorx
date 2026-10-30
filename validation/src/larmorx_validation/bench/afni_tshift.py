@@ -8,8 +8,9 @@ point with ``OMP_NUM_THREADS`` threads, and through the Python API (no file outp
 timing covers reading the gzipped input, shifting, and writing the output (uncompressed
 ``.nii``, so gzip speed does not dominate).
 
-When the GPL replica is built (``larmorx-gpl``, found as the parity suite finds it), it is
-timed too, as a separate process with the same arguments; this package only runs it.
+The bit-exact replica (part of larmorx since 2026-10-29; until then the GPL program
+``larmorx-gpl``) is timed too, through the same console entry point with
+``implementation="replica"``.
 """
 
 from __future__ import annotations
@@ -34,12 +35,11 @@ from larmorx_validation.parity.afni_tshift import (
     _fmriprep_args,
     afni_binary,
     afni_version,
-    replica_binary,
 )
 from larmorx_validation.report import environment_section, table, write_json
 
 OPENNEURO = "openneuro"
-REPLICA_TOOL = "larmorx-gpl (replica, CLI)"
+REPLICA_TOOL = "larmorx replica (CLI)"
 
 
 @dataclass(frozen=True)
@@ -113,7 +113,6 @@ def run_jobs(threads: list[int], repeats: int, quick: bool) -> list[Measurement]
     binary = afni_binary()
     if binary is None:
         raise SystemExit("the AFNI 3dTshift oracle was not found (set LARMORX_AFNI_BIN)")
-    replica = replica_binary()
     env = {**os.environ, "AFNI_DONT_LOGFILE": "YES", "AFNI_NIFTI_TYPE_WARN": "NO"}
     results = []
     with tempfile.TemporaryDirectory(prefix="lx-bench-tshift-") as tmp_name:
@@ -180,21 +179,20 @@ def run_jobs(threads: list[int], repeats: int, quick: bool) -> list[Measurement]
                     )
                 )
             os.environ.pop("OMP_NUM_THREADS", None)
-            if replica is None:
-                continue
-            gpl_out = tmp / "larmorx-gpl.nii"
+            gpl_out = tmp / "larmorx-replica.nii"
             for t in threads:
 
                 def run_gpl(out=gpl_out, args=args, src=src, t=t, label=job.label):
                     out.unlink(missing_ok=True)
-                    p = subprocess.run(
-                        [replica, "afni", "3dTshift", *args, "-prefix", str(out), str(src)],
-                        capture_output=True,
-                        env={**os.environ, "OMP_NUM_THREADS": str(t)},
-                        check=False,
-                    )
-                    if p.returncode != 0 or not out.exists():
-                        raise RuntimeError(f"larmorx-gpl failed on {label}: {p.stderr[-300:]}")
+                    os.environ["OMP_NUM_THREADS"] = str(t)
+                    with contextlib.redirect_stderr(io.StringIO()):
+                        code = run(
+                            ["larmorx", "afni", "3dTshift", *args, "-prefix", str(out), str(src)],
+                            implementation="replica",
+                        )
+                    os.environ.pop("OMP_NUM_THREADS", None)
+                    if code != 0 or not out.exists():
+                        raise RuntimeError(f"the replica failed on {label}")
 
                 seconds = measure(run_gpl, repeats=repeats)
                 g = nib.load(gpl_out).dataobj.get_unscaled()
@@ -249,10 +247,10 @@ def render(
     replica = [m for m in results if m.tool == REPLICA_TOOL]
     if replica:
         lines += [
-            "## The replica: `larmorx-gpl afni 3dTshift`",
+            "## The replica: `larmorx afni 3dTshift` with `LARMORX_IMPLEMENTATION=replica`",
             "",
-            "The GPL-3.0-or-later replica (`crates-gpl/`, a translation of AFNI's source) on the "
-            "same runs, as a separate process with the same arguments. It keeps AFNI's "
+            "The bit-exact replica (a translation of AFNI's source, built into larmorx) on the "
+            "same runs, with the same arguments. It keeps AFNI's "
             "arithmetic (float32 FFT, one voxel pair at a time) and runs the pairs of each slice "
             "in parallel. Its output is compared with AFNI's on every value "
             "(`docs/validation/afni-tshift-replica.md`).",

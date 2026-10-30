@@ -39,7 +39,7 @@ starts no other agent.
 ## The order from here
 
 **Now (2026-10-29):** the version update's AFNI and FSL parts are done (the replicas follow AFNI
-26.3.05 and FSL 6.0.7.23); the clean-room originals follow them too (item 3b), and part 3 (SciPy, numpy, FSL's matrix library) is done the same day; next, item 3c. Before: the move
+26.3.05 and FSL 6.0.7.23); the clean-room originals follow them too (item 3b), and part 3 (SciPy, numpy, FSL's matrix library) is done the same day; item 3c (the AFNI replicas in the main package) is done too; next, BET's clean-room original. Before: the move
 (M, below), the ANTs tools' data panel (part a) and the fourteen whole template registrations
 (14 of 14 identical with correctly rounded maths). The public summary of this order is the site's
 Roadmap page, updated at every completed step.
@@ -98,16 +98,17 @@ at a time:
      `mutualinfo` 54 of 78 (before 0.983, 11); with `-fudge -stages 1` mcflirt's evaluated
      matrices on 22 of 30 phantoms); the in-plane mode's centre is the padded volume's (found by
      `-verbose 20` traces). Both originals' defaults moved to the newest originals at the merge.
-   - **3c. The AFNI replicas move into the main package** (user, 2026-10-29; AFNI 26.3.05 releases
-     MCW's code under CC BY 4.0: [findings/afni-relicensing-26.md](findings/afni-relicensing-26.md)):
-     a replica author's part after part 3: `cbrtf` measured first (rule D: does 3dUnifize `-EPI`'s
-     radius ever depend on glibc's last bit? if not, `larmorx_core::math::cbrtf`; otherwise a
-     permissive routine with glibc's bits, or a small LGPL piece kept apart), `sinf`/`cosf`
-     re-sourced from Arm's MIT routines, CC BY 4.0's attribution and change statement per file, in
-     `PROVENANCE.md` and `NOTICE`, its text in `LICENSES/`, the crate moved to `crates/` with its
-     SPDX headers, `cargo deny`, golden cases and CI's `gpl` jobs adjusted (no new CI minutes),
-     `implementation=` still choosing replica or clean-room original; `docs/licensing.md` and rule 1
-     rewritten for AFNI. The clean-room originals stay (built for speed).
+   - **3c. The AFNI replicas move into the main package: done** (2026-10-29/30,
+     `docs/parts/2026-10-29-afni-move/`, [findings](findings/afni-relicensing-26.md), \"The move\"):
+     `crates/larmorx-afni-replica` (Apache-2.0 with CC BY 4.0's attribution per file, in
+     `PROVENANCE.md`, `NOTICE`; the legal code and Arm's MIT licence in `LICENSES/`), run in-process
+     by the `larmorx` command line and the Python wrappers; `sinf`/`cosf` translated afresh from Arm's
+     Optimized Routines v19.11 and proved equal to glibc's on all 2^32 inputs of each function and
+     build (FMA, SSE2); `tanhf` fdlibm's; `cbrtf` measured: its last bit changes 3dUnifize `-EPI`'s
+     ball on 1,449,010 float volumes (80 in [1, 100) mm³), so the replica takes CORE-MATH's and
+     warns where it could matter (the user decides, \"Waiting for the user\"); the three replica
+     records re-made in-process: no status change; golden checksums unchanged; `crates-gpl/` keeps
+     only the verification tools; CI's `crates-gpl` steps gone (4.0 min a run).
 4. **The ports:** BET's clean-room original (item 7), the clean-room additions mcflirt FSL-20/21
    and 3dUnifize AFNI-75 (specs first), FLIRT with BBR, FAST, topup (item 7); field maps,
    FreeSurfer, surfaces, confounds (item 8); larmorprepx (item 9). Each with its site page from
@@ -455,6 +456,20 @@ The items below keep their history.
   obliquity of its own header extension's 7-digit matrix (AFNI-10); AFNI on the inputs without the
   extension prints the original's angle, and the parity suite now explains such messages by
   AFNI-10 (22 of 22 fMRIPrep cases pass).
+- **3dUnifize's replica memory** (found 2026-10-29, the move's memory cases): its peak is 1.5
+  (`-T2`, 160×192×160) and 2.8 (`-EPI`, 64×64×40×160) times AFNI 26.3.05's, as it was as the
+  `larmorx-gpl` program (`validation/investigations/afni-move/memory.py`); a replica-memory part
+  like antsAI's (no full-size copies AFNI does not hold). Strict expected failures in
+  `tests/parity/test_memory_peak.py` until then.
+- **The Python entry point's own memory** (2026-10-29): `python -m larmorx` takes about 13 MiB more
+  than the binary (the interpreter and numpy), beyond the rule's 8 MiB on a small image
+  (3dAutomask on a 64×64×40 mean: 21.2 MiB against AFNI's 7.5; the replica alone 8.2): a lazy
+  numpy import on the command-line path would bring it within. A strict expected failure until then.
+- **The AFNI evidence pages' entries** (2026-10-29): the figures cache's AFNI entries were computed
+  with the `larmorx-gpl` program; their replica runs could be recomputed in-process at the final
+  validation phase (the records show the same files; the computes now run the in-process replica).
+- **CI's `gpl` job name** (2026-10-29): it runs only `crates-nc` now; renaming it (`nc`) would change
+  the check names the watchers count (kept as is).
 - **The resample-series step and SciPy 1.15.3's varying outputs (SCI-05)** (found 2026-10-29 at the
   part 3 merge): SciPy 1.15.3's `map_coordinates` (mode `nearest`, `prefilter=False`, 3D float32)
   varies between runs, so the record's "originals' own step" detail of `ndimage/nearest-order*`
@@ -547,6 +562,22 @@ Decided 2026-10-23 (decision log): the four rules for questionable behaviours (A
   permissive notice) with no libstdc++ text; the orchestrator accepted that licensing reading
   (algorithms, not code, are reused). The user may prefer the earlier behaviour instead (NaNs last
   in both modes, with a warning). No **decide** entry in the register.
+
+- **3dUnifize `-EPI`'s `cbrtf`** (2026-10-29, the AFNI move; [findings](findings/afni-relicensing-26.md),
+  \"The C library's maths\"): glibc's `cbrtf` (LGPL, not in larmorx) and the correctly rounded one
+  the replica now uses differ in the last bit on one input in ten; on 8,794 voxel volumes from
+  0.001 mm³ (80 in [1, 100) mm³) that bit changes `-EPI`'s ball of neighbours, so the replica is
+  not AFNI's there and warns (on 2,953 volumes in [1, 100) mm³, every changed one among them).
+  **Recommended:** a clean-room `cbrtf` with glibc's bits (a spec of the method by a spec writer,
+  written by an agent that has not read glibc, proved equal on all 2^32 inputs; a small part).
+  Alternatives: a table of the 9,346 changed volumes from 0.001 mm³ (exact on realistic voxels
+  only), or keeping the warning.
+- **For the user's information: `auto` now runs the AFNI replicas** (built in), and the replicas'
+  speed against the clean-room originals on the standard tiers' real cases is in
+  `validation/investigations/afni-move/README.md`: the clean-room originals are faster (the
+  original's time over the replica's, median of the real cases: 3dTshift 0.95 at one thread and
+  0.72 at eight, 3dAutomask 0.54 and 0.44, 3dUnifize 0.47 and 0.27); the rule (the replica when
+  available) is unchanged; the user may want to revisit the default.
 
 Decided 2026-10-22 (decision log): ANTS-106 corrected by default (follow-up below); ANTS-30's
 command line approved. Decided 2026-10-21: ANTS-78, ITK-35, ANTS-67, ANTS-68, ANTS-70, ITK-24, ITK-29

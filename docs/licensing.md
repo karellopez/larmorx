@@ -20,13 +20,14 @@ and lives in the main package.
 |---|---|---|---|
 | ANTs, ITK | Apache-2.0 | ✓ main package | not needed |
 | AFNI, NIH-written files | public domain ("United States Government Work") | ✓ main package, after a per-routine check | not needed |
-| AFNI, files copyrighted by the Medical College of Wisconsin | GPL "Version 2 (or any later edition)" (`doc/README/README.copyright`) | ✓ `larmorx-gpl`, as GPL-3.0-or-later | ✓ main package |
+| AFNI, files copyrighted by the Medical College of Wisconsin | CC BY 4.0 from AFNI 26.3.05 ("As of May 12, 2026, MCW has granted NIH a Creative Commons Attribution License (CC BY 4.0) for all of the code under its copyright", `doc/README/README.copyright`); GPL "Version 2 (or any later edition)" until 25.2.09 | ✓ main package since 2026-10-29 (`crates/larmorx-afni-replica`, with CC BY 4.0's attribution; `larmorx-gpl` until then) | ✓ main package (built for speed) |
 | Connectome Workbench | GPL-2.0-or-later (file headers: "version 2 … or (at your option) any later version") | ✓ `larmorx-gpl`, as GPL-3.0-or-later | ✓ main package |
 | FSL | FSL Licence: non-commercial. Modification and transmission allowed "without financial return", if the licence conditions are imposed on the receiver and all original and amended source is included (`~/fsl/LICENCE.FSL`) | ✓ `larmorx-nc`, under the FSL Licence's terms | ✓ main package |
 | FreeSurfer | FreeSurfer Software License v1.0: derived works and redistribution allowed, also commercially, if the licence text with its required preface ships with them, notices are kept and modifications marked. Every user inherits "research use only" and an indemnity in MGH's favour | ✓ `larmorx-freesurfer` (planned, D3) | not planned (not required; revisit for single parts if needed) |
 | MSM_HOCR | non-commercial. Its ELC library: "derivatives must not be publicly distributed without a prior consent". Its FastPD optimiser: "protected by … patent applications" | ✗ cannot be published | ✓ main package, in the surfaces track, **without** the FastPD/ELC optimisation methods (patents cover methods, however they are coded). First step: a patent check of FastPD and HOCR |
 | tedana | LGPL-2.1 | possible in an LGPL package; not planned | ✓ main package (from the published equations) |
 | CORE-MATH, nibabel | MIT | ✓ main package | not needed |
+| Arm's Optimized Routines (v19.11: the `sinf`/`cosf` glibc 2.35 ships) | MIT | ✓ main package (the AFNI replicas' `sincosf.rs`) | not needed |
 
 ## Packages
 
@@ -36,23 +37,19 @@ command-line binary. Code from different families is never linked into one binar
 | Package | Licence | Contents | Depends on |
 |---|---|---|---|
 | `larmorx` | Apache-2.0 | everything permissive, plus every original | – |
-| `larmorx-gpl` | GPL-3.0-or-later | replicas of AFNI's MCW files and of Workbench | `larmorx` (Apache-2.0 code may be included in GPL-3 works) |
+| `larmorx-gpl` | GPL-3.0-or-later | replicas of Workbench (none yet; until 2026-10-29 also AFNI's MCW files) | `larmorx` (Apache-2.0 code may be included in GPL-3 works) |
 | `larmorx-nc` | the FSL Licence's terms (non-commercial, source included) | replicas of FSL | `larmorx` |
 | `larmorx-freesurfer` | FreeSurfer Software License | replicas of FreeSurfer | `larmorx` |
 
 - **`larmorx-gpl` and `larmorx-nc` are separate,** and neither may link the other. The FSL
   Licence's non-commercial and "impose these conditions" clauses are incompatible with the
   GPL, which forbids added restrictions.
-- **A replica package is a program, not a Python module** (decided 2026-10-11). `larmorx-gpl`
-  is a binary-only wheel (maturin's `bin` bindings, `crates-gpl/pyproject.toml`): it installs
-  the `larmorx-gpl` program into the environment's scripts directory and nothing that Python
-  can import. Its licence metadata is `GPL-3.0-or-later`; the wheel carries the GPL
-  (`crates-gpl/LICENSE`), the AFNI and glibc notices (`crates-gpl/NOTICE`), the LGPL-2.1 of the
-  glibc translation, and the Apache-2.0 text and `NOTICE` of the larmorx crates the program
-  includes (`crates-gpl/LICENSES/`; copies of the repository's files, kept identical by
-  `crates-gpl/larmorx-gpl-cli/tests/notices.rs`, because maturin takes licence files only from
-  below `crates-gpl/`). `larmorx-nc` is packaged the same way (`crates-nc/pyproject.toml`, licence
-  `LicenseRef-FSL`): its wheel carries the FSL Licence (`crates-nc/LICENSE`), the FSL,
+- **A replica package is a program, not a Python module** (decided 2026-10-11). `larmorx-nc`
+  is a binary-only wheel (maturin's `bin` bindings, `crates-nc/pyproject.toml`, licence
+  `LicenseRef-FSL`): it installs the `larmorx-nc` program into the environment's scripts
+  directory and nothing that Python can import. `larmorx-gpl` was packaged the same way for the
+  AFNI replicas until 2026-10-29 (its wheel, program and `larmorx[exact]` extra are in git
+  history); it will be again for Workbench. `larmorx-nc`'s wheel carries the FSL Licence (`crates-nc/LICENSE`), the FSL,
   Armadillo, fslpy, fdlibm, Arm and SGI STL (HP/SGI) notices (`crates-nc/NOTICE`), the
   Apache-2.0 text and `NOTICE` of the larmorx crate it includes and Arm's MIT licence
   (`crates-nc/LICENSES/`), and, because the
@@ -91,12 +88,10 @@ command-line binary. Code from different families is never linked into one binar
   sources, included in the FSL-licensed package as the other permissive ones are.
 - **Nothing is on PyPI yet.** Build the wheels locally:
   ```bash
-  maturin build --release --locked --out dist                    # larmorx (repository root)
-  (cd crates-gpl && maturin build --release --locked --out ../dist)   # larmorx-gpl
+  maturin build --release --locked --out dist                    # larmorx (repository root): the originals and the AFNI replicas
   (cd crates-nc && maturin build --release --locked --out ../dist)    # larmorx-nc (FSL Licence)
-  pip install --find-links dist "larmorx[exact]"                      # + the GPL replicas
   pip install --find-links dist larmorx-nc                            # the FSL replicas, by name
-  pip install --find-links dist "larmorx[all]"                        # everything, both included
+  pip install --find-links dist "larmorx[all]"                        # everything
   ```
 - **In the repository** (all in this one repository; for FSL decided 2026-10-10):
   - `crates/` holds the Apache crates;
@@ -175,22 +170,28 @@ command-line binary. Code from different families is never linked into one binar
   and kept in a restricted findings file, [findings/afni-licence-routines.md](findings/afni-licence-routines.md):
   **clean-room implementers must not read it** (CLAUDE.md rule 1).
 
-  3dUnifize's squash also calls the C library's `tanhf` (and `-EPI` `cbrtf`): the replica
-  carries a port of glibc 2.35's (LGPL-2.1-or-later, fdlibm's notice; `crates-gpl/NOTICE`),
-  checked against glibc on all 2^32 float inputs. So the replicas are in `larmorx-gpl`
-  (`crates-gpl/larmorx-gpl-afni`), and `specs/3dAutomask.md` and `specs/3dUnifize.md` are
-  written for the clean-room originals. The routine-by-routine tables, with
-  file:line, are in the restricted findings `docs/findings/afni-automask.md` and
-  `afni-unifize.md`.
+  3dUnifize's squash also calls the C library's `tanhf`, and `-EPI` its `cbrtf`. Since 2026-10-29 the
+  replica (in the main package) carries fdlibm's `tanhf` (Sun's notice), checked against glibc on all
+  2^32 float inputs, and computes `-EPI`'s cube root correctly rounded (CORE-MATH, MIT): glibc's own
+  `cbrtf` is LGPL-2.1 code, and its last bit changes the ball of neighbours on some voxel volumes, so
+  the replica warns there (`docs/findings/afni-relicensing-26.md`, "The C library's maths"; the
+  user decides how to keep the exact result). `specs/3dAutomask.md` and `specs/3dUnifize.md` are the
+  clean-room originals' input. The routine-by-routine tables, with file:line, are in the restricted
+  findings `docs/findings/afni-automask.md` and `afni-unifize.md`.
 - **AFNI 26.3.05 relicenses MCW's code** (checked 2026-10-29,
-  [findings/afni-relicensing-26.md](findings/afni-relicensing-26.md)): "As of May 12, 2026, MCW
+  [findings/afni-relicensing-26.md](findings/afni-relicensing-26.md)): \"As of May 12, 2026, MCW
   has granted NIH a Creative Commons Attribution License (CC BY 4.0) for all of the code under
-  its copyright" (`doc/README/README.copyright`); every MCW file's header now says CC BY 4.0.
-  None of the 55 AFNI files the replicas derive from is GPL in 26.3.05. The AFNI replicas
-  therefore move into the main Apache package (**decided by the user, 2026-10-29**; next-steps
-  item 3c: attribution, CC BY 4.0's text, `sinf`/`cosf` re-sourced from Arm's MIT routines;
-  glibc's LGPL `cbrtf` measured or kept apart). Until that part they stay in `larmorx-gpl` (CC BY 4.0 allows the GPL-3
-  package), and `crates-gpl/NOTICE` carries the CC BY 4.0 attribution.
+  its copyright\" (`doc/README/README.copyright`); every MCW file's header now says CC BY 4.0, and
+  none of the 55 AFNI files the replicas derive from is GPL. **The AFNI replicas moved into the
+  main package on 2026-10-29** (decided by the user): `crates/larmorx-afni-replica`, Apache-2.0,
+  with CC BY 4.0's attribution (section 3(a): the creator, the copyright notice, the licence and
+  its URI, the disclaimer, the source and its tag, the modification) in every MCW-derived file's
+  header, in the crate's `PROVENANCE.md` and in `NOTICE`, the legal code in `LICENSES/CC-BY-4.0.txt`
+  (CC BY 4.0 lets an adaptation carry the adapter's licence, section 3(a)(4)). The C library's
+  functions are permissive: `sinf`/`cosf` translated from Arm's Optimized Routines (MIT,
+  `LICENSES/MIT-arm-optimized-routines.txt`), `tanhf`/`expm1f` fdlibm's; glibc's LGPL `cbrtf` is
+  not included (above). larmorx's own code written for `larmorx-gpl` was relicensed to Apache-2.0
+  by its author. `scripts/check_spdx.py` allows CC BY 4.0 only in that crate.
 
 ## Publishing
 
@@ -219,8 +220,11 @@ command-line binary. Code from different families is never linked into one binar
 ## Choosing at run time
 
 **The licences stay separate through process boundaries** (decided 2026-10-11). The Apache
-package `larmorx` never imports, loads or links replica code, in Rust or in Python. It runs
-the replica package's program as a separate process, with the tool's original arguments, and
+package `larmorx` never imports, loads or links the code of a replica under another licence
+family (`larmorx-nc`), in Rust or in Python. **A replica under a licence the main package
+allows is built in** (the AFNI replicas since 2026-10-29): it runs in the same process, with the
+arguments, directory and environment a separate program would get, and gives the same files,
+messages and exit status. For the others, larmorx runs the replica package's program as a separate process, with the tool's original arguments, and
 the two exchange NIfTI files. Loading a GPL extension module into the Python process would make
 one combined work of the two, under the GPL, so it is not done. larmorx knows the replica's
 program name and arguments, nothing more.
@@ -230,15 +234,15 @@ The clean-room originals exist since 2026-10-23 (`crates/larmorx-afni`, Apache-2
 CORE-MATH's correctly rounded `tanhf` and `cbrtf` (MIT, `larmorx_core::math`) where AFNI calls the C
 library's.
 - **Python:** `lx.<family>.<tool>(..., implementation="auto")` (built for `lx.afni.tshift`).
-  - `"auto"` (the default) runs the replica when its program is found, and the original
-    otherwise; `"replica"` and `"original"` force one.
-  - `"replica"` without the program raises `lx.ReplicaNotFoundError`, which names the
+  - `"auto"` (the default) runs the replica when it is built in (AFNI's) or its program is
+    found (FSL's), and the original otherwise; `"replica"` and `"original"` force one.
+  - `"replica"` without a separate replica's program raises `lx.ReplicaNotFoundError`, which names the
     install command.
   - A replica that is found but fails raises `lx.ReplicaError`. larmorx never falls back to
     the original then: the two differ in the last bits, so a silent fallback would change
     results without notice.
-  - The wrapper writes in-memory inputs to a temporary directory, runs the program there and
-    reads its output back. Thread counts reach it as `OMP_NUM_THREADS`.
+  - The wrapper writes in-memory inputs to a temporary directory, runs the replica there (a
+    built-in one in this process) and reads its output back. Thread counts reach it as `OMP_NUM_THREADS`.
   - The result records what ran: `Image.implementation` (`lx.Implementation`: `"original"` or
     `"replica"`, the package, its version, the program's path).
   - There is no global setting; each call looks for the program again.
@@ -248,18 +252,18 @@ library's.
     clashes with the tool's own arguments.
   - The replica's output and exit code pass through unchanged. larmorx's own exit codes:
     127 when `replica` is asked for and the program is missing, 126 when it cannot be
-    started, 2 for an invalid `LARMORX_IMPLEMENTATION` or `LARMORX_GPL_BIN`.
+    started, 2 for an invalid `LARMORX_IMPLEMENTATION` or `LARMORX_NC_BIN`.
   - With `-verbose`, each implementation's first line names it, with its package and version.
 - **Finding the program** (the same rules for both, `larmorx_cli::replica`):
-  1. the package's environment variable, `LARMORX_GPL_BIN` or `LARMORX_NC_BIN` (an error if it names no file);
+  1. the package's environment variable, `LARMORX_NC_BIN` (an error if it names no file);
   2. the current Python environment's scripts directory (`sysconfig`), where `pip` puts the
      program, so a venv works without being activated; for the standalone `larmorx` binary,
      the directory of that binary;
   3. `PATH`.
-- **Installing the replicas is explicit:** `pip install "larmorx[exact]"` adds `larmorx-gpl`;
-  `larmorx-nc` (non-commercial) comes only by name or with `pip install "larmorx[all]"`, which
-  installs everything (the user's decision of 2026-10-16), so its licence is accepted knowingly
-  either way; `[exact]` never brings it.
+- **Installing the replicas is explicit:** the AFNI replicas come with `pip install larmorx`
+  (since 2026-10-29); `larmorx-nc` (non-commercial) comes only by name or with `pip install
+  "larmorx[all]"`, which installs everything (the user's decision of 2026-10-16), so its licence
+  is accepted knowingly either way.
 - **larmorprepx** (Apache-2.0) uses `implementation="auto"`, so it gives the most accurate
   results whenever the replicas are installed. Its reports say which tools ran which
   implementation.

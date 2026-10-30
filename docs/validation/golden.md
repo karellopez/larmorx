@@ -13,14 +13,14 @@ Replicas and clean-room originals are covered alike. Written 2026-10-11.
 
 ## Where they are
 
-| | `larmorx` (Apache-2.0) | `larmorx-gpl` (the GPL replica) | `larmorx-nc` (the FSL replicas) |
+| | `larmorx` (Apache-2.0) | the AFNI replicas (in `larmorx`) | `larmorx-nc` (the FSL replicas) |
 |---|---|---|---|
-| Cases | [`tests/golden/registry.py`](../../tests/golden/registry.py): 154 cases, 895 outputs | [`crates-gpl/larmorx-gpl-cli/tests/golden.rs`](../../crates-gpl/larmorx-gpl-cli/tests/golden.rs): 40 cases, 90 outputs | [`crates-nc/larmorx-nc-cli/tests/golden.rs`](../../crates-nc/larmorx-nc-cli/tests/golden.rs): 36 cases, 261 outputs |
-| Checksums | [`tests/golden/golden.json`](../../tests/golden/golden.json) | [`crates-gpl/larmorx-gpl-cli/tests/golden.tsv`](../../crates-gpl/larmorx-gpl-cli/tests/golden.tsv) | [`crates-nc/larmorx-nc-cli/tests/golden.tsv`](../../crates-nc/larmorx-nc-cli/tests/golden.tsv) |
+| Cases | [`tests/golden/registry.py`](../../tests/golden/registry.py): 154 cases, 895 outputs | [`crates/larmorx-cli/tests/afni_replica_golden.rs`](../../crates/larmorx-cli/tests/afni_replica_golden.rs): 40 cases, 90 outputs | [`crates-nc/larmorx-nc-cli/tests/golden.rs`](../../crates-nc/larmorx-nc-cli/tests/golden.rs): 36 cases, 261 outputs |
+| Checksums | [`tests/golden/golden.json`](../../tests/golden/golden.json) | [`crates/larmorx-cli/tests/afni_replica_golden.tsv`](../../crates/larmorx-cli/tests/afni_replica_golden.tsv) | [`crates-nc/larmorx-nc-cli/tests/golden.tsv`](../../crates-nc/larmorx-nc-cli/tests/golden.tsv) |
 | Test | `tests/golden/test_golden.py` (pytest) | `cargo test` | `cargo test` |
-| Runs in CI | job `test`, on the release wheel, Python 3.12 only (the Python 3.14 run skips `tests/golden`) | job `gpl`, `cargo test --workspace --locked` (debug) | job `gpl`, as steps of their own: `cargo test --workspace --locked` in `crates-nc` |
-| Recorded by | `python scripts/record_golden.py` | `LARMORX_GOLDEN_RECORD=1 cargo test --locked -p larmorx-gpl-cli --test golden` | `LARMORX_GOLDEN_RECORD=1 cargo test --locked -p larmorx-nc-cli --test golden` (in `crates-nc`) |
-| CI artifact on failure | `golden-mismatches-<platform>` | `golden-mismatches-gpl-<platform>` | `golden-mismatches-gpl-<platform>` (the same job) |
+| Runs in CI | job `test`, on the release wheel, Python 3.12 only (the Python 3.14 run skips `tests/golden`) | job `test`, `cargo test --workspace --locked` (debug) | job `gpl`, `cargo test --workspace --locked` in `crates-nc` |
+| Recorded by | `python scripts/record_golden.py` | `LARMORX_GOLDEN_RECORD=1 cargo test --locked -p larmorx-cli --test afni_replica_golden` | `LARMORX_GOLDEN_RECORD=1 cargo test --locked -p larmorx-nc-cli --test golden` (in `crates-nc`) |
+| CI artifact on failure | `golden-mismatches-<platform>` | `golden-mismatches-<platform>` (its `afni-replica/` folder) | `golden-mismatches-gpl-<platform>` |
 
 No CI job or runner was added. Parity, benchmarks and real data still never run in CI.
 
@@ -63,8 +63,8 @@ A coverage test fails when anything below has no case; its message says what to 
 | `lx.ndimage` | 3 | `map_coordinates` with each spline order (0-5) and each boundary mode, an integer input; `spline_filter`, `spline_filter1d`; the reflect modes with `upstream_defects="reproduce"` |
 | HDF5 reader | 1 | `hdf5.fixtures` (2026-10-16): larmorx's HDF5 reader on the five committed [HDF5 fixtures](#hdf5-fixtures), every path its own writer never produces; each file fingerprinted by what larmorx reads back (groups, datasets, types, shapes, strings, values, integers' stored bytes), the members of three groups through soft links, and the shared-message file's transforms as `lx.transforms.read` reads them |
 | I/O (`lx`, `lx.io`) | 4 | NIfTI-1 uncompressed and memory-mapped, the header's qform/sform/ITK geometry; a scaled int16 4D file, gzip-compressed (the compressed bytes too), read scaled, as float32 and unscaled; NIfTI-2; `Image.from_nibabel`/`to_nibabel` |
-| `larmorx-gpl afni 3dTshift` | 24 | each method (Fourier, linear, cubic, quintic, heptic, wsinc5, wsinc9), float32/int16/uint8 storage, `-rlt`, `-rlt+`, `-no_detrend`, `-ignore`, `-slice`, `-tzero`, a `@1D:` slice pattern with `-TR` in ms; AFNI's defects corrected (the default) and, in 6 `*.reproduce` cases, reproduced: a negative scale factor (AFNI-01), float32 with a slope and an intercept in an oblique sform in metres with header slice code 2 (AFNI-02, -07; the code-2 timing as AFNI 26.3.05 reads it, AFNI-03 being fixed upstream), a copy keeping slice times within 3 ms of 0 (AFNI-08), an sform 0.006° from plumb (AFNI-16; the reproduced header is the plumb input's, byte for byte), `-TR` in ms with `AFNI_ALLOW_MILLISECONDS` (AFNI-19, in both modes), int16 with a slope and an intercept under `-DAFNI_NIFTI_SCALE=NO` (AFNI-23, in both modes, and the default's `-rlt -ignore` path, read as without the variable); AFNI's global options and variables: `-overwrite` onto an existing output (written through a temporary file and a rename on every platform), NIfTI-2 output by `-DAFNI_NIFTI_WRITE_TYPE=2` and by the environment; each case also checks the defects named on standard error |
-| `larmorx-gpl afni 3dAutomask`, `3dUnifize` | 16 | 3dAutomask: fMRIPrep's call on an int16 head phantom with `-apply_prefix` and `-depth`; `-eclip -nograd -NN1 -erode`; a 4D series with `-SI`; a 2D slice; `-peels 0` (AFNI-43) in both modes. 3dUnifize: the default on int16 with `-ssave` and `-amsave`; fMRIPrep's `-T2` call; `-GM -nosquash`; `-T2 -T2`; `-EPI` on a series, and on one with a negative scale factor in both modes (AFNI-01); `-T2up 100` in both modes (AFNI-45); a 2D slice |
+| `larmorx afni 3dTshift` (the replica) | 24 | each method (Fourier, linear, cubic, quintic, heptic, wsinc5, wsinc9), float32/int16/uint8 storage, `-rlt`, `-rlt+`, `-no_detrend`, `-ignore`, `-slice`, `-tzero`, a `@1D:` slice pattern with `-TR` in ms; AFNI's defects corrected (the default) and, in 6 `*.reproduce` cases, reproduced: a negative scale factor (AFNI-01), float32 with a slope and an intercept in an oblique sform in metres with header slice code 2 (AFNI-02, -07; the code-2 timing as AFNI 26.3.05 reads it, AFNI-03 being fixed upstream), a copy keeping slice times within 3 ms of 0 (AFNI-08), an sform 0.006° from plumb (AFNI-16; the reproduced header is the plumb input's, byte for byte), `-TR` in ms with `AFNI_ALLOW_MILLISECONDS` (AFNI-19, in both modes), int16 with a slope and an intercept under `-DAFNI_NIFTI_SCALE=NO` (AFNI-23, in both modes, and the default's `-rlt -ignore` path, read as without the variable); AFNI's global options and variables: `-overwrite` onto an existing output (written through a temporary file and a rename on every platform), NIfTI-2 output by `-DAFNI_NIFTI_WRITE_TYPE=2` and by the environment; each case also checks the defects named on standard error |
+| `larmorx afni 3dAutomask`, `3dUnifize` (the replicas) | 16 | 3dAutomask: fMRIPrep's call on an int16 head phantom with `-apply_prefix` and `-depth`; `-eclip -nograd -NN1 -erode`; a 4D series with `-SI`; a 2D slice; `-peels 0` (AFNI-43) in both modes. 3dUnifize: the default on int16 with `-ssave` and `-amsave`; fMRIPrep's `-T2` call; `-GM -nosquash`; `-T2 -T2`; `-EPI` on a series, and on one with a negative scale factor in both modes (AFNI-01); `-T2up 100` in both modes (AFNI-45); a 2D slice |
 | `larmorx afni 3dAutomask`, `3dUnifize`, `lx.afni.automask`, `lx.afni.unifize` (clean-room originals) | 8 | 3dAutomask: fMRIPrep's call (`-apply_prefix -dilate 1`) with `-depth` on the oblique float32 volume; a 4D series averaged with `-nograd -eclip -clfrac 0.3 -peels 2 -NN3 -dilate 2 -erode 1 -SI 20`, and the 2D method on a plane; `-peels 0 -nbhrs 12` on a series with a negative scale factor in both modes (AFNI-43, AFNI-01); the Python API in memory with `exterior_clip`, `erode`, `nn=1`, the masked input and the depth. 3dUnifize: the defaults with `-ssave` and `-amsave`; fMRIPrep's `-T2` call; `-T2 -T2 -GM`; `-EPI` on a series; `-T2 -T2up 100` in both modes (AFNI-45); the Python API in memory with `t2`, the scale and the automasked input. The half-size path (more than a million voxels) is covered by the parity suites and the Rust unit tests of `unifize::duplo` |
 | `larmorx-nc fsl mcflirt` | 24 | int16 (the default outputs, int16 written), float32 with a reference file, `-stages 4` and `-sinc_final`, `-meanvol` with `-spline_final` and `-dof 12`, every cost (`mutualinfo` with `-nn_final` and `-bins 64`, `normmi`, `corratio`, `woods`, `leastsquares` with `-smooth 0`), `-init` with `-fudge` and `-rotation 2`, the in-plane mode on a 3-slice slab (and `-2d`), `-stats`, `-gdt`, uint8 and int8 input, NaN and infinite voxels, big-endian float32 in the neurological order written as NIfTI-2, a TR in milliseconds; mcflirt's defects corrected (the default) and, in 7 `*.reproduce` cases, reproduced (FSL-03, -04, -08, -09, -10, -14); every file written fingerprinted (images by header and data, `.mat`, `.par`, `.rms`); each case checks the defects named on standard error; FSL-59 reproduced (`-nn_final` resampled trilinearly, as FSL 6.0.7.23) with zstd outputs (`FSLOUTPUTTYPE=NIFTI_ZST`) |
 | `larmorx-nc fsl bet`, `bet2`, `betsurf` | 12 | bet2's outputs (brain, mask, outline, skull, VTK mesh; `-f 0.4`), its threshold, gradient, centre and smoothness options (NIFTI_GZ), `--ct` (NIFTI_PAIR; the self-intersection passes), FSL-40 reproduced; `bet -R`, `-F` (4D), `-Z` corrected and reproduced (FSL-45); `betsurf --t1only -o -m -s` and with the T2 and `-p 1`. The inputs: a head of 32 x 32 x 24 voxels of 2 mm (brain, CSF, skull, scalp) from SplitMix64 and integer arithmetic, its T2 contrast, 4 volumes of it, a slab of 10 slices, and bet2's own mesh of the head; every file written fingerprinted (images by header and data, meshes as text); each case checks the defects named on standard error. `PATH` is emptied for the runs (FSL-45's branch looks for `imglob` on it); `--binaryMask` (FSL 6.0.7.23) with bzip2 outputs (`NIFTI_BZ2`), and `bet` with zstd outputs (`NIFTI_ZST`) |
@@ -73,7 +73,7 @@ What the coverage test enumerates:
 
 - **CLI tools:** `_core.cli_tools()`, which returns `larmorx_cli::FAMILIES`, the same list the
   command line dispatches and prints in `--help` (21 tools on 2026-10-26). For the replicas, the
-  families and tools printed by `larmorx-gpl --help` and `larmorx-nc --help`.
+  families and tools printed by `larmorx --help` (the AFNI replicas) and `larmorx-nc --help` (the FSL replicas).
 - **ImageMath operations:** `lx.ants.image_math_operations()`, built from the operation
   registry (`GROUPS`), 38 operations.
 - **Public functions:** every function in the `__all__` of `lx.ants`, `lx.afni`, `lx.fsl`,
@@ -84,7 +84,7 @@ What the coverage test enumerates:
 
 - **Tools with a replica and an original** (3dTshift, 3dAutomask, 3dUnifize): the cases in
   `tests/golden/registry.py` run the clean-room original (`implementation="original"`); the
-  replica has its own in `crates-gpl/larmorx-gpl-cli/tests/golden.rs`. BET has only a replica
+  replicas have their own in `crates/larmorx-cli/tests/afni_replica_golden.rs`. BET has only a replica
   (2026-10-26): `larmorx fsl bet`, `bet2`, `betsurf` and `lx.fsl.bet`, `lx.fsl.betsurf`
   (`REPLICA_ONLY_FUNCTIONS`) have their cases in `crates-nc/larmorx-nc-cli/tests/golden.rs`, and a
   test checks that each such tool has one there (`REPLICA_GOLDEN`). 3dUnifize's half-size path (more than a
@@ -225,7 +225,7 @@ python scripts/record_golden.py --compare golden-mismatches-macos-arm64/
 
 It recomputes those cases here and prints, per output, how many values differ, the largest
 absolute difference and the largest ulp distance. For the replica, the job uploads the NIfTI
-files that differ (`golden-mismatches-gpl-<platform>/larmorx-gpl/`).
+files that differ (`golden-mismatches-<platform>/afni-replica/`; the FSL replicas' in `golden-mismatches-gpl-<platform>/`).
 
 ## Recording
 
@@ -237,10 +237,8 @@ maturin develop --release
 python scripts/record_golden.py           # runs pytest tests/parity (smoke tier) first; refuses if it fails
 git add tests/golden/golden.json && git commit -m "Record the golden checksums from <commit>"
 
-cd crates-gpl
-cargo build --release                     # so that the replica's parity suite runs
-(cd .. && pytest tests/parity/test_afni_tshift_replica.py)
-LARMORX_GOLDEN_RECORD=1 cargo test --locked -p larmorx-gpl-cli --test golden
+pytest tests/parity/test_afni_tshift_replica.py   # the replica's parity first
+LARMORX_GOLDEN_RECORD=1 cargo test --locked -p larmorx-cli --test afni_replica_golden
 ```
 
 `record_golden.py --skip-parity` and `--allow-dirty` (`LARMORX_GOLDEN_ALLOW_DIRTY=1` for the
@@ -341,7 +339,9 @@ resampled series), so a regression would show in CI.
   same input and give the same data and header hashes.
 - The main package's `3dTshift` cases run the clean-room original explicitly
   (`implementation="original"`, and the command line with it forced), so an installed
-  `larmorx-gpl` cannot change them (2026-10-11, `docs/licensing.md`, "Choosing at run time").
-  The replica's cases are in `crates-gpl/`.
+  the replica cannot change them (2026-10-11, `docs/licensing.md`, "Choosing at run time").
+  The replicas' cases are in `crates/larmorx-cli/tests/afni_replica_golden.rs` (moved from
+  `crates-gpl/larmorx-gpl-cli/tests/golden.rs` on 2026-10-29 with the replicas; the checksums
+  did not change: recorded from 8218894, they pass through the in-process replica).
 - `golden.json` records the numpy version it was made with; the golden tests use only
   elementwise numpy operations in their inputs, which do not change between numpy versions.

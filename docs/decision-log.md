@@ -1689,6 +1689,25 @@ together at the end.
   (`--python newest` by default for resample-series, resample-series-jacobian, numpy-linalg);
   the shared `.venv` is unchanged (section 13 of the handoff: the recommendation).
 
+## 2026-10-29: The AFNI replicas in the main package (the move, item 3c; rules and measurements)
+- **Done as decided by the user:** the replicas are `crates/larmorx-afni-replica`, Apache-2.0 with
+  CC BY 4.0's attribution, built into larmorx (in-process; `implementation=` unchanged, `auto`
+  keeps its rule and so runs them). `larmorx-gpl` keeps no package; `crates-gpl/` holds the GPL
+  verification tools with the earlier glibc translations (never distributed). The `larmorx[exact]`
+  extra and the `larmorx-gpl` wheel are gone (nothing was on PyPI: no alias).
+- **The C library's functions (rule D for `cbrtf`):** `sinf`/`cosf` from Arm's MIT routines, proved
+  equal on all 2^32 inputs of each function and build; `tanhf`/`expm1f` fdlibm's; `cbrtf` measured:
+  its last bit matters (1,449,010 balls changed over the float volumes; 80 in [1, 100) mm³), so
+  the decision goes to the user (\"Waiting for the user\"); meanwhile the replica uses CORE-MATH's and
+  warns wherever one unit in the last place could change the result (0 changed volumes unwarned).
+- **By the rules:** larmorx's own code written for `larmorx-gpl` relicensed to Apache-2.0 by its
+  author; the replica's messages name `larmorx` instead of `larmorx-gpl`; the warning ends in
+  `(larmorx)`, so the parity harness keeps it out of AFNI's messages; CI's `crates-gpl` steps
+  removed (no package code left), the `gpl` job kept for `crates-nc`.
+- **Memory:** the move adds none (the in-process replica within 1.2 MiB of the separate program);
+  the replica's 3dUnifize and the Python entry point on small images exceed the rule as before:
+  follow-ups, strict expected failures.
+
 ## Open decisions (PLAN.md §16)
 
 | # | Decision | Recommended default (used until decided) | Status |

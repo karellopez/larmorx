@@ -2,7 +2,7 @@
 """3dTshift: the agreement of the clean-room original and of the GPL replica with AFNI, a real
 BOLD run's time series through fMRIPrep's slice-timing command, and speed.
 
-The replica (``larmorx-gpl``, GPL-3.0-or-later) runs here as a separate program, as everywhere
+The replica (part of larmorx since 2026-10-29: ``larmorx afni <program>`` with ``LARMORX_IMPLEMENTATION=replica``; until then the GPL program ``larmorx-gpl``) runs, as everywhere
 in the validation package (Apache-2.0)."""
 
 from __future__ import annotations
@@ -63,15 +63,16 @@ def _compute(e: fcache.Entry) -> None:
     import larmorx_testdata as td
 
     from larmorx_validation.parity.afni_tshift import (
+        REPLICA_ENV,
         afni_binary,
         afni_version,
-        replica_binary,
+        replica_command,
         replica_version,
     )
 
-    afni, gpl = afni_binary(), replica_binary()
-    if afni is None or gpl is None:
-        raise FileNotFoundError("the AFNI oracle or the larmorx-gpl replica is missing")
+    afni = afni_binary()
+    if afni is None:
+        raise FileNotFoundError("the AFNI oracle is missing")
     bold = e.input("BOLD", Path(td.get(BOLD)))
     side = json.loads(Path(td.get(BOLD.replace(".nii.gz", ".json"))).read_text(encoding="utf-8"))
     times = [float(t) for t in side["SliceTiming"]]
@@ -98,7 +99,7 @@ def _compute(e: fcache.Entry) -> None:
     e.run(
         "larmorx-replica",
         [
-            gpl,
+            *replica_command(),
             "afni",
             "3dTshift",
             *args,
@@ -106,10 +107,10 @@ def _compute(e: fcache.Entry) -> None:
             str(e.dir / "larmorx-replica.nii.gz"),
             str(bold),
         ],
-        env=common_env,
+        env={**common_env, **REPLICA_ENV},
     )
     e.finish(
-        versions={"afni": afni_version(), "larmorx-gpl": replica_version()},
+        versions={"afni": afni_version(), "larmorx-replica": replica_version()},
         settings="fMRIPrep 25.2.6's 3dTshift arguments for this run (-ignore 0 -tpattern "
         "@slice_timing.1D -TR 2s -tzero 0.975; the slice times from the BIDS sidecar) on the raw "
         "BOLD; larmorx in reproduce mode",
@@ -180,7 +181,7 @@ def series_figure(ctx: Context) -> Figure:
             ("input, at its acquisition times", theme.both, "line"),
             ("AFNI 3dTshift", theme.original, "o"),
             ("larmorx, clean-room original", theme.larmorx, "o-open"),
-            ("larmorx-gpl, replica", theme.replica, "x"),
+            ("larmorx, replica", theme.replica, "x"),
         ]
         x, y = 0.0, 4.0
         for label, col, mk in legend:
@@ -265,7 +266,7 @@ def series_figure(ctx: Context) -> Figure:
         "Slice-timing correction of a real BOLD run: AFNI, the original and the replica",
         "Top: one voxel's signal over time in the last slice acquired of OpenNeuro ds005040 "
         "sub-002's BOLD run, at its acquisition times and shifted by AFNI 3dTshift, larmorx's "
-        "clean-room original and the larmorx-gpl replica. Bottom: per volume, the number of "
+        "clean-room original and the larmorx replica. Bottom: per volume, the number of "
         "brain voxels whose output differs from AFNI's.",
         draw,
         data=[{**DS005040, "files": [BOLD, f"fMRIPrep 25.2.6's BOLD brain mask ({MASK})"]}],
@@ -312,7 +313,7 @@ def figures(ctx: Context) -> list[Figure]:
                 labels=SPEED_LABELS,
                 title="Speed against AFNI",
                 alt="Median seconds per BOLD run for AFNI's 3dTshift, larmorx's clean-room original "
-                "and the larmorx-gpl replica (command lines), at 1 and 12 threads, on a log scale, "
+                "and the larmorx replica (command lines), at 1 and 12 threads, on a log scale, "
                 "with the original's speed-up over AFNI at one thread.",
             )
         )

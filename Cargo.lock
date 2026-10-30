@@ -251,6 +251,7 @@ dependencies = [
  "larmorx-afni-replica",
  "larmorx-ants",
  "larmorx-core",
+ "larmorx-fsl",
  "larmorx-io",
  "larmorx-mri",
  "sha2",
@@ -267,6 +268,19 @@ dependencies = [
  "num-complex",
  "rayon",
  "thiserror",
+]
+
+[[package]]
+name = "larmorx-fsl"
+version = "0.0.1"
+dependencies = [
+ "bytemuck",
+ "larmorx-core",
+ "larmorx-io",
+ "larmorx-mri",
+ "libm",
+ "rayon",
+ "tempfile",
 ]
 
 [[package]]

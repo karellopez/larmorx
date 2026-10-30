@@ -134,18 +134,19 @@ pub const REPLICAS: &[Replica] = &[
         location: Location::Program(&LARMORX_NC),
         original: true,
     },
-    // FSL's BET: the clean-room original is to be written from specs/bet.md.
+    // FSL's BET: the clean-room originals of bet and bet2 are `larmorx_fsl::cli` (written from
+    // specs/bet.md); betsurf's is still to be written.
     Replica {
         family: "fsl",
         tool: "bet",
         location: Location::Program(&LARMORX_NC),
-        original: false,
+        original: true,
     },
     Replica {
         family: "fsl",
         tool: "bet2",
         location: Location::Program(&LARMORX_NC),
-        original: false,
+        original: true,
     },
     Replica {
         family: "fsl",

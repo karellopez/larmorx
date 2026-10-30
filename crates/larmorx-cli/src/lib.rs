@@ -37,8 +37,9 @@ pub const FAMILIES: &[(&str, &[&str])] = &[
 ];
 
 /// The FSL tools, with FSL's command lines: the replica (`larmorx-nc`) when it is installed,
-/// else the clean-room original of the same program (`fsl mcflirt` is `mri hmc`); BET's
-/// programs have no clean-room original yet ([`replica::replica_only`]; a test checks the list).
+/// else the clean-room original of the same program (`fsl mcflirt` is `mri hmc`; `fsl bet` and
+/// `fsl bet2` are `larmorx_fsl::cli`); betsurf has no clean-room original yet
+/// ([`replica::replica_only`]; a test checks the list).
 const FSL_TOOLS: &[&str] = &["mcflirt", "bet", "bet2", "betsurf"];
 
 /// The AFNI tools: the clean-room originals' (`larmorx_afni::cli::TOOLS`), each with its
@@ -194,6 +195,7 @@ fn run_tool(
         "ants" => larmorx_ants::cli::run(tool, args, options.loader, out, err),
         "fsl" => match tool {
             "mcflirt" => larmorx_mri::cli::run("hmc", args, out, err),
+            "bet" | "bet2" => larmorx_fsl::cli::run(tool, args, out, err),
             _ => None,
         },
         "mri" => larmorx_mri::cli::run(tool, args, out, err),

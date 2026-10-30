@@ -1,0 +1,270 @@
+// SPDX-License-Identifier: Apache-2.0
+//! Images as BET reads and writes them (`specs/bet.md` §3).
+//!
+//! Reading (the names, the compressions by content, the conversion to float32, the scaling and
+//! the x reversal of images stored with a positive determinant) is shared with the clean-room
+//! head-motion correction (`larmorx_mri::hmc::image`), which follows the same FSL 6.0.7.23
+//! behaviour (`specs/mcflirt.md` §4.1). Writing follows §3.3: the input's grid and geometry, a
+//! fresh header, the output's own data type.
+
+use std::path::Path;
+
+use larmorx_core::defects::{self, Notice, UpstreamDefects};
+use larmorx_core::element::DataType;
+use larmorx_core::ndarray::{ArrayD, IxDyn, ShapeBuilder};
+use larmorx_core::{DynArray, parallel};
+use larmorx_io::nifti::{self, NiftiHeader, NiftiVersion, WriteOptions};
+use larmorx_mri::hmc::files::{Compression, ImageFiles};
+pub use larmorx_mri::hmc::image::{ImageError, OUTPUT_TYPES, unknown_output_type_message};
+use larmorx_mri::hmc::image::{output_name, read_series_files};
+
+use super::Vol;
+
+/// The `descrip` field of the images larmorx's BET writes.
+pub const DESCRIP: &str = "larmorx fsl bet2";
+
+/// An image as read: its first volume in the radiological frame and what writing results like
+/// it needs.
+#[derive(Clone, Debug)]
+pub struct Input {
+    pub vol: Vol,
+    pub header: NiftiHeader,
+    /// Whether the x axis is reversed in memory.
+    pub flipped: bool,
+    /// Whether the file had more than one volume (only the first is kept).
+    pub volumes: usize,
+}
+
+/// Reads the image `files` (all its volumes when `all`, else the first).
+pub fn read(files: &ImageFiles, n_threads: usize) -> Result<(Vec<Vol>, Input), ImageError> {
+    let s = read_series_files(files, n_threads)?;
+    let volumes = s.volumes.len();
+    let vols: Vec<Vol> = s
+        .volumes
+        .into_iter()
+        .map(|v| Vol {
+            shape: v.shape,
+            voxel: v.voxel_size.map(f64::from),
+            data: v.data,
+        })
+        .collect();
+    let first = vols.first().cloned().ok_or_else(|| {
+        ImageError::Invalid(format!("{}: the image has no voxels", files.header.display()))
+    })?;
+    Ok((
+        vols,
+        Input {
+            vol: first,
+            header: s.header,
+            flipped: s.flipped,
+            volumes,
+        },
+    ))
+}
+
+/// The values of one output image.
+pub enum Values {
+    F32(Vec<f32>),
+    I16(Vec<i16>),
+}
+
+/// How an output is written.
+#[derive(Clone, Copy, Debug)]
+pub struct Output<'a> {
+    pub template: &'a NiftiHeader,
+    pub flipped: bool,
+    pub shape: [usize; 3],
+    /// The number of volumes (`bet -F`'s brain is 4D).
+    pub volumes: usize,
+    /// `cal_min`, `cal_max` set (the mask's 0 and 1), else the input's kept.
+    pub cal: Option<(f64, f64)>,
+    /// Keep the input's extensions (`FSL_LOAD_NIFTI_EXTENSIONS`).
+    pub extensions: bool,
+    pub defects: UpstreamDefects,
+    pub n_threads: usize,
+}
+
+/// The file name an output stem gets for `FSLOUTPUTTYPE` (`None`: an unknown type).
+pub fn output_file(stem: &str, output_type: &str) -> Option<(String, NiftiVersion)> {
+    output_name(stem, output_type)
+}
+
+/// The output header (§3.3).
+pub fn output_header(o: &Output<'_>, version: NiftiVersion, data_type: DataType) -> NiftiHeader {
+    let mut h = o.template.with_version(version);
+    h.byte_order = larmorx_io::nifti::ByteOrder::Little;
+    h.set_data_type(data_type);
+    h.scl_slope = 1.0;
+    h.scl_inter = 0.0;
+    if let Some((lo, hi)) = o.cal {
+        h.cal_min = lo;
+        h.cal_max = hi;
+    }
+    h.dim_info = 0;
+    h.slice_code = 0;
+    h.slice_start = 0;
+    h.slice_end = 0;
+    h.slice_duration = 0.0;
+    h.toffset = 0.0;
+    h.xyzt_units = 10;
+    h.descrip = [0; 80];
+    let d = DESCRIP.as_bytes();
+    h.descrip[..d.len()].copy_from_slice(d);
+    if version == NiftiVersion::V1 {
+        h.analyze.extents = 16384;
+        h.analyze.regular = b'r';
+    }
+    if !o.extensions {
+        h.extensions.clear();
+    }
+    let [nx, ny, nz] = o.shape;
+    h.dim = [1; 8];
+    if o.volumes > 1 {
+        h.dim[..5].copy_from_slice(&[4, nx as i64, ny as i64, nz as i64, o.volumes as i64]);
+    } else {
+        h.dim[..4].copy_from_slice(&[3, nx as i64, ny as i64, nz as i64]);
+    }
+    h
+}
+
+/// Writes `values` (radiological frame, x fastest, volumes last) to `path` (a name with its
+/// image extension).
+pub fn write(
+    path: &str,
+    version: NiftiVersion,
+    o: &Output<'_>,
+    values: Values,
+) -> Result<Vec<Notice>, ImageError> {
+    let files = ImageFiles::of(path)
+        .ok_or_else(|| ImageError::Invalid(format!("{path}: not an image file name")))?;
+    let [nx, ny, nz] = o.shape;
+    let per = nx * ny * nz;
+    let mut shape = vec![nx, ny, nz];
+    if o.volumes > 1 {
+        shape.push(o.volumes);
+    }
+    let unflip = |n: usize| {
+        let mut out = Vec::with_capacity(n);
+        for v in 0..o.volumes {
+            for row in 0..ny * nz {
+                let base = v * per + row * nx;
+                for i in 0..nx {
+                    out.push(if o.flipped { base + nx - 1 - i } else { base + i });
+                }
+            }
+        }
+        out
+    };
+    let order = unflip(per * o.volumes);
+    let dims = IxDyn(&shape).f();
+    let invalid = |e: larmorx_core::ndarray::ShapeError| ImageError::Invalid(e.to_string());
+    let (array, data_type): (DynArray, DataType) = match values {
+        Values::F32(v) => (
+            ArrayD::from_shape_vec(dims, order.iter().map(|&k| v[k]).collect())
+                .map_err(invalid)?
+                .into(),
+            DataType::F32,
+        ),
+        Values::I16(v) => (
+            ArrayD::from_shape_vec(dims, order.iter().map(|&k| v[k]).collect())
+                .map_err(invalid)?
+                .into(),
+            DataType::I16,
+        ),
+    };
+    let h = output_header(o, version, data_type);
+    let mut notices = Vec::new();
+    let several = h.extensions.len() >= 2
+        && h.extensions
+            .iter()
+            .any(|e| e.size_on_disk() != h.extensions[0].size_on_disk());
+    let compression = Compression::of_name(&files.header.to_string_lossy());
+    let fsl56 = several && files.data.is_none();
+    if fsl56 {
+        let n = h.extensions.len();
+        let detail = match o.defects {
+            UpstreamDefects::Fix => format!(
+                "{path}: the data offset counts each of the {n} extensions' own sizes; FSL counts the first one's {n} times"
+            ),
+            UpstreamDefects::Reproduce => format!(
+                "{path}: the data offset counts the first extension's size once per extension ({n}), as FSL does"
+            ),
+        };
+        notices.push(Notice::new(&defects::FSL_56, o.defects, detail));
+    }
+    if files.standard_names()
+        && matches!(compression, Compression::None | Compression::Gzip)
+        && !(fsl56 && o.defects.reproduce())
+    {
+        let options = WriteOptions {
+            compression_level: 2,
+            n_threads: o.n_threads,
+        };
+        nifti::write_dyn(&files.header, &h, &array, &options)?;
+        return Ok(notices);
+    }
+    write_pieces(&files, h, &array, fsl56 && o.defects.reproduce(), o.n_threads)?;
+    Ok(notices)
+}
+
+/// Writes the header block and the data, each file compressed as its name says.
+fn write_pieces(
+    files: &ImageFiles,
+    mut h: NiftiHeader,
+    array: &DynArray,
+    fsl56: bool,
+    n_threads: usize,
+) -> Result<(), ImageError> {
+    let single = files.data.is_none();
+    h.magic = h.version.magic(single);
+    if h.version == NiftiVersion::V2 {
+        h.nifti2.eol_check = *b"\r\n\x1a\n";
+    }
+    let base = h.version.min_vox_offset();
+    let ext_bytes: usize = h
+        .extensions
+        .iter()
+        .map(larmorx_io::nifti::Extension::size_on_disk)
+        .sum();
+    let offset = if !single {
+        0
+    } else if fsl56 {
+        base + h.extensions.len() * h.extensions[0].size_on_disk()
+    } else {
+        base + ext_bytes
+    };
+    h.vox_offset = offset as f64;
+    let mut head = h.to_bytes();
+    if single {
+        let mut ext = Vec::new();
+        ext.extend_from_slice(&[u8::from(!h.extensions.is_empty()), 0, 0, 0]);
+        for e in &h.extensions {
+            e.write(&mut ext, h.byte_order)
+                .map_err(|e| ImageError::Invalid(e.to_string()))?;
+        }
+        head.extend_from_slice(&ext);
+        // FSL's offset: the data start inside the extensions or after a gap
+        head.resize(offset, 0);
+    }
+    let write = |p: &Path, pieces: &[&[u8]]| -> Result<(), ImageError> {
+        let io = |e: std::io::Error| ImageError::Invalid(format!("{}: {e}", p.display()));
+        let file = std::fs::File::create(p).map_err(io)?;
+        let w = std::io::BufWriter::with_capacity(1 << 16, file);
+        Compression::of_name(&p.to_string_lossy())
+            .write_pieces(pieces, w)
+            .map_err(io)
+    };
+    let bytes: &[u8] = match array {
+        DynArray::F32(a) => bytemuck::cast_slice(a.as_slice_memory_order().unwrap_or(&[])),
+        DynArray::I16(a) => bytemuck::cast_slice(a.as_slice_memory_order().unwrap_or(&[])),
+        _ => return Err(ImageError::Invalid("unexpected output type".into())),
+    };
+    parallel::with_threads(n_threads, || match &files.data {
+        None => write(&files.header, &[&head, bytes]),
+        Some(d) => {
+            write(&files.header, &[&head])?;
+            write(d, &[bytes])
+        }
+    })
+    .map_err(|e| ImageError::Invalid(e.to_string()))?
+}

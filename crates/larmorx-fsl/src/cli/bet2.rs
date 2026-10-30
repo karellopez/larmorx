@@ -745,7 +745,7 @@ pub fn write_vtk(name: &str, m: &mesh::Mesh, points: &[mesh::V3]) -> std::io::Re
         4 * m.triangles.len()
     ));
     for t in &m.triangles {
-        s.push_str(&format!("3 {} {} {} \n", t[2], t[0], t[1]));
+        s.push_str(&format!("3 {} {} {} \n", t[0], t[1], t[2]));
     }
     std::fs::write(name, s)
 }

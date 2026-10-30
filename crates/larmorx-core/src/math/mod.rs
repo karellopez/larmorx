@@ -26,6 +26,7 @@ mod powf;
 mod powi;
 mod sin;
 mod sinf;
+mod tanh_glibc;
 mod tanhf;
 
 pub use powi::powi;
@@ -44,6 +45,12 @@ pub use cbrtf::cbrtf;
 /// `reproduce` where AFNI's result depends on glibc's last bit (3dUnifize `-EPI`'s radius).
 /// No fused multiply-adds: the same bits on every platform.
 pub use cbrtf_glibc::cbrtf_glibc;
+
+/// `tanh(x)` for `f64` with glibc 2.35's bits (x86-64), not correctly rounded (GLIBC-06):
+/// fdlibm's `tanh` over fdlibm's `expm1` (Sun's notice), for `reproduce` where FSL's result
+/// depends on glibc's last bit (`bet2`'s smoothness weight, `specs/bet.md` §8.1). No fused
+/// multiply-adds: the same bits on every platform.
+pub use tanh_glibc::tanh_glibc;
 
 // Speed: without hardware FMA in the generated code (baseline x86-64), every `mul_add` in the
 // kernels is a call into the platform's `fma`. On x86-64 CPUs with FMA, a copy of each kernel

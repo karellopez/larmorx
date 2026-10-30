@@ -12,52 +12,64 @@ pub fn robust_range(v: &Vol) -> (f64, f64) {
     if lo0 == hi0 || v.data.is_empty() {
         return (f64::from(lo0), f64::from(hi0));
     }
-    let n = v.data.len();
-    let target = n / 50;
+    let total = v.data.len();
     let (mut lo, mut hi) = (lo0, hi0);
-    let (mut t2, mut t98) = (f64::from(lo0), f64::from(hi0));
+    let (mut t2, mut t98) = (lo0, hi0);
+    // a narrowed range of no width makes the next pass use the full range as the tenth does
+    let mut full = false;
     for pass in 0..10 {
         let last = pass == 9;
-        if last {
+        if last || full {
             (lo, hi) = (lo0, hi0);
         }
-        let (flo, fhi) = (f64::from(lo), f64::from(hi));
-        let width = fhi - flo;
-        let hist = histogram(&v.data, flo, width);
-        let (first, end) = if last { (1usize, 998usize) } else { (0, 999) };
+        let ends_out = last || full;
+        full = false;
+        // §4.2's exact arithmetic: w = hi − lo in float; the bin `trunc(A x + B)` with
+        // A = 1000/w, B = (1000·(−lo))/w in double
+        let w = f64::from(hi - lo);
+        let hist = histogram(&v.data, f64::from(lo), w);
+        let (first, end) = if ends_out { (1usize, 998usize) } else { (0, 999) };
+        // the voxels in the histogram (the end bins' counts left out with them)
+        let n = if ends_out {
+            total - hist[0] - hist[999]
+        } else {
+            total
+        };
+        let target = n / 50;
         // bins are added while the count is below n / 50: none when that is 0 (observed: a
         // two-voxel image's t2 is one bin below its minimum, its t98 one above its maximum)
         let mut count = 0usize;
         let mut b = first as i64 - 1;
-        while count < target && b < 999 {
+        while count < target && b < end as i64 {
             b += 1;
             count += hist[b as usize];
         }
         count = 0;
         let mut u = end as i64 + 1;
-        while count < target && u > 0 {
+        while count < target && u > first as i64 {
             u -= 1;
             count += hist[u as usize];
         }
-        // (hi - lo) in float, its product with the bin divided by 1000 in double and rounded to
-        // float, added in float (observed: thresh2 -0.142004 on ds005454's BOLD reference, where
-        // the width in double gives -0.142002, and ds000005's run 3, where a product in float
-        // changes thresh98's last bit)
-        let width32 = f64::from(hi - lo);
-        let at = |k: i64| f64::from(lo + (k as f64 * width32 / 1000.0) as f32);
+        // the bin width δ = w/1000 in double; t2 = lo + float(b·δ), the sum in float
+        let delta = w / 1000.0;
+        let at = |k: i64| lo + (k as f64 * delta) as f32;
         t2 = at(b);
         t98 = at(u + 1);
-        if t98 - t2 >= width / 10.0 || last {
+        if last || !(f64::from(t98 - t2) < w / 10.0) {
             break;
         }
-        let (nlo, nhi) = (at((b - 1).max(0)), at((u + 1).min(999) + 1));
-        lo = nlo as f32;
-        hi = nhi as f32;
-        if lo >= hi {
-            break;
+        // the narrowed range, a formula of its own: float(lo + (b'/1000)·w)
+        let b1 = (b - 1).max(0) as f64;
+        let u1 = ((u + 1).min(999) + 1) as f64;
+        let nlo = (f64::from(lo) + (b1 / 1000.0) * w) as f32;
+        let nhi = (f64::from(lo) + (u1 / 1000.0) * w) as f32;
+        lo = nlo;
+        hi = nhi;
+        if lo == hi {
+            full = true;
         }
     }
-    (t2, t98)
+    (f64::from(t2), f64::from(t98))
 }
 
 fn min_max(d: &[f32]) -> (f32, f32) {
@@ -135,14 +147,24 @@ pub fn initial(v: &Vol, radius: Option<f64>, centre: Option<[f64; 3]>) -> Initia
                 .filter(|&&x| f64::from(x) > t)
                 .count() as f64;
             let mut r = larmorx_core::math::pow(
-                0.75 * count * dx * dy * dz / std::f64::consts::PI,
+                (((0.75 * count) * dx) * dy) * dz / std::f64::consts::PI,
                 1.0 / 3.0,
             );
             let mut slabs = 0;
-            let dims = [(nx, dx, dy * dz), (ny, dy, dx * dz), (nz, dz, dx * dy)];
+            // §8.1: the field of view and the area times N in float, the divisions in double
+            let n32 = count as f32;
+            let (fx, fy, fz) = (dx as f32, dy as f32, dz as f32);
+            let dims = [
+                (nx, fx, (n32 * fy) * fz),
+                (ny, fy, (n32 * fx) * fz),
+                (nz, fz, (n32 * fx) * fy),
+            ];
             for (n, d, area) in dims {
-                if (n as f64) * d < r {
-                    r = (count * area / (std::f64::consts::PI * n as f64)).sqrt();
+                if f64::from(n as f32 * d) < r {
+                    r = larmorx_core::math::pow(
+                        (f64::from(area) / std::f64::consts::PI) / n as f64,
+                        0.5,
+                    );
                     slabs += 1;
                 }
             }
@@ -174,32 +196,23 @@ fn centre_of_gravity(v: &Vol, t2: f64, t98: f64, t: f64) -> [f64; 3] {
     let slice = nx * ny;
     let cap = t98 - t2;
     let above = t - t2;
-    // per slice, then in order: the same sums at any thread count
-    let parts: Vec<[f64; 4]> = v
-        .data
-        .par_chunks(slice.max(1))
-        .enumerate()
-        .map(|(k, s)| {
-            let mut acc = [0.0f64; 4];
-            for j in 0..ny {
-                for i in 0..nx {
-                    let x = f64::from(s[j * nx + i]) - t2;
-                    if x > above {
-                        let w = x.min(cap);
-                        acc[0] += w * (i as f64 * dx);
-                        acc[1] += w * (j as f64 * dy);
-                        acc[2] += w * (k as f64 * dz);
-                        acc[3] += w;
-                    }
+    // one running sum over the whole volume in storage order (§8.1: a per-slice partial sum
+    // gives other bits); each voxel adds w and ((w·i)·dx, (w·j)·dy, (w·k)·dz)
+    let mut s = [0.0f64; 4];
+    for (k, sl) in v.data.chunks(slice.max(1)).enumerate() {
+        let kf = k as f64;
+        for j in 0..ny {
+            let jf = j as f64;
+            for i in 0..nx {
+                let e = f64::from(sl[j * nx + i]) - t2;
+                if e > above {
+                    let w = e.min(cap);
+                    s[3] += w;
+                    s[0] += (w * i as f64) * dx;
+                    s[1] += (w * jf) * dy;
+                    s[2] += (w * kf) * dz;
                 }
             }
-            acc
-        })
-        .collect();
-    let mut s = [0.0f64; 4];
-    for p in parts {
-        for k in 0..4 {
-            s[k] += p[k];
         }
     }
     // no voxel above the threshold: 0 / 0, not a number (observed: `c-of-g -nan -nan -nan`)

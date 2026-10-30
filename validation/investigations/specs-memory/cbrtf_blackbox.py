@@ -109,7 +109,11 @@ def main() -> None:
             x = struct.unpack("<f", struct.pack("<I", int(v, 16)))[0]
             y = f(x)
             cr = correctly_rounded(x)
-            mark = "" if cr is None or _bits(cr) == _bits(y) else f" (correctly rounded: {_bits(cr):#010x})"
+            mark = (
+                ""
+                if cr is None or _bits(cr) == _bits(y)
+                else f" (correctly rounded: {_bits(cr):#010x})"
+            )
             print(f"{int(v, 16):#010x} {x!r:>16} -> {_bits(y):#010x} {y!r}{mark}")
         return
     if a.what == "list":
@@ -129,7 +133,9 @@ def main() -> None:
     for k in sorted(blocks):
         for half in (blocks[k] & 0xFFFFFFFF, blocks[k] >> 32):
             h = ((h ^ half) * FNV_PRIME) & MASK
-    print(f"cbrtf: {len(blocks)} blocks of {BLOCK} inputs from block {first}; hash of their hashes {h:016x}")
+    print(
+        f"cbrtf: {len(blocks)} blocks of {BLOCK} inputs from block {first}; hash of their hashes {h:016x}"
+    )
     if a.out:
         a.out.write_text(
             json.dumps(

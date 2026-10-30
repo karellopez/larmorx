@@ -76,10 +76,31 @@ CASES = {
     "bins2-normcorr": _c("normcorr", "2", "-stages", "1", "-mats"),
     "bins2-leastsq": _c("leastsquares", "2", "-stages", "1", "-mats"),
     "bins4-mutualinfo-s0": _c("mutualinfo", "4", "-stages", "0", "-mats"),
-    "bins4-mutualinfo-ref1": ["-out", "o", "-cost", "mutualinfo", "-bins", "4", "-stages", "1",
-                              "-mats", "-reffile", "@ref1"],
-    "bins4-mutualinfo-1vol": ["-out", "o", "-cost", "mutualinfo", "-bins", "4", "-stages", "1",
-                              "-mats", "@onevol"],
+    "bins4-mutualinfo-ref1": [
+        "-out",
+        "o",
+        "-cost",
+        "mutualinfo",
+        "-bins",
+        "4",
+        "-stages",
+        "1",
+        "-mats",
+        "-reffile",
+        "@ref1",
+    ],
+    "bins4-mutualinfo-1vol": [
+        "-out",
+        "o",
+        "-cost",
+        "mutualinfo",
+        "-bins",
+        "4",
+        "-stages",
+        "1",
+        "-mats",
+        "@onevol",
+    ],
     # Negative -bins (atoi reads them): stage 1 has bins / 8, stages 2-4 bins / 4.
     "binsm1-normcorr": ["-out", "o", "-bins", "-1", "-stages", "1", "-mats"],
     "binsm4-normcorr-s2": ["-out", "o", "-bins", "-4", "-stages", "2", "-mats"],
@@ -163,7 +184,9 @@ def main() -> None:
         )
         if name == "fsl20-perm":
             os.chmod(d / "ro", 0o755)
-        mats = {str(m.relative_to(d)): m.read_text(encoding="utf-8") for m in sorted(d.rglob("MAT_*"))}
+        mats = {
+            str(m.relative_to(d)): m.read_text(encoding="utf-8") for m in sorted(d.rglob("MAT_*"))
+        }
         par = {
             str(m.relative_to(d)): m.read_text(encoding="utf-8")
             for m in sorted(d.rglob("*.par"))

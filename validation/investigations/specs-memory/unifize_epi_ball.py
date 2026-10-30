@@ -26,8 +26,10 @@ import nibabel as nib
 import numpy as np
 
 WORKSPACE = Path(__file__).resolve().parents[4]
-if WORKSPACE.name == "worktrees":  # a worktree of the repository: <workspace>/larmorx/.claude/worktrees/<name>
+# A worktree of the repository: <workspace>/larmorx/.claude/worktrees/<name>.
+if WORKSPACE.name == "worktrees":
     WORKSPACE = Path(__file__).resolve().parents[7]
+WORKSPACE = Path(os.environ.get("LARMORX_WORKSPACE", WORKSPACE))
 
 
 def series(path: Path, zooms: tuple[float, float, float], units: str) -> Path:
@@ -62,9 +64,7 @@ def main() -> None:
     ap.add_argument("--only", nargs="*")
     a = ap.parse_args()
     a.out.mkdir(parents=True, exist_ok=True)
-    base = {
-        k: v for k, v in os.environ.items() if not k.upper().startswith(("AFNI_", "NIML_"))
-    }
+    base = {k: v for k, v in os.environ.items() if not k.upper().startswith(("AFNI_", "NIML_"))}
     base.update(
         {
             "OMP_NUM_THREADS": "2",
@@ -82,16 +82,34 @@ def main() -> None:
         inp = series(d / "in.nii.gz", zooms, units)
         runs = {
             "afni": (
-                ["prlimit", f"--as={a.afni_gib << 30}", str(a.afni), "-EPI", "-prefix",
-                 "afni.nii.gz", "-input", str(inp)],
+                [
+                    "prlimit",
+                    f"--as={a.afni_gib << 30}",
+                    str(a.afni),
+                    "-EPI",
+                    "-prefix",
+                    "afni.nii.gz",
+                    "-input",
+                    str(inp),
+                ],
                 {},
             ),
         }
         for impl in ("replica", "original"):
             for mode in ("fix", "reproduce"):
                 runs[f"{impl}-{mode}"] = (
-                    [sys.executable, "-m", "larmorx", "afni", "3dUnifize", "-EPI", "-prefix",
-                     f"{impl}-{mode}.nii.gz", "-input", str(inp)],
+                    [
+                        sys.executable,
+                        "-m",
+                        "larmorx",
+                        "afni",
+                        "3dUnifize",
+                        "-EPI",
+                        "-prefix",
+                        f"{impl}-{mode}.nii.gz",
+                        "-input",
+                        str(inp),
+                    ],
                     {
                         "LARMORX_IMPLEMENTATION": impl,
                         "LARMORX_UPSTREAM_DEFECTS": mode,
@@ -107,16 +125,29 @@ def main() -> None:
                 continue
             try:
                 p = subprocess.run(
-                    argv, cwd=d, env={**base, **extra}, capture_output=True, text=True,
-                    check=False, timeout=a.timeout,
+                    argv,
+                    cwd=d,
+                    env={**base, **extra},
+                    capture_output=True,
+                    text=True,
+                    check=False,
+                    timeout=a.timeout,
                 )
                 code, err = p.returncode, p.stderr
             except subprocess.TimeoutExpired as e:
                 code = "timeout"
-                err = (e.stderr or b"").decode("utf-8", "replace") if isinstance(e.stderr, bytes) else (e.stderr or "")
+                err = (
+                    (e.stderr or b"").decode("utf-8", "replace")
+                    if isinstance(e.stderr, bytes)
+                    else (e.stderr or "")
+                )
             written = sorted(f.name for f in d.iterdir() if f.name.startswith(run))
-            results[name][run] = {"argv": argv[-6:], "returncode": code, "stderr": err[-3000:],
-                                  "written": written}
+            results[name][run] = {
+                "argv": argv[-6:],
+                "returncode": code,
+                "stderr": err[-3000:],
+                "written": written,
+            }
             print(f"  {run:20s} exit {code}; written {written}")
             for line in [x for x in err.splitlines() if x.strip()][-4:]:
                 print(f"     | {line[:300]}")

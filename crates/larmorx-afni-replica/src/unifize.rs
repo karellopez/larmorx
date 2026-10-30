@@ -519,8 +519,11 @@ pub fn local_percmean(
     if do_double {
         letter(verbose, log, "D");
     }
+    // `mri_free(aim)` once the half-size copy exists (memory as AFNI's, 2026-10-30).
     let (bar, bg) = if do_double {
-        double_down(&aar, g)
+        let half = double_down(&aar, g);
+        drop(aar);
+        half
     } else {
         (aar, g)
     };
@@ -551,31 +554,32 @@ pub fn local_percmean(
         let many = nbar.len() > 1;
         (percmean(nbar, p1, p2), many)
     };
-    let all = || -> Vec<(f32, bool)> {
+    // The local means only (`cim`, 4 bytes a voxel, as AFNI's); the dots' voxels are looked at
+    // again below (memory as AFNI's, 2026-10-30).
+    let all = || -> Vec<f32> {
         (0..bg.nvox())
             .into_par_iter()
             .map_init(
                 || Vec::with_capacity(nbhd.len()),
-                |nbar, vvv| one(vvv, nbar),
+                |nbar, vvv| one(vvv, nbar).0,
             )
             .collect()
     };
-    let results = larmorx_core::parallel::with_threads(n_threads, all).unwrap_or_else(|_| {
+    let car = larmorx_core::parallel::with_threads(n_threads, all).unwrap_or_else(|_| {
         let mut nbar = Vec::with_capacity(nbhd.len());
-        (0..bg.nvox()).map(|v| one(v, &mut nbar)).collect()
+        (0..bg.nvox()).map(|v| one(v, &mut nbar).0).collect()
     });
     if verbose {
         // `if( verb && vvv%66666==0 ) fprintf(stderr,".")`, for voxels with two values or more.
-        let dots = results
-            .iter()
-            .enumerate()
-            .filter(|(v, r)| v % 66666 == 0 && r.1)
+        let mut nbar = Vec::with_capacity(nbhd.len());
+        let dots = (0..bg.nvox())
+            .step_by(66666)
+            .filter(|&v| one(v, &mut nbar).1)
             .count();
         if dots > 0 {
             log.push(Message::Raw(".".repeat(dots)));
         }
     }
-    let car: Vec<f32> = results.into_iter().map(|r| r.0).collect();
     let dim = if do_double {
         double_up(
             &car,
@@ -767,13 +771,15 @@ pub fn invert_contrast(
         return Inversion::OneRow;
     }
     let uperc = uperc.clamp(90.0, 100.0);
-    let mut imar = im.to_vec();
-    crate::dataset::floatscan(&mut imar);
-    let mut hist: Vec<f32> = imar
+    // In place, with only the mask's values copied for the sort, as AFNI's (no copy of the whole
+    // image; memory as AFNI's, 2026-10-30): the values are those of the image with its
+    // non-finite values 0, which it becomes only when it is inverted.
+    let finite = |v: f32| if v.is_finite() { v } else { 0.0 };
+    let mut hist: Vec<f32> = im
         .iter()
         .zip(mask)
         .filter(|&(_, &m)| m != 0)
-        .map(|(&v, _)| v)
+        .map(|(&v, _)| finite(v))
         .collect();
     let nhist = hist.len();
     if nhist < 100 {
@@ -787,7 +793,9 @@ pub fn invert_contrast(
         let u = past_end(&hist);
         (u, Some(Inversion::PastTheEnd { ucut: u, nhist }))
     };
-    for (v, &m) in imar.iter_mut().zip(mask) {
+    drop(hist);
+    crate::dataset::floatscan(im);
+    for (v, &m) in im.iter_mut().zip(mask) {
         if m != 0 && *v > 0.0 {
             *v = ucut - *v;
         }
@@ -795,7 +803,6 @@ pub fn invert_contrast(
             *v = 0.0;
         }
     }
-    im.copy_from_slice(&imar);
     outcome.unwrap_or(Inversion::Done { ucut })
 }
 

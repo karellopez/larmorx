@@ -2,7 +2,9 @@
 """Compare re-run parity records with the committed ones, case by case.
 
 Usage: python -P compare_records.py <dir with re-run JSON records> <suite> [<suite> ...]
-       (run from the checkout; the committed records are docs/validation/<suite>.json)
+       [--against <dir>]
+       (run from the checkout; the committed records are docs/validation/<suite>.json, or those
+       in --against's directory: two re-runs compared with each other)
 
 Times, temporary paths and memory addresses are ignored. Prints, per suite, the cases whose status
 differs and those whose details differ, with the first differing fields. Exit status 1 if a status
@@ -31,11 +33,17 @@ def strip(x):
 
 
 def main(argv):
+    argv = list(argv)
+    against = Path("docs/validation")
+    if "--against" in argv:
+        k = argv.index("--against")
+        against = Path(argv[k + 1])
+        del argv[k : k + 2]
     rerun, suites = Path(argv[1]), argv[2:]
     bad = 0
     for s in suites:
         a = json.loads((rerun / f"{s}.json").read_text())
-        b = json.loads(Path(f"docs/validation/{s}.json").read_text())
+        b = json.loads((against / f"{s}.json").read_text())
         A = {r["case"]: r for r in a["results"]}
         B = {r["case"]: r for r in b["results"]}
         new, gone = sorted(set(A) - set(B)), sorted(set(B) - set(A))

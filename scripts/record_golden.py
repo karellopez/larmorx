@@ -8,6 +8,7 @@ x86_64 only, from a committed tree whose parity with the original tools passes:
     python scripts/record_golden.py                  # run tests/parity (smoke tier), then record
     python scripts/record_golden.py --skip-parity    # record without parity (noted in the JSON)
     python scripts/record_golden.py --rerun-parity   # run the smoke tier even if it passed
+    python scripts/record_golden.py --serial-parity  # the smoke tier as one serial pytest run
 
 The smoke tier does not run twice: when ``pytest tests/parity`` passed for this clean commit
 and this build of the extension, its marker (``<oracle cache>/markers/parity-smoke-<commit>.json``,
@@ -157,7 +158,11 @@ def record(registry, args: argparse.Namespace) -> None:  # type: ignore[no-untyp
         parity = f"passed (pytest tests/parity, smoke tier; the run of {marker['time']}, reused)"
     else:
         print("Running the parity suite (tests/parity, smoke tier) ...", flush=True)
-        result = subprocess.run([sys.executable, "-m", "pytest", "tests/parity", "-q"], cwd=ROOT)
+        # In parallel (pytest-xdist workers, then the memory and thread tests alone), or serially
+        # with --serial-parity: scripts/orchestration/parity_smoke.py; both leave the marker.
+        smoke = [sys.executable, "-P", str(ROOT / "scripts/orchestration/parity_smoke.py")]
+        smoke += ["--serial"] if args.serial_parity else ["--workers", str(args.parity_workers)]
+        result = subprocess.run(smoke, cwd=ROOT)
         if result.returncode != 0:
             sys.exit("parity failed: golden checksums are recorded only from a passing tree")
         parity = "passed (pytest tests/parity, smoke tier)"
@@ -249,6 +254,17 @@ def main() -> int:
         description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter
     )
     parser.add_argument("--skip-parity", action="store_true", help="record without running parity")
+    parser.add_argument(
+        "--serial-parity",
+        action="store_true",
+        help="run the parity smoke tier as one serial pytest run (not in parallel)",
+    )
+    parser.add_argument(
+        "--parity-workers",
+        type=int,
+        default=16,
+        help="the parity smoke tier's pytest-xdist workers (16)",
+    )
     parser.add_argument(
         "--rerun-parity",
         action="store_true",

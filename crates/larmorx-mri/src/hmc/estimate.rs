@@ -664,8 +664,14 @@ fn run_stages(
                 (grid, factor, order, ncompose, sinc, in_plane, par, bins)
             };
         // Stage 1: chains of volumes, each started from its predecessor's result.
-        let (g1, f1, order1, nc1, _, ip1, _, bins1) =
-            stage_for(&grid8, 0.8, stage_bins(params.bins, 1), false, in_plane, true);
+        let (g1, f1, order1, nc1, _, ip1, _, bins1) = stage_for(
+            &grid8,
+            0.8,
+            stage_bins(params.bins, 1),
+            false,
+            in_plane,
+            true,
+        );
         let stage1 = Stage {
             grid: &g1,
             tolerances: tolerances(params.rotation, f1),
@@ -733,8 +739,14 @@ fn run_stages(
                 break;
             }
             let sinc = stage == 4 && params.cost == CostFunction::NormCorr;
-            let (g, f, order, nc, sinc, ip, _, bins) =
-                stage_for(&grid4, factor, stage_bins(params.bins, stage), sinc, in_plane, false);
+            let (g, f, order, nc, sinc, ip, _, bins) = stage_for(
+                &grid4,
+                factor,
+                stage_bins(params.bins, stage),
+                sinc,
+                in_plane,
+                false,
+            );
             let s = Stage {
                 grid: &g,
                 tolerances: tolerances(params.rotation, f),
@@ -931,7 +943,10 @@ mod tests {
         use CostFunction::*;
         use McflirtEnd::*;
         // Truncated toward zero: -bins 7 gives 0 and 1, -bins -9 gives -1 and -2.
-        assert_eq!((stage_bins(7, 1), stage_bins(7, 2), stage_bins(7, 4)), (0, 1, 1));
+        assert_eq!(
+            (stage_bins(7, 1), stage_bins(7, 2), stage_bins(7, 4)),
+            (0, 1, 1)
+        );
         assert_eq!((stage_bins(-9, 1), stage_bins(-9, 3)), (-1, -2));
         assert_eq!(
             mcflirt_end(-8, 3, NormCorr),
@@ -945,7 +960,10 @@ mod tests {
         assert_eq!(mcflirt_end(-3, 4, NormCorr), None);
         assert_eq!(
             mcflirt_end(-16, 3, MutualInfo),
-            Some(BadArrayLength { bins: -16, stage: 1 })
+            Some(BadArrayLength {
+                bins: -16,
+                stage: 1
+            })
         );
         assert_eq!(
             mcflirt_end(2, 3, CorrRatio),
@@ -958,7 +976,10 @@ mod tests {
         );
         assert_eq!(mcflirt_end(8, 3, CorrRatio), None);
         assert_eq!(mcflirt_end(-16, 0, NormCorr), None);
-        let bad = BadArrayLength { bins: -16, stage: 1 };
+        let bad = BadArrayLength {
+            bins: -16,
+            stage: 1,
+        };
         assert_eq!(bad.mcflirt_lines().len(), 2);
         assert_eq!(bad.defect().id, "FSL-66");
         assert!(bad.error().contains("(FSL-66;"), "{}", bad.error());
@@ -999,18 +1020,32 @@ mod tests {
         };
         let one = &s[..1];
         for series in [&s[..], one] {
-            let e = estimate(series, &Reference::Index(0), &fix(4, CostFunction::MutualInfo));
+            let e = estimate(
+                series,
+                &Reference::Index(0),
+                &fix(4, CostFunction::MutualInfo),
+            );
             assert!(matches!(e, Err(EstimateError::Bins(_))), "{e:?}");
         }
         let e = estimate(&s, &Reference::Index(0), &fix(-16, CostFunction::NormCorr));
         assert!(matches!(e, Err(EstimateError::Bins(r)) if r.defect.id == "FSL-66"));
-        let e = estimate(&s, &Reference::Index(0), &reproduce(-8, CostFunction::NormCorr));
+        let e = estimate(
+            &s,
+            &Reference::Index(0),
+            &reproduce(-8, CostFunction::NormCorr),
+        );
         assert!(matches!(
             e,
-            Err(EstimateError::McflirtEnds(McflirtEnd::DivisionByZero { .. }))
+            Err(EstimateError::McflirtEnds(
+                McflirtEnd::DivisionByZero { .. }
+            ))
         ));
         // Nothing registered: no stage starts, so nothing ends.
-        let est = estimate(one, &Reference::Index(0), &reproduce(-8, CostFunction::NormCorr));
+        let est = estimate(
+            one,
+            &Reference::Index(0),
+            &reproduce(-8, CostFunction::NormCorr),
+        );
         assert_eq!(est.unwrap().matrices, vec![IDENTITY]);
         // The histogram costs with no bins run, as mcflirt's do, and name FSL-21.
         for cost in [
@@ -1019,16 +1054,30 @@ mod tests {
             CostFunction::Woods,
         ] {
             let est = estimate(&s, &Reference::Index(0), &reproduce(7, cost)).unwrap();
-            assert!(est.matrices.iter().flatten().flatten().all(|v| v.is_finite()));
+            assert!(
+                est.matrices
+                    .iter()
+                    .flatten()
+                    .flatten()
+                    .all(|v| v.is_finite())
+            );
             assert!(
                 est.notices.iter().any(|n| n.defect.id == "FSL-21"),
                 "{cost:?}"
             );
         }
         // -bins -1 with normcorr: no bins anywhere, as mcflirt; FSL-66 named.
-        let est = estimate(&s, &Reference::Index(0), &reproduce(-1, CostFunction::NormCorr));
+        let est = estimate(
+            &s,
+            &Reference::Index(0),
+            &reproduce(-1, CostFunction::NormCorr),
+        );
         let est = est.unwrap();
-        let plain = estimate(&s, &Reference::Index(0), &reproduce(256, CostFunction::NormCorr));
+        let plain = estimate(
+            &s,
+            &Reference::Index(0),
+            &reproduce(256, CostFunction::NormCorr),
+        );
         assert_eq!(est.matrices, plain.unwrap().matrices);
         assert!(est.notices.iter().any(|n| n.defect.id == "FSL-66"));
     }

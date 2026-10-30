@@ -1004,11 +1004,11 @@ fn write_outputs(
     // input's (observed: -stats and -meanvol images carry the input's values). An image that
     // cannot be written is an error; with `reproduce`, after mcflirt's two lines (it aborts).
     let write = |path: &str,
-                     vols: &[Volume],
-                     dt: DataType,
-                     cal: bool,
-                     err: &mut dyn Write,
-                     notices: &mut Vec<Notice>|
+                 vols: &[Volume],
+                 dt: DataType,
+                 cal: bool,
+                 err: &mut dyn Write,
+                 notices: &mut Vec<Notice>|
      -> Result<(), Failure> {
         let files = ImageFiles::of(path).ok_or_else(|| format!("{path}: not an image"))?;
         let files = opened_files(path, files, mode, err);
@@ -1378,8 +1378,14 @@ mod tests {
         assert!(e.error.to_string().ends_with("is not a directory"));
         // The first free name: o.mat, then o.mat+.
         let out = format!("{base}/o");
-        assert_eq!(mat_directory(&out).ok(), Some(PathBuf::from(format!("{out}.mat"))));
-        assert_eq!(mat_directory(&out).ok(), Some(PathBuf::from(format!("{out}.mat+"))));
+        assert_eq!(
+            mat_directory(&out).ok(),
+            Some(PathBuf::from(format!("{out}.mat")))
+        );
+        assert_eq!(
+            mat_directory(&out).ok(),
+            Some(PathBuf::from(format!("{out}.mat+")))
+        );
         let e = mat_directory(&format!("{base}/missing/o")).unwrap_err();
         assert!(!e.permission && e.name.ends_with("missing/o.mat"));
     }
@@ -1389,9 +1395,15 @@ mod tests {
     #[test]
     fn bins_refused_before_any_work() {
         for (args, id) in [
-            (&["-in", "none.nii", "-cost", "mutualinfo", "-bins", "4"][..], "FSL-21"),
+            (
+                &["-in", "none.nii", "-cost", "mutualinfo", "-bins", "4"][..],
+                "FSL-21",
+            ),
             (&["-in", "none.nii", "-bins", "-16"], "FSL-66"),
-            (&["-in", "none.nii", "-cost", "woods", "-bins", "-3"], "FSL-21"),
+            (
+                &["-in", "none.nii", "-cost", "woods", "-bins", "-3"],
+                "FSL-21",
+            ),
         ] {
             let (code, _, err) = run_mode(args, FIX);
             assert_eq!(code, 1, "{args:?}");
@@ -1401,7 +1413,16 @@ mod tests {
         }
         // No stage runs: the input is read (and here does not exist).
         let (code, _, err) = run_mode(
-            &["-in", "none.nii", "-cost", "mutualinfo", "-bins", "4", "-stages", "0"],
+            &[
+                "-in",
+                "none.nii",
+                "-cost",
+                "mutualinfo",
+                "-bins",
+                "4",
+                "-stages",
+                "0",
+            ],
             FIX,
         );
         assert_eq!(code, 1);

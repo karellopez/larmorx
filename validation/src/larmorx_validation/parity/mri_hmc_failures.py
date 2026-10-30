@@ -176,7 +176,9 @@ def _phantom(volumes: int) -> np.ndarray:
     for t in range(volumes):
         cx, cy, cz = 11.5 + 0.3 * t, 11.5 - 0.2 * t, 7.5 + 0.1 * t
         r2 = ((x - cx) / 8) ** 2 + ((y - cy) / 9) ** 2 + ((z - cz) / 5) ** 2
-        vols.append(1000.0 * np.clip(1.0 - r2, 0, None) + 50.0 * x / 24.0 + 20.0 * ((y + 2 * z) % 5))
+        vols.append(
+            1000.0 * np.clip(1.0 - r2, 0, None) + 50.0 * x / 24.0 + 20.0 * ((y + 2 * z) % 5)
+        )
     return np.stack(vols, axis=-1).astype(np.float32)
 
 
@@ -413,7 +415,10 @@ def run_case(case: Case, checks: CheckList) -> dict:
             if c.default_defects:
                 # A correction that refuses what mcflirt runs: named, as every change.
                 defects.add_fix_check(
-                    checks, sorted(f_named), defects.Change(0, 0, 0.0), other_changes=f"exit {f_code}"
+                    checks,
+                    sorted(f_named),
+                    defects.Change(0, 0, 0.0),
+                    other_changes=f"exit {f_code}",
                 )
     finally:
         _release(root)

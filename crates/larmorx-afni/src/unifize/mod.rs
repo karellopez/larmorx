@@ -815,8 +815,14 @@ mod tests {
         assert_eq!(epi_radius(um3), 6100.0);
         let need = epi_ball_bytes(6100.0, 2);
         assert_eq!(larmorx_core::alloc::gib(need), "2.834e4 GiB");
-        assert_eq!(larmorx_core::alloc::gib(epi_ball_bytes(18300.0, 2)), "7.651e5 GiB");
-        assert_eq!(larmorx_core::alloc::gib(epi_ball_bytes(366.0, 2)), "6.12 GiB");
+        assert_eq!(
+            larmorx_core::alloc::gib(epi_ball_bytes(18300.0, 2)),
+            "7.651e5 GiB"
+        );
+        assert_eq!(
+            larmorx_core::alloc::gib(epi_ball_bytes(366.0, 2)),
+            "6.12 GiB"
+        );
         assert_eq!(voxel_size_text(0.003), "0.003");
         assert_eq!(voxel_size_text(-0.05), "0.05");
         assert_eq!(voxel_size_text(3.0), "3");
@@ -829,7 +835,10 @@ mod tests {
              voxels 1000 times smaller than they look)"
         );
         let why = with_memory_limit(4 << 30, || epi_guard([0.05; 3], 2)).unwrap();
-        assert!(why.contains("about 6.12 GiB") && why.ends_with("computation"), "{why}");
+        assert!(
+            why.contains("about 6.12 GiB") && why.ends_with("computation"),
+            "{why}"
+        );
         // What fits is never refused: 0.3 mm (61 voxels) and 3 mm.
         assert!(with_memory_limit(4 << 30, || epi_guard([0.3; 3], 2)).is_none());
         assert!(with_memory_limit(4 << 30, || epi_guard([3.0; 3], 32)).is_none());

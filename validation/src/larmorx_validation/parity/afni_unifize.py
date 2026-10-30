@@ -230,7 +230,12 @@ EPI_VOXELS = (
     ("mm3", 3.0, 2, 3, "6.1"),
 )
 #: The memory each guarded case needs with the suite's two OpenMP threads (§9.1's formula).
-EPI_NEED = {"um3": "2.834e4 GiB", "um1": "7.651e5 GiB", "mm0.05": "6.12 GiB", "um3-one": "2.834e4 GiB"}
+EPI_NEED = {
+    "um3": "2.834e4 GiB",
+    "um1": "7.651e5 GiB",
+    "mm0.05": "6.12 GiB",
+    "um3-one": "2.834e4 GiB",
+}
 HINT = "(a header whose units are micrometres makes the voxels 1000 times smaller than they look)"
 
 

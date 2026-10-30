@@ -16,9 +16,9 @@ variables; the errors and crashes; the defects (D13: AFNI-01, -02, -07, -11, -12
 65.0 90.0 -T2``) on the inputs of every oracle run's BOLD reference, compared with fMRIPrep's
 own outputs too; AFNI's default on the oracle runs' T1w images (the half-size path); ``-GM`` on
 a T1w; ``-EPI`` on BOLD series. The real cases also measure AFNI's own variability (OpenMP
-thread counts, fMRIPrep's build of AFNI in its image). The clean-room original also has AFNI-75's
+thread counts, fMRIPrep's build of AFNI in its image). Both implementations also have AFNI-75's
 guard cases and GLIBC-05's (``-EPI``'s radius from glibc 2.35's cube root with ``reproduce``,
-the correctly rounded one by default: :data:`CBRTF_VOXELS`).
+the correctly rounded one by default: :data:`CBRTF_VOXELS`; the replica's since 2026-10-30).
 """
 
 from __future__ import annotations
@@ -351,9 +351,10 @@ def _guard_scenarios() -> list[tuple[str, str, str, ar.Scenario]]:
 
 
 def _cbrtf_scenarios() -> list[tuple[str, str, str, ar.Scenario]]:
-    """GLIBC-05's cases (:data:`CBRTF_VOXELS`), for the clean-room original: compared with AFNI
-    in ``reproduce`` (glibc's cube root, AFNI's bytes), the default's fix pass naming GLIBC-05
-    exactly where the result changes; the first also through the Python API."""
+    """GLIBC-05's cases (:data:`CBRTF_VOXELS`), for both implementations (the replica since
+    2026-10-30): compared with AFNI in ``reproduce`` (glibc's cube root, AFNI's bytes), the
+    default's fix pass naming GLIBC-05 exactly where the result changes; the first also through
+    the Python API."""
     out = []
     for name, _, _, _, desc in CBRTF_VOXELS:
         s = S(("-EPI", "-prefix", U, "{0}"), (f"epi-cbrtf:{name}",), (U,),
@@ -363,12 +364,13 @@ def _cbrtf_scenarios() -> list[tuple[str, str, str, ar.Scenario]]:
     return out
 
 
-def _check_cbrtf_case(case: Case, checks: CheckList) -> None:
+def _check_cbrtf_case(case: Case, checks: CheckList, implementation: str = "original") -> None:
     """GLIBC-05's own checks on a case of :func:`_cbrtf_scenarios`: ``reproduce`` gives AFNI's
     values bit for bit (not only within the suite's tolerance); the default names GLIBC-05
     exactly where :data:`CBRTF_VOXELS` says; and the default's output and messages are AFNI's
     with CORE-MATH's correctly rounded functions preloaded (``cbrtf`` among them): the default
-    is AFNI's method with the correctly rounded cube root."""
+    is AFNI's method with the correctly rounded cube root. ``implementation`` is the one the
+    suite validates (the clean-room original or the replica)."""
     import tempfile
 
     name = case.id.removeprefix("glibc-05/epi-")
@@ -380,7 +382,7 @@ def _check_cbrtf_case(case: Case, checks: CheckList) -> None:
                threshold="reported", detail="no CORE-MATH preload with tanhf and cbrtf")  # fmt: skip
     else:
         with (
-            afni_versions.using("original"),
+            afni_versions.using(implementation),
             tempfile.TemporaryDirectory(prefix="lx-glibc05-") as t,
         ):
             a_dir, l_dir = Path(t) / "afni-correctly-rounded", Path(t) / "larmorx-fix"
@@ -390,7 +392,7 @@ def _check_cbrtf_case(case: Case, checks: CheckList) -> None:
             env = ar.environment(s.env)
             afni = ar.run_afni(PROGRAM, args, dict(env, LD_PRELOAD=str(lib)), a_dir,
                                never=ar.case_never(s))  # fmt: skip
-            ours = ar.run_larmorx(PROGRAM, args, d13.FIX, env, l_dir, "original")
+            ours = ar.run_larmorx(PROGRAM, args, d13.FIX, env, l_dir, implementation)
             # Without colour codes: larmorx writes AFNI's colours in `reproduce` only.
             a_err, l_err = (
                 ar._ANSI.sub("", t) for t in (ar.afni_text(afni.err), ar.larmorx_text(ours.err))
@@ -460,12 +462,12 @@ def suite(implementation: str = "original") -> Suite:
     def run_case(case: Case, checks: CheckList) -> None:
         ar.run_case(tool_spec, case, checks)
         if case.id.startswith("glibc-05/"):
-            _check_cbrtf_case(case, checks)
+            _check_cbrtf_case(case, checks, implementation)
 
     def suite_cases(tier: str) -> list[Case]:
-        # GLIBC-05's cases are the clean-room original's until the replica takes glibc's cube
-        # root in `reproduce` too (a replica author's part, docs/next-steps.md).
-        return [c for c in cases(tier) if not (replica and c.id.startswith("glibc-05/"))]
+        # One case list for both implementations: AFNI-75's guard cases and GLIBC-05's (the
+        # replica takes glibc 2.35's cube root in `reproduce` since 2026-10-30) included.
+        return cases(tier)
 
     tool = (
         f"the bit-exact replica ({ar.replica_version()}: the translation of AFNI 26.3.05's "

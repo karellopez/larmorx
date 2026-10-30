@@ -26,13 +26,31 @@
 //! their offsets: in each block of 2^16 inputs, the first case found the same and the first
 //! found different, among radii below 30 voxels.
 //!
+//! The replica (`unifize::epi_radius`, since 2026-10-30) takes CORE-MATH's cube root by default
+//! and larmorx's clean-room `larmorx_core::math::cbrtf_glibc` with `reproduce`: checked here on
+//! every input to give the radius of CORE-MATH's and of the glibc translation respectively
+//! (`specs/cbrtf.md` §7.6: with `reproduce` no radius, message or ball differs from glibc's),
+//! and its GLIBC-05 notice (`unifize::epi_cbrtf_notice`) to be absent wherever the two radii
+//! agree and, on a grid that reaches every offset, present exactly where the ball or the
+//! message differs (sampled as the cross-check is).
+//!
 //! Usage: `cbrtf-measure [--threads N] [--list N]`: prints the counts and up to N cases of each
-//! kind (default 40). Exit status 0 when no ball and no message changes, 3 otherwise.
+//! kind (default 40). Exit status 0 when no ball and no message changes, 3 otherwise (and 5 when
+//! the replica's radius or notice is wrong somewhere).
+//!
+//! `cbrtf-measure --glibc-identity [--threads N] [--list N]` (`specs/cbrtf.md` §7.3): compares
+//! `larmorx_core::math::cbrtf_glibc` (clean-room) with the glibc translation
+//! (`glibc_reference::floatmath::cbrtf`) on all 2^32 inputs, bit for bit with NaN bits included,
+//! and prints §7.1's hash through the whole sequence of each function's results with two starts
+//! (§7.1's `14695981039346656037` and the 2026-10-23 program's `1469598103934665603`, see
+//! `floatmath-verify/glibc_reference.c`). Exit status 0 when none differs, 4 otherwise.
 #![forbid(unsafe_code)]
 
 use glibc_reference::floatmath::cbrtf as cbrtf_glibc;
-use larmorx_afni_replica::unifize::{epi_radius, sphere};
+use larmorx_afni_replica::unifize::{ball_in_reach, epi_cbrtf_notice, epi_radius, sphere};
+use larmorx_core::defects::UpstreamDefects::{Fix, Reproduce};
 use larmorx_core::math::cbrtf as cbrtf_core;
+use larmorx_core::math::cbrtf_glibc as cbrtf_cleanroom;
 use rayon::prelude::*;
 
 /// 3dUnifize `-EPI`'s radius from the cube root of the voxel volume (the replica's
@@ -144,13 +162,18 @@ struct Found {
     sensitive: [u64; 3],
     /// Inputs where the ball or the message differs but `sensitive` is false (must be none).
     unflagged: Vec<u32>,
-    /// Inputs the replica's `epi_radius` flags (`may_differ`): all, from 0.001 mm^3, in
-    /// [1, 100) mm^3.
-    replica_flagged: [u64; 3],
-    /// Inputs where the ball or the message differs but the replica does not warn (must be
-    /// none), and where its radius is not CORE-MATH's (must be none).
-    replica_unflagged: Vec<u32>,
+    /// Inputs where the replica's default radius is not CORE-MATH's, and where its `reproduce`
+    /// radius is not the glibc translation's (both must be none).
     replica_radius_wrong: Vec<u32>,
+    replica_reproduce_wrong: Vec<u32>,
+    /// Inputs where the two radii agree but the replica names GLIBC-05 (must be none).
+    replica_notice_spurious: Vec<u32>,
+    /// The notice's sampled cross-check on a grid reaching every offset: cases checked, and
+    /// those where it is present or absent against the ball or message differing (must be none).
+    notice_checked: u64,
+    notice_wrong: Vec<u32>,
+    /// Whether this block's notice check of a same result (0) and of a different one (1) ran.
+    notice_sampled: [bool; 2],
 }
 
 impl Found {
@@ -177,11 +200,13 @@ impl Found {
             *a += b;
         }
         self.unflagged.extend(o.unflagged);
-        for (a, b) in self.replica_flagged.iter_mut().zip(o.replica_flagged) {
-            *a += b;
-        }
-        self.replica_unflagged.extend(o.replica_unflagged);
         self.replica_radius_wrong.extend(o.replica_radius_wrong);
+        self.replica_reproduce_wrong
+            .extend(o.replica_reproduce_wrong);
+        self.replica_notice_spurious
+            .extend(o.replica_notice_spurious);
+        self.notice_checked += o.notice_checked;
+        self.notice_wrong.extend(o.notice_wrong);
         self
     }
 }
@@ -210,22 +235,23 @@ fn sensitive(c: f32) -> bool {
         .any(|n| observable_differ(radius(n), r))
 }
 
+/// Whether two floats are the same radius (NaN alike).
+fn same_radius(a: f32, b: f32) -> bool {
+    a.to_bits() == b.to_bits() || (a.is_nan() && b.is_nan())
+}
+
 fn check(bits: u32, f: &mut Found) {
     let x = f32::from_bits(bits);
     let (cg, cm) = (cbrtf_glibc(x), cbrtf_core(x));
     let flagged = sensitive(cm);
-    let epi = epi_radius(x);
-    if epi.radius.to_bits() != radius(cm).to_bits() && !(epi.radius.is_nan() && cm.is_nan()) {
+    if !same_radius(epi_radius(x, Fix), radius(cm)) {
         f.replica_radius_wrong.push(bits);
     }
-    if epi.may_differ {
-        f.replica_flagged[0] += 1;
-        if x >= 1e-3 {
-            f.replica_flagged[1] += 1;
-        }
-        if (1.0..100.0).contains(&x) {
-            f.replica_flagged[2] += 1;
-        }
+    if !same_radius(epi_radius(x, Reproduce), radius(cg)) {
+        f.replica_reproduce_wrong.push(bits);
+    }
+    if same_radius(radius(cg), radius(cm)) && epi_cbrtf_notice(x, [1, 1, 1], Fix).is_some() {
+        f.replica_notice_spurious.push(bits);
     }
     if flagged {
         f.sensitive[0] += 1;
@@ -241,13 +267,8 @@ fn check(bits: u32, f: &mut Found) {
     }
     f.cbrtf_differ += 1;
     f.max_ulps = f.max_ulps.max(cg.to_bits().abs_diff(cm.to_bits()));
-    if observable_differ(radius(cg), radius(cm)) {
-        if !flagged {
-            f.unflagged.push(bits);
-        }
-        if !epi.may_differ {
-            f.replica_unflagged.push(bits);
-        }
+    if observable_differ(radius(cg), radius(cm)) && !flagged {
+        f.unflagged.push(bits);
     }
     let (rg, rm) = (radius(cg), radius(cm));
     if rg.to_bits() == rm.to_bits() {
@@ -271,6 +292,21 @@ fn check(bits: u32, f: &mut Found) {
     }
     // The cross-check: in each block of 2^16 inputs, the first case of each answer whose
     // radii are below 30 voxels, both balls built and compared.
+    // The replica's notice on a grid reaching every offset (radius below 30): present exactly
+    // where the ball or the printed radius differs; sampled per block, both answers.
+    let effect = observable_differ(rg, rm);
+    let nslot = usize::from(effect);
+    if rg.max(rm) < 30.0 && !f.notice_sampled[nslot] {
+        f.notice_sampled[nslot] = true;
+        f.notice_checked += 1;
+        let grid = [64, 64, 64];
+        let named = epi_cbrtf_notice(x, grid, Fix).is_some();
+        let full = ball_in_reach(rg, grid) == sphere(rg).len() as u64
+            && ball_in_reach(rm, grid) == sphere(rm).len() as u64;
+        if named != effect || !full || epi_cbrtf_notice(x, grid, Reproduce).is_some() != effect {
+            f.notice_wrong.push(bits);
+        }
+    }
     let slot = usize::from(differ);
     if rg.max(rm) < 30.0 && !f.sampled[slot] {
         f.sampled[slot] = true;
@@ -346,6 +382,9 @@ fn main() {
         .num_threads(threads)
         .build()
         .expect("thread pool");
+    if args.iter().any(|a| a == "--glibc-identity") {
+        std::process::exit(glibc_identity(&pool, list));
+    }
     // Every non-negative float32: 0x00000000 ..= 0x7fffffff (the volume is |dx dy dz|).
     let found = pool.install(|| {
         (0u32..0x8000)
@@ -447,22 +486,35 @@ fn main() {
         println!("  {}", show(b));
     }
     println!(
-        "the replica (unifize::epi_radius): its radius is CORE-MATH's on every input except {}; it warns \
-         on {} inputs (from 0.001 mm^3: {}; in [1, 100) mm^3: {}), and {} differences go unwarned \
-         (must be 0)",
+        "the replica (unifize::epi_radius): its default radius is CORE-MATH's on every input \
+         except {}, its reproduce radius the glibc translation's on every input except {} (so \
+         no radius, message or ball of reproduce differs from glibc's); GLIBC-05 named where \
+         the two radii agree: {} (all three must be 0)",
         found.replica_radius_wrong.len(),
-        found.replica_flagged[0],
-        found.replica_flagged[1],
-        found.replica_flagged[2],
-        found.replica_unflagged.len()
+        found.replica_reproduce_wrong.len(),
+        found.replica_notice_spurious.len()
     );
-    for &b in found
-        .replica_unflagged
+    println!(
+        "the replica's GLIBC-05 notice on a grid reaching every offset (radius below 30, \
+         sampled): {} cases, {} where it is not present exactly when the ball or the message \
+         differs (must be 0)",
+        found.notice_checked,
+        found.notice_wrong.len()
+    );
+    let replica_wrong: Vec<u32> = found
+        .replica_radius_wrong
         .iter()
-        .chain(&found.replica_radius_wrong)
-        .take(list)
-    {
+        .chain(&found.replica_reproduce_wrong)
+        .chain(&found.replica_notice_spurious)
+        .chain(&found.notice_wrong)
+        .copied()
+        .collect();
+    for &b in replica_wrong.iter().take(list) {
         println!("  {}", show(b));
+    }
+    if !replica_wrong.is_empty() {
+        println!("THE REPLICA'S RADIUS OR NOTICE IS WRONG");
+        std::process::exit(5);
     }
     let none = message.is_empty() && ball.is_empty() && found.cross_check_failed.is_empty();
     println!(
@@ -474,4 +526,92 @@ fn main() {
         }
     );
     std::process::exit(if none { 0 } else { 3 });
+}
+
+/// §7.1's hash, one step: `h = (h XOR bits) * 1099511628211 mod 2^64`, a NaN counted as
+/// `0x7fc00000`.
+fn hash_step(h: u64, y: f32) -> u64 {
+    let b = if y.is_nan() { 0x7fc0_0000 } else { y.to_bits() };
+    (h ^ u64::from(b)).wrapping_mul(1_099_511_628_211)
+}
+
+/// `specs/cbrtf.md` §7.3: the clean-room `cbrtf_glibc` against the glibc translation on all 2^32
+/// inputs, bit for bit (NaN bits included), and §7.1's hash through the whole sequence of each
+/// one's results, from §7.1's start and from the 2026-10-23 program's. Returns the exit status.
+fn glibc_identity(pool: &rayon::ThreadPool, list: usize) -> i32 {
+    const STARTS: [(&str, u64); 2] = [
+        (
+            "specs/cbrtf.md §7.1's start 14695981039346656037",
+            14_695_981_039_346_656_037,
+        ),
+        (
+            "the 2026-10-23 program's start 1469598103934665603 (floatmath-verify/glibc_reference.c)",
+            1_469_598_103_934_665_603,
+        ),
+    ];
+    const CHUNK: u64 = 1 << 24;
+    let mut differ: u64 = 0;
+    let mut nan_inputs: u64 = 0;
+    let mut first: Vec<u32> = Vec::new();
+    // [function][start]: the translation's and the clean-room function's hashes.
+    let mut h = [[STARTS[0].1, STARTS[1].1]; 2];
+    for c in 0..(1u64 << 32) / CHUNK {
+        let base = (c * CHUNK) as u32;
+        let results: Vec<(f32, f32)> = pool.install(|| {
+            (0..CHUNK as u32)
+                .into_par_iter()
+                .map(|i| {
+                    let x = f32::from_bits(base + i);
+                    (cbrtf_glibc(x), cbrtf_cleanroom(x))
+                })
+                .collect()
+        });
+        for (i, &(a, b)) in results.iter().enumerate() {
+            let bits = base + i as u32;
+            if f32::from_bits(bits).is_nan() {
+                nan_inputs += 1;
+            }
+            if a.to_bits() != b.to_bits() {
+                differ += 1;
+                if first.len() < list {
+                    first.push(bits);
+                }
+            }
+            for start in h[0].iter_mut() {
+                *start = hash_step(*start, a);
+            }
+            for start in h[1].iter_mut() {
+                *start = hash_step(*start, b);
+            }
+        }
+    }
+    println!("inputs: all 2^32 float32 bit patterns ({nan_inputs} NaN inputs among them)");
+    println!(
+        "larmorx_core::math::cbrtf_glibc (clean-room) against glibc_reference::floatmath::cbrtf \
+         (the translation), bit for bit with NaN bits included: {differ} differ"
+    );
+    for &b in &first {
+        let x = f32::from_bits(b);
+        println!(
+            "  x = 0x{b:08x}: translation 0x{:08x}, clean-room 0x{:08x}",
+            cbrtf_glibc(x).to_bits(),
+            cbrtf_cleanroom(x).to_bits()
+        );
+    }
+    for (k, (name, _)) in STARTS.iter().enumerate() {
+        println!(
+            "§7.1's hash through all 2^32 results from {name}: translation {:016x}, clean-room {:016x}",
+            h[0][k], h[1][k]
+        );
+    }
+    let ok = differ == 0 && h[0] == h[1];
+    println!(
+        "{}",
+        if ok {
+            "IDENTICAL ON ALL 2^32 INPUTS"
+        } else {
+            "THE TWO DIFFER"
+        }
+    );
+    if ok { 0 } else { 4 }
 }

@@ -168,9 +168,16 @@ The function is proved equal to glibc's on **all 2^32 inputs**; nothing less cou
    2026-10-30, about 2.5 minutes on 22 workers; the hash of the block hashes, as the tool prints it, `0e26908cfda8506a`**)**. The implementation's test tool computes the same
    4096 hashes from its own function: every one must agree; a block that differs is listed input by
    input with `cbrtf_blackbox.py list <first input>` and compared value by value.
-2. **The whole sequence:** the same hash run through all 2^32 results in input order is
-   `c679cb92d4402e33` for glibc 2.35 on x86-64 (measured 2026-10-23 with a C program calling the
-   C library, `docs/findings/afni-relicensing-26.md`); the implementation's must be that number.
+2. **The whole sequence:** §7.1's hash (the same start `14695981039346656037`, the same step,
+   a NaN result counted as `0x7fc00000`) run through all 2^32 results in input order is
+   `335d1fb5fb714c95` for glibc 2.35 on x86-64 **(observed**, 2026-10-30: the system's `cbrtf`
+   through `dlopen`, `validation/investigations/cleanroom-cbrtf/`, and the earlier translation,
+   `crates-gpl/tools/cbrtf-measure --glibc-identity`**)**; the implementation's must be that
+   number. (Corrected 2026-10-30: this item gave `c679cb92d4402e33`, the number of the
+   2026-10-23 program, whose hash starts from `1469598103934665603`, FNV's offset basis with its
+   last digit missing; with that start the same results give `c679cb92d4402e33`, **observed**
+   on both functions by `cbrtf-measure --glibc-identity`. Either pair identifies the same
+   results.)
 3. **Input by input against the earlier translation** (by someone allowed to read it, not the
    implementer: the orchestrator or a validation agent): a mode of `crates-gpl/tools/cbrtf-measure`
    (or a new tool beside it) comparing the new function with `glibc_reference::floatmath::cbrtf`
@@ -188,7 +195,11 @@ The function is proved equal to glibc's on **all 2^32 inputs**; nothing less cou
    CORE-MATH's; its last-bit warning then goes (it never applies), `cbrtf-measure` re-run with it
    in glibc's place finds no radius, message or ball that differs, and the replica's standard
    record is re-made: no status changes, and the cases where the warning fired now match AFNI
-   without it.
+   without it. (As decided by the user on 2026-10-30, both implementations take this function
+   with `reproduce` only; their default keeps the correctly rounded cube root and names
+   GLIBC-05 where glibc's last bit changes the ball within the grid or the printed radius. So
+   the check is on `reproduce`: its radius is the translation's on every input, and the
+   default's is CORE-MATH's.)
 
 **Whether this spec is complete for bit-identity.** It is meant to be: the method above is the
 whole computation (no table, no branch beyond §2's special values and §3's normalisation), every

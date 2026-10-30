@@ -114,7 +114,7 @@ a tumour (ds005003): bet's defaults and -m
 
 | Component | Version |
 |---|---|
-| larmorx | 0.0.1 (1a291a3430c9) |
+| larmorx | 0.0.1 (2c5f6692c6c9) |
 | larmorx-testdata | 52124bc98f9f |
 | Python | 3.12.16 |
 | Platform | Linux x86_64 (Linux-6.8.0-124-generic-x86_64-with-glibc2.35) |

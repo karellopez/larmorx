@@ -1716,6 +1716,19 @@ together at the end.
   interpreter and the Rust core, about 13 MiB, above the rule's 8 MiB): next-steps, "The Python
   entry point's own memory".
 
+## 2026-10-30: Three decisions by the user (cbrtf, the AFNI default, the memory test)
+- **3dUnifize `-EPI`'s `cbrtf`:** the default keeps the correctly rounded `cbrtf` (the more
+  accurate); `reproduce` uses a clean-room `cbrtf` with glibc 2.35's bits ("if Larmorx is already
+  most accurate then the clean room library should be for the reproduce mode right?"), in both
+  implementations, the default naming the difference where it would change the result.
+- **`implementation="auto"` keeps running the AFNI replicas** (exact, now built in; the clean-room
+  originals are faster and stay available with `implementation="original"`).
+- **The memory test counts Python's start-up apart** ("python has it on memory initialization, so we
+  should count this separately"): 1.10 × the original's peak plus the peak of `python -m larmorx
+  --version`, the 8 MiB margin kept for the computation.
+- **`fslmaths` and `fslstats` join the plan** (the orchestrator, from the user's question): fMRIPrep
+  calls them directly; a replica and a clean-room original each, every operation.
+
 ## Open decisions (PLAN.md §16)
 
 | # | Decision | Recommended default (used until decided) | Status |

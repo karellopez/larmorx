@@ -234,7 +234,12 @@ The items below keep their history.
    every measured call); FSL-22's `reproduce` made exact the same day. Next for BET: the
    clean-room original from `specs/bet.md` (an agent that has never read FSL's source; built for
    speed: the spec's §10), and `bet -S`, `-B`, `-A`, `-A2` once standard_space_roi, FLIRT and FAST
-   are replicated. Then FLIRT with BBR, FAST, topup.
+   are replicated. Then FLIRT with BBR, FAST, topup, and **`fslmaths` and `fslstats`** (found
+   missing from the plan on 2026-10-30, the user's question: fMRIPrep calls `fslmaths -mul` in every
+   BOLD reference's skull strip, and 14 `fslmaths` and 4 `fslstats` in the optional goodvoxels mask,
+   `docs/analysis/01-fmriprep-bold-pipeline.md` rows 7 and 11; the BET replica holds only what
+   `bet`'s script runs of them: `-dilF`, `-mas`, `fslstats -C -l`): a replica and a clean-room
+   original each, every operation (the full-completeness rule), like ImageMath for ANTs.
 8. **Field maps, FreeSurfer, surfaces, confounds:** sdcflows' field-map estimation (Apache Python:
    the B-spline fit, PEPOLAR and phase-difference preparation) and fMRIPrep's own Python steps;
    FreeSurfer 8.2.0, every program complete, a replica (`larmorx-freesurfer`) and a clean-room
@@ -468,17 +473,23 @@ The items below keep their history.
   `-EPI` on 64×64×40×160: 120.8 and 110.4 against 109.2; it was 164.8 and 320.9), results unchanged
   bit for bit (the standard record re-made, compare_records: no change); the two strict expected
   failures removed (`validation/investigations/specs-memory/README.md`).
-- **The Python entry point's own memory: a decision** (2026-10-30, measured with
-  `validation/investigations/specs-memory/entry_memory.py`): numpy is not imported on the command
-  line (it never was); its fixed cost is the interpreter (9.0 MiB) and the Rust core it loads
-  (4.0 MiB). The one import left, `larmorx._replica` (2.3 MiB), is now deferred, so 3dAutomask on the
-  64×64×40 mean takes 19.6 MiB (21.3 before; `_core.cli_main` called alone 18.5; the standalone
-  binary 8.4) against AFNI's 7.7 and the rule's 16.5. No import is left to defer: the rule's 8 MiB is
-  below the entry point's fixed 13 MiB, which no change of larmorx's Python reaches. **For the user**
-  (recommended first): (1) count the entry point's fixed cost apart in the memory test (its
-  allowance `1.10 × original + the peak of python -m larmorx --version`, 14.0 MiB here), keeping the
-  8 MiB rule for the computation, which the binary meets; (2) measure the small cases through the
-  standalone binary; (3) keep the strict expected failure.
+- **3dUnifize `-EPI`'s `cbrtf`: decided by the user (2026-10-30), a clean-room part to do:** the
+  default keeps the correctly rounded `cbrtf` (CORE-MATH, the more accurate: "if Larmorx is already
+  most accurate then the clean room library should be for the reproduce mode"), and `reproduce`
+  uses a clean-room `cbrtf` with glibc 2.35's bits (written from `specs/cbrtf.md` by an implementer
+  who has never read glibc, proved on all 2^32 inputs against the system's `cbrtf` as a black box:
+  `validation/investigations/specs-memory/cbrtf-glibc-2.35-x86_64-blocks.json`). In both 3dUnifize
+  implementations (the replica and the clean-room original): the default names the difference where
+  glibc's last bit would have changed `-EPI`'s ball or message (a D13 notice, as today's warning);
+  `reproduce` gives AFNI's bytes. Measured on 2026-10-29: 8,794 voxel volumes from 0.001 mm³ (80 in
+  [1, 100) mm³) change the ball.
+- **The Python entry point's own memory: decided by the user (2026-10-30), to do:** count the entry
+  point's fixed cost apart in the memory test ("python has it on memory initialization, so we should
+  count this separately"): the allowance for a call through `python -m larmorx` is 1.10 × the
+  original's peak plus the peak of `python -m larmorx --version` (about 14 MiB here: the interpreter
+  and the Rust core), the 8 MiB margin kept for the computation; then 3dAutomask's strict expected
+  failure is removed (`validation/investigations/specs-memory/entry_memory.py`). A small change of
+  `tests/parity/test_memory_peak.py`, with the next part.
 - **The AFNI evidence pages' entries** (2026-10-29): the figures cache's AFNI entries were computed
   with the `larmorx-gpl` program; their replica runs could be recomputed in-process at the final
   validation phase (the records show the same files; the computes now run the in-process replica).
@@ -577,28 +588,6 @@ Decided 2026-10-23 (decision log): the four rules for questionable behaviours (A
   (algorithms, not code, are reused). The user may prefer the earlier behaviour instead (NaNs last
   in both modes, with a warning). No **decide** entry in the register.
 
-- **3dUnifize `-EPI`'s `cbrtf`** (2026-10-29, the AFNI move; [findings](findings/afni-relicensing-26.md),
-  \"The C library's maths\"): glibc's `cbrtf` (LGPL, not in larmorx) and the correctly rounded one
-  the replica now uses differ in the last bit on one input in ten; on 8,794 voxel volumes from
-  0.001 mm³ (80 in [1, 100) mm³) that bit changes `-EPI`'s ball of neighbours, so the replica is
-  not AFNI's there and warns (on 2,953 volumes in [1, 100) mm³, every changed one among them).
-  **Recommended:** a clean-room `cbrtf` with glibc's bits (a spec of the method by a spec writer,
-  written by an agent that has not read glibc, proved equal on all 2^32 inputs; a small part).
-  Alternatives: a table of the 9,346 changed volumes from 0.001 mm³ (exact on realistic voxels
-  only), or keeping the warning.
-  **The spec is ready** (2026-10-30, `specs/cbrtf.md`: the method as mathematics, its constants as
-  binary64 bits, every rounding, the special values; the validation plan: the block hashes of all
-  2^32 inputs from the system's `cbrtf` as a black box, committed as
-  `validation/investigations/specs-memory/cbrtf-glibc-2.35-x86_64-blocks.json`, the whole-sequence
-  hash `c679cb92d4402e33`, and an input-by-input comparison with the earlier translation by someone
-  allowed to read it): if the user agrees, a clean-room implementer can start at once (about an
-  hour).
-- **For the user's information: `auto` now runs the AFNI replicas** (built in), and the replicas'
-  speed against the clean-room originals on the standard tiers' real cases is in
-  `validation/investigations/afni-move/README.md`: the clean-room originals are faster (the
-  original's time over the replica's, median of the real cases: 3dTshift 0.95 at one thread and
-  0.72 at eight, 3dAutomask 0.54 and 0.44, 3dUnifize 0.47 and 0.27); the rule (the replica when
-  available) is unchanged; the user may want to revisit the default.
 
 Decided 2026-10-22 (decision log): ANTS-106 corrected by default (follow-up below); ANTS-30's
 command line approved. Decided 2026-10-21: ANTS-78, ITK-35, ANTS-67, ANTS-68, ANTS-70, ITK-24, ITK-29

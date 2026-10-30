@@ -984,7 +984,10 @@ keeps the order of each sum, which the per-vertex sums allow).
   with `e = v − t2` and `τ = t − t2`, each voxel with `e > τ` adds `w = min(e, t98 − t2)` to `W`
   and `((w·i)·dx, (w·j)·dy, (w·k)·dz)` to `C` (`i`, `j`, `k` as doubles); `c = (C_x/W, C_y/W,
   C_z/W)`. A per-slice partial sum gives other bits. With `-c x y z`: `(x·dx, y·dy, z·dz)` after
-  the conversion of §3.2.
+  the conversion of §3.2; on a neurologically stored image FSL 6.0.7.23 makes that conversion
+  through a 4 × 4 matrix product whose matrix it obtains by an inverse (a linear solve in double),
+  and its x can differ from `nx − 1 − x` in the last bits (the two FSL versions differ there):
+  random-testing cases 154 and 677 (`-c`, among the seven still open in this section) may be this.
 - **The smoothness constants**: `rmin = 3.33·w` in double, `rmax = float(10·w)` (the product in
   float), `w` the float option; `E = (1/rmin + 1/rmax)/2`, `F = 6/(1/rmin − 1/rmax)`.
 - **The initial placement**: §4.4 (translate by `c`, then scale about `c`).

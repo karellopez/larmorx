@@ -27,6 +27,7 @@ from pathlib import Path
 from larmorx_validation.parity import afni_phantoms as ph
 from larmorx_validation.parity import afni_replica as ar
 from larmorx_validation.parity import afni_versions
+from larmorx_validation.parity import defects as d13
 from larmorx_validation.parity.afni_automask import _input
 from larmorx_validation.parity.harness import Case, CheckList, Suite
 
@@ -239,14 +240,13 @@ EPI_NEED = {
 HINT = "(a header whose units are micrometres makes the voxels 1000 times smaller than they look)"
 
 
-def _epi_voxels(name: str) -> Path:
-    """The series ``epi-voxels:<name>`` of :data:`EPI_VOXELS`: a head-like EPI phantom (plain
-    arithmetic and seeded noise), its voxel size in the header's own units."""
+def _epi_phantom(path: Path, sizes: tuple[float, float, float], units: int, nt: int) -> Path:
+    """A head-like EPI phantom of 24 × 24 × 16 voxels and ``nt`` volumes (plain arithmetic and
+    seeded noise) at ``path``, its voxel sizes in the header's own units (NIfTI's code
+    ``units``)."""
     import nibabel as nib
     import numpy as np
 
-    _, size, units, nt, _ = next(e for e in EPI_VOXELS if e[0] == name)
-    path = ar.generated_dir() / f"epi-voxels-{name}.nii"
     if path.exists():
         return path
     shape = (24, 24, 16)
@@ -255,8 +255,8 @@ def _epi_voxels(name: str) -> Path:
     base = 800.0 * np.clip(1.2 - r2, 0, 1) + 300.0 * (r2 < 0.5)
     rng = np.random.default_rng(75)
     data = np.stack([base * (1 + 0.01 * t) + rng.normal(0, 5, shape) for t in range(nt)], -1)
-    affine = np.diag([size, size, size, 1.0])
-    affine[:3, 3] = [-(n - 1) * size / 2 for n in shape]
+    affine = np.diag([*sizes, 1.0])
+    affine[:3, 3] = [-(n - 1) * d / 2 for n, d in zip(shape, sizes, strict=True)]
     img = nib.Nifti1Image(data.astype(np.float32), affine)
     img.header["xyzt_units"] = units | 8
     img.header["pixdim"][4] = 2.0
@@ -264,9 +264,57 @@ def _epi_voxels(name: str) -> Path:
     return path
 
 
+def _epi_voxels(name: str) -> Path:
+    """The series ``epi-voxels:<name>`` of :data:`EPI_VOXELS`."""
+    _, size, units, nt, _ = next(e for e in EPI_VOXELS if e[0] == name)
+    return _epi_phantom(ar.generated_dir() / f"epi-voxels-{name}.nii", (size,) * 3, units, nt)
+
+
+def _f32(bits: int) -> float:
+    """The float32 of a bit pattern, as a Python float (exact)."""
+    import struct
+
+    return struct.unpack("<f", struct.pack("<I", bits))[0]
+
+
+#: GLIBC-05's cases (``specs/cbrtf.md``; ``specs/3dUnifize.md`` §7): ``-EPI`` on the phantom of
+#: :func:`_epi_phantom` with voxel sizes in millimetres (float32; bit patterns where no short
+#: decimal gives them) whose radius glibc 2.35's ``cbrtf`` (AFNI's, and larmorx's ``reproduce``)
+#: and the correctly rounded cube root (larmorx's default) set differently, as (name, voxel
+#: sizes, volumes, whether the default names GLIBC-05, description). ``reproduce`` must give
+#: AFNI's bytes in every case; the default its own result, GLIBC-05 named exactly where the
+#: ball of neighbours within the grid or the printed radius changes.
+CBRTF_VOXELS = (
+    ("ball", (2.0, 2.0, _f32(0x403F83E6)), 3, True,
+     "-EPI on 3 volumes of 2 x 2 x 2.9924254 mm voxels (11.969702 mm³): radius 8 voxels with "
+     "glibc's cube root, 7.9999995 correctly rounded; the ball of neighbours differs by its 6 "
+     "points 8 voxels away"),
+    ("ball-one", (2.0, 2.0, _f32(0x403F83E6)), 1, True,
+     "the same voxels, one volume (the plain path with -EPI's radius): the ball differs"),
+    ("printed", (1.0, 1.0, _f32(0x3F85647F)), 3, True,
+     "-EPI on 1 x 1 x 1.0421294 mm voxels: radius 18.050001 voxels (printed 18.1) with glibc's "
+     "cube root, 18.05 (printed 18.0) correctly rounded; the same ball"),
+    ("same-result", (2.4, 2.4, 2.78), 3, False,
+     "-EPI on 2.4 x 2.4 x 2.78 mm voxels: radii one unit apart in the last place (7.2604237 "
+     "voxels with glibc's cube root, 7.2604246 correctly rounded), the same ball and printed "
+     "radius: no notice"),
+    ("ordinary", (3.4375, 3.4375, 4.0), 3, False,
+     "-EPI on ordinary 3.4375 x 3.4375 x 4 mm voxels: the same radius (5.061384 voxels) with "
+     "both cube roots, no notice"),
+)  # fmt: skip
+
+
+def _epi_cbrtf(name: str) -> Path:
+    """The series ``epi-cbrtf:<name>`` of :data:`CBRTF_VOXELS`."""
+    _, sizes, nt, _, _ = next(e for e in CBRTF_VOXELS if e[0] == name)
+    return _epi_phantom(ar.generated_dir() / f"epi-cbrtf-{name}.nii", sizes, 2, nt)
+
+
 def _unifize_input(name: str) -> Path:
     if name.startswith("epi-voxels:"):
         return _epi_voxels(name.removeprefix("epi-voxels:"))
+    if name.startswith("epi-cbrtf:"):
+        return _epi_cbrtf(name.removeprefix("epi-cbrtf:"))
     return _input(name)
 
 
@@ -300,9 +348,83 @@ def _guard_scenarios() -> list[tuple[str, str, str, ar.Scenario]]:
     return out
 
 
+def _cbrtf_scenarios() -> list[tuple[str, str, str, ar.Scenario]]:
+    """GLIBC-05's cases (:data:`CBRTF_VOXELS`), for the clean-room original: compared with AFNI
+    in ``reproduce`` (glibc's cube root, AFNI's bytes), the default's fix pass naming GLIBC-05
+    exactly where the result changes; the first also through the Python API."""
+    out = []
+    for name, _, _, _, desc in CBRTF_VOXELS:
+        s = S(("-EPI", "-prefix", U, "{0}"), (f"epi-cbrtf:{name}",), (U,),
+              tier="smoke" if name == "ball" else "standard",
+              **(_py(epi=True) if name == "ball" else {}))  # fmt: skip
+        out.append((f"glibc-05/epi-{name}", "GLIBC-05's cube root", desc, s))
+    return out
+
+
+def _check_cbrtf_case(case: Case, checks: CheckList) -> None:
+    """GLIBC-05's own checks on a case of :func:`_cbrtf_scenarios`: ``reproduce`` gives AFNI's
+    values bit for bit (not only within the suite's tolerance); the default names GLIBC-05
+    exactly where :data:`CBRTF_VOXELS` says; and the default's output and messages are AFNI's
+    with CORE-MATH's correctly rounded functions preloaded (``cbrtf`` among them): the default
+    is AFNI's method with the correctly rounded cube root."""
+    import tempfile
+
+    name = case.id.removeprefix("glibc-05/epi-")
+    named = next(e[3] for e in CBRTF_VOXELS if e[0] == name)
+    s: ar.Scenario = case.payload
+    lib = ar.crmath_preload()
+    if lib is None:
+        checks("the default: AFNI with correctly rounded functions", True, value="not run",
+               threshold="reported", detail="no CORE-MATH preload with tanhf and cbrtf")  # fmt: skip
+    else:
+        with (
+            afni_versions.using("original"),
+            tempfile.TemporaryDirectory(prefix="lx-glibc05-") as t,
+        ):
+            a_dir, l_dir = Path(t) / "afni-correctly-rounded", Path(t) / "larmorx-fix"
+            ar._setup(a_dir, s)
+            ar._setup(l_dir, s)
+            args = ar._arguments(s, [_unifize_input(i) for i in s.inputs])
+            env = ar.environment(s.env)
+            afni = ar.run_afni(PROGRAM, args, dict(env, LD_PRELOAD=str(lib)), a_dir,
+                               never=ar.case_never(s))  # fmt: skip
+            ours = ar.run_larmorx(PROGRAM, args, d13.FIX, env, l_dir, "original")
+            # Without colour codes: larmorx writes AFNI's colours in `reproduce` only.
+            a_err, l_err = (
+                ar._ANSI.sub("", t) for t in (ar.afni_text(afni.err), ar.larmorx_text(ours.err))
+            )
+            same_text = afni.code == ours.code and afni.out == ours.out and a_err == l_err
+            c = ar.compare_files(a_dir / U, l_dir / U) if (a_dir / U).is_file() else None
+            checks(
+                "the default: AFNI's output and messages with CORE-MATH's correctly rounded functions",
+                same_text and c is not None and c.identical,
+                metric="values that differ",
+                value=None if c is None else c.differing,
+                threshold=0,
+                detail=("messages identical (colour codes aside)" if same_text
+                        else ar.first_difference(a_err, l_err))
+                + ("" if c is None else f"; {U}: {c.detail}"),
+            )  # fmt: skip
+    data = next((c for c in checks.checks if c.name == f"{U}: data"), None)
+    checks(
+        "reproduce: AFNI's values bit for bit (glibc 2.35's cube root)",
+        data is not None and data.value == 0,
+        metric="values that differ",
+        value=None if data is None else data.value,
+        threshold=0,
+    )
+    fix = next((c for c in checks.checks if c.name == d13.FIX_PASS), None)
+    entries = (fix.detail.partition(": ")[0] if fix is not None else "").split(", ")
+    checks(
+        "the default names GLIBC-05" if named else "the default names no GLIBC-05",
+        fix is not None and ("GLIBC-05" in entries) == named,
+        detail=fix.detail if fix is not None else "no fix pass",
+    )
+
+
 @functools.cache
 def _original_scenario_list() -> list[tuple[str, str, str, ar.Scenario]]:
-    return [*_scenarios(), *_guard_scenarios()]
+    return [*_scenarios(), *_guard_scenarios(), *_cbrtf_scenarios()]
 
 
 #: The implementations this suite validates.
@@ -335,6 +457,8 @@ def suite(implementation: str = "original") -> Suite:
 
     def run_case(case: Case, checks: CheckList) -> None:
         ar.run_case(tool_spec, case, checks)
+        if case.id.startswith("glibc-05/"):
+            _check_cbrtf_case(case, checks)
 
     tool = (
         f"the bit-exact replica ({ar.replica_version()}: the translation of AFNI 26.3.05's "

@@ -254,3 +254,40 @@ def test_epi_ball_guard(tmp_path, no_replica, monkeypatch):
         lx.afni.unifize(path, epi=True, n_threads=2, implementation=ORIGINAL)
     r = lx.afni.unifize(path, epi=True, upstream_defects="reproduce", implementation=ORIGINAL)
     assert np.asarray(r.image.data).shape == series.shape
+
+
+def test_epi_radius_glibc_05(tmp_path, no_replica):
+    """GLIBC-05 (``specs/cbrtf.md``): ``-EPI``'s radius takes the correctly rounded cube root by
+    default and glibc 2.35's (the clean-room ``cbrtf_glibc``) with ``reproduce``. On voxels of
+    11.969702 mm³ the two give radius 7.9999995 and 8 voxels: the ball of neighbours differs,
+    so the default names GLIBC-05 with both radii, the warning names it in both modes, and the
+    results differ; ordinary voxels name nothing."""
+    import struct
+
+    base = head(t2=True)
+    series = np.stack([base * (1 + 0.01 * t) for t in range(3)], axis=-1).astype(np.float32)
+    z = struct.unpack("<f", struct.pack("<I", 0x403F83E6))[0]  # 2 x 2 x z = 11.969702 mm³
+    a = np.diag([2.0, 2.0, z, 1.0])
+    path = tmp_path / "bold.nii"
+    lx.save((series, a), path)
+    with pytest.warns(lx.UpstreamDefectWarning, match="GLIBC-05") as fixed:
+        f = lx.afni.unifize(path, epi=True, implementation=ORIGINAL)
+    text = " ".join(str(w.message) for w in fixed)
+    assert "radius is 7.9999995 voxels" in text and "it is 8 voxels" in text
+    with pytest.warns(lx.UpstreamDefectWarning, match="GLIBC-05"):
+        r = lx.afni.unifize(path, epi=True, upstream_defects="reproduce", implementation=ORIGINAL)
+    assert not np.array_equal(np.asarray(f.image.data), np.asarray(r.image.data))
+    out = tmp_path / "uni.nii"
+    stderr = io.StringIO()
+    with contextlib.redirect_stdout(io.StringIO()), contextlib.redirect_stderr(stderr):
+        args = ["larmorx", "afni", "3dUnifize", "-EPI", "-prefix", str(out), str(path)]
+        code = cli_run(args, implementation=ORIGINAL)
+    err = stderr.getvalue()
+    assert code == 0, err
+    assert "-EPI changes -Urad to 8.0 voxels" in err
+    assert "upstream defect GLIBC-05 (glibc 2.35) corrected: -EPI's radius is 7.9999995" in err
+    ordinary = tmp_path / "ordinary.nii"
+    lx.save((series, affine()), ordinary)
+    with warnings.catch_warnings():
+        warnings.simplefilter("error", lx.UpstreamDefectWarning)
+        lx.afni.unifize(ordinary, epi=True, implementation=ORIGINAL)

@@ -392,11 +392,86 @@ pub fn run(
     .map_err(|e| e.to_string())?
 }
 
-/// The radius of `-EPI` (spec §7): 18.3 mm in voxels, `cbrtf` of the voxel volume, at least
-/// 4.14.
-pub fn epi_radius(steps: [f32; 3]) -> f32 {
-    let u = math::cbrtf((steps[0] * steps[1] * steps[2]).abs());
+/// The voxel volume of `-EPI`'s radius (spec §7): `|dx * dy * dz|`, the float product.
+fn voxel_volume(steps: [f32; 3]) -> f32 {
+    (steps[0] * steps[1] * steps[2]).abs()
+}
+
+/// The radius from the cube root `u` of the voxel volume (spec §7): `(float)(18.3 / u)`, the
+/// quotient in double, at least 4.14.
+fn radius_of(u: f32) -> f32 {
     ((18.3 / f64::from(u)) as f32).max(4.14)
+}
+
+/// The radius of `-EPI` (spec §7): 18.3 mm in voxels, the cube root of the voxel volume, at
+/// least 4.14. The cube root is correctly rounded by default ([`math::cbrtf`]); with
+/// `reproduce` it is glibc 2.35's, which AFNI calls ([`math::cbrtf_glibc`], GLIBC-05).
+pub fn epi_radius(steps: [f32; 3], mode: UpstreamDefects) -> f32 {
+    let v = voxel_volume(steps);
+    radius_of(if mode.fix() {
+        math::cbrtf(v)
+    } else {
+        math::cbrtf_glibc(v)
+    })
+}
+
+/// The offsets of the ball of radius `r` within the reach of a grid of `dims`, and how many.
+fn ball_in_reach(r: f32, dims: [usize; 3]) -> (Vec<(i64, i64, i64)>, i64) {
+    let lines = wmi::Ball::new(r).x_lines(dims);
+    let n = lines.iter().map(|&(_, _, e)| 2 * e + 1).sum();
+    (lines, n)
+}
+
+/// GLIBC-05: where glibc 2.35's `cbrtf` (AFNI's) gives `-EPI` another radius than the correctly
+/// rounded cube root, and that changes the result on a grid of `dims` (the ball of neighbours
+/// within the grid's reach, the only offsets that are ever used, or the radius printed with one
+/// decimal), the notice naming the two radii and what differs. `None` where the two radii are
+/// the same or give the same result.
+pub fn epi_cbrtf_notice(
+    steps: [f32; 3],
+    dims: [usize; 3],
+    mode: UpstreamDefects,
+) -> Option<Notice> {
+    let v = voxel_volume(steps);
+    let (uc, ug) = (math::cbrtf(v), math::cbrtf_glibc(v));
+    let (rc, rg) = (radius_of(uc), radius_of(ug));
+    if rc.to_bits() == rg.to_bits() {
+        return None;
+    }
+    let (pc, pg) = (format!("{rc:.1}"), format!("{rg:.1}"));
+    let ((lc, nc), (lg, ng)) = (ball_in_reach(rc, dims), ball_in_reach(rg, dims));
+    let (ball, printed) = (lc != lg, pc != pg);
+    if !ball && !printed {
+        return None;
+    }
+    // What the other radius would change: its ball within the grid, its printed value.
+    let effects = |n_other: i64, n_this: i64, p_other: &str, p_this: &str| {
+        let mut out = String::new();
+        if ball {
+            out += &format!(
+                ", a ball of neighbours of {n_other} offsets within the grid instead of {n_this}"
+            );
+        }
+        if printed {
+            out += &format!(", printed {p_other} instead of {p_this}");
+        }
+        out
+    };
+    let detail = match mode {
+        UpstreamDefects::Fix => format!(
+            "-EPI's radius is {rc} voxels: 18.3 mm over the correctly rounded cube root ({uc}) \
+             of the voxel volume, {v} mm^3; with glibc 2.35's cbrtf ({ug}), which AFNI calls, \
+             it is {rg} voxels{}",
+            effects(ng, nc, &pg, &pc)
+        ),
+        UpstreamDefects::Reproduce => format!(
+            "-EPI's radius is {rg} voxels, as AFNI's: 18.3 mm over glibc 2.35's cbrtf ({ug}) of \
+             the voxel volume, {v} mm^3; with the correctly rounded cube root ({uc}) it is {rc} \
+             voxels{}",
+            effects(nc, ng, &pc, &pg)
+        ),
+    };
+    Some(Notice::new(&defects::GLIBC_05, mode, detail))
 }
 
 /// The memory AFNI's method needs for `-EPI`'s ball of neighbours (spec §9.1): with `r` the
@@ -423,7 +498,7 @@ fn voxel_size_text(v: f32) -> String {
 /// machine's) exceeds the limit (`larmorx_core::alloc::check_plan`: a limit given to this
 /// computation, `LARMORX_MEMORY_LIMIT`, above 4 GiB the machine's memory). `None`: it fits.
 pub fn epi_guard(steps: [f32; 3], n_threads: usize) -> Option<String> {
-    let r = epi_radius(steps);
+    let r = epi_radius(steps, UpstreamDefects::Fix);
     let need = epi_ball_bytes(r, parallel::resolve_threads(n_threads));
     let limit = larmorx_core::alloc::check_plan(need).err()?;
     let hint = if steps.iter().any(|v| v.abs() < 0.01) {
@@ -482,13 +557,21 @@ fn run_here(
             events.push(Event::Always(Message::Info("-EPI turns off -GM".into())));
             o.gm = false;
         }
-        o.radius = epi_radius(out_geometry.pixdim);
+        o.radius = epi_radius(out_geometry.pixdim, mode);
         o.t2 = 1;
         o.duplo = false;
         events.push(Event::Always(Message::Info(format!(
             "-EPI changes -Urad to {:.1} voxels",
             o.radius
         ))));
+        // GLIBC-05: where glibc's last bit of the cube root changes the radius's use (the
+        // ball, on the full grid: -EPI has no half-size image) or its line. Not where AFNI-75's
+        // guard refuses: the radius is then never used.
+        if refusal.is_none()
+            && let Some(n) = epi_cbrtf_notice(out_geometry.pixdim, dims, mode)
+        {
+            notices.push(n);
+        }
         // AFNI-75 (spec §9.1): a ball of neighbours beyond the memory limit is refused before
         // any work, one volume included; `reproduce` attempts it as AFNI does.
         if let Some(why) = refusal {
@@ -812,7 +895,7 @@ mod tests {
     fn the_epi_ball_guard() {
         use larmorx_core::alloc::with_memory_limit;
         let um3 = [0.003f32; 3];
-        assert_eq!(epi_radius(um3), 6100.0);
+        assert_eq!(epi_radius(um3, UpstreamDefects::Fix), 6100.0);
         let need = epi_ball_bytes(6100.0, 2);
         assert_eq!(larmorx_core::alloc::gib(need), "2.834e4 GiB");
         assert_eq!(
@@ -842,6 +925,63 @@ mod tests {
         // What fits is never refused: 0.3 mm (61 voxels) and 3 mm.
         assert!(with_memory_limit(4 << 30, || epi_guard([0.3; 3], 2)).is_none());
         assert!(with_memory_limit(4 << 30, || epi_guard([3.0; 3], 32)).is_none());
+    }
+
+    /// GLIBC-05: the radius from each cube root, and the notice only where glibc's last bit
+    /// changes the ball within the grid or the printed radius (`specs/cbrtf.md` §6's example:
+    /// 11.969702 mm^3, radius 8 with glibc's cube root, 7.9999995 correctly rounded).
+    #[test]
+    fn the_epi_radius_and_glibc_05() {
+        use UpstreamDefects::{Fix, Reproduce};
+        let volume = f32::from_bits(0x413f_83e6);
+        let ball = [2.0, 2.0, f32::from_bits(0x403f_83e6)];
+        assert_eq!(voxel_volume(ball), volume);
+        assert_eq!(epi_radius(ball, Fix), 7.999_999_5);
+        assert_eq!(epi_radius(ball, Reproduce), 8.0);
+        let dims = [24, 24, 16];
+        let n = epi_cbrtf_notice(ball, dims, Fix).unwrap();
+        assert_eq!(n.defect.id, "GLIBC-05");
+        assert_eq!(
+            n.detail,
+            "-EPI's radius is 7.9999995 voxels: 18.3 mm over the correctly rounded cube root \
+             (2.2875001) of the voxel volume, 11.969702 mm^3; with glibc 2.35's cbrtf (2.2875), \
+             which AFNI calls, it is 8 voxels, a ball of neighbours of 2109 offsets within the \
+             grid instead of 2103"
+        );
+        let r = epi_cbrtf_notice(ball, dims, Reproduce).unwrap();
+        assert_eq!(
+            r.detail,
+            "-EPI's radius is 8 voxels, as AFNI's: 18.3 mm over glibc 2.35's cbrtf (2.2875) of \
+             the voxel volume, 11.969702 mm^3; with the correctly rounded cube root (2.2875001) \
+             it is 7.9999995 voxels, a ball of neighbours of 2103 offsets within the grid \
+             instead of 2109"
+        );
+        // A grid the extra offsets (8 voxels along an axis) cannot reach: nothing changes.
+        assert!(epi_cbrtf_notice(ball, [8, 8, 8], Fix).is_none());
+        // The printed radius only: 18.05 (18.0) correctly rounded, 18.050001 (18.1) glibc's.
+        let printed = [1.0, 1.0, f32::from_bits(0x3f85_647f)];
+        let n = epi_cbrtf_notice(printed, dims, Fix).unwrap();
+        assert!(
+            n.detail
+                .ends_with("it is 18.050001 voxels, printed 18.1 instead of 18.0"),
+            "{}",
+            n.detail
+        );
+        // Radii one unit apart in the last place with the same ball and print: no notice.
+        let same = [2.4, 2.4, 2.78];
+        assert_ne!(epi_radius(same, Fix), epi_radius(same, Reproduce));
+        assert!(epi_cbrtf_notice(same, dims, Fix).is_none());
+        assert!(epi_cbrtf_notice(same, dims, Reproduce).is_none());
+        // Ordinary voxels: the same radius.
+        for s in [
+            [3.0, 3.0, 3.0],
+            [3.4375, 3.4375, 4.0],
+            [2.5, 2.5, 2.5],
+            [2.0, 2.0, 2.0],
+        ] {
+            assert_eq!(epi_radius(s, Fix), epi_radius(s, Reproduce), "{s:?}");
+            assert!(epi_cbrtf_notice(s, dims, Fix).is_none());
+        }
     }
 
     #[test]

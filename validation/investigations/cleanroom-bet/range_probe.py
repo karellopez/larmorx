@@ -48,7 +48,7 @@ def main(argv):
         for name in candidates(lo, hi, b):
             v2 = candidates(lo, hi, b)[name]
             v98 = candidates(lo, hi, u1)[name]
-            ok = ("%g" % v2) == t2s and ("%g" % v98) == t98s
+            ok = f"{v2:g}" == t2s and f"{v98:g}" == t98s
             print(f"   {'==' if ok else '  '} {name}: {v2!r} {v98!r}")
 
 

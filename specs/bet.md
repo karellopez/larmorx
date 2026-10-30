@@ -85,6 +85,8 @@ All three take FSL's image names: a file name with or without its extension (§3
   uncaught exception (exit status 134, `terminate called after throwing an instance of
   'std::runtime_error'` and `what():  ...` lines) **(observed)**. larmorx prints the same
   `Image Exception` lines, then one line of its own saying that FSL aborts here, and exits 1.
+  (spec writer, 2026-10-30) **(observed)** `<name>` in the `#63` and `Error` lines is the name
+  without its image extension; in the `#22` line it is the name as given.
 - Outputs are written in the type `FSLOUTPUTTYPE` names: `NIFTI` (`.nii`), `NIFTI_GZ`
   (`.nii.gz`), `NIFTI_PAIR` (`.hdr`/`.img`), `NIFTI_PAIR_GZ`, `NIFTI2`, `NIFTI2_GZ`,
   `NIFTI2_PAIR`, `NIFTI2_PAIR_GZ`, `ANALYZE`, `ANALYZE_GZ`. Unset, FSL prints `ERROR::
@@ -138,6 +140,13 @@ All three take FSL's image names: a file name with or without its extension (§3
   file (`-e`) is written in these coordinates.
 - Options given in voxels (`bet2 -c`) are voxel indices of the file as stored; they are converted
   to the radiological frame (`i` becomes `nx - 1 - i` when the file was mirrored).
+- (spec writer, 2026-10-30) **ANALYZE 7.5 inputs (observed)**: FSL works on them with x reversed
+  (as on a neurologically stored image) and writes the outputs with a qform and an sform of code
+  2, the voxel sizes on the diagonal and the offset `−(origin − 1)·d` per axis, `origin` being
+  the header's `originator` field (an origin of 0 gives `+d`): the outputs line up with the input
+  voxel for voxel.
+- (spec writer, 2026-10-30) **A single slice (observed)** is written with `dim[0] = 2` (a trailing
+  axis of one voxel is not counted); so are `bet -Z`'s one-slice temporary images (§5.2).
 
 ### 3.3 Writing
 
@@ -150,7 +159,8 @@ Each output image has the input's grid and geometry and a fresh FSL header:
   `vox_offset` 352 for single files without extensions **(observed)**;
 - extensions are written only when `FSL_LOAD_NIFTI_EXTENSIONS` is set to a non-zero number
   (then the input's extensions are kept); FSL computes the data offset of two or more extensions
-  wrongly (FSL-56, §9);
+  wrongly (FSL-56, §9); (spec writer, 2026-10-30) **(observed)** FSL writes the extensions in full
+  and the data right after them: only the recorded `vox_offset` is wrong;
 - the data in the output's own type: the brain and the outline float32, the masks and the skull
   int16 (§4.7).
 
@@ -178,6 +188,13 @@ does (`docs/validation/fsl-bet-replica.md`); the original should write the same 
   `<option>: Couldn't set_value! valstr="<value> <the next words…>"!` (the values the option takes,
   joined by blanks). Each of these errors prints the usage, an empty line and the message on
   standard error, exit 1 **(observed)**.
+- (spec writer, 2026-10-30) **The option values (observed)**: an option of `k` values given fewer
+  than `k` words takes the words left, each read as C's `atof` reads it (0 when it does not read),
+  the missing ones 0, and never fails (`-c 4` is `-c 4 0 0`; `-c 1 -v` takes `-v` as its second
+  value); with `k` words or more, the first `k − 1` are read as `atof` reads them and the last must
+  read whole as a number (`strtod`: leading blanks, hexadecimal, `inf` and `nan` read); a
+  failure's `valstr` is the option's `k` words and the next one, if any. A long flag given a value
+  (`--mask=1`) is the flag. Every value is then rounded to float.
 - After parsing: `-f` outside [0, 1]: an empty line and `Fractional intensity threshold must be
   between 0 and 1!`, exit 1; `-g` outside [-1, 1]: an empty line and `Vertical gradient must be
   between -1 and 1!`, exit 1 (NaN passes both checks: FSL-42). Then `-h` prints the usage and
@@ -242,6 +259,27 @@ histograms, iteratively (every voxel counts, in float; the arithmetic in double)
    out its lowest and highest bins (the counts start one bin in from each end).
 4. If `hi == lo`, `t2 = lo` and `t98 = hi`.
 
+(spec writer, 2026-10-30) **The exact arithmetic** (FSL's bits; `lo`, `hi`, `t2`, `t98` are floats;
+`w = hi − lo` is a float subtraction):
+- the bin of `x`: `trunc(A·x + B)` with `A = 1000 / w` and `B = (1000·(−lo)) / w`, both in double;
+- the bin width `δ = w / 1000` in double; `t2 = lo + float(b·δ)` and `t98 = lo + float((u + 1)·δ)`
+  (the product in double, rounded to float, then added to `lo` in float) **(observed** on
+  fMRIPrep's calls: with `w` in double ds005454's BOLD reference prints `thresh2 -0.142002` where
+  FSL prints `-0.142004`; with the product in float a `thresh98` of ds000005's run 3 is one float
+  bit off**)**. `b·δ` is not `b·w/1000`: the division comes first;
+- the narrowed range of step 3: `lo' = float(lo + (b'/1000)·w)` and `hi' = float(lo + ((u' + 1)/1000)·w)`,
+  computed in double from the previous pass's `lo` and `w` (a formula of its own, not the one of
+  `t2`);
+- the test of step 3 is `t98 − t2 < w / 10` with the current pass's `w` (the narrowed range's),
+  `t98 − t2` a float subtraction, both sides as double; a narrowed range with `lo' == hi'` makes
+  the next pass use the full range as the tenth does;
+- the counts: `n` is the number of voxels in the histogram (the tenth pass removes the two end
+  bins' counts from it), and each scan adds bins while the count is below `n / 50` (integer
+  division).
+**Small images (observed, random testing 2026-10-30, case 36)**: with fewer than 50 voxels
+(`n / 50 = 0`) no bin is added: `t2` lies one bin below the minimum and `t98` one above the
+maximum (a 2-voxel image of 50 and 51: `thresh2 49.999`, `thresh98 51.001`).
+
 The verbose line (§4.9) prints these values.
 
 ### 4.3 Initial parameters
@@ -257,7 +295,10 @@ The verbose line (§4.9) prints these values.
   centre is `(x dx, y dy, z dz)` in the radiological frame (§3.2).
 - **The median within-brain intensity** `tm`: of the voxels with `t2 < v < t98` whose point is
   within the radius `r` of the centre (squared distance `< r²`), in storage order, `tm` is the
-  largest of the `floor(N_m / 2)` smallest values (the lower median). **(FSL 6.0.7.23)** With no
+  largest of the `floor(N_m / 2)` smallest values (the lower median; (spec writer, 2026-10-30)
+  **(observed)** the value of rank `floor(N_m / 2)` of the sorted list, and with one voxel that
+  voxel). With no voxel above the threshold the centre of gravity is `0/0` (**observed**:
+  `c-of-g -nan -nan -nan mm`, and the self-intersection total 0). **(FSL 6.0.7.23)** With no
   such voxel (a constant or binary image) `tm = t98` (FSL 6.0.7.17 read an empty list and
   crashed, FSL-41; fixed upstream: larmorx gives `t98` in both modes and names nothing). A
   constant image then still crashes FSL, in the mask's fill from the surface's centre, which is
@@ -271,6 +312,39 @@ The surface is an icosahedron subdivided 4 times: 2562 vertices, 5120 triangles.
 `o = 0.5257311121`; each subdivision splits every triangle into four at its edges' midpoints and
 then projects every vertex onto the unit sphere. The triangles are oriented so that their normals
 point outwards. The sphere is scaled to radius `r / 2` and centred on `c`.
+
+(spec writer, 2026-10-30) **The numbering and the orders (observed on `bet2 -e`'s files, and the
+ones FSL's sums follow).** Every triangle below is written with its vertices in the order of the
+mesh file (`-e`), `(v0, v1, v2)`.
+- The twelve vertices, numbered 0 to 11: `(τ, o, 0)`, `(−τ, o, 0)`, `(−τ, −o, 0)`, `(τ, −o, 0)`,
+  `(o, 0, τ)`, `(o, 0, −τ)`, `(−o, 0, −τ)`, `(−o, 0, τ)`, `(0, τ, o)`, `(0, −τ, o)`,
+  `(0, −τ, −o)`, `(0, τ, −o)`, with `τ` and `o` the doubles nearest the decimals above.
+- The twenty faces, in order: `(4,7,8) (4,9,7) (5,11,6) (5,6,10) (0,3,4) (0,5,3) (2,1,7)
+  (2,6,1) (8,11,0) (8,1,11) (9,3,10) (9,10,2) (8,0,4) (11,5,0) (4,3,9) (5,10,3) (7,1,8) (6,11,1)
+  (7,9,2) (6,2,10)`.
+- Each subdivision visits the triangles in order; for `(v0, v1, v2)` it makes the midpoints
+  `m0 = (v1 + v2)/2`, `m1 = (v0 + v2)/2`, `m2 = (v0 + v1)/2` (componentwise, in double), reuses a
+  midpoint already made in this subdivision whose coordinates agree within `1e-8` in every axis,
+  numbers the new ones after the existing vertices in the order `m0`, `m1`, `m2`, and replaces the
+  triangle by four, appended in this order: `(m2, m0, m1)`, `(m1, v0, m2)`, `(m0, v2, m1)`,
+  `(m2, v1, m0)`; the old triangles leave the list. Then every vertex `p` becomes
+  `p · (1/|p|)` (the reciprocal of `|p| = sqrt((x·x + y·y) + z·z)`, then three products).
+- A triangle's normal is `N = (v2 − v0) × (v1 − v0)`, the cross product taken as
+  `a × b = (a_y b_z − a_z b_y, b_x a_z − b_z a_x, a_x b_y − b_x a_y)`: these orientations point
+  outwards. (`(v0 − v1) × (v2 − v1)` is the same vector but not the same bits.)
+- **A vertex's triangles** are in the order of the mesh's triangle list (the order above, level by
+  level: each vertex's triangles of the last subdivision, as they were appended).
+- **A vertex's neighbours** (spec writer, 2026-10-30; question 5): the order is the one obtained by
+  visiting the final mesh's triangles in their order and, for each `(v0, v1, v2)`, moving to the end
+  of `v0`'s list first `v1` then `v2`, to the end of `v1`'s list `v2` then `v0`, to the end of
+  `v2`'s list `v0` then `v1` ("moving": a vertex already in the list is taken out of its place and
+  appended, never listed twice). This is the order FSL's mesh holds after the construction above,
+  and the one every copy of the mesh rebuilds (checked: the same lists for all 2562 vertices). A
+  list built "first come, kept in place" holds the same vertices in another order, which changes
+  the last bits of every neighbour mean and distance sum (§8.1).
+- **The initial placement**: each unit vertex `p` is first translated, `p + c` (componentwise, in
+  double), and then scaled about `c`: `c + (r/2)·((p + c) − c)`, with `r/2` computed as `r / 2.0`.
+  (`c + (r/2)·p` is the same point but not the same bits.)
 
 1000 iterations then move every vertex at once (each vertex's new position is computed from the
 positions of the previous iteration). For each vertex `p`:
@@ -288,6 +362,9 @@ positions of the previous iteration). For each vertex `p`:
 - **Intensity term** `u3 = f3 n`, with `f3` from the intensities inward along `-n`:
   - the voxel grid's spacing used for sampling is `(dx, dy, dz)`, except that an axis whose field
     of view is smaller than `r` uses `2 r` instead; `ds = min(1, the smallest of the three)`;
+    (spec writer, 2026-10-30) exactly: an axis keeps its voxel size when `n·d > r`, with `n·d` the
+    product of the voxel count and the voxel size in float, and uses `2r` otherwise (equality
+    included);
   - `Imin = tm`, `Imax = t`. The point `q = p - n` (1 mm inside) is converted to voxel indices by
     `trunc(q / d + 0.5)` per axis (`d` the spacing above, `trunc` toward zero). If that voxel is
     inside the image: its value `I` gives `Imin = min(Imin, I)`, `Imax = max(Imax, I)`; then the
@@ -296,7 +373,10 @@ positions of the previous iteration). For each vertex `p`:
     `k = 1, 2, ...` while `g = 2 + (k - 1) ds` stays below `d1`, the voxel
     `trunc(q/d + 0.5 - k ds n/d)` (the position is accumulated, one step of `ds n/d` at a time)
     lowers `Imin`, and raises `Imax` while `g < d2` (`d2 = 3`): with 1 mm voxels, the samples at
-    2 to 6 mm inside `p`, `Imax` from the one at 2 mm;
+    2 to 6 mm inside `p`, `Imax` from the one at 2 mm; (spec writer, 2026-10-30) `g` itself is
+    accumulated too: it starts at 2 and each step adds `ds` (with `ds = 0.8`, `2 + 5·0.8` and
+    five additions of 0.8 to 2 are not the same double, and the last sample can come or go); `d1`
+    and `d2` are the options' values truncated to integers;
   - `Imin = max(t2, Imin)`, `Imax = min(tm, Imax)`;
   - the local threshold `tl = (Imax - t2) b + t2`, where `b = b_t`, or with `-g G`:
     `b = clamp(b_t + G (p_z - c_z) / r, 0, 1)` (larger `G` grows the brain at the bottom);
@@ -322,6 +402,73 @@ When the surface self-intersects, it is deformed again from the initial sphere, 
 each with the factor `10^(P+1)` for the smoothness term (§4.4), lowered linearly over the last
 quarter of the iterations: for iteration `i > 750`, `4 (1 - i/1000) (10^(P+1) - 1) + 1`. After
 pass 10 the result is kept whatever its self-intersection.
+
+(spec writer, 2026-10-30; question 1) **The rerun, exactly.** The rule above is FSL's, complete:
+- it starts from the initial surface of §4.4 as placed before the first pass, bit for bit (the
+  same positions, and the same vertex, triangle and neighbour orders: §4.4), never from the
+  previous pass's surface;
+- `l` is set to 0 and recomputed on the first pass's schedule (iterations 0, 50, 100, 200, …,
+  900 of the rerun);
+- in iteration `i` (0 to 999) the factor is `F_P = 10^(P+1)` (100 for the first rerun), and for
+  `i > 750` (as `i > 0.75·1000` in double) `4·(1 − i/1000)·(F_P − 1) + 1`, evaluated left to right
+  in double;
+- the only change to the step is `f2 ← min(f2·F_P, 1)` at the vertices where `s·n > 0` (`s·n` the
+  same dot product that gives `s_n`); `t2`, `t`, `tm`, `t98`, `c`, `r`, `b_t`, `E`, `F` and the
+  intensity term are the first pass's;
+- after the 1000 iterations the surface is measured against the initial surface as after the first
+  pass (the total of the measure, or the exact test with `-e`), the verbose lines are printed
+  (§4.9), and after pass 10 the surface is kept.
+**Why an implementation following the rule can miss FSL** (measured with the replica, bit-identical
+to FSL, and copies of it each changed in one rounding): the reruns amplify last-bit differences. On
+the 75-year-old's T1w (ds002422, the standard tier's `real/older-75y`) FSL's first rerun totals
+19809.7; one changed rounding alone (the initial placement as `c + (r/2)·p`, the update summed as
+`((p + u1) + u2) + u3`, `1/R` from `s·n` instead of `s_n·n`, the normal divided by
+multiplication with `1/|v|`, the neighbour mean likewise, the triangle normal from `v1`, the
+centre of gravity summed slice by slice, or the neighbours in first-come order) moves it to
+16005 to 21766 and the final mask to Dice 0.993 to 0.996; the first pass's total (90050) does not
+move. With the clean-room original's ten choices of this kind (those eight, the `libm` crate's
+`tanh` and a correctly rounded `pow`) the replica gives the original's results exactly (16099,
+and the same masks on `older-75y`, `7t` and `tumour`); with FSL's arithmetic it gives FSL's. On
+the tumour (ds005003) `tanh` alone matters too: the `libm` crate's (musl's) is not glibc's
+(613.5 instead of FSL's 737.8 for the rerun's total). So reproducing FSL wherever a surface
+reruns needs every operation of the deformation as §8.1 gives it, `tanh` and `pow` glibc's; a
+surface that does not rerun is far less sensitive (fMRIPrep's 29 calls are FSL's bit for bit with
+the original's arithmetic).
+
+(spec writer, 2026-10-30; question 4) **The exact test (`-e`), exactly.** FSL's test is a sweep
+over the vertices sorted by x, the triangles `(v0, v1, v2)` in the mesh file's order:
+1. The vertices are taken in increasing x (equal x: in the order an unstable introsort leaves
+   them, §8.1); each brings its triangles in the vertex's triangle order (§4.4). A triangle met for
+   the first time is tested against every triangle of the active list, in the list's order (the
+   order they were first met), and then appended to it; met for the third time (its last vertex)
+   it leaves the list. So a pair is tested once, when their x-extents overlap in this order: the
+   triangle met later as `T`, the earlier one as `U`.
+2. A pair with a vertex in common is never tested: "in common" is coordinates agreeing within
+   `1e-8` in each axis, between any vertex of `U` and any vertex of `T`.
+3. The pair `T = (A0, A1, A2)`, `U = (B0, B1, B2)` intersects when this predicate holds, in double,
+   every dot product as `(x·x' + y·y') + z·z'` and every cross product as in §4.4:
+   - `N = (A0 − A1) × (A0 − A2)`; `σ_k = N·(B_k − A0)`;
+   - if neither `σ0·σ1 < 0` nor `σ0·σ2 < 0`: no intersection (so a `U` whose `B0` lies exactly on
+     `T`'s plane never intersects);
+   - else, for each edge `(B_i, B_{i+1})` of `U` (`i = 0, 1, 2`, indices mod 3) with
+     `σ_i·σ_{i+1} < 0`: `v1 = A1 − A0`, `v2 = A2 − A0`, `v3 = A2 − A1`, `V = v1 × v2`,
+     `p = B_i − A0`, `d = B_{i+1} − B_i`, `δ = d·V`; if `δ ≠ 0`: `λ = −(p·V)/δ`, `P = p + λd`,
+     `n1 = v1 × P`, `n2 = P × v2`, `n3 = v3 × (P − v1)`; a hit when `n1·n3`, `n2·n3` and `n1·n2`
+     are all positive or all negative;
+   - and the same with the roles exchanged: `M = (B0 − B1) × (B0 − B2)`, each edge
+     `(A_i, A_{i+1})` of `T` with `(M·(A_i − B0))·(M·(A_{i+1} − B0)) < 0` tested against `U`;
+   - any hit: the pair intersects (the strict signs: touching, coplanar and edge-on contacts are not
+     intersections).
+4. The surface self-intersects as soon as one pair intersects (the sweep stops there).
+The prefilter FSL means to apply (each triangle's bounding sphere) passes every pair (its centres
+are all the origin): only the sweep and the predicate decide.
+**(checked, random testing 2026-10-30 case 27, shrunk: a 14 × 14 × 12 head of 2.5 × 2.5 × 1.5 mm
+voxels)** FSL's first pass finds the pair `T = (834, 195, 835)`, `U = (829, 53, 763)` (vertex
+numbers), which also intersects in exact rational arithmetic on FSL's surface (two edges of `U`
+cross `T`'s interior; the signed distances are about `1e-7`); the clean-room original's first-pass
+surface lies up to 0.14 mm away from FSL's on this small head; on it that pair does not intersect
+(exactly), and FSL's own test finds no pair at all (the replica's test run on the original's
+surface). So the test is not what differs there: the surface's arithmetic is (§8.1).
 
 ### 4.6 The brain mask
 

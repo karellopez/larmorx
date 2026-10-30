@@ -252,7 +252,8 @@ mod tests {
         let data: Vec<f32> = (0..1000).map(|i| i as f32).collect();
         let v = Vol::new([10, 10, 10], [1.0; 3], data);
         let (t2, t98) = robust_range(&v);
-        assert!((t2 - 19.98).abs() < 0.01, "{t2}");
-        assert!((t98 - 979.02).abs() < 0.01, "{t98}");
+        // the bin holding the 20th value from each end (n / 50 = 20), bins 0.999 wide
+        assert!((t2 - 18.981).abs() < 1e-4, "{t2}");
+        assert!((t98 - 980.019).abs() < 1e-3, "{t98}");
     }
 }

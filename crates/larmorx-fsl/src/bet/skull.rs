@@ -142,5 +142,6 @@ fn profile_edge(vol: &Vol, c: V3, nrm: V3, step: f64, t: f64, range: f64) -> Opt
             best = Some((k, rise));
         }
     }
-    best.map(|(k, _)| prof[k].0)
+    // the sample the steepest rise reaches (observed: closest to FSL's skull voxels)
+    best.map(|(k, _)| prof[k + 1].0)
 }

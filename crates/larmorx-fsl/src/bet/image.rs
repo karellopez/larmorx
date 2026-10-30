@@ -35,8 +35,11 @@ pub struct Input {
     pub volumes: usize,
 }
 
-/// Reads the image `files` (all its volumes when `all`, else the first).
+/// Reads the image `files`: every volume, and the first as [`Input`].
 pub fn read(files: &ImageFiles, n_threads: usize) -> Result<(Vec<Vol>, Input), ImageError> {
+    if let Some(r) = read_analyze(files)? {
+        return Ok(r);
+    }
     let s = read_series_files(files, n_threads)?;
     let volumes = s.volumes.len();
     let vols: Vec<Vol> = s
@@ -122,7 +125,15 @@ pub fn output_header(o: &Output<'_>, version: NiftiVersion, data_type: DataType)
     if o.volumes > 1 {
         h.dim[..5].copy_from_slice(&[4, nx as i64, ny as i64, nz as i64, o.volumes as i64]);
     } else {
-        h.dim[..4].copy_from_slice(&[3, nx as i64, ny as i64, nz as i64]);
+        // trailing axes of one voxel are not counted (observed: a single slice is written 2D)
+        let ndim = if nz > 1 {
+            3
+        } else if ny > 1 {
+            2
+        } else {
+            1
+        };
+        h.dim[..4].copy_from_slice(&[ndim, nx as i64, ny as i64, nz as i64]);
     }
     h
 }
@@ -142,6 +153,10 @@ pub fn write(
     let mut shape = vec![nx, ny, nz];
     if o.volumes > 1 {
         shape.push(o.volumes);
+    } else {
+        while shape.len() > 1 && shape[shape.len() - 1] == 1 {
+            shape.pop();
+        }
     }
     let unflip = |n: usize| {
         let mut out = Vec::with_capacity(n);
@@ -267,4 +282,149 @@ fn write_pieces(
         }
     })
     .map_err(|e| ImageError::Invalid(e.to_string()))?
+}
+
+/// An ANALYZE 7.5 pair (a 348-byte header without NIfTI's magic), as FSL reads it (§3.1;
+/// observed): radiological storage, no scaling unless its slope field asks for it, and on
+/// output a qform and sform (code 2) of the voxel sizes with the origin from the header's
+/// `originator` (`-(origin - 1) d`). `None` when `files` is not ANALYZE.
+fn read_analyze(files: &ImageFiles) -> Result<Option<(Vec<Vol>, Input)>, ImageError> {
+    let Some(data_path) = files.data.as_deref() else {
+        return Ok(None);
+    };
+    let invalid = |p: &Path, m: String| ImageError::Invalid(format!("{}: {m}", p.display()));
+    let path = files.header.as_path();
+    let load = |p: &Path| -> Result<Vec<u8>, ImageError> {
+        let c = Compression::of_file(p).map_err(|e| invalid(p, e.to_string()))?;
+        std::fs::read(p)
+            .and_then(|raw| c.decompress(raw))
+            .map_err(|e| invalid(p, e.to_string()))
+    };
+    let Ok(raw) = load(path) else {
+        return Ok(None);
+    };
+    if raw.len() < 348 {
+        return Ok(None);
+    }
+    let le = i32::from_le_bytes([raw[0], raw[1], raw[2], raw[3]]) == 348;
+    let be = i32::from_be_bytes([raw[0], raw[1], raw[2], raw[3]]) == 348;
+    if !(le || be) || &raw[344..347] == b"ni1" || &raw[344..347] == b"n+1" {
+        return Ok(None);
+    }
+    let i16_at = |k: usize| {
+        let b = [raw[k], raw[k + 1]];
+        if le {
+            i16::from_le_bytes(b)
+        } else {
+            i16::from_be_bytes(b)
+        }
+    };
+    let origin = [i16_at(253), i16_at(255), i16_at(257)];
+    let mut block = raw[..348].to_vec();
+    block[344..348].copy_from_slice(b"ni1\0");
+    // the NIfTI fields ANALYZE's history overlaps: no transforms
+    for b in &mut block[252..328] {
+        *b = 0;
+    }
+    let mut h = NiftiHeader::parse(&block).map_err(|e| invalid(path, e.to_string()))?;
+    h.apply_load_fixes()
+        .map_err(|e| invalid(path, e.to_string()))?;
+    let shape = h.shape().map_err(|e| invalid(path, e.to_string()))?;
+    let dt = h.data_type().map_err(|e| invalid(path, e.to_string()))?;
+    let bytes = load(data_path)?;
+    let offset = if h.vox_offset.is_finite() && h.vox_offset > 0.0 {
+        h.vox_offset as usize
+    } else {
+        0
+    };
+    let n: usize = shape.iter().product();
+    let size = dt.size();
+    if bytes.len() < offset + n * size {
+        return Err(invalid(
+            data_path,
+            format!("expected {} bytes of voxel data, found {}", n * size, bytes.len()),
+        ));
+    }
+    let raw = &bytes[offset..offset + n * size];
+    let swap = !h.byte_order.is_native();
+    let value = |k: usize| -> f32 {
+        let b = &raw[k * size..(k + 1) * size];
+        let mut a = [0u8; 8];
+        a[..size].copy_from_slice(b);
+        if swap {
+            a[..size].reverse();
+        }
+        match dt {
+            DataType::U8 => f32::from(a[0]),
+            DataType::I8 => f32::from(a[0] as i8),
+            DataType::U16 => f32::from(u16::from_ne_bytes([a[0], a[1]])),
+            DataType::I16 => f32::from(i16::from_ne_bytes([a[0], a[1]])),
+            DataType::U32 => u32::from_ne_bytes([a[0], a[1], a[2], a[3]]) as f32,
+            DataType::I32 => i32::from_ne_bytes([a[0], a[1], a[2], a[3]]) as f32,
+            DataType::F32 => f32::from_ne_bytes([a[0], a[1], a[2], a[3]]),
+            DataType::F64 => f64::from_ne_bytes(a) as f32,
+            DataType::U64 => u64::from_ne_bytes(a) as f32,
+            DataType::I64 => i64::from_ne_bytes(a) as f32,
+            _ => 0.0,
+        }
+    };
+    let slope = h.scl_slope;
+    let scale = (slope != 0.0 && slope.is_finite() && slope != 1.0).then_some(slope as f32);
+    let values: Vec<f32> = (0..n)
+        .map(|k| match scale {
+            Some(s) => value(k) * s,
+            None => value(k),
+        })
+        .collect();
+    let dims: [usize; 3] = [0, 1, 2].map(|k| shape.get(k).copied().unwrap_or(1));
+    let per = dims.iter().product::<usize>().max(1);
+    let voxel = larmorx_mri::hmc::image::voxel_size(&h).map(f64::from);
+    // FSL gives an ANALYZE input a transform of positive determinant (below), so it works on
+    // it with x reversed, as on any neurologically stored image (observed)
+    let vols: Vec<Vol> = values
+        .chunks_exact(per)
+        .map(|c| flip_x(&Vol::new(dims, voxel, c.to_vec())))
+        .collect();
+    // the output geometry FSL gives an ANALYZE input (observed)
+    let d = voxel;
+    let off = [0, 1, 2].map(|k| -(f64::from(origin[k]) - 1.0) * d[k]);
+    h.qform_code = 2;
+    h.sform_code = 2;
+    h.quatern_b = 0.0;
+    h.quatern_c = 0.0;
+    h.quatern_d = 0.0;
+    h.qoffset_x = off[0];
+    h.qoffset_y = off[1];
+    h.qoffset_z = off[2];
+    h.pixdim[0] = 1.0;
+    h.srow_x = [d[0], 0.0, 0.0, off[0]];
+    h.srow_y = [0.0, d[1], 0.0, off[1]];
+    h.srow_z = [0.0, 0.0, d[2], off[2]];
+    h.scl_slope = 1.0;
+    h.scl_inter = 0.0;
+    h.intent_code = 0;
+    let volumes = vols.len();
+    let first = vols
+        .first()
+        .cloned()
+        .ok_or_else(|| invalid(path, "the image has no voxels".into()))?;
+    Ok(Some((
+        vols,
+        Input {
+            vol: first,
+            header: h,
+            flipped: true,
+            volumes,
+        },
+    )))
+}
+
+/// `v` with its x axis reversed.
+pub fn flip_x(v: &Vol) -> Vol {
+    let [nx, _, _] = v.shape;
+    let mut data = Vec::with_capacity(v.data.len());
+    for row in v.data.chunks_exact(nx.max(1)) {
+        data.extend(row.iter().rev());
+    }
+    Vol::new(v.shape, v.voxel, data)
 }

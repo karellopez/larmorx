@@ -250,10 +250,18 @@ pub fn fsl_name(name: &str) -> Option<String> {
 /// The image layer's messages for an input that cannot be read, and larmorx's line.
 fn read_failure(err: &mut dyn Write, name: &str, e: &ImageError) -> u8 {
     let text = e.to_string();
-    if text.starts_with("No image files match") || text.starts_with("Multiple possible") {
-        let _ = writeln!(err, "Image Exception : #63 :: {text}");
+    let missing = text.starts_with("No image files match") || text.contains("No such file");
+    if missing || text.starts_with("Multiple possible") {
+        // FSL's words name the image without its extension, then as given (observed)
+        let stem = files::strip_image_extension(name);
+        let what = if missing {
+            format!("No image files match: {stem}")
+        } else {
+            format!("Multiple possible filenames detected for basename: {stem}")
+        };
+        let _ = writeln!(err, "Image Exception : #63 :: {what}");
         let _ = writeln!(err, "Image Exception : #22 :: Failed to read volume {name}");
-        let _ = writeln!(err, "Error : {text}");
+        let _ = writeln!(err, "Error : {what}");
         let _ = writeln!(
             err,
             "larmorx fsl bet2: {name} cannot be read; FSL aborts here (larmorx)"

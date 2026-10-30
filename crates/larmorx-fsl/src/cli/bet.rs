@@ -444,6 +444,30 @@ fn brain_centre(run: &Run<'_>, output: &str, err: &mut dyn Write) -> Result<[f64
     }))
 }
 
+/// A failure of one of the script's steps on standard error: FSL's own message (the image
+/// layer's `ERROR::` lines) as FSL prints it, anything else as larmorx's line.
+fn report(err: &mut dyn Write, e: &str) {
+    if e.starts_with("ERROR::") {
+        let _ = err.write_all(e.as_bytes());
+    } else {
+        let _ = writeln!(err, "larmorx fsl bet: {e} (larmorx)");
+    }
+}
+
+/// `header` with the qform's quaternion (`b`, `c`, `d` and the qfac) of `from`, as an FSL
+/// program that read `from` holds it.
+fn with_quaternion(
+    header: &larmorx_io::nifti::NiftiHeader,
+    from: &larmorx_io::nifti::NiftiHeader,
+) -> larmorx_io::nifti::NiftiHeader {
+    let mut h = header.clone();
+    h.quatern_b = from.quatern_b;
+    h.quatern_c = from.quatern_c;
+    h.quatern_d = from.quatern_d;
+    h.pixdim[0] = from.pixdim[0];
+    h
+}
+
 /// Writes `vol` (radiological frame) as an image like `like`.
 fn write_like(
     run: &Run<'_>,
@@ -467,12 +491,13 @@ fn write_values(
     values: Values,
     cal: Option<(f64, f64)>,
 ) -> Result<(), String> {
+    // FSL's programs (fslroi, fslmerge, fslmaths) print the image layer's messages (§3.1)
     let t = run
         .settings
         .get("FSLOUTPUTTYPE")
-        .ok_or_else(|| "FSLOUTPUTTYPE is not set".to_owned())?;
+        .ok_or_else(|| bet2::FSLOUTPUTTYPE_UNSET.to_owned())?;
     let (name, version) = image::output_file(&run.settings.name(stem), t)
-        .ok_or_else(|| format!("FSLOUTPUTTYPE={t} is not a type"))?;
+        .ok_or_else(|| format!("{}\n", image::unknown_output_type_message(t)))?;
     let o = Output {
         template: &like.header,
         flipped: like.flipped,
@@ -505,7 +530,7 @@ fn fmri(
     err: &mut dyn Write,
 ) -> Result<(), u8> {
     let fail = |e: String, out: &mut dyn Write, err: &mut dyn Write| {
-        let _ = writeln!(err, "larmorx fsl bet: {e} (larmorx)");
+        report(err, &e);
         run.failed(out)
     };
     let (vols, inp) = match read_input(run, input) {
@@ -629,7 +654,7 @@ fn small_fov(
     err: &mut dyn Write,
 ) -> Result<(), u8> {
     let fail = |e: String, out: &mut dyn Write, err: &mut dyn Write| {
-        let _ = writeln!(err, "larmorx fsl bet: {e} (larmorx)");
+        report(err, &e);
         run.failed(out)
     };
     let (vols, inp) = match read_input(run, input) {
@@ -711,7 +736,26 @@ fn small_fov(
         padded.extend_from_slice(&top);
     }
     let pvol = Vol::new([nx, ny, pz], v.voxel, padded);
-    w(&tmp, &pvol, out, err)?;
+    // fslmerge writes the padded image with the header of its first image, the bottom slice:
+    // its quaternion is the one fslroi stored there, converted to the matrix and back once more
+    // (each FSL program's read and write is one round trip, specs/bet.md §8.2, and the round
+    // trip can move the last bits again)
+    let bottom_header = read_input(run, &format!("{tmp}_bottom"))
+        .map(|(_, b)| b.header)
+        .map_err(|e| fail(e, out, err))?;
+    let merged = image::Input {
+        header: with_quaternion(&inp.header, &bottom_header),
+        ..inp.clone()
+    };
+    write_like(
+        run,
+        &tmp,
+        &merged,
+        std::slice::from_ref(&pvol),
+        Values::F32(pvol.data.clone()),
+        None,
+    )
+    .map_err(|e| fail(e, out, err))?;
     let mut a = vec![tmp.clone(), output.to_owned()];
     a.extend(opts.iter().cloned());
     run.bet2(&a, out, err)?;
@@ -792,8 +836,10 @@ fn small_fov(
             Values::F32(cropped.data.clone())
         };
         let cal = is_int.then_some((pinp.header.cal_min, pinp.header.cal_max));
+        // fslroi's crop: the input's geometry, the quaternion the padded output holds (one
+        // more round trip, §8.2)
         let like = image::Input {
-            header: inp.header.clone(),
+            header: with_quaternion(&inp.header, &pinp.header),
             ..pinp
         };
         write_like(run, &stem, &like, &[cropped], values, cal).map_err(|e| fail(e, out, err))?;

@@ -82,6 +82,10 @@ const SPECS: [Spec; 17] = [
     number(None, Some("parameter_d2"), 1),
 ];
 
+/// FSL's image layer's message when `FSLOUTPUTTYPE` is not set (§3.1), printed when the first
+/// output is written.
+pub const FSLOUTPUTTYPE_UNSET: &str = "ERROR:: Environment variable FSLOUTPUTTYPE is not set!\nPlease make sure that the appropriate configuration file is sourced by your shell (e.g. by putting it in .profile).\ne.g. bash or sh users add the line \". ${FSLDIR}/etc/fslconf/fsl.sh\"\ne.g. tcsh or csh users add the line \"source ${FSLDIR}/etc/fslconf/fsl.csh\"\n";
+
 /// bet2's options as given.
 #[derive(Clone, Debug, PartialEq)]
 pub struct Options {
@@ -598,10 +602,7 @@ pub fn run(
         let ot = match &output_type {
             None => {
                 print_notices(err, &notices);
-                let _ = write!(
-                    err,
-                    "ERROR:: Environment variable FSLOUTPUTTYPE is not set!\nPlease make sure that the appropriate configuration file is sourced by your shell (e.g. by putting it in .profile).\ne.g. bash or sh users add the line \". ${{FSLDIR}}/etc/fslconf/fsl.sh\"\ne.g. tcsh or csh users add the line \"source ${{FSLDIR}}/etc/fslconf/fsl.csh\"\n"
-                );
+                let _ = err.write_all(FSLOUTPUTTYPE_UNSET.as_bytes());
                 return 1;
             }
             Some(t) if !image::OUTPUT_TYPES.contains(&t.as_str()) => {

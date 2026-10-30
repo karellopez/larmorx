@@ -821,17 +821,8 @@ def compare_original_file(checks: CheckList, label: str, pa: Path, pb: Path) -> 
         )
         return
     kind = _kind(name)
-    if kind == "skull":
-        d = dice(da, db)
-        checks(
-            f"{label}{name}",
-            True,
-            metric="Dice",
-            value=round(d, 6),
-            threshold="reported (specs/bet.md §4.7 leaves the skull search open)",
-            detail=f"{differing} of {da.size} values differ",
-        )
-        return
+    # the skull image (100 at the skull's edge) is held to the masks' thresholds: specs/bet.md
+    # §4.7 gives the skull search exactly since 2026-10-30 (part 1 only reported its Dice)
     if kind == "outline":
         # the surface drawn at the input's maximum: elsewhere the input itself
         top = max(float(np.nanmax(fa)), float(np.nanmax(fb)))
@@ -2176,8 +2167,8 @@ def _original_suite() -> Suite:
             ),
             (
                 "Skull",
-                "reported (Dice): specs/bet.md §4.7 leaves details of the skull search open (a "
-                "question for the spec writer)",
+                "as the masks: bit-identical, or Dice and boundary distance within the masks' "
+                "thresholds (specs/bet.md §4.7 gives the skull search exactly)",
             ),
         ],
         cases=_original_cases,
@@ -2211,10 +2202,12 @@ def highlights_original(results: list[CaseResult]) -> list[str]:
         if not c.name.endswith(FMRIPREP_OWN)
         and (c.metric == "values" or c.metric.startswith(("Dice", "drawn surface")))
     ]
-    skulls = [c for c in files if c.threshold and str(c.threshold).startswith("reported")]
+    skulls = [c for c in files if "_skull" in c.name]
     images = [c for c in files if c not in skulls]
     identical = sum(1 for c in images if c.threshold == "bit-identical")
     within = sum(1 for c in images if c.passed and c.threshold != "bit-identical")
+    skull_same = sum(1 for c in skulls if c.threshold == "bit-identical")
+    skull_within = sum(1 for c in skulls if c.passed and c.threshold != "bit-identical")
     meshes = [c for r in results for c in r.checks if c.metric.startswith("vertex distance")]
     mesh_same = sum(1 for c in meshes if str(c.value).startswith("0.0000 / 0.0000"))
     lines = [
@@ -2225,8 +2218,8 @@ def highlights_original(results: list[CaseResult]) -> list[str]:
         "not have yet).",
         f"- **{identical} of {len(images)} brains, masks and outlines with FSL's values, bit for "
         f"bit**, {within} more within the thresholds; {mesh_same} of {len(meshes)} meshes with "
-        f"FSL's vertices to the file's 6 decimals; {len(skulls)} skull images not bit-identical, "
-        "reported (Dice) with the skull search's open details.",
+        f"FSL's vertices to the file's 6 decimals; {skull_same} of {len(skulls)} skull images "
+        f"bit-identical, {skull_within} more within the masks' thresholds.",
     ]
     own = [c for r in results for c in r.checks if c.name.endswith(FMRIPREP_OWN)]
     if own:

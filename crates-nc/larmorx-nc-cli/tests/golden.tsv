@@ -2,7 +2,7 @@
 # Golden checksums of the larmorx-nc replicas (tests/golden.rs): SHA-256 of the files
 # larmorx-nc writes on Linux x86_64 (images by header and data, with sampled values).
 # Every platform must reproduce them (docs/validation/golden.md). Do not edit by hand.
-# Recorded from f587288740256b958772e6b7478c502e77bcd730 on 2026-10-29 (Linux x86_64)
+# Recorded from f822f64d7947616098e78ef1f0213583265e8918 on 2026-10-30 (Linux x86_64)
 # case	output	sha256	type	sample
 bet.fmri	out.nii.data	fdb80b59230e2a6935591185abccce90349f1b3f64fa343f210c8a99bfa7abf4	float32	0000008000000000000000000000000000000000000000000000008000000000
 bet.fmri	out.nii.header	b219a1a8be7ebc37ac08f7769e7cb523d4693ce806053da5ddb326e38e78c057	-	-
@@ -128,6 +128,25 @@ mcflirt.default.int16.reproduce	mcflirt.default.int16.reproduce_abs.rms	fef89bbe
 mcflirt.default.int16.reproduce	mcflirt.default.int16.reproduce_abs_mean.rms	8d6029823efc0cf540599228cc7a0ac1a9cff5cd3b391b54baa9f33619b56107	-	-
 mcflirt.default.int16.reproduce	mcflirt.default.int16.reproduce_rel.rms	7899c82a64ad3a6bc446f580d75d4a2758f0d69ca7604f27aa93deed8c773143	-	-
 mcflirt.default.int16.reproduce	mcflirt.default.int16.reproduce_rel_mean.rms	2d81ed3a3aacf2241b23973a62e54e43b6583c31cc6d57bda8786ec13c5384cc	-	-
+mcflirt.fsl65.par	status	4355a46b19d348dc2f57c046f8ef63d4538ebb936000f3c9ee954a27460dd865	-	1
+mcflirt.fsl65.par.reproduce	mcflirt.fsl65.par.reproduce.mat/MAT_0000	343725aa083a891c19b42bef7bd529ac6ee7642ad187709b80185e691d85211a	-	-
+mcflirt.fsl65.par.reproduce	mcflirt.fsl65.par.reproduce_rel.rms	9799dce76f113d9cb1cc3d1792defafe33436bba915b4fd77bbe323df2cfee50	-	-
+mcflirt.fsl65.par.reproduce	mcflirt.fsl65.par.reproduce_rel_mean.rms	069d24b8ca741139c10a8943c69f534460d8bf9121e7f1df2f192c3e00bec57c	-	-
+mcflirt.fsl65.rms.reproduce	mcflirt.fsl65.rms.reproduce.mat/MAT_0000	343725aa083a891c19b42bef7bd529ac6ee7642ad187709b80185e691d85211a	-	-
+mcflirt.fsl65.rms.reproduce	mcflirt.fsl65.rms.reproduce.mat/MAT_0001	109a3ece7c40a7672185424dafa68abe14cd4f0b9944982aca80de9821d1ebcc	-	-
+mcflirt.fsl65.rms.reproduce	mcflirt.fsl65.rms.reproduce.mat/MAT_0002	c8b0554af656ea054e53ac2ee9023b9f4696328457ff4cfaa04182bbf2404c6c	-	-
+mcflirt.fsl65.rms.reproduce	mcflirt.fsl65.rms.reproduce.mat/MAT_0003	3c8ef66835d2a1a69a767de570966ad5ee32e27b32d62e2c6a8b646e92765f23	-	-
+mcflirt.fsl65.rms.reproduce	mcflirt.fsl65.rms.reproduce.nii.data	a632dea177763c381880ce878bf3beaff5e1d465116652dc4b31ed6614d895ca	int16	0a0018001200110005000b0022001700
+mcflirt.fsl65.rms.reproduce	mcflirt.fsl65.rms.reproduce.nii.header	fcce1e96b9767ac99ddd344c7e3ae79c99817d0dcaaac673de0b53f73355d159	-	-
+mcflirt.fsl65.rms.reproduce	mcflirt.fsl65.rms.reproduce_rel_mean.rms	069d24b8ca741139c10a8943c69f534460d8bf9121e7f1df2f192c3e00bec57c	-	-
+mcflirt.fsl66.bins	status	4355a46b19d348dc2f57c046f8ef63d4538ebb936000f3c9ee954a27460dd865	-	1
+mcflirt.fsl66.bins-1.reproduce	mcflirt.fsl66.bins-1.reproduce.mat/MAT_0000	343725aa083a891c19b42bef7bd529ac6ee7642ad187709b80185e691d85211a	-	-
+mcflirt.fsl66.bins-1.reproduce	mcflirt.fsl66.bins-1.reproduce.mat/MAT_0001	109a3ece7c40a7672185424dafa68abe14cd4f0b9944982aca80de9821d1ebcc	-	-
+mcflirt.fsl66.bins-1.reproduce	mcflirt.fsl66.bins-1.reproduce.mat/MAT_0002	c8b0554af656ea054e53ac2ee9023b9f4696328457ff4cfaa04182bbf2404c6c	-	-
+mcflirt.fsl66.bins-1.reproduce	mcflirt.fsl66.bins-1.reproduce.mat/MAT_0003	3c8ef66835d2a1a69a767de570966ad5ee32e27b32d62e2c6a8b646e92765f23	-	-
+mcflirt.fsl66.bins-1.reproduce	mcflirt.fsl66.bins-1.reproduce.nii.data	a632dea177763c381880ce878bf3beaff5e1d465116652dc4b31ed6614d895ca	int16	0a0018001200110005000b0022001700
+mcflirt.fsl66.bins-1.reproduce	mcflirt.fsl66.bins-1.reproduce.nii.header	fcce1e96b9767ac99ddd344c7e3ae79c99817d0dcaaac673de0b53f73355d159	-	-
+mcflirt.fsl66.bins.reproduce	status	4355a46b19d348dc2f57c046f8ef63d4538ebb936000f3c9ee954a27460dd865	-	1
 mcflirt.gdt.reproduce	grefvol_mcflirt.gdt.reproduce.nii.data	46da0725055461083baabb2268dab83589132a2aafdb993a0386636adc2ec38f	float32	00008841aaaa924106410041729cd243539464433149c14256551541c6f32441
 mcflirt.gdt.reproduce	grefvol_mcflirt.gdt.reproduce.nii.header	d0fe71576695061cfb9888ad39e8443d228e9f2acf20b649146ab88f31c7bf63	-	-
 mcflirt.gdt.reproduce	mcflirt.gdt.reproduce.mat/MAT_0000	748c70662146cb86190452e957b941ad6141ad4ebdc465502a2e2e1dd80bcb88	-	-

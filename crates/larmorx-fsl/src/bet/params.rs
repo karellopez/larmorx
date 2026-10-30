@@ -39,7 +39,11 @@ pub fn robust_range(v: &Vol) -> (f64, f64) {
             u -= 1;
             count += hist[u as usize];
         }
-        let at = |k: i64| f64::from(lo + (k as f64 * width / 1000.0) as f32);
+        // in float throughout: (hi - lo), its product with the bin and the division by 1000
+        // each rounded to float (observed: thresh2 -0.142004 on ds005454's BOLD reference,
+        // where a product in double gives -0.142002)
+        let width32 = hi - lo;
+        let at = |k: i64| f64::from(lo + (k as f32 * width32) / 1000.0f32);
         t2 = at(b);
         t98 = at(u + 1);
         if t98 - t2 >= width / 10.0 || last {

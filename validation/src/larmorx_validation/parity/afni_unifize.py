@@ -16,7 +16,9 @@ variables; the errors and crashes; the defects (D13: AFNI-01, -02, -07, -11, -12
 65.0 90.0 -T2``) on the inputs of every oracle run's BOLD reference, compared with fMRIPrep's
 own outputs too; AFNI's default on the oracle runs' T1w images (the half-size path); ``-GM`` on
 a T1w; ``-EPI`` on BOLD series. The real cases also measure AFNI's own variability (OpenMP
-thread counts, fMRIPrep's build of AFNI in its image).
+thread counts, fMRIPrep's build of AFNI in its image). The clean-room original also has AFNI-75's
+guard cases and GLIBC-05's (``-EPI``'s radius from glibc 2.35's cube root with ``reproduce``,
+the correctly rounded one by default: :data:`CBRTF_VOXELS`).
 """
 
 from __future__ import annotations

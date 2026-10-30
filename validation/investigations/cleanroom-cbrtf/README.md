@@ -36,7 +36,7 @@ build). It opens the C library's `libm.so.6` with `dlopen` and calls its `cbrtf`
 | Whole-sequence hash (§7.1's hash through all inputs) | `335d1fb5fb714c95`, from the system's results and from `cbrtf_glibc`'s (the unit test `matches_glibc_everywhere`) |
 | Every 4099th input | `fcc5fa1d77606cb4` (the unit test `matches_glibc_on_a_stride`) |
 | glibc's results not correctly rounded | 453,492,162 of the 4,278,190,082 non-NaN inputs (10.6 %) |
-| Time | about 7 s on 22 threads (both functions on every input) |
+| Time | 21.6 s on 22 threads (both functions, CORE-MATH's for the count, and the five hashes on every input; larmorx `d2b8c21`) |
 
 **The spec's §7.2 number, `c679cb92d4402e33`, is not reproduced** by the system's own results:
 §7.1's hash run through all 2^32 results of the system's `cbrtf` gives `335d1fb5fb714c95`

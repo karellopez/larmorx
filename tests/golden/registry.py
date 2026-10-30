@@ -862,7 +862,7 @@ def cli_status(
         os.environ.clear()
         os.environ.update(saved)
     named: list[str] = []
-    for d in re.findall(r"\b((?:AFNI|FSL)-\d\d)\b", err):
+    for d in re.findall(r"\b((?:AFNI|FSL|GLIBC)-\d\d)\b", err):
         if d not in named:
             named.append(d)
     return code, named
@@ -3099,6 +3099,36 @@ def _(ctx: Context) -> dict[str, Any]:
         "named": " ".join(i for i in ids if i == "AFNI-75"),
         "files": files_under(str(ctx.dir)),
     }
+
+
+@case("cli.afni.3dUnifize.glibc05", covers=("cli:afni 3dUnifize",))
+def _(ctx: Context) -> dict[str, Any]:
+    """GLIBC-05 (``specs/cbrtf.md``): ``-EPI``'s radius from the correctly rounded cube root by
+    default and from glibc 2.35's with ``reproduce`` (the clean-room ``cbrtf_glibc``). Voxels of
+    2 x 2 x 2.9924254 mm (11.969702 mm³): radius 7.9999995 and 8 voxels, a different ball;
+    voxels of 1 x 1 x 1.0421294 mm: radius 18.05 and 18.050001, the same ball, printed 18.0 and
+    18.1. GLIBC-05 named in both modes of both."""
+    shape = (24, 24, 16)
+    x, y, z = np.meshgrid(*(np.arange(n, dtype=np.float64) for n in shape), indexing="ij")
+    r2 = ((x - 11.5) / 9) ** 2 + ((y - 11.5) / 10) ** 2 + ((z - 7.5) / 6) ** 2
+    head = 800.0 * np.clip(1.2 - r2, 0.0, 1.0) + 300.0 * (r2 < 0.5)
+    vols = [head * (1.0 + t / 100) + ints(31 + t, shape, 0, 16) for t in range(4)]
+    data = np.asfortranarray(np.stack(vols, axis=-1).astype(np.float32))
+    out: dict[str, Any] = {}
+    for name, bits in (("ball", 0x403F83E6), ("printed", 0x3F85647F)):
+        z = float(np.array([bits], dtype=np.uint32).view(np.float32)[0])
+        sizes = (2.0, 2.0, z) if name == "ball" else (1.0, 1.0, z)
+        aff = np.diag([*sizes, 1.0])
+        hdr = header_for(data, aff, pixdim=(1.0, *sizes, 2.0, 1.0, 1.0, 1.0), xyzt_units=10)
+        path = ctx.out(f"{name}-input.nii")
+        lx.save(lx.Image(data, aff, hdr), path)
+        for mode in ("fix", REPRODUCE):
+            o = ctx.out(f"{name}-{mode}.nii")
+            code, ids = cli_status("afni", "3dUnifize", "-quiet", "-EPI", "-prefix", o, path, upstream_defects=mode)  # fmt: skip
+            out[f"{name}.{mode}.status"] = np.array([code])
+            out[f"{name}.{mode}.named"] = " ".join(i for i in ids if i == "GLIBC-05")
+            out[f"{name}.{mode}"] = Nifti(o)
+    return out
 
 
 @case("py.afni.unifize", covers=("lx.afni.unifize",))

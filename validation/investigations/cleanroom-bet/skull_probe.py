@@ -81,7 +81,7 @@ def main(argv):
     nrm = normals(pts, tri)
     nb = neighbours(len(pts), tri)
     surf = surface(pts, tri, vox, shape)
-    step = vox.min() / 2
+    step = vox.min() / 2 if len(argv) < 7 else float(argv[6])
     rng = t98 - t2
     # profiles once per (voxel, vertex)
     cast = []

@@ -404,7 +404,10 @@ mod tests {
         // package; exit 127 as for a missing program.
         let (code, _, err) = run_capture(&["lx", "fsl", "betsurf", "in", "out"]);
         assert_eq!(code, replica::EXIT_NOT_FOUND);
-        assert!(err.contains("no clean-room original of fsl betsurf"), "{err}");
+        assert!(
+            err.contains("no clean-room original of fsl betsurf"),
+            "{err}"
+        );
         assert!(err.contains("pip install larmorx-nc"), "{err}");
         // bet2 runs its clean-room original: its usage (exit 1, standard error).
         let (code, _, err) = run_capture(&["lx", "fsl", "bet2"]);

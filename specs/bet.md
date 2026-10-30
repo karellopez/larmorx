@@ -77,7 +77,7 @@ All three take FSL's image names: a file name with or without its extension (§3
 
 - A name is resolved by trying, in order, the name as given and the name with `.nii.gz`, `.nii`,
   `.hdr.gz`, `.hdr`, `.img.gz`, `.img` (`.hdr`/`.img` pairs: the header names the pair), and the
-  NIfTI-2 variants; a name ending in one of these extensions is used as is. Images FSL reads:
+  NIfTI-2 variants; a name ending in one of these extensions is used as is when that file exists (spec writer, 2026-10-30: else the search below). Images FSL reads:
   NIfTI-1 and NIfTI-2 single files and pairs, gzipped or not, and ANALYZE 7.5 pairs.
 - When no file matches, FSL's image layer prints `Image Exception : #63 :: No image files match:
   <name>` and then `Image Exception : #22 :: Failed to read volume <name>` followed by
@@ -85,6 +85,8 @@ All three take FSL's image names: a file name with or without its extension (§3
   uncaught exception (exit status 134, `terminate called after throwing an instance of
   'std::runtime_error'` and `what():  ...` lines) **(observed)**. larmorx prints the same
   `Image Exception` lines, then one line of its own saying that FSL aborts here, and exits 1.
+  (spec writer, 2026-10-30) **(observed)** `<name>` in the `#63` and `Error` lines is the name
+  without its image extension; in the `#22` line it is the name as given.
 - Outputs are written in the type `FSLOUTPUTTYPE` names: `NIFTI` (`.nii`), `NIFTI_GZ`
   (`.nii.gz`), `NIFTI_PAIR` (`.hdr`/`.img`), `NIFTI_PAIR_GZ`, `NIFTI2`, `NIFTI2_GZ`,
   `NIFTI2_PAIR`, `NIFTI2_PAIR_GZ`, `ANALYZE`, `ANALYZE_GZ`. Unset, FSL prints `ERROR::
@@ -106,6 +108,13 @@ All three take FSL's image names: a file name with or without its extension (§3
   possible filenames detected for basename: <name>`); `.img`, `.img.gz`, `.img.zst`, `.img.bz2`
   name the pair of the matching `.hdr` name. The data file of a pair is read in whatever format
   its own bytes say. FSL 6.0.7.17 read gzip and uncompressed files only.
+  (spec writer, 2026-10-30) **A name with an extension falls back to the search (observed:** FSL
+  6.0.7.23 reads `in.nii` when given `in.nii.gz` and only `in.nii` exists; the clean-room original
+  refused there**)**: the name loses one extension (the first of the list above that ends it, an
+  `.img` form standing for its `.hdr`); if it had one and that file (the header of a pair) exists,
+  it is read; otherwise the extension-less name is completed as above (exactly one match read,
+  several `Multiple possible filenames detected for basename: <name>`, none the messages above). So
+  a name with an extension is used as is only when that file exists.
 - **Names holding `.img` (FSL 6.0.7.23, FSL-60).** FSL 6.0.7.23 opens every image under its name
   with the last occurrence of `.img` anywhere in it (a directory, or the file's own stem such as
   `sub.img2.nii.gz`) replaced by `.hdr`: it reads or writes another file, or fails with `Error:
@@ -138,6 +147,13 @@ All three take FSL's image names: a file name with or without its extension (§3
   file (`-e`) is written in these coordinates.
 - Options given in voxels (`bet2 -c`) are voxel indices of the file as stored; they are converted
   to the radiological frame (`i` becomes `nx - 1 - i` when the file was mirrored).
+- (spec writer, 2026-10-30) **ANALYZE 7.5 inputs (observed)**: FSL works on them with x reversed
+  (as on a neurologically stored image) and writes the outputs with a qform and an sform of code
+  2, the voxel sizes on the diagonal and the offset `−(origin − 1)·d` per axis, `origin` being
+  the header's `originator` field (an origin of 0 gives `+d`): the outputs line up with the input
+  voxel for voxel.
+- (spec writer, 2026-10-30) **A single slice (observed)** is written with `dim[0] = 2` (a trailing
+  axis of one voxel is not counted); so are `bet -Z`'s one-slice temporary images (§5.2).
 
 ### 3.3 Writing
 
@@ -150,7 +166,8 @@ Each output image has the input's grid and geometry and a fresh FSL header:
   `vox_offset` 352 for single files without extensions **(observed)**;
 - extensions are written only when `FSL_LOAD_NIFTI_EXTENSIONS` is set to a non-zero number
   (then the input's extensions are kept); FSL computes the data offset of two or more extensions
-  wrongly (FSL-56, §9);
+  wrongly (FSL-56, §9); (spec writer, 2026-10-30) **(observed)** FSL writes the extensions in full
+  and the data right after them: only the recorded `vox_offset` is wrong;
 - the data in the output's own type: the brain and the outline float32, the masks and the skull
   int16 (§4.7).
 
@@ -178,6 +195,13 @@ does (`docs/validation/fsl-bet-replica.md`); the original should write the same 
   `<option>: Couldn't set_value! valstr="<value> <the next words…>"!` (the values the option takes,
   joined by blanks). Each of these errors prints the usage, an empty line and the message on
   standard error, exit 1 **(observed)**.
+- (spec writer, 2026-10-30) **The option values (observed)**: an option of `k` values given fewer
+  than `k` words takes the words left, each read as C's `atof` reads it (0 when it does not read),
+  the missing ones 0, and never fails (`-c 4` is `-c 4 0 0`; `-c 1 -v` takes `-v` as its second
+  value); with `k` words or more, the first `k − 1` are read as `atof` reads them and the last must
+  read whole as a number (`strtod`: leading blanks, hexadecimal, `inf` and `nan` read); a
+  failure's `valstr` is the option's `k` words and the next one, if any. A long flag given a value
+  (`--mask=1`) is the flag. Every value is then rounded to float.
 - After parsing: `-f` outside [0, 1]: an empty line and `Fractional intensity threshold must be
   between 0 and 1!`, exit 1; `-g` outside [-1, 1]: an empty line and `Vertical gradient must be
   between -1 and 1!`, exit 1 (NaN passes both checks: FSL-42). Then `-h` prints the usage and
@@ -242,6 +266,27 @@ histograms, iteratively (every voxel counts, in float; the arithmetic in double)
    out its lowest and highest bins (the counts start one bin in from each end).
 4. If `hi == lo`, `t2 = lo` and `t98 = hi`.
 
+(spec writer, 2026-10-30) **The exact arithmetic** (FSL's bits; `lo`, `hi`, `t2`, `t98` are floats;
+`w = hi − lo` is a float subtraction):
+- the bin of `x`: `trunc(A·x + B)` with `A = 1000 / w` and `B = (1000·(−lo)) / w`, both in double;
+- the bin width `δ = w / 1000` in double; `t2 = lo + float(b·δ)` and `t98 = lo + float((u + 1)·δ)`
+  (the product in double, rounded to float, then added to `lo` in float) **(observed** on
+  fMRIPrep's calls: with `w` in double ds005454's BOLD reference prints `thresh2 -0.142002` where
+  FSL prints `-0.142004`; with the product in float a `thresh98` of ds000005's run 3 is one float
+  bit off**)**. `b·δ` is not `b·w/1000`: the division comes first;
+- the narrowed range of step 3: `lo' = float(lo + (b'/1000)·w)` and `hi' = float(lo + ((u' + 1)/1000)·w)`,
+  computed in double from the previous pass's `lo` and `w` (a formula of its own, not the one of
+  `t2`);
+- the test of step 3 is `t98 − t2 < w / 10` with the current pass's `w` (the narrowed range's),
+  `t98 − t2` a float subtraction, both sides as double; a narrowed range with `lo' == hi'` makes
+  the next pass use the full range as the tenth does;
+- the counts: `n` is the number of voxels in the histogram (the tenth pass removes the two end
+  bins' counts from it), and each scan adds bins while the count is below `n / 50` (integer
+  division).
+**Small images (observed, random testing 2026-10-30, case 36)**: with fewer than 50 voxels
+(`n / 50 = 0`) no bin is added: `t2` lies one bin below the minimum and `t98` one above the
+maximum (a 2-voxel image of 50 and 51: `thresh2 49.999`, `thresh98 51.001`).
+
 The verbose line (§4.9) prints these values.
 
 ### 4.3 Initial parameters
@@ -257,7 +302,10 @@ The verbose line (§4.9) prints these values.
   centre is `(x dx, y dy, z dz)` in the radiological frame (§3.2).
 - **The median within-brain intensity** `tm`: of the voxels with `t2 < v < t98` whose point is
   within the radius `r` of the centre (squared distance `< r²`), in storage order, `tm` is the
-  largest of the `floor(N_m / 2)` smallest values (the lower median). **(FSL 6.0.7.23)** With no
+  largest of the `floor(N_m / 2)` smallest values (the lower median; (spec writer, 2026-10-30)
+  **(observed)** the value of rank `floor(N_m / 2)` of the sorted list, and with one voxel that
+  voxel). With no voxel above the threshold the centre of gravity is `0/0` (**observed**:
+  `c-of-g -nan -nan -nan mm`, and the self-intersection total 0). **(FSL 6.0.7.23)** With no
   such voxel (a constant or binary image) `tm = t98` (FSL 6.0.7.17 read an empty list and
   crashed, FSL-41; fixed upstream: larmorx gives `t98` in both modes and names nothing). A
   constant image then still crashes FSL, in the mask's fill from the surface's centre, which is
@@ -271,6 +319,39 @@ The surface is an icosahedron subdivided 4 times: 2562 vertices, 5120 triangles.
 `o = 0.5257311121`; each subdivision splits every triangle into four at its edges' midpoints and
 then projects every vertex onto the unit sphere. The triangles are oriented so that their normals
 point outwards. The sphere is scaled to radius `r / 2` and centred on `c`.
+
+(spec writer, 2026-10-30) **The numbering and the orders (observed on `bet2 -e`'s files, and the
+ones FSL's sums follow).** Every triangle below is written with its vertices in the order of the
+mesh file (`-e`), `(v0, v1, v2)`.
+- The twelve vertices, numbered 0 to 11: `(τ, o, 0)`, `(−τ, o, 0)`, `(−τ, −o, 0)`, `(τ, −o, 0)`,
+  `(o, 0, τ)`, `(o, 0, −τ)`, `(−o, 0, −τ)`, `(−o, 0, τ)`, `(0, τ, o)`, `(0, −τ, o)`,
+  `(0, −τ, −o)`, `(0, τ, −o)`, with `τ` and `o` the doubles nearest the decimals above.
+- The twenty faces, in order: `(4,7,8) (4,9,7) (5,11,6) (5,6,10) (0,3,4) (0,5,3) (2,1,7)
+  (2,6,1) (8,11,0) (8,1,11) (9,3,10) (9,10,2) (8,0,4) (11,5,0) (4,3,9) (5,10,3) (7,1,8) (6,11,1)
+  (7,9,2) (6,2,10)`.
+- Each subdivision visits the triangles in order; for `(v0, v1, v2)` it makes the midpoints
+  `m0 = (v1 + v2)/2`, `m1 = (v0 + v2)/2`, `m2 = (v0 + v1)/2` (componentwise, in double), reuses a
+  midpoint already made in this subdivision whose coordinates agree within `1e-8` in every axis,
+  numbers the new ones after the existing vertices in the order `m0`, `m1`, `m2`, and replaces the
+  triangle by four, appended in this order: `(m2, m0, m1)`, `(m1, v0, m2)`, `(m0, v2, m1)`,
+  `(m2, v1, m0)`; the old triangles leave the list. Then every vertex `p` becomes
+  `p · (1/|p|)` (the reciprocal of `|p| = sqrt((x·x + y·y) + z·z)`, then three products).
+- A triangle's normal is `N = (v2 − v0) × (v1 − v0)`, the cross product taken as
+  `a × b = (a_y b_z − a_z b_y, b_x a_z − b_z a_x, a_x b_y − b_x a_y)`: these orientations point
+  outwards. (`(v0 − v1) × (v2 − v1)` is the same vector but not the same bits.)
+- **A vertex's triangles** are in the order of the mesh's triangle list (the order above, level by
+  level: each vertex's triangles of the last subdivision, as they were appended).
+- **A vertex's neighbours** (spec writer, 2026-10-30; question 5): the order is the one obtained by
+  visiting the final mesh's triangles in their order and, for each `(v0, v1, v2)`, moving to the end
+  of `v0`'s list first `v1` then `v2`, to the end of `v1`'s list `v2` then `v0`, to the end of
+  `v2`'s list `v0` then `v1` ("moving": a vertex already in the list is taken out of its place and
+  appended, never listed twice). This is the order FSL's mesh holds after the construction above,
+  and the one every copy of the mesh rebuilds (checked: the same lists for all 2562 vertices). A
+  list built "first come, kept in place" holds the same vertices in another order, which changes
+  the last bits of every neighbour mean and distance sum (§8.1).
+- **The initial placement**: each unit vertex `p` is first translated, `p + c` (componentwise, in
+  double), and then scaled about `c`: `c + (r/2)·((p + c) − c)`, with `r/2` computed as `r / 2.0`.
+  (`c + (r/2)·p` is the same point but not the same bits.)
 
 1000 iterations then move every vertex at once (each vertex's new position is computed from the
 positions of the previous iteration). For each vertex `p`:
@@ -288,6 +369,9 @@ positions of the previous iteration). For each vertex `p`:
 - **Intensity term** `u3 = f3 n`, with `f3` from the intensities inward along `-n`:
   - the voxel grid's spacing used for sampling is `(dx, dy, dz)`, except that an axis whose field
     of view is smaller than `r` uses `2 r` instead; `ds = min(1, the smallest of the three)`;
+    (spec writer, 2026-10-30) exactly: an axis keeps its voxel size when `n·d > r`, with `n·d` the
+    product of the voxel count and the voxel size in float, and uses `2r` otherwise (equality
+    included);
   - `Imin = tm`, `Imax = t`. The point `q = p - n` (1 mm inside) is converted to voxel indices by
     `trunc(q / d + 0.5)` per axis (`d` the spacing above, `trunc` toward zero). If that voxel is
     inside the image: its value `I` gives `Imin = min(Imin, I)`, `Imax = max(Imax, I)`; then the
@@ -296,7 +380,10 @@ positions of the previous iteration). For each vertex `p`:
     `k = 1, 2, ...` while `g = 2 + (k - 1) ds` stays below `d1`, the voxel
     `trunc(q/d + 0.5 - k ds n/d)` (the position is accumulated, one step of `ds n/d` at a time)
     lowers `Imin`, and raises `Imax` while `g < d2` (`d2 = 3`): with 1 mm voxels, the samples at
-    2 to 6 mm inside `p`, `Imax` from the one at 2 mm;
+    2 to 6 mm inside `p`, `Imax` from the one at 2 mm; (spec writer, 2026-10-30) `g` itself is
+    accumulated too: it starts at 2 and each step adds `ds` (with `ds = 0.8`, `2 + 5·0.8` and
+    five additions of 0.8 to 2 are not the same double, and the last sample can come or go); `d1`
+    and `d2` are the options' values truncated to integers;
   - `Imin = max(t2, Imin)`, `Imax = min(tm, Imax)`;
   - the local threshold `tl = (Imax - t2) b + t2`, where `b = b_t`, or with `-g G`:
     `b = clamp(b_t + G (p_z - c_z) / r, 0, 1)` (larger `G` grows the brain at the bottom);
@@ -323,13 +410,95 @@ each with the factor `10^(P+1)` for the smoothness term (§4.4), lowered linearl
 quarter of the iterations: for iteration `i > 750`, `4 (1 - i/1000) (10^(P+1) - 1) + 1`. After
 pass 10 the result is kept whatever its self-intersection.
 
+(spec writer, 2026-10-30; question 1) **The rerun, exactly.** The rule above is FSL's, complete:
+- it starts from the initial surface of §4.4 as placed before the first pass, bit for bit (the
+  same positions, and the same vertex, triangle and neighbour orders: §4.4), never from the
+  previous pass's surface;
+- `l` is set to 0 and recomputed on the first pass's schedule (iterations 0, 50, 100, 200, …,
+  900 of the rerun);
+- in iteration `i` (0 to 999) the factor is `F_P = 10^(P+1)` (100 for the first rerun), and for
+  `i > 750` (as `i > 0.75·1000` in double) `4·(1 − i/1000)·(F_P − 1) + 1`, evaluated left to right
+  in double;
+- the only change to the step is `f2 ← min(f2·F_P, 1)` at the vertices where `s·n > 0` (`s·n` the
+  same dot product that gives `s_n`); `t2`, `t`, `tm`, `t98`, `c`, `r`, `b_t`, `E`, `F` and the
+  intensity term are the first pass's;
+- after the 1000 iterations the surface is measured against the initial surface as after the first
+  pass (the total of the measure, or the exact test with `-e`), the verbose lines are printed
+  (§4.9), and after pass 10 the surface is kept.
+**Why an implementation following the rule can miss FSL** (measured with the replica, bit-identical
+to FSL, and copies of it each changed in one rounding): the reruns amplify last-bit differences. On
+the 75-year-old's T1w (ds002422, the standard tier's `real/older-75y`) FSL's first rerun totals
+19809.7; one changed rounding alone (the initial placement as `c + (r/2)·p`, the update summed as
+`((p + u1) + u2) + u3`, `1/R` from `s·n` instead of `s_n·n`, the normal divided by
+multiplication with `1/|v|`, the neighbour mean likewise, the triangle normal from `v1`, the
+centre of gravity summed slice by slice, or the neighbours in first-come order) moves it to
+16005 to 21766 and the final mask to Dice 0.993 to 0.996; the first pass's total (90050) does not
+move. With the clean-room original's ten choices of this kind (those eight, the `libm` crate's
+`tanh` and a correctly rounded `pow`) the replica gives the original's results exactly (16099,
+and the same masks on `older-75y`, `7t` and `tumour`); with FSL's arithmetic it gives FSL's. On
+the tumour (ds005003) `tanh` alone matters too: the `libm` crate's (musl's) is not glibc's
+(613.5 instead of FSL's 737.8 for the rerun's total). So reproducing FSL wherever a surface
+reruns needs every operation of the deformation as §8.1 gives it, `tanh` and `pow` glibc's; a
+surface that does not rerun is far less sensitive (fMRIPrep's 29 calls are FSL's bit for bit with
+the original's arithmetic).
+
+(spec writer, 2026-10-30; question 4) **The exact test (`-e`), exactly.** FSL's test is a sweep
+over the vertices sorted by x, the triangles `(v0, v1, v2)` in the mesh file's order:
+1. The vertices are taken in increasing x (equal x: in the order an unstable introsort leaves
+   them, §8.1); each brings its triangles in the vertex's triangle order (§4.4). A triangle met for
+   the first time is tested against every triangle of the active list, in the list's order (the
+   order they were first met), and then appended to it; met for the third time (its last vertex)
+   it leaves the list. So a pair is tested once, when their x-extents overlap in this order: the
+   triangle met later as `T`, the earlier one as `U`.
+2. A pair with a vertex in common is never tested: "in common" is coordinates agreeing within
+   `1e-8` in each axis, between any vertex of `U` and any vertex of `T`.
+3. The pair `T = (A0, A1, A2)`, `U = (B0, B1, B2)` intersects when this predicate holds, in double,
+   every dot product as `(x·x' + y·y') + z·z'` and every cross product as in §4.4:
+   - `N = (A0 − A1) × (A0 − A2)`; `σ_k = N·(B_k − A0)`;
+   - if neither `σ0·σ1 < 0` nor `σ0·σ2 < 0`: no intersection (so a `U` whose `B0` lies exactly on
+     `T`'s plane never intersects);
+   - else, for each edge `(B_i, B_{i+1})` of `U` (`i = 0, 1, 2`, indices mod 3) with
+     `σ_i·σ_{i+1} < 0`: `v1 = A1 − A0`, `v2 = A2 − A0`, `v3 = A2 − A1`, `V = v1 × v2`,
+     `p = B_i − A0`, `d = B_{i+1} − B_i`, `δ = d·V`; if `δ ≠ 0`: `λ = −(p·V)/δ`, `P = p + λd`,
+     `n1 = v1 × P`, `n2 = P × v2`, `n3 = v3 × (P − v1)`; a hit when `n1·n3`, `n2·n3` and `n1·n2`
+     are all positive or all negative;
+   - and the same with the roles exchanged: `M = (B0 − B1) × (B0 − B2)`, each edge
+     `(A_i, A_{i+1})` of `T` with `(M·(A_i − B0))·(M·(A_{i+1} − B0)) < 0` tested against `U`;
+   - any hit: the pair intersects (the strict signs: touching, coplanar and edge-on contacts are not
+     intersections).
+4. The surface self-intersects as soon as one pair intersects (the sweep stops there).
+The prefilter FSL means to apply (each triangle's bounding sphere) passes every pair (its centres
+are all the origin): only the sweep and the predicate decide.
+**(checked, random testing 2026-10-30 case 27, shrunk: a 14 × 14 × 12 head of 2.5 × 2.5 × 1.5 mm
+voxels)** FSL's first pass finds the pair `T = (834, 195, 835)`, `U = (829, 53, 763)` (vertex
+numbers), which also intersects in exact rational arithmetic on FSL's surface (two edges of `U`
+cross `T`'s interior; the signed distances are about `1e-7`); the clean-room original's first-pass
+surface lies up to 0.14 mm away from FSL's on this small head; on it that pair does not intersect
+(exactly), and FSL's own test finds no pair at all (the replica's test run on the original's
+surface). So the test is not what differs there: the surface's arithmetic is (§8.1).
+
 ### 4.6 The brain mask
 
 The mask is what the surface encloses: every voxel 1, the surface drawn as 0 (each triangle
 rasterised: points along one edge every `min(dx, dy, dz)/2` mm, and from each of them to the
 opposite vertex at the same spacing, each point to the voxel `floor(p/d + 0.5)` when inside the
 image), then a flood fill of 0 through 6-connected voxels of value 1 from the voxel holding the
-centroid of the vertices (`trunc` of the centroid in voxels); the mask is `1 - that`. A centroid
+centroid of the vertices (`trunc` of the centroid in voxels); the mask is `1 - that`.
+(spec writer, 2026-10-30) **The rasterisation, exactly (observed** with FSL's own meshes: the
+masks, brains and outlines are bit-identical wherever the surface is**)**: for a triangle
+`(v0, v1, v2)` (the file's order), `s = min(dx, dy, dz)·0.5`; `u = (v0 − v1)/|v0 − v1|` (each
+component divided by the norm; a zero vector stays zero); for `j = 0, s, 2s, …` (accumulated)
+while `j ≤ |v0 − v1|`: the point `q = v1 + j·u`, and from `v2` towards it, `w = (q − v2)/|q − v2|`
+and the points `v2 + i·w` for `i = 0, s, 2s, …` (accumulated) while `i ≤ |q − v2|`; each point
+`p` marks the voxel `(floor(p_x/dx + 0.5), floor(p_y/dy + 0.5), floor(p_z/dz + 0.5))` (the
+outline: `trunc` instead of `floor`), a voxel outside the image is not marked. The triangles are
+drawn in the mesh's order. **The fill's start (observed**, random testing 2026-10-30, cases 4 and
+35**)**: the centroid is `(Σ p)·(1/V)` (the vertices summed in order, then multiplied by the
+reciprocal of their count), divided by the voxel sizes and truncated; the start voxel is set to 0
+whatever it holds and the fill goes on from it, so a surface collapsed into a sheet through the
+start voxel lets the fill reach the whole image (FSL's mask is then every voxel). The mask is made
+whatever outputs are asked for: with `-n` alone FSL still crashes at a centroid that is not a
+number (FSL-43). A centroid
 outside the image (a single slice: the surface's centroid falls below it) makes FSL write and
 read outside the volume (FSL-43): the default starts the fill at the nearest voxel inside the
 image, which on a single slice gives FSL's mask **(observed)**; a centroid that is not a number
@@ -353,6 +522,10 @@ other read as not 1, and warns with the number of those reads.
 - **`-t`**: voxels below `t` are removed from the mask (and so from the brain) as well.
 - **outline** (`<out>_overlay`, `-o`): the input with the surface drawn at the input's maximum
   (rasterised as above, but each point to the voxel `trunc(p/d + 0.5)`); float32.
+  (spec writer, 2026-10-30) With `--ct` the outline is drawn on the converted image (Cormack
+  units, §4.8; **observed**), at the converted image's maximum; `-t` and `-s` also use the converted
+  values (and `t`, `t2`, `t98` of the converted image). With `--binaryMask` they use the input as
+  read (§4.7a).
 - **mesh** (`<out>_mesh.vtk`, `-e`): the surface as VTK ASCII polydata, exactly:
   `# vtk DataFile Version 3.0`, `surface file`, `ASCII`, `DATASET POLYDATA`,
   `POINTS <n>  float` (two blanks), one line `x y z` per vertex in fixed notation with 6 decimals,
@@ -364,6 +537,45 @@ other read as not 1, and warns with the number of those reads.
   maximum `d_max` (when above `t`), the point before it where `d/30 - I(d)/(t98 - t2)` is largest
   (from -3 mm), and from there the position of the steepest rise towards `d_max`: the skull voxel
   (`trunc` of the point).
+
+  (spec writer, 2026-10-30; question 2) **The skull search, exactly.** The image starts at 0. The
+  surface is rasterised as for the mask (§4.6, `floor`) into an image of 1s, its voxels set to 0;
+  reading this image outside the volume gives 0, so **voxels outside the image count as surface
+  voxels**. `h_s = min(dx, dy, dz)`. For each vertex `p`, in order:
+  1. `n` = its unit normal (§4.4, §8.1); `ν = (n_x/dx, n_y/dy, n_z/dz)` (the normal in voxels per
+     mm); `h = ceil(max over its neighbours q of |p − q| / 2)` (mm); `m = (p_x/dx, p_y/dy,
+     p_z/dz)`.
+  2. The candidate voxels `(i, j, k)`, `k` outermost, then `j`, then `i`, each from
+     `floor(m_a − h/d_a)` to `floor(m_a + h/d_a)` inclusive (`m_a − h/d_a`, not `(p_a − h)/d_a`),
+     **not** clipped to the image.
+  3. A candidate is profiled when it is a surface voxel (above: outside the image included) and is
+     no closer to any neighbour of `p` than to `p`: with `x = (i·dx, j·dy, k·dz)`,
+     `min over neighbours q of |x − q| ≥ |x − p|`.
+  4. The profile starts at the voxel's own integer position `o = (i, j, k)` (voxel coordinates);
+     the sample at depth `s` (mm) is the trilinear value (§8.1) at `o + s·ν`, zero outside the
+     image.
+  5. **The maximum**: `M = t`, `d_max = 0`; for `s = 0, h_s/2, h_s, …` (accumulated) while
+     `s < 30`: a sample `> M` sets `M` to it and `d_max = s` (the first position of the strict
+     maximum; no bounds test: samples outside the image are 0). If `M` stayed `t`, the voxel adds
+     nothing.
+  6. **The darkest point before it**: `d_min = −3`, `J_max = −10^6`; for `s = −3, −3 + h_s/2, …`
+     (accumulated, a grid of its own) while `s < d_max`: only where `o + s·ν` lies in
+     `[0, n_a)` on every axis (as doubles: `x ≥ 0` and `x < n_a`), `J = s/30 − I(s)/(t98 − t2)`;
+     a `J > J_max` sets `J_max = J` and `d_min = s` (the first strict maximum).
+  7. **The rise**: if `o + d_min·ν` lies in the image (as in 6): `prev = I(d_min)`, `G = 0`; for
+     `s = d_min + h_s` (a full step first), then `+ h_s/2` each time (accumulated), while
+     `s < d_max`: only in the image, `g = I(s) − prev`, `prev = I(s)`; when `g > 0`: if `g > G`,
+     `G = g` and `d_skull = s`, else the scan stops (a rise smaller than the largest so far ends
+     it; falls do not). Samples outside the image are skipped without changing `prev`.
+  8. If `G > 0` and `o + d_skull·ν` lies in the image (as in 6), the voxel
+     `(trunc(x), trunc(y), trunc(z))` of that point is set to 100.
+  The image is written as int16 (100 and 0). The arithmetic: every position in double
+  (`o + s·ν` componentwise), each sample's coordinates rounded to float for the interpolation,
+  the sample as float, `J` and `g` in double. **(checked)** The replica, which follows this, is
+  bit-identical to FSL's `_skull` in every compared case of its record; the clean-room original's
+  skull search differed from it (Dice about 0.9) in steps 2 (clipped), 3 (outside voxels), 4-6
+  (one grid from −3 mm for every search, the maxima's ties, the interpolation's edge), 7 (the scan)
+  and the trilinear formula (§8.1).
 
 ### 4.7a `--binaryMask <image>` (FSL 6.0.7.23)
 
@@ -379,6 +591,8 @@ search. **(FSL-61)** A mask whose dimensions differ from the input's makes FSL a
 mask over the input's dimensions, reading and writing outside it: larmorx refuses in both modes,
 naming FSL-61. **(FSL-62)** With `--ct`, FSL converts the mask and writes the mask (masked) as the
 brain image: larmorx writes the CT input masked, and `reproduce` FSL's result; both name FSL-62.
+(spec writer, 2026-10-30) **(observed)** FSL's brain image there is the mask as read (its 0 and
+1, not the converted values), masked.
 
 ### 4.8 CT images (`--ct`)
 
@@ -415,6 +629,9 @@ and `-c <x> <y> <z>` too (a missing value prints the usage); `-R`, `-S`, `-Z`, `
 `-d` keeps the temporary files; anything else prints the usage. With `-v`, before running, on
 standard output: `IN=<input>`, `OUT=<output>`, `bet2opts=<the options passed, each preceded by a
 blank>`, `verbose=1`, `debug=<0|1>`, `variation=<0..7>`.
+(spec writer, 2026-10-30) **(observed)** The `variation=` numbers: 0 the default, 1 `-R`, 2 `-S`,
+3 `-Z`, 4 `-F`, 5 `-A`, 6 `-A2`, 7 `-B`; `bet2opts=` lists the options in the order given (`-d`
+not among them); `-h` prints the usage and exits 1.
 
 Under `-R` the options passed to bet2 are first printed by bash's `echo` and every `-n` removed
 from that text (bet2 never gets `-n` there). bash's `echo` takes the leading words made only of
@@ -429,7 +646,11 @@ command:<the script's arguments, as words joined by blanks>` on standard output 
 it leaves undefined (a constant image: FSL-41 in FSL 6.0.7.17, FSL-43 in 6.0.7.23): bash reports the signal on standard error, the
 script then prints its failure and exits 1; in `reproduce` the replica's bet gives that outcome
 (its bet2 alone would fill the undefined part instead), and its default refuses with the reason. The script expands names unquoted
-(FSL-44). It ends by removing every file whose name starts with `<output>_tmp` unless `-d`
+(FSL-44). (spec writer, 2026-10-30) **(observed)** The failure line has no blank after the colon.
+FSL-44 splits names only where the script runs bet2 (its input and output names unquoted there):
+`bet in "my out" -m` runs `bet2 in my out -m`, which reports `out:  is an unrecognised token!`, and
+the script fails; the script's own option loop sees its arguments whole and stops at an empty
+one. It ends by removing every file whose name starts with `<output>_tmp` unless `-d`
 (FSL-46).
 
 The usage, exactly (standard output):
@@ -481,6 +702,12 @@ Miscellaneous options:
   user's options (a later `-f` overrides); its mask is dilated by one voxel (the maximum over the
   3 x 3 x 3 neighbourhood, of the non-zero voxels: `fslmaths -dilF`) into `<out>_mask`, and every
   volume of the input is multiplied by it into `<out>` (float, as `fslmaths -mas` writes).
+  (spec writer, 2026-10-30) **(observed)** The files: the first volume as `<out>_tmp`, bet2's mask
+  as `<out>_tmp_brain_mask`; the dilated mask `<out>_mask` float32 and the 4D brain `<out>`
+  float32, both with the display range 0 and 0 (as `fslmaths` writes them); a float64 series gives
+  a float64 brain with the input's double values (checked on random testing 2026-10-30 case 425:
+  FSL's brain is float64 and not the float-rounded values; only bet2's first volume is read as
+  float).
 - **`-Z`** (small field of view in z): `npad = (100 / dz - nz) / 2 + 1` in `dc`'s arithmetic
   at scale 0 (each division truncated toward zero to an integer; `dz` as `fslval` prints it, the
   sign removed); if `npad ≤ 0`, the message `Image already has a greater Z FOV than 100.0 so not
@@ -489,7 +716,9 @@ Miscellaneous options:
   and each output whose name starts with `<out>` is cropped back to the original slices. The crop
   finds the outputs with `imglob`, which FSL's script calls without `${FSLDIR}/bin`: with FSL's
   programs off the `PATH` it fails (`<script>: line 329: imglob: command not found`) and the
-  outputs stay padded (FSL-45).
+  outputs stay padded (FSL-45). (spec writer, 2026-10-30) **(observed)** The temporary files:
+  `<out>_tmp` (the padded image), `<out>_tmp_bottom` and `<out>_tmp_top` (one slice each, written
+  2D, §3.2; the top one's origin moved to the top slice).
 - **`-S`, `-B`, `-A`, `-A2`**: pending in larmorx (they need standard_space_roi, FLIRT, FAST):
   refused with exit 1 and a message naming the missing program.
 
@@ -727,9 +956,156 @@ For an original that wants to stay as close as possible to FSL (not required):
 - C's conversions of double to int truncate toward zero; `(int)` of a value out of range or NaN is
   `INT_MIN` on x86-64;
 - the sums over a vertex's triangles and neighbours are in the order the triangles were created
-  (§4.4's construction, each subdivision's new triangles in order);
+  (§4.4's construction, each subdivision's new triangles in order); (spec writer, 2026-10-30) the
+  neighbours' own order is §4.4's rule (question 5);
 - the NIfTI headers' quaternions are computed as FSL's NIfTI library does, in x87 extended
-  precision.
+  precision; (spec writer, 2026-10-30) the precision of each step is §8.2 (question 3).
+
+(spec writer, 2026-10-30) **Where a surface reruns, these conventions are not optional**: the
+reruns amplify last-bit differences (§4.5), so an original that wants FSL's results on images whose
+first pass self-intersects (older adults, 7 T, a tumour in the standard tier) needs §8.1 in full.
+Where nothing reruns, the original's own arithmetic already gave FSL's surfaces (fMRIPrep's 29
+calls bit-identical).
+
+### 8.1 The deformation's arithmetic, operation by operation (spec writer, 2026-10-30)
+
+Double precision unless said; `float(·)` rounds to float; no fused multiply-add anywhere (FSL's
+build has none); every sum in the order given (FSL is single-threaded: a parallel implementation
+keeps the order of each sum, which the per-vertex sums allow).
+- **The parameters.** `t2`, `t98` (§4.2) and the median as doubles; `t = t2 + 0.1·(t98 − t2)`;
+  `b_t = pow(f, 0.275)` with `f` the float option as double.
+- **The radius**: `r = pow((((0.75·N)·dx)·dy)·dz / π, 1/3)`, `N` the count as double, the voxel
+  sizes (floats) as doubles, `π` the double nearest, the exponent `1.0/3.0`. A slab along x (the
+  test `float(n_x·dx) < r`, the product in float): `r = pow((float(N·dy·dz) / π) / n_x, 0.5)`,
+  the product `N·dy·dz` in float (`N` first converted to float), the divisions in double; then
+  the same test and formula along y (with `dx`, `dz`) and along z (with `dx`, `dy`), each with the
+  `r` the previous one left.
+- **The centre of gravity**: one running sum over the whole volume in storage order (x fastest):
+  with `e = v − t2` and `τ = t − t2`, each voxel with `e > τ` adds `w = min(e, t98 − t2)` to `W`
+  and `((w·i)·dx, (w·j)·dy, (w·k)·dz)` to `C` (`i`, `j`, `k` as doubles); `c = (C_x/W, C_y/W,
+  C_z/W)`. A per-slice partial sum gives other bits. With `-c x y z`: `(x·dx, y·dy, z·dz)` after
+  the conversion of §3.2; on a neurologically stored image FSL 6.0.7.23 makes that conversion
+  through a 4 × 4 matrix product whose matrix it obtains by an inverse (a linear solve in double),
+  and its x can differ from `nx − 1 − x` in the last bits (the two FSL versions differ there):
+  random-testing cases 154 and 677 (`-c`, among the seven still open in this section) may be this.
+- **The smoothness constants**: `rmin = 3.33·w` in double, `rmax = float(10·w)` (the product in
+  float), `w` the float option; `E = (1/rmin + 1/rmax)/2`, `F = 6/(1/rmin − 1/rmax)`.
+- **The initial placement**: §4.4 (translate by `c`, then scale about `c`).
+- **`l`** (iterations 0, 50, 100, 200, …, 900): for each vertex in order, the sum of `|q − p|` over
+  its neighbours in their order (§4.4), each `|v| = sqrt((v_x·v_x + v_y·v_y) + v_z·v_z)` of the
+  vector `q − p`, divided by the neighbour count; these summed over the vertices in order, then
+  divided by the vertex count.
+- **Each vertex** (from the previous iteration's positions; all move at once afterwards):
+  1. the triangle normals `N = (v2 − v0) × (v1 − v0)` (§4.4); `v` = the sum of the vertex's `N` in
+     its triangle order, from 0; `n = (v_x/|v|, v_y/|v|, v_z/|v|)` (three divisions, not products
+     with `1/|v|`; a zero `v` stays zero);
+  2. `m = (S_x/k, S_y/k, S_z/k)` with `S` the sum of the neighbours' positions in their order and
+     `k` their count (three divisions);
+  3. `s = m − p`; `σ = (s_x·n_x + s_y·n_y) + s_z·n_z`; `s_n = (n_x·σ, n_y·σ, n_z·σ)`;
+     `s_t = s − s_n`; `u1 = s_t·0.5`;
+  4. `1/R = (2·|s_n·n|) / (l·l)`: the dot product of `s_n` with `n` computed again (not `σ`, which
+     differs from it in the last bits);
+  5. `f2 = (1 + tanh(F·(1/R − E)))·0.5`; in a rerun, where `σ > 0`: `f2 = min(f2·F_P, 1)` (§4.5);
+     `u2 = (f2·s_n,x, f2·s_n,y, f2·s_n,z)`;
+  6. the intensity term of §4.4, with `q = p + (−1)·n`, the voxel coordinates `q_a/d_a + 0.5`, the
+     step `ν_a = n_a/d_a`, the deepest voxel at `q_a/d_a + 0.5 − (d1 − 1)·ν_a`, then `ν_a ← ν_a·ds`
+     and each sample `ν_a` further in (accumulated), `g` accumulated; with `-g G`:
+     `b = min(1, max(0, b_t + (G·(p_z − c_z))/r))`; `tl = (Imax − t2)·b + t2`;
+     `f3 = (2·(Imin − tl))/(Imax − t2)` (when `Imax − t2 > 0`, else `(Imin − tl)·2`); then
+     `f3 ← f3·((0.5·0.1)·l)` and `u3 = (f3·n_x, f3·n_y, f3·n_z)`;
+  7. `p_new = p + ((u1 + u2) + u3)`: the three terms summed first, then added to `p`
+     (`((p + u1) + u2) + u3` is not the same double).
+- **The C library's functions.** `tanh` is glibc 2.35's: fdlibm's `tanh` over fdlibm's `expm1`
+  in the revision by Naohiko Shimizu (1997) that glibc ships, both under Sun's notice (freely
+  redistributable), compiled without fused multiply-add. The Rust `libm` crate's `tanh` (musl's)
+  is another algorithm and differs in the last bit for some of BET's arguments: on the tumour's
+  rerun (§4.5) it alone changes the result. `pow` is glibc 2.35's (the code it takes from Arm's
+  Optimized Routines, MIT, in its build with fused multiply-adds for CPUs that have them); a
+  correctly rounded `pow` differs in the last bit for about 0.09 % of BET's arguments and made no
+  difference on the three rerun cases measured. `sqrt` is correctly rounded everywhere.
+- **The trilinear interpolation** (the skull search, betsurf): the coordinates rounded to float;
+  `i = floor(x)` (and `j`, `k`), `f_x = x − i` in float; the eight corners, 0 outside the image
+  (also the `+1` corners past the last voxel); in float, x first, then y, then z, each step
+  `(b − a)·f + a`: `t1 = (v100 − v000)·f_x + v000`, `t2 = (v101 − v001)·f_x + v001`,
+  `t3 = (v110 − v010)·f_x + v010`, `t4 = (v111 − v011)·f_x + v011`, `t5 = (t3 − t1)·f_y + t1`,
+  `t6 = (t4 − t2)·f_y + t2`, the value `(t6 − t5)·f_z + t5` (`v_abc` the corner `(i + a, j + b,
+  k + c)`).
+- **The `-e` sweep's order** (§4.5): vertices of equal x are left in the order libstdc++'s
+  introsort leaves them (the SGI STL's algorithm); this matters only when two vertices share an x.
+- **The self-intersection measure's printed digits** (§4.5, §4.9): `ml` and `mlo` are sums over the
+  vertices in order (as `l`, one loop, two sums), divided by the vertex count; the total is one
+  running sum, `i` the outer vertex in order and `j` the inner one in order, over every ordered
+  pair with `i ≠ j`, `j` not a neighbour of `i` (adjacency as coordinates of one of `i`'s
+  neighbours agreeing with `j`'s within `1e-8` in each axis) and
+  `((x_i − x_j)·(x_i − x_j) + (y_i − y_j)·(y_i − y_j)) + (z_i − z_j)·(z_i − z_j) < ml·ml`, of
+  `(a − b)·(a − b)` with `a = |p_i − p_j|/ml` and `b = |o_i − o_j|/mlo` (`o` the initial surface).
+  A spatial grid finds the same pairs faster and keeps FSL's digits when it adds, for each `i`, its
+  pairs in increasing `j`.
+
+**How these were checked** (spec writer, 2026-10-30): copies of the replica (bit-identical to FSL)
+each given one of the clean-room original's choices (`c + (r/2)p`; `((p + u1) + u2) + u3`; `1/R`
+from `σ`; products with `1/|v|` and `1/k`; the normal from `v1`; per-slice centre sums;
+first-come neighbours; musl's `tanh`; a correctly rounded `pow`) moved the reruns of §4.5; with
+all ten, and three more (`g` as `2 + k·ds`; `n·d` in double with `2r` only below `r`; the slab
+radius as `sqrt(N·(d·d)/(π·n))`), the replica gave the original's results exactly in 59 of the 75
+random-testing cases the original still differed in (the 2026-10-30 trial: every stream, image and
+mesh). Of the other 16: six differ only in the skull image (§4.7's search, written above; case
+135 also in `bet -Z`'s temporaries), two in their zstd files (cases 106 and 482, the latter also
+its skull; not compared by value), one is `bet -F`'s float64 brain (case 425, §5.2), and seven
+(cases 45, 121, 154, 213, 262, 541, 677: small or degenerate heads, the original's surface
+diverging in 541) still differ in their surface, by arithmetic choices of the original not
+identified here: after aligning with this section, they are the cases to check first
+(`difftest --case fsl-bet:20261030:<n>`). The probes: `validation/investigations/bet-spec-answers/`.
+
+### 8.2 The qform's quaternion, operation by operation (spec writer, 2026-10-30; question 3)
+
+FSL rewrites the qform through the NIfTI-1 standard's conversions (the reference library that
+`nifti1.h` points to, public domain): the quaternion to a 4 × 4 matrix when read, the matrix back
+to a quaternion when written. Their precision decides the last float bit, and NIfTI-2's doubles
+in full. In order:
+1. **Read**: `b`, `c`, `d`, the offsets, the voxel sizes and `qfac` as **floats** (a NIfTI-2
+   header's doubles are rounded to float here), then widened to double.
+2. **To the matrix**: `S = (b·b + c·c) + d·d`; `a = 1 − S` computed in x87 extended precision
+   (80 bits, 64-bit mantissa) and rounded to double; if `a < 1e-7` (compared in extended precision,
+   with `1e-7` as an extended constant): `a = 1/sqrt(S)` (the square root in double, the division
+   in extended, rounded to double), `b, c, d` multiplied by it in double, then `a = 0`; else
+   `a = sqrt(a)`. `x_d, y_d, z_d` = the voxel sizes (1 where not positive), `z_d` negated when
+   `qfac < 0`. The diagonal `R11 = float((((a·a + b·b) − c·c) − d·d)·x_d)` (and its kin) in double,
+   rounded to float; each off-diagonal entry, `R12 = float(2·(b·c − a·d)·y_d)` and its kin, with
+   the bracket in double and the two products in extended precision, rounded **once** from
+   extended to float. The matrix is held in float.
+3. The volume keeps that float matrix (as doubles); FSL's radiological mirroring (§3.2) multiplies
+   it by exact ±1 and integer matrices, which changes no bit.
+4. **Back to the quaternion**, from the float matrix: the entries widened to double; each column's
+   length `sqrt((r1j·r1j + r2j·r2j) + r3j·r3j)` in double (a zero length: that column replaced by
+   the unit vector, length 1); each column divided by its length in double; the result rounded to
+   float.
+5. **The polar decomposition, in float** (the nearest orthogonal matrix; FSL's matrices are
+   floats): `X` = that matrix; while `det(X) = 0`, add `float(0.00001·(0.001 + ‖X‖_row))` to its
+   diagonal; then repeat: `Y` = the inverse of `X` (computed in double from the float entries,
+   the determinant left to right as `r11·r22·r33 − r11·r32·r23 − r21·r12·r33 + r21·r32·r13 +
+   r31·r12·r23 − r31·r22·r13`, its reciprocal in extended precision rounded to double, each entry
+   the reciprocal times its cofactor in double, stored as float); while the change `dif` (below)
+   exceeds 0.3: `α = sqrtf(‖X‖_row·‖X‖_col)`, `β = sqrtf(‖Y‖_row·‖Y‖_col)`, `γ = sqrtf(β/α)`,
+   `γ' = float(1/γ)` (the norms the largest row or column sum of absolute values, summed in
+   float; the products and the quotient in float), else `γ = γ' = 1`; `Z_ij = float(0.5·(γ·X_ij +
+   γ'·Y_ji))` (the products and the sum in float); `dif` = the sum, in float and in row order, of
+   `|Z_ij − X_ij|`; stop after 100 rounds or when `dif < 3e-6` (`dif` starts at 1), else `X = Z`.
+6. From `Z` (widened): the determinant (left to right, as in 5) gives `qfac = 1` when positive,
+   else `qfac = −1` and the third column negated; `a = ((r11 + r22) + r33) + 1`, the last addition
+   in extended precision, rounded to double; if `a > 0.5`: `a = 0.5·sqrt(a)`, `b = (0.25·(r32 −
+   r23))/a`, `c = (0.25·(r13 − r31))/a`, `d = (0.25·(r21 − r12))/a`, each difference in double,
+   the product and the division in extended precision, rounded to double; else the standard's
+   other three cases (`1 + r11 − (r22 + r33)` and its kin in double; the largest-diagonal case's
+   component `0.5·sqrt(·)`, the others `(0.25·(sum or difference))/that` in extended, rounded to
+   double), and when the resulting `a < 0` the signs of `b, c, d` are flipped (this picks FSL's
+   sign for a half turn).
+7. **Written**: NIfTI-1 stores `float(b)`, `float(c)`, `float(d)`; **NIfTI-2 stores the doubles of
+   step 6 unrounded** (not their float values: that is the "about 5e-9" of the clean-room
+   original's NIfTI-2 headers, which wrote floats).
+**(checked)** `validation/investigations/bet-spec-answers/quat_emul.py` follows these steps (numpy's
+`longdouble` is x87's 80-bit type on x86-64 Linux) and gives FSL 6.0.7.23's quaternion bit for bit
+on nine real T1w images, NIfTI-1 and NIfTI-2 outputs alike (18 of 18).
 
 ## 9. Defects (D13): what the default does
 

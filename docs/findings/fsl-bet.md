@@ -357,3 +357,45 @@ replica differences; each replayed against both versions (`replay_bet_findings.s
   `niftivox2newimagevox_mat()`'s inverse, whose last bits Armadillo 14.2.1 changes. **Since
   2026-10-29** the replica follows that solve: the drawn case agrees with FSL 6.0.7.23 (permanent
   case `bet2-centre-neurological-solve`).
+
+## The clean-room original's open questions, answered from the source (spec writer, 2026-10-30)
+
+Source-level notes behind the answers in `specs/bet.md` (lines marked "(spec writer,
+2026-10-30)"); the behaviour is there, this section names where it comes from. Probes:
+`validation/investigations/bet-spec-answers/` (Apache) and, for the copies of the replica, the
+patch script in `<workspace>/archive/2026-10-30-bet-spec-answers/` (FSL-licensed snippets).
+
+- **Reruns** (`bet2.cpp`, the `while (self_intersection)` loop): `m = moriginal` (`Mesh::operator=`,
+  which rebuilds the triangles from `moriginal`'s list, so the neighbour lists are rebuilt by the
+  `Triangle` constructor's remove-and-append); `l = 0`; `incfactor = pow(10, pass + 1)`, lowered for
+  `i > .75 * nb_iter`; `step_of_computation(..., pass, incfactor, ...)` changes only
+  `f2 *= increase_smoothing; f2 = Min(f2, 1.)` where `tmp = dv|n > 0`. A copy's neighbour and
+  triangle lists equal the first pass's for all 2562 vertices (scratch probe on
+  `Mesh::icosa(5)` and `copy()`), so the rerun is the spec's rule. The clean-room original's
+  misses come from its arithmetic (ten choices, each enough to move `older-75y`'s first rerun:
+  the specs' §4.5 and §8.1 list them with the measured totals); `step_of_computation`'s exact
+  expressions are what §8.1 transcribes into maths (`rinv` from `sn|n`, `u = u1 + u2 + u3`,
+  `local_normal`'s `normalize()` dividing, `medium_neighbours` dividing, `Triangle::normal` as
+  `(v2 − v0) * (v1 − v0)`, the centre's single running sum in `adjust_initial_mesh`, `rmax = 10 *
+  smootharg.value()` in float, the slab radius's `counter*image.ydim()*image.zdim()` in float,
+  `image.xsize()*image.xdim()` in float, `gi += dscale`).
+- **`real_self_intersection`** (`mesh.cpp`): the sweep over `Pt_special` sorted by `compPt` (x),
+  `data[0]` counting each triangle's visits (tested and appended at 0, removed at 2), the
+  coordinate test `Pt::operator==` (1e-8), the prefilter made moot by `centre *= 1/3`, and
+  `Triangle::intersect` (`triangle.cpp`): the early exit on `B0`'s side, the two half-tests, the
+  `n1|n3`, `n2|n3`, `n1|n2` signs. §4.5 of the spec states it as a predicate.
+- **`find_skull`** (`bet2.cpp`): `volmesh(ci, cj, ck) == 0` reads 0 outside the volume (zero
+  padding), the candidate ranges unclipped, three separately accumulated grids (`d` from 0, from
+  `skull_start`, from `d_min + scale`), the in-volume tests on the voxel coordinates, the scan's
+  `else d = d_max`. §4.7 of the spec.
+- **`find_thresholds`** (`newimage.cc`): `fA = (max-min)/(double)HISTOGRAM_BINS`,
+  `thresh2 = min + (T)((double)bottom_bin*fA)`; the narrowing's `(T)(min + ((double)bottom_bin/
+  (double)HISTOGRAM_BINS)*(max-min))`; `imageHistogram`'s `fA`, `fB`. §4.2 of the spec.
+- **The quaternion** (`legacyFunctions.cc`, `NewNifti.cc`): `getQForm()` passes the header's
+  `qB, qC, qD` (doubles) to `nifti_quatern_to_mat44(float ...)`; `mat44` and `mat33` hold floats;
+  `setQForm` keeps `nifti_mat44_to_quatern`'s doubles, which NIfTI-2 writes unrounded; the
+  long double literals (`1.0l`, `0.5l`, `0.25l`, `2.0l`, `1.e-7l`) make those expressions x87
+  extended. The same code as the NIfTI-1 reference library's (public domain) apart from the
+  outputs' type. §8.2 of the spec, checked 18 of 18 (`quat_emul.py`).
+- **Name resolution** (`generalio.cc`, `return_validimagefilename`): a name with a known extension
+  whose file is missing falls back to the extension search; §3.1 of the spec (observed too).

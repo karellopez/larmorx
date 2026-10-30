@@ -807,7 +807,7 @@ tool = "fsl-bet"
 implementation = "original"
 signature = ["messages: FSL's, byte for byte", "messages before FSL's crash", "exit status"]
 status = "open"
-explanation = "BET's clean-room original (part 1, 2026-10-30): the trial oracles/difftest/2026-10-30-cleanroom-bet (239 differences, 164 agreeing again with the final build; the 75 left: messages 29, meshes 15, brains and masks 25, outlines 5, a header 1): messages: the self-intersection total's last digits on small random heads, one threshold digit; reproducers with difftest --case fsl-bet:20261030:<n> (validation/investigations/cleanroom-bet/retrial.py); for part 2 and the spec writer's answers"
+explanation = "BET's clean-room original (part 1, 2026-10-30): the trial oracles/difftest/2026-10-30-cleanroom-bet (239 differences, 164 agreeing again with the final build; the 75 left: messages 29, meshes 15, brains and masks 25, outlines 5, a header 1): messages: the self-intersection total's last digits on small random heads, one threshold digit; reproducers with difftest --case fsl-bet:20261030:<n> (validation/investigations/cleanroom-bet/retrial.py); explained on 2026-10-30 by the spec writer for 59 of the 75 (the original's arithmetic choices, specs/bet.md 8.1, and the skull search, 4.7: validation/investigations/bet-spec-answers/README.md); still open for part 2: cases 45, 121, 154, 213, 262, 541, 677 (surfaces), 106 and 482 (zstd files)"
 link = "docs/findings/fsl-bet-original.md"
 
 [[difference]]
@@ -815,7 +815,7 @@ tool = "fsl-bet"
 implementation = "original"
 signature = ["out.nii.gz", "out_mask.nii.gz", "out.nii", "out_mask.nii", "out.hdr", "out_mask.hdr", "out.hdr.gz", "out_overlay.nii", "out_overlay.nii.gz"]
 status = "open"
-explanation = "BET's clean-room original (part 1, 2026-10-30): the trial oracles/difftest/2026-10-30-cleanroom-bet (239 differences, 164 agreeing again with the final build; the 75 left: messages 29, meshes 15, brains and masks 25, outlines 5, a header 1): brains, masks and outlines: small random heads, and surfaces whose first pass self-intersects and reruns (the rerun rule is a question for the spec writer, specs/bet.md 4.5); reproducers with difftest --case fsl-bet:20261030:<n> (validation/investigations/cleanroom-bet/retrial.py); for part 2 and the spec writer's answers"
+explanation = "BET's clean-room original (part 1, 2026-10-30): the trial oracles/difftest/2026-10-30-cleanroom-bet (239 differences, 164 agreeing again with the final build; the 75 left: messages 29, meshes 15, brains and masks 25, outlines 5, a header 1): brains, masks and outlines: small random heads, and surfaces whose first pass self-intersects and reruns (the rerun rule is a question for the spec writer, specs/bet.md 4.5); reproducers with difftest --case fsl-bet:20261030:<n> (validation/investigations/cleanroom-bet/retrial.py); explained on 2026-10-30 by the spec writer for 59 of the 75 (the original's arithmetic choices, specs/bet.md 8.1, and the skull search, 4.7: validation/investigations/bet-spec-answers/README.md); still open for part 2: cases 45, 121, 154, 213, 262, 541, 677 (surfaces), 106 and 482 (zstd files)"
 link = "docs/findings/fsl-bet-original.md"
 
 [[difference]]
@@ -823,7 +823,7 @@ tool = "fsl-bet"
 implementation = "original"
 signature = ["out.nii.gz: header", "out_mask.nii.gz: header", "out_skull.nii.gz: header", "out.hdr.bzN: header", "out_overlay.nii.gz: header", "out_mask.hdr.bzN: header", "out.nii: header", "out_mask.nii: header", "out.hdr: header", "out.hdr.gz: header", "out_mask.hdr.gz: header"]
 status = "open"
-explanation = "BET's clean-room original (part 1, 2026-10-30): the trial oracles/difftest/2026-10-30-cleanroom-bet (239 differences, 164 agreeing again with the final build; the 75 left: messages 29, meshes 15, brains and masks 25, outlines 5, a header 1): headers: the qform quaternion's last float bit (specs/bet.md 8 leaves FSL's precision path open); reproducers with difftest --case fsl-bet:20261030:<n> (validation/investigations/cleanroom-bet/retrial.py); for part 2 and the spec writer's answers"
+explanation = "BET's clean-room original (part 1, 2026-10-30): the trial oracles/difftest/2026-10-30-cleanroom-bet (239 differences, 164 agreeing again with the final build; the 75 left: messages 29, meshes 15, brains and masks 25, outlines 5, a header 1): headers: the qform quaternion's last float bit (specs/bet.md 8 leaves FSL's precision path open); reproducers with difftest --case fsl-bet:20261030:<n> (validation/investigations/cleanroom-bet/retrial.py); explained on 2026-10-30 by the spec writer for 59 of the 75 (the original's arithmetic choices, specs/bet.md 8.1, and the skull search, 4.7: validation/investigations/bet-spec-answers/README.md); still open for part 2: cases 45, 121, 154, 213, 262, 541, 677 (surfaces), 106 and 482 (zstd files)"
 link = "docs/findings/fsl-bet-original.md"
 
 [[difference]]
@@ -831,7 +831,7 @@ tool = "fsl-bet"
 implementation = "original"
 signature = ["out_mesh.vtk"]
 status = "open"
-explanation = "BET's clean-room original (part 1, 2026-10-30): the trial oracles/difftest/2026-10-30-cleanroom-bet (239 differences, 164 agreeing again with the final build; the 75 left: messages 29, meshes 15, brains and masks 25, outlines 5, a header 1): meshes: sub-voxel vertex positions on small random heads; reproducers with difftest --case fsl-bet:20261030:<n> (validation/investigations/cleanroom-bet/retrial.py); for part 2 and the spec writer's answers"
+explanation = "BET's clean-room original (part 1, 2026-10-30): the trial oracles/difftest/2026-10-30-cleanroom-bet (239 differences, 164 agreeing again with the final build; the 75 left: messages 29, meshes 15, brains and masks 25, outlines 5, a header 1): meshes: sub-voxel vertex positions on small random heads; reproducers with difftest --case fsl-bet:20261030:<n> (validation/investigations/cleanroom-bet/retrial.py); explained on 2026-10-30 by the spec writer for 59 of the 75 (the original's arithmetic choices, specs/bet.md 8.1, and the skull search, 4.7: validation/investigations/bet-spec-answers/README.md); still open for part 2: cases 45, 121, 154, 213, 262, 541, 677 (surfaces), 106 and 482 (zstd files)"
 link = "docs/findings/fsl-bet-original.md"
 
 [[difference]]
@@ -839,5 +839,5 @@ tool = "fsl-bet"
 implementation = "original"
 signature = ["files written"]
 status = "open"
-explanation = "BET's clean-room original (part 1, 2026-10-30): the trial oracles/difftest/2026-10-30-cleanroom-bet (239 differences, 164 agreeing again with the final build; the 75 left: messages 29, meshes 15, brains and masks 25, outlines 5, a header 1): files written where FSL crashes or the -e test differs; reproducers with difftest --case fsl-bet:20261030:<n> (validation/investigations/cleanroom-bet/retrial.py); for part 2 and the spec writer's answers"
+explanation = "BET's clean-room original (part 1, 2026-10-30): the trial oracles/difftest/2026-10-30-cleanroom-bet (239 differences, 164 agreeing again with the final build; the 75 left: messages 29, meshes 15, brains and masks 25, outlines 5, a header 1): files written where FSL crashes or the -e test differs; reproducers with difftest --case fsl-bet:20261030:<n> (validation/investigations/cleanroom-bet/retrial.py); explained on 2026-10-30 by the spec writer for 59 of the 75 (the original's arithmetic choices, specs/bet.md 8.1, and the skull search, 4.7: validation/investigations/bet-spec-answers/README.md); still open for part 2: cases 45, 121, 154, 213, 262, 541, 677 (surfaces), 106 and 482 (zstd files)"
 link = "docs/findings/fsl-bet-original.md"

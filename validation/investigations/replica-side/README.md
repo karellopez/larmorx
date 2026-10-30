@@ -52,6 +52,12 @@ saw it; only the step's digest of the raw bytes did. The step's digests now coun
 too, and the shared releases' cases run twice (a comparison whose original still varies is
 reported as varying, never as changed).
 
+The resample-series record re-made twice from the same clean commit (bf26b71, 2026-10-30): the
+two records are identical case by case (`compare_records.py --against`), the step line the same;
+against the record of 2026-10-29 no status changes, and 9 comparisons of `ndimage/nearest-order2`
+to `-order5` read "identical" instead of "changed" (their only change was SCI-05's NaN bits; the
+cases stay changed by SCI-03).
+
 ## The parity smoke tier in parallel (`compare_outcomes.py`)
 
 `scripts/orchestration/parity_smoke.py` runs `tests/parity` on pytest-xdist workers (every file

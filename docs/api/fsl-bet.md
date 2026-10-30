@@ -230,8 +230,9 @@ values); headers FSL's byte for byte but for `descrip` (`larmorx fsl bet2`), the
 quaternion included. This follows `specs/bet.md` §8.1 (the deformation's arithmetic, operation
 by operation), §8.2 (the quaternion's precision path) and §4.7 (the skull search), with glibc
 2.35's `tanh` (`larmorx_core::math::tanh_glibc`, fdlibm's, proved equal to the system's on 12.9
-billion inputs). The default uses the same `tanh` until part 2b, which switches it to the
-correctly rounded `larmorx_core::math::tanh` (GLIBC-06).
+billion inputs). The default uses the same `tanh` for now; making the correctly rounded
+`larmorx_core::math::tanh` the default is part 2b's (GLIBC-06: it changes the surface on 4 of
+the standard tier's 13 real images, the findings give the measurement).
 
 **Random testing** (a 30-minute trial, 2026-10-30, `oracles/difftest/2026-10-30-cleanroom-bet`,
 718 cases, both implementations): the replica agreed in every case it finished (716; 2 timeouts

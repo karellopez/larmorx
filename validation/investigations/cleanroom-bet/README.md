@@ -48,6 +48,12 @@ CARGO_TARGET_DIR=<scratch>/verify-target cargo build --release --offline
 <scratch>/verify-target/release/tanh-glibc-verify verify --log2n 32 --threads 16
 ```
 
+`crates/larmorx-fsl/examples/tanh_effect.rs` (`cargo run --release -p larmorx-fsl --example
+tanh_effect -- --threads 24 <images>`): BET's surface with glibc's and with the correctly rounded
+`tanh` on each image, and their differences (passes, totals, vertex distance, mask voxels, Dice).
+On the standard tier's 13 real images: identical on 9, different on the three rerun cases and on
+ds000005's BOLD first volume (findings, "What the correctly rounded `tanh` changes").
+
 `retrial.py` with part 2a's build (`oracles/logs/retrial-cleanroom-bet-2a-2026-10-30-b.log`): 237
 of the trial's 239 differing cases agree, the skull and the quaternion held exactly; the two left
 are cases 622 and 677 (findings). FSL's `fslstats -C` was run by hand on FSL's own `bet -R` output

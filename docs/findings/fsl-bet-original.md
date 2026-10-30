@@ -47,6 +47,18 @@ into the spec, marked (observed).
   differ (6,640 to 9,698 of 36.7 million). glibc's `tanh` is not correctly rounded on 21.3 % of
   that random sample (CORE-MATH's `cr_tanh` as the reference) and on 22,506 of CORE-MATH's
   62,880 worst cases: GLIBC-06.
+- **What the correctly rounded `tanh` changes** (GLIBC-06, rule D; `crates/larmorx-fsl/examples/tanh_effect.rs`,
+  bet2's defaults, the standard tier's 13 real images): on 9 the surface is the same **to the
+  last bit** with either `tanh` (the last-bit differences vanish in `1 + tanh`); on 4 it is not:
+  the three rerun cases (ds002422's 75-year-old: Dice 0.995919, 13,442 voxels, the second rerun's
+  total 2198.2 against glibc's 2817.8; ds005454's 7 T: Dice 0.984779, 50,100 voxels; ds005003's
+  tumour: Dice 0.991957, 24,874 voxels; vertices up to 5.7 to 8.0 mm apart) and the first volume
+  of ds000005's BOLD run 1 (no rerun: the first pass's total 87.2 against 76.8, Dice 0.996618, 226
+  voxels). The correctly rounded result is not more accurate there (the reruns amplify any last
+  bit); it moves the default away from FSL's. A cheap exact test of GLIBC-06 follows: the weight
+  `f2` computed with both `tanh` at every step; where no `f2` differs, the surfaces are identical
+  (the rest of the arithmetic is the same), and only otherwise does a second search with glibc's
+  `tanh` say what changes.
 
 - **The robust range's rounding** (`range_probe.py`; fMRIPrep's calls): `t2 = lo + b (hi − lo) /
   1000` with `hi − lo` rounded to float, the product and the division in double, the result

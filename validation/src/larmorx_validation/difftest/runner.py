@@ -476,7 +476,9 @@ GUARDED = {
     "ants-n4": ("port",),
     "ants-resample-image": ("port",),
     "ants-resample-image-by-spacing": ("port",),
-    "afni-unifize": ("replica",),
+    # Both implementations since 2026-10-30 (the clean-room original's guard, specs/3dUnifize.md
+    # §9.1).
+    "afni-unifize": ("replica", "original"),
 }
 
 

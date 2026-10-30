@@ -1360,6 +1360,54 @@ mod tests {
         }
     }
 
+    /// FSL-20's message names the `.mat` directory after the `-in` string's directory
+    /// (`specs/mcflirt.md` §10.6); FSL-20 corrected without `-mats` checks only its parent.
+    #[test]
+    fn mat_directory_messages() {
+        assert_eq!(input_prefix("/data/run/bold.nii.gz"), "/data/run/");
+        assert_eq!(input_prefix("bold.nii.gz"), "b");
+        assert_eq!(input_prefix("dir/"), "dir/");
+        let dir = tempfile::tempdir().unwrap();
+        let base = dir.path().to_str().unwrap();
+        assert!(mat_parent_exists(&format!("{base}/o")).is_ok());
+        assert!(mat_parent_exists("o").is_ok());
+        let e = mat_parent_exists(&format!("{base}/missing/o")).unwrap_err();
+        assert!(!e.permission && e.error.to_string().ends_with("does not exist"));
+        fs::write(dir.path().join("afile"), "x").unwrap();
+        let e = mat_parent_exists(&format!("{base}/afile/o")).unwrap_err();
+        assert!(e.error.to_string().ends_with("is not a directory"));
+        // The first free name: o.mat, then o.mat+.
+        let out = format!("{base}/o");
+        assert_eq!(mat_directory(&out).ok(), Some(PathBuf::from(format!("{out}.mat"))));
+        assert_eq!(mat_directory(&out).ok(), Some(PathBuf::from(format!("{out}.mat+"))));
+        let e = mat_directory(&format!("{base}/missing/o")).unwrap_err();
+        assert!(!e.permission && e.name.ends_with("missing/o.mat"));
+    }
+
+    /// FSL-21 and FSL-66 corrected: refused before the input is read (it does not exist here),
+    /// with the notice and the error; `-stages 0` is not refused.
+    #[test]
+    fn bins_refused_before_any_work() {
+        for (args, id) in [
+            (&["-in", "none.nii", "-cost", "mutualinfo", "-bins", "4"][..], "FSL-21"),
+            (&["-in", "none.nii", "-bins", "-16"], "FSL-66"),
+            (&["-in", "none.nii", "-cost", "woods", "-bins", "-3"], "FSL-21"),
+        ] {
+            let (code, _, err) = run_mode(args, FIX);
+            assert_eq!(code, 1, "{args:?}");
+            let lines: Vec<&str> = err.lines().collect();
+            assert!(lines[0].contains(&format!("upstream defect {id} (mcflirt) corrected")));
+            assert!(lines[1].starts_with("Error: -bins ") && lines[1].contains(id));
+        }
+        // No stage runs: the input is read (and here does not exist).
+        let (code, _, err) = run_mode(
+            &["-in", "none.nii", "-cost", "mutualinfo", "-bins", "4", "-stages", "0"],
+            FIX,
+        );
+        assert_eq!(code, 1);
+        assert!(!err.contains("FSL-21"), "{err}");
+    }
+
     #[test]
     fn reference_indices() {
         assert_eq!(reference_index(-1, 12), Ok(6));

@@ -215,3 +215,49 @@ def test_command_line_errors(series):
     assert code == 255 and err.startswith("Unrecognised option -edge\n")
     code, _, err = cli("-in", series, "-refvol", "99", "-out", "x")
     assert code == 1 and "-refvol 99" in err
+
+
+def test_bins_no_histogram_can_have(series, tmp_path):
+    """FSL-21 and FSL-66 (``specs/mcflirt.md`` §12.1): refused by default before any work, in
+    the Python API as on the command line; ``reproduce`` runs mcflirt's histogram costs with no
+    bins (FSL-21 named) and stops where mcflirt crashes."""
+    with pytest.raises(ValueError, match=r"-bins 4: the histogram costs need at least 8 bins"):
+        lx.mri.hmc(series, bins=4, cost="mutualinfo")
+    with pytest.raises(ValueError, match=r"-bins -16: a negative number of bins.*FSL-66"):
+        lx.mri.hmc(series, bins=-16)
+    # A file that does not exist: the bins are refused first.
+    with pytest.raises(ValueError, match="FSL-21"):
+        lx.mri.hmc(tmp_path / "missing.nii.gz", bins=0, cost="normmi")
+    with pytest.warns(lx.UpstreamDefectWarning, match="FSL-21"):
+        r = lx.mri.hmc(series, bins=7, cost="mutualinfo", stages=1, upstream_defects="reproduce")
+    assert np.isfinite(r.matrices).all()
+    with pytest.raises(ValueError, match=r"signal 8.*FSL-66"):
+        lx.mri.hmc(series, bins=-8, upstream_defects="reproduce")
+    # normcorr uses no bins: -bins 2 runs as -bins 256.
+    a = lx.mri.hmc(series, bins=2, stages=1, resample=False).matrices
+    b = lx.mri.hmc(series, stages=1, resample=False).matrices
+    np.testing.assert_array_equal(a, b)
+
+
+def test_outputs_that_cannot_be_written(series, tmp_path):
+    """FSL-20 and FSL-65 (``specs/mcflirt.md`` §10.6): refused by default (exit 1, nothing
+    written, the defect named); mcflirt's exit 0 with ``reproduce``, its files and message."""
+    out = tmp_path / "missing" / "o"
+    for mode, code, message in (
+        ("fix", 1, "Error: cannot create the directory"),
+        ("reproduce", 0, "Error!: Unknown Log directory return value"),
+    ):
+        got, _, err = cli("-in", series, "-out", out, "-mats", "-stages", "1",
+                          env={"LARMORX_UPSTREAM_DEFECTS": mode})  # fmt: skip
+        assert got == code and message in err and "FSL-20" in err, err
+        assert not (tmp_path / "missing").exists()
+    (tmp_path / "p").mkdir()
+    (tmp_path / "p" / "o.par").mkdir()
+    args = ("-in", series, "-out", tmp_path / "p" / "o", "-mats", "-plots", "-rmsrel", "-stages", "1")  # fmt: skip
+    got, _, err = cli(*args, env={"LARMORX_UPSTREAM_DEFECTS": "fix"})
+    assert got == 1 and "FSL-65" in err, err
+    assert sorted(p.name for p in (tmp_path / "p").iterdir()) == ["o.par"]
+    got, _, err = cli(*args, env={"LARMORX_UPSTREAM_DEFECTS": "reproduce"})
+    assert got == 0 and "error: unable to open output file!" in err and "FSL-65" in err, err
+    written = sorted(p.relative_to(tmp_path / "p").as_posix() for p in (tmp_path / "p").rglob("*"))
+    assert written == ["o.mat", "o.mat/MAT_0000", "o.par", "o_rel.rms", "o_rel_mean.rms"]

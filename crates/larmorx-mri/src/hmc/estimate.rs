@@ -925,6 +925,114 @@ mod tests {
         }
     }
 
+    /// `specs/mcflirt.md` §12.1: each stage's bins, how mcflirt ends, what the default refuses.
+    #[test]
+    fn bins_no_stage_can_use() {
+        use CostFunction::*;
+        use McflirtEnd::*;
+        // Truncated toward zero: -bins 7 gives 0 and 1, -bins -9 gives -1 and -2.
+        assert_eq!((stage_bins(7, 1), stage_bins(7, 2), stage_bins(7, 4)), (0, 1, 1));
+        assert_eq!((stage_bins(-9, 1), stage_bins(-9, 3)), (-1, -2));
+        assert_eq!(
+            mcflirt_end(-8, 3, NormCorr),
+            Some(DivisionByZero { bins: -8, stage: 1 })
+        );
+        assert_eq!(
+            mcflirt_end(-4, 2, LeastSquares),
+            Some(DivisionByZero { bins: -4, stage: 2 })
+        );
+        assert_eq!(mcflirt_end(-4, 1, NormCorr), None);
+        assert_eq!(mcflirt_end(-3, 4, NormCorr), None);
+        assert_eq!(
+            mcflirt_end(-16, 3, MutualInfo),
+            Some(BadArrayLength { bins: -16, stage: 1 })
+        );
+        assert_eq!(
+            mcflirt_end(2, 3, CorrRatio),
+            Some(CorrRatioHeap { bins: 2, stage: 1 })
+        );
+        // corratio meets its empty first stage before the second stage's division by zero.
+        assert_eq!(
+            mcflirt_end(-4, 3, CorrRatio),
+            Some(CorrRatioHeap { bins: -4, stage: 1 })
+        );
+        assert_eq!(mcflirt_end(8, 3, CorrRatio), None);
+        assert_eq!(mcflirt_end(-16, 0, NormCorr), None);
+        let bad = BadArrayLength { bins: -16, stage: 1 };
+        assert_eq!(bad.mcflirt_lines().len(), 2);
+        assert_eq!(bad.defect().id, "FSL-66");
+        assert!(bad.error().contains("(FSL-66;"), "{}", bad.error());
+        assert_eq!(CorrRatioHeap { bins: 2, stage: 1 }.defect().id, "FSL-21");
+        // The default's refusals.
+        let id = |b, s, c| refused_bins(b, s, c).map(|r| r.defect.id);
+        assert_eq!(id(7, 3, MutualInfo), Some("FSL-21"));
+        assert_eq!(id(0, 1, NormMi), Some("FSL-21"));
+        assert_eq!(id(-7, 3, Woods), Some("FSL-21"));
+        assert_eq!(id(-8, 3, Woods), Some("FSL-66"));
+        assert_eq!(id(-1, 3, NormCorr), Some("FSL-66"));
+        assert_eq!(id(2, 3, NormCorr), None);
+        assert_eq!(id(8, 3, CorrRatio), None);
+        assert_eq!(id(4, 0, MutualInfo), None);
+        assert_eq!(id(-16, 0, NormCorr), None);
+        assert_eq!(
+            refused_bins(4, 3, MutualInfo).unwrap().message,
+            "-bins 4: the histogram costs need at least 8 bins (the first stage uses -bins / 8 of \
+             them; mcflirt computes them with none, FSL-21)"
+        );
+    }
+
+    /// FSL-21 and FSL-66 through the estimation: refused before any work by default (one
+    /// volume included), mcflirt's end or its zero-bin costs reproduced.
+    #[test]
+    fn bins_in_both_modes() {
+        let s = series();
+        let reproduce = |bins, cost| EstimateParams {
+            bins,
+            cost,
+            stages: 1,
+            upstream_defects: UpstreamDefects::Reproduce,
+            ..EstimateParams::default()
+        };
+        let fix = |bins, cost| EstimateParams {
+            upstream_defects: UpstreamDefects::Fix,
+            ..reproduce(bins, cost)
+        };
+        let one = &s[..1];
+        for series in [&s[..], one] {
+            let e = estimate(series, &Reference::Index(0), &fix(4, CostFunction::MutualInfo));
+            assert!(matches!(e, Err(EstimateError::Bins(_))), "{e:?}");
+        }
+        let e = estimate(&s, &Reference::Index(0), &fix(-16, CostFunction::NormCorr));
+        assert!(matches!(e, Err(EstimateError::Bins(r)) if r.defect.id == "FSL-66"));
+        let e = estimate(&s, &Reference::Index(0), &reproduce(-8, CostFunction::NormCorr));
+        assert!(matches!(
+            e,
+            Err(EstimateError::McflirtEnds(McflirtEnd::DivisionByZero { .. }))
+        ));
+        // Nothing registered: no stage starts, so nothing ends.
+        let est = estimate(one, &Reference::Index(0), &reproduce(-8, CostFunction::NormCorr));
+        assert_eq!(est.unwrap().matrices, vec![IDENTITY]);
+        // The histogram costs with no bins run, as mcflirt's do, and name FSL-21.
+        for cost in [
+            CostFunction::MutualInfo,
+            CostFunction::NormMi,
+            CostFunction::Woods,
+        ] {
+            let est = estimate(&s, &Reference::Index(0), &reproduce(7, cost)).unwrap();
+            assert!(est.matrices.iter().flatten().flatten().all(|v| v.is_finite()));
+            assert!(
+                est.notices.iter().any(|n| n.defect.id == "FSL-21"),
+                "{cost:?}"
+            );
+        }
+        // -bins -1 with normcorr: no bins anywhere, as mcflirt; FSL-66 named.
+        let est = estimate(&s, &Reference::Index(0), &reproduce(-1, CostFunction::NormCorr));
+        let est = est.unwrap();
+        let plain = estimate(&s, &Reference::Index(0), &reproduce(256, CostFunction::NormCorr));
+        assert_eq!(est.matrices, plain.unwrap().matrices);
+        assert!(est.notices.iter().any(|n| n.defect.id == "FSL-66"));
+    }
+
     #[test]
     fn shifts_are_recovered_and_the_reference_is_the_identity() {
         let s = series();

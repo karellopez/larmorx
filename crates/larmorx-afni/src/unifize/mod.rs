@@ -806,6 +806,35 @@ mod tests {
         assert!(w.iter().all(|&v| v == 5.0));
     }
 
+    /// AFNI-75 (spec §9.1): the prediction, its words, and the limit given to the computation
+    /// first; the replica's numbers for the spec's cases (two workers).
+    #[test]
+    fn the_epi_ball_guard() {
+        use larmorx_core::alloc::with_memory_limit;
+        let um3 = [0.003f32; 3];
+        assert_eq!(epi_radius(um3), 6100.0);
+        let need = epi_ball_bytes(6100.0, 2);
+        assert_eq!(larmorx_core::alloc::gib(need), "2.834e4 GiB");
+        assert_eq!(larmorx_core::alloc::gib(epi_ball_bytes(18300.0, 2)), "7.651e5 GiB");
+        assert_eq!(larmorx_core::alloc::gib(epi_ball_bytes(366.0, 2)), "6.12 GiB");
+        assert_eq!(voxel_size_text(0.003), "0.003");
+        assert_eq!(voxel_size_text(-0.05), "0.05");
+        assert_eq!(voxel_size_text(3.0), "3");
+        let why = with_memory_limit(4 << 30, || epi_guard(um3, 2)).unwrap();
+        assert_eq!(
+            why,
+            "3dUnifize -EPI would need about 2.834e4 GiB for its ball of neighbours (radius \
+             6100.0 voxels: 18.3 mm over the voxels' 0.003 x 0.003 x 0.003 mm), more than the \
+             4.00 GiB given to this computation (a header whose units are micrometres makes the \
+             voxels 1000 times smaller than they look)"
+        );
+        let why = with_memory_limit(4 << 30, || epi_guard([0.05; 3], 2)).unwrap();
+        assert!(why.contains("about 6.12 GiB") && why.ends_with("computation"), "{why}");
+        // What fits is never refused: 0.3 mm (61 voxels) and 3 mm.
+        assert!(with_memory_limit(4 << 30, || epi_guard([0.3; 3], 2)).is_none());
+        assert!(with_memory_limit(4 << 30, || epi_guard([3.0; 3], 32)).is_none());
+    }
+
     #[test]
     fn squash_is_continuous_at_1300() {
         assert_eq!(squash(1300.0), 1300.0);

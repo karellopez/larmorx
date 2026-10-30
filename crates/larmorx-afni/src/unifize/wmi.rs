@@ -457,6 +457,9 @@ mod tests {
             ([6, 9, 1], 4.1, 30.0, 31.0),
             ([1, 1, 8], 2.0, 70.0, 80.0),
             ([5, 4, 3], 9.0, 80.0, 90.0),
+            // Radii beyond the grid on every axis (the lines kept are the grid's, §9.1).
+            ([7, 5, 4], 30.0, 70.0, 80.0),
+            ([6, 3, 2], 61.0, 65.0, 90.0),
         ]
         .into_iter()
         .enumerate()

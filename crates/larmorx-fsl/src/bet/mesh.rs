@@ -286,7 +286,10 @@ mod tests {
         let normals = m.triangle_normals(&m.points);
         for (t, n) in m.triangles.iter().zip(&normals) {
             let c = scale(
-                add(add(m.points[t[0] as usize], m.points[t[1] as usize]), m.points[t[2] as usize]),
+                add(
+                    add(m.points[t[0] as usize], m.points[t[1] as usize]),
+                    m.points[t[2] as usize],
+                ),
                 1.0 / 3.0,
             );
             assert!(dot(*n, c) > 0.0, "every normal points outwards");

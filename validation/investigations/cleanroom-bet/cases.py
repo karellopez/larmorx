@@ -8,7 +8,7 @@ import sys
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).parent))
-import compare  # noqa: E402
+import compare
 
 
 def cases(ph: Path) -> dict[str, tuple[str, list[str]]]:
@@ -38,12 +38,36 @@ def cases(ph: Path) -> dict[str, tuple[str, list[str]]]:
         "ana": ("bet2", [str(ph / "head-ana.hdr"), "out", "-m"]),
         "4d": ("bet2", [str(ph / "head-4d.nii.gz"), "out", "-m"]),
         "2d": ("bet2", [str(ph / "head-2d.nii.gz"), "out", "-m", "-v"]),
-        "bm": ("bet2", [h, "out", f"--binaryMask={ph / 'head_mask.nii.gz'}", "-m", "-o", "-s", "-t"]),
+        "bm": (
+            "bet2",
+            [h, "out", f"--binaryMask={ph / 'head_mask.nii.gz'}", "-m", "-o", "-s", "-t"],
+        ),
         "bm-v": ("bet2", [h, "out", f"--binaryMask={ph / 'head_mask.nii.gz'}", "-v", "-e"]),
         "rand1-c": ("bet2", [str(ph / "rand1.nii.gz"), "out", "-c", "1", "2x", "3", "-v", "-m"]),
         "bet": ("bet", [h, "out"]),
         "bet-v": ("bet", [h, "out", "-m", "-v"]),
-        "bet-opts": ("bet", [h, "out", "-o", "-m", "-s", "-e", "-t", "-f", "0.4", "-g", "0.1", "-r", "70", "-c", "48", "56", "38"]),
+        "bet-opts": (
+            "bet",
+            [
+                h,
+                "out",
+                "-o",
+                "-m",
+                "-s",
+                "-e",
+                "-t",
+                "-f",
+                "0.4",
+                "-g",
+                "0.1",
+                "-r",
+                "70",
+                "-c",
+                "48",
+                "56",
+                "38",
+            ],
+        ),
         "bet-R": ("bet", [str(ph / "head-off.nii.gz"), "out", "-R", "-m", "-v"]),
         "bet-R-n": ("bet", [h, "out", "-R", "-n", "-m"]),
         "bet-R-e": ("bet", [h, "out", "-R", "-e", "-m"]),

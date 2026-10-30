@@ -10,7 +10,7 @@ use super::Settings;
 use super::fmt::{f as fmt_f, g};
 use super::options::{self, Given, Spec};
 use crate::bet::image::{self, ImageError, Input, Output, Values};
-use crate::bet::{self, Deformation, Found, Vol, mesh};
+use crate::bet::{self, Deformation, Found, mesh};
 
 /// bet2's usage, exactly (standard error).
 pub const USAGE: &str = "\nPart of FSL (ID: 2412.6-dirty)\nBET (Brain Extraction Tool) v2.1 - FMRIB Analysis Group, Oxford\n\nUsage: \nbet2 <input_fileroot> <output_fileroot> [options]\n\nOptional arguments (You may optionally specify one or more of):\n\t-o,--outline\tgenerate brain surface outline overlaid onto original image\n\t-m,--mask\tgenerate binary brain mask\n\t-s,--skull\tgenerate approximate skull image\n\t-n,--nooutput\tdon't generate segmented brain image output\n\t-f <f>\t\tfractional intensity threshold (0->1); default=0.5; smaller values give larger brain outline estimates\n\t-g <g>\t\tvertical gradient in fractional intensity threshold (-1->1); default=0; positive values give larger brain outline at bottom, smaller at top\n\t-r,--radius <r>\thead radius (mm not voxels); initial surface sphere is set to half of this\n\t-w,--smooth <r>\tsmoothness factor; default=1; values smaller than 1 produce more detailed brain surface, values larger than one produce smoother, less detailed surface\n\t-c <x y z>\tcentre-of-gravity (voxels not mm) of initial mesh surface.\n\t-t,--threshold\t-apply thresholding to segmented brain image and mask\n\t--ct\t-treat input as CT image (default is MRI)\n\t--binaryMask <image>\tGenerate mesh from existing mask\n\t-e,--mesh\tgenerates brain surface as mesh in vtk format\n\t-v,--verbose\tswitch on diagnostic messages\n\t-h,--help\tdisplays this help, then exits\n\n\n";
@@ -173,7 +173,10 @@ pub fn parse(args: &[String], err: &mut dyn Write) -> Parsed {
         d2: num(D2, 3.0),
     };
     if o.frac < 0.0 || o.frac > 1.0 {
-        let _ = write!(err, "\nFractional intensity threshold must be between 0 and 1!\n");
+        let _ = write!(
+            err,
+            "\nFractional intensity threshold must be between 0 and 1!\n"
+        );
         return Parsed::Exit(1);
     }
     if o.gradient < -1.0 || o.gradient > 1.0 {
@@ -279,7 +282,7 @@ fn read_image(
     mode: UpstreamDefects,
     notices: &mut Vec<Notice>,
     n_threads: usize,
-) -> Result<(Vec<Vol>, Input), ImageError> {
+) -> Result<Input, ImageError> {
     let full = settings.name(name);
     let resolved = files::resolve_input(&full).map_err(ImageError::Invalid)?;
     let mut f = ImageFiles::of(&resolved)
@@ -298,7 +301,7 @@ fn read_image(
         };
         defects::push_once(notices, Notice::new(&defects::FSL_60, mode, detail));
     }
-    image::read(&f, n_threads)
+    image::read_first(&f, n_threads)
 }
 
 /// The output names of a run (§4.7), from the output root.
@@ -429,7 +432,7 @@ pub fn run(
     };
     // the image the surface is found on: the mask (--binaryMask) or the input
     let surface_source = o.binary_mask.as_deref();
-    let (source_vols, source) = match read_image(
+    let source = match read_image(
         settings,
         surface_source.unwrap_or(&input),
         mode,
@@ -448,28 +451,37 @@ pub fn run(
             "Warning: An input intended to be a single 3D volume has multiple timepoints. Input will be truncated to first volume, but this functionality is deprecated and will be removed in a future release."
         );
     }
-    drop(source_vols);
-    let mut work = source.vol.clone();
-    if o.ct {
-        work.data.iter_mut().for_each(|v| *v = bet::cormack(*v));
-    }
+    // the image the surface is found on: the source, converted for --ct (a copy only then)
+    let cormack = |v: &bet::Vol| v.with_data(v.data.iter().map(|&x| bet::cormack(x)).collect());
+    let work_owned = o.ct.then(|| cormack(&source.vol));
     let centre_mm = o.centre.map(|c| {
-        let nx = work.shape[0] as f64;
-        let x = if source.flipped { nx - 1.0 - c[0] } else { c[0] };
-        [x * work.voxel[0], c[1] * work.voxel[1], c[2] * work.voxel[2]]
+        let v = &source.vol;
+        let nx = v.shape[0] as f64;
+        let x = if source.flipped {
+            nx - 1.0 - c[0]
+        } else {
+            c[0]
+        };
+        [x * v.voxel[0], c[1] * v.voxel[1], c[2] * v.voxel[2]]
     });
     // -r 0 (the default) asks for the estimate; any other value is used (FSL-42 reproduced)
     let radius = (o.radius != 0.0).then_some(o.radius);
-    let found = bet::find_surface(&work, radius, centre_mm, &defo, n_threads);
+    let found = bet::find_surface(
+        work_owned.as_ref().unwrap_or(&source.vol),
+        radius,
+        centre_mm,
+        &defo,
+        n_threads,
+    );
     if found.init.one_d {
         let _ = writeln!(err, "Warning: Image appears to be 1D");
     }
     if o.verbose {
         verbose(out, &found);
     }
-    // the image the outputs are made from
-    let (input_img, input_vol_work) = if surface_source.is_some() {
-        let (_, inp) = match read_image(settings, &input, mode, &mut notices, n_threads) {
+    // the image the outputs are made from, and the one -t and -s measure (converted for --ct)
+    let (input_img, work_out): (Input, Option<bet::Vol>) = if surface_source.is_some() {
+        let inp = match read_image(settings, &input, mode, &mut notices, n_threads) {
             Ok(r) => r,
             Err(e) => {
                 print_notices(err, &notices);
@@ -494,39 +506,37 @@ pub fn run(
                 "--binaryMask names an image on another grid than the input (FSL-61)",
             );
         }
-        let mut w = inp.vol.clone();
-        if o.ct {
-            if mode.reproduce() {
-                // FSL-62: FSL converts the mask and writes it, masked, as the brain image
-                notices.push(Notice::new(
-                    &defects::FSL_62,
-                    mode,
-                    "--ct with --binaryMask: the brain image is the converted mask, masked, as FSL writes it",
-                ));
-                (
-                    Input {
-                        vol: work.clone(),
-                        ..inp
-                    },
-                    work.clone(),
-                )
-            } else {
-                notices.push(Notice::new(
-                    &defects::FSL_62,
-                    mode,
-                    "--ct with --binaryMask: the brain image is the CT input, masked; FSL writes the converted mask instead",
-                ));
-                w.data.iter_mut().for_each(|v| *v = bet::cormack(*v));
-                (inp, w)
-            }
+        if !o.ct {
+            (inp, None)
+        } else if mode.reproduce() {
+            // FSL-62: FSL writes the mask, masked, as the brain image (observed)
+            notices.push(Notice::new(
+                &defects::FSL_62,
+                mode,
+                "--ct with --binaryMask: the brain image is the mask, masked, as FSL writes it",
+            ));
+            (
+                Input {
+                    vol: source.vol,
+                    ..inp
+                },
+                work_owned,
+            )
         } else {
-            (inp, w)
+            notices.push(Notice::new(
+                &defects::FSL_62,
+                mode,
+                "--ct with --binaryMask: the brain image is the CT input, masked; FSL writes the mask instead",
+            ));
+            let w = cormack(&inp.vol);
+            (inp, Some(w))
         }
     } else {
-        (source.clone(), work.clone())
+        (source, work_owned)
     };
+    let input_vol_work: &bet::Vol = work_out.as_ref().unwrap_or(&input_img.vol);
     let (t2, t98, t) = if surface_source.is_some() {
-        let (t2, t98) = bet::params::robust_range(&input_vol_work);
+        let (t2, t98) = bet::params::robust_range(input_vol_work);
         (t2, t98, t2 + 0.1 * (t98 - t2))
     } else {
         (found.init.t2, found.init.t98, found.init.t)
@@ -641,7 +651,7 @@ pub fn run(
             }
         }
         if o.skull {
-            let s = bet::skull::skull(&found.mesh, &found.points, &input_vol_work, t, t2, t98);
+            let s = bet::skull::skull(&found.mesh, &found.points, input_vol_work, t, t2, t98);
             let v = s.iter().map(|&b| if b { 100i16 } else { 0 }).collect();
             if !write(names.stem("_skull"), None, Values::I16(v)) {
                 return 1;
@@ -707,7 +717,12 @@ pub fn write_vtk(name: &str, m: &mesh::Mesh, points: &[mesh::V3]) -> std::io::Re
     s.push_str("# vtk DataFile Version 3.0\nsurface file\nASCII\nDATASET POLYDATA\n");
     s.push_str(&format!("POINTS {}  float\n", points.len()));
     for p in points {
-        s.push_str(&format!("{} {} {}\n", fmt_f(p[0]), fmt_f(p[1]), fmt_f(p[2])));
+        s.push_str(&format!(
+            "{} {} {}\n",
+            fmt_f(p[0]),
+            fmt_f(p[1]),
+            fmt_f(p[2])
+        ));
     }
     s.push_str(&format!(
         "POLYGONS {} {}\n",

@@ -204,6 +204,7 @@ pub fn deform(
         if i == 50 || i % 100 == 0 {
             l = mesh.mean_neighbour_distance(&points);
         }
+        // a rerun's smoothness factor, lowered linearly to 1 over the last quarter
         let factor = boost.map(|b| {
             if i > 750 {
                 4.0 * (1.0 - i as f64 / 1000.0) * (b - 1.0) + 1.0
@@ -234,16 +235,7 @@ pub fn deform(
                     f2 = (f2 * factor).min(1.0);
                 }
                 let u2 = scale(s_n, f2);
-                let f3 = intensity_term(
-                    &sampler,
-                    p,
-                    n,
-                    init,
-                    bt,
-                    opts.gradient,
-                    opts.d1,
-                    opts.d2,
-                );
+                let f3 = intensity_term(&sampler, p, n, init, bt, opts.gradient, opts.d1, opts.d2);
                 let u3 = scale(n, 0.05 * l * f3);
                 *out = add(add(add(p, u1), u2), u3);
             });

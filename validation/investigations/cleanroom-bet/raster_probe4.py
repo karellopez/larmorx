@@ -12,8 +12,8 @@ import nibabel as nib
 import numpy as np
 
 sys.path.insert(0, str(Path(__file__).parent))
-from raster_probe import read_vtk  # noqa: E402
-from raster_probe3 import draw  # noqa: E402
+from raster_probe import read_vtk
+from raster_probe3 import draw
 
 
 def main(argv):
@@ -38,17 +38,26 @@ def main(argv):
     print(np.round(fr[:20], 3))
     # for each off point, the axis whose fractional part is nearest an integer
     near = np.minimum(fr, 1 - fr)
-    print("min distance to a voxel boundary: median", np.median(near.min(1)), "max", near.min(1).max())
+    print(
+        "min distance to a voxel boundary: median", np.median(near.min(1)), "max", near.min(1).max()
+    )
     # does FSL draw the voxel one below along that axis?
     ax = near.argmin(1)
     alt = idx[off].copy()
     for k in range(len(alt)):
         a = ax[k]
         alt[k, a] += -1 if fr[k, a] < 0.5 else 1
-    print("FSL drew the neighbour across that boundary:", int(fline[alt[:, 0], alt[:, 1], alt[:, 2]].sum()), "of", len(alt))
+    print(
+        "FSL drew the neighbour across that boundary:",
+        int(fline[alt[:, 0], alt[:, 1], alt[:, 2]].sum()),
+        "of",
+        len(alt),
+    )
     # offset hypothesis: FSL's voxel of p is trunc(p / d) (no 0.5)?
     idx2 = np.trunc(allp / vox).astype(int)
-    print("trunc(p/d) off:", int((~fline[idx2[:, 0], idx2[:, 1], idx2[:, 2]]).sum()), "of", len(idx2))
+    print(
+        "trunc(p/d) off:", int((~fline[idx2[:, 0], idx2[:, 1], idx2[:, 2]]).sum()), "of", len(idx2)
+    )
 
 
 if __name__ == "__main__":

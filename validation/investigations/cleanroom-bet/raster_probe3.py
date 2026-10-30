@@ -13,7 +13,7 @@ import nibabel as nib
 import numpy as np
 
 sys.path.insert(0, str(Path(__file__).parent))
-from raster_probe import read_vtk  # noqa: E402
+from raster_probe import read_vtk
 
 
 def draw(tri_pts, order, step, mode):
@@ -65,7 +65,7 @@ def draw(tri_pts, order, step, mode):
 def main(argv):
     d, inp = Path(argv[0]), argv[1]
     img = nib.load(inp)
-    shape = img.shape[:3]
+    img.shape[:3]
     vox = np.array([abs(float(np.float32(z))) for z in img.header.get_zooms()[:3]])
     pts, tri = read_vtk(d / "out_mesh.vtk")
     over = np.asanyarray(nib.load(d / "out_overlay.nii.gz").dataobj)

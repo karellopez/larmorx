@@ -12,7 +12,7 @@ import nibabel as nib
 import numpy as np
 
 sys.path.insert(0, str(Path(__file__).parent))
-from raster_probe import points, read_vtk  # noqa: E402
+from raster_probe import points, read_vtk
 
 
 def main(argv):
@@ -42,7 +42,12 @@ def main(argv):
             )
     # FSL's outline voxels nearest a vertex: which vertex positions fall where
     vidx = np.trunc(pts / vox + 0.5).astype(int)
-    print("vertices on FSL's outline (trunc+.5):", int(fline[vidx[:, 0], vidx[:, 1], vidx[:, 2]].sum()), "of", len(pts))
+    print(
+        "vertices on FSL's outline (trunc+.5):",
+        int(fline[vidx[:, 0], vidx[:, 1], vidx[:, 2]].sum()),
+        "of",
+        len(pts),
+    )
 
 
 if __name__ == "__main__":

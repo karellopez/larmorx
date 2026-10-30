@@ -10,6 +10,7 @@
 pub mod image;
 pub mod mesh;
 pub mod params;
+pub mod quatern;
 pub mod raster;
 pub mod skull;
 pub mod surface;
@@ -84,7 +85,12 @@ pub fn find_surface(
         .unwrap_or_else(|_| find_surface_in(vol, radius, centre, opts))
 }
 
-fn find_surface_in(vol: &Vol, radius: Option<f64>, centre: Option<V3>, opts: &Deformation) -> Found {
+fn find_surface_in(
+    vol: &Vol,
+    radius: Option<f64>,
+    centre: Option<V3>,
+    opts: &Deformation,
+) -> Found {
     let init = params::initial(vol, radius, centre);
     let mesh = Mesh::sphere(4);
     let start = surface::initial_surface(&mesh, &init);

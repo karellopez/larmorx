@@ -188,7 +188,11 @@ pub fn parse(
             }
             let value = match value {
                 Some(v) if !v.is_empty() => v,
-                _ => return Err(ParseError(format!("{shown}: Missing non-optional argument!"))),
+                _ => {
+                    return Err(ParseError(format!(
+                        "{shown}: Missing non-optional argument!"
+                    )));
+                }
             };
             given[k] = Some(if s.numeric {
                 let vals: Vec<&str> = value.split_whitespace().collect();
@@ -218,7 +222,9 @@ pub fn parse(
                 }
                 let rest = &words[i..];
                 if rest.is_empty() {
-                    return Err(ParseError(format!("{shown}: Missing non-optional argument!")));
+                    return Err(ParseError(format!(
+                        "{shown}: Missing non-optional argument!"
+                    )));
                 }
                 if !s.numeric {
                     given[k] = Some(Given::Text(rest[0].clone()));

@@ -34,6 +34,17 @@ def replica_find(family: str, tool: str, dirs: list[str]) -> Path | None:
     ``PATH``), or ``None`` (not found, or built in); ``ValueError`` if the variable names no
     file, ``KeyError`` if the tool has no replica."""
 
+def fsl_run_original(
+    tool: str,
+    args: list[str],
+    env: list[tuple[str, str]],
+    cwd: str | None = None,
+) -> tuple[int, str, str]:
+    """Run the clean-room original of ``fsl tool`` (``bet`` or ``bet2``) with FSL's arguments in
+    this process (without the GIL): ``(exit code, standard output, standard error)``. ``env``
+    stands for the process environment (never read or changed); relative names start in
+    ``cwd``. ``KeyError`` for another tool."""
+
 def replica_run_builtin(
     family: str,
     tool: str,

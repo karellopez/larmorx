@@ -353,11 +353,31 @@ def process_environment(env: dict[str, str], cwd: Path | None = None) -> Iterato
         os.chdir(saved_cwd)
 
 
+#: The implementation the suite compares with FSL: ``"replica"`` (``larmorx-nc``, the default)
+#: or ``"original"`` (the clean-room original in ``crates/larmorx-fsl``); set by :func:`suite`.
+IMPLEMENTATION = {"name": "replica"}
+
+
+def original() -> bool:
+    """Whether the suite compares the clean-room original."""
+    return IMPLEMENTATION["name"] == "original"
+
+
 def run_larmorx(tool: str, args: list[str], mode: str, env: dict[str, str], cwd: Path) -> Run:
-    """``larmorx fsl <tool>`` in process (it runs the ``larmorx-nc`` program as a separate
-    process); ``mode`` is D13's choice."""
+    """``larmorx fsl <tool>`` in process (the replica: it runs the ``larmorx-nc`` program as a
+    separate process; the original: in this process); ``mode`` is D13's choice."""
     from larmorx.cli import run
 
+    if original():
+        out, err = io.StringIO(), io.StringIO()
+        with (
+            process_environment(env, cwd),
+            defects.mode(mode),
+            contextlib.redirect_stderr(err),
+            contextlib.redirect_stdout(out),
+        ):
+            code = run(["larmorx", "fsl", tool, *args], implementation="original")
+        return Run(code, out.getvalue(), err.getvalue(), cwd)
     env = dict(env, LARMORX_NC_BIN=str(replica_binary()))
     out, err = io.StringIO(), io.StringIO()
     with (
@@ -585,6 +605,281 @@ def compare_dirs(
 
 def all_same(checks: CheckList, files: dict[str, FileComparison]) -> bool:
     return all(c.passed for c in checks.checks) and all(f.same for f in files.values())
+
+
+# ------------------------------------------------------------------------------------------------
+# The clean-room original's comparison (specs/bet.md §11): by thresholds where not bit-identical
+
+#: The thresholds of the clean-room original (``specs/bet.md`` §11).
+MASK_DICE = 0.995
+BOUNDARY_P95 = 0.5
+BOUNDARY_MAX = 2.0
+MESH_P95 = 0.1
+MESH_MAX = 1.0
+
+
+def boundary_distance(a: np.ndarray, b: np.ndarray) -> tuple[float, float]:
+    """The symmetric distance between the surfaces of two masks (voxels on each mask's
+    boundary, to the nearest boundary voxel of the other), in voxels: 95th percentile and
+    maximum; 0 for identical masks, ``inf`` when one is empty and the other not."""
+    from scipy import ndimage
+
+    a, b = np.asarray(a) != 0, np.asarray(b) != 0
+    if np.array_equal(a, b):
+        return 0.0, 0.0
+    if not a.any() or not b.any():
+        return float("inf"), float("inf")
+    ba = a & ~ndimage.binary_erosion(a)
+    bb = b & ~ndimage.binary_erosion(b)
+    if not ba.any() or not bb.any():
+        return float("inf"), float("inf")
+    d = np.concatenate(
+        [ndimage.distance_transform_edt(~bb)[ba], ndimage.distance_transform_edt(~ba)[bb]]
+    )
+    return float(np.percentile(d, 95)), float(d.max())
+
+
+def set_distance(a: np.ndarray, b: np.ndarray) -> tuple[float, float]:
+    """The symmetric distance between two sets of voxels (each voxel of one to the nearest of
+    the other), in voxels: 95th percentile and maximum."""
+    from scipy import ndimage
+
+    a, b = np.asarray(a, bool), np.asarray(b, bool)
+    if np.array_equal(a, b):
+        return 0.0, 0.0
+    if not a.any() or not b.any():
+        return float("inf"), float("inf")
+    d = np.concatenate(
+        [ndimage.distance_transform_edt(~b)[a], ndimage.distance_transform_edt(~a)[b]]
+    )
+    return float(np.percentile(d, 95)), float(d.max())
+
+
+def _vtk_points(path: Path) -> tuple[np.ndarray, str]:
+    text = path.read_text(encoding="utf-8", errors="replace")
+    w = text.split()
+    k = w.index("POINTS")
+    n = int(w[k + 1])
+    pts = np.array(w[k + 3 : k + 3 + 3 * n], dtype=np.float64).reshape(n, 3)
+    return pts, text[text.index("POLYGONS") :] if "POLYGONS" in text else ""
+
+
+def _header_same(ca: bytes, cb: bytes) -> bool:
+    """Two image headers alike but for ``descrip`` (the original names itself there)."""
+    return _header_compare(ca, cb)[0]
+
+
+#: Where NIfTI-1 keeps the qform's quaternion (b, c, d: float32 at 256, 260, 264).
+QUATERN = (256, 268)
+
+
+def _ulps32(a: bytes, b: bytes) -> int:
+    """The distance in float32 units in the last place between two stored floats."""
+    import struct
+
+    x, y = (struct.unpack("<i", v)[0] for v in (a, b))
+    x = x if x >= 0 else -(x & 0x7FFFFFFF)
+    y = y if y >= 0 else -(y & 0x7FFFFFFF)
+    return abs(x - y)
+
+
+def _header_compare(ca: bytes, cb: bytes) -> tuple[bool, str]:
+    """Two image headers alike but for ``descrip`` (the original names itself there), and the
+    qform's quaternion of a NIfTI-1 header within one float unit in the last place: FSL turns
+    the quaternion into its matrix and back with its NIfTI library's precision path, whose last
+    bit the spec leaves open (``specs/bet.md`` §8; ``docs/findings/fsl-bet-original.md``)."""
+    if len(ca) < 348 or len(cb) < 348:
+        return ca == cb, "the same" if ca == cb else "differs"
+    two = int.from_bytes(ca[:4], "little") == 540
+    size = 540 if two else 348
+    start = 240 if two else 148
+    a, b = ca[:start] + ca[start + 80 : size], cb[:start] + cb[start + 80 : size]
+    if a == b:
+        return True, "the same but for descrip"
+    if not two:
+        q0, q1 = QUATERN
+        outside = ca[:q0] + ca[q1:start] + ca[start + 80 : size]
+        if outside == cb[:q0] + cb[q1:start] + cb[start + 80 : size]:
+            ulps = max(_ulps32(ca[k : k + 4], cb[k : k + 4]) for k in range(q0, q1, 4))
+            if ulps <= 1:
+                return True, (
+                    "the same but for descrip and the quaternion's last float bit (FSL's "
+                    "precision path, specs/bet.md §8)"
+                )
+            return False, f"the quaternion differs by {ulps} float units in the last place"
+    return False, "differs beyond descrip"
+
+
+def _original_image_data(path: Path) -> np.ndarray:
+    """An image's stored values: :func:`image_data`, and for a pair compressed with zstd or
+    bzip2 its two files decompressed."""
+    name = path.name
+    for c in (".zst", ".bz2"):
+        if name.endswith(".hdr" + c):
+            import nibabel as nib
+
+            head = content(path)
+            data = content(path.with_name(name[: -len(".hdr" + c)] + ".img" + c))
+            two = int.from_bytes(head[:4], "little") == 540
+            klass = nib.Nifti2Pair if two else nib.Nifti1Pair
+            fm = klass.make_file_map({"header": io.BytesIO(head), "image": io.BytesIO(data)})
+            return np.asanyarray(klass.from_file_map(fm).dataobj.get_unscaled())
+    return image_data(path)
+
+
+def _kind(name: str) -> str:
+    stem = name.split(".")[0]
+    if stem.endswith("_mask"):
+        return "mask"
+    if stem.endswith("_skull"):
+        return "skull"
+    if stem.endswith("_overlay"):
+        return "outline"
+    return "brain"
+
+
+def compare_original_file(checks: CheckList, label: str, pa: Path, pb: Path) -> None:
+    """One file FSL wrote against the clean-room original's, by specs/bet.md §11's metrics."""
+    name = pa.name
+    if name.endswith(".vtk"):
+        try:
+            va, ta = _vtk_points(pa)
+            vb, tb = _vtk_points(pb)
+        except (ValueError, IndexError):
+            same = content(pa) == content(pb)
+            checks(f"{label}{name}", same, metric="bytes", detail="not a mesh; bytes compared")
+            return
+        if va.shape != vb.shape or ta != tb:
+            checks(f"{label}{name}", False, metric="mesh", detail="other vertices or triangles")
+            return
+        d = np.linalg.norm(va - vb, axis=1)
+        p95, mx = (float(np.percentile(d, 95)), float(d.max())) if len(d) else (0.0, 0.0)
+        checks(
+            f"{label}{name}",
+            p95 <= MESH_P95 and mx <= MESH_MAX,
+            metric="vertex distance p95 / max (mm)",
+            value=f"{p95:.4f} / {mx:.4f}",
+            threshold=f"<= {MESH_P95} / {MESH_MAX}",
+            detail="the same vertices, to the file's 6 decimals"
+            if mx == 0
+            else f"triangles the same; vertex distance p95 {p95:.4f} mm, max {mx:.4f} mm",
+        )
+        return
+    data_suffixes = (".img", ".img.gz", ".img.zst", ".img.bz2")
+    if name.endswith(data_suffixes):
+        for suffix in data_suffixes[::-1]:
+            if name.endswith(suffix):
+                hdr = pa.with_name(name[: -len(suffix)] + suffix.replace(".img", ".hdr"))
+                if hdr.is_file():
+                    return  # compared with its header file
+                break
+    if not is_image(name) or name.endswith(data_suffixes):
+        same = content(pa) == content(pb)
+        checks(
+            f"{label}{name}", same, metric="bytes", detail="byte for byte" if same else "differs"
+        )
+        return
+    ca, cb = content(pa), content(pb)
+    hs, hdetail = _header_compare(ca, cb)
+    try:
+        da, db = _original_image_data(pa), _original_image_data(pb)
+    except Exception as e:
+        # an image nibabel cannot read (FSL-56's offset): its bytes, descrip aside
+        same = hs and ca[348:] == cb[348:]
+        checks(
+            f"{label}{name}",
+            same,
+            metric="bytes",
+            detail=f"not readable by nibabel ({type(e).__name__}): "
+            + ("the same bytes but for descrip" if same else "the bytes differ"),
+        )
+        return
+    if da.shape != db.shape or da.dtype != db.dtype:
+        checks(
+            f"{label}{name}",
+            False,
+            metric="image",
+            detail=f"FSL {da.shape} {da.dtype}, larmorx {db.shape} {db.dtype}",
+        )
+        return
+    checks(
+        f"{label}{name}: header",
+        hs,
+        metric="header",
+        detail=hdetail,
+    )
+    fa, fb = da.astype(np.float64), db.astype(np.float64)
+    differing = int(np.count_nonzero((fa != fb) & ~(np.isnan(fa) & np.isnan(fb))))
+    if differing == 0:
+        checks(
+            f"{label}{name}",
+            True,
+            metric="values",
+            value=0,
+            threshold="bit-identical",
+            detail="every value the same",
+        )
+        return
+    kind = _kind(name)
+    if kind == "skull":
+        d = dice(da, db)
+        checks(
+            f"{label}{name}",
+            True,
+            metric="Dice",
+            value=round(d, 6),
+            threshold="reported (specs/bet.md §4.7 leaves the skull search open)",
+            detail=f"{differing} of {da.size} values differ",
+        )
+        return
+    if kind == "outline":
+        # the surface drawn at the input's maximum: elsewhere the input itself
+        top = max(float(np.nanmax(fa)), float(np.nanmax(fb)))
+        la, lb = fa == top, fb == top
+        rest = int(np.count_nonzero((fa != fb) & ~la & ~lb))
+        p95, mx = set_distance(la, lb)
+        checks(
+            f"{label}{name}",
+            rest == 0 and p95 <= BOUNDARY_P95 and mx <= BOUNDARY_MAX,
+            metric="drawn surface distance p95 / max (voxels)",
+            value=f"{p95:.2f} / {mx:.2f}",
+            threshold=f"<= {BOUNDARY_P95} / {BOUNDARY_MAX}, the input elsewhere identical",
+            detail=f"{differing} of {da.size} values differ, {rest} of them off both surfaces",
+        )
+        return
+    # masks and brains (the input times the mask): the masks by Dice and boundary distance,
+    # the brain's values identical where both are in the brain
+    if fa.ndim == 4:
+        ma, mb = (fa != 0).any(axis=3), (fb != 0).any(axis=3)
+    else:
+        ma, mb = fa != 0, fb != 0
+    d = dice(ma, mb)
+    p95, mx = boundary_distance(ma, mb)
+    both = (fa != 0) & (fb != 0)
+    inside = int(np.count_nonzero((fa != fb) & both))
+    checks(
+        f"{label}{name}",
+        d >= MASK_DICE and p95 <= BOUNDARY_P95 and mx <= BOUNDARY_MAX and inside == 0,
+        metric="Dice; boundary distance p95 / max (voxels)",
+        value=f"{d:.6f}; {p95:.2f} / {mx:.2f}",
+        threshold=f">= {MASK_DICE}; <= {BOUNDARY_P95} / {BOUNDARY_MAX}"
+        + ("" if kind == "mask" else "; values identical inside both"),
+        detail=f"{differing} of {da.size} values differ"
+        + ("" if kind == "mask" else f", {inside} inside both"),
+    )
+
+
+def compare_dirs_original(
+    checks: CheckList, a: Path, b: Path, inputs: tuple[str, ...] = (), label: str = ""
+) -> None:
+    """Every file FSL wrote in ``a`` against the clean-room original's in ``b``."""
+    fa, fb = written(a, inputs), written(b, inputs)
+    checks(
+        f"{label}{FILES}", fa == fb, detail=", ".join(fa) if fa == fb else f"FSL {fa}, larmorx {fb}"
+    )
+    for name in fa:
+        if name in fb:
+            compare_original_file(checks, label, a / name, b / name)
 
 
 # ------------------------------------------------------------------------------------------------
@@ -1245,7 +1540,7 @@ def _run_case(case: Case, checks: CheckList) -> None:
     s: Scenario = case.payload
     if fsl_dir() is None:
         raise Outcome("skipped", "FSL is not installed (~/fsl, LARMORX_FSL_DIR)")
-    if replica_binary() is None:
+    if replica_binary() is None and not original():
         raise Outcome("skipped", "the larmorx-nc program is not built (crates-nc)")
     try:
         paths = [input_path(n) for n in s.inputs]
@@ -1302,6 +1597,10 @@ def _run_case(case: Case, checks: CheckList) -> None:
         memory = ""
         if filled:
             _filled(checks, s, fill_entry or "", args, env, ours, r_dir, root, inputs, late_failure)
+        elif original() and not (filled or crash):
+            # the clean-room original: by its thresholds, also where FSL-43's fill reads memory
+            # beyond the volume (its outputs are FSL's there or the case fails)
+            compare_dirs_original(checks, f_dir, r_dir, inputs)
         elif reads_memory(ours) and not crash:
             # FSL's fill read memory beyond the volume (FSL-43): where its outputs differ from
             # the replica's, they depend on that memory (the replica reads it as not part of
@@ -1323,6 +1622,8 @@ def _run_case(case: Case, checks: CheckList) -> None:
                     True,
                     detail=memory[:600],
                 )
+        elif original():
+            compare_dirs_original(checks, f_dir, r_dir, inputs)
         else:
             compare_dirs(checks, f_dir, r_dir, inputs)
         identical = all(c.passed for c in checks.checks)
@@ -1336,9 +1637,10 @@ def _run_case(case: Case, checks: CheckList) -> None:
         _prepare(fix_dir, s)
         fixed = run_larmorx(s.tool, args, "fix", env, fix_dir)
         _fix_pass(checks, s, ours, fixed, r_dir, fix_dir, inputs)
-        _fsl_step(checks, s, args, env, fsl, f_dir, root, inputs, ours)
+        if not original():
+            _fsl_step(checks, s, args, env, fsl, f_dir, root, inputs, ours)
         if s.python is not None and identical and fsl.code == 0:
-            _python(checks, s, paths, f_dir)
+            _python(checks, s, paths, r_dir if original() else f_dir)
         if filled and all(c.passed for c in checks.checks):
             raise Outcome(
                 EXPECTED,
@@ -1548,6 +1850,23 @@ def _fmriprep_own(checks: CheckList, r_dir: Path, s: Scenario) -> None:
         da, db = image_data(a), image_data(b)
         same = da.shape == db.shape and da.dtype == db.dtype and np.array_equal(da, db)
         head = "header the same" if content(a)[:348] == content(b)[:348] else "header differs"
+        if original():
+            # the original is compared with FSL by thresholds: fMRIPrep's own output is reported
+            d = dice(da, db) if da.shape == db.shape else 0.0
+            checks(
+                f"{ours}: {FMRIPREP_OWN}",
+                True,
+                metric="Dice",
+                value=round(d, 6),
+                threshold="reported",
+                detail=(
+                    "values bit-identical"
+                    if same
+                    else f"{int(np.count_nonzero(da != db)) if da.shape == db.shape else 'all'} values differ"
+                )
+                + f"; {head}",
+            )
+            continue
         checks(
             f"{ours}: {FMRIPREP_OWN}",
             same,
@@ -1687,10 +2006,13 @@ def _python(checks: CheckList, s: Scenario, paths: list[Path], f_dir: Path) -> N
 
     function, kwargs, outputs = s.python  # type: ignore[misc]
     env = dict(os.environ, LARMORX_NC_BIN=str(replica_binary()))
+    impl = "original" if original() else "auto"
     with process_environment(env), warnings.catch_warnings():
         warnings.simplefilter("ignore")
         if function == "bet":
-            result = lx.fsl.bet(str(paths[0]), upstream_defects="reproduce", **kwargs)
+            result = lx.fsl.bet(
+                str(paths[0]), upstream_defects="reproduce", implementation=impl, **kwargs
+            )
         else:
             t2 = None if len(paths) == 3 else paths[1]
             mesh, mat = paths[-2], paths[-1]
@@ -1752,12 +2074,16 @@ def highlights(results: list[CaseResult]) -> list[str]:
 
 
 def suite(implementation: str = "replica") -> Suite:
-    """The BET suite for the replica (``larmorx-nc``): ``larmorx fsl bet|bet2|betsurf`` and
-    ``lx.fsl.bet`` / ``lx.fsl.betsurf``."""
-    if implementation != "replica":
+    """The BET suite: the replica (``larmorx-nc``, ``"replica"``) or the clean-room original
+    (``"original"``) through ``larmorx fsl bet|bet2|betsurf`` and ``lx.fsl.bet`` /
+    ``lx.fsl.betsurf``."""
+    if implementation not in ("replica", "original"):
         raise ValueError(
-            "BET has only its replica so far (its clean-room original is to be written from specs/bet.md)"
+            f"BET's implementations are 'replica' and 'original', not {implementation!r}"
         )
+    IMPLEMENTATION["name"] = implementation
+    if implementation == "original":
+        return _original_suite()
     tool = (
         f"`larmorx-nc fsl bet`, `bet2` and `betsurf` ({replica_version()}; crate larmorx-nc-bet, the "
         f"replica translated from FSL {fsl_versions.NEWEST}'s source under the FSL Licence), run by larmorx as a separate "
@@ -1797,3 +2123,117 @@ def suite(implementation: str = "replica") -> Suite:
             + fsl_versions.record_line("replica")
         ),
     )
+
+
+def _original_cases(tier: str) -> list[Case]:
+    """The suite's cases but betsurf's (its clean-room original is still to be written)."""
+    return [c for c in cases_of(tier) if c.payload.tool != "betsurf"]
+
+
+def _original_suite() -> Suite:
+    import larmorx
+
+    return Suite(
+        name="fsl-bet",
+        title="BET (clean-room original)",
+        tool=(
+            f"`larmorx fsl bet2` and `bet` (larmorx {larmorx.__version__}, crate larmorx-fsl: the "
+            "clean-room original written from specs/bet.md, Apache-2.0), in process, and "
+            "`lx.fsl.bet(..., implementation='original')`; betsurf's original is still to be written"
+        ),
+        reference=f"bet and bet2 from {fsl_version()}, the conda installation in `~/fsl-6.0.7.23`",
+        thresholds=[
+            (
+                "Exit status",
+                "the same (both succeed, or both refuse); where FSL crashes, larmorx exits 1",
+            ),
+            (
+                "Messages",
+                "standard output and error byte for byte (larmorx's own lines set aside; the bet "
+                "script's path read as `bet`)",
+            ),
+            ("Files written", "the same names"),
+            (
+                "Image headers",
+                "byte for byte but for `descrip` (the original writes `larmorx fsl bet2`, FSL its "
+                "build string)",
+            ),
+            (
+                "Masks and brains",
+                f"bit-identical, or Dice >= {MASK_DICE} with the boundary distance's 95th "
+                f"percentile <= {BOUNDARY_P95} and maximum <= {BOUNDARY_MAX} voxels and the "
+                "brain's values identical inside both (specs/bet.md §11)",
+            ),
+            (
+                "Outlines",
+                f"bit-identical, or the drawn surfaces within {BOUNDARY_P95} / {BOUNDARY_MAX} "
+                "voxels (95th percentile / maximum) and the input identical elsewhere",
+            ),
+            (
+                "Meshes",
+                f"the same triangles; per-vertex distance 95th percentile <= {MESH_P95} mm and "
+                f"maximum <= {MESH_MAX} mm (specs/bet.md §11)",
+            ),
+            (
+                "Skull",
+                "reported (Dice): specs/bet.md §4.7 leaves details of the skull search open (a "
+                "question for the spec writer)",
+            ),
+        ],
+        cases=_original_cases,
+        run_case=run_case,
+        packages=("nibabel", "scipy"),
+        highlights=highlights_original,
+        notes=(
+            "Both programs run in directories of their own on the same input files, with "
+            "`PATH=/usr/bin:/bin` (FSL never on it), `FSLDIR` set, an empty `HOME` and the case's "
+            "`FSLOUTPUTTYPE`. The original is compared in `reproduce` mode; the fix pass runs its "
+            "default. The fMRIPrep cases also run FSL again and fMRIPrep 25.2.6's FSL (FSL's own "
+            "variability) and report the original's agreement with fMRIPrep's own outputs. "
+            "betsurf's cases wait for its original. The `-S`, `-B`, `-A` and `-A2` variations of "
+            "`bet` run FSL programs larmorx does not have yet (standard_space_roi, FLIRT, FAST): "
+            "the original refuses them, naming what is missing. FSL 6.0.7.23 (the "
+            "`--fsl-version` default)."
+        ),
+    )
+
+
+def highlights_original(results: list[CaseResult]) -> list[str]:
+    n = len(results)
+    passed = sum(r.status == PASS for r in results)
+    both = sum(r.status == BOTH_ERROR for r in results)
+    pending = sum(r.status == EXPECTED and r.reason.startswith(PENDING) for r in results)
+    filled = sum(r.status == EXPECTED and r.reason.startswith(FILLED) for r in results)
+    images = [
+        c
+        for r in results
+        for c in r.checks
+        if c.metric == "values" or c.metric.startswith(("Dice", "drawn surface"))
+    ]
+    identical = sum(1 for c in images if c.threshold == "bit-identical")
+    meshes = [c for r in results for c in r.checks if c.metric.startswith("vertex distance")]
+    mesh_same = sum(1 for c in meshes if str(c.value).startswith("0.0000 / 0.0000"))
+    lines = [
+        f"- **{passed} of {n} cases within the thresholds** (exit status and messages identical, "
+        f"every file within its threshold); {both} where both refuse or FSL crashes and larmorx "
+        f"refuses; {filled} where FSL crashes and `reproduce` fills what FSL leaves undefined "
+        f"(D13's failure cases); {pending} pending (options that run FSL programs larmorx does "
+        "not have yet).",
+        f"- **{identical} of {len(images)} images with FSL's values, bit for bit**; {mesh_same} of "
+        f"{len(meshes)} meshes with FSL's vertices to the file's 6 decimals.",
+    ]
+    own = [c for r in results for c in r.checks if c.name.endswith(FMRIPREP_OWN)]
+    if own:
+        same = sum(1 for c in own if c.detail.startswith("values bit-identical"))
+        lines.append(
+            f"- fMRIPrep's own BET outputs: {same} of {len(own)} with the same values as the "
+            "original's."
+        )
+    again = [c for r in results for c in r.checks if c.name == RUN_AGAIN]
+    if again:
+        lines.append(
+            f"- FSL run again: {sum(c.passed for c in again)} of {len(again)} runs bit-identical "
+            "(FSL is deterministic)."
+        )
+    lines += defects.summary(results)
+    return lines

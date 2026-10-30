@@ -55,6 +55,17 @@ struct Run<'a> {
 impl Run<'_> {
     /// bet2 with `args`; on failure the script's line and exit 1.
     fn bet2(&self, args: &[String], out: &mut dyn Write, err: &mut dyn Write) -> Result<(), u8> {
+        // FSL-44 reproduced: the script's unquoted expansion of bet2's command line
+        let split: Vec<String>;
+        let args = if self.mode.reproduce() {
+            split = args
+                .iter()
+                .flat_map(|a| a.split_whitespace().map(str::to_owned))
+                .collect();
+            &split[..]
+        } else {
+            args
+        };
         let code = bet2::main(args, self.settings, out, err);
         if code == 0 {
             Ok(())
@@ -79,47 +90,31 @@ pub fn main(args: &[String], settings: &Settings, out: &mut dyn Write, err: &mut
         }
     };
     let mut notices: Vec<Notice> = Vec::new();
-    // FSL-44: the script's words (unquoted expansion splits names with blanks; an empty
-    // argument ends the options)
-    let words: Vec<String> = match mode {
-        UpstreamDefects::Reproduce => {
-            let split: Vec<String> = args
-                .iter()
-                .flat_map(|a| {
-                    if a.is_empty() {
-                        vec![String::new()]
-                    } else {
-                        a.split_whitespace().map(str::to_owned).collect()
-                    }
-                })
-                .collect();
-            if split.len() != args.len() || split.iter().zip(args).any(|(a, b)| a != b) {
-                notices.push(Notice::new(
-                    &defects::FSL_44,
-                    mode,
-                    "the arguments are split into words as the script's unquoted expansion splits them",
-                ));
+    // FSL-44: the script expands its names and options unquoted where it runs bet2 (a name
+    // with a blank becomes several words), and an empty argument ends its options
+    if args
+        .iter()
+        .any(|a| a.contains(char::is_whitespace) || a.is_empty())
+    {
+        let detail = match mode {
+            UpstreamDefects::Fix => {
+                "the arguments are used as given; the script splits names with blanks into words and stops its options at an empty argument"
             }
-            split
-        }
-        UpstreamDefects::Fix => {
-            if args.iter().any(|a| a.contains(char::is_whitespace) || a.is_empty()) {
-                notices.push(Notice::new(
-                    &defects::FSL_44,
-                    mode,
-                    "the arguments are used as given; the script splits names with blanks into words and stops its options at an empty argument",
-                ));
+            UpstreamDefects::Reproduce => {
+                "the arguments are expanded unquoted, as the script expands them: names with blanks split into words, the options ending at an empty argument"
             }
-            args.to_vec()
-        }
-    };
+        };
+        notices.push(Notice::new(&defects::FSL_44, mode, detail));
+    }
+    let words: Vec<String> = args.to_vec();
     if words.len() < 2 || words[1].is_empty() {
         let _ = out.write_all(USAGE.as_bytes());
         return 1;
     }
     let input = remove_ext(&words[0]).to_owned();
     let output = remove_ext(&words[1]).to_owned();
-    if files::resolve_input(&settings.name(&input)).is_err() {
+    let blank = mode.reproduce() && input.contains(char::is_whitespace);
+    if blank || files::resolve_input(&settings.name(&input)).is_err() {
         let _ = write!(out, "\nError: input image {input} not valid\n\n");
         return 1;
     }
@@ -273,7 +268,12 @@ fn cleanup(
     if !others.is_empty() {
         let names: Vec<String> = others
             .iter()
-            .map(|p| p.file_name().unwrap_or_default().to_string_lossy().into_owned())
+            .map(|p| {
+                p.file_name()
+                    .unwrap_or_default()
+                    .to_string_lossy()
+                    .into_owned()
+            })
             .collect();
         let detail = match mode {
             UpstreamDefects::Fix => format!(
@@ -538,7 +538,12 @@ fn fmri(
     }
     let mut all = Vec::with_capacity(dilated.len() * vols.len());
     for v in &vols {
-        all.extend(v.data.iter().zip(&dilated).map(|(&x, &m)| if m != 0.0 { x } else { 0.0 }));
+        all.extend(
+            v.data
+                .iter()
+                .zip(&dilated)
+                .map(|(&x, &m)| if m != 0.0 { x } else { 0.0 }),
+        );
     }
     if let Err(e) = write_like(run, output, &inp, &vols, Values::F32(all), None) {
         return Err(fail(e, out, err));
@@ -621,12 +626,34 @@ fn small_fov(
         .map_err(|e| fail(e, out, err))
     };
     w(&format!("{tmp}_bottom"), &one, out, err)?;
-    w(
+    // the top slice as fslroi cuts it: its origin moved to that slice
+    let mut top_inp = inp.clone();
+    {
+        let h = &mut top_inp.header;
+        let shift = (nz - 1) as f64;
+        for row in [&mut h.srow_x, &mut h.srow_y, &mut h.srow_z] {
+            row[3] = f64::from((row[3] + row[2] * shift) as f32);
+        }
+        let r = crate::bet::quatern::quatern_to_mat(
+            h.quatern_b,
+            h.quatern_c,
+            h.quatern_d,
+            [h.pixdim[0], h.pixdim[1], h.pixdim[2], h.pixdim[3]],
+        );
+        h.qoffset_x = f64::from((h.qoffset_x + r[0][2] * shift) as f32);
+        h.qoffset_y = f64::from((h.qoffset_y + r[1][2] * shift) as f32);
+        h.qoffset_z = f64::from((h.qoffset_z + r[2][2] * shift) as f32);
+    }
+    let top_vol = Vol::new([nx, ny, 1], v.voxel, top.clone());
+    write_like(
+        run,
         &format!("{tmp}_top"),
-        &Vol::new([nx, ny, 1], v.voxel, top.clone()),
-        out,
-        err,
-    )?;
+        &top_inp,
+        std::slice::from_ref(&top_vol),
+        Values::F32(top_vol.data.clone()),
+        None,
+    )
+    .map_err(|e| fail(e, out, err))?;
     let pz = nz + 2 * npad;
     let mut padded = Vec::with_capacity(slice * pz);
     for _ in 0..npad {

@@ -46,7 +46,9 @@ pub fn skull(mesh: &Mesh, points: &[V3], vol: &Vol, t: f64, t2: f64, t98: f64) -
     let [nx, ny, nz] = shape;
     let n = nx * ny * nz;
     let mut surface = vec![false; n];
-    raster::draw(mesh, points, shape, d, Rounding::Floor, |k| surface[k] = true);
+    raster::draw(mesh, points, shape, d, Rounding::Floor, |k| {
+        surface[k] = true
+    });
     let normals = mesh.triangle_normals(points);
     let step = d.iter().copied().fold(f64::INFINITY, f64::min) / 2.0;
     let range = t98 - t2;
@@ -85,9 +87,7 @@ pub fn skull(mesh: &Mesh, points: &[V3], vol: &Vol, t: f64, t2: f64, t98: f64) -
                             let q = add(c, scale(nrm, s));
                             let x = [0, 1, 2].map(|a| (q[a] / d[a]).trunc());
                             if (0..3).all(|a| x[a] >= 0.0 && x[a] < shape[a] as f64) {
-                                out.push(
-                                    (x[2] as usize * ny + x[1] as usize) * nx + x[0] as usize,
-                                );
+                                out.push((x[2] as usize * ny + x[1] as usize) * nx + x[0] as usize);
                             }
                         }
                     }

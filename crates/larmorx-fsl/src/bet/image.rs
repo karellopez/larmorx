@@ -52,7 +52,10 @@ pub fn read(files: &ImageFiles, n_threads: usize) -> Result<(Vec<Vol>, Input), I
         })
         .collect();
     let first = vols.first().cloned().ok_or_else(|| {
-        ImageError::Invalid(format!("{}: the image has no voxels", files.header.display()))
+        ImageError::Invalid(format!(
+            "{}: the image has no voxels",
+            files.header.display()
+        ))
     })?;
     Ok((
         vols,
@@ -63,6 +66,31 @@ pub fn read(files: &ImageFiles, n_threads: usize) -> Result<(Vec<Vol>, Input), I
             volumes,
         },
     ))
+}
+
+/// Reads the image `files`, keeping only its first volume (no copy of it).
+pub fn read_first(files: &ImageFiles, n_threads: usize) -> Result<Input, ImageError> {
+    if let Some((_, inp)) = read_analyze(files)? {
+        return Ok(inp);
+    }
+    let s = read_series_files(files, n_threads)?;
+    let volumes = s.volumes.len();
+    let first = s.volumes.into_iter().next().ok_or_else(|| {
+        ImageError::Invalid(format!(
+            "{}: the image has no voxels",
+            files.header.display()
+        ))
+    })?;
+    Ok(Input {
+        vol: Vol {
+            shape: first.shape,
+            voxel: first.voxel_size.map(f64::from),
+            data: first.data,
+        },
+        header: s.header,
+        flipped: s.flipped,
+        volumes,
+    })
 }
 
 /// The values of one output image.
@@ -120,6 +148,16 @@ pub fn output_header(o: &Output<'_>, version: NiftiVersion, data_type: DataType)
     if !o.extensions {
         h.extensions.clear();
     }
+    if h.qform_code > 0 {
+        // FSL writes the qform's quaternion converted to its matrix and back (§3.3)
+        let pd = [h.pixdim[0], h.pixdim[1], h.pixdim[2], h.pixdim[3]];
+        let ([b, c, d], qfac) =
+            super::quatern::rewritten(h.quatern_b, h.quatern_c, h.quatern_d, pd);
+        h.quatern_b = f64::from(b);
+        h.quatern_c = f64::from(c);
+        h.quatern_d = f64::from(d);
+        h.pixdim[0] = qfac;
+    }
     let [nx, ny, nz] = o.shape;
     h.dim = [1; 8];
     if o.volumes > 1 {
@@ -158,35 +196,23 @@ pub fn write(
             shape.pop();
         }
     }
-    let unflip = |n: usize| {
-        let mut out = Vec::with_capacity(n);
-        for v in 0..o.volumes {
-            for row in 0..ny * nz {
-                let base = v * per + row * nx;
-                for i in 0..nx {
-                    out.push(if o.flipped { base + nx - 1 - i } else { base + i });
-                }
-            }
-        }
-        out
-    };
-    let order = unflip(per * o.volumes);
     let dims = IxDyn(&shape).f();
     let invalid = |e: larmorx_core::ndarray::ShapeError| ImageError::Invalid(e.to_string());
     let (array, data_type): (DynArray, DataType) = match values {
         Values::F32(v) => (
-            ArrayD::from_shape_vec(dims, order.iter().map(|&k| v[k]).collect())
+            ArrayD::from_shape_vec(dims, storage_order(v, nx, o.flipped))
                 .map_err(invalid)?
                 .into(),
             DataType::F32,
         ),
         Values::I16(v) => (
-            ArrayD::from_shape_vec(dims, order.iter().map(|&k| v[k]).collect())
+            ArrayD::from_shape_vec(dims, storage_order(v, nx, o.flipped))
                 .map_err(invalid)?
                 .into(),
             DataType::I16,
         ),
     };
+    let _ = per;
     let h = output_header(o, version, data_type);
     let mut notices = Vec::new();
     let several = h.extensions.len() >= 2
@@ -218,8 +244,25 @@ pub fn write(
         nifti::write_dyn(&files.header, &h, &array, &options)?;
         return Ok(notices);
     }
-    write_pieces(&files, h, &array, fsl56 && o.defects.reproduce(), o.n_threads)?;
+    write_pieces(
+        &files,
+        h,
+        &array,
+        fsl56 && o.defects.reproduce(),
+        o.n_threads,
+    )?;
     Ok(notices)
+}
+
+/// The values in the file's order: each row's x reversed back when the image was flipped (in
+/// place: no second copy).
+fn storage_order<T: Copy>(mut v: Vec<T>, nx: usize, flipped: bool) -> Vec<T> {
+    if flipped && nx > 1 {
+        for row in v.chunks_exact_mut(nx) {
+            row.reverse();
+        }
+    }
+    v
 }
 
 /// Writes the header block and the data, each file compressed as its name says.
@@ -257,9 +300,9 @@ fn write_pieces(
             e.write(&mut ext, h.byte_order)
                 .map_err(|e| ImageError::Invalid(e.to_string()))?;
         }
+        // the extensions in full, the data after them: with FSL-56 reproduced only the
+        // recorded offset is FSL's (observed), so a reader finds the data elsewhere
         head.extend_from_slice(&ext);
-        // FSL's offset: the data start inside the extensions or after a gap
-        head.resize(offset, 0);
     }
     let write = |p: &Path, pieces: &[&[u8]]| -> Result<(), ImageError> {
         let io = |e: std::io::Error| ImageError::Invalid(format!("{}: {e}", p.display()));
@@ -342,7 +385,11 @@ fn read_analyze(files: &ImageFiles) -> Result<Option<(Vec<Vol>, Input)>, ImageEr
     if bytes.len() < offset + n * size {
         return Err(invalid(
             data_path,
-            format!("expected {} bytes of voxel data, found {}", n * size, bytes.len()),
+            format!(
+                "expected {} bytes of voxel data, found {}",
+                n * size,
+                bytes.len()
+            ),
         ));
     }
     let raw = &bytes[offset..offset + n * size];

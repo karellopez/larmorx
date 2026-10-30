@@ -354,6 +354,7 @@ dependencies = [
  "larmorx-ants",
  "larmorx-cli",
  "larmorx-core",
+ "larmorx-fsl",
  "larmorx-hdf5",
  "larmorx-interp",
  "larmorx-io",

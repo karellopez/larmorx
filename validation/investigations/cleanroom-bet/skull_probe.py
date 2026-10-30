@@ -15,7 +15,7 @@ import numpy as np
 from scipy import ndimage
 
 sys.path.insert(0, str(Path(__file__).parent))
-from raster_probe import read_vtk  # noqa: E402
+from raster_probe import read_vtk
 
 
 def normals(pts, tri):
@@ -63,12 +63,12 @@ def surface(pts, tri, vox, shape):
     return out
 
 
-MODE = 'voxel'
+MODE = "voxel"
 
 
 def main(argv):
     global MODE
-    MODE = argv[5] if len(argv) > 5 else 'voxel'
+    MODE = argv[5] if len(argv) > 5 else "voxel"
     d, inp = Path(argv[0]), argv[1]
     img = nib.load(inp)
     data = np.asanyarray(img.dataobj, dtype=np.float32)
@@ -100,7 +100,7 @@ def main(argv):
                     dp = np.linalg.norm(c - p)
                     if any(np.linalg.norm(c - pts[q]) < dp for q in nb[v]):
                         continue
-                    cast.append((c if MODE == 'voxel' else p, nrm[v]))
+                    cast.append((c if MODE == "voxel" else p, nrm[v]))
     print("profiles", len(cast))
     sgrid = np.arange(-3.0, 30.0, step)
     profs = []
@@ -146,7 +146,9 @@ def main(argv):
             x = np.trunc(pt / vox).astype(int)
             if np.all((x >= 0) & (x < shape)):
                 out[tuple(x)] = True
-        print(f"crit from 0 {crit0}, ties {ties}, d_max over all {dmax_all}, rise {rise}: ours {int(out.sum())} FSL-only {int((fsk & ~out).sum())} ours-only {int((out & ~fsk).sum())}")
+        print(
+            f"crit from 0 {crit0}, ties {ties}, d_max over all {dmax_all}, rise {rise}: ours {int(out.sum())} FSL-only {int((fsk & ~out).sum())} ours-only {int((out & ~fsk).sum())}"
+        )
 
 
 if __name__ == "__main__":

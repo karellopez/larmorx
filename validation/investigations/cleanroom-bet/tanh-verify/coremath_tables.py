@@ -29,8 +29,9 @@ def table(src: str, name: str) -> list[str]:
 
 
 def main(argv: list[str]) -> int:
-    src = open(argv[0], encoding="utf-8").read()
-    # the second occurrence of `ch` and `t0`/`t1` are cr_tanh's; take each name's first table
+    from pathlib import Path
+
+    src = Path(argv[0]).read_text(encoding="utf-8")
     for name in ("t0", "t1"):
         lits = table(src, name)
         assert len(lits) == 128, (name, len(lits))

@@ -603,8 +603,10 @@ def test_the_sizing_laws_and_a_case_predicted_over_the_limit():
             over = predicted
             break
     assert over is not None and max(over["ants_gib"], over["larmorx_gib"]) > over["limit_gib"]
-    # An implementation without a guard is not run: queued, its prediction recorded.
-    e = runner.guard_case(tools.get("afni-unifize"), {}, "original", {**over, "law": "x"})
+    # An implementation without a guard is not run: queued, its prediction recorded (3dUnifize's
+    # clean-room original has AFNI-75's guard since 2026-10-30, as the replica).
+    assert "original" in runner.GUARDED["afni-unifize"]
+    e = runner.guard_case(tools.get("afni-automask"), {}, "original", {**over, "law": "x"})
     assert e["verdict"] == "memory" and "no guard" in e["detail"]
 
 

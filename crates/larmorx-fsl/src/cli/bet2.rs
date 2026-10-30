@@ -433,6 +433,7 @@ pub fn run(
         d1: o.d1,
         d2: o.d2,
         exact: o.mesh,
+        tanh: bet::surface::Tanh::Glibc,
     };
     // the image the surface is found on: the mask (--binaryMask) or the input
     let surface_source = o.binary_mask.as_deref();

@@ -27,6 +27,19 @@ pub struct Deformation {
     pub d2: f64,
     /// The exact self-intersection test (`-e`).
     pub exact: bool,
+    /// The `tanh` of the smoothness weight (§8.1).
+    pub tanh: Tanh,
+}
+
+/// Which `tanh` the smoothness weight takes (§8.1; GLIBC-06).
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Default)]
+pub enum Tanh {
+    /// glibc 2.35's bits, as FSL (`larmorx_core::math::tanh_glibc`): `reproduce`, and the
+    /// default until BET's part 2b.
+    #[default]
+    Glibc,
+    /// Correctly rounded (`larmorx_core::math::tanh`, CORE-MATH's).
+    CorrectlyRounded,
 }
 
 impl Default for Deformation {
@@ -38,6 +51,7 @@ impl Default for Deformation {
             d1: 7.0,
             d2: 3.0,
             exact: false,
+            tanh: Tanh::Glibc,
         }
     }
 }
@@ -160,12 +174,14 @@ fn intensity_term(
     }
 }
 
-/// The C library's `tanh` with glibc 2.35's bits (fdlibm's, §8.1): the smoothness weight's
-/// last bit decides the reruns (§4.5). `reproduce` needs it; the default uses it too until
-/// `larmorx_core::math` has a correctly rounded `tanh` in double precision.
+/// The smoothness weight's `tanh` (§8.1): glibc 2.35's bits (fdlibm's) or the correctly rounded
+/// one. Its last bit decides the reruns (§4.5).
 #[inline]
-fn tanh(x: f64) -> f64 {
-    larmorx_core::math::tanh_glibc(x)
+fn tanh(which: Tanh, x: f64) -> f64 {
+    match which {
+        Tanh::Glibc => larmorx_core::math::tanh_glibc(x),
+        Tanh::CorrectlyRounded => larmorx_core::math::tanh(x),
+    }
 }
 
 /// One pass of [`ITERATIONS`] deformation steps from `start`; `pass` 0 is the first, a rerun
@@ -235,7 +251,7 @@ pub fn deform(
                 let u1 = scale(s_t, 0.5);
                 // 1/R from s_n·n computed again (not σ: they differ in the last bits)
                 let rinv = (2.0 * dot(s_n, n).abs()) / l2;
-                let mut f2 = (1.0 + tanh(f * (rinv - e))) * 0.5;
+                let mut f2 = (1.0 + tanh(opts.tanh, f * (rinv - e))) * 0.5;
                 if let Some(factor) = factor
                     && sigma > 0.0
                 {

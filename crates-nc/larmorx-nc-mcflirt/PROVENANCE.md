@@ -41,7 +41,8 @@ The libraries mcflirt uses (newimage, miscmaths, NewNifti, znzlib, armawrap) are
 - **D13** (`docs/api/upstream-defects.md`; `LARMORX_UPSTREAM_DEFECTS=fix`, the default, or
   `reproduce`): mcflirt's deterministic defects are corrected by default with the same
   behaviour as the clean-room original (FSL-01, FSL-03, FSL-05 to FSL-10, FSL-12 to FSL-14,
-  FSL-20, FSL-21; FSL 6.0.7.23's FSL-59, `-sinc_final` and `-nn_final` resampled trilinearly,
+  FSL-20, FSL-21, FSL-65 and FSL-66 (since 2026-10-30, `specs/mcflirt.md` §10.6 and §12.1:
+  an unopenable `.par` or `.rms` file, a negative `-bins`); FSL 6.0.7.23's FSL-59, `-sinc_final` and `-nn_final` resampled trilinearly,
   and FSL-60, image names holding `.img` opened under another name; `-gdt`, broken in mcflirt
   (FSL-04), is refused) and reproduced bit for bit
   with `reproduce`; each case prints a notice line `larmorx-nc: upstream defect FSL-nn (mcflirt)

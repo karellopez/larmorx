@@ -244,7 +244,11 @@ mcflirt's: an uncreatable `.mat` directory ends it with mcflirt's message and ex
 (FSL-20), the permission's message is mcflirt's (its `-in` directory before the name) and the run
 goes on without matrices, an unopenable `.rms` file is not written, an unopenable `.par` file ends
 the run at volume 0 with status 0 (FSL-65). An image that cannot be written is an error in both
-modes (mcflirt aborts; with `reproduce` its two `terminate` lines are printed first).
+modes (mcflirt aborts; with `reproduce` its two `terminate` lines are printed first). **The
+replica** (`larmorx-nc fsl mcflirt`, `implementation="replica"`) does the same since 2026-10-30
+(by default it opens the `.mat` directory, the `.par` file and the `.rms` files in that order,
+an existing file kept until it is written; with `reproduce` mcflirt's order and files), the
+§14.1 cases in its record as in the original's.
 
 `bins` (`-bins`) below 8 with a histogram cost (FSL-21) and negative values (FSL-66) are refused
 by default before the input is read, with `-stages` 1 or more (`-stages 0` registers nothing and
@@ -254,7 +258,9 @@ cost is rounding noise, their matrices arbitrary; FSL-21 named); where mcflirt c
 (`corratio` with no bins, −1 bins or fewer in a stage that runs) larmorx prints mcflirt's own
 lines (`double free or corruption (out)`, the two `std::bad_array_new_length` lines; none for
 SIGFPE), names the defect and exits 1, writing nothing (a crash is never reproduced). With one
-volume and no reference nothing is registered, so `reproduce` runs (identities).
+volume and no reference nothing is registered, so `reproduce` runs (identities). The replica
+likewise since 2026-10-30 (where mcflirt crashes its own line says how, after mcflirt's; its
+matrices with no bins in a stage are mcflirt's to the byte).
 
 On fMRIPrep's command (`-reffile <boldref> -mats`) FSL-01 changes the last volume's matrix
 (the others are mcflirt's), and FSL-09 the rounding of the corrected series when the input is

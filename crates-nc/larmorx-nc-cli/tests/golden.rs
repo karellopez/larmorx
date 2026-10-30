@@ -77,6 +77,77 @@ macro_rules! args {
     ($($a:expr),* $(,)?) => { &[$($a),*] };
 }
 
+/// mcflirt's failure cases (`specs/mcflirt.md` §10.6, §12.1: FSL-65, FSL-66): the int16 series,
+/// a run directory holding the directories `dirs` first (`{out}` the case's `-out`), the exit
+/// status expected; its files are hashed as the other cases' are, and a run that ends with an
+/// error is recorded by its status (`status` in `tests/golden.tsv`) and must write nothing.
+struct FailureCase {
+    id: &'static str,
+    args: &'static [&'static str],
+    mode: &'static str,
+    named: &'static [&'static str],
+    dirs: &'static [&'static str],
+    status: i32,
+}
+
+const FAILURE_CASES: &[FailureCase] = &[
+    // FSL-65: a directory named <out>.par. Refused by default, nothing written; reproduced,
+    // mcflirt's message at volume 0's line, exit 0, after MAT_0000 and the .rms files.
+    FailureCase {
+        id: "mcflirt.fsl65.par",
+        args: args!["-mats", "-plots", "-rmsrel", "-stages", "1"],
+        mode: "fix",
+        named: &["FSL-65"],
+        dirs: &["{out}.par"],
+        status: 1,
+    },
+    FailureCase {
+        id: "mcflirt.fsl65.par.reproduce",
+        args: args!["-mats", "-plots", "-rmsrel", "-stages", "1"],
+        mode: "reproduce",
+        named: &["FSL-65"],
+        dirs: &["{out}.par"],
+        status: 0,
+    },
+    // FSL-65: a directory named <out>_rel.rms, reproduced: that file not written, the rest as
+    // mcflirt.
+    FailureCase {
+        id: "mcflirt.fsl65.rms.reproduce",
+        args: args!["-mats", "-rmsrel", "-stages", "1"],
+        mode: "reproduce",
+        named: &["FSL-09", "FSL-65"],
+        dirs: &["{out}_rel.rms"],
+        status: 0,
+    },
+    // FSL-66: a negative -bins. Refused by default before any work; reproduced, where mcflirt
+    // aborts (std::bad_array_new_length, -bins -16) an error; -bins -1 with normcorr runs as
+    // mcflirt (no stage has bins, and the cost uses none).
+    FailureCase {
+        id: "mcflirt.fsl66.bins",
+        args: args!["-mats", "-bins", "-16", "-stages", "1"],
+        mode: "fix",
+        named: &["FSL-66"],
+        dirs: &[],
+        status: 1,
+    },
+    FailureCase {
+        id: "mcflirt.fsl66.bins.reproduce",
+        args: args!["-mats", "-bins", "-16", "-stages", "1"],
+        mode: "reproduce",
+        named: &["FSL-66"],
+        dirs: &[],
+        status: 1,
+    },
+    FailureCase {
+        id: "mcflirt.fsl66.bins-1.reproduce",
+        args: args!["-mats", "-bins", "-1", "-stages", "1"],
+        mode: "reproduce",
+        named: &["FSL-09", "FSL-66"],
+        dirs: &[],
+        status: 0,
+    },
+];
+
 const CASES: &[Case] = &[
     // FSL 6.0.7.23: -nn_final resampled trilinearly, as FSL does (FSL-59 reproduced), written
     // as zstd (FSLOUTPUTTYPE=NIFTI_ZST, new in FSL 6.0.7.23)
@@ -1216,6 +1287,59 @@ fn golden() {
         }
         let fps = case_fingerprints(&run);
         assert!(!fps.is_empty(), "{}: no outputs", case.id);
+        for (name, fp) in fps {
+            actual.insert((case.id.to_owned(), name), fp);
+        }
+        runs.insert(case.id, run);
+    }
+    for case in FAILURE_CASES {
+        let run = dir.path().join(case.id);
+        std::fs::create_dir(&run).unwrap();
+        let prepared: Vec<String> = case
+            .dirs
+            .iter()
+            .map(|d| d.replace("{out}", case.id))
+            .collect();
+        for d in &prepared {
+            std::fs::create_dir(run.join(d)).unwrap();
+        }
+        let mut args: Vec<String> = vec!["fsl".into(), "mcflirt".into()];
+        args.extend(["-in".into(), inputs[&Input::Int16].display().to_string()]);
+        args.extend(["-out".into(), case.id.to_owned()]);
+        args.extend(case.args.iter().map(|a| (*a).to_owned()));
+        let out = Command::new(EXE)
+            .args(&args)
+            .current_dir(&run)
+            .env_remove("FSLDIR")
+            .env("FSLOUTPUTTYPE", "NIFTI")
+            .env("OMP_NUM_THREADS", "2")
+            .env("LARMORX_UPSTREAM_DEFECTS", case.mode)
+            .output()
+            .unwrap();
+        assert_eq!(out.status.code(), Some(case.status), "{}: {out:?}", case.id);
+        if let Some(problem) = named_problem(&out.stderr, case.id, case.mode, case.named) {
+            notices.push(problem);
+        }
+        let fps = case_fingerprints(&run);
+        if case.status == 0 {
+            assert!(!fps.is_empty(), "{}: no outputs", case.id);
+        } else {
+            let names: Vec<&String> = fps.iter().map(|(n, _)| n).collect();
+            assert!(
+                fps.is_empty(),
+                "{}: an error, yet it wrote {names:?}",
+                case.id
+            );
+            let text = format!("{}\n", case.status);
+            actual.insert(
+                (case.id.to_owned(), "status".to_owned()),
+                Fingerprint {
+                    sha256: sha256(text.as_bytes()),
+                    dtype: "-".into(),
+                    sample: case.status.to_string(),
+                },
+            );
+        }
         for (name, fp) in fps {
             actual.insert((case.id.to_owned(), name), fp);
         }

@@ -146,7 +146,7 @@ def fmriprep_image() -> Path | None:
 
 
 #: What bet2 reads in the text of its one argument: either one anywhere in it prints the usage
-#: and exits 0 (``bet2.cpp:811-818``; docs/findings/fsl-bet.md). The suite's temporary paths
+#: and exits 0 (observed; `specs/bet.md` §4.1). The suite's temporary paths
 #: must hold neither (:func:`temporary_dir`).
 BET2_HELP_TEXT = ("-h", "--help")
 

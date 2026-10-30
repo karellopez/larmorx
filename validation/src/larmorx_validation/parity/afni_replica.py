@@ -769,6 +769,9 @@ class Scenario:
     #: expected divergence unless every value agrees.
     undefined: str | None = None
     defined: int = 0
+    #: ``guard``: text the refusal must hold (the GiB needed, the radius, the limit), and nothing
+    #: written (``specs/3dUnifize.md`` §10).
+    guard_text: tuple[str, ...] = ()
 
 
 @dataclass(frozen=True)
@@ -856,6 +859,15 @@ def _run_case(spec: ToolSpec, case: Case, checks: CheckList) -> None:
                 ours.code != 0 and "(AFNI-75)" in text and "GiB" in text,
                 detail=f"exit {ours.code}: {text[-600:]}",
             )
+            if s.guard_text:
+                missing = [t for t in s.guard_text if t not in text]
+                checks(
+                    "the refusal's words (the memory, the radius, the voxels, the limit)",
+                    not missing,
+                    detail=f"missing {missing}" if missing else "; ".join(s.guard_text),
+                )
+                written = _produced(l_dir, s)
+                checks("nothing written", not written, detail=f"{written}")
             return
         afni = run_afni(program, args, env, a_dir, never=case_never(s))
         ours = run_larmorx(program, args, defects.REPRODUCE, env, l_dir, impl)

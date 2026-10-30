@@ -88,3 +88,21 @@ The ratio is the clean-room original's time over the replica's: the originals, b
 are faster everywhere (3dTshift by 5 % at one thread and 28 % at eight; 3dAutomask about two times;
 3dUnifize two to five times). `implementation="auto"` runs the replica (its documented rule,
 unchanged); the per-case table is in `<workspace>/oracles/logs/afni-move-speed.log`.
+
+### Random testing (a 30-minute trial, 2026-10-30)
+
+`python -m larmorx_validation difftest --tools afni-tshift,afni-automask,afni-unifize --budget 0.5
+--jobs 8` from the clean commit 6ee7765, in a 20 GiB box, into
+`<workspace>/oracles/difftest/2026-10-30-afni-move/`: 13,971 cases (3dTshift 6,348, 3dAutomask
+5,289, 3dUnifize 2,334), both implementations against AFNI 26.3.05: **no difference**. Besides the
+agreeing cases: D13 notices that change nothing the input shows (AFNI-01, -16, -43, -45: the known
+classes), AFNI-20's random identifier (44 cases, never comparable), and 14 3dUnifize `-EPI` cases
+whose ball of neighbours needs more than the case's 3 GiB (AFNI-75's class, queued in `heavy.jsonl`;
+the predictions there show the replica's -EPI ball at about 2.8 times AFNI's memory, the follow-up
+above). Nothing new for `validation/difftest/triage.toml`.
+
+Two earlier attempts the same night are set aside, never used: the first
+(`2026-10-30-afni-move-invalid-extension-replaced/`) had larmorx's extension replaced under it
+while it ran (every later case an exception in both implementations); the second
+(`2026-10-30-afni-move-contaminated-overlap/`) overlapped the first one's end, whose report and
+settings landed in its directory.

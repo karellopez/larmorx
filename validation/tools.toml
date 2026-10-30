@@ -159,8 +159,8 @@ title = "BET (brain extraction; the skull and scalp surfaces)"
 eco = "fsl"
 page = "/tools/fsl-bet/"
 use = ["larmorx fsl bet", "larmorx fsl bet2", "larmorx fsl betsurf", "lx.fsl.bet", "lx.fsl.betsurf"]
-how = "exact replica in `larmorx-nc` (FSL Licence, non-commercial); clean-room original planned (`specs/bet.md`)"
-validation = "[{fsl-bet-replica.pass} of {fsl-bet-replica.compared}](record:fsl-bet-replica) compared cases bit-identical to FSL 6.0.7.23, every file, exit status and message ([{fsl-bet-replica-full.pass} of {fsl-bet-replica-full.compared}](record:fsl-bet-replica-full) in the full tier against FSL 6.0.7.17, the data panel's T1w images included), fMRIPrep's {fsl-bet-replica.fmriprep} BET calls on every oracle run with BOLD runs included; {fsl-bet-replica.both} more rejected by both, alike; {fsl-bet-replica.filled} where FSL crashes and `reproduce` fills what it leaves undefined; {fsl-bet-replica.memory} where FSL's fill reads memory beyond the volume (FSL-43, undefined); `bet -S`, `-B`, `-A`, `-A2` pending (FLIRT, FAST)"
+how = "clean-room original (`bet2` and the `bet` script; betsurf to come), `experimental`; exact replica in `larmorx-nc` (FSL Licence, non-commercial)"
+validation = "original: [{fsl-bet.pass} of {fsl-bet.compared}](record:fsl-bet) compared cases within thresholds against FSL 6.0.7.23, fMRIPrep's {fsl-bet.fmriprep} BET calls on every oracle run with BOLD runs bit-identical (masks, brains, outlines and meshes FSL's wherever the first pass does not self-intersect; the reruns open, a question for the spec writer); [2.6 to 3 times faster than FSL on one thread, 6 to 11 times on 24](repo:docs/benchmarks/fsl-bet.md); replica: [{fsl-bet-replica.pass} of {fsl-bet-replica.compared}](record:fsl-bet-replica) compared cases bit-identical to FSL 6.0.7.23, every file, exit status and message ([{fsl-bet-replica-full.pass} of {fsl-bet-replica-full.compared}](record:fsl-bet-replica-full) in the full tier against FSL 6.0.7.17, the data panel's T1w images included), fMRIPrep's {fsl-bet-replica.fmriprep} BET calls on every oracle run with BOLD runs included; {fsl-bet-replica.both} more rejected by both, alike; {fsl-bet-replica.filled} where FSL crashes and `reproduce` fills what it leaves undefined; {fsl-bet-replica.memory} where FSL's fill reads memory beyond the volume (FSL-43, undefined); `bet -S`, `-B`, `-A`, `-A2` pending (FLIRT, FAST)"
 
 # ------------------------------------------------------------------------------------------------
 # Records: the validation index's table (docs/validation/README.md), in this order.
@@ -356,6 +356,12 @@ id = "fsl-mcflirt-replica-full"
 larmorx = "the same, full tier"
 reference = "FSL 6.0.7.17 (not re-made for 6.0.7.23: the full tier waits for the final validation phase); besides the standard tier's cases, fMRIPrep's call on the 280-volume multiband run of ds005454 and the sinc final interpolation of ds000005 with and without four stages"
 status = "`validated` ({fsl-mcflirt-replica-full.pass} of {fsl-mcflirt-replica-full.compared} compared cases bit-identical; {fsl-mcflirt-replica-full.both} rejected by both, with the same messages and status)"
+
+[[record]]
+id = "fsl-bet"
+larmorx = "`lx.fsl.bet(implementation=\"original\")`, `larmorx fsl bet2`, `larmorx fsl bet` (clean-room, `crates/larmorx-fsl`)"
+reference = "bet and bet2 (FSL 6.0.7.23)"
+status = "`experimental` ({fsl-bet.fail} of {fsl-bet.compared} compared cases miss their threshold: the surfaces whose first pass self-intersects; fMRIPrep's {fsl-bet.fmriprep} calls included; {fsl-bet.both} rejected by both, with the same messages and status; {fsl-bet.filled} where FSL crashes and `reproduce` fills what it leaves undefined; {fsl-bet.pending} pending FLIRT and FAST; betsurf to come)"
 
 [[record]]
 id = "fsl-bet-replica"

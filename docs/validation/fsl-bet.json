@@ -1,0 +1,2525 @@
+{
+ "environment": {
+  "cpu": "AMD Ryzen 9 7945HX with Radeon Graphics",
+  "larmorx": "0.0.1",
+  "larmorx_commit": "2c5f6692c6c9",
+  "larmorx_testdata_commit": "52124bc98f9f",
+  "logical_cpus": 32,
+  "os": "Linux-6.8.0-124-generic-x86_64-with-glibc2.35",
+  "packages": {
+   "nibabel": "5.4.2",
+   "numpy": "2.3.5",
+   "scipy": "1.15.3"
+  },
+  "platform": "Linux x86_64",
+  "python": "3.12.16"
+ },
+ "oracle_cache": {
+  "differences": 0,
+  "fresh": {
+   "ended by a signal, SIGABRT (never stored)": 3,
+   "ended by a signal, SIGSEGV (never stored)": 2,
+   "never cached: FSL-43: FSL reads memory it never wrote": 2,
+   "never cached: files in the run's directory that bet may remove (FSL-46): the cache replays no removal": 1
+  },
+  "location": "<workspace>/oracles/cache",
+  "mode": "use",
+  "ran": 8,
+  "saved_seconds": 245.4,
+  "served": 222
+ },
+ "reference": "bet and bet2 from FSL 6.0.7.23 (fsl-bet2 2111.9, fsl-newimage 2601.0, fsl-meshclass 2111.0), the conda installation in `~/fsl-6.0.7.23`",
+ "results": [
+  {
+   "case": "fmriprep/ds000005-task_mixedgamblestask_run_01-enhance_and_skullstrip_bold",
+   "category": "fmriprep",
+   "checks_passed": 14,
+   "checks_total": 14,
+   "failed_checks": [],
+   "measured": {
+    "out.nii.gz": 0,
+    "out_mask.nii.gz": 0
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0,
+    "FSL run again": null,
+    "fMRIPrep's FSL against the oracle": 0,
+    "out.nii.gz: fMRIPrep's own output (as it ran)": 1.0,
+    "out_mask.nii.gz: fMRIPrep's own output (as it ran)": 1.0
+   },
+   "seconds": 1.102,
+   "status": "pass"
+  },
+  {
+   "case": "fmriprep/ds000005-task_mixedgamblestask_run_02-enhance_and_skullstrip_bold",
+   "category": "fmriprep",
+   "checks_passed": 14,
+   "checks_total": 14,
+   "failed_checks": [],
+   "measured": {
+    "out.nii.gz": 0,
+    "out_mask.nii.gz": 0
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0,
+    "FSL run again": null,
+    "fMRIPrep's FSL against the oracle": 0,
+    "out.nii.gz: fMRIPrep's own output (as it ran)": 1.0,
+    "out_mask.nii.gz: fMRIPrep's own output (as it ran)": 1.0
+   },
+   "seconds": 1.135,
+   "status": "pass"
+  },
+  {
+   "case": "fmriprep/ds000005-task_mixedgamblestask_run_03-enhance_and_skullstrip_bold",
+   "category": "fmriprep",
+   "checks_passed": 14,
+   "checks_total": 14,
+   "failed_checks": [],
+   "measured": {
+    "out.nii.gz": 0,
+    "out_mask.nii.gz": 0
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0,
+    "FSL run again": null,
+    "fMRIPrep's FSL against the oracle": 0,
+    "out.nii.gz: fMRIPrep's own output (as it ran)": 1.0,
+    "out_mask.nii.gz: fMRIPrep's own output (as it ran)": 1.0
+   },
+   "seconds": 1.187,
+   "status": "pass"
+  },
+  {
+   "case": "fmriprep/ds000228-task_pixar-enhance_and_skullstrip_bold",
+   "category": "fmriprep",
+   "checks_passed": 14,
+   "checks_total": 14,
+   "failed_checks": [],
+   "measured": {
+    "out.nii.gz": 0,
+    "out_mask.nii.gz": 0
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0,
+    "FSL run again": null,
+    "fMRIPrep's FSL against the oracle": 0,
+    "out.nii.gz: fMRIPrep's own output (as it ran)": 1.0,
+    "out_mask.nii.gz: fMRIPrep's own output (as it ran)": 1.0
+   },
+   "seconds": 1.121,
+   "status": "pass"
+  },
+  {
+   "case": "fmriprep/ds000256-task_restbaseline-enhance_and_skullstrip_bold",
+   "category": "fmriprep",
+   "checks_passed": 14,
+   "checks_total": 14,
+   "failed_checks": [],
+   "measured": {
+    "out.nii.gz": 0,
+    "out_mask.nii.gz": 0
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0,
+    "FSL run again": null,
+    "fMRIPrep's FSL against the oracle": 0,
+    "out.nii.gz: fMRIPrep's own output (as it ran)": 1.0,
+    "out_mask.nii.gz: fMRIPrep's own output (as it ran)": 1.0
+   },
+   "seconds": 1.158,
+   "status": "pass"
+  },
+  {
+   "case": "fmriprep/ds000256-task_restfixationfixed-enhance_and_skullstrip_bold",
+   "category": "fmriprep",
+   "checks_passed": 14,
+   "checks_total": 14,
+   "failed_checks": [],
+   "measured": {
+    "out.nii.gz": 0,
+    "out_mask.nii.gz": 0
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0,
+    "FSL run again": null,
+    "fMRIPrep's FSL against the oracle": 0,
+    "out.nii.gz: fMRIPrep's own output (as it ran)": 1.0,
+    "out_mask.nii.gz: fMRIPrep's own output (as it ran)": 1.0
+   },
+   "seconds": 1.093,
+   "status": "pass"
+  },
+  {
+   "case": "fmriprep/ds000256-task_restfixationnofeedback-enhance_and_skullstrip_bold",
+   "category": "fmriprep",
+   "checks_passed": 14,
+   "checks_total": 14,
+   "failed_checks": [],
+   "measured": {
+    "out.nii.gz": 0,
+    "out_mask.nii.gz": 0
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0,
+    "FSL run again": null,
+    "fMRIPrep's FSL against the oracle": 0,
+    "out.nii.gz: fMRIPrep's own output (as it ran)": 1.0,
+    "out_mask.nii.gz: fMRIPrep's own output (as it ran)": 1.0
+   },
+   "seconds": 1.105,
+   "status": "pass"
+  },
+  {
+   "case": "fmriprep/ds002422-task_arithm_run_01-enhance_and_skullstrip_bold",
+   "category": "fmriprep",
+   "checks_passed": 14,
+   "checks_total": 14,
+   "failed_checks": [],
+   "measured": {
+    "out.nii.gz": 0,
+    "out_mask.nii.gz": 0
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0,
+    "FSL run again": null,
+    "fMRIPrep's FSL against the oracle": 0,
+    "out.nii.gz: fMRIPrep's own output (as it ran)": 1.0,
+    "out_mask.nii.gz: fMRIPrep's own output (as it ran)": 1.0
+   },
+   "seconds": 1.051,
+   "status": "pass"
+  },
+  {
+   "case": "fmriprep/ds002422-task_arithm_run_01-skullstrip_bold",
+   "category": "fmriprep",
+   "checks_passed": 14,
+   "checks_total": 14,
+   "failed_checks": [],
+   "measured": {
+    "out.nii.gz": 0,
+    "out_mask.nii.gz": 0
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0,
+    "FSL run again": null,
+    "fMRIPrep's FSL against the oracle": 0,
+    "out.nii.gz: fMRIPrep's own output (as it ran)": 1.0,
+    "out_mask.nii.gz: fMRIPrep's own output (as it ran)": 1.0
+   },
+   "seconds": 1.073,
+   "status": "pass"
+  },
+  {
+   "case": "fmriprep/ds002422-task_arithm_run_02-enhance_and_skullstrip_bold",
+   "category": "fmriprep",
+   "checks_passed": 14,
+   "checks_total": 14,
+   "failed_checks": [],
+   "measured": {
+    "out.nii.gz": 0,
+    "out_mask.nii.gz": 0
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0,
+    "FSL run again": null,
+    "fMRIPrep's FSL against the oracle": 0,
+    "out.nii.gz: fMRIPrep's own output (as it ran)": 1.0,
+    "out_mask.nii.gz: fMRIPrep's own output (as it ran)": 1.0
+   },
+   "seconds": 1.084,
+   "status": "pass"
+  },
+  {
+   "case": "fmriprep/ds002422-task_arithm_run_02-skullstrip_bold",
+   "category": "fmriprep",
+   "checks_passed": 14,
+   "checks_total": 14,
+   "failed_checks": [],
+   "measured": {
+    "out.nii.gz": 0,
+    "out_mask.nii.gz": 0
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0,
+    "FSL run again": null,
+    "fMRIPrep's FSL against the oracle": 0,
+    "out.nii.gz: fMRIPrep's own output (as it ran)": 1.0,
+    "out_mask.nii.gz: fMRIPrep's own output (as it ran)": 1.0
+   },
+   "seconds": 1.061,
+   "status": "pass"
+  },
+  {
+   "case": "fmriprep/ds002422-task_rest-enhance_and_skullstrip_bold",
+   "category": "fmriprep",
+   "checks_passed": 14,
+   "checks_total": 14,
+   "failed_checks": [],
+   "measured": {
+    "out.nii.gz": 0,
+    "out_mask.nii.gz": 0
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0,
+    "FSL run again": null,
+    "fMRIPrep's FSL against the oracle": 0,
+    "out.nii.gz: fMRIPrep's own output (as it ran)": 1.0,
+    "out_mask.nii.gz: fMRIPrep's own output (as it ran)": 1.0
+   },
+   "seconds": 1.133,
+   "status": "pass"
+  },
+  {
+   "case": "fmriprep/ds002422-task_rest-skullstrip_bold",
+   "category": "fmriprep",
+   "checks_passed": 14,
+   "checks_total": 14,
+   "failed_checks": [],
+   "measured": {
+    "out.nii.gz": 0,
+    "out_mask.nii.gz": 0
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0,
+    "FSL run again": null,
+    "fMRIPrep's FSL against the oracle": 0,
+    "out.nii.gz: fMRIPrep's own output (as it ran)": 1.0,
+    "out_mask.nii.gz: fMRIPrep's own output (as it ran)": 1.0
+   },
+   "seconds": 1.145,
+   "status": "pass"
+  },
+  {
+   "case": "fmriprep/ds002603-task_wm_acq_Mb4Mm3Tr550-enhance_and_skullstrip_bold",
+   "category": "fmriprep",
+   "checks_passed": 14,
+   "checks_total": 14,
+   "failed_checks": [],
+   "measured": {
+    "out.nii.gz": 0,
+    "out_mask.nii.gz": 0
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0,
+    "FSL run again": null,
+    "fMRIPrep's FSL against the oracle": 0,
+    "out.nii.gz: fMRIPrep's own output (as it ran)": 1.0,
+    "out_mask.nii.gz: fMRIPrep's own output (as it ran)": 1.0
+   },
+   "seconds": 1.209,
+   "status": "pass"
+  },
+  {
+   "case": "fmriprep/ds002603-task_wm_acq_Mb4Mm3Tr550-skullstrip_bold",
+   "category": "fmriprep",
+   "checks_passed": 14,
+   "checks_total": 14,
+   "failed_checks": [],
+   "measured": {
+    "out.nii.gz": 0,
+    "out_mask.nii.gz": 0
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0,
+    "FSL run again": null,
+    "fMRIPrep's FSL against the oracle": 0,
+    "out.nii.gz: fMRIPrep's own output (as it ran)": 1.0,
+    "out_mask.nii.gz: fMRIPrep's own output (as it ran)": 1.0
+   },
+   "seconds": 1.23,
+   "status": "pass"
+  },
+  {
+   "case": "fmriprep/ds002603-task_wm_acq_SeqMm3Tr2000-enhance_and_skullstrip_bold",
+   "category": "fmriprep",
+   "checks_passed": 14,
+   "checks_total": 14,
+   "failed_checks": [],
+   "measured": {
+    "out.nii.gz": 0,
+    "out_mask.nii.gz": 0
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0,
+    "FSL run again": null,
+    "fMRIPrep's FSL against the oracle": 0,
+    "out.nii.gz: fMRIPrep's own output (as it ran)": 1.0,
+    "out_mask.nii.gz: fMRIPrep's own output (as it ran)": 1.0
+   },
+   "seconds": 1.239,
+   "status": "pass"
+  },
+  {
+   "case": "fmriprep/ds002603-task_wm_acq_SeqMm3Tr2000-skullstrip_bold",
+   "category": "fmriprep",
+   "checks_passed": 14,
+   "checks_total": 14,
+   "failed_checks": [],
+   "measured": {
+    "out.nii.gz": 0,
+    "out_mask.nii.gz": 0
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0,
+    "FSL run again": null,
+    "fMRIPrep's FSL against the oracle": 0,
+    "out.nii.gz: fMRIPrep's own output (as it ran)": 1.0,
+    "out_mask.nii.gz: fMRIPrep's own output (as it ran)": 1.0
+   },
+   "seconds": 0.916,
+   "status": "pass"
+  },
+  {
+   "case": "fmriprep/ds003592-ses_1_task_rest_echo_1-enhance_and_skullstrip_bold",
+   "category": "fmriprep",
+   "checks_passed": 14,
+   "checks_total": 14,
+   "failed_checks": [],
+   "measured": {
+    "out.nii.gz": 0,
+    "out_mask.nii.gz": 0
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0,
+    "FSL run again": null,
+    "fMRIPrep's FSL against the oracle": 0,
+    "out.nii.gz: fMRIPrep's own output (as it ran)": 1.0,
+    "out_mask.nii.gz: fMRIPrep's own output (as it ran)": 1.0
+   },
+   "seconds": 0.867,
+   "status": "pass"
+  },
+  {
+   "case": "fmriprep/ds004884-ses_217_task_naming40_acq_epfid2_dir_AP_run_2-enhance_and_skullstrip_bold",
+   "category": "fmriprep",
+   "checks_passed": 14,
+   "checks_total": 14,
+   "failed_checks": [],
+   "measured": {
+    "out.nii.gz": 0,
+    "out_mask.nii.gz": 0
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0,
+    "FSL run again": null,
+    "fMRIPrep's FSL against the oracle": 0,
+    "out.nii.gz: fMRIPrep's own output (as it ran)": 1.0,
+    "out_mask.nii.gz: fMRIPrep's own output (as it ran)": 1.0
+   },
+   "seconds": 0.905,
+   "status": "pass"
+  },
+  {
+   "case": "fmriprep/ds004884-ses_217_task_rest_acq_epfidp2p2_dir_AP_run_9-enhance_and_skullstrip_bold",
+   "category": "fmriprep",
+   "checks_passed": 14,
+   "checks_total": 14,
+   "failed_checks": [],
+   "measured": {
+    "out.nii.gz": 0,
+    "out_mask.nii.gz": 0
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0,
+    "FSL run again": null,
+    "fMRIPrep's FSL against the oracle": 0,
+    "out.nii.gz: fMRIPrep's own output (as it ran)": 1.0,
+    "out_mask.nii.gz: fMRIPrep's own output (as it ran)": 1.0
+   },
+   "seconds": 0.895,
+   "status": "pass"
+  },
+  {
+   "case": "fmriprep/ds004958-task_rest-enhance_and_skullstrip_bold",
+   "category": "fmriprep",
+   "checks_passed": 14,
+   "checks_total": 14,
+   "failed_checks": [],
+   "measured": {
+    "out.nii.gz": 0,
+    "out_mask.nii.gz": 0
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0,
+    "FSL run again": null,
+    "fMRIPrep's FSL against the oracle": 0,
+    "out.nii.gz: fMRIPrep's own output (as it ran)": 1.0,
+    "out_mask.nii.gz: fMRIPrep's own output (as it ran)": 1.0
+   },
+   "seconds": 1.349,
+   "status": "pass"
+  },
+  {
+   "case": "fmriprep/ds005003-ses_1_task_motor-enhance_and_skullstrip_bold",
+   "category": "fmriprep",
+   "checks_passed": 14,
+   "checks_total": 14,
+   "failed_checks": [],
+   "measured": {
+    "out.nii.gz": 0,
+    "out_mask.nii.gz": 0
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0,
+    "FSL run again": null,
+    "fMRIPrep's FSL against the oracle": 0,
+    "out.nii.gz: fMRIPrep's own output (as it ran)": 1.0,
+    "out_mask.nii.gz: fMRIPrep's own output (as it ran)": 1.0
+   },
+   "seconds": 0.931,
+   "status": "pass"
+  },
+  {
+   "case": "fmriprep/ds005003-ses_1_task_rest-enhance_and_skullstrip_bold",
+   "category": "fmriprep",
+   "checks_passed": 14,
+   "checks_total": 14,
+   "failed_checks": [],
+   "measured": {
+    "out.nii.gz": 0,
+    "out_mask.nii.gz": 0
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0,
+    "FSL run again": null,
+    "fMRIPrep's FSL against the oracle": 0,
+    "out.nii.gz: fMRIPrep's own output (as it ran)": 1.0,
+    "out_mask.nii.gz: fMRIPrep's own output (as it ran)": 1.0
+   },
+   "seconds": 0.878,
+   "status": "pass"
+  },
+  {
+   "case": "fmriprep/ds005040-task_clip_run_1-enhance_and_skullstrip_bold",
+   "category": "fmriprep",
+   "checks_passed": 14,
+   "checks_total": 14,
+   "failed_checks": [],
+   "measured": {
+    "out.nii.gz": 0,
+    "out_mask.nii.gz": 0
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0,
+    "FSL run again": null,
+    "fMRIPrep's FSL against the oracle": 0,
+    "out.nii.gz: fMRIPrep's own output (as it ran)": 1.0,
+    "out_mask.nii.gz: fMRIPrep's own output (as it ran)": 1.0
+   },
+   "seconds": 0.903,
+   "status": "pass"
+  },
+  {
+   "case": "fmriprep/ds005040-task_clip_run_1-skullstrip_bold",
+   "category": "fmriprep",
+   "checks_passed": 14,
+   "checks_total": 14,
+   "failed_checks": [],
+   "measured": {
+    "out.nii.gz": 0,
+    "out_mask.nii.gz": 0
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0,
+    "FSL run again": null,
+    "fMRIPrep's FSL against the oracle": 0,
+    "out.nii.gz: fMRIPrep's own output (as it ran)": 1.0,
+    "out_mask.nii.gz: fMRIPrep's own output (as it ran)": 1.0
+   },
+   "seconds": 0.975,
+   "status": "pass"
+  },
+  {
+   "case": "fmriprep/ds005454-task_rest-enhance_and_skullstrip_bold",
+   "category": "fmriprep",
+   "checks_passed": 14,
+   "checks_total": 14,
+   "failed_checks": [],
+   "measured": {
+    "out.nii.gz": 0,
+    "out_mask.nii.gz": 0
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0,
+    "FSL run again": null,
+    "fMRIPrep's FSL against the oracle": 0,
+    "out.nii.gz: fMRIPrep's own output (as it ran)": 1.0,
+    "out_mask.nii.gz: fMRIPrep's own output (as it ran)": 1.0
+   },
+   "seconds": 2.125,
+   "status": "pass"
+  },
+  {
+   "case": "fmriprep/ds005454-task_rest-skullstrip_bold",
+   "category": "fmriprep",
+   "checks_passed": 14,
+   "checks_total": 14,
+   "failed_checks": [],
+   "measured": {
+    "out.nii.gz": 0,
+    "out_mask.nii.gz": 0
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0,
+    "FSL run again": null,
+    "fMRIPrep's FSL against the oracle": 0,
+    "out.nii.gz: fMRIPrep's own output (as it ran)": 1.0,
+    "out_mask.nii.gz: fMRIPrep's own output (as it ran)": 1.0
+   },
+   "seconds": 2.235,
+   "status": "pass"
+  },
+  {
+   "case": "fmriprep/ds005752-ses_01_task_rest_dir_forward-enhance_and_skullstrip_bold",
+   "category": "fmriprep",
+   "checks_passed": 14,
+   "checks_total": 14,
+   "failed_checks": [],
+   "measured": {
+    "out.nii.gz": 0,
+    "out_mask.nii.gz": 0
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0,
+    "FSL run again": null,
+    "fMRIPrep's FSL against the oracle": 0,
+    "out.nii.gz: fMRIPrep's own output (as it ran)": 1.0,
+    "out_mask.nii.gz: fMRIPrep's own output (as it ran)": 1.0
+   },
+   "seconds": 0.925,
+   "status": "pass"
+  },
+  {
+   "case": "fmriprep/ds005752-ses_01_task_rest_dir_reverse-enhance_and_skullstrip_bold",
+   "category": "fmriprep",
+   "checks_passed": 14,
+   "checks_total": 14,
+   "failed_checks": [],
+   "measured": {
+    "out.nii.gz": 0,
+    "out_mask.nii.gz": 0
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0,
+    "FSL run again": null,
+    "fMRIPrep's FSL against the oracle": 0,
+    "out.nii.gz: fMRIPrep's own output (as it ran)": 1.0,
+    "out_mask.nii.gz: fMRIPrep's own output (as it ran)": 1.0
+   },
+   "seconds": 1.004,
+   "status": "pass"
+  },
+  {
+   "case": "bet2/default",
+   "category": "bet2",
+   "checks_passed": 8,
+   "checks_total": 8,
+   "failed_checks": [],
+   "measured": {
+    "out.nii.gz": 0
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0,
+    "Dice with the known brain (FSL)": 0.953628,
+    "Dice with the known brain (larmorx)": 0.953628
+   },
+   "seconds": 2.4,
+   "status": "pass"
+  },
+  {
+   "case": "bet2/all-outputs",
+   "category": "bet2",
+   "checks_passed": 19,
+   "checks_total": 19,
+   "failed_checks": [],
+   "measured": {
+    "out.nii.gz": 0,
+    "out_mask.nii.gz": 0,
+    "out_mesh.vtk": "0.0000 / 0.0000",
+    "out_overlay.nii.gz": 0
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0,
+    "Dice with the known brain (FSL)": 0.953628,
+    "Dice with the known brain (larmorx)": 0.953628,
+    "out_skull.nii.gz": 0.910685
+   },
+   "seconds": 3.347,
+   "status": "pass"
+  },
+  {
+   "case": "bet2/f-0.1",
+   "category": "bet2",
+   "checks_passed": 10,
+   "checks_total": 10,
+   "failed_checks": [],
+   "measured": {
+    "out.nii.gz": 0,
+    "out_mask.nii.gz": 0
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0,
+    "Dice with the known brain (FSL)": 0.950656,
+    "Dice with the known brain (larmorx)": 0.950656
+   },
+   "seconds": 2.333,
+   "status": "pass"
+  },
+  {
+   "case": "bet2/f-0.3",
+   "category": "bet2",
+   "checks_passed": 10,
+   "checks_total": 10,
+   "failed_checks": [],
+   "measured": {
+    "out.nii.gz": 0,
+    "out_mask.nii.gz": 0
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0,
+    "Dice with the known brain (FSL)": 0.952596,
+    "Dice with the known brain (larmorx)": 0.952596
+   },
+   "seconds": 2.276,
+   "status": "pass"
+  },
+  {
+   "case": "bet2/f-0.7",
+   "category": "bet2",
+   "checks_passed": 10,
+   "checks_total": 10,
+   "failed_checks": [],
+   "measured": {
+    "out.nii.gz": 0,
+    "out_mask.nii.gz": 0
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0,
+    "Dice with the known brain (FSL)": 0.956718,
+    "Dice with the known brain (larmorx)": 0.956718
+   },
+   "seconds": 2.284,
+   "status": "pass"
+  },
+  {
+   "case": "bet2/f-0.9",
+   "category": "bet2",
+   "checks_passed": 10,
+   "checks_total": 10,
+   "failed_checks": [],
+   "measured": {
+    "out.nii.gz": 0,
+    "out_mask.nii.gz": 0
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0,
+    "Dice with the known brain (FSL)": 0.5599,
+    "Dice with the known brain (larmorx)": 0.5599
+   },
+   "seconds": 2.348,
+   "status": "pass"
+  },
+  {
+   "case": "bet2/g-0.4",
+   "category": "bet2",
+   "checks_passed": 8,
+   "checks_total": 8,
+   "failed_checks": [],
+   "measured": {
+    "out.nii.gz": 0,
+    "out_mask.nii.gz": 0
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 2.24,
+   "status": "pass"
+  },
+  {
+   "case": "bet2/g0.4",
+   "category": "bet2",
+   "checks_passed": 8,
+   "checks_total": 8,
+   "failed_checks": [],
+   "measured": {
+    "out.nii.gz": 0,
+    "out_mask.nii.gz": 0
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 2.221,
+   "status": "pass"
+  },
+  {
+   "case": "bet2/r",
+   "category": "bet2",
+   "checks_passed": 8,
+   "checks_total": 8,
+   "failed_checks": [],
+   "measured": {
+    "out.nii.gz": 0,
+    "out_mask.nii.gz": 0
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 2.334,
+   "status": "pass"
+  },
+  {
+   "case": "bet2/c",
+   "category": "bet2",
+   "checks_passed": 8,
+   "checks_total": 8,
+   "failed_checks": [],
+   "measured": {
+    "out.nii.gz": 0,
+    "out_mask.nii.gz": 0
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 2.287,
+   "status": "pass"
+  },
+  {
+   "case": "bet2/w",
+   "category": "bet2",
+   "checks_passed": 8,
+   "checks_total": 8,
+   "failed_checks": [],
+   "measured": {
+    "out.nii.gz": 0,
+    "out_mask.nii.gz": 0
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 2.347,
+   "status": "pass"
+  },
+  {
+   "case": "bet2/w-0.5",
+   "category": "bet2",
+   "checks_passed": 8,
+   "checks_total": 8,
+   "failed_checks": [],
+   "measured": {
+    "out.nii.gz": 0,
+    "out_mask.nii.gz": 0
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 2.268,
+   "status": "pass"
+  },
+  {
+   "case": "bet2/t",
+   "category": "bet2",
+   "checks_passed": 8,
+   "checks_total": 8,
+   "failed_checks": [],
+   "measured": {
+    "out.nii.gz": 0,
+    "out_mask.nii.gz": 0
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 2.361,
+   "status": "pass"
+  },
+  {
+   "case": "bet2/n",
+   "category": "bet2",
+   "checks_passed": 6,
+   "checks_total": 6,
+   "failed_checks": [],
+   "measured": {
+    "out_mask.nii.gz": 0
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 2.308,
+   "status": "pass"
+  },
+  {
+   "case": "bet2/ct",
+   "category": "bet2",
+   "checks_passed": 8,
+   "checks_total": 8,
+   "failed_checks": [],
+   "measured": {
+    "out.nii.gz": 0,
+    "out_mask.nii.gz": 0
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 2.552,
+   "status": "pass"
+  },
+  {
+   "case": "bet2/d1d2",
+   "category": "bet2",
+   "checks_passed": 8,
+   "checks_total": 8,
+   "failed_checks": [],
+   "measured": {
+    "out.nii.gz": 0,
+    "out_mask.nii.gz": 0
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 2.601,
+   "status": "pass"
+  },
+  {
+   "case": "bet2/short-run",
+   "category": "bet2",
+   "checks_passed": 8,
+   "checks_total": 8,
+   "failed_checks": [],
+   "measured": {
+    "out_mask.nii.gz": 0,
+    "out_overlay.nii.gz": 0
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 0.848,
+   "status": "pass"
+  },
+  {
+   "case": "bet2/repeated",
+   "category": "bet2",
+   "checks_passed": 8,
+   "checks_total": 8,
+   "failed_checks": [],
+   "measured": {
+    "out.nii.gz": 0,
+    "out_mask.nii.gz": 0
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 0.691,
+   "status": "pass"
+  },
+  {
+   "case": "bet2/t2",
+   "category": "bet2",
+   "checks_passed": 8,
+   "checks_total": 8,
+   "failed_checks": [],
+   "measured": {
+    "out.nii.gz": 0,
+    "out_mask.nii.gz": 0
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 0.836,
+   "status": "pass"
+  },
+  {
+   "case": "bet2/help",
+   "category": "bet2",
+   "checks_passed": 4,
+   "checks_total": 4,
+   "failed_checks": [],
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 0.003,
+   "status": "pass"
+  },
+  {
+   "case": "bet2/usage",
+   "category": "bet2",
+   "checks_passed": 4,
+   "checks_total": 4,
+   "failed_checks": [],
+   "reason": "both refuse (exit 1) with FSL's usage",
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 0.003,
+   "status": "both-error"
+  },
+  {
+   "case": "bet2/one-argument",
+   "category": "bet2",
+   "checks_passed": 4,
+   "checks_total": 4,
+   "failed_checks": [],
+   "reason": "both refuse (exit 255) with error: not enough arguments, use bet -h for help",
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 0.004,
+   "status": "both-error"
+  },
+  {
+   "case": "bet2/dash-names",
+   "category": "bet2",
+   "checks_passed": 4,
+   "checks_total": 4,
+   "failed_checks": [],
+   "reason": "both refuse (exit 255) with error : two first arguments should be input and output names, see bet -h for help",
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 0.004,
+   "status": "both-error"
+  },
+  {
+   "case": "bet2/unknown-option",
+   "category": "bet2",
+   "checks_passed": 4,
+   "checks_total": 4,
+   "failed_checks": [],
+   "reason": "both refuse (exit 1) with FSL's usage",
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 0.004,
+   "status": "both-error"
+  },
+  {
+   "case": "bet2/missing-value",
+   "category": "bet2",
+   "checks_passed": 4,
+   "checks_total": 4,
+   "failed_checks": [],
+   "reason": "both refuse (exit 1) with FSL's usage",
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 0.003,
+   "status": "both-error"
+  },
+  {
+   "case": "bet2/bad-number",
+   "category": "bet2",
+   "checks_passed": 4,
+   "checks_total": 4,
+   "failed_checks": [],
+   "reason": "both refuse (exit 1) with FSL's usage",
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 0.003,
+   "status": "both-error"
+  },
+  {
+   "case": "bet2/long-without-equals",
+   "category": "bet2",
+   "checks_passed": 4,
+   "checks_total": 4,
+   "failed_checks": [],
+   "reason": "both refuse (exit 1) with FSL's usage",
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 0.003,
+   "status": "both-error"
+  },
+  {
+   "case": "bet2/f-out-of-range",
+   "category": "bet2",
+   "checks_passed": 4,
+   "checks_total": 4,
+   "failed_checks": [],
+   "reason": "both refuse (exit 1) with Fractional intensity threshold must be between 0 and 1!",
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 0.003,
+   "status": "both-error"
+  },
+  {
+   "case": "bet2/g-out-of-range",
+   "category": "bet2",
+   "checks_passed": 4,
+   "checks_total": 4,
+   "failed_checks": [],
+   "reason": "both refuse (exit 1) with Vertical gradient must be between -1 and 1!",
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 0.003,
+   "status": "both-error"
+  },
+  {
+   "case": "bet2/unrecognised-token",
+   "category": "bet2",
+   "checks_passed": 4,
+   "checks_total": 4,
+   "failed_checks": [],
+   "reason": "both refuse (exit 1) with FSL's usage",
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 0.003,
+   "status": "both-error"
+  },
+  {
+   "case": "bet2/missing-input",
+   "category": "bet2",
+   "checks_passed": 4,
+   "checks_total": 4,
+   "failed_checks": [],
+   "reason": "FSL crashes, larmorx refuses: larmorx fsl bet2: /nonexistent/in cannot be read; FSL aborts here (larmorx)",
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 0.017,
+   "status": "both-error"
+  },
+  {
+   "case": "bet2/img-output",
+   "category": "bet2",
+   "checks_passed": 4,
+   "checks_total": 4,
+   "failed_checks": [],
+   "reason": "FSL crashes, larmorx refuses: larmorx fsl bet2: a name holds '.img' and no '.hdr', on which FSL aborts (FSL-40) (larmorx)",
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 0.254,
+   "status": "both-error"
+  },
+  {
+   "case": "defects/hdr-in-name",
+   "category": "defects",
+   "checks_passed": 8,
+   "checks_total": 8,
+   "failed_checks": [],
+   "measured": {
+    "ab.nii.gz": 0,
+    "ab_mask.nii.gz": 0
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 0.896,
+   "status": "pass"
+  },
+  {
+   "case": "bet2/constant",
+   "category": "bet2",
+   "checks_passed": 6,
+   "checks_total": 6,
+   "failed_checks": [],
+   "reason": "FSL crashes (status -11); with upstream_defects='reproduce' larmorx fills what FSL leaves undefined deterministically, names FSL-43 and writes its outputs; the default refuses",
+   "reported": {
+    "D13 fix pass": 1
+   },
+   "seconds": 0.95,
+   "status": "expected-divergence"
+  },
+  {
+   "case": "bet2/binary-mask",
+   "category": "bet2",
+   "checks_passed": 12,
+   "checks_total": 12,
+   "failed_checks": [],
+   "measured": {
+    "out.nii.gz": "0.999980; 0.00 / 1.00",
+    "out_mask.nii.gz": "0.999980; 0.00 / 1.00",
+    "out_overlay.nii.gz": "0.00 / 1.00"
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0,
+    "out_skull.nii.gz": 0.900295
+   },
+   "seconds": 1.815,
+   "status": "pass"
+  },
+  {
+   "case": "bet2/binary-mask-verbose",
+   "category": "bet2",
+   "checks_passed": 7,
+   "checks_total": 7,
+   "failed_checks": [],
+   "measured": {
+    "out.nii.gz": "0.999980; 0.00 / 1.00",
+    "out_mesh.vtk": "0.0000 / 0.0000"
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 1.016,
+   "status": "pass"
+  },
+  {
+   "case": "defects/binary-mask-ct",
+   "category": "defects",
+   "checks_passed": 8,
+   "checks_total": 8,
+   "failed_checks": [],
+   "measured": {
+    "out.nii.gz": 0,
+    "out_mask.nii.gz": "0.999990; 0.00 / 1.00"
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 196500
+   },
+   "seconds": 1.022,
+   "status": "pass"
+  },
+  {
+   "case": "bet2/binary-mask-missing",
+   "category": "bet2",
+   "checks_passed": 4,
+   "checks_total": 4,
+   "failed_checks": [],
+   "reason": "FSL crashes, larmorx refuses: larmorx fsl bet2: /nonexistent/mask cannot be read; FSL aborts here (larmorx)",
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 0.025,
+   "status": "both-error"
+  },
+  {
+   "case": "defects/nan-f",
+   "category": "defects",
+   "checks_passed": 6,
+   "checks_total": 6,
+   "failed_checks": [],
+   "reason": "FSL crashes (status -11); with upstream_defects='reproduce' larmorx fills what FSL leaves undefined deterministically, names FSL-42 and writes its outputs; the default refuses",
+   "reported": {
+    "D13 fix pass": 1
+   },
+   "seconds": 0.926,
+   "status": "expected-divergence"
+  },
+  {
+   "case": "defects/negative-r",
+   "category": "defects",
+   "checks_passed": 8,
+   "checks_total": 8,
+   "failed_checks": [],
+   "measured": {
+    "out.nii.gz": 0,
+    "out_mask.nii.gz": 0
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 1
+   },
+   "seconds": 0.414,
+   "status": "pass"
+  },
+  {
+   "case": "defects/zero-w",
+   "category": "defects",
+   "checks_passed": 6,
+   "checks_total": 6,
+   "failed_checks": [],
+   "reason": "FSL crashes (status -11); with upstream_defects='reproduce' larmorx fills what FSL leaves undefined deterministically, names FSL-42 and writes its outputs; the default refuses",
+   "reported": {
+    "D13 fix pass": 1
+   },
+   "seconds": 1.136,
+   "status": "expected-divergence"
+  },
+  {
+   "case": "formats/head-i16",
+   "category": "formats",
+   "checks_passed": 8,
+   "checks_total": 8,
+   "failed_checks": [],
+   "measured": {
+    "out.nii.gz": 0,
+    "out_mask.nii.gz": 0
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 0.832,
+   "status": "pass"
+  },
+  {
+   "case": "formats/head-u8",
+   "category": "formats",
+   "checks_passed": 8,
+   "checks_total": 8,
+   "failed_checks": [],
+   "measured": {
+    "out.nii.gz": 0,
+    "out_mask.nii.gz": 0
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 0.83,
+   "status": "pass"
+  },
+  {
+   "case": "formats/head-i8",
+   "category": "formats",
+   "checks_passed": 8,
+   "checks_total": 8,
+   "failed_checks": [],
+   "measured": {
+    "out.nii.gz": 0,
+    "out_mask.nii.gz": 0
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 0.845,
+   "status": "pass"
+  },
+  {
+   "case": "formats/head-u16",
+   "category": "formats",
+   "checks_passed": 8,
+   "checks_total": 8,
+   "failed_checks": [],
+   "measured": {
+    "out.nii.gz": 0,
+    "out_mask.nii.gz": 0
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 0.85,
+   "status": "pass"
+  },
+  {
+   "case": "formats/head-i32",
+   "category": "formats",
+   "checks_passed": 8,
+   "checks_total": 8,
+   "failed_checks": [],
+   "measured": {
+    "out.nii.gz": 0,
+    "out_mask.nii.gz": 0
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 0.915,
+   "status": "pass"
+  },
+  {
+   "case": "formats/head-f64",
+   "category": "formats",
+   "checks_passed": 8,
+   "checks_total": 8,
+   "failed_checks": [],
+   "measured": {
+    "out.nii.gz": 0,
+    "out_mask.nii.gz": 0
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 0.863,
+   "status": "pass"
+  },
+  {
+   "case": "formats/head-i16-scaled",
+   "category": "formats",
+   "checks_passed": 8,
+   "checks_total": 8,
+   "failed_checks": [],
+   "measured": {
+    "out.nii.gz": 0,
+    "out_mask.nii.gz": 0
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 0.73,
+   "status": "pass"
+  },
+  {
+   "case": "formats/head-neuro",
+   "category": "formats",
+   "checks_passed": 8,
+   "checks_total": 8,
+   "failed_checks": [],
+   "measured": {
+    "out.nii.gz": 0,
+    "out_mask.nii.gz": 0
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 0.854,
+   "status": "pass"
+  },
+  {
+   "case": "formats/head-qform-only",
+   "category": "formats",
+   "checks_passed": 8,
+   "checks_total": 8,
+   "failed_checks": [],
+   "measured": {
+    "out.nii.gz": 0,
+    "out_mask.nii.gz": 0
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 0.839,
+   "status": "pass"
+  },
+  {
+   "case": "formats/head-sform-only",
+   "category": "formats",
+   "checks_passed": 8,
+   "checks_total": 8,
+   "failed_checks": [],
+   "measured": {
+    "out.nii.gz": 0,
+    "out_mask.nii.gz": 0
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 0.779,
+   "status": "pass"
+  },
+  {
+   "case": "formats/head-noxform",
+   "category": "formats",
+   "checks_passed": 8,
+   "checks_total": 8,
+   "failed_checks": [],
+   "measured": {
+    "out.nii.gz": 0,
+    "out_mask.nii.gz": 0
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 0.831,
+   "status": "pass"
+  },
+  {
+   "case": "formats/head-oblique",
+   "category": "formats",
+   "checks_passed": 8,
+   "checks_total": 8,
+   "failed_checks": [],
+   "measured": {
+    "out.nii.gz": 0,
+    "out_mask.nii.gz": 0
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 0.843,
+   "status": "pass"
+  },
+  {
+   "case": "formats/head-nifti2",
+   "category": "formats",
+   "checks_passed": 8,
+   "checks_total": 8,
+   "failed_checks": [],
+   "measured": {
+    "out.nii.gz": 0,
+    "out_mask.nii.gz": 0
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 0.789,
+   "status": "pass"
+  },
+  {
+   "case": "formats/head-uncompressed",
+   "category": "formats",
+   "checks_passed": 8,
+   "checks_total": 8,
+   "failed_checks": [],
+   "measured": {
+    "out.nii.gz": 0,
+    "out_mask.nii.gz": 0
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 0.766,
+   "status": "pass"
+  },
+  {
+   "case": "formats/head-zst",
+   "category": "formats",
+   "checks_passed": 8,
+   "checks_total": 8,
+   "failed_checks": [],
+   "measured": {
+    "out.nii.gz": 0,
+    "out_mask.nii.gz": 0
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 0.829,
+   "status": "pass"
+  },
+  {
+   "case": "formats/head-bz2",
+   "category": "formats",
+   "checks_passed": 8,
+   "checks_total": 8,
+   "failed_checks": [],
+   "measured": {
+    "out.nii.gz": 0,
+    "out_mask.nii.gz": 0
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 1.004,
+   "status": "pass"
+  },
+  {
+   "case": "formats/pair-input",
+   "category": "formats",
+   "checks_passed": 8,
+   "checks_total": 8,
+   "failed_checks": [],
+   "measured": {
+    "out.nii.gz": 0,
+    "out_mask.nii.gz": 0
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 0.659,
+   "status": "pass"
+  },
+  {
+   "case": "formats/analyze-input",
+   "category": "formats",
+   "checks_passed": 8,
+   "checks_total": 8,
+   "failed_checks": [],
+   "measured": {
+    "out.nii.gz": 0,
+    "out_mask.nii.gz": 0
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 0.761,
+   "status": "pass"
+  },
+  {
+   "case": "formats/output-NIFTI",
+   "category": "formats",
+   "checks_passed": 10,
+   "checks_total": 10,
+   "failed_checks": [],
+   "measured": {
+    "out.nii": 0,
+    "out_mask.nii": 0
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0,
+    "out_skull.nii": 0.910685
+   },
+   "seconds": 0.543,
+   "status": "pass"
+  },
+  {
+   "case": "formats/output-NIFTI_PAIR",
+   "category": "formats",
+   "checks_passed": 10,
+   "checks_total": 10,
+   "failed_checks": [],
+   "measured": {
+    "out.hdr": 0,
+    "out_mask.hdr": 0
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0,
+    "out_skull.hdr": 0.910685
+   },
+   "seconds": 0.55,
+   "status": "pass"
+  },
+  {
+   "case": "formats/output-NIFTI2",
+   "category": "formats",
+   "checks_passed": 10,
+   "checks_total": 10,
+   "failed_checks": [],
+   "measured": {
+    "out.nii": 0,
+    "out_mask.nii": 0
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0,
+    "out_skull.nii": 0.910685
+   },
+   "seconds": 0.561,
+   "status": "pass"
+  },
+  {
+   "case": "formats/output-NIFTI2_GZ",
+   "category": "formats",
+   "checks_passed": 10,
+   "checks_total": 10,
+   "failed_checks": [],
+   "measured": {
+    "out.nii.gz": 0,
+    "out_mask.nii.gz": 0
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0,
+    "out_skull.nii.gz": 0.910685
+   },
+   "seconds": 0.861,
+   "status": "pass"
+  },
+  {
+   "case": "formats/output-NIFTI_PAIR_GZ",
+   "category": "formats",
+   "checks_passed": 10,
+   "checks_total": 10,
+   "failed_checks": [],
+   "measured": {
+    "out.hdr.gz": 0,
+    "out_mask.hdr.gz": 0
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0,
+    "out_skull.hdr.gz": 0.910685
+   },
+   "seconds": 0.798,
+   "status": "pass"
+  },
+  {
+   "case": "formats/output-ANALYZE",
+   "category": "formats",
+   "checks_passed": 4,
+   "checks_total": 4,
+   "failed_checks": [],
+   "reason": "both refuse (exit 1) with Legal values are: NIFTI, NIFTI_PAIR, NIFTI2, NIFTI2_PAIR, NIFTI_GZ, NIFTI_PAIR_GZ, NIFTI2_GZ, NIFTI2_PAIR_GZ, NIFTI_ZST, NIFTI_PAIR_ZST, NIFTI2_ZST, NIFTI2_PAIR_ZST, NIFTI_BZ2, NIFTI_PAIR_BZ2, NIFTI2_BZ2, NIFTI2_PAIR_BZ2",
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 0.518,
+   "status": "both-error"
+  },
+  {
+   "case": "formats/output-ANALYZE_GZ",
+   "category": "formats",
+   "checks_passed": 4,
+   "checks_total": 4,
+   "failed_checks": [],
+   "reason": "both refuse (exit 1) with Legal values are: NIFTI, NIFTI_PAIR, NIFTI2, NIFTI2_PAIR, NIFTI_GZ, NIFTI_PAIR_GZ, NIFTI2_GZ, NIFTI2_PAIR_GZ, NIFTI_ZST, NIFTI_PAIR_ZST, NIFTI2_ZST, NIFTI2_PAIR_ZST, NIFTI_BZ2, NIFTI_PAIR_BZ2, NIFTI2_BZ2, NIFTI2_PAIR_BZ2",
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 0.57,
+   "status": "both-error"
+  },
+  {
+   "case": "formats/output-NIFTI_ZST",
+   "category": "formats",
+   "checks_passed": 10,
+   "checks_total": 10,
+   "failed_checks": [],
+   "measured": {
+    "out.nii.zst": 0,
+    "out_mask.nii.zst": 0
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0,
+    "out_skull.nii.zst": 0.910685
+   },
+   "seconds": 0.722,
+   "status": "pass"
+  },
+  {
+   "case": "formats/output-NIFTI2_PAIR_ZST",
+   "category": "formats",
+   "checks_passed": 10,
+   "checks_total": 10,
+   "failed_checks": [],
+   "measured": {
+    "out.hdr.zst": 0,
+    "out_mask.hdr.zst": 0
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0,
+    "out_skull.hdr.zst": 0.910685
+   },
+   "seconds": 0.792,
+   "status": "pass"
+  },
+  {
+   "case": "formats/output-NIFTI_BZ2",
+   "category": "formats",
+   "checks_passed": 10,
+   "checks_total": 10,
+   "failed_checks": [],
+   "measured": {
+    "out.nii.bz2": 0,
+    "out_mask.nii.bz2": 0
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0,
+    "out_skull.nii.bz2": 0.910685
+   },
+   "seconds": 1.222,
+   "status": "pass"
+  },
+  {
+   "case": "formats/output-NIFTI_PAIR_BZ2",
+   "category": "formats",
+   "checks_passed": 10,
+   "checks_total": 10,
+   "failed_checks": [],
+   "measured": {
+    "out.hdr.bz2": 0,
+    "out_mask.hdr.bz2": 0
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0,
+    "out_skull.hdr.bz2": 0.910685
+   },
+   "seconds": 1.191,
+   "status": "pass"
+  },
+  {
+   "case": "formats/output-unset",
+   "category": "formats",
+   "checks_passed": 4,
+   "checks_total": 4,
+   "failed_checks": [],
+   "reason": "both refuse (exit 1) with e.g. tcsh or csh users add the line \"source ${FSLDIR}/etc/fslconf/fsl.csh\"",
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 0.542,
+   "status": "both-error"
+  },
+  {
+   "case": "formats/output-bad",
+   "category": "formats",
+   "checks_passed": 4,
+   "checks_total": 4,
+   "failed_checks": [],
+   "reason": "both refuse (exit 1) with Legal values are: NIFTI, NIFTI_PAIR, NIFTI2, NIFTI2_PAIR, NIFTI_GZ, NIFTI_PAIR_GZ, NIFTI2_GZ, NIFTI2_PAIR_GZ, NIFTI_ZST, NIFTI_PAIR_ZST, NIFTI2_ZST, NIFTI2_PAIR_ZST, NIFTI_BZ2, NIFTI_PAIR_BZ2, NIFTI2_BZ2, NIFTI2_PAIR_BZ2",
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 0.558,
+   "status": "both-error"
+  },
+  {
+   "case": "formats/4d-input",
+   "category": "formats",
+   "checks_passed": 8,
+   "checks_total": 8,
+   "failed_checks": [],
+   "measured": {
+    "out.nii.gz": 0,
+    "out_mask.nii.gz": 0
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 0.896,
+   "status": "pass"
+  },
+  {
+   "case": "defects/2d",
+   "category": "defects",
+   "checks_passed": 8,
+   "checks_total": 8,
+   "failed_checks": [],
+   "measured": {
+    "out.nii.gz": 0,
+    "out_mask.nii.gz": 0
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 1.219,
+   "status": "pass"
+  },
+  {
+   "case": "defects/extensions",
+   "category": "defects",
+   "checks_passed": 6,
+   "checks_total": 6,
+   "failed_checks": [],
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 0.566,
+   "status": "pass"
+  },
+  {
+   "case": "formats/extensions-dropped",
+   "category": "formats",
+   "checks_passed": 8,
+   "checks_total": 8,
+   "failed_checks": [],
+   "measured": {
+    "out.nii": 0,
+    "out_mask.nii": 0
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 0.532,
+   "status": "pass"
+  },
+  {
+   "case": "bet/default",
+   "category": "bet",
+   "checks_passed": 6,
+   "checks_total": 6,
+   "failed_checks": [],
+   "measured": {
+    "out.nii.gz": 0
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 0.713,
+   "status": "pass"
+  },
+  {
+   "case": "bet/zst-output",
+   "category": "bet",
+   "checks_passed": 8,
+   "checks_total": 8,
+   "failed_checks": [],
+   "measured": {
+    "out.nii.zst": 0,
+    "out_mask.nii.zst": 0
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 1.392,
+   "status": "pass"
+  },
+  {
+   "case": "bet/options",
+   "category": "bet",
+   "checks_passed": 13,
+   "checks_total": 13,
+   "failed_checks": [],
+   "measured": {
+    "out.nii.gz": 0,
+    "out_mask.nii.gz": 0,
+    "out_mesh.vtk": "0.0000 / 0.0000",
+    "out_overlay.nii.gz": 0
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0,
+    "out_skull.nii.gz": 0.913139
+   },
+   "seconds": 1.287,
+   "status": "pass"
+  },
+  {
+   "case": "bet/verbose",
+   "category": "bet",
+   "checks_passed": 8,
+   "checks_total": 8,
+   "failed_checks": [],
+   "measured": {
+    "out.nii.gz": 0,
+    "out_mask.nii.gz": 0
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 0.717,
+   "status": "pass"
+  },
+  {
+   "case": "bet/robust",
+   "category": "bet",
+   "checks_passed": 10,
+   "checks_total": 10,
+   "failed_checks": [],
+   "measured": {
+    "out.nii.gz": 0,
+    "out_mask.nii.gz": 0
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 2.294,
+   "status": "pass"
+  },
+  {
+   "case": "bet/robust-n",
+   "category": "bet",
+   "checks_passed": 8,
+   "checks_total": 8,
+   "failed_checks": [],
+   "measured": {
+    "out.nii.gz": 0,
+    "out_mask.nii.gz": 0
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 1.342,
+   "status": "pass"
+  },
+  {
+   "case": "bet/robust-verbose",
+   "category": "bet",
+   "checks_passed": 6,
+   "checks_total": 6,
+   "failed_checks": [],
+   "measured": {
+    "out.nii.gz": 0
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 1.21,
+   "status": "pass"
+  },
+  {
+   "case": "bet/fmri",
+   "category": "bet",
+   "checks_passed": 10,
+   "checks_total": 10,
+   "failed_checks": [],
+   "measured": {
+    "out.nii.gz": 0,
+    "out_mask.nii.gz": 0
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 1.973,
+   "status": "pass"
+  },
+  {
+   "case": "bet/fmri-verbose",
+   "category": "bet",
+   "checks_passed": 8,
+   "checks_total": 8,
+   "failed_checks": [],
+   "measured": {
+    "out.nii.gz": 0,
+    "out_mask.nii.gz": 0
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 1.337,
+   "status": "pass"
+  },
+  {
+   "case": "bet/small-fov",
+   "category": "bet",
+   "checks_passed": 8,
+   "checks_total": 8,
+   "failed_checks": [],
+   "measured": {
+    "out.nii.gz": 0,
+    "out_mask.nii.gz": 0
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 1118208
+   },
+   "seconds": 0.606,
+   "status": "pass"
+  },
+  {
+   "case": "bet/small-fov-verbose",
+   "category": "bet",
+   "checks_passed": 10,
+   "checks_total": 10,
+   "failed_checks": [],
+   "measured": {
+    "out.nii.gz": 0,
+    "out_mask.nii.gz": 0
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 1677312,
+    "out_skull.nii.gz": 0.889219
+   },
+   "seconds": 0.733,
+   "status": "pass"
+  },
+  {
+   "case": "bet/small-fov-large",
+   "category": "bet",
+   "checks_passed": 8,
+   "checks_total": 8,
+   "failed_checks": [],
+   "measured": {
+    "out.nii.gz": 0,
+    "out_mask.nii.gz": 0
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 0.828,
+   "status": "pass"
+  },
+  {
+   "case": "bet/debug",
+   "category": "bet",
+   "checks_passed": 12,
+   "checks_total": 12,
+   "failed_checks": [],
+   "measured": {
+    "out.nii.gz": 0,
+    "out_tmp.nii.gz": 0,
+    "out_tmp_bottom.nii.gz": 0,
+    "out_tmp_top.nii.gz": 0
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 559104
+   },
+   "seconds": 0.923,
+   "status": "pass"
+  },
+  {
+   "case": "bet/pending-S",
+   "category": "bet",
+   "checks_passed": 1,
+   "checks_total": 1,
+   "failed_checks": [],
+   "reason": "needs FSL programs larmorx does not replicate yet: larmorx fsl bet: -S is pending: it runs FSL's standard_space_roi, FLIRT and fslmaths' morphology, which larmorx does not have yet (larmorx)",
+   "seconds": 0.001,
+   "status": "expected-divergence"
+  },
+  {
+   "case": "bet/pending-B",
+   "category": "bet",
+   "checks_passed": 1,
+   "checks_total": 1,
+   "failed_checks": [],
+   "reason": "needs FSL programs larmorx does not replicate yet: larmorx fsl bet: -B is pending: it runs FSL's standard_space_roi and FAST, which larmorx does not have yet (larmorx)",
+   "seconds": 0.001,
+   "status": "expected-divergence"
+  },
+  {
+   "case": "bet/pending-A",
+   "category": "bet",
+   "checks_passed": 1,
+   "checks_total": 1,
+   "failed_checks": [],
+   "reason": "needs FSL programs larmorx does not replicate yet: larmorx fsl bet: -A is pending: it runs FSL's FLIRT (then betsurf), which larmorx does not have yet (larmorx)",
+   "seconds": 0.001,
+   "status": "expected-divergence"
+  },
+  {
+   "case": "bet/pending-A2",
+   "category": "bet",
+   "checks_passed": 1,
+   "checks_total": 1,
+   "failed_checks": [],
+   "reason": "needs FSL programs larmorx does not replicate yet: larmorx fsl bet: -A2 is pending: it runs FSL's FLIRT (then betsurf), which larmorx does not have yet (larmorx)",
+   "seconds": 0.001,
+   "status": "expected-divergence"
+  },
+  {
+   "case": "bet/usage",
+   "category": "bet",
+   "checks_passed": 4,
+   "checks_total": 4,
+   "failed_checks": [],
+   "reason": "both refuse (exit 1) with FSL's usage",
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 0.019,
+   "status": "both-error"
+  },
+  {
+   "case": "bet/no-input",
+   "category": "bet",
+   "checks_passed": 4,
+   "checks_total": 4,
+   "failed_checks": [],
+   "reason": "both refuse (exit 1) with Error: input image /nonexistent/in not valid",
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 0.021,
+   "status": "both-error"
+  },
+  {
+   "case": "bet/unknown-option",
+   "category": "bet",
+   "checks_passed": 4,
+   "checks_total": 4,
+   "failed_checks": [],
+   "reason": "both refuse (exit 1) with FSL's usage",
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 0.022,
+   "status": "both-error"
+  },
+  {
+   "case": "bet/missing-value",
+   "category": "bet",
+   "checks_passed": 4,
+   "checks_total": 4,
+   "failed_checks": [],
+   "reason": "both refuse (exit 1) with FSL's usage",
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 0.02,
+   "status": "both-error"
+  },
+  {
+   "case": "bet/c-short",
+   "category": "bet",
+   "checks_passed": 4,
+   "checks_total": 4,
+   "failed_checks": [],
+   "reason": "both refuse (exit 1) with FSL's usage",
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 0.022,
+   "status": "both-error"
+  },
+  {
+   "case": "bet/bet2-fails",
+   "category": "bet",
+   "checks_passed": 4,
+   "checks_total": 4,
+   "failed_checks": [],
+   "reason": "both refuse (exit 1) with bet failed during command:<generated>/phantoms/head.nii.gz out -f 2",
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 0.019,
+   "status": "both-error"
+  },
+  {
+   "case": "defects/blank-in-output",
+   "category": "defects",
+   "checks_passed": 4,
+   "checks_total": 4,
+   "failed_checks": [],
+   "reason": "both refuse (exit 1) with FSL's usage",
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 0.409,
+   "status": "both-error"
+  },
+  {
+   "case": "defects/empty-argument",
+   "category": "defects",
+   "checks_passed": 6,
+   "checks_total": 6,
+   "failed_checks": [],
+   "measured": {
+    "out.nii.gz": 0
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 0.78,
+   "status": "pass"
+  },
+  {
+   "case": "defects/cleanup",
+   "category": "defects",
+   "checks_passed": 8,
+   "checks_total": 8,
+   "failed_checks": [],
+   "measured": {
+    "out.nii.gz": 0,
+    "out_mask.nii.gz": 0
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 3.055,
+   "status": "pass"
+  },
+  {
+   "case": "real/child-3y",
+   "category": "real",
+   "checks_passed": 10,
+   "checks_total": 10,
+   "failed_checks": [],
+   "measured": {
+    "out.nii.gz": 0,
+    "out_mask.nii.gz": 0
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0,
+    "FSL run again": null,
+    "fMRIPrep's FSL against the oracle": 0
+   },
+   "seconds": 2.855,
+   "status": "pass"
+  },
+  {
+   "case": "real/child-7y",
+   "category": "real",
+   "checks_passed": 10,
+   "checks_total": 10,
+   "failed_checks": [],
+   "measured": {
+    "out.nii.gz": 0,
+    "out_mask.nii.gz": 0
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0,
+    "FSL run again": null,
+    "fMRIPrep's FSL against the oracle": 0
+   },
+   "seconds": 5.782,
+   "status": "pass"
+  },
+  {
+   "case": "real/adult-ds000005",
+   "category": "real",
+   "checks_passed": 10,
+   "checks_total": 10,
+   "failed_checks": [],
+   "measured": {
+    "out.nii.gz": 0,
+    "out_mask.nii.gz": 0
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0,
+    "FSL run again": null,
+    "fMRIPrep's FSL against the oracle": 0
+   },
+   "seconds": 2.618,
+   "status": "pass"
+  },
+  {
+   "case": "real/older-75y",
+   "category": "real",
+   "checks_passed": 8,
+   "checks_total": 10,
+   "failed_checks": [
+    {
+     "detail": "16737 of 11534336 values differ, 0 inside both",
+     "metric": "Dice; boundary distance p95 / max (voxels)",
+     "name": "out.nii.gz",
+     "passed": false,
+     "threshold": ">= 0.995; <= 0.5 / 2.0; values identical inside both",
+     "value": "0.994915; 1.00 / 6.71"
+    },
+    {
+     "detail": "16738 of 11534336 values differ",
+     "metric": "Dice; boundary distance p95 / max (voxels)",
+     "name": "out_mask.nii.gz",
+     "passed": false,
+     "threshold": ">= 0.995; <= 0.5 / 2.0",
+     "value": "0.994914; 1.00 / 6.71"
+    }
+   ],
+   "measured": {
+    "out.nii.gz": "0.994915; 1.00 / 6.71",
+    "out_mask.nii.gz": "0.994914; 1.00 / 6.71"
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0,
+    "FSL run again": null,
+    "fMRIPrep's FSL against the oracle": 0
+   },
+   "seconds": 13.021,
+   "status": "fail"
+  },
+  {
+   "case": "real/older-82y",
+   "category": "real",
+   "checks_passed": 10,
+   "checks_total": 10,
+   "failed_checks": [],
+   "measured": {
+    "out.nii.gz": 0,
+    "out_mask.nii.gz": 0
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0,
+    "FSL run again": null,
+    "fMRIPrep's FSL against the oracle": 0
+   },
+   "seconds": 4.417,
+   "status": "pass"
+  },
+  {
+   "case": "real/7t",
+   "category": "real",
+   "checks_passed": 8,
+   "checks_total": 10,
+   "failed_checks": [
+    {
+     "detail": "64531 of 17547264 values differ, 0 inside both",
+     "metric": "Dice; boundary distance p95 / max (voxels)",
+     "name": "out.nii.gz",
+     "passed": false,
+     "threshold": ">= 0.995; <= 0.5 / 2.0; values identical inside both",
+     "value": "0.980396; 2.24 / 5.92"
+    },
+    {
+     "detail": "64889 of 17547264 values differ",
+     "metric": "Dice; boundary distance p95 / max (voxels)",
+     "name": "out_mask.nii.gz",
+     "passed": false,
+     "threshold": ">= 0.995; <= 0.5 / 2.0",
+     "value": "0.980343; 2.24 / 5.92"
+    }
+   ],
+   "measured": {
+    "out.nii.gz": "0.980396; 2.24 / 5.92",
+    "out_mask.nii.gz": "0.980343; 2.24 / 5.92"
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0,
+    "FSL run again": null,
+    "fMRIPrep's FSL against the oracle": 0
+   },
+   "seconds": 13.959,
+   "status": "fail"
+  },
+  {
+   "case": "real/tumour",
+   "category": "real",
+   "checks_passed": 8,
+   "checks_total": 10,
+   "failed_checks": [
+    {
+     "detail": "28263 of 9437184 values differ, 0 inside both",
+     "metric": "Dice; boundary distance p95 / max (voxels)",
+     "name": "out.nii.gz",
+     "passed": false,
+     "threshold": ">= 0.995; <= 0.5 / 2.0; values identical inside both",
+     "value": "0.990864; 1.41 / 5.00"
+    },
+    {
+     "detail": "28264 of 9437184 values differ",
+     "metric": "Dice; boundary distance p95 / max (voxels)",
+     "name": "out_mask.nii.gz",
+     "passed": false,
+     "threshold": ">= 0.995; <= 0.5 / 2.0",
+     "value": "0.990864; 1.41 / 5.00"
+    }
+   ],
+   "measured": {
+    "out.nii.gz": "0.990864; 1.41 / 5.00",
+    "out_mask.nii.gz": "0.990864; 1.41 / 5.00"
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0,
+    "FSL run again": null,
+    "fMRIPrep's FSL against the oracle": 0
+   },
+   "seconds": 11.253,
+   "status": "fail"
+  },
+  {
+   "case": "real/stroke",
+   "category": "real",
+   "checks_passed": 10,
+   "checks_total": 10,
+   "failed_checks": [],
+   "measured": {
+    "out.nii.gz": 0,
+    "out_mask.nii.gz": 0
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0,
+    "FSL run again": null,
+    "fMRIPrep's FSL against the oracle": 0
+   },
+   "seconds": 4.602,
+   "status": "pass"
+  },
+  {
+   "case": "real/philips",
+   "category": "real",
+   "checks_passed": 10,
+   "checks_total": 10,
+   "failed_checks": [],
+   "measured": {
+    "out.nii.gz": 0,
+    "out_mask.nii.gz": 0
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0,
+    "FSL run again": null,
+    "fMRIPrep's FSL against the oracle": 0
+   },
+   "seconds": 5.285,
+   "status": "pass"
+  },
+  {
+   "case": "real/bold-F",
+   "category": "real",
+   "checks_passed": 8,
+   "checks_total": 8,
+   "failed_checks": [],
+   "measured": {
+    "out.nii.gz": "0.998899; 0.00 / 1.73",
+    "out_mask.nii.gz": "0.997152; 0.00 / 1.41"
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 4.768,
+   "status": "pass"
+  },
+  {
+   "case": "real/bold-first",
+   "category": "real",
+   "checks_passed": 8,
+   "checks_total": 8,
+   "failed_checks": [],
+   "measured": {
+    "out.nii.gz": "0.998485; 0.00 / 1.41",
+    "out_mask.nii.gz": "0.996468; 0.00 / 1.41"
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 1.197,
+   "status": "pass"
+  }
+ ],
+ "suite": "fsl-bet",
+ "summary": {
+  "both-error": 24,
+  "expected-divergence": 7,
+  "fail": 3,
+  "pass": 108,
+  "skipped": 0
+ },
+ "tier": "standard"
+}

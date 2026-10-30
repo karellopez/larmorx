@@ -8,10 +8,11 @@ translated from FSL's source, in the separate package ``larmorx-nc`` (FSL's lice
 a behaviour spec without FSL's code. The same programs run from the command line as
 ``larmorx fsl <program> ...`` with their original arguments.
 
-``bet`` and ``betsurf`` have their replica (FSL 6.0.7.23's ``bet``, ``bet2`` and ``betsurf``);
-their clean-room originals are still to be written (``specs/bet.md``). Until then they need
-``larmorx-nc``: with ``implementation="auto"`` (the default) or ``"replica"`` they run its
-program as a separate process (nothing of it is imported), and without it they raise
+``bet`` and ``betsurf`` have their replica (FSL 6.0.7.23's ``bet``, ``bet2`` and ``betsurf``),
+run as a separate process (nothing of it is imported). ``bet`` also has its clean-room original
+(``bet2`` and the ``bet`` script's ``-R``, ``-F``, ``-Z``; written from ``specs/bet.md``):
+``implementation="auto"`` (the default) runs the replica when ``larmorx-nc`` is installed, else
+the original. ``betsurf``'s original is still to be written: without ``larmorx-nc`` it raises
 :class:`~larmorx.ReplicaNotFoundError` naming the command that installs it.
 """
 

@@ -1,6 +1,6 @@
 {
  "about": "SHA-256 of larmorx's outputs on Linux x86_64 for the golden cases in registry.py; every platform must reproduce them (docs/validation/golden.md). Written by scripts/record_golden.py; do not edit by hand.",
- "recorded": {"commit": "9383f27e7ad91fa5d63a3c54bab26fe52db345e2", "date": "2026-10-30", "numpy": "2.3.5", "parity": "passed (pytest tests/parity, smoke tier)", "platform": "Linux x86_64", "python": "3.12.16"},
+ "recorded": {"commit": "dbb7dcaed30c504c2ee40f503a4844de628c66db", "date": "2026-10-30", "numpy": "2.3.5", "parity": "passed (pytest tests/parity, smoke tier)", "platform": "Linux x86_64", "python": "3.12.16"},
  "cases": {
   "cli.afni.3dAutomask": {
    "depth:data": {"dtype": "<i2", "sample": "00000000020000000000020000000000", "sha256": "5eb371e03027e458585e506ca5feeb8a4a1673ee77a63e6a8442b5b23c1c3c85", "shape": [24, 20, 16], "sum": "2792.0"},
@@ -596,6 +596,60 @@
    "tvf_float.0Warp:data": {"dtype": "<f4", "sample": "00000000285bedb9eb96803a599ea33b173a1f3b89f10f3ceaa9053a00000000", "sha256": "72babc2f9704f74c5d2e3a80da0fbbea6ca75081ed16b6947f5b41b782f1e857", "shape": [24, 20, 16, 1, 3], "sum": "60.0049466776137"},
    "tvf_float.0Warp:header": {"bytes": 352, "sha256": "2c30413d982496f46dc391e2152163eebf5cea0a41c0069aa17ad4bb2e1f0346"}
   },
+  "cli.fsl.bet": {
+   "out:data": {"dtype": "<f4", "sample": "00000000b76d6b41dbb6d4430000000000000000b7edd3430000884100000000", "sha256": "95710438a83e8b0613900d9653290d99dd279c181c604a293344ecea9a9411dc", "shape": [24, 20, 16], "sum": "773061.1430024058"},
+   "out:header": {"bytes": 352, "sha256": "62e17ff66956444f47d3f1fdc2ac9a68d99f55cad794d2818f8b38fff618882e"},
+   "out_mask:data": {"dtype": "<i2", "sample": "00000100010000000000010001000000", "sha256": "2e5b4145aa08a78fcf1e2b86206c2b7f9a93aa75df0aafccdfe092452f05f95a", "shape": [24, 20, 16], "sum": "3589.0"},
+   "out_mask:header": {"bytes": 352, "sha256": "3b7a0c9608f450d6287ab0c6e466b93a5f1e841b21590b1f4ab6e40009e7e7c7"},
+   "stdout": {"bytes": 281, "sha256": "e3b0f54b6193c95e400a0863f162e33740c986c1302fdab010630356a3e368f7"}
+  },
+  "cli.fsl.bet.variations": {
+   "files": {"bytes": 129, "sha256": "3155322ecc6b1187011d8256c8dadc7a6ad836d12c649e745ef94f82205746bc"},
+   "fmri:data": {"dtype": "<f4", "sample": "000000000000c04100000000000070400000d040000000000000000000000000", "sha256": "db5753bf265511791f6f53ad66c7888b97d521e71a867f308bf898234f80fc17", "shape": [16, 14, 12, 4], "sum": "1799089.515625"},
+   "fmri:header": {"bytes": 352, "sha256": "42b83a7ee4ebb868d749eec291674297558245644fb6152796419de5b67d237f"},
+   "fmri_mask:data": {"dtype": "<f4", "sample": "00000000000000000000803f000000000000803f0000803f0000000000000000", "sha256": "1e7aba4f172c89ac20dfb00e150b73a850ccc683ae8ff2d15fc8db68340cbc43", "shape": [16, 14, 12], "sum": "2172.0"},
+   "fmri_mask:header": {"bytes": 352, "sha256": "6955d7f0d930b902ac0b1d63668cf51a55c5f902a5c29e3066c4e8e08807eb58"},
+   "robust:data": {"dtype": "<i2", "sample": "00000100010000000000010001000000", "sha256": "c272130ae398c1eb1788c7537b58daa04de3696b15a8e20df75db485b8ae5237", "shape": [24, 20, 16], "sum": "3586.0"},
+   "robust:header": {"bytes": 352, "sha256": "3b7a0c9608f450d6287ab0c6e466b93a5f1e841b21590b1f4ab6e40009e7e7c7"},
+   "robust_mesh": {"bytes": 161006, "sha256": "cf50e8bcf1f9cff3145756067b73bdb2e654eb8d571ffcb12c9cc6a278cc8daa"},
+   "robust_reproduce:data": {"dtype": "<i2", "sample": "00000100010000000000010001000000", "sha256": "c272130ae398c1eb1788c7537b58daa04de3696b15a8e20df75db485b8ae5237", "shape": [24, 20, 16], "sum": "3586.0"},
+   "robust_reproduce:header": {"bytes": 352, "sha256": "3b7a0c9608f450d6287ab0c6e466b93a5f1e841b21590b1f4ab6e40009e7e7c7"},
+   "small_fov:data": {"dtype": "<i2", "sample": "00000100010000000000010001000000", "sha256": "be5883f7d18201314184c22826855ac02b0ec2f0e50c1d33c1ff61dca488d9f8", "shape": [24, 20, 16], "sum": "3584.0"},
+   "small_fov:header": {"bytes": 352, "sha256": "3b7a0c9608f450d6287ab0c6e466b93a5f1e841b21590b1f4ab6e40009e7e7c7"},
+   "small_fov_reproduce:data": {"dtype": "<i2", "sample": "00000000000001000100000000000000", "sha256": "7a48f22835c96c6584c130663bb8eb4344980546e3d1b34a91f52f894e8a3b1f", "shape": [24, 20, 34], "sum": "3584.0"},
+   "small_fov_reproduce:header": {"bytes": 352, "sha256": "628c52da5ba36ad968a0b00d3bf0f6954900522b98352c6bdb2c120e76198c12"}
+  },
+  "cli.fsl.bet2": {
+   "mesh": {"bytes": 161004, "sha256": "743c1c953de05784217dc8aba0849646ae44291baacc79392f3719ffd48fe1f8"},
+   "out:data": {"dtype": "<f4", "sample": "00000000b76d6b41dbb6d4430000000000000000b7edd3430000884100000000", "sha256": "8e4e7a098a5c2eec0bdad7790b5243e45bd07e8b0b6508e324dab643b3a8298a", "shape": [24, 20, 16], "sum": "772961.2858608216"},
+   "out:header": {"bytes": 352, "sha256": "62e17ff66956444f47d3f1fdc2ac9a68d99f55cad794d2818f8b38fff618882e"},
+   "out_mask:data": {"dtype": "<i2", "sample": "00000100010000000000010001000000", "sha256": "8a7cbe5f8ee27f0c3479a55053834e6fc73106cc89c535018cff61847984bb42", "shape": [24, 20, 16], "sum": "3591.0"},
+   "out_mask:header": {"bytes": 352, "sha256": "3b7a0c9608f450d6287ab0c6e466b93a5f1e841b21590b1f4ab6e40009e7e7c7"},
+   "out_overlay:data": {"dtype": "<f4", "sample": "2549923f6e5be143dbb6d4439224c9406edbb640b7edd3436e5be1434992a43f", "sha256": "6a87b75484c8245ef8fa6034151374a05729c47122ab818ae7b2b9650b7259d1", "shape": [24, 20, 16], "sum": "1358279.2975984663"},
+   "out_overlay:header": {"bytes": 352, "sha256": "62e17ff66956444f47d3f1fdc2ac9a68d99f55cad794d2818f8b38fff618882e"},
+   "out_skull:data": {"dtype": "<i2", "sample": "00000000000000000000000000000000", "sha256": "244b6606a69dd68a99590dc8a31b78caeadad5fd0204a6b390c7288bbe4a1176", "shape": [24, 20, 16], "sum": "14600.0"},
+   "out_skull:header": {"bytes": 352, "sha256": "639c5c0bcb8252d7b1512f7de6436096510d4085bc7dbadf47c4150f5ac0c790"},
+   "stdout": {"bytes": 155, "sha256": "141a0063d2b3dfdc1e03d6e5a517268b1790a1512ac7d98cb420dc8b73b07efa"}
+  },
+  "cli.fsl.bet2.options": {
+   "ct:data": {"dtype": "<f4", "sample": "2549923fb76d6b41000000009224c9406edbb64000000000000088414992a43f", "sha256": "a1b1fd9fa60ecadd17eab866bfc3ab4e632f00fc28c77ffe3134e95602bc8f45", "shape": [24, 20, 16], "sum": "47987.714257627726"},
+   "ct:header": {"bytes": 352, "sha256": "62e17ff66956444f47d3f1fdc2ac9a68d99f55cad794d2818f8b38fff618882e"},
+   "ct_mask:data": {"dtype": "<i2", "sample": "01000100000001000100000001000100", "sha256": "f2f487aa3971cc7c16a150a05a0b548daac8c1976ce71b38497712f50797f582", "shape": [24, 20, 16], "sum": "5184.0"},
+   "ct_mask:header": {"bytes": 352, "sha256": "3b7a0c9608f450d6287ab0c6e466b93a5f1e841b21590b1f4ab6e40009e7e7c7"},
+   "out:data": {"dtype": "<f4", "sample": "0000000000000000dbb6d4430000000000000000b7edd3430000000000000000", "sha256": "5b98f4d7215bcd1bd5f31bd055d89e640de0e6fd85e56b8dbf43872f549a878b", "shape": [24, 20, 16], "sum": "762936.0001525879"},
+   "out:header": {"bytes": 352, "sha256": "62e17ff66956444f47d3f1fdc2ac9a68d99f55cad794d2818f8b38fff618882e"},
+   "out_mask:data": {"dtype": "<i2", "sample": "00000000010000000000010000000000", "sha256": "59fe7284a95732e634086d94e6b4fd58cef4dd13b2fbde1e9e460d516d03dde0", "shape": [24, 20, 16], "sum": "2496.0"},
+   "out_mask:header": {"bytes": 352, "sha256": "3b7a0c9608f450d6287ab0c6e466b93a5f1e841b21590b1f4ab6e40009e7e7c7"}
+  },
+  "cli.fsl.bet2.reproduce": {
+   "files": {"bytes": 57, "sha256": "440ed0e2525497371655c0b18cc3936729b37134087e862d9b8dbbbcc4330011"},
+   "fix_mask:data": {"dtype": "<i2", "sample": "00000000000000000000000000000000", "sha256": "ace900a1cf2abec8ecaf790911dc5c80e4ef8e5bca858fa201acdf916ff3de8a", "shape": [32, 24], "sum": "16.0"},
+   "fix_mask:header": {"bytes": 352, "sha256": "21364f78e5ed3cb6e2596d16db8fd72edc2858f95ca633f21775e25df5acd909"},
+   "reproduce:data": {"dtype": "<f4", "sample": "0000000000000000000000000000000000000000000000000000000000000000", "sha256": "1e23f67090fc274cc446c2e62bfea90148e6e41b3bda398b76db298ec6e03dea", "shape": [32, 24], "sum": "3314.3333129882812"},
+   "reproduce:header": {"bytes": 352, "sha256": "4bccd98a969c47bb2f44a07587edb16e1fa09c2eeffd2c8e649ad349beff7186"},
+   "reproduce_mask:data": {"dtype": "<i2", "sample": "00000000000000000000000000000000", "sha256": "ace900a1cf2abec8ecaf790911dc5c80e4ef8e5bca858fa201acdf916ff3de8a", "shape": [32, 24], "sum": "16.0"},
+   "reproduce_mask:header": {"bytes": 352, "sha256": "21364f78e5ed3cb6e2596d16db8fd72edc2858f95ca633f21775e25df5acd909"}
+  },
   "cli.fsl.mcflirt": {
    "MAT_0000": {"bytes": 148, "sha256": "c8b0554af656ea054e53ac2ee9023b9f4696328457ff4cfaa04182bbf2404c6c"},
    "MAT_0001": {"bytes": 151, "sha256": "21b3fea1f8049563ecb20e4a93192c6820e105c316125dc87cc1764ebd902756"},
@@ -1113,6 +1167,15 @@
    "otsu": {"dtype": "<f4", "sample": "0000000000000000000000400000000000000000000000400000000000000000", "sha256": "a333b7d8f80c62f3a75643a031415dbeea3d8c6492bb0256549643cc0a957f7f", "shape": [24, 20, 16], "sum": "2514.0"},
    "otsu.thresholds": {"dtype": "<f8", "sample": "000000b01ea53140000000e028ce7a40", "sha256": "2f4b42e9d273c9170e43a10ba263fd90ec8f22953db4968564806470fcb83eca", "shape": [2], "sum": "446.52997875213623"},
    "threshold": {"dtype": "<f4", "sample": "000080bf000080bf00000040000080bf000080bf00000040000080bf000080bf", "sha256": "2fd43188d40d9b1819640701e4f2bae1e38e194e5aafda29037ec6fe211ede14", "shape": [24, 20, 16], "sum": "-4224.0"}
+  },
+  "py.fsl.bet": {
+   "brain": {"dtype": "<f4", "sample": "00000000b76d6b41dbb6d4430000000000000000b7edd3430000884100000000", "sha256": "95710438a83e8b0613900d9653290d99dd279c181c604a293344ecea9a9411dc", "shape": [24, 20, 16], "sum": "773061.1430024058"},
+   "mask": {"dtype": "<i2", "sample": "00000100010000000000010001000000", "sha256": "2e5b4145aa08a78fcf1e2b86206c2b7f9a93aa75df0aafccdfe092452f05f95a", "shape": [24, 20, 16], "sum": "3589.0"},
+   "outline": {"dtype": "<f4", "sample": "2549923f6e5be143dbb6d4439224c9406edbb640b7edd3436e5be1434992a43f", "sha256": "d82acd090ecd6460b3264ffd7bad0d60f7b6d14f547b083a2b775f74730974ca", "shape": [24, 20, 16], "sum": "1354209.0117764622"},
+   "robust_mask": {"dtype": "<i2", "sample": "00000100010000000000010001000000", "sha256": "c272130ae398c1eb1788c7537b58daa04de3696b15a8e20df75db485b8ae5237", "shape": [24, 20, 16], "sum": "3586.0"},
+   "skull": {"dtype": "<i2", "sample": "00000000000000000000000000000000", "sha256": "4c32cde346a7e4dcbfe6d9c2f5e8f67b98a77d7129391291b793bfb9a89a2183", "shape": [24, 20, 16], "sum": "13100.0"},
+   "triangles": {"dtype": "<i8", "sample": "840200000000000003060000000000000d0900000000000042010000000000002d08000000000000ad030000000000002c070000000000004b07000000000000", "sha256": "9df06b481eb313cafc744e7ec7eb0f6ff4dd804e0214571f35a7c89ca64803d1", "shape": [5120, 3], "sum": "19683780.0"},
+   "vertices": {"dtype": "<f8", "sample": "dcb75a272ef944409d685721e5ed4440d00b772e8c3e434035971b0c75343d40aca92c0abbd81240844a5cc7b88e33402448a5d8d1b02240527de71725803440", "sha256": "c3ff3bdb610f6a99cd08ae4b2d72b84dc9b4a6f0dec60eebc88261ed6b0d0423", "shape": [2562, 3], "sum": "178079.571618"}
   },
   "py.fsl.read_vtk": {
    "triangles": {"dtype": "<i8", "sample": "0a000000000000000700000000000000100000000000000012000000000000000400000000000000080000000000000019000000000000000c00000000000000", "sha256": "1b28fb6674ccac35900a01e1c412b5082283a87fe0d87d3f9e827bcf74a247a2", "shape": [60, 3], "sum": "3652.0"},

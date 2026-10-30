@@ -231,10 +231,31 @@ The items below keep their history.
    [fsl-bet-replica-full](validation/fsl-bet-replica-full.md): 129 of 129, 364 of 364 files), its
    FSL libraries joined to mcflirt's in `larmorx-nc-core` (one translation of each); under random
    testing (`fsl-bet`, four trial runs, every difference fixed) and the memory rule (below FSL's in
-   every measured call); FSL-22's `reproduce` made exact the same day. Next for BET: the
-   clean-room original from `specs/bet.md` (an agent that has never read FSL's source; built for
-   speed: the spec's §10), and `bet -S`, `-B`, `-A`, `-A2` once standard_space_roi, FLIRT and FAST
-   are replicated. Then FLIRT with BBR, FAST, topup, and **`fslmaths` and `fslstats`** (found
+   every measured call); FSL-22's `reproduce` made exact the same day. **BET's clean-room original: part 1 done (2026-10-30).** `crates/larmorx-fsl`: `bet2` complete
+   (every option, message and failure case of specs/bet.md §4, §7, §9: FSL-40, -42, -43, -56, -60,
+   -61, -62 with `reproduce`), the `bet` script's default, `-R` (FSL-63), `-F`, `-Z` (FSL-45),
+   FSL-44, FSL-46, the pending `-S`, `-B`, `-A`, `-A2`; `lx.fsl.bet(implementation="original")`,
+   `larmorx fsl bet2|bet` (`auto`: the replica when installed, else the original). Record
+   [fsl-bet](validation/fsl-bet.md): 108 of 111 compared cases within the thresholds (fMRIPrep's
+   29 calls bit-identical; 202 of 217 brains, masks and outlines bit-identical; the 3 misses: real
+   T1w images whose first pass reruns); built for speed (benchmark [fsl-bet](benchmarks/fsl-bet.md):
+   2.6 to 3 times FSL's speed on one thread, 6 to 11 times on 24); memory within the rule (`tests/parity/test_memory_peak.py`: bet2 and `bet -F` below FSL's, `bet -R` 117 MiB against 103 plus the interpreter's 13). **Part 2:** betsurf's original (spec §6), the site page's
+   clean-room panels, and — after the spec writer answers — the reruns and the skull search.
+   **Spec questions** (for the spec writer, from [findings/fsl-bet-original.md](findings/fsl-bet-original.md)):
+   (1) the rerun's smoothness rule (§4.5: FSL's first rerun differs from the rule as written though
+   its factor 100 and its 1000 iterations are right; the three standard-tier cases that rerun miss
+   the thresholds, Dice 0.980 to 0.995); (2) the skull search's details (§4.7: Dice about 0.9);
+   (3) the quaternion's precision path (§8: the last float bit of one component in some real
+   headers, about 5e-9 in NIfTI-2's doubles; the record allows 2^-23); (4) `-e`'s exact test
+   (§4.5: FSL finds intersections where a segment-triangle test, with folds and coplanar overlap,
+   does not, on small random heads: difftest 2026-10-30 #27); (5) the order of the sums over a
+   vertex's neighbours (§8 gives the triangles' only: it decides the last digits on degenerate
+   surfaces); (6) move the black-box observations of the findings into the spec, marked
+   (observed): the mesh numbering, the rasterisation, the robust range's rounding (the width in
+   float), small images (`n/50 = 0`), the fill from any start, the option parser's values, ANALYZE
+   inputs, single slices written 2D, `--ct`'s outline in Cormack units, FSL-56's layout, FSL-62's
+   brain, `bet`'s variation numbers, its failure line, FSL-44's splitting, `-F`'s and `-Z`'s files. And `bet -S`, `-B`, `-A`, `-A2` once
+   standard_space_roi, FLIRT and FAST are replicated. Then FLIRT with BBR, FAST, topup, and **`fslmaths` and `fslstats`** (found
    missing from the plan on 2026-10-30, the user's question: fMRIPrep calls `fslmaths -mul` in every
    BOLD reference's skull strip, and 14 `fslmaths` and 4 `fslstats` in the optional goodvoxels mask,
    `docs/analysis/01-fmriprep-bold-pipeline.md` rows 7 and 11; the BET replica holds only what

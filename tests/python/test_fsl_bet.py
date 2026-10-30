@@ -1,9 +1,10 @@
 # SPDX-License-Identifier: Apache-2.0
 """``lx.fsl.bet`` and ``lx.fsl.betsurf``: with a stand-in for the ``larmorx-nc`` program
 (written by the test, as in ``test_replica.py``) they pass FSL's options, settings and D13's
-choice to it and read its outputs back; without it they refuse clearly (there is no clean-room
-original yet). The replica itself is checked by its own golden tests
-(``crates-nc/larmorx-nc-cli/tests/golden.rs``) and by the parity suite against FSL."""
+choice to it and read its outputs back; without it bet runs its clean-room original (in this
+process) and betsurf, which has none yet, refuses clearly. The replica itself is checked by its
+own golden tests (``crates-nc/larmorx-nc-cli/tests/golden.rs``) and by the parity suite against
+FSL; the original by its golden cases and the suite's original mode."""
 
 from __future__ import annotations
 
@@ -115,21 +116,63 @@ def cli(*args: str) -> tuple[int, str, str]:
     return code, out.getvalue(), err.getvalue()
 
 
-def test_without_the_replica_they_refuse(scripts, tmp_path):
+def head(tmp_path: Path) -> Path:
+    """A small head: an ellipsoidal brain in a darker shell and a bright scalp, 2 mm voxels."""
+    i, j, k = np.meshgrid(np.arange(24), np.arange(26), np.arange(22), indexing="ij")
+    r = ((i - 11.5) / 8) ** 2 + ((j - 12.5) / 9) ** 2 + ((k - 10.5) / 7) ** 2
+    data = np.where(r < 1, 700, np.where(r < 1.4, 150, np.where(r < 1.7, 800, 10)))
+    path = tmp_path / "head.nii"
+    lx.save((data.astype(np.float32), np.diag([-2.0, 2.0, 2.0, 1.0])), path)
+    return path
+
+
+def test_without_the_replica(scripts, tmp_path):
+    """bet runs its clean-room original; betsurf, which has none yet, refuses."""
     path = volume(tmp_path)
     install = "pip install larmorx-nc"
+    with pytest.raises(lx.ReplicaNotFoundError, match=install):
+        lx.fsl.bet(path, implementation="replica")
     for implementation in ("auto", "replica"):
         with pytest.raises(lx.ReplicaNotFoundError, match=install):
-            lx.fsl.bet(path, implementation=implementation)
-        with pytest.raises(lx.ReplicaNotFoundError, match=install):
             lx.fsl.betsurf(path, path, np.eye(4), implementation=implementation)
-    with pytest.raises(NotImplementedError, match="no clean-room original of fsl bet2"):
-        lx.fsl.bet(path, implementation="original")
-    with pytest.raises(NotImplementedError, match="no clean-room original of fsl bet "):
-        lx.fsl.bet(path, variation="robust", implementation="original")
-    # the command line refuses the same way
-    code, _, err = cli("bet", str(path), "out")
+    with pytest.raises(NotImplementedError, match="no clean-room original of fsl betsurf"):
+        lx.fsl.betsurf(path, path, np.eye(4), implementation="original")
+    r = lx.fsl.bet(head(tmp_path), mask=True)  # auto: the original
+    assert r.mask.implementation == _replica.ORIGINAL
+    # the command line refuses betsurf the same way
+    code, _, err = cli("betsurf", str(path), "out")
     assert code != 0 and "pip install larmorx-nc" in err, err
+
+
+def test_the_original_runs_in_process(scripts, tmp_path):
+    """``implementation="original"``: bet2 and bet's variations in this process, every output
+    read back; the command line's outputs are the same."""
+    path = head(tmp_path)
+    r = lx.fsl.bet(path, mask=True, outline=True, skull=True, mesh=True, implementation="original")
+    assert r.brain.data.dtype == np.float32 and r.mask.data.dtype == np.int16
+    inside = int(np.asarray(r.mask.data).sum())
+    assert 1500 < inside < 6000, inside
+    assert r.mesh.vertices.shape == (2562, 3) and r.mesh.triangles.shape == (5120, 3)
+    assert r.outline.data.shape == r.brain.data.shape and r.skull.data.dtype == np.int16
+    rob = lx.fsl.bet(path, variation="robust", mask=True, implementation="original")
+    assert rob.mask.implementation == _replica.ORIGINAL
+    for k in ("FSLOUTPUTTYPE",):
+        os.environ.pop(k, None)
+    out = tmp_path / "cli"
+    out.mkdir()
+    os.environ["FSLOUTPUTTYPE"] = "NIFTI"
+    try:
+        code, _, err = cli("bet2", str(path), str(out / "o"), "-m")
+    finally:
+        os.environ.pop("FSLOUTPUTTYPE", None)
+    assert code == 0, err
+    m = np.asanyarray(lx.load(out / "o_mask.nii").data)
+    assert np.array_equal(m, np.asarray(r.mask.data))
+    # FSL's refusals: a fractional threshold out of range, the pending variations
+    with pytest.raises(ValueError, match="frac"):
+        lx.fsl.bet(path, frac=2.0, implementation="original")
+    with pytest.raises(NotImplementedError, match="does not replicate yet"):
+        lx.fsl.bet(path, variation="eyes", implementation="original")
 
 
 def test_arguments_are_checked_before_anything_runs(scripts, tmp_path):

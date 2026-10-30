@@ -1,8 +1,10 @@
 # SPDX-License-Identifier: Apache-2.0
 """``bet`` and ``betsurf``: FSL's brain extraction and its skull and scalp surfaces (FSL
-6.0.7.23's ``bet``, ``bet2`` and ``betsurf``), run by their bit-exact replica from
-``larmorx-nc`` as a separate program (``docs/licensing.md``); the clean-room original is still
-to be written (``specs/bet.md``).
+6.0.7.23's ``bet``, ``bet2`` and ``betsurf``). ``bet`` has two implementations: the bit-exact
+replica from ``larmorx-nc``, run as a separate program (``docs/licensing.md``), and the
+clean-room original of this package (``crates/larmorx-fsl``, written from ``specs/bet.md``),
+run in this process; ``implementation="auto"`` runs the replica when it is installed, else the
+original. ``betsurf``'s clean-room original is still to be written: it needs the replica.
 
 ``bet`` deforms a tessellated sphere onto the brain's surface (S. M. Smith, Human Brain Mapping
 17(3), 2002) and returns the brain, its mask, the surface's outline and mesh, and an approximate
@@ -240,6 +242,38 @@ def _run(
             warnings.warn(line.removeprefix("Warning: "), stacklevel=4)
 
 
+def _run_original(
+    tool: str,
+    args: Sequence[str],
+    tmp: str,
+    *,
+    n_threads: int,
+    upstream_defects: str,
+) -> None:
+    """Runs the clean-room original of ``fsl tool`` in this process, in ``tmp``, with FSL's
+    settings of this call (NIfTI-1 outputs; no FSL program on the ``PATH``); its notices and
+    FSL's warnings become Python warnings; a failure raises :class:`RuntimeError`."""
+    env = [
+        ("FSLOUTPUTTYPE", "NIFTI"),
+        ("PATH", tmp),
+        (_defects.ENV, upstream_defects),
+    ]
+    if n_threads > 0:
+        env.append(("OMP_NUM_THREADS", str(n_threads)))
+    code, _out, err = _core.fsl_run_original(tool, list(args), env, tmp)
+    for line in err.splitlines():
+        notice = _defects.parse_line(line)
+        if notice is not None:
+            warnings.warn(notice, stacklevel=4)
+        elif line.startswith("Warning: "):
+            warnings.warn(line.removeprefix("Warning: "), stacklevel=4)
+    if code != 0:
+        tail = "\n".join(err.strip().splitlines()[-20:])
+        raise RuntimeError(
+            f"larmorx fsl {tool} (the clean-room original) failed with exit code {code}:\n{tail}"
+        )
+
+
 def bet(
     image: Any,
     *,
@@ -293,11 +327,13 @@ def bet(
         the outline (``-o``), the skull (``-s``), the mesh (``-e``). ``"fmri"`` returns the brain
         and the mask, and no others; ``"robust"`` always computes the brain.
     n_threads
-        Threads for the replica (0 = all); the result does not depend on it.
+        Threads (0 = all); the result does not depend on it.
     implementation
-        ``"auto"`` (default) or ``"replica"``: the replica in ``larmorx-nc``
-        (:class:`~larmorx.ReplicaNotFoundError` without it); ``"original"``:
-        :class:`NotImplementedError` until the clean-room original exists.
+        ``"auto"`` (default): the replica in ``larmorx-nc`` when it is installed, else the
+        clean-room original; ``"replica"``: the replica
+        (:class:`~larmorx.ReplicaNotFoundError` without it); ``"original"``: the clean-room
+        original (FSL's behaviour within the thresholds of its validation record,
+        ``docs/validation/fsl-bet.md``).
     upstream_defects
         ``"fix"`` (default) or ``"reproduce"`` (FSL's output); a
         :class:`~larmorx.UpstreamDefectWarning` names each defect that changed the result.
@@ -305,7 +341,7 @@ def bet(
     Returns
     -------
     BetResult
-        Each image's :attr:`~larmorx.Image.implementation` names the replica that ran.
+        Each image's :attr:`~larmorx.Image.implementation` names the implementation that ran.
 
     Raises
     ------
@@ -314,6 +350,8 @@ def bet(
     larmorx.ReplicaError
         The replica failed (its message says why: FSL's own errors, and the cases where FSL's
         result is undefined).
+    RuntimeError
+        The clean-room original failed (its message says why, as the replica's does).
     """
     _defects.check(upstream_defects)
     n_threads = _threads(n_threads)
@@ -373,18 +411,25 @@ def bet(
             )
         options.append(_FLAGS[variation])
     selected = _replica.select("fsl", tool, implementation)
-    if selected is None:  # pragma: no cover - there is no original yet
-        raise NotImplementedError("larmorx has no clean-room original of fsl bet yet")
-    impl = selected.implementation()
+    impl = _replica.ORIGINAL if selected is None else selected.implementation()
     with tempfile.TemporaryDirectory(prefix="larmorx-bet-", ignore_cleanup_errors=True) as tmp:
         source = _write_image(image, tmp, "input", n_threads)
-        _run(
-            selected,
-            [source, "out", *options],
-            tmp,
-            n_threads=n_threads,
-            upstream_defects=upstream_defects,
-        )
+        if selected is None:
+            _run_original(
+                tool,
+                [source, "out", *options],
+                tmp,
+                n_threads=n_threads,
+                upstream_defects=upstream_defects,
+            )
+        else:
+            _run(
+                selected,
+                [source, "out", *options],
+                tmp,
+                n_threads=n_threads,
+                upstream_defects=upstream_defects,
+            )
 
         def read(name: str) -> Image:
             return _read_image(os.path.join(tmp, f"out{name}.nii"), n_threads, impl)

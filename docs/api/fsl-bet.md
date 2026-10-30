@@ -5,17 +5,19 @@
 6.0.7.17's until 2026-10-29: what changed, `bet2 --binaryMask` among it, in
 [findings/fsl-bet.md](../findings/fsl-bet.md), "FSL 6.0.7.23").
 
-**Two implementations, one so far.** FSL is distributed under the FSL Licence (non-commercial use
-only), so larmorx keeps its FSL tools in two implementations ([licensing](../licensing.md)): the
-bit-exact **replica**, `larmorx-nc fsl bet|bet2|betsurf` (package `larmorx-nc`, `crates-nc/`,
-under the FSL Licence's terms; translated from FSL's source:
-[PROVENANCE](../../crates-nc/larmorx-nc-bet/PROVENANCE.md)), done; and the clean-room
-**original** in the main package (Apache-2.0), to be written from
-[`specs/bet.md`](../../specs/bet.md). Until the original exists, `implementation="auto"` and
-`"replica"` run the replica, as a separate program, when `larmorx-nc` is installed
-(`pip install larmorx-nc`), and raise `lx.ReplicaNotFoundError` naming that command otherwise;
-`implementation="original"` raises `NotImplementedError`. Each image's `implementation` names the
-replica that ran.
+**Two implementations.** FSL is distributed under the FSL Licence (non-commercial use only), so
+larmorx keeps its FSL tools in two implementations ([licensing](../licensing.md)): the bit-exact
+**replica**, `larmorx-nc fsl bet|bet2|betsurf` (package `larmorx-nc`, `crates-nc/`, under the FSL
+Licence's terms; translated from FSL's source:
+[PROVENANCE](../../crates-nc/larmorx-nc-bet/PROVENANCE.md)), and the clean-room **original** in
+the main package (Apache-2.0, `crates/larmorx-fsl`), written from
+[`specs/bet.md`](../../specs/bet.md), the BET paper and black-box runs of FSL
+([PROVENANCE](../../crates/larmorx-fsl/PROVENANCE.md); since 2026-10-30, `bet2` and the `bet`
+script; betsurf's original is still to be written). `implementation="auto"` runs the replica, as
+a separate program, when `larmorx-nc` is installed (`pip install larmorx-nc`), else the original
+(betsurf: `lx.ReplicaNotFoundError` naming that command); `"replica"` and `"original"` choose.
+Each image's `implementation` names the one that ran. The command line chooses alike
+(`LARMORX_IMPLEMENTATION=auto|replica|original`).
 
 **Status: `validated`** (the replica), against FSL 6.0.7.23 itself
 ([record](../validation/fsl-bet-replica.md), standard tier: 176 cases, 128 compared, every one
@@ -204,3 +206,53 @@ thread count), `bet2::main`, `bet::main`, `betsurf::main`; `bet2::compute` runs 
 a `larmorx_nc_core::volume::Volume<f32>`. FSL's libraries are the shared core's,
 `larmorx-nc-core` (its [PROVENANCE](../../crates-nc/larmorx-nc-core/PROVENANCE.md) lists the
 API). The Apache-2.0 crates cannot use them.
+
+## The clean-room original (`crates/larmorx-fsl`)
+
+Written from [`specs/bet.md`](../../specs/bet.md), S. M. Smith's paper (Human Brain Mapping
+17(3), 2002) and black-box runs of FSL 6.0.7.23's programs, without FSL's source or the replica
+([PROVENANCE](../../crates/larmorx-fsl/PROVENANCE.md); what the runs showed beyond the spec:
+[findings/fsl-bet-original.md](../findings/fsl-bet-original.md)). Since 2026-10-30: `bet2`
+complete (every option, message, exit status and failure case of the spec, with the D13
+switches of FSL-40, -42, -43, -56, -60, -61 and -62) and the `bet` script's default, `-R`
+(FSL-63), `-F` and `-Z` (FSL-45), FSL-44 and FSL-46; `-S`, `-B`, `-A`, `-A2` refused as pending,
+as the replica does. betsurf's original is still to be written.
+
+**Status: `experimental`** ([record](../validation/fsl-bet.md), standard tier against FSL
+6.0.7.23, the replica's suite without betsurf's cases: 108 of 111 compared cases within the
+thresholds, 24 more rejected by both alike, 3 where `reproduce` fills what FSL leaves undefined,
+4 pending): exit statuses and messages FSL's byte for byte; 202 of 217 brains, masks and outlines
+bit-identical to FSL's and 9 more within the thresholds, the meshes FSL's to the file's 6
+decimals, fMRIPrep's 29 BET calls on its oracle runs all bit-identical (and with fMRIPrep's own
+outputs' values); headers FSL's but for `descrip` (`larmorx fsl bet2`) and the qform's quaternion
+within float precision. Open, questions for the spec writer
+([findings](../findings/fsl-bet-original.md)): the reruns after a self-intersecting first pass
+(the 3 cases that miss the thresholds: real T1w images whose first pass reruns, Dice 0.980 to
+0.995), the skull search (`-s`, reported: Dice about 0.9 with FSL's) and, on small random heads,
+`-e`'s exact test and last digits of the self-intersection total (random testing, below).
+
+**Random testing** (a 30-minute trial, 2026-10-30, `oracles/difftest/2026-10-30-cleanroom-bet`,
+718 cases, both implementations): the replica agreed in every case it finished (716; 2 timeouts
+of both); the original in 334 of 573 (betsurf's 143 skipped). Its differences led to six corrections (the fill
+from any start voxel, the robust range of small images, centres of gravity that are not a
+number, `--ct`'s outline, the quaternion of a qform code 0, `bet -F`'s double series), after which
+164 of the 239 differing cases agree (`validation/investigations/cleanroom-bet/retrial.py`). The
+75 left are small or degenerate random heads (a surface of a few millimetres, collapsed sheets:
+sub-voxel mesh differences and the self-intersection total's last digits), reruns, and `-e`'s
+exact test: the findings list them.
+
+**Built for speed:** the vertices of each iteration are updated in parallel (each from the
+previous iteration's positions only), the self-intersection measure finds close pairs in a grid
+of cells instead of over all pairs, the fill is a stack fill over the grid, and no image is
+held twice; every parallel step runs in the call's own pool of `n_threads` (the command line:
+`OMP_NUM_THREADS`, else every core) with the same result at any thread count. Timings:
+[benchmarks/fsl-bet.md](../benchmarks/fsl-bet.md).
+
+**Deliberate differences of the original:** its `descrip` is `larmorx fsl bet2`; where FSL
+aborts or crashes it prints FSL's messages before that point and one line of its own ending in
+`(larmorx)`, and exits 1; `bet`'s messages name the script `bet`.
+
+**Rust:** `larmorx_fsl::bet::find_surface` (the surface on a `larmorx_fsl::bet::Vol`: the initial
+parameters, the passes and their self-intersection), `brain_mask`, `outline`, `masked`,
+`skull::skull`, `cormack`; the command lines `larmorx_fsl::cli::run` / `run_in` (an environment
+table and a directory given, as `lx.fsl.bet` runs them in process).

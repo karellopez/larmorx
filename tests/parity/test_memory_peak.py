@@ -235,6 +235,48 @@ def test_larmorx_needs_no_more_memory_than_fsl(tmp_path, tool, args):
             assert _contents(f_dir) == _contents(r_dir), f"{tool} {args}"
 
 
+#: BET's clean-room original (``crates/larmorx-fsl``, 2026-10-30) on the same calls but
+#: betsurf's (its original is still to be written): the original's outputs are FSL's within
+#: the thresholds of its record (``docs/validation/fsl-bet.md``), its memory similar to FSL's.
+ORIGINAL_BET_CASES = [c for c in BET_CASES if c[0] != "betsurf"]
+
+
+@pytest.mark.parametrize(("tool", "args"), ORIGINAL_BET_CASES)
+def test_bet_original_needs_no_more_memory_than_fsl(tmp_path, tool, args):
+    fb = pytest.importorskip("larmorx_validation.parity.fsl_bet")
+    if fb.fsl_dir() is None:
+        pytest.skip("FSL (~/fsl-6.0.7.23, LARMORX_FSLDIR) was not found")
+    if not Path("/usr/bin/time").is_file():
+        pytest.skip("/usr/bin/time was not found")
+    paths = _bet_inputs(tmp_path, fb)
+    words = [w.format(**{k: str(v) for k, v in paths.items()}) for w in args.split()]
+    env = {**fb.environment(), "OMP_NUM_THREADS": "1"}
+    f_dir = tmp_path / "fsl"
+    f_dir.mkdir()
+    code, fsl_mib = _peak([str(fb.fsl_dir() / "bin" / tool), *words], env, f_dir)
+    assert code == 0
+    for mode in ("reproduce", "fix"):
+        r_dir = tmp_path / f"larmorx-{mode}"
+        r_dir.mkdir()
+        l_env = {
+            **env,
+            "LARMORX_IMPLEMENTATION": "original",
+            "LARMORX_UPSTREAM_DEFECTS": mode,
+            "PYTHONPATH": os.environ.get("PYTHONPATH", ""),
+        }
+        entry = entry_peak(l_env, r_dir)
+        code, mib = _peak([sys.executable, "-m", "larmorx", "fsl", tool, *words], l_env, r_dir)
+        assert code == 0
+        print(
+            f"{tool} original ({mode}): larmorx {mib:.1f} MiB, FSL {fsl_mib:.1f}, entry {entry:.1f}"
+        )
+        assert mib <= allowance(fsl_mib, entry), (
+            f"{tool} {args} original ({mode}): larmorx {mib:.0f} MiB, FSL {fsl_mib:.0f} MiB, "
+            f"the entry point {entry:.1f} MiB"
+        )
+        assert sorted(p.name for p in f_dir.iterdir()) == sorted(p.name for p in r_dir.iterdir())
+
+
 #: The kinds of call the data panel's re-validation brought (2026-10-26, part a): Atropos,
 #: antsAI, antsAffineInitializer, antsApplyTransforms on a 4D series through a displacement
 #: field and antsRegistration's linear and SyN stages, each ANTs program with correctly rounded

@@ -955,7 +955,6 @@ def image_math_operations() -> list[str]:
 #: cases are the replica's own (``crates-nc/larmorx-nc-cli/tests/golden.rs``, run on every
 #: platform by the replicas' jobs). ``replica_only`` checks that each tool has one there.
 REPLICA_ONLY_FUNCTIONS: dict[str, str] = {
-    "lx.fsl.bet": "fsl bet2",
     "lx.fsl.betsurf": "fsl betsurf",
 }
 
@@ -3761,8 +3760,8 @@ def _(ctx: Context) -> dict[str, Any]:
 
 @case("py.fsl.read_vtk", covers=("lx.fsl.read_vtk",))
 def _(ctx: Context) -> dict[str, Any]:
-    """A VTK mesh as FSL writes it (fixed notation, 6 decimals), read back. (``lx.fsl.bet`` and
-    ``lx.fsl.betsurf`` run only the replica: their cases are in ``crates-nc``.)"""
+    """A VTK mesh as FSL writes it (fixed notation, 6 decimals), read back. (``lx.fsl.betsurf``
+    runs only the replica: its cases are in ``crates-nc``.)"""
     v = ints(71, (40, 3), -90000, 90000) / 1000
     t = ints(72, (60, 3), 0, 40)
     lines = ["# vtk DataFile Version 3.0", "surface file", "ASCII", "DATASET POLYDATA"]
@@ -3774,3 +3773,118 @@ def _(ctx: Context) -> dict[str, Any]:
     Path(path).write_text("\n".join(lines) + "\n", encoding="utf-8")
     s = lx.fsl.read_vtk(path)
     return {"vertices": s.vertices, "triangles": s.triangles}
+
+
+def _fsl(ctx: Context, *argv: str, upstream_defects: str = "fix") -> str:
+    """``larmorx fsl <argv...>`` (the clean-room original) with ``FSLOUTPUTTYPE=NIFTI_GZ`` and
+    no FSL program on the ``PATH`` (``bet -Z`` looks for ``imglob`` there); its standard
+    output."""
+    saved = {k: os.environ.get(k) for k in ("FSLOUTPUTTYPE", "PATH", "FSL_LOAD_NIFTI_EXTENSIONS")}
+    os.environ["FSLOUTPUTTYPE"] = "NIFTI_GZ"
+    os.environ["PATH"] = os.fspath(ctx.dir)
+    os.environ.pop("FSL_LOAD_NIFTI_EXTENSIONS", None)
+    try:
+        return cli("fsl", *argv, upstream_defects=upstream_defects)
+    finally:
+        for k, v in saved.items():
+            if v is None:
+                os.environ.pop(k, None)
+            else:
+                os.environ[k] = v
+
+
+def _bet_files(out: str, suffixes: tuple[str, ...]) -> dict[str, Any]:
+    return {f"out{s}": Nifti(f"{out}{s}.nii.gz") for s in suffixes}
+
+
+@case("cli.fsl.bet2", covers=("cli:fsl bet2",))
+def _(ctx: Context) -> dict[str, Any]:
+    """``larmorx fsl bet2`` (the clean-room original of BET, ``specs/bet.md`` §4) on an oblique
+    image stored with a positive determinant (x reversed in memory): every output, verbose."""
+    out = ctx.out("out")
+    stdout = _fsl(ctx, "bet2", ctx.file("anat.nii"), out, "-o", "-m", "-s", "-e", "-v")
+    return {
+        **_bet_files(out, ("", "_mask", "_overlay", "_skull")),
+        "mesh": File(f"{out}_mesh.vtk"),
+        "stdout": stdout,
+    }
+
+
+@case("cli.fsl.bet2.options")
+def _(ctx: Context) -> dict[str, Any]:
+    """bet2's numeric options (``-f -g -w -r -c``, the hidden search depths) and ``-t``; the CT
+    conversion with ``--binaryMask`` (the surface found on a mask, the outputs from the input)."""
+    out, ct = ctx.out("out"), ctx.out("ct")
+    _fsl(ctx, "bet2", ctx.file("anat.nii"), out, "-f", "0.3", "-g", "0.2", "-w", "1.5", "-r", "30", "-c", "12", "10", "8", "-t", "-m", "--parameter_d1=6", "--parameter_d2=2")  # fmt: skip
+    _fsl(ctx, "bet2", ctx.file("anat.nii"), ct, "--ct", f"--binaryMask={ctx.file('mask.nii')}", "-m", "-t")  # fmt: skip
+    return {**_bet_files(out, ("", "_mask")), "ct": Nifti(f"{ct}.nii.gz"), "ct_mask": Nifti(f"{ct}_mask.nii.gz")}  # fmt: skip
+
+
+@case("cli.fsl.bet2.reproduce")
+def _(ctx: Context) -> dict[str, Any]:
+    """bet2 with FSL's defects reproduced: a single slice, whose mask's fill starts outside the
+    image and reaches places by their linear index (FSL-43), and an output name holding
+    ``.hdr`` (FSL-40); the default on the same calls."""
+    rep, fix = ctx.out("a.hdrb"), ctx.out("b.hdrb")
+    _fsl(ctx, "bet2", ctx.file("plane.nii"), rep, "-m", upstream_defects=REPRODUCE)
+    _fsl(ctx, "bet2", ctx.file("plane.nii"), fix, "-m")
+    return {
+        "reproduce": Nifti(ctx.out("ab.nii.gz")),
+        "reproduce_mask": Nifti(ctx.out("ab_mask.nii.gz")),
+        "fix_mask": Nifti(f"{fix}_mask.nii.gz"),
+        "files": files_under(str(ctx.dir)),
+    }
+
+
+@case("cli.fsl.bet", covers=("cli:fsl bet",))
+def _(ctx: Context) -> dict[str, Any]:
+    """``larmorx fsl bet``: the script's default (bet2 with its options), verbose."""
+    out = ctx.out("out")
+    anat_nii = ctx.file("anat.nii")
+    stdout = _fsl(ctx, "bet", anat_nii, out, "-m", "-f", "0.4", "-v")
+    # the script prints the names it was given: the temporary folders replaced
+    stdout = stdout.replace(os.path.dirname(anat_nii), "<in>").replace(os.fspath(ctx.dir), "<dir>")
+    return {**_bet_files(out, ("", "_mask")), "stdout": stdout}
+
+
+@case("cli.fsl.bet.variations")
+def _(ctx: Context) -> dict[str, Any]:
+    """bet's variations: ``-R`` (bet2 again from the brain's centre; reproduced, the script's
+    echo drops a leading ``-e``: FSL-63), ``-F`` (4D: the first volume's mask dilated on every
+    volume) and ``-Z`` (padded to 100 mm in z and cropped back; reproduced, FSL's outputs stay
+    padded: FSL-45)."""
+    r, rr = ctx.out("r"), ctx.out("rr")
+    f, z, zr = ctx.out("f"), ctx.out("z"), ctx.out("zr")
+    _fsl(ctx, "bet", ctx.file("anat.nii"), r, "-R", "-e", "-m")
+    _fsl(ctx, "bet", ctx.file("anat.nii"), rr, "-R", "-e", "-m", upstream_defects=REPRODUCE)
+    _fsl(ctx, "bet", ctx.file("bold.nii"), f, "-F")
+    _fsl(ctx, "bet", ctx.file("anat.nii"), z, "-Z", "-m")
+    _fsl(ctx, "bet", ctx.file("anat.nii"), zr, "-Z", "-m", upstream_defects=REPRODUCE)
+    return {
+        "robust": Nifti(f"{r}_mask.nii.gz"),
+        "robust_mesh": File(f"{r}_mesh.vtk"),
+        "robust_reproduce": Nifti(f"{rr}_mask.nii.gz"),
+        "fmri": Nifti(f"{f}.nii.gz"),
+        "fmri_mask": Nifti(f"{f}_mask.nii.gz"),
+        "small_fov": Nifti(f"{z}_mask.nii.gz"),
+        "small_fov_reproduce": Nifti(f"{zr}_mask.nii.gz"),
+        "files": files_under(str(ctx.dir)),
+    }
+
+
+@case("py.fsl.bet", covers=("lx.fsl.bet",))
+def _(ctx: Context) -> dict[str, Any]:
+    """``lx.fsl.bet`` with the clean-room original on an in-memory image: every output, and the
+    robust variation."""
+    r = lx.fsl.bet(anat(), mask=True, outline=True, skull=True, mesh=True, frac=0.4, implementation="original")  # fmt: skip
+    rob = lx.fsl.bet(anat(), variation="robust", mask=True, implementation="original")
+    assert r.mesh is not None
+    return {
+        "brain": r.brain.data,
+        "mask": r.mask.data,
+        "outline": r.outline.data,
+        "skull": r.skull.data,
+        "vertices": r.mesh.vertices,
+        "triangles": r.mesh.triangles,
+        "robust_mask": rob.mask.data,
+    }

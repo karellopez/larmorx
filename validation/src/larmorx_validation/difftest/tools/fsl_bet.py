@@ -1,9 +1,11 @@
 # SPDX-License-Identifier: Apache-2.0
-"""BET (``bet2``, ``bet``, ``betsurf``), the ``larmorx-nc`` replica against FSL (6.0.7.23, or
-6.0.7.17 with ``--fsl-version``; FSL's own step between them is the records', not run here):
-random heads and options through BET's own parity runner (``larmorx_validation.parity.fsl_bet``):
-exit status, both streams, every file written byte for byte (images decompressed), the D13 fix
-pass. The replica must be bit-identical.
+"""BET (``bet2``, ``bet``, ``betsurf``), the ``larmorx-nc`` replica and the clean-room original
+(``crates/larmorx-fsl``, since 2026-10-30; betsurf's original is still to be written, its draws
+are skipped for it) against FSL (6.0.7.23, or 6.0.7.17 with ``--fsl-version``; FSL's own step
+between them is the records', not run here): random heads and options through BET's own parity
+runner (``larmorx_validation.parity.fsl_bet``): exit status, both streams, every file written
+(images decompressed), the D13 fix pass. The replica must be bit-identical; the original is held
+to its record's thresholds (``docs/validation/fsl-bet.md``).
 
 Drawn: bet2 with its options (``-f``, ``-g``, ``-r``, ``-c``, ``-m``, ``-o``, ``-s``, ``-e``,
 ``-n``, ``-t``, ``-w``, ``-v``, ``--ct``); bet with them and its variations (``-R``, ``-F`` on a
@@ -290,8 +292,12 @@ def case(
 def _run(impl: str):
     from larmorx_validation.parity import fsl_bet as fb
     from larmorx_validation.parity import fsl_versions
+    from larmorx_validation.parity.harness import Outcome
 
     def run(case, checks) -> None:
+        fb.IMPLEMENTATION["name"] = impl
+        if impl == "original" and case.payload.tool == "betsurf":
+            raise Outcome("skipped", "betsurf's clean-room original is still to be written")
         with fsl_versions.without_step():
             fb.run_case(case, checks)
 
@@ -303,22 +309,22 @@ def _unavailable() -> str:
 
     if fb.fsl_dir() is None:
         return "FSL (~/fsl-6.0.7.23, ~/fsl, LARMORX_FSLDIR) was not found"
-    if fb.replica_binary() is None:
-        return "the larmorx-nc program was not found"
     return ""
 
 
 TOOL = Tool(
     name="fsl-bet",
-    title="BET (replica)",
+    title="BET",
     suite="fsl-bet-replica",
-    implementations=("replica",),
+    implementations=("original", "replica"),
     # a permanent case may name the known change of FSL's own step it meets (``step``)
     payload_fields=("tier", "expect", "reason", "step"),
     draw=draw,
     case=case,
     run=_run,
-    # Bit-identity is the suite's own pass criterion (every file, both streams, the status).
+    # The replica's pass criterion is bit-identity (every file, both streams, the status), the
+    # original's its record's thresholds: both are the suite's own checks.
+    exact=lambda impl: impl == "replica",
     exact_checks=(),
     timeout=300,
     weight=1.0,

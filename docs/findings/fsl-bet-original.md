@@ -24,40 +24,55 @@ into the spec, marked (observed).
   its 6 decimals on the phantoms and on real T1w images (record: [validation/fsl-bet.md](../validation/fsl-bet.md)).
 - **The median** `tm` (`py/params.py`, on images of distinct float values): the value of rank
   `floor(N/2)` (1-based) of the sorted list, as the spec says; with one voxel, that voxel.
-- **Reruns** (§4.5; open): where the first pass self-intersects (a total above 4000), FSL's rerun
-  does not follow the spec's rule as written. On ds002422 sub-02's T1w the first pass's total is
-  FSL's (90050), the first rerun's is 19809.7 in FSL and 16099 by the rule; on ds005003's tumour
-  T1w with `-e` (one rerun), the rerun's mesh is 0.34 mm from FSL's (median; 95th percentile
-  2.5 mm). Tried, none reproducing FSL: the factor `10^P`; the condition `s·n < 0`; all vertices;
-  no lowering; lowering over the whole pass, from `i > 500`, with `(i + 1)/1000`, as a power;
-  `f2` uncapped; the factor on `1/R` or on `rmin`, `rmax`; `l` every iteration, fixed, or the
-  previous pass's; the rerun from the previous pass's surface (`variants.py`,
-  `variants2.py`, with a temporary build). A scan of the first rerun's factor on the tumour
-  (2, 5, 20, 50, 100, 200, 1000) has its sharp minimum at the spec's 100 (0.93 mm at 50, 0.83 mm
-  at 200), and a scan of the rerun's number of iterations its minimum at 1000 (900: 0.66 mm,
-  1100: 0.66 mm, 1250: 1.13 mm, the lowering kept on the last quarter): the factor and the
-  length are right, the remaining difference lies elsewhere in the rerun (FSL's
-  rerun surface is a little smoother than the rule's on its convex parts too: mean `|s·n|`
-  1.382 against 1.404 mm). A question for the spec writer; the five standard-tier cases that
-  rerun are outside the record's thresholds.
-- **The exact test** (`-e`; open): on small random heads FSL finds an intersection where a
-  segment-triangle test between triangles that share no vertex finds none (random testing
-  2026-10-30, case 27: a 14 x 14 x 12 head of 2.5 x 2.5 x 1.5 mm voxels); coplanar or touching
-  triangles may count for FSL. A question for the spec writer.
+- **Reruns** (§4.5; **resolved 2026-10-30, part 2a**): the spec's rule was right; the reruns
+  amplify last-bit differences of the deformation's arithmetic, which the spec writer then gave
+  operation by operation (§8.1). With §8.1 followed in full (the mesh held in the file's triangle
+  order, the neighbour lists by §4.4's move-to-the-end rule, the normal and the neighbour mean by
+  three divisions, the initial placement `c + (r/2)((p + c) − c)`, `1/R` from `s_n·n`, the update
+  `p + ((u1 + u2) + u3)`, the inward depth accumulated, the field of view in float, `rmax`'s
+  product in float, the centre of gravity one running sum, the radius's float products, the
+  robust range's bin width first) and glibc's `tanh` (below), the standard tier's three rerun
+  cases (`real/older-75y`, `real/7t`, `real/tumour`) are FSL's **bit for bit**: their brains,
+  masks, outlines, meshes and verbose streams (the rerun totals printed included).
+- **The exact test** (`-e`; **resolved 2026-10-30, part 2a**): §4.5's sweep and predicate as the
+  spec writer gave them; the tumour's `-e` run (one rerun) is FSL's bit for bit, mesh included.
+- **glibc's `tanh`** (§8.1, part 2a; `validation/investigations/cleanroom-bet/tanh-verify/`):
+  fdlibm 5.3's `tanh` over its `expm1`, as netlib distributes them, differs from the system's
+  (glibc 2.35) in the last bit or two on about 0.03 % of arguments (1,363 of 4.2 million random
+  ones), all where `expm1`'s rational approximation is used; with that polynomial evaluated in
+  Estrin's order, `(1 + Q1 z) + z²(Q2 + Q3 z)` then `+ z⁴(Q4 + Q5 z)` left to right (the pipelined
+  revision the spec names), **every one of 12,918,456,348 inputs** agrees bit for bit (3 x 2^32
+  random ones of three families and 33.5 million around each branch threshold).
+  `larmorx_core::math::tanh_glibc`. Horner's order and two other Estrin groupings were tried and
+  differ (6,640 to 9,698 of 36.7 million). glibc's `tanh` is not correctly rounded on 21.3 % of
+  that random sample (CORE-MATH's `cr_tanh` as the reference) and on 22,506 of CORE-MATH's
+  62,880 worst cases: GLIBC-06.
 
 - **The robust range's rounding** (`range_probe.py`; fMRIPrep's calls): `t2 = lo + b (hi − lo) /
   1000` with `hi − lo` rounded to float, the product and the division in double, the result
   rounded to float and added to `lo` in float. With `hi − lo` in double, ds005454's BOLD
   reference gives `thresh2 -0.142002` where FSL prints `-0.142004` (and another surface); with
   the product in float, ds000005's run 3 a `thresh98` one float bit off FSL's (and another
-  mask). `thresh` itself (`t2 + 0.1 (t98 − t2)`) is printed one digit off FSL's on one random
-  head (random testing 2026-10-30, case 74: `0.743664` in FSL, `0.743665` here, in double or in
-  float): open.
-- **Small and degenerate random heads** (random testing 2026-10-30, 75 cases of 573 after the
-  corrections): surfaces of a few millimetres or collapsed into sheets, where the last bits of
-  the sums (the order in which a vertex's triangles and neighbours are added, which the spec
-  gives only for the triangles) decide the self-intersection total's printed digits and
-  sub-voxel positions; on real and phantom images the meshes are FSL's to their 6 decimals.
+  mask). The spec writer's exact arithmetic (the bin width `w/1000` first, the narrowed range's
+  own formula, the end bins' counts left out of the tenth pass) settles the rest: random-testing
+  case 74's `thresh` digit agrees since part 2a.
+- **A name with an extension** (§3.1; part 2a): `bet2 in.nii.gz` with only `in.nii` present reads
+  `in.nii`, as the spec writer observed; larmorx resolves names so (`bet::image::resolve_input`).
+- **`bet -F` on a float64 series** (§5.2; part 2a, case 425): the brain keeps the series' double
+  values (`bet::image::read_f64_series`).
+- **Small and degenerate random heads** (random testing 2026-10-30, 75 cases of 573 after part
+  1's corrections): with §8.1, §4.7 and §8.2 followed (part 2a), **73 of the 75 agree** with FSL
+  (and 237 of the trial's 239 differing cases). The two left:
+  - case 677 (`bet2 -c 10 6 15 -w 5 -s -v` on a neurologically stored 2 x 4 x 2 mm head): the
+    first pass's self-intersection total differs (258194 in FSL, 259595 here), and the surface
+    and skull with it: `-c` on a neurologically stored image, which FSL converts through a 4 x 4
+    inverse (§8.1 leaves its last bits open; the spec writer named this case for it);
+  - case 622 (`bet -R -f 0.2 -m -t`): every file and standard output FSL's, but FSL prints
+    `dc: stack empty` twice: FSL's `fslstats -C` (run by hand on FSL's brain, a black box) gives
+    `-0.000000 8.507173 16.273980` for a centre whose x is 0 in the file's voxels (the image is
+    stored neurologically: the conversion's last bits again), and `dc` reads the leading `-` as
+    its subtraction command, with too few numbers on its stack. larmorx's centre is `0.000000`.
+    Both wait for the conversion's exact arithmetic (a question for the spec writer).
 
 ## The mask and the outline (§4.6, §4.7)
 
@@ -76,21 +91,29 @@ into the spec, marked (observed).
   (a 2-voxel image of 50 and 51: `thresh2 49.999`, `thresh98 51.001`); with no voxel above the
   threshold the centre of gravity is `0/0` (`c-of-g -nan -nan -nan mm`) and the
   self-intersection total 0.
-- **The skull** (`skull_probe.py`; open): from each surface voxel of a vertex (§6.4's choice), the
-  profile along the vertex's normal from the voxel's own position, sampled every `min(d)/2` from
-  −3 mm to 30 mm; `d_max` the largest sample at or beyond 0; the point maximising
-  `s/30 − I(s)/(t98 − t2)` before it; the skull voxel at the sample the steepest rise between them
-  reaches, `trunc(p/d)`. Dice 0.91 with FSL's `_skull` on the phantom (16249 voxels against FSL's
-  16836, 1771 and 1184 differing): the details the spec leaves open (§4.7) decide the rest.
+- **The skull** (**resolved 2026-10-30, part 2a**): §4.7's search as the spec writer gave it
+  (outside voxels counted as surface voxels, unclipped candidates, three scans on grids of their
+  own, §8.1's trilinear formula): `_skull` is FSL's bit for bit on the real T1w images compared by
+  hand (ds005454's 7 T, ds000005) and in every case of the record; the suite now holds it to the
+  masks' thresholds instead of reporting its Dice.
 
 ## Images (§3)
 
-- **The qform's quaternion** (`quatern_probe.py`): FSL writes the quaternion turned into its
-  matrix and back by the NIfTI standard's conversions; for a half turn (`a = 0`, frequent in real
-  qforms) it picks the other sign of `(b, c, d)` (the oblique phantom). With the matrix rounded to
-  float, 3 of 5 real inputs give FSL's bits; the others differ in the last float bit of one
-  component (x87 extended precision, §8, would decide it): the record allows one unit in the last
-  place there.
+- **The qform's quaternion** (`quatern_probe.py`; **resolved 2026-10-30, part 2a**): FSL writes
+  the quaternion turned into its matrix and back by the NIfTI standard's conversions; for a half
+  turn (`a = 0`, frequent in real qforms) it picks the other sign of `(b, c, d)`. With §8.2's
+  precision path (x87 extended precision in the steps it names, `crates/larmorx-fsl/src/bet/x87.rs`;
+  NIfTI-2's doubles unrounded) every header of the record and of the random trial is FSL's byte
+  for byte; the suite's quaternion tolerance is now 0.
+- **`bet -Z`'s quaternion** (part 2a; random testing 2026-10-30, cases 132, 135, 223, 378, 583):
+  the round trip of §8.2 is not idempotent in the last bits, and FSL applies it once per program
+  of the script's chain: `fslroi` writes the bottom slice, `fslmerge -z` writes the padded image
+  with the bottom slice's header (one more round trip), bet2 another, the crop another. larmorx's
+  `-Z` takes the padded image's quaternion from the bottom slice it wrote and the crop's from the
+  padded output: those five cases are FSL's byte for byte.
+- **The script's steps and `FSLOUTPUTTYPE`** (part 2a; case 617): with an unknown output type the
+  script's first step (`fslroi` for `-Z`, `-F`) prints the image layer's two `ERROR::` lines and
+  the script fails; larmorx now prints them too (it printed its own line).
 - **ANALYZE 7.5 inputs**: FSL works on them with x reversed (as on a neurologically stored image)
   and writes the outputs with a qform and sform of code 2, the voxel sizes on the diagonal and the
   offset `−(origin − 1) d` (the header's `originator`; 0 gives `+d`): the outputs line up with the

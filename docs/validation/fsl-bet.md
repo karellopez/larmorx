@@ -1,15 +1,15 @@
 # Parity: BET (clean-room original)
 
-**3 case(s) fail.** 142 cases on the `standard` tier: 108 pass, 24 rejected by both, 7 expected divergences, 3 failures.
+**All cases agree.** 142 cases on the `standard` tier: 111 pass, 24 rejected by both, 7 expected divergences, 0 failures.
 
 - **Validated:** `larmorx fsl bet2` and `bet` (larmorx 0.0.1, crate larmorx-fsl: the clean-room original written from specs/bet.md, Apache-2.0), in process, and `lx.fsl.bet(..., implementation='original')`; betsurf's original is still to be written
 - **Reference:** bet and bet2 from FSL 6.0.7.23 (fsl-bet2 2111.9, fsl-newimage 2601.0, fsl-meshclass 2111.0), the conda installation in `~/fsl-6.0.7.23`
 - **Test data:** larmorx-testdata `52124bc98f9f`, tier `standard`
 - **Generated:** 2026-10-30 on Linux x86_64, with `python -m larmorx_validation parity fsl-bet --tier standard`
-- **Original programs:** 230 runs: 222 from the oracle cache, 8 run (3 never cached: the original varies); cache `<workspace>/oracles/cache`, mode `use`
+- **Original programs:** 226 runs: 218 from the oracle cache, 8 run (3 never cached: the original varies); cache `<workspace>/oracles/cache`, mode `use`
 
-- **108 of 142 cases within the thresholds** (exit status and messages identical, every file within its threshold); 24 where both refuse or FSL crashes and larmorx refuses; 3 where FSL crashes and `reproduce` fills what FSL leaves undefined (D13's failure cases); 4 pending (options that run FSL programs larmorx does not have yet).
-- **202 of 217 brains, masks and outlines with FSL's values, bit for bit**, 9 more within the thresholds; 3 of 3 meshes with FSL's vertices to the file's 6 decimals; 25 skull images not bit-identical, reported (Dice) with the skull search's open details.
+- **111 of 142 cases within the thresholds** (exit status and messages identical, every file within its threshold); 24 where both refuse or FSL crashes and larmorx refuses; 3 where FSL crashes and `reproduce` fills what FSL leaves undefined (D13's failure cases); 4 pending (options that run FSL programs larmorx does not have yet).
+- **217 of 229 brains, masks and outlines with FSL's values, bit for bit**, 12 more within the thresholds; 3 of 3 meshes with FSL's vertices to the file's 6 decimals; 13 of 13 skull images bit-identical, 0 more within the masks' thresholds.
 - fMRIPrep's own BET outputs: 58 of 58 with the same values as the original's.
 - FSL run again: 38 of 38 runs bit-identical (FSL is deterministic).
 - **D13 fix pass** (larmorx's default, `upstream_defects="fix"`; the comparison above runs `reproduce`): the corrections met
@@ -33,7 +33,7 @@
 | Masks and brains | bit-identical, or Dice >= 0.995 with the boundary distance's 95th percentile <= 0.5 and maximum <= 2.0 voxels and the brain's values identical inside both (specs/bet.md §11) |
 | Outlines | bit-identical, or the drawn surfaces within 0.5 / 2.0 voxels (95th percentile / maximum) and the input identical elsewhere |
 | Meshes | the same triangles; per-vertex distance 95th percentile <= 0.1 mm and maximum <= 1.0 mm (specs/bet.md §11) |
-| Skull | reported (Dice): specs/bet.md §4.7 leaves details of the skull search open (a question for the spec writer) |
+| Skull | as the masks: bit-identical, or Dice and boundary distance within the masks' thresholds (specs/bet.md §4.7 gives the skull search exactly) |
 
 ## Results by category
 
@@ -44,30 +44,7 @@
 | defects | 10 | 7 | 1 | 2 | 0 |
 | fmriprep | 29 | 29 | 0 | 0 | 0 |
 | formats | 33 | 29 | 4 | 0 | 0 |
-| real | 11 | 8 | 0 | 0 | 3 |
-
-## Failures
-
-### `real/older-75y`
-
-an adult of 75 years at 1.5 T (ds002422): bet's defaults and -m
-
-- **out.nii.gz** (Dice; boundary distance p95 / max (voxels) = 0.994915; 1.00 / 6.71, threshold >= 0.995; <= 0.5 / 2.0; values identical inside both): 16737 of 11534336 values differ, 0 inside both
-- **out_mask.nii.gz** (Dice; boundary distance p95 / max (voxels) = 0.994914; 1.00 / 6.71, threshold >= 0.995; <= 0.5 / 2.0): 16738 of 11534336 values differ
-
-### `real/7t`
-
-7 T, MP2RAGE (ds005454): bet's defaults and -m
-
-- **out.nii.gz** (Dice; boundary distance p95 / max (voxels) = 0.980396; 2.24 / 5.92, threshold >= 0.995; <= 0.5 / 2.0; values identical inside both): 64531 of 17547264 values differ, 0 inside both
-- **out_mask.nii.gz** (Dice; boundary distance p95 / max (voxels) = 0.980343; 2.24 / 5.92, threshold >= 0.995; <= 0.5 / 2.0): 64889 of 17547264 values differ
-
-### `real/tumour`
-
-a tumour (ds005003): bet's defaults and -m
-
-- **out.nii.gz** (Dice; boundary distance p95 / max (voxels) = 0.990864; 1.41 / 5.00, threshold >= 0.995; <= 0.5 / 2.0; values identical inside both): 28263 of 9437184 values differ, 0 inside both
-- **out_mask.nii.gz** (Dice; boundary distance p95 / max (voxels) = 0.990864; 1.41 / 5.00, threshold >= 0.995; <= 0.5 / 2.0): 28264 of 9437184 values differ
+| real | 11 | 11 | 0 | 0 | 0 |
 
 ## Expected divergences
 
@@ -114,7 +91,7 @@ a tumour (ds005003): bet's defaults and -m
 
 | Component | Version |
 |---|---|
-| larmorx | 0.0.1 (2c5f6692c6c9) |
+| larmorx | 0.0.1 (5bb2c5a1bab7) |
 | larmorx-testdata | 52124bc98f9f |
 | Python | 3.12.16 |
 | Platform | Linux x86_64 (Linux-6.8.0-124-generic-x86_64-with-glibc2.35) |
@@ -265,10 +242,10 @@ Both programs run in directories of their own on the same input files, with `PAT
 | `real/child-3y` | pass | 10/10 | a child of 3.5 years (ds000228): bet's defaults and -m |
 | `real/child-7y` | pass | 10/10 | a child of 7.5 years with motion (ds000256): bet's defaults and -m |
 | `real/adult-ds000005` | pass | 10/10 | an adult, the fMRIPrep oracle run's T1w (ds000005): bet's defaults and -m |
-| `real/older-75y` | fail | 8/10 | an adult of 75 years at 1.5 T (ds002422): bet's defaults and -m |
+| `real/older-75y` | pass | 10/10 | an adult of 75 years at 1.5 T (ds002422): bet's defaults and -m |
 | `real/older-82y` | pass | 10/10 | an adult of 82 years (ds003592): bet's defaults and -m |
-| `real/7t` | fail | 8/10 | 7 T, MP2RAGE (ds005454): bet's defaults and -m |
-| `real/tumour` | fail | 8/10 | a tumour (ds005003): bet's defaults and -m |
+| `real/7t` | pass | 10/10 | 7 T, MP2RAGE (ds005454): bet's defaults and -m |
+| `real/tumour` | pass | 10/10 | a tumour (ds005003): bet's defaults and -m |
 | `real/stroke` | pass | 10/10 | a stroke (ds004884): bet's defaults and -m |
 | `real/philips` | pass | 10/10 | a Philips scanner (ds002603): bet's defaults and -m |
 | `real/bold-F` | pass | 8/8 | a BOLD series (ds000005): bet -F |

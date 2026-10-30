@@ -34,7 +34,9 @@ voxels, §4.2), AFNI-01 (a negative `scl_slope` in `-EPI`'s median, §7); refuse
 AFNI-40 (`-T2up` without its value, §8.2), AFNI-46 (`-T2` on a 2D image smaller than 16 × 16,
 §5); refused by default, AFNI's with `reproduce` (decided 2026-10-23, rule B): AFNI-48 (`-T2` three or more
 times, §6); and those of AFNI's
-dataset reading and writing (`specs/3dTshift.md` §6, §7.1). §9 lists the defaults.
+dataset reading and writing (`specs/3dTshift.md` §6, §7.1). §9 lists the defaults. (spec writer,
+2026-10-30) Guarded by default, attempted as AFNI does with `reproduce`: AFNI-75 (`-EPI`'s ball of
+neighbours beyond any machine's memory on tiny voxels, §7, §9.1).
 
 ---
 
@@ -189,6 +191,18 @@ neighbours becomes 0. `e` is printed once, before the first pass.
   becomes `u = cbrtf(|dx * dy * dz|)` (the float product of the voxel sizes; `cbrtf` glibc's)
   then `(float)(18.3 / u)` (double quotient), at least 4.14: `++ -EPI changes -Urad to %.1f
   voxels`, whatever `-Urad` or `-rbt` gave.
+- (spec writer, 2026-10-30) **No upper bound (AFNI-75).** The voxel sizes are the header's in
+  millimetres (a header in micrometres has them divided by 1000, §2), so the radius grows without
+  limit as the voxels shrink: 61 voxels for 0.3 mm voxels, 366 for 0.05 mm, 6100 for voxels of 3
+  that the header gives in micrometres. AFNI builds the whole ball of §4.3 (about `4/3·π·r³`
+  offsets) before it uses it, whatever the image's size: with a radius in the thousands that is
+  beyond any machine's memory. AFNI then fills the machine until it is stopped; where its address
+  space is limited, its ball allocation fails and it dies inside the neighbourhood's construction
+  (`Fatal Signal 11 (SIGSEGV) received`, AFNI's crash report, exit status 1, nothing written),
+  after ` + Pre-processing: MIA` **(observed** with AFNI 26.3.05 under a 2 GiB address-space
+  limit: voxels of 3 µm, 1 µm and 0.05 mm; with 0.3 mm voxels it runs normally, `[s25]`; the
+  random-testing cases of 2026-10-25 exceeded 3 GiB, then 600 s**)**. larmorx's default guards
+  it (§9.1).
 - A dataset of one volume: `*+ WARNING: -EPI was used, but only 1 volume in the input dataset`,
   and the program goes on as without `-EPI` but with `-T2`, `-noduplo` and the new radius
   (observed).
@@ -288,6 +302,7 @@ it is unset); it changes no result.
 | AFNI-47 | the half-size grid of an axis of 2 or 3 voxels (§4.2) | expanded to the input's grid; named | AFNI's reading, 0 past the end; named |
 | AFNI-48 | `-T2` three times: no re-inversion, no edge clipping | a fatal error naming AFNI-48, exit 1 (rule B, decided 2026-10-23) | AFNI's |
 | AFNI-49 | the help's `-clfrac` default (0.1; the code uses 0.2) | – (text) | – |
+| AFNI-75 (spec writer, 2026-10-30) | `-EPI`'s radius has no upper bound; on tiny voxels the ball of neighbours exceeds any machine's memory (§7) | the method kept (rule C); a fatal error naming AFNI-75 before the ball is built when its predicted memory exceeds the limit (§9.1), exit 1; every case that fits unchanged | no guard: AFNI's method with that radius (§9.1) |
 | AFNI-02, -07, -11, -12, -16, -18, -20, -22, -23, -26 | dataset reading and writing | as for 3dAutomask | AFNI's |
 
 **(observed** by the clean-room implementer, 2026-10-29: `-EPI`'s output keeps the input's
@@ -311,6 +326,71 @@ runs of AFNI 25.2.09; the clean-room original refuses the same way):
   neither inverted back nor clipped at the bright edges (the inverted image's unifized
   result, as written), with a notice naming AFNI-48.
 
+### 9.1 AFNI-75's guard (spec writer, 2026-10-30)
+
+(spec writer, 2026-10-30) Decided 2026-10-25 by the rules (rule C for the method: the radius is
+AFNI's design for EPI voxels, and the memory is the work asked for; a guard by default, as for
+ANTS-162: a crash, and exhausting the machine is one, is never the default). The replica has it
+since then; the clean-room original needs the same, so that both implementations refuse the same
+calls.
+
+**When.** With `-EPI`, right after the radius is set and its line printed (`++ -EPI changes -Urad
+to %.1f voxels`, and the replica's last-bit warning of `cbrtf` where it applies), before the
+progress line ` + Pre-processing: ` and before any work; also for a one-volume input (§7: the
+radius is used all the same). Not without `-EPI` (`-Urad` and `-rbt` stop at 99 voxels).
+
+**The prediction.** With `r` the radius (float) and `w` the number of workers of the local mean
+(§4.3): `OMP_NUM_THREADS` when it holds a whole number, the machine's available parallelism when
+it is 0, unset or not a number; in the Python API `n_threads`, 0 meaning the machine's), the
+bytes the ball and its buffers need are
+
+    need = (4/3 · π · r³ + 1) · (24 + 4·w)        (in double precision)
+
+(the ball's points, 12 bytes each, counted twice while the list of offsets grows, plus each
+worker's buffer of one 4-byte value per point). The prediction stands for AFNI's method, whatever
+the implementation's own memory: the clean-room original uses this formula, not a measure of its
+own buffers, and must not need more than it for any radius it accepts.
+
+**The limit.** The first that applies: a limit given to the computation (the API's
+`larmorx_core::alloc::with_memory_limit`); the environment variable `LARMORX_MEMORY_LIMIT` (bytes,
+or a number with a binary suffix `K`, `M`, `G`, `T`, optionally followed by `iB` or `B`: `512M`,
+`64G`, `1.5T`); when `need` exceeds 4 GiB, the machine's physical memory; when that cannot be
+read, 1 TiB. A `need` of 4 GiB or less is never refused unless a limit is given or set. The
+guard refuses when `need` exceeds the limit.
+
+**The refusal (default).** On standard error, after the radius line:
+1. the notice, as a warning line: `*+ WARNING: upstream defect AFNI-75 (3dUnifize) corrected:
+   <why>: an error (exit status 1); AFNI fills the machine [LARMORX_UPSTREAM_DEFECTS=reproduce
+   gives 3dUnifize's result]`;
+2. the fatal line: `** FATAL ERROR: <why>. An error (AFNI-75); LARMORX_UPSTREAM_DEFECTS=reproduce
+   attempts it as AFNI does`;
+
+exit status 1, nothing written (no output, `-ssave` or `-amsave` dataset). `<why>` is
+
+    3dUnifize -EPI would need about <need> for its ball of neighbours (radius <r> voxels: 18.3 mm over the voxels' <dx> x <dy> x <dz> mm), more than <limit><hint>
+
+with `<need>` in GiB (2^30 bytes) to three significant digits (`6.12 GiB`, `24.6 GiB`, `246 GiB`;
+from 1000 GiB on in exponent form, `2.834e4 GiB`), `<r>` with one decimal (`%.1f`), the voxel
+sizes' magnitudes with up to six decimals and no trailing zeros (`0.003`, `0.05`, `3`), `<limit>`
+one of `the <x> GiB given to this computation`, `the <x> GiB of LARMORX_MEMORY_LIMIT`, `this
+machine's <x> GiB of memory (LARMORX_MEMORY_LIMIT sets another limit)`, `larmorx's default of
+<x> GiB (this machine's memory could not be read; LARMORX_MEMORY_LIMIT sets a limit)` (`<x>` in
+the same three-digit form), and `<hint>` ` (a header whose units are micrometres makes the voxels
+1000 times smaller than they look)` when any voxel size is below 0.01 mm, else empty
+**(observed**, the replica, `LARMORX_MEMORY_LIMIT=4G`: voxels of 3 µm: `about 2.834e4 GiB ...
+(radius 6100.0 voxels: 18.3 mm over the voxels' 0.003 x 0.003 x 0.003 mm), more than the 4.00
+GiB of LARMORX_MEMORY_LIMIT (a header whose units ...)`; 1 µm: `7.651e5 GiB`, radius 18300.0;
+0.05 mm: `6.12 GiB`, radius 366.0, no hint; 0.3 mm (61 voxels) and 3 mm (6.1): no refusal, the
+output AFNI's**)**. The Python API raises the same message as its error.
+
+**`reproduce`.** No guard: the run goes on with that radius, as AFNI's does. An implementation
+may compute §4.3 with the ball limited to the offsets that can reach the grid (at most `n − 1`
+voxels along an axis of `n`): offsets beyond them never land inside the grid, so the values are
+the same, with less memory; the replica builds the whole ball, as AFNI does, and fills the machine
+where AFNI does. Both are AFNI's result where AFNI's memory suffices.
+
+**Every case that fits is unchanged** bit for bit: the guard reads nothing the computation uses.
+
 ## 10. Validation
 
 - **Bit-identity** of every output (data and header), exit status and messages with AFNI's
@@ -324,6 +404,20 @@ runs of AFNI 25.2.09; the clean-room original refuses the same way):
 - **AFNI's own variability**: the record measures OpenMP thread counts and fMRIPrep's build.
 - **Speed**: the local mean (§4.3) dominates; it can be computed per voxel in parallel, and only
   the values between the two percentile ranks need sorting.
+- (spec writer, 2026-10-30) **AFNI-75's guard** (§9.1), in the original's command-line tests
+  and parity suite: a 4D input of 3 µm voxels (`xyzt_units` micrometres) with `-EPI`, default
+  mode, the limit given explicitly (`LARMORX_MEMORY_LIMIT=4G` or the API's given limit, so the
+  test depends on no machine): exit 1, the fatal line with `about 2.834e4 GiB`, `radius 6100.0
+  voxels`, `0.003 x 0.003 x 0.003 mm`, `the 4.00 GiB of LARMORX_MEMORY_LIMIT` and the hint, the
+  notice naming AFNI-75, nothing written; the same with 1 µm voxels (`7.651e5 GiB`, radius
+  18300.0); 0.05 mm voxels (`6.12 GiB`, radius 366.0, no hint); a one-volume input of 3 µm voxels
+  (refused as well); 0.3 mm and 3 mm voxels (radii 61.0 and 6.1): not refused, output AFNI's
+  (parity: bit-identity in `reproduce`, as every case). AFNI itself is not run where the guard
+  refuses (it fills the machine); the replica's permanent random-testing case
+  `difftest/epi-ball-beyond-any-machine` expects the guard's error, and so should the
+  original's. `validation/investigations/specs-memory/unifize_epi_ball.py` runs these cases on
+  AFNI (under a 2 GiB address-space limit, where it dies with signal 11) and larmorx's two
+  implementations in both modes.
 - Golden cases: the replica's (`crates-gpl/larmorx-gpl-cli/tests/golden.rs`; the half-size path
   needs more than a million voxels, beyond the golden tests' 32³ limit, and is covered by parity
   only).

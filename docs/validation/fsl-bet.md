@@ -91,7 +91,7 @@
 
 | Component | Version |
 |---|---|
-| larmorx | 0.0.1 (5bb2c5a1bab7) |
+| larmorx | 0.0.1 (8abb5b4de9b2) |
 | larmorx-testdata | 52124bc98f9f |
 | Python | 3.12.16 |
 | Platform | Linux x86_64 (Linux-6.8.0-124-generic-x86_64-with-glibc2.35) |

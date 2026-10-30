@@ -48,17 +48,21 @@ into the spec, marked (observed).
   that random sample (CORE-MATH's `cr_tanh` as the reference) and on 22,506 of CORE-MATH's
   62,880 worst cases: GLIBC-06.
 - **What the correctly rounded `tanh` changes** (GLIBC-06, rule D; `crates/larmorx-fsl/examples/tanh_effect.rs`,
-  bet2's defaults, the standard tier's 13 real images): on 9 the surface is the same **to the
-  last bit** with either `tanh` (the last-bit differences vanish in `1 + tanh`); on 4 it is not:
+  bet2's defaults, the standard tier's 13 real images): on 9 the two surfaces agree within a
+  micrometre and every output is the same (most last-bit differences vanish in `1 + tanh`; on
+  ds000005's T1w the vertices still differ in their last bits, and no output with them); on 4 not:
   the three rerun cases (ds002422's 75-year-old: Dice 0.995919, 13,442 voxels, the second rerun's
   total 2198.2 against glibc's 2817.8; ds005454's 7 T: Dice 0.984779, 50,100 voxels; ds005003's
   tumour: Dice 0.991957, 24,874 voxels; vertices up to 5.7 to 8.0 mm apart) and the first volume
   of ds000005's BOLD run 1 (no rerun: the first pass's total 87.2 against 76.8, Dice 0.996618, 226
   voxels). The correctly rounded result is not more accurate there (the reruns amplify any last
-  bit); it moves the default away from FSL's. A cheap exact test of GLIBC-06 follows: the weight
-  `f2` computed with both `tanh` at every step; where no `f2` differs, the surfaces are identical
-  (the rest of the arithmetic is the same), and only otherwise does a second search with glibc's
-  `tanh` say what changes.
+  bit); it moves the default away from FSL's. GLIBC-06's exact test (in the branch, not the
+  default yet): the weight `f2` computed with both `tanh` at every step; where no `f2` differs,
+  the surfaces are identical bit for bit (the rest of the arithmetic is the same); otherwise a
+  second search with glibc's `tanh` and every output asked for compared. Some weight's last bit
+  differs in practically every run, so the second search always runs: the default 1.9 times
+  slower (ds000005's T1w 0.43 → 0.83 s, ds002422's 1.20 → 2.33 s on one thread). bet2 keeps
+  glibc's `tanh` in both modes until part 2b's decision.
 
 - **The robust range's rounding** (`range_probe.py`; fMRIPrep's calls): `t2 = lo + b (hi − lo) /
   1000` with `hi − lo` rounded to float, the product and the division in double, the result

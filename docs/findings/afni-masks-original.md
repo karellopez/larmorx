@@ -180,3 +180,9 @@ program (`LARMORX_IMPLEMENTATION=replica larmorx afni 3dUnifize`); probe
   1 µm voxels on a 24 × 24 × 16 series (radii 6100 and 18300) then take 0.01 s and 5 MiB; the
   unit tests compare the method with the spec's ball, gathered and sorted, for radii beyond the
   grid on every axis.
+- **Random testing after the guard** (a trial of 0.5 h, 2026-10-30, larmorx `6f64291`, AFNI
+  26.3.05): 1,768 `afni-unifize` cases, 1,757 agree in both implementations, 9 over the case's
+  memory limit (3 GiB: `-EPI` on tiny voxels) where both implementations' defaults stop with
+  AFNI-75's error (verdict *guard*, since this part for the original too: `difftest/runner.py`'s
+  `GUARDED`), one *notice* (AFNI-45 in both implementations) and one *undefined* case (AFNI's
+  values from memory it never wrote), none differing.

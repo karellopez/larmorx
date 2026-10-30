@@ -142,3 +142,16 @@ mcflirt live, larmorx in both modes); the probes are in
   stages up to 1.4 mm; from 16 bins on the two agree within 0.07 mm (`-bins 16`, 32, 64; probe
   `hmc_bins_matrices.py`). So `failures/bins8-mutualinfo-s3` reports its matrices; `corratio`
   with 8 bins agrees within the record's thresholds (0.07 mm).
+- **Random testing after the additions** (a trial of 0.5 h, 2026-10-30, larmorx `6f64291`, FSL
+  6.0.7.23, `oracles/difftest/2026-10-30-cleanroom-additions`): 2,411 cases, 882 agree, 1,528
+  beyond the record's thresholds, the several-minima class of the earlier nights (failed checks:
+  the matrices' RMS deviation in 1,105, the `.rms` values, the corrected voxels, FD), as well
+  aligned as mcflirt's: the corrected series' temporal standard deviation, larmorx's over
+  mcflirt's, median 1.000 (5 % – 95 %: 0.929 – 1.047), larmorx lower in 312, within 1 % in 973,
+  higher in 243 (`../../validation/investigations/cleanroom-fixes/hmc_alignment.py`; the per-finding
+  results in [`validation/investigations/cleanroom-additions/results/hmc-alignment-trial-2026-10-30.jsonl`](../../validation/investigations/cleanroom-additions/results/hmc-alignment-trial-2026-10-30.jsonl)).
+  One case names FSL-01, FSL-09 and FSL-59 by default only (`mri-hmc:20261030:1778`: `-cost
+  mutualinfo -bins 128 -nn_final -stages 1` on a thin slab, where FSL-03's correction changes the
+  first stage's path), the class of `mri-hmc:20261029:45`: reported, not changed in this part.
+  The random draws use 64 to 256 bins and write into existing directories, so they meet none of
+  this part's four defects; those are the suite's `failures/` cases.

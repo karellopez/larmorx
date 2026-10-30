@@ -485,3 +485,118 @@ pub fn flip_x(v: &Vol) -> Vol {
     }
     Vol::new(v.shape, v.voxel, data)
 }
+
+/// Reads every volume of the image `files` holding the file's data once beside the volumes
+/// made from it (a 4D series for `bet -F`): the stored array is converted volume by volume to
+/// float32 (scaled, x reversed for a positive determinant). Names and compressions larmorx's
+/// NIfTI reader does not read, and ANALYZE pairs, go through [`read`].
+pub fn read_series_lean(
+    files: &ImageFiles,
+    n_threads: usize,
+) -> Result<(Vec<Vol>, Input), ImageError> {
+    use larmorx_core::element::RealElement;
+    use larmorx_mri::hmc::image::{is_neurological, scaling, voxel_size};
+    let plain = |c: Compression| matches!(c, Compression::None | Compression::Gzip);
+    let compression = |p: &Path| Compression::of_file(p).unwrap_or(Compression::None);
+    let standard = files.standard_names()
+        && plain(compression(&files.header))
+        && files.data.as_deref().is_none_or(|d| plain(compression(d)));
+    if !standard || analyze_header(files) {
+        return read(files, n_threads);
+    }
+    let img = nifti::read(
+        &files.header,
+        &larmorx_io::nifti::ReadOptions {
+            scaling: larmorx_io::nifti::Scaling::Raw,
+            n_threads,
+        },
+    )?;
+    let header = img.header;
+    let shape = img.data.shape().to_vec();
+    let dims: [usize; 3] = [0, 1, 2].map(|k| shape.get(k).copied().unwrap_or(1));
+    let per: usize = dims.iter().product();
+    if per == 0 {
+        return Err(ImageError::Invalid(format!(
+            "{}: the image has no voxels",
+            files.header.display()
+        )));
+    }
+    let scale = scaling(&header);
+    let flipped = is_neurological(&header);
+    let voxel = voxel_size(&header).map(f64::from);
+    fn volumes_of<T: RealElement>(
+        a: &larmorx_core::ndarray::ArrayD<T>,
+        per: usize,
+        dims: [usize; 3],
+        voxel: [f64; 3],
+        scale: Option<(f32, f32)>,
+        flipped: bool,
+    ) -> Vec<Vol> {
+        // Fortran order: x fastest, volumes last
+        let t = a.t();
+        let owned: Vec<T>;
+        let src: &[T] = match t.as_slice() {
+            Some(s) => s,
+            None => {
+                owned = t.iter().copied().collect();
+                &owned
+            }
+        };
+        src.chunks_exact(per)
+            .map(|chunk| {
+                let data: Vec<f32> = chunk
+                    .iter()
+                    .map(|v| match scale {
+                        None => v.to_f32(),
+                        Some((s, i)) => v.to_f32() * s + i,
+                    })
+                    .collect();
+                let v = Vol::new(dims, voxel, data);
+                if flipped { flip_x(&v) } else { v }
+            })
+            .collect()
+    }
+    let vols = larmorx_core::dispatch_real_dyn_array!(
+        &img.data,
+        a => volumes_of(a, per, dims, voxel, scale, flipped),
+        complex => {
+            return Err(ImageError::Invalid(format!(
+                "{}: complex images are not supported",
+                files.header.display()
+            )));
+        }
+    );
+    drop(img.data);
+    let first = vols.first().cloned().ok_or_else(|| {
+        ImageError::Invalid(format!(
+            "{}: the image has no voxels",
+            files.header.display()
+        ))
+    })?;
+    let volumes = vols.len();
+    Ok((
+        vols,
+        Input {
+            vol: first,
+            header,
+            flipped,
+            volumes,
+        },
+    ))
+}
+
+/// Whether the header file of `files` is an ANALYZE 7.5 header (no NIfTI magic).
+fn analyze_header(files: &ImageFiles) -> bool {
+    if files.data.is_none() {
+        return false;
+    }
+    let raw = std::fs::read(&files.header).and_then(|r| {
+        Compression::of_file(&files.header)
+            .unwrap_or(Compression::None)
+            .decompress(r)
+    });
+    match raw {
+        Ok(raw) => raw.len() >= 348 && &raw[344..347] != b"ni1" && &raw[344..347] != b"n+1",
+        Err(_) => false,
+    }
+}

@@ -491,7 +491,7 @@ fn write_values(
 fn read_input(run: &Run<'_>, name: &str) -> Result<(Vec<Vol>, image::Input), String> {
     let resolved = files::resolve_input(&run.settings.name(name))?;
     let f = ImageFiles::of(&resolved).ok_or_else(|| format!("{resolved}: not an image"))?;
-    image::read(&f, run.settings.threads()).map_err(|e| e.to_string())
+    image::read_series_lean(&f, run.settings.threads()).map_err(|e| e.to_string())
 }
 
 /// `-F`: bet2 on the first volume (`-m -n -f 0.3` and the user's options), its mask dilated by

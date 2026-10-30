@@ -698,12 +698,9 @@ fn small_fov(
         .iter()
         .map(|s| format!("{output}{s}"))
         .collect();
-    let path_has_imglob = run
-        .settings
-        .get("PATH")
-        .unwrap_or("")
-        .split(':')
-        .any(|d| !d.is_empty() && Path::new(d).join("imglob").is_file());
+    // the PATH's folders by the platform's own separator (`;` on Windows, whose folders hold `:`)
+    let path_has_imglob = std::env::split_paths(run.settings.get("PATH").unwrap_or(""))
+        .any(|d| !d.as_os_str().is_empty() && d.join("imglob").is_file());
     let crop_list: Vec<String> = if run.mode.reproduce() {
         if path_has_imglob {
             let dir = run.settings.path(output);

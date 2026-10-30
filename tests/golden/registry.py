@@ -3842,8 +3842,10 @@ def _(ctx: Context) -> dict[str, Any]:
     out = ctx.out("out")
     anat_nii = ctx.file("anat.nii")
     stdout = _fsl(ctx, "bet", anat_nii, out, "-m", "-f", "0.4", "-v")
-    # the script prints the names it was given: the temporary folders replaced
-    stdout = stdout.replace(os.path.dirname(anat_nii), "<in>").replace(os.fspath(ctx.dir), "<dir>")
+    # the script prints the names it was given (specs/bet.md §5): the temporary folders, with
+    # the separator after them (Windows': `\`), replaced so that every platform prints the same
+    for folder, mark in ((os.path.dirname(anat_nii), "<in>"), (os.fspath(ctx.dir), "<dir>")):
+        stdout = stdout.replace(folder + os.sep, mark + "/").replace(folder, mark)
     return {**_bet_files(out, ("", "_mask")), "stdout": stdout}
 
 

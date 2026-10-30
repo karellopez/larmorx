@@ -185,7 +185,10 @@ fn tanh(which: Tanh, x: f64) -> f64 {
 }
 
 /// One pass of [`ITERATIONS`] deformation steps from `start`; `pass` 0 is the first, a rerun
-/// `P >= 1` raises the smoothness of concave places (§4.5).
+/// `P >= 1` raises the smoothness of concave places (§4.5). With the correctly rounded `tanh`,
+/// also says whether glibc's would have given another smoothness weight anywhere (GLIBC-06):
+/// when it would not, the pass with glibc's gives the same surface, bit for bit (nothing else
+/// depends on it). With glibc's `tanh` (FSL's bits) nothing is checked (`false`).
 pub fn deform(
     mesh: &Mesh,
     start: &[V3],
@@ -193,7 +196,10 @@ pub fn deform(
     init: &Initial,
     opts: &Deformation,
     pass: u32,
-) -> Vec<V3> {
+) -> (Vec<V3>, bool) {
+    let other = Tanh::Glibc;
+    let check = opts.tanh == Tanh::CorrectlyRounded;
+    let weights_differ = std::sync::atomic::AtomicBool::new(false);
     let r = init.radius;
     let mut spacing = vol.voxel;
     for a in 0..3 {
@@ -251,11 +257,23 @@ pub fn deform(
                 let u1 = scale(s_t, 0.5);
                 // 1/R from s_n·n computed again (not σ: they differ in the last bits)
                 let rinv = (2.0 * dot(s_n, n).abs()) / l2;
-                let mut f2 = (1.0 + tanh(opts.tanh, f * (rinv - e))) * 0.5;
+                let arg = f * (rinv - e);
+                let mut f2 = (1.0 + tanh(opts.tanh, arg)) * 0.5;
+                // the weight glibc's tanh gives, where the correctly rounded one is used
+                // (GLIBC-06's test; none with glibc's own, FSL's bits)
+                let mut f2_other = if check {
+                    (1.0 + tanh(other, arg)) * 0.5
+                } else {
+                    f2
+                };
                 if let Some(factor) = factor
                     && sigma > 0.0
                 {
                     f2 = (f2 * factor).min(1.0);
+                    f2_other = (f2_other * factor).min(1.0);
+                }
+                if f2.to_bits() != f2_other.to_bits() {
+                    weights_differ.store(true, std::sync::atomic::Ordering::Relaxed);
                 }
                 let u2 = scale(s_n, f2);
                 let f3 = intensity_term(&sampler, p, n, init, bt, opts.gradient, d1, d2);
@@ -265,7 +283,7 @@ pub fn deform(
             });
         std::mem::swap(&mut points, &mut next);
     }
-    points
+    (points, weights_differ.into_inner())
 }
 
 /// Whether two points agree within `1e-8` in every axis (FSL's test of a shared vertex).

@@ -70,6 +70,9 @@ pub struct Found {
     pub points: Vec<V3>,
     /// The passes run (the first, then the reruns).
     pub passes: Vec<Pass>,
+    /// Whether the other `tanh` (`Deformation::tanh`) would have given another smoothness
+    /// weight anywhere; when not, its surface is this one, bit for bit (GLIBC-06).
+    pub tanh_differs: bool,
 }
 
 /// Runs `f` in a pool of exactly `n_threads` threads (0: all), so that its parallel work never
@@ -106,8 +109,10 @@ fn find_surface_in(
     let start = surface::initial_surface(&mesh, &init);
     let mut passes = Vec::new();
     let mut pass = 0u32;
+    let mut tanh_differs = false;
     loop {
-        let points = surface::deform(&mesh, &start, vol, &init, opts, pass);
+        let (points, differs) = surface::deform(&mesh, &start, vol, &init, opts, pass);
+        tanh_differs |= differs;
         let (total, intersecting) = if opts.exact {
             (None, surface::intersects(&mesh, &points))
         } else {
@@ -124,6 +129,7 @@ fn find_surface_in(
                 mesh,
                 points,
                 passes,
+                tanh_differs,
             };
         }
         pass += 1;

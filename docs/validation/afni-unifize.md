@@ -5,8 +5,8 @@
 - **Validated:** `larmorx afni 3dUnifize` / `lx.afni.unifize` (crate larmorx-afni, the Apache-2.0 clean-room original written from `specs/3dUnifize.md`), with `implementation="original"`
 - **Reference:** 3dUnifize from AFNI (AFNI_26.3.05, gcc (Ubuntu 11.4.0-1ubuntu1~22.04.3) 11.4.0, with OpenMP), the binary built by `scripts/build_afni_oracle.sh`
 - **Test data:** larmorx-testdata `52124bc98f9f`, tier `standard`
-- **Generated:** 2026-10-29 on Linux x86_64, with `python -m larmorx_validation parity afni-unifize --tier standard --afni-version 26.3.05`
-- **Original programs:** 358 runs: 298 from the oracle cache, 60 run (1 never cached: the original varies); cache `<workspace>/oracles/cache`, mode `use`
+- **Generated:** 2026-10-30 on Linux x86_64, with `python -m larmorx_validation parity afni-unifize --tier standard`
+- **Original programs:** 358 runs: 353 from the oracle cache, 5 run (1 never cached: the original varies); cache `<workspace>/oracles/cache`, mode `use`
 
 **Bit-identical to AFNI: 37 of 92 compared cases that write outputs**: every output the same bytes (data and NIfTI header), with the same exit status and messages. The other 4 compared case(s) write no output in either program (an existing output, a name with a blank, a directory that does not exist) and agree on the exit status and messages; the default mode's corrections there are in the D13 lines below.
 - Messages (standard output and error, byte for byte; AFNI's version banner and compile date, and larmorx's own lines, set aside): 113 of 113 identical, in every case that ran both programs.
@@ -61,7 +61,7 @@
 | Case | Reason |
 |---|---|
 | `defects/slab` | AFNI reads memory it never wrote (AFNI-47): this run crashed (Fatal Signal 11) after the same messages; larmorx fills the read with 0 in reproduce mode and corrects it by default |
-| `divergences/default-prefix` | AFNI's default prefix 'Unifized' is its own dataset format, which larmorx-gpl does not write: it refuses (NIfTI only). |
+| `divergences/default-prefix` | AFNI's default prefix 'Unifized' is its own dataset format, which larmorx does not write: it refuses (NIfTI only). |
 
 ## Rejected by both
 
@@ -91,7 +91,7 @@
 
 | Component | Version |
 |---|---|
-| larmorx | 0.0.1 (add33449f82f) |
+| larmorx | 0.0.1 (058935773321) |
 | larmorx-testdata | 52124bc98f9f |
 | Python | 3.12.16 |
 | Platform | Linux x86_64 (Linux-6.8.0-124-generic-x86_64-with-glibc2.35) |

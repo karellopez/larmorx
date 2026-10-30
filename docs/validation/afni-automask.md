@@ -5,8 +5,8 @@
 - **Validated:** `larmorx afni 3dAutomask` / `lx.afni.automask` (crate larmorx-afni, the Apache-2.0 clean-room original written from `specs/3dAutomask.md`), with `implementation="original"`
 - **Reference:** 3dAutomask from AFNI (AFNI_26.3.05, gcc (Ubuntu 11.4.0-1ubuntu1~22.04.3) 11.4.0), the binary built by `scripts/build_afni_oracle.sh`
 - **Test data:** larmorx-testdata `52124bc98f9f`, tier `standard`
-- **Generated:** 2026-10-29 on Linux x86_64, with `python -m larmorx_validation parity afni-automask --tier standard --afni-version 26.3.05`
-- **Original programs:** 346 runs: 328 from the oracle cache, 18 run; cache `<workspace>/oracles/cache`, mode `use`
+- **Generated:** 2026-10-30 on Linux x86_64, with `python -m larmorx_validation parity afni-automask --tier standard`
+- **Original programs:** 346 runs: 342 from the oracle cache, 4 run; cache `<workspace>/oracles/cache`, mode `use`
 
 **Bit-identical to AFNI: 92 of 106 compared cases that write outputs**: every output the same bytes (data and NIfTI header), with the same exit status and messages. The other 4 compared case(s) write no output in either program (an existing output, a name with a blank, a directory that does not exist) and agree on the exit status and messages; the default mode's corrections there are in the D13 lines below.
 - Messages (standard output and error, byte for byte; AFNI's version banner and compile date, and larmorx's own lines, set aside): 118 of 123 identical, in every case that ran both programs; 5 explained by AFNI-10 (below: AFNI reports the obliquity of its header extension's matrix, and AFNI run on the input without its extension prints the original's messages byte for byte).
@@ -59,7 +59,7 @@
 
 | Case | Reason |
 |---|---|
-| `divergences/default-prefix` | AFNI's default prefix 'automask' is its own dataset format, which larmorx-gpl does not write: it refuses (NIfTI only). |
+| `divergences/default-prefix` | AFNI's default prefix 'automask' is its own dataset format, which larmorx does not write: it refuses (NIfTI only). |
 
 ## Rejected by both
 
@@ -89,7 +89,7 @@
 
 | Component | Version |
 |---|---|
-| larmorx | 0.0.1 (291722a29aba) |
+| larmorx | 0.0.1 (058935773321) |
 | larmorx-testdata | 52124bc98f9f |
 | Python | 3.12.16 |
 | Platform | Linux x86_64 (Linux-6.8.0-124-generic-x86_64-with-glibc2.35) |

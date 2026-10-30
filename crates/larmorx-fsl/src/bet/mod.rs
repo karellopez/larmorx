@@ -71,6 +71,15 @@ pub struct Found {
     pub passes: Vec<Pass>,
 }
 
+/// Runs `f` in a pool of exactly `n_threads` threads (0: all), so that its parallel work never
+/// uses rayon's global pool (CLAUDE.md rule 5); in this thread when no pool can be made.
+pub fn pooled<R: Send>(n_threads: usize, f: impl Fn() -> R + Send + Sync) -> R {
+    match larmorx_core::parallel::with_threads(n_threads, &f) {
+        Ok(r) => r,
+        Err(_) => f(),
+    }
+}
+
 /// Finds the brain's surface on `vol` (§4.3-§4.5): the initial parameters (with the radius
 /// and the centre in mm when given), then passes of the deformation until the surface does
 /// not self-intersect or the last pass.
@@ -234,4 +243,76 @@ pub fn masked(values: &[f32], mask: &[u8]) -> Vec<f32> {
         .with_min_len(1 << 16)
         .map(|(&v, &m)| v * f32::from(m))
         .collect()
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// A head-like volume: an ellipsoidal brain in a darker shell, with seeded noise.
+    fn head(n: usize) -> Vol {
+        let mut data = Vec::with_capacity(n * n * n);
+        let mut s: u64 = 12345;
+        let c = (n as f64 - 1.0) / 2.0;
+        for k in 0..n {
+            for j in 0..n {
+                for i in 0..n {
+                    s = s
+                        .wrapping_mul(6364136223846793005)
+                        .wrapping_add(1442695040888963407);
+                    let noise = ((s >> 33) % 21) as f32 - 10.0;
+                    let r = ((i as f64 - c) / (0.35 * n as f64)).powi(2)
+                        + ((j as f64 - c) / (0.4 * n as f64)).powi(2)
+                        + ((k as f64 - c) / (0.3 * n as f64)).powi(2);
+                    let v = if r < 1.0 {
+                        700.0
+                    } else if r < 1.4 {
+                        150.0
+                    } else if r < 1.7 {
+                        800.0
+                    } else {
+                        10.0
+                    };
+                    data.push(v + noise);
+                }
+            }
+        }
+        Vol::new([n, n, n], [2.0, 2.0, 2.0], data)
+    }
+
+    /// The surface and its mask do not depend on the thread count (CLAUDE.md rule 5).
+    #[test]
+    fn deterministic_at_any_thread_count() {
+        let v = head(28);
+        let opts = Deformation::default();
+        let one = find_surface(&v, None, None, &opts, 1);
+        let many = find_surface(&v, None, None, &opts, 7);
+        assert_eq!(one.points, many.points);
+        assert_eq!(one.passes, many.passes);
+        let mask = |f: &Found, n| {
+            pooled(n, || {
+                brain_mask(
+                    &f.mesh,
+                    &f.points,
+                    v.shape,
+                    v.voxel,
+                    UpstreamDefects::Fix,
+                    &mut Vec::new(),
+                )
+            })
+            .unwrap()
+        };
+        let (m1, m7) = (mask(&one, 1), mask(&many, 7));
+        assert_eq!(m1, m7);
+        // the brain is found: most of the ellipsoid inside, the shell outside
+        let inside = m1.iter().filter(|&&x| x == 1).count();
+        assert!(inside > 2000 && inside < 12000, "{inside}");
+    }
+
+    #[test]
+    fn cormack_units() {
+        assert_eq!(cormack(-2000.0), 0.0);
+        assert_eq!(cormack(0.0), 1024.0 + 124.0 + 1116.0);
+        assert_eq!(cormack(3000.0), 100.0);
+    }
 }

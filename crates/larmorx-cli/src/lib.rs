@@ -387,7 +387,7 @@ mod tests {
     }
 
     #[test]
-    fn fsl_tools_have_only_their_replica() {
+    fn fsl_tools_with_and_without_an_original() {
         let (code, out, _) = run_capture(&["lx", "--help"]);
         assert_eq!(code, 0);
         assert!(out.contains("fsl    mcflirt, bet, bet2, betsurf"), "{out}");
@@ -398,14 +398,18 @@ mod tests {
         assert!(out.contains("LARMORX_NC_BIN"), "{out}");
         assert_eq!(
             replica::replica_only("fsl").collect::<Vec<_>>(),
-            FSL_TOOLS[1..]
+            FSL_TOOLS[3..]
         );
-        // Without the replica (or with `original` asked for) the tool refuses, naming the
+        // betsurf without its replica (or with `original` asked for) refuses, naming the
         // package; exit 127 as for a missing program.
-        let (code, _, err) = run_capture(&["lx", "fsl", "bet", "in", "out"]);
+        let (code, _, err) = run_capture(&["lx", "fsl", "betsurf", "in", "out"]);
         assert_eq!(code, replica::EXIT_NOT_FOUND);
-        assert!(err.contains("no clean-room original of fsl bet"), "{err}");
+        assert!(err.contains("no clean-room original of fsl betsurf"), "{err}");
         assert!(err.contains("pip install larmorx-nc"), "{err}");
+        // bet2 runs its clean-room original: its usage (exit 1, standard error).
+        let (code, _, err) = run_capture(&["lx", "fsl", "bet2"]);
+        assert_eq!(code, 1);
+        assert!(err.contains("BET (Brain Extraction Tool) v2.1"), "{err}");
     }
 
     #[test]

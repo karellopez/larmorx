@@ -390,7 +390,7 @@ pub fn run(
             UpstreamDefects::Fix => {
                 let i = o.input.clone();
                 let out_name = files::strip_image_extension(&o.output).to_owned();
-                let theirs = fsl_out.as_deref().map(|s| files::strip_image_extension(s));
+                let theirs = fsl_out.as_deref().map(files::strip_image_extension);
                 if fsl_in.as_deref() != Some(i.as_str())
                     && fsl_in.as_deref().map(files::strip_image_extension)
                         != Some(files::strip_image_extension(&i))
@@ -536,7 +536,7 @@ pub fn run(
     };
     let input_vol_work: &bet::Vol = work_out.as_ref().unwrap_or(&input_img.vol);
     let (t2, t98, t) = if surface_source.is_some() {
-        let (t2, t98) = bet::params::robust_range(input_vol_work);
+        let (t2, t98) = bet::pooled(n_threads, || bet::params::robust_range(input_vol_work));
         (t2, t98, t2 + 0.1 * (t98 - t2))
     } else {
         (found.init.t2, found.init.t98, found.init.t)
@@ -548,7 +548,13 @@ pub fn run(
     let needs_images = o.brain || o.mask || o.outline || o.skull;
     let mut mask: Option<Vec<u8>> = None;
     if o.brain || o.mask || o.threshold {
-        match bet::brain_mask(&found.mesh, &found.points, shape, voxel, mode, &mut notices) {
+        let made = bet::pooled(n_threads, || {
+            let mut n = Vec::new();
+            let m = bet::brain_mask(&found.mesh, &found.points, shape, voxel, mode, &mut n);
+            (m, n)
+        });
+        notices.extend(made.1);
+        match made.0 {
             Ok(mut m) => {
                 if o.threshold {
                     for (mv, &v) in m.iter_mut().zip(&input_vol_work.data) {
@@ -629,7 +635,9 @@ pub fn run(
             if !write(
                 names.stem(""),
                 None,
-                Values::F32(bet::masked(&input_img.vol.data, m)),
+                Values::F32(bet::pooled(n_threads, || {
+                    bet::masked(&input_img.vol.data, m)
+                })),
             ) {
                 return 1;
             }
@@ -645,13 +653,17 @@ pub fn run(
             }
         }
         if o.outline {
-            let v = bet::outline(&found.mesh, &found.points, &input_img.vol);
+            let v = bet::pooled(n_threads, || {
+                bet::outline(&found.mesh, &found.points, &input_img.vol)
+            });
             if !write(names.stem("_overlay"), None, Values::F32(v)) {
                 return 1;
             }
         }
         if o.skull {
-            let s = bet::skull::skull(&found.mesh, &found.points, input_vol_work, t, t2, t98);
+            let s = bet::pooled(n_threads, || {
+                bet::skull::skull(&found.mesh, &found.points, input_vol_work, t, t2, t98)
+            });
             let v = s.iter().map(|&b| if b { 100i16 } else { 0 }).collect();
             if !write(names.stem("_skull"), None, Values::I16(v)) {
                 return 1;

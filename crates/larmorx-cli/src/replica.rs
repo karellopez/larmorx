@@ -591,8 +591,8 @@ mod tests {
         );
         let e = choose_with(Implementation::Original, &BUILTIN_ONLY, never).unwrap_err();
         assert!(e.to_string().contains("built in"), "{e}");
-        // The AFNI tools have their originals and their replicas built in. FSL's BET has only
-        // its replica so far.
+        // The AFNI tools have their originals and their replicas built in. FSL's betsurf has
+        // only its replica so far; bet and bet2 have their clean-room originals.
         assert!(
             REPLICAS
                 .iter()
@@ -601,14 +601,16 @@ mod tests {
         );
         assert_eq!(replica_only("afni").count(), 0);
         assert_eq!(replica_only("ants").count(), 0);
-        assert_eq!(
-            replica_only("fsl").collect::<Vec<_>>(),
-            ["bet", "bet2", "betsurf"]
-        );
-        let bet = lookup("fsl", "bet").unwrap();
-        assert_eq!(bet.package().unwrap().env, "LARMORX_NC_BIN");
-        let e = choose_with(Implementation::Auto, bet, missing).unwrap_err();
+        assert_eq!(replica_only("fsl").collect::<Vec<_>>(), ["betsurf"]);
+        let betsurf = lookup("fsl", "betsurf").unwrap();
+        assert_eq!(betsurf.package().unwrap().env, "LARMORX_NC_BIN");
+        let e = choose_with(Implementation::Auto, betsurf, missing).unwrap_err();
         assert!(e.to_string().contains("pip install larmorx-nc"), "{e}");
+        let bet = lookup("fsl", "bet").unwrap();
+        assert_eq!(
+            choose_with(Implementation::Auto, bet, missing),
+            Ok(Choice::Original)
+        );
         let automask = lookup("afni", "3dAutomask").unwrap();
         assert_eq!(
             choose_with(Implementation::Auto, automask, never),

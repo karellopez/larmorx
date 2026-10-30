@@ -698,8 +698,11 @@ def _header_compare(ca: bytes, cb: bytes) -> tuple[bool, str]:
         return True, "the same but for descrip"
     if not two:
         q0, q1 = QUATERN
-        outside = ca[:q0] + ca[q1:start] + ca[start + 80 : size]
-        if outside == cb[:q0] + cb[q1:start] + cb[start + 80 : size]:
+
+        def outside(c: bytes) -> bytes:
+            return c[:start] + c[start + 80 : q0] + c[q1:size]
+
+        if outside(ca) == outside(cb):
             ulps = max(_ulps32(ca[k : k + 4], cb[k : k + 4]) for k in range(q0, q1, 4))
             if ulps <= 1:
                 return True, (

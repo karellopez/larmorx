@@ -300,6 +300,14 @@ def programs(d: Path, nc: str | None = None, *, make: bool = True) -> list[Progr
     out.append(Program("mri hmc bzip2 (clean-room original)",
                        (*lx, "mri", "hmc", "-in", s, "-out", o + "_hmc_bz", "-stages", "1"),
                        (*omp, ("FSLOUTPUTTYPE", "NIFTI_PAIR_BZ2"))))  # fmt: skip
+    # BET's clean-room original (2026-10-30): bet2 with every output, bet's -R and -F.
+    bet = (*omp, ("LARMORX_IMPLEMENTATION", "original"))
+    out.append(Program("fsl bet2 (clean-room original)",
+                       (*lx, "fsl", "bet2", t1, o + "_obet2", "-m", "-o", "-s", "-e"), bet))  # fmt: skip
+    out.append(Program("fsl bet -R (clean-room original)",
+                       (*lx, "fsl", "bet", t1, o + "_obetr", "-R", "-m"), bet))  # fmt: skip
+    out.append(Program("fsl bet -F (clean-room original)",
+                       (*lx, "fsl", "bet", s, o + "_obetf", "-F"), bet))  # fmt: skip
     if nc:
         mat = d / "identity.mat"
         if make:

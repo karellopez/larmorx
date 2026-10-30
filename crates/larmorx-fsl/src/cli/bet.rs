@@ -545,7 +545,8 @@ fn fmri(
                 .map(|(&x, &m)| if m != 0.0 { x } else { 0.0 }),
         );
     }
-    if let Err(e) = write_like(run, output, &inp, &vols, Values::F32(all), None) {
+    // fslmaths -mas: the display range reset (observed)
+    if let Err(e) = write_like(run, output, &inp, &vols, Values::F32(all), Some((0.0, 0.0))) {
         return Err(fail(e, out, err));
     }
     Ok(())

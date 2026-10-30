@@ -20,17 +20,20 @@ investigations, `validation/difftest/triage.toml`, the replica authors' permanen
 | The defect register's summary rows of FSL-40 to FSL-63 (`larmorx_core::defects`, which describe them by behaviour) | the defects' names in the notices |
 | larmorx's own Apache-2.0 code: `larmorx_mri::hmc::{files, image}` (FSL 6.0.7.23's image names, compressions and reading, clean-room from `specs/mcflirt.md`), `larmorx_io` (NIfTI headers and writing), `larmorx_core` (correctly rounded `pow`, thread pools, D13), the `%g` formatting of `larmorx_afni::cfmt` (rewritten here) | images, numbers, threads |
 | The NIfTI-1 standard's published conversions between a quaternion and its matrix (`quatern_to_mat44`, `mat44_to_quatern`, with the polar decomposition; public domain, as larmorx-io's port in `nifti/itk/write.rs` follows them) | the qform's quaternion FSL writes |
-| The `libm` crate (MIT/Apache-2.0, pure Rust) | `tanh` in double precision: `larmorx_core::math` has none yet (CLAUDE.md rule 5) |
+| **Part 2a (2026-10-30, the same implementer):** the spec writer's answers in `specs/bet.md` (lines marked "(spec writer, 2026-10-30)": §3.1, §4.2, §4.4, §4.5, §4.7, §5.2, §8, §8.1, §8.2) and the spec writer's black-box README (`validation/investigations/bet-spec-answers/README.md`) | the deformation's arithmetic operation by operation, the neighbour order, the exact `-e` test, the skull search, the quaternion's precision path, the name fallback, `-F`'s doubles |
+| `larmorx_core::math::tanh_glibc` (fdlibm 5.3 from netlib, Sun's notice, black-box-proved equal to glibc 2.35's `tanh`) | the smoothness weight's `tanh` with FSL's bits (§8.1), in `reproduce` and, until part 2b, in the default; `larmorx_core::math::tanh` (CORE-MATH, correctly rounded) is ported for the default |
+| `larmorx_afni::x87`'s method (larmorx's own clean-room code: x87 extended precision with integer arithmetic), adapted in `bet::x87` with the rounding to float | §8.2's extended-precision steps |
+| Black-box runs of FSL 6.0.7.23's `fslstats -C` on FSL's own `bet -R` output (part 2a, case 622) | the centre printed as `-0.000000` (findings) |
 
 | larmorx | Behaviour reproduced | Source |
 |---|---|---|
-| `bet::mesh` (the icosahedron, its subdivision and numbering, adjacency, normals) | BET's tessellated sphere | spec §4.4, black-box (`topo2.py`) |
-| `bet::params` (robust range, threshold, radius, centre of gravity, median) | §4.2, §4.3 | spec, black-box (`py/params.py` of the scratch notes: the median's rank) |
-| `bet::surface` (the deformation, the self-intersection measure with a grid of cells, the exact test, reruns) | §4.4, §4.5 | spec; Möller and Trumbore's segment-triangle test (textbook) |
+| `bet::mesh` (the icosahedron, its subdivision and numbering in the file's order, adjacency by §4.4's move-to-the-end rule, normals and means by division) | BET's tessellated sphere | spec §4.4, §8.1, black-box (`topo2.py`) |
+| `bet::params` (robust range, threshold, radius, centre of gravity, median) | §4.2, §4.3, §8.1 | spec, black-box (`py/params.py` of the scratch notes: the median's rank) |
+| `bet::surface` (the deformation, the self-intersection measure with a grid of cells, the exact test's sweep and predicate, reruns) | §4.4, §4.5, §8.1 | spec |
 | `bet::raster` (drawing, the flood fill, FSL-43's fill by the linear index) | §4.6 | spec, black-box (`raster_probe*.py`) |
-| `bet::skull` | §4.7's skull (approximate: Dice 0.91 with FSL's) | spec, black-box (`skull_probe.py`) |
-| `bet::image` (outputs and their headers, ANALYZE inputs, FSL-56) | §3.1-§3.3 | spec, black-box (`header_diff.py`) |
-| `bet::quatern` | §3.3, §8 | the NIfTI standard's conversions, black-box (`quatern_probe.py`) |
+| `bet::skull` | §4.7's skull search, §8.1's trilinear interpolation | spec |
+| `bet::image` (name resolution, outputs and their headers, ANALYZE inputs, FSL-56, `-F`'s doubles) | §3.1-§3.3, §5.2 | spec, black-box (`header_diff.py`) |
+| `bet::quatern`, `bet::x87` | §3.3, §8.2 | the NIfTI standard's conversions in §8.2's precisions, black-box (`quatern_probe.py`) |
 | `cli::options` | FSL's option parser | spec §4.1, black-box |
 | `cli::bet2` | bet2's command line, messages, outputs, FSL-40, -42, -43, -56, -60, -61, -62 | spec §4, §7, §9, black-box |
 | `cli::bet` | the `bet` script: default, `-R` (FSL-63), `-F`, `-Z` (FSL-45), the pending variations, FSL-44, FSL-46 | spec §5, black-box |

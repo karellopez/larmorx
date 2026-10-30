@@ -21,3 +21,41 @@ environment (FSL never on the `PATH`), and larmorx's clean-room original (`LARMO
 
 The reruns' probes (`variants.py`, `variants2.py` in the part's notes) needed a temporary build
 with each candidate rule; their results are listed in the findings ("Reruns").
+
+## Part 2a (2026-10-30): glibc's `tanh` and CORE-MATH's
+
+`tanh-verify/` is a small Rust program of its own (its own cargo workspace, never part of
+larmorx's build):
+
+- `verify [--log2n N] [--threads T]`: `larmorx_core::math::tanh_glibc` (fdlibm 5.3 from netlib,
+  `expm1`'s polynomial in Estrin's order) against the system's `tanh` (the C library's, called as
+  a black box), bit for bit: `2^N` inputs of each of three random families and every input within
+  2^20 units in the last place of the method's branch thresholds, both signs. **Result
+  (2026-10-30, glibc 2.35, x86-64, `--log2n 32`): 12,918,456,348 inputs, 0 differ**
+  (`VERIFY-PASS`, 19.6 s on 16 threads). Horner's order (fdlibm 5.3 as written) differs on 9,698
+  of 36.7 million inputs (`--log2n 20`), the other two Estrin groupings on 6,640.
+- `coremath <libcrtanh.so> <tanh.wc> [log2n]`: `larmorx_core::math::tanh` against CORE-MATH's C
+  (`gcc -O2 -ffp-contract=off -fPIC -shared .../src/binary64/tanh/tanh.c`), on the 31,440 cases
+  of `tanh.wc` at ±x and the random families. **Result (`log2n` 28): 62,880 and 805,306,368
+  inputs, 0 differ**; glibc's `tanh` is not the correctly rounded result on 22,506 of the worst
+  cases and 171,647,522 of the random inputs (21.3 %).
+- `record`, `bench`: the unit tests' values and hash; 12.1 ns per call against the system's 10.9.
+- `coremath_tables.py`: CORE-MATH's `t0`, `t1` tables as Rust bit patterns.
+
+```bash
+cd validation/investigations/cleanroom-bet/tanh-verify
+CARGO_TARGET_DIR=<scratch>/verify-target cargo build --release --offline
+<scratch>/verify-target/release/tanh-glibc-verify verify --log2n 32 --threads 16
+```
+
+`crates/larmorx-fsl/examples/tanh_effect.rs` (`cargo run --release -p larmorx-fsl --example
+tanh_effect -- --threads 24 <images>`): BET's surface with glibc's and with the correctly rounded
+`tanh` on each image, and their differences (passes, totals, vertex distance, mask voxels, Dice).
+On the standard tier's 13 real images: the same outputs on 9 (surfaces within a micrometre),
+other masks on the three rerun cases and on ds000005's BOLD first volume (findings, "What the
+correctly rounded `tanh` changes").
+
+`retrial.py` with part 2a's build (`oracles/logs/retrial-cleanroom-bet-2a-2026-10-30-b.log`): 237
+of the trial's 239 differing cases agree, the skull and the quaternion held exactly; the two left
+are cases 622 and 677 (findings). FSL's `fslstats -C` was run by hand on FSL's own `bet -R` output
+of case 622 (a black box) to see the centre it prints.

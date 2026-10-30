@@ -672,17 +672,16 @@ def _header_same(ca: bytes, cb: bytes) -> bool:
 #: Where the qform's quaternion (b, c, d) is: NIfTI-1 float32 at 256..268, NIfTI-2 float64 at
 #: 352..376.
 QUATERN = {False: (256, 268, "<3f"), True: (352, 376, "<3d")}
-#: How far the original's quaternion components may be from FSL's: float precision at 1 (a unit
-#: quaternion's components, stored in float in NIfTI-1).
-QUATERN_TOLERANCE = 2.0**-23
+#: How far the original's quaternion components may be from FSL's: none since 2026-10-30 (part
+#: 2a: the precision path of ``specs/bet.md`` §8.2 followed; part 1 allowed float precision at 1,
+#: 2^-23, while the spec left it open).
+QUATERN_TOLERANCE = 0.0
 
 
 def _header_compare(ca: bytes, cb: bytes) -> tuple[bool, str]:
-    """Two image headers alike but for ``descrip`` (the original names itself there), and the
-    qform's quaternion within float precision (:data:`QUATERN_TOLERANCE`): FSL turns the
-    quaternion into its matrix and back with its NIfTI library's precision path, which the spec
-    leaves open (``specs/bet.md`` §8; ``docs/findings/fsl-bet-original.md``: the last float bit
-    in NIfTI-1, about 5e-9 in NIfTI-2's doubles)."""
+    """Two image headers alike but for ``descrip`` (the original names itself there), the
+    qform's quaternion included (:data:`QUATERN_TOLERANCE`: exactly, as FSL turns the quaternion
+    into its matrix and back with its NIfTI library's precision path, ``specs/bet.md`` §8.2)."""
     import struct
 
     if len(ca) < 348 or len(cb) < 348:
@@ -822,17 +821,8 @@ def compare_original_file(checks: CheckList, label: str, pa: Path, pb: Path) -> 
         )
         return
     kind = _kind(name)
-    if kind == "skull":
-        d = dice(da, db)
-        checks(
-            f"{label}{name}",
-            True,
-            metric="Dice",
-            value=round(d, 6),
-            threshold="reported (specs/bet.md §4.7 leaves the skull search open)",
-            detail=f"{differing} of {da.size} values differ",
-        )
-        return
+    # the skull image (100 at the skull's edge) is held to the masks' thresholds: specs/bet.md
+    # §4.7 gives the skull search exactly since 2026-10-30 (part 1 only reported its Dice)
     if kind == "outline":
         # the surface drawn at the input's maximum: elsewhere the input itself
         top = max(float(np.nanmax(fa)), float(np.nanmax(fb)))
@@ -2177,8 +2167,8 @@ def _original_suite() -> Suite:
             ),
             (
                 "Skull",
-                "reported (Dice): specs/bet.md §4.7 leaves details of the skull search open (a "
-                "question for the spec writer)",
+                "as the masks: bit-identical, or Dice and boundary distance within the masks' "
+                "thresholds (specs/bet.md §4.7 gives the skull search exactly)",
             ),
         ],
         cases=_original_cases,
@@ -2212,10 +2202,12 @@ def highlights_original(results: list[CaseResult]) -> list[str]:
         if not c.name.endswith(FMRIPREP_OWN)
         and (c.metric == "values" or c.metric.startswith(("Dice", "drawn surface")))
     ]
-    skulls = [c for c in files if c.threshold and str(c.threshold).startswith("reported")]
+    skulls = [c for c in files if "_skull" in c.name]
     images = [c for c in files if c not in skulls]
     identical = sum(1 for c in images if c.threshold == "bit-identical")
     within = sum(1 for c in images if c.passed and c.threshold != "bit-identical")
+    skull_same = sum(1 for c in skulls if c.threshold == "bit-identical")
+    skull_within = sum(1 for c in skulls if c.passed and c.threshold != "bit-identical")
     meshes = [c for r in results for c in r.checks if c.metric.startswith("vertex distance")]
     mesh_same = sum(1 for c in meshes if str(c.value).startswith("0.0000 / 0.0000"))
     lines = [
@@ -2226,8 +2218,8 @@ def highlights_original(results: list[CaseResult]) -> list[str]:
         "not have yet).",
         f"- **{identical} of {len(images)} brains, masks and outlines with FSL's values, bit for "
         f"bit**, {within} more within the thresholds; {mesh_same} of {len(meshes)} meshes with "
-        f"FSL's vertices to the file's 6 decimals; {len(skulls)} skull images not bit-identical, "
-        "reported (Dice) with the skull search's open details.",
+        f"FSL's vertices to the file's 6 decimals; {skull_same} of {len(skulls)} skull images "
+        f"bit-identical, {skull_within} more within the masks' thresholds.",
     ]
     own = [c for r in results for c in r.checks if c.name.endswith(FMRIPREP_OWN)]
     if own:

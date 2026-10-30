@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 //! Drawing a surface into a grid and filling what it encloses (`specs/bet.md` §4.6).
 
-use super::mesh::{Mesh, V3, add, dist, scale, sub};
+use super::mesh::{Mesh, V3, add, divide, norm, scale, sub};
 
 /// How a point on the surface picks its voxel.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -13,10 +13,9 @@ pub enum Rounding {
 }
 
 /// Calls `f` with the linear index of every voxel the surface's triangles are drawn on. For a
-/// triangle `(a, b, c)` (written `c a b` in mesh files): points from `a` towards `c` every
-/// `min(d) / 2` mm (`0, s, 2s, ...` up to the edge's length), and from `b` towards each of
-/// them at the same spacing; each point to its voxel (observed: these are the points whose
-/// voxels FSL draws).
+/// triangle `(v0, v1, v2)` (the mesh file's order): points from `v1` towards `v0` every
+/// `min(d) / 2` mm (`0, s, 2s, ...` up to the edge's length), and from `v2` towards each of
+/// them at the same spacing; each point to its voxel (§4.6).
 pub fn draw(
     mesh: &Mesh,
     points: &[V3],
@@ -46,26 +45,27 @@ pub fn draw(
         f((idx[2] * ny + idx[1]) * nx + idx[0]);
     };
     for t in &mesh.triangles {
-        let (a, b, c) = (
+        let (v0, v1, v2) = (
             points[t[0] as usize],
             points[t[1] as usize],
             points[t[2] as usize],
         );
-        segment_points(a, c, step, |e| {
-            segment_points(b, e, step, &mut put);
+        segment_points(v1, v0, step, |q| {
+            segment_points(v2, q, step, &mut put);
         });
     }
 }
 
-/// The points `p + k s u` (`u` the unit direction from `p` to `q`, `k s` accumulated, up to
-/// the distance from `p` to `q`).
+/// The points `p + k u` for `k = 0, s, 2s, ...` (accumulated) while `k ≤ |q − p|`, `u` the
+/// unit direction from `p` to `q` (each component divided by the length; a zero vector stays
+/// zero; §4.6).
 fn segment_points(p: V3, q: V3, step: f64, mut f: impl FnMut(V3)) {
     let d = sub(q, p);
-    let len = dist(p, q);
+    let len = norm(d);
     if !len.is_finite() {
         return;
     }
-    let u = if len > 0.0 { scale(d, 1.0 / len) } else { d };
+    let u = if len > 0.0 { divide(d, len) } else { d };
     let mut k = 0.0;
     while k <= len {
         f(add(p, scale(u, k)));

@@ -26,6 +26,8 @@ mod powf;
 mod powi;
 mod sin;
 mod sinf;
+mod tanh;
+mod tanh_glibc;
 mod tanhf;
 
 pub use powi::powi;
@@ -44,6 +46,12 @@ pub use cbrtf::cbrtf;
 /// `reproduce` where AFNI's result depends on glibc's last bit (3dUnifize `-EPI`'s radius).
 /// No fused multiply-adds: the same bits on every platform.
 pub use cbrtf_glibc::cbrtf_glibc;
+
+/// `tanh(x)` for `f64` with glibc 2.35's bits (x86-64), not correctly rounded (GLIBC-06):
+/// fdlibm's `tanh` over fdlibm's `expm1` (Sun's notice), for `reproduce` where FSL's result
+/// depends on glibc's last bit (`bet2`'s smoothness weight, `specs/bet.md` §8.1). No fused
+/// multiply-adds: the same bits on every platform.
+pub use tanh_glibc::tanh_glibc;
 
 // Speed: without hardware FMA in the generated code (baseline x86-64), every `mul_add` in the
 // kernels is a call into the platform's `fma`. On x86-64 CPUs with FMA, a copy of each kernel
@@ -92,6 +100,11 @@ dispatch!(
     /// The arccosine of `x`, correctly rounded (CORE-MATH's `cr_acos`). ITK's `std::acos`
     /// (glibc's `acos`), as in `Rigid2DTransform::ComputeMatrixParameters`.
     acos
+);
+dispatch!(
+    /// The hyperbolic tangent of `x`, correctly rounded (CORE-MATH's `cr_tanh`). FSL's `bet2`
+    /// calls glibc's `tanh`, which is not correctly rounded ([`tanh_glibc`] has its bits).
+    tanh
 );
 dispatch!(
     /// The cube root of `x`, correctly rounded (CORE-MATH's `cr_cbrt`). ITK's
@@ -168,6 +181,7 @@ mod fma {
     fma_copy!(asin);
     fma_copy!(acos);
     fma_copy!(cbrt);
+    fma_copy!(tanh);
 
     #[inline]
     pub(super) fn atan2(y: f64, x: f64) -> f64 {
@@ -219,9 +233,13 @@ mod tests {
             }
             // Arguments in [-1, 1] for the inverse sine and cosine.
             let u = (s >> 11) as f64 / (1u64 << 53) as f64 * 2.0 - 1.0;
+            // tanh over every branch (|x| up to 25)
+            let w = u * 25.0;
             for (a, b) in [
                 (super::asin(u), super::asin::asin(u)),
                 (super::acos(u), super::acos::acos(u)),
+                (super::tanh(w), super::tanh::tanh(w)),
+                (super::tanh(x), super::tanh::tanh(x)),
             ] {
                 assert!(
                     a.to_bits() == b.to_bits() || (a.is_nan() && b.is_nan()),

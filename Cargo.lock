@@ -278,7 +278,6 @@ dependencies = [
  "larmorx-core",
  "larmorx-io",
  "larmorx-mri",
- "libm",
  "rayon",
  "tempfile",
 ]

@@ -1,21 +1,34 @@
 // SPDX-License-Identifier: Apache-2.0
-//! The qform's quaternion as FSL writes it (`specs/bet.md` §3.3, §8; observed): FSL turns the
-//! input's quaternion into its 4 x 4 matrix and back, by the NIfTI-1 standard's conversions
-//! (the reference library's `quatern_to_mat44` and `mat44_to_quatern`, public domain, with a
-//! polar decomposition of the rotation). For a rotation by half a turn (`a = 0`) the two signs
-//! of `(b, c, d)` are the same rotation: the conversion back picks one, which the output
-//! carries. Computed in double precision (FSL's library uses x87 extended precision in places,
-//! which can change a last bit).
+//! The qform's quaternion as FSL writes it (`specs/bet.md` §3.3, §8.2): FSL turns the input's
+//! quaternion into its 4 x 4 matrix and back, by the NIfTI-1 standard's conversions (the
+//! reference library's, public domain, with a polar decomposition of the rotation), in the
+//! precision of each step that §8.2 gives: floats for the matrix, double for most arithmetic,
+//! x87 extended precision for a few products, quotients and sums ([`super::x87`]). For a
+//! rotation by half a turn (`a = 0`) the two signs of `(b, c, d)` are the same rotation: the
+//! conversion back picks one, which the output carries.
+
+use super::x87;
 
 type M33 = [[f64; 3]; 3];
+type F33 = [[f32; 3]; 3];
 
-/// The rotation-and-scale part and the qfac of a quaternion qform (`quatern_to_mat44`),
-/// rounded to float as the standard's `mat44` holds it.
+/// The rotation-and-scale part of a quaternion qform (§8.2, steps 1 and 2), as the float
+/// matrix FSL holds (entries widened to double). `b`, `c`, `d` and `pixdim` are read as floats.
 pub fn quatern_to_mat(b: f64, c: f64, d: f64, pixdim: [f64; 4]) -> M33 {
-    let (mut b, mut c, mut d) = (b, c, d);
-    let mut a = 1.0 - (b * b + c * c + d * d);
-    if a < 1.0e-7 {
-        a = 1.0 / (b * b + c * c + d * d).sqrt();
+    let m = quatern_to_float_mat(b, c, d, pixdim);
+    m.map(|row| row.map(f64::from))
+}
+
+fn quatern_to_float_mat(b: f64, c: f64, d: f64, pixdim: [f64; 4]) -> F33 {
+    // 1. floats, widened
+    let fl = |x: f64| f64::from(x as f32);
+    let (mut b, mut c, mut d) = (fl(b), fl(c), fl(d));
+    let pixdim = pixdim.map(fl);
+    // 2.
+    let s = (b * b + c * c) + d * d;
+    let mut a = x87::sub(1.0, s);
+    if x87::below_ext_1e7(a) {
+        a = x87::div(1.0, s.sqrt());
         b *= a;
         c *= a;
         d *= a;
@@ -30,115 +43,135 @@ pub fn quatern_to_mat(b: f64, c: f64, d: f64, pixdim: [f64; 4]) -> M33 {
     if pixdim[0] < 0.0 {
         zd = -zd;
     }
-    let f = |x: f64| f64::from(x as f32);
+    // the diagonal in double, rounded to float; the off-diagonal: the bracket in double, the
+    // two products in extended, rounded once to float
+    let diag = |x: f64, s: f64| (x * s) as f32;
+    let off = |bracket: f64, s: f64| x87::mul_to_f32(2.0 * bracket, s);
     [
         [
-            f((a * a + b * b - c * c - d * d) * xd),
-            f(2.0 * (b * c - a * d) * yd),
-            f(2.0 * (b * d + a * c) * zd),
+            diag(((a * a + b * b) - c * c) - d * d, xd),
+            off(b * c - a * d, yd),
+            off(b * d + a * c, zd),
         ],
         [
-            f(2.0 * (b * c + a * d) * xd),
-            f((a * a + c * c - b * b - d * d) * yd),
-            f(2.0 * (c * d - a * b) * zd),
+            off(b * c + a * d, xd),
+            diag(((a * a + c * c) - b * b) - d * d, yd),
+            off(c * d - a * b, zd),
         ],
         [
-            f(2.0 * (b * d - a * c) * xd),
-            f(2.0 * (c * d + a * b) * yd),
-            f((a * a + d * d - c * c - b * b) * zd),
+            off(b * d - a * c, xd),
+            off(c * d + a * b, yd),
+            diag(((a * a + d * d) - c * c) - b * b, zd),
         ],
     ]
 }
 
-fn det(r: &M33) -> f64 {
-    r[0][0] * r[1][1] * r[2][2] - r[0][0] * r[2][1] * r[1][2] - r[1][0] * r[0][1] * r[2][2]
-        + r[1][0] * r[2][1] * r[0][2]
-        + r[2][0] * r[0][1] * r[1][2]
-        - r[2][0] * r[1][1] * r[0][2]
+/// The determinant from the float entries, in double, left to right (§8.2, step 5).
+fn det(r: &F33) -> f64 {
+    let [[r11, r12, r13], [r21, r22, r23], [r31, r32, r33]] = r.map(|row| row.map(f64::from));
+    r11 * r22 * r33 - r11 * r32 * r23 - r21 * r12 * r33 + r21 * r32 * r13 + r31 * r12 * r23
+        - r31 * r22 * r13
 }
 
-fn inverse(r: &M33) -> M33 {
-    let [[r11, r12, r13], [r21, r22, r23], [r31, r32, r33]] = *r;
+/// The inverse (§8.2, step 5): in double from the float entries, the determinant's reciprocal
+/// in extended precision rounded to double, each entry the reciprocal times its cofactor in
+/// double, stored as float.
+fn inverse(r: &F33) -> F33 {
+    let [[r11, r12, r13], [r21, r22, r23], [r31, r32, r33]] = r.map(|row| row.map(f64::from));
     let mut deti =
         r11 * r22 * r33 - r11 * r32 * r23 - r21 * r12 * r33 + r21 * r32 * r13 + r31 * r12 * r23
             - r31 * r22 * r13;
     if deti != 0.0 {
-        deti = 1.0 / deti;
+        deti = x87::div(1.0, deti);
     }
+    let f = |x: f64| x as f32;
     [
         [
-            deti * (r22 * r33 - r32 * r23),
-            deti * (-r12 * r33 + r32 * r13),
-            deti * (r12 * r23 - r22 * r13),
+            f(deti * (r22 * r33 - r32 * r23)),
+            f(deti * (-r12 * r33 + r32 * r13)),
+            f(deti * (r12 * r23 - r22 * r13)),
         ],
         [
-            deti * (-r21 * r33 + r31 * r23),
-            deti * (r11 * r33 - r31 * r13),
-            deti * (-r11 * r23 + r21 * r13),
+            f(deti * (-r21 * r33 + r31 * r23)),
+            f(deti * (r11 * r33 - r31 * r13)),
+            f(deti * (-r11 * r23 + r21 * r13)),
         ],
         [
-            deti * (r21 * r32 - r31 * r22),
-            deti * (-r11 * r32 + r31 * r12),
-            deti * (r11 * r22 - r21 * r12),
+            f(deti * (r21 * r32 - r31 * r22)),
+            f(deti * (-r11 * r32 + r31 * r12)),
+            f(deti * (r11 * r22 - r21 * r12)),
         ],
     ]
 }
 
-fn rownorm(r: &M33) -> f64 {
-    r.iter()
-        .map(|row| row.iter().map(|v| v.abs()).sum::<f64>())
-        .fold(0.0, f64::max)
-}
-
-fn colnorm(r: &M33) -> f64 {
-    (0..3)
-        .map(|j| (0..3).map(|i| r[i][j].abs()).sum::<f64>())
-        .fold(0.0, f64::max)
-}
-
-/// The orthogonal matrix nearest `a` (the standard's iterative polar decomposition).
-fn polar(a: &M33) -> M33 {
-    let mut x = *a;
-    let mut gam = det(&x);
-    while gam == 0.0 {
-        gam = 0.00001 * (0.001 + rownorm(&x));
-        for k in 0..3 {
-            x[k][k] += gam;
+/// The largest row sum of absolute values, summed in float.
+fn rownorm(r: &F33) -> f32 {
+    let mut best = 0.0f32;
+    for row in r {
+        let s = (row[0].abs() + row[1].abs()) + row[2].abs();
+        if s > best {
+            best = s;
         }
-        gam = det(&x);
     }
-    let mut dif = 1.0f64;
+    best
+}
+
+/// The largest column sum of absolute values, summed in float.
+fn colnorm(r: &F33) -> f32 {
+    let mut best = 0.0f32;
+    for j in 0..3 {
+        let s = (r[0][j].abs() + r[1][j].abs()) + r[2][j].abs();
+        if s > best {
+            best = s;
+        }
+    }
+    best
+}
+
+/// The orthogonal matrix nearest `a`, in float (§8.2, step 5).
+fn polar(a: &F33) -> F33 {
+    let mut x = *a;
+    while det(&x) == 0.0 {
+        let g = (0.00001 * (0.001 + f64::from(rownorm(&x)))) as f32;
+        for k in 0..3 {
+            x[k][k] += g;
+        }
+    }
+    let mut dif = 1.0f32;
     let mut k = 0;
     loop {
         let y = inverse(&x);
-        let (g, gi) = if dif > 0.3 {
+        let (g, gi) = if f64::from(dif) > 0.3 {
             let alp = (rownorm(&x) * colnorm(&x)).sqrt();
             let bet = (rownorm(&y) * colnorm(&y)).sqrt();
             let g = (bet / alp).sqrt();
-            (g, 1.0 / g)
+            (g, (1.0 / f64::from(g)) as f32)
         } else {
             (1.0, 1.0)
         };
-        let z: M33 =
+        let z: F33 =
             std::array::from_fn(|i| std::array::from_fn(|j| 0.5 * (g * x[i][j] + gi * y[j][i])));
-        dif = (0..3)
-            .flat_map(|i| (0..3).map(move |j| (i, j)))
-            .map(|(i, j)| (z[i][j] - x[i][j]).abs())
-            .sum();
+        dif = 0.0;
+        for i in 0..3 {
+            for j in 0..3 {
+                dif += (z[i][j] - x[i][j]).abs();
+            }
+        }
         k += 1;
-        if k > 100 || dif < 3.0e-6 {
+        if k > 100 || f64::from(dif) < 3.0e-6 {
             return z;
         }
         x = z;
     }
 }
 
-/// `mat44_to_quatern`: the quaternion `(b, c, d)` (as float) and the qfac of a rotation-and-
-/// scale matrix.
-pub fn mat_to_quatern(r: &M33) -> ([f32; 3], f64) {
+/// The quaternion `(b, c, d)` (doubles: NIfTI-2 stores them, NIfTI-1 their floats) and the
+/// qfac of a float rotation-and-scale matrix (§8.2, steps 4 to 6).
+pub fn mat_to_quatern(r: &M33) -> ([f64; 3], f64) {
+    // 4. each column divided by its length in double, rounded to float
     let mut m = *r;
     for j in 0..3 {
-        let mut n = (m[0][j] * m[0][j] + m[1][j] * m[1][j] + m[2][j] * m[2][j]).sqrt();
+        let mut n = ((m[0][j] * m[0][j] + m[1][j] * m[1][j]) + m[2][j] * m[2][j]).sqrt();
         if n == 0.0 {
             for i in 0..3 {
                 m[i][j] = if i == j { 1.0 } else { 0.0 };
@@ -149,13 +182,17 @@ pub fn mat_to_quatern(r: &M33) -> ([f32; 3], f64) {
             row[j] /= n;
         }
     }
-    let p = polar(&m);
+    let mf: F33 = m.map(|row| row.map(|v| v as f32));
+    // 5.
+    let p = polar(&mf);
+    // 6.
+    let det_p = det(&p);
     let [
         [r11, r12, mut r13],
         [r21, r22, mut r23],
         [r31, r32, mut r33],
-    ] = p;
-    let qfac = if det(&p) > 0.0 {
+    ] = p.map(|row| row.map(f64::from));
+    let qfac = if det_p > 0.0 {
         1.0
     } else {
         r13 = -r13;
@@ -163,32 +200,33 @@ pub fn mat_to_quatern(r: &M33) -> ([f32; 3], f64) {
         r33 = -r33;
         -1.0
     };
-    let mut a = r11 + r22 + r33 + 1.0;
+    let q = |x: f64, by: f64| x87::div(0.25 * x, by);
+    let mut a = x87::add((r11 + r22) + r33, 1.0);
     let (mut b, mut c, mut d);
     if a > 0.5 {
         a = 0.5 * a.sqrt();
-        b = 0.25 * (r32 - r23) / a;
-        c = 0.25 * (r13 - r31) / a;
-        d = 0.25 * (r21 - r12) / a;
+        b = q(r32 - r23, a);
+        c = q(r13 - r31, a);
+        d = q(r21 - r12, a);
     } else {
         let xd = 1.0 + r11 - (r22 + r33);
         let yd = 1.0 + r22 - (r11 + r33);
         let zd = 1.0 + r33 - (r11 + r22);
         if xd > 1.0 {
             b = 0.5 * xd.sqrt();
-            c = 0.25 * (r12 + r21) / b;
-            d = 0.25 * (r13 + r31) / b;
-            a = 0.25 * (r32 - r23) / b;
+            c = q(r12 + r21, b);
+            d = q(r13 + r31, b);
+            a = q(r32 - r23, b);
         } else if yd > 1.0 {
             c = 0.5 * yd.sqrt();
-            b = 0.25 * (r12 + r21) / c;
-            d = 0.25 * (r23 + r32) / c;
-            a = 0.25 * (r13 - r31) / c;
+            b = q(r12 + r21, c);
+            d = q(r23 + r32, c);
+            a = q(r13 - r31, c);
         } else {
             d = 0.5 * zd.sqrt();
-            b = 0.25 * (r13 + r31) / d;
-            c = 0.25 * (r23 + r32) / d;
-            a = 0.25 * (r21 - r12) / d;
+            b = q(r13 + r31, d);
+            c = q(r23 + r32, d);
+            a = q(r21 - r12, d);
         }
         if a < 0.0 {
             b = -b;
@@ -196,11 +234,11 @@ pub fn mat_to_quatern(r: &M33) -> ([f32; 3], f64) {
             d = -d;
         }
     }
-    ([b as f32, c as f32, d as f32], qfac)
+    ([b, c, d], qfac)
 }
 
 /// The quaternion FSL writes for the input's `(b, c, d)` and `pixdim` (its qfac and sizes).
-pub fn rewritten(b: f64, c: f64, d: f64, pixdim: [f64; 4]) -> ([f32; 3], f64) {
+pub fn rewritten(b: f64, c: f64, d: f64, pixdim: [f64; 4]) -> ([f64; 3], f64) {
     mat_to_quatern(&quatern_to_mat(b, c, d, pixdim))
 }
 

@@ -56,7 +56,13 @@ unchanged, also after FSL-22's exact `reproduce` (82e4f9e). The FSL core and BET
 `opt-level = 1` in the dev profile so that the debug `cargo test` of CI runs BET's cases in about
 30 s (130 s unoptimised). The main package's `py.fsl.read_vtk` (BET's part 1, recorded without
 parity) was re-recorded with the parity smoke tier: from `d54d773` (commit `04dd94d`), the parity
-smoke tier passing (2461 passed), every checksum unchanged.
+smoke tier passing (2461 passed), every checksum unchanged. BET's clean-room original, part 2a
+(2026-10-30): `cli.fsl.bet`, `cli.fsl.bet.variations`, `cli.fsl.bet2` and `py.fsl.bet` re-recorded
+from 786e708 (the parity smoke tier passing: 2,607 tests): their surfaces follow `specs/bet.md`
+§8.1's arithmetic (glibc's `tanh` as `larmorx_core::math::tanh_glibc`, no fused multiply-add, the
+same bits on every platform); `cli.fsl.bet2.options` and `cli.fsl.bet2.reproduce` and every other
+checksum unchanged. `larmorx_core::math::tanh` and `tanh_glibc` are Rust-only, with their own unit
+tests (recorded values, a sequence hash, the FMA copy against the portable one).
 
 ## What is covered
 
@@ -69,7 +75,7 @@ A coverage test fails when anything below has no case; its message says what to 
 | `lx.ants` | 31 | all 43 functions: the generic `image_math`, arithmetic, intensity, thresholds and Otsu with a mask, the Gaussian group, morphology, components and distance maps, `resample_image` with each interpolator (nearest, Gaussian, windowed sinc, B-spline, linear 4D), `apply_transforms` with each of its 11 interpolators, an integer output type and a 4D series, `apply_transforms_to_points`; `n4_bias_field_correction` with ANTs' defaults, a weight image with a mesh and quadratic splines, quintic splines, a mask with rescaling and a threshold that ends the level, a spline distance in 2D, a 4D series; `denoise_image` with the Rician model, the Gaussian model with a mask, shrink 2, 2D with per-axis patch radii, 4D with shrink 2; the division, the masked N4 and the Rician denoising again with `upstream_defects="reproduce"`; `registration` on an in-memory moving image, from an initial centre alignment: a rigid stage (Mattes, a fixed mask) then an affine stage (mean squares, random sampling), not collapsed, with both warped images and the parsed iterations; `registration` with a SyN stage (A5 part 1); `registration` with B-spline SyN, a Gaussian displacement field and a `BSpline` stage, not collapsed (A5 part 2) |
 | `lx.afni` | 5 | `tshift` with each of its 7 methods; a scaled int16 file, uint8 data, `-ignore`, `restore`, `detrend=False`, `slice`; `detrend=False` with `upstream_defects="reproduce"`; `afni_settings` in the clean-room original (`AFNI_NIFTI_SCALE=NO`, NIfTI-2); `fmriprep_slice_timing` |
 | `lx.mri` | 4 | `hmc` with the default, each other cost function, the mean volume with sinc interpolation, a separate reference with splines and 12 degrees of freedom, the in-plane mode with nearest neighbour and an initial matrix; the reference and in-plane cases with `upstream_defects="reproduce"`, and `normcorr_count="weights"`; `HmcResult.save_mats`/`save_par`/`save_itk`, `read_mats` |
-| `lx.fsl` | 1 | `read_vtk` (a VTK mesh as FSL writes it, read back); `lx.fsl.bet` and `lx.fsl.betsurf` run only the replica: their cases are `larmorx-nc`'s |
+| `lx.fsl` | 2 | `read_vtk` (a VTK mesh as FSL writes it, read back); `lx.fsl.bet` (the clean-room original, since 2026-10-30); `lx.fsl.betsurf` runs only the replica: its cases are `larmorx-nc`'s |
 | `lx.transforms` | 8 | ITK files written and read (text, MATLAB, HDF5); ITK's HDF5 layout written in Rust (`py.transforms.write_h5`, 2026-10-16): a composite of an affine and a displacement field of 32³ vectors (deflate-compressed chunks), the same uncompressed, and a dense group of 11 affines (fractal heap, v2 B-tree), each by its bytes and by what is read back; `load_itk_linear`, `load_itk_composite`, `load_transforms`, and a composite of 11 transforms in both orders (PIPE-04); `Affine.map`, `DenseField.map` (on and off its grid), `TransformChain.map`/`steps`; `ensure_positive_cosines`; `resample_series` with head motion and coregistration, and with distortion correction (also with `upstream_defects="reproduce"`) |
 | `lx.ndimage` | 3 | `map_coordinates` with each spline order (0-5) and each boundary mode, an integer input; `spline_filter`, `spline_filter1d`; the reflect modes with `upstream_defects="reproduce"` |
 | HDF5 reader | 1 | `hdf5.fixtures` (2026-10-16): larmorx's HDF5 reader on the five committed [HDF5 fixtures](#hdf5-fixtures), every path its own writer never produces; each file fingerprinted by what larmorx reads back (groups, datasets, types, shapes, strings, values, integers' stored bytes), the members of three groups through soft links, and the shared-message file's transforms as `lx.transforms.read` reads them |
@@ -95,9 +101,10 @@ What the coverage test enumerates:
 
 - **Tools with a replica and an original** (3dTshift, 3dAutomask, 3dUnifize): the cases in
   `tests/golden/registry.py` run the clean-room original (`implementation="original"`); the
-  replicas have their own in `crates/larmorx-cli/tests/afni_replica_golden.rs`. BET has only a replica
-  (2026-10-26): `larmorx fsl bet`, `bet2`, `betsurf` and `lx.fsl.bet`, `lx.fsl.betsurf`
-  (`REPLICA_ONLY_FUNCTIONS`) have their cases in `crates-nc/larmorx-nc-cli/tests/golden.rs`, and a
+  replicas have their own in `crates/larmorx-cli/tests/afni_replica_golden.rs`. BET: the clean-room
+  original's `larmorx fsl bet`, `bet2` and `lx.fsl.bet` have their cases above (2026-10-30); its
+  `betsurf` is the replica's until part 2b: `lx.fsl.betsurf` (`REPLICA_ONLY_FUNCTIONS`) and the
+  replica's `larmorx-nc fsl bet`, `bet2`, `betsurf` have their cases in `crates-nc/larmorx-nc-cli/tests/golden.rs`, and a
   test checks that each such tool has one there (`REPLICA_GOLDEN`). 3dUnifize's half-size path (more than a
   million voxels) and AFNI-47 are beyond the golden tests' 32³ limit: the parity suites and
   the Rust unit tests (`unifize::duplo`, `unifize::wmi` against the spec's method) cover them.

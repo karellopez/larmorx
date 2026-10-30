@@ -114,7 +114,7 @@ pub fn main(args: &[String], settings: &Settings, out: &mut dyn Write, err: &mut
     let input = remove_ext(&words[0]).to_owned();
     let output = remove_ext(&words[1]).to_owned();
     let blank = mode.reproduce() && input.contains(char::is_whitespace);
-    if blank || files::resolve_input(&settings.name(&input)).is_err() {
+    if blank || image::resolve_input(&settings.name(&input)).is_err() {
         let _ = write!(out, "\nError: input image {input} not valid\n\n");
         return 1;
     }
@@ -444,6 +444,30 @@ fn brain_centre(run: &Run<'_>, output: &str, err: &mut dyn Write) -> Result<[f64
     }))
 }
 
+/// A failure of one of the script's steps on standard error: FSL's own message (the image
+/// layer's `ERROR::` lines) as FSL prints it, anything else as larmorx's line.
+fn report(err: &mut dyn Write, e: &str) {
+    if e.starts_with("ERROR::") {
+        let _ = err.write_all(e.as_bytes());
+    } else {
+        let _ = writeln!(err, "larmorx fsl bet: {e} (larmorx)");
+    }
+}
+
+/// `header` with the qform's quaternion (`b`, `c`, `d` and the qfac) of `from`, as an FSL
+/// program that read `from` holds it.
+fn with_quaternion(
+    header: &larmorx_io::nifti::NiftiHeader,
+    from: &larmorx_io::nifti::NiftiHeader,
+) -> larmorx_io::nifti::NiftiHeader {
+    let mut h = header.clone();
+    h.quatern_b = from.quatern_b;
+    h.quatern_c = from.quatern_c;
+    h.quatern_d = from.quatern_d;
+    h.pixdim[0] = from.pixdim[0];
+    h
+}
+
 /// Writes `vol` (radiological frame) as an image like `like`.
 fn write_like(
     run: &Run<'_>,
@@ -467,12 +491,13 @@ fn write_values(
     values: Values,
     cal: Option<(f64, f64)>,
 ) -> Result<(), String> {
+    // FSL's programs (fslroi, fslmerge, fslmaths) print the image layer's messages (§3.1)
     let t = run
         .settings
         .get("FSLOUTPUTTYPE")
-        .ok_or_else(|| "FSLOUTPUTTYPE is not set".to_owned())?;
+        .ok_or_else(|| bet2::FSLOUTPUTTYPE_UNSET.to_owned())?;
     let (name, version) = image::output_file(&run.settings.name(stem), t)
-        .ok_or_else(|| format!("FSLOUTPUTTYPE={t} is not a type"))?;
+        .ok_or_else(|| format!("{}\n", image::unknown_output_type_message(t)))?;
     let o = Output {
         template: &like.header,
         flipped: like.flipped,
@@ -489,7 +514,7 @@ fn write_values(
 }
 
 fn read_input(run: &Run<'_>, name: &str) -> Result<(Vec<Vol>, image::Input), String> {
-    let resolved = files::resolve_input(&run.settings.name(name))?;
+    let resolved = image::resolve_input(&run.settings.name(name))?;
     let f = ImageFiles::of(&resolved).ok_or_else(|| format!("{resolved}: not an image"))?;
     image::read_series_lean(&f, run.settings.threads()).map_err(|e| e.to_string())
 }
@@ -505,7 +530,7 @@ fn fmri(
     err: &mut dyn Write,
 ) -> Result<(), u8> {
     let fail = |e: String, out: &mut dyn Write, err: &mut dyn Write| {
-        let _ = writeln!(err, "larmorx fsl bet: {e} (larmorx)");
+        report(err, &e);
         run.failed(out)
     };
     let (vols, inp) = match read_input(run, input) {
@@ -549,24 +574,46 @@ fn fmri(
     ) {
         return Err(fail(e, out, err));
     }
-    // every volume masked, each freed as it is used: the series is held once
+    // fslmaths -mas: the display range reset, float, or double for a double series with the
+    // input's double values (observed, §5.2: only bet2's first volume is read as float)
     let (shape, count) = (vols[0].shape, vols.len());
-    let mut all = Vec::with_capacity(dilated.len() * count);
-    for v in vols {
-        all.extend(
-            v.data
-                .iter()
-                .zip(&dilated)
-                .map(|(&x, &m)| if m != 0.0 { x } else { 0.0 }),
-        );
-    }
-    drop(dilated);
-    // fslmaths -mas: the display range reset, float, or double for a double series (observed)
-    let values = if inp.header.datatype == 64 {
-        Values::F64(all.into_iter().map(f64::from).collect())
+    let doubles = if inp.header.datatype == 64 {
+        image::resolve_input(&run.settings.name(input))
+            .ok()
+            .and_then(|r| ImageFiles::of(&r))
+            .and_then(|f| image::read_f64_series(&f, run.settings.threads()))
+            .filter(|d| d.len() == dilated.len() * count)
     } else {
-        Values::F32(all)
+        None
     };
+    let values = if let Some(mut d) = doubles {
+        drop(vols);
+        for chunk in d.chunks_exact_mut(dilated.len()) {
+            for (x, &m) in chunk.iter_mut().zip(&dilated) {
+                if m == 0.0 {
+                    *x = 0.0;
+                }
+            }
+        }
+        Values::F64(d)
+    } else {
+        // every volume masked, each freed as it is used: the series is held once
+        let mut all = Vec::with_capacity(dilated.len() * count);
+        for v in vols {
+            all.extend(
+                v.data
+                    .iter()
+                    .zip(&dilated)
+                    .map(|(&x, &m)| if m != 0.0 { x } else { 0.0 }),
+            );
+        }
+        if inp.header.datatype == 64 {
+            Values::F64(all.into_iter().map(f64::from).collect())
+        } else {
+            Values::F32(all)
+        }
+    };
+    drop(dilated);
     if let Err(e) = write_values(run, output, &inp, shape, count, values, Some((0.0, 0.0))) {
         return Err(fail(e, out, err));
     }
@@ -607,7 +654,7 @@ fn small_fov(
     err: &mut dyn Write,
 ) -> Result<(), u8> {
     let fail = |e: String, out: &mut dyn Write, err: &mut dyn Write| {
-        let _ = writeln!(err, "larmorx fsl bet: {e} (larmorx)");
+        report(err, &e);
         run.failed(out)
     };
     let (vols, inp) = match read_input(run, input) {
@@ -689,7 +736,26 @@ fn small_fov(
         padded.extend_from_slice(&top);
     }
     let pvol = Vol::new([nx, ny, pz], v.voxel, padded);
-    w(&tmp, &pvol, out, err)?;
+    // fslmerge writes the padded image with the header of its first image, the bottom slice:
+    // its quaternion is the one fslroi stored there, converted to the matrix and back once more
+    // (each FSL program's read and write is one round trip, specs/bet.md §8.2, and the round
+    // trip can move the last bits again)
+    let bottom_header = read_input(run, &format!("{tmp}_bottom"))
+        .map(|(_, b)| b.header)
+        .map_err(|e| fail(e, out, err))?;
+    let merged = image::Input {
+        header: with_quaternion(&inp.header, &bottom_header),
+        ..inp.clone()
+    };
+    write_like(
+        run,
+        &tmp,
+        &merged,
+        std::slice::from_ref(&pvol),
+        Values::F32(pvol.data.clone()),
+        None,
+    )
+    .map_err(|e| fail(e, out, err))?;
     let mut a = vec![tmp.clone(), output.to_owned()];
     a.extend(opts.iter().cloned());
     run.bet2(&a, out, err)?;
@@ -770,8 +836,10 @@ fn small_fov(
             Values::F32(cropped.data.clone())
         };
         let cal = is_int.then_some((pinp.header.cal_min, pinp.header.cal_max));
+        // fslroi's crop: the input's geometry, the quaternion the padded output holds (one
+        // more round trip, §8.2)
         let like = image::Input {
-            header: inp.header.clone(),
+            header: with_quaternion(&inp.header, &pinp.header),
             ..pinp
         };
         write_like(run, &stem, &like, &[cropped], values, cal).map_err(|e| fail(e, out, err))?;

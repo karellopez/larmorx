@@ -274,7 +274,27 @@ The items below keep their history.
    `in.nii` given `in.nii.gz`; the original refused) and `bet -F` on a float64 series writes a
    float64 brain (§5.2). Of the 2026-10-30 trial's 75 remaining differences, the replica with
    thirteen of the original's arithmetic choices reproduces 59 exactly; seven surface cases remain
-   open for part 2 (45, 121, 154, 213, 262, 541, 677; 154 and 677 may be `-c`'s solve, §8.1). And `bet -S`, `-B`, `-A`, `-A2` once
+   open for part 2 (45, 121, 154, 213, 262, 541, 677; 154 and 677 may be `-c`'s solve, §8.1).
+   **Part 2a done (2026-10-30):** the spec writer's answers implemented: the deformation's
+   arithmetic of §8.1 operation by operation (the mesh in the file's order with §4.4's neighbour
+   order, the divisions, the update's sum order, the inward depth accumulated, the float products,
+   the single centre sum, the robust range's exact arithmetic), the `-e` sweep and predicate
+   (§4.5), the skull search (§4.7), the quaternion's precision path (§8.2, x87 steps; `bet -Z`'s
+   round trip once per FSL program of the chain), a name with an extension falling back to the
+   search (§3.1), `bet -F`'s float64 brain (§5.2); glibc's `tanh` as
+   `larmorx_core::math::tanh_glibc` (from netlib's fdlibm, proved equal on 12.9 billion arguments)
+   and CORE-MATH's correctly rounded `larmorx_core::math::tanh` (ported, bit-identical to the C on
+   its 62,880 worst cases and 805 million arguments). Record re-made: **all 142 standard-tier cases
+   agree** with FSL 6.0.7.23 (111 pass, 24 rejected by both, 7 expected divergences; `real/older-75y`,
+   `7t`, `tumour` bit-identical; 13 of 13 skulls bit-identical; the quaternion exact; fMRIPrep's 29
+   calls bit-identical); the random-testing trial's 75 open cases: 73 agree (237 of its 239). Speed
+   unchanged (0.43 and 1.20 s on one thread, FSL 1.27 and 3.21 s). **Part 2b (next):** betsurf's
+   original (spec §6), the site page's clean-room panels, a fresh benchmark, and BET's default `tanh`
+   once the user decides (GLIBC-06, "Waiting for the user"). **For the spec writer (one
+   question):** FSL's conversion of a centre between the voxel frames of a neurologically stored
+   image (`bet2 -c`, `fslstats -C`: a 4 x 4 inverse whose last bits §8.1 leaves open); random-testing
+   cases 677 (`-c`: another first-pass surface) and 622 (`bet -R`: `fslstats -C` prints `-0.000000`,
+   and the script's `dc` prints `dc: stack empty` twice; every file FSL's) wait for it. And `bet -S`, `-B`, `-A`, `-A2` once
    standard_space_roi, FLIRT and FAST are replicated. Then FLIRT with BBR, FAST, topup, and **`fslmaths` and `fslstats`** (found
    missing from the plan on 2026-10-30, the user's question: fMRIPrep calls `fslmaths -mul` in every
    BOLD reference's skull strip, and 14 `fslmaths` and 4 `fslstats` in the optional goodvoxels mask,
@@ -644,6 +664,16 @@ results and `cbrtf_glibc`'s alike.
 
 Decided 2026-10-23 (decision log): the four rules for questionable behaviours (A correct, B error, C keep and document, D measure first), applied without asking from now on; the 24 open questions by those rules.
 
+- **GLIBC-06, BET's default `tanh`** (2026-10-30, BET's clean-room part 2a; the register's one
+  **decide** entry). glibc's double `tanh`, which FSL's BET uses for the surface's smoothness weight,
+  is not correctly rounded; where a surface reruns, its last bits grow into another surface. Both are
+  in larmorx now. Measured on the standard tier's 13 real images: with the correctly rounded `tanh`,
+  9 give the same outputs and 4 another mask (Dice 0.985 to 0.997), not a more accurate one; the
+  exact warning needs a second surface search, so the default would run 1.9 times slower (still
+  faster than FSL). Options: (a) correctly rounded by default with the exact warning; (b) the same
+  with a cheaper, inexact warning; (c) glibc's bits by default (rule C), the correctly rounded `tanh`
+  on request. The orchestrator recommends (c) (the agent's recommendation too); the switch is one
+  line in `crates/larmorx-fsl/src/cli/bet2.rs`.
 - **Upstream reports:** PIPE-02 and PIPE-03 are drafts in `docs/upstream-reports/`, now with
   PIPE-03's real-data numbers, ready to file (from the user's GitHub account).
 - **For the user's information, FSL-22** (2026-10-26; decision log): `reproduce` now sorts NaN

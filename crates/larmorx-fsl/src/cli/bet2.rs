@@ -82,6 +82,10 @@ const SPECS: [Spec; 17] = [
     number(None, Some("parameter_d2"), 1),
 ];
 
+/// FSL's image layer's message when `FSLOUTPUTTYPE` is not set (§3.1), printed when the first
+/// output is written.
+pub const FSLOUTPUTTYPE_UNSET: &str = "ERROR:: Environment variable FSLOUTPUTTYPE is not set!\nPlease make sure that the appropriate configuration file is sourced by your shell (e.g. by putting it in .profile).\ne.g. bash or sh users add the line \". ${FSLDIR}/etc/fslconf/fsl.sh\"\ne.g. tcsh or csh users add the line \"source ${FSLDIR}/etc/fslconf/fsl.csh\"\n";
+
 /// bet2's options as given.
 #[derive(Clone, Debug, PartialEq)]
 pub struct Options {
@@ -250,6 +254,65 @@ pub fn fsl_name(name: &str) -> Option<String> {
     }
 }
 
+/// GLIBC-06 (`specs/bet.md` §8.1): the surface found again with the other `tanh` (glibc's or
+/// the correctly rounded one), `None` when it is the same, bit for bit.
+fn other_surface(
+    found: &Found,
+    vol: &bet::Vol,
+    radius: Option<f64>,
+    centre: Option<[f64; 3]>,
+    defo: &Deformation,
+    n_threads: usize,
+) -> Option<Found> {
+    use bet::surface::Tanh;
+    let other_opts = Deformation {
+        tanh: match defo.tanh {
+            Tanh::Glibc => Tanh::CorrectlyRounded,
+            Tanh::CorrectlyRounded => Tanh::Glibc,
+        },
+        ..*defo
+    };
+    let other = bet::find_surface(vol, radius, centre, &other_opts, n_threads);
+    let same = other.passes == found.passes
+        && found
+            .points
+            .iter()
+            .zip(&other.points)
+            .all(|(p, q)| (0..3).all(|k| p[k].to_bits() == q[k].to_bits()));
+    (!same).then_some(other)
+}
+
+/// GLIBC-06's notice, when an output asked for differs between the two surfaces: which ones
+/// and by how much (`changed`, already measured), with the vertices' largest distance.
+fn glibc06(found: &Found, other: &Found, changed: &[String], mode: UpstreamDefects) -> Notice {
+    let far = found
+        .points
+        .iter()
+        .zip(&other.points)
+        .map(|(a, b)| mesh::dist(*a, *b))
+        .fold(0.0f64, f64::max);
+    let effect = format!(
+        "{} (the surface: {} pass(es) against {}, vertices up to {far:.4} mm apart)",
+        changed.join(", "),
+        found.passes.len(),
+        other.passes.len()
+    );
+    let detail = match mode {
+        UpstreamDefects::Fix => format!(
+            "the surface's smoothness weight uses the correctly rounded tanh; with glibc 2.35's, which FSL calls, these outputs would differ: {effect}"
+        ),
+        UpstreamDefects::Reproduce => format!(
+            "the surface's smoothness weight uses glibc 2.35's tanh, as FSL; with the correctly rounded one these outputs would differ: {effect}"
+        ),
+    };
+    Notice::new(&defects::GLIBC_06, mode, detail)
+}
+
+/// How many values differ between two images of the same grid.
+fn differing<T: PartialEq>(a: &[T], b: &[T]) -> usize {
+    a.iter().zip(b).filter(|(x, y)| x != y).count()
+}
+
 /// The image layer's messages for an input that cannot be read, and larmorx's line.
 fn read_failure(err: &mut dyn Write, name: &str, e: &ImageError) -> u8 {
     let text = e.to_string();
@@ -284,7 +347,7 @@ fn read_image(
     n_threads: usize,
 ) -> Result<Input, ImageError> {
     let full = settings.name(name);
-    let resolved = files::resolve_input(&full).map_err(ImageError::Invalid)?;
+    let resolved = image::resolve_input(&full).map_err(ImageError::Invalid)?;
     let mut f = ImageFiles::of(&resolved)
         .ok_or_else(|| ImageError::Invalid(format!("{resolved}: not an image file name")))?;
     if let Some(other) = files::fsl60_header(&resolved) {
@@ -429,6 +492,12 @@ pub fn run(
         d1: o.d1,
         d2: o.d2,
         exact: o.mesh,
+        // GLIBC-06: glibc's (FSL's) bits in both modes for now. `Tanh::CorrectlyRounded` in the
+        // default is ready (the notice below names every output it changes) and waits for the
+        // decision of BET's part 2b: where it changes the mask it is not more accurate (the
+        // reruns amplify any last bit), and its exact notice needs a second surface search in
+        // practically every run (about 1.9 times the default's time, measured; findings)
+        tanh: bet::surface::Tanh::Glibc,
     };
     // the image the surface is found on: the mask (--binaryMask) or the input
     let surface_source = o.binary_mask.as_deref();
@@ -473,6 +542,20 @@ pub fn run(
         &defo,
         n_threads,
     );
+    // GLIBC-06: the surface the other tanh gives, where some smoothness weight differs (else
+    // it is this one, bit for bit); compared output by output below
+    let other_surface = if found.tanh_differs {
+        other_surface(
+            &found,
+            work_owned.as_ref().unwrap_or(&source.vol),
+            radius,
+            centre_mm,
+            &defo,
+            n_threads,
+        )
+    } else {
+        None
+    };
     if found.init.one_d {
         let _ = writeln!(err, "Warning: Image appears to be 1D");
     }
@@ -581,6 +664,73 @@ pub fn run(
             }
         }
     }
+    // GLIBC-06: the outputs asked for, made from the other surface too, compared
+    if let Some(other) = &other_surface {
+        let mut changed: Vec<String> = Vec::new();
+        if o.verbose {
+            let (mut a, mut b) = (Vec::new(), Vec::new());
+            verbose(&mut a, &found);
+            verbose(&mut b, other);
+            if a != b {
+                changed.push("the verbose lines".into());
+            }
+        }
+        if o.brain || o.mask {
+            let om = bet::pooled(n_threads, || {
+                bet::brain_mask(
+                    &other.mesh,
+                    &other.points,
+                    shape,
+                    voxel,
+                    mode,
+                    &mut Vec::new(),
+                )
+            });
+            if let (Ok(mut om), Some(m)) = (om, mask.as_deref()) {
+                if o.threshold {
+                    for (mv, &v) in om.iter_mut().zip(&input_vol_work.data) {
+                        if f64::from(v) < t {
+                            *mv = 0;
+                        }
+                    }
+                }
+                let k = differing(m, &om);
+                if k > 0 {
+                    changed.push(format!("{k} of {} brain-mask voxels", m.len()));
+                }
+            }
+        }
+        if o.outline {
+            let (a, b) = bet::pooled(n_threads, || {
+                (
+                    bet::outline(&found.mesh, &found.points, input_vol_work),
+                    bet::outline(&other.mesh, &other.points, input_vol_work),
+                )
+            });
+            let k = differing(&a, &b);
+            if k > 0 {
+                changed.push(format!("{k} outline voxels"));
+            }
+        }
+        if o.skull {
+            let (a, b) = bet::pooled(n_threads, || {
+                (
+                    bet::skull::skull(&found.mesh, &found.points, input_vol_work, t, t2, t98),
+                    bet::skull::skull(&other.mesh, &other.points, input_vol_work, t, t2, t98),
+                )
+            });
+            let k = differing(&a, &b);
+            if k > 0 {
+                changed.push(format!("{k} skull voxels"));
+            }
+        }
+        if o.mesh && vtk_text(&found.mesh, &found.points) != vtk_text(&other.mesh, &other.points) {
+            changed.push("the mesh file".into());
+        }
+        if !changed.is_empty() {
+            notices.push(glibc06(&found, other, &changed, mode));
+        }
+    }
     let ext = settings
         .get("FSL_LOAD_NIFTI_EXTENSIONS")
         .is_some_and(|v| options::atof(v) != 0.0);
@@ -598,10 +748,7 @@ pub fn run(
         let ot = match &output_type {
             None => {
                 print_notices(err, &notices);
-                let _ = write!(
-                    err,
-                    "ERROR:: Environment variable FSLOUTPUTTYPE is not set!\nPlease make sure that the appropriate configuration file is sourced by your shell (e.g. by putting it in .profile).\ne.g. bash or sh users add the line \". ${{FSLDIR}}/etc/fslconf/fsl.sh\"\ne.g. tcsh or csh users add the line \"source ${{FSLDIR}}/etc/fslconf/fsl.csh\"\n"
-                );
+                let _ = err.write_all(FSLOUTPUTTYPE_UNSET.as_bytes());
                 return 1;
             }
             Some(t) if !image::OUTPUT_TYPES.contains(&t.as_str()) => {
@@ -728,6 +875,11 @@ fn verbose(out: &mut dyn Write, found: &Found) {
 
 /// The mesh as VTK ASCII polydata (§4.7).
 pub fn write_vtk(name: &str, m: &mesh::Mesh, points: &[mesh::V3]) -> std::io::Result<()> {
+    std::fs::write(name, vtk_text(m, points))
+}
+
+/// The text of [`write_vtk`]'s file.
+fn vtk_text(m: &mesh::Mesh, points: &[mesh::V3]) -> String {
     let mut s = String::with_capacity(points.len() * 40 + m.triangles.len() * 24 + 128);
     s.push_str("# vtk DataFile Version 3.0\nsurface file\nASCII\nDATASET POLYDATA\n");
     s.push_str(&format!("POINTS {}  float\n", points.len()));
@@ -745,7 +897,7 @@ pub fn write_vtk(name: &str, m: &mesh::Mesh, points: &[mesh::V3]) -> std::io::Re
         4 * m.triangles.len()
     ));
     for t in &m.triangles {
-        s.push_str(&format!("3 {} {} {} \n", t[2], t[0], t[1]));
+        s.push_str(&format!("3 {} {} {} \n", t[0], t[1], t[2]));
     }
-    std::fs::write(name, s)
+    s
 }

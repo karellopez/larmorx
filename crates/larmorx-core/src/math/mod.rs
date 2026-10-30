@@ -26,6 +26,7 @@ mod powf;
 mod powi;
 mod sin;
 mod sinf;
+mod tanh;
 mod tanh_glibc;
 mod tanhf;
 
@@ -99,6 +100,11 @@ dispatch!(
     /// The arccosine of `x`, correctly rounded (CORE-MATH's `cr_acos`). ITK's `std::acos`
     /// (glibc's `acos`), as in `Rigid2DTransform::ComputeMatrixParameters`.
     acos
+);
+dispatch!(
+    /// The hyperbolic tangent of `x`, correctly rounded (CORE-MATH's `cr_tanh`). FSL's `bet2`
+    /// calls glibc's `tanh`, which is not correctly rounded ([`tanh_glibc`] has its bits).
+    tanh
 );
 dispatch!(
     /// The cube root of `x`, correctly rounded (CORE-MATH's `cr_cbrt`). ITK's
@@ -175,6 +181,7 @@ mod fma {
     fma_copy!(asin);
     fma_copy!(acos);
     fma_copy!(cbrt);
+    fma_copy!(tanh);
 
     #[inline]
     pub(super) fn atan2(y: f64, x: f64) -> f64 {
@@ -226,9 +233,13 @@ mod tests {
             }
             // Arguments in [-1, 1] for the inverse sine and cosine.
             let u = (s >> 11) as f64 / (1u64 << 53) as f64 * 2.0 - 1.0;
+            // tanh over every branch (|x| up to 25)
+            let w = u * 25.0;
             for (a, b) in [
                 (super::asin(u), super::asin::asin(u)),
                 (super::acos(u), super::acos::acos(u)),
+                (super::tanh(w), super::tanh::tanh(w)),
+                (super::tanh(x), super::tanh::tanh(x)),
             ] {
                 assert!(
                     a.to_bits() == b.to_bits() || (a.is_nan() && b.is_nan()),

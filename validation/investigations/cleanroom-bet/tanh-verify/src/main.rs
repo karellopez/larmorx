@@ -226,8 +226,140 @@ fn bench() {
     }
 }
 
+unsafe extern "C" {
+    fn dlopen(filename: *const std::ffi::c_char, flag: std::ffi::c_int) -> *mut std::ffi::c_void;
+    fn dlsym(handle: *mut std::ffi::c_void, symbol: *const std::ffi::c_char)
+    -> *mut std::ffi::c_void;
+}
+
+type Fn64 = extern "C" fn(f64) -> f64;
+
+/// CORE-MATH's `cr_tanh` from a shared library compiled from its C (`tanh.c`, `-O2
+/// -ffp-contract=off -fPIC -shared`).
+fn core_math(lib: &str) -> Fn64 {
+    let c = std::ffi::CString::new(lib).unwrap();
+    // SAFETY: the dynamic loader's calls with NUL-terminated names; the symbol is the C
+    // function `double cr_tanh(double)`.
+    unsafe {
+        let h = dlopen(c.as_ptr(), 2);
+        assert!(!h.is_null(), "dlopen({lib})");
+        let f = dlsym(h, c"cr_tanh".as_ptr());
+        assert!(!f.is_null(), "dlsym(cr_tanh)");
+        std::mem::transmute::<*mut std::ffi::c_void, Fn64>(f)
+    }
+}
+
+/// `larmorx_core::math::tanh` against CORE-MATH's C on its worst cases (both signs) and the
+/// random families; counts where glibc's `tanh` is not the correctly rounded result.
+fn coremath(lib: &str, wc: &str, log2n: u32, threads: usize) -> bool {
+    use larmorx_core::math::tanh as cr;
+    let c = core_math(lib);
+    let mut worst: Vec<f64> = Vec::new();
+    for line in std::fs::read_to_string(wc).unwrap().lines() {
+        let w = line.split_whitespace().next().unwrap_or("");
+        let w = w.strip_prefix('+').unwrap_or(w);
+        if !w.starts_with("0x") && !w.starts_with("-0x") {
+            continue;
+        }
+        worst.push(parse_hex_float(w));
+    }
+    let mut differ = 0u64;
+    let mut glibc_off = 0u64;
+    let mut shown = 0;
+    for &x in &worst {
+        for x in [x, -x] {
+            let (a, b) = (cr(x), c(x));
+            if !same(a, b) {
+                differ += 1;
+                if shown < 10 {
+                    println!("  wc x = {x:e}: ours {:016x}, C {:016x}", a.to_bits(), b.to_bits());
+                    shown += 1;
+                }
+            }
+            glibc_off += u64::from(!same(sys_tanh(x), b));
+        }
+    }
+    println!(
+        "worst cases: {} inputs (both signs), {differ} differ from CORE-MATH's C; glibc not correctly rounded on {glibc_off}",
+        2 * worst.len()
+    );
+    let n = 1u64 << log2n;
+    let rdiff = AtomicU64::new(0);
+    let roff = AtomicU64::new(0);
+    for f in 0..3u32 {
+        let per = n.div_ceil(threads as u64);
+        std::thread::scope(|sc| {
+            for t in 0..threads as u64 {
+                let (rdiff, roff) = (&rdiff, &roff);
+                sc.spawn(move || {
+                    let (mut d, mut o) = (0u64, 0u64);
+                    for i in t * per..((t + 1) * per).min(n) {
+                        let x = input(f, i);
+                        let b = c(x);
+                        d += u64::from(!same(cr(x), b));
+                        o += u64::from(!same(sys_tanh(x), b));
+                    }
+                    rdiff.fetch_add(d, Ordering::Relaxed);
+                    roff.fetch_add(o, Ordering::Relaxed);
+                });
+            }
+        });
+    }
+    let rd = rdiff.load(Ordering::Relaxed);
+    println!(
+        "random: {} inputs, {rd} differ from CORE-MATH's C; glibc not correctly rounded on {}",
+        3 * n,
+        roff.load(Ordering::Relaxed)
+    );
+    // the unit test's values: a few of each branch and the first worst cases
+    let mut rec: Vec<f64> = vec![1e-30, 1e-9, 0.1, 0.2, 0.3, 1.0, 2.5, 3.6, 3.7, 5.0, 12.0, 19.0];
+    rec.extend(worst.iter().step_by((worst.len() / 24).max(1)).take(24));
+    println!("    const RECORDED: &[(u64, u64)] = &[");
+    for x in rec {
+        println!("        (0x{:016x}, 0x{:016x}),", x.to_bits(), c(x).to_bits());
+    }
+    println!("    ];");
+    differ == 0 && rd == 0
+}
+
+/// A C hex-float literal (`0x1.8p-3`, `-0x1p+0`).
+fn parse_hex_float(s: &str) -> f64 {
+    let (neg, s) = s.strip_prefix('-').map_or((false, s), |r| (true, r));
+    let s = &s[2..];
+    let (mant, exp) = s.split_once(['p', 'P']).unwrap();
+    let (int, frac) = mant.split_once('.').unwrap_or((mant, ""));
+    let mut m: u128 = if int.is_empty() {
+        0
+    } else {
+        u128::from_str_radix(int, 16).unwrap()
+    };
+    for ch in frac.chars() {
+        m = m * 16 + u128::from(ch.to_digit(16).unwrap());
+    }
+    let e: i32 = exp.parse::<i32>().unwrap() - 4 * frac.len() as i32;
+    // m < 2^64 here: rounded once to a double (as C's strtod), then scaled exactly in steps
+    let mut v = m as f64;
+    let mut e = e;
+    while e < -1000 {
+        v *= 2f64.powi(-1000);
+        e += 1000;
+    }
+    while e > 1000 {
+        v *= 2f64.powi(1000);
+        e -= 1000;
+    }
+    v *= 2f64.powi(e);
+    if neg { -v } else { v }
+}
+
 fn main() {
     let args: Vec<String> = std::env::args().collect();
+    if args.get(1).map(String::as_str) == Some("coremath") {
+        let log2n = args.get(4).and_then(|s| s.parse().ok()).unwrap_or(24);
+        let ok = coremath(&args[2], &args[3], log2n, 16);
+        println!("{}", if ok { "VERIFY-PASS" } else { "VERIFY-FAIL" });
+        std::process::exit(i32::from(!ok));
+    }
     let mut log2n = 28u32;
     let mut threads = 16usize;
     let mut i = 2;

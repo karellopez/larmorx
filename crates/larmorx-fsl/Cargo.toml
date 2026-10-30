@@ -11,8 +11,8 @@ larmorx-core.workspace = true
 larmorx-io.workspace = true
 # FSL 6.0.7.23's image names, compressions and reading, shared with the clean-room mcflirt.
 larmorx-mri.workspace = true
-# tanh only: larmorx_core::math has no correctly rounded port of it in double precision yet
-# (CLAUDE.md rule 5).
+# Unused since 2026-10-30 (part 2a): tanh is larmorx_core::math's (tanh_glibc for FSL's bits,
+# tanh correctly rounded). Its removal changes the three workspaces' lockfiles: left to the merge.
 libm.workspace = true
 rayon.workspace = true
 bytemuck.workspace = true

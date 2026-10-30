@@ -1,14 +1,14 @@
 # Parity: mcflirt replica (bit-exact, FSL Licence)
 
-**All cases agree.** 203 cases on the `standard` tier: 181 pass, 22 rejected by both, 0 expected divergences, 0 failures.
+**All cases agree.** 236 cases on the `standard` tier: 205 pass, 31 rejected by both, 0 expected divergences, 0 failures.
 
 - **Validated:** `larmorx-nc fsl mcflirt` (crate larmorx-nc-mcflirt, translated from FSL 6.0.7.23's source; `lx.mri.hmc(implementation="replica")`)
 - **Reference:** mcflirt from FSL 6.0.7.23 (fsl-mcflirt 2111.0, the conda build at `~/fsl-6.0.7.23`, as built: glibc 2.35's maths): the recorded runs in `oracles/fsl-6.0.7.23/mcflirt-haswell/` and runs made here
 - **Test data:** larmorx-testdata `52124bc98f9f`, tier `standard`
-- **Generated:** 2026-10-29 on Linux x86_64, with `python -m larmorx_validation parity fsl-mcflirt-replica --tier standard`
-- **Original programs:** 132 runs: 115 from the oracle cache, 17 run; cache `<workspace>/oracles/cache`, mode `use`
+- **Generated:** 2026-10-30 on Linux x86_64, with `python -m larmorx_validation parity fsl-mcflirt-replica --tier standard`
+- **Original programs:** 165 runs: 134 from the oracle cache, 31 run (6 never cached: the original varies); cache `<workspace>/oracles/cache`, mode `use`
 
-- **Bit-identical to mcflirt as built** (every file, the exit status and both streams; the replica in `reproduce` mode): 181 of 181 compared cases; 22 where both end with the same error.
+- **Bit-identical to mcflirt as built** (every file, the exit status and both streams; the replica in `reproduce` mode): 205 of 205 compared cases; 31 where both end with the same error.
 
 The three columns of the head-motion validation (the clean-room original's numbers from its record, `docs/validation/mri-hmc.md`, not computed again):
 
@@ -150,20 +150,23 @@ The three columns of the head-motion validation (the clean-room original's numbe
 | `syn/orientation/ras/reffile` | pass (18/18 files) | pass: p95 RMS 0.0713 mm, MAT identical 0/12 |
 
 - **D13 fix pass** (larmorx's default, `upstream_defects="fix"`; the comparison above runs `reproduce`): the corrections met
-  - FSL-01: 163 case(s) named it, 162 with changed values (largest difference inf), 28 with other changes (exit N -> N; files ['a.hdr.d/out.nii.gz', 'a.img.d/out.nii.gz']; files ['out.nii.gz_mean_reg.nii.gz', 'out.nii.gz_meanvol.nii.gz', 'out.nii.gz_sigma.nii.gz', 'out.nii.gz_variance.nii.gz']; files ['out_mcf.nii.gz.mat/MAT_N']; files ['out_mcf.nii.gz_mean_reg.nii.gz', 'out_mcf_mean_reg.nii.gz']; files ['out_mcf.nii.gz_meanvol.nii.gz', 'out_mcf.nii.gz_sigma.nii.gz', 'out_mcf.nii.gz_variance.nii.gz', 'out_mcf_meanvol.nii.gz']; out.nii.gz header; out_mcf.nii.gz header): `recorded/real/ds000005/default`, `recorded/real/ds000005/fmriprep`, `recorded/real/ds000005/fmriprep-repeat2`, `recorded/real/ds000005/fmriprep-repeat3`, `recorded/real/ds000005/fmriprep-reports`, `recorded/real/ds000005/opt-2d`, `recorded/real/ds000005/opt-bins64`, `recorded/real/ds000005/opt-cost-corratio` …
+  - FSL-01: 174 case(s) named it, 162 with changed values (largest difference inf), 39 with other changes (exit N; exit N -> N; files ['a.hdr.d/out.nii.gz', 'a.img.d/out.nii.gz']; files ['out.nii.gz_mean_reg.nii.gz', 'out.nii.gz_meanvol.nii.gz', 'out.nii.gz_sigma.nii.gz', 'out.nii.gz_variance.nii.gz']; files ['out_mcf.nii.gz.mat/MAT_N']; files ['out_mcf.nii.gz_mean_reg.nii.gz', 'out_mcf_mean_reg.nii.gz']; files ['out_mcf.nii.gz_meanvol.nii.gz', 'out_mcf.nii.gz_sigma.nii.gz', 'out_mcf.nii.gz_variance.nii.gz', 'out_mcf_meanvol.nii.gz']; out.nii.gz header; out_mcf.nii.gz header): `recorded/real/ds000005/default`, `recorded/real/ds000005/fmriprep`, `recorded/real/ds000005/fmriprep-repeat2`, `recorded/real/ds000005/fmriprep-repeat3`, `recorded/real/ds000005/fmriprep-reports`, `recorded/real/ds000005/opt-2d`, `recorded/real/ds000005/opt-bins64`, `recorded/real/ds000005/opt-cost-corratio` …
   - FSL-03: 7 case(s) named it, 7 with changed values (largest difference 371), 6 with other changes (out.nii.gz header; out_mcf.nii.gz header): `recorded/real/ds000005/opt-2d`, `recorded/syn/geometry/thin-slab/default`, `recorded/syn/geometry/thin-slab/fov10`, `recorded/syn/geometry/thin-slab/rotation2`, `recorded/syn/motion/small/2d`, `edge/fov0-2d`, `difftest/atanf-printed-params`
   - FSL-04: 1 case(s) named it, 0 with changed values (largest difference 0), 1 with other changes (exit N -> N; files ['grefvol_out.nii.gz', 'out.nii.gz', 'out.par']): `edge/gdt`
   - FSL-05: 2 case(s) named it, 2 with changed values (largest difference 15): `recorded/real/ds000005/opt-scaling3`, `edge/scaling-hist`
   - FSL-06: 1 case(s) named it, 0 with changed values (largest difference 0), 1 with other changes (exit N -> N; files ['out_mcf.nii.gz', 'out_mcf.nii.gz.mat/MAT_N', 'out_mcf.nii.gz.mat/MAT_N', 'out_mcf.nii.gz.mat/MAT_N']): `recorded/syn/motion/small/unknown-cost`
+  - FSL-07: 1 case(s) named it, 0 with changed values (largest difference 0), 1 with other changes (exit N): `failures/binsabc-mutualinfo`
   - FSL-08: 10 case(s) named it, 9 with changed values (largest difference 992), 9 with other changes (files ['out.nii.gz_mean_reg.nii.gz', 'out.nii.gz_meanvol.nii.gz', 'out.nii.gz_sigma.nii.gz', 'out.nii.gz_variance.nii.gz']; files ['out_mcf.nii.gz_mean_reg.nii.gz', 'out_mcf_mean_reg.nii.gz']; files ['out_mcf.nii.gz_meanvol.nii.gz', 'out_mcf.nii.gz_sigma.nii.gz', 'out_mcf.nii.gz_variance.nii.gz', 'out_mcf_meanvol.nii.gz']; out.nii.gz header; out_mcf.nii.gz header): `recorded/real/ds000005/opt-meanvol`, `recorded/real/ds000005/opt-meanvol-noref`, `recorded/real/ds000005/opt-stats`, `recorded/syn/motion/small/meanvol`, `recorded/syn/motion/small/stats`, `edge/fsloutputtype-zst`, `edge/meanvol-reffile-sinc-stats`, `difftest/atanf-matrices-from-0` …
   - FSL-09: 143 case(s) named it, 143 with changed values (largest difference 1.07e+03), 23 with other changes (files ['a.hdr.d/out.nii.gz', 'a.img.d/out.nii.gz']; files ['out.nii.gz_mean_reg.nii.gz', 'out.nii.gz_meanvol.nii.gz', 'out.nii.gz_sigma.nii.gz', 'out.nii.gz_variance.nii.gz']; files ['out_mcf.nii.gz.mat/MAT_N']; files ['out_mcf.nii.gz_mean_reg.nii.gz', 'out_mcf_mean_reg.nii.gz']; files ['out_mcf.nii.gz_meanvol.nii.gz', 'out_mcf.nii.gz_sigma.nii.gz', 'out_mcf.nii.gz_variance.nii.gz', 'out_mcf_meanvol.nii.gz']; out.nii.gz header; out_mcf.nii.gz header): `recorded/real/ds000005/default`, `recorded/real/ds000005/fmriprep`, `recorded/real/ds000005/fmriprep-repeat2`, `recorded/real/ds000005/fmriprep-repeat3`, `recorded/real/ds000005/fmriprep-reports`, `recorded/real/ds000005/opt-2d`, `recorded/real/ds000005/opt-bins64`, `recorded/real/ds000005/opt-cost-corratio` …
   - FSL-10: 3 case(s) named it, 3 with changed values (largest difference 33), 3 with other changes (out_mcf.nii.gz header): `recorded/real/ds003345/default`, `recorded/real/ds003345/fmriprep`, `recorded/real/ds003345/fmriprep-reports`
-  - FSL-13: 1 case(s) named it, 1 with changed values (largest difference 3), 1 with other changes (files ['out_mcf.nii.gz.mat/MAT_N']): `recorded/syn/cli/rmsrel-only`
+  - FSL-13: 3 case(s) named it, 1 with changed values (largest difference 3), 3 with other changes (exit N; files ['out_mcf.nii.gz.mat/MAT_N']): `recorded/syn/cli/rmsrel-only`, `failures/fsl20-rmsrel`, `failures/fsl20-rmsabs-report`
   - FSL-14: 3 case(s) named it, 3 with changed values (largest difference inf), 1 with other changes (out.nii.gz header): `recorded/syn/content/nan/default`, `recorded/syn/content/nan/reffile`, `edge/nan-reffile`
-  - FSL-20: 1 case(s) named it, 0 with changed values (largest difference 0), 1 with other changes (exit N -> N): `edge/out-dir-missing`
-  - FSL-21: 2 case(s) named it, 0 with changed values (largest difference 0), 2 with other changes (exit N -> N; files ['out.nii.gz']): `edge/bins4-mutualinfo`, `edge/bins1-normmi`
+  - FSL-20: 7 case(s) named it, 0 with changed values (largest difference 0), 7 with other changes (exit N; exit N -> N): `edge/out-dir-missing`, `failures/fsl20-mats`, `failures/fsl20-mats-plots`, `failures/fsl20-reffile`, `failures/fsl20-file-parent`, `failures/fsl20-rmsrel`, `failures/fsl20-rmsabs-report`
+  - FSL-21: 11 case(s) named it, 0 with changed values (largest difference 0), 11 with other changes (exit N; exit N -> N; files ['out.nii.gz']): `edge/bins4-mutualinfo`, `edge/bins1-normmi`, `failures/bins7-mutualinfo`, `failures/bins4-mutualinfo-s2`, `failures/bins4-mutualinfo-s3-plots`, `failures/bins0-normmi`, `failures/bins1-woods`, `failures/bins2-corratio` …
   - FSL-59: 4 case(s) named it, 4 with changed values (largest difference 391), 4 with other changes (files ['out.nii.gz_mean_reg.nii.gz', 'out.nii.gz_meanvol.nii.gz', 'out.nii.gz_sigma.nii.gz', 'out.nii.gz_variance.nii.gz']; out.nii.gz header; out_mcf.nii.gz header): `recorded/real/ds000005/opt-nn_final`, `recorded/syn/motion/small/nn_final`, `recorded/syn/motion/small/sinc_final`, `edge/meanvol-reffile-sinc-stats`
   - FSL-60: 1 case(s) named it, 1 with changed values (largest difference 0.0133), 1 with other changes (files ['a.hdr.d/out.nii.gz', 'a.img.d/out.nii.gz']): `edge/img-in-output-directory`
+  - FSL-65: 5 case(s) named it, 0 with changed values (largest difference 0), 5 with other changes (exit N): `failures/fsl20-plots-only`, `failures/par-dir-plots-mats`, `failures/par-dir-plots`, `failures/par-dir-plots-mats-ref0`, `failures/rms-dir`
+  - FSL-66: 5 case(s) named it, 0 with changed values (largest difference 0), 5 with other changes (exit N): `failures/binsm1-normcorr`, `failures/binsm4-normcorr-s2`, `failures/binsm8-normcorr`, `failures/binsm16-normcorr`, `failures/binsm16-mutualinfo`
 - **FSL's own step, FSL 6.0.7.17 → 6.0.7.23** (both installations on the same arguments; the previous one's runs from the oracle-output cache or its recording where an earlier record made them): 179 of 197 cases identical (exit status, messages, every output); 18 changed: 4 by FSL-59 (FSL 6.0.7.23's mcflirt applies -sinc_final and -nn_final with trilinear interpolation (newimage 2601.0 keeps each volume's interpolation method from its first access); 6.0.7.17 used the method asked for): `recorded/real/ds000005/opt-nn_final`, `recorded/syn/motion/small/nn_final`, `recorded/syn/motion/small/sinc_final`, `edge/meanvol-reffile-sinc-stats`; 2 by FSL-60 (FSL 6.0.7.23 opens an image whose path holds '.img' or '.hdr' before its extension under another name (NewNifti 5.0.0's replaceSuffix)): `edge/img-in-directory`, `edge/img-in-output-directory`; 5 by arma-lapack (FSL 6.0.7.23's Armadillo 14.2.1 inverts 4 x 4 matrices and solves with them through LAPACK (OpenBLAS), where Armadillo 10.5.1 used its closed-form inverse: the last bits of values computed from nearly equal matrices change, and the sign of NaN parameters): `recorded/real/ds000005/opt-stages1`, `recorded/syn/content/nan/default`, `recorded/syn/content/nan/reffile`, `recorded/syn/motion/identical-copies/default`, `recorded/syn/motion/identical-copies/reffile-fudge`; 2 by compressed-input (FSL 6.0.7.23 reads zstd and bzip2 compressed images): `edge/input-zst`, `edge/input-bz2-plain-name`; 5 by output-types (FSL 6.0.7.23 adds the zstd and bzip2 output types (FSLOUTPUTTYPE NIFTI_ZST, NIFTI_BZ2, ...) and lists every type in the message for an unknown one): `edge/fsloutputtype-analyze`, `edge/fsloutputtype-zst`, `edge/fsloutputtype-pair-bz2`, `edge/fsloutputtype-nifti2-zst`, `edge/fsloutputtype-bogus`.
 
 ## Thresholds
@@ -183,6 +186,7 @@ The three columns of the head-motion validation (the clean-room original's numbe
 | difftest | 6 | 6 | 0 | 0 | 0 |
 | edge cases | 42 | 32 | 10 | 0 | 0 |
 | fMRIPrep's calls | 21 | 21 | 0 | 0 | 0 |
+| failure cases (spec §14.1) | 33 | 24 | 9 | 0 | 0 |
 | recorded: options (ds000005) | 25 | 24 | 1 | 0 | 0 |
 | recorded: real | 30 | 29 | 1 | 0 | 0 |
 | recorded: synthetic/cli | 11 | 6 | 5 | 0 | 0 |
@@ -218,12 +222,21 @@ The three columns of the head-motion validation (the clean-room original's numbe
 | `edge/img-in-directory` | an input in a directory named a.img.d: FSL 6.0.7.23 opens a.hdr.d/in.nii.gz (FSL-60) | mcflirt exits [-6]; the same from the replica. Image Exception : #22 :: Failed to read volume a.img.d/in.nii.gz Error : Error: cant open file a.hdr.d/in.nii.gz… |
 | `edge/fsloutputtype-bogus` | an unknown FSLOUTPUTTYPE | mcflirt exits [1]; the same from the replica. ERROR:: Unrecognised value (BOGUS) of environment variable FSLOUTPUTTYPE Legal values are: NIFTI, NIFTI_PAIR, NIF… |
 | `edge/rgb-input` | RGB input (a type FSL does not read) | mcflirt exits [-6]; the same from the replica. Image Exception : #8 :: Fslread: DT 128 not supported terminate called after throwing an instance of 'std::runti… |
+| `failures/fsl20-perm` | -mats in a read-only directory: mcflirt's permission message, then it aborts | mcflirt ends by signal 6 (Error! Could not create directory: <inputs>/<run>/ro/o.mat. No write permission); larmorx exits 1 (reproduce) and 1 (default) with it… |
+| `failures/fsl20-none` | no output option, in a missing directory: the series cannot be written | mcflirt ends by signal 6 (terminate called after throwing an instance of 'NiftiIO::NiftiException'); larmorx exits 1 (reproduce) and 1 (default) with its error |
+| `failures/bins2-corratio` | corratio with -bins 2: mcflirt aborts (FSL-21) | mcflirt ends by signal 6 (double free or corruption (out)); larmorx exits 1 (reproduce) and 1 (default) with its error |
+| `failures/bins2-corratio-smooth0` | corratio, -bins 2, -smooth 0 (FSL-21) | mcflirt ends by signal 6 (double free or corruption (out)); larmorx exits 1 (reproduce) and 1 (default) with its error |
+| `failures/bins2-corratio-report` | corratio, -bins 2, -report (FSL-21) | mcflirt ends by signal 6 (Processed data will be saved as <run>/o); larmorx exits 1 (reproduce) and 1 (default) with its error |
+| `failures/binsm4-normcorr-s2` | -bins -4, two stages: mcflirt is killed by SIGFPE (FSL-66) | mcflirt ends by signal 8 (no message); larmorx exits 1 (reproduce) and 1 (default) with its error |
+| `failures/binsm8-normcorr` | -bins -8: SIGFPE in stage 1 (FSL-66) | mcflirt ends by signal 8 (no message); larmorx exits 1 (reproduce) and 1 (default) with its error |
+| `failures/binsm16-normcorr` | -bins -16: std::bad_array_new_length (FSL-66) | mcflirt ends by signal 6 (terminate called after throwing an instance of 'std::bad_array_new_length'); larmorx exits 1 (reproduce) and 1 (default) with its err… |
+| `failures/binsm16-mutualinfo` | mutualinfo, -bins -16 (FSL-66) | mcflirt ends by signal 6 (terminate called after throwing an instance of 'std::bad_array_new_length'); larmorx exits 1 (reproduce) and 1 (default) with its err… |
 
 ## Environment
 
 | Component | Version |
 |---|---|
-| larmorx | 0.0.1 (59243251aa28) |
+| larmorx | 0.0.1 (7582eaeb4519) |
 | larmorx-testdata | 52124bc98f9f |
 | Python | 3.12.16 |
 | Platform | Linux x86_64 (Linux-6.8.0-124-generic-x86_64-with-glibc2.35) |
@@ -415,6 +428,39 @@ The replica runs as a separate program, the FSL replica package's (`larmorx-nc`)
 | `edge/smooth-negative` | pass | 7/7 | a negative -smooth |
 | `edge/scaling-hist` | pass | 7/7 | -scaling and -hist (no effect: FSL-05) |
 | `edge/fov0-2d` | pass | 7/7 | -2d with -fov 0 |
+| `failures/fsl20-mats` | pass | 8/8 | -mats in a directory that does not exist (FSL-20) |
+| `failures/fsl20-mats-plots` | pass | 8/8 | -mats -plots in a directory that does not exist (FSL-20) |
+| `failures/fsl20-reffile` | pass | 8/8 | -mats with -reffile in a missing directory (FSL-20) |
+| `failures/fsl20-file-parent` | pass | 8/8 | -mats where the directory is a file (FSL-20) |
+| `failures/fsl20-rmsrel` | pass | 8/8 | -rmsrel without -mats in a missing directory (FSL-13, FSL-20) |
+| `failures/fsl20-rmsabs-report` | pass | 8/8 | -rmsabs -report without -mats in a missing directory (FSL-13, FSL-20) |
+| `failures/fsl20-perm` | both-error | 7/7 | -mats in a read-only directory: mcflirt's permission message, then it aborts |
+| `failures/fsl20-plots-only` | pass | 8/8 | -plots alone in a missing directory (FSL-65) |
+| `failures/fsl20-none` | both-error | 7/7 | no output option, in a missing directory: the series cannot be written |
+| `failures/par-dir-plots-mats` | pass | 9/9 | a directory named o.par, with -mats -plots -rmsrel (FSL-65) |
+| `failures/par-dir-plots` | pass | 8/8 | a directory named o.par, -plots (FSL-65) |
+| `failures/par-dir-plots-mats-ref0` | pass | 9/9 | a directory named o.par, -mats -plots -refvol 0 (FSL-65) |
+| `failures/rms-dir` | pass | 9/9 | directories named o_rel.rms and o_abs_mean.rms (FSL-65) |
+| `failures/bins7-mutualinfo` | pass | 9/9 | mutualinfo with -bins 7 (FSL-21) |
+| `failures/bins4-mutualinfo-s2` | pass | 9/9 | mutualinfo, -bins 4, two stages (FSL-21) |
+| `failures/bins4-mutualinfo-s3-plots` | pass | 9/9 | mutualinfo, -bins 4, three stages, -plots (FSL-21) |
+| `failures/bins0-normmi` | pass | 9/9 | normmi with -bins 0 (FSL-21) |
+| `failures/bins1-woods` | pass | 9/9 | woods with -bins 1 (FSL-21) |
+| `failures/binsabc-mutualinfo` | pass | 9/9 | -bins abc, read as 0 (FSL-07; FSL-21 reproduced) |
+| `failures/bins2-corratio` | both-error | 8/8 | corratio with -bins 2: mcflirt aborts (FSL-21) |
+| `failures/bins2-corratio-smooth0` | both-error | 8/8 | corratio, -bins 2, -smooth 0 (FSL-21) |
+| `failures/bins2-corratio-report` | both-error | 8/8 | corratio, -bins 2, -report (FSL-21) |
+| `failures/bins8-corratio` | pass | 7/7 | corratio with -bins 8: one bin in stage 1 |
+| `failures/bins8-mutualinfo-s3` | pass | 7/7 | mutualinfo with -bins 8: one bin in stage 1 (a cost of rounding noise) |
+| `failures/bins2-normcorr` | pass | 7/7 | normcorr with -bins 2 (it uses no bins) |
+| `failures/bins2-leastsq` | pass | 7/7 | leastsquares with -bins 2 (it uses no bins) |
+| `failures/binsm1-normcorr` | pass | 9/9 | normcorr with -bins -1: no bins anywhere (FSL-66) |
+| `failures/bins4-mutualinfo-s0` | pass | 7/7 | mutualinfo, -bins 4, -stages 0: no stage runs |
+| `failures/bins4-mutualinfo-1vol` | pass | 9/9 | mutualinfo, -bins 4, one volume: nothing is registered |
+| `failures/binsm4-normcorr-s2` | both-error | 8/8 | -bins -4, two stages: mcflirt is killed by SIGFPE (FSL-66) |
+| `failures/binsm8-normcorr` | both-error | 8/8 | -bins -8: SIGFPE in stage 1 (FSL-66) |
+| `failures/binsm16-normcorr` | both-error | 8/8 | -bins -16: std::bad_array_new_length (FSL-66) |
+| `failures/binsm16-mutualinfo` | both-error | 8/8 | mutualinfo, -bins -16 (FSL-66) |
 | `fmriprep/ds000005-sub-01-noreconall/task_mixedgamblestask_run_01` | pass | 8/8 | fMRIPrep 25.2.6's mcflirt call (ds000005-sub-01-noreconall, task_mixedgamblestask_run_01) |
 | `fmriprep/ds000005-sub-01-noreconall/task_mixedgamblestask_run_02` | pass | 8/8 | fMRIPrep 25.2.6's mcflirt call (ds000005-sub-01-noreconall, task_mixedgamblestask_run_02) |
 | `fmriprep/ds000005-sub-01-noreconall/task_mixedgamblestask_run_03` | pass | 8/8 | fMRIPrep 25.2.6's mcflirt call (ds000005-sub-01-noreconall, task_mixedgamblestask_run_03) |

@@ -24,6 +24,18 @@ reproduces the original copyright and MIT notice.
 | `math/sinf.rs` (`sinf`, `cosf`) | `src/binary32/sin/sinf.c` (`f27c4baa849b…`), `src/binary32/cos/cosf.c` (`3ea4c6d03d32…`) | bit-identical to the C (gcc 11.4, `-O2`) on all 2^32 inputs of each; unit tests check checksums of every 4099th input, an ignored one of all inputs |
 | `math/tanhf.rs` | `src/binary32/tanh/tanhf.c` (`a60f385ebc85…`) | bit-identical to the C (gcc 11.4, `-O2 -ffp-contract=off`) on all 2^32 inputs; checksums as for `expf` (2026-10-23, for 3dUnifize's squash) |
 | `math/cbrtf.rs` | `src/binary32/cbrt/cbrtf.c` (`36b3c1127013…`) | as for `tanhf` (for 3dUnifize's `-EPI` radius); round to nearest only, the inexact-flag handling dropped |
+| `math/tanh.rs` | `src/binary64/tanh/tanh.c` (`e89441340424…`) | bit-identical to the C (gcc 11.4, `-O2 -ffp-contract=off`, as a shared library) on all 31,440 cases of `tanh.wc` at ±x and 805 million random inputs (log-uniform bit patterns from 2^-80 to 2^6, uniform on (-25, 25) and (-1, 1)), FMA and portable copies alike (2026-10-30, for BET's smoothness weight; `validation/investigations/cleanroom-bet/tanh-verify/`, `coremath`); the tables transcribed mechanically (`coremath_tables.py`); round to nearest only, errno dropped |
+
+**Not ported from CORE-MATH: `math/tanh_glibc.rs`** (2026-10-30), the hyperbolic tangent with glibc
+2.35's bits for `reproduce` (BET's smoothness weight, `specs/bet.md` §8.1; GLIBC-06), is a port
+of fdlibm 5.3's `s_tanh.c` and `s_expm1.c` as netlib distributes them
+(<https://www.netlib.org/fdlibm/>, Sun Microsystems' notice: "Permission to use, copy, modify,
+and distribute this software is freely granted, provided that this notice is preserved",
+reproduced in the file), with `expm1`'s polynomial in Estrin's order (the pipelined revision
+`specs/bet.md` §8.1 names, found by black-box testing), written by BET's clean-room implementer
+from those files only (glibc's source never opened); proved equal to the system's `tanh` (glibc
+2.35, x86-64) on 12,918,456,348 inputs (`validation/investigations/cleanroom-bet/tanh-verify/`);
+unit tests check recorded values and a hash of 2^20 inputs.
 
 **Not ported: `math/cbrtf_glibc.rs`** (2026-10-30), the cube root with glibc 2.35's bits for
 `reproduce` (3dUnifize `-EPI`'s radius, GLIBC-05), is a **clean-room implementation**

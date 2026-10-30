@@ -980,6 +980,12 @@ def suite() -> Suite:
                 f"identical; NCC ≥ {IMAGE_NCC}",
             ),
             ("Synthetic truth: mean RMS deviation", f"larmorx ≤ mcflirt + {TRUTH_SLACK_MM} mm"),
+            (
+                "Failure cases (spec §14.1: FSL-20, -21, -65, -66)",
+                "`reproduce`: mcflirt's exit status (1 where it ends by a signal), its first line "
+                "of standard error, the files written, the defects named; matrices where both run "
+                "(reported where a stage has no bin or one); the default: refused, nothing written",
+            ),
         ],
         cases=cases,
         run_case=_run_case_recording,
@@ -992,6 +998,9 @@ def suite() -> Suite:
             "compared as written (about the reference's intensity-weighted centre). The `descrip` "
             "header field differs by design (larmorx writes its own name). larmorx runs at "
             f"{LX_THREADS} threads (`LARMORX_PARITY_LX_THREADS`); its results do not depend on "
-            "the thread count. " + fsl_versions.record_line("original", with_step=False)
+            "the thread count. The failure cases of `specs/mcflirt.md` §14.1 (`failures/`) run "
+            "mcflirt live, through the oracle cache (`mri_hmc_failures`), on a 24 × 24 × 16 × 5 "
+            "phantom, each program in a run directory of its own prepared alike. "
+            + fsl_versions.record_line("original", with_step=False)
         ),
     )

@@ -251,7 +251,8 @@ pub fn self_intersection(mesh: &Mesh, points: &[V3], initial: &[V3]) -> f64 {
     let ml = mesh.mean_neighbour_distance(points);
     let mlo = mesh.mean_neighbour_distance(initial);
     if !(ml > 0.0) || !ml.is_finite() {
-        return if ml.is_nan() { f64::NAN } else { 0.0 };
+        // no pair is closer than a distance that is not a number (observed: a total of 0)
+        return 0.0;
     }
     let grid = Grid::new(points, ml);
     let terms: Vec<Vec<(u32, f64)>> = (0..points.len())
@@ -409,7 +410,8 @@ pub fn intersects(mesh: &Mesh, points: &[V3]) -> bool {
                 return;
             }
             let tj = tris[j];
-            if ti.iter().any(|v| tj.contains(v)) {
+            let shared = ti.iter().filter(|v| tj.contains(v)).count();
+            if shared >= 2 {
                 return;
             }
             let (lo2, hi2) = boxes[j];
@@ -418,7 +420,12 @@ pub fn intersects(mesh: &Mesh, points: &[V3]) -> bool {
             }
             let a = ti.map(|v| points[v as usize]);
             let b = tj.map(|v| points[v as usize]);
-            if triangles_intersect(&a, &b) {
+            let crossing = if shared == 0 {
+                triangles_intersect(&a, &b)
+            } else {
+                folded(ti, tj, &a, &b)
+            };
+            if crossing {
                 hit = true;
             }
         });
@@ -426,9 +433,94 @@ pub fn intersects(mesh: &Mesh, points: &[V3]) -> bool {
     })
 }
 
+/// Whether two triangles that share one vertex cross elsewhere than at it (a fold of the
+/// surface at that vertex): an edge of one crossing the other away from the shared vertex.
+fn folded(ti: [u32; 3], tj: [u32; 3], a: &[V3; 3], b: &[V3; 3]) -> bool {
+    let away = |t: [u32; 3], p: &[V3; 3], other: [u32; 3], q: &[V3; 3]| {
+        let s = (0..3).find(|&k| other.contains(&t[k])).unwrap_or(0);
+        let (o1, o2) = ((s + 1) % 3, (s + 2) % 3);
+        // the edge opposite the shared vertex, and the two edges from it (crossing beyond it)
+        segment_hits(p[o1], p[o2], q)
+            || segment_crosses_beyond(p[s], p[o1], q)
+            || segment_crosses_beyond(p[s], p[o2], q)
+    };
+    away(ti, a, tj, b) || away(tj, b, ti, a)
+}
+
+/// Whether the segment from `p` (a vertex of `t`) to `q` crosses triangle `t` away from `p`.
+fn segment_crosses_beyond(p: V3, q: V3, t: &[V3; 3]) -> bool {
+    let dir = sub(q, p);
+    let e1 = sub(t[1], t[0]);
+    let e2 = sub(t[2], t[0]);
+    let h = cross(dir, e2);
+    let a = dot(e1, h);
+    if a.abs() < 1e-12 {
+        return false;
+    }
+    let f = 1.0 / a;
+    let s = sub(p, t[0]);
+    let u = f * dot(s, h);
+    if !(0.0..=1.0).contains(&u) {
+        return false;
+    }
+    let qv = cross(s, e1);
+    let v = f * dot(dir, qv);
+    if v < 0.0 || u + v > 1.0 {
+        return false;
+    }
+    let w = f * dot(e2, qv);
+    w > 1e-9 && w <= 1.0
+}
+
 fn triangles_intersect(a: &[V3; 3], b: &[V3; 3]) -> bool {
     (0..3).any(|k| segment_hits(a[k], a[(k + 1) % 3], b))
         || (0..3).any(|k| segment_hits(b[k], b[(k + 1) % 3], a))
+        || coplanar_overlap(a, b)
+}
+
+/// Whether two triangles in one plane overlap (their edges cross, or one holds a vertex of
+/// the other), in the plane's projection on the two axes its normal is least along.
+fn coplanar_overlap(a: &[V3; 3], b: &[V3; 3]) -> bool {
+    let n = cross(sub(a[1], a[0]), sub(a[2], a[0]));
+    let nn = dot(n, n);
+    if !(nn > 0.0) {
+        return false;
+    }
+    let scale = nn.sqrt();
+    let size = dist(a[0], a[1]).max(dist(a[1], a[2])).max(dist(a[2], a[0]));
+    if b.iter()
+        .any(|p| (dot(n, sub(*p, a[0])) / scale).abs() > 1e-9 * size.max(1.0))
+    {
+        return false;
+    }
+    let k = (0..3)
+        .max_by(|&i, &j| n[i].abs().total_cmp(&n[j].abs()))
+        .unwrap_or(2);
+    let (u, v) = ((k + 1) % 3, (k + 2) % 3);
+    let pa = a.map(|p| [p[u], p[v]]);
+    let pb = b.map(|p| [p[u], p[v]]);
+    let cross2 = |o: [f64; 2], p: [f64; 2], q: [f64; 2]| {
+        (p[0] - o[0]) * (q[1] - o[1]) - (p[1] - o[1]) * (q[0] - o[0])
+    };
+    let segments_cross = |p1: [f64; 2], p2: [f64; 2], q1: [f64; 2], q2: [f64; 2]| {
+        let d1 = cross2(q1, q2, p1);
+        let d2 = cross2(q1, q2, p2);
+        let d3 = cross2(p1, p2, q1);
+        let d4 = cross2(p1, p2, q2);
+        ((d1 > 0.0 && d2 < 0.0) || (d1 < 0.0 && d2 > 0.0))
+            && ((d3 > 0.0 && d4 < 0.0) || (d3 < 0.0 && d4 > 0.0))
+    };
+    let inside = |t: &[[f64; 2]; 3], p: [f64; 2]| {
+        let s = [
+            cross2(t[0], t[1], p),
+            cross2(t[1], t[2], p),
+            cross2(t[2], t[0], p),
+        ];
+        s.iter().all(|&x| x > 0.0) || s.iter().all(|&x| x < 0.0)
+    };
+    (0..3).any(|i| (0..3).any(|j| segments_cross(pa[i], pa[(i + 1) % 3], pb[j], pb[(j + 1) % 3])))
+        || pb.iter().any(|&p| inside(&pa, p))
+        || pa.iter().any(|&p| inside(&pb, p))
 }
 
 /// Whether the segment `p q` crosses triangle `t` (Möller and Trumbore's test).

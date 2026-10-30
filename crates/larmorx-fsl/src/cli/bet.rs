@@ -453,18 +453,31 @@ fn write_like(
     values: Values,
     cal: Option<(f64, f64)>,
 ) -> Result<(), String> {
+    let shape = vols.first().map_or(like.vol.shape, |v| v.shape);
+    write_values(run, stem, like, shape, vols.len().max(1), values, cal)
+}
+
+/// [`write_like`] with the grid's shape and the number of volumes given.
+fn write_values(
+    run: &Run<'_>,
+    stem: &str,
+    like: &image::Input,
+    shape: [usize; 3],
+    volumes: usize,
+    values: Values,
+    cal: Option<(f64, f64)>,
+) -> Result<(), String> {
     let t = run
         .settings
         .get("FSLOUTPUTTYPE")
         .ok_or_else(|| "FSLOUTPUTTYPE is not set".to_owned())?;
     let (name, version) = image::output_file(&run.settings.name(stem), t)
         .ok_or_else(|| format!("FSLOUTPUTTYPE={t} is not a type"))?;
-    let shape = vols.first().map_or(like.vol.shape, |v| v.shape);
     let o = Output {
         template: &like.header,
         flipped: like.flipped,
         shape,
-        volumes: vols.len().max(1),
+        volumes,
         cal,
         extensions: false,
         defects: run.mode,
@@ -536,8 +549,10 @@ fn fmri(
     ) {
         return Err(fail(e, out, err));
     }
-    let mut all = Vec::with_capacity(dilated.len() * vols.len());
-    for v in &vols {
+    // every volume masked, each freed as it is used: the series is held once
+    let (shape, count) = (vols[0].shape, vols.len());
+    let mut all = Vec::with_capacity(dilated.len() * count);
+    for v in vols {
         all.extend(
             v.data
                 .iter()
@@ -545,8 +560,17 @@ fn fmri(
                 .map(|(&x, &m)| if m != 0.0 { x } else { 0.0 }),
         );
     }
+    drop(dilated);
     // fslmaths -mas: the display range reset (observed)
-    if let Err(e) = write_like(run, output, &inp, &vols, Values::F32(all), Some((0.0, 0.0))) {
+    if let Err(e) = write_values(
+        run,
+        output,
+        &inp,
+        shape,
+        count,
+        Values::F32(all),
+        Some((0.0, 0.0)),
+    ) {
         return Err(fail(e, out, err));
     }
     Ok(())

@@ -669,25 +669,22 @@ def _header_same(ca: bytes, cb: bytes) -> bool:
     return _header_compare(ca, cb)[0]
 
 
-#: Where NIfTI-1 keeps the qform's quaternion (b, c, d: float32 at 256, 260, 264).
-QUATERN = (256, 268)
-
-
-def _ulps32(a: bytes, b: bytes) -> int:
-    """The distance in float32 units in the last place between two stored floats."""
-    import struct
-
-    x, y = (struct.unpack("<i", v)[0] for v in (a, b))
-    x = x if x >= 0 else -(x & 0x7FFFFFFF)
-    y = y if y >= 0 else -(y & 0x7FFFFFFF)
-    return abs(x - y)
+#: Where the qform's quaternion (b, c, d) is: NIfTI-1 float32 at 256..268, NIfTI-2 float64 at
+#: 352..376.
+QUATERN = {False: (256, 268, "<3f"), True: (352, 376, "<3d")}
+#: How far the original's quaternion components may be from FSL's: float precision at 1 (a unit
+#: quaternion's components, stored in float in NIfTI-1).
+QUATERN_TOLERANCE = 2.0**-23
 
 
 def _header_compare(ca: bytes, cb: bytes) -> tuple[bool, str]:
     """Two image headers alike but for ``descrip`` (the original names itself there), and the
-    qform's quaternion of a NIfTI-1 header within one float unit in the last place: FSL turns
-    the quaternion into its matrix and back with its NIfTI library's precision path, whose last
-    bit the spec leaves open (``specs/bet.md`` §8; ``docs/findings/fsl-bet-original.md``)."""
+    qform's quaternion within float precision (:data:`QUATERN_TOLERANCE`): FSL turns the
+    quaternion into its matrix and back with its NIfTI library's precision path, which the spec
+    leaves open (``specs/bet.md`` §8; ``docs/findings/fsl-bet-original.md``: the last float bit
+    in NIfTI-1, about 5e-9 in NIfTI-2's doubles)."""
+    import struct
+
     if len(ca) < 348 or len(cb) < 348:
         return ca == cb, "the same" if ca == cb else "differs"
     two = int.from_bytes(ca[:4], "little") == 540
@@ -696,21 +693,22 @@ def _header_compare(ca: bytes, cb: bytes) -> tuple[bool, str]:
     a, b = ca[:start] + ca[start + 80 : size], cb[:start] + cb[start + 80 : size]
     if a == b:
         return True, "the same but for descrip"
-    if not two:
-        q0, q1 = QUATERN
+    q0, q1, fmt = QUATERN[two]
 
-        def outside(c: bytes) -> bytes:
-            return c[:start] + c[start + 80 : q0] + c[q1:size]
+    def outside(c: bytes) -> bytes:
+        return c[:start] + c[start + 80 : q0] + c[q1:size]
 
-        if outside(ca) == outside(cb):
-            ulps = max(_ulps32(ca[k : k + 4], cb[k : k + 4]) for k in range(q0, q1, 4))
-            if ulps <= 1:
-                return True, (
-                    "the same but for descrip and the quaternion's last float bit (FSL's "
-                    "precision path, specs/bet.md §8)"
-                )
-            return False, f"the quaternion differs by {ulps} float units in the last place"
-    return False, "differs beyond descrip"
+    if outside(ca) != outside(cb):
+        return False, "differs beyond descrip"
+    qa = struct.unpack(fmt, ca[q0:q1])
+    qb = struct.unpack(fmt, cb[q0:q1])
+    worst = max(abs(x - y) for x, y in zip(qa, qb, strict=True))
+    if worst <= QUATERN_TOLERANCE:
+        return True, (
+            f"the same but for descrip and the quaternion (within {worst:.1e}: FSL's precision "
+            "path, specs/bet.md §8)"
+        )
+    return False, f"the quaternion differs by {worst:.3g}"
 
 
 def _original_image_data(path: Path) -> np.ndarray:

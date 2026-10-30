@@ -25,33 +25,27 @@ pub fn robust_range(v: &Vol) -> (f64, f64) {
         let width = fhi - flo;
         let hist = histogram(&v.data, flo, width);
         let (first, end) = if last { (1usize, 998usize) } else { (0, 999) };
+        // bins are added while the count is below n / 50: none when that is 0 (observed: a
+        // two-voxel image's t2 is one bin below its minimum, its t98 one above its maximum)
         let mut count = 0usize;
-        let mut b = first;
-        while b < 1000 {
-            count += hist[b];
-            if count >= target {
-                break;
-            }
+        let mut b = first as i64 - 1;
+        while count < target && b < 999 {
             b += 1;
+            count += hist[b as usize];
         }
-        let b = b.min(999);
         count = 0;
-        let mut u = end as isize;
-        while u >= 0 {
-            count += hist[u as usize];
-            if count >= target {
-                break;
-            }
+        let mut u = end as i64 + 1;
+        while count < target && u > 0 {
             u -= 1;
+            count += hist[u as usize];
         }
-        let u = u.max(0) as usize;
-        let at = |k: usize| f64::from(lo + (k as f64 * width / 1000.0) as f32);
+        let at = |k: i64| f64::from(lo + (k as f64 * width / 1000.0) as f32);
         t2 = at(b);
         t98 = at(u + 1);
         if t98 - t2 >= width / 10.0 || last {
             break;
         }
-        let (nlo, nhi) = (at(b.saturating_sub(1)), at((u + 1).min(999) + 1));
+        let (nlo, nhi) = (at((b - 1).max(0)), at((u + 1).min(999) + 1));
         lo = nlo as f32;
         hi = nhi as f32;
         if lo >= hi {
@@ -203,11 +197,8 @@ fn centre_of_gravity(v: &Vol, t2: f64, t98: f64, t: f64) -> [f64; 3] {
             s[k] += p[k];
         }
     }
-    if s[3] > 0.0 {
-        [s[0] / s[3], s[1] / s[3], s[2] / s[3]]
-    } else {
-        [0.0; 3]
-    }
+    // no voxel above the threshold: 0 / 0, not a number (observed: `c-of-g -nan -nan -nan`)
+    [s[0] / s[3], s[1] / s[3], s[2] / s[3]]
 }
 
 fn median(v: &Vol, t2: f64, t98: f64, r: f64, c: [f64; 3]) -> f64 {

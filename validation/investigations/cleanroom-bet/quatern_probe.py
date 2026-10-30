@@ -88,7 +88,7 @@ def polar(m, T):
     return x
 
 
-def to_quat(m, T):
+def to_quat(m, T, as_float=True):
     r = np.array(m, dtype=T)
     for j in range(3):
         n = np.sqrt((r[:, j] ** 2).sum())
@@ -126,7 +126,7 @@ def to_quat(m, T):
             a = T(0.25) * (r21 - r12) / d
         if a < 0:
             b, c, d = -b, -c, -d
-    return tuple(float(np.float32(v)) for v in (b, c, d))
+    return tuple(float(np.float32(v)) if as_float else float(v) for v in (b, c, d))
 
 
 def main(argv: list[str]) -> int:

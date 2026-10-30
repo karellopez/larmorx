@@ -73,14 +73,13 @@ fn segment_points(p: V3, q: V3, step: f64, mut f: impl FnMut(V3)) {
     }
 }
 
-/// Flood fill: every voxel of value `from` 6-connected to `start` (which must hold `from`)
+/// Flood fill: `start`, and every voxel of value `from` 6-connected to it,
 /// becomes `to`. Returns how many changed.
 pub fn fill(grid: &mut [u8], shape: [usize; 3], start: [usize; 3], from: u8, to: u8) -> usize {
     let [nx, ny, nz] = shape;
     let s = (start[2] * ny + start[1]) * nx + start[0];
-    if grid[s] != from {
-        return 0;
-    }
+    // the start is filled whatever it holds, and its neighbours from there (observed: a flat
+    // surface through the start voxel lets the fill reach the whole image)
     let slice = nx * ny;
     let mut stack = vec![s as u32];
     grid[s] = to;

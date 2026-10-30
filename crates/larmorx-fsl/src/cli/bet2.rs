@@ -546,8 +546,10 @@ pub fn run(
     // the outputs
     let output_type = settings.get("FSLOUTPUTTYPE").map(str::to_owned);
     let needs_images = o.brain || o.mask || o.outline || o.skull;
-    let mut mask: Option<Vec<u8>> = None;
-    if o.brain || o.mask || o.threshold {
+    let mask: Option<Vec<u8>>;
+    // the mask is made whatever the outputs (observed: FSL crashes in its fill at a centroid
+    // that is not a number also with -n and no other output, FSL-43)
+    {
         let made = bet::pooled(n_threads, || {
             let mut n = Vec::new();
             let m = bet::brain_mask(&found.mesh, &found.points, shape, voxel, mode, &mut n);

@@ -218,15 +218,28 @@ switches of FSL-40, -42, -43, -56, -60, -61 and -62) and the `bet` script's defa
 (FSL-63), `-F` and `-Z` (FSL-45), FSL-44 and FSL-46; `-S`, `-B`, `-A`, `-A2` refused as pending,
 as the replica does. betsurf's original is still to be written.
 
-**Status: `experimental`** ([record](../validation/fsl-bet.md), against FSL 6.0.7.23, the
-replica's suite without betsurf's cases): exit statuses and messages FSL's byte for byte; the
-masks, brains, outlines and meshes bit-identical to FSL's (the meshes to the file's 6 decimals)
-wherever the first pass of the deformation does not self-intersect, fMRIPrep's BET calls
-included; headers FSL's but for `descrip` (`larmorx fsl bet2`) and the qform's quaternion within
-float precision. Two parts are open, questions for the spec writer
+**Status: `experimental`** ([record](../validation/fsl-bet.md), standard tier against FSL
+6.0.7.23, the replica's suite without betsurf's cases: 108 of 111 compared cases within the
+thresholds, 24 more rejected by both alike, 3 where `reproduce` fills what FSL leaves undefined,
+4 pending): exit statuses and messages FSL's byte for byte; 202 of 217 brains, masks and outlines
+bit-identical to FSL's and 9 more within the thresholds, the meshes FSL's to the file's 6
+decimals, fMRIPrep's 29 BET calls on its oracle runs all bit-identical (and with fMRIPrep's own
+outputs' values); headers FSL's but for `descrip` (`larmorx fsl bet2`) and the qform's quaternion
+within float precision. Open, questions for the spec writer
 ([findings](../findings/fsl-bet-original.md)): the reruns after a self-intersecting first pass
-(the cases that rerun miss the thresholds: Dice 0.993 to 0.995) and the skull search (`-s`,
-reported: Dice 0.91 with FSL's).
+(the 3 cases that miss the thresholds: real T1w images whose first pass reruns, Dice 0.980 to
+0.995), the skull search (`-s`, reported: Dice about 0.9 with FSL's) and, on small random heads,
+`-e`'s exact test and last digits of the self-intersection total (random testing, below).
+
+**Random testing** (a 30-minute trial, 2026-10-30, `oracles/difftest/2026-10-30-cleanroom-bet`,
+718 cases, both implementations): the replica agreed in every case it finished (716; 2 timeouts
+of both); the original in 334 of 573 (betsurf's 143 skipped). Its differences led to six corrections (the fill
+from any start voxel, the robust range of small images, centres of gravity that are not a
+number, `--ct`'s outline, the quaternion of a qform code 0, `bet -F`'s double series), after which
+164 of the 239 differing cases agree (`validation/investigations/cleanroom-bet/retrial.py`). The
+75 left are small or degenerate random heads (a surface of a few millimetres, collapsed sheets:
+sub-voxel mesh differences and the self-intersection total's last digits), reruns, and `-e`'s
+exact test: the findings list them.
 
 **Built for speed:** the vertices of each iteration are updated in parallel (each from the
 previous iteration's positions only), the self-intersection measure finds close pairs in a grid

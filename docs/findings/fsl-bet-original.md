@@ -45,6 +45,20 @@ into the spec, marked (observed).
   2026-10-30, case 27: a 14 x 14 x 12 head of 2.5 x 2.5 x 1.5 mm voxels); coplanar or touching
   triangles may count for FSL. A question for the spec writer.
 
+- **The robust range's rounding** (`range_probe.py`; fMRIPrep's calls): `t2 = lo + b (hi − lo) /
+  1000` with `hi − lo` rounded to float, the product and the division in double, the result
+  rounded to float and added to `lo` in float. With `hi − lo` in double, ds005454's BOLD
+  reference gives `thresh2 -0.142002` where FSL prints `-0.142004` (and another surface); with
+  the product in float, ds000005's run 3 a `thresh98` one float bit off FSL's (and another
+  mask). `thresh` itself (`t2 + 0.1 (t98 − t2)`) is printed one digit off FSL's on one random
+  head (random testing 2026-10-30, case 74: `0.743664` in FSL, `0.743665` here, in double or in
+  float): open.
+- **Small and degenerate random heads** (random testing 2026-10-30, 75 cases of 573 after the
+  corrections): surfaces of a few millimetres or collapsed into sheets, where the last bits of
+  the sums (the order in which a vertex's triangles and neighbours are added, which the spec
+  gives only for the triangles) decide the self-intersection total's printed digits and
+  sub-voxel positions; on real and phantom images the meshes are FSL's to their 6 decimals.
+
 ## The mask and the outline (§4.6, §4.7)
 
 - **The rasterisation** (`raster_probe.py` to `raster_probe4.py`): for a triangle `(a, b, c)`

@@ -211,7 +211,11 @@ pub fn tanh_glibc(x: f64) -> f64 {
 
     // x is ±inf or NaN.
     if ix >= 0x7ff0_0000 {
-        return if negative { 1.0 / x - 1.0 } else { 1.0 / x + 1.0 };
+        return if negative {
+            1.0 / x - 1.0
+        } else {
+            1.0 / x + 1.0
+        };
     }
 
     let z = if ix < 0x4036_0000 {

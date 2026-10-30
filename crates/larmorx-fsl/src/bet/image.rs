@@ -23,6 +23,22 @@ use super::Vol;
 /// The `descrip` field of the images larmorx's BET writes.
 pub const DESCRIP: &str = "larmorx fsl bet2";
 
+/// An input name as FSL 6.0.7.23's image layer resolves it (`specs/bet.md` §3.1): a name with
+/// an image extension is used as is when that file (a pair's header) exists; otherwise it loses
+/// that extension and the rest is completed as a name without one (exactly one match read,
+/// several or none an error in FSL's words). So `in.nii.gz` reads `in.nii` when only that
+/// exists.
+pub fn resolve_input(name: &str) -> Result<String, String> {
+    use larmorx_mri::hmc::files;
+    if let Some(ext) = files::image_extension(name) {
+        if ImageFiles::of(name).is_some_and(|f| f.header.is_file()) {
+            return Ok(name.to_owned());
+        }
+        return files::resolve_input(&name[..name.len() - ext.len()]);
+    }
+    files::resolve_input(name)
+}
+
 /// An image as read: its first volume in the radiological frame and what writing results like
 /// it needs.
 #[derive(Clone, Debug)]
@@ -156,9 +172,17 @@ pub fn output_header(o: &Output<'_>, version: NiftiVersion, data_type: DataType)
         let pd = [h.pixdim[0], h.pixdim[1], h.pixdim[2], h.pixdim[3]];
         let ([b, c, d], qfac) =
             super::quatern::rewritten(h.quatern_b, h.quatern_c, h.quatern_d, pd);
-        h.quatern_b = f64::from(b);
-        h.quatern_c = f64::from(c);
-        h.quatern_d = f64::from(d);
+        // §8.2, step 7: NIfTI-1 stores the floats, NIfTI-2 the doubles unrounded
+        let stored = |x: f64| {
+            if version == NiftiVersion::V1 {
+                f64::from(x as f32)
+            } else {
+                x
+            }
+        };
+        h.quatern_b = stored(b);
+        h.quatern_c = stored(c);
+        h.quatern_d = stored(d);
         h.pixdim[0] = qfac;
     }
     let [nx, ny, nz] = o.shape;
@@ -490,6 +514,50 @@ pub fn flip_x(v: &Vol) -> Vol {
 /// made from it (a 4D series for `bet -F`): the stored array is converted volume by volume to
 /// float32 (scaled, x reversed for a positive determinant). Names and compressions larmorx's
 /// NIfTI reader does not read, and ANALYZE pairs, go through [`read`].
+/// Every volume of a float64 image as doubles, in the radiological frame (x fastest, volumes
+/// last), its scaling applied in double: what `fslmaths` keeps of a double series (`bet -F`,
+/// `specs/bet.md` §5.2: FSL's brain holds the input's double values, not their floats). `None`
+/// when the image is not float64 or not a NIfTI file larmorx's reader opens directly.
+pub fn read_f64_series(files: &ImageFiles, n_threads: usize) -> Option<Vec<f64>> {
+    use larmorx_mri::hmc::image::is_neurological;
+    let plain = |c: Compression| matches!(c, Compression::None | Compression::Gzip);
+    let compression = |p: &Path| Compression::of_file(p).unwrap_or(Compression::None);
+    let standard = files.standard_names()
+        && plain(compression(&files.header))
+        && files.data.as_deref().is_none_or(|d| plain(compression(d)));
+    if !standard || analyze_header(files) {
+        return None;
+    }
+    let img = nifti::read(
+        &files.header,
+        &larmorx_io::nifti::ReadOptions {
+            scaling: larmorx_io::nifti::Scaling::Raw,
+            n_threads,
+        },
+    )
+    .ok()?;
+    let h = img.header;
+    let larmorx_core::DynArray::F64(a) = img.data else {
+        return None;
+    };
+    let shape = a.shape().to_vec();
+    let nx = shape.first().copied().unwrap_or(1);
+    let t = a.t();
+    let mut data: Vec<f64> = t.iter().copied().collect();
+    let (slope, inter) = (h.scl_slope, h.scl_inter);
+    if (slope != 0.0 && slope != 1.0) || inter != 0.0 {
+        for v in &mut data {
+            *v = *v * slope + inter;
+        }
+    }
+    if is_neurological(&h) && nx > 1 {
+        for row in data.chunks_exact_mut(nx) {
+            row.reverse();
+        }
+    }
+    Some(data)
+}
+
 pub fn read_series_lean(
     files: &ImageFiles,
     n_threads: usize,

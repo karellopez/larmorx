@@ -395,7 +395,6 @@ impl Grid {
     }
 }
 
-
 /// Whether the surface self-intersects by the exact test of `-e` (§4.5): a sweep over the
 /// vertices in increasing x, each bringing its triangles in their order; a triangle met for the
 /// first time is tested against every triangle of the active list (in the order they were

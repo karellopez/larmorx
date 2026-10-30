@@ -14,6 +14,7 @@ pub mod quatern;
 pub mod raster;
 pub mod skull;
 pub mod surface;
+pub mod x87;
 
 use larmorx_core::defects::{self, Notice, UpstreamDefects};
 use rayon::prelude::*;

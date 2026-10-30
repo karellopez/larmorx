@@ -28,7 +28,11 @@ pub fn robust_range(v: &Vol) -> (f64, f64) {
         // A = 1000/w, B = (1000·(−lo))/w in double
         let w = f64::from(hi - lo);
         let hist = histogram(&v.data, f64::from(lo), w);
-        let (first, end) = if ends_out { (1usize, 998usize) } else { (0, 999) };
+        let (first, end) = if ends_out {
+            (1usize, 998usize)
+        } else {
+            (0, 999)
+        };
         // the voxels in the histogram (the end bins' counts left out with them)
         let n = if ends_out {
             total - hist[0] - hist[999]

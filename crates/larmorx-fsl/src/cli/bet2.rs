@@ -284,7 +284,7 @@ fn read_image(
     n_threads: usize,
 ) -> Result<Input, ImageError> {
     let full = settings.name(name);
-    let resolved = files::resolve_input(&full).map_err(ImageError::Invalid)?;
+    let resolved = image::resolve_input(&full).map_err(ImageError::Invalid)?;
     let mut f = ImageFiles::of(&resolved)
         .ok_or_else(|| ImageError::Invalid(format!("{resolved}: not an image file name")))?;
     if let Some(other) = files::fsl60_header(&resolved) {

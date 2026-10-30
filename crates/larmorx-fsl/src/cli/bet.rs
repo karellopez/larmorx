@@ -114,7 +114,7 @@ pub fn main(args: &[String], settings: &Settings, out: &mut dyn Write, err: &mut
     let input = remove_ext(&words[0]).to_owned();
     let output = remove_ext(&words[1]).to_owned();
     let blank = mode.reproduce() && input.contains(char::is_whitespace);
-    if blank || files::resolve_input(&settings.name(&input)).is_err() {
+    if blank || image::resolve_input(&settings.name(&input)).is_err() {
         let _ = write!(out, "\nError: input image {input} not valid\n\n");
         return 1;
     }
@@ -489,7 +489,7 @@ fn write_values(
 }
 
 fn read_input(run: &Run<'_>, name: &str) -> Result<(Vec<Vol>, image::Input), String> {
-    let resolved = files::resolve_input(&run.settings.name(name))?;
+    let resolved = image::resolve_input(&run.settings.name(name))?;
     let f = ImageFiles::of(&resolved).ok_or_else(|| format!("{resolved}: not an image"))?;
     image::read_series_lean(&f, run.settings.threads()).map_err(|e| e.to_string())
 }
@@ -549,24 +549,46 @@ fn fmri(
     ) {
         return Err(fail(e, out, err));
     }
-    // every volume masked, each freed as it is used: the series is held once
+    // fslmaths -mas: the display range reset, float, or double for a double series with the
+    // input's double values (observed, §5.2: only bet2's first volume is read as float)
     let (shape, count) = (vols[0].shape, vols.len());
-    let mut all = Vec::with_capacity(dilated.len() * count);
-    for v in vols {
-        all.extend(
-            v.data
-                .iter()
-                .zip(&dilated)
-                .map(|(&x, &m)| if m != 0.0 { x } else { 0.0 }),
-        );
-    }
-    drop(dilated);
-    // fslmaths -mas: the display range reset, float, or double for a double series (observed)
-    let values = if inp.header.datatype == 64 {
-        Values::F64(all.into_iter().map(f64::from).collect())
+    let doubles = if inp.header.datatype == 64 {
+        image::resolve_input(&run.settings.name(input))
+            .ok()
+            .and_then(|r| ImageFiles::of(&r))
+            .and_then(|f| image::read_f64_series(&f, run.settings.threads()))
+            .filter(|d| d.len() == dilated.len() * count)
     } else {
-        Values::F32(all)
+        None
     };
+    let values = if let Some(mut d) = doubles {
+        drop(vols);
+        for chunk in d.chunks_exact_mut(dilated.len()) {
+            for (x, &m) in chunk.iter_mut().zip(&dilated) {
+                if m == 0.0 {
+                    *x = 0.0;
+                }
+            }
+        }
+        Values::F64(d)
+    } else {
+        // every volume masked, each freed as it is used: the series is held once
+        let mut all = Vec::with_capacity(dilated.len() * count);
+        for v in vols {
+            all.extend(
+                v.data
+                    .iter()
+                    .zip(&dilated)
+                    .map(|(&x, &m)| if m != 0.0 { x } else { 0.0 }),
+            );
+        }
+        if inp.header.datatype == 64 {
+            Values::F64(all.into_iter().map(f64::from).collect())
+        } else {
+            Values::F32(all)
+        }
+    };
+    drop(dilated);
     if let Err(e) = write_values(run, output, &inp, shape, count, values, Some((0.0, 0.0))) {
         return Err(fail(e, out, err));
     }

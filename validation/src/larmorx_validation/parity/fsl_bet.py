@@ -672,17 +672,16 @@ def _header_same(ca: bytes, cb: bytes) -> bool:
 #: Where the qform's quaternion (b, c, d) is: NIfTI-1 float32 at 256..268, NIfTI-2 float64 at
 #: 352..376.
 QUATERN = {False: (256, 268, "<3f"), True: (352, 376, "<3d")}
-#: How far the original's quaternion components may be from FSL's: float precision at 1 (a unit
-#: quaternion's components, stored in float in NIfTI-1).
-QUATERN_TOLERANCE = 2.0**-23
+#: How far the original's quaternion components may be from FSL's: none since 2026-10-30 (part
+#: 2a: the precision path of ``specs/bet.md`` §8.2 followed; part 1 allowed float precision at 1,
+#: 2^-23, while the spec left it open).
+QUATERN_TOLERANCE = 0.0
 
 
 def _header_compare(ca: bytes, cb: bytes) -> tuple[bool, str]:
-    """Two image headers alike but for ``descrip`` (the original names itself there), and the
-    qform's quaternion within float precision (:data:`QUATERN_TOLERANCE`): FSL turns the
-    quaternion into its matrix and back with its NIfTI library's precision path, which the spec
-    leaves open (``specs/bet.md`` §8; ``docs/findings/fsl-bet-original.md``: the last float bit
-    in NIfTI-1, about 5e-9 in NIfTI-2's doubles)."""
+    """Two image headers alike but for ``descrip`` (the original names itself there), the
+    qform's quaternion included (:data:`QUATERN_TOLERANCE`: exactly, as FSL turns the quaternion
+    into its matrix and back with its NIfTI library's precision path, ``specs/bet.md`` §8.2)."""
     import struct
 
     if len(ca) < 348 or len(cb) < 348:

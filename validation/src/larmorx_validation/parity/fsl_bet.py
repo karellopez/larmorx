@@ -2205,13 +2205,17 @@ def highlights_original(results: list[CaseResult]) -> list[str]:
     both = sum(r.status == BOTH_ERROR for r in results)
     pending = sum(r.status == EXPECTED and r.reason.startswith(PENDING) for r in results)
     filled = sum(r.status == EXPECTED and r.reason.startswith(FILLED) for r in results)
-    images = [
+    files = [
         c
         for r in results
         for c in r.checks
-        if c.metric == "values" or c.metric.startswith(("Dice", "drawn surface"))
+        if not c.name.endswith(FMRIPREP_OWN)
+        and (c.metric == "values" or c.metric.startswith(("Dice", "drawn surface")))
     ]
+    skulls = [c for c in files if c.threshold and str(c.threshold).startswith("reported")]
+    images = [c for c in files if c not in skulls]
     identical = sum(1 for c in images if c.threshold == "bit-identical")
+    within = sum(1 for c in images if c.passed and c.threshold != "bit-identical")
     meshes = [c for r in results for c in r.checks if c.metric.startswith("vertex distance")]
     mesh_same = sum(1 for c in meshes if str(c.value).startswith("0.0000 / 0.0000"))
     lines = [
@@ -2220,8 +2224,10 @@ def highlights_original(results: list[CaseResult]) -> list[str]:
         f"refuses; {filled} where FSL crashes and `reproduce` fills what FSL leaves undefined "
         f"(D13's failure cases); {pending} pending (options that run FSL programs larmorx does "
         "not have yet).",
-        f"- **{identical} of {len(images)} images with FSL's values, bit for bit**; {mesh_same} of "
-        f"{len(meshes)} meshes with FSL's vertices to the file's 6 decimals.",
+        f"- **{identical} of {len(images)} brains, masks and outlines with FSL's values, bit for "
+        f"bit**, {within} more within the thresholds; {mesh_same} of {len(meshes)} meshes with "
+        f"FSL's vertices to the file's 6 decimals; {len(skulls)} skull images not bit-identical, "
+        "reported (Dice) with the skull search's open details.",
     ]
     own = [c for r in results for c in r.checks if c.name.endswith(FMRIPREP_OWN)]
     if own:

@@ -60,6 +60,20 @@ def test_python_m_larmorx():
     assert result.stdout == f"larmorx {VERSION}\n"
 
 
+def test_command_line_loads_only_the_core():
+    """The command line imports the Rust core and nothing of the Python API (memory,
+    2026-10-30: ``larmorx._replica``'s imports cost it about 2.3 MiB), and its replica search
+    directories are ``larmorx._replica.search_dirs()``."""
+    code = (
+        "import sys, larmorx.cli as c; d = c._search_dirs(); "
+        "print(sorted(m for m in sys.modules if m.startswith(('larmorx._replica', 'numpy')))); "
+        "import larmorx._replica as r; print(d == r.search_dirs())"
+    )
+    result = run_process(sys.executable, "-c", code)
+    assert result.returncode == 0, result.stderr
+    assert result.stdout.split("\n")[:2] == ["[]", "True"]
+
+
 def test_cli_run_writes_through_sys_streams(capsys):
     assert run(["larmorx", "--version"]) == 0
     assert capsys.readouterr().out == f"larmorx {VERSION}\n"

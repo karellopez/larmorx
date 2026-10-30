@@ -262,9 +262,16 @@ The items below keep their history.
   when node is present): an apostrophe in a single-quoted string once broke `evidence.js` on every
   page while the build reported 0 problems; only the browser number check caught it.
 
-- **mcflirt's FSL-20 and FSL-21 in the clean-room original:** a spec writer adds them to
-  `specs/mcflirt.md` (behaviour only; the replica's record shows mcflirt's black-box outputs),
-  then a clean-room implementer adds them to `lx.mri.hmc`'s original.
+- **mcflirt's FSL-20, FSL-21, FSL-65 and FSL-66 in the clean-room original: ready for its
+  implementer** (specified 2026-10-30, `specs/mcflirt.md` §10.6, §12.1, the cases in §14.1; the
+  black-box probe `validation/investigations/specs-memory/mcflirt_fsl20_21.py`): a clean-room
+  implementer adds them to `lx.mri.hmc`'s original (today it errors on FSL-20 without naming it,
+  runs FSL-21's cases with one bin in both modes, and runs FSL-66's).
+- **The mcflirt replica's FSL-65 and FSL-66** (found 2026-10-30): its `reproduce` should end where
+  mcflirt does (an unopenable `.par`: status 0 after `MAT_0000` and the `.rms` files; a negative
+  `-bins`: mcflirt's crash, as an error) and its default refuse both (`specs/mcflirt.md` §10.6,
+  §12.1 are the target); a small replica-author part with a command-line test each; no record
+  changes (no recorded case uses them).
 - **A benchmark report of the mcflirt replica** (informal: fMRIPrep's call on ds000005, the
   replica 20 s at 3 threads and 36 s at one, mcflirt 70 s, on a busy machine).
 - **BET, further:** a benchmark report (FSL against the replica; bet2 and betsurf on the data
@@ -314,8 +321,10 @@ The items below keep their history.
     the orchestrator's brief (clean-room implementers do not read `docs/parts/`).
   - D11: N4's lattice as a sparse lattice with virtual padding (ANTS-162; the same result in
     memory proportional to the data).
-  - AFNI-75's guard is in the GPL replica of 3dUnifize only: the clean-room original needs it
-    through `specs/3dUnifize.md` (a spec writer), then a clean-room agent.
+  - AFNI-75's guard is in the replica of 3dUnifize only: the clean-room original's is **ready for
+    its implementer** (specified 2026-10-30, `specs/3dUnifize.md` §9.1: the prediction, the limit,
+    the messages, `reproduce`; the cases in §10; the probe
+    `validation/investigations/specs-memory/unifize_epi_ball.py`).
 - **Random testing, more**: the data panel's real crops as inputs; BET in the nightly random
   testing (its descriptor `fsl-bet` is registered; its random-testing panel goes on the site after
   the first night that includes it); nights on a schedule (cron, boxed) once the machine is free
@@ -456,15 +465,22 @@ The items below keep their history.
   obliquity of its own header extension's 7-digit matrix (AFNI-10); AFNI on the inputs without the
   extension prints the original's angle, and the parity suite now explains such messages by
   AFNI-10 (22 of 22 fMRIPrep cases pass).
-- **3dUnifize's replica memory** (found 2026-10-29, the move's memory cases): its peak is 1.5
-  (`-T2`, 160×192×160) and 2.8 (`-EPI`, 64×64×40×160) times AFNI 26.3.05's, as it was as the
-  `larmorx-gpl` program (`validation/investigations/afni-move/memory.py`); a replica-memory part
-  like antsAI's (no full-size copies AFNI does not hold). Strict expected failures in
-  `tests/parity/test_memory_peak.py` until then.
-- **The Python entry point's own memory** (2026-10-29): `python -m larmorx` takes about 13 MiB more
-  than the binary (the interpreter and numpy), beyond the rule's 8 MiB on a small image
-  (3dAutomask on a 64×64×40 mean: 21.2 MiB against AFNI's 7.5; the replica alone 8.2): a lazy
-  numpy import on the command-line path would bring it within. A strict expected failure until then.
+- **3dUnifize's replica memory: done** (2026-10-30): the replica holds what AFNI holds (`-T2` on
+  160×192×160: 115.2 MiB through `python -m larmorx`, 103.8 through the binary, against AFNI's 99.1;
+  `-EPI` on 64×64×40×160: 120.8 and 110.4 against 109.2; it was 164.8 and 320.9), results unchanged
+  bit for bit (the standard record re-made, compare_records: no change); the two strict expected
+  failures removed (`validation/investigations/specs-memory/README.md`).
+- **The Python entry point's own memory: a decision** (2026-10-30, measured with
+  `validation/investigations/specs-memory/entry_memory.py`): numpy is not imported on the command
+  line (it never was); its fixed cost is the interpreter (9.0 MiB) and the Rust core it loads
+  (4.0 MiB). The one import left, `larmorx._replica` (2.3 MiB), is now deferred, so 3dAutomask on the
+  64×64×40 mean takes 19.6 MiB (21.3 before; `_core.cli_main` called alone 18.5; the standalone
+  binary 8.4) against AFNI's 7.7 and the rule's 16.5. No import is left to defer: the rule's 8 MiB is
+  below the entry point's fixed 13 MiB, which no change of larmorx's Python reaches. **For the user**
+  (recommended first): (1) count the entry point's fixed cost apart in the memory test (its
+  allowance `1.10 × original + the peak of python -m larmorx --version`, 14.0 MiB here), keeping the
+  8 MiB rule for the computation, which the binary meets; (2) measure the small cases through the
+  standalone binary; (3) keep the strict expected failure.
 - **The AFNI evidence pages' entries** (2026-10-29): the figures cache's AFNI entries were computed
   with the `larmorx-gpl` program; their replica runs could be recomputed in-process at the final
   validation phase (the records show the same files; the computes now run the in-process replica).
@@ -572,6 +588,13 @@ Decided 2026-10-23 (decision log): the four rules for questionable behaviours (A
   written by an agent that has not read glibc, proved equal on all 2^32 inputs; a small part).
   Alternatives: a table of the 9,346 changed volumes from 0.001 mm³ (exact on realistic voxels
   only), or keeping the warning.
+  **The spec is ready** (2026-10-30, `specs/cbrtf.md`: the method as mathematics, its constants as
+  binary64 bits, every rounding, the special values; the validation plan: the block hashes of all
+  2^32 inputs from the system's `cbrtf` as a black box, committed as
+  `validation/investigations/specs-memory/cbrtf-glibc-2.35-x86_64-blocks.json`, the whole-sequence
+  hash `c679cb92d4402e33`, and an input-by-input comparison with the earlier translation by someone
+  allowed to read it): if the user agrees, a clean-room implementer can start at once (about an
+  hour).
 - **For the user's information: `auto` now runs the AFNI replicas** (built in), and the replicas'
   speed against the clean-room originals on the standard tiers' real cases is in
   `validation/investigations/afni-move/README.md`: the clean-room originals are faster (the

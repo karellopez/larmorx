@@ -283,7 +283,7 @@ to add (since 2026-10-25: "Random testing's gaps", below); – = nothing to do. 
 | AFNI-47 † | 3dUnifize | more than a million voxels with an axis of 2 or 3: the half-size scale image comes back smaller than the input and is read past its end (a crash in AFNI's runs, or values from that memory) | a | none | the scale brought back to the input's grid by default, named; `reproduce` reads AFNI's smaller image, 0 past its end; the clean-room originals of 3dAutomask and 3dUnifize since 2026-10-23 | – |
 | AFNI-48 † | 3dUnifize | `-T2` three times: neither inverted back nor edge-clipped (the output stays inverted); the help documents once and twice | e (c? until 2026-10-23) | none | refused by default in both implementations (a fatal error naming AFNI-48; with `-EPI`, which implies `-T2` itself, it runs as in AFNI); `reproduce` keeps AFNI's behaviour | – (rule B, 2026-10-23) |
 | AFNI-49 † | 3dUnifize | the help gives `-clfrac`'s default as 0.1, then says it was raised to 0.2 in 2016; the code uses 0.2 | f | none | 0.2; larmorx's docs say so | – |
-| AFNI-75 † | 3dUnifize | `-EPI` sets the neighbourhood's radius from the voxel size ("-EPI changes -Urad to N voxels"), unbounded: on micrometre voxels N is about 6100 and the ball of neighbours has about 10¹² points; AFNI fills the machine until it is stopped | c (rule C for the method, 2026-10-25) | none (fMRIPrep does not call `-EPI`; its voxels are millimetres) | the method kept; by default the GPL replica computes the ball's memory first and stops at once, naming AFNI-75 with the GiB needed and the likely cause (micrometre units); `reproduce` attempts it as AFNI does (2026-10-25) | the clean-room original (its spec) |
+| AFNI-75 † | 3dUnifize | `-EPI` sets the neighbourhood's radius from the voxel size ("-EPI changes -Urad to N voxels"), unbounded: on micrometre voxels N is about 6100 and the ball of neighbours has about 10¹² points; AFNI fills the machine until it is stopped | c (rule C for the method, 2026-10-25) | none (fMRIPrep does not call `-EPI`; its voxels are millimetres) | the method kept; by default the GPL replica computes the ball's memory first and stops at once, naming AFNI-75 with the GiB needed and the likely cause (micrometre units); `reproduce` attempts it as AFNI does (2026-10-25) | the clean-room original (its spec: `specs/3dUnifize.md` §9.1, 2026-10-30) |
 | FSL-01 † | mcflirt | last volume not initialised from the previous one | c | every run | corrected by default (`upstream_defects`, 2026-10-11); on a synthetic series with large motion mcflirt's last volume converges to a 180° rotation, the corrected one to 0.36 mm from the truth ([mri-hmc-normcorr-count.md](../validation/mri-hmc-normcorr-count.md)) | – |
 | FSL-02 † | mcflirt | normalised correlation effectively uncentred | c | every run | reproduces; the corrected count is opt-in (`normcorr_count="weights"`), measured in [mri-hmc-normcorr-count.md](../validation/mri-hmc-normcorr-count.md): a change about the size of mcflirt's band, no gain against the ground truth | – (decided 2026-10-23, rule C: mcflirt's behaviour kept; the corrected count stays opt-in) |
 | FSL-03 † | mcflirt | in-plane mode pads the first stage's reference twice | c, f | none | corrected by default (`upstream_defects`, 2026-10-11) | – |
@@ -302,8 +302,8 @@ to add (since 2026-10-25: "Random testing's gaps", below); – = nothing to do. 
 | FSL-16 † | mcflirt | rotations orthogonal only to about 1e-8 | d | every run | reproduces | – (D11) |
 | FSL-17 † | mcflirt | implementation differs from its paper | f | every run | follows the implementation | – (D11) |
 | FSL-18 † | mcflirt Woods cost | squared bin counts | – (c? until 2026-10-24) | none | reproduces | – (decided 2026-10-24, rule C: not a defect; `n_b² σ_b / Σ_b` is Woods' `n_b σ_b / μ_b`) |
-| FSL-20 † | mcflirt | `.mat` directory not creatable (a missing parent): message, exit 0, nothing more written | e | none | the replica: an error by default (rule B, 2026-10-24), mcflirt's exit 0 with `reproduce`; the clean-room original: to do (the spec) | – |
-| FSL-21 † | mcflirt histogram costs | `-bins` below 8: no bins in the first stage; arbitrary matrices, `corratio` writes before its arrays and aborts | a | none | the replica: refused by default (rule B, 2026-10-24); `reproduce` gives mcflirt's matrices and, for `corratio`, its abort; the clean-room original: to do (the spec) | – |
+| FSL-20 † | mcflirt | `.mat` directory not creatable (a missing parent): message, exit 0, nothing more written | e | none | the replica: an error by default (rule B, 2026-10-24), mcflirt's exit 0 with `reproduce`; the clean-room original: to do (its spec: `specs/mcflirt.md` §10.6, 2026-10-30) | – |
+| FSL-21 † | mcflirt histogram costs | `-bins` below 8: no bins in the first stage; arbitrary matrices, `corratio` writes before its arrays and aborts | a | none | the replica: refused by default (rule B, 2026-10-24); `reproduce` gives mcflirt's matrices and, for `corratio`, its abort; the clean-room original: to do (its spec: `specs/mcflirt.md` §12.1, 2026-10-30) | – |
 | FSL-22 † | `calc_bval` (newimage) | the background value sorts the 2-voxel border with `std::sort` and `operator<`: with NaN voxels not a strict weak ordering (undefined in C++); libstdc++'s introsort leaves a position-dependent order, so the pad value of mcflirt's output (and `affine_transform`'s) is arbitrary | a | none (fMRIPrep's inputs have no NaN) | NaNs sorted last by default (defined; D13, 2026-10-11); `reproduce` exact (SGI STL's sort), 2026-10-26: libstdc++'s order of the NaN values, move for move, from the SGI STL's introsort (HP/SGI permission notice) with libstdc++'s pivot step, not from libstdc++'s code; both name FSL-22 when NaN border voxels make the original's order undefined | – |
 | FSL-40 † | bet2 | names lose their first `.hdr` wherever it stands; a name with `.img` and no `.hdr` aborts | e | none | corrected by default (`upstream_defects`, 2026-10-24): a trailing extension removed | – |
 | FSL-41 † | bet2 | no voxel strictly between the 2nd and 98th percentiles inside the initial sphere (a constant or binary image): the median read from an empty list, crash (FSL 6.0.7.17; **fixed in FSL 6.0.7.23**: the robust maximum) | a | none | refused by default, `reproduce` took the median as 0 (2026-10-25); since FSL 6.0.7.23 (2026-10-29) both modes take 6.0.7.23's robust maximum and name nothing; a constant image then meets FSL-43's crash, which the default refuses, naming FSL-43 | – |
@@ -330,6 +330,8 @@ to add (since 2026-10-25: "Random testing's gaps", below); – = nothing to do. 
 | FSL-62 † | bet2 | FSL 6.0.7.23 only: `--ct` with `--binaryMask` converts the mask instead of the CT image and writes the mask, masked, as the brain image | c | none | corrected by default (the CT input masked; rule A); `reproduce` gives FSL's; named (2026-10-29) | – |
 | FSL-63 † | bet (script) | with `-R`, a leading `-e` among bet2's options (the mesh) is dropped, and backslashes in the later options are read as escapes (FSL 6.0.7.17 and 6.0.7.23) | a | none (fMRIPrep's calls do not combine `-R` and `-e`) | corrected by default (the options as given); `reproduce` passes them through bash's `echo` as FSL does; named where they differ (2026-10-29) | – |
 | FSL-64 † | FSL 6.0.7.23 (Armadillo 14.2.1, OpenBLAS 0.3.33) | the last bits of its 4 × 4 inverses, solves and determinants, and so of mcflirt's and BET's results computed from them, depend on the CPU: OpenBLAS chooses its kernels at start-up, and those of AVX-512 CPUs fuse multiplications and additions that the others round separately (on this AMD Zen 4, 1 of mcflirt's 137 recorded runs changes: a relative rms of identical volumes, 8.07e-15 against 7.98e-15 mm) | d | the last bits of mcflirt's and BET's outputs depend on the machine (an AVX-512 server against an AVX2 laptop) | one order everywhere: the Haswell kernels' (as numpy's, NP-01); the harness runs FSL on that core (`OPENBLAS_CORETYPE=Haswell`, 2026-10-29) | – |
+| FSL-65 † | mcflirt | an output text file that cannot be opened (its name a directory, its directory missing or not writable): `-plots`' `.par` ends the run at volume 0's line with "error: unable to open output file!" and **status 0**, after the `.mat` directory's `MAT_0000` and the `.rms` files (no other matrix, no corrected series); an `.rms` file is silently not written (status 0) | e | none (fMRIPrep's `-out` is in an existing work directory) | to do, by the rule of FSL-20 (rule B, 2026-10-30): an error by default (exit 1, nothing written), mcflirt's behaviour with `reproduce`; specified in `specs/mcflirt.md` §10.6; the replica writes everything it can and ignores the failure in both modes (a follow-up) | the replica and the clean-room original |
+| FSL-66 † | mcflirt | a negative `-bins`: each stage has `-bins / scale` bins (truncated toward zero), prepared for **every** cost function; with −1 bins (`-bins` −8 to −15, or −4 to −7 with two stages or more) the process is killed by `SIGFPE` (an integer division by zero), with −2 or fewer (−16 and below) it aborts with `std::bad_array_new_length`; nothing written | a | none (fMRIPrep passes no `-bins`) | to do (rule B, 2026-10-30): refused by default (exit 1, nothing written), with `reproduce` an error saying how mcflirt ends (a crash is never reproduced); specified in `specs/mcflirt.md` §12.1; the replica and the clean-room original run normally today in both modes (a follow-up) | the replica and the clean-room original |
 
 **Counts** (273 entries, recounted from the table on 2026-10-26, after the BET merge; an entry with two classes
 counts under its first; "c (c? until …)" entries, decided, count as (c)):
@@ -449,6 +451,10 @@ linear index (and memory beyond the volume), which the replica now does point by
 library):** FSL-64 new (class d: FSL 6.0.7.23's 4 × 4 arithmetic depends on the CPU; the harness
 pins FSL's OpenBLAS core); SCI-03 fixed in SciPy 1.18.1, followed in both modes. No **decide**
 entry added.
+**2026-10-30, the spec writer's black-box runs of mcflirt 6.0.7.23:** FSL-65 (class e: an
+unopenable `.par` or `.rms` file, status 0) and FSL-66 (class a: a negative `-bins` crashes mcflirt)
+new, both refused by default by rule B, to do in the replica and the clean-room original; no
+**decide** entry added.
 
 ## D13 gaps: what the next task switches to "correct by default"
 
@@ -531,8 +537,9 @@ replica's own, `atanf`'s `aT[0]` taken from fdlibm's comment and a missing FSL-0
 `-meanvol`, both fixed): FSL-04 refused by default with the
 switch; the new FSL-20 and FSL-21 refused by default (rule B), each with `reproduce`; it shares
 the clean-room original's corrections of FSL-01, -03, -05 to -10, -13 and -14. **Open:** FSL-20
-and FSL-21 in the clean-room original (a spec writer adds them to `specs/mcflirt.md`, then a
-clean-room implementer).
+and FSL-21 in the clean-room original (specified 2026-10-30: `specs/mcflirt.md` §10.6 and §12.1;
+then a clean-room implementer); FSL-65 and FSL-66 (found 2026-10-30) in both the replica and the
+clean-room original.
 
 **The BET replica** (`larmorx-nc`, built 2026-10-24, its FSL libraries joined to
 `larmorx-nc-core` 2026-10-25, merged 2026-10-26): FSL-40 to FSL-58 from fsl-bet2 2111.8,
@@ -557,7 +564,7 @@ switches and notices still to add):
 | ITK-96 | antsRegistration's part-written inverse composite when a displacement field has no inverse (`reproduce`) | `larmorx_ants::cli::registration` (the writer, `larmorx_io::itk_hdf5`, already reproduces ITK-15's file) | none |
 | ITK-97 | the time-varying velocity-field stages: not named (their metrics drop such points in both modes; their sampling is clock-seeded, ANTS-82) | `larmorx_registration::time_varying` | none |
 | ITK-98 | the notice in antsRegistration's warped outputs and the N-D resampler (both use the repeated mirror) | `larmorx_registration::resample` | none |
-| AFNI-75 | the clean-room original of 3dUnifize: the same guard (its spec, then its agent) | `crates/larmorx-afni` (3dUnifize) | none |
+| AFNI-75 | the clean-room original of 3dUnifize: the same guard (its spec, `specs/3dUnifize.md` §9.1, 2026-10-30; then its agent) | `crates/larmorx-afni` (3dUnifize) | none |
 | ANTS-51 | a velocity field written under a `.mat` name in `reproduce` (ANTs writes the velocity lattice) | `larmorx_ants::cli::registration` (`write_one_transform`) | none |
 
 **Main package, fMRIPrep's libraries and SciPy** (done 2026-10-11):
@@ -4350,6 +4357,49 @@ fMRIPrep 25.2.6 (the oracle runs) or its source at `21a490fb`, niworkflows 1.15.
   `corratio`, its abort (when the out-of-bounds write is non-zero, as at every real
   evaluation). The clean-room original: to be specified.
 - **D13 / gap:** done in the replica; the original's is open.
+
+### FSL-65 † An output text file that cannot be opened: status 0, or silently missing — (e)
+- **What:** mcflirt writes its text outputs through plain file streams after the estimation:
+  `decompose_mats` (`mcflirt.cc:460-560`) opens `<out>.par` first (with `-plots`), makes the `.mat`
+  directory (FSL-20), writes the `.rms` files without checking that they opened, then, volume by
+  volume, the `MAT_` file and the `.par` line; at the first `.par` line it tests the stream and,
+  when it failed to open, prints "error: unable to open output file!" and calls `exit(0)`
+  (`mcflirt.cc:526-531`, `:542-547`). So an unopenable `.par` ends the run with status 0 after
+  `MAT_0000` and the `.rms` files, without the corrected series; an unopenable `.rms` is silently
+  not written.
+- **Evidence:** read; verified (2026-10-30, `validation/investigations/specs-memory/mcflirt_fsl20_21.py`:
+  a directory named `o.par` with `-mats -plots -rmsrel`, `-plots` alone and `-mats -plots -refvol 0`;
+  directories named `o_rel.rms` and `o_abs_mean.rms`; `-plots` with a missing parent directory).
+- **fMRIPrep:** none (it writes no `.par` through mcflirt into a blocked name; its `-out` is in an
+  existing work directory).
+- **larmorx:** to do. By FSL-20's rule (rule B: the run cannot honour its command and reports
+  success): an error by default (exit 1, nothing more written), mcflirt's behaviour with
+  `reproduce` (`specs/mcflirt.md` §10.6). The `larmorx-nc` replica today writes every other output
+  and exits 0 in both modes where `.par` fails (mcflirt writes only `MAT_0000` and the `.rms`
+  files), and skips an unopenable `.rms` silently in both modes (mcflirt's behaviour).
+- **D13 / gap:** the replica's `reproduce` (mcflirt's exit point) and default (the error); the
+  clean-room original's (its spec).
+
+### FSL-66 † A negative `-bins` crashes mcflirt, whatever the cost — (a)
+- **What:** `-bins` is read with `atoi` (FSL-07) and each stage calls `set_no_bins(no_bins /
+  scale)` (`mcflirt.cc:350`, integer division toward zero) for every cost function;
+  `Costfn::set_no_bins` (`costfns.cc:3622-3661`) allocates `new int[(no_bins+1)*(no_bins+1)]` and
+  `new int[no_bins+1]` and sizes a table with `10*N/(no_bins+1)`. With −1 bins the division by 0
+  raises `SIGFPE`; with −2 or fewer `new int[no_bins+1]` of a negative length throws
+  `std::bad_array_new_length`, uncaught (abort). So `-bins` −8 to −15 (stage 1 has −1), −4 to −7
+  with two stages or more (stage 2 has −1), and −16 or less end the run with a signal before any
+  output; −1 to −3 give 0 bins in every stage (FSL-21's case for the histogram costs, harmless for
+  `normcorr` and `leastsquares`).
+- **Evidence:** read; verified (2026-10-30, `mcflirt_fsl20_21.py`: `-bins -8` and `-bins -4 -stages
+  2` killed by signal 8, `-bins -16` with `normcorr` and `mutualinfo` signal 6 with
+  `bad_array_new_length`, `-bins -1` runs).
+- **fMRIPrep:** none.
+- **larmorx:** to do: refused by default before any work (rule B: a negative number of bins makes
+  no sense, and mcflirt crashes on most of them), exit 1; with `reproduce`, an error saying how
+  mcflirt ends where it crashes, mcflirt's run where it does not (−1 to −3 with the costs that use
+  no bins) (`specs/mcflirt.md` §12.1). The replica and the clean-room original today run every
+  negative value (they take a negative count as none, or one).
+- **D13 / gap:** the replica's and the clean-room original's.
 
 ### FSL-22 † The background value sorts NaNs: undefined order — (a)
 - **What:** newimage's `calc_bval` (`sort(hist.begin(), hist.end()); return hist[numbins/10]`)

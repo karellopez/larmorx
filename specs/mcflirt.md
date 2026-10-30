@@ -50,7 +50,11 @@ mode's padding, §12), FSL-05 to FSL-07 (the command line, §11), FSL-08 (`-stat
 FSL-09 (output types and conversion, §9.4, §10.1), FSL-10 (units, §10.1), FSL-13 (the `.mat`
 directory, §10.2) and FSL-14 (NaN voxels, §12). FSL-02 (the count `N`, §6.4) is corrected only
 on request (`normcorr_count="weights"`) until it is decided. This spec describes what mcflirt
-does; the reproduced mode follows it.
+does; the reproduced mode follows it. (spec writer, 2026-10-30) Refused by default, mcflirt's
+behaviour with `reproduce` (rule B, the replica's decisions): FSL-20 (an uncreatable `.mat`
+directory ends with status 0) and FSL-65 (an unopenable `.par` or `.rms` file), §10.6; FSL-21
+(fewer than 8 bins with a histogram cost) and FSL-66 (negative `-bins`), §12.1; each section has
+the exact messages, statuses and files of both modes, and §14.1 the cases.
 
 **Importance tiers** used below: **tier 1** is what fMRIPrep runs (§2); **tier 2** is what
 other pipelines commonly use (`-plots`, `-rmsrel`/`-rmsabs`, `-refvol`, `-meanvol`,
@@ -696,6 +700,73 @@ float32. `<out>_mean_reg` of `-meanvol` is named the same way. (nipype expects
 clean-room implementer: these images are 3D and keep the input's `cal_min`/`cal_max`, which
 are not recomputed; ds000005: 0 / 1353 as in the input, the synthetic series: 0 / 0.**)**
 
+### 10.6 Outputs that cannot be written (FSL-20, FSL-65) (spec writer, 2026-10-30)
+
+(spec writer, 2026-10-30) **The order of the writes.** After the estimation and the final
+resampling, mcflirt writes, in this order: the `-stats` images (§10.5; `-meanvol`'s
+`_mean_reg` image earlier still, §8); the two `refnum` lines on standard output (§11, `-report`);
+then, when any of `-mats`, `-plots`, `-rmsrel`, `-rmsabs` is given: it opens `<out>.par` (with
+`-plots`; an empty file appears at once), makes the `.mat` directory (§10.2; with `-mats`,
+`-rmsrel` or `-rmsabs`), writes `<out>_rel.rms` and `<out>_rel_mean.rms`, then `<out>_abs.rms`
+and `<out>_abs_mean.rms`, then, volume by volume from 0 to N − 1, the volume's `MAT_` file
+followed by its `.par` line; last, ` Saving motion corrected time series... ` (with `-report`)
+and the corrected series (§10.1). Every image write that fails (a directory missing or not
+writable) ends the run with an uncaught exception, as for any image: `terminate called after
+throwing an instance of 'NiftiIO::NiftiException'` and `  what():  Error: cant open file
+<name>` on standard error, signal 6 (abort), nothing more written **(observed:** `-out
+missing/o` alone: the series' name; `-out ro/o -mats`, `ro/` not writable: the same after the
+message below**)**.
+
+(spec writer, 2026-10-30) **The `.mat` directory (FSL-20).** Making `<out>.mat` (or the first
+free `<out>.mat+`, `<out>.mat++`, ..., §10.2) ends one of three ways:
+- it is made: the run goes on;
+- permission denied (the parent directory is not writable): `Error! Could not create directory:
+  <P><dir>. No write permission` on standard error, where `<dir>` is the directory's name as tried
+  and `<P>` the `-in` string up to and including its last `/` (with no `/` in it, its first
+  character: a misleading path, message only); the run goes on without any `MAT_` file (the
+  `.rms` files are then not writable either, below), and the corrected series' write aborts as
+  above **(observed:** `-out ro/o -mats`**)**;
+- **any other failure** (FSL-20): a parent directory that does not exist (`-out missing/o`) or is
+  a file (`-out afile/o`): `Error!: Unknown Log directory return value` (one line on standard
+  error) and **exit status 0**, with nothing more written: no `MAT_` file, no `.rms` file, no
+  `.par` line (with `-plots` its file could not be opened either: the same parent), no corrected
+  series **(observed** with `-mats`, `-mats -plots`, `-rmsrel`, `-rmsabs -report` and
+  `-mats -reffile`: status 0, the message, no file at all; with `-report` the progress lines and,
+  without `-reffile`, the `refnum` lines come first**)**.
+
+(spec writer, 2026-10-30) **The `.par` and `.rms` files (FSL-65).** They are opened as plain
+text files:
+- an `.rms` file that cannot be opened (its name is a directory, or its directory is not
+  writable) is silently not written; everything else is written and the status is 0
+  **(observed:** directories named `o_rel.rms` and `o_abs_mean.rms`: the other two `.rms` files,
+  every `MAT_` file and the series written, status 0, no message**)**;
+- a `.par` file that cannot be opened (`-plots`; its name is a directory, or its directory is
+  missing or not writable): at volume 0's line mcflirt prints `error: unable to open output file!`
+  on standard error and **exits with status 0**. Written by then: the `.mat` directory with
+  `MAT_0000` only (with `-mats`; also when volume 0 is the reference, its identity), the `.rms`
+  files; not written: every other `MAT_` file, every `.par` line, the corrected series
+  **(observed:** a directory named `o.par`, with `-mats -plots -rmsrel`, `-plots` alone and
+  `-mats -plots -refvol 0`**)**.
+
+(spec writer, 2026-10-30) **What larmorx does** (the replica's decisions for FSL-20, rule B:
+the run cannot honour its command and mcflirt reports success; the same rule for FSL-65):
+
+| Case | Default (`fix`) | `reproduce` |
+|---|---|---|
+| FSL-20: the `.mat` directory cannot be made, for another reason than its permission | at the same point (after the estimation, before any output of this step): `Error: cannot create the directory <dir> for the matrices (FSL-20: mcflirt prints "Error!: Unknown Log directory return value" and exits with status 0)`, exit status **1**, nothing more written; a notice naming FSL-20 | mcflirt's message `Error!: Unknown Log directory return value`, exit status **0**, nothing more written; a notice naming FSL-20 |
+| the `.mat` directory's permission denied | an error, exit 1, nothing more written (the message may name the real path) | mcflirt's message (its `<P>` prefix included), the run without matrices, then the series' write fails as an image write does: an error, exit 1 (a crash is never reproduced, D13; the replica prints mcflirt's two `terminate` lines first) |
+| FSL-65: a `.par` file that cannot be opened | an error naming the file and FSL-65, exit 1 (before any output of this step: checked when the file is opened) | mcflirt's `error: unable to open output file!` after `MAT_0000` and the `.rms` files, exit status 0, nothing more written; a notice naming FSL-65 |
+| FSL-65: an `.rms` file that cannot be opened | an error naming the file and FSL-65, exit 1 | that file not written, the rest as mcflirt; a notice naming FSL-65 |
+| an image that cannot be written | an error naming the file, exit 1 | the same (the replica prints mcflirt's two `terminate` lines first) |
+
+The default's refusal lines are `Error: <message>` on standard error; the notices are larmorx's
+lines of `docs/api/upstream-defects.md` (`larmorx: upstream defect FSL-20 (mcflirt) corrected:
+... [LARMORX_UPSTREAM_DEFECTS=reproduce gives mcflirt's result]`), after the run's other
+messages. **(spec writer, 2026-10-30)** The replica does all of the FSL-20 rows today
+(`larmorx-nc fsl mcflirt`, observed with the cases above); FSL-65 is new: the replica writes
+everything it can and ignores an unopenable `.par` or `.rms` file in both modes, a follow-up of
+the replica (the table is its target).
+
 ## 11. Command line (`larmorx mri hmc [options]`, accepting mcflirt's)
 
 Arguments are processed left to right. Option names are matched exactly (case-sensitive,
@@ -714,7 +785,7 @@ whole word).
 | `-sinc_final`, `-spline_final`, `-nn_final` | final interpolation (§9.3) |
 | `-dof n` | `atoi`, clamped to 6–12 with a message for values outside (tier 3) |
 | `-cost c` | `mutualinfo`, `corratio`, `woods`, `normcorr`, `normmi`, `leastsquares`; anything else silently keeps `normcorr` **(observed)** (a message only if `-report` came earlier: `Unrecognised cost function type: X` and `Using the default (NormCorr)` on stderr **(observed)**) |
-| `-bins n` | histogram bins (`atoi`) |
+| `-bins n` | histogram bins (`atoi`); each stage uses `n / s` of them (integer division truncating toward zero, `s` the stage's scale: 8 in stage 1, 4 in stages 2–4), for every cost (the bins are prepared whatever the cost); fewer than 8 with a histogram cost and negative values: §12.1 (spec writer, 2026-10-30) |
 | `-smooth x` | edge-weighting width in mm (`atof`); 0 switches the correlation to its centred, unweighted form (§6.4) |
 | `-rotation x` | divides the rotation tolerances (`atof`) **(observed)** |
 | `-scaling x` | accepted and ignored |
@@ -769,6 +840,64 @@ volume and stage:
 - the edge-weighting width becomes 0.1 mm;
 - mcflirt prints `Params: rz : tx : ty` and `Tolerances: ...` lines on stderr for every
   volume, and "restricting optimization to R_z, T_x and T_y" with `-report`.
+
+### 12.1 Bins no histogram can have (FSL-21, FSL-66) (spec writer, 2026-10-30)
+
+(spec writer, 2026-10-30) Stage `k` has `B_k = n / s_k` bins (§11's `-bins` row; `n / 8` in
+stage 1, `n / 4` in stages 2 to 4, truncated toward zero: `-bins 7` gives 0 and 1, `-bins -9`
+gives −1 and −2). Each stage prepares its bins when it starts, for every cost function; the
+histogram costs (`corratio`, `mutualinfo`, `normmi`, `woods`) use them.
+
+**What mcflirt does** (FSL 6.0.7.23; the same in 6.0.7.17):
+- **`B_k = 0` (FSL-21)**, i.e. `-bins` from −7 to 7 in stage 1, −3 to 3 in stages 2 to 4:
+  - `normcorr`, `leastsquares`: no effect (they use no bins) **(observed:** `-bins 2` and `-bins
+    -1`: the matrices of the default, status 0**)**;
+  - `mutualinfo`, `normmi`: appendix B's rules with `B = 0` give every reference grid point bin
+    0 and every sample centre bin `c = 0`, its upper neighbour `c⁺ = −1` (outside the histogram;
+    its weight `w⁺` is exactly 0, so nothing changes) and its lower neighbour `c⁻ = 0`; with `f =
+    0` (`u` is `±0`) each sample adds `g·0.5` twice to the single joint cell and to the single
+    test cell, and `g` once to the single reference cell. The joint and test entropies are then
+    equal, the corrected reference entropy is about 0, and the cost is rounding noise about a
+    constant: the line searches end at arbitrary (deterministic) matrices, the same for every
+    volume or tens of millimetres away **(observed:** `-bins 7`, `-bins 4 -stages 2`, `-bins 4`
+    with three stages and `-plots`, `-bins 0`, `-bins abc` (read as 0): status 0, the matrices
+    nothing like the default's**)**;
+  - `woods`: every sample falls in the one bin (index 0, which here is also bin `B`), so the cost
+    is that bin's term over the whole overlap: no error, a meaningless cost **(observed:** `-bins
+    1`: status 0**)**;
+  - `corratio`: after its sums, the correlation ratio folds the last bin (index `B`) into the one
+    before (index `B − 1`); with `B = 0` that is outside its arrays, before their start, and the
+    C library detects the damage when the arrays are released: `double free or corruption (out)`
+    on standard error and signal 6 (abort), at the first cost evaluation in which any sample was
+    counted, nothing written **(observed:** `-bins 2`, also with `-smooth 0`; with `-report` the
+    message follows `Registering volumes ... [3]`, the first volume's index**)**.
+- **`B_k < 0` (FSL-66)**, for **every** cost function, `normcorr` included, when stage `k` starts:
+  - `B_k = −1` (`-bins` from −15 to −8, or from −7 to −4 with two stages or more): an integer
+    division by zero while the stage prepares its tables: the process is killed by signal 8
+    (`SIGFPE`), with no message of its own and nothing written **(observed:** `-bins -8`, `-bins
+    -4 -stages 2`: exit by signal 8**)**;
+  - `B_k ≤ −2` (`-bins` −16 or less): `terminate called after throwing an instance of
+    'std::bad_array_new_length'` and `  what():  std::bad_array_new_length` on standard error,
+    signal 6, nothing written **(observed:** `-bins -16` with `normcorr` and with
+    `mutualinfo`**)**;
+  - `-bins` from −3 to −1: `B_k = 0` in every stage, as above.
+- With `-stages 0`, or a single volume and no `-reffile` (nothing is registered), no stage
+  starts and `-bins` changes nothing **(observed:** `-bins 4 -stages 0` and a one-volume series
+  with `mutualinfo`: status 0, identity matrices**)**.
+
+**What larmorx does** (the replica's decisions of 2026-10-24 for FSL-21, rule B: a histogram needs
+at least one bin, and mcflirt silently returns arbitrary matrices or corrupts its heap; the same
+rule for FSL-66, whose crashes are never reproduced, D13 class (a)):
+
+| Case | Default (`fix`) | `reproduce` |
+|---|---|---|
+| FSL-21: a histogram cost, `-stages` 1 or more (the default 3), and `-bins` from −7 to 7 (`n / 8` is 0) | refused **before any work** (before the input is registered; whatever the number of volumes or `-reffile`): `Error: -bins <n>: the histogram costs need at least 8 bins (the first stage uses -bins / 8 of them; mcflirt computes them with none, FSL-21)`, exit status 1, nothing written; a notice naming FSL-21 (`-bins <n> is refused with this cost: the first stage's histogram would have no bins`) | mcflirt's rules with `B_k = 0` (above): `mutualinfo`, `normmi`, `woods` run to their (arbitrary) matrices, status 0; `corratio` ends where mcflirt aborts: an error, exit status 1, nothing written (the replica prints `double free or corruption (out)` and then its own line saying mcflirt aborts there, signal 6); a notice naming FSL-21 is welcome (the replica prints none in this mode) |
+| FSL-21 with `-stages 0` | runs (no stage, no bins needed) | the same |
+| FSL-66: `-bins` negative with `-stages` 1 or more (with `normcorr` and `leastsquares` too); with a histogram cost the values −7 to −1 are FSL-21's row | refused before any work: an error naming `-bins <n>` (a negative number of bins) and FSL-66, exit status 1, nothing written; a notice naming FSL-66 | where mcflirt crashes (above: `B_k ≤ −1` in a stage that runs), an error saying how mcflirt ends (signal 8, or the `bad_array_new_length` abort with its two lines), exit status 1, nothing written; elsewhere (−3 to −1 with `normcorr`, `leastsquares`) as mcflirt |
+
+**(spec writer, 2026-10-30)** The replica does the FSL-21 rows today; FSL-66 is new: the replica
+and the clean-room original both run normally on negative `-bins` in both modes (they take the
+stage's negative bins as none, or the original as one), a follow-up of the replica (the table is its target).
 
 ## 13. Numerics, operation order and determinism
 
@@ -871,6 +1000,39 @@ deviation as the primary metric there.
 
 Bit-identity of the matrices is reported (counting the exact `0.000000` entries of §7.4),
 not required.
+
+### 14.1 The failure cases of §10.6 and §12.1 (spec writer, 2026-10-30)
+
+The cases a clean-room implementer adds to the original's parity suite (`mri-hmc`, edge cases)
+and its command-line tests, each in both modes, checking against mcflirt 6.0.7.23 run on the same
+input: the exit status (a signal counts as "mcflirt crashed": larmorx's status is then 1), the
+first line of standard error that is mcflirt's (larmorx's own lines, `Error: ...` and the
+notices, set aside and checked separately: the defect each names), and the set of files written
+(names; the matrices' values only where both run to the end, compared as the other cases are).
+The black-box runs behind §10.6 and §12.1 are made by
+`validation/investigations/specs-memory/mcflirt_fsl20_21.py` (a 24 × 24 × 16 × 5 phantom, its
+cases named as below; `--larmorx` runs larmorx's command line instead, `compare_runs.py` sets the
+runs side by side):
+
+| Case | Arguments (with `-in` the series) | mcflirt | larmorx default | `reproduce` |
+|---|---|---|---|---|
+| `fsl20-mats` | `-out missing/o -mats -stages 1` | status 0, the message, no file | 1, FSL-20 | 0, the message, no file |
+| `fsl20-mats-plots`, `fsl20-reffile`, `fsl20-file-parent` | likewise with `-plots`, with `-reffile`, `-out afile/o` | the same | the same | the same |
+| `fsl20-rmsrel`, `fsl20-rmsabs-report` | `-rmsrel` or `-rmsabs -report` without `-mats` (FSL-13 also named) | status 0, the message | 1, FSL-20 | 0, the message |
+| `fsl20-perm` | `-out ro/o -mats`, `ro/` read-only | the permission message, then signal 6 at the series | 1 | 1 |
+| `fsl20-plots-only`, `fsl20-none` | `-plots` alone; no output option | `-plots`: FSL-65's message, status 0; none: signal 6 at the series | 1 | `-plots`: 0, FSL-65's message; none: 1 |
+| `par-dir-plots-mats`, `par-dir-plots`, `par-dir-plots-mats-ref0` | a directory `o.par`; `-mats -plots -rmsrel`, `-plots`, `-mats -plots -refvol 0` | status 0, FSL-65's message, `MAT_0000` and the `.rms` files only | 1, FSL-65, nothing written | 0, the message, mcflirt's files |
+| `rms-dir` | directories `o_rel.rms` and `o_abs_mean.rms`; `-mats -rmsrel -rmsabs` | status 0, those two files missing | 1, FSL-65 | 0, mcflirt's files |
+| `bins7-mutualinfo`, `bins4-mutualinfo-s2`, `bins4-mutualinfo-s3-plots`, `bins0-normmi`, `bins1-woods`, `binsabc-mutualinfo` | the cost and `-bins` named | status 0, arbitrary matrices | 1, FSL-21, nothing written (`abc`: FSL-07's refusal first, status 255) | 0, matrices by §12.1's rules (close to mcflirt's only as far as the costs' rounding agrees: report, do not require) |
+| `bins2-corratio`, `bins2-corratio-smooth0`, `bins2-corratio-report` | `-cost corratio -bins 2` | signal 6, `double free or corruption (out)`, nothing written | 1, FSL-21 | 1, nothing written |
+| `bins8-corratio`, `bins8-mutualinfo-s3` | 8 bins | runs (one bin in stage 1) | runs | runs |
+| `bins2-normcorr`, `bins2-leastsq`, `binsm1-normcorr` | `-bins 2` or `-1` with the costs that use no bins | runs, the default's matrices | `2`: runs; `-1`: 1, FSL-66 | runs |
+| `bins4-mutualinfo-s0`, `bins4-mutualinfo-1vol` | no stage runs | runs (identities) | `-stages 0`: runs; one volume: 1, FSL-21 (refused before any work, whatever the volumes) | runs |
+| `binsm4-normcorr-s2`, `binsm8-normcorr` | `-bins -4 -stages 2`, `-bins -8` | signal 8, nothing written | 1, FSL-66 | 1, nothing written |
+| `binsm16-normcorr`, `binsm16-mutualinfo` | `-bins -16` | signal 6, `bad_array_new_length`, nothing written | 1, FSL-66 | 1, nothing written |
+
+Also one golden case per new refusal (the error's exit status and that nothing is written), and
+the Python API: `lx.mri.hmc(..., bins=4, cost="mutualinfo")` raises the same error by default.
 
 ## 15. Paper vs implementation
 
@@ -980,7 +1142,7 @@ Each evaluation maps every reference grid point into the test volume through the
 trial matrix, with the same positions, row ranges and bounds test as `normcorr` (§6.1), and
 interpolates the test volume trilinearly there (§6.2).
 
-**Bins.** `B = ⌊bins / s⌋` (integer division) with `bins` from `-bins` (default 256) and `s` the
+**Bins.** `B = ⌊bins / s⌋` (integer division; (spec writer, 2026-10-30) truncating toward zero for a negative `bins`, §12.1) with `bins` from `-bins` (default 256) and `s` the
 stage's scale in mm: with the default, 32 bins in stage 1 (8 mm) and 64 in stages 2 to 4 (4 mm).
 - *Reference bins*, once per stage: `r_min`, `r_max` the minimum and maximum of the reference
   grid's values; when `r_max − r_min = 0`, `r_max` is increased by 1. `a1 = B/(r_max − r_min)`,
@@ -1033,4 +1195,4 @@ a bad registration.
 `NMI = (H_ref + H_test)/H_joint`, or 0 when `|H_joint| < 1e−9`; cost `−NMI`. Both are minimised
 by the line searches of §7, like every cost; neither is centred or normalised further (the
 range `−2 … −1` of `−NMI` and its flatness near the optimum are what the line search sees). With
-`-bins` below 8, stage 1 has `B = 0` bins (FSL-21, §12).
+`-bins` below 8, stage 1 has `B = 0` bins (FSL-21, §12); (spec writer, 2026-10-30) what the rules above give with `B = 0`, and with a negative `B` (FSL-66), is in §12.1.

@@ -51,8 +51,8 @@ use crate::environ::{self, Prefiltered, Settings, UNIFIZE};
 use crate::mask::{Grid, MaskSettings, automask_image};
 use crate::message::Message;
 use crate::unifize::{
-    Inversion, PKVAL, clip_edges, duplo_changes_grid, epi_radius, gm_unifize, invert_contrast,
-    local_percmean, masked_input, percmean_args_ok, qmed, wm_unifize,
+    Inversion, PKVAL, WmResult, clip_edges, duplo_changes_grid, epi_radius, gm_unifize,
+    invert_contrast, local_percmean, masked_input, percmean_args_ok, qmed, wm_unifize,
 };
 
 use super::automask::{dropped_intercept, one_brick, open_input, outputs};
@@ -321,6 +321,40 @@ fn parse(
 
 /// `THD_extract_float_brick(iv, dset)`: the values of sub-brick `iv` as floats, non-finite
 /// values 0, then times the brick factor (any factor but 0 and 1, negative included).
+/// The floats a one-brick dataset made by [`one_brick`] holds, taken back after it is written.
+fn into_floats(data: BrickData) -> Vec<f32> {
+    match data {
+        BrickData::Float(v) => v,
+        _ => unreachable!("the brick was made from floats"),
+    }
+}
+
+/// A series of byte or short sub-bricks as one allocation per sub-brick, in order: each is
+/// split off the end of the series, which is then shrunk, so the series is never held twice
+/// (AFNI holds its sub-bricks apart and unloads each once it has its float copy).
+fn split_bricks(data: BrickData, nvox: usize, nvals: usize) -> Vec<BrickData> {
+    fn split<T>(
+        mut v: Vec<T>,
+        nvox: usize,
+        nvals: usize,
+        wrap: fn(Vec<T>) -> BrickData,
+    ) -> Vec<BrickData> {
+        let mut out = Vec::with_capacity(nvals);
+        for iv in (1..nvals).rev() {
+            out.push(wrap(v.split_off(iv * nvox)));
+            v.shrink_to_fit();
+        }
+        out.push(wrap(v));
+        out.reverse();
+        out
+    }
+    match data {
+        BrickData::Byte(v) => split(v, nvox, nvals, BrickData::Byte),
+        BrickData::Short(v) => split(v, nvox, nvals, BrickData::Short),
+        BrickData::Float(v) => split(v, nvox, nvals, BrickData::Float),
+    }
+}
+
 fn extract_float_brick(ds: &Dataset, iv: usize) -> Vec<f32> {
     let nvox = ds.nxyz.iter().product::<usize>();
     let mut v = scale_to_float(&ds.data, nvox, iv, 0.0);
@@ -600,6 +634,11 @@ fn run(
         }
         median_brick(&ds, mode)
     };
+    if !o.do_epi {
+        // `DSET_unload(inset)`: AFNI keeps only the float copy of sub-brick 0 from here on
+        // (memory as AFNI's, 2026-10-30).
+        ds.data = BrickData::Float(Vec::new());
+    }
     let mut ms = MaskSettings {
         exterior_clip: true,
         ..MaskSettings::default()
@@ -671,8 +710,10 @@ fn run(
         return Err("Can't compute Unifize-d dataset for some reason :-(".into());
     };
     flush(&mut log, io);
-    if let Some(out) = &outs[2] {
-        let am = one_brick(&ds, BrickData::Float(aar.clone()));
+    // The -amsave and -ssave images are written from the arrays themselves, as AFNI writes
+    // them (no copies; memory as AFNI's, 2026-10-30).
+    let aar = if let Some(out) = &outs[2] {
+        let am = one_brick(&ds, BrickData::Float(aar));
         write_out(
             out,
             &am,
@@ -683,14 +724,19 @@ fn run(
             &mut notices,
             io,
         )?;
-    }
+        into_floats(am.data)
+    } else {
+        aar
+    };
     let par = local_percmean(
         aar, g, o.uprad, o.upbot, o.uptop, do_double, expand_to, verbose, &mut log, n_threads,
     );
-    let wm = wm_unifize(&imin, par, o.do_squash, verbose, &mut log);
+    let mut wm = wm_unifize(&imin, par, o.do_squash, verbose, &mut log);
+    // `free(imin)` after mri_WMunifize.
+    drop(imin);
     flush(&mut log, io);
     if let Some(out) = &outs[1] {
-        let ss = one_brick(&ds, BrickData::Float(wm.scale.clone()));
+        let ss = one_brick(&ds, BrickData::Float(std::mem::take(&mut wm.scale)));
         write_out(
             out,
             &ss,
@@ -701,36 +747,82 @@ fn run(
             &mut notices,
             io,
         )?;
+        wm.scale = into_floats(ss.data);
     }
 
     // -EPI: every volume scaled by the median volume's factors.
     if o.do_epi {
         let mask = t2_mask.as_deref().expect("-EPI implies -T2");
         let nvox = g.nvox();
+        let nvals = ds.nvals;
         if verbose {
             io.raw("E");
         }
-        let mut all = Vec::with_capacity(nvox * ds.nvals);
-        for iv in 0..ds.nvals {
-            if iv % 100 == 47 {
-                io.raw(".");
-            }
-            let mut v = extract_float_brick(&ds, iv);
-            invert(&mut v, ny, o.t2_uperc, mask, &mut notices);
+        // AFNI unloads each input sub-brick once it has its float copy, and the output's
+        // sub-brick takes its place: the series is held once, never input and output side by
+        // side (memory as AFNI's, 2026-10-30). Float data are scaled in place; byte and short
+        // data are split into sub-bricks first, each released once converted.
+        let facs: Vec<f32> = ds
+            .factors
+            .iter()
+            .map(|&f| if f == 0.0 { 1.0 } else { f })
+            .collect();
+        let scale_volume = |v: &mut [f32], notices: &mut Notices| {
+            invert(v, ny, o.t2_uperc, mask, notices);
             for (x, &s) in v.iter_mut().zip(&wm.scale) {
                 *x *= s;
             }
-            invert(&mut v, ny, o.t2_uperc, mask, &mut notices);
-            all.extend(v);
-        }
+            invert(v, ny, o.t2_uperc, mask, notices);
+        };
+        let all = match std::mem::replace(&mut ds.data, BrickData::Float(Vec::new())) {
+            BrickData::Float(mut all) => {
+                for (iv, &fac) in facs.iter().enumerate() {
+                    if iv % 100 == 47 {
+                        io.raw(".");
+                    }
+                    // `extract_float_brick`, in place.
+                    let v = &mut all[iv * nvox..(iv + 1) * nvox];
+                    dataset::floatscan(v);
+                    if fac != 1.0 {
+                        for x in v.iter_mut() {
+                            *x *= fac;
+                        }
+                    }
+                    scale_volume(v, &mut notices);
+                }
+                all
+            }
+            other => {
+                let mut all = Vec::with_capacity(nvox * nvals);
+                for (iv, (brick, &fac)) in split_bricks(other, nvox, nvals)
+                    .into_iter()
+                    .zip(&facs)
+                    .enumerate()
+                {
+                    if iv % 100 == 47 {
+                        io.raw(".");
+                    }
+                    let mut v = scale_to_float(&brick, nvox, 0, 0.0);
+                    drop(brick);
+                    if fac != 1.0 {
+                        for x in &mut v {
+                            *x *= fac;
+                        }
+                    }
+                    scale_volume(&mut v, &mut notices);
+                    all.extend(v);
+                }
+                all
+            }
+        };
         if verbose {
             io.raw("\n");
         }
         let epi = Dataset {
             data: BrickData::Float(all),
-            factors: vec![0.0; ds.nvals],
+            factors: vec![0.0; nvals],
             dropped_inter: None,
-            ..ds.clone()
+            ..ds
         };
         if let Some(out) = &outs[0] {
             write_out(
@@ -750,7 +842,13 @@ fn run(
         return Ok(());
     }
 
-    let mut imout = wm.image;
+    // `mri_free(sclim)` before the rest of the one-volume processing.
+    let WmResult {
+        image: mut imout,
+        scale,
+        ..
+    } = wm;
+    drop(scale);
     if o.do_gm > 0 {
         gm_unifize(&mut imout, verbose, &mut log);
     }

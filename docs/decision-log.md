@@ -1708,6 +1708,14 @@ together at the end.
   the replica's 3dUnifize and the Python entry point on small images exceed the rule as before:
   follow-ups, strict expected failures.
 
+## 2026-10-30: FSL-65 and FSL-66; the specs of FSL-20/21, AFNI-75 and cbrtf (orchestrator, by the rules)
+- **FSL-65 and FSL-66** (found by the spec writer's black-box runs of mcflirt 6.0.7.23): refused by
+  default, mcflirt's behaviour (or, for FSL-66's crashes, an error saying how it ends) with
+  `reproduce`, by rule B, as FSL-20 and FSL-21; to do in the replica and the clean-room original.
+- **For the user:** the memory test's allowance for the Python entry point's fixed cost (the
+  interpreter and the Rust core, about 13 MiB, above the rule's 8 MiB): next-steps, "The Python
+  entry point's own memory".
+
 ## Open decisions (PLAN.md §16)
 
 | # | Decision | Recommended default (used until decided) | Status |

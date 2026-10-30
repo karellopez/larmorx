@@ -347,14 +347,21 @@ def test_larmorx_needs_no_more_memory_than_ants_more(tmp_path, program, args):
 #:
 #: Measured on 2026-10-29 (``validation/investigations/afni-move/memory.py``: AFNI, the Python entry
 #: point, the standalone ``larmorx`` binary and the earlier ``larmorx-gpl`` program): the move into
-#: larmorx adds nothing (the binary within 1.2 MiB of ``larmorx-gpl``), but two calls exceed the
-#: rule, as they did before the move, and are strict expected failures until a part fixes them
-#: (``docs/next-steps.md``, follow-ups): 3dAutomask's image is so small that the Python entry
-#: point's own 13 MiB (the interpreter and numpy) exceed the allowance (the replica itself: 8.2 MiB
-#: against AFNI's 7.5), and the replica's 3dUnifize holds 1.5 (``-T2``) and 2.8 (``-EPI``) times
-#: AFNI's peak.
-_SMALL = "the Python entry point's own 13 MiB exceed the allowance on this small image (follow-up)"
-_UNIFIZE = "the replica's 3dUnifize holds 1.5 to 2.8 times AFNI's peak (follow-up)"
+#: larmorx added nothing (the binary within 1.2 MiB of ``larmorx-gpl``). Since 2026-10-30 the
+#: replica's 3dUnifize holds what AFNI holds (it held 1.5 times AFNI's peak with ``-T2`` and 2.8
+#: times with ``-EPI``: the input kept after its float copy, a copy for each contrast inversion, the
+#: masked image after its half-size copy, and with ``-EPI`` the series in and out side by side;
+#: ``validation/investigations/specs-memory/README.md``), and the command line no longer imports
+#: ``larmorx._replica`` (2.3 MiB). One call still exceeds the rule, a strict expected failure:
+#: 3dAutomask's image (64 x 64 x 40) is so small that the Python entry point's fixed cost, the
+#: interpreter (9.0 MiB) and the Rust core it loads (4.0 MiB), exceeds the rule's 8 MiB beyond
+#: AFNI's whole run (7.7 MiB; the entry point 19.6 MiB, ``_core.cli_main`` called alone 18.5, the
+#: standalone binary 8.4: ``validation/investigations/specs-memory/entry_memory.py``). No import
+#: is left to defer; it waits for a decision on the allowance (``docs/next-steps.md``).
+_SMALL = (
+    "the Python entry point's fixed 13 MiB (the interpreter and the Rust core) exceed the "
+    "allowance on this small image (the binary is within it; a decision)"
+)
 AFNI_CASES = [
     ("3dTshift", "-ignore 0 -tzero 1.0 -TR 2s -tpattern alt+z -prefix {out}/ts.nii.gz {bold}"),
     pytest.param(
@@ -362,16 +369,8 @@ AFNI_CASES = [
         "-apply_prefix {out}/masked.nii.gz -dilate 1 -prefix {out}/mask.nii.gz {mean}",
         marks=pytest.mark.xfail(strict=True, reason=_SMALL),
     ),
-    pytest.param(
-        "3dUnifize",
-        "-T2 -clfrac 0.2 -prefix {out}/uni.nii.gz -input {t1}",
-        marks=pytest.mark.xfail(strict=True, reason=_UNIFIZE),
-    ),
-    pytest.param(
-        "3dUnifize",
-        "-EPI -prefix {out}/epi.nii.gz -input {bold}",
-        marks=pytest.mark.xfail(strict=True, reason=_UNIFIZE),
-    ),
+    ("3dUnifize", "-T2 -clfrac 0.2 -prefix {out}/uni.nii.gz -input {t1}"),
+    ("3dUnifize", "-EPI -prefix {out}/epi.nii.gz -input {bold}"),
 ]
 
 

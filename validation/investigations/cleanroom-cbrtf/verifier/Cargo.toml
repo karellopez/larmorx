@@ -1,0 +1,17 @@
+[package]
+name = "cbrtf-glibc-verify"
+description = "larmorx_core::math::cbrtf_glibc against the system's cbrtf (a black box) on all 2^32 inputs"
+version = "0.0.1"
+edition = "2024"
+license = "Apache-2.0"
+publish = false
+
+# Its own workspace: a verification tool, never part of larmorx's build (it calls the C
+# library's cbrtf through dlopen, as a black box).
+[workspace]
+
+[dependencies]
+larmorx-core = { path = "../../../../crates/larmorx-core" }
+
+[profile.release]
+debug = false

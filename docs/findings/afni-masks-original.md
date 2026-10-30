@@ -186,3 +186,47 @@ program (`LARMORX_IMPLEMENTATION=replica larmorx afni 3dUnifize`); probe
   AFNI-75's error (verdict *guard*, since this part for the original too: `difftest/runner.py`'s
   `GUARDED`), one *notice* (AFNI-45 in both implementations) and one *undefined* case (AFNI's
   values from memory it never wrote), none differing.
+
+## `-EPI`'s radius and glibc's cube root in the clean-room 3dUnifize (GLIBC-05, 2026-10-30)
+
+Written from [`specs/cbrtf.md`](../../specs/cbrtf.md) and `specs/3dUnifize.md` §4.3 and §7 by a
+clean-room implementer who has never read glibc's source, with black-box runs of the system's
+`cbrtf` (glibc 2.35, through `dlopen`) and of AFNI 26.3.05's `3dUnifize`; the user's decision of
+2026-10-30 (the default correctly rounded, `reproduce` glibc's bits).
+
+- **The cube root with glibc's bits:** `larmorx_core::math::cbrtf_glibc`, the spec's method (a
+  quadratic start in double rounded to float, its cube in float, one Halley step in double, the
+  factor `2^(ρ/3)`, then float; no fused multiply-add), equals the system's `cbrtf` on **all 2^32
+  float inputs**, bit for bit, NaN results included (16,777,214 NaN inputs: the quiet bit set, the
+  sign and payload kept), and its 4096 block hashes are the spec writer's
+  ([the proof and its verifier](../../validation/investigations/cleanroom-cbrtf/README.md)). It
+  is faster than glibc's: 3.1 ns per call against 7.1 (through a function pointer) and 3.7 for
+  CORE-MATH's correctly rounded one. glibc's result is not the correctly rounded one on
+  453,492,162 of the 4,278,190,082 non-NaN inputs (10.6 %).
+- **The spec's whole-sequence hash** (§7.2, `c679cb92d4402e33`) is not what the system's own
+  results give under §7.1's definition run through all inputs (`335d1fb5fb714c95`; three other
+  conventions tried, none matching): the function agrees with the system input by input, so
+  the number in the spec was formed another way (a correction for the spec writer).
+- **When the last bit matters:** the radius is `(float)(18.3 / u)`; the ball is every offset
+  whose float sum of squares is at most `r * r`. A radius one unit in the last place away changes
+  the result only when an offset's sum of squares lies between the two `r * r` (within the grid's
+  reach: an offset beyond `n − 1` voxels along an axis of `n` is never used) or when the radius
+  printed with one decimal changes. On a 24 × 24 × 16 series: 11.969702 mm³ (2 × 2 × 2.9924254 mm)
+  gives radius 8 with glibc's cube root and 7.9999995 correctly rounded (the ball's 6 points 8
+  voxels away: 2109 offsets within the grid against 2103; the default's output differs from
+  `reproduce`'s in 6,321 of the 27,648 values, by at most 1.95); 1 × 1 × 1.0421294 mm gives 18.050001
+  and 18.05 (printed 18.1 and 18.0, the same ball). Ordinary voxels give the same radius (3 mm,
+  2.5 mm, 2 mm, 3.4375 × 3.4375 × 4 mm), and of the voxel sizes with two decimals from 0.5 to
+  4 mm (x = y, z up to 3 mm larger) 9,467 give radii one unit apart in the last place and none a
+  different ball or printed radius on that grid; of the float voxel volumes in [1, 100) mm³ on a
+  64 × 64 × 40 grid, 123 change the ball or the printed radius (43 the printed radius).
+- **What the original does:** `epi_radius(steps, mode)` takes `cbrtf` by default and
+  `cbrtf_glibc` with `reproduce`; `epi_cbrtf_notice` compares the two radii's balls within the
+  grid's reach (`wmi::Ball::x_lines`, the lines the local mean itself uses) and their printed
+  values, and names GLIBC-05 in both modes where either differs (not where AFNI-75's guard
+  refuses: the radius is then never used).
+- **How we know:** *validated*: the parity suite's cases `glibc-05/epi-*` (the ball, its
+  one-volume path, the printed radius, radii one unit apart with the same result, ordinary
+  voxels) against AFNI 26.3.05: `reproduce` writes AFNI's bytes and messages in every case; the
+  default names GLIBC-05 exactly in the first three, and its output and messages (colour codes
+  aside) are AFNI's with CORE-MATH's correctly rounded functions preloaded, `cbrtf` among them.

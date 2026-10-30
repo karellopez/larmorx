@@ -25,18 +25,30 @@ change the ball of neighbours or the printed radius (measured on every float32 v
 of the volumes in [1, 100) mm³), the replica warns that its result may differ from AFNI's (a
 warning ending in `(larmorx)`). On those, glibc's last bit changes the ball for 80 volumes and the
 printed radius for 43 in [1, 100) mm³ ([findings](../findings/afni-relicensing-26.md), "The C
-library's maths"). How to keep AFNI's exact result there is the user's decision. Each image's `implementation` names the one
-that ran.
+library's maths"). Each image's `implementation` names the one that ran.
+
+**Decided by the user on 2026-10-30, and done in the clean-room original the same day:** the
+default keeps the correctly rounded cube root (`larmorx_core::math::cbrtf`, CORE-MATH's, the more
+accurate), and `reproduce` takes a clean-room cube root with glibc 2.35's bits
+(`larmorx_core::math::cbrtf_glibc`, written from [`specs/cbrtf.md`](../../specs/cbrtf.md) only and
+proved equal to the system's `cbrtf` on all 2^32 float inputs, NaN bits included:
+[the proof](../../validation/investigations/cleanroom-cbrtf/README.md)), so the original's
+`reproduce` gives AFNI's radius, ball and message on every voxel size. By default the original
+names **GLIBC-05** (glibc 2.35's `cbrtf` is not correctly rounded) exactly where glibc's last bit
+would have changed the result: the ball of neighbours within the grid's reach (the only offsets
+ever used) or the radius printed with one decimal, with the radius each cube root gives and what
+differs; `reproduce` names it too ("reproduced", AFNI's radius). The replica's 3dUnifize takes the
+same function in a later part (a replica author's); until then it keeps its warning.
 
 **Status: `validated`**, both, against AFNI 26.3.05 itself (the original against AFNI 25.2.09 until 2026-10-29):
-- the original ([record](../validation/afni-unifize.md), 99 cases, none failing): AFNI's exit
-  status and messages in every case; in 32 of the 72 compared cases that write outputs every
-  output is AFNI's, bit for bit (data and NIfTI header); in the other 40 the headers are AFNI's
-  and some squashed values differ in their last bit (at most 1,633 values of a T1w, at most
+- the original ([record](../validation/afni-unifize.md), 129 cases, none failing; GLIBC-05's 5
+  since 2026-10-30): AFNI's exit status and messages in every case; in 44 of the 99 compared
+  cases that write outputs every output is AFNI's, bit for bit (data and NIfTI header); in the
+  other 55 the headers are AFNI's and some squashed values differ in their last bit (at most
   8.7e-8 of the largest value; the threshold is 1e-5), because AFNI's `tanhf` is glibc's and the
   original's is correctly rounded: AFNI run with CORE-MATH's correctly rounded functions preloaded
-  gives the original's bytes in all 40. fMRIPrep's own outputs of the 7 oracle BOLD references:
-  1 bit for bit, the other 6 AFNI's oracle output with the same last-bit differences. Its result
+  gives the original's bytes in all 55. fMRIPrep's own outputs of 22 oracle BOLD references: 1
+  bit for bit, the other 21 AFNI's oracle output with the same last-bit differences. Its result
   does not depend on the thread count (nor does AFNI's: 1 and 6 threads, and fMRIPrep's build,
   give the oracle's bytes);
 - the replica ([record](../validation/afni-unifize-replica.md)): every compared case, bit for bit.
@@ -120,6 +132,23 @@ Corrected by default, reproduced with `upstream_defects="reproduce"`, by both im
   voxels on a 24 × 24 × 16 series: 0.01 s, 5 MiB).
 - **AFNI-01**: `-EPI`'s median volume drops a negative `scl_slope`, so its sign is wrong and the
   output is all zeros; the default applies the factor.
+- **GLIBC-05** (the clean-room original, 2026-10-30; `specs/cbrtf.md`): `-EPI`'s radius is 18.3
+  mm over the cube root of the voxel volume, which AFNI takes from glibc 2.35's `cbrtf`, not
+  correctly rounded (one unit in the last place on 10.6 % of float inputs). The default uses the
+  correctly rounded cube root and names GLIBC-05 where glibc's would have changed the ball of
+  neighbours within the grid or the printed radius, for example (`-EPI` on 2 × 2 × 2.9924254 mm
+  voxels, 11.969702 mm³, a 24 × 24 × 16 series):
+  `upstream defect GLIBC-05 (glibc 2.35) corrected: -EPI's radius is 7.9999995 voxels: 18.3 mm
+  over the correctly rounded cube root (2.2875001) of the voxel volume, 11.969702 mm^3; with glibc
+  2.35's cbrtf (2.2875), which AFNI calls, it is 8 voxels, a ball of neighbours of 2109 offsets
+  within the grid instead of 2103`; on 1 × 1 × 1.0421294 mm voxels the radius printed changes
+  (`... it is 18.050001 voxels, printed 18.1 instead of 18.0`). `reproduce` uses glibc's bits
+  (`larmorx_core::math::cbrtf_glibc`) and gives AFNI's bytes. Where the two radii differ in their
+  last bit but give the same ball and printed radius (2.4 × 2.4 × 2.78 mm: 7.2604246 and
+  7.2604237 voxels) nothing is named; on ordinary EPI voxels the two agree (3 mm, 2.5 mm,
+  3.4375 × 3.4375 × 4 mm). Of the voxel sizes with two decimals from 0.5 to 4 mm (x = y, z up to
+  3 mm larger), 9,467 give radii one unit apart and none a different ball or printed radius on
+  a 24 × 24 × 16 grid.
 - **AFNI-03 and AFNI-08**: `-EPI`'s output keeps the input's time axis and slice timing: header
   slice code 2 keeps its slice fields in both modes, as AFNI 26.3.05 does, and AFNI-03 is not
   named (AFNI 25.2.09 read every slice time as 0); AFNI-08 is named where the kept times are all
@@ -141,8 +170,8 @@ The replica is bit-identical to AFNI on every compared case. The clean-room orig
 CORE-MATH's) where AFNI calls glibc 2.35's, which is not correctly rounded on some arguments
 (2.8 % of float arguments): squashed values can differ in their last bit. AFNI run with
 CORE-MATH's correctly rounded functions preloaded gives the original's bytes
-([findings](../findings/afni-masks-original.md)). Likewise `-EPI`'s radius uses a correctly
-rounded `cbrtf`.
+([findings](../findings/afni-masks-original.md)). `-EPI`'s radius uses a correctly rounded
+`cbrtf` by default and glibc 2.35's bits with `reproduce` (GLIBC-05, above).
 
 ## Speed
 
@@ -162,7 +191,9 @@ the replica 39 s and 8.7 s, the original 3.8 s and 0.94 s; a T1w (half-size path
 
 The original's Rust API is `larmorx_afni::unifize`: `run(image, options, mode, settings,
 n_threads)` on an `AfniImage` with `UnifizeOptions`; its steps `unifize::{wmi, duplo}`,
-`invert`, `grey_matter`, `clip_edges`, `median_volume`; the command line is
-`cli::unifize::main`. The replica's Rust API is `larmorx_afni_replica` (`unifize`, with
+`invert`, `grey_matter`, `clip_edges`, `median_volume`, `epi_radius(steps, mode)` and
+`epi_cbrtf_notice(steps, dims, mode)` (GLIBC-05); the command line is `cli::unifize::main`. The
+two cube roots are `larmorx_core::math::cbrtf` (correctly rounded) and
+`larmorx_core::math::cbrtf_glibc` (glibc 2.35's bits, clean-room). The replica's Rust API is `larmorx_afni_replica` (`unifize`, with
 `epi_radius`; the command line `cli::unifize::main`, and `cli::run_in` for a run inside a
 caller's process).

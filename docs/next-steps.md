@@ -473,23 +473,38 @@ The items below keep their history.
   `-EPI` on 64×64×40×160: 120.8 and 110.4 against 109.2; it was 164.8 and 320.9), results unchanged
   bit for bit (the standard record re-made, compare_records: no change); the two strict expected
   failures removed (`validation/investigations/specs-memory/README.md`).
-- **3dUnifize `-EPI`'s `cbrtf`: decided by the user (2026-10-30), a clean-room part to do:** the
-  default keeps the correctly rounded `cbrtf` (CORE-MATH, the more accurate: "if Larmorx is already
-  most accurate then the clean room library should be for the reproduce mode"), and `reproduce`
-  uses a clean-room `cbrtf` with glibc 2.35's bits (written from `specs/cbrtf.md` by an implementer
-  who has never read glibc, proved on all 2^32 inputs against the system's `cbrtf` as a black box:
-  `validation/investigations/specs-memory/cbrtf-glibc-2.35-x86_64-blocks.json`). In both 3dUnifize
-  implementations (the replica and the clean-room original): the default names the difference where
-  glibc's last bit would have changed `-EPI`'s ball or message (a D13 notice, as today's warning);
-  `reproduce` gives AFNI's bytes. Measured on 2026-10-29: 8,794 voxel volumes from 0.001 mm³ (80 in
-  [1, 100) mm³) change the ball.
-- **The Python entry point's own memory: decided by the user (2026-10-30), to do:** count the entry
-  point's fixed cost apart in the memory test ("python has it on memory initialization, so we should
-  count this separately"): the allowance for a call through `python -m larmorx` is 1.10 × the
-  original's peak plus the peak of `python -m larmorx --version` (about 14 MiB here: the interpreter
-  and the Rust core), the 8 MiB margin kept for the computation; then 3dAutomask's strict expected
-  failure is removed (`validation/investigations/specs-memory/entry_memory.py`). A small change of
-  `tests/parity/test_memory_peak.py`, with the next part.
+- **3dUnifize `-EPI`'s `cbrtf`: decided by the user (2026-10-30); the clean-room half done the
+  same day, the replica's half to do:** the default keeps the correctly rounded `cbrtf` (CORE-MATH,
+  the more accurate: "if Larmorx is already most accurate then the clean room library should be
+  for the reproduce mode"), and `reproduce` uses `larmorx_core::math::cbrtf_glibc`, a clean-room
+  cube root with glibc 2.35's bits (written from `specs/cbrtf.md` by an implementer who never read
+  glibc; proved equal to the system's `cbrtf` on all 2^32 inputs, NaN bits included, and on the
+  spec writer's 4096 block hashes: `validation/investigations/cleanroom-cbrtf/`). **Done in the
+  clean-room original:** `-EPI`'s radius takes it with `reproduce`; the default names GLIBC-05
+  where glibc's last bit changes the ball within the grid or the printed radius (both radii in the
+  notice); the parity cases `glibc-05/epi-*` (AFNI 26.3.05's bytes in `reproduce`; the default AFNI's
+  with correctly rounded functions preloaded). **To do (a replica author):** the replica's
+  3dUnifize takes `cbrtf_glibc` with `reproduce` instead of its last-bit warning, with the same
+  GLIBC-05 notice by default (the clean-room original's words, `crates/larmorx-afni/src/unifize/mod.rs`,
+  `epi_cbrtf_notice`, may be copied as text: they are larmorx's own Apache lines), the cases
+  `glibc-05/epi-*` enabled for the replica in `parity/afni_unifize.py` (`suite()`'s
+  `suite_cases` leaves them out for the replica today; the replica suite otherwise shares the
+  original's case list, AFNI-75's guard cases included), and the spec's §7.3 run
+  (`cbrtf-measure` against `cbrtf_glibc`) and §7.6. Measured incidentally on 2026-10-30 (the
+  smoke tier before that filter): the replica's `reproduce` on `glibc-05/epi-ball` differs from
+  AFNI in 6,321 of 27,648 values (max 1.95), as its correctly rounded cube root implies.
+  **For the spec writer:** §7.2's number `c679cb92d4402e33` is not what the system's own results
+  give under §7.1's hash run through all inputs (`335d1fb5fb714c95`; the verifier's README lists
+  the conventions tried); the function agrees input by input, so §7.2 should state the convention
+  of the 2026-10-23 program, or the number `335d1fb5fb714c95`.
+- **The Python entry point's own memory: decided by the user (2026-10-30), done the same day:**
+  `tests/parity/test_memory_peak.py` allows a call through `python -m larmorx` 1.10 × the
+  original's peak plus the peak of `python -m larmorx --version` measured the same way, in the
+  same environment (13.0 to 14.0 MiB here: the interpreter and the Rust core); the standalone
+  binary's calls keep the 8 MiB (`allowance`). 3dAutomask's strict expected failure is removed:
+  18.7 to 19.3 MiB in two runs against AFNI's 7.4 to 7.9 and the entry point's 13.0 to 14.0
+  (allowed 21.6 to 22.7). The whole file: 30 of 30 pass (2026-10-30, larmorx `9ec1a7e` plus the
+  test's change, committed in `930a42f`; log `oracles/logs/cleanroom-cbrtf-memory-2026-10-30.log`).
 - **The AFNI evidence pages' entries** (2026-10-29): the figures cache's AFNI entries were computed
   with the `larmorx-gpl` program; their replica runs could be recomputed in-process at the final
   validation phase (the records show the same files; the computes now run the in-process replica).

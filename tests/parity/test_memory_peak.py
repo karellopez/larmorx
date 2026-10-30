@@ -9,9 +9,14 @@ with; ``validation/investigations/difftest/memory_pair.py`` measures any call by
 BET programs likewise, against the ``larmorx-nc`` replica (``BET_CASES``).
 
 The allowance is the user's rule of 2026-10-27, "similar" memory: at most ``RATIO`` times the
-original's peak plus ``OVERHEAD_MIB`` for the Python interpreter and the gzip writer's two blocks
-per worker (a 16-voxel call needs 20 MiB in larmorx, 18 in ANTs; ``docs/findings/ants-image-programs.md``,
-``ants-n4.md`` and ``ants-denoise.md``, "Memory"; the decision log, 2026-10-27).
+original's peak plus a fixed cost (a 16-voxel call needs 20 MiB in larmorx, 18 in ANTs;
+``docs/findings/ants-image-programs.md``, ``ants-n4.md`` and ``ants-denoise.md``, "Memory"; the
+decision log, 2026-10-27). Since 2026-10-30 (the user: "python has it on memory initialization, so
+we should count this separately") a call through the Python entry point (``python -m larmorx``,
+every call of this file) has as its fixed cost the peak of ``python -m larmorx --version``
+measured the same way, in the same environment (:func:`entry_peak`: the interpreter's start-up
+and larmorx's Rust core, about 14 MiB here); a call of the standalone binary keeps
+``OVERHEAD_MIB`` (:func:`allowance`).
 """
 
 from __future__ import annotations
@@ -29,9 +34,10 @@ nib = pytest.importorskip("nibabel")
 np = pytest.importorskip("numpy")
 programs = pytest.importorskip("larmorx_validation.parity.ants_programs")
 
-#: The constant larmorx may need beyond the original (MiB).
+#: The constant the standalone ``larmorx`` binary may need beyond the original (MiB): the gzip
+#: writer's two blocks per worker and the runtime's own.
 OVERHEAD_MIB = 8.0
-#: larmorx's peak may be this many times the original's, plus ``OVERHEAD_MIB``.
+#: larmorx's peak may be this many times the original's, plus the fixed cost (:func:`allowance`).
 RATIO = 1.10
 
 CASES = [
@@ -79,6 +85,22 @@ def _peak(cmd: list[str], env: dict[str, str], cwd: Path | None = None) -> tuple
     return p.returncode, int(m.group(1)) / 1024
 
 
+def entry_peak(env: dict[str, str], cwd: Path | None = None) -> float:
+    """The peak (MiB) of ``python -m larmorx --version`` in ``env``, measured as the calls are:
+    the Python entry point's fixed cost (the interpreter's start-up and larmorx's Rust core),
+    which every call through it pays whatever its work (user, 2026-10-30)."""
+    code, mib = _peak([sys.executable, "-m", "larmorx", "--version"], env, cwd)
+    assert code == 0
+    return mib
+
+
+def allowance(original_mib: float, entry_mib: float | None = None) -> float:
+    """The most larmorx's call may need (MiB): ``RATIO`` times the original's peak, plus the
+    Python entry point's fixed cost for a call through it (``entry_mib``, :func:`entry_peak`),
+    or ``OVERHEAD_MIB`` for the standalone binary (``entry_mib`` ``None``)."""
+    return RATIO * original_mib + (OVERHEAD_MIB if entry_mib is None else entry_mib)
+
+
 @pytest.mark.parametrize(("program", "size", "spacing", "args"), CASES)
 def test_larmorx_needs_no_more_memory_than_ants(tmp_path, program, size, spacing, args):
     if programs.ants_bin() is None or not (programs.ants_bin() / program).is_file():
@@ -113,13 +135,14 @@ def test_larmorx_needs_no_more_memory_than_ants(tmp_path, program, size, spacing
     assert code == 0
     for mode in ("reproduce", "fix"):
         out = tmp_path / f"larmorx-{mode}.nii.gz"
-        code, mib = _peak(
-            [sys.executable, "-m", "larmorx", "ants", program, *argv(out)],
-            {**env, "LARMORX_UPSTREAM_DEFECTS": mode},
-        )
+        l_env = {**env, "LARMORX_UPSTREAM_DEFECTS": mode}
+        entry = entry_peak(l_env)
+        code, mib = _peak([sys.executable, "-m", "larmorx", "ants", program, *argv(out)], l_env)
         assert code == 0
-        assert mib <= RATIO * ants_mib + OVERHEAD_MIB, (
-            f"{program} ({mode}): larmorx {mib:.0f} MiB, ANTs {ants_mib:.0f} MiB"
+        print(f"{program} ({mode}): larmorx {mib:.1f} MiB, ANTs {ants_mib:.1f}, entry {entry:.1f}")
+        assert mib <= allowance(ants_mib, entry), (
+            f"{program} ({mode}): larmorx {mib:.0f} MiB, ANTs {ants_mib:.0f} MiB, "
+            f"the entry point {entry:.1f} MiB"
         )
         if mode == "reproduce":
             a = np.asarray(nib.load(a_out).dataobj)
@@ -194,19 +217,19 @@ def test_larmorx_needs_no_more_memory_than_fsl(tmp_path, tool, args):
     for mode in ("reproduce", "fix"):
         r_dir = tmp_path / f"larmorx-{mode}"
         r_dir.mkdir()
-        code, mib = _peak(
-            [sys.executable, "-m", "larmorx", "fsl", tool, *words],
-            {
-                **env,
-                "LARMORX_NC_BIN": str(fb.replica_binary()),
-                "LARMORX_UPSTREAM_DEFECTS": mode,
-                "PYTHONPATH": os.environ.get("PYTHONPATH", ""),
-            },
-            r_dir,
-        )
+        l_env = {
+            **env,
+            "LARMORX_NC_BIN": str(fb.replica_binary()),
+            "LARMORX_UPSTREAM_DEFECTS": mode,
+            "PYTHONPATH": os.environ.get("PYTHONPATH", ""),
+        }
+        entry = entry_peak(l_env, r_dir)
+        code, mib = _peak([sys.executable, "-m", "larmorx", "fsl", tool, *words], l_env, r_dir)
         assert code == 0
-        assert mib <= RATIO * fsl_mib + OVERHEAD_MIB, (
-            f"{tool} {args} ({mode}): larmorx {mib:.0f} MiB, FSL {fsl_mib:.0f} MiB"
+        print(f"{tool} ({mode}): larmorx {mib:.1f} MiB, FSL {fsl_mib:.1f}, entry {entry:.1f}")
+        assert mib <= allowance(fsl_mib, entry), (
+            f"{tool} {args} ({mode}): larmorx {mib:.0f} MiB, FSL {fsl_mib:.0f} MiB, "
+            f"the entry point {entry:.1f} MiB"
         )
         if mode == "reproduce":
             assert _contents(f_dir) == _contents(r_dir), f"{tool} {args}"
@@ -324,14 +347,14 @@ def test_larmorx_needs_no_more_memory_than_ants_more(tmp_path, program, args):
     for mode in ("reproduce", "fix"):
         r_dir = tmp_path / f"larmorx-{mode}"
         r_dir.mkdir()
-        code, mib = _peak(
-            [sys.executable, "-m", "larmorx", "ants", program, *argv(r_dir)],
-            {**env, "LARMORX_UPSTREAM_DEFECTS": mode},
-        )
+        l_env = {**env, "LARMORX_UPSTREAM_DEFECTS": mode}
+        entry = entry_peak(l_env)
+        code, mib = _peak([sys.executable, "-m", "larmorx", "ants", program, *argv(r_dir)], l_env)
         assert code == 0
-        print(f"{program} ({mode}): larmorx {mib:.1f} MiB, ANTs {ants_mib:.1f} MiB")
-        assert mib <= RATIO * ants_mib + OVERHEAD_MIB, (
-            f"{program} ({mode}): larmorx {mib:.0f} MiB, ANTs {ants_mib:.0f} MiB"
+        print(f"{program} ({mode}): larmorx {mib:.1f} MiB, ANTs {ants_mib:.1f}, entry {entry:.1f}")
+        assert mib <= allowance(ants_mib, entry), (
+            f"{program} ({mode}): larmorx {mib:.0f} MiB, ANTs {ants_mib:.0f} MiB, "
+            f"the entry point {entry:.1f} MiB"
         )
         if mode == "reproduce":
             assert _stored(a_dir) == _stored(r_dir), program
@@ -352,22 +375,19 @@ def test_larmorx_needs_no_more_memory_than_ants_more(tmp_path, program, args):
 #: times with ``-EPI``: the input kept after its float copy, a copy for each contrast inversion, the
 #: masked image after its half-size copy, and with ``-EPI`` the series in and out side by side;
 #: ``validation/investigations/specs-memory/README.md``), and the command line no longer imports
-#: ``larmorx._replica`` (2.3 MiB). One call still exceeds the rule, a strict expected failure:
-#: 3dAutomask's image (64 x 64 x 40) is so small that the Python entry point's fixed cost, the
-#: interpreter (9.0 MiB) and the Rust core it loads (4.0 MiB), exceeds the rule's 8 MiB beyond
-#: AFNI's whole run (7.7 MiB; the entry point 19.6 MiB, ``_core.cli_main`` called alone 18.5, the
-#: standalone binary 8.4: ``validation/investigations/specs-memory/entry_memory.py``). No import
-#: is left to defer; it waits for a decision on the allowance (``docs/next-steps.md``).
-_SMALL = (
-    "the Python entry point's fixed 13 MiB (the interpreter and the Rust core) exceed the "
-    "allowance on this small image (the binary is within it; a decision)"
-)
+#: ``larmorx._replica`` (2.3 MiB). 3dAutomask's image (64 x 64 x 40) is so small that the Python
+#: entry point's fixed cost, the interpreter (9.0 MiB) and the Rust core it loads (4.0 MiB),
+#: exceeded the earlier fixed 8 MiB beyond AFNI's whole run (7.7 MiB; the entry point 19.6 MiB,
+#: ``_core.cli_main`` called alone 18.5, the standalone binary 8.4:
+#: ``validation/investigations/specs-memory/entry_memory.py``), a strict expected failure until
+#: the user's decision of 2026-10-30 counted that fixed cost apart (:func:`allowance`): measured
+#: that day in two runs, 18.7 to 19.3 MiB against AFNI's 7.4 to 7.9 and the entry point's 13.0 to
+#: 14.0, within the allowance (21.6 to 22.7 MiB).
 AFNI_CASES = [
     ("3dTshift", "-ignore 0 -tzero 1.0 -TR 2s -tpattern alt+z -prefix {out}/ts.nii.gz {bold}"),
-    pytest.param(
+    (
         "3dAutomask",
         "-apply_prefix {out}/masked.nii.gz -dilate 1 -prefix {out}/mask.nii.gz {mean}",
-        marks=pytest.mark.xfail(strict=True, reason=_SMALL),
     ),
     ("3dUnifize", "-T2 -clfrac 0.2 -prefix {out}/uni.nii.gz -input {t1}"),
     ("3dUnifize", "-EPI -prefix {out}/epi.nii.gz -input {bold}"),
@@ -433,15 +453,16 @@ def test_larmorx_needs_no_more_memory_than_afni(tmp_path, program, args):
     for mode in ("reproduce", "fix"):
         r_dir = tmp_path / f"larmorx-{mode}"
         r_dir.mkdir()
+        l_env = {**env, "LARMORX_UPSTREAM_DEFECTS": mode, "LARMORX_IMPLEMENTATION": "replica"}
+        entry = entry_peak(l_env, r_dir)
         code, mib = _peak(
-            [sys.executable, "-m", "larmorx", "afni", program, *argv(r_dir)],
-            {**env, "LARMORX_UPSTREAM_DEFECTS": mode, "LARMORX_IMPLEMENTATION": "replica"},
-            r_dir,
+            [sys.executable, "-m", "larmorx", "afni", program, *argv(r_dir)], l_env, r_dir
         )
         assert code == 0
-        print(f"{program} ({mode}): larmorx {mib:.1f} MiB, AFNI {afni_mib:.1f} MiB")
-        assert mib <= RATIO * afni_mib + OVERHEAD_MIB, (
-            f"{program} {args} ({mode}): larmorx {mib:.0f} MiB, AFNI {afni_mib:.0f} MiB"
+        print(f"{program} ({mode}): larmorx {mib:.1f} MiB, AFNI {afni_mib:.1f}, entry {entry:.1f}")
+        assert mib <= allowance(afni_mib, entry), (
+            f"{program} {args} ({mode}): larmorx {mib:.0f} MiB, AFNI {afni_mib:.0f} MiB, "
+            f"the entry point {entry:.1f} MiB"
         )
         if mode == "reproduce":
             assert _stored(a_dir) == _stored(r_dir), f"{program} {args}"

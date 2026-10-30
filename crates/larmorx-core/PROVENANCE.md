@@ -25,6 +25,15 @@ reproduces the original copyright and MIT notice.
 | `math/tanhf.rs` | `src/binary32/tanh/tanhf.c` (`a60f385ebc85…`) | bit-identical to the C (gcc 11.4, `-O2 -ffp-contract=off`) on all 2^32 inputs; checksums as for `expf` (2026-10-23, for 3dUnifize's squash) |
 | `math/cbrtf.rs` | `src/binary32/cbrt/cbrtf.c` (`36b3c1127013…`) | as for `tanhf` (for 3dUnifize's `-EPI` radius); round to nearest only, the inexact-flag handling dropped |
 
+**Not ported: `math/cbrtf_glibc.rs`** (2026-10-30), the cube root with glibc 2.35's bits for
+`reproduce` (3dUnifize `-EPI`'s radius, GLIBC-05), is a **clean-room implementation**
+(Apache-2.0) written only from [`specs/cbrtf.md`](../../specs/cbrtf.md) (the method as
+mathematics, its constants as bits) and black-box runs of the system's `cbrtf`, by an implementer
+who never opened glibc's source or its translations (`crates-gpl/tools/`); proved equal to glibc
+2.35's `cbrtf` on all 2^32 inputs, NaN bits included
+([`validation/investigations/cleanroom-cbrtf/`](../../validation/investigations/cleanroom-cbrtf/README.md));
+unit tests check the hash of every 4099th input and, ignored, of all inputs.
+
 Differences from the C code, all without effect on the result in round-to-nearest:
 - `__builtin_fma` is `f64::mul_add`, which is correctly rounded on every target;
 - exception flags and `errno` are not modelled;

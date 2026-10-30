@@ -244,6 +244,7 @@ to add (since 2026-10-25: "Random testing's gaps", below); – = nothing to do. 
 | GLIBC-02 | glibc 2.35 | `expf`, `logf`, `powf` not correctly rounded | d | N4, DenoiseImage | correctly rounded | – |
 | GLIBC-03 | glibc 2.35 | `sinf`, `cosf` not correctly rounded; two builds differ | d | none | see entry | – |
 | GLIBC-04 | glibc 2.35 | `pow` not correctly rounded for 5 filter-pole powers | d | none | exact | – |
+| GLIBC-05 | glibc 2.35 | `cbrtf` not correctly rounded (one unit in the last place on 10.6 % of float inputs): 3dUnifize `-EPI`'s radius (18.3 mm over the cube root of the voxel volume) changes its ball of neighbours or its printed radius on some voxel sizes (11.969702 mm³: radius 8 with glibc's, 7.9999995 correctly rounded) | d | none (fMRIPrep does not call `-EPI`) | correctly rounded by default (`larmorx_core::math::cbrtf`), named where glibc's last bit changes the ball within the grid or the printed radius; `reproduce` uses glibc 2.35's bits (`larmorx_core::math::cbrtf_glibc`, clean-room from `specs/cbrtf.md`, proved on all 2^32 inputs) in the clean-room original (2026-10-30); the replica keeps its warning until a replica author wires the same function | replica |
 | ANTSPY-01 | ANTsPy 0.6.3 | inverts an affine without being asked | c? | none | never inverts unasked | – |
 | ANTSPY-02 | ANTsPy 0.6.3 | double transforms rounded to float32 | c | none | – | – |
 | ANTSPY-03 | ANTsPy 0.6.3 | header direction transposed and rounded | c | none | – | – |
@@ -455,6 +456,9 @@ entry added.
 unopenable `.par` or `.rms` file, status 0) and FSL-66 (class a: a negative `-bins` crashes mcflirt)
 new, both refused by default by rule B, to do in the replica and the clean-room original; no
 **decide** entry added.
+**2026-10-30, the clean-room `cbrtf` (the user's decision):** GLIBC-05 new (class d: glibc 2.35's
+`cbrtf` not correctly rounded; 3dUnifize `-EPI`'s radius); the clean-room original corrected and
+switchable, the replica's switch to do.
 
 ## D13 gaps: what the next task switches to "correct by default"
 

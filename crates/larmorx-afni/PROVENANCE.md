@@ -146,3 +146,24 @@ inputs only:
 |---|---|---|
 | `unifize::epi_guard`, `epi_ball_bytes`, `run` (the guard before the thread pool, its notice and fatal line) | the default's refusal of AFNI-75 | spec §9.1 |
 | `unifize::wmi::local_intensity` (the ball's lines that reach the grid only), `Ball::extent_within` | AFNI's local mean for any radius, with `reproduce` too | spec §4.3, §9.1 |
+
+## `-EPI`'s radius from glibc's cube root in 3dUnifize (GLIBC-05, 2026-10-30)
+
+Added by a clean-room implementer who never opened glibc's or AFNI's source, the replica crates
+(`crates/larmorx-afni-replica`, `crates-gpl/` with its tools, `crates-nc/`), the restricted
+findings, `docs/parts/`, the spec writer's probes (`validation/investigations/specs-memory/`, its
+block hashes of glibc's results aside) or the version probes, from these inputs only:
+
+| Input | What it gave |
+|---|---|
+| [`specs/cbrtf.md`](../../specs/cbrtf.md) | glibc 2.35's `cbrtf` as mathematics: the range reduction, the quadratic start, its cube, the Halley step, the constants as bits, every rounding, the special values, the validation plan (`larmorx_core::math::cbrtf_glibc`) |
+| `validation/investigations/specs-memory/cbrtf-glibc-2.35-x86_64-blocks.json` | the 4096 block hashes of glibc 2.35's results (black-box output), compared with the function's |
+| Black-box runs of the system's `cbrtf` (glibc 2.35, `libm.so.6` through `dlopen`): [`validation/investigations/cleanroom-cbrtf/`](../../validation/investigations/cleanroom-cbrtf/README.md) | every one of the 2^32 inputs compared bit for bit |
+| [`specs/3dUnifize.md`](../../specs/3dUnifize.md) §4.3, §7 | the radius `(float)(18.3 / u)` from the cube root of the voxel volume, the ball's float test |
+| Black-box runs of AFNI 26.3.05's `3dUnifize` (the parity suite's cases `glibc-05/epi-*`), plain and with CORE-MATH's correctly rounded functions preloaded | `reproduce`: AFNI's bytes and messages; the default: AFNI's with a correctly rounded cube root |
+| The user's decision of 2026-10-30 (`docs/next-steps.md`, "3dUnifize `-EPI`'s `cbrtf`") | the default correctly rounded, `reproduce` glibc's bits, the difference named where it changes the result |
+
+| larmorx | Behaviour reproduced | Source |
+|---|---|---|
+| `unifize::epi_radius(steps, mode)` | the radius: correctly rounded by default, glibc 2.35's (AFNI's) with `reproduce` | spec 3dUnifize §7, specs/cbrtf.md |
+| `unifize::epi_cbrtf_notice`, `wmi::Ball::{lines_within, x_lines}`, `wmi::reach` | GLIBC-05 named where glibc's last bit changes the ball within the grid's reach or the printed radius | spec 3dUnifize §4.3, §9.1 |

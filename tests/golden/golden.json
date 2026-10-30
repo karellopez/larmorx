@@ -1,6 +1,6 @@
 {
  "about": "SHA-256 of larmorx's outputs on Linux x86_64 for the golden cases in registry.py; every platform must reproduce them (docs/validation/golden.md). Written by scripts/record_golden.py; do not edit by hand.",
- "recorded": {"commit": "bbe680b1d87976a1ef83d79e20d4229636e3e650", "date": "2026-10-30", "numpy": "2.3.5", "parity": "passed (pytest tests/parity, smoke tier)", "platform": "Linux x86_64", "python": "3.12.16"},
+ "recorded": {"commit": "9383f27e7ad91fa5d63a3c54bab26fe52db345e2", "date": "2026-10-30", "numpy": "2.3.5", "parity": "passed (pytest tests/parity, smoke tier)", "platform": "Linux x86_64", "python": "3.12.16"},
  "cases": {
   "cli.afni.3dAutomask": {
    "depth:data": {"dtype": "<i2", "sample": "00000000020000000000020000000000", "sha256": "5eb371e03027e458585e506ca5feeb8a4a1673ee77a63e6a8442b5b23c1c3c85", "shape": [24, 20, 16], "sum": "2792.0"},
@@ -65,6 +65,24 @@
    "scale:header": {"bytes": 352, "sha256": "9f76230b6a710fb9899a4ee51196a1b7cf487148e6e3796a1b3bf8429273a3af"},
    "uni:data": {"dtype": "<f4", "sample": "00000000000000008cac7844000000000000000067c177440000000000000000", "sha256": "8206016b24a440dc86128a798769455ca6ac824cd81e7668656922ba054cd636", "shape": [24, 20, 16], "sum": "1780003.364654541"},
    "uni:header": {"bytes": 352, "sha256": "9f76230b6a710fb9899a4ee51196a1b7cf487148e6e3796a1b3bf8429273a3af"}
+  },
+  "cli.afni.3dUnifize.glibc05": {
+   "ball.fix.named": {"bytes": 8, "sha256": "772e6b3640ecbbfb667a59a81ce0aaa7a8d6140803050070979cd4a4b4be0a90"},
+   "ball.fix.status": {"dtype": "<i8", "sample": "0000000000000000", "sha256": "af5570f5a1810b7af78caf4bc70a660f0df51e42baf91d4de5b2328de0e83dfc", "shape": [1], "sum": "0.0"},
+   "ball.fix:data": {"dtype": "<f4", "sample": "00000000bcf7704300000000326493431672c943000000004a32864300000000", "sha256": "e6b086275ec2f120b31b9ecd20b11527c076207c971f3eba76309eafe2e3cc22", "shape": [24, 24, 16, 4], "sum": "4727127.797302246"},
+   "ball.fix:header": {"bytes": 352, "sha256": "5530770d2ebf6fa989dd0d108f6530b8504680499378327f548d0fd944ba3058"},
+   "ball.reproduce.named": {"bytes": 8, "sha256": "772e6b3640ecbbfb667a59a81ce0aaa7a8d6140803050070979cd4a4b4be0a90"},
+   "ball.reproduce.status": {"dtype": "<i8", "sample": "0000000000000000", "sha256": "af5570f5a1810b7af78caf4bc70a660f0df51e42baf91d4de5b2328de0e83dfc", "shape": [1], "sum": "0.0"},
+   "ball.reproduce:data": {"dtype": "<f4", "sample": "00000000fcea70430000000028c39343a25ac94300000000b62c864300000000", "sha256": "ae7414f071a4ca58388ec64ccc0a13ea6cabab603a7b10a569d523e45e67ae2c", "shape": [24, 24, 16, 4], "sum": "4726465.2794799805"},
+   "ball.reproduce:header": {"bytes": 352, "sha256": "5530770d2ebf6fa989dd0d108f6530b8504680499378327f548d0fd944ba3058"},
+   "printed.fix.named": {"bytes": 8, "sha256": "772e6b3640ecbbfb667a59a81ce0aaa7a8d6140803050070979cd4a4b4be0a90"},
+   "printed.fix.status": {"dtype": "<i8", "sample": "0000000000000000", "sha256": "af5570f5a1810b7af78caf4bc70a660f0df51e42baf91d4de5b2328de0e83dfc", "shape": [1], "sum": "0.0"},
+   "printed.fix:data": {"dtype": "<f4", "sample": "0000000064336943000000004ef397438ce1ce4300000000c017834300000000", "sha256": "a950611e820e1977f9219c4cba378a724127a74dade4a2b3e6a18e3263363d73", "shape": [24, 24, 16, 4], "sum": "4723878.191650391"},
+   "printed.fix:header": {"bytes": 352, "sha256": "ffe72666bf986913514f14188b1cb057041180ab1d55c29c201b7e96a6b5825e"},
+   "printed.reproduce.named": {"bytes": 8, "sha256": "772e6b3640ecbbfb667a59a81ce0aaa7a8d6140803050070979cd4a4b4be0a90"},
+   "printed.reproduce.status": {"dtype": "<i8", "sample": "0000000000000000", "sha256": "af5570f5a1810b7af78caf4bc70a660f0df51e42baf91d4de5b2328de0e83dfc", "shape": [1], "sum": "0.0"},
+   "printed.reproduce:data": {"dtype": "<f4", "sample": "0000000064336943000000004ef397438ce1ce4300000000c017834300000000", "sha256": "a950611e820e1977f9219c4cba378a724127a74dade4a2b3e6a18e3263363d73", "shape": [24, 24, 16, 4], "sum": "4723878.191650391"},
+   "printed.reproduce:header": {"bytes": 352, "sha256": "ffe72666bf986913514f14188b1cb057041180ab1d55c29c201b7e96a6b5825e"}
   },
   "cli.afni.3dUnifize.guard": {
    "files": {"bytes": 6, "sha256": "5479c79b7271546ccdf2fa5423448ac452f7ca9c067f7d2848f6be3c56f9b803"},

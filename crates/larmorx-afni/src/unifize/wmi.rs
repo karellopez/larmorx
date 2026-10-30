@@ -60,6 +60,31 @@ impl Ball {
         Some(d)
     }
 
+    /// The lines of the ball along one axis, limited to the offsets that can reach the grid:
+    /// `(b, c, e)` for every `|c| <= reach_c` and `|b| <= across` whose line holds `(0, b, c)`,
+    /// `e` its extent at most `along` ([`Ball::extent_within`]). With the reaches `n - 1` of a
+    /// grid's axes ([`reach`]) they are exactly the offsets of the ball that can land inside the
+    /// grid from some voxel.
+    pub fn lines_within(&self, reach_c: i64, across: i64, along: i64) -> Vec<(i64, i64, i64)> {
+        let mut out = Vec::new();
+        let (hc, hb) = (self.half.min(reach_c), self.half.min(across));
+        for c in -hc..=hc {
+            for b in -hb..=hb {
+                if let Some(e) = self.extent_within(b, c, along) {
+                    out.push((b, c, e));
+                }
+            }
+        }
+        out
+    }
+
+    /// The ball's lines along x within the reach of a grid of `dims` ([`Ball::lines_within`]):
+    /// two radii whose lines are equal give the same local intensity on that grid.
+    pub fn x_lines(&self, dims: [usize; 3]) -> Vec<(i64, i64, i64)> {
+        let [nx, ny, nz] = dims;
+        self.lines_within(reach(nz), reach(ny), reach(nx))
+    }
+
     /// Every offset of the ball.
     pub fn offsets(&self) -> Vec<[i64; 3]> {
         let h = self.half;
@@ -75,6 +100,11 @@ impl Ball {
         }
         out
     }
+}
+
+/// How far an offset can reach inside an axis of `n` voxels: `n - 1` (0 for an empty axis).
+pub fn reach(n: usize) -> i64 {
+    (n as i64 - 1).max(0)
 }
 
 /// The spec's mean of the sorted values `q1 ..= q2` of `n` values given in ascending order by
@@ -260,28 +290,14 @@ pub fn local_intensity(
 ) -> (Vec<f32>, usize) {
     let [nx, ny, nz] = dims;
     let ball = Ball::new(radius);
-    let h = ball.half;
     // The lines of the ball along x (indexed by dj, dk) and along y (by di, dk), limited to the
     // offsets that can reach the grid: at most n - 1 voxels along an axis of n
     // (`specs/3dUnifize.md` §9.1). An offset beyond them never lands inside the grid, and a line
     // at least as long as its axis covers it from any voxel, so every ball holds the same values;
     // a radius of thousands of voxels (`-EPI` on tiny voxels, AFNI-75 reproduced) needs only the
     // grid's lines.
-    let reach = |n: usize| (n as i64 - 1).max(0);
-    let lines = |across: i64, along: i64| -> Vec<(i64, i64, i64)> {
-        let mut out = Vec::new();
-        let (hc, hb) = (h.min(reach(nz)), h.min(across));
-        for c in -hc..=hc {
-            for b in -hb..=hb {
-                if let Some(e) = ball.extent_within(b, c, along) {
-                    out.push((b, c, e));
-                }
-            }
-        }
-        out
-    };
-    let x_lines = lines(reach(ny), reach(nx));
-    let y_lines = lines(reach(nx), reach(ny));
+    let x_lines = ball.lines_within(reach(nz), reach(ny), reach(nx));
+    let y_lines = ball.lines_within(reach(nz), reach(nx), reach(ny));
     let ranked = rank_values(a);
     let nranks = ranked.values.len().max(1);
     let plane = nx * ny;
@@ -447,6 +463,21 @@ mod tests {
             }
         }
         assert_eq!(n as usize, b.offsets().len());
+        // Within a grid that holds the whole ball, its lines along x are those lines.
+        let lines = b.x_lines([40, 40, 40]);
+        let m: i64 = lines.iter().map(|&(_, _, e)| 2 * e + 1).sum();
+        assert_eq!(m as usize, b.offsets().len());
+        // Within a smaller grid, exactly the offsets that fit its reach (n - 1 per axis).
+        let dims = [9, 6, 4];
+        let fit = b
+            .offsets()
+            .iter()
+            .filter(|o| (0..3).all(|k| o[k].abs() <= reach(dims[k])))
+            .count();
+        let m: i64 = b.x_lines(dims).iter().map(|&(_, _, e)| 2 * e + 1).sum();
+        assert_eq!(m as usize, fit);
+        assert_eq!(reach(0), 0);
+        assert_eq!(reach(1), 0);
     }
 
     #[test]

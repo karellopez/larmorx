@@ -186,3 +186,34 @@ def test_a_failing_replica_raises(builtin_stub, tmp_path):
     builtin_stub.stderr = "** FATAL ERROR: Mask creation fails for unknown reasons!\n"
     with pytest.raises(lx.ReplicaError, match="Mask creation fails"):
         lx.afni.automask(volume(tmp_path))
+
+
+def test_unifize_epi_glibc_05_in_the_replica(no_replica, tmp_path):
+    """GLIBC-05 (``specs/cbrtf.md``) in the built-in replica, since 2026-10-30: ``-EPI``'s
+    radius takes the correctly rounded cube root by default and glibc 2.35's (the clean-room
+    ``cbrtf_glibc``) with ``reproduce``. On voxels of 11.969702 mm³ the two radii are 7.9999995
+    and 8 voxels, whose balls differ: GLIBC-05 named in both modes (no last-bit warning any
+    more), the results differ, and ``reproduce`` prints AFNI's radius."""
+    import struct
+
+    x, y, z = np.meshgrid(*(np.arange(n, dtype=np.float64) for n in (24, 24, 16)), indexing="ij")
+    r2 = ((x - 11.5) / 9) ** 2 + ((y - 11.5) / 10) ** 2 + ((z - 7.5) / 6) ** 2
+    head = 800.0 * np.clip(1.2 - r2, 0.0, 1.0) + 300.0 * (r2 < 0.5)
+    series = np.stack([head * (1 + 0.01 * t) for t in range(3)], axis=-1).astype(np.float32)
+    dz = struct.unpack("<f", struct.pack("<I", 0x403F83E6))[0]  # 2 x 2 x dz = 11.969702 mm³
+    path = tmp_path / "bold.nii"
+    lx.save((series, np.diag([2.0, 2.0, dz, 1.0])), path)
+    with pytest.warns(lx.UpstreamDefectWarning, match="GLIBC-05") as fixed:
+        f = lx.afni.unifize(path, epi=True, implementation="replica")
+    text = " ".join(str(w.message) for w in fixed)
+    assert "radius is 7.9999995 voxels" in text and "it is 8 voxels" in text
+    assert f.image.implementation == REPLICA
+    with pytest.warns(lx.UpstreamDefectWarning, match="GLIBC-05"):
+        r = lx.afni.unifize(path, epi=True, upstream_defects="reproduce", implementation="replica")
+    assert not np.array_equal(np.asarray(f.image.data), np.asarray(r.image.data))
+    code, _, err = cli("3dUnifize", "-EPI", "-prefix", str(tmp_path / "u.nii"), str(path),
+                       implementation="replica")  # fmt: skip
+    assert code == 0, err
+    assert "-EPI changes -Urad to 8.0 voxels" in err  # 7.9999995, printed with one decimal
+    assert "upstream defect GLIBC-05 (glibc 2.35) corrected: -EPI's radius is 7.9999995" in err
+    assert "depends on the last bit of the cube root" not in err

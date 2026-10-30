@@ -353,3 +353,155 @@ fn meanvol_name_corrected_with_its_notice() {
     assert_eq!(fsl08(&o.stderr), 1, "{}", o.stderr);
     assert!(o.stderr.contains("-stats"), "{}", o.stderr);
 }
+
+/// Every file under `dir` (relative names), those in `skip` left out.
+fn files_under(dir: &Path, skip: &[&str]) -> Vec<String> {
+    let mut out = Vec::new();
+    let mut stack = vec![dir.to_path_buf()];
+    while let Some(d) = stack.pop() {
+        for e in std::fs::read_dir(&d).unwrap() {
+            let p = e.unwrap().path();
+            let rel = p
+                .strip_prefix(dir)
+                .unwrap()
+                .to_string_lossy()
+                .replace('\\', "/");
+            if skip.contains(&rel.as_str()) {
+                continue;
+            }
+            if p.is_dir() {
+                stack.push(p);
+            } else {
+                out.push(rel);
+            }
+        }
+    }
+    out.sort();
+    out
+}
+
+/// FSL-65 (`specs/mcflirt.md` §10.6): an output text file that cannot be opened. A directory
+/// named `o.par`: refused by default before anything of the step is written (exit 1, FSL-65,
+/// nothing written); reproduced, mcflirt's message at volume 0's line and exit status 0, after
+/// `MAT_0000` and the `.rms` files. A directory named `o_rel.rms`: refused by default;
+/// reproduced, that file not written and everything else as mcflirt.
+#[test]
+fn unopenable_text_outputs_fsl_65() {
+    let d = tempfile::tempdir().unwrap();
+    let bold = series(d.path());
+    let b = bold.to_str().unwrap();
+    for mode in ["fix", "reproduce"] {
+        let run = d.path().join(format!("par-{mode}"));
+        std::fs::create_dir_all(run.join("o.par")).unwrap();
+        let args = [
+            "-in", b, "-out", "o", "-mats", "-plots", "-rmsrel", "-stages", "1",
+        ];
+        let o = mcflirt(&run, &args, mode, &[]);
+        assert_eq!(named(&o.stderr), ["FSL-65"], "{}", o.stderr);
+        let written = files_under(&run, &["o.par"]);
+        if mode == "fix" {
+            assert_eq!(o.code, 1, "{}", o.stderr);
+            assert!(
+                o.stderr.contains("Error: cannot open o.par for writing"),
+                "{}",
+                o.stderr
+            );
+            assert!(written.is_empty(), "{written:?}");
+        } else {
+            assert_eq!(o.code, 0, "{}", o.stderr);
+            assert!(
+                o.stderr.contains("error: unable to open output file!\n"),
+                "{}",
+                o.stderr
+            );
+            assert_eq!(written, ["o.mat/MAT_0000", "o_rel.rms", "o_rel_mean.rms"]);
+        }
+        let run = d.path().join(format!("rms-{mode}"));
+        std::fs::create_dir_all(run.join("o_rel.rms")).unwrap();
+        let args = ["-in", b, "-out", "o", "-mats", "-rmsrel", "-stages", "1"];
+        let o = mcflirt(&run, &args, mode, &[]);
+        assert_eq!(named(&o.stderr), ["FSL-65"], "{}", o.stderr);
+        let written = files_under(&run, &["o_rel.rms"]);
+        if mode == "fix" {
+            assert_eq!(o.code, 1, "{}", o.stderr);
+            assert!(written.is_empty(), "{written:?}");
+        } else {
+            assert_eq!(o.code, 0, "{}", o.stderr);
+            assert!(
+                written.contains(&"o_rel_mean.rms".to_owned()),
+                "{written:?}"
+            );
+            assert!(written.contains(&"o.nii".to_owned()), "{written:?}");
+            let mats = written.iter().filter(|f| f.starts_with("o.mat/")).count();
+            assert_eq!(mats, 3, "{written:?}");
+        }
+    }
+}
+
+/// FSL-66 (`specs/mcflirt.md` §12.1): a negative `-bins`. Refused by default before any work
+/// (exit 1, FSL-66, nothing written), every cost; reproduced, where mcflirt crashes an error
+/// saying how it ends (signal 8 for −1 bins in a stage, `std::bad_array_new_length` for −2 or
+/// fewer, its two lines first), exit 1, nothing written; `-bins -1` with normcorr (no bins in
+/// any stage, a cost that uses none) runs as mcflirt.
+#[test]
+fn negative_bins_fsl_66() {
+    let d = tempfile::tempdir().unwrap();
+    let bold = series(d.path());
+    let b = bold.to_str().unwrap();
+    let cases: [(&str, &[&str], &str); 4] = [
+        ("m8", &["-bins", "-8"], "signal 8"),
+        ("m4s2", &["-bins", "-4", "-stages", "2"], "signal 8"),
+        ("m16", &["-bins", "-16"], "std::bad_array_new_length"),
+        (
+            "m16mi",
+            &["-bins", "-16", "-cost", "mutualinfo"],
+            "std::bad_array_new_length",
+        ),
+    ];
+    for (name, extra, how) in cases {
+        for mode in ["fix", "reproduce"] {
+            let run = d.path().join(format!("{name}-{mode}"));
+            std::fs::create_dir_all(&run).unwrap();
+            let mut args = vec!["-in", b, "-out", "o", "-mats"];
+            args.extend_from_slice(extra);
+            let o = mcflirt(&run, &args, mode, &[]);
+            assert_eq!(o.code, 1, "{name} {mode}: {}", o.stderr);
+            assert_eq!(named(&o.stderr), ["FSL-66"], "{name} {mode}: {}", o.stderr);
+            assert!(files_under(&run, &[]).is_empty(), "{name} {mode}");
+            if mode == "fix" {
+                assert!(o.stderr.starts_with("Error: -bins -"), "{}", o.stderr);
+            } else {
+                assert!(o.stderr.contains(how), "{name}: {}", o.stderr);
+                assert!(
+                    o.stderr.contains("the replica exits with status 1"),
+                    "{}",
+                    o.stderr
+                );
+                if how.starts_with("std::") {
+                    assert!(o.stderr.contains(
+                        "terminate called after throwing an instance of \
+                         'std::bad_array_new_length'\n  what():  std::bad_array_new_length\n"
+                    ));
+                }
+            }
+        }
+    }
+    // -bins -1 with normcorr: refused by default; reproduced, mcflirt's run (no stage has bins,
+    // and normcorr uses none), FSL-66 named.
+    let run = d.path().join("m1-fix");
+    std::fs::create_dir_all(&run).unwrap();
+    let args = ["-in", b, "-out", "o", "-mats", "-bins", "-1"];
+    let o = mcflirt(&run, &args, "fix", &[]);
+    assert_eq!(o.code, 1, "{}", o.stderr);
+    assert_eq!(named(&o.stderr), ["FSL-66"], "{}", o.stderr);
+    let run = d.path().join("m1-reproduce");
+    std::fs::create_dir_all(&run).unwrap();
+    let o = mcflirt(&run, &args, "reproduce", &[]);
+    assert_eq!(o.code, 0, "{}", o.stderr);
+    assert!(
+        named(&o.stderr).contains(&"FSL-66".to_owned()),
+        "{}",
+        o.stderr
+    );
+    assert!(run.join("o.nii").is_file());
+}

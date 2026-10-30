@@ -763,9 +763,8 @@ The default's refusal lines are `Error: <message>` on standard error; the notice
 lines of `docs/api/upstream-defects.md` (`larmorx: upstream defect FSL-20 (mcflirt) corrected:
 ... [LARMORX_UPSTREAM_DEFECTS=reproduce gives mcflirt's result]`), after the run's other
 messages. **(spec writer, 2026-10-30)** The replica does all of the FSL-20 rows today
-(`larmorx-nc fsl mcflirt`, observed with the cases above); FSL-65 is new: the replica writes
-everything it can and ignores an unopenable `.par` or `.rms` file in both modes, a follow-up of
-the replica (the table is its target).
+(`larmorx-nc fsl mcflirt`, observed with the cases above); FSL-65 too since 2026-10-30 (the table's rows,
+observed with §14.1's cases).
 
 ## 11. Command line (`larmorx mri hmc [options]`, accepting mcflirt's)
 
@@ -895,9 +894,8 @@ rule for FSL-66, whose crashes are never reproduced, D13 class (a)):
 | FSL-21 with `-stages 0` | runs (no stage, no bins needed) | the same |
 | FSL-66: `-bins` negative with `-stages` 1 or more (with `normcorr` and `leastsquares` too); with a histogram cost the values −7 to −1 are FSL-21's row | refused before any work: an error naming `-bins <n>` (a negative number of bins) and FSL-66, exit status 1, nothing written; a notice naming FSL-66 | where mcflirt crashes (above: `B_k ≤ −1` in a stage that runs), an error saying how mcflirt ends (signal 8, or the `bad_array_new_length` abort with its two lines), exit status 1, nothing written; elsewhere (−3 to −1 with `normcorr`, `leastsquares`) as mcflirt |
 
-**(spec writer, 2026-10-30)** The replica does the FSL-21 rows today; FSL-66 is new: the replica
-and the clean-room original both run normally on negative `-bins` in both modes (they take the
-stage's negative bins as none, or the original as one), a follow-up of the replica (the table is its target).
+**(spec writer, 2026-10-30)** The replica does the FSL-21 rows today; FSL-66 too since 2026-10-30,
+in the replica and the clean-room original (the table's rows, observed with §14.1's cases).
 
 ## 13. Numerics, operation order and determinism
 

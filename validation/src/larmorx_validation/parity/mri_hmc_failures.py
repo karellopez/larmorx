@@ -1,6 +1,10 @@
 # SPDX-License-Identifier: Apache-2.0
 """The failure cases of ``specs/mcflirt.md`` §14.1 in the ``mri-hmc`` suite: outputs mcflirt
 cannot write (§10.6: FSL-20, FSL-65) and bins no histogram can have (§12.1: FSL-21, FSL-66).
+Since 2026-10-30 also in the mcflirt replica's suite (``fsl-mcflirt-replica``): the same cases
+and checks with ``larmorx-nc fsl mcflirt`` in place of ``larmorx mri hmc``
+(``run_case(..., implementation="replica")``), whose matrices, where both run to the end, must be
+mcflirt's as text.
 
 Each case runs mcflirt (the FSL version the suite validates against, live, through the oracle
 cache) and ``larmorx mri hmc`` in both modes on a 24 × 24 × 16 × 5 phantom (written by this module
@@ -243,8 +247,8 @@ def _normalise(text: str, run: Path) -> str:
     return text.replace(str(run), "<run>").replace(str(inputs()["in"].parent), "<inputs>")
 
 
-#: larmorx's own lines: its notices and its errors.
-_OWN = re.compile(r"^(larmorx: |Error: )")
+#: larmorx's own lines: its notices and its errors (``larmorx-nc:`` the replica's).
+_OWN = re.compile(r"^(larmorx(-nc)?: |Error: )")
 _NAMED = re.compile(r"\b(FSL-\d\d)\b")
 
 
@@ -269,12 +273,13 @@ def named(stderr: str) -> set[str]:
 # Running
 
 
-def _environment() -> tuple[str, dict[str, str]]:
-    """mcflirt and the environment its recorded runs used (FSLOUTPUTTYPE NIFTI_GZ, a plain
-    PATH; OpenBLAS's Haswell kernels, FSL-64)."""
+def _environment(implementation: str = "original") -> tuple[str, dict[str, str]]:
+    """mcflirt (the FSL version ``implementation``'s cases compare with) and the environment its
+    recorded runs used (FSLOUTPUTTYPE NIFTI_GZ, a plain PATH; OpenBLAS's Haswell kernels,
+    FSL-64)."""
     from larmorx_validation.difftest.tools.mri_hmc import _fsl
 
-    fsl = _fsl("original")
+    fsl = _fsl(implementation)
     env = {
         "HOME": str(Path.home()),
         "PATH": "/usr/bin:/bin",
@@ -285,10 +290,10 @@ def _environment() -> tuple[str, dict[str, str]]:
     return str(fsl / "bin" / "mcflirt"), env
 
 
-def _run_mcflirt(case: FailureCase, run: Path):
+def _run_mcflirt(case: FailureCase, run: Path, implementation: str = "original"):
     from larmorx_validation import oracle_cache
 
-    program, env = _environment()
+    program, env = _environment(implementation)
     never = (
         "the case prepares a directory, a file or a permission in the run directory, which the "
         "key does not hold"
@@ -306,8 +311,16 @@ def _run_mcflirt(case: FailureCase, run: Path):
     )
 
 
-def _run_larmorx(case: FailureCase, run: Path, mode: str) -> tuple[int, str, str]:
-    """``larmorx mri hmc`` in process (the record's runner), every path absolute."""
+def _run_larmorx(
+    case: FailureCase, run: Path, mode: str, implementation: str = "original"
+) -> tuple[int, str, str]:
+    """``larmorx mri hmc`` in process (the record's runner), every path absolute; or the
+    replica, ``larmorx-nc fsl mcflirt``, as its suite runs it (in the run directory)."""
+    if implementation == "replica":
+        from larmorx_validation.parity import fsl_mcflirt_replica as rep
+
+        r = rep.run_replica(_args(case, run), cwd=run, settings={}, mode=mode)
+        return r.code, r.stdout, r.stderr
     from larmorx_validation.parity import mri_hmc
 
     _, env = _environment()
@@ -330,21 +343,23 @@ def _matrices(a: Path, b: Path) -> tuple[float, int] | None:
     return float(np.percentile(devs, 95)), sum(x == y for x, y in zip(ta, tb, strict=True))
 
 
-def run_case(case: Case, checks: CheckList) -> dict:
+def run_case(case: Case, checks: CheckList, implementation: str = "original") -> dict:
+    """The checks of the module's documentation, for the clean-room original or the replica."""
     from larmorx_validation.parity import mri_hmc
 
     c: FailureCase = case.payload
-    if not Path(_environment()[0]).is_file():
+    replica = implementation == "replica"
+    if not Path(_environment(implementation)[0]).is_file():
         raise Outcome("skipped", "FSL's mcflirt was not found")
     root = Path(tempfile.mkdtemp(prefix="lx-hmc-failures_"))
     try:
         runs = {k: root / k for k in ("mcflirt", "reproduce", "fix")}
         setups = {k: _prepare(r, c) for k, r in runs.items()}
-        done = _run_mcflirt(c, runs["mcflirt"])
+        done = _run_mcflirt(c, runs["mcflirt"], implementation)
         m_code = done.returncode if done.returncode is not None else -9
         m_err = _normalise(done.stderr, runs["mcflirt"])
-        r_code, _, r_err = _run_larmorx(c, runs["reproduce"], defects.REPRODUCE)
-        f_code, _, f_err = _run_larmorx(c, runs["fix"], defects.FIX)
+        r_code, _, r_err = _run_larmorx(c, runs["reproduce"], defects.REPRODUCE, implementation)
+        f_code, _, f_err = _run_larmorx(c, runs["fix"], defects.FIX, implementation)
         r_err, f_err = _normalise(r_err, runs["reproduce"]), _normalise(f_err, runs["fix"])
         m_files = _written(runs["mcflirt"], setups["mcflirt"])
         r_files = _written(runs["reproduce"], setups["reproduce"])
@@ -379,7 +394,19 @@ def run_case(case: Case, checks: CheckList) -> dict:
         metrics: dict = {}
         if m_code == 0 and r_code == 0:
             mats = _matrices(runs["mcflirt"] / "o.mat", runs["reproduce"] / "o.mat")
-            if mats is not None:
+            if mats is not None and replica:
+                # The replica is mcflirt's translation: its matrices are mcflirt's, as text.
+                p95, identical = mats
+                count = len(list((runs["mcflirt"] / "o.mat").iterdir()))
+                metrics.update(rms_p95=p95, identical=identical)
+                checks(
+                    "reproduce: every matrix identical to mcflirt's as text",
+                    identical == count,
+                    metric="matrices that differ",
+                    value=count - identical,
+                    threshold=0,
+                )
+            elif mats is not None:
                 p95, identical = mats
                 metrics.update(rms_p95=p95, identical=identical)
                 checks(

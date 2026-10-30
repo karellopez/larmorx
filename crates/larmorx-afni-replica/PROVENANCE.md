@@ -64,14 +64,20 @@ the user's decision of 2026-10-29).
   Microsystems, Inc. business. Permission to use, copy, modify, and distribute this software is
   freely granted, provided that this notice is preserved."
 - **No LGPL code.** glibc's own `cbrtf` (LGPL-2.1-or-later), which 3dUnifize `-EPI` calls for
-  its radius, is not part of the crate: `unifize::epi_radius` takes CORE-MATH's correctly
-  rounded `cbrtf` (MIT, `larmorx_core::math`). glibc's result is one unit in the last place from
-  it on 453,492,162 of the 2^32 inputs; measured on every float32 voxel volume
-  (`crates-gpl/tools/cbrtf-measure`), that last bit changes `-EPI`'s ball of neighbours on
-  1,449,010 volumes and its printed radius on 65,145,681 (8,794 and 552 of them at volumes of at
-  least 0.001 mm^3, 80 and 43 in [1, 100) mm^3), so the replica warns (a line ending in
-  `(larmorx)`) wherever a cube root one unit away would change the ball or the message: every
-  volume where glibc's would is warned about (0 missed). The earlier glibc translations
+  its radius, is not part of the crate. Since 2026-10-30 (the user's decision of that day)
+  `unifize::epi_radius` takes CORE-MATH's correctly rounded `cbrtf` (MIT, `larmorx_core::math`)
+  by default and, with `reproduce`, `larmorx_core::math::cbrtf_glibc`: larmorx's own clean-room
+  function with glibc 2.35's bits (Apache-2.0, written from `specs/cbrtf.md` by an implementer
+  who never read glibc; proved equal to the system's `cbrtf` on all 2^32 inputs,
+  `validation/investigations/cleanroom-cbrtf/`, and to the earlier translation by
+  `crates-gpl/tools/cbrtf-measure --glibc-identity`: 0 of 2^32 differ, NaN bits included). The
+  replica calls it; it holds none of glibc's code. glibc's result is one unit in the last place
+  from the correctly rounded one on 453,492,162 of the 2^32 inputs; measured on every float32
+  voxel volume, that last bit changes `-EPI`'s ball of neighbours on 1,449,010 volumes and its
+  printed radius on 65,145,681 (8,794 and 552 of them at volumes of at least 0.001 mm^3), so the
+  default names GLIBC-05 (`unifize::epi_cbrtf_notice`, the clean-room original's words) where
+  the other radius would change the ball within the grid's reach or the printed radius; the
+  last-bit warning of 2026-10-29 (a line ending in `(larmorx)`) is gone. The earlier glibc translations
   (`glibc_sincosf.rs`, `glibc_floatmath.rs`) are kept, unchanged and GPL-3.0-or-later AND
   LGPL-2.1-or-later, as the verification tools' reference in `crates-gpl/tools/glibc-reference`.
 - **larmorx's own code written for `larmorx-gpl`** (`x87`, `cnum`, `cli::output`, the command
@@ -178,7 +184,8 @@ whether AFNI's NIfTI writer could open the output, for AFNI-26).
 |---|---|---|---|
 | `sincosf` (2026-10-29) | `sinf`, `cosf` (both x86-64 builds, `FUSED`) | Arm's Optimized Routines v19.11: `math/sincosf.h` (`abstop12`, `sinf_poly`, `reduce_fast`, `reduce_large`, `pi63`, `pio4`), `math/sinf.c`, `math/cosf.c`, `math/sincosf_data.c` (`__sincosf_table`, `__inv_pio4`) | MIT (Arm) |
 | `fdlibm` (2026-10-23, its own module since 2026-10-29) | `tanhf`, `expm1f` | glibc 2.35's `sysdeps/ieee754/flt-32/s_tanhf.c`, `s_expm1f.c` (fdlibm) | Sun's notice |
-| `unifize::epi_radius` (2026-10-29) | `-EPI`'s radius | 3dUnifize's `main`, with CORE-MATH's `cbrtf` (`larmorx_core::math`) | NIH (public domain); CORE-MATH: MIT |
+| `unifize::epi_radius` (2026-10-29; `reproduce` since 2026-10-30) | `-EPI`'s radius | 3dUnifize's `main`, with CORE-MATH's `cbrtf` by default and larmorx's clean-room `cbrtf_glibc` with `reproduce` (`larmorx_core::math`) | NIH (public domain); CORE-MATH: MIT; `cbrtf_glibc`: Apache-2.0 (larmorx) |
+| `unifize::ball_in_reach`, `epi_cbrtf_notice` (2026-10-30) | GLIBC-05's notice: the two radii, the ball's offsets within the grid's reach, the printed radius | larmorx's own (the notice's words those of the clean-room original's `epi_cbrtf_notice`, larmorx's Apache lines); the ball as `sphere` (`MCW_spheremask`) tests it | Apache-2.0 (larmorx) |
 
 Until 2026-10-29: `glibc_sincosf` (glibc 2.35's `s_sinf.c`, `s_cosf.c`, `s_sincosf.h`,
 `sysdeps/x86/fpu/sincosf_poly.h`, `s_sincosf_data.c`, the FMA and SSE2 builds of
@@ -321,6 +328,7 @@ it.
 | `sincosf` (2026-10-29) | `crates-gpl/tools/sincosf-verify`: all 2^32 inputs of each function, the FMA and the SSE2 build, against the earlier glibc translation (`crates-gpl/tools/glibc-reference`), and against glibc 2.35 itself: its FMA build, and its SSE2 build forced by `GLIBC_TUNABLES=glibc.cpu.hwcaps=-AVX2,-FMA` (the two builds differ from each other on 12 `sinf` and 22 `cosf` inputs) | 0 differ, for each function, build and comparison (`<workspace>/oracles/logs/afni-move-sincosf-verify-{fma,sse2}.log`) |
 | `fdlibm` (2026-10-29) | `crates-gpl/tools/floatmath-verify`: `tanhf` on all 2^32 inputs against glibc 2.35, input by input; the reference `cbrtf`'s hash | 0 differ; `cbrtf` hash `c679cb92d4402e33`, glibc's |
 | `unifize::epi_radius` (2026-10-29) | `crates-gpl/tools/cbrtf-measure`: every non-negative float32 voxel volume (2^31), the radius, its message and its ball of neighbours with CORE-MATH's and glibc's `cbrtf` (the ball's offsets derived exactly while every float sum of squares is an integer, radius up to 2364, and cross-checked by building both balls on 1,303 sampled cases) | the two cube roots at most one unit in the last place apart; the ball differs on 1,449,010 volumes, the message on 65,145,681 (from 0.001 mm^3: 8,794 and 552); the replica warns on 917,292,437 (from 0.001 mm^3: 206,626; in [1, 100) mm^3: 2,953), every difference among them; its radius is CORE-MATH's everywhere |
+| `unifize::epi_radius`, `epi_cbrtf_notice` (2026-10-30) | `crates-gpl/tools/cbrtf-measure` again (the same 2^31 volumes): the replica's default radius against CORE-MATH's, its `reproduce` radius against the glibc translation's, the notice where the two radii agree, and the notice on a 64^3 grid (every offset in reach) against the ball or message differing, sampled per block of 2^16 inputs; and `--glibc-identity`: `cbrtf_glibc` against the translation on all 2^32 inputs (`<workspace>/oracles/logs/replica-side-cbrtf-{measure,identity}-2026-10-30.log`) | default radius CORE-MATH's on every input, `reproduce` radius glibc's on every input (no radius, message or ball differs from AFNI's), 0 notices where the radii agree, 1,358 sampled notices all exact; 0 of 2^32 cube roots differ, NaN bits included (whole-sequence hash `335d1fb5fb714c95` from `specs/cbrtf.md` §7.1's start, `c679cb92d4402e33` from the 2026-10-23 program's) |
 | 3dAutomask, 3dUnifize (2026-10-23) | `python -m larmorx_validation parity afni-automask` and `afni-unifize` against the AFNI 25.2.09 binary | see `docs/validation/afni-automask.md`, `afni-unifize.md` |
 | The three replicas against AFNI 26.3.05 (2026-10-29) | `python -m larmorx_validation parity afni-tshift`, `afni-automask`, `afni-unifize` `--implementation replica` (AFNI 26.3.05 is the replicas' default build; each case also runs 25.2.09: "AFNI's own step") | `docs/validation/afni-tshift-replica.md`, `afni-automask-replica.md`, `afni-unifize-replica.md` |
 | 3dTshift | `python -m larmorx_validation parity afni-tshift --implementation replica` against the AFNI 25.2.09 binary | 217 of 217 compared cases bit-identical (`docs/validation/afni-tshift-replica.md`) |

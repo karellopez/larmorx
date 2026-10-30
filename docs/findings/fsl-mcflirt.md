@@ -349,6 +349,36 @@ FSL-04 now reproduced):
   numy[no_bins]`), before its arrays, and glibc aborts when they are freed ("double free or
   corruption (out)"). The replica reproduces the abort when the written values are non-zero
   (FSL-21).
+- **FSL-65** (the replica since 2026-10-30): `decompose_mats` (`mcflirt.cc:460-554`) opens
+  `<out>.par` first (`outfile.open`, an empty file at once), then makes the `.mat` directory, then
+  opens and writes `_rel.rms` (each line `<< endl`, so flushed), `_rel_mean.rms`, `_abs.rms`,
+  `_abs_mean.rms`, then volume by volume writes the `MAT_` file and, with `-plots`, tests
+  `if (!outfile) { cerr << "error: unable to open output file!\n"; exit(0); }` before the `.par`
+  line: an unopenable `.par` ends the run there (after `MAT_0000` and the `.rms` files), an
+  unopenable `.rms` stream takes nothing (status 0). The replica writes in that order with
+  `reproduce` (its earlier code wrote the `.par` file at the end and the `.rms` texts whole, so
+  it wrote everything it could and ignored the failure in both modes); by default it opens the
+  text outputs before writing any (the `.mat` directory, the `.par` file, the `.rms` files; an
+  existing file is not emptied until it is written) and refuses one it cannot open, removing
+  what it made. With `-rmsrel` or `-rmsabs` alone (no `-mats`: FSL-13 corrected makes no
+  directory) a `.mat` directory whose parent is missing or a file is still FSL-20's error, as
+  mcflirt's `establishDir` meets it there.
+- **FSL-66** (the replica since 2026-10-30): `Costfn::set_no_bins` (`costfns.cc:3622-3664`),
+  which every stage calls for every cost function with `no_bins / scaling`, allocates
+  `new int[(no_bins+1)*(no_bins+1)]`, then `new int[no_bins+1]` (twice) and the float
+  equivalents, then sizes its `p ln p` table with `10*N/(no_bins+1)` (an `unsigned long`
+  division). With −1 bins every array has length 0 and the division is by zero: SIGFPE, no
+  message. With −2 the joint table has length 1 and the first margin −1; below, the joint
+  table's length `(no_bins+1)^2` is positive and the margins' negative: the first negative
+  length throws `std::bad_array_new_length`, uncaught (for `-bins` below about −370,000 the joint
+  table's `int` product overflows: a negative wrapped length throws the same exception, a positive
+  one, at most 8 GiB, is taken as allocated, as Linux's overcommit allows; not measured). The replica checks the stage's bins before
+  `set_no_bins`: with `reproduce` it ends where mcflirt does (the volume's messages so far, the
+  two `terminate` lines for `bad_array_new_length`, its own line saying how mcflirt ends, exit
+  1, nothing written; FSL-66 named), by default it refuses a negative `-bins` with `-stages` 1
+  or more before any work. With `reproduce` FSL-21 is now named too where a histogram cost has
+  a stage of no bins (the replica named none in that mode before), and FSL-66 where −3 to −1
+  give every stage none with a cost that uses none.
 - An `-out` whose `.mat` directory cannot be made, an absent `-in`, a missing or malformed
   `-init` (`Could not open matrix file`, armawrap's `AWException`, Armadillo's "matrix
   multiplication: incompatible matrix dimensions"), `-dof` out of range ("Erroneous dof"),

@@ -9,6 +9,13 @@ the directory (a file, ``-k``, ``-m``, ``--lf``, a deselection) writes none.
 
 At the end, the runs of an original program that differed from their oracle-cache entries during
 the session (findings, ``findings.jsonl``) are listed.
+
+**In parallel** (pytest-xdist, 2026-10-30): ``scripts/orchestration/parity_smoke.py`` runs the
+directory in two parts, every file but :data:`SERIAL` on pytest-xdist's workers and then the files
+of :data:`SERIAL` alone, one test after the other; when both pass from a clean commit it writes the
+same marker (:func:`write_smoke_marker`). A pytest-xdist worker never writes one (it sees only its
+own tests' results), nor does a direct ``pytest -n`` run of the directory: its controller holds no
+items, so the run is not :func:`_whole`.
 """
 
 from __future__ import annotations
@@ -22,6 +29,10 @@ from pathlib import Path
 
 HERE = Path(__file__).resolve().parent
 ROOT = HERE.parent.parent
+#: The files that run alone, after the others, when the directory runs in parallel
+#: (``scripts/orchestration/parity_smoke.py``): they measure each process's peak memory and the
+#: threads each call starts, which other work on the machine must not disturb.
+SERIAL = ("test_memory_peak.py", "test_thread_pools.py")
 _state: dict = {"deselected": 0, "findings": 0, "skipped_modules": set()}
 
 
@@ -88,34 +99,50 @@ def _whole(session) -> bool:
     )
 
 
-def pytest_sessionfinish(session, exitstatus) -> None:
+def write_smoke_marker(tests: dict[str, int], collected: int, command: str) -> Path | None:
+    """The marker of a passing smoke tier of the whole directory at this clean commit and this
+    build of the extension (``<oracle cache>/markers/parity-smoke-<commit>.json``), or ``None``
+    when there is no cache or the tree is not clean."""
     store = _cache()
-    tier = os.environ.get("LARMORX_PARITY_TIER", "smoke")
-    if store is None or exitstatus != 0 or tier != "smoke" or not _whole(session):
-        return
+    if store is None:
+        return None
     try:
         commit = _git("rev-parse", "HEAD")
         dirty = _git("status", "--porcelain", "--untracked-files=no")
     except (OSError, subprocess.CalledProcessError):
-        return
+        return None
     if dirty:
-        return  # a marker names the commit that passed: only from a clean tree
-    reporter = session.config.pluginmanager.get_plugin("terminalreporter")
-    stats = getattr(reporter, "stats", {}) if reporter else {}
+        return None  # a marker names the commit that passed: only from a clean tree
     marker = {
         "commit": commit,
         "time": dt.datetime.now(dt.UTC).isoformat(timespec="seconds"),
         "result": "passed",
         "tier": "smoke",
-        "tests": {k: len(v) for k, v in stats.items() if k in ("passed", "skipped", "failed")},
-        "collected": session.testscollected,
+        "tests": tests,
+        "collected": collected,
         "extension_sha256": extension_sha256(),
-        "command": "pytest tests/parity",
+        "command": command,
     }
     path = store.location() / "markers" / f"parity-smoke-{commit}.json"
     store.write_atomic(path, store.dumps(marker))
-    if reporter:
-        reporter.write_line(f"parity smoke tier passed at {commit[:12]}: marker {path}")
+    return path
+
+
+def pytest_sessionfinish(session, exitstatus) -> None:
+    tier = os.environ.get("LARMORX_PARITY_TIER", "smoke")
+    if hasattr(session.config, "workerinput"):
+        return  # a pytest-xdist worker: its results are only its share of the run
+    if _cache() is None or exitstatus != 0 or tier != "smoke" or not _whole(session):
+        return
+    reporter = session.config.pluginmanager.get_plugin("terminalreporter")
+    stats = getattr(reporter, "stats", {}) if reporter else {}
+    path = write_smoke_marker(
+        {k: len(v) for k, v in stats.items() if k in ("passed", "skipped", "failed")},
+        session.testscollected,
+        "pytest tests/parity",
+    )
+    if reporter and path is not None:
+        reporter.write_line(f"parity smoke tier passed at {path.stem[13:25]}: marker {path}")
 
 
 def pytest_terminal_summary(terminalreporter) -> None:

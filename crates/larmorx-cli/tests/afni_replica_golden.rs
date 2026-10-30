@@ -67,6 +67,10 @@ enum Input {
     Head4d,
     /// The same 4 volumes stored negated with `scl_slope` -1 (AFNI-01).
     Head4dNegative,
+    /// The same 4 volumes on 2 x 2 x 2.9924254 mm voxels (11.969702 mm^3, `specs/cbrtf.md` §6):
+    /// `-EPI`'s radius is 8 voxels with glibc 2.35's cube root and 7.9999995 correctly rounded,
+    /// whose balls differ by 6 offsets (GLIBC-05).
+    Head4dCbrtf,
     /// One axial slice of the head, 24 × 24 × 1, float32 (the 2D automask).
     Slice,
 }
@@ -510,6 +514,28 @@ const CASES: &[Case] = &[
         args: &["-EPI"],
     },
     Case {
+        id: "3dUnifize.EPI.glibc05",
+        tool: "afni 3dUnifize",
+        env: &[],
+        existing: false,
+        outputs: &[],
+        named: &["GLIBC-05"],
+        mode: "fix",
+        input: Input::Head4dCbrtf,
+        args: &["-EPI", "-quiet"],
+    },
+    Case {
+        id: "3dUnifize.EPI.glibc05.reproduce",
+        tool: "afni 3dUnifize",
+        env: &[],
+        existing: false,
+        outputs: &[],
+        named: &["GLIBC-05"],
+        mode: "reproduce",
+        input: Input::Head4dCbrtf,
+        args: &["-EPI", "-quiet"],
+    },
+    Case {
         id: "3dUnifize.EPI.negative",
         tool: "afni 3dUnifize",
         env: &[],
@@ -724,7 +750,8 @@ fn write_shaped<T: Element>(path: &Path, h: &NiftiHeader, shape: &[usize], data:
     nifti::write(path, h, view, &WriteOptions::default()).unwrap();
 }
 
-/// The head inputs: `head`, `head-t2`, `head-4d`, `head-4d-negative` and `slice`.
+/// The head inputs: `head`, `head-t2`, `head-4d`, `head-4d-negative`, `head-4d-cbrtf` and
+/// `slice`.
 fn write_head_inputs(dir: &Path, paths: &mut BTreeMap<&'static str, PathBuf>) {
     let [nx, ny, nz] = HEAD;
     let t1 = head_values(T1_LEVELS, 21);
@@ -763,6 +790,13 @@ fn write_head_inputs(dir: &Path, paths: &mut BTreeMap<&'static str, PathBuf>) {
         &shape4,
         &i16s,
     );
+    // GLIBC-05's voxels: 2 x 2 x 2.9924254 mm (the float 0x403f83e6), a plumb affine.
+    let mut cbrtf = head_header(&shape4, DataType::I16, 2.0, 0.0);
+    let dz = f64::from(f32::from_bits(0x403f_83e6));
+    let affine = Affine::from_zooms([2.0, 2.0, dz], [-30.0, -40.0, -20.0]);
+    cbrtf.set_sform(&affine, 1);
+    cbrtf.set_qform(&affine, 1).unwrap();
+    write_shaped(&p("head-4d-cbrtf", paths), &cbrtf, &shape4, &i16s);
     let negated: Vec<i16> = series.iter().map(|&v| -v as i16).collect();
     write_shaped(
         &p("head-4d-negative", paths),
@@ -1089,6 +1123,7 @@ fn golden() {
             Input::HeadT2 => &inputs["head-t2"],
             Input::Head4d => &inputs["head-4d"],
             Input::Head4dNegative => &inputs["head-4d-negative"],
+            Input::Head4dCbrtf => &inputs["head-4d-cbrtf"],
             Input::Slice => &inputs["slice"],
         };
         let (family, tool) = case.tool.split_once(' ').unwrap();

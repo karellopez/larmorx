@@ -299,10 +299,17 @@ def _python_step(args: argparse.Namespace) -> None:
         cmd += ["--case", args.case]
     env = {k: v for k, v in os.environ.items() if k != pv.STEP_FROM}
     env |= {pv.ENV: pv.SHARED, pv.STEP_RECORD: step_dir}
-    print(f"the originals' own step: the cases in {pv.ENVS[pv.SHARED]} first", file=sys.stderr)
-    done = subprocess.run(cmd, env=env, check=False)
-    if done.returncode not in (0, 1):
-        print(f"the step run ended with status {done.returncode}", file=sys.stderr)
+    # The shared releases' cases run STEP_PASSES times: an original that varies between runs on
+    # the same inputs (SCI-05's kind) is then told apart from one the step changed.
+    for k in range(pv.STEP_PASSES):
+        print(
+            f"the originals' own step: the cases in {pv.ENVS[pv.SHARED]} first "
+            f"(pass {k + 1} of {pv.STEP_PASSES})",
+            file=sys.stderr,
+        )
+        done = subprocess.run(cmd, env=env, check=False)
+        if done.returncode not in (0, 1):
+            print(f"the step run ended with status {done.returncode}", file=sys.stderr)
     os.environ[pv.STEP_FROM] = step_dir  # the workers inherit it
 
 

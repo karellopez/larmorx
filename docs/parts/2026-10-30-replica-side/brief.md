@@ -1,0 +1,39 @@
+You are doing a bounded part of larmorx's queue as a **replica author** (github.com/karellopez/larmorx; your worktree is a checkout of main, at the local merge commit e1fb75a, not yet pushed: the orchestrator is verifying it at the same time). Aim for 4 to 5 hours; stop at the end of the part. Five tasks, in this order.
+
+Read first: the repo's `CLAUDE.md` (rules 1-10, "Agent working rules", "Working on this machine"); `docs/porting-guide.md` §1 and its D13 section; `scripts/orchestration/README.md` and `verify-merge.sh`; `docs/validation/oracle-cache.md`; `docs/validation/difftest.md`; next-steps' follow-ups "3dUnifize `-EPI`'s `cbrtf`", "The mcflirt replica's FSL-65 and FSL-66", "The resample-series step and SciPy 1.15.3's varying outputs (SCI-05)"; `specs/mcflirt.md` §10.6, §12.1, §14.1; `specs/cbrtf.md` §7; `docs/parts/2026-10-30-cleanroom-cbrtf/report.md`; `docs/parts/2026-10-30-cleanroom-additions/report.md`; the register's rows FSL-65, FSL-66, GLIBC-05, SCI-05.
+
+**Testing depth (the user, 2026-10-28):** smart, not exhaustive.
+
+## Your role: replica author
+You may read the upstream sources (FSL, AFNI, glibc), the replica crates (`crates/larmorx-afni-replica`, `crates-nc/`, `crates-gpl/tools/`), the clean-room crates and the restricted findings. Because you read sources, you **never edit a clean-room crate** (`crates/larmorx-afni`, `crates/larmorx-mri`) nor `larmorx_core::math::cbrtf_glibc` (a clean-room function: you may call it); unrestricted documents describe behaviour only.
+
+## Tasks
+1. **The replica's 3dUnifize `-EPI` cube root (GLIBC-05):** the replica takes `larmorx_core::math::cbrtf_glibc` with `reproduce` instead of its last-bit warning, and by default keeps the correctly rounded `cbrtf` with the same GLIBC-05 notice as the clean-room original (its words may be copied as text: larmorx's own Apache lines in `crates/larmorx-afni/src/unifize/mod.rs`, `epi_cbrtf_notice`). Enable the `glibc-05/epi-*` cases for the replica in `parity/afni_unifize.py` (`suite_cases`). Run the spec's §7.3 (`crates-gpl/tools/cbrtf-measure` against `cbrtf_glibc`, every input where the two cube roots differ) and §7.6, and fix §7.2's number in `specs/cbrtf.md` as the spec writer (the convention of the system's results: `335d1fb5fb714c95` under §7.1's run, or state the convention; behaviour only). Records: `afni-unifize-replica` re-made from a clean commit (compare_records: only the 5 new cases).
+2. **The mcflirt replica's FSL-65 and FSL-66** (`crates-nc/larmorx-nc-mcflirt`): as `specs/mcflirt.md` §10.6 and §12.1 specify (the clean-room original does it since 2026-10-30): by default an error (exit 1, nothing written), `reproduce` mcflirt's behaviour (FSL-65: an unopenable `.par` ends after `MAT_0000` and the `.rms` files, exit 0; an unopenable `.rms` not written; FSL-66: an error saying how mcflirt ends where it crashes, mcflirt's run where it does not). Cases from §14.1 in the replica's suite (mcflirt 6.0.7.23 live), a command-line test each; the replica's record re-made from a clean commit (compare_records: only new cases); golden cases for the new paths (`crates-nc` golden).
+3. **SCI-05 and the resample-series step:** SciPy 1.15.3's `map_coordinates` (mode `nearest`, `prefilter=False`, 3D float32) varies between runs on the same inputs, so the record's "originals' own step" detail of `ndimage/nearest-order*` flips between runs. Make the step check robust (for example: run the old release's comparison twice in the shared environment and report a comparison whose old output varies as "varies in SciPy 1.15.3 (SCI-05)", never as changed or identical); re-make the resample-series record from a clean commit and show two runs give the same step detail. If SCI-05's cause is cheap to find (SciPy is BSD), say it in the register text through the handoff.
+4. **The parity smoke tier in parallel** (the user, 2026-10-30: "make sure everything is done properly"): `pytest tests/parity` runs serially in 26 minutes while the machine idles. Run it in parallel with pytest-xdist (about 16 workers; add `pytest-xdist` to the shared `.venv` and `validation/requirements-lock.txt`, nothing else changes there), with the memory-peak, thread-pool and timing tests in a serial group of their own (e.g. `xdist_group` with `--dist loadgroup`, or a second serial invocation), the oracle cache, temporary directories and memory boxes safe under concurrency. **Prove it:** the parallel run's per-test outcomes equal a serial run's (same pass, fail, skip, xfail for every test id; commit the comparison script and its result), and measure both times. Then use it in `scripts/orchestration/verify-merge.sh` (step 4), `record_golden.py`'s smoke run, and the gates the agents run (`gates-python.sh` if it runs it), keeping a `--serial` fallback.
+5. **verify-merge's suites side by side:** `verify-merge.sh` re-runs each `--suite` one after another; run them concurrently (each in its own log, within the box and `--threads`), with the same records as a sequential run (prove on two suites), and the "ALLDONE"/exit lines unchanged so the orchestrator's waiters keep working.
+
+## Validation and documents
+- Records and golden checksums from clean commits only; compare_records for every re-made record.
+- **Your own files:** the replica crates, `specs/cbrtf.md` (§7.2, as spec writer), the parity harness and orchestration scripts you change, `tests/parity/` configuration, the records, permanent cases, `validation/investigations/replica-side/` (README, probes, the parallel-vs-serial comparison).
+- **Shared, through `<scratch>/HANDOFF.md` with the exact text for each:** the register (GLIBC-05, FSL-65, FSL-66, SCI-05 rows: the replica's half done), `docs/api/upstream-defects.md`, next-steps (the three follow-ups done; the parallel tests), golden.md, `scripts/orchestration/README.md` if its usage lines change, CLAUDE.md's merge checklist step 4 if its timing changes, the site's Roadmap row ("A cube root with the C library's digits, for reproduce": done).
+- Defect IDs only if new: FSL-67, FSL-68, SCI-06, SCI-07.
+
+## Machine (shared: read this)
+- **Up to 16 threads** (`cargo -j 16`, parity `--jobs` to match; the parallel smoke tier's 16 workers count): the orchestrator's verification runs beside you with the other 16 for the first hour or so. Memory boxes together at most **30 GiB** (`scripts/orchestration/boxed.sh`).
+- Never touch the main checkout (`<workspace>/larmorx`), `larmorx-heavy` or `oracles/difftest/2026-10-25/`.
+
+## Git and where to work
+- Your worktree branch; commit after every meaningful step; never AI attribution, never `--no-verify`; no push, no merge.
+- Scratch: `<scratch>/replica-side/` (this folder): NOTES.md, HANDOFF.md, builds, outputs; never write under a `.claude/` folder.
+- `source scripts/orchestration/env.sh`; never `maturin develop` (build the wheel into `<scratch>/wheel`, copy the `.so`: `scripts/orchestration/lxv.sh`); build-cache seed: copy the main checkout's `target/`, `crates-gpl/target/`, `crates-nc/target/`, reading only from there.
+- Gates: `scripts/orchestration/gates-rust.sh <worktree> all`, `gates-python.sh <worktree> --no-build`, `pytest tests/parity`, `python -m larmorx_validation tables --check`.
+- Never: delete work products; modify the oracle builds, the FSL installations or any upstream source; ask for sudo.
+- Public repository: no network addresses, account names, hostnames or keys; local paths as `<workspace>`, `<scratch>`, `~/fsl-<version>`.
+- Wait for long runs with one background wait on the log's final line; never stop silently.
+
+## Stop after this part; report (concise)
+- Each task: what changed, the cases, the records (compare_records), golden.
+- The parallel smoke tier: serial vs parallel outcomes (identical?), both times; verify-merge's suites side by side: the proof and the time.
+- Gates, commits, anything for the user.

@@ -19,13 +19,10 @@ it; until 2026-10-29 the separate GPL package `larmorx-gpl`), and the clean-room
 **`-EPI`'s radius and the cube root's last bit** (2026-10-29). `-EPI` sets its radius from the
 voxel volume with the C library's `cbrtf`; AFNI's Linux builds take glibc's, whose code is
 LGPL-2.1 and not part of larmorx, and whose result is one unit in the last place from the
-correctly rounded one on about one input in ten. The replica uses a correctly rounded `cbrtf`.
-For most voxel sizes nothing changes; where one unit in the last place of the cube root would
-change the ball of neighbours or the printed radius (measured on every float32 voxel volume: 2,953
-of the volumes in [1, 100) mm³), the replica warns that its result may differ from AFNI's (a
-warning ending in `(larmorx)`). On those, glibc's last bit changes the ball for 80 volumes and the
-printed radius for 43 in [1, 100) mm³ ([findings](../findings/afni-relicensing-26.md), "The C
-library's maths"). Each image's `implementation` names the one that ran.
+correctly rounded one on about one input in ten. For most voxel sizes nothing changes; glibc's
+last bit changes the ball of neighbours for 80 volumes and the printed radius for 43 in
+[1, 100) mm³ ([findings](../findings/afni-relicensing-26.md), "The C library's maths"). Each
+image's `implementation` names the one that ran.
 
 **Decided by the user on 2026-10-30, and done in the clean-room original the same day:** the
 default keeps the correctly rounded cube root (`larmorx_core::math::cbrtf`, CORE-MATH's, the more
@@ -37,8 +34,11 @@ proved equal to the system's `cbrtf` on all 2^32 float inputs, NaN bits included
 names **GLIBC-05** (glibc 2.35's `cbrtf` is not correctly rounded) exactly where glibc's last bit
 would have changed the result: the ball of neighbours within the grid's reach (the only offsets
 ever used) or the radius printed with one decimal, with the radius each cube root gives and what
-differs; `reproduce` names it too ("reproduced", AFNI's radius). The replica's 3dUnifize takes the
-same function in a later part (a replica author's); until then it keeps its warning.
+differs; `reproduce` names it too ("reproduced", AFNI's radius). **The replica the same since
+2026-10-30:** its `-EPI` radius takes `cbrtf_glibc` with `reproduce` (AFNI's radius, ball and
+message on every voxel size: checked on every float32 voxel volume, `crates-gpl/tools/cbrtf-measure`)
+and the correctly rounded cube root by default, with the same GLIBC-05 notice, word for word; its
+last-bit warning of 2026-10-29 (a line ending in `(larmorx)`) is gone.
 
 **Status: `validated`**, both, against AFNI 26.3.05 itself (the original against AFNI 25.2.09 until 2026-10-29):
 - the original ([record](../validation/afni-unifize.md), 129 cases, none failing; GLIBC-05's 5
@@ -132,7 +132,7 @@ Corrected by default, reproduced with `upstream_defects="reproduce"`, by both im
   voxels on a 24 × 24 × 16 series: 0.01 s, 5 MiB).
 - **AFNI-01**: `-EPI`'s median volume drops a negative `scl_slope`, so its sign is wrong and the
   output is all zeros; the default applies the factor.
-- **GLIBC-05** (the clean-room original, 2026-10-30; `specs/cbrtf.md`): `-EPI`'s radius is 18.3
+- **GLIBC-05** (the clean-room original and the replica, 2026-10-30; `specs/cbrtf.md`): `-EPI`'s radius is 18.3
   mm over the cube root of the voxel volume, which AFNI takes from glibc 2.35's `cbrtf`, not
   correctly rounded (one unit in the last place on 10.6 % of float inputs). The default uses the
   correctly rounded cube root and names GLIBC-05 where glibc's would have changed the ball of

@@ -5,11 +5,11 @@
 - **Validated:** `lx.transforms.resample_series`, `lx.transforms.load_transforms`, `lx.ndimage` (crates larmorx-transform, -interp)
 - **Reference:** fMRIPrep 26.0.0.dev1+g21a490fb8 `ResampleSeries` (run through nipype), nitransforms 25.1.0, SciPy 1.18.1, in-process
 - **Test data:** larmorx-testdata `52124bc98f9f`, tier `standard`
-- **Generated:** 2026-10-29 on Linux x86_64, with `python -m larmorx_validation parity resample-series --tier standard --python newest`
+- **Generated:** 2026-10-30 on Linux x86_64, with `python -m larmorx_validation parity resample-series --tier standard --python newest`
 - **Original programs:** 0 runs: 0 from the oracle cache, 0 run; cache `<workspace>/oracles/cache`, mode `use`
 
 **Bit-identical: 136 of 136 passing cases** produce exactly the values of the reference (SciPy, nitransforms or fMRIPrep's ResampleSeries), with `upstream_defects="reproduce"`.
-**The originals' own step: numpy 2.3.5 (OpenBLAS 0.3.30), SciPy 1.15.3 → numpy 2.5.4 (OpenBLAS 0.3.34), SciPy 1.18.1:** 136 cases compared, 122 with the same outputs under both, 14 changed: `ndimage/nearest-order2`, `ndimage/nearest-order3`, `ndimage/nearest-order4`, `ndimage/nearest-order5`, `ndimage/reflect-order2`, `ndimage/reflect-order3`, `ndimage/reflect-order4`, `ndimage/reflect-order5`, `ndimage/grid-mirror-order2`, `ndimage/grid-mirror-order3`, `ndimage/grid-mirror-order4`, `ndimage/grid-mirror-order5` …; every change has a known reason (SCI-03: SciPy 1.18 sums the reflect boundary's causal initialisation into a variable of its own (scipy/ndimage/src/ni_splines.c), so its last term reads the original first coefficient: SCI-03 fixed upstream, with the scaling's rounding of its own (modes nearest, reflect and grid-mirror, orders 2 to 5)).
+**The originals' own step: numpy 2.3.5 (OpenBLAS 0.3.30), SciPy 1.15.3 → numpy 2.5.4 (OpenBLAS 0.3.34), SciPy 1.18.1:** 136 cases compared (the shared releases' cases run 2 times, NaN values counted alike), 122 with the same outputs under both, 14 changed: `ndimage/nearest-order2`, `ndimage/nearest-order3`, `ndimage/nearest-order4`, `ndimage/nearest-order5`, `ndimage/reflect-order2`, `ndimage/reflect-order3`, `ndimage/reflect-order4`, `ndimage/reflect-order5`, `ndimage/grid-mirror-order2`, `ndimage/grid-mirror-order3`, `ndimage/grid-mirror-order4`, `ndimage/grid-mirror-order5` …; every change has a known reason (SCI-03: SciPy 1.18 sums the reflect boundary's causal initialisation into a variable of its own (scipy/ndimage/src/ni_splines.c), so its last term reads the original first coefficient: SCI-03 fixed upstream, with the scaling's rounding of its own (modes nearest, reflect and grid-mirror, orders 2 to 5)).
 - **D13 fix pass** (larmorx's default, `upstream_defects="fix"`; the comparison above runs `reproduce`): the corrections met
   - PIPE-03: 9 case(s) named it, 9 with changed values (largest difference 871): `pe/las-i`, `pe/las-i-`, `anat/las-hmc-coreg-sdc`, `std/on-grid-warp`, `std/off-grid-warp`, `threads/1`, `threads/3`, `threads/12` …
   - SCI-02: 10 case(s) named it, 10 with changed values (largest difference 2.15e+09): `ndimage/grid-constant-order1`, `ndimage/grid-constant-order2`, `ndimage/grid-constant-order3`, `ndimage/grid-constant-order4`, `ndimage/grid-constant-order5`, `ndimage/nearest-order1`, `ndimage/nearest-order2`, `ndimage/nearest-order3` …
@@ -56,7 +56,7 @@
 
 | Component | Version |
 |---|---|
-| larmorx | 0.0.1 (9b833a357520) |
+| larmorx | 0.0.1 (bf26b7105d22) |
 | larmorx-testdata | 52124bc98f9f |
 | Python | 3.12.16 |
 | Platform | Linux x86_64 (Linux-6.8.0-124-generic-x86_64-with-glibc2.35) |

@@ -51,8 +51,8 @@ use crate::environ::{self, Prefiltered, Settings, UNIFIZE};
 use crate::mask::{Grid, MaskSettings, automask_image};
 use crate::message::Message;
 use crate::unifize::{
-    Inversion, PKVAL, WmResult, clip_edges, duplo_changes_grid, epi_radius, gm_unifize,
-    invert_contrast, local_percmean, masked_input, percmean_args_ok, qmed, wm_unifize,
+    Inversion, PKVAL, WmResult, clip_edges, duplo_changes_grid, epi_cbrtf_notice, epi_radius,
+    gm_unifize, invert_contrast, local_percmean, masked_input, percmean_args_ok, qmed, wm_unifize,
 };
 
 use super::automask::{dropped_intercept, one_brick, open_input, outputs};
@@ -540,21 +540,13 @@ fn run(
         }
         let d = ds.geometry.axes.del;
         let volume = (d[0] * d[1] * d[2]).abs();
-        let epi = epi_radius(volume);
-        o.uprad = epi.radius;
+        // GLIBC-05: the cube root correctly rounded by default, glibc 2.35's (AFNI's) with
+        // `reproduce` (`unifize::epi_radius`).
+        o.uprad = epi_radius(volume, mode);
         io.info(format!(
             "-EPI changes -Urad to {:.1} voxels",
             f64::from(o.uprad)
         ));
-        if epi.may_differ {
-            io.warn(format!(
-                "-EPI's radius for a voxel volume of {} mm^3 depends on the last bit of the cube \
-                 root, which AFNI takes from glibc's cbrtf and larmorx computes correctly rounded: \
-                 the ball of neighbours or the radius printed above may differ from AFNI's \
-                 (larmorx)",
-                crate::cnum::fmt_g(f64::from(volume))
-            ));
-        }
         // AFNI-75: the radius has no upper bound, and the ball is built whole before it is
         // used. By default its memory is checked first (the method kept, rule C, as ANTS-162);
         // `reproduce` attempts it as AFNI does.
@@ -596,6 +588,12 @@ fn run(
                      as AFNI does"
                 )));
             }
+        }
+        // GLIBC-05, named only where glibc's last bit of the cube root changes the radius's use
+        // (the ball within the grid's reach: -EPI has no half-size image) or its printed line;
+        // not where AFNI-75's guard refused (the radius is then never used).
+        if let Some(detail) = epi_cbrtf_notice(volume, ds.nxyz, mode) {
+            notices.add(&defects::GLIBC_05, detail);
         }
     }
     let mut log: Vec<Message> = Vec::new();

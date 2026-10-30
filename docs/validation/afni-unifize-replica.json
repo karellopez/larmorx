@@ -2,7 +2,7 @@
  "environment": {
   "cpu": "AMD Ryzen 9 7945HX with Radeon Graphics",
   "larmorx": "0.0.1",
-  "larmorx_commit": "1c4d4f683aee",
+  "larmorx_commit": "fb587fab4865",
   "larmorx_testdata_commit": "52124bc98f9f",
   "logical_cpus": 32,
   "os": "Linux-6.8.0-124-generic-x86_64-with-glibc2.35",
@@ -17,14 +17,14 @@
   "differences": 0,
   "fresh": {
    "never cached: AFNI reads memory it never wrote (AFNI-47)": 1,
-   "not storable: its output Unifized+orig.HEAD holds a temporary path (lx-afni-gen-ey87d9wx)": 2,
-   "not storable: its standard error names a temporary path (lx-afni-gen-_dh0cheq) in a form the cache cannot map": 2
+   "not storable: its output Unifized+orig.HEAD holds a temporary path (lx-afni-gen-vo0z92rq)": 2,
+   "not storable: its standard error names a temporary path (lx-afni-gen-9khfsgyt) in a form the cache cannot map": 2
   },
   "location": "<workspace>/oracles/cache",
   "mode": "use",
   "ran": 5,
-  "saved_seconds": 9367.6,
-  "served": 294
+  "saved_seconds": 9411.4,
+  "served": 313
  },
  "reference": "3dUnifize from AFNI (AFNI_26.3.05, gcc (Ubuntu 11.4.0-1ubuntu1~22.04.3) 11.4.0, with OpenMP), the binary built by `scripts/build_afni_oracle.sh`",
  "results": [
@@ -43,7 +43,7 @@
     "AFNI's own step: 25.2.09 \u2192 26.3.05": "identical",
     "D13 fix pass": 0
    },
-   "seconds": 32.093,
+   "seconds": 36.638,
    "status": "pass"
   },
   {
@@ -61,7 +61,7 @@
     "AFNI's own step: 25.2.09 \u2192 26.3.05": "identical",
     "D13 fix pass": 0
    },
-   "seconds": 40.038,
+   "seconds": 43.987,
    "status": "pass"
   },
   {
@@ -79,7 +79,7 @@
     "AFNI's own step: 25.2.09 \u2192 26.3.05": "identical",
     "D13 fix pass": 0
    },
-   "seconds": 1.116,
+   "seconds": 1.258,
    "status": "pass"
   },
   {
@@ -97,7 +97,7 @@
     "AFNI's own step: 25.2.09 \u2192 26.3.05": "identical",
     "D13 fix pass": 0
    },
-   "seconds": 6.174,
+   "seconds": 5.998,
    "status": "pass"
   },
   {
@@ -115,7 +115,7 @@
     "AFNI's own step: 25.2.09 \u2192 26.3.05": "identical",
     "D13 fix pass": 0
    },
-   "seconds": 51.052,
+   "seconds": 60.569,
    "status": "pass"
   },
   {
@@ -133,7 +133,7 @@
     "AFNI's own step: 25.2.09 \u2192 26.3.05": "identical",
     "D13 fix pass": 0
    },
-   "seconds": 8.924,
+   "seconds": 10.364,
    "status": "pass"
   },
   {
@@ -151,7 +151,7 @@
     "AFNI's own step: 25.2.09 \u2192 26.3.05": "identical",
     "D13 fix pass": 0
    },
-   "seconds": 7.726,
+   "seconds": 9.833,
    "status": "pass"
   },
   {
@@ -169,7 +169,7 @@
     "AFNI's own step: 25.2.09 \u2192 26.3.05": "identical",
     "D13 fix pass": 0
    },
-   "seconds": 16.189,
+   "seconds": 19.859,
    "status": "pass"
   },
   {
@@ -187,7 +187,7 @@
     "AFNI's own step: 25.2.09 \u2192 26.3.05": "identical",
     "D13 fix pass": 0
    },
-   "seconds": 11.723,
+   "seconds": 15.541,
    "status": "pass"
   },
   {
@@ -205,7 +205,7 @@
     "AFNI's own step: 25.2.09 \u2192 26.3.05": "identical",
     "D13 fix pass": 0
    },
-   "seconds": 8.257,
+   "seconds": 11.813,
    "status": "pass"
   },
   {
@@ -223,7 +223,7 @@
     "AFNI's own step: 25.2.09 \u2192 26.3.05": "identical",
     "D13 fix pass": 0
    },
-   "seconds": 17.28,
+   "seconds": 19.776,
    "status": "pass"
   },
   {
@@ -241,7 +241,7 @@
     "AFNI's own step: 25.2.09 \u2192 26.3.05": "identical",
     "D13 fix pass": 0
    },
-   "seconds": 28.453,
+   "seconds": 32.239,
    "status": "pass"
   },
   {
@@ -259,7 +259,7 @@
     "AFNI's own step: 25.2.09 \u2192 26.3.05": "identical",
     "D13 fix pass": 0
    },
-   "seconds": 31.305,
+   "seconds": 36.625,
    "status": "pass"
   },
   {
@@ -277,7 +277,7 @@
     "AFNI's own step: 25.2.09 \u2192 26.3.05": "identical",
     "D13 fix pass": 0
    },
-   "seconds": 7.346,
+   "seconds": 9.796,
    "status": "pass"
   },
   {
@@ -295,7 +295,7 @@
     "AFNI's own step: 25.2.09 \u2192 26.3.05": "identical",
     "D13 fix pass": 0
    },
-   "seconds": 6.405,
+   "seconds": 9.274,
    "status": "pass"
   },
   {
@@ -313,7 +313,7 @@
     "AFNI's own step: 25.2.09 \u2192 26.3.05": "identical",
     "D13 fix pass": 0
    },
-   "seconds": 0.896,
+   "seconds": 1.184,
    "status": "pass"
   },
   {
@@ -331,7 +331,7 @@
     "AFNI's own step: 25.2.09 \u2192 26.3.05": "identical",
     "D13 fix pass": 0
    },
-   "seconds": 26.098,
+   "seconds": 37.289,
    "status": "pass"
   },
   {
@@ -349,7 +349,7 @@
     "AFNI's own step: 25.2.09 \u2192 26.3.05": "identical",
     "D13 fix pass": 0
    },
-   "seconds": 29.463,
+   "seconds": 34.442,
    "status": "pass"
   },
   {
@@ -367,7 +367,7 @@
     "AFNI's own step: 25.2.09 \u2192 26.3.05": "identical",
     "D13 fix pass": 0
    },
-   "seconds": 13.384,
+   "seconds": 19.648,
    "status": "pass"
   },
   {
@@ -385,7 +385,7 @@
     "AFNI's own step: 25.2.09 \u2192 26.3.05": "identical",
     "D13 fix pass": 0
    },
-   "seconds": 27.314,
+   "seconds": 35.824,
    "status": "pass"
   },
   {
@@ -403,7 +403,7 @@
     "AFNI's own step: 25.2.09 \u2192 26.3.05": "identical",
     "D13 fix pass": 0
    },
-   "seconds": 13.881,
+   "seconds": 19.112,
    "status": "pass"
   },
   {
@@ -423,7 +423,7 @@
     "AFNI's own step: 25.2.09 \u2192 26.3.05": "identical",
     "D13 fix pass": 0
    },
-   "seconds": 29.519,
+   "seconds": 33.299,
    "status": "pass"
   },
   {
@@ -441,7 +441,7 @@
     "AFNI's own step: 25.2.09 \u2192 26.3.05": "identical",
     "D13 fix pass": 0
    },
-   "seconds": 13.06,
+   "seconds": 16.527,
    "status": "pass"
   },
   {
@@ -459,7 +459,7 @@
     "AFNI's own step: 25.2.09 \u2192 26.3.05": "identical",
     "D13 fix pass": 0
    },
-   "seconds": 17.279,
+   "seconds": 15.536,
    "status": "pass"
   },
   {
@@ -477,7 +477,7 @@
     "AFNI's own step: 25.2.09 \u2192 26.3.05": "identical",
     "D13 fix pass": 0
    },
-   "seconds": 19.09,
+   "seconds": 16.25,
    "status": "pass"
   },
   {
@@ -495,7 +495,7 @@
     "AFNI's own step: 25.2.09 \u2192 26.3.05": "identical",
     "D13 fix pass": 0
    },
-   "seconds": 15.758,
+   "seconds": 18.234,
    "status": "pass"
   },
   {
@@ -513,7 +513,7 @@
     "AFNI's own step: 25.2.09 \u2192 26.3.05": "identical",
     "D13 fix pass": 0
    },
-   "seconds": 15.093,
+   "seconds": 19.984,
    "status": "pass"
   },
   {
@@ -531,7 +531,7 @@
     "AFNI's own step: 25.2.09 \u2192 26.3.05": "identical",
     "D13 fix pass": 0
    },
-   "seconds": 14.944,
+   "seconds": 18.136,
    "status": "pass"
   },
   {
@@ -549,7 +549,7 @@
     "AFNI's own step: 25.2.09 \u2192 26.3.05": "identical",
     "D13 fix pass": 0
    },
-   "seconds": 3.481,
+   "seconds": 3.66,
    "status": "pass"
   },
   {
@@ -567,7 +567,7 @@
     "AFNI's own step: 25.2.09 \u2192 26.3.05": "identical",
     "D13 fix pass": 0
    },
-   "seconds": 205.744,
+   "seconds": 211.41,
    "status": "pass"
   },
   {
@@ -586,7 +586,7 @@
     "AFNI's own step: 25.2.09 \u2192 26.3.05": "identical",
     "D13 fix pass": 0
    },
-   "seconds": 4.967,
+   "seconds": 5.419,
    "status": "pass"
   },
   {
@@ -604,7 +604,7 @@
     "AFNI's own step: 25.2.09 \u2192 26.3.05": "identical",
     "D13 fix pass": 0
    },
-   "seconds": 2.117,
+   "seconds": 2.149,
    "status": "pass"
   },
   {
@@ -622,7 +622,7 @@
     "AFNI's own step: 25.2.09 \u2192 26.3.05": "identical",
     "D13 fix pass": 0
    },
-   "seconds": 1.065,
+   "seconds": 1.157,
    "status": "pass"
   },
   {
@@ -640,7 +640,7 @@
     "AFNI's own step: 25.2.09 \u2192 26.3.05": "identical",
     "D13 fix pass": 0
    },
-   "seconds": 0.967,
+   "seconds": 1.066,
    "status": "pass"
   },
   {
@@ -658,7 +658,7 @@
     "AFNI's own step: 25.2.09 \u2192 26.3.05": "identical",
     "D13 fix pass": 0
    },
-   "seconds": 16.833,
+   "seconds": 18.404,
    "status": "pass"
   },
   {
@@ -677,7 +677,7 @@
     "AFNI's own step: 25.2.09 \u2192 26.3.05": "identical",
     "D13 fix pass": 0
    },
-   "seconds": 14.778,
+   "seconds": 18.679,
    "status": "pass"
   },
   {
@@ -696,7 +696,7 @@
     "AFNI's own step: 25.2.09 \u2192 26.3.05": "identical",
     "D13 fix pass": 0
    },
-   "seconds": 15.141,
+   "seconds": 17.417,
    "status": "pass"
   },
   {
@@ -715,7 +715,7 @@
     "AFNI's own step: 25.2.09 \u2192 26.3.05": "identical",
     "D13 fix pass": 0
    },
-   "seconds": 15.966,
+   "seconds": 17.581,
    "status": "pass"
   },
   {
@@ -734,7 +734,7 @@
     "AFNI's own step: 25.2.09 \u2192 26.3.05": "identical",
     "D13 fix pass": 0
    },
-   "seconds": 17.454,
+   "seconds": 18.571,
    "status": "pass"
   },
   {
@@ -753,7 +753,7 @@
     "AFNI's own step: 25.2.09 \u2192 26.3.05": "identical",
     "D13 fix pass": 0
    },
-   "seconds": 15.366,
+   "seconds": 20.006,
    "status": "pass"
   },
   {
@@ -772,7 +772,7 @@
     "AFNI's own step: 25.2.09 \u2192 26.3.05": "identical",
     "D13 fix pass": 0
    },
-   "seconds": 13.856,
+   "seconds": 17.227,
    "status": "pass"
   },
   {
@@ -791,7 +791,7 @@
     "AFNI's own step: 25.2.09 \u2192 26.3.05": "identical",
     "D13 fix pass": 0
    },
-   "seconds": 17.602,
+   "seconds": 19.291,
    "status": "pass"
   },
   {
@@ -810,7 +810,7 @@
     "AFNI's own step: 25.2.09 \u2192 26.3.05": "identical",
     "D13 fix pass": 0
    },
-   "seconds": 16.982,
+   "seconds": 19.8,
    "status": "pass"
   },
   {
@@ -829,7 +829,7 @@
     "AFNI's own step: 25.2.09 \u2192 26.3.05": "identical",
     "D13 fix pass": 0
    },
-   "seconds": 18.207,
+   "seconds": 19.503,
    "status": "pass"
   },
   {
@@ -848,7 +848,7 @@
     "AFNI's own step: 25.2.09 \u2192 26.3.05": "identical",
     "D13 fix pass": 0
    },
-   "seconds": 15.89,
+   "seconds": 20.349,
    "status": "pass"
   },
   {
@@ -866,7 +866,7 @@
     "AFNI's own step: 25.2.09 \u2192 26.3.05": "identical",
     "D13 fix pass": 55249
    },
-   "seconds": 19.999,
+   "seconds": 20.366,
    "status": "pass"
   },
   {
@@ -884,7 +884,7 @@
     "AFNI's own step: 25.2.09 \u2192 26.3.05": "identical",
     "D13 fix pass": 0
    },
-   "seconds": 16.161,
+   "seconds": 20.014,
    "status": "pass"
   },
   {
@@ -902,7 +902,7 @@
     "AFNI's own step: 25.2.09 \u2192 26.3.05": "identical",
     "D13 fix pass": 0
    },
-   "seconds": 14.58,
+   "seconds": 19.602,
    "status": "pass"
   },
   {
@@ -920,7 +920,7 @@
     "AFNI's own step: 25.2.09 \u2192 26.3.05": "identical",
     "D13 fix pass": 58184
    },
-   "seconds": 19.397,
+   "seconds": 18.448,
    "status": "pass"
   },
   {
@@ -938,7 +938,7 @@
     "AFNI's own step: 25.2.09 \u2192 26.3.05": "identical",
     "D13 fix pass": 53571
    },
-   "seconds": 23.977,
+   "seconds": 25.093,
    "status": "pass"
   },
   {
@@ -956,7 +956,7 @@
     "AFNI's own step: 25.2.09 \u2192 26.3.05": "identical",
     "D13 fix pass": 2569
    },
-   "seconds": 0.179,
+   "seconds": 0.182,
    "status": "pass"
   },
   {
@@ -974,7 +974,7 @@
     "AFNI's own step: 25.2.09 \u2192 26.3.05": "identical",
     "D13 fix pass": 337232
    },
-   "seconds": 0.89,
+   "seconds": 0.849,
    "status": "pass"
   },
   {
@@ -987,7 +987,7 @@
    "reported": {
     "D13 fix pass": 211604
    },
-   "seconds": 2.722,
+   "seconds": 2.727,
    "status": "expected-divergence"
   },
   {
@@ -1005,7 +1005,7 @@
     "AFNI's own step: 25.2.09 \u2192 26.3.05": "identical",
     "D13 fix pass": 0
    },
-   "seconds": 0.18,
+   "seconds": 0.208,
    "status": "pass"
   },
   {
@@ -1023,7 +1023,7 @@
     "AFNI's own step: 25.2.09 \u2192 26.3.05": "identical",
     "D13 fix pass": 0
    },
-   "seconds": 0.418,
+   "seconds": 0.437,
    "status": "pass"
   },
   {
@@ -1041,7 +1041,7 @@
     "AFNI's own step: 25.2.09 \u2192 26.3.05": "identical",
     "D13 fix pass": 0
    },
-   "seconds": 0.01,
+   "seconds": 0.015,
    "status": "pass"
   },
   {
@@ -1059,7 +1059,7 @@
     "AFNI's own step: 25.2.09 \u2192 26.3.05": "identical",
     "D13 fix pass": 0
    },
-   "seconds": 7.622,
+   "seconds": 10.174,
    "status": "pass"
   },
   {
@@ -1077,7 +1077,7 @@
     "AFNI's own step: 25.2.09 \u2192 26.3.05": "identical",
     "D13 fix pass": 0
    },
-   "seconds": 20.622,
+   "seconds": 21.952,
    "status": "pass"
   },
   {
@@ -1095,7 +1095,7 @@
     "AFNI's own step: 25.2.09 \u2192 26.3.05": "identical",
     "D13 fix pass": 0
    },
-   "seconds": 15.533,
+   "seconds": 19.781,
    "status": "pass"
   },
   {
@@ -1111,7 +1111,7 @@
    "reported": {
     "AFNI's own step: 25.2.09 \u2192 26.3.05": "identical"
    },
-   "seconds": 0.005,
+   "seconds": 0.006,
    "status": "both-error"
   },
   {
@@ -1127,7 +1127,7 @@
    "reported": {
     "AFNI's own step: 25.2.09 \u2192 26.3.05": "identical"
    },
-   "seconds": 0.004,
+   "seconds": 0.009,
    "status": "both-error"
   },
   {
@@ -1207,7 +1207,7 @@
    "reported": {
     "AFNI's own step: 25.2.09 \u2192 26.3.05": "identical"
    },
-   "seconds": 0.003,
+   "seconds": 0.004,
    "status": "both-error"
   },
   {
@@ -1223,7 +1223,7 @@
    "reported": {
     "AFNI's own step: 25.2.09 \u2192 26.3.05": "identical"
    },
-   "seconds": 0.003,
+   "seconds": 0.004,
    "status": "both-error"
   },
   {
@@ -1239,7 +1239,7 @@
    "reported": {
     "AFNI's own step: 25.2.09 \u2192 26.3.05": "identical"
    },
-   "seconds": 0.003,
+   "seconds": 0.004,
    "status": "both-error"
   },
   {
@@ -1255,7 +1255,7 @@
    "reported": {
     "AFNI's own step: 25.2.09 \u2192 26.3.05": "identical"
    },
-   "seconds": 0.002,
+   "seconds": 0.003,
    "status": "both-error"
   },
   {
@@ -1271,7 +1271,7 @@
    "reported": {
     "AFNI's own step: 25.2.09 \u2192 26.3.05": "identical"
    },
-   "seconds": 0.003,
+   "seconds": 0.004,
    "status": "both-error"
   },
   {
@@ -1287,7 +1287,7 @@
    "reported": {
     "AFNI's own step: 25.2.09 \u2192 26.3.05": "identical"
    },
-   "seconds": 0.003,
+   "seconds": 0.004,
    "status": "both-error"
   },
   {
@@ -1303,7 +1303,7 @@
    "reported": {
     "AFNI's own step: 25.2.09 \u2192 26.3.05": "identical"
    },
-   "seconds": 0.002,
+   "seconds": 0.004,
    "status": "both-error"
   },
   {
@@ -1319,7 +1319,7 @@
    "reported": {
     "AFNI's own step: 25.2.09 \u2192 26.3.05": "identical"
    },
-   "seconds": 0.002,
+   "seconds": 0.003,
    "status": "both-error"
   },
   {
@@ -1335,7 +1335,7 @@
    "reported": {
     "AFNI's own step: 25.2.09 \u2192 26.3.05": "identical"
    },
-   "seconds": 0.002,
+   "seconds": 0.003,
    "status": "both-error"
   },
   {
@@ -1351,7 +1351,7 @@
    "reported": {
     "AFNI's own step: 25.2.09 \u2192 26.3.05": "identical"
    },
-   "seconds": 0.003,
+   "seconds": 0.009,
    "status": "both-error"
   },
   {
@@ -1367,7 +1367,7 @@
    "reported": {
     "AFNI's own step: 25.2.09 \u2192 26.3.05": "identical"
    },
-   "seconds": 0.003,
+   "seconds": 0.004,
    "status": "both-error"
   },
   {
@@ -1383,7 +1383,7 @@
    "reported": {
     "AFNI's own step: 25.2.09 \u2192 26.3.05": "identical"
    },
-   "seconds": 0.002,
+   "seconds": 0.003,
    "status": "both-error"
   },
   {
@@ -1399,7 +1399,7 @@
    "reported": {
     "AFNI's own step: 25.2.09 \u2192 26.3.05": "identical"
    },
-   "seconds": 0.003,
+   "seconds": 0.004,
    "status": "both-error"
   },
   {
@@ -1412,7 +1412,7 @@
    "reported": {
     "AFNI's own step: 25.2.09 \u2192 26.3.05": "identical"
    },
-   "seconds": 89.193,
+   "seconds": 92.026,
    "status": "expected-divergence"
   },
   {
@@ -1429,7 +1429,7 @@
     "AFNI's own step: 25.2.09 \u2192 26.3.05": "identical",
     "D13 fix pass": 0
    },
-   "seconds": 6.911,
+   "seconds": 9.907,
    "status": "pass"
   },
   {
@@ -1447,7 +1447,7 @@
     "AFNI's own step: 25.2.09 \u2192 26.3.05": "identical",
     "D13 fix pass": 0
    },
-   "seconds": 14.524,
+   "seconds": 19.932,
    "status": "pass"
   },
   {
@@ -1465,7 +1465,7 @@
     "AFNI's own step: 25.2.09 \u2192 26.3.05": "identical",
     "D13 fix pass": 0
    },
-   "seconds": 16.198,
+   "seconds": 19.869,
    "status": "pass"
   },
   {
@@ -1483,7 +1483,7 @@
     "AFNI's own step: 25.2.09 \u2192 26.3.05": "identical",
     "D13 fix pass": 0
    },
-   "seconds": 6.983,
+   "seconds": 10.3,
    "status": "pass"
   },
   {
@@ -1501,7 +1501,7 @@
     "AFNI's own step: 25.2.09 \u2192 26.3.05": "identical",
     "D13 fix pass": 0
    },
-   "seconds": 17.84,
+   "seconds": 19.335,
    "status": "pass"
   },
   {
@@ -1519,7 +1519,7 @@
     "AFNI's own step: 25.2.09 \u2192 26.3.05": "identical",
     "D13 fix pass": 0
    },
-   "seconds": 16.743,
+   "seconds": 19.78,
    "status": "pass"
   },
   {
@@ -1537,7 +1537,7 @@
     "AFNI's own step: 25.2.09 \u2192 26.3.05": "identical",
     "D13 fix pass": 0
    },
-   "seconds": 17.532,
+   "seconds": 19.421,
    "status": "pass"
   },
   {
@@ -1555,7 +1555,7 @@
     "AFNI's own step: 25.2.09 \u2192 26.3.05": "identical",
     "D13 fix pass": 0
    },
-   "seconds": 17.874,
+   "seconds": 19.456,
    "status": "pass"
   },
   {
@@ -1572,7 +1572,7 @@
     "AFNI's own step: 25.2.09 \u2192 26.3.05": "identical",
     "D13 fix pass": 0
    },
-   "seconds": 9.221,
+   "seconds": 10.322,
    "status": "pass"
   },
   {
@@ -1589,7 +1589,7 @@
     "AFNI's own step: 25.2.09 \u2192 26.3.05": "identical",
     "D13 fix pass": 0
    },
-   "seconds": 7.864,
+   "seconds": 9.651,
    "status": "pass"
   },
   {
@@ -1606,7 +1606,7 @@
     "AFNI's own step: 25.2.09 \u2192 26.3.05": "identical",
     "D13 fix pass": 0
    },
-   "seconds": 15.248,
+   "seconds": 18.982,
    "status": "pass"
   },
   {
@@ -1628,7 +1628,7 @@
     "band: fMRIPrep 25.2.6's AFNI": 0,
     "uni.nii.gz: fMRIPrep's own output (as it ran)": 0
    },
-   "seconds": 25.542,
+   "seconds": 30.794,
    "status": "pass"
   },
   {
@@ -1650,7 +1650,7 @@
     "band: fMRIPrep 25.2.6's AFNI": 0,
     "uni.nii.gz: fMRIPrep's own output (as it ran)": 0
    },
-   "seconds": 25.653,
+   "seconds": 29.747,
    "status": "pass"
   },
   {
@@ -1672,7 +1672,7 @@
     "band: fMRIPrep 25.2.6's AFNI": 0,
     "uni.nii.gz: fMRIPrep's own output (as it ran)": 0
    },
-   "seconds": 25.287,
+   "seconds": 30.236,
    "status": "pass"
   },
   {
@@ -1694,7 +1694,7 @@
     "band: fMRIPrep 25.2.6's AFNI": 0,
     "uni.nii.gz: fMRIPrep's own output (as it ran)": 0
    },
-   "seconds": 27.244,
+   "seconds": 29.439,
    "status": "pass"
   },
   {
@@ -1716,7 +1716,7 @@
     "band: fMRIPrep 25.2.6's AFNI": 0,
     "uni.nii.gz: fMRIPrep's own output (as it ran)": 0
    },
-   "seconds": 19.659,
+   "seconds": 25.058,
    "status": "pass"
   },
   {
@@ -1738,7 +1738,7 @@
     "band: fMRIPrep 25.2.6's AFNI": 0,
     "uni.nii.gz: fMRIPrep's own output (as it ran)": 0
    },
-   "seconds": 20.652,
+   "seconds": 24.449,
    "status": "pass"
   },
   {
@@ -1760,7 +1760,7 @@
     "band: fMRIPrep 25.2.6's AFNI": 0,
     "uni.nii.gz: fMRIPrep's own output (as it ran)": 0
    },
-   "seconds": 20.524,
+   "seconds": 23.698,
    "status": "pass"
   },
   {
@@ -1782,7 +1782,7 @@
     "band: fMRIPrep 25.2.6's AFNI": 0,
     "uni.nii.gz: fMRIPrep's own output (as it ran)": 0
    },
-   "seconds": 18.642,
+   "seconds": 20.735,
    "status": "pass"
   },
   {
@@ -1804,7 +1804,7 @@
     "band: fMRIPrep 25.2.6's AFNI": 0,
     "uni.nii.gz: fMRIPrep's own output (as it ran)": 0
    },
-   "seconds": 19.299,
+   "seconds": 22.467,
    "status": "pass"
   },
   {
@@ -1826,7 +1826,7 @@
     "band: fMRIPrep 25.2.6's AFNI": 0,
     "uni.nii.gz: fMRIPrep's own output (as it ran)": 0
    },
-   "seconds": 25.871,
+   "seconds": 29.897,
    "status": "pass"
   },
   {
@@ -1848,7 +1848,7 @@
     "band: fMRIPrep 25.2.6's AFNI": 0,
     "uni.nii.gz: fMRIPrep's own output (as it ran)": 0
    },
-   "seconds": 40.554,
+   "seconds": 47.24,
    "status": "pass"
   },
   {
@@ -1870,7 +1870,7 @@
     "band: fMRIPrep 25.2.6's AFNI": 0,
     "uni.nii.gz: fMRIPrep's own output (as it ran)": 0
    },
-   "seconds": 39.536,
+   "seconds": 45.144,
    "status": "pass"
   },
   {
@@ -1892,7 +1892,7 @@
     "band: fMRIPrep 25.2.6's AFNI": 0,
     "uni.nii.gz: fMRIPrep's own output (as it ran)": 0
    },
-   "seconds": 32.22,
+   "seconds": 36.462,
    "status": "pass"
   },
   {
@@ -1914,7 +1914,7 @@
     "band: fMRIPrep 25.2.6's AFNI": 0,
     "uni.nii.gz: fMRIPrep's own output (as it ran)": 0
    },
-   "seconds": 27.013,
+   "seconds": 30.675,
    "status": "pass"
   },
   {
@@ -1936,7 +1936,7 @@
     "band: fMRIPrep 25.2.6's AFNI": 0,
     "uni.nii.gz: fMRIPrep's own output (as it ran)": 0
    },
-   "seconds": 25.659,
+   "seconds": 32.223,
    "status": "pass"
   },
   {
@@ -1958,7 +1958,7 @@
     "band: fMRIPrep 25.2.6's AFNI": 0,
     "uni.nii.gz: fMRIPrep's own output (as it ran)": 0
    },
-   "seconds": 124.258,
+   "seconds": 127.508,
    "status": "pass"
   },
   {
@@ -1980,7 +1980,7 @@
     "band: fMRIPrep 25.2.6's AFNI": 0,
     "uni.nii.gz: fMRIPrep's own output (as it ran)": 0
    },
-   "seconds": 23.774,
+   "seconds": 27.971,
    "status": "pass"
   },
   {
@@ -2002,7 +2002,7 @@
     "band: fMRIPrep 25.2.6's AFNI": 0,
     "uni.nii.gz: fMRIPrep's own output (as it ran)": 0
    },
-   "seconds": 23.065,
+   "seconds": 28.629,
    "status": "pass"
   },
   {
@@ -2024,7 +2024,7 @@
     "band: fMRIPrep 25.2.6's AFNI": 0,
     "uni.nii.gz: fMRIPrep's own output (as it ran)": 0
    },
-   "seconds": 31.471,
+   "seconds": 36.942,
    "status": "pass"
   },
   {
@@ -2046,7 +2046,7 @@
     "band: fMRIPrep 25.2.6's AFNI": 0,
     "uni.nii.gz: fMRIPrep's own output (as it ran)": 0
    },
-   "seconds": 10.16,
+   "seconds": 11.714,
    "status": "pass"
   },
   {
@@ -2068,7 +2068,7 @@
     "band: fMRIPrep 25.2.6's AFNI": 0,
     "uni.nii.gz: fMRIPrep's own output (as it ran)": 0
    },
-   "seconds": 30.102,
+   "seconds": 35.127,
    "status": "pass"
   },
   {
@@ -2090,7 +2090,7 @@
     "band: fMRIPrep 25.2.6's AFNI": 0,
     "uni.nii.gz: fMRIPrep's own output (as it ran)": 0
    },
-   "seconds": 29.949,
+   "seconds": 32.82,
    "status": "pass"
   },
   {
@@ -2111,7 +2111,7 @@
     "band: AFNI at 6 thread(s)": 0,
     "band: fMRIPrep 25.2.6's AFNI": 0
    },
-   "seconds": 19.114,
+   "seconds": 22.032,
    "status": "pass"
   },
   {
@@ -2131,7 +2131,183 @@
     "band: AFNI at 6 thread(s)": 0,
     "band: fMRIPrep 25.2.6's AFNI": 0
    },
-   "seconds": 17.44,
+   "seconds": 17.354,
+   "status": "pass"
+  },
+  {
+   "case": "guard/epi-um3",
+   "category": "AFNI-75's guard",
+   "checks_passed": 3,
+   "checks_total": 3,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.003,
+   "status": "pass"
+  },
+  {
+   "case": "guard/epi-um1",
+   "category": "AFNI-75's guard",
+   "checks_passed": 3,
+   "checks_total": 3,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.002,
+   "status": "pass"
+  },
+  {
+   "case": "guard/epi-mm0.05",
+   "category": "AFNI-75's guard",
+   "checks_passed": 3,
+   "checks_total": 3,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.002,
+   "status": "pass"
+  },
+  {
+   "case": "guard/epi-um3-one",
+   "category": "AFNI-75's guard",
+   "checks_passed": 3,
+   "checks_total": 3,
+   "failed_checks": [],
+   "reason": "",
+   "seconds": 0.002,
+   "status": "pass"
+  },
+  {
+   "case": "guard/epi-mm0.3",
+   "category": "AFNI-75's guard",
+   "checks_passed": 7,
+   "checks_total": 7,
+   "failed_checks": [],
+   "measured": {
+    "exit status": 0,
+    "uni.nii: data": 0
+   },
+   "reason": "",
+   "reported": {
+    "AFNI's own step: 25.2.09 \u2192 26.3.05": "identical",
+    "D13 fix pass": 0
+   },
+   "seconds": 6.491,
+   "status": "pass"
+  },
+  {
+   "case": "guard/epi-mm3",
+   "category": "AFNI-75's guard",
+   "checks_passed": 7,
+   "checks_total": 7,
+   "failed_checks": [],
+   "measured": {
+    "exit status": 0,
+    "uni.nii: data": 0
+   },
+   "reason": "",
+   "reported": {
+    "AFNI's own step: 25.2.09 \u2192 26.3.05": "identical",
+    "D13 fix pass": 0
+   },
+   "seconds": 0.061,
+   "status": "pass"
+  },
+  {
+   "case": "glibc-05/epi-ball",
+   "category": "GLIBC-05's cube root",
+   "checks_passed": 11,
+   "checks_total": 11,
+   "failed_checks": [],
+   "measured": {
+    "exit status": 0,
+    "reproduce: AFNI's values bit for bit (glibc 2.35's cube root)": 0,
+    "the default: AFNI's output and messages with CORE-MATH's correctly rounded functions": 0,
+    "uni.nii: data": 0
+   },
+   "reason": "",
+   "reported": {
+    "AFNI's own step: 25.2.09 \u2192 26.3.05": "identical",
+    "D13 fix pass": 6321
+   },
+   "seconds": 0.237,
+   "status": "pass"
+  },
+  {
+   "case": "glibc-05/epi-ball-one",
+   "category": "GLIBC-05's cube root",
+   "checks_passed": 10,
+   "checks_total": 10,
+   "failed_checks": [],
+   "measured": {
+    "exit status": 0,
+    "reproduce: AFNI's values bit for bit (glibc 2.35's cube root)": 0,
+    "the default: AFNI's output and messages with CORE-MATH's correctly rounded functions": 0,
+    "uni.nii: data": 0
+   },
+   "reason": "",
+   "reported": {
+    "AFNI's own step: 25.2.09 \u2192 26.3.05": "identical",
+    "D13 fix pass": 1865
+   },
+   "seconds": 0.218,
+   "status": "pass"
+  },
+  {
+   "case": "glibc-05/epi-printed",
+   "category": "GLIBC-05's cube root",
+   "checks_passed": 10,
+   "checks_total": 10,
+   "failed_checks": [],
+   "measured": {
+    "exit status": 0,
+    "reproduce: AFNI's values bit for bit (glibc 2.35's cube root)": 0,
+    "the default: AFNI's output and messages with CORE-MATH's correctly rounded functions": 0,
+    "uni.nii: data": 0
+   },
+   "reason": "",
+   "reported": {
+    "AFNI's own step: 25.2.09 \u2192 26.3.05": "identical",
+    "D13 fix pass": 0
+   },
+   "seconds": 0.908,
+   "status": "pass"
+  },
+  {
+   "case": "glibc-05/epi-same-result",
+   "category": "GLIBC-05's cube root",
+   "checks_passed": 10,
+   "checks_total": 10,
+   "failed_checks": [],
+   "measured": {
+    "exit status": 0,
+    "reproduce: AFNI's values bit for bit (glibc 2.35's cube root)": 0,
+    "the default: AFNI's output and messages with CORE-MATH's correctly rounded functions": 0,
+    "uni.nii: data": 0
+   },
+   "reason": "",
+   "reported": {
+    "AFNI's own step: 25.2.09 \u2192 26.3.05": "identical",
+    "D13 fix pass": 0
+   },
+   "seconds": 0.149,
+   "status": "pass"
+  },
+  {
+   "case": "glibc-05/epi-ordinary",
+   "category": "GLIBC-05's cube root",
+   "checks_passed": 10,
+   "checks_total": 10,
+   "failed_checks": [],
+   "measured": {
+    "exit status": 0,
+    "reproduce: AFNI's values bit for bit (glibc 2.35's cube root)": 0,
+    "the default: AFNI's output and messages with CORE-MATH's correctly rounded functions": 0,
+    "uni.nii: data": 0
+   },
+   "reason": "",
+   "reported": {
+    "AFNI's own step: 25.2.09 \u2192 26.3.05": "identical",
+    "D13 fix pass": 0
+   },
+   "seconds": 0.106,
    "status": "pass"
   },
   {
@@ -2141,7 +2317,7 @@
    "checks_total": 1,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.024,
+   "seconds": 0.047,
    "status": "pass"
   },
   {
@@ -2168,7 +2344,7 @@
   "both-error": 19,
   "expected-divergence": 2,
   "fail": 0,
-  "pass": 95,
+  "pass": 106,
   "skipped": 0
  },
  "tier": "standard"

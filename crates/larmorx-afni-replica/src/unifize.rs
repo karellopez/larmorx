@@ -38,6 +38,7 @@
 //! count; within a voxel only the values between the two percentiles are sorted (a selection
 //! puts them in place), and they are summed in sorted order, as AFNI sums them.
 
+use larmorx_core::defects::UpstreamDefects;
 use rayon::prelude::*;
 
 use crate::fdlibm::tanhf;
@@ -330,16 +331,6 @@ pub fn double_up(far: &[f32], g: Grid, add: [bool; 3], target: Option<Grid>) -> 
     (gar, h)
 }
 
-/// 3dUnifize `-EPI`'s radius: see [`epi_radius`].
-#[derive(Clone, Copy, Debug, PartialEq)]
-pub struct EpiRadius {
-    /// The radius in voxels.
-    pub radius: f32,
-    /// Whether the voxel volume is one where the radius's effect depends on the cube root's last
-    /// bit, so that AFNI's result may differ.
-    pub may_differ: bool,
-}
-
 /// The `-EPI` radius from a cube root `c`: `18.3 / c` in double, as float, at least 4.14 (as
 /// 3dUnifize's `main` computes it).
 fn radius_from_cube_root(c: f32) -> f32 {
@@ -350,43 +341,109 @@ fn radius_from_cube_root(c: f32) -> f32 {
     uu
 }
 
-/// What the radius decides: the ball of neighbours ([`sphere`]: `trunc(r)` and the largest
-/// integer at most `fl(r * r)`, every float sum of squares it tests being an integer) and the
-/// radius as `-EPI`'s message prints it (`%.1f`).
-fn radius_effect(r: f32) -> (i32, f64, String) {
-    let dist_q = r * r;
-    let floor = if dist_q.is_finite() {
-        f64::from(dist_q).floor()
+/// The cube root of the voxel volume that `-EPI`'s radius takes: CORE-MATH's correctly rounded
+/// `cbrtf` by default ([`larmorx_core::math::cbrtf`], MIT); with `reproduce` glibc 2.35's,
+/// which AFNI's Linux builds call ([`larmorx_core::math::cbrtf_glibc`]: larmorx's clean-room
+/// function with glibc 2.35's bits, written from `specs/cbrtf.md` and proved equal to the
+/// system's `cbrtf` on all 2^32 inputs; GLIBC-05).
+pub fn epi_cube_root(volume: f32, mode: UpstreamDefects) -> f32 {
+    if mode.fix() {
+        larmorx_core::math::cbrtf(volume)
     } else {
-        f64::INFINITY
-    };
-    (r as i32, floor, format!("{:.1}", f64::from(r)))
+        larmorx_core::math::cbrtf_glibc(volume)
+    }
 }
 
 /// 3dUnifize `-EPI`'s radius in voxels for the voxel volume `volume` (`|dx * dy * dz|`, a float
-/// product): `18.3 / cbrtf(volume)`, at least 4.14.
-///
-/// AFNI's Linux builds take `cbrtf` from glibc 2.35, whose code is LGPL-2.1-or-later and not
-/// part of larmorx; its result is one unit in the last place from the correctly rounded one on
-/// 453,492,162 of the 2^32 inputs. This uses CORE-MATH's correctly rounded `cbrtf` (MIT,
-/// `larmorx_core::math`). `may_differ` is true when a cube root one unit in the last place
-/// below or above would change the ball of neighbours or the printed radius: only there can
-/// glibc's result give another output or message, and the command line warns. Measured on
-/// every float32 volume against the earlier translation of glibc's `cbrtf`
-/// (`crates-gpl/tools/cbrtf-measure`): every volume where glibc's last bit changes the ball or
-/// the message is flagged, and among volumes of at least 0.001 mm^3 (voxel edges of 0.1 mm and
-/// up) glibc's last bit changes the ball for 8,794 and the message for 552 (of the about 174,000
-/// flagged; `validation/investigations/afni-move/README.md`).
-pub fn epi_radius(volume: f32) -> EpiRadius {
-    let c = larmorx_core::math::cbrtf(volume);
-    let radius = radius_from_cube_root(c);
-    let may_differ = c.is_finite()
-        && c > 0.0
-        && [c.next_down(), c.next_up()].into_iter().any(|n| {
-            let r = radius_from_cube_root(n);
-            r.to_bits() != radius.to_bits() && radius_effect(r) != radius_effect(radius)
-        });
-    EpiRadius { radius, may_differ }
+/// product): `18.3 / cbrtf(volume)`, at least 4.14, with the cube root of [`epi_cube_root`]:
+/// AFNI's radius bit for bit with `reproduce`; by default the correctly rounded one, which
+/// differs from AFNI's by one unit in the last place wherever glibc's `cbrtf` does
+/// (453,492,162 of the 2^32 inputs) and the quotient keeps it ([`epi_cbrtf_notice`] names
+/// GLIBC-05 where that changes the result).
+pub fn epi_radius(volume: f32, mode: UpstreamDefects) -> f32 {
+    radius_from_cube_root(epi_cube_root(volume, mode))
+}
+
+/// How many offsets of the ball of `radius` ([`sphere`], the centre included) lie within the
+/// reach of a grid of `dims` voxels: `|i| < nx`, `|j| < ny`, `|k| < nz`, the only offsets a
+/// voxel of the grid ever uses. The ball's float sums of squares are tested in [`sphere`]'s
+/// order; the work is bounded by the grid, so even a radius beyond any machine is counted.
+pub fn ball_in_reach(radius: f32, dims: [usize; 3]) -> u64 {
+    let n = radius as i32;
+    if n < 1 {
+        return 1;
+    }
+    let reach = |d: usize| i64::from(n).min(d.saturating_sub(1) as i64) as i32;
+    let (ri, rj, rk) = (reach(dims[0]), reach(dims[1]), reach(dims[2]));
+    let dist_q = radius * radius;
+    let mut count = 1u64;
+    for kk in -rk..=rk {
+        let zq = (kk as f32) * (kk as f32);
+        for jj in -rj..=rj {
+            let yq = zq + (jj as f32) * (jj as f32);
+            for ii in -ri..=ri {
+                let xq = yq + (ii as f32) * (ii as f32);
+                if xq <= dist_q && xq > 0.0 {
+                    count += 1;
+                }
+            }
+        }
+    }
+    count
+}
+
+/// GLIBC-05: where glibc 2.35's `cbrtf` (AFNI's) gives `-EPI` another radius than the correctly
+/// rounded cube root, and that changes the result on a grid of `dims` (the ball of neighbours
+/// within the grid's reach, [`ball_in_reach`], or the radius printed with one decimal), the
+/// notice's detail naming the two radii and what differs, in `mode`'s words (the run's radius
+/// first). `None` where the two radii are the same or give the same result. The balls of two
+/// radii are nested, so their offsets within reach differ exactly when their counts do.
+pub fn epi_cbrtf_notice(volume: f32, dims: [usize; 3], mode: UpstreamDefects) -> Option<String> {
+    let (uc, ug) = (
+        larmorx_core::math::cbrtf(volume),
+        larmorx_core::math::cbrtf_glibc(volume),
+    );
+    let (rc, rg) = (radius_from_cube_root(uc), radius_from_cube_root(ug));
+    if rc.to_bits() == rg.to_bits() || (rc.is_nan() && rg.is_nan()) {
+        return None;
+    }
+    let (pc, pg) = (
+        format!("{:.1}", f64::from(rc)),
+        format!("{:.1}", f64::from(rg)),
+    );
+    let (nc, ng) = (ball_in_reach(rc, dims), ball_in_reach(rg, dims));
+    let (ball, printed) = (nc != ng, pc != pg);
+    if !ball && !printed {
+        return None;
+    }
+    // What the other radius would change: its ball within the grid, its printed value.
+    let effects = |n_other: u64, n_this: u64, p_other: &str, p_this: &str| {
+        let mut out = String::new();
+        if ball {
+            out += &format!(
+                ", a ball of neighbours of {n_other} offsets within the grid instead of {n_this}"
+            );
+        }
+        if printed {
+            out += &format!(", printed {p_other} instead of {p_this}");
+        }
+        out
+    };
+    Some(if mode.fix() {
+        format!(
+            "-EPI's radius is {rc} voxels: 18.3 mm over the correctly rounded cube root ({uc}) \
+             of the voxel volume, {volume} mm^3; with glibc 2.35's cbrtf ({ug}), which AFNI \
+             calls, it is {rg} voxels{}",
+            effects(ng, nc, &pg, &pc)
+        )
+    } else {
+        format!(
+            "-EPI's radius is {rg} voxels, as AFNI's: 18.3 mm over glibc 2.35's cbrtf ({ug}) of \
+             the voxel volume, {volume} mm^3; with the correctly rounded cube root ({uc}) it is \
+             {rc} voxels{}",
+            effects(nc, ng, &pc, &pg)
+        )
+    })
 }
 
 /// The bytes [`sphere`] and the neighbourhood buffers of [`local_percmean`]'s `threads` workers
@@ -829,21 +886,63 @@ mod tests {
     }
 
     #[test]
-    fn epi_radius_and_its_last_bit() {
-        // 3 mm voxels: 18.3 / 3; no neighbouring cube root changes the ball or "6.1".
-        let r = epi_radius(27.0);
-        assert_eq!((r.radius, r.may_differ), (6.1, false));
+    fn epi_radius_and_glibc_05() {
+        use UpstreamDefects::{Fix, Reproduce};
+        // 3 mm voxels: 18.3 / 3 with either cube root; no notice.
+        assert_eq!(epi_radius(27.0, Fix), 6.1);
+        assert_eq!(epi_radius(27.0, Reproduce), 6.1);
+        assert!(epi_cbrtf_notice(27.0, [64, 64, 40], Fix).is_none());
         // Large voxels: the minimum radius.
-        assert_eq!(epi_radius(1000.0).radius, 4.14);
-        // 11.97 mm^3 (`cbrtf-measure`): glibc's cube root gives a radius of exactly 8 (2109
-        // offsets), CORE-MATH's 7.9999995 (2103 offsets); flagged.
-        let r = epi_radius(f32::from_bits(0x413f_83e6));
-        assert_eq!(r.radius.to_bits(), 0x40ff_ffff);
-        assert!(r.may_differ);
-        assert_eq!(sphere(r.radius).len(), 2103);
+        assert_eq!(epi_radius(1000.0, Fix), 4.14);
+        // 11.969702 mm^3 (`specs/cbrtf.md` §6): glibc's cube root gives a radius of exactly 8
+        // (2109 offsets), the correctly rounded one 7.9999995 (2103 offsets).
+        let v = f32::from_bits(0x413f_83e6);
+        assert_eq!(epi_radius(v, Fix).to_bits(), 0x40ff_ffff);
+        assert_eq!(epi_radius(v, Reproduce), 8.0);
+        assert_eq!(sphere(epi_radius(v, Fix)).len(), 2103);
         assert_eq!(sphere(8.0).len(), 2109);
-        // A zero volume: an infinite radius, nothing to compare.
-        assert!(epi_radius(0.0).radius.is_infinite() && !epi_radius(0.0).may_differ);
+        let dims = [24, 24, 16];
+        assert_eq!(ball_in_reach(8.0, dims), 2109);
+        assert_eq!(ball_in_reach(epi_radius(v, Fix), dims), 2103);
+        assert_eq!(
+            epi_cbrtf_notice(v, dims, Fix).unwrap(),
+            "-EPI's radius is 7.9999995 voxels: 18.3 mm over the correctly rounded cube root \
+             (2.2875001) of the voxel volume, 11.969702 mm^3; with glibc 2.35's cbrtf (2.2875), \
+             which AFNI calls, it is 8 voxels, a ball of neighbours of 2109 offsets within the \
+             grid instead of 2103"
+        );
+        assert_eq!(
+            epi_cbrtf_notice(v, dims, Reproduce).unwrap(),
+            "-EPI's radius is 8 voxels, as AFNI's: 18.3 mm over glibc 2.35's cbrtf (2.2875) of \
+             the voxel volume, 11.969702 mm^3; with the correctly rounded cube root (2.2875001) \
+             it is 7.9999995 voxels, a ball of neighbours of 2103 offsets within the grid \
+             instead of 2109"
+        );
+        // A grid the extra offsets (8 voxels along an axis) cannot reach: nothing changes.
+        assert!(epi_cbrtf_notice(v, [8, 8, 8], Fix).is_none());
+        // The printed radius only: 18.05 (18.0) correctly rounded, 18.050001 (18.1) glibc's.
+        let printed = f32::from_bits(0x3f85_647f);
+        let n = epi_cbrtf_notice(printed, dims, Fix).unwrap();
+        assert!(
+            n.ends_with("it is 18.050001 voxels, printed 18.1 instead of 18.0"),
+            "{n}"
+        );
+        // Radii one unit apart in the last place with the same ball and print: no notice.
+        let same = 2.4f32 * 2.4 * 2.78;
+        assert_ne!(epi_radius(same, Fix), epi_radius(same, Reproduce));
+        assert!(epi_cbrtf_notice(same, dims, Fix).is_none());
+        assert!(epi_cbrtf_notice(same, dims, Reproduce).is_none());
+        // A zero volume: an infinite radius with both cube roots, nothing to name.
+        assert!(epi_radius(0.0, Fix).is_infinite() && epi_radius(0.0, Reproduce).is_infinite());
+        assert!(epi_cbrtf_notice(0.0, dims, Fix).is_none());
+        // The count within reach is the whole ball where the grid reaches every offset.
+        for r in [4.14f32, 6.1, 7.5, 9.15] {
+            assert_eq!(
+                ball_in_reach(r, [64, 64, 64]),
+                sphere(r).len() as u64,
+                "{r}"
+            );
+        }
     }
 
     #[test]

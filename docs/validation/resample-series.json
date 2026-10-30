@@ -2,7 +2,7 @@
  "environment": {
   "cpu": "AMD Ryzen 9 7945HX with Radeon Graphics",
   "larmorx": "0.0.1",
-  "larmorx_commit": "9b833a357520",
+  "larmorx_commit": "bf26b7105d22",
   "larmorx_testdata_commit": "52124bc98f9f",
   "logical_cpus": 32,
   "os": "Linux-6.8.0-124-generic-x86_64-with-glibc2.35",
@@ -312,7 +312,7 @@
     "map_coordinates 3D int16 -> uint8, prefilter=False: bit-identical": 0,
     "map_coordinates 3D int16 -> uint8: bit-identical": 0
    },
-   "seconds": 0.079,
+   "seconds": 0.06,
    "status": "pass"
   },
   {
@@ -597,7 +597,7 @@
     "map_coordinates 3D int16 -> uint8, prefilter=False: bit-identical": 0,
     "map_coordinates 3D int16 -> uint8: bit-identical": 0
    },
-   "seconds": 0.154,
+   "seconds": 0.08,
    "status": "pass"
   },
   {
@@ -888,7 +888,7 @@
     "spline_filter1d: bit-identical": 0,
     "spline_filter: bit-identical": 0
    },
-   "seconds": 0.324,
+   "seconds": 0.202,
    "status": "pass"
   },
   {
@@ -1179,7 +1179,7 @@
     "spline_filter1d: bit-identical": 0,
     "spline_filter: bit-identical": 0
    },
-   "seconds": 0.372,
+   "seconds": 0.242,
    "status": "pass"
   },
   {
@@ -1470,7 +1470,7 @@
     "spline_filter1d: bit-identical": 0,
     "spline_filter: bit-identical": 0
    },
-   "seconds": 0.526,
+   "seconds": 0.46,
    "status": "pass"
   },
   {
@@ -1761,7 +1761,7 @@
     "spline_filter1d: bit-identical": 0,
     "spline_filter: bit-identical": 0
    },
-   "seconds": 0.6,
+   "seconds": 0.541,
    "status": "pass"
   },
   {
@@ -2046,7 +2046,7 @@
     "map_coordinates 3D int16 -> uint8, prefilter=False: bit-identical": 0,
     "map_coordinates 3D int16 -> uint8: bit-identical": 0
    },
-   "seconds": 0.045,
+   "seconds": 0.036,
    "status": "pass"
   },
   {
@@ -2331,7 +2331,7 @@
     "map_coordinates 3D int16 -> uint8, prefilter=False: bit-identical": 0,
     "map_coordinates 3D int16 -> uint8: bit-identical": 0
    },
-   "seconds": 0.05,
+   "seconds": 0.039,
    "status": "pass"
   },
   {
@@ -2622,7 +2622,7 @@
     "spline_filter1d: bit-identical": 0,
     "spline_filter: bit-identical": 0
    },
-   "seconds": 0.061,
+   "seconds": 0.046,
    "status": "pass"
   },
   {
@@ -2913,7 +2913,7 @@
     "spline_filter1d: bit-identical": 0,
     "spline_filter: bit-identical": 0
    },
-   "seconds": 0.061,
+   "seconds": 0.049,
    "status": "pass"
   },
   {
@@ -3204,7 +3204,7 @@
     "spline_filter1d: bit-identical": 0,
     "spline_filter: bit-identical": 0
    },
-   "seconds": 0.065,
+   "seconds": 0.052,
    "status": "pass"
   },
   {
@@ -3495,7 +3495,7 @@
     "spline_filter1d: bit-identical": 0,
     "spline_filter: bit-identical": 0
    },
-   "seconds": 0.075,
+   "seconds": 0.058,
    "status": "pass"
   },
   {
@@ -3780,7 +3780,7 @@
     "map_coordinates 3D int16 -> uint8, prefilter=False: bit-identical": 0,
     "map_coordinates 3D int16 -> uint8: bit-identical": 0
    },
-   "seconds": 0.06,
+   "seconds": 0.051,
    "status": "pass"
   },
   {
@@ -4065,7 +4065,7 @@
     "map_coordinates 3D int16 -> uint8, prefilter=False: bit-identical": 0,
     "map_coordinates 3D int16 -> uint8: bit-identical": 0
    },
-   "seconds": 0.094,
+   "seconds": 0.076,
    "status": "pass"
   },
   {
@@ -4197,7 +4197,7 @@
     "the originals' own step: numpy 2.3.5 (OpenBLAS 0.3.30), SciPy 1.15.3 \u2192 numpy 2.5.4 (OpenBLAS 0.3.34), SciPy 1.18.1: map_coordinates 1D int16 -> int32, prefilter=False": "identical",
     "the originals' own step: numpy 2.3.5 (OpenBLAS 0.3.30), SciPy 1.15.3 \u2192 numpy 2.5.4 (OpenBLAS 0.3.34), SciPy 1.18.1: map_coordinates 1D int16 -> uint8": "identical",
     "the originals' own step: numpy 2.3.5 (OpenBLAS 0.3.30), SciPy 1.15.3 \u2192 numpy 2.5.4 (OpenBLAS 0.3.34), SciPy 1.18.1: map_coordinates 1D int16 -> uint8, prefilter=False": "identical",
-    "the originals' own step: numpy 2.3.5 (OpenBLAS 0.3.30), SciPy 1.15.3 \u2192 numpy 2.5.4 (OpenBLAS 0.3.34), SciPy 1.18.1: map_coordinates 2D float32 -> float32": "changed",
+    "the originals' own step: numpy 2.3.5 (OpenBLAS 0.3.30), SciPy 1.15.3 \u2192 numpy 2.5.4 (OpenBLAS 0.3.34), SciPy 1.18.1: map_coordinates 2D float32 -> float32": "identical",
     "the originals' own step: numpy 2.3.5 (OpenBLAS 0.3.30), SciPy 1.15.3 \u2192 numpy 2.5.4 (OpenBLAS 0.3.34), SciPy 1.18.1: map_coordinates 2D float32 -> float32, prefilter=False": "identical",
     "the originals' own step: numpy 2.3.5 (OpenBLAS 0.3.30), SciPy 1.15.3 \u2192 numpy 2.5.4 (OpenBLAS 0.3.34), SciPy 1.18.1: map_coordinates 2D float32 -> float64": "identical",
     "the originals' own step: numpy 2.3.5 (OpenBLAS 0.3.30), SciPy 1.15.3 \u2192 numpy 2.5.4 (OpenBLAS 0.3.34), SciPy 1.18.1: map_coordinates 2D float32 -> float64, prefilter=False": "identical",
@@ -4217,7 +4217,7 @@
     "the originals' own step: numpy 2.3.5 (OpenBLAS 0.3.30), SciPy 1.15.3 \u2192 numpy 2.5.4 (OpenBLAS 0.3.34), SciPy 1.18.1: map_coordinates 2D float64 -> int32, prefilter=False": "identical",
     "the originals' own step: numpy 2.3.5 (OpenBLAS 0.3.30), SciPy 1.15.3 \u2192 numpy 2.5.4 (OpenBLAS 0.3.34), SciPy 1.18.1: map_coordinates 2D float64 -> uint8": "identical",
     "the originals' own step: numpy 2.3.5 (OpenBLAS 0.3.30), SciPy 1.15.3 \u2192 numpy 2.5.4 (OpenBLAS 0.3.34), SciPy 1.18.1: map_coordinates 2D float64 -> uint8, prefilter=False": "identical",
-    "the originals' own step: numpy 2.3.5 (OpenBLAS 0.3.30), SciPy 1.15.3 \u2192 numpy 2.5.4 (OpenBLAS 0.3.34), SciPy 1.18.1: map_coordinates 2D int16 -> float32": "changed",
+    "the originals' own step: numpy 2.3.5 (OpenBLAS 0.3.30), SciPy 1.15.3 \u2192 numpy 2.5.4 (OpenBLAS 0.3.34), SciPy 1.18.1: map_coordinates 2D int16 -> float32": "identical",
     "the originals' own step: numpy 2.3.5 (OpenBLAS 0.3.30), SciPy 1.15.3 \u2192 numpy 2.5.4 (OpenBLAS 0.3.34), SciPy 1.18.1: map_coordinates 2D int16 -> float32, prefilter=False": "identical",
     "the originals' own step: numpy 2.3.5 (OpenBLAS 0.3.30), SciPy 1.15.3 \u2192 numpy 2.5.4 (OpenBLAS 0.3.34), SciPy 1.18.1: map_coordinates 2D int16 -> float64": "identical",
     "the originals' own step: numpy 2.3.5 (OpenBLAS 0.3.30), SciPy 1.15.3 \u2192 numpy 2.5.4 (OpenBLAS 0.3.34), SciPy 1.18.1: map_coordinates 2D int16 -> float64, prefilter=False": "identical",
@@ -4356,7 +4356,7 @@
     "spline_filter1d: bit-identical": 0,
     "spline_filter: bit-identical": 0
    },
-   "seconds": 0.263,
+   "seconds": 0.219,
    "status": "pass"
   },
   {
@@ -4488,7 +4488,7 @@
     "the originals' own step: numpy 2.3.5 (OpenBLAS 0.3.30), SciPy 1.15.3 \u2192 numpy 2.5.4 (OpenBLAS 0.3.34), SciPy 1.18.1: map_coordinates 1D int16 -> int32, prefilter=False": "identical",
     "the originals' own step: numpy 2.3.5 (OpenBLAS 0.3.30), SciPy 1.15.3 \u2192 numpy 2.5.4 (OpenBLAS 0.3.34), SciPy 1.18.1: map_coordinates 1D int16 -> uint8": "identical",
     "the originals' own step: numpy 2.3.5 (OpenBLAS 0.3.30), SciPy 1.15.3 \u2192 numpy 2.5.4 (OpenBLAS 0.3.34), SciPy 1.18.1: map_coordinates 1D int16 -> uint8, prefilter=False": "identical",
-    "the originals' own step: numpy 2.3.5 (OpenBLAS 0.3.30), SciPy 1.15.3 \u2192 numpy 2.5.4 (OpenBLAS 0.3.34), SciPy 1.18.1: map_coordinates 2D float32 -> float32": "changed",
+    "the originals' own step: numpy 2.3.5 (OpenBLAS 0.3.30), SciPy 1.15.3 \u2192 numpy 2.5.4 (OpenBLAS 0.3.34), SciPy 1.18.1: map_coordinates 2D float32 -> float32": "identical",
     "the originals' own step: numpy 2.3.5 (OpenBLAS 0.3.30), SciPy 1.15.3 \u2192 numpy 2.5.4 (OpenBLAS 0.3.34), SciPy 1.18.1: map_coordinates 2D float32 -> float32, prefilter=False": "identical",
     "the originals' own step: numpy 2.3.5 (OpenBLAS 0.3.30), SciPy 1.15.3 \u2192 numpy 2.5.4 (OpenBLAS 0.3.34), SciPy 1.18.1: map_coordinates 2D float32 -> float64": "identical",
     "the originals' own step: numpy 2.3.5 (OpenBLAS 0.3.30), SciPy 1.15.3 \u2192 numpy 2.5.4 (OpenBLAS 0.3.34), SciPy 1.18.1: map_coordinates 2D float32 -> float64, prefilter=False": "identical",
@@ -4519,9 +4519,9 @@
     "the originals' own step: numpy 2.3.5 (OpenBLAS 0.3.30), SciPy 1.15.3 \u2192 numpy 2.5.4 (OpenBLAS 0.3.34), SciPy 1.18.1: map_coordinates 2D int16 -> uint8": "identical",
     "the originals' own step: numpy 2.3.5 (OpenBLAS 0.3.30), SciPy 1.15.3 \u2192 numpy 2.5.4 (OpenBLAS 0.3.34), SciPy 1.18.1: map_coordinates 2D int16 -> uint8, prefilter=False": "identical",
     "the originals' own step: numpy 2.3.5 (OpenBLAS 0.3.30), SciPy 1.15.3 \u2192 numpy 2.5.4 (OpenBLAS 0.3.34), SciPy 1.18.1: map_coordinates 3D float32 -> float32": "identical",
-    "the originals' own step: numpy 2.3.5 (OpenBLAS 0.3.30), SciPy 1.15.3 \u2192 numpy 2.5.4 (OpenBLAS 0.3.34), SciPy 1.18.1: map_coordinates 3D float32 -> float32, prefilter=False": "changed",
+    "the originals' own step: numpy 2.3.5 (OpenBLAS 0.3.30), SciPy 1.15.3 \u2192 numpy 2.5.4 (OpenBLAS 0.3.34), SciPy 1.18.1: map_coordinates 3D float32 -> float32, prefilter=False": "identical",
     "the originals' own step: numpy 2.3.5 (OpenBLAS 0.3.30), SciPy 1.15.3 \u2192 numpy 2.5.4 (OpenBLAS 0.3.34), SciPy 1.18.1: map_coordinates 3D float32 -> float64": "identical",
-    "the originals' own step: numpy 2.3.5 (OpenBLAS 0.3.30), SciPy 1.15.3 \u2192 numpy 2.5.4 (OpenBLAS 0.3.34), SciPy 1.18.1: map_coordinates 3D float32 -> float64, prefilter=False": "changed",
+    "the originals' own step: numpy 2.3.5 (OpenBLAS 0.3.30), SciPy 1.15.3 \u2192 numpy 2.5.4 (OpenBLAS 0.3.34), SciPy 1.18.1: map_coordinates 3D float32 -> float64, prefilter=False": "identical",
     "the originals' own step: numpy 2.3.5 (OpenBLAS 0.3.30), SciPy 1.15.3 \u2192 numpy 2.5.4 (OpenBLAS 0.3.34), SciPy 1.18.1: map_coordinates 3D float32 -> int16": "identical",
     "the originals' own step: numpy 2.3.5 (OpenBLAS 0.3.30), SciPy 1.15.3 \u2192 numpy 2.5.4 (OpenBLAS 0.3.34), SciPy 1.18.1: map_coordinates 3D float32 -> int16, prefilter=False": "identical",
     "the originals' own step: numpy 2.3.5 (OpenBLAS 0.3.30), SciPy 1.15.3 \u2192 numpy 2.5.4 (OpenBLAS 0.3.34), SciPy 1.18.1: map_coordinates 3D float32 -> int32": "identical",
@@ -4647,7 +4647,7 @@
     "spline_filter1d: bit-identical": 0,
     "spline_filter: bit-identical": 0
    },
-   "seconds": 0.314,
+   "seconds": 0.265,
    "status": "pass"
   },
   {
@@ -4799,7 +4799,7 @@
     "the originals' own step: numpy 2.3.5 (OpenBLAS 0.3.30), SciPy 1.15.3 \u2192 numpy 2.5.4 (OpenBLAS 0.3.34), SciPy 1.18.1: map_coordinates 2D float64 -> int32, prefilter=False": "identical",
     "the originals' own step: numpy 2.3.5 (OpenBLAS 0.3.30), SciPy 1.15.3 \u2192 numpy 2.5.4 (OpenBLAS 0.3.34), SciPy 1.18.1: map_coordinates 2D float64 -> uint8": "identical",
     "the originals' own step: numpy 2.3.5 (OpenBLAS 0.3.30), SciPy 1.15.3 \u2192 numpy 2.5.4 (OpenBLAS 0.3.34), SciPy 1.18.1: map_coordinates 2D float64 -> uint8, prefilter=False": "identical",
-    "the originals' own step: numpy 2.3.5 (OpenBLAS 0.3.30), SciPy 1.15.3 \u2192 numpy 2.5.4 (OpenBLAS 0.3.34), SciPy 1.18.1: map_coordinates 2D int16 -> float32": "changed",
+    "the originals' own step: numpy 2.3.5 (OpenBLAS 0.3.30), SciPy 1.15.3 \u2192 numpy 2.5.4 (OpenBLAS 0.3.34), SciPy 1.18.1: map_coordinates 2D int16 -> float32": "identical",
     "the originals' own step: numpy 2.3.5 (OpenBLAS 0.3.30), SciPy 1.15.3 \u2192 numpy 2.5.4 (OpenBLAS 0.3.34), SciPy 1.18.1: map_coordinates 2D int16 -> float32, prefilter=False": "identical",
     "the originals' own step: numpy 2.3.5 (OpenBLAS 0.3.30), SciPy 1.15.3 \u2192 numpy 2.5.4 (OpenBLAS 0.3.34), SciPy 1.18.1: map_coordinates 2D int16 -> float64": "identical",
     "the originals' own step: numpy 2.3.5 (OpenBLAS 0.3.30), SciPy 1.15.3 \u2192 numpy 2.5.4 (OpenBLAS 0.3.34), SciPy 1.18.1: map_coordinates 2D int16 -> float64, prefilter=False": "identical",
@@ -4938,7 +4938,7 @@
     "spline_filter1d: bit-identical": 0,
     "spline_filter: bit-identical": 0
    },
-   "seconds": 0.559,
+   "seconds": 0.487,
    "status": "pass"
   },
   {
@@ -5070,7 +5070,7 @@
     "the originals' own step: numpy 2.3.5 (OpenBLAS 0.3.30), SciPy 1.15.3 \u2192 numpy 2.5.4 (OpenBLAS 0.3.34), SciPy 1.18.1: map_coordinates 1D int16 -> int32, prefilter=False": "identical",
     "the originals' own step: numpy 2.3.5 (OpenBLAS 0.3.30), SciPy 1.15.3 \u2192 numpy 2.5.4 (OpenBLAS 0.3.34), SciPy 1.18.1: map_coordinates 1D int16 -> uint8": "identical",
     "the originals' own step: numpy 2.3.5 (OpenBLAS 0.3.30), SciPy 1.15.3 \u2192 numpy 2.5.4 (OpenBLAS 0.3.34), SciPy 1.18.1: map_coordinates 1D int16 -> uint8, prefilter=False": "identical",
-    "the originals' own step: numpy 2.3.5 (OpenBLAS 0.3.30), SciPy 1.15.3 \u2192 numpy 2.5.4 (OpenBLAS 0.3.34), SciPy 1.18.1: map_coordinates 2D float32 -> float32": "changed",
+    "the originals' own step: numpy 2.3.5 (OpenBLAS 0.3.30), SciPy 1.15.3 \u2192 numpy 2.5.4 (OpenBLAS 0.3.34), SciPy 1.18.1: map_coordinates 2D float32 -> float32": "identical",
     "the originals' own step: numpy 2.3.5 (OpenBLAS 0.3.30), SciPy 1.15.3 \u2192 numpy 2.5.4 (OpenBLAS 0.3.34), SciPy 1.18.1: map_coordinates 2D float32 -> float32, prefilter=False": "identical",
     "the originals' own step: numpy 2.3.5 (OpenBLAS 0.3.30), SciPy 1.15.3 \u2192 numpy 2.5.4 (OpenBLAS 0.3.34), SciPy 1.18.1: map_coordinates 2D float32 -> float64": "identical",
     "the originals' own step: numpy 2.3.5 (OpenBLAS 0.3.30), SciPy 1.15.3 \u2192 numpy 2.5.4 (OpenBLAS 0.3.34), SciPy 1.18.1: map_coordinates 2D float32 -> float64, prefilter=False": "identical",
@@ -5100,9 +5100,9 @@
     "the originals' own step: numpy 2.3.5 (OpenBLAS 0.3.30), SciPy 1.15.3 \u2192 numpy 2.5.4 (OpenBLAS 0.3.34), SciPy 1.18.1: map_coordinates 2D int16 -> int32, prefilter=False": "identical",
     "the originals' own step: numpy 2.3.5 (OpenBLAS 0.3.30), SciPy 1.15.3 \u2192 numpy 2.5.4 (OpenBLAS 0.3.34), SciPy 1.18.1: map_coordinates 2D int16 -> uint8": "identical",
     "the originals' own step: numpy 2.3.5 (OpenBLAS 0.3.30), SciPy 1.15.3 \u2192 numpy 2.5.4 (OpenBLAS 0.3.34), SciPy 1.18.1: map_coordinates 2D int16 -> uint8, prefilter=False": "identical",
-    "the originals' own step: numpy 2.3.5 (OpenBLAS 0.3.30), SciPy 1.15.3 \u2192 numpy 2.5.4 (OpenBLAS 0.3.34), SciPy 1.18.1: map_coordinates 3D float32 -> float32": "changed",
+    "the originals' own step: numpy 2.3.5 (OpenBLAS 0.3.30), SciPy 1.15.3 \u2192 numpy 2.5.4 (OpenBLAS 0.3.34), SciPy 1.18.1: map_coordinates 3D float32 -> float32": "identical",
     "the originals' own step: numpy 2.3.5 (OpenBLAS 0.3.30), SciPy 1.15.3 \u2192 numpy 2.5.4 (OpenBLAS 0.3.34), SciPy 1.18.1: map_coordinates 3D float32 -> float32, prefilter=False": "identical",
-    "the originals' own step: numpy 2.3.5 (OpenBLAS 0.3.30), SciPy 1.15.3 \u2192 numpy 2.5.4 (OpenBLAS 0.3.34), SciPy 1.18.1: map_coordinates 3D float32 -> float64": "changed",
+    "the originals' own step: numpy 2.3.5 (OpenBLAS 0.3.30), SciPy 1.15.3 \u2192 numpy 2.5.4 (OpenBLAS 0.3.34), SciPy 1.18.1: map_coordinates 3D float32 -> float64": "identical",
     "the originals' own step: numpy 2.3.5 (OpenBLAS 0.3.30), SciPy 1.15.3 \u2192 numpy 2.5.4 (OpenBLAS 0.3.34), SciPy 1.18.1: map_coordinates 3D float32 -> float64, prefilter=False": "identical",
     "the originals' own step: numpy 2.3.5 (OpenBLAS 0.3.30), SciPy 1.15.3 \u2192 numpy 2.5.4 (OpenBLAS 0.3.34), SciPy 1.18.1: map_coordinates 3D float32 -> int16": "identical",
     "the originals' own step: numpy 2.3.5 (OpenBLAS 0.3.30), SciPy 1.15.3 \u2192 numpy 2.5.4 (OpenBLAS 0.3.34), SciPy 1.18.1: map_coordinates 3D float32 -> int16, prefilter=False": "identical",
@@ -5229,7 +5229,7 @@
     "spline_filter1d: bit-identical": 0,
     "spline_filter: bit-identical": 0
    },
-   "seconds": 0.683,
+   "seconds": 0.58,
    "status": "pass"
   },
   {
@@ -5514,7 +5514,7 @@
     "map_coordinates 3D int16 -> uint8, prefilter=False: bit-identical": 0,
     "map_coordinates 3D int16 -> uint8: bit-identical": 0
    },
-   "seconds": 0.073,
+   "seconds": 0.055,
    "status": "pass"
   },
   {
@@ -5799,7 +5799,7 @@
     "map_coordinates 3D int16 -> uint8, prefilter=False: bit-identical": 0,
     "map_coordinates 3D int16 -> uint8: bit-identical": 0
    },
-   "seconds": 0.098,
+   "seconds": 0.067,
    "status": "pass"
   },
   {
@@ -6090,7 +6090,7 @@
     "spline_filter1d: bit-identical": 0,
     "spline_filter: bit-identical": 0
    },
-   "seconds": 0.174,
+   "seconds": 0.122,
    "status": "pass"
   },
   {
@@ -6381,7 +6381,7 @@
     "spline_filter1d: bit-identical": 0,
     "spline_filter: bit-identical": 0
    },
-   "seconds": 0.303,
+   "seconds": 0.191,
    "status": "pass"
   },
   {
@@ -6672,7 +6672,7 @@
     "spline_filter1d: bit-identical": 0,
     "spline_filter: bit-identical": 0
    },
-   "seconds": 0.403,
+   "seconds": 0.314,
    "status": "pass"
   },
   {
@@ -6963,7 +6963,7 @@
     "spline_filter1d: bit-identical": 0,
     "spline_filter: bit-identical": 0
    },
-   "seconds": 0.538,
+   "seconds": 0.469,
    "status": "pass"
   },
   {
@@ -7248,7 +7248,7 @@
     "map_coordinates 3D int16 -> uint8, prefilter=False: bit-identical": 0,
     "map_coordinates 3D int16 -> uint8: bit-identical": 0
    },
-   "seconds": 0.065,
+   "seconds": 0.059,
    "status": "pass"
   },
   {
@@ -7533,7 +7533,7 @@
     "map_coordinates 3D int16 -> uint8, prefilter=False: bit-identical": 0,
     "map_coordinates 3D int16 -> uint8: bit-identical": 0
    },
-   "seconds": 0.082,
+   "seconds": 0.073,
    "status": "pass"
   },
   {
@@ -7824,7 +7824,7 @@
     "spline_filter1d: bit-identical": 0,
     "spline_filter: bit-identical": 0
    },
-   "seconds": 0.152,
+   "seconds": 0.116,
    "status": "pass"
   },
   {
@@ -8115,7 +8115,7 @@
     "spline_filter1d: bit-identical": 0,
     "spline_filter: bit-identical": 0
    },
-   "seconds": 0.223,
+   "seconds": 0.257,
    "status": "pass"
   },
   {
@@ -8406,7 +8406,7 @@
     "spline_filter1d: bit-identical": 0,
     "spline_filter: bit-identical": 0
    },
-   "seconds": 0.403,
+   "seconds": 0.368,
    "status": "pass"
   },
   {
@@ -8697,7 +8697,7 @@
     "spline_filter1d: bit-identical": 0,
     "spline_filter: bit-identical": 0
    },
-   "seconds": 0.637,
+   "seconds": 0.45,
    "status": "pass"
   },
   {
@@ -8982,7 +8982,7 @@
     "map_coordinates 3D int16 -> uint8, prefilter=False: bit-identical": 0,
     "map_coordinates 3D int16 -> uint8: bit-identical": 0
    },
-   "seconds": 0.072,
+   "seconds": 0.056,
    "status": "pass"
   },
   {
@@ -9267,7 +9267,7 @@
     "map_coordinates 3D int16 -> uint8, prefilter=False: bit-identical": 0,
     "map_coordinates 3D int16 -> uint8: bit-identical": 0
    },
-   "seconds": 0.083,
+   "seconds": 0.072,
    "status": "pass"
   },
   {
@@ -9558,7 +9558,7 @@
     "spline_filter1d: bit-identical": 0,
     "spline_filter: bit-identical": 0
    },
-   "seconds": 0.155,
+   "seconds": 0.117,
    "status": "pass"
   },
   {
@@ -9849,7 +9849,7 @@
     "spline_filter1d: bit-identical": 0,
     "spline_filter: bit-identical": 0
    },
-   "seconds": 0.222,
+   "seconds": 0.191,
    "status": "pass"
   },
   {
@@ -10140,7 +10140,7 @@
     "spline_filter1d: bit-identical": 0,
     "spline_filter: bit-identical": 0
    },
-   "seconds": 0.454,
+   "seconds": 0.304,
    "status": "pass"
   },
   {
@@ -10431,7 +10431,7 @@
     "spline_filter1d: bit-identical": 0,
     "spline_filter: bit-identical": 0
    },
-   "seconds": 0.609,
+   "seconds": 0.529,
    "status": "pass"
   },
   {
@@ -10716,7 +10716,7 @@
     "map_coordinates 3D int16 -> uint8, prefilter=False: bit-identical": 0,
     "map_coordinates 3D int16 -> uint8: bit-identical": 0
    },
-   "seconds": 0.137,
+   "seconds": 0.055,
    "status": "pass"
   },
   {
@@ -11001,7 +11001,7 @@
     "map_coordinates 3D int16 -> uint8, prefilter=False: bit-identical": 0,
     "map_coordinates 3D int16 -> uint8: bit-identical": 0
    },
-   "seconds": 0.078,
+   "seconds": 0.14,
    "status": "pass"
   },
   {
@@ -11292,7 +11292,7 @@
     "spline_filter1d: bit-identical": 0,
     "spline_filter: bit-identical": 0
    },
-   "seconds": 0.147,
+   "seconds": 0.112,
    "status": "pass"
   },
   {
@@ -11583,7 +11583,7 @@
     "spline_filter1d: bit-identical": 0,
     "spline_filter: bit-identical": 0
    },
-   "seconds": 0.257,
+   "seconds": 0.182,
    "status": "pass"
   },
   {
@@ -11874,7 +11874,7 @@
     "spline_filter1d: bit-identical": 0,
     "spline_filter: bit-identical": 0
    },
-   "seconds": 0.399,
+   "seconds": 0.299,
    "status": "pass"
   },
   {
@@ -12165,7 +12165,7 @@
     "spline_filter1d: bit-identical": 0,
     "spline_filter: bit-identical": 0
    },
-   "seconds": 0.538,
+   "seconds": 0.452,
    "status": "pass"
   },
   {
@@ -12450,7 +12450,7 @@
     "map_coordinates 3D int16 -> uint8, prefilter=False: bit-identical": 0,
     "map_coordinates 3D int16 -> uint8: bit-identical": 0
    },
-   "seconds": 0.067,
+   "seconds": 0.053,
    "status": "pass"
   },
   {
@@ -12735,7 +12735,7 @@
     "map_coordinates 3D int16 -> uint8, prefilter=False: bit-identical": 0,
     "map_coordinates 3D int16 -> uint8: bit-identical": 0
    },
-   "seconds": 0.085,
+   "seconds": 0.072,
    "status": "pass"
   },
   {
@@ -13026,7 +13026,7 @@
     "spline_filter1d: bit-identical": 0,
     "spline_filter: bit-identical": 0
    },
-   "seconds": 0.134,
+   "seconds": 0.116,
    "status": "pass"
   },
   {
@@ -13317,7 +13317,7 @@
     "spline_filter1d: bit-identical": 0,
     "spline_filter: bit-identical": 0
    },
-   "seconds": 0.233,
+   "seconds": 0.244,
    "status": "pass"
   },
   {
@@ -13608,7 +13608,7 @@
     "spline_filter1d: bit-identical": 0,
     "spline_filter: bit-identical": 0
    },
-   "seconds": 0.35,
+   "seconds": 0.375,
    "status": "pass"
   },
   {
@@ -13899,7 +13899,7 @@
     "spline_filter1d: bit-identical": 0,
     "spline_filter: bit-identical": 0
    },
-   "seconds": 0.569,
+   "seconds": 0.47,
    "status": "pass"
   },
   {
@@ -13926,7 +13926,7 @@
    "reported": {
     "affine series matrices: bit-identical": 0
    },
-   "seconds": 0.045,
+   "seconds": 0.039,
    "status": "pass"
   },
   {
@@ -13986,7 +13986,7 @@
     "mapped points: bit-identical": 0,
     "target grid ndcoords (float32): bit-identical": 0
    },
-   "seconds": 0.063,
+   "seconds": 0.009,
    "status": "pass"
   },
   {
@@ -14006,7 +14006,7 @@
     "mapped points: bit-identical": 0,
     "target grid ndcoords (float32): bit-identical": 0
    },
-   "seconds": 0.027,
+   "seconds": 0.025,
    "status": "pass"
   },
   {
@@ -14026,7 +14026,7 @@
     "mapped points: bit-identical": 0,
     "target grid ndcoords (float32): bit-identical": 0
    },
-   "seconds": 0.031,
+   "seconds": 0.023,
    "status": "pass"
   },
   {
@@ -14046,7 +14046,7 @@
     "mapped points: bit-identical": 0,
     "target grid ndcoords (float32): bit-identical": 0
    },
-   "seconds": 4.041,
+   "seconds": 3.78,
    "status": "pass"
   },
   {
@@ -14063,7 +14063,7 @@
    "reported": {
     "ImageGrid.ndcoords: bit-identical": 0
    },
-   "seconds": 0.001,
+   "seconds": 0.038,
    "status": "pass"
   },
   {
@@ -14080,7 +14080,7 @@
    "reported": {
     "ImageGrid.ndcoords: bit-identical": 0
    },
-   "seconds": 0.005,
+   "seconds": 0.008,
    "status": "pass"
   },
   {
@@ -14116,7 +14116,7 @@
     "D13 fix pass": 0,
     "resampled data: bit-identical": 0
    },
-   "seconds": 4.326,
+   "seconds": 3.974,
    "status": "pass"
   },
   {
@@ -14135,7 +14135,7 @@
     "D13 fix pass": 0,
     "resampled data: bit-identical": 0
    },
-   "seconds": 4.355,
+   "seconds": 3.73,
    "status": "pass"
   },
   {
@@ -14154,7 +14154,7 @@
     "D13 fix pass": 0,
     "resampled data: bit-identical": 0
    },
-   "seconds": 4.093,
+   "seconds": 0.031,
    "status": "pass"
   },
   {
@@ -14173,7 +14173,7 @@
     "D13 fix pass": 0,
     "resampled data: bit-identical": 0
    },
-   "seconds": 4.142,
+   "seconds": 0.029,
    "status": "pass"
   },
   {
@@ -14192,7 +14192,7 @@
     "D13 fix pass": 0,
     "resampled data: bit-identical": 0
    },
-   "seconds": 0.035,
+   "seconds": 0.033,
    "status": "pass"
   },
   {
@@ -14211,7 +14211,7 @@
     "D13 fix pass": 0,
     "resampled data: bit-identical": 0
    },
-   "seconds": 0.034,
+   "seconds": 0.032,
    "status": "pass"
   },
   {
@@ -14230,7 +14230,7 @@
     "D13 fix pass": 0,
     "resampled data: bit-identical": 0
    },
-   "seconds": 0.024,
+   "seconds": 0.023,
    "status": "pass"
   },
   {
@@ -14249,7 +14249,7 @@
     "D13 fix pass": 0,
     "resampled data: bit-identical": 0
    },
-   "seconds": 0.029,
+   "seconds": 0.025,
    "status": "pass"
   },
   {
@@ -14268,7 +14268,7 @@
     "D13 fix pass": 0,
     "resampled data: bit-identical": 0
    },
-   "seconds": 0.028,
+   "seconds": 0.024,
    "status": "pass"
   },
   {
@@ -14287,7 +14287,7 @@
     "D13 fix pass": 49280,
     "resampled data: bit-identical": 0
    },
-   "seconds": 0.035,
+   "seconds": 0.03,
    "status": "pass"
   },
   {
@@ -14306,7 +14306,7 @@
     "D13 fix pass": 49280,
     "resampled data: bit-identical": 0
    },
-   "seconds": 0.033,
+   "seconds": 0.031,
    "status": "pass"
   },
   {
@@ -14325,7 +14325,7 @@
     "D13 fix pass": 0,
     "resampled data: bit-identical": 0
    },
-   "seconds": 0.032,
+   "seconds": 0.031,
    "status": "pass"
   },
   {
@@ -14344,7 +14344,7 @@
     "D13 fix pass": 0,
     "resampled data: bit-identical": 0
    },
-   "seconds": 0.035,
+   "seconds": 0.03,
    "status": "pass"
   },
   {
@@ -14363,7 +14363,7 @@
     "D13 fix pass": 0,
     "resampled data: bit-identical": 0
    },
-   "seconds": 0.034,
+   "seconds": 0.033,
    "status": "pass"
   },
   {
@@ -14382,7 +14382,7 @@
     "D13 fix pass": 0,
     "resampled data: bit-identical": 0
    },
-   "seconds": 0.034,
+   "seconds": 0.033,
    "status": "pass"
   },
   {
@@ -14401,7 +14401,7 @@
     "D13 fix pass": 387072,
     "resampled data: bit-identical": 0
    },
-   "seconds": 0.146,
+   "seconds": 0.199,
    "status": "pass"
   },
   {
@@ -14420,7 +14420,7 @@
     "D13 fix pass": 0,
     "resampled data: bit-identical": 0
    },
-   "seconds": 0.135,
+   "seconds": 0.117,
    "status": "pass"
   },
   {
@@ -14439,7 +14439,7 @@
     "D13 fix pass": 0,
     "resampled data: bit-identical": 0
    },
-   "seconds": 0.132,
+   "seconds": 0.113,
    "status": "pass"
   },
   {
@@ -14458,7 +14458,7 @@
     "D13 fix pass": 40800,
     "resampled data: bit-identical": 0
    },
-   "seconds": 0.063,
+   "seconds": 0.054,
    "status": "pass"
   },
   {
@@ -14477,7 +14477,7 @@
     "D13 fix pass": 118272,
     "resampled data: bit-identical": 0
    },
-   "seconds": 0.131,
+   "seconds": 0.119,
    "status": "pass"
   },
   {
@@ -14515,7 +14515,7 @@
     "D13 fix pass": 0,
     "resampled data: bit-identical": 0
    },
-   "seconds": 0.033,
+   "seconds": 0.03,
    "status": "pass"
   },
   {
@@ -14553,7 +14553,7 @@
     "D13 fix pass": 0,
     "resampled data: bit-identical": 0
    },
-   "seconds": 0.01,
+   "seconds": 0.009,
    "status": "pass"
   },
   {
@@ -14572,7 +14572,7 @@
     "D13 fix pass": 0,
     "resampled data: bit-identical": 0
    },
-   "seconds": 0.053,
+   "seconds": 0.051,
    "status": "pass"
   },
   {
@@ -14591,7 +14591,7 @@
     "D13 fix pass": 0,
     "resampled data: bit-identical": 0
    },
-   "seconds": 0.051,
+   "seconds": 0.049,
    "status": "pass"
   },
   {
@@ -14610,7 +14610,7 @@
     "D13 fix pass": 0,
     "resampled data: bit-identical": 0
    },
-   "seconds": 0.056,
+   "seconds": 0.05,
    "status": "pass"
   },
   {
@@ -14629,7 +14629,7 @@
     "D13 fix pass": 0,
     "resampled data: bit-identical": 0
    },
-   "seconds": 0.057,
+   "seconds": 0.052,
    "status": "pass"
   },
   {
@@ -14648,7 +14648,7 @@
     "D13 fix pass": 0,
     "resampled data: bit-identical": 0
    },
-   "seconds": 0.056,
+   "seconds": 0.05,
    "status": "pass"
   },
   {
@@ -14667,7 +14667,7 @@
     "D13 fix pass": 0,
     "resampled data: bit-identical": 0
    },
-   "seconds": 0.056,
+   "seconds": 0.049,
    "status": "pass"
   },
   {
@@ -14686,7 +14686,7 @@
     "D13 fix pass": 0,
     "resampled data: bit-identical": 0
    },
-   "seconds": 0.06,
+   "seconds": 0.122,
    "status": "pass"
   },
   {
@@ -14705,7 +14705,7 @@
     "D13 fix pass": 0,
     "resampled data: bit-identical": 0
    },
-   "seconds": 0.057,
+   "seconds": 0.053,
    "status": "pass"
   },
   {
@@ -14724,7 +14724,7 @@
     "D13 fix pass": 0,
     "resampled data: bit-identical": 0
    },
-   "seconds": 0.107,
+   "seconds": 0.086,
    "status": "pass"
   },
   {
@@ -14743,7 +14743,7 @@
     "D13 fix pass": 0,
     "resampled data: bit-identical": 0
    },
-   "seconds": 0.078,
+   "seconds": 0.073,
    "status": "pass"
   },
   {
@@ -14762,7 +14762,7 @@
     "D13 fix pass": 0,
     "resampled data: bit-identical": 0
    },
-   "seconds": 0.105,
+   "seconds": 0.096,
    "status": "pass"
   },
   {
@@ -14781,7 +14781,7 @@
     "D13 fix pass": 0,
     "resampled data: bit-identical": 0
    },
-   "seconds": 0.174,
+   "seconds": 0.098,
    "status": "pass"
   },
   {
@@ -14800,7 +14800,7 @@
     "D13 fix pass": 0,
     "resampled data: bit-identical": 0
    },
-   "seconds": 0.173,
+   "seconds": 0.101,
    "status": "pass"
   },
   {
@@ -14819,7 +14819,7 @@
     "D13 fix pass": 0,
     "resampled data: bit-identical": 0
    },
-   "seconds": 0.172,
+   "seconds": 0.094,
    "status": "pass"
   },
   {
@@ -14838,7 +14838,7 @@
     "D13 fix pass": 0,
     "resampled data: bit-identical": 0
    },
-   "seconds": 0.1,
+   "seconds": 0.097,
    "status": "pass"
   },
   {
@@ -14857,7 +14857,7 @@
     "D13 fix pass": 0,
     "resampled data: bit-identical": 0
    },
-   "seconds": 0.102,
+   "seconds": 0.095,
    "status": "pass"
   },
   {
@@ -14876,7 +14876,7 @@
     "D13 fix pass": 0,
     "resampled data: bit-identical": 0
    },
-   "seconds": 0.118,
+   "seconds": 0.147,
    "status": "pass"
   },
   {
@@ -14895,7 +14895,7 @@
     "D13 fix pass": 0,
     "resampled data: bit-identical": 0
    },
-   "seconds": 0.091,
+   "seconds": 0.108,
    "status": "pass"
   },
   {
@@ -14914,7 +14914,7 @@
     "D13 fix pass": 0,
     "resampled data: bit-identical": 0
    },
-   "seconds": 0.116,
+   "seconds": 0.099,
    "status": "pass"
   },
   {
@@ -14933,7 +14933,7 @@
     "D13 fix pass": 0,
     "resampled data: bit-identical": 0
    },
-   "seconds": 0.123,
+   "seconds": 0.105,
    "status": "pass"
   },
   {
@@ -14952,7 +14952,7 @@
     "D13 fix pass": 0,
     "resampled data: bit-identical": 0
    },
-   "seconds": 0.127,
+   "seconds": 0.108,
    "status": "pass"
   },
   {
@@ -14971,7 +14971,7 @@
     "D13 fix pass": 0,
     "resampled data: bit-identical": 0
    },
-   "seconds": 0.12,
+   "seconds": 0.111,
    "status": "pass"
   },
   {
@@ -14990,7 +14990,7 @@
     "D13 fix pass": 0,
     "resampled data: bit-identical": 0
    },
-   "seconds": 0.129,
+   "seconds": 0.12,
    "status": "pass"
   },
   {
@@ -15009,7 +15009,7 @@
     "D13 fix pass": 0,
     "resampled data: bit-identical": 0
    },
-   "seconds": 0.122,
+   "seconds": 0.111,
    "status": "pass"
   },
   {
@@ -15028,7 +15028,7 @@
     "D13 fix pass": 0,
     "resampled data: bit-identical": 0
    },
-   "seconds": 0.129,
+   "seconds": 0.119,
    "status": "pass"
   },
   {
@@ -15047,7 +15047,7 @@
     "D13 fix pass": 0,
     "resampled data: bit-identical": 0
    },
-   "seconds": 0.115,
+   "seconds": 0.103,
    "status": "pass"
   },
   {
@@ -15066,7 +15066,7 @@
     "D13 fix pass": 0,
     "resampled data: bit-identical": 0
    },
-   "seconds": 0.124,
+   "seconds": 0.184,
    "status": "pass"
   },
   {
@@ -15085,7 +15085,7 @@
     "D13 fix pass": 0,
     "resampled data: bit-identical": 0
    },
-   "seconds": 0.163,
+   "seconds": 0.214,
    "status": "pass"
   },
   {
@@ -15104,7 +15104,7 @@
     "D13 fix pass": 0,
     "resampled data: bit-identical": 0
    },
-   "seconds": 0.152,
+   "seconds": 0.145,
    "status": "pass"
   },
   {
@@ -15123,7 +15123,7 @@
     "D13 fix pass": 0,
     "resampled data: bit-identical": 0
    },
-   "seconds": 0.164,
+   "seconds": 0.137,
    "status": "pass"
   },
   {
@@ -15142,7 +15142,7 @@
     "D13 fix pass": 0,
     "resampled data: bit-identical": 0
    },
-   "seconds": 0.171,
+   "seconds": 0.136,
    "status": "pass"
   },
   {
@@ -15161,7 +15161,7 @@
     "D13 fix pass": 0,
     "resampled data: bit-identical": 0
    },
-   "seconds": 0.16,
+   "seconds": 0.138,
    "status": "pass"
   },
   {
@@ -15180,7 +15180,7 @@
     "D13 fix pass": 0,
     "resampled data: bit-identical": 0
    },
-   "seconds": 0.16,
+   "seconds": 0.141,
    "status": "pass"
   },
   {
@@ -15199,7 +15199,7 @@
     "D13 fix pass": 0,
     "resampled data: bit-identical": 0
    },
-   "seconds": 0.214,
+   "seconds": 0.131,
    "status": "pass"
   },
   {
@@ -15218,7 +15218,7 @@
     "D13 fix pass": 0,
     "resampled data: bit-identical": 0
    },
-   "seconds": 0.223,
+   "seconds": 0.135,
    "status": "pass"
   },
   {
@@ -15237,7 +15237,7 @@
     "D13 fix pass": 0,
     "resampled data: bit-identical": 0
    },
-   "seconds": 0.288,
+   "seconds": 0.187,
    "status": "pass"
   },
   {
@@ -15256,7 +15256,7 @@
     "D13 fix pass": 0,
     "resampled data: bit-identical": 0
    },
-   "seconds": 0.219,
+   "seconds": 0.191,
    "status": "pass"
   },
   {
@@ -15275,7 +15275,7 @@
     "D13 fix pass": 0,
     "resampled data: bit-identical": 0
    },
-   "seconds": 0.208,
+   "seconds": 0.187,
    "status": "pass"
   },
   {
@@ -15294,7 +15294,7 @@
     "D13 fix pass": 0,
     "resampled data: bit-identical": 0
    },
-   "seconds": 0.215,
+   "seconds": 0.267,
    "status": "pass"
   },
   {
@@ -15313,7 +15313,7 @@
     "D13 fix pass": 0,
     "resampled data: bit-identical": 0
    },
-   "seconds": 0.221,
+   "seconds": 0.277,
    "status": "pass"
   },
   {
@@ -15332,7 +15332,7 @@
     "D13 fix pass": 0,
     "resampled data: bit-identical": 0
    },
-   "seconds": 0.202,
+   "seconds": 0.189,
    "status": "pass"
   },
   {
@@ -15351,7 +15351,7 @@
     "D13 fix pass": 0,
     "resampled data: bit-identical": 0
    },
-   "seconds": 0.203,
+   "seconds": 0.169,
    "status": "pass"
   },
   {
@@ -15370,7 +15370,7 @@
     "D13 fix pass": 0,
     "resampled data: bit-identical": 0
    },
-   "seconds": 0.173,
+   "seconds": 0.156,
    "status": "pass"
   },
   {
@@ -15389,7 +15389,7 @@
     "D13 fix pass": 0,
     "resampled data: bit-identical": 0
    },
-   "seconds": 0.313,
+   "seconds": 0.263,
    "status": "pass"
   },
   {
@@ -15408,7 +15408,7 @@
     "D13 fix pass": 0,
     "resampled data: bit-identical": 0
    },
-   "seconds": 0.38,
+   "seconds": 0.276,
    "status": "pass"
   },
   {
@@ -15427,7 +15427,7 @@
     "D13 fix pass": 0,
     "resampled data: bit-identical": 0
    },
-   "seconds": 0.38,
+   "seconds": 0.266,
    "status": "pass"
   },
   {
@@ -15446,7 +15446,7 @@
     "D13 fix pass": 0,
     "resampled data: bit-identical": 0
    },
-   "seconds": 0.371,
+   "seconds": 0.342,
    "status": "pass"
   },
   {
@@ -15465,7 +15465,7 @@
     "D13 fix pass": 0,
     "resampled data: bit-identical": 0
    },
-   "seconds": 0.3,
+   "seconds": 0.331,
    "status": "pass"
   },
   {
@@ -15484,7 +15484,7 @@
     "D13 fix pass": 118272,
     "resampled data: bit-identical": 0
    },
-   "seconds": 0.275,
+   "seconds": 0.24,
    "status": "pass"
   },
   {
@@ -15503,7 +15503,7 @@
     "D13 fix pass": 118272,
     "resampled data: bit-identical": 0
    },
-   "seconds": 0.158,
+   "seconds": 0.139,
    "status": "pass"
   },
   {
@@ -15522,7 +15522,7 @@
     "D13 fix pass": 118272,
     "resampled data: bit-identical": 0
    },
-   "seconds": 0.108,
+   "seconds": 0.099,
    "status": "pass"
   },
   {
@@ -15532,7 +15532,7 @@
    "checks_total": 0,
    "failed_checks": [],
    "reason": "fMRIPrep: ValueError: HMC transforms must come last. Found sequence: ['LinearTransformsMapping', 'Affine']; larmorx: ValueError: HMC transforms must come last. Found sequence: ['AffineSeries', 'Affine']",
-   "seconds": 0.006,
+   "seconds": 0.007,
    "status": "both-error"
   },
   {
@@ -15561,7 +15561,7 @@
     "D13 fix pass": 0,
     "resampled data: bit-identical": 0
    },
-   "seconds": 13.702,
+   "seconds": 10.137,
    "status": "pass"
   },
   {
@@ -15580,7 +15580,7 @@
     "D13 fix pass": 22626240,
     "resampled data: bit-identical": 0
    },
-   "seconds": 9.512,
+   "seconds": 6.406,
    "status": "pass"
   },
   {
@@ -15599,7 +15599,7 @@
     "D13 fix pass": 0,
     "resampled data: bit-identical": 0
    },
-   "seconds": 72.101,
+   "seconds": 68.856,
    "status": "pass"
   }
  ],

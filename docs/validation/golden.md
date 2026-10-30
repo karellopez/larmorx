@@ -31,7 +31,14 @@ checksum changed, `mcflirt.nonfinite.reproduce`'s `.par` (`b08d9de2…` → `0f3
 
 `larmorx-nc`'s checksums were re-recorded again on 2026-10-29 from f587288 (Armadillo 14.2.1's
 LAPACK path): 1 output changed, `mcflirt.nonfinite.reproduce.par` (the all-NaN volume's y rotation
-keeps the affine's NaN, as FSL 6.0.7.23 gives it); the rest unchanged. The main package's checksums were re-recorded on 2026-10-30 from 9383f27 (the parity smoke tier
+keeps the affine's NaN, as FSL 6.0.7.23 gives it); the rest unchanged. The AFNI replicas' checksums (`crates/larmorx-cli/tests/afni_replica_golden.tsv`) were re-recorded
+on 2026-10-30 from 0072334 (the replica's parity passing): 2 cases added,
+`3dUnifize.EPI.glibc05` and `.reproduce` (GLIBC-05: 2 × 2 × 2.9924254 mm voxels, both modes, the
+outputs differing), every other checksum unchanged. `larmorx-nc`'s were re-recorded on 2026-10-30
+from f822f64: 6 cases added, `mcflirt.fsl65.par` (refused: recorded by its exit status, nothing
+written), `mcflirt.fsl65.par.reproduce`, `mcflirt.fsl65.rms.reproduce`, `mcflirt.fsl66.bins`
+(refused), `mcflirt.fsl66.bins.reproduce` (the `bad_array_new_length` crash as an error: status 1)
+and `mcflirt.fsl66.bins-1.reproduce` (20 rows), every other checksum unchanged. The main package's checksums were re-recorded on 2026-10-30 from 9383f27 (the parity smoke tier
 passing: 2595 tests): 1 case added, `cli.afni.3dUnifize.glibc05` (16 outputs); every other checksum
 unchanged; `larmorx_core::math::cbrtf_glibc` (glibc 2.35's cube root, clean-room) is checked on every
 platform by its unit tests in `cargo test` (the spec's examples, special values and NaN bits, the
@@ -238,7 +245,7 @@ Checksums are recorded on **Linux x86-64 only** (both recorders refuse other pla
 
 ```bash
 maturin develop --release
-python scripts/record_golden.py           # runs pytest tests/parity (smoke tier) first; refuses if it fails
+python scripts/record_golden.py           # runs the parity smoke tier first (in parallel: scripts/orchestration/parity_smoke.py; --serial-parity serially); refuses if it fails
 git add tests/golden/golden.json && git commit -m "Record the golden checksums from <commit>"
 
 pytest tests/parity/test_afni_tshift_replica.py   # the replica's parity first

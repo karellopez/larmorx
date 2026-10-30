@@ -40,6 +40,58 @@ enum End {
     Exit(u8, Vec<String>),
     /// A refusal of the corrected command line: exit 1 with this message.
     Refuse(String),
+    /// Where mcflirt crashes (FSL-66 reproduced: a stage's negative number of bins): what it
+    /// prints from the crash on, how it ends (the replica's own line says it, then exits 1) and
+    /// the notice naming the defect.
+    Crash {
+        text: String,
+        how: String,
+        notice: Notice,
+    },
+}
+
+/// How mcflirt ends when a stage starts with `bins` histogram bins (`Costfn::set_no_bins`, which
+/// every cost function calls): `None` while `bins >= 0`; with −1 the size of its table of
+/// `p ln p` values divides by `bins + 1` (an integer division by zero: signal 8); with −2 or less
+/// the first histogram it allocates has a negative length (`std::bad_array_new_length`,
+/// signal 6). FSL-66.
+fn bins_crash(bins: i32) -> Option<BinsCrash> {
+    match bins {
+        -1 => Some(BinsCrash::DivisionByZero),
+        b if b <= -2 => Some(BinsCrash::NegativeLength),
+        _ => None,
+    }
+}
+
+/// How mcflirt crashes on a stage's negative number of bins (FSL-66).
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum BinsCrash {
+    /// −1 bins: an integer division by zero, signal 8 (`SIGFPE`), no message of its own.
+    DivisionByZero,
+    /// −2 or fewer: `std::bad_array_new_length`, uncaught (abort, signal 6).
+    NegativeLength,
+}
+
+impl BinsCrash {
+    fn what(self) -> &'static str {
+        match self {
+            BinsCrash::DivisionByZero => {
+                "mcflirt is killed by signal 8 (SIGFPE: an integer division by zero)"
+            }
+            BinsCrash::NegativeLength => "mcflirt aborts with std::bad_array_new_length (signal 6)",
+        }
+    }
+}
+
+/// The stage (1 to 4) where mcflirt crashes on `-bins` (FSL-66), and how, for a run of `stages`
+/// stages: stage 1 has `bins / 8` bins, stages 2 to 4 `bins / 4` (truncated toward zero), each
+/// prepared when the stage registers its first volume. `None` when no stage crashes (a cost
+/// with no bins in a stage and FSL-21 aside).
+fn bins_crash_stage(bins: i32, stages: i32) -> Option<(i32, i32, BinsCrash)> {
+    (1..=stages.min(4)).find_map(|k| {
+        let b = bins / if k == 1 { 8 } else { 4 };
+        bins_crash(b).map(|c| (k, b, c))
+    })
 }
 
 impl From<FslError> for End {
@@ -374,25 +426,24 @@ impl Run<'_> {
                 let o = self.o.clone();
                 let mode = self.mode;
                 let fixed = self.fixed;
-                let results: Vec<Result<VolumeResult, FslError>> =
-                    with_pool(self.n_threads, || {
-                        rest.par_iter()
-                            .map(|&vi| {
-                                register_volume(
-                                    &o,
-                                    &st,
-                                    mode,
-                                    &refvol,
-                                    timeseries,
-                                    vi,
-                                    scaling,
-                                    new_tolerance,
-                                    &mat_in[vi as usize],
-                                    fixed,
-                                )
-                            })
-                            .collect()
-                    });
+                let results: Vec<Result<VolumeResult, End>> = with_pool(self.n_threads, || {
+                    rest.par_iter()
+                        .map(|&vi| {
+                            register_volume(
+                                &o,
+                                &st,
+                                mode,
+                                &refvol,
+                                timeseries,
+                                vi,
+                                scaling,
+                                new_tolerance,
+                                &mat_in[vi as usize],
+                                fixed,
+                            )
+                        })
+                        .collect()
+                });
                 for (r, &vi) in results.into_iter().zip(&rest) {
                     if !self.o.no_reporting {
                         self.e(&format!("[{vi}]"));
@@ -478,7 +529,7 @@ fn register_volume(
     new_tolerance: f32,
     start: &Mat,
     fixed: bool,
-) -> Result<VolumeResult, FslError> {
+) -> Result<VolumeResult, End> {
     let mut st = st.clone();
     register_volume_mut(
         o,
@@ -508,7 +559,7 @@ fn register_volume_mut(
     new_tolerance: f32,
     start: &Mat,
     fixed: bool,
-) -> Result<VolumeResult, FslError> {
+) -> Result<VolumeResult, End> {
     let mut cerr = Cerr::new(fixed);
     let mut testvol = timeseries.sub_volume(i64::from(i))?;
     if o.gdtflag {
@@ -528,7 +579,33 @@ fn register_volume_mut(
         cerr.s(w);
         cerr.s("\n");
     }
-    cf.set_no_bins(o.no_bins / scaling as i32);
+    let bins = o.no_bins / scaling as i32;
+    if let Some(crash) = bins_crash(bins) {
+        // FSL-66, reproduced (the corrected run refuses a negative -bins first): the stage's
+        // histogram tables cannot be prepared, and mcflirt crashes here.
+        let mut text = cerr.text.clone();
+        if crash == BinsCrash::NegativeLength {
+            text.push_str(
+                "terminate called after throwing an instance of 'std::bad_array_new_length'\n  \
+                 what():  std::bad_array_new_length\n",
+            );
+        }
+        return Err(End::Crash {
+            text,
+            how: crash.what().into(),
+            notice: Notice::new(
+                &defects::FSL_66,
+                mode,
+                format!(
+                    "-bins {}: this stage has {bins} bins, where {}: an error (exit status 1), \
+                     nothing written",
+                    o.no_bins,
+                    crash.what()
+                ),
+            ),
+        });
+    }
+    cf.set_no_bins(bins);
     cf.smoothsize = st.smoothsize;
     cf.skip_nonfinite = mode.fix();
     let search = Search {
@@ -543,7 +620,8 @@ fn register_volume_mut(
         return Err(FslError::library_abort(format!(
             "{}double free or corruption (out)",
             &cerr.text[..len]
-        )));
+        ))
+        .into());
     }
     // finalmat = offsettrans * initmat (the identity).
     let finalmat = arma::mul_tinysq(&res, &Mat::eye(4));
@@ -617,6 +695,16 @@ pub fn mcflirt(
             run.e(&format!("Error: {msg}\n"));
             1
         }
+        Err(End::Crash { text, how, notice }) => {
+            run.e(&text);
+            run.e(&format!(
+                "{PREFIX}: {how} here; the replica exits with status 1\n"
+            ));
+            let mut notices = notices;
+            defects::push_once(&mut notices, notice);
+            print_notices(run.err, &notices);
+            return 1;
+        }
     };
     print_notices(run.err, &notices);
     code
@@ -667,6 +755,8 @@ impl Run<'_> {
         }
         if self.mode.fix() {
             self.precheck(&timeseries)?;
+        } else if self.o.no_stages >= 1 {
+            self.reproduced_bins_notice();
         }
         let mut mat0: Vec<Mat> = (0..n).map(|_| Mat::eye(4)).collect();
         let mut mat1: Vec<Mat> = (0..n).map(|_| Mat::eye(4)).collect();
@@ -1185,6 +1275,41 @@ impl Run<'_> {
         Ok(())
     }
 
+    /// FSL-21 and FSL-66 reproduced, where mcflirt does not crash on them (the crashes of FSL-66
+    /// name it where they end the run): a histogram cost with a stage of no bins (FSL-21: its
+    /// cost is degenerate, or, with corratio, it corrupts the heap), and a negative `-bins` that
+    /// gives every stage none with a cost that uses none (FSL-66).
+    fn reproduced_bins_notice(&mut self) {
+        let (bins, stages) = (self.o.no_bins, self.o.no_stages);
+        let histogram = matches!(
+            self.st.maincostfn,
+            CostType::CorrRatio | CostType::MutualInfo | CostType::NormMI | CostType::Woods
+        );
+        let crash = bins_crash_stage(bins, stages).map(|(k, _, _)| k);
+        let zero = (1..=stages.min(4)).find(|&k| bins / if k == 1 { 8 } else { 4 } == 0);
+        if histogram && let Some(k) = zero.filter(|&k| crash.is_none_or(|c| k < c)) {
+            let then = if self.st.maincostfn == CostType::CorrRatio {
+                "the correlation ratio then writes before its arrays, and glibc aborts when they \
+                 are released"
+            } else {
+                "its cost is degenerate and the matrices arbitrary"
+            };
+            self.notice(
+                &defects::FSL_21,
+                format!("-bins {bins}: stage {k} has no histogram bins, as in mcflirt; {then}"),
+            );
+        } else if !histogram && bins < 0 && crash.is_none() {
+            // -3 to -1: every stage has no bins, which normcorr and leastsquares do not use.
+            self.notice(
+                &defects::FSL_66,
+                format!(
+                    "-bins {bins} (a negative number of bins) gives every stage none, as in \
+                     mcflirt; this cost uses none"
+                ),
+            );
+        }
+    }
+
     /// Checks of the corrected command line before any work (FSL-12): the inputs mcflirt
     /// accepts and then aborts on.
     fn precheck(&mut self, timeseries: &Volume) -> Result<(), End> {
@@ -1205,6 +1330,27 @@ impl Run<'_> {
             return Err(End::Refuse(format!(
                 "-bins {}: the histogram costs need at least 8 bins (the first stage uses -bins / \
                  8 of them; mcflirt computes them with none, FSL-21)",
+                self.o.no_bins
+            )));
+        }
+        if self.o.no_stages >= 1 && self.o.no_bins < 0 {
+            let how = match bins_crash_stage(self.o.no_bins, self.o.no_stages) {
+                Some((k, b, crash)) => format!("in stage {k} ({b} bins) {}", crash.what()),
+                None => format!(
+                    "mcflirt gives every stage {} bins, which this cost does not use",
+                    self.o.no_bins / 4
+                ),
+            };
+            self.notice(
+                &defects::FSL_66,
+                format!(
+                    "-bins {} (a negative number of bins) is refused: {how}",
+                    self.o.no_bins
+                ),
+            );
+            return Err(End::Refuse(format!(
+                "-bins {}: a negative number of bins (mcflirt prepares -bins / 8 and -bins / 4 \
+                 bins for every cost and crashes on a negative count, FSL-66)",
                 self.o.no_bins
             )));
         }
@@ -1524,7 +1670,15 @@ impl Run<'_> {
     }
 
     /// `decompose_mats(mat_index, mat_array, refvol)`: the `.mat` directory, the `.par` and
-    /// `.rms` files.
+    /// `.rms` files, in mcflirt's order: the `.par` file opened (`-plots`), the `.mat` directory
+    /// made, `_rel.rms` and `_rel_mean.rms`, `_abs.rms` and `_abs_mean.rms`, then volume by
+    /// volume its `MAT_` file and its `.par` line (`specs/mcflirt.md` §10.6).
+    ///
+    /// FSL-65: a text file that cannot be opened. Reproduced, an `.rms` file is not written and
+    /// an unopenable `.par` ends the run at volume 0's line with mcflirt's message and status 0
+    /// (after `MAT_0000` and the `.rms` files). Corrected (the default), every text output is
+    /// opened and the `.mat` directory made before anything is written; one that cannot be is
+    /// an error (exit status 1) naming the file, and what this step made is removed.
     fn decompose_mats(&mut self, mats: &[Mat], refvol: &Volume) -> Result<(), End> {
         let n = self.st.no_volumes as usize;
         let rmax: f32 = 80.0;
@@ -1542,8 +1696,22 @@ impl Run<'_> {
             2,
             0.5 * (refvol.zsize() as f64 - 1.0) * f64::from(refvol.zdim()),
         );
-        let mut par = String::new();
         let mut tmpmatflag = self.o.tmpmatflag;
+        let par_name = format!("{out}.par");
+        let rms_names: Vec<String> = [
+            (self.o.rmsrelflag, ["_rel.rms", "_rel_mean.rms"]),
+            (self.o.rmsabsflag, ["_abs.rms", "_abs_mean.rms"]),
+        ]
+        .into_iter()
+        .filter(|(on, _)| *on)
+        .flat_map(|(_, names)| names.map(|x| format!("{out}{x}")))
+        .collect();
+        // Reproduced: `outfile.open(filename)` first (an empty file at once, where it can be
+        // made).
+        let mut texts = TextOutputs::default();
+        if self.mode.reproduce() && self.o.plotflag {
+            texts.open_reproduced(&par_name);
+        }
         // FSL-13: mcflirt creates the .mat directory for -rmsrel and -rmsabs without -mats.
         let make_dir = if self.mode.fix() {
             if (self.o.rmsrelflag || self.o.rmsabsflag) && !self.o.matflag {
@@ -1603,40 +1771,102 @@ impl Run<'_> {
                 }
             }
         }
+        if self.mode.fix() && !make_dir && (self.o.rmsrelflag || self.o.rmsabsflag) {
+            // FSL-13 corrected makes no .mat directory for -rmsrel and -rmsabs alone; where
+            // mcflirt's would fail for another reason than its permission (its parent missing or
+            // not a directory), FSL-20 ends mcflirt's run here: the same error as with -mats.
+            let d = format!("{out}.mat");
+            let parent = std::path::Path::new(&d)
+                .parent()
+                .filter(|p| !p.as_os_str().is_empty())
+                .unwrap_or(std::path::Path::new("."));
+            if !parent.is_dir() {
+                self.notice(
+                    &defects::FSL_20,
+                    format!(
+                        "the directory {d} cannot be created: an error; mcflirt exits with \
+                         status 0 and writes nothing more"
+                    ),
+                );
+                return Err(End::Refuse(format!(
+                    "cannot create the directory {d} for the matrices (FSL-20: mcflirt prints \
+                     \"Error!: Unknown Log directory return value\" and exits with status 0)"
+                )));
+            }
+        }
+        if self.mode.fix() {
+            // FSL-65 corrected: every text output opened before anything is written.
+            let wanted = self
+                .o
+                .plotflag
+                .then(|| par_name.clone())
+                .into_iter()
+                .chain(rms_names.iter().cloned());
+            for name in wanted {
+                if let Err(e) = texts.open_corrected(&name) {
+                    texts.remove_made();
+                    if let Some(d) = &dir {
+                        let _ = std::fs::remove_dir(d);
+                    }
+                    let mcflirt = if name == par_name {
+                        "mcflirt prints \"error: unable to open output file!\" at the first \
+                         volume and exits with status 0, after the first matrix and the .rms files"
+                    } else {
+                        "mcflirt silently does not write it and exits with status 0"
+                    };
+                    self.notice(
+                        &defects::FSL_65,
+                        format!(
+                            "{name} cannot be opened ({e}): an error (exit status 1); {mcflirt}"
+                        ),
+                    );
+                    return Err(End::Refuse(format!(
+                        "cannot open {name} for writing: {e} (FSL-65: {mcflirt})"
+                    )));
+                }
+            }
+        }
         if self.o.rmsrelflag {
-            let mut text = String::new();
             let mut mean: f32 = 0.0;
+            let file = texts.take(self.mode, &format!("{out}_rel.rms"));
+            let mut w = TextWriter::new(file);
             for i in 1..n {
                 let r = miscmaths::rms_deviation(&mats[i - 1], &mats[i], &center, rmax)
                     .map_err(|_| rms_error())?;
-                text.push_str(&cnum::stream(f64::from(r)));
-                text.push('\n');
+                w.line(&cnum::stream(f64::from(r)));
                 mean += r;
             }
-            write_text(&format!("{out}_rel.rms"), &text);
+            self.unwritten(w, &format!("{out}_rel.rms"));
             let m = mean / (self.st.no_volumes - 1) as f32;
-            write_text(
-                &format!("{out}_rel_mean.rms"),
-                &format!("{}\n", cnum::stream(f64::from(m))),
-            );
+            let file = texts.take(self.mode, &format!("{out}_rel_mean.rms"));
+            let mut w = TextWriter::new(file);
+            w.line(&cnum::stream(f64::from(m)));
+            self.unwritten(w, &format!("{out}_rel_mean.rms"));
         }
         if self.o.rmsabsflag {
-            let mut text = String::new();
             let mut mean: f32 = 0.0;
+            let file = texts.take(self.mode, &format!("{out}_abs.rms"));
+            let mut w = TextWriter::new(file);
             for m in mats.iter().take(n) {
                 let r = miscmaths::rms_deviation(&Mat::eye(4), m, &center, rmax)
                     .map_err(|_| rms_error())?;
-                text.push_str(&cnum::stream(f64::from(r)));
-                text.push('\n');
+                w.line(&cnum::stream(f64::from(r)));
                 mean += r;
             }
-            write_text(&format!("{out}_abs.rms"), &text);
+            self.unwritten(w, &format!("{out}_abs.rms"));
             let m = mean / self.st.no_volumes as f32;
-            write_text(
-                &format!("{out}_abs_mean.rms"),
-                &format!("{}\n", cnum::stream(f64::from(m))),
-            );
+            let file = texts.take(self.mode, &format!("{out}_abs_mean.rms"));
+            let mut w = TextWriter::new(file);
+            w.line(&cnum::stream(f64::from(m)));
+            self.unwritten(w, &format!("{out}_abs_mean.rms"));
         }
+        let mut par = self.o.plotflag.then(|| {
+            if self.mode.fix() {
+                TextWriter::new(texts.take(self.mode, &par_name))
+            } else {
+                TextWriter::new(texts.par.take())
+            }
+        });
         let mut warnings = Vec::new();
         for (i, m) in mats.iter().enumerate().take(n) {
             let name = format!("MAT_{i:04}");
@@ -1646,7 +1876,7 @@ impl Run<'_> {
             if write_mat && let Some(d) = &dir {
                 write_text(&format!("{d}/{name}"), &mat_text(&product));
             }
-            if self.o.plotflag {
+            if let Some(w) = par.as_mut() {
                 // The parameters' centre: the reference's centre of mass (of its finite values
                 // when FSL-14 is corrected).
                 let cog = if self.mode.fix() {
@@ -1655,21 +1885,123 @@ impl Run<'_> {
                     Mat::col(&refvol.cog_scaled_mm(&mut warnings))
                 };
                 let p = miscmaths::decompose_aff(&product, &cog);
-                for k in 0..6 {
-                    par.push_str(&cnum::stream(p[k]));
-                    par.push_str("  ");
+                if !w.is_open() {
+                    // FSL-65 reproduced: `if (!outfile) { cerr << ...; exit(0); }` at the first
+                    // line.
+                    for w in warnings {
+                        self.e(&w);
+                        self.e("\n");
+                    }
+                    self.notice(
+                        &defects::FSL_65,
+                        format!(
+                            "{par_name} cannot be opened: mcflirt's message at volume 0's line \
+                             and exit status 0, after MAT_0000 and the .rms files, nothing more \
+                             written"
+                        ),
+                    );
+                    return Err(End::Exit(
+                        0,
+                        vec!["error: unable to open output file!".into()],
+                    ));
                 }
-                par.push('\n');
+                let mut line = String::new();
+                for k in 0..6 {
+                    line.push_str(&cnum::stream(p[k]));
+                    line.push_str("  ");
+                }
+                w.line(&line);
             }
         }
         for w in warnings {
             self.e(&w);
             self.e("\n");
         }
-        if self.o.plotflag {
-            write_text(&format!("{out}.par"), &par);
-        }
         Ok(())
+    }
+
+    /// FSL-65 reproduced: the notice of an `.rms` file that could not be opened (mcflirt writes
+    /// nothing into it, silently).
+    fn unwritten(&mut self, w: TextWriter, name: &str) {
+        if !w.is_open() {
+            self.notice(
+                &defects::FSL_65,
+                format!("{name} cannot be opened: not written, as in mcflirt (status 0)"),
+            );
+        }
+    }
+}
+
+/// The text outputs of `decompose_mats` (FSL-65): those opened before anything is written by
+/// default, and the `.par` file mcflirt opens first.
+#[derive(Default)]
+struct TextOutputs {
+    /// Opened by default before any is written: the name, the file, and whether this run made
+    /// it (removed again if a later one cannot be opened).
+    opened: Vec<(String, std::fs::File, bool)>,
+    /// Reproduced: the `.par` file as `ofstream::open` left it (`None`: it could not be opened).
+    par: Option<std::fs::File>,
+}
+
+impl TextOutputs {
+    /// Opens `name` for writing without truncating it (an existing file keeps its contents
+    /// until it is written).
+    fn open_corrected(&mut self, name: &str) -> std::io::Result<()> {
+        let existed = std::fs::symlink_metadata(name).is_ok();
+        let file = std::fs::OpenOptions::new()
+            .write(true)
+            .create(true)
+            .truncate(false)
+            .open(name)?;
+        self.opened.push((name.to_owned(), file, !existed));
+        Ok(())
+    }
+
+    /// `ofstream::open(name)`: created or truncated at once; `None` where it cannot be.
+    fn open_reproduced(&mut self, name: &str) {
+        self.par = std::fs::File::create(name).ok();
+    }
+
+    /// Removes the files this run made (a later output could not be opened).
+    fn remove_made(&mut self) {
+        for (name, _, made) in self.opened.drain(..) {
+            if made {
+                let _ = std::fs::remove_file(name);
+            }
+        }
+    }
+
+    /// The file to write `name` into: by default the one opened beforehand, emptied;
+    /// reproduced, `ofstream::open(name)` now (`None` where it cannot be opened).
+    fn take(&mut self, mode: UpstreamDefects, name: &str) -> Option<std::fs::File> {
+        if mode.reproduce() {
+            return std::fs::File::create(name).ok();
+        }
+        let k = self.opened.iter().position(|(n, _, _)| n == name)?;
+        let (_, file, _) = self.opened.remove(k);
+        file.set_len(0).ok().map(|()| file)
+    }
+}
+
+/// An `ofstream` written line by line, each line flushed (`<< endl`): a file that could not be
+/// opened takes nothing.
+struct TextWriter {
+    file: Option<std::fs::File>,
+}
+
+impl TextWriter {
+    fn new(file: Option<std::fs::File>) -> TextWriter {
+        TextWriter { file }
+    }
+
+    fn is_open(&self) -> bool {
+        self.file.is_some()
+    }
+
+    fn line(&mut self, text: &str) {
+        if let Some(f) = self.file.as_mut() {
+            let _ = writeln!(f, "{text}");
+        }
     }
 }
 

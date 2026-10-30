@@ -185,11 +185,20 @@ sums are exact integers, so the ball is fixed by `(idx, floor(fl(r*r)))`; beyond
 of integers is still an integer-valued float, so the same pair fixes it, but the sums round
 (radii above 2364: a ball of more than 5.5e10 offsets). `crates-gpl/tools/cbrtf-measure` compared
 glibc's `s_cbrtf.c` (the earlier translation) with CORE-MATH's on every non-negative float32: the
-numbers are in `afni-relicensing-26.md`, "The move". The replica's warning
-(`unifize::epi_radius`, `may_differ`) tests the two neighbouring floats of CORE-MATH's cube root
-for a change of `(idx, floor(fl(r*r)), %.1f)`: a superset of the precise test (which also asks
-whether an integer in between is a sum of three squares), shown to hold every volume where
-glibc's last bit changes the ball or the message (0 missed; 917,292,437 flagged).
+numbers are in `afni-relicensing-26.md`, "The move". Until 2026-10-30 the replica warned
+(`unifize::epi_radius`, `may_differ`: the two neighbouring floats of CORE-MATH's cube root tested
+for a change of `(idx, floor(fl(r*r)), %.1f)`, a superset of the precise test; 0 missed,
+917,292,437 flagged). **Since 2026-10-30** (GLIBC-05, the user's decision): `epi_radius(volume,
+mode)` takes CORE-MATH's `cbrtf` by default and `larmorx_core::math::cbrtf_glibc` (clean-room,
+glibc 2.35's bits) with `reproduce`; `epi_cbrtf_notice(volume, dims, mode)` names GLIBC-05 where
+the two radii give another ball within the grid's reach (`ball_in_reach`: the offsets of `sphere`
+with `|i| < nx`, `|j| < ny`, `|k| < nz`, tested in `sphere`'s float order; two balls are nested,
+so their offsets within reach differ exactly when their counts do) or another `%.1f`, after
+AFNI-75's guard (not where it refuses). `cbrtf-measure` re-run: the default radius CORE-MATH's
+and the `reproduce` radius the glibc translation's on every one of the 2^31 volumes, no notice
+where the radii agree, 1,358 sampled notices on a grid reaching every offset exact; and
+`--glibc-identity`: `cbrtf_glibc` equal to the translation on all 2^32 inputs, NaN bits
+included.
 
 ## Verification
 

@@ -233,7 +233,7 @@ to add (since 2026-10-25: "Random testing's gaps", below); – = nothing to do. 
 | SCI-02 | SciPy `map_coordinates` | undefined conversions answered as x86-64 does | a | none | clamps and warns by default; `reproduce` gives x86-64's answers (2026-10-12) | – |
 | SCI-03 | SciPy splines | `reflect`, `grid-mirror` do not interpolate on short axes (SciPy up to 1.17) | c | none | fixed in SciPy 1.18, whose initialisation larmorx follows in both modes since 2026-10-29 (corrected by default from 2026-10-11 until then) | – |
 | SCI-04 | SciPy on aarch64 | fused multiply-adds change last bits | d | ARM machines | never fuses | – |
-| SCI-05 | SciPy 1.15 `map_coordinates` | mode `nearest` without prefiltering, 3D float32: the output varies between runs on the same inputs (SciPy 1.15.3; not in SciPy 1.18.1) | b | none known (fMRIPrep's resampling uses other modes) | deterministic (larmorx follows SciPy 1.18.1, bit for bit); not reproduced | – |
+| SCI-05 | SciPy `map_coordinates` | a NaN coordinate with orders 2 to 5 and mode `nearest` (the suite's 3D float32 inputs, `prefilter=False` mostly): the output there is NaN in every run, but its sign and payload vary between runs on the same inputs (SciPy 1.15.3 and 1.18.1 alike) | b | none known (fMRIPrep's resampling uses other modes) | deterministic (larmorx follows SciPy 1.18.1, bit for bit; NaN values compared alike); not reproduced; the resample-series step counts NaN values alike and runs the shared releases twice (2026-10-30) | – |
 | NP-01 | numpy, OpenBLAS, Accelerate | 4×4 products and inverses depend on the CPU's kernel | d | every run | one order everywhere | – |
 | NP-02 | nibabel, numpy SVD | axis choice at exactly 45° follows the SVD's rounding | d | none | vnl's SVD | – |
 | NIB-01 | nibabel | compression decided by the file name | e | none | decided by content | – (decided 2026-10-23: larmorx's behaviour kept) |
@@ -244,7 +244,7 @@ to add (since 2026-10-25: "Random testing's gaps", below); – = nothing to do. 
 | GLIBC-02 | glibc 2.35 | `expf`, `logf`, `powf` not correctly rounded | d | N4, DenoiseImage | correctly rounded | – |
 | GLIBC-03 | glibc 2.35 | `sinf`, `cosf` not correctly rounded; two builds differ | d | none | see entry | – |
 | GLIBC-04 | glibc 2.35 | `pow` not correctly rounded for 5 filter-pole powers | d | none | exact | – |
-| GLIBC-05 | glibc 2.35 | `cbrtf` not correctly rounded (one unit in the last place on 10.6 % of float inputs): 3dUnifize `-EPI`'s radius (18.3 mm over the cube root of the voxel volume) changes its ball of neighbours or its printed radius on some voxel sizes (11.969702 mm³: radius 8 with glibc's, 7.9999995 correctly rounded) | d | none (fMRIPrep does not call `-EPI`) | correctly rounded by default (`larmorx_core::math::cbrtf`), named where glibc's last bit changes the ball within the grid or the printed radius; `reproduce` uses glibc 2.35's bits (`larmorx_core::math::cbrtf_glibc`, clean-room from `specs/cbrtf.md`, proved on all 2^32 inputs) in the clean-room original (2026-10-30); the replica keeps its warning until a replica author wires the same function | replica |
+| GLIBC-05 | glibc 2.35 | `cbrtf` not correctly rounded (one unit in the last place on 10.6 % of float inputs): 3dUnifize `-EPI`'s radius (18.3 mm over the cube root of the voxel volume) changes its ball of neighbours or its printed radius on some voxel sizes (11.969702 mm³: radius 8 with glibc's, 7.9999995 correctly rounded) | d | none (fMRIPrep does not call `-EPI`) | correctly rounded by default (`larmorx_core::math::cbrtf`), named where glibc's last bit changes the ball within the grid or the printed radius; `reproduce` uses glibc 2.35's bits (`larmorx_core::math::cbrtf_glibc`, clean-room from `specs/cbrtf.md`, proved on all 2^32 inputs) in both implementations (2026-10-30: the clean-room original, then the replica, whose last-bit warning is gone) | – |
 | ANTSPY-01 | ANTsPy 0.6.3 | inverts an affine without being asked | c? | none | never inverts unasked | – |
 | ANTSPY-02 | ANTsPy 0.6.3 | double transforms rounded to float32 | c | none | – | – |
 | ANTSPY-03 | ANTsPy 0.6.3 | header direction transposed and rounded | c | none | – | – |
@@ -331,8 +331,8 @@ to add (since 2026-10-25: "Random testing's gaps", below); – = nothing to do. 
 | FSL-62 † | bet2 | FSL 6.0.7.23 only: `--ct` with `--binaryMask` converts the mask instead of the CT image and writes the mask, masked, as the brain image | c | none | corrected by default (the CT input masked; rule A); `reproduce` gives FSL's; named (2026-10-29) | – |
 | FSL-63 † | bet (script) | with `-R`, a leading `-e` among bet2's options (the mesh) is dropped, and backslashes in the later options are read as escapes (FSL 6.0.7.17 and 6.0.7.23) | a | none (fMRIPrep's calls do not combine `-R` and `-e`) | corrected by default (the options as given); `reproduce` passes them through bash's `echo` as FSL does; named where they differ (2026-10-29) | – |
 | FSL-64 † | FSL 6.0.7.23 (Armadillo 14.2.1, OpenBLAS 0.3.33) | the last bits of its 4 × 4 inverses, solves and determinants, and so of mcflirt's and BET's results computed from them, depend on the CPU: OpenBLAS chooses its kernels at start-up, and those of AVX-512 CPUs fuse multiplications and additions that the others round separately (on this AMD Zen 4, 1 of mcflirt's 137 recorded runs changes: a relative rms of identical volumes, 8.07e-15 against 7.98e-15 mm) | d | the last bits of mcflirt's and BET's outputs depend on the machine (an AVX-512 server against an AVX2 laptop) | one order everywhere: the Haswell kernels' (as numpy's, NP-01); the harness runs FSL on that core (`OPENBLAS_CORETYPE=Haswell`, 2026-10-29) | – |
-| FSL-65 † | mcflirt | an output text file that cannot be opened (its name a directory, its directory missing or not writable): `-plots`' `.par` ends the run at volume 0's line with "error: unable to open output file!" and **status 0**, after the `.mat` directory's `MAT_0000` and the `.rms` files (no other matrix, no corrected series); an `.rms` file is silently not written (status 0) | e | none (fMRIPrep's `-out` is in an existing work directory) | the clean-room original since 2026-10-30 (specs/mcflirt.md §10.6): an error by default (exit 1, the file and FSL-65 named, nothing written), mcflirt's behaviour with reproduce (an unopenable .par: its message after MAT_0000 and the .rms files, exit 0; an unopenable .rms: not written); the replica writes everything it can and ignores the failure in both modes (a follow-up) | the replica |
-| FSL-66 † | mcflirt | a negative `-bins`: each stage has `-bins / scale` bins (truncated toward zero), prepared for **every** cost function; with −1 bins (`-bins` −8 to −15, or −4 to −7 with two stages or more) the process is killed by `SIGFPE` (an integer division by zero), with −2 or fewer (−16 and below) it aborts with `std::bad_array_new_length`; nothing written | a | none (fMRIPrep passes no `-bins`) | the clean-room original since 2026-10-30 (specs/mcflirt.md §12.1): refused by default before any work (exit 1, every cost, -stages 1 or more), with reproduce an error saying how mcflirt ends where it crashes (its own lines first: none for SIGFPE, the two std::bad_array_new_length lines), mcflirt's run elsewhere (-3 to -1 with normcorr, leastsquares); the replica runs normally in both modes (a follow-up) | the replica |
+| FSL-65 † | mcflirt | an output text file that cannot be opened (its name a directory, its directory missing or not writable): `-plots`' `.par` ends the run at volume 0's line with "error: unable to open output file!" and **status 0**, after the `.mat` directory's `MAT_0000` and the `.rms` files (no other matrix, no corrected series); an `.rms` file is silently not written (status 0) | e | none (fMRIPrep's `-out` is in an existing work directory) | the clean-room original since 2026-10-30 (specs/mcflirt.md §10.6): an error by default (exit 1, the file and FSL-65 named, nothing written), mcflirt's behaviour with reproduce (an unopenable .par: its message after MAT_0000 and the .rms files, exit 0; an unopenable .rms: not written); the replica the same since 2026-10-30 (by default the .mat directory, the .par and the .rms files opened before anything is written, an existing file kept until written; reproduce in mcflirt's order) | – |
+| FSL-66 † | mcflirt | a negative `-bins`: each stage has `-bins / scale` bins (truncated toward zero), prepared for **every** cost function; with −1 bins (`-bins` −8 to −15, or −4 to −7 with two stages or more) the process is killed by `SIGFPE` (an integer division by zero), with −2 or fewer (−16 and below) it aborts with `std::bad_array_new_length`; nothing written | a | none (fMRIPrep passes no `-bins`) | the clean-room original since 2026-10-30 (specs/mcflirt.md §12.1): refused by default before any work (exit 1, every cost, -stages 1 or more), with reproduce an error saying how mcflirt ends where it crashes (its own lines first: none for SIGFPE, the two std::bad_array_new_length lines), mcflirt's run elsewhere (-3 to -1 with normcorr, leastsquares); the replica the same since 2026-10-30 (its own line saying how mcflirt ends, after mcflirt's; FSL-21 named in reproduce too) | – |
 
 **Counts** (273 entries, recounted from the table on 2026-10-26, after the BET merge; an entry with two classes
 counts under its first; "c (c? until …)" entries, decided, count as (c)):
@@ -459,6 +459,12 @@ new, both refused by default by rule B, to do in the replica and the clean-room 
 **2026-10-30, the clean-room `cbrtf` (the user's decision):** GLIBC-05 new (class d: glibc 2.35's
 `cbrtf` not correctly rounded; 3dUnifize `-EPI`'s radius); the clean-room original corrected and
 switchable, the replica's switch to do.
+**2026-10-30, the replica side:** GLIBC-05 done in the AFNI replica (`cbrtf_glibc` with
+`reproduce`, the clean-room original's notice by default; `specs/cbrtf.md` §7.3 and §7.6 run:
+`cbrtf_glibc` equal to the glibc translation on all 2^32 inputs, and the replica's `reproduce`
+radius glibc's on every float32 voxel volume); FSL-65 and FSL-66 done in the mcflirt replica (the
+D13 gaps of both closed); SCI-05's cause found (a NaN coordinate's index overflow, in SciPy 1.18.1
+as well) and the resample-series step made robust to it. No new entry, no **decide** entry.
 
 ## D13 gaps: what the next task switches to "correct by default"
 
@@ -540,9 +546,8 @@ defect of mcflirt: the panel's two differing calls and the random tests' 61 find
 replica's own, `atanf`'s `aT[0]` taken from fdlibm's comment and a missing FSL-08 notice for
 `-meanvol`, both fixed): FSL-04 refused by default with the
 switch; the new FSL-20 and FSL-21 refused by default (rule B), each with `reproduce`; it shares
-the clean-room original's corrections of FSL-01, -03, -05 to -10, -13 and -14. **Open:** FSL-65
-and FSL-66 in the replica (the clean-room original has FSL-20, FSL-21, FSL-65 and FSL-66 since
-2026-10-30).
+the clean-room original's corrections of FSL-01, -03, -05 to -10, -13 and -14. FSL-65 and FSL-66 refused by default with
+the switch since 2026-10-30, as in the clean-room original (FSL-21 now named in `reproduce` too).
 
 **The BET replica** (`larmorx-nc`, built 2026-10-24, its FSL libraries joined to
 `larmorx-nc-core` 2026-10-25, merged 2026-10-26): FSL-40 to FSL-58 from fsl-bet2 2111.8,
@@ -3281,22 +3286,32 @@ fMRIPrep 25.2.6 (the oracle runs) or its source at `21a490fb`, niworkflows 1.15.
 - **larmorx:** never contracts: SciPy's x86-64 bits everywhere.
 - **D13 / gap:** not D13.
 
-### SCI-05 `map_coordinates` varies between runs (SciPy 1.15.3) — (b)
-- **What:** `scipy.ndimage.map_coordinates` with `mode="nearest"`, `prefilter=False` and order 5
-  on the resample-series suite's 3D float32 input (`ndimage/nearest-order5`: the comparisons
-  `map_coordinates 3D float32 -> float32, prefilter=False` and `-> float64`) returns other values
-  in two runs on the same inputs in SciPy 1.15.3; SciPy 1.18.1 returns the same values every run.
-  Cause not looked for (a read of memory the call never wrote is the likely kind).
-- **Evidence:** measured (2026-10-29, at the version update's part 3 merge): the case run twice
-  in the shared environment (SciPy 1.15.3) recorded different digests for those two
-  comparisons, twice in `oracles/python-newest` (SciPy 1.18.1) the same 92 of 92; found because
-  the resample-series record's "originals' own step" detail differed between the agent's run and
-  the merge's re-run (no status changed).
-- **fMRIPrep:** none known (its resampling calls other modes).
-- **larmorx:** deterministic, bit for bit SciPy 1.18.1's; the step from SciPy 1.15.3 to 1.18.1 on
-  those comparisons is not reproducible (next-steps follow-up).
+### SCI-05 `map_coordinates` gives a NaN coordinate a NaN read from memory never written (SciPy 1.15.3 and 1.18.1) — (b)
+- **What:** `scipy.ndimage.map_coordinates` with `mode="nearest"` and orders 2 to 5 on a NaN
+  coordinate returns NaN in every run, but with another sign or payload from run to run on the
+  same inputs (`7fc00000`, `ffd7ff97`, `fff7fff7`, `7ff8000000000000`, ...). **Cause** (read
+  2026-10-30 from SciPy's source, `scipy/ndimage/src/ni_interpolation.c`, `NI_GeometricTransform`,
+  the same code in 1.15.2 and 1.18.1): the filter's first index is `(npy_intp)floor(NaN) -
+  order / 2`; x86-64 converts NaN to `INT64_MIN`, and for orders 2 to 5 subtracting 1 or 2
+  overflows (undefined in C; it wraps to near `INT64_MAX`). The border test `start < 0 || start +
+  order >= len` then fails (its sum overflows too), so the coefficients are read at the unchecked
+  offset `stride × start`, which wraps to one or two strides before the array on each axis: memory
+  the call never wrote. The NaN coordinate's spline weights are NaN, so the output is NaN whatever
+  was read; when a value read is itself a NaN, its sign and payload pass into the product
+  (`coeff *= weight`). Orders 0 and 1 subtract nothing and take the border path: they never vary.
+- **Evidence:** measured (2026-10-29: the resample-series record's "originals' own step" detail of
+  `ndimage/nearest-order5` differed between two runs); verified (2026-10-30,
+  `validation/investigations/replica-side/sci05_probe.py`: the suite's `nearest-order<K>` inputs,
+  each call 20 times in one process, three processes per environment of 1,296 calls each: SciPy
+  1.15.3 2, 7 and 7 calls vary, SciPy 1.18.1 1, 2 and 1; always and only the output at the NaN
+  coordinate, orders 2 to 5, NaN in every run, only its bits differing). The earlier "not in SciPy
+  1.18.1" was two runs that happened to agree.
+- **larmorx:** deterministic, bit for bit SciPy 1.18.1's elsewhere; the suites compare NaN values
+  alike (`resample_series._bits`), so no comparison changes. The resample-series step (2026-10-30)
+  digests the originals' outputs with NaN values counted alike and runs the shared releases' cases
+  twice, reporting a comparison whose original varies between the two as varying, never as changed
+  or identical (`parity.python_versions`, `STEP_PASSES`, `VARIES`).
 - **D13 / gap:** class (b), never reproduced.
-
 ### NP-01 numpy's matrices depend on the CPU — (d)
 - **What:** numpy's 4×4 products and inverses run in BLAS and LAPACK kernels chosen at run time:
   OpenBLAS's Haswell, SkylakeX, SandyBridge, Nehalem or Prescott kernels on x86-64, others on
@@ -4374,12 +4389,17 @@ fMRIPrep 25.2.6 (the oracle runs) or its source at `21a490fb`, niworkflows 1.15.
   directories named `o_rel.rms` and `o_abs_mean.rms`; `-plots` with a missing parent directory).
 - **fMRIPrep:** none (it writes no `.par` through mcflirt into a blocked name; its `-out` is in an
   existing work directory).
-- **larmorx:** to do. By FSL-20's rule (rule B: the run cannot honour its command and reports
-  success): an error by default (exit 1, nothing more written), mcflirt's behaviour with
-  `reproduce` (`specs/mcflirt.md` §10.6). The `larmorx-nc` replica today writes every other output
-  and exits 0 in both modes where `.par` fails (mcflirt writes only `MAT_0000` and the `.rms`
-  files), and skips an unopenable `.rms` silently in both modes (mcflirt's behaviour).
-- **D13 / gap:** the replica's `reproduce` (mcflirt's exit point) and default (the error); the
+- **larmorx:** the clean-room original (2026-10-30) and the replica (2026-10-30, the same day):
+  an error by default (exit 1, the file and FSL-65 named, nothing of the step written; every text
+  output opened, the `.mat` directory made, before any is written, what the step made removed; the
+  replica keeps a file that existed until it writes it); mcflirt's behaviour with `reproduce` (the
+  replica writes in mcflirt's order: the `.par` file opened first, the `.mat` directory, the `.rms`
+  files line by line, then each volume's `MAT_` file and `.par` line; an unopenable `.par` ends at
+  volume 0's line with mcflirt's message and status 0, after `MAT_0000` and the `.rms` files; an
+  unopenable `.rms` not written) (`specs/mcflirt.md` §10.6; the 33 cases of §14.1 in both suites).
+  The replica's earlier code wrote the `.par` file whole at the end, so an unopenable one went
+  unnoticed and the run wrote everything else with status 0 in both modes.
+- **D13 / gap:** none.
   clean-room original's (its spec).
 
 ### FSL-66 † A negative `-bins` crashes mcflirt, whatever the cost — (a)
@@ -4396,12 +4416,15 @@ fMRIPrep 25.2.6 (the oracle runs) or its source at `21a490fb`, niworkflows 1.15.
   2` killed by signal 8, `-bins -16` with `normcorr` and `mutualinfo` signal 6 with
   `bad_array_new_length`, `-bins -1` runs).
 - **fMRIPrep:** none.
-- **larmorx:** to do: refused by default before any work (rule B: a negative number of bins makes
-  no sense, and mcflirt crashes on most of them), exit 1; with `reproduce`, an error saying how
-  mcflirt ends where it crashes, mcflirt's run where it does not (−1 to −3 with the costs that use
-  no bins) (`specs/mcflirt.md` §12.1). The replica and the clean-room original today run every
-  negative value (they take a negative count as none, or one).
-- **D13 / gap:** the replica's and the clean-room original's.
+- **larmorx:** both implementations since 2026-10-30: refused by default before any work (rule B:
+  a negative number of bins makes no sense, and mcflirt crashes on most of them), exit 1, every
+  cost, `-stages` 1 or more; with `reproduce`, where mcflirt crashes (a stage with −1 bins: SIGFPE;
+  −2 or fewer: `std::bad_array_new_length`, its two `terminate` lines printed) an error saying how
+  mcflirt ends, exit 1, nothing written; mcflirt's run where it does not (−1 to −3 with `normcorr`
+  and `leastsquares`, FSL-66 named) (`specs/mcflirt.md` §12.1). The replica checks the stage's bins
+  where mcflirt prepares them (`Costfn::set_no_bins`, for every cost), so a one-volume series
+  without `-reffile` (nothing registered) runs as mcflirt.
+- **D13 / gap:** none.
 
 ### FSL-22 † The background value sorts NaNs: undefined order — (a)
 - **What:** newimage's `calc_bval` (`sort(hist.begin(), hist.end()); return hist[numbins/10]`)

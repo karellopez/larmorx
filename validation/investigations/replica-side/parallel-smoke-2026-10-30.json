@@ -1,0 +1,57 @@
+{
+ "date": "2026-10-30",
+ "commit": "7582eae",
+ "extension_sha256_prefix": "4ff92a927a47449c",
+ "larmorx_nc_sha256_prefix": "61bbc380d366a5ba",
+ "machine": "the main machine (32 threads), shared with the orchestrator's verification; memory boxes of 14 GiB (serial) and 28 GiB (parallel)",
+ "serial": {
+  "command": "python -P scripts/orchestration/parity_smoke.py --serial",
+  "seconds": 1574,
+  "pytest": "2600 passed in 1572.83 s"
+ },
+ "parallel": {
+  "command": "python -P scripts/orchestration/parity_smoke.py --workers 16",
+  "seconds": 951,
+  "parts": {
+   "pytest-xdist, 16 workers, every file but conftest.SERIAL": "2493 passed in 290.70 s",
+   "test_memory_peak.py and test_thread_pools.py alone": "107 passed in 659.75 s"
+  }
+ },
+ "comparison": {
+  "a": [
+   "<scratch>/proof/serial/whole.xml"
+  ],
+  "b": [
+   "<scratch>/proof/parallel/parallel.xml",
+   "<scratch>/proof/parallel/serial.xml"
+  ],
+  "tests": {
+   "a": 2600,
+   "b": 2600,
+   "both": 2600
+  },
+  "outcomes_a": {
+   "passed": 2600
+  },
+  "outcomes_b": {
+   "passed": 2600
+  },
+  "only_in_a": [],
+  "only_in_b": [],
+  "outcome_differs": [],
+  "reason_differs": [],
+  "identical": true
+ },
+ "verify_merge_suites": {
+  "suites": [
+   "afni-automask --implementation replica --jobs 3",
+   "ants-smooth-image --jobs 3"
+  ],
+  "serial_seconds": 13,
+  "side_by_side_seconds": 8,
+  "compare_records --against": {
+   "afni-automask-replica": "125/125 cases; status differs: 0; details differ: 0; summary equal: True",
+   "ants-smooth-image": "39/39 cases; status differs: 0; details differ: 0; summary equal: True"
+  }
+ }
+}

@@ -1081,6 +1081,31 @@ def _derived(kind: str, name: str) -> Path:
     T2 to the T1, sinc, as bet -A2 runs it)."""
     t1 = _real(name)
     d = derived_dir(t1)
+    # One process at a time makes them (parallel parity runs share the directory: FSL writes
+    # its files in place, so another process could read one half written).
+    with _derived_lock(d):
+        return _derived_in(kind, name, t1, d)
+
+
+@contextlib.contextmanager
+def _derived_lock(d: Path) -> Iterator[None]:
+    """An exclusive lock on the derived-input directory ``d`` across processes (``fcntl.flock``;
+    none where it does not exist)."""
+    try:
+        import fcntl
+    except ImportError:
+        yield
+        return
+    with open(d / ".lock", "a", encoding="utf-8") as f:
+        fcntl.flock(f, fcntl.LOCK_EX)
+        try:
+            yield
+        finally:
+            fcntl.flock(f, fcntl.LOCK_UN)
+
+
+def _derived_in(kind: str, name: str, t1: Path, d: Path) -> Path:
+    """:func:`_derived`'s work, with ``d``'s lock held."""
     # Inputs, not outputs compared: made once with FSL 6.0.7.17 (the first installation), so
     # that every version is compared on the same files.
     made_with = fsl_versions.PREVIOUS if fsl_dir(fsl_versions.PREVIOUS) else None

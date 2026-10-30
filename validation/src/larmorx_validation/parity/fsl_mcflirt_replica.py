@@ -1317,6 +1317,11 @@ def cases(tier: str) -> list[Case]:
     for name, edge in EDGES.items():
         if _TIERS.index(_EDGE_TIER.get(name, "smoke")) <= rank:
             out.append(Case(f"edge/{name}", "edge cases", edge.description, ("edge", name)))
+    from larmorx_validation.parity import mri_hmc_failures
+
+    # specs/mcflirt.md §14.1's failure cases (FSL-20, -21, -65, -66), mcflirt live, as the
+    # clean-room original's suite runs them (since 2026-10-30).
+    out.extend(mri_hmc_failures.cases(tier))
     if rank >= 1:
         for run, node in fmriprep_calls():
             if "ds005454" in run and rank < 2:
@@ -1339,8 +1344,13 @@ def run_case(case: Case, checks: CheckList) -> None:
 
 
 def _run_case(case: Case, checks: CheckList) -> None:
+    from larmorx_validation.parity import mri_hmc_failures
+
     if replica_binary() is None:
         raise Outcome("skipped", "the larmorx-nc program was not found (LARMORX_NC_BIN)")
+    if isinstance(case.payload, mri_hmc_failures.FailureCase):
+        mri_hmc_failures.run_case(case, checks, implementation="replica")
+        return
     kind, payload = case.payload
     if kind != "recorded" and not (fsldir() / "bin" / "mcflirt").is_file():
         raise Outcome("skipped", f"FSL's mcflirt not found ({fsldir()}/bin/mcflirt)")

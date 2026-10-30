@@ -1,22 +1,22 @@
 # Parity: 3dUnifize (replica)
 
-**All cases agree.** 116 cases on the `standard` tier: 95 pass, 19 rejected by both, 2 expected divergences, 0 failures.
+**All cases agree.** 127 cases on the `standard` tier: 106 pass, 19 rejected by both, 2 expected divergences, 0 failures.
 
 - **Validated:** the bit-exact replica (larmorx 0.0.1 (crate larmorx-afni-replica, built in): the translation of AFNI 26.3.05's source, Apache-2.0 with CC BY 4.0's attribution, part of larmorx since 2026-10-29), in-process: `larmorx afni 3dUnifize` with `LARMORX_IMPLEMENTATION=replica` and `lx.afni.unifize(..., implementation="replica")`
 - **Reference:** 3dUnifize from AFNI (AFNI_26.3.05, gcc (Ubuntu 11.4.0-1ubuntu1~22.04.3) 11.4.0, with OpenMP), the binary built by `scripts/build_afni_oracle.sh`
 - **Test data:** larmorx-testdata `52124bc98f9f`, tier `standard`
 - **Generated:** 2026-10-30 on Linux x86_64, with `python -m larmorx_validation parity afni-unifize --tier standard --implementation replica`
-- **Original programs:** 299 runs: 294 from the oracle cache, 5 run (1 never cached: the original varies); cache `<workspace>/oracles/cache`, mode `use`
+- **Original programs:** 318 runs: 313 from the oracle cache, 5 run (1 never cached: the original varies); cache `<workspace>/oracles/cache`, mode `use`
 
-**Bit-identical to AFNI: 90 of 90 compared cases that write outputs**: every output the same bytes (data and NIfTI header), with the same exit status and messages. The other 5 compared case(s) write no output in either program (an existing output, a name with a blank, a directory that does not exist) and agree on the exit status and messages; the default mode's corrections there are in the D13 lines below.
-- Messages (standard output and error, byte for byte; AFNI's version banner and compile date, and larmorx's own lines, set aside): 111 of 111 identical, in every case that ran both programs.
+**Bit-identical to AFNI: 97 of 97 compared cases that write outputs**: every output the same bytes (data and NIfTI header), with the same exit status and messages. The other 9 compared case(s) write no output in either program (an existing output, a name with a blank, a directory that does not exist) and agree on the exit status and messages; the default mode's corrections there are in the D13 lines below.
+- Messages (standard output and error, byte for byte; AFNI's version banner and compile date, and larmorx's own lines, set aside): 118 of 118 identical, in every case that ran both programs.
 - 3 case(s) where AFNI crashes (a missing option value, AFNI-40; an empty automask dereferenced, AFNI-46): larmorx prints AFNI's messages up to the crash, then refuses with one line and exit status 1.
 - **fMRIPrep's own outputs** (the oracle runs' node outputs, as fMRIPrep 25.2.6 ran them in its image): 22 of 22 bit-identical to the replica's.
 - AFNI's own variability, AFNI at 1 thread(s): 22 of 22 runs give the oracle's output bit for bit.
 - AFNI's own variability, AFNI at 6 thread(s): 24 of 24 runs give the oracle's output bit for bit.
 - AFNI's own variability, fMRIPrep 25.2.6's AFNI: 24 of 24 runs give the oracle's output bit for bit.
-- Python API (`lx.afni.unifize(..., implementation="replica")`): 35 of 35 cases give the command line's outputs bit for bit.
-- **AFNI's own step, AFNI 25.2.09 → 26.3.05** (both builds on the same arguments; the previous one's runs from the oracle-output cache where an earlier record made them): 113 of 114 cases identical (exit status, messages, every output); 1 changed: 1 by AFNI-03 (AFNI 26.3.05 reads header slice code 2 (sequential decreasing) as NIfTI defines it, from slice_end down to slice_start; 25.2.09 gave every slice time 0): `difftest/epi-slice-code-2-afni26`.
+- Python API (`lx.afni.unifize(..., implementation="replica")`): 36 of 36 cases give the command line's outputs bit for bit.
+- **AFNI's own step, AFNI 25.2.09 → 26.3.05** (both builds on the same arguments; the previous one's runs from the oracle-output cache where an earlier record made them): 120 of 121 cases identical (exit status, messages, every output); 1 changed: 1 by AFNI-03 (AFNI 26.3.05 reads header slice code 2 (sequential decreasing) as NIfTI defines it, from slice_end down to slice_start; 25.2.09 gave every slice time 0): `difftest/epi-slice-code-2-afni26`.
 - **D13 fix pass** (larmorx's default, `upstream_defects="fix"`; the comparison above runs `reproduce`): the corrections met
   - AFNI-01: 1 case(s) named it, 1 with changed values (largest difference 1.67e+03), 1 with other changes (messages): `defects/EPI-negative-slope`
   - AFNI-02: 1 case(s) named it, 1 with changed values (largest difference 0.00427): `defects/head-f32-slope-inter`
@@ -30,6 +30,7 @@
   - AFNI-45: 2 case(s) named it, 2 with changed values (largest difference 1.46e+03), 2 with other changes (messages): `defects/T2up-100`, `defects/T2up-99.99`
   - AFNI-47: 1 case(s) named it, 1 with changed values (largest difference 1.5e+03), 1 with other changes (messages): `defects/slab`
   - AFNI-48: 2 case(s) named it, 0 with changed values (largest difference 0): `options/T2-T2-T2`, `options/T2-x4`
+  - GLIBC-05: 3 case(s) named it, 2 with changed values (largest difference 1.95), 1 with other changes (messages): `glibc-05/epi-ball`, `glibc-05/epi-ball-one`, `glibc-05/epi-printed`
 
 ## Thresholds
 
@@ -43,6 +44,8 @@
 
 | Category | Cases | Pass | Both reject | Expected divergence | Fail |
 |---|---|---|---|---|---|
+| AFNI-75's guard | 6 | 6 | 0 | 0 | 0 |
+| GLIBC-05's cube root | 5 | 5 | 0 | 0 | 0 |
 | datatypes | 10 | 10 | 0 | 0 | 0 |
 | defects | 8 | 7 | 0 | 1 | 0 |
 | difftest | 2 | 2 | 0 | 0 | 0 |
@@ -90,7 +93,7 @@
 
 | Component | Version |
 |---|---|
-| larmorx | 0.0.1 (1c4d4f683aee) |
+| larmorx | 0.0.1 (fb587fab4865) |
 | larmorx-testdata | 52124bc98f9f |
 | Python | 3.12.16 |
 | Platform | Linux x86_64 (Linux-6.8.0-124-generic-x86_64-with-glibc2.35) |
@@ -220,5 +223,16 @@ Both programs run in directories of their own on the same input files, in the sa
 | `fmriprep/ds005752-ses_01_task_rest_dir_reverse` | pass | 12/12 | fMRIPrep's call on its BOLD reference's input (ds005752-ses_01_task_rest_dir_reverse) |
 | `real/T1w-ds000005` | pass | 11/11 | AFNI's default on the T1w of ds000005 (the half-size path) |
 | `real/EPI-ds000005` | pass | 9/9 | -EPI on the BOLD series of ds000005 |
+| `guard/epi-um3` | pass | 3/3 | -EPI on 3 volumes of 3 µm voxels (radius 6100.0 voxels): refused (AFNI-75) |
+| `guard/epi-um1` | pass | 3/3 | -EPI on 3 volumes of 1 µm voxels (radius 18300.0 voxels): refused (AFNI-75) |
+| `guard/epi-mm0.05` | pass | 3/3 | -EPI on 3 volumes of 0.05 mm voxels (radius 366.0 voxels): refused (AFNI-75) |
+| `guard/epi-um3-one` | pass | 3/3 | -EPI on one volume of 3 µm voxels (radius 6100.0 voxels): refused (AFNI-75) |
+| `guard/epi-mm0.3` | pass | 7/7 | -EPI on 3 volumes of 0.3 mm voxels (radius 61.0 voxels): not refused |
+| `guard/epi-mm3` | pass | 7/7 | -EPI on 3 volumes of 3 mm voxels (radius 6.1 voxels): not refused |
+| `glibc-05/epi-ball` | pass | 11/11 | -EPI on 3 volumes of 2 x 2 x 2.9924254 mm voxels (11.969702 mm³): radius 8 voxels with glibc's cube root, 7.9999995 cor… |
+| `glibc-05/epi-ball-one` | pass | 10/10 | the same voxels, one volume (the plain path with -EPI's radius): the ball differs |
+| `glibc-05/epi-printed` | pass | 10/10 | -EPI on 1 x 1 x 1.0421294 mm voxels: radius 18.050001 voxels (printed 18.1) with glibc's cube root, 18.05 (printed 18.0… |
+| `glibc-05/epi-same-result` | pass | 10/10 | -EPI on 2.4 x 2.4 x 2.78 mm voxels: radii one unit apart in the last place (7.2604237 voxels with glibc's cube root, 7.… |
+| `glibc-05/epi-ordinary` | pass | 10/10 | -EPI on ordinary 3.4375 x 3.4375 x 4 mm voxels: the same radius (5.061384 voxels) with both cube roots, no notice |
 | `difftest/epi-ball-beyond-any-machine` | pass | 1/1 | 3dUnifize -EPI on a 4D input of micrometre voxels: the ball of neighbours has a radius of about 9600 voxels (about 10^1… |
 | `difftest/epi-slice-code-2-afni26` | pass | 7/7 | -EPI on a series with header slice code 2, against the replica and AFNI 26.3.05: the output keeps the header's slice ti… |

@@ -270,11 +270,10 @@ The items below keep their history.
 - **mcflirt's FSL-20, FSL-21, FSL-65 and FSL-66 in the clean-room original: done** (2026-10-30, from
   `specs/mcflirt.md` §10.6, §12.1; the 33 cases of §14.1 in the mri-hmc suite, `failures/<case>`,
   mcflirt live; golden `cli.mri.hmc.unwritable` and `cli.mri.hmc.bins`; `docs/findings/mri-hmc-original.md`).
-- **The mcflirt replica's FSL-65 and FSL-66** (found 2026-10-30): its `reproduce` should end where
-  mcflirt does (an unopenable `.par`: status 0 after `MAT_0000` and the `.rms` files; a negative
-  `-bins`: mcflirt's crash, as an error) and its default refuse both (`specs/mcflirt.md` §10.6,
-  §12.1 are the target); a small replica-author part with a command-line test each; no record
-  changes (no recorded case uses them).
+- **The mcflirt replica's FSL-65 and FSL-66: done** (2026-10-30, `specs/mcflirt.md` §10.6 and
+  §12.1; the 33 cases of §14.1 in the replica's suite, mcflirt 6.0.7.23 live: 24 pass, 9 rejected
+  by both, the replica's matrices mcflirt's as text wherever both run to the end; a command-line
+  test each; golden `mcflirt.fsl65.*`, `mcflirt.fsl66.*`; FSL-21 named in `reproduce` too).
 - **A benchmark report of the mcflirt replica** (informal: fMRIPrep's call on ds000005, the
   replica 20 s at 3 threads and 36 s at one, mcflirt 70 s, on a busy machine).
 - **BET, further:** a benchmark report (FSL against the replica; bet2 and betsurf on the data
@@ -473,8 +472,8 @@ The items below keep their history.
   `-EPI` on 64×64×40×160: 120.8 and 110.4 against 109.2; it was 164.8 and 320.9), results unchanged
   bit for bit (the standard record re-made, compare_records: no change); the two strict expected
   failures removed (`validation/investigations/specs-memory/README.md`).
-- **3dUnifize `-EPI`'s `cbrtf`: decided by the user (2026-10-30); the clean-room half done the
-  same day, the replica's half to do:** the default keeps the correctly rounded `cbrtf` (CORE-MATH,
+- **3dUnifize `-EPI`'s `cbrtf`: decided by the user (2026-10-30); the clean-room half and the
+  replica's half done the same day:** the default keeps the correctly rounded `cbrtf` (CORE-MATH,
   the more accurate: "if Larmorx is already most accurate then the clean room library should be
   for the reproduce mode"), and `reproduce` uses `larmorx_core::math::cbrtf_glibc`, a clean-room
   cube root with glibc 2.35's bits (written from `specs/cbrtf.md` by an implementer who never read
@@ -483,20 +482,19 @@ The items below keep their history.
   clean-room original:** `-EPI`'s radius takes it with `reproduce`; the default names GLIBC-05
   where glibc's last bit changes the ball within the grid or the printed radius (both radii in the
   notice); the parity cases `glibc-05/epi-*` (AFNI 26.3.05's bytes in `reproduce`; the default AFNI's
-  with correctly rounded functions preloaded). **To do (a replica author):** the replica's
-  3dUnifize takes `cbrtf_glibc` with `reproduce` instead of its last-bit warning, with the same
-  GLIBC-05 notice by default (the clean-room original's words, `crates/larmorx-afni/src/unifize/mod.rs`,
-  `epi_cbrtf_notice`, may be copied as text: they are larmorx's own Apache lines), the cases
-  `glibc-05/epi-*` enabled for the replica in `parity/afni_unifize.py` (`suite()`'s
-  `suite_cases` leaves them out for the replica today; the replica suite otherwise shares the
-  original's case list, AFNI-75's guard cases included), and the spec's §7.3 run
-  (`cbrtf-measure` against `cbrtf_glibc`) and §7.6. Measured incidentally on 2026-10-30 (the
-  smoke tier before that filter): the replica's `reproduce` on `glibc-05/epi-ball` differs from
-  AFNI in 6,321 of 27,648 values (max 1.95), as its correctly rounded cube root implies.
-  **For the spec writer:** §7.2's number `c679cb92d4402e33` is not what the system's own results
-  give under §7.1's hash run through all inputs (`335d1fb5fb714c95`; the verifier's README lists
-  the conventions tried); the function agrees input by input, so §7.2 should state the convention
-  of the 2026-10-23 program, or the number `335d1fb5fb714c95`.
+  with correctly rounded functions preloaded). **Done in the replica (2026-10-30):** its `-EPI` radius takes `cbrtf_glibc` with `reproduce` and
+the correctly rounded cube root by default, with the clean-room original's GLIBC-05 notice word
+for word (its last-bit warning gone); the `glibc-05/epi-*` cases in its suite (5 of 5 pass:
+`reproduce` AFNI 26.3.05's bytes, the default AFNI's with correctly rounded functions preloaded);
+`specs/cbrtf.md` §7.3 (`cbrtf-measure --glibc-identity`: 0 of 2^32 differ from the glibc
+translation, NaN bits included) and §7.6 (the replica's `reproduce` radius glibc's on every
+float32 voxel volume, so no radius, message or ball differs from AFNI's); record re-made
+(compare_records: only the 11 new cases, GLIBC-05's 5 and AFNI-75's 6 guard cases, which the
+replica record had not run before); golden `3dUnifize.EPI.glibc05(.reproduce)`.
+  **§7.2 corrected (spec writer, 2026-10-30):** the 2026-10-23 program's hash starts from
+`1469598103934665603`, FNV's offset basis with its last digit missing; with §7.1's start the
+whole sequence is `335d1fb5fb714c95`, with the program's `c679cb92d4402e33`, for glibc's
+results and `cbrtf_glibc`'s alike.
 - **The Python entry point's own memory: decided by the user (2026-10-30), done the same day:**
   `tests/parity/test_memory_peak.py` allows a call through `python -m larmorx` 1.10 × the
   original's peak plus the peak of `python -m larmorx --version` measured the same way, in the
@@ -510,12 +508,22 @@ The items below keep their history.
   validation phase (the records show the same files; the computes now run the in-process replica).
 - **CI's `gpl` job name** (2026-10-29): it runs only `crates-nc` now; renaming it (`nc`) would change
   the check names the watchers count (kept as is).
-- **The resample-series step and SciPy 1.15.3's varying outputs (SCI-05)** (found 2026-10-29 at the
-  part 3 merge): SciPy 1.15.3's `map_coordinates` (mode `nearest`, `prefilter=False`, 3D float32)
-  varies between runs, so the record's "originals' own step" detail of `ndimage/nearest-order*`
-  flips between runs (no status changes). Make the step check mark such comparisons as varying
-  in the old release (or compare the old release against itself first), then re-make the
-  resample-series record; look for SCI-05's cause if it is cheap (permissive source).
+- **The resample-series step and SCI-05: done** (2026-10-30): SCI-05's cause found (a NaN
+  coordinate's filter index overflows for orders 2 to 5, so SciPy reads memory before the array;
+  only the NaN's bits vary, in SciPy 1.18.1 as well: register SCI-05,
+  `validation/investigations/replica-side/`); the step's digests count NaN values alike and the
+  shared releases' cases run twice (a comparison varying between them is reported as varying);
+  the record re-made from a clean commit, two runs give the same step detail (two records from bf26b71 identical case by case, the same step line; against 2026-10-29's no status change, 9 comparisons of nearest-order2 to -order5 now identical, their only change having been SCI-05's NaN bits).
+- **The parity smoke tier in parallel: done** (2026-10-30, the user: "make sure everything is
+  done properly"): `scripts/orchestration/parity_smoke.py` runs `tests/parity` on 16
+  pytest-xdist workers, then `test_memory_peak.py` and `test_thread_pools.py` alone
+  (`tests/parity/conftest.py` `SERIAL`); the same marker for `record_golden.py`; `--serial` the
+  fallback. Proved on one commit and build: the per-test outcomes of a serial and a parallel run
+  identical (2,600 of 2,600 tests with the same outcome, all passed in both; 1,574 s serially, 951 s in parallel: 291 s on 16 workers, then 660 s for the 107 memory and thread tests alone, of which the memory peaks take about 626 s; commit 7582eae), `validation/investigations/replica-side/`. `verify-merge.sh`
+  step 4 and `record_golden.py` use it (`--serial-parity`); verify-merge's `--suite`s run side by
+  side (`run-suites.sh`; `--serial-suites` the fallback), proved on two suites
+  (`afni-automask --implementation replica` and `ants-smooth-image`: the same records case by case, `compare_records.py --against`; 13 s one after the other, 8 s side by side, served from the oracle cache). pytest-xdist 3.8.0 (with execnet 2.1.2) added to the shared `.venv` and
+  the lock file.
 - **The shared environment's numpy and SciPy** (2026-10-29): keep the shared `.venv` at numpy
   2.3.5 / SciPy 1.15.3 until the final comparisons with fMRIPrep (`docs/parts/2026-10-29-version-numerics/handoff.md`
   §13: nothing else needs the move, it is the step's baseline, and antspyx and smriprep ask for

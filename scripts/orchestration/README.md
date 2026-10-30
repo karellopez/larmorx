@@ -17,8 +17,10 @@ repository), `LARMORX_VENV` (default: `<workspace>/.venv`), cargo first on the p
 | `build-nc.sh <checkout>` | the `larmorx-nc` replica program (release) |
 | `boxed.sh <GiB> <command>` | runs a heavy job in its own memory box (a systemd user scope, no swap): a runaway process is killed inside it and nothing else is touched; use it for every parity, random-testing, oracle, benchmark or merge-verification run |
 | `lxv.sh <checkout> <args>` | `python -m larmorx_validation <args>` from that checkout |
-| `verify-merge.sh <checkout> <out> [--suite "..."]... [--site <dir> --evidence <tool>...] [--golden] [--threads N] [--oracle-cache use\|refresh\|off]` | the checklist's steps 1-5 on a committed merge, one line per step in `<out>/main.log`; the parity runs use the oracle-output cache (below) |
-| `compare_records.py <out>/records <suite>...` | the re-run records against the committed ones, case by case |
+| `verify-merge.sh <checkout> <out> [--suite "..."]... [--site <dir> --evidence <tool>...] [--golden] [--threads N] [--oracle-cache use\|refresh\|off] [--serial-parity] [--serial-suites]` | the checklist's steps 1-5 on a committed merge, one line per step in `<out>/main.log`; step 4 the smoke tier in parallel (`parity_smoke.py`, `--threads` its workers, 16 without), the `--suite`s side by side (`run-suites.sh`: their `--jobs` add up), STEP5 lines in the order given; the parity runs use the oracle-output cache (below) |
+| `parity_smoke.py [--workers N] [--serial] [--junit-dir DIR] [-- <pytest args>]` | the parity smoke tier (`pytest tests/parity`) on N pytest-xdist workers (16), then the memory-peak and thread-pool files alone; the marker `record_golden.py` reuses; `--serial` one pytest run (run with `python -P`, `PYTHONPATH` set) |
+| `run-suites.sh <checkout> <out> [--serial] [--main-log FILE] "<parity args>"...` | standard-tier records of several suites side by side (verify-merge's step 5), each in its own log |
+| `compare_records.py <out>/records <suite>... [--against DIR]` | the re-run records against the committed ones, case by case (or against another re-run's) |
 | `merge_golden.py` | a conflict in `tests/golden/golden.json` resolved case by case (then re-record) |
 | `register_counts.py` | the defect register recounted from its table; every **decide** and **yes** listed |
 | `handoff_blocks.py <HANDOFF.md>` | an agent's handoff: each text block with its instruction |

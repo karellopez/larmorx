@@ -93,12 +93,27 @@ _SPLINE: contextvars.ContextVar[tuple[str | None, int | None]] = contextvars.Con
 
 def _step(checks: CheckList, name: str, expected: np.ndarray) -> None:
     """The originals' own step for comparison ``name`` (``python_versions``): recorded in a
-    ``shared`` step run, reported against that record in a ``newest`` run."""
+    ``shared`` step run, reported against that record in a ``newest`` run. A comparison whose
+    original gave other outputs in the step's passes over the shared releases varies there
+    (SCI-05's kind): reported as such, never as changed or identical."""
     pv.record(name, expected)
-    old = pv.previous(name)
-    if old is None:
+    olds = pv.previous(name)
+    if not olds:
         return
-    changed = old != pv.digest(expected)
+    if len(set(olds)) > 1:
+        checks.add(
+            Check(
+                f"{pv.STEP_CHECK}: {name}",
+                True,
+                metric="the original's output",
+                value=pv.VARIES,
+                threshold="a change has a known reason",
+                detail=f"varies in SciPy 1.15.3 (SCI-05's kind): {len(set(olds))} different outputs in "
+                f"{len(olds)} runs on the same inputs, so the step is not measured",
+            )
+        )
+        return
+    changed = olds[0] != pv.digest(expected)
     why = pv.reasons(*_SPLINE.get())
     checks.add(
         Check(
@@ -910,10 +925,26 @@ def step_summary(results: list[CaseResult]) -> list[str]:
         for r in stepped
         if any(c.name.startswith(pv.STEP_CHECK) and c.value == "changed" for c in r.checks)
     ]
+    varies = [
+        r
+        for r in stepped
+        if r not in changed
+        and any(c.name.startswith(pv.STEP_CHECK) and c.value == pv.VARIES for c in r.checks)
+    ]
     line = (
-        f"**{pv.STEP_CHECK[0].upper() + pv.STEP_CHECK[1:]}:** {len(stepped)} cases compared, "
-        f"{len(stepped) - len(changed)} with the same outputs under both, {len(changed)} changed"
+        f"**{pv.STEP_CHECK[0].upper() + pv.STEP_CHECK[1:]}:** {len(stepped)} cases compared "
+        f"(the shared releases' cases run {pv.STEP_PASSES} times, NaN values counted alike), "
+        f"{len(stepped) - len(changed) - len(varies)} with the same outputs under both, "
+        f"{len(changed)} changed"
     )
+    if varies:
+        line += (
+            f", {len(varies)} with a comparison whose output varies between runs in the shared "
+            "releases (SCI-05's kind; the step not measured there: "
+            + ", ".join(f"`{r.case}`" for r in varies[:12])
+            + (" …" if len(varies) > 12 else "")
+            + ")"
+        )
     if changed:
         reasons = sorted(
             {

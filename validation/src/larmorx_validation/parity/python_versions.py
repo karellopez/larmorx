@@ -25,6 +25,12 @@ originals' outputs by digest (``LARMORX_PYTHON_STEP_RECORD``), then reports per 
 the originals' own results changed from the shared releases to the newest
 (``LARMORX_PYTHON_STEP_FROM``), each change with its reason (:data:`CHANGES`); in ``shared``
 the cases those changes reach are expected divergences, with the reason.
+
+Since 2026-10-30 (SCI-05) the digests treat every NaN alike, as the suites' comparisons do
+(SciPy's ``map_coordinates`` gives a NaN coordinate a NaN whose bits it reads from memory it
+never wrote, in SciPy 1.15.3 and 1.18.1 alike), and the shared releases' cases run
+:data:`STEP_PASSES` times: a comparison whose original gives other outputs in those runs is
+reported as varying in the shared releases (:data:`VARIES`), never as changed or identical.
 """
 
 from __future__ import annotations
@@ -55,6 +61,11 @@ STEP_SUITES = ("resample-series",)
 TOOLS = ("resample-series", "nifti-io")
 STEP_RECORD = "LARMORX_PYTHON_STEP_RECORD"
 STEP_FROM = "LARMORX_PYTHON_STEP_FROM"
+#: How many times the step runs the shared releases' cases (their originals' own variation).
+STEP_PASSES = 2
+#: The step's verdict for a comparison whose original varies between runs in the shared
+#: releases (SCI-05's kind): neither changed nor identical.
+VARIES = "varies"
 #: The releases each environment holds (what the step names; the records read them live).
 RELEASES = {
     NEWEST: "numpy 2.5.4 (OpenBLAS 0.3.34), SciPy 1.18.1",
@@ -209,32 +220,40 @@ def _file(directory: str, case_id: str) -> Path:
 
 
 def digest(a: np.ndarray) -> str:
+    """The SHA-256 of an array's type, shape and values, every NaN counted as one value (the
+    suites compare NaN values alike; SCI-05's NaN bits come from memory never written)."""
     a = np.ascontiguousarray(a)
+    if a.dtype.kind in "fc":
+        a = np.where(np.isnan(a), np.array(np.nan, dtype=a.dtype), a)
     h = hashlib.sha256(f"{a.dtype.str}{a.shape}".encode())
-    h.update(a.tobytes())
+    h.update(np.ascontiguousarray(a).tobytes())
     return h.hexdigest()
 
 
 def record(name: str, expected: np.ndarray) -> None:
-    """In a ``shared`` step run: remember the original's output of comparison ``name``."""
+    """In a ``shared`` step run: remember the original's output of comparison ``name`` (one
+    digest per pass of :data:`STEP_PASSES`)."""
     directory, cid = os.environ.get(STEP_RECORD), _case.get()
     if not directory or cid is None:
         return
     f = _file(directory, cid)
     data = json.loads(f.read_text(encoding="utf-8")) if f.is_file() else {}
-    data[name] = digest(expected)
+    seen = data.get(name, [])
+    data[name] = [*([seen] if isinstance(seen, str) else seen), digest(expected)]
     f.write_text(json.dumps(data, indent=0), encoding="utf-8")
 
 
-def previous(name: str) -> str | None:
-    """In a ``newest`` run: the shared releases' digest of comparison ``name``, if recorded."""
+def previous(name: str) -> list[str] | None:
+    """In a ``newest`` run: the shared releases' digests of comparison ``name`` (one per pass),
+    if recorded."""
     directory, cid = os.environ.get(STEP_FROM), _case.get()
     if not directory or cid is None:
         return None
     f = _file(directory, cid)
     if not f.is_file():
         return None
-    return json.loads(f.read_text(encoding="utf-8")).get(name)
+    found = json.loads(f.read_text(encoding="utf-8")).get(name)
+    return [found] if isinstance(found, str) else found
 
 
 STEP_CHECK = f"the originals' own step: {RELEASES[SHARED]} → {RELEASES[NEWEST]}"

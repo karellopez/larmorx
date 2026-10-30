@@ -77,7 +77,7 @@ All three take FSL's image names: a file name with or without its extension (§3
 
 - A name is resolved by trying, in order, the name as given and the name with `.nii.gz`, `.nii`,
   `.hdr.gz`, `.hdr`, `.img.gz`, `.img` (`.hdr`/`.img` pairs: the header names the pair), and the
-  NIfTI-2 variants; a name ending in one of these extensions is used as is. Images FSL reads:
+  NIfTI-2 variants; a name ending in one of these extensions is used as is when that file exists (spec writer, 2026-10-30: else the search below). Images FSL reads:
   NIfTI-1 and NIfTI-2 single files and pairs, gzipped or not, and ANALYZE 7.5 pairs.
 - When no file matches, FSL's image layer prints `Image Exception : #63 :: No image files match:
   <name>` and then `Image Exception : #22 :: Failed to read volume <name>` followed by
@@ -108,6 +108,13 @@ All three take FSL's image names: a file name with or without its extension (§3
   possible filenames detected for basename: <name>`); `.img`, `.img.gz`, `.img.zst`, `.img.bz2`
   name the pair of the matching `.hdr` name. The data file of a pair is read in whatever format
   its own bytes say. FSL 6.0.7.17 read gzip and uncompressed files only.
+  (spec writer, 2026-10-30) **A name with an extension falls back to the search (observed:** FSL
+  6.0.7.23 reads `in.nii` when given `in.nii.gz` and only `in.nii` exists; the clean-room original
+  refused there**)**: the name loses one extension (the first of the list above that ends it, an
+  `.img` form standing for its `.hdr`); if it had one and that file (the header of a pair) exists,
+  it is read; otherwise the extension-less name is completed as above (exactly one match read,
+  several `Multiple possible filenames detected for basename: <name>`, none the messages above). So
+  a name with an extension is used as is only when that file exists.
 - **Names holding `.img` (FSL 6.0.7.23, FSL-60).** FSL 6.0.7.23 opens every image under its name
   with the last occurrence of `.img` anywhere in it (a directory, or the file's own stem such as
   `sub.img2.nii.gz`) replaced by `.hdr`: it reads or writes another file, or fails with `Error:
@@ -949,9 +956,153 @@ For an original that wants to stay as close as possible to FSL (not required):
 - C's conversions of double to int truncate toward zero; `(int)` of a value out of range or NaN is
   `INT_MIN` on x86-64;
 - the sums over a vertex's triangles and neighbours are in the order the triangles were created
-  (§4.4's construction, each subdivision's new triangles in order);
+  (§4.4's construction, each subdivision's new triangles in order); (spec writer, 2026-10-30) the
+  neighbours' own order is §4.4's rule (question 5);
 - the NIfTI headers' quaternions are computed as FSL's NIfTI library does, in x87 extended
-  precision.
+  precision; (spec writer, 2026-10-30) the precision of each step is §8.2 (question 3).
+
+(spec writer, 2026-10-30) **Where a surface reruns, these conventions are not optional**: the
+reruns amplify last-bit differences (§4.5), so an original that wants FSL's results on images whose
+first pass self-intersects (older adults, 7 T, a tumour in the standard tier) needs §8.1 in full.
+Where nothing reruns, the original's own arithmetic already gave FSL's surfaces (fMRIPrep's 29
+calls bit-identical).
+
+### 8.1 The deformation's arithmetic, operation by operation (spec writer, 2026-10-30)
+
+Double precision unless said; `float(·)` rounds to float; no fused multiply-add anywhere (FSL's
+build has none); every sum in the order given (FSL is single-threaded: a parallel implementation
+keeps the order of each sum, which the per-vertex sums allow).
+- **The parameters.** `t2`, `t98` (§4.2) and the median as doubles; `t = t2 + 0.1·(t98 − t2)`;
+  `b_t = pow(f, 0.275)` with `f` the float option as double.
+- **The radius**: `r = pow((((0.75·N)·dx)·dy)·dz / π, 1/3)`, `N` the count as double, the voxel
+  sizes (floats) as doubles, `π` the double nearest, the exponent `1.0/3.0`. A slab along x (the
+  test `float(n_x·dx) < r`, the product in float): `r = pow((float(N·dy·dz) / π) / n_x, 0.5)`,
+  the product `N·dy·dz` in float (`N` first converted to float), the divisions in double; then
+  the same test and formula along y (with `dx`, `dz`) and along z (with `dx`, `dy`), each with the
+  `r` the previous one left.
+- **The centre of gravity**: one running sum over the whole volume in storage order (x fastest):
+  with `e = v − t2` and `τ = t − t2`, each voxel with `e > τ` adds `w = min(e, t98 − t2)` to `W`
+  and `((w·i)·dx, (w·j)·dy, (w·k)·dz)` to `C` (`i`, `j`, `k` as doubles); `c = (C_x/W, C_y/W,
+  C_z/W)`. A per-slice partial sum gives other bits. With `-c x y z`: `(x·dx, y·dy, z·dz)` after
+  the conversion of §3.2.
+- **The smoothness constants**: `rmin = 3.33·w` in double, `rmax = float(10·w)` (the product in
+  float), `w` the float option; `E = (1/rmin + 1/rmax)/2`, `F = 6/(1/rmin − 1/rmax)`.
+- **The initial placement**: §4.4 (translate by `c`, then scale about `c`).
+- **`l`** (iterations 0, 50, 100, 200, …, 900): for each vertex in order, the sum of `|q − p|` over
+  its neighbours in their order (§4.4), each `|v| = sqrt((v_x·v_x + v_y·v_y) + v_z·v_z)` of the
+  vector `q − p`, divided by the neighbour count; these summed over the vertices in order, then
+  divided by the vertex count.
+- **Each vertex** (from the previous iteration's positions; all move at once afterwards):
+  1. the triangle normals `N = (v2 − v0) × (v1 − v0)` (§4.4); `v` = the sum of the vertex's `N` in
+     its triangle order, from 0; `n = (v_x/|v|, v_y/|v|, v_z/|v|)` (three divisions, not products
+     with `1/|v|`; a zero `v` stays zero);
+  2. `m = (S_x/k, S_y/k, S_z/k)` with `S` the sum of the neighbours' positions in their order and
+     `k` their count (three divisions);
+  3. `s = m − p`; `σ = (s_x·n_x + s_y·n_y) + s_z·n_z`; `s_n = (n_x·σ, n_y·σ, n_z·σ)`;
+     `s_t = s − s_n`; `u1 = s_t·0.5`;
+  4. `1/R = (2·|s_n·n|) / (l·l)`: the dot product of `s_n` with `n` computed again (not `σ`, which
+     differs from it in the last bits);
+  5. `f2 = (1 + tanh(F·(1/R − E)))·0.5`; in a rerun, where `σ > 0`: `f2 = min(f2·F_P, 1)` (§4.5);
+     `u2 = (f2·s_n,x, f2·s_n,y, f2·s_n,z)`;
+  6. the intensity term of §4.4, with `q = p + (−1)·n`, the voxel coordinates `q_a/d_a + 0.5`, the
+     step `ν_a = n_a/d_a`, the deepest voxel at `q_a/d_a + 0.5 − (d1 − 1)·ν_a`, then `ν_a ← ν_a·ds`
+     and each sample `ν_a` further in (accumulated), `g` accumulated; with `-g G`:
+     `b = min(1, max(0, b_t + (G·(p_z − c_z))/r))`; `tl = (Imax − t2)·b + t2`;
+     `f3 = (2·(Imin − tl))/(Imax − t2)` (when `Imax − t2 > 0`, else `(Imin − tl)·2`); then
+     `f3 ← f3·((0.5·0.1)·l)` and `u3 = (f3·n_x, f3·n_y, f3·n_z)`;
+  7. `p_new = p + ((u1 + u2) + u3)`: the three terms summed first, then added to `p`
+     (`((p + u1) + u2) + u3` is not the same double).
+- **The C library's functions.** `tanh` is glibc 2.35's: fdlibm's `tanh` over fdlibm's `expm1`
+  in the revision by Naohiko Shimizu (1997) that glibc ships, both under Sun's notice (freely
+  redistributable), compiled without fused multiply-add. The Rust `libm` crate's `tanh` (musl's)
+  is another algorithm and differs in the last bit for some of BET's arguments: on the tumour's
+  rerun (§4.5) it alone changes the result. `pow` is glibc 2.35's (the code it takes from Arm's
+  Optimized Routines, MIT, in its build with fused multiply-adds for CPUs that have them); a
+  correctly rounded `pow` differs in the last bit for about 0.09 % of BET's arguments and made no
+  difference on the three rerun cases measured. `sqrt` is correctly rounded everywhere.
+- **The trilinear interpolation** (the skull search, betsurf): the coordinates rounded to float;
+  `i = floor(x)` (and `j`, `k`), `f_x = x − i` in float; the eight corners, 0 outside the image
+  (also the `+1` corners past the last voxel); in float, x first, then y, then z, each step
+  `(b − a)·f + a`: `t1 = (v100 − v000)·f_x + v000`, `t2 = (v101 − v001)·f_x + v001`,
+  `t3 = (v110 − v010)·f_x + v010`, `t4 = (v111 − v011)·f_x + v011`, `t5 = (t3 − t1)·f_y + t1`,
+  `t6 = (t4 − t2)·f_y + t2`, the value `(t6 − t5)·f_z + t5` (`v_abc` the corner `(i + a, j + b,
+  k + c)`).
+- **The `-e` sweep's order** (§4.5): vertices of equal x are left in the order libstdc++'s
+  introsort leaves them (the SGI STL's algorithm); this matters only when two vertices share an x.
+- **The self-intersection measure's printed digits** (§4.5, §4.9): `ml` and `mlo` are sums over the
+  vertices in order (as `l`, one loop, two sums), divided by the vertex count; the total is one
+  running sum, `i` the outer vertex in order and `j` the inner one in order, over every ordered
+  pair with `i ≠ j`, `j` not a neighbour of `i` (adjacency as coordinates of one of `i`'s
+  neighbours agreeing with `j`'s within `1e-8` in each axis) and
+  `((x_i − x_j)·(x_i − x_j) + (y_i − y_j)·(y_i − y_j)) + (z_i − z_j)·(z_i − z_j) < ml·ml`, of
+  `(a − b)·(a − b)` with `a = |p_i − p_j|/ml` and `b = |o_i − o_j|/mlo` (`o` the initial surface).
+  A spatial grid finds the same pairs faster and keeps FSL's digits when it adds, for each `i`, its
+  pairs in increasing `j`.
+
+**How these were checked** (spec writer, 2026-10-30): copies of the replica (bit-identical to FSL)
+each given one of the clean-room original's choices (`c + (r/2)p`; `((p + u1) + u2) + u3`; `1/R`
+from `σ`; products with `1/|v|` and `1/k`; the normal from `v1`; per-slice centre sums;
+first-come neighbours; musl's `tanh`; a correctly rounded `pow`) moved the reruns of §4.5; with
+all ten, and three more (`g` as `2 + k·ds`; `n·d` in double with `2r` only below `r`; the slab
+radius as `sqrt(N·(d·d)/(π·n))`), the replica gave the original's results exactly in 59 of the 75
+random-testing cases the original still differed in (the 2026-10-30 trial: every stream, image and
+mesh). Of the other 16: six differ only in the skull image (§4.7's search, written above; case
+135 also in `bet -Z`'s temporaries), two in their zstd files (cases 106 and 482, the latter also
+its skull; not compared by value), one is `bet -F`'s float64 brain (case 425, §5.2), and seven
+(cases 45, 121, 154, 213, 262, 541, 677: small or degenerate heads, the original's surface
+diverging in 541) still differ in their surface, by arithmetic choices of the original not
+identified here: after aligning with this section, they are the cases to check first
+(`difftest --case fsl-bet:20261030:<n>`). The probes: `validation/investigations/bet-spec-answers/`.
+
+### 8.2 The qform's quaternion, operation by operation (spec writer, 2026-10-30; question 3)
+
+FSL rewrites the qform through the NIfTI-1 standard's conversions (the reference library that
+`nifti1.h` points to, public domain): the quaternion to a 4 × 4 matrix when read, the matrix back
+to a quaternion when written. Their precision decides the last float bit, and NIfTI-2's doubles
+in full. In order:
+1. **Read**: `b`, `c`, `d`, the offsets, the voxel sizes and `qfac` as **floats** (a NIfTI-2
+   header's doubles are rounded to float here), then widened to double.
+2. **To the matrix**: `S = (b·b + c·c) + d·d`; `a = 1 − S` computed in x87 extended precision
+   (80 bits, 64-bit mantissa) and rounded to double; if `a < 1e-7` (compared in extended precision,
+   with `1e-7` as an extended constant): `a = 1/sqrt(S)` (the square root in double, the division
+   in extended, rounded to double), `b, c, d` multiplied by it in double, then `a = 0`; else
+   `a = sqrt(a)`. `x_d, y_d, z_d` = the voxel sizes (1 where not positive), `z_d` negated when
+   `qfac < 0`. The diagonal `R11 = float((((a·a + b·b) − c·c) − d·d)·x_d)` (and its kin) in double,
+   rounded to float; each off-diagonal entry, `R12 = float(2·(b·c − a·d)·y_d)` and its kin, with
+   the bracket in double and the two products in extended precision, rounded **once** from
+   extended to float. The matrix is held in float.
+3. The volume keeps that float matrix (as doubles); FSL's radiological mirroring (§3.2) multiplies
+   it by exact ±1 and integer matrices, which changes no bit.
+4. **Back to the quaternion**, from the float matrix: the entries widened to double; each column's
+   length `sqrt((r1j·r1j + r2j·r2j) + r3j·r3j)` in double (a zero length: that column replaced by
+   the unit vector, length 1); each column divided by its length in double; the result rounded to
+   float.
+5. **The polar decomposition, in float** (the nearest orthogonal matrix; FSL's matrices are
+   floats): `X` = that matrix; while `det(X) = 0`, add `float(0.00001·(0.001 + ‖X‖_row))` to its
+   diagonal; then repeat: `Y` = the inverse of `X` (computed in double from the float entries,
+   the determinant left to right as `r11·r22·r33 − r11·r32·r23 − r21·r12·r33 + r21·r32·r13 +
+   r31·r12·r23 − r31·r22·r13`, its reciprocal in extended precision rounded to double, each entry
+   the reciprocal times its cofactor in double, stored as float); while the change `dif` (below)
+   exceeds 0.3: `α = sqrtf(‖X‖_row·‖X‖_col)`, `β = sqrtf(‖Y‖_row·‖Y‖_col)`, `γ = sqrtf(β/α)`,
+   `γ' = float(1/γ)` (the norms the largest row or column sum of absolute values, summed in
+   float; the products and the quotient in float), else `γ = γ' = 1`; `Z_ij = float(0.5·(γ·X_ij +
+   γ'·Y_ji))` (the products and the sum in float); `dif` = the sum, in float and in row order, of
+   `|Z_ij − X_ij|`; stop after 100 rounds or when `dif < 3e-6` (`dif` starts at 1), else `X = Z`.
+6. From `Z` (widened): the determinant (left to right, as in 5) gives `qfac = 1` when positive,
+   else `qfac = −1` and the third column negated; `a = ((r11 + r22) + r33) + 1`, the last addition
+   in extended precision, rounded to double; if `a > 0.5`: `a = 0.5·sqrt(a)`, `b = (0.25·(r32 −
+   r23))/a`, `c = (0.25·(r13 − r31))/a`, `d = (0.25·(r21 − r12))/a`, each difference in double,
+   the product and the division in extended precision, rounded to double; else the standard's
+   other three cases (`1 + r11 − (r22 + r33)` and its kin in double; the largest-diagonal case's
+   component `0.5·sqrt(·)`, the others `(0.25·(sum or difference))/that` in extended, rounded to
+   double), and when the resulting `a < 0` the signs of `b, c, d` are flipped (this picks FSL's
+   sign for a half turn).
+7. **Written**: NIfTI-1 stores `float(b)`, `float(c)`, `float(d)`; **NIfTI-2 stores the doubles of
+   step 6 unrounded** (not their float values: that is the "about 5e-9" of the clean-room
+   original's NIfTI-2 headers, which wrote floats).
+**(checked)** `validation/investigations/bet-spec-answers/quat_emul.py` follows these steps (numpy's
+`longdouble` is x87's 80-bit type on x86-64 Linux) and gives FSL 6.0.7.23's quaternion bit for bit
+on nine real T1w images, NIfTI-1 and NIfTI-2 outputs alike (18 of 18).
 
 ## 9. Defects (D13): what the default does
 

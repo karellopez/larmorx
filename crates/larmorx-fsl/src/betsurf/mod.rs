@@ -61,9 +61,7 @@ pub fn read_matrix(text: &str) -> (Matrix, usize) {
 /// C++'s `>> double` on a word: the value of its longest numeric prefix and whether that was
 /// the whole word; `None` when no prefix reads.
 fn parse_cxx_double(w: &str) -> Option<(f64, bool)> {
-    let r = meshfile::read(&format!("x\n1 0\n{w} 0 0 0\n"));
-    let _ = r;
-    // a small grammar of its own: sign, digits, fraction, exponent
+    // sign, digits, fraction, exponent
     let b = w.as_bytes();
     let mut i = 0;
     if i < b.len() && (b[i] == b'+' || b[i] == b'-') {
@@ -114,6 +112,7 @@ pub enum Refusal {
 /// The brain surface's mask on the T1's grid (§6.3): the surface drawn as 1 into 0s and filled
 /// with 1 from its centroid. A centroid outside the image (FSL-43): the nearest voxel inside
 /// (default) or FSL's fill by the linear index (`reproduce`); not a number: no fill.
+#[allow(clippy::too_many_arguments)]
 pub fn surface_mask(
     mesh: &Mesh,
     points: &[V3],
@@ -441,7 +440,7 @@ fn heap_select(v: &mut [f32], k: usize, less: &impl Fn(f32, f32) -> bool) {
             v[hole] = v[child];
             hole = child;
         }
-        if len % 2 == 0 && len >= 2 && child == (len - 2) / 2 {
+        if len.is_multiple_of(2) && len >= 2 && child == (len - 2) / 2 {
             child = 2 * (child + 1);
             v[hole] = v[child - 1];
             hole = child - 1;
@@ -554,14 +553,13 @@ pub struct Votes {
     pub profiles: usize,
     /// The profiles dropped (counting for nothing).
     pub dropped: usize,
-    /// The profiles of which only the scalp counts.
+    /// The profiles of which only the scalp counts (with the dropped ones, the verbose line's
+    /// "removed profiles", observed).
     pub scalp_only: usize,
     /// The profiles whose searches read past their last sample (FSL-51).
     pub overruns: usize,
     /// A profile on which FSL ends the program (FSL-50 reproduced).
     pub stop: bool,
-    /// Probe dump (temporary).
-    pub dump: Vec<String>,
 }
 
 /// Whether a profile from the point `x` (mm, T1's grid) along `n` passes near the eyes (§6.4):
@@ -599,7 +597,6 @@ pub fn votes(
     grid: &WorkGrid,
     drop_overruns: bool,
     fsl50: bool,
-    variant: u32,
 ) -> Votes {
     let shape = t1.shape;
     let d = t1.voxel;
@@ -621,8 +618,7 @@ pub fn votes(
     let normals = mesh.triangle_normals(points);
     let start = if t2.is_some() { -30.0 } else { -3.0 };
     let [gx, gy, _] = grid.shape;
-    let dump_mode = std::env::var("LX_BETSURF_DUMP").unwrap_or_default();
-    let dump = !dump_mode.is_empty();
+    #[derive(Default)]
     struct Cast {
         hits: Vec<(u8, usize)>,
         profiles: usize,
@@ -630,21 +626,12 @@ pub fn votes(
         scalp_only: usize,
         overruns: usize,
         stop: bool,
-        dump: Vec<String>,
     }
     let casts: Vec<Cast> = (0..points.len())
         .into_par_iter()
         .with_min_len(16)
         .map(|v| {
-            let mut c = Cast {
-                hits: Vec::new(),
-                profiles: 0,
-                dropped: 0,
-                scalp_only: 0,
-                overruns: 0,
-                stop: false,
-                dump: Vec::new(),
-            };
+            let mut c = Cast::default();
             let p = points[v];
             let n = mesh.vertex_normal(v, &normals);
             let nu = [n[0] / d[0], n[1] / d[1], n[2] / d[2]];
@@ -689,39 +676,17 @@ pub fn votes(
                         let sample = |vol: &Vol| -> Vec<f32> {
                             let mut out = Vec::with_capacity(((end - start) / 0.5) as usize);
                             let mut s = start;
-                            let mut acc = [o[0] + s * nu[0], o[1] + s * nu[1], o[2] + s * nu[2]];
                             while s < end {
-                                let q = if variant & 1024 != 0 {
-                                    [0, 1, 2].map(|a| (x[a] + s * n[a]) / d[a])
-                                } else if variant & 2048 != 0 {
-                                    [0, 1, 2].map(|a| o[a] + (s * n[a]) / d[a])
-                                } else if variant & 4096 != 0 {
-                                    let q = acc;
-                                    acc = [0, 1, 2].map(|a| acc[a] + 0.5 * nu[a]);
-                                    q
-                                } else {
-                                    [o[0] + s * nu[0], o[1] + s * nu[1], o[2] + s * nu[2]]
-                                };
+                                let q = [o[0] + s * nu[0], o[1] + s * nu[1], o[2] + s * nu[2]];
                                 out.push(trilinear(vol, q));
                                 s += 0.5;
                             }
                             out
                         };
                         let mut p1 = Profile::new(start, sample(t1));
-                        p1.variant = variant;
-
-                        let record = dump.then(|| {
-                            format!(
-                                "{{\"v\": {v}, \"o\": [{i}, {j}, {k}], \"eyes\": {eyes}, \"n\": {:?}, \"start\": {start}, \"t1\": {:?}, \"t2\": {:?}",
-                                n,
-                                p1.values,
-                                t2.map(&sample).unwrap_or_default()
-                            )
-                        });
                         let est = match t2 {
                             Some(t2v) => {
                                 let mut p2 = Profile::new(start, sample(t2v));
-                                p2.variant = variant;
                                 let e = if eyes {
                                     profile::t1t2_eyes(&mut p1, &mut p2)
                                 } else {
@@ -738,19 +703,6 @@ pub fn votes(
                                 }
                             }
                         };
-                        if let Some(r) = record {
-                            let keep = match dump_mode.as_str() {
-                                "overrun" => p1.overrun,
-                                "eyes" => eyes,
-                                _ => true,
-                            };
-                            if keep {
-                                c.dump.push(format!(
-                                    "{r}, \"over\": {}, \"est\": \"{est:?}\"}}",
-                                    p1.overrun
-                                ));
-                            }
-                        }
                         if p1.overrun {
                             c.overruns += 1;
                             if drop_overruns {
@@ -761,12 +713,7 @@ pub fn votes(
                         let mut put = |image: u8, e: f64| {
                             let mut idx = [0usize; 3];
                             for a in 0..3 {
-                                let x = if variant & 8192 != 0 {
-                                    ((x[a] + e * n[a]) / d[a] + 0.5).floor()
-                                } else {
-                                    (o[a] + e * nu[a] + 0.5).floor()
-                                };
-                                let x = x + grid.pad[a] as f64;
+                                let x = (o[a] + e * nu[a] + 0.5).floor() + grid.pad[a] as f64;
                                 if !(x >= 0.0 && x < grid.shape[a] as f64) {
                                     return;
                                 }
@@ -782,7 +729,7 @@ pub fn votes(
                             }
                             Estimate::Scalp(s) => {
                                 c.scalp_only += 1;
-                                put(2, s)
+                                put(2, s);
                             }
                             Estimate::Kept {
                                 inner,
@@ -807,13 +754,12 @@ pub fn votes(
         scalp: vec![0.0; len],
         ..Votes::default()
     };
+    // the counts are small integers, exact in float: the order of the additions does not
+    // matter
     for c in casts {
         out.profiles += c.profiles;
         out.dropped += c.dropped;
         out.scalp_only += c.scalp_only;
-        for line in &c.dump {
-            out.dump.push(line.clone());
-        }
         out.overruns += c.overruns;
         if c.stop {
             out.stop = true;
@@ -827,7 +773,6 @@ pub fn votes(
             }
         }
     }
-    let _ = nz;
     out
 }
 
@@ -911,10 +856,6 @@ pub fn deform(
             l = mesh.mean_neighbour_distance(points);
         }
         let normals = mesh.triangle_normals(points);
-        let dk: u32 = std::env::var("LX_DEFORM")
-            .ok()
-            .and_then(|v| v.parse().ok())
-            .unwrap_or(0);
         if i % 100 == 0 {
             let pts = &*points;
             outside
@@ -926,13 +867,7 @@ pub fn deform(
                     let n = mesh.vertex_normal(v, &normals);
                     let mut out = true;
                     let mut prev: Option<f64> = None;
-                    let mut t = if dk & 1 != 0 {
-                        1.0
-                    } else if dk & 2 != 0 {
-                        0.0
-                    } else {
-                        -1.0
-                    };
+                    let mut t = -1.0;
                     while t <= 149.0 {
                         let x = at(image, add(p, scale(n, t)));
                         if x > 0.1 {
@@ -940,12 +875,7 @@ pub fn deform(
                             break;
                         }
                         if let Some(pv) = prev
-                            && (if dk & 8 != 0 {
-                                f64::from(100.0f32 * (x as f32 - pv as f32))
-                            } else {
-                                100.0 * (x - pv)
-                            }) > 0.1
-                            && dk & 16 == 0
+                            && 100.0 * (x - pv) > 0.1
                         {
                             out = false;
                             break;
@@ -953,11 +883,7 @@ pub fn deform(
                         prev = Some(x);
                         t += 2.0;
                     }
-                    if dk & 4 != 0 {
-                        *o |= out;
-                    } else {
-                        *o = out;
-                    }
+                    *o = out;
                 });
         }
         let l2 = l * l;

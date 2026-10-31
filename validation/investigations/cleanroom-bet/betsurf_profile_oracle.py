@@ -84,17 +84,14 @@ def main(argv: list[str]) -> int:
         opts = ["-v"] if t2p != "-" else ["-v", "-1"]
         args = [*opts, *images, str(dk / "mesh.vtk"), matp]
         f = fslrun.run("betsurf", [*args, "o"], dk / "fsl")
+        # the original's own -v lines (the part's probe build also wrote each profile's samples
+        # to standard error with LX_BETSURF_DUMP=1, kept in dump.txt: README)
         env = dict(os.environ, LARMORX_IMPLEMENTATION="original", FSLOUTPUTTYPE="NIFTI_GZ",
                    LX_BETSURF_DUMP="1")
-        if copies == 1:
-            env["LX_BETSURF_DEBUG"] = "stop"
-        else:
-            env["LX_BETSURF_DEBUG"] = "1"
         lx = subprocess.run([binary, "fsl", "betsurf", *args, str(dk / "lx")], env=env,
                             capture_output=True, text=True, check=False)
         (dk / "dump.txt").write_text(lx.stderr, encoding="utf-8")
-        mine = re.search(r"DEBUG profiles (\d+) dropped (\d+) scalp_only (\d+)", lx.stderr)
-        lxr = f"{mine[1]}:{int(mine[2]) + int(mine[3])}" if mine else "?"
+        lxr = removed(lx.stdout)
         meshes = ""
         if copies > 1:
             for s in ("inskull", "outskull", "outskin"):

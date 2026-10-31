@@ -4,10 +4,18 @@
 //! skull, the outer skull and the scalp each profile gives.
 //!
 //! A profile holds its samples at the positions `s0, s0 + 0.5, ...` (mm along the normal) and a
-//! region `[L, R)` of them; the thresholds `th(a) = min + a (max - min)` use the region's
-//! minimum and maximum. Forward searches start at the first sample at or after a position and
-//! stop at the region's end; backward searches start at the last sample at or before a position
-//! and stop at the region's start. A search that finds nothing gives [`NONE`].
+//! region of them; the thresholds `th(a) = min + a (max - min)` use the region's minimum and
+//! maximum. Forward searches start at the first sample at or after a position and stop at the
+//! region's end; backward searches start at the last sample at or before a position and stop at
+//! the region's start. A search that finds nothing gives [`NONE`].
+//!
+//! What the spec leaves open was settled by black-box runs of FSL 6.0.7.23's betsurf on single
+//! profiles (`validation/investigations/cleanroom-bet/betsurf_profile_oracle.py`: a tiny
+//! triangle that casts exactly one profile, FSL's `-v` saying whether it set it aside; 330 of
+//! 330 profiles agree, `docs/findings/fsl-bet-original.md`, "betsurf"): a region that ends at a
+//! position holds the sample there; step 5's "more than one" counts the bright samples found;
+//! step 7's scan includes `a`; step 6's fallback is the region's start; a T1-only profile is not
+//! kept when its outer skull lies inside its inner skull.
 
 /// What a search gives when it finds nothing.
 pub const NONE: f64 = -500.0;
@@ -26,20 +34,7 @@ pub struct Profile {
     hi: usize,
     /// Whether a backward search started past the last sample (FSL-51).
     pub overrun: bool,
-    /// Probe variants (`V_*` bits).
-    pub variant: u32,
 }
-
-pub const V_BWD_END: u32 = 1;
-pub const V_FWD_START: u32 = 2;
-pub const V_TH_F32: u32 = 4;
-pub const V_WITHIN_LT: u32 = 8;
-pub const V_SCAN_SKIP_A: u32 = 16;
-pub const V_OS2_FALLBACK: u32 = 32;
-pub const V_COUNTER_FIRST: u32 = 64;
-pub const V_REGION_INCL: u32 = 128;
-pub const V_B_NONE: u32 = 256;
-pub const V_NO_A_MIN: u32 = 512;
 
 impl Profile {
     pub fn new(start: f64, values: Vec<f32>) -> Profile {
@@ -50,7 +45,6 @@ impl Profile {
             lo: 0,
             hi,
             overrun: false,
-            variant: 0,
         }
     }
 
@@ -87,14 +81,9 @@ impl Profile {
         self.lo = self.first_at_or_after(s).min(self.values.len());
     }
 
-    /// The region ends before the first sample at or after `s`.
+    /// The region ends at `s`, the sample there included (observed).
     pub fn set_end(&mut self, s: f64) {
-        // observed (single-profile runs of FSL's betsurf): the region holds the sample at `s`
-        let k = if self.variant & V_REGION_INCL == 0 {
-            self.last_at_or_before(s).map_or(0, |k| k + 1)
-        } else {
-            self.first_at_or_after(s)
-        };
+        let k = self.last_at_or_before(s).map_or(0, |k| k + 1);
         self.hi = k.min(self.values.len());
     }
 
@@ -114,11 +103,11 @@ impl Profile {
 
     /// `th(a) = min + a (max - min)` over the region (NaN for an empty region).
     pub fn th(&self, a: f64) -> f64 {
-        let mut lo = f64::INFINITY;
-        let mut hi = f64::NEG_INFINITY;
         if self.lo >= self.hi {
             return f64::NAN;
         }
+        let mut lo = f64::INFINITY;
+        let mut hi = f64::NEG_INFINITY;
         for &v in &self.values[self.lo..self.hi] {
             let v = f64::from(v);
             if v < lo {
@@ -128,19 +117,12 @@ impl Profile {
                 hi = v;
             }
         }
-        if self.variant & V_TH_F32 != 0 {
-            let (l, h) = (lo as f32, hi as f32);
-            return f64::from(l + (a as f32) * (h - l));
-        }
         lo + a * (hi - lo)
     }
 
     /// The first sample at or after `s`, within the region's end, that satisfies `test`.
     fn forward(&self, s: f64, test: impl Fn(f64) -> bool) -> f64 {
         let mut k = self.first_at_or_after(s);
-        if self.variant & V_FWD_START != 0 {
-            k = k.max(self.lo);
-        }
         while k < self.hi {
             if test(f64::from(self.values[k])) {
                 return self.position(k);
@@ -152,23 +134,17 @@ impl Profile {
 
     /// The last sample at or before `s`, down to the region's start, that satisfies `test`; a
     /// start past the last sample reads "nothing there" for the samples beyond it (FSL-51:
-    /// noted in [`Profile::overrun`]).
+    /// noted in [`Profile::overrun`]; observed: FSL's decisions on such profiles are those).
     fn backward(&mut self, s: f64, test: impl Fn(f64) -> bool) -> f64 {
         let Some(mut k) = self.last_at_or_before(s) else {
             return NONE;
         };
-        if self.variant & V_BWD_END != 0 && k >= self.hi {
-            if self.hi == 0 {
-                return NONE;
-            }
-            k = self.hi - 1;
-        }
         if k >= self.values.len() {
             self.overrun = true;
-            k = self.values.len().saturating_sub(1);
             if self.values.is_empty() {
                 return NONE;
             }
+            k = self.values.len() - 1;
         }
         loop {
             if k < self.lo {
@@ -204,7 +180,7 @@ impl Profile {
         self.backward(s, |v| v <= th)
     }
 
-    /// The samples from index of position `s` (inclusive) to the region's end.
+    /// The samples from the one at or after position `s` to the region's end.
     pub fn samples_from(&self, s: f64) -> impl Iterator<Item = (f64, f64)> + '_ {
         let k0 = self.first_at_or_after(s);
         (k0..self.hi.max(k0)).map(|k| (self.position(k), f64::from(self.values[k])))
@@ -214,7 +190,7 @@ impl Profile {
 /// What a profile gives.
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub enum Estimate {
-    /// Dropped: it counts for nothing (the verbose line's "removed profiles").
+    /// Dropped: it counts for nothing.
     Dropped,
     /// Only its scalp counts.
     Scalp(f64),
@@ -224,20 +200,9 @@ pub enum Estimate {
     Stop,
 }
 
-/// Probe counters (temporary).
-pub static TALLY: [std::sync::atomic::AtomicUsize; 16] =
-    [const { std::sync::atomic::AtomicUsize::new(0) }; 16];
-
-fn tally(k: usize) {
-    TALLY[k].fetch_add(1, std::sync::atomic::Ordering::Relaxed);
-}
-
 /// Whether `a` lies within 10 mm of `b`.
 #[inline]
-fn within_10(a: f64, b: f64, variant: u32) -> bool {
-    if variant & V_WITHIN_LT != 0 {
-        return (a - b).abs() < 10.0;
-    }
+fn within_10(a: f64, b: f64) -> bool {
     (a - b).abs() <= 10.0
 }
 
@@ -268,17 +233,15 @@ pub fn t1t2(t1: &mut Profile, t2: &mut Profile, fsl50: bool) -> Estimate {
         if s >= s2 {
             let th = t1.th(0.2);
             let x = t1.last_ge(m, th);
-            if within_10(x, s2, t1.variant) {
+            if within_10(x, s2) {
                 s = x;
             } else {
-                tally(0);
                 return Estimate::Dropped;
             }
         } else {
             let th = t2.th(0.25);
             let y = t2.last_ge(m, th);
-            if !within_10(y, s, t1.variant) {
-                tally(1);
+            if !within_10(y, s) {
                 return Estimate::Dropped;
             }
             // FSL-49: the T1's scalp kept (rule C)
@@ -298,8 +261,8 @@ pub fn t1t2(t1: &mut Profile, t2: &mut Profile, fsl50: bool) -> Estimate {
     let mut pos = is;
     let mut first_bright = NONE;
     let mut first_gap = NONE;
-    // the bright samples found (observed: "more than one" counts them, a bright sample with
-    // no dark one after it included)
+    // observed: "more than one" counts the bright samples found, a bright one with no dark
+    // sample after it included
     let mut brights = 0usize;
     let mut gaps = 0usize;
     while gaps < 6 {
@@ -321,7 +284,7 @@ pub fn t1t2(t1: &mut Profile, t2: &mut Profile, fsl50: bool) -> Estimate {
         gaps += 1;
         pos = g;
     }
-    let from = if brights > 1 && within_10(first_bright, is, t1.variant) {
+    let from = if brights > 1 && within_10(first_bright, is) {
         first_gap
     } else {
         is + 0.5
@@ -356,14 +319,6 @@ pub fn t1t2(t1: &mut Profile, t2: &mut Profile, fsl50: bool) -> Estimate {
     }
     let os = t1.first_ge(b, low);
     // 8.
-    for (k, ok) in [os2 - os < 3.0, os - os2 < 2.0, s - os >= 2.0, os >= is]
-        .into_iter()
-        .enumerate()
-    {
-        if !ok {
-            tally(4 + k);
-        }
-    }
     if os2 - os < 3.0 && os - os2 < 2.0 && s - os >= 2.0 && os >= is {
         Estimate::Kept {
             inner: is,
@@ -414,28 +369,16 @@ pub fn t1only(t1: &mut Profile) -> Estimate {
     let is = t1.first_le(t1.region_start(), t1.th(0.25));
     t1.set_start(is);
     let x = t1.last_ge(s, t1.th(0.75));
-    let mut os2 = t1.last_le(x, t1.th(0.20));
-    if os2 == NONE && t1.variant & V_OS2_FALLBACK != 0 {
-        os2 = x;
-    }
+    let os2 = t1.last_le(x, t1.th(0.20));
     let a = t1.first_le(t1.region_start(), t1.th(0.30));
     if a == NONE {
         return Estimate::Dropped;
     }
-    let a = if t1.variant & V_NO_A_MIN != 0 {
-        a
-    } else {
-        a.max(-3.0)
-    };
+    let a = a.max(-3.0);
     let (stop, mid) = (t1.th(0.60), t1.th(0.15));
     let mut counter = 0u32;
-    let mut b = if t1.variant & V_B_NONE != 0 { NONE } else { a };
-    let skip = usize::from(t1.variant & V_SCAN_SKIP_A != 0);
-    let counter_first = t1.variant & V_COUNTER_FIRST != 0;
-    for (pos, v) in t1.samples_from(a).skip(skip) {
-        if counter_first && counter >= 12 {
-            break;
-        }
+    let mut b = a;
+    for (pos, v) in t1.samples_from(a) {
         if v > stop {
             break;
         }
@@ -445,15 +388,15 @@ pub fn t1only(t1: &mut Profile) -> Estimate {
             counter = counter.saturating_sub(1);
             b = pos;
         }
-        if !counter_first && counter >= 12 {
+        if counter >= 12 {
             break;
         }
     }
     let os = t1.first_ge(b, mid);
     let d = os2 - os;
-    // observed (single-profile runs): an outer skull found inside the inner skull is not kept
-    // (FSL sets the profile aside where both searches found nothing); `OS ≥ IS` would give the
-    // same decisions on every profile probed (a question for the spec writer)
+    // observed: an outer skull inside the inner skull is not kept (FSL sets the profile aside
+    // where both outer searches found nothing); `OS ≥ IS` gives the same decisions on every
+    // profile probed (a question for the spec writer)
     if (-2.0..2.0).contains(&d) && s - os2 >= 2.0 && os2 >= is {
         Estimate::Kept {
             inner: is,
@@ -469,18 +412,12 @@ pub fn t1only(t1: &mut Profile) -> Estimate {
 pub fn t1only_eyes(t1: &mut Profile) -> Estimate {
     let th = t1.th(0.2);
     let s = t1.last_ge(t1.last_position(), th);
-    let ek: u32 = std::env::var("LX_EYE")
-        .ok()
-        .and_then(|v| v.parse().ok())
-        .unwrap_or(0);
-    if ek & 1 == 0 {
-        t1.set_end(s);
-    }
+    t1.set_end(s);
     let mut is = t1.first_le(-3.0, t1.th(0.25));
-    if is > 5.0 || (ek & 4 != 0 && is >= 5.0) {
+    if is > 5.0 {
         is = 0.0;
     }
-    let os = t1.first_ge(if ek & 2 != 0 { is + 0.5 } else { is }, t1.th(0.35));
+    let os = t1.first_ge(is, t1.th(0.35));
     Estimate::Kept {
         inner: is,
         outer: os,
@@ -508,8 +445,27 @@ mod tests {
         assert!(!p.overrun);
         assert_eq!(p.last_ge(100.0, 8.0), -3.0 + 11.0 * 0.5);
         assert!(p.overrun);
+        // the region ends at 0.0, the sample there (index 6, value 6) included
         p.set_end(0.0);
         assert_eq!(p.first_le(-1.0, -1.0), NONE);
-        assert_eq!(p.th(1.0), 5.0);
+        assert_eq!(p.th(1.0), 6.0);
+    }
+
+    #[test]
+    fn a_t1only_profile() {
+        // brain (bright), a dark skull, the scalp, then air: kept, the estimates in order
+        let mut v = vec![900.0f32; 6];
+        v.extend([100.0f32; 8]);
+        v.extend([800.0f32; 10]);
+        v.extend([5.0f32; 102]);
+        let mut p = Profile::new(-3.0, v);
+        match t1only(&mut p) {
+            Estimate::Kept {
+                inner,
+                outer,
+                scalp,
+            } => assert!(inner < outer && outer < scalp, "{inner} {outer} {scalp}"),
+            e => panic!("{e:?}"),
+        }
     }
 }

@@ -65,7 +65,9 @@ def main(argv: list[str]) -> int:
     pts, tri = read_vtk(Path(meshp))
     mat = np.loadtxt(matp)
     binary = os.environ.get("LARMORX_BIN", "larmorx")
-    for k in range(int(first), int(first) + int(count) * step, step):
+    picked = os.environ.get("TRIS")  # the triangles named (comma-separated) instead
+    ks = [int(t) for t in picked.split(",")] if picked else range(int(first), int(first) + int(count) * step, step)
+    for k in ks:
         if k >= len(tri):
             break
         v = pts[tri[k]]

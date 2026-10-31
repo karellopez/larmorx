@@ -232,7 +232,7 @@ fn mesh_text(
         let _ = writeln!(out, "cancelled");
         return Ok(MeshText::Cancelled);
     }
-    match std::fs::read(settings.path(&name)) {
+    match std::fs::read(settings.path(name)) {
         Ok(bytes) => Ok(MeshText::Text(String::from_utf8_lossy(&bytes).into_owned())),
         Err(_) => {
             let _ = write!(
@@ -503,33 +503,8 @@ fn run_in(
             &grid,
             mode.fix(),
             mode.reproduce(),
-            std::env::var("LX_BETSURF_VARIANT")
-                .ok()
-                .and_then(|v| v.parse().ok())
-                .unwrap_or(0),
         )
     });
-    for line in &votes.dump {
-        let _ = writeln!(err, "DUMP {line}");
-    }
-    if std::env::var_os("LX_BETSURF_DEBUG").is_some() {
-        let _ = writeln!(
-            err,
-            "DEBUG profiles {} dropped {} scalp_only {} overruns {}",
-            votes.profiles, votes.dropped, votes.scalp_only, votes.overruns
-        );
-        let _ = writeln!(
-            err,
-            "TALLY {:?}",
-            crate::betsurf::profile::TALLY
-                .iter()
-                .map(|a| a.load(std::sync::atomic::Ordering::Relaxed))
-                .collect::<Vec<_>>()
-        );
-        if std::env::var("LX_BETSURF_DEBUG").as_deref() == Ok("stop") {
-            return 0;
-        }
-    }
     if votes.stop {
         // FSL-50 reproduced: FSL ends here, silently
         let n = Notice::new(
@@ -575,7 +550,7 @@ fn run_in(
     let scalp_s = pooled(n_threads, || bs::smooth(&votes.scalp, gshape, gvox, 3.0));
     let mut outer_counts = votes.outer;
     drop(votes.inner);
-    let scalp_counts = votes.scalp.clone();
+    drop(votes.scalp);
     if o.verbose {
         let _ = writeln!(out, "computation");
     }
@@ -591,6 +566,7 @@ fn run_in(
         flipped: t1.flipped,
         shape,
         volumes: 1,
+        // the T1's display range kept (observed)
         cal: None,
         extensions: ext,
         defects: mode,
@@ -663,6 +639,8 @@ fn run_in(
         print_notices(err, more);
         code
     };
+    // a working-grid mask as the deformation reads it (trilinear values of its integers)
+    let as_vol = |mask: &[i32]| gvol(mask.iter().map(|&x| x as f32).collect());
     // phase 1: the inner skull
     if o.verbose {
         let _ = writeln!(out, " inner skull");
@@ -676,7 +654,9 @@ fn run_in(
     if precision > 0 && o.verbose {
         let _ = writeln!(out, "  increased precision");
     }
-    let (in_mesh, in_pts) = pooled(n_threads, || refined(&brain, &inner, &inner_img, precision));
+    let (in_mesh, in_pts) = pooled(n_threads, || {
+        refined(&brain, &inner, &inner_img, None, 0.5, precision)
+    });
     let in_t1 = t1grid(&in_pts);
     vtk("inskull", &in_mesh, &in_t1, err);
     if o.outline {
@@ -700,24 +680,21 @@ fn run_in(
         }
         inner_mask_t1 = Some(m);
     }
-    // phase 2: the inner skull's mask on the working grid; the outer skull's votes inside it
+    // phase 2: the inner skull's mask on the working grid (the smoothed inner votes truncated
+    // to integers as barriers, the surface drawn and filled); the outer votes set to 0 inside
     let inner_work = bs::surface_mask(
         &brain,
         &inner,
         gshape,
         gvox,
         Rounding::Floor,
-        if std::env::var("LX_MASK").as_deref() == Ok("8") {
-            vec![0; gshape.iter().product()]
-        } else {
-            pooled(n_threads, || bs::truncated(&inner_img.data))
-        },
+        pooled(n_threads, || bs::truncated(&inner_img.data)),
         None,
         mode,
         &mut notices,
     );
     for (c, &m) in outer_counts.iter_mut().zip(&inner_work) {
-        if m == 1 || (std::env::var("LX_MASK").as_deref() == Ok("1") && m > 0) {
+        if m == 1 {
             *c = 0.0;
         }
     }
@@ -725,24 +702,7 @@ fn run_in(
         bs::smooth(&outer_counts, gshape, gvox, 3.0)
     }));
     drop(outer_counts);
-    let mk: u32 = std::env::var("LX_MASK")
-        .ok()
-        .and_then(|v| v.parse().ok())
-        .unwrap_or(0);
-    let inner_mask_vol = gvol(
-        inner_work
-            .iter()
-            .map(|&x| {
-                if mk & 2 != 0 {
-                    f32::from(u8::from(x == 1))
-                } else if mk & 4 != 0 {
-                    f32::from(u8::from(x > 0))
-                } else {
-                    x as f32
-                }
-            })
-            .collect(),
-    );
+    let inner_mask_vol = as_vol(&inner_work);
     drop(inner_work);
     // phase 3: the outer skull
     if o.verbose {
@@ -757,8 +717,10 @@ fn run_in(
     if precision > 0 && o.verbose {
         let _ = writeln!(out, "  increased precision");
     }
-    let (out_mesh, out_pts) = pooled(n_threads, || refined(&brain, &outer, &outer_img, precision));
-    let _keep = &outer_img;
+    let (out_mesh, out_pts) = pooled(n_threads, || {
+        refined(&brain, &outer, &outer_img, None, 0.5, precision)
+    });
+    drop(outer_img);
     let out_t1 = t1grid(&out_pts);
     vtk("outskull", &out_mesh, &out_t1, err);
     if o.outline {
@@ -810,91 +772,22 @@ fn run_in(
         gshape,
         gvox,
         Rounding::Floor,
-        {
-            let knob: u32 = std::env::var("LX_BETSURF_SPHERE")
-                .ok()
-                .and_then(|v| v.parse().ok())
-                .unwrap_or(0);
-            if knob & 16 != 0 {
-                bs::truncated(&outer_img.data)
-            } else if knob & 32 != 0 {
-                vec![0; gshape.iter().product()]
-            } else {
-                pooled(n_threads, || bs::truncated(&inner_img.data))
-            }
-        },
+        pooled(n_threads, || bs::truncated(&inner_img.data)),
         None,
         mode,
         &mut notices,
     );
     drop(inner_img);
-    let mk: u32 = std::env::var("LX_MASK")
-        .ok()
-        .and_then(|v| v.parse().ok())
-        .unwrap_or(0);
-    let outer_mask_vol = gvol(
-        outer_work
-            .iter()
-            .map(|&x| {
-                if mk & 2 != 0 {
-                    f32::from(u8::from(x == 1))
-                } else if mk & 4 != 0 {
-                    f32::from(u8::from(x > 0))
-                } else {
-                    x as f32
-                }
-            })
-            .collect(),
-    );
-    let _keep2 = &outer_work;
-    // phase 5: the scalp
+    let outer_mask_vol = as_vol(&outer_work);
+    drop(outer_work);
+    // phase 5: the scalp, from a new sphere inside the outer skull
     if o.verbose {
         let _ = writeln!(out, " skin");
     }
-    let scalp_img = if std::env::var("LX_SPHERE2").is_ok() {
-        let mut c = scalp_counts.clone();
-        for (x, m) in c.iter_mut().zip(&outer_work) {
-            if *m == 1 {
-                *x = 0.0;
-            }
-        }
-        gvol(bs::smooth(&c, gshape, gvox, 3.0))
-    } else {
-        gvol(scalp_s)
-    };
-    let knob: u32 = std::env::var("LX_BETSURF_SPHERE")
-        .ok()
-        .and_then(|v| v.parse().ok())
-        .unwrap_or(0);
-    let c = if knob & 4 != 0 {
-        let mut s = [0.0; 3];
-        for p in &outer {
-            s = crate::bet::mesh::add(s, *p);
-        }
-        crate::bet::mesh::divide(s, outer.len() as f64)
-    } else {
-        bs::centroid(&outer)
-    };
-    let r = if knob & 8 != 0 {
-        let mut s = 0.0;
-        for p in &outer {
-            s += crate::bet::mesh::dist(*p, c);
-        }
-        (0.75 * s) / outer.len() as f64
-    } else {
-        0.75 * bs::mean_radius(&outer, c)
-    };
-    let (skin_mesh0, skin0) = if knob & 1 != 0 {
-        let m = Mesh::sphere(4);
-        let p = m
-            .points
-            .iter()
-            .map(|p| crate::bet::mesh::add(c, crate::bet::mesh::scale(*p, r)))
-            .collect();
-        (m, p)
-    } else {
-        bs::sphere(c, r)
-    };
+    let scalp_img = gvol(scalp_s);
+    let c = bs::centroid(&outer);
+    let r = 0.75 * bs::mean_radius(&outer, c);
+    let (skin_mesh0, skin0) = bs::sphere(c, r);
     let skin = pooled(n_threads, || {
         let mut p = skin0.clone();
         bs::deform(
@@ -902,22 +795,18 @@ fn run_in(
             &mut p,
             &scalp_img,
             Some(&outer_mask_vol),
-            std::env::var("LX_STEPS")
-                .ok()
-                .and_then(|v| v.parse().ok())
-                .unwrap_or(1500),
-            std::env::var("LX_SPEED")
-                .ok()
-                .and_then(|v| v.parse().ok())
-                .unwrap_or(1.5),
+            1500,
+            1.5,
         );
         p
     });
     if precision > 0 && o.verbose {
         let _ = writeln!(out, "  increased precision");
     }
+    // `-p`: the scalp itself retessellated, 100 more steps each at the scalp's speed and without
+    // the mask (observed: the closest to FSL's of the four readings)
     let (skin_mesh, skin_pts) = pooled(n_threads, || {
-        refined(&skin_mesh0, &skin, &scalp_img, precision)
+        refined(&skin_mesh0, &skin, &scalp_img, None, 1.5, precision)
     });
     let skin_t1 = t1grid(&skin_pts);
     vtk("outskin", &skin_mesh, &skin_t1, err);
@@ -973,12 +862,19 @@ fn run_in(
 
 /// `-p k`: a copy of the surface retessellated and deformed 100 more steps, `k` times (the
 /// surface itself unchanged); without `-p` the surface.
-fn refined(mesh: &Mesh, points: &[V3], image: &Vol, precision: usize) -> (Mesh, Vec<V3>) {
+fn refined(
+    mesh: &Mesh,
+    points: &[V3],
+    image: &Vol,
+    mask: Option<&Vol>,
+    speed: f64,
+    precision: usize,
+) -> (Mesh, Vec<V3>) {
     let mut m = mesh.clone();
     let mut p = points.to_vec();
     for _ in 0..precision {
         let (m2, mut p2) = bs::retessellate(&m, &p);
-        bs::deform(&m2, &mut p2, image, None, 100, 0.5);
+        bs::deform(&m2, &mut p2, image, mask, 100, speed);
         m = m2;
         p = p2;
     }

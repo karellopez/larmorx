@@ -89,7 +89,8 @@ impl Profile {
 
     /// The region ends before the first sample at or after `s`.
     pub fn set_end(&mut self, s: f64) {
-        let k = if self.variant & V_REGION_INCL != 0 {
+        // observed (single-profile runs of FSL's betsurf): the region holds the sample at `s`
+        let k = if self.variant & V_REGION_INCL == 0 {
             self.last_at_or_before(s).map_or(0, |k| k + 1)
         } else {
             self.first_at_or_after(s)
@@ -296,12 +297,17 @@ pub fn t1t2(t1: &mut Profile, t2: &mut Profile, fsl50: bool) -> Estimate {
     let (bright, dark) = (t2.th(0.40), t2.th(0.30));
     let mut pos = is;
     let mut first_bright = NONE;
-    let mut gaps: Vec<f64> = Vec::with_capacity(6);
-    while gaps.len() < 6 {
+    let mut first_gap = NONE;
+    // the bright samples found (observed: "more than one" counts them, a bright sample with
+    // no dark one after it included)
+    let mut brights = 0usize;
+    let mut gaps = 0usize;
+    while gaps < 6 {
         let b = t2.first_ge(pos, bright);
         if b == NONE {
             break;
         }
+        brights += 1;
         if first_bright == NONE {
             first_bright = b;
         }
@@ -309,11 +315,14 @@ pub fn t1t2(t1: &mut Profile, t2: &mut Profile, fsl50: bool) -> Estimate {
         if g == NONE {
             break;
         }
-        gaps.push(g);
+        if first_gap == NONE {
+            first_gap = g;
+        }
+        gaps += 1;
         pos = g;
     }
-    let from = if gaps.len() > 1 && within_10(first_bright, is, t1.variant) {
-        gaps[0]
+    let from = if brights > 1 && within_10(first_bright, is, t1.variant) {
+        first_gap
     } else {
         is + 0.5
     };
@@ -322,11 +331,8 @@ pub fn t1t2(t1: &mut Profile, t2: &mut Profile, fsl50: bool) -> Estimate {
     let x = t1.last_ge(s, t1.th(0.75));
     let mut os2 = t1.last_le(x, t1.th(0.30));
     if os2 == NONE {
-        os2 = if t1.variant & 16384 != 0 {
-            t1.region_start()
-        } else {
-            x
-        };
+        // observed: the outer skull search's start
+        os2 = t1.region_start();
     }
     // 7.
     let a = t1.first_le(t1.region_start(), t1.th(0.30));
@@ -339,7 +345,8 @@ pub fn t1t2(t1: &mut Profile, t2: &mut Profile, fsl50: bool) -> Estimate {
     }
     let (up, low) = (t1.th(0.25), t1.th(0.15));
     let mut b = a;
-    for (pos, v) in t1.samples_from(a).skip(1) {
+    // observed: the scan includes `a` itself
+    for (pos, v) in t1.samples_from(a) {
         if v > up {
             break;
         }

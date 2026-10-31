@@ -171,6 +171,16 @@ pub fn main(args: &[String], settings: &Settings, out: &mut dyn Write, err: &mut
                 verbose = true;
                 opts.push("-v".into());
             }
+            // larmorx's own (GLIBC-06, the user's decision of 2026-10-31): passed to bet2
+            "--tanh" => {
+                if i + 1 >= words.len() {
+                    let _ = out.write_all(USAGE.as_bytes());
+                    return 1;
+                }
+                opts.push(format!("--tanh={}", words[i + 1]));
+                i += 1;
+            }
+            w if w.starts_with("--tanh=") => opts.push(w.to_owned()),
             "-d" => debug = true,
             _ => {
                 let _ = out.write_all(USAGE.as_bytes());

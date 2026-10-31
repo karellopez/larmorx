@@ -711,7 +711,8 @@ pub fn votes(
 
                         if dump {
                             c.dump.push(format!(
-                                "{{\"v\": {v}, \"o\": [{i}, {j}, {k}], \"eyes\": {eyes}, \"start\": {start}, \"t1\": {:?}, \"t2\": {:?}}}",
+                                "{{\"v\": {v}, \"o\": [{i}, {j}, {k}], \"eyes\": {eyes}, \"n\": {:?}, \"start\": {start}, \"t1\": {:?}, \"t2\": {:?}}}",
+                                n,
                                 p1.values,
                                 t2.map(&sample).unwrap_or_default()
                             ));
@@ -896,6 +897,10 @@ pub fn deform(
             l = mesh.mean_neighbour_distance(points);
         }
         let normals = mesh.triangle_normals(points);
+        let dk: u32 = std::env::var("LX_DEFORM")
+            .ok()
+            .and_then(|v| v.parse().ok())
+            .unwrap_or(0);
         if i % 100 == 0 {
             let pts = &*points;
             outside
@@ -907,7 +912,13 @@ pub fn deform(
                     let n = mesh.vertex_normal(v, &normals);
                     let mut out = true;
                     let mut prev: Option<f64> = None;
-                    let mut t = -1.0;
+                    let mut t = if dk & 1 != 0 {
+                        1.0
+                    } else if dk & 2 != 0 {
+                        0.0
+                    } else {
+                        -1.0
+                    };
                     while t <= 149.0 {
                         let x = at(image, add(p, scale(n, t)));
                         if x > 0.1 {
@@ -915,7 +926,12 @@ pub fn deform(
                             break;
                         }
                         if let Some(pv) = prev
-                            && 100.0 * (x - pv) > 0.1
+                            && (if dk & 8 != 0 {
+                                f64::from(100.0f32 * (x as f32 - pv as f32))
+                            } else {
+                                100.0 * (x - pv)
+                            }) > 0.1
+                            && dk & 16 == 0
                         {
                             out = false;
                             break;
@@ -923,7 +939,11 @@ pub fn deform(
                         prev = Some(x);
                         t += 2.0;
                     }
-                    *o = out;
+                    if dk & 4 != 0 {
+                        *o |= out;
+                    } else {
+                        *o = out;
+                    }
                 });
         }
         let l2 = l * l;

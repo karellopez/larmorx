@@ -575,7 +575,7 @@ fn run_in(
     let scalp_s = pooled(n_threads, || bs::smooth(&votes.scalp, gshape, gvox, 3.0));
     let mut outer_counts = votes.outer;
     drop(votes.inner);
-    drop(votes.scalp);
+    let scalp_counts = votes.scalp.clone();
     if o.verbose {
         let _ = writeln!(out, "computation");
     }
@@ -737,7 +737,7 @@ fn run_in(
         let _ = writeln!(out, "  increased precision");
     }
     let (out_mesh, out_pts) = pooled(n_threads, || refined(&brain, &outer, &outer_img, precision));
-    drop(outer_img);
+    let _keep = &outer_img;
     let out_t1 = t1grid(&out_pts);
     vtk("outskull", &out_mesh, &out_t1, err);
     if o.outline {
@@ -789,22 +789,74 @@ fn run_in(
         gshape,
         gvox,
         Rounding::Floor,
-        pooled(n_threads, || bs::truncated(&inner_img.data)),
+        {
+            let knob: u32 = std::env::var("LX_BETSURF_SPHERE")
+                .ok()
+                .and_then(|v| v.parse().ok())
+                .unwrap_or(0);
+            if knob & 16 != 0 {
+                bs::truncated(&outer_img.data)
+            } else if knob & 32 != 0 {
+                vec![0; gshape.iter().product()]
+            } else {
+                pooled(n_threads, || bs::truncated(&inner_img.data))
+            }
+        },
         None,
         mode,
         &mut notices,
     );
     drop(inner_img);
     let outer_mask_vol = gvol(outer_work.iter().map(|&x| x as f32).collect());
-    drop(outer_work);
+    let _keep2 = &outer_work;
     // phase 5: the scalp
     if o.verbose {
         let _ = writeln!(out, " skin");
     }
-    let scalp_img = gvol(scalp_s);
-    let c = bs::centroid(&outer);
-    let r = 0.75 * bs::mean_radius(&outer, c);
-    let (skin_mesh0, skin0) = bs::sphere(c, r);
+    let scalp_img = if std::env::var("LX_SPHERE2").is_ok() {
+        let mut c = scalp_counts.clone();
+        for (x, m) in c.iter_mut().zip(&outer_work) {
+            if *m == 1 {
+                *x = 0.0;
+            }
+        }
+        gvol(bs::smooth(&c, gshape, gvox, 3.0))
+    } else {
+        gvol(scalp_s)
+    };
+    let knob: u32 = std::env::var("LX_BETSURF_SPHERE")
+        .ok()
+        .and_then(|v| v.parse().ok())
+        .unwrap_or(0);
+    let c = if knob & 4 != 0 {
+        let mut s = [0.0; 3];
+        for p in &outer {
+            s = crate::bet::mesh::add(s, *p);
+        }
+        crate::bet::mesh::divide(s, outer.len() as f64)
+    } else {
+        bs::centroid(&outer)
+    };
+    let r = if knob & 8 != 0 {
+        let mut s = 0.0;
+        for p in &outer {
+            s += crate::bet::mesh::dist(*p, c);
+        }
+        (0.75 * s) / outer.len() as f64
+    } else {
+        0.75 * bs::mean_radius(&outer, c)
+    };
+    let (skin_mesh0, skin0) = if knob & 1 != 0 {
+        let m = Mesh::sphere(4);
+        let p = m
+            .points
+            .iter()
+            .map(|p| crate::bet::mesh::add(c, crate::bet::mesh::scale(*p, r)))
+            .collect();
+        (m, p)
+    } else {
+        bs::sphere(c, r)
+    };
     let skin = pooled(n_threads, || {
         let mut p = skin0.clone();
         bs::deform(
@@ -812,8 +864,14 @@ fn run_in(
             &mut p,
             &scalp_img,
             Some(&outer_mask_vol),
-            1500,
-            1.5,
+            std::env::var("LX_STEPS")
+                .ok()
+                .and_then(|v| v.parse().ok())
+                .unwrap_or(1500),
+            std::env::var("LX_SPEED")
+                .ok()
+                .and_then(|v| v.parse().ok())
+                .unwrap_or(1.5),
         );
         p
     });

@@ -727,8 +727,21 @@ def _original_image_data(path: Path) -> np.ndarray:
     return image_data(path)
 
 
+#: betsurf's masks (``specs/bet.md`` §11): Dice and the boundary distance's 95th percentile.
+SURF_MASK_DICE = 0.99
+SURF_BOUNDARY_P95 = 1.0
+#: betsurf's outputs: its masks (the three surfaces' and the skull's) and its outlines (each
+#: surface drawn as 1, ``<out>_<surface>_mesh`` images).
+SURF_MASKS = ("_inskull_mask", "_outskull_mask", "_outskin_mask", "_skull_mask")
+SURF_OUTLINES = ("_inskull_mesh", "_outskull_mesh", "_outskin_mesh")
+
+
 def _kind(name: str) -> str:
     stem = name.split(".")[0]
+    if stem.endswith(SURF_MASKS):
+        return "surface mask"
+    if stem.endswith(SURF_OUTLINES):
+        return "surface outline"
     if stem.endswith("_mask"):
         return "mask"
     if stem.endswith("_skull"):
@@ -821,6 +834,32 @@ def compare_original_file(checks: CheckList, label: str, pa: Path, pb: Path) -> 
         )
         return
     kind = _kind(name)
+    if kind in ("surface mask", "surface outline"):
+        # betsurf's masks (specs/bet.md §11: Dice >= 0.99, the boundary distance's 95th
+        # percentile <= 1 voxel) and its outlines (the drawn surfaces' distance, as the masks')
+        ma, mb = fa != 0, fb != 0
+        if kind == "surface mask":
+            d = dice(ma, mb)
+            p95, mx = boundary_distance(ma, mb)
+            ok = d >= SURF_MASK_DICE and p95 <= SURF_BOUNDARY_P95
+            value = f"{d:.6f}; {p95:.2f} / {mx:.2f}"
+            metric = "Dice; boundary distance p95 / max (voxels)"
+            threshold = f">= {SURF_MASK_DICE}; p95 <= {SURF_BOUNDARY_P95}"
+        else:
+            p95, mx = set_distance(ma, mb)
+            ok = p95 <= SURF_BOUNDARY_P95
+            value = f"{p95:.2f} / {mx:.2f}"
+            metric = "drawn surface distance p95 / max (voxels)"
+            threshold = f"p95 <= {SURF_BOUNDARY_P95}"
+        checks(
+            f"{label}{name}",
+            ok,
+            metric=metric,
+            value=value,
+            threshold=threshold,
+            detail=f"{differing} of {da.size} values differ",
+        )
+        return
     # the skull image (100 at the skull's edge) is held to the masks' thresholds: specs/bet.md
     # §4.7 gives the skull search exactly since 2026-10-30 (part 1 only reported its Dice)
     if kind == "outline":
@@ -2008,7 +2047,13 @@ def _python(checks: CheckList, s: Scenario, paths: list[Path], f_dir: Path) -> N
             t2 = None if len(paths) == 3 else paths[1]
             mesh, mat = paths[-2], paths[-1]
             result = lx.fsl.betsurf(
-                str(paths[0]), str(mesh), str(mat), t2=t2, upstream_defects="reproduce", **kwargs
+                str(paths[0]),
+                str(mesh),
+                str(mat),
+                t2=t2,
+                upstream_defects="reproduce",
+                implementation=impl,
+                **kwargs,
             )
     for name, attr in outputs.items():
         img = getattr(result, attr)
@@ -2117,8 +2162,16 @@ def suite(implementation: str = "replica") -> Suite:
 
 
 def _original_cases(tier: str) -> list[Case]:
-    """The suite's cases but betsurf's (its clean-room original is still to be written)."""
-    return [c for c in cases_of(tier) if c.payload.tool != "betsurf"]
+    """The suite's cases, and from the standard tier on also betsurf's real images (the full
+    tier's for the replica): fMRIPrep does not call betsurf, so its real cases are the ones
+    that show the original on real heads (bet2's mesh and FLIRT's matrices made by FSL)."""
+    cases = cases_of(tier)
+    if TIERS.index(tier) >= TIERS.index("standard"):
+        have = {c.id for c in cases}
+        for cid, category, desc, s in _scenarios():
+            if s.tool == "betsurf" and category == "real" and cid not in have:
+                cases.append(Case(cid, category, desc, replace(s, tier="standard")))
+    return cases
 
 
 def _original_suite() -> Suite:

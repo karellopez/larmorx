@@ -31,15 +31,27 @@ pub struct Deformation {
     pub tanh: Tanh,
 }
 
-/// Which `tanh` the smoothness weight takes (§8.1; GLIBC-06).
+/// Which `tanh` the smoothness weight takes (§8.1; GLIBC-06, decided by the user on 2026-10-31:
+/// glibc's bits by default, the correctly rounded one on request, `--tanh=correctly-rounded`).
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Default)]
 pub enum Tanh {
-    /// glibc 2.35's bits, as FSL (`larmorx_core::math::tanh_glibc`): `reproduce`, and the
-    /// default until BET's part 2b.
+    /// glibc 2.35's bits, as FSL (`larmorx_core::math::tanh_glibc`): the default, in both
+    /// modes of `upstream_defects`.
     #[default]
     Glibc,
-    /// Correctly rounded (`larmorx_core::math::tanh`, CORE-MATH's).
+    /// Correctly rounded (`larmorx_core::math::tanh`, CORE-MATH's), on request.
     CorrectlyRounded,
+}
+
+impl Tanh {
+    /// The option's values: `glibc`, `correctly-rounded`.
+    pub fn parse(value: &str) -> Option<Tanh> {
+        match value {
+            "glibc" => Some(Tanh::Glibc),
+            "correctly-rounded" => Some(Tanh::CorrectlyRounded),
+            _ => None,
+        }
+    }
 }
 
 impl Default for Deformation {
@@ -185,10 +197,7 @@ fn tanh(which: Tanh, x: f64) -> f64 {
 }
 
 /// One pass of [`ITERATIONS`] deformation steps from `start`; `pass` 0 is the first, a rerun
-/// `P >= 1` raises the smoothness of concave places (§4.5). With the correctly rounded `tanh`,
-/// also says whether glibc's would have given another smoothness weight anywhere (GLIBC-06):
-/// when it would not, the pass with glibc's gives the same surface, bit for bit (nothing else
-/// depends on it). With glibc's `tanh` (FSL's bits) nothing is checked (`false`).
+/// `P >= 1` raises the smoothness of concave places (§4.5).
 pub fn deform(
     mesh: &Mesh,
     start: &[V3],
@@ -196,10 +205,7 @@ pub fn deform(
     init: &Initial,
     opts: &Deformation,
     pass: u32,
-) -> (Vec<V3>, bool) {
-    let other = Tanh::Glibc;
-    let check = opts.tanh == Tanh::CorrectlyRounded;
-    let weights_differ = std::sync::atomic::AtomicBool::new(false);
+) -> Vec<V3> {
     let r = init.radius;
     let mut spacing = vol.voxel;
     for a in 0..3 {
@@ -259,21 +265,10 @@ pub fn deform(
                 let rinv = (2.0 * dot(s_n, n).abs()) / l2;
                 let arg = f * (rinv - e);
                 let mut f2 = (1.0 + tanh(opts.tanh, arg)) * 0.5;
-                // the weight glibc's tanh gives, where the correctly rounded one is used
-                // (GLIBC-06's test; none with glibc's own, FSL's bits)
-                let mut f2_other = if check {
-                    (1.0 + tanh(other, arg)) * 0.5
-                } else {
-                    f2
-                };
                 if let Some(factor) = factor
                     && sigma > 0.0
                 {
                     f2 = (f2 * factor).min(1.0);
-                    f2_other = (f2_other * factor).min(1.0);
-                }
-                if f2.to_bits() != f2_other.to_bits() {
-                    weights_differ.store(true, std::sync::atomic::Ordering::Relaxed);
                 }
                 let u2 = scale(s_n, f2);
                 let f3 = intensity_term(&sampler, p, n, init, bt, opts.gradient, d1, d2);
@@ -283,7 +278,7 @@ pub fn deform(
             });
         std::mem::swap(&mut points, &mut next);
     }
-    (points, weights_differ.into_inner())
+    points
 }
 
 /// Whether two points agree within `1e-8` in every axis (FSL's test of a shared vertex).

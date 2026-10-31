@@ -2267,6 +2267,8 @@ def highlights_original(results: list[CaseResult]) -> list[str]:
         for r in results
         for c in r.checks
         if not c.name.endswith(FMRIPREP_OWN)
+        # a phantom's known brain is reported, not compared with FSL
+        and c.threshold != "reported"
         and (c.metric == "values" or c.metric.startswith(("Dice", "drawn surface")))
     ]
     surf = [

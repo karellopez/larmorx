@@ -540,15 +540,21 @@ def _orig_verdicts(diffs: list[dict], same: dict[str, bool], arrays: dict, outpu
             dice = (
                 2 * np.count_nonzero(ma & mb) / max(1, np.count_nonzero(ma) + np.count_nonzero(mb))
             )
-            parts.append(f"{o['label'].lower()}: Dice {dice:.4f}")
+            n = int(np.count_nonzero(ma != mb))
+            parts.append(
+                f"{o['label'].lower()}: {n:,} voxel{'s' if n != 1 else ''} of "
+                f"{int(np.count_nonzero(mb)):,} (Dice {dice:.5f})"
+            )
         x["verdict"] = "open"
+        who = "the replica's" if x["b"].startswith("replica") else f"{fsl_step.NEW_LABEL}'s"
         x["reason"] = (
-            "The clean-room original differs: "
+            f"The clean-room original's masks differ from {who} in a few voxels at their edges: "
             + ("; ".join(parts) or "values")
             + ". betsurf's profiles agree with FSL's one by one (330 of 330 probed); its surfaces "
-            "differ where few profiles vote and at the scalp (docs/findings/fsl-bet-original.md, "
-            "betsurf): the record holds betsurf to its masks (Dice >= 0.99, boundary p95 <= 1 "
-            "voxel), which these meet."
+            "settle a little elsewhere where few profiles vote and at the scalp "
+            "(docs/findings/fsl-bet-original.md, betsurf). The record holds betsurf to its masks "
+            "(Dice >= 0.99, boundary p95 <= 1 voxel), which these meet; the difference is not "
+            "closed: the original could still match FSL."
         )
 
 
@@ -1338,7 +1344,7 @@ def case_verdict_orig(r: dict, desc: str, s) -> tuple[str, str]:
     )
     if v != "bit-identical":
         return v, why
-    differ = {k: x for k, x in r.get("measured", {}).items() if x not in (0, "0")}
+    differ = {k: x for k, x in r.get("measured", {}).items() if not _zero(x)}
     if not differ:
         why = why.replace(
             "every file FSL writes, byte for byte",
@@ -1347,13 +1353,30 @@ def case_verdict_orig(r: dict, desc: str, s) -> tuple[str, str]:
         )
         return v, why
     shown = "; ".join(f"{k}: {x}" for k, x in list(differ.items())[:4])
+    surf = getattr(s, "tool", "") == "betsurf"
     return "open", common.clip(
-        "Within the record's thresholds, not bit-identical (Dice; boundary distance p95 / max "
-        f"in voxels, or a mesh's vertex distance in mm): {shown}. betsurf's profiles agree with "
-        "FSL's one by one; where few of them vote, and at the scalp, its surfaces settle a little "
-        "elsewhere (docs/findings/fsl-bet-original.md, betsurf).",
+        "Within the record's thresholds, not bit-identical (masks: Dice; boundary distance p95 / "
+        f"max in voxels; drawn surfaces: their distance p95 / max): {shown}."
+        + (
+            " betsurf's profiles agree with FSL's one by one; where few of them vote, and at the "
+            "scalp, its surfaces settle a little elsewhere (docs/findings/fsl-bet-original.md, "
+            "betsurf)."
+            if surf
+            else ""
+        ),
         600,
     )
+
+
+def _zero(x) -> bool:
+    """A measured value that says "no difference": 0, or a text of numbers that are all 0 (a
+    mesh's vertex distance, ``0.0000 / 0.0000``)."""
+    import re
+
+    if isinstance(x, (int, float)):
+        return x == 0
+    nums = re.findall(r"[-+]?\d+(?:\.\d+)?(?:e[-+]?\d+)?", str(x))
+    return bool(nums) and all(float(n) == 0 for n in nums)
 
 
 def cases(

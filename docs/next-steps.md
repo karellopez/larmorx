@@ -290,7 +290,8 @@ The items below keep their history.
    calls bit-identical); the random-testing trial's 75 open cases: 73 agree (237 of its 239). Speed
    unchanged (0.43 and 1.20 s on one thread, FSL 1.27 and 3.21 s). **Part 2b (next):** betsurf's
    original (spec §6), the site page's clean-room panels, a fresh benchmark, and BET's default `tanh`
-   once the user decides (GLIBC-06, "Waiting for the user"). **For the spec writer (one
+   as decided (GLIBC-06, the user 2026-10-31: glibc's bits kept by default, the correctly rounded
+   `tanh` on request). **For the spec writer (one
    question):** FSL's conversion of a centre between the voxel frames of a neurologically stored
    image (`bet2 -c`, `fslstats -C`: a 4 x 4 inverse whose last bits §8.1 leaves open); random-testing
    cases 677 (`-c`: another first-pass surface) and 622 (`bet -R`: `fslstats -C` prints `-0.000000`,
@@ -664,16 +665,6 @@ results and `cbrtf_glibc`'s alike.
 
 Decided 2026-10-23 (decision log): the four rules for questionable behaviours (A correct, B error, C keep and document, D measure first), applied without asking from now on; the 24 open questions by those rules.
 
-- **GLIBC-06, BET's default `tanh`** (2026-10-30, BET's clean-room part 2a; the register's one
-  **decide** entry). glibc's double `tanh`, which FSL's BET uses for the surface's smoothness weight,
-  is not correctly rounded; where a surface reruns, its last bits grow into another surface. Both are
-  in larmorx now. Measured on the standard tier's 13 real images: with the correctly rounded `tanh`,
-  9 give the same outputs and 4 another mask (Dice 0.985 to 0.997), not a more accurate one; the
-  exact warning needs a second surface search, so the default would run 1.9 times slower (still
-  faster than FSL). Options: (a) correctly rounded by default with the exact warning; (b) the same
-  with a cheaper, inexact warning; (c) glibc's bits by default (rule C), the correctly rounded `tanh`
-  on request. The orchestrator recommends (c) (the agent's recommendation too); the switch is one
-  line in `crates/larmorx-fsl/src/cli/bet2.rs`.
 - **Upstream reports:** PIPE-02 and PIPE-03 are drafts in `docs/upstream-reports/`, now with
   PIPE-03's real-data numbers, ready to file (from the user's GitHub account).
 - **For the user's information, FSL-22** (2026-10-26; decision log): `reproduce` now sorts NaN

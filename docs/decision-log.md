@@ -1729,6 +1729,17 @@ together at the end.
 - **`fslmaths` and `fslstats` join the plan** (the orchestrator, from the user's question): fMRIPrep
   calls them directly; a replica and a clean-room original each, every operation.
 
+## 2026-10-31: BET's default `tanh` (the user, GLIBC-06)
+- **BET keeps glibc 2.35's `tanh` bits by default** (option (c), "go with C"; rule C): FSL's surfaces
+  and masks, no slowdown. The correctly rounded `tanh` (CORE-MATH's, ported to Rust) is available on
+  request. Both are pure Rust (`larmorx_core::math::tanh_glibc`, written from fdlibm and proved equal
+  to glibc's on 12.9 billion arguments, and `larmorx_core::math::tanh`); no C library is called.
+  Measured in BET's clean-room part 2a: on 9 of 13 real images the two give the same outputs, on 4
+  another mask (Dice 0.985 to 0.997), not a more accurate one (the reruns amplify any last bit); the
+  exact notice a correctly rounded default would need doubles the work (1.9 times the time). Unlike
+  3dUnifize's `cbrtf` (2026-10-30), where the correctly rounded value is the default, here the more
+  precise function moves the result to another equally valid surface and gains nothing.
+
 ## Open decisions (PLAN.md §16)
 
 | # | Decision | Recommended default (used until decided) | Status |

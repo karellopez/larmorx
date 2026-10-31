@@ -244,9 +244,10 @@ D13 switches of FSL-43, -47, -48, -50 to -55 and -58, FSL-49 and FSL-57 kept as 
 6.0.7.23, re-made 2026-10-31 in part 2b: **127 of the 128 compared cases within the thresholds**, the
 other missing one threshold (below); of its 168 cases 30 more are rejected by both alike, 6 are where
 `reproduce` fills what FSL leaves undefined, 4 pending): exit statuses and messages FSL's byte
-for byte; 217 of 229
-brains, masks and outlines of `bet2` and `bet` bit-identical to FSL's and 12 more within the
-thresholds, 13 of 13 skull images bit-identical, the meshes FSL's to the file's 6 decimals, the
+for byte; 217 of 217
+brains, masks and outlines of `bet2` and `bet` bit-identical to FSL's (part 2a's record
+counted 12 reported Dice values with phantoms' known brains among them, as "within the
+thresholds"), 13 of 13 skull images bit-identical, the meshes FSL's to the file's 6 decimals, the
 surfaces that rerun after a self-intersecting first pass (a 75-year-old's T1w, 7 T, a tumour)
 bit for bit, fMRIPrep's 29 BET calls on its oracle runs all bit-identical (and with fMRIPrep's
 own outputs' values); headers FSL's byte for byte but for `descrip` (`larmorx fsl bet2`), the

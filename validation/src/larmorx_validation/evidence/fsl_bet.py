@@ -752,8 +752,11 @@ def _note(img) -> str:
     return (
         f"Δ is A − B: for the masks +1 where only A holds a voxel, −1 where only B does. "
         f"Computed in float64 over all {n:,} voxels of the outputs, not only those shown. The "
-        "record's threshold: every file bit-identical to FSL's (header and data), with its exit "
-        "status and messages."
+        "replica's records' threshold: every file bit-identical to FSL's (header and data), with "
+        "its exit status and messages. The clean-room original's record (specs/bet.md §11): exit "
+        "status and messages FSL's, each file bit-identical or, for the masks, within a Dice "
+        "coefficient and a boundary distance (betsurf's: Dice >= 0.99, the boundary distance's "
+        "95th percentile <= 1 voxel)."
     )
 
 

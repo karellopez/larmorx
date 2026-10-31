@@ -734,6 +734,8 @@ SURF_BOUNDARY_P95 = 1.0
 #: surface drawn as 1, ``<out>_<surface>_mesh`` images).
 SURF_MASKS = ("_inskull_mask", "_outskull_mask", "_outskin_mask", "_skull_mask")
 SURF_OUTLINES = ("_inskull_mesh", "_outskull_mesh", "_outskin_mesh")
+#: betsurf's meshes (VTK), reported: specs/bet.md §11 holds betsurf to its masks.
+SURF_MESHES = tuple(f"{s}.vtk" for s in SURF_OUTLINES)
 
 
 def _kind(name: str) -> str:
@@ -767,12 +769,16 @@ def compare_original_file(checks: CheckList, label: str, pa: Path, pb: Path) -> 
             return
         d = np.linalg.norm(va - vb, axis=1)
         p95, mx = (float(np.percentile(d, 95)), float(d.max())) if len(d) else (0.0, 0.0)
+        surf = name.endswith(SURF_MESHES)
         checks(
             f"{label}{name}",
-            p95 <= MESH_P95 and mx <= MESH_MAX,
+            surf or (p95 <= MESH_P95 and mx <= MESH_MAX),
             metric="vertex distance p95 / max (mm)",
             value=f"{p95:.4f} / {mx:.4f}",
-            threshold=f"<= {MESH_P95} / {MESH_MAX}",
+            # betsurf is held to its masks (specs/bet.md §11); its meshes are reported
+            threshold="reported (betsurf: its masks are the threshold)"
+            if surf
+            else f"<= {MESH_P95} / {MESH_MAX}",
             detail="the same vertices, to the file's 6 decimals"
             if mx == 0
             else f"triangles the same; vertex distance p95 {p95:.4f} mm, max {mx:.4f} mm",
@@ -2181,11 +2187,12 @@ def _original_suite() -> Suite:
         name="fsl-bet",
         title="BET (clean-room original)",
         tool=(
-            f"`larmorx fsl bet2` and `bet` (larmorx {larmorx.__version__}, crate larmorx-fsl: the "
-            "clean-room original written from specs/bet.md, Apache-2.0), in process, and "
-            "`lx.fsl.bet(..., implementation='original')`; betsurf's original is still to be written"
+            f"`larmorx fsl bet2`, `bet` and `betsurf` (larmorx {larmorx.__version__}, crate "
+            "larmorx-fsl: the clean-room original written from specs/bet.md, Apache-2.0), in "
+            "process, and `lx.fsl.bet` / `lx.fsl.betsurf(..., implementation='original')`"
         ),
-        reference=f"bet and bet2 from {fsl_version()}, the conda installation in `~/fsl-6.0.7.23`",
+        reference=f"bet, bet2 and betsurf from {fsl_version()}, the conda installation in "
+        "`~/fsl-6.0.7.23`",
         thresholds=[
             (
                 "Exit status",
@@ -2223,6 +2230,12 @@ def _original_suite() -> Suite:
                 "as the masks: bit-identical, or Dice and boundary distance within the masks' "
                 "thresholds (specs/bet.md §4.7 gives the skull search exactly)",
             ),
+            (
+                "betsurf's masks and outlines",
+                f"bit-identical, or Dice >= {SURF_MASK_DICE} and the boundary distance's 95th "
+                f"percentile <= {SURF_BOUNDARY_P95} voxel (specs/bet.md §11; the outlines: the "
+                "drawn surfaces' distance, likewise); its three meshes reported (vertex distance)",
+            ),
         ],
         cases=_original_cases,
         run_case=run_case,
@@ -2234,7 +2247,8 @@ def _original_suite() -> Suite:
             "`FSLOUTPUTTYPE`. The original is compared in `reproduce` mode; the fix pass runs its "
             "default. The fMRIPrep cases also run FSL again and fMRIPrep 25.2.6's FSL (FSL's own "
             "variability) and report the original's agreement with fMRIPrep's own outputs. "
-            "betsurf's cases wait for its original. The `-S`, `-B`, `-A` and `-A2` variations of "
+            "betsurf's real images (the full tier's for the replica) run in this standard tier, "
+            "on bet2's meshes and FLIRT's matrices made by FSL. The `-S`, `-B`, `-A` and `-A2` variations of "
             "`bet` run FSL programs larmorx does not have yet (standard_space_roi, FLIRT, FAST): "
             "the original refuses them, naming what is missing. FSL 6.0.7.23 (the "
             "`--fsl-version` default)."
@@ -2255,6 +2269,13 @@ def highlights_original(results: list[CaseResult]) -> list[str]:
         if not c.name.endswith(FMRIPREP_OWN)
         and (c.metric == "values" or c.metric.startswith(("Dice", "drawn surface")))
     ]
+    surf = [
+        c
+        for c in files
+        if c.name.split(".")[0].endswith((*SURF_MASKS, *SURF_OUTLINES))
+        and not c.name.endswith(": header")
+    ]
+    files = [c for c in files if c not in surf]
     skulls = [c for c in files if "_skull" in c.name]
     images = [c for c in files if c not in skulls]
     identical = sum(1 for c in images if c.threshold == "bit-identical")
@@ -2262,7 +2283,8 @@ def highlights_original(results: list[CaseResult]) -> list[str]:
     skull_same = sum(1 for c in skulls if c.threshold == "bit-identical")
     skull_within = sum(1 for c in skulls if c.passed and c.threshold != "bit-identical")
     meshes = [c for r in results for c in r.checks if c.metric.startswith("vertex distance")]
-    mesh_same = sum(1 for c in meshes if str(c.value).startswith("0.0000 / 0.0000"))
+    bet_meshes = [c for c in meshes if not c.name.endswith(SURF_MESHES)]
+    mesh_same = sum(1 for c in bet_meshes if str(c.value).startswith("0.0000 / 0.0000"))
     lines = [
         f"- **{passed} of {n} cases within the thresholds** (exit status and messages identical, "
         f"every file within its threshold); {both} where both refuse or FSL crashes and larmorx "
@@ -2270,10 +2292,28 @@ def highlights_original(results: list[CaseResult]) -> list[str]:
         f"(D13's failure cases); {pending} pending (options that run FSL programs larmorx does "
         "not have yet).",
         f"- **{identical} of {len(images)} brains, masks and outlines with FSL's values, bit for "
-        f"bit**, {within} more within the thresholds; {mesh_same} of {len(meshes)} meshes with "
-        f"FSL's vertices to the file's 6 decimals; {skull_same} of {len(skulls)} skull images "
+        f"bit**, {within} more within the thresholds; {mesh_same} of {len(bet_meshes)} meshes "
+        f"with FSL's vertices to the file's 6 decimals; {skull_same} of {len(skulls)} skull images "
         f"bit-identical, {skull_within} more within the masks' thresholds.",
     ]
+    if surf:
+        same = sum(1 for c in surf if c.threshold == "bit-identical")
+        within = sum(1 for c in surf if c.passed and c.threshold != "bit-identical")
+        surf_meshes = [c for c in meshes if c.name.endswith(SURF_MESHES)]
+        worst = max(
+            (float(str(c.value).split(" / ")[1]) for c in surf_meshes if " / " in str(c.value)),
+            default=0.0,
+        )
+        p95s = sorted(
+            float(str(c.value).split(" / ")[0]) for c in surf_meshes if " / " in str(c.value)
+        )
+        lines.append(
+            f"- **betsurf: {same} of {len(surf)} masks and outlines with FSL's values, bit for "
+            f"bit**, {within} more within its thresholds (Dice >= {SURF_MASK_DICE}, boundary "
+            f"p95 <= {SURF_BOUNDARY_P95} voxel); its {len(surf_meshes)} meshes reported: vertex "
+            f"distance p95 {p95s[0] if p95s else 0:.4f} to {p95s[-1] if p95s else 0:.4f} mm, "
+            f"largest {worst:.2f} mm."
+        )
     own = [c for r in results for c in r.checks if c.name.endswith(FMRIPREP_OWN)]
     if own:
         same = sum(1 for c in own if c.detail.startswith("values bit-identical"))

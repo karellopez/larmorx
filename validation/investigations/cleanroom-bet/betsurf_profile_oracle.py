@@ -59,8 +59,11 @@ def main(argv: list[str]) -> int:
     out = Path(outp)
     out.mkdir(parents=True, exist_ok=True)
     d = np.array(nib.load(t1p).header.get_zooms()[:3], float)
-    recs = [json.loads(ln[5:] if ln.startswith("DUMP ") else ln)
-            for ln in Path(dumpp).read_text().splitlines() if ln.strip().startswith(("{", "DUMP "))]
+    recs = [
+        json.loads(ln[5:] if ln.startswith("DUMP ") else ln)
+        for ln in Path(dumpp).read_text().splitlines()
+        if ln.strip().startswith(("{", "DUMP "))
+    ]
     idx = [int(i) for i in which] if which else range(len(recs))
     binary = os.environ.get("LARMORX_BIN", "larmorx")
     for i in idx:
@@ -74,8 +77,13 @@ def main(argv: list[str]) -> int:
         # one profile votes k times and the surfaces' positions (not only the decision) can be
         # compared: the three meshes FSL writes against the original's
         copies = int(os.environ.get("ORACLE_COPIES", "1"))
-        lines = ["# vtk DataFile Version 3.0", "surface file", "ASCII", "DATASET POLYDATA",
-                 f"POINTS {3 * copies}  float"]
+        lines = [
+            "# vtk DataFile Version 3.0",
+            "surface file",
+            "ASCII",
+            "DATASET POLYDATA",
+            f"POINTS {3 * copies}  float",
+        ]
         lines += [" ".join(f"{c:.6f}" for c in p) for _ in range(copies) for p in v]
         lines += [f"POLYGONS {copies} {4 * copies}"]
         lines += [f"3 {3 * c} {3 * c + 1} {3 * c + 2} " for c in range(copies)]
@@ -86,10 +94,19 @@ def main(argv: list[str]) -> int:
         f = fslrun.run("betsurf", [*args, "o"], dk / "fsl")
         # the original's own -v lines (the part's probe build also wrote each profile's samples
         # to standard error with LX_BETSURF_DUMP=1, kept in dump.txt: README)
-        env = dict(os.environ, LARMORX_IMPLEMENTATION="original", FSLOUTPUTTYPE="NIFTI_GZ",
-                   LX_BETSURF_DUMP="1")
-        lx = subprocess.run([binary, "fsl", "betsurf", *args, str(dk / "lx")], env=env,
-                            capture_output=True, text=True, check=False)
+        env = dict(
+            os.environ,
+            LARMORX_IMPLEMENTATION="original",
+            FSLOUTPUTTYPE="NIFTI_GZ",
+            LX_BETSURF_DUMP="1",
+        )
+        lx = subprocess.run(
+            [binary, "fsl", "betsurf", *args, str(dk / "lx")],
+            env=env,
+            capture_output=True,
+            text=True,
+            check=False,
+        )
         (dk / "dump.txt").write_text(lx.stderr, encoding="utf-8")
         lxr = removed(lx.stdout)
         meshes = ""

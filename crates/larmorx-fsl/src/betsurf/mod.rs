@@ -119,13 +119,13 @@ pub fn surface_mask(
     shape: [usize; 3],
     voxel: [f64; 3],
     rounding: Rounding,
-    base: Vec<i32>,
+    base: Vec<f32>,
     start_from: Option<V3>,
     mode: UpstreamDefects,
     notices: &mut Vec<Notice>,
-) -> Vec<i32> {
+) -> Vec<f32> {
     let mut grid = base;
-    raster::draw(mesh, points, shape, voxel, rounding, |k| grid[k] = 1);
+    raster::draw(mesh, points, shape, voxel, rounding, |k| grid[k] = 1.0);
     let centroid = start_from.unwrap_or_else(|| centroid(points));
     let Some(start) = raster::voxel_of(centroid, voxel) else {
         defects::push_once(
@@ -140,10 +140,10 @@ pub fn surface_mask(
     };
     let inside = (0..3).all(|a| start[a] >= 0 && (start[a] as usize) < shape[a]);
     if inside {
-        fill_i32(&mut grid, shape, start.map(|x| x as usize));
+        fill_mask(&mut grid, shape, start.map(|x| x as usize));
     } else if mode.fix() {
         let s = [0, 1, 2].map(|a| start[a].clamp(0, shape[a] as i64 - 1) as usize);
-        fill_i32(&mut grid, shape, s);
+        fill_mask(&mut grid, shape, s);
         defects::push_once(
             notices,
             Notice::new(
@@ -155,7 +155,7 @@ pub fn surface_mask(
             ),
         );
     } else {
-        let beyond = fill_i32_by_index(&mut grid, shape, start);
+        let beyond = fill_mask_by_index(&mut grid, shape, start);
         defects::push_once(
             notices,
             Notice::new(
@@ -180,11 +180,11 @@ pub fn centroid(points: &[V3]) -> V3 {
 }
 
 /// Fills with 1, from `start` (set whatever it holds), the 6-connected voxels holding 0.
-fn fill_i32(grid: &mut [i32], shape: [usize; 3], start: [usize; 3]) {
+fn fill_mask(grid: &mut [f32], shape: [usize; 3], start: [usize; 3]) {
     let [nx, ny, nz] = shape;
     let slice = nx * ny;
     let s = (start[2] * ny + start[1]) * nx + start[0];
-    grid[s] = 1;
+    grid[s] = 1.0;
     let mut stack = vec![s as u32];
     while let Some(p) = stack.pop() {
         let p = p as usize;
@@ -192,8 +192,8 @@ fn fill_i32(grid: &mut [i32], shape: [usize; 3], start: [usize; 3]) {
         let y = (p / nx) % ny;
         let z = p / slice;
         let mut visit = |q: usize, stack: &mut Vec<u32>| {
-            if grid[q] == 0 {
-                grid[q] = 1;
+            if grid[q] == 0.0 {
+                grid[q] = 1.0;
                 stack.push(q as u32);
             }
         };
@@ -221,7 +221,7 @@ fn fill_i32(grid: &mut [i32], shape: [usize; 3], start: [usize; 3]) {
 /// FSL's fill from a start outside the image (FSL-43 reproduced, as bet2's, §4.6): point by
 /// point by the linear index, nothing written beyond the volume and every read there "not 0".
 /// Returns the reads beyond the volume.
-fn fill_i32_by_index(grid: &mut [i32], shape: [usize; 3], start: [i64; 3]) -> usize {
+fn fill_mask_by_index(grid: &mut [f32], shape: [usize; 3], start: [i64; 3]) -> usize {
     let [nx, ny, nz] = shape.map(|n| n as i64);
     let total = grid.len() as i64;
     let place = |p: [i64; 3]| (p[2] * ny + p[1]) * nx + p[0];
@@ -230,7 +230,7 @@ fn fill_i32_by_index(grid: &mut [i32], shape: [usize; 3], start: [i64; 3]) -> us
     while let Some(p) = stack.pop() {
         let at = place(p);
         if (0..total).contains(&at) {
-            grid[at as usize] = 1;
+            grid[at as usize] = 1.0;
         }
         let candidates = [
             ([p[0] - 1, p[1], p[2]], p[0] > 0),
@@ -246,7 +246,7 @@ fn fill_i32_by_index(grid: &mut [i32], shape: [usize; 3], start: [i64; 3]) -> us
             }
             let at = place(q);
             if (0..total).contains(&at) {
-                if grid[at as usize] == 0 {
+                if grid[at as usize] == 0.0 {
                     stack.push(q);
                 }
             } else {
@@ -262,7 +262,7 @@ fn fill_i32_by_index(grid: &mut [i32], shape: [usize; 3], start: [i64; 3]) -> us
 /// holds a NaN (FSL-55) and `mode` is the default.
 pub fn robust_maximum(
     t1: &Vol,
-    mask: &[i32],
+    mask: &[f32],
     mode: UpstreamDefects,
     notices: &mut Vec<Notice>,
 ) -> Result<f64, Refusal> {
@@ -270,7 +270,7 @@ pub fn robust_maximum(
         .data
         .iter()
         .zip(mask)
-        .filter(|(_, m)| **m == 1)
+        .filter(|(_, m)| **m == 1.0)
         .map(|(v, _)| *v)
         .collect();
     if values.is_empty() {
@@ -779,10 +779,15 @@ pub fn votes(
 /// The separable Gaussian of σ = `sigma` mm (§6.5): per axis σ in voxels `sigma/d`, the kernel
 /// of half-width `2 trunc(σ − 0.001) + 3` voxels and weights `exp(−j²/(2σ²))` normalised to sum
 /// 1, outside the grid 0; along x, then y, then z.
-pub fn smooth(data: &[f32], shape: [usize; 3], voxel: [f64; 3], sigma: f64) -> Vec<f32> {
-    let mut cur = data.to_vec();
+pub fn smooth(data: Vec<f32>, shape: [usize; 3], voxel: [f64; 3], sigma: f64) -> Vec<f32> {
     let [nx, ny, nz] = shape;
-    let strides = [1, nx, nx * ny];
+    let plane = nx * ny;
+    let mut cur = data;
+    if cur.is_empty() {
+        return cur;
+    }
+    // one more buffer: each pass reads one and writes the other (no other copy is held)
+    let mut dst = vec![0.0f32; cur.len()];
     for a in 0..3 {
         let s = sigma / voxel[a];
         let half = 2 * (s - 0.001).trunc().max(0.0) as i64 + 3;
@@ -793,40 +798,43 @@ pub fn smooth(data: &[f32], shape: [usize; 3], voxel: [f64; 3], sigma: f64) -> V
         for x in &mut w {
             *x /= total;
         }
-        let n = shape[a];
-        let stride = strides[a];
-        let src = cur;
-        let mut dst = vec![0.0f32; src.len()];
-        // each line along the axis on its own
-        let lines: Vec<usize> = (0..src.len()).filter(|&k| (k / stride) % n == 0).collect();
-        let results: Vec<(usize, Vec<f32>)> = lines
-            .par_iter()
-            .with_min_len(64)
-            .map(|&base| {
-                let line: Vec<f32> = (0..n).map(|i| src[base + i * stride]).collect();
-                let out: Vec<f32> = (0..n as i64)
-                    .map(|i| {
-                        let mut acc = 0.0f64;
-                        for (t, &wt) in w.iter().enumerate() {
-                            let j = i + t as i64 - half;
-                            if j >= 0 && j < n as i64 {
-                                acc += wt * f64::from(line[j as usize]);
-                            }
-                        }
-                        acc as f32
-                    })
-                    .collect();
-                (base, out)
-            })
-            .collect();
-        for (base, out) in results {
-            for (i, v) in out.into_iter().enumerate() {
-                dst[base + i * stride] = v;
+        let n = shape[a] as i64;
+        let src = &cur;
+        // each output voxel the kernel's weighted sum along the axis, in the kernel's order
+        // (outside the grid 0), in double, stored as float
+        let at = |base: usize, i: i64, stride: usize| -> f32 {
+            let mut acc = 0.0f64;
+            for (t, &wt) in w.iter().enumerate() {
+                let j = i + t as i64 - half;
+                if j >= 0 && j < n {
+                    acc += wt * f64::from(src[base + j as usize * stride]);
+                }
             }
+            acc as f32
+        };
+        match a {
+            0 => dst.par_chunks_mut(nx).enumerate().for_each(|(row, out)| {
+                let base = row * nx;
+                for (i, o) in out.iter_mut().enumerate() {
+                    *o = at(base, i as i64, 1);
+                }
+            }),
+            1 => dst.par_chunks_mut(plane).enumerate().for_each(|(z, out)| {
+                for y in 0..ny {
+                    for x in 0..nx {
+                        out[y * nx + x] = at(z * plane + x, y as i64, nx);
+                    }
+                }
+            }),
+            _ => dst.par_chunks_mut(plane).enumerate().for_each(|(z, out)| {
+                for (k, o) in out.iter_mut().enumerate() {
+                    *o = at(k, z as i64, plane);
+                }
+            }),
         }
-        cur = dst;
-        let _ = (ny, nz);
+        std::mem::swap(&mut cur, &mut dst);
     }
+    let _ = nz;
     cur
 }
 
@@ -961,14 +969,15 @@ pub fn retessellate(mesh: &Mesh, points: &[V3]) -> (Mesh, Vec<V3>) {
     (r, pts)
 }
 
-/// Integer conversion of a smoothed image (truncation; values of 1 or more are the fill's
-/// barriers, §6.5).
-pub fn truncated(data: &[f32]) -> Vec<i32> {
+/// Integer conversion of a smoothed image (C's truncation toward zero; values of 1 or more are
+/// the fill's barriers, §6.5), held as floats (every such integer is exact in float: the mask
+/// the deformation reads by trilinear interpolation needs no second copy).
+pub fn truncated(data: &[f32]) -> Vec<f32> {
     data.par_iter()
         .with_min_len(1 << 16)
         .map(|&v| {
-            c_int(f64::from(v)).map_or(i32::MIN, |x| {
-                x.clamp(i32::MIN as i64, i32::MAX as i64) as i32
+            c_int(f64::from(v)).map_or(i32::MIN as f32, |x| {
+                x.clamp(i32::MIN as i64, i32::MAX as i64) as i32 as f32
             })
         })
         .collect()
@@ -1013,7 +1022,7 @@ mod tests {
         let shape = [21, 21, 21];
         let mut v = vec![0.0f32; 21 * 21 * 21];
         v[(10 * 21 + 10) * 21 + 10] = 1.0;
-        let s = smooth(&v, shape, [1.0; 3], 3.0);
+        let s = smooth(v, shape, [1.0; 3], 3.0);
         let total: f64 = s.iter().map(|&x| f64::from(x)).sum();
         assert!((total - 1.0).abs() < 1e-5, "{total}");
     }

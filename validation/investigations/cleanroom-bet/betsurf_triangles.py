@@ -66,7 +66,11 @@ def main(argv: list[str]) -> int:
     mat = np.loadtxt(matp)
     binary = os.environ.get("LARMORX_BIN", "larmorx")
     picked = os.environ.get("TRIS")  # the triangles named (comma-separated) instead
-    ks = [int(t) for t in picked.split(",")] if picked else range(int(first), int(first) + int(count) * step, step)
+    ks = (
+        [int(t) for t in picked.split(",")]
+        if picked
+        else range(int(first), int(first) + int(count) * step, step)
+    )
     for k in ks:
         if k >= len(tri):
             break
@@ -93,8 +97,13 @@ def main(argv: list[str]) -> int:
             nib.save(img, dk / f"{name}.nii.gz")
             names.append(str(dk / f"{name}.nii.gz"))
         off = lo * d
-        lines = ["# vtk DataFile Version 3.0", "surface file", "ASCII", "DATASET POLYDATA",
-                 "POINTS 3  float"]
+        lines = [
+            "# vtk DataFile Version 3.0",
+            "surface file",
+            "ASCII",
+            "DATASET POLYDATA",
+            "POINTS 3  float",
+        ]
         lines += [" ".join(f"{x:.6f}" for x in p - off) for p in v]
         lines += ["POLYGONS 1 4", "3 0 1 2 "]
         (dk / "mesh.vtk").write_text("\n".join(lines) + "\n", encoding="utf-8")
@@ -105,8 +114,13 @@ def main(argv: list[str]) -> int:
         args = [*opts, *names, str(dk / "mesh.vtk"), str(dk / "m.mat")]
         f = fslrun.run("betsurf", [*args, "o"], dk / "fsl")
         env = dict(os.environ, LARMORX_IMPLEMENTATION="original", FSLOUTPUTTYPE="NIFTI_GZ")
-        lx = subprocess.run([binary, "fsl", "betsurf", *args, str(dk / "lx")], env=env,
-                            capture_output=True, text=True, check=False)
+        lx = subprocess.run(
+            [binary, "fsl", "betsurf", *args, str(dk / "lx")],
+            env=env,
+            capture_output=True,
+            text=True,
+            check=False,
+        )
         if os.environ.get("LX_BETSURF_DUMP"):
             # a build with the profile dump (a probe of the part's notes) writes each profile
             (dk / "dump.txt").write_text(lx.stderr, encoding="utf-8")

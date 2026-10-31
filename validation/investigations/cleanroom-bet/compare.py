@@ -77,7 +77,9 @@ def compare(d: Path, program: str, args: list[str]) -> dict:
         shutil.rmtree(x, ignore_errors=True)
     if reuse:
         f = subprocess.CompletedProcess(
-            args, int((d / "fsl.code").read_text()), (d / "fsl.out").read_text(),
+            args,
+            int((d / "fsl.code").read_text()),
+            (d / "fsl.out").read_text(),
             (d / "fsl.err").read_text(),
         )
     else:

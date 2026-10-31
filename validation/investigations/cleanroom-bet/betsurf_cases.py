@@ -74,8 +74,10 @@ def main(argv: list[str]) -> int:
     all_cases = cases(Path(ph))
     for name in names or list(all_cases):
         r = compare.compare(Path(d) / name, "betsurf", all_cases[name])
-        print(f"=== {name}: exit {r.pop('exit')}, stdout same {r.pop('stdout same')}, "
-              f"stderr same {r.pop('stderr same')}")
+        print(
+            f"=== {name}: exit {r.pop('exit')}, stdout same {r.pop('stdout same')}, "
+            f"stderr same {r.pop('stderr same')}"
+        )
         for k in ("stdout", "stderr"):
             if k in r:
                 print(f"  {k}: {r.pop(k)!r}")

@@ -308,10 +308,18 @@ def programs(d: Path, nc: str | None = None, *, make: bool = True) -> list[Progr
                        (*lx, "fsl", "bet", t1, o + "_obetr", "-R", "-m"), bet))  # fmt: skip
     out.append(Program("fsl bet -F (clean-room original)",
                        (*lx, "fsl", "bet", s, o + "_obetf", "-F"), bet))  # fmt: skip
+    mat = d / "identity.mat"
+    if make:
+        mat.write_text("1 0 0 0\n0 1 0 0\n0 0 1 0\n0 0 0 1\n", encoding="utf-8")
+    # betsurf's clean-room original (2026-10-31) on the bet2 original's mesh: T1 only with the
+    # skull mask and -p, and with a T2 (the same image) and the outlines
+    out.append(Program("fsl betsurf --t1only (clean-room original)",
+                       (*lx, "fsl", "betsurf", "--t1only", "-m", "-s", "-p", "1", t1,
+                        o + "_obet2_mesh.vtk", str(mat), o + "_obs"), bet))  # fmt: skip
+    out.append(Program("fsl betsurf with a T2 (clean-room original)",
+                       (*lx, "fsl", "betsurf", "-o", "-m", t1, t1, o + "_obet2_mesh.vtk",
+                        str(mat), o + "_obs2"), bet))  # fmt: skip
     if nc:
-        mat = d / "identity.mat"
-        if make:
-            mat.write_text("1 0 0 0\n0 1 0 0\n0 0 1 0\n0 0 0 1\n", encoding="utf-8")
         fsl = {
             "mcflirt": ["-in", s, "-out", o + "_mcf"],
             "bet2": [t1, o + "_bet2", "-m", "-e"],

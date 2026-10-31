@@ -383,7 +383,7 @@ fn run_in(
         }
     };
     // the images
-    let t1 = match read_image(settings, &o.t1, mode, &mut notices, n_threads) {
+    let mut t1 = match read_image(settings, &o.t1, mode, &mut notices, n_threads) {
         Ok(i) => i,
         Err(e) => {
             print_notices(err, &notices);
@@ -393,7 +393,7 @@ fn run_in(
     if t1.volumes > 1 {
         let _ = writeln!(err, "{TRUNCATED}");
     }
-    let t2: Option<Input> = match &o.t2 {
+    let mut t2: Option<Input> = match &o.t2 {
         None => None,
         Some(name) => match read_image(settings, name, mode, &mut notices, n_threads) {
             Ok(i) => {
@@ -446,7 +446,7 @@ fn run_in(
         shape,
         voxel,
         Rounding::Floor,
-        vec![0; n_vox],
+        vec![0.0; n_vox],
         None,
         mode,
         &mut notices,
@@ -483,13 +483,13 @@ fn run_in(
         }
     };
     drop(mask0);
-    let t1c = pooled(n_threads, || {
-        let mut v = t1.vol.clone();
+    // §6.4: the profiles, on the T1 clamped in place (no copy of it is held)
+    let grid = WorkGrid::new(&pts, &t1.vol, o.t1only);
+    let empty = Vol::new([0, 0, 0], voxel, Vec::new());
+    let t1c = in_pool(n_threads, std::mem::replace(&mut t1.vol, empty), |mut v| {
         bs::clamp(&mut v, thr);
         v
     });
-    // §6.4: the profiles
-    let grid = WorkGrid::new(&pts, &t1.vol, o.t1only);
     if o.verbose {
         let _ = writeln!(out, "extracting profiles");
     }
@@ -505,6 +505,11 @@ fn run_in(
             mode.reproduce(),
         )
     });
+    // the images are not needed any more (the outputs take the T1's header only)
+    drop(t1c);
+    if let Some(t2) = t2.as_mut() {
+        t2.vol.data = Vec::new();
+    }
     if votes.stop {
         // FSL-50 reproduced: FSL ends here, silently
         let n = Notice::new(
@@ -546,11 +551,10 @@ fn run_in(
     }
     let gshape = grid.shape;
     let gvox = grid.voxel;
-    let inner_s = pooled(n_threads, || bs::smooth(&votes.inner, gshape, gvox, 3.0));
-    let scalp_s = pooled(n_threads, || bs::smooth(&votes.scalp, gshape, gvox, 3.0));
+    let smoothed = |v: Vec<f32>| in_pool(n_threads, v, |v| bs::smooth(v, gshape, gvox, 3.0));
+    let inner_s = smoothed(votes.inner);
+    let scalp_s = smoothed(votes.scalp);
     let mut outer_counts = votes.outer;
-    drop(votes.inner);
-    drop(votes.scalp);
     if o.verbose {
         let _ = writeln!(out, "computation");
     }
@@ -619,13 +623,13 @@ fn run_in(
                 shape,
                 voxel,
                 Rounding::Floor,
-                vec![0; n_vox],
+                vec![0.0; n_vox],
                 start,
                 mode,
                 notices,
             )
             .into_iter()
-            .map(|x| x.clamp(i16::MIN as i32, i16::MAX as i32) as i16)
+            .map(|x| x as i16)
             .collect()
         };
     let vtk = |suffix: &str, mesh: &Mesh, p: &[V3], err: &mut dyn Write| {
@@ -639,8 +643,6 @@ fn run_in(
         print_notices(err, more);
         code
     };
-    // a working-grid mask as the deformation reads it (trilinear values of its integers)
-    let as_vol = |mask: &[i32]| gvol(mask.iter().map(|&x| x as f32).collect());
     // phase 1: the inner skull
     if o.verbose {
         let _ = writeln!(out, " inner skull");
@@ -694,16 +696,12 @@ fn run_in(
         &mut notices,
     );
     for (c, &m) in outer_counts.iter_mut().zip(&inner_work) {
-        if m == 1 {
+        if m == 1.0 {
             *c = 0.0;
         }
     }
-    let outer_img = gvol(pooled(n_threads, || {
-        bs::smooth(&outer_counts, gshape, gvox, 3.0)
-    }));
-    drop(outer_counts);
-    let inner_mask_vol = as_vol(&inner_work);
-    drop(inner_work);
+    let outer_img = gvol(smoothed(outer_counts));
+    let inner_mask_vol = gvol(inner_work);
     // phase 3: the outer skull
     if o.verbose {
         let _ = writeln!(out, " outer skull");
@@ -778,8 +776,7 @@ fn run_in(
         &mut notices,
     );
     drop(inner_img);
-    let outer_mask_vol = as_vol(&outer_work);
-    drop(outer_work);
+    let outer_mask_vol = gvol(outer_work);
     // phase 5: the scalp, from a new sphere inside the outer skull
     if o.verbose {
         let _ = writeln!(out, " skin");
@@ -858,6 +855,20 @@ fn run_in(
         }
     }
     finish(err, &notices, &written_notices, 0)
+}
+
+/// `f(value)` in a pool of exactly `n_threads` threads ([`pooled`]), the value moved in (not
+/// copied): `f` runs once, in the pool or, where no pool can be made, here.
+fn in_pool<T: Send, R: Send>(n_threads: usize, value: T, f: impl Fn(T) -> R + Send + Sync) -> R {
+    let cell = std::sync::Mutex::new(Some(value));
+    pooled(n_threads, || {
+        let v = cell
+            .lock()
+            .ok()
+            .and_then(|mut g| g.take())
+            .expect("in_pool runs its function once");
+        f(v)
+    })
 }
 
 /// `-p k`: a copy of the surface retessellated and deformed 100 more steps, `k` times (the

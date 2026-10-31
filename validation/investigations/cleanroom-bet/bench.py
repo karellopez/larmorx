@@ -100,12 +100,12 @@ def main(argv: list[str]) -> int:
         report["results"].append(
             {
                 "tool": tool,
-                "operation": f"{a.tool}, {t} thread" + ("s" if t > 1 else ""),
-                "input": name,
+                "operation": f"{t} thread" + ("s" if t > 1 else ""),
+                "input": f"{a.tool}: {name}",
                 "median": statistics.median(times),
                 "best": min(times),
                 "seconds": times,
-                "extra": {"threads": t, "call": a.args},
+                "extra": {"threads": t, "program": a.tool, "call": a.args},
             }
         )
         return f"{statistics.median(times):.2f}"

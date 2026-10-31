@@ -159,8 +159,8 @@ title = "BET (brain extraction; the skull and scalp surfaces)"
 eco = "fsl"
 page = "/tools/fsl-bet/"
 use = ["larmorx fsl bet", "larmorx fsl bet2", "larmorx fsl betsurf", "lx.fsl.bet", "lx.fsl.betsurf"]
-how = "clean-room original (`bet2` and the `bet` script; betsurf to come), `experimental`; exact replica in `larmorx-nc` (FSL Licence, non-commercial)"
-validation = "original: [{fsl-bet.pass} of {fsl-bet.compared}](record:fsl-bet) compared cases within thresholds against FSL 6.0.7.23, fMRIPrep's {fsl-bet.fmriprep} BET calls on every oracle run with BOLD runs bit-identical; brains, masks, outlines, meshes and skulls FSL's bit for bit, the surfaces that rerun after a self-intersecting first pass included; [2.6 to 3 times faster than FSL on one thread, 6 to 11 times on 24](repo:docs/benchmarks/fsl-bet.md); replica: [{fsl-bet-replica.pass} of {fsl-bet-replica.compared}](record:fsl-bet-replica) compared cases bit-identical to FSL 6.0.7.23, every file, exit status and message ([{fsl-bet-replica-full.pass} of {fsl-bet-replica-full.compared}](record:fsl-bet-replica-full) in the full tier against FSL 6.0.7.17, the data panel's T1w images included), fMRIPrep's {fsl-bet-replica.fmriprep} BET calls on every oracle run with BOLD runs included; {fsl-bet-replica.both} more rejected by both, alike; {fsl-bet-replica.filled} where FSL crashes and `reproduce` fills what it leaves undefined; {fsl-bet-replica.memory} where FSL's fill reads memory beyond the volume (FSL-43, undefined); `bet -S`, `-B`, `-A`, `-A2` pending (FLIRT, FAST)"
+how = "clean-room original (`bet2`, the `bet` script and `betsurf`), `experimental`; exact replica in `larmorx-nc` (FSL Licence, non-commercial)"
+validation = "original: [{fsl-bet.pass} of {fsl-bet.compared}](record:fsl-bet) compared cases within thresholds against FSL 6.0.7.23, fMRIPrep's {fsl-bet.fmriprep} BET calls on every oracle run with BOLD runs bit-identical; bet2's and bet's brains, masks, outlines, meshes and skulls FSL's bit for bit, the surfaces that rerun after a self-intersecting first pass included; betsurf's profiles decided as FSL's, its masks within its thresholds on 4 of 5 real heads (Dice 0.9907 to 0.9997); [2.5 to 3.6 times faster than FSL on one thread, 6.5 to 13.5 times on 24, betsurf included](repo:docs/benchmarks/fsl-bet.md); replica: [{fsl-bet-replica.pass} of {fsl-bet-replica.compared}](record:fsl-bet-replica) compared cases bit-identical to FSL 6.0.7.23, every file, exit status and message ([{fsl-bet-replica-full.pass} of {fsl-bet-replica-full.compared}](record:fsl-bet-replica-full) in the full tier against FSL 6.0.7.17, the data panel's T1w images included), fMRIPrep's {fsl-bet-replica.fmriprep} BET calls on every oracle run with BOLD runs included; {fsl-bet-replica.both} more rejected by both, alike; {fsl-bet-replica.filled} where FSL crashes and `reproduce` fills what it leaves undefined; {fsl-bet-replica.memory} where FSL's fill reads memory beyond the volume (FSL-43, undefined); `bet -S`, `-B`, `-A`, `-A2` pending (FLIRT, FAST)"
 
 # ------------------------------------------------------------------------------------------------
 # Records: the validation index's table (docs/validation/README.md), in this order.
@@ -359,9 +359,9 @@ status = "`validated` ({fsl-mcflirt-replica-full.pass} of {fsl-mcflirt-replica-f
 
 [[record]]
 id = "fsl-bet"
-larmorx = "`lx.fsl.bet(implementation=\"original\")`, `larmorx fsl bet2`, `larmorx fsl bet` (clean-room, `crates/larmorx-fsl`)"
-reference = "bet and bet2 (FSL 6.0.7.23)"
-status = "`experimental` ({fsl-bet.fail} of {fsl-bet.compared} compared cases miss their threshold; fMRIPrep's {fsl-bet.fmriprep} calls included; {fsl-bet.both} rejected by both, with the same messages and status; {fsl-bet.filled} where FSL crashes and `reproduce` fills what it leaves undefined; {fsl-bet.pending} pending FLIRT and FAST; betsurf to come)"
+larmorx = "`lx.fsl.bet(implementation=\"original\")`, `lx.fsl.betsurf(implementation=\"original\")`, `larmorx fsl bet2`, `bet`, `betsurf` (clean-room, `crates/larmorx-fsl`)"
+reference = "bet, bet2 and betsurf (FSL 6.0.7.23)"
+status = "`experimental` ({fsl-bet.fail} of {fsl-bet.compared} compared cases miss their threshold: betsurf's scalp of ds002603 with its T2; fMRIPrep's {fsl-bet.fmriprep} calls included; {fsl-bet.both} rejected by both, with the same messages and status; {fsl-bet.filled} where FSL crashes and `reproduce` fills what it leaves undefined; {fsl-bet.pending} pending FLIRT and FAST)"
 
 [[record]]
 id = "fsl-bet-replica"

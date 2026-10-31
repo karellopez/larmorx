@@ -1,0 +1,779 @@
+{
+ "environment": {
+  "cpu": "AMD Ryzen 9 7945HX with Radeon Graphics",
+  "logical_cpus": 32,
+  "platform": "Linux x86_64",
+  "os": "Linux-6.8.0-124-generic-x86_64-with-glibc2.35",
+  "python": "3.12.16",
+  "larmorx_commit": "e45d8052faad"
+ },
+ "repeats": 3,
+ "results": [
+  {
+   "tool": "FSL 6.0.7.23",
+   "operation": "1 thread",
+   "input": "bet: fMRIPrep's call, ds000005 BOLD reference (64 x 64 x 34)",
+   "median": 0.6686972419847734,
+   "best": 0.6052767650107853,
+   "seconds": [
+    0.6686972419847734,
+    0.6052767650107853,
+    0.6728662300156429
+   ],
+   "extra": {
+    "threads": 1,
+    "program": "bet",
+    "call": "{0} out -f 0.20 -m"
+   }
+  },
+  {
+   "tool": "replica (larmorx-nc)",
+   "operation": "1 thread",
+   "input": "bet: fMRIPrep's call, ds000005 BOLD reference (64 x 64 x 34)",
+   "median": 0.38843701302539557,
+   "best": 0.3883596159867011,
+   "seconds": [
+    0.38843701302539557,
+    0.45681767200585455,
+    0.3883596159867011
+   ],
+   "extra": {
+    "threads": 1,
+    "program": "bet",
+    "call": "{0} out -f 0.20 -m"
+   }
+  },
+  {
+   "tool": "replica (larmorx-nc)",
+   "operation": "24 threads",
+   "input": "bet: fMRIPrep's call, ds000005 BOLD reference (64 x 64 x 34)",
+   "median": 0.37855532101821154,
+   "best": 0.3782058520009741,
+   "seconds": [
+    0.45937284000683576,
+    0.37855532101821154,
+    0.3782058520009741
+   ],
+   "extra": {
+    "threads": 24,
+    "program": "bet",
+    "call": "{0} out -f 0.20 -m"
+   }
+  },
+  {
+   "tool": "original (larmorx)",
+   "operation": "1 thread",
+   "input": "bet: fMRIPrep's call, ds000005 BOLD reference (64 x 64 x 34)",
+   "median": 0.24258082796586677,
+   "best": 0.24176726100267842,
+   "seconds": [
+    0.32024648098740727,
+    0.24176726100267842,
+    0.24258082796586677
+   ],
+   "extra": {
+    "threads": 1,
+    "program": "bet",
+    "call": "{0} out -f 0.20 -m"
+   }
+  },
+  {
+   "tool": "original (larmorx)",
+   "operation": "24 threads",
+   "input": "bet: fMRIPrep's call, ds000005 BOLD reference (64 x 64 x 34)",
+   "median": 0.05750493099913001,
+   "best": 0.057226035045459867,
+   "seconds": [
+    0.06007022800622508,
+    0.057226035045459867,
+    0.05750493099913001
+   ],
+   "extra": {
+    "threads": 24,
+    "program": "bet",
+    "call": "{0} out -f 0.20 -m"
+   }
+  },
+  {
+   "tool": "FSL 6.0.7.23",
+   "operation": "1 thread",
+   "input": "bet2: adult, ds000005 (160 x 192 x 192)",
+   "median": 1.252456459973473,
+   "best": 1.2357665059971623,
+   "seconds": [
+    1.3098782150191255,
+    1.2357665059971623,
+    1.252456459973473
+   ],
+   "extra": {
+    "threads": 1,
+    "program": "bet2",
+    "call": "{0} out -m"
+   }
+  },
+  {
+   "tool": "replica (larmorx-nc)",
+   "operation": "1 thread",
+   "input": "bet2: adult, ds000005 (160 x 192 x 192)",
+   "median": 0.7220003540278412,
+   "best": 0.6414911180036142,
+   "seconds": [
+    0.7220003540278412,
+    0.72554500203114,
+    0.6414911180036142
+   ],
+   "extra": {
+    "threads": 1,
+    "program": "bet2",
+    "call": "{0} out -m"
+   }
+  },
+  {
+   "tool": "replica (larmorx-nc)",
+   "operation": "24 threads",
+   "input": "bet2: adult, ds000005 (160 x 192 x 192)",
+   "median": 0.7181641260394827,
+   "best": 0.6414259650046006,
+   "seconds": [
+    0.7181641260394827,
+    0.7309863919508643,
+    0.6414259650046006
+   ],
+   "extra": {
+    "threads": 24,
+    "program": "bet2",
+    "call": "{0} out -m"
+   }
+  },
+  {
+   "tool": "original (larmorx)",
+   "operation": "1 thread",
+   "input": "bet2: adult, ds000005 (160 x 192 x 192)",
+   "median": 0.4949798460002057,
+   "best": 0.4270181480096653,
+   "seconds": [
+    0.4955207980237901,
+    0.4270181480096653,
+    0.4949798460002057
+   ],
+   "extra": {
+    "threads": 1,
+    "program": "bet2",
+    "call": "{0} out -m"
+   }
+  },
+  {
+   "tool": "original (larmorx)",
+   "operation": "24 threads",
+   "input": "bet2: adult, ds000005 (160 x 192 x 192)",
+   "median": 0.17173006996745244,
+   "best": 0.16983936895849183,
+   "seconds": [
+    0.17173006996745244,
+    0.17277073697187006,
+    0.16983936895849183
+   ],
+   "extra": {
+    "threads": 24,
+    "program": "bet2",
+    "call": "{0} out -m"
+   }
+  },
+  {
+   "tool": "FSL 6.0.7.23",
+   "operation": "1 thread",
+   "input": "bet2: child of 3.5 years, ds000228 (176 x 192 x 192)",
+   "median": 1.320973404974211,
+   "best": 1.3141000589821488,
+   "seconds": [
+    1.397077038011048,
+    1.3141000589821488,
+    1.320973404974211
+   ],
+   "extra": {
+    "threads": 1,
+    "program": "bet2",
+    "call": "{0} out -m"
+   }
+  },
+  {
+   "tool": "replica (larmorx-nc)",
+   "operation": "1 thread",
+   "input": "bet2: child of 3.5 years, ds000228 (176 x 192 x 192)",
+   "median": 0.8232560380129144,
+   "best": 0.8159080130280927,
+   "seconds": [
+    0.8232560380129144,
+    0.8241353589692153,
+    0.8159080130280927
+   ],
+   "extra": {
+    "threads": 1,
+    "program": "bet2",
+    "call": "{0} out -m"
+   }
+  },
+  {
+   "tool": "replica (larmorx-nc)",
+   "operation": "24 threads",
+   "input": "bet2: child of 3.5 years, ds000228 (176 x 192 x 192)",
+   "median": 0.8152727130218409,
+   "best": 0.7477531000040472,
+   "seconds": [
+    0.8152727130218409,
+    0.7477531000040472,
+    0.8156951310229488
+   ],
+   "extra": {
+    "threads": 24,
+    "program": "bet2",
+    "call": "{0} out -m"
+   }
+  },
+  {
+   "tool": "original (larmorx)",
+   "operation": "1 thread",
+   "input": "bet2: child of 3.5 years, ds000228 (176 x 192 x 192)",
+   "median": 0.5309701160294935,
+   "best": 0.46689266699831933,
+   "seconds": [
+    0.5309701160294935,
+    0.46689266699831933,
+    0.5345844050170854
+   ],
+   "extra": {
+    "threads": 1,
+    "program": "bet2",
+    "call": "{0} out -m"
+   }
+  },
+  {
+   "tool": "original (larmorx)",
+   "operation": "24 threads",
+   "input": "bet2: child of 3.5 years, ds000228 (176 x 192 x 192)",
+   "median": 0.178659362019971,
+   "best": 0.17770608101272956,
+   "seconds": [
+    0.17770608101272956,
+    0.178659362019971,
+    0.18029172701062635
+   ],
+   "extra": {
+    "threads": 24,
+    "program": "bet2",
+    "call": "{0} out -m"
+   }
+  },
+  {
+   "tool": "FSL 6.0.7.23",
+   "operation": "1 thread",
+   "input": "bet2: adult of 82 years, ds003592 (192 x 256 x 256)",
+   "median": 2.0207604530151,
+   "best": 2.007635265996214,
+   "seconds": [
+    2.007635265996214,
+    2.0335002440260723,
+    2.0207604530151
+   ],
+   "extra": {
+    "threads": 1,
+    "program": "bet2",
+    "call": "{0} out -m"
+   }
+  },
+  {
+   "tool": "replica (larmorx-nc)",
+   "operation": "1 thread",
+   "input": "bet2: adult of 82 years, ds003592 (192 x 256 x 256)",
+   "median": 1.0252364510088228,
+   "best": 1.0203041619970463,
+   "seconds": [
+    1.0203041619970463,
+    1.0256739470059983,
+    1.0252364510088228
+   ],
+   "extra": {
+    "threads": 1,
+    "program": "bet2",
+    "call": "{0} out -m"
+   }
+  },
+  {
+   "tool": "replica (larmorx-nc)",
+   "operation": "24 threads",
+   "input": "bet2: adult of 82 years, ds003592 (192 x 256 x 256)",
+   "median": 1.0407925929757766,
+   "best": 1.040515408036299,
+   "seconds": [
+    1.0832824740209617,
+    1.0407925929757766,
+    1.040515408036299
+   ],
+   "extra": {
+    "threads": 24,
+    "program": "bet2",
+    "call": "{0} out -m"
+   }
+  },
+  {
+   "tool": "original (larmorx)",
+   "operation": "1 thread",
+   "input": "bet2: adult of 82 years, ds003592 (192 x 256 x 256)",
+   "median": 0.6999200910213403,
+   "best": 0.6448846360435709,
+   "seconds": [
+    0.6448846360435709,
+    0.7011132659972645,
+    0.6999200910213403
+   ],
+   "extra": {
+    "threads": 1,
+    "program": "bet2",
+    "call": "{0} out -m"
+   }
+  },
+  {
+   "tool": "original (larmorx)",
+   "operation": "24 threads",
+   "input": "bet2: adult of 82 years, ds003592 (192 x 256 x 256)",
+   "median": 0.282348434033338,
+   "best": 0.27882638899609447,
+   "seconds": [
+    0.282348434033338,
+    0.27882638899609447,
+    0.3478462569764815
+   ],
+   "extra": {
+    "threads": 24,
+    "program": "bet2",
+    "call": "{0} out -m"
+   }
+  },
+  {
+   "tool": "FSL 6.0.7.23",
+   "operation": "1 thread",
+   "input": "bet2: 7 T MP2RAGE, ds005454 (224 x 272 x 288)",
+   "median": 3.0587550140335225,
+   "best": 3.0080903659691103,
+   "seconds": [
+    3.0587550140335225,
+    3.0080903659691103,
+    3.070170569990296
+   ],
+   "extra": {
+    "threads": 1,
+    "program": "bet2",
+    "call": "{0} out -m"
+   }
+  },
+  {
+   "tool": "replica (larmorx-nc)",
+   "operation": "1 thread",
+   "input": "bet2: 7 T MP2RAGE, ds005454 (224 x 272 x 288)",
+   "median": 1.7536933349911124,
+   "best": 1.692387173010502,
+   "seconds": [
+    1.692387173010502,
+    1.7536933349911124,
+    1.7537415349506773
+   ],
+   "extra": {
+    "threads": 1,
+    "program": "bet2",
+    "call": "{0} out -m"
+   }
+  },
+  {
+   "tool": "replica (larmorx-nc)",
+   "operation": "24 threads",
+   "input": "bet2: 7 T MP2RAGE, ds005454 (224 x 272 x 288)",
+   "median": 1.761453977029305,
+   "best": 1.7009089630446397,
+   "seconds": [
+    1.761453977029305,
+    1.7009089630446397,
+    1.7659032719675452
+   ],
+   "extra": {
+    "threads": 24,
+    "program": "bet2",
+    "call": "{0} out -m"
+   }
+  },
+  {
+   "tool": "original (larmorx)",
+   "operation": "1 thread",
+   "input": "bet2: 7 T MP2RAGE, ds005454 (224 x 272 x 288)",
+   "median": 1.206907798012253,
+   "best": 1.1952709109755233,
+   "seconds": [
+    1.1952709109755233,
+    1.2804620820097625,
+    1.206907798012253
+   ],
+   "extra": {
+    "threads": 1,
+    "program": "bet2",
+    "call": "{0} out -m"
+   }
+  },
+  {
+   "tool": "original (larmorx)",
+   "operation": "24 threads",
+   "input": "bet2: 7 T MP2RAGE, ds005454 (224 x 272 x 288)",
+   "median": 0.46822269598487765,
+   "best": 0.46306353801628575,
+   "seconds": [
+    0.46306353801628575,
+    0.5310706419986673,
+    0.46822269598487765
+   ],
+   "extra": {
+    "threads": 24,
+    "program": "bet2",
+    "call": "{0} out -m"
+   }
+  },
+  {
+   "tool": "FSL 6.0.7.23",
+   "operation": "1 thread",
+   "input": "betsurf: T1 only: adult, ds000005",
+   "median": 6.51473645598162,
+   "best": 6.4300358860054985,
+   "seconds": [
+    6.51473645598162,
+    6.4300358860054985,
+    6.564212633995339
+   ],
+   "extra": {
+    "threads": 1,
+    "program": "betsurf",
+    "call": "--t1only -m {0} {1} {2} out"
+   }
+  },
+  {
+   "tool": "replica (larmorx-nc)",
+   "operation": "1 thread",
+   "input": "betsurf: T1 only: adult, ds000005",
+   "median": 3.910304834949784,
+   "best": 3.865389572980348,
+   "seconds": [
+    3.932923455024138,
+    3.865389572980348,
+    3.910304834949784
+   ],
+   "extra": {
+    "threads": 1,
+    "program": "betsurf",
+    "call": "--t1only -m {0} {1} {2} out"
+   }
+  },
+  {
+   "tool": "replica (larmorx-nc)",
+   "operation": "24 threads",
+   "input": "betsurf: T1 only: adult, ds000005",
+   "median": 2.5830990070244297,
+   "best": 2.567460010992363,
+   "seconds": [
+    2.567460010992363,
+    2.649718600034248,
+    2.5830990070244297
+   ],
+   "extra": {
+    "threads": 24,
+    "program": "betsurf",
+    "call": "--t1only -m {0} {1} {2} out"
+   }
+  },
+  {
+   "tool": "original (larmorx)",
+   "operation": "1 thread",
+   "input": "betsurf: T1 only: adult, ds000005",
+   "median": 2.1403989029931836,
+   "best": 2.127261443005409,
+   "seconds": [
+    2.2297637119772844,
+    2.127261443005409,
+    2.1403989029931836
+   ],
+   "extra": {
+    "threads": 1,
+    "program": "betsurf",
+    "call": "--t1only -m {0} {1} {2} out"
+   }
+  },
+  {
+   "tool": "original (larmorx)",
+   "operation": "24 threads",
+   "input": "betsurf: T1 only: adult, ds000005",
+   "median": 0.6108152879751287,
+   "best": 0.5459696390316822,
+   "seconds": [
+    0.5459696390316822,
+    0.6108152879751287,
+    0.6124964350019582
+   ],
+   "extra": {
+    "threads": 24,
+    "program": "betsurf",
+    "call": "--t1only -m {0} {1} {2} out"
+   }
+  },
+  {
+   "tool": "FSL 6.0.7.23",
+   "operation": "1 thread",
+   "input": "betsurf: T1 only: adult of 82 years, ds003592",
+   "median": 11.76368888397701,
+   "best": 11.676251675002277,
+   "seconds": [
+    11.676251675002277,
+    11.76368888397701,
+    11.776467696006875
+   ],
+   "extra": {
+    "threads": 1,
+    "program": "betsurf",
+    "call": "--t1only -m {0} {1} {2} out"
+   }
+  },
+  {
+   "tool": "replica (larmorx-nc)",
+   "operation": "1 thread",
+   "input": "betsurf: T1 only: adult of 82 years, ds003592",
+   "median": 6.371108314953744,
+   "best": 6.349623505026102,
+   "seconds": [
+    6.371108314953744,
+    6.412409078038763,
+    6.349623505026102
+   ],
+   "extra": {
+    "threads": 1,
+    "program": "betsurf",
+    "call": "--t1only -m {0} {1} {2} out"
+   }
+  },
+  {
+   "tool": "replica (larmorx-nc)",
+   "operation": "24 threads",
+   "input": "betsurf: T1 only: adult of 82 years, ds003592",
+   "median": 3.754310078045819,
+   "best": 3.707166092004627,
+   "seconds": [
+    3.754310078045819,
+    3.707166092004627,
+    3.7598794730147347
+   ],
+   "extra": {
+    "threads": 24,
+    "program": "betsurf",
+    "call": "--t1only -m {0} {1} {2} out"
+   }
+  },
+  {
+   "tool": "original (larmorx)",
+   "operation": "1 thread",
+   "input": "betsurf: T1 only: adult of 82 years, ds003592",
+   "median": 3.278018823999446,
+   "best": 3.2756842160015367,
+   "seconds": [
+    3.380815413023811,
+    3.278018823999446,
+    3.2756842160015367
+   ],
+   "extra": {
+    "threads": 1,
+    "program": "betsurf",
+    "call": "--t1only -m {0} {1} {2} out"
+   }
+  },
+  {
+   "tool": "original (larmorx)",
+   "operation": "24 threads",
+   "input": "betsurf: T1 only: adult of 82 years, ds003592",
+   "median": 0.9192875450244173,
+   "best": 0.9165828449768014,
+   "seconds": [
+    0.9314977339818142,
+    0.9165828449768014,
+    0.9192875450244173
+   ],
+   "extra": {
+    "threads": 24,
+    "program": "betsurf",
+    "call": "--t1only -m {0} {1} {2} out"
+   }
+  },
+  {
+   "tool": "FSL 6.0.7.23",
+   "operation": "1 thread",
+   "input": "betsurf: T1 and T2: child of 7 years, ds000256",
+   "median": 18.42426964297192,
+   "best": 18.361228744033724,
+   "seconds": [
+    18.42426964297192,
+    18.361228744033724,
+    18.444992873002775
+   ],
+   "extra": {
+    "threads": 1,
+    "program": "betsurf",
+    "call": "-m {0} {1} {2} {3} out"
+   }
+  },
+  {
+   "tool": "replica (larmorx-nc)",
+   "operation": "1 thread",
+   "input": "betsurf: T1 and T2: child of 7 years, ds000256",
+   "median": 9.85542453196831,
+   "best": 9.792664381035138,
+   "seconds": [
+    9.792664381035138,
+    9.85542453196831,
+    9.856732813001145
+   ],
+   "extra": {
+    "threads": 1,
+    "program": "betsurf",
+    "call": "-m {0} {1} {2} {3} out"
+   }
+  },
+  {
+   "tool": "replica (larmorx-nc)",
+   "operation": "24 threads",
+   "input": "betsurf: T1 and T2: child of 7 years, ds000256",
+   "median": 5.811582978989463,
+   "best": 5.711201714002527,
+   "seconds": [
+    5.711201714002527,
+    5.854203717026394,
+    5.811582978989463
+   ],
+   "extra": {
+    "threads": 24,
+    "program": "betsurf",
+    "call": "-m {0} {1} {2} {3} out"
+   }
+  },
+  {
+   "tool": "original (larmorx)",
+   "operation": "1 thread",
+   "input": "betsurf: T1 and T2: child of 7 years, ds000256",
+   "median": 5.324313726974651,
+   "best": 5.283638686989434,
+   "seconds": [
+    5.324313726974651,
+    5.337072447990067,
+    5.283638686989434
+   ],
+   "extra": {
+    "threads": 1,
+    "program": "betsurf",
+    "call": "-m {0} {1} {2} {3} out"
+   }
+  },
+  {
+   "tool": "original (larmorx)",
+   "operation": "24 threads",
+   "input": "betsurf: T1 and T2: child of 7 years, ds000256",
+   "median": 1.3633912720251828,
+   "best": 1.3615240340004675,
+   "seconds": [
+    1.3633912720251828,
+    1.431046892015729,
+    1.3615240340004675
+   ],
+   "extra": {
+    "threads": 24,
+    "program": "betsurf",
+    "call": "-m {0} {1} {2} {3} out"
+   }
+  },
+  {
+   "tool": "FSL 6.0.7.23",
+   "operation": "1 thread",
+   "input": "betsurf: T1 and T2: glioma, ds005003",
+   "median": 12.233280078042299,
+   "best": 12.231657575001009,
+   "seconds": [
+    12.233280078042299,
+    12.231657575001009,
+    12.248310079972725
+   ],
+   "extra": {
+    "threads": 1,
+    "program": "betsurf",
+    "call": "-m {0} {1} {2} {3} out"
+   }
+  },
+  {
+   "tool": "replica (larmorx-nc)",
+   "operation": "1 thread",
+   "input": "betsurf: T1 and T2: glioma, ds005003",
+   "median": 6.833018356002867,
+   "best": 6.813845167984255,
+   "seconds": [
+    6.813845167984255,
+    6.875369837973267,
+    6.833018356002867
+   ],
+   "extra": {
+    "threads": 1,
+    "program": "betsurf",
+    "call": "-m {0} {1} {2} {3} out"
+   }
+  },
+  {
+   "tool": "replica (larmorx-nc)",
+   "operation": "24 threads",
+   "input": "betsurf: T1 and T2: glioma, ds005003",
+   "median": 4.389942463953048,
+   "best": 4.3430882939719595,
+   "seconds": [
+    4.389942463953048,
+    4.3430882939719595,
+    4.432084064988885
+   ],
+   "extra": {
+    "threads": 24,
+    "program": "betsurf",
+    "call": "-m {0} {1} {2} {3} out"
+   }
+  },
+  {
+   "tool": "original (larmorx)",
+   "operation": "1 thread",
+   "input": "betsurf: T1 and T2: glioma, ds005003",
+   "median": 3.8941719210124575,
+   "best": 3.8757967919809744,
+   "seconds": [
+    3.8757967919809744,
+    3.9089750970015302,
+    3.8941719210124575
+   ],
+   "extra": {
+    "threads": 1,
+    "program": "betsurf",
+    "call": "-m {0} {1} {2} {3} out"
+   }
+  },
+  {
+   "tool": "original (larmorx)",
+   "operation": "24 threads",
+   "input": "betsurf: T1 and T2: glioma, ds005003",
+   "median": 0.9792174699832685,
+   "best": 0.9778393249725923,
+   "seconds": [
+    0.9778393249725923,
+    1.002030719013419,
+    0.9792174699832685
+   ],
+   "extra": {
+    "threads": 24,
+    "program": "betsurf",
+    "call": "-m {0} {1} {2} {3} out"
+   }
+  }
+ ],
+ "load": "2.15 2.70 5.65"
+}

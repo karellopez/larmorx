@@ -207,12 +207,14 @@ SSE's NaN bits on every platform (`larmorx-nc-core`'s `sse`; `validation/probes/
 
 ## Speed
 
-Informal timings, one run each on a shared machine (not a benchmark report;
-[validation/investigations/fsl-bet](../../validation/investigations/fsl-bet/README.md)):
-fMRIPrep's call on ds000005's BOLD reference took 1.14 s in FSL and 0.62 s in the replica;
-`bet2 -m` on a T1w 2.27 s and 1.06 s; `betsurf --t1only -m` 31.4 s and 15.1 s (13.6 s at 3
-threads: the replica smooths in parallel, with the same result). There is no benchmark report
-yet.
+[benchmarks/fsl-bet.md](../benchmarks/fsl-bet.md) (2026-10-31, the median of 3 runs, FSL
+6.0.7.23, the replica and the clean-room original on the same calls): fMRIPrep's call on
+ds000005's BOLD reference took 0.67 s in FSL, 0.39 s in the replica and 0.24 s in the original
+(0.06 s on 24 threads); `bet2 -m` on four T1w images 1.25 to 3.06 s, 0.72 to 1.75 s and 0.49 to
+1.21 s; betsurf on four real heads 6.5 to 18.4 s, 3.9 to 9.9 s (2.6 to 5.8 s on 24 threads: the
+replica smooths in parallel, with the same result) and 2.1 to 5.3 s (0.6 to 1.4 s on 24). Earlier
+informal timings of the replica:
+[validation/investigations/fsl-bet](../../validation/investigations/fsl-bet/README.md).
 
 ## Rust
 
@@ -223,6 +225,7 @@ a `larmorx_nc_core::volume::Volume<f32>`. FSL's libraries are the shared core's,
 `larmorx-nc-core` (its [PROVENANCE](../../crates-nc/larmorx-nc-core/PROVENANCE.md) lists the
 API). The Apache-2.0 crates cannot use them.
 
+
 ## The clean-room original (`crates/larmorx-fsl`)
 
 Written from [`specs/bet.md`](../../specs/bet.md), S. M. Smith's paper (Human Brain Mapping
@@ -232,47 +235,81 @@ Written from [`specs/bet.md`](../../specs/bet.md), S. M. Smith's paper (Human Br
 complete (every option, message, exit status and failure case of the spec, with the D13
 switches of FSL-40, -42, -43, -56, -60, -61 and -62) and the `bet` script's default, `-R`
 (FSL-63), `-F` and `-Z` (FSL-45), FSL-44 and FSL-46; `-S`, `-B`, `-A`, `-A2` refused as pending,
-as the replica does. betsurf's original is still to be written.
+as the replica does. Since 2026-10-31: **`betsurf`** complete (spec §6: every option of §6.1,
+`-p`'s retessellation, the VTK, OFF and FreeSurfer meshes, `manual_input`, every message; the
+D13 switches of FSL-43, -47, -48, -50 to -55 and -58, FSL-49 and FSL-57 kept as FSL's), so
+`implementation="auto"` without `larmorx-nc` runs the original for every BET program.
 
 **Status: `experimental`** ([record](../validation/fsl-bet.md), standard tier against FSL
-6.0.7.23, the replica's suite without betsurf's cases; re-made 2026-10-30 in part 2a: **111 of
-111 compared cases within the thresholds**, 24 more rejected by both alike, 3 where `reproduce`
-fills what FSL leaves undefined, 4 pending): exit statuses and messages FSL's byte for byte; 217
-of 229 brains, masks and outlines bit-identical to FSL's and 12 more within the thresholds, 13
-of 13 skull images bit-identical, the meshes FSL's to the file's 6 decimals, the surfaces that
-rerun after a self-intersecting first pass (a 75-year-old's T1w, 7 T, a tumour) bit for bit,
-fMRIPrep's 29 BET calls on its oracle runs all bit-identical (and with fMRIPrep's own outputs'
-values); headers FSL's byte for byte but for `descrip` (`larmorx fsl bet2`), the qform's
-quaternion included. This follows `specs/bet.md` §8.1 (the deformation's arithmetic, operation
-by operation), §8.2 (the quaternion's precision path) and §4.7 (the skull search), with glibc
-2.35's `tanh` (`larmorx_core::math::tanh_glibc`, fdlibm's, proved equal to the system's on 12.9
-billion inputs). The default uses the same `tanh` for now; making the correctly rounded
-`larmorx_core::math::tanh` the default is part 2b's (GLIBC-06: it changes the surface on 4 of
-the standard tier's 13 real images, the findings give the measurement).
+6.0.7.23, re-made 2026-10-31 in part 2b: **127 of the 128 compared cases within the thresholds**, the
+other missing one threshold (below); of its 168 cases 30 more are rejected by both alike, 6 are where
+`reproduce` fills what FSL leaves undefined, 4 pending): exit statuses and messages FSL's byte
+for byte; 217 of 229
+brains, masks and outlines of `bet2` and `bet` bit-identical to FSL's and 12 more within the
+thresholds, 13 of 13 skull images bit-identical, the meshes FSL's to the file's 6 decimals, the
+surfaces that rerun after a self-intersecting first pass (a 75-year-old's T1w, 7 T, a tumour)
+bit for bit, fMRIPrep's 29 BET calls on its oracle runs all bit-identical (and with fMRIPrep's
+own outputs' values); headers FSL's byte for byte but for `descrip` (`larmorx fsl bet2`), the
+qform's quaternion included. The 142 cases of part 2a's record are unchanged; the 26 new ones
+are betsurf's (its options, messages and failure cases, FSL-48, -52, -53, -54 among them, and
+five real heads with bet2's meshes and FLIRT's matrices made by FSL).
 
-**Random testing** (a 30-minute trial, 2026-10-30, `oracles/difftest/2026-10-30-cleanroom-bet`,
-718 cases, both implementations): the replica agreed in every case it finished (716; 2 timeouts
-of both); the original in 334 of 573 (betsurf's 143 skipped). Its differences led to six
-corrections in part 1 (the fill from any start voxel, the robust range of small images, centres
-of gravity that are not a number, `--ct`'s outline, the quaternion of a qform code 0, `bet -F`'s
-double series), and to part 2a's: with them **237 of the 239 differing cases agree**
-(`validation/investigations/cleanroom-bet/retrial.py`, the skull and the quaternion now held
-exactly). The two left (cases 622 and 677) come from FSL's conversion of a centre between the
-voxel frames of a neurologically stored image (a 4 x 4 inverse whose last bits the spec leaves
-open): the findings describe them.
+**betsurf, what agrees and what does not.** The profiles' decisions (§6.4) are FSL's: on 330 of
+330 single profiles probed one at a time (a tiny triangle that casts exactly one profile; FSL's
+`-v` says whether it set it aside), 127 of 128 triangles of a T1 and T2 and 64 of 64 of a T1
+alone; the share of profiles set aside within 0.06 % of FSL's on the record's real images. Where
+the votes are dense the surfaces are FSL's (the phantom's inner and outer skull to the file's 6
+decimals, also with `-p 1`); where few profiles vote (a skull base where nearly every profile is
+set aside) the inner skull settles elsewhere by up to 11 mm on a few vertices, and the scalp
+differs a little everywhere (95 % of the vertices within 0.2 to 3 mm on real heads). The record
+holds betsurf to its masks (Dice >= 0.99 and the boundary distance's 95th percentile <= 1 voxel,
+specs/bet.md §11): 14 of its 67 masks and outlines
+are FSL's bit for bit and 51 more within these thresholds; on the five real heads the masks'
+Dice coefficients are 0.9907 to 0.9997 (the inner skull 0.9989 to 0.9997, the scalp 0.9938 to
+0.9987), and the scalp of ds002603 with its T2 misses the boundary threshold (its 95th
+percentile 2 voxels): the record's one failure. The questions for the spec writer are in the findings.
 
-**Built for speed:** the vertices of each iteration are updated in parallel (each from the
+**`tanh`** (GLIBC-06, the user's decision of 2026-10-31): the smoothness weight's `tanh` is glibc
+2.35's by default (`larmorx_core::math::tanh_glibc`, fdlibm's, proved equal to the system's on
+12.9 billion inputs), so the surfaces are FSL's; `--tanh correctly-rounded` (`tanh=
+"correctly-rounded"`) takes the correctly rounded `larmorx_core::math::tanh` (CORE-MATH's),
+which gives another, equally valid surface on 4 of the standard tier's 13 real images (the
+findings give the measurement). The surface follows `specs/bet.md` §8.1 (the deformation's
+arithmetic, operation by operation), §8.2 (the quaternion's precision path) and §4.7 (the skull
+search).
+
+**Random testing** (a 30-minute trial, 2026-10-31, `oracles/difftest/2026-10-31-cleanroom-betsurf`,
+1,846 cases, both implementations; the first, 2026-10-30, in the findings): the replica agreed in
+every case it finished (3 timeouts). The original agreed in 957 of 961 `bet2` cases and 513 of
+532 `bet` cases: the 21 others are, all but one, neurologically stored images (`bet -R` and
+`-c`; case 1457 stored the other way along x is FSL's exactly), the class of cases 622 and 677,
+open with the spec writer. betsurf: 221 of 353 agree, 6 are FSL-51's (undefined); 126 differ,
+on small synthetic images (11 to 32 voxels per side) where the profiles' decisions differ (case
+36: FSL sets aside 96.8 % of its profiles, the original 87.8 %), and in 2 FSL-50's `reproduce`
+stops where FSL runs on: both for the spec writer (findings, "Random testing, part 2b").
+
+**Built for speed:** bet2's vertices of each iteration are updated in parallel (each from the
 previous iteration's positions only), the self-intersection measure finds close pairs in a grid
-of cells instead of over all pairs, the fill is a stack fill over the grid, and no image is
-held twice; every parallel step runs in the call's own pool of `n_threads` (the command line:
-`OMP_NUM_THREADS`, else every core) with the same result at any thread count. Timings:
-[benchmarks/fsl-bet.md](../benchmarks/fsl-bet.md).
+of cells instead of over all pairs, the fill is a stack fill over the grid, and no image is held
+twice; betsurf casts its profiles in parallel (each vertex's into its own list, counted in
+vertex order), smooths each axis in parallel with exact weights in two buffers, and deforms each of
+its three surfaces with every vertex's step computed in parallel from the previous positions. Every parallel step runs in the call's own pool of `n_threads` (the
+command line: `OMP_NUM_THREADS`, else every core) with the same result at any thread count.
+Memory: betsurf's peak is below FSL's on the memory test's call (144 MiB against 175: the T1
+clamped in place, the images freed after the profiles). Timings:
+[benchmarks/fsl-bet.md](../benchmarks/fsl-bet.md) (the original 2.5 to 2.9 times FSL's speed on one thread for bet2 and bet, 3.0 to 3.6 for betsurf; 6.5 to 11.6 and 10.7 to 13.5 times on 24 threads).
 
-**Deliberate differences of the original:** its `descrip` is `larmorx fsl bet2`; where FSL
-aborts or crashes it prints FSL's messages before that point and one line of its own ending in
-`(larmorx)`, and exits 1; `bet`'s messages name the script `bet`.
+**Deliberate differences of the original:** its images' `descrip` is `larmorx fsl bet2` (betsurf's
+too); where FSL aborts or crashes it prints FSL's messages before that point and one line
+of its own ending in `(larmorx)`, and exits 1; `bet`'s messages name the script `bet`; betsurf's
+`manual_input` refuses at the end of its input, where FSL waits forever; `-p` above 10 is
+refused (the meshes would not fit any memory).
 
 **Rust:** `larmorx_fsl::bet::find_surface` (the surface on a `larmorx_fsl::bet::Vol`: the initial
 parameters, the passes and their self-intersection), `brain_mask`, `outline`, `masked`,
-`skull::skull`, `cormack`; the command lines `larmorx_fsl::cli::run` / `run_in` (an environment
-table and a directory given, as `lx.fsl.bet` runs them in process).
+`skull::skull`, `cormack`; betsurf's steps in `larmorx_fsl::betsurf`: `read_matrix`,
+`robust_maximum` and `clamp` (§6.3), `WorkGrid` (the padded working grid), `votes` (the profiles
+and their counting images, §6.4), `smooth`, `deform`, `sphere`, `retessellate` and
+`surface_mask` (§6.5), the profile searches in `larmorx_fsl::betsurf::profile`; the command
+lines `larmorx_fsl::cli::run` / `run_in` (an environment table and a directory given, as
+`lx.fsl.bet` and `lx.fsl.betsurf` run them in process), `larmorx_fsl::cli::betsurf::main`.

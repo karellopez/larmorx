@@ -1,15 +1,16 @@
 # Parity: BET (clean-room original)
 
-**All cases agree.** 142 cases on the `standard` tier: 111 pass, 24 rejected by both, 7 expected divergences, 0 failures.
+**1 case(s) fail.** 168 cases on the `standard` tier: 127 pass, 30 rejected by both, 10 expected divergences, 1 failures.
 
-- **Validated:** `larmorx fsl bet2` and `bet` (larmorx 0.0.1, crate larmorx-fsl: the clean-room original written from specs/bet.md, Apache-2.0), in process, and `lx.fsl.bet(..., implementation='original')`; betsurf's original is still to be written
-- **Reference:** bet and bet2 from FSL 6.0.7.23 (fsl-bet2 2111.9, fsl-newimage 2601.0, fsl-meshclass 2111.0), the conda installation in `~/fsl-6.0.7.23`
+- **Validated:** `larmorx fsl bet2`, `bet` and `betsurf` (larmorx 0.0.1, crate larmorx-fsl: the clean-room original written from specs/bet.md, Apache-2.0), in process, and `lx.fsl.bet` / `lx.fsl.betsurf(..., implementation='original')`
+- **Reference:** bet, bet2 and betsurf from FSL 6.0.7.23 (fsl-bet2 2111.9, fsl-newimage 2601.0, fsl-meshclass 2111.0), the conda installation in `~/fsl-6.0.7.23`
 - **Test data:** larmorx-testdata `52124bc98f9f`, tier `standard`
-- **Generated:** 2026-10-30 on Linux x86_64, with `python -m larmorx_validation parity fsl-bet --tier standard`
-- **Original programs:** 226 runs: 218 from the oracle cache, 8 run (3 never cached: the original varies); cache `<workspace>/oracles/cache`, mode `use`
+- **Generated:** 2026-10-31 on Linux x86_64, with `python -m larmorx_validation parity fsl-bet --tier standard`
+- **Original programs:** 248 runs: 232 from the oracle cache, 16 run (4 never cached: the original varies); cache `<workspace>/oracles/cache`, mode `use`
 
-- **111 of 142 cases within the thresholds** (exit status and messages identical, every file within its threshold); 24 where both refuse or FSL crashes and larmorx refuses; 3 where FSL crashes and `reproduce` fills what FSL leaves undefined (D13's failure cases); 4 pending (options that run FSL programs larmorx does not have yet).
+- **127 of 168 cases within the thresholds** (exit status and messages identical, every file within its threshold); 30 where both refuse or FSL crashes and larmorx refuses; 6 where FSL crashes and `reproduce` fills what FSL leaves undefined (D13's failure cases); 4 pending (options that run FSL programs larmorx does not have yet).
 - **217 of 229 brains, masks and outlines with FSL's values, bit for bit**, 12 more within the thresholds; 3 of 3 meshes with FSL's vertices to the file's 6 decimals; 13 of 13 skull images bit-identical, 0 more within the masks' thresholds.
+- **betsurf: 14 of 67 masks and outlines with FSL's values, bit for bit**, 51 more within its thresholds (Dice >= 0.99, boundary p95 <= 1.0 voxel); its 42 meshes reported: vertex distance p95 0.0000 to 3.1828 mm, largest 12.23 mm.
 - fMRIPrep's own BET outputs: 58 of 58 with the same values as the original's.
 - FSL run again: 38 of 38 runs bit-identical (FSL is deterministic).
 - **D13 fix pass** (larmorx's default, `upstream_defects="fix"`; the comparison above runs `reproduce`): the corrections met
@@ -19,6 +20,11 @@
   - FSL-44: 2 case(s) named it, 0 with changed values (largest difference 0), 2 with other changes (exit status N became N; files ['out.nii.gz'] became ['out.nii.gz', 'out_mask.nii.gz']; files [] became ['my out.nii.gz', 'my out_mask.nii.gz']): `defects/blank-in-output`, `defects/empty-argument`
   - FSL-45: 3 case(s) named it, 3 with changed values (largest difference inf): `bet/small-fov`, `bet/small-fov-verbose`, `bet/debug`
   - FSL-46: 1 case(s) named it, 0 with changed values (largest difference 0), 1 with other changes (the files present before the run: [] kept, ['out_tmp_notes.txt'] by the default): `defects/cleanup`
+  - FSL-48: 1 case(s) named it, 1 with changed values (largest difference 0): `defects/t2-other-grid`
+  - FSL-51: 3 case(s) named it, 3 with changed values (largest difference 1), 3 with other changes (out_inskull_mesh.vtk changed; out_outskin_mesh.vtk changed; out_outskull_mesh.vtk changed): `real/child-7y-surf-t2`, `real/tumour-surf-t2`, `real/philips-surf-t2`
+  - FSL-52: 3 case(s) named it, 3 with changed values (largest difference 0): `defects/mesh-unread`, `defects/mesh-missing-vertex`, `defects/mesh-truncated`
+  - FSL-53: 1 case(s) named it, 1 with changed values (largest difference 0): `defects/short-matrix`
+  - FSL-54: 2 case(s) named it, 0 with changed values (largest difference 0), 2 with other changes (exit status N became N): `defects/too-few-t1only`, `defects/no-matrix-t1only`
   - FSL-56: 1 case(s) named it, 0 with changed values (largest difference 0), 1 with other changes (files ['out.nii', 'out_mask.nii'] became ['out.nii', 'out_mask.nii']; out.nii changed; out_mask.nii changed): `defects/extensions`
   - FSL-62: 1 case(s) named it, 1 with changed values (largest difference 1e+03): `defects/binary-mask-ct`
 
@@ -34,6 +40,7 @@
 | Outlines | bit-identical, or the drawn surfaces within 0.5 / 2.0 voxels (95th percentile / maximum) and the input identical elsewhere |
 | Meshes | the same triangles; per-vertex distance 95th percentile <= 0.1 mm and maximum <= 1.0 mm (specs/bet.md §11) |
 | Skull | as the masks: bit-identical, or Dice and boundary distance within the masks' thresholds (specs/bet.md §4.7 gives the skull search exactly) |
+| betsurf's masks and outlines | bit-identical, or Dice >= 0.99 and the boundary distance's 95th percentile <= 1.0 voxel (specs/bet.md §11; the outlines: the drawn surfaces' distance, likewise); its three meshes reported (vertex distance) |
 
 ## Results by category
 
@@ -41,10 +48,20 @@
 |---|---|---|---|---|---|
 | bet | 23 | 13 | 6 | 4 | 0 |
 | bet2 | 36 | 22 | 13 | 1 | 0 |
-| defects | 10 | 7 | 1 | 2 | 0 |
+| betsurf | 14 | 8 | 6 | 0 | 0 |
+| defects | 17 | 11 | 1 | 5 | 0 |
 | fmriprep | 29 | 29 | 0 | 0 | 0 |
 | formats | 33 | 29 | 4 | 0 | 0 |
-| real | 11 | 11 | 0 | 0 | 0 |
+| real | 16 | 15 | 0 | 0 | 1 |
+
+## Failures
+
+### `real/philips-surf-t2`
+
+a Philips scanner (ds002603): betsurf -o -m -s with the T2 FLIRT registered
+
+- **out_outskin_mask.nii.gz** (Dice; boundary distance p95 / max (voxels) = 0.993842; 2.00 / 11.22, threshold >= 0.99; p95 <= 1.0): 46698 of 16384000 values differ
+- **out_outskin_mesh.nii.gz** (drawn surface distance p95 / max (voxels) = 1.73 / 11.18, threshold p95 <= 1.0): 58632 of 16384000 values differ
 
 ## Expected divergences
 
@@ -57,6 +74,9 @@
 | `bet/pending-B` | needs FSL programs larmorx does not replicate yet: larmorx fsl bet: -B is pending: it runs FSL's standard_space_roi and FAST, which larmorx does not have yet (larmorx) |
 | `bet/pending-A` | needs FSL programs larmorx does not replicate yet: larmorx fsl bet: -A is pending: it runs FSL's FLIRT (then betsurf), which larmorx does not have yet (larmorx) |
 | `bet/pending-A2` | needs FSL programs larmorx does not replicate yet: larmorx fsl bet: -A2 is pending: it runs FSL's FLIRT (then betsurf), which larmorx does not have yet (larmorx) |
+| `defects/mesh-unread` | FSL crashes (status -11); with upstream_defects='reproduce' larmorx fills what FSL leaves undefined deterministically, names FSL-52 and writes its outputs; the default refuses |
+| `defects/mesh-missing-vertex` | FSL crashes (status -11); with upstream_defects='reproduce' larmorx fills what FSL leaves undefined deterministically, names FSL-52 and writes its outputs; the default refuses |
+| `defects/mesh-truncated` | FSL crashes (status -11); with upstream_defects='reproduce' larmorx fills what FSL leaves undefined deterministically, names FSL-52 and writes its outputs; the default refuses |
 
 ## Rejected by both
 
@@ -86,12 +106,18 @@
 | `bet/c-short` | -c with two numbers | both refuse (exit 1) with FSL's usage |
 | `bet/bet2-fails` | bet2 refuses (-f 2): the script's ERR trap | both refuse (exit 1) with bet failed during command:<generated>/phantoms/head.nii.gz out -f 2 |
 | `defects/blank-in-output` | an output name with a blank (FSL-44) | both refuse (exit 1) with FSL's usage |
+| `betsurf/too-few` | too few arguments | both refuse (exit 255) with FSL's usage |
+| `betsurf/no-matrix` | a matrix that cannot be opened | both refuse (exit 255) with unable to open /nonexistent.mat |
+| `betsurf/no-mesh` | a mesh that cannot be opened | both refuse (exit 255) with terminating. |
+| `betsurf/dash-argument` | a word starting with - among the files | both refuse (exit 255) with FSL's usage |
+| `betsurf/bad-option` | an unknown option | both refuse (exit 1) with FSL's usage |
+| `betsurf/p-bad` | -p with a word | both refuse (exit 1) with FSL's usage |
 
 ## Environment
 
 | Component | Version |
 |---|---|
-| larmorx | 0.0.1 (8abb5b4de9b2) |
+| larmorx | 0.0.1 (ba0d9240d154) |
 | larmorx-testdata | 52124bc98f9f |
 | Python | 3.12.16 |
 | Platform | Linux x86_64 (Linux-6.8.0-124-generic-x86_64-with-glibc2.35) |
@@ -102,7 +128,7 @@
 
 ## Notes
 
-Both programs run in directories of their own on the same input files, with `PATH=/usr/bin:/bin` (FSL never on it), `FSLDIR` set, an empty `HOME` and the case's `FSLOUTPUTTYPE`. The original is compared in `reproduce` mode; the fix pass runs its default. The fMRIPrep cases also run FSL again and fMRIPrep 25.2.6's FSL (FSL's own variability) and report the original's agreement with fMRIPrep's own outputs. betsurf's cases wait for its original. The `-S`, `-B`, `-A` and `-A2` variations of `bet` run FSL programs larmorx does not have yet (standard_space_roi, FLIRT, FAST): the original refuses them, naming what is missing. FSL 6.0.7.23 (the `--fsl-version` default).
+Both programs run in directories of their own on the same input files, with `PATH=/usr/bin:/bin` (FSL never on it), `FSLDIR` set, an empty `HOME` and the case's `FSLOUTPUTTYPE`. The original is compared in `reproduce` mode; the fix pass runs its default. The fMRIPrep cases also run FSL again and fMRIPrep 25.2.6's FSL (FSL's own variability) and report the original's agreement with fMRIPrep's own outputs. betsurf's real images (the full tier's for the replica) run in this standard tier, on bet2's meshes and FLIRT's matrices made by FSL. The `-S`, `-B`, `-A` and `-A2` variations of `bet` run FSL programs larmorx does not have yet (standard_space_roi, FLIRT, FAST): the original refuses them, naming what is missing. FSL 6.0.7.23 (the `--fsl-version` default).
 
 ## All cases
 
@@ -239,6 +265,27 @@ Both programs run in directories of their own on the same input files, with `PAT
 | `defects/blank-in-output` | both-error | 4/4 | an output name with a blank (FSL-44) |
 | `defects/empty-argument` | pass | 6/6 | an empty argument ends the options (FSL-44) |
 | `defects/cleanup` | pass | 8/8 | the cleanup glob removes out_tmp* files it did not create (FSL-46) |
+| `betsurf/t1only` | pass | 23/23 | --t1only -o -m -s: bet -A's call |
+| `betsurf/t1t2` | pass | 21/21 | -o -m -s with the T2: bet -A2's call |
+| `betsurf/verbose` | pass | 13/13 | -v -m |
+| `betsurf/precision` | pass | 13/13 | -p 1: retessellated |
+| `betsurf/surfaces-only` | pass | 7/7 | no option: the meshes only |
+| `betsurf/help` | pass | 4/4 | -h |
+| `betsurf/too-few` | both-error | 4/4 | too few arguments |
+| `defects/too-few-t1only` | pass | 4/4 | --t1only with too few arguments exits 0 (FSL-54) |
+| `betsurf/no-matrix` | both-error | 4/4 | a matrix that cannot be opened |
+| `defects/no-matrix-t1only` | pass | 4/4 | --t1only with a missing matrix exits 0 (FSL-54) |
+| `betsurf/no-mesh` | both-error | 4/4 | a mesh that cannot be opened |
+| `betsurf/dash-argument` | both-error | 4/4 | a word starting with - among the files |
+| `betsurf/bad-option` | both-error | 4/4 | an unknown option |
+| `betsurf/p-bad` | both-error | 4/4 | -p with a word |
+| `defects/short-matrix` | pass | 13/13 | a matrix of 6 numbers (FSL-53) |
+| `defects/mesh-unread` | expected-divergence | 6/6 | a coordinate that does not read (FSL-52: FSL crashes; reproduce fills what FSL leaves undefined) |
+| `defects/mesh-missing-vertex` | expected-divergence | 6/6 | a face naming a vertex the mesh does not have (FSL-52: FSL crashes; reproduce fills what FSL leaves undefined) |
+| `defects/mesh-truncated` | expected-divergence | 6/6 | a mesh file that ends after two vertices (FSL-52: FSL crashes; reproduce fills what FSL leaves undefined) |
+| `defects/t2-other-grid` | pass | 13/13 | a T2 on another grid (FSL-48) |
+| `betsurf/off-mesh` | pass | 13/13 | an OFF mesh |
+| `betsurf/fs-mesh` | pass | 13/13 | a FreeSurfer ASCII mesh |
 | `real/child-3y` | pass | 10/10 | a child of 3.5 years (ds000228): bet's defaults and -m |
 | `real/child-7y` | pass | 10/10 | a child of 7.5 years with motion (ds000256): bet's defaults and -m |
 | `real/adult-ds000005` | pass | 10/10 | an adult, the fMRIPrep oracle run's T1w (ds000005): bet's defaults and -m |
@@ -250,3 +297,8 @@ Both programs run in directories of their own on the same input files, with `PAT
 | `real/philips` | pass | 10/10 | a Philips scanner (ds002603): bet's defaults and -m |
 | `real/bold-F` | pass | 8/8 | a BOLD series (ds000005): bet -F |
 | `real/bold-first` | pass | 8/8 | a BOLD series (ds000005): bet2 on its first volume (FSL's warning) |
+| `real/adult-ds000005-surf` | pass | 21/21 | an adult (ds000005): betsurf --t1only -o -m -s on FLIRT's matrix |
+| `real/older-82y-surf` | pass | 21/21 | an adult of 82 years: betsurf --t1only -o -m -s on FLIRT's matrix |
+| `real/child-7y-surf-t2` | pass | 21/21 | a child of 7.5 years (ds000256): betsurf -o -m -s with the T2 FLIRT registered |
+| `real/tumour-surf-t2` | pass | 21/21 | a tumour (ds005003): betsurf -o -m -s with the T2 FLIRT registered |
+| `real/philips-surf-t2` | fail | 19/21 | a Philips scanner (ds002603): betsurf -o -m -s with the T2 FLIRT registered |

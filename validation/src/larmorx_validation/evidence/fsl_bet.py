@@ -1397,7 +1397,7 @@ def status_of(rec) -> str:
 
 #: The benchmark's series (``docs/benchmarks/fsl-bet.json``, from
 #: ``validation/investigations/cleanroom-bet/bench.py``): FSL is single-threaded.
-SPEED_THREADS = 16
+SPEED_THREADS = 24
 SPEED_SERIES = [
     {"id": "FSL 6.0.7.23|1 thread", "label": "FSL 6.0.7.23 (single-threaded)", "mark": "original"},
     {"id": "replica (larmorx-nc)|1 thread", "label": "replica, 1 thread", "mark": "replica"},

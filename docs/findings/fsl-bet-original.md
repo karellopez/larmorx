@@ -234,3 +234,38 @@ decimals; a T1w whose every profile passes near the eyes: the inner skull exactl
 - so the masks are within betsurf's thresholds (Dice >= 0.99, boundary p95 <= 1 voxel) on 4 of the
   5 real images, and ds002603's scalp mask with its T2 is not (boundary p95 2 voxels, Dice
   0.9938).
+
+**Random testing, part 2b** (a 30-minute trial on 2026-10-31, seed 20261031, 16 cases at a
+time, `oracles/difftest/2026-10-31-cleanroom-betsurf`, from commit `21762e8`; 1,846 cases, both
+implementations): the replica agreed in every case it finished (1,843; 3 timeouts). The
+original:
+
+- **bet2**: 957 of 961 agree (2 time out, 2 differ); **bet**: 513 of 532 (19 differ). 14 of the
+  19 are `bet -R`, and nearly every differing case (20 of 21) is an image stored with a positive
+  determinant (neurologically). Case 1457 (`bet -f 0.7 -c 2 13 16` on a 29 x 14 x 24 head of
+  0.8 x 1 x 2.5 mm, neurologically stored): the meshes differ by 0.11 mm (95th percentile), the
+  mask in 5 voxels; the same image stored the other way along x (its world positions
+  unchanged, `-c 26 13 16`) gives FSL's mask and mesh exactly. So these are the class of cases
+  622 and 677 (the conversion of a centre between the voxel frames of a neurologically stored
+  image, the open spec question), now seen with `-c` and with `bet -R` on many more images.
+- **betsurf**: 221 of 353 agree; 6 more are FSL-51's (profile searches past their samples:
+  FSL's result is undefined there). Of the 126 that differ, 102 differ in masks only (mostly the
+  scalp; the trial's images are small synthetic heads and crops of 11 to 32 voxels per side,
+  some with voxels of 0.5 by 3 mm, cast from synthetic sphere meshes), 12 also in the share of
+  profiles set aside (`removed profiles`, `-v`), 10 in the number of mesh vertices with `-p`, and
+  2 in the exit status (below). The share set aside shows that on these images the profiles'
+  decisions differ, unlike on the real images: on case 36 (`--t1only`, 24 x 29 x 27 voxels of
+  3 x 1.5 x 0.5 mm), FSL sets aside 96.8 % of 378 profiles, the original 87.8 %. Reading the
+  samples beyond the image differently (0 only inside `[0, n − 1]`, the nearest edge value, or
+  the profile ended at the image's edge) gives 32.8 %, 51.3 % and 25.9 %: none of them FSL's.
+  What FSL's profiles read on such images is a question for the spec writer.
+- **FSL-50**: on cases 216 and 635 the original's `reproduce` stops (status 255, FSL-50: a
+  profile whose outer-skull search range is empty) where FSL runs to the end; the default, which
+  sets such a profile aside, prints FSL's share of profiles set aside (79.0323 % on case 635),
+  so FSL sets that profile aside too. When FSL stops (the register's FSL-50), and when it only
+  sets the profile aside, is a question for the spec writer.
+
+The probes: `night_case.py`, `compare.py` and `retrial.py`
+([validation/investigations/cleanroom-bet](../../validation/investigations/cleanroom-bet/README.md)), and for the
+reading beyond the image a temporary build (not kept: three variants of the sample at a point
+outside the image, chosen by an environment variable).

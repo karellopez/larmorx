@@ -14,6 +14,9 @@ pub struct Spec {
     pub values: usize,
     /// The values are numbers (else text).
     pub numeric: bool,
+    /// The numbers are integers, read as C's `strtol` of base 0 on the whole word (betsurf's
+    /// `-p`, observed: `0x10` and `-3` read, `08`, `1.5` and `1e3` do not), else as `strtod`.
+    pub integer: bool,
 }
 
 /// What an option was given.
@@ -33,6 +36,41 @@ pub struct ParseError(pub String);
 pub fn strtod_whole(word: &str) -> Option<f64> {
     let (v, used) = strtod(word);
     (used > 0 && used == word.len()).then(|| f64::from(v as f32))
+}
+
+/// A whole word as the option's number: [`strtol_whole`] for an integer option, else
+/// [`strtod_whole`].
+fn whole(s: &Spec, word: &str) -> Option<f64> {
+    if s.integer {
+        strtol_whole(word).map(|v| v as f64)
+    } else {
+        strtod_whole(word)
+    }
+}
+
+/// C's `strtol` of base 0 on the whole word (leading blanks, a sign, `0x` hexadecimal, a
+/// leading `0` octal), kept in an `int` (its low 32 bits, as FSL stores it).
+pub fn strtol_whole(word: &str) -> Option<i64> {
+    let t = word.trim_start_matches([' ', '\t', '\n', '\r', '\x0b', '\x0c']);
+    let (neg, t) = match t.as_bytes().first() {
+        Some(b'-') => (true, &t[1..]),
+        Some(b'+') => (false, &t[1..]),
+        _ => (false, t),
+    };
+    let (radix, digits) = if let Some(h) = t.strip_prefix("0x").or_else(|| t.strip_prefix("0X")) {
+        (16, h)
+    } else if t.len() > 1 && t.starts_with('0') {
+        (8, &t[1..])
+    } else {
+        (10, t)
+    };
+    if digits.is_empty() || !digits.chars().all(|c| c.is_digit(radix)) {
+        return None;
+    }
+    // strtol saturates at the long's range
+    let v = i64::from_str_radix(digits, radix).unwrap_or(i64::MAX);
+    let v = if neg { v.saturating_neg() } else { v };
+    Some(i64::from(v as i32))
 }
 
 /// C's `atof`: the longest leading number, or 0 (rounded to float).
@@ -197,7 +235,7 @@ pub fn parse(
             given[k] = Some(if s.numeric {
                 let vals: Vec<&str> = value.split_whitespace().collect();
                 let all: Option<Vec<f64>> = if vals.len() == s.values {
-                    vals.iter().map(|v| strtod_whole(v)).collect()
+                    vals.iter().map(|v| whole(&s, v)).collect()
                 } else {
                     None
                 };
@@ -241,7 +279,7 @@ pub fn parse(
                 }
                 // the last value must be a whole number, the others read as atof (observed)
                 let take = &rest[..s.values];
-                let last = strtod_whole(&take[s.values - 1]);
+                let last = whole(&s, &take[s.values - 1]);
                 match last {
                     Some(l) => {
                         let mut vals: Vec<f64> =
@@ -281,18 +319,21 @@ mod tests {
             long: Some("mask"),
             values: 0,
             numeric: false,
+            integer: false,
         },
         Spec {
             short: Some('f'),
             long: None,
             values: 1,
             numeric: true,
+            integer: false,
         },
         Spec {
             short: Some('c'),
             long: None,
             values: 3,
             numeric: true,
+            integer: false,
         },
     ];
 

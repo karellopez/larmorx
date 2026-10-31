@@ -21,6 +21,7 @@ const fn flag(short: char, long: &'static str) -> Spec {
         long: Some(long),
         values: 0,
         numeric: false,
+        integer: false,
     }
 }
 
@@ -30,6 +31,7 @@ const fn number(short: Option<char>, long: Option<&'static str>, values: usize) 
         long,
         values,
         numeric: true,
+        integer: false,
     }
 }
 
@@ -68,12 +70,14 @@ const SPECS: [Spec; 17] = [
         long: Some("ct"),
         values: 0,
         numeric: false,
+        integer: false,
     },
     Spec {
         short: None,
         long: Some("binaryMask"),
         values: 1,
         numeric: false,
+        integer: false,
     },
     flag('e', "mesh"),
     flag('v', "verbose"),
@@ -201,7 +205,7 @@ fn refuse(err: &mut dyn Write, notices: &[Notice], message: &str) -> u8 {
     1
 }
 
-fn print_notices(err: &mut dyn Write, notices: &[Notice]) {
+pub(crate) fn print_notices(err: &mut dyn Write, notices: &[Notice]) {
     for n in notices {
         let _ = writeln!(err, "larmorx: {}", n.line());
     }
@@ -315,6 +319,16 @@ fn differing<T: PartialEq>(a: &[T], b: &[T]) -> usize {
 
 /// The image layer's messages for an input that cannot be read, and larmorx's line.
 fn read_failure(err: &mut dyn Write, name: &str, e: &ImageError) -> u8 {
+    read_failure_of("bet2", err, name, e)
+}
+
+/// [`read_failure`] for `program`'s line.
+pub(crate) fn read_failure_of(
+    program: &str,
+    err: &mut dyn Write,
+    name: &str,
+    e: &ImageError,
+) -> u8 {
     let text = e.to_string();
     let missing = text.starts_with("No image files match") || text.contains("No such file");
     if missing || text.starts_with("Multiple possible") {
@@ -330,16 +344,16 @@ fn read_failure(err: &mut dyn Write, name: &str, e: &ImageError) -> u8 {
         let _ = writeln!(err, "Error : {what}");
         let _ = writeln!(
             err,
-            "larmorx fsl bet2: {name} cannot be read; FSL aborts here (larmorx)"
+            "larmorx fsl {program}: {name} cannot be read; FSL aborts here (larmorx)"
         );
     } else {
-        let _ = writeln!(err, "larmorx fsl bet2: {name}: {text} (larmorx)");
+        let _ = writeln!(err, "larmorx fsl {program}: {name}: {text} (larmorx)");
     }
     1
 }
 
 /// Reads the image FSL's layer opens for `name` (completed when it has no extension).
-fn read_image(
+pub(crate) fn read_image(
     settings: &Settings,
     name: &str,
     mode: UpstreamDefects,

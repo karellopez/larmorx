@@ -40,7 +40,7 @@ def fsl_run_original(
     env: list[tuple[str, str]],
     cwd: str | None = None,
 ) -> tuple[int, str, str]:
-    """Run the clean-room original of ``fsl tool`` (``bet`` or ``bet2``) with FSL's arguments in
+    """Run the clean-room original of ``fsl tool`` (``bet``, ``bet2`` or ``betsurf``) with FSL's arguments in
     this process (without the GIL): ``(exit code, standard output, standard error)``. ``env``
     stands for the process environment (never read or changed); relative names start in
     ``cwd``. ``KeyError`` for another tool."""

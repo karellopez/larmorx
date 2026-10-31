@@ -37,9 +37,8 @@ pub const FAMILIES: &[(&str, &[&str])] = &[
 ];
 
 /// The FSL tools, with FSL's command lines: the replica (`larmorx-nc`) when it is installed,
-/// else the clean-room original of the same program (`fsl mcflirt` is `mri hmc`; `fsl bet` and
-/// `fsl bet2` are `larmorx_fsl::cli`); betsurf has no clean-room original yet
-/// ([`replica::replica_only`]; a test checks the list).
+/// else the clean-room original of the same program (`fsl mcflirt` is `mri hmc`; `fsl bet`,
+/// `fsl bet2` and `fsl betsurf` are `larmorx_fsl::cli`; a test checks the list).
 const FSL_TOOLS: &[&str] = &["mcflirt", "bet", "bet2", "betsurf"];
 
 /// The AFNI tools: the clean-room originals' (`larmorx_afni::cli::TOOLS`), each with its
@@ -195,7 +194,7 @@ fn run_tool(
         "ants" => larmorx_ants::cli::run(tool, args, options.loader, out, err),
         "fsl" => match tool {
             "mcflirt" => larmorx_mri::cli::run("hmc", args, out, err),
-            "bet" | "bet2" => larmorx_fsl::cli::run(tool, args, out, err),
+            "bet" | "bet2" | "betsurf" => larmorx_fsl::cli::run(tool, args, out, err),
             _ => None,
         },
         "mri" => larmorx_mri::cli::run(tool, args, out, err),
@@ -396,19 +395,11 @@ mod tests {
             "{out}"
         );
         assert!(out.contains("LARMORX_NC_BIN"), "{out}");
-        assert_eq!(
-            replica::replica_only("fsl").collect::<Vec<_>>(),
-            FSL_TOOLS[3..]
-        );
-        // betsurf without its replica (or with `original` asked for) refuses, naming the
-        // package; exit 127 as for a missing program.
+        assert_eq!(replica::replica_only("fsl").count(), 0);
+        // betsurf runs its clean-room original: too few arguments, the usage (exit 255).
         let (code, _, err) = run_capture(&["lx", "fsl", "betsurf", "in", "out"]);
-        assert_eq!(code, replica::EXIT_NOT_FOUND);
-        assert!(
-            err.contains("no clean-room original of fsl betsurf"),
-            "{err}"
-        );
-        assert!(err.contains("pip install larmorx-nc"), "{err}");
+        assert_eq!(code, 255);
+        assert!(err.starts_with("too few arguments\n"), "{err}");
         // bet2 runs its clean-room original: its usage (exit 1, standard error).
         let (code, _, err) = run_capture(&["lx", "fsl", "bet2"]);
         assert_eq!(code, 1);

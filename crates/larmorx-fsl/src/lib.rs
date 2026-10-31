@@ -12,4 +12,5 @@
 #![allow(clippy::needless_range_loop, clippy::neg_cmp_op_on_partial_ord)]
 
 pub mod bet;
+pub mod betsurf;
 pub mod cli;

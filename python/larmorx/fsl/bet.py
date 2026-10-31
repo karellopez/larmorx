@@ -45,6 +45,12 @@ VARIATIONS = ("robust", "small_fov", "fmri", "eyes", "bias", "surfaces", "surfac
 
 Variation = Literal["robust", "small_fov", "fmri", "eyes", "bias", "surfaces", "surfaces_t2"]
 
+#: The ``tanh`` of BET's smoothness weight (GLIBC-06): glibc's bits (FSL's, the default) or the
+#: correctly rounded one (the clean-room original's ``--tanh=correctly-rounded``).
+TANHS = ("glibc", "correctly-rounded")
+
+Tanh = Literal["glibc", "correctly-rounded"]
+
 _FLAGS = {"robust": "-R", "small_fov": "-Z", "fmri": "-F"}
 _PENDING = {
     "eyes": ("-S", "standard_space_roi, FLIRT and fslmaths' morphology"),
@@ -290,6 +296,7 @@ def bet(
     outline: bool = False,
     skull: bool = False,
     mesh: bool = False,
+    tanh: Tanh = "glibc",
     n_threads: int = 1,
     implementation: ImplementationName = "auto",
     upstream_defects: UpstreamDefectsName = "fix",
@@ -328,12 +335,18 @@ def bet(
         and the mask, and no others; ``"robust"`` always computes the brain.
     n_threads
         Threads (0 = all); the result does not depend on it.
+    tanh
+        The ``tanh`` of the surface's smoothness weight: ``"glibc"`` (default: glibc 2.35's
+        bits, which FSL calls, so that the surface is FSL's) or ``"correctly-rounded"``
+        (CORE-MATH's; the clean-room original only, as larmorx's own ``--tanh`` option:
+        GLIBC-06, ``docs/api/upstream-defects.md``). Where a surface self-intersects and is
+        found again, the last bit of ``tanh`` can change the result.
     implementation
         ``"auto"`` (default): the replica in ``larmorx-nc`` when it is installed, else the
-        clean-room original; ``"replica"``: the replica
-        (:class:`~larmorx.ReplicaNotFoundError` without it); ``"original"``: the clean-room
-        original (FSL's behaviour within the thresholds of its validation record,
-        ``docs/validation/fsl-bet.md``).
+        clean-room original (always the original with ``tanh="correctly-rounded"``);
+        ``"replica"``: the replica (:class:`~larmorx.ReplicaNotFoundError` without it);
+        ``"original"``: the clean-room original (FSL's behaviour within the thresholds of its
+        validation record, ``docs/validation/fsl-bet.md``).
     upstream_defects
         ``"fix"`` (default) or ``"reproduce"`` (FSL's output); a
         :class:`~larmorx.UpstreamDefectWarning` names each defect that changed the result.
@@ -410,6 +423,16 @@ def bet(
                 "outputs to temporary files it removes)"
             )
         options.append(_FLAGS[variation])
+    if tanh not in TANHS:
+        raise ValueError(f"tanh must be one of {TANHS}, not {tanh!r}")
+    if tanh != "glibc":
+        if implementation == "replica":
+            raise ValueError(
+                "tanh='correctly-rounded' is the clean-room original's option (the replica is "
+                "FSL's, glibc's tanh): use implementation='auto' or 'original'"
+            )
+        implementation = "original"
+        options.append(f"--tanh={tanh}")
     selected = _replica.select("fsl", tool, implementation)
     impl = _replica.ORIGINAL if selected is None else selected.implementation()
     with tempfile.TemporaryDirectory(prefix="larmorx-bet-", ignore_cleanup_errors=True) as tmp:

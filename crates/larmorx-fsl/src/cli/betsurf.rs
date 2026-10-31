@@ -707,13 +707,17 @@ fn run_in(
         gshape,
         gvox,
         Rounding::Floor,
-        pooled(n_threads, || bs::truncated(&inner_img.data)),
+        if std::env::var("LX_MASK").as_deref() == Ok("8") {
+            vec![0; gshape.iter().product()]
+        } else {
+            pooled(n_threads, || bs::truncated(&inner_img.data))
+        },
         None,
         mode,
         &mut notices,
     );
     for (c, &m) in outer_counts.iter_mut().zip(&inner_work) {
-        if m == 1 {
+        if m == 1 || (std::env::var("LX_MASK").as_deref() == Ok("1") && m > 0) {
             *c = 0.0;
         }
     }
@@ -721,7 +725,24 @@ fn run_in(
         bs::smooth(&outer_counts, gshape, gvox, 3.0)
     }));
     drop(outer_counts);
-    let inner_mask_vol = gvol(inner_work.iter().map(|&x| x as f32).collect());
+    let mk: u32 = std::env::var("LX_MASK")
+        .ok()
+        .and_then(|v| v.parse().ok())
+        .unwrap_or(0);
+    let inner_mask_vol = gvol(
+        inner_work
+            .iter()
+            .map(|&x| {
+                if mk & 2 != 0 {
+                    f32::from(u8::from(x == 1))
+                } else if mk & 4 != 0 {
+                    f32::from(u8::from(x > 0))
+                } else {
+                    x as f32
+                }
+            })
+            .collect(),
+    );
     drop(inner_work);
     // phase 3: the outer skull
     if o.verbose {
@@ -807,7 +828,24 @@ fn run_in(
         &mut notices,
     );
     drop(inner_img);
-    let outer_mask_vol = gvol(outer_work.iter().map(|&x| x as f32).collect());
+    let mk: u32 = std::env::var("LX_MASK")
+        .ok()
+        .and_then(|v| v.parse().ok())
+        .unwrap_or(0);
+    let outer_mask_vol = gvol(
+        outer_work
+            .iter()
+            .map(|&x| {
+                if mk & 2 != 0 {
+                    f32::from(u8::from(x == 1))
+                } else if mk & 4 != 0 {
+                    f32::from(u8::from(x > 0))
+                } else {
+                    x as f32
+                }
+            })
+            .collect(),
+    );
     let _keep2 = &outer_work;
     // phase 5: the scalp
     if o.verbose {

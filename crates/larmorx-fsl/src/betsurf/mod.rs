@@ -621,7 +621,8 @@ pub fn votes(
     let normals = mesh.triangle_normals(points);
     let start = if t2.is_some() { -30.0 } else { -3.0 };
     let [gx, gy, _] = grid.shape;
-    let dump = std::env::var_os("LX_BETSURF_DUMP").is_some();
+    let dump_mode = std::env::var("LX_BETSURF_DUMP").unwrap_or_default();
+    let dump = !dump_mode.is_empty();
     struct Cast {
         hits: Vec<(u8, usize)>,
         profiles: usize,
@@ -709,14 +710,14 @@ pub fn votes(
                         let mut p1 = Profile::new(start, sample(t1));
                         p1.variant = variant;
 
-                        if dump {
-                            c.dump.push(format!(
-                                "{{\"v\": {v}, \"o\": [{i}, {j}, {k}], \"eyes\": {eyes}, \"n\": {:?}, \"start\": {start}, \"t1\": {:?}, \"t2\": {:?}}}",
+                        let record = dump.then(|| {
+                            format!(
+                                "{{\"v\": {v}, \"o\": [{i}, {j}, {k}], \"eyes\": {eyes}, \"n\": {:?}, \"start\": {start}, \"t1\": {:?}, \"t2\": {:?}",
                                 n,
                                 p1.values,
                                 t2.map(&sample).unwrap_or_default()
-                            ));
-                        }
+                            )
+                        });
                         let est = match t2 {
                             Some(t2v) => {
                                 let mut p2 = Profile::new(start, sample(t2v));
@@ -737,6 +738,19 @@ pub fn votes(
                                 }
                             }
                         };
+                        if let Some(r) = record {
+                            let keep = match dump_mode.as_str() {
+                                "overrun" => p1.overrun,
+                                "eyes" => eyes,
+                                _ => true,
+                            };
+                            if keep {
+                                c.dump.push(format!(
+                                    "{r}, \"over\": {}, \"est\": \"{est:?}\"}}",
+                                    p1.overrun
+                                ));
+                            }
+                        }
                         if p1.overrun {
                             c.overruns += 1;
                             if drop_overruns {

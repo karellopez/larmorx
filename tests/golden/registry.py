@@ -3818,6 +3818,21 @@ def _(ctx: Context) -> dict[str, Any]:
     return {**_bet_files(out, ("", "_mask")), "ct": Nifti(f"{ct}.nii.gz"), "ct_mask": Nifti(f"{ct}_mask.nii.gz")}  # fmt: skip
 
 
+@case("cli.fsl.bet2.tanh")
+def _(ctx: Context) -> dict[str, Any]:
+    """bet2 with larmorx's own ``--tanh=correctly-rounded`` (the surface's smoothness weight with
+    CORE-MATH's correctly rounded ``tanh`` instead of glibc's bits; GLIBC-06, the user's
+    decision of 2026-10-31), and ``bet`` passing ``--tanh correctly-rounded`` on."""
+    out, b = ctx.out("out"), ctx.out("b")
+    _fsl(ctx, "bet2", ctx.file("anat.nii"), out, "--tanh=correctly-rounded", "-m", "-e")
+    _fsl(ctx, "bet", ctx.file("anat.nii"), b, "--tanh", "correctly-rounded", "-m")
+    return {
+        "mask": Nifti(f"{out}_mask.nii.gz"),
+        "mesh": File(f"{out}_mesh.vtk"),
+        "bet_mask": Nifti(f"{b}_mask.nii.gz"),
+    }
+
+
 @case("cli.fsl.bet2.reproduce")
 def _(ctx: Context) -> dict[str, Any]:
     """bet2 with FSL's defects reproduced: a single slice, whose mask's fill starts outside the

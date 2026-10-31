@@ -31,24 +31,32 @@ def vtk_scaled(text: str, sx: float) -> str:
     return "\n".join(lines) + "\n"
 
 
+def flip(img: nib.Nifti1Image) -> nib.Nifti1Image:
+    """The image stored the other way along x, its world positions unchanged."""
+    data = np.asanyarray(img.dataobj)
+    f = np.eye(4)
+    f[0, 0], f[0, 3] = -1.0, data.shape[0] - 1
+    aff = img.affine @ f
+    h = img.header.copy()
+    flipped = nib.Nifti1Image(data[::-1], aff, h)
+    flipped.set_qform(aff, code=int(h["qform_code"]) or 1)
+    flipped.set_sform(aff, code=int(h["sform_code"]) or 1)
+    return flipped
+
+
 def main(argv: list[str]) -> int:
-    t1p, meshp, matp, outp = argv
+    t1p, meshp, matp, outp, *t2p = argv
     out = Path(outp)
     out.mkdir(parents=True, exist_ok=True)
     img = nib.load(t1p)
     data = np.asanyarray(img.dataobj)
     mesh = Path(meshp).read_text(encoding="utf-8")
     mat = np.loadtxt(matp)
-    # flip: data reversed along x, the affine composed with i -> nx - 1 - i
-    nx = data.shape[0]
-    f = np.eye(4)
-    f[0, 0], f[0, 3] = -1.0, nx - 1
-    aff = img.affine @ f
-    h = img.header.copy()
-    flipped = nib.Nifti1Image(data[::-1], aff, h)
-    flipped.set_qform(aff, code=int(h["qform_code"]) or 1)
-    flipped.set_sform(aff, code=int(h["sform_code"]) or 1)
-    nib.save(flipped, out / "flip_t1.nii.gz")
+    # flip: data reversed along x, the affine composed with i -> nx - 1 - i (and the T2 alike,
+    # when given: ``flip_t2.nii.gz``)
+    nib.save(flip(img), out / "flip_t1.nii.gz")
+    if t2p:
+        nib.save(flip(nib.load(t2p[0])), out / "flip_t2.nii.gz")
     (out / "flip_mesh.vtk").write_text(mesh, encoding="utf-8")
     np.savetxt(out / "flip.mat", mat, fmt="%.10g")
     # aniso: the x voxel size times 1.2
@@ -59,8 +67,8 @@ def main(argv: list[str]) -> int:
     zooms[0] *= 1.2
     h2.set_zooms(zooms)
     aniso = nib.Nifti1Image(data, aff2, h2)
-    aniso.set_qform(aff2, code=int(h["qform_code"]) or 1)
-    aniso.set_sform(aff2, code=int(h["sform_code"]) or 1)
+    aniso.set_qform(aff2, code=int(h2["qform_code"]) or 1)
+    aniso.set_sform(aff2, code=int(h2["sform_code"]) or 1)
     nib.save(aniso, out / "aniso_t1.nii.gz")
     (out / "aniso_mesh.vtk").write_text(vtk_scaled(mesh, 1.2), encoding="utf-8")
     np.savetxt(out / "aniso.mat", mat @ np.linalg.inv(s), fmt="%.10g")

@@ -451,7 +451,10 @@ pub fn t1only(t1: &mut Profile) -> Estimate {
     }
     let os = t1.first_ge(b, mid);
     let d = os2 - os;
-    if (-2.0..2.0).contains(&d) && s - os2 >= 2.0 {
+    // observed (single-profile runs): an outer skull found inside the inner skull is not kept
+    // (FSL sets the profile aside where both searches found nothing); `OS ≥ IS` would give the
+    // same decisions on every profile probed (a question for the spec writer)
+    if (-2.0..2.0).contains(&d) && s - os2 >= 2.0 && os2 >= is {
         Estimate::Kept {
             inner: is,
             outer: os2,
@@ -466,12 +469,18 @@ pub fn t1only(t1: &mut Profile) -> Estimate {
 pub fn t1only_eyes(t1: &mut Profile) -> Estimate {
     let th = t1.th(0.2);
     let s = t1.last_ge(t1.last_position(), th);
-    t1.set_end(s);
+    let ek: u32 = std::env::var("LX_EYE")
+        .ok()
+        .and_then(|v| v.parse().ok())
+        .unwrap_or(0);
+    if ek & 1 == 0 {
+        t1.set_end(s);
+    }
     let mut is = t1.first_le(-3.0, t1.th(0.25));
-    if is > 5.0 {
+    if is > 5.0 || (ek & 4 != 0 && is >= 5.0) {
         is = 0.0;
     }
-    let os = t1.first_ge(is, t1.th(0.35));
+    let os = t1.first_ge(if ek & 2 != 0 { is + 0.5 } else { is }, t1.th(0.35));
     Estimate::Kept {
         inner: is,
         outer: os,

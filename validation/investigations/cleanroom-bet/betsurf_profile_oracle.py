@@ -70,23 +70,41 @@ def main(argv: list[str]) -> int:
         # the voxel must hold the drawn triangle: keep it within 0.25 voxel of x
         dk = out / f"p{i}"
         dk.mkdir(exist_ok=True)
+        # ORACLE_COPIES=k: k copies of the triangle (separate meshes in one file), so that the
+        # one profile votes k times and the surfaces' positions (not only the decision) can be
+        # compared: the three meshes FSL writes against the original's
+        copies = int(os.environ.get("ORACLE_COPIES", "1"))
         lines = ["# vtk DataFile Version 3.0", "surface file", "ASCII", "DATASET POLYDATA",
-                 "POINTS 3  float"]
-        lines += [" ".join(f"{c:.6f}" for c in p) for p in v]
-        lines += ["POLYGONS 1 4", "3 0 1 2 "]
+                 f"POINTS {3 * copies}  float"]
+        lines += [" ".join(f"{c:.6f}" for c in p) for _ in range(copies) for p in v]
+        lines += [f"POLYGONS {copies} {4 * copies}"]
+        lines += [f"3 {3 * c} {3 * c + 1} {3 * c + 2} " for c in range(copies)]
         (dk / "mesh.vtk").write_text("\n".join(lines) + "\n", encoding="utf-8")
         images = [t1p] + ([] if t2p == "-" else [t2p])
         opts = ["-v"] if t2p != "-" else ["-v", "-1"]
         args = [*opts, *images, str(dk / "mesh.vtk"), matp]
         f = fslrun.run("betsurf", [*args, "o"], dk / "fsl")
         env = dict(os.environ, LARMORX_IMPLEMENTATION="original", FSLOUTPUTTYPE="NIFTI_GZ",
-                   LX_BETSURF_DEBUG="stop", LX_BETSURF_DUMP="1")
+                   LX_BETSURF_DUMP="1")
+        if copies == 1:
+            env["LX_BETSURF_DEBUG"] = "stop"
+        else:
+            env["LX_BETSURF_DEBUG"] = "1"
         lx = subprocess.run([binary, "fsl", "betsurf", *args, str(dk / "lx")], env=env,
                             capture_output=True, text=True, check=False)
         (dk / "dump.txt").write_text(lx.stderr, encoding="utf-8")
         mine = re.search(r"DEBUG profiles (\d+) dropped (\d+) scalp_only (\d+)", lx.stderr)
         lxr = f"{mine[1]}:{int(mine[2]) + int(mine[3])}" if mine else "?"
-        print(i, r["o"], "FSL", removed(f.stdout), "larmorx", lxr, flush=True)
+        meshes = ""
+        if copies > 1:
+            for s in ("inskull", "outskull", "outskin"):
+                a, b = dk / "fsl" / f"o_{s}_mesh.vtk", dk / f"lx_{s}_mesh.vtk"
+                if a.is_file() and b.is_file():
+                    pa = np.array(a.read_text().split("POLYGONS")[0].split()[13:], float)
+                    pb = np.array(b.read_text().split("POLYGONS")[0].split()[13:], float)
+                    dist = np.abs(pa - pb).max() if pa.shape == pb.shape else float("inf")
+                    meshes += f" {s} {dist:.6f}"
+        print(i, r["o"], "FSL", removed(f.stdout), "larmorx", lxr, meshes, flush=True)
     return 0
 
 

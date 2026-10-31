@@ -318,6 +318,47 @@ The items below keep their history.
 
 ## Follow-ups, when they fit
 
+- **The site: a page "Why Rust and Python"** (the user, 2026-10-31: "At some point we should clearly
+  explain [on] the website why we choose rust + python and explain all these points"). Before the
+  first release at the latest; written for researchers, in plain words. The points, from the
+  orchestrator's answers of 2026-10-31:
+  - *Why AFNI, FSL and FreeSurfer have no Windows version* (from the projects' history and
+    documentation, not their developers' statements): born on Unix workstations; the main programs
+    are shell scripts chaining Unix tools (`recon-all` in tcsh with Perl steps, `bet` in sh with
+    `dc`, `afni_proc.py` writing tcsh); Unix system features (`fork`, pipes, symbolic links, `/`
+    paths, case-sensitive names, `FSLDIR`-style variables, AFNI-SUMA shared memory and sockets); C
+    that changes meaning on Windows (`long` 32 bits under LLP64, `long double` 64 bits with
+    Microsoft's compiler, C99 and GCC extensions); X11/Motif and Tcl/Tk interfaces; large
+    dependency stacks; small academic teams, Linux clusters and Macs as users, WSL2 removing the
+    pressure. Glatard et al. 2015 (results differ across operating systems).
+  - *What Rust gives:* one build tool (`cargo`) for the six targets and pure-Rust crates, wheels
+    through maturin/PyO3 (abi3: one wheel per platform for every Python >= 3.12); fixed-size types;
+    no silent fused multiply-adds and no x87 on x86-64; memory safety (the register's out-of-bounds
+    and uninitialised-memory defects stop with an error instead of a garbage result); data races
+    refused by the compiler (results independent of the thread count); C-like speed.
+  - *What Rust does not give, and the project's rules do:* Rust's own `sin`, `exp`, `log` call the
+    system's maths library (different digits per platform), so larmorx uses its own correctly
+    rounded functions (CORE-MATH's, 17 ported: `exp`, `log`, `pow`, `sin`, `cos`, `asin`, `acos`,
+    `atan2`, `cbrt`, `tanh` and `expf`, `logf`, `powf`, `sinf`, `cosf`, `tanhf`, `cbrtf`) and, for
+    `reproduce`, Rust copies of the C library's own (`cbrtf_glibc`, `tanh_glibc`, Arm's `sinf`/`cosf`,
+    fdlibm's `tanhf`); matrix arithmetic in one fixed operation order (OpenBLAS's Haswell kernels
+    for numpy's 4 x 4 products and inverses; reference LAPACK's LU, inverse and solves for FSL's;
+    only the routines the tools call, never a CPU's own kernels); ITK's vnl routines, Eigen's
+    symmetric eigensolver, SciPy's spline interpolation and HDF5 in pure Rust; no C, C++ or Fortran
+    dependency; explicit thread pools, seeded random numbers; golden tests on six platforms at
+    every push. "Rust made the solution practical, and the rules made it work."
+  - *Why Python on top:* the users' language: each tool's wrapper, typed inputs and outputs, and
+    larmorprepx as plain Python functions; the Rust core does the computing and releases the GIL.
+  - *Honest limits:* the six-platform proof uses small golden inputs (up to 32³); full-size runs on
+    Windows and macOS come with the final validation phase and the clean-machine check; the
+    originals stay Unix tools (larmorx is an alternative beside them, not a fix of them).
+- **The `libm` crate's last uses** (seen 2026-10-31): `acos` in `crates/larmorx-afni/src/geometry.rs`
+  and `crates/larmorx-core/src/affine.rs`, `atan2` in `crates/larmorx-mri/src/hmc/rigid.rs`, `pow`
+  in `crates/larmorx-interp/src/lib.rs` (musl's, pure Rust) although `larmorx_core::math` has all
+  three correctly rounded now (rule 5): check whether each is deliberate (an original's bits) and
+  switch or document it, with the records the change touches; the clean-room crates' uses go to a
+  clean-room agent. Also `crates/larmorx-transform/src/openblas.rs`'s header still names OpenBLAS
+  0.3.30 and numpy 2.3.5 (the resampler follows numpy 2.5.4 since 2026-10-29): check and correct.
 - **larmorx-testdata:** `ruff format --check` fails on main for three generators
   (`generators/ants_filters_synthetic.py`, `resampling_synthetic.py`, `tshift_synthetic.py`;
   untouched by the panel part); its CI's lint step needs them formatted.

@@ -27,6 +27,7 @@ investigations, `validation/difftest/triage.toml`, the replica authors' permanen
 | **Part 2b (2026-10-31, the same implementer):** `specs/bet.md` §6 (betsurf) with §3, §4.4, §4.6, §8.1; M. Jenkinson, M. Pechaud, S. Smith, "BET2: MR-based estimation of brain, skull and scalp surfaces", OHBM 2005 (the method) | betsurf: the command line, the mesh and matrix files, the robust maximum, the profiles and their searches, the counting images, the smoothing, the three deformations, the masks and outputs, FSL-43, -47, -48, -50 to -55, -58 |
 | Black-box runs of FSL 6.0.7.23's `betsurf` (`validation/investigations/cleanroom-bet/`: `betsurf_cases.py`, `betsurf_inputs.py`, `betsurf_triangles.py`, `betsurf_profile_oracle.py`: one triangle, or one profile, at a time) | the observations of the findings' "betsurf" section: the region that holds its end, the bright samples counted, the scan from `a`, the fallbacks, the T1-only condition, the removed profiles counted with the scalp-only ones, `-p`'s steps, the parser's integers, `manual_input` and `c`, the messages and the order of the outputs |
 | The `--tanh` option (2026-10-31): the user's decision on GLIBC-06 | glibc's bits by default, `larmorx_core::math::tanh` on request |
+| Black-box runs of FSL 6.0.7.23's `bet2` and `bet` on random testing's cases 1608 and 1053 (2026-11-01; `bet2 -c 0 0 0`, `-c 0 0 1` and no `-c` on the same image; `bet -F -d` on a float64 series) | `-c 0 0 0` as no centre given; `bet -F`'s `<out>_tmp` of a float64 series as float64 |
 
 | larmorx | Behaviour reproduced | Source |
 |---|---|---|

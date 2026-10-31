@@ -76,7 +76,7 @@ FSL program is looked for on the `PATH` (CLAUDE.md rule 6).
 | `-f <f>` | `frac` | 0 to 1; smaller gives a larger brain |
 | `-g <g>` | `gradient` | -1 to 1; positive gives a larger brain at the bottom |
 | `-r <r>`, `--radius` | `radius` | mm; the initial sphere is half of it |
-| `-c <x y z>` | `centre` | voxels of the file as stored |
+| `-c <x y z>` | `centre` | voxels of the file as stored; `0 0 0` is "not given" (the centre of gravity), as in FSL (observed) |
 | `-w <r>`, `--smooth` | `smoothness` | bet2 only (`bet` does not pass it) |
 | `-t`, `--threshold` | `threshold=True` | also thresholds the brain and mask |
 | `--ct` | `head_ct=True` | bet2 only: the input in Hounsfield units |

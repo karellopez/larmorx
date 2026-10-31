@@ -548,14 +548,24 @@ fn fmri(
         Err(e) => return Err(fail(e, out, err)),
     };
     let tmp = format!("{output}_tmp");
-    if let Err(e) = write_like(
-        run,
-        &tmp,
-        &inp,
-        &vols[..1],
-        Values::F32(vols[0].data.clone()),
-        None,
-    ) {
+    // the first volume as fslroi writes it: a double series's first volume keeps its double
+    // values (observed, random testing 2026-10-31 case 1053, with -d)
+    let nvox = vols[0].data.len();
+    let first = if inp.header.datatype == 64 {
+        image::resolve_input(&run.settings.name(input))
+            .ok()
+            .and_then(|r| ImageFiles::of(&r))
+            .and_then(|f| image::read_f64_series(&f, run.settings.threads()))
+            .filter(|d| d.len() >= nvox)
+            .map(|mut d| {
+                d.truncate(nvox);
+                Values::F64(d)
+            })
+    } else {
+        None
+    };
+    let first = first.unwrap_or_else(|| Values::F32(vols[0].data.clone()));
+    if let Err(e) = write_like(run, &tmp, &inp, &vols[..1], first, None) {
         return Err(fail(e, out, err));
     }
     let tmp_brain = format!("{tmp}_brain");

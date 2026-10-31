@@ -265,6 +265,19 @@ original:
   so FSL sets that profile aside too. When FSL stops (the register's FSL-50), and when it only
   sets the profile aside, is a question for the spec writer.
 
+- **Two corrections from the trial** (2026-11-01), each checked by running FSL as a black box:
+  `bet2 -c 0 0 0` is FSL's "no centre given": it prints and uses the centre of gravity, as without
+  `-c` (the same mask; `-c 0 0 1` is used as given), so the original takes a centre of three zeros
+  as not given (case 1608: `bet -R` on an image of negative values, whose brain has no voxel above
+  0.001, so the script passes `-c 0 0 0`; and case 1210, where FSL's second bet2 then crashes and
+  the script reports it, as the original now does); and `bet -F` with `-d` keeps the first volume
+  `<out>_tmp` of a float64 series as float64 with its double values, as `fslroi` writes it (case
+  1053; the original wrote float32). `retrial.py` with the corrected build
+  (`oracles/logs/retrial-cleanroom-bet-2b-2026-11-01.log`): 1053, 1210, 1608 and 1740 now agree;
+  the other bet and bet2 cases are the neurological-storage class above (case 965's second pass
+  starts from FSL's centre `-0.000001 0 0`, printed by its centre-of-gravity computation, where the
+  original's sum gives exactly 0: the open question of case 622).
+
 The probes: `night_case.py`, `compare.py` and `retrial.py`
 ([validation/investigations/cleanroom-bet](../../validation/investigations/cleanroom-bet/README.md)), and for the
 reading beyond the image a temporary build (not kept: three variants of the sample at a point

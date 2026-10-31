@@ -192,8 +192,10 @@ pub fn parse(args: &[String], err: &mut dyn Write) -> Parsed {
         gradient: num(GRAD, 0.0),
         radius: num(RADIUS, 0.0),
         smoothness: num(SMOOTH, 1.0),
+        // observed (FSL 6.0.7.23, black box, random testing 2026-10-31 case 1608): `-c 0 0 0` is
+        // bet2's "not given", the centre of gravity (`bet -R` passes it when the brain is empty)
         centre: match &given[CENTRE] {
-            Some(Given::Numbers(v)) => Some([v[0], v[1], v[2]]),
+            Some(Given::Numbers(v)) if v[..3].iter().any(|&x| x != 0.0) => Some([v[0], v[1], v[2]]),
             _ => None,
         },
         threshold: flag(THRESHOLD),
@@ -816,4 +818,30 @@ fn vtk_text(m: &mesh::Mesh, points: &[mesh::V3]) -> String {
         s.push_str(&format!("3 {} {} {} \n", t[0], t[1], t[2]));
     }
     s
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn centre(words: &[&str]) -> Option<[f64; 3]> {
+        let args: Vec<String> = ["in", "out"]
+            .iter()
+            .chain(words)
+            .map(|s| s.to_string())
+            .collect();
+        match parse(&args, &mut Vec::new()) {
+            Parsed::Run(o) => o.centre,
+            Parsed::Exit(s) => panic!("exit {s}"),
+        }
+    }
+
+    #[test]
+    fn a_centre_of_zeros_is_not_given() {
+        // observed: FSL's bet2 takes `-c 0 0 0` as no centre (the centre of gravity)
+        assert_eq!(centre(&["-c", "0", "0", "0"]), None);
+        assert_eq!(centre(&["-c", "-0.000000", "0", "0"]), None);
+        assert_eq!(centre(&[]), None);
+        assert_eq!(centre(&["-c", "0", "0", "1"]), Some([0.0, 0.0, 1.0]));
+    }
 }

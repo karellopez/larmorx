@@ -127,21 +127,25 @@ def head(tmp_path: Path) -> Path:
 
 
 def test_without_the_replica(scripts, tmp_path):
-    """bet runs its clean-room original; betsurf, which has none yet, refuses."""
+    """bet and betsurf run their clean-room originals ("auto"); the replica asked for refuses,
+    naming the package."""
     path = volume(tmp_path)
     install = "pip install larmorx-nc"
     with pytest.raises(lx.ReplicaNotFoundError, match=install):
         lx.fsl.bet(path, implementation="replica")
-    for implementation in ("auto", "replica"):
-        with pytest.raises(lx.ReplicaNotFoundError, match=install):
-            lx.fsl.betsurf(path, path, np.eye(4), implementation=implementation)
-    with pytest.raises(NotImplementedError, match="no clean-room original of fsl betsurf"):
-        lx.fsl.betsurf(path, path, np.eye(4), implementation="original")
-    r = lx.fsl.bet(head(tmp_path), mask=True)  # auto: the original
+    with pytest.raises(lx.ReplicaNotFoundError, match=install):
+        lx.fsl.betsurf(path, path, np.eye(4), implementation="replica")
+    t1 = head(tmp_path)
+    r = lx.fsl.bet(t1, mask=True, mesh=True)  # auto: the original
     assert r.mask.implementation == _replica.ORIGINAL
-    # the command line refuses betsurf the same way
+    s = lx.fsl.betsurf(t1, r.mesh, np.eye(4), skull_mask=True)  # auto: the original
+    assert s.inskull_mask.implementation == _replica.ORIGINAL
+    assert s.outskin.vertices.shape == (2562, 3) and s.skull_mask.data.dtype == np.int16
+    inner, outer = (int(np.asarray(m.data).sum()) for m in (s.inskull_mask, s.outskull_mask))
+    assert 0 < inner <= outer, (inner, outer)
+    # the command line runs betsurf's original: too few arguments, the usage (exit 255)
     code, _, err = cli("betsurf", str(path), "out")
-    assert code != 0 and "pip install larmorx-nc" in err, err
+    assert code == 255 and err.startswith("too few arguments"), err
 
 
 def test_the_original_runs_in_process(scripts, tmp_path):

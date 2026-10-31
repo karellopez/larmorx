@@ -3,8 +3,8 @@
 **Clean-room implementation. No FSL code was used.**
 
 FSL is distributed under the FSL Licence (non-commercial), so larmorx re-implements its tools
-(CLAUDE.md rule 1, `docs/licensing.md`). `bet` (BET's `bet2` and the `bet` script; betsurf is
-still to be written) was written on 2026-10-30 by an implementer who never opened FSL's source
+(CLAUDE.md rule 1, `docs/licensing.md`). `bet` (BET's `bet2` and the `bet` script) was written on
+2026-10-30 and `betsurf` on 2026-10-31 by an implementer who never opened FSL's source
 code (`~/fsl*/src`, `crates-nc/fsl-source/` or any other copy), the replica crates (`crates-nc/`,
 `crates/larmorx-afni-replica`, `crates-gpl/`), the findings written from the source
 (`docs/findings/fsl-bet.md`, `fsl-mcflirt.md`, the AFNI source-derived ones, the sections of
@@ -24,6 +24,9 @@ investigations, `validation/difftest/triage.toml`, the replica authors' permanen
 | `larmorx_core::math::tanh_glibc` (fdlibm 5.3 from netlib, Sun's notice, black-box-proved equal to glibc 2.35's `tanh`) | the smoothness weight's `tanh` with FSL's bits (§8.1), in `reproduce` and, until part 2b, in the default; `larmorx_core::math::tanh` (CORE-MATH, correctly rounded) is ported for the default |
 | `larmorx_afni::x87`'s method (larmorx's own clean-room code: x87 extended precision with integer arithmetic), adapted in `bet::x87` with the rounding to float | §8.2's extended-precision steps |
 | Black-box runs of FSL 6.0.7.23's `fslstats -C` on FSL's own `bet -R` output (part 2a, case 622) | the centre printed as `-0.000000` (findings) |
+| **Part 2b (2026-10-31, the same implementer):** `specs/bet.md` §6 (betsurf) with §3, §4.4, §4.6, §8.1; M. Jenkinson, M. Pechaud, S. Smith, "BET2: MR-based estimation of brain, skull and scalp surfaces", OHBM 2005 (the method) | betsurf: the command line, the mesh and matrix files, the robust maximum, the profiles and their searches, the counting images, the smoothing, the three deformations, the masks and outputs, FSL-43, -47, -48, -50 to -55, -58 |
+| Black-box runs of FSL 6.0.7.23's `betsurf` (`validation/investigations/cleanroom-bet/`: `betsurf_cases.py`, `betsurf_inputs.py`, `betsurf_triangles.py`, `betsurf_profile_oracle.py`: one triangle, or one profile, at a time) | the observations of the findings' "betsurf" section: the region that holds its end, the bright samples counted, the scan from `a`, the fallbacks, the T1-only condition, the removed profiles counted with the scalp-only ones, `-p`'s steps, the parser's integers, `manual_input` and `c`, the messages and the order of the outputs |
+| The `--tanh` option (2026-10-31): the user's decision on GLIBC-06 | glibc's bits by default, `larmorx_core::math::tanh` on request |
 
 | larmorx | Behaviour reproduced | Source |
 |---|---|---|
@@ -37,6 +40,10 @@ investigations, `validation/difftest/triage.toml`, the replica authors' permanen
 | `cli::options` | FSL's option parser | spec §4.1, black-box |
 | `cli::bet2` | bet2's command line, messages, outputs, FSL-40, -42, -43, -56, -60, -61, -62 | spec §4, §7, §9, black-box |
 | `cli::bet` | the `bet` script: default, `-R` (FSL-63), `-F`, `-Z` (FSL-45), the pending variations, FSL-44, FSL-46 | spec §5, black-box |
+| `betsurf::meshfile` (VTK, OFF and FreeSurfer ASCII meshes read as C++'s streams read them) | §6.2, FSL-52 | spec |
+| `betsurf::profile` (the profiles' regions, thresholds and searches; the four kinds of profile) | §6.4, FSL-49, -50, -51 | spec, black-box (`betsurf_profile_oracle.py`, `betsurf_triangles.py`) |
+| `betsurf` (the matrix, the robust maximum and libstdc++'s selection for FSL-55, the working grid, the votes, the smoothing, the deformation, the masks, the scalp's sphere) | §6.2-§6.6, FSL-43, -53, -55, -58 | spec, black-box |
+| `cli::betsurf` | betsurf's command line, messages, outputs and their order, FSL-47, -48, -52, -53, -54 | spec §6.1, §6.6, §7, §9, black-box |
 
 The parity record is [docs/validation/fsl-bet.md](../../docs/validation/fsl-bet.md); the
 benchmark [docs/benchmarks/fsl-bet.md](../../docs/benchmarks/fsl-bet.md).

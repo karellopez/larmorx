@@ -63,6 +63,10 @@ into the spec, marked (observed).
   differs in practically every run, so the second search always runs: the default 1.9 times
   slower (ds000005's T1w 0.43 → 0.83 s, ds002422's 1.20 → 2.33 s on one thread). bet2 keeps
   glibc's `tanh` in both modes until part 2b's decision.
+  **The user's decision (2026-10-31, GLIBC-06 option c):** glibc's bits stay the default; the
+  correctly rounded `tanh` is larmorx's own option `--tanh=correctly-rounded` (bet2 and bet;
+  `lx.fsl.bet(tanh="correctly-rounded")`). Asked for, it needs no notice: the exact test and
+  its second search were removed (part 2b), so the option costs nothing beyond its own run.
 
 - **The robust range's rounding** (`range_probe.py`; fMRIPrep's calls): `t2 = lo + b (hi − lo) /
   1000` with `hi − lo` rounded to float, the product and the division in double, the result
@@ -165,3 +169,68 @@ into the spec, marked (observed).
   dilated mask `<out>_mask` float32 and the 4D brain float32, both with the display range 0 and 0
   (`fslmaths`). **`-Z`'s**: `<out>_tmp` (padded), `<out>_tmp_bottom`, `<out>_tmp_top` (one slice,
   its origin moved to the top slice).
+
+## betsurf (§6), part 2b (2026-10-31)
+
+Probes: `betsurf_cases.py` (FSL against the original on the suite's phantoms and real images),
+`betsurf_inputs.py` (an input stored the other way along x, or with a larger x voxel),
+`betsurf_triangles.py` (one triangle of bet2's mesh at a time: a few profiles) and
+`betsurf_profile_oracle.py` (**one profile at a time**: a triangle 0.2 mm across drawn into the
+profile's voxel, nearer one vertex, so that betsurf casts exactly one profile; FSL's `-v` says
+whether it set it aside). The part's probe build (commit `f1f9a35`) also wrote each profile's
+samples (`LX_BETSURF_DUMP`), from which the readings below were tried; the product has no such
+switch.
+
+- **The removed profiles** (`-v`): the percentage counts the dropped profiles **and those of
+  which only the scalp counts** (exact on every image where the profile logic agrees).
+- **The region's end**: a region that "ends at S" holds the sample at S (`[L, S]`): the
+  thresholds take it into their minimum and maximum, the forward searches reach it.
+- **Step 5 (T1 and T2)**: "more than one gap" counts the **bright** samples found (a bright
+  sample with no dark one after it counts); the outer skull search then starts at the first
+  dark one.
+- **Step 6**: when the second search finds nothing, OS2 is **the region's start** (the outer
+  skull search's start), not the first search's result.
+- **Step 7**: the scan **includes `a`** (the spec's "not the first" is not what FSL does).
+- **T1 only**: a profile whose OS2 lies inside its IS (`OS2 < IS`) is not kept (only its scalp
+  counts); `OS < IS` gives the same decisions on every profile probed (a question for the spec
+  writer).
+- **FSL-51**: on profiles whose searches start past their last sample, FSL's decisions are those
+  of reading "nothing there" (14 of 14 overrunning profiles of the tumour, `reproduce`).
+- With these, **330 of 330 single profiles agree** (214 T1-and-T2 ordinary ones of ds002603, 31
+  near the eyes and 14 overrunning ones of ds005003, 89 T1-only ones of ds000256), and 64 of 64
+  triangles of ds000256 (T1 only) and 127 of 128 of ds002603 and ds005003 (T1 and T2). On whole
+  images the removed profiles differ by at most 0.06 % (+3 of 66,074 on ds000005, +37 of 110,707
+  on ds005003, −1 of 110,938 on ds002603 with the T1 only; −16 of 152,419, +68, −40 with the T2,
+  `reproduce`).
+- **`-p k`**: k times a copy retessellated and 100 more steps (inner and outer skull: speed 0.5,
+  no mask; the scalp: its speed 1.5, no mask, the closest of four readings); the written meshes
+  are the copies (10242 vertices for `-p 1`); the inner and outer skull are FSL's to the file's
+  6 decimals on the phantom with `-p 1`.
+- **The command line**: `-p` reads an int as `strtol` of base 0 on the whole word (`0x10`, `-3`
+  read; `08`, `1.5`, `1e3` do not); a lone `-` is an empty run of options; the mesh name `c`
+  prints `cancelled` and leaves the mesh empty (FSL then crashes: refused, FSL-52);
+  `manual_input` prompts without a newline and reads a whole line, and waits forever at the end
+  of its input (larmorx refuses there).
+- **Outputs**: each surface's VTK file is written as soon as its phase ends, then its outline and
+  its mask (`  outline`, `  mask`), the skull mask after the outer skull; an image write without
+  `FSLOUTPUTTYPE` stops the run there (the VTK files before it written); the images keep the
+  T1's display range, intent and `aux_file`.
+- **The memory**: on the memory test's call (160 × 192 × 160) FSL needs 175 MiB, the original
+  144 MiB (the T1 clamped in place, the images freed after the profiles, the smoothing in two
+  buffers, the working grid's masks held as floats).
+
+**What still differs** (the record's `real/*-surf*` cases): the decisions agree, and where the
+counting images are dense the surfaces are FSL's (the phantom's inner and outer skull to 6
+decimals; a T1w whose every profile passes near the eyes: the inner skull exactly), but
+
+- where few profiles vote (a skull base where nearly every profile is set aside, ds002603 with its
+  T2) the inner skull moves differently: up to 11 mm on a few vertices, though the decisions
+  there agree profile by profile; the deformation's arithmetic in that regime is the first thing
+  to ask the spec writer about (the mark of a vertex as outside, the step where no gradient
+  shows);
+- **the scalp** differs everywhere a little (the phantom: 95 % of vertices within 0.0002 mm, at
+  most 0.13 mm; real heads: 95 % within 0.2 to 3 mm, at most about 12 mm at the face); not the
+  sphere's placement, its radius, the mask's barriers, the step counts or the marks (each tried);
+- so the masks are within betsurf's thresholds (Dice >= 0.99, boundary p95 <= 1 voxel) on 4 of the
+  5 real images, and ds002603's scalp mask with its T2 is not (boundary p95 2 voxels, Dice
+  0.9938).

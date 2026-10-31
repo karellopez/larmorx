@@ -12,10 +12,10 @@ Licence's terms; translated from FSL's source:
 [PROVENANCE](../../crates-nc/larmorx-nc-bet/PROVENANCE.md)), and the clean-room **original** in
 the main package (Apache-2.0, `crates/larmorx-fsl`), written from
 [`specs/bet.md`](../../specs/bet.md), the BET paper and black-box runs of FSL
-([PROVENANCE](../../crates/larmorx-fsl/PROVENANCE.md); since 2026-10-30, `bet2` and the `bet`
-script; betsurf's original is still to be written). `implementation="auto"` runs the replica, as
-a separate program, when `larmorx-nc` is installed (`pip install larmorx-nc`), else the original
-(betsurf: `lx.ReplicaNotFoundError` naming that command); `"replica"` and `"original"` choose.
+([PROVENANCE](../../crates/larmorx-fsl/PROVENANCE.md); since 2026-10-30 `bet2` and the `bet`
+script, since 2026-10-31 `betsurf`). `implementation="auto"` runs the replica, as a separate
+program, when `larmorx-nc` is installed (`pip install larmorx-nc`), else the original;
+`"replica"` and `"original"` choose.
 Each image's `implementation` names the one that ran. The command line chooses alike
 (`LARMORX_IMPLEMENTATION=auto|replica|original`).
 
@@ -54,7 +54,7 @@ larmorx fsl bet2 T1w.nii.gz T1w_brain -e
 larmorx fsl betsurf --t1only -o -m -s T1w.nii.gz T1w_brain_mesh.vtk T1w_to_MNI152.mat T1w
 ```
 
-## `lx.fsl.bet(image, *, frac=0.5, gradient=0.0, radius=None, centre=None, smoothness=1.0, threshold=False, head_ct=False, variation=None, brain=True, mask=False, outline=False, skull=False, mesh=False, n_threads=1, implementation="auto", upstream_defects="fix")`
+## `lx.fsl.bet(image, *, frac=0.5, gradient=0.0, radius=None, centre=None, smoothness=1.0, threshold=False, head_ct=False, variation=None, brain=True, mask=False, outline=False, skull=False, mesh=False, tanh="glibc", n_threads=1, implementation="auto", upstream_defects="fix")`
 
 Returns a `BetResult`: `brain` (float32: the input times the mask; 4D with `"fmri"`), `mask`
 (int16, 1 inside), `outline` (float32), `skull` (int16) and `mesh` (a `Surface`: `vertices`
@@ -87,6 +87,7 @@ FSL program is looked for on the `PATH` (CLAUDE.md rule 6).
 | `-e`, `--mesh` | `mesh=True` | VTK; also switches the self-intersection test to the exact one |
 | `-v`, `--verbose` | (command line only) | |
 | `--parameter_d1=`, `--parameter_d2=` | (command line only) | hidden search depths (7 and 3) |
+| `--tanh=correctly-rounded` (larmorx's own; also `--tanh correctly-rounded`, and passed on by `bet`) | `tanh="correctly-rounded"` | the surface's smoothness weight with the correctly rounded `tanh` (CORE-MATH's, `larmorx_core::math::tanh`) instead of glibc 2.35's bits, which FSL calls (`glibc`, the default). **GLIBC-06, the user's decision of 2026-10-31**: glibc's bits by default, the correctly rounded one on request (no notice: it is asked for). Where a surface self-intersects and is found again, the last bit can change the result (4 of the standard tier's 13 real images: findings). The clean-room original only (`implementation="replica"` refuses it; `"auto"` runs the original) |
 | `FSLOUTPUTTYPE` | (always NIfTI-1 in Python) | on the command line read from the environment, as FSL does |
 
 ### `bet`'s variations
@@ -108,6 +109,21 @@ Returns a `BetsurfResult`: the `inskull`, `outskull` and `outskin` surfaces, the
 or a VTK file; `t1_to_standard` FLIRT's 4 x 4 matrix to MNI152 (a path or an array; it only decides
 which profiles cross the eyes); without `t2` the surfaces come from the T1 alone (`--t1only`).
 `precision` is `-p`. `lx.fsl.read_vtk(path)` reads a VTK mesh as FSL writes it.
+
+### Option mapping (`betsurf`)
+
+| FSL option | Python | Notes |
+|---|---|---|
+| `<t1> [<t2>] <bet_mesh.vtk> <t1_to_standard.mat> <output>` | `t1`, `t2`, `brain_surface`, `t1_to_standard`; the result | outputs `<output>_inskull_mesh.vtk`, `_outskull_mesh.vtk`, `_outskin_mesh.vtk` (always), their images |
+| `-1`, `--t1only` | `t2=None` | the surfaces from the T1 alone |
+| `-m`, `--mask` | `masks=True` (default) | `<output>_inskull_mask`, `_outskull_mask`, `_outskin_mask` |
+| `-s`, `--skullmask` | `skull_mask=True` | `<output>_skull_mask` (the masks are made without `-m` too) |
+| `-o`, `--outline` | `outlines=True` | `<output>_inskull_mesh`, `_outskull_mesh`, `_outskin_mesh` images: each surface drawn as 1 |
+| `-p <int>`, `--increased_precision=<int>` | `precision` | each surface retessellated that many times, 100 more steps each (the meshes written are the retessellated ones); FSL's int: `strtol` of base 0 (`0x10` reads, `08` does not); larmorx refuses more than 10 (the meshes would not fit any memory) |
+| `-v`, `--verbose` | (command line only) | `extracting profiles`, the profiles cast and the percentage set aside (the dropped ones and those of which only the scalp counts), then each phase |
+| `-h`, `--help` | (command line only) | the usage, exit 0 |
+| the mesh name `manual_input` | (command line only) | the name read from standard input (larmorx refuses at its end, where FSL waits forever); the name `c` cancels (an empty mesh: refused, FSL-52) |
+| `FSLOUTPUTTYPE` | (always NIfTI-1 in Python) | read when the first image is written, as FSL does |
 
 ## Upstream defects (D13)
 

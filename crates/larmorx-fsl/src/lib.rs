@@ -5,7 +5,9 @@
 //!   `specs/bet.md`, S. M. Smith's paper (Human Brain Mapping 17(3), 2002), FSL's
 //!   documentation and black-box runs of FSL 6.0.7.23's programs, without access to FSL's
 //!   source code or its bit-exact replica (see `PROVENANCE.md`).
-//! - [`cli`]: the command lines (`larmorx fsl bet2`, `larmorx fsl bet`, FSL's arguments).
+//! - [`betsurf`]: the skull and scalp surfaces of FSL's `betsurf` (`specs/bet.md` §6), written the
+//!   same way.
+//! - [`cli`]: the command lines (`larmorx fsl bet2`, `bet`, `betsurf`, FSL's arguments).
 #![forbid(unsafe_code)]
 // Fixed 3-vectors and 3 x 3 matrices read best indexed; comparisons written so that NaN takes
 // the branch FSL's own comparisons give it.

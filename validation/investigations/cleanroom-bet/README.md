@@ -17,7 +17,8 @@ environment (FSL never on the `PATH`), and larmorx's clean-room original (`LARMO
 | `skull_probe.py <fsl run> <input> <t> <t2> <t98> [vertex]` | readings of the skull search against FSL's `_skull` |
 | `header_diff.py <a> <b>` | the NIfTI-1 fields in which two headers differ |
 | `quatern_probe.py <dir> <inputs...>` | FSL's rewritten quaternion against the standard's conversions in several precisions |
-| `bench.py --larmorx <bin> [--replica <bin>] --threads 1,24 <name>=<image>...` | the benchmark of [docs/benchmarks/fsl-bet.md](../../../docs/benchmarks/fsl-bet.md) |
+| `bench.py --larmorx <bin> [--replica <bin>] --threads 1,16 [--tool betsurf --args "..."] [--json <report>] <name>=<file>[,<file>...]...` | the benchmark of [docs/benchmarks/fsl-bet.md](../../../docs/benchmarks/fsl-bet.md): FSL 6.0.7.23, the replica and the original on the same calls, the median of `--repeat` runs, a JSON report in the form of `docs/benchmarks/*.json` |
+| `site_inventory.py count <site> fsl-bet`, `compare <before> <after>` | the site page's evidence counted (examples, panels, comparisons, arrays, blobs and their bytes, cases per implementation, speed rows), and the proof that an export lost nothing (after >= before) |
 
 The reruns' probes (`variants.py`, `variants2.py` in the part's notes) needed a temporary build
 with each candidate rule; their results are listed in the findings ("Reruns").
@@ -59,3 +60,18 @@ correctly rounded `tanh` changes").
 of the trial's 239 differing cases agree, the skull and the quaternion held exactly; the two left
 are cases 622 and 677 (findings). FSL's `fslstats -C` was run by hand on FSL's own `bet -R` output
 of case 622 (a black box) to see the centre it prints.
+
+## Part 2b (2026-10-31): betsurf
+
+| Script | What it shows |
+|---|---|
+| `betsurf_cases.py <phantoms> <dir> [names...]` | FSL's betsurf against the original on the parity suite's phantoms and real images (with bet2's mesh, FLIRT's matrix and the registered T2 the suite derived): masks by Dice and boundary distance, meshes by vertex distance |
+| `betsurf_profile_oracle.py <t1> <t2\|-> <matrix> <dir> <profiles.jsonl> [i ...]` | FSL's decision on one profile at a time: a 0.2 mm triangle drawn into one voxel casts exactly one profile along a chosen normal; `betsurf -v`'s `removed profiles` line (0 % or 100 %) says whether FSL kept it (`ORACLE_COPIES`: several copies of the triangle, for the profiles' scalp estimate) |
+| `betsurf_triangles.py <t1> <t2\|-> <mesh.vtk> <matrix> <dir> <first> <count> [step]` | bet2's mesh one triangle at a time (the images cropped to `BETSURF_BOX` voxels around it): the profiles FSL and the original set aside, triangle by triangle |
+| `betsurf_inputs.py <t1> <mesh.vtk> <matrix> <dir>` | an input stored the other way along x, and one with a larger x voxel size, to tell whether a difference follows the storage or the voxel size |
+
+The profiles' dumps (`profiles.jsonl`: each profile's start voxel and normal) came from the probe
+build of commit `f1f9a35` (`crates/larmorx-fsl/src/betsurf/`, environment knobs and a dump, removed
+in `095818a`); the decision rules found with them are in the findings ("betsurf (§6), part 2b"):
+330 of 330 single profiles decided as FSL decides, 127 of 128 T1-and-T2 triangles and 64 of 64
+T1-only triangles alike.

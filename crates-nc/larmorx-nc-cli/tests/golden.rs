@@ -432,6 +432,8 @@ const PRINTING: &[&str] = &[
     "fsl img2stdcoord",
     "fsl rmsdiff",
     "fsl makerot",
+    "fsl midtrans",
+    "fsl extracttxt",
 ];
 
 const BET_CASES: &[BetCase] = &[
@@ -688,6 +690,57 @@ const BET_CASES: &[BetCase] = &[
         args: &["-t", "30", "-a", "1,2,3", "-c", "4,5,6"],
         mode: "fix",
         named: &["FSL-76"],
+        output_type: "NIFTI",
+    },
+    // FLIRT part 3: midtrans of two transforms, pointflirt of six points, applyxfm4D of the
+    // 4D head through a matrix per volume (sinc; FSL-09's rounding of the int16 output),
+    // pairreg of the two heads, extracttxt's lines, aff2rigid (FSL-81 corrected)
+    BetCase {
+        id: "midtrans.two",
+        tool: "fsl midtrans",
+        args: &["-o", "mid.mat", "{init}", "{mat}"],
+        mode: "fix",
+        named: &[],
+        output_type: "NIFTI",
+    },
+    BetCase {
+        id: "pointflirt.points",
+        tool: "fsl pointflirt",
+        args: &["-i", "{pts_in}", "-r", "{pts_ref}", "-o", "aff.mat"],
+        mode: "fix",
+        named: &[],
+        output_type: "NIFTI",
+    },
+    BetCase {
+        id: "applyxfm4D.series",
+        tool: "fsl applyxfm4D",
+        args: &["{4d}", "{t2}", "out", "{mats}"],
+        mode: "fix",
+        named: &["FSL-09"],
+        output_type: "NIFTI",
+    },
+    BetCase {
+        id: "pairreg.heads",
+        tool: "fsl pairreg",
+        args: &["{t1}", "{t2}", "{t1}", "{t2}", "pair.mat", "-dof", "6"],
+        mode: "fix",
+        named: &[],
+        output_type: "NIFTI",
+    },
+    BetCase {
+        id: "extracttxt.lines",
+        tool: "fsl extracttxt",
+        args: &["e.4", "{txt}", "3", "-1"],
+        mode: "fix",
+        named: &[],
+        output_type: "NIFTI",
+    },
+    BetCase {
+        id: "aff2rigid.default",
+        tool: "fsl aff2rigid",
+        args: &["{mat}", "rigid.mat"],
+        mode: "fix",
+        named: &["FSL-81"],
         output_type: "NIFTI",
     },
     // FSL 6.0.7.23's bet2 --binaryMask: the surface from a mask, the outputs from the input;
@@ -1241,6 +1294,28 @@ fn write_bet_inputs(dir: &Path) -> BTreeMap<&'static str, PathBuf> {
     let p = dir.join("coords.txt");
     std::fs::write(&p, "10 20 30\n1.5 2.5 3.5\n-4 0 12.25\n").unwrap();
     paths.insert("coords", p);
+    // pointflirt's points (exact decimals) and their images, a matrix per volume of the 4D
+    // head (applyxfm4D's MAT_0000n) and a text file (extracttxt)
+    let p = dir.join("pts_in.txt");
+    std::fs::write(&p, "10 20 30\n-12 5 40\n33 -7 12\n0 0 0\n25 25 -10\n-8 -30 22\n").unwrap();
+    paths.insert("pts_in", p);
+    let p = dir.join("pts_ref.txt");
+    std::fs::write(
+        &p,
+        "13.25 18.5 35.25\n-9.25 7.5 44\n38.5 -8.25 13.75\n2.5 -1 1.5\n29.25 24 -9.75\n-5.25 -31.75 26.5\n",
+    )
+    .unwrap();
+    paths.insert("pts_ref", p);
+    let mats = dir.join("mats");
+    std::fs::create_dir_all(&mats).unwrap();
+    for k in 0..4 {
+        std::fs::write(mats.join(format!("MAT_0000{k}")), if k % 2 == 0 { init } else { mat }).unwrap();
+    }
+    paths.insert("mats", mats);
+    let p = dir.join("text.txt");
+    let text: String = (1..=8).map(|k| format!("line {k} value {}\n", 3 * k)).collect();
+    std::fs::write(&p, text).unwrap();
+    paths.insert("txt", p);
     paths
 }
 

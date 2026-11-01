@@ -204,6 +204,42 @@ pub const REPLICAS: &[Replica] = &[
         location: Location::Program(&LARMORX_NC),
         original: false,
     },
+    Replica {
+        family: "fsl",
+        tool: "midtrans",
+        location: Location::Program(&LARMORX_NC),
+        original: false,
+    },
+    Replica {
+        family: "fsl",
+        tool: "pointflirt",
+        location: Location::Program(&LARMORX_NC),
+        original: false,
+    },
+    Replica {
+        family: "fsl",
+        tool: "applyxfm4D",
+        location: Location::Program(&LARMORX_NC),
+        original: false,
+    },
+    Replica {
+        family: "fsl",
+        tool: "pairreg",
+        location: Location::Program(&LARMORX_NC),
+        original: false,
+    },
+    Replica {
+        family: "fsl",
+        tool: "extracttxt",
+        location: Location::Program(&LARMORX_NC),
+        original: false,
+    },
+    Replica {
+        family: "fsl",
+        tool: "aff2rigid",
+        location: Location::Program(&LARMORX_NC),
+        original: false,
+    },
 ];
 
 /// The tools of `family` that have a replica and no clean-room original yet: the command line
@@ -661,7 +697,13 @@ mod tests {
                 "std2imgcoord",
                 "img2stdcoord",
                 "rmsdiff",
-                "makerot"
+                "makerot",
+                "midtrans",
+                "pointflirt",
+                "applyxfm4D",
+                "pairreg",
+                "extracttxt",
+                "aff2rigid",
             ]
         );
         let betsurf = lookup("fsl", "betsurf").unwrap();

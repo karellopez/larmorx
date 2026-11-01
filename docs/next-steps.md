@@ -342,9 +342,12 @@ The items below keep their history.
    notice (8: FSL-14 on infinite voxels; `-setbackground` with spline), one message count with
    `-dof 3`, one more heap corruption, 2 runs over 3 GiB. **Part 2:**
    those, `-anglerep quaternion`, `alignpaxes`, the SVD pseudo-inverse of general parameter subsets,
-   `-debug`'s BBR volume, FSL-67's measurement, a second random-testing run, the site page, the full
-   tier (fMRIPrep's 22 calls), the other programs (`avscale`, `makerot`, `midtrans`, `rmsdiff`, `img2imgcoord`,
-   `img2stdcoord`, `std2imgcoord`, `applyxfm4D`, `pointflirt`). Then the clean-room original (another
+   `-debug`'s BBR volume, FSL-67's measurement, the site page (first), the other programs (`avscale`,
+   `makerot`, `midtrans`, `rmsdiff`, `img2imgcoord`, `img2stdcoord`, `std2imgcoord`, `applyxfm4D`,
+   `pointflirt`); tested as every part is (the user, 2026-10-28): the open findings re-checked after
+   their fixes and a short random-testing trial of the new paths only. The full tier (fMRIPrep's 22
+   BBR calls on every oracle run), the data panel and long random-testing runs wait for the final
+   validation phase (the user, 2026-11-01, asked: the heavy tests stay at the end). Then the clean-room original (another
    agent, from `specs/flirt.md`; it reuses the main package's clean-room engine, the cost functions,
    optimiser and transform algebra of `larmorx-mri`'s head-motion correction, never a second copy: the
    user, 2026-11-01, "avoid duplication"). The scripts wait for other tools: `epi_reg` (FAST, `fslmaths`,

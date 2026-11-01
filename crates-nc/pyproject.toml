@@ -12,7 +12,7 @@ build-backend = "maturin"
 
 [project]
 name = "larmorx-nc"
-description = "Bit-exact replicas of FSL tools (mcflirt), run by larmorx as a separate program; FSL Licence: non-commercial use only"
+description = "Bit-exact replicas of FSL tools (mcflirt, bet, flirt), run by larmorx as a separate program; FSL Licence: non-commercial use only"
 readme = "README.md"
 requires-python = ">=3.12"
 license = "LicenseRef-FSL"
@@ -26,6 +26,7 @@ license-files = [
     "fsl-source/README.md",
     "fsl-source/MANIFEST.tsv",
     "fsl-source/*/*",
+    "fsl-source/*/*/*",
     "Cargo.toml",
     "Cargo.lock",
     "larmorx-nc-*/Cargo.toml",

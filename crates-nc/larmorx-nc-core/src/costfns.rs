@@ -1418,15 +1418,19 @@ fn q_get_neighbours(v: &Volume, x: f32, y: f32, z: f32) -> ([f32; 8], f32, f32, 
 }
 
 /// The label mismatch of one point: the trilinear weights of the cell's corners whose label
-/// differs from `valx` by more than 0.5, each product in double and added to the float sum
-/// (`lsum += (1.0-dx)*(1.0-dy)*(1.0-dz)`), in FSL's corner order.
+/// differs from `valx` by more than 0.5, added to the float sum in FSL's corner order, each with
+/// C's types left to right: `(1.0-dx)*(1.0-dy)*(1.0-dz)` is double throughout, but
+/// `dx*dy*(1.0-dz)` multiplies the floats `dx*dy` first, and `dx*dy*dz` is a float product added
+/// in float (`addss`; FSL 6.0.7.23's libfsl-newimage, disassembled).
 #[inline]
 fn label_mismatch(n: [f32; 8], valx: f32, dx: f32, dy: f32, dz: f32) -> f32 {
     let [v000, v001, v010, v011, v100, v101, v110, v111] = n;
+    let (fx, fy, fz) = (dx, dy, dz);
     let (dx, dy, dz) = (f64::from(dx), f64::from(dy), f64::from(dz));
     let mut lsum: f32 = 0.0;
+    let differs = |v: f32| f64::from((v - valx).abs()) > 0.5;
     let mut add = |v: f32, w: f64| {
-        if f64::from((v - valx).abs()) > 0.5 {
+        if differs(v) {
             lsum = (f64::from(lsum) + w) as f32;
         }
     };
@@ -1434,10 +1438,12 @@ fn label_mismatch(n: [f32; 8], valx: f32, dx: f32, dy: f32, dz: f32) -> f32 {
     add(v001, (1.0 - dx) * (1.0 - dy) * dz);
     add(v011, (1.0 - dx) * dy * dz);
     add(v010, (1.0 - dx) * dy * (1.0 - dz));
-    add(v110, dx * dy * (1.0 - dz));
+    add(v110, f64::from(fx * fy) * (1.0 - dz));
     add(v100, dx * (1.0 - dy) * (1.0 - dz));
     add(v101, dx * (1.0 - dy) * dz);
-    add(v111, dx * dy * dz);
+    if differs(v111) {
+        lsum += fx * fy * fz;
+    }
     lsum
 }
 

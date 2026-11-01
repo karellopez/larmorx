@@ -386,11 +386,17 @@ impl<'a> Flirt<'a> {
             return Ok(());
         }
         let dims = |name: &str| -> R<[f32; 3]> {
+            // read_volume_hdr_only: the name's own exception (printed when thrown), caught and
+            // thrown again as #22.
             let valid = volume::return_validimagefilename(name).map_err(|e| {
-                FslError::imthrow(
+                let mut again = FslError::imthrow(
                     format!("Failed to read volume {name}\nError : {}", e.what),
                     22,
-                )
+                );
+                let mut printed = e.printed.clone();
+                printed.append(&mut again.printed);
+                again.printed = printed;
+                again
             })?;
             let h = nifti::load_header(std::path::Path::new(&valid), &self.settings.open_options())
                 .map_err(|e| {
@@ -754,6 +760,15 @@ impl<'a> Flirt<'a> {
 
     /// The pair's cost of `affmat` (initmat applied by the caller), with its messages.
     fn pair_cost(&mut self, affmat: &Mat, nonlin: Option<f64>) -> R<f32> {
+        if let Some(p) = &self.impair {
+            if p.costtype == CostType::Bbr && p.bbr.step <= 0 && !p.bbr_points.is_empty() {
+                return Err(Stop::Refuse(format!(
+                    "setoption bbrstep {}: FLIRT's loop over the boundary points never ends with \
+                     a step below 1 (FSL-71)",
+                    p.bbr.step
+                )));
+            }
+        }
         let mut p = self.impair.take().expect("the image pair is set");
         let mut msgs = CostMessages::default();
         let v = {
@@ -790,7 +805,7 @@ impl<'a> Flirt<'a> {
         let nonlin = if self.currentcostfn == CostType::Bbr && self.o.pe_dir != 0 {
             if self.global_fmap.data.is_empty() {
                 return Err(Stop::Refuse(
-                    "-pedir without -fieldmap: FLIRT's BBR cost interpolates an empty field map \
+                    "-pedir without -fieldmap: FLIRT's BBR cost interpolates an empty field map (FSL-73) \
                      (undefined behaviour)"
                         .to_owned(),
                 ));
@@ -1826,7 +1841,7 @@ impl<'a> Flirt<'a> {
         if self.global_fmap.data.is_empty() {
             return Err(Stop::Refuse(
                 "-pedir without a field map read (no -fieldmap, or -applyxfm, which never reads \
-                 it): FLIRT interpolates an empty field map (undefined behaviour)"
+                 it): FLIRT interpolates an empty field map (undefined behaviour, FSL-73)"
                     .to_owned(),
             ));
         }
@@ -2003,13 +2018,13 @@ impl Flirt<'_> {
             Ok(Some(n)) => Ok((n, r1, r2)),
             Ok(None) | Err(BadName::Empty) => Err(Stop::Refuse(format!(
                 "the schedule names no matrix where one is needed ('{word}'): FLIRT then uses \
-                 an uninitialised pointer"
+                 an uninitialised pointer (FSL-70)"
             ))),
             Err(BadName::Message(_)) => Err(Stop::Refuse(format!(
-                "'{word}' is not a matrix name: FLIRT then uses an uninitialised pointer"
+                "'{word}' is not a matrix name: FLIRT then uses an uninitialised pointer (FSL-70)"
             ))),
             Err(BadName::OutOfRange(n)) => Err(Stop::Refuse(format!(
-                "'{n}' names a 28th matrix: FLIRT reads and writes beyond its 27 matrices"
+                "'{n}' names a 28th matrix: FLIRT reads and writes beyond its 27 matrices (FSL-70)"
             ))),
         }
     }
@@ -2278,13 +2293,8 @@ impl Flirt<'_> {
             }
             "minsampling" => self.o.min_sampling = fvalues[0] as f32,
             "bbrstep" => {
+                // set_bbr_step((int) value): a step below 1 is refused when BBR's cost uses it.
                 let step = cnum::f64_to_i32(fvalues[0]);
-                if step <= 0 {
-                    return Err(Stop::Refuse(format!(
-                        "setoption bbrstep {step}: FLIRT's loop over the boundary points never ends \
-                         with a step below 1"
-                    )));
-                }
                 if let Some(p) = self.impair.as_mut() {
                     p.bbr.step = step;
                 }
@@ -2372,6 +2382,12 @@ impl Flirt<'_> {
                 }
                 let (src, _, _) = self.matname(&words[1])?;
                 match read_rows(&words[2], 17) {
+                    Some(rows) if rows.first().is_some_and(Vec::is_empty) => {
+                        return Err(Stop::Refuse(format!(
+                            "read {}: a word that is not a number makes FLIRT read for ever (FSL-72)",
+                            words[2]
+                        )));
+                    }
                     Some(rows) => *self.mats(src) = rows,
                     None => self.el(&format!("Could not open file {} for reading", words[2])),
                 }
@@ -2420,6 +2436,12 @@ impl Flirt<'_> {
                 }
                 let (src, _, _) = self.matname(&words[1])?;
                 match read_rows(&words[2], 13) {
+                    Some(rows) if rows.first().is_some_and(Vec::is_empty) => {
+                        return Err(Stop::Refuse(format!(
+                            "readparams {}: a word that is not a number makes FLIRT read for ever (FSL-72)",
+                            words[2]
+                        )));
+                    }
                     Some(rows) => {
                         let mut out = Vec::new();
                         for r in rows {
@@ -2687,10 +2709,13 @@ fn sort_rows(rows: &mut [Row]) {
 /// the last incomplete one dropped; `None` when it cannot be opened.
 fn read_rows(path: &str, width: usize) -> Option<Vec<Row>> {
     let text = std::fs::read_to_string(path).ok()?;
-    let nums: Vec<f64> = text
-        .split_ascii_whitespace()
-        .map_while(|t| t.parse::<f64>().ok())
-        .collect();
+    let words: Vec<&str> = text.split_ascii_whitespace().collect();
+    let nums: Vec<f64> = words.iter().map_while(|t| t.parse::<f64>().ok()).collect();
+    if nums.len() < words.len() {
+        // A word that is not a number: FSL's stream fails without reaching its end and the
+        // loop never ends (FSL-72). The caller refuses.
+        return Some(vec![Vec::new()]);
+    }
     let mut rows: Vec<Row> = nums
         .chunks(width)
         .filter(|c| c.len() == width)
@@ -3106,6 +3131,15 @@ pub fn run(
     };
     let mut f = Flirt::new(o, mode, settings, threads, out, err);
     let r = f.main();
+    if matches!(r, Err(Stop::Exception(_))) {
+        // FSL-68: FLIRT's main catches every exception and returns 0 (rule B: a clear error).
+        let detail = if mode.fix() {
+            "the run failed: exit status 1 (FLIRT prints the message and exits with status 0)"
+        } else {
+            "the run failed and exits with status 0, as FLIRT does"
+        };
+        f.notice(&defects::FSL_68, detail);
+    }
     let notices = std::mem::take(&mut f.notices);
     let code = match r {
         Ok(()) => 0,
@@ -3113,7 +3147,7 @@ pub fn run(
         Err(Stop::Exception(e)) => {
             let t = format!("{}{}\n", e.printed_text(), e.what);
             f.e(&t);
-            0
+            u8::from(mode.fix())
         }
         Err(Stop::Abort(t)) => {
             f.e(&t);

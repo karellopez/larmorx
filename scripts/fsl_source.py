@@ -35,6 +35,7 @@ DEST = ROOT / "crates-nc" / "fsl-source"
 #: 2111.0, fsl-bet2 2111.8, fsl-utils 2203.5, fsl-avwutils 2209.3, the others the same).
 VERSIONS = {
     "fsl-mcflirt": "2111.0",
+    "fsl-flirt": "2111.4",
     "fsl-newimage": "2601.0",
     "fsl-miscmaths": "2412.6",
     "fsl-newnifti": "5.0.0",
@@ -53,6 +54,12 @@ FILES = [
     ("fsl-mcflirt", "Globaloptions.cc"),
     ("fsl-mcflirt", "Log.h"),
     ("fsl-mcflirt", "Log.cc"),
+    ("fsl-flirt", "flirt.cc"),
+    ("fsl-flirt", "globaloptions.h"),
+    ("fsl-flirt", "globaloptions.cc"),
+    ("fsl-flirt", "defaultschedule.h"),
+    ("fsl-flirt", "convert_xfm.cc"),
+    ("fsl-flirt", "flirtsch/bbr.sch"),
     ("fsl-newimage", "newimage.h"),
     ("fsl-newimage", "newimage.cc"),
     ("fsl-newimage", "newimagefns.h"),

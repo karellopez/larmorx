@@ -49,6 +49,9 @@ const FSL_TOOLS: &[(&str, ToolFn)] = &[
     ("midtrans", larmorx_nc_flirt::midtrans),
     ("pointflirt", larmorx_nc_flirt::pointflirt),
     ("applyxfm4D", larmorx_nc_flirt::applyxfm4d),
+    ("pairreg", larmorx_nc_flirt::pairreg),
+    ("extracttxt", larmorx_nc_flirt::extracttxt),
+    ("aff2rigid", larmorx_nc_flirt::aff2rigid),
 ];
 
 fn tool_names() -> String {
@@ -227,7 +230,7 @@ mod tests {
         assert_eq!(code, 0);
         assert!(out.contains("Usage: larmorx-nc <family> <tool>"), "{out}");
         assert!(
-            out.contains("fsl    mcflirt, bet, bet2, betsurf, flirt, convert_xfm, avscale, img2imgcoord, std2imgcoord, img2stdcoord, rmsdiff, makerot, midtrans, pointflirt, applyxfm4D"),
+            out.contains("fsl    mcflirt, bet, bet2, betsurf, flirt, convert_xfm, avscale, img2imgcoord, std2imgcoord, img2stdcoord, rmsdiff, makerot, midtrans, pointflirt, applyxfm4D, pairreg, extracttxt, aff2rigid"),
             "{out}"
         );
         let (code, out, err) = run_capture(&["larmorx-nc"]);

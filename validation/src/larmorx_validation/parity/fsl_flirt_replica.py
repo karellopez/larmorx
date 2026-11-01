@@ -2011,6 +2011,39 @@ def _program_cases() -> dict[str, tuple[str, str, Run]]:
         E, "out.nii.gz", "none")  # fmt: skip
     add("applyxfm4D-missing-input", "an input that does not exist (FSL aborts)", X,
         "none.nii.gz", E, "out.nii.gz", "one.mat", files=one)  # fmt: skip
+    # FLIRT's scripts (part 3): pairreg, extracttxt, aff2rigid
+    PY = (("PATH", f"{fsldir()}/bin:/usr/bin:/bin"),)  # aff2rigid runs `env fslpython`
+    add("aff2rigid-usage", "aff2rigid without arguments (its usage, exit 1)", "aff2rigid",
+        settings=PY)  # fmt: skip
+    add("aff2rigid-default", "aff2rigid of an affine standard-space matrix (numpy's arithmetic)",
+        "aff2rigid", "aff.mat", "rigid.mat", files=(("aff.mat", _AFF),), settings=PY)  # fmt: skip
+    add("aff2rigid-fmriprep", "aff2rigid of fMRIPrep's initial matrix", "aff2rigid", M,
+        "rigid.mat", settings=PY)  # fmt: skip
+    txt = "".join(f"line {k} value {k * 3}\n" for k in range(1, 13)) + "the end\n"
+    ET = "extracttxt"
+    xt = (("t.txt", txt),)
+    add("extracttxt-usage", "extracttxt with one argument (its usage, exit 255)", ET, "word")
+    add("extracttxt-rest", "the lines from the first match to the end", ET, "value", "t.txt",
+        files=xt)  # fmt: skip
+    add("extracttxt-count", "three lines from the first match", ET, "e.4", "t.txt", "3",
+        files=xt)  # fmt: skip
+    add("extracttxt-regex-start", "a regular expression, two lines, starting 2 lines after", ET,
+        "^line.[5-6]", "t.txt", "2", "2", files=xt)  # fmt: skip
+    add("extracttxt-before", "a negative relative start (lines before the match)", ET, "end$",
+        "t.txt", "4", "-3", files=xt)  # fmt: skip
+    add("extracttxt-zero-count", "zero trailing lines (sed's range ends before it starts)", ET,
+        "line.7", "t.txt", "0", files=xt)  # fmt: skip
+    add("extracttxt-line0", "a relative start reaching line 0 (sed's error, exit 1)", ET,
+        "^line.1.v", "t.txt", "2", "-1", files=xt)  # fmt: skip
+    add("extracttxt-nomatch", "a word that never matches (nothing printed, exit 0)", ET,
+        "nothing", "t.txt", files=xt)  # fmt: skip
+    add("extracttxt-missing", "a file that does not exist (grep's message, exit 0)", ET, "x",
+        "none.txt")  # fmt: skip
+    PR = "pairreg"
+    add("pairreg-usage", "pairreg with four arguments (its usage, exit 1)", PR, "a", "b", "c",
+        "d")  # fmt: skip
+    add("pairreg-default", "pairreg of the T1w and its moved copy (brains and skulls the same)",
+        PR, T, "@t1_moved.nii", T, "@t1_moved.nii", "pair.mat", "-dof", "6")  # fmt: skip
     K = "midtrans"
     mt = (("a.mat", _MT1), ("b.mat", _MT2), ("c.mat", _MT3), ("id.mat", _ID))
     add("midtrans-usage", "midtrans without transforms (its message and usage, exit 1)", K)

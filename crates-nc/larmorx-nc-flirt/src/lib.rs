@@ -31,6 +31,7 @@ pub mod pointflirt;
 pub mod rmsdiff;
 pub mod run;
 pub mod schedule;
+pub mod scripts;
 
 use std::io::Write;
 
@@ -186,4 +187,40 @@ pub fn makerot(
 ) -> u8 {
     let _ = threads;
     makerot::run(args, settings, mode, out, err)
+}
+
+/// `pairreg brain1 brain2 skull1 skull2 outputmatrix [extra flirt args]` (the script).
+pub fn pairreg(
+    args: &[String],
+    settings: &Settings,
+    mode: UpstreamDefects,
+    threads: usize,
+    out: &mut dyn Write,
+    err: &mut dyn Write,
+) -> u8 {
+    scripts::pairreg(args, settings, mode, thread_count(threads), out, err)
+}
+
+/// `extracttxt search_word file [num_trailing_lines [relative_start]]` (the script).
+pub fn extracttxt(
+    args: &[String],
+    settings: &Settings,
+    mode: UpstreamDefects,
+    threads: usize,
+    out: &mut dyn Write,
+    err: &mut dyn Write,
+) -> u8 {
+    scripts::extracttxt(args, settings, mode, threads, out, err)
+}
+
+/// `aff2rigid <input2standard mat> <output mat>` (the script).
+pub fn aff2rigid(
+    args: &[String],
+    settings: &Settings,
+    mode: UpstreamDefects,
+    threads: usize,
+    out: &mut dyn Write,
+    err: &mut dyn Write,
+) -> u8 {
+    scripts::aff2rigid(args, settings, mode, threads, out, err)
 }

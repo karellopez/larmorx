@@ -462,6 +462,8 @@ defects! {
         "spline interpolation of an integer image (char, short or int) stores the spline coefficients in the image's integer type: each deconvolution pass truncates them toward zero, so the interpolated values are those of a coarser, shifted spline";
     FSL_80 = "FSL-80", "applyxfm4D", true,
         "newimage's cache of interpolation kernels holds any two kernels of different widths the same (its comparison is not an ordering), so a sinc kernel defined after another of other widths is replaced by that one: applyxfm4D -3D's rectangular sinc kernel of width 9 becomes the default blackman kernel of width 7 defined just before it";
+    FSL_81 = "FSL-81", "aff2rigid", true,
+        "aff2rigid stops with NameError: name 'mat' is not defined (FSL 6.0.7.23 runs it on numpy 2.4.6, and numpy 2 removed the mat alias): it never writes its matrix";
     FSL_76 = "FSL-76", "makerot", true,
         "the axis is divided by the square root of its length instead of its length: for an axis that is not of unit length the rotation is by the angle times the square root of the axis's length (30 degrees about 0,0,4 give 60)";
     FSL_77 = "FSL-77", "makerot", true,

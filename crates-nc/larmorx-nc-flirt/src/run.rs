@@ -662,19 +662,7 @@ impl<'a> Flirt<'a> {
     /// `default_nonlin_params()`: the field map's scale, echo spacing times the test volume's
     /// size along the phase-encoding axis over 2 pi (negative for a reversed direction).
     fn default_nonlin(&self) -> f64 {
-        let pe = self.o.pe_dir;
-        let n = match pe.abs() {
-            1 => self.testvol.xsize(),
-            2 => self.testvol.ysize(),
-            3 => self.testvol.zsize(),
-            _ => 0,
-        } as i32;
-        let mut s =
-            (f64::from(self.o.echo_spacing * n as f32) / (2.0 * std::f64::consts::PI)) as f32;
-        if pe < 0 {
-            s *= -1.0;
-        }
-        f64::from(s)
+        nonlin_of(self.o.pe_dir, self.o.echo_spacing, &self.testvol)
     }
 
     // --------------------------------------------------------------------------------------
@@ -739,8 +727,8 @@ impl<'a> Flirt<'a> {
     /// `setup_costfn(imagepair, curcostfn, no_bins, smoothsize, fuzzyfrac)`.
     fn setup_costfn(&mut self, p: &mut Pair, ctype: CostType, bins: i32) -> R<()> {
         self.setcostfntype_on(p, ctype)?;
-        let rv = self.slot_vol(p.ref_slot).clone();
-        if let Err(f) = p.set_no_bins(&rv, bins) {
+        let rv = self.slot_vol(p.ref_slot);
+        if let Err(f) = p.set_no_bins(rv, bins) {
             return Err(match f {
                 BinsFailure::DivisionByZero => Stop::Crash(format!(
                     "flirt is killed by signal 8 (SIGFPE: an integer division by zero): {bins} histogram bins at this scale (FSL-66)"
@@ -1790,7 +1778,7 @@ impl<'a> Flirt<'a> {
 
     /// `configure_interpolation(vol)`: the final interpolation, and the pad value (`-setbackground`
     /// with zero padding, else the background value with extraslice extrapolation).
-    fn configure_interpolation(&mut self, vol: &mut Volume, bg_from: &Volume) {
+    fn configure_interpolation_bg(&mut self, vol: &mut Volume, background: f32) {
         match self.o.interpmethod {
             Interp::NearestNeighbour => vol.interp = Interpolation::NearestNeighbour,
             Interp::Sinc => {
@@ -1816,16 +1804,17 @@ impl<'a> Flirt<'a> {
             vol.padvalue = self.o.backgndval;
             vol.extrap = Extrapolation::Constpad;
         } else {
-            vol.padvalue = bg_from.backgroundval();
+            vol.padvalue = background;
             vol.extrap = Extrapolation::Extraslice;
         }
     }
 
-    /// `final_transform(testvol, refvol, finalmat, outputvol)`.
+    /// `final_transform(testvol, refvol, finalmat, outputvol)`, the reference being the run's
+    /// `refvol` (FLIRT's call passes it: `main`'s, or `do_applyxfm`'s, which that function puts
+    /// there).
     fn final_transform(
         &mut self,
         testvol: &Volume,
-        refvol: &Volume,
         finalmat: &Mat,
         outputvol: &mut Volume,
     ) -> R<()> {
@@ -1864,9 +1853,9 @@ impl<'a> Flirt<'a> {
         if self.o.debug {
             self.el("Pre bbr_resamp");
         }
-        let nl = self.default_nonlin();
-        let p = self.pair().clone();
-        let r = bbr::bbr_resamp(refvol, testvol, finalmat, nl, &p.bbr);
+        // default_nonlin_params(): the pair's test volume is this one.
+        let nl = nonlin_of(self.o.pe_dir, self.o.echo_spacing, testvol);
+        let r = bbr::bbr_resamp(&self.refvol, testvol, finalmat, nl, &self.pair().bbr);
         outputvol.data.copy_from_slice(&r.data);
         if self.o.debug {
             self.el("Post bbr_resamp");
@@ -1893,6 +1882,23 @@ impl<'a> Flirt<'a> {
             self.el(&format!("Could not open file {name} for writing"));
         }
     }
+}
+
+/// `default_nonlin_params()`: the field map's scale, `echo_spacing * N / (2 pi)` (`N` the test
+/// volume's size along the phase-encoding axis; the product in float, the quotient in double,
+/// stored as float), negative for a reversed direction.
+fn nonlin_of(pe: i32, echo_spacing: f32, testvol: &Volume) -> f64 {
+    let n = match pe.abs() {
+        1 => testvol.xsize(),
+        2 => testvol.ysize(),
+        3 => testvol.zsize(),
+        _ => 0,
+    } as i32;
+    let mut s = (f64::from(echo_spacing * n as f32) / (2.0 * std::f64::consts::PI)) as f32;
+    if pe < 0 {
+        s *= -1.0;
+    }
+    f64::from(s)
 }
 
 /// `double_end_slices(testvol)`: a single slice repeated above and below (3 slices of 8 mm), the
@@ -2772,12 +2778,24 @@ impl Flirt<'_> {
             refvol = self.resample_refvol(&refvol, &w, self.o.isoscale, false)?;
         }
         let min_sampling_ref = fmin(refvol.xdim(), fmin(refvol.ydim(), refvol.zdim()));
+        // The pair a field map would build refers to this reference (`new Costfn(refvol, ...)`).
+        self.refvol = refvol;
         if !self.o.outputfname.is_empty() {
             let mut cfg = t0.clone();
-            self.configure_interpolation(&mut cfg, &t0);
+            let bg = t0.backgroundval();
+            self.configure_interpolation_bg(&mut cfg, bg);
             let nt = testvol.tsize();
-            let mut outputvol = Volume::new(refvol.xsize(), refvol.ysize(), refvol.zsize(), nt);
-            outputvol.copy_properties(&refvol);
+            // One volume on the reference's grid, reused for every time point; a 3D input's is
+            // the output itself (FLIRT writes into the output's volumes directly).
+            let mut out_t = self.refvol.clone();
+            let mut outputvol = if nt > 1 {
+                let r = &self.refvol;
+                let mut o = Volume::new(r.xsize(), r.ysize(), r.zsize(), nt);
+                o.copy_properties(r);
+                o
+            } else {
+                empty()
+            };
             for t in 0..nt {
                 let mut vt = testvol.sub_volume(t)?;
                 if self.o.interpmethod != Interp::NearestNeighbour && self.o.interpblur {
@@ -2789,22 +2807,26 @@ impl Flirt<'_> {
                 vt.padvalue = cfg.padvalue;
                 vt.extrap = cfg.extrap;
                 if self.o.verbose >= 2 {
-                    let rv = refvol.clone();
+                    let rv = std::mem::replace(&mut self.refvol, empty());
                     self.print_volume_info(&rv, "refvol");
-                    let tv = testvol.clone();
-                    self.print_volume_info(&tv, "inputvol");
+                    self.refvol = rv;
+                    self.print_volume_info(&testvol, "inputvol");
                 }
-                let mut out_t = refvol.clone();
                 let im = self.initmat.clone();
-                self.final_transform(&vt, &refvol, &im, &mut out_t)?;
-                outputvol.set_sub_volume(t, &out_t)?;
+                self.final_transform(&vt, &im, &mut out_t)?;
+                if nt > 1 {
+                    outputvol.set_sub_volume(t, &out_t)?;
+                }
             }
-            if nt > 0 {
-                let r0 = outputvol.sub_volume(0)?;
-                outputvol.sform = r0.sform.clone();
-                outputvol.qform = r0.qform.clone();
-                outputvol.sform_code = r0.sform_code;
-                outputvol.qform_code = r0.qform_code;
+            if nt == 1 {
+                // The output's header is the reference's (what the 4D container FLIRT builds
+                // with addvolume(refvol) keeps).
+                outputvol = out_t;
+                let r = &self.refvol;
+                outputvol.sform = r.sform.clone();
+                outputvol.qform = r.qform.clone();
+                outputvol.sform_code = r.sform_code;
+                outputvol.qform_code = r.qform_code;
             }
             let outputdtype = self.output_dtype(&outputvol);
             outputvol.display_max = 0.0;
@@ -2831,8 +2853,13 @@ impl Flirt<'_> {
         self.set_basescale()?;
         self.refvol = self.get_refvol()?;
         self.get_testvol()?;
-        let (rv, tv) = (self.refvol.clone(), self.testvol.clone());
-        self.set_initmat(&rv, &tv)?;
+        // The volumes moved out for the call (no copies: FSL holds one of each).
+        let rv = std::mem::replace(&mut self.refvol, empty());
+        let tv = std::mem::replace(&mut self.testvol, empty());
+        let r = self.set_initmat(&rv, &tv);
+        self.refvol = rv;
+        self.testvol = tv;
+        r?;
         if self.refvol.sform_code != nifti::XFORM_UNKNOWN
             && self.testvol.sform_code != nifti::XFORM_UNKNOWN
             && self.o.verbose > 0
@@ -2881,9 +2908,13 @@ impl Flirt<'_> {
             if self.o.verbose >= 2 {
                 self.out.s("Subsampling the volumes\n");
             }
-            let rv = self.refvol.clone();
-            let rw = self.global_refweight.clone();
-            self.refvol = self.resample_refvol(&rv, &rw, ms, false)?;
+            // filter_image(refvol, refvol, ...): the input is replaced by the result.
+            let rv = std::mem::replace(&mut self.refvol, empty());
+            let rw = std::mem::replace(&mut self.global_refweight, empty());
+            let r = self.resample_refvol(&rv, &rw, ms, false);
+            drop(rv);
+            self.global_refweight = rw;
+            self.refvol = r?;
             self.global_sampling = ms;
             let rw = self.global_refweight.clone();
             self.global_refweight = self.filter_weight_if(&rw, Filter::ResampBlur)?;
@@ -3047,19 +3078,24 @@ impl Flirt<'_> {
             }
             self.save_matrix(&finalmat);
             if !self.o.outputfname.is_empty() {
-                let refvol = self.refvol.clone();
-                let mut newtestvol = refvol.clone();
-                let min_sampling_ref = fmin(refvol.xdim(), fmin(refvol.ydim(), refvol.zdim()));
+                // No more copies than FLIRT holds: the reference, the output on its grid, the
+                // input (blurred in place).
+                let mut newtestvol = self.refvol.clone();
+                let r = &self.refvol;
+                let min_sampling_ref = fmin(r.xdim(), fmin(r.ydim(), r.zdim()));
                 if self.o.interpmethod != Interp::NearestNeighbour && self.o.interpblur {
                     self.global_sampling = min_sampling_ref;
-                    let tv = self.testvol.clone();
+                    let tv = std::mem::replace(&mut self.testvol, empty());
                     self.testvol = self.filter(Filter::Blur, &tv);
                 }
-                let mut tv = self.testvol.clone();
-                let bg = tv.clone();
-                self.configure_interpolation(&mut tv, &bg);
-                self.testvol = tv.clone();
-                self.final_transform(&tv, &refvol, &finalmat, &mut newtestvol)?;
+                let mut tv = std::mem::replace(&mut self.testvol, empty());
+                let bg = tv.backgroundval();
+                self.configure_interpolation_bg(&mut tv, bg);
+                self.testvol = tv;
+                let tv = std::mem::replace(&mut self.testvol, empty());
+                let done = self.final_transform(&tv, &finalmat, &mut newtestvol);
+                self.testvol = tv;
+                done?;
                 if self.o.verbose >= 2 {
                     self.print_volume_info(&newtestvol, "Transformed testvol");
                 }

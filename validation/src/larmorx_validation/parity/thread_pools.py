@@ -325,10 +325,38 @@ def programs(d: Path, nc: str | None = None, *, make: bool = True) -> list[Progr
             "bet2": [t1, o + "_bet2", "-m", "-e"],
             "bet": [t1, o + "_bet", "-m"],
             "betsurf": ["--t1only", "-m", t1, o + "_bet2_mesh.vtk", str(mat), o + "_bs"],
+            # FLIRT (2026-11-01): the default schedule, and BBR (its boundary from the T1's
+            # bright core, the smoothing of the points' normals threaded).
+            "flirt": ["-in", t1, "-ref", t1, "-dof", "6", "-omat", o + "_flirt.mat"],
         }
+        fsl_bbr = [
+            "-in", t1, "-ref", t1, "-init", str(mat), "-cost", "bbr", "-wmseg", t1,
+            "-schedule", str(_bbr_schedule(d, make)), "-dof", "6", "-omat", o + "_bbr.mat",
+        ]  # fmt: skip
+        out.append(
+            Program("fsl flirt bbr (replica, larmorx-nc)", (nc, "fsl", "flirt", *fsl_bbr), omp)
+        )
+        out.append(Program("fsl convert_xfm (replica, larmorx-nc)",
+                           (nc, "fsl", "convert_xfm", "-omat", o + "_inv.mat", "-inverse",
+                            str(mat)), omp))  # fmt: skip
         for name, a in fsl.items():
             out.append(Program(f"fsl {name} (replica, larmorx-nc)", (nc, "fsl", name, *a), omp))
     return out
+
+
+def _bbr_schedule(d: Path, make: bool) -> Path:
+    """A short boundary-based schedule for FLIRT's thread probe: the identity measured and
+    optimised once at the 1 mm level."""
+    p = d / "bbr-probe.sch"
+    if not make:
+        return p
+    p.write_text(
+        "setscale 1 force\nsetoption costfunction bbr\nclear U\n"
+        "setrow UA 1 0 0 0  0 1 0 0  0 0 1 0  0 0 0 1\n"
+        "optimise 6 UA:1 0.0 0.0 0.0 0.0 0.0 0.0 0.0 rel 1\n",
+        encoding="utf-8",
+    )
+    return p
 
 
 __all__ = ["INPUTS", "Program", "descendants", "inputs", "probe", "programs", "threads"]

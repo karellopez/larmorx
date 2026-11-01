@@ -235,6 +235,77 @@ def test_larmorx_needs_no_more_memory_than_fsl(tmp_path, tool, args):
             assert _contents(f_dir) == _contents(r_dir), f"{tool} {args}"
 
 
+#: FSL's FLIRT (FSL 6.0.7.23) against ``python -m larmorx fsl flirt`` (the ``larmorx-nc``
+#: replica, 2026-11-01) on ds005040's fMRIPrep pair (a 3 mm BOLD reference and the 0.8 mm T1w
+#: brain): fMRIPrep's boundary-based call (``bbr.sch``, its white-matter mask) and a default
+#: 12-dof call, both with ``-out``. The outputs bit-identical in ``reproduce``.
+FLIRT_CASES = [
+    (
+        "bbr",
+        "-in {epi} -ref {t1} -out out -omat out.mat -basescale 1 -searchcost bbr -dof 6 "
+        "-init {init} -schedule {bbr} -wmseg {wm}",
+    ),
+    ("dof12", "-in {epi} -ref {t1} -out out -omat out.mat"),
+]
+
+
+@pytest.mark.parametrize(("name", "args"), FLIRT_CASES)
+def test_flirt_replica_needs_no_more_memory_than_fsl(tmp_path, name, args):
+    fr = pytest.importorskip("larmorx_validation.parity.fsl_flirt_replica")
+    if fr.replica_binary() is None:
+        pytest.skip("the larmorx-nc program is not built (crates-nc)")
+    if not (fr.fsldir() / "bin" / "flirt").is_file() or not Path("/usr/bin/time").is_file():
+        pytest.skip("FSL 6.0.7.23 or /usr/bin/time was not found")
+    src = fr._source_dir()
+    node = fr._bbr_node(src) if src.is_dir() else None
+    if node is None:
+        pytest.skip("the ds005040 fMRIPrep oracle run was not found")
+    bbr = node.parent
+    paths = {
+        "epi": src / "out/sub-002/func/sub-002_task-clip_run-1_desc-coreg_boldref.nii.gz",
+        "t1": next((bbr / "mask_t1w_brain").glob("*_masked.nii.gz")),
+        "wm": next((bbr / "wm_mask").glob("*.nii.gz")),
+        "init": bbr / "lta_to_fsl" / "out.mat",
+        "bbr": fr.fsldir() / "etc" / "flirtsch" / "bbr.sch",
+    }
+    words = [w.format(**{k: str(v) for k, v in paths.items()}) for w in args.split()]
+    env = {**fr._environment({}), "OMP_NUM_THREADS": "1"}
+    f_dir = tmp_path / "fsl"
+    f_dir.mkdir()
+    code, fsl_mib = _peak([str(fr.fsldir() / "bin" / "flirt"), *words], env, f_dir)
+    assert code == 0
+    for mode in ("reproduce", "fix"):
+        r_dir = tmp_path / f"larmorx-{mode}"
+        r_dir.mkdir()
+        l_env = {
+            **env,
+            "LARMORX_NC_BIN": str(fr.replica_binary()),
+            "LARMORX_UPSTREAM_DEFECTS": mode,
+            "PYTHONPATH": os.environ.get("PYTHONPATH", ""),
+        }
+        entry = entry_peak(l_env, r_dir)
+        code, mib = _peak([sys.executable, "-m", "larmorx", "fsl", "flirt", *words], l_env, r_dir)
+        assert code == 0
+        print(f"flirt {name} ({mode}): larmorx {mib:.1f} MiB, FSL {fsl_mib:.1f}, entry {entry:.1f}")
+        assert mib <= allowance(fsl_mib, entry), (
+            f"flirt {name} ({mode}): larmorx {mib:.0f} MiB, FSL {fsl_mib:.0f} MiB, "
+            f"the entry point {entry:.1f} MiB"
+        )
+        if mode == "reproduce":
+            assert _blanked(f_dir) == _blanked(r_dir), f"flirt {name}"
+
+
+def _blanked(d: Path) -> dict[str, bytes]:
+    """The files' contents with the NIfTI-1 headers' ``descrip`` blanked (FLIRT writes FSL's build
+    string there, the replica its own name)."""
+    out = {}
+    for name, raw in _contents(d).items():
+        if len(raw) >= 348 and int.from_bytes(raw[:4], "little") == 348:
+            raw = raw[:148] + b"\0" * 80 + raw[228:]
+        out[name] = raw
+    return out
+
+
 #: BET's clean-room original (``crates/larmorx-fsl``, 2026-10-30; betsurf's since 2026-10-31)
 #: on the same calls: the original's outputs are FSL's within the thresholds of its record
 #: (``docs/validation/fsl-bet.md``), its memory similar to FSL's.

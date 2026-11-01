@@ -284,10 +284,10 @@ def _yaml_string(s: str) -> str:
 def site_table(desc: dict, metrics: _Records) -> str:
     lines = ["implemented:"]
     for t in desc["tool"]:
+        lines += [f"  - eco: {t['eco']}", f"    tool: {_yaml_string(t['title'])}"]
+        if "page" in t:  # a tool whose page is not written yet is listed without a link
+            lines.append(f"    page: {t['page']}")
         lines += [
-            f"  - eco: {t['eco']}",
-            f"    tool: {_yaml_string(t['title'])}",
-            f"    page: {t['page']}",
             "    use: [" + ", ".join(_yaml_string(u) for u in t["use"]) + "]",
             f"    how: {_yaml_string(t['how'])}",
             f"    validation: {_yaml_string(render_text(t['validation'], SITE, metrics))}",

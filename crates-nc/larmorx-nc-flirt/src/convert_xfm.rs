@@ -136,7 +136,7 @@ fn print_mat(m: &Mat) -> String {
 }
 
 /// `write_ascii_matrix(mat, filename)`.
-fn write_matrix(m: &Mat, name: &str) -> Result<(), String> {
+pub(crate) fn write_matrix(m: &Mat, name: &str) -> Result<(), String> {
     let mut t = String::new();
     for r in 0..m.rows() {
         for c in 0..m.cols() {

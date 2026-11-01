@@ -30,6 +30,7 @@ from larmorx.fsl.flirt_tools import (
     avscale,
     img2imgcoord,
     img2stdcoord,
+    makerot,
     rmsdiff,
     std2imgcoord,
 )
@@ -49,6 +50,7 @@ __all__ = [
     "flirt",
     "img2imgcoord",
     "img2stdcoord",
+    "makerot",
     "read_vtk",
     "rmsdiff",
     "std2imgcoord",

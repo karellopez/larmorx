@@ -22,6 +22,7 @@
 pub mod avscale;
 pub mod convert_xfm;
 pub mod coords;
+pub mod makerot;
 pub mod options;
 pub mod pair;
 pub mod rmsdiff;
@@ -130,4 +131,17 @@ pub fn rmsdiff(
 ) -> u8 {
     let _ = threads;
     rmsdiff::run(args, settings, mode, out, err)
+}
+
+/// `makerot --theta=angle [options]`.
+pub fn makerot(
+    args: &[String],
+    settings: &Settings,
+    mode: UpstreamDefects,
+    threads: usize,
+    out: &mut dyn Write,
+    err: &mut dyn Write,
+) -> u8 {
+    let _ = threads;
+    makerot::run(args, settings, mode, out, err)
 }

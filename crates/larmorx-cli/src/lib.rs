@@ -51,6 +51,7 @@ const FSL_TOOLS: &[&str] = &[
     "std2imgcoord",
     "img2stdcoord",
     "rmsdiff",
+    "makerot",
 ];
 
 /// The AFNI tools: the clean-room originals' (`larmorx_afni::cli::TOOLS`), each with its
@@ -402,7 +403,7 @@ mod tests {
         let (code, out, _) = run_capture(&["lx", "--help"]);
         assert_eq!(code, 0);
         assert!(
-            out.contains("fsl    mcflirt, bet, bet2, betsurf, flirt, convert_xfm, avscale, img2imgcoord, std2imgcoord, img2stdcoord, rmsdiff"),
+            out.contains("fsl    mcflirt, bet, bet2, betsurf, flirt, convert_xfm, avscale, img2imgcoord, std2imgcoord, img2stdcoord, rmsdiff, makerot"),
             "{out}"
         );
         assert!(
@@ -419,7 +420,8 @@ mod tests {
                 "img2imgcoord",
                 "std2imgcoord",
                 "img2stdcoord",
-                "rmsdiff"
+                "rmsdiff",
+                "makerot"
             ]
         );
         // flirt has no original yet: `original` is an error that says so.

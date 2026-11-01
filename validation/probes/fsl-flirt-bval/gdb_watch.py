@@ -7,7 +7,7 @@ import subprocess
 import sys
 from pathlib import Path
 
-FSL = os.environ.get("FSLDIR", str(Path.home() / "fsl-6.0.7.23"))
+FSL = os.environ.get("LARMORX_FSL_623", str(Path.home() / "fsl-6.0.7.23"))  # not $FSLDIR
 cwd, addr, *args = sys.argv[1:]
 env = {
     "HOME": os.environ.get("HOME", "/tmp"),

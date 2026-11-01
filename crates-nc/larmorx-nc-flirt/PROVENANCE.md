@@ -29,6 +29,7 @@ and fMRIPrep BBR calls; `docs/findings/fsl-flirt.md`).
 | `avscale` | `avscale.cc` (part 2, 2026-11-01) | `main` (its option word, the volume's centre, the decomposition, the half transforms, `--inverteddies`, the exceptions it catches and throws again) |
 | `coords` | `img2imgcoord.cc`, `std2imgcoord.cc`, `img2stdcoord.cc` (part 2); fsl-warpfns 2501.0 `warpfns.h` | `globaloptions`, `print_usage`, `parse_command_line`, `print_info`, `main` of each; `NewimageCoord2NewimageCoord(M, src, dest, coord)` and `raw_newimagecoord2newimagecoord` without a warp field |
 | `rmsdiff` | `rmsdiff.cc` (part 2) | `main` (the low-determinant warnings, the RMS deviation about the centre of gravity, the mask's distances) |
+| `makerot` | `makerot.cc` (part 2) | the options, `do_work`, `main` (FSL-76 and FSL-77 with their switches) |
 
 ## Changes from the original
 

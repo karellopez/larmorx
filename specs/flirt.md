@@ -906,3 +906,38 @@ single precision; a singular second matrix: `RMS_DEVIATION ERROR:: Could not inv
 distance `|(M1 − M2)·(x, y, z, 1)|` (double, the norm as `√` of the sum of squares); printed are
 the largest distance (a NaN distance never replaces it) and `√(Σ d² / n)` (an empty mask: NaN,
 printed `-nan`).
+
+### 15.4 `makerot --theta=angle [options]`
+
+FSL's general option parser (as `bet2`'s, `specs/bet.md`): `-t,--theta` (compulsory, a float
+read whole: `Couldn't set_value! valstr="<word>"`), `-a,--axis` and `-c,--centre` (one word each,
+split at `,`, or at `:` when the word holds one, each piece read as `atof` reads it: `x` is 0, an
+empty piece 0), `--cov` (an image name), `-o,--out` (a file name), `-v,--verbose` (no effect),
+`-h,--help`; long options take their value after `=` only (`--theta 30`: `--theta: Missing
+non-optional argument!`); one-letter options group (`-vt 30`); a word that is not an option:
+`<word>:  is an unrecognised token!`. A parse error prints the usage, a blank line and the message
+to standard error, exit 1. `-h` prints the usage, exit 1 (help is checked first: no compulsory
+message). Without `-t`: the block `***************************************************`, `The
+following COMPULSORY options have not been set:`, each missing option's usage line, the rule again,
+then the usage, exit 1. The usage: `Part of FSL (ID: 2412.6-dirty)`, the title `makerot `,
+`Copyright(c) 2003, University of Oxford (Mark Jenkinson)`, a blank line, `Usage: `, `makerot
+[options] --theta=angle`, then the compulsory and optional options in the order `-t`, `-a`,
+`--cov`, `-c`, `-o`, `-v`, `-h` (a help text beginning `~` prints after one blank: `-a,--axis
+<ax,ay,az>	unnormalised axis vector (comma separated)`).
+
+The axis is (0, 0, 1) unless given; a zero axis (its length exactly 0): `ERROR:: Axis cannot be
+zero`, exit 1. FSL then divides the axis by **the square root of its length** (FSL-76), so the
+rotation is by `θ·√|a|`: 30 degrees about (0, 0, 4) give 60. The original divides by the length
+(rule A: the help calls the axis "unnormalised") and names FSL-76 wherever the length is not
+exactly 1; `reproduce` gives FSL's matrix. An axis or centre of **other than three values**
+(FSL-77): FSL reads past the values it was given (the vector's buffer: the default's zeros, or the
+values an earlier occurrence of the same option left there: `-a 1,2,3 -a 7` is (7, 2, 3)) and
+ignores values beyond the third; the original refuses it by default (rule B, a message naming
+FSL-77, exit 1) and reads as FSL does with `reproduce` (named). The centre is (0, 0, 0) unless
+given; `--cov` replaces it by `((n − 1)·d·0.5)` along each axis of the image (size `n`, voxel size
+`d`, in double), whatever `-c` says; an image that cannot be read throws newimage's exception
+(signal 6; the original exits 1 after the same text). The matrix is §8.5's rotation (`make_rot`)
+about the axis scaled by `θ·π/180` (in double, element by element: `((a·θ)·π)/180`) through the
+centre. With `-o` it is written as FLIRT writes matrices (§9.1; a file that cannot be opened:
+`Could not open file <name> for writing`, exit 0); otherwise printed (§15's matrix layout) and
+followed by a blank line. Exit 0.

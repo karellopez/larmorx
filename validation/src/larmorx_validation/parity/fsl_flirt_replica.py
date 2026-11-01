@@ -268,6 +268,9 @@ def fix_pass(
         others = []
         if r.code != reproduced.code:
             others.append(f"exit {reproduced.code} -> {r.code}")
+        if r.stdout != reproduced.stdout:
+            # the programs whose results are printed (avscale, rmsdiff, makerot, ...)
+            others.append("standard output")
         a = {k: v for k, v in _files(reproduced_dir, set()).items()}
         b = {k: v for k, v in _files(tmp, set()).items()}
         if set(a) != set(b):
@@ -504,6 +507,13 @@ def _prepare(run: Run, tmp: Path) -> list[str]:
             if not dst.exists():
                 _constant_image(dst, shape, vox, kind == "noform")
             out.append(name)
+        elif "=@" in a and a.startswith("-"):
+            # a long option's value, an input (--cov=@epi.nii)
+            base = base or inputs()
+            key, name = a.split("=@", 1)
+            if not (tmp / name).exists():
+                shutil.copy(base / name, tmp / name)
+            out.append(f"{key}={name}")
         elif a.startswith("@"):
             base = base or inputs()
             name = a[1:]
@@ -1824,7 +1834,8 @@ _COORDS = "10 20 30\n0 0 0\n-5.5 3.25 100\n1e3 2 3\n"
 
 
 def _program_cases() -> dict[str, tuple[str, str, Run]]:
-    """avscale, img2imgcoord, std2imgcoord, img2stdcoord and rmsdiff: one case per path."""
+    """avscale, img2imgcoord, std2imgcoord, img2stdcoord, rmsdiff and makerot: one case per
+    path."""
     c: dict[str, tuple[str, str, Run]] = {}
     st = "standard"
     E, T, W, M = "@epi.nii", "@t1.nii", "@wm.nii", "@init.mat"
@@ -1904,6 +1915,31 @@ def _program_cases() -> dict[str, tuple[str, str, Run]]:
     add("rmsdiff-missing-matrix", "a matrix file that does not exist", R, "none.mat", M, E)
     add("rmsdiff-4d", "a 4D reference (its first volume, the warning)", R, M, "aff.mat",
         "@bold4.nii", files=(("aff.mat", _AFF),))  # fmt: skip
+    K = "makerot"
+    add("makerot-usage", "makerot without arguments (the compulsory -t, its usage, exit 1)", K)
+    add("makerot-help", "makerot -h (its usage, exit 1)", K, "-h")
+    add("makerot-default", "30 degrees about z through the origin", K, "-t", "30", tier="smoke")
+    add("makerot-axis-centre", "an axis that is not of unit length (FSL-76) through a centre",
+        K, "-t", "30", "-a", "1,2,3", "-c", "4,5,6")  # fmt: skip
+    add("makerot-long", "the long options with their values after =", K, "--theta=-45.5",
+        "--axis=0,0,4", "--centre=1:2:3")  # fmt: skip
+    add("makerot-cov", "the centre of an image's volume (--cov)", K, "-t", "20", "-a", "0,1,1",
+        f"--cov={E}")  # fmt: skip
+    add("makerot-cov-missing", "--cov of a file that is not an image (FSL aborts)", K, "-t",
+        "20", "--cov=none.nii")  # fmt: skip
+    add("makerot-zero-axis", "a zero axis (its error, exit 1)", K, "-t", "10", "-a", "0,0,0")
+    add("makerot-short-axis", "an axis of one value (FSL-77: the buffer's zeros)", K, "-t", "30",
+        "-a", "5")  # fmt: skip
+    add("makerot-stale-axis", "the axis given twice, the second of one value (FSL-77: the "
+        "first's values)", K, "-t", "30", "-a", "1,2,3", "-a", "7")  # fmt: skip
+    add("makerot-bad-theta", "a theta that is not a number (Couldn't set_value, exit 1)", K, "-t",
+        "abc")  # fmt: skip
+    add("makerot-out", "the matrix written to a file (-o)", K, "-t", "30", "-a", "1,1,0", "-o",
+        "out.mat")  # fmt: skip
+    add("makerot-out-unwritable", "an output file that cannot be written (the message, exit 0)",
+        K, "-t", "30", "-o", "nodir/out.mat")  # fmt: skip
+    add("makerot-token", "a word that is not an option (unrecognised token, exit 1)", K, "-t",
+        "30", "extra")  # fmt: skip
     return c
 
 

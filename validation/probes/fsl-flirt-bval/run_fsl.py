@@ -10,7 +10,7 @@ import subprocess
 import sys
 from pathlib import Path
 
-FSL = os.environ.get("FSLDIR", str(Path.home() / "fsl-6.0.7.23"))
+FSL = os.environ.get("LARMORX_FSL_623", str(Path.home() / "fsl-6.0.7.23"))  # not $FSLDIR
 NC = os.environ.get(
     "LARMORX_NC_BIN",
     str(Path(__file__).resolve().parents[3] / "crates-nc/target/release/larmorx-nc"),

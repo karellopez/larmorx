@@ -5,7 +5,7 @@ default), with the lines the programs print (``-v``) placed in time: where each 
 is reached.
 
 Usage: python -P rsstrace.py <work dir> <flirt arguments; @name copies the suite's input name>
-(``LARMORX_NC_BIN`` the replica's program; ``FSLDIR`` FSL 6.0.7.23, ``~/fsl-6.0.7.23`` by default;
+(``LARMORX_NC_BIN`` the replica's program; ``LARMORX_FSL_623`` FSL 6.0.7.23, ``~/fsl-6.0.7.23`` by default;
 ``LARMORX_FLIRT_INPUTS`` the parity suite's derived inputs, ``<workspace>/oracles/inputs/
 fsl-flirt-replica`` by default).
 """
@@ -19,7 +19,7 @@ import threading
 import time
 from pathlib import Path
 
-FSL = os.environ.get("FSLDIR", str(Path.home() / "fsl-6.0.7.23"))
+FSL = os.environ.get("LARMORX_FSL_623", str(Path.home() / "fsl-6.0.7.23"))  # not $FSLDIR
 NC = os.environ["LARMORX_NC_BIN"]
 INPUTS = Path(
     os.environ.get(

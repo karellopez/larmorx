@@ -280,6 +280,34 @@ def draw_rmsdiff(d: gen.Draw) -> dict:
     return {"groups": groups, "inputs": inputs, "options": options, "extra": {"tool": "rmsdiff"}}
 
 
+def _values(d: gen.Draw, name: str, n: int) -> str:
+    """``n`` comma-separated numbers (``:`` sometimes), as makerot's vector options take them."""
+    pool = ("0", "1", "-1", "2", "0.5", "-3.25", "4", "1e-3", "10", "-0.7")
+    vals = [d.choice(f"{name}{k}", pool) for k in range(n)]
+    return (":" if d.chance(f"{name}:", 0.15) else ",").join(vals)
+
+
+def draw_makerot(d: gen.Draw) -> dict:
+    theta = d.choice("theta", ("30", "-45.5", "0", "90", "180", "1e-7", "359", "720", "-10"))
+    long = d.chance("long", 0.3)
+    groups = [required("theta", f"--theta={theta}" if long else "-t", *(() if long else (theta,)))]
+    options = []
+    for key, short, lng in (("axis", "-a", "--axis"), ("centre", "-c", "--centre")):
+        if d.chance(key, 0.7 if key == "axis" else 0.5):
+            n = d.choice(f"{key} count", (3, 1, 2, 4), (8, 1, 1, 1))
+            v = _values(d, key, n)
+            words = (f"{lng}={v}",) if d.chance(f"{key} long", 0.3) else (short, v)
+            groups.append(group(key, *words))
+            options.append(f"{short} ({n} values)")
+    if d.chance("-o", 0.3):
+        groups.append(group("-o", "-o", "out.mat"))
+        options.append("-o")
+    if d.chance("-v", 0.1):
+        groups.append(group("-v", "-v"))
+        options.append("-v")
+    return {"groups": groups, "inputs": {}, "options": options, "extra": {"tool": "makerot"}}
+
+
 def draw_apply(d: gen.Draw) -> dict:
     four = d.chance("4D", 0.25)
     ref = _image(d.child("ref"))
@@ -338,6 +366,7 @@ DRAWS = {
     "avscale": draw_avscale,
     "coords": draw_coords,
     "rmsdiff": draw_rmsdiff,
+    "makerot": draw_makerot,
 }
 
 
@@ -348,8 +377,10 @@ def draw(d: gen.Draw) -> dict:
 
 
 def draw_programs(d: gen.Draw) -> dict:
-    """Part 2's new paths only: FLIRT's other programs and quaternion registrations."""
-    kind = d.choice("kind", ("quaternion", "avscale", "coords", "rmsdiff"), (1, 1, 2, 1))
+    """Part 2's new paths only: FLIRT's other programs (makerot among them) and quaternion
+    registrations."""
+    kinds = ("quaternion", "avscale", "coords", "rmsdiff", "makerot")
+    kind = d.choice("kind", kinds, (1, 1, 2, 1, 1))
     if kind == "quaternion":
         body = draw_register(d)
         if "-anglerep quaternion" not in body["options"]:

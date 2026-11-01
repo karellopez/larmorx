@@ -1,7 +1,7 @@
 # SPDX-License-Identifier: Apache-2.0
 """FLIRT's other programs: ``avscale`` (an affine matrix decomposed), ``img2imgcoord``,
-``std2imgcoord`` and ``img2stdcoord`` (coordinates mapped between images) and ``rmsdiff`` (the
-deviation between two matrices), FSL 6.0.7.23's.
+``std2imgcoord`` and ``img2stdcoord`` (coordinates mapped between images), ``rmsdiff`` (the
+deviation between two matrices) and ``makerot`` (a rotation matrix), FSL 6.0.7.23's.
 
 Each runs the bit-exact replica from ``larmorx-nc`` as a separate program (``docs/licensing.md``);
 the clean-room originals are to be written from ``specs/flirt.md``, so
@@ -20,6 +20,7 @@ from typing import Any
 import numpy as np
 
 from larmorx import _replica
+from larmorx._defects import UpstreamDefectsName
 from larmorx._replica import ImplementationName
 from larmorx.fsl.bet import _write_image
 from larmorx.fsl.flirt import _matrix_file, _run
@@ -29,6 +30,7 @@ __all__ = [
     "avscale",
     "img2imgcoord",
     "img2stdcoord",
+    "makerot",
     "rmsdiff",
     "std2imgcoord",
 ]
@@ -255,3 +257,41 @@ def rmsdiff(
     if mask is None:
         return values[0]
     return values[0], values[1]
+
+
+def makerot(
+    theta: float,
+    axis: Any = None,
+    centre: Any = None,
+    *,
+    cov: Any = None,
+    upstream_defects: UpstreamDefectsName = "fix",
+    implementation: ImplementationName = "auto",
+) -> np.ndarray:
+    """FSL's ``makerot``: the 4 x 4 matrix of a rotation by ``theta`` degrees about ``axis``
+    (three values of any length, z by default) through ``centre`` (mm, the origin by default),
+    or through the centre of the image ``cov`` (half its extent in mm). The axis is divided by
+    its length (FSL divides by the square root of it, FSL-76; ``upstream_defects="reproduce"``
+    gives FSL's matrix); an axis or centre of other than three values is an error here (FSL-77
+    is about the command line, where one word holds them)."""
+    selected = _replica.select("fsl", "makerot", implementation)
+    assert selected is not None
+
+    def three(v: Any, what: str) -> str:
+        a = np.asarray(v, dtype=np.float64).ravel()
+        if a.shape != (3,):
+            raise ValueError(f"{what} must hold three values, not {a.size}")
+        return ",".join(repr(float(x)) for x in a)
+
+    with tempfile.TemporaryDirectory(prefix="larmorx-makerot-") as tmp:
+        args = [f"--theta={float(theta)!r}"]
+        if axis is not None:
+            args.append("--axis=" + three(axis, "axis"))
+        if centre is not None:
+            args.append("--centre=" + three(centre, "centre"))
+        if cov is not None:
+            args.append("--cov=" + _image_file(cov, tmp, "cov"))
+        out = os.path.join(tmp, "rot.mat")
+        args += ["-o", out]
+        _run(selected, args, tmp, 1, upstream_defects)
+        return np.loadtxt(out)

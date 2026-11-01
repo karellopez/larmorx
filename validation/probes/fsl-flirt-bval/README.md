@@ -6,7 +6,7 @@ background value (`calc_bval`), and the tools to repeat it (`docs/findings/fsl-f
 - `mk_crash.py <dir> <in shape> <in voxel> <ref shape> <ref voxel> [value]` writes two constant
   float32 images (`in.nii`, `ref.nii`), e.g. `1x1x1 2.5x2.5x2.5 8x1x1 1x1.5x0.5` (FSL segfaults).
 - `run_fsl.py <dir> [--gdb] [--replica[=fix|reproduce]] <program> <args...>` runs FSL's program
-  (`FSLDIR`, default `~/fsl-6.0.7.23`), the replica (`LARMORX_NC_BIN`), or FSL under `gdb` (its
+  (`LARMORX_FSL_623`, default `~/fsl-6.0.7.23`; not `$FSLDIR`), the replica (`LARMORX_NC_BIN`), or FSL under `gdb` (its
   backtrace: the crash is in a later `free`).
 - `gdb_watch.py <dir> <address> <flirt args...>` runs FSL's flirt under `gdb` with a hardware
   watchpoint (`watch -l`) on one heap word and prints a backtrace at every write: give it the

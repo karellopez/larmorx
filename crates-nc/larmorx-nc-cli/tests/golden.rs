@@ -431,6 +431,7 @@ const PRINTING: &[&str] = &[
     "fsl std2imgcoord",
     "fsl img2stdcoord",
     "fsl rmsdiff",
+    "fsl makerot",
 ];
 
 const BET_CASES: &[BetCase] = &[
@@ -678,6 +679,15 @@ const BET_CASES: &[BetCase] = &[
         args: &["{init}", "{mat}", "{t1}", "{mask}"],
         mode: "fix",
         named: &[],
+        output_type: "NIFTI",
+    },
+    // makerot: an axis that is not of unit length (FSL-76 corrected) through a centre
+    BetCase {
+        id: "makerot.axis-centre",
+        tool: "fsl makerot",
+        args: &["-t", "30", "-a", "1,2,3", "-c", "4,5,6"],
+        mode: "fix",
+        named: &["FSL-76"],
         output_type: "NIFTI",
     },
     // FSL 6.0.7.23's bet2 --binaryMask: the surface from a mask, the outputs from the input;

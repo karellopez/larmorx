@@ -1,7 +1,8 @@
 // SPDX-License-Identifier: LicenseRef-FSL
 // Copyright 2026 Karel Lopez Vilaret (the translation).
 //! FSL's command-line options (fsl-utils 2203.5: `options.h`, `parse.cc`, `usage.cc`,
-//! `functions.cc`, `matches.cc`), as `bet2` and `betsurf` parse them.
+//! `functions.cc`, `matches.cc`; `check.cc`'s compulsory options), as `bet2`, `betsurf` and
+//! `makerot` parse them.
 //!
 //! What the parser does (and so what the replica does):
 //! - options are scanned from a given position; a word that does not start with `-` stops the
@@ -16,6 +17,10 @@
 //! - a value that does not read as a number is an error naming it and the word after it
 //!   (`Couldn't set_value! valstr="<value> <next word>"`), except for an option that was set
 //!   before, or a multi-value option whose last value reads (FSL keeps the numeric prefix);
+//! - a `std::vector<float>` option's value is one word split at `,` (at `:` when the word holds
+//!   one), each piece read with `atof` (no check: `x` is 0), the vector cleared first: its old
+//!   buffer is kept, so reading past the new values reads what an earlier value (or the default)
+//!   left there ([`OptState::floats_buffer`]);
 //! - `usage()` prints the title, the example and every visible option to standard error.
 
 use crate::cnum;
@@ -35,6 +40,7 @@ pub enum Kind {
     Float,
     Int,
     Str,
+    FloatVec,
 }
 
 /// An option's value.
@@ -44,6 +50,8 @@ pub enum Value {
     Float(f32),
     Int(i32),
     Str(String),
+    /// `std::vector<float>`: its values.
+    FloatVec(Vec<f32>),
 }
 
 /// One option: its keys (`-v,--verbose`), default, help text, and argument requirements.
@@ -64,6 +72,7 @@ impl Opt {
             Value::Float(_) => Kind::Float,
             Value::Int(_) => Kind::Int,
             Value::Str(_) => Kind::Str,
+            Value::FloatVec(_) => Kind::FloatVec,
         }
     }
 
@@ -100,6 +109,9 @@ pub struct OptState {
     pub value: Value,
     /// The values of a multi-value option (`valuevec_`).
     pub values: Vec<Value>,
+    /// A `std::vector<float>` option's buffer: every position any value (or the default) has
+    /// written, in order; the vector's own values are its first [`OptState::floats`].
+    pub buffer: Vec<f32>,
 }
 
 impl OptState {
@@ -128,6 +140,21 @@ impl OptState {
         }
     }
 
+    /// A `std::vector<float>` option's values.
+    pub fn floats(&self) -> &[f32] {
+        match &self.value {
+            Value::FloatVec(v) => v,
+            _ => &[],
+        }
+    }
+
+    /// `value()[k]` of a `std::vector<float>` option for `k < n`, read as libstdc++ reads it:
+    /// past the values, what the vector's buffer still holds (a value parsed earlier, or the
+    /// default's). `None`: beyond anything written (memory the vector never wrote).
+    pub fn floats_buffer(&self, n: usize) -> Option<Vec<f32>> {
+        (self.buffer.len() >= n).then(|| self.buffer[..n].to_vec())
+    }
+
     /// `value(n)` of a multi-value option.
     pub fn float_at(&self, n: usize) -> f32 {
         match self.values.get(n) {
@@ -149,6 +176,18 @@ fn string_to_t(kind: Kind, s: &str) -> (Value, bool) {
         Kind::Int => {
             let (v, end) = cnum::strtol(s, 0);
             (Value::Int(v as i32), end == s.len())
+        }
+        Kind::FloatVec => {
+            // string_to_T(vector<float>&, s): split at ',' (':' when present), atof each piece
+            let delin = if s.contains(':') { ':' } else { ',' };
+            let mut rest = format!("{s}{delin}");
+            let mut v = Vec::new();
+            while !rest.is_empty() {
+                let p = rest.find(delin).unwrap_or(rest.len());
+                v.push(cnum::strtod(&rest[..p]).0 as f32);
+                rest = rest[(p + 1).min(rest.len())..].to_owned();
+            }
+            (Value::FloatVec(v), true)
         }
     }
 }
@@ -194,6 +233,10 @@ impl OptionParser {
                 set: false,
                 value: o.default.clone(),
                 values: Vec::new(),
+                buffer: match &o.default {
+                    Value::FloatVec(v) => v.clone(),
+                    _ => Vec::new(),
+                },
             })
             .collect()
     }
@@ -280,6 +323,16 @@ impl OptionParser {
         }
         if n == 1 {
             let (v, ok) = string_to_t(o.kind(), vs);
+            if let Value::FloatVec(new) = &v {
+                // clear() keeps the buffer; push_back writes from its start
+                for (k, x) in new.iter().enumerate() {
+                    if k < st.buffer.len() {
+                        st.buffer[k] = *x;
+                    } else {
+                        st.buffer.push(*x);
+                    }
+                }
+            }
             st.value = v;
             if ok {
                 st.set = true;
@@ -351,6 +404,29 @@ impl OptionParser {
             states,
             stop: optpos,
         })
+    }
+
+    /// `check_compulsory_arguments(true)`: the text it prints for the compulsory options that
+    /// were not set, or `None` when every one was.
+    pub fn check_compulsory(&self, parsed: &Parsed) -> Option<String> {
+        let unset: Vec<&Opt> = self
+            .opts
+            .iter()
+            .zip(&parsed.states)
+            .filter(|(o, st)| o.compulsory && !st.set)
+            .map(|(o, _)| o)
+            .collect();
+        if unset.is_empty() {
+            return None;
+        }
+        let rule = "***************************************************\n";
+        let mut s = format!("{rule}The following COMPULSORY options have not been set:\n");
+        for o in unset {
+            s.push_str(&o.usage_line());
+            s.push('\n');
+        }
+        s.push_str(rule);
+        Some(s)
     }
 
     /// `usage()` (to standard error).

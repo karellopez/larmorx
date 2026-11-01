@@ -198,6 +198,12 @@ pub const REPLICAS: &[Replica] = &[
         location: Location::Program(&LARMORX_NC),
         original: false,
     },
+    Replica {
+        family: "fsl",
+        tool: "makerot",
+        location: Location::Program(&LARMORX_NC),
+        original: false,
+    },
 ];
 
 /// The tools of `family` that have a replica and no clean-room original yet: the command line
@@ -654,7 +660,8 @@ mod tests {
                 "img2imgcoord",
                 "std2imgcoord",
                 "img2stdcoord",
-                "rmsdiff"
+                "rmsdiff",
+                "makerot"
             ]
         );
         let betsurf = lookup("fsl", "betsurf").unwrap();

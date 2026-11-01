@@ -92,6 +92,8 @@ something undefined or questionable, and what larmorx does. Each entry says how 
 | FSL-73 | `-pedir` without a field map read (no `-fieldmap`, or `-applyxfm`, which never reads it): an empty field map interpolated | a | — | refused, both modes |
 | FSL-74 | the usage lists `-displayinit` (the option is `-printinit`) and leaves `woods` out of `-cost` | f | — | the same text (messages kept) |
 | FSL-75 | newimage's `calc_bval` (the background value, edge width 2) sizes its buffer too small for an image 3 voxels wide along x (with y or z ≥ 2), or along y (z ≥ 2, x not 2 or 4), and empty for 1 × 1 × 1: heap overflow (the percentile of the values that fit), or a read of an empty vector's first element | a | — | rule A: the whole border's percentile by default, FSL's values that fit with `reproduce`, named in both; 1 × 1 × 1 refused in both modes (rule B; part 2) |
+| FSL-76 | makerot divides its axis by the square root of its length (`ax / sqrt(norm2(ax))`, `norm2` being the length): for an axis that is not of unit length the rotation is by `θ·√|a|` (30 degrees about 0,0,4 give 60; the help calls the axis "unnormalised") | a | — | rule A: divided by its length by default, FSL's with `reproduce`, named (part 2) |
+| FSL-77 | makerot reads `axis.value()[0..2]` and `centre.value()[0..2]` whatever their sizes: fewer than three values read past the vector (its buffer: the default's zeros, or an earlier occurrence's values: `-a 1,2,3 -a 7` is 7,2,3), more are ignored | a | — | rule B: refused by default (a message naming FSL-77); FSL's reading with `reproduce`, named (part 2) |
 
 FSL-21 and FSL-66 are mcflirt's entries; FLIRT meets them through `-bins` (each scale has
 `trunc(bins/scale)` bins). FSL-09, FSL-11, FSL-14, FSL-56 are the shared ones of FSL's libraries.
@@ -190,6 +192,12 @@ the trial's memory agrees, in its shrunk and drawn forms; the 6 that did not are
   background values now take the NaN order by mode (last by default, libstdc++'s with
   `reproduce`) and name FSL-22 wherever a border holds NaN (`_SILENT`: the padding may not show).
   Permanent case `background-nan-order`.
+- **makerot** (part 2): FSL-76 and FSL-77 above; every other path of the 50 probe calls (the
+  usage, `-h`, the compulsory `-t`, parse errors, long options after `=`, `:` as separator, `atof`'s
+  pieces, `--cov`, a zero axis, `-o` and an unwritable file, an image that cannot be read: signal 6)
+  gives FSL's text and files. Left open: three calls with a NaN or infinite angle or axis, where
+  FSL prints `nan` and the replica `-nan` in some rows (the NaN's sign through `make_rot`'s
+  products; part 3).
 - **Quaternion messages: one missing** (trial-flirt-programs-00219 and the like: 1720 lines of
   `Parameters do not form a valid axis` against FSL's 1721). FLIRT's `optimise` builds the starting
   matrix (`vector2affine(params, no_params, affmattst)`) at every verbosity and prints it only from
@@ -252,8 +260,10 @@ differently:
 
 Not refused but not yet compared with FSL: `-debug`'s other volumes (the pyramid, the weights; the
 1 × 1 × 1 weight volumes FSL filters from empty ones).
-- The other programs of fsl-flirt: `applyxfm4D` (templated over the input's type, sinc `b`/7 in
-  4D and `r`/9 in 3D), `makerot` (fsl-utils' `Option<vector<float>>`; its axis is divided by the
-  square root of its norm, `ax / sqrt(norm2(ax))`: a wrong angle unless the axis is unit length, a
-  defect to register), `midtrans` and `pointflirt` (Armadillo's `svd`: LAPACK `dgesdd`, shared with
-  the pseudo-inverse above).
+- The other programs of fsl-flirt: `applyxfm4D` (templated over the input's type: the volumes
+  read, interpolated and written in it, sinc `b`/7 in 4D and `r`/9 in 3D, at most 10001 volumes,
+  the matrix names built from characters past `9` beyond volume 9999, `-userprefix`/`-interp` as
+  the last word read `argv[argc]`), `midtrans` and `pointflirt` (Armadillo's `svd`: LAPACK
+  `dgesdd`, shared with the pseudo-inverse above).
+- makerot's NaN signs: with a NaN or infinite angle or axis FSL prints `nan` where the replica
+  prints `-nan` in some rows (which NaN `make_rot`'s products and divisions carry through).

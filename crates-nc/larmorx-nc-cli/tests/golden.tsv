@@ -2,8 +2,9 @@
 # Golden checksums of the larmorx-nc replicas (tests/golden.rs): SHA-256 of the files
 # larmorx-nc writes on Linux x86_64 (images by header and data, with sampled values).
 # Every platform must reproduce them (docs/validation/golden.md). Do not edit by hand.
-# Recorded from 76520c356b5554e2bf3bbef12b01dc11886c0a37 on 2026-11-01 (Linux x86_64)
+# Recorded from 2979df4fadbd2f3e61e8d51d3044731bcb10ce18 on 2026-11-01 (Linux x86_64)
 # case	output	sha256	type	sample
+avscale.allparams	stdout.txt	2268384b9c7b54fe5a9ce2c1db4dbb2edc22278f7f093eaf5ca15599e9f0a47b	-	-
 bet.fmri	out.nii.data	fdb80b59230e2a6935591185abccce90349f1b3f64fa343f210c8a99bfa7abf4	float32	0000008000000000000000000000000000000000000000000000008000000000
 bet.fmri	out.nii.header	b219a1a8be7ebc37ac08f7769e7cb523d4693ce806053da5ddb326e38e78c057	-	-
 bet.fmri	out_mask.nii.data	6c25fe88cd518a48b9ea50bce466232fd9977a2e799472ea7758b9ba323ae661	float32	0000000000000000000000000000000000000000000000000000000000000000
@@ -96,7 +97,11 @@ flirt.int16-out	out.nii.header	351b4ff1505655295660de6f98fdd338799ee74da742d87c2
 flirt.int16-out.reproduce	out.nii.data	76df1a9f94e56988113c6eb13e9e31201a6661dff6cbdb16a047560ceb76a10a	int16	faff09001200cb0056020800cb00faff
 flirt.int16-out.reproduce	out.nii.header	351b4ff1505655295660de6f98fdd338799ee74da742d87c22aacb9873f1dd62	-	-
 flirt.normmi-dof6	out.mat	4d33ffe262d3b8bfcdbe68b37eefdf71f79b147bb1d61fd9ce8d5ac48db5e4be	-	-
+flirt.quaternion-dof6	out.mat	bb5d972eb83514cf44207de1b7127e26a95a9a738c280ca892674ef6e9ad43b1	-	-
 flirt.weights-leastsq	out.mat	5d8f6b2db3e4bf7ea3880b1bf81c760cd3937e1963b3b759d3bfa7ebe38944de	-	-
+img2imgcoord.vox	stdout.txt	ac0d42f206b3ed99453b7c37b6376ee80645382ca5c4e5c633226bb9a1b6e46d	-	-
+img2stdcoord.mm	stdout.txt	24f2b44d79759dc1512e141bbb7ae252095b42d718d0cd8f69f7698b3069e360	-	-
+makerot.axis-centre	stdout.txt	0f57bb43172017ef7fb2206b73a0caf421787ef040ac891804c867aa392e4b78	-	-
 mcflirt.2d.slab	mcflirt.2d.slab.mat/MAT_0000	633321b8478677454c33d3e82c9de5c297714b8f258fde08d8db42db06ec802f	-	-
 mcflirt.2d.slab	mcflirt.2d.slab.mat/MAT_0001	8795c62cc2ad469560c04bb9ab443d63c187836bf092a312f22b39c9e8e429ae	-	-
 mcflirt.2d.slab	mcflirt.2d.slab.mat/MAT_0002	c8b0554af656ea054e53ac2ee9023b9f4696328457ff4cfaa04182bbf2404c6c	-	-
@@ -302,3 +307,5 @@ mcflirt.woods.stages1	mcflirt.woods.stages1.mat/MAT_0002	c8b0554af656ea054e53ac2
 mcflirt.woods.stages1	mcflirt.woods.stages1.mat/MAT_0003	938c4c7206bae280c1804d89416dffaeca036fff40939f9fbe1024b0717549f7	-	-
 mcflirt.woods.stages1	mcflirt.woods.stages1.nii.data	4f719879fece9cbe7d0c509c260c0afbb88ba5a34e2f861ea84a1150a1743cbc	float32	0000a040022a5a41c48ff040be0ccf40000020400000b0401ff86341bd4c4341
 mcflirt.woods.stages1	mcflirt.woods.stages1.nii.header	c5adb0b5bc888dd50644619e1b10d9b221c3ee59132fff6dcebfcbfbf16316ec	-	-
+rmsdiff.mask	stdout.txt	2e81dd5eabd135a7b966654e55fd992abe804f2587e6deef20c5cde4613ff327	-	-
+std2imgcoord.vox	stdout.txt	07908ca571e5989c86273e01888d6da9ae8dc59d79d7fee6117331f9633fac5f	-	-

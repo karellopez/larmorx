@@ -173,7 +173,8 @@ the trial's memory agrees, in its shrunk and drawn forms; the 6 that did not are
   -03718 FSL 6.3 GiB, the replica 5.9 (identical matrices); -03183 both run over 30 minutes;
   -01768 and -03192 both stopped by a 64 GiB box at 24 to 43 GiB; -02317 FSL segfaults at 8.9 GiB
   (a 3-voxel level: FSL-75). The second trial's quaternion runs over 3 GiB need more than 20 GiB in
-  FSL as in the replica (-2-01831: both stopped at 20 GiB; -2-01944: FSL too). Not a difference:
+  FSL (each stopped by a 20 GiB box), and in the replica on two of them (-2-01831, -2-02240); on
+  -2-01944 the replica finishes at 19.0 GiB. Not a difference:
   both programs need more than the trial's budget; they belong to the final validation phase's
   heavy cases.
 - **The replica's peak memory above FSL's on large references** (found measuring trial-flirt-01374,

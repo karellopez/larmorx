@@ -184,10 +184,12 @@ def compare(
         # heap (its later messages and files are those of undefined behaviour) until the C
         # library or the kernel stopped it. The replica goes on with the values FSL's buffer
         # holds (or refuses the empty buffer of a single voxel), naming the entry.
+        # (going on, the replica ends as FLIRT would without the corruption: exit 0, or an
+        # error FLIRT meets later, such as an output type it cannot write)
         checks(
             f"{program} is killed after FSL-75's heap corruption; the replica "
-            + ("refuses (exit 1)" if refused_75 else "finishes and names FSL-75 (exit 0)"),
-            replica.code == (1 if refused_75 else 0),
+            + ("refuses (exit 1)" if refused_75 else "goes on and names FSL-75"),
+            replica.code == 1 if refused_75 else replica.code >= 0,
             detail=f"{program} signal {-oracle.code}, replica {replica.code}",
         )
         return 0, 0

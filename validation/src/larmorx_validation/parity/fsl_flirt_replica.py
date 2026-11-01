@@ -77,7 +77,7 @@ STANDARD_RUNS = (
 #: The run the real cases' images come from.
 SOURCE_RUN = "ds005040-sub-002-noreconall"
 #: Named whenever an input holds NaN or infinite values, which may lie outside the cost's points.
-_SILENT = ("FSL-14",)
+_SILENT = ("FSL-14", "FSL-75")
 
 
 # ------------------------------------------------------------------------------------------------
@@ -175,16 +175,19 @@ def compare(
     replica_dir: Path,
 ) -> tuple[int, int]:
     """Exit status, streams, files and bytes; returns (identical files, files)."""
-    if oracle.code < 0 and any(
+    refused_75 = any(
         ln.startswith(f"{REPLICA_PREFIX} error:") and "FSL-75" in ln
         for ln in replica.stderr.splitlines()
-    ):
+    )
+    if oracle.code < 0 and (refused_75 or "FSL-75" in defects.notices_in(replica.stderr)):
         # FSL-75: FSL wrote past a buffer (or read an empty one); it went on with a corrupted
         # heap (its later messages and files are those of undefined behaviour) until the C
-        # library or the kernel stopped it. The replica refuses where FSL went wrong.
+        # library or the kernel stopped it. The replica goes on with the values FSL's buffer
+        # holds (or refuses the empty buffer of a single voxel), naming the entry.
         checks(
-            f"{program} is killed after FSL-75's heap corruption; the replica refuses (exit 1)",
-            replica.code == 1,
+            f"{program} is killed after FSL-75's heap corruption; the replica "
+            + ("refuses (exit 1)" if refused_75 else "finishes and names FSL-75 (exit 0)"),
+            replica.code == (1 if refused_75 else 0),
             detail=f"{program} signal {-oracle.code}, replica {replica.code}",
         )
         return 0, 0
@@ -446,9 +449,11 @@ class Run:
     hang: str = ""
     aslimit: str = ""
     #: FSL crashes on this case (the register entry: undefined behaviour, a signal), never
-    #: cached; the replica must refuse in both modes. FSL's last messages (the C library's heap
-    #: diagnostics) are not compared.
+    #: cached; the replica must refuse in both modes, or with ``crash_finishes`` finish in both
+    #: naming the entry (FSL-75: the values FSL's buffer holds, or the whole border). FSL's last
+    #: messages (the C library's heap diagnostics) are not compared.
     crash: str = ""
+    crash_finishes: bool = False
 
 
 #: How long FSL runs on a case where it never finishes.
@@ -581,7 +586,8 @@ def _hang_case(run: Run, checks: CheckList) -> None:
 
 def _crash_case(run: Run, checks: CheckList) -> None:
     """A case FSL crashes on (``run.crash``): FSL killed by a signal, the replica's refusal in
-    both modes naming the entry."""
+    both modes naming the entry (or, ``run.crash_finishes``, its result in both modes with the
+    entry's notice)."""
     from larmorx_validation import oracle_cache
 
     settings = dict(run.settings)
@@ -607,6 +613,14 @@ def _crash_case(run: Run, checks: CheckList) -> None:
         with tempfile.TemporaryDirectory(prefix="lx-nc-flirt-") as b_:
             b = Path(b_)
             r = run_replica(run.program, _prepare(run, b), cwd=b, settings=settings, mode=mode)
+            if run.crash_finishes:
+                named = defects.notices_in(r.stderr)
+                checks(
+                    f"the replica finishes and names {run.crash} ({mode})",
+                    r.code == 0 and run.crash in named and bool(list(b.glob("out*"))),
+                    detail=f"exit {r.code}: {', '.join(named) or 'nothing named'}",
+                )
+                continue
             refusal = next(
                 (ln for ln in r.stderr.splitlines() if ln.startswith(f"{REPLICA_PREFIX} error:")),
                 "",
@@ -617,10 +631,12 @@ def _crash_case(run: Run, checks: CheckList) -> None:
                 detail=f"exit {r.code}: {refusal[:160]}",
             )
     if all(c.passed for c in checks.checks):
-        raise Outcome(
-            EXPECTED,
-            f"FSL crashes ({run.crash}: undefined behaviour); the replica refuses in both modes",
+        what = (
+            f"the replica finishes in both modes and names {run.crash}"
+            if run.crash_finishes
+            else "the replica refuses in both modes"
         )
+        raise Outcome(EXPECTED, f"FSL crashes ({run.crash}: undefined behaviour); {what}")
 
 
 def _run_case(run: Run, checks: CheckList) -> None:
@@ -1773,6 +1789,7 @@ def _edge_cases() -> dict[str, tuple[str, str, Run]]:
         "-omat",
         "out.mat",
         crash="FSL-75",
+        crash_finishes=True,
     )
     add(
         "edge/background-empty",

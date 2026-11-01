@@ -21,8 +21,8 @@ use larmorx_nc_core::nifti::{self, dt};
 use larmorx_nc_core::optimise::{self, OptEvent};
 use larmorx_nc_core::settings::Settings;
 use larmorx_nc_core::volume::{
-    self, Conversion, Extrapolation, FslError, Interpolation, SaveError, SaveOptions, SaveType,
-    Volume,
+    self, BorderBuffer, Conversion, Extrapolation, FslError, Interpolation, SaveError, SaveOptions,
+    SaveType, Volume,
 };
 
 use crate::options::{AngleRep, EXIT_MINUS_ONE, Interp, Options, Parsed, Window, parse};
@@ -366,6 +366,37 @@ impl<'a> Flirt<'a> {
 
     fn notice(&mut self, defect: &'static defects::Defect, detail: impl Into<String>) {
         defects::push_once(&mut self.notices, Notice::new(defect, self.mode, detail));
+    }
+
+    /// `v.backgroundval()` (FSL-75): where FLIRT's buffer is too small for the border it writes,
+    /// FLIRT corrupts its heap and takes the percentile of the values that fit (reproduced); the
+    /// correction takes it over the whole border. Both named. A 1 x 1 x 1 volume has no border
+    /// (FLIRT reads an empty buffer): refused in both modes.
+    fn background_of(&mut self, v: &Volume, what: &str) -> R<f32> {
+        let (x, y, z) = (v.xsize(), v.ysize(), v.zsize());
+        match v.background_buffer() {
+            BorderBuffer::Exact => Ok(v.backgroundval()),
+            BorderBuffer::Empty => Err(Stop::Refuse(format!(
+                "FLIRT's background value of a {x} x {y} x {z} {what} reads the first value of \
+                 an empty buffer (FSL-75)"
+            ))),
+            BorderBuffer::Overflow { numbins, written } => {
+                let fsl = v.background_value_with(false).0;
+                let whole = v.background_value_with(true).0;
+                self.notice(
+                    &defects::FSL_75,
+                    format!(
+                        "the background value of a {x} x {y} x {z} {what}: FLIRT writes \
+                         {written} border values into a buffer of {numbins} (heap corruption; \
+                         FLIRT may abort or crash later) and takes the 10th percentile of the \
+                         {numbins} that fit ({}); of the whole border it is {}",
+                        cnum::stream(f64::from(fsl)),
+                        cnum::stream(f64::from(whole))
+                    ),
+                );
+                Ok(if self.mode.fix() { whole } else { fsl })
+            }
+        }
     }
 
     fn pair(&self) -> &Pair {
@@ -1626,8 +1657,8 @@ impl<'a> Flirt<'a> {
         Ok(match f {
             Filter::SubsampleBy2 => {
                 // subsample_by_2 fills the half-size volume with the background value first
-                background_defined(v)?;
-                newimagefns::subsample_by_2(v)
+                let bg = self.background_of(v, "pyramid level")?;
+                newimagefns::subsample_by_2_with(v, bg)
             }
             Filter::Blur => newimagefns::blur(v, s, self.threads),
             Filter::ResampBlur => {
@@ -1905,8 +1936,7 @@ impl<'a> Flirt<'a> {
             vol.padvalue = self.o.backgndval;
             vol.extrap = Extrapolation::Constpad;
         } else {
-            background_defined(vol)?;
-            vol.padvalue = vol.backgroundval();
+            vol.padvalue = self.background_of(vol, "volume")?;
             vol.extrap = Extrapolation::Extraslice;
         }
         Ok(())
@@ -3422,14 +3452,5 @@ mod tests {
         assert!(!pinv_mask(&half).1);
         // a row shared by two columns
         assert!(!pinv_mask(&mask(&[&[0], &[0, 1]])).1);
-    }
-}
-
-/// FSL-75: refused in both modes where FSL's background value of `v` is undefined (its
-/// buffer too small for the border it writes, or empty).
-fn background_defined(v: &Volume) -> R<()> {
-    match v.background_undefined() {
-        Some(why) => Err(Stop::Refuse(why)),
-        None => Ok(()),
     }
 }

@@ -91,7 +91,7 @@ something undefined or questionable, and what larmorx does. Each entry says how 
 | FSL-72 | `read` of a file with a word that is not a number: an endless loop | a | — | refused, both modes |
 | FSL-73 | `-pedir` without a field map read (no `-fieldmap`, or `-applyxfm`, which never reads it): an empty field map interpolated | a | — | refused, both modes |
 | FSL-74 | the usage lists `-displayinit` (the option is `-printinit`) and leaves `woods` out of `-cost` | f | — | the same text (messages kept) |
-| FSL-75 | newimage's `calc_bval` (the background value, edge width 2) sizes its buffer too small for an image 3 voxels wide along x (with y or z ≥ 2), or along y (z ≥ 2, x not 2 or 4), and empty for 1 × 1 × 1: heap overflow, or a read of an empty vector's first element | a | — | refused, both modes, where FLIRT computes it (part 2) |
+| FSL-75 | newimage's `calc_bval` (the background value, edge width 2) sizes its buffer too small for an image 3 voxels wide along x (with y or z ≥ 2), or along y (z ≥ 2, x not 2 or 4), and empty for 1 × 1 × 1: heap overflow (the percentile of the values that fit), or a read of an empty vector's first element | a | — | rule A: the whole border's percentile by default, FSL's values that fit with `reproduce`, named in both; 1 × 1 × 1 refused in both modes (rule B; part 2) |
 
 FSL-21 and FSL-66 are mcflirt's entries; FLIRT meets them through `-bins` (each scale has
 `trunc(bins/scale)` bins). FSL-09, FSL-11, FSL-14, FSL-56 are the shared ones of FSL's libraries.
@@ -136,12 +136,22 @@ the trial's memory agrees, in its shrunk and drawn forms; the 6 that did not are
   later `free` (`malloc(): invalid size (unsorted)`, `double free or corruption (!prev)`, `free():
   invalid next size`, `munmap_chunk(): invalid pointer`, `corrupted size vs. prev_size`: the
   message depends on the heap's layout), segfaults, or finishes and crashes at exit after writing
-  its files; the `-bins 16` case is the same. The replica refuses in both modes at the first such
-  computation (`Volume::background_undefined`), before writing anything; the suite's comparison
-  takes "FSL killed, the replica refusing FSL-75" as agreement (FSL's later messages and files are
-  those of a corrupted heap). Suite cases `edge/background-overflow`, `edge/background-empty`.
-  mcflirt reaches `calc_bval` through `affine_transform`'s padding and `subsample_by_2` too: its
-  replica does not refuse yet (a follow-up; no record case meets it).
+  its files; the `-bins 16` case is the same. The values FSL sorts are defined: the first
+  `numbins` written (the later writes land past the buffer), so the background value FSL uses is
+  the percentile of those. The short trial of part 2's new paths found an ordinary image where FSL
+  survives (trial-flirt-programs-11900: 25 × 30 × 27 at 0.5 × 1.2 × 1 mm, a 3 × 3 × 3 level, FSL
+  exit 0 and a matrix): a refusal would fail where FLIRT works. Decided by rule A (the input makes
+  sense, the result comes from a part of the border while the heap is corrupted): by default the
+  percentile of the whole border; with `reproduce`, the values that fit FSL's buffer (the D13 rule
+  for undefined cases: the defined part reproduced, with a notice); FSL-75 named in both modes
+  wherever the buffer is too small (`_SILENT` in the suite: the notice is about FSL's heap, whose
+  effect the comparison may not see). The 1 × 1 × 1 case (no border; FSL reads an empty vector, a
+  null read) stays refused in both modes (rule B). The core's `Volume::background_buffer` tells
+  the three cases apart, `background_value_with(whole_border)` computes both values;
+  `Volume::backgroundval` is FSL's (mcflirt and BET reach it too: they now get FSL's values that
+  fit, without a notice yet: a follow-up). Suite cases `edge/background-overflow` (FSL killed, the
+  replica finishes in both modes naming FSL-75), `edge/background-empty` (refused); permanent case
+  `background-level-overflow-survives` (FSL finishes; the replica's matrix is FSL's).
 - **The 66 matrices: `scalemat`'s single-precision quotient.** `orig2scaled_coord(1,1) =
   1/globaloptions::get().basescale` divides an `int` by a `float`: a single-precision quotient
   (exactly 100 for a base scale of 0.01), stored in the double matrix; the replica divided in

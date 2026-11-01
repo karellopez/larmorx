@@ -506,10 +506,15 @@ pub fn blur(src: &Volume, resel: f32, threads: usize) -> Volume {
 /// qform composed with the 2x scaling. Values that come out NaN are computed again with SSE's
 /// NaN rules.
 pub fn subsample_by_2(refvol: &Volume) -> Volume {
+    subsample_by_2_with(refvol, refvol.backgroundval())
+}
+
+/// [`subsample_by_2`] with the half-size volume first filled with `bg` (FLIRT's replica passes
+/// the background value it decided for FSL-75).
+pub fn subsample_by_2_with(refvol: &Volume, bg: f32) -> Volume {
     let (sx, sy, sz) = (refvol.xsize(), refvol.ysize(), refvol.zsize());
     let mut half = Volume::new((sx + 1) / 2, (sy + 1) / 2, (sz + 1) / 2, 1);
     half.copy_properties(refvol);
-    let bg = refvol.backgroundval();
     half.data.fill(bg);
     half.setdims(
         (f64::from(refvol.xdim()) * 2.0) as f32,

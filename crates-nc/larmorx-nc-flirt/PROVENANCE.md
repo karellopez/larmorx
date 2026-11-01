@@ -39,8 +39,9 @@ and fMRIPrep BBR calls; `docs/findings/fsl-flirt.md`).
 - **Undefined behaviour is refused** (D13 class a, both modes; `docs/findings/fsl-flirt.md`): a
   schedule's matrix name FSL cannot interpret (an uninitialised pointer), `U[` (a 28th list),
   `setoption bbrstep` below 1 (a loop that never ends), `-pedir` without a field map read (an empty
-  field map interpolated), newimage's background value of an image 3 voxels wide or of a single
-  voxel (FSL-75: a buffer too small, or empty; part 2), and, not translated yet, the schedule
+  field map interpolated), newimage's background value of a single voxel (FSL-75: an empty
+  buffer; part 2; a buffer too small for an image 3 voxels wide is corrected by default and
+  reproduced with `reproduce`), and, not translated yet, the schedule
   command `alignpaxes` and the coordinate programs' `-warp` with a readable warp field.
 - **Quaternions** (`-anglerep quaternion`, part 2): `construct_rotmat_quat` and `rotmat2quat` with
   the legacy NIfTI quaternion conversion (`larmorx-nc-core`); `construct_rotmat_quat`'s messages,

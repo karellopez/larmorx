@@ -682,12 +682,21 @@ The shell is `e = min(2, n − 1)` voxels deep along each axis of size `n`; FSL 
 fills (the terms with a negative factor count against it while their loops write nothing) exactly
 when **the size along x is 3 and the size along y or z is at least 2, or the size along y is 3,
 the size along z at least 2 and the size along x neither 2 nor 4**; and is empty for a **1 × 1 × 1**
-image, whose first value FSL then reads. These are undefined behaviour (FSL writes past its buffer:
-the heap is corrupted, and FSL aborts, crashes, or carries on with corrupted memory; observed on
-small random images). The original **refuses in both modes**, before writing anything, where FSL
-would compute such a background value (the image being halved, the input being padded), with a
-message naming the size and FSL-75, exit status 1. The levels' sizes follow from the images' sizes
-(§5), so small images with 5 or 6 voxels along x or y meet it in the pyramid.
+image, whose first value FSL then reads. FSL fills the buffer in loop order (the two xy faces
+for each depth `e < e_z`, x from `eₓ` to `x − eₓ − 1`, y from `e_y` to `y − e_y − 1`, the voxel at
+depth `e` then its mirror at `z − 1 − e`; then the xz faces, x as before, z over the whole size;
+then the yz faces, y and z over the whole size), keeps the values that fit, and takes the value at
+position `⌊numbins / 10⌋` of those sorted; the rest are written past the buffer (the heap is
+corrupted: FSL may abort or crash later, or finish, with the same result where the corruption
+touched nothing it reads again; all observed on small random images, and one ordinary 25 × 30 × 27
+image at 0.5 × 1.2 × 1 mm whose pyramid reaches 3 × 3 × 3, where FSL finished). The levels' sizes
+follow from the images' sizes (§5), so images with 5 or 6 voxels along x or y meet it in the
+pyramid. The original, by default (rule A), takes the 10th percentile (`⌊n / 10⌋` of the `n`
+values sorted) of **every** value the loops write; with `reproduce`, the values FSL's buffer holds
+and its position; in both modes it names FSL-75 wherever the buffer is too small (a notice: FSL
+corrupts its heap there). A **1 × 1 × 1** image has no border (FSL reads an empty buffer): refused
+in both modes (rule B), before writing anything, with a message naming the size and FSL-75, exit
+status 1.
 
 ## 11. Defects (D13) and larmorx's defaults
 
@@ -712,8 +721,9 @@ default and with `reproduce`:
 - Undefined behaviour, refused in both modes with a message: an uninitialised matrix name (§7.1),
   `bbrstep` below 1 (FSL-71: FSL never finishes), `-pedir` without a field map read (§6.5), a `read`
   of an unparsable file (FSL-72: FSL reads for ever, its memory growing until an allocation fails:
-  `std::bad_alloc`, exit status 0 under an address-space limit), the background value of the sizes
-  of §10a (FSL-75).
+  `std::bad_alloc`, exit status 0 under an address-space limit), the background value of a single
+  voxel (§10a, FSL-75; the buffer too small for the border: corrected by default, FSL's values with
+  `reproduce`).
 
 ## 12. Numerics and operation order
 

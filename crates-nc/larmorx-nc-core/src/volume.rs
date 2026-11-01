@@ -316,6 +316,17 @@ pub enum NanOrder {
     Libstdcxx,
 }
 
+/// Whether `calc_bval(vol, 2)`'s buffer holds the border it writes (FSL-75).
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum BorderBuffer {
+    /// The buffer holds exactly the values written.
+    Exact,
+    /// `written` values for a buffer of `numbins`: the rest are written past it.
+    Overflow { numbins: i64, written: i64 },
+    /// No buffer (1 × 1 × 1): FSL reads the first element of an empty one.
+    Empty,
+}
+
 /// What [`Volume::background_value`] did with NaN values in the shell.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Background {
@@ -822,13 +833,13 @@ impl Volume {
         self.background_value().0
     }
 
-    /// FSL-75: why `calc_bval(vol, 2)` is undefined for this volume's shape, if it is. It sizes
-    /// its buffer `2(x−2ex)(y−2ey)ez + 2(x−2ex)z·ey + 2yz·ex` (each edge width `e` the smaller
-    /// of 2 and the size less 1), which is too small when the size along x is 3, or along y is 3
-    /// and x is neither 2 nor 4 (a factor of −1 in a term whose loop writes nothing): FSL writes
-    /// past the buffer (heap corruption); at 1 × 1 × 1 the buffer is empty and FSL reads its
-    /// first element. `None`: defined (the buffer holds exactly what is written).
-    pub fn background_undefined(&self) -> Option<String> {
+    /// FSL-75: whether `calc_bval(vol, 2)`'s buffer holds the border it writes. It sizes the
+    /// buffer `2(x−2ex)(y−2ey)ez + 2(x−2ex)z·ey + 2yz·ex` (each edge width `e` the smaller of 2
+    /// and the size less 1), which is too small when the size along x is 3 (and y or z at least
+    /// 2), or along y is 3 (z at least 2, x neither 2 nor 4): a factor of −1 in a term whose
+    /// loop writes nothing. FSL then writes the rest past the buffer (heap corruption) and sorts
+    /// the values that fit; at 1 × 1 × 1 the buffer is empty and FSL reads its first element.
+    pub fn background_buffer(&self) -> BorderBuffer {
         let (zb, yb, xb) = (self.zsize(), self.ysize(), self.xsize());
         let ew = |n: i64| 2i64.min(n - 1);
         let (ewx, ewy, ewz) = (ew(xb), ew(yb), ew(zb));
@@ -838,17 +849,11 @@ impl Volume {
         let (ix, iy) = ((xb - 2 * ewx).max(0), (yb - 2 * ewy).max(0));
         let written = 2 * ewz * ix * iy + 2 * ewy * ix * zb + 2 * ewx * yb * zb;
         if numbins <= 0 {
-            Some(format!(
-                "FSL's background value of a {xb} x {yb} x {zb} image reads the first value of \
-                 an empty buffer (FSL-75)"
-            ))
+            BorderBuffer::Empty
         } else if numbins < written {
-            Some(format!(
-                "FSL's background value of a {xb} x {yb} x {zb} image writes {written} border \
-                 values into a buffer of {numbins} (heap corruption, FSL-75)"
-            ))
+            BorderBuffer::Overflow { numbins, written }
         } else {
-            None
+            BorderBuffer::Exact
         }
     }
 
@@ -856,6 +861,14 @@ impl Volume {
     /// with `operator<` has no defined order for them in C++ (FSL-22), and the volume's
     /// [`NanOrder`] decides theirs.
     pub fn background_value(&self) -> (f32, Background) {
+        self.background_value_with(false)
+    }
+
+    /// [`Volume::background_value`] with `whole_border`: the 10th percentile of every value
+    /// the border loops write (FSL-75 corrected), instead of FSL's, which keeps the values that
+    /// fit its buffer and the percentile of their number (the same wherever the buffer holds
+    /// the border: [`Volume::background_buffer`]).
+    pub fn background_value_with(&self, whole_border: bool) -> (f32, Background) {
         let (zb, yb, xb) = (self.zsize(), self.ysize(), self.xsize());
         let (mut ewx, mut ewy, mut ewz) = (2i64, 2i64, 2i64);
         if ewx >= xb {
@@ -895,6 +908,13 @@ impl Volume {
                 }
             }
         }
+        // FSL-75: FSL's buffer keeps the first `numbins` values written
+        let kept = if whole_border {
+            hist.len() as i64
+        } else {
+            numbins.max(0).min(hist.len() as i64)
+        };
+        hist.truncate(kept as usize);
         let how = if !hist.iter().any(|v| v.is_nan()) {
             Background::Defined
         } else if self.nan_order == NanOrder::Last {
@@ -912,7 +932,8 @@ impl Volume {
         if how != Background::Libstdcxx {
             sort_nan_last(&mut hist);
         }
-        let p10 = (numbins / 10).max(0) as usize;
+        let count = if whole_border { kept } else { numbins };
+        let p10 = (count / 10).max(0) as usize;
         (hist.get(p10).copied().unwrap_or(0.0), how)
     }
 
@@ -1997,7 +2018,7 @@ mod tests {
     use super::*;
 
     #[test]
-    fn background_undefined_shapes() {
+    fn background_buffer_shapes() {
         // FSL-75: x = 3 (y or z at least 2), y = 3 (z at least 2, x not 2 or 4), 1 x 1 x 1
         let shape = |x: i64, y: i64, z: i64| Volume::<f32>::new7([x, y, z, 1, 1, 1, 1]);
         for (x, y, z) in [
@@ -2008,15 +2029,22 @@ mod tests {
             (5, 3, 2),
             (10, 3, 10),
         ] {
-            let why = shape(x, y, z).background_undefined().expect("undefined");
-            assert!(why.contains("heap corruption, FSL-75"), "{why}");
+            assert!(
+                matches!(
+                    shape(x, y, z).background_buffer(),
+                    BorderBuffer::Overflow { .. }
+                ),
+                "{x} {y} {z}"
+            );
         }
-        assert!(
-            shape(1, 1, 1)
-                .background_undefined()
-                .unwrap()
-                .contains("empty buffer (FSL-75)")
+        assert_eq!(
+            shape(3, 3, 3).background_buffer(),
+            BorderBuffer::Overflow {
+                numbins: 28,
+                written: 36
+            }
         );
+        assert_eq!(shape(1, 1, 1).background_buffer(), BorderBuffer::Empty);
         for (x, y, z) in [
             (3, 1, 1),
             (2, 3, 5),
@@ -2025,8 +2053,35 @@ mod tests {
             (8, 1, 1),
             (2, 2, 2),
         ] {
-            assert_eq!(shape(x, y, z).background_undefined(), None, "{x} {y} {z}");
+            assert_eq!(
+                shape(x, y, z).background_buffer(),
+                BorderBuffer::Exact,
+                "{x} {y} {z}"
+            );
         }
+        // 3 x 3 x 3 holding 0..27: only the yz faces' loops write (the others run from x = 2
+        // to 1), 36 values; FSL keeps the first 28
+        let mut v = shape(3, 3, 3);
+        for (k, d) in v.data.iter_mut().enumerate() {
+            *d = k as f32;
+        }
+        let fsl = v.background_value_with(false).0;
+        let all = v.background_value_with(true).0;
+        assert_eq!(fsl, v.backgroundval());
+        let mut written = Vec::new();
+        for e in 0..2 {
+            for y in 0..3 {
+                for z in 0..3 {
+                    written.push(v.value(e, y, z));
+                    written.push(v.value(2 - e, y, z));
+                }
+            }
+        }
+        let mut kept = written[..28].to_vec();
+        kept.sort_by(f32::total_cmp);
+        written.sort_by(f32::total_cmp);
+        assert_eq!(fsl, kept[2]);
+        assert_eq!(all, written[3]);
     }
 
     #[test]

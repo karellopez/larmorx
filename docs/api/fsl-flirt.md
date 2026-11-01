@@ -119,11 +119,15 @@ Corrected by default, FSL's behaviour with `upstream_defects="reproduce"`
 Refused in both modes (FLIRT's behaviour is undefined): FSL-21/FSL-66 (`-bins` giving no or negative
 bins at a scale), FSL-70 (a schedule matrix name FLIRT cannot interpret), FSL-71 (`bbrstep` below 1
 with BBR: FLIRT never finishes), FSL-72 (a schedule `read` of a file that is not numbers: FLIRT reads
-for ever), FSL-73 (`-pedir` without a field map read), **FSL-75** (part 2: the background value of
-an image 3 voxels wide along x, or along y with x neither 2 nor 4, or of a single voxel: FSL writes
-past its buffer, or reads an empty one; its pyramid meets it on small images; FSL aborts, crashes
-or goes on with a corrupted heap; `larmorx-nc: error: FSL's background value of a 3 x 1 x 4 image
-writes 16 border values into a buffer of 12 (heap corruption, FSL-75)`). Kept and documented:
+for ever), FSL-73 (`-pedir` without a field map read), the background value of a single voxel
+(**FSL-75**: FSL reads an empty buffer; `larmorx-nc: error: FLIRT's background value of a 1 x 1 x 1
+volume reads the first value of an empty buffer (FSL-75)`). **FSL-75** otherwise (part 2: the
+background value of an image 3 voxels wide along x, or along y with x neither 2 nor 4, which the
+pyramid meets on small images; FSL writes past its buffer and takes the percentile of the values
+that fit; it may abort, crash or finish): corrected by default (the percentile of the whole
+border), FSL's values with `reproduce`, named in both modes (`upstream defect FSL-75 (flirt)
+corrected: the background value of a 3 x 3 x 3 pyramid level: FLIRT writes 36 border values into a
+buffer of 28 ...`). Kept and documented:
 FSL-67 (BBR's normals scaled by the reference level's voxel sizes; measured in part 2: computing
 them in millimetres moves fMRIPrep's BBR results by 0.02 mm on average and brings no gain on a
 strongly anisotropic case with a known motion: rule C), FSL-69 (a coarse `setscale` the data

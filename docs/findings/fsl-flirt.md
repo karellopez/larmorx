@@ -168,10 +168,14 @@ the trial's memory agrees, in its shrunk and drawn forms; the 6 that did not are
   cost's points: `_SILENT`); FSL-09 was named only for values that were not integers: also for
   values out of the type's range (a negative `-setbackground` into uint8: 251 against 0).
 - **The 6 runs over 3 GiB** (trial-flirt-01374, -01768, -02317, -03183, -03192, -03718: voxels of
-  0.01 mm or 25-50 mm make FLIRT's isotropic levels huge): FSL's own peak is 8.2 GiB on one and
-  above 25 GiB on others (`memory_findings.py`; the box stopped two FSL runs at 26 and 39 GiB). Not a
-  difference: both programs need more than the trial's budget; they belong to the final validation
-  phase's heavy cases.
+  0.01 mm or 25-50 mm make FLIRT's isotropic levels huge; `memory_findings.py`, one thread, each
+  program alone): -01374 FSL 8.0 GiB (the replica 12.1 GiB before part 2's memory fixes, below);
+  -03718 FSL 6.3 GiB, the replica 5.9 (identical matrices); -03183 both run over 30 minutes;
+  -01768 and -03192 both stopped by a 64 GiB box at 24 to 43 GiB; -02317 FSL segfaults at 8.9 GiB
+  (a 3-voxel level: FSL-75). The second trial's quaternion runs over 3 GiB need more than 20 GiB in
+  FSL as in the replica (-2-01831: both stopped at 20 GiB; -2-01944: FSL too). Not a difference:
+  both programs need more than the trial's budget; they belong to the final validation phase's
+  heavy cases.
 - **The replica's peak memory above FSL's on large references** (found measuring trial-flirt-01374,
   12.1 GiB against FSL's 8.0; then on ordinary calls: `-in epi -ref t1full -omat out.mat` with a
   191 × 288 × 288 float reference, 262 MiB against 192, and with `-inweight`, 503 against 375).

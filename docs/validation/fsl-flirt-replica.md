@@ -1,12 +1,12 @@
 # Parity: FLIRT replica (bit-exact, FSL Licence)
 
-**All cases agree.** 141 cases on the `standard` tier: 107 pass, 34 rejected by both, 0 expected divergences, 0 failures.
+**All cases agree.** 217 cases on the `standard` tier: 152 pass, 61 rejected by both, 4 expected divergences, 0 failures.
 
-- **Validated:** `larmorx-nc fsl flirt` and `larmorx-nc fsl convert_xfm` (crate larmorx-nc-flirt, translated from FSL 6.0.7.23's source)
-- **Reference:** flirt and convert_xfm from FSL 6.0.7.23 (fsl-flirt 2111.4, fsl-newimage 2601.0, fsl-miscmaths 2412.6; the conda build at `~/fsl-6.0.7.23`, as built: glibc 2.35's maths, OpenBLAS on its Haswell kernels)
+- **Validated:** `larmorx-nc fsl flirt`, `convert_xfm`, `avscale`, `img2imgcoord`, `std2imgcoord`, `img2stdcoord`, `rmsdiff` and `makerot` (crate larmorx-nc-flirt, translated from FSL 6.0.7.23's source)
+- **Reference:** flirt, convert_xfm, avscale, img2imgcoord, std2imgcoord, img2stdcoord, rmsdiff and makerot from FSL 6.0.7.23 (fsl-flirt 2111.4, fsl-newimage 2601.0, fsl-miscmaths 2412.6, fsl-utils 2412.6, fsl-warpfns 2501.0; the conda build at `~/fsl-6.0.7.23`, as built: glibc 2.35's maths, OpenBLAS on its Haswell kernels)
 - **Test data:** larmorx-testdata `52124bc98f9f`, tier `standard`
 - **Generated:** 2026-11-01 on Linux x86_64, with `python -m larmorx_validation parity fsl-flirt-replica --tier standard`
-- **Original programs:** 141 runs: 139 from the oracle cache, 2 run; cache `<workspace>/oracles/cache`, mode `use`
+- **Original programs:** 217 runs: 204 from the oracle cache, 13 run (4 never cached: the original varies); cache `<workspace>/oracles/cache`, mode `use`
 
 ## Thresholds
 
@@ -24,12 +24,22 @@
 |---|---|---|---|---|---|
 | bbr | 10 | 10 | 0 | 0 | 0 |
 | convert_xfm | 16 | 7 | 9 | 0 | 0 |
-| difftest | 2 | 2 | 0 | 0 | 0 |
-| edge | 28 | 9 | 19 | 0 | 0 |
+| difftest | 5 | 5 | 0 | 0 | 0 |
+| edge | 32 | 9 | 19 | 4 | 0 |
 | fmriprep | 3 | 3 | 0 | 0 | 0 |
-| real | 55 | 55 | 0 | 0 | 0 |
+| programs | 66 | 39 | 27 | 0 | 0 |
+| real | 58 | 58 | 0 | 0 | 0 |
 | schedule | 21 | 15 | 6 | 0 | 0 |
 | verbose | 6 | 6 | 0 | 0 | 0 |
+
+## Expected divergences
+
+| Case | Reason |
+|---|---|
+| `edge/bbrstep-0` | FLIRT never finishes (FSL-71: undefined behaviour); the replica refuses in both modes |
+| `edge/read-not-numbers` | FLIRT never finishes (FSL-72: undefined behaviour); the replica refuses in both modes |
+| `edge/background-overflow` | FSL crashes (FSL-75: undefined behaviour); the replica finishes in both modes and names FSL-75 |
+| `edge/background-empty` | FSL crashes (FSL-75: undefined behaviour); the replica refuses in both modes |
 
 ## Rejected by both
 
@@ -69,12 +79,39 @@
 | `convert_xfm/lacking` | -omat lacking its argument | convert_xfm exits 2; the same from the replica. Lacking argument to option -omat |
 | `convert_xfm/singular` | -inverse of a singular matrix | convert_xfm exits -6; the same from the replica. terminate called after throwing an instance of 'std::runtime_error' what(): inv(): matrix is singular |
 | `convert_xfm/missing-concat` | -concat with a file that does not exist | convert_xfm exits 253; the same from the replica. Could not open matrix file none.mat Cannot read concat-matrix |
+| `programs/avscale-usage` | avscale without arguments (its usage, exit 255) | avscale exits 255; the same from the replica. Usage: ~/fsl-6.0.7.23/bin/avscale [--allparams/--inverteddies] matrixfile [non-reference-volume] |
+| `programs/avscale-singular` | a singular matrix: Armadillo's solve throws, avscale aborts | avscale exits -6; the same from the replica. matrix multiplication: problem with matrix inverse; suggest to use solve() instead terminate called after throwing… |
+| `programs/avscale-missing-matrix` | a matrix file that does not exist (exit 254) | avscale exits 254; the same from the replica. Could not open matrix file none.mat |
+| `programs/avscale-missing-volume` | a volume that does not exist: newimage's exception, abort | avscale exits -6; the same from the replica. Image Exception : #63 :: No image files match: none Image Exception : #22 :: Failed to read volume none.nii.gz Err… |
+| `programs/img2imgcoord-usage` | img2imgcoord without arguments (its usage, exit 1) | img2imgcoord exits 1; the same from the replica. |
+| `programs/img2imgcoord-missing-coords` | img2imgcoord: a coordinate file that does not exist | img2imgcoord exits 255; the same from the replica. Could not open matrix file none.txt |
+| `programs/img2imgcoord-unknown` | img2imgcoord: an unknown option (exit 255) | img2imgcoord exits 255; the same from the replica. Unrecognised option -frob |
+| `programs/img2imgcoord-missing-image` | img2imgcoord: an image that does not exist (abort) | img2imgcoord exits -6; the same from the replica. Image Exception : #63 :: No image files match: none Image Exception : #22 :: Failed to read volume none.nii E… |
+| `programs/std2imgcoord-usage` | std2imgcoord without arguments (its usage, exit 1) | std2imgcoord exits 1; the same from the replica. |
+| `programs/std2imgcoord-missing-coords` | std2imgcoord: a coordinate file that does not exist | std2imgcoord exits 255; the same from the replica. Could not open matrix file none.txt |
+| `programs/std2imgcoord-unknown` | std2imgcoord: an unknown option (exit 255) | std2imgcoord exits 255; the same from the replica. Unrecognised option -frob |
+| `programs/std2imgcoord-missing-image` | std2imgcoord: an image that does not exist (abort) | std2imgcoord exits -6; the same from the replica. Image Exception : #63 :: No image files match: none Image Exception : #22 :: Failed to read volume none.nii E… |
+| `programs/img2stdcoord-usage` | img2stdcoord without arguments (its usage, exit 1) | img2stdcoord exits 1; the same from the replica. |
+| `programs/img2stdcoord-missing-coords` | img2stdcoord: a coordinate file that does not exist | img2stdcoord exits 255; the same from the replica. Could not open matrix file none.txt |
+| `programs/img2stdcoord-unknown` | img2stdcoord: an unknown option (exit 255) | img2stdcoord exits 255; the same from the replica. Unrecognised option -frob |
+| `programs/img2stdcoord-missing-image` | img2stdcoord: an image that does not exist (abort) | img2stdcoord exits -6; the same from the replica. Image Exception : #63 :: No image files match: none Image Exception : #22 :: Failed to read volume none.nii E… |
+| `programs/std2imgcoord-singular` | std2imgcoord with a singular matrix: its inverse throws | std2imgcoord exits -6; the same from the replica. terminate called after throwing an instance of 'std::runtime_error' what(): inv(): matrix is singular |
+| `programs/img2stdcoord-warp-missing` | img2stdcoord -warp of a file that does not exist | img2stdcoord exits 1; the same from the replica. Image Exception : #63 :: No image files match: none Image Exception : #22 :: Failed to read volume none.nii.gz… |
+| `programs/rmsdiff-usage` | rmsdiff without arguments (its usage, exit 255) | rmsdiff exits 255; the same from the replica. Usage: ~/fsl-6.0.7.23/bin/rmsdiff matrixfile1 matrixfile2 refvol [mask] Outputs rms deviation between matrices (i… |
+| `programs/rmsdiff-singular` | a singular second matrix: rms_deviation's message, exit 251 | rmsdiff exits 251; the same from the replica. WARNING:: matrix 2 has low determinant 1.000000 0.000000 0.000000 0.000000 0.000000 0.000000 0.000000 0.000000 0.… |
+| `programs/rmsdiff-missing-matrix` | a matrix file that does not exist | rmsdiff exits 254; the same from the replica. Could not open matrix file none.mat Could not read matrix none.mat |
+| `programs/makerot-usage` | makerot without arguments (the compulsory -t, its usage, exit 1) | makerot exits 1; the same from the replica. *************************************************** The following COMPULSORY options have not been set: -t,--theta … |
+| `programs/makerot-help` | makerot -h (its usage, exit 1) | makerot exits 1; the same from the replica. Part of FSL (ID: 2412.6-dirty) makerot Copyright(c) 2003, University of Oxford (Mark Jenkinson) Usage: makerot [opt… |
+| `programs/makerot-cov-missing` | --cov of a file that is not an image (FSL aborts) | makerot exits -6; the same from the replica. Image Exception : #63 :: No image files match: none Image Exception : #22 :: Failed to read volume none.nii Error … |
+| `programs/makerot-zero-axis` | a zero axis (its error, exit 1) | makerot exits 1; the same from the replica. ERROR:: Axis cannot be zero |
+| `programs/makerot-bad-theta` | a theta that is not a number (Couldn't set_value, exit 1) | makerot exits 1; the same from the replica. Part of FSL (ID: 2412.6-dirty) makerot Copyright(c) 2003, University of Oxford (Mark Jenkinson) Usage: makerot [opt… |
+| `programs/makerot-token` | a word that is not an option (unrecognised token, exit 1) | makerot exits 1; the same from the replica. Part of FSL (ID: 2412.6-dirty) makerot Copyright(c) 2003, University of Oxford (Mark Jenkinson) Usage: makerot [opt… |
 
 ## Environment
 
 | Component | Version |
 |---|---|
-| larmorx | 0.0.1 (6913b97c3bb6) |
+| larmorx | 0.0.1 (b92c7ed2c691) |
 | larmorx-testdata | 52124bc98f9f |
 | Python | 3.12.16 |
 | Platform | Linux x86_64 (Linux-6.8.0-124-generic-x86_64-with-glibc2.35) |
@@ -94,6 +131,8 @@ The replica runs as a separate program, the FSL replica package's (`larmorx-nc`)
 | `fmriprep/ds000228-sub-pixar008-noreconall/bold_task_pixar_wf` | pass | 7/7 | fMRIPrep's BBR call |
 | `fmriprep/ds003592-sub-280-noreconall/bold_ses_1_task_rest_echo_1_wf` | pass | 7/7 | fMRIPrep's BBR call |
 | `fmriprep/ds005040-sub-002-noreconall/bold_task_clip_run_1_wf` | pass | 7/7 | fMRIPrep's BBR call |
+| `real/anglerep-quaternion` | pass | 6/6 | -anglerep quaternion: the rotations as a quaternion's last three components (12 dof) |
+| `real/anglerep-quaternion-dof6` | pass | 6/6 | -anglerep quaternion at 6 dof, -out, verbose (the parameters printed) |
 | `real/default` | pass | 6/6 | the default (12 dof, corratio) with -out and -omat |
 | `real/default-full` | pass | 6/6 | the full-size T1w as reference |
 | `real/dof6` | pass | 6/6 | -dof 6 |
@@ -146,6 +185,7 @@ The replica runs as a separate program, the FSL replica package's (`larmorx-nc`)
 | `real/applyxfm-usesqform` | pass | 6/6 | -applyxfm -usesqform |
 | `real/out-only` | pass | 6/6 | a registration with -out and no -omat (the matrix printed) |
 | `real/basescale-small` | pass | 6/6 | 0.6 mm voxels (the base scale from the voxel size) |
+| `real/basescale-small-init` | pass | 6/6 | 0.6 mm voxels with -init (the initial matrix in the base scale's millimetres) |
 | `real/basescale-big` | pass | 6/6 | 14 mm voxels (the base scale from the voxel size) |
 | `real/basescale-forced` | pass | 6/6 | -basescale 2 |
 | `bbr/default` | pass | 6/6 | BBR (FSL's bbr.sch) with -cost bbr |
@@ -229,6 +269,79 @@ The replica runs as a separate program, the FSL replica package's (`larmorx-nc`)
 | `convert_xfm/unknown` | both-error | 5/5 | an unknown option |
 | `convert_xfm/lacking` | both-error | 5/5 | -omat lacking its argument |
 | `convert_xfm/singular` | both-error | 5/5 | -inverse of a singular matrix |
+| `edge/bbrstep-0` | expected-divergence | 3/3 | setoption bbrstep 0 with BBR: FLIRT's loop over the boundary points never ends (FSL-71) |
+| `edge/read-not-numbers` | expected-divergence | 3/3 | a schedule's read of a file holding a word that is not a number: FLIRT reads for ever, its memory growing (FSL-72) |
+| `edge/background-overflow` | expected-divergence | 3/3 | a 1-voxel input and an 8 x 1 x 1 reference: FLIRT's pyramid computes the background of a 3-voxel-wide level, writing pa… |
+| `edge/background-empty` | expected-divergence | 3/3 | -applyxfm of a 1-voxel input: its background value reads an empty buffer (FSL-75) |
 | `convert_xfm/missing-concat` | both-error | 5/5 | -concat with a file that does not exist |
+| `programs/avscale-usage` | both-error | 5/5 | avscale without arguments (its usage, exit 255) |
+| `programs/avscale-default` | pass | 6/6 | avscale of fMRIPrep's initial matrix |
+| `programs/avscale-allparams` | pass | 6/6 | --allparams, the translations about a volume's centre |
+| `programs/avscale-inverteddies` | pass | 6/6 | --inverteddies (the check and the inverted eddy matrix) |
+| `programs/avscale-flip` | pass | 6/6 | a matrix that swaps left and right (the half transforms of the swap) |
+| `programs/avscale-singular` | both-error | 5/5 | a singular matrix: Armadillo's solve throws, avscale aborts |
+| `programs/avscale-missing-matrix` | both-error | 5/5 | a matrix file that does not exist (exit 254) |
+| `programs/avscale-empty-volume` | pass | 6/6 | an empty volume name: the centre of an empty volume |
+| `programs/avscale-missing-volume` | both-error | 5/5 | a volume that does not exist: newimage's exception, abort |
+| `programs/img2imgcoord-usage` | both-error | 5/5 | img2imgcoord without arguments (its usage, exit 1) |
+| `programs/img2imgcoord-xfm` | pass | 6/6 | img2imgcoord through fMRIPrep's initial matrix |
+| `programs/img2imgcoord-vox` | pass | 6/6 | img2imgcoord -vox |
+| `programs/img2imgcoord-mm` | pass | 6/6 | img2imgcoord -mm |
+| `programs/img2imgcoord-verbose` | pass | 6/6 | img2imgcoord verbose (sizes, matrices; fixed notation after them) |
+| `programs/img2imgcoord-missing-coords` | both-error | 5/5 | img2imgcoord: a coordinate file that does not exist |
+| `programs/img2imgcoord-not-numbers` | pass | 6/6 | img2imgcoord: coordinates that stop at a word |
+| `programs/img2imgcoord-lacking` | pass | 6/6 | img2imgcoord: an option lacking its argument (a message, the run goes on) |
+| `programs/img2imgcoord-unknown` | both-error | 5/5 | img2imgcoord: an unknown option (exit 255) |
+| `programs/img2imgcoord-missing-image` | both-error | 5/5 | img2imgcoord: an image that does not exist (abort) |
+| `programs/std2imgcoord-usage` | both-error | 5/5 | std2imgcoord without arguments (its usage, exit 1) |
+| `programs/std2imgcoord-xfm` | pass | 6/6 | std2imgcoord through fMRIPrep's initial matrix |
+| `programs/std2imgcoord-vox` | pass | 6/6 | std2imgcoord -vox |
+| `programs/std2imgcoord-mm` | pass | 6/6 | std2imgcoord -mm |
+| `programs/std2imgcoord-verbose` | pass | 6/6 | std2imgcoord verbose (sizes, matrices; fixed notation after them) |
+| `programs/std2imgcoord-missing-coords` | both-error | 5/5 | std2imgcoord: a coordinate file that does not exist |
+| `programs/std2imgcoord-not-numbers` | pass | 6/6 | std2imgcoord: coordinates that stop at a word |
+| `programs/std2imgcoord-lacking` | pass | 6/6 | std2imgcoord: an option lacking its argument (a message, the run goes on) |
+| `programs/std2imgcoord-unknown` | both-error | 5/5 | std2imgcoord: an unknown option (exit 255) |
+| `programs/std2imgcoord-missing-image` | both-error | 5/5 | std2imgcoord: an image that does not exist (abort) |
+| `programs/img2stdcoord-usage` | both-error | 5/5 | img2stdcoord without arguments (its usage, exit 1) |
+| `programs/img2stdcoord-xfm` | pass | 6/6 | img2stdcoord through fMRIPrep's initial matrix |
+| `programs/img2stdcoord-vox` | pass | 6/6 | img2stdcoord -vox |
+| `programs/img2stdcoord-mm` | pass | 6/6 | img2stdcoord -mm |
+| `programs/img2stdcoord-verbose` | pass | 6/6 | img2stdcoord verbose (sizes, matrices; fixed notation after them) |
+| `programs/img2stdcoord-missing-coords` | both-error | 5/5 | img2stdcoord: a coordinate file that does not exist |
+| `programs/img2stdcoord-not-numbers` | pass | 6/6 | img2stdcoord: coordinates that stop at a word |
+| `programs/img2stdcoord-lacking` | pass | 6/6 | img2stdcoord: an option lacking its argument (a message, the run goes on) |
+| `programs/img2stdcoord-unknown` | both-error | 5/5 | img2stdcoord: an unknown option (exit 255) |
+| `programs/img2stdcoord-missing-image` | both-error | 5/5 | img2stdcoord: an image that does not exist (abort) |
+| `programs/img2imgcoord-flirt-premat` | pass | 6/6 | img2imgcoord -flirt and -premat |
+| `programs/std2imgcoord-standard` | pass | 6/6 | std2imgcoord from FSL's MNI152 2 mm |
+| `programs/std2imgcoord-no-std` | pass | 6/6 | std2imgcoord without -std (its warning; 1 mm voxels) |
+| `programs/std2imgcoord-singular` | both-error | 5/5 | std2imgcoord with a singular matrix: its inverse throws |
+| `programs/img2stdcoord-noform` | pass | 6/6 | img2stdcoord to a standard image without sform or qform |
+| `programs/img2stdcoord-warp-missing` | both-error | 5/5 | img2stdcoord -warp of a file that does not exist |
+| `programs/rmsdiff-usage` | both-error | 5/5 | rmsdiff without arguments (its usage, exit 255) |
+| `programs/rmsdiff-rms` | pass | 6/6 | the RMS deviation over 80 mm about a volume's centre |
+| `programs/rmsdiff-mask` | pass | 6/6 | the largest and the RMS displacement over a mask |
+| `programs/rmsdiff-low-determinant` | pass | 6/6 | a matrix of low determinant (its warning, the matrix on standard error) |
+| `programs/rmsdiff-singular` | both-error | 5/5 | a singular second matrix: rms_deviation's message, exit 251 |
+| `programs/rmsdiff-missing-matrix` | both-error | 5/5 | a matrix file that does not exist |
+| `programs/rmsdiff-4d` | pass | 6/6 | a 4D reference (its first volume, the warning) |
+| `programs/makerot-usage` | both-error | 5/5 | makerot without arguments (the compulsory -t, its usage, exit 1) |
+| `programs/makerot-help` | both-error | 5/5 | makerot -h (its usage, exit 1) |
+| `programs/makerot-default` | pass | 6/6 | 30 degrees about z through the origin |
+| `programs/makerot-axis-centre` | pass | 6/6 | an axis that is not of unit length (FSL-76) through a centre |
+| `programs/makerot-long` | pass | 6/6 | the long options with their values after = |
+| `programs/makerot-cov` | pass | 6/6 | the centre of an image's volume (--cov) |
+| `programs/makerot-cov-missing` | both-error | 5/5 | --cov of a file that is not an image (FSL aborts) |
+| `programs/makerot-zero-axis` | both-error | 5/5 | a zero axis (its error, exit 1) |
+| `programs/makerot-short-axis` | pass | 6/6 | an axis of one value (FSL-77: the buffer's zeros) |
+| `programs/makerot-stale-axis` | pass | 6/6 | the axis given twice, the second of one value (FSL-77: the first's values) |
+| `programs/makerot-bad-theta` | both-error | 5/5 | a theta that is not a number (Couldn't set_value, exit 1) |
+| `programs/makerot-out` | pass | 6/6 | the matrix written to a file (-o) |
+| `programs/makerot-out-unwritable` | pass | 6/6 | an output file that cannot be written (the message, exit 0) |
+| `programs/makerot-token` | both-error | 5/5 | a word that is not an option (unrecognised token, exit 1) |
 | `difftest/applyxfm-blur-extraslice` | pass | 6/6 | -applyxfm onto a coarser grid: the input's blur reads beyond its edges by extraslice (FLIRT configures the interpolatio… |
+| `difftest/background-level-overflow-survives` | pass | 6/6 | a 25 x 30 x 27 input at 0.5 x 1.2 x 1 mm: FLIRT's pyramid reaches a 3 x 3 x 3 level, whose background value writes 36 b… |
+| `difftest/background-nan-order` | pass | 6/6 | a 3 x 1 x 1 input holding 5000, 100 and NaN against a 1 x 1 x 1 reference: the matrix is NaN, every output voxel the pa… |
+| `difftest/basescale-init-float` | pass | 6/6 | a base scale other than 1 (voxels of 0.01 mm) with -init: FLIRT scales the initial matrix by 1/basescale computed in si… |
 | `difftest/bbr-no-boundary-points-nan` | pass | 6/6 | BBR on a segmentation without boundary points: the cost 0 / 0 is SSE's default NaN, printed -nan |

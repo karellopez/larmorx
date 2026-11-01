@@ -869,6 +869,11 @@ impl Volume {
     /// fit its buffer and the percentile of their number (the same wherever the buffer holds
     /// the border: [`Volume::background_buffer`]).
     pub fn background_value_with(&self, whole_border: bool) -> (f32, Background) {
+        self.background_value_in(whole_border, self.nan_order)
+    }
+
+    /// [`Volume::background_value_with`] with NaN values in `order` instead of the volume's.
+    pub fn background_value_in(&self, whole_border: bool, order: NanOrder) -> (f32, Background) {
         let (zb, yb, xb) = (self.zsize(), self.ysize(), self.xsize());
         let (mut ewx, mut ewy, mut ewz) = (2i64, 2i64, 2i64);
         if ewx >= xb {
@@ -917,7 +922,7 @@ impl Volume {
         hist.truncate(kept as usize);
         let how = if !hist.iter().any(|v| v.is_nan()) {
             Background::Defined
-        } else if self.nan_order == NanOrder::Last {
+        } else if order == NanOrder::Last {
             Background::NanLast
         } else {
             let mut exact = hist.clone();

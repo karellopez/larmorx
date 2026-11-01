@@ -696,7 +696,10 @@ values sorted) of **every** value the loops write; with `reproduce`, the values 
 and its position; in both modes it names FSL-75 wherever the buffer is too small (a notice: FSL
 corrupts its heap there). A **1 × 1 × 1** image has no border (FSL reads an empty buffer): refused
 in both modes (rule B), before writing anything, with a message naming the size and FSL-75, exit
-status 1.
+status 1. NaN values in the border have no defined order in FSL's sort (FSL-22, as for mcflirt,
+`specs/mcflirt.md` §9.2): the original sorts them last by default and names FSL-22; with
+`reproduce` it gives them the order FSL's build gives them (libstdc++'s introsort, insertion sort
+below 16 values), except where that sort would read outside the vector (sorted last there).
 
 ## 11. Defects (D13) and larmorx's defaults
 

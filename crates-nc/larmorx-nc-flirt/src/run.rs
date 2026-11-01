@@ -21,8 +21,8 @@ use larmorx_nc_core::nifti::{self, dt};
 use larmorx_nc_core::optimise::{self, OptEvent};
 use larmorx_nc_core::settings::Settings;
 use larmorx_nc_core::volume::{
-    self, BorderBuffer, Conversion, Extrapolation, FslError, Interpolation, SaveError, SaveOptions,
-    SaveType, Volume,
+    self, Background, BorderBuffer, Conversion, Extrapolation, FslError, Interpolation, NanOrder,
+    SaveError, SaveOptions, SaveType, Volume,
 };
 
 use crate::options::{AngleRep, EXIT_MINUS_ONE, Interp, Options, Parsed, Window, parse};
@@ -368,21 +368,53 @@ impl<'a> Flirt<'a> {
         defects::push_once(&mut self.notices, Notice::new(defect, self.mode, detail));
     }
 
-    /// `v.backgroundval()` (FSL-75): where FLIRT's buffer is too small for the border it writes,
+    /// `v.backgroundval()`. FSL-75: where FLIRT's buffer is too small for the border it writes,
     /// FLIRT corrupts its heap and takes the percentile of the values that fit (reproduced); the
     /// correction takes it over the whole border. Both named. A 1 x 1 x 1 volume has no border
-    /// (FLIRT reads an empty buffer): refused in both modes.
+    /// (FLIRT reads an empty buffer): refused in both modes. FSL-22: NaN values in the border
+    /// have no defined order in FLIRT's sort; sorted last by default, in libstdc++'s order (FSL's
+    /// build's) with `reproduce`; named.
     fn background_of(&mut self, v: &Volume, what: &str) -> R<f32> {
         let (x, y, z) = (v.xsize(), v.ysize(), v.zsize());
-        match v.background_buffer() {
-            BorderBuffer::Exact => Ok(v.backgroundval()),
+        let order = if self.mode.reproduce() {
+            NanOrder::Libstdcxx
+        } else {
+            NanOrder::Last
+        };
+        let buffer = v.background_buffer();
+        if buffer != BorderBuffer::Empty {
+            let (_, how) = v.background_value_in(false, order);
+            let detail = match how {
+                Background::Defined => None,
+                _ if self.mode.fix() => Some(format!(
+                    "the {x} x {y} x {z} {what}'s 2-voxel border holds NaN voxels: they are \
+                     sorted last for its background value; C++ leaves the order of FLIRT's sort \
+                     undefined"
+                )),
+                Background::Outside => Some(format!(
+                    "the {x} x {y} x {z} {what}'s 2-voxel border holds NaN voxels, whose order \
+                     FLIRT's sort leaves undefined in C++: there libstdc++'s sort reads memory \
+                     outside the vector of border values, so they are sorted last"
+                )),
+                _ => Some(format!(
+                    "the {x} x {y} x {z} {what}'s 2-voxel border holds NaN voxels, whose order \
+                     FLIRT's sort leaves undefined in C++: its background value has them in \
+                     libstdc++'s order, as FSL's build sorts them"
+                )),
+            };
+            if let Some(d) = detail {
+                self.notice(&defects::FSL_22, d);
+            }
+        }
+        match buffer {
+            BorderBuffer::Exact => Ok(v.background_value_in(false, order).0),
             BorderBuffer::Empty => Err(Stop::Refuse(format!(
                 "FLIRT's background value of a {x} x {y} x {z} {what} reads the first value of \
                  an empty buffer (FSL-75)"
             ))),
             BorderBuffer::Overflow { numbins, written } => {
-                let fsl = v.background_value_with(false).0;
-                let whole = v.background_value_with(true).0;
+                let fsl = v.background_value_in(false, order).0;
+                let whole = v.background_value_in(true, order).0;
                 self.notice(
                     &defects::FSL_75,
                     format!(

@@ -127,7 +127,9 @@ pyramid meets on small images; FSL writes past its buffer and takes the percenti
 that fit; it may abort, crash or finish): corrected by default (the percentile of the whole
 border), FSL's values with `reproduce`, named in both modes (`upstream defect FSL-75 (flirt)
 corrected: the background value of a 3 x 3 x 3 pyramid level: FLIRT writes 36 border values into a
-buffer of 28 ...`). Kept and documented:
+buffer of 28 ...`). **FSL-22** (NaN voxels in a border whose background value FLIRT computes: no
+defined order in its sort): sorted last by default, libstdc++'s order (FSL's build's) with
+`reproduce`, named, as mcflirt's replica does. Kept and documented:
 FSL-67 (BBR's normals scaled by the reference level's voxel sizes; measured in part 2: computing
 them in millimetres moves fMRIPrep's BBR results by 0.02 mm on average and brings no gain on a
 strongly anisotropic case with a known motion: rule C), FSL-69 (a coarse `setscale` the data

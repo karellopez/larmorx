@@ -25,7 +25,7 @@ def run(path_and_which):
     path, which = path_and_which
     d = json.loads(Path(path).read_text())
     recipe = d["shrunk"] if which == "shrunk" and d.get("shrunk") else d["recipe"]
-    tool = get("fsl-flirt")
+    tool = get(d.get("tool", "fsl-flirt"))
     case = tool.case(recipe, "replica")
     checks = CheckList()
     try:

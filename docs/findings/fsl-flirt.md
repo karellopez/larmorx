@@ -182,6 +182,14 @@ the trial's memory agrees, in its shrunk and drawn forms; the 6 that did not are
   filtered the weight. Each copy is now released once used (the copies made only when the
   extrapolation changes): 201 MiB against 192, 322 against 374, every matrix still FSL's.
   `tests/parity/test_memory_peak.py` gains both calls (`omat-only`, `inweight`).
+- **FSL-22 in FLIRT** (trial-flirt-programs-00931: a 3 × 1 × 1 input holding 5000, 100 and NaN
+  against a 1 × 1 × 1 reference; the matrix is NaN, so every output voxel is the padding, the
+  input's background value; -00902 likewise with a 2 × 2 × 4 input holding NaN voxels). `calc_bval` sorts the border with `std::sort` and `operator<`:
+  libstdc++'s order put the NaN first (FLIRT's output NaN); the replica's volumes sorted NaN last
+  in both modes (100): mcflirt's replica had FSL-22's switch, FLIRT's did not use it. FLIRT's
+  background values now take the NaN order by mode (last by default, libstdc++'s with
+  `reproduce`) and name FSL-22 wherever a border holds NaN (`_SILENT`: the padding may not show).
+  Permanent case `background-nan-order`.
 - **Quaternion messages: one missing** (trial-flirt-programs-00219 and the like: 1720 lines of
   `Parameters do not form a valid axis` against FSL's 1721). FLIRT's `optimise` builds the starting
   matrix (`vector2affine(params, no_params, affmattst)`) at every verbosity and prints it only from

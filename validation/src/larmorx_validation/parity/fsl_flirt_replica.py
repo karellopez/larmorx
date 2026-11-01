@@ -103,17 +103,15 @@ def _environment(settings: dict[str, str | None]) -> dict[str, str]:
     return env
 
 
-def run_oracle(
-    program: str, args: list[str], *, cwd: Path, settings: dict[str, str | None]
-) -> Completed:
+def oracle_run(program: str, args: list[str], *, cwd: Path, settings: dict[str, str | None]):
     """FSL's ``program`` (``flirt`` or ``convert_xfm``) with ``args`` in ``cwd``, through the
     oracle-output cache: FLIRT is single-threaded and draws no random numbers, so a run is
     served once it ran; every file it writes is in ``cwd`` and every file there counts by its
-    content."""
+    content. Returns the cache's ``Completed`` (``cached``: served from it)."""
     from larmorx_validation import oracle_cache
 
     argv = [str(fsldir() / "bin" / program), *args]
-    p = oracle_cache.run(
+    return oracle_cache.run(
         argv,
         env=_environment(settings),
         cwd=cwd,
@@ -123,6 +121,13 @@ def run_oracle(
         inputs=[p for p in sorted(cwd.rglob("*")) if p.is_file()],
         timeout=3600,
     )
+
+
+def run_oracle(
+    program: str, args: list[str], *, cwd: Path, settings: dict[str, str | None]
+) -> Completed:
+    """:func:`oracle_run` as the suite's ``Completed``."""
+    p = oracle_run(program, args, cwd=cwd, settings=settings)
     return Completed(p.returncode, p.stdout, p.stderr)
 
 
@@ -490,32 +495,35 @@ def fmriprep_calls() -> list[tuple[str, Path]]:
     return out
 
 
-def _fmriprep_case(payload: tuple[str, str], checks: CheckList) -> None:
-    run, node = payload
+def fmriprep_args(run: str, node: str | Path) -> list[str]:
+    """fMRIPrep's BBR call of ``run`` (its ``flt_bbr`` node directory ``node``) as the suite
+    runs it: the container's paths mapped onto the run's ``out`` and ``work`` directories, the
+    outputs written into the working directory, FSL's own ``bbr.sch``."""
     ws = workspace()
     assert ws is not None
     rdir = ws / FMRIPREP_RUNS / run
     argv = (Path(node) / "command.txt").read_text(encoding="utf-8").split()[1:]
     mounts = {"/out/": str(rdir / "out") + "/", "/work/": str(rdir / "work") + "/"}
     sched = fsldir() / "etc" / "flirtsch" / "bbr.sch"
+    out = []
+    for i, a in enumerate(argv):
+        prev = argv[i - 1] if i else ""
+        if prev in ("-out", "-omat"):
+            out.append(Path(a).name)
+            continue
+        if prev == "-schedule":
+            out.append(str(sched))
+            continue
+        for k, v in mounts.items():
+            if a.startswith(k):
+                a = v + a[len(k) :]
+        out.append(a)
+    return out
 
-    def mapped() -> list[str]:
-        out = []
-        for i, a in enumerate(argv):
-            prev = argv[i - 1] if i else ""
-            if prev in ("-out", "-omat"):
-                out.append(Path(a).name)
-                continue
-            if prev == "-schedule":
-                out.append(str(sched))
-                continue
-            for k, v in mounts.items():
-                if a.startswith(k):
-                    a = v + a[len(k) :]
-            out.append(a)
-        return out
 
-    args = mapped()
+def _fmriprep_case(payload: tuple[str, str], checks: CheckList) -> None:
+    run, node = payload
+    args = fmriprep_args(run, node)
     missing = [a for a in args if a.startswith("/") and not Path(a).exists()]
     if missing:
         raise Outcome("skipped", f"input not available: {missing[0]}")

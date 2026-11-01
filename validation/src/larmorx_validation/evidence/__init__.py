@@ -27,6 +27,7 @@ TOOLS: dict[str, str] = {
     "afni-automask": "afni_automask",
     "afni-unifize": "afni_unifize",
     "fsl-bet": "fsl_bet",
+    "fsl-flirt": "fsl_flirt",
     "mri-hmc": "mri_hmc",
     "resample-series": "resample_series",
     "nifti-io": "nifti_io",

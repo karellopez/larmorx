@@ -5,7 +5,8 @@
 // Data61 / CSIRO): mul_gemm.hpp, mul_gemv.hpp, op_dot_meat.hpp, op_inv_gen_meat.hpp (14.2.1),
 // op_inv_meat.hpp (10.5.1), op_det_meat.hpp, auxlib_meat.hpp (inv, inv_tr, det,
 // solve_square_fast; 10.5.1's solve_square_tiny), trimat_helper.hpp, sym_helper.hpp, fn_trace.hpp,
-// fn_accu.hpp, glue_times_meat.hpp. Part of larmorx-nc (FSL Licence terms; see LICENSE).
+// fn_accu.hpp, glue_times_meat.hpp, arma_ostream_meat.hpp (14.2.1). Part of larmorx-nc (FSL
+// Licence terms; see LICENSE).
 //! The small dense matrices of FSL's NEWMAT layer, evaluated the way FSL's binaries evaluate
 //! them.
 //!
@@ -879,6 +880,60 @@ pub fn inv_tiny(x: &Mat) -> Option<Mat> {
     Some(out)
 }
 
+/// `std::cout << X` for an Armadillo expression (Armadillo 14.2.1's `arma_ostream::print` with
+/// `modify`: how armawrap's `.i()` and other unevaluated expressions print): the layout from the
+/// finite values (scientific with 4 decimals in 13 columns when one is at least 100 in
+/// magnitude, or non-zero and at most 1e-4; else fixed with 4 decimals in 10 columns when one is
+/// at least 10 in magnitude, or in 9), each value right-aligned, zeros as `0`, non-finite values
+/// as `inf`, `-inf`, `nan`; a newline after each row. The stream's state is restored after it
+/// (the caller's fixed or default notation is unchanged).
+pub fn print_expr(m: &Mat) -> String {
+    let (rows, cols) = (m.rows, m.cols);
+    if rows == 0 || cols == 0 {
+        return format!("[matrix size: {rows}x{cols}]\n");
+    }
+    let (mut c, mut b) = (false, false);
+    for &v in &m.data {
+        if !v.is_finite() {
+            continue;
+        }
+        if v >= 100.0 || v <= -100.0 || (v > 0.0 && v <= 1e-4) || (-1e-4..0.0).contains(&v) {
+            c = true;
+            break;
+        }
+        if v >= 10.0 || v <= -10.0 {
+            b = true;
+        }
+    }
+    let width = if c {
+        13
+    } else if b {
+        10
+    } else {
+        9
+    };
+    let mut s = String::new();
+    for r in 0..rows {
+        for col in 0..cols {
+            let v = m.at(r, col);
+            let t = if v == 0.0 {
+                "0".to_owned()
+            } else if v.is_nan() {
+                "nan".to_owned()
+            } else if v.is_infinite() {
+                if v < 0.0 { "-inf" } else { "inf" }.to_owned()
+            } else if c {
+                crate::cnum::fmt_e(v, 4)
+            } else {
+                crate::cnum::fmt_f(v, 4)
+            };
+            s.push_str(&format!("{t:>width$}"));
+        }
+        s.push('\n');
+    }
+    s
+}
+
 /// `inv()` (Armadillo 14.2.1's `op_inv_gen_full::apply_direct`, no options) of a square matrix:
 ///
 /// - 1 × 1: the reciprocal (singular when the element is 0);
@@ -1160,6 +1215,19 @@ pub fn trace_at_b(a: &Mat, b: &Mat) -> f64 {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn armadillo_expression_layouts() {
+        // fixed, 4 decimals, 9 columns; zeros as 0
+        let m = Mat::from_rows(1, 2, &[0.5, 0.0]);
+        assert_eq!(print_expr(&m), "   0.5000        0\n");
+        // a value of at least 10: 10 columns
+        let m = Mat::from_rows(1, 2, &[12.25, -1.0]);
+        assert_eq!(print_expr(&m), "   12.2500   -1.0000\n");
+        // at least 100, or at most 1e-4: scientific in 13 columns
+        let m = Mat::from_rows(1, 2, &[150.0, 1e-5]);
+        assert_eq!(print_expr(&m), "   1.5000e+02   1.0000e-05\n");
+    }
 
     #[test]
     fn tiny_products_sum_left_to_right() {

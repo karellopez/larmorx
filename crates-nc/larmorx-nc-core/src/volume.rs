@@ -316,6 +316,17 @@ pub enum NanOrder {
     Libstdcxx,
 }
 
+/// Whether `calc_bval(vol, 2)`'s buffer holds the border it writes (FSL-75).
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum BorderBuffer {
+    /// The buffer holds exactly the values written.
+    Exact,
+    /// `written` values for a buffer of `numbins`: the rest are written past it.
+    Overflow { numbins: i64, written: i64 },
+    /// No buffer (1 × 1 × 1): FSL reads the first element of an empty one.
+    Empty,
+}
+
 /// What [`Volume::background_value`] did with NaN values in the shell.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Background {
@@ -822,10 +833,47 @@ impl Volume {
         self.background_value().0
     }
 
+    /// FSL-75: whether `calc_bval(vol, 2)`'s buffer holds the border it writes. It sizes the
+    /// buffer `2(x−2ex)(y−2ey)ez + 2(x−2ex)z·ey + 2yz·ex` (each edge width `e` the smaller of 2
+    /// and the size less 1), which is too small when the size along x is 3 (and y or z at least
+    /// 2), or along y is 3 (z at least 2, x neither 2 nor 4): a factor of −1 in a term whose
+    /// loop writes nothing. FSL then writes the rest past the buffer (heap corruption) and sorts
+    /// the values that fit; at 1 × 1 × 1 the buffer is empty and FSL reads its first element.
+    pub fn background_buffer(&self) -> BorderBuffer {
+        let (zb, yb, xb) = (self.zsize(), self.ysize(), self.xsize());
+        let ew = |n: i64| 2i64.min(n - 1);
+        let (ewx, ewy, ewz) = (ew(xb), ew(yb), ew(zb));
+        let numbins = 2 * (xb - 2 * ewx) * (yb - 2 * ewy) * ewz
+            + 2 * (xb - 2 * ewx) * zb * ewy
+            + 2 * yb * zb * ewx;
+        let (ix, iy) = ((xb - 2 * ewx).max(0), (yb - 2 * ewy).max(0));
+        let written = 2 * ewz * ix * iy + 2 * ewy * ix * zb + 2 * ewx * yb * zb;
+        if numbins <= 0 {
+            BorderBuffer::Empty
+        } else if numbins < written {
+            BorderBuffer::Overflow { numbins, written }
+        } else {
+            BorderBuffer::Exact
+        }
+    }
+
     /// [`Volume::backgroundval`], and what was done with NaN values in the shell: `std::sort`
     /// with `operator<` has no defined order for them in C++ (FSL-22), and the volume's
     /// [`NanOrder`] decides theirs.
     pub fn background_value(&self) -> (f32, Background) {
+        self.background_value_with(false)
+    }
+
+    /// [`Volume::background_value`] with `whole_border`: the 10th percentile of every value
+    /// the border loops write (FSL-75 corrected), instead of FSL's, which keeps the values that
+    /// fit its buffer and the percentile of their number (the same wherever the buffer holds
+    /// the border: [`Volume::background_buffer`]).
+    pub fn background_value_with(&self, whole_border: bool) -> (f32, Background) {
+        self.background_value_in(whole_border, self.nan_order)
+    }
+
+    /// [`Volume::background_value_with`] with NaN values in `order` instead of the volume's.
+    pub fn background_value_in(&self, whole_border: bool, order: NanOrder) -> (f32, Background) {
         let (zb, yb, xb) = (self.zsize(), self.ysize(), self.xsize());
         let (mut ewx, mut ewy, mut ewz) = (2i64, 2i64, 2i64);
         if ewx >= xb {
@@ -865,9 +913,16 @@ impl Volume {
                 }
             }
         }
+        // FSL-75: FSL's buffer keeps the first `numbins` values written
+        let kept = if whole_border {
+            hist.len() as i64
+        } else {
+            numbins.max(0).min(hist.len() as i64)
+        };
+        hist.truncate(kept as usize);
         let how = if !hist.iter().any(|v| v.is_nan()) {
             Background::Defined
-        } else if self.nan_order == NanOrder::Last {
+        } else if order == NanOrder::Last {
             Background::NanLast
         } else {
             let mut exact = hist.clone();
@@ -882,7 +937,8 @@ impl Volume {
         if how != Background::Libstdcxx {
             sort_nan_last(&mut hist);
         }
-        let p10 = (numbins / 10).max(0) as usize;
+        let count = if whole_border { kept } else { numbins };
+        let p10 = (count / 10).max(0) as usize;
         (hist.get(p10).copied().unwrap_or(0.0), how)
     }
 
@@ -1359,6 +1415,64 @@ fn read_general<T: Elem>(
         v.make_radiological();
     }
     Ok((v, header.datatype, header.units))
+}
+
+/// `read_volume_hdr_only(target, filename)`: the header's geometry only (FSL allocates a buffer
+/// of one value; here `data` is empty): sizes below 1 made 1, the voxel sizes as stored
+/// (`setdims`: their magnitudes; no ANALYZE origin or zero-size repair, unlike a full read), the
+/// sform and qform with their codes, the intent, display range and auxiliary file; swapped to
+/// radiological order (header only) when the file is not. A name that cannot be read is
+/// newimage's #22 exception.
+pub fn read_volume_hdr_only(filename: &str, settings: &Settings) -> Result<Volume, FslError> {
+    let fail = |what: &str| {
+        FslError::imthrow(
+            format!("Failed to read volume {filename}\nError : {what}"),
+            22,
+        )
+    };
+    let valid = match return_validimagefilename(filename) {
+        Ok(v) => v,
+        Err(e) => {
+            let mut out = fail(&e.what);
+            out.printed.splice(0..0, e.printed);
+            return Err(out);
+        }
+    };
+    let header =
+        nifti::load_header(Path::new(&valid), &settings.open_options()).map_err(|e| fail(&e.0))?;
+    let mut dims = [1i64; 7];
+    for (k, d) in dims.iter_mut().enumerate() {
+        *d = header.dim[k + 1].max(1);
+    }
+    let mut v = Volume::<f32>::new7([1; 7]);
+    v.data = Vec::new();
+    v.dims = dims;
+    for k in 0..7 {
+        v.pixdims[k] = (header.pixdim[k + 1] as f32).abs();
+    }
+    for k in 4..7 {
+        v.pixdims[k] = header.pixdim[k + 1] as f32;
+    }
+    v.sform = mat44_to_mat(&header.get_sform());
+    v.qform = mat44_to_mat(&header.get_qform());
+    v.sform_code = header.sform_code;
+    v.qform_code = header.qform_code;
+    v.radiological_file = header_left_right_order(&header) == RADIOLOGICAL;
+    v.intent_code = header.intent_code;
+    v.intent_params = [
+        header.intent_p1 as f32,
+        header.intent_p2 as f32,
+        header.intent_p3 as f32,
+    ];
+    v.display_min = header.cal_min as f32;
+    v.display_max = header.cal_max as f32;
+    let mut aux = header.aux_file.clone();
+    aux.truncate(24);
+    v.aux_file = aux;
+    if !v.radiological_file {
+        v.make_radiological();
+    }
+    Ok(v)
 }
 
 /// `read_volume4D(target, filename)`: the volume, the file's datatype and its `xyzt_units`.
@@ -1907,6 +2021,73 @@ pub fn save_type_for(datatype: i16) -> Result<SaveType, String> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn background_buffer_shapes() {
+        // FSL-75: x = 3 (y or z at least 2), y = 3 (z at least 2, x not 2 or 4), 1 x 1 x 1
+        let shape = |x: i64, y: i64, z: i64| Volume::<f32>::new7([x, y, z, 1, 1, 1, 1]);
+        for (x, y, z) in [
+            (3, 2, 1),
+            (3, 1, 2),
+            (3, 10, 10),
+            (1, 3, 2),
+            (5, 3, 2),
+            (10, 3, 10),
+        ] {
+            assert!(
+                matches!(
+                    shape(x, y, z).background_buffer(),
+                    BorderBuffer::Overflow { .. }
+                ),
+                "{x} {y} {z}"
+            );
+        }
+        assert_eq!(
+            shape(3, 3, 3).background_buffer(),
+            BorderBuffer::Overflow {
+                numbins: 28,
+                written: 36
+            }
+        );
+        assert_eq!(shape(1, 1, 1).background_buffer(), BorderBuffer::Empty);
+        for (x, y, z) in [
+            (3, 1, 1),
+            (2, 3, 5),
+            (4, 3, 5),
+            (10, 10, 3),
+            (8, 1, 1),
+            (2, 2, 2),
+        ] {
+            assert_eq!(
+                shape(x, y, z).background_buffer(),
+                BorderBuffer::Exact,
+                "{x} {y} {z}"
+            );
+        }
+        // 3 x 3 x 3 holding 0..27: only the yz faces' loops write (the others run from x = 2
+        // to 1), 36 values; FSL keeps the first 28
+        let mut v = shape(3, 3, 3);
+        for (k, d) in v.data.iter_mut().enumerate() {
+            *d = k as f32;
+        }
+        let fsl = v.background_value_with(false).0;
+        let all = v.background_value_with(true).0;
+        assert_eq!(fsl, v.backgroundval());
+        let mut written = Vec::new();
+        for e in 0..2 {
+            for y in 0..3 {
+                for z in 0..3 {
+                    written.push(v.value(e, y, z));
+                    written.push(v.value(2 - e, y, z));
+                }
+            }
+        }
+        let mut kept = written[..28].to_vec();
+        kept.sort_by(f32::total_cmp);
+        written.sort_by(f32::total_cmp);
+        assert_eq!(fsl, kept[2]);
+        assert_eq!(all, written[3]);
+    }
 
     #[test]
     fn basenames_and_paths() {

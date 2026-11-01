@@ -1,0 +1,292 @@
+{
+ "defect": "FSL-75",
+ "description": "a 25 x 30 x 27 input at 0.5 x 1.2 x 1 mm: FLIRT's pyramid reaches a 3 x 3 x 3 level, whose background value writes 36 border values into a buffer of 28 (FSL-75); FLIRT survives the heap corruption here and finishes: the replica reproduces the values that fit (the same matrix), the correction takes the whole border",
+ "expect": "pass",
+ "found": {
+  "detail": "exit status: 0 vs 1; files written: only FSL ['out.mat'], only the replica []",
+  "n": 11900,
+  "seed": "trial-flirt-programs",
+  "shrink_moves": [],
+  "signature": [
+   "exit status",
+   "files written"
+  ]
+ },
+ "id": "background-level-overflow-survives",
+ "implementations": [
+  "replica"
+ ],
+ "reason": "",
+ "recipe": {
+  "extra": {
+   "output_type": "NIFTI_GZ",
+   "tool": "flirt"
+  },
+  "features": {
+   "-anglerep": false,
+   "-bins": false,
+   "-coarsesearch": false,
+   "-cost": false,
+   "-datatype": true,
+   "-dof": false,
+   "-finesearch": true,
+   "-forcescaling": false,
+   "-init": false,
+   "-interp": false,
+   "-inweight": false,
+   "-minsampling": false,
+   "-noclamp": false,
+   "-noresampblur": false,
+   "-noresample": false,
+   "-nosearch": true,
+   "-out": false,
+   "-paddingsize": false,
+   "-refweight": false,
+   "-searchcost": false,
+   "-searchrx": false,
+   "-searchry": false,
+   "-setbackground": false,
+   "-usesqform": true,
+   "-v": false,
+   "FSLOUTPUTTYPE": "NIFTI_GZ",
+   "axis0": 0.8,
+   "axis1": 0.8,
+   "axis2": 1.1,
+   "bbr": false,
+   "bias0": 0.01,
+   "bias1": 0.0075,
+   "bias2": 0.005,
+   "bias3": 0.0025,
+   "centre0": 1.5,
+   "centre1": 3.0,
+   "centre2": 0.0,
+   "content": "head",
+   "datatype": "short",
+   "dtype": "float32",
+   "extreme": false,
+   "fine": "9",
+   "kind": "quaternion",
+   "noise": 6.0,
+   "orientation": "plumb",
+   "origin0": 9.25,
+   "origin1": -9.0,
+   "origin2": -56.75,
+   "qfac": -1,
+   "qform_code": 1,
+   "range": "plain",
+   "same content": true,
+   "sform": "other",
+   "sform_code": 1,
+   "shape": "25x30x27",
+   "shear0": -0.05,
+   "shear1": 0.0,
+   "shear2": 0.025,
+   "shift0": 3.0,
+   "shift1": 1.5,
+   "shift2": -1.5,
+   "size": 11.5,
+   "spacing0": 0.5,
+   "spacing1": 1.2,
+   "spacing2": 1.0,
+   "suffix": ".nii",
+   "tissues": "epi",
+   "units": "unknown"
+  },
+  "groups": [
+   {
+    "args": [
+     "-in",
+     "{in:in}",
+     "-ref",
+     "{in:ref}",
+     "-omat",
+     "out.mat"
+    ],
+    "name": "files",
+    "optional": false
+   },
+   {
+    "args": [
+     "-nosearch"
+    ],
+    "name": "-nosearch",
+    "optional": true
+   },
+   {
+    "args": [
+     "-finesearch",
+     "9"
+    ],
+    "name": "-finesearch",
+    "optional": true
+   },
+   {
+    "args": [
+     "-usesqform"
+    ],
+    "name": "-usesqform",
+    "optional": true
+   },
+   {
+    "args": [
+     "-datatype",
+     "short"
+    ],
+    "name": "-datatype",
+    "optional": true
+   },
+   {
+    "args": [
+     "-anglerep",
+     "quaternion"
+    ],
+    "name": "-anglerep",
+    "optional": true
+   }
+  ],
+  "inputs": {
+   "in": {
+    "content": {
+     "axes": [
+      0.95,
+      0.8,
+      1.05
+     ],
+     "bias": [
+      -0.01,
+      -0.0025,
+      0.01,
+      -0.0025
+     ],
+     "centre": [
+      0.5,
+      1.5,
+      -4.0
+     ],
+     "noise": 1.0,
+     "seed": 1717076831,
+     "size": 26.5,
+     "tissues": "epi",
+     "type": "head"
+    },
+    "dtype": "float32",
+    "geometry": {
+     "origin": [
+      9.25,
+      -9.0,
+      -56.75
+     ],
+     "qfac": -1,
+     "qform_code": 1,
+     "quaternion": [
+      1,
+      0,
+      0,
+      0
+     ],
+     "sform": "other",
+     "sform_code": 1,
+     "shear": [
+      -0.05,
+      0.0,
+      0.025
+     ],
+     "spacing": [
+      0.5,
+      1.2,
+      1.0
+     ],
+     "units": "unknown"
+    },
+    "scaling": null,
+    "shape": [
+     25,
+     30,
+     27
+    ],
+    "suffix": ".nii",
+    "values": {
+     "offset": 0.0,
+     "scale": 1.0
+    }
+   },
+   "ref": {
+    "content": {
+     "axes": [
+      0.95,
+      0.8,
+      1.05
+     ],
+     "bias": [
+      -0.01,
+      -0.0025,
+      0.01,
+      -0.0025
+     ],
+     "centre": [
+      -2.5,
+      0.0,
+      -2.5
+     ],
+     "noise": 1.0,
+     "seed": 1598418771,
+     "size": 26.5,
+     "tissues": "epi",
+     "type": "head"
+    },
+    "dtype": "int16",
+    "geometry": {
+     "origin": [
+      -33.5,
+      0.75,
+      49.5
+     ],
+     "qfac": 1,
+     "qform_code": 1,
+     "quaternion": [
+      1,
+      0,
+      0,
+      0
+     ],
+     "sform": "same",
+     "sform_code": 0,
+     "spacing": [
+      0.5,
+      0.5,
+      0.5
+     ],
+     "units": "mm"
+    },
+    "scaling": null,
+    "shape": [
+     9,
+     10,
+     10
+    ],
+    "suffix": ".nii",
+    "values": {
+     "offset": 0.0,
+     "scale": 1.0
+    }
+   }
+  },
+  "n": 11900,
+  "options": [
+   "-anglerep quaternion",
+   "-datatype",
+   "-finesearch",
+   "-nosearch",
+   "-usesqform",
+   "FSLOUTPUTTYPE=NIFTI_GZ",
+   "flirt"
+  ],
+  "seed": "trial-flirt-programs",
+  "tool": "fsl-flirt-programs"
+ },
+ "rule": "A",
+ "status": "register",
+ "suite": "fsl-flirt-replica",
+ "tier": "smoke",
+ "tool": "fsl-flirt"
+}

@@ -1,0 +1,264 @@
+{
+ "defect": "FSL-22",
+ "description": "a 3 x 1 x 1 input holding 5000, 100 and NaN against a 1 x 1 x 1 reference: the matrix is NaN, every output voxel the padding, the input's background value (FSL-22: NaN in its border, whose order FLIRT's sort leaves undefined): libstdc++'s order (NaN first, FLIRT's NaN) with reproduce, NaN sorted last (100) by default",
+ "expect": "pass",
+ "found": {
+  "detail": "every file bit-identical: out.nii: 1 of 1 values differ (max |diff| inf)",
+  "n": 931,
+  "seed": "trial-flirt-programs",
+  "shrink_moves": [
+   "dropped -anglerep (-anglerep quaternion)",
+   "dropped -noclamp (-noclamp)",
+   "dropped -bins (-bins 128)",
+   "dropped -dof (-dof 6)",
+   "ref: axis 2 32 -> 16 voxels",
+   "ref: axis 1 22 -> 11 voxels",
+   "ref: axis 2 16 -> 8 voxels",
+   "ref: axis 0 15 -> 7 voxels",
+   "ref: axis 1 11 -> 5 voxels",
+   "ref: axis 2 8 -> 4 voxels",
+   "ref: axis 0 7 -> 3 voxels",
+   "ref: axis 1 5 -> 2 voxels",
+   "ref: axis 2 4 -> 2 voxels",
+   "ref: axis 0 3 -> 1 voxels",
+   "ref: axis 1 2 -> 1 voxels",
+   "ref: axis 2 2 -> 1 voxels",
+   "in: axis 1 30 -> 15 voxels",
+   "in: axis 0 24 -> 12 voxels",
+   "in: axis 1 15 -> 7 voxels",
+   "in: axis 0 12 -> 6 voxels",
+   "in: axis 2 18 -> 9 voxels",
+   "in: axis 2 9 -> 4 voxels",
+   "ref (and its grid): plumb orientation",
+   "ref (and its grid): origin at 0",
+   "ref (and its grid): qform and sform codes 1",
+   "ref (and its grid): millimetres",
+   "ref: float32 storage",
+   "ref: content crop -> constant",
+   "in (and its grid): plumb orientation",
+   "in: axis 2 4 -> 2 voxels",
+   "in: axis 2 2 -> 1 voxels",
+   "in: axis 1 7 -> 3 voxels",
+   "in: axis 1 3 -> 1 voxels",
+   "in: axis 0 6 -> 3 voxels",
+   "in (and its grid): unit spacing",
+   "in (and its grid): origin at 0",
+   "in (and its grid): qform and sform codes 1",
+   "in: plain value range",
+   "in: content crop -> constant"
+  ],
+  "signature": [
+   "every file bit-identical"
+  ]
+ },
+ "id": "background-nan-order",
+ "implementations": [
+  "replica"
+ ],
+ "reason": "",
+ "recipe": {
+  "extra": {
+   "output_type": "NIFTI",
+   "tool": "flirt"
+  },
+  "features": {
+   "-anglerep": false,
+   "-bins": true,
+   "-coarsesearch": false,
+   "-cost": false,
+   "-datatype": false,
+   "-dof": true,
+   "-finesearch": false,
+   "-forcescaling": false,
+   "-init": false,
+   "-interp": false,
+   "-inweight": false,
+   "-minsampling": false,
+   "-noclamp": true,
+   "-noresampblur": false,
+   "-noresample": false,
+   "-nosearch": false,
+   "-out": true,
+   "-paddingsize": false,
+   "-refweight": false,
+   "-searchcost": false,
+   "-searchrx": false,
+   "-searchry": false,
+   "-setbackground": false,
+   "-usesqform": false,
+   "-v": false,
+   "FSLOUTPUTTYPE": "NIFTI",
+   "axis0": 1.2,
+   "axis1": 0.85,
+   "axis2": 1.15,
+   "bbr": false,
+   "bias0": 0.0075,
+   "bias1": -0.0025,
+   "bias2": 0.0025,
+   "bias3": 0.0075,
+   "bins": "128",
+   "centre0": -1.0,
+   "centre1": 2.5,
+   "centre2": 4.5,
+   "content": "head",
+   "corner0": 51,
+   "corner1": 25,
+   "corner2": 58,
+   "crop source": "templateflow/tpl-MNI152NLin2009cAsym/tpl-MNI152NLin2009cAsym_res-02_T1w.nii.gz",
+   "crop stride": 1,
+   "dof": "6",
+   "dtype": "float32",
+   "extreme": true,
+   "kind": "quaternion",
+   "noise": 0.0,
+   "orientation": "plumb",
+   "origin0": -14.0,
+   "origin1": -15.75,
+   "origin2": 9.0,
+   "qfac": -1,
+   "qform_code": 1,
+   "quantize": 10.0,
+   "range": "steps",
+   "same content": true,
+   "sform": "same",
+   "sform_code": 4,
+   "shape": "24x30x18",
+   "size": 24.0,
+   "spacing0": 1.0,
+   "spacing1": 0.5,
+   "spacing2": 0.05,
+   "specials": 3,
+   "suffix": ".nii",
+   "tissues": "t2",
+   "units": "mm"
+  },
+  "groups": [
+   {
+    "args": [
+     "-in",
+     "{in:in}",
+     "-ref",
+     "{in:ref}",
+     "-omat",
+     "out.mat"
+    ],
+    "name": "files",
+    "optional": false
+   },
+   {
+    "args": [
+     "-out",
+     "out"
+    ],
+    "name": "-out",
+    "optional": true
+   }
+  ],
+  "inputs": {
+   "in": {
+    "content": {
+     "seed": 843506083,
+     "type": "constant"
+    },
+    "dtype": "float32",
+    "geometry": {
+     "origin": [
+      0.0,
+      0.0,
+      0.0
+     ],
+     "qfac": 1,
+     "qform_code": 1,
+     "quaternion": [
+      1,
+      0,
+      0,
+      0
+     ],
+     "sform": "same",
+     "sform_code": 1,
+     "spacing": [
+      1.0,
+      1.0,
+      1.0
+     ],
+     "units": "mm"
+    },
+    "scaling": null,
+    "shape": [
+     3,
+     1,
+     1
+    ],
+    "suffix": ".nii",
+    "values": {
+     "offset": 0.0,
+     "scale": 1.0,
+     "specials": [
+      "nan",
+      "-0",
+      "outlier"
+     ]
+    }
+   },
+   "ref": {
+    "content": {
+     "seed": 1885839080,
+     "type": "constant"
+    },
+    "dtype": "float32",
+    "geometry": {
+     "origin": [
+      0.0,
+      0.0,
+      0.0
+     ],
+     "qfac": 1,
+     "qform_code": 1,
+     "quaternion": [
+      1,
+      0,
+      0,
+      0
+     ],
+     "sform": "same",
+     "sform_code": 1,
+     "spacing": [
+      1.0,
+      1.0,
+      1.0
+     ],
+     "units": "mm"
+    },
+    "scaling": null,
+    "shape": [
+     1,
+     1,
+     1
+    ],
+    "suffix": ".nii.gz",
+    "values": {
+     "offset": 0.0,
+     "scale": 1.0
+    }
+   }
+  },
+  "n": 931,
+  "options": [
+   "-anglerep quaternion",
+   "-bins",
+   "-dof 6",
+   "-noclamp",
+   "-out",
+   "FSLOUTPUTTYPE=NIFTI",
+   "flirt"
+  ],
+  "seed": "trial-flirt-programs",
+  "tool": "fsl-flirt-programs"
+ },
+ "rule": "A",
+ "status": "register",
+ "suite": "fsl-flirt-replica",
+ "tier": "smoke",
+ "tool": "fsl-flirt"
+}

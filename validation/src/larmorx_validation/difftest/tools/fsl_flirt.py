@@ -11,9 +11,13 @@ boundary-based cost with FSL's ``bbr.sch``, a white-matter segmentation, its typ
 ``-applyxfm`` and ``-applyisoxfm`` on 3D and 4D inputs with every interpolation,
 ``-paddingsize``, ``-setbackground``; ``convert_xfm`` with ``-inverse``, ``-concat``,
 ``-fixscaleskew``; inputs of every stored type up to 32 voxels per axis, FSL's output types.
-Not drawn: what the replica refuses as not yet replicated (``-anglerep quaternion``, general
-parameter subsets, ``-debug`` with BBR) and what makes FSL loop for ever (FSL-71, FSL-72) or abort
-(``-bins`` below 8: FSL-21, FSL-66)."""
+``-anglerep quaternion`` (since part 2). FLIRT's other programs (part 2, also a tool of their
+own, ``fsl-flirt-programs``, which draws only them and quaternion registrations): ``avscale``
+with its options and a volume, ``img2imgcoord``, ``std2imgcoord`` and ``img2stdcoord`` with
+``-xfm``, ``-mm``, ``-vox``, the verbose levels and random coordinates, ``rmsdiff`` with and
+without a mask. Not drawn: what the replica refuses as not yet replicated (general parameter
+subsets, ``-debug`` with BBR, the coordinate programs' ``-warp``) and what makes FSL loop for ever
+(FSL-71, FSL-72) or abort (``-bins`` below 8: FSL-21, FSL-66)."""
 
 from __future__ import annotations
 
@@ -205,8 +209,103 @@ def draw_register(d: gen.Draw) -> dict:
     if d.chance("-out", 0.6):
         groups.append(group("-out", "-out", "out"))
         options.append("-out")
+    if d.chance("-anglerep", 0.08):
+        groups.append(group("-anglerep", "-anglerep", "quaternion"))
+        options.append("-anglerep quaternion")
     _common(d, groups, options)
     return {"groups": groups, "inputs": inputs, "options": options, "extra": {"tool": "flirt"}}
+
+
+def _coords_text(d: gen.Draw) -> dict:
+    """Random coordinates (a few rows of three numbers with up to 2 decimals; sometimes a word
+    that stops the reading)."""
+    rows = []
+    for k in range(d.integer("rows", 1, 5)):
+        rows.append(" ".join(f"{d.integer(f'c{k}{j}', -4000, 4000) / 100:g}" for j in range(3)))
+    if d.chance("stop word", 0.1):
+        rows.insert(d.integer("stop at", 0, len(rows)), "1 2 x")
+    return {"kind": "text", "suffix": ".txt", "text": "\n".join(rows) + "\n"}
+
+
+def draw_avscale(d: gen.Draw) -> dict:
+    inputs = {"m": _matrix(d, "m")}
+    groups = []
+    options = []
+    opt = d.choice("avscale option", (None, "--allparams", "--inverteddies"), (2, 2, 1))
+    if opt:
+        groups.append(required(opt, opt))
+        options.append(opt)
+    groups.append(required("matrix", "{in:m}"))
+    if d.chance("volume", 0.5):
+        inputs["v"] = _image(d.child("v"))
+        groups.append(required("volume", "{in:v}"))
+        options.append("volume")
+    return {"groups": groups, "inputs": inputs, "options": options, "extra": {"tool": "avscale"}}
+
+
+def draw_coords(d: gen.Draw) -> dict:
+    prog = d.choice("program", ("img2imgcoord", "std2imgcoord", "img2stdcoord"))
+    a, b = ("-src", "-dest") if prog == "img2imgcoord" else ("-img", "-std")
+    inputs = {"a": _image(d.child("a")), "c": _coords_text(d.child("coords"))}
+    groups = [required(a, a, "{in:a}")]
+    options = []
+    if prog == "img2imgcoord" or d.chance("-std", 0.8):
+        inputs["b"] = _image(d.child("b"))
+        groups.append(required(b, b, "{in:b}"))
+    if d.chance("-xfm", 0.7):
+        inputs["m"] = _matrix(d, "m")
+        flag = d.choice("xfm flag", ("-xfm", "-premat"), (4, 1))
+        groups.append(group(flag, flag, "{in:m}"))
+        options.append(flag)
+    space = d.choice("space", (None, "-mm", "-vox"))
+    if space:
+        groups.append(group(space, space))
+        options.append(space)
+    verbose = d.choice("verbose", (None, "-v", "-verbose"), (4, 1, 1))
+    if verbose and not (verbose == "-verbose" and prog == "img2imgcoord"):
+        groups.append(group(verbose, verbose))
+        options.append(verbose)
+    groups.append(required("coordinates", "{in:c}"))
+    return {"groups": groups, "inputs": inputs, "options": options, "extra": {"tool": prog}}
+
+
+def draw_rmsdiff(d: gen.Draw) -> dict:
+    inputs = {"m1": _matrix(d, "m1"), "m2": _matrix(d, "m2"), "ref": _image(d.child("ref"))}
+    groups = [required("matrices", "{in:m1}", "{in:m2}", "{in:ref}")]
+    options = []
+    if d.chance("mask", 0.5):
+        inputs["mask"] = _image(d.child("mask"), contents=("blobs", "head", "constant"))
+        groups.append(required("mask", "{in:mask}"))
+        options.append("mask")
+    return {"groups": groups, "inputs": inputs, "options": options, "extra": {"tool": "rmsdiff"}}
+
+
+def _values(d: gen.Draw, name: str, n: int) -> str:
+    """``n`` comma-separated numbers (``:`` sometimes), as makerot's vector options take them."""
+    pool = ("0", "1", "-1", "2", "0.5", "-3.25", "4", "1e-3", "10", "-0.7")
+    vals = [d.choice(f"{name}{k}", pool) for k in range(n)]
+    return (":" if d.chance(f"{name}:", 0.15) else ",").join(vals)
+
+
+def draw_makerot(d: gen.Draw) -> dict:
+    theta = d.choice("theta", ("30", "-45.5", "0", "90", "180", "1e-7", "359", "720", "-10"))
+    long = d.chance("long", 0.3)
+    groups = [required("theta", f"--theta={theta}" if long else "-t", *(() if long else (theta,)))]
+    options = []
+    for key, short, lng in (("axis", "-a", "--axis"), ("centre", "-c", "--centre")):
+        if d.chance(key, 0.7 if key == "axis" else 0.5):
+            n = d.choice(f"{key} count", (3, 1, 2, 4), (8, 1, 1, 1))
+            v = _values(d, key, n)
+            words = (f"{lng}={v}",) if d.chance(f"{key} long", 0.3) else (short, v)
+            groups.append(group(key, *words))
+            options.append(f"{short} ({n} values)")
+    if d.chance("-o", 0.3):
+        groups.append(group("-o", "-o", "out.mat"))
+        options.append("-o")
+    if d.chance("-v", 0.1):
+        groups.append(group("-v", "-v"))
+        options.append("-v")
+    return {"groups": groups, "inputs": {}, "options": options, "extra": {"tool": "makerot"}}
 
 
 def draw_apply(d: gen.Draw) -> dict:
@@ -260,9 +359,38 @@ def draw_convert(d: gen.Draw) -> dict:
     }
 
 
+DRAWS = {
+    "register": draw_register,
+    "apply": draw_apply,
+    "convert": draw_convert,
+    "avscale": draw_avscale,
+    "coords": draw_coords,
+    "rmsdiff": draw_rmsdiff,
+    "makerot": draw_makerot,
+}
+
+
 def draw(d: gen.Draw) -> dict:
-    kind = d.choice("kind", ("register", "apply", "convert"), (6, 3, 1.5))
-    body = {"register": draw_register, "apply": draw_apply, "convert": draw_convert}[kind](d)
+    kinds = ("register", "apply", "convert", "avscale", "coords", "rmsdiff")
+    kind = d.choice("kind", kinds, (6, 3, 1.5, 0.5, 1, 0.5))
+    return _finish(d, DRAWS[kind](d))
+
+
+def draw_programs(d: gen.Draw) -> dict:
+    """Part 2's new paths only: FLIRT's other programs (makerot among them) and quaternion
+    registrations."""
+    kinds = ("quaternion", "avscale", "coords", "rmsdiff", "makerot")
+    kind = d.choice("kind", kinds, (1, 1, 2, 1, 1))
+    if kind == "quaternion":
+        body = draw_register(d)
+        if "-anglerep quaternion" not in body["options"]:
+            body["groups"].append(group("-anglerep", "-anglerep", "quaternion"))
+            body["options"].append("-anglerep quaternion")
+        return _finish(d, body)
+    return _finish(d, DRAWS[kind](d))
+
+
+def _finish(d: gen.Draw, body: dict) -> dict:
     body["extra"]["output_type"] = d.choice("FSLOUTPUTTYPE", OUTPUT_TYPES, OUTPUT_WEIGHTS)
     tool = body["extra"]["tool"]
     body["options"] = [tool, *body["options"], f"FSLOUTPUTTYPE={body['extra']['output_type']}"]
@@ -321,6 +449,27 @@ def _unavailable() -> str:
         return "the larmorx-nc program is not built (crates-nc)"
     return ""
 
+
+def _tool(name: str, title: str, draw_fn) -> Tool:
+    return Tool(
+        name=name,
+        title=title,
+        suite="fsl-flirt-replica",
+        implementations=("replica",),
+        draw=draw_fn,
+        case=case,
+        run=_run,
+        exact=lambda impl: True,
+        exact_checks=(),
+        timeout=600,
+        weight=1.0,
+        unavailable=_unavailable,
+        family="fsl",
+    )
+
+
+#: Part 2's new paths alone (FLIRT's other programs, quaternions): its short trial.
+PROGRAMS = _tool("fsl-flirt-programs", "FLIRT's other programs", draw_programs)
 
 TOOL = Tool(
     name="fsl-flirt",

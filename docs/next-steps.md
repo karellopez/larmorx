@@ -110,7 +110,7 @@ at a time:
      records re-made in-process: no status change; golden checksums unchanged; `crates-gpl/` keeps
      only the verification tools; CI's `crates-gpl` steps gone (4.0 min a run).
 4. **The ports:** BET's clean-room original (item 7), the clean-room additions mcflirt FSL-20/21
-   and 3dUnifize AFNI-75 (specs first), FLIRT with BBR (part 1 done 2026-11-01; part 2 next), FAST, topup (item 7); field maps,
+   and 3dUnifize AFNI-75 (specs first), FLIRT with BBR (parts 1 and 2 done 2026-11-01; part 3 next: `alignpaxes`, the SVD programs, applyxfm4D), FAST, topup (item 7); field maps,
    FreeSurfer, surfaces, confounds (item 8); larmorprepx (item 9). Each with its site page from
    its smart tests.
 5. **The final validation phase** (after every tool is ported): the data panel for every tool
@@ -340,14 +340,32 @@ The items below keep their history.
    corrupting its heap on small or constant images (281: to be traced, then refused in both modes),
    66 matrices (64 with voxels below 0.5 or above 5 mm), the fix pass changing results without a
    notice (8: FSL-14 on infinite voxels; `-setbackground` with spline), one message count with
-   `-dof 3`, one more heap corruption, 2 runs over 3 GiB. **Part 2:**
-   those, `-anglerep quaternion`, `alignpaxes`, the SVD pseudo-inverse of general parameter subsets,
-   `-debug`'s BBR volume, FSL-67's measurement, the site page (first), the other programs (`avscale`,
-   `makerot`, `midtrans`, `rmsdiff`, `img2imgcoord`, `img2stdcoord`, `std2imgcoord`, `applyxfm4D`,
-   `pointflirt`); tested as every part is (the user, 2026-10-28): the open findings re-checked after
-   their fixes and a short random-testing trial of the new paths only. The full tier (fMRIPrep's 22
-   BBR calls on every oracle run), the data panel and long random-testing runs wait for the final
-   validation phase (the user, 2026-11-01, asked: the heavy tests stay at the end). Then the clean-room original (another
+   `-dof 3`, one more heap corruption, 2 runs over 3 GiB. **Part 2 done (2026-11-01).** The site's FLIRT page
+   (fMRIPrep's BBR on three oracle runs with the white-matter boundary, a default 12-dof registration,
+   `-applyxfm` on a raw BOLD series; the matrices as text with fMRIPrep's own, the displacement over the
+   brain, the record's cases). The trial's findings settled (`recheck_findings.py`: every finding that
+   fits the trial's memory agrees in its shrunk and drawn forms): FSL's heap corruption traced to its
+   background value of volumes 3 voxels wide (FSL-75, rule A: the whole border by default, FSL's values
+   with `reproduce`; a single voxel refused); the 66 matrices were FLIRT's base-scale reciprocal computed
+   in single precision (fixed); the fix pass's unnamed changes were FSL-14 and FSL-09 (named now).
+   FSL-67 measured (rule C, kept). `-anglerep quaternion`; the hangs FSL-71/72 as suite cases (FSL under a
+   timeout and an address-space limit). FLIRT's other programs `avscale`, `img2imgcoord`, `std2imgcoord`,
+   `img2stdcoord`, `rmsdiff`, `makerot` (FSL-76, FSL-77), each with its command line, `lx.fsl` wrapper,
+   golden case and spec section (`specs/flirt.md` §15). The replica's peak memory on large references
+   brought to FSL's (262 → 187 MiB against FSL's 192; with `-inweight` 503 → 310 against 374). FSL-22 in
+   FLIRT (the padding's NaN order). Record [fsl-flirt-replica](validation/fsl-flirt-replica.md): 217
+   cases, 152 of 152 compared cases bit-identical (61 rejected by both, alike; 4 expected divergences:
+   FSL-71, FSL-72 and FSL-75's two, where FLIRT never finishes or crashes); part 1's 141 cases unchanged
+   in status and details (`compare_records.py`); mcflirt's and BET's standard tiers re-run (the core
+   changed): 236 of 236 and 178 of 178 cases identical to their records. Two short trials of the new
+   paths (half an hour and six minutes, 12376 and 3274 cases; descriptor `fsl-flirt-programs`).
+   **Part 3:** the schedule command `alignpaxes` (a symmetric eigendecomposition), general parameter
+   subsets' pseudo-inverse, `midtrans` and `pointflirt` (a singular value decomposition), `applyxfm4D`
+   (every data type), `-debug`'s BBR volume, makerot's NaN signs (three calls with a NaN or infinite
+   angle or axis print `-nan` where FSL prints `nan`), mcflirt's FSL-75 notice and correction; the
+   coordinate programs' `-warp` waits for FNIRT's warp fields. The full tier (fMRIPrep's 22 BBR calls on
+   every oracle run), the data panel and long random-testing runs wait for the final validation phase
+   (the user, 2026-11-01). Then the clean-room original (another
    agent, from `specs/flirt.md`; it reuses the main package's clean-room engine, the cost functions,
    optimiser and transform algebra of `larmorx-mri`'s head-motion correction, never a second copy: the
    user, 2026-11-01, "avoid duplication"). The scripts wait for other tools: `epi_reg` (FAST, `fslmaths`,

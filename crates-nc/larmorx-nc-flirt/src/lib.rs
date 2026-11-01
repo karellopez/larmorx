@@ -19,9 +19,13 @@
 // Index loops mirror FLIRT's loops, so that each step can be checked against the source.
 #![allow(clippy::needless_range_loop)]
 
+pub mod avscale;
 pub mod convert_xfm;
+pub mod coords;
+pub mod makerot;
 pub mod options;
 pub mod pair;
+pub mod rmsdiff;
 pub mod run;
 pub mod schedule;
 
@@ -62,4 +66,82 @@ pub fn convert_xfm(
 ) -> u8 {
     let _ = threads;
     convert_xfm::run(args, settings, mode, out, err)
+}
+
+/// `avscale [--allparams/--inverteddies] matrixfile [non-reference-volume]`.
+pub fn avscale(
+    args: &[String],
+    settings: &Settings,
+    mode: UpstreamDefects,
+    threads: usize,
+    out: &mut dyn Write,
+    err: &mut dyn Write,
+) -> u8 {
+    let _ = threads;
+    avscale::run(args, settings, mode, out, err)
+}
+
+/// `img2imgcoord [options] <filename containing coordinates>`.
+pub fn img2imgcoord(
+    args: &[String],
+    settings: &Settings,
+    mode: UpstreamDefects,
+    threads: usize,
+    out: &mut dyn Write,
+    err: &mut dyn Write,
+) -> u8 {
+    let _ = threads;
+    coords::img2imgcoord(args, settings, mode, out, err)
+}
+
+/// `std2imgcoord [options] <filename containing coordinates>`.
+pub fn std2imgcoord(
+    args: &[String],
+    settings: &Settings,
+    mode: UpstreamDefects,
+    threads: usize,
+    out: &mut dyn Write,
+    err: &mut dyn Write,
+) -> u8 {
+    let _ = threads;
+    coords::std2imgcoord(args, settings, mode, out, err)
+}
+
+/// `img2stdcoord [options] <filename containing coordinates>`.
+pub fn img2stdcoord(
+    args: &[String],
+    settings: &Settings,
+    mode: UpstreamDefects,
+    threads: usize,
+    out: &mut dyn Write,
+    err: &mut dyn Write,
+) -> u8 {
+    let _ = threads;
+    coords::img2stdcoord(args, settings, mode, out, err)
+}
+
+/// `rmsdiff matrixfile1 matrixfile2 refvol [mask]`.
+pub fn rmsdiff(
+    args: &[String],
+    settings: &Settings,
+    mode: UpstreamDefects,
+    threads: usize,
+    out: &mut dyn Write,
+    err: &mut dyn Write,
+) -> u8 {
+    let _ = threads;
+    rmsdiff::run(args, settings, mode, out, err)
+}
+
+/// `makerot --theta=angle [options]`.
+pub fn makerot(
+    args: &[String],
+    settings: &Settings,
+    mode: UpstreamDefects,
+    threads: usize,
+    out: &mut dyn Write,
+    err: &mut dyn Write,
+) -> u8 {
+    let _ = threads;
+    makerot::run(args, settings, mode, out, err)
 }

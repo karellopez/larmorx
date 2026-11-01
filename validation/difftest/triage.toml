@@ -631,7 +631,7 @@ tool = "fsl-bet"
 implementation = "replica"
 signature = ["messages: FSL's, byte for byte"]
 status = "fixed"
-explanation = "fslstats -C printed no warning where newimage's calc_cog writes 'WARNING::in calculating COG, total = 0.0' to cerr (an empty brain under bet -R): larmorx-nc-core's fslstats_cog returns it"
+explanation = "fslstats -C printed no warning where FSL writes 'WARNING::in calculating COG, total = 0.0' to cerr (an empty brain under bet -R): larmorx-nc-core's fslstats_cog returns it"
 link = "validation/difftest/cases/fsl-bet/cog-warning-empty-brain.json"
 
 [[difference]]
@@ -655,7 +655,7 @@ tool = "fsl-bet"
 implementation = "replica"
 signature = ["out.nii.gz"]
 status = "fixed"
-explanation = "bet -F on a series stored as double: fslmaths -mas computes and writes double for a double input (newimage's dtype of the file); larmorx-nc-core's fslmaths_mas wrote float"
+explanation = "bet -F on a series stored as double: fslmaths -mas computes and writes double for a double input (the file's data type); larmorx-nc-core's fslmaths_mas wrote float"
 link = "validation/difftest/cases/fsl-bet/bet-F-double-series.json"
 
 [[difference]]
@@ -900,9 +900,9 @@ link = "validation/difftest/cases/fsl-flirt/bbr-no-boundary-points-nan.json"
 tool = "fsl-flirt"
 implementation = "replica"
 signature = ["every file bit-identical"]
-status = "unclear"
-explanation = "FLIRT's part 2: 66 registrations whose matrix (or BBR's) differs from FSL's, 64 of them with voxels below 0.5 or above 5 mm (2 with plain voxels); not yet traced. Reproducers: the trial's findings (validation/investigations/fsl-flirt/finding_repro.py)"
-link = "docs/findings/fsl-flirt.md"
+status = "fixed"
+explanation = "FLIRT's part 2: the 66 registrations whose matrix differed: FLIRT computes the base scale's reciprocal 1/basescale in single precision (exactly 100 for 0.01 mm voxels), the replica divided in double; visible with -init or -usesqform and a base scale other than 1 (voxels below 0.75 mm or above 12 mm). Fixed in the replica; every one agrees since (recheck_findings.py, shrunk and drawn); suite case real/basescale-small-init"
+link = "validation/difftest/cases/fsl-flirt/basescale-init-float.json"
 
 [[difference]]
 tool = "fsl-flirt"
@@ -916,14 +916,78 @@ link = "validation/difftest/cases/fsl-flirt/applyxfm-blur-extraslice.json"
 tool = "fsl-flirt"
 implementation = "replica"
 signature = ["exit status (flirt is killed; the replica exits N)", "files written", "stderr identical"]
-status = "unclear"
-explanation = "FLIRT's part 2: FSL aborts (munmap_chunk(): invalid pointer, free(): invalid size, double free) or segfaults on 281 of the trial's cases, small or constant images (one voxel up to some 30 per axis, the default options included), where the replica finishes: heap corruption not yet traced; once it is, the replica refuses those inputs in both modes (a crash is never reproduced, D13). Reproducers: trial-flirt-00028, -00069, -02758, -00156"
-link = "docs/findings/fsl-flirt.md"
+status = "register"
+defect = "FSL-75"
+explanation = "FLIRT's part 2: the 281 cases where FSL aborts or segfaults: FLIRT's background value (the 10th percentile of the 2-voxel border) writes past a buffer too small for the border of a volume 3 voxels wide (FLIRT's pyramid levels, its padding), or reads an empty one at 1 x 1 x 1; traced with a hardware watchpoint (validation/probes/fsl-flirt-bval). FSL-75, rule A: the whole border by default, FSL's values that fit with reproduce, named; a single voxel refused in both modes (rule B). The suite takes FSL killed with the replica naming FSL-75 as agreement"
+link = "validation/difftest/cases/fsl-flirt/background-level-overflow-survives.json"
 
 [[difference]]
 tool = "fsl-flirt"
 implementation = "replica"
 signature = ["DN fix pass"]
-status = "unclear"
-explanation = "FLIRT's part 2: on 8 of the trial's cases the default (fix) run changes the matrix or image without naming a defect: references with infinite or NaN voxels (FSL-14's notice does not fire for every value it leaves out) and -setbackground with spline interpolation. Reproducers: trial-flirt-00271, -00293, -00493, -03826"
+status = "fixed"
+explanation = "FLIRT's part 2: the 8 fix-pass changes without a notice: FSL-14 named now whenever the pair's volumes hold NaN or infinite values (silent where they lie outside the cost's points), FSL-09 also for values out of the output type's range (a negative -setbackground into uint8); every one agrees since"
+link = "docs/findings/fsl-flirt.md"
+
+[[difference]]
+tool = "fsl-flirt"
+implementation = "replica"
+signature = ["larmorx exceeds the memory limit"]
+status = "explained"
+explanation = "FLIRT's part 2: the trial's runs over 3 GiB (trial-flirt-01374, -01768, -02317, -03183, -03192, -03718: voxels of 0.01 mm or 25-50 mm make FLIRT's isotropic levels huge): FSL's own peak is 8.0 GiB to above 39 GiB on them, or it runs over 30 minutes (validation/investigations/fsl-flirt/memory_findings.py); the replica's peak was brought to FSL's (12.1 GiB against 8.0 on -01374 before the fix). Heavy cases of the final validation phase"
+link = "docs/findings/fsl-flirt.md"
+
+# ---------------------------------------------------------------- FLIRT's replica, part 2: the trials of the new paths (2026-11-01)
+# `difftest --tools fsl-flirt-programs --budget 0.5 --jobs 8 --seed trial-flirt-programs` (<workspace>/oracles/difftest/
+# 2026-11-01-fsl-flirt-programs): 12376 cases, 12309 agree, 58 differ, 5 over the memory limit, 4 timeouts; then
+# `--budget 0.1 --seed trial-flirt-programs-2` (2026-11-01-fsl-flirt-programs-2, makerot added): 3274 cases, 3222 agree,
+# 47 notices, 2 differ, 3 over the memory limit. Every finding re-checked with the final build (recheck_findings.py).
+
+[[difference]]
+tool = "fsl-flirt-programs"
+implementation = "replica"
+signature = ["stderr identical"]
+status = "fixed"
+explanation = "-anglerep quaternion: FLIRT builds the starting matrix at every verbosity and prints it only from -verbose 5; the replica built it only then, so an invalid starting axis printed one 'Parameters do not form a valid axis' message less (50 findings). Fixed in the replica"
+link = "docs/findings/fsl-flirt.md"
+
+[[difference]]
+tool = "fsl-flirt-programs"
+implementation = "replica"
+signature = ["every file bit-identical"]
+status = "fixed"
+explanation = "FSL-22 in FLIRT: a NaN voxel in the border of the input whose background value pads the output (a NaN matrix makes every voxel the padding): libstdc++'s order put the NaN first in FLIRT, the replica's volumes sorted it last in both modes; FLIRT's background values now take FSL-22's switch (trial-flirt-programs-00931, -00902)"
+link = "validation/difftest/cases/fsl-flirt/background-nan-order.json"
+
+[[difference]]
+tool = "fsl-flirt-programs"
+implementation = "replica"
+signature = ["exit status", "files written"]
+status = "register"
+defect = "FSL-75"
+explanation = "trial-flirt-programs-11900 (and -03179, -03583, -05316, -05574, -05793): FLIRT survives FSL-75's overflow (a 3 x 3 x 3 or 3 x 2 x 2 level) and finishes, where the replica refused: FSL-75 decided by rule A instead (the values that fit with reproduce: FSL's matrix)"
+link = "validation/difftest/cases/fsl-flirt/background-level-overflow-survives.json"
+
+[[difference]]
+tool = "fsl-flirt-programs"
+implementation = "replica"
+signature = ["notice: FSL-76"]
+status = "fixed"
+explanation = "makerot named FSL-76 where the angle gives the identity either way (0 degrees, or below FLIRT's 1e-8 radians): named now only where the matrix changes (47 notices of the second trial)"
+link = "docs/findings/fsl-flirt.md"
+
+[[difference]]
+tool = "fsl-flirt-programs"
+implementation = "replica"
+signature = ["flirt is killed after FSL-N's heap corruption; the replica finishes and names FSL-N (exit N)"]
+status = "fixed"
+explanation = "the suite required exit 0 of the replica where FLIRT is killed after FSL-75; going on, the replica ends as FLIRT would without the corruption (here exit 1: FSLOUTPUTTYPE=ANALYZE cannot be written): the check now requires FSL-75 named and no signal (trial-flirt-programs-2-02673, -02874)"
+link = "docs/findings/fsl-flirt.md"
+
+[[difference]]
+tool = "fsl-flirt-programs"
+implementation = "replica"
+signature = ["larmorx exceeds the memory limit"]
+status = "explained"
+explanation = "quaternion registrations over 3 GiB (trial-flirt-programs-00026, -00667, -02324, -06285, -09485; -2-01831, -01944, -02240): extreme voxel sizes. Re-checked after the memory fixes in a 16 GiB box: -00667 and -09485 agree now (the replica fits), on -06285 FSL is killed and the replica finishes, on -00026 and -02324 both are killed; the second trial's three measured alone in a 20 GiB box (memory_findings.py): FSL is killed at 20 GiB on all three, the replica on two and finishes the third at 19.0 GiB (-2-01944). Heavy cases of the final validation phase (heavy.jsonl)"
 link = "docs/findings/fsl-flirt.md"

@@ -2,7 +2,7 @@
  "environment": {
   "cpu": "AMD Ryzen 9 7945HX with Radeon Graphics",
   "larmorx": "0.0.1",
-  "larmorx_commit": "6913b97c3bb6",
+  "larmorx_commit": "b92c7ed2c691",
   "larmorx_testdata_commit": "52124bc98f9f",
   "logical_cpus": 32,
   "os": "Linux-6.8.0-124-generic-x86_64-with-glibc2.35",
@@ -17,16 +17,19 @@
  "oracle_cache": {
   "differences": 0,
   "fresh": {
-   "ended by a signal, SIGABRT (never stored)": 1,
-   "ended by a signal, SIGSEGV (never stored)": 1
+   "ended by a signal, SIGABRT (never stored)": 8,
+   "ended by a signal, SIGSEGV (never stored)": 1,
+   "never cached: FLIRT never finishes (FSL-71)": 1,
+   "never cached: FLIRT never finishes (FSL-72)": 1,
+   "never cached: FSL crashes (FSL-75)": 2
   },
   "location": "<workspace>/oracles/cache",
   "mode": "use",
-  "ran": 2,
-  "saved_seconds": 588.3,
-  "served": 139
+  "ran": 13,
+  "saved_seconds": 607.9,
+  "served": 204
  },
- "reference": "flirt and convert_xfm from FSL 6.0.7.23 (fsl-flirt 2111.4, fsl-newimage 2601.0, fsl-miscmaths 2412.6; the conda build at `~/fsl-6.0.7.23`, as built: glibc 2.35's maths, OpenBLAS on its Haswell kernels)",
+ "reference": "flirt, convert_xfm, avscale, img2imgcoord, std2imgcoord, img2stdcoord, rmsdiff and makerot from FSL 6.0.7.23 (fsl-flirt 2111.4, fsl-newimage 2601.0, fsl-miscmaths 2412.6, fsl-utils 2412.6, fsl-warpfns 2501.0; the conda build at `~/fsl-6.0.7.23`, as built: glibc 2.35's maths, OpenBLAS on its Haswell kernels)",
  "results": [
   {
    "case": "fmriprep/ds000228-sub-pixar008-noreconall/bold_task_pixar_wf",
@@ -42,7 +45,7 @@
     "D13 fix pass": 0,
     "fMRIPrep's matrix (its container's FSL) identical as text": "yes"
    },
-   "seconds": 48.49,
+   "seconds": 55.964,
    "status": "pass"
   },
   {
@@ -59,7 +62,7 @@
     "D13 fix pass": 0,
     "fMRIPrep's matrix (its container's FSL) identical as text": "yes"
    },
-   "seconds": 97.684,
+   "seconds": 97.351,
    "status": "pass"
   },
   {
@@ -76,7 +79,39 @@
     "D13 fix pass": 0,
     "fMRIPrep's matrix (its container's FSL) identical as text": "yes"
    },
-   "seconds": 116.27,
+   "seconds": 126.203,
+   "status": "pass"
+  },
+  {
+   "case": "real/anglerep-quaternion",
+   "category": "real",
+   "checks_passed": 6,
+   "checks_total": 6,
+   "failed_checks": [],
+   "measured": {
+    "every file bit-identical": "3/3"
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 3.442,
+   "status": "pass"
+  },
+  {
+   "case": "real/anglerep-quaternion-dof6",
+   "category": "real",
+   "checks_passed": 6,
+   "checks_total": 6,
+   "failed_checks": [],
+   "measured": {
+    "every file bit-identical": "4/4"
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 3.21,
    "status": "pass"
   },
   {
@@ -92,7 +127,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 3.276,
+   "seconds": 4.988,
    "status": "pass"
   },
   {
@@ -108,7 +143,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 4.694,
+   "seconds": 6.949,
    "status": "pass"
   },
   {
@@ -124,7 +159,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 1.951,
+   "seconds": 3.135,
    "status": "pass"
   },
   {
@@ -140,7 +175,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 2.874,
+   "seconds": 3.561,
    "status": "pass"
   },
   {
@@ -156,7 +191,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 2.799,
+   "seconds": 3.62,
    "status": "pass"
   },
   {
@@ -172,7 +207,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 5.733,
+   "seconds": 7.412,
    "status": "pass"
   },
   {
@@ -188,7 +223,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 5.897,
+   "seconds": 7.921,
    "status": "pass"
   },
   {
@@ -204,7 +239,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 3.115,
+   "seconds": 3.757,
    "status": "pass"
   },
   {
@@ -220,7 +255,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 3.172,
+   "seconds": 5.005,
    "status": "pass"
   },
   {
@@ -236,7 +271,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 4.168,
+   "seconds": 6.07,
    "status": "pass"
   },
   {
@@ -252,7 +287,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 2.851,
+   "seconds": 4.519,
    "status": "pass"
   },
   {
@@ -268,7 +303,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 3.59,
+   "seconds": 5.19,
    "status": "pass"
   },
   {
@@ -284,7 +319,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 1.582,
+   "seconds": 2.628,
    "status": "pass"
   },
   {
@@ -300,7 +335,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 1.642,
+   "seconds": 2.534,
    "status": "pass"
   },
   {
@@ -316,7 +351,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 3.569,
+   "seconds": 5.638,
    "status": "pass"
   },
   {
@@ -332,7 +367,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 3.052,
+   "seconds": 4.631,
    "status": "pass"
   },
   {
@@ -348,7 +383,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 2.779,
+   "seconds": 4.324,
    "status": "pass"
   },
   {
@@ -364,7 +399,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 2.551,
+   "seconds": 4.075,
    "status": "pass"
   },
   {
@@ -380,7 +415,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 143.573,
+   "seconds": 154.026,
    "status": "pass"
   },
   {
@@ -396,7 +431,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 2.654,
+   "seconds": 4.467,
    "status": "pass"
   },
   {
@@ -412,7 +447,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 7.585,
+   "seconds": 11.351,
    "status": "pass"
   },
   {
@@ -428,7 +463,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 13.284,
+   "seconds": 19.132,
    "status": "pass"
   },
   {
@@ -444,7 +479,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 5.716,
+   "seconds": 7.94,
    "status": "pass"
   },
   {
@@ -460,7 +495,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 4.443,
+   "seconds": 6.13,
    "status": "pass"
   },
   {
@@ -476,7 +511,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 3.463,
+   "seconds": 5.462,
    "status": "pass"
   },
   {
@@ -492,7 +527,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 4.473,
+   "seconds": 5.235,
    "status": "pass"
   },
   {
@@ -508,7 +543,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 4.647,
+   "seconds": 6.612,
    "status": "pass"
   },
   {
@@ -524,7 +559,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 2.31,
+   "seconds": 3.266,
    "status": "pass"
   },
   {
@@ -540,7 +575,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 18.093,
+   "seconds": 26.481,
    "status": "pass"
   },
   {
@@ -556,7 +591,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 13.824,
+   "seconds": 20.673,
    "status": "pass"
   },
   {
@@ -572,7 +607,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 0.339,
+   "seconds": 0.364,
    "status": "pass"
   },
   {
@@ -588,7 +623,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 2.442,
+   "seconds": 4.17,
    "status": "pass"
   },
   {
@@ -604,7 +639,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 0.859,
+   "seconds": 1.195,
    "status": "pass"
   },
   {
@@ -620,7 +655,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 0.507,
+   "seconds": 0.561,
    "status": "pass"
   },
   {
@@ -636,7 +671,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 1.495,
+   "seconds": 1.921,
    "status": "pass"
   },
   {
@@ -652,7 +687,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 2.465,
+   "seconds": 3.748,
    "status": "pass"
   },
   {
@@ -668,7 +703,7 @@
    "reported": {
     "D13 fix pass": 756121
    },
-   "seconds": 0.308,
+   "seconds": 0.455,
    "status": "pass"
   },
   {
@@ -684,7 +719,7 @@
    "reported": {
     "D13 fix pass": 560026
    },
-   "seconds": 0.378,
+   "seconds": 0.525,
    "status": "pass"
   },
   {
@@ -700,7 +735,7 @@
    "reported": {
     "D13 fix pass": 416242
    },
-   "seconds": 0.549,
+   "seconds": 0.704,
    "status": "pass"
   },
   {
@@ -716,7 +751,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 0.525,
+   "seconds": 0.535,
    "status": "pass"
   },
   {
@@ -732,7 +767,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 0.615,
+   "seconds": 0.853,
    "status": "pass"
   },
   {
@@ -748,7 +783,7 @@
    "reported": {
     "D13 fix pass": 416491
    },
-   "seconds": 0.395,
+   "seconds": 0.601,
    "status": "pass"
   },
   {
@@ -764,7 +799,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 0.487,
+   "seconds": 0.671,
    "status": "pass"
   },
   {
@@ -780,7 +815,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 0.445,
+   "seconds": 0.583,
    "status": "pass"
   },
   {
@@ -796,7 +831,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 0.513,
+   "seconds": 0.48,
    "status": "pass"
   },
   {
@@ -812,7 +847,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 0.302,
+   "seconds": 0.275,
    "status": "pass"
   },
   {
@@ -828,7 +863,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 9.626,
+   "seconds": 12.889,
    "status": "pass"
   },
   {
@@ -844,7 +879,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 0.289,
+   "seconds": 0.275,
    "status": "pass"
   },
   {
@@ -860,7 +895,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 0.272,
+   "seconds": 0.37,
    "status": "pass"
   },
   {
@@ -876,7 +911,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 0.45,
+   "seconds": 0.617,
    "status": "pass"
   },
   {
@@ -892,7 +927,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 2.216,
+   "seconds": 2.882,
    "status": "pass"
   },
   {
@@ -908,7 +943,23 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 0.772,
+   "seconds": 1.027,
+   "status": "pass"
+  },
+  {
+   "case": "real/basescale-small-init",
+   "category": "real",
+   "checks_passed": 6,
+   "checks_total": 6,
+   "failed_checks": [],
+   "measured": {
+    "every file bit-identical": "4/4"
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 0.501,
    "status": "pass"
   },
   {
@@ -924,7 +975,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 0.744,
+   "seconds": 1.179,
    "status": "pass"
   },
   {
@@ -940,7 +991,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 1.207,
+   "seconds": 2.216,
    "status": "pass"
   },
   {
@@ -956,7 +1007,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 27.114,
+   "seconds": 32.671,
    "status": "pass"
   },
   {
@@ -972,7 +1023,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 26.339,
+   "seconds": 29.798,
    "status": "pass"
   },
   {
@@ -988,7 +1039,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 26.675,
+   "seconds": 30.799,
    "status": "pass"
   },
   {
@@ -1004,7 +1055,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 22.588,
+   "seconds": 27.175,
    "status": "pass"
   },
   {
@@ -1020,7 +1071,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 25.657,
+   "seconds": 30.364,
    "status": "pass"
   },
   {
@@ -1036,7 +1087,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 2.311,
+   "seconds": 3.806,
    "status": "pass"
   },
   {
@@ -1052,7 +1103,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 36.242,
+   "seconds": 42.746,
    "status": "pass"
   },
   {
@@ -1068,7 +1119,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 529.764,
+   "seconds": 546.411,
    "status": "pass"
   },
   {
@@ -1084,7 +1135,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 31.852,
+   "seconds": 36.042,
    "status": "pass"
   },
   {
@@ -1100,7 +1151,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 0.572,
+   "seconds": 0.766,
    "status": "pass"
   },
   {
@@ -1116,7 +1167,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 0.42,
+   "seconds": 0.449,
    "status": "pass"
   },
   {
@@ -1132,7 +1183,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 0.54,
+   "seconds": 0.907,
    "status": "pass"
   },
   {
@@ -1148,7 +1199,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 0.312,
+   "seconds": 0.508,
    "status": "pass"
   },
   {
@@ -1164,7 +1215,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 0.298,
+   "seconds": 0.473,
    "status": "pass"
   },
   {
@@ -1180,7 +1231,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 0.53,
+   "seconds": 0.938,
    "status": "pass"
   },
   {
@@ -1196,7 +1247,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 0.179,
+   "seconds": 0.223,
    "status": "pass"
   },
   {
@@ -1212,7 +1263,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 3.05,
+   "seconds": 4.557,
    "status": "pass"
   },
   {
@@ -1228,7 +1279,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 0.259,
+   "seconds": 0.245,
    "status": "pass"
   },
   {
@@ -1244,7 +1295,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 0.184,
+   "seconds": 0.236,
    "status": "pass"
   },
   {
@@ -1260,7 +1311,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 0.237,
+   "seconds": 0.505,
    "status": "pass"
   },
   {
@@ -1276,7 +1327,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 0.359,
+   "seconds": 0.674,
    "status": "pass"
   },
   {
@@ -1292,7 +1343,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 0.45,
+   "seconds": 0.834,
    "status": "pass"
   },
   {
@@ -1308,7 +1359,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 0.608,
+   "seconds": 0.976,
    "status": "pass"
   },
   {
@@ -1324,7 +1375,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 0.317,
+   "seconds": 0.439,
    "status": "pass"
   },
   {
@@ -1340,7 +1391,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 1.806,
+   "seconds": 2.968,
    "status": "pass"
   },
   {
@@ -1356,7 +1407,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 1.751,
+   "seconds": 2.971,
    "status": "pass"
   },
   {
@@ -1372,7 +1423,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 1.831,
+   "seconds": 2.964,
    "status": "pass"
   },
   {
@@ -1388,7 +1439,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 1.854,
+   "seconds": 2.883,
    "status": "pass"
   },
   {
@@ -1404,7 +1455,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 0.068,
+   "seconds": 0.077,
    "status": "pass"
   },
   {
@@ -1420,7 +1471,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 1.862,
+   "seconds": 3.069,
    "status": "pass"
   },
   {
@@ -1433,7 +1484,7 @@
     "every file bit-identical": "5/5"
    },
    "reason": "flirt exits 255; the same from the replica. Wrong number of args to SETOPTION",
-   "seconds": 0.341,
+   "seconds": 0.527,
    "status": "both-error"
   },
   {
@@ -1446,7 +1497,7 @@
     "every file bit-identical": "3/3"
    },
    "reason": "flirt exits 255; the same from the replica. Wrong number of args to COPY",
-   "seconds": 0.133,
+   "seconds": 0.111,
    "status": "both-error"
   },
   {
@@ -1459,7 +1510,7 @@
     "every file bit-identical": "3/3"
    },
    "reason": "flirt exits 255; the same from the replica. Wrong number of args to OPTIMISE",
-   "seconds": 0.114,
+   "seconds": 0.113,
    "status": "both-error"
   },
   {
@@ -1472,7 +1523,7 @@
     "every file bit-identical": "3/3"
    },
    "reason": "flirt exits 255; the same from the replica. Cannot recognise operator =< in IF statement",
-   "seconds": 0.126,
+   "seconds": 0.125,
    "status": "both-error"
   },
   {
@@ -1488,7 +1539,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 0.175,
+   "seconds": 0.341,
    "status": "pass"
   },
   {
@@ -1504,7 +1555,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 0.17,
+   "seconds": 0.328,
    "status": "pass"
   },
   {
@@ -1517,7 +1568,7 @@
     "every file bit-identical": "3/3"
    },
    "reason": "flirt exits 255; the same from the replica. Unrecognised cost function: nope",
-   "seconds": 0.098,
+   "seconds": 0.226,
    "status": "both-error"
   },
   {
@@ -1530,7 +1581,7 @@
     "every file bit-identical": "3/3"
    },
    "reason": "flirt exits -11; the same from the replica. Can only accept UA to UZ, not Uq",
-   "seconds": 0.369,
+   "seconds": 0.507,
    "status": "both-error"
   },
   {
@@ -1543,7 +1594,7 @@
     "every file bit-identical": "0/0"
    },
    "reason": "flirt exits 1; the same from the replica. ",
-   "seconds": 0.002,
+   "seconds": 0.003,
    "status": "both-error"
   },
   {
@@ -1559,7 +1610,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 0.003,
+   "seconds": 0.009,
    "status": "pass"
   },
   {
@@ -1575,7 +1626,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 0.002,
+   "seconds": 0.007,
    "status": "pass"
   },
   {
@@ -1588,7 +1639,7 @@
     "every file bit-identical": "1/1"
    },
    "reason": "flirt exits 2; the same from the replica. ERROR:: Input volume filename not found",
-   "seconds": 0.038,
+   "seconds": 0.033,
    "status": "both-error"
   },
   {
@@ -1601,7 +1652,7 @@
     "every file bit-identical": "1/1"
    },
    "reason": "flirt exits 2; the same from the replica. ERROR:: Reference volume filename not found",
-   "seconds": 0.003,
+   "seconds": 0.009,
    "status": "both-error"
   },
   {
@@ -1627,7 +1678,7 @@
     "every file bit-identical": "0/0"
    },
    "reason": "flirt exits 255; the same from the replica. Lacking argument to option -frob",
-   "seconds": 0.002,
+   "seconds": 0.003,
    "status": "both-error"
   },
   {
@@ -1640,7 +1691,7 @@
     "every file bit-identical": "1/1"
    },
    "reason": "flirt exits 255; the same from the replica. Unrecognised option -frob",
-   "seconds": 0.008,
+   "seconds": 0.005,
    "status": "both-error"
   },
   {
@@ -1653,7 +1704,7 @@
     "every file bit-identical": "1/1"
    },
    "reason": "flirt exits 255; the same from the replica. Lacking argument to option -ref",
-   "seconds": 0.007,
+   "seconds": 0.005,
    "status": "both-error"
   },
   {
@@ -1666,7 +1717,7 @@
     "every file bit-identical": "1/1"
    },
    "reason": "flirt exits 255; the same from the replica. Lacking argument to option -searchrx",
-   "seconds": 0.009,
+   "seconds": 0.005,
    "status": "both-error"
   },
   {
@@ -1679,7 +1730,7 @@
     "every file bit-identical": "2/2"
    },
    "reason": "flirt exits 255; the same from the replica. Unrecognised cost function type: nope",
-   "seconds": 0.05,
+   "seconds": 0.029,
    "status": "both-error"
   },
   {
@@ -1692,7 +1743,7 @@
     "every file bit-identical": "2/2"
    },
    "reason": "flirt exits 255; the same from the replica. Unrecognised cost function type: nope",
-   "seconds": 0.054,
+   "seconds": 0.031,
    "status": "both-error"
   },
   {
@@ -1705,7 +1756,7 @@
     "every file bit-identical": "2/2"
    },
    "reason": "flirt exits 255; the same from the replica. Unrecognised interpolation method: cubic",
-   "seconds": 0.041,
+   "seconds": 0.032,
    "status": "both-error"
   },
   {
@@ -1718,7 +1769,7 @@
     "every file bit-identical": "2/2"
    },
    "reason": "flirt exits 255; the same from the replica. Unrecognised data type: long",
-   "seconds": 0.037,
+   "seconds": 0.036,
    "status": "both-error"
   },
   {
@@ -1731,7 +1782,7 @@
     "every file bit-identical": "2/2"
    },
    "reason": "flirt exits 255; the same from the replica. Unrecognised sinc window: gauss",
-   "seconds": 0.027,
+   "seconds": 0.031,
    "status": "both-error"
   },
   {
@@ -1744,7 +1795,7 @@
     "every file bit-identical": "2/2"
    },
    "reason": "flirt exits 255; the same from the replica. Unrecognised angle representation: rodrigues",
-   "seconds": 0.026,
+   "seconds": 0.033,
    "status": "both-error"
   },
   {
@@ -1757,7 +1808,7 @@
     "every file bit-identical": "2/2"
    },
    "reason": "flirt exits 255; the same from the replica. Unrecognised argument to pedir (0) - it should be a number between -3 and 3 (not 0)",
-   "seconds": 0.024,
+   "seconds": 0.03,
    "status": "both-error"
   },
   {
@@ -1773,7 +1824,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 0.042,
+   "seconds": 0.05,
    "status": "pass"
   },
   {
@@ -1789,7 +1840,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 0.006,
+   "seconds": 0.008,
    "status": "pass"
   },
   {
@@ -1805,7 +1856,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 0.087,
+   "seconds": 0.112,
    "status": "pass"
   },
   {
@@ -1818,7 +1869,7 @@
     "every file bit-identical": "2/2"
    },
    "reason": "flirt exits 255; the same from the replica. Could not open filenone.sch",
-   "seconds": 0.093,
+   "seconds": 0.12,
    "status": "both-error"
   },
   {
@@ -1834,7 +1885,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 0.09,
+   "seconds": 0.109,
    "status": "pass"
   },
   {
@@ -1847,7 +1898,7 @@
     "every file bit-identical": "4/4"
    },
    "reason": "flirt exits 1; the same from the replica. Coordinate and Normal matrices wmcoords.txt and n.txt are either zero size or different sizes",
-   "seconds": 0.057,
+   "seconds": 0.068,
    "status": "both-error"
   },
   {
@@ -1860,7 +1911,7 @@
     "every file bit-identical": "3/3"
    },
    "reason": "flirt exits 1; the same from the replica. ERROR:: Environment variable FSLOUTPUTTYPE is not set! Please make sure that the appropriate configuration file is sourced by your shell (e.g. by putting it in .profile). e.g. bash or sh users add the",
-   "seconds": 0.116,
+   "seconds": 0.177,
    "status": "both-error"
   },
   {
@@ -1876,7 +1927,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 0.267,
+   "seconds": 0.469,
    "status": "pass"
   },
   {
@@ -1892,7 +1943,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 0.278,
+   "seconds": 0.491,
    "status": "pass"
   },
   {
@@ -1908,7 +1959,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 0.521,
+   "seconds": 0.79,
    "status": "pass"
   },
   {
@@ -1921,7 +1972,7 @@
     "every file bit-identical": "3/3"
    },
    "reason": "flirt exits 1; the same from the replica. ERROR:: Unrecognised value (ANALYZE) of environment variable FSLOUTPUTTYPE Legal values are: NIFTI, NIFTI_PAIR, NIFTI2, NIFTI2_PAIR, NIFTI_GZ, NIFTI_PAIR_GZ, NIFTI2_GZ, NIFTI2_PAIR_GZ, NIFTI_ZST, NIFT",
-   "seconds": 0.19,
+   "seconds": 0.168,
    "status": "both-error"
   },
   {
@@ -1934,7 +1985,7 @@
     "every file bit-identical": "0/0"
    },
    "reason": "convert_xfm exits 1; the same from the replica. ",
-   "seconds": 0.023,
+   "seconds": 0.012,
    "status": "both-error"
   },
   {
@@ -1950,7 +2001,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 0.007,
+   "seconds": 0.004,
    "status": "pass"
   },
   {
@@ -1966,7 +2017,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 0.014,
+   "seconds": 0.005,
    "status": "pass"
   },
   {
@@ -1982,7 +2033,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 0.009,
+   "seconds": 0.005,
    "status": "pass"
   },
   {
@@ -1998,7 +2049,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 0.014,
+   "seconds": 0.005,
    "status": "pass"
   },
   {
@@ -2014,7 +2065,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 0.014,
+   "seconds": 0.004,
    "status": "pass"
   },
   {
@@ -2030,7 +2081,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 0.008,
+   "seconds": 0.004,
    "status": "pass"
   },
   {
@@ -2046,7 +2097,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 0.003,
+   "seconds": 0.005,
    "status": "pass"
   },
   {
@@ -2098,7 +2149,7 @@
     "every file bit-identical": "1/1"
    },
    "reason": "convert_xfm exits 2; the same from the replica. Unknown option x.mat",
-   "seconds": 0.003,
+   "seconds": 0.002,
    "status": "both-error"
   },
   {
@@ -2137,8 +2188,48 @@
     "every file bit-identical": "1/1"
    },
    "reason": "convert_xfm exits -6; the same from the replica. terminate called after throwing an instance of 'std::runtime_error' what(): inv(): matrix is singular",
-   "seconds": 0.026,
+   "seconds": 0.023,
    "status": "both-error"
+  },
+  {
+   "case": "edge/bbrstep-0",
+   "category": "edge",
+   "checks_passed": 3,
+   "checks_total": 3,
+   "failed_checks": [],
+   "reason": "FLIRT never finishes (FSL-71: undefined behaviour); the replica refuses in both modes",
+   "seconds": 21.148,
+   "status": "expected-divergence"
+  },
+  {
+   "case": "edge/read-not-numbers",
+   "category": "edge",
+   "checks_passed": 3,
+   "checks_total": 3,
+   "failed_checks": [],
+   "reason": "FLIRT never finishes (FSL-72: undefined behaviour); the replica refuses in both modes",
+   "seconds": 5.158,
+   "status": "expected-divergence"
+  },
+  {
+   "case": "edge/background-overflow",
+   "category": "edge",
+   "checks_passed": 3,
+   "checks_total": 3,
+   "failed_checks": [],
+   "reason": "FSL crashes (FSL-75: undefined behaviour); the replica finishes in both modes and names FSL-75",
+   "seconds": 2.819,
+   "status": "expected-divergence"
+  },
+  {
+   "case": "edge/background-empty",
+   "category": "edge",
+   "checks_passed": 3,
+   "checks_total": 3,
+   "failed_checks": [],
+   "reason": "FSL crashes (FSL-75: undefined behaviour); the replica refuses in both modes",
+   "seconds": 0.038,
+   "status": "expected-divergence"
   },
   {
    "case": "convert_xfm/missing-concat",
@@ -2150,6 +2241,981 @@
     "every file bit-identical": "1/1"
    },
    "reason": "convert_xfm exits 253; the same from the replica. Could not open matrix file none.mat Cannot read concat-matrix",
+   "seconds": 0.019,
+   "status": "both-error"
+  },
+  {
+   "case": "programs/avscale-usage",
+   "category": "programs",
+   "checks_passed": 5,
+   "checks_total": 5,
+   "failed_checks": [],
+   "measured": {
+    "every file bit-identical": "0/0"
+   },
+   "reason": "avscale exits 255; the same from the replica. Usage: ~/fsl-6.0.7.23/bin/avscale [--allparams/--inverteddies] matrixfile [non-reference-volume]",
+   "seconds": 0.012,
+   "status": "both-error"
+  },
+  {
+   "case": "programs/avscale-default",
+   "category": "programs",
+   "checks_passed": 6,
+   "checks_total": 6,
+   "failed_checks": [],
+   "measured": {
+    "every file bit-identical": "1/1"
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 0.015,
+   "status": "pass"
+  },
+  {
+   "case": "programs/avscale-allparams",
+   "category": "programs",
+   "checks_passed": 6,
+   "checks_total": 6,
+   "failed_checks": [],
+   "measured": {
+    "every file bit-identical": "2/2"
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 0.012,
+   "status": "pass"
+  },
+  {
+   "case": "programs/avscale-inverteddies",
+   "category": "programs",
+   "checks_passed": 6,
+   "checks_total": 6,
+   "failed_checks": [],
+   "measured": {
+    "every file bit-identical": "1/1"
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 0.004,
+   "status": "pass"
+  },
+  {
+   "case": "programs/avscale-flip",
+   "category": "programs",
+   "checks_passed": 6,
+   "checks_total": 6,
+   "failed_checks": [],
+   "measured": {
+    "every file bit-identical": "1/1"
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 0.004,
+   "status": "pass"
+  },
+  {
+   "case": "programs/avscale-singular",
+   "category": "programs",
+   "checks_passed": 5,
+   "checks_total": 5,
+   "failed_checks": [],
+   "measured": {
+    "every file bit-identical": "1/1"
+   },
+   "reason": "avscale exits -6; the same from the replica. matrix multiplication: problem with matrix inverse; suggest to use solve() instead terminate called after throwing an instance of 'std::runtime_error' what(): matrix multiplication: problem with matri",
+   "seconds": 0.032,
+   "status": "both-error"
+  },
+  {
+   "case": "programs/avscale-missing-matrix",
+   "category": "programs",
+   "checks_passed": 5,
+   "checks_total": 5,
+   "failed_checks": [],
+   "measured": {
+    "every file bit-identical": "0/0"
+   },
+   "reason": "avscale exits 254; the same from the replica. Could not open matrix file none.mat",
+   "seconds": 0.002,
+   "status": "both-error"
+  },
+  {
+   "case": "programs/avscale-empty-volume",
+   "category": "programs",
+   "checks_passed": 6,
+   "checks_total": 6,
+   "failed_checks": [],
+   "measured": {
+    "every file bit-identical": "1/1"
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 0.004,
+   "status": "pass"
+  },
+  {
+   "case": "programs/avscale-missing-volume",
+   "category": "programs",
+   "checks_passed": 5,
+   "checks_total": 5,
+   "failed_checks": [],
+   "measured": {
+    "every file bit-identical": "1/1"
+   },
+   "reason": "avscale exits -6; the same from the replica. Image Exception : #63 :: No image files match: none Image Exception : #22 :: Failed to read volume none.nii.gz Error : No image files match: none Failed to read volume none.nii.gz Error : No image fil",
+   "seconds": 0.045,
+   "status": "both-error"
+  },
+  {
+   "case": "programs/img2imgcoord-usage",
+   "category": "programs",
+   "checks_passed": 5,
+   "checks_total": 5,
+   "failed_checks": [],
+   "measured": {
+    "every file bit-identical": "0/0"
+   },
+   "reason": "img2imgcoord exits 1; the same from the replica. ",
+   "seconds": 0.027,
+   "status": "both-error"
+  },
+  {
+   "case": "programs/img2imgcoord-xfm",
+   "category": "programs",
+   "checks_passed": 6,
+   "checks_total": 6,
+   "failed_checks": [],
+   "measured": {
+    "every file bit-identical": "4/4"
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 0.122,
+   "status": "pass"
+  },
+  {
+   "case": "programs/img2imgcoord-vox",
+   "category": "programs",
+   "checks_passed": 6,
+   "checks_total": 6,
+   "failed_checks": [],
+   "measured": {
+    "every file bit-identical": "4/4"
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 0.108,
+   "status": "pass"
+  },
+  {
+   "case": "programs/img2imgcoord-mm",
+   "category": "programs",
+   "checks_passed": 6,
+   "checks_total": 6,
+   "failed_checks": [],
+   "measured": {
+    "every file bit-identical": "4/4"
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 0.057,
+   "status": "pass"
+  },
+  {
+   "case": "programs/img2imgcoord-verbose",
+   "category": "programs",
+   "checks_passed": 6,
+   "checks_total": 6,
+   "failed_checks": [],
+   "measured": {
+    "every file bit-identical": "4/4"
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 0.058,
+   "status": "pass"
+  },
+  {
+   "case": "programs/img2imgcoord-missing-coords",
+   "category": "programs",
+   "checks_passed": 5,
+   "checks_total": 5,
+   "failed_checks": [],
+   "measured": {
+    "every file bit-identical": "2/2"
+   },
+   "reason": "img2imgcoord exits 255; the same from the replica. Could not open matrix file none.txt",
+   "seconds": 0.039,
+   "status": "both-error"
+  },
+  {
+   "case": "programs/img2imgcoord-not-numbers",
+   "category": "programs",
+   "checks_passed": 6,
+   "checks_total": 6,
+   "failed_checks": [],
+   "measured": {
+    "every file bit-identical": "3/3"
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 0.059,
+   "status": "pass"
+  },
+  {
+   "case": "programs/img2imgcoord-lacking",
+   "category": "programs",
+   "checks_passed": 6,
+   "checks_total": 6,
+   "failed_checks": [],
+   "measured": {
+    "every file bit-identical": "3/3"
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 0.056,
+   "status": "pass"
+  },
+  {
+   "case": "programs/img2imgcoord-unknown",
+   "category": "programs",
+   "checks_passed": 5,
+   "checks_total": 5,
+   "failed_checks": [],
+   "measured": {
+    "every file bit-identical": "3/3"
+   },
+   "reason": "img2imgcoord exits 255; the same from the replica. Unrecognised option -frob",
+   "seconds": 0.049,
+   "status": "both-error"
+  },
+  {
+   "case": "programs/img2imgcoord-missing-image",
+   "category": "programs",
+   "checks_passed": 5,
+   "checks_total": 5,
+   "failed_checks": [],
+   "measured": {
+    "every file bit-identical": "2/2"
+   },
+   "reason": "img2imgcoord exits -6; the same from the replica. Image Exception : #63 :: No image files match: none Image Exception : #22 :: Failed to read volume none.nii Error : No image files match: none terminate called after throwing an instance of 'std::runt",
+   "seconds": 0.053,
+   "status": "both-error"
+  },
+  {
+   "case": "programs/std2imgcoord-usage",
+   "category": "programs",
+   "checks_passed": 5,
+   "checks_total": 5,
+   "failed_checks": [],
+   "measured": {
+    "every file bit-identical": "0/0"
+   },
+   "reason": "std2imgcoord exits 1; the same from the replica. ",
+   "seconds": 0.017,
+   "status": "both-error"
+  },
+  {
+   "case": "programs/std2imgcoord-xfm",
+   "category": "programs",
+   "checks_passed": 6,
+   "checks_total": 6,
+   "failed_checks": [],
+   "measured": {
+    "every file bit-identical": "4/4"
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 0.064,
+   "status": "pass"
+  },
+  {
+   "case": "programs/std2imgcoord-vox",
+   "category": "programs",
+   "checks_passed": 6,
+   "checks_total": 6,
+   "failed_checks": [],
+   "measured": {
+    "every file bit-identical": "4/4"
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 0.054,
+   "status": "pass"
+  },
+  {
+   "case": "programs/std2imgcoord-mm",
+   "category": "programs",
+   "checks_passed": 6,
+   "checks_total": 6,
+   "failed_checks": [],
+   "measured": {
+    "every file bit-identical": "4/4"
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 0.064,
+   "status": "pass"
+  },
+  {
+   "case": "programs/std2imgcoord-verbose",
+   "category": "programs",
+   "checks_passed": 6,
+   "checks_total": 6,
+   "failed_checks": [],
+   "measured": {
+    "every file bit-identical": "4/4"
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 0.057,
+   "status": "pass"
+  },
+  {
+   "case": "programs/std2imgcoord-missing-coords",
+   "category": "programs",
+   "checks_passed": 5,
+   "checks_total": 5,
+   "failed_checks": [],
+   "measured": {
+    "every file bit-identical": "2/2"
+   },
+   "reason": "std2imgcoord exits 255; the same from the replica. Could not open matrix file none.txt",
+   "seconds": 0.037,
+   "status": "both-error"
+  },
+  {
+   "case": "programs/std2imgcoord-not-numbers",
+   "category": "programs",
+   "checks_passed": 6,
+   "checks_total": 6,
+   "failed_checks": [],
+   "measured": {
+    "every file bit-identical": "3/3"
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 0.053,
+   "status": "pass"
+  },
+  {
+   "case": "programs/std2imgcoord-lacking",
+   "category": "programs",
+   "checks_passed": 6,
+   "checks_total": 6,
+   "failed_checks": [],
+   "measured": {
+    "every file bit-identical": "3/3"
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 0.054,
+   "status": "pass"
+  },
+  {
+   "case": "programs/std2imgcoord-unknown",
+   "category": "programs",
+   "checks_passed": 5,
+   "checks_total": 5,
+   "failed_checks": [],
+   "measured": {
+    "every file bit-identical": "3/3"
+   },
+   "reason": "std2imgcoord exits 255; the same from the replica. Unrecognised option -frob",
+   "seconds": 0.031,
+   "status": "both-error"
+  },
+  {
+   "case": "programs/std2imgcoord-missing-image",
+   "category": "programs",
+   "checks_passed": 5,
+   "checks_total": 5,
+   "failed_checks": [],
+   "measured": {
+    "every file bit-identical": "2/2"
+   },
+   "reason": "std2imgcoord exits -6; the same from the replica. Image Exception : #63 :: No image files match: none Image Exception : #22 :: Failed to read volume none.nii Error : No image files match: none terminate called after throwing an instance of 'std::runt",
+   "seconds": 0.028,
+   "status": "both-error"
+  },
+  {
+   "case": "programs/img2stdcoord-usage",
+   "category": "programs",
+   "checks_passed": 5,
+   "checks_total": 5,
+   "failed_checks": [],
+   "measured": {
+    "every file bit-identical": "0/0"
+   },
+   "reason": "img2stdcoord exits 1; the same from the replica. ",
+   "seconds": 0.019,
+   "status": "both-error"
+  },
+  {
+   "case": "programs/img2stdcoord-xfm",
+   "category": "programs",
+   "checks_passed": 6,
+   "checks_total": 6,
+   "failed_checks": [],
+   "measured": {
+    "every file bit-identical": "4/4"
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 0.057,
+   "status": "pass"
+  },
+  {
+   "case": "programs/img2stdcoord-vox",
+   "category": "programs",
+   "checks_passed": 6,
+   "checks_total": 6,
+   "failed_checks": [],
+   "measured": {
+    "every file bit-identical": "4/4"
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 0.055,
+   "status": "pass"
+  },
+  {
+   "case": "programs/img2stdcoord-mm",
+   "category": "programs",
+   "checks_passed": 6,
+   "checks_total": 6,
+   "failed_checks": [],
+   "measured": {
+    "every file bit-identical": "4/4"
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 0.068,
+   "status": "pass"
+  },
+  {
+   "case": "programs/img2stdcoord-verbose",
+   "category": "programs",
+   "checks_passed": 6,
+   "checks_total": 6,
+   "failed_checks": [],
+   "measured": {
+    "every file bit-identical": "4/4"
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 0.051,
+   "status": "pass"
+  },
+  {
+   "case": "programs/img2stdcoord-missing-coords",
+   "category": "programs",
+   "checks_passed": 5,
+   "checks_total": 5,
+   "failed_checks": [],
+   "measured": {
+    "every file bit-identical": "2/2"
+   },
+   "reason": "img2stdcoord exits 255; the same from the replica. Could not open matrix file none.txt",
+   "seconds": 0.034,
+   "status": "both-error"
+  },
+  {
+   "case": "programs/img2stdcoord-not-numbers",
+   "category": "programs",
+   "checks_passed": 6,
+   "checks_total": 6,
+   "failed_checks": [],
+   "measured": {
+    "every file bit-identical": "3/3"
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 0.053,
+   "status": "pass"
+  },
+  {
+   "case": "programs/img2stdcoord-lacking",
+   "category": "programs",
+   "checks_passed": 6,
+   "checks_total": 6,
+   "failed_checks": [],
+   "measured": {
+    "every file bit-identical": "3/3"
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 0.049,
+   "status": "pass"
+  },
+  {
+   "case": "programs/img2stdcoord-unknown",
+   "category": "programs",
+   "checks_passed": 5,
+   "checks_total": 5,
+   "failed_checks": [],
+   "measured": {
+    "every file bit-identical": "3/3"
+   },
+   "reason": "img2stdcoord exits 255; the same from the replica. Unrecognised option -frob",
+   "seconds": 0.031,
+   "status": "both-error"
+  },
+  {
+   "case": "programs/img2stdcoord-missing-image",
+   "category": "programs",
+   "checks_passed": 5,
+   "checks_total": 5,
+   "failed_checks": [],
+   "measured": {
+    "every file bit-identical": "2/2"
+   },
+   "reason": "img2stdcoord exits -6; the same from the replica. Image Exception : #63 :: No image files match: none Image Exception : #22 :: Failed to read volume none.nii Error : No image files match: none terminate called after throwing an instance of 'std::runt",
+   "seconds": 0.032,
+   "status": "both-error"
+  },
+  {
+   "case": "programs/img2imgcoord-flirt-premat",
+   "category": "programs",
+   "checks_passed": 6,
+   "checks_total": 6,
+   "failed_checks": [],
+   "measured": {
+    "every file bit-identical": "4/4"
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 0.052,
+   "status": "pass"
+  },
+  {
+   "case": "programs/std2imgcoord-standard",
+   "category": "programs",
+   "checks_passed": 6,
+   "checks_total": 6,
+   "failed_checks": [],
+   "measured": {
+    "every file bit-identical": "2/2"
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 0.047,
+   "status": "pass"
+  },
+  {
+   "case": "programs/std2imgcoord-no-std",
+   "category": "programs",
+   "checks_passed": 6,
+   "checks_total": 6,
+   "failed_checks": [],
+   "measured": {
+    "every file bit-identical": "2/2"
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 0.053,
+   "status": "pass"
+  },
+  {
+   "case": "programs/std2imgcoord-singular",
+   "category": "programs",
+   "checks_passed": 5,
+   "checks_total": 5,
+   "failed_checks": [],
+   "measured": {
+    "every file bit-identical": "4/4"
+   },
+   "reason": "std2imgcoord exits -6; the same from the replica. terminate called after throwing an instance of 'std::runtime_error' what(): inv(): matrix is singular",
+   "seconds": 0.071,
+   "status": "both-error"
+  },
+  {
+   "case": "programs/img2stdcoord-noform",
+   "category": "programs",
+   "checks_passed": 6,
+   "checks_total": 6,
+   "failed_checks": [],
+   "measured": {
+    "every file bit-identical": "3/3"
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 0.044,
+   "status": "pass"
+  },
+  {
+   "case": "programs/img2stdcoord-warp-missing",
+   "category": "programs",
+   "checks_passed": 5,
+   "checks_total": 5,
+   "failed_checks": [],
+   "measured": {
+    "every file bit-identical": "3/3"
+   },
+   "reason": "img2stdcoord exits 1; the same from the replica. Image Exception : #63 :: No image files match: none Image Exception : #22 :: Failed to read volume none.nii.gz Error : No image files match: none An error occured while reading file: none.nii.gz",
+   "seconds": 0.039,
+   "status": "both-error"
+  },
+  {
+   "case": "programs/rmsdiff-usage",
+   "category": "programs",
+   "checks_passed": 5,
+   "checks_total": 5,
+   "failed_checks": [],
+   "measured": {
+    "every file bit-identical": "0/0"
+   },
+   "reason": "rmsdiff exits 255; the same from the replica. Usage: ~/fsl-6.0.7.23/bin/rmsdiff matrixfile1 matrixfile2 refvol [mask] Outputs rms deviation between matrices (in mm)",
+   "seconds": 0.011,
+   "status": "both-error"
+  },
+  {
+   "case": "programs/rmsdiff-rms",
+   "category": "programs",
+   "checks_passed": 6,
+   "checks_total": 6,
+   "failed_checks": [],
+   "measured": {
+    "every file bit-identical": "3/3"
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 0.009,
+   "status": "pass"
+  },
+  {
+   "case": "programs/rmsdiff-mask",
+   "category": "programs",
+   "checks_passed": 6,
+   "checks_total": 6,
+   "failed_checks": [],
+   "measured": {
+    "every file bit-identical": "4/4"
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 0.153,
+   "status": "pass"
+  },
+  {
+   "case": "programs/rmsdiff-low-determinant",
+   "category": "programs",
+   "checks_passed": 6,
+   "checks_total": 6,
+   "failed_checks": [],
+   "measured": {
+    "every file bit-identical": "3/3"
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 0.02,
+   "status": "pass"
+  },
+  {
+   "case": "programs/rmsdiff-singular",
+   "category": "programs",
+   "checks_passed": 5,
+   "checks_total": 5,
+   "failed_checks": [],
+   "measured": {
+    "every file bit-identical": "3/3"
+   },
+   "reason": "rmsdiff exits 251; the same from the replica. WARNING:: matrix 2 has low determinant 1.000000 0.000000 0.000000 0.000000 0.000000 0.000000 0.000000 0.000000 0.000000 0.000000 1.000000 0.000000 0.000000 0.000000 0.000000 1.000000 RMS_DEVIATION ERR",
+   "seconds": 0.007,
+   "status": "both-error"
+  },
+  {
+   "case": "programs/rmsdiff-missing-matrix",
+   "category": "programs",
+   "checks_passed": 5,
+   "checks_total": 5,
+   "failed_checks": [],
+   "measured": {
+    "every file bit-identical": "2/2"
+   },
+   "reason": "rmsdiff exits 254; the same from the replica. Could not open matrix file none.mat Could not read matrix none.mat",
+   "seconds": 0.007,
+   "status": "both-error"
+  },
+  {
+   "case": "programs/rmsdiff-4d",
+   "category": "programs",
+   "checks_passed": 6,
+   "checks_total": 6,
+   "failed_checks": [],
+   "measured": {
+    "every file bit-identical": "3/3"
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 0.02,
+   "status": "pass"
+  },
+  {
+   "case": "programs/makerot-usage",
+   "category": "programs",
+   "checks_passed": 5,
+   "checks_total": 5,
+   "failed_checks": [],
+   "measured": {
+    "every file bit-identical": "0/0"
+   },
+   "reason": "makerot exits 1; the same from the replica. *************************************************** The following COMPULSORY options have not been set: -t,--theta angle of rotation (in degrees) *************************************************** Pa",
+   "seconds": 0.009,
+   "status": "both-error"
+  },
+  {
+   "case": "programs/makerot-help",
+   "category": "programs",
+   "checks_passed": 5,
+   "checks_total": 5,
+   "failed_checks": [],
+   "measured": {
+    "every file bit-identical": "0/0"
+   },
+   "reason": "makerot exits 1; the same from the replica. Part of FSL (ID: 2412.6-dirty) makerot Copyright(c) 2003, University of Oxford (Mark Jenkinson) Usage: makerot [options] --theta=angle Compulsory arguments (You MUST set one or more of): -t,--theta an",
+   "seconds": 0.002,
+   "status": "both-error"
+  },
+  {
+   "case": "programs/makerot-default",
+   "category": "programs",
+   "checks_passed": 6,
+   "checks_total": 6,
+   "failed_checks": [],
+   "measured": {
+    "every file bit-identical": "0/0"
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 0.005,
+   "status": "pass"
+  },
+  {
+   "case": "programs/makerot-axis-centre",
+   "category": "programs",
+   "checks_passed": 6,
+   "checks_total": 6,
+   "failed_checks": [],
+   "measured": {
+    "every file bit-identical": "0/0"
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 0.005,
+   "status": "pass"
+  },
+  {
+   "case": "programs/makerot-long",
+   "category": "programs",
+   "checks_passed": 6,
+   "checks_total": 6,
+   "failed_checks": [],
+   "measured": {
+    "every file bit-identical": "0/0"
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 0.015,
+   "status": "pass"
+  },
+  {
+   "case": "programs/makerot-cov",
+   "category": "programs",
+   "checks_passed": 6,
+   "checks_total": 6,
+   "failed_checks": [],
+   "measured": {
+    "every file bit-identical": "1/1"
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 0.011,
+   "status": "pass"
+  },
+  {
+   "case": "programs/makerot-cov-missing",
+   "category": "programs",
+   "checks_passed": 5,
+   "checks_total": 5,
+   "failed_checks": [],
+   "measured": {
+    "every file bit-identical": "0/0"
+   },
+   "reason": "makerot exits -6; the same from the replica. Image Exception : #63 :: No image files match: none Image Exception : #22 :: Failed to read volume none.nii Error : No image files match: none terminate called after throwing an instance of 'std::runt",
+   "seconds": 0.022,
+   "status": "both-error"
+  },
+  {
+   "case": "programs/makerot-zero-axis",
+   "category": "programs",
+   "checks_passed": 5,
+   "checks_total": 5,
+   "failed_checks": [],
+   "measured": {
+    "every file bit-identical": "0/0"
+   },
+   "reason": "makerot exits 1; the same from the replica. ERROR:: Axis cannot be zero",
+   "seconds": 0.002,
+   "status": "both-error"
+  },
+  {
+   "case": "programs/makerot-short-axis",
+   "category": "programs",
+   "checks_passed": 6,
+   "checks_total": 6,
+   "failed_checks": [],
+   "measured": {
+    "every file bit-identical": "0/0"
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 0.004,
+   "status": "pass"
+  },
+  {
+   "case": "programs/makerot-stale-axis",
+   "category": "programs",
+   "checks_passed": 6,
+   "checks_total": 6,
+   "failed_checks": [],
+   "measured": {
+    "every file bit-identical": "0/0"
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 0.005,
+   "status": "pass"
+  },
+  {
+   "case": "programs/makerot-bad-theta",
+   "category": "programs",
+   "checks_passed": 5,
+   "checks_total": 5,
+   "failed_checks": [],
+   "measured": {
+    "every file bit-identical": "0/0"
+   },
+   "reason": "makerot exits 1; the same from the replica. Part of FSL (ID: 2412.6-dirty) makerot Copyright(c) 2003, University of Oxford (Mark Jenkinson) Usage: makerot [options] --theta=angle Compulsory arguments (You MUST set one or more of): -t,--theta an",
+   "seconds": 0.005,
+   "status": "both-error"
+  },
+  {
+   "case": "programs/makerot-out",
+   "category": "programs",
+   "checks_passed": 6,
+   "checks_total": 6,
+   "failed_checks": [],
+   "measured": {
+    "every file bit-identical": "1/1"
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 9
+   },
+   "seconds": 0.005,
+   "status": "pass"
+  },
+  {
+   "case": "programs/makerot-out-unwritable",
+   "category": "programs",
+   "checks_passed": 6,
+   "checks_total": 6,
+   "failed_checks": [],
+   "measured": {
+    "every file bit-identical": "0/0"
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 0.005,
+   "status": "pass"
+  },
+  {
+   "case": "programs/makerot-token",
+   "category": "programs",
+   "checks_passed": 5,
+   "checks_total": 5,
+   "failed_checks": [],
+   "measured": {
+    "every file bit-identical": "0/0"
+   },
+   "reason": "makerot exits 1; the same from the replica. Part of FSL (ID: 2412.6-dirty) makerot Copyright(c) 2003, University of Oxford (Mark Jenkinson) Usage: makerot [options] --theta=angle Compulsory arguments (You MUST set one or more of): -t,--theta an",
    "seconds": 0.002,
    "status": "both-error"
   },
@@ -2166,7 +3232,55 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 0.014,
+   "seconds": 0.018,
+   "status": "pass"
+  },
+  {
+   "case": "difftest/background-level-overflow-survives",
+   "category": "difftest",
+   "checks_passed": 6,
+   "checks_total": 6,
+   "failed_checks": [],
+   "measured": {
+    "every file bit-identical": "3/3"
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 0.053,
+   "status": "pass"
+  },
+  {
+   "case": "difftest/background-nan-order",
+   "category": "difftest",
+   "checks_passed": 6,
+   "checks_total": 6,
+   "failed_checks": [],
+   "measured": {
+    "every file bit-identical": "4/4"
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 1
+   },
+   "seconds": 5.062,
+   "status": "pass"
+  },
+  {
+   "case": "difftest/basescale-init-float",
+   "category": "difftest",
+   "checks_passed": 6,
+   "checks_total": 6,
+   "failed_checks": [],
+   "measured": {
+    "every file bit-identical": "4/4"
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 37.727,
    "status": "pass"
   },
   {
@@ -2182,16 +3296,16 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 1.796,
+   "seconds": 2.678,
    "status": "pass"
   }
  ],
  "suite": "fsl-flirt-replica",
  "summary": {
-  "both-error": 34,
-  "expected-divergence": 0,
+  "both-error": 61,
+  "expected-divergence": 4,
   "fail": 0,
-  "pass": 107,
+  "pass": 152,
   "skipped": 0
  },
  "tier": "standard"

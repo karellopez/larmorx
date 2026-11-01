@@ -78,8 +78,10 @@ class Entry:
         unset: Sequence[str] = (),
         check: bool = True,
         timeout: float = 4 * 3600,
+        cwd: Path | None = None,
     ) -> Run:
-        """Run ``argv`` with ``env`` added to (and ``unset`` removed from) this environment."""
+        """Run ``argv`` with ``env`` added to (and ``unset`` removed from) this environment, in
+        ``cwd`` (default: this process's working directory)."""
         full = {k: v for k, v in os.environ.items() if k not in unset}
         full.update(env or {})
         run = Run(label, [str(a) for a in argv], dict(env or {}))
@@ -93,6 +95,7 @@ class Entry:
             errors="replace",
             env=full,
             timeout=timeout,
+            cwd=cwd,
         )
         run.seconds = round(time.perf_counter() - t0, 2)
         run.exit = p.returncode

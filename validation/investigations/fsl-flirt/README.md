@@ -4,11 +4,23 @@
   decompressed bytes with the header's `descrip` blanked) and, when they differ, prints the
   largest data difference and the number of differing voxels. Used while the replica was brought
   to bit-identity (2026-11-01) to compare FSL's and the replica's outputs of one case by hand.
-- `finding_repro.py` reproduces one finding of random testing (`difftest`, tool `fsl-flirt`) by
-  hand: the shrunk recipe's inputs (or the drawn one's, `--drawn`) in two directories, FSL's
-  `flirt` and the replica (`reproduce`) on each, the output images compared voxel by voxel. It
+- `finding_repro.py` reproduces one finding of random testing (`difftest`, tool `fsl-flirt` or
+  `fsl-flirt-programs`) by hand: the shrunk recipe's inputs (or the drawn one's, `--drawn`) in two
+  directories, FSL's program and the replica (`reproduce`) on each, their standard output and
+  error kept with the first line where they differ, the output images compared voxel by voxel. It
   showed the two differences part 1 fixed (the blur of `-applyxfm` beyond the image's edges; the
-  sign of BBR's NaN cost).
+  sign of BBR's NaN cost) and part 2's missing quaternion message (trial-flirt-programs-00219).
+- `memory_findings.py` measures the peak memory and time of FSL and of the replica on the findings
+  that ran over the trial's memory budget (`/usr/bin/time -v`, a timeout; `--replica-only` measures
+  a new build again against the earlier FSL run). Part 2: FSL's own peak is 8 GiB to above 39 GiB
+  on those inputs.
+- `rsstrace.py` samples both programs' resident memory every millisecond with their printed lines
+  placed in time, and `gdb_allocations.py` (a gdb script) lists every allocation of an image's size
+  with the call that made it and the memory at that moment: together they located the replica's
+  extra copies on large references (part 2: 262 MiB against FSL's 192, now 187).
+- `fsl67_measure.py` measures FSL-67 (BBR's normals from the segmentation's voxel sizes) on
+  fMRIPrep's three BBR calls and an anisotropic synthetic case with a known motion; its results
+  are `fsl67-results.json` (rule C: no gain above the noise).
 - `recheck_findings.py` re-runs every finding of a random-testing run (shrunk and drawn recipes)
   through the suite's own runner with the program in `LARMORX_NC_BIN` and says which still
   differ: what a fix leaves open.
@@ -20,6 +32,10 @@ python -P compare_images.py <fsl/out.nii.gz> <replica/out.nii.gz> [more pairs]
 python -P finding_repro.py <workspace>/oracles/difftest/2026-11-01-fsl-flirt/findings/fsl-flirt/trial-flirt-00016-replica.json <scratch>/r16
 LARMORX_NC_BIN=<larmorx-nc> python -P recheck_findings.py <run>/findings/fsl-flirt all 16
 python -P crash_probe.py <larmorx-nc>
+LARMORX_NC_BIN=<larmorx-nc> python -P memory_findings.py <out> 1800 <finding.json>... [--replica-only]
+LARMORX_NC_BIN=<larmorx-nc> python -P rsstrace.py <out> -in @epi.nii -ref @t1full.nii.gz -omat out.mat -v
+gdb -batch -x gdb_allocations.py --args <larmorx-nc> fsl flirt -in epi.nii -ref t1full.nii.gz -omat out.mat
+python -P fsl67_measure.py <out>
 ```
 
 Run them with `PYTHONPATH=<checkout>/python:<checkout>/validation/src` and `FSLDIR` unset or

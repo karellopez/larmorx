@@ -405,7 +405,7 @@ defects! {
     FSL_20 = "FSL-20", "mcflirt", true,
         "when the .mat directory cannot be created for another reason than its permissions (a missing parent directory), mcflirt prints an error and exits with status 0, writing neither the matrices, the .par and .rms files nor the corrected series";
     FSL_22 = "FSL-22", "FSL", true,
-        "the background value (calc_bval) sorts the 2-voxel border with std::sort and operator<: with NaN voxels the order is undefined in C++, so the padding value of a resampled volume is arbitrary";
+        "the background value sorts the 2-voxel border with std::sort and operator<: with NaN voxels the order is undefined in C++, so the padding value of a resampled volume is arbitrary";
     FSL_40 = "FSL-40", "bet2", true,
         "the input and output names lose their first '.hdr' wherever it stands (a directory named x.hdr is read as x), and a name with '.img' but no '.hdr' aborts the program";
     FSL_41 = "FSL-41", "bet2", true,
@@ -456,6 +456,12 @@ defects! {
         "a negative -bins: each stage has -bins / scale bins (truncated toward zero), prepared for every cost function; with -1 bins the process is killed by SIGFPE (an integer division by zero), with -2 or fewer it aborts with std::bad_array_new_length; nothing is written";
     FSL_68 = "FSL-68", "flirt", true,
         "every error after the command line (an image or matrix file that cannot be read, a matrix of the wrong size, an unknown -bbrtype) ends the program with exit status 0: its main catches every exception and returns 0 after printing the message, with no output written";
+    FSL_76 = "FSL-76", "makerot", true,
+        "the axis is divided by the square root of its length instead of its length: for an axis that is not of unit length the rotation is by the angle times the square root of the axis's length (30 degrees about 0,0,4 give 60)";
+    FSL_77 = "FSL-77", "makerot", true,
+        "an axis or centre of fewer than three values reads past the vector's values (what its buffer still holds: the default's zeros or an earlier value of the same option), and values beyond the third are ignored";
+    FSL_75 = "FSL-75", "flirt", true,
+        "the background value (the 10th percentile of the 2-voxel border) sizes its buffer too small for a volume 3 voxels wide along x (2 or more along y or z) or along y (2 or more along z, x not 2 or 4), as FLIRT's pyramid levels can be: it writes the rest past the buffer (heap corruption: FLIRT may abort or crash later, or finish) and takes the percentile of the values that fit; a 1 x 1 x 1 volume reads an empty buffer";
     ITK_50 = "ITK-50", "ITK", true,
         "KdTreeBasedKmeansEstimator never counts the point a k-d tree node is split at when it divides the node between centres: those points are left out of the pass's new centres";
     ITK_51 = "ITK-51", "ITK", true,

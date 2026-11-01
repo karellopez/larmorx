@@ -154,7 +154,7 @@ pub const REPLICAS: &[Replica] = &[
         location: Location::Program(&LARMORX_NC),
         original: true,
     },
-    // FSL's FLIRT and convert_xfm (2026-11-01): the replica only; the clean-room original is to
+    // FSL's FLIRT and its programs (2026-11-01): the replica only; the clean-room original is to
     // be written from specs/flirt.md.
     Replica {
         family: "fsl",
@@ -165,6 +165,42 @@ pub const REPLICAS: &[Replica] = &[
     Replica {
         family: "fsl",
         tool: "convert_xfm",
+        location: Location::Program(&LARMORX_NC),
+        original: false,
+    },
+    Replica {
+        family: "fsl",
+        tool: "avscale",
+        location: Location::Program(&LARMORX_NC),
+        original: false,
+    },
+    Replica {
+        family: "fsl",
+        tool: "img2imgcoord",
+        location: Location::Program(&LARMORX_NC),
+        original: false,
+    },
+    Replica {
+        family: "fsl",
+        tool: "std2imgcoord",
+        location: Location::Program(&LARMORX_NC),
+        original: false,
+    },
+    Replica {
+        family: "fsl",
+        tool: "img2stdcoord",
+        location: Location::Program(&LARMORX_NC),
+        original: false,
+    },
+    Replica {
+        family: "fsl",
+        tool: "rmsdiff",
+        location: Location::Program(&LARMORX_NC),
+        original: false,
+    },
+    Replica {
+        family: "fsl",
+        tool: "makerot",
         location: Location::Program(&LARMORX_NC),
         original: false,
     },
@@ -617,7 +653,16 @@ mod tests {
         assert_eq!(replica_only("ants").count(), 0);
         assert_eq!(
             replica_only("fsl").collect::<Vec<_>>(),
-            ["flirt", "convert_xfm"]
+            [
+                "flirt",
+                "convert_xfm",
+                "avscale",
+                "img2imgcoord",
+                "std2imgcoord",
+                "img2stdcoord",
+                "rmsdiff",
+                "makerot"
+            ]
         );
         let betsurf = lookup("fsl", "betsurf").unwrap();
         assert_eq!(betsurf.package().unwrap().env, "LARMORX_NC_BIN");

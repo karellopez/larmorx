@@ -1,4 +1,4 @@
-# Spec: `flirt` and `convert_xfm` (behaviour of FSL FLIRT, FSL 6.0.7.23)
+# Spec: `flirt`, `convert_xfm` and FLIRT's other programs (behaviour of FSL FLIRT, FSL 6.0.7.23)
 
 The input for the clean-room **original** of larmorx's FLIRT (Apache-2.0, in the main package,
 written later by an implementer who has never read FSL's source). FSL is under the FSL Licence
@@ -176,7 +176,7 @@ input to a 3D reading keeps its first volume with FSL's warning).
 
 **The base scale.** Internally the voxel sizes of every image read are divided by the base scale
 `b` (§4.2) when `|b − 1| > 1e-5`; the matrices of the schedule are in these scaled millimetres.
-The initial matrix is converted in (`S M S⁻¹` with `S = diag(1/b, 1/b, 1/b, 1)`, the product of
+The initial matrix is converted in (`S M S⁻¹` with `S = diag(1/b, 1/b, 1/b, 1)`, `1/b` a single-precision quotient (exactly 100 for b = 0.01), the product of
 three as §12 says), and the final matrix out: its translation column (rows 1-3 of column 4)
 multiplied by `b`. The output image is computed from unscaled images.
 
@@ -184,10 +184,30 @@ multiplied by `b`. The output image is computed from unscaled images.
 three scales, three skews, composed about a centre (`R = Rx·Ry·Rz`, then skew and scale, about
 the centre). The centre is the input volume's intensity-weighted centre of mass (`specs/mcflirt.md`
 §6.1) **of the volume the current image pair was built with** (§5.4), in scaled mm. Decomposition
-(matrix → parameters) is the inverse, about the same centre. With `-anglerep quaternion` the three
-rotation parameters are the vector part `(x, y, z)` of a unit quaternion (`w = √(1 − x² − y² −
-z²)` in single precision; parameters with `x² + y² + z² > 1` are refused with `Parameters do not
-form a valid axis - greater than unity`); the search (§8) always uses Euler angles.
+(matrix → parameters) is the inverse, about the same centre.
+
+**Quaternion parameters** (`-anglerep quaternion`; observed, the replica identical to FSL on the
+record's cases). The three rotation parameters are the vector part `(x, y, z)` of a unit
+quaternion; the search (§8) always uses Euler angles, every other composition and decomposition
+uses the quaternion:
+- *Composition.* `w² = 1 − x² − y² − z²` in double (left to right), stored in single precision; if
+  it is negative, `Parameters do not form a valid axis - greater than unity` on standard error and
+  the rotation is the identity (scales and skews are still applied). Otherwise `w = √w²` in single
+  precision and, with `x, y, z` rounded to single precision, the rotation's entries in single
+  precision, each product left to right (`2·y·y` is `(2y)·y`): `R11 = 1 − 2y² − 2z²`, `R22 = 1 −
+  2x² − 2z²`, `R33 = 1 − 2x² − 2y²`, `R12 = 2xy − 2wz`, `R21 = 2xy + 2wz`, `R13 = 2xz + 2wy`, `R31 =
+  2xz − 2wy`, `R23 = 2yz − 2wx`, `R32 = 2yz + 2wx`. The centre's translation `c − R·c` (double, a
+  3 × 3 times 3-vector product), then the translations added; with exactly 3 parameters the
+  translations are added too (with 4, 5 or 6, as many as there are). With 1 or 2 parameters FLIRT
+  prints `Can only do 3 or more, not <n>` on standard error at each composition and still uses the
+  three components. Messages printed during the optimisation appear on standard error as they
+  arise, every time.
+- *Decomposition.* The rotation part of §3's decomposition, its 3 × 3 entries stored in single
+  precision, converted to a quaternion as the NIfTI-1 reference library converts a matrix
+  (its polar decomposition when the columns are not orthonormal, the sign chosen so that the scalar
+  part is non-negative), computed as FSL's x86-64 build computes it: the library's `long double`
+  constants make some of its operations x87 extended-precision operations, rounded once to 64
+  significant bits and again when stored; the parameters are its `(b, c, d)`.
 
 ## 4. Reading and preparing the images
 
@@ -650,6 +670,37 @@ concat-matrix` (253); the inverse of a singular matrix aborts (`inv(): matrix is
 The usage text names the program as invoked: `convert_xfm (Version 2.1)`, the copyright line, the
 usage lines and options (exact text in the parity record).
 
+## 10a. The background value and FSL-75
+
+FLIRT computes an image's **background value** (the 10th percentile of a border shell, as
+`specs/mcflirt.md` §9.2) in three places: each subsampling of the reference pyramid fills the
+half-size level with the background value of the level it halves (§5); the final resampling
+(`-out`, `-applyxfm`) pads the input with its background value unless `-setbackground` is given
+(§9.2); the windowed-sinc cost's interpolation falls back to it where its kernel sums to about 0.
+The shell is `e = min(2, n − 1)` voxels deep along each axis of size `n`; FSL sizes its buffer as
+`2(x − 2eₓ)(y − 2e_y)e_z + 2(x − 2eₓ)·z·e_y + 2·y·z·eₓ` values, which is smaller than the shell it
+fills (the terms with a negative factor count against it while their loops write nothing) exactly
+when **the size along x is 3 and the size along y or z is at least 2, or the size along y is 3,
+the size along z at least 2 and the size along x neither 2 nor 4**; and is empty for a **1 × 1 × 1**
+image, whose first value FSL then reads. FSL fills the buffer in loop order (the two xy faces
+for each depth `e < e_z`, x from `eₓ` to `x − eₓ − 1`, y from `e_y` to `y − e_y − 1`, the voxel at
+depth `e` then its mirror at `z − 1 − e`; then the xz faces, x as before, z over the whole size;
+then the yz faces, y and z over the whole size), keeps the values that fit, and takes the value at
+position `⌊numbins / 10⌋` of those sorted; the rest are written past the buffer (the heap is
+corrupted: FSL may abort or crash later, or finish, with the same result where the corruption
+touched nothing it reads again; all observed on small random images, and one ordinary 25 × 30 × 27
+image at 0.5 × 1.2 × 1 mm whose pyramid reaches 3 × 3 × 3, where FSL finished). The levels' sizes
+follow from the images' sizes (§5), so images with 5 or 6 voxels along x or y meet it in the
+pyramid. The original, by default (rule A), takes the 10th percentile (`⌊n / 10⌋` of the `n`
+values sorted) of **every** value the loops write; with `reproduce`, the values FSL's buffer holds
+and its position; in both modes it names FSL-75 wherever the buffer is too small (a notice: FSL
+corrupts its heap there). A **1 × 1 × 1** image has no border (FSL reads an empty buffer): refused
+in both modes (rule B), before writing anything, with a message naming the size and FSL-75, exit
+status 1. NaN values in the border have no defined order in FSL's sort (FSL-22, as for mcflirt,
+`specs/mcflirt.md` §9.2): the original sorts them last by default and names FSL-22; with
+`reproduce` it gives them the order FSL's build gives them (libstdc++'s introsort, insertion sort
+below 16 values), except where that sort would read outside the vector (sorted last there).
+
 ## 11. Defects (D13) and larmorx's defaults
 
 The register (`docs/findings/upstream-defects.md`) holds the entries; what the original must do by
@@ -660,14 +711,22 @@ default and with `reproduce`:
 - **FSL-21**, **FSL-66** (no or negative bins: `-bins` below 8 gives 0 bins at the 8 mm scale; FSL
   aborts or crashes): refused with a message in both modes.
 - **FSL-56** (NIfTI extensions' offset): corrected by default.
-- **FSL-67** (BBR normals scaled by the reference level's voxel sizes, §6.5): kept for now; the
-  effect is nil on isotropic levels and is to be measured on anisotropic segmentations (rule D)
-  before it is corrected or kept.
+- **FSL-67** (BBR normals scaled by the reference level's voxel sizes, §6.5): **kept in both
+  modes** (rule C, measured 2026-11-01): computing the normals in millimetres (the segmentation's
+  own voxel sizes) moves fMRIPrep's BBR results by 0.016 mm (ds005040, 0.85 × 0.83 × 0.83 mm) and
+  0.025 mm (ds000228, voxel sizes 1 mm up to a float's last bit) on average over the brain, and on a
+  strongly anisotropic synthetic case with a known motion (0.85 × 0.83 × 2.5 mm, three starts) it
+  brings the result 0.003 mm closer to the truth on average (0.060 against 0.063 mm) and not closer
+  at the 95th percentile: below the size of BBR's own sensitivity to its last bits
+  (`validation/investigations/fsl-flirt/fsl67_measure.py`).
 - **FSL-68** (every error after the command line ends with exit status 0, nothing written; §2):
   exit status 1 with the same message by default; `reproduce` exits 0.
 - Undefined behaviour, refused in both modes with a message: an uninitialised matrix name (§7.1),
-  `bbrstep` below 1, `-pedir` without a field map read (§6.5), a `read` of an unparsable file (FSL
-  loops forever).
+  `bbrstep` below 1 (FSL-71: FSL never finishes), `-pedir` without a field map read (§6.5), a `read`
+  of an unparsable file (FSL-72: FSL reads for ever, its memory growing until an allocation fails:
+  `std::bad_alloc`, exit status 0 under an address-space limit), the background value of a single
+  voxel (§10a, FSL-75; the buffer too small for the border: corrected by default, FSL's values with
+  `reproduce`).
 
 ## 12. Numerics and operation order
 
@@ -706,8 +765,182 @@ Metrics and thresholds (PLAN.md §11.3):
   unit of the input; one slice cropped, reported) and from FSL 6.0.7.17 against 6.0.7.23; the
   record reports the original's distances as ratios to that band.
 
+FLIRT's other programs (§15): every case of the record's `programs/` category (every option, the
+usages, the files that cannot be read, the singular matrices, the aborts) identical in text and
+exit status; avscale also on random matrices (rotations, scales, skews, reflections, any matrix:
+identical text).
+
 ## 14. Open questions
 
 1. The principal-axes alignment (`alignpaxes`) is not specified (no shipped schedule uses it).
 2. The SVD pseudo-inverse of general parameter-subset masks (§8.3).
-3. Quaternion parameters in the schedule's decomposition (`-anglerep quaternion` outside the search).
+3. `applyxfm4D`, `midtrans` and `pointflirt` are not specified yet; the coordinate programs'
+   `-warp` (FNIRT's warp fields) neither.
+4. `makerot` with a NaN or infinite angle or axis: which rows FSL prints as `nan` and which as
+   `-nan` (the sign the NaN carries through the rotation's products) is not specified; every
+   finite input is (§15.4).
+
+## 15. FLIRT's other programs
+
+All print with C++'s stream formatting: numbers with 6 significant digits (`%g`) until a matrix
+is printed, which switches the stream to fixed notation with 6 decimals for good; a matrix is its
+rows, each value in fixed notation with 6 decimals followed by a blank (`-0.000000` for small
+negatives). An **Armadillo expression** printed (`std2imgcoord`'s inverse matrix) uses Armadillo's
+own layout and restores the stream's state: 4 decimals, right-aligned in 9 columns (13 in
+scientific notation `d.dddde±XX` when a finite value is at least 100 in magnitude, or non-zero and
+at most 1e-4; 10 in fixed notation when one is at least 10 in magnitude), zeros as `0`, `nan`,
+`inf`, `-inf`. An uncaught exception ends with the C++ runtime's two lines (`terminate called after
+throwing an instance of '<type>'` and `  what():  <message>`) and signal 6; the original prints
+them and exits 1 (`docs/porting-guide.md`, failure cases). Matrix files are read as FLIRT reads
+them (§2): a missing file prints `Could not open matrix file <name>` and
+gives an empty matrix; fewer numbers than the first numeric line announces throw `Could not find
+enough numbers in matrix file`. Images that cannot be read throw newimage's exception
+(`Image Exception : #63 :: No image files match: <stem>`, then `#22 :: Failed to read volume
+<name>` with `Error : ...`). Matrices other than 4 × 4 where FSL would compute with them beyond
+4 × 4 (a determinant, an inverse) are refused by the original with a message (FSL computes part
+of the output first).
+
+### 15.1 `avscale [--allparams/--inverteddies] matrixfile [non-reference-volume]`
+
+- Fewer than one argument: `Usage: avscale [--allparams/--inverteddies] matrixfile
+  [non-reference-volume]` on standard error, exit 255. A first argument starting with `-` is the
+  option (any such word; only `--allparams` and `--inverteddies` change anything), the next the
+  matrix; a missing matrix argument throws a `std::logic_error` (`basic_string: construction from
+  null is not valid`): `Image error`, then the runtime's lines, signal 6.
+- With a volume argument: the volume is read first (an empty name is not read: the centre of an
+  empty volume, `WARNING::in calculating COG, total = 0.0` on standard error after the matrix is
+  read, centre 0), then the matrix; the centre is the volume's centre of gravity in scaled mm
+  (`specs/mcflirt.md` §6.1). A matrix of fewer than 4 rows: exit 254 (no message besides the
+  reader's).
+- The decomposition of §3 (Euler) about the centre; any exception is caught, its message printed
+  on standard error (`std::runtime_error`s; `Image error` for others), and thrown again (signal 6):
+  a zero scale makes the solve singular (`matrix multiplication: problem with matrix inverse;
+  suggest to use solve() instead`), as does a NaN entry.
+- Prints `Rotation & Translation Matrix:` and the rotation-and-translation matrix (the first six
+  parameters composed about the origin) and a blank line; with `--allparams` `Rotation Angles
+  (x,y,z) [rads] = ` and `Translations (x,y,z) [mm] = ` each followed by the three values as a row
+  and a blank line; `Scales (x,y,z) = `, `Skews (xy,xz,yz) = ` likewise; `Average scaling = ` the
+  mean of the scales (double sum over 3, stored in single precision) and two newlines;
+  `Determinant = ` the determinant (Armadillo's), `Left-Right orientation: preserved` (determinant
+  above 0) or `swapped`, a blank line.
+- The half transforms: with `M' = M` times `diag(−1, 1, 1, 1)` when the determinant is negative,
+  the **square root** of `M'`: its quaternion decomposition (§3) with the rotation halved (the
+  vector part times `1/(2 cos(t/2))`, `t = asin(|v|)`, both in double), the square roots of the
+  scales and half the skews; its rotation `R` (3 parameters, translations 0), `K` the half skews,
+  `S` the root scales; its translation solves `((M'·S⁻¹·K⁻¹·R⁻¹ + I)'s 3 × 3 part)·t = M's
+  translation` (an LU solve; the four-term product with each inverse evaluated); the forward half
+  is `R·K·S` with `t` (the products left to right), the backward half the forward times `M⁻¹`.
+  Printed after `Forward half transform =` and `Backward half transform =`, each with a blank line.
+  A singular `M` throws `inv(): matrix is singular` (signal 6, after the printed lines).
+- `--inverteddies`: after a blank line, `Matrix check: mat^-1 * rotmat * skew * scale =` and
+  `M⁻¹·R·K·S` (left to right), a blank line, then `Inverted eddy matrix:` and `R·K'·S'` with `S'`
+  the scales with `1/s_y`, `K'` the skews with the xy and yz skews negated.
+
+### 15.2 `img2imgcoord`, `std2imgcoord`, `img2stdcoord`
+
+Command lines (options anywhere; a word not starting with `-` is the coordinate file; an empty
+word skipped; `-help` prints the usage on standard output and exits 0; no argument prints it and
+exits 1): `-src`/`-dest` (img2imgcoord) or `-img`/`-std` (the others), `-xfm` or `-premat` (the
+matrix), `-warp` (a FNIRT warp field), `-vox`, `-mm`, `-v` (img2imgcoord: verbose level 5; the
+others: 1), `-verbose` (the others: 5), `-flirt` (accepted; the others print `WARNING::Using
+outdated options, please update to new usage`), `-` (the others: read standard input). An option
+that needs a value and is last: `Lacking argument to option <o>` and the scan ends (the run goes
+on); an unknown option: `Unrecognised option <o>`, exit 255. A missing source (input) name:
+`ERROR:: Source volume filename not found` (img2imgcoord), `ERROR:: image filename not found`
+(std2imgcoord), `ERROR:: input image filename not found` (img2stdcoord), followed by a blank line;
+likewise for the destination (`ERROR:: Destination volume filename not found`) and, with `-std`
+given empty, `ERROR:: standard image filename not found`; the run goes on (the image read then
+throws). Usage texts are FSL's, verbatim (the record compares them).
+
+Images are read **header only**: sizes below 1 count 1; voxel sizes as stored (magnitudes, no
+repair of zero sizes, no ANALYZE origin); swapped to radiological order when stored neurologically
+(the sform and qform follow). Defaults: img2imgcoord in voxels, std2imgcoord output in mm,
+img2stdcoord input in voxels.
+
+Per program: img2imgcoord reads `-src`, then `-dest`; the others `-img`, then `-std` when given
+(without it an empty standard volume: no sform or qform, 1 mm voxels). With verbose level above
+3: `<name>:: SIZE = x x y x z` and `<name>:: DIMS = dx x dy x dz mm` (a blank line after), for the
+destination then the source (`Destination Volume`, `Source Volume`; the others `standard image`
+when given, then `input image`). The matrix (`-xfm`; the identity without one) must have 4 rows
+(`Cannot read transform file`, exit 254); verbose above 3 prints ` affmat =`, the matrix and two
+newlines (std2imgcoord also ` Inverse affmat =` and the inverse as an Armadillo expression).
+`-warp`: the file is read as an image; when it cannot be, its exception's lines and `An error
+occured while reading file: <name>`, exit 1 (with a readable warp field the original's behaviour is
+open, §14). The others then warn `WARNING:: standard coordinates not set in standard image`
+(std2imgcoord) or `WARNING:: mm coordinate space not set in standard volume` (img2stdcoord) when
+the standard volume has neither sform nor qform; with verbose above 3, ` stdvox2world =` and its
+millimetre matrix. Then img2imgcoord always prints `Coordinates in Destination volume (in mm)` or
+`(in voxels)`; std2imgcoord with verbose prints `Coordinates in input image (in mm):` or `(in
+voxels):`; img2stdcoord with verbose `Coordinates in standard image (in mm):`. Coordinates come
+from the file (`Could not open matrix file <name>`, exit 255, when it cannot be opened) or from
+standard input when the name is `-` or empty (verbose: a prompt line, `Please type in input image
+coordinates (in voxels) :`, `(in mm) :`, std2imgcoord `Please type in standard coordinates :`;
+img2imgcoord and img2stdcoord refuse a terminal with `Interactive mode has been removed. Please
+pipe input such as: cat coordinate_file.txt | <program>, OR supply a coordinate file`, exit 1).
+Triples are read as C++ streams read doubles (`std::istream >> double`, "C" locale); the first triple that
+does not read ends the input; std2imgcoord on standard input also ends at a triple equal to the
+previous one. Each output line is the three coordinates separated by two blanks.
+
+The mapping (`V` an image's millimetre matrix: its sform if set, else its qform, else its voxel
+sizes; `S` its voxel-size diagonal; `N` its NIfTI-to-newimage voxel matrix: the identity, or for an
+image stored neurologically `S⁻¹·F·S` with `F` the reversal of x about the field of view (`x' =
+(nx − 1)·dx − x`, the field of view in single precision), evaluated as a solve; every `A⁻¹·v` is an
+LU solve of `A` against `v`, every `A·v` a 4 × 4 times 4-vector product): through the matrix `M`
+from source to target, `n(u) = S_t⁻¹·(M·(S_s·u))` (the fourth element of `u` kept):
+- img2imgcoord: in voxels `N_d⁻¹·n(N_s·c)`, in mm `V_d·n(V_s⁻¹·c)`;
+- std2imgcoord: `n` from the standard to the input through `M⁻¹` (the inverse evaluated at each
+  coordinate: a singular `M` throws `inv(): matrix is singular`, signal 6) of `V_std⁻¹·c`, then
+  `V_img·…` (mm) or `N_img⁻¹·…` (voxels);
+- img2stdcoord: `V_std·n(V_img⁻¹·c)` (input in mm) or `V_std·n(N_img·c)` (voxels).
+A matrix that is not 4 × 4 at the mapping throws `NewimageCoord2NewimageCoord: M must be a 4x4
+matrix` (newimage's exception #11; signal 6, after the lines printed so far).
+
+### 15.3 `rmsdiff matrixfile1 matrixfile2 refvol [mask]`
+
+Fewer than 3 arguments: `Usage: rmsdiff matrixfile1 matrixfile2 refvol [mask]` and `        Outputs
+rms deviation between matrices (in mm)` on standard error, exit 255. Each matrix must have 4 rows
+(`Could not read matrix <name>`, exit 254). A matrix whose determinant's magnitude is below 0.1:
+`WARNING:: matrix <1|2> has low determinant`, the matrix (standard error), a blank line. The
+reference is read in full (a 4D image: its first volume, with FSL's warning). Without a mask: the
+RMS deviation (§8.6) over 80 mm **about the reference's centre of gravity** (scaled mm), printed in
+single precision; a singular second matrix: `RMS_DEVIATION ERROR:: Could not invert matrix`, exit
+251. With a mask: over the mask's voxels above 0.5 (its own indices, x fastest; the coordinates
+`(i·dx, j·dy, k·dz)` with the reference's voxel sizes, each product in single precision), the
+distance `|(M1 − M2)·(x, y, z, 1)|` (double, the norm as `√` of the sum of squares); printed are
+the largest distance (a NaN distance never replaces it) and `√(Σ d² / n)` (an empty mask: NaN,
+printed `-nan`).
+
+### 15.4 `makerot --theta=angle [options]`
+
+FSL's general option parser (as `bet2`'s, `specs/bet.md`): `-t,--theta` (compulsory, a float
+read whole: `Couldn't set_value! valstr="<word>"`), `-a,--axis` and `-c,--centre` (one word each,
+split at `,`, or at `:` when the word holds one, each piece read as `atof` reads it: `x` is 0, an
+empty piece 0), `--cov` (an image name), `-o,--out` (a file name), `-v,--verbose` (no effect),
+`-h,--help`; long options take their value after `=` only (`--theta 30`: `--theta: Missing
+non-optional argument!`); one-letter options group (`-vt 30`); a word that is not an option:
+`<word>:  is an unrecognised token!`. A parse error prints the usage, a blank line and the message
+to standard error, exit 1. `-h` prints the usage, exit 1 (help is checked first: no compulsory
+message). Without `-t`: the block `***************************************************`, `The
+following COMPULSORY options have not been set:`, each missing option's usage line, the rule again,
+then the usage, exit 1. The usage: `Part of FSL (ID: 2412.6-dirty)`, the title `makerot `,
+`Copyright(c) 2003, University of Oxford (Mark Jenkinson)`, a blank line, `Usage: `, `makerot
+[options] --theta=angle`, then the compulsory and optional options in the order `-t`, `-a`,
+`--cov`, `-c`, `-o`, `-v`, `-h` (a help text beginning `~` prints after one blank: `-a,--axis
+<ax,ay,az>	unnormalised axis vector (comma separated)`).
+
+The axis is (0, 0, 1) unless given; a zero axis (its length exactly 0): `ERROR:: Axis cannot be
+zero`, exit 1. FSL then divides the axis by **the square root of its length** (FSL-76), so the
+rotation is by `θ·√|a|`: 30 degrees about (0, 0, 4) give 60. The original divides by the length
+(rule A: the help calls the axis "unnormalised") and names FSL-76 wherever the length is not
+exactly 1; `reproduce` gives FSL's matrix. An axis or centre of **other than three values**
+(FSL-77): FSL reads past the values it was given (the vector's buffer: the default's zeros, or the
+values an earlier occurrence of the same option left there: `-a 1,2,3 -a 7` is (7, 2, 3)) and
+ignores values beyond the third; the original refuses it by default (rule B, a message naming
+FSL-77, exit 1) and reads as FSL does with `reproduce` (named). The centre is (0, 0, 0) unless
+given; `--cov` replaces it by `((n − 1)·d·0.5)` along each axis of the image (size `n`, voxel size
+`d`, in double), whatever `-c` says; an image that cannot be read throws newimage's exception
+(signal 6; the original exits 1 after the same text). The matrix is §8.5's rotation (`make_rot`)
+about the axis scaled by `θ·π/180` (in double, element by element: `((a·θ)·π)/180`) through the
+centre. With `-o` it is written as FLIRT writes matrices (§9.1; a file that cannot be opened:
+`Could not open file <name> for writing`, exit 0); otherwise printed (§15's matrix layout) and
+followed by a blank line. Exit 0.

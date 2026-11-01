@@ -21,8 +21,8 @@ use larmorx_nc_core::nifti::{self, dt};
 use larmorx_nc_core::optimise::{self, OptEvent};
 use larmorx_nc_core::settings::Settings;
 use larmorx_nc_core::volume::{
-    self, Conversion, Extrapolation, FslError, Interpolation, SaveError, SaveOptions, SaveType,
-    Volume,
+    self, Background, BorderBuffer, Conversion, Extrapolation, FslError, Interpolation, NanOrder,
+    SaveError, SaveOptions, SaveType, Volume,
 };
 
 use crate::options::{AngleRep, EXIT_MINUS_ONE, Interp, Options, Parsed, Window, parse};
@@ -121,6 +121,9 @@ pub struct Flirt<'a> {
     out: Cout<'a>,
     err: &'a mut dyn Write,
     notices: Vec<Notice>,
+    /// `construct_rotmat_quat`'s messages not yet written (it prints on standard error from
+    /// inside the cost function).
+    quat_msgs: std::cell::RefCell<Vec<String>>,
     // globaloptions (beyond the command line)
     usrmat: Vec<Vec<Row>>,
     searchoptmat: Vec<Row>,
@@ -307,6 +310,7 @@ impl<'a> Flirt<'a> {
             },
             err,
             notices: Vec::new(),
+            quat_msgs: std::cell::RefCell::new(Vec::new()),
             usrmat: vec![Vec::new(); 27],
             searchoptmat: Vec::new(),
             preoptsearchmat: Vec::new(),
@@ -351,6 +355,7 @@ impl<'a> Flirt<'a> {
     }
 
     fn e(&mut self, t: &str) {
+        self.flush_quat_msgs();
         let _ = self.err.write_all(t.as_bytes());
     }
 
@@ -361,6 +366,69 @@ impl<'a> Flirt<'a> {
 
     fn notice(&mut self, defect: &'static defects::Defect, detail: impl Into<String>) {
         defects::push_once(&mut self.notices, Notice::new(defect, self.mode, detail));
+    }
+
+    /// `v.backgroundval()`. FSL-75: where FLIRT's buffer is too small for the border it writes,
+    /// FLIRT corrupts its heap and takes the percentile of the values that fit (reproduced); the
+    /// correction takes it over the whole border. Both named. A 1 x 1 x 1 volume has no border
+    /// (FLIRT reads an empty buffer): refused in both modes. FSL-22: NaN values in the border
+    /// have no defined order in FLIRT's sort; sorted last by default, in libstdc++'s order (FSL's
+    /// build's) with `reproduce`; named.
+    fn background_of(&mut self, v: &Volume, what: &str) -> R<f32> {
+        let (x, y, z) = (v.xsize(), v.ysize(), v.zsize());
+        let order = if self.mode.reproduce() {
+            NanOrder::Libstdcxx
+        } else {
+            NanOrder::Last
+        };
+        let buffer = v.background_buffer();
+        if buffer != BorderBuffer::Empty {
+            let (_, how) = v.background_value_in(false, order);
+            let detail = match how {
+                Background::Defined => None,
+                _ if self.mode.fix() => Some(format!(
+                    "the {x} x {y} x {z} {what}'s 2-voxel border holds NaN voxels: they are \
+                     sorted last for its background value; C++ leaves the order of FLIRT's sort \
+                     undefined"
+                )),
+                Background::Outside => Some(format!(
+                    "the {x} x {y} x {z} {what}'s 2-voxel border holds NaN voxels, whose order \
+                     FLIRT's sort leaves undefined in C++: there libstdc++'s sort reads memory \
+                     outside the vector of border values, so they are sorted last"
+                )),
+                _ => Some(format!(
+                    "the {x} x {y} x {z} {what}'s 2-voxel border holds NaN voxels, whose order \
+                     FLIRT's sort leaves undefined in C++: its background value has them in \
+                     libstdc++'s order, as FSL's build sorts them"
+                )),
+            };
+            if let Some(d) = detail {
+                self.notice(&defects::FSL_22, d);
+            }
+        }
+        match buffer {
+            BorderBuffer::Exact => Ok(v.background_value_in(false, order).0),
+            BorderBuffer::Empty => Err(Stop::Refuse(format!(
+                "FLIRT's background value of a {x} x {y} x {z} {what} reads the first value of \
+                 an empty buffer (FSL-75)"
+            ))),
+            BorderBuffer::Overflow { numbins, written } => {
+                let fsl = v.background_value_in(false, order).0;
+                let whole = v.background_value_in(true, order).0;
+                self.notice(
+                    &defects::FSL_75,
+                    format!(
+                        "the background value of a {x} x {y} x {z} {what}: FLIRT writes \
+                         {written} border values into a buffer of {numbins} (heap corruption; \
+                         FLIRT may abort or crash later) and takes the 10th percentile of the \
+                         {numbins} that fit ({}); of the whole border it is {}",
+                        cnum::stream(f64::from(fsl)),
+                        cnum::stream(f64::from(whole))
+                    ),
+                );
+                Ok(if self.mode.fix() { whole } else { fsl })
+            }
+        }
     }
 
     fn pair(&self) -> &Pair {
@@ -607,10 +675,11 @@ impl<'a> Flirt<'a> {
 
     /// `scalemat(mat)`: `S * mat * S.i()` with `S = diag(1/b, 1/b, 1/b, 1)`.
     fn scalemat(&self, mat: &Mat) -> R<Mat> {
-        let b = f64::from(self.o.basescale);
+        // `1/basescale`: an int over a float, a single-precision quotient (0.01's is exactly 100)
+        let inv_b = f64::from(larmorx_nc_core::sse::div_f32(1.0, self.o.basescale));
         let mut s = Mat::eye(4);
         for k in 0..3 {
-            s.set(k, k, 1.0 / b);
+            s.set(k, k, inv_b);
         }
         let si = arma::inv(&s).map_err(|e| singular(&e.to_string()))?;
         check_mul(&s, mat)?;
@@ -654,7 +723,8 @@ impl<'a> Flirt<'a> {
         Ok(())
     }
 
-    /// `vector2affine(params, n, centre, aff)` (Euler angles; quaternions are part 2).
+    /// `vector2affine(params, n, centre, aff)`: Euler angles, or with `-anglerep quaternion`
+    /// a quaternion's last three components (whose messages FSL prints at every call).
     fn vector2affine_c(&self, params: &Mat, n: i32, centre: &[f64; 3]) -> Mat {
         let mut p = params.clone();
         if p.len() < 12 {
@@ -662,7 +732,28 @@ impl<'a> Flirt<'a> {
             v.resize(12, 0.0);
             p = Mat::col(&v);
         }
-        miscmaths::compose_aff(&p, n, &Mat::col(centre))
+        match self.o.anglerep {
+            AngleRep::Euler => miscmaths::compose_aff(&p, n, &Mat::col(centre)),
+            AngleRep::Quaternion => {
+                let mut msgs = Vec::new();
+                let a = miscmaths::compose_aff_quat(&p, n, &Mat::col(centre), &mut msgs);
+                if !msgs.is_empty() {
+                    let mut m = self.quat_msgs.borrow_mut();
+                    m.extend(msgs);
+                }
+                a
+            }
+        }
+    }
+
+    /// The quaternion's messages collected since the last write, written to standard error
+    /// first (before anything else written there: FSL prints them as they arise).
+    fn flush_quat_msgs(&mut self) {
+        let msgs: Vec<String> = self.quat_msgs.borrow_mut().drain(..).collect();
+        for m in msgs {
+            let _ = self.err.write_all(m.as_bytes());
+            let _ = self.err.write_all(b"\n");
+        }
     }
 
     /// `vector2affine(params, n, aff)`: about the pair's test centre of mass.
@@ -674,7 +765,10 @@ impl<'a> Flirt<'a> {
     /// `affmat2vector(aff, n, params)`.
     fn affmat2vector(&self, aff: &Mat) -> Mat {
         let c = self.pair().test_cog;
-        Mat::col(&miscmaths::decompose_aff(aff, &Mat::col(&c)))
+        match self.o.anglerep {
+            AngleRep::Euler => Mat::col(&miscmaths::decompose_aff(aff, &Mat::col(&c))),
+            AngleRep::Quaternion => Mat::col(&miscmaths::decompose_aff_quat(aff, &Mat::col(&c))),
+        }
     }
 
     /// `default_nonlin_params()`: the field map's scale, echo spacing times the test volume's
@@ -718,6 +812,8 @@ impl<'a> Flirt<'a> {
                 }
             } else {
                 let rv = self.slot_vol(p.ref_slot);
+                // FSL-67 (rule C, measured 2026-11-01): the gradient divided by the reference
+                // level's voxel sizes, not the segmentation's, in both modes.
                 let dims = [rv.xdim(), rv.ydim(), rv.zdim()];
                 let (pts, found) = bbr::points_from_seg(&self.global_seg, dims, self.threads);
                 p.bbr_points = pts;
@@ -761,6 +857,30 @@ impl<'a> Flirt<'a> {
         p.smoothsize = self.smoothsize;
         p.fuzzyfrac = self.fuzzyfrac;
         p.skip_nonfinite = self.mode.fix();
+        // FSL-14: named whenever the pair's volumes hold NaN or infinite values (they may change
+        // the cost, so the matrix, whichever mode runs)
+        let in_ref = self
+            .slot_vol(p.ref_slot)
+            .data
+            .iter()
+            .any(|v| !v.is_finite());
+        let in_test = self.testvol.data.iter().any(|v| !v.is_finite());
+        if in_ref || in_test {
+            let which = match (in_ref, in_test) {
+                (true, true) => "the reference and the input have",
+                (true, false) => "the reference has",
+                _ => "the input has",
+            };
+            let detail = if self.mode.fix() {
+                format!(
+                    "{which} NaN or infinite voxels: they are left out of the cost (in FLIRT one \
+                     makes the cost NaN or infinite)"
+                )
+            } else {
+                format!("{which} NaN or infinite voxels: as in FLIRT, they enter the cost")
+            };
+            self.notice(&defects::FSL_14, detail);
+        }
         Ok(())
     }
 
@@ -890,8 +1010,10 @@ impl<'a> Flirt<'a> {
         if params.max_abs() < 0.001 && params.len() >= 12 {
             *params = Mat::col(&[0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 1.0, 1.0, 1.0, 0.0, 0.0, 0.0]);
         }
+        // computed at every verbosity: with -anglerep quaternion an invalid axis prints its
+        // message here
+        let a = self.vector2affine(params, n as i32);
         if self.o.verbose >= 5 {
-            let a = self.vector2affine(params, n as i32);
             self.out.s("Starting with : \n");
             self.out.mat(&a);
         }
@@ -1562,10 +1684,14 @@ impl<'a> Flirt<'a> {
     // --------------------------------------------------------------------------------------
     // Filtering and resampling
 
-    fn filter(&mut self, f: Filter, v: &Volume) -> Volume {
+    fn filter(&mut self, f: Filter, v: &Volume) -> R<Volume> {
         let s = self.global_sampling;
-        match f {
-            Filter::SubsampleBy2 => newimagefns::subsample_by_2(v),
+        Ok(match f {
+            Filter::SubsampleBy2 => {
+                // subsample_by_2 fills the half-size volume with the background value first
+                let bg = self.background_of(v, "pyramid level")?;
+                newimagefns::subsample_by_2_with(v, bg)
+            }
             Filter::Blur => newimagefns::blur(v, s, self.threads),
             Filter::ResampBlur => {
                 let t = newimagefns::blur(v, s, self.threads);
@@ -1576,7 +1702,7 @@ impl<'a> Flirt<'a> {
                 }
                 r
             }
-        }
+        })
     }
 
     /// `filter_image(blur_im, orig_im, weight, useweight, filter)`: `filter(I .* B) ./ filter(B)`
@@ -1592,24 +1718,28 @@ impl<'a> Flirt<'a> {
         weight_is_target: bool,
     ) -> R<Volume> {
         if !useweight {
-            return Ok(self.filter(f, orig));
+            return self.filter(f, orig);
         }
+        // each temporary released once used (FSL reuses its one temporary volume)
         let b = newimagefns::binarise(weight, 0.01);
         let mut ib = orig.clone();
         newimagefns::multiply_in_place(&mut ib, &b)?;
-        let blur_im = self.filter(f, &ib);
+        drop(b);
+        let blur_im = self.filter(f, &ib)?;
+        drop(ib);
         let w2 = if weight_is_target { &blur_im } else { weight };
         let b2 = newimagefns::binarise(w2, 0.01);
-        let fb = self.filter(f, &b2);
+        let fb = self.filter(f, &b2)?;
+        drop(b2);
         Ok(newimagefns::divide(&blur_im, &fb, &fb)?)
     }
 
     /// `filter_weight(blur_w, weight, filter)`: `filter(W) .* (filter(B) >= 0.9)`.
     fn filter_weight(&mut self, weight: &Volume, f: Filter) -> R<Volume> {
         let mut tmp = newimagefns::binarise(weight, 0.01);
-        tmp = self.filter(f, &tmp);
+        tmp = self.filter(f, &tmp)?;
         newimagefns::binarise_range(&mut tmp, 0.9, f32::MAX);
-        let mut blur_w = self.filter(f, weight);
+        let mut blur_w = self.filter(f, weight)?;
         newimagefns::multiply_in_place(&mut blur_w, &tmp)?;
         Ok(blur_w)
     }
@@ -1704,10 +1834,21 @@ impl<'a> Flirt<'a> {
             }
         };
         let integer = matches!(ty, SaveType::Char | SaveType::Short | SaveType::Int);
+        // the correction changes a value that is not an integer, not finite, or out of the
+        // type's range (FLIRT's conversion wraps it; random testing, 2026-11-01: a negative
+        // -setbackground into uint8 was changed without the notice)
+        let (lo, hi) = match ty {
+            SaveType::Char => (0.0, 255.0),
+            SaveType::Short => (-32768.0, 32767.0),
+            _ => (f64::from(i32::MIN), f64::from(i32::MAX)),
+        };
         let rounds = integer
-            && v.data
-                .iter()
-                .any(|x| x.round_ties_even() != x.trunc() || !x.is_finite());
+            && v.data.iter().any(|x| {
+                x.round_ties_even() != x.trunc()
+                    || !x.is_finite()
+                    || f64::from(x.round_ties_even()) < lo
+                    || f64::from(x.round_ties_even()) > hi
+            });
         let (ty, conv, code) = if self.mode.fix() {
             if datatype == dt::INT8 {
                 self.notice(
@@ -1798,7 +1939,10 @@ impl<'a> Flirt<'a> {
 
     /// `configure_interpolation(vol)`: the final interpolation, and the pad value (`-setbackground`
     /// with zero padding, else the background value with extraslice extrapolation).
-    fn configure_interpolation_bg(&mut self, vol: &mut Volume, background: f32) {
+    /// FSL computes the background value only without `-setbackground`, after the
+    /// interpolation's set-up (its sinc kernel's messages); on a shape where that is undefined
+    /// (FSL-75) the replica refuses there.
+    fn configure_interpolation_bg(&mut self, vol: &mut Volume) -> R<()> {
         match self.o.interpmethod {
             Interp::NearestNeighbour => vol.interp = Interpolation::NearestNeighbour,
             Interp::Sinc => {
@@ -1824,9 +1968,10 @@ impl<'a> Flirt<'a> {
             vol.padvalue = self.o.backgndval;
             vol.extrap = Extrapolation::Constpad;
         } else {
-            vol.padvalue = background;
+            vol.padvalue = self.background_of(vol, "volume")?;
             vol.extrap = Extrapolation::Extraslice;
         }
+        Ok(())
     }
 
     /// `final_transform(testvol, refvol, finalmat, outputvol)`, the reference being the run's
@@ -2813,8 +2958,7 @@ impl Flirt<'_> {
         self.refvol = refvol;
         if !self.o.outputfname.is_empty() {
             let mut cfg = t0.clone();
-            let bg = t0.backgroundval();
-            self.configure_interpolation_bg(&mut cfg, bg);
+            self.configure_interpolation_bg(&mut cfg)?;
             let nt = testvol.tsize();
             // One volume on the reference's grid, reused for every time point; a 3D input's is
             // the output itself (FLIRT writes into the output's volumes directly).
@@ -2836,7 +2980,7 @@ impl Flirt<'_> {
                 vt.padvalue = cfg.padvalue;
                 if self.o.interpmethod != Interp::NearestNeighbour && self.o.interpblur {
                     self.global_sampling = min_sampling_ref;
-                    vt = self.filter(Filter::Blur, &vt);
+                    vt = self.filter(Filter::Blur, &vt)?;
                 }
                 vt.interp = cfg.interp;
                 vt.kernel = cfg.kernel.clone();
@@ -2885,12 +3029,6 @@ impl Flirt<'_> {
     fn main(&mut self) -> R<()> {
         if !self.o.do_optimise {
             self.do_applyxfm()?;
-        }
-        if self.o.anglerep == AngleRep::Quaternion {
-            return Err(Stop::Refuse(
-                "-anglerep quaternion: FLIRT's quaternion parameters are not replicated yet"
-                    .to_owned(),
-            ));
         }
         self.set_basescale()?;
         self.refvol = self.get_refvol()?;
@@ -2958,16 +3096,25 @@ impl Flirt<'_> {
             self.global_refweight = rw;
             self.refvol = r?;
             self.global_sampling = ms;
-            let rw = self.global_refweight.clone();
+            // The volumes are moved out for each filter and put back (no transient copies: FSL
+            // passes references; its peak has none of them).
+            let rw = std::mem::replace(&mut self.global_refweight, empty());
             self.global_refweight = self.filter_weight_if(&rw, Filter::ResampBlur)?;
+            drop(rw);
             self.global_refweight1 = self.global_refweight.clone();
             // scale 2
             if ms < 1.9 {
-                let (rv, w1) = (self.refvol.clone(), self.global_refweight.clone());
-                self.refvol_2 = self.filter_image(&rv, &w1, uw, Filter::SubsampleBy2, false)?;
+                let rv = std::mem::replace(&mut self.refvol, empty());
+                let w1 = std::mem::replace(&mut self.global_refweight, empty());
+                let r = self.filter_image(&rv, &w1, uw, Filter::SubsampleBy2, false);
+                self.refvol = rv;
+                self.global_refweight = w1;
+                self.refvol_2 = r?;
                 if uw {
-                    let w1 = self.global_refweight1.clone();
-                    self.global_refweight2 = self.filter_weight(&w1, Filter::SubsampleBy2)?;
+                    let w1 = std::mem::replace(&mut self.global_refweight1, empty());
+                    let r = self.filter_weight(&w1, Filter::SubsampleBy2);
+                    self.global_refweight1 = w1;
+                    self.global_refweight2 = r?;
                 }
             } else {
                 self.refvol_2 = self.refvol.clone();
@@ -2977,10 +3124,19 @@ impl Flirt<'_> {
             }
             // scale 4
             if ms < 3.9 {
-                let (rv, w2) = (self.refvol_2.clone(), self.global_refweight2.clone());
-                self.refvol_4 = self.filter_image(&rv, &w2, uw, Filter::SubsampleBy2, false)?;
-                if uw {
-                    self.global_refweight4 = self.filter_weight(&w2, Filter::SubsampleBy2)?;
+                let rv = std::mem::replace(&mut self.refvol_2, empty());
+                let w2 = std::mem::replace(&mut self.global_refweight2, empty());
+                let r = self.filter_image(&rv, &w2, uw, Filter::SubsampleBy2, false);
+                let rw = if uw && r.is_ok() {
+                    Some(self.filter_weight(&w2, Filter::SubsampleBy2))
+                } else {
+                    None
+                };
+                self.refvol_2 = rv;
+                self.global_refweight2 = w2;
+                self.refvol_4 = r?;
+                if let Some(rw) = rw {
+                    self.global_refweight4 = rw?;
                 }
             } else {
                 self.refvol_4 = self.refvol_2.clone();
@@ -2990,10 +3146,19 @@ impl Flirt<'_> {
             }
             // scale 8
             if ms < 7.9 {
-                let (rv, w4) = (self.refvol_4.clone(), self.global_refweight4.clone());
-                self.refvol_8 = self.filter_image(&rv, &w4, uw, Filter::SubsampleBy2, false)?;
-                if uw {
-                    self.global_refweight8 = self.filter_weight(&w4, Filter::SubsampleBy2)?;
+                let rv = std::mem::replace(&mut self.refvol_4, empty());
+                let w4 = std::mem::replace(&mut self.global_refweight4, empty());
+                let r = self.filter_image(&rv, &w4, uw, Filter::SubsampleBy2, false);
+                let rw = if uw && r.is_ok() {
+                    Some(self.filter_weight(&w4, Filter::SubsampleBy2))
+                } else {
+                    None
+                };
+                self.refvol_4 = rv;
+                self.global_refweight4 = w4;
+                self.refvol_8 = r?;
+                if let Some(rw) = rw {
+                    self.global_refweight8 = rw?;
                 }
             } else {
                 self.refvol_8 = self.refvol_4.clone();
@@ -3014,10 +3179,23 @@ impl Flirt<'_> {
         }
         if self.o.resample {
             self.global_sampling = 8.0;
-            let (tv, tw) = (self.testvol.clone(), self.global_testweight.clone());
-            let t8 = self.filter_image(&tv, &tw, uw, Filter::Blur, false)?;
+            let tv = std::mem::replace(&mut self.testvol, empty());
+            let tw = std::mem::replace(&mut self.global_testweight, empty());
+            let t8 = self.filter_image(&tv, &tw, uw, Filter::Blur, false);
+            self.testvol = tv;
+            let t8 = match t8 {
+                Ok(v) => v,
+                Err(e) => {
+                    self.global_testweight = tw;
+                    return Err(e);
+                }
+            };
             self.global_sampling = 8.0;
-            self.global_testweight = self.filter_weight_if(&tw, Filter::Blur)?;
+            let w = self.filter_weight_if(&tw, Filter::Blur);
+            drop(tw);
+            self.global_testweight = w?;
+            // testvol = testvol_8: the unblurred input is released first
+            self.testvol = empty();
             self.testvol = t8;
         }
         if self.o.debug {
@@ -3139,12 +3317,12 @@ impl Flirt<'_> {
                 if self.o.interpmethod != Interp::NearestNeighbour && self.o.interpblur {
                     self.global_sampling = min_sampling_ref;
                     let tv = std::mem::replace(&mut self.testvol, empty());
-                    self.testvol = self.filter(Filter::Blur, &tv);
+                    self.testvol = self.filter(Filter::Blur, &tv)?;
                 }
                 let mut tv = std::mem::replace(&mut self.testvol, empty());
-                let bg = tv.backgroundval();
-                self.configure_interpolation_bg(&mut tv, bg);
+                let c = self.configure_interpolation_bg(&mut tv);
                 self.testvol = tv;
+                c?;
                 let tv = std::mem::replace(&mut self.testvol, empty());
                 let done = self.final_transform(&tv, &finalmat, &mut newtestvol);
                 self.testvol = tv;
@@ -3220,6 +3398,7 @@ pub fn run(
     };
     let mut f = Flirt::new(o, mode, settings, threads, out, err);
     let r = f.main();
+    f.flush_quat_msgs();
     if matches!(r, Err(Stop::Exception(_))) {
         // FSL-68: FLIRT's main catches every exception and returns 0 (rule B: a clear error).
         let detail = if mode.fix() {

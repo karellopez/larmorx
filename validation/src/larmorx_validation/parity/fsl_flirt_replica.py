@@ -58,6 +58,7 @@ from larmorx_validation.parity.fsl_mcflirt_replica import (
 )
 from larmorx_validation.parity.harness import (
     BOTH_ERROR,
+    EXPECTED,
     Case,
     Check,
     CheckList,
@@ -75,7 +76,8 @@ STANDARD_RUNS = (
 )
 #: The run the real cases' images come from.
 SOURCE_RUN = "ds005040-sub-002-noreconall"
-_SILENT = ()
+#: Named whenever an input holds NaN or infinite values, which may lie outside the cost's points.
+_SILENT = ("FSL-14", "FSL-22", "FSL-75")
 
 
 # ------------------------------------------------------------------------------------------------
@@ -103,17 +105,15 @@ def _environment(settings: dict[str, str | None]) -> dict[str, str]:
     return env
 
 
-def run_oracle(
-    program: str, args: list[str], *, cwd: Path, settings: dict[str, str | None]
-) -> Completed:
+def oracle_run(program: str, args: list[str], *, cwd: Path, settings: dict[str, str | None]):
     """FSL's ``program`` (``flirt`` or ``convert_xfm``) with ``args`` in ``cwd``, through the
     oracle-output cache: FLIRT is single-threaded and draws no random numbers, so a run is
     served once it ran; every file it writes is in ``cwd`` and every file there counts by its
-    content."""
+    content. Returns the cache's ``Completed`` (``cached``: served from it)."""
     from larmorx_validation import oracle_cache
 
     argv = [str(fsldir() / "bin" / program), *args]
-    p = oracle_cache.run(
+    return oracle_cache.run(
         argv,
         env=_environment(settings),
         cwd=cwd,
@@ -123,6 +123,13 @@ def run_oracle(
         inputs=[p for p in sorted(cwd.rglob("*")) if p.is_file()],
         timeout=3600,
     )
+
+
+def run_oracle(
+    program: str, args: list[str], *, cwd: Path, settings: dict[str, str | None]
+) -> Completed:
+    """:func:`oracle_run` as the suite's ``Completed``."""
+    p = oracle_run(program, args, cwd=cwd, settings=settings)
     return Completed(p.returncode, p.stdout, p.stderr)
 
 
@@ -168,6 +175,24 @@ def compare(
     replica_dir: Path,
 ) -> tuple[int, int]:
     """Exit status, streams, files and bytes; returns (identical files, files)."""
+    refused_75 = any(
+        ln.startswith(f"{REPLICA_PREFIX} error:") and "FSL-75" in ln
+        for ln in replica.stderr.splitlines()
+    )
+    if oracle.code < 0 and (refused_75 or "FSL-75" in defects.notices_in(replica.stderr)):
+        # FSL-75: FSL wrote past a buffer (or read an empty one); it went on with a corrupted
+        # heap (its later messages and files are those of undefined behaviour) until the C
+        # library or the kernel stopped it. The replica goes on with the values FSL's buffer
+        # holds (or refuses the empty buffer of a single voxel), naming the entry.
+        # (going on, the replica ends as FLIRT would without the corruption: exit 0, or an
+        # error FLIRT meets later, such as an output type it cannot write)
+        checks(
+            f"{program} is killed after FSL-75's heap corruption; the replica "
+            + ("refuses (exit 1)" if refused_75 else "goes on and names FSL-75"),
+            replica.code == 1 if refused_75 else replica.code >= 0,
+            detail=f"{program} signal {-oracle.code}, replica {replica.code}",
+        )
+        return 0, 0
     if oracle.code < 0:
         checks(
             f"exit status ({program} is killed; the replica exits 1)",
@@ -245,6 +270,9 @@ def fix_pass(
         others = []
         if r.code != reproduced.code:
             others.append(f"exit {reproduced.code} -> {r.code}")
+        if r.stdout != reproduced.stdout:
+            # the programs whose results are printed (avscale, rmsdiff, makerot, ...)
+            others.append("standard output")
         a = {k: v for k, v in _files(reproduced_dir, set()).items()}
         b = {k: v for k, v in _files(tmp, set()).items()}
         if set(a) != set(b):
@@ -420,6 +448,38 @@ class Run:
     settings: tuple[tuple[str, str | None], ...] = ()
     files: tuple[tuple[str, str], ...] = ()
     fix: bool = True
+    #: FLIRT never finishes on this case (the register entry): FSL runs under a timeout (and,
+    #: when it grows its memory for ever, ``aslimit``: an address-space limit that refuses it),
+    #: never cached; the replica must refuse in both modes.
+    hang: str = ""
+    aslimit: str = ""
+    #: FSL crashes on this case (the register entry: undefined behaviour, a signal), never
+    #: cached; the replica must refuse in both modes, or with ``crash_finishes`` finish in both
+    #: naming the entry (FSL-75: the values FSL's buffer holds, or the whole border). FSL's last
+    #: messages (the C library's heap diagnostics) are not compared.
+    crash: str = ""
+    crash_finishes: bool = False
+
+
+#: How long FSL runs on a case where it never finishes.
+HANG_SECONDS = 20
+
+
+def _constant_image(path: Path, shape: str, vox: str, noform: bool) -> None:
+    import nibabel as nib
+
+    dims = tuple(int(x) for x in shape.split("x"))
+    sizes = [float(x) for x in vox.split("x")]
+    aff = np.diag([*sizes, 1.0])
+    img = nib.Nifti1Image(np.ones(dims, np.float32), aff)
+    img.header.set_xyzt_units("mm")
+    if noform:
+        img.header.set_sform(None, code=0)
+        img.header.set_qform(None, code=0)
+    else:
+        img.set_qform(aff, 1)
+        img.set_sform(aff, 1)
+    nib.save(img, str(path))
 
 
 def _prepare(run: Run, tmp: Path) -> list[str]:
@@ -438,6 +498,24 @@ def _prepare(run: Run, tmp: Path) -> list[str]:
         elif a.startswith("@fslsch:"):
             # one of FSL's shipped schedules, read where FSL keeps it
             out.append(str(fsldir() / "etc" / "flirtsch" / a.removeprefix("@fslsch:")))
+        elif a.startswith("@fsldata:"):
+            # one of FSL's standard images, read where FSL keeps it
+            out.append(str(fsldir() / "data" / "standard" / a.removeprefix("@fsldata:")))
+        elif a.startswith(("@const:", "@noform:")):
+            # a constant image (value 1, float32): @const:<nx>x<ny>x<nz>:<dx>x<dy>x<dz>:<name>,
+            # with its sform and qform the voxel sizes (@noform: neither set)
+            kind, shape, vox, name = a[1:].split(":")
+            dst = tmp / name
+            if not dst.exists():
+                _constant_image(dst, shape, vox, kind == "noform")
+            out.append(name)
+        elif "=@" in a and a.startswith("-"):
+            # a long option's value, an input (--cov=@epi.nii)
+            base = base or inputs()
+            key, name = a.split("=@", 1)
+            if not (tmp / name).exists():
+                shutil.copy(base / name, tmp / name)
+            out.append(f"{key}={name}")
         elif a.startswith("@"):
             base = base or inputs()
             name = a[1:]
@@ -453,7 +531,133 @@ def _prepare(run: Run, tmp: Path) -> list[str]:
     return out
 
 
+def _hang_case(run: Run, checks: CheckList) -> None:
+    """A case FLIRT never finishes (``run.hang``): FSL under a timeout (and an address-space
+    limit where its memory grows for ever), never cached; the replica refuses in both modes."""
+    from larmorx_validation import address_space, oracle_cache
+
+    settings = dict(run.settings)
+    with tempfile.TemporaryDirectory(prefix="lx-nc-flirt-") as a_:
+        a = Path(a_)
+        args = _prepare(run, a)
+        old = os.environ.get(address_space.ENV)
+        if run.aslimit:
+            os.environ[address_space.ENV] = run.aslimit
+        try:
+            p = oracle_cache.run(
+                [str(fsldir() / "bin" / run.program), *args],
+                env=_environment(settings),
+                cwd=a,
+                outputs=[a],
+                policy=oracle_cache.Policy(
+                    threads=1, family="fsl", never=f"FLIRT never finishes ({run.hang})"
+                ),
+                runner=SUITE,
+                inputs=[q for q in sorted(a.rglob("*")) if q.is_file()],
+                timeout=HANG_SECONDS,
+            )
+        finally:
+            if run.aslimit:
+                if old is None:
+                    os.environ.pop(address_space.ENV, None)
+                else:
+                    os.environ[address_space.ENV] = old
+        if run.aslimit:
+            checks(
+                f"FSL's memory grows until the address-space limit ({run.aslimit}) refuses it",
+                p.returncode == 0 and "bad_alloc" in p.stderr,
+                detail=f"exit {p.returncode}: {' '.join(p.stderr.split())[-160:]}",
+            )
+        else:
+            checks(
+                "FSL does not finish",
+                p.timed_out,
+                detail=f"{'still running' if p.timed_out else f'exit {p.returncode}'} after "
+                f"{HANG_SECONDS} s",
+            )
+    for mode in (defects.REPRODUCE, defects.FIX):
+        with tempfile.TemporaryDirectory(prefix="lx-nc-flirt-") as b_:
+            b = Path(b_)
+            r = run_replica(run.program, _prepare(run, b), cwd=b, settings=settings, mode=mode)
+            refusal = next(
+                (ln for ln in r.stderr.splitlines() if ln.startswith(f"{REPLICA_PREFIX} error:")),
+                "",
+            )
+            checks(
+                f"the replica refuses ({mode})",
+                r.code == 1 and f"({run.hang})" in refusal,
+                detail=f"exit {r.code}: {refusal[:160]}",
+            )
+    if all(c.passed for c in checks.checks):
+        raise Outcome(
+            EXPECTED,
+            f"FLIRT never finishes ({run.hang}: undefined behaviour); the replica refuses in "
+            "both modes",
+        )
+
+
+def _crash_case(run: Run, checks: CheckList) -> None:
+    """A case FSL crashes on (``run.crash``): FSL killed by a signal, the replica's refusal in
+    both modes naming the entry (or, ``run.crash_finishes``, its result in both modes with the
+    entry's notice)."""
+    from larmorx_validation import oracle_cache
+
+    settings = dict(run.settings)
+    with tempfile.TemporaryDirectory(prefix="lx-nc-flirt-") as a_:
+        a = Path(a_)
+        args = _prepare(run, a)
+        p = oracle_cache.run(
+            [str(fsldir() / "bin" / run.program), *args],
+            env=_environment(settings),
+            cwd=a,
+            outputs=[a],
+            policy=oracle_cache.Policy(threads=1, family="fsl", never=f"FSL crashes ({run.crash})"),
+            runner=SUITE,
+            inputs=[q for q in sorted(a.rglob("*")) if q.is_file()],
+            timeout=600,
+        )
+        checks(
+            "FSL is killed by a signal",
+            p.returncode is not None and p.returncode < 0,
+            detail=f"exit {p.returncode}: {' '.join(p.stderr.split())[-160:]}",
+        )
+    for mode in (defects.REPRODUCE, defects.FIX):
+        with tempfile.TemporaryDirectory(prefix="lx-nc-flirt-") as b_:
+            b = Path(b_)
+            r = run_replica(run.program, _prepare(run, b), cwd=b, settings=settings, mode=mode)
+            if run.crash_finishes:
+                named = defects.notices_in(r.stderr)
+                checks(
+                    f"the replica finishes and names {run.crash} ({mode})",
+                    r.code == 0 and run.crash in named and bool(list(b.glob("out*"))),
+                    detail=f"exit {r.code}: {', '.join(named) or 'nothing named'}",
+                )
+                continue
+            refusal = next(
+                (ln for ln in r.stderr.splitlines() if ln.startswith(f"{REPLICA_PREFIX} error:")),
+                "",
+            )
+            checks(
+                f"the replica refuses ({mode})",
+                r.code == 1 and run.crash in refusal and not list(b.glob("out*")),
+                detail=f"exit {r.code}: {refusal[:160]}",
+            )
+    if all(c.passed for c in checks.checks):
+        what = (
+            f"the replica finishes in both modes and names {run.crash}"
+            if run.crash_finishes
+            else "the replica refuses in both modes"
+        )
+        raise Outcome(EXPECTED, f"FSL crashes ({run.crash}: undefined behaviour); {what}")
+
+
 def _run_case(run: Run, checks: CheckList) -> None:
+    if run.hang:
+        _hang_case(run, checks)
+        return
+    if run.crash:
+        _crash_case(run, checks)
+        return
     settings = dict(run.settings)
     with (
         tempfile.TemporaryDirectory(prefix="lx-nc-flirt-") as a_,
@@ -490,32 +694,35 @@ def fmriprep_calls() -> list[tuple[str, Path]]:
     return out
 
 
-def _fmriprep_case(payload: tuple[str, str], checks: CheckList) -> None:
-    run, node = payload
+def fmriprep_args(run: str, node: str | Path) -> list[str]:
+    """fMRIPrep's BBR call of ``run`` (its ``flt_bbr`` node directory ``node``) as the suite
+    runs it: the container's paths mapped onto the run's ``out`` and ``work`` directories, the
+    outputs written into the working directory, FSL's own ``bbr.sch``."""
     ws = workspace()
     assert ws is not None
     rdir = ws / FMRIPREP_RUNS / run
     argv = (Path(node) / "command.txt").read_text(encoding="utf-8").split()[1:]
     mounts = {"/out/": str(rdir / "out") + "/", "/work/": str(rdir / "work") + "/"}
     sched = fsldir() / "etc" / "flirtsch" / "bbr.sch"
+    out = []
+    for i, a in enumerate(argv):
+        prev = argv[i - 1] if i else ""
+        if prev in ("-out", "-omat"):
+            out.append(Path(a).name)
+            continue
+        if prev == "-schedule":
+            out.append(str(sched))
+            continue
+        for k, v in mounts.items():
+            if a.startswith(k):
+                a = v + a[len(k) :]
+        out.append(a)
+    return out
 
-    def mapped() -> list[str]:
-        out = []
-        for i, a in enumerate(argv):
-            prev = argv[i - 1] if i else ""
-            if prev in ("-out", "-omat"):
-                out.append(Path(a).name)
-                continue
-            if prev == "-schedule":
-                out.append(str(sched))
-                continue
-            for k, v in mounts.items():
-                if a.startswith(k):
-                    a = v + a[len(k) :]
-            out.append(a)
-        return out
 
-    args = mapped()
+def _fmriprep_case(payload: tuple[str, str], checks: CheckList) -> None:
+    run, node = payload
+    args = fmriprep_args(run, node)
     missing = [a for a in args if a.startswith("/") and not Path(a).exists()]
     if missing:
         raise Outcome("skipped", f"input not available: {missing[0]}")
@@ -564,6 +771,31 @@ def _real_cases() -> dict[str, tuple[str, str, Run]]:
 
     s = "smoke"
     st = "standard"
+    add(
+        "real/anglerep-quaternion",
+        st,
+        "-anglerep quaternion: the rotations as a quaternion's last three components (12 dof)",
+        *base[1],
+        "-anglerep",
+        "quaternion",
+        "-omat",
+        "out.mat",
+    )
+    add(
+        "real/anglerep-quaternion-dof6",
+        st,
+        "-anglerep quaternion at 6 dof, -out, verbose (the parameters printed)",
+        *base[1],
+        "-anglerep",
+        "quaternion",
+        "-dof",
+        "6",
+        "-out",
+        "out",
+        "-omat",
+        "out.mat",
+        "-v",
+    )
     add(
         "real/default",
         s,
@@ -949,6 +1181,24 @@ def _real_cases() -> dict[str, tuple[str, str, Run]]:
         "@t1_small.nii",
         "-dof",
         "6",
+        "-omat",
+        "out.mat",
+    )
+    # The initial matrix is scaled by 1/basescale, a single-precision quotient (random testing,
+    # 2026-11-01: the replica had divided in double; an identity -init hides it)
+    add(
+        "real/basescale-small-init",
+        st,
+        "0.6 mm voxels with -init (the initial matrix in the base scale's millimetres)",
+        "-in",
+        E,
+        "-ref",
+        "@t1_small.nii",
+        "-init",
+        "@init.mat",
+        "-dof",
+        "6",
+        "-nosearch",
         "-omat",
         "out.mat",
     )
@@ -1498,6 +1748,77 @@ def _edge_cases() -> dict[str, tuple[str, str, Run]]:
         files=(("z.mat", "1 0 0 0\n0 0 0 0\n0 0 1 0\n0 0 0 1\n"),),
     )
     add(
+        "edge/bbrstep-0",
+        "setoption bbrstep 0 with BBR: FLIRT's loop over the boundary points never ends (FSL-71)",
+        "-in",
+        "@epi.nii",
+        "-ref",
+        "@t1.nii",
+        "-cost",
+        "bbr",
+        "-wmseg",
+        "@wm.nii",
+        "-schedule",
+        "s.sch",
+        "-omat",
+        "out.mat",
+        files=(
+            (
+                "s.sch",
+                "setscale 8\nsetoption bbrstep 0\nclear UA\n"
+                "setrow UA 1 0 0 0 0 1 0 0 0 0 1 0 0 0 0 1\n"
+                "measurecost 6 UA 0 0 0 0 0 0 abs\n",
+            ),
+        ),
+        hang="FSL-71",
+    )
+    add(
+        "edge/read-not-numbers",
+        "a schedule's read of a file holding a word that is not a number: FLIRT reads for ever, "
+        "its memory growing (FSL-72)",
+        "-in",
+        "@epi.nii",
+        "-ref",
+        "@t1.nii",
+        "-schedule",
+        "s.sch",
+        "-omat",
+        "out.mat",
+        files=(("s.sch", "read UA bad.txt\n"), ("bad.txt", "1 2 abc\n")),
+        hang="FSL-72",
+        aslimit="8G",
+    )
+    # FSL-75: newimage's background value of an image 3 voxels wide (heap corruption), or of
+    # a single voxel (an empty buffer read)
+    add(
+        "edge/background-overflow",
+        "a 1-voxel input and an 8 x 1 x 1 reference: FLIRT's pyramid computes the background of a "
+        "3-voxel-wide level, writing past its buffer (FSL-75)",
+        "-in",
+        "@const:1x1x1:2.5x2.5x2.5:in.nii",
+        "-ref",
+        "@const:8x1x1:1x1.5x0.5:ref.nii",
+        "-omat",
+        "out.mat",
+        crash="FSL-75",
+        crash_finishes=True,
+    )
+    add(
+        "edge/background-empty",
+        "-applyxfm of a 1-voxel input: its background value reads an empty buffer (FSL-75)",
+        "-in",
+        "@const:1x1x1:2x2x2:in.nii",
+        "-ref",
+        "@const:6x6x6:2x2x2:ref.nii",
+        "-applyxfm",
+        "-init",
+        "id.mat",
+        "-out",
+        "out",
+        files=(("id.mat", "1 0 0 0\n0 1 0 0\n0 0 1 0\n0 0 0 1\n"),),
+        crash="FSL-75",
+    )
+    add(
         "convert_xfm/missing-concat",
         "-concat with a file that does not exist",
         "-concat",
@@ -1508,9 +1829,125 @@ def _edge_cases() -> dict[str, tuple[str, str, Run]]:
     return c
 
 
+_AFF = "1.05 0.02 -0.03 2\n-0.01 0.97 0.04 -3\n0.02 -0.05 1.1 1.5\n0 0 0 1\n"
+_SING = "1 0 0 0\n0 0 0 0\n0 0 1 0\n0 0 0 1\n"
+_FLIP = "-1 0 0 10\n0 1 0 0\n0 0 1 0\n0 0 0 1\n"
+_COORDS = "10 20 30\n0 0 0\n-5.5 3.25 100\n1e3 2 3\n"
+
+
+def _program_cases() -> dict[str, tuple[str, str, Run]]:
+    """avscale, img2imgcoord, std2imgcoord, img2stdcoord, rmsdiff and makerot: one case per
+    path."""
+    c: dict[str, tuple[str, str, Run]] = {}
+    st = "standard"
+    E, T, W, M = "@epi.nii", "@t1.nii", "@wm.nii", "@init.mat"
+    STD = "@fsldata:MNI152_T1_2mm_brain_mask.nii.gz"
+
+    def add(name: str, desc: str, program: str, *args: str, tier: str = st, **kw: Any) -> None:
+        c[f"programs/{name}"] = (tier, desc, Run(program, tuple(args), **kw))
+
+    A = "avscale"
+    add("avscale-usage", "avscale without arguments (its usage, exit 255)", A)
+    add("avscale-default", "avscale of fMRIPrep's initial matrix", A, M, tier="smoke")
+    add("avscale-allparams", "--allparams, the translations about a volume's centre", A,
+        "--allparams", "aff.mat", E, files=(("aff.mat", _AFF),))  # fmt: skip
+    add("avscale-inverteddies", "--inverteddies (the check and the inverted eddy matrix)", A,
+        "--inverteddies", "aff.mat", files=(("aff.mat", _AFF),))  # fmt: skip
+    add("avscale-flip", "a matrix that swaps left and right (the half transforms of the swap)",
+        A, "flip.mat", files=(("flip.mat", _FLIP),))  # fmt: skip
+    add("avscale-singular", "a singular matrix: Armadillo's solve throws, avscale aborts", A,
+        "sing.mat", files=(("sing.mat", _SING),))  # fmt: skip
+    add("avscale-missing-matrix", "a matrix file that does not exist (exit 254)", A, "none.mat")
+    add("avscale-empty-volume", "an empty volume name: the centre of an empty volume", A, M, "")
+    add("avscale-missing-volume", "a volume that does not exist: newimage's exception, abort",
+        A, M, "none.nii.gz")  # fmt: skip
+    for prog, opts in (
+        ("img2imgcoord", ("-src", E, "-dest", T)),
+        ("std2imgcoord", ("-img", T, "-std", E)),
+        ("img2stdcoord", ("-img", T, "-std", E)),
+    ):
+        files = (("coords.txt", _COORDS),)
+        add(f"{prog}-usage", f"{prog} without arguments (its usage, exit 1)", prog)
+        add(f"{prog}-xfm", f"{prog} through fMRIPrep's initial matrix", prog, *opts, "-xfm", M,
+            "coords.txt", files=files, tier="smoke" if prog == "img2imgcoord" else st)  # fmt: skip
+        add(f"{prog}-vox", f"{prog} -vox", prog, *opts, "-xfm", M, "-vox", "coords.txt",
+            files=files)  # fmt: skip
+        add(f"{prog}-mm", f"{prog} -mm", prog, *opts, "-xfm", M, "-mm", "coords.txt",
+            files=files)  # fmt: skip
+        add(f"{prog}-verbose", f"{prog} verbose (sizes, matrices; fixed notation after them)",
+            prog, *opts, "-xfm", M, "-verbose" if prog != "img2imgcoord" else "-v",
+            "coords.txt", files=files)  # fmt: skip
+        add(f"{prog}-missing-coords", f"{prog}: a coordinate file that does not exist", prog,
+            *opts, "none.txt")  # fmt: skip
+        add(f"{prog}-not-numbers", f"{prog}: coordinates that stop at a word", prog, *opts,
+            "bad.txt", files=(("bad.txt", "1 2 x 4\n5 6 7\n"),))  # fmt: skip
+        add(f"{prog}-lacking", f"{prog}: an option lacking its argument (a message, the run "
+            "goes on)", prog, *opts, "coords.txt", "-xfm", files=files)  # fmt: skip
+        add(f"{prog}-unknown", f"{prog}: an unknown option (exit 255)", prog, *opts, "-frob",
+            "x", "coords.txt", files=files)  # fmt: skip
+        add(f"{prog}-missing-image", f"{prog}: an image that does not exist (abort)", prog,
+            opts[0], "none.nii", opts[2], opts[3], "coords.txt", files=files)  # fmt: skip
+    add("img2imgcoord-flirt-premat", "img2imgcoord -flirt and -premat", "img2imgcoord", "-src",
+        E, "-dest", T, "-flirt", "-premat", M, "coords.txt",
+        files=(("coords.txt", _COORDS),))  # fmt: skip
+    add("std2imgcoord-standard", "std2imgcoord from FSL's MNI152 2 mm", "std2imgcoord", "-img",
+        T, "-std", STD, "coords.txt", files=(("coords.txt", _COORDS),))  # fmt: skip
+    add("std2imgcoord-no-std", "std2imgcoord without -std (its warning; 1 mm voxels)",
+        "std2imgcoord", "-img", T, "coords.txt", files=(("coords.txt", _COORDS),))  # fmt: skip
+    add("std2imgcoord-singular", "std2imgcoord with a singular matrix: its inverse throws",
+        "std2imgcoord", "-img", T, "-std", E, "-xfm", "sing.mat", "coords.txt",
+        files=(("coords.txt", _COORDS), ("sing.mat", _SING)))  # fmt: skip
+    add("img2stdcoord-noform", "img2stdcoord to a standard image without sform or qform",
+        "img2stdcoord", "-img", T, "-std", "@noform:5x6x7:2x3x4:noform.nii", "coords.txt",
+        files=(("coords.txt", _COORDS),))  # fmt: skip
+    add("img2stdcoord-warp-missing", "img2stdcoord -warp of a file that does not exist",
+        "img2stdcoord", "-img", T, "-std", E, "-warp", "none.nii.gz", "coords.txt",
+        files=(("coords.txt", _COORDS),))  # fmt: skip
+    R = "rmsdiff"
+    add("rmsdiff-usage", "rmsdiff without arguments (its usage, exit 255)", R)
+    add("rmsdiff-rms", "the RMS deviation over 80 mm about a volume's centre", R, M, "id.mat",
+        E, files=(("id.mat", "1 0 0 0\n0 1 0 0\n0 0 1 0\n0 0 0 1\n"),), tier="smoke")  # fmt: skip
+    add("rmsdiff-mask", "the largest and the RMS displacement over a mask", R, M, "aff.mat", T,
+        W, files=(("aff.mat", _AFF),))  # fmt: skip
+    add("rmsdiff-low-determinant", "a matrix of low determinant (its warning, the matrix on "
+        "standard error)", R, "small.mat", M, E,
+        files=(("small.mat", "0.1 0 0 0\n0 0.5 0 0\n0 0 1 0\n0 0 0 1\n"),))  # fmt: skip
+    add("rmsdiff-singular", "a singular second matrix: rms_deviation's message, exit 251", R, M,
+        "sing.mat", E, files=(("sing.mat", _SING),))  # fmt: skip
+    add("rmsdiff-missing-matrix", "a matrix file that does not exist", R, "none.mat", M, E)
+    add("rmsdiff-4d", "a 4D reference (its first volume, the warning)", R, M, "aff.mat",
+        "@bold4.nii", files=(("aff.mat", _AFF),))  # fmt: skip
+    K = "makerot"
+    add("makerot-usage", "makerot without arguments (the compulsory -t, its usage, exit 1)", K)
+    add("makerot-help", "makerot -h (its usage, exit 1)", K, "-h")
+    add("makerot-default", "30 degrees about z through the origin", K, "-t", "30", tier="smoke")
+    add("makerot-axis-centre", "an axis that is not of unit length (FSL-76) through a centre",
+        K, "-t", "30", "-a", "1,2,3", "-c", "4,5,6")  # fmt: skip
+    add("makerot-long", "the long options with their values after =", K, "--theta=-45.5",
+        "--axis=0,0,4", "--centre=1:2:3")  # fmt: skip
+    add("makerot-cov", "the centre of an image's volume (--cov)", K, "-t", "20", "-a", "0,1,1",
+        f"--cov={E}")  # fmt: skip
+    add("makerot-cov-missing", "--cov of a file that is not an image (FSL aborts)", K, "-t",
+        "20", "--cov=none.nii")  # fmt: skip
+    add("makerot-zero-axis", "a zero axis (its error, exit 1)", K, "-t", "10", "-a", "0,0,0")
+    add("makerot-short-axis", "an axis of one value (FSL-77: the buffer's zeros)", K, "-t", "30",
+        "-a", "5")  # fmt: skip
+    add("makerot-stale-axis", "the axis given twice, the second of one value (FSL-77: the "
+        "first's values)", K, "-t", "30", "-a", "1,2,3", "-a", "7")  # fmt: skip
+    add("makerot-bad-theta", "a theta that is not a number (Couldn't set_value, exit 1)", K, "-t",
+        "abc")  # fmt: skip
+    add("makerot-out", "the matrix written to a file (-o)", K, "-t", "30", "-a", "1,1,0", "-o",
+        "out.mat")  # fmt: skip
+    add("makerot-out-unwritable", "an output file that cannot be written (the message, exit 0)",
+        K, "-t", "30", "-o", "nodir/out.mat")  # fmt: skip
+    add("makerot-token", "a word that is not an option (unrecognised token, exit 1)", K, "-t",
+        "30", "extra")  # fmt: skip
+    return c
+
+
 @functools.cache
 def _all_cases() -> dict[str, tuple[str, str, Run]]:
-    return {**_real_cases(), **_schedule_cases(), **_edge_cases()}
+    return {**_real_cases(), **_schedule_cases(), **_edge_cases(), **_program_cases()}
 
 
 def cases(tier: str) -> list[Case]:
@@ -1552,11 +1989,13 @@ def suite() -> Suite:
     return Suite(
         name=SUITE,
         title="FLIRT replica (bit-exact, FSL Licence)",
-        tool="`larmorx-nc fsl flirt` and `larmorx-nc fsl convert_xfm` (crate larmorx-nc-flirt, "
-        f"translated from FSL {fsl_versions.NEWEST}'s source)",
-        reference=f"flirt and convert_xfm from FSL {fsl_versions.NEWEST} (fsl-flirt 2111.4, "
-        "fsl-newimage 2601.0, fsl-miscmaths 2412.6; the conda build at `~/fsl-6.0.7.23`, as "
-        "built: glibc 2.35's maths, OpenBLAS on its Haswell kernels)",
+        tool="`larmorx-nc fsl flirt`, `convert_xfm`, `avscale`, `img2imgcoord`, `std2imgcoord`, "
+        "`img2stdcoord`, `rmsdiff` and `makerot` (crate larmorx-nc-flirt, translated from FSL "
+        f"{fsl_versions.NEWEST}'s source)",
+        reference=f"flirt, convert_xfm, avscale, img2imgcoord, std2imgcoord, img2stdcoord, rmsdiff "
+        f"and makerot from FSL {fsl_versions.NEWEST} (fsl-flirt 2111.4, fsl-newimage 2601.0, "
+        "fsl-miscmaths 2412.6, fsl-utils 2412.6, fsl-warpfns 2501.0; the conda build at "
+        "`~/fsl-6.0.7.23`, as built: glibc 2.35's maths, OpenBLAS on its Haswell kernels)",
         thresholds=[
             ("Exit status", "the same (an abort: the replica exits 1 after the same text)"),
             (

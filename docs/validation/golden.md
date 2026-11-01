@@ -15,7 +15,7 @@ Replicas and clean-room originals are covered alike. Written 2026-10-11.
 
 | | `larmorx` (Apache-2.0) | the AFNI replicas (in `larmorx`) | `larmorx-nc` (the FSL replicas) |
 |---|---|---|---|
-| Cases | [`tests/golden/registry.py`](../../tests/golden/registry.py): 168 cases, 1026 outputs | [`crates/larmorx-cli/tests/afni_replica_golden.rs`](../../crates/larmorx-cli/tests/afni_replica_golden.rs): 40 cases, 90 outputs | [`crates-nc/larmorx-nc-cli/tests/golden.rs`](../../crates-nc/larmorx-nc-cli/tests/golden.rs): 52 cases, 298 outputs |
+| Cases | [`tests/golden/registry.py`](../../tests/golden/registry.py): 168 cases, 1026 outputs | [`crates/larmorx-cli/tests/afni_replica_golden.rs`](../../crates/larmorx-cli/tests/afni_replica_golden.rs): 40 cases, 90 outputs | [`crates-nc/larmorx-nc-cli/tests/golden.rs`](../../crates-nc/larmorx-nc-cli/tests/golden.rs): 59 cases, 305 outputs |
 | Checksums | [`tests/golden/golden.json`](../../tests/golden/golden.json) | [`crates/larmorx-cli/tests/afni_replica_golden.tsv`](../../crates/larmorx-cli/tests/afni_replica_golden.tsv) | [`crates-nc/larmorx-nc-cli/tests/golden.tsv`](../../crates-nc/larmorx-nc-cli/tests/golden.tsv) |
 | Test | `tests/golden/test_golden.py` (pytest) | `cargo test` | `cargo test` |
 | Runs in CI | job `test`, on the release wheel, Python 3.12 only (the Python 3.14 run skips `tests/golden`) | job `test`, `cargo test --workspace --locked` (debug) | job `gpl`, `cargo test --workspace --locked` in `crates-nc` |
@@ -126,6 +126,13 @@ What the coverage test enumerates:
   the `-applyxfm` blur fix (the others unchanged). `lx.fsl.flirt` and `lx.fsl.convert_xfm` are replica-only
   functions (`tests/golden/registry.py`, `REPLICA_ONLY_FUNCTIONS`, until FLIRT's clean-room original): their
   golden cases are these.
+  `larmorx-nc`'s checksums recorded on 2026-11-01 from 2979df4 (FLIRT part 2): 7 cases added,
+  `flirt.quaternion-dof6` (`-anglerep quaternion`), `avscale.allparams`, `img2imgcoord.vox`,
+  `std2imgcoord.vox`, `img2stdcoord.mm`, `rmsdiff.mask` and `makerot.axis-centre` (FSL-76 corrected), the
+  printing programs' standard output kept as `stdout.txt`; every other checksum unchanged (the core's
+  memory and background-value changes changed no golden output). `lx.fsl.avscale`, `img2imgcoord`,
+  `std2imgcoord`, `img2stdcoord`, `rmsdiff` and `makerot` joined the replica-only functions, mapped to
+  these cases.
 
 - **antsAI's blob alignment** (2026-10-23): new cases: `cli.ants.antsAI.blobs` (antsAI -b in 2D: a rigid search from a rotated blob plane,
 an affine one from 12 pairs of a shifted plane), `py.ants.blob_alignment` (the rotated plane

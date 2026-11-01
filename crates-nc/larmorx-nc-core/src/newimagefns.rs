@@ -23,13 +23,18 @@ pub fn isotropic_resample(aniso: &Volume, scale: f32, warnings: &mut Vec<String>
             .push("WARNING:: Negative scale in isotropic_resample - using abs value".to_owned());
         scale = scale.abs();
     }
-    let mut src = aniso.clone();
-    if matches!(
-        src.extrap,
+    // FSL changes the extrapolation of the volume itself (no copy); a copy here only when it
+    // changes, so the peak memory holds none (FLIRT resamples the full-size reference).
+    let src: std::borrow::Cow<'_, Volume> = if matches!(
+        aniso.extrap,
         Extrapolation::BoundsAssert | Extrapolation::BoundsException
     ) {
-        src.extrap = Extrapolation::Constpad;
-    }
+        let mut v = aniso.clone();
+        v.extrap = Extrapolation::Constpad;
+        std::borrow::Cow::Owned(v)
+    } else {
+        std::borrow::Cow::Borrowed(aniso)
+    };
     let stepx = scale / aniso.xdim();
     let stepy = scale / aniso.ydim();
     let stepz = scale / aniso.zdim();
@@ -104,13 +109,17 @@ pub fn raw_affine_transform(vin: &Volume, vout: &mut Volume, aff: &Mat) -> Resul
             8,
         ));
     }
-    let mut src = vin.clone();
-    if matches!(
-        src.extrap,
+    // FSL changes the input's extrapolation in place (no copy); a copy only when it changes
+    let src: std::borrow::Cow<'_, Volume> = if matches!(
+        vin.extrap,
         Extrapolation::BoundsAssert | Extrapolation::BoundsException
     ) {
-        src.extrap = Extrapolation::Constpad;
-    }
+        let mut v = vin.clone();
+        v.extrap = Extrapolation::Constpad;
+        std::borrow::Cow::Owned(v)
+    } else {
+        std::borrow::Cow::Borrowed(vin)
+    };
     let mut iaffbig = arma::inv(aff).map_err(|e| FslError {
         printed: Vec::new(),
         type_name: "std::runtime_error",
@@ -439,9 +448,12 @@ pub fn convolve_separable(
     kz: &[f64],
     threads: usize,
 ) -> Volume {
-    let r = convolve_axis(src, kx, 0, threads);
-    let r = convolve_axis(&r, ky, 1, threads);
-    convolve_axis(&r, kz, 2, threads)
+    // each pass's input released before the next pass (FSL assigns over its one copy: the
+    // source and two volumes at most)
+    let rx = convolve_axis(src, kx, 0, threads);
+    let ry = convolve_axis(&rx, ky, 1, threads);
+    drop(rx);
+    convolve_axis(&ry, kz, 2, threads)
 }
 
 /// `make_blur_mask(bmask, final_vox_dim, init_vox_dim)`: `[1]` when the sampling ratio is below
@@ -494,10 +506,15 @@ pub fn blur(src: &Volume, resel: f32, threads: usize) -> Volume {
 /// qform composed with the 2x scaling. Values that come out NaN are computed again with SSE's
 /// NaN rules.
 pub fn subsample_by_2(refvol: &Volume) -> Volume {
+    subsample_by_2_with(refvol, refvol.backgroundval())
+}
+
+/// [`subsample_by_2`] with the half-size volume first filled with `bg` (FLIRT's replica passes
+/// the background value it decided for FSL-75).
+pub fn subsample_by_2_with(refvol: &Volume, bg: f32) -> Volume {
     let (sx, sy, sz) = (refvol.xsize(), refvol.ysize(), refvol.zsize());
     let mut half = Volume::new((sx + 1) / 2, (sy + 1) / 2, (sz + 1) / 2, 1);
     half.copy_properties(refvol);
-    let bg = refvol.backgroundval();
     half.data.fill(bg);
     half.setdims(
         (f64::from(refvol.xdim()) * 2.0) as f32,

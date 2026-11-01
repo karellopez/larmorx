@@ -26,6 +26,10 @@ and fMRIPrep BBR calls; `docs/findings/fsl-flirt.md`).
 | `pair` | fsl-newimage 2601.0 `costfns.{h,cc}` | `Costfn` as FLIRT holds it (references to the volumes resolved at each evaluation), `set_no_bins`, `cost` and the weighted `cost`, the member wrappers, `is_bbr_set` |
 | `run` | `flirt.cc` | `main`, `do_applyxfm`, `set_basescale`, `FLIRT_read_volume(4D)`, `get_testvol`, `get_refvol`, `double_end_slices`, `scalemat`, `qsform_init_mat`, `set_initmat`, `vector2affine`, `affmat2vector`, `default_nonlin_params`, `setcostfntype`, `setup_costfn`, `costfn` (three forms), `estimate_scaling`, `set_param_tols`, `optimise`, `params12toN`, `paramsNto12`, `subset_costfn`, `find_cost_minima`, `set_rot_sampling(s)`, `search_cost`, `measure_cost`, `aligncog`, `optimise_strategy0/1/3`, `sorted_posn`, `add2list`, `set_perturbations`, the filters (`filter_blur`, `filter_resamp_blur`, `filter_subsample_by_2`, `filter_weight`, `filter_image`), `resample_refvol`, `output_dtype`, `configure_interpolation`, `final_transform`, `safe_save_volume`, `save_matrix_data`; the schedule commands `usrcopy`, `usrclear`, `usrprint`, `usrsave`, `usrread`, `usrsetrow`, `usrsetrowqsform`, `usrsetrowparams`, `usrsetoption`, `usraligncog`, `usrsort`, `usrdualsort`, `usrsearch`, `usrreadparams`, `usrsaveparams`, `usrprintparams`, `usrmeasurecost`, `usrgridmeasurecost`, `usroptimise`, `usrsetscale`, `interpretcommand` |
 | `convert_xfm` | `convert_xfm.cc` | `globaloptions`, `print_usage`, `parse_command_line`, `vector2affine`, `affmat2vector`, `main` |
+| `avscale` | `avscale.cc` (part 2, 2026-11-01) | `main` (its option word, the volume's centre, the decomposition, the half transforms, `--inverteddies`, the exceptions it catches and throws again) |
+| `coords` | `img2imgcoord.cc`, `std2imgcoord.cc`, `img2stdcoord.cc` (part 2); fsl-warpfns 2501.0 `warpfns.h` | `globaloptions`, `print_usage`, `parse_command_line`, `print_info`, `main` of each; `NewimageCoord2NewimageCoord(M, src, dest, coord)` and `raw_newimagecoord2newimagecoord` without a warp field |
+| `rmsdiff` | `rmsdiff.cc` (part 2) | `main` (the low-determinant warnings, the RMS deviation about the centre of gravity, the mask's distances) |
+| `makerot` | `makerot.cc` (part 2) | the options, `do_work`, `main` (FSL-76 and FSL-77 with their switches) |
 
 ## Changes from the original
 
@@ -36,7 +40,14 @@ and fMRIPrep BBR calls; `docs/findings/fsl-flirt.md`).
 - **Undefined behaviour is refused** (D13 class a, both modes; `docs/findings/fsl-flirt.md`): a
   schedule's matrix name FSL cannot interpret (an uninitialised pointer), `U[` (a 28th list),
   `setoption bbrstep` below 1 (a loop that never ends), `-pedir` without a field map read (an empty
-  field map interpolated), the schedule command `alignpaxes` (not translated yet).
+  field map interpolated), newimage's background value of a single voxel (FSL-75: an empty
+  buffer; part 2; a buffer too small for an image 3 voxels wide is corrected by default and
+  reproduced with `reproduce`), and, not translated yet, the schedule
+  command `alignpaxes` and the coordinate programs' `-warp` with a readable warp field.
+- **Quaternions** (`-anglerep quaternion`, part 2): `construct_rotmat_quat` and `rotmat2quat` with
+  the legacy NIfTI quaternion conversion (`larmorx-nc-core`); `construct_rotmat_quat`'s messages,
+  which FSL prints from inside the cost function, are collected and written to standard error
+  before anything else written there, in FSL's order.
 - **The pair's references.** FSL's `Costfn` holds references to `main`'s volumes; the replica's
   pair names which volume it refers to and the run resolves it at every evaluation, so a later
   change of that volume (each `setscale` refreshes the input; a scale with no pyramid level replaces

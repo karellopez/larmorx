@@ -423,6 +423,17 @@ struct BetCase {
 /// its search, a histogram cost at 6 dof, the weighted least squares, the boundary-based cost
 /// with FSL's `bbr.sch`, `-applyxfm` with sinc and `-applyisoxfm` with splines on 4D, the
 /// integer output (FSL-09), and convert_xfm's operations.
+/// The programs whose results are what they print: their standard output is kept as a file of
+/// the case (`stdout.txt`).
+const PRINTING: &[&str] = &[
+    "fsl avscale",
+    "fsl img2imgcoord",
+    "fsl std2imgcoord",
+    "fsl img2stdcoord",
+    "fsl rmsdiff",
+    "fsl makerot",
+];
+
 const BET_CASES: &[BetCase] = &[
     BetCase {
         id: "flirt.default",
@@ -601,6 +612,82 @@ const BET_CASES: &[BetCase] = &[
         args: &["-omat", "out.mat", "-fixscaleskew", "{mat}", "{init}"],
         mode: "fix",
         named: &[],
+        output_type: "NIFTI",
+    },
+    // FLIRT part 2 (2026-11-01): quaternion parameters; avscale, the coordinate programs and
+    // rmsdiff print their results (kept as stdout.txt, which is fingerprinted)
+    BetCase {
+        id: "flirt.quaternion-dof6",
+        tool: "fsl flirt",
+        args: &[
+            "-in",
+            "{t2}",
+            "-ref",
+            "{t1}",
+            "-dof",
+            "6",
+            "-anglerep",
+            "quaternion",
+            "-omat",
+            "out.mat",
+        ],
+        mode: "fix",
+        named: &[],
+        output_type: "NIFTI",
+    },
+    BetCase {
+        id: "avscale.allparams",
+        tool: "fsl avscale",
+        args: &["--allparams", "{init}", "{t1}"],
+        mode: "fix",
+        named: &[],
+        output_type: "NIFTI",
+    },
+    BetCase {
+        id: "img2imgcoord.vox",
+        tool: "fsl img2imgcoord",
+        args: &[
+            "-src", "{t2}", "-dest", "{t1}", "-xfm", "{init}", "{coords}",
+        ],
+        mode: "fix",
+        named: &[],
+        output_type: "NIFTI",
+    },
+    BetCase {
+        id: "std2imgcoord.vox",
+        tool: "fsl std2imgcoord",
+        args: &[
+            "-img", "{t1}", "-std", "{t2}", "-xfm", "{init}", "-vox", "{coords}",
+        ],
+        mode: "fix",
+        named: &[],
+        output_type: "NIFTI",
+    },
+    BetCase {
+        id: "img2stdcoord.mm",
+        tool: "fsl img2stdcoord",
+        args: &[
+            "-img", "{t1}", "-std", "{t2}", "-xfm", "{init}", "-mm", "{coords}",
+        ],
+        mode: "fix",
+        named: &[],
+        output_type: "NIFTI",
+    },
+    BetCase {
+        id: "rmsdiff.mask",
+        tool: "fsl rmsdiff",
+        args: &["{init}", "{mat}", "{t1}", "{mask}"],
+        mode: "fix",
+        named: &[],
+        output_type: "NIFTI",
+    },
+    // makerot: an axis that is not of unit length (FSL-76 corrected) through a centre
+    BetCase {
+        id: "makerot.axis-centre",
+        tool: "fsl makerot",
+        args: &["-t", "30", "-a", "1,2,3", "-c", "4,5,6"],
+        mode: "fix",
+        named: &["FSL-76"],
         output_type: "NIFTI",
     },
     // FSL 6.0.7.23's bet2 --binaryMask: the surface from a mask, the outputs from the input;
@@ -1150,6 +1237,10 @@ fn write_bet_inputs(dir: &Path) -> BTreeMap<&'static str, PathBuf> {
     let p = dir.join("bbr.sch");
     std::fs::write(&p, BBR_SCH).unwrap();
     paths.insert("bbrsch", p);
+    // coordinates for the coordinate programs (exact decimals)
+    let p = dir.join("coords.txt");
+    std::fs::write(&p, "10 20 30\n1.5 2.5 3.5\n-4 0 12.25\n").unwrap();
+    paths.insert("coords", p);
     paths
 }
 
@@ -1613,6 +1704,9 @@ fn golden() {
             .collect();
         let out = run_bet(&run, case.tool, &args, case.mode, case.output_type);
         assert!(out.status.success(), "{}: {out:?}", case.id);
+        if PRINTING.contains(&case.tool) {
+            std::fs::write(run.join("stdout.txt"), &out.stdout).unwrap();
+        }
         if let Some(problem) = named_problem(&out.stderr, case.id, case.mode, case.named) {
             notices.push(problem);
         }

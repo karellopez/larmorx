@@ -39,7 +39,20 @@ pub const FAMILIES: &[(&str, &[&str])] = &[
 /// The FSL tools, with FSL's command lines: the replica (`larmorx-nc`) when it is installed,
 /// else the clean-room original of the same program (`fsl mcflirt` is `mri hmc`; `fsl bet`,
 /// `fsl bet2` and `fsl betsurf` are `larmorx_fsl::cli`; a test checks the list).
-const FSL_TOOLS: &[&str] = &["mcflirt", "bet", "bet2", "betsurf", "flirt", "convert_xfm"];
+const FSL_TOOLS: &[&str] = &[
+    "mcflirt",
+    "bet",
+    "bet2",
+    "betsurf",
+    "flirt",
+    "convert_xfm",
+    "avscale",
+    "img2imgcoord",
+    "std2imgcoord",
+    "img2stdcoord",
+    "rmsdiff",
+    "makerot",
+];
 
 /// The AFNI tools: the clean-room originals' (`larmorx_afni::cli::TOOLS`), each with its
 /// built-in replica (`larmorx_afni_replica::cli::TOOLS`; a test checks the lists).
@@ -390,7 +403,7 @@ mod tests {
         let (code, out, _) = run_capture(&["lx", "--help"]);
         assert_eq!(code, 0);
         assert!(
-            out.contains("fsl    mcflirt, bet, bet2, betsurf, flirt, convert_xfm"),
+            out.contains("fsl    mcflirt, bet, bet2, betsurf, flirt, convert_xfm, avscale, img2imgcoord, std2imgcoord, img2stdcoord, rmsdiff, makerot"),
             "{out}"
         );
         assert!(
@@ -400,7 +413,16 @@ mod tests {
         assert!(out.contains("LARMORX_NC_BIN"), "{out}");
         assert_eq!(
             replica::replica_only("fsl").collect::<Vec<_>>(),
-            ["flirt", "convert_xfm"]
+            [
+                "flirt",
+                "convert_xfm",
+                "avscale",
+                "img2imgcoord",
+                "std2imgcoord",
+                "img2stdcoord",
+                "rmsdiff",
+                "makerot"
+            ]
         );
         // flirt has no original yet: `original` is an error that says so.
         let original = Options {

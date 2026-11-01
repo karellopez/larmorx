@@ -164,11 +164,12 @@ validation = "original: [{fsl-bet.pass} of {fsl-bet.compared}](record:fsl-bet) c
 
 [[tool]]
 id = "fsl-flirt"
-title = "FLIRT (affine registration, boundary-based registration; convert_xfm)"
+title = "FLIRT (affine registration, boundary-based registration; convert_xfm and FLIRT's other programs)"
 eco = "fsl"
-use = ["larmorx fsl flirt", "larmorx fsl convert_xfm", "lx.fsl.flirt", "lx.fsl.convert_xfm"]
-how = "exact replica in `larmorx-nc` (FSL Licence, non-commercial), `experimental` (part 1); the clean-room original to be written from specs/flirt.md"
-validation = "replica: [{fsl-flirt-replica.pass} of {fsl-flirt-replica.compared}](record:fsl-flirt-replica) compared cases bit-identical to FSL 6.0.7.23 (matrices, images, exit status and messages): fMRIPrep's boundary-based calls on three oracle runs (their matrices also identical as text to fMRIPrep's own), every cost function, the search options, every shipped schedule, `-applyxfm` 3D and 4D with every interpolation and data type, BBR with its types, coordinates and a field map; {fsl-flirt-replica.both} more rejected by both, alike"
+page = "/tools/fsl-flirt/"
+use = ["larmorx fsl flirt", "larmorx fsl convert_xfm", "larmorx fsl avscale", "larmorx fsl img2imgcoord", "larmorx fsl std2imgcoord", "larmorx fsl img2stdcoord", "larmorx fsl rmsdiff", "larmorx fsl makerot", "lx.fsl.flirt", "lx.fsl.convert_xfm", "lx.fsl.avscale", "lx.fsl.img2imgcoord", "lx.fsl.std2imgcoord", "lx.fsl.img2stdcoord", "lx.fsl.rmsdiff", "lx.fsl.makerot"]
+how = "exact replica in `larmorx-nc` (FSL Licence, non-commercial), `experimental` (parts 1 and 2); the clean-room original to be written from specs/flirt.md"
+validation = "replica: [{fsl-flirt-replica.pass} of {fsl-flirt-replica.compared}](record:fsl-flirt-replica) compared cases bit-identical to FSL 6.0.7.23 (matrices, images, printed results, exit status and messages): fMRIPrep's boundary-based calls on three oracle runs (their matrices also identical as text to fMRIPrep's own), every cost function, the search options, every shipped schedule, `-anglerep quaternion`, `-applyxfm` 3D and 4D with every interpolation and data type, BBR with its types, coordinates and a field map, avscale, the coordinate programs, rmsdiff and makerot; {fsl-flirt-replica.both} more rejected by both, alike; {fsl-flirt-replica.expected} where FLIRT crashes or never finishes (FSL-71, FSL-72, FSL-75)"
 
 # ------------------------------------------------------------------------------------------------
 # Records: the validation index's table (docs/validation/README.md), in this order.
@@ -385,6 +386,6 @@ status = "`validated` ({fsl-bet-replica-full.pass} of {fsl-bet-replica-full.comp
 
 [[record]]
 id = "fsl-flirt-replica"
-larmorx = "`larmorx-nc fsl flirt`, `convert_xfm`; `lx.fsl.flirt`, `lx.fsl.convert_xfm` (the replica, FSL Licence)"
-reference = "flirt and convert_xfm (FSL 6.0.7.23); fMRIPrep's BBR calls also against fMRIPrep's own matrices"
-status = "`experimental` (part 1: {fsl-flirt-replica.pass} of {fsl-flirt-replica.compared} compared cases bit-identical, fMRIPrep's calls included; {fsl-flirt-replica.both} rejected by both, with the same messages and status; `-anglerep quaternion`, `alignpaxes` and general parameter subsets wait for part 2)"
+larmorx = "`larmorx-nc fsl flirt`, `convert_xfm`, `avscale`, `img2imgcoord`, `std2imgcoord`, `img2stdcoord`, `rmsdiff`, `makerot`; `lx.fsl.flirt`, `convert_xfm`, `avscale`, `img2imgcoord`, `std2imgcoord`, `img2stdcoord`, `rmsdiff`, `makerot` (the replica, FSL Licence)"
+reference = "flirt, convert_xfm, avscale, img2imgcoord, std2imgcoord, img2stdcoord, rmsdiff and makerot (FSL 6.0.7.23); fMRIPrep's BBR calls also against fMRIPrep's own matrices"
+status = "`experimental` (part 2: {fsl-flirt-replica.pass} of {fsl-flirt-replica.compared} compared cases bit-identical, fMRIPrep's calls included; {fsl-flirt-replica.both} rejected by both, with the same messages and status; {fsl-flirt-replica.expected} expected divergences where FLIRT crashes or never finishes; `alignpaxes`, general parameter subsets, `-debug`'s BBR volume, applyxfm4D, midtrans and pointflirt wait for part 3)"

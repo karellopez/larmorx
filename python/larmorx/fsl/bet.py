@@ -1,10 +1,10 @@
 # SPDX-License-Identifier: Apache-2.0
 """``bet`` and ``betsurf``: FSL's brain extraction and its skull and scalp surfaces (FSL
-6.0.7.23's ``bet``, ``bet2`` and ``betsurf``). ``bet`` has two implementations: the bit-exact
+6.0.7.23's ``bet``, ``bet2`` and ``betsurf``). Each has two implementations: the bit-exact
 replica from ``larmorx-nc``, run as a separate program (``docs/licensing.md``), and the
 clean-room original of this package (``crates/larmorx-fsl``, written from ``specs/bet.md``),
 run in this process; ``implementation="auto"`` runs the replica when it is installed, else the
-original. ``betsurf``'s clean-room original is still to be written: it needs the replica.
+original.
 
 ``bet`` deforms a tessellated sphere onto the brain's surface (S. M. Smith, Human Brain Mapping
 17(3), 2002) and returns the brain, its mask, the surface's outline and mesh, and an approximate
@@ -44,6 +44,12 @@ __all__ = ["VARIATIONS", "BetResult", "BetsurfResult", "Surface", "bet", "betsur
 VARIATIONS = ("robust", "small_fov", "fmri", "eyes", "bias", "surfaces", "surfaces_t2")
 
 Variation = Literal["robust", "small_fov", "fmri", "eyes", "bias", "surfaces", "surfaces_t2"]
+
+#: The ``tanh`` of BET's smoothness weight (GLIBC-06): glibc's bits (FSL's, the default) or the
+#: correctly rounded one (the clean-room original's ``--tanh=correctly-rounded``).
+TANHS = ("glibc", "correctly-rounded")
+
+Tanh = Literal["glibc", "correctly-rounded"]
 
 _FLAGS = {"robust": "-R", "small_fov": "-Z", "fmri": "-F"}
 _PENDING = {
@@ -290,6 +296,7 @@ def bet(
     outline: bool = False,
     skull: bool = False,
     mesh: bool = False,
+    tanh: Tanh = "glibc",
     n_threads: int = 1,
     implementation: ImplementationName = "auto",
     upstream_defects: UpstreamDefectsName = "fix",
@@ -328,12 +335,18 @@ def bet(
         and the mask, and no others; ``"robust"`` always computes the brain.
     n_threads
         Threads (0 = all); the result does not depend on it.
+    tanh
+        The ``tanh`` of the surface's smoothness weight: ``"glibc"`` (default: glibc 2.35's
+        bits, which FSL calls, so that the surface is FSL's) or ``"correctly-rounded"``
+        (CORE-MATH's; the clean-room original only, as larmorx's own ``--tanh`` option:
+        GLIBC-06, ``docs/api/upstream-defects.md``). Where a surface self-intersects and is
+        found again, the last bit of ``tanh`` can change the result.
     implementation
         ``"auto"`` (default): the replica in ``larmorx-nc`` when it is installed, else the
-        clean-room original; ``"replica"``: the replica
-        (:class:`~larmorx.ReplicaNotFoundError` without it); ``"original"``: the clean-room
-        original (FSL's behaviour within the thresholds of its validation record,
-        ``docs/validation/fsl-bet.md``).
+        clean-room original (always the original with ``tanh="correctly-rounded"``);
+        ``"replica"``: the replica (:class:`~larmorx.ReplicaNotFoundError` without it);
+        ``"original"``: the clean-room original (FSL's behaviour within the thresholds of its
+        validation record, ``docs/validation/fsl-bet.md``).
     upstream_defects
         ``"fix"`` (default) or ``"reproduce"`` (FSL's output); a
         :class:`~larmorx.UpstreamDefectWarning` names each defect that changed the result.
@@ -410,6 +423,16 @@ def bet(
                 "outputs to temporary files it removes)"
             )
         options.append(_FLAGS[variation])
+    if tanh not in TANHS:
+        raise ValueError(f"tanh must be one of {TANHS}, not {tanh!r}")
+    if tanh != "glibc":
+        if implementation == "replica":
+            raise ValueError(
+                "tanh='correctly-rounded' is the clean-room original's option (the replica is "
+                "FSL's, glibc's tanh): use implementation='auto' or 'original'"
+            )
+        implementation = "original"
+        options.append(f"--tanh={tanh}")
     selected = _replica.select("fsl", tool, implementation)
     impl = _replica.ORIGINAL if selected is None else selected.implementation()
     with tempfile.TemporaryDirectory(prefix="larmorx-bet-", ignore_cleanup_errors=True) as tmp:
@@ -483,11 +506,21 @@ def betsurf(
     precision
         Retessellate the surfaces this many times for 100 more iterations each (``-p``).
     n_threads, implementation, upstream_defects
-        As for :func:`bet`.
+        As for :func:`bet` (the original's record: ``docs/validation/fsl-bet.md``).
 
     Returns
     -------
     BetsurfResult
+        Each image's :attr:`~larmorx.Image.implementation` names the implementation that ran.
+
+    Raises
+    ------
+    ValueError
+        Invalid arguments.
+    larmorx.ReplicaError
+        The replica failed (its message says why).
+    RuntimeError
+        The clean-room original failed (its message says why, as the replica's does).
     """
     _defects.check(upstream_defects)
     n_threads = _threads(n_threads)
@@ -503,9 +536,7 @@ def betsurf(
     if precision:
         options += ["-p", str(precision)]
     selected = _replica.select("fsl", "betsurf", implementation)
-    if selected is None:  # pragma: no cover - there is no original yet
-        raise NotImplementedError("larmorx has no clean-room original of fsl betsurf yet")
-    impl = selected.implementation()
+    impl = _replica.ORIGINAL if selected is None else selected.implementation()
     with tempfile.TemporaryDirectory(prefix="larmorx-betsurf-", ignore_cleanup_errors=True) as tmp:
         images = [_write_image(t1, tmp, "t1", n_threads)]
         if t2 is not None:
@@ -524,13 +555,13 @@ def betsurf(
             mat_path = os.path.join(tmp, "t1_to_std.mat")
             with open(mat_path, "w", encoding="utf-8", newline="\n") as f:
                 f.writelines(" ".join(repr(float(v)) for v in row) + "\n" for row in m)
-        _run(
-            selected,
-            [*options, *images, mesh_path, mat_path, "out"],
-            tmp,
-            n_threads=n_threads,
-            upstream_defects=upstream_defects,
-        )
+        args = [*options, *images, mesh_path, mat_path, "out"]
+        if selected is None:
+            _run_original(
+                "betsurf", args, tmp, n_threads=n_threads, upstream_defects=upstream_defects
+            )
+        else:
+            _run(selected, args, tmp, n_threads=n_threads, upstream_defects=upstream_defects)
 
         def read(name: str) -> Image:
             return _read_image(os.path.join(tmp, f"out_{name}.nii"), n_threads, impl)

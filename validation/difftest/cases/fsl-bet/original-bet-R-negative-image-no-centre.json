@@ -1,0 +1,206 @@
+{
+ "defect": null,
+ "description": "random testing: out.hdr, out_mask.hdr",
+ "expect": "pass",
+ "found": {
+  "detail": "out.hdr: 215 of 6032 values differ, 0 inside both; out_mask.hdr: 215 of 6032 values differ",
+  "n": 1608,
+  "seed": "20261031",
+  "shrink_moves": [],
+  "signature": [
+   "out.hdr",
+   "out_mask.hdr"
+  ]
+ },
+ "id": "original-bet-R-negative-image-no-centre",
+ "implementations": [
+  "original"
+ ],
+ "reason": "BET's clean-room original, random testing 2026-10-31 (case 1608): bet -R on an image of negative values; the script passes -c 0 0 0, which FSL reads as no centre given (the centre of gravity); corrected 2026-11-01 (e63df59)",
+ "recipe": {
+  "extra": {
+   "output_type": "NIFTI_PAIR",
+   "tool": "bet"
+  },
+  "features": {
+   "-c": false,
+   "-d": false,
+   "-e": false,
+   "-f": true,
+   "-g": true,
+   "-m": true,
+   "-n": false,
+   "-o": false,
+   "-r": true,
+   "-s": false,
+   "-t": false,
+   "-v": false,
+   "-w": false,
+   "FSLOUTPUTTYPE": "NIFTI_PAIR",
+   "axis0": 0.75,
+   "axis1": 1.0,
+   "axis2": 0.85,
+   "bias0": 0.0,
+   "bias1": -0.0025,
+   "bias2": 0.005,
+   "bias3": -0.0075,
+   "centre0": 4.0,
+   "centre1": -6.0,
+   "centre2": 0.5,
+   "content": "head",
+   "dtype": "int16",
+   "extreme": false,
+   "f": "0.9",
+   "g": "0",
+   "noise": 1.0,
+   "offset": 150.0,
+   "orientation": "plumb",
+   "origin0": 21.25,
+   "origin1": 40.75,
+   "origin2": -41.5,
+   "qfac": -1,
+   "qform_code": 4,
+   "r": "60",
+   "range": "negative",
+   "sform": "same",
+   "sform_code": 1,
+   "shape": "29x26x8",
+   "size": 28.0,
+   "spacing0": 1.2,
+   "spacing1": 1.0,
+   "spacing2": 1.5,
+   "suffix": ".nii.gz",
+   "tissues": "t1",
+   "tool": "bet",
+   "units": "mm",
+   "variation": "-R"
+  },
+  "groups": [
+   {
+    "args": [
+     "{in:input}",
+     "out"
+    ],
+    "name": "input",
+    "optional": false
+   },
+   {
+    "args": [
+     "-R"
+    ],
+    "name": "variation",
+    "optional": false
+   },
+   {
+    "args": [
+     "-f",
+     "0.9"
+    ],
+    "name": "-f",
+    "optional": true
+   },
+   {
+    "args": [
+     "-g",
+     "0"
+    ],
+    "name": "-g",
+    "optional": true
+   },
+   {
+    "args": [
+     "-r",
+     "60"
+    ],
+    "name": "-r",
+    "optional": true
+   },
+   {
+    "args": [
+     "-m"
+    ],
+    "name": "-m",
+    "optional": true
+   }
+  ],
+  "inputs": {
+   "input": {
+    "content": {
+     "axes": [
+      0.75,
+      1.0,
+      0.85
+     ],
+     "bias": [
+      0.0,
+      -0.0025,
+      0.005,
+      -0.0075
+     ],
+     "centre": [
+      4.0,
+      -6.0,
+      0.5
+     ],
+     "noise": 1.0,
+     "seed": 1415374539,
+     "size": 28.0,
+     "tissues": "t1",
+     "type": "head"
+    },
+    "dtype": "int16",
+    "geometry": {
+     "origin": [
+      21.25,
+      40.75,
+      -41.5
+     ],
+     "qfac": -1,
+     "qform_code": 4,
+     "quaternion": [
+      1,
+      0,
+      0,
+      0
+     ],
+     "sform": "same",
+     "sform_code": 1,
+     "spacing": [
+      1.2,
+      1.0,
+      1.5
+     ],
+     "units": "mm"
+    },
+    "scaling": null,
+    "shape": [
+     29,
+     26,
+     8
+    ],
+    "suffix": ".nii.gz",
+    "values": {
+     "offset": -150.0,
+     "scale": 1.0
+    }
+   }
+  },
+  "n": 1608,
+  "options": [
+   "-R",
+   "-f",
+   "-g",
+   "-m",
+   "-r",
+   "FSLOUTPUTTYPE=NIFTI_PAIR",
+   "bet"
+  ],
+  "seed": "20261031",
+  "tool": "fsl-bet"
+ },
+ "rule": null,
+ "status": "fixed",
+ "suite": "fsl-bet-replica",
+ "tier": "smoke",
+ "tool": "fsl-bet"
+}

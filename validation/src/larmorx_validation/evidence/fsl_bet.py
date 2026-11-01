@@ -22,6 +22,7 @@ from __future__ import annotations
 import copy
 import os
 import shlex
+import sys
 from pathlib import Path
 
 import numpy as np
@@ -121,14 +122,31 @@ def run_all(
     """``program`` with ``args`` (``{out}``: the run's output stem) by each runner, into the
     entry's directory: ``<tag><label>`` (and the files FSL derives from it); FSL ``version``
     (6.0.7.17 unless given)."""
-    fsl, nc, sif = binaries(version)
+    if any(kind != "original" for _l, kind, _m in runners):
+        fsl, nc, sif = binaries(version)
     home = e.dir / ".home"
     home.mkdir(exist_ok=True)
     add, unset = environment(home, version)
     for label, kind, mode in runners:
         stem = str(e.dir / f"{tag}{label}")
         argv = [a.replace("{out}", stem) for a in args]
-        if kind == "fsl":
+        if kind == "original":
+            # larmorx's clean-room original (crates/larmorx-fsl), in process of `python -m
+            # larmorx`, from this checkout's build
+            env = {
+                **add,
+                "LARMORX_IMPLEMENTATION": "original",
+                "LARMORX_UPSTREAM_DEFECTS": mode,
+                "OMP_NUM_THREADS": "2",
+                "PYTHONPATH": os.environ.get("PYTHONPATH", ""),
+            }
+            e.run(
+                f"{tag}{label}",
+                [sys.executable, "-m", "larmorx", "fsl", program, *argv],
+                env=env,
+                unset=unset,
+            )
+        elif kind == "fsl":
             e.run(f"{tag}{label}", [str(fsl / "bin" / program), *argv], env=add, unset=unset)
         elif kind == "image":
             cmd = ["apptainer", "exec", "--cleanenv", "--no-home"]
@@ -373,6 +391,173 @@ def surf_entry_new(ctx: core.Context) -> fcache.Entry:
     )
 
 
+#: larmorx's clean-room original (``crates/larmorx-fsl``, 2026-10-30 and 31) in its default and
+#: ``reproduce`` modes, in entries of its own beside FSL 6.0.7.23's (its reference).
+RUNNERS_ORIG = [("orig", "original", "fix"), ("orig-reproduce", "original", "reproduce")]
+#: The original's record (standard tier, against FSL 6.0.7.23).
+RECORD_ORIG = "fsl-bet"
+
+
+def versions_orig() -> dict[str, str]:
+    import larmorx
+    from larmorx_validation.parity import fsl_bet as fb
+
+    return {
+        "fsl": fb.fsl_version(fsl_step.NEW),
+        "larmorx": f"larmorx {larmorx.__version__} (crate larmorx-fsl: the clean-room original)",
+    }
+
+
+def _orig_entry(ctx: core.Context, case: str, what: str, compute) -> fcache.Entry:
+    return fcache.entry(ctx.figures_context(), TOOL, f"{case}-original", what, compute)
+
+
+def _compute_orig(e: fcache.Entry) -> None:
+    """The clean-room original on :func:`_compute`'s two calls."""
+    import larmorx_testdata as td
+
+    run = common.fmriprep_run(RUN)
+    command = (run / NODE / "command.txt").read_text(encoding="utf-8").strip()
+    boldref = e.input("BOLD reference, N4-corrected (the node's input)", (run / INPUT).resolve())
+    t1 = e.input("T1w", Path(td.get(T1W)))
+    args = [str(boldref), "{out}", "-f", "0.20", "-m"]
+    run_all(e, "bet", "", args, [boldref], RUNNERS_ORIG, fsl_step.NEW)
+    run_all(e, "bet", "t1-", [str(t1), "{out}", "-R", "-m"], [t1], RUNNERS_ORIG, fsl_step.NEW)
+    e.finish(
+        versions=versions_orig(),
+        command=command,
+        settings="larmorx's clean-room original (python -m larmorx fsl bet, "
+        "LARMORX_IMPLEMENTATION=original) in its default and reproduce modes on the calls of the "
+        "FSL entries beside it: fMRIPrep 25.2.6's BET node of ds000005 sub-01 run 1, and bet -R "
+        "-m on the subject's raw T1w; OMP_NUM_THREADS=2 (the result does not depend on it)",
+    )
+
+
+def entry_orig(ctx: core.Context) -> fcache.Entry:
+    return _orig_entry(
+        ctx,
+        CASE,
+        "the clean-room original on fMRIPrep's BET call (ds000005 sub-01 run 1) and bet -R -m on "
+        "the subject's T1w, default and reproduce",
+        _compute_orig,
+    )
+
+
+def _compute_panel_orig(e: fcache.Entry) -> None:
+    run = common.fmriprep_run(PANEL_RUN)
+    command = (run / PANEL_NODE / "command.txt").read_text(encoding="utf-8").strip()
+    boldref = e.input(
+        "BOLD reference, N4-corrected (the node's input)", (run / PANEL_INPUT).resolve()
+    )
+    args = [str(boldref), "{out}", "-f", "0.20", "-m"]
+    run_all(e, "bet", "", args, [boldref], RUNNERS_ORIG, fsl_step.NEW)
+    e.finish(
+        versions=versions_orig(),
+        command=command,
+        settings="larmorx's clean-room original in both modes on fMRIPrep 25.2.6's BET node of "
+        "the data panel's ds000228 sub-pixar008; OMP_NUM_THREADS=2",
+    )
+
+
+def panel_entry_orig(ctx: core.Context) -> fcache.Entry:
+    return _orig_entry(
+        ctx,
+        PANEL_CASE,
+        "the clean-room original on fMRIPrep's BET call on the BOLD reference of the data "
+        "panel's ds000228 sub-pixar008 (3.5 years)",
+        _compute_panel_orig,
+    )
+
+
+def _compute_surf_orig(e: fcache.Entry) -> None:
+    from larmorx_validation.parity import fsl_bet as fb
+
+    t1 = e.input("synthetic head, T1-like", fb.input_path("head"))
+    t2 = e.input("synthetic head, T2-like", fb.input_path("head-t2"))
+    mesh = e.input("FSL bet2's surface of it (bet2 -e)", fb.input_path("head-mesh"))
+    mat = e.input("its matrix to MNI152", fb.input_path("head-mat"))
+    args = ["-o", "-m", "-s", str(t1), str(t2), str(mesh), str(mat), "{out}"]
+    run_all(e, "betsurf", "", args, [t1, t2, mesh, mat], RUNNERS_ORIG, fsl_step.NEW)
+    e.finish(
+        versions=versions_orig(),
+        command="betsurf -o -m -s <t1> <t2> <bet_mesh.vtk> <t1_to_standard.mat> <out>",
+        settings="betsurf with the T2 on the synthetic head (the inputs of the FSL entries beside "
+        "it): larmorx's clean-room original in both modes; OMP_NUM_THREADS=2",
+    )
+
+
+def surf_entry_orig(ctx: core.Context) -> fcache.Entry:
+    return _orig_entry(
+        ctx,
+        "betsurf-synthetic-head",
+        "betsurf -o -m -s with the T2 on the synthetic head: the clean-room original",
+        _compute_surf_orig,
+    )
+
+
+#: The original's panels (from its entry).
+PANELS_ORIG = [
+    ("orig", "orig", "larmorx", "larmorx's clean-room original",
+     f"default mode (Apache-2.0, crate larmorx-fsl), against {fsl_step.NEW_LABEL}"),
+    ("orig-reproduce", "orig-reproduce", "larmorx", "larmorx's clean-room original",
+     "reproduce mode"),
+]  # fmt: skip
+
+
+def _orig_diffs() -> list[dict]:
+    d = common.d
+    return [
+        d("orig-fsl23", "orig", "fsl23", "main", f"original − {fsl_step.NEW_LABEL}",
+          common.ROLE_LX),
+        d("orig-repro-fsl23", "orig-reproduce", "fsl23", "main",
+          f"original (reproduce) − {fsl_step.NEW_LABEL}", common.ROLE_LX),
+        d("orig-replica23", "orig", "replica23", "check", "original − replica (both following "
+          f"{fsl_step.NEW_LABEL})", common.ROLE_SELF),
+    ]  # fmt: skip
+
+
+def _orig_verdicts(diffs: list[dict], same: dict[str, bool], arrays: dict, outputs: list) -> None:
+    """The original's comparisons: bit-identical, or an open difference with the masks' Dice
+    (betsurf is held to its masks: Dice >= 0.99, boundary p95 <= 1 voxel, its record)."""
+    for x in diffs:
+        if not x["id"].startswith("orig-"):
+            continue
+        x["links"] = []
+        if same[x["id"]]:
+            x["verdict"] = "bit-identical"
+            x["reason"] = {
+                "orig-replica23": "The clean-room original gives the replica's values, every one.",
+            }.get(x["id"], f"The same values as {fsl_step.NEW_LABEL}'s, every one.")
+            continue
+        parts = []
+        for o in outputs:
+            a, b = arrays.get(x["a"], {}).get(o["id"]), arrays.get(x["b"], {}).get(o["id"])
+            if a is None or b is None:
+                continue
+            ma, mb = np.asarray(a) != 0, np.asarray(b) != 0
+            if np.array_equal(ma, mb):
+                continue
+            dice = (
+                2 * np.count_nonzero(ma & mb) / max(1, np.count_nonzero(ma) + np.count_nonzero(mb))
+            )
+            n = int(np.count_nonzero(ma != mb))
+            parts.append(
+                f"{o['label'].lower()}: {n:,} voxel{'s' if n != 1 else ''} of "
+                f"{int(np.count_nonzero(mb)):,} (Dice {dice:.5f})"
+            )
+        x["verdict"] = "open"
+        who = "the replica's" if x["b"].startswith("replica") else f"{fsl_step.NEW_LABEL}'s"
+        x["reason"] = (
+            f"The clean-room original's masks differ from {who} in a few voxels at their edges: "
+            + ("; ".join(parts) or "values")
+            + ". betsurf's profiles agree with FSL's one by one (330 of 330 probed); its surfaces "
+            "settle a little elsewhere where few profiles vote and at the scalp "
+            "(docs/findings/fsl-bet-original.md, betsurf). The record holds betsurf to its masks "
+            "(Dice >= 0.99, boundary p95 <= 1 voxel), which these meet; the difference is not "
+            "closed: the original could still match FSL."
+        )
+
+
 # ----------------------------------------------------------------------------------- export
 
 OUTPUTS = [
@@ -567,12 +752,15 @@ def _note(img) -> str:
     return (
         f"Δ is A − B: for the masks +1 where only A holds a voxel, −1 where only B does. "
         f"Computed in float64 over all {n:,} voxels of the outputs, not only those shown. The "
-        "record's threshold: every file bit-identical to FSL's (header and data), with its exit "
-        "status and messages."
+        "replica's records' threshold: every file bit-identical to FSL's (header and data), with "
+        "its exit status and messages. The clean-room original's record (specs/bet.md §11): exit "
+        "status and messages FSL's, each file bit-identical or, for the masks, within a Dice "
+        "coefficient and a boundary distance (betsurf's: Dice >= 0.99, the boundary distance's "
+        "95th percentile <= 1 voxel)."
     )
 
 
-def _example_fmriprep(ctx: core.Context, e: fcache.Entry, n: fcache.Entry) -> dict:
+def _example_fmriprep(ctx: core.Context, e: fcache.Entry, n: fcache.Entry, o: fcache.Entry) -> dict:
     import nibabel as nib
     from scipy import ndimage
 
@@ -586,6 +774,7 @@ def _example_fmriprep(ctx: core.Context, e: fcache.Entry, n: fcache.Entry) -> di
     node_brain = common.load(str(run / FMRIPREP_BRAIN))
     arrays["node"] = {"mask": node_mask, "brain": node_brain}
     arrays.update(runs(n, "", PANELS_NEW))
+    arrays.update(runs(o, "", PANELS_ORIG))
     show = ndimage.binary_dilation(
         np.logical_or.reduce([a["mask"] != 0 for a in arrays.values()]), iterations=2
     )
@@ -600,7 +789,7 @@ def _example_fmriprep(ctx: core.Context, e: fcache.Entry, n: fcache.Entry) -> di
     ex.add(exm.Panel("node", "fmriprep", "fMRIPrep 25.2.6's own output",
                      "the node's brain and mask, as fMRIPrep wrote them", arrays["node"],
                      overlay=over))  # fmt: skip
-    for pid, _stem, role, label, sub in PANELS_NEW:
+    for pid, _stem, role, label, sub in [*PANELS_NEW, *PANELS_ORIG]:
         ex.add(exm.Panel(pid, role, label, sub, arrays[pid], overlay=over))
     d = common.d
     diffs = [
@@ -609,6 +798,7 @@ def _example_fmriprep(ctx: core.Context, e: fcache.Entry, n: fcache.Entry) -> di
           common.ROLE_FMRIPREP),
         _diffs()[4],
         *_new_diffs(),
+        *_orig_diffs(),
     ]  # fmt: skip
     common.compare_all(ex, diffs, OUTPUTS)
     same = common.identical(diffs)
@@ -622,13 +812,14 @@ def _example_fmriprep(ctx: core.Context, e: fcache.Entry, n: fcache.Entry) -> di
             )
     what = "this BOLD reference"
     _step_verdicts(diffs, same, what, e, n, "", {"mask": "_mask.nii.gz", "brain": ".nii.gz"})
+    _orig_verdicts(diffs, same, arrays, OUTPUTS)
     at, _k = mask_view(ex)
     default = {
         "output": "mask",
         "plane": "axial",
         "voxel": at,
-        "panels": ["boldref", "fsl", "replica", "node"],
-        "diffs": ["replica-fsl", "image-fsl", "replica-node"],
+        "panels": ["boldref", "fsl", "replica", "node", "orig"],
+        "diffs": ["replica-fsl", "image-fsl", "replica-node", "orig-fsl23"],
         "compare": {"a": "fsl", "b": "replica"},
     }
     out = common.finish(ctx, ex, diffs, copy.deepcopy(OUTPUTS), default=default,
@@ -645,7 +836,7 @@ def _example_fmriprep(ctx: core.Context, e: fcache.Entry, n: fcache.Entry) -> di
             "to FSL 6.0.7.17, to fMRIPrep's own build of FSL in its image and to the larmorx-nc "
             "replica in its default and reproduce modes, beside the outputs fMRIPrep's node "
             "wrote. The masks are drawn over the input; choose *Brain* for the extracted brain."
-            " FSL 6.0.7.23's output, and the replica's run compared with it, are shown beside them (the replica's reference since the version update of 2026-10-29)."
+            " FSL 6.0.7.23's output, and the replica's run compared with it, are shown beside them (the replica's reference since the version update of 2026-10-29). LARMORX's clean-room original (Apache-2.0, written from the specification without FSL's source) runs the same call in its default and reproduce modes, compared with FSL 6.0.7.23, its reference."
         ),
         "facts": [
             {
@@ -664,7 +855,8 @@ def _example_fmriprep(ctx: core.Context, e: fcache.Entry, n: fcache.Entry) -> di
                 "label": "Programs",
                 "text": f"{vers.get('fsl', '?')}; {vers.get('fsl_in_fmriprep_image', '?')}; "
                 f"{vers.get('larmorx-nc', '?')} (the replica), from larmorx at commit "
-                f"`{info['larmorx_commit'][:12]}`",
+                f"`{info['larmorx_commit'][:12]}`; "
+                + o.info().get("versions", {}).get("larmorx", "the clean-room original"),
             },
             {
                 "label": "Mask",
@@ -682,11 +874,12 @@ def _example_fmriprep(ctx: core.Context, e: fcache.Entry, n: fcache.Entry) -> di
         "provenance": [
             *common.provenance(info, f"{TOOL}/{e.case}", [DATA]),
             *common.provenance(n.info(), f"{TOOL}/{n.case}", [DATA])[1:],
+            *common.provenance(o.info(), f"{TOOL}/{o.case}", [DATA])[1:],
         ],
     }
 
 
-def _example_panel(ctx: core.Context, pe: fcache.Entry, pn: fcache.Entry) -> dict:
+def _example_panel(ctx: core.Context, pe: fcache.Entry, pn: fcache.Entry, po: fcache.Entry) -> dict:
     """The data-panel case as three full-resolution slices (``view="slices"``), around the masks
     (dilated by 2 voxels: the BOLD reference is shown brain-masked)."""
     import nibabel as nib
@@ -703,6 +896,7 @@ def _example_panel(ctx: core.Context, pe: fcache.Entry, pn: fcache.Entry) -> dic
         "brain": common.load(str(run / PANEL_BRAIN)),
     }
     arrays.update(runs(pn, "", PANELS_NEW))
+    arrays.update(runs(po, "", PANELS_ORIG))
     show = ndimage.binary_dilation(
         np.logical_or.reduce([a["mask"] != 0 for a in arrays.values()]), iterations=2
     )
@@ -717,7 +911,7 @@ def _example_panel(ctx: core.Context, pe: fcache.Entry, pn: fcache.Entry) -> dic
     ex.add(exm.Panel("node", "fmriprep", "fMRIPrep 25.2.6's own output",
                      "the node's brain and mask, as fMRIPrep wrote them", arrays["node"],
                      overlay=over))  # fmt: skip
-    for pid, _stem, role, label, sub in PANELS_NEW:
+    for pid, _stem, role, label, sub in [*PANELS_NEW, *PANELS_ORIG]:
         ex.add(exm.Panel(pid, role, label, sub, arrays[pid], overlay=over))
     d = common.d
     diffs = [
@@ -726,6 +920,7 @@ def _example_panel(ctx: core.Context, pe: fcache.Entry, pn: fcache.Entry) -> dic
           common.ROLE_FMRIPREP),
         _diffs()[4],
         *_new_diffs(),
+        *_orig_diffs(),
     ]  # fmt: skip
     common.compare_all(ex, diffs, OUTPUTS)
     same = common.identical(diffs)
@@ -739,13 +934,14 @@ def _example_panel(ctx: core.Context, pe: fcache.Entry, pn: fcache.Entry) -> dic
                 "of the mask (the headers differ only in FSL's build string, `descrip`)."
             )
     _step_verdicts(diffs, same, what, pe, pn, "", {"mask": "_mask.nii.gz", "brain": ".nii.gz"})
+    _orig_verdicts(diffs, same, arrays, OUTPUTS)
     at = common.slice_voxel(ex, "replica", "fsl", "mask")
     default = {
         "output": "mask",
         "plane": "axial",
         "voxel": at,
-        "panels": ["boldref", "fsl", "replica", "node"],
-        "diffs": ["replica-fsl", "image-fsl", "replica-node"],
+        "panels": ["boldref", "fsl", "replica", "node", "orig"],
+        "diffs": ["replica-fsl", "image-fsl", "replica-node", "orig-fsl23"],
         "compare": {"a": "fsl", "b": "replica"},
     }
     differs = not same["replica-fsl"]
@@ -768,7 +964,7 @@ def _example_panel(ctx: core.Context, pe: fcache.Entry, pn: fcache.Entry) -> dic
             "given to FSL 6.0.7.17, fMRIPrep's build of FSL and the replica in both modes, "
             "beside the outputs fMRIPrep's node wrote. As a panel case beside the examples "
             "above, it is stored as three full-resolution slices."
-            " FSL 6.0.7.23's output, and the replica's run compared with it, are shown beside them (the replica's reference since the version update of 2026-10-29)."
+            " FSL 6.0.7.23's output, and the replica's run compared with it, are shown beside them (the replica's reference since the version update of 2026-10-29). LARMORX's clean-room original (Apache-2.0, written from the specification without FSL's source) runs the same call in its default and reproduce modes, compared with FSL 6.0.7.23, its reference."
         ),
         "facts": [
             {
@@ -787,7 +983,8 @@ def _example_panel(ctx: core.Context, pe: fcache.Entry, pn: fcache.Entry) -> dic
                 "label": "Programs",
                 "text": f"{vers.get('fsl', '?')}; {vers.get('fsl_in_fmriprep_image', '?')}; "
                 f"{vers.get('larmorx-nc', '?')} (the replica), from larmorx at commit "
-                f"`{info['larmorx_commit'][:12]}`",
+                f"`{info['larmorx_commit'][:12]}`; "
+                + po.info().get("versions", {}).get("larmorx", "the clean-room original"),
             },
             {
                 "label": "Mask",
@@ -805,11 +1002,12 @@ def _example_panel(ctx: core.Context, pe: fcache.Entry, pn: fcache.Entry) -> dic
         "provenance": [
             *common.provenance(info, f"{TOOL}/{pe.case}", [PANEL_DATA]),
             *common.provenance(pn.info(), f"{TOOL}/{pn.case}", [PANEL_DATA])[1:],
+            *common.provenance(po.info(), f"{TOOL}/{po.case}", [PANEL_DATA])[1:],
         ],
     }
 
 
-def _example_t1(ctx: core.Context, e: fcache.Entry, n: fcache.Entry) -> dict:
+def _example_t1(ctx: core.Context, e: fcache.Entry, n: fcache.Entry, o: fcache.Entry) -> dict:
     import larmorx_testdata as td
     import nibabel as nib
     from scipy import ndimage
@@ -820,6 +1018,7 @@ def _example_t1(ctx: core.Context, e: fcache.Entry, n: fcache.Entry) -> dict:
     img = nib.load(td.get(T1W))
     arrays = runs(e, "t1-")
     arrays.update(runs(n, "t1-", PANELS_NEW))
+    arrays.update(runs(o, "t1-", PANELS_ORIG))
     # only the brain is shown: the masks' union, dilated by 2 voxels (no face can show)
     show = ndimage.binary_dilation(
         np.logical_or.reduce([a["mask"] != 0 for a in arrays.values()]), iterations=2
@@ -829,11 +1028,15 @@ def _example_t1(ctx: core.Context, e: fcache.Entry, n: fcache.Entry) -> dict:
     ex.add(exm.Panel("t1", "input", "ds000005 sub-01 T1w", "the raw image (int16), inside the "
                      "brain masks only", {"all": np.asanyarray(img.dataobj)}))  # fmt: skip
     over = {"mask": {"on": "t1", "window": window_of(ex, "t1")}}
-    for pid, _stem, role, label, sub in [*PANELS, *PANELS_NEW]:
+    for pid, _stem, role, label, sub in [*PANELS, *PANELS_NEW, *PANELS_ORIG]:
         if pid in arrays:
             ex.add(exm.Panel(pid, role, label.replace("bet", "bet -R"), sub, arrays[pid],
                              overlay=over))  # fmt: skip
-    diffs = [*(x for x in _diffs() if "image" not in (x["a"], x["b"])), *_new_diffs()]
+    diffs = [
+        *(x for x in _diffs() if "image" not in (x["a"], x["b"])),
+        *_new_diffs(),
+        *_orig_diffs(),
+    ]
     common.compare_all(ex, diffs, OUTPUTS)
     same = common.identical(diffs)
     h = headers(e, "t1-", {"mask": "_mask.nii.gz", "brain": ".nii.gz"})
@@ -841,13 +1044,14 @@ def _example_t1(ctx: core.Context, e: fcache.Entry, n: fcache.Entry) -> dict:
         _verdict(x, same, "this T1w", h)
     what = "this T1w"
     _step_verdicts(diffs, same, what, e, n, "t1-", {"mask": "_mask.nii.gz", "brain": ".nii.gz"})
+    _orig_verdicts(diffs, same, arrays, OUTPUTS)
     at, _k = mask_view(ex)
     default = {
         "output": "mask",
         "plane": "axial",
         "voxel": at,
-        "panels": ["t1", "fsl", "replica", "replica-reproduce"],
-        "diffs": ["replica-fsl", "repro-fsl"],
+        "panels": ["t1", "fsl", "replica", "replica-reproduce", "orig"],
+        "diffs": ["replica-fsl", "repro-fsl", "orig-fsl23"],
         "compare": {"a": "fsl", "b": "replica"},
     }
     out = common.finish(ctx, ex, diffs, copy.deepcopy(OUTPUTS), default=default,
@@ -862,7 +1066,7 @@ def _example_t1(ctx: core.Context, e: fcache.Entry, n: fcache.Entry) -> dict:
             "the brain's centre until it moves less than a voxel), on the raw T1w of the same "
             "subject. The `bet` script itself is replicated: its options, its loop, the "
             "centre-of-gravity computation it asks of `fslstats -C`, its messages."
-            " FSL 6.0.7.23's output, and the replica's run compared with it, are shown beside them (the replica's reference since the version update of 2026-10-29)."
+            " FSL 6.0.7.23's output, and the replica's run compared with it, are shown beside them (the replica's reference since the version update of 2026-10-29). LARMORX's clean-room original (Apache-2.0, written from the specification without FSL's source) runs the same call in its default and reproduce modes, compared with FSL 6.0.7.23, its reference."
         ),
         "facts": [
             {
@@ -873,7 +1077,9 @@ def _example_t1(ctx: core.Context, e: fcache.Entry, n: fcache.Entry) -> dict:
             {"label": "Command", "text": "`bet sub-01_T1w.nii.gz out -R -m`"},
             {
                 "label": "Programs",
-                "text": f"{vers.get('fsl', '?')}; {vers.get('larmorx-nc', '?')}. fMRIPrep's image "
+                "text": f"{vers.get('fsl', '?')}; {vers.get('larmorx-nc', '?')}; "
+                + o.info().get("versions", {}).get("larmorx", "the clean-room original")
+                + ". fMRIPrep's image "
                 "is not shown: it has no `dc`, which the bet script's `-R` needs, so its `bet -R` "
                 "stops (`dc: command not found`)",
             },
@@ -887,11 +1093,12 @@ def _example_t1(ctx: core.Context, e: fcache.Entry, n: fcache.Entry) -> dict:
         "provenance": [
             *common.provenance(info, f"{TOOL}/{e.case}", [DATA]),
             *common.provenance(n.info(), f"{TOOL}/{n.case}", [DATA])[1:],
+            *common.provenance(o.info(), f"{TOOL}/{o.case}", [DATA])[1:],
         ],
     }
 
 
-def _example_surf(ctx: core.Context, e: fcache.Entry, n: fcache.Entry) -> dict:
+def _example_surf(ctx: core.Context, e: fcache.Entry, n: fcache.Entry, o: fcache.Entry) -> dict:
     import nibabel as nib
 
     from larmorx_validation.evidence import example as exm
@@ -902,6 +1109,7 @@ def _example_surf(ctx: core.Context, e: fcache.Entry, n: fcache.Entry) -> dict:
     t2 = nib.load(str(fb.input_path("head-t2")))
     arrays = surf_runs(e)
     arrays.update(surf_runs(n, PANELS_NEW))
+    arrays.update(surf_runs(o, PANELS_ORIG))
     show = np.ones(img.shape[:3], dtype=bool)
     grid = core.Grid.around(img, show, margin=0)
     ex = exm.Example(ctx, grid, show)
@@ -910,10 +1118,10 @@ def _example_surf(ctx: core.Context, e: fcache.Entry, n: fcache.Entry) -> dict:
     ex.add(exm.Panel("t2", "input", "synthetic head, T2-like", "the same shells, T2 contrast",
                      {"all": np.asanyarray(t2.dataobj)}))  # fmt: skip
     over = {o["id"]: {"on": "t1", "window": window_of(ex, "t1")} for o in SURF_OUTPUTS}
-    for pid, _stem, role, label, sub in [*PANELS, *PANELS_NEW]:
+    for pid, _stem, role, label, sub in [*PANELS, *PANELS_NEW, *PANELS_ORIG]:
         ex.add(exm.Panel(pid, role, label.replace("bet", "betsurf"), sub, arrays[pid],
                          overlay=over))  # fmt: skip
-    diffs = [*_diffs(), *_new_diffs()]
+    diffs = [*_diffs(), *_new_diffs(), *_orig_diffs()]
     common.compare_all(ex, diffs, SURF_OUTPUTS)
     same = common.identical(diffs)
     h = headers(
@@ -924,6 +1132,7 @@ def _example_surf(ctx: core.Context, e: fcache.Entry, n: fcache.Entry) -> dict:
     what = "this head"
     surf_files = {o: f"_{o}_mask.nii.gz" for o in ("inskull", "outskull", "outskin", "skull")}
     _step_verdicts(diffs, same, what, e, n, "", surf_files)
+    _orig_verdicts(diffs, same, arrays, SURF_OUTPUTS)
     # the middle axial slice of the display grid; the crosshair on the skull mask nearest its centre
     sk = ex.values(ex.key("fsl", "skull")) != 0
     k = sk.shape[2] // 2
@@ -934,8 +1143,8 @@ def _example_surf(ctx: core.Context, e: fcache.Entry, n: fcache.Entry) -> dict:
         "output": "skull",
         "plane": "axial",
         "voxel": [int(i), int(j), k],
-        "panels": ["t1", "fsl", "replica", "image"],
-        "diffs": ["replica-fsl", "image-fsl"],
+        "panels": ["t1", "fsl", "replica", "image", "orig"],
+        "diffs": ["replica-fsl", "image-fsl", "orig-fsl23"],
         "compare": {"a": "fsl", "b": "replica"},
     }
     out = common.finish(ctx, ex, diffs, copy.deepcopy(SURF_OUTPUTS), default=default,
@@ -951,7 +1160,7 @@ def _example_surf(ctx: core.Context, e: fcache.Entry, n: fcache.Entry) -> dict:
             "surfaces are deformed onto them in turn. A synthetic head shows them whole: on a "
             "real head the scalp would show a face. FSL 6.0.7.17, fMRIPrep's FSL and the replica "
             "in both modes; choose the mask above the panels."
-            " FSL 6.0.7.23's output, and the replica's run compared with it, are shown beside them (the replica's reference since the version update of 2026-10-29)."
+            " FSL 6.0.7.23's output, and the replica's run compared with it, are shown beside them (the replica's reference since the version update of 2026-10-29). LARMORX's clean-room original (Apache-2.0, written from the specification without FSL's source) runs the same call in its default and reproduce modes, compared with FSL 6.0.7.23, its reference."
         ),
         "facts": [
             {
@@ -968,7 +1177,8 @@ def _example_surf(ctx: core.Context, e: fcache.Entry, n: fcache.Entry) -> dict:
             {
                 "label": "Programs",
                 "text": f"{vers.get('fsl', '?')}; {vers.get('fsl_in_fmriprep_image', '?')}; "
-                f"{vers.get('larmorx-nc', '?')}",
+                f"{vers.get('larmorx-nc', '?')}; "
+                + o.info().get("versions", {}).get("larmorx", "the clean-room original"),
             },
             {
                 "label": "Grid",
@@ -982,6 +1192,7 @@ def _example_surf(ctx: core.Context, e: fcache.Entry, n: fcache.Entry) -> dict:
         "provenance": [
             *common.provenance(info, f"{TOOL}/{e.case}", [SYNTHETIC]),
             *common.provenance(n.info(), f"{TOOL}/{n.case}", [SYNTHETIC])[1:],
+            *common.provenance(o.info(), f"{TOOL}/{o.case}", [SYNTHETIC])[1:],
         ],
     }
 
@@ -1122,6 +1333,55 @@ def case_verdict(r: dict, desc: str, s) -> tuple[str, str]:
     return verdict, common.clip("; ".join(notes), 600)
 
 
+def case_verdict_orig(r: dict, desc: str, s) -> tuple[str, str]:
+    """A case's verdict for the clean-room original: its record compares it with FSL 6.0.7.23 by
+    specs/bet.md §11's thresholds (bit-identical where it is; betsurf's masks Dice >= 0.99 and
+    boundary p95 <= 1 voxel), exit status and messages identical."""
+    v, why = case_verdict(r, desc, s)
+    who = "the clean-room original"
+    why = (
+        why.replace("The replica's", "The clean-room original's")
+        .replace("The replica", "The clean-room original")
+        .replace("the replica's", f"{who}'s")
+        .replace("the replica", who)
+    )
+    if v != "bit-identical":
+        return v, why
+    differ = {k: x for k, x in r.get("measured", {}).items() if not _zero(x)}
+    if not differ:
+        why = why.replace(
+            "every file FSL writes, byte for byte",
+            "every value of every file FSL writes, its headers but for the program's name in "
+            "`descrip`, with FSL's exit status and messages",
+        )
+        return v, why
+    shown = "; ".join(f"{k}: {x}" for k, x in list(differ.items())[:4])
+    surf = getattr(s, "tool", "") == "betsurf"
+    return "open", common.clip(
+        "Within the record's thresholds, not bit-identical (masks: Dice; boundary distance p95 / "
+        f"max in voxels; drawn surfaces: their distance p95 / max): {shown}."
+        + (
+            " betsurf's profiles agree with FSL's one by one; where few of them vote, and at the "
+            "scalp, its surfaces settle a little elsewhere (docs/findings/fsl-bet-original.md, "
+            "betsurf)."
+            if surf
+            else ""
+        ),
+        600,
+    )
+
+
+def _zero(x) -> bool:
+    """A measured value that says "no difference": 0, or a text of numbers that are all 0 (a
+    mesh's vertex distance, ``0.0000 / 0.0000``)."""
+    import re
+
+    if isinstance(x, (int, float)):
+        return x == 0
+    nums = re.findall(r"[-+]?\d+(?:\.\d+)?(?:e[-+]?\d+)?", str(x))
+    return bool(nums) and all(float(n) == 0 for n in nums)
+
+
 def cases(
     rec, scenarios, examples: dict[str, str], impl: str = "replica", into: list | None = None
 ) -> list[dict]:
@@ -1131,9 +1391,10 @@ def cases(
     defs = {cid: (desc, s) for cid, _cat, desc, s in scenarios}
     out = [] if into is None else into
     by_id = {c["id"]: c for c in out}
+    verdict_of = case_verdict_orig if impl == "original" else case_verdict
     for r in rec.results:
         desc, s = defs.get(r["case"], ("", None))
-        v, why = case_verdict(r, desc, s)
+        v, why = verdict_of(r, desc, s)
         result = {
             "outcome": r["status"],
             "verdict": v,
@@ -1160,11 +1421,42 @@ def status_of(rec) -> str:
     return "experimental" if rec.data.get("summary", {}).get("fail") else "validated"
 
 
+#: The benchmark's series (``docs/benchmarks/fsl-bet.json``, from
+#: ``validation/investigations/cleanroom-bet/bench.py``): FSL is single-threaded.
+SPEED_THREADS = 24
+SPEED_SERIES = [
+    {"id": "FSL 6.0.7.23|1 thread", "label": "FSL 6.0.7.23 (single-threaded)", "mark": "original"},
+    {"id": "replica (larmorx-nc)|1 thread", "label": "replica, 1 thread", "mark": "replica"},
+    {"id": f"replica (larmorx-nc)|{SPEED_THREADS} threads",
+     "label": f"replica, {SPEED_THREADS} threads", "mark": "replica-open"},
+    {"id": "original (larmorx)|1 thread", "label": "clean-room original, 1 thread",
+     "mark": "larmorx"},
+    {"id": f"original (larmorx)|{SPEED_THREADS} threads",
+     "label": f"clean-room original, {SPEED_THREADS} threads", "mark": "larmorx-open"},
+]  # fmt: skip
+
+
+def speed(ctx: core.Context):
+    bench = records.load_bench(ctx.repo, TOOL)
+    chart = common.speed(
+        bench,
+        SPEED_SERIES,
+        {},
+        title="Seconds for the whole command (read, compute, write), median of repeated runs, "
+        "log scale; the factor is the clean-room original's speed-up over FSL at one thread",
+        base=(SPEED_SERIES[0]["id"], SPEED_SERIES[3]["id"]),
+        note="From the benchmark report `docs/benchmarks/fsl-bet.json` ({cpu}, {cpus} logical "
+        "CPUs; each program in a clean environment, outputs NIfTI-1 gzipped).",
+    )
+    return bench, chart
+
+
 def export(ctx: core.Context) -> dict:
     from larmorx_validation.parity.fsl_bet import _scenarios
 
     rec = records.load(ctx.repo, RECORD)
     rec_new = records.load(ctx.repo, RECORD_NEW)
+    rec_orig = records.load(ctx.repo, RECORD_ORIG)
     examples = {
         "fmriprep/ds000005-task_mixedgamblestask_run_01-enhance_and_skullstrip_bold": "fmriprep-bet",
         "real/adult-ds000005-R": "t1w-robust",
@@ -1173,19 +1465,22 @@ def export(ctx: core.Context) -> dict:
     }
     cs = cases(rec, _scenarios(), examples)
     cases(rec_new, _scenarios(), examples, impl="replica-23", into=cs)
+    cases(rec_orig, _scenarios(), examples, impl="original", into=cs)
     e = entry(ctx)
     s = surf_entry(ctx)
     pe = panel_entry(ctx)
     n, sn, pn = entry_new(ctx), surf_entry_new(ctx), panel_entry_new(ctx)
+    o, so, po = entry_orig(ctx), surf_entry_orig(ctx), panel_entry_orig(ctx)
+    bench, chart = speed(ctx)
     return {
         "schema": 1,
         "tool": TOOL,
         "title": "BET",
         "provenance": {
             "exporter": core.tree_hash(ctx.repo, "validation/src/larmorx_validation/evidence"),
-            "records": rec.source() + rec_new.source(),
-            "benchmarks": [],
-            "cache": [fcache.provenance(x) for x in (e, s, pe, n, sn, pn)],
+            "records": rec.source() + rec_new.source() + rec_orig.source(),
+            "benchmarks": bench.source() if bench else [],
+            "cache": [fcache.provenance(x) for x in (e, s, pe, n, sn, pn, o, so, po)],
             "command": f"python -m larmorx_validation evidence {TOOL} --site <site>",
         },
         "implementations": [
@@ -1205,15 +1500,23 @@ def export(ctx: core.Context) -> dict:
                 f"docs/validation/{RECORD_NEW}.md",
                 status_of(rec_new),
             ),
+            common.implementation(
+                cs,
+                "original",
+                f"larmorx clean-room original, against FSL {fsl_step.NEW} (standard tier)",
+                "original",
+                f"docs/validation/{RECORD_ORIG}.md",
+                status_of(rec_orig),
+            ),
         ],
         "cases": cs,
         "cases_total": len(cs),
-        "speed": None,
+        "speed": chart,
         "examples": [
-            _example_fmriprep(ctx, e, n),
-            _example_t1(ctx, e, n),
-            _example_surf(ctx, s, sn),
-            _example_panel(ctx, pe, pn),
+            _example_fmriprep(ctx, e, n, o),
+            _example_t1(ctx, e, n, o),
+            _example_surf(ctx, s, sn, so),
+            _example_panel(ctx, pe, pn, po),
         ],
     }
 
@@ -1224,3 +1527,4 @@ if __name__ == "__main__":  # compute the cache entries only
     c = core.Context(repo=REPO, site=Path("."), cache=default_cache())
     print("done", entry(c).dir, surf_entry(c).dir, panel_entry(c).dir)
     print("done", entry_new(c).dir, surf_entry_new(c).dir, panel_entry_new(c).dir)
+    print("done", entry_orig(c).dir, surf_entry_orig(c).dir, panel_entry_orig(c).dir)

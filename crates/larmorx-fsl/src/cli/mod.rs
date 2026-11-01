@@ -9,6 +9,7 @@
 
 pub mod bet;
 pub mod bet2;
+pub mod betsurf;
 pub mod fmt;
 pub mod options;
 
@@ -19,7 +20,7 @@ use std::path::{Path, PathBuf};
 use larmorx_core::defects::{self, UpstreamDefects};
 
 /// The tools on the command line.
-pub const TOOLS: &[&str] = &["bet", "bet2"];
+pub const TOOLS: &[&str] = &["bet", "bet2", "betsurf"];
 
 /// The settings of one run: the environment it reads and the directory relative names start
 /// in.
@@ -103,6 +104,7 @@ pub fn run_with(
     match tool {
         "bet2" => Some(bet2::main(args, settings, out, err)),
         "bet" => Some(bet::main(args, settings, out, err)),
+        "betsurf" => Some(betsurf::main(args, settings, out, err)),
         _ => None,
     }
 }

@@ -288,11 +288,27 @@ The items below keep their history.
    agree** with FSL 6.0.7.23 (111 pass, 24 rejected by both, 7 expected divergences; `real/older-75y`,
    `7t`, `tumour` bit-identical; 13 of 13 skulls bit-identical; the quaternion exact; fMRIPrep's 29
    calls bit-identical); the random-testing trial's 75 open cases: 73 agree (237 of its 239). Speed
-   unchanged (0.43 and 1.20 s on one thread, FSL 1.27 and 3.21 s). **Part 2b (next):** betsurf's
-   original (spec §6), the site page's clean-room panels, a fresh benchmark, and BET's default `tanh`
-   as decided (GLIBC-06, the user 2026-10-31: glibc's bits kept by default, the correctly rounded
-   `tanh` on request). **For the spec writer (one
-   question):** FSL's conversion of a centre between the voxel frames of a neurologically stored
+   unchanged (0.43 and 1.20 s on one thread, FSL 1.27 and 3.21 s). **Part 2b: done (2026-10-31 and 11-01).** betsurf's clean-room original complete (spec §6:
+   every option, message and failure case; FSL-43, -47, -48, -50 to -55, -58 with `reproduce`;
+   `larmorx fsl betsurf`, `lx.fsl.betsurf(implementation="original")`, and `"auto"` without
+   `larmorx-nc`); its profile rules settled by a black-box oracle of single profiles (330 of 330
+   decided as FSL decides); GLIBC-06 as the user decided (`--tanh correctly-rounded` on request,
+   the notice removed); record [fsl-bet](validation/fsl-bet.md) re-made with betsurf's real heads:
+   127 of 128 compared cases within the thresholds (ds002603's scalp with its T2 misses: boundary
+   p95 2 voxels), all 217 bet2 and bet brains, masks and outlines bit-identical; the site page's
+   clean-room panels; benchmark [fsl-bet](benchmarks/fsl-bet.md) re-made (the original 2.5 to 3.6
+   times FSL's speed on one thread, 6.5 to 13.5 on 24); random testing's trial (1,846 cases): two
+   corrections of the original (`-c 0 0 0`, `bet -F`'s float64 `_tmp`), four permanent cases.
+   **Open, for the spec writer (BET's questions,
+   [findings/fsl-bet-original.md](findings/fsl-bet-original.md)):** (1) the centre's conversion
+   on a neurologically stored image (cases 622 and 677, and now 17 of the trial's `bet`/`bet2`
+   cases: `bet -R`, `-c`); (2) betsurf's deformation where few profiles vote (the inner skull up to
+   11 mm on a few vertices of a skull base) and the scalp's small differences everywhere; (3) what
+   betsurf's profiles read on small images (the trial's 124 differing cases); (4) when FSL-50
+   stops the program and when FSL only sets the profile aside (cases 216, 635); also the observed
+   T1-only rule (`OS2 >= IS`) and the two observations of 2026-11-01 to add to §4.1 and §5.2
+   (`docs/parts/2026-11-01-cleanroom-bet-part2b/handoff.md` §7). **For the spec writer (the first of the four above,
+   in detail):** FSL's conversion of a centre between the voxel frames of a neurologically stored
    image (`bet2 -c`, `fslstats -C`: a 4 x 4 inverse whose last bits §8.1 leaves open); random-testing
    cases 677 (`-c`: another first-pass surface) and 622 (`bet -R`: `fslstats -C` prints `-0.000000`,
    and the script's `dc` prints `dc: stack empty` twice; every file FSL's) wait for it. And `bet -S`, `-B`, `-A`, `-A2` once

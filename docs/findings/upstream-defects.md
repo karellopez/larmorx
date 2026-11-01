@@ -317,7 +317,7 @@ to add (since 2026-10-25: "Random testing's gaps", below); – = nothing to do. 
 | FSL-47 † | betsurf `--t1only` | the scalp mask is filled from the outer skull surface's centre, in the padded grid | c | none | corrected by default (`upstream_defects`, 2026-10-24), named when the mask changes | – |
 | FSL-48 † | betsurf | a T2 on another grid than the T1 is sampled at the T1's voxel coordinates | e | none | refused by default (rule B, 2026-10-24) | – |
 | FSL-49 † | betsurf | when the T2's scalp lies beyond the T1's, the T1's estimate is validated and kept (`outskin = outskin`, flagged "very suspicious" in FSL's source) | c (c? until 2026-10-24) | none | kept as FSL's and documented (rule C, 2026-10-24) | – |
-| FSL-50 † | betsurf | one profile with an empty search range ends the program, status 255, no message, no output | c | none | the profile dropped (rule A, 2026-10-24) | – |
+| FSL-50 † | betsurf | one profile with an empty search range ends the program, status 255, no message, no output | c | none | the profile dropped (rule A, 2026-10-24); random testing 2026-10-31 (cases 216 and 635): a profile FSL sets aside without stopping where the clean-room original's `reproduce` stops; when FSL stops and when it only sets the profile aside is a question for the spec writer | – |
 | FSL-51 † | betsurf | profile searches can read past the profile's samples (memory never set) and use it | a | none | the profile dropped; `reproduce` reads "nothing there" and warns | – |
 | FSL-52 † | betsurf | mesh files read without checks: values never set, faces naming missing vertices, an empty mesh | a | none | refused by default, naming the problem; `reproduce` takes 0 for the values FSL never sets and leaves out the faces naming missing vertices, names FSL-52 and writes the outputs (D13's failure case, 2026-10-25); an empty mesh refused in both modes | – |
 | FSL-53 † | betsurf | a matrix with fewer than the 12 numbers used: entries never set | e | none | refused by default (rule B, 2026-10-24); `reproduce` uses 0 and warns | – |
@@ -473,6 +473,11 @@ as well) and the resample-series step made robust to it. No new entry, no **deci
 [next-steps.md](../next-steps.md)).
 **2026-10-31, the user's decision:** GLIBC-06 decided (glibc's bits by default, rule C; the
 correctly rounded `tanh` on request); the gap column has no **decide** left.
+**2026-11-01, BET's clean-room original complete:** `crates/larmorx-fsl` (`bet2` and the `bet`
+script since 2026-10-30, `betsurf` since 2026-10-31) shares the replica's corrections and
+`reproduce` switches of FSL-40 to FSL-58 and FSL-60 to FSL-63 (FSL-49 and FSL-57 kept as FSL's); no
+new entry (`bet2 -c 0 0 0` as "no centre" and `bet -F -d`'s float64 `_tmp` are FSL's normal
+behaviour, now followed).
 
 ## D13 gaps: what the next task switches to "correct by default"
 

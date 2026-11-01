@@ -1,0 +1,213 @@
+{
+ "defect": null,
+ "description": "random testing: exit status, messages before FSL's crash, out.nii.gz",
+ "expect": "pass",
+ "found": {
+  "detail": "exit status: FSL crashed (1), larmorx 0; messages before FSL's crash: stdout FSL 128 characters, larmorx 0: 'bet failed during command:/tmp/lxb2b/tmp/lx-difftest-inputs_syj1gf7r/run/0638443' / ''; out.nii.gz: 34 of 1944 values differ, 0 inside both",
+  "n": 1210,
+  "seed": "20261031",
+  "shrink_moves": [],
+  "signature": [
+   "exit status",
+   "messages before FSL's crash",
+   "out.nii.gz"
+  ]
+ },
+ "id": "original-bet-R-negative-image-bet2-crash",
+ "implementations": [
+  "original"
+ ],
+ "reason": "BET's clean-room original, random testing 2026-10-31 (case 1210): the same -c 0 0 0 path, FSL's second bet2 then crashes and the script reports it; corrected 2026-11-01 (e63df59)",
+ "recipe": {
+  "extra": {
+   "output_type": "NIFTI_GZ",
+   "tool": "bet"
+  },
+  "features": {
+   "-c": true,
+   "-d": false,
+   "-e": false,
+   "-f": false,
+   "-g": false,
+   "-m": false,
+   "-n": false,
+   "-o": true,
+   "-r": true,
+   "-s": false,
+   "-t": false,
+   "-v": false,
+   "-w": false,
+   "FSLOUTPUTTYPE": "NIFTI_GZ",
+   "axis0": 0.75,
+   "axis1": 0.85,
+   "axis2": 1.05,
+   "bias0": 0.0,
+   "bias1": 0.0025,
+   "bias2": 0.0025,
+   "bias3": 0.01,
+   "c0": 0,
+   "c1": 0,
+   "c2": 1,
+   "centre0": 5.0,
+   "centre1": -5.5,
+   "centre2": -5.5,
+   "content": "head",
+   "dtype": "uint8",
+   "extreme": false,
+   "inter": -5.0,
+   "noise": 0.0,
+   "orientation": "axes",
+   "origin0": -41.25,
+   "origin1": -1.5,
+   "origin2": 11.75,
+   "qfac": 1,
+   "qform_code": 1,
+   "r": "30",
+   "range": "plain",
+   "sform": "other",
+   "sform_code": 2,
+   "shape": "18x12x9",
+   "shear0": 0.025,
+   "shear1": -0.05,
+   "shear2": 0.075,
+   "size": 17.0,
+   "slope": 1.5,
+   "spacing0": 1.5,
+   "spacing1": 1.5,
+   "spacing2": 1.2,
+   "suffix": ".nii.gz",
+   "tissues": "epi",
+   "tool": "bet",
+   "units": "unknown",
+   "variation": "-R"
+  },
+  "groups": [
+   {
+    "args": [
+     "{in:input}",
+     "out"
+    ],
+    "name": "input",
+    "optional": false
+   },
+   {
+    "args": [
+     "-R"
+    ],
+    "name": "variation",
+    "optional": false
+   },
+   {
+    "args": [
+     "-r",
+     "30"
+    ],
+    "name": "-r",
+    "optional": true
+   },
+   {
+    "args": [
+     "-c",
+     "0",
+     "0",
+     "1"
+    ],
+    "name": "-c",
+    "optional": true
+   },
+   {
+    "args": [
+     "-o"
+    ],
+    "name": "-o",
+    "optional": true
+   }
+  ],
+  "inputs": {
+   "input": {
+    "content": {
+     "axes": [
+      0.75,
+      0.85,
+      1.05
+     ],
+     "bias": [
+      0.0,
+      0.0025,
+      0.0025,
+      0.01
+     ],
+     "centre": [
+      5.0,
+      -5.5,
+      -5.5
+     ],
+     "noise": 0.0,
+     "seed": 2073291136,
+     "size": 17.0,
+     "tissues": "epi",
+     "type": "head"
+    },
+    "dtype": "uint8",
+    "geometry": {
+     "origin": [
+      -41.25,
+      -1.5,
+      11.75
+     ],
+     "qfac": 1,
+     "qform_code": 1,
+     "quaternion": [
+      0,
+      0,
+      1,
+      0
+     ],
+     "sform": "other",
+     "sform_code": 2,
+     "shear": [
+      0.025,
+      -0.05,
+      0.075
+     ],
+     "spacing": [
+      1.5,
+      1.5,
+      1.2
+     ],
+     "units": "unknown"
+    },
+    "scaling": {
+     "inter": -5.0,
+     "slope": 1.5
+    },
+    "shape": [
+     18,
+     12,
+     9
+    ],
+    "suffix": ".nii.gz",
+    "values": {
+     "offset": 0.0,
+     "scale": 1.0
+    }
+   }
+  },
+  "n": 1210,
+  "options": [
+   "-R",
+   "-c",
+   "-o",
+   "-r",
+   "FSLOUTPUTTYPE=NIFTI_GZ",
+   "bet"
+  ],
+  "seed": "20261031",
+  "tool": "fsl-bet"
+ },
+ "rule": null,
+ "status": "fixed",
+ "suite": "fsl-bet-replica",
+ "tier": "smoke",
+ "tool": "fsl-bet"
+}

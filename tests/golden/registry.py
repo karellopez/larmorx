@@ -954,9 +954,8 @@ def image_math_operations() -> list[str]:
 #: with the tool: the replica's program is not installed where these tests run, so their golden
 #: cases are the replica's own (``crates-nc/larmorx-nc-cli/tests/golden.rs``, run on every
 #: platform by the replicas' jobs). ``replica_only`` checks that each tool has one there.
-REPLICA_ONLY_FUNCTIONS: dict[str, str] = {
-    "lx.fsl.betsurf": "fsl betsurf",
-}
+#: None since 2026-10-31 (betsurf's clean-room original).
+REPLICA_ONLY_FUNCTIONS: dict[str, str] = {}
 
 #: The replicas' golden cases: the AFNI replicas' (built into larmorx since 2026-10-29, cases
 #: in the larmorx command line's tests, run by ``cargo test`` in every platform's test job) and
@@ -3760,8 +3759,7 @@ def _(ctx: Context) -> dict[str, Any]:
 
 @case("py.fsl.read_vtk", covers=("lx.fsl.read_vtk",))
 def _(ctx: Context) -> dict[str, Any]:
-    """A VTK mesh as FSL writes it (fixed notation, 6 decimals), read back. (``lx.fsl.betsurf``
-    runs only the replica: its cases are in ``crates-nc``.)"""
+    """A VTK mesh as FSL writes it (fixed notation, 6 decimals), read back."""
     v = ints(71, (40, 3), -90000, 90000) / 1000
     t = ints(72, (60, 3), 0, 40)
     lines = ["# vtk DataFile Version 3.0", "surface file", "ASCII", "DATASET POLYDATA"]
@@ -3820,6 +3818,21 @@ def _(ctx: Context) -> dict[str, Any]:
     return {**_bet_files(out, ("", "_mask")), "ct": Nifti(f"{ct}.nii.gz"), "ct_mask": Nifti(f"{ct}_mask.nii.gz")}  # fmt: skip
 
 
+@case("cli.fsl.bet2.tanh")
+def _(ctx: Context) -> dict[str, Any]:
+    """bet2 with larmorx's own ``--tanh=correctly-rounded`` (the surface's smoothness weight with
+    CORE-MATH's correctly rounded ``tanh`` instead of glibc's bits; GLIBC-06, the user's
+    decision of 2026-10-31), and ``bet`` passing ``--tanh correctly-rounded`` on."""
+    out, b = ctx.out("out"), ctx.out("b")
+    _fsl(ctx, "bet2", ctx.file("anat.nii"), out, "--tanh=correctly-rounded", "-m", "-e")
+    _fsl(ctx, "bet", ctx.file("anat.nii"), b, "--tanh", "correctly-rounded", "-m")
+    return {
+        "mask": Nifti(f"{out}_mask.nii.gz"),
+        "mesh": File(f"{out}_mesh.vtk"),
+        "bet_mask": Nifti(f"{b}_mask.nii.gz"),
+    }
+
+
 @case("cli.fsl.bet2.reproduce")
 def _(ctx: Context) -> dict[str, Any]:
     """bet2 with FSL's defects reproduced: a single slice, whose mask's fill starts outside the
@@ -3872,6 +3885,71 @@ def _(ctx: Context) -> dict[str, Any]:
         "small_fov_reproduce": Nifti(f"{zr}_mask.nii.gz"),
         "files": files_under(str(ctx.dir)),
     }
+
+
+#: A matrix to MNI152 for betsurf's golden cases (it only decides which profiles cross the eyes).
+_BETSURF_MATRIX = "1 0 0 -8\n0 1 0 4\n0 0 1 -12\n0 0 0 1\n"
+
+
+def _brain_mesh(ctx: Context) -> str:
+    """bet2's mesh of ``anat.nii`` (the clean-room original), betsurf's brain surface."""
+    out = ctx.out("brain")
+    _fsl(ctx, "bet2", ctx.file("anat.nii"), out, "-e", "-n")
+    return f"{out}_mesh.vtk"
+
+
+def _betsurf_files(out: str, names: tuple[str, ...]) -> dict[str, Any]:
+    files: dict[str, Any] = {f"{n}.vtk": File(f"{out}_{n}_mesh.vtk") for n in ("inskull", "outskull", "outskin")}  # fmt: skip
+    files.update({n: Nifti(f"{out}_{n}.nii.gz") for n in names})
+    return files
+
+
+@case("cli.fsl.betsurf", covers=("cli:fsl betsurf",))
+def _(ctx: Context) -> dict[str, Any]:
+    """``larmorx fsl betsurf`` (the clean-room original, ``specs/bet.md`` §6) with a T2 on the
+    T1's grid: the three surfaces, their outlines and masks and the skull mask, verbose."""
+    mat = ctx.out("t1_to_std.mat")
+    Path(mat).write_text(_BETSURF_MATRIX, encoding="utf-8")
+    out = ctx.out("out")
+    stdout = _fsl(ctx, "betsurf", "-v", "-o", "-m", "-s", ctx.file("anat.nii"), ctx.file("anat2.nii"), _brain_mesh(ctx), mat, out)  # fmt: skip
+    names = ("inskull_mesh", "outskull_mesh", "outskin_mesh", "inskull_mask", "outskull_mask", "outskin_mask", "skull_mask")  # fmt: skip
+    return {**_betsurf_files(out, names), "stdout": stdout}
+
+
+@case("cli.fsl.betsurf.t1only")
+def _(ctx: Context) -> dict[str, Any]:
+    """betsurf from the T1 alone (``--t1only``), its surfaces retessellated once (``-p 1``),
+    with the masks; and with FSL's defects reproduced (the scalp mask filled from the outer
+    skull's centre in the padded grid: FSL-47)."""
+    mat = ctx.out("t1_to_std.mat")
+    Path(mat).write_text(_BETSURF_MATRIX, encoding="utf-8")
+    mesh = _brain_mesh(ctx)
+    out, rep = ctx.out("out"), ctx.out("rep")
+    _fsl(ctx, "betsurf", "--t1only", "-m", "-s", "-p", "1", ctx.file("anat.nii"), mesh, mat, out)  # fmt: skip
+    _fsl(ctx, "betsurf", "-1", "-m", ctx.file("anat.nii"), mesh, mat, rep, upstream_defects=REPRODUCE)  # fmt: skip
+    return {
+        **_betsurf_files(out, ("inskull_mask", "outskull_mask", "outskin_mask", "skull_mask")),
+        "reproduce_outskin_mask": Nifti(f"{rep}_outskin_mask.nii.gz"),
+    }
+
+
+@case("py.fsl.betsurf", covers=("lx.fsl.betsurf",))
+def _(ctx: Context) -> dict[str, Any]:
+    """``lx.fsl.betsurf`` with the clean-room original on in-memory images and bet's mesh: the
+    surfaces, masks, skull mask and outlines."""
+    brain = lx.fsl.bet(anat(), mesh=True, brain=False, implementation="original")
+    assert brain.mesh is not None
+    m = np.array([[1.0, 0, 0, -8], [0, 1, 0, 4], [0, 0, 1, -12], [0, 0, 0, 1]])
+    s = lx.fsl.betsurf(anat(), brain.mesh, m, t2=anat2(), skull_mask=True, outlines=True, implementation="original")  # fmt: skip
+    out: dict[str, Any] = {}
+    for name in ("inskull", "outskull", "outskin"):
+        surface = getattr(s, name)
+        out[f"{name}.vertices"] = surface.vertices
+        out[f"{name}.triangles"] = surface.triangles
+        out[f"{name}.mask"] = getattr(s, f"{name}_mask").data
+        out[f"{name}.outline"] = getattr(s, f"{name}_outline").data
+    out["skull_mask"] = s.skull_mask.data
+    return out
 
 
 @case("py.fsl.bet", covers=("lx.fsl.bet",))

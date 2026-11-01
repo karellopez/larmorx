@@ -21,6 +21,7 @@ const fn flag(short: char, long: &'static str) -> Spec {
         long: Some(long),
         values: 0,
         numeric: false,
+        integer: false,
     }
 }
 
@@ -30,6 +31,7 @@ const fn number(short: Option<char>, long: Option<&'static str>, values: usize) 
         long,
         values,
         numeric: true,
+        integer: false,
     }
 }
 
@@ -51,8 +53,9 @@ const VERBOSE: usize = 13;
 const HELP: usize = 14;
 const D1: usize = 15;
 const D2: usize = 16;
+const TANH: usize = 17;
 
-const SPECS: [Spec; 17] = [
+const SPECS: [Spec; 18] = [
     flag('o', "outline"),
     flag('m', "mask"),
     flag('s', "skull"),
@@ -68,18 +71,28 @@ const SPECS: [Spec; 17] = [
         long: Some("ct"),
         values: 0,
         numeric: false,
+        integer: false,
     },
     Spec {
         short: None,
         long: Some("binaryMask"),
         values: 1,
         numeric: false,
+        integer: false,
     },
     flag('e', "mesh"),
     flag('v', "verbose"),
     flag('h', "help"),
     number(None, Some("parameter_d1"), 1),
     number(None, Some("parameter_d2"), 1),
+    // larmorx's own (GLIBC-06, the user's decision of 2026-10-31): --tanh=correctly-rounded
+    Spec {
+        short: None,
+        long: Some("tanh"),
+        values: 1,
+        numeric: false,
+        integer: false,
+    },
 ];
 
 /// FSL's image layer's message when `FSLOUTPUTTYPE` is not set (§3.1), printed when the first
@@ -109,6 +122,8 @@ pub struct Options {
     pub verbose: bool,
     pub d1: f64,
     pub d2: f64,
+    /// The smoothness weight's `tanh` (larmorx's `--tanh`, GLIBC-06).
+    pub tanh: bet::surface::Tanh,
 }
 
 /// What [`parse`] decided: run, or stop with an exit status (its messages written).
@@ -138,12 +153,28 @@ pub fn parse(args: &[String], err: &mut dyn Write) -> Parsed {
         );
         return Parsed::Exit(255);
     }
-    let (given, _) = match options::parse(&args[2..], &SPECS, false) {
+    // larmorx's own `--tanh <value>` is also taken in two words (FSL's long options take
+    // `--name=value`)
+    let words = join_tanh(&args[2..]);
+    let (given, _) = match options::parse(&words, &SPECS, false) {
         Ok(g) => g,
         Err(e) => {
             let _ = write!(err, "{USAGE}\n{}\n", e.0);
             return Parsed::Exit(1);
         }
+    };
+    let tanh = match &given[TANH] {
+        Some(Given::Text(t)) => match bet::surface::Tanh::parse(t) {
+            Some(v) => v,
+            None => {
+                let _ = writeln!(
+                    err,
+                    "larmorx fsl bet2: --tanh is glibc (the default, FSL's bits) or correctly-rounded, not {t:?} (larmorx)"
+                );
+                return Parsed::Exit(1);
+            }
+        },
+        _ => bet::surface::Tanh::Glibc,
     };
     let flag = |k: usize| given[k].is_some();
     let num = |k: usize, default: f64| match &given[k] {
@@ -161,8 +192,10 @@ pub fn parse(args: &[String], err: &mut dyn Write) -> Parsed {
         gradient: num(GRAD, 0.0),
         radius: num(RADIUS, 0.0),
         smoothness: num(SMOOTH, 1.0),
+        // observed (FSL 6.0.7.23, black box, random testing 2026-10-31 case 1608): `-c 0 0 0` is
+        // bet2's "not given", the centre of gravity (`bet -R` passes it when the brain is empty)
         centre: match &given[CENTRE] {
-            Some(Given::Numbers(v)) => Some([v[0], v[1], v[2]]),
+            Some(Given::Numbers(v)) if v[..3].iter().any(|&x| x != 0.0) => Some([v[0], v[1], v[2]]),
             _ => None,
         },
         threshold: flag(THRESHOLD),
@@ -175,6 +208,7 @@ pub fn parse(args: &[String], err: &mut dyn Write) -> Parsed {
         verbose: flag(VERBOSE),
         d1: num(D1, 7.0),
         d2: num(D2, 3.0),
+        tanh,
     };
     if o.frac < 0.0 || o.frac > 1.0 {
         let _ = write!(
@@ -201,7 +235,7 @@ fn refuse(err: &mut dyn Write, notices: &[Notice], message: &str) -> u8 {
     1
 }
 
-fn print_notices(err: &mut dyn Write, notices: &[Notice]) {
+pub(crate) fn print_notices(err: &mut dyn Write, notices: &[Notice]) {
     for n in notices {
         let _ = writeln!(err, "larmorx: {}", n.line());
     }
@@ -254,67 +288,34 @@ pub fn fsl_name(name: &str) -> Option<String> {
     }
 }
 
-/// GLIBC-06 (`specs/bet.md` §8.1): the surface found again with the other `tanh` (glibc's or
-/// the correctly rounded one), `None` when it is the same, bit for bit.
-fn other_surface(
-    found: &Found,
-    vol: &bet::Vol,
-    radius: Option<f64>,
-    centre: Option<[f64; 3]>,
-    defo: &Deformation,
-    n_threads: usize,
-) -> Option<Found> {
-    use bet::surface::Tanh;
-    let other_opts = Deformation {
-        tanh: match defo.tanh {
-            Tanh::Glibc => Tanh::CorrectlyRounded,
-            Tanh::CorrectlyRounded => Tanh::Glibc,
-        },
-        ..*defo
-    };
-    let other = bet::find_surface(vol, radius, centre, &other_opts, n_threads);
-    let same = other.passes == found.passes
-        && found
-            .points
-            .iter()
-            .zip(&other.points)
-            .all(|(p, q)| (0..3).all(|k| p[k].to_bits() == q[k].to_bits()));
-    (!same).then_some(other)
-}
-
-/// GLIBC-06's notice, when an output asked for differs between the two surfaces: which ones
-/// and by how much (`changed`, already measured), with the vertices' largest distance.
-fn glibc06(found: &Found, other: &Found, changed: &[String], mode: UpstreamDefects) -> Notice {
-    let far = found
-        .points
-        .iter()
-        .zip(&other.points)
-        .map(|(a, b)| mesh::dist(*a, *b))
-        .fold(0.0f64, f64::max);
-    let effect = format!(
-        "{} (the surface: {} pass(es) against {}, vertices up to {far:.4} mm apart)",
-        changed.join(", "),
-        found.passes.len(),
-        other.passes.len()
-    );
-    let detail = match mode {
-        UpstreamDefects::Fix => format!(
-            "the surface's smoothness weight uses the correctly rounded tanh; with glibc 2.35's, which FSL calls, these outputs would differ: {effect}"
-        ),
-        UpstreamDefects::Reproduce => format!(
-            "the surface's smoothness weight uses glibc 2.35's tanh, as FSL; with the correctly rounded one these outputs would differ: {effect}"
-        ),
-    };
-    Notice::new(&defects::GLIBC_06, mode, detail)
-}
-
-/// How many values differ between two images of the same grid.
-fn differing<T: PartialEq>(a: &[T], b: &[T]) -> usize {
-    a.iter().zip(b).filter(|(x, y)| x != y).count()
+/// The words with larmorx's `--tanh <value>` joined into `--tanh=<value>`.
+pub(crate) fn join_tanh(words: &[String]) -> Vec<String> {
+    let mut out = Vec::with_capacity(words.len());
+    let mut i = 0;
+    while i < words.len() {
+        if words[i] == "--tanh" && i + 1 < words.len() {
+            out.push(format!("--tanh={}", words[i + 1]));
+            i += 2;
+        } else {
+            out.push(words[i].clone());
+            i += 1;
+        }
+    }
+    out
 }
 
 /// The image layer's messages for an input that cannot be read, and larmorx's line.
 fn read_failure(err: &mut dyn Write, name: &str, e: &ImageError) -> u8 {
+    read_failure_of("bet2", err, name, e)
+}
+
+/// [`read_failure`] for `program`'s line.
+pub(crate) fn read_failure_of(
+    program: &str,
+    err: &mut dyn Write,
+    name: &str,
+    e: &ImageError,
+) -> u8 {
     let text = e.to_string();
     let missing = text.starts_with("No image files match") || text.contains("No such file");
     if missing || text.starts_with("Multiple possible") {
@@ -330,16 +331,16 @@ fn read_failure(err: &mut dyn Write, name: &str, e: &ImageError) -> u8 {
         let _ = writeln!(err, "Error : {what}");
         let _ = writeln!(
             err,
-            "larmorx fsl bet2: {name} cannot be read; FSL aborts here (larmorx)"
+            "larmorx fsl {program}: {name} cannot be read; FSL aborts here (larmorx)"
         );
     } else {
-        let _ = writeln!(err, "larmorx fsl bet2: {name}: {text} (larmorx)");
+        let _ = writeln!(err, "larmorx fsl {program}: {name}: {text} (larmorx)");
     }
     1
 }
 
 /// Reads the image FSL's layer opens for `name` (completed when it has no extension).
-fn read_image(
+pub(crate) fn read_image(
     settings: &Settings,
     name: &str,
     mode: UpstreamDefects,
@@ -492,12 +493,10 @@ pub fn run(
         d1: o.d1,
         d2: o.d2,
         exact: o.mesh,
-        // GLIBC-06: glibc's (FSL's) bits in both modes for now. `Tanh::CorrectlyRounded` in the
-        // default is ready (the notice below names every output it changes) and waits for the
-        // decision of BET's part 2b: where it changes the mask it is not more accurate (the
-        // reruns amplify any last bit), and its exact notice needs a second surface search in
-        // practically every run (about 1.9 times the default's time, measured; findings)
-        tanh: bet::surface::Tanh::Glibc,
+        // GLIBC-06 (the user's decision, 2026-10-31): glibc's bits (FSL's) by default in both
+        // modes, the correctly rounded tanh with `--tanh=correctly-rounded` (asked for, so no
+        // notice)
+        tanh: o.tanh,
     };
     // the image the surface is found on: the mask (--binaryMask) or the input
     let surface_source = o.binary_mask.as_deref();
@@ -542,20 +541,6 @@ pub fn run(
         &defo,
         n_threads,
     );
-    // GLIBC-06: the surface the other tanh gives, where some smoothness weight differs (else
-    // it is this one, bit for bit); compared output by output below
-    let other_surface = if found.tanh_differs {
-        other_surface(
-            &found,
-            work_owned.as_ref().unwrap_or(&source.vol),
-            radius,
-            centre_mm,
-            &defo,
-            n_threads,
-        )
-    } else {
-        None
-    };
     if found.init.one_d {
         let _ = writeln!(err, "Warning: Image appears to be 1D");
     }
@@ -662,73 +647,6 @@ pub fn run(
                     "the surface diverged (its centroid is not a number), on which FSL crashes (FSL-43)",
                 );
             }
-        }
-    }
-    // GLIBC-06: the outputs asked for, made from the other surface too, compared
-    if let Some(other) = &other_surface {
-        let mut changed: Vec<String> = Vec::new();
-        if o.verbose {
-            let (mut a, mut b) = (Vec::new(), Vec::new());
-            verbose(&mut a, &found);
-            verbose(&mut b, other);
-            if a != b {
-                changed.push("the verbose lines".into());
-            }
-        }
-        if o.brain || o.mask {
-            let om = bet::pooled(n_threads, || {
-                bet::brain_mask(
-                    &other.mesh,
-                    &other.points,
-                    shape,
-                    voxel,
-                    mode,
-                    &mut Vec::new(),
-                )
-            });
-            if let (Ok(mut om), Some(m)) = (om, mask.as_deref()) {
-                if o.threshold {
-                    for (mv, &v) in om.iter_mut().zip(&input_vol_work.data) {
-                        if f64::from(v) < t {
-                            *mv = 0;
-                        }
-                    }
-                }
-                let k = differing(m, &om);
-                if k > 0 {
-                    changed.push(format!("{k} of {} brain-mask voxels", m.len()));
-                }
-            }
-        }
-        if o.outline {
-            let (a, b) = bet::pooled(n_threads, || {
-                (
-                    bet::outline(&found.mesh, &found.points, input_vol_work),
-                    bet::outline(&other.mesh, &other.points, input_vol_work),
-                )
-            });
-            let k = differing(&a, &b);
-            if k > 0 {
-                changed.push(format!("{k} outline voxels"));
-            }
-        }
-        if o.skull {
-            let (a, b) = bet::pooled(n_threads, || {
-                (
-                    bet::skull::skull(&found.mesh, &found.points, input_vol_work, t, t2, t98),
-                    bet::skull::skull(&other.mesh, &other.points, input_vol_work, t, t2, t98),
-                )
-            });
-            let k = differing(&a, &b);
-            if k > 0 {
-                changed.push(format!("{k} skull voxels"));
-            }
-        }
-        if o.mesh && vtk_text(&found.mesh, &found.points) != vtk_text(&other.mesh, &other.points) {
-            changed.push("the mesh file".into());
-        }
-        if !changed.is_empty() {
-            notices.push(glibc06(&found, other, &changed, mode));
         }
     }
     let ext = settings
@@ -900,4 +818,30 @@ fn vtk_text(m: &mesh::Mesh, points: &[mesh::V3]) -> String {
         s.push_str(&format!("3 {} {} {} \n", t[0], t[1], t[2]));
     }
     s
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn centre(words: &[&str]) -> Option<[f64; 3]> {
+        let args: Vec<String> = ["in", "out"]
+            .iter()
+            .chain(words)
+            .map(|s| s.to_string())
+            .collect();
+        match parse(&args, &mut Vec::new()) {
+            Parsed::Run(o) => o.centre,
+            Parsed::Exit(s) => panic!("exit {s}"),
+        }
+    }
+
+    #[test]
+    fn a_centre_of_zeros_is_not_given() {
+        // observed: FSL's bet2 takes `-c 0 0 0` as no centre (the centre of gravity)
+        assert_eq!(centre(&["-c", "0", "0", "0"]), None);
+        assert_eq!(centre(&["-c", "-0.000000", "0", "0"]), None);
+        assert_eq!(centre(&[]), None);
+        assert_eq!(centre(&["-c", "0", "0", "1"]), Some([0.0, 0.0, 1.0]));
+    }
 }

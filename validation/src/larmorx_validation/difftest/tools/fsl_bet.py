@@ -1,7 +1,7 @@
 # SPDX-License-Identifier: Apache-2.0
 """BET (``bet2``, ``bet``, ``betsurf``), the ``larmorx-nc`` replica and the clean-room original
-(``crates/larmorx-fsl``, since 2026-10-30; betsurf's original is still to be written, its draws
-are skipped for it) against FSL (6.0.7.23, or 6.0.7.17 with ``--fsl-version``; FSL's own step
+(``crates/larmorx-fsl``, since 2026-10-30; betsurf's since 2026-10-31) against FSL (6.0.7.23, or
+6.0.7.17 with ``--fsl-version``; FSL's own step
 between them is the records', not run here): random heads and options through BET's own parity
 runner (``larmorx_validation.parity.fsl_bet``): exit status, both streams, every file written
 (images decompressed), the D13 fix pass. The replica must be bit-identical; the original is held
@@ -292,12 +292,9 @@ def case(
 def _run(impl: str):
     from larmorx_validation.parity import fsl_bet as fb
     from larmorx_validation.parity import fsl_versions
-    from larmorx_validation.parity.harness import Outcome
 
     def run(case, checks) -> None:
         fb.IMPLEMENTATION["name"] = impl
-        if impl == "original" and case.payload.tool == "betsurf":
-            raise Outcome("skipped", "betsurf's clean-room original is still to be written")
         with fsl_versions.without_step():
             fb.run_case(case, checks)
 

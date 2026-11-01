@@ -134,8 +134,8 @@ pub const REPLICAS: &[Replica] = &[
         location: Location::Program(&LARMORX_NC),
         original: true,
     },
-    // FSL's BET: the clean-room originals of bet and bet2 are `larmorx_fsl::cli` (written from
-    // specs/bet.md); betsurf's is still to be written.
+    // FSL's BET: the clean-room originals of bet, bet2 and betsurf are `larmorx_fsl::cli`
+    // (written from specs/bet.md).
     Replica {
         family: "fsl",
         tool: "bet",
@@ -152,7 +152,7 @@ pub const REPLICAS: &[Replica] = &[
         family: "fsl",
         tool: "betsurf",
         location: Location::Program(&LARMORX_NC),
-        original: false,
+        original: true,
     },
 ];
 
@@ -591,8 +591,8 @@ mod tests {
         );
         let e = choose_with(Implementation::Original, &BUILTIN_ONLY, never).unwrap_err();
         assert!(e.to_string().contains("built in"), "{e}");
-        // The AFNI tools have their originals and their replicas built in. FSL's betsurf has
-        // only its replica so far; bet and bet2 have their clean-room originals.
+        // The AFNI tools have their originals and their replicas built in. FSL's bet, bet2 and
+        // betsurf have their clean-room originals (since 2026-10-31 betsurf's too).
         assert!(
             REPLICAS
                 .iter()
@@ -601,11 +601,13 @@ mod tests {
         );
         assert_eq!(replica_only("afni").count(), 0);
         assert_eq!(replica_only("ants").count(), 0);
-        assert_eq!(replica_only("fsl").collect::<Vec<_>>(), ["betsurf"]);
+        assert_eq!(replica_only("fsl").count(), 0);
         let betsurf = lookup("fsl", "betsurf").unwrap();
         assert_eq!(betsurf.package().unwrap().env, "LARMORX_NC_BIN");
-        let e = choose_with(Implementation::Auto, betsurf, missing).unwrap_err();
-        assert!(e.to_string().contains("pip install larmorx-nc"), "{e}");
+        assert_eq!(
+            choose_with(Implementation::Auto, betsurf, missing),
+            Ok(Choice::Original)
+        );
         let bet = lookup("fsl", "bet").unwrap();
         assert_eq!(
             choose_with(Implementation::Auto, bet, missing),

@@ -841,3 +841,43 @@ signature = ["files written"]
 status = "fixed"
 explanation = "BET's clean-room original (part 1, 2026-10-30): the trial oracles/difftest/2026-10-30-cleanroom-bet (239 differences, 164 agreeing again with the final build; the 75 left: messages 29, meshes 15, brains and masks 25, outlines 5, a header 1): files written where FSL crashes or the -e test differs; reproducers with difftest --case fsl-bet:20261030:<n> (validation/investigations/cleanroom-bet/retrial.py); explained on 2026-10-30 by the spec writer for 59 of the 75 (the original's arithmetic choices, specs/bet.md 8.1, and the skull search, 4.7: validation/investigations/bet-spec-answers/README.md); still open for part 2: cases 45, 121, 154, 213, 262, 541, 677 (surfaces), 106 and 482 (zstd files) Part 2a (2026-10-30): corrected in the original (the quaternion's precision path, specs/bet.md 8.2; the skull search, 4.7; the deformation's arithmetic, 8.1): none of the 75 left with this difference (237 of the 239 agree; oracles/logs/retrial-cleanroom-bet-2a-2026-10-30-b.log)."
 link = "docs/findings/fsl-bet-original.md"
+
+[[difference]]
+tool = "fsl-bet"
+implementation = "original"
+signature = ["exit status", "messages before FSL's crash", "out.hdr", "out.nii.gz", "out_mask.hdr", "out_skull.nii.gz", "out_tmp.nii.gz"]
+status = "fixed"
+explanation = "BET's clean-room original, random testing 2026-10-31 (oracles/difftest/2026-10-31-cleanroom-betsurf, seed 20261031, 1,846 cases): bet -R and bet2 through -c 0 0 0, which FSL reads as no centre given (cases 1608, 1210, 1740), and bet -F -d's float64 <out>_tmp (1053); corrected 2026-11-01 (e63df59), the four agreeing again (oracles/logs/retrial-cleanroom-bet-2b-2026-11-01.log); permanent cases original-bet-R-negative-image-no-centre, original-bet-R-negative-image-bet2-crash, original-bet-R-centre-zero, original-bet-F-d-float64-tmp"
+link = "validation/difftest/cases/fsl-bet/original-bet-R-centre-zero.json"
+
+[[difference]]
+tool = "fsl-bet"
+implementation = "original"
+signature = ["messages: FSL's, byte for byte", "out.nii", "out.nii.gz", "out_mask.nii", "out_mask.nii.gz", "out_mesh.vtk", "out_overlay.nii", "out_overlay.nii.gz", "out_skull.hdr", "out_skull.hdr.bzN", "out_skull.nii", "out_skull.nii.gz"]
+status = "open"
+explanation = "BET's clean-room original, random testing 2026-10-31: bet (30, 37, 196, 280, 350, 366, 383, 735, 899, 965, 1011, 1044, 1457, 1708, 1822) and bet2 (1108, 1676) on neurologically stored images: a centre converted between the voxel frames through FSL's 4 x 4 inverse, whose last bits specs/bet.md 8.1 leaves open (with 622 and 677 of 2026-10-30; 1457 stored the other way along x gives FSL's result exactly; 965's second pass starts from FSL's printed centre -0.000001 0 0 where the original's is exactly 0); a question for the spec writer; reproducers: validation/investigations/cleanroom-bet/night_case.py 20261031 <n> <dir>"
+link = "docs/findings/fsl-bet-original.md"
+
+[[difference]]
+tool = "fsl-bet"
+implementation = "original"
+signature = ["messages: FSL's, byte for byte", "out_inskull_mask.hdr.gz", "out_inskull_mask.nii.gz", "out_inskull_mesh.nii.gz", "out_inskull_mesh.vtk", "out_outskin_mask.hdr", "out_outskin_mask.hdr.bzN", "out_outskin_mask.hdr.gz", "out_outskin_mask.nii", "out_outskin_mask.nii.gz", "out_outskin_mesh.hdr", "out_outskin_mesh.hdr.bzN", "out_outskin_mesh.nii", "out_outskin_mesh.nii.gz", "out_outskin_mesh.nii.zst", "out_outskull_mask.nii.gz", "out_outskull_mesh.nii", "out_outskull_mesh.nii.gz", "out_skull_mask.hdr", "out_skull_mask.hdr.gz", "out_skull_mask.nii", "out_skull_mask.nii.gz"]
+status = "open"
+explanation = "BET's clean-room original, random testing 2026-10-31: betsurf on small synthetic images (124 cases: masks only in 102, the share of profiles set aside in 12, the vertex count with -p in 10): what a profile reads where it leaves the image (specs/bet.md 6.4) is open; the original reads 0 per corner outside [0, n), three alternatives tried give none of FSL's shares on case 36; a question for the spec writer; the case list in docs/parts/2026-11-01-cleanroom-bet-part2b/handoff.md section 4"
+link = "docs/findings/fsl-bet-original.md"
+
+[[difference]]
+tool = "fsl-bet"
+implementation = "original"
+signature = ["DN fix pass", "exit status", "files written"]
+status = "open"
+explanation = "BET's clean-room original, random testing 2026-10-31 (cases 216, 635): FSL-50's trigger: FSL sets the profile aside without stopping where the original's reproduce stops; when FSL stops and when it only sets the profile aside is a question for the spec writer"
+link = "docs/findings/fsl-bet-original.md"
+
+[[difference]]
+tool = "fsl-bet"
+implementation = "original"
+signature = ["undefined: FSL-51"]
+status = "register"
+explanation = "BET's clean-room original, random testing 2026-10-31 (cases 20, 124, 425, 610, 816, 1233): FSL-51 (betsurf searches past a profile's samples: undefined), as registered"
+link = "docs/findings/upstream-defects.md"

@@ -1,0 +1,212 @@
+{
+ "defect": null,
+ "description": "random testing: out_tmp.nii.gz",
+ "expect": "pass",
+ "found": {
+  "detail": "out_tmp.nii.gz: FSL (25, 20, 9) float64, larmorx (25, 20, 9) float32",
+  "n": 1053,
+  "seed": "20261031",
+  "shrink_moves": [],
+  "signature": [
+   "out_tmp.nii.gz"
+  ]
+ },
+ "id": "original-bet-F-d-float64-tmp",
+ "implementations": [
+  "original"
+ ],
+ "reason": "BET's clean-room original, random testing 2026-10-31 (case 1053): bet -F -d on a float64 series keeps the first volume <out>_tmp as float64 with the double values, as FSL; corrected 2026-11-01 (e63df59)",
+ "recipe": {
+  "extra": {
+   "output_type": "NIFTI_GZ",
+   "tool": "bet"
+  },
+  "features": {
+   "-c": false,
+   "-d": true,
+   "-e": false,
+   "-f": false,
+   "-g": true,
+   "-m": true,
+   "-n": false,
+   "-o": true,
+   "-r": false,
+   "-s": false,
+   "-t": false,
+   "-v": false,
+   "-w": false,
+   "FSLOUTPUTTYPE": "NIFTI_GZ",
+   "axis0": 0.9,
+   "axis1": 1.05,
+   "axis2": 1.2,
+   "bias0": -0.01,
+   "bias1": 0.0025,
+   "bias2": 0.0075,
+   "bias3": -0.0075,
+   "centre0": 3.0,
+   "centre1": 5.0,
+   "centre2": -1.5,
+   "content": "head",
+   "dtype": "float64",
+   "extreme": false,
+   "g": "0",
+   "noise": 3.0,
+   "orientation": "axes",
+   "origin0": -50.0,
+   "origin1": 3.25,
+   "origin2": 18.75,
+   "qfac": 1,
+   "qform_code": 1,
+   "range": "plain",
+   "sform": "same",
+   "sform_code": 1,
+   "shape": "25x20x9x5",
+   "size": 27.0,
+   "slice_code": 2,
+   "spacing0": 0.8,
+   "spacing1": 3.0,
+   "spacing2": 4.0,
+   "suffix": ".nii",
+   "tissues": "t1",
+   "tool": "bet",
+   "tr": 2.5,
+   "tunits": "unknown",
+   "units": "mm",
+   "variation": "-F"
+  },
+  "groups": [
+   {
+    "args": [
+     "{in:input}",
+     "out"
+    ],
+    "name": "input",
+    "optional": false
+   },
+   {
+    "args": [
+     "-F"
+    ],
+    "name": "variation",
+    "optional": false
+   },
+   {
+    "args": [
+     "-g",
+     "0"
+    ],
+    "name": "-g",
+    "optional": true
+   },
+   {
+    "args": [
+     "-m"
+    ],
+    "name": "-m",
+    "optional": true
+   },
+   {
+    "args": [
+     "-o"
+    ],
+    "name": "-o",
+    "optional": true
+   },
+   {
+    "args": [
+     "-d"
+    ],
+    "name": "-d",
+    "optional": true
+   }
+  ],
+  "inputs": {
+   "input": {
+    "content": {
+     "axes": [
+      0.9,
+      1.05,
+      1.2
+     ],
+     "bias": [
+      -0.01,
+      0.0025,
+      0.0075,
+      -0.0075
+     ],
+     "centre": [
+      3.0,
+      5.0,
+      -1.5
+     ],
+     "noise": 3.0,
+     "seed": 1536250964,
+     "size": 27.0,
+     "tissues": "t1",
+     "type": "head"
+    },
+    "dtype": "float64",
+    "geometry": {
+     "origin": [
+      -50.0,
+      3.25,
+      18.75
+     ],
+     "qfac": 1,
+     "qform_code": 1,
+     "quaternion": [
+      1,
+      1,
+      -1,
+      1
+     ],
+     "sform": "same",
+     "sform_code": 1,
+     "spacing": [
+      0.8,
+      0.8,
+      0.8
+     ],
+     "units": "mm"
+    },
+    "scaling": null,
+    "shape": [
+     25,
+     20,
+     9,
+     5
+    ],
+    "suffix": ".nii",
+    "timing": {
+     "slice_code": 2,
+     "slice_duration": 0.2778,
+     "slice_end": 8,
+     "slice_start": 0,
+     "tr": 2.5,
+     "tunits": "unknown"
+    },
+    "values": {
+     "offset": 0.0,
+     "scale": 1.0
+    }
+   }
+  },
+  "n": 1053,
+  "options": [
+   "-F",
+   "-d",
+   "-g",
+   "-m",
+   "-o",
+   "FSLOUTPUTTYPE=NIFTI_GZ",
+   "bet"
+  ],
+  "seed": "20261031",
+  "tool": "fsl-bet"
+ },
+ "rule": null,
+ "status": "fixed",
+ "suite": "fsl-bet-replica",
+ "tier": "smoke",
+ "tool": "fsl-bet"
+}

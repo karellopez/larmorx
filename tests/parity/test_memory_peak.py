@@ -235,10 +235,10 @@ def test_larmorx_needs_no_more_memory_than_fsl(tmp_path, tool, args):
             assert _contents(f_dir) == _contents(r_dir), f"{tool} {args}"
 
 
-#: BET's clean-room original (``crates/larmorx-fsl``, 2026-10-30) on the same calls but
-#: betsurf's (its original is still to be written): the original's outputs are FSL's within
-#: the thresholds of its record (``docs/validation/fsl-bet.md``), its memory similar to FSL's.
-ORIGINAL_BET_CASES = [c for c in BET_CASES if c[0] != "betsurf"]
+#: BET's clean-room original (``crates/larmorx-fsl``, 2026-10-30; betsurf's since 2026-10-31)
+#: on the same calls: the original's outputs are FSL's within the thresholds of its record
+#: (``docs/validation/fsl-bet.md``), its memory similar to FSL's.
+ORIGINAL_BET_CASES = list(BET_CASES)
 
 
 @pytest.mark.parametrize(("tool", "args"), ORIGINAL_BET_CASES)

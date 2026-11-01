@@ -11,7 +11,9 @@ values (masks by Dice and the boundary distance), meshes by the per-vertex dista
 from __future__ import annotations
 
 import gzip
+import os
 import shutil
+import subprocess
 import sys
 from pathlib import Path
 
@@ -69,9 +71,22 @@ def boundary_distance(a: np.ndarray, b: np.ndarray) -> tuple[float, float]:
 
 def compare(d: Path, program: str, args: list[str]) -> dict:
     fd, ld = d / "fsl", d / "lx"
-    for x in (fd, ld):
+    # COMPARE_REUSE=1: FSL's run of an earlier call kept (its streams in fsl.out / fsl.err)
+    reuse = os.environ.get("COMPARE_REUSE") == "1" and (d / "fsl.out").is_file()
+    for x in (fd, ld) if not reuse else (ld,):
         shutil.rmtree(x, ignore_errors=True)
-    f = fslrun.run(program, args, fd)
+    if reuse:
+        f = subprocess.CompletedProcess(
+            args,
+            int((d / "fsl.code").read_text()),
+            (d / "fsl.out").read_text(),
+            (d / "fsl.err").read_text(),
+        )
+    else:
+        f = fslrun.run(program, args, fd)
+        (d / "fsl.out").write_text(f.stdout)
+        (d / "fsl.err").write_text(f.stderr)
+        (d / "fsl.code").write_text(str(f.returncode))
     lx = fslrun.run(program, args, ld, larmorx=True)
     out = {
         "exit": (f.returncode, lx.returncode),

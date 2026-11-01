@@ -17,7 +17,10 @@ cases:
 - **schedule**: written schedules that use every command and option of FLIRT's schedule
   language, and its errors;
 - **edge**: the command line's errors and messages, missing files, verbose output;
-- **convert_xfm**: every option and failure.
+- **convert_xfm**: every option and failure;
+- **programs**: FLIRT's other programs (part 2: avscale, the coordinate programs, rmsdiff,
+  makerot; part 3: midtrans, pointflirt, applyxfm4D in every data type and interpolation, and the
+  scripts pairreg, extracttxt and aff2rigid), every option, message and failure.
 
 Every case compares, with the replica in ``reproduce`` mode (D13): the exit status (an abort,
 signal 6, is the replica's exit 1 after the same text), standard output and error (the run
@@ -1477,6 +1480,12 @@ def _real_cases() -> dict[str, tuple[str, str, Run]]:
         "-omat",
         "out.mat",
     )
+    # -debug (part 3): the pyramid's volumes saved after the preparation, its final cost call
+    add("verbose/debug", st, "-debug: the pyramid's volumes and weights saved (no weights: the "
+        "one-voxel weight)", *base[1], "-debug", "-dof", "6", "-omat", "out.mat")  # fmt: skip
+    add("verbose/debug-weights", st, "-debug with -refweight and -inweight (the weights' "
+        "levels saved)", *base[1], "-refweight", "@refweight.nii", "-inweight", "@inweight.nii",
+        "-debug", "-dof", "6", "-omat", "out.mat")  # fmt: skip
     return c
 
 
@@ -1595,8 +1604,17 @@ def _schedule_cases() -> dict[str, tuple[str, str, Run]]:
         "alignpaxes in 2D mode (one slice: a zero third moment)",
         Run(
             "flirt",
-            ("-in", "@slice_in.nii", "-ref", "@slice_ref.nii", "-2D", "-schedule", "s.sch",
-             "-omat", "out.mat"),
+            (
+                "-in",
+                "@slice_in.nii",
+                "-ref",
+                "@slice_ref.nii",
+                "-2D",
+                "-schedule",
+                "s.sch",
+                "-omat",
+                "out.mat",
+            ),
             files=(("s.sch", pax),),
         ),
     )
@@ -1964,15 +1982,15 @@ _MT2 = "0.97 -0.08 0.02 -1.5\n0.07 1.01 -0.02 4\n-0.03 0.02 0.99 -3\n0 0 0 1\n"
 _MT3 = "1.1 0.01 0.03 0.5\n0.02 0.92 -0.05 1\n-0.01 0.04 1.03 2.5\n0 0 0 1\n"
 _ID = "1 0 0 0\n0 1 0 0\n0 0 1 0\n0 0 0 1\n"
 #: pointflirt's inputs: 8 points (one per line) and their images under an affine map.
-_PTS_IN = (
-    "10 20 30\n-12 5 40\n33 -7 12\n0 0 0\n25 25 -10\n-8 -30 22\n14 9 -3\n-20 18 6\n"
-)
+_PTS_IN = "10 20 30\n-12 5 40\n33 -7 12\n0 0 0\n25 25 -10\n-8 -30 22\n14 9 -3\n-20 18 6\n"
 _PTS_REF = (
     "13.31 18.62 35.25\n-9.33 7.41 44.05\n38.47 -8.32 13.9\n2.5 -1 1.5\n"
     "29.29 23.95 -9.68\n-5.24 -31.87 26.59\n17.35 7.55 -1.71\n-17.75 18.24 7.86\n"
 )
 #: 20 points: x·xᵀ by BLAS dsyrk (more than 48 elements).
-_PTS20 = "".join(f"{(i * 7) % 23 - 11} {(i * 5) % 17 - 8} {(i * 11) % 29 - 14}\n" for i in range(20))
+_PTS20 = "".join(
+    f"{(i * 7) % 23 - 11} {(i * 5) % 17 - 8} {(i * 11) % 29 - 14}\n" for i in range(20)
+)
 _PTS20_REF = "".join(
     f"{(i * 7) % 23 - 11 + 0.1 * i} {(i * 5) % 17 - 8 - 0.05 * i} {(i * 11) % 29 - 13.5}\n"
     for i in range(20)
@@ -1991,8 +2009,10 @@ def _program_cases() -> dict[str, tuple[str, str, Run]]:
         c[f"programs/{name}"] = (tier, desc, Run(program, tuple(args), **kw))
 
     X = "applyxfm4D"
-    rot = ("0.996 -0.087 0 3\n0.087 0.996 0 -2\n0 0 1 1.5\n0 0 0 1\n",
-           "0.99 0.02 -0.03 1\n-0.02 1.01 0.01 0.5\n0.03 -0.01 0.98 -1\n0 0 0 1\n")
+    rot = (
+        "0.996 -0.087 0 3\n0.087 0.996 0 -2\n0 0 1 1.5\n0 0 0 1\n",
+        "0.99 0.02 -0.03 1\n-0.02 1.01 0.01 0.5\n0.03 -0.01 0.98 -1\n0 0 0 1\n",
+    )
     mats = tuple((f"mats/MAT_0{k:04d}", rot[k % 2]) for k in range(4))
     mats4 = tuple((f"m4/MAT_{k:04d}", rot[k % 2]) for k in range(4))
     matsu = tuple((f"mu/vol{k:04d}", rot[k % 2]) for k in range(4))
@@ -2280,12 +2300,16 @@ def suite() -> Suite:
         name=SUITE,
         title="FLIRT replica (bit-exact, FSL Licence)",
         tool="`larmorx-nc fsl flirt`, `convert_xfm`, `avscale`, `img2imgcoord`, `std2imgcoord`, "
-        "`img2stdcoord`, `rmsdiff` and `makerot` (crate larmorx-nc-flirt, translated from FSL "
-        f"{fsl_versions.NEWEST}'s source)",
-        reference=f"flirt, convert_xfm, avscale, img2imgcoord, std2imgcoord, img2stdcoord, rmsdiff "
-        f"and makerot from FSL {fsl_versions.NEWEST} (fsl-flirt 2111.4, fsl-newimage 2601.0, "
-        "fsl-miscmaths 2412.6, fsl-utils 2412.6, fsl-warpfns 2501.0; the conda build at "
-        "`~/fsl-6.0.7.23`, as built: glibc 2.35's maths, OpenBLAS on its Haswell kernels)",
+        "`img2stdcoord`, `rmsdiff`, `makerot`, `midtrans`, `pointflirt`, `applyxfm4D` and the "
+        "scripts `pairreg`, `extracttxt` and `aff2rigid` (crate larmorx-nc-flirt, translated from "
+        f"FSL {fsl_versions.NEWEST}'s source)",
+        reference=f"flirt, convert_xfm, avscale, img2imgcoord, std2imgcoord, img2stdcoord, rmsdiff, "
+        "makerot, midtrans, pointflirt, applyxfm4D, pairreg, extracttxt and aff2rigid from FSL "
+        f"{fsl_versions.NEWEST} (fsl-flirt 2111.4, fsl-newimage 2601.0, fsl-miscmaths 2412.6, "
+        "fsl-utils 2412.6, fsl-warpfns 2501.0, fsl-armawrap 0.7.0 with Armadillo 14.2.1; the conda "
+        "build at `~/fsl-6.0.7.23`, as built: glibc 2.35's maths, OpenBLAS 0.3.33 with its LAPACK "
+        "on its Haswell kernels; the scripts under dash, GNU grep, dc and sed of Ubuntu 22.04 and "
+        "FSL's Python with NumPy 2.4.6)",
         thresholds=[
             ("Exit status", "the same (an abort: the replica exits 1 after the same text)"),
             (

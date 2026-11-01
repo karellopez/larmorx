@@ -373,11 +373,24 @@ def _points(d: gen.Draw, name: str, n: int, *, moved_from: list | None = None) -
             pts.append([c.step(f"p{k}{a}", -60.0, 60.0, 0.25) for a in range(3)])
         else:
             x = moved_from[k]
-            m = [[1.0 + c.step(f"m{i}{j}", -0.1, 0.1, 0.05) if i == j else
-                  c.step(f"m{i}{j}", -0.1, 0.1, 0.05) for j in range(3)] for i in range(3)]
+            m = [
+                [
+                    1.0 + c.step(f"m{i}{j}", -0.1, 0.1, 0.05)
+                    if i == j
+                    else c.step(f"m{i}{j}", -0.1, 0.1, 0.05)
+                    for j in range(3)
+                ]
+                for i in range(3)
+            ]
             t = [c.step(f"t{i}", -5.0, 5.0, 0.5) for i in range(3)]
-            pts.append([sum(m[i][j] * x[j] for j in range(3)) + t[i] +
-                        c.step(f"e{k}{i}", -0.5, 0.5, 0.25) for i in range(3)])
+            pts.append(
+                [
+                    sum(m[i][j] * x[j] for j in range(3))
+                    + t[i]
+                    + c.step(f"e{k}{i}", -0.5, 0.5, 0.25)
+                    for i in range(3)
+                ]
+            )
     text = "".join(" ".join(f"{v:.6g}" for v in row) + "\n" for row in pts)
     return pts, _text(text)
 
@@ -452,13 +465,26 @@ def draw_schedule3(d: gen.Draw) -> dict:
         k = d.choice("subset size", (1, 2, 3, 4))
         pool = ("0", "0", "0", "1", "1", "-1", "0.5", "2")
         cols = [" ".join(d.choice(f"w{c}{r}", pool) for r in range(12)) for c in range(k)]
-        text = ("setscale 8\nsetrow UA 1 0 0 0  0 1 0 0  0 0 1 0  0 0 0 1\n"
-                f"setoption paramsubset {k}  " + "  ".join(cols) + "\n"
-                "optimise 12 UA:1 0.0 0.0 0.0 0.0 0.0 0.0 rel 1\n")
+        text = (
+            "setscale 8\nsetrow UA 1 0 0 0  0 1 0 0  0 0 1 0  0 0 0 1\n"
+            f"setoption paramsubset {k}  " + "  ".join(cols) + "\n"
+            "optimise 12 UA:1 0.0 0.0 0.0 0.0 0.0 0.0 rel 1\n"
+        )
         what = f"paramsubset {k}"
     inputs["sch"] = _text(text, ".sch")
-    groups = [required("files", "-in", "{in:in}", "-ref", "{in:ref}", "-schedule", "{in:sch}",
-                       "-omat", "out.mat")]
+    groups = [
+        required(
+            "files",
+            "-in",
+            "{in:in}",
+            "-ref",
+            "{in:ref}",
+            "-schedule",
+            "{in:sch}",
+            "-omat",
+            "out.mat",
+        )
+    ]
     return {"groups": groups, "inputs": inputs, "options": [what], "extra": {"tool": "flirt"}}
 
 
@@ -476,8 +502,12 @@ def draw_extracttxt(d: gen.Draw) -> dict:
             st = d.choice("start", ("0", "2", "-1", "-3"))
             groups.append(required("start", st))
             options.append(f"start {st}")
-    return {"groups": groups, "inputs": {"t": _text(text)}, "options": options,
-            "extra": {"tool": "extracttxt"}}
+    return {
+        "groups": groups,
+        "inputs": {"t": _text(text)},
+        "options": options,
+        "extra": {"tool": "extracttxt"},
+    }
 
 
 DRAWS = {

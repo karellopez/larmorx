@@ -90,7 +90,12 @@ def pointflirt(
     assert selected is not None
     with tempfile.TemporaryDirectory(prefix="larmorx-pointflirt-") as tmp:
         out = os.path.join(tmp, "aff.mat")
-        args = ["-i", _points_file(in_points, tmp, "in"), "-r", _points_file(ref_points, tmp, "ref")]
+        args = [
+            "-i",
+            _points_file(in_points, tmp, "in"),
+            "-r",
+            _points_file(ref_points, tmp, "ref"),
+        ]
         args += ["-o", out]
         if (in_image is None) != (ref_image is None):
             raise ValueError("pointflirt's voxel coordinates need both in_image and ref_image")

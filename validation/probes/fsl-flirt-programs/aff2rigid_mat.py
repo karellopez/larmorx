@@ -61,13 +61,28 @@ def main() -> int:
         (d / "in.mat").write_text(text)
         kept = d / "fsl.mat"
         if fresh or not kept.is_file():
-            subprocess.run([str(FSL / "bin" / "fslpython"), "-c", SHIM,
-                            str(FSL / "bin" / "aff2rigid"), "in.mat", "fsl.mat"],
-                           cwd=d, env=env, check=True, capture_output=True)
+            subprocess.run(
+                [
+                    str(FSL / "bin" / "fslpython"),
+                    "-c",
+                    SHIM,
+                    str(FSL / "bin" / "aff2rigid"),
+                    "in.mat",
+                    "fsl.mat",
+                ],
+                cwd=d,
+                env=env,
+                check=True,
+                capture_output=True,
+            )
         (d / "rep.mat").unlink(missing_ok=True)
-        subprocess.run([nc, "fsl", "aff2rigid", "in.mat", "rep.mat"], cwd=d,
-                       env={**env, "LARMORX_UPSTREAM_DEFECTS": "fix"}, check=True,
-                       capture_output=True)
+        subprocess.run(
+            [nc, "fsl", "aff2rigid", "in.mat", "rep.mat"],
+            cwd=d,
+            env={**env, "LARMORX_UPSTREAM_DEFECTS": "fix"},
+            check=True,
+            capture_output=True,
+        )
         same = kept.read_bytes() == (d / "rep.mat").read_bytes()
         bad += not same
         print(f"{name}: {'identical' if same else 'DIFFER'}")

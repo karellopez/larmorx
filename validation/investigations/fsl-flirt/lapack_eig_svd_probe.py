@@ -34,7 +34,7 @@ from pathlib import Path
 os.environ["OPENBLAS_CORETYPE"] = "Haswell"
 os.environ.setdefault("OPENBLAS_NUM_THREADS", "1")
 
-import numpy as np  # noqa: E402
+import numpy as np
 
 FSL_LAPACK = Path.home() / "fsl-6.0.7.23" / "lib" / "liblapack.so.3"
 
@@ -163,7 +163,9 @@ class Fsl:
 
     def nrm2(self, x) -> float:
         x = np.ascontiguousarray(x)
-        return self.lib.dnrm2_(ctypes.byref(ctypes.c_int(len(x))), _p(x), ctypes.byref(ctypes.c_int(1)))
+        return self.lib.dnrm2_(
+            ctypes.byref(ctypes.c_int(len(x))), _p(x), ctypes.byref(ctypes.c_int(1))
+        )
 
     def gemm(self, ta, tb, a, b, c, alpha, beta) -> np.ndarray:
         m, n = c.shape
@@ -272,7 +274,9 @@ def compare(name: str, fsl: list[np.ndarray], port: np.ndarray, summary: dict) -
 
 
 def main() -> int:
-    ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
+    ap = argparse.ArgumentParser(
+        description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter
+    )
     ap.add_argument("--tool", type=Path, required=True)
     ap.add_argument("--out", type=Path, required=True)
     ap.add_argument("--count", type=int, default=1000)
@@ -318,7 +322,16 @@ def main() -> int:
             compare(f"nrm2_{n}", fres, run_tool(args.tool, f"nrm2_{n}", recs, args.out), summary)
         for ta in (b"N", b"T"):
             for tb in (b"N", b"T"):
-                for m, n, k in ((12, 3, 3), (12, 7, 7), (3, 3, 1), (3, 3, 40), (12, 12, 12), (5, 12, 4), (3, 3, 300), (12, 1, 1)):
+                for m, n, k in (
+                    (12, 3, 3),
+                    (12, 7, 7),
+                    (3, 3, 1),
+                    (3, 3, 40),
+                    (12, 12, 12),
+                    (5, 12, 4),
+                    (3, 3, 300),
+                    (12, 1, 1),
+                ):
                     recs, fres = [], []
                     for _ in range(max(args.count // 20, 20)):
                         a = rng.normal(size=(k, m) if ta == b"T" else (m, k))
@@ -326,7 +339,16 @@ def main() -> int:
                         c = rng.normal(size=(m, n))
                         alpha = float(rng.choice([1.0, rng.normal()]))
                         beta = float(rng.choice([0.0, 1.0, rng.normal()]))
-                        recs.append(np.concatenate([a.ravel(order="F"), b.ravel(order="F"), c.ravel(order="F"), [alpha, beta]]))
+                        recs.append(
+                            np.concatenate(
+                                [
+                                    a.ravel(order="F"),
+                                    b.ravel(order="F"),
+                                    c.ravel(order="F"),
+                                    [alpha, beta],
+                                ]
+                            )
+                        )
                         fres.append(fsl.gemm(ta, tb, a, b, c, alpha, beta))
                     op = f"gemm{ta.decode().lower()}{tb.decode().lower()}{m}x{n}x{k}"
                     compare(op, fres, run_tool(args.tool, op, recs, args.out), summary)

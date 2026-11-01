@@ -41,12 +41,18 @@ def main() -> int:
     for k, args in enumerate(CALLS):
         kept = out / f"fsl-{k}.txt"
         if fresh or not kept.is_file():
-            p = subprocess.run([str(FSL / "bin" / "makerot"), *args], env=env,
-                               capture_output=True, text=True, check=False)
+            p = subprocess.run(
+                [str(FSL / "bin" / "makerot"), *args],
+                env=env,
+                capture_output=True,
+                text=True,
+                check=False,
+            )
             kept.write_text(f"{p.returncode}\n{p.stdout}", encoding="utf-8")
         fsl = kept.read_text(encoding="utf-8")
-        r = subprocess.run([nc, "fsl", "makerot", *args], env=env, capture_output=True,
-                           text=True, check=False)
+        r = subprocess.run(
+            [nc, "fsl", "makerot", *args], env=env, capture_output=True, text=True, check=False
+        )
         rep = f"{r.returncode}\n{r.stdout}"
         same = fsl == rep
         bad += not same

@@ -31,7 +31,11 @@ def cases():
             for st in STARTS:
                 if c is None and st is not None:
                     continue
-                yield [w, "text.txt"] + ([c] if c is not None else []) + ([st] if st is not None else [])
+                yield (
+                    [w, "text.txt"]
+                    + ([c] if c is not None else [])
+                    + ([st] if st is not None else [])
+                )
 
 
 def run(cmd, cwd, env):
@@ -54,7 +58,9 @@ def main() -> int:
         key = " ".join(args)
         if key not in fsl:
             fsl[key] = run([str(FSL / "bin" / "extracttxt"), *args], out, env)
-        rep = run([nc, "fsl", "extracttxt", *args], out, {**env, "LARMORX_UPSTREAM_DEFECTS": "reproduce"})
+        rep = run(
+            [nc, "fsl", "extracttxt", *args], out, {**env, "LARMORX_UPSTREAM_DEFECTS": "reproduce"}
+        )
         f = fsl[key]
         # the script's own name in dash's messages
         rep_err = rep["err"]

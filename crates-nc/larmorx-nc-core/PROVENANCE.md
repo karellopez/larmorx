@@ -29,7 +29,8 @@ the joined version.
 | `interp`, `kernel` | `interpolate` (the volume's method: nearest, trilinear for every element type, sinc and splines for float volumes; `Volume::interpolate` for the defaults), `q_tri`, `round_f32`, `SplineCoefs`, the sinc kernels |
 | `newimagefns` | `isotropic_resample`, `affine_transform`, `raw_affine_transform`, `affine_transform_mask`, `gradient`, `smooth` (separable Gaussian, threads without changing the result), `gaussian_kernel_1d` |
 | `costfns`, `optimise`, `miscmaths` | FLIRT's cost functions, the line-search optimiser, the transform algebra, `read_ascii_matrix` |
-| `arma` | `Mat` and the evaluation paths of Armadillo's small products, inverses, determinants and solves (`mul`, `mul3`, `mul4`, `gemv_tinysq`, `inv`, `det`, `solve`, `dot`, `accu`, `trace`) |
+| `arma` | `Mat` and the evaluation paths of Armadillo's small products, inverses, determinants and solves (`mul`, `mul3`, `mul4`, `gemv_tinysq`, `inv`, `det`, `solve`, `dot`, `accu`, `trace`); since FLIRT's part 3 the BLAS products beyond 4 × 4 (`mul`, `mul_tb`, `syrk`, `dot_arma`), `eig_sym`, `svd_econ` and `pinv` |
+| `lapack::blas`, `lapack::reference` | OpenBLAS 0.3.33's Haswell BLAS (`ddot`, `daxpy`, `dscal`, `drot`, `dnrm2`, `dgemv` both ways, `dger`, `dsymv`, `dsyr2`, `dgemm`) and reference LAPACK's `dsyevd('V','U')` and `dgesdd('S')` for m ≥ n (FLIRT part 3) |
 | `mesh` | meshclass: `Mesh` (`icosa`, `update`, `translation`, `rescale`, `retessellate`, `self_intersection`, `real_self_intersection`, `save_vtk`, ...), `MPoint`, `V3`, `mesh::profile::Profile`, `mesh::load` (`load`, OFF, VTK, FreeSurfer surfaces) |
 | `options` | fsl-utils' `OptionParser`, `Opt`, the parsed values and `usage` |
 | `avwutils` | what FSL's scripts run of `fslval`, `fslroi`, `fslmerge -z`, `fslmaths -dilF`/`-mas`, `fslstats -l -C`, and fslpy's `imtest`, `remove_ext`, `imglob`; `ToolFailure` (the program's messages and status) |
@@ -111,7 +112,9 @@ Every source file starts with an SPDX header naming its licence and the files it
 | `glibc_double` | Arm Optimized Routines v19.11 `math/pow.c`, `pow_log_data.c`, `exp.c`, `exp_data.c` (glibc 2.35's `e_pow.c`, `e_pow_log_data.c`, `e_exp.c`, `e_exp_data.c`) | `__pow`, `log_inline`, `exp_inline`, `specialcase`, `checkint`; `__exp` and its `specialcase`, as `__pow_fma` and `__exp_fma` (`tools/libm-verify`: 0 of 4 million `pow` and 0 of 4 million `exp` differ from the C library) |
 | `cnum` | (glibc behaviour) | `strtod`, `strtof`, `strtol`, `atof`, `atoi`, `printf`'s `%g`, `%f`, `%e`; x86-64's conversions |
 | `x87` | (x87 behaviour) | `long double` sums, products and quotients rounded to 64 bits, then stored (`tools/libm-verify`: 0 of 5 million differ from the x87 unit) |
-| `stdsort` | (libstdc++ behaviour; the SGI STL, under the HP/SGI notice) | `std::sort` (`sort_by`; `sort_f32_checked` for floats that may be NaN), `std::nth_element` on doubles |
+| `stdsort` | (libstdc++ behaviour; the SGI STL, under the HP/SGI notice) | `std::sort` (`sort_by`; `sort_checked`, `sort_f32_checked`, `sort_f64_checked` for values that may be NaN), `std::nth_element` on doubles |
+| `lapack::blas` | OpenBLAS 0.3.33 (BSD-3-Clause): `kernel/x86_64/ddot.c`, `daxpy.c`, `dscal.c`, `drot.c` (`drot_microk_haswell-2.c`), `nrm2.S` (x87), `dgemv_n_4.c`, `dgemv_n_microk_haswell-4.c`, `dgemv_t_4.c`, `dgemv_t_microk_haswell-4.c`, `dgemm_kernel_4x8_haswell.S`, `interface/{dot,axpy,scal,rot,nrm2,gemv,ger,symv,syr2,gemm}.c`, `driver/level2/{ger,symv_k,syr2_k}`, `driver/level3/level3.c` (`GEMM_Q`, `GEMM_UNROLL_M`), `param.h` (FLIRT part 3) | the Haswell kernels as FSL's build runs them: the FMA microkernels, the C tails of `dgemv_t` contracted into FMAs by the compiler, `dnrm2` in x87 extended precision, `dgemm`'s per-element FMA chains in blocks |
+| `lapack::reference` | reference LAPACK as OpenBLAS 0.3.33 bundles it (modified BSD; towards 3.13): `dsyevd.f`, `dsytrd.f`/`dsytd2.f`, `dstedc.f`, `dsteqr.f`, `dormtr.f`, `dormql.f`/`dorm2l.f`, `dlansy.f`, `dlanst.f`, `dlascl.f`, `dlaset.f`, `dlasr.f`, `dlaev2.f`, `dlapy2.f`, `dlartg.f90`, `dlarfg.f`, `dlarf1f.f`, `dlarf1l.f`, `iladlc.f`, `iladlr.f`, `dgesdd.f`, `dgeqrf.f`/`dgeqr2.f`, `dorgqr.f`/`dorg2r.f`, `dgebrd.f`/`dgebd2.f`, `dbdsdc.f`, `dlasdq.f`, `dbdsqr.f`, `dlas2.f`, `dlasv2.f`, `dormbr.f`, `dormqr.f`/`dorm2r.f`, `dormlq.f`/`dorml2.f`, `dlamch.f` (FLIRT part 3) | `dsyevd_vu` (`jobz = 'V'`, `uplo = 'U'`, n ≤ 25: `dsteqr('I')`), `dgesdd_s` (`jobz = 'S'`, m ≥ n, paths 3 and 5, `dbdsdc`'s `dbdsqr` route for n ≤ 25), with Armadillo's work sizes |
 | `istream` | (libstdc++ behaviour) | `operator>>` for `int`, `float`, `double`, `std::string`; `std::getline` |
 
 ## Changes from the originals
@@ -135,6 +138,16 @@ Every source file starts with an SPDX header naming its licence and the files it
   Gaussian smoothing, `fslmaths -mas` and `fslstats`'s threshold, newimage's robust range
   (`find_thresholds`: the histogram's range and the 2 and 98 % thresholds) and meshclass's
   points and vectors (BET's merge, from BET's NaN matrix, `validation/probes/fsl-bet-nan`).
+- **FSL's LAPACK beyond 4 × 4** (FLIRT part 3): `lapack::blas` and `lapack::reference` translate
+  the routines `eig_sym`, `svd_econ` and `pinv` reach for the sizes FLIRT's programs use (3 × 3
+  principal axes, 12 × n parameter masks, 3 × 3 Procrustes matrices, pointflirt's 12 × 12 system),
+  unblocked as LAPACK runs them below its block sizes; checked word for word against FSL's
+  `liblapack.so.3` (`validation/investigations/fsl-flirt/lapack_eig_svd_probe.py`, 400 records).
+  The Armadillo paths larger than these remain untranslated and panic if reached. `Volume<T>`'s
+  background value is computed in its own type (a double image's in double, sorted with
+  libstdc++'s order: `stdsort::sort_checked`), and `interp` gives double images their sinc sums
+  and spline coefficients in double precision (`interpolate_double`, `SplineCoefs::new_f64`) and
+  integer images' spline coefficients stored in the type (`new_f64` with a store, `with_cast`).
 - **Thread-independent.** The Gaussian smoothing shares its z slices between threads; nothing
   else here is parallel; the results never depend on the thread count.
 - **D13 hooks.** `Costfn::skip_nonfinite` (FSL-14's non-finite samples), the corrected centre of

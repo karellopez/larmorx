@@ -431,7 +431,7 @@ status 255.
 | `measurecost` | dof list[:rows] p1 … [rel\|abs] | for each row: perturb, append the cost of the matrix to `U` (≥ 5 words) |
 | `gridmeasurecost` | dof list[:rows] (lo step hi)… [abs\|rel] | for each row, the costs on a grid of perturbations (§8.4) appended to `U` (≥ 7 words) |
 | `aligncog` | list[:rows] | each row's matrix with its translation replaced so that the input's centre of mass maps onto the reference's (`t = c_ref − L·c_in`, `L` the linear part); appended to `U` |
-| `alignpaxes` | list[:rows] | each row's matrix replaced by the principal-axes alignment of the two images (tier 3; not specified further here) |
+| `alignpaxes` | list[:rows] | for each row, the principal-axes alignment of the two images (§8.7; the row's matrix is not used), appended to `U` with the row's cost (< 2 words: wrong number) |
 | `setscale` | s [force] | §7.2 |
 | `setrow` | list p1 … p16 | appends the matrix whose **columns** are p1-p4, p5-p8, ... (the order in which rows store a matrix), cost 0 (≥ 18 words) |
 | `setrowqsform` | list | appends the sform/qform initialisation (§8.5) relative to the initial matrix, cost 0 |
@@ -589,9 +589,27 @@ x₀) − pinv(P)·(x₀ − x₀)`. For masks of zeros and ones with at most on
 search's, and every shipped schedule's), `pinv(P)` has, for a column of `k` ones, the value
 `(1/√k)²` (square root and reciprocal correctly rounded, then the product rounded: `0x1.5555555555557p-2`
 for `k = 3`, `0x1.ffffffffffffep-2` for `k = 2`) at its rows, zero elsewhere (observed, FSL's
-LAPACK); the products `P·y` and `pinv(P)·d` are plain sums of rounded products. For other masks FSL
-uses an SVD pseudo-inverse whose last bits are not specified here. With `setoption paramsubset`
-active, `optimise` uses the subset form with the row's own parameters as `x₀`.
+LAPACK); the products `P·y` and `pinv(P)·d` are plain sums of rounded products.
+
+**Every other mask** (several non-zeros in a row, values other than 0 and 1, dependent columns:
+any finite 12 × n mask; observed bit for bit, part 3) has Armadillo 14.2.1's pseudo-inverse:
+- a **diagonal** mask (non-zeros only at `(i, i)`): `1/p_ii` at `(i, i)` for each
+  `|p_ii| ≥ tol`, `tol = 12·max_i |p_ii|·ε` (ε = 2⁻⁵²), zeros elsewhere;
+- otherwise the thin SVD `P = U·diag(s)·Vᵀ` (`s` descending) by LAPACK's divide-and-conquer
+  driver `dgesdd` with `jobz = 'S'` (reference LAPACK as bundled in OpenBLAS 0.3.33, unblocked
+  below 13 columns, on OpenBLAS's Haswell kernels: the transposed matrix-vector product and the
+  plane rotation contract into fused multiply-adds, the matrix product accumulates each element
+  by fused multiply-adds over the inner index in order, the Euclidean norm sums its squares in
+  x87 extended precision); the singular values `s_k ≥ tol = max(12, n)·s₁·ε` are kept (none:
+  `pinv(P)` is zero), and `pinv(P) = W·Uᵀ` over them, `W(i, k) = V(i, k)·(1/s_k)` (the reciprocal
+  rounded first), the product `W·Uᵀ` as the matrix product above.
+
+LAPACK (modified BSD) and OpenBLAS (BSD-3-Clause) are permissive: the original may port those
+routines to reproduce FSL's last bits; any accurate SVD is within §13's thresholds. A mask with a
+NaN or infinite value is refused by the original in both modes (rule B: FSL's SVD fails and its
+run stops on the empty result). The products `P·y` and `pinv(P)·d` are Armadillo's
+matrix-vector products (§12). With `setoption paramsubset` active, `optimise` uses the subset
+form with the row's own parameters as `x₀`.
 
 ### 8.4 `gridmeasurecost`
 
@@ -616,6 +634,37 @@ the identity. `setrowqsform` appends `M_q · M_init⁻¹` (or the identity with 
 
 `√(tᵀt + (80²/5)·tr(AᵀA))` with `D = M1·M2⁻¹ − I`, `A` its 3 × 3 part, `t` its translation (about the
 origin), as `specs/mcflirt.md` §10.4.
+
+### 8.7 The principal-axes alignment (`alignpaxes`)
+
+The schedule command `alignpaxes list[:rows]` appends, for each row of the list, the matrix that
+carries the input level's principal axes onto the current reference level's, with the row's cost;
+the row's own matrix is not used.
+
+**The principal axes of an image** (volume 0, every voxel, x fastest): with `m` the image's
+minimum and `w = v − m` per voxel, the double-precision sums `Σw`, `Σw·x`, `Σw·y`, `Σw·z`,
+`Σw·x·x`, `Σw·x·y`, `Σw·x·z`, `Σw·y·y`, `Σw·y·z`, `Σw·z·z` (voxel coordinates; each term
+`(w·a)·b` from the left), accumulated in partial sums that are added to running totals after every
+`max(1000, ⌊√N⌋) + 1` voxels (N the voxel count) and once at the end (the same blocking as the
+centre of mass, §6.1). A total below 1e-5 in magnitude prints `WARNING::in calculating Principle
+Axes, total = 0.0` on standard error and counts as 1. With `M` the second moments divided by the
+total, `μ` the first moments divided by it and `S` the 3 × 3 diagonal of the voxel sizes, the
+covariance in millimetres is `C = (S·M)·S − (S·μ)(S·μ)ᵀ`, each of the two steps made symmetric from
+its lower triangle. Its eigenvectors (LAPACK `dsyevd`, `jobz = 'V'`, `uplo = 'U'`, eigenvalues
+ascending, as §8.3's library) are the columns of `R`, then reordered: the column of the smallest
+eigenvalue (the first strictly smaller one, scanning the second and the third) exchanged with the
+first, then the second and the third exchanged when the third's eigenvalue is below the second's;
+each exchange stores the eigenvalue it moves into the other place rounded to single precision
+(which the second comparison reads). A non-finite moment (a NaN or infinite voxel): the
+decomposition fails and FSL stops with `Mat::operator(): index out of bounds` (status 0, nothing
+written: FSL-68; the original exits 1 by default as §11).
+
+**The alignment** of the reference level's axes `R_r` and the input level's `R_i` (each computed
+as above, the reference's first): for the first and the second column `n`, when the dot product
+`R_r(:, n)·R_i(:, n)` (summed in order) is negative, `R_r(:, n)` is negated; then each of the two
+matrices whose determinant (§12's closed form) is negative has its third column negated. The
+linear part is `L = R_r·R_iᵀ`, the translation `aligncog`'s (§7.1: `t = c_r − L·c_i`, the centres
+of mass in scaled millimetres, computed after the axes).
 
 ## 9. Outputs
 
@@ -652,6 +701,27 @@ isotropically to `s` mm (§5). For each volume `t` of the input, in order: blurr
 smallest voxel size (unless nearest neighbour or `-noresampblur`), resampled as §9.2 — with the
 **pad value taken from the unblurred first volume**, once — into volume `t` of the output; the output
 has the input's TR. `-omat` writes the initial matrix. The program ends with status 0 after this.
+
+### 9.4 `-debug`
+
+With `-debug`, once the images are prepared (the reference pyramid, its weights, the input at
+8 mm), FLIRT saves in single precision, in the output type of `FSLOUTPUTTYPE`, in the working
+directory: `refvol_8`, `refvol_4`, `refvol_2`, `refvol` (the reference's levels), `global_refweight1`,
+`global_refweight2`, `global_refweight4`, `global_refweight8` (the reference weight's levels:
+without `-refweight` the first is a 1 × 1 × 1 volume holding 0 with the base scale's voxel size,
+the filtering of an empty weight, and the others are FSL's empty volumes), `testvol` and
+`testweight` (observed). After the schedule, on standard error, `Final DEBUG call in FLIRT`,
+`Pointer to impair is <the cost object's address>` (a run-dependent address; the original prints
+any non-null value), `Final DEBUG call in FLIRT 2`, `Scale is:<the requested scale>`, then one cost
+evaluation of the matrix (as the schedule's `measurecost 12 U:1 0 0 0 0 0 0 0 rel 8`, its result
+appended to `U`), `Final DEBUG call in FLIRT 3` and `Final DEBUG call in FLIRT 4`. With the
+boundary-based cost (§6.5) that evaluation also writes `debug`: two volumes on the reference
+level's grid (its header), zero, where each pair of points of the boundary (the two sides' points
+in reference voxels) writes, at the rounded midpoint of the two points, `w·u + (1 − w)` in volume 0
+and `w` in volume 1 (`w` the pair's weight, `u` its cost term, both in single precision; later
+pairs over earlier ones); a midpoint outside the grid is written where the reference's
+extrapolation would read it: nowhere for zero and constant padding, the nearest edge voxel when it
+is one voxel outside with extraslice (nowhere beyond), the mirrored or periodic voxel otherwise.
 
 ## 10. `convert_xfm`
 
@@ -721,6 +791,22 @@ default and with `reproduce`:
   (`validation/investigations/fsl-flirt/fsl67_measure.py`).
 - **FSL-68** (every error after the command line ends with exit status 0, nothing written; §2):
   exit status 1 with the same message by default; `reproduce` exits 0.
+- **FSL-78** (`midtrans`: an exception of its computation, a singular or non-square matrix, is
+  printed and the program exits with status 0, nothing written; §15.5): exit status 1 by default
+  (rule B), FSL's 0 with `reproduce`, named in both modes.
+- **FSL-79** (`applyxfm4D`'s spline interpolation of an integer image keeps its spline
+  coefficients and each interpolated value in the image's type; §15.7): the float image's
+  coefficients and values by default (rule A: the coefficients are a filter's output, not image
+  values), FSL's with `reproduce`; named where the result differs.
+- **FSL-80** (`applyxfm4D -3D` with sinc: the program asks for a rectangular window of full width
+  9 but gets the blackman window of width 7 it defined first; §15.7): the rectangular width-9
+  kernel by default (rule A), the blackman width-7 one with `reproduce`; named where the result
+  differs.
+- **FSL-81** (`aff2rigid` of FSL 6.0.7.23 stops with a Python `NameError` before writing; §15.8):
+  the matrix computed and written by default (rule A), FSL's traceback and exit status 1 with
+  `reproduce`, named in both modes.
+- Kept (rule C): `pointflirt` reads a file of exactly three points as three coordinates per
+  column (a 3 × 3 file is taken as given, not transposed; §15.6); documented.
 - Undefined behaviour, refused in both modes with a message: an uninitialised matrix name (§7.1),
   `bbrstep` below 1 (FSL-71: FSL never finishes), `-pedir` without a field map read (§6.5), a `read`
   of an unparsable file (FSL-72: FSL reads for ever, its memory growing until an allocation fails:
@@ -768,17 +854,26 @@ Metrics and thresholds (PLAN.md §11.3):
 FLIRT's other programs (§15): every case of the record's `programs/` category (every option, the
 usages, the files that cannot be read, the singular matrices, the aborts) identical in text and
 exit status; avscale also on random matrices (rotations, scales, skews, reflections, any matrix:
-identical text).
+identical text). `midtrans` and `pointflirt` (SVD-based: §15.5, §15.6) and `aff2rigid`: matrices
+within 1e-9 of FSL's in every element (bit-identical if the original ports §8.3's library
+routines), messages and statuses identical; `applyxfm4D`: bit-identical images for nearest
+neighbour and trilinear in every data type, sinc and spline as §9.2's images (NCC ≥ 0.9999 with
+FSL's, identical where both are exact); `extracttxt` and `pairreg`: identical text and matrices
+(`pairreg` as FLIRT's). The parameter subsets and `alignpaxes` (§8.3, §8.7): the matrices'
+thresholds above.
 
 ## 14. Open questions
 
-1. The principal-axes alignment (`alignpaxes`) is not specified (no shipped schedule uses it).
-2. The SVD pseudo-inverse of general parameter-subset masks (§8.3).
-3. `applyxfm4D`, `midtrans` and `pointflirt` are not specified yet; the coordinate programs'
-   `-warp` (FNIRT's warp fields) neither.
-4. `makerot` with a NaN or infinite angle or axis: which rows FSL prints as `nan` and which as
-   `-nan` (the sign the NaN carries through the rotation's products) is not specified; every
-   finite input is (§15.4).
+Closed in part 3: the principal-axes alignment (§8.7), every parameter-subset mask (§8.3),
+`midtrans`, `pointflirt`, `applyxfm4D` (§15.5 to §15.7), the scripts (§15.8), `-debug` (§9.4) and
+`makerot`'s NaN signs (§15.4). Open:
+1. The coordinate programs' `-warp` (FNIRT's warp fields): refused by the original (and by the
+   replica) until FSL's warp-field libraries are ported (`docs/next-steps.md`).
+2. The sign of an all-NaN result matrix (FSL's `-nan` or `nan`) when the input's centre of mass is
+   not finite (an infinite voxel with `reproduce`'s FSL-14) and a schedule optimises relative to a
+   row (`optimise ... rel`): not specified (the values are NaN either way).
+3. Not ported, by decision: `standard_space_roi`, `flirt_average`, `epi_reg` (they need FSL's other
+   programs: `fslmaths`, `fslroi`, FAST, `fugue`).
 
 ## 15. FLIRT's other programs
 
@@ -944,3 +1039,196 @@ about the axis scaled by `θ·π/180` (in double, element by element: `((a·θ)�
 centre. With `-o` it is written as FLIRT writes matrices (§9.1; a file that cannot be opened:
 `Could not open file <name> for writing`, exit 0); otherwise printed (§15's matrix layout) and
 followed by a blank line. Exit 0.
+
+**NaN signs** (a NaN or infinite angle, axis or centre; observed, part 3, every bit of FSL's
+output: `validation/probes/fsl-flirt-programs/makerot_nan.py`). FSL's arithmetic follows x86-64's
+SSE rules: an invalid operation (`∞ − ∞`, `0·∞`, `∞/∞`) gives the default NaN, whose sign bit is
+set (printed `-nan`); an operation with one NaN operand returns that NaN (its sign kept); with two,
+the first operand's. The order of the operands is therefore part of the result: in each 3 × 3
+matrix-vector product of the rotation (each column of `(B·R)·Bᵀ`, and `(I − R)·c` for the
+translation), the **first row** is formed as `x₀·a₀₀`, then `(x_k·a₀ₖ) + s` for `k = 1, 2` (the
+vector's element first, the new product before the running sum `s`); the **other rows** as
+`a_r0·x₀`, then `s + a_rk·x_k` (the matrix element first, the running sum first). Every other step
+(the norms, the divisions, the cross product) passes NaNs on by the same rules; the angle's single-
+precision sine and cosine of a non-finite angle are `θ − θ` (glibc's: the default NaN for an
+infinite angle, the NaN itself for a NaN).
+
+### 15.5 `midtrans [options] transform1 transform2 ... transformN`
+
+The transform from the space the inputs map into (a template) to their "middle". FSL's general
+option parser (§15.4's rules: long options take `=value`, one-letter options group): `-o,--out`
+(a file name), `--template` (an image), `--separate` (a name prefix), `--debug`, `-v,--verbose`,
+`-h,--help`; the first word that is not an option and every word after it are the transforms
+(matrix files). Usage: `Part of FSL (ID: 2412.6-dirty)`, the title `midtrans ` and `Copyright(c)
+2010, University of Oxford (Mark Jenkinson)`, a blank line, `Usage: `, then `midtrans [options]
+transform1 transform2 ... transformN`, `  e.g. midtrans -o temp2mid.mat A2temp.mat B2temp.mat
+C2temp.mat`, `       midtrans -o C2mid.mat A2C.mat B2C.mat ident.mat`, then the options (help texts:
+`output filename for matrix`, `input filename for template image (needed for fix origin)`,
+`basename for output of separate matrices (final name includes a number; e.g. img2mid0001.mat)`,
+`switch on debugging output`, `switch on diagnostic messages`, `display this message`). A parse
+error: the usage, a blank line, the message, exit 1; `-h`: the usage, exit 1. Fewer than two
+transforms: `Must specify at least 2 transforms to find the mid-transform`, then the usage, exit 1.
+
+Each transform is read as §15's matrix files (a missing file: its message and an empty matrix,
+which has determinant 1); a matrix that is not square: `det(): given matrix must be square sized`
+(FSL-78); a determinant below 1e-6 in magnitude: `Could not read matrix <name>`, exit 1. With `-v`:
+`Number of matrices = <N>`. The centre `o`: the template's centre of mass in scaled millimetres
+(§6.1) with `--template`, else `Assuming MNI origin as no template image specified` on standard
+output and `o = (90, 110, 90)`, `(0, 0, 0)` with `--debug`; with `-v`, `Centre of template = ` and
+`o` as a row. With `-v` the stages print `Initialising averages`, `Stage 1`, `A = `/`s = `,
+`Stage 2`, `Subject number <n>` with `R = `/`u = `, `Stage 3`, `M = `/`w = `, `Final calculations`
+(each matrix in §15's layout); `--debug` prints `P_<n> = ` and `Pxx_av = `.
+
+The computation, for `N` transforms `T_n = [P_n t_n; 0 1]`, with `x_n` the first three components
+of `T_n⁻¹·(o, 1)` (an LU solve), `r = (80·80)/5` (single precision) and every average a sum in
+order divided by `N` as a single-precision number:
+1. `M₁ = avg(P_n·(r·I + x_n·x_nᵀ)) + avg(t_n·x_nᵀ) − avg(P_n·x_n)·avg(x_n)ᵀ − avg(t_n)·avg(x_n)ᵀ`;
+   its SVD `U·D·Vᵀ` (§8.3's driver) gives the rotation `A = V·Uᵀ` and `s = avg(x_n) −
+   A·(avg(P_n·x_n) + avg(t_n))`.
+2. For each `n`: `P'_n = A·P_n`, `t'_n = A·t_n + s`, `R_n = V·Uᵀ` from the SVD of `P'_nᵀ`, and
+   `u_n = (P'_n − R_n)·x_n + t'_n`.
+3. With the averages over `n` of `x`, `u`, `t'`, `t'·t'ᵀ`, `u·t'ᵀ`, `P'·x`, `R·x`, `(P'·x)·t'ᵀ`,
+   `(R·x)·t'ᵀ`, `(u·xᵀ)·P'ᵀ`, `P'·P'ᵀ`, `R·P'ᵀ`, and the sums `Σ((P'x)·xᵀ)·P'ᵀ`, `Σ((Rx)·xᵀ)·P'ᵀ`
+   divided by `N` (in double): `Pxx = r·avg(P'P'ᵀ) + Σ(...)/N`, `Rxx = r·avg(RP'ᵀ) + Σ(...)/N`;
+   `AAᵀ = Pxx − avg(P'x)avg(P'x)ᵀ + avg((P'x)t'ᵀ) + avg((P'x)t'ᵀ)ᵀ − avg(t')avg(P'x)ᵀ −
+   avg(P'x)avg(t')ᵀ + avg(t't'ᵀ) − avg(t')avg(t')ᵀ` and `BAᵀ = −(Rxx − avg(Rx)avg(P'x)ᵀ +
+   avg((Rx)t'ᵀ) − avg(Rx)avg(t')ᵀ − avg((ux)P'ᵀ) + avg(u)avg(P'x)ᵀ − avg(ut'ᵀ) + avg(u)avg(t')ᵀ)`,
+   summed left to right; `M = −(BAᵀ·inv(AAᵀ))` (the inverse by LU, then the product) and
+   `w = −(M·avg(P'x)) − M·avg(t') + avg(Rx) + avg(u)`.
+The result is `[M·A, w + M·s; 0 0 0 1]`. Products of a matrix with its own transpose are formed
+as symmetric rank-k updates (each element `Σ a_ik·a_jk` in order, both triangles alike). With
+`-o` it is written (§9.1's matrix file: a file that cannot be opened prints `Could not open file
+<name> for writing`); printed (§15's layout, then a blank line) with `-v` or without `-o`. With
+`--separate p`, each `result·T_n` is written to `p0001.mat`, `p0002.mat`, ... Exit 0. A singular
+`AAᵀ` (`inv(): matrix is singular`) or a singular input (`matrix multiplication: problem with matrix
+inverse; suggest to use solve() instead`) prints the message (FSL-78); a non-finite matrix makes the
+SVD fail: refused by the original with a message (rule B).
+
+### 15.6 `pointflirt -i <file> -r <file> [options]`
+
+The affine matrix that maps the input points onto the reference points in the least-squares
+sense. FSL's general option parser: `-i` and `-r` (compulsory, text files of coordinates),
+`-o,--out` (a matrix file), `--vox`, `--invol`, `--refvol` (images), `-v,--verbose`, `-h,--help`
+(the usage: the title `pointflirt `, `Copyright(c) 2001, University of Oxford (Mark Jenkinson)`,
+the examples `pointflirt -i <invol coords>  -r <refvol coords> -o <output matrix>` and `pointflirt
+-i <invol coords>  -r <refvol coords> -o <output matrix> --vox --invol=<input vol> --refvol=<ref
+vol>`; parse errors, `-h` and missing compulsory options as §15.4). The files are read as matrix
+files (§15); a matrix with more rows than columns is transposed (both files are then transposed),
+so points are columns: a file of exactly three points (3 × 3) is taken as three points **per
+column** (rule C, §11). Different numbers of points: `ERROR: Different number of coordinates in
+the two files`, exit 255. With `--vox`, both `--invol` and `--refvol` are needed (`ERROR: need to
+specify --invol and --refvol to use --vox`, exit 2); their headers' voxel sizes multiply each
+coordinate (x, y, z). With `-v`: `Input volume coordinates are (in mm)`, the matrix, a blank line,
+`Reference volume coordinates are (in mm)`, the matrix, a blank line. Coordinates other than three
+per point stop the run (`copy into submatrix: incompatible matrix dimensions: 3x1 and <k>x1`,
+signal 6; the original exits 1 after the text).
+
+With `X` (3 × n) and `Y` the points, `S = X·Xᵀ` (a symmetric rank-k update), `x̄`, `ȳ` the means
+of the rows (each value divided by `n`, then summed in order), `Q = X·Yᵀ`: the 12 × 12 system `B` has `S` in its
+three diagonal 3 × 3 blocks, the column block `W·n` at rows 1-9 and columns 10-12 (`W` 9 × 3 with
+`x̄` in rows `3k+1..3k+3` of column `k`), `Wᵀ` at rows 10-12 and columns 1-9, and the identity at
+rows and columns 10-12; the right-hand side `q = (Q(:,1), Q(:,2), Q(:,3), ȳ)`. Its SVD
+`B = U·diag(d)·Vᵀ` (§8.3's driver): each `d_k > 1e-8` replaced by `1/d_k`, the others by 0; any
+zero printed as `WARNING: nullspace of dimension <k>`, `  ... lacks sufficient independent
+coordinates`, `Finding non-unique solution` (standard output); `p = V·(D·(Uᵀ·q))`. The matrix rows
+are `(p1 p2 p3 p10)`, `(p4 p5 p6 p11)`, `(p7 p8 p9 p12)`, `(0 0 0 1)`; written with `-o`, else
+printed (§15's layout, then a blank line). Exit 0. A non-finite coordinate makes the SVD fail
+(`Mat::operator(): index out of bounds`, signal 6; the original exits 1).
+
+### 15.7 `applyxfm4D <input> <ref> <output> <transform file or directory> [options]`
+
+Every volume of the input resampled onto the reference's grid. Fewer than four arguments: the usage
+(`Usage: applyxfm4D <input volume> <ref volume> <output volume> <transformation matrix file/dir>`, a
+blank line, `\t--interp, -interp <nearestneighbour (or nn), trilinear, spline, sinc (default)>`,
+`\t--singlematrix, -singlematrix (flag option, do not provide an argument)`, `\t--fourdigit,
+-fourdigit (flag option, do not provide an argument)`, `\t--userprefix, -userprefix <prefix>`, two
+blank lines) on standard error, exit 255. The words after the fourth, in order: `-singlematrix`
+(one matrix file for every volume), `-fourdigit` (the matrices `MAT_nnnn`), `-userprefix p` (the
+matrices `p` followed by the four digits), `-interp m` (`nearestneighbour` or `nn`, `trilinear`,
+`sinc`, `spline`; another word: `interpolation method: <m> is not a valid choice. Please choose
+from nearestneighbour, trilinear, sinc, or spline.`, exit 1), `-3D`/`--3D`/`-3d`/`--3d` (one 3D
+volume), `-v`/`-verbose`/`--verbose`; every option has its `--` form; other words are ignored; an
+option needing a value as the last word stops the run (`basic_string: construction from null is
+not valid`, signal 6; the original exits 1). Without `-singlematrix` the matrix of volume `m` is
+`<dir>/MAT_0` followed by the four digits of `m` (each `'0' + digit`). The type: the input's,
+grouped as FSL's programs group types (char, short, int, float, double; int8 as char): the values
+are interpolated in single precision from the type's values, each converted to single precision
+where it is read, except as below; the background value is the type's; each result is converted
+to the type (FSL-09: toward zero, int8 written as uint8; rounded and clamped by default).
+
+**4D** (the default): the input read whole, the reference as one volume; `-v` prints `using
+interpolation method (enum, string): <0|1|2|4>, <m>`; with more than 10000 volumes `WARNING:: More
+than 10000 volumes - only doing first 10000` (volumes up to 10000 done); for each volume, its
+matrix file's name printed (standard output) unless `-singlematrix`, then the volume resampled as
+§9.2 onto a copy of the reference: its background value (§10a, FSL-75: also named on every
+overflow, the whole border by default) as the padding, the extraslice rule, padding size 0, the
+sinc kernel blackman with full width 7. The output: the volumes in order, the input's TR, display
+range 0, 0. **-3D**: the input and the reference read as volumes; the input padded with its
+background value; sinc with the rectangular window of full width 9 (FSL-80: FSL uses blackman of
+width 7, `reproduce`); the output on the reference's grid with the input's TR.
+
+**Spline**: cubic B-spline coefficients computed by recursive filtering along x, then y, then z
+(as `specs/mcflirt.md`'s spline, the constant rule at the edges for extraslice); for float images
+each pass's results stored in single precision; for **double** images in double precision; for
+**integer** images (FSL-79, `reproduce`) each pass's results stored as `(T)(c + 0.5)` (the type's
+conversion toward zero) and each interpolated value converted to the type before the output's
+conversion; by default as float images. **Double** images: the sinc kernel's sum adds each product
+`value·kernel` (the value in double, the kernel factor in single precision) in double precision to
+the single-precision running sum, rounding it back to single precision at each step; the voxels
+the padding mask sets (pre-images outside the input) hold the background value **in double
+precision**, while every interpolated voxel (extrapolated ones included) passes through single
+precision. Matrix files that cannot be read: their message and an empty matrix, which stops the
+run (`matrix multiplication: incompatible matrix dimensions: 0x0 and 4x4`, signal 6; the original
+exits 1 after the text); a missing input: newimage's exception (signal 6). Exit 0.
+
+### 15.8 The scripts: `pairreg`, `extracttxt`, `aff2rigid`
+
+`pairreg brain1 brain2 skull1 skull2 outputmatrix [extra flirt args]` (FSL's shell script, run with
+`LC_ALL=C`): fewer than five arguments print `Usage: pairreg brain1 brain2 skull1 skull2
+outputmatrix [extra flirt args]`, a blank line and `  NB: brain1 and skull1 are used as -ref
+arguments internally` (standard output), exit 1. Then, the extra arguments split at blanks and
+appended to each FLIRT run: `flirt -in brain2 -ref brain1 -schedule pairreg1.sch -omat
+<out>.1.<pid>`; `flirt -in skull2 -ref skull1 -init <out>.1.<pid> -schedule pairreg2.sch -omat
+<out>.2.<pid>`; `convert_xfm -fixscaleskew <out>.2.<pid> <out>.1.<pid> -omat <out>.3.<pid>` (the
+second matrix with the first's scales and skews, §10); `flirt -in brain2 -ref brain1 -init
+<out>.3.<pid> -schedule pairreg3.sch -omat <out>` (FSL's three shipped schedules, in
+`$FSLDIR/etc/flirtsch`); the three temporary matrices removed; exit 0 whatever the runs did (each
+run's messages as its own). A glob character in an argument is refused by the original (the shell
+would expand it).
+
+`extracttxt search_word file [num_trailing_lines [relative_start]]` (a `/bin/sh` script run with
+`LC_ALL=C` on GNU grep, dc and sed): one argument or none: `Usage: extracttxt search_word file
+[num_trailing_lines [relative_start]]` on standard output and dash's `extracttxt: 68: exit: Illegal
+number: -1` on standard error, exit 2. `num` is the line number of the first line matching the
+basic regular expression `search_word` (none: nothing printed, exit 0; a missing file: `grep:
+<file>: No such file or directory`, exit 0). With a relative start `k`: `num1 = num + k` (dc's
+arithmetic on the words as given); with a count `c`: `num2 = num1 + c − 1` and `num1 = num2` when
+`num2 < num1`; the lines `num1` to `num2` (to the end without a count) printed by sed. dc reads a
+`+` or `-` sign as a command: with fewer than two numbers on its stack it prints `dc: stack empty`
+on standard error and does nothing, so a signed argument (`+2`, `-0`, a negative count) and a
+negative `num1` read back (`num2`'s computation) each print it and count as their digits. A range
+starting with `-` (a negative `num1`) is read by sed as options: `sed: invalid option -- '<its first
+digit>'` and GNU sed 4.8's usage on standard error, exit 1; a range starting at 0: `sed: -e
+expression #1, char <length of the range>: invalid usage of line address 0`, exit 1. A word or file
+with blanks, a word starting with `-`, an empty word, a file with a NUL byte, a non-integer count or
+start: refused by the original (the shell passes them unquoted; grep would read them otherwise).
+
+`aff2rigid <input2standard mat> <output mat>` (FSL's Python script, on its NumPy 2.4.6): without
+arguments, `Usage: aff2rigid <input2standard mat> <output mat>`, a line holding one blank, `
+First argument is the FLIRT transform (12 DOF) from the input image to standard`, `       Second
+argument is the output matrix which will go from the input image to standard space (6 DOF)` and
+`          aligning the AC, the AC-PC line and the mid-sagittal plane (in order of decreasing
+accuracy)` (standard output), exit 1. FSL 6.0.7.23's script then stops with `NameError: name 'mat'
+is not defined` (FSL-81: NumPy 2 has no `mat`; its traceback `Traceback (most recent call last):`,
+`  File "aff2rigid", line 105, in <module>`, `    v41=mat(zeros((4,1)))`, `        ^^^`, exit 1).
+The original computes the matrix the script defines (rule A): with `A` the input (4 × 4, an
+input-to-standard matrix) and the standard-space points `x1 = (91, 129, 67)`, `x2 = (91, 100,
+70)`, `x3 = (91, 129, 117)` (homogeneous, last component 1): `v2 = (x2 − x1)/‖x2 − x1‖`, `v3 = x3 −
+x1 − (v3ᵀv2)·v2` normalised, `v4 = v2 × v3` (as 4-vectors with last component 0); `w2 = A⁻¹·v2`
+normalised, `w3 = A⁻¹·v3` made orthogonal to `w2` the same way and normalised, `w4 = w2 × w3`; `R1`
+the identity with columns 1-3 replaced by `w2`, `w3`, `w4` (4 components each), `R2` the identity
+with rows 1-3 replaced by `v2ᵀ`, `v3ᵀ`, `v4ᵀ`; `R = R2ᵀ·R1ᵀ`, its translation `x1 − R·(A⁻¹·x1)`
+(rows 1-3 of column 4). The numbers as NumPy forms them on OpenBLAS's Haswell kernels: `A⁻¹` by LU
+(`dgesv` on the identity), norms as the square root of a dot product, products of a matrix and a
+vector or of two matrices by the library's kernels (§8.3), cross products in the textbook order.
+The output is written with each number in `%14.10f`, four per row, separated by a blank.

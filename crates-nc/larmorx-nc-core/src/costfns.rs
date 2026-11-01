@@ -20,7 +20,8 @@ use crate::arma::{self, Mat};
 use crate::cnum;
 use crate::volume::Volume;
 
-/// `costfns` (costfns.h), the values mcflirt uses.
+/// `costfns` (costfns.h): mcflirt's values, and FLIRT's `LabelDiff` and `Bbr` (evaluated by
+/// FLIRT's own image pair, `larmorx-nc-flirt`, with the functions below and [`crate::bbr`]).
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum CostType {
     Woods,
@@ -29,7 +30,41 @@ pub enum CostType {
     NormCorr,
     NormMI,
     LeastSq,
+    LabelDiff,
     NormCorrSinc,
+    Bbr,
+}
+
+impl CostType {
+    /// `costfn_type(cname)` (costfns.cc): `None` for FSL's `Unknown`.
+    pub fn from_name(cname: &str) -> Option<CostType> {
+        match cname {
+            "mutualinfo" => Some(CostType::MutualInfo),
+            "corratio" => Some(CostType::CorrRatio),
+            "woods" => Some(CostType::Woods),
+            "normcorr" => Some(CostType::NormCorr),
+            "normmi" => Some(CostType::NormMI),
+            "leastsq" => Some(CostType::LeastSq),
+            "labeldiff" => Some(CostType::LabelDiff),
+            "bbr" => Some(CostType::Bbr),
+            _ => None,
+        }
+    }
+
+    /// The `costfns` enum's value (what FSL prints for `cout << get_costfn()`).
+    pub fn code(self) -> i32 {
+        match self {
+            CostType::Woods => 0,
+            CostType::CorrRatio => 1,
+            CostType::MutualInfo => 2,
+            CostType::NormCorr => 3,
+            CostType::NormMI => 4,
+            CostType::LeastSq => 5,
+            CostType::LabelDiff => 6,
+            CostType::NormCorrSinc => 7,
+            CostType::Bbr => 8,
+        }
+    }
 }
 
 /// `Costfn`: a reference and a test volume, the histogram bins of the reference, and the
@@ -84,25 +119,9 @@ impl Costfn {
     /// mutual information, is not used by mcflirt's paths and is not built).
     pub fn set_no_bins(&mut self, n_bins: i32) {
         self.no_bins = n_bins;
-        let (refmax0, refmin) = self.refvol.extrema();
-        let mut refmax = refmax0;
-        if refmax - refmin == 0.0 {
-            refmax += 1.0;
-        }
-        self.bin_a1 = n_bins as f32 / (refmax - refmin);
-        self.bin_a0 = (-refmin * n_bins as f32) / (refmax - refmin);
-        let n = self.refvol.nvoxels() as usize;
-        let mut bindex = Vec::with_capacity(n);
-        for &v in &self.refvol.data[..n] {
-            let mut b = cnum::f32_to_i32(v * self.bin_a1 + self.bin_a0);
-            if b >= n_bins {
-                b = n_bins - 1;
-            }
-            if b < 0 {
-                b = 0;
-            }
-            bindex.push(b);
-        }
+        let (bindex, a0, a1) = bin_index(&self.refvol, n_bins);
+        self.bin_a0 = a0;
+        self.bin_a1 = a1;
         self.bindex = bindex;
     }
 
@@ -174,6 +193,16 @@ impl Costfn {
                 self.heap_corrupted |= corrupted;
                 (1.0 - f64::from(c)) as f32
             }
+            CostType::LabelDiff => {
+                if self.smoothsize > 0.0 {
+                    p_labeldiff_weighted(&self.refvol, &self.testvol, None, affmat, self.smoothsize)
+                } else {
+                    p_labeldiff(&self.refvol, &self.testvol, affmat)
+                }
+            }
+            // mcflirt never selects BBR (it has no boundary points); FLIRT's image pair evaluates
+            // it with crate::bbr.
+            CostType::Bbr => f32::NAN,
             CostType::Woods => p_woods_fn(
                 &self.refvol,
                 &self.testvol,
@@ -213,6 +242,33 @@ impl Costfn {
             }
         }
     }
+}
+
+/// The reference's bin of every voxel, as `set_no_bins(n)` computes it (`bin_a1 = n / (max -
+/// min)`, `bin_a0 = -min n / (max - min)`, a constant volume's range taken as 1; each index
+/// `(int)(v a1 + a0)` clamped to `[0, n - 1]`, then to 0 if negative). Returns the indices,
+/// `bin_a0` and `bin_a1`.
+pub fn bin_index(refvol: &Volume, n_bins: i32) -> (Vec<i32>, f32, f32) {
+    let (refmax0, refmin) = refvol.extrema();
+    let mut refmax = refmax0;
+    if refmax - refmin == 0.0 {
+        refmax += 1.0;
+    }
+    let a1 = n_bins as f32 / (refmax - refmin);
+    let a0 = (-refmin * n_bins as f32) / (refmax - refmin);
+    let n = refvol.nvoxels() as usize;
+    let mut bindex = Vec::with_capacity(n);
+    for &v in &refvol.data[..n] {
+        let mut b = cnum::f32_to_i32(v * a1 + a0);
+        if b >= n_bins {
+            b = n_bins - 1;
+        }
+        if b < 0 {
+            b = 0;
+        }
+        bindex.push(b);
+    }
+    (bindex, a0, a1)
 }
 
 // ------------------------------------------------------------------------------------------------
@@ -392,10 +448,12 @@ impl Geometry {
         (xmin, xmax, o1, o2, o3)
     }
 
-    /// The edge weight of a point (`smoothx = smoothsize / xdim`, ...).
+    /// The edge weight of a point (`smoothx = smoothsize / xdim`, ...), starting from `w0`: 1 for
+    /// the smoothed costs, `wval * refweight(x, y, z)` for the fully weighted ones (FLIRT's
+    /// `-refweight` and `-inweight`), which FSL writes as the same statements.
     #[inline]
-    fn weight(&self, o1: f32, o2: f32, o3: f32, sm: [f32; 3]) -> f32 {
-        let mut w: f32 = 1.0;
+    fn weight(&self, w0: f32, o1: f32, o2: f32, o3: f32, sm: [f32; 3]) -> f32 {
+        let mut w: f32 = w0;
         if o1 < sm[0] {
             w *= o1 / sm[0];
         } else if (self.xb2 - o1) < sm[0] {
@@ -425,6 +483,27 @@ fn smooth3(smoothsize: f32, vtest: &Volume) -> [f32; 3] {
         smoothsize / vtest.ydim(),
         smoothsize / vtest.zdim(),
     ]
+}
+
+/// The weight volumes of FLIRT's fully weighted costs (`Costfn(refv, inputv, refweight,
+/// inweight)`): `refweight` on the reference's grid, `testweight` on the test volume's.
+#[derive(Clone, Copy)]
+pub struct Weights<'a> {
+    pub refweight: &'a Volume,
+    pub testweight: &'a Volume,
+}
+
+/// The weight a point starts from: 1, or `q_tri_interpolation(testweight, o1, o2, o3) *
+/// refweight(x, y, z)` (the reference weight read with its extrapolation, as `operator()`).
+#[inline]
+fn start_weight(w: Option<Weights>, o1: f32, o2: f32, o3: f32, x: u32, y: u32, z: u32) -> f32 {
+    match w {
+        None => 1.0,
+        Some(w) => {
+            let wval = q_tri_interpolation(w.testweight, o1, o2, o3);
+            wval * w.refweight.get(i64::from(x), i64::from(y), i64::from(z))
+        }
+    }
 }
 
 /// Whether point `x` of a row is used: inner points always, end points when inside the
@@ -523,6 +602,21 @@ pub fn p_normcorr_smoothed(
     sinc: bool,
     skip: bool,
 ) -> f32 {
+    p_normcorr_weighted(vref, vtest, None, aff, smoothsize, sinc, skip)
+}
+
+/// `p_normcorr_smoothed` with `weights: None`, `p_normcorr_fully_weighted` with the weights
+/// (the same loop: each point's weight starts from `wval * refweight(x, y, z)`; FSL-02's count
+/// alike).
+pub fn p_normcorr_weighted(
+    vref: &Volume,
+    vtest: &Volume,
+    weights: Option<Weights>,
+    aff: &Mat,
+    smoothsize: f32,
+    sinc: bool,
+    skip: bool,
+) -> f32 {
     let g = Geometry::new(vref, vtest, aff);
     let sm = smooth3(smoothsize, vtest);
     let (a11, a21, a31) = (g.a[0], g.a[4], g.a[8]);
@@ -549,7 +643,8 @@ pub fn p_normcorr_smoothed(
                                 .value(i64::from(x), i64::from(y), i64::from(z))
                                 .is_finite())
                     {
-                        let weight = g.weight(o1, o2, o3, sm);
+                        let weight =
+                            g.weight(start_weight(weights, o1, o2, o3, x, y, z), o1, o2, o3, sm);
                         let valx = vref.value(i64::from(x), i64::from(y), i64::from(z));
                         let valy = val;
                         num += weight;
@@ -675,6 +770,18 @@ pub fn p_leastsquares_smoothed(
     smoothsize: f32,
     skip: bool,
 ) -> f32 {
+    p_leastsquares_weighted(vref, vtest, None, aff, smoothsize, skip)
+}
+
+/// `p_leastsquares_smoothed` with `weights: None`, `p_leastsquares_fully_weighted` with them.
+pub fn p_leastsquares_weighted(
+    vref: &Volume,
+    vtest: &Volume,
+    weights: Option<Weights>,
+    aff: &Mat,
+    smoothsize: f32,
+    skip: bool,
+) -> f32 {
     let g = Geometry::new(vref, vtest, aff);
     let sm = smooth3(smoothsize, vtest);
     let (a11, a21, a31) = (g.a[0], g.a[4], g.a[8]);
@@ -693,7 +800,8 @@ pub fn p_leastsquares_smoothed(
                                 .value(i64::from(x), i64::from(y), i64::from(z))
                                 .is_finite())
                     {
-                        let weight = g.weight(o1, o2, o3, sm);
+                        let weight =
+                            g.weight(start_weight(weights, o1, o2, o3, x, y, z), o1, o2, o3, sm);
                         let valx = vref.value(i64::from(x), i64::from(y), i64::from(z));
                         let valy = val;
                         num += weight;
@@ -747,6 +855,22 @@ pub fn p_corr_ratio_smoothed(
     smoothsize: f32,
     skip: bool,
 ) -> (f32, bool) {
+    p_corr_ratio_weighted(vref, vtest, None, bindex, aff, no_bins, smoothsize, skip)
+}
+
+/// `p_corr_ratio_smoothed` with `weights: None`, `p_corr_ratio_fully_weighted` (the affine
+/// form) with them.
+#[allow(clippy::too_many_arguments)]
+pub fn p_corr_ratio_weighted(
+    vref: &Volume,
+    vtest: &Volume,
+    weights: Option<Weights>,
+    bindex: &[i32],
+    aff: &Mat,
+    no_bins: i32,
+    smoothsize: f32,
+    skip: bool,
+) -> (f32, bool) {
     let g = Geometry::new(vref, vtest, aff);
     let sm = smooth3(smoothsize, vtest);
     let (a11, a21, a31) = (g.a[0], g.a[4], g.a[8]);
@@ -770,7 +894,8 @@ pub fn p_corr_ratio_smoothed(
                                 .is_finite())
                     {
                         let b = bindex[bptr] as usize;
-                        let weight = g.weight(o1, o2, o3, sm);
+                        let weight =
+                            g.weight(start_weight(weights, o1, o2, o3, x, y, z), o1, o2, o3, sm);
                         numy[b] += weight;
                         sumy[b] += weight * val;
                         sumy2[b] += weight * val * val;
@@ -1011,6 +1136,27 @@ pub fn calc_smoothed_entropy(
     fuzzyfrac: f32,
     skip: bool,
 ) -> (f32, f32, f32) {
+    calc_weighted_entropy(
+        vref, vtest, None, bindex, aff, mintest, maxtest, no_bins, smoothsize, fuzzyfrac, skip,
+    )
+}
+
+/// `calc_smoothed_entropy` with `weights: None`, `calc_fully_weighted_entropy` with them (the
+/// same loop and sums; the geometric weight starts from `wval * refweight(x, y, z)`).
+#[allow(clippy::too_many_arguments)]
+pub fn calc_weighted_entropy(
+    vref: &Volume,
+    vtest: &Volume,
+    weights: Option<Weights>,
+    bindex: &[i32],
+    aff: &Mat,
+    mintest: f32,
+    maxtest: f32,
+    no_bins: i32,
+    smoothsize: f32,
+    fuzzyfrac: f32,
+    skip: bool,
+) -> (f32, f32, f32) {
     let g = Geometry::new(vref, vtest, aff);
     let sm = smooth3(smoothsize, vtest);
     let (a11, a21, a31) = (g.a[0], g.a[4], g.a[8]);
@@ -1036,7 +1182,8 @@ pub fn calc_smoothed_entropy(
                                 .value(i64::from(x), i64::from(y), i64::from(z))
                                 .is_finite())
                     {
-                        let geomweight = g.weight(o1, o2, o3, sm);
+                        let geomweight =
+                            g.weight(start_weight(weights, o1, o2, o3, x, y, z), o1, o2, o3, sm);
                         let a = i64::from(bindex[bptr]);
                         let mut bidx = val * b1 + b0;
                         let mut bcentre = cnum::f32_to_i64(bidx);
@@ -1237,4 +1384,272 @@ pub fn q_sinc_interpolation(v: &Volume, x: f32, y: f32, z: f32) -> f32 {
     } else {
         v.backgroundval()
     }
+}
+
+// ------------------------------------------------------------------------------------------------
+// FLIRT's label difference (`-cost labeldiff`) and the unsmoothed entropies
+
+/// `q_get_neighbours(v, x, y, z, ...)`: the cell's eight values (or the pad value eight times
+/// outside `[0, n-1)`) and the fractional offsets, with the indices truncated as `(int)`.
+#[inline]
+fn q_get_neighbours(v: &Volume, x: f32, y: f32, z: f32) -> ([f32; 8], f32, f32, f32) {
+    let ix = cnum::f32_to_i32(x);
+    let iy = cnum::f32_to_i32(y);
+    let iz = cnum::f32_to_i32(z);
+    let dx = x - ix as f32;
+    let dy = y - iy as f32;
+    let dz = z - iz as f32;
+    if ix >= 0
+        && iy >= 0
+        && iz >= 0
+        && i64::from(ix) < v.xsize() - 1
+        && i64::from(iy) < v.ysize() - 1
+        && i64::from(iz) < v.zsize() - 1
+    {
+        (
+            crate::interp::neighbours(v, i64::from(ix), i64::from(iy), i64::from(iz)),
+            dx,
+            dy,
+            dz,
+        )
+    } else {
+        ([v.padvalue; 8], dx, dy, dz)
+    }
+}
+
+/// The label mismatch of one point: the trilinear weights of the cell's corners whose label
+/// differs from `valx` by more than 0.5, each product in double and added to the float sum
+/// (`lsum += (1.0-dx)*(1.0-dy)*(1.0-dz)`), in FSL's corner order.
+#[inline]
+fn label_mismatch(n: [f32; 8], valx: f32, dx: f32, dy: f32, dz: f32) -> f32 {
+    let [v000, v001, v010, v011, v100, v101, v110, v111] = n;
+    let (dx, dy, dz) = (f64::from(dx), f64::from(dy), f64::from(dz));
+    let mut lsum: f32 = 0.0;
+    let mut add = |v: f32, w: f64| {
+        if f64::from((v - valx).abs()) > 0.5 {
+            lsum = (f64::from(lsum) + w) as f32;
+        }
+    };
+    add(v000, (1.0 - dx) * (1.0 - dy) * (1.0 - dz));
+    add(v001, (1.0 - dx) * (1.0 - dy) * dz);
+    add(v011, (1.0 - dx) * dy * dz);
+    add(v010, (1.0 - dx) * dy * (1.0 - dz));
+    add(v110, dx * dy * (1.0 - dz));
+    add(v100, dx * (1.0 - dy) * (1.0 - dz));
+    add(v101, dx * (1.0 - dy) * dz);
+    add(v111, dx * dy * dz);
+    lsum
+}
+
+/// `p_labeldiff(vref, vtest, aff)`: the mean label mismatch over the used points (count exact),
+/// or the worst cost `(max - min)^2` with at most one point.
+pub fn p_labeldiff(vref: &Volume, vtest: &Volume, aff: &Mat) -> f32 {
+    let g = Geometry::new(vref, vtest, aff);
+    let (a11, a21, a31) = (g.a[0], g.a[4], g.a[8]);
+    let (mut sum, mut sum_a, mut sum_b) = (0f32, 0f32, 0f32);
+    let mut num: i64 = 0;
+    for z in 0..=g.zb1 {
+        for y in 0..=g.yb1 {
+            let (xmin, xmax, mut o1, mut o2, mut o3) = g.row(y, z);
+            let mut x = xmin;
+            while x <= xmax {
+                if use_point(vtest, x, xmin, xmax, o1, o2, o3) {
+                    num += 1;
+                    let valx = vref.value(i64::from(x), i64::from(y), i64::from(z));
+                    let (n, dx, dy, dz) = q_get_neighbours(vtest, o1, o2, o3);
+                    sum += label_mismatch(n, valx, dx, dy, dz);
+                }
+                o1 += a11;
+                o2 += a21;
+                o3 += a31;
+                if x == u32::MAX {
+                    break;
+                }
+                x += 1;
+            }
+            sum_a += sum;
+            sum = 0.0;
+        }
+        sum_b += sum_a;
+        sum_a = 0.0;
+    }
+    if num > 1 {
+        sum_b / num as f32
+    } else {
+        let d = max_ff(vref.max(), vtest.max()) - min_ff(vref.min(), vtest.min());
+        d * d
+    }
+}
+
+/// `p_labeldiff_smoothed` (`weights: None`) and `p_labeldiff_fully_weighted` (with them): the
+/// edge-weighted mean label mismatch, the counts reset per row and slice.
+pub fn p_labeldiff_weighted(
+    vref: &Volume,
+    vtest: &Volume,
+    weights: Option<Weights>,
+    aff: &Mat,
+    smoothsize: f32,
+) -> f32 {
+    let g = Geometry::new(vref, vtest, aff);
+    let sm = smooth3(smoothsize, vtest);
+    let (a11, a21, a31) = (g.a[0], g.a[4], g.a[8]);
+    let (mut sum, mut sum_a, mut sum_b) = (0f32, 0f32, 0f32);
+    let (mut num, mut num_a, mut num_b) = (0f32, 0f32, 0f32);
+    for z in 0..=g.zb1 {
+        for y in 0..=g.yb1 {
+            let (xmin, xmax, mut o1, mut o2, mut o3) = g.row(y, z);
+            let mut x = xmin;
+            while x <= xmax {
+                if use_point(vtest, x, xmin, xmax, o1, o2, o3) {
+                    let w0 = start_weight(weights, o1, o2, o3, x, y, z);
+                    let weight = g.weight(w0, o1, o2, o3, sm);
+                    let valx = vref.value(i64::from(x), i64::from(y), i64::from(z));
+                    num += weight;
+                    let (n, dx, dy, dz) = q_get_neighbours(vtest, o1, o2, o3);
+                    sum += weight * label_mismatch(n, valx, dx, dy, dz);
+                }
+                o1 += a11;
+                o2 += a21;
+                o3 += a31;
+                if x == u32::MAX {
+                    break;
+                }
+                x += 1;
+            }
+            sum_a += sum;
+            sum = 0.0;
+            num_a += num;
+            num = 0.0;
+        }
+        sum_b += sum_a;
+        sum_a = 0.0;
+        num_b += num_a;
+        num_a = 0.0;
+    }
+    if num_b > 1.0 {
+        sum_b / num_b
+    } else {
+        let d = max_ff(vref.max(), vtest.max()) - min_ff(vref.min(), vtest.min());
+        d * d
+    }
+}
+
+/// `set_no_bins`'s table `plnp(n) = -p log p` for `p = n / N` (`float` arithmetic, `logf`,
+/// stored as double), `min(10000, 10 N / (no_bins + 1))` entries; `None` when FSL's integer
+/// division would divide by zero (`no_bins = -1`).
+pub fn plnp_table(nvoxels: u64, no_bins: i32) -> Option<Vec<f64>> {
+    let d = i64::from(no_bins) + 1;
+    if d == 0 {
+        return None;
+    }
+    // (unsigned long) (10*N/(no_bins+1)): no_bins+1 is converted to unsigned long.
+    let n = (10u64.wrapping_mul(nvoxels)).wrapping_div(d as u64);
+    let size = n.min(10000) as usize;
+    let nf = nvoxels as f32;
+    Some(
+        (1..=size)
+            .map(|num| {
+                let p = num as f32 / nf;
+                f64::from(-p * crate::glibc_float::logf(p))
+            })
+            .collect(),
+    )
+}
+
+/// `calc_entropy`: the joint and marginal entropies with plain (integer) histograms, the
+/// `-p log p` of counts up to the table's size from `plnp`. Returns `(joint, marginal 1,
+/// marginal 2)`.
+#[allow(clippy::too_many_arguments)]
+pub fn calc_entropy(
+    vref: &Volume,
+    vtest: &Volume,
+    bindex: &[i32],
+    aff: &Mat,
+    mintest: f32,
+    maxtest: f32,
+    no_bins: i32,
+    plnp: &[f64],
+) -> (f32, f32, f32) {
+    let g = Geometry::new(vref, vtest, aff);
+    let (a11, a21, a31) = (g.a[0], g.a[4], g.a[8]);
+    let nb = no_bins.max(0) as usize;
+    let nbl = i64::from(no_bins);
+    let mut jointhist = vec![0i32; (nb + 1) * (nb + 1)];
+    let mut marghist1 = vec![0i32; nb + 1];
+    let mut marghist2 = vec![0i32; nb + 1];
+    let b1 = no_bins as f32 / (maxtest - mintest);
+    let b0 = (-mintest * no_bins as f32) / (maxtest - mintest);
+    let (nx, ny) = (vref.xsize() as usize, vref.ysize() as usize);
+    for z in 0..=g.zb1 {
+        for y in 0..=g.yb1 {
+            let (xmin, xmax, mut o1, mut o2, mut o3) = g.row(y, z);
+            let mut bptr = (z as usize * ny + y as usize) * nx + xmin as usize;
+            let mut x = xmin;
+            while x <= xmax {
+                if use_point(vtest, x, xmin, xmax, o1, o2, o3) {
+                    let val = q_tri_interpolation(vtest, o1, o2, o3);
+                    let a = i64::from(bindex[bptr]);
+                    let mut b = cnum::f32_to_i64(val * b1 + b0);
+                    if b >= nbl {
+                        b = nbl - 1;
+                    }
+                    if b < 0 {
+                        b = 0;
+                    }
+                    jointhist[(a * (nbl + 1) + b) as usize] += 1;
+                    marghist1[a as usize] += 1;
+                    marghist2[b as usize] += 1;
+                }
+                bptr += 1;
+                o1 += a11;
+                o2 += a21;
+                o3 += a31;
+                if x == u32::MAX {
+                    break;
+                }
+                x += 1;
+            }
+        }
+    }
+    let psize = plnp.len() as i32;
+    let nvoxels = vref.ysize() * vref.xsize() * vref.zsize();
+    let term = |e: f32, n: i32| -> f32 {
+        if n <= psize {
+            (f64::from(e) + plnp[(n - 1) as usize]) as f32
+        } else {
+            let p = n as f32 / nvoxels as f32;
+            e + -p * crate::glibc_float::logf(p)
+        }
+    };
+    let (mut jointentropy, mut margentropy1, mut margentropy2) = (0f32, 0f32, 0f32);
+    for &n in &jointhist {
+        if n > 0 {
+            jointentropy = term(jointentropy, n);
+        }
+    }
+    for &n in &marghist1 {
+        if n > 0 {
+            margentropy1 = term(margentropy1, n);
+        }
+    }
+    let mut noverlap: i64 = 0;
+    for &n in &marghist2 {
+        if n > 0 {
+            noverlap += i64::from(n);
+            margentropy2 = term(margentropy2, n);
+        }
+    }
+    if noverlap > 0 {
+        let nratio = nvoxels as f32 / noverlap as f32;
+        let l = crate::glibc_float::logf(nratio);
+        jointentropy = nratio * jointentropy - l;
+        margentropy1 = nratio * margentropy1 - l;
+        margentropy2 = nratio * margentropy2 - l;
+    } else {
+        let l = math::log(f64::from(no_bins));
+        jointentropy = (2.0 * l) as f32;
+        margentropy1 = l as f32;
+        margentropy2 = l as f32;
+    }
+    (jointentropy, margentropy1, margentropy2)
 }

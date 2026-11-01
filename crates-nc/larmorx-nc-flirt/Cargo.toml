@@ -1,0 +1,14 @@
+[package]
+name = "larmorx-nc-flirt"
+description = "The bit-exact replica of FSL's flirt (linear registration, with boundary-based registration) and convert_xfm, translated from FSL 6.0.7.23 (FSL Licence: non-commercial)"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+
+[dependencies]
+larmorx-core.workspace = true
+larmorx-nc-core.workspace = true
+
+[dev-dependencies]
+tempfile.workspace = true

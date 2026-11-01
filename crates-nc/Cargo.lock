@@ -211,6 +211,7 @@ dependencies = [
  "larmorx-core",
  "larmorx-nc-bet",
  "larmorx-nc-core",
+ "larmorx-nc-flirt",
  "larmorx-nc-mcflirt",
  "ruzstd",
  "sha2",
@@ -225,6 +226,15 @@ dependencies = [
  "flate2",
  "larmorx-core",
  "ruzstd",
+ "tempfile",
+]
+
+[[package]]
+name = "larmorx-nc-flirt"
+version = "0.0.1"
+dependencies = [
+ "larmorx-core",
+ "larmorx-nc-core",
  "tempfile",
 ]
 

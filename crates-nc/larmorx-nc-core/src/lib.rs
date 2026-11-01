@@ -39,6 +39,7 @@
 
 pub mod arma;
 pub mod avwutils;
+pub mod bbr;
 pub mod cnum;
 pub mod costfns;
 pub mod fdlibm;

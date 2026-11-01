@@ -101,6 +101,24 @@ pub fn affine_transform(
     affine_transform_mask(&src, vout, aff, paddingsize, src.padvalue)
 }
 
+/// [`affine_transform`] with the background value over the whole border when `whole_border`
+/// (FSL-75's correction: FSL's buffer holds part of the border of a volume 3 voxels wide; see
+/// [`Volume::background_buffer`]), else the values that fit FSL's buffer, as
+/// [`affine_transform`] (the same wherever the buffer holds the border).
+pub fn affine_transform_bg(
+    vin: &Volume,
+    vout: &mut Volume,
+    aff: &Mat,
+    paddingsize: f32,
+    whole_border: bool,
+) -> Result<(), FslError> {
+    let mut src = vin.clone();
+    src.padvalue = vin.background_value_with(whole_border).0;
+    src.extrap = Extrapolation::Extraslice;
+    raw_affine_transform(&src, vout, aff)?;
+    affine_transform_mask(&src, vout, aff, paddingsize, src.padvalue)
+}
+
 /// `raw_affine_transform(vin, vout, aff)`.
 pub fn raw_affine_transform(vin: &Volume, vout: &mut Volume, aff: &Mat) -> Result<(), FslError> {
     raw_affine_transform_coefs(vin, vout, aff, None)

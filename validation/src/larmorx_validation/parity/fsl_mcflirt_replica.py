@@ -466,6 +466,20 @@ def compare(
     exclude: set[str],
 ) -> tuple[int, int]:
     """Exit status, streams, files and bytes; returns (identical files, files)."""
+    refused_75 = any(
+        ln.startswith("larmorx-nc: error:") and "FSL-75" in ln for ln in replica.stderr.splitlines()
+    )
+    if oracle.code < 0 and (refused_75 or "FSL-75" in defects.notices_in(replica.stderr)):
+        # FSL-75 (part 3, as in fsl-flirt-replica): mcflirt wrote past the background value's
+        # buffer and went on with a corrupted heap until the C library stopped it; the replica
+        # goes on with the values that fit FSL's buffer (or refuses a single voxel), naming it.
+        checks(
+            "mcflirt is killed after FSL-75's heap corruption; the replica "
+            + ("refuses (exit 1)" if refused_75 else "goes on and names FSL-75"),
+            replica.code == 1 if refused_75 else replica.code >= 0,
+            detail=f"mcflirt signal {-oracle.code}, replica {replica.code}",
+        )
+        return 0, 0
     if oracle.code < 0:
         checks(
             "exit status (mcflirt aborts; the replica exits 1)",
@@ -988,6 +1002,10 @@ def _make_inputs(kind: str, d: Path) -> dict[str, str]:
     elif kind.startswith("phantom-"):
         nib.save(_moving_phantom(int(kind.removeprefix("phantom-"))), d / "in.nii.gz")
         files["in"] = "in.nii.gz"
+    elif kind == "narrow":
+        # three voxels along x (FSL-75: the background value's buffer is too small)
+        _write_like(small, d / "in.nii.gz", data[20:23], np.float32)
+        files["in"] = "in.nii.gz"
     elif kind == "nan-ref":
         r = np.asanyarray(nib.load(ref).dataobj).astype(np.float32)
         r[r.shape[0] // 2, r.shape[1] // 2, r.shape[2] // 2] = np.nan
@@ -997,6 +1015,12 @@ def _make_inputs(kind: str, d: Path) -> dict[str, str]:
 
 
 EDGES: dict[str, Edge] = {
+    "fsl75-narrow": Edge(
+        ("-in", "@in", "-out", "out", "-mats", "-plots"),
+        inputs="narrow",
+        description="a series 3 voxels wide (FSL-75: the background value's buffer is too small "
+        "for the border mcflirt writes)",
+    ),
     "gdt": Edge(
         ("-in", "@in", "-out", "out", "-gdt", "-mats", "-plots"),
         description="-gdt with a relative -out: the gradient images are registered (FSL-04)",

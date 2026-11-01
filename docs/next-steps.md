@@ -447,6 +447,10 @@ The items below keep their history.
   §12.1; the 33 cases of §14.1 in the replica's suite, mcflirt 6.0.7.23 live: 24 pass, 9 rejected
   by both, the replica's matrices mcflirt's as text wherever both run to the end; a command-line
   test each; golden `mcflirt.fsl65.*`, `mcflirt.fsl66.*`; FSL-21 named in `reproduce` too).
+- **FSL's warp-field libraries** (warpfns, basisfield; 2026-11-01): needed by `applywarp` and `fugue`
+  (and so `epi_reg`), and by FLIRT's coordinate programs' `-warp` (refused with a message until then):
+  ported with the first tool that needs them, then `-warp` added to `img2imgcoord`, `std2imgcoord` and
+  `img2stdcoord`.
 - **A benchmark report of the mcflirt replica** (informal: fMRIPrep's call on ds000005, the
   replica 20 s at 3 threads and 36 s at one, mcflirt 70 s, on a busy machine).
 - **BET, further:** a benchmark report (FSL against the replica; bet2 and betsurf on the data

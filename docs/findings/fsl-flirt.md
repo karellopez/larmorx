@@ -83,7 +83,7 @@ something undefined or questionable, and what larmorx does. Each entry says how 
 | FSL-14 | a NaN voxel makes a cost NaN | c | A | non-finite points left out by default |
 | FSL-21, FSL-66 | `-bins` giving no or negative bins at a scale (`no_bins/8` at 8 mm: `-bins` below 8) | a | — | refused (heap corruption, division by zero, `bad_array_new_length`), both modes |
 | FSL-56 | NIfTI extensions' offset | c | A | corrected by default |
-| FSL-67 | BBR normals divided by the reference level's voxel sizes | c? | D | kept; measured in part 2 |
+| FSL-67 | BBR normals divided by the reference level's voxel sizes | c? | D, then C (measured 2026-11-01) | kept in both modes: no measurable gain |
 | FSL-68 | every error after the command line exits with status 0 (`main` catches all exceptions) | e | B | exit status 1 by default, with FSL's message; `reproduce` exits 0 |
 | FSL-69 | an older image pair compares with the unblurred input after a `setscale` the data are too coarse for | c? | C | kept (pipelines' results depend on it), documented |
 | FSL-70 | a schedule matrix name FSL cannot interpret (`Uq`, an empty word) or `U[` (a 28th list): an uninitialised or out-of-bounds pointer | a | — | refused, both modes, after FSL's message |
@@ -91,6 +91,7 @@ something undefined or questionable, and what larmorx does. Each entry says how 
 | FSL-72 | `read` of a file with a word that is not a number: an endless loop | a | — | refused, both modes |
 | FSL-73 | `-pedir` without a field map read (no `-fieldmap`, or `-applyxfm`, which never reads it): an empty field map interpolated | a | — | refused, both modes |
 | FSL-74 | the usage lists `-displayinit` (the option is `-printinit`) and leaves `woods` out of `-cost` | f | — | the same text (messages kept) |
+| FSL-75 | newimage's `calc_bval` (the background value, edge width 2) sizes its buffer too small for an image 3 voxels wide along x (with y or z ≥ 2), or along y (z ≥ 2, x not 2 or 4), and empty for 1 × 1 × 1: heap overflow, or a read of an empty vector's first element | a | — | refused, both modes, where FLIRT computes it (part 2) |
 
 FSL-21 and FSL-66 are mcflirt's entries; FLIRT meets them through `-bins` (each scale has
 `trunc(bins/scale)` bins). FSL-09, FSL-11, FSL-14, FSL-56 are the shared ones of FSL's libraries.
@@ -116,30 +117,109 @@ the 936 findings after the fixes: 577 agree in both their shrunk and drawn forms
   (`-nan` when printed); the compiler had folded the empty loop's `0.0 / 0.0` into a positive NaN.
   The division now follows SSE's NaN rules (`sse::div_f64`). Permanent case
   `bbr-no-boundary-points-nan`.
-- **Open (part 2): FSL's heap corruption.** 281 findings: FSL aborts (`munmap_chunk(): invalid
-  pointer`, `free(): invalid size`, `double free or corruption`) or segfaults on small or constant
-  images (from one voxel up to some 30 per axis; with the default options too, e.g. a 1 x 1 x 1
-  input against a 9 x 1 x 1 reference), where the replica finishes. gdb shows the crash in a later
-  `free` (reading the next image), so the corruption happened earlier; it is not yet traced
-  (`crash_probe.py` narrows the inputs). Once traced, the replica refuses those inputs in both modes.
-- **Open (part 2): 66 matrices.** Registrations (45) and BBR (21) whose matrix differs, 64 with
-  voxels below 0.5 or above 5 mm.
-- **Open (part 2): the fix pass.** 8 cases where `fix` changes a result without naming a defect:
-  infinite or NaN reference voxels (FSL-14's notice) and `-setbackground` with spline.
-- **Open (part 2):** one stderr count (`Erroneous dof 3 : using 6 instead` once more than FSL,
-  trial-flirt-01277), one more heap corruption with `-bins 16` (`corrupted size vs. prev_size`), and
-  the replica over 3 GiB on two cases with 0.01 mm and 25 mm voxels (FSL's peak not yet measured).
+Part 2 (2026-11-01) settled the 359 open findings (`recheck_findings.py` with each build; logs
+`<workspace>/oracles/logs/fsl-flirt-2-recheck{2,3}.log`): every one of the 930 findings that fit
+the trial's memory agrees, in its shrunk and drawn forms; the 6 that did not are FSL's own memory
+(below).
+- **FSL-75: FSL's heap corruption.** Traced with a hardware watchpoint (`gdb`, `watch -l` on the
+  corrupted chunk header found by a first run; `<scratch>/py/gdb_watch.py`, now
+  `validation/probes/fsl-flirt-bval/`): the write is in `calc_bval` (newimage.cc:1432), reached
+  from `subsample_by_2` (`halfvol = refvol.backgroundval()`). `numbins = 2(xb−2ewx)(yb−2ewy)ewz +
+  2(xb−2ewx)zb·ewy + 2yb·zb·ewx` with `ew = min(2, n−1)`; for `n = 3`, `n − 2ew = −1`: the
+  negative terms shrink the vector while their loops write nothing, and the yz faces' loop writes
+  past it. Exactly: `numbins < written` when x = 3 (and y or z ≥ 2) or y = 3 (z ≥ 2, x ∉ {2, 4});
+  `numbins = 0` at 1 × 1 × 1 (`hist[0]` on an empty vector: a null read, segfault). FLIRT computes
+  it in `subsample_by_2` (the reference pyramid), `configure_interpolation` (without
+  `-setbackground`: the final resampling's padding) and `q_sinc_interpolation`'s fallback (kernel
+  sum ≈ 0; on the input, never met in the trial). The levels' sizes follow from the images': e.g. a
+  1 × 1 × 1 input against an 8 × 1 × 1 reference reaches a 3 × 1 × 4 level. FSL then aborts at a
+  later `free` (`malloc(): invalid size (unsorted)`, `double free or corruption (!prev)`, `free():
+  invalid next size`, `munmap_chunk(): invalid pointer`, `corrupted size vs. prev_size`: the
+  message depends on the heap's layout), segfaults, or finishes and crashes at exit after writing
+  its files; the `-bins 16` case is the same. The replica refuses in both modes at the first such
+  computation (`Volume::background_undefined`), before writing anything; the suite's comparison
+  takes "FSL killed, the replica refusing FSL-75" as agreement (FSL's later messages and files are
+  those of a corrupted heap). Suite cases `edge/background-overflow`, `edge/background-empty`.
+  mcflirt reaches `calc_bval` through `affine_transform`'s padding and `subsample_by_2` too: its
+  replica does not refuse yet (a follow-up; no record case meets it).
+- **The 66 matrices: `scalemat`'s single-precision quotient.** `orig2scaled_coord(1,1) =
+  1/globaloptions::get().basescale` divides an `int` by a `float`: a single-precision quotient
+  (exactly 100 for a base scale of 0.01), stored in the double matrix; the replica divided in
+  double. With an identity initial matrix `S·I·S⁻¹` hides it; with `-init` (or `-usesqform`) and a
+  base scale other than 1 (voxels below 0.75 mm or above 12 mm: every one of the 66) the initial
+  matrix differed in its last digits (−200.000004 against −200) and the search went elsewhere.
+  Found by comparing `-verbose 5` traces. Fixed; suite case `real/basescale-small-init` (the old
+  build differs from FSL there), permanent case `basescale-init-float`. The extra `Erroneous dof 3`
+  line and the stdout differences were the same cause.
+- **The fix pass's unnamed changes (8).** FSL-14 was never named by FLIRT's replica: it is now
+  named whenever the pair's volumes hold NaN or infinite values (silent where they lie outside the
+  cost's points: `_SILENT`); FSL-09 was named only for values that were not integers: also for
+  values out of the type's range (a negative `-setbackground` into uint8: 251 against 0).
+- **The 6 runs over 3 GiB** (trial-flirt-01374, -01768, -02317, -03183, -03192, -03718: voxels of
+  0.01 mm or 25-50 mm make FLIRT's isotropic levels huge): FSL's own peak is 8.2 GiB on one and
+  above 25 GiB on others (`memory_findings.py`; the box stopped two FSL runs at 26 and 39 GiB). Not a
+  difference: both programs need more than the trial's budget; they belong to the final validation
+  phase's heavy cases.
 
-## Not replicated yet (part 2)
+## Part 2's other findings (2026-11-01)
+
+- **`-anglerep quaternion`.** `construct_rotmat_quat` computes `w2 = 1.0 - Sqr(p1) - Sqr(p2) -
+  Sqr(p3)` in double and stores it in a `float`; `w = sqrt(w2)` (float), `x, y, z` floats, every
+  entry a float expression (`2*y*y` is `(2y)·y`); with `n == 3` it does not return before the
+  translations (it adds `params(4..6)`); with `n < 3` it prints `Can only do 3 or more, not <n>` and
+  goes on; `w2 < 0` prints `Parameters do not form a valid axis - greater than unity` and returns
+  the identity (scales and skews still applied by `compose_aff`). FLIRT prints these from inside
+  the cost function, so the replica collects them and writes them to standard error before
+  anything else written there. `rotmat2quat` fills a `mat44` (float) with the 3 × 3 rotation only
+  (the rest uninitialised: it reaches only discarded outputs) and calls the legacy
+  `nifti_mat44_to_quatern` (x87 precision in FSL's build; the core's `mat44_to_quatern`), keeping
+  `(qb, qc, qd)` (the fourth output, `qfac`, lands in `quaternion(4)`). The search keeps Euler
+  angles (`flirt.cc:695`).
+- **FSL-67's measurement** (rule D → C): `validation/investigations/fsl-flirt/fsl67_measure.py`
+  at commit c9f0aa6 (whose default computed the normals with the segmentation's voxel sizes),
+  results in `fsl67-results.json`: fMRIPrep's three BBR calls move by 0.016 mm (ds005040, 0.85 ×
+  0.83 × 0.83 mm segmentation), 0 (ds003592, isotropic) and 0.025 mm (ds000228, whose 0.9999998 mm
+  voxel differs from 1 only in the float's last bit: BBR's own sensitivity) on average over the
+  brain; on ds005040's T1w taken every third slice (0.85 × 0.83 × 2.5 mm) and moved by a known
+  rigid motion, three starts converge 0.060 mm (corrected) and 0.063 mm (FLIRT's) from the truth on
+  average, the 95th percentiles 0.092 and 0.092 mm: no gain above the noise. Kept in both modes.
+- **avscale** (avscale.cc): `catch (Exception)` catches `std::runtime_error` (armawrap's and
+  newimage's exceptions: it prints `what()`), `catch (...)` the rest (`Image error`), and both
+  `throw;` again: `std::terminate`. `optionarg[0]` of an empty first argument reads the string's
+  terminator (not `-`: no option). A missing matrix argument after an option makes
+  `std::string(nullptr)` (`std::logic_error`). `affmat.i() * rotmat * skew * scale` is a chain of
+  four (each operand evaluated, `((A⁻¹R)K)S`); `(mat*scale.i()*skew.i()*rot.i() + id4)` in
+  `sqrtaff` likewise; `.SubMatrix(1,3,1,3).i() * trans` is a solve. 400 random matrices
+  (rotations, scales, skews, reflections, any matrix) give FSL's text.
+- **The coordinate programs**: `read_volume_hdr_only` neither repairs zero voxel sizes nor builds
+  ANALYZE's sform (unlike a full read) and allocates a one-element buffer; `std2imgcoord` prints
+  `affmat.i()` as an Armadillo expression (`arma_ostream::print`: its own widths, the stream's
+  state restored), while every `Matrix` prints through armawrap's `doPrint` (fixed, 6 decimals,
+  for good); `img2imgcoord`'s `verbose` is a zero-initialised global (no constructor sets it);
+  `-` is an option for img2imgcoord (`Lacking argument to option -` when last) and the standard
+  input for the others; the `-warp` reader's failure prints the image exception and `An error
+  occured while reading file: <name>`, exit 1.
+- **rmsdiff**: `rms_deviation` catches its inverse's exception (`RMS_DEVIATION ERROR:: Could not
+  invert matrix`, `exit(-5)`); the low-determinant warning prints the matrix on `cerr` (which then
+  stays fixed); `Max(dist, maxdist)` keeps `maxdist` for a NaN distance; an empty mask divides 0 by
+  0 (`-nan`).
+
+## Not replicated yet (part 3)
 
 Each is refused with a message (`larmorx-nc: error: ... not replicated yet`), never computed
 differently:
-- `-anglerep quaternion` (`construct_rotmat_quat`, `rotmat2quat`).
 - The schedule command `alignpaxes` (`principleaxes_mat`: Armadillo's `eig_sym`, LAPACK `dsyevd`).
 - General parameter-subset masks' pseudo-inverse (`dgesdd`).
-- `-debug` with the BBR cost (the `debug` 4D volume of `set_debug_mode`).
+- `-debug` with the BBR cost (the `debug` 4D volume of `set_debug_mode`: `refvol` doubled, the
+  points' rounded mean of millimetre coordinates used as voxel indices, writes out of bounds going
+  through `extrapolate`'s reference).
+- The coordinate programs' `-warp` with a readable warp field (FNIRT's `FnirtFileReader`: field or
+  coefficient files, the latter needing fsl-basisfield's splines).
 
 Not refused but not yet compared with FSL: `-debug`'s other volumes (the pyramid, the weights; the
 1 × 1 × 1 weight volumes FSL filters from empty ones).
-- The other programs of fsl-flirt: `avscale`, `makerot`, `midtrans`, `rmsdiff`, `img2imgcoord`,
-  `img2stdcoord`, `std2imgcoord`, `applyxfm4D`, `pointflirt`.
+- The other programs of fsl-flirt: `applyxfm4D` (templated over the input's type, sinc `b`/7 in
+  4D and `r`/9 in 3D), `makerot` (fsl-utils' `Option<vector<float>>`; its axis is divided by the
+  square root of its norm, `ax / sqrt(norm2(ax))`: a wrong angle unless the axis is unit length, a
+  defect to register), `midtrans` and `pointflirt` (Armadillo's `svd`: LAPACK `dgesdd`, shared with
+  the pseudo-inverse above).

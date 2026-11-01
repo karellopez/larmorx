@@ -238,19 +238,23 @@ def test_larmorx_needs_no_more_memory_than_fsl(tmp_path, tool, args):
 #: FSL's FLIRT (FSL 6.0.7.23) against ``python -m larmorx fsl flirt`` (the ``larmorx-nc``
 #: replica, 2026-11-01) on ds005040's fMRIPrep pair (a 3 mm BOLD reference and the 0.8 mm T1w
 #: brain): fMRIPrep's boundary-based call (``bbr.sch``, its white-matter mask) and a default
-#: 12-dof call, both with ``-out``. The outputs bit-identical in ``reproduce``.
+#: 12-dof call, both with ``-out``. The outputs bit-identical in ``reproduce``. FLIRT's other
+#: programs that read images (part 2): avscale with the T1w's centre, rmsdiff over its mask.
 FLIRT_CASES = [
     (
         "bbr",
+        "flirt",
         "-in {epi} -ref {t1} -out out -omat out.mat -basescale 1 -searchcost bbr -dof 6 "
         "-init {init} -schedule {bbr} -wmseg {wm}",
     ),
-    ("dof12", "-in {epi} -ref {t1} -out out -omat out.mat"),
+    ("dof12", "flirt", "-in {epi} -ref {t1} -out out -omat out.mat"),
+    ("avscale-volume", "avscale", "--allparams {init} {t1}"),
+    ("rmsdiff-mask", "rmsdiff", "{init} {init} {t1} {wm}"),
 ]
 
 
-@pytest.mark.parametrize(("name", "args"), FLIRT_CASES)
-def test_flirt_replica_needs_no_more_memory_than_fsl(tmp_path, name, args):
+@pytest.mark.parametrize(("name", "program", "args"), FLIRT_CASES)
+def test_flirt_replica_needs_no_more_memory_than_fsl(tmp_path, name, program, args):
     fr = pytest.importorskip("larmorx_validation.parity.fsl_flirt_replica")
     if fr.replica_binary() is None:
         pytest.skip("the larmorx-nc program is not built (crates-nc)")
@@ -272,7 +276,7 @@ def test_flirt_replica_needs_no_more_memory_than_fsl(tmp_path, name, args):
     env = {**fr._environment({}), "OMP_NUM_THREADS": "1"}
     f_dir = tmp_path / "fsl"
     f_dir.mkdir()
-    code, fsl_mib = _peak([str(fr.fsldir() / "bin" / "flirt"), *words], env, f_dir)
+    code, fsl_mib = _peak([str(fr.fsldir() / "bin" / program), *words], env, f_dir)
     assert code == 0
     for mode in ("reproduce", "fix"):
         r_dir = tmp_path / f"larmorx-{mode}"
@@ -284,15 +288,17 @@ def test_flirt_replica_needs_no_more_memory_than_fsl(tmp_path, name, args):
             "PYTHONPATH": os.environ.get("PYTHONPATH", ""),
         }
         entry = entry_peak(l_env, r_dir)
-        code, mib = _peak([sys.executable, "-m", "larmorx", "fsl", "flirt", *words], l_env, r_dir)
+        code, mib = _peak([sys.executable, "-m", "larmorx", "fsl", program, *words], l_env, r_dir)
         assert code == 0
-        print(f"flirt {name} ({mode}): larmorx {mib:.1f} MiB, FSL {fsl_mib:.1f}, entry {entry:.1f}")
+        print(
+            f"{program} {name} ({mode}): larmorx {mib:.1f} MiB, FSL {fsl_mib:.1f}, entry {entry:.1f}"
+        )
         assert mib <= allowance(fsl_mib, entry), (
-            f"flirt {name} ({mode}): larmorx {mib:.0f} MiB, FSL {fsl_mib:.0f} MiB, "
+            f"{program} {name} ({mode}): larmorx {mib:.0f} MiB, FSL {fsl_mib:.0f} MiB, "
             f"the entry point {entry:.1f} MiB"
         )
         if mode == "reproduce":
-            assert _blanked(f_dir) == _blanked(r_dir), f"flirt {name}"
+            assert _blanked(f_dir) == _blanked(r_dir), f"{program} {name}"
 
 
 def _blanked(d: Path) -> dict[str, bytes]:

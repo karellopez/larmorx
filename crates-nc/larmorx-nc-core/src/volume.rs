@@ -822,6 +822,36 @@ impl Volume {
         self.background_value().0
     }
 
+    /// FSL-75: why `calc_bval(vol, 2)` is undefined for this volume's shape, if it is. It sizes
+    /// its buffer `2(x−2ex)(y−2ey)ez + 2(x−2ex)z·ey + 2yz·ex` (each edge width `e` the smaller
+    /// of 2 and the size less 1), which is too small when the size along x is 3, or along y is 3
+    /// and x is neither 2 nor 4 (a factor of −1 in a term whose loop writes nothing): FSL writes
+    /// past the buffer (heap corruption); at 1 × 1 × 1 the buffer is empty and FSL reads its
+    /// first element. `None`: defined (the buffer holds exactly what is written).
+    pub fn background_undefined(&self) -> Option<String> {
+        let (zb, yb, xb) = (self.zsize(), self.ysize(), self.xsize());
+        let ew = |n: i64| 2i64.min(n - 1);
+        let (ewx, ewy, ewz) = (ew(xb), ew(yb), ew(zb));
+        let numbins = 2 * (xb - 2 * ewx) * (yb - 2 * ewy) * ewz
+            + 2 * (xb - 2 * ewx) * zb * ewy
+            + 2 * yb * zb * ewx;
+        let (ix, iy) = ((xb - 2 * ewx).max(0), (yb - 2 * ewy).max(0));
+        let written = 2 * ewz * ix * iy + 2 * ewy * ix * zb + 2 * ewx * yb * zb;
+        if numbins <= 0 {
+            Some(format!(
+                "FSL's background value of a {xb} x {yb} x {zb} image reads the first value of \
+                 an empty buffer (FSL-75)"
+            ))
+        } else if numbins < written {
+            Some(format!(
+                "FSL's background value of a {xb} x {yb} x {zb} image writes {written} border \
+                 values into a buffer of {numbins} (heap corruption, FSL-75)"
+            ))
+        } else {
+            None
+        }
+    }
+
     /// [`Volume::backgroundval`], and what was done with NaN values in the shell: `std::sort`
     /// with `operator<` has no defined order for them in C++ (FSL-22), and the volume's
     /// [`NanOrder`] decides theirs.

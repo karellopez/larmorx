@@ -58,6 +58,7 @@ from larmorx_validation.parity.fsl_mcflirt_replica import (
 )
 from larmorx_validation.parity.harness import (
     BOTH_ERROR,
+    EXPECTED,
     Case,
     Check,
     CheckList,
@@ -425,6 +426,15 @@ class Run:
     settings: tuple[tuple[str, str | None], ...] = ()
     files: tuple[tuple[str, str], ...] = ()
     fix: bool = True
+    #: FLIRT never finishes on this case (the register entry): FSL runs under a timeout (and,
+    #: when it grows its memory for ever, ``aslimit``: an address-space limit that refuses it),
+    #: never cached; the replica must refuse in both modes.
+    hang: str = ""
+    aslimit: str = ""
+
+
+#: How long FSL runs on a case where it never finishes.
+HANG_SECONDS = 20
 
 
 def _prepare(run: Run, tmp: Path) -> list[str]:
@@ -458,7 +468,73 @@ def _prepare(run: Run, tmp: Path) -> list[str]:
     return out
 
 
+def _hang_case(run: Run, checks: CheckList) -> None:
+    """A case FLIRT never finishes (``run.hang``): FSL under a timeout (and an address-space
+    limit where its memory grows for ever), never cached; the replica refuses in both modes."""
+    from larmorx_validation import address_space, oracle_cache
+
+    settings = dict(run.settings)
+    with tempfile.TemporaryDirectory(prefix="lx-nc-flirt-") as a_:
+        a = Path(a_)
+        args = _prepare(run, a)
+        old = os.environ.get(address_space.ENV)
+        if run.aslimit:
+            os.environ[address_space.ENV] = run.aslimit
+        try:
+            p = oracle_cache.run(
+                [str(fsldir() / "bin" / run.program), *args],
+                env=_environment(settings),
+                cwd=a,
+                outputs=[a],
+                policy=oracle_cache.Policy(
+                    threads=1, family="fsl", never=f"FLIRT never finishes ({run.hang})"
+                ),
+                runner=SUITE,
+                inputs=[q for q in sorted(a.rglob("*")) if q.is_file()],
+                timeout=HANG_SECONDS,
+            )
+        finally:
+            if run.aslimit:
+                if old is None:
+                    os.environ.pop(address_space.ENV, None)
+                else:
+                    os.environ[address_space.ENV] = old
+        if run.aslimit:
+            checks(
+                f"FSL's memory grows until the address-space limit ({run.aslimit}) refuses it",
+                p.returncode is not None and "bad_alloc" in p.stderr,
+                detail=f"exit {p.returncode}: {' '.join(p.stderr.split())[-160:]}",
+            )
+        else:
+            checks(
+                "FSL does not finish",
+                p.timed_out,
+                detail=f"{'still running' if p.timed_out else f'exit {p.returncode}'} after "
+                f"{HANG_SECONDS} s",
+            )
+    for mode in (defects.REPRODUCE, defects.FIX):
+        with tempfile.TemporaryDirectory(prefix="lx-nc-flirt-") as b_:
+            b = Path(b_)
+            r = run_replica(run.program, _prepare(run, b), cwd=b, settings=settings, mode=mode)
+            refusal = next(
+                (ln for ln in r.stderr.splitlines() if ln.startswith(f"{REPLICA_PREFIX}: error:")),
+                "",
+            )
+            checks(
+                f"the replica refuses ({mode})",
+                r.code == 1 and f"({run.hang})" in refusal,
+                detail=f"exit {r.code}: {refusal[:160]}",
+            )
+    raise Outcome(
+        EXPECTED,
+        f"FLIRT never finishes ({run.hang}: undefined behaviour); the replica refuses in both modes",
+    )
+
+
 def _run_case(run: Run, checks: CheckList) -> None:
+    if run.hang:
+        _hang_case(run, checks)
+        return
     settings = dict(run.settings)
     with (
         tempfile.TemporaryDirectory(prefix="lx-nc-flirt-") as a_,
@@ -1504,6 +1580,47 @@ def _edge_cases() -> dict[str, tuple[str, str, Run]]:
         "z.mat",
         program=X,
         files=(("z.mat", "1 0 0 0\n0 0 0 0\n0 0 1 0\n0 0 0 1\n"),),
+    )
+    add(
+        "edge/bbrstep-0",
+        "setoption bbrstep 0 with BBR: FLIRT's loop over the boundary points never ends (FSL-71)",
+        "-in",
+        "@epi.nii",
+        "-ref",
+        "@t1.nii",
+        "-cost",
+        "bbr",
+        "-wmseg",
+        "@wm.nii",
+        "-schedule",
+        "s.sch",
+        "-omat",
+        "out.mat",
+        files=(
+            (
+                "s.sch",
+                "setscale 8\nsetoption bbrstep 0\nclear UA\n"
+                "setrow UA 1 0 0 0 0 1 0 0 0 0 1 0 0 0 0 1\n"
+                "measurecost 6 UA 0 0 0 0 0 0 abs\n",
+            ),
+        ),
+        hang="FSL-71",
+    )
+    add(
+        "edge/read-not-numbers",
+        "a schedule's read of a file holding a word that is not a number: FLIRT reads for ever, "
+        "its memory growing (FSL-72)",
+        "-in",
+        "@epi.nii",
+        "-ref",
+        "@t1.nii",
+        "-schedule",
+        "s.sch",
+        "-omat",
+        "out.mat",
+        files=(("s.sch", "read UA bad.txt\n"), ("bad.txt", "1 2 abc\n")),
+        hang="FSL-72",
+        aslimit="2G",
     )
     add(
         "convert_xfm/missing-concat",

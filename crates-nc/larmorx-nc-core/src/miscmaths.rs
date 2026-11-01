@@ -115,6 +115,80 @@ pub fn construct_rotmat_euler(params: &Mat, n: i32, centre: &Mat) -> Mat {
     aff
 }
 
+/// `construct_rotmat_quat(params, n, aff, centre)`: the rotation of the unit quaternion whose
+/// last three components are `params(1..3)` (the first, `w`, the square root of what is left,
+/// in `float`), about `centre`, then the translations. Its messages go to `msgs` (FSL prints
+/// them on standard error at every call): fewer than 3 parameters, and components whose squares
+/// sum above 1 (the identity is kept then). With `n == 3` the translations are added too (FSL
+/// returns after them only from 4 parameters on).
+pub fn construct_rotmat_quat(params: &Mat, n: i32, centre: &Mat, msgs: &mut Vec<String>) -> Mat {
+    let mut aff = Mat::eye(4);
+    if n <= 0 {
+        return aff;
+    }
+    if (1..3).contains(&n) {
+        msgs.push(format!("Can only do 3 or more, not {n}"));
+    }
+    let (p1, p2, p3) = (S64(params.get(0)), S64(params.get(1)), S64(params.get(2)));
+    // float w2 = 1.0 - Sqr(p1) - Sqr(p2) - Sqr(p3): double arithmetic, stored to a float
+    let w2 = (((S64(1.0) - p1 * p1) - p2 * p2) - p3 * p3).0 as f32;
+    if f64::from(w2) < 0.0 {
+        msgs.push("Parameters do not form a valid axis - greater than unity".to_owned());
+        return aff;
+    }
+    let w = S32(w2).sqrt();
+    let (x, y, z) = (S32(p1.0 as f32), S32(p2.0 as f32), S32(p3.0 as f32));
+    let two = S32(2.0);
+    let one = S32(1.0);
+    let set = |aff: &mut Mat, r: usize, c: usize, v: S32| aff.set(r, c, f64::from(v.0));
+    set(&mut aff, 0, 0, (one - two * y * y) - two * z * z);
+    set(&mut aff, 1, 1, (one - two * x * x) - two * z * z);
+    set(&mut aff, 2, 2, (one - two * x * x) - two * y * y);
+    set(&mut aff, 0, 1, two * x * y - two * w * z);
+    set(&mut aff, 1, 0, two * x * y + two * w * z);
+    set(&mut aff, 0, 2, two * x * z + two * w * y);
+    set(&mut aff, 2, 0, two * x * z - two * w * y);
+    set(&mut aff, 1, 2, two * y * z - two * w * x);
+    set(&mut aff, 2, 1, two * y * z + two * w * x);
+    // x' = R x + (I - R) centre
+    let trans = arma::gemv_tinysq(&aff.sub(0, 3, 0, 3), centre.as_slice(), false);
+    for (r, t) in trans.into_iter().enumerate() {
+        aff.set(r, 3, (S64(centre.get(r)) - t).0);
+    }
+    for k in 0..3 {
+        let v = (S64(aff.at(k, 3)) + params.get(3 + k)).0;
+        aff.set(k, 3, v);
+        if n == k as i32 + 4 {
+            return aff;
+        }
+    }
+    aff
+}
+
+/// `rotmat2quat(quaternion, rotmat)`: the quaternion's `(b, c, d)` of `nifti_mat44_to_quatern`
+/// (FSL's legacy NIfTI routine, x87 precision) of the rotation stored in a `float` `mat44`.
+pub fn rotmat2quat(rotmat: &Mat) -> [f64; 3] {
+    let mut rot = [[0.0f32; 4]; 4];
+    for (i, row) in rot.iter_mut().enumerate().take(3) {
+        for (j, v) in row.iter_mut().enumerate().take(3) {
+            *v = rotmat.at(i, j) as f32;
+        }
+    }
+    // FSL leaves the mat44's last row and column unset: they reach only outputs it discards.
+    let q = crate::nifti::mat44_to_quatern(&rot);
+    [q.qb, q.qc, q.qd]
+}
+
+/// `compose_aff(params, n, centre, aff, construct_rotmat_quat)` (`-anglerep quaternion`); the
+/// rotation's messages go to `msgs`.
+pub fn compose_aff_quat(params: &Mat, n: i32, centre: &Mat, msgs: &mut Vec<String>) -> Mat {
+    if n <= 0 {
+        return Mat::zeros(4, 4);
+    }
+    let aff = construct_rotmat_quat(params, n, centre, msgs);
+    scale_skew(aff, params, n, centre)
+}
+
 /// `compose_aff(params, n, centre, aff, construct_rotmat_euler)`.
 pub fn compose_aff(params: &Mat, n: i32, centre: &Mat) -> Mat {
     if n <= 0 {
@@ -122,6 +196,11 @@ pub fn compose_aff(params: &Mat, n: i32, centre: &Mat) -> Mat {
         return Mat::zeros(4, 4);
     }
     let aff = construct_rotmat_euler(params, n, centre);
+    scale_skew(aff, params, n, centre)
+}
+
+/// `compose_aff`'s scales and skews after the rotation `aff` (none up to 6 parameters).
+fn scale_skew(aff: Mat, params: &Mat, n: i32, centre: &Mat) -> Mat {
     if n <= 6 {
         return aff;
     }
@@ -177,6 +256,20 @@ pub fn rotmat2euler(rotmat: &Mat) -> [f64; 3] {
 /// `decompose_aff(params, affmat, centre, rotmat2euler)`: the 12 parameters (3 rotations, 3
 /// translations about `centre`, 3 scales, 3 skews) of `affmat = rotmat * skew * scale`.
 pub fn decompose_aff(affmat: &Mat, centre: &Mat) -> [f64; 12] {
+    decompose_aff_with(affmat, centre, rotmat2euler)
+}
+
+/// `decompose_aff(params, affmat, centre, rotmat2quat)` (`-anglerep quaternion`): the
+/// rotation's parameters are the quaternion's last three components.
+pub fn decompose_aff_quat(affmat: &Mat, centre: &Mat) -> [f64; 12] {
+    decompose_aff_with(affmat, centre, rotmat2quat)
+}
+
+fn decompose_aff_with(
+    affmat: &Mat,
+    centre: &Mat,
+    rotmat2params: fn(&Mat) -> [f64; 3],
+) -> [f64; 12] {
     let mut params = [0.0f64; 12];
     let aff3 = affmat.sub(0, 3, 0, 3);
     let x = affmat.sub(0, 3, 0, 1);
@@ -230,7 +323,7 @@ pub fn decompose_aff(affmat: &Mat, centre: &Mat) -> [f64; 12] {
     for i in 0..3 {
         params[3 + i] = ((S64(ac[i]) + affmat.at(i, 3)) - centre.get(i)).0;
     }
-    let rp = rotmat2euler(&rotmat);
+    let rp = rotmat2params(&rotmat);
     params[..3].copy_from_slice(&rp);
     // An affine all of one NaN (FSL-14's matrices): with Armadillo 14.2.1's LAPACK path (the
     // skew's triangular inverse, the solve by `dgesv`) FSL 6.0.7.23's binary gives every

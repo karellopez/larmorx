@@ -174,6 +174,19 @@ def compare(
     replica_dir: Path,
 ) -> tuple[int, int]:
     """Exit status, streams, files and bytes; returns (identical files, files)."""
+    if oracle.code < 0 and any(
+        ln.startswith(f"{REPLICA_PREFIX} error:") and "FSL-75" in ln
+        for ln in replica.stderr.splitlines()
+    ):
+        # FSL-75: FSL wrote past a buffer (or read an empty one); it went on with a corrupted
+        # heap (its later messages and files are those of undefined behaviour) until the C
+        # library or the kernel stopped it. The replica refuses where FSL went wrong.
+        checks(
+            f"{program} is killed after FSL-75's heap corruption; the replica refuses (exit 1)",
+            replica.code == 1,
+            detail=f"{program} signal {-oracle.code}, replica {replica.code}",
+        )
+        return 0, 0
     if oracle.code < 0:
         checks(
             f"exit status ({program} is killed; the replica exits 1)",
@@ -1139,6 +1152,24 @@ def _real_cases() -> dict[str, tuple[str, str, Run]]:
         "@t1_small.nii",
         "-dof",
         "6",
+        "-omat",
+        "out.mat",
+    )
+    # The initial matrix is scaled by 1/basescale, a single-precision quotient (random testing,
+    # 2026-11-01: the replica had divided in double; an identity -init hides it)
+    add(
+        "real/basescale-small-init",
+        st,
+        "0.6 mm voxels with -init (the initial matrix in the base scale's millimetres)",
+        "-in",
+        E,
+        "-ref",
+        "@t1_small.nii",
+        "-init",
+        "@init.mat",
+        "-dof",
+        "6",
+        "-nosearch",
         "-omat",
         "out.mat",
     )

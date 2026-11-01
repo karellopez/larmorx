@@ -433,7 +433,7 @@ fn body(
             // an Armadillo expression: Armadillo's own layout, the stream's state kept
             let inv = inverse(&affmat)?;
             out.s(" Inverse affmat =\n");
-            out.s(&cnum::arma_print(4, 4, |r, c| inv.at(r, c)));
+            out.s(&arma::print_expr(&inv));
             out.s("\n\n");
         }
     }

@@ -619,7 +619,15 @@ const BET_CASES: &[BetCase] = &[
         id: "flirt.quaternion-dof6",
         tool: "fsl flirt",
         args: &[
-            "-in", "{t2}", "-ref", "{t1}", "-dof", "6", "-anglerep", "quaternion", "-omat",
+            "-in",
+            "{t2}",
+            "-ref",
+            "{t1}",
+            "-dof",
+            "6",
+            "-anglerep",
+            "quaternion",
+            "-omat",
             "out.mat",
         ],
         mode: "fix",
@@ -637,7 +645,9 @@ const BET_CASES: &[BetCase] = &[
     BetCase {
         id: "img2imgcoord.vox",
         tool: "fsl img2imgcoord",
-        args: &["-src", "{t2}", "-dest", "{t1}", "-xfm", "{init}", "{coords}"],
+        args: &[
+            "-src", "{t2}", "-dest", "{t1}", "-xfm", "{init}", "{coords}",
+        ],
         mode: "fix",
         named: &[],
         output_type: "NIFTI",
@@ -645,7 +655,9 @@ const BET_CASES: &[BetCase] = &[
     BetCase {
         id: "std2imgcoord.vox",
         tool: "fsl std2imgcoord",
-        args: &["-img", "{t1}", "-std", "{t2}", "-xfm", "{init}", "-vox", "{coords}"],
+        args: &[
+            "-img", "{t1}", "-std", "{t2}", "-xfm", "{init}", "-vox", "{coords}",
+        ],
         mode: "fix",
         named: &[],
         output_type: "NIFTI",
@@ -653,7 +665,9 @@ const BET_CASES: &[BetCase] = &[
     BetCase {
         id: "img2stdcoord.mm",
         tool: "fsl img2stdcoord",
-        args: &["-img", "{t1}", "-std", "{t2}", "-xfm", "{init}", "-mm", "{coords}"],
+        args: &[
+            "-img", "{t1}", "-std", "{t2}", "-xfm", "{init}", "-mm", "{coords}",
+        ],
         mode: "fix",
         named: &[],
         output_type: "NIFTI",

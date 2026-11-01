@@ -24,9 +24,9 @@ pub mod convert_xfm;
 pub mod coords;
 pub mod options;
 pub mod pair;
+pub mod rmsdiff;
 pub mod run;
 pub mod schedule;
-pub mod rmsdiff;
 
 use std::io::Write;
 

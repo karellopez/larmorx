@@ -1,0 +1,279 @@
+{
+ "defect": null,
+ "description": "a base scale other than 1 (voxels of 0.01 mm) with -init: FLIRT scales the initial matrix by 1/basescale computed in single precision (exactly 100 for 0.01), the replica had divided in double",
+ "expect": "pass",
+ "found": {
+  "detail": "every file bit-identical: out.mat",
+  "n": 192,
+  "seed": "trial-flirt",
+  "shrink_moves": [],
+  "signature": [
+   "every file bit-identical"
+  ]
+ },
+ "id": "basescale-init-float",
+ "implementations": [
+  "replica"
+ ],
+ "reason": "",
+ "recipe": {
+  "extra": {
+   "output_type": "NIFTI",
+   "tool": "flirt"
+  },
+  "features": {
+   "-bins": false,
+   "-coarsesearch": false,
+   "-cost": true,
+   "-datatype": false,
+   "-dof": true,
+   "-finesearch": false,
+   "-forcescaling": false,
+   "-init": true,
+   "-interp": true,
+   "-inweight": false,
+   "-minsampling": true,
+   "-noclamp": false,
+   "-noresampblur": false,
+   "-noresample": false,
+   "-nosearch": true,
+   "-out": false,
+   "-paddingsize": false,
+   "-refweight": false,
+   "-searchcost": false,
+   "-searchrx": false,
+   "-searchry": false,
+   "-setbackground": false,
+   "-sincwidth": false,
+   "-sincwindow": true,
+   "-usesqform": false,
+   "-v": false,
+   "FSLOUTPUTTYPE": "NIFTI",
+   "bbr": false,
+   "content": "crop",
+   "corner0": 32,
+   "corner1": 24,
+   "corner2": 41,
+   "cost": "corratio",
+   "crop source": "templateflow/tpl-MNI152NLin2009cAsym/tpl-MNI152NLin2009cAsym_res-02_T1w.nii.gz",
+   "crop stride": 1,
+   "dof": "6",
+   "dtype": "int16",
+   "extreme": true,
+   "interp": "sinc",
+   "kind": "register",
+   "minsamp": "2.5",
+   "orientation": "plumb",
+   "origin0": -42.5,
+   "origin1": 56.75,
+   "origin2": 48.0,
+   "q0": 24,
+   "q1": 1,
+   "q2": -2,
+   "q3": 3,
+   "qfac": 1,
+   "qform_code": 1,
+   "range": "plain",
+   "same content": true,
+   "scale0": "1",
+   "scale1": "1.05",
+   "scale2": "1",
+   "sform": "same",
+   "sform_code": 0,
+   "shape": "31x23x32",
+   "shift0": "0",
+   "shift1": "0",
+   "shift2": "-2",
+   "sincwindow": "rectangular",
+   "spacing0": 1.5,
+   "spacing1": 1.5,
+   "spacing2": 0.01,
+   "suffix": ".nii.gz",
+   "units": "m"
+  },
+  "groups": [
+   {
+    "args": [
+     "-in",
+     "{in:in}",
+     "-ref",
+     "{in:ref}",
+     "-omat",
+     "out.mat"
+    ],
+    "name": "files",
+    "optional": false
+   },
+   {
+    "args": [
+     "-cost",
+     "corratio"
+    ],
+    "name": "-cost",
+    "optional": true
+   },
+   {
+    "args": [
+     "-dof",
+     "6"
+    ],
+    "name": "-dof",
+    "optional": true
+   },
+   {
+    "args": [
+     "-init",
+     "{in:init}"
+    ],
+    "name": "-init",
+    "optional": true
+   },
+   {
+    "args": [
+     "-nosearch"
+    ],
+    "name": "-nosearch",
+    "optional": true
+   },
+   {
+    "args": [
+     "-minsampling",
+     "2.5"
+    ],
+    "name": "-minsampling",
+    "optional": true
+   },
+   {
+    "args": [
+     "-interp",
+     "sinc",
+     "-sincwindow",
+     "rectangular"
+    ],
+    "name": "-interp",
+    "optional": true
+   }
+  ],
+  "inputs": {
+   "in": {
+    "content": {
+     "corner": [
+      25,
+      22,
+      20
+     ],
+     "seed": 1792225328,
+     "source": "templateflow/tpl-MNI152NLin2009cAsym/tpl-MNI152NLin2009cAsym_res-02_desc-fMRIPrep_boldref.nii.gz",
+     "stride": 2,
+     "type": "crop"
+    },
+    "dtype": "int16",
+    "geometry": {
+     "origin": [
+      -42.5,
+      56.75,
+      48.0
+     ],
+     "qfac": 1,
+     "qform_code": 1,
+     "quaternion": [
+      1,
+      0,
+      0,
+      0
+     ],
+     "sform": "same",
+     "sform_code": 0,
+     "spacing": [
+      1.5,
+      1.5,
+      0.01
+     ],
+     "units": "m"
+    },
+    "scaling": null,
+    "shape": [
+     31,
+     23,
+     32
+    ],
+    "suffix": ".nii.gz",
+    "values": {
+     "offset": 0.0,
+     "scale": 1.0
+    }
+   },
+   "init": {
+    "kind": "text",
+    "suffix": ".mat",
+    "text": "0.9559322034 -0.2633898305 -0.1525423729 0\n0.2372881356 1.01440678 -0.1016949153 0\n0.1728813559 0.06406779661 0.9830508475 -2\n0 0 0 1\n"
+   },
+   "ref": {
+    "content": {
+     "corner": [
+      25,
+      22,
+      20
+     ],
+     "seed": 212139900,
+     "source": "templateflow/tpl-MNI152NLin2009cAsym/tpl-MNI152NLin2009cAsym_res-02_desc-fMRIPrep_boldref.nii.gz",
+     "stride": 2,
+     "type": "crop"
+    },
+    "dtype": "int16",
+    "geometry": {
+     "origin": [
+      -38.25,
+      -52.75,
+      14.25
+     ],
+     "qfac": 1,
+     "qform_code": 1,
+     "quaternion": [
+      1,
+      0,
+      0,
+      0
+     ],
+     "sform": "same",
+     "sform_code": 0,
+     "spacing": [
+      2.0,
+      0.8,
+      0.05
+     ],
+     "units": "mm"
+    },
+    "scaling": null,
+    "shape": [
+     22,
+     30,
+     23
+    ],
+    "suffix": ".nii",
+    "values": {
+     "offset": 0.0,
+     "scale": 1.0
+    }
+   }
+  },
+  "n": 192,
+  "options": [
+   "-cost corratio",
+   "-dof 6",
+   "-init",
+   "-interp",
+   "-minsampling",
+   "-nosearch",
+   "FSLOUTPUTTYPE=NIFTI",
+   "flirt"
+  ],
+  "seed": "trial-flirt",
+  "tool": "fsl-flirt"
+ },
+ "rule": null,
+ "status": "fixed",
+ "suite": "fsl-flirt-replica",
+ "tier": "smoke",
+ "tool": "fsl-flirt"
+}

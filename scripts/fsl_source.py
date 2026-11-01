@@ -44,6 +44,7 @@ VERSIONS = {
     "fsl-meshclass": "2111.0",
     "fsl-utils": "2412.6",
     "fsl-avwutils": "2209.6",
+    "fsl-warpfns": "2501.0",
 }
 
 #: The original files: every file a translation in crates-nc/ comes from (see each crate's
@@ -60,6 +61,13 @@ FILES = [
     ("fsl-flirt", "defaultschedule.h"),
     ("fsl-flirt", "convert_xfm.cc"),
     ("fsl-flirt", "flirtsch/bbr.sch"),
+    # FLIRT's other programs (part 2, 2026-11-01); warpfns' affine coordinate mapping
+    ("fsl-flirt", "avscale.cc"),
+    ("fsl-flirt", "img2imgcoord.cc"),
+    ("fsl-flirt", "std2imgcoord.cc"),
+    ("fsl-flirt", "img2stdcoord.cc"),
+    ("fsl-flirt", "rmsdiff.cc"),
+    ("fsl-warpfns", "warpfns.h"),
     ("fsl-newimage", "newimage.h"),
     ("fsl-newimage", "newimage.cc"),
     ("fsl-newimage", "newimagefns.h"),

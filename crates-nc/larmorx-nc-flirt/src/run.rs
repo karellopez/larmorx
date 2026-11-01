@@ -612,10 +612,11 @@ impl<'a> Flirt<'a> {
 
     /// `scalemat(mat)`: `S * mat * S.i()` with `S = diag(1/b, 1/b, 1/b, 1)`.
     fn scalemat(&self, mat: &Mat) -> R<Mat> {
-        let b = f64::from(self.o.basescale);
+        // `1/basescale`: an int over a float, a single-precision quotient (0.01's is exactly 100)
+        let inv_b = f64::from(larmorx_nc_core::sse::div_f32(1.0, self.o.basescale));
         let mut s = Mat::eye(4);
         for k in 0..3 {
-            s.set(k, k, 1.0 / b);
+            s.set(k, k, inv_b);
         }
         let si = arma::inv(&s).map_err(|e| singular(&e.to_string()))?;
         check_mul(&s, mat)?;

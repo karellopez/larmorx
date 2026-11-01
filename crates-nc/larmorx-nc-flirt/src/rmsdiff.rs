@@ -75,7 +75,12 @@ fn read_vol(name: &str, settings: &Settings, err: &mut String) -> Result<Volume,
     Ok(v)
 }
 
-fn body(args: &[String], settings: &Settings, out: &mut String, err: &mut String) -> Result<(), End> {
+fn body(
+    args: &[String],
+    settings: &Settings,
+    out: &mut String,
+    err: &mut String,
+) -> Result<(), End> {
     let argc = args.len() + 1;
     if argc < 4 {
         err.push_str("Usage: rmsdiff matrixfile1 matrixfile2 refvol [mask]\n");

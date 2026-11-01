@@ -1989,11 +1989,13 @@ def suite() -> Suite:
     return Suite(
         name=SUITE,
         title="FLIRT replica (bit-exact, FSL Licence)",
-        tool="`larmorx-nc fsl flirt` and `larmorx-nc fsl convert_xfm` (crate larmorx-nc-flirt, "
-        f"translated from FSL {fsl_versions.NEWEST}'s source)",
-        reference=f"flirt and convert_xfm from FSL {fsl_versions.NEWEST} (fsl-flirt 2111.4, "
-        "fsl-newimage 2601.0, fsl-miscmaths 2412.6; the conda build at `~/fsl-6.0.7.23`, as "
-        "built: glibc 2.35's maths, OpenBLAS on its Haswell kernels)",
+        tool="`larmorx-nc fsl flirt`, `convert_xfm`, `avscale`, `img2imgcoord`, `std2imgcoord`, "
+        "`img2stdcoord`, `rmsdiff` and `makerot` (crate larmorx-nc-flirt, translated from FSL "
+        f"{fsl_versions.NEWEST}'s source)",
+        reference=f"flirt, convert_xfm, avscale, img2imgcoord, std2imgcoord, img2stdcoord, rmsdiff "
+        f"and makerot from FSL {fsl_versions.NEWEST} (fsl-flirt 2111.4, fsl-newimage 2601.0, "
+        "fsl-miscmaths 2412.6, fsl-utils 2412.6, fsl-warpfns 2501.0; the conda build at "
+        "`~/fsl-6.0.7.23`, as built: glibc 2.35's maths, OpenBLAS on its Haswell kernels)",
         thresholds=[
             ("Exit status", "the same (an abort: the replica exits 1 after the same text)"),
             (

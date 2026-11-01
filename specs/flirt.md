@@ -774,8 +774,11 @@ identical text).
 
 1. The principal-axes alignment (`alignpaxes`) is not specified (no shipped schedule uses it).
 2. The SVD pseudo-inverse of general parameter-subset masks (§8.3).
-3. `applyxfm4D`, `makerot`, `midtrans` and `pointflirt` are not specified yet; the coordinate
-   programs' `-warp` (FNIRT's warp fields) neither.
+3. `applyxfm4D`, `midtrans` and `pointflirt` are not specified yet; the coordinate programs'
+   `-warp` (FNIRT's warp fields) neither.
+4. `makerot` with a NaN or infinite angle or axis: which rows FSL prints as `nan` and which as
+   `-nan` (the sign the NaN carries through the rotation's products) is not specified; every
+   finite input is (§15.4).
 
 ## 15. FLIRT's other programs
 

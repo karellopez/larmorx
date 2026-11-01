@@ -509,6 +509,21 @@ def _prepare(run: Run, tmp: Path) -> list[str]:
             if not dst.exists():
                 _constant_image(dst, shape, vox, kind == "noform")
             out.append(name)
+        elif a.startswith("@int8:"):
+            # an input stored as int8 (its values divided by 16, rounded, clipped):
+            # @int8:<input>:<name>
+            import nibabel as nib
+
+            _, src_name, name = a.split(":")
+            dst = tmp / name
+            if not dst.exists():
+                base = base or inputs()
+                img = nib.load(str(base / src_name))
+                arr = np.clip(np.round(np.asanyarray(img.dataobj) / 16.0), -128, 127)
+                h = img.header.copy()
+                h.set_data_dtype(np.int8)
+                nib.save(nib.Nifti1Image(arr.astype(np.int8), img.affine, h), str(dst))
+            out.append(name)
         elif a.startswith("@nan:"):
             # an input with one NaN voxel at (3, 4, 5): @nan:<input>:<name>
             import nibabel as nib
@@ -540,6 +555,7 @@ def _prepare(run: Run, tmp: Path) -> list[str]:
         else:
             out.append(a)
     for name, text in run.files:
+        (tmp / name).parent.mkdir(parents=True, exist_ok=True)
         (tmp / name).write_text(text, encoding="utf-8")
     return out
 
@@ -1952,6 +1968,42 @@ def _program_cases() -> dict[str, tuple[str, str, Run]]:
     def add(name: str, desc: str, program: str, *args: str, tier: str = st, **kw: Any) -> None:
         c[f"programs/{name}"] = (tier, desc, Run(program, tuple(args), **kw))
 
+    X = "applyxfm4D"
+    rot = ("0.996 -0.087 0 3\n0.087 0.996 0 -2\n0 0 1 1.5\n0 0 0 1\n",
+           "0.99 0.02 -0.03 1\n-0.02 1.01 0.01 0.5\n0.03 -0.01 0.98 -1\n0 0 0 1\n")
+    mats = tuple((f"mats/MAT_0{k:04d}", rot[k % 2]) for k in range(4))
+    mats4 = tuple((f"m4/MAT_{k:04d}", rot[k % 2]) for k in range(4))
+    matsu = tuple((f"mu/vol{k:04d}", rot[k % 2]) for k in range(4))
+    one = (("one.mat", rot[0]),)
+    B4 = "@bold4.nii"
+    add("applyxfm4D-usage", "applyxfm4D without arguments (its usage, exit 255)", X)
+    add("applyxfm4D-default", "a 4D int16 series, a matrix per volume (MAT_0000n), sinc", X,
+        B4, E, "out.nii.gz", "mats", files=mats, tier="smoke")  # fmt: skip
+    add("applyxfm4D-single-trilinear", "-singlematrix with trilinear interpolation, verbose", X,
+        B4, E, "out.nii.gz", "one.mat", "-singlematrix", "-interp", "trilinear", "-v",
+        files=one)  # fmt: skip
+    add("applyxfm4D-fourdigit-nn", "--fourdigit (MAT_000n) with nearest neighbour (nn)", X,
+        B4, E, "out.nii.gz", "m4", "--fourdigit", "--interp", "nn", files=mats4)  # fmt: skip
+    add("applyxfm4D-userprefix-spline", "-userprefix with spline on an integer series (FSL-79)",
+        X, B4, E, "out.nii.gz", "mu", "-userprefix", "vol", "-interp", "spline",
+        files=matsu)  # fmt: skip
+    add("applyxfm4D-float-sinc", "a float input (one volume), -singlematrix, sinc", X, E, T,
+        "out.nii.gz", "one.mat", "-singlematrix", files=one)  # fmt: skip
+    add("applyxfm4D-3d", "-3D (the rectangular sinc of width 9) on a float volume", X, E, E,
+        "out.nii.gz", "one.mat", "-3D", files=one)  # fmt: skip
+    add("applyxfm4D-3d-spline-float", "-3D with spline on a float volume", X, E, E,
+        "out.nii.gz", "one.mat", "-3d", "-interp", "spline", files=one)  # fmt: skip
+    add("applyxfm4D-int8", "an int8 input (FSL-09: written as uint8), trilinear", X,
+        "@int8:epi.nii:epi_i8.nii", E, "out.nii.gz", "one.mat", "-singlematrix",
+        "-interp", "trilinear", files=one)  # fmt: skip
+    add("applyxfm4D-bad-interp", "an unknown interpolation (its message, exit 1)", X, B4, E,
+        "out.nii.gz", "one.mat", "-interp", "cubic", files=one)  # fmt: skip
+    add("applyxfm4D-userprefix-last", "-userprefix as the last word (std::string of null)", X,
+        B4, E, "out.nii.gz", "mu", "-userprefix", files=matsu)  # fmt: skip
+    add("applyxfm4D-missing-matrix", "a directory without the matrices (FSL aborts)", X, B4,
+        E, "out.nii.gz", "none")  # fmt: skip
+    add("applyxfm4D-missing-input", "an input that does not exist (FSL aborts)", X,
+        "none.nii.gz", E, "out.nii.gz", "one.mat", files=one)  # fmt: skip
     K = "midtrans"
     mt = (("a.mat", _MT1), ("b.mat", _MT2), ("c.mat", _MT3), ("id.mat", _ID))
     add("midtrans-usage", "midtrans without transforms (its message and usage, exit 1)", K)

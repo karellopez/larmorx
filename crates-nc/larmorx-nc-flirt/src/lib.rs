@@ -19,6 +19,7 @@
 // Index loops mirror FLIRT's loops, so that each step can be checked against the source.
 #![allow(clippy::needless_range_loop)]
 
+pub mod applyxfm4d;
 pub mod avscale;
 pub mod convert_xfm;
 pub mod coords;
@@ -133,6 +134,19 @@ pub fn rmsdiff(
 ) -> u8 {
     let _ = threads;
     rmsdiff::run(args, settings, mode, out, err)
+}
+
+/// `applyxfm4D <input volume> <ref volume> <output volume> <transformation matrix file/dir>`.
+pub fn applyxfm4d(
+    args: &[String],
+    settings: &Settings,
+    mode: UpstreamDefects,
+    threads: usize,
+    out: &mut dyn Write,
+    err: &mut dyn Write,
+) -> u8 {
+    let _ = threads;
+    applyxfm4d::run(args, settings, mode, out, err)
 }
 
 /// `midtrans [options] transform1 transform2 ... transformN`.

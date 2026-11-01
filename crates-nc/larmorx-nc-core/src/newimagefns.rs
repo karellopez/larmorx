@@ -103,6 +103,17 @@ pub fn affine_transform(
 
 /// `raw_affine_transform(vin, vout, aff)`.
 pub fn raw_affine_transform(vin: &Volume, vout: &mut Volume, aff: &Mat) -> Result<(), FslError> {
+    raw_affine_transform_coefs(vin, vout, aff, None)
+}
+
+/// [`raw_affine_transform`] with the spline coefficients given (`None`: computed from `vin`
+/// when its interpolation is the spline).
+pub fn raw_affine_transform_coefs(
+    vin: &Volume,
+    vout: &mut Volume,
+    aff: &Mat,
+    coefs: Option<&SplineCoefs>,
+) -> Result<(), FslError> {
     if vout.nvoxels() <= 0 {
         return Err(FslError::imthrow(
             "Attempted to use affine transform with no voxels in vout",
@@ -139,11 +150,12 @@ pub fn raw_affine_transform(vin: &Volume, vout: &mut Volume, aff: &Mat) -> Resul
         what: e.to_string(),
     })?;
     let a: [f32; 12] = std::array::from_fn(|k| iaffbig.at(k / 4, k % 4) as f32);
-    let spline = if src.interp == Interpolation::Spline {
+    let own = if src.interp == Interpolation::Spline && coefs.is_none() {
         Some(SplineCoefs::new(&src))
     } else {
         None
     };
+    let spline = coefs.or(own.as_ref());
     for z in 0..vout.zsize() {
         for x in 0..vout.xsize() {
             let (xf, zf) = (x as f32, z as f32);
@@ -152,7 +164,7 @@ pub fn raw_affine_transform(vin: &Volume, vout: &mut Volume, aff: &Mat) -> Resul
             let mut o3 = xf * a[8] + zf * a[10] + a[11];
             for y in 0..vout.ysize() {
                 let i = vout.idx(x, y, z);
-                vout.data[i] = interp::interpolate(&src, o1, o2, o3, spline.as_ref());
+                vout.data[i] = interp::interpolate(&src, o1, o2, o3, spline);
                 o1 += a[1];
                 o2 += a[5];
                 o3 += a[9];

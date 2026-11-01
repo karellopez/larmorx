@@ -14,7 +14,7 @@
 
 use std::io::Write;
 
-use larmorx_core::defects::UpstreamDefects;
+use larmorx_core::defects::{self, Notice, UpstreamDefects};
 use larmorx_nc_core::arma::{self, Mat, Singular};
 use larmorx_nc_core::cnum;
 use larmorx_nc_core::miscmaths::{self, MatrixFileError};
@@ -496,15 +496,22 @@ pub fn run(
     out: &mut dyn Write,
     err: &mut dyn Write,
 ) -> u8 {
-    let _ = mode;
     let (mut o, mut e) = (String::new(), String::new());
+    let mut notices: Vec<Notice> = Vec::new();
     let code = match body(args, settings, &mut o, &mut e) {
         Ok(()) => 0,
         Err(End::Exit(c)) => c,
         Err(End::Caught(what)) => {
+            // FSL-78 (rule B): main catches the exception and returns 0; an error by default.
             e.push_str(&what);
             e.push('\n');
-            0
+            let detail = if mode.fix() {
+                "the run failed: exit status 1 (midtrans prints the message and exits with status 0)"
+            } else {
+                "the run failed and exits with status 0, as midtrans does"
+            };
+            notices.push(Notice::new(&defects::FSL_78, mode, detail.to_owned()));
+            u8::from(mode.fix())
         }
         Err(End::Terminate {
             printed,
@@ -525,6 +532,9 @@ pub fn run(
             1
         }
     };
+    for n in &notices {
+        e.push_str(&format!("{PREFIX}: {}\n", n.line()));
+    }
     let _ = out.write_all(o.as_bytes());
     let _ = err.write_all(e.as_bytes());
     let _ = out.flush();

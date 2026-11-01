@@ -290,6 +290,15 @@ fn spline_extrap(e: Extrapolation) -> SplineExtrap {
 impl SplineCoefs {
     /// The coefficients of volume 0 of `v` (order 3).
     pub fn new(v: &Volume) -> SplineCoefs {
+        SplineCoefs::new_stored(v, &|c: f64| f64::from(c as f32))
+    }
+
+    /// The coefficients as `Splinterpolator<T>` stores them for an image of type `T`: each
+    /// deconvolution pass's results converted by `store` (`(T) value`; for `float`, the
+    /// rounding to single precision) before the next pass reads them. Integer types' values are
+    /// exact in single precision up to 2^24 (beyond, as the replica holds every image in
+    /// single precision).
+    pub fn new_stored(v: &Volume, store: &dyn Fn(f64) -> f64) -> SplineCoefs {
         let dims = [v.xsize() as usize, v.ysize() as usize, v.zsize() as usize];
         let n = dims[0] * dims[1] * dims[2];
         let mut coef = v.data[..n].to_vec();
@@ -317,7 +326,7 @@ impl SplineCoefs {
                         deconv_sse(&mut col, et);
                     }
                     for (t, c) in col.iter().enumerate() {
-                        coef[start + t * steps[dim]] = *c as f32;
+                        coef[start + t * steps[dim]] = store(*c) as f32;
                     }
                 }
             }
@@ -328,6 +337,17 @@ impl SplineCoefs {
             constant: et == SplineExtrap::Constant,
             zeros: et == SplineExtrap::Zeros,
         }
+    }
+
+    /// Whether two coefficient sets hold the same bits.
+    pub fn same_as(&self, other: &SplineCoefs) -> bool {
+        self.dims == other.dims
+            && self.coef.len() == other.coef.len()
+            && self
+                .coef
+                .iter()
+                .zip(&other.coef)
+                .all(|(a, b)| a.to_bits() == b.to_bits())
     }
 
     fn et(&self) -> SplineExtrap {

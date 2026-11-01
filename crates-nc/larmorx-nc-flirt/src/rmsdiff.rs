@@ -150,7 +150,7 @@ fn body(
                         let dist = miscmaths::norm2(&Mat::col(&v));
                         // Max(dist, maxdist): the first when it is larger, else the second (NaN keeps maxdist)
                         maxdist = if dist > maxdist { dist } else { maxdist };
-                        sumdistsq = sumdistsq + S64(dist) * S64(dist);
+                        sumdistsq += S64(dist) * S64(dist);
                         nvox += 1;
                     }
                 }

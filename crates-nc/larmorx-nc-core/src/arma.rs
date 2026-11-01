@@ -897,7 +897,7 @@ pub fn print_expr(m: &Mat) -> String {
         if !v.is_finite() {
             continue;
         }
-        if v >= 100.0 || v <= -100.0 || (v > 0.0 && v <= 1e-4) || (v < 0.0 && v >= -1e-4) {
+        if v >= 100.0 || v <= -100.0 || (v > 0.0 && v <= 1e-4) || (-1e-4..0.0).contains(&v) {
             c = true;
             break;
         }

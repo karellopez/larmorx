@@ -561,4 +561,62 @@ mod tests {
         assert!(u.contains("\t-m,--mask\tmask\n"));
         assert!(u.ends_with("\n\n\n"));
     }
+
+    #[test]
+    fn vector_values_and_compulsory() {
+        let p = OptionParser::new(
+            "T",
+            "ex",
+            vec![
+                Opt {
+                    key: "-t",
+                    default: Value::Float(0.0),
+                    help: "theta",
+                    compulsory: true,
+                    flag: ArgFlag::Requires(1),
+                    visible: true,
+                },
+                Opt {
+                    key: "-a,--axis",
+                    default: Value::FloatVec(vec![0.0; 3]),
+                    help: "~<a,b,c>\taxis",
+                    compulsory: false,
+                    flag: ArgFlag::Requires(1),
+                    visible: true,
+                },
+            ],
+        );
+        let argv = |a: &[&str]| {
+            let mut v = vec!["prog".to_owned()];
+            v.extend(a.iter().map(|s| s.to_string()));
+            v
+        };
+        let r = p
+            .parse_command_line(&argv(&["-a", "1,x,,2.5"]), 0, false)
+            .ok()
+            .unwrap();
+        assert_eq!(r.get(&p, "-a,--axis").floats(), [1.0, 0.0, 0.0, 2.5]);
+        let r = p
+            .parse_command_line(&argv(&["--axis=1:2,5:3"]), 0, false)
+            .ok()
+            .unwrap();
+        assert_eq!(r.get(&p, "-a,--axis").floats(), [1.0, 2.0, 3.0]);
+        // clear() keeps the buffer: past the new values, the earlier ones (or the default's)
+        let r = p
+            .parse_command_line(&argv(&["-a", "1,2,3,4", "-a", "7"]), 0, false)
+            .ok()
+            .unwrap();
+        let a = r.get(&p, "-a,--axis");
+        assert_eq!(a.floats(), [7.0]);
+        assert_eq!(a.floats_buffer(3).unwrap(), [7.0, 2.0, 3.0]);
+        let missing = p.check_compulsory(&r).unwrap();
+        assert!(
+            missing.contains("The following COMPULSORY options have not been set:\n\t-t\ttheta\n")
+        );
+        let r = p
+            .parse_command_line(&argv(&["-t", "3"]), 0, false)
+            .ok()
+            .unwrap();
+        assert!(p.check_compulsory(&r).is_none());
+    }
 }

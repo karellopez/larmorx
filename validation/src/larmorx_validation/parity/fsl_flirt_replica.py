@@ -76,7 +76,8 @@ STANDARD_RUNS = (
 )
 #: The run the real cases' images come from.
 SOURCE_RUN = "ds005040-sub-002-noreconall"
-_SILENT = ()
+#: Named whenever an input holds NaN or infinite values, which may lie outside the cost's points.
+_SILENT = ("FSL-14",)
 
 
 # ------------------------------------------------------------------------------------------------

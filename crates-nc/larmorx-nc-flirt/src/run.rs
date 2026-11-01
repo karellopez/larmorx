@@ -794,6 +794,26 @@ impl<'a> Flirt<'a> {
         p.smoothsize = self.smoothsize;
         p.fuzzyfrac = self.fuzzyfrac;
         p.skip_nonfinite = self.mode.fix();
+        // FSL-14: named whenever the pair's volumes hold NaN or infinite values (they may change
+        // the cost, so the matrix, whichever mode runs)
+        let in_ref = self.slot_vol(p.ref_slot).data.iter().any(|v| !v.is_finite());
+        let in_test = self.testvol.data.iter().any(|v| !v.is_finite());
+        if in_ref || in_test {
+            let which = match (in_ref, in_test) {
+                (true, true) => "the reference and the input have",
+                (true, false) => "the reference has",
+                _ => "the input has",
+            };
+            let detail = if self.mode.fix() {
+                format!(
+                    "{which} NaN or infinite voxels: they are left out of the cost (in FLIRT one \
+                     makes the cost NaN or infinite)"
+                )
+            } else {
+                format!("{which} NaN or infinite voxels: as in FLIRT, they enter the cost")
+            };
+            self.notice(&defects::FSL_14, detail);
+        }
         Ok(())
     }
 
@@ -1741,10 +1761,21 @@ impl<'a> Flirt<'a> {
             }
         };
         let integer = matches!(ty, SaveType::Char | SaveType::Short | SaveType::Int);
+        // the correction changes a value that is not an integer, not finite, or out of the
+        // type's range (FLIRT's conversion wraps it; random testing, 2026-11-01: a negative
+        // -setbackground into uint8 was changed without the notice)
+        let (lo, hi) = match ty {
+            SaveType::Char => (0.0, 255.0),
+            SaveType::Short => (-32768.0, 32767.0),
+            _ => (f64::from(i32::MIN), f64::from(i32::MAX)),
+        };
         let rounds = integer
-            && v.data
-                .iter()
-                .any(|x| x.round_ties_even() != x.trunc() || !x.is_finite());
+            && v.data.iter().any(|x| {
+                x.round_ties_even() != x.trunc()
+                    || !x.is_finite()
+                    || f64::from(x.round_ties_even()) < lo
+                    || f64::from(x.round_ties_even()) > hi
+            });
         let (ty, conv, code) = if self.mode.fix() {
             if datatype == dt::INT8 {
                 self.notice(

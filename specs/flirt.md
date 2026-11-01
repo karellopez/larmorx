@@ -176,7 +176,7 @@ input to a 3D reading keeps its first volume with FSL's warning).
 
 **The base scale.** Internally the voxel sizes of every image read are divided by the base scale
 `b` (§4.2) when `|b − 1| > 1e-5`; the matrices of the schedule are in these scaled millimetres.
-The initial matrix is converted in (`S M S⁻¹` with `S = diag(1/b, 1/b, 1/b, 1)`, the product of
+The initial matrix is converted in (`S M S⁻¹` with `S = diag(1/b, 1/b, 1/b, 1)`, `1/b` a single-precision quotient (exactly 100 for b = 0.01), the product of
 three as §12 says), and the final matrix out: its translation column (rows 1-3 of column 4)
 multiplied by `b`. The output image is computed from unscaled images.
 

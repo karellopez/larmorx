@@ -38,11 +38,12 @@ something undefined or questionable, and what larmorx does. Each entry says how 
   `params12toN` calls `pinv(parammask)` (MISCMATHS → `arma::pinv(A, 0)`, Armadillo 14.2.1's
   divide-and-conquer SVD, LAPACK `dgesdd` on FSL's OpenBLAS). For the search's 12 × 4 mask (a
   column of three ones for the common scale, three unit columns) the scale row is
-  `0x1.5555555555557p-2` (two units above the rounded 1/3) = `(1/√3)²` rounded; for the shipped
-  schedules' column of two ones `0x1.ffffffffffffep-2` = `(1/√2)²`; unit columns give exactly 1.
-  Columns whose ones are not the first rows of their support give other last bits and small
-  off-support values (`check_masks.py`: 25 of 30 rows of other masks differ from the closed form),
-  so general masks need `dgesdd` itself (part 2). The products `pinv·d` and `parammask·p` go to
+  `0x1.5555555555557p-2` (two units above the rounded 1/3) = `(1/√3)²` rounded; unit columns
+  (FLIRT's identity, every `paramsubset` of FSL's shipped schedules, the 2D subset) give exactly 1:
+  `check_masks.py` confirms 104 such masks. Other masks (a single column of several ones, such a
+  column beside others, values other than 0 and 1) give other last bits and small off-support
+  values (17 rows of 21 such masks differ from the closed form), so they need `dgesdd` itself: the
+  replica refuses them at `setoption paramsubset` until part 2. The products `pinv·d` and `parammask·p` go to
   OpenBLAS's `dgemv_n` (Haswell's 4 × 4 microkernel with FMA), but for these masks every sum has at
   most the products of one mask column, added left to right, and the FMA with α = 1 is an addition:
   plain sums give the same bits.
@@ -95,10 +96,14 @@ FSL-21 and FSL-66 are mcflirt's entries; FLIRT meets them through `-bins` (each 
 
 ## Not replicated yet (part 2)
 
-- `-anglerep quaternion` (`construct_rotmat_quat`, `rotmat2quat`): refused.
+Each is refused with a message (`larmorx-nc: error: ... not replicated yet`), never computed
+differently:
+- `-anglerep quaternion` (`construct_rotmat_quat`, `rotmat2quat`).
 - The schedule command `alignpaxes` (`principleaxes_mat`: Armadillo's `eig_sym`, LAPACK `dsyevd`).
 - General parameter-subset masks' pseudo-inverse (`dgesdd`).
-- `-debug`'s BBR debug volume (`debug` 4D) and the 1 × 1 × 1 weight volumes FSL filters from empty
-  ones (only written with `-debug`).
+- `-debug` with the BBR cost (the `debug` 4D volume of `set_debug_mode`).
+
+Not refused but not yet compared with FSL: `-debug`'s other volumes (the pyramid, the weights; the
+1 × 1 × 1 weight volumes FSL filters from empty ones).
 - The other programs of fsl-flirt: `avscale`, `makerot`, `midtrans`, `rmsdiff`, `img2imgcoord`,
   `img2stdcoord`, `std2imgcoord`, `applyxfm4D`, `pointflirt`.

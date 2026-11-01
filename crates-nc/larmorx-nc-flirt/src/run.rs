@@ -196,11 +196,23 @@ fn mat_to_16(m: &Mat) -> Vec<f64> {
 /// `pinv(parammask)` for the masks FLIRT builds and its shipped schedules give (only 0 and 1,
 /// no row with two non-zeros): a column of `k` ones gives `(1/sqrt(k))^2` at its rows, as
 /// Armadillo's divide-and-conquer SVD on FSL's LAPACK gives it (`validation/probes/fsl-flirt-pinv`).
-/// Other masks: the normal-equations pseudo-inverse (not FSL's last bits; `None` marks them).
+/// The flag is true for the masks whose bits the probe confirms: columns of single ones, and the
+/// search's 12 x 4 mask (one scale on rows 7 to 9, then the translations). Other masks: the
+/// normal-equations pseudo-inverse, not FSL's last bits (false; `setoption paramsubset` refuses
+/// them).
 fn pinv_mask(m: &Mat) -> (Mat, bool) {
     let (rows, cols) = (m.rows(), m.cols());
     let disjoint = (0..rows).all(|r| (0..cols).filter(|&c| m.at(r, c) != 0.0).count() <= 1)
         && (0..rows).all(|r| (0..cols).all(|c| m.at(r, c) == 0.0 || m.at(r, c) == 1.0));
+    let ones = |c: usize| (0..rows).filter(|&r| m.at(r, c) == 1.0).collect::<Vec<_>>();
+    let confirmed = disjoint
+        && ((0..cols).all(|c| ones(c).len() == 1)
+            || (rows == 12
+                && cols == 4
+                && ones(0) == [6, 7, 8]
+                && ones(1) == [3]
+                && ones(2) == [4]
+                && ones(3) == [5]));
     let mut out = Mat::zeros(cols, rows);
     if disjoint {
         for c in 0..cols {
@@ -217,7 +229,7 @@ fn pinv_mask(m: &Mat) -> (Mat, bool) {
                 }
             }
         }
-        return (out, true);
+        return (out, confirmed);
     }
     // (M^T M)^-1 M^T by Gauss-Jordan on the small normal matrix.
     let mut a = vec![vec![0.0f64; 2 * cols]; cols];
@@ -748,14 +760,16 @@ impl<'a> Flirt<'a> {
 
     /// The pair's cost of `affmat` (initmat applied by the caller), with its messages.
     fn pair_cost(&mut self, affmat: &Mat, nonlin: Option<f64>) -> R<f32> {
-        if let Some(p) = &self.impair {
-            if p.costtype == CostType::Bbr && p.bbr.step <= 0 && !p.bbr_points.is_empty() {
-                return Err(Stop::Refuse(format!(
-                    "setoption bbrstep {}: FLIRT's loop over the boundary points never ends with \
-                     a step below 1 (FSL-71)",
-                    p.bbr.step
-                )));
-            }
+        if let Some(p) = &self.impair
+            && p.costtype == CostType::Bbr
+            && p.bbr.step <= 0
+            && !p.bbr_points.is_empty()
+        {
+            return Err(Stop::Refuse(format!(
+                "setoption bbrstep {}: FLIRT's loop over the boundary points never ends with a \
+                 step below 1 (FSL-71)",
+                p.bbr.step
+            )));
         }
         let mut p = self.impair.take().expect("the image pair is set");
         let mut msgs = CostMessages::default();
@@ -2065,7 +2079,7 @@ impl Flirt<'_> {
         while wordno < words.len() && words[wordno] != "rel" && words[wordno] != "abs" {
             let v = self.scalar_f(&words[wordno]);
             let k = wordno - 2;
-            if k < 1 || k > 12 {
+            if !(1..=12).contains(&k) {
                 return Err(out_of_bounds());
             }
             p[k - 1] = f64::from(v);
@@ -2192,14 +2206,14 @@ impl Flirt<'_> {
                 bins
             };
             self.setup_costfn(&mut p, self.currentcostfn, bins)?;
-            if self.o.verbose >= 3 {
-                if let Some(old) = &self.impair {
-                    let t = format!(
-                        "Previous scale used {} cost function evaluations\n",
-                        old.count
-                    );
-                    self.out.s(&t);
-                }
+            if self.o.verbose >= 3
+                && let Some(old) = &self.impair
+            {
+                let t = format!(
+                    "Previous scale used {} cost function evaluations\n",
+                    old.count
+                );
+                self.out.s(&t);
             }
             self.impair = Some(p);
         }
@@ -2294,6 +2308,13 @@ impl Flirt<'_> {
                     for r in 0..12 {
                         m.set(r, c, fvalues[c * 12 + 1 + r]);
                     }
+                }
+                if n > 0 && !pinv_mask(&m).1 {
+                    return Err(Stop::Refuse(
+                        "setoption paramsubset: a mask whose columns are not single ones on \
+                         distinct rows; its pseudo-inverse (LAPACK's SVD) is not replicated yet"
+                            .to_owned(),
+                    ));
                 }
                 self.parammask = m;
             }
@@ -2581,7 +2602,7 @@ impl Flirt<'_> {
                     for &s in &nsteps {
                         nit = nit.wrapping_mul(volume::round_f64(s));
                     }
-                    let mut nvec = vec![0.0f64; 12];
+                    let mut nvec = [0.0f64; 12];
                     for _ in 1..=nit.max(0) {
                         let mut stepflag = 1.0;
                         for m in 0..12 {
@@ -2683,7 +2704,10 @@ impl Flirt<'_> {
                 }
                 let a1 = self.scalar_f(&words[1]);
                 let a2 = self.scalar_f(&words[3]);
-                *skip = match words[2].as_str() {
+                // FLIRT skips the next line unless the comparison holds: with a NaN every
+                // comparison fails, so `!(a > b)` is not `a <= b`.
+                #[allow(clippy::neg_cmp_op_on_partial_ord)]
+                let skip_next = match words[2].as_str() {
                     ">" => !(a1 > a2),
                     "<" => !(a1 < a2),
                     "==" => a1 != a2,
@@ -2695,6 +2719,7 @@ impl Flirt<'_> {
                         return Err(Stop::Exit(EXIT_MINUS_ONE));
                     }
                 };
+                *skip = skip_next;
             }
             other => {
                 self.el(&format!("Unrecognised command {other}"));
@@ -2730,7 +2755,7 @@ fn read_rows(path: &str, width: usize) -> Option<Vec<Row>> {
     // A row is kept only if the stream is not at its end after its last number: a file whose
     // last number has no blank after it loses its last row.
     let ends_blank = text.ends_with(|c: char| c.is_ascii_whitespace());
-    if !ends_blank && nums.len() % width == 0 && !rows.is_empty() {
+    if !ends_blank && nums.len().is_multiple_of(width) && !rows.is_empty() {
         rows.pop();
     }
     Some(rows)
@@ -2849,6 +2874,12 @@ impl Flirt<'_> {
     fn main(&mut self) -> R<()> {
         if !self.o.do_optimise {
             self.do_applyxfm()?;
+        }
+        if self.o.anglerep == AngleRep::Quaternion {
+            return Err(Stop::Refuse(
+                "-anglerep quaternion: FLIRT's quaternion parameters are not replicated yet"
+                    .to_owned(),
+            ));
         }
         self.set_basescale()?;
         self.refvol = self.get_refvol()?;
@@ -3039,6 +3070,17 @@ impl Flirt<'_> {
             }
             self.interpretcommand(comline, &mut skip)?;
         }
+        if self.o.debug
+            && self
+                .impair
+                .as_ref()
+                .is_some_and(|p| p.costtype == CostType::Bbr)
+        {
+            return Err(Stop::Refuse(
+                "-debug with the bbr cost: FLIRT's BBR debug volume (`debug`) is not replicated yet"
+                    .to_owned(),
+            ));
+        }
         if self.o.debug {
             self.el("Final DEBUG call in FLIRT");
             self.el("Pointer to impair is (set)");
@@ -3207,4 +3249,46 @@ pub fn run(
     let _ = f.out.w.flush();
     let _ = f.err.flush();
     code
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{Mat, pinv_mask};
+
+    fn mask(cols: &[&[usize]]) -> Mat {
+        let mut m = Mat::zeros(12, cols.len());
+        for (c, rows) in cols.iter().enumerate() {
+            for &r in *rows {
+                m.set(r, c, 1.0);
+            }
+        }
+        m
+    }
+
+    #[test]
+    fn the_masks_whose_bits_the_probe_confirms_are_accepted() {
+        // FLIRT's 12-dof identity, the shipped schedules' single translations, the 2D subset
+        let (p, ok) = pinv_mask(&Mat::eye(12));
+        assert!(ok);
+        assert_eq!(p.at(3, 3), 1.0);
+        assert!(pinv_mask(&mask(&[&[3], &[4], &[5]])).1);
+        assert!(pinv_mask(&mask(&[&[2], &[3], &[4]])).1);
+        // the search's mask: one scale on rows 7 to 9 ((1/sqrt 3)^2, FSL's LAPACK bits)
+        let (p, ok) = pinv_mask(&mask(&[&[6, 7, 8], &[3], &[4], &[5]]));
+        assert!(ok);
+        assert_eq!(p.at(0, 7).to_bits(), 0x3FD5_5555_5555_5557);
+        assert_eq!(p.at(1, 3), 1.0);
+    }
+
+    #[test]
+    fn other_masks_are_not_claimed_exact() {
+        assert!(!pinv_mask(&mask(&[&[0, 1]])).1);
+        assert!(!pinv_mask(&mask(&[&[0, 1, 2], &[3, 4]])).1);
+        assert!(!pinv_mask(&mask(&[&[6, 7, 8], &[3], &[4]])).1);
+        let mut half = Mat::zeros(12, 1);
+        half.set(0, 0, 0.5);
+        assert!(!pinv_mask(&half).1);
+        // a row shared by two columns
+        assert!(!pinv_mask(&mask(&[&[0], &[0, 1]])).1);
+    }
 }

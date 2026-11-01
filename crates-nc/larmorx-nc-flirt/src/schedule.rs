@@ -381,7 +381,11 @@ mod tests {
             vec!["optimise", "7", "US:1-3", "0.0", "0.0"]
         );
         assert_eq!(parseline("   "), vec![""]);
-        assert_eq!(parseline("clear U  "), vec!["clear", "U", ""]);
+        // the line's own ends are stripped first; FSL's quirk keeps the blanks after a line
+        // whose last non-blank character is its first, which then gives an empty word
+        assert_eq!(parseline("clear U  "), vec!["clear", "U"]);
+        assert_eq!(parseline("x  "), vec!["x", ""]);
+        assert_eq!(parseline("x"), vec!["x"]);
         assert_eq!(parseline(" if MAXDOF > 7"), vec!["if", "MAXDOF", ">", "7"]);
     }
 

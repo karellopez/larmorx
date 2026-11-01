@@ -492,9 +492,7 @@ pub fn subsample_by_2(refvol: &Volume) -> Volume {
     let mut half = Volume::new((sx + 1) / 2, (sy + 1) / 2, (sz + 1) / 2, 1);
     half.copy_properties(refvol);
     let bg = refvol.backgroundval();
-    for v in &mut half.data {
-        *v = bg;
-    }
+    half.data.fill(bg);
     half.setdims(
         (f64::from(refvol.xdim()) * 2.0) as f32,
         (f64::from(refvol.ydim()) * 2.0) as f32,

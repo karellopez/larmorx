@@ -660,8 +660,11 @@ default and with `reproduce`:
 - **FSL-21**, **FSL-66** (no or negative bins: `-bins` below 8 gives 0 bins at the 8 mm scale; FSL
   aborts or crashes): refused with a message in both modes.
 - **FSL-56** (NIfTI extensions' offset): corrected by default.
-- **FSL-67** (BBR normals scaled by the reference level's voxel sizes, §6.5): kept (rule C: FSL's
-  results depend on it and the effect on isotropic levels is nil; under measurement).
+- **FSL-67** (BBR normals scaled by the reference level's voxel sizes, §6.5): kept for now; the
+  effect is nil on isotropic levels and is to be measured on anisotropic segmentations (rule D)
+  before it is corrected or kept.
+- **FSL-68** (every error after the command line ends with exit status 0, nothing written; §2):
+  exit status 1 with the same message by default; `reproduce` exits 0.
 - Undefined behaviour, refused in both modes with a message: an uninitialised matrix name (§7.1),
   `bbrstep` below 1, `-pedir` without a field map read (§6.5), a `read` of an unparsable file (FSL
   loops forever).

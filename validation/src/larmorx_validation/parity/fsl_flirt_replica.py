@@ -423,10 +423,23 @@ class Run:
 
 
 def _prepare(run: Run, tmp: Path) -> list[str]:
-    base = inputs()
+    base: Path | None = None
     out = []
     for a in run.args:
-        if a.startswith("@"):
+        if a.startswith("@dt:"):
+            # a random case's input (differential random testing), built from its recipe
+            from larmorx_validation.difftest import inputs as dt_inputs
+
+            src = dt_inputs.path(a[1:])
+            dst = tmp / src.name
+            if not dst.exists():
+                shutil.copy(src, dst)
+            out.append(src.name)
+        elif a.startswith("@fslsch:"):
+            # one of FSL's shipped schedules, read where FSL keeps it
+            out.append(str(fsldir() / "etc" / "flirtsch" / a.removeprefix("@fslsch:")))
+        elif a.startswith("@"):
+            base = base or inputs()
             name = a[1:]
             src = base / name
             dst = tmp / name
@@ -1491,6 +1504,9 @@ def run_case(case: Case, checks: CheckList) -> None:
     kind, payload = case.payload
     if kind == "fmriprep":
         _fmriprep_case(payload, checks)
+    elif kind == "direct":
+        # a Run given whole (differential random testing's cases)
+        _run_case(payload, checks)
     else:
         _run_case(_all_cases()[payload][2], checks)
 

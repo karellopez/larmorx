@@ -254,10 +254,10 @@ fn body(o: &Opts, out: &mut String, err: &mut String) -> Result<(), End> {
             }
         };
     }
-    if !o.outputmatascii.is_empty() {
-        if let Err(e) = write_matrix(&affmat, &o.outputmatascii) {
-            err.push_str(&e);
-        }
+    if !o.outputmatascii.is_empty()
+        && let Err(e) = write_matrix(&affmat, &o.outputmatascii)
+    {
+        err.push_str(&e);
     }
     if o.verbose > 0 {
         out.push_str(&print_mat(&affmat));

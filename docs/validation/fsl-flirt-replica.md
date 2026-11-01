@@ -1,12 +1,12 @@
 # Parity: FLIRT replica (bit-exact, FSL Licence)
 
-**All cases agree.** 137 cases on the `standard` tier: 103 pass, 34 rejected by both, 0 expected divergences, 0 failures.
+**All cases agree.** 141 cases on the `standard` tier: 107 pass, 34 rejected by both, 0 expected divergences, 0 failures.
 
 - **Validated:** `larmorx-nc fsl flirt` and `larmorx-nc fsl convert_xfm` (crate larmorx-nc-flirt, translated from FSL 6.0.7.23's source)
 - **Reference:** flirt and convert_xfm from FSL 6.0.7.23 (fsl-flirt 2111.4, fsl-newimage 2601.0, fsl-miscmaths 2412.6; the conda build at `~/fsl-6.0.7.23`, as built: glibc 2.35's maths, OpenBLAS on its Haswell kernels)
 - **Test data:** larmorx-testdata `52124bc98f9f`, tier `standard`
 - **Generated:** 2026-11-01 on Linux x86_64, with `python -m larmorx_validation parity fsl-flirt-replica --tier standard`
-- **Original programs:** 137 runs: 135 from the oracle cache, 2 run; cache `<workspace>/oracles/cache`, mode `use`
+- **Original programs:** 141 runs: 139 from the oracle cache, 2 run; cache `<workspace>/oracles/cache`, mode `use`
 
 ## Thresholds
 
@@ -24,9 +24,10 @@
 |---|---|---|---|---|---|
 | bbr | 10 | 10 | 0 | 0 | 0 |
 | convert_xfm | 16 | 7 | 9 | 0 | 0 |
+| difftest | 2 | 2 | 0 | 0 | 0 |
 | edge | 28 | 9 | 19 | 0 | 0 |
 | fmriprep | 3 | 3 | 0 | 0 | 0 |
-| real | 53 | 53 | 0 | 0 | 0 |
+| real | 55 | 55 | 0 | 0 | 0 |
 | schedule | 21 | 15 | 6 | 0 | 0 |
 | verbose | 6 | 6 | 0 | 0 | 0 |
 
@@ -73,7 +74,7 @@
 
 | Component | Version |
 |---|---|
-| larmorx | 0.0.1 (435d03f394c7) |
+| larmorx | 0.0.1 (6913b97c3bb6) |
 | larmorx-testdata | 52124bc98f9f |
 | Python | 3.12.16 |
 | Platform | Linux x86_64 (Linux-6.8.0-124-generic-x86_64-with-glibc2.35) |
@@ -140,6 +141,8 @@ The replica runs as a separate program, the FSL replica package's (`larmorx-nc`)
 | `real/noresampblur` | pass | 6/6 | -noresampblur |
 | `real/applyisoxfm` | pass | 6/6 | -applyisoxfm 3 |
 | `real/applyxfm-4d` | pass | 6/6 | -applyxfm on four volumes of the raw series, sinc |
+| `real/applyisoxfm-4d-blur` | pass | 6/6 | -applyisoxfm 6 on four volumes of the raw series (blurred first) |
+| `real/applyisoxfm-4d-blur-setbackground` | pass | 6/6 | -applyisoxfm 6 with -setbackground (the blur's outside a constant) |
 | `real/applyxfm-usesqform` | pass | 6/6 | -applyxfm -usesqform |
 | `real/out-only` | pass | 6/6 | a registration with -out and no -omat (the matrix printed) |
 | `real/basescale-small` | pass | 6/6 | 0.6 mm voxels (the base scale from the voxel size) |
@@ -227,3 +230,5 @@ The replica runs as a separate program, the FSL replica package's (`larmorx-nc`)
 | `convert_xfm/lacking` | both-error | 5/5 | -omat lacking its argument |
 | `convert_xfm/singular` | both-error | 5/5 | -inverse of a singular matrix |
 | `convert_xfm/missing-concat` | both-error | 5/5 | -concat with a file that does not exist |
+| `difftest/applyxfm-blur-extraslice` | pass | 6/6 | -applyxfm onto a coarser grid: the input's blur reads beyond its edges by extraslice (FLIRT configures the interpolatio… |
+| `difftest/bbr-no-boundary-points-nan` | pass | 6/6 | BBR on a segmentation without boundary points: the cost 0 / 0 is SSE's default NaN, printed -nan |

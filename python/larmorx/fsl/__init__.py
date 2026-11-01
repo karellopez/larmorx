@@ -24,13 +24,18 @@ from larmorx.fsl.bet import (
     betsurf,
     read_vtk,
 )
+from larmorx.fsl.flirt import COSTS, FlirtResult, convert_xfm, flirt
 
 __all__ = [
+    "COSTS",
     "VARIATIONS",
     "BetResult",
     "BetsurfResult",
+    "FlirtResult",
     "Surface",
     "bet",
     "betsurf",
+    "convert_xfm",
+    "flirt",
     "read_vtk",
 ]

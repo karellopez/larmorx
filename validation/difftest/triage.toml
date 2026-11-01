@@ -881,3 +881,49 @@ signature = ["undefined: FSL-51"]
 status = "register"
 explanation = "BET's clean-room original, random testing 2026-10-31 (cases 20, 124, 425, 610, 816, 1233): FSL-51 (betsurf searches past a profile's samples: undefined), as registered"
 link = "docs/findings/upstream-defects.md"
+
+# ---------------------------------------------------------------- FLIRT's replica: the trial (2026-11-01)
+# `difftest --tools fsl-flirt --budget 0.5 --jobs 8 --seed trial-flirt` (<workspace>/oracles/difftest/2026-11-01-fsl-flirt):
+# 3945 cases, 3009 agree, 928 differ, 8 over the memory limit. Two causes fixed in part 1 (577 of the 936 findings
+# then agree in their shrunk and drawn forms; validation/investigations/fsl-flirt/recheck_findings.py); the others
+# wait for part 2 of the port, the trial's findings their reproducers.
+
+[[difference]]
+tool = "fsl-flirt"
+implementation = "replica"
+signature = ["stdout identical"]
+status = "fixed"
+explanation = "BBR on a segmentation without boundary points: the cost 0 / 0 is SSE's default NaN, which FLIRT prints -nan; the compiler folded the empty loop's 0.0 / 0.0 into a positive NaN (larmorx-nc-core bbr.rs: the division with SSE's NaN rules)"
+link = "validation/difftest/cases/fsl-flirt/bbr-no-boundary-points-nan.json"
+
+[[difference]]
+tool = "fsl-flirt"
+implementation = "replica"
+signature = ["every file bit-identical"]
+status = "unclear"
+explanation = "FLIRT's part 2: 66 registrations whose matrix (or BBR's) differs from FSL's, 64 of them with voxels below 0.5 or above 5 mm (2 with plain voxels); not yet traced. Reproducers: the trial's findings (validation/investigations/fsl-flirt/finding_repro.py)"
+link = "docs/findings/fsl-flirt.md"
+
+[[difference]]
+tool = "fsl-flirt"
+implementation = "replica"
+signature = ["every file bit-identical"]
+status = "fixed"
+explanation = "-applyxfm and -applyisoxfm onto a coarser grid: FLIRT configures the input's interpolation (extraslice with the background, or -setbackground's constant) before it blurs it, so the blur reads beyond the edges by that extrapolation; the replica blurred with zero outside (larmorx-nc-core newimagefns.rs convolve, larmorx-nc-flirt do_applyxfm; every -applyxfm finding of the trial agrees since; parity cases real/applyisoxfm-4d-blur and -setbackground)"
+link = "validation/difftest/cases/fsl-flirt/applyxfm-blur-extraslice.json"
+
+[[difference]]
+tool = "fsl-flirt"
+implementation = "replica"
+signature = ["exit status (flirt is killed; the replica exits N)", "files written", "stderr identical"]
+status = "unclear"
+explanation = "FLIRT's part 2: FSL aborts (munmap_chunk(): invalid pointer, free(): invalid size, double free) or segfaults on 281 of the trial's cases, small or constant images (one voxel up to some 30 per axis, the default options included), where the replica finishes: heap corruption not yet traced; once it is, the replica refuses those inputs in both modes (a crash is never reproduced, D13). Reproducers: trial-flirt-00028, -00069, -02758, -00156"
+link = "docs/findings/fsl-flirt.md"
+
+[[difference]]
+tool = "fsl-flirt"
+implementation = "replica"
+signature = ["DN fix pass"]
+status = "unclear"
+explanation = "FLIRT's part 2: on 8 of the trial's cases the default (fix) run changes the matrix or image without naming a defect: references with infinite or NaN voxels (FSL-14's notice does not fire for every value it leaves out) and -setbackground with spline interpolation. Reproducers: trial-flirt-00271, -00293, -00493, -03826"
+link = "docs/findings/fsl-flirt.md"

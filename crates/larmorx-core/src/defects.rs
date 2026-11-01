@@ -454,6 +454,8 @@ defects! {
         "an output text file that cannot be opened (its name a directory, its directory missing or not writable): -plots' .par file ends the run at volume 0's line with \"error: unable to open output file!\" and exit status 0, after the first matrix and the .rms files (no other matrix, no corrected series); an .rms file is silently not written";
     FSL_66 = "FSL-66", "mcflirt", true,
         "a negative -bins: each stage has -bins / scale bins (truncated toward zero), prepared for every cost function; with -1 bins the process is killed by SIGFPE (an integer division by zero), with -2 or fewer it aborts with std::bad_array_new_length; nothing is written";
+    FSL_68 = "FSL-68", "flirt", true,
+        "every error after the command line (an image or matrix file that cannot be read, a matrix of the wrong size, an unknown -bbrtype) ends the program with exit status 0: its main catches every exception and returns 0 after printing the message, with no output written";
     ITK_50 = "ITK-50", "ITK", true,
         "KdTreeBasedKmeansEstimator never counts the point a k-d tree node is split at when it divides the node between centres: those points are left out of the pass's new centres";
     ITK_51 = "ITK-51", "ITK", true,

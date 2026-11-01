@@ -57,6 +57,7 @@ def _findings() -> list[str]:
 
 def pytest_sessionstart(session) -> None:
     _state["findings"] = len(_findings())
+    _state["started"] = head_and_build()
 
 
 def pytest_deselected(items) -> None:
@@ -85,6 +86,15 @@ def extension_sha256() -> str | None:
     return hashlib.sha256(Path(core.__file__).read_bytes()).hexdigest()
 
 
+def head_and_build() -> tuple[str, str | None] | None:
+    """The commit and the extension's SHA-256 at the start of a run: a marker is written only if
+    neither moved by its end (a commit made during the run must not inherit its result)."""
+    try:
+        return _git("rev-parse", "HEAD"), extension_sha256()
+    except (OSError, subprocess.CalledProcessError):
+        return None
+
+
 def _whole(session) -> bool:
     config = session.config
     collected = {Path(str(i.path)).resolve() for i in session.items}
@@ -99,10 +109,16 @@ def _whole(session) -> bool:
     )
 
 
-def write_smoke_marker(tests: dict[str, int], collected: int, command: str) -> Path | None:
+def write_smoke_marker(
+    tests: dict[str, int],
+    collected: int,
+    command: str,
+    started: tuple[str, str | None] | None = None,
+) -> Path | None:
     """The marker of a passing smoke tier of the whole directory at this clean commit and this
     build of the extension (``<oracle cache>/markers/parity-smoke-<commit>.json``), or ``None``
-    when there is no cache or the tree is not clean."""
+    when there is no cache, the tree is not clean, or the commit or the build is not the one the
+    run started from (``started``, from ``head_and_build``)."""
     store = _cache()
     if store is None:
         return None
@@ -113,6 +129,8 @@ def write_smoke_marker(tests: dict[str, int], collected: int, command: str) -> P
         return None
     if dirty:
         return None  # a marker names the commit that passed: only from a clean tree
+    if started is not None and started != (commit, extension_sha256()):
+        return None  # HEAD or the build moved during the run: the run tested another state
     marker = {
         "commit": commit,
         "time": dt.datetime.now(dt.UTC).isoformat(timespec="seconds"),
@@ -140,6 +158,7 @@ def pytest_sessionfinish(session, exitstatus) -> None:
         {k: len(v) for k, v in stats.items() if k in ("passed", "skipped", "failed")},
         session.testscollected,
         "pytest tests/parity",
+        started=_state.get("started"),
     )
     if reporter and path is not None:
         reporter.write_line(f"parity smoke tier passed at {path.stem[13:25]}: marker {path}")

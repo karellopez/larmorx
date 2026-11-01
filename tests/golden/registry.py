@@ -954,8 +954,11 @@ def image_math_operations() -> list[str]:
 #: with the tool: the replica's program is not installed where these tests run, so their golden
 #: cases are the replica's own (``crates-nc/larmorx-nc-cli/tests/golden.rs``, run on every
 #: platform by the replicas' jobs). ``replica_only`` checks that each tool has one there.
-#: None since 2026-10-31 (betsurf's clean-room original).
-REPLICA_ONLY_FUNCTIONS: dict[str, str] = {}
+#: Since 2026-11-01: FLIRT's two (the clean-room original is still to be written).
+REPLICA_ONLY_FUNCTIONS: dict[str, str] = {
+    "lx.fsl.flirt": "fsl flirt",
+    "lx.fsl.convert_xfm": "fsl convert_xfm",
+}
 
 #: The replicas' golden cases: the AFNI replicas' (built into larmorx since 2026-10-29, cases
 #: in the larmorx command line's tests, run by ``cargo test`` in every platform's test job) and

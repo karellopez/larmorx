@@ -69,6 +69,11 @@ command-line binary. Code from different families is never linked into one binar
   written from the SGI STL's introsort and introselect under the HP/SGI permission notice, with
   the one step where libstdc++'s order differs written from that step's description: no
   libstdc++ (GPL-3.0) text (decision log, 2026-10-26).
+  FLIRT (2026-11-01, part 1) is the third FSL replica: `larmorx-nc fsl flirt` and `convert_xfm`,
+  translated from FSL 6.0.7.23's fsl-flirt 2111.4 (`flirt.cc`, `globaloptions.{h,cc}`,
+  `defaultschedule.h`, `convert_xfm.cc`; FSL's `bbr.sch` copied with them), whose files are in
+  `crates-nc/fsl-source/fsl-flirt/` (`scripts/fsl_source.py`; the wheel's licence files now
+  include `fsl-source/*/*/*` for the schedule).
 - **FSL 6.0.7.23** (checked 2026-10-29): the replicas follow it; `crates-nc/fsl-source/` holds
   its original files of everything the translation now comes from (68 files, `MANIFEST.tsv`
   with each package's version and SHA-256; fsl-znzlib 2511.3's C++ files replace 2111.0's

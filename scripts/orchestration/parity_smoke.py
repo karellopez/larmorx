@@ -93,6 +93,7 @@ def main(argv: list[str]) -> int:
         print(f"PARITY-SMOKE exit {code} (serial, {seconds:.0f} s)", flush=True)
         return code
     conftest = _conftest()
+    started = conftest.head_and_build()
     serial = [f"tests/parity/{name}" for name in conftest.SERIAL]
     missing = [s for s in serial if not (ROOT / s).is_file()]
     if missing:
@@ -119,9 +120,12 @@ def main(argv: list[str]) -> int:
             counts["collected"],
             f"scripts/orchestration/parity_smoke.py ({a.workers} pytest-xdist workers, then "
             f"{', '.join(conftest.SERIAL)} serially)",
+            started=started,
         )
         if marker is not None:
             print(f"parity smoke tier passed: marker {marker}", flush=True)
+        elif started != conftest.head_and_build():
+            print("HEAD or the build changed during the run: no marker written", flush=True)
     print(
         f"PARITY-SMOKE exit {code} (parallel, {a.workers} workers: {p_sec:.0f} s, exit {p_code}; "
         f"then serial: {s_sec:.0f} s, exit {s_code}; {summary})",

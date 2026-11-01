@@ -38,6 +38,8 @@ const FSL_TOOLS: &[(&str, ToolFn)] = &[
     ("bet", larmorx_nc_bet::bet),
     ("bet2", larmorx_nc_bet::bet2),
     ("betsurf", larmorx_nc_bet::betsurf),
+    ("flirt", larmorx_nc_flirt::flirt),
+    ("convert_xfm", larmorx_nc_flirt::convert_xfm),
 ];
 
 fn tool_names() -> String {
@@ -215,7 +217,10 @@ mod tests {
         let (code, out, _) = run_capture(&["dir/larmorx-nc.exe", "-h"]);
         assert_eq!(code, 0);
         assert!(out.contains("Usage: larmorx-nc <family> <tool>"), "{out}");
-        assert!(out.contains("fsl    mcflirt, bet, bet2, betsurf"), "{out}");
+        assert!(
+            out.contains("fsl    mcflirt, bet, bet2, betsurf, flirt, convert_xfm"),
+            "{out}"
+        );
         let (code, out, err) = run_capture(&["larmorx-nc"]);
         assert_eq!((code, out.as_str()), (EXIT_USAGE, ""));
         assert!(err.contains("Usage:"), "{err}");
@@ -223,9 +228,9 @@ mod tests {
 
     #[test]
     fn unknown_tools() {
-        let (code, _, err) = run_capture(&["larmorx-nc", "fsl", "flirt"]);
+        let (code, _, err) = run_capture(&["larmorx-nc", "fsl", "fnirt"]);
         assert_eq!(code, EXIT_USAGE);
-        assert!(err.starts_with("error: unknown fsl tool 'flirt'"), "{err}");
+        assert!(err.starts_with("error: unknown fsl tool 'fnirt'"), "{err}");
         let (code, _, err) = run_capture(&["larmorx-nc", "afni", "3dTshift"]);
         assert_eq!(code, EXIT_USAGE);
         assert!(err.starts_with("error: unknown command 'afni'"), "{err}");

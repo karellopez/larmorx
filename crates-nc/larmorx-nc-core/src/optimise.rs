@@ -237,41 +237,123 @@ pub fn optimise(
     boundguess: &[f64],
     messages: &mut Vec<String>,
 ) -> f32 {
+    let mut ev = |e: OptEvent| {
+        if let OptEvent::Stderr(s) = e {
+            messages.push(s);
+        }
+    };
+    optimise_full(pt, numopt, tol, func, max_iter, boundguess, false, &mut ev).0
+}
+
+/// What `optimise` prints: `findinitialbound`'s line on standard error, and Powell's three
+/// lines on standard output (`Applying POWELL correction`, `finit, fend, fextrap = ...`,
+/// `fval = ...`; their numbers in the stream's current format, which the caller knows).
+#[derive(Clone, Debug)]
+pub enum OptEvent {
+    Stderr(String),
+    PowellApplied { finit: f32, fend: f32, fextrap: f32 },
+    PowellFval(f32),
+}
+
+/// `optimise(pt, numopt, tol, func, iterations_done, max_iter, boundguess, type)`, both of its
+/// types: `powell` false is `"brent"` (any name but `"powell"`), true Powell's direction-set
+/// update. Up to `max_iter` sweeps of line searches along the current directions (the
+/// coordinate axes at first); a sweep that moved the point by less than one average tolerance
+/// (`SP(initpt - pt, inv_tol).SumAbsoluteValue()`, Armadillo's two-accumulator `accu`) ends it.
+/// Returns the final cost and `iterations_done` (the line searches' iterations).
+#[allow(clippy::too_many_arguments)]
+pub fn optimise_full(
+    pt: &mut Mat,
+    numopt: usize,
+    tol: &Mat,
+    func: &mut dyn FnMut(&Mat) -> f32,
+    max_iter: i32,
+    boundguess: &[f64],
+    powell: bool,
+    events: &mut dyn FnMut(OptEvent),
+) -> (f32, i32) {
     let n = pt.len();
-    let mut fval: f32 = 0.0;
-    let mut it = 0;
+    // inv_tol = |1/tol| (0 for tolerances about 0), divided by (float) tol.Nrows().
+    let mut inv_tol = vec![0.0f64; tol.len()];
+    for (k, v) in inv_tol.iter_mut().enumerate() {
+        if tol.get(k).abs() > 1e-15 {
+            *v = (1.0 / tol.get(k)).abs();
+        }
+        *v /= tol.len() as f32 as f64;
+    }
+    let mut dirs = Mat::eye(n);
+    let mut deltaf = vec![0.0f64; n];
+    let (mut littot, mut it) = (0i32, 0i32);
+    let (mut fval, mut finit): (f32, f32) = (0.0, 0.0);
+    let mut stderr = Vec::new();
     loop {
         it += 1;
         if it > max_iter {
             break;
         }
         let initpt = pt.clone();
-        let bi = (it as usize).min(boundguess.len()) - 1;
+        let bi = (it.max(1) as usize).min(boundguess.len()) - 1;
         let bndguess = boundguess[bi] as f32;
         for d in 0..numopt {
-            let mut dir = Mat::zeros(n, 1);
-            dir.put(d, 1.0);
-            let mut init = fval;
-            let (fval2, _) = optimise1d(pt, &dir, tol, func, 100, &mut init, bndguess, messages);
-            fval = fval2;
-        }
-        // The convergence test: no effect with max_iter = 1 except stopping the loop.
-        let mut inv_tol = vec![0.0f64; tol.len()];
-        for (k, v) in inv_tol.iter_mut().enumerate() {
-            if tol.get(k).abs() > 1e-15 {
-                *v = (1.0 / tol.get(k)).abs();
+            let dir = Mat::col(dirs.colptr(d));
+            let (fval2, lit) =
+                optimise1d(pt, &dir, tol, func, 100, &mut fval, bndguess, &mut stderr);
+            for s in stderr.drain(..) {
+                events(OptEvent::Stderr(s));
             }
-            *v /= tol.len() as f32 as f64;
+            deltaf[d] = f64::from(fval2 - fval);
+            if d == 0 {
+                finit = fval;
+            }
+            fval = fval2;
+            littot = littot.wrapping_add(lit);
         }
-        let mut avtol: f64 = 0.0;
-        for k in 0..n {
-            avtol += ((initpt.get(k) - pt.get(k)) * inv_tol[k]).abs();
-        }
-        if (avtol as f32) < 1.0 {
+        let terms: Vec<f64> = (0..n)
+            .map(|k| ((initpt.get(k) - pt.get(k)) * inv_tol[k]).abs())
+            .collect();
+        let avtol = crate::arma::accu(&terms) as f32;
+        if avtol < 1.0 {
             break;
         }
+        if powell {
+            let mut bestm = 0usize;
+            for m in 0..numopt {
+                if deltaf[m] < deltaf[bestm] {
+                    bestm = m;
+                }
+            }
+            let fend = fval;
+            let extrap: Vec<f64> = (0..n)
+                .map(|k| initpt.get(k) + 2.0 * (pt.get(k) - initpt.get(k)))
+                .collect();
+            let fextrap = func(&Mat::col(&extrap));
+            let df = deltaf[bestm].abs() as f32;
+            let a = finit - 2.0 * fend + fextrap;
+            let b = finit - fend - df;
+            let c = finit - fextrap;
+            if 2.0 * a * b * b < c * c * df && fextrap < finit {
+                events(OptEvent::PowellApplied {
+                    finit,
+                    fend,
+                    fextrap,
+                });
+                let step: Vec<f64> = (0..n).map(|k| pt.get(k) - initpt.get(k)).collect();
+                let stepm = Mat::col(&step);
+                let (fval2, lit) =
+                    optimise1d(pt, &stepm, tol, func, 100, &mut fval, bndguess, &mut stderr);
+                for s in stderr.drain(..) {
+                    events(OptEvent::Stderr(s));
+                }
+                fval = fval2;
+                events(OptEvent::PowellFval(fval));
+                littot = littot.wrapping_add(lit);
+                for m in 0..n {
+                    dirs.set(m, bestm, pt.get(m) - initpt.get(m));
+                }
+            }
+        }
     }
-    fval
+    (fval, littot)
 }
 
 #[cfg(test)]

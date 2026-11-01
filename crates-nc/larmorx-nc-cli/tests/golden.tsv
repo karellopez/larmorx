@@ -2,7 +2,7 @@
 # Golden checksums of the larmorx-nc replicas (tests/golden.rs): SHA-256 of the files
 # larmorx-nc writes on Linux x86_64 (images by header and data, with sampled values).
 # Every platform must reproduce them (docs/validation/golden.md). Do not edit by hand.
-# Recorded from f822f64d7947616098e78ef1f0213583265e8918 on 2026-10-30 (Linux x86_64)
+# Recorded from 76520c356b5554e2bf3bbef12b01dc11886c0a37 on 2026-11-01 (Linux x86_64)
 # case	output	sha256	type	sample
 bet.fmri	out.nii.data	fdb80b59230e2a6935591185abccce90349f1b3f64fa343f210c8a99bfa7abf4	float32	0000008000000000000000000000000000000000000000000000008000000000
 bet.fmri	out.nii.header	b219a1a8be7ebc37ac08f7769e7cb523d4693ce806053da5ddb326e38e78c057	-	-
@@ -79,6 +79,24 @@ betsurf.t2.precision	out_outskull_mask.nii.header	89ec1a2d4df09f9b4fa9c48d6ecb8a
 betsurf.t2.precision	out_outskull_mesh.vtk	dbef697be6b291cd8ffe581a59ccfffa445d4535d44e0bc8832ae22432800d5b	-	-
 betsurf.t2.precision	out_skull_mask.nii.data	6eea34865e993154dbe1c4533d838f8058591961893071668871e98e1cfa06b1	int16	00000000000000000000000000000000
 betsurf.t2.precision	out_skull_mask.nii.header	89ec1a2d4df09f9b4fa9c48d6ecb8adabe765df67cfec3d9cdae940f9b29df6e	-	-
+convert_xfm.fixscaleskew	out.mat	e00e0b809ae8b1768ca035442b0ce8ba646325a407999159fc4d5c8903c09c5f	-	-
+convert_xfm.inverse-concat	out.mat	3620fce3c4486c3dd7aed6d28d1785b2c4058e59205c2c4e2b5f91c5bfe19581	-	-
+flirt.applyisoxfm-4d-spline	out.nii.data	05326648c5feca84007d5754dfb3334043e0ff94319860a25c46d4451d2c040b	float32	0000c0c0bd3785419a073441fbc45141fa4e47410000c0c00000c0c00000c0c0
+flirt.applyisoxfm-4d-spline	out.nii.header	d3a6eacfcae1fb9312ead6f1faa61c84230a320497a92f20e0be6b570f7648d5	-	-
+flirt.applyxfm-sinc	out.nii.data	1d86df8994933a3a2e00456af0be2ab855ce781b6dcf4ce9fb5d81b821395807	float32	0000c0c0c82b533f017438c285e09242bd806043196ca641b0a29a420000c0c0
+flirt.applyxfm-sinc	out.nii.header	b6451d07e2176f23ddba3e510d57ea2d439f6a709a799677ec2c4dfcc5ef1246	-	-
+flirt.bbr	out.mat	2b26e756dbada28c69df44b40eab73f6f36a3870406c1315fc617b41ec7247db	-	-
+flirt.bbr	out.nii.gz.data	42696acdfcfea0d4fa6398a3fc0b1b8c5e462cce44b65a4f7ecacf94342a09c8	float32	0000c0c077b299418aafef4068137040f08766447e139941b37892430000c0c0
+flirt.bbr	out.nii.gz.header	b6451d07e2176f23ddba3e510d57ea2d439f6a709a799677ec2c4dfcc5ef1246	-	-
+flirt.default	out.mat	bb5d972eb83514cf44207de1b7127e26a95a9a738c280ca892674ef6e9ad43b1	-	-
+flirt.default	out.nii.data	e68c0896ccc80495543ebc5d72ee1b776927534dcb3d7516b39310d81c4b1b80	float32	0000604100009041000000c1000040400000b24300009841000000c10000a841
+flirt.default	out.nii.header	b6451d07e2176f23ddba3e510d57ea2d439f6a709a799677ec2c4dfcc5ef1246	-	-
+flirt.int16-out	out.nii.data	1ed20b1e1353d56868d1159fba4289d041c0f410b8434a50149c1c0721d31b72	int16	faff09001200cc0056020800cb00faff
+flirt.int16-out	out.nii.header	351b4ff1505655295660de6f98fdd338799ee74da742d87c22aacb9873f1dd62	-	-
+flirt.int16-out.reproduce	out.nii.data	76df1a9f94e56988113c6eb13e9e31201a6661dff6cbdb16a047560ceb76a10a	int16	faff09001200cb0056020800cb00faff
+flirt.int16-out.reproduce	out.nii.header	351b4ff1505655295660de6f98fdd338799ee74da742d87c22aacb9873f1dd62	-	-
+flirt.normmi-dof6	out.mat	4d33ffe262d3b8bfcdbe68b37eefdf71f79b147bb1d61fd9ce8d5ac48db5e4be	-	-
+flirt.weights-leastsq	out.mat	5d8f6b2db3e4bf7ea3880b1bf81c760cd3937e1963b3b759d3bfa7ebe38944de	-	-
 mcflirt.2d.slab	mcflirt.2d.slab.mat/MAT_0000	633321b8478677454c33d3e82c9de5c297714b8f258fde08d8db42db06ec802f	-	-
 mcflirt.2d.slab	mcflirt.2d.slab.mat/MAT_0001	8795c62cc2ad469560c04bb9ab443d63c187836bf092a312f22b39c9e8e429ae	-	-
 mcflirt.2d.slab	mcflirt.2d.slab.mat/MAT_0002	c8b0554af656ea054e53ac2ee9023b9f4696328457ff4cfaa04182bbf2404c6c	-	-

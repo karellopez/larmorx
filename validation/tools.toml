@@ -162,6 +162,14 @@ use = ["larmorx fsl bet", "larmorx fsl bet2", "larmorx fsl betsurf", "lx.fsl.bet
 how = "clean-room original (`bet2`, the `bet` script and `betsurf`), `experimental`; exact replica in `larmorx-nc` (FSL Licence, non-commercial)"
 validation = "original: [{fsl-bet.pass} of {fsl-bet.compared}](record:fsl-bet) compared cases within thresholds against FSL 6.0.7.23, fMRIPrep's {fsl-bet.fmriprep} BET calls on every oracle run with BOLD runs bit-identical; bet2's and bet's brains, masks, outlines, meshes and skulls FSL's bit for bit, the surfaces that rerun after a self-intersecting first pass included; betsurf's profiles decided as FSL's, its masks within its thresholds on 4 of 5 real heads (Dice 0.9907 to 0.9997); [2.5 to 3.6 times faster than FSL on one thread, 6.5 to 13.5 times on 24, betsurf included](repo:docs/benchmarks/fsl-bet.md); replica: [{fsl-bet-replica.pass} of {fsl-bet-replica.compared}](record:fsl-bet-replica) compared cases bit-identical to FSL 6.0.7.23, every file, exit status and message ([{fsl-bet-replica-full.pass} of {fsl-bet-replica-full.compared}](record:fsl-bet-replica-full) in the full tier against FSL 6.0.7.17, the data panel's T1w images included), fMRIPrep's {fsl-bet-replica.fmriprep} BET calls on every oracle run with BOLD runs included; {fsl-bet-replica.both} more rejected by both, alike; {fsl-bet-replica.filled} where FSL crashes and `reproduce` fills what it leaves undefined; {fsl-bet-replica.memory} where FSL's fill reads memory beyond the volume (FSL-43, undefined); `bet -S`, `-B`, `-A`, `-A2` pending (FLIRT, FAST)"
 
+[[tool]]
+id = "fsl-flirt"
+title = "FLIRT (affine registration, boundary-based registration; convert_xfm)"
+eco = "fsl"
+use = ["larmorx fsl flirt", "larmorx fsl convert_xfm", "lx.fsl.flirt", "lx.fsl.convert_xfm"]
+how = "exact replica in `larmorx-nc` (FSL Licence, non-commercial), `experimental` (part 1); the clean-room original to be written from specs/flirt.md"
+validation = "replica: [{fsl-flirt-replica.pass} of {fsl-flirt-replica.compared}](record:fsl-flirt-replica) compared cases bit-identical to FSL 6.0.7.23 (matrices, images, exit status and messages): fMRIPrep's boundary-based calls on three oracle runs (their matrices also identical as text to fMRIPrep's own), every cost function, the search options, every shipped schedule, `-applyxfm` 3D and 4D with every interpolation and data type, BBR with its types, coordinates and a field map; {fsl-flirt-replica.both} more rejected by both, alike"
+
 # ------------------------------------------------------------------------------------------------
 # Records: the validation index's table (docs/validation/README.md), in this order.
 
@@ -374,3 +382,9 @@ id = "fsl-bet-replica-full"
 larmorx = "the same, full tier"
 reference = "FSL 6.0.7.17 (not re-made for 6.0.7.23: the full tier waits for the final validation phase), and the data panel's real T1w images (bet2, `bet -R`, betsurf on FLIRT's matrices)"
 status = "`validated` ({fsl-bet-replica-full.pass} of {fsl-bet-replica-full.compared} compared cases bit-identical; {fsl-bet-replica-full.both} rejected by both; {fsl-bet-replica-full.filled} filled where FSL crashes; {fsl-bet-replica-full.pending} pending)"
+
+[[record]]
+id = "fsl-flirt-replica"
+larmorx = "`larmorx-nc fsl flirt`, `convert_xfm`; `lx.fsl.flirt`, `lx.fsl.convert_xfm` (the replica, FSL Licence)"
+reference = "flirt and convert_xfm (FSL 6.0.7.23); fMRIPrep's BBR calls also against fMRIPrep's own matrices"
+status = "`experimental` (part 1: {fsl-flirt-replica.pass} of {fsl-flirt-replica.compared} compared cases bit-identical, fMRIPrep's calls included; {fsl-flirt-replica.both} rejected by both, with the same messages and status; `-anglerep quaternion`, `alignpaxes` and general parameter subsets wait for part 2)"

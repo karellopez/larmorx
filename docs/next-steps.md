@@ -110,7 +110,7 @@ at a time:
      records re-made in-process: no status change; golden checksums unchanged; `crates-gpl/` keeps
      only the verification tools; CI's `crates-gpl` steps gone (4.0 min a run).
 4. **The ports:** BET's clean-room original (item 7), the clean-room additions mcflirt FSL-20/21
-   and 3dUnifize AFNI-75 (specs first), FLIRT with BBR, FAST, topup (item 7); field maps,
+   and 3dUnifize AFNI-75 (specs first), FLIRT with BBR (part 1 done 2026-11-01; part 2 next), FAST, topup (item 7); field maps,
    FreeSurfer, surfaces, confounds (item 8); larmorprepx (item 9). Each with its site page from
    its smart tests.
 5. **The final validation phase** (after every tool is ported): the data panel for every tool
@@ -318,6 +318,39 @@ The items below keep their history.
    `docs/analysis/01-fmriprep-bold-pipeline.md` rows 7 and 11; the BET replica holds only what
    `bet`'s script runs of them: `-dilF`, `-mas`, `fslstats -C -l`): a replica and a clean-room
    original each, every operation (the full-completeness rule), like ImageMath for ANTs.
+   **FLIRT: the replica's part 1 done (2026-11-01).** `crates-nc/larmorx-nc-flirt`: `flirt` (every
+   cost function: `corratio`, `mutualinfo`, `normmi`, `normcorr`, `leastsq`, `labeldiff`, `woods`,
+   `bbr` with `-wmseg` or `-wmcoords`/`-wmnorms`, its types, slope and a field map; the search; the
+   pyramid; the schedule language, every command; the default 3D and 2D schedules and FSL's shipped
+   ones; `-applyxfm`, `-applyisoxfm`; weights; every output type) and `convert_xfm`; `larmorx fsl
+   flirt|convert_xfm` through the replica dispatch (no original yet); `lx.fsl.flirt`,
+   `lx.fsl.convert_xfm`; the core gained the weighted costs, `labeldiff`, the unsmoothed entropies,
+   BBR (`larmorx-nc-core::bbr`), FLIRT's filters and Powell's optimiser (mcflirt's and BET's records
+   unchanged: 236/236, 178/178). Record [fsl-flirt-replica](validation/fsl-flirt-replica.md): 107 of
+   107 compared cases bit-identical (34 more rejected by both, alike), fMRIPrep's BBR calls on ds005040, ds003592, ds000228 (their
+   matrices also fMRIPrep's own as text). `specs/flirt.md` for the clean-room original. FSL-67 to
+   FSL-74. Memory below FSL's (fMRIPrep's BBR call 395 against 452 MiB, a 12-dof call 247 against 259).
+   Speed (informal, one thread, a 3 mm BOLD reference to a 0.8 mm T1w): the default 12-dof run 3.1 s
+   against FSL's 4.6 s, fMRIPrep's BBR call 57 s against 47 s. Random testing: descriptor
+   `fsl-flirt`; the trial (half an hour, 8 jobs, 3945 cases on images up to 32 voxels per axis) found
+   928 differences; two causes fixed (`-applyxfm`'s blur beyond the image's edges; the sign of BBR's
+   NaN cost without boundary points), permanent cases `applyxfm-blur-extraslice` and
+   `bbr-no-boundary-points-nan`; after the fixes 577 of the 936 findings agree, the other 359 are
+   triaged for part 2 (`validation/difftest/triage.toml`, `docs/findings/fsl-flirt.md`): FSL
+   corrupting its heap on small or constant images (281: to be traced, then refused in both modes),
+   66 matrices (64 with voxels below 0.5 or above 5 mm), the fix pass changing results without a
+   notice (8: FSL-14 on infinite voxels; `-setbackground` with spline), one message count with
+   `-dof 3`, one more heap corruption, 2 runs over 3 GiB. **Part 2:**
+   those, `-anglerep quaternion`, `alignpaxes`, the SVD pseudo-inverse of general parameter subsets,
+   `-debug`'s BBR volume, FSL-67's measurement, a second random-testing run, the site page, the full
+   tier (fMRIPrep's 22 calls), the other programs (`avscale`, `makerot`, `midtrans`, `rmsdiff`, `img2imgcoord`,
+   `img2stdcoord`, `std2imgcoord`, `applyxfm4D`, `pointflirt`). Then the clean-room original (another
+   agent, from `specs/flirt.md`; it reuses the main package's clean-room engine, the cost functions,
+   optimiser and transform algebra of `larmorx-mri`'s head-motion correction, never a second copy: the
+   user, 2026-11-01, "avoid duplication"). The scripts wait for other tools: `epi_reg` (FAST, `fslmaths`,
+   `fugue`/`applywarp` for field maps, `convert_xfm`, `flirt`), `standard_space_roi` (`flirt`,
+   `fslmaths`, `fslroi`), `aff2rigid` (`avscale`), `flirt_average` (`flirt`, `fslmaths`,
+   `convert_xfm`), `pairreg` (`flirt` with `pairreg*.sch`, `bet`).
 8. **Field maps, FreeSurfer, surfaces, confounds:** sdcflows' field-map estimation (Apache Python:
    the B-spline fit, PEPOLAR and phase-difference preparation) and fMRIPrep's own Python steps;
    FreeSurfer 8.2.0, every program complete, a replica (`larmorx-freesurfer`) and a clean-room

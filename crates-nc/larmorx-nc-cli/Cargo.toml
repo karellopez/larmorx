@@ -16,6 +16,7 @@ larmorx-core.workspace = true
 larmorx-nc-core.workspace = true
 larmorx-nc-mcflirt.workspace = true
 larmorx-nc-bet.workspace = true
+larmorx-nc-flirt.workspace = true
 
 [dev-dependencies]
 flate2.workspace = true

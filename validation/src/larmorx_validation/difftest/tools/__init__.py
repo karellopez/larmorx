@@ -35,6 +35,7 @@ TOOLS: dict[str, tuple[str, str]] = {
     "mri-hmc": ("mri_hmc", "ORIGINAL"),
     "fsl-mcflirt": ("mri_hmc", "REPLICA"),
     "fsl-bet": ("fsl_bet", "TOOL"),
+    "fsl-flirt": ("fsl_flirt", "TOOL"),
     "resample-series": ("resample_series", "TOOL"),
 }
 

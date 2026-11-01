@@ -15,7 +15,7 @@ Replicas and clean-room originals are covered alike. Written 2026-10-11.
 
 | | `larmorx` (Apache-2.0) | the AFNI replicas (in `larmorx`) | `larmorx-nc` (the FSL replicas) |
 |---|---|---|---|
-| Cases | [`tests/golden/registry.py`](../../tests/golden/registry.py): 168 cases, 1026 outputs | [`crates/larmorx-cli/tests/afni_replica_golden.rs`](../../crates/larmorx-cli/tests/afni_replica_golden.rs): 40 cases, 90 outputs | [`crates-nc/larmorx-nc-cli/tests/golden.rs`](../../crates-nc/larmorx-nc-cli/tests/golden.rs): 36 cases, 261 outputs |
+| Cases | [`tests/golden/registry.py`](../../tests/golden/registry.py): 168 cases, 1026 outputs | [`crates/larmorx-cli/tests/afni_replica_golden.rs`](../../crates/larmorx-cli/tests/afni_replica_golden.rs): 40 cases, 90 outputs | [`crates-nc/larmorx-nc-cli/tests/golden.rs`](../../crates-nc/larmorx-nc-cli/tests/golden.rs): 52 cases, 298 outputs |
 | Checksums | [`tests/golden/golden.json`](../../tests/golden/golden.json) | [`crates/larmorx-cli/tests/afni_replica_golden.tsv`](../../crates/larmorx-cli/tests/afni_replica_golden.tsv) | [`crates-nc/larmorx-nc-cli/tests/golden.tsv`](../../crates-nc/larmorx-nc-cli/tests/golden.tsv) |
 | Test | `tests/golden/test_golden.py` (pytest) | `cargo test` | `cargo test` |
 | Runs in CI | job `test`, on the release wheel, Python 3.12 only (the Python 3.14 run skips `tests/golden`) | job `test`, `cargo test --workspace --locked` (debug) | job `gpl`, `cargo test --workspace --locked` in `crates-nc` |
@@ -115,6 +115,17 @@ What the coverage test enumerates:
   test checks that each such tool has one there (`REPLICA_GOLDEN`). 3dUnifize's half-size path (more than a
   million voxels) and AFNI-47 are beyond the golden tests' 32³ limit: the parity suites and
   the Rust unit tests (`unifize::duplo`, `unifize::wmi` against the spec's method) cover them.
+
+- **FLIRT and convert_xfm, the replica** (2026-11-01, ten cases in `crates-nc/larmorx-nc-cli/tests/golden.rs`'s
+  `BET_CASES`, on BET's generated head: the T2-like head registered to the T1-like one): `flirt.default` (the
+  default schedule and its search, `-out`), `flirt.normmi-dof6`, `flirt.weights-leastsq` (`-refweight`,
+  `-inweight`, `-nosearch`), `flirt.bbr` (FSL's `bbr.sch` as text, `-wmseg`), `flirt.applyxfm-sinc`,
+  `flirt.applyisoxfm-4d-spline`, `flirt.int16-out` and its `.reproduce` (FSL-09), `convert_xfm.inverse-concat`,
+  `convert_xfm.fixscaleskew`. The whole crates-nc golden test runs in about 31 s (debug, FLIRT at opt-level 1
+  like the core and BET). Recorded from 320e4ec; `flirt.applyisoxfm-4d-spline` re-recorded from 76520c3 after
+  the `-applyxfm` blur fix (the others unchanged). `lx.fsl.flirt` and `lx.fsl.convert_xfm` are replica-only
+  functions (`tests/golden/registry.py`, `REPLICA_ONLY_FUNCTIONS`, until FLIRT's clean-room original): their
+  golden cases are these.
 
 - **antsAI's blob alignment** (2026-10-23): new cases: `cli.ants.antsAI.blobs` (antsAI -b in 2D: a rigid search from a rotated blob plane,
 an affine one from 12 pairs of a shifted plane), `py.ants.blob_alignment` (the rotated plane

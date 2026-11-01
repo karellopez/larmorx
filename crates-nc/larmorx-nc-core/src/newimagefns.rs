@@ -328,11 +328,13 @@ pub fn gaussian_kernel_1d(sigma: f32, radius: i32) -> Vec<f64> {
 }
 
 /// One pass of `convolve_separable`: `convolve(source, kernel)` with a kernel along `axis`
-/// (centred on `(n - 1) / 2`), the image zero outside; each output voxel the `float` sum, in
-/// kernel order, of the `double` products (`val += source(...) * kernel(...)`). A sum that
-/// comes out NaN (NaN or infinite voxels) is computed again with SSE's NaNs ([`crate::sse`]:
-/// the products' and the running sum's NaNs as FSL's binary passes them on). The z slices are
-/// shared between `threads` threads; the result does not depend on their number.
+/// (centred on `(n - 1) / 2`), the image outside given by its extrapolation (`source(x, y, z)`
+/// out of bounds: zero by default; FLIRT's `-applyxfm` blurs a volume set to extraslice or a
+/// constant); each output voxel the `float` sum, in kernel order, of the `double` products
+/// (`val += source(...) * kernel(...)`). A sum that comes out NaN (NaN or infinite voxels) is
+/// computed again with SSE's NaNs ([`crate::sse`]: the products' and the running sum's NaNs as
+/// FSL's binary passes them on). The z slices are shared between `threads` threads; the result
+/// does not depend on their number.
 fn convolve_axis(src: &Volume, ker: &[f64], axis: usize, threads: usize) -> Volume {
     use crate::sse::{add_f64, mul_f64};
     let mut result = src.clone();
@@ -344,6 +346,7 @@ fn convolve_axis(src: &Volume, ker: &[f64], axis: usize, threads: usize) -> Volu
         return result;
     }
     let data = &src.data[..n];
+    let outside_zero = src.extrap == Extrapolation::Zeropad;
     let at = |x: i64, y: i64, z: i64, d: i64| -> Option<f32> {
         let (cx, cy, cz) = match axis {
             0 => (x + d, y, z),
@@ -351,7 +354,10 @@ fn convolve_axis(src: &Volume, ker: &[f64], axis: usize, threads: usize) -> Volu
             _ => (x, y, z + d),
         };
         if cx < 0 || cy < 0 || cz < 0 || cx >= nx || cy >= ny || cz >= nz {
-            return None; // + 0 * k: no change
+            if outside_zero {
+                return None; // + 0 * k: no change
+            }
+            return Some(src.extrapolate(cx, cy, cz));
         }
         Some(data[((cz * ny + cy) * nx + cx) as usize])
     };
@@ -416,4 +422,325 @@ pub fn smooth(src: &Volume, sigma_mm: f32, threads: usize) -> Volume {
         result = convolve_axis(&result, &ker, axis, threads);
     }
     result
+}
+
+// ------------------------------------------------------------------------------------------------
+// What FLIRT adds (newimagefns.{h,cc}: convolve_separable, make_blur_mask, blur, subsample_by_2,
+// gradient into a 4D volume, clamp, binarise, divide; newimage.h's affine_transform without
+// setting the background)
+
+/// `convolve_separable(source, kernelx, kernely, kernelz)`: the three passes of `convolve`, along
+/// x, then y, then z (each as [`smooth`]'s), on `threads` threads (the result does not depend on
+/// their number).
+pub fn convolve_separable(
+    src: &Volume,
+    kx: &[f64],
+    ky: &[f64],
+    kz: &[f64],
+    threads: usize,
+) -> Volume {
+    let r = convolve_axis(src, kx, 0, threads);
+    let r = convolve_axis(&r, ky, 1, threads);
+    convolve_axis(&r, kz, 2, threads)
+}
+
+/// `make_blur_mask(bmask, final_vox_dim, init_vox_dim)`: `[1]` when the sampling ratio is below
+/// 1.1 (or the initial size about 0, or sigma below 0.5), else `n = 2 (int)(sigma - 0.001) + 3`
+/// values `exp(-(float)(x - midn)^2 / (sigma^2 4.0))` (glibc's `exp`) divided by their sum
+/// (Armadillo's `accu`).
+pub fn make_blur_mask(final_vox_dim: f32, init_vox_dim: f32) -> Vec<f64> {
+    if f64::from(init_vox_dim.abs()) < 1e-8 {
+        return vec![1.0];
+    }
+    let sampling_ratio = final_vox_dim / init_vox_dim;
+    if f64::from(sampling_ratio) < 1.1 {
+        return vec![1.0];
+    }
+    let sigma = (0.85 * (f64::from(sampling_ratio) / 2.0)) as f32;
+    if f64::from(sigma) < 0.5 {
+        return vec![1.0];
+    }
+    let n = crate::cnum::f64_to_i32(f64::from(sigma) - 0.001)
+        .wrapping_mul(2)
+        .wrapping_add(3);
+    let midn = n / 2 + 1;
+    let mut bmask: Vec<f64> = (1..=n)
+        .map(|x| {
+            let d = x - midn;
+            let num = -((d.wrapping_mul(d)) as f32);
+            crate::glibc_double::exp(f64::from(num) / (f64::from(sigma * sigma) * 4.0))
+        })
+        .collect();
+    let s = arma::accu(&bmask);
+    for v in &mut bmask {
+        *v /= s;
+    }
+    bmask
+}
+
+/// `blur(source, iso_resel_size)`: [`convolve_separable`] with `make_blur_mask(resel, xdim)` (and
+/// the same for y and z).
+pub fn blur(src: &Volume, resel: f32, threads: usize) -> Volume {
+    let kx = make_blur_mask(resel, src.xdim());
+    let ky = make_blur_mask(resel, src.ydim());
+    let kz = make_blur_mask(resel, src.zdim());
+    convolve_separable(src, &kx, &ky, &kz, threads)
+}
+
+/// `subsample_by_2(refvol, centred=true)`: every other voxel of a hand-coded 3x3x3 smoothing
+/// (`0.125` the centre, `0.0625` the six faces, `0.0312` the twelve edges, `0.0156` the eight
+/// corners: each group summed in float, the weighted groups in double, in FSL's order),
+/// neighbours outside taken by the volume's extrapolation; twice the voxel size, the sform and
+/// qform composed with the 2x scaling. Values that come out NaN are computed again with SSE's
+/// NaN rules.
+pub fn subsample_by_2(refvol: &Volume) -> Volume {
+    let (sx, sy, sz) = (refvol.xsize(), refvol.ysize(), refvol.zsize());
+    let mut half = Volume::new((sx + 1) / 2, (sy + 1) / 2, (sz + 1) / 2, 1);
+    half.copy_properties(refvol);
+    let bg = refvol.backgroundval();
+    half.data.fill(bg);
+    half.setdims(
+        (f64::from(refvol.xdim()) * 2.0) as f32,
+        (f64::from(refvol.ydim()) * 2.0) as f32,
+        (f64::from(refvol.zdim()) * 2.0) as f32,
+    );
+    let mut sub2 = Mat::eye(4);
+    sub2.set(0, 0, 2.0);
+    sub2.set(1, 1, 2.0);
+    sub2.set(2, 2, 2.0);
+    if refvol.sform_code != XFORM_UNKNOWN {
+        half.sform = arma::mul_tinysq(&refvol.sform, &sub2);
+        half.sform_code = refvol.sform_code;
+    }
+    if refvol.qform_code != XFORM_UNKNOWN {
+        half.qform = arma::mul_tinysq(&refvol.qform, &sub2);
+        half.qform_code = refvol.qform_code;
+    }
+    const FACES: [(i64, i64, i64); 6] = [
+        (1, 0, 0),
+        (-1, 0, 0),
+        (0, 1, 0),
+        (0, -1, 0),
+        (0, 0, 1),
+        (0, 0, -1),
+    ];
+    const EDGES: [(i64, i64, i64); 12] = [
+        (1, 1, 0),
+        (1, -1, 0),
+        (-1, 1, 0),
+        (-1, -1, 0),
+        (1, 0, 1),
+        (1, 0, -1),
+        (-1, 0, 1),
+        (-1, 0, -1),
+        (0, 1, 1),
+        (0, 1, -1),
+        (0, -1, 1),
+        (0, -1, -1),
+    ];
+    const CORNERS: [(i64, i64, i64); 8] = [
+        (1, 1, 1),
+        (1, 1, -1),
+        (1, -1, 1),
+        (1, -1, -1),
+        (-1, 1, 1),
+        (-1, 1, -1),
+        (-1, -1, 1),
+        (-1, -1, -1),
+    ];
+    for z in 0..half.zsize() {
+        let bz = 2 * z;
+        for y in 0..half.ysize() {
+            let by = 2 * y;
+            for x in 0..half.xsize() {
+                let bx = 2 * x;
+                let group = |offs: &[(i64, i64, i64)]| -> f32 {
+                    let mut s = refvol.get(bx + offs[0].0, by + offs[0].1, bz + offs[0].2);
+                    for &(dx, dy, dz) in &offs[1..] {
+                        s += refvol.get(bx + dx, by + dy, bz + dz);
+                    }
+                    s
+                };
+                let centre = refvol.get(bx, by, bz);
+                let (f, e, c) = (group(&FACES), group(&EDGES), group(&CORNERS));
+                let mut v = (0.125 * f64::from(centre)
+                    + 0.0625 * f64::from(f)
+                    + 0.0312 * f64::from(e)
+                    + 0.0156 * f64::from(c)) as f32;
+                if v.is_nan() {
+                    use crate::sse::{add_f32, add_f64, mul_f64};
+                    let group_sse = |offs: &[(i64, i64, i64)]| -> f32 {
+                        let mut s = refvol.get(bx + offs[0].0, by + offs[0].1, bz + offs[0].2);
+                        for &(dx, dy, dz) in &offs[1..] {
+                            s = add_f32(s, refvol.get(bx + dx, by + dy, bz + dz));
+                        }
+                        s
+                    };
+                    let t0 = mul_f64(0.125, f64::from(centre));
+                    let t1 = mul_f64(0.0625, f64::from(group_sse(&FACES)));
+                    let t2 = mul_f64(0.0312, f64::from(group_sse(&EDGES)));
+                    let t3 = mul_f64(0.0156, f64::from(group_sse(&CORNERS)));
+                    v = add_f64(add_f64(add_f64(t0, t1), t2), t3) as f32;
+                }
+                half.set(x, y, z, v);
+            }
+        }
+    }
+    half
+}
+
+/// `gradient(source, grad)` into a 4D volume: the three components of the 3x3x3 gradient (the
+/// sums of [`gradient`], without the magnitude), in voxel coordinates, with `source`'s
+/// properties.
+pub fn gradient_components(source: &Volume) -> [Volume; 3] {
+    let m = grad_masks();
+    let mut out = [source.clone(), source.clone(), source.clone()];
+    for z in 0..source.zsize() {
+        for y in 0..source.ysize() {
+            for x in 0..source.xsize() {
+                let (mut vx, mut vy, mut vz) = (0.0f32, 0.0f32, 0.0f32);
+                for mz in -1i64..=1 {
+                    for my in -1i64..=1 {
+                        for mx in -1i64..=1 {
+                            let v = source.get(x + mx, y + my, z + mz);
+                            let i = ((mx + 1) + 3 * ((my + 1) + 3 * (mz + 1))) as usize;
+                            vx += v * m[0][i];
+                            vy += v * m[1][i];
+                            vz += v * m[2][i];
+                        }
+                    }
+                }
+                if vx.is_nan() || vy.is_nan() || vz.is_nan() {
+                    use crate::sse::{add_f32 as add, mul_f32 as mul};
+                    let (mut ax, mut ay, mut az) = (0.0f32, 0.0f32, 0.0f32);
+                    for mz in -1i64..=1 {
+                        for my in -1i64..=1 {
+                            for mx in -1i64..=1 {
+                                let v = source.get(x + mx, y + my, z + mz);
+                                let i = ((mx + 1) + 3 * ((my + 1) + 3 * (mz + 1))) as usize;
+                                ax = add(ax, mul(v, m[0][i]));
+                                ay = add(ay, mul(v, m[1][i]));
+                                az = add(az, mul(v, m[2][i]));
+                            }
+                        }
+                    }
+                    (vx, vy, vz) = (ax, ay, az);
+                }
+                let k = source.idx(x, y, z);
+                out[0].data[k] = vx;
+                out[1].data[k] = vy;
+                out[2].data[k] = vz;
+            }
+        }
+    }
+    out
+}
+
+/// `clamp(vol, minval, maxval)`: values above `maxval` set to it, else values below `minval`
+/// set to it (NaN kept); nothing when `maxval < minval`.
+pub fn clamp(vol: &mut Volume, minval: f32, maxval: f32) {
+    if maxval < minval {
+        return;
+    }
+    for v in &mut vol.data {
+        if *v > maxval {
+            *v = maxval;
+        } else if *v < minval {
+            *v = minval;
+        }
+    }
+}
+
+/// `volume<T>::binarise(lower, upper, inclusive)`: 1 inside `[lower, upper]`, 0 outside (NaN 0).
+pub fn binarise_range(vol: &mut Volume, lower: f32, upper: f32) {
+    for v in &mut vol.data {
+        *v = if *v >= lower && *v <= upper { 1.0 } else { 0.0 };
+    }
+}
+
+/// `binarise(vol, thresh)` (the free function): `[thresh, vol.max()]`.
+pub fn binarise(vol: &Volume, thresh: f32) -> Volume {
+    let mut out = vol.clone();
+    let upper = vol.max();
+    binarise_range(&mut out, thresh, upper);
+    out
+}
+
+/// `samesize(a, b, SUBSET)` for 3D volumes and their first three dimensions.
+fn same_size3(a: &Volume, b: &Volume) -> bool {
+    a.dims[..3] == b.dims[..3]
+}
+
+/// `divide(numervol, denomvol, mask)`: each value divided where the mask is not zero, 0 elsewhere
+/// (the mask cycled over the values). FSL's error when the sizes differ.
+pub fn divide(numer: &Volume, denom: &Volume, mask: &Volume) -> Result<Volume, FslError> {
+    if !same_size3(numer, denom) || !same_size3(mask, denom) {
+        return Err(FslError::imthrow(
+            "Attempted to divide images of different sizes",
+            3,
+        ));
+    }
+    let mut res = numer.clone();
+    let n = mask.data.len().max(1);
+    for (k, v) in res.data.iter_mut().enumerate() {
+        if mask.data[k % n] != 0.0 {
+            *v /= denom.data[k];
+        } else {
+            *v = 0.0;
+        }
+    }
+    Ok(res)
+}
+
+/// `vol *= source` (the source cycled over the values). FSL's error when the sizes differ.
+pub fn multiply_in_place(vol: &mut Volume, source: &Volume) -> Result<(), FslError> {
+    if !same_size3(vol, source) || vol.dimensionality() < source.dimensionality() {
+        return Err(FslError::imthrow(
+            "Attempted to multiply images of different sizes",
+            3,
+        ));
+    }
+    let n = source.data.len().max(1);
+    for (k, v) in vol.data.iter_mut().enumerate() {
+        *v *= source.data[k % n];
+    }
+    Ok(())
+}
+
+/// `affine_transform(vin, vout, aff, paddingsize, set_backgnd)`: with `set_backgnd` false the
+/// input's own pad value and extrapolation (FLIRT's final transform, after its
+/// `configure_interpolation`), else [`affine_transform`]'s background value and extraslice.
+pub fn affine_transform_with(
+    vin: &Volume,
+    vout: &mut Volume,
+    aff: &Mat,
+    paddingsize: f32,
+    set_backgnd: bool,
+) -> Result<(), FslError> {
+    if set_backgnd {
+        return affine_transform(vin, vout, aff, paddingsize);
+    }
+    raw_affine_transform(vin, vout, aff)?;
+    affine_transform_mask(vin, vout, aff, paddingsize, vin.padvalue)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn the_blur_reads_beyond_the_edges_by_the_volumes_extrapolation() {
+        // FLIRT's -applyxfm blurs a volume set to extraslice: a constant stays constant; with
+        // the default (zero outside) the edges lose the kernel's outer weights.
+        let mut v = Volume::new(3, 3, 3, 1);
+        v.data.fill(100.0);
+        let zero = blur(&v, 2.0, 1);
+        assert!(zero.data[0] < 100.0);
+        v.extrap = Extrapolation::Extraslice;
+        v.padvalue = 0.0;
+        let kept = blur(&v, 2.0, 1);
+        assert!(kept.data.iter().all(|&x| (x - 100.0).abs() < 1e-4));
+        // the extrapolation is passed on (convolve's result copies the source's properties)
+        assert_eq!(kept.extrap, Extrapolation::Extraslice);
+    }
 }

@@ -1391,6 +1391,64 @@ fn read_general<T: Elem>(
     Ok((v, header.datatype, header.units))
 }
 
+/// `read_volume_hdr_only(target, filename)`: the header's geometry only (FSL allocates a buffer
+/// of one value; here `data` is empty): sizes below 1 made 1, the voxel sizes as stored
+/// (`setdims`: their magnitudes; no ANALYZE origin or zero-size repair, unlike a full read), the
+/// sform and qform with their codes, the intent, display range and auxiliary file; swapped to
+/// radiological order (header only) when the file is not. A name that cannot be read is
+/// newimage's #22 exception.
+pub fn read_volume_hdr_only(filename: &str, settings: &Settings) -> Result<Volume, FslError> {
+    let fail = |what: &str| {
+        FslError::imthrow(
+            format!("Failed to read volume {filename}\nError : {what}"),
+            22,
+        )
+    };
+    let valid = match return_validimagefilename(filename) {
+        Ok(v) => v,
+        Err(e) => {
+            let mut out = fail(&e.what);
+            out.printed.splice(0..0, e.printed);
+            return Err(out);
+        }
+    };
+    let header =
+        nifti::load_header(Path::new(&valid), &settings.open_options()).map_err(|e| fail(&e.0))?;
+    let mut dims = [1i64; 7];
+    for (k, d) in dims.iter_mut().enumerate() {
+        *d = header.dim[k + 1].max(1);
+    }
+    let mut v = Volume::<f32>::new7([1; 7]);
+    v.data = Vec::new();
+    v.dims = dims;
+    for k in 0..7 {
+        v.pixdims[k] = (header.pixdim[k + 1] as f32).abs();
+    }
+    for k in 4..7 {
+        v.pixdims[k] = header.pixdim[k + 1] as f32;
+    }
+    v.sform = mat44_to_mat(&header.get_sform());
+    v.qform = mat44_to_mat(&header.get_qform());
+    v.sform_code = header.sform_code;
+    v.qform_code = header.qform_code;
+    v.radiological_file = header_left_right_order(&header) == RADIOLOGICAL;
+    v.intent_code = header.intent_code;
+    v.intent_params = [
+        header.intent_p1 as f32,
+        header.intent_p2 as f32,
+        header.intent_p3 as f32,
+    ];
+    v.display_min = header.cal_min as f32;
+    v.display_max = header.cal_max as f32;
+    let mut aux = header.aux_file.clone();
+    aux.truncate(24);
+    v.aux_file = aux;
+    if !v.radiological_file {
+        v.make_radiological();
+    }
+    Ok(v)
+}
+
 /// `read_volume4D(target, filename)`: the volume, the file's datatype and its `xyzt_units`.
 pub fn read_volume4d<T: Elem>(
     filename: &str,

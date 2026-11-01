@@ -40,6 +40,10 @@ const FSL_TOOLS: &[(&str, ToolFn)] = &[
     ("betsurf", larmorx_nc_bet::betsurf),
     ("flirt", larmorx_nc_flirt::flirt),
     ("convert_xfm", larmorx_nc_flirt::convert_xfm),
+    ("avscale", larmorx_nc_flirt::avscale),
+    ("img2stdcoord", larmorx_nc_flirt::img2stdcoord),
+    ("std2imgcoord", larmorx_nc_flirt::std2imgcoord),
+    ("img2imgcoord", larmorx_nc_flirt::img2imgcoord),
 ];
 
 fn tool_names() -> String {

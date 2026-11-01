@@ -748,38 +748,10 @@ impl<'a> Flirt<'a> {
                 }
             } else {
                 let rv = self.slot_vol(p.ref_slot);
-                let level = [rv.xdim(), rv.ydim(), rv.zdim()];
-                let seg = &self.global_seg;
-                let segdims = [seg.xdim(), seg.ydim(), seg.zdim()];
-                // FSL-67: FSL divides the gradient by the reference level's voxel sizes; the
-                // normal in millimetres divides it by the segmentation's own.
-                let differ = !proportional(level, segdims);
-                let dims = if self.mode.fix() && differ {
-                    segdims
-                } else {
-                    level
-                };
+                // FSL-67 (rule C, measured 2026-11-01): the gradient divided by the reference
+                // level's voxel sizes, not the segmentation's, in both modes.
+                let dims = [rv.xdim(), rv.ydim(), rv.zdim()];
                 let (pts, found) = bbr::points_from_seg(&self.global_seg, dims, self.threads);
-                if differ && found {
-                    self.notice(
-                        &defects::FSL_67,
-                        format!(
-                            "the boundary normals of a {} x {} x {} mm segmentation {} (FLIRT \
-                             divides its gradient by the reference level's {} x {} x {} mm)",
-                            cnum::stream(f64::from(segdims[0])),
-                            cnum::stream(f64::from(segdims[1])),
-                            cnum::stream(f64::from(segdims[2])),
-                            if self.mode.fix() {
-                                "are computed in millimetres"
-                            } else {
-                                "are FLIRT's"
-                            },
-                            cnum::stream(f64::from(level[0])),
-                            cnum::stream(f64::from(level[1])),
-                            cnum::stream(f64::from(level[2])),
-                        ),
-                    );
-                }
                 p.bbr_points = pts;
                 if !found {
                     self.el("ERROR::set_bbr_seg: could not find any boundary points!");
@@ -3378,11 +3350,4 @@ fn background_defined(v: &Volume) -> R<()> {
         Some(why) => Err(Stop::Refuse(why)),
         None => Ok(()),
     }
-}
-
-/// Whether two voxel-size triples are proportional (their gradients' directions agree after
-/// dividing by either), in single precision as FSL's normals are computed.
-fn proportional(a: [f32; 3], b: [f32; 3]) -> bool {
-    let r0 = a[0] / b[0];
-    r0 == a[1] / b[1] && r0 == a[2] / b[2]
 }

@@ -270,6 +270,34 @@ fn decompose_aff_with(
     centre: &Mat,
     rotmat2params: fn(&Mat) -> [f64; 3],
 ) -> [f64; 12] {
+    decompose_aff_impl(affmat, centre, rotmat2params, false).unwrap_or([f64::NAN; 12])
+}
+
+/// The message of the `std::runtime_error` Armadillo throws when `inv(A) * B`'s solve finds
+/// `A` singular.
+pub const SOLVE_ERROR: &str =
+    "matrix multiplication: problem with matrix inverse; suggest to use solve() instead";
+/// The message of the `std::runtime_error` Armadillo's `inv()` throws on a singular matrix.
+pub const INV_ERROR: &str = "inv(): matrix is singular";
+
+/// [`decompose_aff`] (`rotmat2euler`, or with `quat` `rotmat2quat`) where FSL throws: a scale
+/// of 0 makes the solve's matrix singular, and Armadillo throws [`SOLVE_ERROR`] (the
+/// translations and rotations are never computed).
+pub fn decompose_aff_try(
+    affmat: &Mat,
+    centre: &Mat,
+    quat: bool,
+) -> Result<[f64; 12], &'static str> {
+    let f = if quat { rotmat2quat } else { rotmat2euler };
+    decompose_aff_impl(affmat, centre, f, true)
+}
+
+fn decompose_aff_impl(
+    affmat: &Mat,
+    centre: &Mat,
+    rotmat2params: fn(&Mat) -> [f64; 3],
+    strict: bool,
+) -> Result<[f64; 12], &'static str> {
     let mut params = [0.0f64; 12];
     let aff3 = affmat.sub(0, 3, 0, 3);
     let x = affmat.sub(0, 3, 0, 1);
@@ -314,9 +342,16 @@ fn decompose_aff_with(
     params[10] = f64::from(b);
     params[11] = f64::from(c);
     // aff3 * scales.i() * skew(1:3,1:3).i(): Armadillo evaluates A * solve(B, inv(C)).
-    let skew_inv = arma::inv(&skew).unwrap_or_else(|_| Mat::from_rows(3, 3, &[f64::NAN; 9]));
-    let solved =
-        arma::solve(&scales, &skew_inv).unwrap_or_else(|_| Mat::from_rows(3, 3, &[f64::NAN; 9]));
+    let skew_inv = match arma::inv(&skew) {
+        Ok(m) => m,
+        Err(_) if strict => return Err(INV_ERROR),
+        Err(_) => Mat::from_rows(3, 3, &[f64::NAN; 9]),
+    };
+    let solved = match arma::solve(&scales, &skew_inv) {
+        Ok(m) => m,
+        Err(_) if strict => return Err(SOLVE_ERROR),
+        Err(_) => Mat::from_rows(3, 3, &[f64::NAN; 9]),
+    };
     let rotmat = arma::mul_tinysq(&aff3, &solved);
     // transl = aff3*centre + affmat(1:3,4) - centre
     let ac = arma::gemv_tinysq(&aff3, centre.as_slice(), false);
@@ -330,7 +365,62 @@ fn decompose_aff_with(
     // rotation the affine's own NaN, as this order does (FSL 6.0.7.17's closed-form inverse gave
     // the y rotation the other sign: validation/probes/fsl-mcflirt-affine-trace, nan_decompose.cc
     // built against each release).
-    params
+    Ok(params)
+}
+
+/// `sqrtaff(mat)`: an approximate square root of an affine matrix: the quaternion rotation
+/// halved (its axis scaled by `1 / (2 cos(t/2))`, `t = asin(|q|)`), the square roots of the
+/// scales, half the skews, and the translation that both halves share (`(mat S⁻¹ K⁻¹ R⁻¹ + I)`'s
+/// 3 × 3 part solved against the translation). Armadillo's errors are returned: [`INV_ERROR`]
+/// from an inverse, [`SOLVE_ERROR`] from the solve. `asin` and `cos` are the correctly rounded
+/// ones of `larmorx_core::math` (glibc's agree with them on all but rare arguments).
+pub fn sqrtaff(mat: &Mat) -> Result<Mat, &'static str> {
+    let zero = Mat::col(&[0.0, 0.0, 0.0]);
+    let mut params = decompose_aff_try(mat, &zero, true)?;
+    let sint =
+        (S64(params[0]) * params[0] + S64(params[1]) * params[1] + S64(params[2]) * params[2])
+            .sqrt()
+            .0;
+    let t = larmorx_core::math::asin(sint);
+    let factor = (S64(1.0) / (S64(2.0) * larmorx_core::math::cos((S64(0.5) * t).0))).0;
+    for k in 0..3 {
+        params[k] = (S64(factor) * params[k]).0;
+    }
+    for k in 6..9 {
+        params[k] = S64(params[k]).sqrt().0;
+    }
+    for k in 9..12 {
+        params[k] = (S64(0.5) * params[k]).0;
+    }
+    let mut msgs = Vec::new();
+    let mut rot = construct_rotmat_quat(&Mat::col(&params), 3, &zero, &mut msgs);
+    rot.set(0, 3, 0.0);
+    rot.set(1, 3, 0.0);
+    rot.set(2, 3, 0.0);
+    let mut scale = Mat::eye(4);
+    scale.set(0, 0, params[6]);
+    scale.set(1, 1, params[7]);
+    scale.set(2, 2, params[8]);
+    let mut skew = Mat::eye(4);
+    skew.set(0, 1, params[9]);
+    skew.set(0, 2, params[10]);
+    skew.set(1, 2, params[11]);
+    let trans = Mat::col(&[params[3], params[4], params[5]]);
+    // (mat * scale.i() * skew.i() * rot.i() + id4): four operands, each inverse evaluated, the
+    // product ((A B) C) D (Armadillo's glue_times_redirect<4>, equal sizes).
+    let si = arma::inv(&scale).map_err(|_| INV_ERROR)?;
+    let ki = arma::inv(&skew).map_err(|_| INV_ERROR)?;
+    let ri = arma::inv(&rot).map_err(|_| INV_ERROR)?;
+    let prod = arma::mul_tinysq(&arma::mul_tinysq(&arma::mul_tinysq(mat, &si), &ki), &ri);
+    let sum = prod.plus(&Mat::eye(4));
+    // .SubMatrix(1,3,1,3).i() * trans: inv(A) * B is solve(A, B).
+    let th = arma::solve(&sum.sub(0, 3, 0, 3), &trans).map_err(|_| SOLVE_ERROR)?;
+    // matnew = rot * skew * scale: (rot * skew) * scale
+    let mut matnew = arma::mul_tinysq(&arma::mul_tinysq(&rot, &skew), &scale);
+    matnew.set(0, 3, th.get(0));
+    matnew.set(1, 3, th.get(1));
+    matnew.set(2, 3, th.get(2));
+    Ok(matnew)
 }
 
 /// `rms_deviation(affmat1, affmat2, centre, rmax)` of two 4 × 4 matrices.

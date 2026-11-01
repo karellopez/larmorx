@@ -404,6 +404,61 @@ pub fn stream(v: f64) -> String {
     fmt_g(v, 6)
 }
 
+/// `std::cout << X` for an Armadillo expression (Armadillo's `arma_ostream::print` with
+/// `modify`, as armawrap's `.i()` and other expressions print): the layout from the finite
+/// values (scientific with 4 decimals in 13 columns when one is at least 100 in magnitude, or
+/// non-zero and at most 1e-4; else fixed with 4 decimals in 10 columns when one is at least 10
+/// in magnitude, or in 9), each value right-aligned, zeros as `0`, non-finite values as `inf`,
+/// `-inf`, `nan`; a newline after each row. The stream's own state is restored after it.
+pub fn arma_print(rows: usize, cols: usize, at: impl Fn(usize, usize) -> f64) -> String {
+    if rows == 0 || cols == 0 {
+        return format!("[matrix size: {rows}x{cols}]\n");
+    }
+    let (mut c, mut b) = (false, false);
+    'scan: for col in 0..cols {
+        for row in 0..rows {
+            let v = at(row, col);
+            if !v.is_finite() {
+                continue;
+            }
+            if v >= 100.0 || v <= -100.0 || (v > 0.0 && v <= 1e-4) || (v < 0.0 && v >= -1e-4) {
+                c = true;
+                break 'scan;
+            }
+            if v >= 10.0 || v <= -10.0 {
+                b = true;
+            }
+        }
+    }
+    let width = if c {
+        13
+    } else if b {
+        10
+    } else {
+        9
+    };
+    let mut s = String::new();
+    for row in 0..rows {
+        for col in 0..cols {
+            let v = at(row, col);
+            let t = if v == 0.0 {
+                "0".to_owned()
+            } else if v.is_nan() {
+                "nan".to_owned()
+            } else if v.is_infinite() {
+                if v < 0.0 { "-inf" } else { "inf" }.to_owned()
+            } else if c {
+                fmt_e(v, 4)
+            } else {
+                fmt_f(v, 4)
+            };
+            s.push_str(&format!("{t:>width$}"));
+        }
+        s.push('\n');
+    }
+    s
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

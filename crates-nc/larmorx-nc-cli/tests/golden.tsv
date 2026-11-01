@@ -2,7 +2,7 @@
 # Golden checksums of the larmorx-nc replicas (tests/golden.rs): SHA-256 of the files
 # larmorx-nc writes on Linux x86_64 (images by header and data, with sampled values).
 # Every platform must reproduce them (docs/validation/golden.md). Do not edit by hand.
-# Recorded from 320e4ec91e96e3636d8c99b36b87283413e9fc88 on 2026-11-01 (Linux x86_64)
+# Recorded from 76520c356b5554e2bf3bbef12b01dc11886c0a37 on 2026-11-01 (Linux x86_64)
 # case	output	sha256	type	sample
 bet.fmri	out.nii.data	fdb80b59230e2a6935591185abccce90349f1b3f64fa343f210c8a99bfa7abf4	float32	0000008000000000000000000000000000000000000000000000008000000000
 bet.fmri	out.nii.header	b219a1a8be7ebc37ac08f7769e7cb523d4693ce806053da5ddb326e38e78c057	-	-
@@ -81,7 +81,7 @@ betsurf.t2.precision	out_skull_mask.nii.data	6eea34865e993154dbe1c4533d838f80585
 betsurf.t2.precision	out_skull_mask.nii.header	89ec1a2d4df09f9b4fa9c48d6ecb8adabe765df67cfec3d9cdae940f9b29df6e	-	-
 convert_xfm.fixscaleskew	out.mat	e00e0b809ae8b1768ca035442b0ce8ba646325a407999159fc4d5c8903c09c5f	-	-
 convert_xfm.inverse-concat	out.mat	3620fce3c4486c3dd7aed6d28d1785b2c4058e59205c2c4e2b5f91c5bfe19581	-	-
-flirt.applyisoxfm-4d-spline	out.nii.data	ec09ee2aa59cbae141de291d6132edd272ec09fbdc7a8ea6f616a5421cae617f	float32	0000c0c026816b414ed7354134c63b41e7270d410000c0c00000c0c00000c0c0
+flirt.applyisoxfm-4d-spline	out.nii.data	05326648c5feca84007d5754dfb3334043e0ff94319860a25c46d4451d2c040b	float32	0000c0c0bd3785419a073441fbc45141fa4e47410000c0c00000c0c00000c0c0
 flirt.applyisoxfm-4d-spline	out.nii.header	d3a6eacfcae1fb9312ead6f1faa61c84230a320497a92f20e0be6b570f7648d5	-	-
 flirt.applyxfm-sinc	out.nii.data	1d86df8994933a3a2e00456af0be2ab855ce781b6dcf4ce9fb5d81b821395807	float32	0000c0c0c82b533f017438c285e09242bd806043196ca641b0a29a420000c0c0
 flirt.applyxfm-sinc	out.nii.header	b6451d07e2176f23ddba3e510d57ea2d439f6a709a799677ec2c4dfcc5ef1246	-	-

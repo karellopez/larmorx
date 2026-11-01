@@ -431,10 +431,31 @@ class Run:
     #: never cached; the replica must refuse in both modes.
     hang: str = ""
     aslimit: str = ""
+    #: FSL crashes on this case (the register entry: undefined behaviour, a signal), never
+    #: cached; the replica must refuse in both modes. FSL's last messages (the C library's heap
+    #: diagnostics) are not compared.
+    crash: str = ""
 
 
 #: How long FSL runs on a case where it never finishes.
 HANG_SECONDS = 20
+
+
+def _constant_image(path: Path, shape: str, vox: str, noform: bool) -> None:
+    import nibabel as nib
+
+    dims = tuple(int(x) for x in shape.split("x"))
+    sizes = [float(x) for x in vox.split("x")]
+    aff = np.diag([*sizes, 1.0])
+    img = nib.Nifti1Image(np.ones(dims, np.float32), aff)
+    img.header.set_xyzt_units("mm")
+    if noform:
+        img.header.set_sform(None, code=0)
+        img.header.set_qform(None, code=0)
+    else:
+        img.set_qform(aff, 1)
+        img.set_sform(aff, 1)
+    nib.save(img, str(path))
 
 
 def _prepare(run: Run, tmp: Path) -> list[str]:
@@ -453,6 +474,17 @@ def _prepare(run: Run, tmp: Path) -> list[str]:
         elif a.startswith("@fslsch:"):
             # one of FSL's shipped schedules, read where FSL keeps it
             out.append(str(fsldir() / "etc" / "flirtsch" / a.removeprefix("@fslsch:")))
+        elif a.startswith("@fsldata:"):
+            # one of FSL's standard images, read where FSL keeps it
+            out.append(str(fsldir() / "data" / "standard" / a.removeprefix("@fsldata:")))
+        elif a.startswith(("@const:", "@noform:")):
+            # a constant image (value 1, float32): @const:<nx>x<ny>x<nz>:<dx>x<dy>x<dz>:<name>,
+            # with its sform and qform the voxel sizes (@noform: neither set)
+            kind, shape, vox, name = a[1:].split(":")
+            dst = tmp / name
+            if not dst.exists():
+                _constant_image(dst, shape, vox, kind == "noform")
+            out.append(name)
         elif a.startswith("@"):
             base = base or inputs()
             name = a[1:]
@@ -502,7 +534,7 @@ def _hang_case(run: Run, checks: CheckList) -> None:
         if run.aslimit:
             checks(
                 f"FSL's memory grows until the address-space limit ({run.aslimit}) refuses it",
-                p.returncode is not None and "bad_alloc" in p.stderr,
+                p.returncode == 0 and "bad_alloc" in p.stderr,
                 detail=f"exit {p.returncode}: {' '.join(p.stderr.split())[-160:]}",
             )
         else:
@@ -517,7 +549,7 @@ def _hang_case(run: Run, checks: CheckList) -> None:
             b = Path(b_)
             r = run_replica(run.program, _prepare(run, b), cwd=b, settings=settings, mode=mode)
             refusal = next(
-                (ln for ln in r.stderr.splitlines() if ln.startswith(f"{REPLICA_PREFIX}: error:")),
+                (ln for ln in r.stderr.splitlines() if ln.startswith(f"{REPLICA_PREFIX} error:")),
                 "",
             )
             checks(
@@ -525,15 +557,64 @@ def _hang_case(run: Run, checks: CheckList) -> None:
                 r.code == 1 and f"({run.hang})" in refusal,
                 detail=f"exit {r.code}: {refusal[:160]}",
             )
-    raise Outcome(
-        EXPECTED,
-        f"FLIRT never finishes ({run.hang}: undefined behaviour); the replica refuses in both modes",
-    )
+    if all(c.passed for c in checks.checks):
+        raise Outcome(
+            EXPECTED,
+            f"FLIRT never finishes ({run.hang}: undefined behaviour); the replica refuses in "
+            "both modes",
+        )
+
+
+def _crash_case(run: Run, checks: CheckList) -> None:
+    """A case FSL crashes on (``run.crash``): FSL killed by a signal, the replica's refusal in
+    both modes naming the entry."""
+    from larmorx_validation import oracle_cache
+
+    settings = dict(run.settings)
+    with tempfile.TemporaryDirectory(prefix="lx-nc-flirt-") as a_:
+        a = Path(a_)
+        args = _prepare(run, a)
+        p = oracle_cache.run(
+            [str(fsldir() / "bin" / run.program), *args],
+            env=_environment(settings),
+            cwd=a,
+            outputs=[a],
+            policy=oracle_cache.Policy(threads=1, family="fsl", never=f"FSL crashes ({run.crash})"),
+            runner=SUITE,
+            inputs=[q for q in sorted(a.rglob("*")) if q.is_file()],
+            timeout=600,
+        )
+        checks(
+            "FSL is killed by a signal",
+            p.returncode is not None and p.returncode < 0,
+            detail=f"exit {p.returncode}: {' '.join(p.stderr.split())[-160:]}",
+        )
+    for mode in (defects.REPRODUCE, defects.FIX):
+        with tempfile.TemporaryDirectory(prefix="lx-nc-flirt-") as b_:
+            b = Path(b_)
+            r = run_replica(run.program, _prepare(run, b), cwd=b, settings=settings, mode=mode)
+            refusal = next(
+                (ln for ln in r.stderr.splitlines() if ln.startswith(f"{REPLICA_PREFIX} error:")),
+                "",
+            )
+            checks(
+                f"the replica refuses ({mode})",
+                r.code == 1 and run.crash in refusal and not list(b.glob("out*")),
+                detail=f"exit {r.code}: {refusal[:160]}",
+            )
+    if all(c.passed for c in checks.checks):
+        raise Outcome(
+            EXPECTED,
+            f"FSL crashes ({run.crash}: undefined behaviour); the replica refuses in both modes",
+        )
 
 
 def _run_case(run: Run, checks: CheckList) -> None:
     if run.hang:
         _hang_case(run, checks)
+        return
+    if run.crash:
+        _crash_case(run, checks)
         return
     settings = dict(run.settings)
     with (
@@ -648,6 +729,31 @@ def _real_cases() -> dict[str, tuple[str, str, Run]]:
 
     s = "smoke"
     st = "standard"
+    add(
+        "real/anglerep-quaternion",
+        st,
+        "-anglerep quaternion: the rotations as a quaternion's last three components (12 dof)",
+        *base[1],
+        "-anglerep",
+        "quaternion",
+        "-omat",
+        "out.mat",
+    )
+    add(
+        "real/anglerep-quaternion-dof6",
+        st,
+        "-anglerep quaternion at 6 dof, -out, verbose (the parameters printed)",
+        *base[1],
+        "-anglerep",
+        "quaternion",
+        "-dof",
+        "6",
+        "-out",
+        "out",
+        "-omat",
+        "out.mat",
+        "-v",
+    )
     add(
         "real/default",
         s,
@@ -1620,7 +1726,36 @@ def _edge_cases() -> dict[str, tuple[str, str, Run]]:
         "out.mat",
         files=(("s.sch", "read UA bad.txt\n"), ("bad.txt", "1 2 abc\n")),
         hang="FSL-72",
-        aslimit="2G",
+        aslimit="8G",
+    )
+    # FSL-75: newimage's background value of an image 3 voxels wide (heap corruption), or of
+    # a single voxel (an empty buffer read)
+    add(
+        "edge/background-overflow",
+        "a 1-voxel input and an 8 x 1 x 1 reference: FLIRT's pyramid computes the background of a "
+        "3-voxel-wide level, writing past its buffer (FSL-75)",
+        "-in",
+        "@const:1x1x1:2.5x2.5x2.5:in.nii",
+        "-ref",
+        "@const:8x1x1:1x1.5x0.5:ref.nii",
+        "-omat",
+        "out.mat",
+        crash="FSL-75",
+    )
+    add(
+        "edge/background-empty",
+        "-applyxfm of a 1-voxel input: its background value reads an empty buffer (FSL-75)",
+        "-in",
+        "@const:1x1x1:2x2x2:in.nii",
+        "-ref",
+        "@const:6x6x6:2x2x2:ref.nii",
+        "-applyxfm",
+        "-init",
+        "id.mat",
+        "-out",
+        "out",
+        files=(("id.mat", "1 0 0 0\n0 1 0 0\n0 0 1 0\n0 0 0 1\n"),),
+        crash="FSL-75",
     )
     add(
         "convert_xfm/missing-concat",
@@ -1633,9 +1768,99 @@ def _edge_cases() -> dict[str, tuple[str, str, Run]]:
     return c
 
 
+_AFF = "1.05 0.02 -0.03 2\n-0.01 0.97 0.04 -3\n0.02 -0.05 1.1 1.5\n0 0 0 1\n"
+_SING = "1 0 0 0\n0 0 0 0\n0 0 1 0\n0 0 0 1\n"
+_FLIP = "-1 0 0 10\n0 1 0 0\n0 0 1 0\n0 0 0 1\n"
+_COORDS = "10 20 30\n0 0 0\n-5.5 3.25 100\n1e3 2 3\n"
+
+
+def _program_cases() -> dict[str, tuple[str, str, Run]]:
+    """avscale, img2imgcoord, std2imgcoord, img2stdcoord and rmsdiff: one case per path."""
+    c: dict[str, tuple[str, str, Run]] = {}
+    st = "standard"
+    E, T, W, M = "@epi.nii", "@t1.nii", "@wm.nii", "@init.mat"
+    STD = "@fsldata:MNI152_T1_2mm_brain_mask.nii.gz"
+
+    def add(name: str, desc: str, program: str, *args: str, tier: str = st, **kw: Any) -> None:
+        c[f"programs/{name}"] = (tier, desc, Run(program, tuple(args), **kw))
+
+    A = "avscale"
+    add("avscale-usage", "avscale without arguments (its usage, exit 255)", A)
+    add("avscale-default", "avscale of fMRIPrep's initial matrix", A, M, tier="smoke")
+    add("avscale-allparams", "--allparams, the translations about a volume's centre", A,
+        "--allparams", "aff.mat", E, files=(("aff.mat", _AFF),))  # fmt: skip
+    add("avscale-inverteddies", "--inverteddies (the check and the inverted eddy matrix)", A,
+        "--inverteddies", "aff.mat", files=(("aff.mat", _AFF),))  # fmt: skip
+    add("avscale-flip", "a matrix that swaps left and right (the half transforms of the swap)",
+        A, "flip.mat", files=(("flip.mat", _FLIP),))  # fmt: skip
+    add("avscale-singular", "a singular matrix: Armadillo's solve throws, avscale aborts", A,
+        "sing.mat", files=(("sing.mat", _SING),))  # fmt: skip
+    add("avscale-missing-matrix", "a matrix file that does not exist (exit 254)", A, "none.mat")
+    add("avscale-empty-volume", "an empty volume name: the centre of an empty volume", A, M, "")
+    add("avscale-missing-volume", "a volume that does not exist: newimage's exception, abort",
+        A, M, "none.nii.gz")  # fmt: skip
+    for prog, opts in (
+        ("img2imgcoord", ("-src", E, "-dest", T)),
+        ("std2imgcoord", ("-img", T, "-std", E)),
+        ("img2stdcoord", ("-img", T, "-std", E)),
+    ):
+        files = (("coords.txt", _COORDS),)
+        add(f"{prog}-usage", f"{prog} without arguments (its usage, exit 1)", prog)
+        add(f"{prog}-xfm", f"{prog} through fMRIPrep's initial matrix", prog, *opts, "-xfm", M,
+            "coords.txt", files=files, tier="smoke" if prog == "img2imgcoord" else st)  # fmt: skip
+        add(f"{prog}-vox", f"{prog} -vox", prog, *opts, "-xfm", M, "-vox", "coords.txt",
+            files=files)  # fmt: skip
+        add(f"{prog}-mm", f"{prog} -mm", prog, *opts, "-xfm", M, "-mm", "coords.txt",
+            files=files)  # fmt: skip
+        add(f"{prog}-verbose", f"{prog} verbose (sizes, matrices; fixed notation after them)",
+            prog, *opts, "-xfm", M, "-verbose" if prog != "img2imgcoord" else "-v",
+            "coords.txt", files=files)  # fmt: skip
+        add(f"{prog}-missing-coords", f"{prog}: a coordinate file that does not exist", prog,
+            *opts, "none.txt")  # fmt: skip
+        add(f"{prog}-not-numbers", f"{prog}: coordinates that stop at a word", prog, *opts,
+            "bad.txt", files=(("bad.txt", "1 2 x 4\n5 6 7\n"),))  # fmt: skip
+        add(f"{prog}-lacking", f"{prog}: an option lacking its argument (a message, the run "
+            "goes on)", prog, *opts, "coords.txt", "-xfm", files=files)  # fmt: skip
+        add(f"{prog}-unknown", f"{prog}: an unknown option (exit 255)", prog, *opts, "-frob",
+            "x", "coords.txt", files=files)  # fmt: skip
+        add(f"{prog}-missing-image", f"{prog}: an image that does not exist (abort)", prog,
+            opts[0], "none.nii", opts[2], opts[3], "coords.txt", files=files)  # fmt: skip
+    add("img2imgcoord-flirt-premat", "img2imgcoord -flirt and -premat", "img2imgcoord", "-src",
+        E, "-dest", T, "-flirt", "-premat", M, "coords.txt",
+        files=(("coords.txt", _COORDS),))  # fmt: skip
+    add("std2imgcoord-standard", "std2imgcoord from FSL's MNI152 2 mm", "std2imgcoord", "-img",
+        T, "-std", STD, "coords.txt", files=(("coords.txt", _COORDS),))  # fmt: skip
+    add("std2imgcoord-no-std", "std2imgcoord without -std (its warning; 1 mm voxels)",
+        "std2imgcoord", "-img", T, "coords.txt", files=(("coords.txt", _COORDS),))  # fmt: skip
+    add("std2imgcoord-singular", "std2imgcoord with a singular matrix: its inverse throws",
+        "std2imgcoord", "-img", T, "-std", E, "-xfm", "sing.mat", "coords.txt",
+        files=(("coords.txt", _COORDS), ("sing.mat", _SING)))  # fmt: skip
+    add("img2stdcoord-noform", "img2stdcoord to a standard image without sform or qform",
+        "img2stdcoord", "-img", T, "-std", "@noform:5x6x7:2x3x4:noform.nii", "coords.txt",
+        files=(("coords.txt", _COORDS),))  # fmt: skip
+    add("img2stdcoord-warp-missing", "img2stdcoord -warp of a file that does not exist",
+        "img2stdcoord", "-img", T, "-std", E, "-warp", "none.nii.gz", "coords.txt",
+        files=(("coords.txt", _COORDS),))  # fmt: skip
+    R = "rmsdiff"
+    add("rmsdiff-usage", "rmsdiff without arguments (its usage, exit 255)", R)
+    add("rmsdiff-rms", "the RMS deviation over 80 mm about a volume's centre", R, M, "id.mat",
+        E, files=(("id.mat", "1 0 0 0\n0 1 0 0\n0 0 1 0\n0 0 0 1\n"),), tier="smoke")  # fmt: skip
+    add("rmsdiff-mask", "the largest and the RMS displacement over a mask", R, M, "aff.mat", T,
+        W, files=(("aff.mat", _AFF),))  # fmt: skip
+    add("rmsdiff-low-determinant", "a matrix of low determinant (its warning, the matrix on "
+        "standard error)", R, "small.mat", M, E,
+        files=(("small.mat", "0.1 0 0 0\n0 0.5 0 0\n0 0 1 0\n0 0 0 1\n"),))  # fmt: skip
+    add("rmsdiff-singular", "a singular second matrix: rms_deviation's message, exit 251", R, M,
+        "sing.mat", E, files=(("sing.mat", _SING),))  # fmt: skip
+    add("rmsdiff-missing-matrix", "a matrix file that does not exist", R, "none.mat", M, E)
+    add("rmsdiff-4d", "a 4D reference (its first volume, the warning)", R, M, "aff.mat",
+        "@bold4.nii", files=(("aff.mat", _AFF),))  # fmt: skip
+    return c
+
+
 @functools.cache
 def _all_cases() -> dict[str, tuple[str, str, Run]]:
-    return {**_real_cases(), **_schedule_cases(), **_edge_cases()}
+    return {**_real_cases(), **_schedule_cases(), **_edge_cases(), **_program_cases()}
 
 
 def cases(tier: str) -> list[Case]:

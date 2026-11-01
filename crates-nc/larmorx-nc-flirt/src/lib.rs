@@ -26,6 +26,7 @@ pub mod options;
 pub mod pair;
 pub mod run;
 pub mod schedule;
+pub mod rmsdiff;
 
 use std::io::Write;
 
@@ -116,4 +117,17 @@ pub fn img2stdcoord(
 ) -> u8 {
     let _ = threads;
     coords::img2stdcoord(args, settings, mode, out, err)
+}
+
+/// `rmsdiff matrixfile1 matrixfile2 refvol [mask]`.
+pub fn rmsdiff(
+    args: &[String],
+    settings: &Settings,
+    mode: UpstreamDefects,
+    threads: usize,
+    out: &mut dyn Write,
+    err: &mut dyn Write,
+) -> u8 {
+    let _ = threads;
+    rmsdiff::run(args, settings, mode, out, err)
 }

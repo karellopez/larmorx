@@ -25,17 +25,31 @@ from larmorx.fsl.bet import (
     read_vtk,
 )
 from larmorx.fsl.flirt import COSTS, FlirtResult, convert_xfm, flirt
+from larmorx.fsl.flirt_tools import (
+    AvscaleResult,
+    avscale,
+    img2imgcoord,
+    img2stdcoord,
+    rmsdiff,
+    std2imgcoord,
+)
 
 __all__ = [
     "COSTS",
     "VARIATIONS",
+    "AvscaleResult",
     "BetResult",
     "BetsurfResult",
     "FlirtResult",
     "Surface",
+    "avscale",
     "bet",
     "betsurf",
     "convert_xfm",
     "flirt",
+    "img2imgcoord",
+    "img2stdcoord",
     "read_vtk",
+    "rmsdiff",
+    "std2imgcoord",
 ]

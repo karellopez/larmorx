@@ -10,7 +10,8 @@ the others (their pseudo-inverse is LAPACK's divide-and-conquer SVD, part 2 of t
   schedules): the pseudo-inverse is the transpose;
 * the search's 12 x 4 mask (one common scale on rows 7 to 9, then the three translations):
   ``(1 / sqrt(3))**2 = 0x1.5555555555557p-2`` on the scale's rows (two units above the rounded
-  1/3) and ones on the translations'.
+  1/3) and ones on the translations';
+* FSL's ``sch2D_4dof`` (rz, tx, ty, one scale on rows 7 and 8): ``(1 / sqrt(2))**2``.
 
 Both kinds are asserted here. Masks the replica refuses (columns of several ones beside other
 columns, a single column of ``k`` ones, values other than 0 and 1) are only reported, with how
@@ -53,6 +54,10 @@ def accepted() -> list[Mask]:
     for r in (6, 7, 8):
         scale[r] = 1.0
     out.append([scale, _unit(3), _unit(4), _unit(5)])
+    # FSL's sch2D_4dof: rz, tx, ty and one scale for x and y
+    xy = [0.0] * 12
+    xy[6] = xy[7] = 1.0
+    out.append([_unit(2), _unit(3), _unit(4), xy])
     return out
 
 

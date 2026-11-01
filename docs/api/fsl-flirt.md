@@ -96,8 +96,8 @@ with the unblurred input).
 ## Not yet (part 2)
 
 Refused with a message until then: `-anglerep quaternion`; the schedule command `alignpaxes`;
-`setoption paramsubset` with a mask other than single-one columns (the kind FLIRT builds and FSL's
-shipped schedules give); `-debug` with the BBR cost (its debug volume). Also waiting: a comparison
+`setoption paramsubset` with a mask other than those FLIRT builds and FSL's shipped schedules give
+(columns of single ones, the search's, `sch2D_4dof`'s); `-debug` with the BBR cost (its debug volume). Also waiting: a comparison
 of `-debug`'s other volumes with FSL's; the clean-room original; the other programs of fsl-flirt
 (`avscale`, `makerot`, `midtrans`, `rmsdiff`, `img2imgcoord`, `img2stdcoord`, `std2imgcoord`,
 `applyxfm4D`, `pointflirt`); random testing's descriptor; the site page.

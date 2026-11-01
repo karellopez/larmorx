@@ -196,10 +196,10 @@ fn mat_to_16(m: &Mat) -> Vec<f64> {
 /// `pinv(parammask)` for the masks FLIRT builds and its shipped schedules give (only 0 and 1,
 /// no row with two non-zeros): a column of `k` ones gives `(1/sqrt(k))^2` at its rows, as
 /// Armadillo's divide-and-conquer SVD on FSL's LAPACK gives it (`validation/probes/fsl-flirt-pinv`).
-/// The flag is true for the masks whose bits the probe confirms: columns of single ones, and the
-/// search's 12 x 4 mask (one scale on rows 7 to 9, then the translations). Other masks: the
-/// normal-equations pseudo-inverse, not FSL's last bits (false; `setoption paramsubset` refuses
-/// them).
+/// The flag is true for the masks whose bits the probe confirms: columns of single ones, the
+/// search's 12 x 4 mask (one scale on rows 7 to 9, then the translations) and FSL's
+/// `sch2D_4dof` (rz, tx, ty, one scale on rows 7 and 8). Other masks: the normal-equations
+/// pseudo-inverse, not FSL's last bits (false; `setoption paramsubset` refuses them).
 fn pinv_mask(m: &Mat) -> (Mat, bool) {
     let (rows, cols) = (m.rows(), m.cols());
     let disjoint = (0..rows).all(|r| (0..cols).filter(|&c| m.at(r, c) != 0.0).count() <= 1)
@@ -212,7 +212,13 @@ fn pinv_mask(m: &Mat) -> (Mat, bool) {
                 && ones(0) == [6, 7, 8]
                 && ones(1) == [3]
                 && ones(2) == [4]
-                && ones(3) == [5]));
+                && ones(3) == [5])
+            || (rows == 12
+                && cols == 4
+                && ones(0) == [2]
+                && ones(1) == [3]
+                && ones(2) == [4]
+                && ones(3) == [6, 7]));
     let mut out = Mat::zeros(cols, rows);
     if disjoint {
         for c in 0..cols {
@@ -2311,8 +2317,8 @@ impl Flirt<'_> {
                 }
                 if n > 0 && !pinv_mask(&m).1 {
                     return Err(Stop::Refuse(
-                        "setoption paramsubset: a mask whose columns are not single ones on \
-                         distinct rows; its pseudo-inverse (LAPACK's SVD) is not replicated yet"
+                        "setoption paramsubset: a mask other than FLIRT's own and FSL's shipped \
+                         schedules'; its pseudo-inverse (LAPACK's SVD) is not replicated yet"
                             .to_owned(),
                     ));
                 }
@@ -3283,6 +3289,10 @@ mod tests {
         assert!(ok);
         assert_eq!(p.at(0, 7).to_bits(), 0x3FD5_5555_5555_5557);
         assert_eq!(p.at(1, 3), 1.0);
+        // FSL's sch2D_4dof: one scale for x and y ((1/sqrt 2)^2)
+        let (p, ok) = pinv_mask(&mask(&[&[2], &[3], &[4], &[6, 7]]));
+        assert!(ok);
+        assert_eq!(p.at(3, 6).to_bits(), 0x3FDF_FFFF_FFFF_FFFE);
     }
 
     #[test]

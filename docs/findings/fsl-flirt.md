@@ -38,9 +38,10 @@ something undefined or questionable, and what larmorx does. Each entry says how 
   `params12toN` calls `pinv(parammask)` (MISCMATHS → `arma::pinv(A, 0)`, Armadillo 14.2.1's
   divide-and-conquer SVD, LAPACK `dgesdd` on FSL's OpenBLAS). For the search's 12 × 4 mask (a
   column of three ones for the common scale, three unit columns) the scale row is
-  `0x1.5555555555557p-2` (two units above the rounded 1/3) = `(1/√3)²` rounded; unit columns
-  (FLIRT's identity, every `paramsubset` of FSL's shipped schedules, the 2D subset) give exactly 1:
-  `check_masks.py` confirms 104 such masks. Other masks (a single column of several ones, such a
+  `0x1.5555555555557p-2` (two units above the rounded 1/3) = `(1/√3)²` rounded; for `sch2D_4dof`'s
+  column of two ones (one scale for x and y, beside rz, tx, ty) `0x1.ffffffffffffep-2` = `(1/√2)²`;
+  unit columns (FLIRT's identity, the other shipped schedules' `paramsubset`s, the 2D subset) give
+  exactly 1: `check_masks.py` confirms 105 such masks. Other masks (a single column of several ones, such a
   column beside others, values other than 0 and 1) give other last bits and small off-support
   values (17 rows of 21 such masks differ from the closed form), so they need `dgesdd` itself: the
   replica refuses them at `setoption paramsubset` until part 2. The products `pinv·d` and `parammask·p` go to

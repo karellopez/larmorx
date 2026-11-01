@@ -11,9 +11,10 @@ linked against FSL's own LAPACK and BLAS, on the masks FLIRT builds (the search'
 12 x 3, the 2D schedule's, the identity) or on masks read from standard input, and prints every
 element as a C99 hexadecimal float. `check_masks.py` feeds it:
 
-- 104 masks the replica accepts (columns of single ones on distinct rows, every column count and
-  several orders; the search's 12 x 4 mask): every element must equal the replica's closed form
-  (unit columns give 1; the search's scale column `(1/sqrt 3)^2 = 0x1.5555555555557p-2`);
+- 105 masks the replica accepts (columns of single ones on distinct rows, every column count and
+  several orders; the search's 12 x 4 mask; FSL's `sch2D_4dof`): every element must equal the
+  replica's closed form (unit columns give 1; the search's scale column
+  `(1/sqrt 3)^2 = 0x1.5555555555557p-2`; `sch2D_4dof`'s `(1/sqrt 2)^2 = 0x1.ffffffffffffep-2`);
 - 21 masks the replica refuses (a column of several ones alone or beside another column): only
   reported, with how many rows the closed form would miss (17 on 2026-11-01).
 
@@ -24,4 +25,4 @@ python -P check_masks.py --probe <scratch>/pinv_probe
 ```
 
 `OPENBLAS_CORETYPE=Haswell` is set for the probe (FSL's programs run on OpenBLAS's Haswell
-kernels in every record, FSL-64). Result on 2026-11-01: `accepted: 104 masks, 0 differ`.
+kernels in every record, FSL-64). Result on 2026-11-01: `accepted: 105 masks, 0 differ`.

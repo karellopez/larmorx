@@ -26,6 +26,7 @@ Settings come from the environment: `FSLOUTPUTTYPE` and `FSL_LOAD_NIFTI_EXTENSIO
 - Validation: `docs/validation/fsl-flirt-replica.md` (parity with FSL); golden cases: the FLIRT
   and convert_xfm cases of `../larmorx-nc-cli/tests/golden.rs`.
 - Not replicated yet (part 2, refused with a message): `-anglerep quaternion`, the schedule command
-  `alignpaxes`, parameter-subset masks other than single-one columns (FLIRT's own and the shipped
-  schedules' kind; `validation/probes/fsl-flirt-pinv`), `-debug` with the BBR cost (its debug
-  volume). `-debug`'s other volumes are written but not yet compared with FSL's.
+  `alignpaxes`, parameter-subset masks other than FLIRT's own and FSL's shipped schedules'
+  (columns of single ones, the search's mask, `sch2D_4dof`'s; `validation/probes/fsl-flirt-pinv`),
+  `-debug` with the BBR cost (its debug volume). `-debug`'s other volumes are written but not yet
+  compared with FSL's.

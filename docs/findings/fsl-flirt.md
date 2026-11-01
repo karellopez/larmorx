@@ -94,6 +94,41 @@ something undefined or questionable, and what larmorx does. Each entry says how 
 FSL-21 and FSL-66 are mcflirt's entries; FLIRT meets them through `-bins` (each scale has
 `trunc(bins/scale)` bins). FSL-09, FSL-11, FSL-14, FSL-56 are the shared ones of FSL's libraries.
 
+## Random testing: the trial of 2026-11-01
+
+`difftest --tools fsl-flirt --budget 0.5 --jobs 8 --seed trial-flirt` (images up to 32 voxels per
+axis, every stored type, odd geometries; `<workspace>/oracles/difftest/2026-11-01-fsl-flirt`):
+3945 cases, 3009 agree, 928 differ, 8 over the 3 GiB limit. Triage in
+`validation/difftest/triage.toml`; `validation/investigations/fsl-flirt/recheck_findings.py` re-ran
+the 936 findings after the fixes: 577 agree in both their shrunk and drawn forms.
+
+- **Fixed: the blur of `-applyxfm`.** `do_applyxfm` calls `configure_interpolation(testvol)`
+  (extraslice with `backgroundval()`, or constpad with `-setbackground`'s value) *before* it blurs
+  each volume (`filter_image(tempvol, tempvol, tempvol, min_sampling_ref, false, filter_blur)` on a
+  `ShadowVolume` of `testvol[t0]`), and `convolve` reads `source(x, y, z)` out of bounds through the
+  volume's extrapolation. The replica blurred with zero outside: wrong wherever the input's edges
+  are not zero and the reference is coarser (the blur only runs then). The core's convolution now
+  takes the volume's extrapolation (zero for the default zeropad, as before); the main path blurs
+  `testvol` before configuring it, so it is unchanged. Parity cases `real/applyisoxfm-4d-blur` and
+  `-setbackground` (the raw series' edges are not zero); permanent case `applyxfm-blur-extraslice`.
+- **Fixed: BBR's NaN without boundary points.** `bbrval /= bbrwsum` is 0 / 0, SSE's default NaN
+  (`-nan` when printed); the compiler had folded the empty loop's `0.0 / 0.0` into a positive NaN.
+  The division now follows SSE's NaN rules (`sse::div_f64`). Permanent case
+  `bbr-no-boundary-points-nan`.
+- **Open (part 2): FSL's heap corruption.** 281 findings: FSL aborts (`munmap_chunk(): invalid
+  pointer`, `free(): invalid size`, `double free or corruption`) or segfaults on small or constant
+  images (from one voxel up to some 30 per axis; with the default options too, e.g. a 1 x 1 x 1
+  input against a 9 x 1 x 1 reference), where the replica finishes. gdb shows the crash in a later
+  `free` (reading the next image), so the corruption happened earlier; it is not yet traced
+  (`crash_probe.py` narrows the inputs). Once traced, the replica refuses those inputs in both modes.
+- **Open (part 2): 66 matrices.** Registrations (45) and BBR (21) whose matrix differs, 64 with
+  voxels below 0.5 or above 5 mm.
+- **Open (part 2): the fix pass.** 8 cases where `fix` changes a result without naming a defect:
+  infinite or NaN reference voxels (FSL-14's notice) and `-setbackground` with spline.
+- **Open (part 2):** one stderr count (`Erroneous dof 3 : using 6 instead` once more than FSL,
+  trial-flirt-01277), one more heap corruption with `-bins 16` (`corrupted size vs. prev_size`), and
+  the replica over 3 GiB on two cases with 0.01 mm and 25 mm voxels (FSL's peak not yet measured).
+
 ## Not replicated yet (part 2)
 
 Each is refused with a message (`larmorx-nc: error: ... not replicated yet`), never computed

@@ -1,0 +1,255 @@
+{
+ "defect": null,
+ "description": "-applyxfm onto a coarser grid: the input's blur reads beyond its edges by extraslice (FLIRT configures the interpolation first)",
+ "expect": "pass",
+ "found": {
+  "detail": "every file bit-identical: out.nii.gz: 1 of 36 values differ (max |diff| 57)",
+  "n": 16,
+  "seed": "trial-flirt",
+  "shrink_moves": [
+   "dropped -datatype (-datatype char)",
+   "dropped -omat (-omat out.mat)",
+   "ref: axis 0 28 -> 14 voxels",
+   "ref: axis 2 28 -> 14 voxels",
+   "ref: axis 0 14 -> 7 voxels",
+   "ref: axis 2 14 -> 7 voxels",
+   "ref: axis 1 8 -> 4 voxels",
+   "ref: axis 0 7 -> 3 voxels",
+   "ref: axis 2 7 -> 3 voxels",
+   "in: axis 0 16 -> 8 voxels",
+   "in: axis 2 11 -> 5 voxels",
+   "in: axis 1 9 -> 4 voxels",
+   "in: axis 0 8 -> 4 voxels",
+   "in: axis 2 5 -> 2 voxels",
+   "in: axis 1 4 -> 2 voxels",
+   "ref (and its grid): plumb orientation",
+   "ref (and its grid): origin at 0",
+   "ref (and its grid): sform = qform",
+   "ref (and its grid): qform and sform codes 1",
+   "ref (and its grid): millimetres",
+   "ref: float32 storage",
+   "ref: content head -> constant",
+   "in (and its grid): plumb orientation",
+   "in (and its grid): unit spacing",
+   "in (and its grid): origin at 0"
+  ],
+  "signature": [
+   "every file bit-identical"
+  ]
+ },
+ "id": "applyxfm-blur-extraslice",
+ "implementations": [
+  "replica"
+ ],
+ "reason": "",
+ "recipe": {
+  "extra": {
+   "output_type": "NIFTI_GZ",
+   "tool": "flirt"
+  },
+  "features": {
+   "-applyisoxfm": false,
+   "-datatype": true,
+   "-interp": false,
+   "-noclamp": false,
+   "-omat": true,
+   "-paddingsize": false,
+   "-setbackground": false,
+   "-v": false,
+   "4D": false,
+   "FSLOUTPUTTYPE": "NIFTI_GZ",
+   "axis0": 0.95,
+   "axis1": 1.15,
+   "axis2": 1.25,
+   "bias0": -0.0025,
+   "bias1": 0.01,
+   "bias2": -0.01,
+   "bias3": -0.005,
+   "centre0": -3.5,
+   "centre1": 0.0,
+   "centre2": -1.0,
+   "content": "head",
+   "datatype": "char",
+   "dtype": "float32",
+   "extreme": false,
+   "kind": "apply",
+   "noise": 6.0,
+   "orientation": "oblique",
+   "origin0": -49.25,
+   "origin1": 43.25,
+   "origin2": 33.75,
+   "q0": 27,
+   "q1": -2,
+   "q2": -3,
+   "q3": -1,
+   "qfac": -1,
+   "qform_code": 2,
+   "range": "plain",
+   "scale0": "1.05",
+   "scale1": "1",
+   "scale2": "1",
+   "sform": "other",
+   "sform_code": 1,
+   "shape": "16x9x11",
+   "shear0": 0.05,
+   "shear1": -0.1,
+   "shear2": 0.05,
+   "shift0": "1.5",
+   "shift1": "3.25",
+   "shift2": "3.25",
+   "size": 15.0,
+   "spacing0": 1.5,
+   "spacing1": 1.0,
+   "spacing2": 2.5,
+   "suffix": ".nii.gz",
+   "tissues": "t1",
+   "units": "mm"
+  },
+  "groups": [
+   {
+    "args": [
+     "-in",
+     "{in:in}",
+     "-ref",
+     "{in:ref}",
+     "-out",
+     "out",
+     "-applyxfm",
+     "-init",
+     "{in:init}"
+    ],
+    "name": "files",
+    "optional": false
+   }
+  ],
+  "inputs": {
+   "in": {
+    "content": {
+     "axes": [
+      0.95,
+      1.15,
+      1.25
+     ],
+     "bias": [
+      -0.0025,
+      0.01,
+      -0.01,
+      -0.005
+     ],
+     "centre": [
+      -3.5,
+      0.0,
+      -1.0
+     ],
+     "noise": 6.0,
+     "seed": 884550068,
+     "size": 15.0,
+     "tissues": "t1",
+     "type": "head"
+    },
+    "dtype": "float32",
+    "geometry": {
+     "origin": [
+      0.0,
+      0.0,
+      0.0
+     ],
+     "qfac": 1,
+     "qform_code": 2,
+     "quaternion": [
+      1,
+      0,
+      0,
+      0
+     ],
+     "sform": "other",
+     "sform_code": 1,
+     "shear": [
+      0.05,
+      -0.1,
+      0.05
+     ],
+     "spacing": [
+      1.0,
+      1.0,
+      1.0
+     ],
+     "units": "mm"
+    },
+    "scaling": null,
+    "shape": [
+     4,
+     2,
+     2
+    ],
+    "suffix": ".nii.gz",
+    "values": {
+     "offset": 0.0,
+     "scale": 1.0
+    }
+   },
+   "init": {
+    "kind": "text",
+    "suffix": ".mat",
+    "text": "1.021736205 0.08882907133 -0.2126514132 1.5\n-0.05935397039 0.9865410498 0.1534320323 3.25\n0.234589502 -0.1372812921 0.9650067295 3.25\n0 0 0 1\n"
+   },
+   "ref": {
+    "content": {
+     "seed": 793012370,
+     "type": "constant"
+    },
+    "dtype": "float32",
+    "geometry": {
+     "origin": [
+      0.0,
+      0.0,
+      0.0
+     ],
+     "qfac": 1,
+     "qform_code": 1,
+     "quaternion": [
+      1,
+      0,
+      0,
+      0
+     ],
+     "sform": "same",
+     "sform_code": 1,
+     "spacing": [
+      4.0,
+      2.0,
+      4.0
+     ],
+     "units": "mm"
+    },
+    "scaling": null,
+    "shape": [
+     3,
+     4,
+     3
+    ],
+    "suffix": ".nii.gz",
+    "values": {
+     "offset": 0.0,
+     "scale": 1.0
+    }
+   }
+  },
+  "n": 16,
+  "options": [
+   "-applyxfm",
+   "-datatype",
+   "-omat",
+   "3D",
+   "FSLOUTPUTTYPE=NIFTI_GZ",
+   "flirt"
+  ],
+  "seed": "trial-flirt",
+  "tool": "fsl-flirt"
+ },
+ "rule": null,
+ "status": "fixed",
+ "suite": "fsl-flirt-replica",
+ "tier": "smoke",
+ "tool": "fsl-flirt"
+}

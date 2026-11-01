@@ -880,6 +880,43 @@ def _real_cases() -> dict[str, tuple[str, str, Run]]:
         "-out",
         "out",
     )
+    # Onto a grid coarser than the input: the input is blurred first, beyond its edges by the
+    # extrapolation FLIRT configured (extraslice with the background, or -setbackground's
+    # constant): the raw series' edges are not zero (random testing, 2026-11-01).
+    add(
+        "real/applyisoxfm-4d-blur",
+        st,
+        "-applyisoxfm 6 on four volumes of the raw series (blurred first)",
+        "-in",
+        "@bold4.nii",
+        "-ref",
+        T,
+        "-init",
+        "@init.mat",
+        "-applyisoxfm",
+        "6",
+        "-out",
+        "out",
+    )
+    add(
+        "real/applyisoxfm-4d-blur-setbackground",
+        st,
+        "-applyisoxfm 6 with -setbackground (the blur's outside a constant)",
+        "-in",
+        "@bold4.nii",
+        "-ref",
+        T,
+        "-init",
+        "@init.mat",
+        "-applyisoxfm",
+        "6",
+        "-setbackground",
+        "40",
+        "-interp",
+        "spline",
+        "-out",
+        "out",
+    )
     add(
         "real/applyxfm-usesqform",
         st,

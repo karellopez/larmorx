@@ -1,0 +1,295 @@
+{
+ "defect": null,
+ "description": "BBR on a segmentation without boundary points: the cost 0 / 0 is SSE's default NaN, printed -nan",
+ "expect": "pass",
+ "found": {
+  "detail": "stdout identical: line 1: FSL '-nan 0.997668 -0.068072 0.004889 0.000000 0.068247 0.995105 -0.071472 0.000000 0.000000 0.071639 0.997431 0.000000 3.900000 3.900000 -3.900000 1.000000 ', replica 'nan 0.997668 -0.068072 0.004889 0.000000 0.068247 0.995105 -0.071472 0.000000 0.000000 0.071639 0.997431 ",
+  "n": 21,
+  "seed": "trial-flirt",
+  "shrink_moves": [
+   "dropped -out (-out out)",
+   "dropped -bbrtype (-bbrtype local_abs)",
+   "ref: axis 1 12 -> 6 voxels",
+   "ref: axis 2 11 -> 5 voxels",
+   "ref: axis 1 6 -> 3 voxels",
+   "ref: axis 2 5 -> 2 voxels",
+   "ref: axis 1 3 -> 1 voxels",
+   "ref: axis 2 2 -> 1 voxels",
+   "in: axis 0 32 -> 16 voxels",
+   "in: axis 2 27 -> 13 voxels",
+   "in: axis 0 16 -> 8 voxels",
+   "in: axis 2 13 -> 6 voxels",
+   "in: axis 0 8 -> 4 voxels",
+   "in: axis 1 8 -> 4 voxels",
+   "in: axis 2 6 -> 3 voxels",
+   "in: axis 0 4 -> 2 voxels",
+   "in: axis 1 4 -> 2 voxels",
+   "in: axis 2 3 -> 1 voxels",
+   "in: axis 0 2 -> 1 voxels",
+   "in: axis 1 2 -> 1 voxels",
+   "ref (and its grid): plumb orientation",
+   "ref (and its grid): unit spacing",
+   "ref (and its grid): sform = qform",
+   "ref (and its grid): qform and sform codes 1",
+   "ref: float32 storage",
+   "ref: content crop -> constant",
+   "in (and its grid): unit spacing",
+   "in (and its grid): origin at 0",
+   "in (and its grid): sform = qform",
+   "in (and its grid): qform and sform codes 1",
+   "in: float32 storage",
+   "in: content crop -> constant",
+   "wm: float32 storage",
+   "wm: content labels -> constant",
+   "ref (and its grid): origin at 0"
+  ],
+  "signature": [
+   "stdout identical"
+  ]
+ },
+ "id": "bbr-no-boundary-points-nan",
+ "implementations": [
+  "replica"
+ ],
+ "reason": "",
+ "recipe": {
+  "extra": {
+   "output_type": "NIFTI_GZ",
+   "tool": "flirt"
+  },
+  "features": {
+   "-bbrslope": false,
+   "-bbrtype": true,
+   "-datatype": false,
+   "-interp": false,
+   "-noclamp": false,
+   "-out": true,
+   "-paddingsize": false,
+   "-setbackground": false,
+   "-v": false,
+   "FSLOUTPUTTYPE": "NIFTI_GZ",
+   "bbr": true,
+   "bbrtype": "local_abs",
+   "content": "noise",
+   "corner0": 40,
+   "corner1": 31,
+   "corner2": 53,
+   "crop source": "templateflow/tpl-MNI152NLin2009cAsym/tpl-MNI152NLin2009cAsym_res-02_desc-fMRIPrep_boldref.nii.gz",
+   "crop stride": 1,
+   "dtype": "int32",
+   "extreme": false,
+   "inter": 0.0,
+   "kind": "register",
+   "orientation": "plumb",
+   "origin0": 45.25,
+   "origin1": -13.0,
+   "origin2": -17.75,
+   "q0": 38,
+   "q1": -1,
+   "q2": 2,
+   "q3": 0,
+   "qfac": 1,
+   "qform_code": 4,
+   "range": "plain",
+   "same content": true,
+   "scale0": "1",
+   "scale1": "1",
+   "scale2": "1",
+   "sform": "other",
+   "sform_code": 0,
+   "shape": "32x8x27",
+   "shear0": -0.05,
+   "shear1": -0.025,
+   "shear2": 0.05,
+   "shift0": "0",
+   "shift1": "1.5",
+   "shift2": "0",
+   "slope": -1.0,
+   "spacing0": 2.0,
+   "spacing1": 2.5,
+   "spacing2": 1.0,
+   "suffix": ".nii",
+   "units": "mm"
+  },
+  "groups": [
+   {
+    "args": [
+     "-in",
+     "{in:in}",
+     "-ref",
+     "{in:ref}",
+     "-omat",
+     "out.mat"
+    ],
+    "name": "files",
+    "optional": false
+   },
+   {
+    "args": [
+     "-cost",
+     "bbr",
+     "-wmseg",
+     "{in:wm}",
+     "-schedule",
+     "@fslsch:bbr.sch"
+    ],
+    "name": "bbr",
+    "optional": false
+   },
+   {
+    "args": [
+     "-init",
+     "{in:init}"
+    ],
+    "name": "-init",
+    "optional": false
+   }
+  ],
+  "inputs": {
+   "in": {
+    "content": {
+     "seed": 585077818,
+     "type": "constant"
+    },
+    "dtype": "float32",
+    "geometry": {
+     "origin": [
+      0.0,
+      0.0,
+      0.0
+     ],
+     "qfac": 1,
+     "qform_code": 1,
+     "quaternion": [
+      1,
+      0,
+      0,
+      0
+     ],
+     "sform": "same",
+     "sform_code": 1,
+     "spacing": [
+      1.0,
+      1.0,
+      1.0
+     ],
+     "units": "mm"
+    },
+    "scaling": null,
+    "shape": [
+     1,
+     1,
+     1
+    ],
+    "suffix": ".nii",
+    "values": {
+     "offset": 0.0,
+     "scale": 1.0
+    }
+   },
+   "init": {
+    "kind": "text",
+    "suffix": ".mat",
+    "text": "0.994478951 -0.0027605245 0.104899931 0\n-0.0027605245 0.9986197378 0.05244996549 1.5\n-0.104899931 -0.05244996549 0.9930986888 0\n0 0 0 1\n"
+   },
+   "ref": {
+    "content": {
+     "seed": 36992951,
+     "type": "constant"
+    },
+    "dtype": "float32",
+    "geometry": {
+     "origin": [
+      0.0,
+      0.0,
+      0.0
+     ],
+     "qfac": 1,
+     "qform_code": 1,
+     "quaternion": [
+      1,
+      0,
+      0,
+      0
+     ],
+     "sform": "same",
+     "sform_code": 1,
+     "spacing": [
+      1.0,
+      1.0,
+      1.0
+     ],
+     "units": "mm"
+    },
+    "scaling": null,
+    "shape": [
+     25,
+     1,
+     1
+    ],
+    "suffix": ".nii.gz",
+    "values": {
+     "offset": 0.0,
+     "scale": 1.0
+    }
+   },
+   "wm": {
+    "content": {
+     "seed": 1137108384,
+     "type": "constant"
+    },
+    "dtype": "float32",
+    "geometry": {
+     "origin": [
+      0.0,
+      0.0,
+      0.0
+     ],
+     "qfac": 1,
+     "qform_code": 1,
+     "quaternion": [
+      1,
+      0,
+      0,
+      0
+     ],
+     "sform": "same",
+     "sform_code": 1,
+     "spacing": [
+      1.0,
+      1.0,
+      1.0
+     ],
+     "units": "mm"
+    },
+    "scaling": null,
+    "shape": [
+     25,
+     1,
+     1
+    ],
+    "suffix": ".nii.gz",
+    "values": {
+     "offset": 0.0,
+     "scale": 1.0
+    }
+   }
+  },
+  "n": 21,
+  "options": [
+   "-bbrtype",
+   "-cost bbr",
+   "-init",
+   "-out",
+   "FSLOUTPUTTYPE=NIFTI_GZ",
+   "flirt"
+  ],
+  "seed": "trial-flirt",
+  "tool": "fsl-flirt"
+ },
+ "rule": null,
+ "status": "fixed",
+ "suite": "fsl-flirt-replica",
+ "tier": "smoke",
+ "tool": "fsl-flirt"
+}

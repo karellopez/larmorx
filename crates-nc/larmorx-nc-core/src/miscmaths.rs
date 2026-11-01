@@ -45,6 +45,44 @@ fn sincosf(theta: f32) -> (f32, f32) {
     crate::glibc_float::sincosf(theta)
 }
 
+/// The 3 × 3 matrix-vector product of `make_rot` (`gemv_emul_tinysq` for three rows, inlined in
+/// make_rot): the same value as [`arma::gemv_tinysq`] for numbers; for NaN operands, the first
+/// row passes on the vector's NaN before the matrix's and adds each new product before the
+/// running sum (the order FSL's build gives that row, measured on makerot's NaN and infinite
+/// angles, axes and centres: `validation/probes/fsl-flirt-programs/makerot_nan.py`), the other
+/// rows the matrix's first and the running sum first.
+fn gemv3_rot(a: &Mat, x: &[f64]) -> Vec<f64> {
+    (0..3)
+        .map(|r| {
+            if r == 0 {
+                let mut acc = S64(x[0]) * a.at(0, 0);
+                for k in 1..3 {
+                    acc = (S64(x[k]) * a.at(0, k)) + acc.0;
+                }
+                acc.0
+            } else {
+                let mut acc = S64(a.at(r, 0)) * x[0];
+                for k in 1..3 {
+                    acc += S64(a.at(r, k)) * x[k];
+                }
+                acc.0
+            }
+        })
+        .collect()
+}
+
+/// `A B` for 3 × 3 operands with [`gemv3_rot`] per column (`gemm_emul_tinysq`).
+fn mul3_rot(a: &Mat, b: &Mat) -> Mat {
+    let mut out = Mat::zeros(3, 3);
+    for c in 0..3 {
+        let y = gemv3_rot(a, b.colptr(c));
+        for (r, v) in y.into_iter().enumerate() {
+            out.set(r, c, v);
+        }
+    }
+    out
+}
+
 /// `make_rot(angl, centre, rot)`: the rotation by `|angl|` about the axis `angl` through
 /// `centre`.
 pub fn make_rot(angl: &Mat, centre: &Mat) -> Mat {
@@ -77,12 +115,12 @@ pub fn make_rot(angl: &Mat, centre: &Mat) -> Mat {
     rotcore.set(0, 1, f64::from(s));
     rotcore.set(1, 0, -f64::from(s));
     // basischange * rotcore * basischange.t(): (B R) Bᵀ, the transpose applied by the product.
-    let br = arma::mul_tinysq(&basis, &rotcore);
-    let r3 = arma::mul_tinysq(&br, &basis.t());
+    let br = mul3_rot(&basis, &rotcore);
+    let r3 = mul3_rot(&br, &basis.t());
     rot.set_sub(0, 0, &r3);
     // trans = (I - rot(1:3,1:3)) * centre
     let im = Mat::eye(3).minus(&r3);
-    let trans = arma::gemv_tinysq(&im, centre.as_slice(), false);
+    let trans = gemv3_rot(&im, centre.as_slice());
     for (r, t) in trans.into_iter().enumerate() {
         rot.set(r, 3, t);
     }

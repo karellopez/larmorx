@@ -161,8 +161,13 @@ def run_replica(
 
 
 def _clean(text: str, run_dir: Path, program: str) -> str:
+    import re
+
     lines = [ln for ln in text.split("\n") if not ln.startswith(REPLICA_PREFIX)]
     t = "\n".join(lines).replace(str(run_dir), "<run>")
+    # -debug prints the cost function's address (`Pointer to impair is 0x...`), which the
+    # address-space layout decides: the replica prints `(set)`.
+    t = re.sub(r"Pointer to impair is 0x[0-9a-f]+", "Pointer to impair is (set)", t)
     return t.replace(str(fsldir() / "bin" / program), program)
 
 
@@ -1288,6 +1293,8 @@ def _real_cases() -> dict[str, tuple[str, str, Run]]:
     )
     for t in ("global_abs", "local_abs"):
         add(f"bbr/type-{t}", st, f"-bbrtype {t}", *bbr, "-cost", "bbr", "-bbrtype", t)
+    add("bbr/debug", st, "-debug with -cost bbr (BBR's debug volume `debug`, part 3)", *bbr,
+        "-cost", "bbr", "-debug")  # fmt: skip
     add("bbr/slope", st, "-bbrslope -0.25", *bbr, "-cost", "bbr", "-bbrslope", "-0.25")
     add(
         "bbr/coords",

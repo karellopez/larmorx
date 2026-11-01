@@ -1880,6 +1880,31 @@ impl<'a> Flirt<'a> {
         }
     }
 
+    /// `save_volume4D(debugvol, "debug")` (BBR's debug volume: the reference's header, two
+    /// float volumes; written whatever `-nosave` says).
+    fn save_bbr_debug(&mut self, d: &bbr::BbrDebug) -> R<()> {
+        let rv = self.slot_vol(self.pair().ref_slot);
+        let mut v = Volume::new(d.dims[0], d.dims[1], d.dims[2], 2);
+        v.copy_properties(rv);
+        v.data.copy_from_slice(&d.data);
+        let settings = self.output_settings();
+        let opts = SaveOptions {
+            description: DESCRIP,
+            units: nifti::UNITS_MM_SEC,
+            reproduce_offset: self.mode.reproduce(),
+        };
+        match v.save_volume("debug", &settings, &opts) {
+            Ok(_) => Ok(()),
+            Err(SaveError::OutputType(e)) => {
+                for l in &e.printed {
+                    self.el(l);
+                }
+                Err(Stop::Exit(1))
+            }
+            Err(SaveError::Exception(e)) => Err(e.into()),
+        }
+    }
+
     /// `safe_save_volume(source, filename)`: only without `-nosave` (FLIRT's default) in the
     /// input's data type.
     fn safe_save(&mut self, v: &Volume, name: &str) -> R<()> {
@@ -3079,6 +3104,15 @@ impl Flirt<'_> {
             self.global_refweight = self.filter_weight_if(&rw, Filter::ResampBlur)?;
             drop(rw);
             self.global_refweight1 = self.global_refweight.clone();
+            if self.o.debug && self.global_refweight1.data.is_empty() {
+                // Without weights FLIRT still filters its empty weight volume: the resampling of
+                // a volume without voxels has one voxel (size max(1, 0 / step)), 0, with the
+                // empty volume's properties and the new voxel size; `-debug` saves it.
+                let mut one = Volume::new(1, 1, 1, 1);
+                one.data[0] = 0.0;
+                one.setdims(ms, ms, ms);
+                self.global_refweight1 = one;
+            }
             // scale 2
             if ms < 1.9 {
                 let rv = std::mem::replace(&mut self.refvol, empty());
@@ -3236,20 +3270,18 @@ impl Flirt<'_> {
             }
             self.interpretcommand(comline, &mut skip)?;
         }
-        if self.o.debug
-            && self
-                .impair
-                .as_ref()
-                .is_some_and(|p| p.costtype == CostType::Bbr)
-        {
-            return Err(Stop::Refuse(
-                "-debug with the bbr cost: FLIRT's BBR debug volume (`debug`) is not replicated yet"
-                    .to_owned(),
-            ));
-        }
         if self.o.debug {
             self.el("Final DEBUG call in FLIRT");
             self.el("Pointer to impair is (set)");
+            // set_debug_mode(true): with the bbr cost each evaluation fills the debug volume
+            // and saves it as `debug` (save_volume4D: the last evaluation's).
+            let bbr_debug = self.impair.as_ref().is_some_and(|p| p.costtype == CostType::Bbr);
+            if bbr_debug {
+                let d = bbr::BbrDebug::new(self.slot_vol(self.pair().ref_slot));
+                if let Some(p) = self.impair.as_mut() {
+                    p.bbr_debug = Some(d);
+                }
+            }
             self.el("Final DEBUG call in FLIRT 2");
             self.el(&format!(
                 "Scale is:{}",
@@ -3260,6 +3292,10 @@ impl Flirt<'_> {
                 &mut skip,
             )?;
             self.el("Final DEBUG call in FLIRT 3");
+            let written = self.impair.as_mut().and_then(|p| p.bbr_debug.take());
+            if let Some(d) = written {
+                self.save_bbr_debug(&d)?;
+            }
             self.el("Final DEBUG call in FLIRT 4");
         }
         // The outputs.

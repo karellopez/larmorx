@@ -332,7 +332,9 @@ pub fn bbr_cost(
             _ => n,
         };
     }
-    bbrval /= bbrwsum;
+    // SSE's NaN: no points (0 / 0) gives the default NaN, `-nan`; the compiler would otherwise
+    // fold the empty loop's 0.0 / 0.0 into a positive NaN (the trial of 2026-11-01).
+    bbrval = crate::sse::div_f64(bbrval, bbrwsum);
     if s.kind == BbrType::GlobalAbs {
         let other = 2.0 - bbrval;
         bbrval = if bbrval < other { bbrval } else { other };
@@ -378,4 +380,29 @@ pub fn bbr_resamp(
 #[allow(dead_code)]
 fn round_index(x: f64) -> i64 {
     i64::from(cnum::f64_to_i32(if x > 0.0 { x + 0.5 } else { x - 0.5 }))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn no_boundary_points_give_sses_default_nan() {
+        // FLIRT prints this cost as `-nan` (0 / 0 on SSE); a folded 0.0 / 0.0 would be `nan`.
+        let mut v = Volume::new(4, 4, 4, 1);
+        v.data.fill(1.0);
+        let mut msgs = BbrMessages::default();
+        let c = bbr_cost(
+            &v,
+            &v,
+            None,
+            &Mat::eye(4),
+            1.0,
+            &BbrPoints::default(),
+            &BbrSettings::default(),
+            &mut msgs,
+        );
+        assert_eq!(c.to_bits(), crate::sse::DEFAULT_NAN_F32.to_bits());
+        assert!(msgs.nan_final);
+    }
 }

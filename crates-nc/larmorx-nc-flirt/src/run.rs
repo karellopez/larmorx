@@ -2823,6 +2823,11 @@ impl Flirt<'_> {
             };
             for t in 0..nt {
                 let mut vt = testvol.sub_volume(t)?;
+                // configure_interpolation(testvol) came first: the blur reads the volume beyond
+                // its edges by the extrapolation set there (extraslice with the background, or
+                // the -setbackground constant).
+                vt.extrap = cfg.extrap;
+                vt.padvalue = cfg.padvalue;
                 if self.o.interpmethod != Interp::NearestNeighbour && self.o.interpblur {
                     self.global_sampling = min_sampling_ref;
                     vt = self.filter(Filter::Blur, &vt);

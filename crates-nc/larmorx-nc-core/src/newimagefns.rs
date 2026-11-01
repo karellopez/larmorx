@@ -328,11 +328,13 @@ pub fn gaussian_kernel_1d(sigma: f32, radius: i32) -> Vec<f64> {
 }
 
 /// One pass of `convolve_separable`: `convolve(source, kernel)` with a kernel along `axis`
-/// (centred on `(n - 1) / 2`), the image zero outside; each output voxel the `float` sum, in
-/// kernel order, of the `double` products (`val += source(...) * kernel(...)`). A sum that
-/// comes out NaN (NaN or infinite voxels) is computed again with SSE's NaNs ([`crate::sse`]:
-/// the products' and the running sum's NaNs as FSL's binary passes them on). The z slices are
-/// shared between `threads` threads; the result does not depend on their number.
+/// (centred on `(n - 1) / 2`), the image outside given by its extrapolation (`source(x, y, z)`
+/// out of bounds: zero by default; FLIRT's `-applyxfm` blurs a volume set to extraslice or a
+/// constant); each output voxel the `float` sum, in kernel order, of the `double` products
+/// (`val += source(...) * kernel(...)`). A sum that comes out NaN (NaN or infinite voxels) is
+/// computed again with SSE's NaNs ([`crate::sse`]: the products' and the running sum's NaNs as
+/// FSL's binary passes them on). The z slices are shared between `threads` threads; the result
+/// does not depend on their number.
 fn convolve_axis(src: &Volume, ker: &[f64], axis: usize, threads: usize) -> Volume {
     use crate::sse::{add_f64, mul_f64};
     let mut result = src.clone();
@@ -344,6 +346,7 @@ fn convolve_axis(src: &Volume, ker: &[f64], axis: usize, threads: usize) -> Volu
         return result;
     }
     let data = &src.data[..n];
+    let outside_zero = src.extrap == Extrapolation::Zeropad;
     let at = |x: i64, y: i64, z: i64, d: i64| -> Option<f32> {
         let (cx, cy, cz) = match axis {
             0 => (x + d, y, z),
@@ -351,7 +354,10 @@ fn convolve_axis(src: &Volume, ker: &[f64], axis: usize, threads: usize) -> Volu
             _ => (x, y, z + d),
         };
         if cx < 0 || cy < 0 || cz < 0 || cx >= nx || cy >= ny || cz >= nz {
-            return None; // + 0 * k: no change
+            if outside_zero {
+                return None; // + 0 * k: no change
+            }
+            return Some(src.extrapolate(cx, cy, cz));
         }
         Some(data[((cz * ny + cy) * nx + cx) as usize])
     };
@@ -716,4 +722,25 @@ pub fn affine_transform_with(
     }
     raw_affine_transform(vin, vout, aff)?;
     affine_transform_mask(vin, vout, aff, paddingsize, vin.padvalue)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn the_blur_reads_beyond_the_edges_by_the_volumes_extrapolation() {
+        // FLIRT's -applyxfm blurs a volume set to extraslice: a constant stays constant; with
+        // the default (zero outside) the edges lose the kernel's outer weights.
+        let mut v = Volume::new(3, 3, 3, 1);
+        v.data.fill(100.0);
+        let zero = blur(&v, 2.0, 1);
+        assert!(zero.data[0] < 100.0);
+        v.extrap = Extrapolation::Extraslice;
+        v.padvalue = 0.0;
+        let kept = blur(&v, 2.0, 1);
+        assert!(kept.data.iter().all(|&x| (x - 100.0).abs() < 1e-4));
+        // the extrapolation is passed on (convolve's result copies the source's properties)
+        assert_eq!(kept.extrap, Extrapolation::Extraslice);
+    }
 }

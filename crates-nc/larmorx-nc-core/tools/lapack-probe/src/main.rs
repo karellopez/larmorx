@@ -19,6 +19,8 @@ use larmorx_nc_core::arma::{self, Mat};
 use larmorx_nc_core::lapack;
 use std::io::Write;
 
+mod eig_svd;
+
 fn parse(op: &str) -> (usize, usize) {
     let digits: String = op
         .trim_start_matches(|c: char| !c.is_ascii_digit())
@@ -41,6 +43,13 @@ fn main() {
         .iter()
         .map(|c| f64::from_le_bytes(*c))
         .collect();
+    if let Some(out) = eig_svd::run(op, count, &words) {
+        let mut f = std::io::BufWriter::new(std::fs::File::create(&args[4]).expect("output"));
+        for v in out {
+            f.write_all(&v.to_le_bytes()).expect("write");
+        }
+        return;
+    }
     let (n, nrhs) = parse(op);
     let nn = n * n;
     let rec = nn + n * nrhs;

@@ -792,6 +792,127 @@ impl Volume {
         v_cog
     }
 
+    /// `principleaxes_mat()` (`calc_principleaxes`, volume 0): the second moments of the values
+    /// minus the minimum about the centre of gravity, in millimetres (`samp·M·samp − m·mᵀ`, kept
+    /// symmetric from its lower triangle), their eigenvectors (Armadillo's `eig_sym`, LAPACK
+    /// `dsyevd`) as columns in FSL's order: the least eigenvalue's first, then the other two
+    /// swapped when the third is less than the second; the eigenvalue moved by each exchange is
+    /// stored in single precision (`float etemp`). Partial sums are flushed every
+    /// `max(1000, √nvoxels)` voxels; a total below `1e-5` in magnitude prints FSL's warning and
+    /// counts 1. `None` when the decomposition fails (a non-finite moment).
+    pub fn principal_axes(&self, warnings: &mut Vec<String>) -> Option<Mat> {
+        let vmin = self.min();
+        let mut m2 = [[0.0f64; 3]; 3];
+        let mut mean = [0.0f64; 3];
+        let mut total = 0.0f64;
+        let (mut tot, mut mxx, mut mxy, mut mxz, mut myy, mut myz, mut mzz) =
+            (0.0f64, 0.0f64, 0.0f64, 0.0f64, 0.0f64, 0.0f64, 0.0f64);
+        let (mut mx, mut my, mut mz) = (0.0f64, 0.0f64, 0.0f64);
+        let mut n: i64 = 0;
+        let mut nlim = (self.nvoxels() as f64).sqrt() as i64;
+        if nlim < 1000 {
+            nlim = 1000;
+        }
+        let flush = |m2: &mut [[f64; 3]; 3], s: [f64; 6]| {
+            // m2(r,c) += v sets both (r,c) and (c,r) (armawrap's symmetric element).
+            let idx = [(0, 0), (0, 1), (0, 2), (1, 1), (1, 2), (2, 2)];
+            for (k, &(r, c)) in idx.iter().enumerate() {
+                let v = m2[r][c] + s[k];
+                m2[r][c] = v;
+                m2[c][r] = v;
+            }
+        };
+        for z in 0..self.zsize() {
+            for y in 0..self.ysize() {
+                for x in 0..self.xsize() {
+                    let val = f64::from(self.get(x, y, z) - vmin);
+                    let (xf, yf, zf) = (x as f64, y as f64, z as f64);
+                    mxx += val * xf * xf;
+                    mxy += val * xf * yf;
+                    mxz += val * xf * zf;
+                    myy += val * yf * yf;
+                    myz += val * yf * zf;
+                    mzz += val * zf * zf;
+                    mx += val * xf;
+                    my += val * yf;
+                    mz += val * zf;
+                    tot += val;
+                    n += 1;
+                    if n > nlim {
+                        n = 0;
+                        total += tot;
+                        flush(&mut m2, [mxx, mxy, mxz, myy, myz, mzz]);
+                        mean[0] += mx;
+                        mean[1] += my;
+                        mean[2] += mz;
+                        (tot, mxx, mxy, mxz, myy, myz, mzz) = (0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0);
+                        (mx, my, mz) = (0.0, 0.0, 0.0);
+                    }
+                }
+            }
+        }
+        total += tot;
+        flush(&mut m2, [mxx, mxy, mxz, myy, myz, mzz]);
+        mean[0] += mx;
+        mean[1] += my;
+        mean[2] += mz;
+        if total.abs() < 1e-5 {
+            warnings.push("WARNING::in calculating Principle Axes, total = 0.0".to_owned());
+            total = 1.0;
+        }
+        let mut m = Mat::zeros(3, 3);
+        for r in 0..3 {
+            for c in 0..3 {
+                m.set(r, c, m2[r][c] / total);
+            }
+        }
+        let mean_t: Vec<f64> = mean.iter().map(|v| v / total).collect();
+        let samp = self.sampling_mat().sub(0, 3, 0, 3);
+        let symmatl = |a: &Mat| {
+            let mut s = a.clone();
+            for c in 0..3 {
+                for r in 0..c {
+                    s.set(r, c, a.at(c, r));
+                }
+            }
+            s
+        };
+        let m = symmatl(&arma::mul3(&samp, &m, &samp));
+        let mean = arma::gemv_tinysq(&samp, &mean_t, false);
+        let mut meanprod = Mat::zeros(3, 3);
+        for k1 in 0..3 {
+            for k2 in 0..3 {
+                meanprod.set(k1, k2, mean[k1] * mean[k2]);
+            }
+        }
+        let m = symmatl(&m.minus(&meanprod));
+        let (mut evals, mut paxes) = arma::eig_sym(&m, warnings)?;
+        let swap = |paxes: &mut Mat, evals: &mut Vec<f64>, i: usize, k: usize| {
+            let etemp = evals[i] as f32;
+            let ptemp: Vec<f64> = (0..3).map(|r| paxes.at(r, i)).collect();
+            evals[i] = evals[k];
+            for r in 0..3 {
+                let v = paxes.at(r, k);
+                paxes.set(r, i, v);
+            }
+            evals[k] = f64::from(etemp);
+            for r in 0..3 {
+                paxes.set(r, k, ptemp[r]);
+            }
+        };
+        let mut kmin = 0;
+        for k in 1..3 {
+            if evals[k] < evals[kmin] {
+                kmin = k;
+            }
+        }
+        swap(&mut paxes, &mut evals, 0, kmin);
+        if evals[2] < evals[1] {
+            swap(&mut paxes, &mut evals, 1, 2);
+        }
+        Some(paxes)
+    }
+
     /// [`Volume::calc_cog`]'s sums (`v_cog`, `total`) with every operation's NaN as SSE gives
     /// it, in the source's order (`vx += val*x`: `vx` first).
     #[cold]

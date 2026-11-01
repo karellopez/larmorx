@@ -509,6 +509,19 @@ def _prepare(run: Run, tmp: Path) -> list[str]:
             if not dst.exists():
                 _constant_image(dst, shape, vox, kind == "noform")
             out.append(name)
+        elif a.startswith("@nan:"):
+            # an input with one NaN voxel at (3, 4, 5): @nan:<input>:<name>
+            import nibabel as nib
+
+            _, src_name, name = a.split(":")
+            dst = tmp / name
+            if not dst.exists():
+                base = base or inputs()
+                img = nib.load(str(base / src_name))
+                arr = np.asanyarray(img.dataobj).astype(np.float32).copy()
+                arr[3, 4, 5] = np.nan
+                nib.save(nib.Nifti1Image(arr, img.affine, img.header), str(dst))
+            out.append(name)
         elif "=@" in a and a.startswith("-"):
             # a long option's value, an input (--cov=@epi.nii)
             base = base or inputs()
@@ -1514,6 +1527,78 @@ def _schedule_cases() -> dict[str, tuple[str, str, Run]]:
                 files=(("s.sch", text),),
             ),
         )
+    # alignpaxes (the principal axes: LAPACK dsyevd) and a general parameter subset (the SVD
+    # pseudo-inverse: LAPACK dgesdd), part 3: one case per path.
+    pax = "setscale 8\nsetrow UA 1 0 0 0  0 1 0 0  0 0 1 0  0 0 0 1\nalignpaxes UA\nprint U\n"
+    for name, desc, ins in (
+        ("schedule/alignpaxes", "alignpaxes on real images", ("@epi.nii", "@t1.nii")),
+        (
+            "schedule/alignpaxes-constant",
+            "alignpaxes on constant images (zero moments, total 0)",
+            ("@const:12x10x8:2x2x2:c.nii", "@const:12x10x8:2x2x2:c.nii"),
+        ),
+        (
+            "schedule/alignpaxes-nan",
+            "alignpaxes on an input with a NaN voxel (eig_sym fails: the exception)",
+            ("@nan:epi.nii:epi_nan.nii", "@t1.nii"),
+        ),
+    ):
+        c[name] = (
+            "standard",
+            desc,
+            Run(
+                "flirt",
+                ("-in", ins[0], "-ref", ins[1], "-schedule", "s.sch", "-omat", "out.mat"),
+                files=(("s.sch", pax),),
+            ),
+        )
+    c["schedule/alignpaxes-2d"] = (
+        "standard",
+        "alignpaxes in 2D mode (one slice: a zero third moment)",
+        Run(
+            "flirt",
+            ("-in", "@slice_in.nii", "-ref", "@slice_ref.nii", "-2D", "-schedule", "s.sch",
+             "-omat", "out.mat"),
+            files=(("s.sch", pax),),
+        ),
+    )
+    c["schedule/alignpaxes-args"] = (
+        "standard",
+        "alignpaxes without its matrix",
+        Run(
+            "flirt",
+            ("-in", "@epi.nii", "-ref", "@t1.nii", "-schedule", "s.sch", "-omat", "out.mat"),
+            files=(("s.sch", "alignpaxes\n"),),
+        ),
+    )
+    sub = (
+        "setscale 8\nsetrow UA 1 0 0 0  0 1 0 0  0 0 1 0  0 0 0 1\n"
+        "setoption paramsubset 2  0 0 1 0 0 0 0 0 0 0 0 0  0 0 0 1 1 0 0 0 0 0 0 0\n"
+        "optimise 12 UA:1 0.0 0.0 0.0 0.0 0.0 0.0 rel 1\nprint U\n"
+    )
+    c["schedule/paramsubset-general"] = (
+        "standard",
+        "a parameter subset whose column has two ones in different rows of another (rz; tx+ty)",
+        Run(
+            "flirt",
+            ("-in", "@epi.nii", "-ref", "@t1.nii", "-schedule", "s.sch", "-omat", "out.mat"),
+            files=(("s.sch", sub),),
+        ),
+    )
+    sub2 = (
+        "setscale 8\nsetrow UA 1 0 0 0  0 1 0 0  0 0 1 0  0 0 0 1\n"
+        "setoption paramsubset 2  0 0 0.5 0.25 0 0 0 0 0 0 0 0  0 0 1 -1 2 0 0 0 0 0 0 0\n"
+        "optimise 12 UA:1 0.0 0.0 0.0 0.0 0.0 0.0 rel 1\nprint U\n"
+    )
+    c["schedule/paramsubset-weighted"] = (
+        "standard",
+        "a parameter subset with weights other than 0 and 1 sharing rows (the SVD's QR path)",
+        Run(
+            "flirt",
+            ("-in", "@epi.nii", "-ref", "@t1.nii", "-schedule", "s.sch", "-omat", "out.mat"),
+            files=(("s.sch", sub2),),
+        ),
+    )
     return c
 
 

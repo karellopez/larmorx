@@ -196,97 +196,13 @@ fn mat_to_16(m: &Mat) -> Vec<f64> {
     v
 }
 
-/// `pinv(parammask)` for the masks FLIRT builds and its shipped schedules give (only 0 and 1,
-/// no row with two non-zeros): a column of `k` ones gives `(1/sqrt(k))^2` at its rows, as
-/// Armadillo's divide-and-conquer SVD on FSL's LAPACK gives it (`validation/probes/fsl-flirt-pinv`).
-/// The flag is true for the masks whose bits the probe confirms: columns of single ones, the
-/// search's 12 x 4 mask (one scale on rows 7 to 9, then the translations) and FSL's
-/// `sch2D_4dof` (rz, tx, ty, one scale on rows 7 and 8). Other masks: the normal-equations
-/// pseudo-inverse, not FSL's last bits (false; `setoption paramsubset` refuses them).
-fn pinv_mask(m: &Mat) -> (Mat, bool) {
-    let (rows, cols) = (m.rows(), m.cols());
-    let disjoint = (0..rows).all(|r| (0..cols).filter(|&c| m.at(r, c) != 0.0).count() <= 1)
-        && (0..rows).all(|r| (0..cols).all(|c| m.at(r, c) == 0.0 || m.at(r, c) == 1.0));
-    let ones = |c: usize| (0..rows).filter(|&r| m.at(r, c) == 1.0).collect::<Vec<_>>();
-    let confirmed = disjoint
-        && ((0..cols).all(|c| ones(c).len() == 1)
-            || (rows == 12
-                && cols == 4
-                && ones(0) == [6, 7, 8]
-                && ones(1) == [3]
-                && ones(2) == [4]
-                && ones(3) == [5])
-            || (rows == 12
-                && cols == 4
-                && ones(0) == [2]
-                && ones(1) == [3]
-                && ones(2) == [4]
-                && ones(3) == [6, 7]));
-    let mut out = Mat::zeros(cols, rows);
-    if disjoint {
-        for c in 0..cols {
-            let k = (0..rows).filter(|&r| m.at(r, c) == 1.0).count();
-            let v = if k == 1 {
-                1.0
-            } else {
-                let r = 1.0 / (k as f64).sqrt();
-                r * r
-            };
-            for r in 0..rows {
-                if m.at(r, c) == 1.0 {
-                    out.set(c, r, v);
-                }
-            }
-        }
-        return (out, confirmed);
-    }
-    // (M^T M)^-1 M^T by Gauss-Jordan on the small normal matrix.
-    let mut a = vec![vec![0.0f64; 2 * cols]; cols];
-    for i in 0..cols {
-        for j in 0..cols {
-            a[i][j] = (0..rows).map(|r| m.at(r, i) * m.at(r, j)).sum();
-        }
-        a[i][cols + i] = 1.0;
-    }
-    for i in 0..cols {
-        let p = (i..cols)
-            .max_by(|&x, &y| a[x][i].abs().total_cmp(&a[y][i].abs()))
-            .unwrap_or(i);
-        a.swap(i, p);
-        let d = a[i][i];
-        if d == 0.0 {
-            continue;
-        }
-        for v in a[i].iter_mut() {
-            *v /= d;
-        }
-        for j in 0..cols {
-            if j != i {
-                let f = a[j][i];
-                for k in 0..2 * cols {
-                    a[j][k] -= f * a[i][k];
-                }
-            }
-        }
-    }
-    for i in 0..cols {
-        for r in 0..rows {
-            out.set(i, r, (0..cols).map(|j| a[i][cols + j] * m.at(r, j)).sum());
-        }
-    }
-    (out, false)
-}
-
-/// `A * x` with the products rounded and summed column by column (OpenBLAS's `dgemv_n` gives
-/// these bits for masks with at most one non-zero per row, and for their pseudo-inverses).
-fn mat_vec(a: &Mat, x: &[f64]) -> Vec<f64> {
-    let mut y = vec![0.0f64; a.rows()];
-    for c in 0..a.cols() {
-        for r in 0..a.rows() {
-            y[r] += a.at(r, c) * x[c];
-        }
-    }
-    y
+/// `pinv(parammask)` (miscmaths' `pinv`: Armadillo's `pinv(X, 0)`, the divide-and-conquer SVD
+/// on FSL's LAPACK, [`arma::pinv`]): a diagonal mask (FLIRT's identity, `[I; 0]`) by its
+/// reciprocals, any other by the economical SVD. `None` when the decomposition fails (a
+/// non-finite element: FSL then prints `Error during MISCMATHS::pinv using dc, attempting once
+/// more with std.` and tries LAPACK's `dgesvd`, not translated; the replica refuses).
+fn pinv_mask(m: &Mat) -> Option<Mat> {
+    arma::pinv(m)
 }
 
 impl<'a> Flirt<'a> {
@@ -1076,16 +992,16 @@ impl<'a> Flirt<'a> {
         let d: Vec<f64> = (0..12)
             .map(|i| params.get(i) - self.refparams.get(i))
             .collect();
-        let (pi, _) = pinv_mask(&self.parammask);
-        Mat::col(&mat_vec(&pi, &d))
+        let pi = pinv_mask(&self.parammask).expect("a finite mask (checked when it is set)");
+        arma::mul(&pi, &Mat::col(&d), false)
     }
 
     /// `paramsNto12(params)`: `parammask * params + refparams`.
     fn params_n_to_12(&self, params: &Mat) -> Mat {
-        let y = mat_vec(&self.parammask, params.as_slice());
+        let y = arma::mul(&self.parammask, params, false);
         Mat::col(
             &(0..12)
-                .map(|i| y[i] + self.refparams.get(i))
+                .map(|i| y.get(i) + self.refparams.get(i))
                 .collect::<Vec<f64>>(),
         )
     }
@@ -1533,6 +1449,59 @@ impl<'a> Flirt<'a> {
             resmat.set(r, 3, -(t[r] - rcog[r]));
         }
         *affmat = resmat;
+    }
+
+    /// `alignpaxes(affmat)`: the rotation that maps the test image's principal axes onto the
+    /// reference's (the first two reference axes turned to point the test axes' way, each
+    /// frame made right-handed by its third axis), then [`Flirt::aligncog`]'s translation. The
+    /// incoming matrix is not used.
+    fn alignpaxes(&mut self, affmat: &mut Mat) -> R<()> {
+        let mut w = Vec::new();
+        let paxref = self.slot_vol(self.pair().ref_slot).principal_axes(&mut w);
+        let paxref = match paxref {
+            Some(p) => p,
+            None => {
+                for l in &w {
+                    self.el(l);
+                }
+                return Err(Self::paxes_failed());
+            }
+        };
+        let paxtest = self.testvol.principal_axes(&mut w);
+        for l in &w {
+            self.el(l);
+        }
+        let mut paxtest = paxtest.ok_or_else(Self::paxes_failed)?;
+        let mut paxref = paxref;
+        for n in 0..2 {
+            let rv: Vec<f64> = (0..3).map(|r| paxref.at(r, n)).collect();
+            let tv: Vec<f64> = (0..3).map(|r| paxtest.at(r, n)).collect();
+            if arma::dot(&rv, &tv) < 0.0 {
+                for r in 0..3 {
+                    paxref.set(r, n, -rv[r]);
+                }
+            }
+        }
+        for p in [&mut paxref, &mut paxtest] {
+            if arma::det(p) < 0.0 {
+                for r in 0..3 {
+                    let v = p.at(r, 2);
+                    p.set(r, 2, -v);
+                }
+            }
+        }
+        let mut m = Mat::eye(4);
+        m.set_sub(0, 0, &arma::mul_tb(&paxref, &paxtest));
+        self.aligncog(&mut m);
+        *affmat = m;
+        Ok(())
+    }
+
+    /// The principal axes of an image whose moments are not finite: Armadillo's `eig_sym`
+    /// fails, empties its outputs, and FSL's first read of a column throws
+    /// `Mat::operator(): index out of bounds` (caught by `main`: exit 0, no matrix written).
+    fn paxes_failed() -> Stop {
+        out_of_bounds()
     }
 
     /// `optimise_strategy0(matresult, fans, max_iterations)`: one optimisation in the user's
@@ -2460,10 +2429,11 @@ impl Flirt<'_> {
                         m.set(r, c, fvalues[c * 12 + 1 + r]);
                     }
                 }
-                if n > 0 && !pinv_mask(&m).1 {
+                if pinv_mask(&m).is_none() {
                     return Err(Stop::Refuse(
-                        "setoption paramsubset: a mask other than FLIRT's own and FSL's shipped \
-                         schedules'; its pseudo-inverse (LAPACK's SVD) is not replicated yet"
+                        "setoption paramsubset: a mask with a non-finite value (FSL's \
+                         pseudo-inverse then fails and falls back to another SVD, which fails \
+                         too)"
                             .to_owned(),
                     ));
                 }
@@ -2790,10 +2760,17 @@ impl Flirt<'_> {
                 }
             }
             "alignpaxes" => {
-                return Err(Stop::Refuse(
-                    "the schedule command alignpaxes (principal axes) is not replicated yet"
-                        .to_owned(),
-                ));
+                if n < 2 {
+                    return Err(self.wrong_args("ALIGNPAXES"));
+                }
+                let (src, d1, d2) = self.matname(&words[1])?;
+                for row in self.rows_of(src, d1, d2) {
+                    let mut m = row_to_mat(&row);
+                    self.alignpaxes(&mut m)?;
+                    let mut r = vec![row[0]];
+                    r.extend(mat_to_16(&m));
+                    self.usrmat[0].push(r);
+                }
             }
             "setscale" => {
                 if n < 2 {
@@ -3456,33 +3433,30 @@ mod tests {
     }
 
     #[test]
-    fn the_masks_whose_bits_the_probe_confirms_are_accepted() {
-        // FLIRT's 12-dof identity, the shipped schedules' single translations, the 2D subset
-        let (p, ok) = pinv_mask(&Mat::eye(12));
-        assert!(ok);
+    fn pinv_gives_fsl_s_bits_for_its_masks() {
+        // FLIRT's 12-dof identity (the diagonal path), the 2D subset
+        let p = pinv_mask(&Mat::eye(12)).unwrap();
         assert_eq!(p.at(3, 3), 1.0);
-        assert!(pinv_mask(&mask(&[&[3], &[4], &[5]])).1);
-        assert!(pinv_mask(&mask(&[&[2], &[3], &[4]])).1);
+        assert!(pinv_mask(&mask(&[&[3], &[4], &[5]])).is_some());
         // the search's mask: one scale on rows 7 to 9 ((1/sqrt 3)^2, FSL's LAPACK bits)
-        let (p, ok) = pinv_mask(&mask(&[&[6, 7, 8], &[3], &[4], &[5]]));
-        assert!(ok);
+        let p = pinv_mask(&mask(&[&[6, 7, 8], &[3], &[4], &[5]])).unwrap();
         assert_eq!(p.at(0, 7).to_bits(), 0x3FD5_5555_5555_5557);
         assert_eq!(p.at(1, 3), 1.0);
         // FSL's sch2D_4dof: one scale for x and y ((1/sqrt 2)^2)
-        let (p, ok) = pinv_mask(&mask(&[&[2], &[3], &[4], &[6, 7]]));
-        assert!(ok);
+        let p = pinv_mask(&mask(&[&[2], &[3], &[4], &[6, 7]])).unwrap();
         assert_eq!(p.at(3, 6).to_bits(), 0x3FDF_FFFF_FFFF_FFFE);
     }
 
     #[test]
-    fn other_masks_are_not_claimed_exact() {
-        assert!(!pinv_mask(&mask(&[&[0, 1]])).1);
-        assert!(!pinv_mask(&mask(&[&[0, 1, 2], &[3, 4]])).1);
-        assert!(!pinv_mask(&mask(&[&[6, 7, 8], &[3], &[4]])).1);
+    fn general_masks_and_their_failures() {
+        // a row shared by two columns: rank 2, the SVD path
+        let p = pinv_mask(&mask(&[&[0], &[0, 1]])).unwrap();
+        assert_eq!((p.rows(), p.cols()), (2, 12));
         let mut half = Mat::zeros(12, 1);
         half.set(0, 0, 0.5);
-        assert!(!pinv_mask(&half).1);
-        // a row shared by two columns
-        assert!(!pinv_mask(&mask(&[&[0], &[0, 1]])).1);
+        assert_eq!(pinv_mask(&half).unwrap().at(0, 0), 2.0);
+        let mut bad = mask(&[&[0, 1]]);
+        bad.set(3, 0, f64::NAN);
+        assert!(pinv_mask(&bad).is_none());
     }
 }

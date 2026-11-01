@@ -447,20 +447,65 @@ pub fn mul(a: &Mat, b: &Mat, trans_a: bool) -> Mat {
     gemm(a, b, true)
 }
 
-/// `gemv<trans>::apply_blas_type`: square `A` up to 4 × 4 by [`gemv_tinysq`]; the rest goes to
-/// BLAS (not ported).
+/// `gemv<trans>::apply_blas_type`: square `A` up to 4 × 4 by [`gemv_tinysq`]; the rest by BLAS
+/// `dgemv` (OpenBLAS's Haswell kernels, [`lapack::blas`]).
 fn gemv(a: &Mat, x: &[f64], trans: bool) -> Vec<f64> {
     if a.rows <= 4 && a.rows == a.cols {
         return gemv_tinysq(a, x, trans);
     }
-    panic!(
-        "a {}x{} matrix-vector product goes to BLAS in Armadillo (not ported)",
-        a.rows, a.cols
+    let am = lapack::blas::MatRef { off: 0, ld: a.rows };
+    if trans {
+        let mut y = vec![0.0; a.cols];
+        lapack::blas::dgemv_t(a.rows, a.cols, 1.0, &a.data, am, x, 1, 0.0, &mut y);
+        y
+    } else {
+        let mut y = vec![0.0; a.rows];
+        lapack::blas::dgemv_n(a.rows, a.cols, 1.0, &a.data, am, x, 1, 0.0, &mut y);
+        y
+    }
+}
+
+/// `gemm<trans_a, trans_b>` by BLAS `dgemm` (`C = op(A)·op(B)`, alpha 1, beta 0).
+fn gemm_blas(a: &Mat, b: &Mat, trans_a: bool, trans_b: bool) -> Mat {
+    let (m, k) = if trans_a { (a.cols, a.rows) } else { (a.rows, a.cols) };
+    let n = if trans_b { b.rows } else { b.cols };
+    let mut c = Mat::zeros(m, n);
+    let am = lapack::blas::MatRef { off: 0, ld: a.rows };
+    let bm = lapack::blas::MatRef { off: 0, ld: b.rows };
+    let cm = lapack::blas::MatRef { off: 0, ld: m };
+    lapack::blas::dgemm(
+        trans_a, trans_b, m, n, k, 1.0, &a.data, am, &b.data, bm, 0.0, &mut c.data, cm,
     );
+    c
+}
+
+/// `A·Bᵀ` (`glue_times::apply<do_trans_A = false, do_trans_B = true>`): a row-vector `A` by
+/// `gemv` of `B` with `A`, a row-vector `B` by `gemv` of `A` with `B`, square operands of equal
+/// size up to 4 by [`mul_tinysq`] of `A` and `Bᵀ`, the rest by BLAS `dgemm('N', 'T')`. (The same
+/// object on both sides goes to `syrk` in Armadillo: not this function.)
+pub fn mul_tb(a: &Mat, b: &Mat) -> Mat {
+    assert_eq!(a.cols, b.cols, "matrix multiplication: incompatible sizes");
+    if a.rows == 1 {
+        // gemv<false>(out, B, A): B a.
+        let y = gemv(b, a.as_slice(), false);
+        return Mat {
+            rows: 1,
+            cols: b.rows,
+            data: y,
+        };
+    }
+    if b.rows == 1 {
+        let y = gemv(a, b.as_slice(), false);
+        return Mat::col(&y);
+    }
+    if a.rows <= 4 && a.rows == a.cols && a.rows == b.rows && b.rows == b.cols {
+        return mul_tinysq(a, &b.t());
+    }
+    gemm_blas(a, b, false, true)
 }
 
 /// `gemm<trans_a, false>::apply_blas_type`: square operands of equal size up to 4 by
-/// [`mul_tinysq`] (a transposed `A` is transposed first); the rest goes to BLAS (not ported).
+/// [`mul_tinysq`] (a transposed `A` is transposed first); the rest by BLAS `dgemm`.
 fn gemm(a: &Mat, b: &Mat, trans_a: bool) -> Mat {
     if a.rows <= 4 && a.rows == a.cols && a.rows == b.rows && b.rows == b.cols {
         if trans_a {
@@ -477,10 +522,179 @@ fn gemm(a: &Mat, b: &Mat, trans_a: bool) -> Mat {
         }
         return mul_tinysq(a, b);
     }
-    panic!(
-        "a {}x{} by {}x{} matrix product goes to BLAS in Armadillo (not ported)",
-        a.rows, a.cols, b.rows, b.cols
-    );
+    gemm_blas(a, b, trans_a, false)
+}
+
+/// `eig_sym(eigval, eigvec, X)` with the default method `"dc"` (as armawrap's `Jacobi` and
+/// `EigenValues` call it): Armadillo's rudimentary symmetry check (its corner elements; a
+/// failure prints `warning: eig_sym(): given matrix is not symmetric`, after a blank line, into
+/// `warnings`), then LAPACK `dsyevd` (`jobz = 'V'`, `uplo = 'U'`; [`lapack::reference`]) unless the
+/// upper triangle holds a non-finite value. `None` when the decomposition fails (Armadillo
+/// then empties both outputs; its level-3 warning is not printed at the default level).
+pub fn eig_sym(x: &Mat, warnings: &mut Vec<String>) -> Option<(Vec<f64>, Mat)> {
+    assert_eq!(x.rows, x.cols, "eig_sym(): given matrix must be square sized");
+    let n = x.rows;
+    if n > 1 {
+        let a1 = x.data[n - 2];
+        let a2 = x.data[n - 1];
+        let b1 = x.data[(n - 2) * n];
+        let b2 = x.data[(n - 1) * n];
+        let c1 = a1.abs().max_arma(b1.abs());
+        let c2 = a2.abs().max_arma(b2.abs());
+        let d1 = (a1 - b1).abs();
+        let d2 = (a2 - b2).abs();
+        let tol = 10000.0 * f64::EPSILON;
+        let ok1 = d1 <= tol || d1 <= c1 * tol;
+        let ok2 = d2 <= tol || d2 <= c2 * tol;
+        if !(ok1 && ok2) {
+            warnings.push("\nwarning: eig_sym(): given matrix is not symmetric".to_owned());
+        }
+    }
+    for c in 0..n {
+        for r in 0..=c {
+            if !x.at(r, c).is_finite() {
+                return None;
+            }
+        }
+    }
+    if n == 0 {
+        return Some((Vec::new(), Mat::zeros(0, 0)));
+    }
+    let mut a = x.data.clone();
+    let mut w = vec![0.0; n];
+    let info = lapack::reference::dsyevd_vu(n, &mut a, &mut w);
+    if info != 0 {
+        // Armadillo then tries dsyev (not translated): the replica refuses there.
+        return None;
+    }
+    Some((
+        w,
+        Mat {
+            rows: n,
+            cols: n,
+            data: a,
+        },
+    ))
+}
+
+/// `std::max` for doubles: `a < b ? b : a`.
+trait MaxArma {
+    fn max_arma(self, b: f64) -> f64;
+}
+
+impl MaxArma for f64 {
+    fn max_arma(self, b: f64) -> f64 {
+        if self < b { b } else { self }
+    }
+}
+
+/// `svd_econ(U, s, V, X)` (mode `'b'`, method `"dc"`; `auxlib::svd_dc_econ`) for `m ≥ n`: LAPACK
+/// `dgesdd('S')`, `V` the transpose of its `Vᵀ`. `None` for non-finite input or a failure.
+pub fn svd_econ(x: &Mat) -> Option<(Mat, Vec<f64>, Mat)> {
+    let (m, n) = (x.rows, x.cols);
+    assert!(m >= n, "svd_econ is translated for m >= n");
+    if x.data.iter().any(|v| !v.is_finite()) {
+        return None;
+    }
+    let k = n;
+    if m == 0 || n == 0 {
+        return Some((Mat::eye(m), Vec::new(), Mat::zeros(n, k)));
+    }
+    let mut a = x.data.clone();
+    let mut s = vec![0.0; k];
+    let mut u = vec![0.0; m * k];
+    let mut vt = vec![0.0; k * n];
+    let info = lapack::reference::dgesdd_s(m, n, &mut a, &mut s, &mut u, &mut vt);
+    if info != 0 {
+        return None;
+    }
+    let vtm = Mat {
+        rows: k,
+        cols: n,
+        data: vt,
+    };
+    Some((
+        Mat {
+            rows: m,
+            cols: k,
+            data: u,
+        },
+        s,
+        vtm.t(),
+    ))
+}
+
+/// `pinv(X, tol = 0)` with the default method (`op_pinv::apply_direct`): an empty matrix gives
+/// an empty `n × m` result; a diagonal matrix (every element off the main diagonal zero) the
+/// reciprocals of its diagonal elements of magnitude at least `max(m, n)·max|Aᵢᵢ|·ε`
+/// (`apply_diag`); any other matrix (FSL's sizes never reach the symmetric path, which needs
+/// more than 40 rows) the economical SVD of `X` or of `Xᵀ` when it is wide (`apply_gen`): the
+/// singular values of at least `max(m, n)·s₀·ε` inverted, `V·diag(1/s)` element by element, then
+/// times `Uᵀ` (or `U·diag(1/s)·Vᵀ` for a wide `X`). `None` when the decomposition fails (a
+/// non-finite element).
+pub fn pinv(x: &Mat) -> Option<Mat> {
+    let (n_rows, n_cols) = (x.rows, x.cols);
+    if x.data.is_empty() {
+        return Some(Mat::zeros(n_cols, n_rows));
+    }
+    let is_diag = (0..n_cols).all(|c| (0..n_rows).all(|r| r == c || x.at(r, c) == 0.0));
+    if is_diag {
+        let mut out = Mat::zeros(n_cols, n_rows);
+        let nd = n_rows.min(n_cols);
+        let mut max_abs = 0.0f64;
+        let mut abs = Vec::with_capacity(nd);
+        for i in 0..nd {
+            let aii = x.at(i, i);
+            if aii.is_nan() {
+                return None;
+            }
+            let a = aii.abs();
+            abs.push(a);
+            max_abs = if a > max_abs { a } else { max_abs };
+        }
+        let tol = (n_rows.max(n_cols) as f64) * max_abs * f64::EPSILON;
+        for i in 0..nd {
+            if abs[i] >= tol {
+                let aii = x.at(i, i);
+                if aii != 0.0 {
+                    out.set(i, i, 1.0 / aii);
+                }
+            }
+        }
+        return Some(out);
+    }
+    let a = if n_cols > n_rows { x.t() } else { x.clone() };
+    let (u, s, v) = svd_econ(&a)?;
+    let tol = if s.is_empty() {
+        0.0
+    } else {
+        (n_rows.max(n_cols) as f64) * s[0] * f64::EPSILON
+    };
+    let count = s.iter().filter(|&&v| v >= tol).count();
+    if count == 0 {
+        return Some(Mat::zeros(n_cols, n_rows));
+    }
+    let s2: Vec<f64> = s
+        .iter()
+        .filter(|&&v| v >= tol)
+        .map(|&v| if v > 0.0 { 1.0 / v } else { 0.0 })
+        .collect();
+    let u_use = u.sub(0, u.rows, 0, count);
+    let v_use = v.sub(0, v.rows, 0, count);
+    let scale_cols = |m: &Mat| {
+        let mut t = m.clone();
+        for c in 0..count {
+            for r in 0..m.rows {
+                t.set(r, c, m.at(r, c) * s2[c]);
+            }
+        }
+        t
+    };
+    Some(if n_rows >= n_cols {
+        mul_tb(&scale_cols(&v_use), &u_use)
+    } else {
+        mul_tb(&scale_cols(&u_use), &v_use)
+    })
 }
 
 /// `A B C` for evaluated operands (`glue_times::apply` with three matrices): `(A B) C` when

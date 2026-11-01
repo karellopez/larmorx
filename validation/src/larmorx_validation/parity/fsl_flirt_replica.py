@@ -529,6 +529,21 @@ def _prepare(run: Run, tmp: Path) -> list[str]:
                 h.set_data_dtype(np.int8)
                 nib.save(nib.Nifti1Image(arr.astype(np.int8), img.affine, h), str(dst))
             out.append(name)
+        elif a.startswith("@double:"):
+            # an input stored as float64, its values divided by 7 (not exact in single
+            # precision): @double:<input>:<name>
+            import nibabel as nib
+
+            _, src_name, name = a.split(":")
+            dst = tmp / name
+            if not dst.exists():
+                base = base or inputs()
+                img = nib.load(str(base / src_name))
+                arr = np.asanyarray(img.dataobj).astype(np.float64) / 7.0
+                h = img.header.copy()
+                h.set_data_dtype(np.float64)
+                nib.save(nib.Nifti1Image(arr, img.affine, h), str(dst))
+            out.append(name)
         elif a.startswith("@nan:"):
             # an input with one NaN voxel at (3, 4, 5): @nan:<input>:<name>
             import nibabel as nib
@@ -2003,6 +2018,18 @@ def _program_cases() -> dict[str, tuple[str, str, Run]]:
     add("applyxfm4D-int8", "an int8 input (FSL-09: written as uint8), trilinear", X,
         "@int8:epi.nii:epi_i8.nii", E, "out.nii.gz", "one.mat", "-singlematrix",
         "-interp", "trilinear", files=one)  # fmt: skip
+    add("applyxfm4D-double-sinc", "a double series (sinc sums in double precision; the "
+        "background value kept in double precision where the mask sets it)", X,
+        "@double:bold4.nii:bold4_f64.nii", E, "out.nii.gz", "mats", files=mats)  # fmt: skip
+    add("applyxfm4D-double-3d-spline", "-3D spline on a double volume (its coefficients in "
+        "double precision)", X, "@double:epi.nii:epi_f64.nii", E, "out.nii.gz", "one.mat",
+        "-3D", "-interp", "spline", files=one)  # fmt: skip
+    add("applyxfm4D-double-nn", "a double volume, nearest neighbour (values through float)", X,
+        "@double:epi.nii:epi_f64.nii", T, "out.nii.gz", "one.mat", "-singlematrix", "-interp",
+        "nn", files=one)  # fmt: skip
+    add("applyxfm4D-3d-spline-int", "-3D spline on an int16 volume (FSL-79: coefficients and "
+        "values in the type)", X, B4, E, "out.nii.gz", "one.mat", "-3D", "-interp", "spline",
+        files=one)  # fmt: skip
     add("applyxfm4D-bad-interp", "an unknown interpolation (its message, exit 1)", X, B4, E,
         "out.nii.gz", "one.mat", "-interp", "cubic", files=one)  # fmt: skip
     add("applyxfm4D-userprefix-last", "-userprefix as the last word (std::string of null)", X,
@@ -2035,6 +2062,13 @@ def _program_cases() -> dict[str, tuple[str, str, Run]]:
         "line.7", "t.txt", "0", files=xt)  # fmt: skip
     add("extracttxt-line0", "a relative start reaching line 0 (sed's error, exit 1)", ET,
         "^line.1.v", "t.txt", "2", "-1", files=xt)  # fmt: skip
+    add("extracttxt-dc-negative", "a start before line 1: dc reads its own negative result as "
+        "a subtraction (stack empty), sed the range as an option", ET, "e.2", "t.txt", "3",
+        "-4", files=xt)  # fmt: skip
+    add("extracttxt-sed-option", "a start on line 0 with no trailing line: the range -1,-1 "
+        "(sed's unknown option)", ET, "e.4", "t.txt", "0", "-4", files=xt)  # fmt: skip
+    add("extracttxt-signed", "signed arguments (+2, -0): dc reads each sign as a command",
+        ET, "e.4", "t.txt", "-0", "+2", files=xt)  # fmt: skip
     add("extracttxt-nomatch", "a word that never matches (nothing printed, exit 0)", ET,
         "nothing", "t.txt", files=xt)  # fmt: skip
     add("extracttxt-missing", "a file that does not exist (grep's message, exit 0)", ET, "x",

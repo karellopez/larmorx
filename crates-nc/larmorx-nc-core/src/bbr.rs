@@ -284,7 +284,8 @@ impl BbrDebug {
     /// `debugvol(x, y, z, t) = v`.
     fn write(&mut self, x: i64, y: i64, z: i64, t: usize, v: f32) {
         let [nx, ny, nz] = self.dims;
-        let inside = |x: i64, y: i64, z: i64| x >= 0 && y >= 0 && z >= 0 && x < nx && y < ny && z < nz;
+        let inside =
+            |x: i64, y: i64, z: i64| x >= 0 && y >= 0 && z >= 0 && x < nx && y < ny && z < nz;
         let (mut a, mut b, mut c) = (x, y, z);
         if !inside(a, b, c) {
             match self.extrap {

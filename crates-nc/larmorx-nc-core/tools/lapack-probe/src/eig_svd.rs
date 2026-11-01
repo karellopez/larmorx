@@ -50,7 +50,10 @@ pub fn run(op: &str, count: usize, words: &[f64]) -> Option<Vec<f64>> {
         }
         return Some(out);
     }
-    if let Some(rest) = op.strip_prefix("gemvn").or_else(|| op.strip_prefix("gemvt")) {
+    if let Some(rest) = op
+        .strip_prefix("gemvn")
+        .or_else(|| op.strip_prefix("gemvt"))
+    {
         let trans = op.starts_with("gemvt");
         let d = dims(rest);
         let (m, n) = (d[0], d[1]);

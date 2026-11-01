@@ -730,6 +730,123 @@ impl<T: Elem> Volume<T> {
     }
 }
 
+impl<T: Elem> Volume<T> {
+    /// `backgroundval()` (`calc_bval(vol, 2)`): the 10th percentile of the values in a 2-voxel
+    /// shell at the edges of volume 0 (an element of the sorted shell, not interpolated).
+    pub fn backgroundval(&self) -> T {
+        self.background_value().0
+    }
+
+    /// FSL-75: whether `calc_bval(vol, 2)`'s buffer holds the border it writes. It sizes the
+    /// buffer `2(x−2ex)(y−2ey)ez + 2(x−2ex)z·ey + 2yz·ex` (each edge width `e` the smaller of 2
+    /// and the size less 1), which is too small when the size along x is 3 (and y or z at least
+    /// 2), or along y is 3 (z at least 2, x neither 2 nor 4): a factor of −1 in a term whose
+    /// loop writes nothing. FSL then writes the rest past the buffer (heap corruption) and sorts
+    /// the values that fit; at 1 × 1 × 1 the buffer is empty and FSL reads its first element.
+    pub fn background_buffer(&self) -> BorderBuffer {
+        let (zb, yb, xb) = (self.zsize(), self.ysize(), self.xsize());
+        let ew = |n: i64| 2i64.min(n - 1);
+        let (ewx, ewy, ewz) = (ew(xb), ew(yb), ew(zb));
+        let numbins = 2 * (xb - 2 * ewx) * (yb - 2 * ewy) * ewz
+            + 2 * (xb - 2 * ewx) * zb * ewy
+            + 2 * yb * zb * ewx;
+        let (ix, iy) = ((xb - 2 * ewx).max(0), (yb - 2 * ewy).max(0));
+        let written = 2 * ewz * ix * iy + 2 * ewy * ix * zb + 2 * ewx * yb * zb;
+        if numbins <= 0 {
+            BorderBuffer::Empty
+        } else if numbins < written {
+            BorderBuffer::Overflow { numbins, written }
+        } else {
+            BorderBuffer::Exact
+        }
+    }
+
+    /// [`Volume::backgroundval`], and what was done with NaN values in the shell: `std::sort`
+    /// with `operator<` has no defined order for them in C++ (FSL-22), and the volume's
+    /// [`NanOrder`] decides theirs.
+    pub fn background_value(&self) -> (T, Background) {
+        self.background_value_with(false)
+    }
+
+    /// [`Volume::background_value`] with `whole_border`: the 10th percentile of every value
+    /// the border loops write (FSL-75 corrected), instead of FSL's, which keeps the values that
+    /// fit its buffer and the percentile of their number (the same wherever the buffer holds
+    /// the border: [`Volume::background_buffer`]).
+    pub fn background_value_with(&self, whole_border: bool) -> (T, Background) {
+        self.background_value_in(whole_border, self.nan_order)
+    }
+
+    /// [`Volume::background_value_with`] with NaN values in `order` instead of the volume's.
+    pub fn background_value_in(&self, whole_border: bool, order: NanOrder) -> (T, Background) {
+        let (zb, yb, xb) = (self.zsize(), self.ysize(), self.xsize());
+        let (mut ewx, mut ewy, mut ewz) = (2i64, 2i64, 2i64);
+        if ewx >= xb {
+            ewx = xb - 1;
+        }
+        if ewy >= yb {
+            ewy = yb - 1;
+        }
+        if ewz >= zb {
+            ewz = zb - 1;
+        }
+        let numbins = 2 * (xb - 2 * ewx) * (yb - 2 * ewy) * ewz
+            + 2 * (xb - 2 * ewx) * zb * ewy
+            + 2 * yb * zb * ewx;
+        let mut hist: Vec<T> = Vec::with_capacity(numbins.max(0) as usize);
+        for e in 0..ewz {
+            for x in ewx..xb - ewx {
+                for y in ewy..yb - ewy {
+                    hist.push(self.value(x, y, e));
+                    hist.push(self.value(x, y, zb - 1 - e));
+                }
+            }
+        }
+        for e in 0..ewy {
+            for x in ewx..xb - ewx {
+                for z in 0..zb {
+                    hist.push(self.value(x, e, z));
+                    hist.push(self.value(x, yb - 1 - e, z));
+                }
+            }
+        }
+        for e in 0..ewx {
+            for y in 0..yb {
+                for z in 0..zb {
+                    hist.push(self.value(e, y, z));
+                    hist.push(self.value(xb - 1 - e, y, z));
+                }
+            }
+        }
+        // FSL-75: FSL's buffer keeps the first `numbins` values written
+        let kept = if whole_border {
+            hist.len() as i64
+        } else {
+            numbins.max(0).min(hist.len() as i64)
+        };
+        hist.truncate(kept as usize);
+        let how = if !hist.iter().any(|v| v.to_f64().is_nan()) {
+            Background::Defined
+        } else if order == NanOrder::Last {
+            Background::NanLast
+        } else {
+            let mut exact = hist.clone();
+            match crate::stdsort::sort_checked(&mut exact) {
+                Ok(()) => {
+                    hist = exact;
+                    Background::Libstdcxx
+                }
+                Err(_) => Background::Outside,
+            }
+        };
+        if how != Background::Libstdcxx {
+            sort_nan_last(&mut hist);
+        }
+        let count = if whole_border { kept } else { numbins };
+        let p10 = (count / 10).max(0) as usize;
+        (hist.get(p10).copied().unwrap_or_default(), how)
+    }
+}
+
 impl Volume {
     /// `cog("scaled_mm")` of volume 0 (`calc_cog`, then times the sampling matrix): the centre of
     /// the values minus the minimum, partial sums flushed every `max(1000, √nvoxels)` voxels,
@@ -948,121 +1065,6 @@ impl Volume {
         (v_cog, total)
     }
 
-    /// `backgroundval()` (`calc_bval(vol, 2)`): the 10th percentile of the values in a 2-voxel
-    /// shell at the edges of volume 0 (an element of the sorted shell, not interpolated).
-    pub fn backgroundval(&self) -> f32 {
-        self.background_value().0
-    }
-
-    /// FSL-75: whether `calc_bval(vol, 2)`'s buffer holds the border it writes. It sizes the
-    /// buffer `2(x−2ex)(y−2ey)ez + 2(x−2ex)z·ey + 2yz·ex` (each edge width `e` the smaller of 2
-    /// and the size less 1), which is too small when the size along x is 3 (and y or z at least
-    /// 2), or along y is 3 (z at least 2, x neither 2 nor 4): a factor of −1 in a term whose
-    /// loop writes nothing. FSL then writes the rest past the buffer (heap corruption) and sorts
-    /// the values that fit; at 1 × 1 × 1 the buffer is empty and FSL reads its first element.
-    pub fn background_buffer(&self) -> BorderBuffer {
-        let (zb, yb, xb) = (self.zsize(), self.ysize(), self.xsize());
-        let ew = |n: i64| 2i64.min(n - 1);
-        let (ewx, ewy, ewz) = (ew(xb), ew(yb), ew(zb));
-        let numbins = 2 * (xb - 2 * ewx) * (yb - 2 * ewy) * ewz
-            + 2 * (xb - 2 * ewx) * zb * ewy
-            + 2 * yb * zb * ewx;
-        let (ix, iy) = ((xb - 2 * ewx).max(0), (yb - 2 * ewy).max(0));
-        let written = 2 * ewz * ix * iy + 2 * ewy * ix * zb + 2 * ewx * yb * zb;
-        if numbins <= 0 {
-            BorderBuffer::Empty
-        } else if numbins < written {
-            BorderBuffer::Overflow { numbins, written }
-        } else {
-            BorderBuffer::Exact
-        }
-    }
-
-    /// [`Volume::backgroundval`], and what was done with NaN values in the shell: `std::sort`
-    /// with `operator<` has no defined order for them in C++ (FSL-22), and the volume's
-    /// [`NanOrder`] decides theirs.
-    pub fn background_value(&self) -> (f32, Background) {
-        self.background_value_with(false)
-    }
-
-    /// [`Volume::background_value`] with `whole_border`: the 10th percentile of every value
-    /// the border loops write (FSL-75 corrected), instead of FSL's, which keeps the values that
-    /// fit its buffer and the percentile of their number (the same wherever the buffer holds
-    /// the border: [`Volume::background_buffer`]).
-    pub fn background_value_with(&self, whole_border: bool) -> (f32, Background) {
-        self.background_value_in(whole_border, self.nan_order)
-    }
-
-    /// [`Volume::background_value_with`] with NaN values in `order` instead of the volume's.
-    pub fn background_value_in(&self, whole_border: bool, order: NanOrder) -> (f32, Background) {
-        let (zb, yb, xb) = (self.zsize(), self.ysize(), self.xsize());
-        let (mut ewx, mut ewy, mut ewz) = (2i64, 2i64, 2i64);
-        if ewx >= xb {
-            ewx = xb - 1;
-        }
-        if ewy >= yb {
-            ewy = yb - 1;
-        }
-        if ewz >= zb {
-            ewz = zb - 1;
-        }
-        let numbins = 2 * (xb - 2 * ewx) * (yb - 2 * ewy) * ewz
-            + 2 * (xb - 2 * ewx) * zb * ewy
-            + 2 * yb * zb * ewx;
-        let mut hist: Vec<f32> = Vec::with_capacity(numbins.max(0) as usize);
-        for e in 0..ewz {
-            for x in ewx..xb - ewx {
-                for y in ewy..yb - ewy {
-                    hist.push(self.value(x, y, e));
-                    hist.push(self.value(x, y, zb - 1 - e));
-                }
-            }
-        }
-        for e in 0..ewy {
-            for x in ewx..xb - ewx {
-                for z in 0..zb {
-                    hist.push(self.value(x, e, z));
-                    hist.push(self.value(x, yb - 1 - e, z));
-                }
-            }
-        }
-        for e in 0..ewx {
-            for y in 0..yb {
-                for z in 0..zb {
-                    hist.push(self.value(e, y, z));
-                    hist.push(self.value(xb - 1 - e, y, z));
-                }
-            }
-        }
-        // FSL-75: FSL's buffer keeps the first `numbins` values written
-        let kept = if whole_border {
-            hist.len() as i64
-        } else {
-            numbins.max(0).min(hist.len() as i64)
-        };
-        hist.truncate(kept as usize);
-        let how = if !hist.iter().any(|v| v.is_nan()) {
-            Background::Defined
-        } else if order == NanOrder::Last {
-            Background::NanLast
-        } else {
-            let mut exact = hist.clone();
-            match crate::stdsort::sort_f32_checked(&mut exact) {
-                Ok(()) => {
-                    hist = exact;
-                    Background::Libstdcxx
-                }
-                Err(_) => Background::Outside,
-            }
-        };
-        if how != Background::Libstdcxx {
-            sort_nan_last(&mut hist);
-        }
-        let count = if whole_border { kept } else { numbins };
-        let p10 = (count / 10).max(0) as usize;
-        (hist.get(p10).copied().unwrap_or(0.0), how)
-    }
-
     /// `robustmin()`, `robustmax()` (`calc_robustlimits`: Steve Smith's 2%-98% thresholds,
     /// `find_thresholds` without a mask).
     pub fn robust_limits(&self) -> (f32, f32) {
@@ -1073,10 +1075,10 @@ impl Volume {
 /// `std::sort` of floats with `operator<`: for values without NaN any correct sort gives
 /// libstdc++'s sequence (equal values are interchangeable). With NaN values, which have no
 /// defined order in C++ (FSL-22), they are put last.
-fn sort_nan_last(v: &mut [f32]) {
+fn sort_nan_last<T: Elem>(v: &mut [T]) {
     v.sort_by(|a, b| {
         a.partial_cmp(b)
-            .unwrap_or_else(|| a.is_nan().cmp(&b.is_nan()))
+            .unwrap_or_else(|| a.to_f64().is_nan().cmp(&b.to_f64().is_nan()))
     });
 }
 

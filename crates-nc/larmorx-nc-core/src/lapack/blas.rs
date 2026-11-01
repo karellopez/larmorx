@@ -39,7 +39,10 @@ pub fn ddot(x: &[f64], incx: usize, y: &[f64], incy: usize) -> f64 {
         return 0.0;
     }
     if incx == 1 && incy == 1 {
-        assert!(n < 16, "ddot's 8-way kernel (16 or more elements) is not ported");
+        assert!(
+            n < 16,
+            "ddot's 8-way kernel (16 or more elements) is not ported"
+        );
         let mut dot = 0.0;
         for i in 0..n {
             dot += y[i] * x[i];
@@ -538,7 +541,10 @@ pub fn dger(alpha: f64, x: &[f64], y: &[f64], a: &mut [f64], am: MatRef) {
     if m == 0 || n == 0 || alpha == 0.0 {
         return;
     }
-    assert!(m < 16, "dger's columns of 16 or more rows (daxpy's kernel) are not ported");
+    assert!(
+        m < 16,
+        "dger's columns of 16 or more rows (daxpy's kernel) are not ported"
+    );
     for j in 0..n {
         let da = alpha * y[j];
         for i in 0..m {
@@ -556,7 +562,10 @@ pub fn dsymv_u(alpha: f64, a: &[f64], am: MatRef, x: &[f64], beta: f64, y: &mut 
     if n == 0 {
         return;
     }
-    assert!(n < 16, "dsymv_U's 4 x 4 kernel (16 or more rows) is not ported");
+    assert!(
+        n < 16,
+        "dsymv_U's 4 x 4 kernel (16 or more rows) is not ported"
+    );
     if beta != 1.0 {
         scal_beta(beta, &mut y[..n]);
     }

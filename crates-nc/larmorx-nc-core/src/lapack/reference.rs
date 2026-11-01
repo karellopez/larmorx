@@ -189,7 +189,11 @@ pub fn dlasv2(f: f64, g: f64, h: f64) -> (f64, f64, f64, f64, f64, f64) {
             let mm = m * m;
             let tt = t * t;
             let s = (tt + mm).sqrt();
-            let r = if l == 0.0 { m.abs() } else { (l * l + mm).sqrt() };
+            let r = if l == 0.0 {
+                m.abs()
+            } else {
+                (l * l + mm).sqrt()
+            };
             let a = 0.5 * (s + r);
             let smin = ha / a;
             let smax = fa * a;
@@ -262,7 +266,11 @@ pub fn dlaev2(a: f64, b: f64, c: f64) -> (f64, f64, f64, f64) {
         rt2 = -(0.5 * rt);
         sgn1 = 1;
     }
-    let (cs, sgn2) = if df >= 0.0 { (df + rt, 1) } else { (df - rt, -1) };
+    let (cs, sgn2) = if df >= 0.0 {
+        (df + rt, 1)
+    } else {
+        (df - rt, -1)
+    };
     let acs = cs.abs();
     let (mut cs1, mut sn1);
     if acs > ab {
@@ -603,7 +611,17 @@ pub fn dlarf1f(
                 off: cm.at(1, 0),
                 ld: cm.ld,
             };
-            blas::dgemv_t(lastv - 1, lastc, 1.0, c, sub, &v[1..lastv], incv, 0.0, &mut work);
+            blas::dgemv_t(
+                lastv - 1,
+                lastc,
+                1.0,
+                c,
+                sub,
+                &v[1..lastv],
+                incv,
+                0.0,
+                &mut work,
+            );
             let r0 = row(c, cm, 0, lastc);
             blas::daxpy(1.0, &r0, cm.ld, &mut work, 1);
             let mut r0 = r0;
@@ -621,7 +639,17 @@ pub fn dlarf1f(
             off: cm.at(0, 1),
             ld: cm.ld,
         };
-        blas::dgemv_n(lastc, lastv - 1, 1.0, c, sub, &v[1..lastv], incv, 0.0, &mut work);
+        blas::dgemv_n(
+            lastc,
+            lastv - 1,
+            1.0,
+            c,
+            sub,
+            &v[1..lastv],
+            incv,
+            0.0,
+            &mut work,
+        );
         let k0 = col(c, cm, 0, lastc);
         blas::daxpy(1.0, &k0, 1, &mut work, 1);
         let mut k0 = k0;
@@ -714,7 +742,14 @@ pub fn dlarf1l(
 
 /// `DSYTD2` with the upper triangle: the tridiagonal form `Qᵀ A Q`; `d`, `e` its diagonals,
 /// `tau` the reflectors' scalars, the reflectors in `A` above the superdiagonal.
-pub fn dsytd2_u(n: usize, a: &mut [f64], am: MatRef, d: &mut [f64], e: &mut [f64], tau: &mut [f64]) {
+pub fn dsytd2_u(
+    n: usize,
+    a: &mut [f64],
+    am: MatRef,
+    d: &mut [f64],
+    e: &mut [f64],
+    tau: &mut [f64],
+) {
     if n == 0 {
         return;
     }
@@ -820,12 +855,44 @@ pub fn dsteqr_i(n: usize, d: &mut [f64], e: &mut [f64], z: &mut [f64], zm: MatRe
         let dm = MatRef { off: 0, ld: n };
         if anorm > ssfmax {
             iscale = 1;
-            dlascl(Scl::General, anorm, ssfmax, lend - l + 1, 1, &mut d[l - 1..], dm);
-            dlascl(Scl::General, anorm, ssfmax, lend - l, 1, &mut e[l - 1..], dm);
+            dlascl(
+                Scl::General,
+                anorm,
+                ssfmax,
+                lend - l + 1,
+                1,
+                &mut d[l - 1..],
+                dm,
+            );
+            dlascl(
+                Scl::General,
+                anorm,
+                ssfmax,
+                lend - l,
+                1,
+                &mut e[l - 1..],
+                dm,
+            );
         } else if anorm < ssfmin {
             iscale = 2;
-            dlascl(Scl::General, anorm, ssfmin, lend - l + 1, 1, &mut d[l - 1..], dm);
-            dlascl(Scl::General, anorm, ssfmin, lend - l, 1, &mut e[l - 1..], dm);
+            dlascl(
+                Scl::General,
+                anorm,
+                ssfmin,
+                lend - l + 1,
+                1,
+                &mut d[l - 1..],
+                dm,
+            );
+            dlascl(
+                Scl::General,
+                anorm,
+                ssfmin,
+                lend - l,
+                1,
+                &mut e[l - 1..],
+                dm,
+            );
         }
         if dd!(lend).abs() < dd!(l).abs() {
             lend = lsv;
@@ -1015,11 +1082,43 @@ pub fn dsteqr_i(n: usize, d: &mut [f64], e: &mut [f64], z: &mut [f64], zm: MatRe
         // label 140
         let dm = MatRef { off: 0, ld: n };
         if iscale == 1 {
-            dlascl(Scl::General, ssfmax, anorm, lendsv - lsv + 1, 1, &mut d[lsv - 1..], dm);
-            dlascl(Scl::General, ssfmax, anorm, lendsv - lsv, 1, &mut e[lsv - 1..], dm);
+            dlascl(
+                Scl::General,
+                ssfmax,
+                anorm,
+                lendsv - lsv + 1,
+                1,
+                &mut d[lsv - 1..],
+                dm,
+            );
+            dlascl(
+                Scl::General,
+                ssfmax,
+                anorm,
+                lendsv - lsv,
+                1,
+                &mut e[lsv - 1..],
+                dm,
+            );
         } else if iscale == 2 {
-            dlascl(Scl::General, ssfmin, anorm, lendsv - lsv + 1, 1, &mut d[lsv - 1..], dm);
-            dlascl(Scl::General, ssfmin, anorm, lendsv - lsv, 1, &mut e[lsv - 1..], dm);
+            dlascl(
+                Scl::General,
+                ssfmin,
+                anorm,
+                lendsv - lsv + 1,
+                1,
+                &mut d[lsv - 1..],
+                dm,
+            );
+            dlascl(
+                Scl::General,
+                ssfmin,
+                anorm,
+                lendsv - lsv,
+                1,
+                &mut e[lsv - 1..],
+                dm,
+            );
         }
         if jtot >= nmaxit {
             let mut info = 0;
@@ -1431,8 +1530,7 @@ pub fn dbdsqr_u(
             // label 90
             ll += 1;
             if ll == m - 1 {
-                let (sigmn, sigmx, sinr, cosr, sinl, cosl) =
-                    dlasv2(dd!(m - 1), ee!(m - 1), dd!(m));
+                let (sigmn, sigmx, sinr, cosr, sinl, cosl) = dlasv2(dd!(m - 1), ee!(m - 1), dd!(m));
                 dd!(m - 1) = sigmx;
                 ee!(m - 1) = 0.0;
                 dd!(m) = sigmn;
@@ -1591,14 +1689,14 @@ pub fn dbdsqr_u(
                     f = cosr * dd!(i) + sinr * ee!(i);
                     ee!(i) = cosr * ee!(i) - sinr * dd!(i);
                     g = sinr * dd!(i + 1);
-                    dd!(i + 1) = cosr * dd!(i + 1);
+                    dd!(i + 1) *= cosr;
                     let (cosl, sinl, r2) = dlartg(f, g);
                     dd!(i) = r2;
                     f = cosl * ee!(i) + sinl * dd!(i + 1);
                     dd!(i + 1) = cosl * dd!(i + 1) - sinl * ee!(i);
                     if i < m - 1 {
                         g = sinl * ee!(i + 1);
-                        ee!(i + 1) = cosl * ee!(i + 1);
+                        ee!(i + 1) *= cosl;
                     }
                     work[i - ll] = cosr;
                     work[i - ll + nm1] = sinr;
@@ -1629,14 +1727,14 @@ pub fn dbdsqr_u(
                     f = cosr * dd!(i) + sinr * ee!(i - 1);
                     ee!(i - 1) = cosr * ee!(i - 1) - sinr * dd!(i);
                     g = sinr * dd!(i - 1);
-                    dd!(i - 1) = cosr * dd!(i - 1);
+                    dd!(i - 1) *= cosr;
                     let (cosl, sinl, r2) = dlartg(f, g);
                     dd!(i) = r2;
                     f = cosl * ee!(i - 1) + sinl * dd!(i - 1);
                     dd!(i - 1) = cosl * dd!(i - 1) - sinl * ee!(i - 1);
                     if i > ll + 1 {
                         g = sinl * ee!(i - 2);
-                        ee!(i - 2) = cosl * ee!(i - 2);
+                        ee!(i - 2) *= cosl;
                     }
                     work[i - ll - 1] = cosr;
                     work[i - ll - 1 + nm1] = -sinr;
@@ -1707,7 +1805,10 @@ pub fn dbdsdc_ui(
     if n == 0 {
         return 0;
     }
-    assert!(n <= 25, "dbdsdc's divide and conquer (n > 25) is not translated");
+    assert!(
+        n <= 25,
+        "dbdsdc's divide and conquer (n > 25) is not translated"
+    );
     if n == 1 {
         u[um.at(0, 0)] = sign(1.0, d[0]);
         vt[vtm.at(0, 0)] = 1.0;
@@ -1765,7 +1866,10 @@ pub fn dgesdd_s(
     u: &mut [f64],
     vt: &mut [f64],
 ) -> i64 {
-    assert!(m >= n, "dgesdd is translated for m >= n (Armadillo transposes a wide matrix)");
+    assert!(
+        m >= n,
+        "dgesdd is translated for m >= n (Armadillo transposes a wide matrix)"
+    );
     if m == 0 || n == 0 {
         return 0;
     }

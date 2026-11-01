@@ -467,14 +467,30 @@ fn gemv(a: &Mat, x: &[f64], trans: bool) -> Vec<f64> {
 
 /// `gemm<trans_a, trans_b>` by BLAS `dgemm` (`C = op(A)·op(B)`, alpha 1, beta 0).
 fn gemm_blas(a: &Mat, b: &Mat, trans_a: bool, trans_b: bool) -> Mat {
-    let (m, k) = if trans_a { (a.cols, a.rows) } else { (a.rows, a.cols) };
+    let (m, k) = if trans_a {
+        (a.cols, a.rows)
+    } else {
+        (a.rows, a.cols)
+    };
     let n = if trans_b { b.rows } else { b.cols };
     let mut c = Mat::zeros(m, n);
     let am = lapack::blas::MatRef { off: 0, ld: a.rows };
     let bm = lapack::blas::MatRef { off: 0, ld: b.rows };
     let cm = lapack::blas::MatRef { off: 0, ld: m };
     lapack::blas::dgemm(
-        trans_a, trans_b, m, n, k, 1.0, &a.data, am, &b.data, bm, 0.0, &mut c.data, cm,
+        trans_a,
+        trans_b,
+        m,
+        n,
+        k,
+        1.0,
+        &a.data,
+        am,
+        &b.data,
+        bm,
+        0.0,
+        &mut c.data,
+        cm,
     );
     c
 }
@@ -598,7 +614,10 @@ pub fn syrk(a: &Mat) -> Mat {
 /// upper triangle holds a non-finite value. `None` when the decomposition fails (Armadillo
 /// then empties both outputs; its level-3 warning is not printed at the default level).
 pub fn eig_sym(x: &Mat, warnings: &mut Vec<String>) -> Option<(Vec<f64>, Mat)> {
-    assert_eq!(x.rows, x.cols, "eig_sym(): given matrix must be square sized");
+    assert_eq!(
+        x.rows, x.cols,
+        "eig_sym(): given matrix must be square sized"
+    );
     let n = x.rows;
     if n > 1 {
         let a1 = x.data[n - 2];

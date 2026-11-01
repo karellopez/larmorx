@@ -209,7 +209,8 @@ fn avg_affine_with_procrustes(
         let inner = times(rr, &Mat::eye(3)).plus(&arma::syrk(x_i));
         pxx_av = pxx_av.plus(&arma::mul(&p_i, &inner, false));
         if cx.debug {
-            cx.out.push_str(&format!("P_{} = \n{}\n", n + 1, print_mat(&p_i)));
+            cx.out
+                .push_str(&format!("P_{} = \n{}\n", n + 1, print_mat(&p_i)));
         }
     }
     div_count(&mut x_av, nn);
@@ -218,7 +219,8 @@ fn avg_affine_with_procrustes(
     div_count(&mut px_av, nn);
     div_count(&mut pxx_av, nn);
     if cx.debug {
-        cx.out.push_str(&format!("Pxx_av = \n{}\n", print_mat(&pxx_av)));
+        cx.out
+            .push_str(&format!("Pxx_av = \n{}\n", print_mat(&pxx_av)));
     }
     let m2 = pxx_av
         .plus(&tx_av)
@@ -332,9 +334,8 @@ fn avg_affine_with_procrustes(
         .plus(&arma::mul_tb(&u_av, &t_av));
     let ba = times(-1.0, &inner);
     // -ba * inv(aat): the inverse evaluated (Armadillo's inv), then the product with alpha -1.
-    let inv = arma::inv(&aat).map_err(|Singular| {
-        End::Caught("inv(): matrix is singular".to_owned())
-    })?;
+    let inv =
+        arma::inv(&aat).map_err(|Singular| End::Caught("inv(): matrix is singular".to_owned()))?;
     let mm = times(-1.0, &arma::mul(&ba, &inv, false));
     // -M*Px_av - M*t_av + Rx_av + u_av
     let w = times(-1.0, &mv(&mm, &px_av))
@@ -407,7 +408,9 @@ fn body(
         let det = if trans.is_empty() {
             1.0
         } else if trans.rows() != trans.cols() {
-            return Err(End::Caught("det(): given matrix must be square sized".to_owned()));
+            return Err(End::Caught(
+                "det(): given matrix must be square sized".to_owned(),
+            ));
         } else if trans.rows() > 4 {
             return Err(End::Refuse(format!(
                 "the matrix {name} is {}x{}: FSL's determinant of a matrix beyond 4 x 4 (LAPACK's \
@@ -467,10 +470,10 @@ fn body(
     };
     let mid = avg_affine_with_procrustes(&matlist, &temp_orig, 80.0, &mut cx)?;
     let outname = get("-o,--out");
-    if outname.set {
-        if let Err(e) = crate::convert_xfm::write_matrix(&mid, outname.str()) {
-            err.push_str(&e);
-        }
+    if outname.set
+        && let Err(e) = crate::convert_xfm::write_matrix(&mid, outname.str())
+    {
+        err.push_str(&e);
     }
     if verbose || !outname.set {
         cx.out.push_str(&print_mat(&mid));

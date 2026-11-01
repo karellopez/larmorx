@@ -8,12 +8,14 @@
 //! with `-3D`; FSL's argument scan, messages and exit statuses, its output in the input's data
 //! type.
 //!
-//! FSL templates the program on the input's type (`char`, `short`, `int`, `float`; `double` is
-//! refused here, not translated): the values are interpolated in single precision from the
-//! type's values (each converted to `float` where it is read, as the replica's float volume
-//! holds them: exact for `char` and `short`, and for `int` the rounding FSL applies at every
-//! read), the background value is the type's, and each result is cast to the type. Defects,
-//! each with its switch (D13):
+//! FSL templates the program on the input's type (`char`, `short`, `int`, `float`, `double`):
+//! the values are interpolated in single precision from the type's values (each converted to
+//! `float` where it is read, as the replica's float volume holds them: exact for `char` and
+//! `short`, and for `int` and `double` the rounding FSL applies at every read), except where
+//! the type's own arithmetic shows: a `double` image's sinc sums add each product in double
+//! precision and its spline coefficients are held in double precision; an integer image's
+//! spline coefficients and values are the type's (FSL-79). The background value is the type's,
+//! and each result is cast to the type. Defects, each with its switch (D13):
 //! - FSL-09: an integer output is the interpolated value truncated toward zero (and wrapped out
 //!   of range); rounded and clamped by default, FSL's cast with `reproduce`; an int8 input is
 //!   written as uint8 (the type's bits kept), as int8 by default.
@@ -23,18 +25,20 @@
 //!   `-3D`'s rectangular kernel of width 9 is replaced by the default blackman kernel of width
 //!   7 defined just before it; the rectangular kernel by default, FSL's with `reproduce`.
 //! - FSL-79: spline interpolation of an integer image stores its spline coefficients in the
-//!   image's type (truncated toward zero); kept in single precision by default (the float
-//!   image's coefficients), truncated with `reproduce`.
+//!   image's type (`(T)(c + 0.5)`: rounded half up, and toward zero below -0.5) and converts each
+//!   interpolated value to the type (truncated toward zero) before the output's cast; the float
+//!   image's coefficients and values by default, FSL's with `reproduce`.
 
 use std::io::Write;
 
 use larmorx_core::defects::{self, Notice, UpstreamDefects};
 use larmorx_nc_core::arma::Mat;
+use larmorx_nc_core::cnum;
 use larmorx_nc_core::interp::SplineCoefs;
 use larmorx_nc_core::kernel;
 use larmorx_nc_core::miscmaths::{self, MatrixFileError};
-use larmorx_nc_core::nifti::{self, dt};
 use larmorx_nc_core::newimagefns;
+use larmorx_nc_core::nifti::{self, dt};
 use larmorx_nc_core::settings::Settings;
 use larmorx_nc_core::volume::{
     self, BorderBuffer, Conversion, Elem, Extrapolation, FslError, Interpolation, SaveError,
@@ -216,8 +220,8 @@ impl Run<'_> {
         defects::push_once(&mut self.notices, Notice::new(d, self.mode, detail));
     }
 
-    /// The background value of `vin` (`backgroundval()`) with FSL-75's switch.
-    fn padvalue(&mut self, vin: &Volume) -> Result<f32, End> {
+    /// The background value of `vin` (`backgroundval()`, in its type) with FSL-75's switch.
+    fn padvalue<T: Elem>(&mut self, vin: &Volume<T>) -> Result<T, End> {
         match vin.background_buffer() {
             BorderBuffer::Empty => Err(End::Refuse(
                 "the background value of a 1 x 1 x 1 volume: FSL reads an empty buffer (FSL-75)"
@@ -226,35 +230,44 @@ impl Run<'_> {
             BorderBuffer::Overflow { numbins, written } => {
                 let (fsl, _) = vin.background_value_with(false);
                 let (whole, _) = vin.background_value_with(true);
-                if fsl.to_bits() != whole.to_bits() {
-                    self.notice(
-                        &defects::FSL_75,
-                        format!(
-                            "the background value's buffer holds {numbins} of the border's \
-                             {written} values: {}",
-                            if self.mode.fix() {
-                                format!("the whole border's value {whole} is used (FSL: {fsl})")
-                            } else {
-                                format!("the value of those that fit, {fsl}, as FSL")
-                            }
-                        ),
-                    );
-                }
+                // as flirt's: named whenever FSL writes past the buffer (it may abort or crash
+                // later), whatever the value
+                self.notice(
+                    &defects::FSL_75,
+                    format!(
+                        "the background value of a {} x {} x {} volume: applyxfm4D writes \
+                         {written} border values into a buffer of {numbins} (heap corruption; \
+                         applyxfm4D may abort or crash later) and takes the 10th percentile of \
+                         the {numbins} that fit ({}); of the whole border it is {}",
+                        vin.xsize(),
+                        vin.ysize(),
+                        vin.zsize(),
+                        cnum::stream(fsl.to_f64()),
+                        cnum::stream(whole.to_f64())
+                    ),
+                );
                 Ok(if self.mode.fix() { whole } else { fsl })
             }
             BorderBuffer::Exact => Ok(vin.backgroundval()),
         }
     }
 
-    /// `affine_transform(vin, vout, aff, 0, true)` for a volume of the input's type held in
-    /// single precision: the background value as padding, extraslice extrapolation.
-    fn transform(
+    /// `affine_transform(vin, vout, aff, 0, true)` for a volume of the input's type (`vin_t`)
+    /// held in single precision (`vin`): the background value as padding, extraslice
+    /// extrapolation. `data64` holds the voxels of a `double` image (`double`: true) in double
+    /// precision, or an integer image's for its spline coefficients with `reproduce`. Returns
+    /// the background value in the type and the voxels `affine_transform_mask` sets to it.
+    #[allow(clippy::too_many_arguments)]
+    fn transform<T: Elem>(
         &mut self,
         vin: &Volume,
+        vin_t: &Volume<T>,
+        data64: Option<&[f64]>,
+        double: bool,
         vout: &mut Volume,
         aff: &Mat,
         integer: Option<SaveType>,
-    ) -> Result<(), End> {
+    ) -> Result<(T, Vec<usize>), End> {
         if aff.rows() != 4 || aff.cols() != 4 {
             return Err(End::Terminate {
                 printed: String::new(),
@@ -267,43 +280,107 @@ impl Run<'_> {
             });
         }
         let mut src = vin.clone();
-        src.padvalue = self.padvalue(vin)?;
+        let padval = self.padvalue(vin_t)?;
+        // the extrapolated values reach the output through interpolate's float
+        src.padvalue = padval.to_f32();
         src.extrap = Extrapolation::Extraslice;
-        let coefs = if src.interp == Interpolation::Spline {
-            Some(self.spline_coefs(&src, integer))
+        let (coefs, alt) = if src.interp == Interpolation::Spline {
+            match (double, data64, integer) {
+                (true, Some(d), _) => (Some(SplineCoefs::new_f64(&src, d, &|c: f64| c)), None),
+                (_, _, Some(ty)) => {
+                    let (chosen, other) = self.spline_coefs(&src, data64, ty);
+                    (Some(chosen), Some(other))
+                }
+                _ => (Some(SplineCoefs::new(&src)), None),
+            }
         } else {
-            None
+            (None, None)
         };
-        newimagefns::raw_affine_transform_coefs(&src, vout, aff, coefs.as_ref())?;
-        newimagefns::affine_transform_mask(&src, vout, aff, 0.0, src.padvalue)?;
-        Ok(())
+        let before = alt.as_ref().map(|_| vout.clone());
+        let resample = |vout: &mut Volume, coefs: Option<&SplineCoefs>| match (double, data64) {
+            (true, Some(d)) => newimagefns::raw_affine_transform_double(&src, d, vout, aff, coefs),
+            _ => newimagefns::raw_affine_transform_coefs(&src, vout, aff, coefs),
+        };
+        resample(vout, coefs.as_ref())?;
+        if let (Some(alt), Some(mut other)) = (alt, before) {
+            // FSL-79 named only where FSL's coefficients and values change the result
+            resample(&mut other, Some(&alt))?;
+            if other
+                .data
+                .iter()
+                .zip(&vout.data)
+                .any(|(a, b)| a.to_bits() != b.to_bits())
+            {
+                self.notice(
+                    &defects::FSL_79,
+                    if self.mode.fix() {
+                        "the spline coefficients and values of the integer image are kept in \
+                         single precision (applyxfm4D holds them in the image's type)"
+                            .to_owned()
+                    } else {
+                        "the spline coefficients and values are those of the image's integer \
+                         type, as in applyxfm4D"
+                            .to_owned()
+                    },
+                );
+            }
+        }
+        let outside = newimagefns::affine_transform_mask_indices(&src, vout, aff, 0.0)?;
+        for &i in &outside {
+            vout.data[i] = src.padvalue;
+        }
+        Ok((padval, outside))
     }
 
-    /// The spline coefficients: FSL-79 for an integer image.
-    fn spline_coefs(&mut self, src: &Volume, integer: Option<SaveType>) -> SplineCoefs {
+    /// The spline coefficients of an integer image of type `ty` (`data64` its values in double
+    /// precision): the float image's (FSL-79 corrected) and FSL's, the one the mode uses first.
+    fn spline_coefs(
+        &mut self,
+        src: &Volume,
+        data64: Option<&[f64]>,
+        ty: SaveType,
+    ) -> (SplineCoefs, SplineCoefs) {
         let float = SplineCoefs::new(src);
-        let Some(ty) = integer else {
-            return float;
+        let owned;
+        let data = match data64 {
+            Some(d) => d,
+            None => {
+                owned = src.data.iter().map(|&v| f64::from(v)).collect::<Vec<f64>>();
+                &owned
+            }
         };
-        let stored = SplineCoefs::new_stored(src, &|c: f64| match ty {
-            SaveType::Char => f64::from(i8::from_f64(c)),
-            SaveType::Short => f64::from(i16::from_f64(c)),
-            _ => f64::from(i32::from_f64(c)),
-        });
-        if !float.same_as(&stored) {
-            self.notice(
-                &defects::FSL_79,
-                if self.mode.fix() {
-                    "the spline coefficients of the integer image are kept in single precision"
-                        .to_owned()
-                } else {
-                    "the spline coefficients are truncated to the image's integer type, as FSL"
-                        .to_owned()
-                },
-            );
+        // SplineColumn::Set: `static_cast<T>(_col[i] + 0.5)`; Splinterpolator's value
+        // `static_cast<T>(value_at(coord))`.
+        let (store, cast): (F64Map, F64Map) = match ty {
+            SaveType::Char => (
+                |c| f64::from(i8::from_f64(c + 0.5)),
+                |v| f64::from(i8::from_f64(v)),
+            ),
+            SaveType::Short => (
+                |c| f64::from(i16::from_f64(c + 0.5)),
+                |v| f64::from(i16::from_f64(v)),
+            ),
+            _ => (
+                |c| f64::from(i32::from_f64(c + 0.5)),
+                |v| f64::from(i32::from_f64(v)),
+            ),
+        };
+        let stored = SplineCoefs::new_f64(src, data, &store).with_cast(cast);
+        if self.mode.fix() {
+            (float, stored)
+        } else {
+            (stored, float)
         }
-        if self.mode.fix() { float } else { stored }
     }
+}
+
+/// A conversion of a double (a coefficient or value to the image's type).
+type F64Map = fn(f64) -> f64;
+
+/// Volume `m`'s values in double precision when the arithmetic needs them: a `double` image's
+/// always, an integer image's for its spline coefficients (FSL-79).
+fn data64_of<T: Elem>(v: &Volume<T>, double: bool, spline_int: bool) -> Option<Vec<f64>> {
+    (double || spline_int).then(|| v.data.iter().map(|&x| x.to_f64()).collect())
 }
 
 /// The output values in the input's type: `(T) value` (FSL's cast) or FSL-09's rounding.
@@ -340,16 +417,21 @@ fn typed_main<T: Elem>(
     r: &mut Run,
     out: &mut String,
 ) -> Result<(), End> {
+    let double = T::DTYPE == dt::DOUBLE;
+    let spline_int = integer.is_some() && o.interp == Interp::Spline;
+    let method = match o.interp {
+        Interp::Nearest => Interpolation::NearestNeighbour,
+        Interp::Trilinear => Interpolation::Trilinear,
+        Interp::Sinc => Interpolation::Sinc,
+        Interp::Spline => Interpolation::Spline,
+    };
     let set_interp = |v: &mut Volume, msgs: &mut Vec<String>, window: &str, w: i32| {
         v.extrap = Extrapolation::Extraslice;
-        v.interp = match o.interp {
-            Interp::Nearest => Interpolation::NearestNeighbour,
-            Interp::Trilinear => Interpolation::Trilinear,
-            Interp::Sinc => Interpolation::Sinc,
-            Interp::Spline => Interpolation::Spline,
-        };
+        v.interp = method;
         if o.interp == Interp::Sinc {
-            v.kernel = Some(std::sync::Arc::new(kernel::sinc_kernel(window, w, 1201, msgs)));
+            v.kernel = Some(std::sync::Arc::new(kernel::sinc_kernel(
+                window, w, 1201, msgs,
+            )));
         }
     };
     let conv = if integer.is_some() && r.mode.fix() {
@@ -362,16 +444,17 @@ fn typed_main<T: Elem>(
         if integer.is_some() && !fsl09 {
             let a: Vec<T> = to_type::<T>(v, Conversion::X86Cast);
             let b: Vec<T> = to_type::<T>(v, Conversion::RoundClamp);
-            if a.iter().zip(&b).any(|(x, y)| x.to_f64().to_bits() != y.to_f64().to_bits()) {
+            if a.iter()
+                .zip(&b)
+                .any(|(x, y)| x.to_f64().to_bits() != y.to_f64().to_bits())
+            {
                 fsl09 = true;
             }
         }
     };
-    let result: Volume<T>;
-    if o.fourd {
-        let (inv_t, _, _) = volume::read_volume4d::<T>(&o.iname, settings)?;
-        let mut invol = Volume::<f32>::copyconvert(&inv_t);
-        drop(inv_t);
+    let result: Volume<T> = if o.fourd {
+        // The series stays in its type (as FSL holds it); each volume is converted on its own.
+        let (invol, _, _) = volume::read_volume4d::<T>(&o.iname, settings)?;
         if o.verbose {
             out.push_str(&format!(
                 "using interpolation method (enum, string): {}, {}\n",
@@ -380,7 +463,9 @@ fn typed_main<T: Elem>(
             ));
         }
         let mut msgs = Vec::new();
-        set_interp(&mut invol, &mut msgs, "b", 7);
+        let mut first_vol = Volume::<f32>::new(1, 1, 1, 1);
+        set_interp(&mut first_vol, &mut msgs, "b", 7);
+        let sinc = first_vol.kernel.take();
         for m in &msgs {
             r.err.push_str(m);
             r.err.push('\n');
@@ -397,16 +482,13 @@ fn typed_main<T: Elem>(
         }
         let (mint, maxt) = (0i64, invol.tsize() - 1);
         if maxt - mint > 10000 {
-            r.err.push_str("WARNING:: More than 10000 volumes - only doing first 10000\n");
+            r.err
+                .push_str("WARNING:: More than 10000 volumes - only doing first 10000\n");
         }
         let last = maxt.min(mint + 10000);
         let count = (last - mint + 1).max(0);
-        let mut outvol = Volume::<T>::new(
-            refvol.xsize(),
-            refvol.ysize(),
-            refvol.zsize(),
-            count.max(1),
-        );
+        let mut outvol =
+            Volume::<T>::new(refvol.xsize(), refvol.ysize(), refvol.zsize(), count.max(1));
         let mut first = true;
         for m in mint..=last {
             if !o.singlematrix {
@@ -416,11 +498,29 @@ fn typed_main<T: Elem>(
                 affmat = read_matrix(&matname, r.err)?;
             }
             let mut dummy = refvol.clone();
-            let vin = invol.sub_volume(m)?;
-            r.transform(&vin, &mut dummy, &affmat, integer)?;
+            let vin_t = invol.sub_volume(m)?;
+            let mut vin = Volume::<f32>::copyconvert(&vin_t);
+            vin.extrap = Extrapolation::Extraslice;
+            vin.interp = method;
+            vin.kernel = sinc.clone();
+            let d64 = data64_of(&vin_t, double, spline_int);
+            let (padval, outside) = r.transform(
+                &vin,
+                &vin_t,
+                d64.as_deref(),
+                double,
+                &mut dummy,
+                &affmat,
+                integer,
+            )?;
+            drop(vin_t);
             check09(&dummy);
             let mut typed = Volume::<T>::copyconvert(&dummy);
             typed.data = to_type::<T>(&dummy, conv);
+            // affine_transform_mask writes the background value in the type
+            for i in outside {
+                typed.data[i] = padval;
+            }
             if first {
                 outvol.copy_properties(&typed);
                 first = false;
@@ -428,7 +528,7 @@ fn typed_main<T: Elem>(
             outvol.set_sub_volume(m - mint, &typed)?;
         }
         outvol.pixdims[3] = invol.tdim().abs();
-        result = outvol;
+        outvol
     } else {
         let (in_t, warning) = volume::read_volume::<T>(&o.iname, settings)?;
         if let Some(w) = warning {
@@ -436,6 +536,7 @@ fn typed_main<T: Elem>(
             r.err.push('\n');
         }
         let mut invol = Volume::<f32>::copyconvert(&in_t);
+        let d64 = data64_of(&in_t, double, spline_int);
         let (out_t, warning) = volume::read_volume::<T>(&o.refname, settings)?;
         if let Some(w) = warning {
             r.err.push_str(&w);
@@ -447,25 +548,18 @@ fn typed_main<T: Elem>(
         // (blackman, width 7), and the kernel cache's comparison holds kernels of other widths
         // the same, so definesincinterpolation("r", 9) gets the cached blackman kernel back.
         // The rectangular kernel of width 9 by default; FSL's blackman 7 with reproduce.
+        let mut alt_in = None;
         if o.interp == Interp::Sinc {
-            let fix = r.mode.fix();
-            r.notice(
-                &defects::FSL_80,
-                if fix {
-                    "-3D's sinc kernel is the rectangular one of width 9 the program defines \
-                     (applyxfm4D uses the default blackman kernel of width 7)"
-                        .to_owned()
-                } else {
-                    "-3D's sinc kernel is the cached blackman kernel of width 7, as in \
-                     applyxfm4D (not the rectangular one of width 9 it defines)"
-                        .to_owned()
-                },
-            );
-            if fix {
+            let mut other = invol.clone();
+            let mut unused = Vec::new();
+            if r.mode.fix() {
                 set_interp(&mut invol, &mut msgs, "r", 9);
+                set_interp(&mut other, &mut unused, "b", 7);
             } else {
                 set_interp(&mut invol, &mut msgs, "b", 7);
+                set_interp(&mut other, &mut unused, "r", 9);
             }
+            alt_in = Some(other);
         } else {
             set_interp(&mut invol, &mut msgs, "r", 9);
         }
@@ -474,13 +568,56 @@ fn typed_main<T: Elem>(
             r.err.push('\n');
         }
         let affmat = read_matrix(&o.transname, r.err)?;
-        r.transform(&invol, &mut outvol, &affmat, integer)?;
+        let before = alt_in.as_ref().map(|_| outvol.clone());
+        let (padval, outside) = r.transform(
+            &invol,
+            &in_t,
+            d64.as_deref(),
+            double,
+            &mut outvol,
+            &affmat,
+            integer,
+        )?;
+        if let (Some(alt_in), Some(mut other)) = (alt_in, before) {
+            // FSL-80 named only where the kernel changes the result
+            r.transform(
+                &alt_in,
+                &in_t,
+                d64.as_deref(),
+                double,
+                &mut other,
+                &affmat,
+                integer,
+            )?;
+            if other
+                .data
+                .iter()
+                .zip(&outvol.data)
+                .any(|(a, b)| a.to_bits() != b.to_bits())
+            {
+                r.notice(
+                    &defects::FSL_80,
+                    if r.mode.fix() {
+                        "-3D's sinc kernel is the rectangular one of width 9 the program defines \
+                         (applyxfm4D uses the default blackman kernel of width 7)"
+                            .to_owned()
+                    } else {
+                        "-3D's sinc kernel is the cached blackman kernel of width 7, as in \
+                         applyxfm4D (not the rectangular one of width 9 it defines)"
+                            .to_owned()
+                    },
+                );
+            }
+        }
         check09(&outvol);
         outvol.pixdims[3] = in_t.tdim().abs();
         let mut typed = Volume::<T>::copyconvert(&outvol);
         typed.data = to_type::<T>(&outvol, conv);
-        result = typed;
-    }
+        for i in outside {
+            typed.data[i] = padval;
+        }
+        typed
+    };
     if fsl09 {
         r.notice(
             &defects::FSL_09,
@@ -517,7 +654,14 @@ fn typed_main<T: Elem>(
             "int8 data are written as int8 (applyxfm4D writes them as uint8)".to_owned(),
         );
         let f = Volume::<f32>::copyconvert(&result);
-        f.save_typed(&o.oname, SaveType::Int8, Conversion::X86Cast, settings, &opts, None)
+        f.save_typed(
+            &o.oname,
+            SaveType::Int8,
+            Conversion::X86Cast,
+            settings,
+            &opts,
+            None,
+        )
     } else {
         if int8_input {
             r.notice(
@@ -540,12 +684,7 @@ fn typed_main<T: Elem>(
     }
 }
 
-fn body(
-    args: &[String],
-    settings: &Settings,
-    out: &mut String,
-    r: &mut Run,
-) -> Result<(), End> {
+fn body(args: &[String], settings: &Settings, out: &mut String, r: &mut Run) -> Result<(), End> {
     if args.len() < 4 {
         r.err.push_str(&usage());
         return Err(End::Exit(255));
@@ -565,11 +704,7 @@ fn body(
         dt::SIGNED_SHORT => typed_main::<i16>(&o, settings, Some(SaveType::Short), false, r, out),
         dt::SIGNED_INT => typed_main::<i32>(&o, settings, Some(SaveType::Int), false, r, out),
         dt::FLOAT => typed_main::<f32>(&o, settings, None, false, r, out),
-        _ => Err(End::Refuse(
-            "a double-precision input: applyxfm4D's double template (its interpolation in double \
-             precision) is not translated"
-                .to_owned(),
-        )),
+        _ => typed_main::<f64>(&o, settings, None, false, r, out),
     }
 }
 

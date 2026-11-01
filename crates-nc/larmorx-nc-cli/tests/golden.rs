@@ -1297,7 +1297,11 @@ fn write_bet_inputs(dir: &Path) -> BTreeMap<&'static str, PathBuf> {
     // pointflirt's points (exact decimals) and their images, a matrix per volume of the 4D
     // head (applyxfm4D's MAT_0000n) and a text file (extracttxt)
     let p = dir.join("pts_in.txt");
-    std::fs::write(&p, "10 20 30\n-12 5 40\n33 -7 12\n0 0 0\n25 25 -10\n-8 -30 22\n").unwrap();
+    std::fs::write(
+        &p,
+        "10 20 30\n-12 5 40\n33 -7 12\n0 0 0\n25 25 -10\n-8 -30 22\n",
+    )
+    .unwrap();
     paths.insert("pts_in", p);
     let p = dir.join("pts_ref.txt");
     std::fs::write(
@@ -1309,11 +1313,17 @@ fn write_bet_inputs(dir: &Path) -> BTreeMap<&'static str, PathBuf> {
     let mats = dir.join("mats");
     std::fs::create_dir_all(&mats).unwrap();
     for k in 0..4 {
-        std::fs::write(mats.join(format!("MAT_0000{k}")), if k % 2 == 0 { init } else { mat }).unwrap();
+        std::fs::write(
+            mats.join(format!("MAT_0000{k}")),
+            if k % 2 == 0 { init } else { mat },
+        )
+        .unwrap();
     }
     paths.insert("mats", mats);
     let p = dir.join("text.txt");
-    let text: String = (1..=8).map(|k| format!("line {k} value {}\n", 3 * k)).collect();
+    let text: String = (1..=8)
+        .map(|k| format!("line {k} value {}\n", 3 * k))
+        .collect();
     std::fs::write(&p, text).unwrap();
     paths.insert("txt", p);
     paths

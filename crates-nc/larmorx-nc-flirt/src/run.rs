@@ -3275,7 +3275,10 @@ impl Flirt<'_> {
             self.el("Pointer to impair is (set)");
             // set_debug_mode(true): with the bbr cost each evaluation fills the debug volume
             // and saves it as `debug` (save_volume4D: the last evaluation's).
-            let bbr_debug = self.impair.as_ref().is_some_and(|p| p.costtype == CostType::Bbr);
+            let bbr_debug = self
+                .impair
+                .as_ref()
+                .is_some_and(|p| p.costtype == CostType::Bbr);
             if bbr_debug {
                 let d = bbr::BbrDebug::new(self.slot_vol(self.pair().ref_slot));
                 if let Some(p) = self.impair.as_mut() {

@@ -60,7 +60,10 @@ pub fn pairreg(
             "Usage: pairreg brain1 brain2 skull1 skull2 outputmatrix [extra flirt args]"
         );
         let _ = writeln!(out);
-        let _ = writeln!(out, "  NB: brain1 and skull1 are used as -ref arguments internally");
+        let _ = writeln!(
+            out,
+            "  NB: brain1 and skull1 are used as -ref arguments internally"
+        );
         return 1;
     }
     let words = |v: &str| split_words(v);
@@ -242,8 +245,25 @@ fn parse_bre(p: &[u8]) -> Result<Regex, String> {
                 let Some(&n) = p.get(i + 1) else {
                     return Err("a trailing backslash".to_owned());
                 };
-                if matches!(n, b'(' | b')' | b'{' | b'}' | b'|' | b'+' | b'?' | b'<' | b'>' | b'b' | b'B' | b'w' | b'W' | b's' | b'S' | b'`' | b'\'')
-                    || n.is_ascii_digit()
+                if matches!(
+                    n,
+                    b'(' | b')'
+                        | b'{'
+                        | b'}'
+                        | b'|'
+                        | b'+'
+                        | b'?'
+                        | b'<'
+                        | b'>'
+                        | b'b'
+                        | b'B'
+                        | b'w'
+                        | b'W'
+                        | b's'
+                        | b'S'
+                        | b'`'
+                        | b'\''
+                ) || n.is_ascii_digit()
                 {
                     return Err(format!("the extension \\{}", char::from(n)));
                 }
@@ -303,12 +323,97 @@ impl Regex {
 
 /// A shell integer argument of `[` and `dc` (an optional sign and decimal digits).
 fn integer(s: &str) -> Option<i64> {
-    let t = s.strip_prefix('+').unwrap_or(s);
-    if t.is_empty() || !t.trim_start_matches('-').bytes().all(|b| b.is_ascii_digit()) {
+    let t = s.strip_prefix(['+', '-']).unwrap_or(s);
+    if t.is_empty() || !t.bytes().all(|b| b.is_ascii_digit()) {
         return None;
     }
-    t.parse().ok()
+    let v: i64 = t.parse().ok()?;
+    // dc's results stay far inside i64 (a line number plus two arguments)
+    if v > i64::MAX / 4 {
+        return None;
+    }
+    Some(if s.starts_with('-') { -v } else { v })
 }
+
+/// GNU dc 1.4.1 on `expr` (numbers, `+`, `-`, `p`, blanks): a `+` or `-` that finds fewer
+/// than two numbers on the stack writes "dc: stack empty" and does nothing, so the sign of a
+/// signed number is a command and its digits a separate number. Returns the number `p`
+/// prints (dc prints a negative one as `-N`).
+fn dc(expr: &str, err: &mut dyn Write) -> Option<i64> {
+    let mut stack: Vec<i64> = Vec::new();
+    let mut printed = None;
+    let b = expr.as_bytes();
+    let mut i = 0;
+    while i < b.len() {
+        match b[i] {
+            b'0'..=b'9' => {
+                let start = i;
+                while i < b.len() && b[i].is_ascii_digit() {
+                    i += 1;
+                }
+                stack.push(expr[start..i].parse().ok()?);
+                continue;
+            }
+            c @ (b'+' | b'-') => {
+                if stack.len() < 2 {
+                    let _ = writeln!(err, "dc: stack empty");
+                } else {
+                    let y = stack.pop()?;
+                    let x = stack.pop()?;
+                    stack.push(if c == b'+' { x + y } else { x - y });
+                }
+            }
+            b'p' => printed = stack.last().copied(),
+            _ => {}
+        }
+        i += 1;
+    }
+    printed
+}
+
+/// GNU sed 4.8's usage text after an unknown option (on standard error, exit status 1).
+const SED_USAGE: &str = "Usage: sed [OPTION]... {script-only-if-no-other-script} [input-file]...
+
+  -n, --quiet, --silent
+                 suppress automatic printing of pattern space
+      --debug
+                 annotate program execution
+  -e script, --expression=script
+                 add the script to the commands to be executed
+  -f script-file, --file=script-file
+                 add the contents of script-file to the commands to be executed
+  --follow-symlinks
+                 follow symlinks when processing in place
+  -i[SUFFIX], --in-place[=SUFFIX]
+                 edit files in place (makes backup if SUFFIX supplied)
+  -l N, --line-length=N
+                 specify the desired line-wrap length for the `l' command
+  --posix
+                 disable all GNU extensions.
+  -E, -r, --regexp-extended
+                 use extended regular expressions in the script
+                 (for portability use POSIX -E).
+  -s, --separate
+                 consider files as separate rather than as a single,
+                 continuous long stream.
+      --sandbox
+                 operate in sandbox mode (disable e/r/w commands).
+  -u, --unbuffered
+                 load minimal amounts of data from the input files and flush
+                 the output buffers more often
+  -z, --null-data
+                 separate lines by NUL characters
+      --help     display this help and exit
+      --version  output version information and exit
+
+If no -e, --expression, -f, or --file option is given, then the first
+non-option argument is taken as the sed script to interpret.  All
+remaining arguments are names of input files; if no input files are
+specified, then the standard input is read.
+
+GNU sed home page: <https://www.gnu.org/software/sed/>.
+General help using GNU software: <https://www.gnu.org/gethelp/>.
+";
 
 /// `extracttxt search_word file [num_trailing_lines [relative_start]]`.
 pub fn extracttxt(
@@ -330,27 +435,39 @@ pub fn extracttxt(
         return 2;
     }
     let (word, file) = (&args[0], &args[1]);
-    if word.is_empty() || file.is_empty() || word.contains([' ', '\t', '\n']) || file.contains([' ', '\t', '\n']) {
+    if word.is_empty()
+        || file.is_empty()
+        || word.contains([' ', '\t', '\n'])
+        || file.contains([' ', '\t', '\n'])
+    {
         return refuse(
             err,
             "an empty word or one with blanks: the script passes $1 and $2 to grep unquoted",
         );
     }
     if word.starts_with('-') {
-        return refuse(err, "a search word starting with '-': grep reads it as an option");
+        return refuse(
+            err,
+            "a search word starting with '-': grep reads it as an option",
+        );
     }
     let re = match parse_bre(word.as_bytes()) {
         Ok(r) => r,
-        Err(e) => return refuse(err, &format!("the search word's regular expression has {e}")),
+        Err(e) => {
+            return refuse(
+                err,
+                &format!("the search word's regular expression has {e}"),
+            );
+        }
     };
     let n3 = args.get(2).map(|s| (s, integer(s)));
     let n4 = args.get(3).map(|s| (s, integer(s)));
-    if n3.as_ref().is_some_and(|(_, v)| v.is_none_or(|v| v < 0))
+    if n3.as_ref().is_some_and(|(_, v)| v.is_none())
         || n4.as_ref().is_some_and(|(_, v)| v.is_none())
     {
         return refuse(
             err,
-            "num_trailing_lines must be a non-negative integer and relative_start an integer",
+            "num_trailing_lines and relative_start must be integers",
         );
     }
     let text = match std::fs::read(file) {
@@ -361,22 +478,44 @@ pub fn extracttxt(
         }
     };
     if text.contains(&0u8) {
-        return refuse(err, "a binary file (grep reports a match without its line number)");
+        return refuse(
+            err,
+            "a binary file (grep reports a match without its line number)",
+        );
     }
     let mut lines: Vec<&[u8]> = text.split(|&b| b == b'\n').collect();
     if text.ends_with(b"\n") {
         lines.pop();
     }
-    let Some(num) = lines.iter().position(|l| re.is_match(l)).map(|k| k as i64 + 1) else {
+    let Some(num) = lines
+        .iter()
+        .position(|l| re.is_match(l))
+        .map(|k| k as i64 + 1)
+    else {
         return 0;
     };
+    // the script's arithmetic, in dc on the arguments as given
     let mut num1 = match n4 {
-        Some((_, Some(v))) => num + v,
+        Some((s4, Some(v4))) => {
+            let expr = if v4 >= 0 {
+                format!("{num} {s4} + p")
+            } else {
+                format!("0 0 {s4} - {num} + p")
+            };
+            match dc(&expr, err) {
+                Some(v) => v,
+                None => return refuse(err, "relative_start out of range"),
+            }
+        }
         _ => num,
     };
     let num2: Option<i64> = match n3 {
-        Some((_, Some(v))) => {
-            let n2 = num1 + v - 1;
+        Some((s3, Some(_))) => {
+            // dc prints a negative num1 as `-N`, and reading it back takes the `-` for its
+            // subtraction command
+            let Some(n2) = dc(&format!("{num1} {s3} + 1 - p"), err) else {
+                return refuse(err, "num_trailing_lines out of range");
+            };
             if n2 < num1 {
                 num1 = n2;
             }
@@ -385,12 +524,12 @@ pub fn extracttxt(
         _ => None,
     };
     // sed -n "$num1,$num2"p $2
-    let expr = format!(
-        "{num1},{}p",
-        num2.map_or("$".to_owned(), |v| v.to_string())
-    );
+    let expr = format!("{num1},{}p", num2.map_or("$".to_owned(), |v| v.to_string()));
     if num1 < 0 {
-        let _ = writeln!(err, "sed: -e expression #1, char 1: unknown command: `-'");
+        // the range starts with `-`: sed reads it as options, its first digit an unknown one
+        let digit = expr.chars().nth(1).unwrap_or('-');
+        let _ = writeln!(err, "sed: invalid option -- '{digit}'");
+        let _ = err.write_all(SED_USAGE.as_bytes());
         return 1;
     }
     if num1 == 0 {
@@ -399,11 +538,6 @@ pub fn extracttxt(
             "sed: -e expression #1, char {}: invalid usage of line address 0",
             expr.len()
         );
-        return 1;
-    }
-    if num2.is_some_and(|v| v < 0) {
-        let at = format!("{num1},").len() + 1;
-        let _ = writeln!(err, "sed: -e expression #1, char {at}: unexpected `,'");
         return 1;
     }
     let first = num1 as usize;
@@ -448,7 +582,17 @@ fn gemv4(a: &[[f64; 4]; 4], x: &[f64; 4]) -> [f64; 4] {
         }
     }
     let mut y = [0.0f64; 4];
-    blas::dgemv_t(4, 4, 1.0, &view, MatRef { off: 0, ld: 4 }, x, 1, 0.0, &mut y);
+    blas::dgemv_t(
+        4,
+        4,
+        1.0,
+        &view,
+        MatRef { off: 0, ld: 4 },
+        x,
+        1,
+        0.0,
+        &mut y,
+    );
     y
 }
 

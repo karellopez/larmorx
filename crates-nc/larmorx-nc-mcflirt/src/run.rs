@@ -19,8 +19,8 @@ use larmorx_nc_core::optimise;
 use larmorx_nc_core::settings::Settings;
 use larmorx_nc_core::sse;
 use larmorx_nc_core::volume::{
-    self, Background, BorderBuffer, Conversion, Extrapolation, FslError, Interpolation, NanOrder, SaveError,
-    SaveOptions, SaveType, Volume,
+    self, Background, BorderBuffer, Conversion, Extrapolation, FslError, Interpolation, NanOrder,
+    SaveError, SaveOptions, SaveType, Volume,
 };
 use rayon::prelude::*;
 

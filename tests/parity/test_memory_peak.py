@@ -248,6 +248,10 @@ FLIRT_CASES = [
         "-init {init} -schedule {bbr} -wmseg {wm}",
     ),
     ("dof12", "flirt", "-in {epi} -ref {t1} -out out -omat out.mat"),
+    # no output volume: the peak is the reference's blur (each pass's input released)
+    ("omat-only", "flirt", "-in {epi} -ref {t1} -omat out.mat"),
+    # weights: the weighted filter's temporaries released once used
+    ("inweight", "flirt", "-in {epi} -ref {t1} -inweight {epi} -nosearch -omat out.mat"),
     ("avscale-volume", "avscale", "--allparams {init} {t1}"),
     ("rmsdiff-mask", "rmsdiff", "{init} {init} {t1} {wm}"),
 ]

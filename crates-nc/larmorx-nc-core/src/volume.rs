@@ -1997,6 +1997,39 @@ mod tests {
     use super::*;
 
     #[test]
+    fn background_undefined_shapes() {
+        // FSL-75: x = 3 (y or z at least 2), y = 3 (z at least 2, x not 2 or 4), 1 x 1 x 1
+        let shape = |x: i64, y: i64, z: i64| Volume::<f32>::new7([x, y, z, 1, 1, 1, 1]);
+        for (x, y, z) in [
+            (3, 2, 1),
+            (3, 1, 2),
+            (3, 10, 10),
+            (1, 3, 2),
+            (5, 3, 2),
+            (10, 3, 10),
+        ] {
+            let why = shape(x, y, z).background_undefined().expect("undefined");
+            assert!(why.contains("heap corruption, FSL-75"), "{why}");
+        }
+        assert!(
+            shape(1, 1, 1)
+                .background_undefined()
+                .unwrap()
+                .contains("empty buffer (FSL-75)")
+        );
+        for (x, y, z) in [
+            (3, 1, 1),
+            (2, 3, 5),
+            (4, 3, 5),
+            (10, 10, 3),
+            (8, 1, 1),
+            (2, 2, 2),
+        ] {
+            assert_eq!(shape(x, y, z).background_undefined(), None, "{x} {y} {z}");
+        }
+    }
+
+    #[test]
     fn basenames_and_paths() {
         assert_eq!(make_basename("a/b.nii.gz"), "a/b");
         assert_eq!(make_basename("a/b.img.gz"), "a/b");

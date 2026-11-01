@@ -653,6 +653,33 @@ mod tests {
     use super::*;
 
     #[test]
+    fn quaternion_round_trip_and_messages() {
+        let centre = Mat::col(&[10.0, 20.0, 30.0]);
+        let p = Mat::col(&[
+            0.01, -0.02, 0.03, 1.0, -2.0, 0.5, 1.0, 1.0, 1.0, 0.0, 0.0, 0.0,
+        ]);
+        let mut msgs = Vec::new();
+        let a = compose_aff_quat(&p, 6, &centre, &mut msgs);
+        assert!(msgs.is_empty());
+        let q = decompose_aff_quat(&a, &centre);
+        for k in 0..6 {
+            assert!((q[k] - p.get(k)).abs() < 1e-6, "{k}: {} {}", q[k], p.get(k));
+        }
+        // components beyond the unit sphere: the message, the identity rotation
+        let big = Mat::col(&[0.9, 0.5, 0.1, 1.0, 2.0, 3.0, 1.0, 1.0, 1.0, 0.0, 0.0, 0.0]);
+        let r = construct_rotmat_quat(&big, 6, &centre, &mut msgs);
+        assert_eq!(
+            msgs,
+            ["Parameters do not form a valid axis - greater than unity"]
+        );
+        assert_eq!(r, Mat::eye(4));
+        // fewer than three parameters: the message, the rotation still built
+        msgs.clear();
+        let _ = construct_rotmat_quat(&p, 2, &centre, &mut msgs);
+        assert_eq!(msgs, ["Can only do 3 or more, not 2"]);
+    }
+
+    #[test]
     fn identity_round_trip() {
         let centre = Mat::col(&[10.0, 20.0, 30.0]);
         let p = Mat::col(&[

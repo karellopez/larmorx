@@ -160,6 +160,22 @@ the trial's memory agrees, in its shrunk and drawn forms; the 6 that did not are
   above 25 GiB on others (`memory_findings.py`; the box stopped two FSL runs at 26 and 39 GiB). Not a
   difference: both programs need more than the trial's budget; they belong to the final validation
   phase's heavy cases.
+- **The replica's peak memory above FSL's on large references** (found measuring trial-flirt-01374,
+  12.1 GiB against FSL's 8.0; then on ordinary calls: `-in epi -ref t1full -omat out.mat` with a
+  191 × 288 × 288 float reference, 262 MiB against 192, and with `-inweight`, 503 against 375).
+  Located with an RSS timeline and `gdb` catching every allocation of the reference's size
+  (`validation/investigations/fsl-flirt/rsstrace.py`, `gdb_allocations.py`): FSL's blur holds the source and two volumes
+  (`convolve_separable` assigns each pass over its one copy); the core's kept all three passes'
+  results alive (shadowed bindings live to the end of the scope); `isotropic_resample` and
+  `raw_affine_transform` copied their input to change its extrapolation (FSL changes it in place),
+  and FLIRT's weighted `filter_image` kept its binarised weight and weighted product while it
+  filtered the weight. Each copy is now released once used (the copies made only when the
+  extrapolation changes): 201 MiB against 192, 322 against 374, every matrix still FSL's.
+  `tests/parity/test_memory_peak.py` gains both calls (`omat-only`, `inweight`).
+- **Quaternion messages: one missing** (trial-flirt-programs-00219 and the like: 1720 lines of
+  `Parameters do not form a valid axis` against FSL's 1721). FLIRT's `optimise` builds the starting
+  matrix (`vector2affine(params, no_params, affmattst)`) at every verbosity and prints it only from
+  `-verbose 5`; the replica built it only then, so an invalid starting axis printed nothing. Fixed.
 
 ## Part 2's other findings (2026-11-01)
 

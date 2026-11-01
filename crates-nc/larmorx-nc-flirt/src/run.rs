@@ -796,7 +796,11 @@ impl<'a> Flirt<'a> {
         p.skip_nonfinite = self.mode.fix();
         // FSL-14: named whenever the pair's volumes hold NaN or infinite values (they may change
         // the cost, so the matrix, whichever mode runs)
-        let in_ref = self.slot_vol(p.ref_slot).data.iter().any(|v| !v.is_finite());
+        let in_ref = self
+            .slot_vol(p.ref_slot)
+            .data
+            .iter()
+            .any(|v| !v.is_finite());
         let in_test = self.testvol.data.iter().any(|v| !v.is_finite());
         if in_ref || in_test {
             let which = match (in_ref, in_test) {
@@ -943,8 +947,10 @@ impl<'a> Flirt<'a> {
         if params.max_abs() < 0.001 && params.len() >= 12 {
             *params = Mat::col(&[0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 1.0, 1.0, 1.0, 0.0, 0.0, 0.0]);
         }
+        // computed at every verbosity: with -anglerep quaternion an invalid axis prints its
+        // message here
+        let a = self.vector2affine(params, n as i32);
         if self.o.verbose >= 5 {
-            let a = self.vector2affine(params, n as i32);
             self.out.s("Starting with : \n");
             self.out.mat(&a);
         }
@@ -1651,13 +1657,17 @@ impl<'a> Flirt<'a> {
         if !useweight {
             return self.filter(f, orig);
         }
+        // each temporary released once used (FSL reuses its one temporary volume)
         let b = newimagefns::binarise(weight, 0.01);
         let mut ib = orig.clone();
         newimagefns::multiply_in_place(&mut ib, &b)?;
+        drop(b);
         let blur_im = self.filter(f, &ib)?;
+        drop(ib);
         let w2 = if weight_is_target { &blur_im } else { weight };
         let b2 = newimagefns::binarise(w2, 0.01);
         let fb = self.filter(f, &b2)?;
+        drop(b2);
         Ok(newimagefns::divide(&blur_im, &fb, &fb)?)
     }
 
@@ -3024,16 +3034,25 @@ impl Flirt<'_> {
             self.global_refweight = rw;
             self.refvol = r?;
             self.global_sampling = ms;
-            let rw = self.global_refweight.clone();
+            // The volumes are moved out for each filter and put back (no transient copies: FSL
+            // passes references; its peak has none of them).
+            let rw = std::mem::replace(&mut self.global_refweight, empty());
             self.global_refweight = self.filter_weight_if(&rw, Filter::ResampBlur)?;
+            drop(rw);
             self.global_refweight1 = self.global_refweight.clone();
             // scale 2
             if ms < 1.9 {
-                let (rv, w1) = (self.refvol.clone(), self.global_refweight.clone());
-                self.refvol_2 = self.filter_image(&rv, &w1, uw, Filter::SubsampleBy2, false)?;
+                let rv = std::mem::replace(&mut self.refvol, empty());
+                let w1 = std::mem::replace(&mut self.global_refweight, empty());
+                let r = self.filter_image(&rv, &w1, uw, Filter::SubsampleBy2, false);
+                self.refvol = rv;
+                self.global_refweight = w1;
+                self.refvol_2 = r?;
                 if uw {
-                    let w1 = self.global_refweight1.clone();
-                    self.global_refweight2 = self.filter_weight(&w1, Filter::SubsampleBy2)?;
+                    let w1 = std::mem::replace(&mut self.global_refweight1, empty());
+                    let r = self.filter_weight(&w1, Filter::SubsampleBy2);
+                    self.global_refweight1 = w1;
+                    self.global_refweight2 = r?;
                 }
             } else {
                 self.refvol_2 = self.refvol.clone();
@@ -3043,10 +3062,19 @@ impl Flirt<'_> {
             }
             // scale 4
             if ms < 3.9 {
-                let (rv, w2) = (self.refvol_2.clone(), self.global_refweight2.clone());
-                self.refvol_4 = self.filter_image(&rv, &w2, uw, Filter::SubsampleBy2, false)?;
-                if uw {
-                    self.global_refweight4 = self.filter_weight(&w2, Filter::SubsampleBy2)?;
+                let rv = std::mem::replace(&mut self.refvol_2, empty());
+                let w2 = std::mem::replace(&mut self.global_refweight2, empty());
+                let r = self.filter_image(&rv, &w2, uw, Filter::SubsampleBy2, false);
+                let rw = if uw && r.is_ok() {
+                    Some(self.filter_weight(&w2, Filter::SubsampleBy2))
+                } else {
+                    None
+                };
+                self.refvol_2 = rv;
+                self.global_refweight2 = w2;
+                self.refvol_4 = r?;
+                if let Some(rw) = rw {
+                    self.global_refweight4 = rw?;
                 }
             } else {
                 self.refvol_4 = self.refvol_2.clone();
@@ -3056,10 +3084,19 @@ impl Flirt<'_> {
             }
             // scale 8
             if ms < 7.9 {
-                let (rv, w4) = (self.refvol_4.clone(), self.global_refweight4.clone());
-                self.refvol_8 = self.filter_image(&rv, &w4, uw, Filter::SubsampleBy2, false)?;
-                if uw {
-                    self.global_refweight8 = self.filter_weight(&w4, Filter::SubsampleBy2)?;
+                let rv = std::mem::replace(&mut self.refvol_4, empty());
+                let w4 = std::mem::replace(&mut self.global_refweight4, empty());
+                let r = self.filter_image(&rv, &w4, uw, Filter::SubsampleBy2, false);
+                let rw = if uw && r.is_ok() {
+                    Some(self.filter_weight(&w4, Filter::SubsampleBy2))
+                } else {
+                    None
+                };
+                self.refvol_4 = rv;
+                self.global_refweight4 = w4;
+                self.refvol_8 = r?;
+                if let Some(rw) = rw {
+                    self.global_refweight8 = rw?;
                 }
             } else {
                 self.refvol_8 = self.refvol_4.clone();
@@ -3080,10 +3117,23 @@ impl Flirt<'_> {
         }
         if self.o.resample {
             self.global_sampling = 8.0;
-            let (tv, tw) = (self.testvol.clone(), self.global_testweight.clone());
-            let t8 = self.filter_image(&tv, &tw, uw, Filter::Blur, false)?;
+            let tv = std::mem::replace(&mut self.testvol, empty());
+            let tw = std::mem::replace(&mut self.global_testweight, empty());
+            let t8 = self.filter_image(&tv, &tw, uw, Filter::Blur, false);
+            self.testvol = tv;
+            let t8 = match t8 {
+                Ok(v) => v,
+                Err(e) => {
+                    self.global_testweight = tw;
+                    return Err(e);
+                }
+            };
             self.global_sampling = 8.0;
-            self.global_testweight = self.filter_weight_if(&tw, Filter::Blur)?;
+            let w = self.filter_weight_if(&tw, Filter::Blur);
+            drop(tw);
+            self.global_testweight = w?;
+            // testvol = testvol_8: the unblurred input is released first
+            self.testvol = empty();
             self.testvol = t8;
         }
         if self.o.debug {

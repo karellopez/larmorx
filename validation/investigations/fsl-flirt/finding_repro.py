@@ -1,6 +1,8 @@
 # SPDX-License-Identifier: Apache-2.0
 """Reproduces a FLIRT difftest finding by hand: its shrunk recipe's inputs in two directories,
-FSL's flirt and the replica (reproduce) on each, the outputs compared voxel by voxel.
+FSL's program and the replica (reproduce) on each, their standard output and error kept
+(``stdout.txt``, ``stderr.txt``) with the first line where they differ, the output images
+compared voxel by voxel.
 
 Usage: python -P finding_repro.py <finding.json> <out dir> [--drawn] [extra flirt args...]
 """
@@ -65,6 +67,23 @@ b = subprocess.run(
 print("exit", a.returncode, b.returncode)
 print("FSL stderr:", a.stderr[-500:])
 print("rep stderr:", b.stderr[-500:])
+
+
+def first_difference(x: str, y: str) -> str:
+    lx, ly = x.splitlines(), y.splitlines()
+    for k in range(max(len(lx), len(ly))):
+        u = lx[k] if k < len(lx) else "<end>"
+        v = ly[k] if k < len(ly) else "<end>"
+        if u != v:
+            return f"line {k + 1}: FSL {u!r}, replica {v!r} ({len(lx)} vs {len(ly)} lines)"
+    return f"identical ({len(lx)} lines)"
+
+
+for run, d in ((a, "fsl"), (b, "rep")):
+    (out / d / "stdout.txt").write_text(run.stdout, encoding="utf-8")
+    (out / d / "stderr.txt").write_text(run.stderr, encoding="utf-8")
+print("stdout:", first_difference(a.stdout, b.stdout))
+print("stderr:", first_difference(a.stderr, b.stderr))
 for f in sorted((out / "fsl").iterdir()):
     g = out / "rep" / f.name
     if f.name.startswith("out") and f.suffix != ".hdr":

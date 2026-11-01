@@ -5,8 +5,10 @@ into two directories, each program run alone under ``/usr/bin/time -v`` (its max
 set) with a timeout, the matrices compared.
 
 Usage: python -P memory_findings.py <out dir> <timeout s> <finding.json>... [--drawn]
-(with ``LARMORX_NC_BIN`` the replica's program; ``PYTHONPATH=<checkout>/python:<checkout>/
-validation/src``). Prints one line per finding and program: exit status, seconds, peak MiB.
+[--replica-only] (with ``LARMORX_NC_BIN`` the replica's program; ``PYTHONPATH=<checkout>/python:
+<checkout>/validation/src``). Prints one line per finding and program: exit status, seconds, peak
+MiB. ``--replica-only`` measures a new build of the replica again (in ``rep-again``) and compares
+its matrix with FSL's from the earlier measurement, without running FSL a second time.
 """
 
 from __future__ import annotations
@@ -54,20 +56,22 @@ def main() -> None:
     out = Path(sys.argv[1])
     timeout = float(sys.argv[2])
     drawn = "--drawn" in sys.argv
-    for path in [a for a in sys.argv[3:] if a != "--drawn"]:
+    again = "--replica-only" in sys.argv
+    for path in [a for a in sys.argv[3:] if not a.startswith("--")]:
         finding = json.loads(Path(path).read_text(encoding="utf-8"))
         recipe = finding["recipe"] if drawn or not finding.get("shrunk") else finding["shrunk"]
         prefix = inputs.register(recipe["inputs"])
         d = out / Path(path).stem
-        if d.exists():
-            shutil.rmtree(d)
-        words = []
-        for sub in ("fsl", "rep"):
+        subs = ("rep-again",) if again else ("fsl", "rep")
+        for sub in subs:
+            if (d / sub).exists():
+                shutil.rmtree(d / sub)
             (d / sub).mkdir(parents=True)
+        words = []
         for w in arguments(recipe):
             if w.startswith("{in:"):
                 src = inputs.path("dt:" + inputs.key(prefix, w[4:-1]))
-                for sub in ("fsl", "rep"):
+                for sub in subs:
                     shutil.copy(src, d / sub / src.name)
                 words.append(src.name)
             elif w.startswith("@fslsch:"):
@@ -85,11 +89,13 @@ def main() -> None:
         }
         prog = recipe["extra"]["tool"]
         print(Path(path).stem, prog, " ".join(words), flush=True)
-        fsl = measure([str(ff.fsldir() / "bin" / prog), *words], d / "fsl", env, timeout)
-        print("  FSL:     ", fsl, flush=True)
-        rep = measure([str(ff.replica_binary()), "fsl", prog, *words], d / "rep", env, timeout)
+        if not again:
+            fsl = measure([str(ff.fsldir() / "bin" / prog), *words], d / "fsl", env, timeout)
+            print("  FSL:     ", fsl, flush=True)
+        r = subs[-1]
+        rep = measure([str(ff.replica_binary()), "fsl", prog, *words], d / r, env, timeout)
         print("  replica: ", rep, flush=True)
-        a, b = d / "fsl" / "out.mat", d / "rep" / "out.mat"
+        a, b = d / "fsl" / "out.mat", d / r / "out.mat"
         if a.is_file() and b.is_file():
             print("  matrices:", "identical" if a.read_bytes() == b.read_bytes() else "DIFFER")
 

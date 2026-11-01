@@ -1217,6 +1217,19 @@ mod tests {
     use super::*;
 
     #[test]
+    fn armadillo_expression_layouts() {
+        // fixed, 4 decimals, 9 columns; zeros as 0
+        let m = Mat::from_rows(1, 2, &[0.5, 0.0]);
+        assert_eq!(print_expr(&m), "   0.5000        0\n");
+        // a value of at least 10: 10 columns
+        let m = Mat::from_rows(1, 2, &[12.25, -1.0]);
+        assert_eq!(print_expr(&m), "   12.2500   -1.0000\n");
+        // at least 100, or at most 1e-4: scientific in 13 columns
+        let m = Mat::from_rows(1, 2, &[150.0, 1e-5]);
+        assert_eq!(print_expr(&m), "   1.5000e+02   1.0000e-05\n");
+    }
+
+    #[test]
     fn tiny_products_sum_left_to_right() {
         let a = Mat::from_rows(2, 2, &[1.0, 1e16, 0.0, 1.0]);
         let x = [1.0, 1.0];

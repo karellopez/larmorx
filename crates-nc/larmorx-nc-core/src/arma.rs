@@ -525,6 +525,72 @@ fn gemm(a: &Mat, b: &Mat, trans_a: bool) -> Mat {
     gemm_blas(a, b, trans_a, false)
 }
 
+/// `op_dot::direct_dot_arma` of any length (as `syrk_emul` calls it): two interleaved
+/// accumulators, then their sum.
+pub fn dot_arma(a: &[f64], b: &[f64]) -> f64 {
+    assert_eq!(a.len(), b.len());
+    let n = a.len();
+    let mut val1 = S64(0.0);
+    let mut val2 = S64(0.0);
+    let mut i = 0;
+    let mut j = 1;
+    while j < n {
+        val1 += S64(a[i]) * b[i];
+        val2 += S64(a[j]) * b[j];
+        i += 2;
+        j += 2;
+    }
+    if i < n {
+        val1 += S64(a[i]) * b[i];
+    }
+    (val1 + val2).0
+}
+
+/// `A·Aᵀ` for one object on both sides (`glue_times` hands it to `syrk<false>`): a vector by
+/// `syrk_vec` (the products `aₖ·aᵢ`, mirrored), up to 48 elements by `syrk_emul` (each element
+/// [`dot_arma`] of two rows, mirrored), larger by BLAS `dsyrk` (the upper triangle as `dgemm`
+/// computes each element, mirrored).
+pub fn syrk(a: &Mat) -> Mat {
+    let n = a.rows;
+    let mut c = Mat::zeros(n, n);
+    if a.rows == 1 || a.cols == 1 {
+        if n == 1 {
+            c.data[0] = dot_arma(&a.data, &a.data);
+            return c;
+        }
+        for k in 0..n {
+            for i in k..n {
+                let v = a.data[k] * a.data[i];
+                c.set(k, i, v);
+                c.set(i, k, v);
+            }
+        }
+        return c;
+    }
+    if a.data.len() <= 48 {
+        let rows: Vec<Vec<f64>> = (0..n)
+            .map(|r| (0..a.cols).map(|k| a.at(r, k)).collect())
+            .collect();
+        for i in 0..n {
+            for k in i..n {
+                let v = dot_arma(&rows[i], &rows[k]);
+                c.set(i, k, v);
+                c.set(k, i, v);
+            }
+        }
+        return c;
+    }
+    let full = gemm_blas(a, a, false, true);
+    for j in 0..n {
+        for i in 0..=j {
+            let v = full.at(i, j);
+            c.set(i, j, v);
+            c.set(j, i, v);
+        }
+    }
+    c
+}
+
 /// `eig_sym(eigval, eigvec, X)` with the default method `"dc"` (as armawrap's `Jacobi` and
 /// `EigenValues` call it): Armadillo's rudimentary symmetry check (its corner elements; a
 /// failure prints `warning: eig_sym(): given matrix is not symmetric`, after a blank line, into

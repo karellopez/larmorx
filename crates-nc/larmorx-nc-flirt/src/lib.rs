@@ -23,8 +23,10 @@ pub mod avscale;
 pub mod convert_xfm;
 pub mod coords;
 pub mod makerot;
+pub mod midtrans;
 pub mod options;
 pub mod pair;
+pub mod pointflirt;
 pub mod rmsdiff;
 pub mod run;
 pub mod schedule;
@@ -131,6 +133,32 @@ pub fn rmsdiff(
 ) -> u8 {
     let _ = threads;
     rmsdiff::run(args, settings, mode, out, err)
+}
+
+/// `midtrans [options] transform1 transform2 ... transformN`.
+pub fn midtrans(
+    args: &[String],
+    settings: &Settings,
+    mode: UpstreamDefects,
+    threads: usize,
+    out: &mut dyn Write,
+    err: &mut dyn Write,
+) -> u8 {
+    let _ = threads;
+    midtrans::run(args, settings, mode, out, err)
+}
+
+/// `pointflirt -i <invol coords> -r <refvol coords> [options]`.
+pub fn pointflirt(
+    args: &[String],
+    settings: &Settings,
+    mode: UpstreamDefects,
+    threads: usize,
+    out: &mut dyn Write,
+    err: &mut dyn Write,
+) -> u8 {
+    let _ = threads;
+    pointflirt::run(args, settings, mode, out, err)
 }
 
 /// `makerot --theta=angle [options]`.

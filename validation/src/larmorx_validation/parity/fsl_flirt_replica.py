@@ -1920,9 +1920,30 @@ _FLIP = "-1 0 0 10\n0 1 0 0\n0 0 1 0\n0 0 0 1\n"
 _COORDS = "10 20 30\n0 0 0\n-5.5 3.25 100\n1e3 2 3\n"
 
 
+#: midtrans' inputs (part 3): three transforms of images to one template.
+_MT1 = "1.02 0.05 -0.01 3.5\n-0.04 0.98 0.06 -2\n0.02 -0.03 1.05 1\n0 0 0 1\n"
+_MT2 = "0.97 -0.08 0.02 -1.5\n0.07 1.01 -0.02 4\n-0.03 0.02 0.99 -3\n0 0 0 1\n"
+_MT3 = "1.1 0.01 0.03 0.5\n0.02 0.92 -0.05 1\n-0.01 0.04 1.03 2.5\n0 0 0 1\n"
+_ID = "1 0 0 0\n0 1 0 0\n0 0 1 0\n0 0 0 1\n"
+#: pointflirt's inputs: 8 points (one per line) and their images under an affine map.
+_PTS_IN = (
+    "10 20 30\n-12 5 40\n33 -7 12\n0 0 0\n25 25 -10\n-8 -30 22\n14 9 -3\n-20 18 6\n"
+)
+_PTS_REF = (
+    "13.31 18.62 35.25\n-9.33 7.41 44.05\n38.47 -8.32 13.9\n2.5 -1 1.5\n"
+    "29.29 23.95 -9.68\n-5.24 -31.87 26.59\n17.35 7.55 -1.71\n-17.75 18.24 7.86\n"
+)
+#: 20 points: x·xᵀ by BLAS dsyrk (more than 48 elements).
+_PTS20 = "".join(f"{(i * 7) % 23 - 11} {(i * 5) % 17 - 8} {(i * 11) % 29 - 14}\n" for i in range(20))
+_PTS20_REF = "".join(
+    f"{(i * 7) % 23 - 11 + 0.1 * i} {(i * 5) % 17 - 8 - 0.05 * i} {(i * 11) % 29 - 13.5}\n"
+    for i in range(20)
+)
+
+
 def _program_cases() -> dict[str, tuple[str, str, Run]]:
-    """avscale, img2imgcoord, std2imgcoord, img2stdcoord, rmsdiff and makerot: one case per
-    path."""
+    """avscale, img2imgcoord, std2imgcoord, img2stdcoord, rmsdiff, makerot, midtrans and
+    pointflirt: one case per path."""
     c: dict[str, tuple[str, str, Run]] = {}
     st = "standard"
     E, T, W, M = "@epi.nii", "@t1.nii", "@wm.nii", "@init.mat"
@@ -1930,6 +1951,64 @@ def _program_cases() -> dict[str, tuple[str, str, Run]]:
 
     def add(name: str, desc: str, program: str, *args: str, tier: str = st, **kw: Any) -> None:
         c[f"programs/{name}"] = (tier, desc, Run(program, tuple(args), **kw))
+
+    K = "midtrans"
+    mt = (("a.mat", _MT1), ("b.mat", _MT2), ("c.mat", _MT3), ("id.mat", _ID))
+    add("midtrans-usage", "midtrans without transforms (its message and usage, exit 1)", K)
+    add("midtrans-help", "midtrans -h (its usage, exit 1)", K, "-h")
+    add("midtrans-one", "one transform only (at least 2 needed, exit 1)", K, "a.mat", files=mt)
+    add("midtrans-default", "three transforms, printed (the MNI origin assumed)", K, "a.mat",
+        "b.mat", "c.mat", files=mt, tier="smoke")  # fmt: skip
+    add("midtrans-out-verbose", "-o with -v (every stage printed, the matrix written)", K, "-v",
+        "-o", "mid.mat", "a.mat", "b.mat", "id.mat", files=mt)  # fmt: skip
+    add("midtrans-template-separate", "--template (its centre of gravity) and --separate", K,
+        "--template", E, "--separate", "img2mid", "-o", "mid.mat", "a.mat", "b.mat", "c.mat",
+        files=mt)  # fmt: skip
+    add("midtrans-debug", "--debug (the origin at 0 and the debug matrices)", K, "--debug",
+        "a.mat", "c.mat", files=mt)  # fmt: skip
+    add("midtrans-singular", "a transform with a determinant below 1e-6 (its message, exit 1)",
+        K, "a.mat", "sing.mat", files=(*mt, ("sing.mat", _SING)))  # fmt: skip
+    add("midtrans-token", "an option after the transforms (read as a file: an empty matrix, "
+        "the size error caught)", K, "a.mat", "b.mat", "-v", files=mt)  # fmt: skip
+    add("midtrans-not-square", "a 3 x 4 matrix (the determinant's error, caught)", K, "a.mat",
+        "r.mat", files=(*mt, ("r.mat", "1 0 0 1\n0 1 0 2\n0 0 1 3\n")))  # fmt: skip
+    add("midtrans-3x3", "a 3 x 3 matrix (the product's size error, caught)", K, "a.mat",
+        "r.mat", files=(*mt, ("r.mat", "1 0 0\n0 1 0\n0 0 1\n")))  # fmt: skip
+    P = "pointflirt"
+    pf = (("in.txt", _PTS_IN), ("ref.txt", _PTS_REF))
+    add("pointflirt-usage", "pointflirt without arguments (the compulsory options, exit 1)", P)
+    add("pointflirt-default", "eight points, the matrix printed", P, "-i", "in.txt", "-r",
+        "ref.txt", files=pf, tier="smoke")  # fmt: skip
+    add("pointflirt-out-verbose", "-v and -o (the coordinates printed, the matrix written)", P,
+        "-v", "-i", "in.txt", "-r", "ref.txt", "-o", "aff.mat", files=pf)  # fmt: skip
+    add("pointflirt-vox", "--vox with --invol and --refvol (voxel coordinates scaled)", P, "-i",
+        "in.txt", "-r", "ref.txt", "--vox", "--invol=@epi.nii", "--refvol=@t1.nii", files=pf,
+        )  # fmt: skip
+    add("pointflirt-vox-missing", "--vox without the volumes (its error, exit 2)", P, "-i",
+        "in.txt", "-r", "ref.txt", "--vox", files=pf)  # fmt: skip
+    add("pointflirt-nullspace", "four points (a nullspace: the warning, a non-unique solution)",
+        P, "-i", "in4.txt", "-r", "ref4.txt",
+        files=(("in4.txt", "".join(_PTS_IN.splitlines(True)[:4])),
+               ("ref4.txt", "".join(_PTS_REF.splitlines(True)[:4]))))  # fmt: skip
+    add("pointflirt-count", "files with different numbers of points (its error, exit 255)", P,
+        "-i", "in.txt", "-r", "ref4.txt",
+        files=(*pf, ("ref4.txt", "".join(_PTS_REF.splitlines(True)[:4]))))  # fmt: skip
+    add("pointflirt-many", "twenty points (x·xᵀ by BLAS dsyrk)", P, "-i", "in20.txt", "-r",
+        "ref20.txt", files=(("in20.txt", _PTS20), ("ref20.txt", _PTS20_REF)))  # fmt: skip
+    add("pointflirt-missing", "a coordinate file that does not exist (FSL aborts)", P, "-i",
+        "none.txt", "-r", "ref.txt", files=pf)  # fmt: skip
+    three = "".join(_PTS_IN.splitlines(True)[:3])
+    three_ref = "".join(_PTS_REF.splitlines(True)[:3])
+    add("pointflirt-three", "three points: a square file is read with points as columns", P,
+        "-i", "in3.txt", "-r", "ref3.txt", files=(("in3.txt", three), ("ref3.txt", three_ref)))  # fmt: skip
+    add("pointflirt-two", "two points (two rows of three: FSL reads past its rows, aborts)", P,
+        "-i", "in2.txt", "-r", "ref2.txt",
+        files=(("in2.txt", "".join(_PTS_IN.splitlines(True)[:2])),
+               ("ref2.txt", "".join(_PTS_REF.splitlines(True)[:2]))))  # fmt: skip
+    add("pointflirt-four-columns", "points of four coordinates (FSL's block sizes clash, aborts)",
+        P, "-i", "in4c.txt", "-r", "ref4c.txt",
+        files=(("in4c.txt", "".join(f"{ln} 1\n" for ln in _PTS_IN.splitlines())),
+               ("ref4c.txt", "".join(f"{ln} 1\n" for ln in _PTS_REF.splitlines()))))  # fmt: skip
 
     A = "avscale"
     add("avscale-usage", "avscale without arguments (its usage, exit 255)", A)

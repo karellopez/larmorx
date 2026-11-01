@@ -54,7 +54,7 @@ def compare(a: Path, b: Path) -> str:
 
 def main() -> int:
     args = [Path(p) for p in sys.argv[1:]]
-    for a, b in zip(args[::2], args[1::2]):
+    for a, b in zip(args[::2], args[1::2], strict=False):
         print(compare(a, b))
     return 0
 

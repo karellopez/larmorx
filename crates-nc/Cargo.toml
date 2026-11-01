@@ -58,3 +58,6 @@ opt-level = 1
 
 [profile.dev.package.larmorx-nc-bet]
 opt-level = 1
+
+[profile.dev.package.larmorx-nc-flirt]
+opt-level = 1

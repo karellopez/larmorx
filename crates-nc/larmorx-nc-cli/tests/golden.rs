@@ -418,8 +418,191 @@ struct BetCase {
 
 /// One case per distinct code path: bet2's outputs and options, bet's variations (`-R`, `-F`,
 /// `-Z`), betsurf with and without the T2, and the paths of FSL's defects (D13), corrected (the
-/// default) and, in the `*.reproduce` cases, reproduced.
+/// default) and, in the `*.reproduce` cases, reproduced. FLIRT's and convert_xfm's cases (the
+/// T2-like head registered to the T1-like one) use the same inputs: the default schedule with
+/// its search, a histogram cost at 6 dof, the weighted least squares, the boundary-based cost
+/// with FSL's `bbr.sch`, `-applyxfm` with sinc and `-applyisoxfm` with splines on 4D, the
+/// integer output (FSL-09), and convert_xfm's operations.
 const BET_CASES: &[BetCase] = &[
+    BetCase {
+        id: "flirt.default",
+        tool: "fsl flirt",
+        args: &[
+            "-in", "{t2}", "-ref", "{t1}", "-out", "out", "-omat", "out.mat",
+        ],
+        mode: "fix",
+        named: &[],
+        output_type: "NIFTI",
+    },
+    BetCase {
+        id: "flirt.normmi-dof6",
+        tool: "fsl flirt",
+        args: &[
+            "-in",
+            "{t2}",
+            "-ref",
+            "{t1}",
+            "-cost",
+            "normmi",
+            "-searchcost",
+            "normcorr",
+            "-dof",
+            "6",
+            "-omat",
+            "out.mat",
+        ],
+        mode: "fix",
+        named: &[],
+        output_type: "NIFTI",
+    },
+    BetCase {
+        id: "flirt.weights-leastsq",
+        tool: "fsl flirt",
+        args: &[
+            "-in",
+            "{t2}",
+            "-ref",
+            "{t1}",
+            "-refweight",
+            "{mask}",
+            "-inweight",
+            "{mask}",
+            "-cost",
+            "leastsq",
+            "-dof",
+            "7",
+            "-nosearch",
+            "-omat",
+            "out.mat",
+        ],
+        mode: "fix",
+        named: &[],
+        output_type: "NIFTI",
+    },
+    BetCase {
+        id: "flirt.bbr",
+        tool: "fsl flirt",
+        args: &[
+            "-in",
+            "{t2}",
+            "-ref",
+            "{t1}",
+            "-init",
+            "{init}",
+            "-schedule",
+            "{bbrsch}",
+            "-cost",
+            "bbr",
+            "-wmseg",
+            "{mask}",
+            "-dof",
+            "6",
+            "-out",
+            "out",
+            "-omat",
+            "out.mat",
+        ],
+        mode: "fix",
+        named: &[],
+        output_type: "NIFTI_GZ",
+    },
+    BetCase {
+        id: "flirt.applyxfm-sinc",
+        tool: "fsl flirt",
+        args: &[
+            "-in",
+            "{t2}",
+            "-ref",
+            "{t1}",
+            "-init",
+            "{init}",
+            "-applyxfm",
+            "-interp",
+            "sinc",
+            "-out",
+            "out",
+        ],
+        mode: "fix",
+        named: &[],
+        output_type: "NIFTI",
+    },
+    BetCase {
+        id: "flirt.applyisoxfm-4d-spline",
+        tool: "fsl flirt",
+        args: &[
+            "-in",
+            "{4d}",
+            "-ref",
+            "{t1}",
+            "-init",
+            "{init}",
+            "-applyisoxfm",
+            "3",
+            "-interp",
+            "spline",
+            "-datatype",
+            "float",
+            "-out",
+            "out",
+        ],
+        mode: "fix",
+        named: &[],
+        output_type: "NIFTI",
+    },
+    BetCase {
+        id: "flirt.int16-out",
+        tool: "fsl flirt",
+        args: &[
+            "-in",
+            "{t1}",
+            "-ref",
+            "{t1}",
+            "-init",
+            "{init}",
+            "-applyxfm",
+            "-out",
+            "out",
+        ],
+        mode: "fix",
+        named: &["FSL-09"],
+        output_type: "NIFTI",
+    },
+    BetCase {
+        id: "flirt.int16-out.reproduce",
+        tool: "fsl flirt",
+        args: &[
+            "-in",
+            "{t1}",
+            "-ref",
+            "{t1}",
+            "-init",
+            "{init}",
+            "-applyxfm",
+            "-out",
+            "out",
+        ],
+        mode: "reproduce",
+        named: &["FSL-09"],
+        output_type: "NIFTI",
+    },
+    BetCase {
+        id: "convert_xfm.inverse-concat",
+        tool: "fsl convert_xfm",
+        args: &[
+            "-omat", "out.mat", "-concat", "{init}", "-inverse", "{init}",
+        ],
+        mode: "fix",
+        named: &[],
+        output_type: "NIFTI",
+    },
+    BetCase {
+        id: "convert_xfm.fixscaleskew",
+        tool: "fsl convert_xfm",
+        args: &["-omat", "out.mat", "-fixscaleskew", "{mat}", "{init}"],
+        mode: "fix",
+        named: &[],
+        output_type: "NIFTI",
+    },
     // FSL 6.0.7.23's bet2 --binaryMask: the surface from a mask, the outputs from the input;
     // written as bzip2 (FSLOUTPUTTYPE=NIFTI_BZ2, new in FSL 6.0.7.23)
     BetCase {
@@ -803,6 +986,51 @@ const HEAD: [i64; 3] = [32, 32, 24];
 const T1_LEVELS: [i64; 5] = [700, 150, 60, 800, 10];
 const T2_LEVELS: [i64; 5] = [400, 1500, 40, 300, 10];
 
+/// FSL 6.0.7.23's `etc/flirtsch/bbr.sch` (fMRIPrep's boundary-based schedule), as text.
+const BBR_SCH: &str = "# 1mm scale
+setscale 1 force
+setoption costfunction bbr
+setoption optimisationtype brent
+setoption tolerance 0.0005 0.0005 0.0005 0.02 0.02 0.02 0.002 0.002 0.002 0.001 0.001 0.001
+setoption boundguess 1
+setoption bbrstep 200
+clear UA
+clear UU
+clear UV
+clear U
+setrowqsform UU
+setrow UU 1 0 0 0  0 1 0 0  0 0 1 0  0 0 0 1
+measurecost 6 UU:1-2  0.0   0.0   0.0   0.0   0.0   0.0   0.0  rel 8
+gridmeasurecost 6 UU:1-2  -0.07 0.07 0.07  -0.07 0.07 0.07  -0.07 0.07 0.07  -4.0 4.0 4.0  -4.0 4.0 4.0  -4.0 4.0 4.0  0.0 0.0 0.0  abs 8
+sort U
+copy U UA
+clear U
+optimise 6 UA:1  0.0   0.0   0.0   0.0   0.0   0.0   0.0  rel 8
+setoption optimisationtype powell
+optimise 6 U:1  0.0   0.0   0.0   0.0   0.0   0.0   0.0  rel 8
+setoption optimisationtype brent
+optimise 6 U:2  0.0   0.0   0.0   0.0   0.0   0.0   0.0  rel 4
+sort U
+setoption tolerance 0.0002 0.0002 0.0002 0.02 0.02 0.02 0.002 0.002 0.002 0.001 0.001 0.001
+setoption bbrstep 2
+clear UU
+copy U UU
+clear U
+gridmeasurecost 6 UU:1  -0.0017 0.0017 0.0017  -0.0017 0.0017 0.0017  -0.0017 0.0017 0.0017  -0.1 0.1 0.1  -0.1 0.1 0.1  -0.1 0.1 0.1  0.0 0.0 0.0  abs 8
+sort U
+clear UB
+copy U UB
+clear U
+setoption optimisationtype brent
+optimise 6 UB:1  0.0   0.0   0.0   0.0   0.0   0.0   0.0  rel 8
+setoption optimisationtype powell
+optimise 12 U:1  0.0   0.0   0.0   0.0   0.0   0.0   0.0  rel 8
+setoption optimisationtype brent
+optimise 12 U:2  0.0   0.0   0.0   0.0   0.0   0.0   0.0  rel 4
+sort U
+print U:1
+";
+
 /// A head: brain, CSF, skull, scalp and air by (twice) the squared distance from the centre,
 /// with an intensity ramp along x and noise.
 fn bet_head_values(levels: [i64; 5], seed: u64) -> Vec<i64> {
@@ -913,6 +1141,15 @@ fn write_bet_inputs(dir: &Path) -> BTreeMap<&'static str, PathBuf> {
     let p = dir.join("t1_to_std.mat");
     std::fs::write(&p, mat).unwrap();
     paths.insert("mat", p);
+    // FLIRT's initial matrix (a small rotation about z and a shift, decimal numbers that are
+    // exact in the file and read alike everywhere) and FSL's bbr.sch (FSL 6.0.7.23's text).
+    let init = "0.995 -0.0998 0 1.5\n0.0998 0.995 0 -1\n0 0 1 0.5\n0 0 0 1\n";
+    let p = dir.join("init.mat");
+    std::fs::write(&p, init).unwrap();
+    paths.insert("init", p);
+    let p = dir.join("bbr.sch");
+    std::fs::write(&p, BBR_SCH).unwrap();
+    paths.insert("bbrsch", p);
     paths
 }
 

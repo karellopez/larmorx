@@ -355,7 +355,9 @@ def inputs() -> Path:
     # A smooth field map (rad/s) on the T1w's grid and its mask.
     ii, jj, kk = np.meshgrid(*[np.arange(n) for n in t.shape], indexing="ij")
     c = [n / 2 for n in t.shape]
-    r2 = ((ii - c[0]) ** 2 + (jj - c[1] * 1.2) ** 2 + (kk - c[2] * 0.6) ** 2) / (0.3 * t.shape[0]) ** 2
+    r2 = ((ii - c[0]) ** 2 + (jj - c[1] * 1.2) ** 2 + (kk - c[2] * 0.6) ** 2) / (
+        0.3 * t.shape[0]
+    ) ** 2
     _save(out / "fmap.nii", (120.0 * np.exp(-r2)).astype(np.float32), ta)
     _save(out / "fmapmask.nii", (t > 0).astype(np.float32), ta)
     # One axial slice (2D mode) and the same slice rotated by 6 degrees and shifted.
@@ -549,70 +551,581 @@ def _real_cases() -> dict[str, tuple[str, str, Run]]:
 
     s = "smoke"
     st = "standard"
-    add("real/default", s, "the default (12 dof, corratio) with -out and -omat", *base[1], "-out", "out", "-omat", "out.mat")
-    add("real/default-full", st, "the full-size T1w as reference", "-in", E, "-ref", "@t1full.nii.gz", "-omat", "out.mat")
+    add(
+        "real/default",
+        s,
+        "the default (12 dof, corratio) with -out and -omat",
+        *base[1],
+        "-out",
+        "out",
+        "-omat",
+        "out.mat",
+    )
+    add(
+        "real/default-full",
+        st,
+        "the full-size T1w as reference",
+        "-in",
+        E,
+        "-ref",
+        "@t1full.nii.gz",
+        "-omat",
+        "out.mat",
+    )
     for dof in ("6", "7", "9"):
         add(f"real/dof{dof}", st, f"-dof {dof}", *base[1], "-dof", dof, "-omat", "out.mat")
     for cost in ("mutualinfo", "normmi", "normcorr", "leastsq", "woods", "labeldiff"):
-        add(f"real/cost-{cost}", st, f"-cost {cost} (and -searchcost corratio)", *base[1], "-cost", cost, "-omat", "out.mat")
-    add("real/searchcost-normmi", st, "-searchcost normmi", *base[1], "-searchcost", "normmi", "-omat", "out.mat")
+        add(
+            f"real/cost-{cost}",
+            st,
+            f"-cost {cost} (and -searchcost corratio)",
+            *base[1],
+            "-cost",
+            cost,
+            "-omat",
+            "out.mat",
+        )
+    add(
+        "real/searchcost-normmi",
+        st,
+        "-searchcost normmi",
+        *base[1],
+        "-searchcost",
+        "normmi",
+        "-omat",
+        "out.mat",
+    )
     add("real/nosearch", st, "-nosearch", *base[1], "-nosearch", "-omat", "out.mat")
-    add("real/searchr", st, "-searchrx/ry/rz with narrow ranges", *base[1], "-searchrx", "-20", "30", "-searchry", "15", "-15", "-searchrz", "-5", "5", "-omat", "out.mat")
-    add("real/coarse-fine", st, "-coarsesearch 30 -finesearch 10", *base[1], "-coarsesearch", "30", "-finesearch", "10", "-dof", "6", "-omat", "out.mat")
-    add("real/init", st, "-init (fMRIPrep's initial matrix)", *base[1], "-init", "@init.mat", "-omat", "out.mat")
+    add(
+        "real/searchr",
+        st,
+        "-searchrx/ry/rz with narrow ranges",
+        *base[1],
+        "-searchrx",
+        "-20",
+        "30",
+        "-searchry",
+        "15",
+        "-15",
+        "-searchrz",
+        "-5",
+        "5",
+        "-omat",
+        "out.mat",
+    )
+    add(
+        "real/coarse-fine",
+        st,
+        "-coarsesearch 30 -finesearch 10",
+        *base[1],
+        "-coarsesearch",
+        "30",
+        "-finesearch",
+        "10",
+        "-dof",
+        "6",
+        "-omat",
+        "out.mat",
+    )
+    add(
+        "real/init",
+        st,
+        "-init (fMRIPrep's initial matrix)",
+        *base[1],
+        "-init",
+        "@init.mat",
+        "-omat",
+        "out.mat",
+    )
     add("real/usesqform", st, "-usesqform", *base[1], "-usesqform", "-omat", "out.mat")
     add("real/bins64", st, "-bins 64", *base[1], "-bins", "64", "-omat", "out.mat")
-    add("real/noresample", st, "-noresample", *base[1], "-noresample", "-dof", "6", "-omat", "out.mat")
+    add(
+        "real/noresample",
+        st,
+        "-noresample",
+        *base[1],
+        "-noresample",
+        "-dof",
+        "6",
+        "-omat",
+        "out.mat",
+    )
     add("real/noclamp", st, "-noclamp", *base[1], "-noclamp", "-omat", "out.mat")
     add("real/minsampling", st, "-minsampling 4", *base[1], "-minsampling", "4", "-omat", "out.mat")
-    add("real/forcescaling", st, "-forcescaling", *base[1], "-forcescaling", "-dof", "6", "-omat", "out.mat")
-    add("real/weights", st, "-refweight and -inweight", *base[1], "-refweight", "@refweight.nii", "-inweight", "@inweight.nii", "-omat", "out.mat")
+    add(
+        "real/forcescaling",
+        st,
+        "-forcescaling",
+        *base[1],
+        "-forcescaling",
+        "-dof",
+        "6",
+        "-omat",
+        "out.mat",
+    )
+    add(
+        "real/weights",
+        st,
+        "-refweight and -inweight",
+        *base[1],
+        "-refweight",
+        "@refweight.nii",
+        "-inweight",
+        "@inweight.nii",
+        "-omat",
+        "out.mat",
+    )
     for cost in ("normcorr", "leastsq", "normmi", "mutualinfo", "woods"):
-        add(f"real/weights-{cost}", st, f"weights with -cost {cost}", *base[1], "-refweight", "@refweight.nii", "-cost", cost, "-dof", "6", "-omat", "out.mat")
-    add("real/labeldiff-dseg", st, "-cost labeldiff on a label image", "-in", "@dseg_shift.nii", "-ref", "@dseg.nii", "-cost", "labeldiff", "-searchcost", "labeldiff", "-dof", "6", "-interp", "nearestneighbour", "-out", "out", "-omat", "out.mat")
-    add("real/known-motion", st, "a known rigid motion of the T1w (-dof 6)", "-in", "@t1_moved.nii", "-ref", T, "-dof", "6", "-omat", "out.mat")
+        add(
+            f"real/weights-{cost}",
+            st,
+            f"weights with -cost {cost}",
+            *base[1],
+            "-refweight",
+            "@refweight.nii",
+            "-cost",
+            cost,
+            "-dof",
+            "6",
+            "-omat",
+            "out.mat",
+        )
+    add(
+        "real/labeldiff-dseg",
+        st,
+        "-cost labeldiff on a label image",
+        "-in",
+        "@dseg_shift.nii",
+        "-ref",
+        "@dseg.nii",
+        "-cost",
+        "labeldiff",
+        "-searchcost",
+        "labeldiff",
+        "-dof",
+        "6",
+        "-interp",
+        "nearestneighbour",
+        "-out",
+        "out",
+        "-omat",
+        "out.mat",
+    )
+    add(
+        "real/known-motion",
+        st,
+        "a known rigid motion of the T1w (-dof 6)",
+        "-in",
+        "@t1_moved.nii",
+        "-ref",
+        T,
+        "-dof",
+        "6",
+        "-omat",
+        "out.mat",
+    )
     # Outputs and interpolation
     for interp in ("nearestneighbour", "sinc", "spline", "trilinear"):
-        add(f"real/interp-{interp}", st, f"-interp {interp} for -out", *base[1], "-init", "@init.mat", "-applyxfm", "-interp", interp, "-out", "out")
-    add("real/sinc-window", st, "-sincwidth 5 -sincwindow blackman", *base[1], "-init", "@init.mat", "-applyxfm", "-interp", "sinc", "-sincwidth", "5", "-sincwindow", "blackman", "-out", "out")
-    add("real/sinc-rect", st, "-sincwindow rectangular", *base[1], "-init", "@init.mat", "-applyxfm", "-interp", "sinc", "-sincwindow", "rectangular", "-out", "out")
+        add(
+            f"real/interp-{interp}",
+            st,
+            f"-interp {interp} for -out",
+            *base[1],
+            "-init",
+            "@init.mat",
+            "-applyxfm",
+            "-interp",
+            interp,
+            "-out",
+            "out",
+        )
+    add(
+        "real/sinc-window",
+        st,
+        "-sincwidth 5 -sincwindow blackman",
+        *base[1],
+        "-init",
+        "@init.mat",
+        "-applyxfm",
+        "-interp",
+        "sinc",
+        "-sincwidth",
+        "5",
+        "-sincwindow",
+        "blackman",
+        "-out",
+        "out",
+    )
+    add(
+        "real/sinc-rect",
+        st,
+        "-sincwindow rectangular",
+        *base[1],
+        "-init",
+        "@init.mat",
+        "-applyxfm",
+        "-interp",
+        "sinc",
+        "-sincwindow",
+        "rectangular",
+        "-out",
+        "out",
+    )
     for dt in ("char", "short", "int", "float", "double"):
-        add(f"real/datatype-{dt}", st, f"-datatype {dt}", *base[1], "-init", "@init.mat", "-applyxfm", "-datatype", dt, "-out", "out")
-    add("real/int16-input", st, "an int16 input (its type kept)", "-in", "@epi_i16.nii", "-ref", T, "-init", "@init.mat", "-applyxfm", "-out", "out")
-    add("real/paddingsize", st, "-paddingsize 2", *base[1], "-init", "@init.mat", "-applyxfm", "-paddingsize", "2", "-out", "out")
-    add("real/setbackground", st, "-setbackground 100", *base[1], "-init", "@init.mat", "-applyxfm", "-setbackground", "100", "-out", "out")
-    add("real/noresampblur", st, "-noresampblur", *base[1], "-init", "@init.mat", "-applyxfm", "-noresampblur", "-out", "out")
-    add("real/applyisoxfm", st, "-applyisoxfm 3", *base[1], "-init", "@init.mat", "-applyisoxfm", "3", "-out", "out", "-omat", "out.mat")
-    add("real/applyxfm-4d", st, "-applyxfm on four volumes of the raw series, sinc", "-in", "@bold4.nii", "-ref", T, "-init", "@init.mat", "-applyxfm", "-interp", "sinc", "-out", "out")
-    add("real/applyxfm-usesqform", st, "-applyxfm -usesqform", *base[1], "-usesqform", "-applyxfm", "-out", "out", "-omat", "out.mat")
-    add("real/out-only", st, "a registration with -out and no -omat (the matrix printed)", *base[1], "-dof", "6", "-out", "out")
-    add("real/basescale-small", st, "0.6 mm voxels (the base scale from the voxel size)", "-in", E, "-ref", "@t1_small.nii", "-dof", "6", "-omat", "out.mat")
-    add("real/basescale-big", st, "14 mm voxels (the base scale from the voxel size)", "-in", "@epi_big.nii", "-ref", T, "-dof", "6", "-omat", "out.mat")
-    add("real/basescale-forced", st, "-basescale 2", *base[1], "-basescale", "2", "-dof", "6", "-omat", "out.mat")
+        add(
+            f"real/datatype-{dt}",
+            st,
+            f"-datatype {dt}",
+            *base[1],
+            "-init",
+            "@init.mat",
+            "-applyxfm",
+            "-datatype",
+            dt,
+            "-out",
+            "out",
+        )
+    add(
+        "real/int16-input",
+        st,
+        "an int16 input (its type kept)",
+        "-in",
+        "@epi_i16.nii",
+        "-ref",
+        T,
+        "-init",
+        "@init.mat",
+        "-applyxfm",
+        "-out",
+        "out",
+    )
+    add(
+        "real/paddingsize",
+        st,
+        "-paddingsize 2",
+        *base[1],
+        "-init",
+        "@init.mat",
+        "-applyxfm",
+        "-paddingsize",
+        "2",
+        "-out",
+        "out",
+    )
+    add(
+        "real/setbackground",
+        st,
+        "-setbackground 100",
+        *base[1],
+        "-init",
+        "@init.mat",
+        "-applyxfm",
+        "-setbackground",
+        "100",
+        "-out",
+        "out",
+    )
+    add(
+        "real/noresampblur",
+        st,
+        "-noresampblur",
+        *base[1],
+        "-init",
+        "@init.mat",
+        "-applyxfm",
+        "-noresampblur",
+        "-out",
+        "out",
+    )
+    add(
+        "real/applyisoxfm",
+        st,
+        "-applyisoxfm 3",
+        *base[1],
+        "-init",
+        "@init.mat",
+        "-applyisoxfm",
+        "3",
+        "-out",
+        "out",
+        "-omat",
+        "out.mat",
+    )
+    add(
+        "real/applyxfm-4d",
+        st,
+        "-applyxfm on four volumes of the raw series, sinc",
+        "-in",
+        "@bold4.nii",
+        "-ref",
+        T,
+        "-init",
+        "@init.mat",
+        "-applyxfm",
+        "-interp",
+        "sinc",
+        "-out",
+        "out",
+    )
+    add(
+        "real/applyxfm-usesqform",
+        st,
+        "-applyxfm -usesqform",
+        *base[1],
+        "-usesqform",
+        "-applyxfm",
+        "-out",
+        "out",
+        "-omat",
+        "out.mat",
+    )
+    add(
+        "real/out-only",
+        st,
+        "a registration with -out and no -omat (the matrix printed)",
+        *base[1],
+        "-dof",
+        "6",
+        "-out",
+        "out",
+    )
+    add(
+        "real/basescale-small",
+        st,
+        "0.6 mm voxels (the base scale from the voxel size)",
+        "-in",
+        E,
+        "-ref",
+        "@t1_small.nii",
+        "-dof",
+        "6",
+        "-omat",
+        "out.mat",
+    )
+    add(
+        "real/basescale-big",
+        st,
+        "14 mm voxels (the base scale from the voxel size)",
+        "-in",
+        "@epi_big.nii",
+        "-ref",
+        T,
+        "-dof",
+        "6",
+        "-omat",
+        "out.mat",
+    )
+    add(
+        "real/basescale-forced",
+        st,
+        "-basescale 2",
+        *base[1],
+        "-basescale",
+        "2",
+        "-dof",
+        "6",
+        "-omat",
+        "out.mat",
+    )
     # Boundary-based registration on the half-size T1w
-    bbr = ("-in", E, "-ref", T, "-init", "@init.mat", "-schedule", _sch("bbr.sch"), "-wmseg", W, "-dof", "6", "-omat", "out.mat")
-    add("bbr/default", st, "BBR (FSL's bbr.sch) with -cost bbr", *bbr, "-cost", "bbr", "-out", "out")
-    add("bbr/fmriprep-form", s, "fMRIPrep's form: -searchcost bbr -basescale 1", *bbr, "-searchcost", "bbr", "-basescale", "1")
+    bbr = (
+        "-in",
+        E,
+        "-ref",
+        T,
+        "-init",
+        "@init.mat",
+        "-schedule",
+        _sch("bbr.sch"),
+        "-wmseg",
+        W,
+        "-dof",
+        "6",
+        "-omat",
+        "out.mat",
+    )
+    add(
+        "bbr/default", st, "BBR (FSL's bbr.sch) with -cost bbr", *bbr, "-cost", "bbr", "-out", "out"
+    )
+    add(
+        "bbr/fmriprep-form",
+        s,
+        "fMRIPrep's form: -searchcost bbr -basescale 1",
+        *bbr,
+        "-searchcost",
+        "bbr",
+        "-basescale",
+        "1",
+    )
     for t in ("global_abs", "local_abs"):
         add(f"bbr/type-{t}", st, f"-bbrtype {t}", *bbr, "-cost", "bbr", "-bbrtype", t)
     add("bbr/slope", st, "-bbrslope -0.25", *bbr, "-cost", "bbr", "-bbrslope", "-0.25")
-    add("bbr/coords", st, "-wmcoords and -wmnorms", "-in", E, "-ref", T, "-init", "@init.mat", "-schedule", _sch("bbr.sch"), "-wmcoords", "@wmcoords.txt", "-wmnorms", "@wmnorms.txt", "-cost", "bbr", "-dof", "6", "-omat", "out.mat")
-    add("bbr/fieldmap", st, "-fieldmap -pedir 2 -echospacing (the BBR resampling for -out)", *bbr, "-cost", "bbr", "-fieldmap", "@fmap.nii", "-pedir", "2", "-echospacing", "0.0007", "-out", "out")
-    add("bbr/fieldmap-mask", st, "-fieldmapmask -pedir -2", *bbr, "-cost", "bbr", "-fieldmap", "@fmap.nii", "-fieldmapmask", "@fmapmask.nii", "-pedir", "-2")
-    add("bbr/weights", st, "BBR with -refweight", *bbr, "-cost", "bbr", "-refweight", "@refweight.nii")
-    add("bbr/bad-type", st, "-bbrtype unknown (FSL's exception)", *bbr, "-cost", "bbr", "-bbrtype", "nope")
+    add(
+        "bbr/coords",
+        st,
+        "-wmcoords and -wmnorms",
+        "-in",
+        E,
+        "-ref",
+        T,
+        "-init",
+        "@init.mat",
+        "-schedule",
+        _sch("bbr.sch"),
+        "-wmcoords",
+        "@wmcoords.txt",
+        "-wmnorms",
+        "@wmnorms.txt",
+        "-cost",
+        "bbr",
+        "-dof",
+        "6",
+        "-omat",
+        "out.mat",
+    )
+    add(
+        "bbr/fieldmap",
+        st,
+        "-fieldmap -pedir 2 -echospacing (the BBR resampling for -out)",
+        *bbr,
+        "-cost",
+        "bbr",
+        "-fieldmap",
+        "@fmap.nii",
+        "-pedir",
+        "2",
+        "-echospacing",
+        "0.0007",
+        "-out",
+        "out",
+    )
+    add(
+        "bbr/fieldmap-mask",
+        st,
+        "-fieldmapmask -pedir -2",
+        *bbr,
+        "-cost",
+        "bbr",
+        "-fieldmap",
+        "@fmap.nii",
+        "-fieldmapmask",
+        "@fmapmask.nii",
+        "-pedir",
+        "-2",
+    )
+    add(
+        "bbr/weights",
+        st,
+        "BBR with -refweight",
+        *bbr,
+        "-cost",
+        "bbr",
+        "-refweight",
+        "@refweight.nii",
+    )
+    add(
+        "bbr/bad-type",
+        st,
+        "-bbrtype unknown (FSL's exception)",
+        *bbr,
+        "-cost",
+        "bbr",
+        "-bbrtype",
+        "nope",
+    )
     # FSL's shipped schedules
-    for sch in ("simple3D.sch", "xyztrans.sch", "ytransonly.sch", "ztransonly.sch", "sch3Dtrans_3dof", "measurecost1.sch", "pairreg1.sch", "pairreg2.sch", "pairreg3.sch"):
-        add(f"schedule/{sch}", st, f"FSL's {sch}", *base[1], "-init", "@init.mat", "-schedule", _sch(sch), "-omat", "out.mat")
+    for sch in (
+        "simple3D.sch",
+        "xyztrans.sch",
+        "ytransonly.sch",
+        "ztransonly.sch",
+        "sch3Dtrans_3dof",
+        "measurecost1.sch",
+        "pairreg1.sch",
+        "pairreg2.sch",
+        "pairreg3.sch",
+    ):
+        add(
+            f"schedule/{sch}",
+            st,
+            f"FSL's {sch}",
+            *base[1],
+            "-init",
+            "@init.mat",
+            "-schedule",
+            _sch(sch),
+            "-omat",
+            "out.mat",
+        )
     for sch in ("sch2D_3dof", "sch2D_4dof", "sch2D_5dof", "sch2D_6dof"):
-        add(f"schedule/{sch}", st, f"FSL's {sch} on one slice", "-in", "@slice_in.nii", "-ref", "@slice_ref.nii", "-2D", "-schedule", _sch(sch), "-omat", "out.mat")
-    add("real/2d", st, "-2D's default schedule on one slice, with -out", "-in", "@slice_in.nii", "-ref", "@slice_ref.nii", "-2D", "-out", "out", "-omat", "out.mat")
+        add(
+            f"schedule/{sch}",
+            st,
+            f"FSL's {sch} on one slice",
+            "-in",
+            "@slice_in.nii",
+            "-ref",
+            "@slice_ref.nii",
+            "-2D",
+            "-schedule",
+            _sch(sch),
+            "-omat",
+            "out.mat",
+        )
+    add(
+        "real/2d",
+        st,
+        "-2D's default schedule on one slice, with -out",
+        "-in",
+        "@slice_in.nii",
+        "-ref",
+        "@slice_ref.nii",
+        "-2D",
+        "-out",
+        "out",
+        "-omat",
+        "out.mat",
+    )
     # Verbose output
     add("verbose/v", st, "-v", *base[1], "-v", "-dof", "6", "-omat", "out.mat")
     for lvl in ("2", "3", "5"):
-        add(f"verbose/{lvl}", st, f"-verbose {lvl}", *base[1], "-verbose", lvl, "-dof", "6", "-omat", "out.mat")
-    add("verbose/printinit", st, "-printinit", *base[1], "-printinit", "-init", "@init.mat", "-applyxfm", "-omat", "out.mat")
-    add("verbose/debugsave", st, "-debugsave -verbose 4 (the search's volumes saved)", *base[1], "-debugsave", "-verbose", "4", "-dof", "6", "-omat", "out.mat")
+        add(
+            f"verbose/{lvl}",
+            st,
+            f"-verbose {lvl}",
+            *base[1],
+            "-verbose",
+            lvl,
+            "-dof",
+            "6",
+            "-omat",
+            "out.mat",
+        )
+    add(
+        "verbose/printinit",
+        st,
+        "-printinit",
+        *base[1],
+        "-printinit",
+        "-init",
+        "@init.mat",
+        "-applyxfm",
+        "-omat",
+        "out.mat",
+    )
+    add(
+        "verbose/debugsave",
+        st,
+        "-debugsave -verbose 4 (the search's volumes saved)",
+        *base[1],
+        "-debugsave",
+        "-verbose",
+        "4",
+        "-dof",
+        "6",
+        "-omat",
+        "out.mat",
+    )
     return c
 
 
@@ -685,13 +1198,21 @@ def _schedule_cases() -> dict[str, tuple[str, str, Run]]:
     c["schedule/every-command"] = (
         "standard",
         "a schedule using every command and option",
-        Run("flirt", ("-in", "@epi.nii", "-ref", "@t1.nii", "-schedule", "all.sch", "-omat", "out.mat"), files=(("all.sch", _SCHED_ALL),)),
+        Run(
+            "flirt",
+            ("-in", "@epi.nii", "-ref", "@t1.nii", "-schedule", "all.sch", "-omat", "out.mat"),
+            files=(("all.sch", _SCHED_ALL),),
+        ),
     )
     for name, text in _SCHED_ERRORS.items():
         c[name] = (
             "standard",
             f"a schedule: {text.splitlines()[0]}",
-            Run("flirt", ("-in", "@epi.nii", "-ref", "@t1.nii", "-schedule", "s.sch", "-omat", "out.mat"), files=(("s.sch", text),)),
+            Run(
+                "flirt",
+                ("-in", "@epi.nii", "-ref", "@t1.nii", "-schedule", "s.sch", "-omat", "out.mat"),
+                files=(("s.sch", text),),
+            ),
         )
     return c
 
@@ -701,7 +1222,11 @@ def _edge_cases() -> dict[str, tuple[str, str, Run]]:
     c: dict[str, tuple[str, str, Run]] = {}
 
     def add(name: str, desc: str, *args: str, program: str = F, **kw: Any) -> None:
-        c[name] = ("standard" if not kw.pop("smoke", False) else "smoke", desc, Run(program, tuple(args), **kw))
+        c[name] = (
+            "standard" if not kw.pop("smoke", False) else "smoke",
+            desc,
+            Run(program, tuple(args), **kw),
+        )
 
     add("edge/no-args", "no arguments (the usage, exit 1)", smoke=True)
     add("edge/help", "-help", "-help")
@@ -710,38 +1235,226 @@ def _edge_cases() -> dict[str, tuple[str, str, Run]]:
     add("edge/no-ref", "no -ref", "-in", "@epi.nii")
     add("edge/not-option", "a word that is not an option", "epi.nii")
     add("edge/unknown-1", "an unknown option with one word after it", "-frob", "x")
-    add("edge/unknown-2", "an unknown option with two words after it", "-in", "@epi.nii", "-frob", "x", "y")
+    add(
+        "edge/unknown-2",
+        "an unknown option with two words after it",
+        "-in",
+        "@epi.nii",
+        "-frob",
+        "x",
+        "y",
+    )
     add("edge/lacking", "an option lacking its argument", "-in", "@epi.nii", "-ref")
     add("edge/lacking-2", "a two-argument option lacking one", "-in", "@epi.nii", "-searchrx", "10")
-    for opt, val in (("-cost", "nope"), ("-searchcost", "nope"), ("-interp", "cubic"), ("-datatype", "long"), ("-sincwindow", "gauss"), ("-anglerep", "rodrigues"), ("-pedir", "0")):
+    for opt, val in (
+        ("-cost", "nope"),
+        ("-searchcost", "nope"),
+        ("-interp", "cubic"),
+        ("-datatype", "long"),
+        ("-sincwindow", "gauss"),
+        ("-anglerep", "rodrigues"),
+        ("-pedir", "0"),
+    ):
         add(f"edge/bad{opt}", f"{opt} {val}", "-in", "@epi.nii", "-ref", "@t1.nii", opt, val)
-    add("edge/missing-in", "an input that does not exist", "-in", "nothere.nii.gz", "-ref", "@t1.nii", "-omat", "o.mat")
-    add("edge/missing-ref", "a reference that does not exist", "-in", "@epi.nii", "-ref", "nothere", "-omat", "o.mat")
-    add("edge/missing-init", "an -init file that does not exist", "-in", "@epi.nii", "-ref", "@t1.nii", "-init", "none.mat", "-omat", "o.mat")
-    add("edge/missing-schedule", "a -schedule file that does not exist", "-in", "@epi.nii", "-ref", "@t1.nii", "-schedule", "none.sch", "-omat", "o.mat")
-    add("edge/bad-init", "an -init file with too few numbers", "-in", "@epi.nii", "-ref", "@t1.nii", "-init", "bad.mat", "-omat", "o.mat", files=(("bad.mat", "1 0 0\n0 1\n"),))
-    add("edge/coords-mismatch", "-wmcoords and -wmnorms of different lengths", "-in", "@epi.nii", "-ref", "@t1.nii", "-wmcoords", "@wmcoords.txt", "-wmnorms", "n.txt", "-cost", "bbr", files=(("n.txt", "1 0 0\n"),))
-    add("edge/outtype-unset", "FSLOUTPUTTYPE unset", "-in", "@epi.nii", "-ref", "@t1.nii", "-init", "@init.mat", "-applyxfm", "-out", "out", settings=(("FSLOUTPUTTYPE", None),))
+    add(
+        "edge/missing-in",
+        "an input that does not exist",
+        "-in",
+        "nothere.nii.gz",
+        "-ref",
+        "@t1.nii",
+        "-omat",
+        "o.mat",
+    )
+    add(
+        "edge/missing-ref",
+        "a reference that does not exist",
+        "-in",
+        "@epi.nii",
+        "-ref",
+        "nothere",
+        "-omat",
+        "o.mat",
+    )
+    add(
+        "edge/missing-init",
+        "an -init file that does not exist",
+        "-in",
+        "@epi.nii",
+        "-ref",
+        "@t1.nii",
+        "-init",
+        "none.mat",
+        "-omat",
+        "o.mat",
+    )
+    add(
+        "edge/missing-schedule",
+        "a -schedule file that does not exist",
+        "-in",
+        "@epi.nii",
+        "-ref",
+        "@t1.nii",
+        "-schedule",
+        "none.sch",
+        "-omat",
+        "o.mat",
+    )
+    add(
+        "edge/bad-init",
+        "an -init file with too few numbers",
+        "-in",
+        "@epi.nii",
+        "-ref",
+        "@t1.nii",
+        "-init",
+        "bad.mat",
+        "-omat",
+        "o.mat",
+        files=(("bad.mat", "1 0 0\n0 1\n"),),
+    )
+    add(
+        "edge/coords-mismatch",
+        "-wmcoords and -wmnorms of different lengths",
+        "-in",
+        "@epi.nii",
+        "-ref",
+        "@t1.nii",
+        "-wmcoords",
+        "@wmcoords.txt",
+        "-wmnorms",
+        "n.txt",
+        "-cost",
+        "bbr",
+        files=(("n.txt", "1 0 0\n"),),
+    )
+    add(
+        "edge/outtype-unset",
+        "FSLOUTPUTTYPE unset",
+        "-in",
+        "@epi.nii",
+        "-ref",
+        "@t1.nii",
+        "-init",
+        "@init.mat",
+        "-applyxfm",
+        "-out",
+        "out",
+        settings=(("FSLOUTPUTTYPE", None),),
+    )
     for ot in ("NIFTI", "NIFTI_PAIR", "NIFTI2_GZ", "ANALYZE"):
-        add(f"edge/outtype-{ot}", f"FSLOUTPUTTYPE={ot}", "-in", "@epi.nii", "-ref", "@t1.nii", "-init", "@init.mat", "-applyxfm", "-out", "out", settings=(("FSLOUTPUTTYPE", ot),))
+        add(
+            f"edge/outtype-{ot}",
+            f"FSLOUTPUTTYPE={ot}",
+            "-in",
+            "@epi.nii",
+            "-ref",
+            "@t1.nii",
+            "-init",
+            "@init.mat",
+            "-applyxfm",
+            "-out",
+            "out",
+            settings=(("FSLOUTPUTTYPE", ot),),
+        )
     # convert_xfm
     X = "convert_xfm"
     add("convert_xfm/no-args", "no arguments", program=X, smoke=True)
     add("convert_xfm/help", "-help", "-help", program=X)
-    add("convert_xfm/inverse", "-omat -inverse", "-omat", "inv.mat", "-inverse", "@init.mat", program=X, smoke=True)
-    add("convert_xfm/concat", "-omat -concat", "-omat", "cat.mat", "-concat", "@init.mat", "@init.mat", program=X)
-    add("convert_xfm/fixscaleskew", "-fixscaleskew", "-omat", "f.mat", "-fixscaleskew", "s.mat", "@init.mat", program=X, files=(("s.mat", "1.1 0.05 0 0\n0 0.9 0.02 0\n0 0 1.05 0\n0 0 0 1\n"),))
-    add("convert_xfm/verbose", "-v with -concat and -inverse (the matrices printed)", "-v", "-concat", "@init.mat", "-inverse", "@init.mat", program=X)
-    add("convert_xfm/verbose-1", "-verbose 1 (the result printed)", "-verbose", "1", "@init.mat", program=X)
-    add("convert_xfm/copy", "-omat only (the matrix written again)", "-omat", "c.mat", "@init.mat", program=X)
-    add("convert_xfm/missing", "an input matrix that does not exist", "-omat", "o.mat", "none.mat", program=X)
-    add("convert_xfm/short", "a 3-row input matrix", "-omat", "o.mat", "s.mat", program=X, files=(("s.mat", "1 0 0 0\n0 1 0 0\n0 0 1 0\n"),))
+    add(
+        "convert_xfm/inverse",
+        "-omat -inverse",
+        "-omat",
+        "inv.mat",
+        "-inverse",
+        "@init.mat",
+        program=X,
+        smoke=True,
+    )
+    add(
+        "convert_xfm/concat",
+        "-omat -concat",
+        "-omat",
+        "cat.mat",
+        "-concat",
+        "@init.mat",
+        "@init.mat",
+        program=X,
+    )
+    add(
+        "convert_xfm/fixscaleskew",
+        "-fixscaleskew",
+        "-omat",
+        "f.mat",
+        "-fixscaleskew",
+        "s.mat",
+        "@init.mat",
+        program=X,
+        files=(("s.mat", "1.1 0.05 0 0\n0 0.9 0.02 0\n0 0 1.05 0\n0 0 0 1\n"),),
+    )
+    add(
+        "convert_xfm/verbose",
+        "-v with -concat and -inverse (the matrices printed)",
+        "-v",
+        "-concat",
+        "@init.mat",
+        "-inverse",
+        "@init.mat",
+        program=X,
+    )
+    add(
+        "convert_xfm/verbose-1",
+        "-verbose 1 (the result printed)",
+        "-verbose",
+        "1",
+        "@init.mat",
+        program=X,
+    )
+    add(
+        "convert_xfm/copy",
+        "-omat only (the matrix written again)",
+        "-omat",
+        "c.mat",
+        "@init.mat",
+        program=X,
+    )
+    add(
+        "convert_xfm/missing",
+        "an input matrix that does not exist",
+        "-omat",
+        "o.mat",
+        "none.mat",
+        program=X,
+    )
+    add(
+        "convert_xfm/short",
+        "a 3-row input matrix",
+        "-omat",
+        "o.mat",
+        "s.mat",
+        program=X,
+        files=(("s.mat", "1 0 0 0\n0 1 0 0\n0 0 1 0\n"),),
+    )
     add("convert_xfm/no-input", "no input matrix", "-omat", "o.mat", program=X)
     add("convert_xfm/two-inputs", "two input matrices", "@init.mat", "x.mat", program=X)
     add("convert_xfm/unknown", "an unknown option", "-frob", "x", "@init.mat", program=X)
     add("convert_xfm/lacking", "-omat lacking its argument", "@init.mat", "-omat", program=X)
-    add("convert_xfm/singular", "-inverse of a singular matrix", "-inverse", "z.mat", program=X, files=(("z.mat", "1 0 0 0\n0 0 0 0\n0 0 1 0\n0 0 0 1\n"),))
-    add("convert_xfm/missing-concat", "-concat with a file that does not exist", "-concat", "none.mat", "@init.mat", program=X)
+    add(
+        "convert_xfm/singular",
+        "-inverse of a singular matrix",
+        "-inverse",
+        "z.mat",
+        program=X,
+        files=(("z.mat", "1 0 0 0\n0 0 0 0\n0 0 1 0\n0 0 0 1\n"),),
+    )
+    add(
+        "convert_xfm/missing-concat",
+        "-concat with a file that does not exist",
+        "-concat",
+        "none.mat",
+        "@init.mat",
+        program=X,
+    )
     return c
 
 
@@ -768,7 +1481,7 @@ def cases(tier: str) -> list[Case]:
                     ("fmriprep", (run, str(node))),
                 )
             )
-    for name, (t, desc, run) in _all_cases().items():
+    for name, (t, desc, _run) in _all_cases().items():
         if in_tier(t, tier):
             out.append(Case(name, name.split("/")[0], desc, ("run", name)))
     return out

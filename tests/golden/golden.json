@@ -1,6 +1,6 @@
 {
  "about": "SHA-256 of larmorx's outputs on Linux x86_64 for the golden cases in registry.py; every platform must reproduce them (docs/validation/golden.md). Written by scripts/record_golden.py; do not edit by hand.",
- "recorded": {"commit": "d6be1e4a16e8b829d977178ed8b45c86b2c9ddbd", "date": "2026-11-02", "numpy": "2.3.5", "parity": "passed (pytest tests/parity, smoke tier; the run of 2026-11-02T06:43:58+00:00, reused)", "platform": "Linux x86_64", "python": "3.12.16"},
+ "recorded": {"commit": "13012f3f806da0d9b009a6c8932610dc46c20adf", "date": "2026-11-02", "numpy": "2.3.5", "parity": "skipped", "platform": "Linux x86_64", "python": "3.12.16"},
  "cases": {
   "cli.afni.3dAutomask": {
    "depth:data": {"dtype": "<i2", "sample": "00000000020000000000020000000000", "sha256": "5eb371e03027e458585e506ca5feeb8a4a1673ee77a63e6a8442b5b23c1c3c85", "shape": [24, 20, 16], "sum": "2792.0"},
@@ -692,6 +692,82 @@
    "skull_mask:data": {"dtype": "<i2", "sample": "00000000000001000100000000000000", "sha256": "fa688f15c57d37c4d5802b2d40a8fee17dd4db31db7b0faf224dfc15fe0bd325", "shape": [24, 20, 16], "sum": "1731.0"},
    "skull_mask:header": {"bytes": 352, "sha256": "639c5c0bcb8252d7b1512f7de6436096510d4085bc7dbadf47c4150f5ac0c790"}
   },
+  "cli.fsl.convert_xfm": {
+   "matrix": {"bytes": 190, "sha256": "7c30e63566d8070a61efb4fcc75cf1468cbd48e2f4d6c6576ab2c5346e653464"},
+   "stdout": {"bytes": 833, "sha256": "75daa7b9f3b8ede7f41d1ebd7be62e45444474d011f38b602482f25fd161fcab"},
+   "usage:status": {"dtype": "<f8", "sample": "000000000000f03f", "sha256": "6c3c396ed6b5c36dcae172271f462051b1266b851e92df3deea8ac65478fd712", "shape": [], "sum": "1.0"},
+   "usage:stderr": {"bytes": 0, "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"},
+   "usage:stdout": {"bytes": 595, "sha256": "6db4a65962d2afcc3df9bab1227353542aec27ee3b54f6ba51d236e9b1acac9c"}
+  },
+  "cli.fsl.flirt": {
+   "image:data": {"dtype": "<f4", "sample": "bae8e23fda280d4145004943a0a9a23f3152cb407b8a4c43905e7a3fbae8e23f", "sha256": "774e10d92f8412e3ed89ce7b1ac715f17ff6ed601ee14010dee288f8c779914b", "shape": [24, 20, 16], "sum": "390910.8533526063"},
+   "image:header": {"bytes": 352, "sha256": "197c1e52bb3848db0acc107836e1ab653f3f24940dfb3a58051bf2cb776a57a8"},
+   "matrix": {"bytes": 199, "sha256": "f8e95c9a3b25b7d453ba3e60ce4d289becf16dc2029ca9f4e10b51b895b4e56d"},
+   "stdout": {"bytes": 3022, "sha256": "997fdc96bb25824a2e78a5601b3b353a05bcd484fa7eb07461a99c1b62e040c8"}
+  },
+  "cli.fsl.flirt.applyxfm": {
+   "iso:data": {"dtype": "<f4", "sample": "bae8e23fd940094260c47d42d89a5d426fcfa141ea55c7428ddf8242bae8e23f", "sha256": "c1879199a1579f6cb127fc365a679f7d50a6b1fcd2b8ba9d59decf486b04d7d4", "shape": [12, 12, 12], "sum": "90646.00253844261"},
+   "iso:header": {"bytes": 352, "sha256": "2e030c056f9a16098b65e14e3d371732b412284f2101e1ac0f5a12d5fb30d7c2"},
+   "nearestneighbour:data": {"dtype": "<i2", "sample": "02000800ca0002000900cc0006000200", "sha256": "940d682551c6187ac150cbe1151c062d77e0f59e87265212094a29beba880e40", "shape": [24, 20, 16], "sum": "386075.0"},
+   "nearestneighbour:header": {"bytes": 352, "sha256": "4e9164cb5ebf3345aa7794e0b0806beb42419d082108ce582129590f44fd4fa2"},
+   "sinc:data": {"dtype": "<f4", "sample": "bae8e23f19dfab4075454d4384798b40c800f94017db4c43b913b240bae8e23f", "sha256": "ccd34cb1a937d304488d23b46b31d828c333277ee0d77937bc8537ea329fdf35", "shape": [24, 20, 16], "sum": "387247.7665162826"},
+   "sinc:header": {"bytes": 352, "sha256": "197c1e52bb3848db0acc107836e1ab653f3f24940dfb3a58051bf2cb776a57a8"},
+   "spline:data": {"dtype": "<f4", "sample": "000040406bc867407dba4c431ea88b406456dd407b0a4a43bfb8854000004040", "sha256": "20ff121d5bb2fc29f60155d07f810242199f28bc563a28b351fc7cf145edacb4", "shape": [24, 20, 16], "sum": "389162.4855405775"},
+   "spline:header": {"bytes": 352, "sha256": "197c1e52bb3848db0acc107836e1ab653f3f24940dfb3a58051bf2cb776a57a8"},
+   "trilinear:data": {"dtype": "<f4", "sample": "034e0a411542d34052ae4d438130a2404257e240e69a4d437d09b840bae8e23f", "sha256": "c3f48b45c8bd9f4ca3bd7c25d4a5e1b9ff835bd11b6d43ff4a880521c3c50706", "shape": [24, 20, 16], "sum": "391503.2801440954"},
+   "trilinear:header": {"bytes": 352, "sha256": "197c1e52bb3848db0acc107836e1ab653f3f24940dfb3a58051bf2cb776a57a8"}
+  },
+  "cli.fsl.flirt.bbr": {
+   "coords": {"bytes": 188, "sha256": "8f8354b0ff089652afaf1545e0976c3fbafa20a2425b6d9185a5e386f888ca0b"},
+   "coords_stdout": {"bytes": 159, "sha256": "cde3a6ad880f1e287678e075be1983f569a08b618da4d9d3aac091d80d7b6a17"},
+   "seg": {"bytes": 201, "sha256": "7546b59d14e8f6c698839107c3977b0be2dd1702efb6bd1eb9c347c42e6c1b08"},
+   "seg_stdout": {"bytes": 159, "sha256": "89e9531ca15351e675e95243cfc7d2b209e62be28923e454ce6664f4057c3c54"}
+  },
+  "cli.fsl.flirt.costs": {
+   "2d": {"bytes": 166, "sha256": "c1c10668f9429714661320419b5fc98e00eb94a149d046c4ac43538fe445452b"},
+   "labeldiff": {"bytes": 196, "sha256": "533859f27a92eeadb1ef8e3477c52ebb13ec5e4736156eeab0d3a4aec0a143b6"},
+   "leastsq": {"bytes": 194, "sha256": "b29060f5345beca59cf03c0f1e5659543efc49ec9276e6593c5c53f9899b866b"},
+   "mutualinfo": {"bytes": 197, "sha256": "4bc7145a44d24adb6523ec8963ab4803a73cb0b28f3bd3b69dd74d5875d9520a"},
+   "normcorr": {"bytes": 207, "sha256": "f10d4fd88fcd089c21e96a65eca70fbb86bafe0f7406a492542af8e5f1311a56"},
+   "normmi": {"bytes": 177, "sha256": "b1254d34e9189ddb0d9e5af819e090f913b56cd774e70537e81498311d4a7d31"},
+   "weights": {"bytes": 183, "sha256": "bded71b8318baf959651e9680174f20bab11f42517dbcc3ddfaefae9e0467ff1"},
+   "woods": {"bytes": 193, "sha256": "1f8bf9059b58b414e6e80150b8fe44c52ba44b9155454b719d0e9329a90641c3"}
+  },
+  "cli.fsl.flirt.errors": {
+   "bad-cost:status": {"dtype": "<f8", "sample": "0000000000e06f40", "sha256": "729bef532e854760af95391c84e7ba32d372f3384227e6d952a809b8b7f35eb5", "shape": [], "sum": "255.0"},
+   "bad-cost:stderr": {"bytes": 38, "sha256": "ac58263d3b68ae9de837cab1e478f9f15c4d1adca9cf6ac278850c2e9738f3cc"},
+   "bad-cost:stdout": {"bytes": 0, "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"},
+   "bins:status": {"dtype": "<f8", "sample": "000000000000f03f", "sha256": "6c3c396ed6b5c36dcae172271f462051b1266b851e92df3deea8ac65478fd712", "shape": [], "sum": "1.0"},
+   "bins:stderr": {"bytes": 152, "sha256": "afd5f6fe35e814b98969d44bba896da7d189f3a70744f74f4900d70a17f73b8c"},
+   "bins:stdout": {"bytes": 0, "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"},
+   "help:status": {"dtype": "<f8", "sample": "0000000000000000", "sha256": "af5570f5a1810b7af78caf4bc70a660f0df51e42baf91d4de5b2328de0e83dfc", "shape": [], "sum": "0.0"},
+   "help:stderr": {"bytes": 0, "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"},
+   "help:stdout": {"bytes": 4178, "sha256": "6a5a4c220dd9e3e779cf47caeae16b3f90a877ce5f304dbb78bff08512e82747"},
+   "lacking:status": {"dtype": "<f8", "sample": "0000000000e06f40", "sha256": "729bef532e854760af95391c84e7ba32d372f3384227e6d952a809b8b7f35eb5", "shape": [], "sum": "255.0"},
+   "lacking:stderr": {"bytes": 32, "sha256": "e9ce6e557a879b215c084e7d136b84fea60502a66fabdd57c89969cd948bda9e"},
+   "lacking:stdout": {"bytes": 0, "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"},
+   "missing-init:status": {"dtype": "<f8", "sample": "000000000000f03f", "sha256": "6c3c396ed6b5c36dcae172271f462051b1266b851e92df3deea8ac65478fd712", "shape": [], "sum": "1.0"},
+   "missing-init:stderr": {"bytes": 290, "sha256": "1c4db79e5637853945f4dc2d9564a4cc25535ff951cda56dc5547c8b132ec97d"},
+   "missing-init:stdout": {"bytes": 0, "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"},
+   "no-ref:status": {"dtype": "<f8", "sample": "0000000000000040", "sha256": "3f710ac088db33363087de2b9a657541fe5447821debaa9fe5cbd538eb1a5f29", "shape": [], "sum": "2.0"},
+   "no-ref:stderr": {"bytes": 45, "sha256": "d29d8fa31714592a830bca73d6befa1ee3d2feb63f68020ed9934deab60dd96f"},
+   "no-ref:stdout": {"bytes": 4179, "sha256": "88d91757797b9019afb18a610925450386cc66ae6abb8a4283bf4ca4f26725b2"},
+   "not-option:status": {"dtype": "<f8", "sample": "0000000000e06f40", "sha256": "729bef532e854760af95391c84e7ba32d372f3384227e6d952a809b8b7f35eb5", "shape": [], "sum": "255.0"},
+   "not-option:stderr": {"bytes": 22, "sha256": "a789dd8c03f346394076ea2bc8902986dc797913a4bf10bdcc954f25d5240b07"},
+   "not-option:stdout": {"bytes": 0, "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"},
+   "reproduce:status": {"dtype": "<f8", "sample": "0000000000000000", "sha256": "af5570f5a1810b7af78caf4bc70a660f0df51e42baf91d4de5b2328de0e83dfc", "shape": [], "sum": "0.0"},
+   "reproduce:stderr": {"bytes": 257, "sha256": "b217f75b15a345b90b5a101ee5bde10bc3e10efe27ecef0484b216096d5a0f88"},
+   "reproduce:stdout": {"bytes": 0, "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"},
+   "usage:status": {"dtype": "<f8", "sample": "000000000000f03f", "sha256": "6c3c396ed6b5c36dcae172271f462051b1266b851e92df3deea8ac65478fd712", "shape": [], "sum": "1.0"},
+   "usage:stderr": {"bytes": 0, "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"},
+   "usage:stdout": {"bytes": 4179, "sha256": "88d91757797b9019afb18a610925450386cc66ae6abb8a4283bf4ca4f26725b2"}
+  },
+  "cli.fsl.flirt.schedule": {
+   "matrix": {"bytes": 89, "sha256": "88b063c68f6827af39ff75f77d055bc684d5679d60438fde203b468e96d77444"},
+   "params": {"bytes": 486, "sha256": "7fbc098281b4e10b4469058017f61a3dca0bd92a42034023ed5a6cb466fb12b0"},
+   "rows": {"bytes": 628, "sha256": "dd7a25b5f678c01023258482dc27f38896671e2ab1f5930c10ea427c02d7f871"},
+   "stdout": {"bytes": 594, "sha256": "c3f9f816f90ddca39872bff8cc367aa5e2efb088a35d26129972599708a64b6d"}
+  },
   "cli.fsl.mcflirt": {
    "MAT_0000": {"bytes": 148, "sha256": "c8b0554af656ea054e53ac2ee9023b9f4696328457ff4cfaa04182bbf2404c6c"},
    "MAT_0001": {"bytes": 151, "sha256": "21b3fea1f8049563ecb20e4a93192c6820e105c316125dc87cc1764ebd902756"},
@@ -1233,6 +1309,14 @@
    "outskull.triangles": {"dtype": "<i8", "sample": "840200000000000003060000000000000d0900000000000042010000000000002d08000000000000ad030000000000002c070000000000004b07000000000000", "sha256": "9df06b481eb313cafc744e7ec7eb0f6ff4dd804e0214571f35a7c89ca64803d1", "shape": [5120, 3], "sum": "19683780.0"},
    "outskull.vertices": {"dtype": "<f8", "sample": "0a85083884004640eab298d87c604640d9cf62299295444070b54e5c8eef3d4085b2f0f5b5aee93f499f56d11f263340334fae2990a91840e2ea0088bb563440", "sha256": "39066794e6956035f975846ed1a1cfd0f1cbcc51433ad830ca4a77f7518a0766", "shape": [2562, 3], "sum": "178311.096808"},
    "skull_mask": {"dtype": "<i2", "sample": "00000100000001000100000001000000", "sha256": "74e38c53f108af609430dd14389ee02da7b936c678d2e6c1131730ec5da57f02", "shape": [24, 20, 16], "sum": "3061.0"}
+  },
+  "py.fsl.convert_xfm": {
+   "matrix": {"dtype": "<f8", "sample": "e027fe4f8d65ee3ffdcaa79d87ef80bfa1661c7043efbcbf1d695733f41db63f3de4ef0194899b3f01d9b95abf11e83fc4a92050472105c0000000000000f03f", "sha256": "bce8ced23d566bba4e599fb39cb46ab7de8960e5fcfe1de488016ee98ee1dc67", "shape": [4, 4], "sum": "2.76205304355"}
+  },
+  "py.fsl.flirt": {
+   "applied": {"dtype": "<f4", "sample": "bae8e23f6a63ed402f7b4c43b10ba740d46ce440a4965243daf00d41bae8e23f", "sha256": "6d03a70ad8d02db4adcf609ad2a3752bc4adf95aeda7c7ad0b07a286184a7fa3", "shape": [24, 20, 16], "sum": "390379.2483714521"},
+   "image": {"dtype": "<f4", "sample": "bae8e23ff6e1ec40a6804c43a54ea8403a32e440cb925243e6770d41bae8e23f", "sha256": "abf0d6fe34867549ac293507e4f71917ed4176305eaa096a989eec5341b0fc27", "shape": [24, 20, 16], "sum": "390376.34065014124"},
+   "matrix": {"dtype": "<f8", "sample": "1e310360ffffef3faca2b7966220333f697f3ce9f4c5463f70de29b6db4f36bf0ae501206a1c33bfd94601c0ffffef3f4a4e44c46f000040000000000000f03f", "sha256": "ee8d493160d7ed65e67faef97ba5bc614e1856106bb0a3c209888be2645cba4d", "shape": [4, 4], "sum": "6.0091304444867"}
   },
   "py.fsl.read_vtk": {
    "triangles": {"dtype": "<i8", "sample": "0a000000000000000700000000000000100000000000000012000000000000000400000000000000080000000000000019000000000000000c00000000000000", "sha256": "1b28fb6674ccac35900a01e1c412b5082283a87fe0d87d3f9e827bcf74a247a2", "shape": [60, 3], "sum": "3652.0"},

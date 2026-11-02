@@ -42,6 +42,10 @@ FMRIPREP = [
     ("panel-ds005003-glioma", "ds005003-sub-RS001-noreconall", "slices",
      "a glioma patient's T1w (ds005003)"),
 ]  # fmt: skip
+#: Where a data-panel example's three slices go (a file voxel of fMRIPrep's T1w brain), when not
+#: through the brain's centre: ds005003's tumour (the data panel's "70 mL right frontal
+#: oligodendroglioma"; a voxel inside its hypointense core, chosen on the T1w at slice 172).
+VIEW_AT = {"ds005003-sub-RS001-noreconall": (45, 150, 172)}
 #: The record's other cases shown as examples: example id -> case.
 REAL = {"bias-field": "opt/bias-outputs", "priors": "priors/a-verbose", "multi-channel": "multi/s3"}
 #: The replica's runs: label, D13 mode, threads.
@@ -580,6 +584,10 @@ def _example_fmriprep(ctx: core.Context, ex_id: str, run: str, view: str, words:
     same = common.identical(diffs)
     _verdicts(diffs, same, "this call", info, bias=False)
     at = _default_view(ex, view, "fsl", "replica", "pve_1")
+    where = "the brain's centre"
+    if run in VIEW_AT:
+        at = grid.display_index(VIEW_AT[run])
+        where = "the tumour"
     default = {
         "output": "pve_1",
         "plane": "axial",
@@ -590,9 +598,9 @@ def _example_fmriprep(ctx: core.Context, ex_id: str, run: str, view: str, words:
     }
     out = common.finish(
         ctx, ex, diffs, copy.deepcopy(outputs), default=default, window_panel="fsl",
-        caption=("the three slices through the brain's centre are stored at full resolution "
-                 "(the outputs agree everywhere)." if view == "slices"
-                 else "the crosshair at the brain's centre (the outputs agree everywhere)."),
+        caption=(f"the three slices through {where} are stored at full resolution (the "
+                 "outputs agree everywhere)." if view == "slices"
+                 else f"the crosshair at {where} (the outputs agree everywhere)."),
     )  # fmt: skip
     vox_ml = float(np.prod(img.header.get_zooms()[:3])) / 1000.0
     pve = {

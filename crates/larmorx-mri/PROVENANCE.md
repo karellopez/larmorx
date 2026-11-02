@@ -117,3 +117,7 @@ changes `lx.mri.hmc`'s `-cost corratio` and `-cost woods` (closer to mcflirt: th
 re-made from 04b58ca; every other case identical). `hmc::cost::PointWeight` now receives the
 point's edge weight and `TestVolume::edge_factors` gives its three factors (FLIRT's weighted costs,
 `specs/flirt.md` §6.4); the head-motion correction passes no weight.
+
+Part 2 of FLIRT's clean-room original, relay 5 (2026-11-02): `hmc::image::to_f32_vec` converts the
+stored array where it lies (no copy of it first): one full-size array less at the reading's peak,
+the values the same (FLIRT's avscale and midtrans with a 0.8 mm volume within FSL's memory).

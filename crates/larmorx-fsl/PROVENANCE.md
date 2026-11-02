@@ -158,3 +158,15 @@ opened). Its only inputs were:
 | `flirt::schedule::{std_sort, std_sort_checked}` | the order of rows of equal cost; NaN's order in the background value with `reproduce` | §7.1, §10a |
 | `flirt::bbr::points` (with `pyramid::convolve`) | the boundary normals: a Gaussian of 2 mm, the gradient's weights 3, 1, 1/3, zeros outside | §6.5 |
 | `flirt::output::{FlirtSpline, trilinear_constant, SincKernel}`, `Edge` | the spline exactly, `-setbackground`'s constant, the sinc's table and lookup, the edge rule before the blur | §9.2, §9.3 |
+
+### Part 2, relay 5 (2026-11-02): from the random-testing trial (black-box runs of FSL 6.0.7.23)
+
+| Code | Behaviour | Source |
+|---|---|---|
+| `flirt::engine::apply` (`-applyisoxfm`'s header) | single-precision `st`, each form swapped by both grids, every element in single precision, the qform's quaternion from its matrix | §9.3, §4.1 |
+| `flirt::engine::completed_forms` | an unset form written as the set one (a registration's `-out`, applyxfm4D) | observed (docs/findings/fsl-flirt-original.md, "Random testing of every program") |
+| `flirt::bbr::setup_errors`, the `(2)` warning of a NaN cost | BBR without a boundary voxel | §6.5; observed (the set-up's count) |
+| `flirt::programs::Space::{of_image, unset}`, `cli::coords` | an image without forms at its voxel sizes; the standard programs' warning | §15.2; observed |
+| `cli::common::header_bytes` | only the header's bytes read (memory) | observed (FSL's peak) |
+| `cli::applyxfm4d`, `cli::makerot` | FSL-76, FSL-79, FSL-80 named only where they change a value | D13 |
+| `bet::image::write_pieces` | zstd and bzip2 outputs of every stored type | §10.1 |

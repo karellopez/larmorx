@@ -7,7 +7,11 @@
 //!   source code or its bit-exact replica (see `PROVENANCE.md`).
 //! - [`betsurf`]: the skull and scalp surfaces of FSL's `betsurf` (`specs/bet.md` §6), written the
 //!   same way.
-//! - [`cli`]: the command lines (`larmorx fsl bet2`, `bet`, `betsurf`, FSL's arguments).
+//! - [`flirt`]: linear registration compatible with FSL's `flirt` and its matrix tool
+//!   `convert_xfm`, written from `specs/flirt.md` the same way, on the main package's shared
+//!   clean-room registration engine (`larmorx_mri::hmc`).
+//! - [`cli`]: the command lines (`larmorx fsl bet2`, `bet`, `betsurf`, `flirt`, `convert_xfm`,
+//!   FSL's arguments).
 #![forbid(unsafe_code)]
 // Fixed 3-vectors and 3 x 3 matrices read best indexed; comparisons written so that NaN takes
 // the branch FSL's own comparisons give it.
@@ -16,3 +20,4 @@
 pub mod bet;
 pub mod betsurf;
 pub mod cli;
+pub mod flirt;

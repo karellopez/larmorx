@@ -347,6 +347,18 @@ pub(crate) fn read_image(
     notices: &mut Vec<Notice>,
     n_threads: usize,
 ) -> Result<Input, ImageError> {
+    let f = resolve_image(settings, name, mode, notices)?;
+    image::read_first(&f, n_threads)
+}
+
+/// The files FSL's layer opens for the image `name` (completed when it has no extension;
+/// FSL-60's renaming with `reproduce`).
+pub(crate) fn resolve_image(
+    settings: &Settings,
+    name: &str,
+    mode: UpstreamDefects,
+    notices: &mut Vec<Notice>,
+) -> Result<ImageFiles, ImageError> {
     let full = settings.name(name);
     let resolved = image::resolve_input(&full).map_err(ImageError::Invalid)?;
     let mut f = ImageFiles::of(&resolved)
@@ -365,7 +377,7 @@ pub(crate) fn read_image(
         };
         defects::push_once(notices, Notice::new(&defects::FSL_60, mode, detail));
     }
-    image::read_first(&f, n_threads)
+    Ok(f)
 }
 
 /// The output names of a run (§4.7), from the output root.
@@ -661,6 +673,7 @@ pub fn run(
         extensions: ext,
         defects: mode,
         n_threads,
+        descrip: image::DESCRIP,
     };
     if needs_images {
         let ot = match &output_type {

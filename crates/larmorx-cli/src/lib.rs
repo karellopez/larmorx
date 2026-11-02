@@ -38,7 +38,8 @@ pub const FAMILIES: &[(&str, &[&str])] = &[
 
 /// The FSL tools, with FSL's command lines: the replica (`larmorx-nc`) when it is installed,
 /// else the clean-room original of the same program (`fsl mcflirt` is `mri hmc`; `fsl bet`,
-/// `fsl bet2` and `fsl betsurf` are `larmorx_fsl::cli`; a test checks the list).
+/// `fsl bet2`, `fsl betsurf`, `fsl flirt` and `fsl convert_xfm` are `larmorx_fsl::cli`; a test
+/// checks the list).
 const FSL_TOOLS: &[&str] = &[
     "mcflirt",
     "bet",
@@ -213,7 +214,9 @@ fn run_tool(
         "ants" => larmorx_ants::cli::run(tool, args, options.loader, out, err),
         "fsl" => match tool {
             "mcflirt" => larmorx_mri::cli::run("hmc", args, out, err),
-            "bet" | "bet2" | "betsurf" => larmorx_fsl::cli::run(tool, args, out, err),
+            "bet" | "bet2" | "betsurf" | "flirt" | "convert_xfm" => {
+                larmorx_fsl::cli::run(tool, args, out, err)
+            }
             _ => None,
         },
         "mri" => larmorx_mri::cli::run(tool, args, out, err),
@@ -420,8 +423,6 @@ mod tests {
         assert_eq!(
             replica::replica_only("fsl").collect::<Vec<_>>(),
             [
-                "flirt",
-                "convert_xfm",
                 "avscale",
                 "img2imgcoord",
                 "std2imgcoord",
@@ -436,14 +437,21 @@ mod tests {
                 "aff2rigid",
             ]
         );
-        // flirt has no original yet: `original` is an error that says so.
+        // avscale has no original yet: `original` is an error that says so.
         let original = Options {
             implementation: Some(Implementation::Original),
             ..Options::default()
         };
-        let (code, _, err) = run_options(&["lx", "fsl", "flirt", "-version"], &original);
+        let (code, _, err) = run_options(&["lx", "fsl", "avscale"], &original);
         assert_ne!(code, 0);
         assert!(err.contains("LARMORX_IMPLEMENTATION=original"), "{err}");
+        // flirt and convert_xfm run their clean-room originals (2026-11-02).
+        let (code, out, _) = run_options(&["lx", "fsl", "flirt", "-version"], &original);
+        assert_eq!(code, 0);
+        assert_eq!(out, "FLIRT version 6.0\n");
+        let (code, out, _) = run_options(&["lx", "fsl", "convert_xfm"], &original);
+        assert_eq!(code, 1);
+        assert!(out.starts_with("convert_xfm (Version 2.1)"), "{out}");
         // betsurf runs its clean-room original: too few arguments, the usage (exit 255).
         let (code, _, err) = run_capture(&["lx", "fsl", "betsurf", "in", "out"]);
         assert_eq!(code, 255);

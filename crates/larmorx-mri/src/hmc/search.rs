@@ -34,9 +34,21 @@ fn golden(a1: f32, am: f32, a2: f32) -> f32 {
 /// A line search from offset 0 with cost `y0` there, along a parameter of tolerance `u`
 /// (§7.2). `phi(a)` is the cost at offset `a`. Returns the best offset and its cost.
 pub fn line_search(phi: &mut dyn FnMut(f32) -> f32, y0: f32, u: f32) -> (f32, f32) {
+    line_search_from(phi, y0, u, 10.0)
+}
+
+/// [`line_search`] with the first trial at `guess·u` instead of `10·u` (FLIRT's bound guess,
+/// `specs/flirt.md` §8.2; mcflirt's is always 10). The same search otherwise: shared by the
+/// head-motion correction and FLIRT's clean-room original.
+pub fn line_search_from(
+    phi: &mut dyn FnMut(f32) -> f32,
+    y0: f32,
+    u: f32,
+    guess: f32,
+) -> (f32, f32) {
     // Bracketing.
     let (mut am, mut ym) = (0.0f32, y0);
-    let mut a1 = 10.0 * u;
+    let mut a1 = guess * u;
     let mut y1 = phi(a1);
     if y1 < ym {
         std::mem::swap(&mut am, &mut a1);

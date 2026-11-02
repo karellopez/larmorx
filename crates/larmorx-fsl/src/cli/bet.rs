@@ -517,6 +517,7 @@ fn write_values(
         extensions: false,
         defects: run.mode,
         n_threads: run.settings.threads(),
+        descrip: image::DESCRIP,
     };
     image::write(&name, version, &o, values)
         .map(|_| ())

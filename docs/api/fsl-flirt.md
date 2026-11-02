@@ -177,9 +177,33 @@ text and file, 27 more where both refuse or abort alike; one more matrix of the 
 (a reflection's `--inverteddies` check) differs in the sign of a 1e-10 residual
 ([findings](../findings/fsl-flirt-original.md), "FLIRT's other programs").
 
+**FLIRT's other programs and scripts (part 2, relay 2, 2026-11-02).** `midtrans`, `pointflirt`,
+`applyxfm4D` and the scripts `pairreg`, `extracttxt` and `aff2rigid` (modules `flirt::fits` and
+`cli::{midtrans, pointflirt, applyxfm4d, pairreg, extracttxt, bre, aff2rigid}`), complete: every
+option, usage, message, exit status and failure case of §15.5 to §15.8. `midtrans` with every
+stage `-v` and `--debug` print, FSL-78 (exit status 1 by default, named); `pointflirt` with its
+transposition rule, `--vox` and the nullspace warning; `applyxfm4D` on FLIRT's shared resampling
+(no blur, as FSL: observed), in the input's grouped type, a double input's padding in double
+precision, FSL-09, FSL-75, FSL-79 (the spline's coefficients per pass in the image's type with
+`reproduce`) and FSL-80 (the rectangular width-9 kernel with `-3D` by default); `pairreg` as three
+runs of the original's `flirt` and one `convert_xfm -fixscaleskew` in this process, FSL's
+schedules read from `$FSLDIR/etc/flirtsch` as the script reads them (FSLDIR unset: refused);
+`extracttxt` with its own POSIX basic regular expressions (GNU grep's extensions) and the script's
+dc and sed arithmetic, messages included (GNU sed's usage text, which a range read as sed's options
+prints, is not reproduced: one larmorx line instead); `aff2rigid`'s matrix computed by default
+(FSL-81), FSL 6.0.7.23's traceback with `reproduce`. Refused, as the spec says (rule B): non-finite
+coordinates (`pointflirt`), averages beyond double precision (`midtrans`), arguments the scripts'
+shell would split or expand, non-integer counts and starts, files with NUL bytes. The fsl-flirt
+suite's 63 cases of these programs: 40 identical to FSL (the fits within 1e-9 of FSL's matrices
+in every element, `applyxfm4D`'s nearest-neighbour and trilinear images bit for bit, its sinc and
+spline images at a correlation of 1.0000000 with FSL's, the last bits of single precision apart),
+23 more where both refuse or abort alike; `aff2rigid`'s corrected matrix identical to the
+replica's. Also in this relay: FLIRT's matrix files read as FSL reads them (`inf`, `nan` and words
+that are not numbers read 0 and stop their line, a value beyond the double range the largest
+double; [findings](../findings/fsl-flirt-original.md)).
+
 **Not yet (part 2):** `-debug` and `-debugsave` (refused with a message naming the replica), the
-verbose levels above 1 (`-verbose 2` and more print the level-1 lines only), `midtrans`,
-`pointflirt`, `applyxfm4D` and the scripts.
+verbose levels above 1 (`-verbose 2` and more print the level-1 lines only).
 
 **Status: `experimental`.** Its record: [`docs/validation/fsl-flirt.md`](../validation/fsl-flirt.md)
 (the replica suite's cases against FSL 6.0.7.23): 89 of 111 compared cases within thresholds, 35
@@ -246,8 +270,7 @@ of its type's range.
 
 The coordinate programs' `-warp` (FNIRT's warp fields, refused until FSL's warp-field libraries are
 ported); `standard_space_roi`, `flirt_average` and `epi_reg` (scripts of FSL's other programs: not
-ported); the clean-room original's `-debug`, its verbose levels above 1, `midtrans`,
-`pointflirt`, `applyxfm4D` and the scripts (part 2). Known difference (part 3's random testing): with NaN or
+ported); the clean-room original's `-debug` and its verbose levels above 1 (part 2). Known difference (part 3's random testing): with NaN or
 infinite input voxels in `reproduce` mode (FSL-14), the sign of NaN results can differ from FSL's
 (`nan` against `-nan`): an all-NaN matrix from a schedule that optimises relative to a row, and
 the NaN voxels of `applyxfm4D`'s spline interpolation; the values are NaN in both.

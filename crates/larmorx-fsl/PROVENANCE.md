@@ -98,3 +98,24 @@ above opened). Its only inputs were:
 | `flirt::programs` (the determinant, `avscale`'s decomposition, half transforms and inverted eddy matrix, the coordinate mappings, the RMS deviations, `makerot`'s rotation with x86-64's NaN rules written out) | §15.1 to §15.4 | spec, black-box |
 | `cli::common` (matrix files, the image layer's and the C++ runtime's messages, images read for their header, the centre of gravity with FSL-14) | §15 | spec, black-box |
 | `cli::avscale`, `cli::coords`, `cli::rmsdiff`, `cli::makerot` | the four command lines, their usages and messages, FSL-76, FSL-77 | spec §15.1 to §15.4, black-box |
+
+## FLIRT's other programs and scripts (`midtrans`, `pointflirt`, `applyxfm4D`, `pairreg`, `extracttxt`, `aff2rigid`; part 2, relay 2, 2026-11-02)
+
+Written by a clean-room implementer under the same rules (none of the files listed above
+opened; FSL's scripts in `~/fsl-6.0.7.23/bin` not opened either, only run). Its only inputs were:
+
+| Input | What it gave |
+|---|---|
+| [`specs/flirt.md`](../../specs/flirt.md) §15, §15.5 to §15.8 (with §8.3, §9.1, §9.2, §10a, §11, §13) | the programs' command lines, messages, exit statuses, fits, resampling, the scripts' steps, FSL-78 to FSL-81 |
+| Black-box runs of FSL 6.0.7.23's programs and scripts (FSL off the `PATH`): the `fsl-flirt` suite's `programs/` cases through the oracle cache, further command lines through it (convert_xfm on odd matrix files, applyxfm4D on generated integer series), the system's GNU dc 1.4.1 run directly | the observations of [`docs/findings/fsl-flirt-original.md`](../../docs/findings/fsl-flirt-original.md), "FLIRT's other programs and scripts": the matrix-file reader, midtrans's stages and errors, pointflirt's transposition, applyxfm4D's resampling (no blur), sform zeros and error forms, extracttxt's dc arithmetic |
+| The `larmorx-nc` replica's `aff2rigid` program, run as a black box | FSL-81's corrected matrix, to check the original's |
+| POSIX's definition of basic regular expressions and GNU grep's manual (`\+`, `\?`, `\|`, `\w`, `\s`, `\b`, `\<`, `\>`) | `cli::bre` |
+| larmorx's own Apache-2.0 code: part 1's `flirt::{mat, output, pyramid, engine}` (the resampling, the background value, the image writer), relay 1's `cli::{common, options}`, `larmorx_mri::hmc::kernels` (the spline, now with a per-pass store), `larmorx_core::vnl_svd` (the singular value decompositions) | numbers, images |
+
+| larmorx | Behaviour reproduced | Source |
+|---|---|---|
+| `flirt::fits` (midtrans's three stages, pointflirt's normal equations solved by their SVD, aff2rigid's rigid matrix, determinants of any size) | §15.5, §15.6, §15.8 | spec |
+| `flirt::mat::parse_matrix_text` (FSL's matrix files: libstdc++'s extraction of doubles) | §2, §15 | black-box |
+| `flirt::output::{padded, Resampling::spline}`, `flirt::pyramid::background_f64`, `flirt::engine::{write_values, grouped_type}` (shared with flirt) | §9.2, §10a, §15.7 | spec, black-box |
+| `cli::midtrans`, `cli::pointflirt`, `cli::applyxfm4d` | the three command lines, usages, messages, FSL-78, FSL-79, FSL-80 | spec §15.5 to §15.7, black-box |
+| `cli::pairreg`, `cli::extracttxt`, `cli::bre`, `cli::aff2rigid` | the three scripts, their messages, FSL-81 | spec §15.8, black-box, POSIX |

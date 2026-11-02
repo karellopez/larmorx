@@ -225,3 +225,87 @@ matrix it is used as given. With a mask that equals the reference: `0` and `0`.
   own message, exit 1.
 - A missing source and destination: `ERROR:: Source volume filename not found` (a blank line), the
   run goes on and the image layer's exception for the empty name aborts it.
+
+## FLIRT's other programs and scripts (part 2, relay 2, 2026-11-02)
+
+Black-box runs of FSL 6.0.7.23 (through the oracle cache; probes in
+`validation/investigations/cleanroom-flirt/programs2_*.py`) that the spec does not say, or says
+otherwise:
+
+**FLIRT's matrix files** (every program: flirt's `-init`, `convert_xfm`, `avscale`, ...; observed
+through `convert_xfm -omat`): a line counts when its first word is a number for C's `strtod`
+(`inf`, `nan`, `0x1p3` included; `.x`, `x1`, `# 1 2` and blank lines are passed over); the first
+such line's count of words is the number of columns (`1 0 0 0 junk` makes 5, and the next line of
+four then throws `Could not find enough numbers in matrix file`); each value is read as libstdc++'s
+`operator>>` reads a double: the characters a number may hold are taken (a sign, digits, one point,
+an exponent after a digit), and when they are not a whole number (`inf`, `nan`, `2.5e`, `.`, the
+`x10` left of `0x10`) the value is 0 and the line's stream fails, so **every later value on the line
+repeats the last stored one** (`1 inf 0 0` reads `1 0 0 0`, `0 0 inf 1` reads `0 0 0 0`; after
+`1e400`, which reads the largest double, `1 0 1e400 5` reads `1 0 1.797693135e+308
+1.797693135e+308`); a line that ends before its values are read throws (`0 1 0` and `0 1 0 ` with
+four columns), one whose stream failed does not (`0 1 nan` reads `0 1 0 0`). Part 1's reader took
+`inf` and `nan` as numbers and counted the first line's numbers; corrected in this relay (the
+programs' 145 suite cases unchanged). Spec question: §2 and §15 say only "as FLIRT reads them".
+
+**`midtrans`:** the transforms are read, each checked by its determinant, before anything is
+printed (`-v`'s `Number of matrices` comes after); a matrix with a non-finite determinant counts as
+unreadable (`Could not read matrix <name>`, exit 1). `x_n` is computed for every transform after
+`Initialising averages` and before `Stage 1` (a 3 × 3 transform's `matrix multiplication:
+incompatible matrix dimensions: 3x3 and 4x1` comes there); `--debug` prints `P_<n>` (1-based) and
+`Pxx_av` inside stage 1, before `A` (so `Pxx_av` is stage 1's `avg(P_n·(r·I + x_n·x_nᵀ))`, not stage
+3's `Pxx`); without a template `Centre of template = ` prints four values (`90 110 90 0`, or zeros
+with `--debug`), with one three; `Subject number` counts from 0. A translation of `1e300` makes the
+averages infinite: FSL's SVD fails and its run stops at `matrix multiplication: incompatible matrix
+dimensions: 0x0 and 3x1` after `Stage 1` (exit 0; refused by the original, rule B, as the spec
+says). A template that cannot be read: the image layer's lines, then the exception caught (FSL-78:
+exit 0). `--separate` to a directory that does not exist: `Could not open file <p>0001.mat for
+writing` per matrix, exit 0. The original's matrices are FSL's to the printed digits in every case
+(its SVD is larmorx's, not LAPACK's: within 1e-9).
+
+**`pointflirt`:** both files are transposed when the **input's** has more rows than columns (an
+input of 3 × 3 and a reference of 4 × 3: points as columns, then `copy into submatrix:
+incompatible matrix dimensions: 3x1 and 4x1`); a missing file reads as empty (`Could not open
+matrix file`, then `ERROR: Different number of coordinates`, exit 255: the spec's "FSL aborts" is
+not what happens); with `-v` the coordinates are printed (scaled by `--vox`'s voxel sizes, read in
+single precision) before the size checks; a NaN coordinate does **not** stop FSL: its SVD returns
+an arbitrary matrix (`1 -0 -0 0 / -0 1 -0 -0 / -1 2 -0 0` for one NaN in four points; the spec says
+it aborts), refused by the original (rule B). `-o` to a directory that does not exist: `Could not
+open file <name> for writing`, exit 0.
+
+**`applyxfm4D`:** the volumes are **not blurred** before resampling (a 1.7 mm T1w onto a 3 mm grid
+with trilinear: FSL's image bit for bit without the blur §9.2 describes for `flirt -out`); the
+output's sform keeps the reference's negative zeros unless the reference is stored
+neurologically (FSL flips it, and the products make its zeros positive); `-v` prints the method as
+given (`0, nn`); an input that cannot be read prints only `Image Exception : #63 :: No image files
+match: <stem>` before the abort (in 4D and `-3D` alike), the reference the volume's lines too
+(`#22 :: Failed to read volume`, `Error : ...`); a matrix is inverted before its product: a
+non-square one aborts with `inv(): given matrix must be square sized`, a square one of another size
+with `matrix multiplication: incompatible matrix dimensions: RxR and 4x4`. On int16 and uint16
+series the original's trilinear images are FSL's bit for bit (FSL-09 truncation with `reproduce`),
+its spline with FSL-79 reproduced differs from FSL's in 11 of 327,680 voxels by one unit (the
+coefficients' passes in single precision against FSL's arithmetic), its sinc in 17 by one unit;
+float series: sinc and spline differ in the last bits of single precision (correlation 1.0000000
+with FSL's). A uint16 series is written as int32 (FSL's grouping).
+
+**`extracttxt`:** a negative relative start is subtracted without dc's message (`end$ t.txt 4 -3`
+prints lines 10 to 13, no `dc: stack empty`), while `-0` and `+0` as starts, and any sign on a
+count, print it once and count as their digits (the script tests the start's sign as a number:
+`-0` is not negative); the system's GNU dc 1.4.1 reads `13 -3 + p` as 16 with `dc: stack empty`.
+A range read as sed's options prints GNU sed 4.8's usage text after `sed: invalid option -- '<d>'`:
+GPL text, not reproduced by the Apache original (one larmorx line instead; the suite leaves the
+usage out of FSL's standard error). The script's words reach the shell unquoted: the original
+refuses a word that is a shell pattern matching a name in the directory (the shell would replace
+it).
+
+**`aff2rigid`:** with one argument the script does not print its usage: it reads the matrix, then
+stops at line 105 (FSL-81) like the full call; a missing, non-square or singular matrix stops it
+with NumPy's tracebacks (`FileNotFoundError`, `LinAlgError`), which the original does not
+reproduce (its own message, exit 1). Its corrected matrix is the replica's in every printed digit
+(the suite's two cases).
+
+**`pairreg`:** the schedules are FSL's files in `$FSLDIR/etc/flirtsch`; the original reads them
+there and refuses without `FSLDIR` (spec question: their texts, so the original can carry its own).
+
+**The oracle cache** keys FSL's runs without `PATH`: an `aff2rigid` run without FSL's `bin` on the
+`PATH` (`/usr/bin/env: 'fslpython': No such file or directory`, exit 127) is served for the same
+inputs with it. Not a suite problem (its cases always set it), noted for the cache's policy.

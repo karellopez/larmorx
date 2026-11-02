@@ -215,10 +215,11 @@ pub fn search(
     }
     // 8. the minima (the last index on each axis excluded)
     let idx = |a: usize, b: usize, c: usize| a * fy * fz + b * fz + c;
+    // scanned z outer, then y, then x (observed: FSL lists its minima in this order)
     let mut minima = Vec::new();
-    for a in 0..fx.saturating_sub(1) {
+    for c in 0..fz.saturating_sub(1) {
         for b in 0..fy.saturating_sub(1) {
-            for c in 0..fz.saturating_sub(1) {
+            for a in 0..fx.saturating_sub(1) {
                 let v = costs[idx(a, b, c)];
                 let mut is_min = true;
                 'n: for da in -1i64..=1 {

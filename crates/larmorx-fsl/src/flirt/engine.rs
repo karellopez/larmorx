@@ -700,13 +700,11 @@ fn register(
     };
     if o.debug {
         // §9.4: the pyramid's levels (development: the volumes, single precision)
-        let testvol = pyramid::blur(&in0, 8.0);
         for (name, v) in [
             ("refvol_8", &levels[3]),
             ("refvol_4", &levels[2]),
             ("refvol_2", &levels[1]),
             ("refvol", &levels[0]),
-            ("testvol", &testvol),
         ] {
             let shape = v.shape;
             let mut h = reference.input.header.clone();
@@ -1493,9 +1491,7 @@ fn set_scale(st: &mut State<'_>, s: f32, force: bool) -> Result<(), End> {
         pair.no_bins = no_bins;
         // the existing pair keeps its centre, the previous input's centre of mass (observed:
         // the costs of a transformed matrix are FSL's only so)
-        if std::env::var_os("LXFLIRT_NOKEEP").is_none() {
-            pair.centre = centre;
-        }
+        pair.centre = centre;
         st.pair = Some(Arc::new(pair));
     }
     Ok(())

@@ -19,13 +19,9 @@ import sys
 from pathlib import Path
 
 import numpy as np
-
-sys.path.insert(0, str(Path(__file__).resolve().parent))
-from probe import main as _unused  # noqa: E402,F401  (the probe's imports: the suites)
-
-from larmorx_validation.parity import defects  # noqa: E402
-from larmorx_validation.parity import fsl_flirt as orig  # noqa: E402
-from larmorx_validation.parity import fsl_flirt_replica as rep  # noqa: E402
+from larmorx_validation.parity import defects
+from larmorx_validation.parity import fsl_flirt as orig
+from larmorx_validation.parity import fsl_flirt_replica as rep
 
 RUST = Path(__file__).resolve().parents[3] / "crates/larmorx-fsl/src/flirt/schedule.rs"
 

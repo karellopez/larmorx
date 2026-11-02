@@ -255,11 +255,14 @@ fn along(
 
 /// The optimisation of a vector `v0` with tolerances `tol` (§8.2): up to `maxit` sweeps of line
 /// searches along the current directions, the convergence test after each, Powell's correction
-/// when asked. Returns the final vector, its cost, and the lines Powell's correction prints.
+/// when asked. `n_tol` is the convergence test's count of tolerances: 12 for the parameters,
+/// the subset's size for a subset's variables (observed: with the search's four variables FSL
+/// sweeps again where a count of 12 would stop). Returns the final vector and its cost.
 fn minimise(
     cost: &dyn Fn(&[f64]) -> f32,
     v0: Vec<f64>,
     tol: &[f32],
+    n_tol: usize,
     maxit: usize,
     s: &Settings,
 ) -> (Vec<f64>, f32) {
@@ -309,7 +312,7 @@ fn minimise(
             v = moved;
             best = y;
         }
-        // convergence: Σ |(x_start − x_end)/t| / 12 below 1 (two interleaved accumulators)
+        // convergence: Σ |(x_start − x_end)/t| / n_tol below 1 (two interleaved accumulators)
         let (mut even, mut odd) = (0.0f64, 0.0f64);
         for i in 0..n {
             let t = f64::from(tol[i]);
@@ -324,7 +327,7 @@ fn minimise(
                 odd += term;
             }
         }
-        if (even + odd) / 12.0 < 1.0 {
+        if (even + odd) / (n_tol as f64) < 1.0 {
             break;
         }
         if s.powell {
@@ -356,23 +359,6 @@ fn minimise(
 /// One optimisation of the trial matrix `start` (§8.2): its parameters about `centre`, the first
 /// `dof` optimised (or, with `subset`, the subset's variables from `start`'s own parameters),
 /// `maxit` sweeps. `eval` is the cost of a trial matrix. Returns the matrix and its cost.
-// TEMPORARY TRACE (development): every evaluation's parameters and cost on standard error.
-static TRACE_N: std::sync::atomic::AtomicUsize = std::sync::atomic::AtomicUsize::new(0);
-fn trace(x: &[f64], c: f32) {
-    if let Some(path) = std::env::var_os("LXFLIRT_TRACE") {
-        use std::io::Write as _;
-        let n = TRACE_N.fetch_add(1, std::sync::atomic::Ordering::Relaxed) + 1;
-        let v: Vec<String> = x.iter().map(|v| format!("{v:.6}")).collect();
-        if let Ok(mut f) = std::fs::OpenOptions::new()
-            .create(true)
-            .append(true)
-            .open(path)
-        {
-            let _ = writeln!(f, "{n} : {c:.6} :: {}", v.join(" "));
-        }
-    }
-}
-
 pub fn optimise(
     eval: &dyn Fn(&Mat4) -> f32,
     start: &Mat4,
@@ -417,14 +403,8 @@ pub fn optimise_params(
                 x[..dof].copy_from_slice(v);
                 param::compose(s.rep, &x, dof, centre, log)
             };
-            let cost = |v: &[f64]| {
-                let c = eval(&compose(v));
-                let mut x = x0;
-                x[..dof].copy_from_slice(v);
-                trace(&x, c);
-                c
-            };
-            let (v, c) = minimise(&cost, x0[..dof].to_vec(), &tol[..dof], maxit, s);
+            let cost = |v: &[f64]| eval(&compose(v));
+            let (v, c) = minimise(&cost, x0[..dof].to_vec(), &tol[..dof], 12, maxit, s);
             let mut x = x0;
             x[..dof].copy_from_slice(&v);
             Ok((x, c))
@@ -451,14 +431,8 @@ pub fn optimise_params(
             let b = p.reduce(&zero);
             let ty: Vec<f32> = a.iter().zip(&b).map(|(x, y)| (x - y) as f32).collect();
             let y0 = p.reduce(&zero);
-            let cost = |y: &[f64]| {
-                let c = eval(&compose(y));
-                let d = p.expand(y);
-                let x: Vec<f64> = (0..12).map(|i| d[i] + x0d[i]).collect();
-                trace(&x, c);
-                c
-            };
-            let (y, c) = minimise(&cost, y0, &ty, maxit, s);
+            let cost = |y: &[f64]| eval(&compose(y));
+            let (y, c) = minimise(&cost, y0, &ty, ty.len(), maxit, s);
             let d = p.expand(&y);
             let mut x = [0.0; 12];
             for i in 0..12 {

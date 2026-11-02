@@ -65,6 +65,37 @@ and the two finer scales that only reset the input (3 mm data); FSL against the 
   once more there than once per pair (`-refweight` of zeros: once; `-inweight` of zeros: one per
   pair and one more), also with `-nosearch` (the search runs with no rotations).
 
+## The search and the optimisation (`-verbose 7`)
+
+`flirt -verbose 7` prints every cost evaluation (`<count> : <cost> :: <parameters>`; inside the
+search the level is lowered by 2, so the grids' evaluations show at 7). The original's
+evaluations, written the same way by a development hook (since removed), were compared with
+FSL's one by one on the suite's `-dof 6` registration (`validation/investigations/cleanroom-flirt/`:
+`stages.py` compares the rows the default schedule's stages print). What this showed:
+
+- **The grids' parameters ignore `-dof`.** The `search` command's own dof (12 when it has none)
+  chooses the coarse grid's subset and the fine grid's scale rule: with `-dof 6` FSL's coarse
+  grid optimises the common scale with the translations, its fine grid keeps the median scale;
+  `-dof` applies to the minima's free optimisations only (6 parameters there).
+- **The grid points and minima start from their sampled parameters** (the angles as sampled,
+  e.g. `-1.570796 -1.570796 -1.570796`), not from a decomposition of their matrix (which gives an
+  equivalent but different triple of angles, and so different line-search directions), and the
+  coarse grid keeps the optimised translations and scale as they come.
+- **The convergence test of a subset's optimisation counts the subset's tolerances** (four for
+  the search's), not 12: a coarse point whose first sweep moves the scale by 0.072 and two
+  translations by 1.3 and 1.8 mm (tolerances 0.016 and 1.6 mm at 8 mm) sweeps again in FSL (sum
+  6.4 / 4 > 1), where a count of 12 would stop.
+- **The minima are listed z outer, then y, then x** (FSL's `COST minima at : a,b,c` lines), which
+  decides which of two near-duplicate minima is kept.
+- **`P` holds each start with its own cost** (the cost of the start's matrix, an evaluation FSL
+  does not print), not the optimised one.
+
+With these, the two traces agree evaluation by evaluation through the whole 8 mm stage (4,029
+evaluations) within 1e-3 in every parameter; they part from the 9th evaluation in the 5th
+decimal of a parabolic step (the costs agree in their printed digits; their last bits do not:
+neither double sums nor single-precision variants of the correlation ratio's final arithmetic
+reproduce the 9th and 10th steps both), and the drift grows to 0.02 mm in the 4 mm stage.
+
 ## The pyramid and the outputs
 
 - The pyramid's levels (`-debug`'s `refvol*`, read back): the original's differ from FSL's in the

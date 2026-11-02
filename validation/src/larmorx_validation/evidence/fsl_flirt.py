@@ -1415,7 +1415,8 @@ def speed(ctx: core.Context):
         note="From the benchmark report `docs/benchmarks/fsl-flirt.json` ({cpu}, {cpus} logical "
         "CPUs, shared with another agent's runs, so the times may be a little long; each program "
         "in FSL's clean environment, outputs NIfTI-1 gzipped; informal: one run each, larmorx at "
-        "commit 04f5462, whose later changes left the speed paths as they were).",
+        "commit 04f5462, part 2's third step, before the specification's answers changed the "
+        "arithmetic: not timed again).",
     )
     return bench, chart
 

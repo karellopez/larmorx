@@ -264,7 +264,7 @@ mcflirt's defaults (middle volume as reference)
 
 | Component | Version |
 |---|---|
-| larmorx | 0.0.1 (04b58ca8e43d) |
+| larmorx | 0.0.1 (f22179aa9118) |
 | larmorx-testdata | 52124bc98f9f |
 | Python | 3.12.16 |
 | Platform | Linux x86_64 (Linux-6.8.0-124-generic-x86_64-with-glibc2.35) |

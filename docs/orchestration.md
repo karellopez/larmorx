@@ -17,7 +17,7 @@ handoff: `docs/parts/`.
   7. Commit, check for AI attribution, push, then watch CI on all six platforms.
   8. Once CI is green, delete that agent worktree's Rust build caches (`target/`, `crates-gpl/target/`; regenerable), keeping only the newest worktree's cache as a seed for the next agent (user, 2026-10-19: 30 merged worktrees had grown to 190 GB). Never delete a worktree's source or branch.
 - **Reading CI results without a login:** GitHub serves job logs only to logged-in users. Golden mismatches, failing `cargo test` tests and build errors (`scripts/ci_cargo_failures.py`, since 2026-10-12) are printed as workflow annotations, which `https://api.github.com/repos/karellopez/larmorx/check-runs/<job id>/annotations` serves without a login. Each job's step results: `https://api.github.com/repos/karellopez/larmorx/actions/jobs/<job id>`. GitHub's Windows runners give the temporary directory as an 8.3 short path (`C:\Users\RUNNER~1\...`): tests must not assume a temporary path free of `~` or blanks.
-- **Launch worktree agents from inside this repository** (`cd /home/karelo/VScode_projects/super_fmriprep/larmorx` right before the Agent call): the harness creates the worktree in the repository of the current directory. On 2026-10-20 A5 part 2 was launched from `larmorx_documentation` and its worktree landed there.
+- **Launch worktree agents from inside this repository** (`cd <workspace>/larmorx` right before the Agent call): the harness creates the worktree in the repository of the current directory. On 2026-10-20 A5 part 2 was launched from `larmorx_documentation` and its worktree landed there.
 
 ## The agents rule as CLAUDE.md stated it until 2026-11-02 (verbatim)
 

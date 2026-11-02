@@ -38,6 +38,12 @@ starts no other agent.
 
 ## The order from here
 
+**From 2026-11-02 (the user; decision log):** two agents at once by role, each part run by relay agents
+(CLAUDE.md, "Relay agents and fewer, fuller steps"): FLIRT's clean-room part 2 beside FAST's replica, then
+FAST's clean-room original beside topup's replica, topup's clean-room beside `fslmaths` and `fslstats`'s
+replica, and so on; before FreeSurfer, the templates (one replay harness, one page template, generated
+option tables).
+
 **Now (2026-10-29):** the version update's AFNI and FSL parts are done (the replicas follow AFNI
 26.3.05 and FSL 6.0.7.23); the clean-room originals follow them too (item 3b), and part 3 (SciPy, numpy, FSL's matrix library) is done the same day; item 3c (the AFNI replicas in the main package) is done too; next, BET's clean-room original. Before: the move
 (M, below), the ANTs tools' data panel (part a) and the fourteen whole template registrations

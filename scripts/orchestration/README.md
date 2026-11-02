@@ -24,6 +24,7 @@ repository), `LARMORX_VENV` (default: `<workspace>/.venv`), cargo first on the p
 | `merge_golden.py` | a conflict in `tests/golden/golden.json` resolved case by case (then re-record) |
 | `register_counts.py` | the defect register recounted from its table; every **decide** and **yes** listed |
 | `handoff_blocks.py <HANDOFF.md>` | an agent's handoff: each text block with its instruction |
+| `apply_handoff.py <HANDOFF.toml> [--site <dir>] [--check]` | an agent's machine-readable handoff applied to the shared documents in its order, all or nothing (`[[op]]` edit, insert, append, block; `site:` paths in `--site`); then `tables`, `register_counts.py` and a re-read |
 | `watch_ci.py <sha>`, `watch_pages.py <sha>` | wait for the six-platform CI run, or the site's deployment |
 | `upstream_watch.py [--out DIR] [--offline] [--only NAME...]` | the upstream watch: the newest release of every upstream of `UPSTREAM.md` (git tags, PyPI, AFNI's `AFNI.version`, FSL's release manifest) and, for a newer one, which files of the crates' `PROVENANCE.md` it changed (licence-only changes marked), from `<workspace>/tags/` or `~/fsl-<version>/src`; Markdown and JSON in `<workspace>/oracles/logs/upstream-watch/`. `difftest-nightly.sh` runs it once a week |
 

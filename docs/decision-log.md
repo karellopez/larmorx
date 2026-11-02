@@ -1757,6 +1757,26 @@ together at the end.
   only where the original and larmorx finish within a 4 GiB box. Every re-check and probe runs in a
   memory box with the trial's per-case cap (CLAUDE.md, "Every heavy job runs in a memory box").
 
+## 2026-11-02: Faster at the same quality: relay agents, two agents by role (the user)
+- **Measured** (`tools/claude-usage/usage.py summary`): the week at 12 % against a pace line of about
+  44 %, so the clock bounds the work, not usage; within it, an agent's cost is mostly re-reading its own
+  context (71-76 % cache reads, 450 000 to 560 000 tokens per step in mid-part, 700 to 900 steps a
+  part; every FLIRT part reached the context ceiling and was summarized at least once), while what it
+  reads or runs is small (command outputs under 2 000 characters on average).
+- **Proposed by the orchestrator, by impact:** relay agents (one agent per sub-task, NOTES.md handoff,
+  a fresh agent continues: about half the tokens per piece of work); two agents at once by role (a
+  replica beside the previous tool's clean-room original, which never touch the same files); the
+  verification overlapping the next agents within explicit memory budgets; fewer, fuller steps;
+  templates before FreeSurfer (one replay harness, one page template, generated option tables); a
+  machine-readable handoff applied by a script (`apply_handoff.py`); a leaner CLAUDE.md. Unchanged: the
+  model, each part's tests, the clean-room originals, the merge checks, at most two agents.
+- **The user:** "can we try this new method after this flirt clean room? The idea is to go faster,
+  spending less tokens and also maintaining quality which means reliable replicas and clean rooms."
+  From the part after FLIRT's clean-room part 1: FLIRT's clean-room part 2 beside FAST's replica, each
+  with relay agents; 14 threads and at most 32 GiB of boxes per agent, the verification at most 32 GiB
+  and 8 threads. The trial is judged by the merges' checks (records, compare_records, CI) and by the
+  usage per piece of work.
+
 ## Open decisions (PLAN.md §16)
 
 | # | Decision | Recommended default (used until decided) | Status |

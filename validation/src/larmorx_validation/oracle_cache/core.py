@@ -423,8 +423,17 @@ def identical_runs(entry: dict) -> int:
     return 1 + sum(h.get("event") in AGREED for h in entry.get("history", []))
 
 
+#: The exit statuses of a command that could not be found (127) or run (126): a script's ``env`` or
+#: shell says so when a program it starts is not on ``PATH``, which the key leaves out, so such a
+#: run is never stored, and an entry stored with one before 2026-11-02 is never served (an
+#: aff2rigid probe with FSL off the PATH, the clean-room FLIRT's part 2)
+LAUNCH_FAILURES = (126, 127)
+
+
 def _servable(store: Store, entry: dict) -> bool:
     if entry.get("disputed") or entry.get("confirmations", 0) < entry.get("required", 1):
+        return False
+    if entry["result"].get("returncode") in LAUNCH_FAILURES:
         return False
     r = entry["result"]
     shas = [r["stdout"], r["stderr"], *(o["sha256"] for o in r["outputs"])]
@@ -618,6 +627,8 @@ def _settle(
         except ValueError:
             name = str(-done.returncode)
         return f"ended by a signal, {name} (never stored)"
+    if done.returncode in LAUNCH_FAILURES:
+        return f"exit status {done.returncode}: a command it starts was not found or not runnable (never stored)"
     try:
         result, files = _capture(store, prep, done, before, policy)
     except Uncacheable as e:

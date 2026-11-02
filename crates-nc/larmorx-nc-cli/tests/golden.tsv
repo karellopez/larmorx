@@ -2,7 +2,7 @@
 # Golden checksums of the larmorx-nc replicas (tests/golden.rs): SHA-256 of the files
 # larmorx-nc writes on Linux x86_64 (images by header and data, with sampled values).
 # Every platform must reproduce them (docs/validation/golden.md). Do not edit by hand.
-# Recorded from 222e226eb038b4b052d76b16406e85d1f941fed8 on 2026-11-02 (Linux x86_64)
+# Recorded from 6af5ff91b4dbf83f2791902f4c020b1cf4c38878 on 2026-11-02 (Linux x86_64)
 # case	output	sha256	type	sample
 aff2rigid.default	rigid.mat	7d8900a15c14c36e92cc26c3a1ebe371d32655cb54b9b5dd2d365f00d50ecb20	-	-
 applyxfm4D.series	out.nii.data	4b5f8b2bfd49c65488efcc4ce1ddd312b6851986a91dca8bd829b477b60c09fe	int16	faffb3fffafffaffa9ffb400fafffaff
@@ -96,6 +96,9 @@ flirt.bbr	out.nii.gz.header	b6451d07e2176f23ddba3e510d57ea2d439f6a709a799677ec2c
 flirt.default	out.mat	bb5d972eb83514cf44207de1b7127e26a95a9a738c280ca892674ef6e9ad43b1	-	-
 flirt.default	out.nii.data	e68c0896ccc80495543ebc5d72ee1b776927534dcb3d7516b39310d81c4b1b80	float32	0000604100009041000000c1000040400000b24300009841000000c10000a841
 flirt.default	out.nii.header	b6451d07e2176f23ddba3e510d57ea2d439f6a709a799677ec2c4dfcc5ef1246	-	-
+flirt.fsl91.empty-refweight	status	4355a46b19d348dc2f57c046f8ef63d4538ebb936000f3c9ee954a27460dd865	-	1
+flirt.fsl92.one-voxel	status	4355a46b19d348dc2f57c046f8ef63d4538ebb936000f3c9ee954a27460dd865	-	1
+flirt.fsl93.zero-voxel-size	out.mat	95134870af67dc13b6b5abd891012d7c1302c0586f063a83a05c059d96b6dc14	-	-
 flirt.int16-out	out.nii.data	1ed20b1e1353d56868d1159fba4289d041c0f410b8434a50149c1c0721d31b72	int16	faff09001200cc0056020800cb00faff
 flirt.int16-out	out.nii.header	351b4ff1505655295660de6f98fdd338799ee74da742d87c22aacb9873f1dd62	-	-
 flirt.int16-out.reproduce	out.nii.data	76df1a9f94e56988113c6eb13e9e31201a6661dff6cbdb16a047560ceb76a10a	int16	faff09001200cb0056020800cb00faff

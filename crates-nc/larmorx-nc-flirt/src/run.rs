@@ -158,6 +158,9 @@ pub struct Flirt<'a> {
     global_norms: Mat,
     global_scale1ok: bool,
     read_testvol: bool,
+    /// The images of one voxel (1 x 1 x 1 as read, before a single slice is tripled), by
+    /// their options (FSL-92).
+    one_voxel: Vec<&'static str>,
     global_sampling: f32,
     // main's volumes (the pair refers to them)
     refvol: Volume,
@@ -261,6 +264,7 @@ impl<'a> Flirt<'a> {
             global_norms: Mat::zeros(0, 0),
             global_scale1ok: true,
             read_testvol: false,
+            one_voxel: Vec::new(),
             global_sampling: 1.0,
             refvol: empty(),
             testvol: empty(),
@@ -383,8 +387,21 @@ impl<'a> Flirt<'a> {
 
     /// `set_basescale(filenameA, filenameB)`: unless `-basescale`, voxels above 12 mm make the
     /// base scale the largest size over 8, and voxels below 0.75 mm the smallest size.
+    ///
+    /// FSL-93: the headers' voxel sizes as stored, where reading the image counts a size of 0
+    /// as 1: a header size of 0 makes the base scale 0, every voxel size infinite (divided by
+    /// it), and FLIRT never finishes (its pyramid's sizes an undefined conversion of infinity).
+    /// By default a size of 0 counts as 1 here too (rule A); with `reproduce` refused (FLIRT
+    /// never finishes). `-basescale 0` is refused in both modes.
     fn set_basescale(&mut self) -> R<()> {
         if self.o.force_basescale {
+            if self.o.basescale == 0.0 {
+                return Err(Stop::Refuse(
+                    "-basescale 0: every voxel size divided by a base scale of 0 is infinite, and \
+                     FLIRT never finishes (FSL-93)"
+                        .to_owned(),
+                ));
+            }
             return Ok(());
         }
         let dims = |name: &str| -> R<[f32; 3]> {
@@ -410,8 +427,39 @@ impl<'a> Flirt<'a> {
                 (h.pixdim[3] as f32).abs(),
             ])
         };
-        let a = dims(&self.o.reffname.clone())?;
-        let b = dims(&self.o.inputfname.clone())?;
+        let mut a = dims(&self.o.reffname.clone())?;
+        let mut b = dims(&self.o.inputfname.clone())?;
+        let zeros: Vec<String> = [
+            ("-ref", &self.o.reffname, a),
+            ("-in", &self.o.inputfname, b),
+        ]
+        .iter()
+        .flat_map(|(opt, name, d)| {
+            (0..3)
+                .filter(|&k| d[k] == 0.0)
+                .map(move |k| format!("{opt} {name}'s {}", ["x", "y", "z"][k]))
+        })
+        .collect();
+        if !zeros.is_empty() {
+            let which = zeros.join(", ");
+            if self.mode.reproduce() {
+                return Err(Stop::Refuse(format!(
+                    "a header voxel size of 0 ({which}) makes FLIRT's base scale 0: every voxel \
+                     size divided by it is infinite, and FLIRT never finishes (FSL-93)"
+                )));
+            }
+            for d in [&mut a, &mut b] {
+                d.iter_mut().filter(|v| **v == 0.0).for_each(|v| *v = 1.0);
+            }
+            self.notice(
+                &defects::FSL_93,
+                format!(
+                    "a header voxel size of 0 ({which}) counted as 1 for the base scale, as \
+                     reading the image counts it: FLIRT's base scale is 0, every voxel size \
+                     divided by it infinite, and it never finishes"
+                ),
+            );
+        }
         let maxa = fmax(fmax(a[0], a[1]), a[2]);
         let maxb = fmax(fmax(b[0], b[1]), b[2]);
         if fmax(maxa, maxb) > 12.0 {
@@ -425,6 +473,83 @@ impl<'a> Flirt<'a> {
         Ok(())
     }
 
+    /// Rule B, before a registration (both images and weights read): FSL-92, an input or
+    /// reference of one voxel; FSL-91, a weight with no voxel of at least 0.01 (FLIRT's
+    /// threshold for a voxel inside a weight, its weighting's binarisation: none inside, the
+    /// images are filtered to zeros and every weight is 0). FLIRT registers them anyway, every
+    /// cost constant (or NaN for `bbr`), and writes the matrix its search happens to end at.
+    /// Refused by default; FLIRT's run with `reproduce`; named in both modes.
+    fn check_registrable(&mut self) -> R<()> {
+        if let Some(&opt) = self.one_voxel.first() {
+            let which = self.one_voxel.join(" and ");
+            if self.mode.fix() {
+                self.notice(
+                    &defects::FSL_92,
+                    format!("{which}: an image of one voxel refused"),
+                );
+                let (what, has) = if self.one_voxel.len() > 1 {
+                    (format!("{which} images"), "have")
+                } else {
+                    (format!("{opt} image"), "has")
+                };
+                return Err(Stop::Refuse(format!(
+                    "the {what} {has} one voxel (1 x 1 x 1): one value cannot be registered; \
+                     FLIRT registers it anyway and writes the matrix its search ends at (FSL-92)"
+                )));
+            }
+            self.notice(
+                &defects::FSL_92,
+                format!(
+                    "{which}: an image of one voxel (1 x 1 x 1), registered as FLIRT does: its \
+                     matrix is the one its search ends at on costs that cannot measure an \
+                     alignment"
+                ),
+            );
+        }
+        if !self.o.useweights {
+            return Ok(());
+        }
+        let weights = [
+            (
+                "-refweight",
+                self.o.refweightfname.clone(),
+                &self.global_refweight,
+            ),
+            (
+                "-inweight",
+                self.o.testweightfname.clone(),
+                &self.global_testweight,
+            ),
+        ];
+        let empty: Vec<(&str, String)> = weights
+            .iter()
+            .filter(|(_, f, w)| !f.is_empty() && !w.data.iter().any(|v| *v >= 0.01f32))
+            .map(|(o, f, _)| (*o, f.clone()))
+            .collect();
+        for (opt, fname) in empty {
+            if self.mode.fix() {
+                self.notice(
+                    &defects::FSL_91,
+                    format!("the {opt} with no voxel of at least 0.01 is refused"),
+                );
+                return Err(Stop::Refuse(format!(
+                    "{opt} {fname} has no voxel of at least 0.01 (an empty weighting mask): \
+                     every cost is constant and FLIRT writes the matrix its search ends at \
+                     (FSL-91)"
+                )));
+            }
+            self.notice(
+                &defects::FSL_91,
+                format!(
+                    "{opt} {fname} has no voxel of at least 0.01 (an empty weighting mask): \
+                     FLIRT registers anyway, every cost constant (or NaN), and writes the matrix \
+                     its search ends at"
+                ),
+            );
+        }
+        Ok(())
+    }
+
     /// `get_testvol(testvol)`.
     fn get_testvol(&mut self) -> R<()> {
         let mut dtype: i16 = 0;
@@ -434,6 +559,9 @@ impl<'a> Flirt<'a> {
             dtype = volume::file_dtype(&self.o.inputfname, self.settings)?;
             if !self.o.forcedatatype {
                 self.o.datatype = dtype;
+            }
+            if (tv.xsize(), tv.ysize(), tv.zsize()) == (1, 1, 1) {
+                self.one_voxel.push("-in");
             }
             if tv.zsize() == 1 {
                 double_end_slices(&mut tv);
@@ -494,6 +622,9 @@ impl<'a> Flirt<'a> {
     /// the boundary coordinates). Returns the volume; the globals are set.
     fn get_refvol(&mut self) -> R<Volume> {
         let mut rv = self.read_volume(&self.o.reffname.clone())?;
+        if (rv.xsize(), rv.ysize(), rv.zsize()) == (1, 1, 1) && !self.one_voxel.contains(&"-ref") {
+            self.one_voxel.push("-ref");
+        }
         if rv.zsize() == 1 && self.o.do_optimise {
             double_end_slices(&mut rv);
         }
@@ -1567,7 +1698,7 @@ impl<'a> Flirt<'a> {
             self.out.s("After free optimisation, parameters are:\n");
         }
         for p in &paramlist {
-            let mut matresult = self.vector2affine(&Mat::col(p), dof);
+            let mut matresult = self.search_start(p, dof);
             let premat = matresult.clone();
             let costval = self.optimise_strategy1(&mut matresult, dof, 4)?;
             let mut row = vec![0.0f64; 34];
@@ -1585,6 +1716,7 @@ impl<'a> Flirt<'a> {
         }
         self.o.verbose = verbose;
         self.currentcostfn = self.o.maincostfn;
+        self.name_search_starts(&paramlist);
         if self.o.verbose >= 3 {
             self.out.s("Parameters (1st column costs) are:\n");
             let rows: Vec<f64> = list.iter().flatten().copied().collect();
@@ -1593,6 +1725,59 @@ impl<'a> Flirt<'a> {
             self.out.s("\n");
         }
         Ok(list)
+    }
+
+    /// A starting point of the search as a matrix of `dof` parameters. FSL-90: the search's
+    /// starting points hold Euler angles (the search composes and decomposes with Euler angles
+    /// whatever `-anglerep`), but FLIRT composes each one with `-anglerep`'s representation:
+    /// with `quaternion` the three angles are read as a quaternion's vector part (the rotation
+    /// lost, with FLIRT's message, where their squares sum above 1; another rotation
+    /// otherwise). Composed as Euler angles by default (rule A), FLIRT's with `reproduce`.
+    fn search_start(&mut self, p: &[f64; 12], dof: i32) -> Mat {
+        if self.o.anglerep == AngleRep::Quaternion && self.mode.fix() {
+            self.o.anglerep = AngleRep::Euler;
+            let m = self.vector2affine(&Mat::col(p), dof);
+            self.o.anglerep = AngleRep::Quaternion;
+            m
+        } else {
+            self.vector2affine(&Mat::col(p), dof)
+        }
+    }
+
+    /// FSL-90's notice (both modes), when `-anglerep quaternion` and a starting point of the
+    /// search has a rotation.
+    fn name_search_starts(&mut self, paramlist: &[[f64; 12]]) {
+        if self.o.anglerep != AngleRep::Quaternion {
+            return;
+        }
+        let rotated = paramlist
+            .iter()
+            .filter(|p| p[..3].iter().any(|a| *a != 0.0))
+            .count();
+        if rotated == 0 {
+            return;
+        }
+        // FLIRT's quaternion composition: w^2 = 1 - x^2 - y^2 - z^2 (double, stored as a float)
+        let lost = paramlist
+            .iter()
+            .filter(|p| ((1.0 - p[0] * p[0] - p[1] * p[1] - p[2] * p[2]) as f32) < 0.0)
+            .count();
+        let n = paramlist.len();
+        let detail = if self.mode.fix() {
+            format!(
+                "the search's {n} starting points ({rotated} with a rotation) composed as the \
+                 Euler angles they are: FLIRT composes them with -anglerep quaternion, reading \
+                 the three angles as a quaternion's vector part ({lost} of them lose their \
+                 rotation: the squares of their angles sum above 1)"
+            )
+        } else {
+            format!(
+                "the search's {n} starting points ({rotated} with a rotation) composed with \
+                 -anglerep quaternion, as FLIRT does: their three Euler angles read as a \
+                 quaternion's vector part ({lost} of them lose their rotation)"
+            )
+        };
+        self.notice(&defects::FSL_90, detail);
     }
 
     /// `add2list(rowmat, opt_matrixlist, rms_min)`.
@@ -3035,6 +3220,7 @@ impl Flirt<'_> {
         self.set_basescale()?;
         self.refvol = self.get_refvol()?;
         self.get_testvol()?;
+        self.check_registrable()?;
         // The volumes moved out for the call (no copies: FSL holds one of each).
         let rv = std::mem::replace(&mut self.refvol, empty());
         let tv = std::mem::replace(&mut self.testvol, empty());

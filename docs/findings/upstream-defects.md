@@ -349,16 +349,20 @@ to add (since 2026-10-25: "Random testing's gaps", below); – = nothing to do. 
 | FSL-79 † | applyxfm4D (spline interpolation of integer images) | spline interpolation of a char, short or int image: each deconvolution pass's coefficients are stored in the image's integer type (rounded half up, toward zero below −0.5) and the interpolated value is truncated to that type before the output's float: the coefficients of a coarser, shifted spline and integer values before the output's own conversion | c | none (fMRIPrep resamples with its own resampler) | rule A: the float image's coefficients and values by default, FSL's with `reproduce`; named where the written output changes (2026-11-01) | – |
 | FSL-80 † | applyxfm4D `-3D` | a sinc kernel other than the default (blackman, full width 7) is asked for (e.g. a rectangular window of width 9), and the default kernel is used instead: the program's cache of kernels takes any two different kernels for the same one | c | none | rule A: the rectangular width-9 kernel the program asks for by default, blackman 7 with `reproduce`; named where the written output changes (2026-11-01) | – |
 | FSL-81 † | aff2rigid (FSL 6.0.7.23's Python script) | `from numpy import *` then `mat(zeros((4,1)))`: NumPy 2 (FSL's 2.4.6) removed `mat`, so the script stops with `NameError` before writing its matrix | a | none | rule A: the matrix computed by default (identical to FSL's script with `mat` restored on 22 matrices, `validation/probes/fsl-flirt-programs/aff2rigid_mat.py`), FSL's traceback and exit status 1 with `reproduce`, named in both (2026-11-01) | – |
+| FSL-90 † | flirt (`-anglerep quaternion`) | the search's starting points hold Euler angles, but FLIRT composes each with the quaternion representation: the three angles are read as a quaternion's vector part, so a starting point whose angles' squares sum above 1 loses its rotation (FLIRT prints `Parameters do not form a valid axis - greater than unity`) and the others start from another rotation than the search found | c | none (fMRIPrep's FLIRT calls use Euler angles) | rule A: composed as Euler angles by default, FLIRT's composition with `reproduce`, named in both modes (measured on `real/anglerep-quaternion`: four of its five starting points lose their rotation in FLIRT; FLIRT's matrix lies 0.37 mm from the same registration with Euler angles, the corrected one 0.23 mm); FLIRT's replica 2026-11-02; the clean-room original in its part 2 (`specs/flirt.md` §11) | – |
+| FSL-91 † | flirt (`-refweight`, `-inweight`) | a weight with no voxel of at least 0.01 (an empty weighting mask: an image of zeros, a mask that misses the image) is accepted: the weighted images are filtered to zeros and every weight is 0, so every cost is constant (BBR's NaN, with a warning at every evaluation), and FLIRT writes, with exit status 0, the matrix its search happens to end at (a rotation of 95 to 143 degrees on the suite's images), deterministically | c | none (fMRIPrep passes no weights to FLIRT) | rule B: a registration with such a weight refused by default (exit status 1, nothing written), FLIRT's run with `reproduce`, named in both modes; FLIRT's replica 2026-11-02; the clean-room original in its part 2 | – |
+| FSL-92 † | flirt | an input or reference of one voxel (1 × 1 × 1) is registered: one value cannot measure an alignment, and FLIRT writes the matrix its search happens to end at (a rotation of 95 to 143 degrees), deterministically | c | none | rule B: refused by default (exit status 1, nothing written), FLIRT's run with `reproduce`, named in both modes; FLIRT's replica 2026-11-02; the clean-room original in its part 2 | – |
+| FSL-93 † | flirt | a voxel size of 0 in the input's or reference's header (which reading the image counts as 1) makes the base scale 0: every voxel size divided by it is infinite, the initial matrix NaN, the pyramid's grid sizes an undefined conversion of infinity, and FLIRT never finishes (still running after 60 minutes, its memory constant); `-basescale 0` the same | a | none (fMRIPrep passes `-basescale 1`) | rule A: a header size of 0 counted as 1 for the base scale too by default, named; refused with `reproduce` (FLIRT never finishes); `-basescale 0` refused in both modes; FLIRT's replica 2026-11-02; the clean-room original in its part 2 | – |
 
-**Counts** (299 entries, recounted from the table on 2026-11-02, after the FLIRT replica's part 3
+**Counts** (303 entries, recounted from the table on 2026-11-02, after FLIRT's spec answers (FSL-90 to FSL-93)
 (`scripts/orchestration/register_counts.py`); an entry with two classes counts under its first; "c (c? until …)"
 entries, decided, count as (c)):
 
 | Class | Entries | of them questionable (c?) |
 |---|---|---|
-| (a) crash, undefined behaviour, out of bounds | 63 | |
+| (a) crash, undefined behaviour, out of bounds | 64 | |
 | (b) race, nondeterminism | 12 | |
-| (c) deterministic bug that changes results | 136 | 10 |
+| (c) deterministic bug that changes results | 139 | 10 |
 | (d) imprecision | 23 | |
 | (e) command-line or parsing quirk | 51 | |
 | (f) documentation or message only | 12 | |
@@ -505,6 +509,11 @@ modes), FSL-75 to FSL-77 added (FSL-75 by rule A after the trial found FLIRT sur
 an ordinary image, its single-voxel case by rule B; FSL-76 rule A; FSL-77 rule B); FSL-09, FSL-14 and
 FSL-22 named by FLIRT's replica too. No new **decide** entry.
 **2026-11-02, FLIRT's clean-room original (part 1):** no new entry (FSL-90 to FSL-95 unused); `flirt` and `convert_xfm` in `crates/larmorx-fsl` follow the replica's decisions for FSL-09, 11, 14, 21, 22, 66, 67, 68, 71, 72 and 75 (the rows say how). The summary rows FSL-07, 09, 22, 56, 72, 75, 78, 79 and 80 reworded to behaviour only, as the table's rule asks (they named FSL's routines; the clean-room implementer saw them in a search of the table).
+**2026-11-02, FLIRT's spec answers (the spec writer):** FSL-90 (rule A), FSL-91 and FSL-92 (rule
+B) and FSL-93 (rule A; `-basescale 0` refused in both modes) added, from the clean-room original's
+two candidate refusals and two leads of the spec answers; each in FLIRT's replica with its
+`reproduce` switch (FSL-93's a refusal: FLIRT never finishes) and in `specs/flirt.md` §11 for the
+clean-room original's part 2. FSL-94 and FSL-95 unused. No new **decide** entry.
 
 **2026-11-02, FLIRT's replica (part 3):** FSL-78 (rule B), FSL-79, FSL-80 and FSL-81 (rule A)
 added, each with its `reproduce` switch; FSL-75 named in applyxfm4D and in mcflirt's replica; FSL-09,
@@ -4822,3 +4831,17 @@ FSL's 0 with `reproduce`. FSL-79 (applyxfm4D's spline of an integer image kept i
 FSL-80 (`-3D` sinc given the cached default kernel instead of the one asked for) and FSL-81
 (aff2rigid stopping under NumPy 2 before writing its matrix) are corrected by default (rule A),
 FSL's behaviour with `reproduce`; FSL-79 and FSL-80 are named only where the written output changes.
+### FSL-90 to FSL-93: FLIRT's spec answers (FSL 6.0.7.23) †
+
+Found answering the questions of FLIRT's clean-room original (2026-11-02; `docs/findings/fsl-flirt.md`,
+restricted, "The refusals and leads of 2026-11-02", has the source lines; FSL's runs and the
+replica's in both modes in `validation/investigations/flirt-spec-answers/`). FSL-90 (`-anglerep
+quaternion`'s search starting points composed as quaternions) is corrected by default (rule A),
+FLIRT's composition with `reproduce`. FSL-91 (an empty weighting mask) and FSL-92 (an image of one
+voxel) are refused by default (rule B: every cost constant, FLIRT's matrix an artefact of its
+search), FLIRT's run with `reproduce`; FSL is deterministic on both (the replica's `reproduce`
+identical on its seven runs). FSL-93 (a header voxel size of 0: a base scale of 0, FLIRT never
+finishes) is corrected by default (the size counted as 1, as FLIRT's own reading counts it) and
+refused with `reproduce`; `-basescale 0` is refused in both modes. Cases: `real/anglerep-quaternion`,
+`real/weights-empty-refweight`, `real/weights-empty-inweight`, `edge/one-voxel-input`,
+`edge/zero-voxel-size`, `edge/basescale-0`.

@@ -37,11 +37,11 @@ import sys
 from pathlib import Path
 
 import pytest
-from larmorx_validation import oracle_cache
 
 nib = pytest.importorskip("nibabel")
 np = pytest.importorskip("numpy")
 programs = pytest.importorskip("larmorx_validation.parity.ants_programs")
+oracle_cache = pytest.importorskip("larmorx_validation.oracle_cache")
 
 #: The constant the standalone ``larmorx`` binary may need beyond the original (MiB): the gzip
 #: writer's two blocks per worker and the runtime's own.

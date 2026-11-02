@@ -361,6 +361,19 @@ def test_exit_status_and_failures_are_cached(cache, fake, workdir):
     assert again.cached and again.returncode == 3
 
 
+def test_a_command_not_found_is_never_stored_nor_served(cache, fake, workdir):
+    _d, src, dst = workdir()
+    assert run(fake, src, dst, "--exit", "127").returncode == 127
+    assert entries(cache) == []  # PATH decides it, and the key leaves PATH out
+    stored = run(fake, *workdir()[1:], "--exit", "3")
+    assert stored.returncode == 3
+    (e,) = entries(cache)
+    e["result"]["returncode"] = 127  # an entry stored so before 2026-11-02
+    cache.write(e)
+    oc.begin_case("another case")
+    assert not run(fake, *workdir()[1:], "--exit", "3").cached
+
+
 needs_time = pytest.mark.skipif(not Path(oc.TIME).is_file(), reason="GNU time is not installed")
 
 

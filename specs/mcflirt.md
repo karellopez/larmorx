@@ -1116,9 +1116,21 @@ binned once per stage: `bin = ⌊(g − g_min)·B/(g_max − g_min)⌋`, clamped
   empty overlap gives `(max − min)²` over both images.
 - `corratio`: `Σ_b n_b·var_b / (n·var)` over bins with `n_b > 2` (weighted counts, variances
   with `n_b − 1`), i.e. 1 − the correlation ratio of the test values given the reference bin;
-  0 if the total variance is not positive.
-- `woods`: `Σ_b n_b²·σ_b/μ_b / n` (unweighted; `σ_b/μ_b` replaced by `σ_b` when the bin mean
-  is not positive); `1e10` for an empty overlap.
+  (spec writer, 2026-11-02) **`n` and the total variance `var` over those bins only**: the points
+  of a bin with at most two (weighted) points are left out of everything; the cost is 1 (not 0)
+  when no bin has more than two points or the total variance is not positive. The exact sums,
+  precisions and the two final roundings: `specs/flirt.md` §6.2.
+- `woods`: (spec writer, 2026-11-02, corrected) `Σ_b t_b / n` over bins with `n_b > 2`
+  (unweighted, unsmoothed integer counts, `n` the count of those bins' points), with
+  `t_b = n_b²·σ_b/S_b` (`S_b` the bin's sum of test values, so `t_b = n_b·σ_b/μ_b`, Woods'
+  criterion weighted by the counts) when `S_b > 0`, else `t_b = n_b²·σ_b`; `σ_b` from `n_b − 1`;
+  `1e10` for an empty overlap. Exactly: `specs/flirt.md` §6.2. (The earlier text,
+  `Σ n_b²·σ_b/μ_b / n`, was `n_b` times too large for every bin with a positive sum.)
+- (spec writer, 2026-11-02) **For `lx.mri.hmc`'s later part (tier 3):** mcflirt's `-cost corratio`
+  and `-cost woods` are FLIRT's two costs unchanged (FSL's two programs share them): the sparse
+  bins' points left out of the count and the total variance too, Woods' terms as above, and
+  `specs/flirt.md` §6.2's sums and roundings (mcflirt's `corratio` takes the edge weights unless
+  `-smooth 0`; its `woods` never does).
 - `mutualinfo` (cost `−MI`) and `normmi` (cost `−(H1 + H2)/H12`), exactly in appendix B:
   joint histogram of the
   reference bins and test bins (test values binned over the test volume's min–max), each

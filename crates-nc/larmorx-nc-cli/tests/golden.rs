@@ -436,6 +436,30 @@ const PRINTING: &[&str] = &[
     "fsl extracttxt",
 ];
 
+/// FLIRT's refusals (rule B, 2026-11-02): `(id, arguments, the defect named)`, refused by
+/// default with exit status 1 and nothing written (recorded by their status).
+const FLIRT_REFUSALS: &[(&str, &[&str], &str)] = &[
+    (
+        "flirt.fsl91.empty-refweight",
+        &[
+            "-in",
+            "{t2}",
+            "-ref",
+            "{t1}",
+            "-refweight",
+            "{zero}",
+            "-omat",
+            "out.mat",
+        ],
+        "FSL-91",
+    ),
+    (
+        "flirt.fsl92.one-voxel",
+        &["-in", "{one}", "-ref", "{t1}", "-omat", "out.mat"],
+        "FSL-92",
+    ),
+];
+
 const BET_CASES: &[BetCase] = &[
     BetCase {
         id: "flirt.default",
@@ -634,7 +658,19 @@ const BET_CASES: &[BetCase] = &[
             "out.mat",
         ],
         mode: "fix",
-        named: &[],
+        // FSL-90: the search's starting points composed as Euler angles
+        named: &["FSL-90"],
+        output_type: "NIFTI",
+    },
+    // FSL-93 (2026-11-02): a header voxel size of 0 counted as 1 for the base scale
+    BetCase {
+        id: "flirt.fsl93.zero-voxel-size",
+        tool: "fsl flirt",
+        args: &[
+            "-in", "{t2zv}", "-ref", "{t1}", "-dof", "6", "-omat", "out.mat",
+        ],
+        mode: "fix",
+        named: &["FSL-93"],
         output_type: "NIFTI",
     },
     BetCase {
@@ -1266,6 +1302,16 @@ fn write_bet_inputs(dir: &Path) -> BTreeMap<&'static str, PathBuf> {
     let mask: Vec<i64> = t1.iter().map(|&v| i64::from(v >= 600)).collect();
     put("mask", bet_nifti(&[nx, ny, nz], 16, 32, &f32_bytes(&mask)));
     put("t2", bet_nifti(&[nx, ny, nz], 16, 32, &f32_bytes(&t2)));
+    // FLIRT's refusals and FSL-93 (2026-11-02): an empty weight, an image of one voxel, the T2
+    // with a header voxel size of 0 along z
+    put(
+        "zero",
+        bet_nifti(&[nx, ny, nz], 16, 32, &f32_bytes(&vec![0; t2.len()])),
+    );
+    put("one", bet_nifti(&[1, 1, 1], 16, 32, &f32_bytes(&[100])));
+    let mut zv = bet_nifti(&[nx, ny, nz], 16, 32, &f32_bytes(&t2));
+    zv[88..92].copy_from_slice(&0f32.to_le_bytes());
+    put("t2zv", zv);
     let mut series = Vec::new();
     for t in 0..4u64 {
         series.extend(bet_head_values(T1_LEVELS, 10 + t));
@@ -1801,6 +1847,36 @@ fn golden() {
             actual.insert((case.id.to_owned(), name), fp);
         }
         runs.insert(case.id, run);
+    }
+    for &(id, case_args, entry) in FLIRT_REFUSALS {
+        let run = dir.path().join(id);
+        std::fs::create_dir(&run).unwrap();
+        let args: Vec<String> = case_args
+            .iter()
+            .map(|a| match *a {
+                a if a.starts_with('{') => bet_inputs[a.trim_matches(|c| c == '{' || c == '}')]
+                    .display()
+                    .to_string(),
+                other => other.to_owned(),
+            })
+            .collect();
+        let out = run_bet(&run, "fsl flirt", &args, "fix", "NIFTI");
+        assert_eq!(out.status.code(), Some(1), "{id}: {out:?}");
+        if let Some(problem) = named_problem(&out.stderr, id, "fix", &[entry]) {
+            notices.push(problem);
+        }
+        let fps = case_fingerprints(&run);
+        let names: Vec<&String> = fps.iter().map(|(n, _)| n).collect();
+        assert!(fps.is_empty(), "{id}: refused, yet it wrote {names:?}");
+        actual.insert(
+            (id.to_owned(), "status".to_owned()),
+            Fingerprint {
+                sha256: sha256(b"1\n"),
+                dtype: "-".into(),
+                sample: "1".into(),
+            },
+        );
+        runs.insert(id, run);
     }
 
     assert!(

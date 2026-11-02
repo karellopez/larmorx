@@ -80,3 +80,21 @@ replica parts, or `validation/src/larmorx_validation/parity/fsl_versions.py`. It
 | `cli::flirt` | FLIRT's command line, its usage and messages | spec §2, black-box |
 
 The parity record is [docs/validation/fsl-flirt.md](../../docs/validation/fsl-flirt.md).
+
+## FLIRT's other programs (`avscale`, `img2imgcoord`, `std2imgcoord`, `img2stdcoord`, `rmsdiff`, `makerot`; part 2, 2026-11-02)
+
+Written by a clean-room implementer under the same rules as part 1 (none of the files listed
+above opened). Its only inputs were:
+
+| Input | What it gave |
+|---|---|
+| [`specs/flirt.md`](../../specs/flirt.md) §15 to §15.4 (with §2.5, §3, §8.5, §8.6, §12) and [`specs/mcflirt.md`](../../specs/mcflirt.md) §4.1, §4.2, §4.4, §6.1, §10.4 | the programs' command lines, messages, exit statuses, mappings, decompositions and matrices, FSL-76, FSL-77 |
+| Black-box runs of FSL 6.0.7.23's six programs (`~/fsl-6.0.7.23/bin`, FSL off the `PATH`): the `fsl-flirt` suite's `programs/` cases through the oracle cache, further command lines through it, and the coordinate programs reading standard input run directly (the cache does not key standard input) | the observations of [`docs/findings/fsl-flirt-original.md`](../../docs/findings/fsl-flirt-original.md), "FLIRT's other programs": `makerot`'s basis and precisions, `avscale`'s precisions, the coordinate programs' default space and standard input |
+| The defect register's summary rows of FSL-14, FSL-76 and FSL-77 (behaviour only) | the corrections, refusals and notices |
+| larmorx's own Apache-2.0 code: part 1's `flirt::mat` and `flirt::param` (the quaternion parametrisation), `larmorx_mri::hmc::rigid` (the decomposition and composition), `cli::options` (FSL's option parser, now also every occurrence of an option), `bet::image` and `cli::bet2` (FSL's image names and reading), `larmorx_core::math` (correctly rounded `sinf`, `cosf`, `asin`, `cos`) | numbers, images, parameters |
+
+| larmorx | Behaviour reproduced | Source |
+|---|---|---|
+| `flirt::programs` (the determinant, `avscale`'s decomposition, half transforms and inverted eddy matrix, the coordinate mappings, the RMS deviations, `makerot`'s rotation with x86-64's NaN rules written out) | §15.1 to §15.4 | spec, black-box |
+| `cli::common` (matrix files, the image layer's and the C++ runtime's messages, images read for their header, the centre of gravity with FSL-14) | §15 | spec, black-box |
+| `cli::avscale`, `cli::coords`, `cli::rmsdiff`, `cli::makerot` | the four command lines, their usages and messages, FSL-76, FSL-77 | spec §15.1 to §15.4, black-box |

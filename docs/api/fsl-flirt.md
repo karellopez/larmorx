@@ -17,9 +17,11 @@ and the clean-room **original** of `flirt` and `convert_xfm` in the main package
 `crates/larmorx-fsl`, written from [`specs/flirt.md`](../../specs/flirt.md) on the registration
 engine it shares with `lx.mri.hmc`; part 1, 2026-11-02: [PROVENANCE](../../crates/larmorx-fsl/PROVENANCE.md),
 section "FLIRT"). `implementation="auto"` runs the replica when `larmorx-nc` is installed, else
-the original; `"original"` runs the original in this process. FLIRT's other programs (avscale,
-the coordinate programs, ...) have their replica only for now (`"auto"` needs `larmorx-nc` for
-them). The command line chooses alike (`LARMORX_IMPLEMENTATION`).
+the original; `"original"` runs the original in this process. Of FLIRT's other programs,
+`avscale`, the coordinate programs, `rmsdiff` and `makerot` have their clean-room original too
+(part 2 of the original, 2026-11-02); `midtrans`, `pointflirt`, `applyxfm4D` and the scripts have
+their replica only for now (`"auto"` needs `larmorx-nc` for them). The command line chooses alike
+(`LARMORX_IMPLEMENTATION`).
 
 **Status: `experimental`** (part 1): the replica against FSL 6.0.7.23 itself
 ([record](../validation/fsl-flirt-replica.md), standard tier): fMRIPrep's boundary-based calls on
@@ -82,8 +84,9 @@ inv = lx.fsl.convert_xfm(r.matrix, inverse=True)
 
 ## FLIRT's other programs (part 2)
 
-Each is the replica of FSL 6.0.7.23's program (every option, message, exit status and failure,
-`specs/flirt.md` §15), run as a separate program; its Python function returns what the program
+Each has the replica of FSL 6.0.7.23's program (every option, message, exit status and failure,
+`specs/flirt.md` §15), run as a separate program, and since part 2 of the original (2026-11-02)
+its clean-room original, run in this process (below); its Python function returns what the program
 prints, parsed (FSL prints 6 decimals or 6 significant digits, and so do these).
 
 ```python
@@ -158,9 +161,25 @@ FSL-72, an undefined matrix name, `-pedir` without a field map, a single-voxel b
 search's grid points, the large evaluations' slices, the pyramid's filters, the boundary points
 and the output's slices run in parallel, each result folded in a fixed order.
 
+**FLIRT's other programs (part 2, relay 1, 2026-11-02).** `avscale`, `img2imgcoord`,
+`std2imgcoord`, `img2stdcoord`, `rmsdiff` and `makerot` (`LARMORX_IMPLEMENTATION=original larmorx
+fsl <program>`, `lx.fsl.<program>(..., implementation="original")`; crate `larmorx-fsl`, modules
+`flirt::programs` and `cli::{avscale, coords, rmsdiff, makerot, common}`), complete: every option,
+usage, message, exit status and failure case of §15.1 to §15.4 (where FSL aborts, the same lines
+and exit status 1), standard input for the coordinate programs (their prompts, `std2imgcoord`'s
+repeated-triple end, the terminal refusal), FSL-76 (corrected by default, FSL's matrix with
+`reproduce`, named), FSL-77 (refused by default, FSL's reading with `reproduce`, named in both
+modes) and FSL-14 for a NaN volume's centre of gravity (left out by default). Refused, as the spec
+says: matrices of 4 rows that are not 4 × 4 where FSL aborts at a determinant, an inverse or a
+product (FSL prints part of its output first), and every readable `-warp` (FNIRT's warp fields are
+not ported). The fsl-flirt suite's 66 cases of these programs: 39 identical to FSL in every byte of
+text and file, 27 more where both refuse or abort alike; one more matrix of the findings
+(a reflection's `--inverteddies` check) differs in the sign of a 1e-10 residual
+([findings](../findings/fsl-flirt-original.md), "FLIRT's other programs").
+
 **Not yet (part 2):** `-debug` and `-debugsave` (refused with a message naming the replica), the
-verbose levels above 1 (`-verbose 2` and more print the level-1 lines only), FLIRT's other
-programs.
+verbose levels above 1 (`-verbose 2` and more print the level-1 lines only), `midtrans`,
+`pointflirt`, `applyxfm4D` and the scripts.
 
 **Status: `experimental`.** Its record: [`docs/validation/fsl-flirt.md`](../validation/fsl-flirt.md)
 (the replica suite's cases against FSL 6.0.7.23): 89 of 111 compared cases within thresholds, 35
@@ -227,8 +246,8 @@ of its type's range.
 
 The coordinate programs' `-warp` (FNIRT's warp fields, refused until FSL's warp-field libraries are
 ported); `standard_space_roi`, `flirt_average` and `epi_reg` (scripts of FSL's other programs: not
-ported); the clean-room original's `-debug`, its verbose levels above 1 and FLIRT's other
-programs (part 2). Known difference (part 3's random testing): with NaN or
+ported); the clean-room original's `-debug`, its verbose levels above 1, `midtrans`,
+`pointflirt`, `applyxfm4D` and the scripts (part 2). Known difference (part 3's random testing): with NaN or
 infinite input voxels in `reproduce` mode (FSL-14), the sign of NaN results can differ from FSL's
 (`nan` against `-nan`): an all-NaN matrix from a schedule that optimises relative to a row, and
 the NaN voxels of `applyxfm4D`'s spline interpolation; the values are NaN in both.

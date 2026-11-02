@@ -17,6 +17,9 @@ inside `scripts/orchestration/boxed.sh`, with `PYTHONPATH=python:validation/src`
 | `bbrcost.sch` | the boundary-based cost of the initial matrix with `bbrstep` 1, 2, 200 and 201 (the findings' "The boundary-based cost") | `probe.py <dir> --args "-in @@epi -ref @@t1 -init @@m -wmseg @@wm -cost bbr -omat o.mat -schedule <path>/bbrcost.sch"` |
 | `stages.py` | the default schedule with `print` after the search and every `measurecost` and `optimise`, FSL against the original: where a registration's path leaves FSL's (the findings' "The search and the optimisation") | `stages.py <dir> [flirt args, default -dof 6]` |
 | `sinc_kernel.py` | which construction of the windowed sinc reproduces FSL's `-applyxfm -interp sinc` values (the findings' "The pyramid and the outputs") | `sinc_kernel.py <probe dir of real/interp-sinc> [voxels]` |
+| `programs_fsl.py`, `programs_cases.txt` | part 2 (relay 1): FSL 6.0.7.23's `avscale`, coordinate programs, `rmsdiff` and `makerot` on command lines beyond the suite's (`makerot -o`'s last bits, small angles, NaN axes; `avscale`'s precisions and failures; the coordinate programs' default space), through the oracle cache (the findings' "FLIRT's other programs") | `programs_fsl.py programs_cases.txt` |
+| `programs_cmp.py` | the same command lines with FSL and the original (`reproduce`), the differences of exit status, streams and files | `programs_cmp.py programs_cases.txt [fix]` |
+| `programs_stdin.sh` | the coordinate programs reading standard input, FSL run directly (the oracle cache does not key standard input) against the original | `programs_stdin.sh <dir with epi.nii, t1.nii> <larmorx binary>` |
 | `speed.py` | the informal speed table of the API page: FSL, the replica (`LARMORX_NC_BIN`) and the original at 1 and 8 threads, one run each | `speed.py` |
 
 FSL's `flirt -verbose 7` (every cost evaluation with its parameters) was the reference for the

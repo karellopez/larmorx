@@ -152,3 +152,76 @@ reproduce the 9th and 10th steps both), and the drift grows to 0.02 mm in the 4 
 - A non-finite moment (`schedule/alignpaxes-nan`): before FLIRT's `Mat::operator(): index out of
   bounds` FSL prints an empty line and Armadillo's `warning: eig_sym(): given matrix is not
   symmetric` on standard error.
+
+## FLIRT's other programs (part 2, relay 1, 2026-11-02)
+
+`avscale`, `img2imgcoord`, `std2imgcoord`, `img2stdcoord`, `rmsdiff` and `makerot`: what black-box
+runs of FSL 6.0.7.23's programs showed beyond `specs/flirt.md` §15 (the `fsl-flirt` suite's
+`programs/` cases through the oracle cache; further command lines through it; the coordinate
+programs reading standard input run directly, as the cache does not key standard input). The
+original reproduces each of these.
+
+**`makerot`** (`-o` writes 10 significant digits, which show the last bits):
+- The rotation is `(B·R)·Bᵀ` with `B = [u, v, n]`: `n = w/θ` where `w` is the axis scaled by the
+  angle (§15.4) and `θ` its length **rounded to single precision**, `n` not normalised again (30
+  degrees about z give `R33 = 0.9999999443 = n_z²`, and the translation `(1 − R33)·c_z`); `u =
+  (−n_y, n_x, 0)` divided by its length, or `(1, 0, 0)` when that length is exactly 0 (an axis of
+  `1e-30, 0, 1` uses the first); `v = n × u` divided by its length; `R` the rotation by `θ` (its
+  single-precision cosine and sine) in the `(u, v)` plane, `[[c, s, 0], [−s, c, 0], [0, 0, 1]]`.
+  Every matrix of the suite's cases and seven more command lines are FSL's to the last printed
+  digit, the signs of zeros (`-0.000000` from a translation of `−2.08e-07`) included; a NaN axis
+  component and an infinite angle give FSL's `nan`/`-nan` rows with §15.4's operand orders.
+- An angle `θ` below 1e-8 radians (the single-precision value) gives the identity (5.7e-7 degrees
+  about z: the identity; 5.75e-7: a rotation).
+- The axis and centre values are kept in **single precision**: an axis of `1e-30, 0, 1` behaves as
+  `1.0000000032e-30, 0, 1`.
+
+**`avscale`:**
+- The **scales and skews** are kept in **single precision**, the rotations and translations in
+  double: `Average scaling` of `-1.1 0.1 0 3 / 0.05 0.9 0.2 -1 / 0 -0.1 1.2 2` prints 1.074986 (the
+  double mean, 1.0749865469, would print 1.074987), and the half transforms' and the inverted eddy
+  matrix's last printed digits on three matrices follow only this choice (the rotation-and-
+  translation matrix's entries in double: 0.998610, not 0.998609).
+- `--inverteddies`' check matrix of a reflection (the matrix above): FSL prints its third row
+  `0.000000 0.000000 1.000000 0.000000`, residuals of about 1e-10 whose signs follow FSL's own last
+  bits; the original prints `-0.000000` for the first (every other entry and every other case
+  identical). No variant of the rotation's precision gives FSL's signs on both this matrix and the
+  suite's (spec question).
+- A matrix file that cannot be parsed (a row shorter than the first): FSL prints `Could not find
+  enough numbers in matrix file` (its catch) and aborts with it; a volume that cannot be read: the
+  image layer's three lines, the catch's two, the abort. A matrix of 4 rows that is not 4 × 4 (4 × 3,
+  5 × 5): FSL prints its output up to `Determinant = ` or the half transforms and aborts in
+  Armadillo's `det()` or a product (`std::logic_error`); the original refuses it before printing
+  (§15). A singular last row (`0 0 0 0`): `Determinant = 0.000000`, `Left-Right orientation:
+  swapped`, then `inv(): matrix is singular` (the catch's line) and the abort; an infinite entry, as
+  a NaN or a zero column, gives the decomposition's message.
+
+**`rmsdiff`:** a matrix that cannot be parsed aborts without a catch's line; a 4 × 3 matrix aborts
+in `det()` (the original refuses it); a second matrix with a singular last row prints the low
+determinant warning, then `RMS_DEVIATION ERROR:: Could not invert matrix`, exit 251; as the first
+matrix it is used as given. With a mask that equals the reference: `0` and `0`.
+
+**The coordinate programs:**
+- An image read whose header has **neither sform nor qform** gets the millimetre matrix of the
+  voxel sizes with x reversed about the field of view (`V = F·S`: a 5 × 6 × 7 image of 2 × 3 × 4 mm
+  prints ` stdvox2world =` `-2 0 0 8 / 0 3 0 0 / 0 0 4 0`), and **counts as having a coordinate
+  space** (no warning); only the empty standard volume (no `-std`) has `V = S` (the identity, 1 mm
+  voxels) and the warning (§15.2 says "else its voxel sizes" for both: spec question).
+- `-` is an option of `std2imgcoord` and `img2stdcoord` only: `img2imgcoord ... -` prints `Lacking
+  argument to option -` (the scan's end) and reads standard input as for no file; an unknown
+  option as the last word prints `Lacking argument to option <o>` and the run goes on, with a word
+  after it `Unrecognised option <o>` (exit 255); `img2imgcoord -verbose` is unknown; `-flirt`'s
+  warning is on standard error.
+- Standard input: the prompt (verbose) is printed after the heading, before the terminal refusal,
+  which is on standard error (`... | img2imgcoord, OR supply a coordinate file`, the program's bare
+  name), exit 1; `std2imgcoord` reads a terminal (no refusal). Its "triple equal to the previous one"
+  is compared exactly (`1 2 3` then `1 2 3.0000001` both print) and never to the first triple (`0 0
+  0` first prints).
+- Numbers are read as libstdc++'s streams read doubles: `nan`, `inf` and `1e400` (out of range) end
+  the input; `0x10` reads `0`, then `x10` ends it; triples run across lines (`1 2 3 4 5 6 7 8 9 / 10
+  11`: three triples).
+- `-warp` of a readable image that is not a warp field (a 3D image): FSL prints `An error occured
+  while reading file: <name>`, exit 1; the original refuses every readable `-warp` (§14.1) with its
+  own message, exit 1.
+- A missing source and destination: `ERROR:: Source volume filename not found` (a blank line), the
+  run goes on and the image layer's exception for the empty name aborts it.

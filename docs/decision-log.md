@@ -1794,3 +1794,8 @@ together at the end.
 | D11 | Default when an improved algorithm exists | the improvement, once its results stay within the upstream's own variability; opt-in otherwise | **decided 2026-10-10** |
 | D13 | Deterministic upstream bugs | fixed by default with a warning; a compatibility switch reproduces them; parity uses the switch | **decided 2026-10-11** |
 | D12 | How other platforms are checked | golden tests: every function reproduces larmorx's own Linux x64 output on every CI platform; light inputs, small CI budget (CLAUDE.md rule 10) | **decided 2026-10-10** |
+
+## 2026-11-02: FLIRT's spec answers before FAST's replica (the user)
+- **What changed:** the first pair under the new method was to be FLIRT's clean-room original, part 2, beside FAST's replica. The orchestrator put one short replica-side task in front of FAST: answering the clean-room implementer's 20 spec questions (`specs/flirt.md` §14), which only an agent allowed to read FSL's source can do, and without which the clean-room original's 22 open cases cannot close (as BET's spec answers did on 2026-10-30). It was raised with the user after the launch, not before.
+- **User decision:** "lets follow your recommendation": the spec answers first (three relays, done the same day: every answer checked by a model written from the spec's text alone; FSL-90 to FSL-93), then FAST's replica.
+- **For the orchestrator:** a change to the agreed order is named to the user before launching, with the option to keep the old one.

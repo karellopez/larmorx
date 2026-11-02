@@ -193,6 +193,41 @@ the centre). The centre is the input volume's intensity-weighted centre of mass 
 §6.1) **of the volume the current image pair was built with** (§5.4), in scaled mm. Decomposition
 (matrix → parameters) is the inverse, about the same centre.
 
+**The composition exactly** (spec writer, 2026-11-02; every composition of FLIRT and `convert_xfm`,
+the search's included; observed: the model of `validation/investigations/flirt-spec-answers/`
+gives FSL's ten significant digits). With `n` parameters only the first `n` are used (7: one scale
+for the three axes). The rotations are three elementary rotations, about x by `r_x`, then y by
+`r_y`, then z by `r_z`, each a 4 × 4 matrix about the centre `c`, multiplied in that order
+(`((I·R_x)·R_y)·R_z`, §12's small products). An elementary rotation, with `a` the angle vector (the
+angle in its axis' place, zeros elsewhere): `θ = √(a·a)` (in double: the squares summed as §12's
+dot products, the square root) rounded to single precision; the identity if `θ < 1e-8`. Otherwise
+`u = a/θ` (double quotients: `u` is exactly ±1 on its axis only when the angle is a
+single-precision number), `v = (−u_y, u_x, 0)` (or `(1, 0, 0)` if `√(v·v)` is not positive) divided
+by `√(v·v)`, `w = u × v` (each component `p₂q₃ − p₃q₂` and its cyclic forms, the products rounded
+first) divided by `√(w·w)`; `B` the 3 × 3 matrix whose columns are `v`, `w`, `u`; `C = [c s 0; −s c 0;
+0 0 1]` with `c` and `s` the single-precision cosine and sine of `θ` (glibc's); the rotation is `(B·C)·Bᵀ`
+(§12's small products) and its translation `(I − R)·c` (the difference first, then the
+matrix-vector product). So the x rotation's (1, 1) entry is `u_x²`, not 1: for angles that are not
+single-precision numbers (the optimiser's, `setrowparams`') FLIRT's matrices differ from the
+textbook rotation of single-precision sines and cosines in their 8th significant digit (observed:
+`1.018201124` against `1.018201155`). The translations are then added to the fourth column (`t_x`,
+`t_y`, `t_z` in turn), and with more than 6 parameters the matrix is multiplied by the skew and then
+by the scale, both about the centre: `(M·K)·S` with `K = [1 k₁ k₂; 0 1 k₃; 0 0 1]`, `S = diag(s_x,
+s_y, s_z)` and their translations `c − K·c`, `c − S·c` (the products first).
+
+**The decomposition exactly** (spec writer, 2026-11-02). Of a matrix `M` about `c`, with `x`, `y`,
+`z` its first three columns and every dot product summed as §12's (two interleaved accumulators:
+`(p₁ + p₃) + p₂` for three terms): `s_x = √(x·x)` in double, rounded to single; then in single
+precision, each dot product rounded to single first: `d = x·y`, `s_y = √(y·y − d²/s_x²)`, `k₁ =
+d/(s_x·s_y)`; in double `x₀ = x/s_x` and `y₀ = y/s_y − k₁·x₀`; in single `s_z = √((z·z − (x₀·z)²) −
+(y₀·z)²)`, `k₂ = (x₀·z)/s_z`, `k₃ = (y₀·z)/s_z`. The rotation is `R = A·(S⁻¹·K⁻¹)` with `A` the 3 × 3
+part, `K⁻¹` §12's triangular inverse of the unit upper triangle (its (1, 3) entry `−(k₂ − k₁k₃)`, the
+product rounded first) and `S⁻¹·K⁻¹` each row of `K⁻¹` times the reciprocal `1/s` of its scale (the
+reciprocal rounded first); the angles from `R` as `specs/mcflirt.md` §4.4 (`cy` the double square
+root of `R₁₁² + R₁₂²` rounded to single; `R₁₁/cy` and the other quotients double quotients rounded
+to single; glibc's `atan2f`), and the translations `A·c + m − c` (double, the product first, `m`
+the fourth column).
+
 **Quaternion parameters** (`-anglerep quaternion`; observed, the replica identical to FSL on the
 record's cases). The three rotation parameters are the vector part `(x, y, z)` of a unit
 quaternion; the search (§8) always uses Euler angles, every other composition and decomposition
@@ -233,15 +268,53 @@ scaled file counts as float, `specs/mcflirt.md` §4.1) becomes the output data t
    values below the lower set to it; NaN stays NaN.
 3. **Weights**: with `-inweight` (`-refweight`) the weight image is read (scaled voxels, single
    slices tripled); with weighting on and no weight file, a volume of ones on the image's grid.
+   (spec writer, 2026-11-02) A weight with no voxel of at least 0.01 is refused by default before
+   a registration (FSL-91, §6.4).
 4. With `-fieldmap`: the field map (rad/s, on the reference's grid) and `-fieldmapmask` (default:
    `0·fmap + 1`, so ones except where the map is NaN). With `-wmseg`: the white-matter
    segmentation; with `-wmcoords`: the two text matrices (§9.2).
+
+**An image of one voxel** (spec writer, 2026-11-02; FSL-92; observed). FLIRT registers an input or
+reference of one voxel (1 × 1 × 1 as read, tripled by step 1 to 1 × 1 × 3): one value cannot
+measure an alignment, and the matrix written is the one the search happens to end at (FSL 6.0.7.23
+on the suite's T1w and BOLD reference: rotations of 95 to 143 degrees, scales 1, for a 2-mm
+constant input, reference, or both, deterministically). The original refuses such a registration
+by default (exit status 1, a message naming FSL-92, nothing written), once both images are read and
+before the weights are checked and the initial matrix formed; with `reproduce` it registers as FLIRT
+does (§11). `-applyxfm`
+of a one-voxel input is §10a's single voxel, refused in both modes.
+
+**Neurological files** (spec writer, 2026-11-02; questions 9 and 15, observed with the model). Every
+image read is put in radiological order, and back when it is written: a file whose sform (if set,
+else its qform) has a positive 3 × 3 determinant (a sform and a qform of opposite signs, or a zero
+determinant: left as stored) has its data reversed along x, and its sform and qform (both, whatever
+their codes) replaced by `W·D⁻¹·F⁻¹·D` (the four products in §12's order; `D = diag(d_x, d_y, d_z,
+1)`; `D⁻¹` by reciprocals; `F = [−1 0 0 f; 0 1 0 0; 0 0 1 0; 0 0 0 1]`, whose §12 triangular inverse
+is `F` itself), with the field of view **`f = (n_x − 1)·d_x` computed in single precision** (95 ×
+1.7 gives 161.5, not 161.500004530). Writing does the same with the written grid's `n_x` and `d_x`.
+The forms are read as single-precision matrices: the sform's rows as stored, the qform from its
+quaternion by the NIfTI-1 reference library's conversion (its long double constants as x87
+operations, each element stored in single precision).
 
 ### 4.2 The base scale
 
 Unless `-basescale` is given, it is decided from the two images' headers: with `M` the largest and
 `m` the smallest absolute voxel size over both images (single precision), `b = M/8` if `M > 12`;
-then `b = m` if `m < 0.75` (the second wins). With `-applyxfm` the base scale is 1.
+then `b = m` if `m < 0.75` (the second wins). With `-applyxfm` the base scale is 1. (spec writer,
+2026-11-02) The voxel sizes are the headers' as stored, read before anything else and before a
+single slice is tripled (§4.1): a single slice counts with its own thickness (observed by the
+implementer: an 8 × 1 × 1 reference of 1 × 1.5 × 0.5 mm voxels gives `b = 0.5`, FSL-75's case).
+
+(spec writer, 2026-11-02; FSL-93; observed) Reading an image (§4.1) takes each voxel size's
+magnitude and counts a size of 0 as 1 (the sizes along the header's number of dimensions); the base
+scale reads the headers' sizes without that repair. A header size of 0 along x, y or z (of either
+image) therefore makes `m = 0` and `b = 0`: every voxel size divided by `b` is infinite, the initial
+matrix NaN, and the pyramid's grid sizes an undefined conversion of infinity (−2147483648 on
+x86-64): FLIRT never finishes (FSL 6.0.7.23 on the BOLD reference with its z size 0: still running
+after 60 minutes at one core's full use, its memory constant). The original counts a size of 0 as 1
+here too by default (then `b` as above; FSL-93, §11, named); with `reproduce` it refuses (FLIRT
+never finishes). `-basescale 0` gives the same base scale and is refused in both modes; a negative
+`-basescale` is FLIRT's (it finishes).
 
 ### 4.3 The minimum sampling
 
@@ -310,16 +383,64 @@ trunc(bins / s)` bins at scale `s` (the quotient in single precision).
 ### 6.2 The cost functions without weights
 
 As `specs/mcflirt.md`: `normcorr` (§6.4, the count `N` quirk included; cost `1 − |r|`; with
-smoothing 0 the centred correlation with the true count), `corratio` (appendix A; cost `1 −
-η²`-like value `Σ n_b var_b / (n var)`; with smoothing 0 the unweighted counts), `woods` (appendix
-A), `mutualinfo` and `normmi` (appendix B), `leastsq` (appendix A; with smoothing 0 the unweighted
-mean). FLIRT's histogram costs use the schedule's fuzzy fraction (default 0.5, §7.3); **with
+smoothing 0 the centred correlation with the true count), `corratio` (cost `Σ n_b var_b / (n
+var)`, exactly below; with smoothing 0 the unweighted counts), `woods` (exactly below), `mutualinfo`
+and `normmi` (appendix B), `leastsq` (appendix A; with smoothing 0 the unweighted mean). FLIRT's histogram costs use the schedule's fuzzy fraction (default 0.5, §7.3); **with
 smoothing 0 and fuzzy fraction 0** the mutual-information costs use plain histograms: each sample
 adds 1 to the cell of its reference bin and test bin (`trunc(y·b1 + b0)` clamped to `0..B−1`), and
 the entropies are `Σ −p ln p` with `p = n/N` in single precision, the terms for counts `n` up to
 `min(10000, trunc(10N/(B+1)))` taken from a table computed once per pair (`−p ln p` in single
 precision, stored in double, then added to the single-precision sum in double and rounded), the
 rest computed directly; the overlap correction and the empty case as appendix B.
+
+**`corratio` exactly** (spec writer, 2026-11-02; reproduced from this text by
+`validation/investigations/flirt-spec-answers/corratio_model.py`, below). For every contributing
+grid point (§6.1), in the sampling order (z outer, then y, then x along each row), with its
+reference bin `b`, the interpolated input value `y` and its weight `w` (the edge weight of
+`specs/mcflirt.md` §6.3; 1 with smoothing 0; with weighting, §6.4's `wt·wr` times the edge
+factors):
+- **three single-precision running sums per bin, over the whole grid in that order** (one level:
+  no row or slice partial sums, unlike `normcorr`): `n_b += w`, `S_b += w·y`, `Q_b += (w·y)·y`,
+  each product rounded to single precision before the next operation (`w·y` once, then times `y`);
+  no fused multiply-add. With smoothing 0 and no weights the counts are integers and the sums
+  `S_b += y`, `Q_b += y·y`: the same values as with `w = 1`;
+- the bins are clamped to `0 … B−1` (§6.1), so the extra bin `B` never fills (FLIRT folds it into
+  bin `B − 1`, which changes nothing);
+- then over the bins in index order, **only the bins with `n_b > 2`** (a weighted count above 2;
+  more than two points with smoothing 0) take part, each in this order, all single precision:
+  `n += n_b`, `S += S_b`, `Q += Q_b`, `v_b = (Q_b − (S_b·S_b)/n_b) / (n_b − 1)` (`S_b·S_b` rounded,
+  then divided, then subtracted; `n_b − 1` in single), `A += v_b·n_b`. **The points of a bin with at
+  most two points are left out of everything**: of `n`, `S`, `Q` and so of the total variance, not
+  only of `A` (the clean-room observation of 2026-11-02, right; `specs/mcflirt.md` appendix A's
+  reading, sparse bins out of `A` only, gives 0.982248 where FSL prints 0.984415 on `real/dof6`'s
+  8 mm pair at the identity, observed);
+- `A ← A/n` if `n > 0`; `V = (Q − (S·S)/n) / (n − 1)` if `n > 1` (single precision; `n − 1` in
+  single); `A ← A/V` if `V > 0`;
+- if `n ≤ 1` or `V ≤ 0` (no bin with more than two points, or no variance), `η = 0`; otherwise
+  `η = 1 − A`, **computed in double and rounded to single**;
+- the cost is `1 − η`, **again computed in double and rounded to single**. The two roundings are
+  not an identity: for `A < 0.5` the cost is `1 − η` with `η` the single-precision rounding of
+  `1 − A` (to nearest, ties to even), so a multiple of 2⁻²⁴, up to 3·10⁻⁸ from `A`; for `A ≥ 0.5`
+  both steps are exact and the cost is `A`; this is what decides the last bits of the
+  costs a parabolic step sees (spec question 3: the 9th and 10th evaluations of `real/dof6`'s
+  `-verbose 7` trace). (Model, observed: with this text all 23 evaluations of the search's first
+  sweep at 8 mm on `real/dof6` print FSL's costs and parameters; returning `A` itself parts from
+  FSL's trace at the 5th evaluation, double-precision bin sums at the 2nd.)
+
+**`woods` exactly** (spec writer, 2026-11-02; the same model). Always the unsmoothed, unweighted
+form, whatever the smoothing (with weights FLIRT prints its warning and uses it, §6.4): per bin, in
+the sampling order, the integer count `n_b` and the single-precision running sums `S_b += y`,
+`Q_b += y·y` (`y·y` rounded). Then over the bins `b = 0 … B` in index order (bin `B` is always
+empty), only the bins with `n_b > 2`, all single precision (`n_b` converted to single): `n += n_b`
+(integer); `v_b = (Q_b − (S_b·S_b)/n_b) / (n_b − 1)`; `σ_b = √v_b` if `v_b > 0`, else 0 (correctly
+rounded); the term `t_b = ((n_b·n_b)·σ_b) / S_b` if `S_b > 0`, else `(n_b·n_b)·σ_b`; `W += t_b`.
+The cost is `W/n` (single) if `n > 0`, else `1e10`. For a bin with a positive sum `t_b = n_b·σ_b/μ_b`
+(`μ_b = S_b/n_b`): Woods' criterion weighted by the bins' counts (FSL-18: not a defect), so the
+clean-room observation `Σ n_b·σ_b/μ_b / n` with `σ_b` from `n_b − 1` is right for those bins and
+`specs/mcflirt.md` appendix A's `n_b²·σ_b/μ_b` was not; **a bin whose sum is not positive adds
+`n_b²·σ_b`**, not `n_b·σ_b` (observed: on the suite's BOLD reference minus 30000, FSL's `woods` at
+the identity is 37174512, which `n_b·σ_b` would make 20844; the model gives FSL's six printed
+`corratio` and `woods` values on both images).
 
 ### 6.3 `labeldiff`
 
@@ -347,6 +468,22 @@ The sums are those of the smoothed forms. Differences from §6.2:
 The weight volumes follow the pyramid (§5): the reference weight's level matches the reference
 level; the input weight is blurred with the input (§7.2).
 
+**An empty weighting mask** (spec writer, 2026-11-02; FSL-91; observed). A weight with no voxel of at
+least 0.01 (an image of zeros: a mask that misses the image, or an empty lesion mask) has an empty
+`B` (§5): the weighted images are filtered to zeros and every weight is 0, so every cost is constant
+(each cost's value for no weighted point: `corratio` and `normcorr` 1, the mutual-information costs
+their values for no overlap) and BBR's `Σ w12` is 0 (its cost NaN: `WARNING:: Found NaN in BBR cost
+(2)` at every evaluation). An image filtered to zeros has a centre of mass of total 0:
+`WARNING::in calculating COG, total = 0.0` on standard error each time it is measured, the centre
+then the voxel origin (§8.1 step 3). FLIRT finishes with status 0 and writes the matrix its search
+happens to end at (FSL 6.0.7.23 with an all-zero `-refweight` on the suite's T1w: a rotation of 95
+degrees, the same at 6 and 12 dof; an all-zero `-inweight`: 143 degrees; with `bbr` 2339 NaN
+warnings), deterministically. The original refuses a registration with such a weight by default
+(exit status 1, a message naming FSL-91, nothing written; the reference weight is checked first),
+once both images and their weights are read (§4.1) and before the initial matrix is formed; with
+`reproduce` it registers as FLIRT does (§11). With `-applyxfm` or `-applyisoxfm` the weights are not used and nothing is
+refused.
+
 ### 6.5 The boundary-based cost (`bbr`)
 
 **The boundary points**, computed the first time the cost is BBR for a pair (and again for later
@@ -355,15 +492,48 @@ pairs):
   above 0.5 and the 3×3×3 box sum of the segmentation there (the separable convolution of §5 with
   taps `[1, 1, 1]`) is below 26.5. Boundary voxels are taken in z, y, x order. Its point is the
   voxel's position in the segmentation's scaled mm (index times voxel size, 4 × 4 times 4-vector
-  product); its normal `n` is minus the 3×3×3 gradient (the gradient masks of `specs/bet.md`'s
-  smoothing step, each component a single-precision running sum over the 27 neighbours in z, y, x
-  order) of the segmentation smoothed by a Gaussian of σ = 2 mm (the separable Gaussian of
-  `specs/mcflirt.md`/`specs/bet.md`), **each component divided by the voxel size of the current
-  reference level** (not the segmentation's; FSL-67), normalised by `√(nx² + ny² + nz²)` in single
+  product); its normal `n` is minus the 3×3×3 gradient of the segmentation smoothed by a Gaussian of
+  σ = 2 mm (both exactly below; (spec writer, 2026-11-02) not `specs/bet.md`'s, which has none),
+  **each component divided by the voxel size of the current reference level** (not the
+  segmentation's; FSL-67), normalised by `√(nx² + ny² + nz²)` in single
   precision. The pair's two points are `p + 2n` (the grey-matter side) and `p − 2n` (white
   matter), each coordinate `p_k ± n_k·2` with `n_k·2` in single and the sum in double, stored as
   single. No boundary voxel: `ERROR::set_bbr_seg: could not find any boundary points!` on standard
   error (at each evaluation, which then is NaN, §6.5 below).
+
+  **The smoothing, the gradient and the normals exactly** (spec writer, 2026-11-02; with this text
+  `validation/investigations/flirt-spec-answers/bbr_model.py` reproduces FSL's printed cost of the
+  initial matrix of `bbr/default`, 0.537036, 0.540203, 0.566266, 0.554291 with `bbrstep` 1, 2, 200
+  and 201, and the same four costs with `-noclamp`, `-bbrtype local_abs` and `global_abs`: 16 of 16
+  values, observed):
+  - *The Gaussian.* Per axis `σ_k = 2/d_k` voxels (a single-precision quotient, `d_k` the
+    segmentation's voxel size as read, after the base scale), a kernel of **radius**
+    `r_k = 2·trunc(σ_k − 0.001) + 3` (the difference in double), so `2r_k + 1` taps
+    `g_j = exp(−j²/(2σ_k²))`, `j = −r_k … r_k` (`j²` an integer; the denominator `(2·σ_k)·σ_k` in
+    double; glibc's `exp`), each rounded to single and summed in single precision in `j` order; the
+    taps applied are `g_j·(1/Σ)` in double (`1/Σ` a double quotient). This is a Gaussian of standard
+    deviation `σ_k` voxels (§5's blur, with its `4σ²`, is √2 wider): the suite's 1.7 × 1.67 × 1.67 mm
+    segmentation has `σ` = 1.18, 1.2, 1.2 voxels, radius 5, 11 taps per axis.
+  - *Its convolution:* separable, along x, then y, then z, each pass as §5's (each output value the
+    single-precision running sum, in tap order from `−r_k` to `+r_k`, of the double products of value
+    and tap; values outside the image count 0). The box sum of the boundary test is the same
+    convolution with the taps `[1, 1, 1]`.
+  - *The gradient:* at every voxel, three components, each a single-precision running sum over the
+    27 neighbours (offsets `(dx, dy, dz)`, `dz` outer, then `dy`, then `dx`, each from −1 to +1) of
+    `v·m`, the smoothed value times the mask weight rounded to single (no fused multiply-add);
+    neighbours outside the image count 0. The x component's weight is `dx·3^(1 − |dy| − |dz|)`
+    (computed in double, stored in single): ±3 for the two neighbours along x, ±1 for the eight that
+    also move along one other axis, ±1/3 (0.33333334) for the eight corners, 0 when `dx = 0`; the y
+    and z components the same with the axes exchanged (`dy·3^(1 − |dx| − |dz|)`,
+    `dz·3^(1 − |dx| − |dy|)`). Not a `[1, 2, 1]` smoothing across a central difference.
+  - *The normal:* `n_k = −G_k/d^ref_k` (single), `|n| = √((n_x·n_x + n_y·n_y) + n_z·n_z)` in single
+    precision, then `n_k/|n|` (single). A zero gradient (a perfectly symmetric neighbourhood) makes
+    the pair's points NaN, and the cost NaN with the warnings below. `d^ref` is the voxel size of the
+    pair's reference level when its cost first becomes BBR: with `bbr.sch`'s `setscale 1 force` the
+    "1 mm" level, isotropic at `s_min` (3 mm on the suite's images), where the division changes no
+    direction; it matters only with an anisotropic level (`-noresample`).
+  - *The order:* boundary voxels with z outer, then y, then x (the stored order of the points, and
+    so the order of the cost's terms and of `bbrstep`'s subsampling).
 - *From `-wmcoords`/`-wmnorms`*: rows of `x y z` (mm) and normals; the points `c ± n·2` in double,
   stored as single.
 
@@ -371,10 +541,18 @@ pairs):
 voxel sizes `S_in`; computed as the solution of `S_in·T = A⁻¹`, LU with partial pivoting, after
 `A⁻¹` by LU), for every pair `k = 0, step, 2·step, …` (`step` from `setoption bbrstep`, default 1):
 `g = I(T·p_gm)`, `w = I(T·p_wm)` (4 × 4 times 4-vector products in double, the input interpolated
-at the single-precision coordinates by its own interpolation: trilinear with zero outside),
+at the single-precision coordinates by its own interpolation: trilinear with zero outside;
+(spec writer, 2026-11-02) each of the eight neighbours outside the grid counts 0 on its own, so a
+point less than one voxel outside still takes the neighbours inside),
 `q = 200(g − w)/(g + w)` in double (0 when `|g + w| ≤ 1e-6`), `u = 1 + tanh(slope·(q − offset))`
-(the slope and offset 0 single, converted to double; glibc's `tanh`). With `-bbrtype local_abs`
-each term is `min(u, 2 − u)`. The cost is `Σ u / Σ 1` (double sums in pair order; with weights,
+(the slope, default −0.5, and the offset 0 single, converted to double; glibc's `tanh`). With
+`-bbrtype local_abs` each term is `min(u, 2 − u)` (in double, before the weight multiplies it).
+(spec writer, 2026-11-02) This is FLIRT's rule (spec question 5: the clean-room observation was
+right): the model reproduces FSL's `local_abs` costs of `bbr/default`'s initial matrix, 0.080241,
+0.080231, 0.090327 and 0.084639 with `bbrstep` 1, 2, 200 and 201, with the normals above; the
+clean-room original's 1.4 mm on `bbr/type-local_abs` come from its normals, amplified by this cost,
+which rewards a contrast of either sign and is flat where the default is not (FSL's own band there is
+0.90 mm against 0.015 mm for the default). The cost is `Σ u / Σ 1` (double sums in pair order; with weights,
 each term times `w12 = (wt(T p_gm)·wr(V p_gm))·(wt(T p_wm)·wr(V p_wm))`, the products of single
 interpolated weights, in double, `V = S_ref⁻¹`, and the denominator `Σ w12`), then with
 `global_abs` `min(c, 2 − c)`; returned as single. A NaN sum prints `WARNING:: Found NaN in BBR
@@ -471,6 +649,11 @@ the working minimum sampling is at most `1.25·s`:
 Otherwise (the scale is too fine for the data) **only the input is reset**: the existing pair now
 compares its previous reference level with the clamped, unblurred input (observed: with 3 mm data
 the default schedule's `setscale 2` leaves the 4 mm pair in place with the unblurred input).
+(spec writer, 2026-11-02; observed by the implementer, confirmed) The pair keeps everything else:
+its reference level, bins, cost, smoothing, fuzzy fraction and **its centre** (the centre of mass of
+the input it was built with: the rotations stay about it); the requested scale, and so the
+tolerances, is the new one. A later `search` (§8.1 step 3) or `aligncog` measures the centre of
+mass of the input the pair now holds (the unblurred input) afresh.
 
 ### 7.3 `setoption name values`
 
@@ -488,6 +671,14 @@ ends in FSL). Too few words: `Must specify an option and a value`. Anything else
 is unrecognised - ignoring`.
 
 ### 7.4 The default schedules and `bbr.sch`
+
+**The first pair** (spec writer, 2026-11-02; observed by the implementer, confirmed). Before the
+first line of any schedule FLIRT builds an image pair from the 8 mm reference level (§5; with
+`-noresample` the reference as read) and the input blurred to 8 mm (with `-noresample` as read;
+the weights filtered likewise), with `trunc(bins/8)` bins, the main cost (`-cost`), the command
+line's smoothing and fuzzy fraction, its centre the centre of mass of that input. The requested
+scale is 1 until a `setscale`, so the tolerances (§8.2) are the unscaled ones. A schedule with no
+`setscale` (FSL's `measurecost1.sch`, `pairreg2.sch`, `pairreg3.sch`) runs on this pair.
 
 The 3D default (no `-schedule`, no `-2D`):
 1. **8 mm**: smoothing 8; the search (§8.1) with dof 12 into `S` and `P`.
@@ -537,12 +728,35 @@ fMRIPrep's log shows as one row of 17 numbers). FSL's other shipped schedules (`
    ends (`(max + min)/2` when `m = 1`), for the coarse step (60°) and the fine step (18°): with the
    defaults 4 coarse angles (−90°, −30°, 30°, 90°) and 11 fine angles per axis.
 2. The search's parameter subset: with dof > 6, a common scale and three translations (the scale
-   column has three ones, on `sx, sy, sz`); else the three translations.
+   column has three ones, on `sx, sy, sz`); else the three translations. (spec writer, 2026-11-02;
+   observed by the implementer, confirmed) The dof of steps 2 to 8 is the `search` command's own
+   (12 when it has none), not `-dof`: with `-dof 6` the coarse grid still optimises the common
+   scale and the fine grid keeps the median scale; `-dof` enters step 9 only. The grids'
+   tolerances are §8.3's for this subset with `x₀` the reference parameters in force when the
+   search starts (the identity's `(0, 0, 0, 0, 0, 0, 1, 1, 1, 0, 0, 0)`, unless an earlier search or
+   a subset `optimise` left others), computed once before step 3; all the search's optimisations
+   use them.
 3. The reference parameters start at the translation that aligns the centres of mass (`c_ref −
    M_init·c_in`, both in scaled mm, `M_init` applied as a 4 × 4 times 4-vector product), unit scales.
+   (spec writer, 2026-11-02) `c_ref` is the centre of the pair's reference level and `c_in` of the
+   pair's input (blurred to the scale), the same as the rotations' centre; every centre of mass of
+   FLIRT (and `specs/mcflirt.md` §6.1's) is computed with `v − v_min` **in single precision**, then
+   converted to double, and double running sums `Σ(v − v_min)·i` (per axis) and `Σ(v − v_min)` over
+   the voxels in z, y, x order, flushed into the totals after every `max(1000, trunc(√N)) + 1`
+   voxels (`N` the number of voxels; each block's sums restart at 0 and are added to the totals,
+   which are added to the last block's at the end); each coordinate is its total over the total
+   (a total below 1e-5 in magnitude counts 1, with `WARNING::in calculating COG, total = 0.0` on
+   standard error), times the voxel size. (With
+   it the model gives the search's printed reference translations on `real/dof6`, -15.257971
+   13.083505 76.451790; with the subtraction in double, 13.083506.) (spec writer, 2026-11-02) Both
+   centres are measured afresh at every search (their warnings printed again, observed by the
+   implementer); after a `setscale` that only reset the input (§7.2) `c_in` is the unblurred
+   input's, no longer the rotations' centre.
 4. **Coarse grid**: for every coarse `(rx, ry, rz)` (x outer, z inner), the subset optimised (§8.3,
    4 iterations) from the reference parameters with those rotations; the resulting translations
-   and scale stored on a small grid.
+   and scale stored on a small grid. (spec writer, 2026-11-02) The reference parameters `x₀` are
+   these parameters (the sampled angles exactly) and the subset starts from `y = 0`, so the first
+   evaluation is at them; the grid holds the results in single precision.
 5. The scale grid is replaced everywhere by its median (the element at `trunc(0.5·n)` of the sorted
    values).
 6. **Fine grid**: for every fine `(rx, ry, rz)`, the translations and scale interpolated
@@ -553,16 +767,38 @@ fMRIPrep's log shows as one row of 17 numbers). FSL's other shipped schedules (`
 7. The threshold `t = min(c_min + 0.2(c_max − c_min), 20th percentile)`; if `t ≤ c_min`, `t =
    max(1.0001 c_min, 0.9999 c_min)`. The points with cost strictly below `t` are optimised
    (subset, 4 iterations) from their interpolated parameters (skews 0); their costs replace the
-   grid's.
+   grid's. (spec writer, 2026-11-02) The percentile is the element at `trunc(n·p)` (`n` the number
+   of fine points converted to single, `p = 0.2` in single precision, the product in single) of the
+   sorted costs, as the median of step 5 with `p = 0.5`; each point's interpolated parameters (the
+   sampled angles) become the subset's reference parameters `x₀` and it starts from `y = 0`; the
+   points are visited x outer, z inner.
 8. **Minima**: the grid points (excluding the last index on each axis) none of whose 26
    neighbours (inside the grid) has a strictly smaller cost; if none, the overall minimum (the
    grid scanned z outer, then y, then x, starting from point (0, 0, 0) and replaced on a strictly
    smaller cost). Their interpolated parameters (skews 0) are the search's starting points.
+   (spec writer, 2026-11-02; observed by the implementer, confirmed) The minima are listed z outer,
+   then y, then x (`COST minima at : a,b,c`, then `Cost minima at : a,b,c` in the same order).
 9. Each starting point, as a matrix of `min(dof, 7)` parameters, is optimised freely (§8.2, dof
    `min(dof, 7)`, 4 iterations, with the search cost); the optimised and starting matrices, with
    their costs, enter a list sorted by the optimised cost, from which a new entry is dropped if its
    RMS deviation (§8.6) from an existing one is below the reference level's smallest voxel size,
-   unless it is better, which replaces that one.
+   unless it is better, which replaces that one. (spec writer, 2026-11-02) Here `dof` is `-dof`.
+   Exactly: the starting point's first `min(dof, 7)` parameters are composed (§3, about the pair's
+   centre; with `-dof 6` the median scale is dropped) and **that matrix** is optimised: its
+   decomposition (§3) is the start, which gives back the sampled angles to single precision
+   (other angles under gimbal lock, `|r_y| = 90°`). With `-anglerep quaternion` this composition
+   reads the three Euler angles as a quaternion's vector part (§3): a starting point whose angles'
+   squares sum above 1 prints `Parameters do not form a valid axis - greater than unity` on
+   standard error and keeps only its translations and scale (observed: FSL's four lines on
+   `real/anglerep-quaternion`, one per such minimum of its five; nothing else in the search
+   prints it). (spec writer, 2026-11-02; FSL-90) By default the original composes the starting
+   points as the Euler angles they are, whatever `-anglerep` (no message then; the optimisations
+   from them use `-anglerep`'s representation as before); FLIRT's quaternion reading with
+   `reproduce` (§11). The cost stored with the starting matrix (in `P`) is the search cost of that matrix,
+   evaluated after its optimisation (counted, not printed: observed by the implementer). The
+   list: a new entry is compared with the entries in their (sorted) order and the first one within
+   the distance decides: a strictly better new entry replaces it (removed, the new one inserted
+   after every entry of lower or equal cost), otherwise the new one is dropped.
 
 ### 8.2 One optimisation
 
@@ -578,7 +814,23 @@ differences:
   known, evaluated).
 - **Convergence.** After a sweep, `Σ_i |(x_i^start − x_i^end) / t_i| / n_t` (terms with `|t_i| ≤
   1e-15` count 0; `n_t` the number of tolerances, 12; the sum with two interleaved accumulators,
-  even and odd indices, then added) below 1 ends the optimisation.
+  even and odd indices, then added) below 1 ends the optimisation. (spec writer, 2026-11-02;
+  observed by the implementer, confirmed) Exactly: `n_t` is the length of the tolerance list, 12
+  for every optimisation of the 12 parameters whatever its dof, and the subset's number of columns
+  in the subset form (§8.3: 4, or 3, in the search); the weights `w_i = |1/t_i| / n_t` are computed
+  first (double), each term is `|(x_i^start − x_i^end)·w_i|`, and the sum is rounded to single
+  precision before the comparison.
+- **The tolerance unit of a line search** (spec writer, 2026-11-02). Along a direction `d` (a
+  coordinate axis, or Powell's `x_end − x_start`): `û = d/√(d·d)` (double: §12's sum of squares,
+  its square root, each component divided), `τ = Σ_i |û_i / t_i|` accumulated in single precision
+  over the tolerances with `|t_i| > 1e-15` (each double quotient's magnitude added to the single
+  running sum in double, rounded back to single), and the unit `u = |1/τ|` (a single-precision
+  quotient); mcflirt's line search (`specs/mcflirt.md` §7.2) runs with this `u`, its trial points
+  `p + a·û` (`a` single, the product and the sum double). Along a coordinate axis `u =
+  fl(1/fl(1/t_k))`, which differs from `fl(t_k)` for some tolerances (for 29 % of random ones;
+  never for the defaults at the scales 8, 4, 2 and 1); along Powell's direction it is one tolerance
+  unit in this L1 sense (question 19: the implementer's `1/‖d ⊘ t‖` holds with the L1 norm of the
+  unit direction).
 - **Powell** (`optimisationtype powell`): after a sweep that did not converge, let `Δ_m` be each
   line search's cost change (new minus start, single), `m*` the most negative, `f0` the sweep's
   first starting cost, `f1` its final cost, `fe` the cost at `x_start + 2(x_end − x_start)`; if
@@ -635,7 +887,11 @@ S_in⁻¹` (the four 4 × 4 products in Armadillo's order, §12; `W` the sform i
 else the voxel-size diagonal; `S` the voxel-size matrices), converted to scaled mm (§3); otherwise
 the identity. `setrowqsform` appends `M_q · M_init⁻¹` (or the identity with `-usesqform`).
 `-usesqform` makes `M_q` the initial matrix. Note that single-slice images lose their sform/qform
-(§4.1) and that the input used is the current (blurred) one, whose sform is kept.
+(§4.1) and that the input used is the current (blurred) one, whose sform is kept. (spec writer,
+2026-11-02; question 15, observed with the model: FSL's `-13.74984741`) `W` is the form as FLIRT
+holds it after reading: for a neurological file the swapped one of §4.1, whose single-precision
+field of view is the 4.5e-6 mm the implementer found (the double product gives `-13.74984288`);
+`W_ref⁻¹` by §12's inverse, `S_in⁻¹` by reciprocals, and the products `((S_ref·W_ref⁻¹)·W_in)·S_in⁻¹`.
 
 ### 8.6 The RMS deviation
 
@@ -664,7 +920,12 @@ first, then the second and the third exchanged when the third's eigenvalue is be
 each exchange stores the eigenvalue it moves into the other place rounded to single precision
 (which the second comparison reads). A non-finite moment (a NaN or infinite voxel): the
 decomposition fails and FSL stops with `Mat::operator(): index out of bounds` (status 0, nothing
-written: FSL-68; the original exits 1 by default as §11).
+written: FSL-68; the original exits 1 by default as §11). (spec writer, 2026-11-02; observed by
+the implementer, confirmed) Both images' axes are computed (the reference level's first) before
+either is used, and for each image whose covariance is not finite (a NaN or infinite voxel makes
+every entry NaN) standard error gets an empty line and `warning: eig_sym(): given matrix is not
+symmetric` (the symmetry check before the decomposition compares entries within a tolerance, which
+NaN fails); then FLIRT's message.
 
 **The alignment** of the reference level's axes `R_r` and the input level's `R_i` (each computed
 as above, the reference's first): for the first and the second column `n`, when the dot product
@@ -694,7 +955,33 @@ blurred input**. The output grid is the reference's (its header kept: sform, qfo
 replaced); each voxel is the input interpolated at `M⁻¹` of its position (`specs/mcflirt.md` §9.1's
 voxel-to-voxel mapping), then voxels whose pre-image lies more than `-paddingsize` voxels (at least
 1 with `-2D`) outside the input are set to the background/pad value. With a field map (§6.5) the
-values are resampled through the BBR mapping instead. **Data type**: the input's (§4.1), except that
+values are resampled through the BBR mapping instead. (spec writer, 2026-11-02; observed by the
+implementer, confirmed) Exactly: the pre-image tested is the interpolation's own, in single
+precision (`x·a₁₁ + z·a₁₃ + a₁₄` at the start of each line along y, then `a₁₂` added at each step;
+the same for the other two coordinates; `a` the voxel-to-voxel matrix rounded to single), and a
+voxel keeps its interpolated value when every coordinate lies in `[−p, n − 1 + p]`; within `p`
+voxels outside the input the value is therefore interpolated with the neighbours outside read by
+the edge rule: the extraslice rule by default (one voxel beyond an edge reads the edge voxel,
+further ones the background value), the constant `v` with `-setbackground v`. With a field map
+there is no padding test: every voxel is interpolated (the edge rule outside the input).
+
+**The windowed sinc exactly** (spec writer, 2026-11-02; question 13, observed with the model: 40000
+of 40000 sampled voxels of `-applyxfm -interp sinc` bit for bit; the two sums in double, the weight
+as `w_x·(w_y·w_z)` or the table's position in double each part from FSL in 38 to 91 % of them).
+The table (full width `w`, half-width `h = (w − 1)/2`): 1201 samples, `m = 600` in single
+precision; sample `k = 1 … 1201` at `x = ((k − m − 1)/m)·h` (single precision, left to right); the
+sinc `1 − |x|` when `|x| < 1e-7`, else `sin(y)/y` with `y = π·x` rounded to single and the
+single-precision sine (glibc's) and quotient; the window in double, rounded to single (Hanning
+`0.5 + 0.5·cos(π·x/h)`, Blackman `0.42 + 0.5·cos(π·x/h) + 0.08·cos(2π·x/h)`, rectangular 1; 0 for
+`|x| > h`; glibc's `cos`); the sample is the single product of the sinc and the window. The table
+read at `t` (single): 0 if `|t| > h`; `q = (t/h)·m + m` in single, plus 1 in double, rounded to
+single; `n = ⌊q⌋`, `f = q − n` (single); 0 if `n < 1` or `n > 1200`; otherwise `k_n·(1 − f) +
+k_{n+1}·f` in double, rounded to single. At a position `p` (single), with `i₀ = ⌊p⌋` per axis: each
+axis' `2h + 1` weights, the neighbour `i₀ + e` weighted by the table at `(p − i₀) − e` (the
+difference in single precision, then `−e` added in single); over the neighbours inside the grid,
+z outer from `i₀ − h`, then y, then x, the weight `(w_x·w_y)·w_z` in single, and the single
+running sums `S += v·w` and `W += w`; the value `S/W` (single) when `|W| > 1e-9`, otherwise the
+edge rule's value at `i₀`. **Data type**: the input's (§4.1), except that
 a non-float type becomes float when the output's values span less than 1.5 (unless `-datatype`);
 conversion to integers as mcflirt's FSL-09 rule (`specs/mcflirt.md` §9.4: truncation; larmorx's
 default rounds and clamps). `descrip` is the writer's; units mm and s.
@@ -708,6 +995,44 @@ isotropically to `s` mm (§5). For each volume `t` of the input, in order: blurr
 smallest voxel size (unless nearest neighbour or `-noresampblur`), resampled as §9.2 — with the
 **pad value taken from the unblurred first volume**, once — into volume `t` of the output; the output
 has the input's TR. `-omat` writes the initial matrix. The program ends with status 0 after this.
+
+(spec writer, 2026-11-02; question 10, observed by the implementer, confirmed) The image is
+written before the matrix: an image FSL cannot write (an output type it does not know) ends the
+run before `-omat` is written. (After a registration it is the other way round: `-omat`, §9.1,
+then the image.)
+
+(spec writer, 2026-11-02; question 14, observed with the model: FSL's 172800 values of
+`real/applyisoxfm-4d-blur-setbackground` bit for bit; a blur reading zeros parts in 43441 of them,
+edge coefficients repeated in 5654) **The edge rule comes before the blur here**: the input's edge rule (the constant `v` with `-setbackground v`,
+else the extraslice rule with the first volume's background value) is set before each volume is
+blurred, so the blur reads the neighbours beyond the image by that rule (`v`, or the edge voxel one
+voxel out and the background value further), not zeros as after a registration (§9.2, where the
+blur comes first and reads zeros). With `-interp spline` and `-setbackground v` the spline's
+coefficients are computed as for the extraslice rule (`specs/mcflirt.md` §9.3's prefilter, its
+mirror-symmetric initialisation), but at evaluation the coefficients outside the grid count 0 (the
+extraslice rule repeats the edge coefficient instead), and a position outside `[0, n − 1]` on any
+axis gives `v`. The spline exactly: the coefficients along x, then y, then z (axes of one voxel
+skipped), each column in double and the results stored in single precision after each axis; pole
+`z = √3 − 2`; the causal start `c₀ + Σ_{i=1}^{N−1} zⁱ·cᵢ` with `N = trunc(ln(1e-8)/ln|z| + 1.5)`
+(15) capped at the column's length, the powers by repeated products; the causal sweep `cᵢ += z·cᵢ₋₁`;
+the anti-causal start `c_last = (−z/(1 − z²))·(2·c_last − l)` with `l` the column's last value
+before the causal sweep; the anti-causal sweep `cᵢ = z·(cᵢ₊₁ − cᵢ)` downwards; every coefficient times
+6. At a position `p`, the start index `⌈p⌉ − 2` per axis and the four cubic weights of the distances
+`p − (s + i)` (`2/3 + ((0.5·a)·a)·(a − 2)` for `a < 1`, `(1/6)·((b·b)·b)` with `b = 2 − a` for `a < 2`,
+in double); the value `Σ (c·w_x)·(w_z·w_y)` in double, z outer, then y, then x, rounded to single.
+The input's values are those read (a scaled integer file: `raw·slope` then `+ intercept`, in
+single precision).
+
+(spec writer, 2026-11-02; question 9, observed with the model: FSL's `quatern_b`, `quatern_c`,
+`quatern_d`, offsets and sform rows on a neurological reference with an oblique qform and no
+sform) **`-applyisoxfm`'s header.** The resampling (§5) composes a set sform or qform (code ≠ 0)
+with `diag(st_x, st_y, st_z, 1)` (`st = s/d`, single precision) and keeps an unset one as read
+(for a neurological file: swapped by the read grid, §4.1); writing swaps both back with the new
+grid's `n_x` and `s` (§4.1). So an unset sform keeps its rows but for its x translation, which
+moves by the two fields of view (observed by the implementer: 57.75 became 64.75 for 16 voxels of
+0.5 mm resampled to 3.5 mm). The written qform: every element of the matrix rounded to single
+precision first, then the quaternion of §3's conversion (the NIfTI-1 reference library's, x87
+operations included), its fields stored in single precision.
 
 ### 9.4 `-debug`
 
@@ -812,9 +1137,29 @@ default and with `reproduce`:
 - **FSL-81** (`aff2rigid` of FSL 6.0.7.23 stops with a Python `NameError` before writing; §15.8):
   the matrix computed and written by default (rule A), FSL's traceback and exit status 1 with
   `reproduce`, named in both modes.
+- **FSL-90** (`-anglerep quaternion`: the search's starting points, Euler angles, composed as a
+  quaternion's vector part; §8.1 step 9) (spec writer, 2026-11-02): composed as Euler angles by
+  default (rule A: a documented option, the search's minima misread: four of
+  `real/anglerep-quaternion`'s five starting points lose their rotation); FLIRT's composition, with
+  its messages, with `reproduce`; named in both modes when a starting point has a rotation. Measured
+  on `real/anglerep-quaternion`: FLIRT's matrix lies 0.37 mm (RMS deviation, §8.6) from the same
+  registration with Euler angles (`-anglerep euler`), the corrected one 0.23 mm (the rest is the
+  optimisations' own parametrisation); the corrected result is 0.19 mm from FLIRT's.
+- **FSL-91** (a `-refweight` or `-inweight` with no voxel of at least 0.01; §6.4) (spec writer,
+  2026-11-02): a registration with it refused by default (rule B: an empty weighting mask, every
+  cost constant, FLIRT's matrix an artefact of its search); FLIRT's run with `reproduce`; named in
+  both modes.
+- **FSL-92** (an input or reference of one voxel, 1 × 1 × 1; §4.1) (spec writer, 2026-11-02): a
+  registration of it refused by default (rule B: one value, FLIRT's matrix an artefact of its
+  search); FLIRT's run with `reproduce`; named in both modes.
+- **FSL-93** (a header voxel size of 0 makes the base scale 0; §4.2) (spec writer, 2026-11-02): the
+  size counted as 1 by default, as reading the image counts it (rule A: FLIRT never finishes on an
+  image its own reading accepts), named; refused with `reproduce` (FLIRT never finishes);
+  `-basescale 0` refused in both modes.
 - Kept (rule C): `pointflirt` reads a file of exactly three points as three coordinates per
   column (a 3 × 3 file is taken as given, not transposed; §15.6); documented.
-- Undefined behaviour, refused in both modes with a message: an uninitialised matrix name (§7.1),
+- Undefined behaviour, refused in both modes with a message: `-basescale 0` (FSL-93, §4.2; spec
+  writer, 2026-11-02), an uninitialised matrix name (§7.1),
   `bbrstep` below 1 (FSL-71: FSL never finishes), `-pedir` without a field map read (§6.5), a `read`
   of an unparsable file (FSL-72: FSL reads for ever, its memory growing until an allocation fails:
   `std::bad_alloc`, exit status 0 under an address-space limit), the background value of a single
@@ -828,13 +1173,38 @@ default and with `reproduce`:
   (`dgesv`, OpenBLAS's Haswell kernels); `A·B·C` as `(A·B)·C` for equal square sizes; `A·inv(B)·C·
   inv(D)` evaluates each inverse (LU) and then the products of four; `inv(A)` alone by LU (`dgetrf`
   + `dgetri`), with the 2×2 and 3×3 closed forms and the diagonal shortcut of Armadillo.
+- (spec writer, 2026-11-02; question 11, observed with the model: FSL's text of `convert_xfm
+  -inverse`, its `-0`s included) **The 4 × 4 inverse exactly.** A diagonal matrix: reciprocals.
+  An upper triangle (the left-right flip of §4.1, the skew of §3): the triangle's inverse below.
+  Otherwise the LU factorisation with partial pivoting, column by column (left-looking): for
+  column `j`, the earlier row interchanges; the entries above the diagonal `a_ij − Σ_{k<i} l_ik
+  a_kj` (the sum from 0 in order, then `+ 0`); the entries on and below it `y − A·x` (below); the
+  pivot the first entry of largest magnitude, the rows interchanged, the entries below it
+  multiplied by the pivot's reciprocal. Then the inverse of `U`, column by column: `d = 1/u_jj`;
+  the column above the diagonal multiplied by the part already inverted (for each earlier column
+  `i` in order: `x_k = x_i·u_ki + x_k` for `k < i`, then `x_i = x_i·u_ii`), then each entry
+  multiplied by `−d` (so a zero becomes `−0`). Then from the last column to the first: the
+  column's entries below the diagonal set aside and zeroed, and the column replaced by `y − A·x`
+  with the columns to its right and the entries set aside; then the column interchanges in
+  reverse order. Every `y − A·x` (OpenBLAS's matrix-vector kernel with `α = −1`): with four rows,
+  the columns in pairs, `y − (a_{r,k+1}·x_{k+1} + a_{r,k}·x_k)` (the second product first, then one
+  subtraction), a last single column as `y + a_{r,k}·(x_k·(−1))`; with fewer rows, `t` summed from
+  0 in order, then `(−1)·t + y`. The kernels' fused multiply-adds occur only with `α = −1`, where
+  they give the rounded subtraction above: no FMA changes these inverses.
 - Every cost evaluation's sums are single precision in the visiting order (§6); the line search is
-  single precision (`specs/mcflirt.md` §7). BBR's sums are double.
+  single precision (`specs/mcflirt.md` §7). BBR's sums are double. (spec writer, 2026-11-02) No
+  fused multiply-add in FLIRT's own arithmetic (the costs, the filters, the boundary points, the
+  line search: FSL's x86-64 build has none there): every product is rounded before it is added;
+  glibc's functions and OpenBLAS's kernels compute as their own builds do.
 - glibc's `exp`, `tanh`, `logf` give the last bits (CORE-MATH agrees in more than 99.8% of calls).
 - Speed (built-for-speed original): the cost sums may be computed in blocks of rows in parallel only
   if the block sums are combined in the visiting order with FSL's three-level summation (row, slice,
   volume) preserved — the row sums are independent, so rows can run in parallel and be folded per
-  slice in order; the search's coarse grid points are independent (each is optimised from the
+  slice in order; (spec writer, 2026-11-02) this holds for the costs summed in three levels
+  (`normcorr`, `specs/mcflirt.md` §6.4; `labeldiff`, §6.3), **not** for `corratio`, `woods` and the
+  mutual-information histograms, whose per-bin sums are single running sums over the whole grid in
+  the visiting order (§6.2, appendix B): their rows can be interpolated in parallel, but the values
+  must be added to the bins in the visiting order to keep FSL's bits; the search's coarse grid points are independent (each is optimised from the
   reference parameters) and can run in parallel; the fine grid's costs too; the threshold step's
   optimisations too. The pyramid's convolutions are separable and parallel over slices.
 
@@ -844,7 +1214,11 @@ Cases (the replica's `fsl-flirt-replica` cases are the model; their inputs are m
 from ds005040's fMRIPrep run): fMRIPrep's 22 BBR calls (3 in the standard tier); the default schedule
 on a BOLD reference to T1w at 6, 7, 9, 12 dof; every cost function; every search option; weights;
 `-applyxfm` 3D and 4D with every interpolation and data type; the boundary-based options; every
-shipped schedule; the 2D mode; the verbose levels; every failure of §2 and §10.
+shipped schedule; the 2D mode; the verbose levels; every failure of §2 and §10. (spec writer,
+2026-11-02) The refusals and corrections of §11's FSL-90 to FSL-93: the replica's cases
+`real/anglerep-quaternion` (FSL-90), `real/weights-empty-refweight` and `-inweight` (FSL-91),
+`edge/one-voxel-input` (FSL-92), `edge/zero-voxel-size` and `edge/basescale-0` (FSL-93; FSL does
+not finish, so the case checks that FSL is still running after 20 s).
 
 Metrics and thresholds (PLAN.md §11.3):
 - **Matrices**: the RMS deviation from FSL's matrix (§8.6, radius 80 mm about the origin) and the
@@ -884,6 +1258,41 @@ Closed in part 3: the principal-axes alignment (§8.7), every parameter-subset m
    of its pre-check's).
 3. Not ported, by decision: `standard_space_roi`, `flirt_average`, `epi_reg` (they need FSL's other
    programs: `fslmaths`, `fslroi`, FAST, `fugue`).
+
+### The clean-room questions of 2026-11-02 (spec writer)
+
+The questions of FLIRT's clean-room original, part 1 (its black-box observations:
+`docs/findings/fsl-flirt-original.md`), answered in the sections named. "Right", "incomplete" or
+"wrong" is the observation as the implementer stated it. The models that reproduce FSL's numbers
+from this spec's text alone are in `validation/investigations/flirt-spec-answers/` (its README).
+
+| # | Question | Answered in | The observation | Confidence and check |
+|---|---|---|---|---|
+| 1 | `corratio` and `woods`: the points of a bin with at most two (weighted) points | §6.2 (`specs/mcflirt.md` appendix A for mcflirt) | right: left out of the count, the sums and the total variance (`corratio`), of the count (`woods`) | high: the model gives FSL's six printed `corratio` (smoothing 8 and 0) and `woods` values on two images; the sparse bins out of `A` only give 0.982248 for FSL's 0.984415 |
+| 2 | `woods`' formula | §6.2 | incomplete: `Σ n_b σ_b/μ_b / n` with `σ_b` from `n_b − 1` holds for bins with a positive sum; a bin whose sum is not positive adds `n_b²·σ_b`; appendix A's `n_b²·σ_b/μ_b` corrected | high: FSL's 37174512 on the BOLD reference minus 30000, where `n_b·σ_b` gives 20844 |
+| 3 | The correlation ratio's sums and precisions | §6.2, §12 | incomplete: the per-bin single-precision running sums in the sampling order are right (one level, products rounded, no fused multiply-add); missing were the two double-to-single roundings of the result (`η = 1 − A`, then the cost `1 − η`) | high: the model prints FSL's costs and parameters at all 23 evaluations of the search's first sweep on `real/dof6` (the 9th and 10th included); without the two roundings it parts at the 5th, with double sums at the 2nd. Also stated: the centres of mass' single-precision `v − v_min` and block sums (§8.1), needed for the printed translations |
+| 4 | BBR's normals: the Gaussian, the gradient's weights, the voxels' order | §6.5 | wrong reference (`specs/bet.md` has no such masks): a Gaussian of σ = 2 mm (radius `2·trunc(σ − 0.001) + 3` voxels, not that many taps) and weights 3, 1, 1/3 (not `[1, 2, 1]`); the order z, y, x was right | high: the model gives FSL's 0.537036 (and the other 15 printed costs of the initial matrix: `bbrstep` 1, 2, 200, 201; default, `-noclamp`, `local_abs`, `global_abs`) |
+| 5 | `-bbrtype local_abs` | §6.5 | right: `min(u, 2 − u)` per term; the 1.4 mm come from the normals (question 4), which this cost amplifies | high for the formula (the model's four `local_abs` costs are FSL's); medium that the record's case then passes (FSL's own band 0.90 mm) |
+| 6 | The search: (a) the grids follow the `search` command's dof; (b) the starts are the sampled parameters; (c) the minima z outer; (d) `P` holds each start with its own cost; (e) both centres measured again | §8.1 steps 2, 3, 4, 7, 8, 9 | (a), (c), (d), (e) right; (b) right for the grids and the threshold step, incomplete for the minima: their first `min(-dof, 7)` parameters are composed and that matrix's decomposition is the start (the same angles to single precision; with `-dof 6` the median scale dropped); also stated: the grids' tolerances (`x₀` the parameters in force when the search starts), the percentile's element, the list's replacement rule, and `-anglerep quaternion`'s minima read as quaternions (`real/anglerep-quaternion`'s four messages) | high (source; FSL's four messages counted on the five minima of the `-verbose 7` trace) |
+| 7 | The convergence test's `n_t` in the subset form | §8.2 | right: the tolerance list's length (the subset's columns; 12 for every free optimisation); also the weights `|1/t|/n_t` first and the sum rounded to single | high (source) |
+| 8 | A `setscale` that only resets the input keeps the pair's centre | §7.2 | right; a later `search` or `aligncog` measures the current (unblurred) input's centre afresh | high (source) |
+| 9 | `-applyisoxfm`'s unset sform and the qform's last float bit | §4.1, §9.3 | right about the unset sform (both forms swapped by the two grids' single-precision fields of view); incomplete for the qform: its matrix is rounded to single precision before §3's conversion | high: the model gives FSL's six quaternion and offset fields and twelve sform values on an oblique neurological reference (a double field of view moves the sform's x translation, 1.803835 for 1.803831) |
+| 10 | `-applyxfm` writes the image before `-omat` | §9.3 | right (a registration writes `-omat` first) | high (source) |
+| 11 | `inv(A)`'s `-0` and OpenBLAS's fused multiply-adds | §12 | right about the order; the fused multiply-adds occur only with `α = −1`, where they equal the rounded subtraction: none changes the inverse | high: the model prints FSL's `convert_xfm -inverse` text, its two `-0`s included |
+| 12 | `alignpaxes` with a non-finite moment | §8.7 | right: an empty line and the warning for each non-finite image (the reference level's first), then the error | high (source; the implementer's observation) |
+| 13 | The windowed sinc's last bits | §9.2 | incomplete: the table's single-precision samples and lookup (the position's last addition in double), the per-axis weights at `(p − i₀) − e`, the weight `(w_x·w_y)·w_z` and both sums in single precision, z outer | high: the model gives 40000 of 40000 sampled voxels of `-applyxfm -interp sinc` bit for bit; double sums, `w_x·(w_y·w_z)` and a double lookup position part in 38 to 91 % |
+| 14 | The spline with `-setbackground` | §9.3 | incomplete: with `-applyxfm` the edge rule is set before the blur, which reads `-setbackground`'s constant beyond the image; the spline's coefficients are the extraslice rule's but count 0 outside the grid; the prefilter and the evaluation stated exactly | high: the model gives FSL's 172800 values of `real/applyisoxfm-4d-blur-setbackground` bit for bit (a blur reading zeros parts in 43441, edge coefficients in 5654) |
+| 15 | `-usesqform`'s 4.5e-6 mm | §4.1, §8.5 | the single precision found: the left-right swap of a neurological file, whose field of view `(n_x − 1)·d_x` is a single-precision product | high: the model gives FSL's `-13.74984741` (a double field of view gives `-13.74984288`) |
+| 16 | `convert_xfm -fixscaleskew`'s 8th digit | §3 | incomplete: the decomposition's single-precision steps, the skew's triangular inverse and the scales' reciprocals, and the composition's elementary rotations `(B·C)·Bᵀ` (whose (1, 1) entry is `u_x²`) are FLIRT's | high: the model gives FSL's ten digits on the suite's `-fixscaleskew` and on a composition of double angles, where the textbook rotation parts in the 8th digit (1.018201155 for 1.018201124) |
+| 17 | A schedule without `setscale` runs on a first pair | §7.4 | right: the 8 mm level, the input blurred to 8 mm, `trunc(bins/8)` bins, the main cost; the requested scale 1 | high (source) |
+| 18 | The base scale before the single slices' tripling | §4.2 | right (the headers as stored) | high (source) |
+| 19 | Powell's direction's tolerance | §8.2 | right in the L1 sense: `u = |1/Σ|û_i/t_i||`, summed in single precision; also along the axes `u = fl(1/fl(1/t))`, not `fl(t)` | high (source) |
+| 20 | The paddings | §9.2 | right: the mask's single-precision pre-image is the interpolation's; within `p` voxels the edge rule (extraslice, or `-setbackground`'s constant); no test with a field map | high (source; the implementer's observation) |
+| 21 | Candidate refusal: an all-zero `-refweight` or `-inweight` (every weighted cost 0 / 0) | §4.1 step 3, §6.4, §11 (FSL-91) | incomplete: FLIRT's weighted costs are not 0 / 0 but constant (each has a value for no weight), BBR's NaN; the condition is FLIRT's own empty mask (no voxel of at least 0.01), which also blanks the images. Rule B: refused by default, FLIRT's run with `reproduce` | high: FSL 6.0.7.23's runs (an all-zero reference weight at 6 and 12 dof and with `bbr`, an all-zero input weight: rotations of 95 and 143 degrees, 2339 NaN warnings), the replica identical in `reproduce` |
+| 22 | Candidate refusal: images of one voxel along every axis | §4.1, §11 (FSL-92) | right (a 1 × 1 × 1 input, reference or both: a rotation of the search's grid, deterministically). Rule B: refused by default, FLIRT's run with `reproduce` | high: FSL's three runs, the replica identical in `reproduce` |
+| 23 | (spec writer's lead) `-anglerep quaternion`'s search minima | §8.1 step 9, §11 (FSL-90) | — | high: rule A; measured (FLIRT's matrix 0.37 mm from the Euler registration, the corrected 0.23 mm) |
+| 24 | (spec writer's lead) a header voxel size of 0 | §4.2, §11 (FSL-93) | — | high: FSL still running after 60 minutes; the replica's trace (infinite voxel sizes, a NaN initial matrix, a pyramid level of −2147483648 voxels per axis) |
+| 25 | (spec writer's lead) a zero BBR normal | §6.5 | — | unchanged: stated in §6.5 (NaN points and cost, FSL's warnings); unrealistic on a segmentation, not registered |
 
 ## 15. FLIRT's other programs
 

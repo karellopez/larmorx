@@ -398,15 +398,30 @@ The items below keep their history.
    included). **Part 2:** `-debug`, the verbose levels above 1, FLIRT's other programs (avscale, the
    coordinate programs, rmsdiff, makerot, midtrans, pointflirt, applyxfm4D, pairreg, extracttxt,
    aff2rigid), the site's clean-room panels, the benchmark report and speed; the record's open cases
-   once the spec writer answers part 1's 20 spec questions (`docs/parts/2026-11-02-cleanroom-flirt-1/handoff.md`, for the spec writer only) (BBR's normal masks and smoothing,
-   `local_abs`, the correlation ratio's last bits, sinc's arithmetic, `-usesqform`'s and
-   `-fixscaleskew`'s precision, the spline with `-setbackground`). Follow-up for `lx.mri.hmc` (its
+   with the spec writer's answers. **The spec questions answered (spec writer, 2026-11-02;
+   `specs/flirt.md`, lines marked "(spec writer, 2026-11-02)"; §14's table "The clean-room
+   questions of 2026-11-02" names each answer's section and whether the observation was right):
+   FLIRT's clean-room part 2 can close its open cases.** The 20 questions in §3, §4.1, §4.2, §6.2,
+   §6.5, §7.2, §7.4, §8.1, §8.2, §8.5, §8.7, §9.2, §9.3 and §12 (the correlation ratio's and
+   Woods' sparse bins and formula, the correlation ratio's two final roundings, BBR's Gaussian of
+   σ = 2 mm and gradient weights 3, 1, 1/3, `local_abs`, the search's grids, minima and starting
+   matrices, the convergence test, the line search's tolerance unit, the windowed sinc's and the
+   spline's arithmetic, `-usesqform`'s single-precision field of view, `-fixscaleskew`'s
+   composition, the inverse's zeros, the paddings); every precision answer proved by a model
+   written from the spec's text alone that gives FSL's numbers
+   (`validation/investigations/flirt-spec-answers/`: BBR's 16 printed costs, the search's first
+   sweep of 23 evaluations on `real/dof6`, 40000 of 40000 sinc voxels, 172800 of 172800 spline
+   values, five matrix outputs). The two candidate refusals and two leads decided: FSL-90 to
+   FSL-93 (§11; in the replica with their `reproduce` switches; for the clean-room original in
+   its part 2, its suite `fsl_flirt.py` needing `Run.hang_fixed` for `edge/zero-voxel-size`). Follow-up for `lx.mri.hmc` (its
    own part; not changed here, its record stays identical): the correlation ratio's sparse-bin rule
    found here (a reference bin with at most two points is left out of the counts, the sums and the
    total variance; `docs/findings/fsl-flirt-original.md`, "The costs") probably holds for mcflirt's
    `-cost corratio` too (`specs/mcflirt.md` appendix A leaves the sparse bins in the total); and the
    search findings (a subset's convergence test over its own tolerances) for its schedule-free
-   optimiser if it uses subsets. A spec-writer question first. The scripts wait for other tools: `epi_reg` (FAST, `fslmaths`,
+   optimiser if it uses subsets. Answered (spec writer, 2026-11-02, `specs/mcflirt.md` appendix A):
+   mcflirt's `-cost corratio` and `woods` are FLIRT's two costs, the sparse bins left out of the
+   counts, sums and total variance, and Woods' `n_b²σ_b/S_b` (`n_b²σ_b` when `S_b ≤ 0`). The scripts wait for other tools: `epi_reg` (FAST, `fslmaths`,
    `fugue`/`applywarp` for field maps, `convert_xfm`, `flirt`), `standard_space_roi` (`flirt`,
    `fslmaths`, `fslroi`), `aff2rigid` (`avscale`), `flirt_average` (`flirt`, `fslmaths`,
    `convert_xfm`), `pairreg` (`flirt` with `pairreg*.sch`, `bet`).

@@ -1,0 +1,131 @@
+# FLIRT spec answers (relays 1 to 3, 2026-11-02): the exact changes to the shared documents.
+# Apply from the merged checkout: python -P scripts/orchestration/apply_handoff.py <this> [--check]
+# The reasons: HANDOFF.md beside this file.
+
+# ---------------------------------------------------------------------------------------------
+# docs/findings/upstream-defects.md: the four new rows (behaviour only), the history paragraph and
+# the detailed section
+
+[[op]]
+do = "insert"
+file = "docs/findings/upstream-defects.md"
+after = "| FSL-81 † |"
+text = """| FSL-90 † | flirt (`-anglerep quaternion`) | the search's starting points hold Euler angles, but FLIRT composes each with the quaternion representation: the three angles are read as a quaternion's vector part, so a starting point whose angles' squares sum above 1 loses its rotation (FLIRT prints `Parameters do not form a valid axis - greater than unity`) and the others start from another rotation than the search found | c | none (fMRIPrep's FLIRT calls use Euler angles) | rule A: composed as Euler angles by default, FLIRT's composition with `reproduce`, named in both modes (measured on `real/anglerep-quaternion`: four of its five starting points lose their rotation in FLIRT; FLIRT's matrix lies 0.37 mm from the same registration with Euler angles, the corrected one 0.23 mm); FLIRT's replica 2026-11-02; the clean-room original in its part 2 (`specs/flirt.md` §11) | – |
+| FSL-91 † | flirt (`-refweight`, `-inweight`) | a weight with no voxel of at least 0.01 (an empty weighting mask: an image of zeros, a mask that misses the image) is accepted: the weighted images are filtered to zeros and every weight is 0, so every cost is constant (BBR's NaN, with a warning at every evaluation), and FLIRT writes, with exit status 0, the matrix its search happens to end at (a rotation of 95 to 143 degrees on the suite's images), deterministically | c | none (fMRIPrep passes no weights to FLIRT) | rule B: a registration with such a weight refused by default (exit status 1, nothing written), FLIRT's run with `reproduce`, named in both modes; FLIRT's replica 2026-11-02; the clean-room original in its part 2 | – |
+| FSL-92 † | flirt | an input or reference of one voxel (1 × 1 × 1) is registered: one value cannot measure an alignment, and FLIRT writes the matrix its search happens to end at (a rotation of 95 to 143 degrees), deterministically | c | none | rule B: refused by default (exit status 1, nothing written), FLIRT's run with `reproduce`, named in both modes; FLIRT's replica 2026-11-02; the clean-room original in its part 2 | – |
+| FSL-93 † | flirt | a voxel size of 0 in the input's or reference's header (which reading the image counts as 1) makes the base scale 0: every voxel size divided by it is infinite, the initial matrix NaN, the pyramid's grid sizes an undefined conversion of infinity, and FLIRT never finishes (still running after 60 minutes, its memory constant); `-basescale 0` the same | a | none (fMRIPrep passes `-basescale 1`) | rule A: a header size of 0 counted as 1 for the base scale too by default, named; refused with `reproduce` (FLIRT never finishes); `-basescale 0` refused in both modes; FLIRT's replica 2026-11-02; the clean-room original in its part 2 | – |"""
+
+[[op]]
+do = "insert"
+file = "docs/findings/upstream-defects.md"
+after = "**2026-11-02, FLIRT's clean-room original (part 1):**"
+text = """
+**2026-11-02, FLIRT's spec answers (the spec writer):** FSL-90 (rule A), FSL-91 and FSL-92 (rule
+B) and FSL-93 (rule A; `-basescale 0` refused in both modes) added, from the clean-room original's
+two candidate refusals and two leads of the spec answers; each in FLIRT's replica with its
+`reproduce` switch (FSL-93's a refusal: FLIRT never finishes) and in `specs/flirt.md` §11 for the
+clean-room original's part 2. FSL-94 and FSL-95 unused. No new **decide** entry."""
+
+[[op]]
+do = "insert"
+file = "docs/findings/upstream-defects.md"
+after = "FSL's behaviour with `reproduce`; FSL-79 and FSL-80 are named only where the written output changes."
+text = """
+### FSL-90 to FSL-93: FLIRT's spec answers (FSL 6.0.7.23) †
+
+Found answering the questions of FLIRT's clean-room original (2026-11-02; `docs/findings/fsl-flirt.md`,
+restricted, "The refusals and leads of 2026-11-02", has the source lines; FSL's runs and the
+replica's in both modes in `validation/investigations/flirt-spec-answers/`). FSL-90 (`-anglerep
+quaternion`'s search starting points composed as quaternions) is corrected by default (rule A),
+FLIRT's composition with `reproduce`. FSL-91 (an empty weighting mask) and FSL-92 (an image of one
+voxel) are refused by default (rule B: every cost constant, FLIRT's matrix an artefact of its
+search), FLIRT's run with `reproduce`; FSL is deterministic on both (the replica's `reproduce`
+identical on its seven runs). FSL-93 (a header voxel size of 0: a base scale of 0, FLIRT never
+finishes) is corrected by default (the size counted as 1, as FLIRT's own reading counts it) and
+refused with `reproduce`; `-basescale 0` is refused in both modes. Cases: `real/anglerep-quaternion`,
+`real/weights-empty-refweight`, `real/weights-empty-inweight`, `edge/one-voxel-input`,
+`edge/zero-voxel-size`, `edge/basescale-0`."""
+
+# ---------------------------------------------------------------------------------------------
+# docs/api/upstream-defects.md: the users' table
+
+[[op]]
+do = "insert"
+file = "docs/api/upstream-defects.md"
+after = "| FSL-81 |"
+text = """| FSL-90 | flirt | the replica `larmorx-nc fsl flirt` (`larmorx fsl flirt`, `lx.fsl.flirt`) | with `-anglerep quaternion` the search's starting points (Euler angles) are read as a quaternion's vector part: most lose their rotation | composed as Euler angles, named; `reproduce` FLIRT's composition and its messages |
+| FSL-91 | flirt | the same | a `-refweight` or `-inweight` with no voxel of at least 0.01 (an empty mask): every cost constant, the matrix an artefact of the search | an error (exit status 1), named; `reproduce` FLIRT's registration |
+| FSL-92 | flirt | the same | an input or reference of one voxel (1 × 1 × 1) is registered: the matrix an artefact of the search | an error (exit status 1), named; `reproduce` FLIRT's registration |
+| FSL-93 | flirt | the same | a header voxel size of 0 makes the base scale 0: FLIRT never finishes (`-basescale 0` the same) | the size counted as 1 for the base scale, as reading the image counts it, named; `reproduce` and `-basescale 0`: an error (FLIRT never finishes) |"""
+
+# ---------------------------------------------------------------------------------------------
+# docs/api/fsl-flirt.md (the tool's page, shared with the clean-room original's part 2: apply after
+# both merges)
+
+[[op]]
+do = "insert"
+file = "docs/api/fsl-flirt.md"
+after = "mcflirt's replica (named in both modes, the whole border by default)."
+text = """
+The spec answers (2026-11-02, the replica): **FSL-90** (`-anglerep quaternion`: the search's
+starting points, Euler angles, composed as Euler angles by default; FLIRT reads them as a
+quaternion's vector part), **FSL-91** (a `-refweight` or `-inweight` with no voxel of at least 0.01:
+refused by default, exit status 1; FLIRT registers on constant costs), **FSL-92** (an input or
+reference of one voxel: refused by default), **FSL-93** (a header voxel size of 0: counted as 1 for
+the base scale by default, as reading the image counts it; FLIRT's base scale is then 0 and it never
+finishes, so `reproduce` refuses; `-basescale 0` refused in both modes). Each named in both modes
+(`upstream defect FSL-9n (flirt) corrected: ...`); the clean-room original follows in its part 2."""
+
+# ---------------------------------------------------------------------------------------------
+# docs/next-steps.md item 7: the spec questions answered
+
+[[op]]
+do = "edit"
+file = "docs/next-steps.md"
+old = """the record's open cases
+   once the spec writer answers part 1's 20 spec questions (`docs/parts/2026-11-02-cleanroom-flirt-1/handoff.md`, for the spec writer only) (BBR's normal masks and smoothing,
+   `local_abs`, the correlation ratio's last bits, sinc's arithmetic, `-usesqform`'s and
+   `-fixscaleskew`'s precision, the spline with `-setbackground`)."""
+new = """the record's open cases
+   with the spec writer's answers. **The spec questions answered (spec writer, 2026-11-02;
+   `specs/flirt.md`, lines marked "(spec writer, 2026-11-02)"; §14's table "The clean-room
+   questions of 2026-11-02" names each answer's section and whether the observation was right):
+   FLIRT's clean-room part 2 can close its open cases.** The 20 questions in §3, §4.1, §4.2, §6.2,
+   §6.5, §7.2, §7.4, §8.1, §8.2, §8.5, §8.7, §9.2, §9.3 and §12 (the correlation ratio's and
+   Woods' sparse bins and formula, the correlation ratio's two final roundings, BBR's Gaussian of
+   σ = 2 mm and gradient weights 3, 1, 1/3, `local_abs`, the search's grids, minima and starting
+   matrices, the convergence test, the line search's tolerance unit, the windowed sinc's and the
+   spline's arithmetic, `-usesqform`'s single-precision field of view, `-fixscaleskew`'s
+   composition, the inverse's zeros, the paddings); every precision answer proved by a model
+   written from the spec's text alone that gives FSL's numbers
+   (`validation/investigations/flirt-spec-answers/`: BBR's 16 printed costs, the search's first
+   sweep of 23 evaluations on `real/dof6`, 40000 of 40000 sinc voxels, 172800 of 172800 spline
+   values, five matrix outputs). The two candidate refusals and two leads decided: FSL-90 to
+   FSL-93 (§11; in the replica with their `reproduce` switches; for the clean-room original in
+   its part 2, its suite `fsl_flirt.py` needing `Run.hang_fixed` for `edge/zero-voxel-size`)."""
+
+[[op]]
+do = "edit"
+file = "docs/next-steps.md"
+old = """optimiser if it uses subsets. A spec-writer question first."""
+new = """optimiser if it uses subsets. Answered (spec writer, 2026-11-02, `specs/mcflirt.md` appendix A):
+   mcflirt's `-cost corratio` and `woods` are FLIRT's two costs, the sparse bins left out of the
+   counts, sums and total variance, and Woods' `n_b²σ_b/S_b` (`n_b²σ_b` when `S_b ≤ 0`)."""
+
+# ---------------------------------------------------------------------------------------------
+# validation/tools.toml: the replica's expected divergences
+
+[[op]]
+do = "edit"
+file = "validation/tools.toml"
+old = "(FSL-71, FSL-72, FSL-75)"
+new = "(FSL-71, FSL-72, FSL-75, FSL-93)"
+
+# ---------------------------------------------------------------------------------------------
+# validation/difftest/triage.toml: the clean-room original's two candidates, now register entries
+
+[[op]]
+do = "edit"
+file = "validation/difftest/triage.toml"
+old = "an all-zero -refweight or -inweight (every weighted cost 0 / 0 in both: a candidate for a rule-B refusal), one-voxel shrunk inputs (an arbitrary matrix in both)"
+new = "an all-zero -refweight or -inweight and one-voxel inputs (an arbitrary matrix in both: registered 2026-11-02 as FSL-91 and FSL-92, rule B, refused by default in the replica; the original's part 2 to follow, specs/flirt.md §11)"

@@ -991,3 +991,92 @@ signature = ["larmorx exceeds the memory limit"]
 status = "explained"
 explanation = "quaternion registrations over 3 GiB (trial-flirt-programs-00026, -00667, -02324, -06285, -09485; -2-01831, -01944, -02240): extreme voxel sizes. Re-checked after the memory fixes in a 16 GiB box: -00667 and -09485 agree now (the replica fits), on -06285 FSL is killed and the replica finishes, on -00026 and -02324 both are killed; the second trial's three measured alone in a 20 GiB box (memory_findings.py): FSL is killed at 20 GiB on all three, the replica on two and finishes the third at 19.0 GiB (-2-01944). Heavy cases of the final validation phase (heavy.jsonl)"
 link = "docs/findings/fsl-flirt.md"
+
+# ---------------------------------------------------------------- FLIRT's replica, part 3: the trial of the new paths (2026-11-01/02)
+# A pre-check (`difftest --tools fsl-flirt-part3`, seed probe-part3b, 2805 cases) and one trial
+# (`difftest --tools fsl-flirt-part3 --budget 0.5 --jobs 20 --seed part3-trial`, <workspace>/oracles/difftest/
+# 2026-11-01-fsl-flirt-part3: 209657 cases, 209455 agree, 136 notices, 19 differ, 47 over the memory limit).
+# Every realistic finding re-checked with the final build in a memory box (recheck_findings.py, memory findings
+# skipped); the extreme ones (odd units, voxels of 0.01 to 50 mm) deferred to the final validation phase (the
+# user, 2026-11-02: random testing in the porting parts uses realistic cases only).
+
+[[difference]]
+tool = "fsl-flirt-part3"
+implementation = "replica"
+signature = ["exit status", "files written"]
+status = "fixed"
+explanation = "FLIRT's part 3: applyxfm4D on a double-precision input was refused; its double template is translated (the interpolated voxels through single precision, the voxels the padding mask sets holding the background value in double precision, the sinc sums adding double products, double spline coefficients). About 100 pre-check cases; every one agrees since"
+link = "validation/difftest/cases/fsl-flirt/applyxfm4d-double-padding.json"
+
+[[difference]]
+tool = "fsl-flirt-part3"
+implementation = "replica"
+signature = ["every file bit-identical"]
+status = "fixed"
+explanation = "FLIRT's part 3: applyxfm4D's spline interpolation of an integer image with reproduce (FSL-79): the coefficients are stored as the type's value of c + 0.5 and each interpolated value is converted to the type before the output's conversion (the replica had truncated the coefficients only); every one agrees since"
+link = "validation/difftest/cases/fsl-flirt/applyxfm4d-int-spline-small.json"
+
+[[difference]]
+tool = "fsl-flirt-part3"
+implementation = "replica"
+signature = ["every file bit-identical"]
+status = "register"
+defect = "FSL-22"
+explanation = "FLIRT's part 3: applyxfm4D's background value of a volume with a NaN voxel in its 2-voxel border (trial 39242, 152078): the order of NaN values in the sort is undefined in C++; libstdc++'s order (FSL's build's) with reproduce, NaN sorted last by default, named (as flirt and mcflirt)"
+link = "validation/difftest/cases/fsl-flirt/applyxfm4d-nan-background.json"
+
+[[difference]]
+tool = "fsl-flirt-part3"
+implementation = "replica"
+signature = ["files written", "stderr identical"]
+status = "fixed"
+explanation = "FLIRT's part 3 (trial 57755): a parameter subset whose line search reaches a scale of 0 on one-voxel images: the cost function's inverse of the singular matrix throws inv(): matrix is singular, which FLIRT's main catches (FSL-68), nothing written; the replica had gone on with a NaN matrix. The exception now unwinds to FLIRT's main (larmorx-nc-core exception)"
+link = "validation/difftest/cases/fsl-flirt/paramsubset-singular-cost.json"
+
+[[difference]]
+tool = "fsl-flirt-part3"
+implementation = "replica"
+signature = ["stderr identical"]
+status = "fixed"
+explanation = "FLIRT's part 3: extracttxt with a start before the first line: dc reads its own negative result back as its subtraction command (dc: stack empty) and sed reads a range beginning with - as options (invalid option, GNU sed's usage, exit 1); the replica had printed another sed message. 390 of 390 combinations identical since (validation/probes/fsl-flirt-programs/extracttxt_ranges.py)"
+link = "validation/difftest/cases/fsl-flirt/extracttxt-dc-negative.json"
+
+[[difference]]
+tool = "fsl-flirt-part3"
+implementation = "replica"
+signature = ["every file bit-identical"]
+status = "open"
+explanation = "FLIRT's part 3: the sign of NaN results from inputs with NaN or infinite voxels under reproduce (FSL-14 lets them in): an all-NaN -omat matrix when a schedule optimises relative to a row (trial 65393, 83738, 97568, pre-check probe-part3b-00496; also without a parameter subset, so a path of part 2), and NaN voxels of applyxfm4D's spline interpolation (trial 102752, 122789, 191754): FSL writes nan where the replica writes -nan, or the reverse; every value is NaN in both. Left open (specs/flirt.md §14.2): the operand order FSL's build gives two NaN operands in these sums"
+link = "docs/findings/fsl-flirt.md"
+
+[[difference]]
+tool = "fsl-flirt-part3"
+implementation = "replica"
+signature = ["exit status", "stderr identical"]
+status = "fixed"
+explanation = "FLIRT's part 3 (extreme cases: voxels of 0.01 mm make the isotropic reference 417 or 585 GB; trial 70320, 116905, 165530): newimage's Out of memory (#99), caught by FLIRT's main (FSL-68); the replica's allocator had aborted. The volume is allocated fallibly and the exception unwinds to FLIRT's main. Re-checked once before the user's decision of 2026-11-02 (agree); not run again"
+link = "docs/findings/fsl-flirt.md"
+
+[[difference]]
+tool = "fsl-flirt-part3"
+implementation = "replica"
+signature = ["larmorx exceeds the memory limit"]
+status = "open"
+explanation = "FLIRT's part 3: the trial's 47 runs over its 3 GiB limit, all extreme cases (flirt schedules with alignpaxes or a parameter subset on voxels of 0.01 to 50 mm): deferred to the final validation phase (the user's decision of 2026-11-02: random testing in the porting parts uses realistic cases only); queued in the trial's heavy.jsonl. One measured in the pre-check (probe-part3b-01970): FSL 8,966 MiB, the replica 8,342, the matrices identical (memory_findings.py)"
+link = "docs/findings/fsl-flirt.md"
+
+[[difference]]
+tool = "fsl-flirt-part3"
+implementation = "replica"
+signature = ["original exceeds the memory limit"]
+status = "open"
+explanation = "FLIRT's part 3: the trial's runs where FSL's flirt itself exceeds 3 GiB (extreme cases, as above): deferred to the final validation phase (the user's decision of 2026-11-02)"
+link = "docs/findings/fsl-flirt.md"
+
+[[difference]]
+tool = "fsl-flirt-part3"
+implementation = "replica"
+signature = ["notice: FSL-79", "notice: FSL-80", "notice: FSL-09"]
+status = "explained"
+explanation = "FLIRT's part 3: the trial's 136 notices without a visible change: FSL-79 and FSL-80 were named where the coefficients or the kernel changed but not the written image, FSL-09 for voxels the padding mask overwrites. Now named where the written output changes (both conversions compared, masked voxels left out): 131 of the 136 agree on a re-run (difftest --case, boxed); in 5, FSL-79 or FSL-80 and FSL-09 meet in one voxel and cancel (a float spline's 2.6 rounded to 3, FSL's integer 3 truncated to 3): notices by design"
+link = "docs/findings/fsl-flirt.md"

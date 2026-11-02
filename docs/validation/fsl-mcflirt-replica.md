@@ -1,14 +1,14 @@
 # Parity: mcflirt replica (bit-exact, FSL Licence)
 
-**All cases agree.** 236 cases on the `standard` tier: 205 pass, 31 rejected by both, 0 expected divergences, 0 failures.
+**All cases agree.** 237 cases on the `standard` tier: 205 pass, 32 rejected by both, 0 expected divergences, 0 failures.
 
 - **Validated:** `larmorx-nc fsl mcflirt` (crate larmorx-nc-mcflirt, translated from FSL 6.0.7.23's source; `lx.mri.hmc(implementation="replica")`)
 - **Reference:** mcflirt from FSL 6.0.7.23 (fsl-mcflirt 2111.0, the conda build at `~/fsl-6.0.7.23`, as built: glibc 2.35's maths): the recorded runs in `oracles/fsl-6.0.7.23/mcflirt-haswell/` and runs made here
 - **Test data:** larmorx-testdata `52124bc98f9f`, tier `standard`
-- **Generated:** 2026-10-30 on Linux x86_64, with `python -m larmorx_validation parity fsl-mcflirt-replica --tier standard`
-- **Original programs:** 165 runs: 134 from the oracle cache, 31 run (6 never cached: the original varies); cache `<workspace>/oracles/cache`, mode `use`
+- **Generated:** 2026-11-02 on Linux x86_64, with `python -m larmorx_validation parity fsl-mcflirt-replica --tier standard`
+- **Original programs:** 167 runs: 134 from the oracle cache, 33 run (6 never cached: the original varies); cache `<workspace>/oracles/cache`, mode `use`
 
-- **Bit-identical to mcflirt as built** (every file, the exit status and both streams; the replica in `reproduce` mode): 205 of 205 compared cases; 31 where both end with the same error.
+- **Bit-identical to mcflirt as built** (every file, the exit status and both streams; the replica in `reproduce` mode): 205 of 205 compared cases; 32 where both end with the same error.
 
 The three columns of the head-motion validation (the clean-room original's numbers from its record, `docs/validation/mri-hmc.md`, not computed again):
 
@@ -150,7 +150,7 @@ The three columns of the head-motion validation (the clean-room original's numbe
 | `syn/orientation/ras/reffile` | pass (18/18 files) | pass: p95 RMS 0.0713 mm, MAT identical 0/12 |
 
 - **D13 fix pass** (larmorx's default, `upstream_defects="fix"`; the comparison above runs `reproduce`): the corrections met
-  - FSL-01: 174 case(s) named it, 162 with changed values (largest difference inf), 39 with other changes (exit N; exit N -> N; files ['a.hdr.d/out.nii.gz', 'a.img.d/out.nii.gz']; files ['out.nii.gz_mean_reg.nii.gz', 'out.nii.gz_meanvol.nii.gz', 'out.nii.gz_sigma.nii.gz', 'out.nii.gz_variance.nii.gz']; files ['out_mcf.nii.gz.mat/MAT_N']; files ['out_mcf.nii.gz_mean_reg.nii.gz', 'out_mcf_mean_reg.nii.gz']; files ['out_mcf.nii.gz_meanvol.nii.gz', 'out_mcf.nii.gz_sigma.nii.gz', 'out_mcf.nii.gz_variance.nii.gz', 'out_mcf_meanvol.nii.gz']; out.nii.gz header; out_mcf.nii.gz header): `recorded/real/ds000005/default`, `recorded/real/ds000005/fmriprep`, `recorded/real/ds000005/fmriprep-repeat2`, `recorded/real/ds000005/fmriprep-repeat3`, `recorded/real/ds000005/fmriprep-reports`, `recorded/real/ds000005/opt-2d`, `recorded/real/ds000005/opt-bins64`, `recorded/real/ds000005/opt-cost-corratio` …
+  - FSL-01: 175 case(s) named it, 163 with changed values (largest difference inf), 39 with other changes (exit N; exit N -> N; files ['a.hdr.d/out.nii.gz', 'a.img.d/out.nii.gz']; files ['out.nii.gz_mean_reg.nii.gz', 'out.nii.gz_meanvol.nii.gz', 'out.nii.gz_sigma.nii.gz', 'out.nii.gz_variance.nii.gz']; files ['out_mcf.nii.gz.mat/MAT_N']; files ['out_mcf.nii.gz_mean_reg.nii.gz', 'out_mcf_mean_reg.nii.gz']; files ['out_mcf.nii.gz_meanvol.nii.gz', 'out_mcf.nii.gz_sigma.nii.gz', 'out_mcf.nii.gz_variance.nii.gz', 'out_mcf_meanvol.nii.gz']; out.nii.gz header; out_mcf.nii.gz header): `recorded/real/ds000005/default`, `recorded/real/ds000005/fmriprep`, `recorded/real/ds000005/fmriprep-repeat2`, `recorded/real/ds000005/fmriprep-repeat3`, `recorded/real/ds000005/fmriprep-reports`, `recorded/real/ds000005/opt-2d`, `recorded/real/ds000005/opt-bins64`, `recorded/real/ds000005/opt-cost-corratio` …
   - FSL-03: 7 case(s) named it, 7 with changed values (largest difference 371), 6 with other changes (out.nii.gz header; out_mcf.nii.gz header): `recorded/real/ds000005/opt-2d`, `recorded/syn/geometry/thin-slab/default`, `recorded/syn/geometry/thin-slab/fov10`, `recorded/syn/geometry/thin-slab/rotation2`, `recorded/syn/motion/small/2d`, `edge/fov0-2d`, `difftest/atanf-printed-params`
   - FSL-04: 1 case(s) named it, 0 with changed values (largest difference 0), 1 with other changes (exit N -> N; files ['grefvol_out.nii.gz', 'out.nii.gz', 'out.par']): `edge/gdt`
   - FSL-05: 2 case(s) named it, 2 with changed values (largest difference 15): `recorded/real/ds000005/opt-scaling3`, `edge/scaling-hist`
@@ -167,7 +167,8 @@ The three columns of the head-motion validation (the clean-room original's numbe
   - FSL-60: 1 case(s) named it, 1 with changed values (largest difference 0.0133), 1 with other changes (files ['a.hdr.d/out.nii.gz', 'a.img.d/out.nii.gz']): `edge/img-in-output-directory`
   - FSL-65: 5 case(s) named it, 0 with changed values (largest difference 0), 5 with other changes (exit N): `failures/fsl20-plots-only`, `failures/par-dir-plots-mats`, `failures/par-dir-plots`, `failures/par-dir-plots-mats-ref0`, `failures/rms-dir`
   - FSL-66: 5 case(s) named it, 0 with changed values (largest difference 0), 5 with other changes (exit N): `failures/binsm1-normcorr`, `failures/binsm4-normcorr-s2`, `failures/binsm8-normcorr`, `failures/binsm16-normcorr`, `failures/binsm16-mutualinfo`
-- **FSL's own step, FSL 6.0.7.17 → 6.0.7.23** (both installations on the same arguments; the previous one's runs from the oracle-output cache or its recording where an earlier record made them): 179 of 197 cases identical (exit status, messages, every output); 18 changed: 4 by FSL-59 (FSL 6.0.7.23's mcflirt applies -sinc_final and -nn_final with trilinear interpolation (newimage 2601.0 keeps each volume's interpolation method from its first access); 6.0.7.17 used the method asked for): `recorded/real/ds000005/opt-nn_final`, `recorded/syn/motion/small/nn_final`, `recorded/syn/motion/small/sinc_final`, `edge/meanvol-reffile-sinc-stats`; 2 by FSL-60 (FSL 6.0.7.23 opens an image whose path holds '.img' or '.hdr' before its extension under another name (NewNifti 5.0.0's replaceSuffix)): `edge/img-in-directory`, `edge/img-in-output-directory`; 5 by arma-lapack (FSL 6.0.7.23's Armadillo 14.2.1 inverts 4 x 4 matrices and solves with them through LAPACK (OpenBLAS), where Armadillo 10.5.1 used its closed-form inverse: the last bits of values computed from nearly equal matrices change, and the sign of NaN parameters): `recorded/real/ds000005/opt-stages1`, `recorded/syn/content/nan/default`, `recorded/syn/content/nan/reffile`, `recorded/syn/motion/identical-copies/default`, `recorded/syn/motion/identical-copies/reffile-fudge`; 2 by compressed-input (FSL 6.0.7.23 reads zstd and bzip2 compressed images): `edge/input-zst`, `edge/input-bz2-plain-name`; 5 by output-types (FSL 6.0.7.23 adds the zstd and bzip2 output types (FSLOUTPUTTYPE NIFTI_ZST, NIFTI_BZ2, ...) and lists every type in the message for an unknown one): `edge/fsloutputtype-analyze`, `edge/fsloutputtype-zst`, `edge/fsloutputtype-pair-bz2`, `edge/fsloutputtype-nifti2-zst`, `edge/fsloutputtype-bogus`.
+  - FSL-75: 1 case(s) named it, 1 with changed values (largest difference 17.5): `edge/fsl75-narrow`
+- **FSL's own step, FSL 6.0.7.17 → 6.0.7.23** (both installations on the same arguments; the previous one's runs from the oracle-output cache or its recording where an earlier record made them): 180 of 198 cases identical (exit status, messages, every output); 18 changed: 4 by FSL-59 (FSL 6.0.7.23's mcflirt applies -sinc_final and -nn_final with trilinear interpolation (newimage 2601.0 keeps each volume's interpolation method from its first access); 6.0.7.17 used the method asked for): `recorded/real/ds000005/opt-nn_final`, `recorded/syn/motion/small/nn_final`, `recorded/syn/motion/small/sinc_final`, `edge/meanvol-reffile-sinc-stats`; 2 by FSL-60 (FSL 6.0.7.23 opens an image whose path holds '.img' or '.hdr' before its extension under another name (NewNifti 5.0.0's replaceSuffix)): `edge/img-in-directory`, `edge/img-in-output-directory`; 5 by arma-lapack (FSL 6.0.7.23's Armadillo 14.2.1 inverts 4 x 4 matrices and solves with them through LAPACK (OpenBLAS), where Armadillo 10.5.1 used its closed-form inverse: the last bits of values computed from nearly equal matrices change, and the sign of NaN parameters): `recorded/real/ds000005/opt-stages1`, `recorded/syn/content/nan/default`, `recorded/syn/content/nan/reffile`, `recorded/syn/motion/identical-copies/default`, `recorded/syn/motion/identical-copies/reffile-fudge`; 2 by compressed-input (FSL 6.0.7.23 reads zstd and bzip2 compressed images): `edge/input-zst`, `edge/input-bz2-plain-name`; 5 by output-types (FSL 6.0.7.23 adds the zstd and bzip2 output types (FSLOUTPUTTYPE NIFTI_ZST, NIFTI_BZ2, ...) and lists every type in the message for an unknown one): `edge/fsloutputtype-analyze`, `edge/fsloutputtype-zst`, `edge/fsloutputtype-pair-bz2`, `edge/fsloutputtype-nifti2-zst`, `edge/fsloutputtype-bogus`.
 
 ## Thresholds
 
@@ -184,7 +185,7 @@ The three columns of the head-motion validation (the clean-room original's numbe
 | Category | Cases | Pass | Both reject | Expected divergence | Fail |
 |---|---|---|---|---|---|
 | difftest | 6 | 6 | 0 | 0 | 0 |
-| edge cases | 42 | 32 | 10 | 0 | 0 |
+| edge cases | 43 | 32 | 11 | 0 | 0 |
 | fMRIPrep's calls | 21 | 21 | 0 | 0 | 0 |
 | failure cases (spec §14.1) | 33 | 24 | 9 | 0 | 0 |
 | recorded: options (ds000005) | 25 | 24 | 1 | 0 | 0 |
@@ -212,6 +213,7 @@ The three columns of the head-motion validation (the clean-room original's numbe
 | `recorded/syn/motion/small/reffile-grid2` | syn/motion/small/reffile-grid2 | mcflirt exits [-6]; the same from the replica. |
 | `recorded/syn/motion/small/refvol-out-of-range` | syn/motion/small/refvol-out-of-range | mcflirt exits [-6]; the same from the replica. |
 | `recorded/syn/motion/small/unknown-option` | syn/motion/small/unknown-option | mcflirt exits [255]; the same from the replica. |
+| `edge/fsl75-narrow` | a series 3 voxels wide (FSL-75: the background value's buffer is too small for the border mcflirt writes) | mcflirt exits [-6]; the same from the replica. double free or corruption (out) |
 | `edge/bins2-corratio` | the correlation ratio with 2 bins | mcflirt exits [-6]; the same from the replica. double free or corruption (out) |
 | `edge/in-missing` | -in names no file | mcflirt exits [-6]; the same from the replica. Image Exception : #63 :: No image files match: nosuch Image Exception : #22 :: Failed to read volume nosuch Erro… |
 | `edge/init-missing` | -init names no file | mcflirt exits [-6]; the same from the replica. Could not open matrix file nosuch.mat terminate called after throwing an instance of 'std::logic_error' what(): … |
@@ -236,7 +238,7 @@ The three columns of the head-motion validation (the clean-room original's numbe
 
 | Component | Version |
 |---|---|
-| larmorx | 0.0.1 (7582eaeb4519) |
+| larmorx | 0.0.1 (68ad3fd66f95) |
 | larmorx-testdata | 52124bc98f9f |
 | Python | 3.12.16 |
 | Platform | Linux x86_64 (Linux-6.8.0-124-generic-x86_64-with-glibc2.35) |
@@ -386,6 +388,7 @@ The replica runs as a separate program, the FSL replica package's (`larmorx-nc`)
 | `recorded/syn/orientation/ras-unflipped/reffile` | pass | 7/7 | syn/orientation/ras-unflipped/reffile |
 | `recorded/syn/orientation/ras/default` | pass | 7/7 | syn/orientation/ras/default |
 | `recorded/syn/orientation/ras/reffile` | pass | 7/7 | syn/orientation/ras/reffile |
+| `edge/fsl75-narrow` | both-error | 3/3 | a series 3 voxels wide (FSL-75: the background value's buffer is too small for the border mcflirt writes) |
 | `edge/gdt` | pass | 7/7 | -gdt with a relative -out: the gradient images are registered (FSL-04) |
 | `edge/bins4-mutualinfo` | pass | 7/7 | mutual information with 4 bins |
 | `edge/bins1-normmi` | pass | 7/7 | normalised mutual information with 1 bin |

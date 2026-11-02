@@ -268,6 +268,16 @@ pub struct Outside;
 /// ends (memory C++ does not own: [`Outside`], with `v` partly sorted). Without NaN values the
 /// result is any correct sort's.
 pub fn sort_f32_checked(v: &mut [f32]) -> Result<(), Outside> {
+    sort_checked(v)
+}
+
+/// [`sort_f32_checked`] for doubles (`std::sort` of a `std::vector<double>`).
+pub fn sort_f64_checked(v: &mut [f64]) -> Result<(), Outside> {
+    sort_checked(v)
+}
+
+/// [`sort_f32_checked`] for any type ordered by `operator<`.
+pub fn sort_checked<T: Copy + PartialOrd>(v: &mut [T]) -> Result<(), Outside> {
     let n = v.len() as isize;
     if n == 0 {
         return Ok(());
@@ -280,19 +290,19 @@ pub fn sort_f32_checked(v: &mut [f32]) -> Result<(), Outside> {
 
 /// A vector of floats addressed as C++ iterators (signed offsets from `begin()`), every
 /// access checked against its ends.
-struct Checked<'a> {
-    v: &'a mut [f32],
+struct Checked<'a, T> {
+    v: &'a mut [T],
 }
 
-impl Checked<'_> {
-    fn at(&self, i: isize) -> Result<f32, Outside> {
+impl<T: Copy + PartialOrd> Checked<'_, T> {
+    fn at(&self, i: isize) -> Result<T, Outside> {
         usize::try_from(i)
             .ok()
             .and_then(|i| self.v.get(i).copied())
             .ok_or(Outside)
     }
 
-    fn set(&mut self, i: isize, x: f32) -> Result<(), Outside> {
+    fn set(&mut self, i: isize, x: T) -> Result<(), Outside> {
         let slot = usize::try_from(i)
             .ok()
             .and_then(|i| self.v.get_mut(i))
@@ -444,7 +454,7 @@ impl Checked<'_> {
         first: isize,
         mut hole: isize,
         len: isize,
-        value: f32,
+        value: T,
     ) -> Result<(), Outside> {
         let top = hole;
         let mut second = hole;

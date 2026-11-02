@@ -1,10 +1,12 @@
-# FLIRT (`flirt`, `convert_xfm`, `avscale`, the coordinate programs, `rmsdiff`, `makerot`)
+# FLIRT (`flirt`, `convert_xfm`, `avscale`, the coordinate programs, `rmsdiff`, `makerot`, `midtrans`, `pointflirt`, `applyxfm4D` and the scripts)
 
 `lx.fsl.flirt` and `lx.fsl.convert_xfm` (command line `larmorx fsl flirt`, `larmorx fsl
 convert_xfm`): FSL 6.0.7.23's linear (affine) registration, with every cost function and
 boundary-based registration (BBR), and its matrix tool. Since part 2 (2026-11-01) also FLIRT's
 other programs `avscale`, `img2imgcoord`, `std2imgcoord`, `img2stdcoord`, `rmsdiff` and
-`makerot` (`lx.fsl.avscale`, ... below).
+`makerot` (`lx.fsl.avscale`, ... below), and since part 3 `midtrans`, `pointflirt`, `applyxfm4D`
+and the scripts `pairreg`, `extracttxt`, `aff2rigid` (`lx.fsl.midtrans`, ... below), with every
+schedule command (`alignpaxes` and any parameter-subset mask) and `-debug`.
 
 **Two implementations, one so far.** FSL is distributed under the FSL Licence (non-commercial use
 only), so larmorx keeps its FSL tools in two implementations ([licensing](../licensing.md)): the
@@ -104,7 +106,31 @@ r = lx.fsl.makerot(30, axis=(1, 2, 3), centre=(4, 5, 6))      # 4 x 4, 30 degree
 The coordinate programs' `-warp` (a FNIRT warp field) is refused until FNIRT is ported (an
 unreadable file gives FSL's messages and exit status 1, as FSL); matrices other than 4 × 4 where
 FSL would invert them beyond 4 × 4 are refused (FSL prints part of its output, then aborts).
-Not yet: `applyxfm4D`, `makerot`, `midtrans`, `pointflirt` (part 3).
+
+## FLIRT's other programs and scripts (part 3)
+
+```python
+mid = lx.fsl.midtrans(["A2temp.mat", "B2temp.mat", "C2temp.mat"])    # 4 x 4 to the middle
+aff = lx.fsl.pointflirt(in_points, ref_points)                         # N x 3 each, mm
+lx.fsl.applyxfm4d("bold.nii.gz", "boldref.nii.gz", "out.nii.gz", "mats_dir")  # MAT_0000n
+pair = lx.fsl.pairreg("b1_brain.nii.gz", "b2_brain.nii.gz", "b1.nii.gz", "b2.nii.gz")
+text = lx.fsl.extracttxt("value", "log.txt", 3, -1)
+rigid = lx.fsl.aff2rigid("T1w2MNI.mat")                                 # 6-parameter 4 x 4
+```
+
+| Program | Command line | `lx.fsl` | Notes |
+|---|---|---|---|
+| `midtrans [-o file] [--template img] [--separate prefix] [--debug] [-v] t1 t2 ...` | `larmorx fsl midtrans` | `midtrans(transforms, *, template, separate)` → 4 × 4 | the transform from the template space to the "middle" of the transforms (FSL's Procrustes average about the MNI origin or the template's centre of gravity); `--separate` writes each transform composed with it; an error after the arguments exits 1 (FSL 0: **FSL-78**) |
+| `pointflirt -i file -r file [-o file] [--vox --invol=img --refvol=img] [-v]` | `larmorx fsl pointflirt` | `pointflirt(in_points, ref_points, *, in_image, ref_image)` → 4 × 4 | the least-squares affine matrix mapping the input points onto the reference points (mm; voxels scaled by the images' voxel sizes with `--vox`); a warning when the points do not determine it; a file of exactly three points is read with one point per column (as FSL) |
+| `applyxfm4D in ref out mats [-singlematrix] [-fourdigit] [-userprefix p] [-interp m] [-3D] [-v]` | `larmorx fsl applyxfm4D` | `applyxfm4d(in, ref, out, transforms, *, single_matrix, four_digit, user_prefix, interp, three_d)` | each volume resampled onto the reference's grid through one matrix or one per volume (`MAT_0000n`, `MAT_nnnn`, `<prefix>nnnn`), sinc (default), trilinear, nearest neighbour or spline, in the input's data type (char, short, int, float, double); integer outputs rounded and clamped (**FSL-09**); spline on integer images computed as on float ones (**FSL-79**); `-3D` sinc with the rectangular kernel the program asks for (**FSL-80**) |
+| `pairreg brain1 brain2 skull1 skull2 outmat [flirt args]` | `larmorx fsl pairreg` | `pairreg(brain1, brain2, skull1, skull2, *, flirt_args)` → 4 × 4 | brain-to-brain registration refined with the skulls (three FLIRT runs with FSL's `pairreg` schedules, in-process) |
+| `extracttxt word file [count [start]]` | `larmorx fsl extracttxt` | `extracttxt(word, file, trailing_lines, relative_start)` → str | the lines from the first match (a basic regular expression), or `count` of them from `start` lines after it; FSL's messages for ranges before the first line |
+| `aff2rigid in.mat out.mat` | `larmorx fsl aff2rigid` | `aff2rigid(matrix)` → 4 × 4 | the 6-parameter matrix keeping the anterior commissure, the AC-PC line and the mid-sagittal plane of an input-to-standard matrix; FSL 6.0.7.23's script stops with a Python error before writing (**FSL-81**): computed by default, FSL's error with `reproduce` |
+
+`flirt`'s schedules may now use `alignpaxes` (the rotation between the two images' principal axes,
+with the centres of gravity aligned) and `setoption paramsubset` with any finite mask (its
+pseudo-inverse by the SVD, as FSL's); `-debug` writes FLIRT's debug volumes (the pyramid, the
+weights and, with `-cost bbr`, BBR's `debug` volume).
 
 ## Upstream defects (D13)
 
@@ -117,6 +143,15 @@ Corrected by default, FSL's behaviour with `upstream_defects="reproduce"`
 - **FSL-56**: NIfTI extensions' offset.
 - **FSL-68**: an error after the command line (an image or matrix that cannot be read, an unknown
   `-bbrtype`) exits with status 1 (FLIRT prints the message and exits 0).
+
+Part 3's programs: **FSL-78** (`midtrans` exits 0 after an error of its computation: exit 1 by
+default), **FSL-79** (`applyxfm4D`'s spline interpolation of an integer image keeps the spline
+coefficients and values in the image's type: computed as for a float image by default, named
+where the output changes), **FSL-80** (`applyxfm4D -3D` with sinc uses a blackman kernel of width
+7 instead of the rectangular one of width 9 it asks for: the rectangular kernel by default, named
+where the output changes), **FSL-81** (`aff2rigid` stops with a Python `NameError` under NumPy 2:
+the matrix computed by default). **FSL-75** also in `applyxfm4D` (a volume 3 voxels wide) and in
+mcflirt's replica (named in both modes, the whole border by default).
 
 Refused in both modes (FLIRT's behaviour is undefined): FSL-21/FSL-66 (`-bins` giving no or negative
 bins at a scale), FSL-70 (a schedule matrix name FLIRT cannot interpret), FSL-71 (`bbrstep` below 1
@@ -139,15 +174,11 @@ cannot take leaves the previous level in place with the unblurred input). FSL-14
 an input holds NaN or infinite voxels; FSL-09 whenever an integer output is not an integer or out
 of its type's range.
 
-## Not yet (part 3)
+## Not yet
 
-Refused with a message until then: the schedule command `alignpaxes` (Armadillo's `eig_sym`:
-LAPACK `dsyevd`); `setoption paramsubset` with a mask other than those FLIRT builds and FSL's
-shipped schedules give (columns of single ones, the search's, `sch2D_4dof`'s: LAPACK `dgesdd`'s
-pseudo-inverse); `-debug` with the BBR cost (its debug volume); the coordinate programs' `-warp`.
-Also waiting: a comparison of `-debug`'s other volumes with FSL's; `applyxfm4D`, `midtrans`,
-`pointflirt` (the last two need `dgesdd` too); the sign of NaN in `makerot`'s matrix for a NaN or
-infinite angle or axis (FSL prints `nan` where the replica prints `-nan` in some rows: the NaN's
-path through `make_rot`'s products); the clean-room original. Since part 2: `-anglerep
-quaternion`; `avscale`, `img2imgcoord`, `std2imgcoord`, `img2stdcoord`, `rmsdiff`, `makerot`; the
-site page.
+The coordinate programs' `-warp` (FNIRT's warp fields, refused until FSL's warp-field libraries are
+ported); `standard_space_roi`, `flirt_average` and `epi_reg` (scripts of FSL's other programs: not
+ported); the clean-room original. Known difference (part 3's random testing): with NaN or
+infinite input voxels in `reproduce` mode (FSL-14), the sign of NaN results can differ from FSL's
+(`nan` against `-nan`): an all-NaN matrix from a schedule that optimises relative to a row, and
+the NaN voxels of `applyxfm4D`'s spline interpolation; the values are NaN in both.

@@ -13,14 +13,14 @@ use larmorx_nc_core::cnum;
 use larmorx_nc_core::costfns::{CostType, Costfn};
 use larmorx_nc_core::kernel;
 use larmorx_nc_core::miscmaths::{self, MatrixFileError};
-use larmorx_nc_core::newimagefns::{self, affine_transform, isotropic_resample};
+use larmorx_nc_core::newimagefns::{self, affine_transform_bg, isotropic_resample};
 use larmorx_nc_core::nifti;
 use larmorx_nc_core::optimise;
 use larmorx_nc_core::settings::Settings;
 use larmorx_nc_core::sse;
 use larmorx_nc_core::volume::{
-    self, Background, Conversion, Extrapolation, FslError, Interpolation, NanOrder, SaveError,
-    SaveOptions, SaveType, Volume,
+    self, Background, BorderBuffer, Conversion, Extrapolation, FslError, Interpolation, NanOrder,
+    SaveError, SaveOptions, SaveType, Volume,
 };
 use rayon::prelude::*;
 
@@ -796,10 +796,11 @@ impl Run<'_> {
                     timeseries.extrap = Extrapolation::Extraslice;
                     timeseries.interp = Interpolation::Trilinear;
                     self.background_nan_notice(&timeseries)?;
+                    let whole = self.background_buffer_notice(&timeseries)?;
                     for i in 0..n {
                         let src = timeseries.sub_volume(i64::from(i))?;
                         let mut testvol = src.clone();
-                        affine_transform(&src, &mut testvol, &mat1[i as usize], 1.0)?;
+                        affine_transform_bg(&src, &mut testvol, &mat1[i as usize], 1.0, whole)?;
                         for (m, t) in mv.data.iter_mut().zip(&testvol.data) {
                             *m = sse::add_f32(*m, *t);
                         }
@@ -1070,6 +1071,7 @@ impl Run<'_> {
             .map(|m| arma::mul_tinysq(m, &init_trans))
             .collect();
         self.background_nan_notice(&timeseries)?;
+        let whole = self.background_buffer_notice(&timeseries)?;
         let resample = |interp: Interpolation| -> Vec<Result<Volume, FslError>> {
             with_pool(self.n_threads, || {
                 (0..n)
@@ -1078,7 +1080,7 @@ impl Run<'_> {
                         let mut src = timeseries.sub_volume(i64::from(i))?;
                         src.interp = interp;
                         let mut testvol = template.clone().unwrap_or_else(|| src.clone());
-                        affine_transform(&src, &mut testvol, &mats[i as usize], 1.0)?;
+                        affine_transform_bg(&src, &mut testvol, &mats[i as usize], 1.0, whole)?;
                         Ok(testvol)
                     })
                     .collect()
@@ -1215,6 +1217,41 @@ impl Run<'_> {
             )
         };
         self.notice(&defects::FSL_14, detail);
+    }
+
+    /// FSL-75: the background value (the resampling's padding, `calc_bval(vol, 2)`) of volumes 3
+    /// voxels wide along x (2 or more along y or z) or along y (2 or more along z, x not 2 or
+    /// 4): mcflirt's buffer is too small for the border it writes, so it writes past it (heap
+    /// corruption) and takes the 10th percentile of the values that fit. The correction (rule A,
+    /// as FLIRT's since 2026-11-01) takes it over the whole border; `reproduce` takes the values
+    /// that fit; named in both modes. A 1 x 1 x 1 volume has no border (mcflirt reads an empty
+    /// buffer): refused in both modes. Returns whether the whole border is used.
+    fn background_buffer_notice(&mut self, timeseries: &Volume) -> Result<bool, End> {
+        let first = timeseries.sub_volume(0)?;
+        let (x, y, z) = (first.xsize(), first.ysize(), first.zsize());
+        match first.background_buffer() {
+            BorderBuffer::Exact => Ok(false),
+            BorderBuffer::Empty => Err(End::Refuse(format!(
+                "mcflirt's background value of a {x} x {y} x {z} volume reads the first value of \
+                 an empty buffer (FSL-75)"
+            ))),
+            BorderBuffer::Overflow { numbins, written } => {
+                let fsl = first.background_value_with(false).0;
+                let whole = first.background_value_with(true).0;
+                self.notice(
+                    &defects::FSL_75,
+                    format!(
+                        "the background value of the {x} x {y} x {z} volumes: mcflirt writes \
+                         {written} border values into a buffer of {numbins} (heap corruption; \
+                         mcflirt may abort or crash later) and takes the 10th percentile of the \
+                         {numbins} that fit (volume 0: {}); of the whole border it is {}",
+                        cnum::stream(f64::from(fsl)),
+                        cnum::stream(f64::from(whole))
+                    ),
+                );
+                Ok(self.mode.fix())
+            }
+        }
     }
 
     /// FSL-22: the volumes whose 2-voxel border holds a NaN voxel, where `calc_bval`'s

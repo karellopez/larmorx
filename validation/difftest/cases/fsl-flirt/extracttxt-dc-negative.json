@@ -1,0 +1,80 @@
+{
+ "defect": null,
+ "description": "extracttxt with a start before line 1: dc reads its own negative result back as a subtraction (dc: stack empty), sed reads the range as options (invalid option, GNU sed's usage)",
+ "expect": "pass",
+ "found": {
+  "detail": "stderr identical: line 1: FSL 'dc: stack empty', replica \"sed: -e expression #1, char 1: unknown command: `-'\"",
+  "n": 142,
+  "seed": "probe-part3b",
+  "shrink_moves": [],
+  "signature": [
+   "stderr identical"
+  ]
+ },
+ "id": "extracttxt-dc-negative",
+ "implementations": [
+  "replica"
+ ],
+ "reason": "",
+ "recipe": {
+  "extra": {
+   "output_type": "NIFTI_GZ",
+   "tool": "extracttxt"
+  },
+  "features": {
+   "FSLOUTPUTTYPE": "NIFTI_GZ",
+   "count": "20",
+   "extreme": false,
+   "kind": "extracttxt",
+   "lines": 3,
+   "start": "-3",
+   "word": "value"
+  },
+  "groups": [
+   {
+    "args": [
+     "value",
+     "{in:t}"
+    ],
+    "name": "args",
+    "optional": false
+   },
+   {
+    "args": [
+     "20"
+    ],
+    "name": "count",
+    "optional": false
+   },
+   {
+    "args": [
+     "-3"
+    ],
+    "name": "start",
+    "optional": false
+   }
+  ],
+  "inputs": {
+   "t": {
+    "kind": "text",
+    "suffix": ".txt",
+    "text": "line 1 value 3\nline 2 value 6\nline 3 value 9\n"
+   }
+  },
+  "n": 142,
+  "options": [
+   "FSLOUTPUTTYPE=NIFTI_GZ",
+   "count 20",
+   "extracttxt",
+   "start -3",
+   "word value"
+  ],
+  "seed": "probe-part3b",
+  "tool": "fsl-flirt-part3"
+ },
+ "rule": null,
+ "status": "fixed",
+ "suite": "fsl-flirt-replica",
+ "tier": "smoke",
+ "tool": "fsl-flirt"
+}

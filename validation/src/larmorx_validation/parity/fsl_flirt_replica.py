@@ -17,7 +17,10 @@ cases:
 - **schedule**: written schedules that use every command and option of FLIRT's schedule
   language, and its errors;
 - **edge**: the command line's errors and messages, missing files, verbose output;
-- **convert_xfm**: every option and failure.
+- **convert_xfm**: every option and failure;
+- **programs**: FLIRT's other programs (part 2: avscale, the coordinate programs, rmsdiff,
+  makerot; part 3: midtrans, pointflirt, applyxfm4D in every data type and interpolation, and the
+  scripts pairreg, extracttxt and aff2rigid), every option, message and failure.
 
 Every case compares, with the replica in ``reproduce`` mode (D13): the exit status (an abort,
 signal 6, is the replica's exit 1 after the same text), standard output and error (the run
@@ -161,8 +164,13 @@ def run_replica(
 
 
 def _clean(text: str, run_dir: Path, program: str) -> str:
+    import re
+
     lines = [ln for ln in text.split("\n") if not ln.startswith(REPLICA_PREFIX)]
     t = "\n".join(lines).replace(str(run_dir), "<run>")
+    # -debug prints the cost function's address (`Pointer to impair is 0x...`), which the
+    # address-space layout decides: the replica prints `(set)`.
+    t = re.sub(r"Pointer to impair is 0x[0-9a-f]+", "Pointer to impair is (set)", t)
     return t.replace(str(fsldir() / "bin" / program), program)
 
 
@@ -509,12 +517,91 @@ def _prepare(run: Run, tmp: Path) -> list[str]:
             if not dst.exists():
                 _constant_image(dst, shape, vox, kind == "noform")
             out.append(name)
+        elif a.startswith("@int8:"):
+            # an input stored as int8 (its values divided by 16, rounded, clipped):
+            # @int8:<input>:<name>
+            import nibabel as nib
+
+            _, src_name, name = a.split(":")
+            dst = tmp / name
+            if not dst.exists():
+                base = base or inputs()
+                img = nib.load(str(base / src_name))
+                arr = np.clip(np.round(np.asanyarray(img.dataobj) / 16.0), -128, 127)
+                h = img.header.copy()
+                h.set_data_dtype(np.int8)
+                nib.save(nib.Nifti1Image(arr.astype(np.int8), img.affine, h), str(dst))
+            out.append(name)
+        elif a.startswith("@double:"):
+            # an input stored as float64, its values divided by 7 (not exact in single
+            # precision): @double:<input>:<name>
+            import nibabel as nib
+
+            _, src_name, name = a.split(":")
+            dst = tmp / name
+            if not dst.exists():
+                base = base or inputs()
+                img = nib.load(str(base / src_name))
+                arr = np.asanyarray(img.dataobj).astype(np.float64) / 7.0
+                h = img.header.copy()
+                h.set_data_dtype(np.float64)
+                nib.save(nib.Nifti1Image(arr, img.affine, h), str(dst))
+            out.append(name)
+        elif a.startswith("@metres:"):
+            # a copy of an input whose header gives its spatial units as metres (a nonsense
+            # header for a head image): @metres:<input>:<name>
+            import nibabel as nib
+
+            _, src_name, name = a.split(":")
+            dst = tmp / name
+            if not dst.exists():
+                base = base or inputs()
+                img = nib.load(str(base / src_name))
+                h = img.header.copy()
+                h.set_xyzt_units("meter", "sec")
+                nib.save(nib.Nifti1Image(np.asanyarray(img.dataobj), img.affine, h), str(dst))
+            out.append(name)
+        elif a.startswith("@nanedge:"):
+            # an input with NaN voxels in its 2-voxel border, at (0, 4, 5) and (1, 6, 7), and an
+            # infinite one at (4, 4, 4): @nanedge:<input>:<name>
+            import nibabel as nib
+
+            _, src_name, name = a.split(":")
+            dst = tmp / name
+            if not dst.exists():
+                base = base or inputs()
+                img = nib.load(str(base / src_name))
+                arr = np.asanyarray(img.dataobj).astype(np.float32).copy()
+                arr[0, 4, 5] = np.nan
+                arr[1, 6, 7] = np.nan
+                arr[4, 4, 4] = np.inf
+                nib.save(nib.Nifti1Image(arr, img.affine, img.header), str(dst))
+            out.append(name)
+        elif a.startswith("@nan:"):
+            # an input with one NaN voxel at (3, 4, 5): @nan:<input>:<name>
+            import nibabel as nib
+
+            _, src_name, name = a.split(":")
+            dst = tmp / name
+            if not dst.exists():
+                base = base or inputs()
+                img = nib.load(str(base / src_name))
+                arr = np.asanyarray(img.dataobj).astype(np.float32).copy()
+                arr[3, 4, 5] = np.nan
+                nib.save(nib.Nifti1Image(arr, img.affine, img.header), str(dst))
+            out.append(name)
         elif "=@" in a and a.startswith("-"):
             # a long option's value, an input (--cov=@epi.nii)
-            base = base or inputs()
             key, name = a.split("=@", 1)
-            if not (tmp / name).exists():
-                shutil.copy(base / name, tmp / name)
+            if name.startswith("const:"):
+                # a constant image as the value (--invol=@const:<shape>:<vox>:<name>)
+                _, shape, vox, name = name.split(":")
+                if not (tmp / name).exists():
+                    _constant_image(tmp / name, shape, vox, False)
+            else:
+                base = base or inputs()
+                if not (tmp / name).exists():
+                    shutil.copy(base / name, tmp / name)
             out.append(f"{key}={name}")
         elif a.startswith("@"):
             base = base or inputs()
@@ -527,6 +614,7 @@ def _prepare(run: Run, tmp: Path) -> list[str]:
         else:
             out.append(a)
     for name, text in run.files:
+        (tmp / name).parent.mkdir(parents=True, exist_ok=True)
         (tmp / name).write_text(text, encoding="utf-8")
     return out
 
@@ -1259,6 +1347,8 @@ def _real_cases() -> dict[str, tuple[str, str, Run]]:
     )
     for t in ("global_abs", "local_abs"):
         add(f"bbr/type-{t}", st, f"-bbrtype {t}", *bbr, "-cost", "bbr", "-bbrtype", t)
+    add("bbr/debug", st, "-debug with -cost bbr (BBR's debug volume `debug`, part 3)", *bbr,
+        "-cost", "bbr", "-debug")  # fmt: skip
     add("bbr/slope", st, "-bbrslope -0.25", *bbr, "-cost", "bbr", "-bbrslope", "-0.25")
     add(
         "bbr/coords",
@@ -1426,6 +1516,12 @@ def _real_cases() -> dict[str, tuple[str, str, Run]]:
         "-omat",
         "out.mat",
     )
+    # -debug (part 3): the pyramid's volumes saved after the preparation, its final cost call
+    add("verbose/debug", st, "-debug: the pyramid's volumes and weights saved (no weights: the "
+        "one-voxel weight)", *base[1], "-debug", "-dof", "6", "-omat", "out.mat")  # fmt: skip
+    add("verbose/debug-weights", st, "-debug with -refweight and -inweight (the weights' "
+        "levels saved)", *base[1], "-refweight", "@refweight.nii", "-inweight", "@inweight.nii",
+        "-debug", "-dof", "6", "-omat", "out.mat")  # fmt: skip
     return c
 
 
@@ -1514,6 +1610,113 @@ def _schedule_cases() -> dict[str, tuple[str, str, Run]]:
                 files=(("s.sch", text),),
             ),
         )
+    # alignpaxes (the principal axes: LAPACK dsyevd) and a general parameter subset (the SVD
+    # pseudo-inverse: LAPACK dgesdd), part 3: one case per path.
+    pax = "setscale 8\nsetrow UA 1 0 0 0  0 1 0 0  0 0 1 0  0 0 0 1\nalignpaxes UA\nprint U\n"
+    for name, desc, ins in (
+        ("schedule/alignpaxes", "alignpaxes on real images", ("@epi.nii", "@t1.nii")),
+        (
+            "schedule/alignpaxes-constant",
+            "alignpaxes on constant images (zero moments, total 0)",
+            ("@const:12x10x8:2x2x2:c.nii", "@const:12x10x8:2x2x2:c.nii"),
+        ),
+        (
+            "schedule/alignpaxes-nan",
+            "alignpaxes on an input with a NaN voxel (eig_sym fails: the exception)",
+            ("@nan:epi.nii:epi_nan.nii", "@t1.nii"),
+        ),
+    ):
+        c[name] = (
+            "standard",
+            desc,
+            Run(
+                "flirt",
+                ("-in", ins[0], "-ref", ins[1], "-schedule", "s.sch", "-omat", "out.mat"),
+                files=(("s.sch", pax),),
+            ),
+        )
+    c["schedule/alignpaxes-2d"] = (
+        "standard",
+        "alignpaxes in 2D mode (one slice: a zero third moment)",
+        Run(
+            "flirt",
+            (
+                "-in",
+                "@slice_in.nii",
+                "-ref",
+                "@slice_ref.nii",
+                "-2D",
+                "-schedule",
+                "s.sch",
+                "-omat",
+                "out.mat",
+            ),
+            files=(("s.sch", pax),),
+        ),
+    )
+    c["schedule/alignpaxes-args"] = (
+        "standard",
+        "alignpaxes without its matrix",
+        Run(
+            "flirt",
+            ("-in", "@epi.nii", "-ref", "@t1.nii", "-schedule", "s.sch", "-omat", "out.mat"),
+            files=(("s.sch", "alignpaxes\n"),),
+        ),
+    )
+    sub = (
+        "setscale 8\nsetrow UA 1 0 0 0  0 1 0 0  0 0 1 0  0 0 0 1\n"
+        "setoption paramsubset 2  0 0 1 0 0 0 0 0 0 0 0 0  0 0 0 1 1 0 0 0 0 0 0 0\n"
+        "optimise 12 UA:1 0.0 0.0 0.0 0.0 0.0 0.0 rel 1\nprint U\n"
+    )
+    c["schedule/paramsubset-general"] = (
+        "standard",
+        "a parameter subset whose column has two ones in different rows of another (rz; tx+ty)",
+        Run(
+            "flirt",
+            ("-in", "@epi.nii", "-ref", "@t1.nii", "-schedule", "s.sch", "-omat", "out.mat"),
+            files=(("s.sch", sub),),
+        ),
+    )
+    sub2 = (
+        "setscale 8\nsetrow UA 1 0 0 0  0 1 0 0  0 0 1 0  0 0 0 1\n"
+        "setoption paramsubset 2  0 0 0.5 0.25 0 0 0 0 0 0 0 0  0 0 1 -1 2 0 0 0 0 0 0 0\n"
+        "optimise 12 UA:1 0.0 0.0 0.0 0.0 0.0 0.0 rel 1\nprint U\n"
+    )
+    c["schedule/paramsubset-weighted"] = (
+        "standard",
+        "a parameter subset with weights other than 0 and 1 sharing rows (the SVD's QR path)",
+        Run(
+            "flirt",
+            ("-in", "@epi.nii", "-ref", "@t1.nii", "-schedule", "s.sch", "-omat", "out.mat"),
+            files=(("s.sch", sub2),),
+        ),
+    )
+    # part 3's trial (part3-trial-57755): a subset whose line search reaches a zero scale on
+    # one-voxel images: the cost's inverse of a singular matrix throws, FLIRT's main catches it
+    sub3 = (
+        "setscale 8\nsetrow UA 1 0 0 0  0 1 0 0  0 0 1 0  0 0 0 1\n"
+        "setoption paramsubset 2  0 0 0 0 0.5 2 0 1 0.5 0 2 0  1 0 0 0 0 0.5 2 0 -1 0 0 0.5\n"
+        "optimise 12 UA:1 0.0 0.0 0.0 0.0 0.0 0.0 rel 1\n"
+    )
+    c["schedule/paramsubset-singular"] = (
+        "standard",
+        "a parameter subset reaching a singular matrix in a cost evaluation (the exception "
+        "caught by FLIRT's main: FSL-68)",
+        Run(
+            "flirt",
+            (
+                "-in",
+                "@const:1x1x1:1x1x1:one.nii",
+                "-ref",
+                "@const:1x1x1:1x1x1:one.nii",
+                "-schedule",
+                "s.sch",
+                "-omat",
+                "out.mat",
+            ),
+            files=(("s.sch", sub3),),
+        ),
+    )
     return c
 
 
@@ -1835,9 +2038,30 @@ _FLIP = "-1 0 0 10\n0 1 0 0\n0 0 1 0\n0 0 0 1\n"
 _COORDS = "10 20 30\n0 0 0\n-5.5 3.25 100\n1e3 2 3\n"
 
 
+#: midtrans' inputs (part 3): three transforms of images to one template.
+_MT1 = "1.02 0.05 -0.01 3.5\n-0.04 0.98 0.06 -2\n0.02 -0.03 1.05 1\n0 0 0 1\n"
+_MT2 = "0.97 -0.08 0.02 -1.5\n0.07 1.01 -0.02 4\n-0.03 0.02 0.99 -3\n0 0 0 1\n"
+_MT3 = "1.1 0.01 0.03 0.5\n0.02 0.92 -0.05 1\n-0.01 0.04 1.03 2.5\n0 0 0 1\n"
+_ID = "1 0 0 0\n0 1 0 0\n0 0 1 0\n0 0 0 1\n"
+#: pointflirt's inputs: 8 points (one per line) and their images under an affine map.
+_PTS_IN = "10 20 30\n-12 5 40\n33 -7 12\n0 0 0\n25 25 -10\n-8 -30 22\n14 9 -3\n-20 18 6\n"
+_PTS_REF = (
+    "13.31 18.62 35.25\n-9.33 7.41 44.05\n38.47 -8.32 13.9\n2.5 -1 1.5\n"
+    "29.29 23.95 -9.68\n-5.24 -31.87 26.59\n17.35 7.55 -1.71\n-17.75 18.24 7.86\n"
+)
+#: 20 points: x·xᵀ by BLAS dsyrk (more than 48 elements).
+_PTS20 = "".join(
+    f"{(i * 7) % 23 - 11} {(i * 5) % 17 - 8} {(i * 11) % 29 - 14}\n" for i in range(20)
+)
+_PTS20_REF = "".join(
+    f"{(i * 7) % 23 - 11 + 0.1 * i} {(i * 5) % 17 - 8 - 0.05 * i} {(i * 11) % 29 - 13.5}\n"
+    for i in range(20)
+)
+
+
 def _program_cases() -> dict[str, tuple[str, str, Run]]:
-    """avscale, img2imgcoord, std2imgcoord, img2stdcoord, rmsdiff and makerot: one case per
-    path."""
+    """avscale, img2imgcoord, std2imgcoord, img2stdcoord, rmsdiff, makerot, midtrans and
+    pointflirt: one case per path."""
     c: dict[str, tuple[str, str, Run]] = {}
     st = "standard"
     E, T, W, M = "@epi.nii", "@t1.nii", "@wm.nii", "@init.mat"
@@ -1845,6 +2069,173 @@ def _program_cases() -> dict[str, tuple[str, str, Run]]:
 
     def add(name: str, desc: str, program: str, *args: str, tier: str = st, **kw: Any) -> None:
         c[f"programs/{name}"] = (tier, desc, Run(program, tuple(args), **kw))
+
+    X = "applyxfm4D"
+    rot = (
+        "0.996 -0.087 0 3\n0.087 0.996 0 -2\n0 0 1 1.5\n0 0 0 1\n",
+        "0.99 0.02 -0.03 1\n-0.02 1.01 0.01 0.5\n0.03 -0.01 0.98 -1\n0 0 0 1\n",
+    )
+    mats = tuple((f"mats/MAT_0{k:04d}", rot[k % 2]) for k in range(4))
+    mats4 = tuple((f"m4/MAT_{k:04d}", rot[k % 2]) for k in range(4))
+    matsu = tuple((f"mu/vol{k:04d}", rot[k % 2]) for k in range(4))
+    one = (("one.mat", rot[0]),)
+    B4 = "@bold4.nii"
+    add("applyxfm4D-usage", "applyxfm4D without arguments (its usage, exit 255)", X)
+    add("applyxfm4D-default", "a 4D int16 series, a matrix per volume (MAT_0000n), sinc", X,
+        B4, E, "out.nii.gz", "mats", files=mats, tier="smoke")  # fmt: skip
+    add("applyxfm4D-single-trilinear", "-singlematrix with trilinear interpolation, verbose", X,
+        B4, E, "out.nii.gz", "one.mat", "-singlematrix", "-interp", "trilinear", "-v",
+        files=one)  # fmt: skip
+    add("applyxfm4D-fourdigit-nn", "--fourdigit (MAT_000n) with nearest neighbour (nn)", X,
+        B4, E, "out.nii.gz", "m4", "--fourdigit", "--interp", "nn", files=mats4)  # fmt: skip
+    add("applyxfm4D-userprefix-spline", "-userprefix with spline on an integer series (FSL-79)",
+        X, B4, E, "out.nii.gz", "mu", "-userprefix", "vol", "-interp", "spline",
+        files=matsu)  # fmt: skip
+    add("applyxfm4D-float-sinc", "a float input (one volume), -singlematrix, sinc", X, E, T,
+        "out.nii.gz", "one.mat", "-singlematrix", files=one)  # fmt: skip
+    add("applyxfm4D-3d", "-3D (the rectangular sinc of width 9) on a float volume", X, E, E,
+        "out.nii.gz", "one.mat", "-3D", files=one)  # fmt: skip
+    add("applyxfm4D-3d-spline-float", "-3D with spline on a float volume", X, E, E,
+        "out.nii.gz", "one.mat", "-3d", "-interp", "spline", files=one)  # fmt: skip
+    add("applyxfm4D-int8", "an int8 input (FSL-09: written as uint8), trilinear", X,
+        "@int8:epi.nii:epi_i8.nii", E, "out.nii.gz", "one.mat", "-singlematrix",
+        "-interp", "trilinear", files=one)  # fmt: skip
+    add("applyxfm4D-double-sinc", "a double series (sinc sums in double precision; the "
+        "background value kept in double precision where the mask sets it)", X,
+        "@double:bold4.nii:bold4_f64.nii", E, "out.nii.gz", "mats", files=mats)  # fmt: skip
+    add("applyxfm4D-double-3d-spline", "-3D spline on a double volume (its coefficients in "
+        "double precision)", X, "@double:epi.nii:epi_f64.nii", E, "out.nii.gz", "one.mat",
+        "-3D", "-interp", "spline", files=one)  # fmt: skip
+    add("applyxfm4D-double-nn", "a double volume, nearest neighbour (values through float)", X,
+        "@double:epi.nii:epi_f64.nii", T, "out.nii.gz", "one.mat", "-singlematrix", "-interp",
+        "nn", files=one)  # fmt: skip
+    add("applyxfm4D-3d-spline-int", "-3D spline on an int16 volume (FSL-79: coefficients and "
+        "values in the type)", X, B4, E, "out.nii.gz", "one.mat", "-3D", "-interp", "spline",
+        files=one)  # fmt: skip
+    add("applyxfm4D-nan-border", "NaN voxels in the input's border and an infinite one: the "
+        "background value's NaN order (FSL-22), spline coefficients through them", X,
+        "@nanedge:epi.nii:epi_nanedge.nii", E, "out.nii.gz", "one.mat", "-singlematrix",
+        "-interp", "spline", files=one)  # fmt: skip
+    add("applyxfm4D-nan-border-3d", "the same with -3D and sinc", X,
+        "@nanedge:epi.nii:epi_nanedge.nii", E, "out.nii.gz", "one.mat", "-3D", files=one)  # fmt: skip
+    # robustness (part 3): one case per new program with a nonsense header
+    add("applyxfm4D-metres", "an input whose header gives metres (a nonsense header): read as FSL "
+        "reads it", X, "@metres:epi.nii:epi_m.nii", E, "out.nii.gz", "one.mat",
+        "-singlematrix", "-interp", "trilinear", files=one)  # fmt: skip
+    add("applyxfm4D-bad-interp", "an unknown interpolation (its message, exit 1)", X, B4, E,
+        "out.nii.gz", "one.mat", "-interp", "cubic", files=one)  # fmt: skip
+    add("applyxfm4D-userprefix-last", "-userprefix as the last word (std::string of null)", X,
+        B4, E, "out.nii.gz", "mu", "-userprefix", files=matsu)  # fmt: skip
+    add("applyxfm4D-missing-matrix", "a directory without the matrices (FSL aborts)", X, B4,
+        E, "out.nii.gz", "none")  # fmt: skip
+    add("applyxfm4D-missing-input", "an input that does not exist (FSL aborts)", X,
+        "none.nii.gz", E, "out.nii.gz", "one.mat", files=one)  # fmt: skip
+    # FLIRT's scripts (part 3): pairreg, extracttxt, aff2rigid
+    PY = (("PATH", f"{fsldir()}/bin:/usr/bin:/bin"),)  # aff2rigid runs `env fslpython`
+    add("aff2rigid-usage", "aff2rigid without arguments (its usage, exit 1)", "aff2rigid",
+        settings=PY)  # fmt: skip
+    add("aff2rigid-default", "aff2rigid of an affine standard-space matrix (numpy's arithmetic)",
+        "aff2rigid", "aff.mat", "rigid.mat", files=(("aff.mat", _AFF),), settings=PY)  # fmt: skip
+    add("aff2rigid-fmriprep", "aff2rigid of fMRIPrep's initial matrix", "aff2rigid", M,
+        "rigid.mat", settings=PY)  # fmt: skip
+    txt = "".join(f"line {k} value {k * 3}\n" for k in range(1, 13)) + "the end\n"
+    ET = "extracttxt"
+    xt = (("t.txt", txt),)
+    add("extracttxt-usage", "extracttxt with one argument (its usage, exit 255)", ET, "word")
+    add("extracttxt-rest", "the lines from the first match to the end", ET, "value", "t.txt",
+        files=xt)  # fmt: skip
+    add("extracttxt-count", "three lines from the first match", ET, "e.4", "t.txt", "3",
+        files=xt)  # fmt: skip
+    add("extracttxt-regex-start", "a regular expression, two lines, starting 2 lines after", ET,
+        "^line.[5-6]", "t.txt", "2", "2", files=xt)  # fmt: skip
+    add("extracttxt-before", "a negative relative start (lines before the match)", ET, "end$",
+        "t.txt", "4", "-3", files=xt)  # fmt: skip
+    add("extracttxt-zero-count", "zero trailing lines (sed's range ends before it starts)", ET,
+        "line.7", "t.txt", "0", files=xt)  # fmt: skip
+    add("extracttxt-line0", "a relative start reaching line 0 (sed's error, exit 1)", ET,
+        "^line.1.v", "t.txt", "2", "-1", files=xt)  # fmt: skip
+    add("extracttxt-dc-negative", "a start before line 1: dc reads its own negative result as "
+        "a subtraction (stack empty), sed the range as an option", ET, "e.2", "t.txt", "3",
+        "-4", files=xt)  # fmt: skip
+    add("extracttxt-sed-option", "a start on line 0 with no trailing line: the range -1,-1 "
+        "(sed's unknown option)", ET, "e.4", "t.txt", "0", "-4", files=xt)  # fmt: skip
+    add("extracttxt-signed", "signed arguments (+2, -0): dc reads each sign as a command",
+        ET, "e.4", "t.txt", "-0", "+2", files=xt)  # fmt: skip
+    add("extracttxt-nomatch", "a word that never matches (nothing printed, exit 0)", ET,
+        "nothing", "t.txt", files=xt)  # fmt: skip
+    add("extracttxt-missing", "a file that does not exist (grep's message, exit 0)", ET, "x",
+        "none.txt")  # fmt: skip
+    PR = "pairreg"
+    add("pairreg-usage", "pairreg with four arguments (its usage, exit 1)", PR, "a", "b", "c",
+        "d")  # fmt: skip
+    add("pairreg-default", "pairreg of the T1w and its moved copy (brains and skulls the same)",
+        PR, T, "@t1_moved.nii", T, "@t1_moved.nii", "pair.mat", "-dof", "6")  # fmt: skip
+    add("pairreg-metres", "pairreg of images whose headers give metres (nonsense headers)", PR,
+        "@metres:epi.nii:epi_m.nii", "@metres:epi.nii:epi_m.nii", "@metres:epi.nii:epi_m.nii",
+        "@metres:epi.nii:epi_m.nii", "pair.mat", "-dof", "6")  # fmt: skip
+    K = "midtrans"
+    mt = (("a.mat", _MT1), ("b.mat", _MT2), ("c.mat", _MT3), ("id.mat", _ID))
+    add("midtrans-usage", "midtrans without transforms (its message and usage, exit 1)", K)
+    add("midtrans-help", "midtrans -h (its usage, exit 1)", K, "-h")
+    add("midtrans-one", "one transform only (at least 2 needed, exit 1)", K, "a.mat", files=mt)
+    add("midtrans-default", "three transforms, printed (the MNI origin assumed)", K, "a.mat",
+        "b.mat", "c.mat", files=mt, tier="smoke")  # fmt: skip
+    add("midtrans-out-verbose", "-o with -v (every stage printed, the matrix written)", K, "-v",
+        "-o", "mid.mat", "a.mat", "b.mat", "id.mat", files=mt)  # fmt: skip
+    add("midtrans-template-separate", "--template (its centre of gravity) and --separate", K,
+        "--template=@epi.nii", "--separate=img2mid", "-o", "mid.mat", "a.mat", "b.mat", "c.mat",
+        files=mt)  # fmt: skip
+    add("midtrans-template-50mm", "--template with voxels of 50 mm (a nonsense header: its "
+        "centre of gravity far out)", K, "--template=@const:6x5x4:50x50x50:t50.nii", "a.mat",
+        "b.mat", files=mt)  # fmt: skip
+    add("midtrans-debug", "--debug (the origin at 0 and the debug matrices)", K, "--debug",
+        "a.mat", "c.mat", files=mt)  # fmt: skip
+    add("midtrans-singular", "a transform with a determinant below 1e-6 (its message, exit 1)",
+        K, "a.mat", "sing.mat", files=(*mt, ("sing.mat", _SING)))  # fmt: skip
+    add("midtrans-token", "an option after the transforms (read as a file: an empty matrix, "
+        "the size error caught)", K, "a.mat", "b.mat", "-v", files=mt)  # fmt: skip
+    add("midtrans-not-square", "a 3 x 4 matrix (the determinant's error, caught)", K, "a.mat",
+        "r.mat", files=(*mt, ("r.mat", "1 0 0 1\n0 1 0 2\n0 0 1 3\n")))  # fmt: skip
+    add("midtrans-3x3", "a 3 x 3 matrix (the product's size error, caught)", K, "a.mat",
+        "r.mat", files=(*mt, ("r.mat", "1 0 0\n0 1 0\n0 0 1\n")))  # fmt: skip
+    P = "pointflirt"
+    pf = (("in.txt", _PTS_IN), ("ref.txt", _PTS_REF))
+    add("pointflirt-usage", "pointflirt without arguments (the compulsory options, exit 1)", P)
+    add("pointflirt-default", "eight points, the matrix printed", P, "-i", "in.txt", "-r",
+        "ref.txt", files=pf, tier="smoke")  # fmt: skip
+    add("pointflirt-out-verbose", "-v and -o (the coordinates printed, the matrix written)", P,
+        "-v", "-i", "in.txt", "-r", "ref.txt", "-o", "aff.mat", files=pf)  # fmt: skip
+    add("pointflirt-vox", "--vox with --invol and --refvol (voxel coordinates scaled)", P, "-i",
+        "in.txt", "-r", "ref.txt", "--vox", "--invol=@epi.nii", "--refvol=@t1.nii", files=pf,
+        )  # fmt: skip
+    add("pointflirt-vox-odd", "--vox with voxels of 0.01 mm and of 50 mm (nonsense headers)", P,
+        "-i", "in.txt", "-r", "ref.txt", "--vox", "--invol=@const:4x4x4:0.01x0.01x0.01:v001.nii",
+        "--refvol=@const:4x4x4:50x50x50:v50.nii", files=pf)  # fmt: skip
+    add("pointflirt-vox-missing", "--vox without the volumes (its error, exit 2)", P, "-i",
+        "in.txt", "-r", "ref.txt", "--vox", files=pf)  # fmt: skip
+    add("pointflirt-nullspace", "four points (a nullspace: the warning, a non-unique solution)",
+        P, "-i", "in4.txt", "-r", "ref4.txt",
+        files=(("in4.txt", "".join(_PTS_IN.splitlines(True)[:4])),
+               ("ref4.txt", "".join(_PTS_REF.splitlines(True)[:4]))))  # fmt: skip
+    add("pointflirt-count", "files with different numbers of points (its error, exit 255)", P,
+        "-i", "in.txt", "-r", "ref4.txt",
+        files=(*pf, ("ref4.txt", "".join(_PTS_REF.splitlines(True)[:4]))))  # fmt: skip
+    add("pointflirt-many", "twenty points (x·xᵀ by BLAS dsyrk)", P, "-i", "in20.txt", "-r",
+        "ref20.txt", files=(("in20.txt", _PTS20), ("ref20.txt", _PTS20_REF)))  # fmt: skip
+    add("pointflirt-missing", "a coordinate file that does not exist (FSL aborts)", P, "-i",
+        "none.txt", "-r", "ref.txt", files=pf)  # fmt: skip
+    three = "".join(_PTS_IN.splitlines(True)[:3])
+    three_ref = "".join(_PTS_REF.splitlines(True)[:3])
+    add("pointflirt-three", "three points: a square file is read with points as columns", P,
+        "-i", "in3.txt", "-r", "ref3.txt", files=(("in3.txt", three), ("ref3.txt", three_ref)))  # fmt: skip
+    add("pointflirt-two", "two points (two rows of three: FSL reads past its rows, aborts)", P,
+        "-i", "in2.txt", "-r", "ref2.txt",
+        files=(("in2.txt", "".join(_PTS_IN.splitlines(True)[:2])),
+               ("ref2.txt", "".join(_PTS_REF.splitlines(True)[:2]))))  # fmt: skip
+    add("pointflirt-four-columns", "points of four coordinates (FSL's block sizes clash, aborts)",
+        P, "-i", "in4c.txt", "-r", "ref4c.txt",
+        files=(("in4c.txt", "".join(f"{ln} 1\n" for ln in _PTS_IN.splitlines())),
+               ("ref4c.txt", "".join(f"{ln} 1\n" for ln in _PTS_REF.splitlines()))))  # fmt: skip
 
     A = "avscale"
     add("avscale-usage", "avscale without arguments (its usage, exit 255)", A)
@@ -1990,12 +2381,16 @@ def suite() -> Suite:
         name=SUITE,
         title="FLIRT replica (bit-exact, FSL Licence)",
         tool="`larmorx-nc fsl flirt`, `convert_xfm`, `avscale`, `img2imgcoord`, `std2imgcoord`, "
-        "`img2stdcoord`, `rmsdiff` and `makerot` (crate larmorx-nc-flirt, translated from FSL "
-        f"{fsl_versions.NEWEST}'s source)",
-        reference=f"flirt, convert_xfm, avscale, img2imgcoord, std2imgcoord, img2stdcoord, rmsdiff "
-        f"and makerot from FSL {fsl_versions.NEWEST} (fsl-flirt 2111.4, fsl-newimage 2601.0, "
-        "fsl-miscmaths 2412.6, fsl-utils 2412.6, fsl-warpfns 2501.0; the conda build at "
-        "`~/fsl-6.0.7.23`, as built: glibc 2.35's maths, OpenBLAS on its Haswell kernels)",
+        "`img2stdcoord`, `rmsdiff`, `makerot`, `midtrans`, `pointflirt`, `applyxfm4D` and the "
+        "scripts `pairreg`, `extracttxt` and `aff2rigid` (crate larmorx-nc-flirt, translated from "
+        f"FSL {fsl_versions.NEWEST}'s source)",
+        reference=f"flirt, convert_xfm, avscale, img2imgcoord, std2imgcoord, img2stdcoord, rmsdiff, "
+        "makerot, midtrans, pointflirt, applyxfm4D, pairreg, extracttxt and aff2rigid from FSL "
+        f"{fsl_versions.NEWEST} (fsl-flirt 2111.4, fsl-newimage 2601.0, fsl-miscmaths 2412.6, "
+        "fsl-utils 2412.6, fsl-warpfns 2501.0, fsl-armawrap 0.7.0 with Armadillo 14.2.1; the conda "
+        "build at `~/fsl-6.0.7.23`, as built: glibc 2.35's maths, OpenBLAS 0.3.33 with its LAPACK "
+        "on its Haswell kernels; the scripts under dash, GNU grep, dc and sed of Ubuntu 22.04 and "
+        "FSL's Python with NumPy 2.4.6)",
         thresholds=[
             ("Exit status", "the same (an abort: the replica exits 1 after the same text)"),
             (

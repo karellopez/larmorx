@@ -239,7 +239,10 @@ def test_larmorx_needs_no_more_memory_than_fsl(tmp_path, tool, args):
 #: replica, 2026-11-01) on ds005040's fMRIPrep pair (a 3 mm BOLD reference and the 0.8 mm T1w
 #: brain): fMRIPrep's boundary-based call (``bbr.sch``, its white-matter mask) and a default
 #: 12-dof call, both with ``-out``. The outputs bit-identical in ``reproduce``. FLIRT's other
-#: programs that read images (part 2): avscale with the T1w's centre, rmsdiff over its mask.
+#: programs that read images (part 2): avscale with the T1w's centre, rmsdiff over its mask;
+#: part 3: applyxfm4D of fMRIPrep's 63-volume preprocessed BOLD series onto its reference
+#: (trilinear, and spline with its coefficients per volume; the series held in its type and
+#: each volume converted alone, as FSL holds it).
 FLIRT_CASES = [
     (
         "bbr",
@@ -254,6 +257,12 @@ FLIRT_CASES = [
     ("inweight", "flirt", "-in {epi} -ref {t1} -inweight {epi} -nosearch -omat out.mat"),
     ("avscale-volume", "avscale", "--allparams {init} {t1}"),
     ("rmsdiff-mask", "rmsdiff", "{init} {init} {t1} {wm}"),
+    (
+        "applyxfm4D-trilinear",
+        "applyxfm4D",
+        "{bold} {epi} out {init} -singlematrix -interp trilinear",
+    ),
+    ("applyxfm4D-spline", "applyxfm4D", "{bold} {epi} out {init} -singlematrix -interp spline"),
 ]
 
 
@@ -275,6 +284,7 @@ def test_flirt_replica_needs_no_more_memory_than_fsl(tmp_path, name, program, ar
         "wm": next((bbr / "wm_mask").glob("*.nii.gz")),
         "init": bbr / "lta_to_fsl" / "out.mat",
         "bbr": fr.fsldir() / "etc" / "flirtsch" / "bbr.sch",
+        "bold": src / "out/sub-002/func/sub-002_task-clip_run-1_desc-preproc_bold.nii.gz",
     }
     words = [w.format(**{k: str(v) for k, v in paths.items()}) for w in args.split()]
     env = {**fr._environment({}), "OMP_NUM_THREADS": "1"}

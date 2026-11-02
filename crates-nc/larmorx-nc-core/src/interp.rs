@@ -149,6 +149,92 @@ pub fn interpolate<T: Elem>(
     }
 }
 
+/// `volume<double>::interpolate(x, y, z)`: `v` holds the values converted to `float` (as the
+/// nearest-neighbour and trilinear methods read them) and `data64` the same voxels in double
+/// precision, which the sinc kernel's products read (`double * float`, added to the `float`
+/// sum in double precision). The spline coefficients are a `double` image's
+/// ([`SplineCoefs::new_f64`]).
+pub fn interpolate_double(
+    v: &Volume,
+    data64: &[f64],
+    x: f32,
+    y: f32,
+    z: f32,
+    spline: Option<&SplineCoefs>,
+) -> f32 {
+    match v.interp {
+        Interpolation::Sinc => match v.kernel.as_deref() {
+            Some(k) => kernel_interp_double(v, data64, k, x, y, z),
+            None => v.extrapolate(0, 0, 0),
+        },
+        _ => interpolate(v, x, y, z, spline),
+    }
+}
+
+/// [`kernel_interp_with`] for `volume<double>`: `convsum += value * kerfac` in double
+/// precision, rounded to `float` at each step.
+fn kernel_interp_double(v: &Volume, d64: &[f64], k: &Kernel, x: f32, y: f32, z: f32) -> f32 {
+    let (wx, wy, wz) = (k.widthx, k.widthy, k.widthz);
+    let ix0 = floor_i64(x);
+    let iy0 = floor_i64(y);
+    let iz0 = floor_i64(z);
+    let mut storex = vec![0.0f32; (2 * wx + 1) as usize];
+    let mut storey = vec![0.0f32; (2 * wy + 1) as usize];
+    let mut storez = vec![0.0f32; (2 * wz + 1) as usize];
+    for d in -wz..=wz {
+        storez[(d + wz) as usize] = kernelval(z - iz0 as f32 + d as f32, wz, &k.kz);
+    }
+    for d in -wy..=wy {
+        storey[(d + wy) as usize] = kernelval(y - iy0 as f32 + d as f32, wy, &k.ky);
+    }
+    for d in -wx..=wx {
+        storex[(d + wx) as usize] = kernelval(x - ix0 as f32 + d as f32, wx, &k.kx);
+    }
+    let (wx, wy, wz) = (i64::from(wx), i64::from(wy), i64::from(wz));
+    let sums = |sse_nans: bool| {
+        let mut convsum: f32 = 0.0;
+        let mut kersum: f32 = 0.0;
+        for z1 in iz0.wrapping_sub(wz)..=iz0.wrapping_add(wz) {
+            let zj = iz0.wrapping_sub(z1).wrapping_add(wz) as usize;
+            for y1 in iy0.wrapping_sub(wy)..=iy0.wrapping_add(wy) {
+                let yj = iy0.wrapping_sub(y1).wrapping_add(wy) as usize;
+                for x1 in ix0.wrapping_sub(wx)..=ix0.wrapping_add(wx) {
+                    if v.in_bounds(x1, y1, z1) {
+                        let xj = ix0.wrapping_sub(x1).wrapping_add(wx) as usize;
+                        let value = d64[v.idx(x1, y1, z1)];
+                        if sse_nans {
+                            let kerfac =
+                                sse::mul_f32(sse::mul_f32(storex[xj], storey[yj]), storez[zj]);
+                            let prod = sse::mul_f64(value, f64::from(kerfac));
+                            convsum = sse::add_f64(f64::from(convsum), prod) as f32;
+                            kersum = sse::add_f32(kersum, kerfac);
+                        } else {
+                            let kerfac = storex[xj] * storey[yj] * storez[zj];
+                            convsum = (f64::from(convsum) + value * f64::from(kerfac)) as f32;
+                            kersum += kerfac;
+                        }
+                    }
+                }
+            }
+        }
+        (convsum, kersum)
+    };
+    let (mut convsum, mut kersum) = sums(false);
+    if convsum.is_nan() || kersum.is_nan() {
+        // NaN or infinite voxels: the same sums with SSE's NaNs.
+        (convsum, kersum) = sums(true);
+        if f64::from(kersum.abs()) > 1e-9 {
+            return sse::div_f32(convsum, kersum);
+        }
+        return v.extrapolate(ix0, iy0, iz0);
+    }
+    if f64::from(kersum.abs()) > 1e-9 {
+        convsum / kersum
+    } else {
+        v.extrapolate(ix0, iy0, iz0)
+    }
+}
+
 /// The volume as `volume<float>`: the methods translated for float volumes only.
 fn float_only<T: Elem>(v: &Volume<T>) -> &Volume {
     v.as_float()
@@ -263,10 +349,17 @@ fn in_extraslice_bounds(v: &Volume, x: f32, y: f32, z: f32) -> bool {
 /// `Splinterpolator<float>` computes them single-threaded.
 #[derive(Clone, Debug)]
 pub struct SplineCoefs {
+    /// The coefficients of a `float` image (empty when [`SplineCoefs::coef64`] holds them).
     pub coef: Vec<f32>,
+    /// The coefficients held in double precision: a `double` image's, or an integer image's
+    /// (integers, exact in double precision) ([`SplineCoefs::new_f64`]).
+    pub coef64: Vec<f64>,
     pub dims: [usize; 3],
     pub constant: bool,
     pub zeros: bool,
+    /// `static_cast<T>(value_at(coord))`: the interpolated value converted to the image's
+    /// type before `splineinterpolate` returns it as `float` (`None` for `float` and `double`).
+    pub cast: Option<fn(f64) -> f64>,
 }
 
 /// `Splinterpolator` extrapolation types.
@@ -290,43 +383,71 @@ fn spline_extrap(e: Extrapolation) -> SplineExtrap {
 impl SplineCoefs {
     /// The coefficients of volume 0 of `v` (order 3).
     pub fn new(v: &Volume) -> SplineCoefs {
+        SplineCoefs::new_stored(v, &|c: f64| f64::from(c as f32))
+    }
+
+    /// The coefficients as `Splinterpolator<T>` stores them for an image of type `T`: each
+    /// deconvolution pass's results converted by `store` (`(T) value`; for `float`, the
+    /// rounding to single precision) before the next pass reads them. Integer types' values are
+    /// exact in single precision up to 2^24 (beyond, as the replica holds every image in
+    /// single precision).
+    pub fn new_stored(v: &Volume, store: &dyn Fn(f64) -> f64) -> SplineCoefs {
         let dims = [v.xsize() as usize, v.ysize() as usize, v.zsize() as usize];
         let n = dims[0] * dims[1] * dims[2];
         let mut coef = v.data[..n].to_vec();
         let et = spline_extrap(v.extrap);
-        let steps = [1, dims[0], dims[0] * dims[1]];
-        for dim in 0..3 {
-            if dims[dim] <= 1 {
-                continue;
-            }
-            // deconv_along(dim): the remaining dimensions in order, x fastest.
-            let others: Vec<usize> = (0..3).filter(|&d| d != dim).collect();
-            let (r0, r1) = (others[0], others[1]);
-            let mut col = vec![0.0f64; dims[dim]];
-            for j in 0..dims[r1] {
-                for i in 0..dims[r0] {
-                    let start = j * steps[r1] + i * steps[r0];
-                    for (t, c) in col.iter_mut().enumerate() {
-                        *c = f64::from(coef[start + t * steps[dim]]);
-                    }
-                    let line = col.clone();
-                    deconv(&mut col, et);
-                    if col.iter().any(|c| c.is_nan()) {
-                        // NaN or infinite voxels on the line: SSE's NaNs.
-                        col.copy_from_slice(&line);
-                        deconv_sse(&mut col, et);
-                    }
-                    for (t, c) in col.iter().enumerate() {
-                        coef[start + t * steps[dim]] = *c as f32;
-                    }
-                }
-            }
-        }
+        deconv_volume(&mut coef, dims, et, &|c: f32| f64::from(c), &|c| {
+            store(c) as f32
+        });
         SplineCoefs {
             coef,
+            coef64: Vec::new(),
             dims,
             constant: et == SplineExtrap::Constant,
             zeros: et == SplineExtrap::Zeros,
+            cast: None,
+        }
+    }
+
+    /// The coefficients of `data` (volume 0's values in double precision, on `v`'s grid with
+    /// its extrapolation) as `Splinterpolator<T>` stores them in an image of type `T` held in
+    /// double precision: `double` (`store` the identity) or an integer type (`store` the
+    /// conversion `(T)(c + 0.5)`, exact in double precision).
+    pub fn new_f64(v: &Volume, data: &[f64], store: &dyn Fn(f64) -> f64) -> SplineCoefs {
+        let dims = [v.xsize() as usize, v.ysize() as usize, v.zsize() as usize];
+        let n = dims[0] * dims[1] * dims[2];
+        let mut coef = data[..n].to_vec();
+        let et = spline_extrap(v.extrap);
+        deconv_volume(&mut coef, dims, et, &|c: f64| c, store);
+        SplineCoefs {
+            coef: Vec::new(),
+            coef64: coef,
+            dims,
+            constant: et == SplineExtrap::Constant,
+            zeros: et == SplineExtrap::Zeros,
+            cast: None,
+        }
+    }
+
+    /// The same coefficients with the interpolated value converted by `cast` (an integer
+    /// image's `static_cast<T>(value_at(coord))`).
+    pub fn with_cast(mut self, cast: fn(f64) -> f64) -> SplineCoefs {
+        self.cast = Some(cast);
+        self
+    }
+
+    /// Whether two coefficient sets hold the same bits.
+    pub fn same_as(&self, other: &SplineCoefs) -> bool {
+        let n = self.dims.iter().product::<usize>();
+        self.dims == other.dims
+            && (0..n).all(|i| self.at_index(i).to_bits() == other.at_index(i).to_bits())
+    }
+
+    fn at_index(&self, i: usize) -> f64 {
+        if self.coef64.is_empty() {
+            f64::from(self.coef[i])
+        } else {
+            self.coef64[i]
         }
     }
 
@@ -387,7 +508,7 @@ impl SplineCoefs {
             idx[d] = self.indx2indx(ijk[d], d);
         }
         let (d0, d1) = (self.dims[0], self.dims[1]);
-        f64::from(self.coef[idx[0] + d0 * (idx[1] + d1 * idx[2])])
+        self.at_index(idx[0] + d0 * (idx[1] + d1 * idx[2]))
     }
 
     /// `value_at(coord)` for three dimensions, order 3 (fsl-miscmaths 2412.6: the first index
@@ -454,6 +575,45 @@ fn get_wgt3(x: f64) -> f64 {
         (1.0 / 6.0) * (ax * ax * ax)
     } else {
         0.0
+    }
+}
+
+/// `calc_coef`: `deconv_along(dim)` for each dimension longer than 1, each line read as `double`
+/// (`to`) and its results stored in the image's type (`from`) before the next pass reads them.
+fn deconv_volume<S: Copy>(
+    coef: &mut [S],
+    dims: [usize; 3],
+    et: SplineExtrap,
+    to: &dyn Fn(S) -> f64,
+    from: &dyn Fn(f64) -> S,
+) {
+    let steps = [1, dims[0], dims[0] * dims[1]];
+    for dim in 0..3 {
+        if dims[dim] <= 1 {
+            continue;
+        }
+        // deconv_along(dim): the remaining dimensions in order, x fastest.
+        let others: Vec<usize> = (0..3).filter(|&d| d != dim).collect();
+        let (r0, r1) = (others[0], others[1]);
+        let mut col = vec![0.0f64; dims[dim]];
+        for j in 0..dims[r1] {
+            for i in 0..dims[r0] {
+                let start = j * steps[r1] + i * steps[r0];
+                for (t, c) in col.iter_mut().enumerate() {
+                    *c = to(coef[start + t * steps[dim]]);
+                }
+                let line = col.clone();
+                deconv(&mut col, et);
+                if col.iter().any(|c| c.is_nan()) {
+                    // NaN or infinite voxels on the line: SSE's NaNs.
+                    col.copy_from_slice(&line);
+                    deconv_sse(&mut col, et);
+                }
+                for (t, c) in col.iter().enumerate() {
+                    coef[start + t * steps[dim]] = from(*c);
+                }
+            }
+        }
     }
 }
 
@@ -564,7 +724,11 @@ fn spline_interpolate(v: &Volume, x: f32, y: f32, z: f32, s: &SplineCoefs) -> f3
     if ep == Extrapolation::Extraslice && !in_extraslice_bounds(v, x, y, z) {
         return v.padvalue;
     }
-    s.value_at([f64::from(x), f64::from(y), f64::from(z)]) as f32
+    let v = s.value_at([f64::from(x), f64::from(y), f64::from(z)]);
+    match s.cast {
+        Some(cast) => cast(v) as f32,
+        None => v as f32,
+    }
 }
 
 #[cfg(test)]

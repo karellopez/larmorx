@@ -1,0 +1,238 @@
+{
+ "defect": null,
+ "description": "a parameter subset whose line search reaches a zero scale on one-voxel images: the cost function's inverse of the singular matrix throws inv(): matrix is singular, which FLIRT's main catches (FSL-68: exit 0 in reproduce, nothing written)",
+ "expect": "pass",
+ "found": {
+  "detail": "stderr identical: line 3: FSL 'inv(): matrix is singular', replica '<end>'; files written: only FSL [], only the replica ['out.mat']",
+  "n": 57755,
+  "seed": "part3-trial",
+  "shrink_moves": [
+   "ref: axis 0 32 -> 16 voxels",
+   "ref: axis 1 22 -> 11 voxels",
+   "ref: axis 0 16 -> 8 voxels",
+   "ref: axis 1 11 -> 5 voxels",
+   "ref: axis 2 8 -> 4 voxels",
+   "ref: axis 1 5 -> 2 voxels",
+   "ref: axis 2 4 -> 2 voxels",
+   "ref: axis 1 2 -> 1 voxels",
+   "ref: axis 2 2 -> 1 voxels",
+   "ref: axis 0 8 -> 4 voxels",
+   "ref: axis 0 4 -> 2 voxels",
+   "ref: axis 0 2 -> 1 voxels",
+   "in: axis 2 27 -> 13 voxels",
+   "in: axis 2 13 -> 6 voxels",
+   "in: axis 0 8 -> 4 voxels",
+   "in: axis 1 8 -> 4 voxels",
+   "in: axis 2 6 -> 3 voxels",
+   "in: axis 0 4 -> 2 voxels",
+   "in: axis 1 4 -> 2 voxels",
+   "in: axis 2 3 -> 1 voxels",
+   "in: axis 0 2 -> 1 voxels",
+   "in: axis 1 2 -> 1 voxels",
+   "ref (and its grid): plumb orientation",
+   "ref (and its grid): unit spacing",
+   "ref (and its grid): origin at 0",
+   "ref (and its grid): qform and sform codes 1",
+   "ref (and its grid): millimetres",
+   "ref: float32 storage",
+   "ref: content labels -> constant",
+   "in (and its grid): plumb orientation",
+   "in (and its grid): unit spacing",
+   "in (and its grid): origin at 0",
+   "in: float32 storage",
+   "in: content labels -> constant"
+  ],
+  "signature": [
+   "files written",
+   "stderr identical"
+  ]
+ },
+ "id": "paramsubset-singular-cost",
+ "implementations": [
+  "replica"
+ ],
+ "reason": "",
+ "recipe": {
+  "extra": {
+   "output_type": "NIFTI",
+   "tool": "flirt"
+  },
+  "features": {
+   "FSLOUTPUTTYPE": "NIFTI",
+   "alignpaxes": false,
+   "axis0": 1.2,
+   "axis1": 1.25,
+   "axis2": 0.8,
+   "centre0": -3.5,
+   "centre1": 5.5,
+   "centre2": 5.0,
+   "content": "noise",
+   "dtype": "int16",
+   "extreme": false,
+   "inter": -5.0,
+   "kind": "schedule3",
+   "labels": 3,
+   "orientation": "axes",
+   "origin0": 1.75,
+   "origin1": 33.25,
+   "origin2": -52.0,
+   "qfac": -1,
+   "qform_code": 1,
+   "range": "plain",
+   "same content": true,
+   "sform": "same",
+   "sform_code": 1,
+   "shape": "8x8x27",
+   "size": 13.5,
+   "slope": 0.01,
+   "spacing0": 3.0,
+   "spacing1": 1.2,
+   "spacing2": 0.5,
+   "subset size": 2,
+   "suffix": ".nii.gz",
+   "units": "mm",
+   "w00": "0",
+   "w01": "0",
+   "w010": "2",
+   "w011": "0",
+   "w02": "0",
+   "w03": "0",
+   "w04": "0.5",
+   "w05": "2",
+   "w06": "0",
+   "w07": "1",
+   "w08": "0.5",
+   "w09": "0",
+   "w10": "1",
+   "w11": "0",
+   "w110": "0",
+   "w111": "0.5",
+   "w12": "0",
+   "w13": "0",
+   "w14": "0",
+   "w15": "0.5",
+   "w16": "2",
+   "w17": "0",
+   "w18": "-1",
+   "w19": "0"
+  },
+  "groups": [
+   {
+    "args": [
+     "-in",
+     "{in:in}",
+     "-ref",
+     "{in:ref}",
+     "-schedule",
+     "{in:sch}",
+     "-omat",
+     "out.mat"
+    ],
+    "name": "files",
+    "optional": false
+   }
+  ],
+  "inputs": {
+   "in": {
+    "content": {
+     "seed": 1133179767,
+     "type": "constant"
+    },
+    "dtype": "float32",
+    "geometry": {
+     "origin": [
+      0.0,
+      0.0,
+      0.0
+     ],
+     "qfac": 1,
+     "qform_code": 1,
+     "quaternion": [
+      1,
+      0,
+      0,
+      0
+     ],
+     "sform": "same",
+     "sform_code": 1,
+     "spacing": [
+      1.0,
+      1.0,
+      1.0
+     ],
+     "units": "mm"
+    },
+    "scaling": null,
+    "shape": [
+     1,
+     1,
+     1
+    ],
+    "suffix": ".nii.gz",
+    "values": {
+     "offset": 0.0,
+     "scale": 1.0
+    }
+   },
+   "ref": {
+    "content": {
+     "seed": 1164592510,
+     "type": "constant"
+    },
+    "dtype": "float32",
+    "geometry": {
+     "origin": [
+      0.0,
+      0.0,
+      0.0
+     ],
+     "qfac": 1,
+     "qform_code": 1,
+     "quaternion": [
+      1,
+      0,
+      0,
+      0
+     ],
+     "sform": "same",
+     "sform_code": 1,
+     "spacing": [
+      1.0,
+      1.0,
+      1.0
+     ],
+     "units": "mm"
+    },
+    "scaling": null,
+    "shape": [
+     1,
+     1,
+     1
+    ],
+    "suffix": ".nii",
+    "values": {
+     "offset": 0.0,
+     "scale": 1.0
+    }
+   },
+   "sch": {
+    "kind": "text",
+    "suffix": ".sch",
+    "text": "setscale 8\nsetrow UA 1 0 0 0  0 1 0 0  0 0 1 0  0 0 0 1\nsetoption paramsubset 2  0 0 0 0 0.5 2 0 1 0.5 0 2 0  1 0 0 0 0 0.5 2 0 -1 0 0 0.5\noptimise 12 UA:1 0.0 0.0 0.0 0.0 0.0 0.0 rel 1\n"
+   }
+  },
+  "n": 57755,
+  "options": [
+   "FSLOUTPUTTYPE=NIFTI",
+   "flirt",
+   "paramsubset 2"
+  ],
+  "seed": "part3-trial",
+  "tool": "fsl-flirt-part3"
+ },
+ "rule": null,
+ "status": "fixed",
+ "suite": "fsl-flirt-replica",
+ "tier": "smoke",
+ "tool": "fsl-flirt"
+}

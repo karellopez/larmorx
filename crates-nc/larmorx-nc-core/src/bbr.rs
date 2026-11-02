@@ -19,7 +19,7 @@ use crate::arma::{self, Mat};
 use crate::cnum;
 use crate::fdlibm;
 use crate::newimagefns::{convolve_separable, gradient_components, smooth};
-use crate::volume::{FslError, Volume};
+use crate::volume::{self, Extrapolation, FslError, Volume};
 
 /// `bbr_type`: `signed` (the default), `global_abs`, `local_abs`.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -252,6 +252,79 @@ impl Frame {
     }
 }
 
+/// The debug volume of BBR's cost in FLIRT's final `-debug` call (`debugvol`: the reference's
+/// grid with two volumes, zero; at each pair's midpoint in reference voxels, rounded,
+/// `w·update + (1 − w)` in volume 0 and the pair's weight `w` in volume 1, in single precision,
+/// later pairs over earlier ones). A midpoint outside the grid is written where the reference's
+/// extrapolation reads it: nowhere for zero and constant padding, its nearest edge voxel for
+/// extraslice (one voxel outside), the mirrored or periodic voxel otherwise.
+#[derive(Clone, Debug)]
+pub struct BbrDebug {
+    pub data: Vec<f32>,
+    pub dims: [i64; 3],
+    pub extrap: Extrapolation,
+}
+
+impl BbrDebug {
+    /// `debugvol = refvol; debugvol.addvolume(refvol); debugvol = 0.0f`.
+    pub fn new(refvol: &Volume) -> BbrDebug {
+        let dims = [refvol.xsize(), refvol.ysize(), refvol.zsize()];
+        let n = (dims[0] * dims[1] * dims[2]) as usize;
+        BbrDebug {
+            data: vec![0.0; 2 * n],
+            dims,
+            extrap: refvol.extrap,
+        }
+    }
+
+    fn reset(&mut self) {
+        self.data.iter_mut().for_each(|v| *v = 0.0);
+    }
+
+    /// `debugvol(x, y, z, t) = v`.
+    fn write(&mut self, x: i64, y: i64, z: i64, t: usize, v: f32) {
+        let [nx, ny, nz] = self.dims;
+        let inside =
+            |x: i64, y: i64, z: i64| x >= 0 && y >= 0 && z >= 0 && x < nx && y < ny && z < nz;
+        let (mut a, mut b, mut c) = (x, y, z);
+        if !inside(a, b, c) {
+            match self.extrap {
+                Extrapolation::Periodic => {
+                    a = volume::periodicclamp(a, 0, nx - 1);
+                    b = volume::periodicclamp(b, 0, ny - 1);
+                    c = volume::periodicclamp(c, 0, nz - 1);
+                }
+                Extrapolation::Mirror => {
+                    a = volume::mirrorclamp(a, 0, nx - 1);
+                    b = volume::mirrorclamp(b, 0, ny - 1);
+                    c = volume::mirrorclamp(c, 0, nz - 1);
+                }
+                Extrapolation::Extraslice => {
+                    let edge = |v: i64, n: i64| {
+                        if v == -1 {
+                            0
+                        } else if v == n {
+                            n - 1
+                        } else {
+                            v
+                        }
+                    };
+                    a = edge(a, nx);
+                    b = edge(b, ny);
+                    c = edge(c, nz);
+                    if !inside(a, b, c) {
+                        return;
+                    }
+                }
+                _ => return,
+            }
+        }
+        let n = (nx * ny * nz) as usize;
+        let i = t * n + ((c * ny + b) * nx + a) as usize;
+        self.data[i] = v;
+    }
+}
+
 /// What one cost evaluation printed (`WARNING:: Found NaN in BBR cost`, once per pair after the
 /// sum became NaN, and `(2)` after the division).
 #[derive(Clone, Debug, Default)]
@@ -274,8 +347,12 @@ pub fn bbr_cost(
     pts: &BbrPoints,
     s: &BbrSettings,
     msgs: &mut BbrMessages,
+    mut debug: Option<&mut BbrDebug>,
 ) -> f32 {
     let fr = Frame::new(refvol, testvol, aff);
+    if let Some(d) = debug.as_deref_mut() {
+        d.reset();
+    }
     let fm = s.fieldmap.as_ref();
     let (mut bbrval, mut bbrwsum) = (0.0f64, 0.0f64);
     let n = pts.len() as i64;
@@ -322,6 +399,12 @@ pub fn bbr_cost(
             bbrval += w12 * update;
         }
         bbrwsum += w12;
+        if let Some(d) = debug.as_deref_mut() {
+            let mid = |k: usize| i64::from(volume::round_f64((rvc1[k] + rvc2[k]) / 2.0));
+            let (x, y, z) = (mid(0), mid(1), mid(2));
+            d.write(x, y, z, 0, (w12 * update + (1.0 - w12)) as f32);
+            d.write(x, y, z, 1, w12 as f32);
+        }
         if bbrval.is_nan() {
             msgs.nan_pairs += 1;
         }
@@ -401,6 +484,7 @@ mod tests {
             &BbrPoints::default(),
             &BbrSettings::default(),
             &mut msgs,
+            None,
         );
         assert_eq!(c.to_bits(), crate::sse::DEFAULT_NAN_F32.to_bits());
         assert!(msgs.nan_final);

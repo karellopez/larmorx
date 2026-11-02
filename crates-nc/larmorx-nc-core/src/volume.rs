@@ -730,6 +730,123 @@ impl<T: Elem> Volume<T> {
     }
 }
 
+impl<T: Elem> Volume<T> {
+    /// `backgroundval()` (`calc_bval(vol, 2)`): the 10th percentile of the values in a 2-voxel
+    /// shell at the edges of volume 0 (an element of the sorted shell, not interpolated).
+    pub fn backgroundval(&self) -> T {
+        self.background_value().0
+    }
+
+    /// FSL-75: whether `calc_bval(vol, 2)`'s buffer holds the border it writes. It sizes the
+    /// buffer `2(x−2ex)(y−2ey)ez + 2(x−2ex)z·ey + 2yz·ex` (each edge width `e` the smaller of 2
+    /// and the size less 1), which is too small when the size along x is 3 (and y or z at least
+    /// 2), or along y is 3 (z at least 2, x neither 2 nor 4): a factor of −1 in a term whose
+    /// loop writes nothing. FSL then writes the rest past the buffer (heap corruption) and sorts
+    /// the values that fit; at 1 × 1 × 1 the buffer is empty and FSL reads its first element.
+    pub fn background_buffer(&self) -> BorderBuffer {
+        let (zb, yb, xb) = (self.zsize(), self.ysize(), self.xsize());
+        let ew = |n: i64| 2i64.min(n - 1);
+        let (ewx, ewy, ewz) = (ew(xb), ew(yb), ew(zb));
+        let numbins = 2 * (xb - 2 * ewx) * (yb - 2 * ewy) * ewz
+            + 2 * (xb - 2 * ewx) * zb * ewy
+            + 2 * yb * zb * ewx;
+        let (ix, iy) = ((xb - 2 * ewx).max(0), (yb - 2 * ewy).max(0));
+        let written = 2 * ewz * ix * iy + 2 * ewy * ix * zb + 2 * ewx * yb * zb;
+        if numbins <= 0 {
+            BorderBuffer::Empty
+        } else if numbins < written {
+            BorderBuffer::Overflow { numbins, written }
+        } else {
+            BorderBuffer::Exact
+        }
+    }
+
+    /// [`Volume::backgroundval`], and what was done with NaN values in the shell: `std::sort`
+    /// with `operator<` has no defined order for them in C++ (FSL-22), and the volume's
+    /// [`NanOrder`] decides theirs.
+    pub fn background_value(&self) -> (T, Background) {
+        self.background_value_with(false)
+    }
+
+    /// [`Volume::background_value`] with `whole_border`: the 10th percentile of every value
+    /// the border loops write (FSL-75 corrected), instead of FSL's, which keeps the values that
+    /// fit its buffer and the percentile of their number (the same wherever the buffer holds
+    /// the border: [`Volume::background_buffer`]).
+    pub fn background_value_with(&self, whole_border: bool) -> (T, Background) {
+        self.background_value_in(whole_border, self.nan_order)
+    }
+
+    /// [`Volume::background_value_with`] with NaN values in `order` instead of the volume's.
+    pub fn background_value_in(&self, whole_border: bool, order: NanOrder) -> (T, Background) {
+        let (zb, yb, xb) = (self.zsize(), self.ysize(), self.xsize());
+        let (mut ewx, mut ewy, mut ewz) = (2i64, 2i64, 2i64);
+        if ewx >= xb {
+            ewx = xb - 1;
+        }
+        if ewy >= yb {
+            ewy = yb - 1;
+        }
+        if ewz >= zb {
+            ewz = zb - 1;
+        }
+        let numbins = 2 * (xb - 2 * ewx) * (yb - 2 * ewy) * ewz
+            + 2 * (xb - 2 * ewx) * zb * ewy
+            + 2 * yb * zb * ewx;
+        let mut hist: Vec<T> = Vec::with_capacity(numbins.max(0) as usize);
+        for e in 0..ewz {
+            for x in ewx..xb - ewx {
+                for y in ewy..yb - ewy {
+                    hist.push(self.value(x, y, e));
+                    hist.push(self.value(x, y, zb - 1 - e));
+                }
+            }
+        }
+        for e in 0..ewy {
+            for x in ewx..xb - ewx {
+                for z in 0..zb {
+                    hist.push(self.value(x, e, z));
+                    hist.push(self.value(x, yb - 1 - e, z));
+                }
+            }
+        }
+        for e in 0..ewx {
+            for y in 0..yb {
+                for z in 0..zb {
+                    hist.push(self.value(e, y, z));
+                    hist.push(self.value(xb - 1 - e, y, z));
+                }
+            }
+        }
+        // FSL-75: FSL's buffer keeps the first `numbins` values written
+        let kept = if whole_border {
+            hist.len() as i64
+        } else {
+            numbins.max(0).min(hist.len() as i64)
+        };
+        hist.truncate(kept as usize);
+        let how = if !hist.iter().any(|v| v.to_f64().is_nan()) {
+            Background::Defined
+        } else if order == NanOrder::Last {
+            Background::NanLast
+        } else {
+            let mut exact = hist.clone();
+            match crate::stdsort::sort_checked(&mut exact) {
+                Ok(()) => {
+                    hist = exact;
+                    Background::Libstdcxx
+                }
+                Err(_) => Background::Outside,
+            }
+        };
+        if how != Background::Libstdcxx {
+            sort_nan_last(&mut hist);
+        }
+        let count = if whole_border { kept } else { numbins };
+        let p10 = (count / 10).max(0) as usize;
+        (hist.get(p10).copied().unwrap_or_default(), how)
+    }
+}
+
 impl Volume {
     /// `cog("scaled_mm")` of volume 0 (`calc_cog`, then times the sampling matrix): the centre of
     /// the values minus the minimum, partial sums flushed every `max(1000, √nvoxels)` voxels,
@@ -792,6 +909,127 @@ impl Volume {
         v_cog
     }
 
+    /// `principleaxes_mat()` (`calc_principleaxes`, volume 0): the second moments of the values
+    /// minus the minimum about the centre of gravity, in millimetres (`samp·M·samp − m·mᵀ`, kept
+    /// symmetric from its lower triangle), their eigenvectors (Armadillo's `eig_sym`, LAPACK
+    /// `dsyevd`) as columns in FSL's order: the least eigenvalue's first, then the other two
+    /// swapped when the third is less than the second; the eigenvalue moved by each exchange is
+    /// stored in single precision (`float etemp`). Partial sums are flushed every
+    /// `max(1000, √nvoxels)` voxels; a total below `1e-5` in magnitude prints FSL's warning and
+    /// counts 1. `None` when the decomposition fails (a non-finite moment).
+    pub fn principal_axes(&self, warnings: &mut Vec<String>) -> Option<Mat> {
+        let vmin = self.min();
+        let mut m2 = [[0.0f64; 3]; 3];
+        let mut mean = [0.0f64; 3];
+        let mut total = 0.0f64;
+        let (mut tot, mut mxx, mut mxy, mut mxz, mut myy, mut myz, mut mzz) =
+            (0.0f64, 0.0f64, 0.0f64, 0.0f64, 0.0f64, 0.0f64, 0.0f64);
+        let (mut mx, mut my, mut mz) = (0.0f64, 0.0f64, 0.0f64);
+        let mut n: i64 = 0;
+        let mut nlim = (self.nvoxels() as f64).sqrt() as i64;
+        if nlim < 1000 {
+            nlim = 1000;
+        }
+        let flush = |m2: &mut [[f64; 3]; 3], s: [f64; 6]| {
+            // m2(r,c) += v sets both (r,c) and (c,r) (armawrap's symmetric element).
+            let idx = [(0, 0), (0, 1), (0, 2), (1, 1), (1, 2), (2, 2)];
+            for (k, &(r, c)) in idx.iter().enumerate() {
+                let v = m2[r][c] + s[k];
+                m2[r][c] = v;
+                m2[c][r] = v;
+            }
+        };
+        for z in 0..self.zsize() {
+            for y in 0..self.ysize() {
+                for x in 0..self.xsize() {
+                    let val = f64::from(self.get(x, y, z) - vmin);
+                    let (xf, yf, zf) = (x as f64, y as f64, z as f64);
+                    mxx += val * xf * xf;
+                    mxy += val * xf * yf;
+                    mxz += val * xf * zf;
+                    myy += val * yf * yf;
+                    myz += val * yf * zf;
+                    mzz += val * zf * zf;
+                    mx += val * xf;
+                    my += val * yf;
+                    mz += val * zf;
+                    tot += val;
+                    n += 1;
+                    if n > nlim {
+                        n = 0;
+                        total += tot;
+                        flush(&mut m2, [mxx, mxy, mxz, myy, myz, mzz]);
+                        mean[0] += mx;
+                        mean[1] += my;
+                        mean[2] += mz;
+                        (tot, mxx, mxy, mxz, myy, myz, mzz) = (0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0);
+                        (mx, my, mz) = (0.0, 0.0, 0.0);
+                    }
+                }
+            }
+        }
+        total += tot;
+        flush(&mut m2, [mxx, mxy, mxz, myy, myz, mzz]);
+        mean[0] += mx;
+        mean[1] += my;
+        mean[2] += mz;
+        if total.abs() < 1e-5 {
+            warnings.push("WARNING::in calculating Principle Axes, total = 0.0".to_owned());
+            total = 1.0;
+        }
+        let mut m = Mat::zeros(3, 3);
+        for r in 0..3 {
+            for c in 0..3 {
+                m.set(r, c, m2[r][c] / total);
+            }
+        }
+        let mean_t: Vec<f64> = mean.iter().map(|v| v / total).collect();
+        let samp = self.sampling_mat().sub(0, 3, 0, 3);
+        let symmatl = |a: &Mat| {
+            let mut s = a.clone();
+            for c in 0..3 {
+                for r in 0..c {
+                    s.set(r, c, a.at(c, r));
+                }
+            }
+            s
+        };
+        let m = symmatl(&arma::mul3(&samp, &m, &samp));
+        let mean = arma::gemv_tinysq(&samp, &mean_t, false);
+        let mut meanprod = Mat::zeros(3, 3);
+        for k1 in 0..3 {
+            for k2 in 0..3 {
+                meanprod.set(k1, k2, mean[k1] * mean[k2]);
+            }
+        }
+        let m = symmatl(&m.minus(&meanprod));
+        let (mut evals, mut paxes) = arma::eig_sym(&m, warnings)?;
+        let swap = |paxes: &mut Mat, evals: &mut Vec<f64>, i: usize, k: usize| {
+            let etemp = evals[i] as f32;
+            let ptemp: Vec<f64> = (0..3).map(|r| paxes.at(r, i)).collect();
+            evals[i] = evals[k];
+            for r in 0..3 {
+                let v = paxes.at(r, k);
+                paxes.set(r, i, v);
+            }
+            evals[k] = f64::from(etemp);
+            for r in 0..3 {
+                paxes.set(r, k, ptemp[r]);
+            }
+        };
+        let mut kmin = 0;
+        for k in 1..3 {
+            if evals[k] < evals[kmin] {
+                kmin = k;
+            }
+        }
+        swap(&mut paxes, &mut evals, 0, kmin);
+        if evals[2] < evals[1] {
+            swap(&mut paxes, &mut evals, 1, 2);
+        }
+        Some(paxes)
+    }
+
     /// [`Volume::calc_cog`]'s sums (`v_cog`, `total`) with every operation's NaN as SSE gives
     /// it, in the source's order (`vx += val*x`: `vx` first).
     #[cold]
@@ -827,121 +1065,6 @@ impl Volume {
         (v_cog, total)
     }
 
-    /// `backgroundval()` (`calc_bval(vol, 2)`): the 10th percentile of the values in a 2-voxel
-    /// shell at the edges of volume 0 (an element of the sorted shell, not interpolated).
-    pub fn backgroundval(&self) -> f32 {
-        self.background_value().0
-    }
-
-    /// FSL-75: whether `calc_bval(vol, 2)`'s buffer holds the border it writes. It sizes the
-    /// buffer `2(x−2ex)(y−2ey)ez + 2(x−2ex)z·ey + 2yz·ex` (each edge width `e` the smaller of 2
-    /// and the size less 1), which is too small when the size along x is 3 (and y or z at least
-    /// 2), or along y is 3 (z at least 2, x neither 2 nor 4): a factor of −1 in a term whose
-    /// loop writes nothing. FSL then writes the rest past the buffer (heap corruption) and sorts
-    /// the values that fit; at 1 × 1 × 1 the buffer is empty and FSL reads its first element.
-    pub fn background_buffer(&self) -> BorderBuffer {
-        let (zb, yb, xb) = (self.zsize(), self.ysize(), self.xsize());
-        let ew = |n: i64| 2i64.min(n - 1);
-        let (ewx, ewy, ewz) = (ew(xb), ew(yb), ew(zb));
-        let numbins = 2 * (xb - 2 * ewx) * (yb - 2 * ewy) * ewz
-            + 2 * (xb - 2 * ewx) * zb * ewy
-            + 2 * yb * zb * ewx;
-        let (ix, iy) = ((xb - 2 * ewx).max(0), (yb - 2 * ewy).max(0));
-        let written = 2 * ewz * ix * iy + 2 * ewy * ix * zb + 2 * ewx * yb * zb;
-        if numbins <= 0 {
-            BorderBuffer::Empty
-        } else if numbins < written {
-            BorderBuffer::Overflow { numbins, written }
-        } else {
-            BorderBuffer::Exact
-        }
-    }
-
-    /// [`Volume::backgroundval`], and what was done with NaN values in the shell: `std::sort`
-    /// with `operator<` has no defined order for them in C++ (FSL-22), and the volume's
-    /// [`NanOrder`] decides theirs.
-    pub fn background_value(&self) -> (f32, Background) {
-        self.background_value_with(false)
-    }
-
-    /// [`Volume::background_value`] with `whole_border`: the 10th percentile of every value
-    /// the border loops write (FSL-75 corrected), instead of FSL's, which keeps the values that
-    /// fit its buffer and the percentile of their number (the same wherever the buffer holds
-    /// the border: [`Volume::background_buffer`]).
-    pub fn background_value_with(&self, whole_border: bool) -> (f32, Background) {
-        self.background_value_in(whole_border, self.nan_order)
-    }
-
-    /// [`Volume::background_value_with`] with NaN values in `order` instead of the volume's.
-    pub fn background_value_in(&self, whole_border: bool, order: NanOrder) -> (f32, Background) {
-        let (zb, yb, xb) = (self.zsize(), self.ysize(), self.xsize());
-        let (mut ewx, mut ewy, mut ewz) = (2i64, 2i64, 2i64);
-        if ewx >= xb {
-            ewx = xb - 1;
-        }
-        if ewy >= yb {
-            ewy = yb - 1;
-        }
-        if ewz >= zb {
-            ewz = zb - 1;
-        }
-        let numbins = 2 * (xb - 2 * ewx) * (yb - 2 * ewy) * ewz
-            + 2 * (xb - 2 * ewx) * zb * ewy
-            + 2 * yb * zb * ewx;
-        let mut hist: Vec<f32> = Vec::with_capacity(numbins.max(0) as usize);
-        for e in 0..ewz {
-            for x in ewx..xb - ewx {
-                for y in ewy..yb - ewy {
-                    hist.push(self.value(x, y, e));
-                    hist.push(self.value(x, y, zb - 1 - e));
-                }
-            }
-        }
-        for e in 0..ewy {
-            for x in ewx..xb - ewx {
-                for z in 0..zb {
-                    hist.push(self.value(x, e, z));
-                    hist.push(self.value(x, yb - 1 - e, z));
-                }
-            }
-        }
-        for e in 0..ewx {
-            for y in 0..yb {
-                for z in 0..zb {
-                    hist.push(self.value(e, y, z));
-                    hist.push(self.value(xb - 1 - e, y, z));
-                }
-            }
-        }
-        // FSL-75: FSL's buffer keeps the first `numbins` values written
-        let kept = if whole_border {
-            hist.len() as i64
-        } else {
-            numbins.max(0).min(hist.len() as i64)
-        };
-        hist.truncate(kept as usize);
-        let how = if !hist.iter().any(|v| v.is_nan()) {
-            Background::Defined
-        } else if order == NanOrder::Last {
-            Background::NanLast
-        } else {
-            let mut exact = hist.clone();
-            match crate::stdsort::sort_f32_checked(&mut exact) {
-                Ok(()) => {
-                    hist = exact;
-                    Background::Libstdcxx
-                }
-                Err(_) => Background::Outside,
-            }
-        };
-        if how != Background::Libstdcxx {
-            sort_nan_last(&mut hist);
-        }
-        let count = if whole_border { kept } else { numbins };
-        let p10 = (count / 10).max(0) as usize;
-        (hist.get(p10).copied().unwrap_or(0.0), how)
-    }
-
     /// `robustmin()`, `robustmax()` (`calc_robustlimits`: Steve Smith's 2%-98% thresholds,
     /// `find_thresholds` without a mask).
     pub fn robust_limits(&self) -> (f32, f32) {
@@ -952,10 +1075,10 @@ impl Volume {
 /// `std::sort` of floats with `operator<`: for values without NaN any correct sort gives
 /// libstdc++'s sequence (equal values are interchangeable). With NaN values, which have no
 /// defined order in C++ (FSL-22), they are put last.
-fn sort_nan_last(v: &mut [f32]) {
+fn sort_nan_last<T: Elem>(v: &mut [T]) {
     v.sort_by(|a, b| {
         a.partial_cmp(b)
-            .unwrap_or_else(|| a.is_nan().cmp(&b.is_nan()))
+            .unwrap_or_else(|| a.to_f64().is_nan().cmp(&b.to_f64().is_nan()))
     });
 }
 

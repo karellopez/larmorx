@@ -46,6 +46,12 @@ const FSL_TOOLS: &[(&str, ToolFn)] = &[
     ("img2stdcoord", larmorx_nc_flirt::img2stdcoord),
     ("rmsdiff", larmorx_nc_flirt::rmsdiff),
     ("makerot", larmorx_nc_flirt::makerot),
+    ("midtrans", larmorx_nc_flirt::midtrans),
+    ("pointflirt", larmorx_nc_flirt::pointflirt),
+    ("applyxfm4D", larmorx_nc_flirt::applyxfm4d),
+    ("pairreg", larmorx_nc_flirt::pairreg),
+    ("extracttxt", larmorx_nc_flirt::extracttxt),
+    ("aff2rigid", larmorx_nc_flirt::aff2rigid),
 ];
 
 fn tool_names() -> String {
@@ -118,7 +124,24 @@ where
                         Ok(mode) => {
                             let settings = Settings::from_env(FSL_VARIABLES)
                                 .reproducing_renames(mode.reproduce());
-                            let code = f(&rest, &settings, mode, threads(), out, err);
+                            // an exception nothing in the program catches: std::terminate
+                            let code = match larmorx_nc_core::exception::catch(|| {
+                                f(&rest, &settings, mode, threads(), out, err)
+                            }) {
+                                Ok(code) => code,
+                                Err(e) => {
+                                    let _ = write!(
+                                        err,
+                                        "{}terminate called after throwing an instance of \
+                                         '{}'\n  what():  {}\nlarmorx-nc: {tool} aborts here \
+                                         (signal 6); the replica exits with status 1\n",
+                                        e.printed_text(),
+                                        e.type_name,
+                                        e.what
+                                    );
+                                    1
+                                }
+                            };
                             renamed_notices(&settings, mode, err);
                             (code, Ok(()))
                         }
@@ -224,7 +247,7 @@ mod tests {
         assert_eq!(code, 0);
         assert!(out.contains("Usage: larmorx-nc <family> <tool>"), "{out}");
         assert!(
-            out.contains("fsl    mcflirt, bet, bet2, betsurf, flirt, convert_xfm, avscale, img2imgcoord, std2imgcoord, img2stdcoord, rmsdiff, makerot"),
+            out.contains("fsl    mcflirt, bet, bet2, betsurf, flirt, convert_xfm, avscale, img2imgcoord, std2imgcoord, img2stdcoord, rmsdiff, makerot, midtrans, pointflirt, applyxfm4D, pairreg, extracttxt, aff2rigid"),
             "{out}"
         );
         let (code, out, err) = run_capture(&["larmorx-nc"]);

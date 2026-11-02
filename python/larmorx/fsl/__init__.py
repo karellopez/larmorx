@@ -25,6 +25,14 @@ from larmorx.fsl.bet import (
     read_vtk,
 )
 from larmorx.fsl.flirt import COSTS, FlirtResult, convert_xfm, flirt
+from larmorx.fsl.flirt_more import (
+    aff2rigid,
+    applyxfm4d,
+    extracttxt,
+    midtrans,
+    pairreg,
+    pointflirt,
+)
 from larmorx.fsl.flirt_tools import (
     AvscaleResult,
     avscale,
@@ -43,14 +51,20 @@ __all__ = [
     "BetsurfResult",
     "FlirtResult",
     "Surface",
+    "aff2rigid",
+    "applyxfm4d",
     "avscale",
     "bet",
     "betsurf",
     "convert_xfm",
+    "extracttxt",
     "flirt",
     "img2imgcoord",
     "img2stdcoord",
     "makerot",
+    "midtrans",
+    "pairreg",
+    "pointflirt",
     "read_vtk",
     "rmsdiff",
     "std2imgcoord",

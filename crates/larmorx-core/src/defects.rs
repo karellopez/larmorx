@@ -456,6 +456,14 @@ defects! {
         "a negative -bins: each stage has -bins / scale bins (truncated toward zero), prepared for every cost function; with -1 bins the process is killed by SIGFPE (an integer division by zero), with -2 or fewer it aborts with std::bad_array_new_length; nothing is written";
     FSL_68 = "FSL-68", "flirt", true,
         "every error after the command line (an image or matrix file that cannot be read, a matrix of the wrong size, an unknown -bbrtype) ends the program with exit status 0: its main catches every exception and returns 0 after printing the message, with no output written";
+    FSL_78 = "FSL-78", "midtrans", true,
+        "an error after the transforms are read (a matrix that is not 4 x 4, a singular product, an image that cannot be read) ends the program with exit status 0: its main catches the exception, prints its message and returns 0, with no output written";
+    FSL_79 = "FSL-79", "applyxfm4D", true,
+        "spline interpolation of an integer image (char, short or int) keeps the spline coefficients in the image's integer type (each filtering pass's results rounded half up, toward zero below -0.5) and converts each interpolated value to the type before the output's own conversion: the values of a coarser, shifted spline";
+    FSL_80 = "FSL-80", "applyxfm4D", true,
+        "a sinc kernel asked for after another one was defined is replaced by the earlier one whatever their windows and widths: applyxfm4D -3D's rectangular sinc kernel of width 9 becomes the default blackman kernel of width 7 defined just before it";
+    FSL_81 = "FSL-81", "aff2rigid", true,
+        "aff2rigid stops with NameError: name 'mat' is not defined (FSL 6.0.7.23 runs it on numpy 2.4.6, and numpy 2 removed the mat alias): it never writes its matrix";
     FSL_76 = "FSL-76", "makerot", true,
         "the axis is divided by the square root of its length instead of its length: for an axis that is not of unit length the rotation is by the angle times the square root of the axis's length (30 degrees about 0,0,4 give 60)";
     FSL_77 = "FSL-77", "makerot", true,

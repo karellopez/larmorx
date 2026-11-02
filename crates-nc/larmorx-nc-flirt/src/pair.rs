@@ -56,6 +56,8 @@ pub struct Pair {
     pub bbr: BbrSettings,
     /// FSL-14 corrected: points whose values are not finite are left out of the cost.
     pub skip_nonfinite: bool,
+    /// `set_debug_mode(true)` with the bbr cost: the debug volume each evaluation writes.
+    pub bbr_debug: Option<bbr::BbrDebug>,
 }
 
 impl Pair {
@@ -76,6 +78,7 @@ impl Pair {
             bbr_points: BbrPoints::default(),
             bbr: BbrSettings::default(),
             skip_nonfinite: false,
+            bbr_debug: None,
         }
     }
 
@@ -322,6 +325,7 @@ impl Pair {
             &self.bbr_points,
             &self.bbr,
             &mut m,
+            self.bbr_debug.as_mut(),
         );
         for _ in 0..m.nan_pairs {
             msgs.lines

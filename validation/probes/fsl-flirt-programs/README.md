@@ -11,11 +11,26 @@ write. The lists behind part 2's statements (2026-11-01; `docs/findings/fsl-flir
 | `cases_img2img.py` | `img2imgcoord` | 21 | 21 identical |
 | `cases_std.py` | `std2imgcoord`, `img2stdcoord` | 21 each | identical |
 | `cases_rmsdiff.py` | `rmsdiff` | 40 | 40 identical |
-| `cases_makerot.py` | `makerot` | 50 | 47 identical; 3 with a NaN or infinite angle or axis print `-nan` where FSL prints `nan` (part 3) |
+| `cases_makerot.py` | `makerot` | 50 | 50 identical (part 3: the 3 with a NaN or infinite angle or axis too, since `make_rot`'s operand order) |
 
 ```bash
 LARMORX_NC_BIN=<larmorx-nc> python -P probe.py <work dir> cases_makerot.py --rep --quiet
 MODE=fix LARMORX_NC_BIN=<larmorx-nc> python -P probe.py <work dir> cases_makerot.py --rep
+```
+
+Part 3's probes (each keeps FSL's outputs in its work directory and reuses them; `--fresh` runs
+FSL again):
+
+| File | What | Result |
+|---|---|---|
+| `makerot_nan.py` | `makerot` with NaN and infinite angles, axes and centres: the signs of its NaNs | 10 of 10 identical |
+| `aff2rigid_mat.py` | FSL's `aff2rigid` run in FSL's Python with `mat` restored (FSL-81), against the replica's default | 22 of 22 matrices identical |
+| `extracttxt_ranges.py` | `extracttxt` on every combination of 5 words, 8 counts and 11 starts (signed, negative, zero): dc's and sed's messages | 390 of 390 identical |
+
+```bash
+LARMORX_NC_BIN=<larmorx-nc> python -P makerot_nan.py <work dir>
+LARMORX_NC_BIN=<larmorx-nc> python -P aff2rigid_mat.py <work dir>
+LARMORX_NC_BIN=<larmorx-nc> python -P extracttxt_ranges.py <work dir>
 ```
 
 The inputs are the parity suite's (`<workspace>/oracles/inputs/fsl-flirt-replica`, made by

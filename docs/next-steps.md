@@ -110,7 +110,7 @@ at a time:
      records re-made in-process: no status change; golden checksums unchanged; `crates-gpl/` keeps
      only the verification tools; CI's `crates-gpl` steps gone (4.0 min a run).
 4. **The ports:** BET's clean-room original (item 7), the clean-room additions mcflirt FSL-20/21
-   and 3dUnifize AFNI-75 (specs first), FLIRT with BBR (parts 1 and 2 done 2026-11-01; part 3 next: `alignpaxes`, the SVD programs, applyxfm4D), FAST, topup (item 7); field maps,
+   and 3dUnifize AFNI-75 (specs first), FLIRT with BBR (parts 1 to 3 done 2026-11-01/02; the clean-room original next), FAST, topup (item 7); field maps,
    FreeSurfer, surfaces, confounds (item 8); larmorprepx (item 9). Each with its site page from
    its smart tests.
 5. **The final validation phase** (after every tool is ported): the data panel for every tool
@@ -361,13 +361,29 @@ The items below keep their history.
    in status and details (`compare_records.py`); mcflirt's and BET's standard tiers re-run (the core
    changed): 236 of 236 and 178 of 178 cases identical to their records. Two short trials of the new
    paths (half an hour and six minutes, 12376 and 3274 cases; descriptor `fsl-flirt-programs`).
-   **Part 3:** the schedule command `alignpaxes` (a symmetric eigendecomposition), general parameter
-   subsets' pseudo-inverse, `midtrans` and `pointflirt` (a singular value decomposition), `applyxfm4D`
-   (every data type), `-debug`'s BBR volume, makerot's NaN signs (three calls with a NaN or infinite
-   angle or axis print `-nan` where FSL prints `nan`), mcflirt's FSL-75 notice and correction; the
-   coordinate programs' `-warp` waits for FNIRT's warp fields. The full tier (fMRIPrep's 22 BBR calls on
-   every oracle run), the data panel and long random-testing runs wait for the final validation phase
-   (the user, 2026-11-01). Then the clean-room original (another
+   **Part 3 done (2026-11-02).** FLIRT's replica is complete but for the coordinate programs'
+   `-warp` (FNIRT's warp fields: after FSL's warp-field libraries, the follow-up below) and the
+   scripts of FSL's other programs (`standard_space_roi`, `flirt_average`, `epi_reg`: with
+   `fslmaths`, FAST and the field maps). Added: FSL's LAPACK beyond 4 × 4 in `larmorx-nc-core`
+   (`dsyevd`, `dgesdd` with OpenBLAS's Haswell BLAS, every word identical to FSL's library on 400
+   records); the schedule command `alignpaxes` and every parameter-subset mask (`specs/flirt.md`
+   §8.3, §8.7); `-debug` and BBR's debug volume (§9.4); `midtrans`, `pointflirt`, `applyxfm4D`
+   (every data type and interpolation, the double template included) and the scripts `pairreg`,
+   `extracttxt`, `aff2rigid` (§15.5-15.8), each with its command line, `lx.fsl` wrapper and golden
+   case; makerot's NaN signs; mcflirt's FSL-75 (named, the whole border by default); FSL-78 to
+   FSL-81. Record [fsl-flirt-replica](validation/fsl-flirt-replica.md): 296 cases, 205 of 205
+   compared cases bit-identical (87 rejected by both, alike; 4 expected divergences: FSL-71, FSL-72
+   and FSL-75's two); part 2's 217 cases unchanged in status and details (`compare_records.py`);
+   mcflirt's and BET's standard tiers re-run (the core changed): 237 cases, every one of the
+   committed record's 236 identical, the new `edge/fsl75-narrow` rejected by both (FSL aborts with a
+   double free; FSL-75 named) and 178 of 178 identical to the committed record (not re-committed).
+   One trial of the new paths (half an hour, 209,657 cases, after a pre-check of 2,805; the
+   realistic findings re-checked boxed with the final build, the extreme ones deferred to the final
+   validation phase by the user's decision of 2026-11-02); four robustness cases with nonsense
+   headers (metres, voxels of 0.01 and 50 mm) for applyxfm4D, midtrans, pointflirt and pairreg, each
+   identical to FSL in a 4 GiB box. `specs/flirt.md` §14 lists only what is left by decision.
+   The full tier, the data panel and long random testing wait for the final validation phase.
+   **Next:** the clean-room original (another
    agent, from `specs/flirt.md`; it reuses the main package's clean-room engine, the cost functions,
    optimiser and transform algebra of `larmorx-mri`'s head-motion correction, never a second copy: the
    user, 2026-11-01, "avoid duplication"). The scripts wait for other tools: `epi_reg` (FAST, `fslmaths`,
@@ -449,6 +465,10 @@ The items below keep their history.
   §12.1; the 33 cases of §14.1 in the replica's suite, mcflirt 6.0.7.23 live: 24 pass, 9 rejected
   by both, the replica's matrices mcflirt's as text wherever both run to the end; a command-line
   test each; golden `mcflirt.fsl65.*`, `mcflirt.fsl66.*`; FSL-21 named in `reproduce` too).
+- **FLIRT's NaN signs** (2026-11-02): the sign of an all-NaN `-omat` matrix with an infinite input voxel under `reproduce` (FSL-14) and a
+  schedule that optimises relative to a row (FSL `-nan`, the replica `nan`; part 2's path, found by
+  part 3's pre-check, probe-part3b-00496; `docs/findings/fsl-flirt.md`, "Open"): trace the NaN of
+  the input's centre of gravity.
 - **FSL's warp-field libraries** (warpfns, basisfield; 2026-11-01): needed by `applywarp` and `fugue`
   (and so `epi_reg`), and by FLIRT's coordinate programs' `-warp` (refused with a message until then):
   ported with the first tool that needs them, then `-warp` added to `img2imgcoord`, `std2imgcoord` and

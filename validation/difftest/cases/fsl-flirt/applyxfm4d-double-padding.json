@@ -1,0 +1,243 @@
+{
+ "defect": null,
+ "description": "a double series with nearest neighbour: the interpolated voxels pass through single precision, the voxels the padding mask sets hold the background value in double precision (applyxfm4D's double template)",
+ "expect": "pass",
+ "found": {
+  "detail": "exit status: 0 vs 1; files written: only FSL ['out.nii'], only the replica []",
+  "n": 89,
+  "seed": "probe-part3b",
+  "shrink_moves": [
+   "dropped -interp (-interp nn)",
+   "in: axis 0 23 -> 11 voxels",
+   "in: axis 1 23 -> 11 voxels",
+   "in: axis 2 12 -> 6 voxels",
+   "in: axis 0 11 -> 5 voxels",
+   "in: axis 1 11 -> 5 voxels",
+   "in: axis 2 6 -> 3 voxels",
+   "in: axis 0 5 -> 2 voxels",
+   "in: axis 1 5 -> 2 voxels",
+   "in: axis 2 3 -> 1 voxels",
+   "in: axis 0 2 -> 1 voxels",
+   "in: 3 -> 2 volumes",
+   "ref: axis 0 19 -> 9 voxels",
+   "ref: axis 1 16 -> 8 voxels",
+   "ref: axis 2 13 -> 6 voxels",
+   "ref: axis 0 9 -> 4 voxels",
+   "ref: axis 1 8 -> 4 voxels",
+   "ref: axis 2 6 -> 3 voxels",
+   "ref: axis 0 4 -> 2 voxels",
+   "ref: axis 1 4 -> 2 voxels",
+   "ref: axis 2 3 -> 1 voxels",
+   "ref: axis 0 2 -> 1 voxels",
+   "ref: axis 1 2 -> 1 voxels",
+   "in (and its grid): plumb orientation",
+   "in (and its grid): unit spacing",
+   "in (and its grid): origin at 0",
+   "in (and its grid): qform and sform codes 1",
+   "in: no slice timing",
+   "in: content head -> constant",
+   "ref (and its grid): plumb orientation",
+   "ref (and its grid): unit spacing",
+   "ref (and its grid): origin at 0",
+   "ref (and its grid): qform and sform codes 1",
+   "ref (and its grid): millimetres",
+   "ref: content crop -> constant"
+  ],
+  "signature": [
+   "exit status",
+   "files written"
+  ]
+ },
+ "id": "applyxfm4d-double-padding",
+ "implementations": [
+  "replica"
+ ],
+ "reason": "",
+ "recipe": {
+  "extra": {
+   "output_type": "NIFTI",
+   "tool": "applyxfm4D"
+  },
+  "features": {
+   "-3D": false,
+   "-interp": true,
+   "FSLOUTPUTTYPE": "NIFTI",
+   "axis0": 0.9,
+   "axis1": 0.8,
+   "axis2": 0.75,
+   "bias0": -0.0075,
+   "bias1": -0.0025,
+   "bias2": 0.0025,
+   "bias3": 0.0025,
+   "centre0": 5.0,
+   "centre1": 0.5,
+   "centre2": 5.5,
+   "content": "crop",
+   "corner0": 53,
+   "corner1": 35,
+   "corner2": 58,
+   "crop source": "templateflow/tpl-MNI152NLin2009cAsym/tpl-MNI152NLin2009cAsym_res-02_desc-fMRIPrep_boldref.nii.gz",
+   "crop stride": 1,
+   "dtype": "float32",
+   "extreme": false,
+   "interp": "nn",
+   "kind": "applyxfm4D",
+   "noise": 3.0,
+   "orientation": "oblique",
+   "origin0": 46.5,
+   "origin1": 43.75,
+   "origin2": 29.0,
+   "q0": 31,
+   "q1": 0,
+   "q2": 1,
+   "q3": 1,
+   "qfac": 1,
+   "qform_code": 4,
+   "range": "plain",
+   "scale0": "1",
+   "scale1": "1",
+   "scale2": "0.95",
+   "sform": "same",
+   "sform_code": 0,
+   "shape": "19x16x13",
+   "shift0": "1.5",
+   "shift1": "3.25",
+   "shift2": "0",
+   "size": 14.0,
+   "slice_code": 4,
+   "spacing0": 4.0,
+   "spacing1": 1.0,
+   "spacing2": 1.2,
+   "suffix": ".nii",
+   "tissues": "epi",
+   "tr": 0.5,
+   "tunits": "sec",
+   "units": "unknown"
+  },
+  "groups": [
+   {
+    "args": [
+     "{in:in}",
+     "{in:ref}",
+     "out",
+     "{in:m}",
+     "-singlematrix"
+    ],
+    "name": "files",
+    "optional": false
+   }
+  ],
+  "inputs": {
+   "in": {
+    "content": {
+     "seed": 661427028,
+     "type": "constant"
+    },
+    "dtype": "float64",
+    "geometry": {
+     "origin": [
+      0.0,
+      0.0,
+      0.0
+     ],
+     "qfac": 1,
+     "qform_code": 1,
+     "quaternion": [
+      1,
+      0,
+      0,
+      0
+     ],
+     "sform": "same",
+     "sform_code": 1,
+     "spacing": [
+      1.0,
+      1.0,
+      1.0
+     ],
+     "units": "mm"
+    },
+    "scaling": null,
+    "shape": [
+     1,
+     2,
+     1,
+     2
+    ],
+    "suffix": ".nii.gz",
+    "timing": {
+     "slice_code": 0,
+     "slice_duration": 0.0417,
+     "slice_end": 0,
+     "slice_start": 0,
+     "tr": 0.5,
+     "tunits": "sec"
+    },
+    "values": {
+     "offset": 0.0,
+     "scale": 1.0
+    }
+   },
+   "m": {
+    "kind": "text",
+    "suffix": ".mat",
+    "text": "0.9958463136 -0.06438213915 0.06116303219 1.5\n0.06438213915 0.9979231568 0.001973001038 3.25\n-0.06438213915 0.002076843198 0.948026999 0\n0 0 0 1\n"
+   },
+   "ref": {
+    "content": {
+     "seed": 53042741,
+     "type": "constant"
+    },
+    "dtype": "float32",
+    "geometry": {
+     "origin": [
+      0.0,
+      0.0,
+      0.0
+     ],
+     "qfac": 1,
+     "qform_code": 1,
+     "quaternion": [
+      1,
+      0,
+      0,
+      0
+     ],
+     "sform": "same",
+     "sform_code": 1,
+     "spacing": [
+      1.0,
+      1.0,
+      1.0
+     ],
+     "units": "mm"
+    },
+    "scaling": null,
+    "shape": [
+     1,
+     1,
+     1
+    ],
+    "suffix": ".nii",
+    "values": {
+     "offset": 0.0,
+     "scale": 1.0
+    }
+   }
+  },
+  "n": 89,
+  "options": [
+   "-interp nn",
+   "4D",
+   "FSLOUTPUTTYPE=NIFTI",
+   "applyxfm4D"
+  ],
+  "seed": "probe-part3b",
+  "tool": "fsl-flirt-part3"
+ },
+ "rule": null,
+ "status": "fixed",
+ "suite": "fsl-flirt-replica",
+ "tier": "smoke",
+ "tool": "fsl-flirt"
+}

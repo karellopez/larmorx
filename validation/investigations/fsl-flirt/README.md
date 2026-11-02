@@ -26,6 +26,15 @@
   differ: what a fix leaves open.
 - `crash_probe.py` runs FSL's `flirt` and the replica with the default options on small and
   constant images, to narrow down the inputs on which FSL corrupts its heap (part 2).
+- `lapack_eig_svd_probe.py` (part 3) calls FSL's own `liblapack.so.3` (OpenBLAS 0.3.33, Haswell
+  kernels) through ctypes with Armadillo's work sizes and compares every output word with the
+  replica's translation (`crates-nc/larmorx-nc-core/tools/lapack-probe`): the BLAS kernels
+  (`ddot`, `drot`, `dnrm2`, `dgemv` both ways, `dgemm`), `dsyevd` on 3 × 3 matrices of every family
+  and `dgesdd('S')` on 3 × 3, 12 × 12 and 12 × n: 400 records, every word identical. It found
+  `dgemv_t`'s FMA-contracted tails, `dnrm2`'s x87 rounding and `drot`'s FMA.
+- Part 3's pre-check and trial: `finding_repro.py`, `recheck_findings.py` and `memory_findings.py`
+  serve `fsl-flirt-part3` too (the double template of `applyxfm4D`, its integer splines, the
+  scripts' messages; finding probe-part3b-01970 needs 9 GiB in FSL as in the replica).
 
 ```bash
 python -P compare_images.py <fsl/out.nii.gz> <replica/out.nii.gz> [more pairs]
@@ -36,6 +45,7 @@ LARMORX_NC_BIN=<larmorx-nc> python -P memory_findings.py <out> 1800 <finding.jso
 LARMORX_NC_BIN=<larmorx-nc> python -P rsstrace.py <out> -in @epi.nii -ref @t1full.nii.gz -omat out.mat -v
 gdb -batch -x gdb_allocations.py --args <larmorx-nc> fsl flirt -in epi.nii -ref t1full.nii.gz -omat out.mat
 python -P fsl67_measure.py <out>
+python -P lapack_eig_svd_probe.py --tool <crates-nc>/target/release/lapack-probe --out <dir>
 ```
 
 Run them with `PYTHONPATH=<checkout>/python:<checkout>/validation/src` and `FSLDIR` unset or

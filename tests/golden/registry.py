@@ -964,6 +964,12 @@ REPLICA_ONLY_FUNCTIONS: dict[str, str] = {
     "lx.fsl.img2stdcoord": "fsl img2stdcoord",
     "lx.fsl.rmsdiff": "fsl rmsdiff",
     "lx.fsl.makerot": "fsl makerot",
+    "lx.fsl.midtrans": "fsl midtrans",
+    "lx.fsl.pointflirt": "fsl pointflirt",
+    "lx.fsl.applyxfm4d": "fsl applyxfm4D",
+    "lx.fsl.pairreg": "fsl pairreg",
+    "lx.fsl.extracttxt": "fsl extracttxt",
+    "lx.fsl.aff2rigid": "fsl aff2rigid",
 }
 
 #: The replicas' golden cases: the AFNI replicas' (built into larmorx since 2026-10-29, cases

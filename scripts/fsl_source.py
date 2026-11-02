@@ -45,6 +45,7 @@ VERSIONS = {
     "fsl-utils": "2412.6",
     "fsl-avwutils": "2209.6",
     "fsl-warpfns": "2501.0",
+    "fsl-armawrap": "0.7.0",
 }
 
 #: The original files: every file a translation in crates-nc/ comes from (see each crate's
@@ -68,6 +69,19 @@ FILES = [
     ("fsl-flirt", "img2stdcoord.cc"),
     ("fsl-flirt", "rmsdiff.cc"),
     ("fsl-flirt", "makerot.cc"),
+    # FLIRT part 3 (2026-11-01): the SVD programs, applyxfm4D and the scripts
+    ("fsl-flirt", "midtrans.cc"),
+    ("fsl-flirt", "pointflirt.cc"),
+    ("fsl-flirt", "applyxfm4D.cc"),
+    ("fsl-flirt", "extracttxt"),
+    ("fsl-flirt", "aff2rigid"),
+    ("fsl-flirt", "pairreg"),
+    ("fsl-flirt", "flirtsch/pairreg1.sch"),
+    ("fsl-flirt", "flirtsch/pairreg2.sch"),
+    ("fsl-flirt", "flirtsch/pairreg3.sch"),
+    ("fsl-newimage", "fmribmain.h"),
+    ("fsl-armawrap", "armawrap/function_svd.hpp"),
+    ("fsl-armawrap", "armawrap/function_eigenvalues.hpp"),
     ("fsl-warpfns", "warpfns.h"),
     ("fsl-newimage", "newimage.h"),
     ("fsl-newimage", "newimage.cc"),

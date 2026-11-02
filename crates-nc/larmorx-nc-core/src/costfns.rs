@@ -18,7 +18,7 @@ use larmorx_core::math;
 
 use crate::arma::{self, Mat};
 use crate::cnum;
-use crate::volume::Volume;
+use crate::volume::{FslError, Volume};
 
 /// `costfns` (costfns.h): mcflirt's values, and FLIRT's `LabelDiff` and `Bbr` (evaluated by
 /// FLIRT's own image pair, `larmorx-nc-flirt`, with the functions below and [`crate::bbr`]).
@@ -277,11 +277,21 @@ pub fn bin_index(refvol: &Volume, n_bins: i32) -> (Vec<i32>, f32, f32) {
 /// `vtest.sampling_mat().i() * aff.i() * vref.sampling_mat()`, as Armadillo evaluates it:
 /// `solve(Stest, inv(aff) * Sref)`, the inverse by cofactors and the products in Armadillo's
 /// small-matrix order. The 12 coefficients are returned as FSL stores them (`float`s).
+///
+/// A singular `aff` throws Armadillo's `inv(): matrix is singular`, a singular sampling matrix
+/// its solve's message ([`crate::exception::throw`]: the cost function's caller catches it, as
+/// FSL's `main` does).
 pub fn voxel_map(vref: &Volume, vtest: &Volume, aff: &Mat) -> [f32; 12] {
-    let ai = arma::inv(aff).unwrap_or_else(|_| Mat::from_rows(4, 4, &[f64::NAN; 16]));
+    let thrown = |what: &str| FslError {
+        printed: Vec::new(),
+        type_name: "std::runtime_error",
+        what: what.to_owned(),
+    };
+    let ai = arma::inv(aff)
+        .unwrap_or_else(|_| crate::exception::throw(thrown(crate::miscmaths::INV_ERROR)));
     let b = arma::mul_tinysq(&ai, &vref.sampling_mat());
     let iaffbig = arma::solve(&vtest.sampling_mat(), &b)
-        .unwrap_or_else(|_| Mat::from_rows(4, 4, &[f64::NAN; 16]));
+        .unwrap_or_else(|_| crate::exception::throw(thrown(crate::miscmaths::SOLVE_ERROR)));
     // a11 a12 a13 a14 / a21 .. a24 / a31 .. a34
     std::array::from_fn(|k| {
         let (r, c) = (k / 4, k % 4);

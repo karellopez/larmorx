@@ -47,7 +47,9 @@ pub fn isotropic_resample(aniso: &Volume, scale: f32, warnings: &mut Vec<String>
     let sz = size(aniso.zsize(), stepz);
     let sy = size(aniso.ysize(), stepy);
     let sx = size(aniso.xsize(), stepx);
-    let mut iso = Volume::new(sx, sy, sz, 1);
+    // newimage's `Out of memory` where the allocation fails (thrown: FLIRT's main catches it)
+    let mut iso = crate::exception::try_volume::<f32>(sx, sy, sz, 1)
+        .unwrap_or_else(|e| crate::exception::throw(e));
     let spline = if src.interp == Interpolation::Spline {
         Some(SplineCoefs::new(&src))
     } else {
@@ -101,8 +103,59 @@ pub fn affine_transform(
     affine_transform_mask(&src, vout, aff, paddingsize, src.padvalue)
 }
 
+/// [`affine_transform`] with the background value over the whole border when `whole_border`
+/// (FSL-75's correction: FSL's buffer holds part of the border of a volume 3 voxels wide; see
+/// [`Volume::background_buffer`]), else the values that fit FSL's buffer, as
+/// [`affine_transform`] (the same wherever the buffer holds the border).
+pub fn affine_transform_bg(
+    vin: &Volume,
+    vout: &mut Volume,
+    aff: &Mat,
+    paddingsize: f32,
+    whole_border: bool,
+) -> Result<(), FslError> {
+    let mut src = vin.clone();
+    src.padvalue = vin.background_value_with(whole_border).0;
+    src.extrap = Extrapolation::Extraslice;
+    raw_affine_transform(&src, vout, aff)?;
+    affine_transform_mask(&src, vout, aff, paddingsize, src.padvalue)
+}
+
 /// `raw_affine_transform(vin, vout, aff)`.
 pub fn raw_affine_transform(vin: &Volume, vout: &mut Volume, aff: &Mat) -> Result<(), FslError> {
+    raw_affine_transform_coefs(vin, vout, aff, None)
+}
+
+/// [`raw_affine_transform`] with the spline coefficients given (`None`: computed from `vin`
+/// when its interpolation is the spline).
+pub fn raw_affine_transform_coefs(
+    vin: &Volume,
+    vout: &mut Volume,
+    aff: &Mat,
+    coefs: Option<&SplineCoefs>,
+) -> Result<(), FslError> {
+    raw_affine_transform_typed(vin, None, vout, aff, coefs)
+}
+
+/// [`raw_affine_transform_coefs`] for `volume<double>`: `vin` holds the values converted to
+/// `float` and `data64` the same voxels in double precision ([`interp::interpolate_double`]).
+pub fn raw_affine_transform_double(
+    vin: &Volume,
+    data64: &[f64],
+    vout: &mut Volume,
+    aff: &Mat,
+    coefs: Option<&SplineCoefs>,
+) -> Result<(), FslError> {
+    raw_affine_transform_typed(vin, Some(data64), vout, aff, coefs)
+}
+
+fn raw_affine_transform_typed(
+    vin: &Volume,
+    data64: Option<&[f64]>,
+    vout: &mut Volume,
+    aff: &Mat,
+    coefs: Option<&SplineCoefs>,
+) -> Result<(), FslError> {
     if vout.nvoxels() <= 0 {
         return Err(FslError::imthrow(
             "Attempted to use affine transform with no voxels in vout",
@@ -139,11 +192,12 @@ pub fn raw_affine_transform(vin: &Volume, vout: &mut Volume, aff: &Mat) -> Resul
         what: e.to_string(),
     })?;
     let a: [f32; 12] = std::array::from_fn(|k| iaffbig.at(k / 4, k % 4) as f32);
-    let spline = if src.interp == Interpolation::Spline {
+    let own = if src.interp == Interpolation::Spline && coefs.is_none() {
         Some(SplineCoefs::new(&src))
     } else {
         None
     };
+    let spline = coefs.or(own.as_ref());
     for z in 0..vout.zsize() {
         for x in 0..vout.xsize() {
             let (xf, zf) = (x as f32, z as f32);
@@ -152,7 +206,10 @@ pub fn raw_affine_transform(vin: &Volume, vout: &mut Volume, aff: &Mat) -> Resul
             let mut o3 = xf * a[8] + zf * a[10] + a[11];
             for y in 0..vout.ysize() {
                 let i = vout.idx(x, y, z);
-                vout.data[i] = interp::interpolate(&src, o1, o2, o3, spline.as_ref());
+                vout.data[i] = match data64 {
+                    Some(d) => interp::interpolate_double(&src, d, o1, o2, o3, spline),
+                    None => interp::interpolate(&src, o1, o2, o3, spline),
+                };
                 o1 += a[1];
                 o2 += a[5];
                 o3 += a[9];
@@ -195,12 +252,27 @@ pub fn affine_transform_mask(
     padding: f32,
     padval: f32,
 ) -> Result<(), FslError> {
+    for i in affine_transform_mask_indices(vin, vout, aff, padding)? {
+        vout.data[i] = padval;
+    }
+    Ok(())
+}
+
+/// The output voxels [`affine_transform_mask`] sets to the padding value, in its order: for a
+/// volume of another type, which takes `padval` in that type (`affine_transform_mask<T>`).
+pub fn affine_transform_mask_indices(
+    vin: &Volume,
+    vout: &Volume,
+    aff: &Mat,
+    padding: f32,
+) -> Result<Vec<usize>, FslError> {
     if vout.nvoxels() <= 0 {
         return Err(FslError::imthrow(
             "Attempted to use affine transform with no voxels in vout",
             8,
         ));
     }
+    let mut outside = Vec::new();
     let a = crate::costfns::voxel_map(vout, vin, aff);
     let xb = (vin.xsize() - 1) as i32;
     let yb = (vin.ysize() - 1) as i32;
@@ -219,8 +291,7 @@ pub fn affine_transform_mask(
                 let inside =
                     o1 >= xb0 && o2 >= yb0 && o3 >= zb0 && o1 <= xb1 && o2 <= yb1 && o3 <= zb1;
                 if !inside {
-                    let i = vout.idx(x, y, z);
-                    vout.data[i] = padval;
+                    outside.push(vout.idx(x, y, z));
                 }
                 o1 += a[1];
                 o2 += a[5];
@@ -228,7 +299,7 @@ pub fn affine_transform_mask(
             }
         }
     }
-    Ok(())
+    Ok(outside)
 }
 
 /// `make_grad_masks(maskx, masky, maskz)`: the 3x3x3 gradient masks,

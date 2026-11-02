@@ -19,15 +19,19 @@
 // Index loops mirror FLIRT's loops, so that each step can be checked against the source.
 #![allow(clippy::needless_range_loop)]
 
+pub mod applyxfm4d;
 pub mod avscale;
 pub mod convert_xfm;
 pub mod coords;
 pub mod makerot;
+pub mod midtrans;
 pub mod options;
 pub mod pair;
+pub mod pointflirt;
 pub mod rmsdiff;
 pub mod run;
 pub mod schedule;
+pub mod scripts;
 
 use std::io::Write;
 
@@ -133,6 +137,45 @@ pub fn rmsdiff(
     rmsdiff::run(args, settings, mode, out, err)
 }
 
+/// `applyxfm4D <input volume> <ref volume> <output volume> <transformation matrix file/dir>`.
+pub fn applyxfm4d(
+    args: &[String],
+    settings: &Settings,
+    mode: UpstreamDefects,
+    threads: usize,
+    out: &mut dyn Write,
+    err: &mut dyn Write,
+) -> u8 {
+    let _ = threads;
+    applyxfm4d::run(args, settings, mode, out, err)
+}
+
+/// `midtrans [options] transform1 transform2 ... transformN`.
+pub fn midtrans(
+    args: &[String],
+    settings: &Settings,
+    mode: UpstreamDefects,
+    threads: usize,
+    out: &mut dyn Write,
+    err: &mut dyn Write,
+) -> u8 {
+    let _ = threads;
+    midtrans::run(args, settings, mode, out, err)
+}
+
+/// `pointflirt -i <invol coords> -r <refvol coords> [options]`.
+pub fn pointflirt(
+    args: &[String],
+    settings: &Settings,
+    mode: UpstreamDefects,
+    threads: usize,
+    out: &mut dyn Write,
+    err: &mut dyn Write,
+) -> u8 {
+    let _ = threads;
+    pointflirt::run(args, settings, mode, out, err)
+}
+
 /// `makerot --theta=angle [options]`.
 pub fn makerot(
     args: &[String],
@@ -144,4 +187,40 @@ pub fn makerot(
 ) -> u8 {
     let _ = threads;
     makerot::run(args, settings, mode, out, err)
+}
+
+/// `pairreg brain1 brain2 skull1 skull2 outputmatrix [extra flirt args]` (the script).
+pub fn pairreg(
+    args: &[String],
+    settings: &Settings,
+    mode: UpstreamDefects,
+    threads: usize,
+    out: &mut dyn Write,
+    err: &mut dyn Write,
+) -> u8 {
+    scripts::pairreg(args, settings, mode, thread_count(threads), out, err)
+}
+
+/// `extracttxt search_word file [num_trailing_lines [relative_start]]` (the script).
+pub fn extracttxt(
+    args: &[String],
+    settings: &Settings,
+    mode: UpstreamDefects,
+    threads: usize,
+    out: &mut dyn Write,
+    err: &mut dyn Write,
+) -> u8 {
+    scripts::extracttxt(args, settings, mode, threads, out, err)
+}
+
+/// `aff2rigid <input2standard mat> <output mat>` (the script).
+pub fn aff2rigid(
+    args: &[String],
+    settings: &Settings,
+    mode: UpstreamDefects,
+    threads: usize,
+    out: &mut dyn Write,
+    err: &mut dyn Write,
+) -> u8 {
+    scripts::aff2rigid(args, settings, mode, threads, out, err)
 }

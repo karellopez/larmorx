@@ -854,13 +854,6 @@ fn segment_multi_channel(
     let nch = a.nchannel as usize;
     // argv[argc - c - 1] for c < nchannel: argv[0] (the program) or before it when fewer
     // words follow the program than channels
-    if nch > MAX_CHANNELS {
-        let _ = writeln!(
-            io.err,
-            "larmorx-nc: fast -S {nch} (more than {MAX_CHANNELS} channels) is not replicated yet"
-        );
-        return 1;
-    }
     let input_name = args[args.len() - 1].clone();
     let outname = output_name(a, &input_name);
     let mut images: Vec<Volume> = Vec::with_capacity(nch);
@@ -878,6 +871,14 @@ fn segment_multi_channel(
         image.display_max = 0.0;
         image.display_min = 0.0;
         images.push(image);
+    }
+    // (after the images are read: FAST's errors in reading them come first)
+    if nch > MAX_CHANNELS {
+        let _ = writeln!(
+            io.err,
+            "larmorx-nc: fast -S {nch} (more than {MAX_CHANNELS} channels) is not replicated yet"
+        );
+        return 1;
     }
     let r = prior_registration(a, &input_name, &outname, run, io, notices);
     let priors = match priors_or_exit(r, io, notices) {

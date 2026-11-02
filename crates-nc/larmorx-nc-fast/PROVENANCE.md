@@ -30,7 +30,7 @@ what it translates.
 
 | Rust module | FSL file | Functions, classes |
 |---|---|---|
-| `fast` | fsl-fast4 `fast_two.cc` | `main` (the options in their order, the usage, the option errors, `-H`'s check), `segmentSingleChannel` (the input, its negative values, the outputs `_seg`, `_seg_<n>`, `_prob_<n>`, `_pve_<n>`, `_pveseg`, `_mixeltype`, `_restore`, `_bias`), `prior_registration` (the prior names, `FSLDIR`; `-a`'s registration with FLIRT pending), `segmentMultiChannel` (the channels read from the last words, channel 1 the last; the outputs, `_restore_<n>`, `_bias_<n>`; fewer than two channels; more than four refused: LAPACK's paths are ported up to 4 x 4) |
+| `fast` | fsl-fast4 `fast_two.cc` | `main` (the options in their order, the usage, the option errors, `-H`'s check), `segmentSingleChannel` (the input, its negative values, the outputs `_seg`, `_seg_<n>`, `_prob_<n>`, `_pve_<n>`, `_pveseg`, `_mixeltype`, `_restore`, `_bias`), `prior_registration` (the prior names, `FSLDIR`, `-a`'s three FLIRT runs: FLIRT's replica, `../larmorx-nc-flirt`, in this process, with the shell's word splitting reproduced; the registered priors read back), `segmentMultiChannel` (the channels read from the last words, channel 1 the last; the outputs, `_restore_<n>`, `_bias_<n>`; fewer than two channels; more than four refused, after the images are read: LAPACK's paths are ported up to 4 x 4) |
 | `mriseg` | fsl-fast4 `mriseg_two.{h,cc}` | `ZMRISegmentation`: `TanakaCreate`, `TanakaMain`, `BiasRemoval`, `Classification`, `Convolve`, `Dimensions`, `Initialise`, `logGaussian`, `MRFWeightsTotal`, `MRFWeightsInner`, `MRFWeightsAM`, `TanakaHyper`, `TanakaIterations`, `PVEnergy`, `PVClassificationStep`, `ICMPV`, `mixelType`, `PVestimation`, `takeexpo`, `InitSimple`, `calculateVolumes`, `printVolumeTotals`, `InitKernel`, `MeansVariances`, `Initclass`, `UpdateMembers`, `WeightedKMeans`, `qsort`, `pveClassification`; `TanakaPriorHyper` is not translated (it runs only for a negative `-H`, which `main` refuses) |
 | `multi_mriseg` | fsl-fast4 `multi_mriseg_two.{h,cc}` | `ZMRIMULTISegmentation`: `TanakaCreate`, `TanakaMain`, `Dimensions`, `Initialise`, `Classification`, `pveClassification`, `logGaussian`, `MRFWeightsTotal`, `MRFWeightsInner`, `MRFWeightsAM`, `TanakaHyper`, `TanakaIterations`, `PVEnergy`, `PVClassificationStep`, `logpveGaussian`, `ICMPV`, `PVMoreSophisticated`, `PVestimation`, `takeexpo`, `InitWeights`, `InitSimple`, `Volumesquant`, `InitKernel`, `Convolve`, `MeansVariances`, `BiasRemoval`, `Initclass`, `UpdateMembers`, `WeightedKMeans`, `qsort`, `mresmatrix`, `covariancematrix`, `M_2PI`; not translated: `TanakaPriorHyper` (a negative `-H`, refused by `main`), `InitclassAlt`, `InitAprioriKMeans`, `UpdateWeights`, `pvmeans`, `pvvar`, `PVMeansVar` (never called) |
 
@@ -48,6 +48,13 @@ what it translates.
   `lapack`; `logGaussian`'s inverse and normalisation are taken once per class and sweep,
   `logpveGaussian`'s once per mixel type and fraction, and `PVEnergy`'s LU factors once per
   mixel type and fraction (FSL recomputes each per voxel: the same values); `p_bias` without a
-  bias field (`-N`), which FSL never writes, is 0 (pending its D13 decision).
-- Pending in this part's later steps: `-a`'s priors registered with FLIRT, and the D13 decisions
-  of FAST's defects.
+  bias field (`-N`), which FSL never writes, is no bias field (1; FSL-97).
+- `-a`'s FLIRT runs (`system("$FSLDIR/bin/flirt ...")` in FAST) call FLIRT's replica in this
+  process; its exceptions end that FLIRT run only, as they end FLIRT's process.
+- FAST's defects (FSL-96 to FSL-104, `docs/findings/fsl-fast.md`) are corrected by default, or
+  refused where FAST's input has no meaning (rule B) or FAST reads outside its memory; with
+  `LARMORX_UPSTREAM_DEFECTS=reproduce` FAST's results, where FAST leaves memory unwritten its
+  defined parts with the rest filled deterministically (`_prob_<n>` outside the mask 0, FSL-96;
+  the multi-channel `-N` bias field 1, FSL-97; `-H nan`'s table of several channels 0, FSL-99),
+  each named on standard error.
+- Pending: more than four channels (`-S 5` and more: LAPACK's LU, inverse and solve beyond 4 x 4).

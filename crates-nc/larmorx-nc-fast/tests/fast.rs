@@ -15,6 +15,17 @@ fn settings() -> Settings {
 }
 
 fn run(args: &[&str], dir: &std::path::Path, s: &Settings) -> (u8, String, String) {
+    run_in(UpstreamDefects::Reproduce, args, dir, s)
+        .unwrap_or_else(|e| panic!("{}: {}", e.type_name, e.what))
+}
+
+/// [`run`] in D13's `mode`; `Err`: an exception nothing in FAST catches.
+fn run_in(
+    mode: UpstreamDefects,
+    args: &[&str],
+    dir: &std::path::Path,
+    s: &Settings,
+) -> Result<(u8, String, String), larmorx_nc_core::volume::FslError> {
     let args: Vec<String> = args
         .iter()
         .map(|a| match a.strip_prefix('@') {
@@ -24,14 +35,13 @@ fn run(args: &[&str], dir: &std::path::Path, s: &Settings) -> (u8, String, Strin
         .collect();
     let (mut out, mut err) = (Vec::new(), Vec::new());
     let code = larmorx_nc_core::exception::catch(|| {
-        larmorx_nc_fast::fast(&args, s, UpstreamDefects::Reproduce, 2, &mut out, &mut err)
-    })
-    .unwrap_or_else(|e| panic!("{}: {}", e.type_name, e.what));
-    (
+        larmorx_nc_fast::fast(&args, s, mode, 2, &mut out, &mut err)
+    })?;
+    Ok((
         code,
         String::from_utf8(out).unwrap(),
         String::from_utf8(err).unwrap(),
-    )
+    ))
 }
 
 /// A 16 x 16 x 12 brain-like image: a dark ring (CSF), a middle shell (grey matter) and a
@@ -117,7 +127,13 @@ fn fmriprep_options_on_a_phantom() {
         dir.path(),
         &s,
     );
-    assert_eq!((code, out.as_str(), err.as_str()), (0, "", ""));
+    // FSL-96: the probability maps outside the mask, which FAST never writes, are 0
+    assert_eq!((code, out.as_str()), (0, ""));
+    assert!(
+        err.starts_with("larmorx-nc: upstream defect FSL-96 (fast) reproduced: ")
+            && err.lines().count() == 1,
+        "{err}"
+    );
     for f in [
         "seg",
         "seg_0",
@@ -234,8 +250,63 @@ fn two_channels_on_slabs() {
             .0;
     assert!(b.data.iter().all(|&v| v.is_finite() && v > 0.0));
     assert_eq!(b.value(0, 0, 0), 1.0);
-    // more channels than words after the program (FSL would read its own path, then memory)
-    let (code, _, err) = run(&["-S", "9", "@t1.nii", "@t2.nii"], dir.path(), &s);
-    assert_eq!(code, 1);
-    assert!(err.contains("fewer images than channels"), "{err}");
+    // more channels than images: FAST reads the words before them as images ("9" here)
+    let e = run_in(
+        UpstreamDefects::Reproduce,
+        &["-S", "9", "@t1.nii", "@t2.nii"],
+        dir.path(),
+        &s,
+    )
+    .unwrap_err();
+    assert!(
+        e.what.starts_with("Failed to read volume 9\n"),
+        "{}",
+        e.what
+    );
+}
+
+#[test]
+fn meaningless_options_and_fsldir() {
+    let dir = tempfile::tempdir().unwrap();
+    phantom(dir.path());
+    let s = settings();
+    // FSL-99 (rule B): refused by default
+    for opt in [["-H", "nan"], ["-l", "0"], ["-f", "inf"], ["-n", "0"]] {
+        let (code, _, err) = run_in(
+            UpstreamDefects::Fix,
+            &[opt[0], opt[1], "-N", "--nopve", "@t1.nii"],
+            dir.path(),
+            &s,
+        )
+        .unwrap();
+        assert_eq!(code, 1, "{opt:?}");
+        assert!(
+            err.contains("larmorx-nc: error: fast: ") && err.contains("FSL-99"),
+            "{err}"
+        );
+        assert!(!dir.path().join("t1_seg.nii").exists());
+    }
+    // FSL-100: FSLDIR unset, no priors asked for: FAST aborts; the default segments
+    let bare = Settings::new().with("FSLOUTPUTTYPE", "NIFTI");
+    let e = run_in(
+        UpstreamDefects::Reproduce,
+        &["-N", "--nopve", "@t1.nii"],
+        dir.path(),
+        &bare,
+    )
+    .unwrap_err();
+    assert_eq!(e.type_name, "std::logic_error");
+    let (code, _, err) = run_in(
+        UpstreamDefects::Fix,
+        &["-N", "--nopve", "@t1.nii"],
+        dir.path(),
+        &bare,
+    )
+    .unwrap();
+    assert_eq!(code, 0);
+    assert!(
+        err.contains("upstream defect FSL-100 (fast) corrected"),
+        "{err}"
+    );
+    assert!(dir.path().join("t1_seg.nii").is_file());
 }

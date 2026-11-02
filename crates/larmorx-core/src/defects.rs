@@ -744,7 +744,7 @@ mod tests {
             assert!(!d.what.ends_with('.'), "{}", d.id);
             assert_eq!(lookup(d.id), Some(*d));
         }
-        assert!(lookup("FSL-99").is_none());
+        assert!(lookup("NONE-01").is_none());
     }
 
     #[test]

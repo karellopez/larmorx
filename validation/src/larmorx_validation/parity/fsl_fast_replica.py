@@ -245,6 +245,25 @@ def _prior_inputs(ws: Path, out: Path) -> None:
     )
 
 
+def _phantom_inputs(out: Path) -> None:
+    """A two-channel phantom of opposite contrasts (16 x 16 x 12 voxels of 1 x 1 x 1.5 mm, a
+    border of zeros): three slabs along x, dark, middle and bright in the T1-like channel and
+    the reverse in the T2-like one, with seeded noise. FAST starts each channel's class means
+    from that channel's own percentiles in ascending order, so the classes it pairs across the
+    channels hold no voxel."""
+    rng = np.random.default_rng(5)
+    a = np.diag([1.0, 1.0, 1.5, 1.0])
+    t1 = np.zeros((16, 16, 12), np.float32)
+    t2 = np.zeros((16, 16, 12), np.float32)
+    for k, (v1, v2) in enumerate(((80, 300), (150, 150), (300, 80))):
+        sl = (slice(2 + 4 * k, 6 + 4 * k), slice(2, 14), slice(2, 10))
+        shape = t1[sl].shape
+        t1[sl] = v1 + rng.normal(0, 3, shape).astype(np.float32)
+        t2[sl] = v2 + rng.normal(0, 3, shape).astype(np.float32)
+    _save(out / "phantom_t1.nii.gz", t1, a)
+    _save(out / "phantom_t2.nii.gz", t2, a)
+
+
 @functools.cache
 def inputs() -> Path:
     """The derived inputs (``oracles/inputs/fsl-fast-replica/``), made once, deterministically:
@@ -256,7 +275,7 @@ def inputs() -> Path:
     ws = workspace()
     assert ws is not None
     out = ws / "oracles" / "inputs" / SUITE
-    stamp = out / "DONE-v7"
+    stamp = out / "DONE-v8"
     if stamp.is_file():
         return out
     out.mkdir(parents=True, exist_ok=True)
@@ -270,7 +289,8 @@ def inputs() -> Path:
     _single_inputs(out)
     _multichannel_inputs(ws, out)
     _prior_inputs(ws, out)
-    stamp.write_text("derived inputs of the fsl-fast-replica suite, version 7\n", encoding="utf-8")
+    _phantom_inputs(out)
+    stamp.write_text("derived inputs of the fsl-fast-replica suite, version 8\n", encoding="utf-8")
     return out
 
 
@@ -1039,6 +1059,12 @@ def _prior_cases() -> dict[str, tuple[str, str, Run]]:
         "seg",
         "@mni_t2.nii.gz",
         t1,
+    )
+    add(
+        "multi/s2-opposite-contrasts",
+        "-S 2 -B -b on a phantom of opposite contrasts: classes paired across the channels "
+        "start empty; every voxel ends in class 1, the bias field NaN (FAST exits 0)",
+        *("-S", "2", "-B", "-b", "-o", "seg", "@phantom_t2.nii.gz", "@phantom_t1.nii.gz"),
     )
     add(
         "multi/s2-manualseg-cycle",

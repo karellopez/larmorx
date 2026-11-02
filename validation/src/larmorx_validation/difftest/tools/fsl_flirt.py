@@ -408,11 +408,11 @@ def draw_midtrans(d: gen.Draw) -> dict:
             groups.append(group(flag, flag))
             options.append(flag)
     if d.chance("--separate", 0.2):
-        groups.append(group("--separate", "--separate", "sep"))
+        groups.append(group("--separate", "--separate=sep"))
         options.append("--separate")
     if d.chance("--template", 0.2):
         inputs["template"] = _image(d.child("template"))
-        groups.append(group("--template", "--template", "{in:template}"))
+        groups.append(group("--template", "--template={in:template}"))
         options.append("--template")
     groups.append(required("transforms", *(f"{{in:t{k}}}" for k in range(n))))
     return {"groups": groups, "inputs": inputs, "options": options, "extra": {"tool": "midtrans"}}

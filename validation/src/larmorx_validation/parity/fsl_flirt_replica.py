@@ -547,6 +547,20 @@ def _prepare(run: Run, tmp: Path) -> list[str]:
                 h.set_data_dtype(np.float64)
                 nib.save(nib.Nifti1Image(arr, img.affine, h), str(dst))
             out.append(name)
+        elif a.startswith("@metres:"):
+            # a copy of an input whose header gives its spatial units as metres (a nonsense
+            # header for a head image): @metres:<input>:<name>
+            import nibabel as nib
+
+            _, src_name, name = a.split(":")
+            dst = tmp / name
+            if not dst.exists():
+                base = base or inputs()
+                img = nib.load(str(base / src_name))
+                h = img.header.copy()
+                h.set_xyzt_units("meter", "sec")
+                nib.save(nib.Nifti1Image(np.asanyarray(img.dataobj), img.affine, h), str(dst))
+            out.append(name)
         elif a.startswith("@nanedge:"):
             # an input with NaN voxels in its 2-voxel border, at (0, 4, 5) and (1, 6, 7), and an
             # infinite one at (4, 4, 4): @nanedge:<input>:<name>
@@ -578,10 +592,16 @@ def _prepare(run: Run, tmp: Path) -> list[str]:
             out.append(name)
         elif "=@" in a and a.startswith("-"):
             # a long option's value, an input (--cov=@epi.nii)
-            base = base or inputs()
             key, name = a.split("=@", 1)
-            if not (tmp / name).exists():
-                shutil.copy(base / name, tmp / name)
+            if name.startswith("const:"):
+                # a constant image as the value (--invol=@const:<shape>:<vox>:<name>)
+                _, shape, vox, name = name.split(":")
+                if not (tmp / name).exists():
+                    _constant_image(tmp / name, shape, vox, False)
+            else:
+                base = base or inputs()
+                if not (tmp / name).exists():
+                    shutil.copy(base / name, tmp / name)
             out.append(f"{key}={name}")
         elif a.startswith("@"):
             base = base or inputs()
@@ -2098,6 +2118,10 @@ def _program_cases() -> dict[str, tuple[str, str, Run]]:
         "-interp", "spline", files=one)  # fmt: skip
     add("applyxfm4D-nan-border-3d", "the same with -3D and sinc", X,
         "@nanedge:epi.nii:epi_nanedge.nii", E, "out.nii.gz", "one.mat", "-3D", files=one)  # fmt: skip
+    # robustness (part 3): one case per new program with a nonsense header
+    add("applyxfm4D-metres", "an input whose header gives metres (a nonsense header): read as FSL "
+        "reads it", X, "@metres:epi.nii:epi_m.nii", E, "out.nii.gz", "one.mat",
+        "-singlematrix", "-interp", "trilinear", files=one)  # fmt: skip
     add("applyxfm4D-bad-interp", "an unknown interpolation (its message, exit 1)", X, B4, E,
         "out.nii.gz", "one.mat", "-interp", "cubic", files=one)  # fmt: skip
     add("applyxfm4D-userprefix-last", "-userprefix as the last word (std::string of null)", X,
@@ -2146,6 +2170,9 @@ def _program_cases() -> dict[str, tuple[str, str, Run]]:
         "d")  # fmt: skip
     add("pairreg-default", "pairreg of the T1w and its moved copy (brains and skulls the same)",
         PR, T, "@t1_moved.nii", T, "@t1_moved.nii", "pair.mat", "-dof", "6")  # fmt: skip
+    add("pairreg-metres", "pairreg of images whose headers give metres (nonsense headers)", PR,
+        "@metres:epi.nii:epi_m.nii", "@metres:epi.nii:epi_m.nii", "@metres:epi.nii:epi_m.nii",
+        "@metres:epi.nii:epi_m.nii", "pair.mat", "-dof", "6")  # fmt: skip
     K = "midtrans"
     mt = (("a.mat", _MT1), ("b.mat", _MT2), ("c.mat", _MT3), ("id.mat", _ID))
     add("midtrans-usage", "midtrans without transforms (its message and usage, exit 1)", K)
@@ -2156,8 +2183,11 @@ def _program_cases() -> dict[str, tuple[str, str, Run]]:
     add("midtrans-out-verbose", "-o with -v (every stage printed, the matrix written)", K, "-v",
         "-o", "mid.mat", "a.mat", "b.mat", "id.mat", files=mt)  # fmt: skip
     add("midtrans-template-separate", "--template (its centre of gravity) and --separate", K,
-        "--template", E, "--separate", "img2mid", "-o", "mid.mat", "a.mat", "b.mat", "c.mat",
+        "--template=@epi.nii", "--separate=img2mid", "-o", "mid.mat", "a.mat", "b.mat", "c.mat",
         files=mt)  # fmt: skip
+    add("midtrans-template-50mm", "--template with voxels of 50 mm (a nonsense header: its "
+        "centre of gravity far out)", K, "--template=@const:6x5x4:50x50x50:t50.nii", "a.mat",
+        "b.mat", files=mt)  # fmt: skip
     add("midtrans-debug", "--debug (the origin at 0 and the debug matrices)", K, "--debug",
         "a.mat", "c.mat", files=mt)  # fmt: skip
     add("midtrans-singular", "a transform with a determinant below 1e-6 (its message, exit 1)",
@@ -2178,6 +2208,9 @@ def _program_cases() -> dict[str, tuple[str, str, Run]]:
     add("pointflirt-vox", "--vox with --invol and --refvol (voxel coordinates scaled)", P, "-i",
         "in.txt", "-r", "ref.txt", "--vox", "--invol=@epi.nii", "--refvol=@t1.nii", files=pf,
         )  # fmt: skip
+    add("pointflirt-vox-odd", "--vox with voxels of 0.01 mm and of 50 mm (nonsense headers)", P,
+        "-i", "in.txt", "-r", "ref.txt", "--vox", "--invol=@const:4x4x4:0.01x0.01x0.01:v001.nii",
+        "--refvol=@const:4x4x4:50x50x50:v50.nii", files=pf)  # fmt: skip
     add("pointflirt-vox-missing", "--vox without the volumes (its error, exit 2)", P, "-i",
         "in.txt", "-r", "ref.txt", "--vox", files=pf)  # fmt: skip
     add("pointflirt-nullspace", "four points (a nullspace: the warning, a non-unique solution)",

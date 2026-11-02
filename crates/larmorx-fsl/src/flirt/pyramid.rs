@@ -318,14 +318,54 @@ pub struct Background {
 
 /// The background value of `v` (§10a). `None` for a 1 × 1 × 1 volume (no border: refused).
 pub fn background(v: &Volume, mode: UpstreamDefects) -> Option<Background> {
-    let [x, y, z] = v.shape.map(|n| n as i64);
+    let (value, overflow, nan) = shell_background(v.shape, &v.data, mode)?;
+    Some(Background {
+        value,
+        overflow,
+        nan,
+    })
+}
+
+/// [`background`] of a volume of doubles (`applyxfm4D`'s double images, §15.7: the background
+/// value in double precision): the value, FSL-75's overflow and whether a NaN lies in the shell.
+pub fn background_f64(
+    shape: [usize; 3],
+    data: &[f64],
+    mode: UpstreamDefects,
+) -> Option<(f64, bool, bool)> {
+    shell_background(shape, data, mode)
+}
+
+/// The numbers a background value is taken from.
+trait Real: Copy + PartialOrd {
+    fn nan(self) -> bool;
+}
+
+impl Real for f32 {
+    fn nan(self) -> bool {
+        self.is_nan()
+    }
+}
+
+impl Real for f64 {
+    fn nan(self) -> bool {
+        self.is_nan()
+    }
+}
+
+fn shell_background<T: Real>(
+    shape: [usize; 3],
+    data: &[T],
+    mode: UpstreamDefects,
+) -> Option<(T, bool, bool)> {
+    let [x, y, z] = shape.map(|n| n as i64);
     if x * y * z <= 1 {
         return None;
     }
     let e = [x, y, z].map(|n| 2.min(n - 1).max(0));
     let [ex, ey, ez] = e;
-    let at = |i: i64, j: i64, k: i64| v.data[(i + x * (j + y * k)) as usize];
-    let mut values: Vec<f32> = Vec::new();
+    let at = |i: i64, j: i64, k: i64| data[(i + x * (j + y * k)) as usize];
+    let mut values: Vec<T> = Vec::new();
     // the xy faces, for each depth
     for d in 0..ez {
         for i in ex..x - ex {
@@ -355,8 +395,8 @@ pub fn background(v: &Volume, mode: UpstreamDefects) -> Option<Background> {
     }
     let buffer = 2 * (x - 2 * ex) * (y - 2 * ey) * ez + 2 * (x - 2 * ex) * z * ey + 2 * y * z * ex;
     let overflow = buffer < values.len() as i64;
-    let nan = values.iter().any(|v| v.is_nan());
-    let kept: &mut [f32] = if mode.reproduce() && overflow {
+    let nan = values.iter().any(|v| v.nan());
+    let kept: &mut [T] = if mode.reproduce() && overflow {
         let n = buffer.max(0) as usize;
         &mut values[..n]
     } else {
@@ -366,18 +406,14 @@ pub fn background(v: &Volume, mode: UpstreamDefects) -> Option<Background> {
         return None;
     }
     // NaN last (FSL-22 corrected); every other value in order
-    kept.sort_unstable_by(|a, b| match (a.is_nan(), b.is_nan()) {
+    kept.sort_unstable_by(|a, b| match (a.nan(), b.nan()) {
         (true, true) => std::cmp::Ordering::Equal,
         (true, false) => std::cmp::Ordering::Greater,
         (false, true) => std::cmp::Ordering::Less,
         _ => a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal),
     });
     let n = kept.len();
-    Some(Background {
-        value: kept[n / 10],
-        overflow,
-        nan,
-    })
+    Some((kept[n / 10], overflow, nan))
 }
 
 /// The notices of a background value: FSL-75 where FSL's buffer overflows, FSL-22 where a NaN

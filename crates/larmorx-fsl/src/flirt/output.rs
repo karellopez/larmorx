@@ -189,6 +189,9 @@ pub struct Resampling<'a> {
     pub pad: f32,
     /// `-paddingsize` (voxels).
     pub padding: f32,
+    /// The spline's coefficients when the caller computed them (`applyxfm4D`'s, §15.7), else
+    /// the shared engine's of the input.
+    pub spline: Option<&'a Spline>,
 }
 
 /// The input `src` resampled by `m` (input mm → output mm) onto a grid of `shape` and
@@ -203,7 +206,8 @@ pub fn resample(
     let a = output_map(m, src.voxel_size, voxel)?;
     let [nx, ny, nz] = shape;
     let n = src.shape.map(|v| v as f32);
-    let spline = (r.interp == Interp::Spline).then(|| Spline::new(src));
+    let own = (r.interp == Interp::Spline && r.spline.is_none()).then(|| Spline::new(src));
+    let spline = r.spline.or(own.as_ref());
     let mut data = vec![r.pad; nx * ny * nz];
     let plane = nx * ny;
     data.par_chunks_mut(plane.max(1))
@@ -230,9 +234,7 @@ pub fn resample(
                                 Interp::Sinc => {
                                     r.sinc.and_then(|k| k.value(src, p)).unwrap_or(r.pad)
                                 }
-                                Interp::Spline => {
-                                    spline.as_ref().map_or(r.pad, |s| s.value(p, r.pad))
-                                }
+                                Interp::Spline => spline.map_or(r.pad, |s| s.value(p, r.pad)),
                             }
                         };
                         slab[x + nx * y] = v;
@@ -242,6 +244,38 @@ pub fn resample(
             }
         });
     Some(data)
+}
+
+/// Which output voxels [`resample`] sets to the padding value (their pre-image more than
+/// `padding` voxels outside an input of `src_shape`): the same positions, stepped as there.
+pub fn padded(
+    src_shape: [usize; 3],
+    src_voxel: [f32; 3],
+    m: &Mat4,
+    shape: [usize; 3],
+    voxel: [f32; 3],
+    padding: f32,
+) -> Option<Vec<bool>> {
+    let a = output_map(m, src_voxel, voxel)?;
+    let [nx, ny, nz] = shape;
+    let n = src_shape.map(|v| v as f32);
+    let mut out = vec![false; nx * ny * nz];
+    let plane = nx * ny;
+    out.par_chunks_mut(plane.max(1))
+        .enumerate()
+        .for_each(|(z, slab)| {
+            let zf = z as f32;
+            for x in 0..nx {
+                let xf = x as f32;
+                let mut p = [0, 1, 2].map(|k| xf * a[k][0] + zf * a[k][2] + a[k][3]);
+                for y in 0..ny {
+                    slab[x + nx * y] =
+                        (0..3).any(|k| p[k] < -padding || p[k] > n[k] - 1.0 + padding);
+                    p = [p[0] + a[0][1], p[1] + a[1][1], p[2] + a[2][1]];
+                }
+            }
+        });
+    Some(out)
 }
 
 /// The input `src` resampled through the boundary-based cost's mapping with a field map

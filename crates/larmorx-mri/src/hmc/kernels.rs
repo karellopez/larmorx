@@ -146,6 +146,17 @@ pub struct Spline {
 impl Spline {
     /// The coefficients by the recursive prefilter along x, y and z (pole `√3 − 2`).
     pub fn new(vol: &Volume) -> Spline {
+        Spline::build(vol, None)
+    }
+
+    /// [`Spline::new`] with each pass's results stored through `store` (FLIRT's `applyxfm4D`,
+    /// `specs/flirt.md` §15.7: single precision for float images, the image's type for integer
+    /// ones with FSL-79 reproduced).
+    pub fn with_store(vol: &Volume, store: &dyn Fn(f64) -> f64) -> Spline {
+        Spline::build(vol, Some(store))
+    }
+
+    fn build(vol: &Volume, store: Option<&dyn Fn(f64) -> f64>) -> Spline {
         let [nx, ny, nz] = vol.shape;
         let mut c: Vec<f64> = vol.data.iter().map(|&v| f64::from(v)).collect();
         let mut line = Vec::new();
@@ -165,6 +176,11 @@ impl Spline {
                 prefilter(&mut line);
                 for (k, &v) in line.iter().enumerate() {
                     c[start + k * stride] = v;
+                }
+            }
+            if let Some(f) = store {
+                for v in &mut c {
+                    *v = f(*v);
                 }
             }
         }

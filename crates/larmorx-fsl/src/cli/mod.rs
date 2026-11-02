@@ -7,17 +7,24 @@
 //! count) are read into a table of settings ([`Settings`]): the command line fills it from the
 //! process environment, the Python wrappers give it explicitly (porting guide §9.1).
 
+pub mod aff2rigid;
+pub mod applyxfm4d;
 pub mod avscale;
 pub mod bet;
 pub mod bet2;
 pub mod betsurf;
+pub mod bre;
 pub mod common;
 pub mod convert_xfm;
 pub mod coords;
+pub mod extracttxt;
 pub mod flirt;
 pub mod fmt;
 pub mod makerot;
+pub mod midtrans;
 pub mod options;
+pub mod pairreg;
+pub mod pointflirt;
 pub mod rmsdiff;
 
 use std::collections::BTreeMap;
@@ -39,6 +46,12 @@ pub const TOOLS: &[&str] = &[
     "img2stdcoord",
     "rmsdiff",
     "makerot",
+    "midtrans",
+    "pointflirt",
+    "applyxfm4D",
+    "pairreg",
+    "extracttxt",
+    "aff2rigid",
 ];
 
 /// The settings of one run: the environment it reads and the directory relative names start
@@ -154,6 +167,12 @@ pub fn run_with(
         )),
         "rmsdiff" => Some(rmsdiff::main(args, settings, out, err)),
         "makerot" => Some(makerot::main(args, settings, out, err)),
+        "midtrans" => Some(midtrans::main(args, settings, out, err)),
+        "pointflirt" => Some(pointflirt::main(args, settings, out, err)),
+        "applyxfm4D" => Some(applyxfm4d::main(args, settings, out, err)),
+        "pairreg" => Some(pairreg::main(args, settings, out, err)),
+        "extracttxt" => Some(extracttxt::main(args, settings, out, err)),
+        "aff2rigid" => Some(aff2rigid::main(args, settings, out, err)),
         _ => None,
     }
 }

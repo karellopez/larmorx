@@ -155,8 +155,8 @@ pub const REPLICAS: &[Replica] = &[
         original: true,
     },
     // FSL's FLIRT and its programs (2026-11-01): flirt and convert_xfm have their clean-room
-    // originals (`larmorx_fsl::cli`, written from specs/flirt.md, 2026-11-02), and avscale, the
-    // coordinate programs, rmsdiff and makerot (part 2); the other programs the replica only.
+    // originals (`larmorx_fsl::cli`, written from specs/flirt.md, 2026-11-02), and so have
+    // FLIRT's other programs and scripts (part 2).
     Replica {
         family: "fsl",
         tool: "flirt",
@@ -209,37 +209,37 @@ pub const REPLICAS: &[Replica] = &[
         family: "fsl",
         tool: "midtrans",
         location: Location::Program(&LARMORX_NC),
-        original: false,
+        original: true,
     },
     Replica {
         family: "fsl",
         tool: "pointflirt",
         location: Location::Program(&LARMORX_NC),
-        original: false,
+        original: true,
     },
     Replica {
         family: "fsl",
         tool: "applyxfm4D",
         location: Location::Program(&LARMORX_NC),
-        original: false,
+        original: true,
     },
     Replica {
         family: "fsl",
         tool: "pairreg",
         location: Location::Program(&LARMORX_NC),
-        original: false,
+        original: true,
     },
     Replica {
         family: "fsl",
         tool: "extracttxt",
         location: Location::Program(&LARMORX_NC),
-        original: false,
+        original: true,
     },
     Replica {
         family: "fsl",
         tool: "aff2rigid",
         location: Location::Program(&LARMORX_NC),
-        original: false,
+        original: true,
     },
 ];
 
@@ -688,17 +688,7 @@ mod tests {
         );
         assert_eq!(replica_only("afni").count(), 0);
         assert_eq!(replica_only("ants").count(), 0);
-        assert_eq!(
-            replica_only("fsl").collect::<Vec<_>>(),
-            [
-                "midtrans",
-                "pointflirt",
-                "applyxfm4D",
-                "pairreg",
-                "extracttxt",
-                "aff2rigid",
-            ]
-        );
+        assert_eq!(replica_only("fsl").count(), 0);
         let betsurf = lookup("fsl", "betsurf").unwrap();
         assert_eq!(betsurf.package().unwrap().env, "LARMORX_NC_BIN");
         assert_eq!(

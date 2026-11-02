@@ -13,6 +13,7 @@
 pub mod bbr;
 pub mod cost;
 pub mod engine;
+pub mod fits;
 pub mod mat;
 pub mod optimise;
 pub mod output;

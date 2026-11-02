@@ -1630,7 +1630,7 @@ fn run_search(st: &mut State<'_>, dof: usize) -> Result<(), End> {
 }
 
 /// The output data type (§9.2) of an input stored as `stored` (`scaled`: a scaled file).
-fn output_type(
+pub(crate) fn output_type(
     o: &Options,
     stored: DataType,
     scaled: bool,
@@ -1646,26 +1646,7 @@ fn output_type(
             OutType::Double => DataType::F64,
         };
     }
-    let t = if scaled {
-        DataType::F32
-    } else {
-        match stored {
-            DataType::U8 => DataType::U8,
-            DataType::I8 => {
-                if mode.fix() {
-                    DataType::I8
-                } else {
-                    DataType::U8
-                }
-            }
-            DataType::I16 => DataType::I16,
-            DataType::U16 | DataType::I32 | DataType::U32 | DataType::I64 | DataType::U64 => {
-                DataType::I32
-            }
-            DataType::F64 => DataType::F64,
-            _ => DataType::F32,
-        }
-    };
+    let t = grouped_type(stored, scaled, mode);
     if larmorx_mri::hmc::image::integer_range(t).is_some() {
         let (lo, hi) = values
             .iter()
@@ -1680,8 +1661,33 @@ fn output_type(
     t
 }
 
+/// The type of an image stored as `stored` as FSL's programs group types (char, short, int,
+/// float, double; a scaled file is float): int8 as char (FSL-09) with `reproduce`, kept by
+/// default.
+pub(crate) fn grouped_type(stored: DataType, scaled: bool, mode: UpstreamDefects) -> DataType {
+    if scaled {
+        return DataType::F32;
+    }
+    match stored {
+        DataType::U8 => DataType::U8,
+        DataType::I8 => {
+            if mode.fix() {
+                DataType::I8
+            } else {
+                DataType::U8
+            }
+        }
+        DataType::I16 => DataType::I16,
+        DataType::U16 | DataType::I32 | DataType::U32 | DataType::I64 | DataType::U64 => {
+            DataType::I32
+        }
+        DataType::F64 => DataType::F64,
+        _ => DataType::F32,
+    }
+}
+
 /// The input's stored type and whether its file scales its values.
-fn stored_type(h: &NiftiHeader) -> (DataType, bool) {
+pub(crate) fn stored_type(h: &NiftiHeader) -> (DataType, bool) {
     let t = h.data_type().unwrap_or(DataType::F32);
     (t, larmorx_mri::hmc::image::scaling(h).is_some())
 }
@@ -1700,6 +1706,42 @@ fn write_image(
     err: &mut dyn Write,
     notices: &mut Vec<Notice>,
 ) -> Result<(), End> {
+    let look = Look {
+        reference,
+        shape,
+        volumes,
+        tr,
+        cal: None,
+        descrip: "larmorx fsl flirt",
+    };
+    write_values(ctx, stem, &look, values, None, t, err, notices)
+}
+
+/// How an output image looks besides its values: the reference it copies (header, order),
+/// its grid and volumes, its TR, its display range and description.
+pub(crate) struct Look<'a> {
+    pub reference: &'a Input,
+    pub shape: [usize; 3],
+    pub volumes: usize,
+    pub tr: Option<f64>,
+    pub cal: Option<(f64, f64)>,
+    pub descrip: &'a str,
+}
+
+/// Writes `values` like `look`'s reference in type `t` (FSL-09's conversion to integers, FSL-11's
+/// output type); a double output takes `doubles` when given (else the values in double).
+#[allow(clippy::too_many_arguments)]
+pub(crate) fn write_values(
+    ctx: &Ctx<'_>,
+    stem: &str,
+    look: &Look<'_>,
+    values: Vec<f32>,
+    doubles: Option<Vec<f64>>,
+    t: DataType,
+    err: &mut dyn Write,
+    notices: &mut Vec<Notice>,
+) -> Result<(), End> {
+    let (reference, shape, volumes, tr) = (look.reference, look.shape, look.volumes, look.tr);
     let mode = ctx.mode;
     let ot = match ctx.settings.get("FSLOUTPUTTYPE") {
         Some(v) => v.to_owned(),
@@ -1738,11 +1780,11 @@ fn write_image(
         flipped: reference.flipped,
         shape,
         volumes,
-        cal: None,
+        cal: look.cal,
         extensions: false,
         defects: mode,
         n_threads: ctx.n_threads,
-        descrip: "larmorx fsl flirt",
+        descrip: look.descrip,
     };
     let v = match larmorx_mri::hmc::image::integer_range(t) {
         Some((lo, hi)) => {
@@ -1766,7 +1808,9 @@ fn write_image(
                 _ => Values::I32(data.iter().map(|&x| x as i64 as i32).collect()),
             }
         }
-        None if t == DataType::F64 => Values::F64(values.iter().map(|&x| f64::from(x)).collect()),
+        None if t == DataType::F64 => Values::F64(
+            doubles.unwrap_or_else(|| values.iter().map(|&x| f64::from(x)).collect()),
+        ),
         None => Values::F32(values),
     };
     match image::write(&name, version, &o, v) {
@@ -1789,7 +1833,7 @@ fn write_image(
 }
 
 /// The background value of the output's input (§10a): refused for a single voxel.
-fn pad_value(v: &Volume, ctx: &Ctx<'_>, notices: &mut Vec<Notice>) -> Result<f32, End> {
+pub(crate) fn pad_value(v: &Volume, ctx: &Ctx<'_>, notices: &mut Vec<Notice>) -> Result<f32, End> {
     match pyramid::background(v, ctx.mode) {
         Some(b) => {
             for n in pyramid::background_notices(&b, "the input's border", ctx.mode) {
@@ -1915,6 +1959,7 @@ fn resample_one(
         sinc: kernel.as_ref(),
         pad: pad_v,
         padding,
+        spline: None,
     };
     output::resample(&blurred, m, refv.shape, refv.voxel_size, &r)
         .ok_or_else(|| End::Error(mat::SINGULAR.into()))

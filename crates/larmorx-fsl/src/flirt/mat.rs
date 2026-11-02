@@ -257,46 +257,110 @@ pub fn atoi(word: &str) -> i32 {
     v as i32
 }
 
-/// A number as a C++ stream reads a double from text: the longest prefix of the token that is
-/// a number; `None` when the token does not start with one.
-fn stream_number(token: &str) -> Option<f64> {
-    let lower = token.to_ascii_lowercase();
-    let body = lower.trim_start_matches(['+', '-']);
-    if body.starts_with("inf") || body.starts_with("nan") {
-        return Some(atof(token));
-    }
-    let b = token.as_bytes();
-    let mut i = 0;
-    if i < b.len() && (b[i] == b'+' || b[i] == b'-') {
-        i += 1;
-    }
-    let start = i;
-    while i < b.len() && (b[i].is_ascii_digit() || b[i] == b'.') {
-        i += 1;
-    }
-    if i == start || !token[start..i].bytes().any(|c| c.is_ascii_digit()) {
-        return None;
-    }
-    Some(atof(token))
+/// One extraction of a double by a C++ stream (libstdc++'s `operator>>`, observed on FSL's
+/// matrix files): blanks skipped; the characters that may form a number accumulated (a sign,
+/// digits, one decimal point, an exponent after a digit with its sign and digits: no `inf`,
+/// `nan` or hexadecimal); the whole accumulated text must be a number, else the value is 0 and
+/// the stream fails; a value beyond the double range is ±`f64::MAX` and fails the stream.
+enum Extracted {
+    /// The end of the text before any character of a number.
+    End,
+    Value(f64),
+    /// The stream failed: this value is stored, every later extraction keeps it.
+    Failed(f64),
 }
 
-/// The rows of numbers of a matrix file as FLIRT reads them (§2.2): the lines that start with
-/// a number; the first such line's count of numbers is the number of columns, and a later line
-/// with fewer numbers is an error (`Could not find enough numbers in matrix file`).
+fn extract(b: &[u8], pos: &mut usize) -> Extracted {
+    while *pos < b.len() && c_space(b[*pos]) {
+        *pos += 1;
+    }
+    if *pos >= b.len() {
+        return Extracted::End;
+    }
+    let start = *pos;
+    let mut i = start;
+    if b[i] == b'+' || b[i] == b'-' {
+        i += 1;
+    }
+    let (mut digit, mut point, mut exponent) = (false, false, false);
+    while i < b.len() {
+        let c = b[i];
+        if c.is_ascii_digit() {
+            digit = true;
+        } else if c == b'.' && !point && !exponent {
+            point = true;
+        } else if (c == b'e' || c == b'E') && digit && !exponent {
+            exponent = true;
+            if i + 1 < b.len() && (b[i + 1] == b'+' || b[i + 1] == b'-') {
+                i += 1;
+            }
+        } else {
+            break;
+        }
+        i += 1;
+    }
+    *pos = i;
+    let text = std::str::from_utf8(&b[start..i]).unwrap_or("");
+    match text.parse::<f64>() {
+        Ok(v) if v.is_infinite() => Extracted::Failed(f64::MAX.copysign(v)),
+        Ok(v) if digit && !text.ends_with(['e', 'E', '+', '-']) => Extracted::Value(v),
+        _ => Extracted::Failed(0.0),
+    }
+}
+
+/// C's `isspace` in the C locale.
+fn c_space(c: u8) -> bool {
+    matches!(c, b' ' | b'\t' | b'\n' | b'\r' | 0x0b | 0x0c)
+}
+
+/// Whether a word is all number for C's `strtod` (decimal, hexadecimal, `inf`, `nan`).
+fn whole_number(word: &str) -> bool {
+    let (_, used) = crate::cli::options::strtod(word);
+    used > 0 && used == word.len()
+}
+
+/// The rows of numbers of a matrix file as FLIRT's programs read them (§2.2; observed on FSL
+/// 6.0.7.23): the lines whose first word is a number for `strtod` (other lines are passed
+/// over); the first such line's count of words is the number of columns; each line's values
+/// are read as a C++ stream reads doubles ([`extract`]): a word that is not a number reads 0 and
+/// the rest of the line repeats the last value (0, or ±`f64::MAX` after a value out of range);
+/// a line that ends before its values are read is an error (`Could not find enough numbers in
+/// matrix file`).
 pub fn parse_matrix_text(text: &str) -> Result<Vec<Vec<f64>>, String> {
     let mut rows: Vec<Vec<f64>> = Vec::new();
     let mut cols = 0;
-    for line in text.lines() {
-        let nums: Vec<f64> = line.split_whitespace().map_while(stream_number).collect();
-        if nums.is_empty() {
+    for line in text.split('\n') {
+        let mut words = line
+            .split(|c: char| c.is_ascii() && c_space(c as u8))
+            .filter(|w| !w.is_empty());
+        let Some(first) = words.next() else { continue };
+        if !whole_number(first) {
             continue;
         }
         if rows.is_empty() {
-            cols = nums.len();
-        } else if nums.len() < cols {
-            return Err("Could not find enough numbers in matrix file".to_owned());
+            cols = 1 + words.count();
         }
-        rows.push(nums[..cols].to_vec());
+        let b = line.as_bytes();
+        let mut pos = 0;
+        let mut row = Vec::with_capacity(cols);
+        let mut kept: Option<f64> = None;
+        for _ in 0..cols {
+            if let Some(v) = kept {
+                row.push(v);
+                continue;
+            }
+            match extract(b, &mut pos) {
+                Extracted::End => {
+                    return Err("Could not find enough numbers in matrix file".to_owned());
+                }
+                Extracted::Value(v) => row.push(v),
+                Extracted::Failed(v) => {
+                    row.push(v);
+                    kept = Some(v);
+                }
+            }
+        }
+        rows.push(row);
     }
     Ok(rows)
 }
@@ -458,6 +522,26 @@ mod tests {
         let rows = parse_matrix_text("1 0 0 0\n0 1 0 0\n\n0 0 1 0\n0 0 0 1\n").unwrap();
         assert_eq!(mat4_of(&rows), Some(IDENTITY));
         assert!(parse_matrix_text("1 2 3 4\n5 6\n").is_err());
+        // FSL 6.0.7.23's reader (observed through convert_xfm): inf and nan read 0 and fail the
+        // line; a value out of range is the largest double, repeated; extra words ignored
+        let r = |t: &str| parse_matrix_text(t);
+        let rest = "0 1 0 0\n0 0 1 0\n0 0 0 1\n";
+        assert_eq!(r(&format!("1 inf 0 0\n{rest}")).unwrap()[0], [1.0, 0.0, 0.0, 0.0]);
+        assert_eq!(r(&format!("0 0 inf 1\n{rest}")).unwrap()[0], [0.0; 4]);
+        assert_eq!(r(&format!("1 0x10 0 3\n{rest}")).unwrap()[0], [1.0, 0.0, 0.0, 0.0]);
+        assert_eq!(r(&format!("1 2.5e 0 3\n{rest}")).unwrap()[0], [1.0, 0.0, 0.0, 0.0]);
+        assert_eq!(
+            r(&format!("1 0 1e400 5\n{rest}")).unwrap()[0],
+            [1.0, 0.0, f64::MAX, f64::MAX]
+        );
+        assert_eq!(r(&format!("0x1p3 1 0 0\n{rest}")).unwrap()[0], [0.0; 4]);
+        assert!(r(&format!("1 0 0 0 junk\n{rest}")).is_err());
+        assert!(r("1 2 3 4\n0 1 0 \n0 0 1 0\n0 0 0 1\n").is_err());
+        assert_eq!(r("1 2 3 4\n0 1 nan\n0 0 1 0\n0 0 0 1\n").unwrap()[1], [0.0, 1.0, 0.0, 0.0]);
+        let skipped = r("1 2 3 4\n.x 1 0 0\nx1 0\n# 1 2\n0 0 1 0\n0 0 0 1\n0 1 0 0\n").unwrap();
+        assert_eq!(skipped.len(), 4);
+        assert_eq!(r(&format!("1 2\\t3 4\n{rest}")).unwrap()[0], [1.0, 2.0, 0.0]);
+        assert_eq!(r(&format!("1\\t2 3 4 5\n{rest}")).unwrap().len(), 3);
         assert_eq!(file_text(&IDENTITY).lines().next(), Some("1  0  0  0  "));
         assert_eq!(g(0.9998031425123, 10), "0.9998031425");
         assert_eq!(

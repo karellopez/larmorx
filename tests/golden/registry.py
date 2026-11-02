@@ -4009,6 +4009,13 @@ def _flirt(ctx: Context, *argv: str, upstream_defects: str = "fix") -> str:
     return _fsl(ctx, "flirt", *argv, upstream_defects=upstream_defects)
 
 
+def _status_outputs(name: str, status: tuple[int, str, str]) -> dict[str, Any]:
+    """A call's exit status and streams as three outputs (``<name>:status``, ``:stdout``,
+    ``:stderr``)."""
+    code, out, err = status
+    return {f"{name}:status": code, f"{name}:stdout": out, f"{name}:stderr": err}
+
+
 def _fsl_status(ctx: Context, *argv: str, upstream_defects: str = "fix") -> tuple[int, str, str]:
     """``larmorx fsl <argv...>`` (the clean-room original) that may fail: its exit status and
     streams, the run directory's name replaced."""
@@ -4130,9 +4137,9 @@ def _(ctx: Context) -> dict[str, Any]:
     ]
     out: dict[str, Any] = {}
     for name, argv in calls:
-        out[name] = list(_fsl_status(ctx, "flirt", *argv))
+        out.update(_status_outputs(name, _fsl_status(ctx, "flirt", *argv)))
     rep = ("-in", a2, "-ref", a, "-init", "none.mat", "-omat", ctx.out("z.mat"))
-    out["reproduce"] = list(_fsl_status(ctx, "flirt", *rep, upstream_defects=REPRODUCE))
+    out.update(_status_outputs("reproduce", _fsl_status(ctx, "flirt", *rep, upstream_defects=REPRODUCE)))  # fmt: skip
     return out
 
 
@@ -4145,7 +4152,7 @@ def _(ctx: Context) -> dict[str, Any]:
     b.write_text("0.99 0.1 0 1\n-0.1 0.99 0.05 2\n0 -0.05 1.2 -3\n0 0 0 1\n")
     o = ctx.out("o.mat")
     stdout = _fsl(ctx, "convert_xfm", "-v", "-omat", o, "-fixscaleskew", str(b), "-concat", str(b), "-inverse", str(a))  # fmt: skip
-    return {"matrix": File(o), "stdout": stdout, "usage": list(_fsl_status(ctx, "convert_xfm"))}
+    return {"matrix": File(o), "stdout": stdout, **_status_outputs("usage", _fsl_status(ctx, "convert_xfm"))}  # fmt: skip
 
 
 @case("py.fsl.flirt", covers=("lx.fsl.flirt",))

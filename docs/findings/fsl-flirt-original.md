@@ -125,9 +125,22 @@ reproduce the 9th and 10th steps both), and the drift grows to 0.02 mm in the 4 
 ## The boundary-based cost
 
 - With `-wmcoords`/`-wmnorms` the original's matrix is FSL's within 0.0004 mm (`bbr/coords`): the
-  cost, the schedule and the optimisation agree; the differences of the `-wmseg` cases (0.05 to
-  0.11 mm) come from the boundary points and their normals. Three gradient masks tried for the
-  normals (central differences, `[1, 1, 1]` and `[1, 2, 1]` across the axis): 0.108, 0.091 and
-  0.107 mm; the spec does not name the masks.
-- `-bbrtype local_abs`: 1.2 mm from FSL's (`min(u, 2 − u)` of §6.5); the other types within
-  0.11 mm.
+  cost, the schedule and the optimisation agree; the differences of the `-wmseg` cases (0.13 mm on
+  the suite's `bbr/default`, fMRIPrep's three calls 0.01 to 0.05 mm) come from the boundary points
+  and their normals.
+- `bbrcost.sch` measures the cost of the initial matrix with `bbrstep` 1, 2, 200 and 201 on
+  `bbr/default`'s images: FSL 0.537036, 0.540203, 0.566266, 0.554291; the original (the
+  segmentation smoothed by `specs/bet.md`'s Gaussian of σ = 2 mm, `[1, 2, 1]` across each
+  derivative) 0.537732, 0.541060, 0.568640, 0.556265. Variants tried, each with `[1, 2, 1]`,
+  `[1, 1, 1]` and plain central differences: the Gaussian `exp(−k²/(2σ²))` over `2⌊σ − 0.001⌋ + 3`
+  taps (σ in voxels; closest: 0.536692, 0.539858, 0.564964, 0.553858 with `[1, 1, 1]`), FLIRT's
+  pyramid kernel, no smoothing, σ of 1, 3 mm and 2 voxels: none gives FSL's value. The spec's
+  "gradient masks of `specs/bet.md`'s smoothing step" are not in `specs/bet.md` (spec question).
+- `-bbrtype local_abs`: 1.4 mm from FSL's (`min(u, 2 − u)` of §6.5); the other types as the
+  default.
+
+## The principal axes
+
+- A non-finite moment (`schedule/alignpaxes-nan`): before FLIRT's `Mat::operator(): index out of
+  bounds` FSL prints an empty line and Armadillo's `warning: eig_sym(): given matrix is not
+  symmetric` on standard error.

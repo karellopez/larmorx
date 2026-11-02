@@ -51,7 +51,11 @@ pub fn axes(v: &Volume, warn: &mut Vec<String>) -> Result<M3, String> {
         tot[k] += part[k];
     }
     if tot.iter().any(|t| !t.is_finite()) {
-        return Err("Mat::operator(): index out of bounds".into());
+        // observed: Armadillo's warning (after an empty line) before FLIRT's message
+        return Err(
+            "\nwarning: eig_sym(): given matrix is not symmetric\nMat::operator(): index out of bounds"
+                .into(),
+        );
     }
     let mut total = tot[0];
     if total.abs() < 1e-5 {

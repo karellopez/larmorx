@@ -128,7 +128,7 @@ pub fn inverse(a: &Mat4) -> Option<Mat4> {
         }
         if k < 4 {
             for row in m.iter_mut() {
-                row[j] += row[k] * (work[k] * -1.0);
+                row[j] += row[k] * -work[k];
             }
         }
     }
@@ -158,7 +158,7 @@ fn upper_inverse(m: &mut Mat4) {
         for i in 0..j {
             let xi = x[i];
             for k in 0..i {
-                x[k] = xi * m[k][i] + x[k];
+                x[k] += xi * m[k][i];
             }
             x[i] = xi * m[i][i];
         }

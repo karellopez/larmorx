@@ -46,6 +46,7 @@ VERSIONS = {
     "fsl-avwutils": "2209.6",
     "fsl-warpfns": "2501.0",
     "fsl-armawrap": "0.7.0",
+    "fsl-fast4": "2111.3",
 }
 
 #: The original files: every file a translation in crates-nc/ comes from (see each crate's
@@ -149,6 +150,12 @@ FILES = [
     ("fsl-avwutils", "fslmerge.cc"),
     ("fsl-avwutils", "fslmaths.cc"),
     ("fsl-avwutils", "fslval"),
+    # FAST (2026-11-02): fast_two.cc (main), the single- and multi-channel segmentations
+    ("fsl-fast4", "fast_two.cc"),
+    ("fsl-fast4", "mriseg_two.h"),
+    ("fsl-fast4", "mriseg_two.cc"),
+    ("fsl-fast4", "multi_mriseg_two.h"),
+    ("fsl-fast4", "multi_mriseg_two.cc"),
 ]
 
 MANIFEST = DEST / "MANIFEST.tsv"

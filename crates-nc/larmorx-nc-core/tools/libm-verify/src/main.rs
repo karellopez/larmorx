@@ -9,7 +9,7 @@
 use std::io::{BufRead, BufReader, Write};
 use std::process::{Command, Stdio};
 
-use larmorx_nc_core::{fdlibm, glibc_double as glibc_pow, x87};
+use larmorx_nc_core::{fdlibm, glibc_double as glibc_pow, glibc_float, x87};
 
 struct Rng(u64);
 
@@ -67,6 +67,31 @@ fn cases(n: usize) -> Vec<Case> {
         if e.is_finite() {
             v.push(("exp", e, 0.0));
         }
+        // log: FAST's arguments, the log intensities log(x + 1.0) of float voxel values, the
+        // Gaussians' log(sqrt(2 pi sigma^2)) of float variances (PI a float), arguments close
+        // to 1 (Arm's second path) and the whole range (subnormals, negative numbers)
+        let vox = r.log_uniform(1e-6, 1e6) as f32;
+        v.push(("log", f64::from(vox) + 1.0, 0.0));
+        let var = r.log_uniform(1e-9, 1e3) as f32;
+        // FAST's `const float PI=3.14159265`, the float nearest to pi
+        let pi = f64::from(std::f32::consts::PI);
+        v.push(("log", (2.0 * pi * f64::from(var)).sqrt(), 0.0));
+        v.push(("log", 1.0 + (r.unit() - 0.5) * 0.15, 0.0));
+        let l = f64::from_bits(r.next());
+        if !l.is_nan() {
+            v.push(("log", l, 0.0));
+        }
+        // logf and expf as FSL's binaries bind them (logf@GLIBC_2.2.5, expf@GLIBC_2.2.5: the
+        // SVID-compatible wrappers): FAST's variances, energies and log intensities, and every
+        // float (negative numbers, zeros, infinities)
+        let fv = r.log_uniform(1e-9, 1e3) as f32;
+        v.push(("logf", f64::from(fv), 0.0));
+        let fx = f32::from_bits(r.next() as u32);
+        if !fx.is_nan() {
+            v.push(("logf", f64::from(fx), 0.0));
+            v.push(("expf", f64::from(fx), 0.0));
+        }
+        v.push(("expf", f64::from(((r.unit() - 0.9) * 130.0) as f32), 0.0));
         // x87 operations on doubles of NIfTI matrices' size
         let a = (r.unit() - 0.5) * 8.0;
         let b = (r.unit() - 0.5) * 8.0 + 1e-3;
@@ -84,6 +109,9 @@ fn ours(op: &str, a: f64, b: f64) -> u64 {
         "pow" => glibc_pow::pow(a, b).to_bits(),
         "tanh" => fdlibm::tanh(a).to_bits(),
         "exp" => glibc_pow::exp(a).to_bits(),
+        "log" => glibc_pow::log_compat(a).to_bits(),
+        "logf" => u64::from(glibc_float::logf_compat(a as f32).to_bits()),
+        "expf" => u64::from(glibc_float::expf(a as f32).to_bits()),
         "lddiv" => x87::div_to_f64(a, b).to_bits(),
         "ldadd" => x87::add_to_f64(a, b).to_bits(),
         "ldsub" => x87::sub_to_f64(a, b).to_bits(),

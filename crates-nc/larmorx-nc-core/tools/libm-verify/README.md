@@ -18,3 +18,17 @@ kernels' `-j²/(2σ²)`, the smoothness term's `tanh` arguments) and random oper
 range. Meaningful only on x86-64 Linux with glibc 2.35 and a CPU with FMA and AVX2 (the oracle
 machine). Result on 2026-10-24: 0 of 4 million `pow`, 0 of 4 million `exp`, 0 of 3 million
 `tanh` and 0 of 5 million x87 operations differ.
+
+Since 2026-11-02 (FAST) it also checks `log`, `logf` and `expf` as FSL's binaries bind them:
+`log@GLIBC_2.2.5`, `logf@GLIBC_2.2.5` and `expf@GLIBC_2.2.5`, the SVID-compatible wrappers of an
+older C library's symbols (FSL's conda build links against an old sysroot), which give C's
+positive `NAN` for the logarithm of a negative number where the newer symbols give SSE's `-nan`.
+So `glibc_reference` must bind the same symbols: build it with FSL's own compiler
+(`$FSLDIR/bin/gcc`, conda-forge's, whose sysroot binds the `GLIBC_2.2.5` versions; check with
+`nm -D glibc_reference | grep log`); the system's `gcc` binds `log@GLIBC_2.29`. FAST's arguments:
+the log intensities `log(x + 1)`, the Gaussians' `log(sqrt(2 pi sigma^2))`, arguments close to 1,
+variances for `logf`, energies and log intensities for `expf`, and random operands over the whole
+range. Result on 2026-11-02 (4 million per family): 0 of 16 million `log`, 0 of 8 million `logf`
+and 0 of 8 million `expf` differ (the earlier families unchanged: 0 differ).
+`glibc-float-verify expf` compares `expf` on all 2^32 inputs (Rust's `f32::exp`, the C library's
+`expf@@GLIBC_2.27`, which gives the same values as the wrapper): 0 differ.

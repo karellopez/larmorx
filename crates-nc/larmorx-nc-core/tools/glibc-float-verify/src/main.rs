@@ -17,8 +17,10 @@
 //! random bits, rotation-like pairs (`|y| <= 1`, `x` in `[0.5, 1]`: `atan2(sy, cy)`), and
 //! pairs in `[-1, 1]` (`atan2(sx, cx)`, `atan2(sz, cz)`).
 //!
-//! Usage: `glibc-float-verify [--threads N] [kernel] [sinf] [cosf] [sincosf] [logf] [atanf]
-//! [atan2f]` (all when none is named). Exits 0 when the port matches the platform everywhere.
+//! `expf` (FAST: `larmorx_nc_core::glibc_float::expf`) is compared on all 2^32 inputs too.
+//!
+//! Usage: `glibc-float-verify [--threads N] [kernel] [sinf] [cosf] [sincosf] [logf] [expf]
+//! [atanf] [atan2f]` (all when none is named). Exits 0 when the port matches the platform everywhere.
 #![deny(unsafe_code)]
 
 use larmorx_core::math;
@@ -366,6 +368,17 @@ fn main() {
             math::logf,
             |x| x > 0.0 && x <= 1.0,
             "probabilities in (0, 1]",
+        );
+    }
+    if want("expf") {
+        // FAST's arguments: minus the Gaussian energies (Initclass) and the log intensities
+        ok &= sweep(
+            "expf",
+            f32::exp,
+            glibc_float::expf,
+            math::expf,
+            |x| (-110.0..=12.0).contains(&x),
+            "FAST's arguments [-110, 12]",
         );
     }
     if want("atanf") {

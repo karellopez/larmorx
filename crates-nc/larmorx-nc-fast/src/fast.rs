@@ -17,6 +17,7 @@ use larmorx_nc_core::settings::Settings;
 use larmorx_nc_core::volume::{self, Elem, FslError, SaveError, SaveOptions, Saved, Volume};
 
 use crate::mriseg::{Io, Params, Segmentation};
+use crate::multi_mriseg::{MAX_CHANNELS, MultiParams, MultiSegmentation};
 
 const TITLE: &str = "FAST \nCopyright(c) 2004-2012, University of Oxford";
 const EXAMPLES: &str = "fast [options] file(s)";
@@ -351,20 +352,7 @@ fn segment_single_channel(args: &[String], a: &Args, run: &Run, io: &mut Io) -> 
         }
         Err(e) => exception::throw(e),
     };
-    if input.min() < 0.0 {
-        let (p02, _) = input
-            .percentile_masked(0.02, None)
-            .unwrap_or_else(|e| exception::throw(e));
-        if p02 < 0.0 {
-            let m = input.min();
-            for v in &mut input.data {
-                *v -= m;
-            }
-        } else {
-            let mx = input.max();
-            input.threshold_inclusive(0.0, mx);
-        }
-    }
+    clear_negative(&mut input);
     if a.verbose {
         let kind = match a.typeofimage {
             2 => "T2-weighted image",
@@ -473,23 +461,175 @@ fn segment_single_channel(args: &[String], a: &Args, run: &Run, io: &mut Io) -> 
     0
 }
 
-/// `segmentMultiChannel(argc, argv)`: fewer than two channels is FAST's error; two or more are
-/// not replicated yet.
-fn segment_multi_channel(_args: &[String], a: &Args, _run: &Run, io: &mut Io) -> u8 {
+/// The negative values of an input, as `segment*Channel` treats them: when the 2nd percentile
+/// is negative the minimum is subtracted, otherwise the negative values are set to 0.
+fn clear_negative(input: &mut Volume) {
+    if input.min() < 0.0 {
+        let (p02, _) = input
+            .percentile_masked(0.02, None)
+            .unwrap_or_else(|e| exception::throw(e));
+        if p02 < 0.0 {
+            let m = input.min();
+            for v in &mut input.data {
+                *v -= m;
+            }
+        } else {
+            let mx = input.max();
+            input.threshold_inclusive(0.0, mx);
+        }
+    }
+}
+
+/// `segmentMultiChannel(argc, argv)`: `-S n` reads the last `n` words of the command line,
+/// channel 1 the last one (which also names the outputs and orders the classes).
+fn segment_multi_channel(args: &[String], a: &Args, run: &Run, io: &mut Io) -> u8 {
     if a.verbose {
         let _ = writeln!(io.out, "Starting Multi Image Segmentation");
     }
-    if a.nchannel >= 2 {
-        let _ = writeln!(
+    if a.nchannel < 2 {
+        let _ = write!(
             io.err,
-            "larmorx-nc: fast -S {} (multi-channel segmentation) is not replicated yet",
-            a.nchannel
+            "At least 2 channels required for Multi Channel Segmentation"
         );
         return 1;
     }
-    let _ = write!(
-        io.err,
-        "At least 2 channels required for Multi Channel Segmentation"
-    );
-    1
+    let nch = a.nchannel as usize;
+    // argv[argc - c - 1] for c < nchannel: argv[0] (the program) or before it when fewer
+    // words follow the program than channels
+    if nch >= args.len() {
+        let _ = writeln!(
+            io.err,
+            "larmorx-nc: fast -S {nch}: fewer images than channels on the command line (FAST \
+             reads the program's own path or memory before the arguments)"
+        );
+        return 1;
+    }
+    if nch > MAX_CHANNELS {
+        let _ = writeln!(
+            io.err,
+            "larmorx-nc: fast -S {nch} (more than {MAX_CHANNELS} channels) is not replicated yet"
+        );
+        return 1;
+    }
+    let input_name = args[args.len() - 1].clone();
+    let outname = output_name(a, &input_name);
+    let mut images: Vec<Volume> = Vec::with_capacity(nch);
+    for c in 0..nch {
+        let name = &args[args.len() - c - 1];
+        let mut image: Volume = match volume::read_volume::<f32>(name, run.fsl) {
+            Ok((v, warning)) => {
+                if let Some(w) = warning {
+                    let _ = writeln!(io.err, "{w}");
+                }
+                v
+            }
+            Err(e) => exception::throw(e),
+        };
+        clear_negative(&mut image);
+        image.display_max = 0.0;
+        image.display_min = 0.0;
+        images.push(image);
+    }
+    let priors = match prior_registration(a, run, io) {
+        Ok(p) => p,
+        Err(e) if e.type_name.is_empty() => return 1,
+        Err(e) => exception::throw(e),
+    };
+    let (nx, ny, nz) = (images[0].xsize(), images[0].ysize(), images[0].zsize());
+    if images
+        .iter()
+        .any(|v| (v.xsize(), v.ysize(), v.zsize()) != (nx, ny, nz))
+    {
+        let _ = writeln!(
+            io.err,
+            "larmorx-nc: fast -S {nch}: the channels' images differ in size (FAST reads and \
+             writes past the smaller ones)"
+        );
+        return 1;
+    }
+    let params = MultiParams {
+        nclasses: a.nclass,
+        nbiter: a.nbiter,
+        nblowpass: a.nblowpass,
+        fbeta: a.fbeta,
+        bapused: priors.bapused,
+        bias: !a.remove_bias,
+        initfixed: a.initfixity,
+        verbose: a.verbose,
+        iterationspve: a.pve,
+        inititerations: a.inititer,
+        mixeltype_mrf: a.mixel,
+        hyper: a.hyper,
+        mansegfile: a.manualseg.clone(),
+        imagetype: a.typeofimage,
+        threads: run.threads,
+    };
+    let mut mri = MultiSegmentation::create(&images, params);
+    let pr = priors.volumes.as_ref().map(|[c, g, w]| [c, g, w]);
+    match mri.main(pr, io) {
+        Ok(0) => {}
+        // TanakaMain's -1: main returns -1
+        Ok(_) => return 255,
+        Err(e) => exception::throw(e),
+    }
+    let mut props = images[0].clone();
+    props.data = Vec::new();
+    let nc = a.nclass.max(0) as usize;
+    let seg: Volume<i32> = grid(&props, mri.segment.clone());
+    if let Some(code) = save(&seg, &format!("{outname}_seg"), run, io) {
+        return code;
+    }
+    if a.segments {
+        for i in 1..=nc as i32 {
+            let ind: Vec<i32> = mri.segment.iter().map(|&s| i32::from(s == i)).collect();
+            let v: Volume<i32> = grid(&props, ind);
+            if let Some(code) = save(&v, &format!("{outname}_seg_{}", i - 1), run, io) {
+                return code;
+            }
+        }
+    }
+    if a.probabilities {
+        for i in 0..nc {
+            let v: Volume = grid(&props, mri.member_volume(i));
+            if let Some(code) = save(&v, &format!("{outname}_prob_{i}"), run, io) {
+                return code;
+            }
+        }
+    }
+    if a.pve != 0 {
+        for i in 1..=nc {
+            let v: Volume = grid(&props, mri.pve_volume(i));
+            if let Some(code) = save(&v, &format!("{outname}_pve_{}", i - 1), run, io) {
+                return code;
+            }
+        }
+        let v: Volume<i32> = grid(&props, mri.pve_segment.clone());
+        if let Some(code) = save(&v, &format!("{outname}_pveseg"), run, io) {
+            return code;
+        }
+        let v: Volume<i32> = grid(&props, mri.hard_pv.clone());
+        if let Some(code) = save(&v, &format!("{outname}_mixeltype"), run, io) {
+            return code;
+        }
+    }
+    if a.output_corrected {
+        for (ch, image) in images.iter_mut().enumerate() {
+            for (v, &b) in image.data.iter_mut().zip(mri.final_bias(ch)) {
+                *v *= b;
+            }
+            if let Some(code) = save(image, &format!("{outname}_restore_{}", ch + 1), run, io) {
+                return code;
+            }
+        }
+    }
+    if a.output_bias {
+        for ch in 0..nch {
+            let field: Vec<f32> = mri.final_bias(ch).iter().map(|&b| 1.0 / b).collect();
+            let v: Volume = grid(&props, field);
+            if let Some(code) = save(&v, &format!("{outname}_bias_{}", ch + 1), run, io) {
+                return code;
+            }
+        }
+    }
+    0
 }

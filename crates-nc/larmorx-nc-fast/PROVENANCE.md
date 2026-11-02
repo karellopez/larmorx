@@ -30,8 +30,9 @@ what it translates.
 
 | Rust module | FSL file | Functions, classes |
 |---|---|---|
-| `fast` | fsl-fast4 `fast_two.cc` | `main` (the options in their order, the usage, the option errors, `-H`'s check), `segmentSingleChannel` (the input, its negative values, the outputs `_seg`, `_seg_<n>`, `_prob_<n>`, `_pve_<n>`, `_pveseg`, `_mixeltype`, `_restore`, `_bias`), `prior_registration` (the prior names, `FSLDIR`; `-a`'s registration with FLIRT pending), `segmentMultiChannel` (fewer than two channels; two or more pending) |
+| `fast` | fsl-fast4 `fast_two.cc` | `main` (the options in their order, the usage, the option errors, `-H`'s check), `segmentSingleChannel` (the input, its negative values, the outputs `_seg`, `_seg_<n>`, `_prob_<n>`, `_pve_<n>`, `_pveseg`, `_mixeltype`, `_restore`, `_bias`), `prior_registration` (the prior names, `FSLDIR`; `-a`'s registration with FLIRT pending), `segmentMultiChannel` (the channels read from the last words, channel 1 the last; the outputs, `_restore_<n>`, `_bias_<n>`; fewer than two channels; more than four refused: LAPACK's paths are ported up to 4 x 4) |
 | `mriseg` | fsl-fast4 `mriseg_two.{h,cc}` | `ZMRISegmentation`: `TanakaCreate`, `TanakaMain`, `BiasRemoval`, `Classification`, `Convolve`, `Dimensions`, `Initialise`, `logGaussian`, `MRFWeightsTotal`, `MRFWeightsInner`, `MRFWeightsAM`, `TanakaHyper`, `TanakaIterations`, `PVEnergy`, `PVClassificationStep`, `ICMPV`, `mixelType`, `PVestimation`, `takeexpo`, `InitSimple`, `calculateVolumes`, `printVolumeTotals`, `InitKernel`, `MeansVariances`, `Initclass`, `UpdateMembers`, `WeightedKMeans`, `qsort`, `pveClassification`; `TanakaPriorHyper` is not translated (it runs only for a negative `-H`, which `main` refuses) |
+| `multi_mriseg` | fsl-fast4 `multi_mriseg_two.{h,cc}` | `ZMRIMULTISegmentation`: `TanakaCreate`, `TanakaMain`, `Dimensions`, `Initialise`, `Classification`, `pveClassification`, `logGaussian`, `MRFWeightsTotal`, `MRFWeightsInner`, `MRFWeightsAM`, `TanakaHyper`, `TanakaIterations`, `PVEnergy`, `PVClassificationStep`, `logpveGaussian`, `ICMPV`, `PVMoreSophisticated`, `PVestimation`, `takeexpo`, `InitWeights`, `InitSimple`, `Volumesquant`, `InitKernel`, `Convolve`, `MeansVariances`, `BiasRemoval`, `Initclass`, `UpdateMembers`, `WeightedKMeans`, `qsort`, `mresmatrix`, `covariancematrix`, `M_2PI`; not translated: `TanakaPriorHyper` (a negative `-H`, refused by `main`), `InitclassAlt`, `InitAprioriKMeans`, `UpdateWeights`, `pvmeans`, `pvvar`, `PVMeansVar` (never called) |
 
 ## Changes from the originals
 
@@ -42,5 +43,11 @@ what it translates.
   each class's sum reads only its own class, so the sums and their order are FSL's.
 - `log(sqrt(2 pi sigma^2))` of each class is computed once per sweep (FSL computes it per voxel):
   the same value each time.
-- Pending in this part's later steps: the multi-channel segmentation (`multi_mriseg_two.cc`),
-  `-a`'s priors registered with FLIRT, and the D13 decisions of FAST's defects.
+- Multi-channel: the matrix expressions follow Armadillo 14.2.1's evaluation (`row * M * col`
+  as `(row M) col`, `row * M.i() * col` as `row * solve(M, col)`) with the core's `arma` and
+  `lapack`; `logGaussian`'s inverse and normalisation are taken once per class and sweep,
+  `logpveGaussian`'s once per mixel type and fraction, and `PVEnergy`'s LU factors once per
+  mixel type and fraction (FSL recomputes each per voxel: the same values); `p_bias` without a
+  bias field (`-N`), which FSL never writes, is 0 (pending its D13 decision).
+- Pending in this part's later steps: `-a`'s priors registered with FLIRT, and the D13 decisions
+  of FAST's defects.

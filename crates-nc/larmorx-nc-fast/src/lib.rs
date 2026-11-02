@@ -11,6 +11,7 @@
 //!
 //! - [`fast`]: the command line, the input, the files written.
 //! - [`mriseg`]: the single-channel segmentation (`ZMRISegmentation`).
+//! - [`multi_mriseg`]: the multi-channel segmentation (`ZMRIMULTISegmentation`, `-S n`).
 //! - [`cli`]: the command line (`fsl fast`) as `larmorx-nc` runs it.
 #![forbid(unsafe_code)]
 // Index loops mirror FSL's loops, so that each step can be checked against the source.
@@ -19,5 +20,6 @@
 pub mod cli;
 pub mod fast;
 pub mod mriseg;
+pub mod multi_mriseg;
 
 pub use cli::fast;

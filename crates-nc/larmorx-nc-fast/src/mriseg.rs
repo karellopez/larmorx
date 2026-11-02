@@ -1129,7 +1129,7 @@ fn mixel_type(nc: i32, t: i32) -> Result<(usize, usize), FslError> {
 
 /// The floats of a text file (`copy(istream_iterator<float>(file), ...)`): read until the first
 /// word that is not a number.
-fn read_floats(path: &str) -> Vec<f32> {
+pub(crate) fn read_floats(path: &str) -> Vec<f32> {
     let Ok(text) = std::fs::read_to_string(path) else {
         return Vec::new();
     };

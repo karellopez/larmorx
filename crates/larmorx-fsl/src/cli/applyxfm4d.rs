@@ -381,6 +381,7 @@ fn run(
             pad,
             padding: 0.0,
             spline: spline.as_ref(),
+            constant: false,
         };
         let Some(mut v) = output::resample(vol, &mat, refv.shape, refv.voxel_size, &r) else {
             return abort(err, "applyxfm4D", "std::runtime_error", mat::SINGULAR);

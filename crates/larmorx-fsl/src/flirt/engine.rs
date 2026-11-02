@@ -183,17 +183,28 @@ fn world(input: &Input) -> Option<Mat4> {
     if h.sform_code + h.qform_code <= 0 {
         return None;
     }
+    // the forms as single-precision matrices (§4.1)
     let a = if h.sform_code > 0 {
         *h.sform().rows()
     } else {
-        *h.qform().ok()?.rows()
+        h.qform()
+            .ok()?
+            .rows()
+            .map(|r| r.map(|v| f64::from(v as f32)))
     };
-    let mut f = IDENTITY;
-    if input.flipped {
-        f[0][0] = -1.0;
-        f[0][3] = input.vol.shape[0] as f64 - 1.0;
+    if !input.flipped {
+        return Some(a);
     }
-    Some(mat::mul(&a, &f))
+    // a neurological file's form swapped as reading swaps it: W·D⁻¹·F⁻¹·D, the field of view
+    // f = (n_x − 1)·d_x in single precision, F its own inverse (§4.1)
+    let d = input.vol.voxel.map(|v| f64::from(v as f32));
+    let fov = (input.vol.shape[0] as f32 - 1.0) * (input.vol.voxel[0] as f32);
+    let mut f = IDENTITY;
+    f[0][0] = -1.0;
+    f[0][3] = f64::from(fov);
+    let dm = mat::diagonal(d);
+    let di = mat::diagonal(d.map(|v| 1.0 / v));
+    Some(mat::mul(&mat::mul(&mat::mul(&a, &di), &f), &dm))
 }
 
 /// The scaled-mm conversion of a matrix (§3): `S M S⁻¹`, `S = diag(1/b)`.
@@ -213,8 +224,8 @@ fn qsform(reference: &Input, input: &Input) -> Mat4 {
         return IDENTITY;
     };
     let sr = mat::diagonal(reference.vol.voxel);
-    let si = mat::diagonal(input.vol.voxel);
-    let (Some(wri), Some(sii)) = (mat::inverse(&wr), mat::inverse(&si)) else {
+    let sii = mat::diagonal(input.vol.voxel.map(|v| 1.0 / v));
+    let Some(wri) = mat::inverse(&wr) else {
         return IDENTITY;
     };
     mat::mul(&mat::mul(&mat::mul(&sr, &wri), &wi), &sii)
@@ -2549,8 +2560,16 @@ fn resample_one(
         (None, Some(p)) => p,
         (None, None) => pad_value(src, ctx, notices)?,
     };
+    // the blur's edge (§9.3): with -applyxfm the edge rule (the constant of -setbackground,
+    // else the extraslice rule), after a registration zeros (§9.2)
+    let applying = o.apply_xfm || o.apply_iso.is_some();
+    let edge = match (applying, o.background) {
+        (false, _) => output::Edge::Zero,
+        (true, Some(b)) => output::Edge::Constant(b),
+        (true, None) => output::Edge::Extraslice(raw_pad),
+    };
     let blurred = if blur {
-        output::blur_for_output(src, ref_min, raw_pad)
+        output::blur_with_edge(src, ref_min, edge)
     } else {
         src.clone()
     };
@@ -2577,6 +2596,7 @@ fn resample_one(
         pad: pad_v,
         padding,
         spline: None,
+        constant: o.background.is_some(),
     };
     output::resample(&blurred, m, refv.shape, refv.voxel_size, &r)
         .ok_or_else(|| End::Error(mat::SINGULAR.into()))

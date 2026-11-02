@@ -148,6 +148,12 @@ Every source file starts with an SPDX header naming its licence and the files it
   libstdc++'s order: `stdsort::sort_checked`), and `interp` gives double images their sinc sums
   and spline coefficients in double precision (`interpolate_double`, `SplineCoefs::new_f64`) and
   integer images' spline coefficients stored in the type (`new_f64` with a store, `with_cast`).
+- **Exceptions thrown inside computations** (FLIRT part 3, `exception`): where FSL's code throws
+  from a function whose Rust form returns a value (a cost evaluation inverting a singular matrix:
+  Armadillo's `inv(): matrix is singular`; newimage's `Out of memory` where a volume cannot be
+  allocated), the replica unwinds with the exception as the payload (`resume_unwind`, which prints
+  nothing) to the program that catches it (FLIRT's `main`) or to the entry point, which prints
+  what C++ prints for an uncaught exception.
 - **Thread-independent.** The Gaussian smoothing shares its z slices between threads; nothing
   else here is parallel; the results never depend on the thread count.
 - **D13 hooks.** `Costfn::skip_nonfinite` (FSL-14's non-finite samples), the corrected centre of

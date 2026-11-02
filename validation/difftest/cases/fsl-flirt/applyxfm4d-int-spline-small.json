@@ -1,0 +1,216 @@
+{
+ "defect": null,
+ "description": "spline interpolation of a small integer volume (FSL-79's reproduce: the coefficients stored as (T)(c + 0.5), each value converted to the type); FSL-75 named (the volume is 3 voxels wide), FSL crashing there",
+ "expect": "pass",
+ "found": {
+  "detail": "exit status (applyxfm4D is killed; the replica exits 1): applyxfm4D signal 11, replica 0; every file bit-identical: out.nii.gz: differ",
+  "n": 9,
+  "seed": "probe-part3b",
+  "shrink_moves": [
+   "in: axis 0 25 -> 12 voxels",
+   "in: axis 1 25 -> 12 voxels",
+   "in: axis 2 17 -> 8 voxels",
+   "in: axis 0 12 -> 6 voxels",
+   "in: axis 1 12 -> 6 voxels",
+   "in: axis 2 8 -> 4 voxels",
+   "in: axis 0 6 -> 3 voxels",
+   "dropped -interp (-interp spline)",
+   "in (and its grid): plumb orientation",
+   "in (and its grid): unit spacing",
+   "in: content head -> constant",
+   "in (and its grid): origin at 0",
+   "ref (and its grid): plumb orientation",
+   "ref (and its grid): unit spacing",
+   "ref (and its grid): origin at 0",
+   "ref (and its grid): qform and sform codes 1",
+   "ref: content blobs -> constant"
+  ],
+  "signature": [
+   "every file bit-identical"
+  ]
+ },
+ "id": "applyxfm4d-int-spline-small",
+ "implementations": [
+  "replica"
+ ],
+ "reason": "",
+ "recipe": {
+  "extra": {
+   "output_type": "NIFTI_GZ",
+   "tool": "applyxfm4D"
+  },
+  "features": {
+   "-3D": false,
+   "-interp": true,
+   "FSLOUTPUTTYPE": "NIFTI_GZ",
+   "axis0": 1.2,
+   "axis1": 0.85,
+   "axis2": 1.2,
+   "bias0": -0.005,
+   "bias1": -0.0075,
+   "bias2": -0.0075,
+   "bias3": -0.01,
+   "blobs": 1,
+   "centre0": 4.5,
+   "centre1": 3.5,
+   "centre2": 3.0,
+   "content": "blobs",
+   "dtype": "float32",
+   "extreme": false,
+   "interp": "spline",
+   "kind": "applyxfm4D",
+   "noise": 1.0,
+   "orientation": "axes",
+   "origin0": -22.75,
+   "origin1": -58.75,
+   "origin2": 51.25,
+   "q0": 35,
+   "q1": 3,
+   "q2": -3,
+   "q3": -3,
+   "qfac": 1,
+   "qform_code": 1,
+   "range": "plain",
+   "scale0": "1",
+   "scale1": "0.95",
+   "scale2": "1",
+   "sform": "same",
+   "sform_code": 0,
+   "shape": "14x12x8",
+   "shift0": "3.25",
+   "shift1": "1.5",
+   "shift2": "-2",
+   "size": 25.5,
+   "spacing0": 3.0,
+   "spacing1": 1.0,
+   "spacing2": 4.0,
+   "suffix": ".nii.gz",
+   "tissues": "epi",
+   "tr": 2.0,
+   "tunits": "unknown",
+   "units": "mm"
+  },
+  "groups": [
+   {
+    "args": [
+     "{in:in}",
+     "{in:ref}",
+     "out",
+     "{in:m}",
+     "-singlematrix"
+    ],
+    "name": "files",
+    "optional": false
+   }
+  ],
+  "inputs": {
+   "in": {
+    "content": {
+     "seed": 2067822973,
+     "type": "constant"
+    },
+    "dtype": "uint8",
+    "geometry": {
+     "origin": [
+      0.0,
+      0.0,
+      0.0
+     ],
+     "qfac": 1,
+     "qform_code": 1,
+     "quaternion": [
+      1,
+      0,
+      0,
+      0
+     ],
+     "sform": "same",
+     "sform_code": 1,
+     "spacing": [
+      1.0,
+      1.0,
+      1.0
+     ],
+     "units": "mm"
+    },
+    "scaling": null,
+    "shape": [
+     3,
+     6,
+     4,
+     1
+    ],
+    "suffix": ".nii.gz",
+    "timing": {
+     "slice_code": 0,
+     "tr": 2.0,
+     "tunits": "unknown"
+    },
+    "values": {
+     "offset": 0.0,
+     "scale": 1.0
+    }
+   },
+   "m": {
+    "kind": "text",
+    "suffix": ".mat",
+    "text": "0.9712460064 0.145686901 -0.1821086262 3.25\n-0.1821086262 0.9226837061 -0.1533546326 1.5\n0.1533546326 0.1730031949 0.9712460064 -2\n0 0 0 1\n"
+   },
+   "ref": {
+    "content": {
+     "seed": 898715081,
+     "type": "constant"
+    },
+    "dtype": "float32",
+    "geometry": {
+     "origin": [
+      0.0,
+      0.0,
+      0.0
+     ],
+     "qfac": 1,
+     "qform_code": 1,
+     "quaternion": [
+      1,
+      0,
+      0,
+      0
+     ],
+     "sform": "same",
+     "sform_code": 1,
+     "spacing": [
+      1.0,
+      1.0,
+      1.0
+     ],
+     "units": "mm"
+    },
+    "scaling": null,
+    "shape": [
+     14,
+     12,
+     8
+    ],
+    "suffix": ".nii.gz",
+    "values": {
+     "offset": 0.0,
+     "scale": 1.0
+    }
+   }
+  },
+  "n": 9,
+  "options": [
+   "-interp spline",
+   "4D",
+   "FSLOUTPUTTYPE=NIFTI_GZ",
+   "applyxfm4D"
+  ],
+  "seed": "probe-part3b",
+  "tool": "fsl-flirt-part3"
+ },
+ "rule": null,
+ "status": "fixed",
+ "suite": "fsl-flirt-replica",
+ "tier": "smoke",
+ "tool": "fsl-flirt"
+}

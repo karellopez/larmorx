@@ -3413,7 +3413,9 @@ pub fn run(
         }
     };
     let mut f = Flirt::new(o, mode, settings, threads, out, err);
-    let r = f.main();
+    // FLIRT's main catches the exceptions thrown inside its computations too (a singular
+    // matrix in a cost evaluation, a volume that cannot be allocated)
+    let r = larmorx_nc_core::exception::catch(|| f.main()).unwrap_or_else(|e| Err(e.into()));
     f.flush_quat_msgs();
     if matches!(r, Err(Stop::Exception(_))) {
         // FSL-68: FLIRT's main catches every exception and returns 0 (rule B: a clear error).

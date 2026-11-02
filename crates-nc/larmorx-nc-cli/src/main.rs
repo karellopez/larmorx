@@ -124,7 +124,24 @@ where
                         Ok(mode) => {
                             let settings = Settings::from_env(FSL_VARIABLES)
                                 .reproducing_renames(mode.reproduce());
-                            let code = f(&rest, &settings, mode, threads(), out, err);
+                            // an exception nothing in the program catches: std::terminate
+                            let code = match larmorx_nc_core::exception::catch(|| {
+                                f(&rest, &settings, mode, threads(), out, err)
+                            }) {
+                                Ok(code) => code,
+                                Err(e) => {
+                                    let _ = write!(
+                                        err,
+                                        "{}terminate called after throwing an instance of \
+                                         '{}'\n  what():  {}\nlarmorx-nc: {tool} aborts here \
+                                         (signal 6); the replica exits with status 1\n",
+                                        e.printed_text(),
+                                        e.type_name,
+                                        e.what
+                                    );
+                                    1
+                                }
+                            };
                             renamed_notices(&settings, mode, err);
                             (code, Ok(()))
                         }

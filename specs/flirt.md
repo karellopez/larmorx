@@ -123,6 +123,13 @@ yet written are not written. (observed)
   same two lines again, status 0.
 - `FSLOUTPUTTYPE` unset when an image is written: FSL's message about the variable, status 1 (as
   mcflirt, `specs/mcflirt.md` §10.1; larmorx's default writes `.nii.gz`, FSL-11).
+- A matrix a cost evaluation must invert that is singular (a scale of 0 reached by an
+  optimisation, e.g. through a parameter subset on degenerate images): `inv(): matrix is
+  singular`, status 0, nothing written, wherever in the schedule it happens (observed, part 3).
+- An image the program cannot allocate (an isotropic reference of voxels of 0.01 mm: hundreds of
+  GB): `Image Exception : #99 :: Out of memory`, then `Out of memory`, status 0 (observed under an
+  address-space limit, part 3). The original reports it alike where its own allocation fails, and
+  never starts a computation it cannot hold.
 
 ### 2.3 Verbose output
 
@@ -869,9 +876,12 @@ Closed in part 3: the principal-axes alignment (§8.7), every parameter-subset m
 `makerot`'s NaN signs (§15.4). Open:
 1. The coordinate programs' `-warp` (FNIRT's warp fields): refused by the original (and by the
    replica) until FSL's warp-field libraries are ported (`docs/next-steps.md`).
-2. The sign of an all-NaN result matrix (FSL's `-nan` or `nan`) when the input's centre of mass is
-   not finite (an infinite voxel with `reproduce`'s FSL-14) and a schedule optimises relative to a
-   row (`optimise ... rel`): not specified (the values are NaN either way).
+2. The sign of NaN results from non-finite inputs in `reproduce` mode (FSL-14 lets them in): an
+   all-NaN `-omat` matrix when a schedule optimises relative to a row (`optimise ... rel`, with or
+   without a parameter subset), and the NaN voxels of `applyxfm4D`'s spline interpolation of an
+   image with NaN and infinite voxels: FSL writes `nan` or `-nan` by an operand order not specified
+   here (the values are NaN either way; six findings of the part-3 trial's 209,657 cases and one
+   of its pre-check's).
 3. Not ported, by decision: `standard_space_roi`, `flirt_average`, `epi_reg` (they need FSL's other
    programs: `fslmaths`, `fslroi`, FAST, `fugue`).
 
@@ -1161,7 +1171,8 @@ interpolation method (enum, string): <0|1|2|4>, <m>`; with more than 10000 volum
 than 10000 volumes - only doing first 10000` (volumes up to 10000 done); for each volume, its
 matrix file's name printed (standard output) unless `-singlematrix`, then the volume resampled as
 §9.2 onto a copy of the reference: its background value (§10a, FSL-75: also named on every
-overflow, the whole border by default) as the padding, the extraslice rule, padding size 0, the
+overflow, the whole border by default; NaN voxels in the border ordered as §10a, FSL-22) as the
+padding, the extraslice rule, padding size 0, the
 sinc kernel blackman with full width 7. The output: the volumes in order, the input's TR, display
 range 0, 0. **-3D**: the input and the reference read as volumes; the input padded with its
 background value; sinc with the rectangular window of full width 9 (FSL-80: FSL uses blackman of

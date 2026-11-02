@@ -21,7 +21,7 @@ import numpy as np
 from larmorx import _replica
 from larmorx._defects import UpstreamDefectsName
 from larmorx._replica import ImplementationName
-from larmorx.fsl.flirt import _matrix_file, _run
+from larmorx.fsl.flirt import _matrix_file, _run, _warn
 from larmorx.fsl.flirt_tools import _image_file
 
 __all__ = [
@@ -34,6 +34,25 @@ __all__ = [
 ]
 
 Interp4D = Literal["sinc", "trilinear", "nearestneighbour", "spline"]
+
+#: The output types by the file name's extension (FSL replaces the extension by its own).
+_OUTPUT_TYPES = (
+    (".nii.gz", "NIFTI_GZ"),
+    (".nii", "NIFTI"),
+    (".hdr.gz", "NIFTI_PAIR_GZ"),
+    (".img.gz", "NIFTI_PAIR_GZ"),
+    (".hdr", "NIFTI_PAIR"),
+    (".img", "NIFTI_PAIR"),
+)
+
+
+def _output_type(path: str) -> tuple[str, str]:
+    """The path FSL writes for ``path`` and the ``FSLOUTPUTTYPE`` that writes it (a name without
+    a known extension: ``.nii.gz``, FSL's default)."""
+    for ext, kind in _OUTPUT_TYPES:
+        if path.endswith(ext):
+            return path, kind
+    return path + ".nii.gz", "NIFTI_GZ"
 
 
 def _points_file(points: Any, tmp: str, name: str) -> str:
@@ -126,12 +145,13 @@ def applyxfm4d(
     """FSL's ``applyxfm4D``: each volume of ``in_image`` resampled onto ``ref_image``'s grid
     through ``transforms`` (one matrix file with ``single_matrix``, else a directory of
     ``MAT_0000n`` files, ``MAT_000n`` with ``four_digit``, ``<user_prefix>000n`` with
-    ``user_prefix``), written to ``out_image`` in the input's data type; ``three_d`` resamples
-    one volume (``-3D``). Returns the output path."""
+    ``user_prefix``), written to ``out_image`` in the input's data type (its extension chooses
+    the format: ``.nii.gz``, ``.nii``, ``.hdr``/``.img``; none: ``.nii.gz``); ``three_d``
+    resamples one volume (``-3D``). Returns the path written."""
     selected = _replica.select("fsl", "applyxfm4D", implementation)
     assert selected is not None
     with tempfile.TemporaryDirectory(prefix="larmorx-applyxfm4d-") as tmp:
-        out = os.path.abspath(os.fspath(out_image))
+        out, kind = _output_type(os.path.abspath(os.fspath(out_image)))
         args = [
             os.path.abspath(os.fspath(in_image)),
             os.path.abspath(os.fspath(ref_image)),
@@ -147,7 +167,16 @@ def applyxfm4d(
         args += ["-interp", interp]
         if three_d:
             args.append("-3D")
-        _run(selected, args, tmp, 1, upstream_defects)
+        process = _replica.run(
+            selected,
+            args,
+            cwd=tmp,
+            n_threads=1,
+            upstream_defects=upstream_defects,
+            env={"FSLOUTPUTTYPE": kind, "PATH": tmp},
+            exclude=lambda name: name.upper().startswith("FSL"),
+        )
+        _warn(process.stderr)
     return out
 
 

@@ -341,11 +341,46 @@ matrix-vector products, `dgemm`), `savetxt('%14.10f')`. `pairreg`: three flirt r
 `calc_bval` too; on a series 3 voxels wide FSL aborts (double free) or finishes; the replica names
 FSL-75 in both modes and uses the whole border by default.
 
-**Open** (part 3's trial and pre-check): the sign of an all-NaN `-omat` matrix with an infinite
-input voxel under FSL-14's `reproduce` and an `optimise ... rel` schedule (FSL `-nan`, the replica
-`nan`; also without `paramsubset`, so part 2's path: the starting matrix from `testCog` already
-differs in sign; probe-part3b-00496). Not traced: the NaN of `calc_cog` (the replica's SSE order)
-or the tiny `sampling_mat()·v` product.
+**Part 3's random testing** (*validated*): a pre-check (2,805 cases, seed `probe-part3b`) and one
+half-hour trial of the new paths (`difftest --tools fsl-flirt-part3 --budget 0.5 --jobs 20 --seed
+part3-trial`, `<workspace>/oracles/difftest/2026-11-01-fsl-flirt-part3`: 209,657 cases, 209,455
+agree, 136 notices, 19 differ, 47 over the memory limit). What they found, each fixed with a suite
+case or a permanent case (`validation/difftest/cases/fsl-flirt/`), re-checked boxed with the final
+build (`recheck_findings.py`):
+- applyxfm4D's double template (≈ 100 pre-check cases): `fmrib_main<double>` was refused; its
+  arithmetic is above (interpolate's float return, the mask's double padding value, the sinc sum's
+  `double·float`, double spline coefficients).
+- FSL-79 exactly: `SplineColumn::Set` adds 0.5 before the integer cast, and `Splinterpolator<T>`
+  returns `static_cast<T>(value_at)`.
+- FSL-22 in applyxfm4D (`calc_bval<T>` sorts the border with libstdc++'s introsort: NaN voxels in
+  the border move the 10th percentile; trial 39242, 152078).
+- FLIRT's exceptions inside computations whose Rust signature returns a value: the cost
+  function's `aff.i()` of a singular matrix (`inv(): matrix is singular`; trial 57755: a parameter
+  subset reaching scale 0 on one-voxel images; the replica had used a NaN matrix there) and
+  newimage's `Out of memory` (#99) for an isotropic reference of 417 or 585 GB (voxels of 0.01 mm;
+  trial 70320, 165530; the replica's allocator aborted). `larmorx-nc-core::exception` throws them as
+  an unwinding payload (`resume_unwind`, nothing printed) that FLIRT's `main` catches (FSL-68) and
+  the program entry point otherwise reports as `std::terminate`; the volume is allocated with
+  `try_reserve` (`exception::try_volume`).
+- extracttxt's dc and sed behaviour for ranges before the first line (dash, dc 1.4.1, sed 4.8:
+  `validation/probes/fsl-flirt-programs/extracttxt_ranges.py`, 390 of 390).
+- The notices: FSL-79 and FSL-80 are named only where the written output changes (both
+  conversions compared, the masked voxels left out), FSL-09 only for voxels the mask does not
+  overwrite; 131 of the trial's 136 notice cases agree since; in 5 (FSL-79 or FSL-80 with FSL-09 in
+  one voxel) the two corrections cancel (the float spline's 2.6 rounded to 3, FSL's integer 3 truncated to 3: the combined
+  output equals FSL's): left as notices.
+- The 47 memory cases are flirt schedules on extreme voxel sizes: FSL needs as much (finding
+  probe-part3b-01970: FSL 8,966 MiB, the replica 8,342, the matrices identical; `memory_findings.py`):
+  heavy cases of the final validation phase.
+
+**Open** (left by decision of part 3; `specs/flirt.md` §14.2): the sign of NaN results from
+non-finite inputs under FSL-14's `reproduce`: an all-NaN `-omat` matrix when a schedule optimises
+relative to a row (pre-check 496, trial 65393, 83738, 97568; also without `paramsubset`, so part
+2's path: the starting matrix from `testCog` already differs in sign; FSL `-nan` against the
+replica's `nan` in some, the reverse in others), and the NaN voxels of applyxfm4D's spline of an
+image with NaN and infinite voxels (trial 102752, 122789, 191754: `deconv`'s or `value_at`'s
+operand order in FSL's build for two NaN operands). Not traced: which of `calc_cog`'s sums, the tiny
+`sampling_mat()·v` product, `compose_aff` or the spline's sweeps passes the other operand's NaN.
 
 ## Not replicated (by decision)
 

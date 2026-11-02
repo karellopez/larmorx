@@ -178,6 +178,7 @@ of its type's range.
 
 The coordinate programs' `-warp` (FNIRT's warp fields, refused until FSL's warp-field libraries are
 ported); `standard_space_roi`, `flirt_average` and `epi_reg` (scripts of FSL's other programs: not
-ported); the clean-room original. Known difference (part 3's random testing): with an infinite
-input voxel, `reproduce` (FSL-14) and a schedule that optimises relative to a row, an all-NaN
-matrix is written as `nan` where FSL writes `-nan`.
+ported); the clean-room original. Known difference (part 3's random testing): with NaN or
+infinite input voxels in `reproduce` mode (FSL-14), the sign of NaN results can differ from FSL's
+(`nan` against `-nan`): an all-NaN matrix from a schedule that optimises relative to a row, and
+the NaN voxels of `applyxfm4D`'s spline interpolation; the values are NaN in both.

@@ -41,8 +41,8 @@ use larmorx_nc_core::newimagefns;
 use larmorx_nc_core::nifti::{self, dt};
 use larmorx_nc_core::settings::Settings;
 use larmorx_nc_core::volume::{
-    self, BorderBuffer, Conversion, Elem, Extrapolation, FslError, Interpolation, SaveError,
-    SaveOptions, SaveType, Volume,
+    self, Background, BorderBuffer, Conversion, Elem, Extrapolation, FslError, Interpolation,
+    NanOrder, SaveError, SaveOptions, SaveType, Volume,
 };
 
 use crate::run::PREFIX;
@@ -222,14 +222,47 @@ impl Run<'_> {
 
     /// The background value of `vin` (`backgroundval()`, in its type) with FSL-75's switch.
     fn padvalue<T: Elem>(&mut self, vin: &Volume<T>) -> Result<T, End> {
-        match vin.background_buffer() {
+        // FSL-22: NaN values in the border have no defined order in FSL's sort; sorted last by
+        // default, in libstdc++'s order (FSL's build's) with `reproduce`; named (as flirt's)
+        let order = if self.mode.reproduce() {
+            NanOrder::Libstdcxx
+        } else {
+            NanOrder::Last
+        };
+        let buffer = vin.background_buffer();
+        if buffer != BorderBuffer::Empty {
+            let (x, y, z) = (vin.xsize(), vin.ysize(), vin.zsize());
+            let (_, how) = vin.background_value_in(false, order);
+            let detail = match how {
+                Background::Defined => None,
+                _ if self.mode.fix() => Some(format!(
+                    "the {x} x {y} x {z} volume's 2-voxel border holds NaN voxels: they are \
+                     sorted last for its background value; C++ leaves the order of \
+                     applyxfm4D's sort undefined"
+                )),
+                Background::Outside => Some(format!(
+                    "the {x} x {y} x {z} volume's 2-voxel border holds NaN voxels, whose order \
+                     applyxfm4D's sort leaves undefined in C++: there libstdc++'s sort reads \
+                     memory outside the vector of border values, so they are sorted last"
+                )),
+                _ => Some(format!(
+                    "the {x} x {y} x {z} volume's 2-voxel border holds NaN voxels, whose order \
+                     applyxfm4D's sort leaves undefined in C++: its background value has them \
+                     in libstdc++'s order, as FSL's build sorts them"
+                )),
+            };
+            if let Some(d) = detail {
+                self.notice(&defects::FSL_22, d);
+            }
+        }
+        match buffer {
             BorderBuffer::Empty => Err(End::Refuse(
                 "the background value of a 1 x 1 x 1 volume: FSL reads an empty buffer (FSL-75)"
                     .to_owned(),
             )),
             BorderBuffer::Overflow { numbins, written } => {
-                let (fsl, _) = vin.background_value_with(false);
-                let (whole, _) = vin.background_value_with(true);
+                let (fsl, _) = vin.background_value_in(false, order);
+                let (whole, _) = vin.background_value_in(true, order);
                 // as flirt's: named whenever FSL writes past the buffer (it may abort or crash
                 // later), whatever the value
                 self.notice(
@@ -248,7 +281,7 @@ impl Run<'_> {
                 );
                 Ok(if self.mode.fix() { whole } else { fsl })
             }
-            BorderBuffer::Exact => Ok(vin.backgroundval()),
+            BorderBuffer::Exact => Ok(vin.background_value_in(false, order).0),
         }
     }
 
@@ -302,15 +335,11 @@ impl Run<'_> {
             _ => newimagefns::raw_affine_transform_coefs(&src, vout, aff, coefs),
         };
         resample(vout, coefs.as_ref())?;
+        let outside = newimagefns::affine_transform_mask_indices(&src, vout, aff, 0.0)?;
         if let (Some(alt), Some(mut other)) = (alt, before) {
-            // FSL-79 named only where FSL's coefficients and values change the result
+            // FSL-79 named only where FSL's coefficients and values change the output
             resample(&mut other, Some(&alt))?;
-            if other
-                .data
-                .iter()
-                .zip(&vout.data)
-                .any(|(a, b)| a.to_bits() != b.to_bits())
-            {
+            if typed_differs::<T>(&other, vout, &outside) {
                 self.notice(
                     &defects::FSL_79,
                     if self.mode.fix() {
@@ -325,7 +354,6 @@ impl Run<'_> {
                 );
             }
         }
-        let outside = newimagefns::affine_transform_mask_indices(&src, vout, aff, 0.0)?;
         for &i in &outside {
             vout.data[i] = src.padvalue;
         }
@@ -372,6 +400,25 @@ impl Run<'_> {
             (stored, float)
         }
     }
+}
+
+/// Whether two interpolated volumes give different outputs in the type `T` (with FSL's cast or
+/// FSL-09's rounding, either), outside the voxels the mask sets: a defect's notice where it
+/// changes what is written.
+fn typed_differs<T: Elem>(a: &Volume, b: &Volume, outside: &[usize]) -> bool {
+    let mut masked = vec![false; a.data.len()];
+    for &i in outside {
+        masked[i] = true;
+    }
+    [Conversion::X86Cast, Conversion::RoundClamp]
+        .iter()
+        .any(|&conv| {
+            let (x, y) = (to_type::<T>(a, conv), to_type::<T>(b, conv));
+            x.iter()
+                .zip(&y)
+                .zip(&masked)
+                .any(|((p, q), &m)| !m && p.to_f64().to_bits() != q.to_f64().to_bits())
+        })
 }
 
 /// A conversion of a double (a coefficient or value to the image's type).
@@ -440,13 +487,20 @@ fn typed_main<T: Elem>(
         Conversion::X86Cast
     };
     let mut fsl09 = false;
-    let mut check09 = |v: &Volume| {
+    // FSL-09 named where the conversion changes a written voxel (not those the mask sets to the
+    // background value afterwards)
+    let mut check09 = |v: &Volume, outside: &[usize]| {
         if integer.is_some() && !fsl09 {
             let a: Vec<T> = to_type::<T>(v, Conversion::X86Cast);
             let b: Vec<T> = to_type::<T>(v, Conversion::RoundClamp);
+            let mut masked = vec![false; a.len()];
+            for &i in outside {
+                masked[i] = true;
+            }
             if a.iter()
                 .zip(&b)
-                .any(|(x, y)| x.to_f64().to_bits() != y.to_f64().to_bits())
+                .zip(&masked)
+                .any(|((x, y), &m)| !m && x.to_f64().to_bits() != y.to_f64().to_bits())
             {
                 fsl09 = true;
             }
@@ -514,7 +568,7 @@ fn typed_main<T: Elem>(
                 integer,
             )?;
             drop(vin_t);
-            check09(&dummy);
+            check09(&dummy, &outside);
             let mut typed = Volume::<T>::copyconvert(&dummy);
             typed.data = to_type::<T>(&dummy, conv);
             // affine_transform_mask writes the background value in the type
@@ -589,12 +643,7 @@ fn typed_main<T: Elem>(
                 &affmat,
                 integer,
             )?;
-            if other
-                .data
-                .iter()
-                .zip(&outvol.data)
-                .any(|(a, b)| a.to_bits() != b.to_bits())
-            {
+            if typed_differs::<T>(&other, &outvol, &outside) {
                 r.notice(
                     &defects::FSL_80,
                     if r.mode.fix() {
@@ -609,7 +658,7 @@ fn typed_main<T: Elem>(
                 );
             }
         }
-        check09(&outvol);
+        check09(&outvol, &outside);
         outvol.pixdims[3] = in_t.tdim().abs();
         let mut typed = Volume::<T>::copyconvert(&outvol);
         typed.data = to_type::<T>(&outvol, conv);

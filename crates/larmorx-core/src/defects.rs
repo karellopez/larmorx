@@ -459,9 +459,9 @@ defects! {
     FSL_78 = "FSL-78", "midtrans", true,
         "an error after the transforms are read (a matrix that is not 4 x 4, a singular product, an image that cannot be read) ends the program with exit status 0: its main catches the exception, prints its message and returns 0, with no output written";
     FSL_79 = "FSL-79", "applyxfm4D", true,
-        "spline interpolation of an integer image (char, short or int) stores the spline coefficients in the image's integer type: each deconvolution pass truncates them toward zero, so the interpolated values are those of a coarser, shifted spline";
+        "spline interpolation of an integer image (char, short or int) keeps the spline coefficients in the image's integer type (each filtering pass's results rounded half up, toward zero below -0.5) and converts each interpolated value to the type before the output's own conversion: the values of a coarser, shifted spline";
     FSL_80 = "FSL-80", "applyxfm4D", true,
-        "newimage's cache of interpolation kernels holds any two kernels of different widths the same (its comparison is not an ordering), so a sinc kernel defined after another of other widths is replaced by that one: applyxfm4D -3D's rectangular sinc kernel of width 9 becomes the default blackman kernel of width 7 defined just before it";
+        "a sinc kernel asked for after another one was defined is replaced by the earlier one whatever their windows and widths: applyxfm4D -3D's rectangular sinc kernel of width 9 becomes the default blackman kernel of width 7 defined just before it";
     FSL_81 = "FSL-81", "aff2rigid", true,
         "aff2rigid stops with NameError: name 'mat' is not defined (FSL 6.0.7.23 runs it on numpy 2.4.6, and numpy 2 removed the mat alias): it never writes its matrix";
     FSL_76 = "FSL-76", "makerot", true,

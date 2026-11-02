@@ -1,0 +1,248 @@
+{
+ "defect": "FSL-22",
+ "description": "applyxfm4D's background value of a volume with a NaN in its border: libstdc++'s order (FSL's build's) with reproduce, NaN sorted last by default, named (FSL-22, as flirt)",
+ "expect": "pass",
+ "found": {
+  "detail": "every file bit-identical: out.nii: 1 of 1 values differ (max |diff| 0.00129)",
+  "n": 39242,
+  "seed": "part3-trial",
+  "shrink_moves": [
+   "dropped -interp (-interp sinc)",
+   "ref: axis 2 25 -> 12 voxels",
+   "ref: axis 1 19 -> 9 voxels",
+   "ref: axis 0 17 -> 8 voxels",
+   "ref: axis 2 12 -> 6 voxels",
+   "ref: axis 1 9 -> 4 voxels",
+   "ref: axis 0 8 -> 4 voxels",
+   "ref: axis 2 6 -> 3 voxels",
+   "ref: axis 0 4 -> 2 voxels",
+   "ref: axis 1 4 -> 2 voxels",
+   "ref: axis 2 3 -> 1 voxels",
+   "ref: axis 0 2 -> 1 voxels",
+   "ref: axis 1 2 -> 1 voxels",
+   "in (and its grid): unit spacing",
+   "in (and its grid): plumb orientation",
+   "in (and its grid): qform and sform codes 1",
+   "ref (and its grid): plumb orientation",
+   "ref (and its grid): origin at 0",
+   "ref (and its grid): qform and sform codes 1",
+   "ref (and its grid): millimetres",
+   "ref: content crop -> constant"
+  ],
+  "signature": [
+   "every file bit-identical"
+  ]
+ },
+ "id": "applyxfm4d-nan-background",
+ "implementations": [
+  "replica"
+ ],
+ "reason": "",
+ "recipe": {
+  "extra": {
+   "output_type": "NIFTI",
+   "tool": "applyxfm4D"
+  },
+  "features": {
+   "-3D": false,
+   "-interp": true,
+   "FSLOUTPUTTYPE": "NIFTI",
+   "axis0": 0.95,
+   "axis1": 0.8,
+   "axis2": 1.0,
+   "bias0": 0.0025,
+   "bias1": 0.0025,
+   "bias2": 0.01,
+   "bias3": 0.005,
+   "centre0": -5.5,
+   "centre1": -2.5,
+   "centre2": 4.5,
+   "content": "crop",
+   "corner0": 20,
+   "corner1": 28,
+   "corner2": 23,
+   "crop source": "templateflow/tpl-MNI152NLin2009cAsym/tpl-MNI152NLin2009cAsym_res-02_T1w.nii.gz",
+   "crop stride": 2,
+   "dtype": "float32",
+   "extreme": false,
+   "interp": "sinc",
+   "kind": "applyxfm4D",
+   "noise": 1.0,
+   "orientation": "oblique",
+   "origin0": 32.25,
+   "origin1": 15.75,
+   "origin2": -1.25,
+   "q0": 32,
+   "q1": 1,
+   "q2": -2,
+   "q3": 3,
+   "qfac": -1,
+   "qform_code": 1,
+   "range": "plain",
+   "scale0": "1",
+   "scale1": "1",
+   "scale2": "0.95",
+   "sform": "same",
+   "sform_code": 0,
+   "shape": "17x19x25",
+   "shift0": "0",
+   "shift1": "-2",
+   "shift2": "1.5",
+   "size": 26.5,
+   "spacing0": 1.0,
+   "spacing1": 2.0,
+   "spacing2": 2.5,
+   "specials": 2,
+   "suffix": ".nii.gz",
+   "tissues": "epi",
+   "tr": 0.5,
+   "tunits": "sec",
+   "units": "unknown"
+  },
+  "groups": [
+   {
+    "args": [
+     "{in:in}",
+     "{in:ref}",
+     "out",
+     "{in:m}",
+     "-singlematrix"
+    ],
+    "name": "files",
+    "optional": false
+   }
+  ],
+  "inputs": {
+   "in": {
+    "content": {
+     "axes": [
+      0.95,
+      0.8,
+      1.0
+     ],
+     "bias": [
+      0.0025,
+      0.0025,
+      0.01,
+      0.005
+     ],
+     "centre": [
+      -5.5,
+      -2.5,
+      4.5
+     ],
+     "noise": 1.0,
+     "seed": 616481135,
+     "size": 26.5,
+     "tissues": "epi",
+     "type": "head"
+    },
+    "dtype": "float32",
+    "geometry": {
+     "origin": [
+      -46.25,
+      -14.25,
+      -1.5
+     ],
+     "qfac": 1,
+     "qform_code": 1,
+     "quaternion": [
+      1,
+      0,
+      0,
+      0
+     ],
+     "sform": "same",
+     "sform_code": 1,
+     "spacing": [
+      1.0,
+      1.0,
+      1.0
+     ],
+     "units": "mm"
+    },
+    "scaling": null,
+    "shape": [
+     8,
+     15,
+     18,
+     1
+    ],
+    "suffix": ".nii.gz",
+    "timing": {
+     "slice_code": 0,
+     "tr": 0.5,
+     "tunits": "sec"
+    },
+    "values": {
+     "offset": 0.0,
+     "scale": 1.0,
+     "specials": [
+      "nan",
+      "inf"
+     ]
+    }
+   },
+   "m": {
+    "kind": "text",
+    "suffix": ".mat",
+    "text": "0.9749518304 -0.1888246628 -0.1116570328 0\n0.1811175337 0.9807321773 -0.06955684008 -2\n0.1290944123 0.05009633911 0.9408477842 1.5\n0 0 0 1\n"
+   },
+   "ref": {
+    "content": {
+     "seed": 341784760,
+     "type": "constant"
+    },
+    "dtype": "float32",
+    "geometry": {
+     "origin": [
+      0.0,
+      0.0,
+      0.0
+     ],
+     "qfac": 1,
+     "qform_code": 1,
+     "quaternion": [
+      1,
+      0,
+      0,
+      0
+     ],
+     "sform": "same",
+     "sform_code": 1,
+     "spacing": [
+      1.0,
+      1.0,
+      1.0
+     ],
+     "units": "mm"
+    },
+    "scaling": null,
+    "shape": [
+     1,
+     1,
+     1
+    ],
+    "suffix": ".nii.gz",
+    "values": {
+     "offset": 0.0,
+     "scale": 1.0
+    }
+   }
+  },
+  "n": 39242,
+  "options": [
+   "-interp sinc",
+   "4D",
+   "FSLOUTPUTTYPE=NIFTI",
+   "applyxfm4D"
+  ],
+  "seed": "part3-trial",
+  "tool": "fsl-flirt-part3"
+ },
+ "rule": "A",
+ "status": "register",
+ "suite": "fsl-flirt-replica",
+ "tier": "smoke",
+ "tool": "fsl-flirt"
+}

@@ -42,6 +42,7 @@ pub mod avwutils;
 pub mod bbr;
 pub mod cnum;
 pub mod costfns;
+pub mod exception;
 pub mod fdlibm;
 pub mod glibc_double;
 pub mod glibc_float;

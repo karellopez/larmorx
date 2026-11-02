@@ -47,7 +47,9 @@ pub fn isotropic_resample(aniso: &Volume, scale: f32, warnings: &mut Vec<String>
     let sz = size(aniso.zsize(), stepz);
     let sy = size(aniso.ysize(), stepy);
     let sx = size(aniso.xsize(), stepx);
-    let mut iso = Volume::new(sx, sy, sz, 1);
+    // newimage's `Out of memory` where the allocation fails (thrown: FLIRT's main catches it)
+    let mut iso = crate::exception::try_volume::<f32>(sx, sy, sz, 1)
+        .unwrap_or_else(|e| crate::exception::throw(e));
     let spline = if src.interp == Interpolation::Spline {
         Some(SplineCoefs::new(&src))
     } else {

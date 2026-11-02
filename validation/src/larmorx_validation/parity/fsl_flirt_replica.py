@@ -547,6 +547,22 @@ def _prepare(run: Run, tmp: Path) -> list[str]:
                 h.set_data_dtype(np.float64)
                 nib.save(nib.Nifti1Image(arr, img.affine, h), str(dst))
             out.append(name)
+        elif a.startswith("@nanedge:"):
+            # an input with NaN voxels in its 2-voxel border, at (0, 4, 5) and (1, 6, 7), and an
+            # infinite one at (4, 4, 4): @nanedge:<input>:<name>
+            import nibabel as nib
+
+            _, src_name, name = a.split(":")
+            dst = tmp / name
+            if not dst.exists():
+                base = base or inputs()
+                img = nib.load(str(base / src_name))
+                arr = np.asanyarray(img.dataobj).astype(np.float32).copy()
+                arr[0, 4, 5] = np.nan
+                arr[1, 6, 7] = np.nan
+                arr[4, 4, 4] = np.inf
+                nib.save(nib.Nifti1Image(arr, img.affine, img.header), str(dst))
+            out.append(name)
         elif a.startswith("@nan:"):
             # an input with one NaN voxel at (3, 4, 5): @nan:<input>:<name>
             import nibabel as nib
@@ -1655,6 +1671,32 @@ def _schedule_cases() -> dict[str, tuple[str, str, Run]]:
             files=(("s.sch", sub2),),
         ),
     )
+    # part 3's trial (part3-trial-57755): a subset whose line search reaches a zero scale on
+    # one-voxel images: the cost's inverse of a singular matrix throws, FLIRT's main catches it
+    sub3 = (
+        "setscale 8\nsetrow UA 1 0 0 0  0 1 0 0  0 0 1 0  0 0 0 1\n"
+        "setoption paramsubset 2  0 0 0 0 0.5 2 0 1 0.5 0 2 0  1 0 0 0 0 0.5 2 0 -1 0 0 0.5\n"
+        "optimise 12 UA:1 0.0 0.0 0.0 0.0 0.0 0.0 rel 1\n"
+    )
+    c["schedule/paramsubset-singular"] = (
+        "standard",
+        "a parameter subset reaching a singular matrix in a cost evaluation (the exception "
+        "caught by FLIRT's main: FSL-68)",
+        Run(
+            "flirt",
+            (
+                "-in",
+                "@const:1x1x1:1x1x1:one.nii",
+                "-ref",
+                "@const:1x1x1:1x1x1:one.nii",
+                "-schedule",
+                "s.sch",
+                "-omat",
+                "out.mat",
+            ),
+            files=(("s.sch", sub3),),
+        ),
+    )
     return c
 
 
@@ -2050,6 +2092,12 @@ def _program_cases() -> dict[str, tuple[str, str, Run]]:
     add("applyxfm4D-3d-spline-int", "-3D spline on an int16 volume (FSL-79: coefficients and "
         "values in the type)", X, B4, E, "out.nii.gz", "one.mat", "-3D", "-interp", "spline",
         files=one)  # fmt: skip
+    add("applyxfm4D-nan-border", "NaN voxels in the input's border and an infinite one: the "
+        "background value's NaN order (FSL-22), spline coefficients through them", X,
+        "@nanedge:epi.nii:epi_nanedge.nii", E, "out.nii.gz", "one.mat", "-singlematrix",
+        "-interp", "spline", files=one)  # fmt: skip
+    add("applyxfm4D-nan-border-3d", "the same with -3D and sinc", X,
+        "@nanedge:epi.nii:epi_nanedge.nii", E, "out.nii.gz", "one.mat", "-3D", files=one)  # fmt: skip
     add("applyxfm4D-bad-interp", "an unknown interpolation (its message, exit 1)", X, B4, E,
         "out.nii.gz", "one.mat", "-interp", "cubic", files=one)  # fmt: skip
     add("applyxfm4D-userprefix-last", "-userprefix as the last word (std::string of null)", X,

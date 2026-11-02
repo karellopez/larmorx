@@ -345,7 +345,16 @@ SILENT = ("FSL-96", "FSL-97")
 def _prepare(run: Run, tmp: Path) -> list[str]:
     out = []
     for a in run.args:
-        if a.startswith("@"):
+        if a.startswith("@dt:"):
+            # a random case's input (differential random testing), built from its recipe
+            from larmorx_validation.difftest import inputs as dt_inputs
+
+            src = dt_inputs.path(a[1:])
+            dst = tmp / src.name
+            if not dst.exists():
+                shutil.copy(src, dst)
+            out.append(src.name)
+        elif a.startswith("@"):
             src = inputs() / a[1:]
             shutil.copy(src, tmp / src.name)
             out.append(src.name)

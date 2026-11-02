@@ -23,6 +23,7 @@ pub mod programs;
 pub mod pyramid;
 pub mod schedule;
 pub mod search;
+pub mod trace;
 pub mod xfm;
 
 pub use cost::Cost;

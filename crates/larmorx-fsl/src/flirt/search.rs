@@ -10,8 +10,9 @@
 use larmorx_mri::hmc::rigid::{self, Params};
 use rayon::prelude::*;
 
-use super::mat::{self, Mat4};
-use super::optimise::{self, Settings, Subset};
+use super::mat::{self, IDENTITY, Mat4};
+use super::optimise::{self, Kind, Settings, Subset};
+use super::trace::Trace;
 
 /// The search's settings: the rotation ranges (radians, `[min, max]` per axis) and the coarse
 /// and fine steps (radians, single precision).
@@ -46,6 +47,30 @@ pub fn samples(range: [f64; 2], delta: f32) -> Vec<f32> {
 pub struct Found {
     pub results: Vec<(f32, Mat4)>,
     pub starts: Vec<(f32, Mat4)>,
+    /// The grids `-debugsave` writes (§2.3): the coarse grid's shape, translations and scales
+    /// (the median), the fine grid's shape and costs (the threshold's optimised costs in).
+    pub coarse_shape: [usize; 3],
+    pub translations: Vec<[f64; 3]>,
+    pub scales: Vec<f64>,
+    pub fine_shape: [usize; 3],
+    pub costs: Vec<f32>,
+}
+
+/// The rotation samplings' lines (`Coarse rotation samplings are:` and the fine ones), which
+/// `measurecost`, `gridmeasurecost`, `optimise` and the search print at a level of 4 or more.
+pub fn samplings_text(t: &Trace, r: &Ranges) -> String {
+    let mut s = String::from("Coarse rotation samplings are:\n");
+    for k in 0..3 {
+        s.push_str(&t.nums(samples(r.ranges[k], r.coarse).into_iter().map(f64::from)));
+        s.push('\n');
+    }
+    s.push_str(" and fine rotation samplings are:\n");
+    for k in 0..3 {
+        s.push_str(&t.nums(samples(r.ranges[k], r.fine).into_iter().map(f64::from)));
+        s.push('\n');
+    }
+    s.push('\n');
+    s
 }
 
 /// The search (§8.1): `dof` the `search` command's degrees of freedom, which choose the
@@ -53,7 +78,9 @@ pub struct Found {
 /// coarse grid optimises the common scale and its fine grid keeps the median scale), `free_dof`
 /// those of the minima's free optimisations (`-dof` applies there). `eval` is the search cost of a trial
 /// matrix; `centre` the parameters' centre; `ref_params` the reference parameters (the
-/// centres of mass aligned); `min_voxel` the reference level's smallest voxel size.
+/// centres of mass aligned); `min_voxel` the reference level's smallest voxel size. Its verbose
+/// lines go to `settings.trace` at `settings.level` (the run's level lowered by 2); where they
+/// interleave with the optimisations' lines (a level of 4 or more) the grids run in order.
 #[allow(clippy::too_many_arguments)]
 pub fn search(
     eval: &(dyn Fn(&Mat4) -> f32 + Sync),
@@ -89,7 +116,18 @@ pub fn search(
         ..settings.clone()
     };
     let settings = &euler;
-    let at = |angles: [f32; 3], t: [f64; 3], sc: f64| -> Params {
+    let at = |l: i32| settings.at(l);
+    // the lines of each grid point interleave with the evaluations': one point after the other
+    let n_threads_parallel = n_threads_parallel && at(4).is_none();
+    if let Some(t) = at(4) {
+        t.write(&samplings_text(t, r));
+    }
+    let stars = |n: usize, per: usize| {
+        if let Some(t) = at(2) {
+            t.write(&"*".repeat(n / per.max(1)));
+        }
+    };
+    let point = |angles: [f32; 3], t: [f64; 3], sc: f64| -> Params {
         let mut p = ref_params;
         p[0] = f64::from(angles[0]);
         p[1] = f64::from(angles[1]);
@@ -102,8 +140,18 @@ pub fn search(
     };
     // from the sampled parameters themselves (observed: FSL's evaluations start at the angles
     // it sampled, and the grid keeps the optimised translations and scale as they come)
-    let run = |p: &Params| -> Result<(Params, f32), String> {
-        optimise::optimise_params(eval, *p, centre, 12, 4, settings, Some(&subset))
+    let run = |p: &Params, kind: Kind| -> Result<(Params, f32), String> {
+        optimise::optimise_params(
+            eval,
+            *p,
+            centre,
+            12,
+            4,
+            settings,
+            Some(&subset),
+            kind,
+            &IDENTITY,
+        )
     };
     let par_map = |n: usize, f: &(dyn Fn(usize) -> Result<(Params, f32), String> + Sync)| {
         if n_threads_parallel {
@@ -117,12 +165,25 @@ pub fn search(
     let rp = ref_params;
     let coarse_out = par_map(cx * cy * cz, &|i| {
         let (a, b, c) = (i / (cy * cz), (i / cz) % cy, i % cz);
-        run(&at(
-            [coarse[0][a], coarse[1][b], coarse[2][c]],
-            [rp[3], rp[4], rp[5]],
-            rp[6],
-        ))
+        let r = run(
+            &point(
+                [coarse[0][a], coarse[1][b], coarse[2][c]],
+                [rp[3], rp[4], rp[5]],
+                rp[6],
+            ),
+            Kind::Coarse,
+        );
+        if !n_threads_parallel && c + 1 == cz {
+            stars(1, 1);
+        }
+        r
     })?;
+    if n_threads_parallel {
+        stars(cx * cy * cz, cz);
+    }
+    if let Some(t) = at(2) {
+        t.write("\n");
+    }
     let mut trans: Vec<[f64; 3]> = coarse_out.iter().map(|(p, _)| [p[3], p[4], p[5]]).collect();
     let mut scales: Vec<f64> = coarse_out.iter().map(|(p, _)| p[6]).collect();
     // 5. the scales replaced by their median
@@ -131,6 +192,9 @@ pub fn search(
     let median = sorted[(0.5 * sorted.len() as f64) as usize];
     scales.fill(median);
     let _ = &mut trans;
+    if let Some(t) = at(2) {
+        t.line(&format!("Median scale = {}", t.num(median)));
+    }
     // 6. the fine grid: translations and scale interpolated on the coarse grid
     let [fx, fy, fz] = [fine[0].len(), fine[1].len(), fine[2].len()];
     let f = [
@@ -176,7 +240,7 @@ pub fn search(
             if !(0.5..=2.0).contains(&sc) || dof <= 6 {
                 sc = 1.0;
             }
-            let mut p = at([fine[0][a], fine[1][b], fine[2][c]], t, sc);
+            let mut p = point([fine[0][a], fine[1][b], fine[2][c]], t, sc);
             p[9] = 0.0;
             p[10] = 0.0;
             p[11] = 0.0;
@@ -184,16 +248,31 @@ pub fn search(
         })
         .collect();
     let mut costs: Vec<f32> = if n_threads_parallel {
-        fine_params
+        let c: Vec<f32> = fine_params
             .par_iter()
             .map(|p| eval(&rigid::compose(p, 12, centre)))
-            .collect()
+            .collect();
+        stars(nfine, fz);
+        c
     } else {
         fine_params
             .iter()
-            .map(|p| eval(&rigid::compose(p, 12, centre)))
+            .enumerate()
+            .map(|(i, p)| {
+                let c = eval(&rigid::compose(p, 12, centre));
+                if let Some(t) = at(5) {
+                    t.evaluation(c, p);
+                }
+                if (i + 1) % fz == 0 {
+                    stars(1, 1);
+                }
+                c
+            })
             .collect()
     };
+    if let Some(t) = at(2) {
+        t.write("\n");
+    }
     // 7. the threshold, and the points below it optimised (their costs replace the grid's)
     let (cmin, cmax) = costs
         .iter()
@@ -207,9 +286,43 @@ pub fn search(
     if t <= cmin {
         t = (1.0001 * cmin).max(0.9999 * cmin);
     }
+    if let Some(tr) = at(4) {
+        tr.line(&format!(
+            "Cost threshold = {} and minimum is {}",
+            tr.num(f64::from(t)),
+            tr.num(f64::from(cmin))
+        ));
+    }
     let below: Vec<usize> = (0..nfine).filter(|&i| costs[i] < t).collect();
     let fp = &fine_params;
-    let opt = par_map(below.len(), &|j| run(&fp[below[j]]))?;
+    let at_index = |i: usize| (i / (fy * fz), (i / fz) % fy, i % fz);
+    let reached = |tr: &Trace, i: usize, (x, c): &(Params, f32)| {
+        let (a, b, cc) = at_index(i);
+        tr.line(&format!(
+            "({a},{b},{cc}) => {} with {}",
+            tr.num(f64::from(*c)),
+            tr.nums(*x)
+        ));
+    };
+    let opt = par_map(below.len(), &|j| {
+        let r = run(&fp[below[j]], Kind::Threshold)?;
+        if !n_threads_parallel && let Some(tr) = at(3) {
+            reached(tr, below[j], &r);
+        }
+        Ok(r)
+    })?;
+    if let Some(tr) = at(3) {
+        if n_threads_parallel {
+            for (j, &i) in below.iter().enumerate() {
+                reached(tr, i, &opt[j]);
+            }
+        }
+        tr.line("Costs (1st column) are:");
+        for (x, c) in &opt {
+            tr.line(&format!("{} {}", tr.num(f64::from(*c)), tr.nums(*x)));
+        }
+        tr.line("");
+    }
     for (j, &i) in below.iter().enumerate() {
         costs[i] = opt[j].1;
     }
@@ -264,6 +377,19 @@ pub fn search(
         }
         minima.push(best);
     }
+    if let Some(tr) = at(3) {
+        for word in ["COST", "Cost"] {
+            for &i in &minima {
+                let (a, b, c) = at_index(i);
+                tr.line(&format!("{word} minima at : {a},{b},{c}"));
+            }
+        }
+        tr.line("Chosen parameters:");
+        for &i in &minima {
+            tr.line(&tr.nums(fine_params[i]));
+        }
+        tr.line("");
+    }
     // 9. each minimum optimised freely; near-duplicates dropped
     let free = free_dof.min(7);
     let starts: Vec<Mat4> = minima
@@ -272,6 +398,13 @@ pub fn search(
         .collect();
     // each start's own cost goes with it into `P` (observed: FSL's `P` rows carry the cost of
     // their matrix, the free optimisation's first evaluation)
+    let freed_line = |tr: &Trace, c: f32, m: &Mat4| {
+        tr.line(&format!(
+            "{} ::: {}",
+            tr.num(f64::from(c)),
+            tr.nums(rigid::decompose(m, centre))
+        ));
+    };
     let run_free = |k: usize| -> Result<(Mat4, f32, f32), String> {
         let c0 = eval(&starts[k]);
         let (x, c) = optimise::optimise_params(
@@ -282,14 +415,29 @@ pub fn search(
             4,
             settings,
             None,
+            Kind::Free,
+            &starts[k],
         )?;
-        Ok((rigid::compose(&x, free, centre), c, c0))
+        let m = rigid::compose(&x, free, centre);
+        if !n_threads_parallel && let Some(tr) = at(1) {
+            freed_line(tr, c, &m);
+        }
+        Ok((m, c, c0))
     };
+    if let Some(tr) = at(1) {
+        tr.line("After free optimisation, parameters are:");
+    }
     let freed: Vec<(Mat4, f32, f32)> = if n_threads_parallel {
-        (0..starts.len())
+        let f: Vec<(Mat4, f32, f32)> = (0..starts.len())
             .into_par_iter()
             .map(run_free)
-            .collect::<Result<_, _>>()?
+            .collect::<Result<_, _>>()?;
+        if let Some(tr) = at(1) {
+            for (m, c, _) in &f {
+                freed_line(tr, *c, m);
+            }
+        }
+        f
     } else {
         (0..starts.len()).map(run_free).collect::<Result<_, _>>()?
     };
@@ -308,9 +456,28 @@ pub fn search(
         }
     }
     list.sort_by(|a, b| a.0.partial_cmp(&b.0).unwrap_or(std::cmp::Ordering::Equal));
+    if let Some(tr) = at(1) {
+        let cols = |m: &Mat4| tr.nums((0..16).map(|k| m[k % 4][k / 4]));
+        tr.line("Parameters (1st column costs) are:");
+        for (c, m, s, c0) in &list {
+            tr.line(&format!(
+                "{} {}{} {}",
+                tr.num(f64::from(*c)),
+                cols(m),
+                tr.num(f64::from(*c0)),
+                cols(s)
+            ));
+        }
+        tr.line("");
+    }
     Ok(Found {
         results: list.iter().map(|(c, m, _, _)| (*c, *m)).collect(),
         starts: list.iter().map(|(_, _, s, c0)| (*c0, *s)).collect(),
+        coarse_shape: [cx, cy, cz],
+        translations: trans,
+        scales,
+        fine_shape: [fx, fy, fz],
+        costs,
     })
 }
 

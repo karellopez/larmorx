@@ -15,7 +15,7 @@ use larmorx_mri::hmc::volume::Volume;
 
 use super::bbr::BbrSource;
 use super::cost::{Cost, Log, Pair};
-use super::mat::{self, IDENTITY, Mat4, Stream};
+use super::mat::{self, IDENTITY, Mat4};
 use super::optimise::{self, Subset};
 use super::output::{self, Resampling, SincKernel};
 use super::param::{self, AngleRep};
@@ -23,6 +23,7 @@ use super::paxes;
 use super::pyramid;
 use super::schedule::{self, Var};
 use super::search::{self, Ranges};
+use super::trace::{self, Trace};
 use super::{Interp, Options, OutType};
 use crate::bet::image::{self, Input, Output, Values};
 use crate::cli::Settings;
@@ -125,8 +126,13 @@ fn triple(v: &Volume) -> Volume {
     )
 }
 
-/// Clamping to the robust range (§4.1), in place (the range read from the data itself, no copy).
-fn clamp_in_place(v: &mut Volume) {
+/// The robust range an image is clamped to (§4.1), of the image as prepared (a single slice
+/// made three): read from the data itself, no copy of a volume.
+fn clamp_range(v: &mut Volume) -> (f32, f32) {
+    if v.shape[2] == 1 {
+        let mut t = triple(v);
+        return clamp_range(&mut t);
+    }
     let vol = crate::bet::Vol::new(
         v.shape,
         v.voxel_size.map(f64::from),
@@ -134,7 +140,11 @@ fn clamp_in_place(v: &mut Volume) {
     );
     let (lo, hi) = crate::bet::params::robust_range(&vol);
     v.data = vol.data;
-    let (lo, hi) = (lo as f32, hi as f32);
+    (lo as f32, hi as f32)
+}
+
+/// Clamping to the range `(lo, hi)` (§4.1), in place.
+fn clamp_in_place(v: &mut Volume, (lo, hi): (f32, f32)) {
     for x in &mut v.data {
         if *x > hi {
             *x = hi;
@@ -261,7 +271,16 @@ struct State<'a> {
     o: &'a Options,
     ctx: &'a Ctx<'a>,
     log: Arc<Log>,
-    stream: Stream,
+    /// Standard output, its notation and the evaluation counter (§2.3, §2.5).
+    trace: Arc<Trace>,
+    /// The input's sampling matrix and raw range, which a level of 2 prints at each `setscale`.
+    sampling: Mat4,
+    raw_input: (f32, f32),
+    /// `-debug`: the current pair's boundary-based cost set up (its lines printed, §9.4); the
+    /// final debug call's evaluation, which saves BBR's volume `debug`.
+    bbr_set: bool,
+    debug_bbr: bool,
+    debug_volume: Option<Vec<f32>>,
     /// The reference and input as read and prepared (clamped, tripled, scaled).
     reference: Volume,
     input0: Volume,
@@ -336,9 +355,19 @@ impl State<'_> {
         schedule::scalar(w, self.maxdof as f64, f64::from(self.min_sampling))
     }
 
-    fn eval(&self, t: &Mat4, cost: Cost) -> Result<f32, End> {
-        let p = self.pair()?;
-        Ok(evaluate(p, t, cost, &self.log))
+    fn eval(&mut self, t: &Mat4, cost: Cost) -> Result<f32, End> {
+        let p = self.pair()?.clone();
+        if self.debug_bbr && cost == Cost::Bbr {
+            self.trace.tick();
+            let mut v = Vec::new();
+            let a = mat::mul(t, &p.init);
+            let c = super::bbr::cost_and_debug(&p, &a, &self.log, Some(&mut v));
+            if !v.is_empty() {
+                self.debug_volume = Some(v);
+            }
+            return Ok(c);
+        }
+        Ok(evaluate(&p, t, cost, &self.log, &self.trace))
     }
 
     fn deltas(&self, dof: usize) -> [f64; 12] {
@@ -363,8 +392,12 @@ impl State<'_> {
         d
     }
 
-    /// The perturbed matrix of a row (§7.1).
+    /// The perturbed matrix of a row (§7.1): a short tolerance list (`setoption tolerance` with
+    /// fewer than 12 values) is FSL's index error here, `rel` or `abs` (observed).
     fn perturb(&self, m: &Mat4, p: &[f64], abs: bool, dof: usize) -> Result<Mat4, End> {
+        if self.opt.tolerances.len() < 12 {
+            return Err(End::Error("Mat::operator(): index out of bounds".into()));
+        }
         let pair = self.pair()?;
         let c = pair.centre;
         let mut x = param::decompose(self.opt.rep, m, c);
@@ -385,11 +418,178 @@ fn refuse_name(m: &str) -> End {
     ))
 }
 
-/// The cost of the trial matrix `t` with `cost`; evaluations of large grids sample their
-/// slices in parallel.
-fn evaluate(pair: &Pair, t: &Mat4, cost: Cost, log: &Log) -> f32 {
+/// The cost of the trial matrix `t` with `cost` (one more evaluation counted); evaluations of
+/// large grids sample their slices in parallel.
+fn evaluate(pair: &Pair, t: &Mat4, cost: Cost, log: &Log, trace: &Trace) -> f32 {
+    trace.tick();
     let parallel = pair.reference.len() > 16_384;
     pair.cost_of(t, cost, parallel, log)
+}
+
+/// `-debug`'s lines when a pair's boundary-based cost is set up (§9.4, observed): a new pair
+/// with that cost, or `setoption costfunction bbr` on a pair without it.
+fn announce_bbr(st: &mut State<'_>) {
+    if !st.o.debug || st.bbr_set {
+        return;
+    }
+    st.bbr_set = true;
+    for line in [
+        "Setting bbr seg 1",
+        "Cost is set to 8",
+        "Cost == BBR is 1",
+        "Result (pre) of is_bbr_set is 0",
+        "Result (post) of is_bbr_set is 1",
+    ] {
+        st.log.push(line);
+    }
+}
+
+/// The header of a level of the reference pyramid (§5, observed in `-debug`'s volumes): the
+/// reference's, its voxel sizes the level's and its sform and qform following the grid
+/// (`W' = W·F_n·D·F_n'`, `D` the ratio of the voxel sizes, `F` FSL's x flip of each grid).
+fn level_header(reference: &Input, shape0: [usize; 3], level: &Volume) -> Input {
+    let mut out = reference.clone();
+    let h = &mut out.header;
+    let old = [h.pixdim[1], h.pixdim[2], h.pixdim[3]];
+    let flip = |n: usize| -> Mat4 {
+        let mut f = IDENTITY;
+        if reference.flipped {
+            f[0][0] = -1.0;
+            f[0][3] = n as f64 - 1.0;
+        }
+        f
+    };
+    let scale = mat::diagonal([0, 1, 2].map(|j| {
+        if old[j] != 0.0 {
+            f64::from(level.voxel_size[j]) / old[j].abs()
+        } else {
+            1.0
+        }
+    }));
+    let step = mat::mul(&mat::mul(&flip(shape0[0]), &scale), &flip(level.shape[0]));
+    let srow = [h.srow_x, h.srow_y, h.srow_z, [0.0, 0.0, 0.0, 1.0]];
+    let new_s = if h.sform_code > 0 {
+        mat::mul(&srow, &step)
+    } else {
+        mat::mul(&mat::mul(&srow, &flip(shape0[0])), &flip(level.shape[0]))
+    };
+    h.srow_x = new_s[0];
+    h.srow_y = new_s[1];
+    h.srow_z = new_s[2];
+    if h.qform_code > 0
+        && let Ok(q) = h.qform()
+    {
+        let nq = mat::mul(q.rows(), &step);
+        h.qoffset_x = nq[0][3];
+        h.qoffset_y = nq[1][3];
+        h.qoffset_z = nq[2][3];
+    }
+    for j in 0..3 {
+        h.pixdim[1 + j] = f64::from(level.voxel_size[j]);
+    }
+    out.vol.shape = level.shape;
+    out
+}
+
+/// `-debug`'s volumes once the images are prepared (§9.4): the reference pyramid's levels and
+/// their weights (without weights the one-voxel weight FSL's empty filtering leaves), the
+/// input at 8 mm and its weight; single precision, in the working directory.
+fn debug_files(
+    st: &State<'_>,
+    reference: &Input,
+    input: &Input,
+    testvol: &Volume,
+    err: &mut dyn Write,
+    notices: &mut Vec<Notice>,
+) -> Result<(), End> {
+    let ctx = st.ctx;
+    let shape0 = reference.vol.shape;
+    let save =
+        |name: &str, like: &Input, v: &Volume, err: &mut dyn Write, notices: &mut Vec<Notice>| {
+            write_image(
+                ctx,
+                name,
+                like,
+                v.shape,
+                1,
+                None,
+                v.data.clone(),
+                DataType::F32,
+                err,
+                notices,
+            )
+        };
+    for (name, k) in [
+        ("refvol_8", 3),
+        ("refvol_4", 2),
+        ("refvol_2", 1),
+        ("refvol", 0),
+    ] {
+        let v = &st.levels[k];
+        save(name, &level_header(reference, shape0, v), v, err, notices)?;
+    }
+    if st.level_weights.iter().any(Option::is_some) {
+        for (name, k) in [
+            ("global_refweight1", 0),
+            ("global_refweight2", 1),
+            ("global_refweight4", 2),
+            ("global_refweight8", 3),
+        ] {
+            if let Some(w) = &st.level_weights[k] {
+                save(name, &level_header(reference, shape0, w), w, err, notices)?;
+            }
+        }
+    } else {
+        // the filtering of an empty weight: one voxel of 0 at the minimum sampling, no sform
+        // or qform (observed)
+        let m = f64::from(st.min_sampling);
+        let mut like = reference.clone();
+        let h = &mut like.header;
+        h.sform_code = 0;
+        h.qform_code = 0;
+        h.pixdim[1] = m;
+        h.pixdim[2] = m;
+        h.pixdim[3] = m;
+        h.srow_x = [1.0, 0.0, 0.0, 0.0];
+        h.srow_y = [0.0, 1.0, 0.0, 0.0];
+        h.srow_z = [0.0, 0.0, 1.0, 0.0];
+        h.quatern_b = 0.0;
+        h.quatern_c = 0.0;
+        h.quatern_d = 0.0;
+        h.qoffset_x = 0.0;
+        h.qoffset_y = 0.0;
+        h.qoffset_z = 0.0;
+        like.flipped = false;
+        let one = Volume::new([1, 1, 1], [st.min_sampling; 3], vec![0.0]);
+        save("global_refweight1", &like, &one, err, notices)?;
+    }
+    // the input's header as read: its sform's negative zeros kept (observed)
+    let as_read = |name: &str, v: &Volume, err: &mut dyn Write, notices: &mut Vec<Notice>| {
+        let look = Look {
+            reference: input,
+            shape: v.shape,
+            volumes: 1,
+            tr: None,
+            cal: None,
+            descrip: "larmorx fsl flirt",
+            positive_zeros: false,
+        };
+        write_values(
+            ctx,
+            name,
+            &look,
+            v.data.clone(),
+            None,
+            DataType::F32,
+            err,
+            notices,
+        )
+    };
+    as_read("testvol", testvol, err, notices)?;
+    if let Some(w) = st.pair()?.in_weight.as_ref() {
+        as_read("testweight", w, err, notices)?;
+    }
+    Ok(())
 }
 
 fn wrong(cmd: &str, err: &mut dyn Write) -> End {
@@ -401,11 +601,11 @@ fn wrong(cmd: &str, err: &mut dyn Write) -> End {
 pub fn run(o: &Options, ctx: &Ctx<'_>, out: &mut dyn Write, err: &mut dyn Write) -> u8 {
     let mut notices: Vec<Notice> = Vec::new();
     let result = larmorx_core::parallel::with_threads(ctx.n_threads, || {
-        let mut o_buf: Vec<u8> = Vec::new();
+        let trace = Arc::new(Trace::new(o.verbose, o.debug));
         let mut e_buf: Vec<u8> = Vec::new();
         let mut n = Vec::new();
-        let r = run_inner(o, ctx, &mut o_buf, &mut e_buf, &mut n);
-        (r, o_buf, e_buf, n)
+        let r = run_inner(o, ctx, &trace, &mut e_buf, &mut n);
+        (r, trace.take().into_bytes(), e_buf, n)
     });
     let (r, o_buf, e_buf, n) = match result {
         Ok(x) => x,
@@ -452,37 +652,85 @@ pub fn run(o: &Options, ctx: &Ctx<'_>, out: &mut dyn Write, err: &mut dyn Write)
 fn run_inner(
     o: &Options,
     ctx: &Ctx<'_>,
-    out: &mut dyn Write,
+    trace: &Arc<Trace>,
     err: &mut dyn Write,
     notices: &mut Vec<Notice>,
 ) -> Result<(), End> {
     let in_name = o.input.clone().unwrap_or_default();
     let ref_name = o.reference.clone().unwrap_or_default();
     let applying = o.apply_xfm || o.apply_iso.is_some();
-    let reference = read(ctx, &ref_name, false, notices)?;
+    let mut reference = read(ctx, &ref_name, false, notices)?;
     if reference.input.volumes > 1 && applying {
         let _ = writeln!(
             err,
             "Warning: An input intended to be a single 3D volume has multiple timepoints. Input will be truncated to first volume, but this functionality is deprecated and will be removed in a future release."
         );
     }
-    let input = read(ctx, &in_name, applying, notices)?;
+    let mut input = read(ctx, &in_name, applying, notices)?;
+    // the images as read, which a level of 2 describes at the end (§2.3)
+    let raw = trace.at(2).then(|| {
+        [&reference, &input].map(|im| RawInfo {
+            shape: im.vols[0].shape,
+            dims: [
+                f64::from(im.vols[0].voxel_size[0]),
+                f64::from(im.vols[0].voxel_size[1]),
+                f64::from(im.vols[0].voxel_size[2]),
+                im.input.header.pixdim[4],
+            ],
+            range: trace::min_max(&im.vols[0].data),
+        })
+    });
+    // the clamping ranges (§4.1), of the images as prepared (a single slice made three)
+    let ranges = if applying || o.no_clamp {
+        None
+    } else {
+        Some((
+            clamp_range(&mut reference.vols[0]),
+            clamp_range(&mut input.vols[0]),
+        ))
+    };
+    if !applying && trace.at(2) {
+        let raw = raw
+            .as_ref()
+            .map_or([(0.0, 0.0); 2], |r| [r[0].range, r[1].range]);
+        let between = |name: &str, k: usize| match &ranges {
+            Some(r) => {
+                let (lo, hi) = if k == 0 { r.0 } else { r.1 };
+                format!(
+                    "{name} intensity clamped between {} and {}",
+                    trace.num(f64::from(lo)),
+                    trace.num(f64::from(hi))
+                )
+            }
+            None => format!(
+                "{name} intensity between {} and {}",
+                trace.num(f64::from(raw[k].0)),
+                trace.num(f64::from(raw[k].1))
+            ),
+        };
+        trace.line(&between("Refvol", 0));
+        let vs = input.vols[0].voxel_size;
+        let z = if input.vols[0].shape[2] == 1 {
+            8.0
+        } else {
+            vs[2]
+        };
+        let sampling = mat::diagonal([f64::from(vs[0]), f64::from(vs[1]), f64::from(z)]);
+        trace.write(&format!(
+            "Testvol sampling matrix =\n{}\n",
+            trace.matrix(&sampling)
+        ));
+        trace.line(&format!(
+            "Testvol Data Type = {}",
+            input.input.header.datatype
+        ));
+        trace.line(&between("Testvol", 1));
+    }
     let ref_sform = reference.input.header.sform_code > 0;
     let in_sform = input.input.header.sform_code > 0;
-    if o.verbose >= 1 {
-        if ref_sform {
-            let _ = writeln!(
-                out,
-                "The output image will use the sform from the reference image"
-            );
-        }
-        if in_sform && !(applying && ref_sform) {
-            let _ = writeln!(
-                out,
-                "The output image will use the transformed sform from the input image"
-            );
-        }
-    }
+    // the sform messages (observed: none in the 2D mode)
+    let ref_sform = ref_sform && !o.two_d;
+    let in_sform = in_sform && !o.two_d;
     if ref_sform && in_sform && o.verbose >= 1 {
         let _ = writeln!(
             err,
@@ -499,9 +747,25 @@ fn run_inner(
     } else {
         IDENTITY
     };
-    let mut stream = Stream::default();
-    if o.verbose >= 1 || o.print_init {
-        let _ = write!(out, "Init Matrix = \n{}\n", stream.matrix(&init_unscaled));
+    if trace.at(2) {
+        trace.write(&format!(
+            "Init Matrix = \n{}\n",
+            trace.matrix(&init_unscaled)
+        ));
+    }
+    if trace.at(1) {
+        if ref_sform {
+            trace.line("The output image will use the sform from the reference image");
+        }
+        if in_sform && !(applying && ref_sform) {
+            trace.line("The output image will use the transformed sform from the input image");
+        }
+    }
+    if trace.at(1) || o.print_init {
+        trace.write(&format!(
+            "Init Matrix = \n{}\n",
+            trace.matrix(&init_unscaled)
+        ));
     }
     if applying {
         return apply(
@@ -510,7 +774,7 @@ fn run_inner(
             &reference,
             &input,
             &init_unscaled,
-            out,
+            trace,
             err,
             notices,
         );
@@ -522,11 +786,26 @@ fn run_inner(
         input,
         init_unscaled,
         q_unscaled,
-        stream,
-        out,
+        Prepared { ranges, raw },
+        trace,
         err,
         notices,
     )
+}
+
+/// An image as read, as a level of 2 describes it at the end (§2.3).
+#[derive(Clone, Copy, Debug)]
+struct RawInfo {
+    shape: [usize; 3],
+    dims: [f64; 4],
+    range: (f32, f32),
+}
+
+/// What the reading prepared for a registration: the clamping ranges (none with `-noclamp`)
+/// and the raw images' descriptions (a level of 2).
+struct Prepared {
+    ranges: Option<((f32, f32), (f32, f32))>,
+    raw: Option<[RawInfo; 2]>,
 }
 
 /// The images of a registration, prepared (§4).
@@ -538,8 +817,8 @@ fn register(
     input: Image,
     init_unscaled: Mat4,
     q_unscaled: Mat4,
-    stream: Stream,
-    out: &mut dyn Write,
+    prepared: Prepared,
+    trace: &Arc<Trace>,
     err: &mut dyn Write,
     notices: &mut Vec<Notice>,
 ) -> Result<(), End> {
@@ -549,23 +828,26 @@ fn register(
     let b = base_scale(o, &reference.vols[0], &input.vols[0]);
     // prepared in place: the reference's values are not needed again (its grid is), the input's
     // are (the output resamples them)
-    let prep = |mut v: Volume| -> Volume {
+    let prep = |mut v: Volume, range: Option<(f32, f32)>| -> Volume {
         if v.shape[2] == 1 {
             v = triple(&v);
         }
-        if !o.no_clamp {
-            clamp_in_place(&mut v);
+        if let Some(r) = range {
+            clamp_in_place(&mut v, r);
         }
         scale_in_place(&mut v, b);
         v
     };
     let r = &mut reference.vols[0];
-    let ref0 = prep(Volume {
-        shape: r.shape,
-        voxel_size: r.voxel_size,
-        data: std::mem::take(&mut r.data),
-    });
-    let in0 = prep(input.vols[0].clone());
+    let ref0 = prep(
+        Volume {
+            shape: r.shape,
+            voxel_size: r.voxel_size,
+            data: std::mem::take(&mut r.data),
+        },
+        prepared.ranges.map(|r| r.0),
+    );
+    let in0 = prep(input.vols[0].clone(), prepared.ranges.map(|r| r.1));
     let read_weight = |name: &Option<String>,
                        like: &Volume,
                        notices: &mut Vec<Notice>|
@@ -720,41 +1002,6 @@ fn register(
         };
         ([l1, l2, l4, l8], [w1, w2, w4, w8])
     };
-    if o.debug {
-        // §9.4: the pyramid's levels (development: the volumes, single precision)
-        for (name, v) in [
-            ("refvol_8", &levels[3]),
-            ("refvol_4", &levels[2]),
-            ("refvol_2", &levels[1]),
-            ("refvol", &levels[0]),
-        ] {
-            let shape = v.shape;
-            let mut h = reference.input.header.clone();
-            h.pixdim[1] = f64::from(v.voxel_size[0]);
-            h.pixdim[2] = f64::from(v.voxel_size[1]);
-            h.pixdim[3] = f64::from(v.voxel_size[2]);
-            h.sform_code = 0;
-            h.qform_code = 0;
-            let like = Input {
-                vol: crate::bet::Vol::new(shape, v.voxel_size.map(f64::from), v.data.clone()),
-                header: h,
-                flipped: reference.input.flipped,
-                volumes: 1,
-            };
-            write_image(
-                ctx,
-                name,
-                &like,
-                shape,
-                1,
-                None,
-                v.data.clone(),
-                DataType::F32,
-                err,
-                notices,
-            )?;
-        }
-    }
     let init = scale_in(&init_unscaled, b);
     let qs = scale_in(&q_unscaled, b);
     let (maxdof, dof_msg) = optimise::clamp_dof(i64::from(o.dof));
@@ -765,7 +1012,20 @@ fn register(
         o,
         ctx,
         log: Arc::new(Log::default()),
-        stream,
+        trace: trace.clone(),
+        sampling: {
+            let vs = input.vols[0].voxel_size;
+            let z = if input.vols[0].shape[2] == 1 {
+                8.0
+            } else {
+                vs[2]
+            };
+            mat::diagonal([f64::from(vs[0]), f64::from(vs[1]), f64::from(z)])
+        },
+        raw_input: prepared.raw.map_or((0.0, 0.0), |r| r[1].range),
+        bbr_set: false,
+        debug_bbr: false,
+        debug_volume: None,
         reference: ref0,
         input0: in0,
         ref_weight,
@@ -797,6 +1057,8 @@ fn register(
         AngleRep::Euler
     };
     st.opt.log = Some(st.log.clone());
+    st.opt.trace = Some(trace.clone());
+    st.opt.level = o.verbose;
     // the schedule
     let text = match &o.schedule {
         Some(name) => match std::fs::read_to_string(ctx.settings.path(name)) {
@@ -815,47 +1077,118 @@ fn register(
         text.lines().collect()
     };
     // the first pair: the 8 mm level and the input blurred to 8 mm (§5), before any setscale
-    set_scale(&mut st, 8.0, true)?;
+    set_scale(&mut st, 8.0, true, false, err)?;
     st.flush(err);
+    if trace.at(3) {
+        let c = |v: &Volume| trace.nums(v.centre_of_mass());
+        trace.line(&format!("CoG for refvol is:  {}", c(&st.reference)));
+        trace.line(&format!("CoG for testvol is:  {}", c(&st.input0)));
+    }
+    let testvol = if o.no_resample {
+        st.input0.clone()
+    } else {
+        st.pair()?.input.clone()
+    };
+    if trace.at(2) {
+        if !o.no_resample {
+            trace.line("Subsampling the volumes");
+            trace.line(&format!(
+                "Resampling refvol isotropically: {}",
+                trace.num(f64::from(st.min_sampling))
+            ));
+            trace.volume_info("Refvol", &st.levels[0]);
+        }
+        trace.volume_info("TESTVOL", &testvol);
+    }
+    if o.debug {
+        debug_files(&st, &reference.input, &input.input, &testvol, err, notices)?;
+    }
     let mut skip = false;
     for line in lines {
         if o.verbose >= 1 {
-            let _ = writeln!(out, " >> {line}");
+            trace.line(&format!(" >> {line}"));
         }
         if skip {
             skip = false;
             continue;
         }
         let w = schedule::words(line);
-        let r = command(&mut st, &w, out, err, &mut skip);
+        let r = command(&mut st, &w, err, &mut skip);
         st.flush(err);
         r?;
         st.check()?;
+    }
+    if o.debug && st.pair.is_some() {
+        // the final debug call (§9.4): one cost evaluation of the matrix, appended to `U`
+        let _ = writeln!(err, "Final DEBUG call in FLIRT");
+        let address = st.pair.as_ref().map_or(std::ptr::null(), Arc::as_ptr);
+        let _ = writeln!(err, "Pointer to impair is {address:p}");
+        let _ = writeln!(err, "Final DEBUG call in FLIRT 2");
+        let _ = writeln!(err, "Scale is:{}", mat::g(f64::from(st.scale), 6));
+        let words: Vec<String> = "measurecost 12 U:1 0 0 0 0 0 0 0 rel 8"
+            .split(' ')
+            .map(str::to_owned)
+            .collect();
+        st.debug_bbr = true;
+        let r = command(&mut st, &words, err, &mut skip);
+        st.debug_bbr = false;
+        st.flush(err);
+        r?;
+        st.check()?;
+        if let Some(values) = st.debug_volume.take() {
+            let pair = st.pair()?.clone();
+            let like = level_header(&reference.input, reference.vols[0].shape, &pair.reference);
+            write_image(
+                ctx,
+                "debug",
+                &like,
+                pair.reference.shape,
+                2,
+                None,
+                values,
+                DataType::F32,
+                err,
+                notices,
+            )?;
+        }
+        let _ = writeln!(err, "Final DEBUG call in FLIRT 3");
+        let _ = writeln!(err, "Final DEBUG call in FLIRT 4");
     }
     // the result (§9.1)
     let Some(best) = st.list(Var::U(0)).first().copied() else {
         let _ = writeln!(err, "Failed to calculate any transformation matrix");
         return Ok(());
     };
+    // the images as read (observed: not when no matrix was found)
+    if let Some([r, i]) = &prepared.raw {
+        for (name, x) in [("testvol", i), ("refvol", r)] {
+            trace.info(name, x.shape, x.dims, 1, &[x.range.0, x.range.1]);
+        }
+    }
     let mut result = mat::mul(&best.m, &st.init);
     if (b - 1.0).abs() > 1e-5 {
         for row in result.iter_mut().take(3) {
             row[3] *= f64::from(b);
         }
     }
-    match &o.omat {
-        Some(name) if !name.is_empty() => {
-            if std::fs::write(ctx.settings.path(name), mat::file_text(&result)).is_err() {
-                let _ = writeln!(err, "Could not open file {name} for writing");
-            }
-        }
-        Some(_) => {}
-        None => {
-            let _ = write!(out, "\nFinal result: \n{}\n", st.stream.matrix(&result));
-        }
+    if trace.at(2) {
+        trace.write(&format!(
+            "Final transform matrix is:\n{}\n",
+            trace.matrix(&result)
+        ));
+    }
+    if let Some(name) = o.omat.as_ref().filter(|n| !n.is_empty())
+        && std::fs::write(ctx.settings.path(name), mat::file_text(&result)).is_err()
+    {
+        let _ = writeln!(err, "Could not open file {name} for writing");
     }
     if let Some(stem) = &o.out {
-        write_registered(o, ctx, &reference, &input, &result, stem, err, notices)?;
+        write_registered(
+            o, ctx, &reference, &input, &result, stem, trace, err, notices,
+        )?;
+    }
+    if o.omat.is_none() {
+        trace.write(&format!("\nFinal result: \n{}\n", trace.matrix(&result)));
     }
     Ok(())
 }
@@ -864,7 +1197,6 @@ fn register(
 fn command(
     st: &mut State<'_>,
     w: &[String],
-    out: &mut dyn Write,
     err: &mut dyn Write,
     skip: &mut bool,
 ) -> Result<(), End> {
@@ -910,9 +1242,9 @@ fn command(
                 return Err(wrong(cmd, err));
             }
             let (_, rows) = st.rows(&w[1])?;
-            st.stream.fixed = true;
+            st.trace.set_fixed();
             for r in rows {
-                let _ = writeln!(out, "{}", row_text(&r));
+                st.trace.line(&row_text(&r));
             }
         }
         "save" => {
@@ -955,7 +1287,7 @@ fn command(
                 let cost = if cmd == "saveparams" && k == 0 {
                     mat::g(r.cost, 6)
                 } else {
-                    st.stream.num(r.cost)
+                    st.trace.num(r.cost)
                 };
                 s.push_str(&cost);
                 s.push(' ');
@@ -966,8 +1298,8 @@ fn command(
                 s.push_str("\n\n");
             }
             if cmd == "printparams" {
-                st.stream.fixed = true;
-                let _ = write!(out, "{s}");
+                st.trace.set_fixed();
+                st.trace.write(&s);
             } else {
                 s.push('\n');
                 let _ = std::fs::write(st.ctx.settings.path(&w[2]), s);
@@ -1036,12 +1368,13 @@ fn command(
                 12
             };
             let dof = optimise::clamp_dof(dof).0;
-            run_search(st, dof)?;
+            run_search(st, dof, err)?;
         }
         "optimise" | "measurecost" => {
             if n < 5 {
                 return Err(wrong(cmd, err));
             }
+            samplings(st);
             let dof_req = schedule::int_scalar(st.scalar(&w[1]));
             let (dof, msg) = optimise::clamp_dof(dof_req.min(st.maxdof as i64));
             if let Some(m) = msg {
@@ -1102,6 +1435,7 @@ fn command(
             if n < 7 {
                 return Err(wrong(cmd, err));
             }
+            samplings(st);
             let dof_req = schedule::int_scalar(st.scalar(&w[1]));
             let (dof, _) = optimise::clamp_dof(dof_req.min(st.maxdof as i64));
             let (_, rows) = st.rows(&w[2])?;
@@ -1147,10 +1481,14 @@ fn command(
                 let pair = st.pair()?.clone();
                 let log = st.log.clone();
                 let cost = st.cost;
+                let tr = st.trace.clone();
                 use rayon::prelude::*;
                 let costs: Vec<f32> = mats
                     .par_iter()
-                    .map(|m| pair.cost_of(m, cost, false, &log))
+                    .map(|m| {
+                        tr.tick();
+                        pair.cost_of(m, cost, false, &log)
+                    })
                     .collect();
                 for (m, c) in mats.into_iter().zip(costs) {
                     st.push(
@@ -1203,7 +1541,7 @@ fn command(
             }
             let s = st.scalar(&w[1]) as f32;
             let force = n > 2 && w[2] == "force";
-            set_scale(st, s, force)?;
+            set_scale(st, s, force, true, err)?;
         }
         "setrow" => {
             if n < 18 {
@@ -1285,6 +1623,19 @@ fn command(
     Ok(())
 }
 
+/// The rotation samplings a level of 4 or more prints for `measurecost`, `gridmeasurecost` and
+/// `optimise` (observed: once per command).
+fn samplings(st: &State<'_>) {
+    if st.trace.at(4) {
+        let r = Ranges {
+            ranges: st.o.search,
+            coarse: st.o.coarse,
+            fine: st.o.fine,
+        };
+        st.trace.write(&search::samplings_text(&st.trace, &r));
+    }
+}
+
 /// A row as `print` and `save` write it: the cost and the matrix column by column, fixed.
 fn row_text(r: &Row) -> String {
     let mut s = mat::f6(r.cost);
@@ -1336,6 +1687,14 @@ fn read_rows(settings: &Settings, name: &str, width: usize) -> Result<Vec<Vec<f6
 /// `setoption` (§7.3).
 fn set_option(st: &mut State<'_>, w: &[String], err: &mut dyn Write) -> Result<(), End> {
     let vals: Vec<f64> = w[2..].iter().map(|x| st.scalar(x)).collect();
+    if st.trace.at(3) {
+        // the option echoed with its values read as numbers (observed: a word reads 0)
+        st.trace.write(&format!(
+            "setoptions: {} {}\n\n",
+            w[1],
+            st.trace.nums(vals.iter().copied())
+        ));
+    }
     match w[1].as_str() {
         "smoothing" => {
             st.smoothing = vals[0] as f32;
@@ -1350,6 +1709,9 @@ fn set_option(st: &mut State<'_>, w: &[String], err: &mut dyn Write) -> Result<(
             Some(c) => {
                 st.cost = c;
                 st.search_cost = c;
+                if c == Cost::Bbr && st.pair.is_some() {
+                    announce_bbr(st);
+                }
             }
             None => {
                 let _ = writeln!(err, "Unrecognised cost function: {}", w[2]);
@@ -1415,17 +1777,64 @@ fn rebuild_pair(st: &mut State<'_>, f: impl FnOnce(&mut Pair)) {
     }
 }
 
-/// `setscale s [force]` (§7.2).
-fn set_scale(st: &mut State<'_>, s: f32, force: bool) -> Result<(), End> {
+/// `setscale s [force]` (§7.2); `schedule` for the schedule's command (the first pair, made
+/// before the schedule, prints nothing).
+fn set_scale(
+    st: &mut State<'_>,
+    s: f32,
+    force: bool,
+    schedule: bool,
+    err: &mut dyn Write,
+) -> Result<(), End> {
     if s > 0.0 {
         st.scale = s;
         st.opt.scale = s;
     }
     let s = st.scale;
     let o = st.o;
+    let trace = st.trace.clone();
+    if schedule {
+        if o.debug {
+            let _ = writeln!(err, "MJ DEBUG OUTPUT: scale = {}", mat::g(f64::from(s), 6));
+            let _ = writeln!(
+                err,
+                "MJ DEBUG OUTPUT: min_sampling = {}",
+                mat::g(f64::from(st.min_sampling), 6)
+            );
+            if let Some(p) = &st.pair {
+                trace.volume_info("testvol DEBUG", &p.input);
+            }
+        }
+        if trace.at(2) {
+            trace.write(&format!(
+                "Testvol sampling matrix =\n{}\n",
+                trace.matrix(&st.sampling)
+            ));
+            trace.line("Testvol Data Type = 0");
+            trace.line(&if o.no_clamp {
+                format!(
+                    "Testvol intensity between {} and {}",
+                    trace.num(f64::from(st.raw_input.0)),
+                    trace.num(f64::from(st.raw_input.1))
+                )
+            } else {
+                format!(
+                    "Testvol intensity clamped between {} and {}",
+                    trace.num(0.0),
+                    trace.num(0.0)
+                )
+            });
+        }
+    }
     let input = st.input0.clone();
     let inw = st.in_weight0.clone();
     if force || o.force_scaling || st.min_sampling <= 1.25 * s {
+        let evaluations = trace.reset_count();
+        if schedule && trace.at(3) {
+            trace.line(&format!(
+                "Previous scale used {evaluations} cost function evaluations"
+            ));
+        }
         // the input blurred to the scale (also with -noresample, observed)
         let (inp, w) = match &inw {
             Some(wt) => {
@@ -1490,6 +1899,10 @@ fn set_scale(st: &mut State<'_>, s: f32, force: bool) -> Result<(), End> {
             // checked again at use: FSL never finishes there (FSL-71)
         }
         st.pair = Some(Arc::new(pair));
+        st.bbr_set = false;
+        if st.cost == Cost::Bbr {
+            announce_bbr(st);
+        }
     } else if let Some(p) = st.pair.take() {
         // only the input reset (§7.2)
         let old = Arc::try_unwrap(p).unwrap_or_else(|a| clone_pair(&a));
@@ -1556,19 +1969,24 @@ fn optimise_row(st: &State<'_>, m: &Mat4, dof: usize, maxit: usize) -> Result<(M
     let pair = st.pair()?.clone();
     let log = st.log.clone();
     let cost = st.cost;
-    let eval = move |t: &Mat4| evaluate(&pair, t, cost, &log);
+    let tr = st.trace.clone();
+    let eval = move |t: &Mat4| evaluate(&pair, t, cost, &log, &tr);
     let centre = st.pair()?.centre;
     optimise::optimise(&eval, m, centre, dof, maxit, &st.opt, st.subset.as_ref())
         .map_err(End::Error)
 }
 
-/// The search (§8.1), appending to `S` and `P`.
-fn run_search(st: &mut State<'_>, dof: usize) -> Result<(), End> {
+/// The search (§8.1), appending to `S` and `P`; its verbose lines at the run's level lowered by
+/// 2 (§2.3), and with `-debugsave` at a level of 6 or more its grids saved.
+fn run_search(st: &mut State<'_>, dof: usize, err: &mut dyn Write) -> Result<(), End> {
     check_bbr_step(st, st.search_cost)?;
     let pair = st.pair()?.clone();
     let log = st.log.clone();
     let cost = st.search_cost;
-    let eval = |t: &Mat4| evaluate(&pair, t, cost, &log);
+    let tr = st.trace.clone();
+    let eval = |t: &Mat4| evaluate(&pair, t, cost, &log, &tr);
+    let mut opt = st.opt.clone();
+    opt.level = st.o.verbose - 2;
     // the search measures both centres again (observed: one more warning for an empty
     // reference or input level)
     for v in [&pair.reference, &pair.input] {
@@ -1602,12 +2020,74 @@ fn run_search(st: &mut State<'_>, dof: usize) -> Result<(), End> {
         dof,
         dof.min(st.maxdof),
         &r,
-        &st.opt,
+        &opt,
         min_voxel,
         true,
     )
     .map_err(End::Error)?;
     st.check()?;
+    if st.o.debug_save && opt.level >= 4 {
+        // the coarse grid's translations and scales, the fine grid's costs (observed: float
+        // volumes of 1 mm voxels, no sform or qform)
+        let [cx, cy, cz] = found.coarse_shape;
+        let n = cx * cy * cz;
+        let mut grids: Vec<(&str, [usize; 3], Vec<f32>)> = (0..3)
+            .map(|k| {
+                let v = (0..n).map(|i| found.translations[i][k] as f32);
+                (
+                    ["tx", "ty", "tz"][k],
+                    found.coarse_shape,
+                    grid_order(v, found.coarse_shape),
+                )
+            })
+            .collect();
+        grids.push((
+            "sc",
+            found.coarse_shape,
+            grid_order(found.scales.iter().map(|&v| v as f32), found.coarse_shape),
+        ));
+        grids.push((
+            "costs",
+            found.fine_shape,
+            grid_order(found.costs.iter().copied(), found.fine_shape),
+        ));
+        let mut notices = Vec::new();
+        for (name, shape, values) in grids {
+            let mut vol = crate::bet::Vol::new(shape, [1.0; 3], vec![0.0; shape.iter().product()]);
+            vol.data = Vec::new();
+            let mut like = Input {
+                vol,
+                header: NiftiHeader::new(
+                    larmorx_io::nifti::NiftiVersion::V1,
+                    &shape,
+                    DataType::F32,
+                )
+                .map_err(|e| End::Error(e.to_string()))?,
+                flipped: false,
+                volumes: 1,
+            };
+            let h = &mut like.header;
+            h.pixdim[1] = 1.0;
+            h.pixdim[2] = 1.0;
+            h.pixdim[3] = 1.0;
+            h.xyzt_units = 10;
+            h.srow_x = [1.0, 0.0, 0.0, 0.0];
+            h.srow_y = [0.0, 1.0, 0.0, 0.0];
+            h.srow_z = [0.0, 0.0, 1.0, 0.0];
+            write_image(
+                st.ctx,
+                name,
+                &like,
+                shape,
+                1,
+                None,
+                values,
+                DataType::F32,
+                err,
+                &mut notices,
+            )?;
+        }
+    }
     for (c, m) in found.results {
         st.push(
             Var::S,
@@ -1627,6 +2107,21 @@ fn run_search(st: &mut State<'_>, dof: usize) -> Result<(), End> {
         );
     }
     Ok(())
+}
+
+/// A search grid's values (first index slowest) in an image's order (x fastest).
+fn grid_order(values: impl Iterator<Item = f32>, shape: [usize; 3]) -> Vec<f32> {
+    let v: Vec<f32> = values.collect();
+    let [nx, ny, nz] = shape;
+    let mut out = vec![0.0; v.len()];
+    for a in 0..nx {
+        for b in 0..ny {
+            for c in 0..nz {
+                out[a + nx * (b + ny * c)] = v[(a * ny + b) * nz + c];
+            }
+        }
+    }
+    out
 }
 
 /// The output data type (§9.2) of an input stored as `stored` (`scaled`: a scaled file).
@@ -1863,6 +2358,7 @@ fn write_registered(
     input: &Image,
     m: &Mat4,
     stem: &str,
+    trace: &Trace,
     err: &mut dyn Write,
     notices: &mut Vec<Notice>,
 ) -> Result<(), End> {
@@ -1902,6 +2398,11 @@ fn write_registered(
     };
     let (stored, scaled) = stored_type(&input.input.header);
     let t = output_type(o, stored, scaled, &values, ctx.mode);
+    if trace.at(2) {
+        let d = refv.voxel_size.map(f64::from);
+        let dims = [d[0], d[1], d[2], reference.input.header.pixdim[4]];
+        trace.info("Transformed testvol", refv.shape, dims, 1, &values);
+    }
     write_image(
         ctx,
         stem,
@@ -1979,10 +2480,24 @@ fn apply(
     reference: &Image,
     input: &Image,
     init: &Mat4,
-    _out: &mut dyn Write,
+    trace: &Trace,
     err: &mut dyn Write,
     notices: &mut Vec<Notice>,
 ) -> Result<(), End> {
+    if trace.at(2) {
+        // the images as read (§2.3, observed)
+        for (name, im) in [("refvol", reference), ("inputvol", input)] {
+            let v = &im.vols[0];
+            let d = v.voxel_size.map(f64::from);
+            let all: Vec<f32> = im
+                .vols
+                .iter()
+                .flat_map(|x| x.data.iter().copied())
+                .collect();
+            let dims = [d[0], d[1], d[2], im.input.header.pixdim[4]];
+            trace.info(name, v.shape, dims, im.vols.len(), &all);
+        }
+    }
     let mut refv = reference.vols[0].clone();
     let mut ref_input = reference.input.clone();
     if let Some(s) = o.apply_iso {
@@ -2061,6 +2576,17 @@ fn apply(
     let (stored, scaled) = stored_type(&input.input.header);
     let t = output_type(o, stored, scaled, &values, ctx.mode);
     let tr = (input.vols.len() > 1).then(|| input.input.header.pixdim[4]);
+    if trace.at(2) {
+        let d = refv.voxel_size.map(f64::from);
+        let dims = [d[0], d[1], d[2], tr.unwrap_or(ref_input.header.pixdim[4])];
+        trace.info(
+            "Resampled volume",
+            refv.shape,
+            dims,
+            input.vols.len(),
+            &values,
+        );
+    }
     write_image(
         ctx,
         stem,

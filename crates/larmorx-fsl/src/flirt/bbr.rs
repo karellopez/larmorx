@@ -242,6 +242,15 @@ pub fn field_shift<'a>(
 
 /// The boundary-based cost of `a` (reference mm → input mm through `a⁻¹`, §6.5).
 pub fn cost(pair: &Pair, a: &Mat4, log: &Log) -> f32 {
+    cost_and_debug(pair, a, log, None)
+}
+
+/// [`cost`], and with `debug` the volume `-debug` saves (§9.4): two volumes on the reference
+/// level's grid, zero but where each boundary pair used writes, at the rounded midpoint of its
+/// two points (reference voxels), `w·u + (1 − w)` in the first and `w` in the second (`u` the
+/// pair's term, `w` its weight, single precision; later pairs over earlier ones; a midpoint
+/// outside the grid writes nothing).
+pub fn cost_and_debug(pair: &Pair, a: &Mat4, log: &Log, debug: Option<&mut Vec<f32>>) -> f32 {
     let Some(src) = pair.bbr_source.as_ref() else {
         log.fatal("BBR cost requested without -wmseg or -wmcoords/-wmnorms");
         return f32::NAN;
@@ -350,6 +359,33 @@ pub fn cost(pair: &Pair, a: &Mat4, log: &Log) -> f32 {
             (u, w12)
         })
         .collect();
+    if let Some(out) = debug {
+        let [nx, ny, nz] = pair.reference.shape;
+        let per = nx * ny * nz;
+        out.clear();
+        out.resize(2 * per, 0.0);
+        let vs = pair.reference.voxel_size;
+        for (j, &k) in indices.iter().enumerate() {
+            let (g, w) = (pts.gm[k], pts.wm[k]);
+            let mut ix = [0i64; 3];
+            for d in 0..3 {
+                let mid = (f64::from(g[d]) + f64::from(w[d])) / 2.0 / f64::from(vs[d]);
+                ix[d] = (mid + 0.5).floor() as i64;
+            }
+            if ix
+                .iter()
+                .zip([nx, ny, nz])
+                .any(|(&i, n)| i < 0 || i >= n as i64)
+            {
+                continue;
+            }
+            let at = ix[0] as usize + nx * (ix[1] as usize + ny * ix[2] as usize);
+            let (u, w12) = terms[j];
+            let (u, w12) = (u as f32, w12 as f32);
+            out[at] = w12 * u + (1.0 - w12);
+            out[per + at] = w12;
+        }
+    }
     let (mut num, mut den) = (0.0f64, 0.0f64);
     let mut nan_at = None;
     for (i, &(u, w12)) in terms.iter().enumerate() {

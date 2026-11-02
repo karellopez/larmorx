@@ -88,11 +88,8 @@ _SED_USAGE = re.compile(
     r"gethelp/>\.\n",
     re.S,
 )
-#: Options the original does not have yet (part 2): its cases are skipped.
-PENDING = {
-    "-debug": "-debug (part 2)",
-    "-debugsave": "-debugsave (part 2)",
-}
+#: Options the original does not have yet: its cases are skipped.
+PENDING: dict[str, str] = {}
 
 _NUMBER = re.compile(r"[-+]?(?:nan|inf|(?:\d+\.?\d*|\.\d+)(?:[eE][-+]?\d+)?)")
 
@@ -145,6 +142,45 @@ def _own(text: str) -> str:
 
 def _masked(text: str) -> str:
     return _NUMBER.sub("#", text)
+
+
+#: A cost evaluation's line of a verbose level of 5 or more (`<count> : <cost> :: <params>`).
+_EVALUATION = re.compile(r"^\*?# : # :: (?:# )*$")
+#: `-debug`'s volumes that do not depend on the registration's matrix (§9.4): the reference
+#: pyramid and its weights, the input at 8 mm and its weight.
+_DEBUG_VOLUMES = re.compile(r"^(refvol(_[248])?|global_refweight[1248]|testvol|testweight)\.")
+#: `-debugsave`'s grids of the search (§2.3), which follow the search's optimisations.
+_SEARCH_GRIDS = re.compile(r"^(tx|ty|tz|sc|costs)\.")
+
+
+def _collapsed(text: str) -> tuple[str, int]:
+    """The masked text with each run of evaluation lines as one line, and their count: the
+    evaluations follow the optimisation's path, which the matrices' thresholds hold."""
+    out: list[str] = []
+    n = 0
+    for ln in _masked(text).split("\n"):
+        if _EVALUATION.match(ln):
+            n += 1
+            star = ln.startswith("*")
+            if out and out[-1] in ("<evaluations>", "*<evaluations>"):
+                if star:
+                    out[-1] = "*<evaluations>"
+                continue
+            out.append("*<evaluations>" if star else "<evaluations>")
+        else:
+            out.append(ln)
+    return "\n".join(out), n
+
+
+def _verbose_level(args: list[str]) -> int:
+    level = 0
+    for i, w in enumerate(args):
+        if w == "-v":
+            level = max(level, 1)
+        elif w == "-verbose" and i + 1 < len(args):
+            with contextlib.suppress(ValueError):
+                level = max(level, int(args[i + 1]))
+    return level
 
 
 def _numbers(text: str) -> list[float]:
@@ -544,6 +580,14 @@ def compare(
         same = want == got
         close = _masked(want) == _masked(got)
         detail = ""
+        value = "yes" if same else ("numbers differ" if close else "no")
+        if not close and _verbose_level(args) >= 5:
+            # every cost evaluation printed: their number follows the optimisation's path
+            (cw, nw), (cg, ng) = _collapsed(want), _collapsed(got)
+            if cw == cg:
+                close = True
+                value = "evaluations differ"
+                detail = f"{nw} evaluation lines from FSL, {ng} from the original"
         if not close:
             wl, gl = want.splitlines(), got.splitlines()
             first = next(
@@ -562,8 +606,9 @@ def compare(
             f"{stream}: the same lines (numbers aside)",
             close,
             metric="identical",
-            value="yes" if same else ("numbers differ" if close else "no"),
-            threshold="the same text, numbers read as numbers",
+            value=value,
+            threshold="the same text, numbers read as numbers"
+            + (" (runs of evaluation lines as one)" if _verbose_level(args) >= 5 else ""),
             detail=detail,
         )
     theirs, mine = _files(a, set()), _files(b, set())
@@ -673,6 +718,41 @@ def compare(
         fa, fb = theirs[name], mine[name]
         if fa.read_bytes() == fb.read_bytes():
             continue
+        if _DEBUG_VOLUMES.match(name):
+            # -debug's volumes before any registration: the header and the values (the
+            # pyramid's last bits, docs/findings/fsl-flirt-original.md)
+            same = _same_streams(fa, fb, blank_descrip=True)
+            rel = 0.0 if same else _relative_difference(fa, fb)
+            checks(
+                f"{name}: the same header, values within 1e-6 of the image's range",
+                same or (_same_header(fa, fb) and rel <= 1e-6),
+                metric="max difference / range",
+                value=float(f"{rel:.3g}"),
+                threshold=1e-6,
+                detail="" if same else _image_difference(fa, fb),
+            )
+            continue
+        if _SEARCH_GRIDS.match(name):
+            # the search's grids: its optimised translations, scales and costs, which follow
+            # the optimisations' paths (the matrices' thresholds hold them)
+            da = np.asanyarray(_load(fa).dataobj).astype(np.float64)
+            db = np.asanyarray(_load(fb).dataobj).astype(np.float64)
+            ok = da.shape == db.shape and _same_header(fa, fb)
+            rel = (
+                float(np.max(np.abs(da - db)) / max(float(np.max(np.abs(da))), 1e-12))
+                if ok
+                else 1.0
+            )
+            c = float(np.corrcoef(da.ravel(), db.ravel())[0, 1]) if ok and da.std() > 0 else 1.0
+            checks(
+                f"{name}: the same grid and header, correlation 0.999 (or within 1e-4 when "
+                "constant)",
+                ok and (c >= 0.999 if da.std() > 0 else rel <= 1e-4),
+                metric="correlation" if ok and da.std() > 0 else "max relative difference",
+                value=round(c, 6) if ok and da.std() > 0 else float(f"{rel:.3g}"),
+                threshold=0.999 if ok and da.std() > 0 else 1e-4,
+            )
+            continue
         kernel = any(f"-interp {k}" in " ".join(args) for k in ("sinc", "spline"))
         if mats_identical and not (kernel and not _same_streams(fa, fb, blank_descrip=True)):
             same = _same_streams(fa, fb, blank_descrip=True)
@@ -720,6 +800,13 @@ def compare(
                 value=round(c, 6) if np.isfinite(c) else str(c),
                 threshold="reported" if ill_posed else 0.999,
             )
+
+
+def _same_header(fa: Path, fb: Path) -> bool:
+    """The two images' headers equal but for their descriptions."""
+    ha, hb = _load(fa).header.copy(), _load(fb).header.copy()
+    ha["descrip"] = hb["descrip"] = b""
+    return bytes(ha.binaryblock) == bytes(hb.binaryblock)
 
 
 def _relative_difference(fa: Path, fb: Path) -> float:
@@ -856,9 +943,6 @@ def fix_pass(
 
 def _pending(args: list[str], run: rep.Run) -> str | None:
     words = list(args) + [t for _, t in run.files]
-    for i, w in enumerate(args[:-1]):
-        if w == "-verbose" and args[i + 1].isdigit() and int(args[i + 1]) >= 2:
-            return "the verbose levels above 1 (part 2)"
     for k, why in PENDING.items():
         if k in words:
             return why
@@ -972,7 +1056,202 @@ def _fmriprep_case(payload: tuple[str, str], checks: CheckList) -> None:
             fix_pass(checks, "flirt", None, args, {}, b, ours)
 
 
+_ROW = "setrow UQ 1 0 0 0 0 1 0 0 0 0 1 0 0 0 0 1"
+_COST = "measurecost 6 UQ 0 0 0 0 0 0 rel"
+
+
+def _sched(*lines: str) -> tuple[tuple[str, str], ...]:
+    return (("s.sch", "\n".join(lines) + "\n"),)
+
+
+def _original_cases() -> list[tuple[str, str, rep.Run]]:
+    """The original's own cases (part 2): the verbose levels' and -debug's code paths the replica
+    suite's cases leave out (each once; FSL's runs cached under their own keys)."""
+    E, T = "@epi.nii", "@t1.nii"
+    base = (E, "-ref", T)
+    sch = ("-omat", "out.mat", "-schedule", "s.sch")
+    r = rep.Run
+    return [
+        (
+            "verbose/6-search-debugsave",
+            "-verbose 6 -debugsave on the search alone: its inner level 4 and the grids it saves",
+            r(
+                "flirt",
+                ("-in", *base, "-verbose", "6", "-debugsave", *sch),
+                files=_sched("setscale 8", "clear S", "clear P", "search", "print S"),
+            ),
+        ),
+        (
+            "verbose/7",
+            "-verbose 7 on the default schedule: the search's evaluations, starts and tolerances",
+            r("flirt", ("-in", *base, "-verbose", "7", "-dof", "6", "-omat", "out.mat")),
+        ),
+        (
+            "verbose/5-optimisers",
+            "-verbose 5: gridmeasurecost, Brent, Powell's correction, a parameter subset",
+            r(
+                "flirt",
+                ("-in", *base, "-verbose", "5", *sch),
+                files=_sched(
+                    "setscale 4",
+                    _ROW,
+                    _COST,
+                    "gridmeasurecost 6 UQ -0.1 0.1 0.1 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 abs",
+                    "setoption optimisationtype brent",
+                    "optimise 6 UQ 0 0 0 0 0 0 0 rel 2",
+                    "setoption optimisationtype powell",
+                    "setoption paramsubset 1  0 0 0 1 0 0 0 0 0 0 0 0",
+                    "optimise 6 UQ 0 0 0 0 0 0 0 rel 2",
+                    "print U",
+                ),
+            ),
+        ),
+        (
+            "verbose/7-subset",
+            "-verbose 7: Brent's and a subset's starts, tolerances and doubled evaluations",
+            r(
+                "flirt",
+                ("-in", *base, "-verbose", "7", *sch),
+                files=_sched(
+                    "setscale 4",
+                    _ROW,
+                    "setoption optimisationtype brent",
+                    "optimise 6 UQ 0 0 0 0 0 0 0 rel 2",
+                    "setoption optimisationtype powell",
+                    "setoption paramsubset 1  0 0 0 1 0 0 0 0 0 0 0 0",
+                    "optimise 6 UQ 0 0 0 0 0 0 0 rel 2",
+                ),
+            ),
+        ),
+        (
+            "verbose/3-scales-options",
+            "-verbose 3: forced and input-only scales (the evaluation counts), every setoption "
+            "echoed, a short tolerance list's index error",
+            r(
+                "flirt",
+                ("-in", *base, "-verbose", "3", *sch),
+                files=_sched(
+                    "setscale 8",
+                    _ROW,
+                    _COST,
+                    "setscale 2 force",
+                    _COST,
+                    "setscale 1",
+                    _COST,
+                    "setscale 4",
+                    _COST,
+                    "setscale 2",
+                    "setoption tolerance 0.1 0.2 0.3",
+                    "setoption costfunction normcorr",
+                    "setoption optimisationtype brent",
+                    "setoption fuzzyfraction 0.3",
+                    "setoption bbrtype global_abs",
+                    "setoption smoothing 3",
+                    "setoption nosubset 1 2",
+                    "setoption boundguess 0",
+                    "setoption bbrstep 3",
+                    "setoption bbrslope 0.4",
+                    "setoption minsampling 2",
+                    "setoption frobnicate 2",
+                    _COST,
+                    "setscale 8",
+                    _COST,
+                ),
+            ),
+        ),
+        (
+            "verbose/2-noclamp",
+            "-verbose 2 -noclamp: the images' ranges unclamped",
+            r(
+                "flirt",
+                ("-in", *base, "-verbose", "2", "-noclamp", *sch),
+                files=_sched("setscale 4", _ROW, _COST),
+            ),
+        ),
+        (
+            "verbose/2-noresample",
+            "-verbose 2 -noresample: no subsampling lines",
+            r(
+                "flirt",
+                ("-in", *base, "-verbose", "2", "-noresample", *sch),
+                files=_sched("setscale 4", _ROW, _COST),
+            ),
+        ),
+        (
+            "verbose/2-applyxfm",
+            "-verbose 2 -applyxfm: the images read and the resampled volume",
+            r(
+                "flirt",
+                ("-in", *base, "-verbose", "2", "-applyxfm", "-init", "@init.mat", "-out", "out"),
+            ),
+        ),
+        (
+            "verbose/2-out",
+            "-verbose 2 -out without -omat: the transformed input, then the final result",
+            r(
+                "flirt",
+                ("-in", *base, "-verbose", "2", "-out", "out", "-schedule", "s.sch"),
+                files=_sched("setscale 8", _ROW, _COST),
+            ),
+        ),
+        (
+            "verbose/3-2d",
+            "-2D -verbose 3: the tripled slice, no sform messages",
+            r(
+                "flirt",
+                ("-in", "@slice_in.nii", "-ref", "@slice_ref.nii", "-2D", "-verbose", "3", *sch),
+                files=_sched("setscale 4", _ROW, _COST),
+            ),
+        ),
+        (
+            "verbose/3-debug",
+            "-verbose 3 -debug: each setscale's debug lines before the input's",
+            r(
+                "flirt",
+                ("-in", *base, "-verbose", "3", "-debug", *sch),
+                files=_sched("setscale 4", "setscale 2", _ROW, _COST),
+            ),
+        ),
+        (
+            "debug/scales",
+            "-debug over forced and input-only scales: the pair's input at each setscale",
+            r(
+                "flirt",
+                ("-in", *base, "-debug", *sch),
+                files=_sched(
+                    "setscale 8",
+                    _ROW,
+                    _COST,
+                    "setscale 2 force",
+                    _COST,
+                    "setscale 1",
+                    _COST,
+                    "setscale 4",
+                    _COST,
+                ),
+            ),
+        ),
+        (
+            "debug/bbr-setoption",
+            "-debug -wmseg: the boundary-based cost set up by setoption and by a new pair",
+            r(
+                "flirt",
+                ("-in", *base, "-wmseg", "@wm.nii", "-debug", *sch),
+                files=_sched(
+                    "setscale 4",
+                    "setoption costfunction bbr",
+                    "setscale 2 force",
+                    "setoption costfunction normcorr",
+                    "setscale 4",
+                ),
+            ),
+        ),
+    ]
+
+
 def cases(tier: str) -> list[Case]:
+    from larmorx_validation.parity.harness import in_tier
+
     out = []
     for c in rep.cases(tier):
         kind, payload = c.payload
@@ -981,6 +1260,9 @@ def cases(tier: str) -> list[Case]:
             if run.program not in PROGRAMS:
                 continue
         out.append(c)
+    if in_tier("standard", tier):
+        for name, desc, run in _original_cases():
+            out.append(Case(name, name.split("/")[0], desc, ("direct", run)))
     return out
 
 

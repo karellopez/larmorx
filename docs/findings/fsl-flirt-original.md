@@ -110,8 +110,16 @@ reproduce the 9th and 10th steps both), and the drift grows to 0.02 mm in the 4 
   value), not set to the padding value.
 - FSL writes the sform's negative zeros as zeros, and a `NIFTI_PAIR` header of 352 bytes (the
   four extension bytes).
-- `-applyisoxfm` keeps the reference's sform rows when its sform code is 0 (and its quaternion
-  fields when its qform code is 0); only a set transform follows the new grid.
+- `-applyisoxfm` with an unset sform (code 0) keeps the reference's sform rows but for the x
+  flips of the two grids (`W·F_n·F_n'`, no scaling: 57.75 became 64.75 for 16 voxels of 0.5 mm
+  resampled to 3.5 mm on a flipped image); the quaternion's fields follow only a set qform (an
+  oblique qform's `quatern_b` and `quatern_c` then differ from FSL's in their last float bit).
+- `-applyxfm` writes the image before the `-omat` matrix: with an output type FSL cannot write
+  (`FSLOUTPUTTYPE=ANALYZE`) FSL stops with its message and writes neither.
+- `convert_xfm -inverse` (and every `inv(A)`, §12) leaves LAPACK's signs of zero: `-0` where the
+  inverse of an upper triangle through `dtrti2` scales a zero by minus the inverse of a diagonal
+  (the translation of a matrix with no z translation, observed); the original computes the
+  inverse in that order (`dgetrf`, then `dgetri`).
 - A level of the reference pyramid of 1 x 1 x 1 voxels (a reference of 1 or 2 voxels along every
   axis) is halved from a border-less volume (§10a, FSL-75's empty buffer): refused in both modes
   like the single voxel of the output's padding.

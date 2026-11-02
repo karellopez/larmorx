@@ -59,26 +59,32 @@ struct Image {
     input: Input,
 }
 
-fn to_volume(v: &crate::bet::Vol) -> Volume {
-    Volume::new(v.shape, v.voxel.map(|d| d as f32), v.data.clone())
-}
-
 /// Reads `name` as FSL's image layer does (every volume when `all`).
 fn read(ctx: &Ctx<'_>, name: &str, all: bool, notices: &mut Vec<Notice>) -> Result<Image, End> {
     let files = crate::cli::bet2::resolve_image(ctx.settings, name, ctx.mode, notices)
         .map_err(|e| End::Error(read_message(name, &e)))?;
+    // the values move into `vols` (one copy of an image, not two: FLIRT reads only the grid
+    // and the header from `input` afterwards)
+    let take = |v: &mut crate::bet::Vol| {
+        Volume::new(
+            v.shape,
+            v.voxel.map(|d| d as f32),
+            std::mem::take(&mut v.data),
+        )
+    };
     if all {
-        let (vols, input) =
+        let (mut vols, mut input) =
             image::read(&files, ctx.n_threads).map_err(|e| End::Error(read_message(name, &e)))?;
+        input.vol.data = Vec::new();
         Ok(Image {
-            vols: vols.iter().map(to_volume).collect(),
+            vols: vols.iter_mut().map(take).collect(),
             input,
         })
     } else {
-        let input = image::read_first(&files, ctx.n_threads)
+        let mut input = image::read_first(&files, ctx.n_threads)
             .map_err(|e| End::Error(read_message(name, &e)))?;
         Ok(Image {
-            vols: vec![to_volume(&input.vol)],
+            vols: vec![take(&mut input.vol)],
             input,
         })
     }
@@ -119,25 +125,30 @@ fn triple(v: &Volume) -> Volume {
     )
 }
 
-/// Clamping to the robust range (§4.1).
-fn clamp(v: &Volume) -> Volume {
-    let vol = crate::bet::Vol::new(v.shape, v.voxel_size.map(f64::from), v.data.clone());
+/// Clamping to the robust range (§4.1), in place (the range read from the data itself, no copy).
+fn clamp_in_place(v: &mut Volume) {
+    let vol = crate::bet::Vol::new(
+        v.shape,
+        v.voxel_size.map(f64::from),
+        std::mem::take(&mut v.data),
+    );
     let (lo, hi) = crate::bet::params::robust_range(&vol);
+    v.data = vol.data;
     let (lo, hi) = (lo as f32, hi as f32);
-    let data = v
-        .data
-        .iter()
-        .map(|&x| {
-            if x > hi {
-                hi
-            } else if x < lo {
-                lo
-            } else {
-                x
-            }
-        })
-        .collect();
-    Volume::new(v.shape, v.voxel_size, data)
+    for x in &mut v.data {
+        if *x > hi {
+            *x = hi;
+        } else if *x < lo {
+            *x = lo;
+        }
+    }
+}
+
+/// [`scaled`] in place.
+fn scale_in_place(v: &mut Volume, b: f32) {
+    if (b - 1.0).abs() > 1e-5 {
+        v.voxel_size = v.voxel_size.map(|d| d / b);
+    }
 }
 
 fn scaled(v: &Volume, b: f32) -> Volume {
@@ -523,7 +534,7 @@ fn run_inner(
 fn register(
     o: &Options,
     ctx: &Ctx<'_>,
-    reference: Image,
+    mut reference: Image,
     input: Image,
     init_unscaled: Mat4,
     q_unscaled: Mat4,
@@ -534,16 +545,27 @@ fn register(
 ) -> Result<(), End> {
     let mode = ctx.mode;
     let weighting = o.ref_weight.is_some() || o.in_weight.is_some();
-    let prep = |v: &Volume| -> Volume {
-        let t = triple(v);
-        if o.no_clamp { t } else { clamp(&t) }
-    };
-    let ref0 = prep(&reference.vols[0]);
-    let in0 = prep(&input.vols[0]);
     // from the headers, before the single-slice tripling (observed)
     let b = base_scale(o, &reference.vols[0], &input.vols[0]);
-    let ref0 = scaled(&ref0, b);
-    let in0 = scaled(&in0, b);
+    // prepared in place: the reference's values are not needed again (its grid is), the input's
+    // are (the output resamples them)
+    let prep = |mut v: Volume| -> Volume {
+        if v.shape[2] == 1 {
+            v = triple(&v);
+        }
+        if !o.no_clamp {
+            clamp_in_place(&mut v);
+        }
+        scale_in_place(&mut v, b);
+        v
+    };
+    let r = &mut reference.vols[0];
+    let ref0 = prep(Volume {
+        shape: r.shape,
+        voxel_size: r.voxel_size,
+        data: std::mem::take(&mut r.data),
+    });
+    let in0 = prep(input.vols[0].clone());
     let read_weight = |name: &Option<String>,
                        like: &Volume,
                        notices: &mut Vec<Notice>|

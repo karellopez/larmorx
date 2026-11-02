@@ -84,12 +84,102 @@ fn convolve_axis(data: &[f32], shape: [usize; 3], axis: usize, taps: &[f64]) -> 
     out
 }
 
+/// One output value of the convolution along a line: the single-precision running sum, in kernel
+/// order, of the double products of value and tap (values outside the line count 0).
+#[inline(always)]
+fn line_value(at: impl Fn(usize) -> f32, n: usize, pos: usize, taps: &[f64]) -> f32 {
+    let half = (taps.len() - 1) / 2;
+    let mut acc = 0.0f32;
+    for (t, &w) in taps.iter().enumerate() {
+        let j = pos as i64 + t as i64 - half as i64;
+        if j >= 0 && (j as usize) < n {
+            acc = (f64::from(acc) + f64::from(at(j as usize)) * w) as f32;
+        }
+    }
+    acc
+}
+
+/// [`convolve_axis`] in place, with the same values: x and y line by line (a copy of the line),
+/// z plane by plane (the original planes the kernel still needs kept aside), so that a blur holds
+/// one copy of the volume, not three.
+fn convolve_axis_in_place(data: &mut [f32], shape: [usize; 3], axis: usize, taps: &[f64]) {
+    let [nx, ny, nz] = shape;
+    let plane = nx * ny;
+    if data.is_empty() {
+        return;
+    }
+    match axis {
+        0 => data.par_chunks_mut(nx.max(1)).for_each(|row| {
+            let line = row.to_vec();
+            for (x, o) in row.iter_mut().enumerate() {
+                *o = line_value(|j| line[j], nx, x, taps);
+            }
+        }),
+        1 => data.par_chunks_mut(plane.max(1)).for_each(|slab| {
+            let mut line = vec![0.0f32; ny];
+            for x in 0..nx {
+                for (y, l) in line.iter_mut().enumerate() {
+                    *l = slab[x + nx * y];
+                }
+                for y in 0..ny {
+                    slab[x + nx * y] = line_value(|j| line[j], ny, y, taps);
+                }
+            }
+        }),
+        _ => {
+            let half = (taps.len() - 1) / 2;
+            // the original planes below z that the kernel still reads (a ring of `half` planes)
+            let mut kept: std::collections::VecDeque<(usize, Vec<f32>)> =
+                std::collections::VecDeque::new();
+            let mut out = vec![0.0f32; plane];
+            for z in 0..nz {
+                {
+                    let src = &*data;
+                    // the planes each tap reads (None outside the volume), in kernel order
+                    let planes: Vec<Option<&[f32]>> = (0..taps.len())
+                        .map(|t| {
+                            let j = z as i64 + t as i64 - half as i64;
+                            if j < 0 || j >= nz as i64 {
+                                None
+                            } else if j as usize >= z {
+                                let j = j as usize;
+                                Some(&src[j * plane..(j + 1) * plane])
+                            } else {
+                                kept.iter()
+                                    .find(|(i, _)| *i == j as usize)
+                                    .map(|(_, p)| p.as_slice())
+                            }
+                        })
+                        .collect();
+                    out.par_iter_mut().enumerate().for_each(|(k, o)| {
+                        let mut acc = 0.0f32;
+                        for (pl, &w) in planes.iter().zip(taps) {
+                            if let Some(pl) = pl {
+                                acc = (f64::from(acc) + f64::from(pl[k]) * w) as f32;
+                            }
+                        }
+                        *o = acc;
+                    });
+                }
+                let cur = &mut data[z * plane..(z + 1) * plane];
+                if half > 0 {
+                    kept.push_back((z, cur.to_vec()));
+                    while kept.len() > half {
+                        kept.pop_front();
+                    }
+                }
+                cur.copy_from_slice(&out);
+            }
+        }
+    }
+}
+
 /// The blur of `v` to resolution `r` mm (§5): a separable convolution along x, y, z.
 pub fn blur(v: &Volume, r: f32) -> Volume {
     let mut data = v.data.clone();
     for axis in 0..3 {
         if let Some(taps) = blur_kernel(r, v.voxel_size[axis]) {
-            data = convolve_axis(&data, v.shape, axis, &taps);
+            convolve_axis_in_place(&mut data, v.shape, axis, &taps);
         }
     }
     Volume::new(v.shape, v.voxel_size, data)

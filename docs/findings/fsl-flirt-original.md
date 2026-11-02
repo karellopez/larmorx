@@ -461,3 +461,72 @@ evaluation; every FSL run through the oracle cache):
   sorts and its list (the 8 mm search's trace is FSL's but for a few 6th digits of the
   translations of the free optimisations' results, then the 4 mm stage's choices part). By default
   the original refuses all three (FSL-91, FSL-92, rule B).
+
+## Random testing of every program (part 2, relay 5, 2026-11-02)
+
+The trial `difftest --tools fsl-flirt-original --budget 0.4 --jobs 8 --threads 1 --seed 20261103
+--shrink-budget 240` (24.4 minutes, realistic cases only, a 24 GiB box, 3 GiB a case; the
+descriptor now draws every program of the original, a registration's `-verbose` 2 to 7 and
+`-debug`), on `4ba5ada`: 9,854 cases, 7,093 agree, 2,712 differ, 49 notices
+(`<workspace>/oracles/difftest/2026-11-02-cleanroom-flirt-2`). extracttxt, midtrans, pointflirt
+and rmsdiff agree in every case; aff2rigid in 169 of 170. Found and corrected (black-box runs,
+each checked on the trial's cases and the suite's 168 affected cases: no change but the two
+FSL-91 cases already open):
+
+- **`-applyisoxfm`'s header** as §9.3 states it: `st = s/d` in single precision, each form swapped
+  by the read grid (`W·D⁻¹·F⁻¹·D`, the field of view in single precision) and back by the new
+  grid's `n_x` and `s`, every element rounded to single precision (a model of 12 cases: 12 of 12
+  of FSL's sform rows, where the voxel-flip form gave 9; `1.5 × 2.3333333` writes `3.4999998`,
+  not the tie's `3.5`); an unset qform is swapped likewise (its x offset moves, as the unset
+  sform's); the quaternion from the composed single-precision matrix (§3's conversion). NIfTI-2
+  outputs carry FSL's single-precision values.
+- **An unset form completed** (observed): a registration's `-out` image and applyxfm4D's output
+  write an unset sform as the qform's matrix with the qform's code, an unset qform as the sform's
+  quaternion and offsets with its code (130 of 135 applyxfm4D runs, every `-nosearch`
+  registration whose matrix is FSL's); `-applyxfm` keeps it unset (0 of 443).
+- **zstd and bzip2 outputs of every integer type** (char and int images were refused with
+  `unexpected output type`).
+- **FSL-76, FSL-79, FSL-80 named only where they change a value** (D13): makerot with a zero
+  angle or an axis whose two scalings give the same matrix, applyxfm4D's spline of an integer
+  image and its `-3D` sinc kernel where the other mode's volume is the same.
+- **The coordinate programs: an image without sform or qform** has its voxel sizes as its world
+  coordinates, x not reversed (the source in millimetres as well as the destination or standard
+  image); `std2imgcoord` and `img2stdcoord` then print their warning of a standard volume without
+  coordinates. 20 of the trial's 37 coordinate findings agree now; the 17 others differ only in
+  a printed 6th significant digit (the last bits of the mapping).
+- **BBR without a boundary voxel**: `ERROR::set_bbr_seg: could not find any boundary points!` once
+  each time a pair is made with the cost (a `setscale` makes it twice) and at `setoption
+  costfunction bbr`, and at each evaluation the error then `WARNING:: Found NaN in BBR cost (2)`
+  (a NaN cost, also `Σ w12 = 0`'s, is warned at the end): FSL's lines on five schedules, line for
+  line.
+- **Memory**: the coordinate programs and pointflirt's `--vox` read only the header's bytes (89 MiB
+  for a 0.8 mm T1w's header, FSL 10 MiB).
+
+Still open (for the next relay; triage as below):
+- *avscale and midtrans with a 0.8 mm volume*: 197 MiB against FSL's 130 MiB (the whole file
+  decompressed and converted while the decompressed bytes are held: the shared reader's two
+  copies);
+- *uint8 images in applyxfm4D (sinc, spline) and `-applyxfm`*: values that differ by up to 255
+  (9 of 9 `-3D` sinc and 10 of 11 spline uint8 cases): FSL's handling of char data (the type
+  group, its conversion) to be measured;
+- *the quaternion's signs* of a completed or composed qform (`quatern_b/c/d` of `-0` against `0`,
+  or a half turn's sign) in 8 of the replayed applyxfm4D and `-applyisoxfm` findings;
+- *`-dof 3`*: FSL prints `Erroneous dof 3 : using 6 instead` more often (95 of 108 cases): the
+  count per command to be measured (the findings' first section gives part 1's count);
+- *avscale's skews* printed `-0.000000` by FSL where the original's are `0.000000` (the sign of a
+  residual of about 1e-17, relay 1's spec question 2), a rotation angle's 6th digit;
+- *registrations* (1,808 of 3,616 differ): paths that part in the costs' last bits and ill-posed
+  random pairs (displacement beyond the thresholds with FSL's own variability often 0 on these
+  small images), `Parameters do not form a valid axis` counts that follow the path (FSL-90),
+  COG-warning counts; pairreg (204 of 230: its three registrations' paths; FSL's own heap
+  corruption, FSL-75, in 30 of them);
+- *convert_xfm* (7 of 861): the text of six matrices differs (to be looked at).
+
+Part 1's 128 open findings replayed (`difftest --replay`, 8 at a time in a 32 GiB box, memory
+findings left out): 47 agree, 81 differ (registrations 76, `-applyxfm` 4, convert_xfm 1); a
+stratified sample of 180 of this trial's findings: 50 agree since these corrections.
+
+The thread probes (`tests/parity/test_thread_pools.py`): a one-thread rmsdiff's pool thread was
+seen once under its process's name (`python`), before it named itself: the probe now reads such
+a thread's name again 2 ms later (`thread_pools.probe`); every original FLIRT program then stays
+in its pool (6 runs each).

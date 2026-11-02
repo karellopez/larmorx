@@ -275,6 +275,8 @@ name = "larmorx-fsl"
 version = "0.0.1"
 dependencies = [
  "bytemuck",
+ "bzip2",
+ "flate2",
  "larmorx-core",
  "larmorx-io",
  "larmorx-mri",

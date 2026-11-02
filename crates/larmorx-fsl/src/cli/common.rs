@@ -115,9 +115,7 @@ pub fn read_header(
     let path = f.header.as_path();
     let invalid = |m: String| ImageError::Invalid(format!("{}: {m}", path.display()));
     let c = Compression::of_file(path).map_err(|e| invalid(e.to_string()))?;
-    let raw = std::fs::read(path)
-        .and_then(|r| c.decompress(r))
-        .map_err(|e| invalid(e.to_string()))?;
+    let raw = header_bytes(path, c).map_err(|e| invalid(e.to_string()))?;
     if raw.len() < 4 {
         return Err(invalid("the file ends inside the header".into()));
     }
@@ -137,6 +135,36 @@ pub fn read_header(
     }
     let h = NiftiHeader::parse(&block).map_err(|e| invalid(e.to_string()))?;
     Ok(header_image(&h))
+}
+
+/// The first 540 bytes of an image file, decompressed (at most a NIfTI-2 header): only the
+/// header is read, as FSL reads it for the coordinate programs (2026-11-02: reading a whole
+/// 0.8 mm T1w for its header needed 89 MiB where FSL needs 10).
+fn header_bytes(path: &std::path::Path, c: Compression) -> std::io::Result<Vec<u8>> {
+    use std::io::Read;
+    const N: u64 = 540;
+    let file = std::io::BufReader::new(std::fs::File::open(path)?);
+    let mut out = Vec::with_capacity(N as usize);
+    match c {
+        Compression::None => {
+            file.take(N).read_to_end(&mut out)?;
+        }
+        Compression::Gzip => {
+            flate2::read::MultiGzDecoder::new(file)
+                .take(N)
+                .read_to_end(&mut out)?;
+        }
+        Compression::Bzip2 => {
+            bzip2::read::MultiBzDecoder::new(file)
+                .take(N)
+                .read_to_end(&mut out)?;
+        }
+        Compression::Zstd => {
+            out = c.decompress(std::fs::read(path)?)?;
+            out.truncate(N as usize);
+        }
+    }
+    Ok(out)
 }
 
 /// [`HeaderImage`] of a parsed header.

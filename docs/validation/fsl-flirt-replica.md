@@ -1,12 +1,12 @@
 # Parity: FLIRT replica (bit-exact, FSL Licence)
 
-**All cases agree.** 296 cases on the `standard` tier: 205 pass, 87 rejected by both, 4 expected divergences, 0 failures.
+**All cases agree.** 302 cases on the `standard` tier: 209 pass, 87 rejected by both, 6 expected divergences, 0 failures.
 
 - **Validated:** `larmorx-nc fsl flirt`, `convert_xfm`, `avscale`, `img2imgcoord`, `std2imgcoord`, `img2stdcoord`, `rmsdiff`, `makerot`, `midtrans`, `pointflirt`, `applyxfm4D` and the scripts `pairreg`, `extracttxt` and `aff2rigid` (crate larmorx-nc-flirt, translated from FSL 6.0.7.23's source)
 - **Reference:** flirt, convert_xfm, avscale, img2imgcoord, std2imgcoord, img2stdcoord, rmsdiff, makerot, midtrans, pointflirt, applyxfm4D, pairreg, extracttxt and aff2rigid from FSL 6.0.7.23 (fsl-flirt 2111.4, fsl-newimage 2601.0, fsl-miscmaths 2412.6, fsl-utils 2412.6, fsl-warpfns 2501.0, fsl-armawrap 0.7.0 with Armadillo 14.2.1; the conda build at `~/fsl-6.0.7.23`, as built: glibc 2.35's maths, OpenBLAS 0.3.33 with its LAPACK on its Haswell kernels; the scripts under dash, GNU grep, dc and sed of Ubuntu 22.04 and FSL's Python with NumPy 2.4.6)
 - **Test data:** larmorx-testdata `52124bc98f9f`, tier `standard`
 - **Generated:** 2026-11-02 on Linux x86_64, with `python -m larmorx_validation parity fsl-flirt-replica --tier standard`
-- **Original programs:** 296 runs: 277 from the oracle cache, 19 run (4 never cached: the original varies); cache `<workspace>/oracles/cache`, mode `use`
+- **Original programs:** 302 runs: 281 from the oracle cache, 21 run (6 never cached: the original varies); cache `<workspace>/oracles/cache`, mode `use`
 
 ## Thresholds
 
@@ -25,10 +25,10 @@
 | bbr | 11 | 11 | 0 | 0 | 0 |
 | convert_xfm | 16 | 7 | 9 | 0 | 0 |
 | difftest | 10 | 8 | 2 | 0 | 0 |
-| edge | 32 | 9 | 19 | 4 | 0 |
+| edge | 35 | 10 | 19 | 6 | 0 |
 | fmriprep | 3 | 3 | 0 | 0 | 0 |
 | programs | 129 | 79 | 50 | 0 | 0 |
-| real | 58 | 58 | 0 | 0 | 0 |
+| real | 61 | 61 | 0 | 0 | 0 |
 | schedule | 29 | 22 | 7 | 0 | 0 |
 | verbose | 8 | 8 | 0 | 0 | 0 |
 
@@ -40,6 +40,8 @@
 | `edge/read-not-numbers` | FLIRT never finishes (FSL-72: undefined behaviour); the replica refuses in both modes |
 | `edge/background-overflow` | FSL crashes (FSL-75: undefined behaviour); the replica finishes in both modes and names FSL-75 |
 | `edge/background-empty` | FSL crashes (FSL-75: undefined behaviour); the replica refuses in both modes |
+| `edge/zero-voxel-size` | FLIRT never finishes (FSL-93: undefined behaviour); the replica corrects it by default and refuses with reproduce |
+| `edge/basescale-0` | FLIRT never finishes (FSL-93: undefined behaviour); the replica refuses in both modes |
 
 ## Rejected by both
 
@@ -137,7 +139,7 @@
 
 | Component | Version |
 |---|---|
-| larmorx | 0.0.1 (bc119ffde16b) |
+| larmorx | 0.0.1 (2c21ac663955) |
 | larmorx-testdata | 52124bc98f9f |
 | Python | 3.12.16 |
 | Platform | Linux x86_64 (Linux-6.8.0-124-generic-x86_64-with-glibc2.35) |
@@ -187,6 +189,9 @@ The replica runs as a separate program, the FSL replica package's (`larmorx-nc`)
 | `real/weights-normmi` | pass | 6/6 | weights with -cost normmi |
 | `real/weights-mutualinfo` | pass | 6/6 | weights with -cost mutualinfo |
 | `real/weights-woods` | pass | 6/6 | weights with -cost woods |
+| `real/weights-empty-refweight` | pass | 6/6 | an empty -refweight (every voxel 0): refused by default (FSL-91) |
+| `real/weights-empty-inweight` | pass | 6/6 | an empty -inweight (every voxel 0): refused by default (FSL-91) |
+| `real/applyxfm-nan-border` | pass | 6/6 | -applyxfm of a BOLD reference with NaN voxels in its border and an infinite one: the padding's background value (FSL-22… |
 | `real/labeldiff-dseg` | pass | 6/6 | -cost labeldiff on a label image |
 | `real/known-motion` | pass | 6/6 | a known rigid motion of the T1w (-dof 6) |
 | `real/interp-nearestneighbour` | pass | 6/6 | -interp nearestneighbour for -out |
@@ -308,8 +313,11 @@ The replica runs as a separate program, the FSL replica package's (`larmorx-nc`)
 | `convert_xfm/singular` | both-error | 5/5 | -inverse of a singular matrix |
 | `edge/bbrstep-0` | expected-divergence | 3/3 | setoption bbrstep 0 with BBR: FLIRT's loop over the boundary points never ends (FSL-71) |
 | `edge/read-not-numbers` | expected-divergence | 3/3 | a schedule's read of a file holding a word that is not a number: FLIRT reads for ever, its memory growing (FSL-72) |
-| `edge/background-overflow` | expected-divergence | 3/3 | a 1-voxel input and an 8 x 1 x 1 reference: FLIRT's pyramid computes the background of a 3-voxel-wide level, writing pa… |
+| `edge/background-overflow` | expected-divergence | 3/3 | a 2 x 1 x 1 input and an 8 x 1 x 1 reference: FLIRT's pyramid computes the background of a 3-voxel-wide level, writing … |
 | `edge/background-empty` | expected-divergence | 3/3 | -applyxfm of a 1-voxel input: its background value reads an empty buffer (FSL-75) |
+| `edge/one-voxel-input` | pass | 6/6 | a 1 x 1 x 1 input registered to the T1w: one value, FLIRT's matrix an artefact of its search; refused by default (FSL-9… |
+| `edge/zero-voxel-size` | expected-divergence | 3/3 | a header voxel size of 0 along z: FLIRT's base scale 0, every voxel size infinite, it never finishes; counted as 1 by d… |
+| `edge/basescale-0` | expected-divergence | 3/3 | -basescale 0: every voxel size infinite, FLIRT never finishes (FSL-93) |
 | `convert_xfm/missing-concat` | both-error | 5/5 | -concat with a file that does not exist |
 | `programs/applyxfm4D-usage` | both-error | 5/5 | applyxfm4D without arguments (its usage, exit 255) |
 | `programs/applyxfm4D-default` | pass | 6/6 | a 4D int16 series, a matrix per volume (MAT_0000n), sinc |

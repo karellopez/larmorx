@@ -339,26 +339,29 @@ def _files(run_dir: Path, base: str) -> dict[str, Path]:
     return {k: out[k] for k in sorted(out, key=lambda k: ORDER.index(k) if k in ORDER else 99)}
 
 
+#: The tissues' short names in the viewer's output selector.
+SHORT = ("CSF", "GM", "WM")
+
+
 def _label(sfx: str, channels: list[str] | None = None) -> str:
+    """An output's name in the viewer (short: the selector holds up to 12; the files' names are
+    in the table below the viewer)."""
     m = re.fullmatch(r"(seg|pve|prob)_(\d)", sfx)
     if m:
-        what = {"seg": "Class", "pve": "Partial volume", "prob": "Probability"}[m.group(1)]
+        what = {"seg": "Binary", "pve": "Partial volume", "prob": "Probability"}[m.group(1)]
         k = int(m.group(2))
-        tissue = TISSUES[k] if k < len(TISSUES) else f"class {k}"
-        opt = {"seg": ", -g", "pve": "", "prob": ", -p"}[m.group(1)]
-        return f"{what}: {tissue} (_{sfx}{opt})"
+        return f"{what}: {SHORT[k] if k < len(SHORT) else f'class {k}'}"
     m = re.fullmatch(r"(bias|restore)_(\d)", sfx)
     if m:
         k = int(m.group(2))
         name = channels[k - 1] if channels and k <= len(channels) else f"channel {k}"
-        what = "Bias field" if m.group(1) == "bias" else "Bias-corrected image"
-        return f"{what}: {name} (_{sfx}, -{'b' if m.group(1) == 'bias' else 'B'})"
+        return f"{'Bias field' if m.group(1) == 'bias' else 'Corrected'}: {name}"
     return {
-        "seg": "Segmentation (_seg: 1 CSF, 2 grey matter, 3 white matter)",
-        "pveseg": "Segmentation of the partial volumes (_pveseg)",
-        "mixeltype": "Mixel type (_mixeltype)",
-        "bias": "Bias field (_bias, -b)",
-        "restore": "Bias-corrected image (_restore, -B)",
+        "seg": "Classes (1 CSF, 2 GM, 3 WM)",
+        "pveseg": "Classes of the partial volumes",
+        "mixeltype": "Mixel type",
+        "bias": "Bias field",
+        "restore": "Corrected image",
     }.get(sfx, f"_{sfx}")
 
 
@@ -873,9 +876,11 @@ def case_verdict(r: dict, dm: dict) -> tuple[str, str]:
         verdict, why = v
         if verdict == "both-reject" and named:
             why += (
-                f" The replica's default mode finishes instead, naming {', '.join(named)}."
+                f" The replica's default mode finishes instead (exit status 0), naming "
+                f"{', '.join(named)}."
                 if code == 0
-                else f" The replica's default mode refuses it, naming {', '.join(named)}."
+                else f" The replica's default mode ends with exit status {code} too, naming "
+                f"{', '.join(named)}."
             )
         return verdict, common.clip(why, 600)
     rep = {**r.get("reported", {}), **r.get("measured", {})}

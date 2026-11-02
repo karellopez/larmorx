@@ -21,7 +21,10 @@ command line chooses alike (`LARMORX_IMPLEMENTATION`).
 ([record](../validation/fsl-fast-replica.md), standard tier): fMRIPrep's call bit-identical on
 three oracle runs (ds000005, an adult; ds000228, a 3.5-year-old; ds005003, a glioma), every file
 FAST writes, its standard output and error; every option, 2 to 8 channels, the priors, the odd
-inputs and every message, exit status and failure case of the command line.
+inputs and every message, exit status and failure case of the command line: 59 of 59 compared
+cases bit-identical, 26 rejected by both alike, 1 refused where FSL reads past a smaller channel
+(FSL-104). The evidence (fMRIPrep's call on three T1w brains in an image viewer, the bias field,
+the priors, three channels, every case with its verdict) is FAST's page on the documentation site.
 
 ## Quick start
 
@@ -120,4 +123,12 @@ error and as an `UpstreamDefectWarning` ([all of them](upstream-defects.md)):
   (`larmorx-nc: error: fast: -S 9: more than 8 channels are not replicated ...`, exit 1): FSL's
   results there follow OpenBLAS's kernels for larger matrices (its aligned `iamax` path, the 8-way
   dot products, LAPACK's blocked LU), which larmorx does not reproduce.
-- Random testing, the records and the site's page: the next steps of this part.
+- The full tier (fMRIPrep's call on every oracle run), the data panel's other images and long
+  random testing: in the final validation phase. The standard tier, one random-testing trial
+  (half an hour, 17,497 realistic cases; its four differences, all FSL-101, fixed in `reproduce`
+  and kept as cases of the record) and the site's page (fMRIPrep's call on three oracle runs, the
+  bias field, the priors, three channels, every case) are done.
+- Two behaviours of the multi-channel segmentation are kept as FAST's until they are measured on
+  real T1w and T2w pairs (rule D): its initialisation (each channel's classes started in the order
+  of that channel's own intensities, so channels of opposite contrast can start from empty classes)
+  and its bias field ([spec](../../specs/fast.md) §9.2).

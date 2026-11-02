@@ -592,8 +592,19 @@ fn prior_registration(
 /// FSL-101: FLIRT's outputs missing (a matrix it cannot read, a prior it cannot register):
 /// FAST says the priors are not used, then initialises from priors it never allocated and
 /// crashes. By default the segmentation runs without them, as the message says; `reproduce`
-/// stops where FAST crashes.
-fn unregistered_priors(priors: &mut Priors, io: &mut Io, notices: &mut Notices) -> Option<u8> {
+/// gives what FAST defines before it crashes: `-v`'s "Beginning prior-based initialisation"
+/// (its first act there), and with several channels of one size whose first voxel lies in the
+/// mask (every channel above 0), the exception FAST throws at that voxel (its unallocated
+/// priors' bounds-checked time index: "Out of Bounds (time index)", then an abort); elsewhere
+/// FAST writes through a null pointer (or, with an empty mask, runs on): refused.
+/// `multi_first_masked`: with several channels, whether that exception is FAST's next act.
+fn unregistered_priors(
+    priors: &mut Priors,
+    io: &mut Io,
+    notices: &mut Notices,
+    verbose: bool,
+    multi_first_masked: bool,
+) -> Option<u8> {
     if priors.bapused != -1 {
         return None;
     }
@@ -610,6 +621,13 @@ fn unregistered_priors(priors: &mut Priors, io: &mut Io, notices: &mut Notices) 
         &defects::FSL_101,
         "FLIRT's registered priors are missing: FAST crashes here (memory it never allocated)",
     );
+    if verbose {
+        let _ = writeln!(io.out, "Beginning prior-based initialisation");
+    }
+    if multi_first_masked {
+        let _ = io.out.flush();
+        exception::throw(FslError::imthrow("Out of Bounds (time index)", 5));
+    }
     Some(refuse(
         io,
         "the registered priors are missing and FAST initialises from priors it never \
@@ -622,9 +640,11 @@ fn priors_or_exit(
     r: Result<Priors, Stop>,
     io: &mut Io,
     notices: &mut Notices,
+    verbose: bool,
+    multi_first_masked: bool,
 ) -> Result<Priors, u8> {
     match r {
-        Ok(mut p) => match unregistered_priors(&mut p, io, notices) {
+        Ok(mut p) => match unregistered_priors(&mut p, io, notices, verbose, multi_first_masked) {
             Some(code) => Err(code),
             None => Ok(p),
         },
@@ -694,9 +714,18 @@ fn segment_single_channel(
         );
     }
     let r = prior_registration(a, &input_name, &outname, run, io, notices);
-    let priors = match priors_or_exit(r, io, notices) {
-        Ok(p) => p,
-        Err(code) => return code,
+    // FSL-101 with `reproduce`: what FAST does next depends on its mask (decided below)
+    let unregistered = !notices.fix() && matches!(&r, Ok(p) if p.bapused == -1);
+    let priors = if unregistered {
+        match r {
+            Ok(p) => p,
+            Err(_) => unreachable!("matched above"),
+        }
+    } else {
+        match priors_or_exit(r, io, notices, a.verbose, false) {
+            Ok(p) => p,
+            Err(code) => return code,
+        }
     };
     input.display_max = 0.0;
     input.display_min = 0.0;
@@ -734,7 +763,27 @@ fn segment_single_channel(
             ),
         );
     }
-    let pr = priors.volumes.as_ref().map(|[c, g, w]| [c, g, w]);
+    // FSL-101 (`reproduce`): FAST initialises from priors it never allocated; with an empty
+    // mask no voxel reads them and FAST runs on (every statistic of an empty mask), otherwise it
+    // writes through a null pointer at the first voxel of the mask: refused there
+    let unallocated: [Volume; 3];
+    let pr = if unregistered {
+        if !mri.mask_is_empty() {
+            let mut p = priors;
+            return unregistered_priors(&mut p, io, notices, a.verbose, false).unwrap_or(1);
+        }
+        notices.add(
+            &defects::FSL_101,
+            "FLIRT's registered priors are missing: FAST initialises from priors it never \
+             allocated, which no voxel of its empty mask reads",
+        );
+        let mut z = Volume::<f32>::new(input.xsize(), input.ysize(), input.zsize(), 1);
+        z.copy_properties(&input);
+        unallocated = [z.clone(), z.clone(), z];
+        Some([&unallocated[0], &unallocated[1], &unallocated[2]])
+    } else {
+        priors.volumes.as_ref().map(|[c, g, w]| [c, g, w])
+    };
     match mri.main(pr, io) {
         Ok(0) => {}
         // TanakaMain's 1: main returns -1
@@ -895,7 +944,14 @@ fn segment_multi_channel(
         );
     }
     let r = prior_registration(a, &input_name, &outname, run, io, notices);
-    let priors = match priors_or_exit(r, io, notices) {
+    // FSL-101's exception (reproduce): FAST's first voxel in the mask of every channel, the
+    // channels of one size (otherwise FAST reads past the smaller ones first: FSL-104)
+    let first_masked = images.iter().all(|v| {
+        (v.xsize(), v.ysize(), v.zsize())
+            == (images[0].xsize(), images[0].ysize(), images[0].zsize())
+            && v.data.first().is_some_and(|&x| x > 0.0)
+    });
+    let priors = match priors_or_exit(r, io, notices, a.verbose, first_masked) {
         Ok(p) => p,
         Err(code) => return code,
     };

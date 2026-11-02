@@ -1,0 +1,259 @@
+{
+ "defect": null,
+ "description": "FSL-101 with -v: FAST prints 'Beginning prior-based initialisation' before it crashes on the priors it never allocated; reproduce now prints it before its refusal",
+ "expect": "pass",
+ "found": {
+  "detail": "stdout identical: line 9: FSL 'Beginning prior-based initialisation', replica '<end>'",
+  "n": 4273,
+  "seed": "fast-trial",
+  "shrink_moves": [],
+  "signature": [
+   "stdout identical"
+  ]
+ },
+ "id": "fsl101-verbose-before-crash",
+ "implementations": [
+  "replica"
+ ],
+ "reason": "",
+ "recipe": {
+  "extra": {
+   "channels": 1,
+   "classes": 3,
+   "nobias": false,
+   "output_type": "ANALYZE",
+   "probs": false,
+   "tool": "fast"
+  },
+  "features": {
+   "--nopve": true,
+   "-B": true,
+   "-H": false,
+   "-I": true,
+   "-I long": true,
+   "-I value": "6",
+   "-N": false,
+   "-O": false,
+   "-P": true,
+   "-P long": false,
+   "-R": false,
+   "-S 1": false,
+   "-W": false,
+   "-a": true,
+   "-b": false,
+   "-f": true,
+   "-f long": false,
+   "-f value": "0.05",
+   "-g": false,
+   "-l": false,
+   "-n": false,
+   "-o": true,
+   "-o long": false,
+   "-p": false,
+   "-t 1": false,
+   "-v": true,
+   "-v long": false,
+   "2D": false,
+   "FSLOUTPUTTYPE": "ANALYZE",
+   "axis0": 0.95,
+   "axis1": 1.0,
+   "axis2": 0.75,
+   "basename": "fast",
+   "bias0": 0.0075,
+   "bias1": 0.0075,
+   "bias2": -0.0025,
+   "bias3": 0.005,
+   "brain centre0": -0.02,
+   "brain centre1": 0.08,
+   "brain centre2": 0.0,
+   "brain fraction": 0.3,
+   "centre0": -1.5,
+   "centre1": -5.0,
+   "centre2": 0.0,
+   "content": "head",
+   "dtype": "float32",
+   "extreme": false,
+   "field of view": 64.0,
+   "isotropic": true,
+   "kind": "single",
+   "noise": 1.0,
+   "orientation": "axes+oblique",
+   "origin0": -45.25,
+   "origin1": -37.75,
+   "origin2": -59.5,
+   "prior scale": 0.15833333333333333,
+   "prior shift0": -2.0,
+   "prior shift1": 0.0,
+   "prior shift2": 0.0,
+   "qfac": 1,
+   "qform_code": 1,
+   "range": "plain",
+   "sform": "same",
+   "sform_code": 1,
+   "shape": "32x32x32",
+   "size": 16.5,
+   "spacing0": 1.0,
+   "spacing1": 0.5,
+   "spacing2": 2.0,
+   "suffix": ".nii.gz",
+   "tissues": "epi",
+   "units": "mm",
+   "whole head": true
+  },
+  "groups": [
+   {
+    "args": [
+     "--iter=6"
+    ],
+    "name": "-I",
+    "optional": true
+   },
+   {
+    "args": [
+     "-f",
+     "0.05"
+    ],
+    "name": "-f",
+    "optional": true
+   },
+   {
+    "args": [
+     "-B"
+    ],
+    "name": "-B",
+    "optional": true
+   },
+   {
+    "args": [
+     "--nopve"
+    ],
+    "name": "--nopve",
+    "optional": true
+   },
+   {
+    "args": [
+     "-v"
+    ],
+    "name": "-v",
+    "optional": true
+   },
+   {
+    "args": [
+     "-a",
+     "{in:mat}"
+    ],
+    "name": "-a",
+    "optional": true
+   },
+   {
+    "args": [
+     "-P"
+    ],
+    "name": "-P",
+    "optional": true
+   },
+   {
+    "args": [
+     "-o",
+     "fast"
+    ],
+    "name": "-o",
+    "optional": true
+   },
+   {
+    "args": [
+     "{in:ch1}"
+    ],
+    "name": "images",
+    "optional": false
+   }
+  ],
+  "inputs": {
+   "ch1": {
+    "content": {
+     "axes": [
+      0.95,
+      1.0,
+      0.75
+     ],
+     "bias": [
+      0.00375,
+      0.00375,
+      -0.00125,
+      0.00016666666666666666
+     ],
+     "brain": false,
+     "centre": [
+      -0.5,
+      2.5,
+      0.0
+     ],
+     "noise": 1.0,
+     "seed": 1757803025,
+     "size": 9.5,
+     "tissues": "t1",
+     "type": "head"
+    },
+    "dtype": "float32",
+    "geometry": {
+     "origin": [
+      19.25,
+      -12.0,
+      14.25
+     ],
+     "qfac": 1,
+     "qform_code": 1,
+     "quaternion": [
+      20,
+      -18,
+      -26,
+      24
+     ],
+     "sform": "same",
+     "sform_code": 1,
+     "spacing": [
+      1.0,
+      1.0,
+      1.0
+     ],
+     "units": "mm"
+    },
+    "scaling": null,
+    "shape": [
+     32,
+     32,
+     32
+    ],
+    "suffix": ".nii.gz",
+    "values": {
+     "offset": 0.0,
+     "scale": 1.0
+    }
+   },
+   "mat": {
+    "kind": "text",
+    "suffix": ".mat",
+    "text": "0.158333 0 0 -0.750000\n0 0.158333 0 -1.600000\n0 0 0.158333 1.250000\n0 0 0 1\n"
+   }
+  },
+  "n": 4273,
+  "options": [
+   "--nopve",
+   "-B",
+   "-I",
+   "-P",
+   "-a",
+   "-f",
+   "-o",
+   "-v",
+   "FSLOUTPUTTYPE=ANALYZE"
+  ],
+  "seed": "fast-trial",
+  "tool": "fsl-fast"
+ },
+ "rule": null,
+ "status": "fixed",
+ "suite": "fsl-fast-replica",
+ "tier": "standard",
+ "tool": "fsl-fast"
+}

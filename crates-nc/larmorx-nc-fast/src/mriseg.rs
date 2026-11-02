@@ -1198,3 +1198,11 @@ pub(crate) fn read_floats(path: &str) -> Vec<f32> {
 pub fn throw(e: FslError) -> ! {
     exception::throw(e)
 }
+
+impl Segmentation {
+    /// Whether FAST's mask holds no voxel (FSL-101: with the priors unregistered FAST then
+    /// runs on, as no voxel reads them).
+    pub fn mask_is_empty(&self) -> bool {
+        self.mask.iter().all(|&m| m != 1.0)
+    }
+}

@@ -171,6 +171,15 @@ use = ["larmorx fsl flirt", "larmorx fsl convert_xfm", "larmorx fsl avscale", "l
 how = "clean-room original of `flirt` and `convert_xfm` (part 1), `experimental`; exact replica of every program in `larmorx-nc` (FSL Licence, non-commercial), `experimental` (parts 1 to 3: every program and script of fsl-flirt but `-warp`, `standard_space_roi`, `flirt_average`, `epi_reg`)"
 validation = "original: [{fsl-flirt.pass} of {fsl-flirt.compared}](record:fsl-flirt) compared cases within thresholds against FSL 6.0.7.23 (fMRIPrep's three boundary-based calls within 0.1 mm, `-applyxfm` FSL's images bit for bit with trilinear and nearest neighbour, `convert_xfm`, the schedules' and the command line's messages FSL's), {fsl-flirt.both} more rejected by both alike, {fsl-flirt.expected} where FLIRT crashes or never finishes; the cases it misses are in its record (costs equal to FSL's printed digits, paths that part in the last bits; BBR's normals from `-wmseg`; ill-posed registrations); replica: [{fsl-flirt-replica.pass} of {fsl-flirt-replica.compared}](record:fsl-flirt-replica) compared cases bit-identical to FSL 6.0.7.23 (matrices, images, printed results, exit status and messages): fMRIPrep's boundary-based calls on three oracle runs (their matrices also identical as text to fMRIPrep's own), every cost function, the search options, every shipped schedule and every schedule command (`alignpaxes`, any parameter-subset mask), `-anglerep quaternion`, `-debug`, `-applyxfm` 3D and 4D with every interpolation and data type, BBR with its types, coordinates and a field map, avscale, the coordinate programs, rmsdiff, makerot, midtrans, pointflirt, applyxfm4D in every data type and interpolation, pairreg, extracttxt and aff2rigid; {fsl-flirt-replica.both} more rejected by both, alike; {fsl-flirt-replica.expected} where FLIRT crashes or never finishes (FSL-71, FSL-72, FSL-75, FSL-93)"
 
+[[tool]]
+id = "fsl-fast"
+title = "FAST (tissue segmentation: classes, partial volumes, bias field)"
+eco = "fsl"
+page = "/tools/fsl-fast/"
+use = ["larmorx fsl fast", "lx.fsl.fast"]
+how = "exact replica in `larmorx-nc` (FSL Licence, non-commercial), `experimental`; the clean-room original is the next part"
+validation = "replica: [{fsl-fast-replica.pass} of {fsl-fast-replica.compared}](record:fsl-fast-replica) compared cases bit-identical to FSL 6.0.7.23 (every image written, the printed messages, the exit status): fMRIPrep's call on {fsl-fast-replica.fmriprep} oracle runs (an adult, a 3.5-year-old, a glioma), every option, one to eight channels, FSL's tissue priors registered by FLIRT's replica, the image types, 2D images; {fsl-fast-replica.both} more rejected by both alike; {fsl-fast-replica.expected} where FSL reads and writes past the smaller of channels of different sizes (FSL-104, refused)"
+
 # ------------------------------------------------------------------------------------------------
 # Records: the validation index's table (docs/validation/README.md), in this order.
 
@@ -395,3 +404,9 @@ id = "fsl-flirt-replica"
 larmorx = "`larmorx-nc fsl flirt`, `convert_xfm`, `avscale`, `img2imgcoord`, `std2imgcoord`, `img2stdcoord`, `rmsdiff`, `makerot`, `midtrans`, `pointflirt`, `applyxfm4D`, `pairreg`, `extracttxt`, `aff2rigid`; `lx.fsl.flirt`, `convert_xfm`, `avscale`, `img2imgcoord`, `std2imgcoord`, `img2stdcoord`, `rmsdiff`, `makerot`, `midtrans`, `pointflirt`, `applyxfm4d`, `pairreg`, `extracttxt`, `aff2rigid` (the replica, FSL Licence)"
 reference = "flirt, convert_xfm, avscale, img2imgcoord, std2imgcoord, img2stdcoord, rmsdiff, makerot, midtrans, pointflirt, applyxfm4D, pairreg, extracttxt and aff2rigid (FSL 6.0.7.23); fMRIPrep's BBR calls also against fMRIPrep's own matrices"
 status = "`experimental` (part 3: {fsl-flirt-replica.pass} of {fsl-flirt-replica.compared} compared cases bit-identical, fMRIPrep's calls included; {fsl-flirt-replica.both} rejected by both, with the same messages and status; {fsl-flirt-replica.expected} expected divergences where FLIRT crashes or never finishes; every program and script of fsl-flirt but the coordinate programs' `-warp` and the scripts of FSL's other programs)"
+
+[[record]]
+id = "fsl-fast-replica"
+larmorx = "`larmorx-nc fsl fast`; `lx.fsl.fast`, `larmorx fsl fast` (the replica, FSL Licence)"
+reference = "fast (FSL 6.0.7.23, fsl-fast4 2111.3); fMRIPrep's calls also against fMRIPrep's own outputs"
+status = "`experimental` ({fsl-fast-replica.pass} of {fsl-fast-replica.compared} compared cases bit-identical, fMRIPrep's {fsl-fast-replica.fmriprep} calls included; {fsl-fast-replica.both} rejected by both, with the same messages and status; {fsl-fast-replica.expected} expected divergence: channels of different sizes, refused in both modes, FSL-104)"

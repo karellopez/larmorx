@@ -128,7 +128,21 @@ decided by the rules A-D (user, 2026-10-23):
 - **FSL-101** (crash): FLIRT's outputs missing (a matrix it cannot read, a name split by the shell,
   FSLDIR unset with `-A`): `prior_registration` returns -1, FAST prints "... priors are not used!",
   then `InitSimple` reads the priors it never allocated: SIGSEGV. Fix: segments without priors;
-  reproduce refuses where FAST crashes.
+  reproduce refuses where FAST crashes. Precisely (random testing's trial of 2026-11-02, the
+  output type `ANALYZE` that FSL 6.0.7.23 refuses making FLIRT fail; three permanent cases
+  `validation/difftest/cases/fsl-fast/fsl101-*`): `prior_registration` has read FSL's standard
+  priors into `pCSF`/`pGM`/`pWM` before FLIRT (so `pcsf.value()` reads defined values), but
+  `talpriors` was never allocated (`TanakaCreate` allocates it only for `bapused > 0`): its
+  `Data` is `nullptr` and every size 0. `InitSimple` prints its verbose line first; then, with
+  one channel, the first voxel of the mask writes `talpriors.value(x,y,z,1)` through the null
+  pointer (SIGSEGV, deterministic), and an image with an empty mask runs on (no write; the
+  statistics of an empty mask: `MeaNsK variance nan`, `ERROR:: Empty mask image`); with several
+  channels the loop's first voxel (0,0,0) decides: outside the mask (some channel <= 0) the
+  `else` branch writes `talpriors.value(0,0,0,1)` through the null pointer (SIGSEGV); inside it,
+  the chained assignment evaluates `talpriors(x,y,z,3)` first (C++17: right to left), whose
+  bounds check throws `Out of Bounds (time index)` (#5) and FAST aborts. Reproduce gives each of
+  these but the two null-pointer crashes (refused there). Channels of different sizes (FSL-104)
+  keep the refusal: FAST reads past the smaller ones first.
 - **FSL-102** (the shell): `system()` with `sprintf`'s unquoted names; FSLDIR unset gives the text
   `(null)` and dash's `sh: 1: Syntax error: word unexpected`. Fix: each name one argument, FLIRT's
   replica in-process (no FSLDIR); reproduce splits at blanks and refuses the shell's special

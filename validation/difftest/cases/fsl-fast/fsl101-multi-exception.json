@@ -1,0 +1,294 @@
+{
+ "defect": null,
+ "description": "FSL-101 with three channels whose first voxel is in the mask: FAST's bounds-checked access to the unallocated priors throws 'Out of Bounds (time index)' and aborts; reproduce now throws the same",
+ "expect": "pass",
+ "found": {
+  "detail": "stderr identical: line 8: FSL 'Image Exception : #5 :: Out of Bounds (time index)', replica '<end>'",
+  "n": 4762,
+  "seed": "fast-trial",
+  "shrink_moves": [
+   "dropped -B (-B)",
+   "ch1: axis 2 21 -> 10 voxels",
+   "ch1: axis 0 13 -> 6 voxels",
+   "ch1: axis 1 12 -> 6 voxels",
+   "ch1: axis 0 6 -> 3 voxels",
+   "ch1: axis 2 10 -> 5 voxels",
+   "ch1: axis 1 6 -> 3 voxels",
+   "ch1: axis 2 5 -> 2 voxels",
+   "ch1: axis 0 3 -> 1 voxels",
+   "ch1: axis 1 3 -> 1 voxels",
+   "ch1: axis 2 2 -> 1 voxels",
+   "ch1 (and its grid): unit spacing",
+   "ch1 (and its grid): origin at 0",
+   "ch1 (and its grid): sform = qform",
+   "ch1: float32 storage",
+   "ch1: content head -> constant",
+   "ch2: content head -> constant",
+   "ch3: float32 storage",
+   "ch3: content head -> constant"
+  ],
+  "signature": [
+   "stderr identical"
+  ]
+ },
+ "id": "fsl101-multi-exception",
+ "implementations": [
+  "replica"
+ ],
+ "reason": "",
+ "recipe": {
+  "extra": {
+   "channels": 3,
+   "classes": 3,
+   "nobias": false,
+   "output_type": "ANALYZE",
+   "probs": false,
+   "tool": "fast"
+  },
+  "features": {
+   "--nopve": false,
+   "-B": true,
+   "-H": false,
+   "-I": false,
+   "-N": false,
+   "-O": false,
+   "-P": false,
+   "-R": false,
+   "-S long": false,
+   "-W": false,
+   "-a": true,
+   "-b": false,
+   "-f": false,
+   "-g": false,
+   "-l": false,
+   "-n": false,
+   "-o": false,
+   "-p": false,
+   "-t 1": false,
+   "-v": false,
+   "2D": false,
+   "FSLOUTPUTTYPE": "ANALYZE",
+   "axis0": 0.75,
+   "axis1": 0.95,
+   "axis2": 1.05,
+   "bias0": -0.01,
+   "bias1": 0.01,
+   "bias2": 0.0075,
+   "bias3": 0.0,
+   "brain centre0": 0.04,
+   "brain centre1": 0.08,
+   "brain centre2": 0.02,
+   "brain fraction": 0.3,
+   "centre0": -5.0,
+   "centre1": -3.5,
+   "centre2": 5.0,
+   "channels": 3,
+   "content": "head",
+   "dtype": "int32",
+   "extreme": false,
+   "field of view": 32.0,
+   "isotropic": false,
+   "kind": "multi",
+   "noise": 6.0,
+   "orientation": "plumb",
+   "origin0": 46.5,
+   "origin1": 1.75,
+   "origin2": 49.75,
+   "prior scale": 0.11875,
+   "prior shift0": 0.0,
+   "prior shift1": 1.5,
+   "prior shift2": 0.0,
+   "qfac": 1,
+   "qform_code": 1,
+   "range": "plain",
+   "sform": "other",
+   "sform_code": 1,
+   "shape": "13x12x21",
+   "shear0": 0.0,
+   "shear1": 0.05,
+   "shear2": -0.025,
+   "size": 27.5,
+   "spacing0": 2.5,
+   "spacing1": 3.0,
+   "spacing2": 1.5,
+   "suffix": ".nii",
+   "tissues": "epi",
+   "tissues2": "t1",
+   "tissues3": "t1",
+   "units": "mm",
+   "whole head": true
+  },
+  "groups": [
+   {
+    "args": [
+     "-a",
+     "{in:mat}"
+    ],
+    "name": "-a",
+    "optional": true
+   },
+   {
+    "args": [
+     "-S",
+     "3"
+    ],
+    "name": "-S",
+    "optional": false
+   },
+   {
+    "args": [
+     "{in:ch3}",
+     "{in:ch2}",
+     "{in:ch1}"
+    ],
+    "name": "images",
+    "optional": false
+   }
+  ],
+  "inputs": {
+   "ch1": {
+    "content": {
+     "seed": 1111223596,
+     "type": "constant"
+    },
+    "dtype": "float32",
+    "geometry": {
+     "origin": [
+      0.0,
+      0.0,
+      0.0
+     ],
+     "qfac": 1,
+     "qform_code": 1,
+     "quaternion": [
+      1,
+      0,
+      0,
+      0
+     ],
+     "sform": "same",
+     "sform_code": 1,
+     "spacing": [
+      1.0,
+      1.0,
+      1.0
+     ],
+     "units": "mm"
+    },
+    "scaling": null,
+    "shape": [
+     1,
+     1,
+     1
+    ],
+    "suffix": ".nii",
+    "values": {
+     "offset": 0.0,
+     "scale": 1.0
+    }
+   },
+   "ch2": {
+    "content": {
+     "seed": 890562045,
+     "type": "constant"
+    },
+    "dtype": "float32",
+    "geometry": {
+     "origin": [
+      0.0,
+      0.0,
+      0.0
+     ],
+     "qfac": 1,
+     "qform_code": 1,
+     "quaternion": [
+      1,
+      0,
+      0,
+      0
+     ],
+     "sform": "same",
+     "sform_code": 1,
+     "spacing": [
+      1.0,
+      1.0,
+      1.0
+     ],
+     "units": "mm"
+    },
+    "scaling": null,
+    "shape": [
+     1,
+     1,
+     1
+    ],
+    "suffix": ".nii.gz",
+    "values": {
+     "offset": 0.0,
+     "scale": 1.0
+    }
+   },
+   "ch3": {
+    "content": {
+     "seed": 1705085039,
+     "type": "constant"
+    },
+    "dtype": "float32",
+    "geometry": {
+     "origin": [
+      0.0,
+      0.0,
+      0.0
+     ],
+     "qfac": 1,
+     "qform_code": 1,
+     "quaternion": [
+      1,
+      0,
+      0,
+      0
+     ],
+     "sform": "same",
+     "sform_code": 1,
+     "spacing": [
+      1.0,
+      1.0,
+      1.0
+     ],
+     "units": "mm"
+    },
+    "scaling": null,
+    "shape": [
+     1,
+     1,
+     1
+    ],
+    "suffix": ".nii",
+    "values": {
+     "offset": 0.0,
+     "scale": 1.0
+    }
+   },
+   "mat": {
+    "kind": "text",
+    "suffix": ".mat",
+    "text": "0.118750 0 0 4.312500\n0 0.118750 0 5.175000\n0 0 0.118750 4.312500\n0 0 0 1\n"
+   }
+  },
+  "n": 4762,
+  "options": [
+   "-B",
+   "-S",
+   "-a",
+   "3 channels",
+   "FSLOUTPUTTYPE=ANALYZE"
+  ],
+  "seed": "fast-trial",
+  "tool": "fsl-fast"
+ },
+ "rule": null,
+ "status": "fixed",
+ "suite": "fsl-fast-replica",
+ "tier": "standard",
+ "tool": "fsl-fast"
+}

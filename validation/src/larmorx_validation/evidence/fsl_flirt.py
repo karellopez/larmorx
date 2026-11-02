@@ -1,16 +1,20 @@
 # SPDX-License-Identifier: Apache-2.0
-"""FLIRT's evidence (the larmorx-nc replica, FSL Licence; the clean-room original is still to be
-written): fMRIPrep's boundary-based registration call (``fsl_bbr_wf/flt_bbr``) on three oracle
-runs, a default 12-dof registration and ``-applyxfm`` on four volumes of a raw BOLD series, by
-FSL 6.0.7.23 and by the replica in its ``reproduce`` and default modes (and at one thread); the
-matrices as text with fMRIPrep's own, the displacement each pair of matrices gives over the
-reference's brain, and every case of the record.
+"""FLIRT's evidence (the larmorx-nc replica, FSL Licence, and larmorx's clean-room original,
+Apache-2.0): fMRIPrep's boundary-based registration call (``fsl_bbr_wf/flt_bbr``) on three
+oracle runs, a default 12-dof registration and ``-applyxfm`` on four volumes of a raw BOLD
+series, by FSL 6.0.7.23, by the replica and by the clean-room original, each in its
+``reproduce`` and default modes (and at one thread); FSL's own variability (its input perturbed
+by noise of half an intensity unit, the record's band) for each registration the original is
+shown on; the matrices as text with fMRIPrep's own, the displacement each pair of matrices gives
+over the reference's brain, every case of both records and the benchmark's speed.
 
 Every run of FSL is a run of the parity record (``parity.fsl_flirt_replica``), with the same
 arguments, environment and inputs, through the oracle-output cache: the page computes no
-original result of its own but one, the BOLD reference resampled at fMRIPrep's initial
-alignment (``-applyxfm`` with the call's ``-init``), which shows what BBR changed. The replica
-runs as a separate program; nothing here imports it. Everything shown lies inside the
+original result of its own but two: the BOLD reference resampled at fMRIPrep's initial
+alignment (``-applyxfm`` with the call's ``-init``), which shows what BBR changed, and FSL on its
+perturbed input (never cached: variation is measured fresh). The replica runs as a separate
+program; nothing here imports it. The clean-room original runs as ``python -m larmorx`` from
+this checkout's build. Everything shown lies inside the
 reference's brain mask (fMRIPrep's masked T1w), dilated by two voxels: no face can show.
 """
 
@@ -21,6 +25,7 @@ import os
 import re
 import shlex
 import shutil
+import sys
 import tempfile
 from pathlib import Path
 
@@ -227,6 +232,191 @@ def real_entry(ctx: core.Context, case: str) -> fcache.Entry:
     )
 
 
+# ------------------------------------------------------------- the clean-room original
+
+#: The clean-room original's record (standard tier, against FSL 6.0.7.23).
+ORIG_RECORD = "fsl-flirt"
+#: The clean-room original's runs (crate larmorx-fsl, Apache-2.0): label, D13 mode, threads;
+#: its record runs it in reproduce mode at 4 threads.
+ORIG_RUNS = [("orig", "reproduce", "4"), ("orig-1", "reproduce", "1"),
+             ("orig-fix", "fix", "4")]  # fmt: skip
+#: FSL's own variability (the record's band, ``parity.fsl_flirt._band``): FSL on its input with
+#: uniform noise of ±0.5 intensity units (this seed), its matrix against its unperturbed one.
+BAND_SEED = 20261102
+
+
+def versions_orig() -> dict[str, str]:
+    import larmorx
+
+    return {
+        "fsl": versions()["fsl"],
+        "larmorx": f"larmorx {larmorx.__version__} (crate larmorx-fsl: the clean-room original, "
+        "Apache-2.0, written from specs/flirt.md)",
+    }
+
+
+def _original(e: fcache.Entry, args: list[str], inputs: dict[str, Path]) -> None:
+    """The clean-room original on ``args`` (``python -m larmorx fsl flirt`` with
+    ``LARMORX_IMPLEMENTATION=original``, this checkout's build), once per :data:`ORIG_RUNS`,
+    each in ``<entry>/<label>``, in FSL's clean environment as the record runs it."""
+    fp = _suite()
+    env = fp._environment({})
+    env["LARMORX_IMPLEMENTATION"] = "original"
+    for k in ("PYTHONPATH", "VIRTUAL_ENV"):
+        if k in os.environ:
+            env[k] = os.environ[k]
+    unset = tuple(k for k in os.environ if k.upper().startswith(("FSL", "LARMORX_")))
+    for label, mode, threads in ORIG_RUNS:
+        cwd = e.dir / label
+        cwd.mkdir(exist_ok=True)
+        argv = []
+        for a in args:
+            if a.startswith("@"):
+                shutil.copy(inputs[a[1:]], cwd / a[1:])
+                argv.append(a[1:])
+            else:
+                argv.append(a)
+        run_env = {**env, "LARMORX_UPSTREAM_DEFECTS": mode, "OMP_NUM_THREADS": threads}
+        e.run(label, [sys.executable, "-m", "larmorx", "fsl", "flirt", *argv], env=run_env,
+              unset=unset, cwd=cwd)  # fmt: skip
+        for a in args:
+            if a.startswith("@"):
+                (cwd / a[1:]).unlink()
+
+
+def _perturbed(e: fcache.Entry, args: list[str], inputs: dict[str, Path]) -> None:
+    """FSL's flirt on ``args`` with its ``-in`` perturbed (:data:`BAND_SEED`), its files into
+    ``<entry>/fsl-perturbed``: FSL's own variability, through the oracle-output cache in use
+    mode, never cached (variation is measured fresh)."""
+    import nibabel as nib
+
+    from larmorx_validation import oracle_cache
+
+    fp = _suite()
+    i = args.index("-in")
+    src = args[i + 1]
+    path = inputs[src[1:]] if src.startswith("@") else Path(src)
+    img = nib.load(str(path))
+    data = np.asanyarray(img.dataobj).astype(np.float32)
+    rng = np.random.default_rng(BAND_SEED)
+    noisy = data + rng.uniform(-0.5, 0.5, data.shape).astype(np.float32)
+    out = nib.Nifti1Image(noisy, img.affine, img.header)
+    out.set_data_dtype(np.float32)
+    name = "perturbed_input.nii"
+    with tempfile.TemporaryDirectory(prefix="lx-flirt-ev-band_") as t:
+        cwd = Path(t)
+        nib.save(out, str(cwd / name))
+        argv, copied = [], {name}
+        for j, a in enumerate(args):
+            if j == i + 1:
+                argv.append(name)
+            elif a.startswith("@"):
+                shutil.copy(inputs[a[1:]], cwd / a[1:])
+                argv.append(a[1:])
+                copied.add(a[1:])
+            else:
+                argv.append(a)
+        command = [str(fp.fsldir() / "bin" / "flirt"), *argv]
+        p = oracle_cache.run(
+            command,
+            env=fp._environment({}),
+            cwd=cwd,
+            outputs=[cwd],
+            policy=oracle_cache.Policy(
+                threads=1, family="fsl", never="FSL's own variability: a perturbed input"
+            ),
+            runner="evidence-fsl-flirt",
+            inputs=[q for q in sorted(cwd.rglob("*")) if q.is_file()],
+            timeout=3600,
+        )
+        if p.returncode != 0:
+            raise RuntimeError(f"fsl-perturbed: FSL's flirt exited {p.returncode}")
+        dest = e.dir / "fsl-perturbed"
+        dest.mkdir(exist_ok=True)
+        for f in cwd.iterdir():
+            if f.name not in copied:
+                shutil.copy(f, dest / f.name)
+    run = fcache.Run("fsl-perturbed", command, fp._environment({}))
+    run.exit, run.seconds = p.returncode, round(p.seconds, 2)
+    run.stderr_tail = p.stderr[-2000:]
+    e.runs.append(run)
+    e.extra.setdefault("oracle_cache", {})["fsl-perturbed"] = "ran (never cached)"
+    e.extra["band"] = (
+        f"FSL 6.0.7.23 on the same call with its -in perturbed by uniform noise of ±0.5 "
+        f"intensity units (numpy's default_rng({BAND_SEED}), float32, as the record's band)"
+    )
+
+
+def _compute_orig_bbr(run: str):
+    def compute(e: fcache.Entry) -> None:
+        fp = _suite()
+        node = _bbr_node(run)
+        args = fp.fmriprep_args(run, node)
+        for o in ("-in", "-ref", "-wmseg", "-init"):
+            e.input(f"{o} (fMRIPrep's)", Path(_arg(args, o)))
+        _original(e, args, {})
+        _perturbed(e, args, {})
+        e.finish(
+            versions=versions_orig(),
+            command=(node / "command.txt").read_text(encoding="utf-8").strip(),
+            node=str(node.relative_to(common.fmriprep_run(run))),
+            settings="fMRIPrep 25.2.6's BBR node of the run, its arguments as the record's case "
+            "maps them, by larmorx's clean-room original (python -m larmorx fsl flirt, "
+            "LARMORX_IMPLEMENTATION=original): reproduce mode at 4 and 1 threads, the default "
+            "mode at 4; and FSL 6.0.7.23 on the same call with its input perturbed (FSL's own "
+            "variability, through the oracle-output cache, never cached)",
+        )
+
+    return compute
+
+
+def orig_bbr_entry(ctx: core.Context, run: str) -> fcache.Entry:
+    return fcache.entry(
+        ctx.figures_context(),
+        TOOL,
+        f"fmriprep-{run}-original",
+        f"fMRIPrep's BBR call of {run}: the clean-room original, reproduce and default modes, "
+        "and FSL 6.0.7.23 on a perturbed input",
+        _compute_orig_bbr(run),
+    )
+
+
+def _compute_orig_real(case: str):
+    def compute(e: fcache.Entry) -> None:
+        args, files = _real_args(case)
+        for name, f in files.items():
+            e.input(name, f)
+        _original(e, args, files)
+        if "-omat" in args:
+            _perturbed(e, args, files)
+        e.finish(
+            versions=versions_orig(),
+            command="flirt " + " ".join(a.lstrip("@") for a in args),
+            settings=f"The record's case {case}, its inputs from the suite's derived inputs, by "
+            "larmorx's clean-room original: reproduce mode at 4 and 1 threads, the default mode "
+            "at 4"
+            + (
+                "; and FSL 6.0.7.23 on the same call with its input perturbed (FSL's own "
+                "variability, through the oracle-output cache, never cached)"
+                if "-omat" in args
+                else ""
+            ),
+        )
+
+    return compute
+
+
+def orig_real_entry(ctx: core.Context, case: str) -> fcache.Entry:
+    return fcache.entry(
+        ctx.figures_context(),
+        TOOL,
+        case.replace("/", "-") + "-original",
+        f"The record's case {case}: the clean-room original"
+        + (", and FSL 6.0.7.23 on a perturbed input" if case != "real/applyxfm-4d" else ""),
+        _compute_orig_real(case),
+    )
+
+
 # ------------------------------------------------------------------------- matrices
 
 
@@ -407,6 +597,142 @@ def _verdicts(diffs: list[dict], same: dict[str, bool], what: str, mats_same: bo
             x["reason"] = "Not accounted for by the other runs of this example (see the record)."
 
 
+#: The clean-room original's panels (from its entry).
+ORIG_PANELS = [
+    ("orig", "larmorx", "larmorx's clean-room original",
+     "reproduce mode, 4 threads (Apache-2.0, crate larmorx-fsl; the record's run)"),
+    ("orig-1", "larmorx", "larmorx's clean-room original", "reproduce mode, 1 thread"),
+    ("orig-fix", "larmorx", "larmorx's clean-room original",
+     "default mode (D13 corrections), 4 threads"),
+]  # fmt: skip
+
+
+def _orig_diffs() -> list[dict]:
+    d = common.d
+    return [
+        d("orig-fsl", "orig", "fsl", "main", "clean-room original − FSL 6.0.7.23", common.ROLE_LX),
+        d("orig-replica", "orig", "replica", "check", "clean-room original − replica",
+          common.ROLE_SELF),
+        d("orig1-orig", "orig-1", "orig", "check", "original, 1 thread − 4 threads",
+          common.ROLE_SELF),
+        d("origfix-orig", "orig-fix", "orig", "check", "original, default − reproduce mode",
+          common.ROLE_SELF),
+    ]  # fmt: skip
+
+
+def _named(o: fcache.Entry, label: str) -> list[str]:
+    """The register entries the run ``label`` of ``o`` named on its standard error."""
+    log = o.dir / f"{label}.log"
+    text = log.read_text(encoding="utf-8") if log.is_file() else ""
+    return sorted(set(re.findall(r"\bFSL-\d+\b", text.split("--- stderr", 1)[-1])))
+
+
+def _orig_verdicts(
+    diffs: list[dict],
+    same: dict[str, bool],
+    o: fcache.Entry,
+    shift: dict | None,
+    band: dict | None,
+    threshold: float,
+    background: float | None = None,
+) -> None:
+    """The clean-room original's comparisons: its matrix against FSL's beside FSL's own
+    variability (``shift``: the original's displacement from FSL's matrix, ``band``: FSL's on a
+    perturbed input, both over the reference's brain; ``None`` for ``-applyxfm``, where both use
+    the given matrix), its threads and its two modes; ``background``: FSL's output outside the
+    input's field of view (its first voxel), to say where the images differ most."""
+    for x in diffs:
+        i = x["id"]
+        if not i.startswith("orig"):
+            continue
+        x["links"] = [{"label": "record", "href": f"docs/validation/{ORIG_RECORD}.md"}]
+        m = x["metrics"].get("registered", {})
+        if i in ("orig-fsl", "orig-replica"):
+            who = "FSL's" if i == "orig-fsl" else "the replica's (FSL's bytes)"
+            if same[i]:
+                x["verdict"] = "bit-identical"
+                x["reason"] = f"The clean-room original gives {who} values, every one."
+                continue
+            edge = background is not None and any(
+                abs(float(m.get(k, np.nan)) - background) <= 1e-6 * max(1.0, abs(background))
+                for k in ("a_at", "b_at")
+            )
+            img = (
+                f"the images differ in {m.get('share', 0):.1%} of their values, by at most "
+                f"{m.get('max_rel_range', 0):.2g} of the range (1 − NCC "
+                f"{m.get('one_minus_ncc', 0):.2g}"
+                + (
+                    "; the largest where a voxel at the edge of the input's field of view is "
+                    "inside it for one matrix and outside, at the background value, for the other)"
+                    if edge
+                    else ")"
+                )
+            )
+            if shift is None:
+                x["verdict"] = "open"
+                x["reason"] = (
+                    f"From the same matrix (-applyxfm), {img}: the windowed-sinc interpolation "
+                    "follows FSL's within the last bits of its float arithmetic, and how FSL "
+                    "rounds its kernel's weights is an open question of the specification "
+                    "(docs/findings/fsl-flirt-original.md). The record holds such images to "
+                    "1e-5 of their range."
+                )
+                continue
+            within = band is not None and shift["p95"] <= band["p95"]
+            x["verdict"] = "within-variability" if within else "open"
+            x["reason"] = (
+                f"A clean-room implementation, so not bit-identical by design: its matrix is "
+                f"{shift['p95']:.3g} mm from {who} at the 95th percentile of the brain (at most "
+                f"{shift['max']:.3g} mm)"
+                + (
+                    f", against FSL's own {band['p95']:.3g} mm when its input changes by noise "
+                    f"of half an intensity unit (at most {band['max']:.3g} mm)"
+                    if band is not None
+                    else ""
+                )
+                + f"; {img}, the input interpolated at slightly other positions. "
+                + (
+                    "The difference is within FSL's own variability."
+                    if within
+                    else f"Within the record's threshold ({threshold:g} mm), above FSL's own "
+                    "variability on this input: the cost's last bits and the optimiser's path "
+                    "(docs/findings/fsl-flirt-original.md)."
+                )
+            )
+        elif i == "orig1-orig":
+            x["verdict"] = "bit-identical" if same[i] else "open"
+            x["reason"] = (
+                "The thread count changes nothing: the original's parallel steps (the boundary "
+                "points' terms, the correlation ratio's bins, the search's grid points) are "
+                "summed in a fixed order, so the values are the same at any thread count."
+                if same[i]
+                else "The original's result should not depend on its thread count; here it does "
+                "(see the record)."
+            )
+        elif i == "origfix-orig":
+            names = _named(o, "orig-fix")
+            if same[i]:
+                x["verdict"] = "bit-identical"
+                x["reason"] = (
+                    "No correction of the register applies to this call: both modes give the "
+                    "same values."
+                )
+            else:
+                x["verdict"] = "d13"
+                x["reason"] = (
+                    "The default corrects FSL's deterministic defects and names them: "
+                    + (", ".join(names) or "none named")
+                    + "; reproduce mode gives FSL's behaviour."
+                )
+
+
+def _flirt_threshold(args: list[str]) -> float:
+    """The record's fixed threshold for a registration's matrix (``parity.fsl_flirt``)."""
+    from larmorx_validation.parity import fsl_flirt as fo
+
+    return fo._threshold([a.lstrip("@") for a in args])
+
+
 def _note(n: int, extra: str = "") -> str:
     return (
         f"Δ is A − B, computed in float64 over all {n:,} voxels of the outputs, not only those "
@@ -426,7 +752,8 @@ def _example_bbr(ctx: core.Context, ex_id: str, run: str, view: str, words: str)
     from larmorx_validation.evidence import example as exm
 
     e = bbr_entry(ctx, run)
-    info = e.info()
+    o = orig_bbr_entry(ctx, run)
+    info, oinfo = e.info(), o.info()
     fp = _suite()
     node = _bbr_node(run)
     args = fp.fmriprep_args(run, node)
@@ -444,6 +771,9 @@ def _example_bbr(ctx: core.Context, ex_id: str, run: str, view: str, words: str)
     arrays = {
         "init": {"registered": common.load(str(e.dir / "init" / "init.nii.gz"))},
         **{pid: {"registered": common.load(str(e.dir / pid / out_name))} for pid, *_ in PANELS},
+        **{
+            pid: {"registered": common.load(str(o.dir / pid / out_name))} for pid, *_ in ORIG_PANELS
+        },
     }
     wm = common.load(str(wm_path))
     w_init = {"window": None}
@@ -461,13 +791,22 @@ def _example_bbr(ctx: core.Context, ex_id: str, run: str, view: str, words: str)
     ex.add(exm.Panel("wm-fsl", "input", "White matter over FSL's result",
                      "the same mask drawn over FSL 6.0.7.23's registered BOLD reference",
                      {"all": wm}, overlay={"registered": {"on": "fsl", "window": lo_hi}}))  # fmt: skip
-    diffs = _diffs(True)
+    for pid, role, label, sub in ORIG_PANELS:
+        ex.add(exm.Panel(pid, role, label, sub, arrays[pid]))
+    diffs = _diffs(True) + _orig_diffs()
     common.compare_all(ex, diffs, OUTPUTS)
     same = common.identical(diffs)
     mats = {pid: e.dir / pid / mat_name for pid, *_ in PANELS}
+    mats.update({pid: o.dir / pid / mat_name for pid, *_ in ORIG_PANELS})
+    mats["fsl-perturbed"] = o.dir / "fsl-perturbed" / mat_name
     own = next(node.glob("*.mat"))
     mats_same = mats["replica"].read_bytes() == mats["fsl"].read_bytes()
     _verdicts(diffs, same, "this call", mats_same)
+    m = {k: np.loadtxt(p) for k, p in {**mats, "own": own}.items()}
+    m["init"] = np.loadtxt(Path(_arg(args, "-init")))
+    o_shift = displacement(m["orig"], m["fsl"], ref, brain)
+    o_band = displacement(m["fsl-perturbed"], m["fsl"], ref, brain)
+    _orig_verdicts(diffs, same, o, o_shift, o_band, 0.1, float(arrays["fsl"]["registered"].flat[0]))
     if view == "slices":
         at = common.slice_voxel(ex, "fsl", "init", "registered")
     else:
@@ -476,8 +815,8 @@ def _example_bbr(ctx: core.Context, ex_id: str, run: str, view: str, words: str)
         "output": "registered",
         "plane": "axial",
         "voxel": at,
-        "panels": ["t1w", "wm-init", "wm-fsl", "fsl", "replica"],
-        "diffs": ["replica-fsl", "fsl-init"],
+        "panels": ["t1w", "wm-init", "wm-fsl", "fsl", "replica", "orig"],
+        "diffs": ["replica-fsl", "orig-fsl", "fsl-init"],
         "compare": {"a": "fsl", "b": "init"},
     }
     out = common.finish(
@@ -486,16 +825,16 @@ def _example_bbr(ctx: core.Context, ex_id: str, run: str, view: str, words: str)
         + ("; the three slices through it are stored at full resolution." if view == "slices"
            else "."),
     )  # fmt: skip
-    m = {k: np.loadtxt(p) for k, p in {**mats, "own": own}.items()}
-    m["init"] = np.loadtxt(Path(_arg(args, "-init")))
     labels = {
         "fsl": "FSL 6.0.7.23",
         "replica": "replica (reproduce)",
         "replica-fix": "replica (default)",
+        "orig": "clean-room original (reproduce)",
+        "orig-fix": "clean-room original (default)",
         "own": "fMRIPrep's own (its image's FSL)",
         "init": "the initial matrix (-init)",
     }
-    mat_files = {k: mats[k] for k in ("fsl", "replica", "replica-fix")}
+    mat_files = {k: mats[k] for k in ("fsl", "replica", "replica-fix", "orig", "orig-fix")}
     mat_files["own"] = own
     mat_files["init"] = Path(_arg(args, "-init"))
     tables = [
@@ -506,13 +845,21 @@ def _example_bbr(ctx: core.Context, ex_id: str, run: str, view: str, words: str)
             "Each matrix file as written (`-omat`), its numbers as text; fMRIPrep's own is the "
             "node's output in the run's working directory (FSL in fMRIPrep 25.2.6's image), "
             "the initial matrix the call's `-init` (mri_coreg's, converted by lta_to_fsl). "
-            "*identical*: the same bytes as FSL 6.0.7.23's file.",
+            "*identical*: the same bytes as FSL 6.0.7.23's file. The clean-room original's "
+            "matrices are its own result, written as FSL writes them.",
         ),
         _shift_table(
             f"{ex_id}-shift",
             [
                 ("replica − FSL 6.0.7.23", m["replica"], m["fsl"]),
                 ("replica (default) − FSL 6.0.7.23", m["replica-fix"], m["fsl"]),
+                ("clean-room original − FSL 6.0.7.23", m["orig"], m["fsl"]),
+                ("clean-room original (default) − FSL 6.0.7.23", m["orig-fix"], m["fsl"]),
+                (
+                    "FSL 6.0.7.23 on a perturbed input − FSL 6.0.7.23 (its own variability)",
+                    m["fsl-perturbed"],
+                    m["fsl"],
+                ),
                 ("fMRIPrep's own − FSL 6.0.7.23", m["own"], m["fsl"]),
                 ("FSL 6.0.7.23 − the initial matrix (what BBR changed)", m["fsl"], m["init"]),
             ],
@@ -539,7 +886,11 @@ def _example_bbr(ctx: core.Context, ex_id: str, run: str, view: str, words: str)
             "in its reproduce and default modes. The white-matter mask is drawn over the BOLD "
             "reference at the initial alignment and over FSL's result: the boundary the cost "
             "aligns the BOLD contrast to. The matrices follow as text, with fMRIPrep's own, and "
-            "the displacement each pair gives over the brain."
+            "the displacement each pair gives over the brain. LARMORX's clean-room original "
+            "(Apache-2.0, written from the specification without FSL's source) runs the same "
+            "call in its reproduce and default modes and at one thread; FSL runs it once more on "
+            "the BOLD reference perturbed by noise of half an intensity unit, which measures "
+            "FSL's own variability, the yardstick of a registration that is not bit-identical."
             + (
                 " As a data-panel case beside the first example, it is stored as three "
                 "full-resolution slices."
@@ -565,7 +916,9 @@ def _example_bbr(ctx: core.Context, ex_id: str, run: str, view: str, words: str)
                     else "run for this page"
                 )
                 + f"); {vers.get('larmorx-nc', '?')} (the replica), from larmorx at commit "
-                f"`{info['larmorx_commit'][:12]}`",
+                f"`{info['larmorx_commit'][:12]}`; "
+                + oinfo.get("versions", {}).get("larmorx", "the clean-room original")
+                + f", from larmorx at commit `{oinfo['larmorx_commit'][:12]}`",
             },
             {
                 "label": "Matrix",
@@ -576,18 +929,33 @@ def _example_bbr(ctx: core.Context, ex_id: str, run: str, view: str, words: str)
                 + f"; BBR moved the brain by {shift['mean']:.2f} mm on average from the "
                 f"initial alignment (at most {shift['max']:.2f} mm)",
             },
+            {
+                "label": "Original",
+                "text": f"the clean-room original's matrix {o_shift['p95']:.3g} mm from FSL's at "
+                f"the 95th percentile of the brain (at most {o_shift['max']:.3g} mm); FSL's own "
+                f"on a perturbed input {o_band['p95']:.3g} mm (at most {o_band['max']:.3g} mm); "
+                "its runs at 1 thread and in its default mode "
+                + (
+                    "give the same bytes"
+                    if same["orig1-orig"] and same["origfix-orig"]
+                    else "differ (the comparisons below)"
+                ),
+            },
             {"label": "Grid", "text": common.describe_grid(ref, grid.shape)},
         ],
         **out,
         "chain": None,
         "groups": [
             ["main", "LARMORX against FSL"],
-            ["check", "LARMORX against itself: threads and modes"],
+            ["check", "LARMORX against itself: threads, modes and its two implementations"],
             ["reference", "What the registration changed"],
         ],
         "tables": tables,
         "metrics_note": _note(n_vox),
-        "provenance": common.provenance(info, f"{TOOL}/{e.case}", [data]),
+        "provenance": [
+            *common.provenance(info, f"{TOOL}/{e.case}", [data]),
+            *common.provenance(oinfo, f"{TOOL}/{o.case}", [data])[1:],
+        ],
     }
 
 
@@ -614,7 +982,8 @@ def _example_real(ctx: core.Context, ex_id: str) -> dict:
 
     case = REAL[ex_id]
     e = real_entry(ctx, case)
-    info = e.info()
+    o = orig_real_entry(ctx, case)
+    info, oinfo = e.info(), o.info()
     args, files = _real_args(case)
     ref_path = files[_arg(args, "-ref").lstrip("@")]
     ref = nib.load(str(ref_path))
@@ -628,6 +997,12 @@ def _example_real(ctx: core.Context, ex_id: str) -> dict:
     arrays = {
         pid: {"registered": common.load(str(e.dir / pid / "out.nii.gz"))} for pid, *_ in PANELS
     }
+    arrays.update(
+        {
+            pid: {"registered": common.load(str(o.dir / pid / "out.nii.gz"))}
+            for pid, *_ in ORIG_PANELS
+        }
+    )
     for pid, role, label, sub in PANELS:
         ex.add(exm.Panel(pid, role, label, sub, arrays[pid]))
     four_d = arrays["fsl"]["registered"].ndim == 4
@@ -638,45 +1013,71 @@ def _example_real(ctx: core.Context, ex_id: str) -> dict:
                          "6.0.7.23's registered BOLD reference: a check of the fit",
                          {"all": wm},
                          overlay={"registered": {"on": "fsl", "window": _window(ex, "fsl")}}))  # fmt: skip
-    diffs = _diffs(False)
+    for pid, role, label, sub in ORIG_PANELS:
+        ex.add(exm.Panel(pid, role, label, sub, arrays[pid]))
+    diffs = _diffs(False) + _orig_diffs()
     common.compare_all(ex, diffs, OUTPUTS)
     same = common.identical(diffs)
     tables = []
     mats_same = True
+    o_shift = o_band = None
     if "-omat" in args:
         mats = {pid: e.dir / pid / _arg(args, "-omat") for pid, *_ in PANELS}
+        mats.update({pid: o.dir / pid / _arg(args, "-omat") for pid, *_ in ORIG_PANELS})
+        mats["fsl-perturbed"] = o.dir / "fsl-perturbed" / _arg(args, "-omat")
         mats_same = mats["replica"].read_bytes() == mats["fsl"].read_bytes()
         m = {k: np.loadtxt(p) for k, p in mats.items()}
+        o_shift = displacement(m["orig"], m["fsl"], ref, brain)
+        o_band = displacement(m["fsl-perturbed"], m["fsl"], ref, brain)
         tables = [
             _matrix_table(
                 f"{ex_id}-matrices",
-                {k: mats[k] for k in ("fsl", "replica", "replica-fix")},
+                {k: mats[k] for k in ("fsl", "replica", "replica-fix", "orig", "orig-fix")},
                 {
                     "fsl": "FSL 6.0.7.23",
                     "replica": "replica (reproduce)",
                     "replica-fix": "replica (default)",
+                    "orig": "clean-room original (reproduce)",
+                    "orig-fix": "clean-room original (default)",
                 },
                 "Each matrix file as written (`-omat`), its numbers as text. *identical*: the "
-                "same bytes as FSL 6.0.7.23's file.",
+                "same bytes as FSL 6.0.7.23's file. The clean-room original's matrices are its "
+                "own result, written as FSL writes them.",
             ),
             _shift_table(
                 f"{ex_id}-shift",
                 [
                     ("replica − FSL 6.0.7.23", m["replica"], m["fsl"]),
                     ("replica (default) − FSL 6.0.7.23", m["replica-fix"], m["fsl"]),
+                    ("clean-room original − FSL 6.0.7.23", m["orig"], m["fsl"]),
+                    ("clean-room original (default) − FSL 6.0.7.23", m["orig-fix"], m["fsl"]),
+                    (
+                        "FSL 6.0.7.23 on a perturbed input − FSL 6.0.7.23 (its own variability)",
+                        m["fsl-perturbed"],
+                        m["fsl"],
+                    ),
                 ],
                 ref,
                 brain,
             ),
         ]
     _verdicts(diffs, same, "this call", mats_same)
+    _orig_verdicts(
+        diffs,
+        same,
+        o,
+        o_shift,
+        o_band,
+        _flirt_threshold(args),
+        float(arrays["fsl"]["registered"].flat[0]),
+    )
     at, _k = common.centre_view(ex)
     default = {
         "output": "registered",
         "plane": "axial",
         "voxel": at,
-        "panels": ["t1w", *(["wm-fsl"] if not four_d else []), "fsl", "replica"],
-        "diffs": ["replica-fsl", "fix-replica"],
+        "panels": ["t1w", *(["wm-fsl"] if not four_d else []), "fsl", "replica", "orig"],
+        "diffs": ["replica-fsl", "fix-replica", "orig-fsl"],
         "compare": {"a": "fsl", "b": "replica"},
     }
     out = common.finish(
@@ -693,14 +1094,18 @@ def _example_real(ctx: core.Context, ex_id: str) -> dict:
             "correlation ratio, its search over rotations and its multi-resolution schedule) "
             "registering ds005040's BOLD reference to the subject's T1w brain at half "
             "resolution, by FSL 6.0.7.23 and the replica in its reproduce and default modes; "
-            "the white-matter mask drawn over FSL's result shows the fit.",
+            "the white-matter mask drawn over FSL's result shows the fit. LARMORX's clean-room "
+            "original runs the same call in both modes and at one thread, and FSL once more on "
+            "the BOLD reference perturbed by noise of half an intensity unit (its own "
+            "variability).",
         ),
         "applyxfm-4d": (
             "-applyxfm on a raw BOLD series, sinc interpolation",
             "The record's case `real/applyxfm-4d`: four volumes of ds005040's raw BOLD series "
             "resampled onto the T1w's grid (every second voxel) through fMRIPrep's initial "
             "matrix, with `-applyxfm -interp sinc`, by FSL 6.0.7.23 and the replica in its "
-            "reproduce and default modes; choose the volume below the panels.",
+            "reproduce and default modes; choose the volume below the panels. LARMORX's "
+            "clean-room original applies the same matrix in both modes and at one thread.",
         ),
     }
     title, summary = texts[ex_id]
@@ -727,19 +1132,37 @@ def _example_real(ctx: core.Context, ex_id: str) -> dict:
                     else "run for this page"
                 )
                 + f"); {vers.get('larmorx-nc', '?')} (the replica), from larmorx at commit "
-                f"`{info['larmorx_commit'][:12]}`",
+                f"`{info['larmorx_commit'][:12]}`; "
+                + oinfo.get("versions", {}).get("larmorx", "the clean-room original")
+                + f", from larmorx at commit `{oinfo['larmorx_commit'][:12]}`",
             },
+            *(
+                [
+                    {
+                        "label": "Original",
+                        "text": f"the clean-room original's matrix {o_shift['p95']:.3g} mm from "
+                        f"FSL's at the 95th percentile of the brain (at most "
+                        f"{o_shift['max']:.3g} mm); FSL's own on a perturbed input "
+                        f"{o_band['p95']:.3g} mm (at most {o_band['max']:.3g} mm)",
+                    }
+                ]
+                if o_shift is not None and o_band is not None
+                else []
+            ),
             {"label": "Grid", "text": common.describe_grid(ref, grid.shape)},
         ],
         **out,
         "chain": None,
         "groups": [
             ["main", "LARMORX against FSL"],
-            ["check", "LARMORX against itself: threads and modes"],
+            ["check", "LARMORX against itself: threads, modes and its two implementations"],
         ],
         "tables": tables,
         "metrics_note": _note(n_vox),
-        "provenance": common.provenance(info, f"{TOOL}/{e.case}", [common.DS005040]),
+        "provenance": [
+            *common.provenance(info, f"{TOOL}/{e.case}", [common.DS005040]),
+            *common.provenance(oinfo, f"{TOOL}/{o.case}", [common.DS005040])[1:],
+        ],
     }
 
 
@@ -755,22 +1178,36 @@ def _input(a: str) -> str:
     return f"<{name}: derived from ds005040's fMRIPrep run>"
 
 
+def _direct() -> dict:
+    """The clean-room original's own cases (``parity.fsl_flirt._original_cases``): name -> run."""
+    from larmorx_validation.parity import fsl_flirt as fo
+
+    return {name: run for name, _desc, run in fo._original_cases()}
+
+
+def _run_of(case: str):
+    defs = _suite()._all_cases()
+    if case in defs:
+        return defs[case][2]
+    return _direct().get(case)
+
+
 def command(case: str) -> str:
-    fp = _suite()
     if case.startswith("fmriprep/"):
         run = case.split("/")[1]
         node = _bbr_node(run)
         return _short_bbr((node / "command.txt").read_text(encoding="utf-8"))
-    defs = fp._all_cases()
-    if case not in defs:
+    run = _run_of(case)
+    if run is None:
         return ""
-    run = defs[case][2]
     words = [_input(a) if a.startswith("@") else a for a in run.args]
     parts = [run.program, *(shlex.quote(w) if re.search(r"\s", w) or w == "" else w
                             for w in words)]  # fmt: skip
     env = " ".join(f"{k}={v}" for k, v in run.settings if v is not None)
     files = " ".join(f"(with {n} written first)" for n, _ in run.files)
-    return " ".join(x for x in (env, " ".join(parts), files) if x)
+    text = " ".join(x for x in (env, " ".join(parts), files) if x)
+    # FSL's installation as $FSLDIR, the home directory as ~: no local paths on the site
+    return text.replace(str(_suite().fsldir()), "$FSLDIR").replace(str(Path.home()), "~")
 
 
 #: The register entries the replica corrects by default in FLIRT's runs.
@@ -796,37 +1233,199 @@ def case_verdict(r: dict, desc: str) -> tuple[str, str]:
     return "bit-identical", common.clip("; ".join(notes), 600)
 
 
-def cases(rec, examples: dict[str, str]) -> list[dict]:
+def _zero(x) -> bool:
+    """A measured value that says "no difference": "yes" (the same text) or a difference of 0."""
+    return x == "yes" or (isinstance(x, (int, float)) and not isinstance(x, bool) and x == 0)
+
+
+def case_verdict_orig(r: dict, desc: str, band: dict | None = None) -> tuple[str, str]:
+    """A case's verdict for the clean-room original: its record holds it to specs/flirt.md §13's
+    thresholds (exit status and messages FSL's; files identical, matrices within a displacement,
+    images from its own matrix by their correlation). Bit-identical where every value it
+    measures is FSL's; within FSL's own variability where its matrix is beyond the fixed
+    threshold but within FSL's on a perturbed input (the record's band), or within the band
+    measured for a worked example (``band``); open otherwise."""
+    from larmorx_validation.parity import fsl_flirt as fo
+
+    v = common.outcome_verdict(r)
+    if v is not None:
+        return v
+    rep_ = r.get("reported", {})
+    named = sorted(set(re.findall(r"\b(FSL-\d+)\b", desc)))
+    fix = rep_.get("D13 fix pass")
+    note = (
+        f" In its default mode the original corrects {', '.join(named) or 'a defect of the register'} and "
+        f"names it: {fix:,} values change."
+        if isinstance(fix, int) and fix
+        else ""
+    )
+    differ = {
+        k: x for k, x in r.get("measured", {}).items() if not (_zero(x) and "correlation" not in k)
+    }
+    if not differ:
+        return "bit-identical", common.clip(
+            "Every file FSL writes, byte for byte (images: every value and header field, "
+            "`descrip` aside), with FSL's exit status and messages." + note,
+            600,
+        )
+    parts = "; ".join(f"{k}: {x}" for k, x in list(differ.items())[:4])
+    disp = [x for k, x in differ.items() if "displacement" in k and isinstance(x, (int, float))]
+    run = _run_of(r["case"])
+    args = ["-cost", "bbr"] if r["case"].startswith("fmriprep/") else list(run.args if run else [])
+    thr = fo._threshold([a.lstrip("@") for a in args])
+    if disp and max(disp) > thr:
+        return "within-variability", common.clip(
+            f"The matrix beyond the record's fixed threshold ({thr:g} mm) but within FSL's own "
+            "variability, which the record measured on the same call with its input perturbed "
+            f"by noise of half an intensity unit (a poorly conditioned registration): {parts}."
+            + note,
+            600,
+        )
+    if disp and band is not None and max(disp) <= band["p95"]:
+        return "within-variability", common.clip(
+            f"{parts}; within FSL's own variability on this call, measured for the worked "
+            f"example: {band['p95']:.3g} mm at the 95th percentile (its input perturbed by "
+            "noise of half an intensity unit)." + note,
+            600,
+        )
+    why = f"Within the record's thresholds, not bit-identical: {parts}."
+    if disp:
+        why += (
+            " A clean-room registration: the cost's last bits and the optimiser's path "
+            "(docs/findings/fsl-flirt-original.md); "
+            + (
+                f"FSL's own variability on this call {band['p95']:.3g} mm."
+                if band is not None
+                else "FSL's own variability is not measured for this case."
+            )
+        )
+    elif any("sinc" in k or "spline" in k or "1e-5" in k for k in differ):
+        why += (
+            " From the same matrix: the sinc and spline kernels' last float bits (an open "
+            "question of the specification)."
+        )
+    elif any(k.startswith(("stdout", "stderr")) for k in differ):
+        why += " Printed numbers differ in their last digits."
+    return "open", common.clip(why + note, 600)
+
+
+def cases(
+    rec,
+    examples: dict[str, str],
+    impl: str = "replica",
+    into: list | None = None,
+    bands: dict[str, dict] | None = None,
+) -> list[dict]:
+    """The record's cases as the case explorer's, its results as ``impl``'s; ``into``: the
+    cases of another record, to which this one's results join (a case of its own where that
+    record has none)."""
     fp = _suite()
-    descs = {c.id: c.description for c in fp.cases("full")}
-    out = []
+    if impl == "original":
+        from larmorx_validation.parity import fsl_flirt as fo
+
+        descs = {c.id: c.description for c in fo.cases("standard")}
+    else:
+        descs = {c.id: c.description for c in fp.cases("full")}
+    out = [] if into is None else into
+    by_id = {c["id"]: c for c in out}
     for r in rec.results:
         desc = descs.get(r["case"], "")
         if r["case"].startswith("fmriprep/"):
             desc = f"fMRIPrep's BBR call ({r['case'].split('/')[1].split('-noreconall')[0]})"
-        v, why = case_verdict(r, desc)
-        out.append(
-            {
-                "id": r["case"],
-                "category": r["category"],
-                "description": desc,
-                "command": command(r["case"]),
-                "results": {
-                    "replica": {
-                        "outcome": r["status"],
-                        "verdict": v,
-                        "checks": f"{r['checks_passed']}/{r['checks_total']}",
-                        "reason": why,
-                    }
-                },
-                **({"example": examples[r["case"]]} if r["case"] in examples else {}),
-            }
+        if impl == "original":
+            v, why = case_verdict_orig(r, desc, (bands or {}).get(r["case"]))
+        else:
+            v, why = case_verdict(r, desc)
+        result = {
+            "outcome": r["status"],
+            "verdict": v,
+            "checks": f"{r['checks_passed']}/{r['checks_total']}",
+            "reason": why,
+        }
+        if r["case"] in by_id:
+            by_id[r["case"]]["results"][impl] = result
+            continue
+        c = {
+            "id": r["case"],
+            "category": r["category"],
+            "description": desc,
+            "command": command(r["case"]),
+            "results": {impl: result},
+            **({"example": examples[r["case"]]} if r["case"] in examples else {}),
+        }
+        out.append(c)
+        by_id[c["id"]] = c
+    return out
+
+
+def _bands(ctx: core.Context, examples: dict[str, str]) -> dict[str, dict]:
+    """FSL's own variability measured for the worked examples (the record's case -> the
+    displacement of FSL's matrix on a perturbed input from its own, over the brain)."""
+    import nibabel as nib
+
+    fp = _suite()
+    out = {}
+    for _i, run, _v, _w in BBR:
+        node = _bbr_node(run)
+        args = fp.fmriprep_args(run, node)
+        e, o = bbr_entry(ctx, run), orig_bbr_entry(ctx, run)
+        mat, ref_path = _arg(args, "-omat"), Path(_arg(args, "-ref"))
+        cid = next(c for c, x in examples.items() if x == _i)
+        out[cid] = displacement(
+            np.loadtxt(o.dir / "fsl-perturbed" / mat),
+            np.loadtxt(e.dir / "fsl" / mat),
+            nib.load(str(ref_path)),
+            _brain(ref_path),
+        )
+    for case in REAL.values():
+        args, files = _real_args(case)
+        if "-omat" not in args:
+            continue
+        e, o = real_entry(ctx, case), orig_real_entry(ctx, case)
+        mat, ref_path = _arg(args, "-omat"), files[_arg(args, "-ref").lstrip("@")]
+        out[case] = displacement(
+            np.loadtxt(o.dir / "fsl-perturbed" / mat),
+            np.loadtxt(e.dir / "fsl" / mat),
+            nib.load(str(ref_path)),
+            _brain(ref_path),
         )
     return out
 
 
+#: The benchmark's series (``docs/benchmarks/fsl-flirt.json``, from
+#: ``validation/investigations/cleanroom-flirt/bench.py``): FSL and the replica on one thread.
+SPEED_THREADS = 14
+SPEED_SERIES = [
+    {"id": "FSL 6.0.7.23|1 thread", "label": "FSL 6.0.7.23 (single-threaded)", "mark": "original"},
+    {"id": "replica (larmorx-nc)|1 thread", "label": "replica, 1 thread", "mark": "replica"},
+    {"id": "original (larmorx)|1 thread", "label": "clean-room original, 1 thread",
+     "mark": "larmorx"},
+    {"id": f"original (larmorx)|{SPEED_THREADS} threads",
+     "label": f"clean-room original, {SPEED_THREADS} threads", "mark": "larmorx-open"},
+]  # fmt: skip
+
+
+def speed(ctx: core.Context):
+    bench = records.load_bench(ctx.repo, TOOL)
+    chart = common.speed(
+        bench,
+        SPEED_SERIES,
+        {},
+        title="Seconds for the whole command (read, register, write), one run each, log scale; "
+        f"the factor is the clean-room original's speed-up over FSL at {SPEED_THREADS} threads",
+        base=(SPEED_SERIES[0]["id"], SPEED_SERIES[3]["id"]),
+        note="From the benchmark report `docs/benchmarks/fsl-flirt.json` ({cpu}, {cpus} logical "
+        "CPUs, shared with another agent's runs, so the times may be a little long; each program "
+        "in FSL's clean environment, outputs NIfTI-1 gzipped; informal: one run each, larmorx at "
+        "commit 04f5462, part 2's third step, before the specification's answers changed the "
+        "arithmetic: not timed again).",
+    )
+    return bench, chart
+
+
 def export(ctx: core.Context) -> dict:
     rec = records.load(ctx.repo, RECORD)
+    rec_orig = records.load(ctx.repo, ORIG_RECORD)
     examples = {
         **{
             f"fmriprep/{run}/{_bbr_node(run).parent.parent.parent.parent.name}": ex_id
@@ -835,8 +1434,12 @@ def export(ctx: core.Context) -> dict:
         **{case: ex_id for ex_id, case in REAL.items()},
     }
     cs = cases(rec, examples)
+    cases(rec_orig, examples, impl="original", into=cs, bands=_bands(ctx, examples))
     entries = [bbr_entry(ctx, run) for _i, run, _v, _w in BBR]
     entries += [real_entry(ctx, case) for case in REAL.values()]
+    entries += [orig_bbr_entry(ctx, run) for _i, run, _v, _w in BBR]
+    entries += [orig_real_entry(ctx, case) for case in REAL.values()]
+    bench, chart = speed(ctx)
     status = "experimental"
     return {
         "schema": 1,
@@ -844,8 +1447,8 @@ def export(ctx: core.Context) -> dict:
         "title": "FLIRT",
         "provenance": {
             "exporter": core.tree_hash(ctx.repo, "validation/src/larmorx_validation/evidence"),
-            "records": rec.source(),
-            "benchmarks": [],
+            "records": rec.source() + rec_orig.source(),
+            "benchmarks": bench.source() if bench else [],
             "cache": [fcache.provenance(x) for x in entries],
             "command": f"python -m larmorx_validation evidence {TOOL} --site <site>",
         },
@@ -858,9 +1461,18 @@ def export(ctx: core.Context) -> dict:
                 f"docs/validation/{RECORD}.md",
                 status,
             ),
+            common.implementation(
+                cs,
+                "original",
+                "larmorx clean-room original, against FSL 6.0.7.23 (standard tier)",
+                "original",
+                f"docs/validation/{ORIG_RECORD}.md",
+                "experimental" if rec_orig.data.get("summary", {}).get("fail") else "validated",
+            ),
         ],
         "cases": cs,
         "cases_total": len(cs),
+        "speed": chart,
         "examples": [
             _example_bbr(ctx, ex_id, run, view, words) for ex_id, run, view, words in BBR[:1]
         ]
@@ -877,3 +1489,7 @@ if __name__ == "__main__":  # compute the cache entries only
         print("done", bbr_entry(c, run).dir)
     for case in REAL.values():
         print("done", real_entry(c, case).dir)
+    for _i, run, _v, _w in BBR:
+        print("done", orig_bbr_entry(c, run).dir)
+    for case in REAL.values():
+        print("done", orig_real_entry(c, case).dir)

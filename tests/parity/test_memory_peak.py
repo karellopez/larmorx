@@ -366,10 +366,42 @@ def test_flirt_replica_needs_no_more_memory_than_fsl(tmp_path, name, program, ar
             assert _blanked(f_dir) == _blanked(r_dir), f"{program} {name}"
 
 
-#: FLIRT's clean-room original (``crates/larmorx-fsl``, 2026-11-02) on the same ``flirt`` calls:
-#: its matrices and images are FSL's within the thresholds of its record
-#: (``docs/validation/fsl-flirt.md``), its memory similar to FSL's.
-ORIGINAL_FLIRT_CASES = [c for c in FLIRT_CASES if c[1] == "flirt"]
+#: FLIRT's clean-room original (``crates/larmorx-fsl``, 2026-11-02) on the same calls (FLIRT's
+#: other programs since part 2): its matrices and images are FSL's within the thresholds of its
+#: record (``docs/validation/fsl-flirt.md``), its memory similar to FSL's.
+ORIGINAL_FLIRT_CASES = [
+    *FLIRT_CASES,
+    # part 2: each of FLIRT's other programs and scripts once, on the same pair and fMRIPrep's
+    # matrix; {coords}, {pin}, {pref}, {mat2} and {text} are small text inputs the test writes
+    ("img2imgcoord", "img2imgcoord", "-src {epi} -dest {t1} -xfm {init} -mm {coords}"),
+    ("std2imgcoord", "std2imgcoord", "-img {epi} -std {t1} -xfm {init} -vox {coords}"),
+    ("img2stdcoord", "img2stdcoord", "-img {epi} -std {t1} -xfm {init} {coords}"),
+    ("makerot", "makerot", "-t 30 -a 1,0.5,0.2 -c 10,20,30 -o rot.mat"),
+    ("midtrans-template", "midtrans", "--template={t1} -o mid.mat {init} {mat2}"),
+    (
+        "pointflirt-vox",
+        "pointflirt",
+        "-i {pin} -r {pref} -o aff.mat --vox --invol={epi} --refvol={t1}",
+    ),
+    ("extracttxt", "extracttxt", "value {text} 3"),
+    # FSL's script stops at its NameError (FSL-81): exit 1 there and in the original's
+    # reproduce; the original's default computes the matrix
+    ("aff2rigid", "aff2rigid", "{init} rigid.mat"),
+    # three registrations of the BOLD reference to itself with FSL's pairreg schedules
+    ("pairreg", "pairreg", "{epi} {epi} {epi} {epi} pair.mat -dof 6"),
+]
+
+#: FSL's exit status and the original's in each mode, where a call does not succeed (FSL-81).
+ORIGINAL_FLIRT_EXITS = {"aff2rigid": (1, {"reproduce": 1, "fix": 0})}
+
+#: The small text inputs of :data:`ORIGINAL_FLIRT_CASES`.
+_FLIRT_TEXTS = {
+    "coords": "10 20 30\n-12.5 4 0\n0 0 0\n",
+    "pin": "10 12 8\n40 15 9\n12 50 10\n15 18 30\n35 40 25\n",
+    "pref": "60 70 50\n150 75 52\n64 180 55\n70 78 120\n140 150 100\n",
+    "mat2": "0.99 0.01 0 1.5\n-0.01 0.99 0.02 -2\n0 -0.02 1.01 0.5\n0 0 0 1\n",
+    "text": "".join(f"line {k} value {k * 3}\n" for k in range(1, 13)),
+}
 
 
 @pytest.mark.parametrize(("name", "program", "args"), ORIGINAL_FLIRT_CASES)
@@ -388,15 +420,24 @@ def test_flirt_original_needs_no_more_memory_than_fsl(tmp_path, name, program, a
         "wm": next((bbr / "wm_mask").glob("*.nii.gz")),
         "init": bbr / "lta_to_fsl" / "out.mat",
         "bbr": fr.fsldir() / "etc" / "flirtsch" / "bbr.sch",
+        "bold": src / "out/sub-002/func/sub-002_task-clip_run-1_desc-preproc_bold.nii.gz",
     }
+    texts = tmp_path / "texts"
+    texts.mkdir()
+    for key, text in _FLIRT_TEXTS.items():
+        (texts / f"{key}.txt").write_text(text, encoding="utf-8")
+        paths[key] = texts / f"{key}.txt"
     words = [w.format(**{k: str(v) for k, v in paths.items()}) for w in args.split()]
     env = {**fr._environment({}), "OMP_NUM_THREADS": "1"}
+    if program == "aff2rigid":
+        env["PATH"] = f"{fr.fsldir()}/bin:/usr/bin:/bin"  # the script runs `env fslpython`
+    want, codes = ORIGINAL_FLIRT_EXITS.get(program, (0, {"reproduce": 0, "fix": 0}))
     f_dir = tmp_path / "fsl"
     f_dir.mkdir()
     code, fsl_mib = _original_peak(
         [str(fr.fsldir() / "bin" / program), *words], env, "fsl", _emptier(f_dir), f_dir
     )
-    assert code == 0
+    assert code == want
     for mode in ("reproduce", "fix"):
         r_dir = tmp_path / f"larmorx-{mode}"
         r_dir.mkdir()
@@ -408,7 +449,7 @@ def test_flirt_original_needs_no_more_memory_than_fsl(tmp_path, name, program, a
         }
         entry = entry_peak(l_env, r_dir)
         code, mib = _peak([sys.executable, "-m", "larmorx", "fsl", program, *words], l_env, r_dir)
-        assert code == 0
+        assert code == codes[mode], f"{program} {name} original ({mode}): exit {code}"
         print(
             f"{program} {name} original ({mode}): larmorx {mib:.1f} MiB, FSL {fsl_mib:.1f}, "
             f"entry {entry:.1f}"
@@ -417,7 +458,9 @@ def test_flirt_original_needs_no_more_memory_than_fsl(tmp_path, name, program, a
             f"{program} {name} original ({mode}): larmorx {mib:.0f} MiB, FSL {fsl_mib:.0f} MiB, "
             f"the entry point {entry:.1f} MiB"
         )
-        assert sorted(p.name for p in f_dir.iterdir()) == sorted(p.name for p in r_dir.iterdir())
+        if codes[mode] == want:
+            names = sorted(p.name for p in r_dir.iterdir())
+            assert sorted(p.name for p in f_dir.iterdir()) == names
 
 
 def _blanked(d: Path) -> dict[str, bytes]:

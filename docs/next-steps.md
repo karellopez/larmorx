@@ -116,7 +116,7 @@ at a time:
      records re-made in-process: no status change; golden checksums unchanged; `crates-gpl/` keeps
      only the verification tools; CI's `crates-gpl` steps gone (4.0 min a run).
 4. **The ports:** BET's clean-room original (item 7), the clean-room additions mcflirt FSL-20/21
-   and 3dUnifize AFNI-75 (specs first), FLIRT with BBR (the replica's parts 1 to 3 done 2026-11-01/02; the clean-room original's part 1 done 2026-11-02, part 2 next), FAST, topup (item 7); field maps,
+   and 3dUnifize AFNI-75 (specs first), FLIRT with BBR (the replica's parts 1 to 3 done 2026-11-01/02; the clean-room original's parts 1 and 2 done 2026-11-02), FAST, topup (item 7); field maps,
    FreeSurfer, surfaces, confounds (item 8); larmorprepx (item 9). Each with its site page from
    its smart tests.
 5. **The final validation phase** (after every tool is ported): the data panel for every tool
@@ -395,10 +395,19 @@ The items below keep their history.
    done (2026-11-02):** `flirt` and `convert_xfm` (crate `larmorx-fsl`, module `flirt`, on
    `larmorx_mri::hmc`'s shared engine; record `fsl-flirt`: 89 of 111 compared cases within
    thresholds, fMRIPrep's three BBR calls within 0.1 mm; `-anglerep quaternion` and `alignpaxes`
-   included). **Part 2:** `-debug`, the verbose levels above 1, FLIRT's other programs (avscale, the
+   included). **Part 2 done (2026-11-02, seven relay agents):** FLIRT's other programs (avscale, the
    coordinate programs, rmsdiff, makerot, midtrans, pointflirt, applyxfm4D, pairreg, extracttxt,
-   aff2rigid), the site's clean-room panels, the benchmark report and speed; the record's open cases
-   with the spec writer's answers. **The spec questions answered (spec writer, 2026-11-02;
+   aff2rigid), `-debug` and every verbose level, the speed (fMRIPrep's BBR call 1.2 to 1.3 times
+   FSL's speed on one thread, 12 to 14 times on 14; the benchmark report `docs/benchmarks/fsl-flirt.md`),
+   the spec writer's answers (the record's open cases 30 -> 8: BBR's normals, the correlation ratio's
+   and Woods' sums, §3's Euler composition, the search's grids and starts, the sinc and spline,
+   `-usesqform`, `-fixscaleskew`, the inverse; FSL-90 to FSL-93 with `reproduce`), one random-testing
+   trial (24 minutes, 9,854 realistic cases of every program; its fixable findings fixed), FSL-111
+   (applyxfm4D reads uint8 as signed bytes: rule A), the memory and thread tests of every new
+   program, the site's clean-room panels. Record `fsl-flirt`: 206 of 214 compared cases within
+   thresholds (85 rejected by both, 6 expected divergences); the 8 it misses: ill-posed registrations
+   (`-cost normmi`, `leastsq`, weighted `normcorr`, `normmi`, `woods`' stream) and FSL-91/FSL-92's
+   reproduced runs. 24 golden cases added, 8 re-recorded on purpose. **The spec questions answered (spec writer, 2026-11-02;
    `specs/flirt.md`, lines marked "(spec writer, 2026-11-02)"; §14's table "The clean-room
    questions of 2026-11-02" names each answer's section and whether the observation was right):
    FLIRT's clean-room part 2 can close its open cases.** The 20 questions in §3, §4.1, §4.2, §6.2,
@@ -421,7 +430,9 @@ The items below keep their history.
    search findings (a subset's convergence test over its own tolerances) for its schedule-free
    optimiser if it uses subsets. Answered (spec writer, 2026-11-02, `specs/mcflirt.md` appendix A):
    mcflirt's `-cost corratio` and `woods` are FLIRT's two costs, the sparse bins left out of the
-   counts, sums and total variance, and Woods' `n_b²σ_b/S_b` (`n_b²σ_b` when `S_b ≤ 0`). The scripts wait for other tools: `epi_reg` (FAST, `fslmaths`,
+   counts, sums and total variance, and Woods' `n_b²σ_b/S_b` (`n_b²σ_b` when `S_b ≤ 0`). Done in FLIRT's clean-room part 2 (relay 4, 2026-11-02): `lx.mri.hmc`'s
+   `corratio` and `woods` are FLIRT's (one implementation in `larmorx-mri`), its record re-made: the
+   same statuses, four cases closer to mcflirt (`docs/findings/mri-hmc-original.md`). The scripts wait for other tools: `epi_reg` (FAST, `fslmaths`,
    `fugue`/`applywarp` for field maps, `convert_xfm`, `flirt`), `standard_space_roi` (`flirt`,
    `fslmaths`, `fslroi`), `aff2rigid` (`avscale`), `flirt_average` (`flirt`, `fslmaths`,
    `convert_xfm`), `pairreg` (`flirt` with `pairreg*.sch`, `bet`).
@@ -504,6 +515,18 @@ The items below keep their history.
   schedule that optimises relative to a row (FSL `-nan`, the replica `nan`; part 2's path, found by
   part 3's pre-check, probe-part3b-00496; `docs/findings/fsl-flirt.md`, "Open"): trace the NaN of
   the input's centre of gravity.
+- **FLIRT's clean-room original, what is left** (2026-11-02, part 2's report; for the final
+  validation phase or a part of its own): the sinc and spline outputs' last float bits (1.6 % of
+  `real/interp-sinc`'s voxels, applyxfm4D's spline of float images; spec question 22 of part 2's
+  handoff); SIMD sampling with runtime dispatch (the same bits) and a lower-overhead parallel pass
+  for the correlation ratio's small evaluations: the one-thread 12-dof registration is 0.9 times
+  FSL's speed; the registrations' paths on ill-posed random pairs (the trial's 1,808 of 3,616
+  registrations; `-dof 3`'s and FSL-90's message counts, the COG warnings, which follow the path);
+  `-debug`'s volumes' headers on the trial's oblique and anisotropic images; avscale's residual sign
+  in one of twelve sampled cases; the 8 cases its record misses.
+- **FSL-111 in the replica** (2026-11-02): `larmorx-nc fsl applyxfm4D` reads a uint8 image as signed
+  bytes in both modes (black-box runs of the clean-room part 2, relay 6); by the D13 rules its default
+  should read it as stored and name FSL-111, `reproduce` FSL's reading (the clean-room original does).
 - **FSL's warp-field libraries** (warpfns, basisfield; 2026-11-01): needed by `applywarp` and `fugue`
   (and so `epi_reg`), and by FLIRT's coordinate programs' `-warp` (refused with a message until then):
   ported with the first tool that needs them, then `-warp` added to `img2imgcoord`, `std2imgcoord` and

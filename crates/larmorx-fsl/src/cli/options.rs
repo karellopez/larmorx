@@ -27,6 +27,15 @@ pub enum Given {
     Text(String),
 }
 
+/// The occurrences of the options, in order.
+struct Recorder(Vec<(usize, Given)>);
+
+impl Recorder {
+    fn set(&mut self, k: usize, g: Given) {
+        self.0.push((k, g));
+    }
+}
+
 /// A parse error, with FSL's message (printed after the usage and an empty line).
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct ParseError(pub String);
@@ -204,7 +213,22 @@ pub fn parse(
     specs: &[Spec],
     stop_at_word: bool,
 ) -> Result<(Vec<Option<Given>>, usize), ParseError> {
+    let (all, rest) = parse_all(words, specs, stop_at_word)?;
     let mut given: Vec<Option<Given>> = vec![None; specs.len()];
+    for (k, g) in all {
+        given[k] = Some(g);
+    }
+    Ok((given, rest))
+}
+
+/// [`parse`] with every occurrence of every option, in order (`makerot`'s repeated vectors,
+/// FSL-77): `(spec index, what it was given)`.
+pub fn parse_all(
+    words: &[String],
+    specs: &[Spec],
+    stop_at_word: bool,
+) -> Result<(Vec<(usize, Given)>, usize), ParseError> {
+    let mut given = Recorder(Vec::new());
     let mut i = 0;
     while i < words.len() {
         let w = &words[i];
@@ -221,7 +245,7 @@ pub fn parse(
             let s = specs[k];
             i += 1;
             if s.values == 0 {
-                given[k] = Some(Given::Flag);
+                given.set(k, Given::Flag);
                 continue;
             }
             let value = match value {
@@ -232,19 +256,22 @@ pub fn parse(
                     )));
                 }
             };
-            given[k] = Some(if s.numeric {
-                let vals: Vec<&str> = value.split_whitespace().collect();
-                let all: Option<Vec<f64>> = if vals.len() == s.values {
-                    vals.iter().map(|v| whole(&s, v)).collect()
+            given.set(
+                k,
+                if s.numeric {
+                    let vals: Vec<&str> = value.split_whitespace().collect();
+                    let all: Option<Vec<f64>> = if vals.len() == s.values {
+                        vals.iter().map(|v| whole(&s, v)).collect()
+                    } else {
+                        None
+                    };
+                    Given::Numbers(all.ok_or_else(|| {
+                        ParseError(format!("{shown}: Couldn't set_value! valstr=\"{value}\"!"))
+                    })?)
                 } else {
-                    None
-                };
-                Given::Numbers(all.ok_or_else(|| {
-                    ParseError(format!("{shown}: Couldn't set_value! valstr=\"{value}\"!"))
-                })?)
-            } else {
-                Given::Text(value.to_owned())
-            });
+                    Given::Text(value.to_owned())
+                },
+            );
         } else if let Some(run) = w.strip_prefix('-').filter(|r| !r.is_empty()) {
             i += 1;
             for c in run.chars() {
@@ -255,7 +282,7 @@ pub fn parse(
                     .ok_or_else(|| ParseError(format!("{shown}: Option doesn't exist!")))?;
                 let s = specs[k];
                 if s.values == 0 {
-                    given[k] = Some(Given::Flag);
+                    given.set(k, Given::Flag);
                     continue;
                 }
                 let rest = &words[i..];
@@ -265,7 +292,7 @@ pub fn parse(
                     )));
                 }
                 if !s.numeric {
-                    given[k] = Some(Given::Text(rest[0].clone()));
+                    given.set(k, Given::Text(rest[0].clone()));
                     i += 1;
                     continue;
                 }
@@ -273,7 +300,7 @@ pub fn parse(
                     // fewer words than values: each read as atof, the others 0 (observed)
                     let mut vals: Vec<f64> = rest.iter().map(|v| atof(v)).collect();
                     vals.resize(s.values, 0.0);
-                    given[k] = Some(Given::Numbers(vals));
+                    given.set(k, Given::Numbers(vals));
                     i = words.len();
                     continue;
                 }
@@ -285,7 +312,7 @@ pub fn parse(
                         let mut vals: Vec<f64> =
                             take[..s.values - 1].iter().map(|v| atof(v)).collect();
                         vals.push(l);
-                        given[k] = Some(Given::Numbers(vals));
+                        given.set(k, Given::Numbers(vals));
                         i += s.values;
                     }
                     None => {
@@ -297,12 +324,12 @@ pub fn parse(
                 }
             }
         } else if stop_at_word {
-            return Ok((given, i));
+            return Ok((given.0, i));
         } else {
             return Err(ParseError(format!("{w}:  is an unrecognised token!")));
         }
     }
-    Ok((given, i))
+    Ok((given.0, i))
 }
 
 #[cfg(test)]

@@ -167,6 +167,20 @@ impl<'a> TestVolume<'a> {
     /// The edge weight at `p` (§6.3): per axis `p/σ` within `σ` of 0, `(b − p)/σ` within `σ`
     /// of the bound, else 1; the product of the three in float32.
     #[inline(always)]
+    /// The edge factors `w_x`, `w_y`, `w_z` at `p` (§6.3), before their product.
+    pub fn edge_factors(&self, p: [f32; 3]) -> [f32; 3] {
+        [0, 1, 2].map(|k| {
+            let s = self.sigma[k];
+            if p[k] < s {
+                p[k] / s
+            } else if self.bound[k] - p[k] < s {
+                (self.bound[k] - p[k]) / s
+            } else {
+                1.0
+            }
+        })
+    }
+
     fn weight(&self, p: [f32; 3]) -> f32 {
         let axis = |k: usize| {
             let s = self.sigma[k];
@@ -303,10 +317,12 @@ pub fn sample<A: Accumulator>(
 /// A weight of each contributing point from images of its own: given the grid point's linear
 /// index and its test-voxel position, the factor that multiplies the point's edge weight (FLIRT's
 /// `-refweight` and `-inweight`, `specs/flirt.md` §6.4).
-pub type PointWeight<'a> = &'a (dyn Fn(usize, [f32; 3]) -> f32 + Sync);
+///
+/// The closure receives the point's edge weight `w` (§6.3) and returns the point's weight.
+pub type PointWeight<'a> = &'a (dyn Fn(usize, [f32; 3], f32) -> f32 + Sync);
 
 /// An accumulator whose points are weighted by a [`PointWeight`] first: the point's weight is
-/// `weight(index, p)·w`.
+/// `weight(index, p, w)` (`w` the edge weight).
 pub struct Weighted<'a, A> {
     pub inner: A,
     pub weight: PointWeight<'a>,
@@ -319,7 +335,7 @@ impl<A: Accumulator> Accumulator for Weighted<'_, A> {
     }
     #[inline(always)]
     fn point_at(&mut self, g: f32, v: f32, w: f32, index: usize, p: [f32; 3]) {
-        let ww = (self.weight)(index, p) * w;
+        let ww = (self.weight)(index, p, w);
         self.inner.point(g, v, ww);
     }
     fn end_row(&mut self) {
@@ -613,58 +629,196 @@ pub fn min_max(data: &[f32]) -> (f32, f32) {
         })
 }
 
-/// Per-bin moments of the test values: weighted `[Σw, Σwv, Σwv²]` and unweighted
-/// `[n, Σv, Σv²]`.
-struct BinSlice {
-    weighted: Vec<[f64; 3]>,
-    plain: Vec<[f64; 3]>,
+/// The moments of the test values in each reference bin (appendix A; `specs/flirt.md` §6.2):
+/// weighted `[Σw, Σw·y, Σ(w·y)·y]` (`corratio`) or unweighted `[n, Σy, Σy²]` (`woods`),
+/// single-precision running sums over the whole grid in the sampling order (one level: no row
+/// or slice partial sums), each product rounded before the next operation.
+pub struct BinMoments {
+    pub s: Vec<[f32; 3]>,
+    pub unweighted: bool,
 }
 
-impl BinSlice {
+impl BinMoments {
     /// `bins` cells, at least one: with no bins (FSL-21 reproduced) every sample falls into the
     /// one cell mcflirt then has (its bin `B` = 0, §12.1).
-    fn new(bins: usize) -> BinSlice {
-        let bins = bins.max(1);
-        BinSlice {
-            weighted: vec![[0.0; 3]; bins],
-            plain: vec![[0.0; 3]; bins],
+    pub fn new(bins: usize, unweighted: bool) -> BinMoments {
+        BinMoments {
+            s: vec![[0.0; 3]; bins.max(1)],
+            unweighted,
+        }
+    }
+
+    #[inline(always)]
+    fn add_to(s: &mut [f32; 3], v: f32, w: f32, unweighted: bool) {
+        if unweighted {
+            s[0] += 1.0;
+            s[1] += v;
+            s[2] += v * v;
+        } else {
+            let wv = w * v;
+            s[0] += w;
+            s[1] += wv;
+            s[2] += wv * v;
         }
     }
 }
 
-impl Accumulator for BinSlice {
+impl Accumulator for BinMoments {
     #[inline(always)]
     fn point(&mut self, g: f32, v: f32, w: f32) {
-        let k = (g as usize).min(self.weighted.len() - 1);
-        let (w, v) = (f64::from(w), f64::from(v));
-        let s = &mut self.weighted[k];
-        s[0] += w;
-        s[1] += w * v;
-        s[2] += w * v * v;
-        let s = &mut self.plain[k];
-        s[0] += 1.0;
-        s[1] += v;
-        s[2] += v * v;
+        let k = (g as usize).min(self.s.len() - 1);
+        BinMoments::add_to(&mut self.s[k], v, w, self.unweighted);
     }
     fn end_row(&mut self) {}
 }
 
-fn merge_bins(slices: Vec<BinSlice>, bins: usize) -> BinSlice {
-    let bins = bins.max(1);
-    let mut out = BinSlice::new(bins);
-    for s in slices {
-        for k in 0..bins {
-            for j in 0..3 {
-                out.weighted[k][j] += s.weighted[k][j];
-                out.plain[k][j] += s.plain[k][j];
-            }
-        }
-    }
-    out
+/// One slice's points sorted by bin, each bin's in sampling order: bin `k`'s values are
+/// `values[start[k]..start[k + 1]]`.
+struct SortedSlice {
+    start: Vec<u32>,
+    values: Vec<(f32, f32)>,
 }
 
-/// One minus the correlation ratio (appendix A): `Σ_b n_b·var_b / (n·var)` over bins with
-/// `n_b > 2`, weighted; 0 if the total variance is not positive. `bin_grid` holds bin indices.
+impl SortedSlice {
+    fn of(rec: &BinRecord, bins: usize) -> SortedSlice {
+        let mut start = vec![0u32; bins + 1];
+        for &(k, _, _) in &rec.points {
+            start[k as usize + 1] += 1;
+        }
+        for k in 0..bins {
+            start[k + 1] += start[k];
+        }
+        let mut at = start.clone();
+        let mut values = vec![(0.0f32, 0.0f32); rec.points.len()];
+        for &(k, v, w) in &rec.points {
+            let p = &mut at[k as usize];
+            values[*p as usize] = (v, w);
+            *p += 1;
+        }
+        SortedSlice { start, values }
+    }
+}
+
+/// The points of one slice, in sampling order, with their bins.
+struct BinRecord {
+    points: Vec<(u32, f32, f32)>,
+    top: usize,
+}
+
+impl Accumulator for BinRecord {
+    #[inline(always)]
+    fn point(&mut self, g: f32, v: f32, w: f32) {
+        self.points.push(((g as usize).min(self.top) as u32, v, w));
+    }
+    fn end_row(&mut self) {}
+}
+
+/// The test values' moments in each bin of `bin_grid` (bin indices): weighted (`corratio`,
+/// each point's edge weight times `weight` when one is given) or `unweighted` (`woods`).
+///
+/// In parallel, the slices are sampled at once, each slice's points sorted by bin keeping their
+/// order (a counting sort), and each bin's sums then run over the slices in order, the bins at
+/// once: the same additions in the same order as one pass, so the same bits.
+pub fn bin_moments(
+    bin_grid: &Volume,
+    test: &TestVolume<'_>,
+    b: &[[f32; 4]; 3],
+    bins: usize,
+    parallel: bool,
+    weight: Option<PointWeight<'_>>,
+    unweighted: bool,
+) -> BinMoments {
+    let bins = bins.max(1);
+    let out = BinMoments::new(bins, unweighted);
+    if !parallel {
+        return sample_all_weighted(bin_grid, test, b, weight, out);
+    }
+    let row = bin_grid.shape[0] * bin_grid.shape[1];
+    let slices = sample_weighted(bin_grid, test, b, true, weight, || BinRecord {
+        points: Vec::with_capacity(row),
+        top: bins - 1,
+    });
+    let sorted: Vec<SortedSlice> = slices
+        .par_iter()
+        .map(|s| SortedSlice::of(s, bins))
+        .collect();
+    let sums: Vec<[f32; 3]> = (0..bins)
+        .into_par_iter()
+        .with_min_len(8)
+        .map(|k| {
+            let mut st = [0.0f32; 3];
+            for sl in &sorted {
+                let (lo, hi) = (sl.start[k] as usize, sl.start[k + 1] as usize);
+                for &(v, w) in &sl.values[lo..hi] {
+                    BinMoments::add_to(&mut st, v, w, unweighted);
+                }
+            }
+            st
+        })
+        .collect();
+    BinMoments {
+        s: sums,
+        unweighted,
+    }
+}
+
+/// One minus the correlation ratio from the bins' moments (appendix A; exactly as
+/// `specs/flirt.md` §6.2): over the bins with more than two (weighted) points, in index order and
+/// single precision, `n`, `S`, `Q` and `A = Σ v_b·n_b` (`v_b` with `n_b − 1`); `A/n`, then over
+/// the total variance of the same points; the points of sparser bins left out of everything.
+/// `η = 1 − A` and the cost `1 − η`, each computed in double and rounded to single; `η = 0` (the
+/// cost 1) when no bin has more than two points or the total variance is not positive.
+pub fn corr_ratio_of(m: &BinMoments) -> f32 {
+    let (mut n, mut s, mut q, mut a) = (0.0f32, 0.0f32, 0.0f32, 0.0f32);
+    for &[nb, sb, qb] in &m.s {
+        if nb > 2.0 {
+            n += nb;
+            s += sb;
+            q += qb;
+            let vb = (qb - (sb * sb) / nb) / (nb - 1.0);
+            a += vb * nb;
+        }
+    }
+    if n > 0.0 {
+        a /= n;
+    }
+    let mut eta = 0.0f32;
+    if n > 1.0 {
+        let v = (q - (s * s) / n) / (n - 1.0);
+        if v > 0.0 {
+            a /= v;
+            eta = (1.0 - f64::from(a)) as f32;
+        }
+    }
+    (1.0 - f64::from(eta)) as f32
+}
+
+/// Woods' criterion from the bins' unweighted moments (appendix A; exactly as `specs/flirt.md`
+/// §6.2): over the bins with more than two points, in index order and single precision,
+/// `t_b = ((n_b·n_b)·σ_b)/S_b` (`σ_b` from `n_b − 1`, 0 unless the variance is positive) when the
+/// bin's sum `S_b` is positive, else `(n_b·n_b)·σ_b`; the cost `Σ t_b / n`, `n` those bins'
+/// points; `1e10` when there are none.
+pub fn woods_of(m: &BinMoments) -> f32 {
+    let mut n: u64 = 0;
+    let mut w = 0.0f32;
+    for &[nb, sb, qb] in &m.s {
+        if nb > 2.0 {
+            n += nb as u64;
+            let vb = (qb - (sb * sb) / nb) / (nb - 1.0);
+            let sigma = if vb > 0.0 { vb.sqrt() } else { 0.0 };
+            let nn = nb * nb;
+            w += if sb > 0.0 {
+                (nn * sigma) / sb
+            } else {
+                nn * sigma
+            };
+        }
+    }
+    if n > 0 { w / n as f32 } else { 1e10 }
+}
+
+/// One minus the correlation ratio (appendix A, [`corr_ratio_of`]), the points edge-weighted.
+/// `bin_grid` holds bin indices.
 pub fn corr_ratio(
     bin_grid: &Volume,
     test: &TestVolume<'_>,
@@ -684,34 +838,13 @@ pub fn corr_ratio_weighted(
     parallel: bool,
     weight: Option<PointWeight<'_>>,
 ) -> f32 {
-    let m = merge_bins(
-        sample_weighted(bin_grid, test, b, parallel, weight, || BinSlice::new(bins)),
-        bins,
-    );
-    let (mut n, mut s, mut ss) = (0.0, 0.0, 0.0);
-    for st in &m.weighted {
-        n += st[0];
-        s += st[1];
-        ss += st[2];
-    }
-    if n <= 1.0 {
-        return 1.0;
-    }
-    let var = (ss - s * s / n) / (n - 1.0);
-    if var <= 0.0 {
-        return 0.0;
-    }
-    let within: f64 = m
-        .weighted
-        .iter()
-        .filter(|st| st[0] > 2.0)
-        .map(|st| st[0] * (st[2] - st[1] * st[1] / st[0]) / (st[0] - 1.0))
-        .sum();
-    (within / (n * var)) as f32
+    corr_ratio_of(&bin_moments(
+        bin_grid, test, b, bins, parallel, weight, false,
+    ))
 }
 
-/// Woods' criterion (appendix A), unweighted: `Σ_b n_b²·σ_b/μ_b / n` (`σ_b` alone where the bin
-/// mean is not positive); `1e10` for an empty overlap.
+/// Woods' criterion (appendix A, [`woods_of`]), unweighted and unsmoothed; `1e10` for an empty
+/// overlap.
 pub fn woods(
     bin_grid: &Volume,
     test: &TestVolume<'_>,
@@ -719,24 +852,7 @@ pub fn woods(
     bins: usize,
     parallel: bool,
 ) -> f32 {
-    let m = merge_bins(
-        sample(bin_grid, test, b, parallel, || BinSlice::new(bins)),
-        bins,
-    );
-    let n: f64 = m.plain.iter().map(|st| st[0]).sum();
-    if n <= 0.0 {
-        return 1e10;
-    }
-    let mut cost = 0.0;
-    for st in &m.plain {
-        let nb = st[0];
-        if nb > 1.0 {
-            let mean = st[1] / nb;
-            let sd = ((st[2] - st[1] * st[1] / nb) / (nb - 1.0)).max(0.0).sqrt();
-            cost += nb * nb * if mean > 0.0 { sd / mean } else { sd };
-        }
-    }
-    (cost / n) as f32
+    woods_of(&bin_moments(bin_grid, test, b, bins, parallel, None, true))
 }
 
 /// x86-64's conversion of a float32 to a 64-bit integer (`cvttss2si`): truncation toward zero,

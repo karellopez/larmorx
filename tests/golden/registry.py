@@ -954,22 +954,9 @@ def image_math_operations() -> list[str]:
 #: with the tool: the replica's program is not installed where these tests run, so their golden
 #: cases are the replica's own (``crates-nc/larmorx-nc-cli/tests/golden.rs``, run on every
 #: platform by the replicas' jobs). ``replica_only`` checks that each tool has one there.
-#: Since 2026-11-01: FLIRT's programs but flirt and convert_xfm (their clean-room originals since
-#: 2026-11-02; the others are still to be written).
-REPLICA_ONLY_FUNCTIONS: dict[str, str] = {
-    "lx.fsl.avscale": "fsl avscale",
-    "lx.fsl.img2imgcoord": "fsl img2imgcoord",
-    "lx.fsl.std2imgcoord": "fsl std2imgcoord",
-    "lx.fsl.img2stdcoord": "fsl img2stdcoord",
-    "lx.fsl.rmsdiff": "fsl rmsdiff",
-    "lx.fsl.makerot": "fsl makerot",
-    "lx.fsl.midtrans": "fsl midtrans",
-    "lx.fsl.pointflirt": "fsl pointflirt",
-    "lx.fsl.applyxfm4d": "fsl applyxfm4D",
-    "lx.fsl.pairreg": "fsl pairreg",
-    "lx.fsl.extracttxt": "fsl extracttxt",
-    "lx.fsl.aff2rigid": "fsl aff2rigid",
-}
+#: Since 2026-11-02 every FLIRT program has its clean-room original (part 2 of FLIRT's original):
+#: no FSL function has a replica only.
+REPLICA_ONLY_FUNCTIONS: dict[str, str] = {}
 
 #: The replicas' golden cases: the AFNI replicas' (built into larmorx since 2026-10-29, cases
 #: in the larmorx command line's tests, run by ``cargo test`` in every platform's test job) and
@@ -4171,6 +4158,363 @@ def _(ctx: Context) -> dict[str, Any]:
     a = np.array([[1.05, 0.02, -0.03, 2], [-0.01, 0.97, 0.04, -3], [0.02, -0.05, 1.1, 1.5], [0, 0, 0, 1]])  # fmt: skip
     b = np.array([[0.99, 0.1, 0, 1], [-0.1, 0.99, 0.05, 2], [0, -0.05, 1.2, -3], [0, 0, 0, 1]])
     return {"matrix": lx.fsl.convert_xfm(a, concat=b, inverse=True, implementation="original")}
+
+
+_AFFINE = "1.05 0.02 -0.03 2\n-0.01 0.97 0.04 -3\n0.02 -0.05 1.1 1.5\n0 0 0 1\n"
+_REFLECTION = "-1.1 0.1 0 3\n0.05 0.9 0.2 -1\n0 -0.1 1.2 2\n0 0 0 1\n"
+_COORDS = "10 20 30\n0 0 0\n-5.5 3.25 7\n"
+
+
+def _mat(text: str) -> np.ndarray:
+    """A matrix written as text, as an array."""
+    return np.array([[float(v) for v in line.split()] for line in text.splitlines()])
+
+
+def _flirt_files(ctx: Context) -> tuple[str, str, str]:
+    """An affine matrix, a reflection and three coordinates, in the case's directory."""
+    a, f, c = ctx.dir / "a.mat", ctx.dir / "f.mat", ctx.dir / "coords.txt"
+    a.write_text(_AFFINE)
+    f.write_text(_REFLECTION)
+    c.write_text(_COORDS)
+    return str(a), str(f), str(c)
+
+
+@case("cli.fsl.avscale", covers=("cli:fsl avscale",))
+def _(ctx: Context) -> dict[str, Any]:
+    """``larmorx fsl avscale`` (the clean-room original, ``specs/flirt.md`` §15.1):
+    ``--allparams`` about a volume's centre of gravity, ``--inverteddies`` of a reflection (its
+    half transforms of the matrix made proper), the usage."""
+    a, f, _ = _flirt_files(ctx)
+    return {
+        "allparams": _fsl(ctx, "avscale", "--allparams", a, ctx.file("anat.nii")),
+        "eddies": _fsl(ctx, "avscale", "--inverteddies", f),
+        **_status_outputs("usage", _fsl_status(ctx, "avscale")),
+    }
+
+
+@case("cli.fsl.img2imgcoord", covers=("cli:fsl img2imgcoord",))
+def _(ctx: Context) -> dict[str, Any]:
+    """``larmorx fsl img2imgcoord`` (§15.2) between an oblique image stored with a positive
+    determinant (x reversed in memory) and another: voxels, and millimetres verbose (the sizes
+    and the matrix, then fixed notation)."""
+    a, _, c = _flirt_files(ctx)
+    src, dest = ctx.file("anat.nii"), ctx.file("anat2.nii")
+    return {
+        "vox": _fsl(ctx, "img2imgcoord", "-src", src, "-dest", dest, "-xfm", a, c),
+        "mm": _fsl(ctx, "img2imgcoord", "-src", src, "-dest", dest, "-xfm", a, "-mm", "-v", c),
+    }
+
+
+@case("cli.fsl.std2imgcoord", covers=("cli:fsl std2imgcoord",))
+def _(ctx: Context) -> dict[str, Any]:
+    """``larmorx fsl std2imgcoord`` (§15.2): millimetres verbose (the matrix's inverse as the
+    linear-algebra library prints it), voxels, and without a standard image (its warning)."""
+    a, _, c = _flirt_files(ctx)
+    img, std = ctx.file("anat.nii"), ctx.file("anat2.nii")
+    return {
+        "mm": _fsl(ctx, "std2imgcoord", "-img", img, "-std", std, "-xfm", a, "-verbose", c),
+        "vox": _fsl(ctx, "std2imgcoord", "-img", img, "-std", std, "-xfm", a, "-vox", c),
+        **_status_outputs("nostd", _fsl_status(ctx, "std2imgcoord", "-img", img, c)),
+    }
+
+
+@case("cli.fsl.img2stdcoord", covers=("cli:fsl img2stdcoord",))
+def _(ctx: Context) -> dict[str, Any]:
+    """``larmorx fsl img2stdcoord`` (§15.2): voxels, millimetres verbose, and an unknown
+    option's message."""
+    a, _, c = _flirt_files(ctx)
+    img, std = ctx.file("anat.nii"), ctx.file("anat2.nii")
+    return {
+        "vox": _fsl(ctx, "img2stdcoord", "-img", img, "-std", std, "-xfm", a, c),
+        "mm": _fsl(ctx, "img2stdcoord", "-img", img, "-std", std, "-xfm", a, "-mm", "-verbose", c),
+        **_status_outputs(
+            "unknown", _fsl_status(ctx, "img2stdcoord", "-img", img, "-frob", "x", c)
+        ),
+    }
+
+
+@case("cli.fsl.rmsdiff", covers=("cli:fsl rmsdiff",))
+def _(ctx: Context) -> dict[str, Any]:
+    """``larmorx fsl rmsdiff`` (§15.3): the RMS deviation over 80 mm about a volume's centre of
+    gravity, the largest and RMS displacement over a mask, a matrix of low determinant."""
+    a, f, _ = _flirt_files(ctx)
+    small = ctx.dir / "small.mat"
+    small.write_text("0.1 0 0 0\n0 0.5 0 0\n0 0 1 0\n0 0 0 1\n")
+    vol = ctx.file("anat.nii")
+    return {
+        "rms": _fsl(ctx, "rmsdiff", a, f, vol),
+        "mask": _fsl(ctx, "rmsdiff", a, f, vol, ctx.file("mask.nii")),
+        **_status_outputs("low", _fsl_status(ctx, "rmsdiff", str(small), a, vol)),
+    }
+
+
+@case("cli.fsl.makerot", covers=("cli:fsl makerot",))
+def _(ctx: Context) -> dict[str, Any]:
+    """``larmorx fsl makerot`` (§15.4): an axis not of unit length through a centre (FSL-76:
+    corrected by default, FSL's matrix with ``reproduce``), written with ``-o``; an axis of one
+    value (FSL-77: refused by default)."""
+    o = ctx.out("rot.mat")
+    args = ("-t", "30", "-a", "1,2,3", "-c", "4,5,6")
+    fix = _fsl(ctx, "makerot", *args)
+    _fsl(ctx, "makerot", *args, "-o", o, upstream_defects=REPRODUCE)
+    return {
+        "fix": fix,
+        "reproduce": File(o),
+        **_status_outputs("short", _fsl_status(ctx, "makerot", "-t", "30", "-a", "5")),
+    }
+
+
+_POINTS = "10 20 30\n-12 5 40\n33 -7 12\n0 0 0\n25 25 -10\n-8 -30 22\n"
+#: A schedule of FLIRT's language for pairreg's three runs (the golden case's own: FSL's
+#: pairreg1.sch to pairreg3.sch are FSL's files, not on the CI's machines).
+_PAIRREG_SCHEDULE = (
+    "setscale 2 force\nsetrow UA 1 0 0 0 0 1 0 0 0 0 1 0 0 0 0 1\n"
+    "optimise 6 UA:1 0.0 0.0 0.0 0.0 0.0 0.0 0.0 rel 2\nsort U\n"
+)
+
+
+def _points(ctx: Context) -> tuple[str, str]:
+    """Six points and their images under ``_AFFINE`` (plain arithmetic), as pointflirt reads
+    them."""
+    m = _mat(_AFFINE)
+    rows = [[float(v) for v in line.split()] for line in _POINTS.splitlines()]
+    mapped = [
+        [m[i][0] * p[0] + m[i][1] * p[1] + m[i][2] * p[2] + m[i][3] for i in range(3)] for p in rows
+    ]
+    a, b = ctx.dir / "in.txt", ctx.dir / "ref.txt"
+    a.write_text(_POINTS)
+    b.write_text("".join(" ".join(repr(float(v)) for v in r) + "\n" for r in mapped))
+    return str(a), str(b)
+
+
+def _fsldir(ctx: Context) -> str:
+    """A directory standing for ``$FSLDIR`` with pairreg's three schedules."""
+    d = ctx.dir / "fsl" / "etc" / "flirtsch"
+    d.mkdir(parents=True, exist_ok=True)
+    for k in (1, 2, 3):
+        (d / f"pairreg{k}.sch").write_text(_PAIRREG_SCHEDULE)
+    return os.fspath(ctx.dir / "fsl")
+
+
+@case("cli.fsl.midtrans", covers=("cli:fsl midtrans",))
+def _(ctx: Context) -> dict[str, Any]:
+    """``larmorx fsl midtrans`` (§15.5): three transforms about a template's centre of gravity,
+    verbose (every stage), written with ``-o`` and ``--separate``; a non-square matrix (FSL-78:
+    exit status 1 by default)."""
+    a, f, _ = _flirt_files(ctx)
+    b = ctx.dir / "b.mat"
+    b.write_text("1.1 0.01 0.03 0.5\n0.02 0.92 -0.05 1\n-0.01 0.04 1.03 2.5\n0 0 0 1\n")
+    r = ctx.dir / "r.mat"
+    r.write_text("1 0 0 1\n0 1 0 2\n0 0 1 3\n")
+    o, sep = ctx.out("mid.mat"), ctx.out("sep")
+    stdout = _fsl(ctx, "midtrans", "-v", f"--template={ctx.file('anat.nii')}", f"--separate={sep}", "-o", o, a, f, str(b))  # fmt: skip
+    return {
+        "stdout": stdout,
+        "mid": File(o),
+        "sep1": File(f"{sep}0001.mat"),
+        "sep3": File(f"{sep}0003.mat"),
+        **_status_outputs("square", _fsl_status(ctx, "midtrans", a, str(r))),
+    }
+
+
+@case("cli.fsl.pointflirt", covers=("cli:fsl pointflirt",))
+def _(ctx: Context) -> dict[str, Any]:
+    """``larmorx fsl pointflirt`` (§15.6): six point pairs, verbose; in voxels of two images
+    (``--vox``), written with ``-o``; different numbers of points (exit status 255)."""
+    i, r = _points(ctx)
+    o = ctx.out("aff.mat")
+    _fsl(ctx, "pointflirt", "-i", i, "-r", r, "--vox", f"--invol={ctx.file('anat.nii')}", f"--refvol={ctx.file('anat2.nii')}", "-o", o)  # fmt: skip
+    few = ctx.dir / "few.txt"
+    few.write_text("1 2 3\n4 5 6\n7 8 10\n2 3 4\n")
+    return {
+        "verbose": _fsl(ctx, "pointflirt", "-v", "-i", i, "-r", r),
+        "vox": File(o),
+        **_status_outputs("count", _fsl_status(ctx, "pointflirt", "-i", i, "-r", str(few))),
+    }
+
+
+@case("cli.fsl.applyxfm4D", covers=("cli:fsl applyxfm4D",))
+def _(ctx: Context) -> dict[str, Any]:
+    """``larmorx fsl applyxfm4D`` (§15.7): a 4D series onto another grid with a matrix per
+    volume (``MAT_0000n``, sinc), and one volume with ``-3D`` and the spline."""
+    mats = ctx.dir / "mats"
+    mats.mkdir(exist_ok=True)
+    for k, text in enumerate((_AFFINE, _REFLECTION, _AFFINE, _REFLECTION)):
+        (mats / f"MAT_0{k:04d}").write_text(text)
+    a, _, _ = _flirt_files(ctx)
+    o4, o3 = ctx.out("out4"), ctx.out("out3")
+    stdout = _fsl(ctx, "applyxfm4D", ctx.file("bold.nii"), ctx.file("anat.nii"), o4, str(mats))
+    _fsl(ctx, "applyxfm4D", ctx.file("anat2.nii"), ctx.file("anat.nii"), o3, a, "-3D", "-interp", "spline")  # fmt: skip
+    return {
+        "series": Nifti(f"{o4}.nii.gz"),
+        "names": stdout.replace(os.fspath(ctx.dir), "<dir>"),
+        "volume": Nifti(f"{o3}.nii.gz"),
+    }
+
+
+@case("cli.fsl.pairreg", covers=("cli:fsl pairreg",))
+def _(ctx: Context) -> dict[str, Any]:
+    """``larmorx fsl pairreg`` (§15.8): three FLIRT runs and one ``convert_xfm -fixscaleskew``
+    with the case's own schedules standing for FSL's; its usage."""
+    saved = os.environ.get("FSLDIR")
+    os.environ["FSLDIR"] = _fsldir(ctx)
+    try:
+        o = ctx.out("pair.mat")
+        b1, b2 = ctx.file("anat.nii"), ctx.file("anat2.nii")
+        _fsl(ctx, "pairreg", b1, b2, b1, b2, o, "-dof 6")
+    finally:
+        if saved is None:
+            os.environ.pop("FSLDIR", None)
+        else:
+            os.environ["FSLDIR"] = saved
+    return {"matrix": File(o), **_status_outputs("usage", _fsl_status(ctx, "pairreg", "a"))}
+
+
+@case("cli.fsl.extracttxt", covers=("cli:fsl extracttxt",))
+def _(ctx: Context) -> dict[str, Any]:
+    """``larmorx fsl extracttxt`` (§15.8): two lines from two after the first match of a regular
+    expression; signed words read by dc; a range starting before line 1 (sed's option error)."""
+    t = ctx.dir / "t.txt"
+    t.write_text("".join(f"line {k} value {k * 3}\n" for k in range(1, 13)))
+    return {
+        "lines": _fsl(ctx, "extracttxt", "^line.[5-6]", str(t), "2", "2"),
+        **_status_outputs("signed", _fsl_status(ctx, "extracttxt", "e.4", str(t), "-0", "+2")),
+        **_status_outputs("sed", _fsl_status(ctx, "extracttxt", "e.2", str(t), "3", "-4")),
+    }
+
+
+@case("cli.fsl.aff2rigid", covers=("cli:fsl aff2rigid",))
+def _(ctx: Context) -> dict[str, Any]:
+    """``larmorx fsl aff2rigid`` (§15.8): the rigid matrix of an affine one (FSL-81's
+    correction, by default); FSL 6.0.7.23's traceback with ``reproduce``."""
+    a, _, _ = _flirt_files(ctx)
+    o = ctx.out("rigid.mat")
+    _fsl(ctx, "aff2rigid", a, o)
+    return {
+        "matrix": File(o),
+        **_status_outputs(
+            "reproduce", _fsl_status(ctx, "aff2rigid", a, o + "2", upstream_defects=REPRODUCE)
+        ),
+    }
+
+
+@case("py.fsl.avscale", covers=("lx.fsl.avscale",))
+def _(ctx: Context) -> dict[str, Any]:
+    """``lx.fsl.avscale`` with the clean-room original: every parameter about a volume's centre."""
+    m = _mat(_AFFINE)
+    r = lx.fsl.avscale(m, anat(), all_params=True, implementation="original")
+    return {
+        "rt": r.rotation_translation,
+        "params": np.r_[r.rotations, r.translations, r.scales, r.skews],
+        "forward": r.forward_half,
+        "backward": r.backward_half,
+    }
+
+
+@case("py.fsl.img2imgcoord", covers=("lx.fsl.img2imgcoord",))
+def _(ctx: Context) -> dict[str, Any]:
+    """``lx.fsl.img2imgcoord`` with the clean-room original, in voxels."""
+    m = _mat(_AFFINE)
+    pts = [[10, 20, 30], [0, 0, 0], [-5.5, 3.25, 7]]
+    return {"coords": lx.fsl.img2imgcoord(pts, anat(), anat2(), xfm=m, implementation="original")}
+
+
+@case("py.fsl.std2imgcoord", covers=("lx.fsl.std2imgcoord",))
+def _(ctx: Context) -> dict[str, Any]:
+    """``lx.fsl.std2imgcoord`` with the clean-room original, in millimetres."""
+    m = _mat(_AFFINE)
+    pts = [[10, 20, 30], [0, 0, 0], [-5.5, 3.25, 7]]
+    return {"coords": lx.fsl.std2imgcoord(pts, anat(), anat2(), xfm=m, implementation="original")}
+
+
+@case("py.fsl.img2stdcoord", covers=("lx.fsl.img2stdcoord",))
+def _(ctx: Context) -> dict[str, Any]:
+    """``lx.fsl.img2stdcoord`` with the clean-room original, from millimetres."""
+    m = _mat(_AFFINE)
+    pts = [[10, 20, 30], [0, 0, 0], [-5.5, 3.25, 7]]
+    return {
+        "coords": lx.fsl.img2stdcoord(
+            pts, anat(), anat2(), xfm=m, mm=True, implementation="original"
+        )
+    }
+
+
+@case("py.fsl.rmsdiff", covers=("lx.fsl.rmsdiff",))
+def _(ctx: Context) -> dict[str, Any]:
+    """``lx.fsl.rmsdiff`` with the clean-room original: about a volume's centre, over a mask."""
+    a = _mat(_AFFINE)
+    b = _mat(_REFLECTION)
+    return {
+        "rms": lx.fsl.rmsdiff(a, b, anat(), implementation="original"),
+        "mask": np.array(lx.fsl.rmsdiff(a, b, anat(), mask(), implementation="original")),
+    }
+
+
+@case("py.fsl.makerot", covers=("lx.fsl.makerot",))
+def _(ctx: Context) -> dict[str, Any]:
+    """``lx.fsl.makerot`` with the clean-room original: about an axis through a centre (the axis
+    divided by its length, FSL-76's correction, named in a warning)."""
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore")
+        m = lx.fsl.makerot(30, axis=(1, 2, 3), centre=(4, 5, 6), implementation="original")
+    return {"matrix": m}
+
+
+@case("py.fsl.midtrans", covers=("lx.fsl.midtrans",))
+def _(ctx: Context) -> dict[str, Any]:
+    """``lx.fsl.midtrans`` with the clean-room original: two transforms about the MNI origin."""
+    m = lx.fsl.midtrans([_mat(_AFFINE), _mat(_REFLECTION)], implementation="original")
+    return {"matrix": m}
+
+
+@case("py.fsl.pointflirt", covers=("lx.fsl.pointflirt",))
+def _(ctx: Context) -> dict[str, Any]:
+    """``lx.fsl.pointflirt`` with the clean-room original: six point pairs in millimetres."""
+    i, r = _points(ctx)
+    return {"matrix": lx.fsl.pointflirt(i, r, implementation="original")}
+
+
+@case("py.fsl.applyxfm4d", covers=("lx.fsl.applyxfm4d",))
+def _(ctx: Context) -> dict[str, Any]:
+    """``lx.fsl.applyxfm4d`` with the clean-room original: a series through one matrix,
+    trilinear."""
+    a, _, _ = _flirt_files(ctx)
+    out = lx.fsl.applyxfm4d(ctx.file("bold.nii"), ctx.file("anat.nii"), ctx.out("o.nii.gz"), a, single_matrix=True, interp="trilinear", implementation="original")  # fmt: skip
+    return {"series": Nifti(out)}
+
+
+@case("py.fsl.pairreg", covers=("lx.fsl.pairreg",))
+def _(ctx: Context) -> dict[str, Any]:
+    """``lx.fsl.pairreg`` with the clean-room original and the case's own schedules."""
+    saved = os.environ.get("FSLDIR")
+    os.environ["FSLDIR"] = _fsldir(ctx)
+    try:
+        b1, b2 = ctx.file("anat.nii"), ctx.file("anat2.nii")
+        m = lx.fsl.pairreg(b1, b2, b1, b2, flirt_args=["-dof", "6"], implementation="original")
+    finally:
+        if saved is None:
+            os.environ.pop("FSLDIR", None)
+        else:
+            os.environ["FSLDIR"] = saved
+    return {"matrix": m}
+
+
+@case("py.fsl.extracttxt", covers=("lx.fsl.extracttxt",))
+def _(ctx: Context) -> dict[str, Any]:
+    """``lx.fsl.extracttxt`` with the clean-room original: three lines from the first match."""
+    t = ctx.dir / "t.txt"
+    t.write_text("".join(f"line {k} value {k * 3}\n" for k in range(1, 13)))
+    return {"lines": lx.fsl.extracttxt("e.4", t, 3, implementation="original")}
+
+
+@case("py.fsl.aff2rigid", covers=("lx.fsl.aff2rigid",))
+def _(ctx: Context) -> dict[str, Any]:
+    """``lx.fsl.aff2rigid`` with the clean-room original (FSL-81's correction, named in a
+    warning)."""
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore")
+        m = lx.fsl.aff2rigid(_mat(_AFFINE), implementation="original")
+    return {"matrix": m}
 
 
 @case("py.fsl.bet", covers=("lx.fsl.bet",))

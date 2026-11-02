@@ -2,7 +2,7 @@
  "environment": {
   "cpu": "AMD Ryzen 9 7945HX with Radeon Graphics",
   "larmorx": "0.0.1",
-  "larmorx_commit": "b244d758acba",
+  "larmorx_commit": "f22179aa9118",
   "larmorx_testdata_commit": "52124bc98f9f",
   "logical_cpus": 32,
   "os": "Linux-6.8.0-124-generic-x86_64-with-glibc2.35",
@@ -17,16 +17,16 @@
  "oracle_cache": {
   "differences": 0,
   "fresh": {
-   "ended by a signal, SIGABRT (never stored)": 1,
+   "ended by a signal, SIGABRT (never stored)": 13,
    "ended by a signal, SIGSEGV (never stored)": 1
   },
   "location": "<workspace>/oracles/cache",
   "mode": "use",
-  "ran": 2,
-  "saved_seconds": 915.2,
-  "served": 167
+  "ran": 14,
+  "saved_seconds": 689.9,
+  "served": 300
  },
- "reference": "flirt and convert_xfm from FSL 6.0.7.23 (fsl-flirt 2111.4), the conda build at `~/fsl-6.0.7.23`",
+ "reference": "flirt, convert_xfm and FLIRT's other programs from FSL 6.0.7.23 (fsl-flirt 2111.4), the conda build at `~/fsl-6.0.7.23`",
  "results": [
   {
    "case": "fmriprep/ds000228-sub-pixar008-noreconall/bold_task_pixar_wf",
@@ -37,15 +37,15 @@
    "measured": {
     "stderr: the same lines (numbers aside)": "yes",
     "stdout: the same lines (numbers aside)": "numbers differ",
-    "sub-pixar008_task-pixar_desc-coreg_boldref_flirt.mat: 95th-percentile displacement over the reference's brain": 0.0525,
-    "sub-pixar008_task-pixar_desc-coreg_boldref_flirt.nii.gz: correlation with FSL's image inside the reference's mask": 0.999261
+    "sub-pixar008_task-pixar_desc-coreg_boldref_flirt.mat: 95th-percentile displacement over the reference's brain": 0.006,
+    "sub-pixar008_task-pixar_desc-coreg_boldref_flirt.nii.gz: correlation with FSL's image inside the reference's mask": 0.999988
    },
    "reason": "",
    "reported": {
     "D13 fix pass": 0,
-    "fMRIPrep's own matrix (its container's FSL): displacement": 0.0525
+    "fMRIPrep's own matrix (its container's FSL): displacement": 0.006
    },
-   "seconds": 17.212,
+   "seconds": 10.783,
    "status": "pass"
   },
   {
@@ -57,15 +57,15 @@
    "measured": {
     "stderr: the same lines (numbers aside)": "yes",
     "stdout: the same lines (numbers aside)": "numbers differ",
-    "sub-280_ses-1_task-rest_desc-coreg_boldref_flirt.mat: 95th-percentile displacement over the reference's brain": 0.0107,
-    "sub-280_ses-1_task-rest_desc-coreg_boldref_flirt.nii.gz: correlation with FSL's image inside the reference's mask": 0.99996
+    "sub-280_ses-1_task-rest_desc-coreg_boldref_flirt.mat: 95th-percentile displacement over the reference's brain": 0.0011,
+    "sub-280_ses-1_task-rest_desc-coreg_boldref_flirt.nii.gz: correlation with FSL's image inside the reference's mask": 0.999994
    },
    "reason": "",
    "reported": {
     "D13 fix pass": 0,
-    "fMRIPrep's own matrix (its container's FSL): displacement": 0.0107
+    "fMRIPrep's own matrix (its container's FSL): displacement": 0.0011
    },
-   "seconds": 33.601,
+   "seconds": 20.505,
    "status": "pass"
   },
   {
@@ -77,71 +77,50 @@
    "measured": {
     "stderr: the same lines (numbers aside)": "yes",
     "stdout: the same lines (numbers aside)": "numbers differ",
-    "sub-002_task-clip_run-1_desc-coreg_boldref_flirt.mat: 95th-percentile displacement over the reference's brain": 0.0297,
-    "sub-002_task-clip_run-1_desc-coreg_boldref_flirt.nii.gz: correlation with FSL's image inside the reference's mask": 0.999922
+    "sub-002_task-clip_run-1_desc-coreg_boldref_flirt.mat: 95th-percentile displacement over the reference's brain": 0.0101,
+    "sub-002_task-clip_run-1_desc-coreg_boldref_flirt.nii.gz: correlation with FSL's image inside the reference's mask": 0.999978
    },
    "reason": "",
    "reported": {
     "D13 fix pass": 0,
-    "fMRIPrep's own matrix (its container's FSL): displacement": 0.0297
+    "fMRIPrep's own matrix (its container's FSL): displacement": 0.0101
    },
-   "seconds": 44.857,
+   "seconds": 26.302,
    "status": "pass"
   },
   {
    "case": "real/anglerep-quaternion",
    "category": "real",
    "checks_passed": 5,
-   "checks_total": 6,
-   "failed_checks": [
-    {
-     "detail": "line 5: FSL '<end>', original 'Parameters do not form a valid axis - greater than unity'",
-     "metric": "identical",
-     "name": "stderr: the same lines (numbers aside)",
-     "passed": false,
-     "threshold": "the same text, numbers read as numbers",
-     "value": "no"
-    }
-   ],
+   "checks_total": 5,
+   "failed_checks": [],
    "measured": {
-    "out.mat: 95th-percentile displacement over the reference's brain": 0.1474,
-    "stderr: the same lines (numbers aside)": "no",
+    "stderr: the same lines (numbers aside)": "yes",
     "stdout: the same lines (numbers aside)": "yes"
    },
    "reason": "",
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 5.693,
-   "status": "fail"
+   "seconds": 1.115,
+   "status": "pass"
   },
   {
    "case": "real/anglerep-quaternion-dof6",
    "category": "real",
    "checks_passed": 6,
-   "checks_total": 7,
-   "failed_checks": [
-    {
-     "detail": "line 10: FSL '<end>', original 'Parameters do not form a valid axis - greater than unity'",
-     "metric": "identical",
-     "name": "stderr: the same lines (numbers aside)",
-     "passed": false,
-     "threshold": "the same text, numbers read as numbers",
-     "value": "no"
-    }
-   ],
+   "checks_total": 6,
+   "failed_checks": [],
    "measured": {
-    "out.mat: 95th-percentile displacement over the reference's brain": 0.0944,
-    "out.nii.gz: correlation with FSL's image inside the reference's mask": 0.999507,
-    "stderr: the same lines (numbers aside)": "no",
+    "stderr: the same lines (numbers aside)": "yes",
     "stdout: the same lines (numbers aside)": "yes"
    },
    "reason": "",
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 4.619,
-   "status": "fail"
+   "seconds": 0.95,
+   "status": "pass"
   },
   {
    "case": "real/default",
@@ -150,8 +129,8 @@
    "checks_total": 7,
    "failed_checks": [],
    "measured": {
-    "out.mat: 95th-percentile displacement over the reference's brain": 0.0373,
-    "out.nii.gz: correlation with FSL's image inside the reference's mask": 0.999584,
+    "out.mat: 95th-percentile displacement over the reference's brain": 0.0331,
+    "out.nii.gz: correlation with FSL's image inside the reference's mask": 0.999959,
     "stderr: the same lines (numbers aside)": "yes",
     "stdout: the same lines (numbers aside)": "yes"
    },
@@ -159,7 +138,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 7.351,
+   "seconds": 1.565,
    "status": "pass"
   },
   {
@@ -169,7 +148,7 @@
    "checks_total": 6,
    "failed_checks": [],
    "measured": {
-    "out.mat: 95th-percentile displacement over the reference's brain": 0.0266,
+    "out.mat: 95th-percentile displacement over the reference's brain": 0.0123,
     "stderr: the same lines (numbers aside)": "yes",
     "stdout: the same lines (numbers aside)": "yes"
    },
@@ -177,596 +156,11 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 8.302,
+   "seconds": 1.945,
    "status": "pass"
   },
   {
    "case": "real/dof6",
-   "category": "real",
-   "checks_passed": 5,
-   "checks_total": 6,
-   "failed_checks": [
-    {
-     "detail": "maximum 0.2151 mm, RMS deviation 0.4625 mm; FSL's own p95 on a perturbed input 0.1553 mm",
-     "metric": "p95 displacement (mm)",
-     "name": "out.mat: 95th-percentile displacement over the reference's brain",
-     "passed": false,
-     "threshold": "0.1 or FSL's own variability",
-     "value": 0.1789
-    }
-   ],
-   "measured": {
-    "out.mat: 95th-percentile displacement over the reference's brain": 0.1789,
-    "stderr: the same lines (numbers aside)": "yes",
-    "stdout: the same lines (numbers aside)": "yes"
-   },
-   "reason": "",
-   "reported": {
-    "D13 fix pass": 0
-   },
-   "seconds": 4.103,
-   "status": "fail"
-  },
-  {
-   "case": "real/dof7",
-   "category": "real",
-   "checks_passed": 6,
-   "checks_total": 6,
-   "failed_checks": [],
-   "measured": {
-    "out.mat: 95th-percentile displacement over the reference's brain": 0.0009,
-    "stderr: the same lines (numbers aside)": "yes",
-    "stdout: the same lines (numbers aside)": "yes"
-   },
-   "reason": "",
-   "reported": {
-    "D13 fix pass": 0
-   },
-   "seconds": 6.797,
-   "status": "pass"
-  },
-  {
-   "case": "real/dof9",
-   "category": "real",
-   "checks_passed": 6,
-   "checks_total": 6,
-   "failed_checks": [],
-   "measured": {
-    "out.mat: 95th-percentile displacement over the reference's brain": 0.0441,
-    "stderr: the same lines (numbers aside)": "yes",
-    "stdout: the same lines (numbers aside)": "yes"
-   },
-   "reason": "",
-   "reported": {
-    "D13 fix pass": 0
-   },
-   "seconds": 5.922,
-   "status": "pass"
-  },
-  {
-   "case": "real/cost-mutualinfo",
-   "category": "real",
-   "checks_passed": 6,
-   "checks_total": 6,
-   "failed_checks": [],
-   "measured": {
-    "out.mat: 95th-percentile displacement over the reference's brain": 0.5977,
-    "stderr: the same lines (numbers aside)": "yes",
-    "stdout: the same lines (numbers aside)": "yes"
-   },
-   "reason": "",
-   "reported": {
-    "D13 fix pass": 0
-   },
-   "seconds": 9.475,
-   "status": "pass"
-  },
-  {
-   "case": "real/cost-normmi",
-   "category": "real",
-   "checks_passed": 5,
-   "checks_total": 6,
-   "failed_checks": [
-    {
-     "detail": "maximum 1.7684 mm, RMS deviation 3.2780 mm; FSL's own p95 on a perturbed input 1.2445 mm",
-     "metric": "p95 displacement (mm)",
-     "name": "out.mat: 95th-percentile displacement over the reference's brain",
-     "passed": false,
-     "threshold": "0.5 or FSL's own variability",
-     "value": 1.4169
-    }
-   ],
-   "measured": {
-    "out.mat: 95th-percentile displacement over the reference's brain": 1.4169,
-    "stderr: the same lines (numbers aside)": "yes",
-    "stdout: the same lines (numbers aside)": "yes"
-   },
-   "reason": "",
-   "reported": {
-    "D13 fix pass": 0
-   },
-   "seconds": 10.801,
-   "status": "fail"
-  },
-  {
-   "case": "real/cost-normcorr",
-   "category": "real",
-   "checks_passed": 6,
-   "checks_total": 6,
-   "failed_checks": [],
-   "measured": {
-    "out.mat: 95th-percentile displacement over the reference's brain": 0.012,
-    "stderr: the same lines (numbers aside)": "yes",
-    "stdout: the same lines (numbers aside)": "yes"
-   },
-   "reason": "",
-   "reported": {
-    "D13 fix pass": 0
-   },
-   "seconds": 5.535,
-   "status": "pass"
-  },
-  {
-   "case": "real/cost-leastsq",
-   "category": "real",
-   "checks_passed": 6,
-   "checks_total": 6,
-   "failed_checks": [],
-   "measured": {
-    "out.mat: 95th-percentile displacement over the reference's brain": 17.6916,
-    "stderr: the same lines (numbers aside)": "yes",
-    "stdout: the same lines (numbers aside)": "yes"
-   },
-   "reason": "",
-   "reported": {
-    "D13 fix pass": 0
-   },
-   "seconds": 6.942,
-   "status": "pass"
-  },
-  {
-   "case": "real/cost-woods",
-   "category": "real",
-   "checks_passed": 5,
-   "checks_total": 6,
-   "failed_checks": [
-    {
-     "detail": "maximum 54.9439 mm, RMS deviation 278.8845 mm; FSL's own p95 on a perturbed input 44.1365 mm",
-     "metric": "p95 displacement (mm)",
-     "name": "out.mat: 95th-percentile displacement over the reference's brain",
-     "passed": false,
-     "threshold": "0.5 or FSL's own variability",
-     "value": 50.4909
-    }
-   ],
-   "measured": {
-    "out.mat: 95th-percentile displacement over the reference's brain": 50.4909,
-    "stderr: the same lines (numbers aside)": "yes",
-    "stdout: the same lines (numbers aside)": "yes"
-   },
-   "reason": "",
-   "reported": {
-    "D13 fix pass": 0
-   },
-   "seconds": 12.174,
-   "status": "fail"
-  },
-  {
-   "case": "real/cost-labeldiff",
-   "category": "real",
-   "checks_passed": 5,
-   "checks_total": 6,
-   "failed_checks": [
-    {
-     "detail": "maximum 75.8375 mm, RMS deviation 96.9277 mm; FSL's own p95 on a perturbed input 54.5916 mm",
-     "metric": "p95 displacement (mm)",
-     "name": "out.mat: 95th-percentile displacement over the reference's brain",
-     "passed": false,
-     "threshold": "0.5 or FSL's own variability",
-     "value": 66.0454
-    }
-   ],
-   "measured": {
-    "out.mat: 95th-percentile displacement over the reference's brain": 66.0454,
-    "stderr: the same lines (numbers aside)": "yes",
-    "stdout: the same lines (numbers aside)": "yes"
-   },
-   "reason": "",
-   "reported": {
-    "D13 fix pass": 0
-   },
-   "seconds": 8.098,
-   "status": "fail"
-  },
-  {
-   "case": "real/searchcost-normmi",
-   "category": "real",
-   "checks_passed": 6,
-   "checks_total": 6,
-   "failed_checks": [],
-   "measured": {
-    "out.mat: 95th-percentile displacement over the reference's brain": 0.2312,
-    "stderr: the same lines (numbers aside)": "yes",
-    "stdout: the same lines (numbers aside)": "yes"
-   },
-   "reason": "",
-   "reported": {
-    "D13 fix pass": 0
-   },
-   "seconds": 6.095,
-   "status": "pass"
-  },
-  {
-   "case": "real/nosearch",
-   "category": "real",
-   "checks_passed": 6,
-   "checks_total": 6,
-   "failed_checks": [],
-   "measured": {
-    "out.mat: 95th-percentile displacement over the reference's brain": 0.0931,
-    "stderr: the same lines (numbers aside)": "yes",
-    "stdout: the same lines (numbers aside)": "yes"
-   },
-   "reason": "",
-   "reported": {
-    "D13 fix pass": 0
-   },
-   "seconds": 4.691,
-   "status": "pass"
-  },
-  {
-   "case": "real/searchr",
-   "category": "real",
-   "checks_passed": 6,
-   "checks_total": 6,
-   "failed_checks": [],
-   "measured": {
-    "out.mat: 95th-percentile displacement over the reference's brain": 0.0474,
-    "stderr: the same lines (numbers aside)": "yes",
-    "stdout: the same lines (numbers aside)": "yes"
-   },
-   "reason": "",
-   "reported": {
-    "D13 fix pass": 0
-   },
-   "seconds": 3.671,
-   "status": "pass"
-  },
-  {
-   "case": "real/coarse-fine",
-   "category": "real",
-   "checks_passed": 5,
-   "checks_total": 6,
-   "failed_checks": [
-    {
-     "detail": "maximum 0.1971 mm, RMS deviation 0.4197 mm; FSL's own p95 on a perturbed input 0.1553 mm",
-     "metric": "p95 displacement (mm)",
-     "name": "out.mat: 95th-percentile displacement over the reference's brain",
-     "passed": false,
-     "threshold": "0.1 or FSL's own variability",
-     "value": 0.1618
-    }
-   ],
-   "measured": {
-    "out.mat: 95th-percentile displacement over the reference's brain": 0.1618,
-    "stderr: the same lines (numbers aside)": "yes",
-    "stdout: the same lines (numbers aside)": "yes"
-   },
-   "reason": "",
-   "reported": {
-    "D13 fix pass": 0
-   },
-   "seconds": 4.101,
-   "status": "fail"
-  },
-  {
-   "case": "real/init",
-   "category": "real",
-   "checks_passed": 6,
-   "checks_total": 6,
-   "failed_checks": [],
-   "measured": {
-    "out.mat: 95th-percentile displacement over the reference's brain": 0.3193,
-    "stderr: the same lines (numbers aside)": "yes",
-    "stdout: the same lines (numbers aside)": "yes"
-   },
-   "reason": "",
-   "reported": {
-    "D13 fix pass": 0
-   },
-   "seconds": 8.128,
-   "status": "pass"
-  },
-  {
-   "case": "real/usesqform",
-   "category": "real",
-   "checks_passed": 6,
-   "checks_total": 6,
-   "failed_checks": [],
-   "measured": {
-    "out.mat: 95th-percentile displacement over the reference's brain": 0.0016,
-    "stderr: the same lines (numbers aside)": "yes",
-    "stdout: the same lines (numbers aside)": "yes"
-   },
-   "reason": "",
-   "reported": {
-    "D13 fix pass": 0
-   },
-   "seconds": 7.353,
-   "status": "pass"
-  },
-  {
-   "case": "real/bins64",
-   "category": "real",
-   "checks_passed": 6,
-   "checks_total": 6,
-   "failed_checks": [],
-   "measured": {
-    "out.mat: 95th-percentile displacement over the reference's brain": 0.1141,
-    "stderr: the same lines (numbers aside)": "yes",
-    "stdout: the same lines (numbers aside)": "yes"
-   },
-   "reason": "",
-   "reported": {
-    "D13 fix pass": 0
-   },
-   "seconds": 6.01,
-   "status": "pass"
-  },
-  {
-   "case": "real/noresample",
-   "category": "real",
-   "checks_passed": 6,
-   "checks_total": 6,
-   "failed_checks": [],
-   "measured": {
-    "out.mat: 95th-percentile displacement over the reference's brain": 0.0673,
-    "stderr: the same lines (numbers aside)": "yes",
-    "stdout: the same lines (numbers aside)": "yes"
-   },
-   "reason": "",
-   "reported": {
-    "D13 fix pass": 0
-   },
-   "seconds": 78.329,
-   "status": "pass"
-  },
-  {
-   "case": "real/noclamp",
-   "category": "real",
-   "checks_passed": 6,
-   "checks_total": 6,
-   "failed_checks": [],
-   "measured": {
-    "out.mat: 95th-percentile displacement over the reference's brain": 0.016,
-    "stderr: the same lines (numbers aside)": "yes",
-    "stdout: the same lines (numbers aside)": "yes"
-   },
-   "reason": "",
-   "reported": {
-    "D13 fix pass": 0
-   },
-   "seconds": 7.084,
-   "status": "pass"
-  },
-  {
-   "case": "real/minsampling",
-   "category": "real",
-   "checks_passed": 6,
-   "checks_total": 6,
-   "failed_checks": [],
-   "measured": {
-    "out.mat: 95th-percentile displacement over the reference's brain": 0.0143,
-    "stderr: the same lines (numbers aside)": "yes",
-    "stdout: the same lines (numbers aside)": "yes"
-   },
-   "reason": "",
-   "reported": {
-    "D13 fix pass": 0
-   },
-   "seconds": 18.821,
-   "status": "pass"
-  },
-  {
-   "case": "real/forcescaling",
-   "category": "real",
-   "checks_passed": 6,
-   "checks_total": 6,
-   "failed_checks": [],
-   "measured": {
-    "out.mat: 95th-percentile displacement over the reference's brain": 0.0957,
-    "stderr: the same lines (numbers aside)": "yes",
-    "stdout: the same lines (numbers aside)": "yes"
-   },
-   "reason": "",
-   "reported": {
-    "D13 fix pass": 0
-   },
-   "seconds": 19.689,
-   "status": "pass"
-  },
-  {
-   "case": "real/weights",
-   "category": "real",
-   "checks_passed": 5,
-   "checks_total": 6,
-   "failed_checks": [
-    {
-     "detail": "maximum 329.5561 mm, RMS deviation 281.4465 mm; FSL's own p95 on a perturbed input 17.6579 mm",
-     "metric": "p95 displacement (mm)",
-     "name": "out.mat: 95th-percentile displacement over the reference's brain",
-     "passed": false,
-     "threshold": "0.5 or FSL's own variability",
-     "value": 295.9329
-    }
-   ],
-   "measured": {
-    "out.mat: 95th-percentile displacement over the reference's brain": 295.9329,
-    "stderr: the same lines (numbers aside)": "yes",
-    "stdout: the same lines (numbers aside)": "yes"
-   },
-   "reason": "",
-   "reported": {
-    "D13 fix pass": 0
-   },
-   "seconds": 13.824,
-   "status": "fail"
-  },
-  {
-   "case": "real/weights-normcorr",
-   "category": "real",
-   "checks_passed": 6,
-   "checks_total": 6,
-   "failed_checks": [],
-   "measured": {
-    "out.mat: 95th-percentile displacement over the reference's brain": 0.1847,
-    "stderr: the same lines (numbers aside)": "yes",
-    "stdout: the same lines (numbers aside)": "yes"
-   },
-   "reason": "",
-   "reported": {
-    "D13 fix pass": 0
-   },
-   "seconds": 9.278,
-   "status": "pass"
-  },
-  {
-   "case": "real/weights-leastsq",
-   "category": "real",
-   "checks_passed": 5,
-   "checks_total": 6,
-   "failed_checks": [
-    {
-     "detail": "maximum 0.2756 mm, RMS deviation 0.2089 mm; FSL's own p95 on a perturbed input 0.2067 mm",
-     "metric": "p95 displacement (mm)",
-     "name": "out.mat: 95th-percentile displacement over the reference's brain",
-     "passed": false,
-     "threshold": "0.1 or FSL's own variability",
-     "value": 0.2406
-    }
-   ],
-   "measured": {
-    "out.mat: 95th-percentile displacement over the reference's brain": 0.2406,
-    "stderr: the same lines (numbers aside)": "yes",
-    "stdout: the same lines (numbers aside)": "yes"
-   },
-   "reason": "",
-   "reported": {
-    "D13 fix pass": 0
-   },
-   "seconds": 7.328,
-   "status": "fail"
-  },
-  {
-   "case": "real/weights-normmi",
-   "category": "real",
-   "checks_passed": 5,
-   "checks_total": 6,
-   "failed_checks": [
-    {
-     "detail": "maximum 154.6531 mm, RMS deviation 101.4895 mm; FSL's own p95 on a perturbed input 10.0584 mm",
-     "metric": "p95 displacement (mm)",
-     "name": "out.mat: 95th-percentile displacement over the reference's brain",
-     "passed": false,
-     "threshold": "0.1 or FSL's own variability",
-     "value": 131.5883
-    }
-   ],
-   "measured": {
-    "out.mat: 95th-percentile displacement over the reference's brain": 131.5883,
-    "stderr: the same lines (numbers aside)": "yes",
-    "stdout: the same lines (numbers aside)": "yes"
-   },
-   "reason": "",
-   "reported": {
-    "D13 fix pass": 0
-   },
-   "seconds": 8.347,
-   "status": "fail"
-  },
-  {
-   "case": "real/weights-mutualinfo",
-   "category": "real",
-   "checks_passed": 5,
-   "checks_total": 6,
-   "failed_checks": [
-    {
-     "detail": "maximum 131.1597 mm, RMS deviation 183.6401 mm; FSL's own p95 on a perturbed input 30.8362 mm",
-     "metric": "p95 displacement (mm)",
-     "name": "out.mat: 95th-percentile displacement over the reference's brain",
-     "passed": false,
-     "threshold": "0.1 or FSL's own variability",
-     "value": 108.893
-    }
-   ],
-   "measured": {
-    "out.mat: 95th-percentile displacement over the reference's brain": 108.893,
-    "stderr: the same lines (numbers aside)": "yes",
-    "stdout: the same lines (numbers aside)": "yes"
-   },
-   "reason": "",
-   "reported": {
-    "D13 fix pass": 0
-   },
-   "seconds": 7.72,
-   "status": "fail"
-  },
-  {
-   "case": "real/weights-woods",
-   "category": "real",
-   "checks_passed": 4,
-   "checks_total": 6,
-   "failed_checks": [
-    {
-     "detail": "line 3938: FSL 'WARNING: Woods is not implemented with cost function weighting', original '<end>'",
-     "metric": "identical",
-     "name": "stderr: the same lines (numbers aside)",
-     "passed": false,
-     "threshold": "the same text, numbers read as numbers",
-     "value": "no"
-    },
-    {
-     "detail": "maximum 65.6105 mm, RMS deviation 82.2202 mm; FSL's own p95 on a perturbed input 43.5171 mm",
-     "metric": "p95 displacement (mm)",
-     "name": "out.mat: 95th-percentile displacement over the reference's brain",
-     "passed": false,
-     "threshold": "0.1 or FSL's own variability",
-     "value": 59.7626
-    }
-   ],
-   "measured": {
-    "out.mat: 95th-percentile displacement over the reference's brain": 59.7626,
-    "stderr: the same lines (numbers aside)": "no",
-    "stdout: the same lines (numbers aside)": "yes"
-   },
-   "reason": "",
-   "reported": {
-    "D13 fix pass": 0
-   },
-   "seconds": 4.777,
-   "status": "fail"
-  },
-  {
-   "case": "real/labeldiff-dseg",
-   "category": "real",
-   "checks_passed": 7,
-   "checks_total": 7,
-   "failed_checks": [],
-   "measured": {
-    "out.mat: 95th-percentile displacement over the reference's brain": 0.0526,
-    "out.nii.gz: correlation with FSL's image inside the reference's mask": 1.0,
-    "stderr: the same lines (numbers aside)": "yes",
-    "stdout: the same lines (numbers aside)": "yes"
-   },
-   "reason": "",
-   "reported": {
-    "D13 fix pass": 0
-   },
-   "seconds": 25.412,
-   "status": "pass"
-  },
-  {
-   "case": "real/known-motion",
    "category": "real",
    "checks_passed": 6,
    "checks_total": 6,
@@ -780,7 +174,609 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 22.997,
+   "seconds": 0.741,
+   "status": "pass"
+  },
+  {
+   "case": "real/dof7",
+   "category": "real",
+   "checks_passed": 6,
+   "checks_total": 6,
+   "failed_checks": [],
+   "measured": {
+    "out.mat: 95th-percentile displacement over the reference's brain": 0.0006,
+    "stderr: the same lines (numbers aside)": "yes",
+    "stdout: the same lines (numbers aside)": "yes"
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 1.144,
+   "status": "pass"
+  },
+  {
+   "case": "real/dof9",
+   "category": "real",
+   "checks_passed": 6,
+   "checks_total": 6,
+   "failed_checks": [],
+   "measured": {
+    "out.mat: 95th-percentile displacement over the reference's brain": 0.0443,
+    "stderr: the same lines (numbers aside)": "yes",
+    "stdout: the same lines (numbers aside)": "yes"
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 1.058,
+   "status": "pass"
+  },
+  {
+   "case": "real/cost-mutualinfo",
+   "category": "real",
+   "checks_passed": 6,
+   "checks_total": 6,
+   "failed_checks": [],
+   "measured": {
+    "out.mat: 95th-percentile displacement over the reference's brain": 0.6247,
+    "stderr: the same lines (numbers aside)": "yes",
+    "stdout: the same lines (numbers aside)": "yes"
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 2.435,
+   "status": "pass"
+  },
+  {
+   "case": "real/cost-normmi",
+   "category": "real",
+   "checks_passed": 5,
+   "checks_total": 6,
+   "failed_checks": [
+    {
+     "detail": "maximum 1.9198 mm, RMS deviation 3.8287 mm; FSL's own p95 on a perturbed input 1.2445 mm",
+     "metric": "p95 displacement (mm)",
+     "name": "out.mat: 95th-percentile displacement over the reference's brain",
+     "passed": false,
+     "threshold": "0.5 or FSL's own variability",
+     "value": 1.5996
+    }
+   ],
+   "measured": {
+    "out.mat: 95th-percentile displacement over the reference's brain": 1.5996,
+    "stderr: the same lines (numbers aside)": "yes",
+    "stdout: the same lines (numbers aside)": "yes"
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 2.541,
+   "status": "fail"
+  },
+  {
+   "case": "real/cost-normcorr",
+   "category": "real",
+   "checks_passed": 6,
+   "checks_total": 6,
+   "failed_checks": [],
+   "measured": {
+    "out.mat: 95th-percentile displacement over the reference's brain": 0.0126,
+    "stderr: the same lines (numbers aside)": "yes",
+    "stdout: the same lines (numbers aside)": "yes"
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 1.094,
+   "status": "pass"
+  },
+  {
+   "case": "real/cost-leastsq",
+   "category": "real",
+   "checks_passed": 5,
+   "checks_total": 6,
+   "failed_checks": [
+    {
+     "detail": "maximum 95.6303 mm, RMS deviation 93.6118 mm; FSL's own p95 on a perturbed input 46.7560 mm",
+     "metric": "p95 displacement (mm)",
+     "name": "out.mat: 95th-percentile displacement over the reference's brain",
+     "passed": false,
+     "threshold": "0.5 or FSL's own variability",
+     "value": 81.8069
+    }
+   ],
+   "measured": {
+    "out.mat: 95th-percentile displacement over the reference's brain": 81.8069,
+    "stderr: the same lines (numbers aside)": "yes",
+    "stdout: the same lines (numbers aside)": "yes"
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 0.981,
+   "status": "fail"
+  },
+  {
+   "case": "real/cost-woods",
+   "category": "real",
+   "checks_passed": 6,
+   "checks_total": 6,
+   "failed_checks": [],
+   "measured": {
+    "out.mat: 95th-percentile displacement over the reference's brain": 8.7229,
+    "stderr: the same lines (numbers aside)": "yes",
+    "stdout: the same lines (numbers aside)": "yes"
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 2.536,
+   "status": "pass"
+  },
+  {
+   "case": "real/cost-labeldiff",
+   "category": "real",
+   "checks_passed": 6,
+   "checks_total": 6,
+   "failed_checks": [],
+   "measured": {
+    "out.mat: 95th-percentile displacement over the reference's brain": 1.226,
+    "stderr: the same lines (numbers aside)": "yes",
+    "stdout: the same lines (numbers aside)": "yes"
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 1.252,
+   "status": "pass"
+  },
+  {
+   "case": "real/searchcost-normmi",
+   "category": "real",
+   "checks_passed": 6,
+   "checks_total": 6,
+   "failed_checks": [],
+   "measured": {
+    "out.mat: 95th-percentile displacement over the reference's brain": 0.1178,
+    "stderr: the same lines (numbers aside)": "yes",
+    "stdout: the same lines (numbers aside)": "yes"
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 1.255,
+   "status": "pass"
+  },
+  {
+   "case": "real/nosearch",
+   "category": "real",
+   "checks_passed": 6,
+   "checks_total": 6,
+   "failed_checks": [],
+   "measured": {
+    "out.mat: 95th-percentile displacement over the reference's brain": 0.0212,
+    "stderr: the same lines (numbers aside)": "yes",
+    "stdout: the same lines (numbers aside)": "yes"
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 0.87,
+   "status": "pass"
+  },
+  {
+   "case": "real/searchr",
+   "category": "real",
+   "checks_passed": 6,
+   "checks_total": 6,
+   "failed_checks": [],
+   "measured": {
+    "out.mat: 95th-percentile displacement over the reference's brain": 0.033,
+    "stderr: the same lines (numbers aside)": "yes",
+    "stdout: the same lines (numbers aside)": "yes"
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 0.852,
+   "status": "pass"
+  },
+  {
+   "case": "real/coarse-fine",
+   "category": "real",
+   "checks_passed": 6,
+   "checks_total": 6,
+   "failed_checks": [],
+   "measured": {
+    "out.mat: 95th-percentile displacement over the reference's brain": 0.0004,
+    "stderr: the same lines (numbers aside)": "yes",
+    "stdout: the same lines (numbers aside)": "yes"
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 1.343,
+   "status": "pass"
+  },
+  {
+   "case": "real/init",
+   "category": "real",
+   "checks_passed": 6,
+   "checks_total": 6,
+   "failed_checks": [],
+   "measured": {
+    "out.mat: 95th-percentile displacement over the reference's brain": 0.0303,
+    "stderr: the same lines (numbers aside)": "yes",
+    "stdout: the same lines (numbers aside)": "yes"
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 1.368,
+   "status": "pass"
+  },
+  {
+   "case": "real/usesqform",
+   "category": "real",
+   "checks_passed": 6,
+   "checks_total": 6,
+   "failed_checks": [],
+   "measured": {
+    "out.mat: 95th-percentile displacement over the reference's brain": 0.001,
+    "stderr: the same lines (numbers aside)": "yes",
+    "stdout: the same lines (numbers aside)": "yes"
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 1.408,
+   "status": "pass"
+  },
+  {
+   "case": "real/bins64",
+   "category": "real",
+   "checks_passed": 6,
+   "checks_total": 6,
+   "failed_checks": [],
+   "measured": {
+    "out.mat: 95th-percentile displacement over the reference's brain": 0.0601,
+    "stderr: the same lines (numbers aside)": "yes",
+    "stdout: the same lines (numbers aside)": "yes"
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 1.159,
+   "status": "pass"
+  },
+  {
+   "case": "real/noresample",
+   "category": "real",
+   "checks_passed": 6,
+   "checks_total": 6,
+   "failed_checks": [],
+   "measured": {
+    "out.mat: 95th-percentile displacement over the reference's brain": 0.0018,
+    "stderr: the same lines (numbers aside)": "yes",
+    "stdout: the same lines (numbers aside)": "yes"
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 43.6,
+   "status": "pass"
+  },
+  {
+   "case": "real/noclamp",
+   "category": "real",
+   "checks_passed": 6,
+   "checks_total": 6,
+   "failed_checks": [],
+   "measured": {
+    "out.mat: 95th-percentile displacement over the reference's brain": 0.1669,
+    "stderr: the same lines (numbers aside)": "yes",
+    "stdout: the same lines (numbers aside)": "yes"
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 1.265,
+   "status": "pass"
+  },
+  {
+   "case": "real/minsampling",
+   "category": "real",
+   "checks_passed": 6,
+   "checks_total": 6,
+   "failed_checks": [],
+   "measured": {
+    "out.mat: 95th-percentile displacement over the reference's brain": 0.0297,
+    "stderr: the same lines (numbers aside)": "yes",
+    "stdout: the same lines (numbers aside)": "yes"
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 3.0,
+   "status": "pass"
+  },
+  {
+   "case": "real/forcescaling",
+   "category": "real",
+   "checks_passed": 5,
+   "checks_total": 5,
+   "failed_checks": [],
+   "measured": {
+    "stderr: the same lines (numbers aside)": "yes",
+    "stdout: the same lines (numbers aside)": "yes"
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 7.301,
+   "status": "pass"
+  },
+  {
+   "case": "real/weights",
+   "category": "real",
+   "checks_passed": 6,
+   "checks_total": 6,
+   "failed_checks": [],
+   "measured": {
+    "out.mat: 95th-percentile displacement over the reference's brain": 0.21,
+    "stderr: the same lines (numbers aside)": "yes",
+    "stdout: the same lines (numbers aside)": "yes"
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 2.878,
+   "status": "pass"
+  },
+  {
+   "case": "real/weights-normcorr",
+   "category": "real",
+   "checks_passed": 5,
+   "checks_total": 6,
+   "failed_checks": [
+    {
+     "detail": "maximum 0.7099 mm, RMS deviation 1.2748 mm; FSL's own p95 on a perturbed input 0.1879 mm",
+     "metric": "p95 displacement (mm)",
+     "name": "out.mat: 95th-percentile displacement over the reference's brain",
+     "passed": false,
+     "threshold": "0.1 or FSL's own variability",
+     "value": 0.5785
+    }
+   ],
+   "measured": {
+    "out.mat: 95th-percentile displacement over the reference's brain": 0.5785,
+    "stderr: the same lines (numbers aside)": "yes",
+    "stdout: the same lines (numbers aside)": "yes"
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 1.798,
+   "status": "fail"
+  },
+  {
+   "case": "real/weights-leastsq",
+   "category": "real",
+   "checks_passed": 6,
+   "checks_total": 6,
+   "failed_checks": [],
+   "measured": {
+    "out.mat: 95th-percentile displacement over the reference's brain": 0.1458,
+    "stderr: the same lines (numbers aside)": "yes",
+    "stdout: the same lines (numbers aside)": "yes"
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 1.465,
+   "status": "pass"
+  },
+  {
+   "case": "real/weights-normmi",
+   "category": "real",
+   "checks_passed": 5,
+   "checks_total": 6,
+   "failed_checks": [
+    {
+     "detail": "maximum 12.1231 mm, RMS deviation 14.0621 mm; FSL's own p95 on a perturbed input 10.0584 mm",
+     "metric": "p95 displacement (mm)",
+     "name": "out.mat: 95th-percentile displacement over the reference's brain",
+     "passed": false,
+     "threshold": "0.1 or FSL's own variability",
+     "value": 10.151
+    }
+   ],
+   "measured": {
+    "out.mat: 95th-percentile displacement over the reference's brain": 10.151,
+    "stderr: the same lines (numbers aside)": "yes",
+    "stdout: the same lines (numbers aside)": "yes"
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 2.2,
+   "status": "fail"
+  },
+  {
+   "case": "real/weights-mutualinfo",
+   "category": "real",
+   "checks_passed": 6,
+   "checks_total": 6,
+   "failed_checks": [],
+   "measured": {
+    "out.mat: 95th-percentile displacement over the reference's brain": 0.0019,
+    "stderr: the same lines (numbers aside)": "yes",
+    "stdout: the same lines (numbers aside)": "yes"
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 2.215,
+   "status": "pass"
+  },
+  {
+   "case": "real/weights-woods",
+   "category": "real",
+   "checks_passed": 5,
+   "checks_total": 6,
+   "failed_checks": [
+    {
+     "detail": "line 4004: FSL '<end>', original 'WARNING: Woods is not implemented with cost function weighting'",
+     "metric": "identical",
+     "name": "stderr: the same lines (numbers aside)",
+     "passed": false,
+     "threshold": "the same text, numbers read as numbers",
+     "value": "no"
+    }
+   ],
+   "measured": {
+    "out.mat: 95th-percentile displacement over the reference's brain": 2.7803,
+    "stderr: the same lines (numbers aside)": "no",
+    "stdout: the same lines (numbers aside)": "yes"
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 1.477,
+   "status": "fail"
+  },
+  {
+   "case": "real/weights-empty-refweight",
+   "category": "real",
+   "checks_passed": 5,
+   "checks_total": 6,
+   "failed_checks": [
+    {
+     "detail": "maximum 371.6170 mm, RMS deviation 83.9047 mm; FSL's own p95 on a perturbed input 0.0001 mm",
+     "metric": "p95 displacement (mm)",
+     "name": "out.mat: 95th-percentile displacement over the reference's brain",
+     "passed": false,
+     "threshold": 0.5,
+     "value": 330.6537
+    }
+   ],
+   "measured": {
+    "out.mat: 95th-percentile displacement over the reference's brain": 330.6537,
+    "stderr: the same lines (numbers aside)": "yes",
+    "stdout: the same lines (numbers aside)": "yes"
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 1.513,
+   "status": "fail"
+  },
+  {
+   "case": "real/weights-empty-inweight",
+   "category": "real",
+   "checks_passed": 5,
+   "checks_total": 6,
+   "failed_checks": [
+    {
+     "detail": "maximum 172.9050 mm, RMS deviation 113.3139 mm; FSL's own p95 on a perturbed input 0.0000 mm",
+     "metric": "p95 displacement (mm)",
+     "name": "out.mat: 95th-percentile displacement over the reference's brain",
+     "passed": false,
+     "threshold": 0.5,
+     "value": 133.6991
+    }
+   ],
+   "measured": {
+    "out.mat: 95th-percentile displacement over the reference's brain": 133.6991,
+    "stderr: the same lines (numbers aside)": "yes",
+    "stdout: the same lines (numbers aside)": "yes"
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 1.786,
+   "status": "fail"
+  },
+  {
+   "case": "real/applyxfm-nan-border",
+   "category": "real",
+   "checks_passed": 6,
+   "checks_total": 6,
+   "failed_checks": [],
+   "measured": {
+    "stderr: the same lines (numbers aside)": "yes",
+    "stdout: the same lines (numbers aside)": "yes"
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 1149794
+   },
+   "seconds": 0.353,
+   "status": "pass"
+  },
+  {
+   "case": "real/labeldiff-dseg",
+   "category": "real",
+   "checks_passed": 7,
+   "checks_total": 7,
+   "failed_checks": [],
+   "measured": {
+    "out.mat: 95th-percentile displacement over the reference's brain": 0.0,
+    "out.nii.gz: correlation with FSL's image inside the reference's mask": 1.0,
+    "stderr: the same lines (numbers aside)": "yes",
+    "stdout: the same lines (numbers aside)": "yes"
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 7.255,
+   "status": "pass"
+  },
+  {
+   "case": "real/known-motion",
+   "category": "real",
+   "checks_passed": 6,
+   "checks_total": 6,
+   "failed_checks": [],
+   "measured": {
+    "out.mat: 95th-percentile displacement over the reference's brain": 0.0002,
+    "stderr: the same lines (numbers aside)": "yes",
+    "stdout: the same lines (numbers aside)": "yes"
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 5.111,
    "status": "pass"
   },
   {
@@ -797,7 +793,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 0.618,
+   "seconds": 0.247,
    "status": "pass"
   },
   {
@@ -807,7 +803,7 @@
    "checks_total": 6,
    "failed_checks": [],
    "measured": {
-    "out.nii.gz: the same values within 1e-5 of the image's range": 4.36e-07,
+    "out.nii.gz: the same values within 1e-5 of the image's range": 2.18e-07,
     "stderr: the same lines (numbers aside)": "yes",
     "stdout: the same lines (numbers aside)": "yes"
    },
@@ -815,7 +811,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 1.516,
+   "seconds": 0.82,
    "status": "pass"
   },
   {
@@ -825,7 +821,6 @@
    "checks_total": 6,
    "failed_checks": [],
    "measured": {
-    "out.nii.gz: the same values within 1e-5 of the image's range": 4.79e-08,
     "stderr: the same lines (numbers aside)": "yes",
     "stdout: the same lines (numbers aside)": "yes"
    },
@@ -833,7 +828,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 1.007,
+   "seconds": 0.448,
    "status": "pass"
   },
   {
@@ -850,7 +845,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 0.722,
+   "seconds": 0.439,
    "status": "pass"
   },
   {
@@ -860,7 +855,7 @@
    "checks_total": 6,
    "failed_checks": [],
    "measured": {
-    "out.nii.gz: the same values within 1e-5 of the image's range": 2.45e-07,
+    "out.nii.gz: the same values within 1e-5 of the image's range": 1.84e-07,
     "stderr: the same lines (numbers aside)": "yes",
     "stdout: the same lines (numbers aside)": "yes"
    },
@@ -868,7 +863,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 1.397,
+   "seconds": 0.646,
    "status": "pass"
   },
   {
@@ -878,7 +873,7 @@
    "checks_total": 6,
    "failed_checks": [],
    "measured": {
-    "out.nii.gz: the same values within 1e-5 of the image's range": 5.95e-07,
+    "out.nii.gz: the same values within 1e-5 of the image's range": 2.68e-07,
     "stderr: the same lines (numbers aside)": "yes",
     "stdout: the same lines (numbers aside)": "yes"
    },
@@ -886,7 +881,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 1.477,
+   "seconds": 0.813,
    "status": "pass"
   },
   {
@@ -903,7 +898,7 @@
    "reported": {
     "D13 fix pass": 756121
    },
-   "seconds": 0.609,
+   "seconds": 0.255,
    "status": "pass"
   },
   {
@@ -920,7 +915,7 @@
    "reported": {
     "D13 fix pass": 560026
    },
-   "seconds": 0.622,
+   "seconds": 0.386,
    "status": "pass"
   },
   {
@@ -937,7 +932,7 @@
    "reported": {
     "D13 fix pass": 416242
    },
-   "seconds": 0.779,
+   "seconds": 0.426,
    "status": "pass"
   },
   {
@@ -954,7 +949,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 0.69,
+   "seconds": 0.304,
    "status": "pass"
   },
   {
@@ -971,7 +966,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 0.825,
+   "seconds": 0.535,
    "status": "pass"
   },
   {
@@ -988,7 +983,7 @@
    "reported": {
     "D13 fix pass": 416491
    },
-   "seconds": 0.607,
+   "seconds": 0.331,
    "status": "pass"
   },
   {
@@ -1005,7 +1000,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 0.64,
+   "seconds": 0.459,
    "status": "pass"
   },
   {
@@ -1022,7 +1017,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 0.642,
+   "seconds": 0.401,
    "status": "pass"
   },
   {
@@ -1039,7 +1034,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 0.667,
+   "seconds": 0.309,
    "status": "pass"
   },
   {
@@ -1056,7 +1051,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 0.531,
+   "seconds": 0.213,
    "status": "pass"
   },
   {
@@ -1066,7 +1061,7 @@
    "checks_total": 6,
    "failed_checks": [],
    "measured": {
-    "out.nii.gz: the same values within 1e-5 of the image's range": 3.89e-07,
+    "out.nii.gz: the same values within 1e-5 of the image's range": 2.59e-07,
     "stderr: the same lines (numbers aside)": "yes",
     "stdout: the same lines (numbers aside)": "yes"
    },
@@ -1074,7 +1069,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 4.6,
+   "seconds": 2.806,
    "status": "pass"
   },
   {
@@ -1091,26 +1086,16 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 0.449,
+   "seconds": 0.199,
    "status": "pass"
   },
   {
    "case": "real/applyisoxfm-4d-blur-setbackground",
    "category": "real",
-   "checks_passed": 5,
+   "checks_passed": 6,
    "checks_total": 6,
-   "failed_checks": [
-    {
-     "detail": "53831 of 172800 values differ (max 4.516e+04)",
-     "metric": "max difference / range",
-     "name": "out.nii.gz: the same values within 1e-5 of the image's range",
-     "passed": false,
-     "threshold": 1e-05,
-     "value": 0.408
-    }
-   ],
+   "failed_checks": [],
    "measured": {
-    "out.nii.gz: the same values within 1e-5 of the image's range": 0.408,
     "stderr: the same lines (numbers aside)": "yes",
     "stdout: the same lines (numbers aside)": "yes"
    },
@@ -1118,18 +1103,16 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 0.82,
-   "status": "fail"
+   "seconds": 0.373,
+   "status": "pass"
   },
   {
    "case": "real/applyxfm-usesqform",
    "category": "real",
-   "checks_passed": 7,
-   "checks_total": 7,
+   "checks_passed": 6,
+   "checks_total": 6,
    "failed_checks": [],
    "measured": {
-    "out.mat: the sform/qform matrix within 1e-5 mm": 4.5300000000025875e-06,
-    "out.nii.gz: correlation with FSL's image inside the reference's mask": 1.0,
     "stderr: the same lines (numbers aside)": "yes",
     "stdout: the same lines (numbers aside)": "yes"
    },
@@ -1137,26 +1120,17 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 0.878,
+   "seconds": 0.392,
    "status": "pass"
   },
   {
    "case": "real/out-only",
    "category": "real",
-   "checks_passed": 5,
+   "checks_passed": 6,
    "checks_total": 6,
-   "failed_checks": [
-    {
-     "detail": "",
-     "metric": "NCC",
-     "name": "out.nii.gz: correlation with FSL's image inside the reference's mask",
-     "passed": false,
-     "threshold": 0.999,
-     "value": 0.998965
-    }
-   ],
+   "failed_checks": [],
    "measured": {
-    "out.nii.gz: correlation with FSL's image inside the reference's mask": 0.998965,
+    "out.nii.gz: correlation with FSL's image inside the reference's mask": 1.0,
     "stderr: the same lines (numbers aside)": "yes",
     "stdout: the same lines (numbers aside)": "numbers differ"
    },
@@ -1164,8 +1138,8 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 3.93,
-   "status": "fail"
+   "seconds": 1.193,
+   "status": "pass"
   },
   {
    "case": "real/basescale-small",
@@ -1174,7 +1148,7 @@
    "checks_total": 6,
    "failed_checks": [],
    "measured": {
-    "out.mat: 95th-percentile displacement over the reference's brain": 91.2885,
+    "out.mat: 95th-percentile displacement over the reference's brain": 0.673,
     "stderr: the same lines (numbers aside)": "yes",
     "stdout: the same lines (numbers aside)": "yes"
    },
@@ -1182,7 +1156,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 1.227,
+   "seconds": 0.629,
    "status": "pass"
   },
   {
@@ -1192,7 +1166,7 @@
    "checks_total": 6,
    "failed_checks": [],
    "measured": {
-    "out.mat: 95th-percentile displacement over the reference's brain": 0.1856,
+    "out.mat: 95th-percentile displacement over the reference's brain": 0.0015,
     "stderr: the same lines (numbers aside)": "yes",
     "stdout: the same lines (numbers aside)": "yes"
    },
@@ -1200,26 +1174,17 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 0.611,
+   "seconds": 0.256,
    "status": "pass"
   },
   {
    "case": "real/basescale-big",
    "category": "real",
-   "checks_passed": 5,
+   "checks_passed": 6,
    "checks_total": 6,
-   "failed_checks": [
-    {
-     "detail": "maximum 0.2374 mm, RMS deviation 0.3144 mm; FSL's own p95 on a perturbed input 0.0022 mm",
-     "metric": "p95 displacement (mm)",
-     "name": "out.mat: 95th-percentile displacement over the reference's brain",
-     "passed": false,
-     "threshold": 0.1,
-     "value": 0.2144
-    }
-   ],
+   "failed_checks": [],
    "measured": {
-    "out.mat: 95th-percentile displacement over the reference's brain": 0.2144,
+    "out.mat: 95th-percentile displacement over the reference's brain": 0.0009,
     "stderr: the same lines (numbers aside)": "yes",
     "stdout: the same lines (numbers aside)": "yes"
    },
@@ -1227,26 +1192,17 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 1.114,
-   "status": "fail"
+   "seconds": 0.346,
+   "status": "pass"
   },
   {
    "case": "real/basescale-forced",
    "category": "real",
-   "checks_passed": 5,
+   "checks_passed": 6,
    "checks_total": 6,
-   "failed_checks": [
-    {
-     "detail": "maximum 0.1539 mm, RMS deviation 0.1733 mm; FSL's own p95 on a perturbed input 0.0477 mm",
-     "metric": "p95 displacement (mm)",
-     "name": "out.mat: 95th-percentile displacement over the reference's brain",
-     "passed": false,
-     "threshold": 0.1,
-     "value": 0.1321
-    }
-   ],
+   "failed_checks": [],
    "measured": {
-    "out.mat: 95th-percentile displacement over the reference's brain": 0.1321,
+    "out.mat: 95th-percentile displacement over the reference's brain": 0.0071,
     "stderr: the same lines (numbers aside)": "yes",
     "stdout: the same lines (numbers aside)": "yes"
    },
@@ -1254,27 +1210,18 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 3.113,
-   "status": "fail"
+   "seconds": 0.663,
+   "status": "pass"
   },
   {
    "case": "bbr/default",
    "category": "bbr",
-   "checks_passed": 6,
+   "checks_passed": 7,
    "checks_total": 7,
-   "failed_checks": [
-    {
-     "detail": "maximum 0.1319 mm, RMS deviation 0.1612 mm; FSL's own p95 on a perturbed input 0.0148 mm",
-     "metric": "p95 displacement (mm)",
-     "name": "out.mat: 95th-percentile displacement over the reference's brain",
-     "passed": false,
-     "threshold": 0.1,
-     "value": 0.1074
-    }
-   ],
+   "failed_checks": [],
    "measured": {
-    "out.mat: 95th-percentile displacement over the reference's brain": 0.1074,
-    "out.nii.gz: correlation with FSL's image inside the reference's mask": 0.999619,
+    "out.mat: 95th-percentile displacement over the reference's brain": 0.0197,
+    "out.nii.gz: correlation with FSL's image inside the reference's mask": 0.999937,
     "stderr: the same lines (numbers aside)": "yes",
     "stdout: the same lines (numbers aside)": "numbers differ"
    },
@@ -1282,26 +1229,17 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 11.807,
-   "status": "fail"
+   "seconds": 6.01,
+   "status": "pass"
   },
   {
    "case": "bbr/fmriprep-form",
    "category": "bbr",
-   "checks_passed": 5,
+   "checks_passed": 6,
    "checks_total": 6,
-   "failed_checks": [
-    {
-     "detail": "maximum 0.1319 mm, RMS deviation 0.1612 mm; FSL's own p95 on a perturbed input 0.0148 mm",
-     "metric": "p95 displacement (mm)",
-     "name": "out.mat: 95th-percentile displacement over the reference's brain",
-     "passed": false,
-     "threshold": 0.1,
-     "value": 0.1074
-    }
-   ],
+   "failed_checks": [],
    "measured": {
-    "out.mat: 95th-percentile displacement over the reference's brain": 0.1074,
+    "out.mat: 95th-percentile displacement over the reference's brain": 0.0197,
     "stderr: the same lines (numbers aside)": "yes",
     "stdout: the same lines (numbers aside)": "numbers differ"
    },
@@ -1309,26 +1247,17 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 11.253,
-   "status": "fail"
+   "seconds": 5.765,
+   "status": "pass"
   },
   {
    "case": "bbr/type-global_abs",
    "category": "bbr",
-   "checks_passed": 5,
+   "checks_passed": 6,
    "checks_total": 6,
-   "failed_checks": [
-    {
-     "detail": "maximum 0.1319 mm, RMS deviation 0.1612 mm; FSL's own p95 on a perturbed input 0.0148 mm",
-     "metric": "p95 displacement (mm)",
-     "name": "out.mat: 95th-percentile displacement over the reference's brain",
-     "passed": false,
-     "threshold": 0.1,
-     "value": 0.1074
-    }
-   ],
+   "failed_checks": [],
    "measured": {
-    "out.mat: 95th-percentile displacement over the reference's brain": 0.1074,
+    "out.mat: 95th-percentile displacement over the reference's brain": 0.0197,
     "stderr: the same lines (numbers aside)": "yes",
     "stdout: the same lines (numbers aside)": "numbers differ"
    },
@@ -1336,26 +1265,17 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 10.457,
-   "status": "fail"
+   "seconds": 5.728,
+   "status": "pass"
   },
   {
    "case": "bbr/type-local_abs",
    "category": "bbr",
-   "checks_passed": 5,
+   "checks_passed": 6,
    "checks_total": 6,
-   "failed_checks": [
-    {
-     "detail": "maximum 1.4270 mm, RMS deviation 2.5016 mm; FSL's own p95 on a perturbed input 0.9038 mm",
-     "metric": "p95 displacement (mm)",
-     "name": "out.mat: 95th-percentile displacement over the reference's brain",
-     "passed": false,
-     "threshold": "0.1 or FSL's own variability",
-     "value": 1.1777
-    }
-   ],
+   "failed_checks": [],
    "measured": {
-    "out.mat: 95th-percentile displacement over the reference's brain": 1.1777,
+    "out.mat: 95th-percentile displacement over the reference's brain": 0.3647,
     "stderr: the same lines (numbers aside)": "yes",
     "stdout: the same lines (numbers aside)": "numbers differ"
    },
@@ -1363,18 +1283,33 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 9.491,
-   "status": "fail"
+   "seconds": 5.007,
+   "status": "pass"
   },
   {
    "case": "bbr/debug",
    "category": "bbr",
-   "checks_passed": 0,
-   "checks_total": 0,
+   "checks_passed": 13,
+   "checks_total": 13,
    "failed_checks": [],
-   "reason": "not in the clean-room original yet: -debug (part 2)",
-   "seconds": 0.0,
-   "status": "skipped"
+   "measured": {
+    "debug.nii.gz: correlation with FSL's image inside the reference's mask": 0.999991,
+    "global_refweight1.nii.gz: the same header, values within 1e-6 of the image's range": 0.0,
+    "out.mat: 95th-percentile displacement over the reference's brain": 0.0197,
+    "refvol.nii.gz: the same header, values within 1e-6 of the image's range": 0.0,
+    "refvol_2.nii.gz: the same header, values within 1e-6 of the image's range": 0.0,
+    "refvol_4.nii.gz: the same header, values within 1e-6 of the image's range": 0.0,
+    "refvol_8.nii.gz: the same header, values within 1e-6 of the image's range": 0.0,
+    "stderr: the same lines (numbers aside)": "yes",
+    "stdout: the same lines (numbers aside)": "numbers differ",
+    "testvol.nii.gz: the same header, values within 1e-6 of the image's range": 0.0
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 5.808,
+   "status": "pass"
   },
   {
    "case": "bbr/slope",
@@ -1383,7 +1318,7 @@
    "checks_total": 6,
    "failed_checks": [],
    "measured": {
-    "out.mat: 95th-percentile displacement over the reference's brain": 0.0561,
+    "out.mat: 95th-percentile displacement over the reference's brain": 0.0183,
     "stderr: the same lines (numbers aside)": "yes",
     "stdout: the same lines (numbers aside)": "numbers differ"
    },
@@ -1391,7 +1326,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 10.301,
+   "seconds": 5.353,
    "status": "pass"
   },
   {
@@ -1401,7 +1336,7 @@
    "checks_total": 6,
    "failed_checks": [],
    "measured": {
-    "out.mat: 95th-percentile displacement over the reference's brain": 0.0004,
+    "out.mat: 95th-percentile displacement over the reference's brain": 0.0016,
     "stderr: the same lines (numbers aside)": "yes",
     "stdout: the same lines (numbers aside)": "numbers differ"
    },
@@ -1409,7 +1344,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 1.07,
+   "seconds": 0.576,
    "status": "pass"
   },
   {
@@ -1419,8 +1354,8 @@
    "checks_total": 7,
    "failed_checks": [],
    "measured": {
-    "out.mat: 95th-percentile displacement over the reference's brain": 0.0491,
-    "out.nii.gz: correlation with FSL's image inside the reference's mask": 0.999979,
+    "out.mat: 95th-percentile displacement over the reference's brain": 0.0902,
+    "out.nii.gz: correlation with FSL's image inside the reference's mask": 0.999935,
     "stderr: the same lines (numbers aside)": "yes",
     "stdout: the same lines (numbers aside)": "numbers differ"
    },
@@ -1428,26 +1363,17 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 9.41,
+   "seconds": 6.583,
    "status": "pass"
   },
   {
    "case": "bbr/fieldmap-mask",
    "category": "bbr",
-   "checks_passed": 5,
+   "checks_passed": 6,
    "checks_total": 6,
-   "failed_checks": [
-    {
-     "detail": "maximum 0.1367 mm, RMS deviation 0.2011 mm; FSL's own p95 on a perturbed input 0.0063 mm",
-     "metric": "p95 displacement (mm)",
-     "name": "out.mat: 95th-percentile displacement over the reference's brain",
-     "passed": false,
-     "threshold": 0.1,
-     "value": 0.1179
-    }
-   ],
+   "failed_checks": [],
    "measured": {
-    "out.mat: 95th-percentile displacement over the reference's brain": 0.1179,
+    "out.mat: 95th-percentile displacement over the reference's brain": 0.0386,
     "stderr: the same lines (numbers aside)": "yes",
     "stdout: the same lines (numbers aside)": "numbers differ"
    },
@@ -1455,8 +1381,8 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 313.784,
-   "status": "fail"
+   "seconds": 54.929,
+   "status": "pass"
   },
   {
    "case": "bbr/weights",
@@ -1465,7 +1391,7 @@
    "checks_total": 6,
    "failed_checks": [],
    "measured": {
-    "out.mat: 95th-percentile displacement over the reference's brain": 0.0883,
+    "out.mat: 95th-percentile displacement over the reference's brain": 0.006,
     "stderr: the same lines (numbers aside)": "yes",
     "stdout: the same lines (numbers aside)": "numbers differ"
    },
@@ -1473,7 +1399,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 12.512,
+   "seconds": 11.631,
    "status": "pass"
   },
   {
@@ -1490,7 +1416,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 0.275,
+   "seconds": 0.178,
    "status": "pass"
   },
   {
@@ -1500,7 +1426,7 @@
    "checks_total": 6,
    "failed_checks": [],
    "measured": {
-    "out.mat: 95th-percentile displacement over the reference's brain": 0.0089,
+    "out.mat: 95th-percentile displacement over the reference's brain": 0.0016,
     "stderr: the same lines (numbers aside)": "yes",
     "stdout: the same lines (numbers aside)": "yes"
    },
@@ -1508,17 +1434,16 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 0.818,
+   "seconds": 0.234,
    "status": "pass"
   },
   {
    "case": "schedule/xyztrans.sch",
    "category": "schedule",
-   "checks_passed": 6,
-   "checks_total": 6,
+   "checks_passed": 5,
+   "checks_total": 5,
    "failed_checks": [],
    "measured": {
-    "out.mat: 95th-percentile displacement over the reference's brain": 0.0001,
     "stderr: the same lines (numbers aside)": "yes",
     "stdout: the same lines (numbers aside)": "yes"
    },
@@ -1526,17 +1451,16 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 1.324,
+   "seconds": 0.448,
    "status": "pass"
   },
   {
    "case": "schedule/ytransonly.sch",
    "category": "schedule",
-   "checks_passed": 6,
-   "checks_total": 6,
+   "checks_passed": 5,
+   "checks_total": 5,
    "failed_checks": [],
    "measured": {
-    "out.mat: 95th-percentile displacement over the reference's brain": 0.0002,
     "stderr: the same lines (numbers aside)": "yes",
     "stdout: the same lines (numbers aside)": "yes"
    },
@@ -1544,17 +1468,16 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 0.566,
+   "seconds": 0.199,
    "status": "pass"
   },
   {
    "case": "schedule/ztransonly.sch",
    "category": "schedule",
-   "checks_passed": 6,
-   "checks_total": 6,
+   "checks_passed": 5,
+   "checks_total": 5,
    "failed_checks": [],
    "measured": {
-    "out.mat: 95th-percentile displacement over the reference's brain": 0.0,
     "stderr: the same lines (numbers aside)": "yes",
     "stdout: the same lines (numbers aside)": "yes"
    },
@@ -1562,17 +1485,16 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 0.518,
+   "seconds": 0.195,
    "status": "pass"
   },
   {
    "case": "schedule/sch3Dtrans_3dof",
    "category": "schedule",
-   "checks_passed": 6,
-   "checks_total": 6,
+   "checks_passed": 5,
+   "checks_total": 5,
    "failed_checks": [],
    "measured": {
-    "out.mat: 95th-percentile displacement over the reference's brain": 0.0001,
     "stderr: the same lines (numbers aside)": "yes",
     "stdout: the same lines (numbers aside)": "yes"
    },
@@ -1580,7 +1502,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 1.125,
+   "seconds": 0.352,
    "status": "pass"
   },
   {
@@ -1597,101 +1519,11 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 0.266,
+   "seconds": 0.201,
    "status": "pass"
   },
   {
    "case": "schedule/pairreg1.sch",
-   "category": "schedule",
-   "checks_passed": 6,
-   "checks_total": 6,
-   "failed_checks": [],
-   "measured": {
-    "out.mat: 95th-percentile displacement over the reference's brain": 0.3488,
-    "stderr: the same lines (numbers aside)": "yes",
-    "stdout: the same lines (numbers aside)": "yes"
-   },
-   "reason": "",
-   "reported": {
-    "D13 fix pass": 0
-   },
-   "seconds": 4.722,
-   "status": "pass"
-  },
-  {
-   "case": "schedule/pairreg2.sch",
-   "category": "schedule",
-   "checks_passed": 6,
-   "checks_total": 6,
-   "failed_checks": [],
-   "measured": {
-    "out.mat: 95th-percentile displacement over the reference's brain": 0.2173,
-    "stderr: the same lines (numbers aside)": "yes",
-    "stdout: the same lines (numbers aside)": "yes"
-   },
-   "reason": "",
-   "reported": {
-    "D13 fix pass": 0
-   },
-   "seconds": 0.376,
-   "status": "pass"
-  },
-  {
-   "case": "schedule/pairreg3.sch",
-   "category": "schedule",
-   "checks_passed": 6,
-   "checks_total": 6,
-   "failed_checks": [],
-   "measured": {
-    "out.mat: 95th-percentile displacement over the reference's brain": 0.0071,
-    "stderr: the same lines (numbers aside)": "yes",
-    "stdout: the same lines (numbers aside)": "yes"
-   },
-   "reason": "",
-   "reported": {
-    "D13 fix pass": 0
-   },
-   "seconds": 0.294,
-   "status": "pass"
-  },
-  {
-   "case": "schedule/sch2D_3dof",
-   "category": "schedule",
-   "checks_passed": 6,
-   "checks_total": 6,
-   "failed_checks": [],
-   "measured": {
-    "out.mat: 95th-percentile displacement over the reference's brain": 0.0001,
-    "stderr: the same lines (numbers aside)": "yes",
-    "stdout: the same lines (numbers aside)": "yes"
-   },
-   "reason": "",
-   "reported": {
-    "D13 fix pass": 0
-   },
-   "seconds": 0.498,
-   "status": "pass"
-  },
-  {
-   "case": "schedule/sch2D_4dof",
-   "category": "schedule",
-   "checks_passed": 6,
-   "checks_total": 6,
-   "failed_checks": [],
-   "measured": {
-    "out.mat: 95th-percentile displacement over the reference's brain": 0.0005,
-    "stderr: the same lines (numbers aside)": "yes",
-    "stdout: the same lines (numbers aside)": "yes"
-   },
-   "reason": "",
-   "reported": {
-    "D13 fix pass": 0
-   },
-   "seconds": 0.663,
-   "status": "pass"
-  },
-  {
-   "case": "schedule/sch2D_5dof",
    "category": "schedule",
    "checks_passed": 6,
    "checks_total": 6,
@@ -1705,7 +1537,95 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 0.748,
+   "seconds": 1.228,
+   "status": "pass"
+  },
+  {
+   "case": "schedule/pairreg2.sch",
+   "category": "schedule",
+   "checks_passed": 6,
+   "checks_total": 6,
+   "failed_checks": [],
+   "measured": {
+    "out.mat: 95th-percentile displacement over the reference's brain": 0.0003,
+    "stderr: the same lines (numbers aside)": "yes",
+    "stdout: the same lines (numbers aside)": "yes"
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 0.167,
+   "status": "pass"
+  },
+  {
+   "case": "schedule/pairreg3.sch",
+   "category": "schedule",
+   "checks_passed": 6,
+   "checks_total": 6,
+   "failed_checks": [],
+   "measured": {
+    "out.mat: 95th-percentile displacement over the reference's brain": 0.001,
+    "stderr: the same lines (numbers aside)": "yes",
+    "stdout: the same lines (numbers aside)": "yes"
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 0.174,
+   "status": "pass"
+  },
+  {
+   "case": "schedule/sch2D_3dof",
+   "category": "schedule",
+   "checks_passed": 5,
+   "checks_total": 5,
+   "failed_checks": [],
+   "measured": {
+    "stderr: the same lines (numbers aside)": "yes",
+    "stdout: the same lines (numbers aside)": "yes"
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 0.169,
+   "status": "pass"
+  },
+  {
+   "case": "schedule/sch2D_4dof",
+   "category": "schedule",
+   "checks_passed": 6,
+   "checks_total": 6,
+   "failed_checks": [],
+   "measured": {
+    "out.mat: 95th-percentile displacement over the reference's brain": 0.0,
+    "stderr: the same lines (numbers aside)": "yes",
+    "stdout: the same lines (numbers aside)": "yes"
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 0.306,
+   "status": "pass"
+  },
+  {
+   "case": "schedule/sch2D_5dof",
+   "category": "schedule",
+   "checks_passed": 5,
+   "checks_total": 5,
+   "failed_checks": [],
+   "measured": {
+    "stderr: the same lines (numbers aside)": "yes",
+    "stdout: the same lines (numbers aside)": "yes"
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 0.282,
    "status": "pass"
   },
   {
@@ -1715,7 +1635,7 @@
    "checks_total": 6,
    "failed_checks": [],
    "measured": {
-    "out.mat: 95th-percentile displacement over the reference's brain": 0.2603,
+    "out.mat: 95th-percentile displacement over the reference's brain": 0.2607,
     "stderr: the same lines (numbers aside)": "yes",
     "stdout: the same lines (numbers aside)": "yes"
    },
@@ -1723,18 +1643,16 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 1.021,
+   "seconds": 0.343,
    "status": "pass"
   },
   {
    "case": "real/2d",
    "category": "real",
-   "checks_passed": 7,
-   "checks_total": 7,
+   "checks_passed": 6,
+   "checks_total": 6,
    "failed_checks": [],
    "measured": {
-    "out.mat: 95th-percentile displacement over the reference's brain": 0.0001,
-    "out.nii.gz: correlation with FSL's image inside the reference's mask": 1.0,
     "stderr: the same lines (numbers aside)": "yes",
     "stdout: the same lines (numbers aside)": "yes"
    },
@@ -1742,26 +1660,17 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 0.669,
+   "seconds": 0.169,
    "status": "pass"
   },
   {
    "case": "verbose/v",
    "category": "verbose",
-   "checks_passed": 5,
+   "checks_passed": 6,
    "checks_total": 6,
-   "failed_checks": [
-    {
-     "detail": "maximum 0.2151 mm, RMS deviation 0.4625 mm; FSL's own p95 on a perturbed input 0.1553 mm",
-     "metric": "p95 displacement (mm)",
-     "name": "out.mat: 95th-percentile displacement over the reference's brain",
-     "passed": false,
-     "threshold": "0.1 or FSL's own variability",
-     "value": 0.1789
-    }
-   ],
+   "failed_checks": [],
    "measured": {
-    "out.mat: 95th-percentile displacement over the reference's brain": 0.1789,
+    "out.mat: 95th-percentile displacement over the reference's brain": 0.0004,
     "stderr: the same lines (numbers aside)": "yes",
     "stdout: the same lines (numbers aside)": "yes"
    },
@@ -1769,38 +1678,62 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 2.633,
-   "status": "fail"
+   "seconds": 0.827,
+   "status": "pass"
   },
   {
    "case": "verbose/2",
    "category": "verbose",
-   "checks_passed": 0,
-   "checks_total": 0,
+   "checks_passed": 6,
+   "checks_total": 6,
    "failed_checks": [],
-   "reason": "not in the clean-room original yet: the verbose levels above 1 (part 2)",
-   "seconds": 0.0,
-   "status": "skipped"
+   "measured": {
+    "out.mat: 95th-percentile displacement over the reference's brain": 0.0004,
+    "stderr: the same lines (numbers aside)": "yes",
+    "stdout: the same lines (numbers aside)": "numbers differ"
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 0.828,
+   "status": "pass"
   },
   {
    "case": "verbose/3",
    "category": "verbose",
-   "checks_passed": 0,
-   "checks_total": 0,
+   "checks_passed": 6,
+   "checks_total": 6,
    "failed_checks": [],
-   "reason": "not in the clean-room original yet: the verbose levels above 1 (part 2)",
-   "seconds": 0.0,
-   "status": "skipped"
+   "measured": {
+    "out.mat: 95th-percentile displacement over the reference's brain": 0.0004,
+    "stderr: the same lines (numbers aside)": "yes",
+    "stdout: the same lines (numbers aside)": "numbers differ"
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 0.804,
+   "status": "pass"
   },
   {
    "case": "verbose/5",
    "category": "verbose",
-   "checks_passed": 0,
-   "checks_total": 0,
+   "checks_passed": 6,
+   "checks_total": 6,
    "failed_checks": [],
-   "reason": "not in the clean-room original yet: the verbose levels above 1 (part 2)",
-   "seconds": 0.0,
-   "status": "skipped"
+   "measured": {
+    "out.mat: 95th-percentile displacement over the reference's brain": 0.0004,
+    "stderr: the same lines (numbers aside)": "yes",
+    "stdout: the same lines (numbers aside)": "numbers differ"
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 0.831,
+   "status": "pass"
   },
   {
    "case": "verbose/printinit",
@@ -1816,53 +1749,92 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 0.161,
+   "seconds": 0.101,
    "status": "pass"
   },
   {
    "case": "verbose/debugsave",
    "category": "verbose",
-   "checks_passed": 0,
-   "checks_total": 0,
-   "failed_checks": [],
-   "reason": "not in the clean-room original yet: the verbose levels above 1 (part 2)",
-   "seconds": 0.0,
-   "status": "skipped"
-  },
-  {
-   "case": "verbose/debug",
-   "category": "verbose",
-   "checks_passed": 0,
-   "checks_total": 0,
-   "failed_checks": [],
-   "reason": "not in the clean-room original yet: -debug (part 2)",
-   "seconds": 0.0,
-   "status": "skipped"
-  },
-  {
-   "case": "verbose/debug-weights",
-   "category": "verbose",
-   "checks_passed": 0,
-   "checks_total": 0,
-   "failed_checks": [],
-   "reason": "not in the clean-room original yet: -debug (part 2)",
-   "seconds": 0.0,
-   "status": "skipped"
-  },
-  {
-   "case": "schedule/every-command",
-   "category": "schedule",
    "checks_passed": 6,
    "checks_total": 6,
    "failed_checks": [],
    "measured": {
-    "params.txt: the same numbers within 5 % (a registration's rows)": 7.88e-06,
-    "rows.txt: the same numbers within 5 % (a registration's rows)": 5.08e-05,
+    "out.mat: 95th-percentile displacement over the reference's brain": 0.0004,
+    "stderr: the same lines (numbers aside)": "yes",
+    "stdout: the same lines (numbers aside)": "numbers differ"
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 0.894,
+   "status": "pass"
+  },
+  {
+   "case": "verbose/debug",
+   "category": "verbose",
+   "checks_passed": 12,
+   "checks_total": 12,
+   "failed_checks": [],
+   "measured": {
+    "global_refweight1.nii.gz: the same header, values within 1e-6 of the image's range": 0.0,
+    "out.mat: 95th-percentile displacement over the reference's brain": 0.0004,
+    "refvol.nii.gz: the same header, values within 1e-6 of the image's range": 0.0,
+    "refvol_2.nii.gz: the same header, values within 1e-6 of the image's range": 0.0,
+    "refvol_4.nii.gz: the same header, values within 1e-6 of the image's range": 0.0,
+    "refvol_8.nii.gz: the same header, values within 1e-6 of the image's range": 0.0,
+    "stderr: the same lines (numbers aside)": "yes",
+    "stdout: the same lines (numbers aside)": "yes",
+    "testvol.nii.gz: the same header, values within 1e-6 of the image's range": 0.0
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 0.843,
+   "status": "pass"
+  },
+  {
+   "case": "verbose/debug-weights",
+   "category": "verbose",
+   "checks_passed": 16,
+   "checks_total": 16,
+   "failed_checks": [],
+   "measured": {
+    "global_refweight1.nii.gz: the same header, values within 1e-6 of the image's range": 0.0,
+    "global_refweight2.nii.gz: the same header, values within 1e-6 of the image's range": 0.0,
+    "global_refweight4.nii.gz: the same header, values within 1e-6 of the image's range": 0.0,
+    "global_refweight8.nii.gz: the same header, values within 1e-6 of the image's range": 0.0,
+    "out.mat: 95th-percentile displacement over the reference's brain": 0.3576,
+    "refvol.nii.gz: the same header, values within 1e-6 of the image's range": 0.0,
+    "refvol_2.nii.gz: the same header, values within 1e-6 of the image's range": 0.0,
+    "refvol_4.nii.gz: the same header, values within 1e-6 of the image's range": 0.0,
+    "refvol_8.nii.gz: the same header, values within 1e-6 of the image's range": 0.0,
+    "stderr: the same lines (numbers aside)": "yes",
+    "stdout: the same lines (numbers aside)": "yes",
+    "testvol.nii.gz: the same header, values within 1e-6 of the image's range": 0.0,
+    "testweight.nii.gz: the same header, values within 1e-6 of the image's range": 0.0
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 2.122,
+   "status": "pass"
+  },
+  {
+   "case": "schedule/every-command",
+   "category": "schedule",
+   "checks_passed": 5,
+   "checks_total": 5,
+   "failed_checks": [],
+   "measured": {
+    "rows.txt: the same numbers within 5 % (a registration's rows)": 9.2e-08,
     "stderr: the same lines (numbers aside)": "yes",
     "stdout: the same lines (numbers aside)": "numbers differ"
    },
    "reason": "flirt exits 255; the same from the original. Wrong number of args to SETOPTION",
-   "seconds": 0.283,
+   "seconds": 0.123,
    "status": "both-error"
   },
   {
@@ -1876,7 +1848,7 @@
     "stdout: the same lines (numbers aside)": "yes"
    },
    "reason": "flirt exits 255; the same from the original. Wrong number of args to COPY",
-   "seconds": 0.186,
+   "seconds": 0.076,
    "status": "both-error"
   },
   {
@@ -1890,7 +1862,7 @@
     "stdout: the same lines (numbers aside)": "yes"
    },
    "reason": "flirt exits 255; the same from the original. Wrong number of args to OPTIMISE",
-   "seconds": 0.242,
+   "seconds": 0.075,
    "status": "both-error"
   },
   {
@@ -1904,7 +1876,7 @@
     "stdout: the same lines (numbers aside)": "yes"
    },
    "reason": "flirt exits 255; the same from the original. Cannot recognise operator =< in IF statement",
-   "seconds": 0.181,
+   "seconds": 0.079,
    "status": "both-error"
   },
   {
@@ -1921,7 +1893,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 0.311,
+   "seconds": 0.141,
    "status": "pass"
   },
   {
@@ -1938,7 +1910,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 0.332,
+   "seconds": 0.132,
    "status": "pass"
   },
   {
@@ -1952,7 +1924,7 @@
     "stdout: the same lines (numbers aside)": "yes"
    },
    "reason": "flirt exits 255; the same from the original. Unrecognised cost function: nope",
-   "seconds": 0.192,
+   "seconds": 0.073,
    "status": "both-error"
   },
   {
@@ -1966,7 +1938,7 @@
     "stdout: the same lines (numbers aside)": "yes"
    },
    "reason": "flirt exits -11; the same from the original. Can only accept UA to UZ, not Uq",
-   "seconds": 0.616,
+   "seconds": 0.397,
    "status": "both-error"
   },
   {
@@ -1983,7 +1955,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 0.39,
+   "seconds": 0.13,
    "status": "pass"
   },
   {
@@ -2000,7 +1972,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 0.077,
+   "seconds": 0.044,
    "status": "pass"
   },
   {
@@ -2017,7 +1989,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 0.338,
+   "seconds": 0.142,
    "status": "pass"
   },
   {
@@ -2034,7 +2006,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 0.151,
+   "seconds": 0.062,
    "status": "pass"
   },
   {
@@ -2048,43 +2020,41 @@
     "stdout: the same lines (numbers aside)": "yes"
    },
    "reason": "flirt exits 255; the same from the original. Wrong number of args to ALIGNPAXES",
-   "seconds": 0.147,
+   "seconds": 0.071,
    "status": "both-error"
   },
   {
    "case": "schedule/paramsubset-general",
    "category": "schedule",
-   "checks_passed": 6,
-   "checks_total": 6,
+   "checks_passed": 5,
+   "checks_total": 5,
    "failed_checks": [],
    "measured": {
-    "out.mat: 95th-percentile displacement over the reference's brain": 0.0036,
     "stderr: the same lines (numbers aside)": "yes",
-    "stdout: the same lines (numbers aside)": "numbers differ"
+    "stdout: the same lines (numbers aside)": "yes"
    },
    "reason": "",
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 0.378,
+   "seconds": 0.142,
    "status": "pass"
   },
   {
    "case": "schedule/paramsubset-weighted",
    "category": "schedule",
-   "checks_passed": 6,
-   "checks_total": 6,
+   "checks_passed": 5,
+   "checks_total": 5,
    "failed_checks": [],
    "measured": {
-    "out.mat: 95th-percentile displacement over the reference's brain": 0.0115,
     "stderr: the same lines (numbers aside)": "yes",
-    "stdout: the same lines (numbers aside)": "numbers differ"
+    "stdout: the same lines (numbers aside)": "yes"
    },
    "reason": "",
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 0.407,
+   "seconds": 0.14,
    "status": "pass"
   },
   {
@@ -2101,7 +2071,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 0.066,
+   "seconds": 0.046,
    "status": "pass"
   },
   {
@@ -2115,7 +2085,7 @@
     "stdout: the same lines (numbers aside)": "yes"
    },
    "reason": "flirt exits 1; the same from the original. ",
-   "seconds": 0.03,
+   "seconds": 0.02,
    "status": "both-error"
   },
   {
@@ -2132,7 +2102,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 0.089,
+   "seconds": 0.039,
    "status": "pass"
   },
   {
@@ -2149,7 +2119,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 0.088,
+   "seconds": 0.039,
    "status": "pass"
   },
   {
@@ -2163,7 +2133,7 @@
     "stdout: the same lines (numbers aside)": "yes"
    },
    "reason": "flirt exits 2; the same from the original. ERROR:: Input volume filename not found",
-   "seconds": 0.07,
+   "seconds": 0.04,
    "status": "both-error"
   },
   {
@@ -2177,7 +2147,7 @@
     "stdout: the same lines (numbers aside)": "yes"
    },
    "reason": "flirt exits 2; the same from the original. ERROR:: Reference volume filename not found",
-   "seconds": 0.034,
+   "seconds": 0.021,
    "status": "both-error"
   },
   {
@@ -2191,7 +2161,7 @@
     "stdout: the same lines (numbers aside)": "yes"
    },
    "reason": "flirt exits 255; the same from the original. Unrecognised option e",
-   "seconds": 0.032,
+   "seconds": 0.02,
    "status": "both-error"
   },
   {
@@ -2205,7 +2175,7 @@
     "stdout: the same lines (numbers aside)": "yes"
    },
    "reason": "flirt exits 255; the same from the original. Lacking argument to option -frob",
-   "seconds": 0.029,
+   "seconds": 0.02,
    "status": "both-error"
   },
   {
@@ -2219,7 +2189,7 @@
     "stdout: the same lines (numbers aside)": "yes"
    },
    "reason": "flirt exits 255; the same from the original. Unrecognised option -frob",
-   "seconds": 0.031,
+   "seconds": 0.021,
    "status": "both-error"
   },
   {
@@ -2233,7 +2203,7 @@
     "stdout: the same lines (numbers aside)": "yes"
    },
    "reason": "flirt exits 255; the same from the original. Lacking argument to option -ref",
-   "seconds": 0.031,
+   "seconds": 0.023,
    "status": "both-error"
   },
   {
@@ -2247,7 +2217,7 @@
     "stdout: the same lines (numbers aside)": "yes"
    },
    "reason": "flirt exits 255; the same from the original. Lacking argument to option -searchrx",
-   "seconds": 0.035,
+   "seconds": 0.021,
    "status": "both-error"
   },
   {
@@ -2261,7 +2231,7 @@
     "stdout: the same lines (numbers aside)": "yes"
    },
    "reason": "flirt exits 255; the same from the original. Unrecognised cost function type: nope",
-   "seconds": 0.057,
+   "seconds": 0.07,
    "status": "both-error"
   },
   {
@@ -2275,7 +2245,7 @@
     "stdout: the same lines (numbers aside)": "yes"
    },
    "reason": "flirt exits 255; the same from the original. Unrecognised cost function type: nope",
-   "seconds": 0.059,
+   "seconds": 0.085,
    "status": "both-error"
   },
   {
@@ -2289,7 +2259,7 @@
     "stdout: the same lines (numbers aside)": "yes"
    },
    "reason": "flirt exits 255; the same from the original. Unrecognised interpolation method: cubic",
-   "seconds": 0.066,
+   "seconds": 0.084,
    "status": "both-error"
   },
   {
@@ -2303,7 +2273,7 @@
     "stdout: the same lines (numbers aside)": "yes"
    },
    "reason": "flirt exits 255; the same from the original. Unrecognised data type: long",
-   "seconds": 0.06,
+   "seconds": 0.067,
    "status": "both-error"
   },
   {
@@ -2317,7 +2287,7 @@
     "stdout: the same lines (numbers aside)": "yes"
    },
    "reason": "flirt exits 255; the same from the original. Unrecognised sinc window: gauss",
-   "seconds": 0.059,
+   "seconds": 0.042,
    "status": "both-error"
   },
   {
@@ -2331,7 +2301,7 @@
     "stdout: the same lines (numbers aside)": "yes"
    },
    "reason": "flirt exits 255; the same from the original. Unrecognised angle representation: rodrigues",
-   "seconds": 0.067,
+   "seconds": 0.041,
    "status": "both-error"
   },
   {
@@ -2345,7 +2315,7 @@
     "stdout: the same lines (numbers aside)": "yes"
    },
    "reason": "flirt exits 255; the same from the original. Unrecognised argument to pedir (0) - it should be a number between -3 and 3 (not 0)",
-   "seconds": 0.062,
+   "seconds": 0.041,
    "status": "both-error"
   },
   {
@@ -2362,7 +2332,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 0.138,
+   "seconds": 0.078,
    "status": "pass"
   },
   {
@@ -2379,7 +2349,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 0.069,
+   "seconds": 0.04,
    "status": "pass"
   },
   {
@@ -2396,7 +2366,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 0.179,
+   "seconds": 0.087,
    "status": "pass"
   },
   {
@@ -2410,7 +2380,7 @@
     "stdout: the same lines (numbers aside)": "yes"
    },
    "reason": "flirt exits 255; the same from the original. Could not open filenone.sch",
-   "seconds": 0.121,
+   "seconds": 0.068,
    "status": "both-error"
   },
   {
@@ -2427,7 +2397,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 0.227,
+   "seconds": 0.089,
    "status": "pass"
   },
   {
@@ -2441,7 +2411,7 @@
     "stdout: the same lines (numbers aside)": "yes"
    },
    "reason": "flirt exits 1; the same from the original. Coordinate and Normal matrices wmcoords.txt and n.txt are either zero size or different sizes",
-   "seconds": 0.169,
+   "seconds": 0.056,
    "status": "both-error"
   },
   {
@@ -2455,7 +2425,7 @@
     "stdout: the same lines (numbers aside)": "yes"
    },
    "reason": "flirt exits 1; the same from the original. ERROR:: Environment variable FSLOUTPUTTYPE is not set! Please make sure that the appropriate configuration file is sourced by your shell (e.g. by putting it in .profile). e.g. bash or sh users add the",
-   "seconds": 0.194,
+   "seconds": 0.08,
    "status": "both-error"
   },
   {
@@ -2472,7 +2442,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 0.375,
+   "seconds": 0.209,
    "status": "pass"
   },
   {
@@ -2489,7 +2459,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 0.335,
+   "seconds": 0.217,
    "status": "pass"
   },
   {
@@ -2506,7 +2476,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 0.452,
+   "seconds": 0.288,
    "status": "pass"
   },
   {
@@ -2520,7 +2490,7 @@
     "stdout: the same lines (numbers aside)": "yes"
    },
    "reason": "flirt exits 1; the same from the original. ERROR:: Unrecognised value (ANALYZE) of environment variable FSLOUTPUTTYPE Legal values are: NIFTI, NIFTI_PAIR, NIFTI2, NIFTI2_PAIR, NIFTI_GZ, NIFTI_PAIR_GZ, NIFTI2_GZ, NIFTI2_PAIR_GZ, NIFTI_ZST, NIFT",
-   "seconds": 0.131,
+   "seconds": 0.082,
    "status": "both-error"
   },
   {
@@ -2534,7 +2504,7 @@
     "stdout: the same lines (numbers aside)": "yes"
    },
    "reason": "convert_xfm exits 1; the same from the original. ",
-   "seconds": 0.057,
+   "seconds": 0.027,
    "status": "both-error"
   },
   {
@@ -2551,7 +2521,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 0.08,
+   "seconds": 0.039,
    "status": "pass"
   },
   {
@@ -2568,7 +2538,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 0.083,
+   "seconds": 0.04,
    "status": "pass"
   },
   {
@@ -2585,17 +2555,16 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 0.088,
+   "seconds": 0.038,
    "status": "pass"
   },
   {
    "case": "convert_xfm/fixscaleskew",
    "category": "convert_xfm",
-   "checks_passed": 6,
-   "checks_total": 6,
+   "checks_passed": 5,
+   "checks_total": 5,
    "failed_checks": [],
    "measured": {
-    "f.mat: within 1e-7 of FSL's (relative)": 6.79e-08,
     "stderr: the same lines (numbers aside)": "yes",
     "stdout: the same lines (numbers aside)": "yes"
    },
@@ -2603,7 +2572,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 0.086,
+   "seconds": 0.046,
    "status": "pass"
   },
   {
@@ -2620,7 +2589,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 0.094,
+   "seconds": 0.036,
    "status": "pass"
   },
   {
@@ -2637,7 +2606,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 0.082,
+   "seconds": 0.038,
    "status": "pass"
   },
   {
@@ -2654,7 +2623,7 @@
    "reported": {
     "D13 fix pass": 0
    },
-   "seconds": 0.108,
+   "seconds": 0.036,
    "status": "pass"
   },
   {
@@ -2668,7 +2637,7 @@
     "stdout: the same lines (numbers aside)": "yes"
    },
    "reason": "convert_xfm exits 254; the same from the original. Could not open matrix file none.mat Cannot read input-matrix",
-   "seconds": 0.053,
+   "seconds": 0.034,
    "status": "both-error"
   },
   {
@@ -2682,7 +2651,7 @@
     "stdout: the same lines (numbers aside)": "yes"
    },
    "reason": "convert_xfm exits 254; the same from the original. Cannot read input-matrix",
-   "seconds": 0.057,
+   "seconds": 0.034,
    "status": "both-error"
   },
   {
@@ -2696,7 +2665,7 @@
     "stdout: the same lines (numbers aside)": "yes"
    },
    "reason": "convert_xfm exits 2; the same from the original. Input matrix filename not found",
-   "seconds": 0.051,
+   "seconds": 0.065,
    "status": "both-error"
   },
   {
@@ -2710,7 +2679,7 @@
     "stdout: the same lines (numbers aside)": "yes"
    },
    "reason": "convert_xfm exits 2; the same from the original. Unknown option x.mat",
-   "seconds": 0.065,
+   "seconds": 0.063,
    "status": "both-error"
   },
   {
@@ -2724,7 +2693,7 @@
     "stdout: the same lines (numbers aside)": "yes"
    },
    "reason": "convert_xfm exits 255; the same from the original. Unrecognised option -frob",
-   "seconds": 0.039,
+   "seconds": 0.03,
    "status": "both-error"
   },
   {
@@ -2738,7 +2707,7 @@
     "stdout: the same lines (numbers aside)": "yes"
    },
    "reason": "convert_xfm exits 2; the same from the original. Lacking argument to option -omat",
-   "seconds": 0.036,
+   "seconds": 0.029,
    "status": "both-error"
   },
   {
@@ -2752,7 +2721,7 @@
     "stdout: the same lines (numbers aside)": "yes"
    },
    "reason": "convert_xfm exits -6; the same from the original. terminate called after throwing an instance of 'std::runtime_error' what(): inv(): matrix is singular",
-   "seconds": 0.054,
+   "seconds": 0.035,
    "status": "both-error"
   },
   {
@@ -2762,7 +2731,7 @@
    "checks_total": 2,
    "failed_checks": [],
    "reason": "FSL never finishes (FSL-71: undefined behaviour); the original refuses in both modes",
-   "seconds": 0.329,
+   "seconds": 0.269,
    "status": "expected-divergence"
   },
   {
@@ -2772,7 +2741,7 @@
    "checks_total": 2,
    "failed_checks": [],
    "reason": "FSL never finishes (FSL-72: undefined behaviour); the original refuses in both modes",
-   "seconds": 0.201,
+   "seconds": 0.115,
    "status": "expected-divergence"
   },
   {
@@ -2782,7 +2751,7 @@
    "checks_total": 2,
    "failed_checks": [],
    "reason": "FSL crashes (FSL-75: undefined behaviour); the original finishes naming it",
-   "seconds": 0.209,
+   "seconds": 0.174,
    "status": "expected-divergence"
   },
   {
@@ -2792,7 +2761,54 @@
    "checks_total": 2,
    "failed_checks": [],
    "reason": "FSL crashes (FSL-75: undefined behaviour); the original refuses in both modes",
-   "seconds": 0.063,
+   "seconds": 0.04,
+   "status": "expected-divergence"
+  },
+  {
+   "case": "edge/one-voxel-input",
+   "category": "edge",
+   "checks_passed": 5,
+   "checks_total": 6,
+   "failed_checks": [
+    {
+     "detail": "maximum 159.0868 mm, RMS deviation 303.8605 mm; FSL's own p95 on a perturbed input 0.0000 mm",
+     "metric": "p95 displacement (mm)",
+     "name": "out.mat: 95th-percentile displacement over the reference's brain",
+     "passed": false,
+     "threshold": 0.5,
+     "value": 131.933
+    }
+   ],
+   "measured": {
+    "out.mat: 95th-percentile displacement over the reference's brain": 131.933,
+    "stderr: the same lines (numbers aside)": "yes",
+    "stdout: the same lines (numbers aside)": "yes"
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 1.257,
+   "status": "fail"
+  },
+  {
+   "case": "edge/zero-voxel-size",
+   "category": "edge",
+   "checks_passed": 2,
+   "checks_total": 2,
+   "failed_checks": [],
+   "reason": "FSL never finishes (FSL-93: undefined behaviour); the original corrects it by default and refuses with reproduce",
+   "seconds": 1.962,
+   "status": "expected-divergence"
+  },
+  {
+   "case": "edge/basescale-0",
+   "category": "edge",
+   "checks_passed": 2,
+   "checks_total": 2,
+   "failed_checks": [],
+   "reason": "FSL never finishes (FSL-93: undefined behaviour); the original refuses in both modes",
+   "seconds": 0.079,
    "status": "expected-divergence"
   },
   {
@@ -2806,17 +2822,1946 @@
     "stdout: the same lines (numbers aside)": "yes"
    },
    "reason": "convert_xfm exits 253; the same from the original. Could not open matrix file none.mat Cannot read concat-matrix",
-   "seconds": 0.038,
+   "seconds": 0.022,
    "status": "both-error"
+  },
+  {
+   "case": "programs/applyxfm4D-usage",
+   "category": "programs",
+   "checks_passed": 4,
+   "checks_total": 4,
+   "failed_checks": [],
+   "reason": "applyxfm4D exits 255; the same from the original. Usage: ~/fsl-6.0.7.23/bin/applyxfm4D <input volume> <ref volume> <output volume> <transformation matrix file/dir> --interp, -interp <nearestneighbour (or nn), trilinear, spline, sinc (defau",
+   "seconds": 0.027,
+   "status": "both-error"
+  },
+  {
+   "case": "programs/applyxfm4D-default",
+   "category": "programs",
+   "checks_passed": 7,
+   "checks_total": 7,
+   "failed_checks": [],
+   "measured": {
+    "out.nii.gz: correlation with FSL's values (sinc)": 1.0
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 0.53,
+   "status": "pass"
+  },
+  {
+   "case": "programs/applyxfm4D-single-trilinear",
+   "category": "programs",
+   "checks_passed": 6,
+   "checks_total": 6,
+   "failed_checks": [],
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 0.186,
+   "status": "pass"
+  },
+  {
+   "case": "programs/applyxfm4D-fourdigit-nn",
+   "category": "programs",
+   "checks_passed": 6,
+   "checks_total": 6,
+   "failed_checks": [],
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 0.162,
+   "status": "pass"
+  },
+  {
+   "case": "programs/applyxfm4D-userprefix-spline",
+   "category": "programs",
+   "checks_passed": 7,
+   "checks_total": 7,
+   "failed_checks": [],
+   "measured": {
+    "out.nii.gz: correlation with FSL's values (spline)": 1.0
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 0.386,
+   "status": "pass"
+  },
+  {
+   "case": "programs/applyxfm4D-float-sinc",
+   "category": "programs",
+   "checks_passed": 7,
+   "checks_total": 7,
+   "failed_checks": [],
+   "measured": {
+    "out.nii.gz: correlation with FSL's values (sinc)": 1.0
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 0.791,
+   "status": "pass"
+  },
+  {
+   "case": "programs/applyxfm4D-3d",
+   "category": "programs",
+   "checks_passed": 7,
+   "checks_total": 7,
+   "failed_checks": [],
+   "measured": {
+    "out.nii.gz: correlation with FSL's values (sinc)": 1.0
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 147498
+   },
+   "seconds": 0.276,
+   "status": "pass"
+  },
+  {
+   "case": "programs/applyxfm4D-3d-spline-float",
+   "category": "programs",
+   "checks_passed": 7,
+   "checks_total": 7,
+   "failed_checks": [],
+   "measured": {
+    "out.nii.gz: correlation with FSL's values (spline)": 1.0
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 0.14,
+   "status": "pass"
+  },
+  {
+   "case": "programs/applyxfm4D-int8",
+   "category": "programs",
+   "checks_passed": 6,
+   "checks_total": 6,
+   "failed_checks": [],
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 163840
+   },
+   "seconds": 0.067,
+   "status": "pass"
+  },
+  {
+   "case": "programs/applyxfm4D-double-sinc",
+   "category": "programs",
+   "checks_passed": 7,
+   "checks_total": 7,
+   "failed_checks": [],
+   "measured": {
+    "out.nii.gz: correlation with FSL's values (sinc)": 1.0
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 0.549,
+   "status": "pass"
+  },
+  {
+   "case": "programs/applyxfm4D-double-3d-spline",
+   "category": "programs",
+   "checks_passed": 7,
+   "checks_total": 7,
+   "failed_checks": [],
+   "measured": {
+    "out.nii.gz: correlation with FSL's values (spline)": 1.0
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 0.176,
+   "status": "pass"
+  },
+  {
+   "case": "programs/applyxfm4D-double-nn",
+   "category": "programs",
+   "checks_passed": 6,
+   "checks_total": 6,
+   "failed_checks": [],
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 0.323,
+   "status": "pass"
+  },
+  {
+   "case": "programs/applyxfm4D-3d-spline-int",
+   "category": "programs",
+   "checks_passed": 7,
+   "checks_total": 7,
+   "failed_checks": [],
+   "measured": {
+    "out.nii.gz: correlation with FSL's values (spline)": 1.0
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 0.223,
+   "status": "pass"
+  },
+  {
+   "case": "programs/applyxfm4D-nan-border",
+   "category": "programs",
+   "checks_passed": 6,
+   "checks_total": 6,
+   "failed_checks": [],
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 16342
+   },
+   "seconds": 0.08,
+   "status": "pass"
+  },
+  {
+   "case": "programs/applyxfm4D-nan-border-3d",
+   "category": "programs",
+   "checks_passed": 7,
+   "checks_total": 7,
+   "failed_checks": [],
+   "measured": {
+    "out.nii.gz: correlation with FSL's values (sinc)": 1.0
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 163429
+   },
+   "seconds": 0.279,
+   "status": "pass"
+  },
+  {
+   "case": "programs/applyxfm4D-metres",
+   "category": "programs",
+   "checks_passed": 6,
+   "checks_total": 6,
+   "failed_checks": [],
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 0.09,
+   "status": "pass"
+  },
+  {
+   "case": "programs/applyxfm4D-bad-interp",
+   "category": "programs",
+   "checks_passed": 4,
+   "checks_total": 4,
+   "failed_checks": [],
+   "reason": "applyxfm4D exits 1; the same from the original. interpolation method: cubic is not a valid choice. Please choose from nearestneighbour, trilinear, sinc, or spline.",
+   "seconds": 0.027,
+   "status": "both-error"
+  },
+  {
+   "case": "programs/applyxfm4D-userprefix-last",
+   "category": "programs",
+   "checks_passed": 4,
+   "checks_total": 4,
+   "failed_checks": [],
+   "reason": "applyxfm4D exits -6; the same from the original. terminate called after throwing an instance of 'std::logic_error' what(): basic_string: construction from null is not valid",
+   "seconds": 0.05,
+   "status": "both-error"
+  },
+  {
+   "case": "programs/applyxfm4D-missing-matrix",
+   "category": "programs",
+   "checks_passed": 4,
+   "checks_total": 4,
+   "failed_checks": [],
+   "reason": "applyxfm4D exits -6; the same from the original. Could not open matrix file none/MAT_00000 terminate called after throwing an instance of 'std::logic_error' what(): matrix multiplication: incompatible matrix dimensions: 0x0 and 4x4",
+   "seconds": 0.071,
+   "status": "both-error"
+  },
+  {
+   "case": "programs/applyxfm4D-missing-input",
+   "category": "programs",
+   "checks_passed": 4,
+   "checks_total": 4,
+   "failed_checks": [],
+   "reason": "applyxfm4D exits -6; the same from the original. Image Exception : #63 :: No image files match: none terminate called after throwing an instance of 'std::runtime_error' what(): No image files match: none",
+   "seconds": 0.047,
+   "status": "both-error"
+  },
+  {
+   "case": "programs/aff2rigid-usage",
+   "category": "programs",
+   "checks_passed": 4,
+   "checks_total": 4,
+   "failed_checks": [],
+   "measured": {
+    "stderr: the same text, the numbers within one unit of their last printed digit": 0.0,
+    "stdout: the same text, the numbers within one unit of their last printed digit": 0.0
+   },
+   "reason": "aff2rigid exits 1; the same from the original. ",
+   "seconds": 0.391,
+   "status": "both-error"
+  },
+  {
+   "case": "programs/aff2rigid-default",
+   "category": "programs",
+   "checks_passed": 5,
+   "checks_total": 5,
+   "failed_checks": [],
+   "measured": {
+    "FSL-81's correction: the matrix within 1e-9 of the replica's (NumPy's arithmetic)": 0.0,
+    "stderr: the same text, the numbers within one unit of their last printed digit": 0.0,
+    "stdout: the same text, the numbers within one unit of their last printed digit": 0.0
+   },
+   "reason": "aff2rigid exits 1; the same from the original. Traceback (most recent call last): File \"~/fsl-6.0.7.23/bin/aff2rigid\", line 105, in <module> v41=mat(zeros((4,1))) ^^^ NameError: name 'mat' is not defined",
+   "seconds": 0.406,
+   "status": "both-error"
+  },
+  {
+   "case": "programs/aff2rigid-fmriprep",
+   "category": "programs",
+   "checks_passed": 5,
+   "checks_total": 5,
+   "failed_checks": [],
+   "measured": {
+    "FSL-81's correction: the matrix within 1e-9 of the replica's (NumPy's arithmetic)": 0.0,
+    "stderr: the same text, the numbers within one unit of their last printed digit": 0.0,
+    "stdout: the same text, the numbers within one unit of their last printed digit": 0.0
+   },
+   "reason": "aff2rigid exits 1; the same from the original. Traceback (most recent call last): File \"~/fsl-6.0.7.23/bin/aff2rigid\", line 105, in <module> v41=mat(zeros((4,1))) ^^^ NameError: name 'mat' is not defined",
+   "seconds": 0.058,
+   "status": "both-error"
+  },
+  {
+   "case": "programs/extracttxt-usage",
+   "category": "programs",
+   "checks_passed": 5,
+   "checks_total": 5,
+   "failed_checks": [],
+   "reason": "extracttxt exits 2; the same from the original. ~/fsl-6.0.7.23/bin/extracttxt: 68: exit: Illegal number: -1",
+   "seconds": 0.039,
+   "status": "both-error"
+  },
+  {
+   "case": "programs/extracttxt-rest",
+   "category": "programs",
+   "checks_passed": 6,
+   "checks_total": 6,
+   "failed_checks": [],
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 0.055,
+   "status": "pass"
+  },
+  {
+   "case": "programs/extracttxt-count",
+   "category": "programs",
+   "checks_passed": 6,
+   "checks_total": 6,
+   "failed_checks": [],
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 0.055,
+   "status": "pass"
+  },
+  {
+   "case": "programs/extracttxt-regex-start",
+   "category": "programs",
+   "checks_passed": 6,
+   "checks_total": 6,
+   "failed_checks": [],
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 0.056,
+   "status": "pass"
+  },
+  {
+   "case": "programs/extracttxt-before",
+   "category": "programs",
+   "checks_passed": 6,
+   "checks_total": 6,
+   "failed_checks": [],
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 0.057,
+   "status": "pass"
+  },
+  {
+   "case": "programs/extracttxt-zero-count",
+   "category": "programs",
+   "checks_passed": 6,
+   "checks_total": 6,
+   "failed_checks": [],
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 0.062,
+   "status": "pass"
+  },
+  {
+   "case": "programs/extracttxt-line0",
+   "category": "programs",
+   "checks_passed": 5,
+   "checks_total": 5,
+   "failed_checks": [],
+   "reason": "extracttxt exits 1; the same from the original. sed: -e expression #1, char 4: invalid usage of line address 0",
+   "seconds": 0.045,
+   "status": "both-error"
+  },
+  {
+   "case": "programs/extracttxt-dc-negative",
+   "category": "programs",
+   "checks_passed": 5,
+   "checks_total": 5,
+   "failed_checks": [],
+   "reason": "extracttxt exits 1; the same from the original. dc: stack empty sed: invalid option -- '2' Usage: sed [OPTION]... {script-only-if-no-other-script} [input-file]... -n, --quiet, --silent suppress automatic printing of pattern space --debug annotate p",
+   "seconds": 0.036,
+   "status": "both-error"
+  },
+  {
+   "case": "programs/extracttxt-sed-option",
+   "category": "programs",
+   "checks_passed": 5,
+   "checks_total": 5,
+   "failed_checks": [],
+   "reason": "extracttxt exits 1; the same from the original. sed: invalid option -- '1' Usage: sed [OPTION]... {script-only-if-no-other-script} [input-file]... -n, --quiet, --silent suppress automatic printing of pattern space --debug annotate program execution",
+   "seconds": 0.037,
+   "status": "both-error"
+  },
+  {
+   "case": "programs/extracttxt-signed",
+   "category": "programs",
+   "checks_passed": 6,
+   "checks_total": 6,
+   "failed_checks": [],
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 0.13,
+   "status": "pass"
+  },
+  {
+   "case": "programs/extracttxt-nomatch",
+   "category": "programs",
+   "checks_passed": 6,
+   "checks_total": 6,
+   "failed_checks": [],
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 0.125,
+   "status": "pass"
+  },
+  {
+   "case": "programs/extracttxt-missing",
+   "category": "programs",
+   "checks_passed": 6,
+   "checks_total": 6,
+   "failed_checks": [],
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 0.056,
+   "status": "pass"
+  },
+  {
+   "case": "programs/pairreg-usage",
+   "category": "programs",
+   "checks_passed": 4,
+   "checks_total": 4,
+   "failed_checks": [],
+   "measured": {
+    "stderr: the same lines (numbers aside)": "yes",
+    "stdout: the same lines (numbers aside)": "yes"
+   },
+   "reason": "pairreg exits 1; the same from the original. ",
+   "seconds": 0.034,
+   "status": "both-error"
+  },
+  {
+   "case": "programs/pairreg-default",
+   "category": "programs",
+   "checks_passed": 6,
+   "checks_total": 6,
+   "failed_checks": [],
+   "measured": {
+    "pair.mat: 95th-percentile displacement over the reference's brain": 0.0001,
+    "stderr: the same lines (numbers aside)": "yes",
+    "stdout: the same lines (numbers aside)": "yes"
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 5.966,
+   "status": "pass"
+  },
+  {
+   "case": "programs/pairreg-metres",
+   "category": "programs",
+   "checks_passed": 6,
+   "checks_total": 6,
+   "failed_checks": [],
+   "measured": {
+    "pair.mat: 95th-percentile displacement over the reference's brain": 0.0029,
+    "stderr: the same lines (numbers aside)": "yes",
+    "stdout: the same lines (numbers aside)": "yes"
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 0.69,
+   "status": "pass"
+  },
+  {
+   "case": "programs/midtrans-usage",
+   "category": "programs",
+   "checks_passed": 4,
+   "checks_total": 4,
+   "failed_checks": [],
+   "measured": {
+    "stderr: the same text, the numbers within one unit of their last printed digit": 0.0,
+    "stdout: the same text, the numbers within one unit of their last printed digit": 0.0
+   },
+   "reason": "midtrans exits 1; the same from the original. Must specify at least 2 transforms to find the mid-transform Part of FSL (ID: 2412.6-dirty) midtrans Copyright(c) 2010, University of Oxford (Mark Jenkinson) Usage: midtrans [options] transform1 trans",
+   "seconds": 0.03,
+   "status": "both-error"
+  },
+  {
+   "case": "programs/midtrans-help",
+   "category": "programs",
+   "checks_passed": 4,
+   "checks_total": 4,
+   "failed_checks": [],
+   "measured": {
+    "stderr: the same text, the numbers within one unit of their last printed digit": 0.0,
+    "stdout: the same text, the numbers within one unit of their last printed digit": 0.0
+   },
+   "reason": "midtrans exits 1; the same from the original. Part of FSL (ID: 2412.6-dirty) midtrans Copyright(c) 2010, University of Oxford (Mark Jenkinson) Usage: midtrans [options] transform1 transform2 ... transformN e.g. midtrans -o temp2mid.mat A2temp.mat",
+   "seconds": 0.021,
+   "status": "both-error"
+  },
+  {
+   "case": "programs/midtrans-one",
+   "category": "programs",
+   "checks_passed": 4,
+   "checks_total": 4,
+   "failed_checks": [],
+   "measured": {
+    "stderr: the same text, the numbers within one unit of their last printed digit": 0.0,
+    "stdout: the same text, the numbers within one unit of their last printed digit": 0.0
+   },
+   "reason": "midtrans exits 1; the same from the original. Must specify at least 2 transforms to find the mid-transform Part of FSL (ID: 2412.6-dirty) midtrans Copyright(c) 2010, University of Oxford (Mark Jenkinson) Usage: midtrans [options] transform1 trans",
+   "seconds": 0.021,
+   "status": "both-error"
+  },
+  {
+   "case": "programs/midtrans-default",
+   "category": "programs",
+   "checks_passed": 5,
+   "checks_total": 5,
+   "failed_checks": [],
+   "measured": {
+    "stderr: the same text, the numbers within one unit of their last printed digit": 0.0,
+    "stdout: the same text, the numbers within one unit of their last printed digit": 0.0
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 0.04,
+   "status": "pass"
+  },
+  {
+   "case": "programs/midtrans-out-verbose",
+   "category": "programs",
+   "checks_passed": 6,
+   "checks_total": 6,
+   "failed_checks": [],
+   "measured": {
+    "mid.mat: within 1e-9 of FSL's in every element": 1e-10,
+    "stderr: the same text, the numbers within one unit of their last printed digit": 0.0,
+    "stdout: the same text, the numbers within one unit of their last printed digit": 0.0
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 0.051,
+   "status": "pass"
+  },
+  {
+   "case": "programs/midtrans-template-separate",
+   "category": "programs",
+   "checks_passed": 5,
+   "checks_total": 5,
+   "failed_checks": [],
+   "measured": {
+    "stderr: the same text, the numbers within one unit of their last printed digit": 0.0,
+    "stdout: the same text, the numbers within one unit of their last printed digit": 0.0
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 0.111,
+   "status": "pass"
+  },
+  {
+   "case": "programs/midtrans-template-50mm",
+   "category": "programs",
+   "checks_passed": 5,
+   "checks_total": 5,
+   "failed_checks": [],
+   "measured": {
+    "stderr: the same text, the numbers within one unit of their last printed digit": 0.0,
+    "stdout: the same text, the numbers within one unit of their last printed digit": 0.0
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 0.043,
+   "status": "pass"
+  },
+  {
+   "case": "programs/midtrans-debug",
+   "category": "programs",
+   "checks_passed": 5,
+   "checks_total": 5,
+   "failed_checks": [],
+   "measured": {
+    "stderr: the same text, the numbers within one unit of their last printed digit": 0.0,
+    "stdout: the same text, the numbers within one unit of their last printed digit": 0.0
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 0.049,
+   "status": "pass"
+  },
+  {
+   "case": "programs/midtrans-singular",
+   "category": "programs",
+   "checks_passed": 4,
+   "checks_total": 4,
+   "failed_checks": [],
+   "measured": {
+    "stderr: the same text, the numbers within one unit of their last printed digit": 0.0,
+    "stdout: the same text, the numbers within one unit of their last printed digit": 0.0
+   },
+   "reason": "midtrans exits 1; the same from the original. Could not read matrix sing.mat",
+   "seconds": 0.023,
+   "status": "both-error"
+  },
+  {
+   "case": "programs/midtrans-token",
+   "category": "programs",
+   "checks_passed": 5,
+   "checks_total": 5,
+   "failed_checks": [],
+   "measured": {
+    "stderr: the same text, the numbers within one unit of their last printed digit": 0.0,
+    "stdout: the same text, the numbers within one unit of their last printed digit": 0.0
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 0.04,
+   "status": "pass"
+  },
+  {
+   "case": "programs/midtrans-not-square",
+   "category": "programs",
+   "checks_passed": 5,
+   "checks_total": 5,
+   "failed_checks": [],
+   "measured": {
+    "stderr: the same text, the numbers within one unit of their last printed digit": 0.0,
+    "stdout: the same text, the numbers within one unit of their last printed digit": 0.0
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 0.04,
+   "status": "pass"
+  },
+  {
+   "case": "programs/midtrans-3x3",
+   "category": "programs",
+   "checks_passed": 5,
+   "checks_total": 5,
+   "failed_checks": [],
+   "measured": {
+    "stderr: the same text, the numbers within one unit of their last printed digit": 0.0,
+    "stdout: the same text, the numbers within one unit of their last printed digit": 0.0
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 0.039,
+   "status": "pass"
+  },
+  {
+   "case": "programs/pointflirt-usage",
+   "category": "programs",
+   "checks_passed": 4,
+   "checks_total": 4,
+   "failed_checks": [],
+   "measured": {
+    "stderr: the same text, the numbers within one unit of their last printed digit": 0.0,
+    "stdout: the same text, the numbers within one unit of their last printed digit": 0.0
+   },
+   "reason": "pointflirt exits 1; the same from the original. *************************************************** The following COMPULSORY options have not been set: -i filename of input volume coordinates -r filename of reference volume coordinates ************",
+   "seconds": 0.027,
+   "status": "both-error"
+  },
+  {
+   "case": "programs/pointflirt-default",
+   "category": "programs",
+   "checks_passed": 5,
+   "checks_total": 5,
+   "failed_checks": [],
+   "measured": {
+    "stderr: the same text, the numbers within one unit of their last printed digit": 0.0,
+    "stdout: the same text, the numbers within one unit of their last printed digit": 0.0
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 0.045,
+   "status": "pass"
+  },
+  {
+   "case": "programs/pointflirt-out-verbose",
+   "category": "programs",
+   "checks_passed": 5,
+   "checks_total": 5,
+   "failed_checks": [],
+   "measured": {
+    "stderr: the same text, the numbers within one unit of their last printed digit": 0.0,
+    "stdout: the same text, the numbers within one unit of their last printed digit": 0.0
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 0.039,
+   "status": "pass"
+  },
+  {
+   "case": "programs/pointflirt-vox",
+   "category": "programs",
+   "checks_passed": 5,
+   "checks_total": 5,
+   "failed_checks": [],
+   "measured": {
+    "stderr: the same text, the numbers within one unit of their last printed digit": 0.0,
+    "stdout: the same text, the numbers within one unit of their last printed digit": 0.0
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 0.071,
+   "status": "pass"
+  },
+  {
+   "case": "programs/pointflirt-vox-odd",
+   "category": "programs",
+   "checks_passed": 5,
+   "checks_total": 5,
+   "failed_checks": [],
+   "measured": {
+    "stderr: the same text, the numbers within one unit of their last printed digit": 0.0,
+    "stdout: the same text, the numbers within one unit of their last printed digit": 0.0
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 0.046,
+   "status": "pass"
+  },
+  {
+   "case": "programs/pointflirt-vox-missing",
+   "category": "programs",
+   "checks_passed": 4,
+   "checks_total": 4,
+   "failed_checks": [],
+   "measured": {
+    "stderr: the same text, the numbers within one unit of their last printed digit": 0.0,
+    "stdout: the same text, the numbers within one unit of their last printed digit": 0.0
+   },
+   "reason": "pointflirt exits 2; the same from the original. ERROR: need to specify --invol and --refvol to use --vox",
+   "seconds": 0.02,
+   "status": "both-error"
+  },
+  {
+   "case": "programs/pointflirt-nullspace",
+   "category": "programs",
+   "checks_passed": 5,
+   "checks_total": 5,
+   "failed_checks": [],
+   "measured": {
+    "stderr: the same text, the numbers within one unit of their last printed digit": 0.0,
+    "stdout: the same text, the numbers within one unit of their last printed digit": 0.0
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 0.045,
+   "status": "pass"
+  },
+  {
+   "case": "programs/pointflirt-count",
+   "category": "programs",
+   "checks_passed": 4,
+   "checks_total": 4,
+   "failed_checks": [],
+   "measured": {
+    "stderr: the same text, the numbers within one unit of their last printed digit": 0.0,
+    "stdout: the same text, the numbers within one unit of their last printed digit": 0.0
+   },
+   "reason": "pointflirt exits 255; the same from the original. ERROR: Different number of coordinates in the two files",
+   "seconds": 0.021,
+   "status": "both-error"
+  },
+  {
+   "case": "programs/pointflirt-many",
+   "category": "programs",
+   "checks_passed": 5,
+   "checks_total": 5,
+   "failed_checks": [],
+   "measured": {
+    "stderr: the same text, the numbers within one unit of their last printed digit": 0.0,
+    "stdout: the same text, the numbers within one unit of their last printed digit": 0.0
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 0.039,
+   "status": "pass"
+  },
+  {
+   "case": "programs/pointflirt-missing",
+   "category": "programs",
+   "checks_passed": 4,
+   "checks_total": 4,
+   "failed_checks": [],
+   "measured": {
+    "stderr: the same text, the numbers within one unit of their last printed digit": 0.0,
+    "stdout: the same text, the numbers within one unit of their last printed digit": 0.0
+   },
+   "reason": "pointflirt exits 255; the same from the original. Could not open matrix file none.txt ERROR: Different number of coordinates in the two files",
+   "seconds": 0.022,
+   "status": "both-error"
+  },
+  {
+   "case": "programs/pointflirt-three",
+   "category": "programs",
+   "checks_passed": 5,
+   "checks_total": 5,
+   "failed_checks": [],
+   "measured": {
+    "stderr: the same text, the numbers within one unit of their last printed digit": 0.0,
+    "stdout: the same text, the numbers within one unit of their last printed digit": 0.0
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 0.038,
+   "status": "pass"
+  },
+  {
+   "case": "programs/pointflirt-two",
+   "category": "programs",
+   "checks_passed": 4,
+   "checks_total": 4,
+   "failed_checks": [],
+   "measured": {
+    "stderr: the same text, the numbers within one unit of their last printed digit": 0.0,
+    "stdout: the same text, the numbers within one unit of their last printed digit": 0.0
+   },
+   "reason": "pointflirt exits -6; the same from the original. terminate called after throwing an instance of 'std::logic_error' what(): copy into submatrix: incompatible matrix dimensions: 3x1 and 2x1",
+   "seconds": 0.039,
+   "status": "both-error"
+  },
+  {
+   "case": "programs/pointflirt-four-columns",
+   "category": "programs",
+   "checks_passed": 4,
+   "checks_total": 4,
+   "failed_checks": [],
+   "measured": {
+    "stderr: the same text, the numbers within one unit of their last printed digit": 0.0,
+    "stdout: the same text, the numbers within one unit of their last printed digit": 0.0
+   },
+   "reason": "pointflirt exits -6; the same from the original. terminate called after throwing an instance of 'std::logic_error' what(): copy into submatrix: incompatible matrix dimensions: 3x1 and 4x1",
+   "seconds": 0.045,
+   "status": "both-error"
+  },
+  {
+   "case": "programs/avscale-usage",
+   "category": "programs",
+   "checks_passed": 5,
+   "checks_total": 5,
+   "failed_checks": [],
+   "reason": "avscale exits 255; the same from the original. Usage: ~/fsl-6.0.7.23/bin/avscale [--allparams/--inverteddies] matrixfile [non-reference-volume]",
+   "seconds": 0.03,
+   "status": "both-error"
+  },
+  {
+   "case": "programs/avscale-default",
+   "category": "programs",
+   "checks_passed": 6,
+   "checks_total": 6,
+   "failed_checks": [],
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 0.043,
+   "status": "pass"
+  },
+  {
+   "case": "programs/avscale-allparams",
+   "category": "programs",
+   "checks_passed": 6,
+   "checks_total": 6,
+   "failed_checks": [],
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 0.052,
+   "status": "pass"
+  },
+  {
+   "case": "programs/avscale-inverteddies",
+   "category": "programs",
+   "checks_passed": 6,
+   "checks_total": 6,
+   "failed_checks": [],
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 0.084,
+   "status": "pass"
+  },
+  {
+   "case": "programs/avscale-flip",
+   "category": "programs",
+   "checks_passed": 6,
+   "checks_total": 6,
+   "failed_checks": [],
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 0.065,
+   "status": "pass"
+  },
+  {
+   "case": "programs/avscale-singular",
+   "category": "programs",
+   "checks_passed": 5,
+   "checks_total": 5,
+   "failed_checks": [],
+   "reason": "avscale exits -6; the same from the original. matrix multiplication: problem with matrix inverse; suggest to use solve() instead terminate called after throwing an instance of 'std::runtime_error' what(): matrix multiplication: problem with matri",
+   "seconds": 0.035,
+   "status": "both-error"
+  },
+  {
+   "case": "programs/avscale-missing-matrix",
+   "category": "programs",
+   "checks_passed": 5,
+   "checks_total": 5,
+   "failed_checks": [],
+   "reason": "avscale exits 254; the same from the original. Could not open matrix file none.mat",
+   "seconds": 0.023,
+   "status": "both-error"
+  },
+  {
+   "case": "programs/avscale-empty-volume",
+   "category": "programs",
+   "checks_passed": 6,
+   "checks_total": 6,
+   "failed_checks": [],
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 0.039,
+   "status": "pass"
+  },
+  {
+   "case": "programs/avscale-missing-volume",
+   "category": "programs",
+   "checks_passed": 5,
+   "checks_total": 5,
+   "failed_checks": [],
+   "reason": "avscale exits -6; the same from the original. Image Exception : #63 :: No image files match: none Image Exception : #22 :: Failed to read volume none.nii.gz Error : No image files match: none Failed to read volume none.nii.gz Error : No image fil",
+   "seconds": 0.033,
+   "status": "both-error"
+  },
+  {
+   "case": "programs/img2imgcoord-usage",
+   "category": "programs",
+   "checks_passed": 5,
+   "checks_total": 5,
+   "failed_checks": [],
+   "reason": "img2imgcoord exits 1; the same from the original. ",
+   "seconds": 0.028,
+   "status": "both-error"
+  },
+  {
+   "case": "programs/img2imgcoord-xfm",
+   "category": "programs",
+   "checks_passed": 6,
+   "checks_total": 6,
+   "failed_checks": [],
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 0.078,
+   "status": "pass"
+  },
+  {
+   "case": "programs/img2imgcoord-vox",
+   "category": "programs",
+   "checks_passed": 6,
+   "checks_total": 6,
+   "failed_checks": [],
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 0.073,
+   "status": "pass"
+  },
+  {
+   "case": "programs/img2imgcoord-mm",
+   "category": "programs",
+   "checks_passed": 6,
+   "checks_total": 6,
+   "failed_checks": [],
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 0.074,
+   "status": "pass"
+  },
+  {
+   "case": "programs/img2imgcoord-verbose",
+   "category": "programs",
+   "checks_passed": 6,
+   "checks_total": 6,
+   "failed_checks": [],
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 0.074,
+   "status": "pass"
+  },
+  {
+   "case": "programs/img2imgcoord-missing-coords",
+   "category": "programs",
+   "checks_passed": 5,
+   "checks_total": 5,
+   "failed_checks": [],
+   "reason": "img2imgcoord exits 255; the same from the original. Could not open matrix file none.txt",
+   "seconds": 0.044,
+   "status": "both-error"
+  },
+  {
+   "case": "programs/img2imgcoord-not-numbers",
+   "category": "programs",
+   "checks_passed": 6,
+   "checks_total": 6,
+   "failed_checks": [],
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 0.073,
+   "status": "pass"
+  },
+  {
+   "case": "programs/img2imgcoord-lacking",
+   "category": "programs",
+   "checks_passed": 6,
+   "checks_total": 6,
+   "failed_checks": [],
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 0.073,
+   "status": "pass"
+  },
+  {
+   "case": "programs/img2imgcoord-unknown",
+   "category": "programs",
+   "checks_passed": 5,
+   "checks_total": 5,
+   "failed_checks": [],
+   "reason": "img2imgcoord exits 255; the same from the original. Unrecognised option -frob",
+   "seconds": 0.044,
+   "status": "both-error"
+  },
+  {
+   "case": "programs/img2imgcoord-missing-image",
+   "category": "programs",
+   "checks_passed": 5,
+   "checks_total": 5,
+   "failed_checks": [],
+   "reason": "img2imgcoord exits -6; the same from the original. Image Exception : #63 :: No image files match: none Image Exception : #22 :: Failed to read volume none.nii Error : No image files match: none terminate called after throwing an instance of 'std::runt",
+   "seconds": 0.061,
+   "status": "both-error"
+  },
+  {
+   "case": "programs/std2imgcoord-usage",
+   "category": "programs",
+   "checks_passed": 5,
+   "checks_total": 5,
+   "failed_checks": [],
+   "reason": "std2imgcoord exits 1; the same from the original. ",
+   "seconds": 0.029,
+   "status": "both-error"
+  },
+  {
+   "case": "programs/std2imgcoord-xfm",
+   "category": "programs",
+   "checks_passed": 6,
+   "checks_total": 6,
+   "failed_checks": [],
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 0.073,
+   "status": "pass"
+  },
+  {
+   "case": "programs/std2imgcoord-vox",
+   "category": "programs",
+   "checks_passed": 6,
+   "checks_total": 6,
+   "failed_checks": [],
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 0.145,
+   "status": "pass"
+  },
+  {
+   "case": "programs/std2imgcoord-mm",
+   "category": "programs",
+   "checks_passed": 6,
+   "checks_total": 6,
+   "failed_checks": [],
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 0.075,
+   "status": "pass"
+  },
+  {
+   "case": "programs/std2imgcoord-verbose",
+   "category": "programs",
+   "checks_passed": 6,
+   "checks_total": 6,
+   "failed_checks": [],
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 0.09,
+   "status": "pass"
+  },
+  {
+   "case": "programs/std2imgcoord-missing-coords",
+   "category": "programs",
+   "checks_passed": 5,
+   "checks_total": 5,
+   "failed_checks": [],
+   "reason": "std2imgcoord exits 255; the same from the original. Could not open matrix file none.txt",
+   "seconds": 0.043,
+   "status": "both-error"
+  },
+  {
+   "case": "programs/std2imgcoord-not-numbers",
+   "category": "programs",
+   "checks_passed": 6,
+   "checks_total": 6,
+   "failed_checks": [],
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 0.067,
+   "status": "pass"
+  },
+  {
+   "case": "programs/std2imgcoord-lacking",
+   "category": "programs",
+   "checks_passed": 6,
+   "checks_total": 6,
+   "failed_checks": [],
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 0.08,
+   "status": "pass"
+  },
+  {
+   "case": "programs/std2imgcoord-unknown",
+   "category": "programs",
+   "checks_passed": 5,
+   "checks_total": 5,
+   "failed_checks": [],
+   "reason": "std2imgcoord exits 255; the same from the original. Unrecognised option -frob",
+   "seconds": 0.047,
+   "status": "both-error"
+  },
+  {
+   "case": "programs/std2imgcoord-missing-image",
+   "category": "programs",
+   "checks_passed": 5,
+   "checks_total": 5,
+   "failed_checks": [],
+   "reason": "std2imgcoord exits -6; the same from the original. Image Exception : #63 :: No image files match: none Image Exception : #22 :: Failed to read volume none.nii Error : No image files match: none terminate called after throwing an instance of 'std::runt",
+   "seconds": 0.036,
+   "status": "both-error"
+  },
+  {
+   "case": "programs/img2stdcoord-usage",
+   "category": "programs",
+   "checks_passed": 5,
+   "checks_total": 5,
+   "failed_checks": [],
+   "reason": "img2stdcoord exits 1; the same from the original. ",
+   "seconds": 0.029,
+   "status": "both-error"
+  },
+  {
+   "case": "programs/img2stdcoord-xfm",
+   "category": "programs",
+   "checks_passed": 6,
+   "checks_total": 6,
+   "failed_checks": [],
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 0.071,
+   "status": "pass"
+  },
+  {
+   "case": "programs/img2stdcoord-vox",
+   "category": "programs",
+   "checks_passed": 6,
+   "checks_total": 6,
+   "failed_checks": [],
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 0.075,
+   "status": "pass"
+  },
+  {
+   "case": "programs/img2stdcoord-mm",
+   "category": "programs",
+   "checks_passed": 6,
+   "checks_total": 6,
+   "failed_checks": [],
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 0.074,
+   "status": "pass"
+  },
+  {
+   "case": "programs/img2stdcoord-verbose",
+   "category": "programs",
+   "checks_passed": 6,
+   "checks_total": 6,
+   "failed_checks": [],
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 0.074,
+   "status": "pass"
+  },
+  {
+   "case": "programs/img2stdcoord-missing-coords",
+   "category": "programs",
+   "checks_passed": 5,
+   "checks_total": 5,
+   "failed_checks": [],
+   "reason": "img2stdcoord exits 255; the same from the original. Could not open matrix file none.txt",
+   "seconds": 0.042,
+   "status": "both-error"
+  },
+  {
+   "case": "programs/img2stdcoord-not-numbers",
+   "category": "programs",
+   "checks_passed": 6,
+   "checks_total": 6,
+   "failed_checks": [],
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 0.083,
+   "status": "pass"
+  },
+  {
+   "case": "programs/img2stdcoord-lacking",
+   "category": "programs",
+   "checks_passed": 6,
+   "checks_total": 6,
+   "failed_checks": [],
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 0.121,
+   "status": "pass"
+  },
+  {
+   "case": "programs/img2stdcoord-unknown",
+   "category": "programs",
+   "checks_passed": 5,
+   "checks_total": 5,
+   "failed_checks": [],
+   "reason": "img2stdcoord exits 255; the same from the original. Unrecognised option -frob",
+   "seconds": 0.042,
+   "status": "both-error"
+  },
+  {
+   "case": "programs/img2stdcoord-missing-image",
+   "category": "programs",
+   "checks_passed": 5,
+   "checks_total": 5,
+   "failed_checks": [],
+   "reason": "img2stdcoord exits -6; the same from the original. Image Exception : #63 :: No image files match: none Image Exception : #22 :: Failed to read volume none.nii Error : No image files match: none terminate called after throwing an instance of 'std::runt",
+   "seconds": 0.043,
+   "status": "both-error"
+  },
+  {
+   "case": "programs/img2imgcoord-flirt-premat",
+   "category": "programs",
+   "checks_passed": 6,
+   "checks_total": 6,
+   "failed_checks": [],
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 0.073,
+   "status": "pass"
+  },
+  {
+   "case": "programs/std2imgcoord-standard",
+   "category": "programs",
+   "checks_passed": 6,
+   "checks_total": 6,
+   "failed_checks": [],
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 0.069,
+   "status": "pass"
+  },
+  {
+   "case": "programs/std2imgcoord-no-std",
+   "category": "programs",
+   "checks_passed": 6,
+   "checks_total": 6,
+   "failed_checks": [],
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 0.067,
+   "status": "pass"
+  },
+  {
+   "case": "programs/std2imgcoord-singular",
+   "category": "programs",
+   "checks_passed": 5,
+   "checks_total": 5,
+   "failed_checks": [],
+   "reason": "std2imgcoord exits -6; the same from the original. terminate called after throwing an instance of 'std::runtime_error' what(): inv(): matrix is singular",
+   "seconds": 0.061,
+   "status": "both-error"
+  },
+  {
+   "case": "programs/img2stdcoord-noform",
+   "category": "programs",
+   "checks_passed": 6,
+   "checks_total": 6,
+   "failed_checks": [],
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 0.068,
+   "status": "pass"
+  },
+  {
+   "case": "programs/img2stdcoord-warp-missing",
+   "category": "programs",
+   "checks_passed": 5,
+   "checks_total": 5,
+   "failed_checks": [],
+   "reason": "img2stdcoord exits 1; the same from the original. Image Exception : #63 :: No image files match: none Image Exception : #22 :: Failed to read volume none.nii.gz Error : No image files match: none An error occured while reading file: none.nii.gz",
+   "seconds": 0.042,
+   "status": "both-error"
+  },
+  {
+   "case": "programs/rmsdiff-usage",
+   "category": "programs",
+   "checks_passed": 5,
+   "checks_total": 5,
+   "failed_checks": [],
+   "reason": "rmsdiff exits 255; the same from the original. Usage: ~/fsl-6.0.7.23/bin/rmsdiff matrixfile1 matrixfile2 refvol [mask] Outputs rms deviation between matrices (in mm)",
+   "seconds": 0.026,
+   "status": "both-error"
+  },
+  {
+   "case": "programs/rmsdiff-rms",
+   "category": "programs",
+   "checks_passed": 6,
+   "checks_total": 6,
+   "failed_checks": [],
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 0.045,
+   "status": "pass"
+  },
+  {
+   "case": "programs/rmsdiff-mask",
+   "category": "programs",
+   "checks_passed": 6,
+   "checks_total": 6,
+   "failed_checks": [],
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 0.112,
+   "status": "pass"
+  },
+  {
+   "case": "programs/rmsdiff-low-determinant",
+   "category": "programs",
+   "checks_passed": 6,
+   "checks_total": 6,
+   "failed_checks": [],
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 0.06,
+   "status": "pass"
+  },
+  {
+   "case": "programs/rmsdiff-singular",
+   "category": "programs",
+   "checks_passed": 5,
+   "checks_total": 5,
+   "failed_checks": [],
+   "reason": "rmsdiff exits 251; the same from the original. WARNING:: matrix 2 has low determinant 1.000000 0.000000 0.000000 0.000000 0.000000 0.000000 0.000000 0.000000 0.000000 0.000000 1.000000 0.000000 0.000000 0.000000 0.000000 1.000000 RMS_DEVIATION ERR",
+   "seconds": 0.025,
+   "status": "both-error"
+  },
+  {
+   "case": "programs/rmsdiff-missing-matrix",
+   "category": "programs",
+   "checks_passed": 5,
+   "checks_total": 5,
+   "failed_checks": [],
+   "reason": "rmsdiff exits 254; the same from the original. Could not open matrix file none.mat Could not read matrix none.mat",
+   "seconds": 0.025,
+   "status": "both-error"
+  },
+  {
+   "case": "programs/rmsdiff-4d",
+   "category": "programs",
+   "checks_passed": 6,
+   "checks_total": 6,
+   "failed_checks": [],
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 0.053,
+   "status": "pass"
+  },
+  {
+   "case": "programs/makerot-usage",
+   "category": "programs",
+   "checks_passed": 5,
+   "checks_total": 5,
+   "failed_checks": [],
+   "reason": "makerot exits 1; the same from the original. *************************************************** The following COMPULSORY options have not been set: -t,--theta angle of rotation (in degrees) *************************************************** Pa",
+   "seconds": 0.027,
+   "status": "both-error"
+  },
+  {
+   "case": "programs/makerot-help",
+   "category": "programs",
+   "checks_passed": 5,
+   "checks_total": 5,
+   "failed_checks": [],
+   "reason": "makerot exits 1; the same from the original. Part of FSL (ID: 2412.6-dirty) makerot Copyright(c) 2003, University of Oxford (Mark Jenkinson) Usage: makerot [options] --theta=angle Compulsory arguments (You MUST set one or more of): -t,--theta an",
+   "seconds": 0.054,
+   "status": "both-error"
+  },
+  {
+   "case": "programs/makerot-default",
+   "category": "programs",
+   "checks_passed": 6,
+   "checks_total": 6,
+   "failed_checks": [],
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 0.079,
+   "status": "pass"
+  },
+  {
+   "case": "programs/makerot-axis-centre",
+   "category": "programs",
+   "checks_passed": 6,
+   "checks_total": 6,
+   "failed_checks": [],
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 0.041,
+   "status": "pass"
+  },
+  {
+   "case": "programs/makerot-long",
+   "category": "programs",
+   "checks_passed": 6,
+   "checks_total": 6,
+   "failed_checks": [],
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 0.038,
+   "status": "pass"
+  },
+  {
+   "case": "programs/makerot-cov",
+   "category": "programs",
+   "checks_passed": 6,
+   "checks_total": 6,
+   "failed_checks": [],
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 0.042,
+   "status": "pass"
+  },
+  {
+   "case": "programs/makerot-cov-missing",
+   "category": "programs",
+   "checks_passed": 5,
+   "checks_total": 5,
+   "failed_checks": [],
+   "reason": "makerot exits -6; the same from the original. Image Exception : #63 :: No image files match: none Image Exception : #22 :: Failed to read volume none.nii Error : No image files match: none terminate called after throwing an instance of 'std::runt",
+   "seconds": 0.042,
+   "status": "both-error"
+  },
+  {
+   "case": "programs/makerot-zero-axis",
+   "category": "programs",
+   "checks_passed": 5,
+   "checks_total": 5,
+   "failed_checks": [],
+   "reason": "makerot exits 1; the same from the original. ERROR:: Axis cannot be zero",
+   "seconds": 0.022,
+   "status": "both-error"
+  },
+  {
+   "case": "programs/makerot-short-axis",
+   "category": "programs",
+   "checks_passed": 6,
+   "checks_total": 6,
+   "failed_checks": [],
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 0.04,
+   "status": "pass"
+  },
+  {
+   "case": "programs/makerot-stale-axis",
+   "category": "programs",
+   "checks_passed": 6,
+   "checks_total": 6,
+   "failed_checks": [],
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 0.04,
+   "status": "pass"
+  },
+  {
+   "case": "programs/makerot-bad-theta",
+   "category": "programs",
+   "checks_passed": 5,
+   "checks_total": 5,
+   "failed_checks": [],
+   "reason": "makerot exits 1; the same from the original. Part of FSL (ID: 2412.6-dirty) makerot Copyright(c) 2003, University of Oxford (Mark Jenkinson) Usage: makerot [options] --theta=angle Compulsory arguments (You MUST set one or more of): -t,--theta an",
+   "seconds": 0.022,
+   "status": "both-error"
+  },
+  {
+   "case": "programs/makerot-out",
+   "category": "programs",
+   "checks_passed": 6,
+   "checks_total": 6,
+   "failed_checks": [],
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 9
+   },
+   "seconds": 0.04,
+   "status": "pass"
+  },
+  {
+   "case": "programs/makerot-out-unwritable",
+   "category": "programs",
+   "checks_passed": 6,
+   "checks_total": 6,
+   "failed_checks": [],
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 0.039,
+   "status": "pass"
+  },
+  {
+   "case": "programs/makerot-token",
+   "category": "programs",
+   "checks_passed": 5,
+   "checks_total": 5,
+   "failed_checks": [],
+   "reason": "makerot exits 1; the same from the original. Part of FSL (ID: 2412.6-dirty) makerot Copyright(c) 2003, University of Oxford (Mark Jenkinson) Usage: makerot [options] --theta=angle Compulsory arguments (You MUST set one or more of): -t,--theta an",
+   "seconds": 0.02,
+   "status": "both-error"
+  },
+  {
+   "case": "verbose/6-search-debugsave",
+   "category": "verbose",
+   "checks_passed": 10,
+   "checks_total": 10,
+   "failed_checks": [],
+   "measured": {
+    "costs.nii.gz: the same grid and header, correlation 0.999 (or within 1e-4 when constant)": 1.0,
+    "sc.nii.gz: the same grid and header, correlation 0.999 (or within 1e-4 when constant)": 0.0,
+    "stderr: the same lines (numbers aside)": "yes",
+    "stdout: the same lines (numbers aside)": "numbers differ",
+    "tx.nii.gz: the same grid and header, correlation 0.999 (or within 1e-4 when constant)": 1.0,
+    "ty.nii.gz: the same grid and header, correlation 0.999 (or within 1e-4 when constant)": 1.0,
+    "tz.nii.gz: the same grid and header, correlation 0.999 (or within 1e-4 when constant)": 1.0
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 0.499,
+   "status": "pass"
+  },
+  {
+   "case": "verbose/7",
+   "category": "verbose",
+   "checks_passed": 6,
+   "checks_total": 6,
+   "failed_checks": [],
+   "measured": {
+    "out.mat: 95th-percentile displacement over the reference's brain": 0.0004,
+    "stderr: the same lines (numbers aside)": "yes",
+    "stdout: the same lines (numbers aside)": "numbers differ"
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 1.172,
+   "status": "pass"
+  },
+  {
+   "case": "verbose/5-optimisers",
+   "category": "verbose",
+   "checks_passed": 5,
+   "checks_total": 5,
+   "failed_checks": [],
+   "measured": {
+    "stderr: the same lines (numbers aside)": "yes",
+    "stdout: the same lines (numbers aside)": "numbers differ"
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 0.18,
+   "status": "pass"
+  },
+  {
+   "case": "verbose/7-subset",
+   "category": "verbose",
+   "checks_passed": 5,
+   "checks_total": 5,
+   "failed_checks": [],
+   "measured": {
+    "stderr: the same lines (numbers aside)": "yes",
+    "stdout: the same lines (numbers aside)": "numbers differ"
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 0.197,
+   "status": "pass"
+  },
+  {
+   "case": "verbose/3-scales-options",
+   "category": "verbose",
+   "checks_passed": 5,
+   "checks_total": 5,
+   "failed_checks": [],
+   "measured": {
+    "stderr: the same lines (numbers aside)": "yes",
+    "stdout: the same lines (numbers aside)": "yes"
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 0.234,
+   "status": "pass"
+  },
+  {
+   "case": "verbose/2-noclamp",
+   "category": "verbose",
+   "checks_passed": 5,
+   "checks_total": 5,
+   "failed_checks": [],
+   "measured": {
+    "stderr: the same lines (numbers aside)": "yes",
+    "stdout: the same lines (numbers aside)": "yes"
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 0.143,
+   "status": "pass"
+  },
+  {
+   "case": "verbose/2-noresample",
+   "category": "verbose",
+   "checks_passed": 5,
+   "checks_total": 5,
+   "failed_checks": [],
+   "measured": {
+    "stderr: the same lines (numbers aside)": "yes",
+    "stdout: the same lines (numbers aside)": "yes"
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 0.271,
+   "status": "pass"
+  },
+  {
+   "case": "verbose/2-applyxfm",
+   "category": "verbose",
+   "checks_passed": 6,
+   "checks_total": 6,
+   "failed_checks": [],
+   "measured": {
+    "stderr: the same lines (numbers aside)": "yes",
+    "stdout: the same lines (numbers aside)": "yes"
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 0.317,
+   "status": "pass"
+  },
+  {
+   "case": "verbose/2-out",
+   "category": "verbose",
+   "checks_passed": 6,
+   "checks_total": 6,
+   "failed_checks": [],
+   "measured": {
+    "out.nii.gz: correlation with FSL's image inside the reference's mask": 1.0,
+    "stderr: the same lines (numbers aside)": "yes",
+    "stdout: the same lines (numbers aside)": "yes"
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 0.433,
+   "status": "pass"
+  },
+  {
+   "case": "verbose/3-2d",
+   "category": "verbose",
+   "checks_passed": 5,
+   "checks_total": 5,
+   "failed_checks": [],
+   "measured": {
+    "stderr: the same lines (numbers aside)": "yes",
+    "stdout: the same lines (numbers aside)": "yes"
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 0.051,
+   "status": "pass"
+  },
+  {
+   "case": "verbose/3-debug",
+   "category": "verbose",
+   "checks_passed": 11,
+   "checks_total": 11,
+   "failed_checks": [],
+   "measured": {
+    "global_refweight1.nii.gz: the same header, values within 1e-6 of the image's range": 0.0,
+    "refvol.nii.gz: the same header, values within 1e-6 of the image's range": 0.0,
+    "refvol_2.nii.gz: the same header, values within 1e-6 of the image's range": 0.0,
+    "refvol_4.nii.gz: the same header, values within 1e-6 of the image's range": 0.0,
+    "refvol_8.nii.gz: the same header, values within 1e-6 of the image's range": 0.0,
+    "stderr: the same lines (numbers aside)": "yes",
+    "stdout: the same lines (numbers aside)": "yes",
+    "testvol.nii.gz: the same header, values within 1e-6 of the image's range": 0.0
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 0.258,
+   "status": "pass"
+  },
+  {
+   "case": "debug/scales",
+   "category": "debug",
+   "checks_passed": 11,
+   "checks_total": 11,
+   "failed_checks": [],
+   "measured": {
+    "global_refweight1.nii.gz: the same header, values within 1e-6 of the image's range": 0.0,
+    "refvol.nii.gz: the same header, values within 1e-6 of the image's range": 0.0,
+    "refvol_2.nii.gz: the same header, values within 1e-6 of the image's range": 0.0,
+    "refvol_4.nii.gz: the same header, values within 1e-6 of the image's range": 0.0,
+    "refvol_8.nii.gz: the same header, values within 1e-6 of the image's range": 0.0,
+    "stderr: the same lines (numbers aside)": "yes",
+    "stdout: the same lines (numbers aside)": "yes",
+    "testvol.nii.gz: the same header, values within 1e-6 of the image's range": 0.0
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 0.256,
+   "status": "pass"
+  },
+  {
+   "case": "debug/bbr-setoption",
+   "category": "debug",
+   "checks_passed": 11,
+   "checks_total": 11,
+   "failed_checks": [],
+   "measured": {
+    "global_refweight1.nii.gz: the same header, values within 1e-6 of the image's range": 0.0,
+    "refvol.nii.gz: the same header, values within 1e-6 of the image's range": 0.0,
+    "refvol_2.nii.gz: the same header, values within 1e-6 of the image's range": 0.0,
+    "refvol_4.nii.gz: the same header, values within 1e-6 of the image's range": 0.0,
+    "refvol_8.nii.gz: the same header, values within 1e-6 of the image's range": 0.0,
+    "stderr: the same lines (numbers aside)": "yes",
+    "stdout: the same lines (numbers aside)": "yes",
+    "testvol.nii.gz: the same header, values within 1e-6 of the image's range": 0.0
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 0.491,
+   "status": "pass"
   }
  ],
  "suite": "fsl-flirt",
  "summary": {
-  "both-error": 35,
-  "expected-divergence": 4,
-  "fail": 22,
-  "pass": 89,
-  "skipped": 7
+  "both-error": 85,
+  "expected-divergence": 6,
+  "fail": 8,
+  "pass": 206,
+  "skipped": 0
  },
  "tier": "standard"
 }

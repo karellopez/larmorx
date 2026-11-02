@@ -112,10 +112,12 @@ def _run(
     n_threads: int,
     upstream_defects: str,
     program: str = "flirt",
+    extra_env: tuple[tuple[str, str], ...] = (),
 ):
     if selected is None:
         # the clean-room original, in this process, with FSL's settings of this call
         env = [("FSLOUTPUTTYPE", "NIFTI"), ("PATH", tmp), (_defects.ENV, upstream_defects)]
+        env.extend(extra_env)
         if n_threads > 0:
             env.append(("OMP_NUM_THREADS", str(n_threads)))
         code, out, err = _core.fsl_run_original(program, list(args), env, tmp)

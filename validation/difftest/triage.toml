@@ -1131,3 +1131,95 @@ signature = ["out.mat identical", "out.mat: the matrices", "out.mat: within Ne-N
 status = "fixed"
 explanation = "FLIRT's clean-room original (part 1, 2026-11-02): the trial oracles/difftest/2026-11-02-cleanroom-flirt (27 minutes, realistic cases only, on WIP 3: 5,668 cases, 2,166 agree, 3,242 differ, 260 skipped for part 2's options, 41 rejected by both; a stratified sample of 282 findings replayed on WIP 7: 154 agree): convert_xfm -inverse: the inverse in LAPACK's order, which gives FSL's -0; -fixscaleskew's 8th digit and -usesqform's 4.5e-6 mm still open (spec questions 15 and 16)"
 link = "docs/findings/fsl-flirt-original.md"
+
+# FLIRT's clean-room original, part 2: the trial of 2026-11-02 (oracles/difftest/2026-11-02-cleanroom-flirt-2:
+# 9,854 realistic cases of every program at 4ba5ada, 2,712 differ), triaged by relays 5 to 7.
+
+[[difference]]
+tool = "fsl-flirt-original"
+implementation = "original"
+signature = ["out.mat: Nth-percentile displacement over the reference's brain", "out.nii.gz: correlation with FSL's image inside the reference's mask", "out.nii: correlation with FSL's image inside the reference's mask", "out.img: correlation with FSL's image inside the reference's mask", "out.hdr: correlation with FSL's image inside the reference's mask", "out.nii.zst: correlation with FSL's image inside the reference's mask"]
+status = "open"
+explanation = "A registration of the clean-room original ends elsewhere than FSL's on the trial's random, often ill-posed pairs (small synthetic heads and blobs, odd orientations and voxel sizes, where FSL's own variability is often 0): its costs follow FSL's arithmetic within their last bits and the optimiser's path then parts; the image written from its own matrix follows. 1,808 of the trial's 3,616 registrations differ (991 by their matrix). The record's real registrations and fMRIPrep's three calls are within its thresholds (fMRIPrep's within 0.011 mm). Part 1's 128 findings replayed after relay 5: 76 registrations still differ. Left for the final validation phase."
+link = "docs/findings/fsl-flirt-original.md"
+
+[[difference]]
+tool = "fsl-flirt-original"
+implementation = "original"
+signature = ["pair.mat: Nth-percentile displacement over the reference's brain"]
+status = "open"
+explanation = "pairreg's three registrations: their paths part as a registration's do (the entry above); FSL itself corrupts its heap (FSL-75) in 30 of the trial's 230 pairreg runs. 204 of 230 differ. Left for the final validation phase."
+link = "docs/findings/fsl-flirt-original.md"
+
+[[difference]]
+tool = "fsl-flirt-original"
+implementation = "original"
+signature = ["stderr: the same lines (numbers aside)", "stdout: the same lines (numbers aside)"]
+status = "open"
+explanation = "A registration's messages and printed lines whose number follows the optimiser's path: -dof 3's Erroneous dof (the rule fixed in relay 6: once per row of optimise and measurecost and once per free start; 15 of 16 sampled cases print FSL's count, the others differ by their search's rows), FSL-90's 'Parameters do not form a valid axis', the centre-of-gravity warnings, the search's minima lines; fixed in relay 5: BBR without a boundary point (FSL's error and NaN lines on five schedules, line for line). Open: the counts that follow the path."
+link = "docs/findings/fsl-flirt-original.md"
+
+[[difference]]
+tool = "fsl-flirt-original"
+implementation = "original"
+signature = ["out.nii.gz bit-identical", "out.nii bit-identical", "out.hdr bit-identical", "out.nii.zst bit-identical", "out.nii.gz: the same header", "out.nii: the same header", "out.hdr: the same header", "out.img: the same header", "out.nii.zst: the same header", "out.nii.gz bit-identical (nearestneighbour)", "out.nii bit-identical (nearestneighbour)", "out.hdr bit-identical (nearestneighbour)", "out.nii.zst bit-identical (nearestneighbour)", "out.nii.gz bit-identical (trilinear)", "out.nii bit-identical (trilinear)", "out.hdr bit-identical (trilinear)", "out.nii.zst bit-identical (trilinear)"]
+status = "fixed"
+explanation = "Images written from a given matrix (-applyxfm, -applyisoxfm, applyxfm4D, a registration's -out with -nosearch): -applyisoxfm's header as specs/flirt.md 9.3 states it (12 of 12 modelled sforms), an unset sform or qform completed from the other (130 of 135 applyxfm4D runs), the zstd and bzip2 outputs of integer images (relay 5); a reference without sform or qform (25 probes bit for bit), the quaternions computed from a matrix written once, nearest neighbour outside the input (the nearest index first, then the extraslice rule), applyxfm4D's uint8 images read as FSL reads them in reproduce mode (FSL-111, registered) (relay 6). Checked on the trial's cases of each kind; the rest of these findings re-checked in the final validation phase's trials."
+link = "docs/findings/fsl-flirt-original.md"
+
+[[difference]]
+tool = "fsl-flirt-original"
+implementation = "original"
+signature = ["out.nii.gz: correlation with FSL's values (sinc)", "out.nii.gz: correlation with FSL's values (spline)", "out.nii: correlation with FSL's values (sinc)", "out.nii: correlation with FSL's values (spline)", "out.img: correlation with FSL's values (spline)"]
+status = "register"
+defect = "FSL-111"
+explanation = "applyxfm4D reads a uint8 image as signed bytes: its values 128 to 255 enter the interpolation, the background value and the spline's coefficients as v - 256 (FSL-111, rule A: the original reads them as stored by default, as FSL with reproduce, named where a written value changes); FSL-79's conversions are x86-64's (through a 32-bit integer, wrapped). All 29 uint8 applyxfm4D findings of the trial now give FSL's bytes in reproduce mode (relay 6). The float images' sinc and spline values stay within their last bits (the entry below)."
+link = "docs/findings/fsl-flirt-original.md"
+
+[[difference]]
+tool = "fsl-flirt-original"
+implementation = "original"
+signature = ["out.nii.gz: the same values within Ne-N of the image's range", "out.nii: the same values within Ne-N of the image's range"]
+status = "open"
+explanation = "From the same matrix, the windowed sinc and the spline of float images differ from FSL's in their last bits (1.6 % of real/interp-sinc's voxels; applyxfm4D's float spline 1.7 to 23 % of the voxels' last bit in five trial findings): how FSL rounds its kernels' weights is an open question of the specification (part 2's spec question 22)."
+link = "docs/findings/fsl-flirt-original.md"
+
+[[difference]]
+tool = "fsl-flirt-original"
+implementation = "original"
+signature = ["global_refweightN.nii.gz: the same header, values within Ne-N of the image's range", "global_refweightN.nii: the same header, values within Ne-N of the image's range", "global_refweightN.hdr: the same header, values within Ne-N of the image's range", "global_refweightN.nii.zst: the same header, values within Ne-N of the image's range", "refvol_N.nii.gz: the same header, values within Ne-N of the image's range", "refvol.nii.gz: the same header, values within Ne-N of the image's range", "refvol_N.nii: the same header, values within Ne-N of the image's range", "refvol.nii: the same header, values within Ne-N of the image's range", "refvol_N.hdr: the same header, values within Ne-N of the image's range", "refvol.hdr: the same header, values within Ne-N of the image's range", "testvol.nii.gz: the same header, values within Ne-N of the image's range", "testvol.nii: the same header, values within Ne-N of the image's range", "testvol.hdr: the same header, values within Ne-N of the image's range", "testweight.nii.gz: the same header, values within Ne-N of the image's range", "testweight.nii: the same header, values within Ne-N of the image's range", "out.mat: the matrices"]
+status = "open"
+explanation = "-debug's volumes on the trial's oblique and anisotropic images: global_refweight1's voxel size and the pyramid levels' qoffset and srow differ from FSL's (the record's -debug cases give FSL's headers); with BBR and no boundary point FSL writes debug and out images where the original stops after its set-up lines. 114 findings, replayed with the final build (#170, #2424): still differ. Spec questions 18 and 38 of part 2's handoff."
+link = "docs/findings/fsl-flirt-original.md"
+
+[[difference]]
+tool = "fsl-flirt-original"
+implementation = "original"
+signature = ["DN fix pass", "files written", "stderr: the same lines (numbers aside)", "exit status"]
+status = "open"
+explanation = "With non-finite input voxels (-inf, NaN) a registration of the original stops with 'inv(): matrix is singular' (exit status 0 in reproduce mode, FSL-68) where FSL goes on and writes its matrix (8 findings; #2905 and #704 replayed with the final build: still differ). Spec question 37 of part 2's handoff. Fixed in relay 5 under the same checks: the zstd and bzip2 outputs of integer images (char and int images were refused)."
+link = "docs/findings/fsl-flirt-original.md"
+
+[[difference]]
+tool = "fsl-flirt-original"
+implementation = "original"
+signature = ["stdout identical", "stderr identical", "out.mat identical"]
+status = "fixed"
+explanation = "The text programs: the coordinate programs with an image without forms (V = S, the standard programs' warning; relay 5) and their qform as FSL holds it (18 of 18 sampled findings agree; relay 6), avscale on specs/flirt.md 3's decomposition (11 of 12 sampled agree; one residual's sign, -0.000000 against 0.000000, open), convert_xfm -inverse with the specification's inverse (the 7 texts FSL's; relay 6)."
+link = "docs/findings/fsl-flirt-original.md"
+
+[[difference]]
+tool = "fsl-flirt-original"
+implementation = "original"
+signature = ["DN fix pass"]
+status = "fixed"
+explanation = "FSL-76, FSL-79 and FSL-80 named only where the other mode's output differs (makerot with a zero angle, applyxfm4D's spline of an integer image and its -3D sinc kernel when the volume is the same): relay 5."
+link = "docs/findings/fsl-flirt-original.md"
+
+[[difference]]
+tool = "fsl-flirt-original"
+implementation = "original"
+signature = ["FSL-N's correction: the matrix within Ne-N of the replica's (NumPy's arithmetic)"]
+status = "open"
+explanation = "aff2rigid's corrected matrix (FSL-81) against the replica's in 1 of the trial's 170 aff2rigid cases (169 agree): not yet looked at."
+link = "docs/findings/fsl-flirt-original.md"

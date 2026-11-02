@@ -27,44 +27,61 @@ pub struct SincKernel {
 }
 
 impl SincKernel {
+    /// The table (§9.2): full width `round(width)`, half-width `h = (w − 1)/2`, 1201 samples at
+    /// `x = ((k − m − 1)/m)·h` (single, `m = 600`), each the single product of the sinc (`sinf(y)/y`,
+    /// `y = π·x` rounded to single; `1 − |x|` below 1e-7) and the window (double, rounded).
     pub fn new(width: f32, window: SincWindow) -> SincKernel {
         let w = (width.round() as i64).max(1);
         let half = ((w - 1) / 2).max(1);
-        let h = half as f64;
-        let n = 1201usize;
-        let mid = (n - 1) / 2;
-        let values = (0..n)
+        let h = half as f32;
+        let hd = f64::from(h);
+        let m = 600.0f32;
+        let values = (1..=1201)
             .map(|k| {
-                let u = (k as f64 - mid as f64) / mid as f64 * h;
-                let s = if u.abs() < 1e-7 {
-                    1.0 - u.abs()
+                let x = ((k as f32 - m - 1.0) / m) * h;
+                let sinc = if x.abs() < 1e-7 {
+                    1.0 - x.abs()
                 } else {
-                    math::sin(PI * u) / (PI * u)
+                    let y = (PI * f64::from(x)) as f32;
+                    math::sinf(y) / y
                 };
-                let win = match window {
-                    SincWindow::Rectangular => 1.0,
-                    SincWindow::Hanning => 0.5 + 0.5 * math::cos(PI * u / h),
-                    SincWindow::Blackman => {
-                        0.42 + 0.5 * math::cos(PI * u / h) + 0.08 * math::cos(2.0 * PI * u / h)
-                    }
+                let xd = f64::from(x);
+                let win = if x.abs() > h {
+                    0.0
+                } else {
+                    (match window {
+                        SincWindow::Rectangular => 1.0,
+                        SincWindow::Hanning => 0.5 + 0.5 * math::cos((PI * xd) / hd),
+                        SincWindow::Blackman => {
+                            0.42 + 0.5 * math::cos((PI * xd) / hd)
+                                + 0.08 * math::cos((2.0 * PI * xd) / hd)
+                        }
+                    }) as f32
                 };
-                (s * win) as f32
+                sinc * win
             })
             .collect();
         SincKernel { half, values }
     }
 
+    /// The table read at `t` (§9.2): `q = (t/h)·m + m` (single) plus 1 in double, rounded; the
+    /// samples `n` and `n + 1` blended in double.
     #[inline]
-    fn at(&self, u: f32) -> f32 {
-        let mid = ((self.values.len() - 1) / 2) as f32;
-        let x = u / self.half as f32 * mid + mid;
-        let n = floor(x);
-        if !(n >= 0.0 && (n as usize) + 1 < self.values.len()) {
+    fn at(&self, t: f32) -> f32 {
+        let h = self.half as f32;
+        if t.abs() > h {
             return 0.0;
         }
-        let i = n as usize;
-        let f = x - n;
-        self.values[i] + f * (self.values[i + 1] - self.values[i])
+        let m = 600.0f32;
+        let q = (f64::from((t / h) * m + m) + 1.0) as f32;
+        let n = floor(q);
+        let f = q - n;
+        if !(1.0..=1200.0).contains(&n) {
+            return 0.0;
+        }
+        let i = n as usize - 1;
+        let (a, b) = (f64::from(self.values[i]), f64::from(self.values[i + 1]));
+        (a * (1.0 - f64::from(f)) + b * f64::from(f)) as f32
     }
 
     /// The interpolated value at `p` over the voxels inside the volume; `None` where the weights
@@ -76,7 +93,8 @@ impl SincKernel {
         let mut k = vec![[0.0f32; 3]; w];
         for (d, row) in k.iter_mut().enumerate() {
             for a in 0..3 {
-                row[a] = self.at(p[a] - (base[a] + d as i64 - h) as f32);
+                // (p − i₀) − e, in single precision
+                row[a] = self.at((p[a] - base[a] as f32) - (d as i64 - h) as f32);
             }
         }
         let [nx, ny, _] = vol.shape;
@@ -102,6 +120,22 @@ impl SincKernel {
 /// the image's edges read by the extraslice rule (one voxel beyond: the edge voxel; further:
 /// `pad`).
 pub fn blur_for_output(v: &Volume, r: f32, pad: f32) -> Volume {
+    blur_with_edge(v, r, Edge::Extraslice(pad))
+}
+
+/// What a blur reads beyond the image (§9.2, §9.3).
+#[derive(Clone, Copy, Debug)]
+pub enum Edge {
+    /// Zeros (after a registration: the blur comes first).
+    Zero,
+    /// The extraslice rule: the edge voxel one voxel out, the value further.
+    Extraslice(f32),
+    /// `-setbackground`'s constant.
+    Constant(f32),
+}
+
+/// The blur of `v` to `r` mm (§5) reading beyond the image by `edge`.
+pub fn blur_with_edge(v: &Volume, r: f32, edge: Edge) -> Volume {
     let mut data = v.data.clone();
     let [nx, ny, _] = v.shape;
     for axis in 0..3 {
@@ -126,12 +160,20 @@ pub fn blur_for_output(v: &Volume, r: f32, pad: f32) -> Volume {
                         let j = pos + t as i64 - half;
                         let v = if j >= 0 && j < n {
                             src[(base + j * stride as i64) as usize]
-                        } else if j == -1 {
-                            src[base as usize]
-                        } else if j == n {
-                            src[(base + (n - 1) * stride as i64) as usize]
                         } else {
-                            pad
+                            match edge {
+                                Edge::Zero => 0.0,
+                                Edge::Constant(c) => c,
+                                Edge::Extraslice(pad) => {
+                                    if j == -1 {
+                                        src[base as usize]
+                                    } else if j == n {
+                                        src[(base + (n - 1) * stride as i64) as usize]
+                                    } else {
+                                        pad
+                                    }
+                                }
+                            }
                         };
                         acc = (f64::from(acc) + f64::from(v) * w) as f32;
                     }
@@ -189,6 +231,11 @@ pub struct Resampling<'a> {
     pub pad: f32,
     /// `-paddingsize` (voxels).
     pub padding: f32,
+    /// The spline's coefficients when the caller computed them (`applyxfm4D`'s, §15.7), else
+    /// the shared engine's of the input.
+    pub spline: Option<&'a Spline>,
+    /// `-setbackground`: neighbours outside the input read `pad` (not the extraslice rule).
+    pub constant: bool,
 }
 
 /// The input `src` resampled by `m` (input mm → output mm) onto a grid of `shape` and
@@ -203,7 +250,7 @@ pub fn resample(
     let a = output_map(m, src.voxel_size, voxel)?;
     let [nx, ny, nz] = shape;
     let n = src.shape.map(|v| v as f32);
-    let spline = (r.interp == Interp::Spline).then(|| Spline::new(src));
+    let own = (r.interp == Interp::Spline && r.spline.is_none()).then(|| FlirtSpline::new(src));
     let mut data = vec![r.pad; nx * ny * nz];
     let plane = nx * ny;
     data.par_chunks_mut(plane.max(1))
@@ -218,7 +265,30 @@ pub fn resample(
                         (0..3).any(|k| p[k] < -r.padding || p[k] > n[k] - 1.0 + r.padding);
                     if !pad_out {
                         let extended = (0..3).all(|k| p[k] >= -1.0 && p[k] <= n[k]);
-                        let v = if !extended {
+                        let v = if r.interp == Interp::Spline {
+                            match (r.spline, own.as_ref()) {
+                                (Some(s), _) => {
+                                    if extended {
+                                        s.value(p, r.pad)
+                                    } else {
+                                        r.pad
+                                    }
+                                }
+                                (None, Some(s)) => s.value(p, r.pad, r.constant),
+                                (None, None) => r.pad,
+                            }
+                        } else if r.constant && r.interp == Interp::Trilinear {
+                            trilinear_constant(src, p, r.pad)
+                        } else if r.interp == Interp::NearestNeighbour && !r.constant {
+                            // the nearest index first, then the extraslice rule on it: one
+                            // voxel beyond an edge reads the edge voxel (observed, 2026-11-02:
+                            // positions 1 to 1.5 voxels outside take the edge's value)
+                            let beyond = (0..3).any(|k| {
+                                let i = p[k].round();
+                                i < -1.0 || i > n[k]
+                            });
+                            if beyond { r.pad } else { nearest(src, p) }
+                        } else if !extended {
                             match r.interp {
                                 Interp::Trilinear => trilinear_extraslice(src, p, r.pad),
                                 _ => r.pad,
@@ -230,9 +300,7 @@ pub fn resample(
                                 Interp::Sinc => {
                                     r.sinc.and_then(|k| k.value(src, p)).unwrap_or(r.pad)
                                 }
-                                Interp::Spline => {
-                                    spline.as_ref().map_or(r.pad, |s| s.value(p, r.pad))
-                                }
+                                Interp::Spline => r.pad,
                             }
                         };
                         slab[x + nx * y] = v;
@@ -242,6 +310,185 @@ pub fn resample(
             }
         });
     Some(data)
+}
+
+/// Trilinear interpolation with every neighbour outside the volume reading `c`
+/// (`-setbackground`, §9.2).
+fn trilinear_constant(vol: &Volume, p: [f32; 3], c: f32) -> f32 {
+    let [nx, ny, nz] = vol.shape.map(|n| n as i64);
+    let f = p.map(floor);
+    let (ix, iy, iz) = (f[0] as i64, f[1] as i64, f[2] as i64);
+    let (fx, fy, fz) = (p[0] - f[0], p[1] - f[1], p[2] - f[2]);
+    let at = |x: i64, y: i64, z: i64| -> f32 {
+        if x >= 0 && x < nx && y >= 0 && y < ny && z >= 0 && z < nz {
+            vol.data[(x + nx * (y + ny * z)) as usize]
+        } else {
+            c
+        }
+    };
+    let v = [0i64, 1].map(|cz| [0i64, 1].map(|b| [0i64, 1].map(|a| at(ix + a, iy + b, iz + cz))));
+    larmorx_mri::hmc::interp::blend(v, fx, fy, fz)
+}
+
+/// FLIRT's cubic spline (§9.3, exactly): the coefficients along x, then y, then z (axes of
+/// one voxel skipped), each column in double, stored in single after each axis; at a position the
+/// four weights per axis from `⌈p⌉ − 2`, the value `Σ (c·w_x)·(w_z·w_y)` in double, z outer.
+pub struct FlirtSpline {
+    shape: [usize; 3],
+    coef: Vec<f32>,
+}
+
+impl FlirtSpline {
+    pub fn new(vol: &Volume) -> FlirtSpline {
+        let [nx, ny, nz] = vol.shape;
+        let mut c = vol.data.clone();
+        let strides = [1, nx, nx * ny];
+        for axis in 0..3 {
+            let len = vol.shape[axis];
+            if len < 2 {
+                continue;
+            }
+            let others: Vec<usize> = (0..nx * ny * nz)
+                .filter(|&i| (i / strides[axis]) % len == 0)
+                .collect();
+            let st = strides[axis];
+            let cols: Vec<Vec<f32>> = others
+                .par_iter()
+                .map(|&start| {
+                    let mut col: Vec<f64> =
+                        (0..len).map(|k| f64::from(c[start + k * st])).collect();
+                    spline_column(&mut col);
+                    col.into_iter().map(|v| v as f32).collect()
+                })
+                .collect();
+            for (&start, col) in others.iter().zip(cols) {
+                for (k, v) in col.into_iter().enumerate() {
+                    c[start + k * st] = v;
+                }
+            }
+        }
+        FlirtSpline {
+            shape: vol.shape,
+            coef: c,
+        }
+    }
+
+    /// The value at `p`; with `constant` (`-setbackground`) coefficients outside the grid count
+    /// 0 and a position outside `[0, n − 1]` gives `pad`; otherwise the edge coefficients repeat
+    /// and `pad` where `⌊p⌋ < −1` or `⌊p⌋ ≥ n`.
+    pub fn value(&self, p: [f32; 3], pad: f32, constant: bool) -> f32 {
+        let n = self.shape.map(|v| v as i64);
+        if constant {
+            if (0..3).any(|k| !(p[k] >= 0.0 && p[k] <= (n[k] - 1) as f32)) {
+                return pad;
+            }
+        } else if (0..3).any(|k| {
+            let b = floor(p[k]) as i64;
+            b < -1 || b >= n[k]
+        }) {
+            return pad;
+        }
+        let start = p.map(|v| v.ceil() as i64 - 2);
+        let w = [0, 1, 2].map(|k| {
+            [0, 1, 2, 3].map(|i| {
+                let a = (f64::from(p[k]) - (start[k] + i as i64) as f64).abs();
+                if a < 1.0 {
+                    2.0 / 3.0 + ((0.5 * a) * a) * (a - 2.0)
+                } else if a < 2.0 {
+                    let b = 2.0 - a;
+                    (1.0 / 6.0) * ((b * b) * b)
+                } else {
+                    0.0
+                }
+            })
+        });
+        let at = |x: i64, y: i64, z: i64| -> f64 {
+            let inside = |v: i64, k: usize| v >= 0 && v < n[k];
+            if constant && !(inside(x, 0) && inside(y, 1) && inside(z, 2)) {
+                return 0.0;
+            }
+            let (x, y, z) = (
+                x.clamp(0, n[0] - 1),
+                y.clamp(0, n[1] - 1),
+                z.clamp(0, n[2] - 1),
+            );
+            f64::from(self.coef[(x + n[0] * (y + n[1] * z)) as usize])
+        };
+        let mut sum = 0.0f64;
+        for (dz, &wz) in w[2].iter().enumerate() {
+            for (dy, &wy) in w[1].iter().enumerate() {
+                for (dx, &wx) in w[0].iter().enumerate() {
+                    let c = at(
+                        start[0] + dx as i64,
+                        start[1] + dy as i64,
+                        start[2] + dz as i64,
+                    );
+                    sum += (c * wx) * (wz * wy);
+                }
+            }
+        }
+        sum as f32
+    }
+}
+
+/// One column's cubic B-spline coefficients (§9.3): pole `√3 − 2`, the causal start over
+/// `min(15, len)` terms (powers by repeated products), the causal sweep, the anti-causal start
+/// from the column's last value before the sweep, the anti-causal sweep, every coefficient
+/// times 6.
+fn spline_column(c: &mut [f64]) {
+    let len = c.len();
+    let z = 3.0f64.sqrt() - 2.0;
+    let horizon = ((1e-8f64.ln() / z.abs().ln() + 1.5) as usize).min(len);
+    let last = c[len - 1];
+    let mut zi = z;
+    let mut sum = c[0];
+    for &v in &c[1..horizon] {
+        sum += zi * v;
+        zi *= z;
+    }
+    c[0] = sum;
+    for i in 1..len {
+        c[i] += z * c[i - 1];
+    }
+    c[len - 1] = (-z / (1.0 - z * z)) * (2.0 * c[len - 1] - last);
+    for i in (0..len - 1).rev() {
+        c[i] = z * (c[i + 1] - c[i]);
+    }
+    for v in c.iter_mut() {
+        *v *= 6.0;
+    }
+}
+
+/// Which output voxels [`resample`] sets to the padding value (their pre-image more than
+/// `padding` voxels outside an input of `src_shape`): the same positions, stepped as there.
+pub fn padded(
+    src_shape: [usize; 3],
+    src_voxel: [f32; 3],
+    m: &Mat4,
+    shape: [usize; 3],
+    voxel: [f32; 3],
+    padding: f32,
+) -> Option<Vec<bool>> {
+    let a = output_map(m, src_voxel, voxel)?;
+    let [nx, ny, nz] = shape;
+    let n = src_shape.map(|v| v as f32);
+    let mut out = vec![false; nx * ny * nz];
+    let plane = nx * ny;
+    out.par_chunks_mut(plane.max(1))
+        .enumerate()
+        .for_each(|(z, slab)| {
+            let zf = z as f32;
+            for x in 0..nx {
+                let xf = x as f32;
+                let mut p = [0, 1, 2].map(|k| xf * a[k][0] + zf * a[k][2] + a[k][3]);
+                for y in 0..ny {
+                    slab[x + nx * y] =
+                        (0..3).any(|k| p[k] < -padding || p[k] > n[k] - 1.0 + padding);
+                    p = [p[0] + a[0][1], p[1] + a[1][1], p[2] + a[2][1]];
+                }
+            }
+        });
+    Some(out)
 }
 
 /// The input `src` resampled through the boundary-based cost's mapping with a field map

@@ -17,7 +17,13 @@ with its options and a volume, ``img2imgcoord``, ``std2imgcoord`` and ``img2stdc
 ``-xfm``, ``-mm``, ``-vox``, the verbose levels and random coordinates, ``rmsdiff`` with and
 without a mask. Not drawn: what the replica refuses as not yet replicated (general parameter
 subsets, ``-debug`` with BBR, the coordinate programs' ``-warp``) and what makes FSL loop for ever
-(FSL-71, FSL-72) or abort (``-bins`` below 8: FSL-21, FSL-66)."""
+(FSL-71, FSL-72) or abort (``-bins`` below 8: FSL-21, FSL-66).
+
+The clean-room original (``fsl-flirt-original``, :data:`ORIGINAL`) draws every program the
+original has (:data:`ORIGINAL_KINDS`: the registrations, ``-applyxfm``, ``convert_xfm``, the
+other programs, alignpaxes and parameter subsets, and the scripts ``pairreg``, ``extracttxt``
+and ``aff2rigid``), its registrations sometimes with ``-verbose`` 2 to 7 or ``-debug``
+(part 2), through its own suite and thresholds."""
 
 from __future__ import annotations
 
@@ -510,6 +516,37 @@ def draw_extracttxt(d: gen.Draw) -> dict:
     }
 
 
+def draw_pairreg(d: gen.Draw) -> dict:
+    """pairreg (the script: three flirt runs with FSL's pairreg schedules and convert_xfm) of a
+    drawn pair, each brain also its head; sometimes with flirt's options after the five
+    arguments."""
+    ref = _image(d.child("ref"))
+    inputs = {"ref": ref, "in": _moved(d.child("in"), ref)}
+    groups = [required("files", "{in:ref}", "{in:in}", "{in:ref}", "{in:in}", "pair.mat")]
+    options: list[str] = []
+    if d.chance("-dof", 0.5):
+        dof = d.choice("dof", ("6", "7", "12"))
+        groups.append(group("-dof", "-dof", dof))
+        options.append(f"-dof {dof}")
+    if d.chance("-cost", 0.2):
+        cost = d.choice("cost", ("corratio", "normcorr", "mutualinfo"))
+        groups.append(group("-cost", "-cost", cost))
+        options.append(f"-cost {cost}")
+    return {"groups": groups, "inputs": inputs, "options": options, "extra": {"tool": "pairreg"}}
+
+
+def draw_aff2rigid(d: gen.Draw) -> dict:
+    """aff2rigid (the script, NumPy's arithmetic in FSL's Python) of a drawn affine matrix."""
+    inputs = {"m": _matrix(d, "m")}
+    groups = [required("files", "{in:m}", "rigid.mat")]
+    return {
+        "groups": groups,
+        "inputs": inputs,
+        "options": [],
+        "extra": {"tool": "aff2rigid", "fsl_path": True},
+    }
+
+
 DRAWS = {
     "register": draw_register,
     "apply": draw_apply,
@@ -523,6 +560,8 @@ DRAWS = {
     "applyxfm4D": draw_applyxfm4d,
     "schedule3": draw_schedule3,
     "extracttxt": draw_extracttxt,
+    "pairreg": draw_pairreg,
+    "aff2rigid": draw_aff2rigid,
 }
 
 
@@ -581,11 +620,11 @@ def case(
             words.append("@dt:" + inputs.key(prefix, w[4:-1]))
         else:
             words.append(w)
-    run = ff.Run(
-        recipe["extra"]["tool"],
-        tuple(words),
-        settings=(("FSLOUTPUTTYPE", recipe["extra"]["output_type"]),),
-    )
+    settings = [("FSLOUTPUTTYPE", recipe["extra"]["output_type"])]
+    if recipe["extra"].get("fsl_path"):
+        # aff2rigid runs `env fslpython`: FSL's programs on PATH, as the replica suite runs it
+        settings.append(("PATH", f"{ff.fsldir()}/bin:/usr/bin:/bin"))
+    run = ff.Run(recipe["extra"]["tool"], tuple(words), settings=tuple(settings))
     return Case(
         cid or _ants.case_id(recipe),
         "difftest",
@@ -658,12 +697,41 @@ TOOL = Tool(
 )
 
 
+#: The original's kinds and their weights (part 2, 2026-11-02: every program of FLIRT's).
+ORIGINAL_KINDS = (
+    ("register", 6),
+    ("apply", 3),
+    ("convert", 1.5),
+    ("avscale", 0.5),
+    ("coords", 1),
+    ("rmsdiff", 0.5),
+    ("makerot", 0.5),
+    ("midtrans", 0.5),
+    ("pointflirt", 0.5),
+    ("applyxfm4D", 1),
+    ("schedule3", 0.7),
+    ("extracttxt", 0.3),
+    ("pairreg", 0.4),
+    ("aff2rigid", 0.3),
+)
+
+
 def draw_original(d: gen.Draw) -> dict:
-    """The clean-room original's programs only (2026-11-02): registrations, ``-applyxfm`` and
-    ``convert_xfm``."""
-    kinds = ("register", "apply", "convert")
-    kind = d.choice("kind", kinds, (6, 3, 1.5))
-    return _finish(d, DRAWS[kind](d))
+    """The clean-room original's programs (part 1: registrations, ``-applyxfm`` and
+    ``convert_xfm``; part 2: FLIRT's other programs and scripts, and a registration's
+    ``-verbose`` levels above 1 and ``-debug``)."""
+    kinds = tuple(k for k, _ in ORIGINAL_KINDS)
+    kind = d.choice("kind", kinds, tuple(w for _, w in ORIGINAL_KINDS))
+    body = DRAWS[kind](d)
+    if kind in ("register", "schedule3"):
+        if d.chance("-verbose", 0.08):
+            level = d.choice("verbose level", ("2", "3", "4", "5", "7"), (2, 2, 1, 1, 0.5))
+            body["groups"].append(group("-verbose", "-verbose", level))
+            body["options"].append(f"-verbose {level}")
+        if d.chance("-debug", 0.05):
+            body["groups"].append(group("-debug", "-debug"))
+            body["options"].append("-debug")
+    return _finish(d, body)
 
 
 def _run_original(impl: str):
@@ -683,8 +751,9 @@ def _original_unavailable() -> str:
     return ""
 
 
-#: FLIRT's clean-room original (``larmorx fsl flirt`` and ``convert_xfm``, 2026-11-02) through
-#: its suite (``larmorx_validation.parity.fsl_flirt``): the record's thresholds, not bit-identity.
+#: FLIRT's clean-room original (``larmorx fsl flirt`` and ``convert_xfm``, 2026-11-02; FLIRT's
+#: other programs and scripts, ``-verbose`` and ``-debug`` since part 2) through its suite
+#: (``larmorx_validation.parity.fsl_flirt``): the record's thresholds, not bit-identity.
 ORIGINAL = Tool(
     name="fsl-flirt-original",
     title="FLIRT (clean-room original)",

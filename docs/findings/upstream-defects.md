@@ -353,8 +353,9 @@ to add (since 2026-10-25: "Random testing's gaps", below); – = nothing to do. 
 | FSL-91 † | flirt (`-refweight`, `-inweight`) | a weight with no voxel of at least 0.01 (an empty weighting mask: an image of zeros, a mask that misses the image) is accepted: the weighted images are filtered to zeros and every weight is 0, so every cost is constant (BBR's NaN, with a warning at every evaluation), and FLIRT writes, with exit status 0, the matrix its search happens to end at (a rotation of 95 to 143 degrees on the suite's images), deterministically | c | none (fMRIPrep passes no weights to FLIRT) | rule B: a registration with such a weight refused by default (exit status 1, nothing written), FLIRT's run with `reproduce`, named in both modes; FLIRT's replica 2026-11-02; the clean-room original in its part 2 | – |
 | FSL-92 † | flirt | an input or reference of one voxel (1 × 1 × 1) is registered: one value cannot measure an alignment, and FLIRT writes the matrix its search happens to end at (a rotation of 95 to 143 degrees), deterministically | c | none | rule B: refused by default (exit status 1, nothing written), FLIRT's run with `reproduce`, named in both modes; FLIRT's replica 2026-11-02; the clean-room original in its part 2 | – |
 | FSL-93 † | flirt | a voxel size of 0 in the input's or reference's header (which reading the image counts as 1) makes the base scale 0: every voxel size divided by it is infinite, the initial matrix NaN, the pyramid's grid sizes an undefined conversion of infinity, and FLIRT never finishes (still running after 60 minutes, its memory constant); `-basescale 0` the same | a | none (fMRIPrep passes `-basescale 1`) | rule A: a header size of 0 counted as 1 for the base scale too by default, named; refused with `reproduce` (FLIRT never finishes); `-basescale 0` refused in both modes; FLIRT's replica 2026-11-02; the clean-room original in its part 2 | – |
+| FSL-111 | applyxfm4D (8-bit unsigned images) | an image stored as uint8 is read as signed bytes: its values 128 to 255 are taken as v − 256 (255 as −1), so the interpolation between values on both sides of 127/128, the background value (the border's 10th percentile) and the spline's coefficients are those of the negative values (a profile 100, 140 interpolated 0.4 of the way gives 13, not 116); nearest neighbour writes the stored bytes back (the output's conversion wraps them to bytes) but for the padding voxels; `flirt -applyxfm` reads the same image as stored | c | none (fMRIPrep resamples with its own resampler) | rule A: read as stored by default in the clean-room original, FSL's reading with `reproduce`, named where a written value changes (2026-11-02); the replica reads them as FSL does in both modes | replica |
 
-**Counts** (303 entries, recounted from the table on 2026-11-02, after FLIRT's spec answers (FSL-90 to FSL-93)
+**Counts** (304 entries, recounted from the table on 2026-11-02, after FLIRT's clean-room original's part 2 (FSL-111)
 (`scripts/orchestration/register_counts.py`); an entry with two classes counts under its first; "c (c? until …)"
 entries, decided, count as (c)):
 
@@ -362,7 +363,7 @@ entries, decided, count as (c)):
 |---|---|---|
 | (a) crash, undefined behaviour, out of bounds | 64 | |
 | (b) race, nondeterminism | 12 | |
-| (c) deterministic bug that changes results | 139 | 10 |
+| (c) deterministic bug that changes results | 140 | 10 |
 | (d) imprecision | 23 | |
 | (e) command-line or parsing quirk | 51 | |
 | (f) documentation or message only | 12 | |
@@ -514,6 +515,11 @@ B) and FSL-93 (rule A; `-basescale 0` refused in both modes) added, from the cle
 two candidate refusals and two leads of the spec answers; each in FLIRT's replica with its
 `reproduce` switch (FSL-93's a refusal: FLIRT never finishes) and in `specs/flirt.md` §11 for the
 clean-room original's part 2. FSL-94 and FSL-95 unused. No new **decide** entry.
+**2026-11-02, FLIRT's clean-room original (part 2):** FSL-111 (applyxfm4D's uint8 images read as
+signed bytes; rule A), found by the clean-room original's black-box runs (relay 6), the register's first
+FSL entry open to everyone (its own section, "FSL: black-box findings"); the replica's switch is still to
+do. FSL-112 to FSL-115 unused. The clean-room original follows the replica's decisions for FSL-76, 78, 79,
+81 and FSL-90 to FSL-93 too. No new **decide** entry.
 
 **2026-11-02, FLIRT's replica (part 3):** FSL-78 (rule B), FSL-79, FSL-80 and FSL-81 (rule A)
 added, each with its `reproduce` switch; FSL-75 named in applyxfm4D and in mcflirt's replica; FSL-09,
@@ -3494,6 +3500,27 @@ fMRIPrep 25.2.6 (the oracle runs) or its source at `21a490fb`, niworkflows 1.15.
 - **fMRIPrep:** none.
 - **larmorx:** not used as a geometry oracle.
 - **D13 / gap:** no larmorx code. No gap.
+
+## FSL: black-box findings (open to everyone)
+
+Entries found by running FSL's programs, not from its source: anyone may read them, clean-room
+implementers included.
+
+### FSL-111 applyxfm4D reads uint8 images as signed bytes (FSL 6.0.7.23) — (c)
+
+**What:** an image stored as uint8 is held as signed bytes: values 128 to 255 read v − 256 (255 as −1).
+Interpolating across 127/128 (a profile 100, 140 at 0.4 of the way gives 13, not 116), the background
+value (the border's 10th percentile: 180 for a border of 10s and 140 to 250s) and the spline's
+coefficients use the negative values; nearest neighbour writes the stored bytes back (the output's
+conversion wraps them) but for the padding voxels. `flirt -applyxfm` reads the same image as stored.
+**Evidence:** verified (black-box runs of FSL 6.0.7.23's applyxfm4D and flirt on uint8 and int16
+profiles, every run through the oracle cache: `validation/investigations/cleanroom-flirt/relay6_u8probe.py`;
+the 29 uint8 applyxfm4D findings of the clean-room trial of 2026-11-02); validated in the
+clean-room record's `programs/applyxfm4D-*` cases. **fMRIPrep users:** none (fMRIPrep resamples with
+its own resampler). **larmorx:** the clean-room original reads the values as stored by default and as
+FSL with `reproduce`, naming FSL-111 where a written value changes (2026-11-02, rule A); the replica
+reads them as FSL in both modes. **D13 gap:** the replica's default and its notice (next-steps
+follow-up "FSL-111 in the replica").
 
 ## Restricted: AFNI 3dTshift (source-derived)
 

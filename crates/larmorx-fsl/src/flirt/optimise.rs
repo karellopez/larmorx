@@ -6,9 +6,12 @@
 use larmorx_mri::hmc::rigid::Params;
 use larmorx_mri::hmc::search::line_search_from;
 
+use std::sync::Arc;
+
 use super::cost::Log;
-use super::mat::Mat4;
+use super::mat::{IDENTITY, Mat4};
 use super::param::{self, AngleRep};
+use super::trace::Trace;
 
 /// FLIRT's default tolerances (§8.2): rotations (rad), translations (mm), scales, skews.
 pub const DEFAULT_TOLERANCES: [f32; 12] = [
@@ -185,6 +188,26 @@ pub struct Settings {
     pub rep: AngleRep,
     /// Where the quaternion's messages go.
     pub log: Option<std::sync::Arc<Log>>,
+    /// Where the verbose lines go (`-verbose`, §2.3), and the level they are printed at here
+    /// (the run's level, lowered by 2 inside the search).
+    pub trace: Option<Arc<Trace>>,
+    pub level: i32,
+    /// The reference parameters a subset's tolerances are computed with (§8.1 step 2: the
+    /// search's, once for all its optimisations); `None`: the optimisation's own `x₀`.
+    pub tol_x0: Option<Params>,
+}
+
+/// Which optimisation a run makes (their verbose lines differ, observed).
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum Kind {
+    /// A schedule's `optimise` (with `setoption paramsubset`, the subset's form).
+    Row,
+    /// A point of the search's coarse grid (the search's subset).
+    Coarse,
+    /// A point of the search's fine grid below its threshold (the search's subset).
+    Threshold,
+    /// A free optimisation of one of the search's minima.
+    Free,
 }
 
 impl Default for Settings {
@@ -196,6 +219,9 @@ impl Default for Settings {
             powell: false,
             rep: AngleRep::Euler,
             log: None,
+            trace: None,
+            level: 0,
+            tol_x0: None,
         }
     }
 }
@@ -204,6 +230,11 @@ impl Settings {
     /// The tolerance of parameter `i` at the requested scale (`None` when the list is short).
     pub fn tolerance(&self, i: usize) -> Option<f32> {
         self.tolerances.get(i).map(|t| t * self.scale)
+    }
+
+    /// The trace when this optimisation's level is at least `level`.
+    pub fn at(&self, level: i32) -> Option<&Trace> {
+        self.trace.as_deref().filter(|_| self.level >= level)
     }
 
     fn guess(&self, sweep: usize) -> f32 {
@@ -270,29 +301,33 @@ fn minimise(
     let mut dirs: Vec<Vec<f64>> = (0..n)
         .map(|i| (0..n).map(|j| if i == j { 1.0 } else { 0.0 }).collect())
         .collect();
-    let dir_tol = |d: &[f64]| -> f32 {
-        // a unit direction keeps its parameter's tolerance; any other the step of one tolerance
-        // unit along it
-        if let Some(k) = (0..n).find(|&k| d[k] == 1.0 && (0..n).all(|j| j == k || d[j] == 0.0)) {
-            return tol[k];
+    // a direction's unit vector and tolerance unit (§8.2): `û = d/√(d·d)`, `τ = Σ |û_i/t_i|`
+    // in single precision over the tolerances above 1e-15, `u = |1/τ|` (single): along an axis
+    // `fl(1/fl(1/t))`
+    let unit = |d: &[f64]| -> (Vec<f64>, f32) {
+        let ss: f64 = d.iter().map(|x| x * x).sum();
+        let norm = ss.sqrt();
+        let u: Vec<f64> = d.iter().map(|x| x / norm).collect();
+        let mut tau = 0.0f32;
+        for (ui, &t) in u.iter().zip(tol) {
+            if f64::from(t).abs() > 1e-15 {
+                tau = (f64::from(tau) + (ui / f64::from(t)).abs()) as f32;
+            }
         }
-        let ss: f64 = d
-            .iter()
-            .zip(tol)
-            .map(|(x, &t)| {
-                if t.abs() > 1e-15 {
-                    (x / f64::from(t)).powi(2)
-                } else {
-                    0.0
-                }
-            })
-            .sum();
-        if ss > 0.0 {
-            (1.0 / ss.sqrt()) as f32
-        } else {
-            1.0
-        }
+        (u, (1.0f32 / tau).abs())
     };
+    // the convergence test's weights `|1/t_i|/n_t` (0 for a tolerance of at most 1e-15)
+    let weights: Vec<f64> = tol
+        .iter()
+        .map(|&t| {
+            let t = f64::from(t);
+            if t.abs() <= 1e-15 {
+                0.0
+            } else {
+                (1.0 / t).abs() / n_tol as f64
+            }
+        })
+        .collect();
     let mut v = v0;
     let mut best = 0.0f32;
     for sweep in 0..maxit {
@@ -307,27 +342,24 @@ fn minimise(
             if best == 0.0 {
                 best = cost(&v);
             }
-            let (moved, y) = along(cost, &v, d, best, dir_tol(d), guess);
+            let (ud, u) = unit(d);
+            let (moved, y) = along(cost, &v, &ud, best, u, guess);
             deltas.push(y - best);
             v = moved;
             best = y;
         }
-        // convergence: Σ |(x_start − x_end)/t| / n_tol below 1 (two interleaved accumulators)
+        // convergence: Σ |(x_start − x_end)·w_i| (two interleaved accumulators, then added),
+        // rounded to single, below 1
         let (mut even, mut odd) = (0.0f64, 0.0f64);
         for i in 0..n {
-            let t = f64::from(tol[i]);
-            let term = if t.abs() <= 1e-15 {
-                0.0
-            } else {
-                ((start[i] - v[i]) / t).abs()
-            };
+            let term = ((start[i] - v[i]) * weights[i]).abs();
             if i % 2 == 0 {
                 even += term;
             } else {
                 odd += term;
             }
         }
-        if (even + odd) / (n_tol as f64) < 1.0 {
+        if ((even + odd) as f32) < 1.0 {
             break;
         }
         if s.powell {
@@ -346,10 +378,23 @@ fn minimise(
             let lhs = 2.0 * (f0 - 2.0 * f1 + fe) * (f0 - f1 - adm) * (f0 - f1 - adm);
             let rhs = (f0 - fe) * (f0 - fe) * adm;
             if lhs < rhs && fe < f0 {
-                let (moved, y) = along(cost, &v, &diff, best, dir_tol(&diff), guess);
+                if let Some(t) = s.at(5) {
+                    t.line("Applying POWELL correction");
+                    t.line(&format!(
+                        "finit, fend, fextrap = {} , {} , {}",
+                        t.num(f64::from(f0)),
+                        t.num(f64::from(f1)),
+                        t.num(f64::from(fe))
+                    ));
+                }
+                let (ud, u) = unit(&diff);
+                let (moved, y) = along(cost, &v, &ud, best, u, guess);
                 v = moved;
                 best = y;
                 dirs[m] = diff;
+            }
+            if let Some(t) = s.at(5) {
+                t.line(&format!("fval = {}", t.num(f64::from(best))));
             }
         }
     }
@@ -369,9 +414,14 @@ pub fn optimise(
     subset: Option<&Subset>,
 ) -> Result<(Mat4, f32), String> {
     let x0: Params = param::decompose(s.rep, start, centre);
-    let (x, c) = optimise_params(eval, x0, centre, dof, maxit, s, subset)?;
     let quiet = Log::default();
     let log = s.log.as_deref().unwrap_or(&quiet);
+    let shown = if s.at(5).is_some() {
+        param::compose(s.rep, &x0, 12, centre, log)
+    } else {
+        IDENTITY
+    };
+    let (x, c) = optimise_params(eval, x0, centre, dof, maxit, s, subset, Kind::Row, &shown)?;
     let n = if subset.is_some() { 12 } else { dof };
     Ok((param::compose(s.rep, &x, n, centre, log), c))
 }
@@ -379,6 +429,8 @@ pub fn optimise(
 /// [`optimise`] from the parameters `x0` themselves (the search's grid points and minima: FSL
 /// starts there from the angles it sampled, not from a decomposition of their matrix, observed):
 /// returns the optimised parameters (the first `dof`, or all twelve with `subset`) and the cost.
+/// `kind` and `shown` (the matrix its verbose lines start from) choose its verbose lines.
+#[allow(clippy::too_many_arguments)]
 pub fn optimise_params(
     eval: &dyn Fn(&Mat4) -> f32,
     x0: Params,
@@ -387,6 +439,8 @@ pub fn optimise_params(
     maxit: usize,
     s: &Settings,
     subset: Option<&Subset>,
+    kind: Kind,
+    shown: &Mat4,
 ) -> Result<(Params, f32), String> {
     let quiet = Log::default();
     let log = s.log.as_deref().unwrap_or(&quiet);
@@ -396,14 +450,33 @@ pub fn optimise_params(
                 .ok_or_else(|| "Mat::operator(): index out of bounds".to_owned())
         })
         .collect::<Result<_, _>>()?;
+    let starting = |t: &Trace| {
+        t.write(&format!("Starting with : \n{}", t.matrix(shown)));
+    };
     match subset {
         None => {
+            if let Some(t) = s.at(7) {
+                t.line(&format!("Starting with {}", t.nums(x0)));
+                t.line(&format!(
+                    "  and tolerance {}",
+                    t.nums(tol.iter().map(|&v| f64::from(v)))
+                ));
+            }
+            if let Some(t) = s.at(5) {
+                starting(t);
+            }
             let compose = |v: &[f64]| {
                 let mut x = x0;
                 x[..dof].copy_from_slice(v);
                 param::compose(s.rep, &x, dof, centre, log)
             };
-            let cost = |v: &[f64]| eval(&compose(v));
+            let cost = |v: &[f64]| {
+                let c = eval(&compose(v));
+                if let Some(t) = s.at(5) {
+                    t.evaluation(c, v);
+                }
+                c
+            };
             let (v, c) = minimise(&cost, x0[..dof].to_vec(), &tol[..dof], 12, maxit, s);
             let mut x = x0;
             x[..dof].copy_from_slice(&v);
@@ -422,21 +495,67 @@ pub fn optimise_params(
             };
             let mut tplus = [0.0; 12];
             let mut zero = [0.0; 12];
+            let tx0 = s.tol_x0.unwrap_or(x0d);
             for i in 0..12 {
-                tplus[i] = (f64::from(tol[i]) + x0d[i]) - x0d[i];
+                tplus[i] = (f64::from(tol[i]) + tx0[i]) - tx0[i];
                 // x0 - x0 as the spec writes it: 0, or NaN for a parameter that is not finite
-                zero[i] = if x0d[i].is_finite() { 0.0 } else { f64::NAN };
+                zero[i] = if tx0[i].is_finite() { 0.0 } else { f64::NAN };
             }
             let a = p.reduce(&tplus);
             let b = p.reduce(&zero);
+            // the start y = pinv(P)·(x_start − x₀) = 0 (x_start = x₀)
+            let zero: [f64; 12] =
+                std::array::from_fn(|i| if x0d[i].is_finite() { 0.0 } else { f64::NAN });
             let ty: Vec<f32> = a.iter().zip(&b).map(|(x, y)| (x - y) as f32).collect();
             let y0 = p.reduce(&zero);
-            let cost = |y: &[f64]| eval(&compose(y));
+            let tys = |t: &Trace| t.nums(ty.iter().map(|&v| f64::from(v)));
+            match kind {
+                Kind::Row => {
+                    if let Some(t) = s.at(4) {
+                        t.line("Using subset cost function");
+                    }
+                    if let Some(t) = s.at(7) {
+                        t.line(&format!("Starting with {}", t.nums(y0.iter().copied())));
+                        t.line(&format!("  and tolerance {}", tys(t)));
+                    }
+                }
+                Kind::Coarse => {
+                    if let Some(t) = s.at(4) {
+                        t.line(&format!("Starting with {}", t.nums(x0)));
+                        t.line(&format!("  and tolerance {}", tys(t)));
+                    }
+                }
+                Kind::Threshold | Kind::Free => {}
+            }
+            if let Some(t) = s.at(5) {
+                starting(t);
+            }
+            let full = |y: &[f64]| {
+                let d = p.expand(y);
+                let mut x = [0.0; 12];
+                for i in 0..12 {
+                    x[i] = d[i] + x0d[i];
+                }
+                x
+            };
+            let cost = |y: &[f64]| {
+                let c = eval(&compose(y));
+                if let Some(t) = s.at(5) {
+                    let x = full(y);
+                    t.evaluation(c, &x);
+                    if kind == Kind::Row && s.level >= 7 {
+                        t.evaluation(c, &x);
+                        t.line("");
+                    }
+                }
+                c
+            };
             let (y, c) = minimise(&cost, y0, &ty, ty.len(), maxit, s);
-            let d = p.expand(&y);
-            let mut x = [0.0; 12];
-            for i in 0..12 {
-                x[i] = d[i] + x0d[i];
+            let x = full(&y);
+            if kind == Kind::Coarse
+                && let Some(t) = s.at(4)
+            {
+                t.line(&format!(" dearranged: {}", t.nums(x)));
             }
             Ok((x, c))
         }

@@ -1,0 +1,2 @@
+applyxfm4D @epi.nii @bold4.nii out.nii.gz one.mat 'file:one.mat=0.996 -0.087 0 3\n0.087 0.996 0 -2\n0 0 1 1.5\n0 0 0 1\n' -singlematrix -interp trilinear
+applyxfm4D @bold4.nii @epi.nii out.nii.gz one.mat 'file:one.mat=0.996 -0.087 0 3\n0.087 0.996 0 -2\n0 0 1 1.5\n0 0 0 1\n' -3D -interp trilinear

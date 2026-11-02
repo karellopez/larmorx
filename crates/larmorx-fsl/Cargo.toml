@@ -13,6 +13,10 @@ larmorx-io.workspace = true
 larmorx-mri.workspace = true
 rayon.workspace = true
 bytemuck.workspace = true
+# the coordinate programs read only an image's header bytes (pure Rust: zlib-rs, bzip2's Rust
+# backend), as FSL does
+flate2.workspace = true
+bzip2.workspace = true
 
 [dev-dependencies]
 tempfile.workspace = true

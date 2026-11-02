@@ -37,9 +37,8 @@ pub const FAMILIES: &[(&str, &[&str])] = &[
 ];
 
 /// The FSL tools, with FSL's command lines: the replica (`larmorx-nc`) when it is installed,
-/// else the clean-room original of the same program (`fsl mcflirt` is `mri hmc`; `fsl bet`,
-/// `fsl bet2`, `fsl betsurf`, `fsl flirt` and `fsl convert_xfm` are `larmorx_fsl::cli`; a test
-/// checks the list).
+/// else the clean-room original of the same program (`fsl mcflirt` is `mri hmc`; the others,
+/// BET's and FLIRT's programs, are `larmorx_fsl::cli`; a test checks the list).
 const FSL_TOOLS: &[&str] = &[
     "mcflirt",
     "bet",
@@ -214,10 +213,7 @@ fn run_tool(
         "ants" => larmorx_ants::cli::run(tool, args, options.loader, out, err),
         "fsl" => match tool {
             "mcflirt" => larmorx_mri::cli::run("hmc", args, out, err),
-            "bet" | "bet2" | "betsurf" | "flirt" | "convert_xfm" => {
-                larmorx_fsl::cli::run(tool, args, out, err)
-            }
-            _ => None,
+            _ => larmorx_fsl::cli::run(tool, args, out, err),
         },
         "mri" => larmorx_mri::cli::run(tool, args, out, err),
         _ => None,
@@ -420,31 +416,45 @@ mod tests {
             "{out}"
         );
         assert!(out.contains("LARMORX_NC_BIN"), "{out}");
-        assert_eq!(
-            replica::replica_only("fsl").collect::<Vec<_>>(),
-            [
-                "avscale",
-                "img2imgcoord",
-                "std2imgcoord",
-                "img2stdcoord",
-                "rmsdiff",
-                "makerot",
-                "midtrans",
-                "pointflirt",
-                "applyxfm4D",
-                "pairreg",
-                "extracttxt",
-                "aff2rigid",
-            ]
-        );
-        // avscale has no original yet: `original` is an error that says so.
+        assert_eq!(replica::replica_only("fsl").count(), 0);
+        // every FSL tool but mcflirt (`mri hmc`) is larmorx_fsl's
+        assert_eq!(&FSL_TOOLS[1..], larmorx_fsl::cli::TOOLS);
         let original = Options {
             implementation: Some(Implementation::Original),
             ..Options::default()
         };
+        // FLIRT's other programs and scripts run their clean-room originals (part 2).
+        let (code, _, err) = run_options(&["lx", "fsl", "midtrans"], &original);
+        assert_eq!(code, 1);
+        assert!(
+            err.starts_with("Must specify at least 2 transforms"),
+            "{err}"
+        );
+        let (code, _, err) = run_options(&["lx", "fsl", "applyxfm4D"], &original);
+        assert_eq!(code, 255);
+        assert!(err.starts_with("Usage: applyxfm4D"), "{err}");
+        let (code, out, _) = run_options(&["lx", "fsl", "extracttxt"], &original);
+        assert_eq!(code, 2);
+        assert!(out.starts_with("Usage: extracttxt"), "{out}");
+        // avscale, the coordinate programs, rmsdiff and makerot run their clean-room originals
+        // (part 2 of FLIRT's original).
         let (code, _, err) = run_options(&["lx", "fsl", "avscale"], &original);
-        assert_ne!(code, 0);
-        assert!(err.contains("LARMORX_IMPLEMENTATION=original"), "{err}");
+        assert_eq!(code, 255);
+        assert!(err.starts_with("Usage: avscale"), "{err}");
+        for tool in ["img2imgcoord", "std2imgcoord", "img2stdcoord"] {
+            let (code, out, _) = run_options(&["lx", "fsl", tool], &original);
+            assert_eq!(code, 1);
+            assert!(out.starts_with(&format!("Usage: {tool}")), "{out}");
+        }
+        let (code, _, err) = run_options(&["lx", "fsl", "rmsdiff"], &original);
+        assert_eq!(code, 255);
+        assert!(err.starts_with("Usage: rmsdiff"), "{err}");
+        let (code, out, _) = run_options(&["lx", "fsl", "makerot", "-t", "30"], &original);
+        assert_eq!(code, 0);
+        assert!(
+            out.starts_with("0.866025 0.500000 0.000000 0.000000 \n"),
+            "{out}"
+        );
         // flirt and convert_xfm run their clean-room originals (2026-11-02).
         let (code, out, _) = run_options(&["lx", "fsl", "flirt", "-version"], &original);
         assert_eq!(code, 0);
@@ -513,7 +523,11 @@ mod tests {
             );
             for tool in *tools {
                 let (code, _, err) = run_capture(&["lx", family, tool]);
-                assert_ne!(code, EXIT_USAGE, "{family} {tool}: {err}");
+                // (extracttxt's own usage exits 2, as FSL's script does)
+                assert!(
+                    code != EXIT_USAGE || !err.starts_with("error:"),
+                    "{family} {tool}: {err}"
+                );
                 assert!(!err.contains("unknown"), "{family} {tool}: {err}");
             }
         }

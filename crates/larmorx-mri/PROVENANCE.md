@@ -103,3 +103,21 @@ re-run and compared identical, `docs/validation/mri-hmc.md`):
 | `hmc::cost::sample_all_weighted` | every slice into one accumulator, in slice order | FLIRT's single-precision bin sums of `corratio` and `woods` |
 | `hmc::rigid::{decompose_parts, with_scales_skews}` (`decompose` and `compose` call them) | the decomposition's factors; the linear part from a given rotation | FLIRT's quaternion parameters (`-anglerep quaternion`, §3) |
 | `hmc::image::read_series_files`: the stored array dropped once converted, a single volume taking the converted values, `Volume::flip_x_in_place` | the same values with one copy of an image at a time (the reader held up to four) | FLIRT's memory on full-size T1w references (`tests/parity/test_memory_peak.py`); mcflirt's reads too |
+
+## The histogram costs' exact sums (2026-11-02, FLIRT's clean-room original part 2)
+
+`specs/mcflirt.md` appendix A (the spec writer, 2026-11-02): mcflirt's `corratio` and `woods` are
+FLIRT's (`specs/flirt.md` §6.2) unchanged. `hmc::cost::{BinMoments, bin_moments, corr_ratio_of,
+woods_of}` (moved here from FLIRT's original, which uses them) compute them: single-precision
+running sums per bin in the sampling order, only the bins of more than two points (left out of
+the count and the total variance too), `η = 1 − A` and the cost `1 − η` each rounded to single,
+Woods' terms `((n_b·n_b)·σ_b)/S_b` (or `(n_b·n_b)·σ_b` for a sum that is not positive). This
+changes `lx.mri.hmc`'s `-cost corratio` and `-cost woods` (closer to mcflirt: the record's
+`opt-cost-corratio` 95th-percentile RMS deviation 0.066 to 0.028 mm, `docs/validation/mri-hmc.md`,
+re-made from 04b58ca; every other case identical). `hmc::cost::PointWeight` now receives the
+point's edge weight and `TestVolume::edge_factors` gives its three factors (FLIRT's weighted costs,
+`specs/flirt.md` §6.4); the head-motion correction passes no weight.
+
+Part 2 of FLIRT's clean-room original, relay 5 (2026-11-02): `hmc::image::to_f32_vec` converts the
+stored array where it lies (no copy of it first): one full-size array less at the reading's peak,
+the values the same (FLIRT's avscale and midtrans with a 0.8 mm volume within FSL's memory).

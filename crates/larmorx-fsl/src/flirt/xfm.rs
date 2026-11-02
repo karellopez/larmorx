@@ -2,18 +2,16 @@
 //! `convert_xfm`'s matrix algebra (`specs/flirt.md` §10): concatenation, the scales and skews of
 //! another matrix, the inverse.
 
-use larmorx_mri::hmc::rigid;
-
 use super::mat::{self, Mat4};
 
 /// `m`'s rotations and translations with `other`'s scales and skews (§10): both decomposed about
 /// the origin, combined, composed with 12 parameters.
 pub fn fix_scale_skew(m: &Mat4, other: &Mat4) -> Mat4 {
-    let a = rigid::decompose(m, [0.0; 3]);
-    let b = rigid::decompose(other, [0.0; 3]);
+    let a = super::param::euler_decompose(m, [0.0; 3]);
+    let b = super::param::euler_decompose(other, [0.0; 3]);
     let mut p = a;
     p[6..12].copy_from_slice(&b[6..12]);
-    rigid::compose(&p, 12, [0.0; 3])
+    super::param::euler_compose(&p, 12, [0.0; 3])
 }
 
 /// `second · m` (§10).

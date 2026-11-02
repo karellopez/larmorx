@@ -276,9 +276,243 @@ pub fn parse_ref(word: &str, maxdof: f64, minsampling: f64) -> Result<(Var, i64,
     Ok((var, r1, r2))
 }
 
+/// `sort`'s order (§7.1): libstdc++'s `std::sort` as its documentation describes it, an
+/// introsort (median-of-three pivots moved to the front, an unguarded partition, the larger
+/// part looped and the right one recursed into while more than 16 rows remain, a heap sort when
+/// the depth `2·⌊log₂ n⌋` runs out), then an insertion sort (guarded over the first 16 rows,
+/// unguarded after them). Rows of equal cost keep the order this gives them (not stable).
+pub fn std_sort<T: Clone>(v: &mut [T], less: &impl Fn(&T, &T) -> bool) {
+    std_sort_checked(v, less);
+}
+
+/// [`std_sort`]; returns `false` where libstdc++'s unguarded scans would have read outside the
+/// slice (an inconsistent order, such as `<` with NaN values: the scans stop at its ends here).
+pub fn std_sort_checked<T: Clone>(v: &mut [T], less: &impl Fn(&T, &T) -> bool) -> bool {
+    let n = v.len();
+    if n < 2 {
+        return true;
+    }
+    let inside = std::cell::Cell::new(true);
+    let less = |a: &T, b: &T| less(a, b);
+    let guard = Guard { inside: &inside };
+    let depth = 2 * (usize::BITS - 1 - n.leading_zeros()) as usize;
+    introsort_loop(v, 0, n, depth, &less, &guard);
+    if n > 16 {
+        insertion_sort(v, 0, 16, &less, &guard);
+        for i in 16..n {
+            unguarded_linear_insert(v, i, &less, &guard);
+        }
+    } else {
+        insertion_sort(v, 0, n, &less, &guard);
+    }
+    inside.get()
+}
+
+/// Notes a scan that would have left the slice.
+struct Guard<'a> {
+    inside: &'a std::cell::Cell<bool>,
+}
+
+impl Guard<'_> {
+    fn out(&self) {
+        self.inside.set(false);
+    }
+}
+
+fn introsort_loop<T: Clone>(
+    v: &mut [T],
+    first: usize,
+    mut last: usize,
+    mut depth: usize,
+    less: &impl Fn(&T, &T) -> bool,
+    guard: &Guard<'_>,
+) {
+    while last - first > 16 {
+        if depth == 0 {
+            heap_sort(&mut v[first..last], less);
+            return;
+        }
+        depth -= 1;
+        let mid = first + (last - first) / 2;
+        move_median_to_first(v, first, first + 1, mid, last - 1, less);
+        let cut = unguarded_partition(v, first + 1, last, first, less, guard);
+        introsort_loop(v, cut, last, depth, less, guard);
+        last = cut;
+    }
+}
+
+fn move_median_to_first<T>(
+    v: &mut [T],
+    result: usize,
+    a: usize,
+    b: usize,
+    c: usize,
+    less: &impl Fn(&T, &T) -> bool,
+) {
+    let pick = if less(&v[a], &v[b]) {
+        if less(&v[b], &v[c]) {
+            b
+        } else if less(&v[a], &v[c]) {
+            c
+        } else {
+            a
+        }
+    } else if less(&v[a], &v[c]) {
+        a
+    } else if less(&v[b], &v[c]) {
+        c
+    } else {
+        b
+    };
+    v.swap(result, pick);
+}
+
+fn unguarded_partition<T>(
+    v: &mut [T],
+    mut first: usize,
+    mut last: usize,
+    pivot: usize,
+    less: &impl Fn(&T, &T) -> bool,
+    guard: &Guard<'_>,
+) -> usize {
+    loop {
+        while first < v.len() && less(&v[first], &v[pivot]) {
+            first += 1;
+        }
+        if first == v.len() {
+            guard.out();
+            return first.min(last);
+        }
+        last -= 1;
+        while last > 0 && less(&v[pivot], &v[last]) {
+            last -= 1;
+        }
+        if last == 0 && less(&v[pivot], &v[0]) {
+            guard.out();
+        }
+        if first >= last {
+            return first;
+        }
+        v.swap(first, last);
+        first += 1;
+    }
+}
+
+fn insertion_sort<T: Clone>(
+    v: &mut [T],
+    first: usize,
+    last: usize,
+    less: &impl Fn(&T, &T) -> bool,
+    guard: &Guard<'_>,
+) {
+    for i in first + 1..last {
+        if less(&v[i], &v[first]) {
+            let x = v[i].clone();
+            for j in (first..i).rev() {
+                v[j + 1] = v[j].clone();
+            }
+            v[first] = x;
+        } else {
+            unguarded_linear_insert(v, i, less, guard);
+        }
+    }
+}
+
+fn unguarded_linear_insert<T: Clone>(
+    v: &mut [T],
+    last: usize,
+    less: &impl Fn(&T, &T) -> bool,
+    guard: &Guard<'_>,
+) {
+    let x = v[last].clone();
+    let mut hole = last;
+    while hole > 0 && less(&x, &v[hole - 1]) {
+        v[hole] = v[hole - 1].clone();
+        hole -= 1;
+    }
+    if hole == 0 && last > 0 {
+        // libstdc++ would compare with the value before the slice next
+        guard.out();
+    }
+    v[hole] = x;
+}
+
+/// `std::partial_sort` over the whole range: the heap made, then popped from the back.
+fn heap_sort<T: Clone>(v: &mut [T], less: &impl Fn(&T, &T) -> bool) {
+    let len = v.len();
+    if len < 2 {
+        return;
+    }
+    let mut parent = (len - 2) / 2;
+    loop {
+        let x = v[parent].clone();
+        adjust_heap(v, parent, len, x, less);
+        if parent == 0 {
+            break;
+        }
+        parent -= 1;
+    }
+    let mut end = len;
+    while end > 1 {
+        end -= 1;
+        let x = v[end].clone();
+        v[end] = v[0].clone();
+        adjust_heap(v, 0, end, x, less);
+    }
+}
+
+fn adjust_heap<T: Clone>(
+    v: &mut [T],
+    mut hole: usize,
+    len: usize,
+    x: T,
+    less: &impl Fn(&T, &T) -> bool,
+) {
+    let top = hole;
+    let mut second = hole;
+    while second < (len - 1) / 2 {
+        second = 2 * (second + 1);
+        if less(&v[second], &v[second - 1]) {
+            second -= 1;
+        }
+        v[hole] = v[second].clone();
+        hole = second;
+    }
+    if len.is_multiple_of(2) && second == (len - 2) / 2 {
+        second = 2 * (second + 1);
+        v[hole] = v[second - 1].clone();
+        hole = second - 1;
+    }
+    let mut parent = hole.wrapping_sub(1) / 2;
+    while hole > top && less(&v[parent], &x) {
+        v[hole] = v[parent].clone();
+        hole = parent;
+        parent = hole.wrapping_sub(1) / 2;
+    }
+    v[hole] = x;
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn std_sort_sorts() {
+        let mut state = 12345u64;
+        for n in [0usize, 1, 2, 5, 16, 17, 40, 300, 1000] {
+            let mut v: Vec<(u32, usize)> = (0..n)
+                .map(|i| {
+                    state = state.wrapping_mul(6364136223846793005).wrapping_add(1);
+                    (((state >> 33) % 7) as u32, i)
+                })
+                .collect();
+            std_sort(&mut v, &|a, b| a.0 < b.0);
+            assert!(v.windows(2).all(|w| w[0].0 <= w[1].0), "{n}");
+            let mut ids: Vec<usize> = v.iter().map(|x| x.1).collect();
+            ids.sort_unstable();
+            assert_eq!(ids, (0..n).collect::<Vec<_>>());
+        }
+    }
 
     #[test]
     fn splitting() {

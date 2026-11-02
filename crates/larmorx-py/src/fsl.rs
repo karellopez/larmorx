@@ -7,8 +7,9 @@ use std::path::PathBuf;
 use pyo3::exceptions::PyKeyError;
 use pyo3::prelude::*;
 
-/// Runs the clean-room original of `fsl tool` (`bet`, `bet2`, `betsurf`, `flirt`, `convert_xfm`,
-/// `larmorx_fsl::cli::TOOLS`) with FSL's arguments inside
+/// Runs the clean-room original of `fsl tool` (`larmorx_fsl::cli::TOOLS`: `bet`, `bet2`,
+/// `betsurf`, `flirt`, `convert_xfm`, `avscale`, the coordinate programs, `rmsdiff`, `makerot`)
+/// with FSL's arguments inside
 /// this process, without the GIL: `(exit code, standard output, standard error)`. `env` stands
 /// for the process environment (`FSLOUTPUTTYPE`, `FSL_LOAD_NIFTI_EXTENSIONS`,
 /// `LARMORX_UPSTREAM_DEFECTS`, `OMP_NUM_THREADS`); the process's own is neither read nor

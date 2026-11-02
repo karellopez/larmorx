@@ -80,3 +80,107 @@ replica parts, or `validation/src/larmorx_validation/parity/fsl_versions.py`. It
 | `cli::flirt` | FLIRT's command line, its usage and messages | spec §2, black-box |
 
 The parity record is [docs/validation/fsl-flirt.md](../../docs/validation/fsl-flirt.md).
+
+## FLIRT's other programs (`avscale`, `img2imgcoord`, `std2imgcoord`, `img2stdcoord`, `rmsdiff`, `makerot`; part 2, 2026-11-02)
+
+Written by a clean-room implementer under the same rules as part 1 (none of the files listed
+above opened). Its only inputs were:
+
+| Input | What it gave |
+|---|---|
+| [`specs/flirt.md`](../../specs/flirt.md) §15 to §15.4 (with §2.5, §3, §8.5, §8.6, §12) and [`specs/mcflirt.md`](../../specs/mcflirt.md) §4.1, §4.2, §4.4, §6.1, §10.4 | the programs' command lines, messages, exit statuses, mappings, decompositions and matrices, FSL-76, FSL-77 |
+| Black-box runs of FSL 6.0.7.23's six programs (`~/fsl-6.0.7.23/bin`, FSL off the `PATH`): the `fsl-flirt` suite's `programs/` cases through the oracle cache, further command lines through it, and the coordinate programs reading standard input run directly (the cache does not key standard input) | the observations of [`docs/findings/fsl-flirt-original.md`](../../docs/findings/fsl-flirt-original.md), "FLIRT's other programs": `makerot`'s basis and precisions, `avscale`'s precisions, the coordinate programs' default space and standard input |
+| The defect register's summary rows of FSL-14, FSL-76 and FSL-77 (behaviour only) | the corrections, refusals and notices |
+| larmorx's own Apache-2.0 code: part 1's `flirt::mat` and `flirt::param` (the quaternion parametrisation), `larmorx_mri::hmc::rigid` (the decomposition and composition), `cli::options` (FSL's option parser, now also every occurrence of an option), `bet::image` and `cli::bet2` (FSL's image names and reading), `larmorx_core::math` (correctly rounded `sinf`, `cosf`, `asin`, `cos`) | numbers, images, parameters |
+
+| larmorx | Behaviour reproduced | Source |
+|---|---|---|
+| `flirt::programs` (the determinant, `avscale`'s decomposition, half transforms and inverted eddy matrix, the coordinate mappings, the RMS deviations, `makerot`'s rotation with x86-64's NaN rules written out) | §15.1 to §15.4 | spec, black-box |
+| `cli::common` (matrix files, the image layer's and the C++ runtime's messages, images read for their header, the centre of gravity with FSL-14) | §15 | spec, black-box |
+| `cli::avscale`, `cli::coords`, `cli::rmsdiff`, `cli::makerot` | the four command lines, their usages and messages, FSL-76, FSL-77 | spec §15.1 to §15.4, black-box |
+
+## FLIRT's other programs and scripts (`midtrans`, `pointflirt`, `applyxfm4D`, `pairreg`, `extracttxt`, `aff2rigid`; part 2, relay 2, 2026-11-02)
+
+Written by a clean-room implementer under the same rules (none of the files listed above
+opened; FSL's scripts in `~/fsl-6.0.7.23/bin` not opened either, only run). Its only inputs were:
+
+| Input | What it gave |
+|---|---|
+| [`specs/flirt.md`](../../specs/flirt.md) §15, §15.5 to §15.8 (with §8.3, §9.1, §9.2, §10a, §11, §13) | the programs' command lines, messages, exit statuses, fits, resampling, the scripts' steps, FSL-78 to FSL-81 |
+| Black-box runs of FSL 6.0.7.23's programs and scripts (FSL off the `PATH`): the `fsl-flirt` suite's `programs/` cases through the oracle cache, further command lines through it (convert_xfm on odd matrix files, applyxfm4D on generated integer series), the system's GNU dc 1.4.1 run directly | the observations of [`docs/findings/fsl-flirt-original.md`](../../docs/findings/fsl-flirt-original.md), "FLIRT's other programs and scripts": the matrix-file reader, midtrans's stages and errors, pointflirt's transposition, applyxfm4D's resampling (no blur), sform zeros and error forms, extracttxt's dc arithmetic |
+| The `larmorx-nc` replica's `aff2rigid` program, run as a black box | FSL-81's corrected matrix, to check the original's |
+| POSIX's definition of basic regular expressions and GNU grep's manual (`\+`, `\?`, `\|`, `\w`, `\s`, `\b`, `\<`, `\>`) | `cli::bre` |
+| larmorx's own Apache-2.0 code: part 1's `flirt::{mat, output, pyramid, engine}` (the resampling, the background value, the image writer), relay 1's `cli::{common, options}`, `larmorx_mri::hmc::kernels` (the spline, now with a per-pass store), `larmorx_core::vnl_svd` (the singular value decompositions) | numbers, images |
+
+| larmorx | Behaviour reproduced | Source |
+|---|---|---|
+| `flirt::fits` (midtrans's three stages, pointflirt's normal equations solved by their SVD, aff2rigid's rigid matrix, determinants of any size) | §15.5, §15.6, §15.8 | spec |
+| `flirt::mat::parse_matrix_text` (FSL's matrix files: libstdc++'s extraction of doubles) | §2, §15 | black-box |
+| `flirt::output::{padded, Resampling::spline}`, `flirt::pyramid::background_f64`, `flirt::engine::{write_values, grouped_type}` (shared with flirt) | §9.2, §10a, §15.7 | spec, black-box |
+| `cli::midtrans`, `cli::pointflirt`, `cli::applyxfm4d` | the three command lines, usages, messages, FSL-78, FSL-79, FSL-80 | spec §15.5 to §15.7, black-box |
+| `cli::pairreg`, `cli::extracttxt`, `cli::bre`, `cli::aff2rigid` | the three scripts, their messages, FSL-81 | spec §15.8, black-box, POSIX |
+
+## FLIRT's verbose levels, `-debug` and speed (part 2, relay 3, 2026-11-02)
+
+Written by a clean-room implementer under the same rules (none of the files listed above
+opened). Its only inputs were:
+
+| Input | What it gave |
+|---|---|
+| [`specs/flirt.md`](../../specs/flirt.md) §2.3, §2.5, §7.3, §9.4, §12 | the levels' outline, the stream's notation, `-debug`'s volumes and final call, which sums may run in parallel |
+| Black-box runs of FSL 6.0.7.23's `flirt` (FSL off the `PATH`) through the oracle cache: the fsl-flirt suite's `verbose/` and `bbr/debug` cases and about 30 probe command lines (levels 2 to 7 on short schedules, `-noclamp`, `-noresample`, `-2D`, `-applyxfm`, `-out`, `-debug` over forced and input-only scales, the boundary-based cost set up by `setoption`, short tolerance lists), and part 1's level-7 trace | every line's text, level and place ([findings](../../docs/findings/fsl-flirt-original.md), "The verbose levels and -debug"), the debug volumes' headers, the short tolerance list's index error |
+| larmorx's own Apache-2.0 code: part 1's engine, search, optimiser and costs | numbers |
+
+| larmorx | Behaviour reproduced | Source |
+|---|---|---|
+| `flirt::trace` (standard output in order, its notation, the evaluation counter, the images' four information lines) | §2.3, §2.5 | spec, black-box |
+| `flirt::engine` (the reading's, preparation's, `setscale`'s, `setoption`'s and the end's lines; `-debug`'s volumes, lines and final call; `-debugsave`'s grids), `flirt::optimise` (the optimisations' starts, tolerances, evaluations, Powell's lines), `flirt::search` (the grids', threshold's and minima's lines), `flirt::bbr::cost_and_debug` (BBR's `debug` volume) | §2.3, §9.4 | spec, black-box |
+| `flirt::cost` (the correlation ratio's and Woods' bin sums in parallel, each bin's additions in the sampling order: the same bits), `flirt::bbr::mask_distance` (the field map's search skipping the steps that cannot reach its mask: the same point found) | §6.2, §6.5, §12 | spec, larmorx's own design |
+
+## The spec writer's answers (part 2, relay 4, 2026-11-02)
+
+Written by a clean-room implementer under the same rules (none of the files listed above
+opened). Its only inputs were:
+
+| Input | What it gave |
+|---|---|
+| [`specs/flirt.md`](../../specs/flirt.md) §3, §4.1, §4.2, §5, §6.2, §6.4, §6.5, §7.1, §7.2, §8.1, §8.2, §8.5, §9.2, §9.3, §10a, §11 (FSL-90 to FSL-93), §12, §14's table; [`specs/mcflirt.md`](../../specs/mcflirt.md) §4.4, §6.2, §6.3, appendix A | the exact arithmetic of the costs, parameters, search, optimiser, normals, spline, sinc, forms; the four defects' defaults |
+| Black-box runs of FSL 6.0.7.23's `flirt` and `convert_xfm` (FSL off the `PATH`) through the oracle cache: the fsl-flirt suite's standard tier and `-verbose 7` traces of its cases | where the two traces part, evaluation by evaluation |
+| libstdc++'s documented `std::sort` (introsort, insertion sort below 16 elements) | `sort`, `dualsort` and FSL-22's `reproduce` order |
+
+| larmorx | Behaviour reproduced | Source |
+|---|---|---|
+| `flirt::param::{euler_compose, euler_decompose, euler_decompose_parts}` | every Euler composition and decomposition of FLIRT and `convert_xfm` (`-fixscaleskew` included) | §3 |
+| `flirt::cost::centre_of_mass`; the weighted costs' edge factors one by one | the centres of mass in blocks; `(((w_t·w_r)·w_x)·w_y)·w_z` | §8.1 step 3, §6.4 |
+| `flirt::optimise` (the unit along `û`, the convergence weights, `Settings::tol_x0`) | §8.2's line search and convergence test; the search's tolerances | §8.1, §8.2 |
+| `flirt::search` (the coarse grid in single precision, its trilinear interpolation, the percentile, the minima's starts, the list, FSL-90) | §8.1's steps 2 to 9 | §8.1, §11 |
+| `flirt::engine` (FSL-91, FSL-92, FSL-93, the reference parameters in force, fresh centres, the neurological forms' single-precision field of view, the output blur's edge) | §4.1, §4.2, §6.4, §8.5, §9.3 | §4, §6.4, §8.5, §9.3, §11 |
+| `flirt::schedule::{std_sort, std_sort_checked}` | the order of rows of equal cost; NaN's order in the background value with `reproduce` | §7.1, §10a |
+| `flirt::bbr::points` (with `pyramid::convolve`) | the boundary normals: a Gaussian of 2 mm, the gradient's weights 3, 1, 1/3, zeros outside | §6.5 |
+| `flirt::output::{FlirtSpline, trilinear_constant, SincKernel}`, `Edge` | the spline exactly, `-setbackground`'s constant, the sinc's table and lookup, the edge rule before the blur | §9.2, §9.3 |
+
+### Part 2, relay 5 (2026-11-02): from the random-testing trial (black-box runs of FSL 6.0.7.23)
+
+| Code | Behaviour | Source |
+|---|---|---|
+| `flirt::engine::apply` (`-applyisoxfm`'s header) | single-precision `st`, each form swapped by both grids, every element in single precision, the qform's quaternion from its matrix | §9.3, §4.1 |
+| `flirt::engine::completed_forms` | an unset form written as the set one (a registration's `-out`, applyxfm4D) | observed (docs/findings/fsl-flirt-original.md, "Random testing of every program") |
+| `flirt::bbr::setup_errors`, the `(2)` warning of a NaN cost | BBR without a boundary voxel | §6.5; observed (the set-up's count) |
+| `flirt::programs::Space::{of_image, unset}`, `cli::coords` | an image without forms at its voxel sizes; the standard programs' warning | §15.2; observed |
+| `cli::common::header_bytes` | only the header's bytes read (memory) | observed (FSL's peak) |
+| `cli::applyxfm4d`, `cli::makerot` | FSL-76, FSL-79, FSL-80 named only where they change a value | D13 |
+| `bet::image::write_pieces` | zstd and bzip2 outputs of every stored type | §10.1 |
+
+### Part 2, relay 6 (2026-11-02): the trial's open items (black-box runs of FSL 6.0.7.23)
+
+| Code | Behaviour | Source |
+|---|---|---|
+| `cli::applyxfm4d` (`char_reading`, `x86_convert`) | a uint8 image read as signed char (FSL-111, `reproduce`; as stored by default); FSL-79's `(T)(c + 0.5)` and `(T)v` as x86-64 converts (through a 32-bit integer, wrapped to the type's bits) | §15.7; observed (docs/findings/fsl-flirt-original.md, "The open items of the trial closed") |
+| `flirt::engine::formless_forms` | a reference without forms: the input's form through `W·D_in⁻¹·A⁻¹·D_ref`, as sform and qform with the input's code (`-out`, applyxfm4D's first matrix) | observed |
+| `flirt::engine::Look::quaternion_final`, `bet::image::Output::rewrite_quaternion` | a quaternion computed from a matrix (completed, `-applyisoxfm`'s, a formless reference's) written once | observed |
+| `flirt::engine` (`optimise`, `measurecost`), `flirt::search` | `Erroneous dof` once per row and once per free start, in the warnings' order; FSL-90's starts composed once below 6 dof | §8.2; observed |
+| `flirt::mat::{inverse, upper_inverse, lu_left_looking, solve_vec}` | the 4 × 4 inverse exactly (the upper triangle's own, the left-looking LU, the columns in pairs) | §12 |
+| `flirt::programs::avscale` | §3's decomposition and composition | §15.1, §3 |
+| `cli::common::header_image` | the qform as FSL holds it (`bet::quatern`) | §4.1, §15.2 |
+| `flirt::output::resample` (nearest neighbour) | the nearest index first, then the extraslice rule | §9.2; observed |
+| `larmorx_core::defects::FSL_111` | the new defect's entry | D13, rule A |

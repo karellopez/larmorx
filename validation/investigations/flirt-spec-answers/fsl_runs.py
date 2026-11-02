@@ -34,6 +34,19 @@ Sub-task 2 (the search, the outputs and their precision, questions 6 to 20):
 - ``inverse-noz``: ``convert_xfm -inverse`` of a rotation whose z translation is 0 (question 11);
 - ``rotation``: a schedule of one ``setrowparams`` (angles 0.1, -0.25, 0.3: not single-precision
   numbers) written by ``-omat`` (questions 16 and 6: §3's composition).
+
+Sub-task 3 (the two candidate refusals and the leads, FSL-90 to FSL-95):
+
+- ``default12``: the suite's default registration (12 dof, ``corratio``, Euler angles), the
+  matrix ``-anglerep quaternion``'s (``quat``) is compared with;
+- ``zero-refweight``, ``zero-inweight``: the same with an all-zero weight (``zeroweight.nii`` on
+  the T1w's grid, ``zeroinweight.nii`` on the BOLD reference's: derived inputs, an empty mask);
+  ``zero-refweight-6`` with ``-dof 6`` (is the matrix an artefact of the search?);
+  ``zero-refweight-bbr``: the suite's ``bbr/default`` with the empty reference weight;
+- ``onevox-in``, ``onevox-ref``, ``onevox-both``: a 1 x 1 x 1 input, reference, or both
+  (constant images of 2 mm voxels) against the suite's images;
+- ``zero-voxsize``: the BOLD reference with a header voxel size of 0 along z
+  (``epi_zerovox.nii``, a derived input: a broken header).
 """
 
 from __future__ import annotations
@@ -179,6 +192,81 @@ RUNS: dict[str, tuple[tuple[str, ...], tuple[str, ...]]] = {
         ("-in", "@epi.nii", "-ref", "@t1.nii", "-schedule", "rot.sch", "-omat", "out.mat"),
         (),
     ),
+    # sub-task 3
+    "default12": (("-in", "@epi.nii", "-ref", "@t1.nii", "-omat", "out.mat"), ()),
+    "zero-refweight": (
+        (
+            "-in",
+            "@epi.nii",
+            "-ref",
+            "@t1.nii",
+            "-refweight",
+            "@@zeroweight.nii",
+            "-omat",
+            "out.mat",
+        ),
+        (),
+    ),
+    "zero-refweight-6": (
+        (*DOF6, "-refweight", "@@zeroweight.nii"),
+        (),
+    ),
+    "zero-inweight": (
+        (
+            "-in",
+            "@epi.nii",
+            "-ref",
+            "@t1.nii",
+            "-inweight",
+            "@@zeroinweight.nii",
+            "-omat",
+            "out.mat",
+        ),
+        (),
+    ),
+    "zero-refweight-bbr": (
+        (
+            "-in",
+            "@epi.nii",
+            "-ref",
+            "@t1.nii",
+            "-init",
+            "@init.mat",
+            "-wmseg",
+            "@wm.nii",
+            "-cost",
+            "bbr",
+            "-dof",
+            "6",
+            "-schedule",
+            "@fslsch:bbr.sch",
+            "-refweight",
+            "@@zeroweight.nii",
+            "-omat",
+            "out.mat",
+        ),
+        (),
+    ),
+    "onevox-in": (
+        ("-in", "@const:1x1x1:2x2x2:one.nii", "-ref", "@t1.nii", "-omat", "out.mat"),
+        (),
+    ),
+    "onevox-ref": (
+        ("-in", "@epi.nii", "-ref", "@const:1x1x1:2x2x2:one.nii", "-omat", "out.mat"),
+        (),
+    ),
+    "onevox-both": (
+        (
+            "-in",
+            "@const:1x1x1:2x2x2:one.nii",
+            "-ref",
+            "@const:1x1x1:2x2x2:oneref.nii",
+            "-omat",
+            "out.mat",
+        ),
+        (),
+    ),
+    "zero-voxsize": (("-in", "@@epi_zerovox.nii", "-ref", "@t1.nii", "-omat", "out.mat"), ()),
 }
 
 #: The runs of another program than ``flirt``, and the text files written into a run first.
@@ -222,6 +310,21 @@ def derived(name: str) -> Path:
         out_img = nib.Nifti1Image(a, None, h)
         out_img.set_qform(aff, code=1)
         out_img.set_sform(None, code=0)
+        nib.save(out_img, str(p))
+    if not p.is_file() and name in ("zeroweight.nii", "zeroinweight.nii"):
+        # an empty mask (every voxel 0, float32) on the T1w's or the BOLD reference's grid
+        img = nib.load(str(rep.inputs() / ("t1.nii" if name == "zeroweight.nii" else "epi.nii")))
+        h = img.header.copy()
+        h.set_data_dtype(np.float32)
+        h["scl_slope"], h["scl_inter"] = 1.0, 0.0
+        nib.save(nib.Nifti1Image(np.zeros(img.shape[:3], np.float32), img.affine, h), str(p))
+    if not p.is_file() and name == "epi_zerovox.nii":
+        # the BOLD reference with its header's voxel size along z set to 0 (pixdim[3]; the
+        # sform and qform as stored)
+        img = nib.load(str(rep.inputs() / "epi.nii"))
+        h = img.header.copy()
+        out_img = nib.Nifti1Image(np.asanyarray(img.dataobj), img.affine, h)
+        out_img.header["pixdim"][3] = 0.0
         nib.save(out_img, str(p))
     if not p.is_file() and name == "epi_neg.nii":
         img = nib.load(str(rep.inputs() / "epi.nii"))

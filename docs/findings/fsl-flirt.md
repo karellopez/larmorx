@@ -488,6 +488,57 @@ to 20 (§3, §4.1, §4.2, §7.2, §7.4, §8.1, §8.2, §8.5, §8.7, §9.2, §9.3
   with `no_bins/8`; `requestedscale = 1.0` by default; `set_basescale` reads the headers only
   (`read_volume_hdr_only`) before `get_refvol`/`get_testvol` (whose `double_end_slices` triples).
 
+## The refusals and leads of 2026-11-02 (FSL-90 to FSL-93, from the source)
+
+What FSL 6.0.7.23's source says behind `specs/flirt.md` §4.1, §4.2, §6.4, §8.1 step 9 and §11's
+FSL-90 to FSL-93, decided by rules A-D; FSL's runs are `validation/investigations/flirt-spec-answers/
+fsl_runs.py`'s `default12`, `quat`, `zero-*`, `onevox-*` and `zero-voxsize` (through the oracle
+cache), the replica's in both modes `replica_runs.py`.
+
+- **FSL-90, `-anglerep quaternion`'s search** (`optimise_strategy3`, `flirt.cc`): `search_cost`
+  sets `anglerep = Euler` for its own compositions and decompositions and restores the user's
+  before returning `paramlist` (Euler angles); `optimise_strategy3` then calls `vector2affine(
+  params_8, dof, matresult)` with the user's `anglerep`, so `construct_rotmat_quat` reads the three
+  angles as `(x, y, z)` (`w² = 1 − x² − y² − z²` negative: its message and the identity). Rule A
+  (a documented option, the search's minima misread); the replica's `search_start` composes them
+  with Euler angles by default, FSL's call with `reproduce`. Measured on `real/anglerep-quaternion`:
+  FSL's matrix 0.3685 mm (`rmsdiff`'s 80 mm form) from FSL's `-anglerep euler` run (`default12`), the
+  corrected one 0.2333 mm, 0.192 mm from FSL's; four of the five starting points lose their rotation
+  in FSL (its four messages).
+- **FSL-91, an empty weighting mask** (`filter_image`, `filter_weight`, `flirt.cc`; `binarise`,
+  `newimagefns.h`; the `*_fully_weighted` costs, `costfns.cc`; `calc_cog`, `newimage.cc`):
+  `binarise(weight, 0.01)` is `binarise(vol, 0.01, vol.max(), inclusive)`, empty when the maximum
+  is below 0.01; `filter_image` gives `divide(f(I·B), f(B), f(B))` = 0 (the safe division) and
+  `filter_weight` `f(W)·[f(B) ≥ 0.9]` = 0, at every level and at every `setscale` (the input from
+  `global_init_testweight`). Each weighted cost has a guard for no weight: `corr_ratio_fully_
+  weighted` returns 0 when `numtoty <= 1` (cost 1), `normcorr_fully_weighted` `corr = 0` unless
+  `num > 2` (cost 1), `leastsquares_fully_weighted` and `labeldiff_fully_weighted` the squared range
+  of the two (zero) images, `calc_fully_weighted_entropy` the maximum entropies when `noverlap` is 0
+  (`mutualinfo` 0, `normmi` −1); `woods` ignores the weights (its warning) on zero images; BBR's
+  `bbrval /= bbrwsum` with `bbrwsum = 0` (NaN, its `(2)` warning at every evaluation). `calc_cog`
+  prints `WARNING::in calculating COG, total = 0.0` when `|total| < 1e-5` and divides by 1. Every
+  value is defined, so FSL is deterministic (the replica's `reproduce` identical in the four runs).
+  Rule B; the replica's `check_registrable` refuses after `get_testvol` (only `main`'s registration
+  path: `-applyxfm` returns before).
+- **FSL-92, an image of one voxel**: no defect in the arithmetic (a constant 1 × 1 × 3 image after
+  `double_end_slices`); FSL's three runs give rotations of the search's grid (95, 131 and 143
+  degrees). Rule B, the same check (recorded before `double_end_slices`).
+- **FSL-93, a base scale of 0** (`set_basescale`, `flirt.cc`; `read_volume_hdr_only` against
+  `NiftiIO`'s reading in `generalio.cc`): the full reading sets `pixdim[i] = pixdim[i] == 0 ? 1 :
+  fabs(pixdim[i])` for `i = 1 .. dim[0]`; `read_volume_hdr_only` keeps the stored magnitudes, so a
+  zero makes `Min(mindimA, mindimB) = 0 < 0.75` and `basescale = 0`. `FLIRT_read_volume`'s
+  `setxdim(xdim() / basescale)` gives infinite sizes, `set_initmat`'s `orig2scaled_coord(1,1) =
+  1/basescale` a NaN initial matrix, `resample_refvol`'s grid `(int)` of an infinite size
+  −2147483648 (x86-64's `cvttss2si`, undefined in C++), and the costs' loops over `unsigned int
+  zb1 = vref.zsize() − 1` (2147483647) never end in practice (the replica traced under a debugger:
+  inside the search's first optimisations, `p_corr_ratio_weighted`). FSL ran for 60 minutes at one
+  core with 19 MB resident before the cache's timeout. Rule A for the header (FLIRT's own reading
+  counts the size as 1; the replica counts it so in the base scale by default, refuses with
+  `reproduce`); `-basescale 0` (`atof`, `force_basescale`) is refused in both modes; `-basescale
+  -1` finishes (the replica: the default registration's matrix with its translation negated).
+- **A zero BBR normal** (relay 1's lead): unchanged (spec §6.5 states FSL's NaN), not registered:
+  unrealistic on a segmentation.
+
 ## Not replicated (by decision)
 
 - The coordinate programs' `-warp` (FNIRT's warp fields): refused until FSL's warp-field libraries

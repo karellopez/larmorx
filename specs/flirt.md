@@ -268,9 +268,21 @@ scaled file counts as float, `specs/mcflirt.md` §4.1) becomes the output data t
    values below the lower set to it; NaN stays NaN.
 3. **Weights**: with `-inweight` (`-refweight`) the weight image is read (scaled voxels, single
    slices tripled); with weighting on and no weight file, a volume of ones on the image's grid.
+   (spec writer, 2026-11-02) A weight with no voxel of at least 0.01 is refused by default before
+   a registration (FSL-91, §6.4).
 4. With `-fieldmap`: the field map (rad/s, on the reference's grid) and `-fieldmapmask` (default:
    `0·fmap + 1`, so ones except where the map is NaN). With `-wmseg`: the white-matter
    segmentation; with `-wmcoords`: the two text matrices (§9.2).
+
+**An image of one voxel** (spec writer, 2026-11-02; FSL-92; observed). FLIRT registers an input or
+reference of one voxel (1 × 1 × 1 as read, tripled by step 1 to 1 × 1 × 3): one value cannot
+measure an alignment, and the matrix written is the one the search happens to end at (FSL 6.0.7.23
+on the suite's T1w and BOLD reference: rotations of 95 to 143 degrees, scales 1, for a 2-mm
+constant input, reference, or both, deterministically). The original refuses such a registration
+by default (exit status 1, a message naming FSL-92, nothing written), once both images are read and
+before the weights are checked and the initial matrix formed; with `reproduce` it registers as FLIRT
+does (§11). `-applyxfm`
+of a one-voxel input is §10a's single voxel, refused in both modes.
 
 **Neurological files** (spec writer, 2026-11-02; questions 9 and 15, observed with the model). Every
 image read is put in radiological order, and back when it is written: a file whose sform (if set,
@@ -292,6 +304,17 @@ then `b = m` if `m < 0.75` (the second wins). With `-applyxfm` the base scale is
 2026-11-02) The voxel sizes are the headers' as stored, read before anything else and before a
 single slice is tripled (§4.1): a single slice counts with its own thickness (observed by the
 implementer: an 8 × 1 × 1 reference of 1 × 1.5 × 0.5 mm voxels gives `b = 0.5`, FSL-75's case).
+
+(spec writer, 2026-11-02; FSL-93; observed) Reading an image (§4.1) takes each voxel size's
+magnitude and counts a size of 0 as 1 (the sizes along the header's number of dimensions); the base
+scale reads the headers' sizes without that repair. A header size of 0 along x, y or z (of either
+image) therefore makes `m = 0` and `b = 0`: every voxel size divided by `b` is infinite, the initial
+matrix NaN, and the pyramid's grid sizes an undefined conversion of infinity (−2147483648 on
+x86-64): FLIRT never finishes (FSL 6.0.7.23 on the BOLD reference with its z size 0: still running
+after 60 minutes at one core's full use, its memory constant). The original counts a size of 0 as 1
+here too by default (then `b` as above; FSL-93, §11, named); with `reproduce` it refuses (FLIRT
+never finishes). `-basescale 0` gives the same base scale and is refused in both modes; a negative
+`-basescale` is FLIRT's (it finishes).
 
 ### 4.3 The minimum sampling
 
@@ -444,6 +467,22 @@ The sums are those of the smoothed forms. Differences from §6.2:
 - the mutual-information costs always take the weighted fuzzy form.
 The weight volumes follow the pyramid (§5): the reference weight's level matches the reference
 level; the input weight is blurred with the input (§7.2).
+
+**An empty weighting mask** (spec writer, 2026-11-02; FSL-91; observed). A weight with no voxel of at
+least 0.01 (an image of zeros: a mask that misses the image, or an empty lesion mask) has an empty
+`B` (§5): the weighted images are filtered to zeros and every weight is 0, so every cost is constant
+(each cost's value for no weighted point: `corratio` and `normcorr` 1, the mutual-information costs
+their values for no overlap) and BBR's `Σ w12` is 0 (its cost NaN: `WARNING:: Found NaN in BBR cost
+(2)` at every evaluation). An image filtered to zeros has a centre of mass of total 0:
+`WARNING::in calculating COG, total = 0.0` on standard error each time it is measured, the centre
+then the voxel origin (§8.1 step 3). FLIRT finishes with status 0 and writes the matrix its search
+happens to end at (FSL 6.0.7.23 with an all-zero `-refweight` on the suite's T1w: a rotation of 95
+degrees, the same at 6 and 12 dof; an all-zero `-inweight`: 143 degrees; with `bbr` 2339 NaN
+warnings), deterministically. The original refuses a registration with such a weight by default
+(exit status 1, a message naming FSL-91, nothing written; the reference weight is checked first),
+once both images and their weights are read (§4.1) and before the initial matrix is formed; with
+`reproduce` it registers as FLIRT does (§11). With `-applyxfm` or `-applyisoxfm` the weights are not used and nothing is
+refused.
 
 ### 6.5 The boundary-based cost (`bbr`)
 
@@ -752,7 +791,10 @@ fMRIPrep's log shows as one row of 17 numbers). FSL's other shipped schedules (`
    squares sum above 1 prints `Parameters do not form a valid axis - greater than unity` on
    standard error and keeps only its translations and scale (observed: FSL's four lines on
    `real/anglerep-quaternion`, one per such minimum of its five; nothing else in the search
-   prints it). The cost stored with the starting matrix (in `P`) is the search cost of that matrix,
+   prints it). (spec writer, 2026-11-02; FSL-90) By default the original composes the starting
+   points as the Euler angles they are, whatever `-anglerep` (no message then; the optimisations
+   from them use `-anglerep`'s representation as before); FLIRT's quaternion reading with
+   `reproduce` (§11). The cost stored with the starting matrix (in `P`) is the search cost of that matrix,
    evaluated after its optimisation (counted, not printed: observed by the implementer). The
    list: a new entry is compared with the entries in their (sorted) order and the first one within
    the distance decides: a strictly better new entry replaces it (removed, the new one inserted
@@ -1095,9 +1137,29 @@ default and with `reproduce`:
 - **FSL-81** (`aff2rigid` of FSL 6.0.7.23 stops with a Python `NameError` before writing; §15.8):
   the matrix computed and written by default (rule A), FSL's traceback and exit status 1 with
   `reproduce`, named in both modes.
+- **FSL-90** (`-anglerep quaternion`: the search's starting points, Euler angles, composed as a
+  quaternion's vector part; §8.1 step 9) (spec writer, 2026-11-02): composed as Euler angles by
+  default (rule A: a documented option, the search's minima misread: four of
+  `real/anglerep-quaternion`'s five starting points lose their rotation); FLIRT's composition, with
+  its messages, with `reproduce`; named in both modes when a starting point has a rotation. Measured
+  on `real/anglerep-quaternion`: FLIRT's matrix lies 0.37 mm (RMS deviation, §8.6) from the same
+  registration with Euler angles (`-anglerep euler`), the corrected one 0.23 mm (the rest is the
+  optimisations' own parametrisation); the corrected result is 0.19 mm from FLIRT's.
+- **FSL-91** (a `-refweight` or `-inweight` with no voxel of at least 0.01; §6.4) (spec writer,
+  2026-11-02): a registration with it refused by default (rule B: an empty weighting mask, every
+  cost constant, FLIRT's matrix an artefact of its search); FLIRT's run with `reproduce`; named in
+  both modes.
+- **FSL-92** (an input or reference of one voxel, 1 × 1 × 1; §4.1) (spec writer, 2026-11-02): a
+  registration of it refused by default (rule B: one value, FLIRT's matrix an artefact of its
+  search); FLIRT's run with `reproduce`; named in both modes.
+- **FSL-93** (a header voxel size of 0 makes the base scale 0; §4.2) (spec writer, 2026-11-02): the
+  size counted as 1 by default, as reading the image counts it (rule A: FLIRT never finishes on an
+  image its own reading accepts), named; refused with `reproduce` (FLIRT never finishes);
+  `-basescale 0` refused in both modes.
 - Kept (rule C): `pointflirt` reads a file of exactly three points as three coordinates per
   column (a 3 × 3 file is taken as given, not transposed; §15.6); documented.
-- Undefined behaviour, refused in both modes with a message: an uninitialised matrix name (§7.1),
+- Undefined behaviour, refused in both modes with a message: `-basescale 0` (FSL-93, §4.2; spec
+  writer, 2026-11-02), an uninitialised matrix name (§7.1),
   `bbrstep` below 1 (FSL-71: FSL never finishes), `-pedir` without a field map read (§6.5), a `read`
   of an unparsable file (FSL-72: FSL reads for ever, its memory growing until an allocation fails:
   `std::bad_alloc`, exit status 0 under an address-space limit), the background value of a single
@@ -1152,7 +1214,11 @@ Cases (the replica's `fsl-flirt-replica` cases are the model; their inputs are m
 from ds005040's fMRIPrep run): fMRIPrep's 22 BBR calls (3 in the standard tier); the default schedule
 on a BOLD reference to T1w at 6, 7, 9, 12 dof; every cost function; every search option; weights;
 `-applyxfm` 3D and 4D with every interpolation and data type; the boundary-based options; every
-shipped schedule; the 2D mode; the verbose levels; every failure of §2 and §10.
+shipped schedule; the 2D mode; the verbose levels; every failure of §2 and §10. (spec writer,
+2026-11-02) The refusals and corrections of §11's FSL-90 to FSL-93: the replica's cases
+`real/anglerep-quaternion` (FSL-90), `real/weights-empty-refweight` and `-inweight` (FSL-91),
+`edge/one-voxel-input` (FSL-92), `edge/zero-voxel-size` and `edge/basescale-0` (FSL-93; FSL does
+not finish, so the case checks that FSL is still running after 20 s).
 
 Metrics and thresholds (PLAN.md §11.3):
 - **Matrices**: the RMS deviation from FSL's matrix (§8.6, radius 80 mm about the origin) and the
@@ -1222,6 +1288,11 @@ from this spec's text alone are in `validation/investigations/flirt-spec-answers
 | 18 | The base scale before the single slices' tripling | §4.2 | right (the headers as stored) | high (source) |
 | 19 | Powell's direction's tolerance | §8.2 | right in the L1 sense: `u = |1/Σ|û_i/t_i||`, summed in single precision; also along the axes `u = fl(1/fl(1/t))`, not `fl(t)` | high (source) |
 | 20 | The paddings | §9.2 | right: the mask's single-precision pre-image is the interpolation's; within `p` voxels the edge rule (extraslice, or `-setbackground`'s constant); no test with a field map | high (source; the implementer's observation) |
+| 21 | Candidate refusal: an all-zero `-refweight` or `-inweight` (every weighted cost 0 / 0) | §4.1 step 3, §6.4, §11 (FSL-91) | incomplete: FLIRT's weighted costs are not 0 / 0 but constant (each has a value for no weight), BBR's NaN; the condition is FLIRT's own empty mask (no voxel of at least 0.01), which also blanks the images. Rule B: refused by default, FLIRT's run with `reproduce` | high: FSL 6.0.7.23's runs (an all-zero reference weight at 6 and 12 dof and with `bbr`, an all-zero input weight: rotations of 95 and 143 degrees, 2339 NaN warnings), the replica identical in `reproduce` |
+| 22 | Candidate refusal: images of one voxel along every axis | §4.1, §11 (FSL-92) | right (a 1 × 1 × 1 input, reference or both: a rotation of the search's grid, deterministically). Rule B: refused by default, FLIRT's run with `reproduce` | high: FSL's three runs, the replica identical in `reproduce` |
+| 23 | (spec writer's lead) `-anglerep quaternion`'s search minima | §8.1 step 9, §11 (FSL-90) | — | high: rule A; measured (FLIRT's matrix 0.37 mm from the Euler registration, the corrected 0.23 mm) |
+| 24 | (spec writer's lead) a header voxel size of 0 | §4.2, §11 (FSL-93) | — | high: FSL still running after 60 minutes; the replica's trace (infinite voxel sizes, a NaN initial matrix, a pyramid level of −2147483648 voxels per axis) |
+| 25 | (spec writer's lead) a zero BBR normal | §6.5 | — | unchanged: stated in §6.5 (NaN points and cost, FSL's warnings); unrealistic on a segmentation, not registered |
 
 ## 15. FLIRT's other programs
 

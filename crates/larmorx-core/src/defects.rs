@@ -470,6 +470,14 @@ defects! {
         "an axis or centre of fewer than three values reads past the vector's values (what its buffer still holds: the default's zeros or an earlier value of the same option), and values beyond the third are ignored";
     FSL_75 = "FSL-75", "flirt", true,
         "the background value (the 10th percentile of the 2-voxel border) sizes its buffer too small for a volume 3 voxels wide along x (2 or more along y or z) or along y (2 or more along z, x not 2 or 4), as FLIRT's pyramid levels can be: it writes the rest past the buffer (heap corruption: FLIRT may abort or crash later, or finish) and takes the percentile of the values that fit; a 1 x 1 x 1 volume reads an empty buffer";
+    FSL_90 = "FSL-90", "flirt", true,
+        "with -anglerep quaternion the search's starting points, which hold Euler angles, are composed as quaternions: the three angles are read as a quaternion's vector part, so a starting point whose angles' squares sum above 1 loses its rotation (FLIRT prints Parameters do not form a valid axis - greater than unity) and the others start from another rotation than the search found";
+    FSL_91 = "FSL-91", "flirt", true,
+        "a -refweight or -inweight with no voxel of at least 0.01 (an empty weighting mask, such as an image of zeros) is accepted: the weighted images are filtered to zeros and every weight is 0, so every cost is constant (NaN for bbr), and FLIRT writes the matrix its search happens to end at (an arbitrary rotation of its grid)";
+    FSL_92 = "FSL-92", "flirt", true,
+        "an input or reference of one voxel (1 x 1 x 1) is registered: one value cannot measure an alignment, and FLIRT writes the matrix its search happens to end at (an arbitrary rotation of its grid)";
+    FSL_93 = "FSL-93", "flirt", true,
+        "a voxel size of 0 in the input's or reference's header (which reading the image counts as 1) makes the base scale 0: every voxel size divided by it is infinite, the initial matrix NaN, and FLIRT never finishes; -basescale 0 the same";
     ITK_50 = "ITK-50", "ITK", true,
         "KdTreeBasedKmeansEstimator never counts the point a k-d tree node is split at when it divides the node between centres: those points are left out of the pass's new centres";
     ITK_51 = "ITK-51", "ITK", true,

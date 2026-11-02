@@ -80,7 +80,7 @@ STANDARD_RUNS = (
 #: The run the real cases' images come from.
 SOURCE_RUN = "ds005040-sub-002-noreconall"
 #: Named whenever an input holds NaN or infinite values, which may lie outside the cost's points.
-_SILENT = ("FSL-14", "FSL-22", "FSL-75")
+_SILENT = ("FSL-14", "FSL-22", "FSL-75", "FSL-90")
 
 
 # ------------------------------------------------------------------------------------------------
@@ -461,6 +461,9 @@ class Run:
     #: never cached; the replica must refuse in both modes.
     hang: str = ""
     aslimit: str = ""
+    #: With ``hang``: the replica's default corrects the entry (it finishes, naming it) and only
+    #: ``reproduce`` refuses (FSL-93: a header voxel size of 0).
+    hang_fixed: bool = False
     #: FSL crashes on this case (the register entry: undefined behaviour, a signal), never
     #: cached; the replica must refuse in both modes, or with ``crash_finishes`` finish in both
     #: naming the entry (FSL-75: the values FSL's buffer holds, or the whole border). FSL's last
@@ -577,6 +580,35 @@ def _prepare(run: Run, tmp: Path) -> list[str]:
                 arr[4, 4, 4] = np.inf
                 nib.save(nib.Nifti1Image(arr, img.affine, img.header), str(dst))
             out.append(name)
+        elif a.startswith("@zero:"):
+            # an empty mask: every voxel 0 (float32) on an input's grid: @zero:<input>:<name>
+            import nibabel as nib
+
+            _, src_name, name = a.split(":")
+            dst = tmp / name
+            if not dst.exists():
+                base = base or inputs()
+                img = nib.load(str(base / src_name))
+                h = img.header.copy()
+                h.set_data_dtype(np.float32)
+                h["scl_slope"], h["scl_inter"] = 1.0, 0.0
+                arr = np.zeros(img.shape[:3], np.float32)
+                nib.save(nib.Nifti1Image(arr, img.affine, h), str(dst))
+            out.append(name)
+        elif a.startswith("@zerovox:"):
+            # a copy of an input whose header gives a voxel size of 0 along z (pixdim[3]; the
+            # sform and qform as stored): @zerovox:<input>:<name>
+            import nibabel as nib
+
+            _, src_name, name = a.split(":")
+            dst = tmp / name
+            if not dst.exists():
+                base = base or inputs()
+                img = nib.load(str(base / src_name))
+                zimg = nib.Nifti1Image(np.asanyarray(img.dataobj), img.affine, img.header.copy())
+                zimg.header["pixdim"][3] = 0.0
+                nib.save(zimg, str(dst))
+            out.append(name)
         elif a.startswith("@nan:"):
             # an input with one NaN voxel at (3, 4, 5): @nan:<input>:<name>
             import nibabel as nib
@@ -671,6 +703,14 @@ def _hang_case(run: Run, checks: CheckList) -> None:
                 (ln for ln in r.stderr.splitlines() if ln.startswith(f"{REPLICA_PREFIX} error:")),
                 "",
             )
+            if run.hang_fixed and mode == defects.FIX:
+                named = defects.notices_in(r.stderr)
+                checks(
+                    f"the replica's default finishes and names {run.hang}",
+                    r.code == 0 and run.hang in named and bool(list(b.glob("out*"))),
+                    detail=f"exit {r.code}: {', '.join(named) or 'nothing named'}",
+                )
+                continue
             checks(
                 f"the replica refuses ({mode})",
                 r.code == 1 and f"({run.hang})" in refusal,
@@ -679,8 +719,12 @@ def _hang_case(run: Run, checks: CheckList) -> None:
     if all(c.passed for c in checks.checks):
         raise Outcome(
             EXPECTED,
-            f"FLIRT never finishes ({run.hang}: undefined behaviour); the replica refuses in "
-            "both modes",
+            f"FLIRT never finishes ({run.hang}: undefined behaviour); the replica "
+            + (
+                "corrects it by default and refuses with reproduce"
+                if run.hang_fixed
+                else "refuses in both modes"
+            ),
         )
 
 
@@ -1020,6 +1064,22 @@ def _real_cases() -> dict[str, tuple[str, str, Run]]:
             cost,
             "-dof",
             "6",
+            "-omat",
+            "out.mat",
+        )
+    # FSL-91: an empty weighting mask (every voxel 0): every cost constant, FLIRT's matrix an
+    # artefact of its search; refused by default, FSL's run with reproduce
+    for opt, src, name in (
+        ("-refweight", "t1.nii", "zeroweight.nii"),
+        ("-inweight", "epi.nii", "zeroinweight.nii"),
+    ):
+        add(
+            f"real/weights-empty-{opt[1:]}",
+            st,
+            f"an empty {opt} (every voxel 0): refused by default (FSL-91)",
+            *base[1],
+            opt,
+            f"@zero:{src}:{name}",
             "-omat",
             "out.mat",
         )
@@ -2020,6 +2080,44 @@ def _edge_cases() -> dict[str, tuple[str, str, Run]]:
         "out",
         files=(("id.mat", "1 0 0 0\n0 1 0 0\n0 0 1 0\n0 0 0 1\n"),),
         crash="FSL-75",
+    )
+    add(
+        "edge/one-voxel-input",
+        "a 1 x 1 x 1 input registered to the T1w: one value, FLIRT's matrix an artefact of its "
+        "search; refused by default (FSL-92)",
+        "-in",
+        "@const:1x1x1:2x2x2:one.nii",
+        "-ref",
+        "@t1.nii",
+        "-omat",
+        "out.mat",
+    )
+    # FSL-93: a base scale of 0 (a header voxel size of 0; -basescale 0): FLIRT never finishes
+    add(
+        "edge/zero-voxel-size",
+        "a header voxel size of 0 along z: FLIRT's base scale 0, every voxel size infinite, it "
+        "never finishes; counted as 1 by default, refused with reproduce (FSL-93)",
+        "-in",
+        "@zerovox:epi.nii:epi_zerovox.nii",
+        "-ref",
+        "@t1.nii",
+        "-omat",
+        "out.mat",
+        hang="FSL-93",
+        hang_fixed=True,
+    )
+    add(
+        "edge/basescale-0",
+        "-basescale 0: every voxel size infinite, FLIRT never finishes (FSL-93)",
+        "-in",
+        "@epi.nii",
+        "-ref",
+        "@t1.nii",
+        "-basescale",
+        "0",
+        "-omat",
+        "out.mat",
+        hang="FSL-93",
     )
     add(
         "convert_xfm/missing-concat",

@@ -18,6 +18,8 @@ use super::cost::{Cost, Log, Pair};
 use super::mat::{self, IDENTITY, Mat4, Stream};
 use super::optimise::{self, Subset};
 use super::output::{self, Resampling, SincKernel};
+use super::param::{self, AngleRep};
+use super::paxes;
 use super::pyramid;
 use super::schedule::{self, Var};
 use super::search::{self, Ranges};
@@ -354,7 +356,7 @@ impl State<'_> {
     fn perturb(&self, m: &Mat4, p: &[f64], abs: bool, dof: usize) -> Result<Mat4, End> {
         let pair = self.pair()?;
         let c = pair.centre;
-        let mut x = rigid::decompose(m, c);
+        let mut x = param::decompose(self.opt.rep, m, c);
         let d = self.deltas(dof);
         for (i, &pi) in p.iter().enumerate() {
             if i >= 12 {
@@ -362,7 +364,7 @@ impl State<'_> {
             }
             x[i] += if abs { pi } else { pi * d[i] };
         }
-        Ok(rigid::compose(&x, dof.max(6), c))
+        Ok(param::compose(self.opt.rep, &x, dof.max(6), c, &self.log))
     }
 }
 
@@ -755,6 +757,12 @@ fn register(
         fine_counts,
     };
     let _ = maxdof;
+    st.opt.rep = if o.quaternion {
+        AngleRep::Quaternion
+    } else {
+        AngleRep::Euler
+    };
+    st.opt.log = Some(st.log.clone());
     // the schedule
     let text = match &o.schedule {
         Some(name) => match std::fs::read_to_string(ctx.settings.path(name)) {
@@ -909,7 +917,7 @@ fn command(
             let c = st.pair()?.centre;
             let mut s = String::new();
             for (k, r) in rows.iter().enumerate() {
-                let p = rigid::decompose(&r.m, c);
+                let p = param::decompose(st.opt.rep, &r.m, c);
                 let cost = if cmd == "saveparams" && k == 0 {
                     mat::g(r.cost, 6)
                 } else {
@@ -945,7 +953,7 @@ fn command(
                     p.copy_from_slice(&r[1..13]);
                     Row {
                         cost: f64::from(r[0] as f32),
-                        m: rigid::compose(&p, 12, c),
+                        m: param::compose(st.opt.rep, &p, 12, c, &st.log),
                     }
                 })
                 .collect();
@@ -1142,9 +1150,18 @@ fn command(
             if n < 2 {
                 return Err(wrong(cmd, err));
             }
-            return Err(End::Error(
-                "larmorx: alignpaxes is not implemented in the clean-room original yet (use the replica)".into(),
-            ));
+            let (_, rows) = st.rows(&w[1])?;
+            let pair = st.pair()?.clone();
+            let mut warn = Vec::new();
+            let rr = paxes::axes(&pair.reference, &mut warn).map_err(End::Error)?;
+            let ri = paxes::axes(&pair.input, &mut warn).map_err(End::Error)?;
+            for line in warn {
+                st.log.push(line);
+            }
+            let m = paxes::align(rr, ri, pair.reference.centre_of_mass(), pair.centre);
+            for r in rows {
+                st.push(Var::U(0), Row { cost: r.cost, m });
+            }
         }
         "setscale" => {
             if n < 2 {
@@ -1195,7 +1212,7 @@ fn command(
                 v,
                 Row {
                     cost: 0.0,
-                    m: rigid::compose(&p, 12, c),
+                    m: param::compose(st.opt.rep, &p, 12, c, &st.log),
                 },
             );
         }
@@ -1405,11 +1422,14 @@ fn set_scale(st: &mut State<'_>, s: f32, force: bool) -> Result<(), End> {
             }
         };
         let bins = (st.o.bins as f32 / s) as i32;
-        if bins < 1 && (st.cost.histogram() || st.search_cost.histogram() || bins < 0) {
-            return Err(End::Refuse(format!(
-                "larmorx: -bins {} gives {bins} bins at the {s} mm scale, which no histogram can have (FSL-21, FSL-66: FSL's result is undefined, it aborts or crashes); refused",
-                st.o.bins
-            )));
+        let refusal = format!(
+            "larmorx: -bins {} gives {bins} bins at the {s} mm scale, which no histogram can have (FSL-21, FSL-66: FSL's result is undefined, it aborts or crashes); refused",
+            st.o.bins
+        );
+        // negative bins: FSL prepares them for every cost (FSL-66); none: refused where a
+        // histogram cost is evaluated (FSL-21)
+        if bins < 0 {
+            return Err(End::Refuse(refusal));
         }
         let skip = st.ctx.mode.fix() && (inp.has_non_finite() || refl.has_non_finite());
         if cog_total(&inp) < 1e-5 {
@@ -1429,6 +1449,9 @@ fn set_scale(st: &mut State<'_>, s: f32, force: bool) -> Result<(), End> {
         );
         pair.bbr_source = Some(st.bbr.clone());
         pair.bbr_step = std::sync::atomic::AtomicUsize::new(st.bbr_step.max(0) as usize);
+        if bins == 0 {
+            pair.no_bins = Some(refusal);
+        }
         if st.bbr_step < 1 && (st.cost == Cost::Bbr || st.search_cost == Cost::Bbr) {
             // checked again at use: FSL never finishes there (FSL-71)
         }
@@ -1437,6 +1460,7 @@ fn set_scale(st: &mut State<'_>, s: f32, force: bool) -> Result<(), End> {
         // only the input reset (§7.2)
         let old = Arc::try_unwrap(p).unwrap_or_else(|a| clone_pair(&a));
         let skip = st.ctx.mode.fix() && (input.has_non_finite() || old.reference.has_non_finite());
+        let no_bins = old.no_bins.clone();
         let mut pair = Pair::new(
             old.reference,
             old.ref_weight,
@@ -1451,6 +1475,7 @@ fn set_scale(st: &mut State<'_>, s: f32, force: bool) -> Result<(), End> {
         );
         pair.bbr_source = Some(st.bbr.clone());
         pair.bbr_step = std::sync::atomic::AtomicUsize::new(st.bbr_step.max(0) as usize);
+        pair.no_bins = no_bins;
         st.pair = Some(Arc::new(pair));
     }
     Ok(())

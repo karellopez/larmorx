@@ -8,16 +8,18 @@ other programs `avscale`, `img2imgcoord`, `std2imgcoord`, `img2stdcoord`, `rmsdi
 and the scripts `pairreg`, `extracttxt`, `aff2rigid` (`lx.fsl.midtrans`, ... below), with every
 schedule command (`alignpaxes` and any parameter-subset mask) and `-debug`.
 
-**Two implementations, one so far.** FSL is distributed under the FSL Licence (non-commercial use
-only), so larmorx keeps its FSL tools in two implementations ([licensing](../licensing.md)): the
-bit-exact **replica**, `larmorx-nc fsl flirt|convert_xfm` (package `larmorx-nc`, `crates-nc/`, under
-the FSL Licence's terms; translated from FSL's source:
-[PROVENANCE](../../crates-nc/larmorx-nc-flirt/PROVENANCE.md)), done (part 1, 2026-11-01), and the
-clean-room **original** in the main package (Apache-2.0), to be written from
-[`specs/flirt.md`](../../specs/flirt.md). Until the original exists, `implementation="auto"` runs the
-replica and needs `larmorx-nc` installed (`pip install larmorx-nc`; without it a clear error names
-the package); `"original"` is an error that says so. The command line chooses alike
-(`LARMORX_IMPLEMENTATION`).
+**Two implementations.** FSL is distributed under the FSL Licence (non-commercial use only), so
+larmorx keeps its FSL tools in two implementations ([licensing](../licensing.md)): the bit-exact
+**replica**, `larmorx-nc fsl flirt|convert_xfm` (package `larmorx-nc`, `crates-nc/`, under the FSL
+Licence's terms; translated from FSL's source:
+[PROVENANCE](../../crates-nc/larmorx-nc-flirt/PROVENANCE.md)), done (parts 1 to 3, 2026-11-01/02),
+and the clean-room **original** of `flirt` and `convert_xfm` in the main package (Apache-2.0,
+`crates/larmorx-fsl`, written from [`specs/flirt.md`](../../specs/flirt.md) on the registration
+engine it shares with `lx.mri.hmc`; part 1, 2026-11-02: [PROVENANCE](../../crates/larmorx-fsl/PROVENANCE.md),
+section "FLIRT"). `implementation="auto"` runs the replica when `larmorx-nc` is installed, else
+the original; `"original"` runs the original in this process. FLIRT's other programs (avscale,
+the coordinate programs, ...) have their replica only for now (`"auto"` needs `larmorx-nc` for
+them). The command line chooses alike (`LARMORX_IMPLEMENTATION`).
 
 **Status: `experimental`** (part 1): the replica against FSL 6.0.7.23 itself
 ([record](../validation/fsl-flirt-replica.md), standard tier): fMRIPrep's boundary-based calls on
@@ -132,6 +134,48 @@ with the centres of gravity aligned) and `setoption paramsubset` with any finite
 pseudo-inverse by the SVD, as FSL's); `-debug` writes FLIRT's debug volumes (the pyramid, the
 weights and, with `-cost bbr`, BBR's `debug` volume).
 
+## The clean-room original (part 1, 2026-11-02)
+
+`lx.fsl.flirt(..., implementation="original")`, `lx.fsl.convert_xfm(..., implementation="original")`,
+`LARMORX_IMPLEMENTATION=original larmorx fsl flirt|convert_xfm` (crate `larmorx-fsl`, module
+`flirt`; Apache-2.0, written from [`specs/flirt.md`](../../specs/flirt.md) by an implementer who
+never read FSL's source or the replica). It runs on the main package's clean-room registration
+engine, shared with `lx.mri.hmc` (`larmorx_mri::hmc`: the parametrisation, the cost sampling and
+sums, the line search, the interpolators), not a copy of it.
+
+**What it has.** FLIRT's whole command line with its messages and exit statuses; the base scale,
+the clamping, single slices; the reference pyramid; every cost (`corratio`, `mutualinfo`,
+`normmi`, `normcorr`, `leastsq`, `labeldiff`, `woods`, the boundary-based `bbr` from `-wmseg` or
+`-wmcoords`/`-wmnorms`, with `-bbrtype`, `-bbrslope` and a field map) and their weighted forms;
+the schedule language with every command but `alignpaxes`, the 3D and 2D default schedules (`-v`
+prints FSL's lines) and every schedule FSL ships, `bbr.sch` included; the search; the
+optimisation (the bound guesses, the convergence test, Powell's correction, parameter subsets of
+any mask); the sform/qform initialisation; `-omat`, `-out`, `-applyxfm`, `-applyisoxfm` with
+every interpolation, sinc width and window, `-paddingsize`, `-setbackground` and data type; the
+background value with FSL-75 and FSL-22; FSL-68's exit status; the refusals of FSL-21/66, FSL-71,
+FSL-72, an undefined matrix name, `-pedir` without a field map, a single-voxel background.
+`convert_xfm` complete. Deterministic at any thread count (`n_threads`, `OMP_NUM_THREADS`): the
+search's grid points, the large evaluations' slices, the pyramid's filters, the boundary points
+and the output's slices run in parallel, each result folded in a fixed order.
+
+**Not yet (part 2):** `-anglerep quaternion`, `alignpaxes`, `-debug` (each refused with a message
+naming the replica), the verbose levels above 1 (`-verbose 2` and more print the level-1 lines
+only), FLIRT's other programs.
+
+**Status: `experimental`.** Its record: [`docs/validation/fsl-flirt.md`](../validation/fsl-flirt.md)
+(the replica suite's cases against FSL 6.0.7.23). fMRIPrep's three boundary-based calls within
+0.1 mm of FSL's matrices at the 95th percentile over the brain (0.053, 0.011 and 0.030 mm),
+their images' correlation with FSL's 0.9993 to 0.99996; `-applyxfm` with trilinear and nearest
+neighbour FSL's images bit for bit, sinc and spline within 1e-5 of the image's range; the
+command line's errors, `convert_xfm` and the schedules' messages FSL's. The cases it misses and
+why are in the record; what the spec does not say is in
+[`docs/findings/fsl-flirt-original.md`](../findings/fsl-flirt-original.md).
+
+**Speed** (one run each, a busy machine; the benchmark report is part 2's): a default 12-dof
+registration of a 3 mm BOLD reference to a T1w at 1.7 mm: FSL 1.47 s, the replica 2.08 s, the
+original 1.69 s on one thread and 0.52 s on eight; fMRIPrep's boundary-based call (ds005040, its
+full-size T1w): FSL 67 s, the replica 77 s, the original 50 s on one thread and 8.7 s on eight.
+
 ## Upstream defects (D13)
 
 Corrected by default, FSL's behaviour with `upstream_defects="reproduce"`
@@ -178,7 +222,8 @@ of its type's range.
 
 The coordinate programs' `-warp` (FNIRT's warp fields, refused until FSL's warp-field libraries are
 ported); `standard_space_roi`, `flirt_average` and `epi_reg` (scripts of FSL's other programs: not
-ported); the clean-room original. Known difference (part 3's random testing): with NaN or
+ported); the clean-room original's `-anglerep quaternion`, `alignpaxes`, `-debug`, its verbose
+levels above 1 and FLIRT's other programs (part 2). Known difference (part 3's random testing): with NaN or
 infinite input voxels in `reproduce` mode (FSL-14), the sign of NaN results can differ from FSL's
 (`nan` against `-nan`): an all-NaN matrix from a schedule that optimises relative to a row, and
 the NaN voxels of `applyxfm4D`'s spline interpolation; the values are NaN in both.

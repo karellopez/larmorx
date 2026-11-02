@@ -3,10 +3,12 @@
 //! engine's parametrisation (`larmorx_mri::hmc::rigid`) and line search
 //! (`larmorx_mri::hmc::search::line_search_from`).
 
-use larmorx_mri::hmc::rigid::{self, Params};
+use larmorx_mri::hmc::rigid::Params;
 use larmorx_mri::hmc::search::line_search_from;
 
+use super::cost::Log;
 use super::mat::Mat4;
+use super::param::{self, AngleRep};
 
 /// FLIRT's default tolerances (§8.2): rotations (rad), translations (mm), scales, skews.
 pub const DEFAULT_TOLERANCES: [f32; 12] = [
@@ -179,6 +181,10 @@ pub struct Settings {
     pub bound_guess: Vec<f32>,
     /// Powell's correction (`optimisationtype powell`).
     pub powell: bool,
+    /// The rotation's parameters (`-anglerep`; the search always uses Euler angles).
+    pub rep: AngleRep,
+    /// Where the quaternion's messages go.
+    pub log: Option<std::sync::Arc<Log>>,
 }
 
 impl Default for Settings {
@@ -188,6 +194,8 @@ impl Default for Settings {
             scale: 1.0,
             bound_guess: vec![10.0, 1.0],
             powell: false,
+            rep: AngleRep::Euler,
+            log: None,
         }
     }
 }
@@ -324,12 +332,13 @@ fn minimise(
             let diff: Vec<f64> = v.iter().zip(&start).map(|(a, b)| a - b).collect();
             let extrap: Vec<f64> = start.iter().zip(&diff).map(|(a, d)| a + 2.0 * d).collect();
             let fe = cost(&extrap);
-            let (m, dm) = deltas
-                .iter()
-                .enumerate()
-                .fold((0usize, f32::INFINITY), |(bi, bv), (i, &d)| {
-                    if d < bv { (i, d) } else { (bi, bv) }
-                });
+            let (m, dm) =
+                deltas
+                    .iter()
+                    .enumerate()
+                    .fold((0usize, f32::INFINITY), |(bi, bv), (i, &d)| {
+                        if d < bv { (i, d) } else { (bi, bv) }
+                    });
             let adm = dm.abs();
             let lhs = 2.0 * (f0 - 2.0 * f1 + fe) * (f0 - f1 - adm) * (f0 - f1 - adm);
             let rhs = (f0 - fe) * (f0 - fe) * adm;
@@ -356,7 +365,9 @@ pub fn optimise(
     s: &Settings,
     subset: Option<&Subset>,
 ) -> Result<(Mat4, f32), String> {
-    let x0: Params = rigid::decompose(start, centre);
+    let x0: Params = param::decompose(s.rep, start, centre);
+    let quiet = Log::default();
+    let log = s.log.as_deref().unwrap_or(&quiet);
     let tol: Vec<f32> = (0..12)
         .map(|i| {
             s.tolerance(i)
@@ -368,7 +379,7 @@ pub fn optimise(
             let compose = |v: &[f64]| {
                 let mut x = x0;
                 x[..dof].copy_from_slice(v);
-                rigid::compose(&x, dof, centre)
+                param::compose(s.rep, &x, dof, centre, log)
             };
             let cost = |v: &[f64]| eval(&compose(v));
             let (v, c) = minimise(&cost, x0[..dof].to_vec(), &tol[..dof], maxit, s);
@@ -383,7 +394,7 @@ pub fn optimise(
                 for i in 0..12 {
                     x[i] = d[i] + x0d[i];
                 }
-                rigid::compose(&x, 12, centre)
+                param::compose(s.rep, &x, 12, centre, log)
             };
             let mut tplus = [0.0; 12];
             let mut zero = [0.0; 12];
@@ -406,6 +417,7 @@ pub fn optimise(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use larmorx_mri::hmc::rigid;
 
     #[test]
     fn closed_form_pinv() {

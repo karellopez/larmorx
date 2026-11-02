@@ -53,6 +53,18 @@ def main() -> None:
     fd, od = out / "fsl", out / "orig"
     fd.mkdir(parents=True)
     od.mkdir(parents=True)
+    # `@@<path>`: a file of one's own, copied into both directories (so the oracle cache keys
+    # on its content)
+    own = [a[2:] for a in run.args if a.startswith("@@")]
+    run = rep.Run(
+        run.program,
+        tuple(Path(a[2:]).name if a.startswith("@@") else a for a in run.args),
+        run.settings,
+        run.files,
+    )
+    for d in (fd, od):
+        for src in own:
+            shutil.copy(src, d / Path(src).name)
     args = rep._prepare(run, fd)
     rep._prepare(run, od)
     settings = dict(run.settings)

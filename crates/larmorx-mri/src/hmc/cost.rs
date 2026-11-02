@@ -349,6 +349,34 @@ pub fn sample_weighted<A: Accumulator>(
     }
 }
 
+/// Every slice of the grid into the one accumulator `acc`, in slice order (one running sum over
+/// the whole grid), each point weighted by `weight` when one is given.
+pub fn sample_all_weighted<A: Accumulator>(
+    grid: &Volume,
+    test: &TestVolume<'_>,
+    b: &[[f32; 4]; 3],
+    weight: Option<PointWeight<'_>>,
+    acc: A,
+) -> A {
+    let nz = grid.shape[2];
+    match weight {
+        None => {
+            let mut acc = acc;
+            for z in 0..nz {
+                sample_into(grid, test, b, z, &mut acc);
+            }
+            acc
+        }
+        Some(weight) => {
+            let mut w = Weighted { inner: acc, weight };
+            for z in 0..nz {
+                sample_into(grid, test, b, z, &mut w);
+            }
+            w.inner
+        }
+    }
+}
+
 /// Visits the contributing points of grid slice `z` into `acc` (§6.1), with the test volume's
 /// interpolation and edge weighting.
 fn sample_into<A: Accumulator>(

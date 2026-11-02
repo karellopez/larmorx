@@ -79,6 +79,12 @@ pub fn search(
         cols.push(c);
     }
     let subset = Subset::new(&cols).expect("finite mask");
+    // the search's parameters are Euler angles whatever -anglerep says (§3)
+    let euler = Settings {
+        rep: super::param::AngleRep::Euler,
+        ..settings.clone()
+    };
+    let settings = &euler;
     let at = |angles: [f32; 3], t: [f64; 3], sc: f64| -> Params {
         let mut p = ref_params;
         p[0] = f64::from(angles[0]);

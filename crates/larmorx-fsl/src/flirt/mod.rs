@@ -16,6 +16,8 @@ pub mod engine;
 pub mod mat;
 pub mod optimise;
 pub mod output;
+pub mod param;
+pub mod paxes;
 pub mod pyramid;
 pub mod schedule;
 pub mod search;

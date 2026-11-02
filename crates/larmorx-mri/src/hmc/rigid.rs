@@ -143,24 +143,7 @@ fn scales(p: &Params, n: usize) -> [f64; 3] {
 /// `T(c + t) · L · T(−c)`, as plain 4 × 4 products (so a NaN centre makes the top three rows
 /// NaN), with the last row set to `0 0 0 1`.
 pub fn compose(p: &Params, n: usize, centre: [f64; 3]) -> Mat4 {
-    let mut linear = rotation(p[0], p[1], p[2]);
-    if n > 6 {
-        let s = scales(p, n);
-        let skew = [
-            [
-                1.0,
-                if n > 9 { p[9] } else { 0.0 },
-                if n > 10 { p[10] } else { 0.0 },
-            ],
-            [0.0, 1.0, if n > 11 { p[11] } else { 0.0 }],
-            [0.0, 0.0, 1.0],
-        ];
-        let ks = mul3(
-            &skew,
-            &[[s[0], 0.0, 0.0], [0.0, s[1], 0.0], [0.0, 0.0, s[2]]],
-        );
-        linear = mul3(&linear, &ks);
-    }
+    let linear = with_scales_skews(&rotation(p[0], p[1], p[2]), p, n);
     let shift = [centre[0] + p[3], centre[1] + p[4], centre[2] + p[5]];
     let mut m = mul(
         &mul(&translation(shift), &embed(&linear)),
@@ -207,6 +190,20 @@ pub fn decompose(m: &Mat4, centre: [f64; 3]) -> Params {
         p[1] = -f64::NAN;
         return p;
     }
+    let (r, s, k, t) = decompose_parts(m, centre);
+    let angles = euler(&r);
+    [
+        angles[0], angles[1], angles[2], t[0], t[1], t[2], s[0], s[1], s[2], k[0], k[1], k[2],
+    ]
+}
+
+/// The factors of [`decompose`]: the rotation `R` (the linear part itself when `m` is rigid),
+/// the scales, the skews and the translations about `centre`. Shared with FLIRT's quaternion
+/// parameters (`specs/flirt.md` §3).
+pub fn decompose_parts(
+    m: &Mat4,
+    centre: [f64; 3],
+) -> ([[f64; 3]; 3], [f64; 3], [f64; 3], [f64; 3]) {
     let l = [0, 1, 2].map(|i| [m[i][0], m[i][1], m[i][2]]);
     let col = |j: usize| [l[0][j], l[1][j], l[2][j]];
     let dot = |a: [f64; 3], b: [f64; 3]| a[0] * b[0] + a[1] * b[1] + a[2] * b[2];
@@ -235,14 +232,34 @@ pub fn decompose(m: &Mat4, centre: [f64; 3]) -> Params {
         let q = [0, 1, 2].map(|i| [q0[i], q1[i], q2[i]]);
         (q, [sx, sy, sz], [u01 / sy, u02 / sz, u12 / sz])
     };
-    let angles = euler(&r);
     let t = [0, 1, 2].map(|i| {
         let lc = l[i][0] * centre[0] + l[i][1] * centre[1] + l[i][2] * centre[2];
         lc + m[i][3] - centre[i]
     });
-    [
-        angles[0], angles[1], angles[2], t[0], t[1], t[2], s[0], s[1], s[2], k[0], k[1], k[2],
-    ]
+    (r, s, k, t)
+}
+
+/// The linear part `L = R·K·S` of `n` parameters (§4.4) with the rotation `r` given: the
+/// scales and skews of `p` as [`compose`] takes them. Shared with FLIRT's quaternion parameters.
+pub fn with_scales_skews(r: &[[f64; 3]; 3], p: &Params, n: usize) -> [[f64; 3]; 3] {
+    if n <= 6 {
+        return *r;
+    }
+    let s = scales(p, n);
+    let skew = [
+        [
+            1.0,
+            if n > 9 { p[9] } else { 0.0 },
+            if n > 10 { p[10] } else { 0.0 },
+        ],
+        [0.0, 1.0, if n > 11 { p[11] } else { 0.0 }],
+        [0.0, 0.0, 1.0],
+    ];
+    let ks = mul3(
+        &skew,
+        &[[s[0], 0.0, 0.0], [0.0, s[1], 0.0], [0.0, 0.0, s[2]]],
+    );
+    mul3(r, &ks)
 }
 
 /// Whether every parameter is finite.

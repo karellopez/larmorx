@@ -60,8 +60,6 @@ SUITE = "fsl-flirt"
 PROGRAMS = ("flirt", "convert_xfm")
 #: Options the original does not have yet (part 2): its cases are skipped.
 PENDING = {
-    "-anglerep": "-anglerep quaternion (part 2)",
-    "alignpaxes": "alignpaxes (part 2)",
     "-debug": "-debug (part 2)",
     "-debugsave": "-debugsave (part 2)",
 }
@@ -518,9 +516,7 @@ def _pending(args: list[str], run: rep.Run) -> str | None:
         if w == "-verbose" and args[i + 1].isdigit() and int(args[i + 1]) >= 2:
             return "the verbose levels above 1 (part 2)"
     for k, why in PENDING.items():
-        if any(k == w or (k == "alignpaxes" and "alignpaxes" in w) for w in words):
-            if k == "-anglerep" and "quaternion" not in " ".join(args):
-                continue
+        if k in words:
             return why
     return None
 
@@ -676,6 +672,6 @@ def suite() -> Suite:
             "`convert_xfm`; FSL's runs are served from the oracle cache under that suite's keys. "
             "The original is compared in `reproduce` mode (D13) and its default `fix` pass "
             "against the reproduced run. Cases of options the original has not yet "
-            "(`-anglerep quaternion`, `alignpaxes`, `-debug`, `-debugsave`: part 2) are skipped."
+            "(`-debug`, `-debugsave`, the verbose levels above 1: part 2) are skipped."
         ),
     )

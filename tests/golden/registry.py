@@ -4076,7 +4076,13 @@ def _(ctx: Context) -> dict[str, Any]:
     sch = ctx.dir / "all.sch"
     sch.write_text(_FLIRT_SCHEDULE)
     m = ctx.out("out.mat")
-    stdout = _flirt(ctx, "-in", ctx.file("anat2.nii"), "-ref", ctx.file("anat.nii"), "-omat", m, "-schedule", str(sch), "-dof", "6")  # fmt: skip
+    # the schedule's files are named relative to the working directory, as FLIRT names them
+    cwd = os.getcwd()
+    os.chdir(ctx.dir)
+    try:
+        stdout = _flirt(ctx, "-in", ctx.file("anat2.nii"), "-ref", ctx.file("anat.nii"), "-omat", m, "-schedule", str(sch), "-dof", "6")  # fmt: skip
+    finally:
+        os.chdir(cwd)
     return {
         "stdout": stdout,
         "rows": File(str(ctx.dir / "rows.txt")),

@@ -56,7 +56,7 @@ impl Cost {
 
 /// Messages a cost prints on standard error as it evaluates (identical lines, so their order
 /// across parallel evaluations does not matter).
-#[derive(Default)]
+#[derive(Debug, Default)]
 pub struct Log {
     lines: Mutex<Vec<String>>,
     fatal: Mutex<Option<String>>,
@@ -111,6 +111,9 @@ pub struct Pair {
     pub bbr_source: Option<std::sync::Arc<BbrSource>>,
     /// `setoption bbrstep`: every step-th boundary pair is used.
     pub bbr_step: std::sync::atomic::AtomicUsize,
+    /// The scale has no bins (`-bins` below the scale, FSL-21): a histogram cost is refused when
+    /// it is evaluated here.
+    pub no_bins: Option<String>,
     /// The test bins' factors (`b1`, `b0`) of the mutual-information costs.
     test_factors: (f32, f32),
     /// The reference's and input's extremes (the empty-overlap value of `leastsq` and
@@ -161,6 +164,7 @@ impl Pair {
             bbr: std::sync::OnceLock::new(),
             bbr_source: None,
             bbr_step: std::sync::atomic::AtomicUsize::new(1),
+            no_bins: None,
             test_factors: (tb.b1, tb.b0),
             extremes: (lo, hi),
         }
@@ -201,6 +205,12 @@ impl Pair {
 
     /// The cost of the matrix `a` (input mm → reference mm).
     pub fn evaluate(&self, a: &Mat4, cost: Cost, parallel: bool, log: &Log) -> f32 {
+        if let Some(m) = &self.no_bins
+            && cost.histogram()
+        {
+            log.fatal(m.clone());
+            return f32::NAN;
+        }
         if cost == Cost::Bbr {
             return super::bbr::cost(self, a, log);
         }
@@ -278,16 +288,20 @@ impl Pair {
     ) -> BinMoments {
         let bins = self.bins.max(1);
         let grid = self.reference_bins();
-        let slices =
-            hcost::sample_weighted(grid, tv, b, parallel, weight, || BinMoments::new(bins));
         let mut out = BinMoments::new(bins);
-        for s in slices {
-            for k in 0..bins {
-                for j in 0..3 {
-                    out.w[k][j] += s.w[k][j];
-                    out.n[k][j] += s.n[k][j];
+        if parallel {
+            let slices = hcost::sample_weighted(grid, tv, b, true, weight, || BinRecord {
+                points: Vec::new(),
+                top: bins - 1,
+            });
+            for s in slices {
+                for &(k, v, w) in &s.points {
+                    out.add(k as usize, v, w);
                 }
             }
+        } else {
+            // one running sum over every slice, in order
+            out = hcost::sample_all_weighted(grid, tv, b, weight, out);
         }
         out
     }
@@ -332,10 +346,11 @@ impl Pair {
 }
 
 /// The moments of the test values in each reference bin: weighted `[Σw, Σwy, Σwy²]` and
-/// unweighted `[n, Σy, Σy²]`, in double.
+/// unweighted `[n, Σy, Σy²]`, single-precision running sums in the sampling order (observed:
+/// FSL's `corratio` agrees to its printed digits with these and not with double sums).
 struct BinMoments {
-    w: Vec<[f64; 3]>,
-    n: Vec<[f64; 3]>,
+    w: Vec<[f32; 3]>,
+    n: Vec<[f32; 3]>,
 }
 
 impl BinMoments {
@@ -345,21 +360,40 @@ impl BinMoments {
             n: vec![[0.0; 3]; bins],
         }
     }
+
+    #[inline(always)]
+    fn add(&mut self, k: usize, v: f32, w: f32) {
+        let s = &mut self.w[k];
+        s[0] += w;
+        s[1] += w * v;
+        s[2] += (w * v) * v;
+        let s = &mut self.n[k];
+        s[0] += 1.0;
+        s[1] += v;
+        s[2] += v * v;
+    }
 }
 
 impl Accumulator for BinMoments {
     #[inline(always)]
     fn point(&mut self, g: f32, v: f32, w: f32) {
         let k = (g as usize).min(self.w.len() - 1);
-        let (w, v) = (f64::from(w), f64::from(v));
-        let s = &mut self.w[k];
-        s[0] += w;
-        s[1] += w * v;
-        s[2] += w * v * v;
-        let s = &mut self.n[k];
-        s[0] += 1.0;
-        s[1] += v;
-        s[2] += v * v;
+        self.add(k, v, w);
+    }
+    fn end_row(&mut self) {}
+}
+
+/// The points of one slice, in sampling order (a parallel evaluation's slices, folded in order
+/// into one [`BinMoments`]).
+struct BinRecord {
+    points: Vec<(u32, f32, f32)>,
+    top: usize,
+}
+
+impl Accumulator for BinRecord {
+    #[inline(always)]
+    fn point(&mut self, g: f32, v: f32, w: f32) {
+        self.points.push(((g as usize).min(self.top) as u32, v, w));
     }
     fn end_row(&mut self) {}
 }
@@ -367,11 +401,13 @@ impl Accumulator for BinMoments {
 /// The correlation ratio's cost (§6.2): `Σ_b n_b var_b / (n var)` over the bins with more than
 /// two (weighted) points, the variances with `n − 1`; 0 when the variance is not positive.
 fn corr_ratio(m: &BinMoments) -> f32 {
-    let (mut n, mut s, mut ss) = (0.0, 0.0, 0.0);
+    let d = |st: &[f32; 3]| st.map(f64::from);
+    let (mut n, mut s, mut ss) = (0.0f64, 0.0f64, 0.0f64);
     for st in &m.w {
-        n += st[0];
-        s += st[1];
-        ss += st[2];
+        let [a, b, c] = d(st);
+        n += a;
+        s += b;
+        ss += c;
     }
     if n <= 1.0 {
         return 1.0;
@@ -382,24 +418,25 @@ fn corr_ratio(m: &BinMoments) -> f32 {
     }
     let within: f64 =
         m.w.iter()
+            .map(d)
             .filter(|st| st[0] > 2.0)
             .map(|st| st[0] * (st[2] - st[1] * st[1] / st[0]) / (st[0] - 1.0))
             .sum();
     (within / (n * var)) as f32
 }
 
-/// Woods' cost (§6.2).
+/// Woods' cost (§6.2): `Σ_b n_b·σ_b/μ_b / n` (observed: not appendix A's `n_b²`).
 fn woods(m: &BinMoments) -> f32 {
-    let n: f64 = m.n.iter().map(|st| st[0]).sum();
+    let n: f64 = m.n.iter().map(|st| f64::from(st[0])).sum();
     if n <= 0.0 {
         return 1e10;
     }
     let mut cost = 0.0;
     for st in &m.n {
-        let nb = st[0];
+        let [nb, s1, s2] = st.map(f64::from);
         if nb > 1.0 {
-            let mean = st[1] / nb;
-            let sd = ((st[2] - st[1] * st[1] / nb) / (nb - 1.0)).max(0.0).sqrt();
+            let mean = s1 / nb;
+            let sd = ((s2 - s1 * s1 / nb) / (nb - 1.0)).max(0.0).sqrt();
             cost += nb * if mean > 0.0 { sd / mean } else { sd };
         }
     }

@@ -21,7 +21,9 @@ pub fn blur_kernel(r: f32, d: f32) -> Option<Vec<f64>> {
     if ratio < 1.1 {
         return None;
     }
-    let sigma = 0.85f32 * ratio / 2.0;
+    // σ = 0.85·ratio/2 with the constant in double, rounded to single (observed: `-debug`'s
+    // levels bit for bit; the single-precision product misses the last bit of 2.5 % of them)
+    let sigma = (0.85f64 * f64::from(ratio) / 2.0) as f32;
     if sigma < 0.5 {
         return None;
     }

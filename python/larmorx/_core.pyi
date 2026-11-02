@@ -41,9 +41,10 @@ def fsl_run_original(
     cwd: str | None = None,
 ) -> tuple[int, str, str]:
     """Run the clean-room original of ``fsl tool`` (``bet``, ``bet2``, ``betsurf``, ``flirt``,
-    ``convert_xfm``, ``avscale``, ``img2imgcoord``, ``std2imgcoord``, ``img2stdcoord``, ``rmsdiff``
-    or ``makerot``) with FSL's arguments in this process (without the GIL): ``(exit code,
-    standard output, standard error)``. ``env``
+    ``convert_xfm``, ``avscale``, ``img2imgcoord``, ``std2imgcoord``, ``img2stdcoord``,
+    ``rmsdiff``, ``makerot``, ``midtrans``, ``pointflirt``, ``applyxfm4D``, ``pairreg``,
+    ``extracttxt`` or ``aff2rigid``) with FSL's arguments in this process (without the GIL):
+    ``(exit code, standard output, standard error)``. ``env``
     stands for the process environment (never read or changed); relative names start in
     ``cwd``. ``KeyError`` for another tool."""
 

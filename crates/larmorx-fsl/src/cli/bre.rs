@@ -104,7 +104,8 @@ impl Parser<'_> {
                 self.i += 1;
                 c
             };
-            if self.p.get(self.i) == Some(&b'-') && self.p.get(self.i + 1).is_some_and(|&n| n != b']')
+            if self.p.get(self.i) == Some(&b'-')
+                && self.p.get(self.i + 1).is_some_and(|&n| n != b']')
             {
                 let hi = self.p[self.i + 1];
                 self.i += 2;
@@ -398,7 +399,10 @@ mod tests {
     use super::*;
 
     fn m(p: &str, l: &str) -> bool {
-        Bre::new(p.as_bytes()).unwrap().is_match(l.as_bytes()).unwrap()
+        Bre::new(p.as_bytes())
+            .unwrap()
+            .is_match(l.as_bytes())
+            .unwrap()
     }
 
     #[test]

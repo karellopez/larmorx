@@ -1713,6 +1713,7 @@ fn write_image(
         tr,
         cal: None,
         descrip: "larmorx fsl flirt",
+        positive_zeros: true,
     };
     write_values(ctx, stem, &look, values, None, t, err, notices)
 }
@@ -1726,6 +1727,9 @@ pub(crate) struct Look<'a> {
     pub tr: Option<f64>,
     pub cal: Option<(f64, f64)>,
     pub descrip: &'a str,
+    /// The sform's negative zeros written as zeros (FLIRT's outputs; `applyxfm4D` keeps them
+    /// unless the reference is stored neurologically, observed).
+    pub positive_zeros: bool,
 }
 
 /// Writes `values` like `look`'s reference in type `t` (FSL-09's conversion to integers, FSL-11's
@@ -1762,14 +1766,16 @@ pub(crate) fn write_values(
         return Err(End::Exit(1));
     };
     let mut template = reference.header.clone();
-    // FSL's image layer writes the sform's negative zeros as zeros (observed)
-    for row in [
-        &mut template.srow_x,
-        &mut template.srow_y,
-        &mut template.srow_z,
-    ] {
-        for v in row.iter_mut() {
-            *v += 0.0;
+    // FLIRT writes the sform's negative zeros as zeros (observed)
+    if look.positive_zeros {
+        for row in [
+            &mut template.srow_x,
+            &mut template.srow_y,
+            &mut template.srow_z,
+        ] {
+            for v in row.iter_mut() {
+                *v += 0.0;
+            }
         }
     }
     if let Some(tr) = tr {
@@ -1808,9 +1814,9 @@ pub(crate) fn write_values(
                 _ => Values::I32(data.iter().map(|&x| x as i64 as i32).collect()),
             }
         }
-        None if t == DataType::F64 => Values::F64(
-            doubles.unwrap_or_else(|| values.iter().map(|&x| f64::from(x)).collect()),
-        ),
+        None if t == DataType::F64 => {
+            Values::F64(doubles.unwrap_or_else(|| values.iter().map(|&x| f64::from(x)).collect()))
+        }
         None => Values::F32(values),
     };
     match image::write(&name, version, &o, v) {

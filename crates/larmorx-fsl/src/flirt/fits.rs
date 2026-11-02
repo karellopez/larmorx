@@ -262,10 +262,10 @@ fn inverse3(a: &M3) -> Option<M3> {
 /// case is [`super::programs::determinant`]'s.
 pub fn determinant(rows: &[Vec<f64>]) -> f64 {
     let n = rows.len();
-    if n == 4 {
-        if let Some(m) = mat::mat4_of(rows) {
-            return super::programs::determinant(&m);
-        }
+    if n == 4
+        && let Some(m) = mat::mat4_of(rows)
+    {
+        return super::programs::determinant(&m);
     }
     let mut m: Vec<Vec<f64>> = rows.to_vec();
     let mut det = 1.0;

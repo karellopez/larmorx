@@ -60,9 +60,26 @@ from larmorx_validation.parity.harness import (
 SUITE = "fsl-flirt"
 #: FLIRT's other programs whose results are their text and files (part 2): compared identical
 #: (§13: every case of the replica's ``programs/`` category, identical in text and exit status).
-TEXT_PROGRAMS = ("avscale", "img2imgcoord", "std2imgcoord", "img2stdcoord", "rmsdiff", "makerot")
+TEXT_PROGRAMS = (
+    "avscale",
+    "img2imgcoord",
+    "std2imgcoord",
+    "img2stdcoord",
+    "rmsdiff",
+    "makerot",
+    "extracttxt",
+)
+#: The fits (SVD-based, §13): the same text and statuses, the matrices within 1e-9 of FSL's.
+FIT_PROGRAMS = ("midtrans", "pointflirt", "aff2rigid")
 #: The programs with a clean-room original.
-PROGRAMS = ("flirt", "convert_xfm", *TEXT_PROGRAMS)
+PROGRAMS = ("flirt", "convert_xfm", *TEXT_PROGRAMS, *FIT_PROGRAMS, "applyxfm4D", "pairreg")
+#: GNU sed's usage text (GPL), which extracttxt's runs print and the Apache original does not
+#: reproduce: left out of FSL's standard error (the original prints one line of its own there).
+_SED_USAGE = re.compile(
+    r"Usage: sed \[OPTION\]\.\.\..*?General help using GNU software: <https://www\.gnu\.org/"
+    r"gethelp/>\.\n",
+    re.S,
+)
 #: Options the original does not have yet (part 2): its cases are skipped.
 PENDING = {
     "-debug": "-debug (part 2)",
@@ -231,6 +248,8 @@ def compare_text(
     for stream in ("stdout", "stderr"):
         want = rep._clean(getattr(oracle, stream), a, program)
         got = rep._clean(_own(getattr(ours, stream)), b, program)
+        if program == "extracttxt":
+            want = _SED_USAGE.sub("", want)
         detail = ""
         if want != got:
             wl, gl = want.splitlines(), got.splitlines()
@@ -252,6 +271,216 @@ def compare_text(
     )
     differ = [n for n in sorted(set(theirs) & set(mine)) if not rep._same_bytes(theirs[n], mine[n])]
     checks("every file identical", not differ, detail="; ".join(differ[:6]))
+
+
+def _first_difference(want: str, got: str, same) -> str:
+    wl, gl = want.splitlines(), got.splitlines()
+    first = next(
+        (i for i, (x, y) in enumerate(zip(wl, gl, strict=False)) if not same(x, y)),
+        min(len(wl), len(gl)),
+    )
+    return (
+        f"line {first + 1}: FSL {wl[first] if first < len(wl) else '<end>'!r}, "
+        f"original {gl[first] if first < len(gl) else '<end>'!r}"
+    )
+
+
+def _unit10(v: float) -> float:
+    """One unit of the 10th significant digit of ``v`` (FSL writes matrix files in ``%.10g``)."""
+    return 10.0 ** (np.floor(np.log10(abs(v))) - 9) if v and np.isfinite(v) else 0.0
+
+
+def _numbers_close(want: str, got: str, tol) -> tuple[bool, float]:
+    """The same text with the numbers masked, and every number within ``tol(fsl value)``
+    (NaN equal to NaN); the largest difference."""
+    if _masked(want) != _masked(got):
+        return False, float("inf")
+    na, nb = _numbers(want), _numbers(got)
+    if len(na) != len(nb):
+        return False, float("inf")
+    worst = 0.0
+    for x, y in zip(na, nb, strict=True):
+        if np.isnan(x) and np.isnan(y):
+            continue
+        d = abs(x - y) if np.isfinite(x) and np.isfinite(y) else (0.0 if x == y else np.inf)
+        worst = max(worst, d)
+        if d > tol(x):
+            return False, worst
+    return True, worst
+
+
+def compare_fit(
+    checks: CheckList, program: str, oracle: Completed, ours: Completed, a: Path, b: Path
+) -> None:
+    """``midtrans``, ``pointflirt`` and ``aff2rigid`` (§13: SVD-based): exit status and the same
+    text, the numbers printed (6 decimals) within one unit of their last digit and the matrices
+    written within 1e-9 of FSL's (plus one unit of the 10th significant digit they are written
+    with); every other file identical."""
+    if oracle.code < 0:
+        checks(
+            f"exit status ({program} is killed; the original exits 1)",
+            ours.code == 1,
+            detail=f"{program} signal {-oracle.code}, original {ours.code}",
+        )
+    else:
+        checks("exit status", oracle.code == ours.code, detail=f"{oracle.code} vs {ours.code}")
+    printed = 1e-6 + 1e-12
+    for stream in ("stdout", "stderr"):
+        want = rep._clean(getattr(oracle, stream), a, program)
+        got = rep._clean(_own(getattr(ours, stream)), b, program)
+        ok, worst = (True, 0.0) if want == got else _numbers_close(want, got, lambda _x: printed)
+        checks(
+            f"{stream}: the same text, the numbers within one unit of their last printed digit",
+            ok,
+            metric="max difference",
+            value=float(f"{worst:.3g}"),
+            threshold=printed,
+            detail="" if ok else _first_difference(want, got, lambda x, y: x == y),
+        )
+    theirs, mine = _files(a, set()), _files(b, set())
+    checks(
+        "files written",
+        set(theirs) == set(mine),
+        detail=f"only FSL {sorted(set(theirs) - set(mine))[:6]}, "
+        f"only the original {sorted(set(mine) - set(theirs))[:6]}",
+    )
+    for name in sorted(set(theirs) & set(mine)):
+        if rep._same_bytes(theirs[name], mine[name]):
+            continue
+        ta = theirs[name].read_text(errors="replace")
+        tb = mine[name].read_text(errors="replace")
+        ok, worst = _numbers_close(ta, tb, lambda x: 1e-9 + _unit10(x))
+        checks(
+            f"{name}: within 1e-9 of FSL's in every element",
+            ok,
+            metric="max difference",
+            value=float(f"{worst:.3g}"),
+            threshold="1e-9 + one unit of the 10th significant digit",
+        )
+
+
+def _interp_of(args: list[str]) -> str:
+    """applyxfm4D's interpolation (§15.7: the words after the fourth; sinc by default)."""
+    method = "sinc"
+    words = args[4:]
+    for i, w in enumerate(words[:-1]):
+        if w.lstrip("-") == "interp":
+            method = words[i + 1]
+    return "nearestneighbour" if method == "nn" else method
+
+
+def compare_4d(
+    checks: CheckList, args: list[str], oracle: Completed, ours: Completed, a: Path, b: Path
+) -> None:
+    """``applyxfm4D`` (§13): exit status, the same text, the same files; the images
+    bit-identical for nearest neighbour and trilinear, for sinc and spline the same header and
+    grid and a normalised correlation with FSL's values of at least 0.9999 (identical where
+    both are exact)."""
+    compare_text_streams(checks, "applyxfm4D", oracle, ours, a, b)
+    theirs, mine = _files(a, set()), _files(b, set())
+    checks(
+        "files written",
+        set(theirs) == set(mine),
+        detail=f"only FSL {sorted(set(theirs) - set(mine))[:6]}, "
+        f"only the original {sorted(set(mine) - set(theirs))[:6]}",
+    )
+    method = _interp_of(args)
+    for name in sorted(set(theirs) & set(mine)):
+        fa, fb = theirs[name], mine[name]
+        if rep._same_bytes(fa, fb):
+            continue
+        if not _is_image(name):
+            checks(f"{name} identical", False, detail="the bytes differ")
+            continue
+        same = _same_streams(fa, fb, blank_descrip=True)
+        if same or method in ("nearestneighbour", "trilinear"):
+            checks(
+                f"{name} bit-identical ({method})",
+                same,
+                detail="" if same else _image_difference(fa, fb),
+            )
+            continue
+        ia, ib = _load(fa), _load(fb)
+        fields = [
+            k for k in ia.header if k not in ("descrip",) and _differs(ia.header[k], ib.header[k])
+        ]
+        checks(f"{name}: the same header", not fields, detail=", ".join(fields))
+        da = np.asanyarray(ia.dataobj).astype(np.float64)
+        db = np.asanyarray(ib.dataobj).astype(np.float64)
+        if da.shape != db.shape:
+            checks(f"{name}: the same grid", False, detail=f"{da.shape} vs {db.shape}")
+            continue
+        ok = np.isfinite(da) & np.isfinite(db)
+        nonfinite_same = bool(np.array_equal(np.isnan(da), np.isnan(db)))
+        c = _ncc(np.where(ok, da, 0), np.where(ok, db, 0), np.ones(da.shape, bool))
+        checks(
+            f"{name}: correlation with FSL's values ({method})",
+            c >= 0.9999 and nonfinite_same,
+            metric="NCC",
+            value=round(c, 7) if np.isfinite(c) else str(c),
+            threshold=0.9999,
+            detail=_image_difference(fa, fb)
+            + ("" if nonfinite_same else "; the NaN voxels differ"),
+        )
+
+
+def compare_text_streams(
+    checks: CheckList, program: str, oracle: Completed, ours: Completed, a: Path, b: Path
+) -> None:
+    """The exit status (where FSL aborts, the original exits 1) and both streams identical."""
+    if oracle.code < 0:
+        checks(
+            f"exit status ({program} is killed; the original exits 1)",
+            ours.code == 1,
+            detail=f"{program} signal {-oracle.code}, original {ours.code}",
+        )
+    else:
+        checks("exit status", oracle.code == ours.code, detail=f"{oracle.code} vs {ours.code}")
+    for stream in ("stdout", "stderr"):
+        want = rep._clean(getattr(oracle, stream), a, program)
+        got = rep._clean(_own(getattr(ours, stream)), b, program)
+        checks(
+            f"{stream} identical",
+            want == got,
+            detail="" if want == got else _first_difference(want, got, lambda x, y: x == y),
+        )
+
+
+def _aff2rigid_fix(
+    checks: CheckList, run: rep.Run, args: list[str], settings: dict[str, str | None]
+) -> None:
+    """FSL-81's correction: the original's default matrix against the replica's (which computes
+    the script's matrix with NumPy's arithmetic), within 1e-9; reported when the replica's
+    program is not built."""
+    from larmorx_validation.parity.fsl_mcflirt_replica import replica_binary
+
+    if replica_binary() is None or len(args) < 2:
+        return
+    with (
+        tempfile.TemporaryDirectory(prefix="lx-flirt-a2r-") as c_,
+        tempfile.TemporaryDirectory(prefix="lx-flirt-a2r-") as d_,
+    ):
+        c, d = Path(c_), Path(d_)
+        rep._prepare(run, c)
+        rep._prepare(run, d)
+        r = rep.run_replica("aff2rigid", args, cwd=c, settings=settings, mode=defects.FIX)
+        o = run_original("aff2rigid", args, cwd=d, settings=settings, mode=defects.FIX)
+        fa, fb = c / args[1], d / args[1]
+        if r.code != 0 or not fa.is_file():
+            return
+        ok, worst = (
+            _numbers_close(fa.read_text(), fb.read_text(), lambda _x: 1e-9)
+            if o.code == 0 and fb.is_file()
+            else (False, float("inf"))
+        )
+        checks(
+            "FSL-81's correction: the matrix within 1e-9 of the replica's (NumPy's arithmetic)",
+            ok,
+            metric="max difference",
+            value=float(f"{worst:.3g}"),
+            threshold=1e-9,
+            detail=f"original exit {o.code}",
+        )
 
 
 def compare(
@@ -592,7 +821,7 @@ def fix_pass(
         others = []
         if r.code != reproduced.code:
             others.append(f"exit {reproduced.code} -> {r.code}")
-        if program in TEXT_PROGRAMS and r.stdout != reproduced.stdout:
+        if program in (*TEXT_PROGRAMS, *FIT_PROGRAMS) and r.stdout != reproduced.stdout:
             # the programs whose results are printed
             others.append("standard output")
         a = dict(_files(reproduced_dir, set()))
@@ -647,10 +876,19 @@ def _run_case(run: rep.Run, checks: CheckList) -> None:
         ours = run_original(run.program, args, cwd=b, settings=settings, mode=defects.REPRODUCE)
         if run.program in TEXT_PROGRAMS:
             compare_text(checks, run.program, oracle, ours, a, b)
+        elif run.program in FIT_PROGRAMS:
+            compare_fit(checks, run.program, oracle, ours, a, b)
+        elif run.program == "applyxfm4D":
+            compare_4d(checks, args, oracle, ours, a, b)
+        elif run.program == "pairreg":
+            # FLIRT's matrices (§13), the first brain the reference
+            compare(checks, "pairreg", [*args, "-ref", args[0]], oracle, ours, a, b)
         else:
             compare(
                 checks, run.program, args, oracle, ours, a, b, band=_band(run, args, settings, a)
             )
+        if run.program == "aff2rigid":
+            _aff2rigid_fix(checks, run, args, settings)
         if run.fix and ours.code == 0:
             fix_pass(checks, run.program, lambda t: rep._prepare(run, t), args, settings, b, ours)
     if oracle.code != 0 and all(c.passed for c in checks.checks):

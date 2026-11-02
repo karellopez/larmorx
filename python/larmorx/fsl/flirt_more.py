@@ -5,9 +5,10 @@ of several transforms), ``pointflirt`` (an affine matrix from point corresponden
 ``pairreg`` (brain and skull registration), ``extracttxt`` (lines of a text file) and
 ``aff2rigid`` (a 6-parameter approximation of a standard-space matrix), FSL 6.0.7.23's.
 
-Each runs the bit-exact replica from ``larmorx-nc`` as a separate program (``docs/licensing.md``);
-the clean-room originals are to be written from ``specs/flirt.md``, so
-``implementation="auto"`` needs ``larmorx-nc`` installed.
+Each has two implementations (``docs/licensing.md``): the bit-exact replica from ``larmorx-nc``
+(FSL Licence), run as a separate program, and the clean-room original (Apache-2.0, written from
+``specs/flirt.md``), run in this process; ``implementation="auto"`` runs the replica when it is
+installed, else the original. A run that fails raises :class:`RuntimeError` with its messages.
 """
 
 from __future__ import annotations
@@ -18,7 +19,7 @@ from typing import Any, Literal
 
 import numpy as np
 
-from larmorx import _replica
+from larmorx import _core, _defects, _replica
 from larmorx._defects import UpstreamDefectsName
 from larmorx._replica import ImplementationName
 from larmorx.fsl.flirt import _matrix_file, _run, _warn
@@ -44,6 +45,18 @@ _OUTPUT_TYPES = (
     (".hdr", "NIFTI_PAIR"),
     (".img", "NIFTI_PAIR"),
 )
+
+
+def _call(tool: str, args: list[str], tmp: str, implementation: str, upstream_defects: str):
+    """``tool`` with ``args`` in ``tmp`` (its replica or its original, :func:`_run`; the
+    original's ``pairreg`` reads FSL's schedules from ``$FSLDIR``); a failure (exit status not
+    0) raises :class:`RuntimeError` with its messages."""
+    selected = _replica.select("fsl", tool, implementation)
+    extra = (("FSLDIR", os.environ["FSLDIR"]),) if os.environ.get("FSLDIR") else ()
+    process = _run(selected, args, tmp, 1, upstream_defects, program=tool, extra_env=extra)
+    if process.returncode != 0:
+        raise RuntimeError(f"{tool} failed (exit {process.returncode}):\n{process.stderr}")
+    return process
 
 
 def _output_type(path: str) -> tuple[str, str]:
@@ -80,8 +93,6 @@ def midtrans(
     each transform composed with it is also written to ``<separate>0001.mat`` and so on."""
     if len(transforms) < 2:
         raise ValueError("midtrans needs at least 2 transforms")
-    selected = _replica.select("fsl", "midtrans", implementation)
-    assert selected is not None
     with tempfile.TemporaryDirectory(prefix="larmorx-midtrans-") as tmp:
         out = os.path.join(tmp, "mid.mat")
         args = ["-o", out]
@@ -90,7 +101,7 @@ def midtrans(
         if separate is not None:
             args += ["--separate", os.path.abspath(separate)]
         args += [_matrix_file(t, tmp, f"t{k}") for k, t in enumerate(transforms)]
-        _run(selected, args, tmp, 1, upstream_defects)
+        _call("midtrans", args, tmp, implementation, upstream_defects)
         return np.loadtxt(out)
 
 
@@ -105,8 +116,6 @@ def pointflirt(
     """FSL's ``pointflirt``: the affine 4 x 4 matrix that maps ``in_points`` onto ``ref_points``
     (N x 3 arrays or text files, in mm; with ``in_image`` and ``ref_image``, in voxels, scaled
     by their voxel sizes: ``--vox``) in the least-squares sense."""
-    selected = _replica.select("fsl", "pointflirt", implementation)
-    assert selected is not None
     with tempfile.TemporaryDirectory(prefix="larmorx-pointflirt-") as tmp:
         out = os.path.join(tmp, "aff.mat")
         args = [
@@ -124,7 +133,7 @@ def pointflirt(
                 "--invol=" + _image_file(in_image, tmp, "invol"),
                 "--refvol=" + _image_file(ref_image, tmp, "refvol"),
             ]
-        _run(selected, args, tmp, 1, "fix")
+        _call("pointflirt", args, tmp, implementation, "fix")
         return np.loadtxt(out)
 
 
@@ -149,7 +158,6 @@ def applyxfm4d(
     the format: ``.nii.gz``, ``.nii``, ``.hdr``/``.img``; none: ``.nii.gz``); ``three_d``
     resamples one volume (``-3D``). Returns the path written."""
     selected = _replica.select("fsl", "applyxfm4D", implementation)
-    assert selected is not None
     with tempfile.TemporaryDirectory(prefix="larmorx-applyxfm4d-") as tmp:
         out, kind = _output_type(os.path.abspath(os.fspath(out_image)))
         args = [
@@ -167,16 +175,25 @@ def applyxfm4d(
         args += ["-interp", interp]
         if three_d:
             args.append("-3D")
-        process = _replica.run(
-            selected,
-            args,
-            cwd=tmp,
-            n_threads=1,
-            upstream_defects=upstream_defects,
-            env={"FSLOUTPUTTYPE": kind, "PATH": tmp},
-            exclude=lambda name: name.upper().startswith("FSL"),
-        )
-        _warn(process.stderr)
+        if selected is None:
+            # the clean-room original, in this process
+            env = [("FSLOUTPUTTYPE", kind), ("PATH", tmp), (_defects.ENV, upstream_defects)]
+            code, _, err = _core.fsl_run_original("applyxfm4D", args, env, tmp)
+            _warn(err)
+        else:
+            process = _replica.run(
+                selected,
+                args,
+                cwd=tmp,
+                n_threads=1,
+                upstream_defects=upstream_defects,
+                env={"FSLOUTPUTTYPE": kind, "PATH": tmp},
+                exclude=lambda name: name.upper().startswith("FSL"),
+            )
+            _warn(process.stderr)
+            code, err = process.returncode, process.stderr
+        if code != 0:
+            raise RuntimeError(f"applyxfm4D failed (exit {code}):\n{err}")
     return out
 
 
@@ -192,14 +209,15 @@ def pairreg(
 ) -> np.ndarray:
     """FSL's ``pairreg``: the matrix from ``brain2`` to ``brain1`` (``brain1`` and ``skull1``
     the references), found with the brains, refined with the skulls and finished with the
-    brains (three FLIRT runs with FSL's ``pairreg*.sch`` schedules); ``flirt_args`` are passed
-    to every FLIRT run."""
-    selected = _replica.select("fsl", "pairreg", implementation)
-    assert selected is not None
+    brains (three FLIRT runs with FSL's ``pairreg*.sch`` schedules, read from ``$FSLDIR``'s
+    ``etc/flirtsch``); ``flirt_args`` are passed to every FLIRT run."""
     with tempfile.TemporaryDirectory(prefix="larmorx-pairreg-") as tmp:
         out = os.path.join(tmp, "pair.mat")
         files = [os.path.abspath(os.fspath(p)) for p in (brain1, brain2, skull1, skull2)]
-        _run(selected, [*files, out, *(flirt_args or [])], tmp, 1, upstream_defects)
+        args = [*files, out, *(flirt_args or [])]
+        process = _call("pairreg", args, tmp, implementation, upstream_defects)
+        if not os.path.exists(out):
+            raise RuntimeError(f"pairreg wrote no matrix:\n{process.stderr}")
         return np.loadtxt(out)
 
 
@@ -216,15 +234,13 @@ def extracttxt(
     starting ``relative_start`` lines after (or before) the match."""
     if relative_start is not None and trailing_lines is None:
         raise ValueError("extracttxt's relative_start needs trailing_lines")
-    selected = _replica.select("fsl", "extracttxt", implementation)
-    assert selected is not None
     with tempfile.TemporaryDirectory(prefix="larmorx-extracttxt-") as tmp:
         args = [search_word, os.path.abspath(os.fspath(file))]
         if trailing_lines is not None:
             args.append(str(int(trailing_lines)))
         if relative_start is not None:
             args.append(str(int(relative_start)))
-        return _run(selected, args, tmp, 1, "fix").stdout
+        return _call("extracttxt", args, tmp, implementation, "fix").stdout
 
 
 def aff2rigid(
@@ -236,10 +252,10 @@ def aff2rigid(
     """FSL's ``aff2rigid``: the rigid (6-parameter) 4 x 4 matrix that keeps the anterior
     commissure, the AC-PC line and the mid-sagittal plane of the 12-parameter input-to-standard
     ``matrix`` (array or file). FSL 6.0.7.23's script stops before writing it (FSL-81); the
-    replica computes it as the script does (``upstream_defects="reproduce"`` fails as FSL)."""
-    selected = _replica.select("fsl", "aff2rigid", implementation)
-    assert selected is not None
+    replica and the original compute it as the script defines it (``upstream_defects="reproduce"``
+    fails as FSL)."""
     with tempfile.TemporaryDirectory(prefix="larmorx-aff2rigid-") as tmp:
         out = os.path.join(tmp, "rigid.mat")
-        _run(selected, [_matrix_file(matrix, tmp, "in"), out], tmp, 1, upstream_defects)
+        args = [_matrix_file(matrix, tmp, "in"), out]
+        _call("aff2rigid", args, tmp, implementation, upstream_defects)
         return np.loadtxt(out)

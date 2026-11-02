@@ -426,7 +426,10 @@ mod tests {
         // FLIRT's other programs and scripts run their clean-room originals (part 2).
         let (code, _, err) = run_options(&["lx", "fsl", "midtrans"], &original);
         assert_eq!(code, 1);
-        assert!(err.starts_with("Must specify at least 2 transforms"), "{err}");
+        assert!(
+            err.starts_with("Must specify at least 2 transforms"),
+            "{err}"
+        );
         let (code, _, err) = run_options(&["lx", "fsl", "applyxfm4D"], &original);
         assert_eq!(code, 255);
         assert!(err.starts_with("Usage: applyxfm4D"), "{err}");

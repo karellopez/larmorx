@@ -200,7 +200,10 @@ mod tests {
         assert!(err.contains("FSL-81"));
         let text = std::fs::read_to_string(dir.path().join("r.mat")).unwrap();
         assert_eq!(text.lines().count(), 4);
-        assert_eq!(text.lines().last(), Some("  0.0000000000   0.0000000000   0.0000000000   1.0000000000"));
+        assert_eq!(
+            text.lines().last(),
+            Some("  0.0000000000   0.0000000000   0.0000000000   1.0000000000")
+        );
         settings
             .vars
             .insert(defects::ENV.to_owned(), "reproduce".to_owned());

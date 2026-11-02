@@ -526,10 +526,19 @@ mod tests {
         // line; a value out of range is the largest double, repeated; extra words ignored
         let r = |t: &str| parse_matrix_text(t);
         let rest = "0 1 0 0\n0 0 1 0\n0 0 0 1\n";
-        assert_eq!(r(&format!("1 inf 0 0\n{rest}")).unwrap()[0], [1.0, 0.0, 0.0, 0.0]);
+        assert_eq!(
+            r(&format!("1 inf 0 0\n{rest}")).unwrap()[0],
+            [1.0, 0.0, 0.0, 0.0]
+        );
         assert_eq!(r(&format!("0 0 inf 1\n{rest}")).unwrap()[0], [0.0; 4]);
-        assert_eq!(r(&format!("1 0x10 0 3\n{rest}")).unwrap()[0], [1.0, 0.0, 0.0, 0.0]);
-        assert_eq!(r(&format!("1 2.5e 0 3\n{rest}")).unwrap()[0], [1.0, 0.0, 0.0, 0.0]);
+        assert_eq!(
+            r(&format!("1 0x10 0 3\n{rest}")).unwrap()[0],
+            [1.0, 0.0, 0.0, 0.0]
+        );
+        assert_eq!(
+            r(&format!("1 2.5e 0 3\n{rest}")).unwrap()[0],
+            [1.0, 0.0, 0.0, 0.0]
+        );
         assert_eq!(
             r(&format!("1 0 1e400 5\n{rest}")).unwrap()[0],
             [1.0, 0.0, f64::MAX, f64::MAX]
@@ -537,10 +546,16 @@ mod tests {
         assert_eq!(r(&format!("0x1p3 1 0 0\n{rest}")).unwrap()[0], [0.0; 4]);
         assert!(r(&format!("1 0 0 0 junk\n{rest}")).is_err());
         assert!(r("1 2 3 4\n0 1 0 \n0 0 1 0\n0 0 0 1\n").is_err());
-        assert_eq!(r("1 2 3 4\n0 1 nan\n0 0 1 0\n0 0 0 1\n").unwrap()[1], [0.0, 1.0, 0.0, 0.0]);
+        assert_eq!(
+            r("1 2 3 4\n0 1 nan\n0 0 1 0\n0 0 0 1\n").unwrap()[1],
+            [0.0, 1.0, 0.0, 0.0]
+        );
         let skipped = r("1 2 3 4\n.x 1 0 0\nx1 0\n# 1 2\n0 0 1 0\n0 0 0 1\n0 1 0 0\n").unwrap();
         assert_eq!(skipped.len(), 4);
-        assert_eq!(r(&format!("1 2\\t3 4\n{rest}")).unwrap()[0], [1.0, 2.0, 0.0]);
+        assert_eq!(
+            r(&format!("1 2\\t3 4\n{rest}")).unwrap()[0],
+            [1.0, 2.0, 0.0]
+        );
         assert_eq!(r(&format!("1\\t2 3 4 5\n{rest}")).unwrap().len(), 3);
         assert_eq!(file_text(&IDENTITY).lines().next(), Some("1  0  0  0  "));
         assert_eq!(g(0.9998031425123, 10), "0.9998031425");

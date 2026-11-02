@@ -67,7 +67,8 @@ fn glob_matches(word: &str, settings: &Settings) -> bool {
     };
     entries.flatten().any(|e| {
         let name = e.file_name().to_string_lossy().into_owned();
-        !(name.starts_with('.') && !pat.starts_with('.')) && fnmatch(pat.as_bytes(), name.as_bytes())
+        !(name.starts_with('.') && !pat.starts_with('.'))
+            && fnmatch(pat.as_bytes(), name.as_bytes())
     })
 }
 
@@ -277,7 +278,11 @@ mod tests {
         // FSL 6.0.7.23's script (observed)
         assert_eq!(
             run(&["e.4", "t.txt", "3"]),
-            (0, "line 4 value 12\nline 5 value 15\nline 6 value 18\n".into(), String::new())
+            (
+                0,
+                "line 4 value 12\nline 5 value 15\nline 6 value 18\n".into(),
+                String::new()
+            )
         );
         assert_eq!(
             run(&["end$", "t.txt", "4", "-3"]).1,
@@ -286,23 +291,40 @@ mod tests {
         assert_eq!(run(&["line.7", "t.txt", "0"]).1, "line 6 value 18\n");
         assert_eq!(
             run(&["e.4", "t.txt", "-0", "+2"]),
-            (0, "line 5 value 15\n".into(), "dc: stack empty\ndc: stack empty\n".into())
+            (
+                0,
+                "line 5 value 15\n".into(),
+                "dc: stack empty\ndc: stack empty\n".into()
+            )
         );
         let (c, _, err) = run(&["^line.1.v", "t.txt", "2", "-1"]);
         assert_eq!(
             (c, err.as_str()),
-            (1, "sed: -e expression #1, char 4: invalid usage of line address 0\n")
+            (
+                1,
+                "sed: -e expression #1, char 4: invalid usage of line address 0\n"
+            )
         );
         let (c, _, err) = run(&["e.2", "t.txt", "3", "-4"]);
         assert_eq!(c, 1);
-        assert!(err.starts_with("dc: stack empty\nsed: invalid option -- '2'\n"), "{err}");
+        assert!(
+            err.starts_with("dc: stack empty\nsed: invalid option -- '2'\n"),
+            "{err}"
+        );
         let (c, _, err) = run(&["e.4", "t.txt", "0", "-4"]);
         assert_eq!(c, 1);
         assert!(err.starts_with("sed: invalid option -- '1'\n"), "{err}");
-        assert_eq!(run(&["nothing", "t.txt"]), (0, String::new(), String::new()));
+        assert_eq!(
+            run(&["nothing", "t.txt"]),
+            (0, String::new(), String::new())
+        );
         assert_eq!(
             run(&["x", "none.txt"]),
-            (0, String::new(), "grep: none.txt: No such file or directory\n".into())
+            (
+                0,
+                String::new(),
+                "grep: none.txt: No such file or directory\n".into()
+            )
         );
         assert_eq!(run(&["word"]), (2, USAGE.into(), ILLEGAL.into()));
         assert_eq!(run(&["c", "t.txt", "x"]).0, 1);

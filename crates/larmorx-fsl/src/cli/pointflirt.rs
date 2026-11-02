@@ -60,7 +60,9 @@ fn rows_text(rows: &[Vec<f64>]) -> String {
 
 fn transpose(rows: &[Vec<f64>]) -> Vec<Vec<f64>> {
     let c = rows.first().map_or(0, Vec::len);
-    (0..c).map(|j| rows.iter().map(|r| r[j]).collect()).collect()
+    (0..c)
+        .map(|j| rows.iter().map(|r| r[j]).collect())
+        .collect()
 }
 
 /// `pointflirt` with FSL's arguments; returns the exit status.
@@ -135,13 +137,19 @@ fn run(
         y = transpose(&y);
     }
     if common::size(&x).1 != common::size(&y).1 {
-        let _ = writeln!(err, "ERROR: Different number of coordinates in the two files");
+        let _ = writeln!(
+            err,
+            "ERROR: Different number of coordinates in the two files"
+        );
         return 255;
     }
     let verbose = given[6].is_some();
     if given[3].is_some() {
         let (Some(iv), Some(rv)) = (text(&given[4]), text(&given[5])) else {
-            let _ = writeln!(err, "ERROR: need to specify --invol and --refvol to use --vox");
+            let _ = writeln!(
+                err,
+                "ERROR: need to specify --invol and --refvol to use --vox"
+            );
             return 2;
         };
         for (pts, name) in [(&mut x, iv), (&mut y, rv)] {
@@ -237,7 +245,8 @@ mod tests {
         )
     }
 
-    const IN: &str = "10 20 30\n-12 5 40\n33 -7 12\n0 0 0\n25 25 -10\n-8 -30 22\n14 9 -3\n-20 18 6\n";
+    const IN: &str =
+        "10 20 30\n-12 5 40\n33 -7 12\n0 0 0\n25 25 -10\n-8 -30 22\n14 9 -3\n-20 18 6\n";
     const REF: &str = "13.31 18.62 35.25\n-9.33 7.41 44.05\n38.47 -8.32 13.9\n2.5 -1 1.5\n29.29 23.95 -9.68\n-5.24 -31.87 26.59\n17.35 7.55 -1.71\n-17.75 18.24 7.86\n";
 
     #[test]
@@ -278,12 +287,17 @@ mod tests {
         let (c, _, err) = run(&["-i", "in.txt", "-r", "ref.txt", "--vox"], &files);
         assert_eq!(
             (c, err.as_str()),
-            (2, "ERROR: need to specify --invol and --refvol to use --vox\n")
+            (
+                2,
+                "ERROR: need to specify --invol and --refvol to use --vox\n"
+            )
         );
         let files = [("o.txt", "1 2 3\n4 5 6\n"), ("p.txt", "1 2 4\n4 5 7\n")];
         let (c, out, err) = run(&["-v", "-i", "o.txt", "-r", "p.txt"], &files);
         assert_eq!(c, 1);
-        assert!(out.starts_with("Input volume coordinates are (in mm)\n1.000000 2.000000 3.000000 \n"));
+        assert!(
+            out.starts_with("Input volume coordinates are (in mm)\n1.000000 2.000000 3.000000 \n")
+        );
         assert!(err.contains("3x1 and 2x1"), "{err}");
     }
 }

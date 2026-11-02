@@ -110,11 +110,7 @@ fn image_error(err: &mut dyn Write, name: &str, e: &image::ImageError) -> u8 {
 
 /// A matrix file as FSL reads it here: its message and an empty matrix when it cannot be opened,
 /// which stops the run at its product with the volume's 4 × 4 map.
-fn matrix(
-    settings: &Settings,
-    name: &str,
-    err: &mut dyn Write,
-) -> Result<Mat4, u8> {
+fn matrix(settings: &Settings, name: &str, err: &mut dyn Write) -> Result<Mat4, u8> {
     let rows = match common::read_rows(settings, name, err) {
         Ok(r) => r,
         Err(m) => return Err(abort(err, "applyxfm4D", "std::runtime_error", &m)),
@@ -162,7 +158,11 @@ pub fn main(args: &[String], settings: &Settings, out: &mut dyn Write, err: &mut
             Interp::Sinc => 2,
             Interp::Spline => 4,
         };
-        let _ = writeln!(out, "using interpolation method (enum, string): {k}, {}", o.method);
+        let _ = writeln!(
+            out,
+            "using interpolation method (enum, string): {k}, {}",
+            o.method
+        );
     }
     let ctx = Ctx {
         settings,
@@ -207,7 +207,7 @@ fn read(
         Err(e) => return Err(image_error(err, name, &e)),
     };
     let r = if all {
-        image::read(&files, ctx.n_threads).map(|(v, i)| (v, i))
+        image::read(&files, ctx.n_threads)
     } else {
         image::read_first(&files, ctx.n_threads).map(|i| (vec![i.vol.clone()], i))
     };
@@ -264,7 +264,10 @@ fn run(
     let double = t == DataType::F64 && src.doubles.is_some();
     let mut nv = src.vols.len();
     if !o.three_d && nv > MAX_VOLUMES {
-        let _ = writeln!(err, "WARNING:: More than 10000 volumes - only doing first 10000");
+        let _ = writeln!(
+            err,
+            "WARNING:: More than 10000 volumes - only doing first 10000"
+        );
         nv = MAX_VOLUMES;
     }
     // the sinc kernel: blackman of width 7, or with -3D the rectangular window of width 9 it asks
@@ -277,18 +280,32 @@ fn run(
     };
     if fsl80 {
         let detail = match mode {
-            UpstreamDefects::Fix => "applyxfm4D -3D resamples with the rectangular sinc window of full width 9 it asks for (FSL uses the blackman window of width 7 it defined first)",
-            UpstreamDefects::Reproduce => "applyxfm4D -3D resamples with the blackman sinc window of width 7, as FSL does (it asks for the rectangular window of width 9)",
+            UpstreamDefects::Fix => {
+                "applyxfm4D -3D resamples with the rectangular sinc window of full width 9 it asks for (FSL uses the blackman window of width 7 it defined first)"
+            }
+            UpstreamDefects::Reproduce => {
+                "applyxfm4D -3D resamples with the blackman sinc window of width 7, as FSL does (it asks for the rectangular window of width 9)"
+            }
         };
-        defects::push_once(notices, Notice::new(&defects::FSL_80, mode, detail.to_owned()));
+        defects::push_once(
+            notices,
+            Notice::new(&defects::FSL_80, mode, detail.to_owned()),
+        );
     }
     let fsl79 = integer && o.interp == Interp::Spline;
     if fsl79 {
         let detail = match mode {
-            UpstreamDefects::Fix => "applyxfm4D's spline of an integer image: its coefficients and values in single precision, as for a float image (FSL keeps them in the image's type)",
-            UpstreamDefects::Reproduce => "applyxfm4D's spline of an integer image: its coefficients and each value in the image's type, as FSL does",
+            UpstreamDefects::Fix => {
+                "applyxfm4D's spline of an integer image: its coefficients and values in single precision, as for a float image (FSL keeps them in the image's type)"
+            }
+            UpstreamDefects::Reproduce => {
+                "applyxfm4D's spline of an integer image: its coefficients and each value in the image's type, as FSL does"
+            }
         };
-        defects::push_once(notices, Notice::new(&defects::FSL_79, mode, detail.to_owned()));
+        defects::push_once(
+            notices,
+            Notice::new(&defects::FSL_79, mode, detail.to_owned()),
+        );
     }
     let single = o.single || o.three_d;
     let one = if single {
@@ -378,6 +395,9 @@ fn run(
         tr: Some(src.input.header.pixdim[4]),
         cal: Some((0.0, 0.0)),
         descrip: "larmorx fsl applyxfm4D",
+        // the sform as stored, but recomputed (its zeros positive) for a reference stored
+        // neurologically, which FSL flips (observed)
+        positive_zeros: reference.input.flipped,
     };
     match engine::write_values(ctx, outname, &look, values, doubles, t, err, notices) {
         Ok(()) => 0,
@@ -410,7 +430,10 @@ mod tests {
         let (c, _, err) = run(&["a", "b", "c", "d", "-interp", "cubic"]);
         assert_eq!(
             (c, err.as_str()),
-            (1, "interpolation method: cubic is not a valid choice. Please choose from nearestneighbour, trilinear, sinc, or spline.\n")
+            (
+                1,
+                "interpolation method: cubic is not a valid choice. Please choose from nearestneighbour, trilinear, sinc, or spline.\n"
+            )
         );
         let (c, _, err) = run(&["a", "b", "c", "d", "-userprefix"]);
         assert_eq!(c, 1);

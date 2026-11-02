@@ -59,7 +59,16 @@ pub fn main(args: &[String], settings: &Settings, out: &mut dyn Write, err: &mut
     );
     flirt(
         words(&[
-            "-in", s2, "-ref", s1, "-init", &t1, "-schedule", &sch2, "-omat", &t2,
+            "-in",
+            s2,
+            "-ref",
+            s1,
+            "-init",
+            &t1,
+            "-schedule",
+            &sch2,
+            "-omat",
+            &t2,
         ]),
         out,
         err,
@@ -71,7 +80,16 @@ pub fn main(args: &[String], settings: &Settings, out: &mut dyn Write, err: &mut
     super::convert_xfm::main(&fix, settings, out, err);
     flirt(
         words(&[
-            "-in", b2, "-ref", b1, "-init", &t3, "-schedule", &sch3, "-omat", omat,
+            "-in",
+            b2,
+            "-ref",
+            b1,
+            "-init",
+            &t3,
+            "-schedule",
+            &sch3,
+            "-omat",
+            omat,
         ]),
         out,
         err,

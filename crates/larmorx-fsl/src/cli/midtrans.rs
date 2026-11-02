@@ -159,7 +159,7 @@ pub fn main(args: &[String], settings: &Settings, out: &mut dyn Write, err: &mut
         }
     };
     if verbose {
-        let _ = write!(out, "Centre of template = {}\n", row_text(&centre));
+        let _ = writeln!(out, "Centre of template = {}", row_text(&centre));
         let _ = writeln!(out, "Initialising averages");
     }
     let o = [centre[0], centre[1], centre[2], 1.0];
@@ -312,7 +312,10 @@ mod tests {
             err.contains("Could not open matrix file b.mat\nCould not open matrix file -v\nmatrix multiplication: incompatible matrix dimensions: 0x0 and 4x1\n"),
             "{err}"
         );
-        let sing = [("a.mat", A), ("s.mat", "1 0 0 0\n0 0 0 0\n0 0 1 0\n0 0 0 1\n")];
+        let sing = [
+            ("a.mat", A),
+            ("s.mat", "1 0 0 0\n0 0 0 0\n0 0 1 0\n0 0 0 1\n"),
+        ];
         let (c, _, err) = run(&["a.mat", "s.mat"], &sing, "fix");
         assert_eq!((c, err.as_str()), (1, "Could not read matrix s.mat\n"));
     }

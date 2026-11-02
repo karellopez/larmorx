@@ -511,8 +511,11 @@ Still open (for the next relay; triage as below):
   group, its conversion) to be measured;
 - *the quaternion's signs* of a completed or composed qform (`quatern_b/c/d` of `-0` against `0`,
   or a half turn's sign) in 8 of the replayed applyxfm4D and `-applyisoxfm` findings;
-- *`-dof 3`*: FSL prints `Erroneous dof 3 : using 6 instead` more often (95 of 108 cases): the
-  count per command to be measured (the findings' first section gives part 1's count);
+- *`-dof 3`*: FSL prints `Erroneous dof 3 : using 6 instead` more often (95 of 108 cases): 73 times
+  for the default schedule with `-nosearch` (part 1's count in the first section: twice per
+  optimised row, once per search start, never for `measurecost`), 1599 and 2753 times with the
+  search on two of the trial's pairs, where the original prints it once per `optimise` or
+  `measurecost` command (19); the search's count to be measured;
 - *avscale's skews* printed `-0.000000` by FSL where the original's are `0.000000` (the sign of a
   residual of about 1e-17, relay 1's spec question 2), a rotation angle's 6th digit;
 - *registrations* (1,808 of 3,616 differ): paths that part in the costs' last bits and ill-posed

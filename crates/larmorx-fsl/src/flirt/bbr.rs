@@ -168,6 +168,52 @@ fn fieldmap_value(fmap: &Volume, mask: &Volume, r: [f64; 3], dir: [f64; 3]) -> f
     0.0
 }
 
+/// A field map's shift of the input coordinates (§6.5) for one matrix.
+pub struct Shift<'a> {
+    fmap: &'a Volume,
+    mask: &'a Volume,
+    /// The input axis shifted.
+    pub axis: usize,
+    sigma: f32,
+    dir: [f64; 3],
+}
+
+impl Shift<'_> {
+    /// The shift (input voxels along [`Shift::axis`]) of the reference voxel `r`.
+    pub fn at(&self, r: [f64; 3]) -> f64 {
+        f64::from(self.sigma * fieldmap_value(self.fmap, self.mask, r, self.dir))
+    }
+}
+
+/// The shift of matrix `a` (input mm → reference mm) for an input of `input_shape` and a
+/// reference of voxel sizes `ref_voxel`; `None` without a field map.
+pub fn field_shift<'a>(
+    src: &'a BbrSource,
+    a: &Mat4,
+    input_shape: [usize; 3],
+    ref_voxel: [f32; 3],
+) -> Option<Shift<'a>> {
+    let (fmap, mask) = src.fieldmap.as_ref().filter(|_| src.pedir != 0)?;
+    let ax = src.pedir.unsigned_abs() as usize - 1;
+    let n = input_shape[ax] as f32;
+    let mut sigma = src.echo_spacing * n / (2.0 * std::f32::consts::PI);
+    if src.pedir < 0 {
+        sigma = -sigma;
+    }
+    let s_ref_inv = mat::diagonal(ref_voxel.map(|d| 1.0 / f64::from(d)));
+    let mut e = [0.0, 0.0, 0.0, 1.0];
+    e[ax] = 1.0;
+    let d4 = mat::apply(&mat::mul(&s_ref_inv, a), e);
+    let norm = (d4[0] * d4[0] + d4[1] * d4[1] + d4[2] * d4[2] + d4[3] * d4[3]).sqrt();
+    Some(Shift {
+        fmap,
+        mask,
+        axis: ax,
+        sigma,
+        dir: [d4[0] / norm, d4[1] / norm, d4[2] / norm],
+    })
+}
+
 /// The boundary-based cost of `a` (reference mm → input mm through `a⁻¹`, §6.5).
 pub fn cost(pair: &Pair, a: &Mat4, log: &Log) -> f32 {
     let Some(src) = pair.bbr_source.as_ref() else {
@@ -196,34 +242,24 @@ pub fn cost(pair: &Pair, a: &Mat4, log: &Log) -> f32 {
         return f32::NAN;
     };
     let s_ref_inv = mat::diagonal(pair.reference.voxel_size.map(|d| 1.0 / f64::from(d)));
-    let fmap = src.fieldmap.as_ref().filter(|_| src.pedir != 0);
-    let (axis, sigma, dir) = match fmap {
-        Some(_) => {
-            let ax = src.pedir.unsigned_abs() as usize - 1;
-            let n = pair.input.shape[ax] as f32;
-            let mut s = src.echo_spacing * n / (2.0 * std::f32::consts::PI);
-            if src.pedir < 0 {
-                s = -s;
-            }
-            let mut e = [0.0, 0.0, 0.0, 1.0];
-            e[ax] = 1.0;
-            let d4 = mat::apply(&mat::mul(&s_ref_inv, a), e);
-            let norm = (d4[0] * d4[0] + d4[1] * d4[1] + d4[2] * d4[2] + d4[3] * d4[3]).sqrt();
-            (ax, s, [d4[0] / norm, d4[1] / norm, d4[2] / norm])
-        }
-        None => (0, 0.0, [0.0; 3]),
-    };
+    let shift = field_shift(src, a, pair.input.shape, pair.reference.voxel_size);
     let slope = f64::from(src.slope);
     let local = pts.kind == Kind::LocalAbs;
-    let step = pair.bbr_step().max(1);
+    let step = pair.bbr_step();
+    if step < 1 {
+        log.fatal(
+            "larmorx: setoption bbrstep below 1 with the boundary-based cost: FSL's loop over the boundary points never ends (FSL-71); refused",
+        );
+        return f32::NAN;
+    }
     let in_w = pair.in_weight.as_ref();
     let ref_w = pair.ref_weight.as_ref();
     let sample = |p: [f32; 3]| -> (f32, f32) {
         let v = [f64::from(p[0]), f64::from(p[1]), f64::from(p[2]), 1.0];
         let mut q = mat::apply(&t, v);
-        if let Some((fm, mask)) = fmap {
+        if let Some(sh) = &shift {
             let r = mat::apply(&s_ref_inv, v);
-            q[axis] += f64::from(sigma * fieldmap_value(fm, mask, [r[0], r[1], r[2]], dir));
+            q[sh.axis] += sh.at([r[0], r[1], r[2]]);
         }
         let qf = [q[0] as f32, q[1] as f32, q[2] as f32];
         let val = trilinear_zero(&pair.input, qf);

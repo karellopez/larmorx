@@ -143,6 +143,34 @@ pub fn blur_for_output(v: &Volume, r: f32, pad: f32) -> Volume {
     Volume::new(v.shape, v.voxel_size, data)
 }
 
+/// Trilinear interpolation by the extraslice rule (§9.2): a neighbour one voxel beyond an edge
+/// reads the edge voxel, a neighbour further out reads `pad`.
+pub fn trilinear_extraslice(vol: &Volume, p: [f32; 3], pad: f32) -> f32 {
+    let [nx, ny, nz] = vol.shape.map(|n| n as i64);
+    let f = p.map(floor);
+    let (ix, iy, iz) = (f[0] as i64, f[1] as i64, f[2] as i64);
+    let (fx, fy, fz) = (p[0] - f[0], p[1] - f[1], p[2] - f[2]);
+    let at = |x: i64, y: i64, z: i64| -> f32 {
+        let c = |v: i64, n: i64| -> Option<i64> {
+            if v >= 0 && v < n {
+                Some(v)
+            } else if v == -1 {
+                Some(0)
+            } else if v == n {
+                Some(n - 1)
+            } else {
+                None
+            }
+        };
+        match (c(x, nx), c(y, ny), c(z, nz)) {
+            (Some(a), Some(b), Some(cz)) => vol.data[(a + nx * (b + ny * cz)) as usize],
+            _ => pad,
+        }
+    };
+    let v = [0i64, 1].map(|c| [0i64, 1].map(|b| [0i64, 1].map(|a| at(ix + a, iy + b, iz + c))));
+    larmorx_mri::hmc::interp::blend(v, fx, fy, fz)
+}
+
 /// The voxel-to-voxel map of the output grid (§9.2): `D_in⁻¹ · M⁻¹ · D_out`, rounded to
 /// float32; `None` for a singular matrix.
 pub fn output_map(m: &Mat4, in_voxel: [f32; 3], out_voxel: [f32; 3]) -> Option<[[f32; 4]; 3]> {
@@ -190,7 +218,10 @@ pub fn resample(
                     if !pad_out {
                         let extended = (0..3).all(|k| p[k] >= -1.0 && p[k] <= n[k]);
                         let v = if !extended {
-                            r.pad
+                            match r.interp {
+                                Interp::Trilinear => trilinear_extraslice(src, p, r.pad),
+                                _ => r.pad,
+                            }
                         } else {
                             match r.interp {
                                 Interp::Trilinear => trilinear_extended(src, p[0], p[1], p[2]),
@@ -207,6 +238,50 @@ pub fn resample(
                         slab[x + nx * y] = v;
                     }
                     p = [p[0] + a[0][1], p[1] + a[1][1], p[2] + a[2][1]];
+                }
+            }
+        });
+    Some(data)
+}
+
+/// The input `src` resampled through the boundary-based cost's mapping with a field map
+/// (§6.5, §9.2): each output voxel `o` reads the input at `T·(D_out·o)` with `T = D_in⁻¹·M⁻¹`,
+/// shifted along the phase-encoding axis by `shift(o)`, by the extraslice rule.
+pub fn resample_shifted(
+    src: &Volume,
+    m: &Mat4,
+    shape: [usize; 3],
+    voxel: [f32; 3],
+    pad: f32,
+    shift: &(dyn Fn([f64; 3]) -> (usize, f64) + Sync),
+) -> Option<Vec<f32>> {
+    let inv = mat::inverse(m)?;
+    let din = mat::diagonal(src.voxel_size.map(|d| 1.0 / f64::from(d)));
+    let t = mat::mul(&din, &inv);
+    let [nx, ny, nz] = shape;
+    let n = src.shape.map(|v| v as f64);
+    let mut data = vec![pad; nx * ny * nz];
+    let plane = nx * ny;
+    data.par_chunks_mut(plane.max(1))
+        .enumerate()
+        .for_each(|(z, slab)| {
+            for y in 0..ny {
+                for x in 0..nx {
+                    let o = [x as f64, y as f64, z as f64];
+                    let pmm = [
+                        o[0] * f64::from(voxel[0]),
+                        o[1] * f64::from(voxel[1]),
+                        o[2] * f64::from(voxel[2]),
+                        1.0,
+                    ];
+                    let mut q = mat::apply(&t, pmm);
+                    let (axis, d) = shift(o);
+                    q[axis] += d;
+                    if (0..3).any(|k| q[k] < 0.0 || q[k] > n[k] - 1.0) {
+                        continue;
+                    }
+                    slab[x + nx * y] =
+                        trilinear_extraslice(src, [q[0] as f32, q[1] as f32, q[2] as f32], pad);
                 }
             }
         });

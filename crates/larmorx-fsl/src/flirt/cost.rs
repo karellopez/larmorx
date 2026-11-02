@@ -241,19 +241,16 @@ impl Pair {
             Cost::LeastSq => {
                 hcost::least_squares_weighted(&self.reference, &tv, &b, parallel, weight)
             }
-            Cost::CorrRatio => hcost::corr_ratio_weighted(
-                self.reference_bins(),
-                &tv,
-                &b,
-                self.bins,
-                parallel,
-                weight,
-            ),
+            Cost::CorrRatio => {
+                let m = self.bin_moments(&tv, &b, parallel, weight);
+                corr_ratio(&m)
+            }
             Cost::Woods => {
                 if weight.is_some() {
                     log.push("WARNING: Woods is not implemented with cost function weighting");
                 }
-                hcost::woods(self.reference_bins(), &tv, &b, self.bins, parallel)
+                let m = self.bin_moments(&tv, &b, parallel, None);
+                woods(&m)
             }
             Cost::MutualInfo | Cost::NormMi => hcost::mutual_info_weighted(
                 self.reference_bins(),
@@ -267,6 +264,31 @@ impl Pair {
             Cost::LabelDiff => self.labeldiff(&tv, &b, parallel, weight),
             Cost::Bbr => unreachable!(),
         }
+    }
+
+    /// The test values' moments in each reference bin (the histogram costs of §6.2).
+    fn bin_moments(
+        &self,
+        tv: &TestVolume<'_>,
+        b: &[[f32; 4]; 3],
+        parallel: bool,
+        weight: Option<PointWeight<'_>>,
+    ) -> BinMoments {
+        let bins = self.bins.max(1);
+        let grid = self.reference_bins();
+        let slices = hcost::sample_weighted(grid, tv, b, parallel, weight, || {
+            BinMoments::new(bins)
+        });
+        let mut out = BinMoments::new(bins);
+        for s in slices {
+            for k in 0..bins {
+                for j in 0..3 {
+                    out.w[k][j] += s.w[k][j];
+                    out.n[k][j] += s.n[k][j];
+                }
+            }
+        }
+        out
     }
 
     /// `labeldiff` (§6.3).
@@ -307,6 +329,82 @@ impl Pair {
             num / points as f32
         }
     }
+}
+
+/// The moments of the test values in each reference bin: weighted `[Σw, Σwy, Σwy²]` and
+/// unweighted `[n, Σy, Σy²]`, in double.
+struct BinMoments {
+    w: Vec<[f64; 3]>,
+    n: Vec<[f64; 3]>,
+}
+
+impl BinMoments {
+    fn new(bins: usize) -> BinMoments {
+        BinMoments {
+            w: vec![[0.0; 3]; bins],
+            n: vec![[0.0; 3]; bins],
+        }
+    }
+}
+
+impl Accumulator for BinMoments {
+    #[inline(always)]
+    fn point(&mut self, g: f32, v: f32, w: f32) {
+        let k = (g as usize).min(self.w.len() - 1);
+        let (w, v) = (f64::from(w), f64::from(v));
+        let s = &mut self.w[k];
+        s[0] += w;
+        s[1] += w * v;
+        s[2] += w * v * v;
+        let s = &mut self.n[k];
+        s[0] += 1.0;
+        s[1] += v;
+        s[2] += v * v;
+    }
+    fn end_row(&mut self) {}
+}
+
+/// The correlation ratio's cost (§6.2): `Σ_b n_b var_b / (n var)` over the bins with more than
+/// two (weighted) points, the variances with `n − 1`; 0 when the variance is not positive.
+fn corr_ratio(m: &BinMoments) -> f32 {
+    let (mut n, mut s, mut ss) = (0.0, 0.0, 0.0);
+    for st in &m.w {
+        n += st[0];
+        s += st[1];
+        ss += st[2];
+    }
+    if n <= 1.0 {
+        return 1.0;
+    }
+    let var = (ss - s * s / n) / (n - 1.0);
+    if var <= 0.0 {
+        return 0.0;
+    }
+    let within: f64 = m
+        .w
+        .iter()
+        .filter(|st| st[0] > 2.0)
+        .map(|st| st[0] * (st[2] - st[1] * st[1] / st[0]) / (st[0] - 1.0))
+        .sum();
+    (within / (n * var)) as f32
+}
+
+/// Woods' cost (§6.2).
+fn woods(m: &BinMoments) -> f32 {
+    let n: f64 = m.n.iter().map(|st| st[0]).sum();
+    if n <= 0.0 {
+        return 1e10;
+    }
+    let mut cost = 0.0;
+    for st in &m.n {
+        let nb = st[0];
+        if nb > 1.0 {
+            let mean = st[1] / nb;
+            let sd = ((st[2] - st[1] * st[1] / nb) / (nb - 1.0)).max(0.0).sqrt();
+            cost += nb * if mean > 0.0 { sd / mean } else { sd };
+        }
+    }
+    (cost / n) as f32
 }
 
 /// The mismatch sums of one slice of `labeldiff` (§6.3): `Σ w·mismatch` and `Σ w` per row,

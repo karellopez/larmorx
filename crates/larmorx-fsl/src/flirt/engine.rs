@@ -32,6 +32,9 @@ pub enum End {
     Exit(u8),
     /// FSL's exception (FSL-68): the message; exit status 1 by default, 0 with `reproduce`.
     Error(String),
+    /// A case whose result FSL leaves undefined (it crashes, never finishes, reads memory it
+    /// never set): refused in both modes with the message, exit status 1.
+    Refuse(String),
 }
 
 /// One row of a matrix variable (§7.1): a cost and a matrix.
@@ -277,6 +280,7 @@ impl State<'_> {
 
     fn check(&self) -> Result<(), End> {
         match self.log.fatal_error() {
+            Some(m) if m.starts_with("larmorx: ") => Err(End::Refuse(m)),
             Some(m) => Err(End::Error(m)),
             None => Ok(()),
         }
@@ -357,7 +361,7 @@ impl State<'_> {
 }
 
 fn refuse_name(m: &str) -> End {
-    End::Error(format!("{m}\nlarmorx: an undefined matrix name in the schedule: FSL reads an uninitialised list there; refused"))
+    End::Refuse(format!("{m}\nlarmorx: an undefined matrix name in the schedule: FSL reads an uninitialised list there; refused"))
 }
 
 /// The cost of the trial matrix `t` with `cost`; evaluations of large grids sample their
@@ -397,6 +401,10 @@ pub fn run(o: &Options, ctx: &Ctx<'_>, out: &mut dyn Write, err: &mut dyn Write)
     let code = match r {
         Ok(()) => 0,
         Err(End::Exit(c)) => c,
+        Err(End::Refuse(m)) => {
+            let _ = writeln!(err, "{m}");
+            1
+        }
         Err(End::Error(m)) => {
             let _ = writeln!(err, "{m}");
             let detail = match ctx.mode {
@@ -485,7 +493,8 @@ fn register(
     };
     let ref0 = prep(&reference.vols[0]);
     let in0 = prep(&input.vols[0]);
-    let b = base_scale(o, &triple(&reference.vols[0]), &triple(&input.vols[0]));
+    // from the headers, before the single-slice tripling (observed)
+    let b = base_scale(o, &reference.vols[0], &input.vols[0]);
     let ref0 = scaled(&ref0, b);
     let in0 = scaled(&in0, b);
     let read_weight = |name: &Option<String>, like: &Volume, notices: &mut Vec<Notice>| -> Result<Option<Volume>, End> {
@@ -527,7 +536,7 @@ fn register(
     }
     if let Some(n) = &o.fieldmap {
         if o.pedir == 0 {
-            return Err(End::Error("larmorx: -fieldmap needs -pedir (FSL's result is undefined without it): refused".into()));
+            return Err(End::Refuse("larmorx: -fieldmap needs -pedir (FSL's result is undefined without it): refused".into()));
         }
         let f = read(ctx, n, false, notices)?;
         let fm = scaled(&triple(&f.vols[0]), b);
@@ -579,6 +588,30 @@ fn register(
         let (l8, w8) = if s < 7.9 { halve(&l4, &w4, notices) } else { (l4.clone(), w4.clone()) };
         ([l1, l2, l4, l8], [w1, w2, w4, w8])
     };
+    if o.debug {
+        // §9.4: the pyramid's levels (development: the volumes, single precision)
+        for (name, v) in [
+            ("refvol_8", &levels[3]),
+            ("refvol_4", &levels[2]),
+            ("refvol_2", &levels[1]),
+            ("refvol", &levels[0]),
+        ] {
+            let shape = v.shape;
+            let mut h = reference.input.header.clone();
+            h.pixdim[1] = f64::from(v.voxel_size[0]);
+            h.pixdim[2] = f64::from(v.voxel_size[1]);
+            h.pixdim[3] = f64::from(v.voxel_size[2]);
+            h.sform_code = 0;
+            h.qform_code = 0;
+            let like = Input {
+                vol: crate::bet::Vol::new(shape, v.voxel_size.map(f64::from), v.data.clone()),
+                header: h,
+                flipped: reference.input.flipped,
+                volumes: 1,
+            };
+            write_image(ctx, name, &like, shape, 1, None, v.data.clone(), DataType::F32, err, notices)?;
+        }
+    }
     let init = scale_in(&init_unscaled, b);
     let qs = scale_in(&q_unscaled, b);
     let (maxdof, dof_msg) = optimise::clamp_dof(i64::from(o.dof));
@@ -637,6 +670,9 @@ fn register(
     } else {
         text.lines().collect()
     };
+    // the first pair: the 8 mm level and the input blurred to 8 mm (§5), before any setscale
+    set_scale(&mut st, 8.0, true)?;
+    st.flush(err);
     let mut skip = false;
     for line in lines {
         if o.verbose >= 1 {
@@ -1085,7 +1121,7 @@ fn read_rows(settings: &Settings, name: &str, width: usize) -> Result<Vec<Vec<f6
         match w.parse::<f64>() {
             Ok(v) => vals.push(v),
             Err(_) => {
-                return Err(End::Error(format!(
+                return Err(End::Refuse(format!(
                     "larmorx: {name} holds a word that is not a number ({w}): FSL reads such a file for ever (FSL-72); refused"
                 )));
             }
@@ -1149,7 +1185,7 @@ fn set_option(st: &mut State<'_>, w: &[String], err: &mut dyn Write) -> Result<(
                 })
                 .collect();
             st.subset = Some(Subset::new(&cols).ok_or_else(|| {
-                End::Error("larmorx: a parameter subset with a value that is not a number: FSL's decomposition fails; refused".into())
+                End::Refuse("larmorx: a parameter subset with a value that is not a number: FSL's decomposition fails; refused".into())
             })?);
         }
         "minsampling" => st.min_sampling = vals[0] as f32,
@@ -1188,16 +1224,13 @@ fn set_scale(st: &mut State<'_>, s: f32, force: bool) -> Result<(), End> {
     let input = st.input0.clone();
     let inw = st.in_weight0.clone();
     if force || o.force_scaling || st.min_sampling <= 1.25 * s {
-        let (inp, w) = if o.no_resample {
-            (input, inw)
-        } else {
-            match &inw {
-                Some(wt) => {
-                    let (a, b) = pyramid::weighted(&input, wt, &|v: &Volume| pyramid::blur(v, s));
-                    (a, Some(b))
-                }
-                None => (pyramid::blur(&input, s), None),
+        // the input blurred to the scale (also with -noresample, observed)
+        let (inp, w) = match &inw {
+            Some(wt) => {
+                let (a, b) = pyramid::weighted(&input, wt, &|v: &Volume| pyramid::blur(v, s));
+                (a, Some(b))
             }
+            None => (pyramid::blur(&input, s), None),
         };
         let level = [(1.0f32, 0usize), (2.0, 1), (4.0, 2), (8.0, 3)]
             .iter()
@@ -1222,12 +1255,15 @@ fn set_scale(st: &mut State<'_>, s: f32, force: bool) -> Result<(), End> {
         };
         let bins = (st.o.bins as f32 / s) as i32;
         if bins < 1 && (st.cost.histogram() || st.search_cost.histogram() || bins < 0) {
-            return Err(End::Error(format!(
+            return Err(End::Refuse(format!(
                 "larmorx: -bins {} gives {bins} bins at the {s} mm scale, which no histogram can have (FSL-21, FSL-66: FSL's result is undefined, it aborts or crashes); refused",
                 st.o.bins
             )));
         }
         let skip = st.ctx.mode.fix() && (inp.has_non_finite() || refl.has_non_finite());
+        if cog_total(&inp) < 1e-5 {
+            st.log.push("WARNING::in calculating COG, total = 0.0");
+        }
         let mut pair = Pair::new(
             refl,
             refw,
@@ -1269,6 +1305,12 @@ fn set_scale(st: &mut State<'_>, s: f32, force: bool) -> Result<(), End> {
     Ok(())
 }
 
+/// The total of a centre of mass (`Σ (v − v_min)`, §6.1).
+fn cog_total(v: &Volume) -> f64 {
+    let m = v.min();
+    v.data.iter().map(|&x| f64::from(x - m)).sum()
+}
+
 fn clone_pair(p: &Pair) -> Pair {
     Pair::new(
         p.reference.clone(),
@@ -1286,7 +1328,7 @@ fn clone_pair(p: &Pair) -> Pair {
 
 fn check_bbr_step(st: &State<'_>, cost: Cost) -> Result<(), End> {
     if cost == Cost::Bbr && st.bbr_step < 1 {
-        return Err(End::Error(format!(
+        return Err(End::Refuse(format!(
             "larmorx: setoption bbrstep {} with the boundary-based cost: FSL's loop over the boundary points never ends (FSL-71); refused",
             st.bbr_step
         )));
@@ -1418,6 +1460,12 @@ fn write_image(
         return Err(End::Exit(1));
     };
     let mut template = reference.header.clone();
+    // FSL's image layer writes the sform's negative zeros as zeros (observed)
+    for row in [&mut template.srow_x, &mut template.srow_y, &mut template.srow_z] {
+        for v in row.iter_mut() {
+            *v += 0.0;
+        }
+    }
     if let Some(tr) = tr {
         template.pixdim[4] = tr;
     }
@@ -1456,6 +1504,15 @@ fn write_image(
             for x in n {
                 defects::push_once(notices, x);
             }
+            // FLIRT's pair headers carry NIfTI's four extension bytes (observed: 352 bytes)
+            if name.ends_with(".hdr") {
+                if let Ok(mut bytes) = std::fs::read(&name) {
+                    if bytes.len() == 348 {
+                        bytes.extend_from_slice(&[0, 0, 0, 0]);
+                        let _ = std::fs::write(&name, bytes);
+                    }
+                }
+            }
             Ok(())
         }
         Err(e) => Err(End::Error(format!("{name}: {e}"))),
@@ -1471,7 +1528,7 @@ fn pad_value(v: &Volume, ctx: &Ctx<'_>, notices: &mut Vec<Notice>) -> Result<f32
             }
             Ok(b.value)
         }
-        None => Err(End::Error(format!(
+        None => Err(End::Refuse(format!(
             "larmorx: the input is {} x {} x {} voxels: its background value (the 10th percentile of its border) has no border to read (FSL reads an empty buffer, FSL-75); refused",
             v.shape[0], v.shape[1], v.shape[2]
         ))),
@@ -1492,7 +1549,32 @@ fn write_registered(
 ) -> Result<(), End> {
     let src = &input.vols[0];
     let refv = &reference.vols[0];
-    let values = resample_one(o, ctx, src, refv, m, None, notices)?;
+    let values = match (&o.fieldmap, o.pedir) {
+        (Some(fname), d) if d != 0 => {
+            // the boundary-based mapping with the field map (§6.5), from unscaled images
+            let f = read(ctx, fname, false, notices)?;
+            let fm = triple(&f.vols[0]);
+            let mask = match &o.fieldmap_mask {
+                Some(mn) => triple(&read(ctx, mn, false, notices)?.vols[0]),
+                None => Volume::new(fm.shape, fm.voxel_size, fm.data.iter().map(|&v| 0.0 * v + 1.0).collect()),
+            };
+            let srcb = BbrSource {
+                fieldmap: Some((fm, mask)),
+                pedir: o.pedir,
+                echo_spacing: o.echo_spacing,
+                ..BbrSource::default()
+            };
+            let sh = super::bbr::field_shift(&srcb, m, src.shape, refv.voxel_size)
+                .ok_or_else(|| End::Error("the field map could not be used".into()))?;
+            let pad = match o.background {
+                Some(b) => b,
+                None => pad_value(src, ctx, notices)?,
+            };
+            output::resample_shifted(src, m, refv.shape, refv.voxel_size, pad, &|r| (sh.axis, sh.at(r)))
+                .ok_or_else(|| End::Error(mat::SINGULAR.into()))?
+        }
+        _ => resample_one(o, ctx, src, refv, m, None, notices)?,
+    };
     let (stored, scaled) = stored_type(&input.input.header);
     let t = output_type(o, stored, scaled, &values, ctx.mode);
     write_image(ctx, stem, &reference.input, refv.shape, 1, None, values, t, err, notices)

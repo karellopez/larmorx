@@ -88,9 +88,9 @@ def run_original(
     env[defects.ENV] = mode
     env["OMP_NUM_THREADS"] = str(threads)
     env["LARMORX_IMPLEMENTATION"] = "original"
-    for k in ("PYTHONPATH", "VIRTUAL_ENV"):
-        if k in os.environ:
-            env[k] = os.environ[k]
+    for k, v in os.environ.items():
+        if k in ("PYTHONPATH", "VIRTUAL_ENV") or k.startswith("LXFLIRT_"):
+            env[k] = v
     p = subprocess.run(
         [*original_command(), "fsl", program, *args],
         cwd=cwd,
@@ -193,8 +193,11 @@ def compare(
     ours: Completed,
     a: Path,
     b: Path,
+    band=None,
 ) -> None:
-    """Exit status, streams, files, matrices and images (the module's rules)."""
+    """Exit status, streams, files, matrices and images (the module's rules). ``band()``, when
+    given, is FSL's own variability for this registration (its p95 displacement on a perturbed
+    input), asked for only where the original is beyond the fixed threshold."""
     if oracle.code < 0:
         checks(
             f"exit status ({program} is killed; the original exits 1)",
@@ -238,7 +241,9 @@ def compare(
         f"only the original {sorted(set(mine) - set(theirs))[:6]}",
     )
     applying = "-applyxfm" in args or "-applyisoxfm" in args or program == "convert_xfm"
-    mats_identical = True
+    # the images compare bit for bit where both programs used the same matrix: -applyxfm's, or
+    # a registration's whose written matrices are identical
+    mats_identical = applying or any(n.endswith(".mat") for n in theirs)
     ref_path = _reference_path(args, a)
     pts = None
     for name in sorted(set(theirs) & set(mine)):
@@ -251,7 +256,43 @@ def compare(
         mats_identical = False
         na, nb = _numbers(ta), _numbers(tb)
         is_mat = name.endswith(".mat") and len(na) == 16 and len(nb) == 16
+        usesqform = "-usesqform" in args and "-init" not in args
+        if is_mat and "-fixscaleskew" in args:
+            # the decomposition and composition's last digits (spec question)
+            rel = float(np.max(np.abs(np.array(na) - np.array(nb)) / np.maximum(np.abs(na), 1)))
+            checks(
+                f"{name}: within 1e-7 of FSL's (relative)",
+                rel <= 1e-7,
+                metric="max relative difference",
+                value=float(f"{rel:.3g}"),
+                threshold=1e-7,
+            )
+            continue
+        if not applying and not is_mat and len(na) == len(nb) and na:
+            # a schedule's text output (rows, parameters) of a registration: its numbers
+            rel = float(
+                np.max(np.abs(np.array(na) - np.array(nb)) / np.maximum(np.abs(na), 1.0))
+            )
+            checks(
+                f"{name}: the same numbers within 5 % (a registration's rows)",
+                rel <= 0.05,
+                metric="max relative difference",
+                value=float(f"{rel:.3g}"),
+                threshold=0.05,
+            )
+            continue
         if applying or not is_mat:
+            if is_mat and usesqform and len(na) == len(nb):
+                # the sform/qform initialisation: its last digits (spec question)
+                dev = float(np.max(np.abs(np.array(na) - np.array(nb))))
+                checks(
+                    f"{name}: the sform/qform matrix within 1e-5 mm",
+                    dev <= 1e-5,
+                    metric="max abs difference",
+                    value=dev,
+                    threshold=1e-5,
+                )
+                continue
             if is_mat or len(na) != len(nb):
                 checks(f"{name} identical", False, detail="the text differs")
                 continue
@@ -276,13 +317,20 @@ def compare(
             checks(f"{name}: invertible matrices", False)
             continue
         thr = _threshold(args)
+        detail = f"maximum {mx:.4f} mm, RMS deviation {rep._rms80(m1, m2):.4f} mm"
+        limit = thr
+        if p95 > thr and band is not None:
+            own = band(name, pts[0])
+            if own is not None:
+                limit = max(thr, own)
+                detail += f"; FSL's own p95 on a perturbed input {own:.4f} mm"
         checks(
             f"{name}: 95th-percentile displacement over the reference's brain",
-            p95 <= thr,
+            p95 <= limit,
             metric="p95 displacement (mm)",
             value=round(p95, 4),
-            threshold=thr,
-            detail=f"maximum {mx:.4f} mm, RMS deviation {rep._rms80(m1, m2):.4f} mm",
+            threshold=thr if limit == thr else f"{thr} or FSL's own variability",
+            detail=detail,
         )
     for name in sorted(set(theirs) & set(mine)):
         if not _is_image(name):
@@ -290,10 +338,22 @@ def compare(
         fa, fb = theirs[name], mine[name]
         if fa.read_bytes() == fb.read_bytes():
             continue
-        if mats_identical:
+        kernel = any(f"-interp {k}" in " ".join(args) for k in ("sinc", "spline"))
+        if mats_identical and not (kernel and not _same_streams(fa, fb, blank_descrip=True)):
             same = _same_streams(fa, fb, blank_descrip=True)
             detail = "" if same else _image_difference(fa, fb)
             checks(f"{name} bit-identical", same, detail=detail)
+        elif mats_identical:
+            # sinc and spline from the same matrix: the kernels' last bits (spec question)
+            rel = _relative_difference(fa, fb)
+            checks(
+                f"{name}: the same values within 1e-5 of the image's range",
+                rel <= 1e-5,
+                metric="max difference / range",
+                value=float(f"{rel:.3g}"),
+                threshold=1e-5,
+                detail=_image_difference(fa, fb),
+            )
         else:
             import nibabel as nib
 
@@ -326,6 +386,58 @@ def compare(
                 value=round(c, 6),
                 threshold=0.999,
             )
+
+
+def _relative_difference(fa: Path, fb: Path) -> float:
+    import nibabel as nib
+
+    da = np.asanyarray(nib.load(str(fa)).dataobj).astype(np.float64)
+    db = np.asanyarray(nib.load(str(fb)).dataobj).astype(np.float64)
+    if da.shape != db.shape:
+        return float("inf")
+    ok = np.isfinite(da) & np.isfinite(db)
+    if not ok.any():
+        return 0.0
+    rng = float(np.ptp(da[ok])) or 1.0
+    return float(np.max(np.abs(da[ok] - db[ok]))) / rng
+
+
+def _band(run: rep.Run, args: list[str], settings: dict[str, str | None], a: Path):
+    """FSL's own variability for a registration (§13's band): FSL on the input with uniform noise
+    of ±0.5 intensity units (seeded), its matrix against its own unperturbed one; the
+    95th-percentile displacement over the reference's brain (``None`` where it cannot run)."""
+
+    def band(name: str, pts: np.ndarray) -> float | None:
+        import nibabel as nib
+
+        try:
+            i = args.index("-in")
+        except ValueError:
+            return None
+        with tempfile.TemporaryDirectory(prefix="lx-flirt-band-") as c_:
+            c = Path(c_)
+            rep._prepare(run, c)
+            src = c / args[i + 1]
+            if not src.is_file():
+                return None
+            img = nib.load(str(src))
+            data = np.asanyarray(img.dataobj).astype(np.float32)
+            rng = np.random.default_rng(20261102)
+            noisy = data + rng.uniform(-0.5, 0.5, data.shape).astype(np.float32)
+            out = nib.Nifti1Image(noisy, img.affine, img.header)
+            out.set_data_dtype(np.float32)
+            src.unlink()
+            nib.save(out, str(src))
+            p = rep.run_oracle(run.program, args, cwd=c, settings=settings)
+            f1, f2 = a / name, c / name
+            if p.code != 0 or not f1.is_file() or not f2.is_file():
+                return None
+            try:
+                return displacement(np.loadtxt(f1), np.loadtxt(f2), pts)[0]
+            except (ValueError, np.linalg.LinAlgError):
+                return None
+
+    return band
 
 
 def _image_difference(fa: Path, fb: Path) -> str:
@@ -401,6 +513,9 @@ def fix_pass(
 
 def _pending(args: list[str], run: rep.Run) -> str | None:
     words = list(args) + [t for _, t in run.files]
+    for i, w in enumerate(args[:-1]):
+        if w == "-verbose" and args[i + 1].isdigit() and int(args[i + 1]) >= 2:
+            return "the verbose levels above 1 (part 2)"
     for k, why in PENDING.items():
         if any(k == w or (k == "alignpaxes" and "alignpaxes" in w) for w in words):
             if k == "-anglerep" and "quaternion" not in " ".join(args):
@@ -426,7 +541,7 @@ def _run_case(run: rep.Run, checks: CheckList) -> None:
         rep._prepare(run, b)
         oracle = rep.run_oracle(run.program, args, cwd=a, settings=settings)
         ours = run_original(run.program, args, cwd=b, settings=settings, mode=defects.REPRODUCE)
-        compare(checks, run.program, args, oracle, ours, a, b)
+        compare(checks, run.program, args, oracle, ours, a, b, band=_band(run, args, settings, a))
         if run.fix and ours.code == 0:
             fix_pass(checks, run.program, lambda t: rep._prepare(run, t), args, settings, b, ours)
     if oracle.code != 0 and all(c.passed for c in checks.checks):

@@ -14,7 +14,7 @@ search
 setscale 4
 setoption smoothing 4
 clear U
-clear UA
+clear UA\x20
 clear UB
 clear US
 clear UP
@@ -99,7 +99,7 @@ setoption paramsubset 3  0 0 1 0 0 0 0 0 0 0 0 0  0 0 0 1 0 0 0 0 0 0 0 0  0 0 0
 clear U
 clear UA
 setrow UA 1 0 0 0  0 1 0 0  0 0 1 0  0 0 0 1
-optimise 12 UA:1  0.0   0.0   0.0   0.0   0.0   0.0   0.0  rel 4
+optimise 12 UA:1  0.0   0.0   0.0   0.0   0.0   0.0   0.0  rel 4\x20
 
 # 4mm scale
 setscale 4

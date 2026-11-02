@@ -1311,7 +1311,12 @@ def suite() -> Suite:
             "The cases are the replica suite's (`fsl-flirt-replica`) for `flirt`, "
             "`convert_xfm` and FLIRT's other programs; FSL's runs are served from the oracle cache under that suite's keys. "
             "The original is compared in `reproduce` mode (D13) and its default `fix` pass "
-            "against the reproduced run. Cases of options the original has not yet "
-            "(`-debug`, `-debugsave`, the verbose levels above 1: part 2) are skipped."
+            "against the reproduced run. The original's own cases (`verbose/` and `debug/` "
+            "beyond the replica's: part 2) cover the verbose levels' and -debug's code paths; at "
+            "a verbose level of 5 or more the streams are compared with each run of cost "
+            "evaluation lines as one (the evaluations follow the optimisation's path). "
+            "-debug's volumes before the registration (the pyramid, its weights, the input at "
+            "8 mm) are held to FSL's header and values within 1e-6 of their range, "
+            "-debugsave's search grids to FSL's header and a correlation of 0.999."
         ),
     )

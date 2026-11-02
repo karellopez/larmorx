@@ -192,6 +192,9 @@ pub struct Settings {
     /// (the run's level, lowered by 2 inside the search).
     pub trace: Option<Arc<Trace>>,
     pub level: i32,
+    /// The reference parameters a subset's tolerances are computed with (§8.1 step 2: the
+    /// search's, once for all its optimisations); `None`: the optimisation's own `x₀`.
+    pub tol_x0: Option<Params>,
 }
 
 /// Which optimisation a run makes (their verbose lines differ, observed).
@@ -218,6 +221,7 @@ impl Default for Settings {
             log: None,
             trace: None,
             level: 0,
+            tol_x0: None,
         }
     }
 }
@@ -297,29 +301,33 @@ fn minimise(
     let mut dirs: Vec<Vec<f64>> = (0..n)
         .map(|i| (0..n).map(|j| if i == j { 1.0 } else { 0.0 }).collect())
         .collect();
-    let dir_tol = |d: &[f64]| -> f32 {
-        // a unit direction keeps its parameter's tolerance; any other the step of one tolerance
-        // unit along it
-        if let Some(k) = (0..n).find(|&k| d[k] == 1.0 && (0..n).all(|j| j == k || d[j] == 0.0)) {
-            return tol[k];
+    // a direction's unit vector and tolerance unit (§8.2): `û = d/√(d·d)`, `τ = Σ |û_i/t_i|`
+    // in single precision over the tolerances above 1e-15, `u = |1/τ|` (single): along an axis
+    // `fl(1/fl(1/t))`
+    let unit = |d: &[f64]| -> (Vec<f64>, f32) {
+        let ss: f64 = d.iter().map(|x| x * x).sum();
+        let norm = ss.sqrt();
+        let u: Vec<f64> = d.iter().map(|x| x / norm).collect();
+        let mut tau = 0.0f32;
+        for (ui, &t) in u.iter().zip(tol) {
+            if f64::from(t).abs() > 1e-15 {
+                tau = (f64::from(tau) + (ui / f64::from(t)).abs()) as f32;
+            }
         }
-        let ss: f64 = d
-            .iter()
-            .zip(tol)
-            .map(|(x, &t)| {
-                if t.abs() > 1e-15 {
-                    (x / f64::from(t)).powi(2)
-                } else {
-                    0.0
-                }
-            })
-            .sum();
-        if ss > 0.0 {
-            (1.0 / ss.sqrt()) as f32
-        } else {
-            1.0
-        }
+        (u, (1.0f32 / tau).abs())
     };
+    // the convergence test's weights `|1/t_i|/n_t` (0 for a tolerance of at most 1e-15)
+    let weights: Vec<f64> = tol
+        .iter()
+        .map(|&t| {
+            let t = f64::from(t);
+            if t.abs() <= 1e-15 {
+                0.0
+            } else {
+                (1.0 / t).abs() / n_tol as f64
+            }
+        })
+        .collect();
     let mut v = v0;
     let mut best = 0.0f32;
     for sweep in 0..maxit {
@@ -334,27 +342,24 @@ fn minimise(
             if best == 0.0 {
                 best = cost(&v);
             }
-            let (moved, y) = along(cost, &v, d, best, dir_tol(d), guess);
+            let (ud, u) = unit(d);
+            let (moved, y) = along(cost, &v, &ud, best, u, guess);
             deltas.push(y - best);
             v = moved;
             best = y;
         }
-        // convergence: Σ |(x_start − x_end)/t| / n_tol below 1 (two interleaved accumulators)
+        // convergence: Σ |(x_start − x_end)·w_i| (two interleaved accumulators, then added),
+        // rounded to single, below 1
         let (mut even, mut odd) = (0.0f64, 0.0f64);
         for i in 0..n {
-            let t = f64::from(tol[i]);
-            let term = if t.abs() <= 1e-15 {
-                0.0
-            } else {
-                ((start[i] - v[i]) / t).abs()
-            };
+            let term = ((start[i] - v[i]) * weights[i]).abs();
             if i % 2 == 0 {
                 even += term;
             } else {
                 odd += term;
             }
         }
-        if (even + odd) / (n_tol as f64) < 1.0 {
+        if ((even + odd) as f32) < 1.0 {
             break;
         }
         if s.powell {
@@ -382,7 +387,8 @@ fn minimise(
                         t.num(f64::from(fe))
                     ));
                 }
-                let (moved, y) = along(cost, &v, &diff, best, dir_tol(&diff), guess);
+                let (ud, u) = unit(&diff);
+                let (moved, y) = along(cost, &v, &ud, best, u, guess);
                 v = moved;
                 best = y;
                 dirs[m] = diff;
@@ -489,13 +495,17 @@ pub fn optimise_params(
             };
             let mut tplus = [0.0; 12];
             let mut zero = [0.0; 12];
+            let tx0 = s.tol_x0.unwrap_or(x0d);
             for i in 0..12 {
-                tplus[i] = (f64::from(tol[i]) + x0d[i]) - x0d[i];
+                tplus[i] = (f64::from(tol[i]) + tx0[i]) - tx0[i];
                 // x0 - x0 as the spec writes it: 0, or NaN for a parameter that is not finite
-                zero[i] = if x0d[i].is_finite() { 0.0 } else { f64::NAN };
+                zero[i] = if tx0[i].is_finite() { 0.0 } else { f64::NAN };
             }
             let a = p.reduce(&tplus);
             let b = p.reduce(&zero);
+            // the start y = pinv(P)·(x_start − x₀) = 0 (x_start = x₀)
+            let zero: [f64; 12] =
+                std::array::from_fn(|i| if x0d[i].is_finite() { 0.0 } else { f64::NAN });
             let ty: Vec<f32> = a.iter().zip(&b).map(|(x, y)| (x - y) as f32).collect();
             let y0 = p.reduce(&zero);
             let tys = |t: &Trace| t.nums(ty.iter().map(|&v| f64::from(v)));

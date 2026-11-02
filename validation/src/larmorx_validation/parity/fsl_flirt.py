@@ -993,13 +993,23 @@ def _run_case(run: rep.Run, checks: CheckList) -> None:
 def _undefined_case(run: rep.Run, checks: CheckList) -> None:
     """FSL never finishes or crashes (the register entry): FSL is not run again here (the
     replica suite measures it, never cached); the original refuses in both modes (or, where
-    FSL-75's result is defined, finishes naming it)."""
+    FSL-75's result is defined, finishes naming it; with ``hang_fixed``, FSL-93, its default
+    corrects the entry and finishes naming it, and only ``reproduce`` refuses)."""
     settings = dict(run.settings)
     entry = run.hang or run.crash
     for mode in (defects.REPRODUCE, defects.FIX):
         with tempfile.TemporaryDirectory(prefix="lx-flirt-") as b_:
             b = Path(b_)
             r = run_original(run.program, rep._prepare(run, b), cwd=b, settings=settings, mode=mode)
+            if run.hang_fixed and mode == defects.FIX:
+                # the default corrects the entry: it finishes, naming it (FSL-93)
+                named = defects.notices_in(r.stderr)
+                checks(
+                    f"the original's default finishes and names {entry}",
+                    r.code == 0 and entry in named and bool(list(b.glob("out*"))),
+                    detail=f"exit {r.code}: {', '.join(named) or 'nothing named'}",
+                )
+                continue
             if run.crash_finishes:
                 named = defects.notices_in(r.stderr)
                 checks(
@@ -1018,7 +1028,13 @@ def _undefined_case(run: rep.Run, checks: CheckList) -> None:
             EXPECTED,
             f"FSL {'never finishes' if run.hang else 'crashes'} ({entry}: undefined behaviour); "
             "the original "
-            + ("finishes naming it" if run.crash_finishes else "refuses in both modes"),
+            + (
+                "finishes naming it"
+                if run.crash_finishes
+                else "corrects it by default and refuses with reproduce"
+                if run.hang_fixed
+                else "refuses in both modes"
+            ),
         )
 
 

@@ -7,7 +7,9 @@
 //! and the results are collected in grid order, so the search gives the same matrices at any
 //! thread count.
 
-use larmorx_mri::hmc::rigid::{self, Params};
+use larmorx_mri::hmc::interp::trilinear_zero;
+use larmorx_mri::hmc::rigid::Params;
+use larmorx_mri::hmc::volume::Volume;
 use rayon::prelude::*;
 
 use super::mat::{self, IDENTITY, Mat4};
@@ -54,6 +56,11 @@ pub struct Found {
     pub scales: Vec<f64>,
     pub fine_shape: [usize; 3],
     pub costs: Vec<f32>,
+    /// The reference parameters the search leaves in force (the last subset optimisation's
+    /// `x₀`: the last threshold point's interpolated parameters).
+    pub last_x0: Params,
+    /// With `-anglerep quaternion`, a starting point had a rotation (FSL-90 applies).
+    pub quaternion_starts: bool,
 }
 
 /// The rotation samplings' lines (`Coarse rotation samplings are:` and the fine ones), which
@@ -78,7 +85,10 @@ pub fn samplings_text(t: &Trace, r: &Ranges) -> String {
 /// coarse grid optimises the common scale and its fine grid keeps the median scale), `free_dof`
 /// those of the minima's free optimisations (`-dof` applies there). `eval` is the search cost of a trial
 /// matrix; `centre` the parameters' centre; `ref_params` the reference parameters (the
-/// centres of mass aligned); `min_voxel` the reference level's smallest voxel size. Its verbose
+/// centres of mass aligned); `tol_x0` the reference parameters in force when the search starts
+/// (its subsets' tolerances, step 2); with `fsl90` (FSL-90 reproduced) and `-anglerep
+/// quaternion` the starting points' Euler angles are composed as a quaternion's vector part;
+/// `min_voxel` the reference level's smallest voxel size. Its verbose
 /// lines go to `settings.trace` at `settings.level` (the run's level lowered by 2); where they
 /// interleave with the optimisations' lines (a level of 4 or more) the grids run in order.
 #[allow(clippy::too_many_arguments)]
@@ -90,9 +100,12 @@ pub fn search(
     free_dof: usize,
     r: &Ranges,
     settings: &Settings,
+    tol_x0: Params,
+    fsl90: bool,
     min_voxel: f32,
     n_threads_parallel: bool,
 ) -> Result<Found, String> {
+    let user = settings;
     let coarse: Vec<Vec<f32>> = (0..3).map(|k| samples(r.ranges[k], r.coarse)).collect();
     let fine: Vec<Vec<f32>> = (0..3).map(|k| samples(r.ranges[k], r.fine)).collect();
     // the subset: a common scale and three translations (dof > 6), else the translations
@@ -113,6 +126,7 @@ pub fn search(
     // the search's parameters are Euler angles whatever -anglerep says (§3)
     let euler = Settings {
         rep: super::param::AngleRep::Euler,
+        tol_x0: Some(tol_x0),
         ..settings.clone()
     };
     let settings = &euler;
@@ -184,12 +198,17 @@ pub fn search(
     if let Some(t) = at(2) {
         t.write("\n");
     }
-    let mut trans: Vec<[f64; 3]> = coarse_out.iter().map(|(p, _)| [p[3], p[4], p[5]]).collect();
-    let mut scales: Vec<f64> = coarse_out.iter().map(|(p, _)| p[6]).collect();
+    // the grid holds the results in single precision (step 4)
+    let single = |v: f64| f64::from(v as f32);
+    let mut trans: Vec<[f64; 3]> = coarse_out
+        .iter()
+        .map(|(p, _)| [single(p[3]), single(p[4]), single(p[5])])
+        .collect();
+    let mut scales: Vec<f64> = coarse_out.iter().map(|(p, _)| single(p[6])).collect();
     // 5. the scales replaced by their median
     let mut sorted = scales.clone();
     sorted.sort_by(|a, b| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal));
-    let median = sorted[(0.5 * sorted.len() as f64) as usize];
+    let median = sorted[(sorted.len() as f32 * 0.5f32) as usize];
     scales.fill(median);
     let _ = &mut trans;
     if let Some(t) = at(2) {
@@ -202,33 +221,24 @@ pub fn search(
         (cy as f32 - 1.0) / ((fy as f32 - 1.0).max(1.0)),
         (cz as f32 - 1.0) / ((fz as f32 - 1.0).max(1.0)),
     ];
-    let coarse_at = |a: i64, b: i64, c: i64, k: usize| -> f64 {
-        if a < 0 || b < 0 || c < 0 || a >= cx as i64 || b >= cy as i64 || c >= cz as i64 {
-            return 0.0;
-        }
-        let i = a as usize * cy * cz + b as usize * cz + c as usize;
-        if k < 3 { trans[i][k] } else { scales[i] }
-    };
-    let interp = |pos: [f32; 3], k: usize| -> f64 {
-        let fl = pos.map(|v| v.floor());
-        let (ia, ib, ic) = (fl[0] as i64, fl[1] as i64, fl[2] as i64);
-        let (da, db, dc) = (
-            f64::from(pos[0] - fl[0]),
-            f64::from(pos[1] - fl[1]),
-            f64::from(pos[2] - fl[2]),
-        );
-        let mut s = 0.0;
-        for (oa, wa) in [(0, 1.0 - da), (1, da)] {
-            for (ob, wb) in [(0, 1.0 - db), (1, db)] {
-                for (oc, wc) in [(0, 1.0 - dc), (1, dc)] {
-                    let w = wa * wb * wc;
-                    if w != 0.0 {
-                        s += w * coarse_at(ia + oa, ib + ob, ic + oc, k);
-                    }
+    // the coarse grid's four volumes (x the first angle), single precision, interpolated as
+    // §6.2's trilinear rule with zeros outside the grid
+    let grid = |k: usize| -> Volume {
+        let mut data = vec![0.0f32; cx * cy * cz];
+        for a in 0..cx {
+            for b in 0..cy {
+                for c in 0..cz {
+                    let i = a * cy * cz + b * cz + c;
+                    data[a + cx * (b + cy * c)] =
+                        if k < 3 { trans[i][k] } else { scales[i] } as f32;
                 }
             }
         }
-        s
+        Volume::new([cx, cy, cz], [1.0; 3], data)
+    };
+    let grids: Vec<Volume> = (0..4).map(grid).collect();
+    let interp = |pos: [f32; 3], k: usize| -> f64 {
+        f64::from(trilinear_zero(&grids[k], pos[0], pos[1], pos[2]))
     };
     let nfine = fx * fy * fz;
     let fine_params: Vec<Params> = (0..nfine)
@@ -250,7 +260,7 @@ pub fn search(
     let mut costs: Vec<f32> = if n_threads_parallel {
         let c: Vec<f32> = fine_params
             .par_iter()
-            .map(|p| eval(&rigid::compose(p, 12, centre)))
+            .map(|p| eval(&super::param::euler_compose(p, 12, centre)))
             .collect();
         stars(nfine, fz);
         c
@@ -259,7 +269,7 @@ pub fn search(
             .iter()
             .enumerate()
             .map(|(i, p)| {
-                let c = eval(&rigid::compose(p, 12, centre));
+                let c = eval(&super::param::euler_compose(p, 12, centre));
                 if let Some(t) = at(5) {
                     t.evaluation(c, p);
                 }
@@ -281,7 +291,8 @@ pub fn search(
         });
     let mut sc: Vec<f32> = costs.clone();
     sc.sort_by(|a, b| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal));
-    let pct = sc[((0.2 * sc.len() as f64) as usize).min(sc.len() - 1)];
+    // the element at trunc(n·p), the product in single precision (step 7)
+    let pct = sc[((sc.len() as f32 * 0.2f32) as usize).min(sc.len() - 1)];
     let mut t = (cmin + 0.2 * (cmax - cmin)).min(pct);
     if t <= cmin {
         t = (1.0001 * cmin).max(0.9999 * cmin);
@@ -326,6 +337,15 @@ pub fn search(
     for (j, &i) in below.iter().enumerate() {
         costs[i] = opt[j].1;
     }
+    // the reference parameters in force after the search: the last subset optimisation's x₀
+    let last_x0 = match below.last() {
+        Some(&i) => fine_params[i],
+        None => point(
+            [coarse[0][cx - 1], coarse[1][cy - 1], coarse[2][cz - 1]],
+            [rp[3], rp[4], rp[5]],
+            rp[6],
+        ),
+    };
     // 8. the minima (the last index on each axis excluded)
     let idx = |a: usize, b: usize, c: usize| a * fy * fz + b * fz + c;
     // scanned z outer, then y, then x (observed: FSL lists its minima in this order)
@@ -390,35 +410,60 @@ pub fn search(
         }
         tr.line("");
     }
-    // 9. each minimum optimised freely; near-duplicates dropped
+    // 9. each minimum optimised freely; near-duplicates dropped. The start is the matrix of
+    // its first min(dof, 7) parameters (with FSL-90 reproduced and quaternions, its angles read
+    // as a quaternion's vector part), the optimisation from that matrix's decomposition in
+    // -anglerep's representation.
     let free = free_dof.min(7);
+    let rep = user.rep;
+    let quaternion = rep == super::param::AngleRep::Quaternion;
+    let quaternion_starts = quaternion
+        && minima
+            .iter()
+            .any(|&i| fine_params[i][..3].iter().any(|&a| a != 0.0));
+    let quiet = super::cost::Log::default();
+    let log = user.log.as_deref().unwrap_or(&quiet);
     let starts: Vec<Mat4> = minima
         .iter()
-        .map(|&i| rigid::compose(&fine_params[i], free, centre))
+        .map(|&i| {
+            if fsl90 && quaternion {
+                super::param::compose(rep, &fine_params[i], free, centre, log)
+            } else {
+                super::param::euler_compose(&fine_params[i], free, centre)
+            }
+        })
         .collect();
-    // each start's own cost goes with it into `P` (observed: FSL's `P` rows carry the cost of
-    // their matrix, the free optimisation's first evaluation)
+    let free_settings = Settings {
+        tol_x0: None,
+        ..user.clone()
+    };
+    let free_settings = Settings {
+        level: settings.level,
+        ..free_settings
+    };
     let freed_line = |tr: &Trace, c: f32, m: &Mat4| {
         tr.line(&format!(
             "{} ::: {}",
             tr.num(f64::from(c)),
-            tr.nums(rigid::decompose(m, centre))
+            tr.nums(super::param::decompose(rep, m, centre))
         ));
     };
     let run_free = |k: usize| -> Result<(Mat4, f32, f32), String> {
-        let c0 = eval(&starts[k]);
         let (x, c) = optimise::optimise_params(
             eval,
-            fine_params[minima[k]],
+            super::param::decompose(rep, &starts[k], centre),
             centre,
             free,
             4,
-            settings,
+            &free_settings,
             None,
             Kind::Free,
             &starts[k],
         )?;
-        let m = rigid::compose(&x, free, centre);
+        let m = super::param::compose(rep, &x, free, centre, log);
+        // the start's own cost goes with it into `P`: evaluated after the optimisation
+        // (counted, not printed)
+        let c0 = eval(&starts[k]);
         if !n_threads_parallel && let Some(tr) = at(1) {
             freed_line(tr, c, &m);
         }
@@ -441,7 +486,15 @@ pub fn search(
     } else {
         (0..starts.len()).map(run_free).collect::<Result<_, _>>()?
     };
+    // the list, sorted by the optimised cost: a new entry is compared with the entries in their
+    // order and the first within the distance decides (a strictly better new entry replaces it,
+    // otherwise the new one is dropped); a new entry is inserted after every entry of lower or
+    // equal cost
     let mut list: Vec<(f32, Mat4, Mat4, f32)> = Vec::new();
+    let insert = |list: &mut Vec<(f32, Mat4, Mat4, f32)>, e: (f32, Mat4, Mat4, f32)| {
+        let at = list.iter().take_while(|x| x.0 <= e.0).count();
+        list.insert(at, e);
+    };
     for (k, (m, c, c0)) in freed.into_iter().enumerate() {
         let near = list
             .iter()
@@ -449,13 +502,13 @@ pub fn search(
         match near {
             Some(j) => {
                 if c < list[j].0 {
-                    list[j] = (c, m, starts[k], c0);
+                    list.remove(j);
+                    insert(&mut list, (c, m, starts[k], c0));
                 }
             }
-            None => list.push((c, m, starts[k], c0)),
+            None => insert(&mut list, (c, m, starts[k], c0)),
         }
     }
-    list.sort_by(|a, b| a.0.partial_cmp(&b.0).unwrap_or(std::cmp::Ordering::Equal));
     if let Some(tr) = at(1) {
         let cols = |m: &Mat4| tr.nums((0..16).map(|k| m[k % 4][k / 4]));
         tr.line("Parameters (1st column costs) are:");
@@ -478,6 +531,8 @@ pub fn search(
         scales,
         fine_shape: [fx, fy, fz],
         costs,
+        last_x0,
+        quaternion_starts,
     })
 }
 

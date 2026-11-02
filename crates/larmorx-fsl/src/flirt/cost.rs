@@ -8,8 +8,6 @@
 
 use std::sync::Mutex;
 
-use rayon::prelude::*;
-
 use larmorx_mri::hmc::cost::{
     self as hcost, Accumulator, CorrSlice, NormCorrCount, PointWeight, TestBins, TestVolume,
 };
@@ -137,11 +135,7 @@ impl Pair {
         skip_non_finite: bool,
         init: Mat4,
     ) -> Pair {
-        let centre = if skip_non_finite {
-            input.centre_of_mass_finite()
-        } else {
-            input.centre_of_mass()
-        };
+        let centre = centre_of_mass(&input, skip_non_finite);
         let tb = TestBins::new(&input, bins);
         let (lo, hi) = [&reference, &input]
             .iter()
@@ -255,16 +249,28 @@ impl Pair {
             Cost::LeastSq => {
                 hcost::least_squares_weighted(&self.reference, &tv, &b, parallel, weight)
             }
-            Cost::CorrRatio => {
-                let m = self.bin_moments(&tv, &b, parallel, weight, false);
-                corr_ratio(&m)
-            }
+            Cost::CorrRatio => hcost::corr_ratio_of(&hcost::bin_moments(
+                self.reference_bins(),
+                &tv,
+                &b,
+                self.bins,
+                parallel,
+                weight,
+                false,
+            )),
             Cost::Woods => {
                 if weight.is_some() {
                     log.push("WARNING: Woods is not implemented with cost function weighting");
                 }
-                let m = self.bin_moments(&tv, &b, parallel, None, true);
-                woods(&m)
+                hcost::woods_of(&hcost::bin_moments(
+                    self.reference_bins(),
+                    &tv,
+                    &b,
+                    self.bins,
+                    parallel,
+                    None,
+                    true,
+                ))
             }
             Cost::MutualInfo | Cost::NormMi => hcost::mutual_info_weighted(
                 self.reference_bins(),
@@ -277,54 +283,6 @@ impl Pair {
             ),
             Cost::LabelDiff => self.labeldiff(&tv, &b, parallel, weight),
             Cost::Bbr => unreachable!(),
-        }
-    }
-
-    /// The test values' moments in each reference bin (the histogram costs of §6.2): weighted
-    /// (`corratio`) or unweighted (`unweighted`, `woods`).
-    ///
-    /// Each bin's moments are running sums over its points in the sampling order. In parallel,
-    /// the slices are sampled at once, each slice's points sorted by bin keeping their order
-    /// (a counting sort), and each bin's sums then run over the slices in order, the bins at
-    /// once: the same additions in the same order as one pass, so the same bits.
-    fn bin_moments(
-        &self,
-        tv: &TestVolume<'_>,
-        b: &[[f32; 4]; 3],
-        parallel: bool,
-        weight: Option<PointWeight<'_>>,
-        unweighted: bool,
-    ) -> BinMoments {
-        let bins = self.bins.max(1);
-        let grid = self.reference_bins();
-        let out = BinMoments::new(bins, unweighted);
-        if !parallel {
-            // one running sum over every slice, in order
-            return hcost::sample_all_weighted(grid, tv, b, weight, out);
-        }
-        let row = grid.shape[0] * grid.shape[1];
-        let slices = hcost::sample_weighted(grid, tv, b, true, weight, || BinRecord {
-            points: Vec::with_capacity(row),
-            top: bins - 1,
-        });
-        let sorted: Vec<Sorted> = slices.par_iter().map(|s| Sorted::of(s, bins)).collect();
-        let sums: Vec<[f32; 3]> = (0..bins)
-            .into_par_iter()
-            .with_min_len(8)
-            .map(|k| {
-                let mut st = [0.0f32; 3];
-                for sl in &sorted {
-                    let (lo, hi) = (sl.start[k] as usize, sl.start[k + 1] as usize);
-                    for &(v, w) in &sl.values[lo..hi] {
-                        BinMoments::add_to(&mut st, v, w, unweighted);
-                    }
-                }
-                st
-            })
-            .collect();
-        BinMoments {
-            s: sums,
-            unweighted,
         }
     }
 
@@ -365,138 +323,6 @@ impl Pair {
             num / points as f32
         }
     }
-}
-
-/// The moments of the test values in each reference bin: weighted `[Σw, Σwy, Σwy²]` or
-/// unweighted `[n, Σy, Σy²]`, single-precision running sums in the sampling order (observed:
-/// FSL's `corratio` agrees to its printed digits with these and not with double sums).
-struct BinMoments {
-    s: Vec<[f32; 3]>,
-    unweighted: bool,
-}
-
-impl BinMoments {
-    fn new(bins: usize, unweighted: bool) -> BinMoments {
-        BinMoments {
-            s: vec![[0.0; 3]; bins],
-            unweighted,
-        }
-    }
-
-    #[inline(always)]
-    fn add_to(s: &mut [f32; 3], v: f32, w: f32, unweighted: bool) {
-        if unweighted {
-            s[0] += 1.0;
-            s[1] += v;
-            s[2] += v * v;
-        } else {
-            s[0] += w;
-            s[1] += w * v;
-            s[2] += (w * v) * v;
-        }
-    }
-}
-
-impl Accumulator for BinMoments {
-    #[inline(always)]
-    fn point(&mut self, g: f32, v: f32, w: f32) {
-        let k = (g as usize).min(self.s.len() - 1);
-        BinMoments::add_to(&mut self.s[k], v, w, self.unweighted);
-    }
-    fn end_row(&mut self) {}
-}
-
-/// One slice's points sorted by bin, each bin's in sampling order: bin `k`'s values are
-/// `values[start[k]..start[k + 1]]`.
-struct Sorted {
-    start: Vec<u32>,
-    values: Vec<(f32, f32)>,
-}
-
-impl Sorted {
-    fn of(rec: &BinRecord, bins: usize) -> Sorted {
-        let mut start = vec![0u32; bins + 1];
-        for &(k, _, _) in &rec.points {
-            start[k as usize + 1] += 1;
-        }
-        for k in 0..bins {
-            start[k + 1] += start[k];
-        }
-        let mut at = start.clone();
-        let mut values = vec![(0.0f32, 0.0f32); rec.points.len()];
-        for &(k, v, w) in &rec.points {
-            let p = &mut at[k as usize];
-            values[*p as usize] = (v, w);
-            *p += 1;
-        }
-        Sorted { start, values }
-    }
-}
-
-/// The points of one slice, in sampling order (a parallel evaluation's slices, folded in order
-/// into one [`BinMoments`]).
-struct BinRecord {
-    points: Vec<(u32, f32, f32)>,
-    top: usize,
-}
-
-impl Accumulator for BinRecord {
-    #[inline(always)]
-    fn point(&mut self, g: f32, v: f32, w: f32) {
-        self.points.push(((g as usize).min(self.top) as u32, v, w));
-    }
-    fn end_row(&mut self) {}
-}
-
-/// A bin's points take part in `corratio` and `woods` only when the bin holds more than
-/// [`SPARSE`] (weighted) points (observed: FSL leaves the points of sparser bins out of the
-/// counts, the sums and the total variance alike).
-const SPARSE: f64 = 2.0;
-
-/// The correlation ratio's cost (§6.2): `Σ_b n_b var_b / (n var)`, the variances with `n − 1`,
-/// over the bins with more than two (weighted) points, `n` and `var` over the same points; 0 when
-/// the variance is not positive.
-fn corr_ratio(m: &BinMoments) -> f32 {
-    let d = |st: &[f32; 3]| st.map(f64::from);
-    let kept = || m.s.iter().map(d).filter(|st| st[0] > SPARSE);
-    let (mut n, mut s, mut ss) = (0.0f64, 0.0f64, 0.0f64);
-    for [a, b, c] in kept() {
-        n += a;
-        s += b;
-        ss += c;
-    }
-    if n <= 1.0 {
-        return 1.0;
-    }
-    let var = (ss - s * s / n) / (n - 1.0);
-    if var <= 0.0 {
-        return 0.0;
-    }
-    let within: f64 = kept()
-        .map(|st| st[0] * (st[2] - st[1] * st[1] / st[0]) / (st[0] - 1.0))
-        .sum();
-    (within / (n * var)) as f32
-}
-
-/// Woods' cost (§6.2): `Σ_b n_b·σ_b/μ_b / n` (observed: not appendix A's `n_b²`) over the bins
-/// with more than two points, `n` their points.
-fn woods(m: &BinMoments) -> f32 {
-    let kept = || {
-        m.s.iter()
-            .map(|st| st.map(f64::from))
-            .filter(|st| st[0] > SPARSE)
-    };
-    let n: f64 = kept().map(|st| st[0]).sum();
-    if n <= 0.0 {
-        return 1e10;
-    }
-    let mut cost = 0.0;
-    for [nb, s1, s2] in kept() {
-        let mean = s1 / nb;
-        let sd = ((s2 - s1 * s1 / nb) / (nb - 1.0)).max(0.0).sqrt();
-        cost += nb * if mean > 0.0 { sd / mean } else { sd };
-    }
-    (cost / n) as f32
 }
 
 /// The mismatch sums of one slice of `labeldiff` (§6.3): `Σ w·mismatch` and `Σ w` per row,
@@ -556,4 +382,63 @@ fn mismatch(v: &Volume, p: [f32; 3], x: f32) -> f32 {
         }
     }
     sum
+}
+
+/// FLIRT's centre of mass (`specs/flirt.md` §8.1 step 3), in mm: `v − v_min` in single
+/// precision, converted to double, the sums `Σ(v − v_min)·i` per axis and `Σ(v − v_min)` over the
+/// voxels in z, y, x order in blocks of `max(1000, trunc(√N)) + 1` voxels (each block's double
+/// sums restart at 0 and are added to the totals, the last block's at the end); each coordinate
+/// its total over the total (a total below 1e-5 in magnitude counts 1) times the voxel size.
+/// With `finite_only` (FSL-14 corrected) NaN and infinite voxels are left out of the minimum and
+/// the sums (they still count in the blocks' lengths).
+pub fn centre_of_mass(v: &Volume, finite_only: bool) -> [f64; 3] {
+    let [nx, ny, nz] = v.shape;
+    let vmin = if finite_only {
+        let mut it = v.data.iter().copied().filter(|x| x.is_finite());
+        it.next().map_or(0.0, |first| {
+            it.fold(first, |m, x| if x < m { x } else { m })
+        })
+    } else {
+        v.min()
+    };
+    let n = v.data.len();
+    let block = ((n as f64).sqrt() as usize).max(1000) + 1;
+    let mut tot = [0.0f64; 4];
+    let mut part = [0.0f64; 4];
+    let mut count = 0usize;
+    for z in 0..nz {
+        for y in 0..ny {
+            let row = &v.data[nx * (y + ny * z)..nx * (y + ny * z + 1)];
+            for (x, &val) in row.iter().enumerate() {
+                if !(finite_only && !val.is_finite()) {
+                    let w = f64::from(val - vmin);
+                    part[0] += w * x as f64;
+                    part[1] += w * y as f64;
+                    part[2] += w * z as f64;
+                    part[3] += w;
+                }
+                count += 1;
+                if count == block {
+                    for k in 0..4 {
+                        tot[k] += part[k];
+                        part[k] = 0.0;
+                    }
+                    count = 0;
+                }
+            }
+        }
+    }
+    for k in 0..4 {
+        tot[k] += part[k];
+    }
+    let mut total = tot[3];
+    if total.abs() < 1e-5 {
+        total = 1.0;
+    }
+    let d = v.voxel_size.map(f64::from);
+    [
+        d[0] * (tot[0] / total),
+        d[1] * (tot[1] / total),
+        d[2] * (tot[2] / total),
+    ]
 }

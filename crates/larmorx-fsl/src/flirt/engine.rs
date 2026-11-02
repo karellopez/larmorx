@@ -14,7 +14,7 @@ use larmorx_mri::hmc::rigid;
 use larmorx_mri::hmc::volume::Volume;
 
 use super::bbr::BbrSource;
-use super::cost::{Cost, Log, Pair};
+use super::cost::{self, Cost, Log, Pair};
 use super::mat::{self, IDENTITY, Mat4};
 use super::optimise::{self, Subset};
 use super::output::{self, Resampling, SincKernel};
@@ -58,12 +58,17 @@ pub struct Ctx<'a> {
 struct Image {
     vols: Vec<Volume>,
     input: Input,
+    /// The header as stored has a voxel size of 0 along x, y or z (which reading counts as 1;
+    /// FLIRT's base scale reads it as stored: FSL-93).
+    zero_size: bool,
 }
 
 /// Reads `name` as FSL's image layer does (every volume when `all`).
 fn read(ctx: &Ctx<'_>, name: &str, all: bool, notices: &mut Vec<Notice>) -> Result<Image, End> {
     let files = crate::cli::bet2::resolve_image(ctx.settings, name, ctx.mode, notices)
         .map_err(|e| End::Error(read_message(name, &e)))?;
+    let zero_size = larmorx_io::nifti::read_header(&files.header)
+        .is_ok_and(|h| (1..=3).any(|k| h.pixdim[k] == 0.0));
     // the values move into `vols` (one copy of an image, not two: FLIRT reads only the grid
     // and the header from `input` afterwards)
     let take = |v: &mut crate::bet::Vol| {
@@ -80,6 +85,7 @@ fn read(ctx: &Ctx<'_>, name: &str, all: bool, notices: &mut Vec<Notice>) -> Resu
         Ok(Image {
             vols: vols.iter_mut().map(take).collect(),
             input,
+            zero_size,
         })
     } else {
         let mut input = image::read_first(&files, ctx.n_threads)
@@ -87,6 +93,7 @@ fn read(ctx: &Ctx<'_>, name: &str, all: bool, notices: &mut Vec<Notice>) -> Resu
         Ok(Image {
             vols: vec![take(&mut input.vol)],
             input,
+            zero_size,
         })
     }
 }
@@ -306,6 +313,11 @@ struct State<'a> {
     init: Mat4,
     qsform: Mat4,
     fine_counts: [usize; 3],
+    /// The reference parameters in force (§8.1 step 2): the identity's, until a search or a
+    /// subset `optimise` leaves others; the search's subsets' tolerances are computed with them.
+    ref_x0: std::cell::Cell<rigid::Params>,
+    /// The notices of the commands run (drained after each command).
+    notices: Vec<Notice>,
 }
 
 impl State<'_> {
@@ -668,6 +680,32 @@ fn run_inner(
         );
     }
     let mut input = read(ctx, &in_name, applying, notices)?;
+    // FSL-92: an image of one voxel cannot measure an alignment (§4.1): refused by default
+    if !applying {
+        let one = |im: &Image| im.vols[0].shape == [1, 1, 1];
+        let which = match (one(&reference), one(&input)) {
+            (true, true) => Some("the input and the reference are"),
+            (false, true) => Some("the input is"),
+            (true, false) => Some("the reference is"),
+            (false, false) => None,
+        };
+        if let Some(which) = which {
+            let detail = match ctx.mode {
+                UpstreamDefects::Fix => format!(
+                    "{which} a single voxel: one value cannot measure an alignment; the registration refused"
+                ),
+                UpstreamDefects::Reproduce => format!(
+                    "{which} a single voxel; registered as FLIRT does (its matrix an artefact of its search)"
+                ),
+            };
+            defects::push_once(notices, Notice::new(&defects::FSL_92, ctx.mode, detail));
+            if ctx.mode.fix() {
+                return Err(End::Refuse(format!(
+                    "larmorx: {which} a single voxel (1 x 1 x 1): one value cannot measure an alignment, and FLIRT's matrix would be an artefact of its search (FSL-92); refused"
+                )));
+            }
+        }
+    }
     // the images as read, which a level of 2 describes at the end (§2.3)
     let raw = trace.at(2).then(|| {
         [&reference, &input].map(|im| RawInfo {
@@ -826,6 +864,32 @@ fn register(
     let mode = ctx.mode;
     let weighting = o.ref_weight.is_some() || o.in_weight.is_some();
     // from the headers, before the single-slice tripling (observed)
+    if o.base_scale == Some(0.0) {
+        return Err(End::Refuse(
+            "larmorx: -basescale 0 makes every voxel size infinite: FLIRT never finishes (FSL-93: undefined behaviour); refused".to_owned(),
+        ));
+    }
+    // FSL-93: a header voxel size of 0 makes FLIRT's base scale 0 (§4.2): counted as 1 by
+    // default, as reading the image counts it; refused with reproduce (FLIRT never finishes)
+    if o.base_scale.is_none() {
+        let zero = reference.zero_size || input.zero_size;
+        if zero {
+            let detail = match mode {
+                UpstreamDefects::Fix => {
+                    "a header voxel size of 0 counted as 1 for the base scale, as reading the image counts it (FLIRT's base scale is 0 and it never finishes)"
+                }
+                UpstreamDefects::Reproduce => {
+                    "a header voxel size of 0 makes FLIRT's base scale 0: it never finishes; refused"
+                }
+            };
+            defects::push_once(notices, Notice::new(&defects::FSL_93, mode, detail));
+            if !mode.fix() {
+                return Err(End::Refuse(
+                    "larmorx: a header voxel size of 0 makes FLIRT's base scale 0 and every voxel size infinite: FLIRT never finishes (FSL-93: undefined behaviour); refused".to_owned(),
+                ));
+            }
+        }
+    }
     let b = base_scale(o, &reference.vols[0], &input.vols[0]);
     // prepared in place: the reference's values are not needed again (its grid is), the input's
     // are (the output resamples them)
@@ -856,6 +920,28 @@ fn register(
         match name {
             Some(n) => {
                 let w = read(ctx, n, false, notices)?;
+                // FSL-91: no voxel of at least 0.01, an empty weighting mask (§4.1 step 3)
+                if !w.vols[0].data.iter().any(|&v| v >= 0.01) {
+                    let opt = if Some(n) == o.ref_weight.as_ref() {
+                        "-refweight"
+                    } else {
+                        "-inweight"
+                    };
+                    let detail = match ctx.mode {
+                        UpstreamDefects::Fix => format!(
+                            "{opt} {n} has no voxel of at least 0.01: every cost constant; the registration refused"
+                        ),
+                        UpstreamDefects::Reproduce => format!(
+                            "{opt} {n} has no voxel of at least 0.01; registered as FLIRT does (every cost constant)"
+                        ),
+                    };
+                    defects::push_once(notices, Notice::new(&defects::FSL_91, ctx.mode, detail));
+                    if ctx.mode.fix() {
+                        return Err(End::Refuse(format!(
+                            "larmorx: {opt} {n} has no voxel of at least 0.01 (an empty weighting mask): every cost is constant and FLIRT's matrix would be an artefact of its search (FSL-91); refused"
+                        )));
+                    }
+                }
                 Ok(Some(scaled(&triple(&w.vols[0]), b)))
             }
             None if weighting => Ok(Some(Volume::new(
@@ -1050,6 +1136,8 @@ fn register(
         init,
         qsform: qs,
         fine_counts,
+        ref_x0: std::cell::Cell::new(rigid::IDENTITY_PARAMS),
+        notices: Vec::new(),
     };
     let _ = maxdof;
     st.opt.rep = if o.quaternion {
@@ -1081,7 +1169,7 @@ fn register(
     set_scale(&mut st, 8.0, true, false, err)?;
     st.flush(err);
     if trace.at(3) {
-        let c = |v: &Volume| trace.nums(v.centre_of_mass());
+        let c = |v: &Volume| trace.nums(cost::centre_of_mass(v, false));
         trace.line(&format!("CoG for refvol is:  {}", c(&st.reference)));
         trace.line(&format!("CoG for testvol is:  {}", c(&st.input0)));
     }
@@ -1115,6 +1203,9 @@ fn register(
         }
         let w = schedule::words(line);
         let r = command(&mut st, &w, err, &mut skip);
+        for x in st.notices.drain(..) {
+            defects::push_once(notices, x);
+        }
         st.flush(err);
         r?;
         st.check()?;
@@ -1332,11 +1423,7 @@ fn command(
             }
             let v = st.var(&w[1])?;
             if let Some(l) = st.lists.get_mut(&v) {
-                l.sort_by(|a, b| {
-                    a.cost
-                        .partial_cmp(&b.cost)
-                        .unwrap_or(std::cmp::Ordering::Equal)
-                });
+                schedule::std_sort(l, &|a: &Row, b: &Row| a.cost < b.cost);
             }
         }
         "dualsort" => {
@@ -1349,12 +1436,7 @@ fn command(
                 let _ = write!(err, "Cannot dual sort matrices of unequal size");
             } else {
                 let mut idx: Vec<usize> = (0..la.len()).collect();
-                idx.sort_by(|&i, &j| {
-                    la[i]
-                        .cost
-                        .partial_cmp(&la[j].cost)
-                        .unwrap_or(std::cmp::Ordering::Equal)
-                });
+                schedule::std_sort(&mut idx, &|&i: &usize, &j: &usize| la[i].cost < la[j].cost);
                 st.lists.insert(a, idx.iter().map(|&i| la[i]).collect());
                 st.lists.insert(b, idx.iter().map(|&i| lb[i]).collect());
             }
@@ -1509,8 +1591,9 @@ fn command(
             }
             let (_, rows) = st.rows(&w[1])?;
             let pair = st.pair()?.clone();
-            let cr = pair.reference.centre_of_mass();
-            let ci = pair.centre;
+            // both centres measured afresh: the input's is the one the pair now holds (§7.2)
+            let cr = cost::centre_of_mass(&pair.reference, false);
+            let ci = cost::centre_of_mass(&pair.input, pair.skip_non_finite);
             for r in rows {
                 let mut m = r.m;
                 for i in 0..3 {
@@ -1531,7 +1614,12 @@ fn command(
             for line in warn {
                 st.log.push(line);
             }
-            let m = paxes::align(rr, ri, pair.reference.centre_of_mass(), pair.centre);
+            let m = paxes::align(
+                rr,
+                ri,
+                cost::centre_of_mass(&pair.reference, false),
+                cost::centre_of_mass(&pair.input, pair.skip_non_finite),
+            );
             for r in rows {
                 st.push(Var::U(0), Row { cost: r.cost, m });
             }
@@ -1973,6 +2061,10 @@ fn optimise_row(st: &State<'_>, m: &Mat4, dof: usize, maxit: usize) -> Result<(M
     let tr = st.trace.clone();
     let eval = move |t: &Mat4| evaluate(&pair, t, cost, &log, &tr);
     let centre = st.pair()?.centre;
+    if st.subset.is_some() {
+        // a subset optimisation's x₀ (the row's own parameters) stays in force (§8.1 step 2)
+        st.ref_x0.set(param::decompose(st.opt.rep, m, centre));
+    }
     optimise::optimise(&eval, m, centre, dof, maxit, &st.opt, st.subset.as_ref())
         .map_err(End::Error)
 }
@@ -1995,8 +2087,10 @@ fn run_search(st: &mut State<'_>, dof: usize, err: &mut dyn Write) -> Result<(),
             st.log.push("WARNING::in calculating COG, total = 0.0");
         }
     }
-    let c_ref = pair.reference.centre_of_mass();
-    let c_in = pair.centre;
+    // both centres measured afresh (§8.1 step 3): the input's is the one the pair now holds
+    // (after a setscale that only reset the input, the unblurred input's, §7.2)
+    let c_ref = super::cost::centre_of_mass(&pair.reference, false);
+    let c_in = super::cost::centre_of_mass(&pair.input, pair.skip_non_finite);
     let mc = mat::apply(&st.init, [c_in[0], c_in[1], c_in[2], 1.0]);
     let mut rp = rigid::IDENTITY_PARAMS;
     for k in 0..3 {
@@ -2016,16 +2110,31 @@ fn run_search(st: &mut State<'_>, dof: usize, err: &mut dyn Write) -> Result<(),
         .fold(f32::INFINITY, f32::min);
     let found = search::search(
         &eval,
-        c_in,
+        pair.centre,
         rp,
         dof,
         dof.min(st.maxdof),
         &r,
         &opt,
+        st.ref_x0.get(),
+        !st.ctx.mode.fix(),
         min_voxel,
         true,
     )
     .map_err(End::Error)?;
+    st.ref_x0.set(found.last_x0);
+    if found.quaternion_starts {
+        let detail = match st.ctx.mode {
+            UpstreamDefects::Fix => {
+                "the search's starting points composed from their Euler angles (FLIRT reads them as a quaternion's vector part)"
+            }
+            UpstreamDefects::Reproduce => {
+                "the search's starting points' Euler angles read as a quaternion's vector part, as FLIRT does"
+            }
+        };
+        st.notices
+            .push(Notice::new(&defects::FSL_90, st.ctx.mode, detail));
+    }
     st.check()?;
     if st.o.debug_save && opt.level >= 4 {
         // the coarse grid's translations and scales, the fine grid's costs (observed: float

@@ -215,11 +215,7 @@ pub fn centre(
         };
         defects::push_once(notices, Notice::new(&defects::FSL_14, mode, detail));
     }
-    if finite {
-        v.centre_of_mass_finite()
-    } else {
-        v.centre_of_mass()
-    }
+    crate::flirt::cost::centre_of_mass(v, finite)
 }
 
 /// Prints the notices (one line each).

@@ -7,6 +7,10 @@ values. A development tool of the clean-room original (part 1, 2026-11-02).
     PYTHONPATH=python:validation/src python -P validation/investigations/cleanroom-flirt/probe.py \
         <out-dir> --case real/dof6 [--mode reproduce|fix]
     ... probe.py <out-dir> --args "-in @epi.nii -ref @t1.nii -omat out.mat"
+    ... probe.py <out-dir> --finding <random-testing finding .json> [--whole]
+
+``--finding`` writes the finding's (shrunk, unless ``--whole``) inputs into ``<out-dir>/inputs``
+and runs its command line.
 
 Run it inside scripts/orchestration/boxed.sh (it runs FSL and the original on real images).
 """
@@ -39,6 +43,28 @@ def header_diff(a: Path, b: Path) -> list[str]:
     return out
 
 
+def from_finding(path: Path, inputs: Path, whole: bool) -> rep.Run:
+    """The finding's command line, its inputs written into ``inputs`` (``@@`` paths)."""
+    import json
+
+    from larmorx_validation.difftest.inputs import materialize, suffix_of
+
+    d = json.loads(path.read_text(encoding="utf-8"))
+    r = d["recipe"] if whole or not d.get("shrunk") else d["shrunk"]
+    files = {}
+    for name, spec in r["inputs"].items():
+        files[name] = materialize(spec, inputs / (name + suffix_of(spec)))
+    args: list[str] = []
+    for g in r["groups"]:
+        for w in g["args"]:
+            for name, f in files.items():
+                w = w.replace("{in:" + name + "}", "@@" + str(f))
+            args.append(w)
+    extra = r.get("extra", {})
+    settings = (("FSLOUTPUTTYPE", extra["output_type"]),) if extra.get("output_type") else ()
+    return rep.Run(extra.get("tool", "flirt"), tuple(args), settings)
+
+
 def main() -> None:
     ap = argparse.ArgumentParser()
     ap.add_argument("out")
@@ -46,10 +72,17 @@ def main() -> None:
     ap.add_argument("--args")
     ap.add_argument("--program", default="flirt")
     ap.add_argument("--mode", default=defects.REPRODUCE)
+    ap.add_argument("--finding")
+    ap.add_argument("--whole", action="store_true")
     a = ap.parse_args()
-    run = rep._all_cases()[a.case][2] if a.case else rep.Run(a.program, tuple(shlex.split(a.args)))
     out = Path(a.out)
     shutil.rmtree(out, ignore_errors=True)
+    if a.finding:
+        run = from_finding(Path(a.finding), out / "inputs", a.whole)
+    elif a.case:
+        run = rep._all_cases()[a.case][2]
+    else:
+        run = rep.Run(a.program, tuple(shlex.split(a.args)))
     fd, od = out / "fsl", out / "orig"
     fd.mkdir(parents=True)
     od.mkdir(parents=True)

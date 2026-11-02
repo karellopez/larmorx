@@ -147,10 +147,10 @@ sums, the line search, the interpolators), not a copy of it.
 the clamping, single slices; the reference pyramid; every cost (`corratio`, `mutualinfo`,
 `normmi`, `normcorr`, `leastsq`, `labeldiff`, `woods`, the boundary-based `bbr` from `-wmseg` or
 `-wmcoords`/`-wmnorms`, with `-bbrtype`, `-bbrslope` and a field map) and their weighted forms;
-the schedule language with every command but `alignpaxes`, the 3D and 2D default schedules (`-v`
+the schedule language with every command (`alignpaxes` included), the 3D and 2D default schedules (`-v`
 prints FSL's lines) and every schedule FSL ships, `bbr.sch` included; the search; the
 optimisation (the bound guesses, the convergence test, Powell's correction, parameter subsets of
-any mask); the sform/qform initialisation; `-omat`, `-out`, `-applyxfm`, `-applyisoxfm` with
+any mask); `-anglerep quaternion`; the sform/qform initialisation; `-omat`, `-out`, `-applyxfm`, `-applyisoxfm` with
 every interpolation, sinc width and window, `-paddingsize`, `-setbackground` and data type; the
 background value with FSL-75 and FSL-22; FSL-68's exit status; the refusals of FSL-21/66, FSL-71,
 FSL-72, an undefined matrix name, `-pedir` without a field map, a single-voxel background.
@@ -158,9 +158,9 @@ FSL-72, an undefined matrix name, `-pedir` without a field map, a single-voxel b
 search's grid points, the large evaluations' slices, the pyramid's filters, the boundary points
 and the output's slices run in parallel, each result folded in a fixed order.
 
-**Not yet (part 2):** `-anglerep quaternion`, `alignpaxes`, `-debug` (each refused with a message
-naming the replica), the verbose levels above 1 (`-verbose 2` and more print the level-1 lines
-only), FLIRT's other programs.
+**Not yet (part 2):** `-debug` and `-debugsave` (refused with a message naming the replica), the
+verbose levels above 1 (`-verbose 2` and more print the level-1 lines only), FLIRT's other
+programs.
 
 **Status: `experimental`.** Its record: [`docs/validation/fsl-flirt.md`](../validation/fsl-flirt.md)
 (the replica suite's cases against FSL 6.0.7.23). fMRIPrep's three boundary-based calls within
@@ -222,8 +222,8 @@ of its type's range.
 
 The coordinate programs' `-warp` (FNIRT's warp fields, refused until FSL's warp-field libraries are
 ported); `standard_space_roi`, `flirt_average` and `epi_reg` (scripts of FSL's other programs: not
-ported); the clean-room original's `-anglerep quaternion`, `alignpaxes`, `-debug`, its verbose
-levels above 1 and FLIRT's other programs (part 2). Known difference (part 3's random testing): with NaN or
+ported); the clean-room original's `-debug`, its verbose levels above 1 and FLIRT's other
+programs (part 2). Known difference (part 3's random testing): with NaN or
 infinite input voxels in `reproduce` mode (FSL-14), the sign of NaN results can differ from FSL's
 (`nan` against `-nan`): an all-NaN matrix from a schedule that optimises relative to a row, and
 the NaN voxels of `applyxfm4D`'s spline interpolation; the values are NaN in both.

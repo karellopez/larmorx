@@ -660,27 +660,39 @@ fn register(
         let (l1, w1) = filt(&ref0, &ref_weight, &|v| {
             pyramid::isotropic(&pyramid::blur(v, s), s)
         });
-        let halve = |v: &Volume, w: &Option<Volume>, notices: &mut Vec<Notice>| {
-            if let Some(bg) = pyramid::background(v, mode) {
-                for n in pyramid::background_notices(&bg, "a level of the reference pyramid", mode)
-                {
-                    defects::push_once(notices, n);
+        let halve = |v: &Volume,
+                     w: &Option<Volume>,
+                     notices: &mut Vec<Notice>|
+         -> Result<(Volume, Option<Volume>), End> {
+            match pyramid::background(v, mode) {
+                Some(bg) => {
+                    for n in
+                        pyramid::background_notices(&bg, "a level of the reference pyramid", mode)
+                    {
+                        defects::push_once(notices, n);
+                    }
+                }
+                None => {
+                    return Err(End::Refuse(
+                        "larmorx: a level of the reference pyramid is 1 x 1 x 1 voxels: its background value (the 10th percentile of its border) has no border to read (FSL reads an empty buffer, FSL-75); refused"
+                            .into(),
+                    ));
                 }
             }
-            filt(v, w, &pyramid::halve)
+            Ok(filt(v, w, &pyramid::halve))
         };
         let (l2, w2) = if s < 1.9 {
-            halve(&l1, &w1, notices)
+            halve(&l1, &w1, notices)?
         } else {
             (l1.clone(), w1.clone())
         };
         let (l4, w4) = if s < 3.9 {
-            halve(&l2, &w2, notices)
+            halve(&l2, &w2, notices)?
         } else {
             (l2.clone(), w2.clone())
         };
         let (l8, w8) = if s < 7.9 {
-            halve(&l4, &w4, notices)
+            halve(&l4, &w4, notices)?
         } else {
             (l4.clone(), w4.clone())
         };
@@ -688,11 +700,13 @@ fn register(
     };
     if o.debug {
         // §9.4: the pyramid's levels (development: the volumes, single precision)
+        let testvol = pyramid::blur(&in0, 8.0);
         for (name, v) in [
             ("refvol_8", &levels[3]),
             ("refvol_4", &levels[2]),
             ("refvol_2", &levels[1]),
             ("refvol", &levels[0]),
+            ("testvol", &testvol),
         ] {
             let shape = v.shape;
             let mut h = reference.input.header.clone();
@@ -1001,7 +1015,7 @@ fn command(
             } else {
                 12
             };
-            let dof = optimise::clamp_dof(dof.min(st.maxdof as i64)).0;
+            let dof = optimise::clamp_dof(dof).0;
             run_search(st, dof)?;
         }
         "optimise" | "measurecost" => {
@@ -1461,6 +1475,7 @@ fn set_scale(st: &mut State<'_>, s: f32, force: bool) -> Result<(), End> {
         let old = Arc::try_unwrap(p).unwrap_or_else(|a| clone_pair(&a));
         let skip = st.ctx.mode.fix() && (input.has_non_finite() || old.reference.has_non_finite());
         let no_bins = old.no_bins.clone();
+        let centre = old.centre;
         let mut pair = Pair::new(
             old.reference,
             old.ref_weight,
@@ -1476,6 +1491,11 @@ fn set_scale(st: &mut State<'_>, s: f32, force: bool) -> Result<(), End> {
         pair.bbr_source = Some(st.bbr.clone());
         pair.bbr_step = std::sync::atomic::AtomicUsize::new(st.bbr_step.max(0) as usize);
         pair.no_bins = no_bins;
+        // the existing pair keeps its centre, the previous input's centre of mass (observed:
+        // the costs of a transformed matrix are FSL's only so)
+        if std::env::var_os("LXFLIRT_NOKEEP").is_none() {
+            pair.centre = centre;
+        }
         st.pair = Some(Arc::new(pair));
     }
     Ok(())
@@ -1531,6 +1551,13 @@ fn run_search(st: &mut State<'_>, dof: usize) -> Result<(), End> {
     let log = st.log.clone();
     let cost = st.search_cost;
     let eval = |t: &Mat4| evaluate(&pair, t, cost, &log);
+    // the search measures both centres again (observed: one more warning for an empty
+    // reference or input level)
+    for v in [&pair.reference, &pair.input] {
+        if cog_total(v) < 1e-5 {
+            st.log.push("WARNING::in calculating COG, total = 0.0");
+        }
+    }
     let c_ref = pair.reference.centre_of_mass();
     let c_in = pair.centre;
     let mc = mat::apply(&st.init, [c_in[0], c_in[1], c_in[2], 1.0]);
@@ -1550,8 +1577,18 @@ fn run_search(st: &mut State<'_>, dof: usize) -> Result<(), End> {
         .iter()
         .map(|d| d.abs())
         .fold(f32::INFINITY, f32::min);
-    let found =
-        search::search(&eval, c_in, rp, dof, &r, &st.opt, min_voxel, true).map_err(End::Error)?;
+    let found = search::search(
+        &eval,
+        c_in,
+        rp,
+        dof,
+        dof.min(st.maxdof),
+        &r,
+        &st.opt,
+        min_voxel,
+        true,
+    )
+    .map_err(End::Error)?;
     st.check()?;
     for (c, m) in found.results {
         st.push(
@@ -1905,12 +1942,17 @@ fn apply(
             &mat::mul(&flip(reference.vols[0].shape[0]), &scale),
             &flip(refv.shape[0]),
         );
-        let srow = [h.srow_x, h.srow_y, h.srow_z, [0.0, 0.0, 0.0, 1.0]];
-        let new_s = mat::mul(&srow, &step);
-        h.srow_x = new_s[0];
-        h.srow_y = new_s[1];
-        h.srow_z = new_s[2];
-        if let Ok(q) = h.qform() {
+        // an unset sform keeps the reference's rows (observed)
+        if h.sform_code > 0 {
+            let srow = [h.srow_x, h.srow_y, h.srow_z, [0.0, 0.0, 0.0, 1.0]];
+            let new_s = mat::mul(&srow, &step);
+            h.srow_x = new_s[0];
+            h.srow_y = new_s[1];
+            h.srow_z = new_s[2];
+        }
+        if h.qform_code > 0
+            && let Ok(q) = h.qform()
+        {
             let nq = mat::mul(q.rows(), &step);
             h.qoffset_x = nq[0][3];
             h.qoffset_y = nq[1][3];

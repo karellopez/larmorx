@@ -32,21 +32,38 @@ what the spec should say is in the part's spec questions (its handoff).
 ## The costs
 
 `validation/investigations/cleanroom-flirt/costs.sch` measures two matrices at the 8, 4 and 2 mm
-pairs (and with smoothing 0 and fuzzy fraction 0) for every cost; FSL against the original
+pairs (and with smoothing 0 and fuzzy fraction 0) for every cost; `costs3.sch` at the 4 mm pair
+and the two finer scales that only reset the input (3 mm data); FSL against the original
 (`costs.py`):
 
 - `normcorr`, `mutualinfo`, `normmi`, `labeldiff`: the same printed values (6 decimals) at every
   scale, also weighted (`-refweight`, `-inweight`); `leastsq` to 7 significant digits.
-- `corratio`: the same values at the 4 and 2 mm pairs and at every smoothing (0 to 16 mm), but
-  not at the 8 mm pair with 32 or 64 bins (`0.984415` against `0.982248`; with 16 bins, `-bins
-  128`, the same) nor with `-noresample` (relative 3.5e-5). No bin count reproduces FSL's value,
-  and none of these variants does: unweighted counts, biased variances, every bin counted,
-  appendix A's binning, a top bin of its own, the roles of the two images swapped. Weighted, FSL's
-  8 mm value is above 1 (`1.016`): its weighted form is not the weighted moments of §6.2.
-- `woods`: FSL's is `Σ_b n_b·σ_b/μ_b / n` (`specs/mcflirt.md` appendix A's `n_b²` is not FLIRT's:
-  1.23 against 2119 at 8 mm), with the same 8 mm and `-noresample` mismatch as `corratio`
-  (relative 1e-3).
+- `corratio` and `woods`: **the points of a reference bin holding at most two points are left out
+  altogether**: of the bins' sums, of the count `n` and of the total variance (`corratio`), of the
+  count (`woods`). Found on synthetic images (`corratio_synth.py`, `corratio_sparse.py`): on a
+  10 x 10 x 10 ramp FSL's `corratio` was 0.6 to 2 % above appendix A's formula (the sparse bins
+  left out of the sum only) and its `woods` 0.14 % (`n/(n − 1)`), at 8, 16 and 32 bins alike;
+  leaving the sparse bins' points out everywhere gives FSL's printed values in every case. With
+  it the original's `corratio` and `woods` are FSL's at every pair (the 8 mm pair, whose few
+  voxels make sparse bins, included) and with `-noresample` (whose brightest voxels make one).
+- `woods` is `Σ_b n_b·σ_b/μ_b / n` (`specs/mcflirt.md` appendix A's `n_b²` is not FLIRT's: 1.23
+  against 2119 at 8 mm), `σ_b` with `n_b − 1`.
+- The bin sums are single-precision running sums in the sampling order (one running sum per bin
+  over the whole grid); FSL's printed digits agree with them at every pair.
 - `-noresample` still blurs the input at each `setscale` (only so do the `normcorr` values agree).
+
+## The image pair's centre
+
+- A `setscale` that only resets the input (§7.2: the data too coarse for the scale) **keeps the
+  pair's centre**, the centre of mass of the input the pair was built with (blurred to its
+  scale): `centre.sch` prints the parameters of two rotations (`printparams`) after each
+  `setscale`; their translations, `(R − I)·c`, give the centre: FSL's stays the 4 mm pair's at
+  the 2 and 1 mm scales of 3 mm data. (A fresh centre at each reset moves the default schedule's
+  result on the suite's 3 mm BOLD reference by 0.1 mm.)
+- The search (§8.1) measures both centres of mass again (the reference level's and the input's):
+  with an empty level (a weight of zeros) FSL prints `WARNING::in calculating COG, total = 0.0`
+  once more there than once per pair (`-refweight` of zeros: once; `-inweight` of zeros: one per
+  pair and one more), also with `-nosearch` (the search runs with no rotations).
 
 ## The pyramid and the outputs
 
@@ -62,6 +79,11 @@ pairs (and with smoothing 0 and fuzzy fraction 0) for every cost; FSL against th
   value), not set to the padding value.
 - FSL writes the sform's negative zeros as zeros, and a `NIFTI_PAIR` header of 352 bytes (the
   four extension bytes).
+- `-applyisoxfm` keeps the reference's sform rows when its sform code is 0 (and its quaternion
+  fields when its qform code is 0); only a set transform follows the new grid.
+- A level of the reference pyramid of 1 x 1 x 1 voxels (a reference of 1 or 2 voxels along every
+  axis) is halved from a border-less volume (§10a, FSL-75's empty buffer): refused in both modes
+  like the single voxel of the output's padding.
 - `-usesqform`'s matrix (`real/applyxfm-usesqform`): FSL's translation differs from the double
   products of §8.5 by 4.5e-6 mm (-13.74984741 against -13.74984288), whichever of the sform and
   qform is used: FSL computes part of it in single precision.

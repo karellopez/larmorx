@@ -398,13 +398,19 @@ impl Accumulator for BinRecord {
     fn end_row(&mut self) {}
 }
 
-/// The correlation ratio's cost (§6.2): `Σ_b n_b var_b / (n var)` over the bins with more than
-/// two (weighted) points, the variances with `n − 1`; 0 when the variance is not positive.
+/// A bin's points take part in `corratio` and `woods` only when the bin holds more than
+/// [`SPARSE`] (weighted) points (observed: FSL leaves the points of sparser bins out of the
+/// counts, the sums and the total variance alike).
+const SPARSE: f64 = 2.0;
+
+/// The correlation ratio's cost (§6.2): `Σ_b n_b var_b / (n var)`, the variances with `n − 1`,
+/// over the bins with more than two (weighted) points, `n` and `var` over the same points; 0 when
+/// the variance is not positive.
 fn corr_ratio(m: &BinMoments) -> f32 {
     let d = |st: &[f32; 3]| st.map(f64::from);
+    let kept = || m.w.iter().map(d).filter(|st| st[0] > SPARSE);
     let (mut n, mut s, mut ss) = (0.0f64, 0.0f64, 0.0f64);
-    for st in &m.w {
-        let [a, b, c] = d(st);
+    for [a, b, c] in kept() {
         n += a;
         s += b;
         ss += c;
@@ -416,29 +422,29 @@ fn corr_ratio(m: &BinMoments) -> f32 {
     if var <= 0.0 {
         return 0.0;
     }
-    let within: f64 =
-        m.w.iter()
-            .map(d)
-            .filter(|st| st[0] > 2.0)
-            .map(|st| st[0] * (st[2] - st[1] * st[1] / st[0]) / (st[0] - 1.0))
-            .sum();
+    let within: f64 = kept()
+        .map(|st| st[0] * (st[2] - st[1] * st[1] / st[0]) / (st[0] - 1.0))
+        .sum();
     (within / (n * var)) as f32
 }
 
-/// Woods' cost (§6.2): `Σ_b n_b·σ_b/μ_b / n` (observed: not appendix A's `n_b²`).
+/// Woods' cost (§6.2): `Σ_b n_b·σ_b/μ_b / n` (observed: not appendix A's `n_b²`) over the bins
+/// with more than two points, `n` their points.
 fn woods(m: &BinMoments) -> f32 {
-    let n: f64 = m.n.iter().map(|st| f64::from(st[0])).sum();
+    let kept = || {
+        m.n.iter()
+            .map(|st| st.map(f64::from))
+            .filter(|st| st[0] > SPARSE)
+    };
+    let n: f64 = kept().map(|st| st[0]).sum();
     if n <= 0.0 {
         return 1e10;
     }
     let mut cost = 0.0;
-    for st in &m.n {
-        let [nb, s1, s2] = st.map(f64::from);
-        if nb > 1.0 {
-            let mean = s1 / nb;
-            let sd = ((s2 - s1 * s1 / nb) / (nb - 1.0)).max(0.0).sqrt();
-            cost += nb * if mean > 0.0 { sd / mean } else { sd };
-        }
+    for [nb, s1, s2] in kept() {
+        let mean = s1 / nb;
+        let sd = ((s2 - s1 * s1 / nb) / (nb - 1.0)).max(0.0).sqrt();
+        cost += nb * if mean > 0.0 { sd / mean } else { sd };
     }
     (cost / n) as f32
 }

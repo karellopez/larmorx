@@ -356,6 +356,23 @@ fn minimise(
 /// One optimisation of the trial matrix `start` (§8.2): its parameters about `centre`, the first
 /// `dof` optimised (or, with `subset`, the subset's variables from `start`'s own parameters),
 /// `maxit` sweeps. `eval` is the cost of a trial matrix. Returns the matrix and its cost.
+// TEMPORARY TRACE (development): every evaluation's parameters and cost on standard error.
+static TRACE_N: std::sync::atomic::AtomicUsize = std::sync::atomic::AtomicUsize::new(0);
+fn trace(x: &[f64], c: f32) {
+    if let Some(path) = std::env::var_os("LXFLIRT_TRACE") {
+        use std::io::Write as _;
+        let n = TRACE_N.fetch_add(1, std::sync::atomic::Ordering::Relaxed) + 1;
+        let v: Vec<String> = x.iter().map(|v| format!("{v:.6}")).collect();
+        if let Ok(mut f) = std::fs::OpenOptions::new()
+            .create(true)
+            .append(true)
+            .open(path)
+        {
+            let _ = writeln!(f, "{n} : {c:.6} :: {}", v.join(" "));
+        }
+    }
+}
+
 pub fn optimise(
     eval: &dyn Fn(&Mat4) -> f32,
     start: &Mat4,
@@ -366,6 +383,25 @@ pub fn optimise(
     subset: Option<&Subset>,
 ) -> Result<(Mat4, f32), String> {
     let x0: Params = param::decompose(s.rep, start, centre);
+    let (x, c) = optimise_params(eval, x0, centre, dof, maxit, s, subset)?;
+    let quiet = Log::default();
+    let log = s.log.as_deref().unwrap_or(&quiet);
+    let n = if subset.is_some() { 12 } else { dof };
+    Ok((param::compose(s.rep, &x, n, centre, log), c))
+}
+
+/// [`optimise`] from the parameters `x0` themselves (the search's grid points and minima: FSL
+/// starts there from the angles it sampled, not from a decomposition of their matrix, observed):
+/// returns the optimised parameters (the first `dof`, or all twelve with `subset`) and the cost.
+pub fn optimise_params(
+    eval: &dyn Fn(&Mat4) -> f32,
+    x0: Params,
+    centre: [f64; 3],
+    dof: usize,
+    maxit: usize,
+    s: &Settings,
+    subset: Option<&Subset>,
+) -> Result<(Params, f32), String> {
     let quiet = Log::default();
     let log = s.log.as_deref().unwrap_or(&quiet);
     let tol: Vec<f32> = (0..12)
@@ -381,9 +417,17 @@ pub fn optimise(
                 x[..dof].copy_from_slice(v);
                 param::compose(s.rep, &x, dof, centre, log)
             };
-            let cost = |v: &[f64]| eval(&compose(v));
+            let cost = |v: &[f64]| {
+                let c = eval(&compose(v));
+                let mut x = x0;
+                x[..dof].copy_from_slice(v);
+                trace(&x, c);
+                c
+            };
             let (v, c) = minimise(&cost, x0[..dof].to_vec(), &tol[..dof], maxit, s);
-            Ok((compose(&v), c))
+            let mut x = x0;
+            x[..dof].copy_from_slice(&v);
+            Ok((x, c))
         }
         Some(p) => {
             let mut x0d = [0.0; 12];
@@ -407,9 +451,20 @@ pub fn optimise(
             let b = p.reduce(&zero);
             let ty: Vec<f32> = a.iter().zip(&b).map(|(x, y)| (x - y) as f32).collect();
             let y0 = p.reduce(&zero);
-            let cost = |y: &[f64]| eval(&compose(y));
+            let cost = |y: &[f64]| {
+                let c = eval(&compose(y));
+                let d = p.expand(y);
+                let x: Vec<f64> = (0..12).map(|i| d[i] + x0d[i]).collect();
+                trace(&x, c);
+                c
+            };
             let (y, c) = minimise(&cost, y0, &ty, maxit, s);
-            Ok((compose(&y), c))
+            let d = p.expand(&y);
+            let mut x = [0.0; 12];
+            for i in 0..12 {
+                x[i] = d[i] + x0d[i];
+            }
+            Ok((x, c))
         }
     }
 }

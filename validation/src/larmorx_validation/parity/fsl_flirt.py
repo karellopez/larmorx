@@ -125,13 +125,40 @@ def _numbers(text: str) -> list[float]:
     return out
 
 
+def _load(path: Path):
+    """A nibabel image of any file FSL writes: gzip and plain by nibabel, zstd and bzip2 (which
+    the validation environment cannot read) from their decompressed bytes (a pair's two files
+    together)."""
+    import io
+
+    import nibabel as nib
+
+    name = path.name
+    for c in (".zst", ".bz2"):
+        if not name.endswith(c):
+            continue
+        from larmorx_validation.parity.fsl_bet import content
+
+        for stem in (".hdr", ".img"):
+            if name.endswith(stem + c):
+                base = name[: -len(stem + c)]
+                head = content(path.with_name(base + ".hdr" + c))
+                data = content(path.with_name(base + ".img" + c))
+                two = int.from_bytes(head[:4], "little") == 540
+                klass = nib.Nifti2Pair if two else nib.Nifti1Pair
+                fm = klass.make_file_map({"header": io.BytesIO(head), "image": io.BytesIO(data)})
+                return klass.from_file_map(fm)
+        raw = content(path)
+        two = int.from_bytes(raw[:4], "little") == 540
+        return (nib.Nifti2Image if two else nib.Nifti1Image).from_bytes(raw)
+    return nib.load(str(path))
+
+
 def _reference_mask(path: Path) -> tuple[np.ndarray, np.ndarray] | None:
     """The reference's brain (voxels above 0, all voxels when none) as FSL millimetres (voxel
     index times voxel size, radiological order), and the image's voxel sizes."""
-    import nibabel as nib
-
     try:
-        img = nib.load(str(path))
+        img = _load(path)
     except Exception:
         return None
     data = np.asanyarray(img.dataobj)
@@ -195,6 +222,29 @@ def compare(
     """Exit status, streams, files, matrices and images (the module's rules). ``band()``, when
     given, is FSL's own variability for this registration (its p95 displacement on a perturbed
     input), asked for only where the original is beyond the fixed threshold."""
+    refused_75 = ours.code == 1 and any(
+        ln.startswith("larmorx:") and "FSL-75" in ln and "refused" in ln
+        for ln in ours.stderr.splitlines()
+    )
+    if refused_75 and oracle.code <= 0:
+        # FSL-75's single voxel: FSL reads an empty buffer (its run is undefined: it finishes or
+        # is killed); the original refuses before writing anything (specs/flirt.md §10a)
+        checks(
+            "a single voxel's background value (FSL-75): the original refuses (exit 1)",
+            True,
+            detail=f"{program} {oracle.code}, original {ours.code}",
+        )
+        return
+    if oracle.code < 0 and "FSL-75" in defects.notices_in(ours.stderr):
+        # FSL-75: FSL wrote past its buffer and went on with a corrupted heap until the C library
+        # stopped it; the original takes every border value and names the entry (§10a)
+        checks(
+            f"{program} is killed after FSL-75's heap corruption; the original goes on and names "
+            "FSL-75",
+            ours.code >= 0,
+            detail=f"{program} signal {-oracle.code}, original {ours.code}",
+        )
+        return
     if oracle.code < 0:
         checks(
             f"exit status ({program} is killed; the original exits 1)",
@@ -247,6 +297,9 @@ def compare(
     mats_identical = applying or any(n.endswith(".mat") for n in theirs)
     ref_path = _reference_path(args, a)
     pts = None
+    #: a matrix within FSL's own variability only (an ill-posed registration): the image follows
+    #: the matrix, so its correlation with FSL's is reported, not held to 0.999
+    ill_posed = False
     for name in sorted(set(theirs) & set(mine)):
         fa, fb = theirs[name], mine[name]
         if _is_image(name):
@@ -323,6 +376,7 @@ def compare(
             if own is not None:
                 limit = max(thr, own)
                 detail += f"; FSL's own p95 on a perturbed input {own:.4f} mm"
+                ill_posed = ill_posed or p95 <= limit
         checks(
             f"{name}: 95th-percentile displacement over the reference's brain",
             p95 <= limit,
@@ -354,9 +408,7 @@ def compare(
                 detail=_image_difference(fa, fb),
             )
         else:
-            import nibabel as nib
-
-            ia, ib = nib.load(str(fa)), nib.load(str(fb))
+            ia, ib = _load(fa), _load(fb)
             da = np.asanyarray(ia.dataobj).astype(np.float64)
             db = np.asanyarray(ib.dataobj).astype(np.float64)
             if da.shape != db.shape:
@@ -365,7 +417,7 @@ def compare(
             rm = None
             if ref_path is not None:
                 try:
-                    r = np.asanyarray(nib.load(str(ref_path)).dataobj)
+                    r = np.asanyarray(_load(ref_path).dataobj)
                     if r.ndim > 3:
                         r = r[..., 0]
                     r = r.reshape(da.shape[:3])
@@ -379,19 +431,18 @@ def compare(
             ok = np.isfinite(da) & np.isfinite(db)
             c = _ncc(np.where(ok, da, 0), np.where(ok, db, 0), rm)
             checks(
-                f"{name}: correlation with FSL's image inside the reference's mask",
-                c >= 0.999,
+                f"{name}: correlation with FSL's image inside the reference's mask"
+                + (" (reported: the matrix within FSL's own variability)" if ill_posed else ""),
+                ill_posed or c >= 0.999,
                 metric="NCC",
-                value=round(c, 6),
-                threshold=0.999,
+                value=round(c, 6) if np.isfinite(c) else str(c),
+                threshold="reported" if ill_posed else 0.999,
             )
 
 
 def _relative_difference(fa: Path, fb: Path) -> float:
-    import nibabel as nib
-
-    da = np.asanyarray(nib.load(str(fa)).dataobj).astype(np.float64)
-    db = np.asanyarray(nib.load(str(fb)).dataobj).astype(np.float64)
+    da = np.asanyarray(_load(fa).dataobj).astype(np.float64)
+    db = np.asanyarray(_load(fb).dataobj).astype(np.float64)
     if da.shape != db.shape:
         return float("inf")
     ok = np.isfinite(da) & np.isfinite(db)
@@ -439,19 +490,27 @@ def _band(run: rep.Run, args: list[str], settings: dict[str, str | None], a: Pat
     return band
 
 
-def _image_difference(fa: Path, fb: Path) -> str:
-    import nibabel as nib
+def _differs(a, b) -> bool:
+    """Whether two header fields differ (NaN equal to NaN)."""
+    x, y = np.asarray(a), np.asarray(b)
+    if x.dtype.kind in "fc" and y.dtype.kind in "fc":
+        return not np.array_equal(x, y, equal_nan=True)
+    return not np.array_equal(x, y)
 
+
+def _image_difference(fa: Path, fb: Path) -> str:
     try:
-        da = np.asanyarray(nib.load(str(fa)).dataobj).astype(np.float64)
-        db = np.asanyarray(nib.load(str(fb)).dataobj).astype(np.float64)
+        ia, ib = _load(fa), _load(fb)
+        da = np.asanyarray(ia.dataobj).astype(np.float64)
+        db = np.asanyarray(ib.dataobj).astype(np.float64)
     except Exception as e:
         return f"cannot read: {e}"
     if da.shape != db.shape:
         return f"shapes {da.shape} vs {db.shape}"
     diff = ~((da == db) | (np.isnan(da) & np.isnan(db)))
     if not diff.any():
-        return "the headers differ"
+        fields = [k for k in ia.header if k != "descrip" and _differs(ia.header[k], ib.header[k])]
+        return "the headers differ" + (f": {', '.join(fields)}" if fields else "")
     return f"{int(diff.sum())} of {diff.size} values differ (max {np.nanmax(np.abs(da - db)):.4g})"
 
 

@@ -48,7 +48,10 @@ pub struct Found {
     pub starts: Vec<(f32, Mat4)>,
 }
 
-/// The search (§8.1) with `dof` degrees of freedom. `eval` is the search cost of a trial
+/// The search (§8.1): `dof` the `search` command's degrees of freedom, which choose the
+/// grids' parameter subset and scale rule whatever `-dof` says (observed: with `-dof 6` FSL's
+/// coarse grid optimises the common scale and its fine grid keeps the median scale), `free_dof`
+/// those of the minima's free optimisations (`-dof` applies there). `eval` is the search cost of a trial
 /// matrix; `centre` the parameters' centre; `ref_params` the reference parameters (the
 /// centres of mass aligned); `min_voxel` the reference level's smallest voxel size.
 #[allow(clippy::too_many_arguments)]
@@ -57,6 +60,7 @@ pub fn search(
     centre: [f64; 3],
     ref_params: Params,
     dof: usize,
+    free_dof: usize,
     r: &Ranges,
     settings: &Settings,
     min_voxel: f32,
@@ -96,10 +100,10 @@ pub fn search(
         p[8] = sc;
         p
     };
+    // from the sampled parameters themselves (observed: FSL's evaluations start at the angles
+    // it sampled, and the grid keeps the optimised translations and scale as they come)
     let run = |p: &Params| -> Result<(Params, f32), String> {
-        let m = rigid::compose(p, 12, centre);
-        let (out, c) = optimise::optimise(eval, &m, centre, 12, 4, settings, Some(&subset))?;
-        Ok((rigid::decompose(&out, centre), c))
+        optimise::optimise_params(eval, *p, centre, 12, 4, settings, Some(&subset))
     };
     let par_map = |n: usize, f: &(dyn Fn(usize) -> Result<(Params, f32), String> + Sync)| {
         if n_threads_parallel {
@@ -260,15 +264,27 @@ pub fn search(
         minima.push(best);
     }
     // 9. each minimum optimised freely; near-duplicates dropped
-    let free = dof.min(7);
+    let free = free_dof.min(7);
     let starts: Vec<Mat4> = minima
         .iter()
         .map(|&i| rigid::compose(&fine_params[i], free, centre))
         .collect();
-    let run_free = |k: usize| -> Result<(Mat4, f32), String> {
-        optimise::optimise(eval, &starts[k], centre, free, 4, settings, None)
+    // each start's own cost goes with it into `P` (observed: FSL's `P` rows carry the cost of
+    // their matrix, the free optimisation's first evaluation)
+    let run_free = |k: usize| -> Result<(Mat4, f32, f32), String> {
+        let c0 = eval(&starts[k]);
+        let (x, c) = optimise::optimise_params(
+            eval,
+            fine_params[minima[k]],
+            centre,
+            free,
+            4,
+            settings,
+            None,
+        )?;
+        Ok((rigid::compose(&x, free, centre), c, c0))
     };
-    let freed: Vec<(Mat4, f32)> = if n_threads_parallel {
+    let freed: Vec<(Mat4, f32, f32)> = if n_threads_parallel {
         (0..starts.len())
             .into_par_iter()
             .map(run_free)
@@ -276,24 +292,24 @@ pub fn search(
     } else {
         (0..starts.len()).map(run_free).collect::<Result<_, _>>()?
     };
-    let mut list: Vec<(f32, Mat4, Mat4)> = Vec::new();
-    for (k, (m, c)) in freed.into_iter().enumerate() {
+    let mut list: Vec<(f32, Mat4, Mat4, f32)> = Vec::new();
+    for (k, (m, c, c0)) in freed.into_iter().enumerate() {
         let near = list
             .iter()
-            .position(|(_, e, _)| mat::rms_deviation(&m, e, 80.0) < f64::from(min_voxel));
+            .position(|(_, e, _, _)| mat::rms_deviation(&m, e, 80.0) < f64::from(min_voxel));
         match near {
             Some(j) => {
                 if c < list[j].0 {
-                    list[j] = (c, m, starts[k]);
+                    list[j] = (c, m, starts[k], c0);
                 }
             }
-            None => list.push((c, m, starts[k])),
+            None => list.push((c, m, starts[k], c0)),
         }
     }
     list.sort_by(|a, b| a.0.partial_cmp(&b.0).unwrap_or(std::cmp::Ordering::Equal));
     Ok(Found {
-        results: list.iter().map(|(c, m, _)| (*c, *m)).collect(),
-        starts: list.iter().map(|(c, _, s)| (*c, *s)).collect(),
+        results: list.iter().map(|(c, m, _, _)| (*c, *m)).collect(),
+        starts: list.iter().map(|(_, _, s, c0)| (*c0, *s)).collect(),
     })
 }
 

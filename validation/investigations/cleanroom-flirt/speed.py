@@ -36,9 +36,12 @@ def main() -> None:
     nc = os.environ.get("LARMORX_NC_BIN")
     lx = os.environ.get("LARMORX_FLIRT_BIN")
     cases = {
-        "default 12 dof": rep.Run("flirt", ("-in", "@epi.nii", "-ref", "@t1.nii", "-omat", "o.mat")),
+        "default 12 dof": rep.Run(
+            "flirt", ("-in", "@epi.nii", "-ref", "@t1.nii", "-omat", "o.mat")
+        ),
         "6 dof with -out": rep.Run(
-            "flirt", ("-in", "@epi.nii", "-ref", "@t1.nii", "-dof", "6", "-out", "o", "-omat", "o.mat")
+            "flirt",
+            ("-in", "@epi.nii", "-ref", "@t1.nii", "-dof", "6", "-out", "o", "-omat", "o.mat"),
         ),
     }
     runs = rep.fmriprep_calls()
@@ -51,9 +54,21 @@ def main() -> None:
             rows.append((name, args, d))
             env = rep._environment({})
             fsl = timed([str(rep.fsldir() / "bin" / "flirt"), *args], d, env)
-            o1 = timed([lx, "fsl", "flirt", *args], d, {**env, "OMP_NUM_THREADS": "1", "LARMORX_IMPLEMENTATION": "original"})
-            o8 = timed([lx, "fsl", "flirt", *args], d, {**env, "OMP_NUM_THREADS": "8", "LARMORX_IMPLEMENTATION": "original"})
-            r1 = timed([nc, "fsl", "flirt", *args], d, {**env, "OMP_NUM_THREADS": "1"}) if nc else float("nan")
+            o1 = timed(
+                [lx, "fsl", "flirt", *args],
+                d,
+                {**env, "OMP_NUM_THREADS": "1", "LARMORX_IMPLEMENTATION": "original"},
+            )
+            o8 = timed(
+                [lx, "fsl", "flirt", *args],
+                d,
+                {**env, "OMP_NUM_THREADS": "8", "LARMORX_IMPLEMENTATION": "original"},
+            )
+            r1 = (
+                timed([nc, "fsl", "flirt", *args], d, {**env, "OMP_NUM_THREADS": "1"})
+                if nc
+                else float("nan")
+            )
             print(f"| {name} | {fsl:.2f} | {r1:.2f} | {o1:.2f} | {o8:.2f} |")
     if fp is not None:
         args = rep.fmriprep_args(*fp)
@@ -61,9 +76,21 @@ def main() -> None:
             d = Path(d_)
             env = rep._environment({})
             fsl = timed([str(rep.fsldir() / "bin" / "flirt"), *args], d, env)
-            o1 = timed([lx, "fsl", "flirt", *args], d, {**env, "OMP_NUM_THREADS": "1", "LARMORX_IMPLEMENTATION": "original"})
-            o8 = timed([lx, "fsl", "flirt", *args], d, {**env, "OMP_NUM_THREADS": "8", "LARMORX_IMPLEMENTATION": "original"})
-            r1 = timed([nc, "fsl", "flirt", *args], d, {**env, "OMP_NUM_THREADS": "1"}) if nc else float("nan")
+            o1 = timed(
+                [lx, "fsl", "flirt", *args],
+                d,
+                {**env, "OMP_NUM_THREADS": "1", "LARMORX_IMPLEMENTATION": "original"},
+            )
+            o8 = timed(
+                [lx, "fsl", "flirt", *args],
+                d,
+                {**env, "OMP_NUM_THREADS": "8", "LARMORX_IMPLEMENTATION": "original"},
+            )
+            r1 = (
+                timed([nc, "fsl", "flirt", *args], d, {**env, "OMP_NUM_THREADS": "1"})
+                if nc
+                else float("nan")
+            )
             print(f"| fMRIPrep's BBR (ds005040) | {fsl:.2f} | {r1:.2f} | {o1:.2f} | {o8:.2f} |")
 
 

@@ -16,7 +16,6 @@ from pathlib import Path
 
 import nibabel as nib
 import numpy as np
-
 from larmorx_validation.parity import defects
 from larmorx_validation.parity import fsl_flirt as orig
 from larmorx_validation.parity import fsl_flirt_replica as rep

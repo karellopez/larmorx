@@ -1,12 +1,12 @@
 # Parity: FLIRT replica (bit-exact, FSL Licence)
 
-**All cases agree.** 217 cases on the `standard` tier: 152 pass, 61 rejected by both, 4 expected divergences, 0 failures.
+**All cases agree.** 296 cases on the `standard` tier: 205 pass, 87 rejected by both, 4 expected divergences, 0 failures.
 
-- **Validated:** `larmorx-nc fsl flirt`, `convert_xfm`, `avscale`, `img2imgcoord`, `std2imgcoord`, `img2stdcoord`, `rmsdiff` and `makerot` (crate larmorx-nc-flirt, translated from FSL 6.0.7.23's source)
-- **Reference:** flirt, convert_xfm, avscale, img2imgcoord, std2imgcoord, img2stdcoord, rmsdiff and makerot from FSL 6.0.7.23 (fsl-flirt 2111.4, fsl-newimage 2601.0, fsl-miscmaths 2412.6, fsl-utils 2412.6, fsl-warpfns 2501.0; the conda build at `~/fsl-6.0.7.23`, as built: glibc 2.35's maths, OpenBLAS on its Haswell kernels)
+- **Validated:** `larmorx-nc fsl flirt`, `convert_xfm`, `avscale`, `img2imgcoord`, `std2imgcoord`, `img2stdcoord`, `rmsdiff`, `makerot`, `midtrans`, `pointflirt`, `applyxfm4D` and the scripts `pairreg`, `extracttxt` and `aff2rigid` (crate larmorx-nc-flirt, translated from FSL 6.0.7.23's source)
+- **Reference:** flirt, convert_xfm, avscale, img2imgcoord, std2imgcoord, img2stdcoord, rmsdiff, makerot, midtrans, pointflirt, applyxfm4D, pairreg, extracttxt and aff2rigid from FSL 6.0.7.23 (fsl-flirt 2111.4, fsl-newimage 2601.0, fsl-miscmaths 2412.6, fsl-utils 2412.6, fsl-warpfns 2501.0, fsl-armawrap 0.7.0 with Armadillo 14.2.1; the conda build at `~/fsl-6.0.7.23`, as built: glibc 2.35's maths, OpenBLAS 0.3.33 with its LAPACK on its Haswell kernels; the scripts under dash, GNU grep, dc and sed of Ubuntu 22.04 and FSL's Python with NumPy 2.4.6)
 - **Test data:** larmorx-testdata `52124bc98f9f`, tier `standard`
-- **Generated:** 2026-11-01 on Linux x86_64, with `python -m larmorx_validation parity fsl-flirt-replica --tier standard`
-- **Original programs:** 217 runs: 204 from the oracle cache, 13 run (4 never cached: the original varies); cache `<workspace>/oracles/cache`, mode `use`
+- **Generated:** 2026-11-02 on Linux x86_64, with `python -m larmorx_validation parity fsl-flirt-replica --tier standard`
+- **Original programs:** 296 runs: 277 from the oracle cache, 19 run (4 never cached: the original varies); cache `<workspace>/oracles/cache`, mode `use`
 
 ## Thresholds
 
@@ -22,15 +22,15 @@
 
 | Category | Cases | Pass | Both reject | Expected divergence | Fail |
 |---|---|---|---|---|---|
-| bbr | 10 | 10 | 0 | 0 | 0 |
+| bbr | 11 | 11 | 0 | 0 | 0 |
 | convert_xfm | 16 | 7 | 9 | 0 | 0 |
-| difftest | 5 | 5 | 0 | 0 | 0 |
+| difftest | 10 | 8 | 2 | 0 | 0 |
 | edge | 32 | 9 | 19 | 4 | 0 |
 | fmriprep | 3 | 3 | 0 | 0 | 0 |
-| programs | 66 | 39 | 27 | 0 | 0 |
+| programs | 129 | 79 | 50 | 0 | 0 |
 | real | 58 | 58 | 0 | 0 | 0 |
-| schedule | 21 | 15 | 6 | 0 | 0 |
-| verbose | 6 | 6 | 0 | 0 | 0 |
+| schedule | 29 | 22 | 7 | 0 | 0 |
+| verbose | 8 | 8 | 0 | 0 | 0 |
 
 ## Expected divergences
 
@@ -51,6 +51,7 @@
 | `schedule/bad-if` | a schedule: if 1 =< 2 | flirt exits 255; the same from the replica. Cannot recognise operator =< in IF statement |
 | `schedule/bad-costfunction` | a schedule: setoption costfunction nope | flirt exits 255; the same from the replica. Unrecognised cost function: nope |
 | `schedule/bad-matname` | a schedule: clear Uq | flirt exits -11; the same from the replica. Can only accept UA to UZ, not Uq |
+| `schedule/alignpaxes-args` | alignpaxes without its matrix | flirt exits 255; the same from the replica. Wrong number of args to ALIGNPAXES |
 | `edge/no-args` | no arguments (the usage, exit 1) | flirt exits 1; the same from the replica. |
 | `edge/no-in` | no -in | flirt exits 2; the same from the replica. ERROR:: Input volume filename not found |
 | `edge/no-ref` | no -ref | flirt exits 2; the same from the replica. ERROR:: Reference volume filename not found |
@@ -79,6 +80,29 @@
 | `convert_xfm/lacking` | -omat lacking its argument | convert_xfm exits 2; the same from the replica. Lacking argument to option -omat |
 | `convert_xfm/singular` | -inverse of a singular matrix | convert_xfm exits -6; the same from the replica. terminate called after throwing an instance of 'std::runtime_error' what(): inv(): matrix is singular |
 | `convert_xfm/missing-concat` | -concat with a file that does not exist | convert_xfm exits 253; the same from the replica. Could not open matrix file none.mat Cannot read concat-matrix |
+| `programs/applyxfm4D-usage` | applyxfm4D without arguments (its usage, exit 255) | applyxfm4D exits 255; the same from the replica. Usage: ~/fsl-6.0.7.23/bin/applyxfm4D <input volume> <ref volume> <output volume> <transformation matrix file/d… |
+| `programs/applyxfm4D-bad-interp` | an unknown interpolation (its message, exit 1) | applyxfm4D exits 1; the same from the replica. interpolation method: cubic is not a valid choice. Please choose from nearestneighbour, trilinear, sinc, or spli… |
+| `programs/applyxfm4D-userprefix-last` | -userprefix as the last word (std::string of null) | applyxfm4D exits -6; the same from the replica. terminate called after throwing an instance of 'std::logic_error' what(): basic_string: construction from null … |
+| `programs/applyxfm4D-missing-matrix` | a directory without the matrices (FSL aborts) | applyxfm4D exits -6; the same from the replica. Could not open matrix file none/MAT_00000 terminate called after throwing an instance of 'std::logic_error' wha… |
+| `programs/applyxfm4D-missing-input` | an input that does not exist (FSL aborts) | applyxfm4D exits -6; the same from the replica. Image Exception : #63 :: No image files match: none terminate called after throwing an instance of 'std::runtim… |
+| `programs/aff2rigid-usage` | aff2rigid without arguments (its usage, exit 1) | aff2rigid exits 1; the same from the replica. |
+| `programs/aff2rigid-default` | aff2rigid of an affine standard-space matrix (numpy's arithmetic) | aff2rigid exits 1; the same from the replica. Traceback (most recent call last): File "~/fsl-6.0.7.23/bin/aff2rigid", line 105, in <module> v41=mat(zeros((4,1)… |
+| `programs/aff2rigid-fmriprep` | aff2rigid of fMRIPrep's initial matrix | aff2rigid exits 1; the same from the replica. Traceback (most recent call last): File "~/fsl-6.0.7.23/bin/aff2rigid", line 105, in <module> v41=mat(zeros((4,1)… |
+| `programs/extracttxt-usage` | extracttxt with one argument (its usage, exit 255) | extracttxt exits 2; the same from the replica. ~/fsl-6.0.7.23/bin/extracttxt: 68: exit: Illegal number: -1 |
+| `programs/extracttxt-line0` | a relative start reaching line 0 (sed's error, exit 1) | extracttxt exits 1; the same from the replica. sed: -e expression #1, char 4: invalid usage of line address 0 |
+| `programs/extracttxt-dc-negative` | a start before line 1: dc reads its own negative result as a subtraction (stack empty), sed the range as an option | extracttxt exits 1; the same from the replica. dc: stack empty sed: invalid option -- '2' Usage: sed [OPTION]... {script-only-if-no-other-script} [input-file].… |
+| `programs/extracttxt-sed-option` | a start on line 0 with no trailing line: the range -1,-1 (sed's unknown option) | extracttxt exits 1; the same from the replica. sed: invalid option -- '1' Usage: sed [OPTION]... {script-only-if-no-other-script} [input-file]... -n, --quiet, … |
+| `programs/pairreg-usage` | pairreg with four arguments (its usage, exit 1) | pairreg exits 1; the same from the replica. |
+| `programs/midtrans-usage` | midtrans without transforms (its message and usage, exit 1) | midtrans exits 1; the same from the replica. Must specify at least 2 transforms to find the mid-transform Part of FSL (ID: 2412.6-dirty) midtrans Copyright(c) … |
+| `programs/midtrans-help` | midtrans -h (its usage, exit 1) | midtrans exits 1; the same from the replica. Part of FSL (ID: 2412.6-dirty) midtrans Copyright(c) 2010, University of Oxford (Mark Jenkinson) Usage: midtrans [… |
+| `programs/midtrans-one` | one transform only (at least 2 needed, exit 1) | midtrans exits 1; the same from the replica. Must specify at least 2 transforms to find the mid-transform Part of FSL (ID: 2412.6-dirty) midtrans Copyright(c) … |
+| `programs/midtrans-singular` | a transform with a determinant below 1e-6 (its message, exit 1) | midtrans exits 1; the same from the replica. Could not read matrix sing.mat |
+| `programs/pointflirt-usage` | pointflirt without arguments (the compulsory options, exit 1) | pointflirt exits 1; the same from the replica. *************************************************** The following COMPULSORY options have not been set: -i filen… |
+| `programs/pointflirt-vox-missing` | --vox without the volumes (its error, exit 2) | pointflirt exits 2; the same from the replica. ERROR: need to specify --invol and --refvol to use --vox |
+| `programs/pointflirt-count` | files with different numbers of points (its error, exit 255) | pointflirt exits 255; the same from the replica. ERROR: Different number of coordinates in the two files |
+| `programs/pointflirt-missing` | a coordinate file that does not exist (FSL aborts) | pointflirt exits 255; the same from the replica. Could not open matrix file none.txt ERROR: Different number of coordinates in the two files |
+| `programs/pointflirt-two` | two points (two rows of three: FSL reads past its rows, aborts) | pointflirt exits -6; the same from the replica. terminate called after throwing an instance of 'std::logic_error' what(): copy into submatrix: incompatible mat… |
+| `programs/pointflirt-four-columns` | points of four coordinates (FSL's block sizes clash, aborts) | pointflirt exits -6; the same from the replica. terminate called after throwing an instance of 'std::logic_error' what(): copy into submatrix: incompatible mat… |
 | `programs/avscale-usage` | avscale without arguments (its usage, exit 255) | avscale exits 255; the same from the replica. Usage: ~/fsl-6.0.7.23/bin/avscale [--allparams/--inverteddies] matrixfile [non-reference-volume] |
 | `programs/avscale-singular` | a singular matrix: Armadillo's solve throws, avscale aborts | avscale exits -6; the same from the replica. matrix multiplication: problem with matrix inverse; suggest to use solve() instead terminate called after throwing… |
 | `programs/avscale-missing-matrix` | a matrix file that does not exist (exit 254) | avscale exits 254; the same from the replica. Could not open matrix file none.mat |
@@ -106,12 +130,14 @@
 | `programs/makerot-zero-axis` | a zero axis (its error, exit 1) | makerot exits 1; the same from the replica. ERROR:: Axis cannot be zero |
 | `programs/makerot-bad-theta` | a theta that is not a number (Couldn't set_value, exit 1) | makerot exits 1; the same from the replica. Part of FSL (ID: 2412.6-dirty) makerot Copyright(c) 2003, University of Oxford (Mark Jenkinson) Usage: makerot [opt… |
 | `programs/makerot-token` | a word that is not an option (unrecognised token, exit 1) | makerot exits 1; the same from the replica. Part of FSL (ID: 2412.6-dirty) makerot Copyright(c) 2003, University of Oxford (Mark Jenkinson) Usage: makerot [opt… |
+| `difftest/applyxfm4d-int-spline-small` | spline interpolation of a small integer volume (FSL-79's reproduce: the coefficients stored as (T)(c + 0.5), each value converted to the type); FSL-75 named (the volume is 3 voxels wide), FSL crashing there | applyxfm4D exits -11; the same from the replica. |
+| `difftest/extracttxt-dc-negative` | extracttxt with a start before line 1: dc reads its own negative result back as a subtraction (dc: stack empty), sed reads the range as options (invalid option, GNU sed's usage) | extracttxt exits 1; the same from the replica. dc: stack empty sed: invalid option -- '2' Usage: sed [OPTION]... {script-only-if-no-other-script} [input-file].… |
 
 ## Environment
 
 | Component | Version |
 |---|---|
-| larmorx | 0.0.1 (b92c7ed2c691) |
+| larmorx | 0.0.1 (bc119ffde16b) |
 | larmorx-testdata | 52124bc98f9f |
 | Python | 3.12.16 |
 | Platform | Linux x86_64 (Linux-6.8.0-124-generic-x86_64-with-glibc2.35) |
@@ -192,6 +218,7 @@ The replica runs as a separate program, the FSL replica package's (`larmorx-nc`)
 | `bbr/fmriprep-form` | pass | 6/6 | fMRIPrep's form: -searchcost bbr -basescale 1 |
 | `bbr/type-global_abs` | pass | 6/6 | -bbrtype global_abs |
 | `bbr/type-local_abs` | pass | 6/6 | -bbrtype local_abs |
+| `bbr/debug` | pass | 6/6 | -debug with -cost bbr (BBR's debug volume `debug`, part 3) |
 | `bbr/slope` | pass | 6/6 | -bbrslope -0.25 |
 | `bbr/coords` | pass | 6/6 | -wmcoords and -wmnorms |
 | `bbr/fieldmap` | pass | 6/6 | -fieldmap -pedir 2 -echospacing (the BBR resampling for -out) |
@@ -218,6 +245,8 @@ The replica runs as a separate program, the FSL replica package's (`larmorx-nc`)
 | `verbose/5` | pass | 6/6 | -verbose 5 |
 | `verbose/printinit` | pass | 6/6 | -printinit |
 | `verbose/debugsave` | pass | 6/6 | -debugsave -verbose 4 (the search's volumes saved) |
+| `verbose/debug` | pass | 6/6 | -debug: the pyramid's volumes and weights saved (no weights: the one-voxel weight) |
+| `verbose/debug-weights` | pass | 6/6 | -debug with -refweight and -inweight (the weights' levels saved) |
 | `schedule/every-command` | both-error | 5/5 | a schedule using every command and option |
 | `schedule/args-copy` | both-error | 5/5 | a schedule: copy U |
 | `schedule/args-optimise` | both-error | 5/5 | a schedule: optimise 6 U |
@@ -226,6 +255,14 @@ The replica runs as a separate program, the FSL replica package's (`larmorx-nc`)
 | `schedule/no-matrix` | pass | 6/6 | a schedule: clear U |
 | `schedule/bad-costfunction` | both-error | 5/5 | a schedule: setoption costfunction nope |
 | `schedule/bad-matname` | both-error | 5/5 | a schedule: clear Uq |
+| `schedule/alignpaxes` | pass | 6/6 | alignpaxes on real images |
+| `schedule/alignpaxes-constant` | pass | 6/6 | alignpaxes on constant images (zero moments, total 0) |
+| `schedule/alignpaxes-nan` | pass | 6/6 | alignpaxes on an input with a NaN voxel (eig_sym fails: the exception) |
+| `schedule/alignpaxes-2d` | pass | 6/6 | alignpaxes in 2D mode (one slice: a zero third moment) |
+| `schedule/alignpaxes-args` | both-error | 5/5 | alignpaxes without its matrix |
+| `schedule/paramsubset-general` | pass | 6/6 | a parameter subset whose column has two ones in different rows of another (rz; tx+ty) |
+| `schedule/paramsubset-weighted` | pass | 6/6 | a parameter subset with weights other than 0 and 1 sharing rows (the SVD's QR path) |
+| `schedule/paramsubset-singular` | pass | 6/6 | a parameter subset reaching a singular matrix in a cost evaluation (the exception caught by FLIRT's main: FSL-68) |
 | `edge/no-args` | both-error | 5/5 | no arguments (the usage, exit 1) |
 | `edge/help` | pass | 6/6 | -help |
 | `edge/version` | pass | 6/6 | -version |
@@ -274,6 +311,69 @@ The replica runs as a separate program, the FSL replica package's (`larmorx-nc`)
 | `edge/background-overflow` | expected-divergence | 3/3 | a 1-voxel input and an 8 x 1 x 1 reference: FLIRT's pyramid computes the background of a 3-voxel-wide level, writing pa… |
 | `edge/background-empty` | expected-divergence | 3/3 | -applyxfm of a 1-voxel input: its background value reads an empty buffer (FSL-75) |
 | `convert_xfm/missing-concat` | both-error | 5/5 | -concat with a file that does not exist |
+| `programs/applyxfm4D-usage` | both-error | 5/5 | applyxfm4D without arguments (its usage, exit 255) |
+| `programs/applyxfm4D-default` | pass | 6/6 | a 4D int16 series, a matrix per volume (MAT_0000n), sinc |
+| `programs/applyxfm4D-single-trilinear` | pass | 6/6 | -singlematrix with trilinear interpolation, verbose |
+| `programs/applyxfm4D-fourdigit-nn` | pass | 6/6 | --fourdigit (MAT_000n) with nearest neighbour (nn) |
+| `programs/applyxfm4D-userprefix-spline` | pass | 6/6 | -userprefix with spline on an integer series (FSL-79) |
+| `programs/applyxfm4D-float-sinc` | pass | 6/6 | a float input (one volume), -singlematrix, sinc |
+| `programs/applyxfm4D-3d` | pass | 6/6 | -3D (the rectangular sinc of width 9) on a float volume |
+| `programs/applyxfm4D-3d-spline-float` | pass | 6/6 | -3D with spline on a float volume |
+| `programs/applyxfm4D-int8` | pass | 6/6 | an int8 input (FSL-09: written as uint8), trilinear |
+| `programs/applyxfm4D-double-sinc` | pass | 6/6 | a double series (sinc sums in double precision; the background value kept in double precision where the mask sets it) |
+| `programs/applyxfm4D-double-3d-spline` | pass | 6/6 | -3D spline on a double volume (its coefficients in double precision) |
+| `programs/applyxfm4D-double-nn` | pass | 6/6 | a double volume, nearest neighbour (values through float) |
+| `programs/applyxfm4D-3d-spline-int` | pass | 6/6 | -3D spline on an int16 volume (FSL-79: coefficients and values in the type) |
+| `programs/applyxfm4D-nan-border` | pass | 6/6 | NaN voxels in the input's border and an infinite one: the background value's NaN order (FSL-22), spline coefficients th… |
+| `programs/applyxfm4D-nan-border-3d` | pass | 6/6 | the same with -3D and sinc |
+| `programs/applyxfm4D-metres` | pass | 6/6 | an input whose header gives metres (a nonsense header): read as FSL reads it |
+| `programs/applyxfm4D-bad-interp` | both-error | 5/5 | an unknown interpolation (its message, exit 1) |
+| `programs/applyxfm4D-userprefix-last` | both-error | 5/5 | -userprefix as the last word (std::string of null) |
+| `programs/applyxfm4D-missing-matrix` | both-error | 5/5 | a directory without the matrices (FSL aborts) |
+| `programs/applyxfm4D-missing-input` | both-error | 5/5 | an input that does not exist (FSL aborts) |
+| `programs/aff2rigid-usage` | both-error | 5/5 | aff2rigid without arguments (its usage, exit 1) |
+| `programs/aff2rigid-default` | both-error | 5/5 | aff2rigid of an affine standard-space matrix (numpy's arithmetic) |
+| `programs/aff2rigid-fmriprep` | both-error | 5/5 | aff2rigid of fMRIPrep's initial matrix |
+| `programs/extracttxt-usage` | both-error | 5/5 | extracttxt with one argument (its usage, exit 255) |
+| `programs/extracttxt-rest` | pass | 6/6 | the lines from the first match to the end |
+| `programs/extracttxt-count` | pass | 6/6 | three lines from the first match |
+| `programs/extracttxt-regex-start` | pass | 6/6 | a regular expression, two lines, starting 2 lines after |
+| `programs/extracttxt-before` | pass | 6/6 | a negative relative start (lines before the match) |
+| `programs/extracttxt-zero-count` | pass | 6/6 | zero trailing lines (sed's range ends before it starts) |
+| `programs/extracttxt-line0` | both-error | 5/5 | a relative start reaching line 0 (sed's error, exit 1) |
+| `programs/extracttxt-dc-negative` | both-error | 5/5 | a start before line 1: dc reads its own negative result as a subtraction (stack empty), sed the range as an option |
+| `programs/extracttxt-sed-option` | both-error | 5/5 | a start on line 0 with no trailing line: the range -1,-1 (sed's unknown option) |
+| `programs/extracttxt-signed` | pass | 6/6 | signed arguments (+2, -0): dc reads each sign as a command |
+| `programs/extracttxt-nomatch` | pass | 6/6 | a word that never matches (nothing printed, exit 0) |
+| `programs/extracttxt-missing` | pass | 6/6 | a file that does not exist (grep's message, exit 0) |
+| `programs/pairreg-usage` | both-error | 5/5 | pairreg with four arguments (its usage, exit 1) |
+| `programs/pairreg-default` | pass | 6/6 | pairreg of the T1w and its moved copy (brains and skulls the same) |
+| `programs/pairreg-metres` | pass | 6/6 | pairreg of images whose headers give metres (nonsense headers) |
+| `programs/midtrans-usage` | both-error | 5/5 | midtrans without transforms (its message and usage, exit 1) |
+| `programs/midtrans-help` | both-error | 5/5 | midtrans -h (its usage, exit 1) |
+| `programs/midtrans-one` | both-error | 5/5 | one transform only (at least 2 needed, exit 1) |
+| `programs/midtrans-default` | pass | 6/6 | three transforms, printed (the MNI origin assumed) |
+| `programs/midtrans-out-verbose` | pass | 6/6 | -o with -v (every stage printed, the matrix written) |
+| `programs/midtrans-template-separate` | pass | 6/6 | --template (its centre of gravity) and --separate |
+| `programs/midtrans-template-50mm` | pass | 6/6 | --template with voxels of 50 mm (a nonsense header: its centre of gravity far out) |
+| `programs/midtrans-debug` | pass | 6/6 | --debug (the origin at 0 and the debug matrices) |
+| `programs/midtrans-singular` | both-error | 5/5 | a transform with a determinant below 1e-6 (its message, exit 1) |
+| `programs/midtrans-token` | pass | 6/6 | an option after the transforms (read as a file: an empty matrix, the size error caught) |
+| `programs/midtrans-not-square` | pass | 6/6 | a 3 x 4 matrix (the determinant's error, caught) |
+| `programs/midtrans-3x3` | pass | 6/6 | a 3 x 3 matrix (the product's size error, caught) |
+| `programs/pointflirt-usage` | both-error | 5/5 | pointflirt without arguments (the compulsory options, exit 1) |
+| `programs/pointflirt-default` | pass | 6/6 | eight points, the matrix printed |
+| `programs/pointflirt-out-verbose` | pass | 6/6 | -v and -o (the coordinates printed, the matrix written) |
+| `programs/pointflirt-vox` | pass | 6/6 | --vox with --invol and --refvol (voxel coordinates scaled) |
+| `programs/pointflirt-vox-odd` | pass | 6/6 | --vox with voxels of 0.01 mm and of 50 mm (nonsense headers) |
+| `programs/pointflirt-vox-missing` | both-error | 5/5 | --vox without the volumes (its error, exit 2) |
+| `programs/pointflirt-nullspace` | pass | 6/6 | four points (a nullspace: the warning, a non-unique solution) |
+| `programs/pointflirt-count` | both-error | 5/5 | files with different numbers of points (its error, exit 255) |
+| `programs/pointflirt-many` | pass | 6/6 | twenty points (x·xᵀ by BLAS dsyrk) |
+| `programs/pointflirt-missing` | both-error | 5/5 | a coordinate file that does not exist (FSL aborts) |
+| `programs/pointflirt-three` | pass | 6/6 | three points: a square file is read with points as columns |
+| `programs/pointflirt-two` | both-error | 5/5 | two points (two rows of three: FSL reads past its rows, aborts) |
+| `programs/pointflirt-four-columns` | both-error | 5/5 | points of four coordinates (FSL's block sizes clash, aborts) |
 | `programs/avscale-usage` | both-error | 5/5 | avscale without arguments (its usage, exit 255) |
 | `programs/avscale-default` | pass | 6/6 | avscale of fMRIPrep's initial matrix |
 | `programs/avscale-allparams` | pass | 6/6 | --allparams, the translations about a volume's centre |
@@ -341,7 +441,12 @@ The replica runs as a separate program, the FSL replica package's (`larmorx-nc`)
 | `programs/makerot-out-unwritable` | pass | 6/6 | an output file that cannot be written (the message, exit 0) |
 | `programs/makerot-token` | both-error | 5/5 | a word that is not an option (unrecognised token, exit 1) |
 | `difftest/applyxfm-blur-extraslice` | pass | 6/6 | -applyxfm onto a coarser grid: the input's blur reads beyond its edges by extraslice (FLIRT configures the interpolatio… |
+| `difftest/applyxfm4d-double-padding` | pass | 6/6 | a double series with nearest neighbour: the interpolated voxels pass through single precision, the voxels the padding m… |
+| `difftest/applyxfm4d-int-spline-small` | both-error | 2/2 | spline interpolation of a small integer volume (FSL-79's reproduce: the coefficients stored as (T)(c + 0.5), each value… |
+| `difftest/applyxfm4d-nan-background` | pass | 6/6 | applyxfm4D's background value of a volume with a NaN in its border: libstdc++'s order (FSL's build's) with reproduce, N… |
 | `difftest/background-level-overflow-survives` | pass | 6/6 | a 25 x 30 x 27 input at 0.5 x 1.2 x 1 mm: FLIRT's pyramid reaches a 3 x 3 x 3 level, whose background value writes 36 b… |
 | `difftest/background-nan-order` | pass | 6/6 | a 3 x 1 x 1 input holding 5000, 100 and NaN against a 1 x 1 x 1 reference: the matrix is NaN, every output voxel the pa… |
 | `difftest/basescale-init-float` | pass | 6/6 | a base scale other than 1 (voxels of 0.01 mm) with -init: FLIRT scales the initial matrix by 1/basescale computed in si… |
 | `difftest/bbr-no-boundary-points-nan` | pass | 6/6 | BBR on a segmentation without boundary points: the cost 0 / 0 is SSE's default NaN, printed -nan |
+| `difftest/extracttxt-dc-negative` | both-error | 5/5 | extracttxt with a start before line 1: dc reads its own negative result back as a subtraction (dc: stack empty), sed re… |
+| `difftest/paramsubset-singular-cost` | pass | 6/6 | a parameter subset whose line search reaches a zero scale on one-voxel images: the cost function's inverse of the singu… |

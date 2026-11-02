@@ -172,9 +172,11 @@ why are in the record; what the spec does not say is in
 [`docs/findings/fsl-flirt-original.md`](../findings/fsl-flirt-original.md).
 
 **Speed** (one run each, a busy machine; the benchmark report is part 2's): a default 12-dof
-registration of a 3 mm BOLD reference to a T1w at 1.7 mm: FSL 1.47 s, the replica 2.08 s, the
-original 1.69 s on one thread and 0.52 s on eight; fMRIPrep's boundary-based call (ds005040, its
-full-size T1w): FSL 67 s, the replica 77 s, the original 50 s on one thread and 8.7 s on eight.
+registration of a 3 mm BOLD reference to a T1w at 1.7 mm: FSL 1.01 s, the replica 1.32 s, the
+original 1.18 s on one thread and 0.37 s on eight; a 6-dof one with `-out`: FSL 0.97 s, the
+replica 0.96 s, the original 0.88 s and 0.27 s; fMRIPrep's boundary-based call (ds005040, its
+full-size T1w): FSL 46 s, the replica 57 s, the original 38 s on one thread and 5.9 s on eight
+(`validation/investigations/cleanroom-flirt/speed.py`).
 
 ## Upstream defects (D13)
 

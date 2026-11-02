@@ -1,13 +1,14 @@
 # SPDX-License-Identifier: Apache-2.0
 """tcat.py <trial dir> [kind] [signature substring] [n examples]: differing cases by (kind,
-signature); with a kind, examples (case number, options, detail)."""
+signature)
+with a kind, examples (case number, options, detail)."""
 
 import collections
 import json
 import sys
 from pathlib import Path
 
-rows = [json.loads(l) for l in open(Path(sys.argv[1]) / "results.jsonl")]
+rows = [json.loads(x) for x in (Path(sys.argv[1]) / "results.jsonl").read_text().splitlines()]
 kind = sys.argv[2] if len(sys.argv) > 2 else None
 sub = sys.argv[3] if len(sys.argv) > 3 else ""
 nex = int(sys.argv[4]) if len(sys.argv) > 4 else 4

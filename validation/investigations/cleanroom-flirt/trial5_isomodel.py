@@ -3,11 +3,14 @@
 
 import glob
 import sys
+from pathlib import Path
 
 import nibabel as nib
 import numpy as np
 
-f32 = lambda x: float(np.float32(x))
+
+def f32(x):
+    return float(np.float32(x))
 
 
 def mul(a, b):
@@ -37,7 +40,7 @@ def rnd(m):
 
 tot = {}
 for d in sys.argv[1:]:
-    log = open(d + ".log").read().split("\n")[0].split()
+    log = Path(d + ".log").read_text().split("\n")[0].split()
     s = f32(float(log[log.index("-applyisoxfm") + 1]))
     ref = nib.load(
         glob.glob(d + "/fsl/ref.*")[0]
@@ -45,7 +48,7 @@ for d in sys.argv[1:]:
         else glob.glob(d + "/fsl/ref.hdr")[0]
     ).header
     out = nib.load(
-        [p for p in glob.glob(d + "/fsl/out.*") if p.endswith((".nii", ".nii.gz", ".hdr"))][0]
+        next(p for p in glob.glob(d + "/fsl/out.*") if p.endswith((".nii", ".nii.gz", ".hdr")))
     ).header
     if int(ref["sform_code"]) <= 0:
         continue
@@ -64,7 +67,7 @@ for d in sys.argv[1:]:
                 B = mul(B, flipm(n0 - 1.0))
             else:
                 fov = f32(np.float32(n0 - 1) * np.float32(dd[0]))
-                B = mul(mul(mul(B, diag([1 / x for x in dd] + [1])), flipm(fov)), diag(dd + [1]))
+                B = mul(mul(mul(B, diag([*[1 / x for x in dd], 1])), flipm(fov)), diag([*dd, 1]))
                 if name == "mm-r":
                     B = rnd(B)
         B = mul(B, diag(st))

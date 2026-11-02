@@ -1,6 +1,7 @@
 # SPDX-License-Identifier: Apache-2.0
 """dcmp.py <seed> <n> [outdir]: an original difftest case run by hand (FSL with the cache off,
-the original in reproduce), both directories kept in <outdir>/<n>/{fsl,orig}; prints the
+the original in reproduce), both directories kept in <outdir>/<n>/{fsl,orig}
+prints the
 arguments, the exit statuses, the first differing stream lines, and per image the header fields
 that differ (values) and the voxels that differ."""
 
@@ -37,7 +38,9 @@ for nm, r in (("fsl", fo), ("orig", lo)):
 for s in ("stdout", "stderr"):
     x, y = getattr(fo, s).splitlines(), orig._own(getattr(lo, s)).splitlines()
     if x != y:
-        i = next((k for k, (p, q) in enumerate(zip(x, y)) if p != q), min(len(x), len(y)))
+        i = next(
+            (k for k, (p, q) in enumerate(zip(x, y, strict=False)) if p != q), min(len(x), len(y))
+        )
         print(f"{s} differs at line {i + 1} ({len(x)} vs {len(y)} lines):")
         print("   FSL :", x[i] if i < len(x) else "<end>")
         print("   orig:", y[i] if i < len(y) else "<end>")
@@ -55,7 +58,7 @@ for f in sorted(a.iterdir()):
         except Exception as e:
             print(f.name, "unreadable", e)
             continue
-        for k in ha.keys():
+        for k in ha:
             va, vb = np.asarray(ha[k]), np.asarray(hb[k])
             if va.tobytes() != vb.tobytes() and k != "descrip":
                 print(f"  {f.name} {k}: FSL {va.tolist()!r} orig {vb.tolist()!r}")

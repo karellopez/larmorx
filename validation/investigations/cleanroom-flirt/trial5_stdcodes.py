@@ -2,11 +2,12 @@
 import collections
 import json
 import sys
+from pathlib import Path
 
 from larmorx_validation.difftest import core
 from larmorx_validation.difftest.tools import fsl_flirt as dt
 
-rows = [json.loads(l) for l in open(sys.argv[1] + "/results.jsonl")]
+rows = [json.loads(x) for x in Path(sys.argv[1] + "/results.jsonl").read_text().splitlines()]
 c = collections.Counter()
 for r in rows:
     if r["features"].get("kind") != "coords":

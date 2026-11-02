@@ -5,8 +5,9 @@ import collections
 import json
 import re
 import sys
+from pathlib import Path
 
-rows = [json.loads(l) for l in open(sys.argv[1] + "/results.jsonl")]
+rows = [json.loads(x) for x in Path(sys.argv[1] + "/results.jsonl").read_text().splitlines()]
 c = collections.Counter()
 ex = {}
 for r in rows:

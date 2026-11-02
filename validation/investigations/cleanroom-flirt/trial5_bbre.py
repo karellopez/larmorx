@@ -41,7 +41,10 @@ for k, text in scheds.items():
     st = {"FSLOUTPUTTYPE": "NIFTI_GZ"}
     f = rep.run_oracle("flirt", args, cwd=d, settings=st)
     o = orig.run_original("flirt", args, cwd=d, settings=st, mode=defects.REPRODUCE)
-    seq = lambda t: "".join(
-        "E" if "ERROR" in l else "W" if "NaN" in l else "?" for l in t.splitlines() if l.strip()
-    )
+
+    def seq(t):
+        return "".join(
+            "E" if "ERROR" in x else "W" if "NaN" in x else "?" for x in t.splitlines() if x.strip()
+        )
+
     print(k, "FSL", f.code, seq(f.stderr), "| orig", o.code, seq(orig._own(o.stderr)))

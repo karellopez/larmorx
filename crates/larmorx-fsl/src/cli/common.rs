@@ -171,10 +171,24 @@ fn header_bytes(path: &std::path::Path, c: Compression) -> std::io::Result<Vec<u
 pub fn header_image(h: &NiftiHeader) -> HeaderImage {
     let shape = [1, 2, 3].map(|k| usize::try_from(h.dim[k]).unwrap_or(0).max(1));
     let voxel = [1, 2, 3].map(|k| (h.pixdim[k] as f32).abs());
+    // the qform as FSL holds it: the NIfTI-1 reference library's conversion, its elements in
+    // single precision (specs/flirt.md §4.1; observed, 2026-11-02: the coordinates' 6th digit)
     let form = if h.sform_code > 0 {
         Some(*h.sform().rows())
-    } else if h.qform_code > 0 {
-        h.qform().ok().map(|q| *q.rows())
+    } else if h.qform_code > 0 && h.qform().is_ok() {
+        let r = crate::bet::quatern::quatern_to_mat(
+            h.quatern_b,
+            h.quatern_c,
+            h.quatern_d,
+            [h.pixdim[0], h.pixdim[1], h.pixdim[2], h.pixdim[3]],
+        );
+        let off = [h.qoffset_x, h.qoffset_y, h.qoffset_z].map(|v| f64::from(v as f32));
+        Some([
+            [r[0][0], r[0][1], r[0][2], off[0]],
+            [r[1][0], r[1][1], r[1][2], off[1]],
+            [r[2][0], r[2][1], r[2][2], off[2]],
+            [0.0, 0.0, 0.0, 1.0],
+        ])
     } else {
         None
     };

@@ -279,6 +279,15 @@ pub fn resample(
                             }
                         } else if r.constant && r.interp == Interp::Trilinear {
                             trilinear_constant(src, p, r.pad)
+                        } else if r.interp == Interp::NearestNeighbour && !r.constant {
+                            // the nearest index first, then the extraslice rule on it: one
+                            // voxel beyond an edge reads the edge voxel (observed, 2026-11-02:
+                            // positions 1 to 1.5 voxels outside take the edge's value)
+                            let beyond = (0..3).any(|k| {
+                                let i = p[k].round();
+                                i < -1.0 || i > n[k]
+                            });
+                            if beyond { r.pad } else { nearest(src, p) }
                         } else if !extended {
                             match r.interp {
                                 Interp::Trilinear => trilinear_extraslice(src, p, r.pad),

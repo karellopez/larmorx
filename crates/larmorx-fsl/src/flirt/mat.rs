@@ -53,7 +53,11 @@ fn lu_pivots(a: &Mat4) -> Option<(Mat4, [usize; 4], [usize; 4])> {
 
 /// The solution `x` of `a·x = b` by LU with partial pivoting; `None` for a singular `a`.
 pub fn solve_vec(a: &Mat4, b: [f64; 4]) -> Option<[f64; 4]> {
-    let (lu, perm) = lu(a)?;
+    let (lu, ipiv) = lu_left_looking(a)?;
+    let mut perm = [0, 1, 2, 3];
+    for (k, &p) in ipiv.iter().enumerate() {
+        perm.swap(k, p);
+    }
     Some(substitute(&lu, &perm, b))
 }
 
@@ -77,8 +81,11 @@ fn substitute(lu: &Mat4, perm: &[usize; 4], b: [f64; 4]) -> [f64; 4] {
     x
 }
 
-/// `inv(a)` (§12): a diagonal matrix element by element, any other by LU with partial
-/// pivoting; `None` when `a` is singular.
+/// `inv(a)` (§12, "the 4 × 4 inverse exactly"): a diagonal matrix by reciprocals, an upper
+/// triangle by the triangle's inverse ([`upper_inverse`]), any other by the left-looking LU
+/// factorisation with partial pivoting, the inverse of `U`, the solve against `L` and the
+/// column interchanges; `None` when `a` is singular. (Observed: so the signs of FSL's zeros,
+/// e.g. convert_xfm -inverse's `-0`.)
 pub fn inverse(a: &Mat4) -> Option<Mat4> {
     let diagonal = (0..4).all(|i| (0..4).all(|j| i == j || a[i][j] == 0.0));
     if diagonal {
@@ -91,42 +98,37 @@ pub fn inverse(a: &Mat4) -> Option<Mat4> {
         }
         return Some(out);
     }
-    // LAPACK's way (§12: `dgetrf` + `dgetri`): the inverse of U in place (`dtrti2`: each column
-    // by the triangular product with the columns already inverted, then scaled by minus its
-    // diagonal's inverse), then the columns from the last solved against L (`dgemv` with -1),
-    // then the interchanges undone column by column from the last. (Observed: so the signs of
-    // FSL's zeros, e.g. convert_xfm -inverse's `-0`.)
-    let (mut m, _, ipiv) = lu_pivots(a)?;
-    for j in 0..4 {
-        m[j][j] = 1.0 / m[j][j];
-        let ajj = -m[j][j];
-        let mut x = [0.0f64; 4];
-        for (i, xi) in x.iter_mut().enumerate().take(j) {
-            *xi = m[i][j];
+    let upper = (0..4).all(|i| (0..i).all(|j| a[i][j] == 0.0));
+    if upper {
+        if (0..4).any(|i| a[i][i] == 0.0 || !a[i][i].is_finite()) {
+            return None;
         }
-        for jj in 0..j {
-            if x[jj] != 0.0 {
-                let temp = x[jj];
-                for i in 0..jj {
-                    x[i] += temp * m[i][jj];
-                }
-                x[jj] *= m[jj][jj];
-            }
-        }
-        for i in 0..j {
-            m[i][j] = x[i] * ajj;
-        }
+        let mut m = *a;
+        upper_inverse(&mut m);
+        return Some(m);
     }
+    let (mut m, ipiv) = lu_left_looking(a)?;
+    upper_inverse(&mut m);
+    // from the last column to the first: the entries below the diagonal set aside and zeroed,
+    // the column replaced by y - A·x with the columns to its right (four rows: the columns in
+    // pairs, y - (a_{k+1}·x_{k+1} + a_k·x_k); a last single column y + a_k·(x_k·(-1)))
     for j in (0..4).rev() {
         let mut work = [0.0f64; 4];
         for i in j + 1..4 {
             work[i] = m[i][j];
             m[i][j] = 0.0;
         }
-        for (jj, &wj) in work.iter().enumerate().skip(j + 1) {
-            let temp = -wj;
+        let mut k = j + 1;
+        while k + 1 < 4 {
             for row in m.iter_mut() {
-                row[j] += temp * row[jj];
+                let p = row[k + 1] * work[k + 1] + row[k] * work[k];
+                row[j] -= p;
+            }
+            k += 2;
+        }
+        if k < 4 {
+            for row in m.iter_mut() {
+                row[j] += row[k] * (work[k] * -1.0);
             }
         }
     }
@@ -139,6 +141,89 @@ pub fn inverse(a: &Mat4) -> Option<Mat4> {
         }
     }
     Some(m)
+}
+
+/// The inverse of the upper triangle of `m` in place (§12): column by column, `d = 1/u_jj`, the
+/// column above the diagonal multiplied by the part already inverted (for each earlier column
+/// `i` in order, `x_k = x_i·u_ki + x_k` for `k < i`, then `x_i = x_i·u_ii`), then each entry
+/// multiplied by `-d` (so a zero becomes `-0`).
+fn upper_inverse(m: &mut Mat4) {
+    for j in 0..4 {
+        m[j][j] = 1.0 / m[j][j];
+        let ajj = -m[j][j];
+        let mut x = [0.0f64; 4];
+        for (i, xi) in x.iter_mut().enumerate().take(j) {
+            *xi = m[i][j];
+        }
+        for i in 0..j {
+            let xi = x[i];
+            for k in 0..i {
+                x[k] = xi * m[k][i] + x[k];
+            }
+            x[i] = xi * m[i][i];
+        }
+        for (i, &xi) in x.iter().enumerate().take(j) {
+            m[i][j] = xi * ajj;
+        }
+    }
+}
+
+/// The LU factorisation with partial pivoting, column by column (left-looking, §12): for
+/// column `j` the earlier row interchanges; the entries above the diagonal `a_ij - Σ_{k<i} l_ik
+/// a_kj` (the sum from 0 in order, then `+ 0`); the entries on and below it `y - A·x` (`t` summed from 0 in
+/// order, then `(-1)·t + y`); the pivot the first entry of largest magnitude, the rows
+/// interchanged (the columns so far), the entries below it multiplied by the pivot's
+/// reciprocal. `None` when a pivot is exactly zero or not finite.
+fn lu_left_looking(a: &Mat4) -> Option<(Mat4, [usize; 4])> {
+    let mut m = *a;
+    let mut ipiv = [0, 1, 2, 3];
+    for j in 0..4 {
+        for (k, &p) in ipiv.iter().enumerate().take(j) {
+            if p != k {
+                let t = m[k][j];
+                m[k][j] = m[p][j];
+                m[p][j] = t;
+            }
+        }
+        for i in 1..j {
+            let mut t = 0.0f64;
+            for k in 0..i {
+                t += m[i][k] * m[k][j];
+            }
+            m[i][j] = (m[i][j] - t) + 0.0;
+        }
+        for r in j..4 {
+            let mut t = 0.0f64;
+            for k in 0..j {
+                t += m[r][k] * m[k][j];
+            }
+            m[r][j] += -t;
+        }
+        let mut p = j;
+        let mut best = m[j][j].abs();
+        for (i, row) in m.iter().enumerate().skip(j + 1) {
+            if row[j].abs() > best {
+                best = row[j].abs();
+                p = i;
+            }
+        }
+        if best == 0.0 || !best.is_finite() {
+            return None;
+        }
+        ipiv[j] = p;
+        if p != j {
+            for c in 0..=j {
+                let t = m[j][c];
+                m[j][c] = m[p][c];
+                m[p][c] = t;
+            }
+        }
+        let r = 1.0 / m[j][j];
+        for row in m.iter_mut().skip(j + 1) {
+            row[j] *= r;
+        }
+    }
+    Some((m, ipiv))
 }
 
 /// `inv(a)·b` as a solve (§12); `None` for a singular `a`.

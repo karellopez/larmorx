@@ -388,7 +388,7 @@ fn run(
     let per_volume = refv.len();
     let mut values = Vec::with_capacity(per_volume * nv);
     let mut doubles: Option<Vec<f64>> = double.then(|| Vec::with_capacity(per_volume * nv));
-    let mut mats: Vec<Mat4> = Vec::new();
+    let mut first_mat: Option<Mat4> = None;
     let mut fsl111_changes = false;
     let name111 = |notices: &mut Vec<Notice>| {
         let detail = match mode {
@@ -421,11 +421,7 @@ fn run(
                 }
             }
         };
-        if mats.len() < 2 {
-            mats.push(mat);
-        } else {
-            mats[1] = mat;
-        }
+        first_mat.get_or_insert(mat);
         let vol = &src.vols[m];
         let pad = match engine::pad_value(vol, ctx, notices) {
             Ok(p) => p,
@@ -526,10 +522,10 @@ fn run(
     if fsl111_changes {
         name111(notices);
     }
-    // a reference without forms: the input's form through the matrix (observed); else the
-    // reference's unset form completed from the set one (observed)
-    let formless = mats
-        .last()
+    // a reference without forms: the input's form through the first volume's matrix
+    // (observed); else the reference's unset form completed from the set one (observed)
+    let formless = first_mat
+        .as_ref()
         .and_then(|m| engine::formless_forms(&reference.input, &src.input, m));
     let quaternion_final = formless.is_some() || engine::qform_completed(&reference.input);
     let completed = formless.unwrap_or_else(|| engine::completed_forms(&reference.input));

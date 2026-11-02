@@ -423,28 +423,30 @@ pub fn search(
             .any(|&i| fine_params[i][..3].iter().any(|&a| a != 0.0));
     let quiet = super::cost::Log::default();
     let log = user.log.as_deref().unwrap_or(&quiet);
+    // the matrix the optimisation starts from: the start's decomposition composed again
+    // (observed: FLIRT's `Starting with` and `P` show it, under gimbal lock other angles);
+    // a `-dof` below 6 prints FLIRT's dof message once for each start, after the start's own
+    // messages (observed, 2026-11-02)
+    let dof_message = super::optimise::clamp_dof(free_dof as i64).1;
     let starts: Vec<Mat4> = minima
         .iter()
         .map(|&i| {
-            if fsl90 && quaternion {
-                // below 7 parameters the 7 are composed first, then the scale dropped
-                // (observed: FLIRT's message twice for each such start with -dof 6)
-                if free < 7 {
+            let m = if fsl90 && quaternion {
+                // at 6 parameters the 7 are composed first, then the scale dropped (observed:
+                // FLIRT's message twice for each such start with -dof 6, once below 6)
+                if free == 6 {
                     let _ = super::param::compose(rep, &fine_params[i], 7, centre, log);
                 }
                 super::param::compose(rep, &fine_params[i], free, centre, log)
             } else {
                 super::param::euler_compose(&fine_params[i], free, centre)
+            };
+            let x = super::param::decompose(rep, &m, centre);
+            let m = super::param::compose(rep, &x, free, centre, log);
+            if let Some(msg) = &dof_message {
+                log.push(msg.as_str());
             }
-        })
-        .collect();
-    // the matrix the optimisation starts from: the start's decomposition composed again
-    // (observed: FLIRT's `Starting with` and `P` show it, under gimbal lock other angles)
-    let starts: Vec<Mat4> = starts
-        .iter()
-        .map(|m| {
-            let x = super::param::decompose(rep, m, centre);
-            super::param::compose(rep, &x, free, centre, log)
+            m
         })
         .collect();
     let free_settings = Settings {

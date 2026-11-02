@@ -1472,9 +1472,6 @@ fn command(
             samplings(st);
             let dof_req = schedule::int_scalar(st.scalar(&w[1]));
             let (dof, msg) = optimise::clamp_dof(dof_req.min(st.maxdof as i64));
-            if let Some(m) = msg {
-                let _ = writeln!(err, "{m}");
-            }
             let (_, rows) = st.rows(&w[2])?;
             let mut p = Vec::new();
             let mut abs = false;
@@ -1503,6 +1500,11 @@ fn command(
                 return Err(End::Error("Mat::operator(): index out of bounds".into()));
             }
             for r in rows {
+                // FLIRT's dof message once for each row (observed, 2026-11-02: 73 lines for the
+                // default schedule with -nosearch -dof 3, measurecost's rows included)
+                if let Some(m) = &msg {
+                    st.log.push(m.as_str());
+                }
                 let m = st.perturb(&r.m, &p, abs, dof)?;
                 if cmd == "measurecost" {
                     let c = st.eval(&m, st.cost)?;

@@ -97,8 +97,8 @@ pub fn avscale(m: &Mat4, centre: [f64; 3]) -> Result<Avscale, &'static str> {
     if s.contains(&0.0) {
         return Err(INVERSE_PROBLEM);
     }
-    let params = single_scales(rigid::decompose(m, centre));
-    let rotation_translation = rigid::compose(&params, 6, [0.0; 3]);
+    let params = single_scales(param::euler_decompose(m, centre));
+    let rotation_translation = param::euler_compose(&params, 6, [0.0; 3]);
     let average_scale = (((params[6] + params[7]) + params[8]) / 3.0) as f32;
     Ok(Avscale {
         params,

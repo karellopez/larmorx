@@ -137,6 +137,9 @@ pub struct Output<'a> {
     pub n_threads: usize,
     /// The header's `descrip` (the writer's name).
     pub descrip: &'a str,
+    /// The template's quaternion converted to its matrix and back, as FSL writes an image it
+    /// read (§3.3); `false`: written as it is (a quaternion FLIRT computed from its matrix).
+    pub rewrite_quaternion: bool,
 }
 
 /// The file name an output stem gets for `FSLOUTPUTTYPE` (`None`: an unknown type).
@@ -177,8 +180,11 @@ pub fn output_header(o: &Output<'_>, version: NiftiVersion, data_type: DataType)
         // FSL writes the qform's quaternion converted to its matrix and back (§3.3), also with
         // a qform code of 0 (observed)
         let pd = [h.pixdim[0], h.pixdim[1], h.pixdim[2], h.pixdim[3]];
-        let ([b, c, d], qfac) =
-            super::quatern::rewritten(h.quatern_b, h.quatern_c, h.quatern_d, pd);
+        let ([b, c, d], qfac) = if o.rewrite_quaternion {
+            super::quatern::rewritten(h.quatern_b, h.quatern_c, h.quatern_d, pd)
+        } else {
+            ([h.quatern_b, h.quatern_c, h.quatern_d], h.pixdim[0])
+        };
         // §8.2, step 7: NIfTI-1 stores the floats, NIfTI-2 the doubles unrounded
         let stored = |x: f64| {
             if version == NiftiVersion::V1 {

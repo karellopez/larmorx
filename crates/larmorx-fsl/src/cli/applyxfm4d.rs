@@ -255,10 +255,37 @@ fn read(
     })
 }
 
-/// The range of an integer type `t` (FSL-79 reproduced: each spline pass stored as
-/// `(T)(c + 0.5)` and each value as `(T)v`, toward zero, kept in the range).
-fn range(t: DataType) -> (f64, f64) {
-    larmorx_mri::hmc::image::integer_range(t).unwrap_or((f64::MIN, f64::MAX))
+/// `v` converted to the integer type `t` as x86-64 converts a double to it (FSL-79 reproduced:
+/// each spline pass stored as `(T)(c + 0.5)` and each value as `(T)v`): truncated toward zero
+/// through a 32-bit integer (NaN and values beyond it give its smallest value), then wrapped to
+/// the type's bits (observed, 2026-11-02: a coefficient of 160 in a char image reads -96).
+fn x86_convert(v: f64, t: DataType) -> f64 {
+    let i = if v.is_nan() || !(-2_147_483_648.0..2_147_483_648.0).contains(&v) {
+        i32::MIN
+    } else {
+        v as i32
+    };
+    match t {
+        DataType::U8 => f64::from(i as u8),
+        DataType::I8 => f64::from(i as i8),
+        DataType::I16 => f64::from(i as i16),
+        _ => f64::from(i),
+    }
+}
+
+/// A uint8 volume's values as FSL's applyxfm4D reads them into its char images (FSL-111, x86-64's
+/// signed char: 128 to 255 read as `v - 256`) when `signed`, or as stored (0 to 255) otherwise.
+fn char_reading(vol: &Volume, signed: bool) -> Volume {
+    let data = vol
+        .data
+        .iter()
+        .map(|&v| match (signed, v >= 128.0, v < 0.0) {
+            (true, true, _) => v - 256.0,
+            (false, _, true) => v + 256.0,
+            _ => v,
+        })
+        .collect();
+    Volume::new(vol.shape, vol.voxel_size, data)
 }
 
 fn run(
@@ -283,6 +310,21 @@ fn run(
     let (stored, scaled) = engine::stored_type(&src.input.header);
     let t = engine::grouped_type(stored, scaled, mode);
     let integer = larmorx_mri::hmc::image::integer_range(t).is_some();
+    // FSL-111: FSL reads a uint8 image into its char images, signed on x86-64, so 128 to 255
+    // read as v - 256 (observed, 2026-11-02); larmorx reads them as stored by default
+    let unsigned_char = stored == DataType::U8 && !scaled;
+    let mut src = src;
+    if unsigned_char && mode.reproduce() {
+        for v in &mut src.vols {
+            *v = char_reading(v, true);
+        }
+    }
+    // the type FSL-79 keeps the coefficients and values in: char (signed) for the char group
+    // read signed, the image's own type otherwise
+    let store_type = |signed: bool| match t {
+        DataType::U8 if signed || stored == DataType::I8 => DataType::I8,
+        other => other,
+    };
     let double = t == DataType::F64 && src.doubles.is_some();
     let mut nv = src.vols.len();
     if !o.three_d && nv > MAX_VOLUMES {
@@ -346,8 +388,22 @@ fn run(
     let per_volume = refv.len();
     let mut values = Vec::with_capacity(per_volume * nv);
     let mut doubles: Option<Vec<f64>> = double.then(|| Vec::with_capacity(per_volume * nv));
-    let (lo, hi) = range(t);
-    let stored_pass = move |c: f64| (c + 0.5).trunc().clamp(lo, hi);
+    let mut mats: Vec<Mat4> = Vec::new();
+    let mut fsl111_changes = false;
+    let name111 = |notices: &mut Vec<Notice>| {
+        let detail = match mode {
+            UpstreamDefects::Fix => {
+                "applyxfm4D reads the uint8 image's values 128 to 255 as stored (FSL reads them into a signed char image, as v - 256)"
+            }
+            UpstreamDefects::Reproduce => {
+                "applyxfm4D reads the uint8 image's values 128 to 255 as v - 256, into a signed char image, as FSL does on x86-64"
+            }
+        };
+        defects::push_once(
+            notices,
+            Notice::new(&defects::FSL_111, mode, detail.to_owned()),
+        );
+    };
     for m in 0..nv {
         let mat = match one {
             Some(x) => x,
@@ -365,17 +421,29 @@ fn run(
                 }
             }
         };
+        if mats.len() < 2 {
+            mats.push(mat);
+        } else {
+            mats[1] = mat;
+        }
         let vol = &src.vols[m];
         let pad = match engine::pad_value(vol, ctx, notices) {
             Ok(p) => p,
             Err(End::Refuse(msg)) => return common::refuse(err, "applyxfm4D", &msg),
             Err(_) => return 1,
         };
-        // one volume resampled with FSL-79 reproduced or not, with `kernel`
-        let resampled = |reproduce79: bool, kernel: &SincKernel| -> Option<Vec<f32>> {
+        // one volume (`vol`, its background `pad`, read signed or not) resampled with FSL-79
+        // reproduced or not, with `kernel`
+        let resampled = |vol: &Volume,
+                         pad: f32,
+                         signed: bool,
+                         reproduce79: bool,
+                         kernel: &SincKernel|
+         -> Option<Vec<f32>> {
+            let st = store_type(signed);
             let spline = (o.interp == Interp::Spline).then(|| {
                 if fsl79 && reproduce79 {
-                    Spline::with_store(vol, &stored_pass)
+                    Spline::with_store(vol, &|c| x86_convert(c + 0.5, st))
                 } else if double {
                     Spline::new(vol)
                 } else {
@@ -393,22 +461,41 @@ fn run(
             let mut v = output::resample(vol, &mat, refv.shape, refv.voxel_size, &r)?;
             if fsl79 && reproduce79 {
                 for x in &mut v {
-                    *x = f64::from(*x).trunc().clamp(lo, hi) as f32;
+                    *x = x86_convert(f64::from(*x), st) as f32;
                 }
             }
             Some(v)
         };
         let same = |a: &[f32], b: &[f32]| a.iter().zip(b).all(|(x, y)| x.to_bits() == y.to_bits());
-        let Some(v) = resampled(mode.reproduce(), kernel) else {
+        let signed = unsigned_char && mode.reproduce();
+        let Some(v) = resampled(vol, pad, signed, mode.reproduce(), kernel) else {
             return abort(err, "applyxfm4D", "std::runtime_error", mat::SINGULAR);
         };
         // (the matrix was checked invertible when it was read)
         if fsl80 && !fsl80_changes {
-            fsl80_changes =
-                resampled(mode.reproduce(), other_kernel).is_some_and(|w| !same(&v, &w));
+            fsl80_changes = resampled(vol, pad, signed, mode.reproduce(), other_kernel)
+                .is_some_and(|w| !same(&v, &w));
         }
         if fsl79 && !fsl79_changes {
-            fsl79_changes = resampled(!mode.reproduce(), kernel).is_some_and(|w| !same(&v, &w));
+            fsl79_changes = resampled(vol, pad, signed, !mode.reproduce(), kernel)
+                .is_some_and(|w| !same(&v, &w));
+        }
+        // FSL-111 named where the other reading changes a value written (the output's own
+        // conversion wraps a signed char back to the stored byte)
+        if unsigned_char && !fsl111_changes && vol.data.iter().any(|&x| x >= 128.0 || x < 0.0) {
+            let other = char_reading(vol, !signed);
+            let mut scratch = Vec::new();
+            if let Ok(p) = engine::pad_value(&other, ctx, &mut scratch)
+                && let Some(w) = resampled(&other, p, !signed, mode.reproduce(), kernel)
+            {
+                let byte = |x: f32| x86_convert(f64::from(x), DataType::U8);
+                let rounded = |x: f32| f64::from(x).round_ties_even().clamp(0.0, 255.0);
+                let written = |x: f32| if mode.fix() { rounded(x) } else { byte(x) };
+                fsl111_changes = v
+                    .iter()
+                    .zip(&w)
+                    .any(|(&a, &b)| written(a).to_bits() != written(b).to_bits());
+            }
         }
         if let (Some(d), Some(all)) = (doubles.as_mut(), src.doubles.as_ref()) {
             let part = &all[m * vol.len()..(m + 1) * vol.len()];
@@ -436,8 +523,16 @@ fn run(
     if fsl79_changes {
         name79(notices);
     }
-    // the reference's unset form completed from the set one (observed)
-    let completed = engine::completed_forms(&reference.input);
+    if fsl111_changes {
+        name111(notices);
+    }
+    // a reference without forms: the input's form through the matrix (observed); else the
+    // reference's unset form completed from the set one (observed)
+    let formless = mats
+        .last()
+        .and_then(|m| engine::formless_forms(&reference.input, &src.input, m));
+    let quaternion_final = formless.is_some() || engine::qform_completed(&reference.input);
+    let completed = formless.unwrap_or_else(|| engine::completed_forms(&reference.input));
     let look = Look {
         reference: &completed,
         shape: refv.shape,
@@ -448,6 +543,7 @@ fn run(
         // the sform as stored, but recomputed (its zeros positive) for a reference stored
         // neurologically, which FSL flips (observed)
         positive_zeros: reference.input.flipped,
+        quaternion_final,
     };
     match engine::write_values(ctx, outname, &look, values, doubles, t, err, notices) {
         Ok(()) => 0,

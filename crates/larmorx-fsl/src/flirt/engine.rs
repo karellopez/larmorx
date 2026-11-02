@@ -597,6 +597,7 @@ fn debug_files(
             cal: None,
             descrip: "larmorx fsl flirt",
             positive_zeros: false,
+            quaternion_final: false,
         };
         write_values(
             ctx,
@@ -2364,6 +2365,26 @@ fn write_image(
     err: &mut dyn Write,
     notices: &mut Vec<Notice>,
 ) -> Result<(), End> {
+    write_image_as(
+        ctx, stem, reference, shape, volumes, tr, values, t, false, err, notices,
+    )
+}
+
+/// [`write_image`] with the qform's quaternion written as it is when `quaternion_final`.
+#[allow(clippy::too_many_arguments)]
+fn write_image_as(
+    ctx: &Ctx<'_>,
+    stem: &str,
+    reference: &Input,
+    shape: [usize; 3],
+    volumes: usize,
+    tr: Option<f64>,
+    values: Vec<f32>,
+    t: DataType,
+    quaternion_final: bool,
+    err: &mut dyn Write,
+    notices: &mut Vec<Notice>,
+) -> Result<(), End> {
     let look = Look {
         reference,
         shape,
@@ -2372,6 +2393,7 @@ fn write_image(
         cal: None,
         descrip: "larmorx fsl flirt",
         positive_zeros: true,
+        quaternion_final,
     };
     write_values(ctx, stem, &look, values, None, t, err, notices)
 }
@@ -2388,6 +2410,58 @@ pub(crate) struct Look<'a> {
     /// The sform's negative zeros written as zeros (FLIRT's outputs; `applyxfm4D` keeps them
     /// unless the reference is stored neurologically, observed).
     pub positive_zeros: bool,
+    /// The qform's quaternion already computed from the matrix FSL holds (a qform completed from
+    /// the sform, `-applyisoxfm`'s): written as it is. Otherwise FSL's quaternion is converted
+    /// to its matrix and back, as FSL reads and writes it (observed, 2026-11-02: the second
+    /// conversion moves a last bit and the sign of a zero).
+    pub quaternion_final: bool,
+}
+
+/// The output's forms when the reference has neither form (observed, 2026-11-02: a
+/// registration's `-out` image and applyxfm4D's output; `-applyxfm` keeps the reference's
+/// unset forms): the input's voxel-to-world matrix (its sform when set, else its qform, as FSL
+/// holds it, [`world`]) composed with the output's voxel-to-input-voxel mapping,
+/// `W·D_in⁻¹·A⁻¹·D_ref` (`A` the matrix in mm), written as both the sform (single precision)
+/// and the qform (its quaternion, final), with the input's code of that form. `None` when the
+/// reference has a form, the input has none, or `A` is singular.
+pub(crate) fn formless_forms(reference: &Input, input: &Input, a: &Mat4) -> Option<Input> {
+    let h = &reference.header;
+    if h.sform_code > 0 || h.qform_code > 0 {
+        return None;
+    }
+    let w = world(input)?;
+    let code = if input.header.sform_code > 0 {
+        input.header.sform_code
+    } else {
+        input.header.qform_code
+    };
+    let ai = mat::inverse(a)?;
+    let di = mat::diagonal(input.vol.voxel.map(|v| 1.0 / f64::from(v.abs() as f32)));
+    let dr = mat::diagonal(reference.vol.voxel.map(|v| f64::from(v.abs() as f32)));
+    let m = mat::mul(&mat::mul(&mat::mul(&w, &di), &ai), &dr);
+    let rows = m.map(|r| r.map(|v| f64::from(v as f32)));
+    let mut out = reference.clone();
+    let o = &mut out.header;
+    o.srow_x = rows[0];
+    o.srow_y = rows[1];
+    o.srow_z = rows[2];
+    o.sform_code = code;
+    let rot = [0, 1, 2].map(|i| [rows[i][0], rows[i][1], rows[i][2]]);
+    let ([b, c, d], qfac) = crate::bet::quatern::mat_to_quatern(&rot);
+    o.quatern_b = b;
+    o.quatern_c = c;
+    o.quatern_d = d;
+    o.pixdim[0] = qfac;
+    o.qoffset_x = rows[0][3];
+    o.qoffset_y = rows[1][3];
+    o.qoffset_z = rows[2][3];
+    o.qform_code = code;
+    Some(out)
+}
+
+/// Whether [`completed_forms`] computes the qform's quaternion from the sform.
+pub(crate) fn qform_completed(input: &Input) -> bool {
+    input.header.qform_code == 0 && input.header.sform_code > 0
 }
 
 /// Writes `values` like `look`'s reference in type `t` (FSL-09's conversion to integers, FSL-11's
@@ -2449,6 +2523,7 @@ pub(crate) fn write_values(
         defects: mode,
         n_threads: ctx.n_threads,
         descrip: look.descrip,
+        rewrite_quaternion: !look.quaternion_final,
     };
     let v = match larmorx_mri::hmc::image::integer_range(t) {
         Some((lo, hi)) => {
@@ -2566,15 +2641,23 @@ fn write_registered(
         let dims = [d[0], d[1], d[2], reference.input.header.pixdim[4]];
         trace.info("Transformed testvol", refv.shape, dims, 1, &values);
     }
-    write_image(
+    let (like, quaternion_final) = match formless_forms(&reference.input, &input.input, m) {
+        Some(f) => (f, true),
+        None => (
+            completed_forms(&reference.input),
+            qform_completed(&reference.input),
+        ),
+    };
+    write_image_as(
         ctx,
         stem,
-        &completed_forms(&reference.input),
+        &like,
         refv.shape,
         1,
         None,
         values,
         t,
+        quaternion_final,
         err,
         notices,
     )
@@ -2672,6 +2755,7 @@ fn apply(
     }
     let mut refv = reference.vols[0].clone();
     let mut ref_input = reference.input.clone();
+    let mut quaternion_final = false;
     if let Some(s) = o.apply_iso {
         refv = pyramid::isotropic(&pyramid::blur(&refv, s), s);
         // the header follows the resampling (§9.3, §4.1): each form as FSL holds it, a
@@ -2738,6 +2822,7 @@ fn apply(
             h.qoffset_x = nq[0][3];
             h.qoffset_y = nq[1][3];
             h.qoffset_z = nq[2][3];
+            quaternion_final = true;
         }
         h.pixdim[1] = f64::from(s);
         h.pixdim[2] = f64::from(s);
@@ -2778,7 +2863,7 @@ fn apply(
             &values,
         );
     }
-    write_image(
+    write_image_as(
         ctx,
         stem,
         &ref_input,
@@ -2787,6 +2872,7 @@ fn apply(
         tr,
         values,
         t,
+        quaternion_final,
         err,
         notices,
     )?;

@@ -674,6 +674,7 @@ pub fn run(
         defects: mode,
         n_threads,
         descrip: image::DESCRIP,
+        rewrite_quaternion: true,
     };
     if needs_images {
         let ot = match &output_type {

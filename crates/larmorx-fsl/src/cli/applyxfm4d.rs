@@ -115,23 +115,28 @@ fn matrix(settings: &Settings, name: &str, err: &mut dyn Write) -> Result<Mat4, 
         Ok(r) => r,
         Err(m) => return Err(abort(err, "applyxfm4D", "std::runtime_error", &m)),
     };
-    if let Some(m) = common::exact4(&rows) {
-        return Ok(m);
-    }
+    // the matrix is inverted, then multiplied with the volume's 4 × 4 map (observed)
     let (r, c) = common::size(&rows);
-    if c != 4 || r == 0 {
+    if r != c {
+        return Err(abort(
+            err,
+            "applyxfm4D",
+            "std::logic_error",
+            "inv(): given matrix must be square sized",
+        ));
+    }
+    let Some(m) = common::exact4(&rows) else {
         return Err(abort(
             err,
             "applyxfm4D",
             "std::logic_error",
             &format!("matrix multiplication: incompatible matrix dimensions: {r}x{c} and 4x4"),
         ));
+    };
+    if mat::inverse(&m).is_none() {
+        return Err(abort(err, "applyxfm4D", "std::runtime_error", mat::SINGULAR));
     }
-    Err(common::refuse(
-        err,
-        "applyxfm4D",
-        &format!("{name} holds a {r} x {c} matrix; applyxfm4D needs a 4 x 4 one"),
-    ))
+    Ok(m)
 }
 
 /// `applyxfm4D` with FSL's arguments; returns the exit status.
@@ -195,33 +200,45 @@ struct Source {
     input: image::Input,
 }
 
+/// Reads `name`: every volume when `all`; the input (`input`) names only the missing files when
+/// it cannot be read, the reference the volume too (observed).
 fn read(
     ctx: &Ctx<'_>,
     name: &str,
     all: bool,
+    input: bool,
     notices: &mut Vec<Notice>,
     err: &mut dyn Write,
 ) -> Result<Source, u8> {
+    let failed = |e: &image::ImageError, err: &mut dyn Write| {
+        if input {
+            image_error(err, name, e)
+        } else {
+            let (lines, what) = common::image_exception(name, e);
+            let _ = write!(err, "{lines}");
+            abort(err, "applyxfm4D", "std::runtime_error", &what)
+        }
+    };
     let files = match super::bet2::resolve_image(ctx.settings, name, ctx.mode, notices) {
         Ok(f) => f,
-        Err(e) => return Err(image_error(err, name, &e)),
+        Err(e) => return Err(failed(&e, err)),
     };
     let r = if all {
         image::read(&files, ctx.n_threads)
     } else {
         image::read_first(&files, ctx.n_threads).map(|i| (vec![i.vol.clone()], i))
     };
-    let (vols, mut input) = match r {
+    let (vols, mut image) = match r {
         Ok(x) => x,
-        Err(e) => return Err(image_error(err, name, &e)),
+        Err(e) => return Err(failed(&e, err)),
     };
-    if !all && input.volumes > 1 {
+    if !all && image.volumes > 1 {
         let _ = writeln!(err, "{TRUNCATED}");
     }
-    let doubles = (input.header.data_type() == Ok(DataType::F64))
+    let doubles = (image.header.data_type() == Ok(DataType::F64))
         .then(|| image::read_f64_series(&files, ctx.n_threads))
         .flatten();
-    input.vol.data = Vec::new();
+    image.vol.data = Vec::new();
     let vols = vols
         .into_iter()
         .map(|v| Volume::new(v.shape, v.voxel.map(|d| d as f32), v.data))
@@ -229,7 +246,7 @@ fn read(
     Ok(Source {
         vols,
         doubles,
-        input,
+        input: image,
     })
 }
 
@@ -249,11 +266,11 @@ fn run(
 ) -> u8 {
     let mode = ctx.mode;
     let (inname, refname, outname, xfm) = (&names[0], &names[1], &names[2], &names[3]);
-    let src = match read(ctx, inname, !o.three_d, notices, err) {
+    let src = match read(ctx, inname, !o.three_d, true, notices, err) {
         Ok(s) => s,
         Err(c) => return c,
     };
-    let reference = match read(ctx, refname, false, notices, err) {
+    let reference = match read(ctx, refname, false, false, notices, err) {
         Ok(s) => s,
         Err(c) => return c,
     };
@@ -363,6 +380,7 @@ fn run(
         let Some(mut v) = output::resample(vol, &mat, refv.shape, refv.voxel_size, &r) else {
             return abort(err, "applyxfm4D", "std::runtime_error", mat::SINGULAR);
         };
+        // (the matrix was checked invertible when it was read)
         if fsl79 && mode.reproduce() {
             for x in &mut v {
                 *x = f64::from(*x).trunc().clamp(lo, hi) as f32;

@@ -68,6 +68,7 @@ fn exception(
     notices: &mut Vec<Notice>,
 ) -> u8 {
     let _ = writeln!(err, "{what}");
+    let what = what.lines().next().unwrap_or_default();
     let detail = match mode {
         UpstreamDefects::Fix => format!(
             "midtrans stops at '{what}' and writes nothing: exit status 1 (FSL exits with status 0)"
@@ -143,10 +144,10 @@ pub fn main(args: &[String], settings: &Settings, out: &mut dyn Write, err: &mut
         Some(name) => match common::read_volume(settings, name, mode, &mut notices, err) {
             Ok(v) => common::centre(&v, "midtrans", mode, &mut notices, err).to_vec(),
             Err(e) => {
+                // the image layer's lines, then its exception caught (FSL-78)
                 let (lines, what) = common::image_exception(name, &e);
                 let _ = write!(err, "{lines}");
-                print_notices(err, &notices);
-                return common::abort(err, "midtrans", "std::runtime_error", &what);
+                return exception(err, &what, mode, &mut notices);
             }
         },
         None => {

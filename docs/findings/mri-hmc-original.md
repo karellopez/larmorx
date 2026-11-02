@@ -155,3 +155,25 @@ mcflirt live, larmorx in both modes); the probes are in
   first stage's path), the class of `mri-hmc:20261029:45`: reported, not changed in this part.
   The random draws use 64 to 256 bins and write into existing directories, so they meet none of
   this part's four defects; those are the suite's `failures/` cases.
+
+## `corratio` and `woods` exactly (2026-11-02)
+
+`specs/mcflirt.md` appendix A now says (the spec writer, 2026-11-02, from FLIRT's questions) that
+mcflirt's `-cost corratio` and `-cost woods` are FLIRT's two costs unchanged (`specs/flirt.md`
+§6.2): the points of a bin with at most two (weighted) points are left out of the count and the
+total variance too, not only of the within-bin sum; the cost is 1 (not 0) when no bin has more
+than two points or the total variance is not positive; Woods' term is `n_b·σ_b/μ_b` (the
+appendix's earlier `n_b²·σ_b/μ_b` was `n_b` times too large), `n_b²·σ_b` for a bin whose sum is
+not positive; and the sums are single-precision running sums per bin in the sampling order with
+two final double-to-single roundings. `lx.mri.hmc` uses FLIRT's implementation of them
+(`hmc::cost::bin_moments`, `corr_ratio_of`, `woods_of`). The standard tier re-made from 04b58ca
+(`docs/validation/mri-hmc.md`): the same statuses (145 pass, 20 rejected by both, 3 expected, 1
+failure, `real/ds003345/default`, as before), and only the four cases of these costs changed, each
+closer to mcflirt:
+
+| Case | Before | After |
+|---|---|---|
+| `real/ds000005/opt-cost-corratio` | RMS deviation p95 0.0662 mm, FD r 0.578, 0/240 matrices identical | 0.0284 mm, FD r 0.864, 1/240 identical |
+| `real/ds000005/opt-cost-woods` | "no parameter is identifiable" 48.21 / 50.64 | 13.42 / 2.65 |
+| `failures/bins1-woods` (`reproduce`) | RMS deviation p95 73.82 mm | 3.64 mm |
+| `failures/bins8-corratio` (`reproduce`) | RMS deviation p95 0.0717 mm | 0.0416 mm |

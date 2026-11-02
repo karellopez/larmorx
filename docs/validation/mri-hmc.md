@@ -5,9 +5,55 @@
 - **Validated:** `larmorx mri hmc` / `lx.mri.hmc` (crate larmorx-mri, clean-room from `specs/mcflirt.md`, Apache-2.0)
 - **Reference:** mcflirt from FSL 6.0.7.23 (fsl-mcflirt 2111.0), the recorded runs in `oracles/fsl-6.0.7.23/mcflirt-haswell/`
 - **Test data:** larmorx-testdata `52124bc98f9f`, tier `standard`
-- **Generated:** 2026-10-30 on Linux x86_64, with `python -m larmorx_validation parity mri-hmc --tier standard --fsl-version 6.0.7.23`
+- **Generated:** 2026-11-02 on Linux x86_64, with `python -m larmorx_validation parity mri-hmc --tier standard --fsl-version 6.0.7.23`
 - **Original programs:** 35 runs: 21 from the oracle cache, 14 run (6 never cached: the original varies); cache `<workspace>/oracles/cache`, mode `use`
 
+**fMRIPrep's command on real BOLD runs** (`-reffile <HMC reference> -mats`): larmorx's matrices against mcflirt's, next to mcflirt's own deviation when its input is perturbed slightly (the band: the worst of three noise realisations and the reverse order):
+
+| Run | Volumes | RMS dev. median (mm) | 95th pct (mm) | mcflirt band 95th pct (mm) | Median Δparam (mm / °) | FD r | mcflirt band FD r |
+|---|---|---|---|---|---|---|---|
+| ds000005 | 240 | 0.0094 | **0.0262** | 0.1014 | 0.0017 / 0.0005 | 0.8869 | 0.7941 |
+| ds000117 | 208 | 0.0111 | **0.0191** | 0.0203 | 0.0023 / 0.0031 | 0.8991 | 0.8720 |
+| ds000122 | 258 | 0.0159 | **0.0299** | 0.0312 | 0.0023 / 0.0048 | 0.9985 | 0.9977 |
+| ds000210-rest-echo2 | 204 | 0.0130 | **0.0226** | 0.0229 | 0.0024 / 0.0039 | 0.9820 | 0.9799 |
+| ds000258-bigendian | 239 | 0.0103 | **0.0181** | 0.0193 | 0.0014 / 0.0021 | 0.9949 | 0.9949 |
+| ds003345 | 216 | 0.0141 | **0.0259** | 0.0299 | 0.0023 / 0.0040 | 0.9867 | 0.9840 |
+| ds005040 | 63 | 0.0135 | **0.0252** | 0.0257 | 0.0028 / 0.0032 | 0.8539 | 0.8238 |
+| ds006010 | 113 | 0.0073 | **0.0142** | 0.0164 | 0.0010 / 0.0010 | 0.9263 | 0.8514 |
+| ds006736 | 69 | 0.0121 | **0.0252** | 0.0259 | 0.0021 / 0.0038 | 0.9987 | 0.9974 |
+
+**All runs with `-mats`** (116): the worst 95th-percentile RMS deviation is 0.2811 mm and the worst median parameter difference 0.0099 mm / 0.0278° (thresholds per run: 0.1 mm and 0.05 mm / 0.05°, or mcflirt's band where wider; 25 runs use the band). 52 of 11271 matrix files are identical to mcflirt's as text (6 decimals).
+
+| Category | Runs | RMS dev. median (mm) | Worst 95th pct (mm) | Worst median Δparam (mm / °) | Max Δparam (mm / °) | Lowest FD r | Identical .mat |
+|---|---|---|---|---|---|---|---|
+| options (ds000005) | 23 | 0.0094 | 0.0308 | 0.0024 / 0.0049 | 0.061 / 0.058 | 0.9991 | 9/5520 |
+| real | 28 | 0.0113 | 0.0299 | 0.0029 / 0.0053 | 0.047 / 0.046 | 0.9820 | 8/5094 |
+| synthetic/cli | 4 | 0.0213 | 0.0713 | 0.0027 / 0.0164 | 0.016 / 0.080 | 0.9971 | 3/37 |
+| synthetic/content | 4 | 0.0293 | 0.0870 | 0.0036 / 0.0126 | 0.027 / 0.094 | 0.9988 | 5/36 |
+| synthetic/dtypes | 10 | 0.0265 | 0.0961 | 0.0032 / 0.0164 | 0.017 / 0.099 | 0.9971 | 5/120 |
+| synthetic/geometry | 10 | 0.0171 | 0.1130 | 0.0029 / 0.0278 | 0.018 / 0.114 | 0.9995 | 8/38 |
+| synthetic/motion | 31 | 0.0365 | 0.2811 | 0.0099 / 0.0267 | 0.071 / 0.624 | 0.9737 | 11/354 |
+| synthetic/orientation | 6 | 0.0293 | 0.0713 | 0.0027 / 0.0164 | 0.019 / 0.080 | 0.9971 | 3/72 |
+
+**Against the synthetic ground truth** (mean RMS deviation from the true motion, 27 runs): larmorx 0.4090 mm, mcflirt 0.4143 mm.
+
+- **D13 fix pass** (larmorx's default, `upstream_defects="fix"`; the comparison above runs `reproduce`): the corrections met
+  - FSL-01: 124 case(s) named it, 113 with changed values (largest difference 1.54e+03), 124 with other changes (N of N matrices, by up to N mm; exit N; files out_mcf.nii.gz.mat; files out_mcf.nii.gz_mean_reg.nii.gz, out_mcf_mean_reg.nii.gz; files out_mcf.nii.gz_meanvol.nii.gz, out_mcf.nii.gz_sigma.nii.gz, out_mcf.nii.gz_variance.nii.gz, out_mcf_meanvol.nii.gz, out_mcf_sigma.nii.gz, out_mcf_variance.nii.gz; out_mcf.nii.gz.par text; out_mcf.nii.gz: type or units; out_mcf.nii.gz_abs.rms text; out_mcf.nii.gz_abs_mean.rms text; out_mcf.nii.gz_rel.rms text; out_mcf.nii.gz_rel_mean.rms text; plain.par text; plain_abs.rms text; plain_abs_mean.rms text; plain_rel.rms text; plain_rel_mean.rms text; small_mcf.par text): `real/ds000005/default`, `real/ds000005/fmriprep`, `real/ds000005/fmriprep-repeat2`, `real/ds000005/fmriprep-repeat3`, `real/ds000005/fmriprep-reports`, `real/ds000005/opt-2d`, `real/ds000005/opt-bins64`, `real/ds000005/opt-cost-corratio` …
+  - FSL-03: 5 case(s) named it, 5 with changed values (largest difference 39), 5 with other changes (N of N matrices, by up to N mm; out_mcf.nii.gz.par text; out_mcf.nii.gz_abs.rms text; out_mcf.nii.gz_abs_mean.rms text; out_mcf.nii.gz_rel.rms text; out_mcf.nii.gz_rel_mean.rms text): `real/ds000005/opt-2d`, `syn/geometry/thin-slab/default`, `syn/geometry/thin-slab/fov10`, `syn/geometry/thin-slab/rotation2`, `syn/motion/small/2d`
+  - FSL-05: 1 case(s) named it, 1 with changed values (largest difference 20), 1 with other changes (N of N matrices, by up to N mm; out_mcf.nii.gz.par text; out_mcf.nii.gz_abs.rms text; out_mcf.nii.gz_abs_mean.rms text; out_mcf.nii.gz_rel.rms text; out_mcf.nii.gz_rel_mean.rms text): `real/ds000005/opt-scaling3`
+  - FSL-06: 1 case(s) named it, 0 with changed values (largest difference 0), 1 with other changes (exit [N]): `syn/motion/small/unknown-cost`
+  - FSL-07: 1 case(s) named it, 0 with changed values (largest difference 0), 1 with other changes (exit N): `failures/binsabc-mutualinfo`
+  - FSL-08: 5 case(s) named it, 5 with changed values (largest difference 43), 5 with other changes (N of N matrices, by up to N mm; files out_mcf.nii.gz_mean_reg.nii.gz, out_mcf_mean_reg.nii.gz; files out_mcf.nii.gz_meanvol.nii.gz, out_mcf.nii.gz_sigma.nii.gz, out_mcf.nii.gz_variance.nii.gz, out_mcf_meanvol.nii.gz, out_mcf_sigma.nii.gz, out_mcf_variance.nii.gz; out_mcf.nii.gz.par text; out_mcf.nii.gz_abs.rms text; out_mcf.nii.gz_abs_mean.rms text; out_mcf.nii.gz_rel.rms text; out_mcf.nii.gz_rel_mean.rms text): `real/ds000005/opt-meanvol`, `real/ds000005/opt-meanvol-noref`, `real/ds000005/opt-stats`, `syn/motion/small/meanvol`, `syn/motion/small/stats`
+  - FSL-09: 105 case(s) named it, 105 with changed values (largest difference 815), 98 with other changes (N of N matrices, by up to N mm; files out_mcf.nii.gz.mat; files out_mcf.nii.gz_mean_reg.nii.gz, out_mcf_mean_reg.nii.gz; files out_mcf.nii.gz_meanvol.nii.gz, out_mcf.nii.gz_sigma.nii.gz, out_mcf.nii.gz_variance.nii.gz, out_mcf_meanvol.nii.gz, out_mcf_sigma.nii.gz, out_mcf_variance.nii.gz; out_mcf.nii.gz.par text; out_mcf.nii.gz: type or units; out_mcf.nii.gz_abs.rms text; out_mcf.nii.gz_abs_mean.rms text; out_mcf.nii.gz_rel.rms text; out_mcf.nii.gz_rel_mean.rms text; plain.par text; plain_abs.rms text; plain_abs_mean.rms text; plain_rel.rms text; plain_rel_mean.rms text; small_mcf.par text): `real/ds000005/default`, `real/ds000005/fmriprep`, `real/ds000005/fmriprep-repeat2`, `real/ds000005/fmriprep-repeat3`, `real/ds000005/fmriprep-reports`, `real/ds000005/opt-2d`, `real/ds000005/opt-bins64`, `real/ds000005/opt-cost-corratio` …
+  - FSL-10: 3 case(s) named it, 3 with changed values (largest difference 44), 3 with other changes (N of N matrices, by up to N mm; out_mcf.nii.gz.par text; out_mcf.nii.gz: type or units; out_mcf.nii.gz_abs.rms text; out_mcf.nii.gz_abs_mean.rms text; out_mcf.nii.gz_rel.rms text; out_mcf.nii.gz_rel_mean.rms text): `real/ds003345/default`, `real/ds003345/fmriprep`, `real/ds003345/fmriprep-reports`
+  - FSL-13: 3 case(s) named it, 1 with changed values (largest difference 3), 3 with other changes (exit N; files out_mcf.nii.gz.mat; out_mcf.nii.gz_rel.rms text; out_mcf.nii.gz_rel_mean.rms text): `syn/cli/rmsrel-only`, `failures/fsl20-rmsrel`, `failures/fsl20-rmsabs-report`
+  - FSL-14: 2 case(s) named it, 2 with changed values (largest difference 1.54e+03), 2 with other changes (N of N matrices, by up to N mm; out_mcf.nii.gz.par text; out_mcf.nii.gz_abs.rms text; out_mcf.nii.gz_abs_mean.rms text; out_mcf.nii.gz_rel.rms text; out_mcf.nii.gz_rel_mean.rms text): `syn/content/nan/default`, `syn/content/nan/reffile`
+  - FSL-20: 6 case(s) named it, 0 with changed values (largest difference 0), 6 with other changes (exit N): `failures/fsl20-mats`, `failures/fsl20-mats-plots`, `failures/fsl20-reffile`, `failures/fsl20-file-parent`, `failures/fsl20-rmsrel`, `failures/fsl20-rmsabs-report`
+  - FSL-21: 9 case(s) named it, 0 with changed values (largest difference 0), 9 with other changes (exit N): `failures/bins7-mutualinfo`, `failures/bins4-mutualinfo-s2`, `failures/bins4-mutualinfo-s3-plots`, `failures/bins0-normmi`, `failures/bins1-woods`, `failures/bins2-corratio`, `failures/bins2-corratio-smooth0`, `failures/bins2-corratio-report` …
+  - FSL-59: 3 case(s) named it, 3 with changed values (largest difference 392), 3 with other changes (N of N matrices, by up to N mm; out_mcf.nii.gz.par text; out_mcf.nii.gz_abs.rms text; out_mcf.nii.gz_abs_mean.rms text; out_mcf.nii.gz_rel.rms text; out_mcf.nii.gz_rel_mean.rms text): `real/ds000005/opt-nn_final`, `syn/motion/small/nn_final`, `syn/motion/small/sinc_final`
+  - FSL-65: 5 case(s) named it, 0 with changed values (largest difference 0), 5 with other changes (exit N): `failures/fsl20-plots-only`, `failures/par-dir-plots-mats`, `failures/par-dir-plots`, `failures/par-dir-plots-mats-ref0`, `failures/rms-dir`
+  - FSL-66: 5 case(s) named it, 0 with changed values (largest difference 0), 5 with other changes (exit N): `failures/binsm1-normcorr`, `failures/binsm4-normcorr-s2`, `failures/binsm8-normcorr`, `failures/binsm16-normcorr`, `failures/binsm16-mutualinfo`
+  - Matrices (RMS deviation, radius 80 mm): the corrections change 109 run(s); on the 52 real runs a run's largest change is 0.0237 mm (median) and at most 15.9 mm; the largest is 106 mm, in `syn/content/background/default`; non-finite matrices on one side in `syn/content/nan/default`, `syn/content/nan/reffile`.
 
 ## mcflirt's own variability band
 
@@ -218,7 +264,7 @@ mcflirt's defaults (middle volume as reference)
 
 | Component | Version |
 |---|---|
-| larmorx | 0.0.1 (7c9df9d9c8b2) |
+| larmorx | 0.0.1 (04b58ca8e43d) |
 | larmorx-testdata | 52124bc98f9f |
 | Python | 3.12.16 |
 | Platform | Linux x86_64 (Linux-6.8.0-124-generic-x86_64-with-glibc2.35) |

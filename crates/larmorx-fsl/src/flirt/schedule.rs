@@ -478,7 +478,7 @@ fn adjust_heap<T: Clone>(
         v[hole] = v[second].clone();
         hole = second;
     }
-    if len % 2 == 0 && second == (len - 2) / 2 {
+    if len.is_multiple_of(2) && second == (len - 2) / 2 {
         second = 2 * (second + 1);
         v[hole] = v[second - 1].clone();
         hole = second - 1;

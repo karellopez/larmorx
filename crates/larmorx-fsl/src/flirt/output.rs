@@ -76,7 +76,7 @@ impl SincKernel {
         let q = (f64::from((t / h) * m + m) + 1.0) as f32;
         let n = floor(q);
         let f = q - n;
-        if !(n >= 1.0 && n <= 1200.0) {
+        if !(1.0..=1200.0).contains(&n) {
             return 0.0;
         }
         let i = n as usize - 1;

@@ -238,6 +238,23 @@ ratio's bins are summed in parallel with each bin's additions in the sampling or
 grid points, the boundary pairs and the field map's searches run in parallel and are collected in
 order.
 
+**The spec writer's answers (part 2, relay 4).** The costs, parameters, search, optimiser,
+boundary normals, spline, sinc and forms follow `specs/flirt.md`'s exact arithmetic of 2026-11-02:
+a development run of the standard tier's 305 cases had 206 within thresholds, 85 rejected by both
+alike, 6 where FLIRT crashes or never finishes, and 8 failures (part 1: 22 of 157); every
+boundary-based case and fMRIPrep's three calls, `-anglerep quaternion`, `-usesqform`, `convert_xfm
+-fixscaleskew` and every spline output FSL's (the spline's and `-usesqform`'s bit for bit); the
+sinc outputs within 1e-5 of the image's range (1.6 % of the voxels in their last bit). The
+failures and why: [findings](../findings/fsl-flirt-original.md), "The spec writer's answers". Its
+defaults for the four defects the spec writer found: **FSL-90** (`-anglerep quaternion`: the
+search's starting points composed from their Euler angles; FLIRT's quaternion reading, with its
+messages, with `reproduce`), **FSL-91** (a `-refweight` or `-inweight` with no voxel of at least
+0.01: the registration refused; FLIRT's run with `reproduce`), **FSL-92** (an input or reference of
+one voxel: refused; FLIRT's run with `reproduce`), **FSL-93** (a header voxel size of 0: counted
+as 1 for the base scale; refused with `reproduce`, where FLIRT never finishes; `-basescale 0`
+refused in both modes), each named in both modes. `lx.mri.hmc`'s `-cost corratio` and `-cost
+woods` now use the same sums (`specs/mcflirt.md` appendix A).
+
 ## Upstream defects (D13)
 
 Corrected by default, FSL's behaviour with `upstream_defects="reproduce"`

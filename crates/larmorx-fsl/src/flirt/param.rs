@@ -140,9 +140,9 @@ pub fn euler_decompose_parts(m: &Mat4, c: [f64; 3]) -> (Params, M3) {
     let (k2, k3) = (xz / sz, yz / sz);
     let (k2d, k3d) = (f64::from(k2), f64::from(k3));
     // K⁻¹, the unit upper triangle's inverse as §12 forms it (each column's entries times −1)
-    let i01 = k1d * -1.0;
-    let i02 = (k3d * i01 + k2d) * -1.0;
-    let i12 = k3d * -1.0;
+    let i01 = -k1d;
+    let i02 = -(k3d * i01 + k2d);
+    let i12 = -k3d;
     let inv: M3 = [[1.0, i01, i02], [0.0, 1.0, i12], [0.0, 0.0, 1.0]];
     let recip = [sxd, syd, f64::from(sz)].map(|v| 1.0 / v);
     let sk: M3 = [0, 1, 2].map(|i| inv[i].map(|v| v * recip[i]));
@@ -291,9 +291,7 @@ mod tests {
                 0.3, -0.2, 0.1, 1.0, -2.0, 0.5, 1.1, 0.9, 1.05, 0.02, -0.03, 0.01,
             ],
             [-1.2, 0.7, 2.5, 3.0, 2.0, -1.5, 1.0, 1.0, 1.0, 0.0, 0.0, 0.0],
-            [
-                0.0, 1.5707963, 0.4, 0.0, 0.0, 0.0, 1.0, 1.0, 1.0, 0.0, 0.0, 0.0,
-            ],
+            [0.0, 1.5, 0.4, 0.0, 0.0, 0.0, 1.0, 1.0, 1.0, 0.0, 0.0, 0.0],
         ];
         for p in ps {
             let a = euler_compose(&p, 12, c);

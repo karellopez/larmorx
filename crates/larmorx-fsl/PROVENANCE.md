@@ -136,3 +136,25 @@ opened). Its only inputs were:
 | `flirt::trace` (standard output in order, its notation, the evaluation counter, the images' four information lines) | §2.3, §2.5 | spec, black-box |
 | `flirt::engine` (the reading's, preparation's, `setscale`'s, `setoption`'s and the end's lines; `-debug`'s volumes, lines and final call; `-debugsave`'s grids), `flirt::optimise` (the optimisations' starts, tolerances, evaluations, Powell's lines), `flirt::search` (the grids', threshold's and minima's lines), `flirt::bbr::cost_and_debug` (BBR's `debug` volume) | §2.3, §9.4 | spec, black-box |
 | `flirt::cost` (the correlation ratio's and Woods' bin sums in parallel, each bin's additions in the sampling order: the same bits), `flirt::bbr::mask_distance` (the field map's search skipping the steps that cannot reach its mask: the same point found) | §6.2, §6.5, §12 | spec, larmorx's own design |
+
+## The spec writer's answers (part 2, relay 4, 2026-11-02)
+
+Written by a clean-room implementer under the same rules (none of the files listed above
+opened). Its only inputs were:
+
+| Input | What it gave |
+|---|---|
+| [`specs/flirt.md`](../../specs/flirt.md) §3, §4.1, §4.2, §5, §6.2, §6.4, §6.5, §7.1, §7.2, §8.1, §8.2, §8.5, §9.2, §9.3, §10a, §11 (FSL-90 to FSL-93), §12, §14's table; [`specs/mcflirt.md`](../../specs/mcflirt.md) §4.4, §6.2, §6.3, appendix A | the exact arithmetic of the costs, parameters, search, optimiser, normals, spline, sinc, forms; the four defects' defaults |
+| Black-box runs of FSL 6.0.7.23's `flirt` and `convert_xfm` (FSL off the `PATH`) through the oracle cache: the fsl-flirt suite's standard tier and `-verbose 7` traces of its cases | where the two traces part, evaluation by evaluation |
+| libstdc++'s documented `std::sort` (introsort, insertion sort below 16 elements) | `sort`, `dualsort` and FSL-22's `reproduce` order |
+
+| larmorx | Behaviour reproduced | Source |
+|---|---|---|
+| `flirt::param::{euler_compose, euler_decompose, euler_decompose_parts}` | every Euler composition and decomposition of FLIRT and `convert_xfm` (`-fixscaleskew` included) | §3 |
+| `flirt::cost::centre_of_mass`; the weighted costs' edge factors one by one | the centres of mass in blocks; `(((w_t·w_r)·w_x)·w_y)·w_z` | §8.1 step 3, §6.4 |
+| `flirt::optimise` (the unit along `û`, the convergence weights, `Settings::tol_x0`) | §8.2's line search and convergence test; the search's tolerances | §8.1, §8.2 |
+| `flirt::search` (the coarse grid in single precision, its trilinear interpolation, the percentile, the minima's starts, the list, FSL-90) | §8.1's steps 2 to 9 | §8.1, §11 |
+| `flirt::engine` (FSL-91, FSL-92, FSL-93, the reference parameters in force, fresh centres, the neurological forms' single-precision field of view, the output blur's edge) | §4.1, §4.2, §6.4, §8.5, §9.3 | §4, §6.4, §8.5, §9.3, §11 |
+| `flirt::schedule::{std_sort, std_sort_checked}` | the order of rows of equal cost; NaN's order in the background value with `reproduce` | §7.1, §10a |
+| `flirt::bbr::points` (with `pyramid::convolve`) | the boundary normals: a Gaussian of 2 mm, the gradient's weights 3, 1, 1/3, zeros outside | §6.5 |
+| `flirt::output::{FlirtSpline, trilinear_constant, SincKernel}`, `Edge` | the spline exactly, `-setbackground`'s constant, the sinc's table and lookup, the edge rule before the blur | §9.2, §9.3 |

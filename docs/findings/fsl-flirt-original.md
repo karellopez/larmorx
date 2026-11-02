@@ -393,3 +393,71 @@ aside: at level 5 and more the evaluations follow the optimisation's path, so th
 where the matrices differ in their last digits; the suite then compares the lines with each run of
 evaluations as one). The pyramid's volumes and the input's are FSL's bit for bit on these cases;
 BBR's `debug` volume correlates at 0.9994 with FSL's (it follows the final matrix).
+
+## The spec writer's answers (part 2, relay 4, 2026-11-02)
+
+The spec writer's answers to part 1's questions (`specs/flirt.md` §14, "The clean-room questions of
+2026-11-02") are now in the original; what black-box runs of FSL 6.0.7.23 showed while they went
+in (the suite's cases, and `-verbose 7` traces of FSL and the original compared evaluation by
+evaluation; every FSL run through the oracle cache):
+
+- **The traces now agree.** With §6.2's `corratio` (single-precision sums over the bins with more
+  than two points, the two roundings of `η` and of the cost), §3's composition and decomposition
+  (the elementary rotations `(B·C)·Bᵀ`, the single-precision scales and skews, `atan2f`), §8.1's
+  search (the tolerances of the search-wide `x₀`, the coarse grid held and interpolated in single
+  precision, the percentile's single-precision index, the minima's starts from their composed
+  matrix, the sorted list's rule), §8.2's line-search unit and convergence weights, and the centres
+  of mass in blocks of `max(1000, trunc(√N)) + 1` voxels, `real/dof6`'s `-verbose 7` trace is FSL's
+  for its first 3,982 evaluations (part 1: the 9th), the whole 8 mm search and most of the free
+  optimisations included; it parts at the 3,983rd, a parabolic step along `t_x` of the free
+  optimisation from `rx = −3.118587` (the 6th decimal of the step; the costs agree to their printed
+  digits). `real/weights-normcorr`'s trace is FSL's through its 5,449th evaluation.
+- **The free optimisations start from the start's decomposition composed again.** FSL's `Starting
+  with :` matrix of each minimum, and its row in `P`, is the composition of the decomposed start,
+  not the start itself: under gimbal lock (`|r_y| = 90°`, the search's −1.570796) the decomposition
+  gives other angles (`−1.570796 −1.570796 −1.570796` becomes `3.141593 −1.570796 0`) and the
+  recomposed matrix differs from the start in the 6th significant digit of its translation
+  (84.266231 against 84.266223 on `real/weights-normcorr`). The original does the same.
+- **Weighted costs multiply the edge factors one by one** (§6.4's "then the edge factors multiply
+  it"): `(((w_t·w_r)·w_x)·w_y)·w_z`, not `(w_t·w_r)·((w_x·w_y)·w_z)`; with the product of the
+  factors first the weighted `corratio` of `real/weights-normcorr` parts from FSL's at the 2,194th
+  evaluation (a scale of 0.248, where most points lie near the input's edges). The shared engine's
+  point weight now receives the edge weight (`larmorx_mri::hmc::cost::PointWeight`); `lx.mri.hmc`
+  passes none.
+- **FSL-90's composition with `-dof 6` happens twice.** With `-anglerep quaternion` and `-dof 6`
+  FSL prints `Parameters do not form a valid axis - greater than unity` twice for each starting
+  point whose angles' squares sum above 1 (8 lines for the four of `real/anglerep-quaternion-dof6`;
+  once each with 12 dof): the 7 parameters are composed first, then the scale dropped. The original
+  in `reproduce` composes the same two (§8.1 step 9 says only "with `-dof 6` the median scale
+  dropped": spec question).
+- **FSL-22 in FLIRT's padding** (`real/applyxfm-nan-border`): with `reproduce`, the order FSL's build
+  gives the border's NaN values is libstdc++'s `std::sort` with `<`; the original sorts them so
+  (`schedule::std_sort`, an introsort written from its documented behaviour: median of three moved
+  to the front, unguarded partition, a heap sort when the depth runs out, an insertion sort over
+  the first 16 values and an unguarded one after) and FSL's background value, so every padded voxel,
+  is reproduced bit for bit. The schedule's `sort` and `dualsort` use the same order (§7.1: rows of
+  equal cost keep the order libstdc++ gives them).
+- **The output image.** With §9.3's rules (the edge rule before the blur with `-applyxfm`, the
+  spline's coefficients and weights exactly, `-setbackground`'s zero coefficients outside the grid
+  and its constant in the trilinear padding) `real/applyisoxfm-4d-blur-setbackground` and every
+  spline case are FSL's bit for bit; with §8.5's swapped forms (a single-precision field of view)
+  `real/applyxfm-usesqform`'s matrix is FSL's to its last printed digit (part 1: 4.5e-6 mm); with
+  §3's decomposition and composition `convert_xfm -fixscaleskew` prints FSL's ten digits (part 1:
+  the 8th). With §9.2's sinc table and lookup the sinc outputs differ from FSL's in the last bit of
+  1.6 % of the voxels (`real/interp-sinc`: 32,052 of 1,990,656; part 1: a third); a single-precision
+  `π` in the sinc's argument is further (646,586), `1 − f` in single precision changes nothing:
+  spec question (what else §9.2's model does).
+- **BBR's normals** as §6.5 states them (a Gaussian of 2 mm, the gradient's weights 3, 1, 1/3,
+  neighbours outside the image 0): every `bbr/` case and fMRIPrep's three calls within thresholds,
+  `bbr/type-local_abs` included (part 1: 1.4 mm).
+- **Left open** (the record's 8 failures of 305 on the standard tier): `real/cost-leastsq` (its
+  trace parts at the 3,952nd evaluation, the first free optimisation's start, `leastsq`'s last
+  bits: §6.2 gives no exact order for it), `real/cost-normmi`, `real/weights-normmi`,
+  `real/weights-normcorr` (traces part late; FSL's own bands 1.2 to 46.8 mm: unstable
+  registrations, a last bit decides), `real/weights-woods` (36 more evaluations than FSL, each
+  printing Woods' warning: the search's weighted `corratio` parts as above), and FSL-91's and
+  FSL-92's `reproduce` runs (`real/weights-empty-refweight`, `-inweight`, `edge/one-voxel-input`):
+  every cost constant, the matrix FLIRT ends at is decided by the ties of its line searches, its
+  sorts and its list (the 8 mm search's trace is FSL's but for a few 6th digits of the
+  translations of the free optimisations' results, then the 4 mm stage's choices part). By default
+  the original refuses all three (FSL-91, FSL-92, rule B).

@@ -1,13 +1,14 @@
 // SPDX-License-Identifier: Apache-2.0
-//! Bindings of the clean-room FSL-compatible tools (`larmorx-fsl`): BET's original, run as its
-//! command line inside this process.
+//! Bindings of the clean-room FSL-compatible tools (`larmorx-fsl`): BET's and FLIRT's originals,
+//! run as their command lines inside this process.
 
 use std::path::PathBuf;
 
 use pyo3::exceptions::PyKeyError;
 use pyo3::prelude::*;
 
-/// Runs the clean-room original of `fsl tool` (`bet` or `bet2`) with FSL's arguments inside
+/// Runs the clean-room original of `fsl tool` (`bet`, `bet2`, `betsurf`, `flirt`, `convert_xfm`,
+/// `larmorx_fsl::cli::TOOLS`) with FSL's arguments inside
 /// this process, without the GIL: `(exit code, standard output, standard error)`. `env` stands
 /// for the process environment (`FSLOUTPUTTYPE`, `FSL_LOAD_NIFTI_EXTENSIONS`,
 /// `LARMORX_UPSTREAM_DEFECTS`, `OMP_NUM_THREADS`); the process's own is neither read nor

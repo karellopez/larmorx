@@ -216,6 +216,13 @@ fn row_range(row0: [f32; 3], step: [f32; 3], bound: [f32; 3], nx: usize) -> Opti
 pub trait Accumulator: Send {
     /// One contributing point: grid value `g`, interpolated test value `v`, edge weight `w`.
     fn point(&mut self, g: f32, v: f32, w: f32);
+    /// [`Accumulator::point`] with the grid point's linear index (`x + nx·(y + ny·z)`) and its
+    /// test-voxel position `p`, for costs that weight each point by images of their own (FLIRT's
+    /// weighted costs, `specs/flirt.md` §6.4). By default the point alone.
+    #[inline(always)]
+    fn point_at(&mut self, g: f32, v: f32, w: f32, _index: usize, _p: [f32; 3]) {
+        self.point(g, v, w);
+    }
     /// The end of a row (every row of the grid, also rows without points).
     fn end_row(&mut self);
 }
@@ -248,18 +255,19 @@ fn sample_slice<A: Accumulator, V: Fn([f32; 3]) -> f32, W: Fn([f32; 3]) -> f32>(
                 p = [p[0] + step[0], p[1] + step[1], p[2] + step[2]];
                 x += 1;
             }
+            let row_index = gx * (y + gy * z);
             if test.skip_non_finite {
                 while x <= x1 && test.inside(p) {
                     let (g, v) = (grow[x], value(p));
                     if g.is_finite() && v.is_finite() {
-                        acc.point(g, v, weight(p));
+                        acc.point_at(g, v, weight(p), row_index + x, p);
                     }
                     p = [p[0] + step[0], p[1] + step[1], p[2] + step[2]];
                     x += 1;
                 }
             } else {
                 while x <= x1 && test.inside(p) {
-                    acc.point(grow[x], value(p), weight(p));
+                    acc.point_at(grow[x], value(p), weight(p), row_index + x, p);
                     p = [p[0] + step[0], p[1] + step[1], p[2] + step[2]];
                     x += 1;
                 }
@@ -289,6 +297,83 @@ pub fn sample<A: Accumulator>(
         (0..nz).into_par_iter().map(one).collect()
     } else {
         (0..nz).map(one).collect()
+    }
+}
+
+/// A weight of each contributing point from images of its own: given the grid point's linear
+/// index and its test-voxel position, the factor that multiplies the point's edge weight (FLIRT's
+/// `-refweight` and `-inweight`, `specs/flirt.md` §6.4).
+pub type PointWeight<'a> = &'a (dyn Fn(usize, [f32; 3]) -> f32 + Sync);
+
+/// An accumulator whose points are weighted by a [`PointWeight`] first: the point's weight is
+/// `weight(index, p)·w`.
+pub struct Weighted<'a, A> {
+    pub inner: A,
+    pub weight: PointWeight<'a>,
+}
+
+impl<A: Accumulator> Accumulator for Weighted<'_, A> {
+    #[inline(always)]
+    fn point(&mut self, g: f32, v: f32, w: f32) {
+        self.inner.point(g, v, w);
+    }
+    #[inline(always)]
+    fn point_at(&mut self, g: f32, v: f32, w: f32, index: usize, p: [f32; 3]) {
+        let ww = (self.weight)(index, p) * w;
+        self.inner.point(g, v, ww);
+    }
+    fn end_row(&mut self) {
+        self.inner.end_row();
+    }
+}
+
+/// [`sample`], each point weighted by `weight` when one is given (the same pass as [`sample`]
+/// without one).
+pub fn sample_weighted<A: Accumulator>(
+    grid: &Volume,
+    test: &TestVolume<'_>,
+    b: &[[f32; 4]; 3],
+    parallel: bool,
+    weight: Option<PointWeight<'_>>,
+    make: impl Fn() -> A + Sync,
+) -> Vec<A> {
+    match weight {
+        None => sample(grid, test, b, parallel, make),
+        Some(weight) => sample(grid, test, b, parallel, || Weighted {
+            inner: make(),
+            weight,
+        })
+        .into_iter()
+        .map(|w| w.inner)
+        .collect(),
+    }
+}
+
+/// Every slice of the grid into the one accumulator `acc`, in slice order (one running sum over
+/// the whole grid), each point weighted by `weight` when one is given.
+pub fn sample_all_weighted<A: Accumulator>(
+    grid: &Volume,
+    test: &TestVolume<'_>,
+    b: &[[f32; 4]; 3],
+    weight: Option<PointWeight<'_>>,
+    acc: A,
+) -> A {
+    let nz = grid.shape[2];
+    match weight {
+        None => {
+            let mut acc = acc;
+            for z in 0..nz {
+                sample_into(grid, test, b, z, &mut acc);
+            }
+            acc
+        }
+        Some(weight) => {
+            let mut w = Weighted { inner: acc, weight };
+            for z in 0..nz {
+                sample_into(grid, test, b, z, &mut w);
+            }
+            w.inner
+        }
     }
 }
 
@@ -347,7 +432,7 @@ impl Sums {
 /// The correlation sums of one slice (§6.4): float32 running sums over each row, the row
 /// totals summed over the slice; the total weight of every row; the number of points.
 #[derive(Default)]
-struct CorrSlice {
+pub struct CorrSlice {
     slice: Sums,
     row: Sums,
     row_weight: f32,
@@ -382,10 +467,17 @@ impl Accumulator for CorrSlice {
 /// without weighting, the number of contributing points (Pearson's correlation).
 pub fn normcorr(grid: &Volume, test: &TestVolume<'_>, b: &[[f32; 4]; 3], parallel: bool) -> f32 {
     let slices = sample(grid, test, b, parallel, CorrSlice::default);
+    1.0 - correlation(&slices, test.weighted(), test.count).abs()
+}
+
+/// The correlation `r` of the slices' sums (§6.4): with `weighted` (`smooth > 0`) mcflirt's
+/// count `N` or the sum of the weights (`count`), else the number of contributing points. Shared
+/// by mcflirt's `normcorr` and FLIRT's (`specs/flirt.md` §6.2, §6.4).
+pub fn correlation(slices: &[CorrSlice], weighted: bool, count: NormCorrCount) -> f32 {
     let mut total = Sums::default();
     let (mut c, mut a, mut n) = (0.0f32, 0.0f32, 0.0f32);
     let mut points = 0u32;
-    for s in &slices {
+    for s in slices {
         for &w in &s.row_weights {
             c += w;
             a += c;
@@ -394,16 +486,15 @@ pub fn normcorr(grid: &Volume, test: &TestVolume<'_>, b: &[[f32; 4]; 3], paralle
         total.add(&s.slice);
         points += s.points;
     }
-    let r = if test.weighted() {
-        match test.count {
+    if weighted {
+        match count {
             NormCorrCount::Mcflirt => correlation_weighted(&total, n),
             // `c` is the float32 running total of every row's weight: Σ w.
             NormCorrCount::Weights => correlation_weighted(&total, c),
         }
     } else {
         correlation_counted(&total, points as f32)
-    };
-    1.0 - r.abs()
+    }
 }
 
 /// The correlation with mcflirt's count `N`: the divisions by `N − 1` in double, the
@@ -466,7 +557,18 @@ pub fn least_squares(
     b: &[[f32; 4]; 3],
     parallel: bool,
 ) -> f32 {
-    let slices = sample(grid, test, b, parallel, SquaresSlice::default);
+    least_squares_weighted(grid, test, b, parallel, None)
+}
+
+/// [`least_squares`] with each point weighted by `weight` when one is given.
+pub fn least_squares_weighted(
+    grid: &Volume,
+    test: &TestVolume<'_>,
+    b: &[[f32; 4]; 3],
+    parallel: bool,
+    weight: Option<PointWeight<'_>>,
+) -> f32 {
+    let slices = sample_weighted(grid, test, b, parallel, weight, SquaresSlice::default);
     let (sum, weight) = slices
         .iter()
         .fold((0.0, 0.0), |(s, w), x| (s + x.sum, w + x.weight));
@@ -570,8 +672,20 @@ pub fn corr_ratio(
     bins: usize,
     parallel: bool,
 ) -> f32 {
+    corr_ratio_weighted(bin_grid, test, b, bins, parallel, None)
+}
+
+/// [`corr_ratio`] with each point weighted by `weight` when one is given.
+pub fn corr_ratio_weighted(
+    bin_grid: &Volume,
+    test: &TestVolume<'_>,
+    b: &[[f32; 4]; 3],
+    bins: usize,
+    parallel: bool,
+    weight: Option<PointWeight<'_>>,
+) -> f32 {
     let m = merge_bins(
-        sample(bin_grid, test, b, parallel, || BinSlice::new(bins)),
+        sample_weighted(bin_grid, test, b, parallel, weight, || BinSlice::new(bins)),
         bins,
     );
     let (mut n, mut s, mut ss) = (0.0, 0.0, 0.0);
@@ -690,6 +804,9 @@ pub fn bin_grid_mi(grid: &Volume, bins: usize, skip_non_finite: bool) -> Volume 
 pub struct TestBins {
     pub b1: f32,
     pub b0: f32,
+    /// The fuzzy fraction φ (mcflirt's is fixed at 0.5; FLIRT's `setoption fuzzyfraction`,
+    /// `specs/flirt.md` §7.3).
+    pub fuzzy: f32,
 }
 
 impl TestBins {
@@ -702,6 +819,7 @@ impl TestBins {
         TestBins {
             b1: b / range,
             b0: (-lo * b) / range,
+            fuzzy: FUZZY,
         }
     }
 }
@@ -722,7 +840,7 @@ struct Contribution {
 }
 
 /// The fuzzy fraction φ (fixed; mcflirt has no option for it).
-const FUZZY: f32 = 0.5;
+pub const FUZZY: f32 = 0.5;
 
 /// The contribution of a sample with reference bin `a`, interpolated test value `y` and edge
 /// weight `g` (appendix B, "Bins" and "Fuzzy binning"), every step in float32 as described.
@@ -747,11 +865,12 @@ fn contribution(a: f32, y: f32, g: f32, bins: i64, t: TestBins) -> Contribution 
         cm = 0;
     }
     let f = (u - x86_i32(u) as f32).abs();
-    let (wc, wp, wm) = if f < FUZZY {
-        let wc = 0.5 + 0.5 * (f / FUZZY);
+    let phi = t.fuzzy;
+    let (wc, wp, wm) = if f < phi {
+        let wc = 0.5 + 0.5 * (f / phi);
         (wc, 0.0, 1.0 - wc)
-    } else if f > 1.0 - FUZZY {
-        let wc = 0.5 + 0.5 * ((1.0 - f) / FUZZY);
+    } else if f > 1.0 - phi {
+        let wc = 0.5 + 0.5 * ((1.0 - f) / phi);
         (wc, 1.0 - wc, 0.0)
     } else {
         (1.0, 0.0, 0.0)
@@ -871,6 +990,19 @@ pub fn mutual_info(
     normalised: bool,
     parallel: bool,
 ) -> f32 {
+    mutual_info_weighted(bin_grid, test, b, bins, normalised, parallel, None)
+}
+
+/// [`mutual_info`] with each point weighted by `weight` when one is given.
+pub fn mutual_info_weighted(
+    bin_grid: &Volume,
+    test: &TestVolume<'_>,
+    b: &[[f32; 4]; 3],
+    bins: usize,
+    normalised: bool,
+    parallel: bool,
+    weight: Option<PointWeight<'_>>,
+) -> f32 {
     let test_bins = test
         .test_bins
         .unwrap_or_else(|| TestBins::new(test.vol, bins));
@@ -881,11 +1013,17 @@ pub fn mutual_info(
             bins: bins as i64,
             test_bins,
         };
-        for slice in sample(bin_grid, test, b, true, make) {
+        for slice in sample_weighted(bin_grid, test, b, true, weight, make) {
             for k in &slice.points {
                 h.add(k);
             }
         }
+    } else if let Some(weight) = weight {
+        let mut wh = Weighted { inner: h, weight };
+        for z in 0..bin_grid.shape[2] {
+            sample_into(bin_grid, test, b, z, &mut wh);
+        }
+        h = wh.inner;
     } else {
         for z in 0..bin_grid.shape[2] {
             sample_into(bin_grid, test, b, z, &mut h);
@@ -994,7 +1132,11 @@ mod tests {
     /// `u = y`.
     #[test]
     fn mi_contributions_by_hand() {
-        let t = TestBins { b1: 1.0, b0: -0.0 };
+        let t = TestBins {
+            b1: 1.0,
+            b0: -0.0,
+            fuzzy: FUZZY,
+        };
         let k = |y: f32| {
             let k = contribution(2.0, y, 0.5, 4, t);
             (k.c, k.cp, k.cm, k.gwc, k.gwp, k.gwm)

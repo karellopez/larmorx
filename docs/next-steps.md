@@ -116,7 +116,7 @@ at a time:
      records re-made in-process: no status change; golden checksums unchanged; `crates-gpl/` keeps
      only the verification tools; CI's `crates-gpl` steps gone (4.0 min a run).
 4. **The ports:** BET's clean-room original (item 7), the clean-room additions mcflirt FSL-20/21
-   and 3dUnifize AFNI-75 (specs first), FLIRT with BBR (parts 1 to 3 done 2026-11-01/02; the clean-room original next), FAST, topup (item 7); field maps,
+   and 3dUnifize AFNI-75 (specs first), FLIRT with BBR (the replica's parts 1 to 3 done 2026-11-01/02; the clean-room original's part 1 done 2026-11-02, part 2 next), FAST, topup (item 7); field maps,
    FreeSurfer, surfaces, confounds (item 8); larmorprepx (item 9). Each with its site page from
    its smart tests.
 5. **The final validation phase** (after every tool is ported): the data panel for every tool
@@ -389,10 +389,24 @@ The items below keep their history.
    headers (metres, voxels of 0.01 and 50 mm) for applyxfm4D, midtrans, pointflirt and pairreg, each
    identical to FSL in a 4 GiB box. `specs/flirt.md` §14 lists only what is left by decision.
    The full tier, the data panel and long random testing wait for the final validation phase.
-   **Next:** the clean-room original (another
-   agent, from `specs/flirt.md`; it reuses the main package's clean-room engine, the cost functions,
-   optimiser and transform algebra of `larmorx-mri`'s head-motion correction, never a second copy: the
-   user, 2026-11-01, "avoid duplication"). The scripts wait for other tools: `epi_reg` (FAST, `fslmaths`,
+   **The clean-room original** (another agent, from `specs/flirt.md`, on the main package's
+   clean-room engine, the cost functions, optimiser and transform algebra of `larmorx-mri`'s
+   head-motion correction, never a second copy: the user, 2026-11-01, "avoid duplication"). **Part 1
+   done (2026-11-02):** `flirt` and `convert_xfm` (crate `larmorx-fsl`, module `flirt`, on
+   `larmorx_mri::hmc`'s shared engine; record `fsl-flirt`: 89 of 111 compared cases within
+   thresholds, fMRIPrep's three BBR calls within 0.1 mm; `-anglerep quaternion` and `alignpaxes`
+   included). **Part 2:** `-debug`, the verbose levels above 1, FLIRT's other programs (avscale, the
+   coordinate programs, rmsdiff, makerot, midtrans, pointflirt, applyxfm4D, pairreg, extracttxt,
+   aff2rigid), the site's clean-room panels, the benchmark report and speed; the record's open cases
+   once the spec writer answers part 1's 20 spec questions (`docs/parts/2026-11-02-cleanroom-flirt-1/handoff.md`, for the spec writer only) (BBR's normal masks and smoothing,
+   `local_abs`, the correlation ratio's last bits, sinc's arithmetic, `-usesqform`'s and
+   `-fixscaleskew`'s precision, the spline with `-setbackground`). Follow-up for `lx.mri.hmc` (its
+   own part; not changed here, its record stays identical): the correlation ratio's sparse-bin rule
+   found here (a reference bin with at most two points is left out of the counts, the sums and the
+   total variance; `docs/findings/fsl-flirt-original.md`, "The costs") probably holds for mcflirt's
+   `-cost corratio` too (`specs/mcflirt.md` appendix A leaves the sparse bins in the total); and the
+   search findings (a subset's convergence test over its own tolerances) for its schedule-free
+   optimiser if it uses subsets. A spec-writer question first. The scripts wait for other tools: `epi_reg` (FAST, `fslmaths`,
    `fugue`/`applywarp` for field maps, `convert_xfm`, `flirt`), `standard_space_roi` (`flirt`,
    `fslmaths`, `fslroi`), `aff2rigid` (`avscale`), `flirt_average` (`flirt`, `fslmaths`,
    `convert_xfm`), `pairreg` (`flirt` with `pairreg*.sch`, `bet`).

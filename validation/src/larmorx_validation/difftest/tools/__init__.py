@@ -38,6 +38,7 @@ TOOLS: dict[str, tuple[str, str]] = {
     "fsl-flirt": ("fsl_flirt", "TOOL"),
     "fsl-flirt-programs": ("fsl_flirt", "PROGRAMS"),
     "fsl-flirt-part3": ("fsl_flirt", "PART3"),
+    "fsl-flirt-original": ("fsl_flirt", "ORIGINAL"),
     "resample-series": ("resample_series", "TOOL"),
 }
 

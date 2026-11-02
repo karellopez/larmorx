@@ -631,7 +631,7 @@ tool = "fsl-bet"
 implementation = "replica"
 signature = ["messages: FSL's, byte for byte"]
 status = "fixed"
-explanation = "fslstats -C printed no warning where FSL writes 'WARNING::in calculating COG, total = 0.0' to cerr (an empty brain under bet -R): larmorx-nc-core's fslstats_cog returns it"
+explanation = "fslstats -C printed no warning where FSL writes 'WARNING::in calculating COG, total = 0.0' to cerr (an empty brain under bet -R): the replica's fslstats -C now prints it"
 link = "validation/difftest/cases/fsl-bet/cog-warning-empty-brain.json"
 
 [[difference]]
@@ -655,7 +655,7 @@ tool = "fsl-bet"
 implementation = "replica"
 signature = ["out.nii.gz"]
 status = "fixed"
-explanation = "bet -F on a series stored as double: fslmaths -mas computes and writes double for a double input (the file's data type); larmorx-nc-core's fslmaths_mas wrote float"
+explanation = "bet -F on a series stored as double: fslmaths -mas computes and writes double for a double input (the file's data type); the replica wrote float"
 link = "validation/difftest/cases/fsl-bet/bet-F-double-series.json"
 
 [[difference]]
@@ -893,7 +893,7 @@ tool = "fsl-flirt"
 implementation = "replica"
 signature = ["stdout identical"]
 status = "fixed"
-explanation = "BBR on a segmentation without boundary points: the cost 0 / 0 is SSE's default NaN, which FLIRT prints -nan; the compiler folded the empty loop's 0.0 / 0.0 into a positive NaN (larmorx-nc-core bbr.rs: the division with SSE's NaN rules)"
+explanation = "BBR on a segmentation without boundary points: the cost 0 / 0 is SSE's default NaN, which FLIRT prints -nan; the compiler folded the empty loop's 0.0 / 0.0 into a positive NaN (the replica divides with SSE's NaN rules)"
 link = "validation/difftest/cases/fsl-flirt/bbr-no-boundary-points-nan.json"
 
 [[difference]]
@@ -909,7 +909,7 @@ tool = "fsl-flirt"
 implementation = "replica"
 signature = ["every file bit-identical"]
 status = "fixed"
-explanation = "-applyxfm and -applyisoxfm onto a coarser grid: FLIRT configures the input's interpolation (extraslice with the background, or -setbackground's constant) before it blurs it, so the blur reads beyond the edges by that extrapolation; the replica blurred with zero outside (larmorx-nc-core newimagefns.rs convolve, larmorx-nc-flirt do_applyxfm; every -applyxfm finding of the trial agrees since; parity cases real/applyisoxfm-4d-blur and -setbackground)"
+explanation = "-applyxfm and -applyisoxfm onto a coarser grid: FLIRT configures the input's interpolation (extraslice with the background, or -setbackground's constant) before it blurs it, so the blur reads beyond the edges by that extrapolation; the replica blurred with zero outside (every -applyxfm finding of the trial agrees since; parity cases real/applyisoxfm-4d-blur and -setbackground)"
 link = "validation/difftest/cases/fsl-flirt/applyxfm-blur-extraslice.json"
 
 [[difference]]
@@ -1080,3 +1080,54 @@ signature = ["notice: FSL-79", "notice: FSL-80", "notice: FSL-09"]
 status = "explained"
 explanation = "FLIRT's part 3: the trial's 136 notices without a visible change: FSL-79 and FSL-80 were named where the coefficients or the kernel changed but not the written image, FSL-09 for voxels the padding mask overwrites. Now named where the written output changes (both conversions compared, masked voxels left out): 131 of the 136 agree on a re-run (difftest --case, boxed); in 5, FSL-79 or FSL-80 and FSL-09 meet in one voxel and cancel (a float spline's 2.6 rounded to 3, FSL's integer 3 truncated to 3): notices by design"
 link = "docs/findings/fsl-flirt.md"
+
+# ---------------------------------------------------------------- FLIRT's clean-room original, part 1 (2026-11-02)
+
+[[difference]]
+tool = "fsl-flirt-original"
+implementation = "original"
+signature = ["exit status (flirt is killed; the original exits N)"]
+status = "register"
+defect = "FSL-75"
+explanation = "FLIRT's clean-room original (part 1, 2026-11-02): the trial oracles/difftest/2026-11-02-cleanroom-flirt (27 minutes, realistic cases only, on WIP 3: 5,668 cases, 2,166 agree, 3,242 differ, 260 skipped for part 2's options, 41 rejected by both; a stratified sample of 282 findings replayed on WIP 7: 154 agree): FSL's background-value buffer overflow on small levels (5 or 6 voxels along x or y): FSL is killed by heap corruption or finishes; the original takes every border value and names FSL-75 (specs/flirt.md 10a); about 370 in the trial, 84 of 86 replayed agree (the 2 others: the one-voxel shrunk inputs below)"
+link = "docs/findings/fsl-flirt-original.md"
+
+[[difference]]
+tool = "fsl-flirt-original"
+implementation = "original"
+signature = ["out.mat: Nth-percentile displacement over the reference's brain", "out.nii.gz: correlation with FSL's image inside the reference's mask", "out.nii: correlation with FSL's image inside the reference's mask", "out.hdr: correlation with FSL's image inside the reference's mask", "out.img: correlation with FSL's image inside the reference's mask"]
+status = "open"
+explanation = "FLIRT's clean-room original (part 1, 2026-11-02): the trial oracles/difftest/2026-11-02-cleanroom-flirt (27 minutes, realistic cases only, on WIP 3: 5,668 cases, 2,166 agree, 3,242 differ, 260 skipped for part 2's options, 41 rejected by both; a stratified sample of 282 findings replayed on WIP 7: 154 agree): registrations: fixed since the trial: the correlation ratio's and Woods' sparse bins, the pair's centre kept at a reset, the search grids' dof, sampled parameters, minima order and start costs, a subset's convergence count (docs/findings/fsl-flirt-original.md); still open: paths that part from FSL's in the costs' last bits (spec question 3) and ill-posed registrations that amplify it, BBR's normals from -wmseg and -bbrtype local_abs (spec questions 4 and 5), an all-zero -refweight or -inweight (every weighted cost 0 / 0 in both: a candidate for a rule-B refusal), one-voxel shrunk inputs (an arbitrary matrix in both); the image check is reported, not held, when the matrix passes by FSL's own variability"
+link = "docs/findings/fsl-flirt-original.md"
+
+[[difference]]
+tool = "fsl-flirt-original"
+implementation = "original"
+signature = ["stderr: the same lines (numbers aside)", "stdout: the same lines (numbers aside)"]
+status = "open"
+explanation = "FLIRT's clean-room original (part 1, 2026-11-02): the trial oracles/difftest/2026-11-02-cleanroom-flirt (27 minutes, realistic cases only, on WIP 3: 5,668 cases, 2,166 agree, 3,242 differ, 260 skipped for part 2's options, 41 rejected by both; a stratified sample of 282 findings replayed on WIP 7: 154 agree): messages: the centres-of-mass warnings fixed (the search measures both centres again); still open: per-evaluation messages whose count follows the optimisation's path (Erroneous dof, Parameters do not form a valid axis, Woods' warnings: the last bits of spec question 3), BBR's messages on an empty segmentation, alignpaxes with a non-finite moment (spec question 12)"
+link = "docs/findings/fsl-flirt-original.md"
+
+[[difference]]
+tool = "fsl-flirt-original"
+implementation = "original"
+signature = ["out.nii.gz bit-identical", "out.nii bit-identical", "out.hdr bit-identical", "out.img bit-identical", "out.nii.zst bit-identical", "out.nii.gz: the same values within Ne-N of the image's range", "out.nii: the same values within Ne-N of the image's range", "out.hdr: the same values within Ne-N of the image's range", "out.img: the same values within Ne-N of the image's range"]
+status = "open"
+explanation = "FLIRT's clean-room original (part 1, 2026-11-02): the trial oracles/difftest/2026-11-02-cleanroom-flirt (27 minutes, realistic cases only, on WIP 3: 5,668 cases, 2,166 agree, 3,242 differ, 260 skipped for part 2's options, 41 rejected by both; a stratified sample of 282 findings replayed on WIP 7: 154 agree): -applyxfm and -applyisoxfm images: headers with -applyisoxfm fixed (an unset sform keeps the reference's rows; the qform's fields only when set); zstd and bzip2 outputs now read by the comparer (harness); still open: quatern_b and quatern_c in their last float bit on an oblique qform (spec question 9), the sinc's last bits (spec question 13), the spline with -setbackground (spec question 14), 2 of 16 voxels on a tiny 4D case with -setbackground"
+link = "docs/findings/fsl-flirt-original.md"
+
+[[difference]]
+tool = "fsl-flirt-original"
+implementation = "original"
+signature = ["files written"]
+status = "fixed"
+explanation = "FLIRT's clean-room original (part 1, 2026-11-02): the trial oracles/difftest/2026-11-02-cleanroom-flirt (27 minutes, realistic cases only, on WIP 3: 5,668 cases, 2,166 agree, 3,242 differ, 260 skipped for part 2's options, 41 rejected by both; a stratified sample of 282 findings replayed on WIP 7: 154 agree): -applyxfm writes the image before the matrix: an output type FSL cannot write (FSLOUTPUTTYPE=ANALYZE with a 4D image) ends the run before -omat"
+link = "docs/findings/fsl-flirt-original.md"
+
+[[difference]]
+tool = "fsl-flirt-original"
+implementation = "original"
+signature = ["out.mat identical", "out.mat: the matrices", "out.mat: within Ne-N of FSL's (relative)"]
+status = "fixed"
+explanation = "FLIRT's clean-room original (part 1, 2026-11-02): the trial oracles/difftest/2026-11-02-cleanroom-flirt (27 minutes, realistic cases only, on WIP 3: 5,668 cases, 2,166 agree, 3,242 differ, 260 skipped for part 2's options, 41 rejected by both; a stratified sample of 282 findings replayed on WIP 7: 154 agree): convert_xfm -inverse: the inverse in LAPACK's order, which gives FSL's -0; -fixscaleskew's 8th digit and -usesqform's 4.5e-6 mm still open (spec questions 15 and 16)"
+link = "docs/findings/fsl-flirt-original.md"

@@ -113,6 +113,10 @@ pub fn read_first(files: &ImageFiles, n_threads: usize) -> Result<Input, ImageEr
 pub enum Values {
     F32(Vec<f32>),
     I16(Vec<i16>),
+    /// FLIRT's outputs of other types (`specs/flirt.md` §9.2).
+    U8(Vec<u8>),
+    I8(Vec<i8>),
+    I32(Vec<i32>),
     /// `bet -F`'s brain of a float64 series (fslmaths keeps the type, observed).
     F64(Vec<f64>),
 }
@@ -131,6 +135,8 @@ pub struct Output<'a> {
     pub extensions: bool,
     pub defects: UpstreamDefects,
     pub n_threads: usize,
+    /// The header's `descrip` (the writer's name).
+    pub descrip: &'a str,
 }
 
 /// The file name an output stem gets for `FSLOUTPUTTYPE` (`None`: an unknown type).
@@ -157,7 +163,8 @@ pub fn output_header(o: &Output<'_>, version: NiftiVersion, data_type: DataType)
     h.toffset = 0.0;
     h.xyzt_units = 10;
     h.descrip = [0; 80];
-    let d = DESCRIP.as_bytes();
+    let d = o.descrip.as_bytes();
+    let d = &d[..d.len().min(79)];
     h.descrip[..d.len()].copy_from_slice(d);
     if version == NiftiVersion::V1 {
         h.analyze.extents = 16384;
@@ -243,6 +250,24 @@ pub fn write(
                 .map_err(invalid)?
                 .into(),
             DataType::F64,
+        ),
+        Values::U8(v) => (
+            ArrayD::from_shape_vec(dims, storage_order(v, nx, o.flipped))
+                .map_err(invalid)?
+                .into(),
+            DataType::U8,
+        ),
+        Values::I8(v) => (
+            ArrayD::from_shape_vec(dims, storage_order(v, nx, o.flipped))
+                .map_err(invalid)?
+                .into(),
+            DataType::I8,
+        ),
+        Values::I32(v) => (
+            ArrayD::from_shape_vec(dims, storage_order(v, nx, o.flipped))
+                .map_err(invalid)?
+                .into(),
+            DataType::I32,
         ),
     };
     let _ = per;

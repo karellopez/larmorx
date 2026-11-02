@@ -575,6 +575,7 @@ fn run_in(
         extensions: ext,
         defects: mode,
         n_threads,
+        descrip: image::DESCRIP,
     };
     let mut written_notices: Vec<Notice> = Vec::new();
     let mut write_image = |suffix: &str, data: Vec<i16>, err: &mut dyn Write| -> Result<(), u8> {

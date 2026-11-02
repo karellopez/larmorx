@@ -449,7 +449,7 @@ defects! {
     FSL_63 = "FSL-63", "bet", true,
         "bet -R passes bet2's options through bash's echo, which takes leading words made of -n, -e and -E as its own options: a leading -e (bet2's mesh) is dropped, and the other options' backslashes are read as escapes";
     FSL_56 = "FSL-56", "FSL", true,
-        "an image saved with two or more NIfTI extensions of different sizes gets the wrong vox_offset (NewNifti adds the first extension's size once per extension): the data start inside the extensions or after a gap";
+        "an image saved with two or more NIfTI extensions of different sizes gets the wrong vox_offset (FSL counts the first extension's size once per extension): the data start inside the extensions or after a gap";
     FSL_65 = "FSL-65", "mcflirt", true,
         "an output text file that cannot be opened (its name a directory, its directory missing or not writable): -plots' .par file ends the run at volume 0's line with \"error: unable to open output file!\" and exit status 0, after the first matrix and the .rms files (no other matrix, no corrected series); an .rms file is silently not written";
     FSL_66 = "FSL-66", "mcflirt", true,

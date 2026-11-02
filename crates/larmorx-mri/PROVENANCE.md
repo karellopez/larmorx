@@ -84,3 +84,22 @@ register's restricted sections), `docs/parts/`, the spec writer's probes
 | `hmc::estimate` (`stage_bins`, `refused_bins`, `mcflirt_end`, `McflirtEnd`, the bins as `i64`) | mcflirt's bins per stage, its crashes (reproduced as errors) and the default's refusals | spec §12.1 |
 | `hmc::cost` (`bin_grid_mi`, `TestBins`, `MiHistograms` and the correlation-ratio cells with no bins) | appendix B and A with `B = 0` | spec §12.1, appendix B |
 | `cli::hmc` (`write_outputs` in mcflirt's order, `mat_directory`, `mat_parent_exists`, `input_prefix`, the reproduced endings with exit status 0) | mcflirt's outputs that cannot be written | spec §10.6 |
+
+## The shared registration engine (2026-11-02)
+
+FLIRT's clean-room original (`crates/larmorx-fsl/src/flirt/`, written from `specs/flirt.md` by a
+clean-room implementer under the same restrictions) runs on `hmc`'s code, which it shares rather
+than copies (the user, 2026-11-01: "Avoid duplication is a good quality practice"). The
+additions, which leave the head-motion correction's computation unchanged (its standard tier
+re-run and compared identical, `docs/validation/mri-hmc.md`):
+
+| larmorx | Addition | For |
+|---|---|---|
+| `hmc::search::line_search_from` (`line_search` calls it with 10) | the first trial at `guess·u` | FLIRT's bound guess (`specs/flirt.md` §8.2) |
+| `hmc::search::{vertex, golden}` public | | the line search's pieces |
+| `hmc::cost::Accumulator::point_at` (by default `point`), `PointWeight`, `Weighted`, `sample_weighted`, `least_squares_weighted`, `corr_ratio_weighted`, `mutual_info_weighted` (the unweighted functions call them with no weight) | each point's weight from images of its own | FLIRT's `-refweight`, `-inweight` (§6.4) |
+| `hmc::cost::correlation` and `CorrSlice` public (`normcorr` calls it) | | FLIRT's `normcorr` and its weighted `1 − r` |
+| `hmc::cost::TestBins::fuzzy` (`TestBins::new` sets mcflirt's 0.5) | the fuzzy fraction | `setoption fuzzyfraction` (§7.3) |
+| `hmc::cost::sample_all_weighted` | every slice into one accumulator, in slice order | FLIRT's single-precision bin sums of `corratio` and `woods` |
+| `hmc::rigid::{decompose_parts, with_scales_skews}` (`decompose` and `compose` call them) | the decomposition's factors; the linear part from a given rotation | FLIRT's quaternion parameters (`-anglerep quaternion`, §3) |
+| `hmc::image::read_series_files`: the stored array dropped once converted, a single volume taking the converted values, `Volume::flip_x_in_place` | the same values with one copy of an image at a time (the reader held up to four) | FLIRT's memory on full-size T1w references (`tests/parity/test_memory_peak.py`); mcflirt's reads too |

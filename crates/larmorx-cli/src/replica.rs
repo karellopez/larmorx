@@ -154,19 +154,20 @@ pub const REPLICAS: &[Replica] = &[
         location: Location::Program(&LARMORX_NC),
         original: true,
     },
-    // FSL's FLIRT and its programs (2026-11-01): the replica only; the clean-room original is to
-    // be written from specs/flirt.md.
+    // FSL's FLIRT and its programs (2026-11-01): flirt and convert_xfm have their clean-room
+    // originals (`larmorx_fsl::cli`, written from specs/flirt.md, 2026-11-02); the other programs
+    // the replica only.
     Replica {
         family: "fsl",
         tool: "flirt",
         location: Location::Program(&LARMORX_NC),
-        original: false,
+        original: true,
     },
     Replica {
         family: "fsl",
         tool: "convert_xfm",
         location: Location::Program(&LARMORX_NC),
-        original: false,
+        original: true,
     },
     Replica {
         family: "fsl",
@@ -690,8 +691,6 @@ mod tests {
         assert_eq!(
             replica_only("fsl").collect::<Vec<_>>(),
             [
-                "flirt",
-                "convert_xfm",
                 "avscale",
                 "img2imgcoord",
                 "std2imgcoord",

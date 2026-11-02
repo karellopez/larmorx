@@ -319,16 +319,25 @@ pub fn read_series_files(files: &ImageFiles, n_threads: usize) -> Result<Series,
     let values = dispatch_real_dyn_array!(&data, a => to_f32_vec(a, scale, n_threads), complex => {
         return Err(ImageError::Invalid(format!("{}: complex images are not supported", path.display())));
     });
+    // the stored array is not needed once converted; a single volume takes the converted values
+    // as they are and is flipped in place (one copy of the image at a time beside the file's)
+    drop(data);
     let flipped = is_neurological(&header);
     let vox = voxel_size(&header);
     let per = dims.iter().product::<usize>();
-    let volumes = values
-        .chunks_exact(per)
-        .map(|c| {
-            let v = Volume::new(dims, vox, c.to_vec());
-            if flipped { v.flipped_x() } else { v }
-        })
-        .collect();
+    let mut volumes: Vec<Volume> = if values.len() == per {
+        vec![Volume::new(dims, vox, values)]
+    } else {
+        values
+            .chunks_exact(per)
+            .map(|c| Volume::new(dims, vox, c.to_vec()))
+            .collect()
+    };
+    if flipped {
+        for v in &mut volumes {
+            v.flip_x_in_place();
+        }
+    }
     Ok(Series {
         volumes,
         header,

@@ -136,6 +136,14 @@ impl Volume {
 
     /// The volume with its x axis reversed (the in-memory order of a positive-determinant
     /// image, and back).
+    /// [`Volume::flipped_x`] in place (each row reversed; no copy of the volume).
+    pub fn flip_x_in_place(&mut self) {
+        let nx = self.shape[0];
+        for row in self.data.chunks_exact_mut(nx.max(1)) {
+            row.reverse();
+        }
+    }
+
     pub fn flipped_x(&self) -> Volume {
         let nx = self.shape[0];
         let mut data = Vec::with_capacity(self.data.len());

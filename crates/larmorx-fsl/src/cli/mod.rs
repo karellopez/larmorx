@@ -10,6 +10,8 @@
 pub mod bet;
 pub mod bet2;
 pub mod betsurf;
+pub mod convert_xfm;
+pub mod flirt;
 pub mod fmt;
 pub mod options;
 
@@ -20,7 +22,7 @@ use std::path::{Path, PathBuf};
 use larmorx_core::defects::{self, UpstreamDefects};
 
 /// The tools on the command line.
-pub const TOOLS: &[&str] = &["bet", "bet2", "betsurf"];
+pub const TOOLS: &[&str] = &["bet", "bet2", "betsurf", "flirt", "convert_xfm"];
 
 /// The settings of one run: the environment it reads and the directory relative names start
 /// in.
@@ -105,6 +107,8 @@ pub fn run_with(
         "bet2" => Some(bet2::main(args, settings, out, err)),
         "bet" => Some(bet::main(args, settings, out, err)),
         "betsurf" => Some(betsurf::main(args, settings, out, err)),
+        "flirt" => Some(flirt::main(args, settings, out, err)),
+        "convert_xfm" => Some(convert_xfm::main(args, settings, out, err)),
         _ => None,
     }
 }

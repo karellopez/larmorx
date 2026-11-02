@@ -656,3 +656,47 @@ TOOL = Tool(
     unavailable=_unavailable,
     family="fsl",
 )
+
+
+def draw_original(d: gen.Draw) -> dict:
+    """The clean-room original's programs only (2026-11-02): registrations, ``-applyxfm`` and
+    ``convert_xfm``."""
+    kinds = ("register", "apply", "convert")
+    kind = d.choice("kind", kinds, (6, 3, 1.5))
+    return _finish(d, DRAWS[kind](d))
+
+
+def _run_original(impl: str):
+    from larmorx_validation.parity import fsl_flirt as fo
+
+    def run(case, checks) -> None:
+        fo.run_case(case, checks)
+
+    return run
+
+
+def _original_unavailable() -> str:
+    from larmorx_validation.parity import fsl_versions
+
+    if not fsl_versions.installed(fsl_versions.NEWEST):
+        return f"FSL {fsl_versions.NEWEST} (~/fsl-{fsl_versions.NEWEST}) was not found"
+    return ""
+
+
+#: FLIRT's clean-room original (``larmorx fsl flirt`` and ``convert_xfm``, 2026-11-02) through
+#: its suite (``larmorx_validation.parity.fsl_flirt``): the record's thresholds, not bit-identity.
+ORIGINAL = Tool(
+    name="fsl-flirt-original",
+    title="FLIRT (clean-room original)",
+    suite="fsl-flirt",
+    implementations=("original",),
+    draw=draw_original,
+    case=case,
+    run=_run_original,
+    exact=lambda impl: False,
+    exact_checks=(),
+    timeout=600,
+    weight=1.0,
+    unavailable=_original_unavailable,
+    family="fsl",
+)

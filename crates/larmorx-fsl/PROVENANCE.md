@@ -48,3 +48,35 @@ investigations, `validation/difftest/triage.toml`, the replica authors' permanen
 
 The parity record is [docs/validation/fsl-bet.md](../../docs/validation/fsl-bet.md); the
 benchmark [docs/benchmarks/fsl-bet.md](../../docs/benchmarks/fsl-bet.md).
+
+## FLIRT (`flirt`, `convert_xfm`; part 1, 2026-11-02)
+
+`flirt` (FLIRT's registration, its schedule language, the boundary-based cost, the resampled
+image, `-applyxfm`) and `convert_xfm` were written by a clean-room implementer who never opened
+FSL's source code (`~/fsl*/src`, `crates-nc/fsl-source/` or any other copy), the replica crates
+(`crates-nc/`, `crates/larmorx-afni-replica`, `crates-gpl/`), the restricted findings
+(`docs/findings/fsl-flirt.md`, `fsl-bet.md`, `fsl-mcflirt.md`, the AFNI source-derived ones, the
+register's sections marked †), `docs/parts/`, the replica parts' investigations and probes,
+`validation/difftest/triage.toml`, the replica authors' permanent cases, the git history of the
+replica parts, or `validation/src/larmorx_validation/parity/fsl_versions.py`. Its only inputs were:
+
+| Input | What it gave |
+|---|---|
+| [`specs/flirt.md`](../../specs/flirt.md) (FSL 6.0.7.23) and the parts of [`specs/mcflirt.md`](../../specs/mcflirt.md) it refers to | the behaviour: the command line and its messages, coordinates and the base scale, the pyramid, the costs, the schedule language, the search, the optimisation, parameter subsets, the sform/qform initialisation, the outputs, the background value, `convert_xfm`, the defects and their D13 switches |
+| M. Jenkinson and S. Smith, "A global optimisation method for robust affine registration of brain images", Medical Image Analysis 5(2):143-156, 2001; M. Jenkinson, P. Bannister, M. Brady and S. Smith, "Improved optimization for the robust and accurate linear registration and motion correction of brain images", NeuroImage 17(2):825-841, 2002; D. Greve and B. Fischl, "Accurate and robust brain image alignment using boundary-based registration", NeuroImage 48(1):63-72, 2009 | the methods |
+| Black-box runs of FSL 6.0.7.23's `flirt` and `convert_xfm` (`~/fsl-6.0.7.23/bin`, FSL off the `PATH`), through the oracle cache: the `fsl-flirt` suite's cases and [`validation/investigations/cleanroom-flirt/`](../../validation/investigations/cleanroom-flirt/README.md) | the observations of [`docs/findings/fsl-flirt-original.md`](../../docs/findings/fsl-flirt-original.md); the default schedules' lines as `flirt -v` prints them (`flirt::schedule`), the usage texts, the messages of the command line and the schedule |
+| The defect register's summary rows of FSL-09, -11, -14, -21, -22, -56, -66, -67, -68, -71, -72, -75 (behaviour only) | the corrections and refusals, the notices' names (`larmorx_core::defects`) |
+| larmorx's own Apache-2.0 code, the **shared clean-room registration engine** of `larmorx_mri::hmc` (written from `specs/mcflirt.md`): its volumes and centres of mass, the parametrisation (`rigid`: composition and decomposition), the cost sampling and sums (`cost`: the row ranges, edge weights, normalised correlation with its count, least squares, the mutual-information costs, now with a weighted sampling and the fuzzy fraction), the line search (`search::line_search_from`, now with the first step's multiple), the reference grids, the interpolators and kernels; `bet::image` and `bet::params` (FSL's image names, reading, writing, the robust range), `betsurf::smooth` (the separable Gaussian), `larmorx_core::math` (correctly rounded `exp`, `sin`, `cos`; `tanh_glibc`) | the engine FLIRT runs on, with the head-motion correction: one copy |
+
+| larmorx | Behaviour reproduced | Source |
+|---|---|---|
+| `flirt::mat` | 4 x 4 algebra (LU inverses and solves), matrix files read and written, the stream's notation | spec §2.2, §2.5, §12 |
+| `flirt::pyramid` | the blur, the isotropic resampling, the halving, the weighted filters, the background value (FSL-75, FSL-22) | spec §5, §10a |
+| `flirt::cost`, `flirt::bbr` | the image pair, every cost and its weighted form, `labeldiff`, the boundary points, their normals (FSL-67 kept) and the boundary-based cost with a field map | spec §6, black-box |
+| `flirt::optimise`, `flirt::search` | the sweeps, the convergence test, Powell's correction, parameter subsets and their pseudo-inverse, the search over rotations | spec §8.1 to §8.4 |
+| `flirt::schedule`, `flirt::engine` | the schedule language, the default schedules, the scales, every command, the run and its outputs, FSL-68 | spec §3, §4, §7, §9, black-box |
+| `flirt::output` | the resampled image: the output's blur by the extraslice rule, the interpolations (the windowed sinc of any width and window), the padding, the field map's resampling | spec §9.2, §9.3, black-box |
+| `flirt::xfm`, `cli::convert_xfm` | `convert_xfm` | spec §10, black-box |
+| `cli::flirt` | FLIRT's command line, its usage and messages | spec §2, black-box |
+
+The parity record is [docs/validation/fsl-flirt.md](../../docs/validation/fsl-flirt.md).

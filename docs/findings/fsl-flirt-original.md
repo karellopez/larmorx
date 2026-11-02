@@ -309,3 +309,87 @@ there and refuses without `FSLDIR` (spec question: their texts, so the original 
 **The oracle cache** keys FSL's runs without `PATH`: an `aff2rigid` run without FSL's `bin` on the
 `PATH` (`/usr/bin/env: 'fslpython': No such file or directory`, exit 127) is served for the same
 inputs with it. Not a suite problem (its cases always set it), noted for the cache's policy.
+
+## The verbose levels and `-debug` (part 2, relay 3, 2026-11-02)
+
+Black-box runs of FSL 6.0.7.23's `flirt` at every level from 1 to 7 and with `-debug` and
+`-debugsave` (the fsl-flirt suite's cases `verbose/*`, `debug/*`, `bbr/debug`, and the probe
+schedules they came from) show where each line is printed and at which level; the original prints
+the same lines in the same order (`crates/larmorx-fsl/src/flirt/trace.rs`, the engine, the search
+and the optimiser). Every line below is on standard output unless it says otherwise; the levels
+inside the search are the run's lowered by 2 (§2.3), the minima's free optimisations at the same
+lowered level (not 2 more: their evaluations show at 7).
+
+- **Reading (level 2):** `Refvol intensity clamped between <lo> and <hi>` (the reference's
+  clamping range; `Refvol intensity between <min> and <max>`, its raw range, with `-noclamp`),
+  `Testvol sampling matrix =` and the input's voxel sizes as a matrix (a single slice's third
+  8), `Testvol Data Type = <the input's NIfTI code>`, the input's clamping line, then `Init
+  Matrix =` and the initial matrix a first time; level 1's lines follow (with `-2D` neither
+  `The output image will use ...` line nor the sform warning, whatever the images hold). The
+  first matrix switches the stream to fixed notation, so the reference's line is the only one in
+  `%g`. Level 3 adds `CoG for refvol is:  x y z ` and the input's, of the prepared images.
+- **Preparation (level 2):** `Subsampling the volumes`, `Resampling refvol isotropically: <the
+  minimum sampling>` and four lines describing that level (`Refvol:: Size = (54,80,80,1)`, `Dims`,
+  `ROI Size`, `Minimum and maximum intensities are: ...`); then the input as prepared
+  (`TESTVOL::`, blurred to 8 mm; with `-noresample` none of the reference's lines and the input
+  unblurred).
+- **Each `setscale` (level 2):** `Testvol sampling matrix =` and the matrix again, `Testvol Data
+  Type = 0`, `Testvol intensity clamped between 0.000000 and 0.000000` (with `-noclamp` the input's
+  raw range); at level 3, when the scale makes a new image pair (forced, or the minimum sampling at
+  most 1.25 times the scale), `Previous scale used <n> cost function evaluations`: the evaluations
+  since the last such line (an input-only reset neither prints nor resets the count; the pair made
+  before the schedule resets it silently).
+- **`setoption` (level 3):** `setoptions: <name> <each value read as a number> ` and an empty line,
+  for every option, known or not (a word reads 0: `costfunction normcorr` echoes `0.000000`).
+- **`measurecost`, `gridmeasurecost`, `optimise` (level 4) and the search (level 6):** once per
+  command, `Coarse rotation samplings are:` with the three axes' coarse angles, ` and fine
+  rotation samplings are:` with the fine ones, an empty line.
+- **An optimisation:** at 7 `Starting with <its 12 parameters>` and `  and tolerance <the 12
+  tolerances at the scale>` (with a parameter subset its own variables and tolerances, after
+  `Using subset cost function`, which shows from level 4); at 5 `Starting with : ` and the matrix
+  it starts from, then every evaluation, `<count> : <cost> :: <the optimised parameters>` (with a
+  subset all twelve, and at 7 each printed twice and followed by an empty line). With Powell's
+  method, at 5, `Applying POWELL correction` and `finit, fend, fextrap = a , b , c` where the
+  correction is made, `fval = <cost>` at the end of each iteration. `measurecost` and
+  `gridmeasurecost` evaluate without printing their evaluations (they count).
+- **The search** (its level, the run's minus 2): at 2 a `*` after each row of the coarse grid and
+  a newline, `Median scale = <s>`, a `*` after each row of the fine grid and a newline; at 3
+  `(a,b,c) => <cost> with <12 parameters>` for each fine point below the threshold after its
+  optimisation, `Costs (1st column) are:` with those points again, `COST minima at : a,b,c` for
+  each minimum and the same list as `Cost minima at`, `Chosen parameters:` with their parameters;
+  at 1 `After free optimisation, parameters are:` and each minimum's `<cost> ::: <parameters>`,
+  then `Parameters (1st column costs) are:` with each kept result (its cost, its matrix by
+  columns, its start's cost, the start's matrix by columns); at 4 each coarse point's `Starting
+  with <12 parameters>`, `  and tolerance <the subset's 4>` and ` dearranged: <12 parameters>`,
+  and `Cost threshold = <t> and minimum is <c>`; at 5 each point's evaluations (the fine grid's
+  too) and its `Starting with : ` (the identity for the grid points, the minimum's start for the
+  free optimisations).
+- **The end (level 2):** the input and the reference as read (`testvol::`, `refvol::`, their raw
+  ranges; not when no matrix was found), `Final transform matrix is:` and the matrix; with `-out`
+  the output (`Transformed testvol::`) before `Final result:`. `-applyxfm` prints `refvol::`,
+  `inputvol::` (as read) and `Resampled volume::` instead.
+- **`-debugsave`** writes nothing at level 4: from level 6 (the search's 4) it saves the coarse
+  grid's optimised translations (`tx`, `ty`, `tz`) and scales after the median (`sc`), and the fine
+  grid's costs after the threshold's optimisations (`costs`), float volumes of the grids' sizes
+  (x the first angle), 1 mm voxels, no sform or qform, identity sform rows.
+- **`-debug`:** once the images are prepared, the reference pyramid's levels (`refvol_8`,
+  `refvol_4`, `refvol_2`, `refvol`: each level's header follows its grid as `-applyisoxfm`'s
+  does), their weights (`global_refweight1` to `8`; without weights only `global_refweight1`, one
+  voxel of 0, a 1-dimensional image at the minimum sampling's voxel size with no sform or qform),
+  the input at 8 mm (`testvol`, the input's header with its sform's negative zeros kept) and its
+  weight (`testweight`); at each `setscale`, on standard error `MJ DEBUG OUTPUT: scale = <s>` and
+  `MJ DEBUG OUTPUT: min_sampling = <m>`, and on standard output the current pair's input before the
+  scale changes it (`testvol DEBUG::` four lines); the boundary-based cost's five lines (`Setting
+  bbr seg 1`, ..., `Result (post) of is_bbr_set is 1`, standard error) when a pair's cost becomes
+  `bbr` (a new pair with that cost, or `setoption costfunction bbr` on a pair without it); then
+  §9.4's final call (the cost of `U`'s first row appended to `U`, before `Failed to calculate any
+  transformation matrix` when `U` is empty) and BBR's volume `debug`.
+- **Also found:** a `setoption tolerance` with fewer than 12 values makes the next `measurecost`
+  or `optimise` FSL's index error (`Mat::operator(): index out of bounds`), with `rel` and `abs`
+  alike (§7.3 says "when used"; the original now refuses there too, FSL-68's status).
+
+Every line and file above is the original's, in FSL's order, on the suite's cases (the numbers
+aside: at level 5 and more the evaluations follow the optimisation's path, so their count differs
+where the matrices differ in their last digits; the suite then compares the lines with each run of
+evaluations as one). The pyramid's volumes and the input's are FSL's bit for bit on these cases;
+BBR's `debug` volume correlates at 0.9994 with FSL's (it follows the final matrix).

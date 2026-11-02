@@ -119,3 +119,20 @@ opened; FSL's scripts in `~/fsl-6.0.7.23/bin` not opened either, only run). Its 
 | `flirt::output::{padded, Resampling::spline}`, `flirt::pyramid::background_f64`, `flirt::engine::{write_values, grouped_type}` (shared with flirt) | §9.2, §10a, §15.7 | spec, black-box |
 | `cli::midtrans`, `cli::pointflirt`, `cli::applyxfm4d` | the three command lines, usages, messages, FSL-78, FSL-79, FSL-80 | spec §15.5 to §15.7, black-box |
 | `cli::pairreg`, `cli::extracttxt`, `cli::bre`, `cli::aff2rigid` | the three scripts, their messages, FSL-81 | spec §15.8, black-box, POSIX |
+
+## FLIRT's verbose levels, `-debug` and speed (part 2, relay 3, 2026-11-02)
+
+Written by a clean-room implementer under the same rules (none of the files listed above
+opened). Its only inputs were:
+
+| Input | What it gave |
+|---|---|
+| [`specs/flirt.md`](../../specs/flirt.md) §2.3, §2.5, §7.3, §9.4, §12 | the levels' outline, the stream's notation, `-debug`'s volumes and final call, which sums may run in parallel |
+| Black-box runs of FSL 6.0.7.23's `flirt` (FSL off the `PATH`) through the oracle cache: the fsl-flirt suite's `verbose/` and `bbr/debug` cases and about 30 probe command lines (levels 2 to 7 on short schedules, `-noclamp`, `-noresample`, `-2D`, `-applyxfm`, `-out`, `-debug` over forced and input-only scales, the boundary-based cost set up by `setoption`, short tolerance lists), and part 1's level-7 trace | every line's text, level and place ([findings](../../docs/findings/fsl-flirt-original.md), "The verbose levels and -debug"), the debug volumes' headers, the short tolerance list's index error |
+| larmorx's own Apache-2.0 code: part 1's engine, search, optimiser and costs | numbers |
+
+| larmorx | Behaviour reproduced | Source |
+|---|---|---|
+| `flirt::trace` (standard output in order, its notation, the evaluation counter, the images' four information lines) | §2.3, §2.5 | spec, black-box |
+| `flirt::engine` (the reading's, preparation's, `setscale`'s, `setoption`'s and the end's lines; `-debug`'s volumes, lines and final call; `-debugsave`'s grids), `flirt::optimise` (the optimisations' starts, tolerances, evaluations, Powell's lines), `flirt::search` (the grids', threshold's and minima's lines), `flirt::bbr::cost_and_debug` (BBR's `debug` volume) | §2.3, §9.4 | spec, black-box |
+| `flirt::cost` (the correlation ratio's and Woods' bin sums in parallel, each bin's additions in the sampling order: the same bits), `flirt::bbr::mask_distance` (the field map's search skipping the steps that cannot reach its mask: the same point found) | §6.2, §6.5, §12 | spec, larmorx's own design |

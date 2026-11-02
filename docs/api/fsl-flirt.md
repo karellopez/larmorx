@@ -202,8 +202,18 @@ replica's. Also in this relay: FLIRT's matrix files read as FSL reads them (`inf
 that are not numbers read 0 and stop their line, a value beyond the double range the largest
 double; [findings](../findings/fsl-flirt-original.md)).
 
-**Not yet (part 2):** `-debug` and `-debugsave` (refused with a message naming the replica), the
-verbose levels above 1 (`-verbose 2` and more print the level-1 lines only).
+**The verbose levels and `-debug` (part 2, relay 3).** `-verbose 2` to `7` print FSL 6.0.7.23's
+lines in its order: the images as read and prepared, each `setscale`'s lines and evaluation
+counts, `setoption`'s echo, the rotation samplings, every optimisation's start, tolerances,
+evaluations and Powell's corrections, and the search's grids, thresholds and minima at the run's
+level lowered by 2; `-debugsave` writes the search's grids from level 6 (FSL writes none at 4);
+`-debug` writes the reference pyramid, its weights and the input at 8 mm (FSL's bit for bit on the
+suite's cases), prints each `setscale`'s and the boundary-based cost's debug lines and makes the
+final debug call with BBR's volume `debug`
+([findings](../findings/fsl-flirt-original.md), "The verbose levels and -debug"). At level 5 and
+more the evaluation lines follow the optimisation's path, so their count differs from FSL's where
+the matrices differ in their last digits. The suite's 22 cases of these options (13 of the
+original's own): every line, exit status and file FSL's.
 
 **Status: `experimental`.** Its record: [`docs/validation/fsl-flirt.md`](../validation/fsl-flirt.md)
 (the replica suite's cases against FSL 6.0.7.23): 89 of 111 compared cases within thresholds, 35
@@ -270,7 +280,7 @@ of its type's range.
 
 The coordinate programs' `-warp` (FNIRT's warp fields, refused until FSL's warp-field libraries are
 ported); `standard_space_roi`, `flirt_average` and `epi_reg` (scripts of FSL's other programs: not
-ported); the clean-room original's `-debug` and its verbose levels above 1 (part 2). Known difference (part 3's random testing): with NaN or
+ported). Known difference (part 3's random testing): with NaN or
 infinite input voxels in `reproduce` mode (FSL-14), the sign of NaN results can differ from FSL's
 (`nan` against `-nan`): an all-NaN matrix from a schedule that optimises relative to a row, and
 the NaN voxels of `applyxfm4D`'s spline interpolation; the values are NaN in both.

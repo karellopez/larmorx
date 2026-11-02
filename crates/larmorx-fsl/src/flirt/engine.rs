@@ -422,7 +422,8 @@ fn refuse_name(m: &str) -> End {
 /// large grids sample their slices in parallel.
 fn evaluate(pair: &Pair, t: &Mat4, cost: Cost, log: &Log, trace: &Trace) -> f32 {
     trace.tick();
-    let parallel = pair.reference.len() > 16_384;
+    // in parallel only where the pool has threads to share the slices (the same result)
+    let parallel = pair.reference.len() > 16_384 && rayon::current_num_threads() > 1;
     pair.cost_of(t, cost, parallel, log)
 }
 

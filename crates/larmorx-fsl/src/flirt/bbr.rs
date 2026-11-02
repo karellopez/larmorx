@@ -31,6 +31,8 @@ pub struct BbrSource {
     /// `-bbrtype` as given (checked when the cost is first used).
     pub bbr_type: String,
     pub slope: f32,
+    /// The field map mask's distance map ([`mask_distance`]), made when first needed.
+    pub mask_distance: std::sync::OnceLock<Vec<u16>>,
 }
 
 /// The boundary's point pairs in reference scaled mm: the grey-matter side and the white-matter
@@ -164,7 +166,13 @@ fn trilinear_zero(v: &Volume, p: [f32; 3]) -> f32 {
 
 /// The field map's value for a reference point `r` (reference voxels) along the
 /// phase-encoding direction `dir` (§6.5).
-fn fieldmap_value(fmap: &Volume, mask: &Volume, r: [f64; 3], dir: [f64; 3]) -> f32 {
+fn fieldmap_value(
+    fmap: &Volume,
+    mask: &Volume,
+    distance: &[u16],
+    r: [f64; 3],
+    dir: [f64; 3],
+) -> f32 {
     let at = |q: [f64; 3]| q.map(|c| c as f32);
     if trilinear_zero(mask, at(r)) >= 0.95 {
         return trilinear_zero(fmap, at(r));
@@ -172,21 +180,130 @@ fn fieldmap_value(fmap: &Volume, mask: &Volume, r: [f64; 3], dir: [f64; 3]) -> f
     let extent = (0..3)
         .map(|k| fmap.shape[k] as f32 * fmap.voxel_size[k])
         .fold(0.0f32, f32::max) as i64;
+    // the steps that cannot reach the mask are skipped, each side on its own (the same first
+    // point found, sooner): from a point `q` of one side, a point `k` steps further
+    // (`|dir| <= 1` voxel per step) has its eight neighbours within `k + 3` voxels (Chebyshev,
+    // single precision's rounding included) of `q`'s voxel, and its interpolated mask exceeds
+    // 0.95 only if one of them exceeds 0.9; a side that has left the grid moving outwards stays
+    // outside (every neighbour 0)
+    let n = mask.shape;
+    let dist_at = |q: [f64; 3]| -> Option<u16> {
+        if (0..3).all(|k| q[k] >= 0.0 && q[k] < n[k] as f64) {
+            let v = q[0] as usize + n[0] * (q[1] as usize + n[1] * q[2] as usize);
+            distance.get(v).copied()
+        } else {
+            None
+        }
+    };
+    let gone = |q: [f64; 3], sgn: f64| {
+        (0..3).any(|k| {
+            let step = sgn * dir[k];
+            (q[k] < -2.0 && step <= 0.0) || (q[k] > n[k] as f64 + 1.0 && step >= 0.0)
+        })
+    };
+    let mut next = [0i64; 2];
+    let mut dead = [false; 2];
     for d in 0..=extent {
-        for sgn in [-1.0, 1.0] {
+        for (side, sgn) in [-1.0, 1.0].into_iter().enumerate() {
+            if dead[side] || d < next[side] {
+                continue;
+            }
             let q = [0, 1, 2].map(|k| r[k] + sgn * d as f64 * dir[k]);
+            match dist_at(q) {
+                Some(u16::MAX) => {
+                    dead[side] = true;
+                    continue;
+                }
+                Some(c) if c > 4 => {
+                    next[side] = d + i64::from(c) - 3;
+                    continue;
+                }
+                Some(_) => {}
+                None if gone(q, sgn) => {
+                    dead[side] = true;
+                    continue;
+                }
+                None => {}
+            }
             if trilinear_zero(mask, at(q)) > 0.95 {
                 return trilinear_zero(fmap, at(q));
             }
         }
+        if dead[0] && dead[1] {
+            break;
+        }
     }
     0.0
+}
+
+/// The Chebyshev distance (voxels) from each voxel of `mask` to the nearest voxel above 0.9
+/// (`u16::MAX` when there is none), by two passes over the 26 neighbours (exact for this
+/// distance).
+pub fn mask_distance(mask: &Volume) -> Vec<u16> {
+    let [nx, ny, nz] = mask.shape;
+    let far = u16::MAX;
+    let mut d: Vec<u16> = mask
+        .data
+        .iter()
+        .map(|&m| if m > 0.9 { 0 } else { far })
+        .collect();
+    let idx = |x: usize, y: usize, z: usize| x + nx * (y + ny * z);
+    let pass = |d: &mut Vec<u16>, forward: bool| {
+        for zi in 0..nz {
+            let z = if forward { zi } else { nz - 1 - zi };
+            for yi in 0..ny {
+                let y = if forward { yi } else { ny - 1 - yi };
+                for xi in 0..nx {
+                    let x = if forward { xi } else { nx - 1 - xi };
+                    let mut best = d[idx(x, y, z)];
+                    if best == 0 {
+                        continue;
+                    }
+                    for dz in -1i64..=1 {
+                        for dy in -1i64..=1 {
+                            for dx in -1i64..=1 {
+                                // the neighbours already visited in this pass's order
+                                let key = (dz, dy, dx);
+                                let before = if forward {
+                                    key < (0, 0, 0)
+                                } else {
+                                    key > (0, 0, 0)
+                                };
+                                if !before {
+                                    continue;
+                                }
+                                let (a, b, c) = (x as i64 + dx, y as i64 + dy, z as i64 + dz);
+                                if a < 0
+                                    || b < 0
+                                    || c < 0
+                                    || a >= nx as i64
+                                    || b >= ny as i64
+                                    || c >= nz as i64
+                                {
+                                    continue;
+                                }
+                                let n = d[idx(a as usize, b as usize, c as usize)];
+                                if n != far {
+                                    best = best.min(n.saturating_add(1));
+                                }
+                            }
+                        }
+                    }
+                    d[idx(x, y, z)] = best;
+                }
+            }
+        }
+    };
+    pass(&mut d, true);
+    pass(&mut d, false);
+    d
 }
 
 /// A field map's shift of the input coordinates (§6.5) for one matrix.
 pub struct Shift<'a> {
     fmap: &'a Volume,
     mask: &'a Volume,
+    distance: &'a [u16],
     /// The input axis shifted.
     pub axis: usize,
     sigma: f32,
@@ -196,7 +313,7 @@ pub struct Shift<'a> {
 impl Shift<'_> {
     /// The shift (input voxels along [`Shift::axis`]) of the reference voxel `r`.
     pub fn at(&self, r: [f64; 3]) -> f64 {
-        f64::from(self.sigma * fieldmap_value(self.fmap, self.mask, r, self.dir))
+        f64::from(self.sigma * fieldmap_value(self.fmap, self.mask, self.distance, r, self.dir))
     }
 
     /// The field map's value at `r` when `r` lies inside the mask (no search needed).
@@ -234,6 +351,7 @@ pub fn field_shift<'a>(
     Some(Shift {
         fmap,
         mask,
+        distance: src.mask_distance.get_or_init(|| mask_distance(mask)),
         axis: ax,
         sigma,
         dir: [d4[0] / norm, d4[1] / norm, d4[2] / norm],
@@ -406,4 +524,79 @@ pub fn cost_and_debug(pair: &Pair, a: &Mat4, log: &Log, debug: Option<&mut Vec<f
         c = c.min(2.0 - c);
     }
     c as f32
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// The field map's search as §6.5 states it, every step checked.
+    fn plain(fmap: &Volume, mask: &Volume, r: [f64; 3], dir: [f64; 3]) -> f32 {
+        let at = |q: [f64; 3]| q.map(|c| c as f32);
+        if trilinear_zero(mask, at(r)) >= 0.95 {
+            return trilinear_zero(fmap, at(r));
+        }
+        let extent = (0..3)
+            .map(|k| fmap.shape[k] as f32 * fmap.voxel_size[k])
+            .fold(0.0f32, f32::max) as i64;
+        for d in 0..=extent {
+            for sgn in [-1.0, 1.0] {
+                let q = [0, 1, 2].map(|k| r[k] + sgn * d as f64 * dir[k]);
+                if trilinear_zero(mask, at(q)) > 0.95 {
+                    return trilinear_zero(fmap, at(q));
+                }
+            }
+        }
+        0.0
+    }
+
+    #[test]
+    fn the_skipping_search_finds_the_same_point() {
+        // a mask of two blobs and scattered voxels, a field map of distinct values
+        let shape = [23, 19, 17];
+        let n: usize = shape.iter().product();
+        let mut seed = 12345u64;
+        let mut next = || {
+            seed = seed
+                .wrapping_mul(6364136223846793005)
+                .wrapping_add(1442695040888963407);
+            (seed >> 33) as u32
+        };
+        let mut m = vec![0.0f32; n];
+        for (i, v) in m.iter_mut().enumerate() {
+            let (x, y, z) = (i % 23, (i / 23) % 19, i / (23 * 19));
+            let blob = (x as i64 - 6).pow(2) + (y as i64 - 5).pow(2) + (z as i64 - 8).pow(2) < 12
+                || (x as i64 - 17).pow(2) + (y as i64 - 13).pow(2) + (z as i64 - 4).pow(2) < 6;
+            *v = if blob || next() % 97 == 0 {
+                1.0
+            } else if next() % 13 == 0 {
+                0.93
+            } else {
+                0.0
+            };
+        }
+        let mask = Volume::new(shape, [1.0; 3], m);
+        let fmap = Volume::new(
+            shape,
+            [1.0; 3],
+            (0..n).map(|i| i as f32 * 0.5 - 30.0).collect(),
+        );
+        let empty = Volume::new(shape, [1.0; 3], vec![0.0; n]);
+        let dist = mask_distance(&mask);
+        let none = mask_distance(&empty);
+        for t in 0..3000 {
+            let r = [0, 1, 2].map(|k| f64::from(next() % 3000) / 100.0 - 3.0 + 0.0 * k as f64);
+            let a = f64::from(next() % 1000) / 1000.0 - 0.5;
+            let b = f64::from(next() % 1000) / 1000.0 - 0.5;
+            let c = if t % 2 == 0 { 1.0 } else { 0.1 };
+            let norm = (a * a + b * b + c * c + 1.0).sqrt();
+            let dir = [a / norm, c / norm, b / norm];
+            assert_eq!(
+                fieldmap_value(&fmap, &mask, &dist, r, dir).to_bits(),
+                plain(&fmap, &mask, r, dir).to_bits(),
+                "{r:?} {dir:?}"
+            );
+            assert_eq!(fieldmap_value(&fmap, &empty, &none, r, dir), 0.0);
+        }
+    }
 }

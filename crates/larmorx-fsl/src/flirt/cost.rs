@@ -8,6 +8,8 @@
 
 use std::sync::Mutex;
 
+use rayon::prelude::*;
+
 use larmorx_mri::hmc::cost::{
     self as hcost, Accumulator, CorrSlice, NormCorrCount, PointWeight, TestBins, TestVolume,
 };
@@ -254,14 +256,14 @@ impl Pair {
                 hcost::least_squares_weighted(&self.reference, &tv, &b, parallel, weight)
             }
             Cost::CorrRatio => {
-                let m = self.bin_moments(&tv, &b, parallel, weight);
+                let m = self.bin_moments(&tv, &b, parallel, weight, false);
                 corr_ratio(&m)
             }
             Cost::Woods => {
                 if weight.is_some() {
                     log.push("WARNING: Woods is not implemented with cost function weighting");
                 }
-                let m = self.bin_moments(&tv, &b, parallel, None);
+                let m = self.bin_moments(&tv, &b, parallel, None, true);
                 woods(&m)
             }
             Cost::MutualInfo | Cost::NormMi => hcost::mutual_info_weighted(
@@ -278,32 +280,52 @@ impl Pair {
         }
     }
 
-    /// The test values' moments in each reference bin (the histogram costs of §6.2).
+    /// The test values' moments in each reference bin (the histogram costs of §6.2): weighted
+    /// (`corratio`) or unweighted (`unweighted`, `woods`).
+    ///
+    /// Each bin's moments are running sums over its points in the sampling order. In parallel,
+    /// the slices are sampled at once, each slice's points sorted by bin keeping their order
+    /// (a counting sort), and each bin's sums then run over the slices in order, the bins at
+    /// once: the same additions in the same order as one pass, so the same bits.
     fn bin_moments(
         &self,
         tv: &TestVolume<'_>,
         b: &[[f32; 4]; 3],
         parallel: bool,
         weight: Option<PointWeight<'_>>,
+        unweighted: bool,
     ) -> BinMoments {
         let bins = self.bins.max(1);
         let grid = self.reference_bins();
-        let mut out = BinMoments::new(bins);
-        if parallel {
-            let slices = hcost::sample_weighted(grid, tv, b, true, weight, || BinRecord {
-                points: Vec::new(),
-                top: bins - 1,
-            });
-            for s in slices {
-                for &(k, v, w) in &s.points {
-                    out.add(k as usize, v, w);
-                }
-            }
-        } else {
+        let out = BinMoments::new(bins, unweighted);
+        if !parallel {
             // one running sum over every slice, in order
-            out = hcost::sample_all_weighted(grid, tv, b, weight, out);
+            return hcost::sample_all_weighted(grid, tv, b, weight, out);
         }
-        out
+        let row = grid.shape[0] * grid.shape[1];
+        let slices = hcost::sample_weighted(grid, tv, b, true, weight, || BinRecord {
+            points: Vec::with_capacity(row),
+            top: bins - 1,
+        });
+        let sorted: Vec<Sorted> = slices.par_iter().map(|s| Sorted::of(s, bins)).collect();
+        let sums: Vec<[f32; 3]> = (0..bins)
+            .into_par_iter()
+            .with_min_len(8)
+            .map(|k| {
+                let mut st = [0.0f32; 3];
+                for sl in &sorted {
+                    let (lo, hi) = (sl.start[k] as usize, sl.start[k + 1] as usize);
+                    for &(v, w) in &sl.values[lo..hi] {
+                        BinMoments::add_to(&mut st, v, w, unweighted);
+                    }
+                }
+                st
+            })
+            .collect();
+        BinMoments {
+            s: sums,
+            unweighted,
+        }
     }
 
     /// `labeldiff` (§6.3).
@@ -345,42 +367,70 @@ impl Pair {
     }
 }
 
-/// The moments of the test values in each reference bin: weighted `[Σw, Σwy, Σwy²]` and
+/// The moments of the test values in each reference bin: weighted `[Σw, Σwy, Σwy²]` or
 /// unweighted `[n, Σy, Σy²]`, single-precision running sums in the sampling order (observed:
 /// FSL's `corratio` agrees to its printed digits with these and not with double sums).
 struct BinMoments {
-    w: Vec<[f32; 3]>,
-    n: Vec<[f32; 3]>,
+    s: Vec<[f32; 3]>,
+    unweighted: bool,
 }
 
 impl BinMoments {
-    fn new(bins: usize) -> BinMoments {
+    fn new(bins: usize, unweighted: bool) -> BinMoments {
         BinMoments {
-            w: vec![[0.0; 3]; bins],
-            n: vec![[0.0; 3]; bins],
+            s: vec![[0.0; 3]; bins],
+            unweighted,
         }
     }
 
     #[inline(always)]
-    fn add(&mut self, k: usize, v: f32, w: f32) {
-        let s = &mut self.w[k];
-        s[0] += w;
-        s[1] += w * v;
-        s[2] += (w * v) * v;
-        let s = &mut self.n[k];
-        s[0] += 1.0;
-        s[1] += v;
-        s[2] += v * v;
+    fn add_to(s: &mut [f32; 3], v: f32, w: f32, unweighted: bool) {
+        if unweighted {
+            s[0] += 1.0;
+            s[1] += v;
+            s[2] += v * v;
+        } else {
+            s[0] += w;
+            s[1] += w * v;
+            s[2] += (w * v) * v;
+        }
     }
 }
 
 impl Accumulator for BinMoments {
     #[inline(always)]
     fn point(&mut self, g: f32, v: f32, w: f32) {
-        let k = (g as usize).min(self.w.len() - 1);
-        self.add(k, v, w);
+        let k = (g as usize).min(self.s.len() - 1);
+        BinMoments::add_to(&mut self.s[k], v, w, self.unweighted);
     }
     fn end_row(&mut self) {}
+}
+
+/// One slice's points sorted by bin, each bin's in sampling order: bin `k`'s values are
+/// `values[start[k]..start[k + 1]]`.
+struct Sorted {
+    start: Vec<u32>,
+    values: Vec<(f32, f32)>,
+}
+
+impl Sorted {
+    fn of(rec: &BinRecord, bins: usize) -> Sorted {
+        let mut start = vec![0u32; bins + 1];
+        for &(k, _, _) in &rec.points {
+            start[k as usize + 1] += 1;
+        }
+        for k in 0..bins {
+            start[k + 1] += start[k];
+        }
+        let mut at = start.clone();
+        let mut values = vec![(0.0f32, 0.0f32); rec.points.len()];
+        for &(k, v, w) in &rec.points {
+            let p = &mut at[k as usize];
+            values[*p as usize] = (v, w);
+            *p += 1;
+        }
+        Sorted { start, values }
+    }
 }
 
 /// The points of one slice, in sampling order (a parallel evaluation's slices, folded in order
@@ -408,7 +458,7 @@ const SPARSE: f64 = 2.0;
 /// the variance is not positive.
 fn corr_ratio(m: &BinMoments) -> f32 {
     let d = |st: &[f32; 3]| st.map(f64::from);
-    let kept = || m.w.iter().map(d).filter(|st| st[0] > SPARSE);
+    let kept = || m.s.iter().map(d).filter(|st| st[0] > SPARSE);
     let (mut n, mut s, mut ss) = (0.0f64, 0.0f64, 0.0f64);
     for [a, b, c] in kept() {
         n += a;
@@ -432,7 +482,7 @@ fn corr_ratio(m: &BinMoments) -> f32 {
 /// with more than two points, `n` their points.
 fn woods(m: &BinMoments) -> f32 {
     let kept = || {
-        m.n.iter()
+        m.s.iter()
             .map(|st| st.map(f64::from))
             .filter(|st| st[0] > SPARSE)
     };

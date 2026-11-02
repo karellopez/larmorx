@@ -634,11 +634,13 @@ def _orig_verdicts(
     shift: dict | None,
     band: dict | None,
     threshold: float,
+    background: float | None = None,
 ) -> None:
     """The clean-room original's comparisons: its matrix against FSL's beside FSL's own
     variability (``shift``: the original's displacement from FSL's matrix, ``band``: FSL's on a
     perturbed input, both over the reference's brain; ``None`` for ``-applyxfm``, where both use
-    the given matrix), its threads and its two modes."""
+    the given matrix), its threads and its two modes; ``background``: FSL's output outside the
+    input's field of view (its first voxel), to say where the images differ most."""
     for x in diffs:
         i = x["id"]
         if not i.startswith("orig"):
@@ -651,10 +653,20 @@ def _orig_verdicts(
                 x["verdict"] = "bit-identical"
                 x["reason"] = f"The clean-room original gives {who} values, every one."
                 continue
+            edge = background is not None and any(
+                abs(float(m.get(k, np.nan)) - background) <= 1e-6 * max(1.0, abs(background))
+                for k in ("a_at", "b_at")
+            )
             img = (
                 f"the images differ in {m.get('share', 0):.1%} of their values, by at most "
                 f"{m.get('max_rel_range', 0):.2g} of the range (1 − NCC "
-                f"{m.get('one_minus_ncc', 0):.2g})"
+                f"{m.get('one_minus_ncc', 0):.2g}"
+                + (
+                    "; the largest where a voxel at the edge of the input's field of view is "
+                    "inside it for one matrix and outside, at the background value, for the other)"
+                    if edge
+                    else ")"
+                )
             )
             if shift is None:
                 x["verdict"] = "open"
@@ -794,7 +806,7 @@ def _example_bbr(ctx: core.Context, ex_id: str, run: str, view: str, words: str)
     m["init"] = np.loadtxt(Path(_arg(args, "-init")))
     o_shift = displacement(m["orig"], m["fsl"], ref, brain)
     o_band = displacement(m["fsl-perturbed"], m["fsl"], ref, brain)
-    _orig_verdicts(diffs, same, o, o_shift, o_band, 0.1)
+    _orig_verdicts(diffs, same, o, o_shift, o_band, 0.1, float(arrays["fsl"]["registered"].flat[0]))
     if view == "slices":
         at = common.slice_voxel(ex, "fsl", "init", "registered")
     else:
@@ -1050,7 +1062,15 @@ def _example_real(ctx: core.Context, ex_id: str) -> dict:
             ),
         ]
     _verdicts(diffs, same, "this call", mats_same)
-    _orig_verdicts(diffs, same, o, o_shift, o_band, _flirt_threshold(args))
+    _orig_verdicts(
+        diffs,
+        same,
+        o,
+        o_shift,
+        o_band,
+        _flirt_threshold(args),
+        float(arrays["fsl"]["registered"].flat[0]),
+    )
     at, _k = common.centre_view(ex)
     default = {
         "output": "registered",

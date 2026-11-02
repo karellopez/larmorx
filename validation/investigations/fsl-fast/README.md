@@ -21,3 +21,17 @@ the SVID-compatible wrappers around Arm's routines in their FMA builds (`__expf_
   negative number, where the newer symbols return `-nan`).
 - `rand`: `crand.rs`'s tests compare its sequences with glibc 2.35's (`srand(-1)`, FAST's seed;
   `srand(0)` and `srand(1)`; the millionth value and a checksum of the first million).
+
+## `difftest_finding.py`: a random-testing finding's runs in full (2026-11-02)
+
+Runs a finding's recipe (`shrunk` by default, or `recipe`) through FSL's `fast` (the oracle cache,
+`use`) and the replica in `reproduce` and `fix`, printing exit statuses and both streams whole.
+It showed what FAST does when FLIRT cannot register the priors (FSL-101, the trial
+`oracles/difftest/2026-11-02-fsl-fast`): the verbose line before the crash, an empty mask running
+on, the multi-channel exception (the permanent cases `validation/difftest/cases/fsl-fast/fsl101-*`).
+Run it in a memory box:
+
+```bash
+scripts/orchestration/boxed.sh 4 python -P validation/investigations/fsl-fast/difftest_finding.py \
+    <workspace>/oracles/difftest/2026-11-02-fsl-fast/findings/fsl-fast/fast-trial-04762-replica.json
+```

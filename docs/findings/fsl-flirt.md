@@ -382,6 +382,41 @@ image with NaN and infinite voxels (trial 102752, 122789, 191754: `deconv`'s or 
 operand order in FSL's build for two NaN operands). Not traced: which of `calc_cog`'s sums, the tiny
 `sampling_mat()·v` product, `compose_aff` or the spline's sweeps passes the other operand's NaN.
 
+## The spec answers of 2026-11-02 (the costs and BBR, from the source)
+
+What FSL 6.0.7.23's source says behind `specs/flirt.md`'s answers to the clean-room questions 1
+to 5 (§6.2, §6.5, §8.1, §12, §14); the models that reproduce FSL's numbers from the spec's text are
+in `validation/investigations/flirt-spec-answers/`.
+
+- **The correlation ratio** (`p_corr_ratio`, `p_corr_ratio_smoothed`, `p_corr_ratio_fully_weighted`
+  in `costfns.cc`): per-bin `float` arrays `numy`, `sumy`, `sumy2` filled in the sampling loop
+  (`sumy2[b] += weight*val*val`, left to right), the extra bin folded into `no_bins − 1`, then the
+  loop over bins with `numy[b] > 2` accumulating `numtoty`, `totsumy`, `totsumy2` and `corr_ratio`
+  inside the same test: the sparse bins never reach the totals. The function returns
+  `(1.0 − corr_ratio)` (a double expression returned as `float`) and `Costfn::cost` takes `1.0 −`
+  it into the `float` `retval`: the two roundings of §6.2. With `numtoty <= 1 || var <= 0` it returns
+  0.0, so the cost is 1.
+- **Woods** (`p_woods_fn`, the only form `Costfn::woods_fn` calls; `p_woods_fn_smoothed` is never
+  used): `woods += Sqr((float) num[b])*stdev/sum[b]` when `sum[b] > 0`, else
+  `Sqr((float) num[b])*stdev`; the loop runs over `b = 0 … no_bins`; `1e+10` when `numtot` is 0.
+- **BBR's points** (`Costfn::set_bbr_seg`): `wmsum = convolve_separable(wmseg, box3, box3, box3)`,
+  `wmsmooth = smooth(wmseg, 2.0)` and `gradient(wmsmooth, wmgrad)` (`newimagefns.h`):
+  `smooth()` passes `2·(int)(σ − 0.001) + 3` to `gaussian_kernel1D(σ, radius)` as the **radius**
+  (`exp(−(j*j)/(2.0*sigma*sigma))` into a `float`, summed in `float`, `kern *= 1.0/sum`);
+  `make_grad_masks()` builds `(x − 1)·pow(3, 1 − |y − 1| − |z − 1|)` and its permutations as
+  `float` volumes; `gradient()` sums `source(...)*mask(...)` (`float` × `float`) over `mz`, `my`,
+  `mx`; the normal `−wmgrad/refvol.?dim()` and `std::sqrt(norm2sq(...))` (`float`). The volumes
+  extrapolate with zeros (the default `zeropad`). `bbr_slope` defaults to −0.5, `bbr_dist` to 2.0;
+  `local_abs` is `Min(bbrupdate, 2.0 − bbrupdate)` inside the sum (`Costfn::bbr`).
+- **The centres of mass** (`calc_cog` in `newimage.cc`): `val = (double)(vol(x,y,z) − vmin)` (the
+  subtraction in the volume's type, `float`), double sums flushed every `nlim + 1` voxels with
+  `nlim = max(1000, (int64_t) sqrt(nvoxels))`.
+- **The rotations' sines and cosines** (`make_rot` in `miscmaths.cc`): `float theta = norm2(angl)`
+  and `cos(theta)`, `sin(theta)` on the `float` (`std::` overloads: single precision); the model
+  of the search's first sweep reproduces FSL's trace with either precision, so §3 was left as it is.
+- FSL's x86-64 build has no fused multiply-adds in this code (the replica, bit-identical, uses
+  none there).
+
 ## Not replicated (by decision)
 
 - The coordinate programs' `-warp` (FNIRT's warp fields): refused until FSL's warp-field libraries

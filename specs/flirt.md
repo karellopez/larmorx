@@ -310,16 +310,64 @@ trunc(bins / s)` bins at scale `s` (the quotient in single precision).
 ### 6.2 The cost functions without weights
 
 As `specs/mcflirt.md`: `normcorr` (§6.4, the count `N` quirk included; cost `1 − |r|`; with
-smoothing 0 the centred correlation with the true count), `corratio` (appendix A; cost `1 −
-η²`-like value `Σ n_b var_b / (n var)`; with smoothing 0 the unweighted counts), `woods` (appendix
-A), `mutualinfo` and `normmi` (appendix B), `leastsq` (appendix A; with smoothing 0 the unweighted
-mean). FLIRT's histogram costs use the schedule's fuzzy fraction (default 0.5, §7.3); **with
+smoothing 0 the centred correlation with the true count), `corratio` (cost `Σ n_b var_b / (n
+var)`, exactly below; with smoothing 0 the unweighted counts), `woods` (exactly below), `mutualinfo`
+and `normmi` (appendix B), `leastsq` (appendix A; with smoothing 0 the unweighted mean). FLIRT's histogram costs use the schedule's fuzzy fraction (default 0.5, §7.3); **with
 smoothing 0 and fuzzy fraction 0** the mutual-information costs use plain histograms: each sample
 adds 1 to the cell of its reference bin and test bin (`trunc(y·b1 + b0)` clamped to `0..B−1`), and
 the entropies are `Σ −p ln p` with `p = n/N` in single precision, the terms for counts `n` up to
 `min(10000, trunc(10N/(B+1)))` taken from a table computed once per pair (`−p ln p` in single
 precision, stored in double, then added to the single-precision sum in double and rounded), the
 rest computed directly; the overlap correction and the empty case as appendix B.
+
+**`corratio` exactly** (spec writer, 2026-11-02; reproduced from this text by
+`validation/investigations/flirt-spec-answers/corratio_model.py`, below). For every contributing
+grid point (§6.1), in the sampling order (z outer, then y, then x along each row), with its
+reference bin `b`, the interpolated input value `y` and its weight `w` (the edge weight of
+`specs/mcflirt.md` §6.3; 1 with smoothing 0; with weighting, §6.4's `wt·wr` times the edge
+factors):
+- **three single-precision running sums per bin, over the whole grid in that order** (one level:
+  no row or slice partial sums, unlike `normcorr`): `n_b += w`, `S_b += w·y`, `Q_b += (w·y)·y`,
+  each product rounded to single precision before the next operation (`w·y` once, then times `y`);
+  no fused multiply-add. With smoothing 0 and no weights the counts are integers and the sums
+  `S_b += y`, `Q_b += y·y`: the same values as with `w = 1`;
+- the bins are clamped to `0 … B−1` (§6.1), so the extra bin `B` never fills (FLIRT folds it into
+  bin `B − 1`, which changes nothing);
+- then over the bins in index order, **only the bins with `n_b > 2`** (a weighted count above 2;
+  more than two points with smoothing 0) take part, each in this order, all single precision:
+  `n += n_b`, `S += S_b`, `Q += Q_b`, `v_b = (Q_b − (S_b·S_b)/n_b) / (n_b − 1)` (`S_b·S_b` rounded,
+  then divided, then subtracted; `n_b − 1` in single), `A += v_b·n_b`. **The points of a bin with at
+  most two points are left out of everything**: of `n`, `S`, `Q` and so of the total variance, not
+  only of `A` (the clean-room observation of 2026-11-02, right; `specs/mcflirt.md` appendix A's
+  reading, sparse bins out of `A` only, gives 0.982248 where FSL prints 0.984415 on `real/dof6`'s
+  8 mm pair at the identity, observed);
+- `A ← A/n` if `n > 0`; `V = (Q − (S·S)/n) / (n − 1)` if `n > 1` (single precision; `n − 1` in
+  single); `A ← A/V` if `V > 0`;
+- if `n ≤ 1` or `V ≤ 0` (no bin with more than two points, or no variance), `η = 0`; otherwise
+  `η = 1 − A`, **computed in double and rounded to single**;
+- the cost is `1 − η`, **again computed in double and rounded to single**. The two roundings are
+  not an identity: for `A < 0.5` the cost is `1 − η` with `η` the single-precision rounding of
+  `1 − A` (to nearest, ties to even), so a multiple of 2⁻²⁴, up to 3·10⁻⁸ from `A`; for `A ≥ 0.5`
+  both steps are exact and the cost is `A`; this is what decides the last bits of the
+  costs a parabolic step sees (spec question 3: the 9th and 10th evaluations of `real/dof6`'s
+  `-verbose 7` trace). (Model, observed: with this text all 23 evaluations of the search's first
+  sweep at 8 mm on `real/dof6` print FSL's costs and parameters; returning `A` itself parts from
+  FSL's trace at the 5th evaluation, double-precision bin sums at the 2nd.)
+
+**`woods` exactly** (spec writer, 2026-11-02; the same model). Always the unsmoothed, unweighted
+form, whatever the smoothing (with weights FLIRT prints its warning and uses it, §6.4): per bin, in
+the sampling order, the integer count `n_b` and the single-precision running sums `S_b += y`,
+`Q_b += y·y` (`y·y` rounded). Then over the bins `b = 0 … B` in index order (bin `B` is always
+empty), only the bins with `n_b > 2`, all single precision (`n_b` converted to single): `n += n_b`
+(integer); `v_b = (Q_b − (S_b·S_b)/n_b) / (n_b − 1)`; `σ_b = √v_b` if `v_b > 0`, else 0 (correctly
+rounded); the term `t_b = ((n_b·n_b)·σ_b) / S_b` if `S_b > 0`, else `(n_b·n_b)·σ_b`; `W += t_b`.
+The cost is `W/n` (single) if `n > 0`, else `1e10`. For a bin with a positive sum `t_b = n_b·σ_b/μ_b`
+(`μ_b = S_b/n_b`): Woods' criterion weighted by the bins' counts (FSL-18: not a defect), so the
+clean-room observation `Σ n_b·σ_b/μ_b / n` with `σ_b` from `n_b − 1` is right for those bins and
+`specs/mcflirt.md` appendix A's `n_b²·σ_b/μ_b` was not; **a bin whose sum is not positive adds
+`n_b²·σ_b`**, not `n_b·σ_b` (observed: on the suite's BOLD reference minus 30000, FSL's `woods` at
+the identity is 37174512, which `n_b·σ_b` would make 20844; the model gives FSL's six printed
+`corratio` and `woods` values on both images).
 
 ### 6.3 `labeldiff`
 
@@ -355,15 +403,48 @@ pairs):
   above 0.5 and the 3×3×3 box sum of the segmentation there (the separable convolution of §5 with
   taps `[1, 1, 1]`) is below 26.5. Boundary voxels are taken in z, y, x order. Its point is the
   voxel's position in the segmentation's scaled mm (index times voxel size, 4 × 4 times 4-vector
-  product); its normal `n` is minus the 3×3×3 gradient (the gradient masks of `specs/bet.md`'s
-  smoothing step, each component a single-precision running sum over the 27 neighbours in z, y, x
-  order) of the segmentation smoothed by a Gaussian of σ = 2 mm (the separable Gaussian of
-  `specs/mcflirt.md`/`specs/bet.md`), **each component divided by the voxel size of the current
-  reference level** (not the segmentation's; FSL-67), normalised by `√(nx² + ny² + nz²)` in single
+  product); its normal `n` is minus the 3×3×3 gradient of the segmentation smoothed by a Gaussian of
+  σ = 2 mm (both exactly below; (spec writer, 2026-11-02) not `specs/bet.md`'s, which has none),
+  **each component divided by the voxel size of the current reference level** (not the
+  segmentation's; FSL-67), normalised by `√(nx² + ny² + nz²)` in single
   precision. The pair's two points are `p + 2n` (the grey-matter side) and `p − 2n` (white
   matter), each coordinate `p_k ± n_k·2` with `n_k·2` in single and the sum in double, stored as
   single. No boundary voxel: `ERROR::set_bbr_seg: could not find any boundary points!` on standard
   error (at each evaluation, which then is NaN, §6.5 below).
+
+  **The smoothing, the gradient and the normals exactly** (spec writer, 2026-11-02; with this text
+  `validation/investigations/flirt-spec-answers/bbr_model.py` reproduces FSL's printed cost of the
+  initial matrix of `bbr/default`, 0.537036, 0.540203, 0.566266, 0.554291 with `bbrstep` 1, 2, 200
+  and 201, and the same four costs with `-noclamp`, `-bbrtype local_abs` and `global_abs`: 16 of 16
+  values, observed):
+  - *The Gaussian.* Per axis `σ_k = 2/d_k` voxels (a single-precision quotient, `d_k` the
+    segmentation's voxel size as read, after the base scale), a kernel of **radius**
+    `r_k = 2·trunc(σ_k − 0.001) + 3` (the difference in double), so `2r_k + 1` taps
+    `g_j = exp(−j²/(2σ_k²))`, `j = −r_k … r_k` (`j²` an integer; the denominator `(2·σ_k)·σ_k` in
+    double; glibc's `exp`), each rounded to single and summed in single precision in `j` order; the
+    taps applied are `g_j·(1/Σ)` in double (`1/Σ` a double quotient). This is a Gaussian of standard
+    deviation `σ_k` voxels (§5's blur, with its `4σ²`, is √2 wider): the suite's 1.7 × 1.67 × 1.67 mm
+    segmentation has `σ` = 1.18, 1.2, 1.2 voxels, radius 5, 11 taps per axis.
+  - *Its convolution:* separable, along x, then y, then z, each pass as §5's (each output value the
+    single-precision running sum, in tap order from `−r_k` to `+r_k`, of the double products of value
+    and tap; values outside the image count 0). The box sum of the boundary test is the same
+    convolution with the taps `[1, 1, 1]`.
+  - *The gradient:* at every voxel, three components, each a single-precision running sum over the
+    27 neighbours (offsets `(dx, dy, dz)`, `dz` outer, then `dy`, then `dx`, each from −1 to +1) of
+    `v·m`, the smoothed value times the mask weight rounded to single (no fused multiply-add);
+    neighbours outside the image count 0. The x component's weight is `dx·3^(1 − |dy| − |dz|)`
+    (computed in double, stored in single): ±3 for the two neighbours along x, ±1 for the eight that
+    also move along one other axis, ±1/3 (0.33333334) for the eight corners, 0 when `dx = 0`; the y
+    and z components the same with the axes exchanged (`dy·3^(1 − |dx| − |dz|)`,
+    `dz·3^(1 − |dx| − |dy|)`). Not a `[1, 2, 1]` smoothing across a central difference.
+  - *The normal:* `n_k = −G_k/d^ref_k` (single), `|n| = √((n_x·n_x + n_y·n_y) + n_z·n_z)` in single
+    precision, then `n_k/|n|` (single). A zero gradient (a perfectly symmetric neighbourhood) makes
+    the pair's points NaN, and the cost NaN with the warnings below. `d^ref` is the voxel size of the
+    pair's reference level when its cost first becomes BBR: with `bbr.sch`'s `setscale 1 force` the
+    "1 mm" level, isotropic at `s_min` (3 mm on the suite's images), where the division changes no
+    direction; it matters only with an anisotropic level (`-noresample`).
+  - *The order:* boundary voxels with z outer, then y, then x (the stored order of the points, and
+    so the order of the cost's terms and of `bbrstep`'s subsampling).
 - *From `-wmcoords`/`-wmnorms`*: rows of `x y z` (mm) and normals; the points `c ± n·2` in double,
   stored as single.
 
@@ -371,10 +452,18 @@ pairs):
 voxel sizes `S_in`; computed as the solution of `S_in·T = A⁻¹`, LU with partial pivoting, after
 `A⁻¹` by LU), for every pair `k = 0, step, 2·step, …` (`step` from `setoption bbrstep`, default 1):
 `g = I(T·p_gm)`, `w = I(T·p_wm)` (4 × 4 times 4-vector products in double, the input interpolated
-at the single-precision coordinates by its own interpolation: trilinear with zero outside),
+at the single-precision coordinates by its own interpolation: trilinear with zero outside;
+(spec writer, 2026-11-02) each of the eight neighbours outside the grid counts 0 on its own, so a
+point less than one voxel outside still takes the neighbours inside),
 `q = 200(g − w)/(g + w)` in double (0 when `|g + w| ≤ 1e-6`), `u = 1 + tanh(slope·(q − offset))`
-(the slope and offset 0 single, converted to double; glibc's `tanh`). With `-bbrtype local_abs`
-each term is `min(u, 2 − u)`. The cost is `Σ u / Σ 1` (double sums in pair order; with weights,
+(the slope, default −0.5, and the offset 0 single, converted to double; glibc's `tanh`). With
+`-bbrtype local_abs` each term is `min(u, 2 − u)` (in double, before the weight multiplies it).
+(spec writer, 2026-11-02) This is FLIRT's rule (spec question 5: the clean-room observation was
+right): the model reproduces FSL's `local_abs` costs of `bbr/default`'s initial matrix, 0.080241,
+0.080231, 0.090327 and 0.084639 with `bbrstep` 1, 2, 200 and 201, with the normals above; the
+clean-room original's 1.4 mm on `bbr/type-local_abs` come from its normals, amplified by this cost,
+which rewards a contrast of either sign and is flat where the default is not (FSL's own band there is
+0.90 mm against 0.015 mm for the default). The cost is `Σ u / Σ 1` (double sums in pair order; with weights,
 each term times `w12 = (wt(T p_gm)·wr(V p_gm))·(wt(T p_wm)·wr(V p_wm))`, the products of single
 interpolated weights, in double, `V = S_ref⁻¹`, and the denominator `Σ w12`), then with
 `global_abs` `min(c, 2 − c)`; returned as single. A NaN sum prints `WARNING:: Found NaN in BBR
@@ -540,6 +629,17 @@ fMRIPrep's log shows as one row of 17 numbers). FSL's other shipped schedules (`
    column has three ones, on `sx, sy, sz`); else the three translations.
 3. The reference parameters start at the translation that aligns the centres of mass (`c_ref −
    M_init·c_in`, both in scaled mm, `M_init` applied as a 4 × 4 times 4-vector product), unit scales.
+   (spec writer, 2026-11-02) `c_ref` is the centre of the pair's reference level and `c_in` of the
+   pair's input (blurred to the scale), the same as the rotations' centre; every centre of mass of
+   FLIRT (and `specs/mcflirt.md` §6.1's) is computed with `v − v_min` **in single precision**, then
+   converted to double, and double running sums `Σ(v − v_min)·i` (per axis) and `Σ(v − v_min)` over
+   the voxels in z, y, x order, flushed into the totals after every `max(1000, trunc(√N)) + 1`
+   voxels (`N` the number of voxels; each block's sums restart at 0 and are added to the totals,
+   which are added to the last block's at the end); each coordinate is its total over the total
+   (a total below 1e-5 in magnitude counts 1, with `WARNING::in calculating COG, total = 0.0` on
+   standard error), times the voxel size. (With
+   it the model gives the search's printed reference translations on `real/dof6`, -15.257971
+   13.083505 76.451790; with the subtraction in double, 13.083506.)
 4. **Coarse grid**: for every coarse `(rx, ry, rz)` (x outer, z inner), the subset optimised (§8.3,
    4 iterations) from the reference parameters with those rotations; the resulting translations
    and scale stored on a small grid.
@@ -829,12 +929,19 @@ default and with `reproduce`:
   inv(D)` evaluates each inverse (LU) and then the products of four; `inv(A)` alone by LU (`dgetrf`
   + `dgetri`), with the 2×2 and 3×3 closed forms and the diagonal shortcut of Armadillo.
 - Every cost evaluation's sums are single precision in the visiting order (§6); the line search is
-  single precision (`specs/mcflirt.md` §7). BBR's sums are double.
+  single precision (`specs/mcflirt.md` §7). BBR's sums are double. (spec writer, 2026-11-02) No
+  fused multiply-add in FLIRT's own arithmetic (the costs, the filters, the boundary points, the
+  line search: FSL's x86-64 build has none there): every product is rounded before it is added;
+  glibc's functions and OpenBLAS's kernels compute as their own builds do.
 - glibc's `exp`, `tanh`, `logf` give the last bits (CORE-MATH agrees in more than 99.8% of calls).
 - Speed (built-for-speed original): the cost sums may be computed in blocks of rows in parallel only
   if the block sums are combined in the visiting order with FSL's three-level summation (row, slice,
   volume) preserved — the row sums are independent, so rows can run in parallel and be folded per
-  slice in order; the search's coarse grid points are independent (each is optimised from the
+  slice in order; (spec writer, 2026-11-02) this holds for the costs summed in three levels
+  (`normcorr`, `specs/mcflirt.md` §6.4; `labeldiff`, §6.3), **not** for `corratio`, `woods` and the
+  mutual-information histograms, whose per-bin sums are single running sums over the whole grid in
+  the visiting order (§6.2, appendix B): their rows can be interpolated in parallel, but the values
+  must be added to the bins in the visiting order to keep FSL's bits; the search's coarse grid points are independent (each is optimised from the
   reference parameters) and can run in parallel; the fine grid's costs too; the threshold step's
   optimisations too. The pyramid's convolutions are separable and parallel over slices.
 
@@ -884,6 +991,21 @@ Closed in part 3: the principal-axes alignment (§8.7), every parameter-subset m
    of its pre-check's).
 3. Not ported, by decision: `standard_space_roi`, `flirt_average`, `epi_reg` (they need FSL's other
    programs: `fslmaths`, `fslroi`, FAST, `fugue`).
+
+### The clean-room questions of 2026-11-02 (spec writer)
+
+The questions of FLIRT's clean-room original, part 1 (its black-box observations:
+`docs/findings/fsl-flirt-original.md`), answered in the sections named. "Right", "incomplete" or
+"wrong" is the observation as the implementer stated it. The models that reproduce FSL's numbers
+from this spec's text alone are in `validation/investigations/flirt-spec-answers/` (its README).
+
+| # | Question | Answered in | The observation | Confidence and check |
+|---|---|---|---|---|
+| 1 | `corratio` and `woods`: the points of a bin with at most two (weighted) points | §6.2 (`specs/mcflirt.md` appendix A for mcflirt) | right: left out of the count, the sums and the total variance (`corratio`), of the count (`woods`) | high: the model gives FSL's six printed `corratio` (smoothing 8 and 0) and `woods` values on two images; the sparse bins out of `A` only give 0.982248 for FSL's 0.984415 |
+| 2 | `woods`' formula | §6.2 | incomplete: `Σ n_b σ_b/μ_b / n` with `σ_b` from `n_b − 1` holds for bins with a positive sum; a bin whose sum is not positive adds `n_b²·σ_b`; appendix A's `n_b²·σ_b/μ_b` corrected | high: FSL's 37174512 on the BOLD reference minus 30000, where `n_b·σ_b` gives 20844 |
+| 3 | The correlation ratio's sums and precisions | §6.2, §12 | incomplete: the per-bin single-precision running sums in the sampling order are right (one level, products rounded, no fused multiply-add); missing were the two double-to-single roundings of the result (`η = 1 − A`, then the cost `1 − η`) | high: the model prints FSL's costs and parameters at all 23 evaluations of the search's first sweep on `real/dof6` (the 9th and 10th included); without the two roundings it parts at the 5th, with double sums at the 2nd. Also stated: the centres of mass' single-precision `v − v_min` and block sums (§8.1), needed for the printed translations |
+| 4 | BBR's normals: the Gaussian, the gradient's weights, the voxels' order | §6.5 | wrong reference (`specs/bet.md` has no such masks): a Gaussian of σ = 2 mm (radius `2·trunc(σ − 0.001) + 3` voxels, not that many taps) and weights 3, 1, 1/3 (not `[1, 2, 1]`); the order z, y, x was right | high: the model gives FSL's 0.537036 (and the other 15 printed costs of the initial matrix: `bbrstep` 1, 2, 200, 201; default, `-noclamp`, `local_abs`, `global_abs`) |
+| 5 | `-bbrtype local_abs` | §6.5 | right: `min(u, 2 − u)` per term; the 1.4 mm come from the normals (question 4), which this cost amplifies | high for the formula (the model's four `local_abs` costs are FSL's); medium that the record's case then passes (FSL's own band 0.90 mm) |
 
 ## 15. FLIRT's other programs
 

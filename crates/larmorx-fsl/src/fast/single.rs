@@ -310,7 +310,7 @@ fn bias_field(
     post: &[f32],
     y: &[f32],
     s: &[(f32, f32)],
-    kernels: &[Vec<f32>; 3],
+    kernels: &[Vec<f64>; 3],
     len: usize,
 ) -> Vec<f32> {
     let n = s.len();
@@ -341,7 +341,7 @@ fn bias_field(
 }
 
 /// The bias field's kernels for one channel (§4.5): `σ = 0.51 l / d` voxels along each axis.
-pub fn kernels(lowpass: f32, voxel: [f32; 3]) -> [Vec<f32>; 3] {
+pub fn kernels(lowpass: f32, voxel: [f32; 3]) -> [Vec<f64>; 3] {
     voxel.map(|d| bias::kernel(((0.51 * f64::from(lowpass)) / f64::from(d)) as f32))
 }
 

@@ -29,6 +29,27 @@ in single, **the second moment's quotient in double**, the difference rounded to
 (`variance_model.py`; the original since 2026-11-03). Spec question
 for the handoff: §4.4's "the quotients are rounded to single precision" holds for the mean only.
 
+## The bias field's kernel (§4.5): the normalised taps stay in double
+
+`specs/fast.md` §4.5 divides the taps (each `exp(-j² / (2σ²))` rounded to single) by their
+single-precision sum "as a multiplication by the double-precision inverse of the sum". Rounding
+the normalised taps to single again moves 0.05 % of one bias field's voxels (0.37 % of the mask's
+on `t1_half`) by one or two units in the last place against FSL with correctly rounded maths, and
+over the main loop's eight estimates that grew into segmentations outside §11's thresholds (Dice
+0.995 of `_mixeltype` on the values above 2^24, `_pve` 99.9th percentiles up to 0.24 on the MNI
+T1w at 4 mm). The cause was isolated with `-l 5` on `t1_half` (2 x 2.67 x 2.67 mm: a 5-tap kernel
+along x, one tap along y and z): `-l 3` (one tap everywhere) is bit-identical, `-l 5` is not, so
+the per-voxel `W` and `R`, the quotient, the mean and the outputs are FSL's and the convolution
+is not. Against FSL's `_bias` (`conv_model.py`, numpy, from the original's `W` and `R`): the
+taps rounded to single 98.12 % of the mask's voxels identical; a double accumulator, the taps in
+reverse order, single-precision products, unnormalised taps with or without a division
+afterwards, every tap one unit in the last place up or down: all fewer; **the taps rounded to
+single, times the double inverse of their single sum, kept in double: 100 %**. With the taps in
+double the original's bias field, restored image, segmentations, partial volumes and
+probabilities on `-v -g -p` and `-b -B -v` are bit-identical to FSL with correctly rounded maths,
+and the six cases that were outside the thresholds pass (2026-11-03). Spec question for the
+handoff: §4.5's normalised taps are double-precision values.
+
 ## `MRFWeightsTotal` (§4.10)
 
 `-v`'s `Tanaka-inner-loop-iteration=<k> MRFWeightsTotal=<T>` (k from 0 to 4) is computed after

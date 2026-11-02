@@ -9,8 +9,11 @@ use rayon::prelude::*;
 
 /// A normalised Gaussian kernel of `sigma` voxels: radius `2 trunc(σ)`, taps
 /// `exp(-j² / (2σ²))` (double, rounded to single) divided by their single-precision sum (as a
-/// multiplication by the double inverse); `σ ≤ 1e-6` the unit impulse.
-pub fn kernel(sigma: f32) -> Vec<f32> {
+/// multiplication by the double inverse); `σ ≤ 1e-6` the unit impulse. The normalised taps stay
+/// in double precision (observed: rounding them to single moves 0.05 % of a bias field's voxels
+/// by one unit in the last place against FSL with correctly rounded maths; kept in double, the
+/// field is bit-identical: `docs/findings/fsl-fast-original.md`).
+pub fn kernel(sigma: f32) -> Vec<f64> {
     if sigma <= 1e-6 {
         return vec![1.0];
     }
@@ -29,7 +32,7 @@ pub fn kernel(sigma: f32) -> Vec<f32> {
         .collect();
     let total = taps.iter().fold(0f32, |a, &b| a + b);
     let inv = 1.0 / f64::from(total);
-    taps.iter().map(|&v| (f64::from(v) * inv) as f32).collect()
+    taps.iter().map(|&v| f64::from(v) * inv).collect()
 }
 
 /// `acc[x] += tap · src[x]` as FSL's convolution adds (the product in double, the sum in single).
@@ -50,14 +53,12 @@ fn reach(n: usize, j: usize, r: usize) -> (usize, usize) {
 }
 
 /// Smooths `v` (an image of `shape`, x fastest) with the kernels `k` along x, y and z.
-pub fn smooth(v: Vec<f32>, shape: [usize; 3], k: [&[f32]; 3]) -> Vec<f32> {
+pub fn smooth(v: Vec<f32>, shape: [usize; 3], k: [&[f64]; 3]) -> Vec<f32> {
     let [nx, ny, nz] = shape;
     if v.is_empty() {
         return v;
     }
-    let tx: Vec<f64> = k[0].iter().map(|&t| f64::from(t)).collect();
-    let ty: Vec<f64> = k[1].iter().map(|&t| f64::from(t)).collect();
-    let tz: Vec<f64> = k[2].iter().map(|&t| f64::from(t)).collect();
+    let (tx, ty, tz) = (k[0], k[1], k[2]);
     let (rx, ry, rz) = (tx.len() / 2, ty.len() / 2, tz.len() / 2);
     let slice = nx * ny;
     // x, then y, slice by slice (in place, with one slice of scratch each)
@@ -116,8 +117,8 @@ mod tests {
         assert_eq!(kernel(0.5), vec![1.0]);
         let k = kernel(10.2);
         assert_eq!(k.len(), 41);
-        let s: f32 = k.iter().sum();
-        assert!((s - 1.0).abs() < 1e-5);
+        let s: f64 = k.iter().sum();
+        assert!((s - 1.0).abs() < 1e-6);
         // an impulse is spread into the kernels' outer product
         let shape = [9, 7, 5];
         let mut v = vec![0f32; 9 * 7 * 5];
@@ -126,8 +127,8 @@ mod tests {
         let out = smooth(v, shape, [&kx, &kx, &kx]);
         assert_eq!(kx.len(), 5);
         let at = |x: usize, y: usize, z: usize| out[(z * 7 + y) * 9 + x];
-        assert!((at(4, 3, 2) - kx[2] * kx[2] * kx[2]).abs() < 1e-7);
-        assert!((at(6, 3, 2) - kx[4] * kx[2] * kx[2]).abs() < 1e-7);
+        assert!((f64::from(at(4, 3, 2)) - kx[2] * kx[2] * kx[2]).abs() < 1e-7);
+        assert!((f64::from(at(6, 3, 2)) - kx[4] * kx[2] * kx[2]).abs() < 1e-7);
         assert_eq!(at(0, 3, 2), 0.0);
         let total: f32 = out.iter().sum();
         assert!((total - 1.0).abs() < 1e-5);

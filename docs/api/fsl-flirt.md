@@ -163,12 +163,15 @@ verbose levels above 1 (`-verbose 2` and more print the level-1 lines only), FLI
 programs.
 
 **Status: `experimental`.** Its record: [`docs/validation/fsl-flirt.md`](../validation/fsl-flirt.md)
-(the replica suite's cases against FSL 6.0.7.23). fMRIPrep's three boundary-based calls within
-0.1 mm of FSL's matrices at the 95th percentile over the brain (0.053, 0.011 and 0.030 mm),
-their images' correlation with FSL's 0.9993 to 0.99996; `-applyxfm` with trilinear and nearest
-neighbour FSL's images bit for bit, sinc and spline within 1e-5 of the image's range; the
-command line's errors, `convert_xfm` and the schedules' messages FSL's. The cases it misses and
-why are in the record; what the spec does not say is in
+(the replica suite's cases against FSL 6.0.7.23): 89 of 111 compared cases within thresholds, 35
+more rejected by both alike, 4 where FLIRT crashes or never finishes. fMRIPrep's three
+boundary-based calls within 0.1 mm of FSL's matrices at the 95th percentile over the brain (0.053,
+0.011 and 0.030 mm), their images' correlation with FSL's 0.9993 to 0.99996; `-applyxfm` with
+trilinear and nearest neighbour FSL's images bit for bit, sinc and spline within 1e-5 of the
+image's range; the command line's errors, `convert_xfm` and the schedules' messages FSL's; the
+costs FSL's printed values at every scale. The cases it misses and why are in the record (the
+optimisation's paths part from FSL's in the costs' last bits, BBR's normals from `-wmseg`,
+ill-posed registrations); what the spec does not say is in
 [`docs/findings/fsl-flirt-original.md`](../findings/fsl-flirt-original.md).
 
 **Speed** (one run each, a busy machine; the benchmark report is part 2's): a default 12-dof

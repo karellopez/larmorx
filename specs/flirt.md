@@ -921,7 +921,25 @@ voxel keeps its interpolated value when every coordinate lies in `[−p, n − 1
 voxels outside the input the value is therefore interpolated with the neighbours outside read by
 the edge rule: the extraslice rule by default (one voxel beyond an edge reads the edge voxel,
 further ones the background value), the constant `v` with `-setbackground v`. With a field map
-there is no padding test: every voxel is interpolated (the edge rule outside the input). **Data type**: the input's (§4.1), except that
+there is no padding test: every voxel is interpolated (the edge rule outside the input).
+
+**The windowed sinc exactly** (spec writer, 2026-11-02; question 13, observed with the model: 40000
+of 40000 sampled voxels of `-applyxfm -interp sinc` bit for bit; the two sums in double, the weight
+as `w_x·(w_y·w_z)` or the table's position in double each part from FSL in 38 to 91 % of them).
+The table (full width `w`, half-width `h = (w − 1)/2`): 1201 samples, `m = 600` in single
+precision; sample `k = 1 … 1201` at `x = ((k − m − 1)/m)·h` (single precision, left to right); the
+sinc `1 − |x|` when `|x| < 1e-7`, else `sin(y)/y` with `y = π·x` rounded to single and the
+single-precision sine (glibc's) and quotient; the window in double, rounded to single (Hanning
+`0.5 + 0.5·cos(π·x/h)`, Blackman `0.42 + 0.5·cos(π·x/h) + 0.08·cos(2π·x/h)`, rectangular 1; 0 for
+`|x| > h`; glibc's `cos`); the sample is the single product of the sinc and the window. The table
+read at `t` (single): 0 if `|t| > h`; `q = (t/h)·m + m` in single, plus 1 in double, rounded to
+single; `n = ⌊q⌋`, `f = q − n` (single); 0 if `n < 1` or `n > 1200`; otherwise `k_n·(1 − f) +
+k_{n+1}·f` in double, rounded to single. At a position `p` (single), with `i₀ = ⌊p⌋` per axis: each
+axis' `2h + 1` weights, the neighbour `i₀ + e` weighted by the table at `(p − i₀) − e` (the
+difference in single precision, then `−e` added in single); over the neighbours inside the grid,
+z outer from `i₀ − h`, then y, then x, the weight `(w_x·w_y)·w_z` in single, and the single
+running sums `S += v·w` and `W += w`; the value `S/W` (single) when `|W| > 1e-9`, otherwise the
+edge rule's value at `i₀`. **Data type**: the input's (§4.1), except that
 a non-float type becomes float when the output's values span less than 1.5 (unless `-datatype`);
 conversion to integers as mcflirt's FSL-09 rule (`specs/mcflirt.md` §9.4: truncation; larmorx's
 default rounds and clamps). `descrip` is the writer's; units mm and s.
@@ -941,8 +959,9 @@ written before the matrix: an image FSL cannot write (an output type it does not
 run before `-omat` is written. (After a registration it is the other way round: `-omat`, §9.1,
 then the image.)
 
-(spec writer, 2026-11-02; question 14, from the source; its model is the next relay's) **The edge
-rule comes before the blur here**: the input's edge rule (the constant `v` with `-setbackground v`,
+(spec writer, 2026-11-02; question 14, observed with the model: FSL's 172800 values of
+`real/applyisoxfm-4d-blur-setbackground` bit for bit; a blur reading zeros parts in 43441 of them,
+edge coefficients repeated in 5654) **The edge rule comes before the blur here**: the input's edge rule (the constant `v` with `-setbackground v`,
 else the extraslice rule with the first volume's background value) is set before each volume is
 blurred, so the blur reads the neighbours beyond the image by that rule (`v`, or the edge voxel one
 voxel out and the background value further), not zeros as after a registration (§9.2, where the
@@ -950,7 +969,17 @@ blur comes first and reads zeros). With `-interp spline` and `-setbackground v` 
 coefficients are computed as for the extraslice rule (`specs/mcflirt.md` §9.3's prefilter, its
 mirror-symmetric initialisation), but at evaluation the coefficients outside the grid count 0 (the
 extraslice rule repeats the edge coefficient instead), and a position outside `[0, n − 1]` on any
-axis gives `v`.
+axis gives `v`. The spline exactly: the coefficients along x, then y, then z (axes of one voxel
+skipped), each column in double and the results stored in single precision after each axis; pole
+`z = √3 − 2`; the causal start `c₀ + Σ_{i=1}^{N−1} zⁱ·cᵢ` with `N = trunc(ln(1e-8)/ln|z| + 1.5)`
+(15) capped at the column's length, the powers by repeated products; the causal sweep `cᵢ += z·cᵢ₋₁`;
+the anti-causal start `c_last = (−z/(1 − z²))·(2·c_last − l)` with `l` the column's last value
+before the causal sweep; the anti-causal sweep `cᵢ = z·(cᵢ₊₁ − cᵢ)` downwards; every coefficient times
+6. At a position `p`, the start index `⌈p⌉ − 2` per axis and the four cubic weights of the distances
+`p − (s + i)` (`2/3 + ((0.5·a)·a)·(a − 2)` for `a < 1`, `(1/6)·((b·b)·b)` with `b = 2 − a` for `a < 2`,
+in double); the value `Σ (c·w_x)·(w_z·w_y)` in double, z outer, then y, then x, rounded to single.
+The input's values are those read (a scaled integer file: `raw·slope` then `+ intercept`, in
+single precision).
 
 (spec writer, 2026-11-02; question 9, observed with the model: FSL's `quatern_b`, `quatern_c`,
 `quatern_d`, offsets and sform rows on a neurological reference with an oblique qform and no
@@ -1185,8 +1214,8 @@ from this spec's text alone are in `validation/investigations/flirt-spec-answers
 | 10 | `-applyxfm` writes the image before `-omat` | §9.3 | right (a registration writes `-omat` first) | high (source) |
 | 11 | `inv(A)`'s `-0` and OpenBLAS's fused multiply-adds | §12 | right about the order; the fused multiply-adds occur only with `α = −1`, where they equal the rounded subtraction: none changes the inverse | high: the model prints FSL's `convert_xfm -inverse` text, its two `-0`s included |
 | 12 | `alignpaxes` with a non-finite moment | §8.7 | right: an empty line and the warning for each non-finite image (the reference level's first), then the error | high (source; the implementer's observation) |
-| 13 | The windowed sinc's last bits | (the next relay) | | |
-| 14 | The spline with `-setbackground` | §9.3 (stated from the source; the model is the next relay's) | | |
+| 13 | The windowed sinc's last bits | §9.2 | incomplete: the table's single-precision samples and lookup (the position's last addition in double), the per-axis weights at `(p − i₀) − e`, the weight `(w_x·w_y)·w_z` and both sums in single precision, z outer | high: the model gives 40000 of 40000 sampled voxels of `-applyxfm -interp sinc` bit for bit; double sums, `w_x·(w_y·w_z)` and a double lookup position part in 38 to 91 % |
+| 14 | The spline with `-setbackground` | §9.3 | incomplete: with `-applyxfm` the edge rule is set before the blur, which reads `-setbackground`'s constant beyond the image; the spline's coefficients are the extraslice rule's but count 0 outside the grid; the prefilter and the evaluation stated exactly | high: the model gives FSL's 172800 values of `real/applyisoxfm-4d-blur-setbackground` bit for bit (a blur reading zeros parts in 43441, edge coefficients in 5654) |
 | 15 | `-usesqform`'s 4.5e-6 mm | §4.1, §8.5 | the single precision found: the left-right swap of a neurological file, whose field of view `(n_x − 1)·d_x` is a single-precision product | high: the model gives FSL's `-13.74984741` (a double field of view gives `-13.74984288`) |
 | 16 | `convert_xfm -fixscaleskew`'s 8th digit | §3 | incomplete: the decomposition's single-precision steps, the skew's triangular inverse and the scales' reciprocals, and the composition's elementary rotations `(B·C)·Bᵀ` (whose (1, 1) entry is `u_x²`) are FLIRT's | high: the model gives FSL's ten digits on the suite's `-fixscaleskew` and on a composition of double angles, where the textbook rotation parts in the 8th digit (1.018201155 for 1.018201124) |
 | 17 | A schedule without `setscale` runs on a first pair | §7.4 | right: the 8 mm level, the input blurred to 8 mm, `trunc(bins/8)` bins, the main cost; the requested scale 1 | high (source) |

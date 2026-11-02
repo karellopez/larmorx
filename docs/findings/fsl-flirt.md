@@ -417,6 +417,77 @@ in `validation/investigations/flirt-spec-answers/`.
 - FSL's x86-64 build has no fused multiply-adds in this code (the replica, bit-identical, uses
   none there).
 
+## The spec answers of 2026-11-02 (the search, the outputs and their precision, from the source)
+
+What FSL 6.0.7.23's source says behind `specs/flirt.md`'s answers to the clean-room questions 6
+to 20 (§3, §4.1, §4.2, §7.2, §7.4, §8.1, §8.2, §8.5, §8.7, §9.2, §9.3, §12, §14); the models are
+`validation/investigations/flirt-spec-answers/matrices_model.py` and `resample_model.py`.
+
+- **The search** (`search_cost`, `optimise_strategy3`, `usrsearch` in `flirt.cc`): `search_cost`
+  sets `dof = searchdof` (the `search` command's argument, default 12) for the subset mask and
+  the `dof <= 6` scale rule, and restores it at the end; `optimise_strategy3` then uses `Min(dof,
+  7)` of `-dof`, `vector2affine(params_8, dof, matresult)` (so the composition of the first
+  `min(dof, 7)` parameters, with the user's `anglerep`: the `Euler` hack covers `search_cost`
+  only) and `optimise_strategy1`, whose `affmat2vector` decomposes the matrix. `matrow(1,18) =
+  costfn(premat)` (the matrix form of `costfn` prints nothing). `param_tol` is computed at the
+  start of `search_cost` from the `refparams` in force (`params12toN` of `refparams` and of `tol +
+  refparams`). The coarse points: `refparams` = the sampled parameters, `params12toN` gives 0;
+  `tx`, `ty`, `tz`, `scale` are `volume<float>`. The threshold step sets `refparams = params_8`.
+  `find_cost_minima`'s loops are z, y, x. `percentile` (`percentile_vec`, `newimage.cc`) takes
+  `hist[(unsigned int)(((float) numbins) * p)]`. `add2list` scans the list in order, breaks at the
+  first close entry (`delete_row` when better, else `return -1`), `sorted_posn` inserts before the
+  first strictly greater cost.
+- **The optimiser** (`MISCMATHS::optimise`, `optimise1d`, `optimise.cc`): `inv_tol /= (float)
+  tol.Nrows()` and `float avtol = SP(initpt - pt, inv_tol).SumAbsoluteValue()`; `optimise1d`'s
+  `unitdir = dir/std::sqrt(dir.SumSquare())`, `float dir_tol += fabs(unitdir(n)/tol(n))`, `float
+  unittol = fabs(1/dir_tol)`, trial points `x*unitdir + pt`.
+- **The composition** (`make_rot`, `construct_rotmat_euler`, `compose_aff` in `miscmaths.cc`):
+  `float theta = norm2(angl)`, `axis = angl/theta`, the basis `x2`, `x3 = cross(x1, x2)` normalised
+  by `norm2` (double), `rotcore` with `cos(theta)`, `sin(theta)` of the float (`sincosf`),
+  `basischange * rotcore * basischange.t()`; `aff = aff * newaff` per axis; `aff * skew * scale`.
+  **The decomposition** (`decompose_aff`, `rotmat2euler`): `float sx = norm2(x)`, `MISCMATHS::dot`
+  returns `float`, `aff3 * scales.i() * (skew.SubMatrix(1,3,1,3)).i()` (Armadillo: `aff3 *
+  solve(scales, inv(skew))`, the skew's inverse by `dtrtri` as a triangular matrix, the solve by
+  `dgesv`'s packed reciprocals).
+- **The left-right swap** (`basic_swapdimensions`, `swapmat`, `setrow` in `newimage.cc`):
+  `swapmat(-1, 2, 3)`'s translation `(xsize - 1)·xdim` is computed in `float` by `setrow`;
+  `newS = sform_mat() * sampling_mat().i() * swapmat.i() * swappedSamplingMatrix` (and `newQ`),
+  both whatever the codes; `readGeneralVolume` swaps when `RadiologicalFile` is false and
+  `makeradiological` finds `FSL_NEUROLOGICAL`; the writer (`save_basic_volume`) swaps back. The
+  forms are `mat44` (float) from `getSForm`/`getQForm` (`nifti_quatern_to_mat44`, x87 long
+  double constants). `set_fsl_hdr` writes `setQForm(newmat2mat44(qform_mat()))`
+  (`nifti_mat44_to_quatern` of the float matrix). `qsform_init_mat` uses `newimagevox2mm_mat()`
+  (the swapped sform).
+- **`-applyisoxfm`** (`isotropic_resample`, `newimagefns.cc`): `iso.copyproperties(aniso)` keeps an
+  unset form unchanged; a set one becomes `form * iso2aniso` with the `float` steps.
+- **The inverse** (`arma::inv` → `dgetrf` (OpenBLAS `getrf_single` → `getf2_k`) and `dgetri`
+  (reference LAPACK, `dtrtri` → OpenBLAS `trti2_U`)): every `dgemv_n` call there has `α = −1`; the
+  Haswell microkernel's `fma(alpha, s, y)` with `α = −1` equals `y − s`; `dscal` with `−1/u_jj`
+  turns a zero into `−0`. The replica's `larmorx-nc-core::lapack` is the reference.
+- **The output order** (`do_applyxfm`, `main` in `flirt.cc`): `do_applyxfm` saves the volume
+  before `save_matrix_data`; after a registration `main` calls `save_matrix_data` first.
+- **The paddings** (`affine_transform`, `affine_transform_mask`, `raw_affine_transform` in
+  `newimagefns.*`): the mask's `o1 = x*a11 + z*a13 + a14; o1 += a12` in `float`, the same
+  accumulation as the interpolation; the mask omits `raw_affine_transform`'s neurological
+  `swapmat` products, which never apply in FLIRT (every volume is radiological once read).
+  `Costfn::bbr_resamp` (the field-map output) has no mask.
+- **`alignpaxes`** (`flirt.cc`): `principleaxes_mat()` of the reference, then of the input, then
+  the `SubMatrix` reads; Armadillo's `eig_sym_helper` prints `arma_warn(1, "eig_sym():", ": given
+  matrix is not symmetric")` when `rudimentary_sym_check` fails (`"\nwarning: "` first).
+- **The sinc** (`kernelinterpolation` in `newimage.cc`, `sinckernel1D`, `sincfn`, `hanning`,
+  `blackman`, `kernelval` in `kernel.cc`): the store loops `storez[d+wz] = kernelval((z-iz0+d), wz,
+  kernelz)`, `zj = iz0 - z1 + wz`, `float kerfac = storex[xj] * storey[yj] * storez[zj]`, `float
+  convsum`, `kersum`; `kernelval`'s `float dn = x/w*halfnk + halfnk + 1.0`.
+- **The spline with `-setbackground`** (`configure_interpolation` before `filter_image` in
+  `do_applyxfm`, `convolve` reading `source(...)` through the extrapolation;
+  `translate_extrapolation_type(constpad) = Zeros`; `Splinterpolator::coef` returns 0 for Zeros
+  outside; `init_fwd_sweep`/`init_bwd_sweep` treat Zeros as Mirror; `SplineColumn::Set` stores
+  `static_cast<T>`; `value_at`'s loops and `get_wgt`). After a registration `main` blurs first and
+  configures afterwards (zeros outside).
+- **The first pair, the base scale** (`main`, `set_basescale`): `new Costfn(refvol_8, testvol)`
+  with `no_bins/8`; `requestedscale = 1.0` by default; `set_basescale` reads the headers only
+  (`read_volume_hdr_only`) before `get_refvol`/`get_testvol` (whose `double_end_slices` triples).
+
 ## Not replicated (by decision)
 
 - The coordinate programs' `-warp` (FNIRT's warp fields): refused until FSL's warp-field libraries

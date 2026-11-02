@@ -114,7 +114,9 @@ at a time:
    FreeSurfer, surfaces, confounds (item 8); larmorprepx (item 9). Each with its site page from
    its smart tests.
 5. **The final validation phase** (after every tool is ported): the data panel for every tool
-   (part b: AFNI, FSL and I/O; the new tools), full tiers, heavy and nightly random testing,
+   (part b: AFNI, FSL and I/O; the new tools), full tiers, heavy and nightly random testing
+   (realistic cases; an extreme share, `--extreme-share`, only if then decided, in boxes: the user,
+   2026-11-02; the extreme findings of the porting parts' trials re-checked there),
    thread-band studies, the extensive evidence on each tool's page (added to what it shows),
    speed and memory studies beyond the rule's check, independent reviews, the agents' scripts
    triage (follow-ups), then the comparisons with fMRIPrep (item 9). Machine-only runs that need

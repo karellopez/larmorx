@@ -35,6 +35,7 @@ from __future__ import annotations
 import gzip
 import hashlib
 import json
+import os
 from collections.abc import Sequence
 from fractions import Fraction
 from pathlib import Path
@@ -94,10 +95,18 @@ AXIS_QUATERNIONS: tuple[tuple[int, int, int, int], ...] = (
 # The stream of choices
 
 
-#: The share of cases drawn as *extreme* (user, 2026-10-25: "reasonable size tests"): header
-#: units of metres or micrometres and voxel sizes far outside an MRI's. The others are
+#: The variable (or ``difftest --extreme-share``) that sets the share of cases drawn as *extreme*:
+#: header units of metres or micrometres and voxel sizes far outside an MRI's. The others are
 #: realistic: millimetres (or no units), voxels of 0.5 to 4 mm, at most 32 voxels per axis.
-EXTREME_SHARE = 0.1
+EXTREME_SHARE_ENV = "LARMORX_DIFFTEST_EXTREME_SHARE"
+#: The share every night drew before 2026-11-02 (user, 2026-10-25: "reasonable size tests"): the
+#: share of a night whose ``run.json`` names none.
+EXTREME_SHARE_BEFORE_2026_11_02 = 0.1
+#: The share of extreme cases: none by default (user, 2026-11-02: realistic cases only while the
+#: tools are ported; the extreme cases alone needed the memory that took the machine down twice).
+#: The final validation phase may set a share; the draw is consumed either way, so a realistic
+#: case is the same case at any share.
+EXTREME_SHARE = float(os.environ.get(EXTREME_SHARE_ENV) or 0.0)
 #: Realistic voxel sizes, mm (within 0.2 to 10 mm), and the extreme ones.
 REALISTIC_SPACINGS = (0.5, 0.8, 1.0, 1.0, 1.2, 1.5, 2.0, 2.5, 3.0, 4.0)
 EXTREME_SPACINGS = (0.01, 0.05, 0.1, 15.0, 25.0, 50.0)

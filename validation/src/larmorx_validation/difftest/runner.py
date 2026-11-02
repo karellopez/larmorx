@@ -892,6 +892,7 @@ def night(
         },
         "tools": [t.name for t in selected],
         "unavailable": skipped,
+        "extreme_share": gen.EXTREME_SHARE,
         "started": time.strftime("%Y-%m-%dT%H:%M:%S"),
         "environment": _environment(),
     }
@@ -1056,8 +1057,19 @@ def night_recipe(out: Path, h: dict) -> dict | None:
             continue
         if isinstance(r, dict) and (want is None or core.recipe_id(r) == want):
             return r
-    r = core.make_recipe(tools.get(h["tool"]), h["seed"], int(h["n"]))
+    r = core.make_recipe(tools.get(h["tool"]), h["seed"], int(h["n"]), night_extreme_share(out))
     return r if want is None or core.recipe_id(r) == want else None
+
+
+def night_extreme_share(out: Path) -> float:
+    """The share of extreme cases the night in ``out`` drew (its ``run.json``; a night from before
+    2026-11-02 names none and drew ``gen.EXTREME_SHARE_BEFORE_2026_11_02``)."""
+    try:
+        info = json.loads((out / "run.json").read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        info = {}
+    share = info.get("extreme_share")
+    return gen.EXTREME_SHARE_BEFORE_2026_11_02 if share is None else float(share)
 
 
 def run_heavy(

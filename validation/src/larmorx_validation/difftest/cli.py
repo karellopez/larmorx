@@ -26,7 +26,7 @@ import os
 import sys
 from pathlib import Path
 
-from larmorx_validation.difftest import core, tools
+from larmorx_validation.difftest import core, gen, tools
 
 
 def add_arguments(p: argparse.ArgumentParser) -> None:
@@ -46,6 +46,14 @@ def add_arguments(p: argparse.ArgumentParser) -> None:
         "--threads", type=int, default=1, help="threads of each original and larmorx run"
     )
     p.add_argument("--seed", default=None, help="the night's seed (default: the date, YYYYMMDD)")
+    p.add_argument(
+        "--extreme-share",
+        type=float,
+        default=None,
+        help="share of extreme cases (odd units, voxels of 0.01 to 50): 0 by default, realistic "
+        "cases only (user, 2026-11-02); the final validation phase may ask for e.g. 0.1; "
+        "to draw a night's case again with --case, give that night's share (before 2026-11-02: 0.1)",
+    )
     p.add_argument(
         "--out",
         default=None,
@@ -141,6 +149,11 @@ def main(args: argparse.Namespace) -> int:
     python_versions.reexec(args, named)  # --python: may start again under that interpreter
     afni_versions.apply(args)  # --afni-version: the workers inherit it
     fsl_versions.apply(args)  # --fsl-version: the workers inherit it
+    if args.extreme_share is not None:  # the workers inherit it
+        if not 0.0 <= args.extreme_share <= 1.0:
+            raise SystemExit("--extreme-share is a share between 0 and 1")
+        os.environ[gen.EXTREME_SHARE_ENV] = repr(args.extreme_share)
+        gen.EXTREME_SHARE = args.extreme_share
     if args.list:
         for name in tools.names():
             t = tools.get(name)

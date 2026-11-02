@@ -391,7 +391,14 @@ def test_a_heavy_case_runs_the_recipe_of_its_night_after_the_generator_changed(t
     # A queue line written since keeps its recipe itself; a draw that gives the id is used.
     assert runner.night_recipe(out, {**h, "recipe": other}) == other
     same = {"tool": "ants-n4", "seed": "r", "n": 7, "recipe_id": core.recipe_id(drawn)}
-    assert core.recipe_id(runner.night_recipe(tmp_path / "none", same)) == core.recipe_id(drawn)
+    today = tmp_path / "today"  # a night that names its share draws with it
+    today.mkdir()
+    (today / "run.json").write_text(json.dumps({"extreme_share": 0.0}), encoding="utf-8")
+    assert core.recipe_id(runner.night_recipe(today, same)) == core.recipe_id(drawn)
+    # A night from before 2026-11-02 (no share named) drew one case in ten as extreme.
+    old = core.make_recipe(tool, "r", 7, gen.EXTREME_SHARE_BEFORE_2026_11_02)
+    was = {**same, "recipe_id": core.recipe_id(old)}
+    assert core.recipe_id(runner.night_recipe(tmp_path / "none", was)) == core.recipe_id(old)
 
 
 def test_a_tool_held_to_thresholds_gets_one_group_per_implementation(tmp_path):
@@ -541,16 +548,22 @@ def test_a_case_over_the_memory_limit_is_recorded_and_the_night_goes_on(tmp_path
     assert "ended" in info
 
 
-def test_most_cases_are_realistic_and_the_extreme_share_is_labelled():
-    """User, 2026-10-25: "reasonable size tests". Most cases are realistic (millimetres or no
-    units, voxels of 0.2 to 10 mm, at most 32 voxels per axis); a small share, labelled
-    ``extreme`` in the case's features, may have odd units and voxel sizes."""
+def test_cases_are_realistic_and_an_extreme_share_is_labelled():
+    """User, 2026-10-25: "reasonable size tests"; 2026-11-02: realistic cases only by default.
+    Every case is realistic (millimetres or no units, voxels of 0.2 to 10 mm, at most 32 voxels
+    per axis) unless a share of extreme ones is asked for; those are labelled ``extreme`` in the
+    case's features and may have odd units and voxel sizes, and a realistic case is the same case
+    at any share (the draw is consumed either way: old nights' cases keep their seeds)."""
+    assert gen.EXTREME_SHARE == 0.0  # the default (LARMORX_DIFFTEST_EXTREME_SHARE unset)
     n_cases, extreme = 300, 0
     for name in ("ants-n4", "ants-resample-image-by-spacing", "ants-smooth-image"):
         tool = tools.get(name)
         for n in range(n_cases):
-            r = core.make_recipe(tool, "realistic", n)
+            assert not core.make_recipe(tool, "realistic", n)["features"]["extreme"], (name, n)
+            r = core.make_recipe(tool, "realistic", n, gen.EXTREME_SHARE_BEFORE_2026_11_02)
             is_extreme = r["features"]["extreme"]
+            if not is_extreme:
+                assert r == core.make_recipe(tool, "realistic", n), (name, n)
             extreme += is_extreme
             for spec in r["inputs"].values():
                 if spec.get("kind", "nifti") != "nifti" or "geometry" not in spec:
@@ -562,6 +575,18 @@ def test_most_cases_are_realistic_and_the_extreme_share_is_labelled():
                     assert all(0.2 <= s <= 10.0 for s in g["spacing"]), (name, n, g["spacing"])
     share = extreme / (3 * n_cases)
     assert 0.05 < share < 0.15, share
+
+
+def test_a_nights_extreme_share(tmp_path):
+    """A night's cases are drawn again with the share it drew (``run.json``); a night from before
+    2026-11-02 names none and drew one case in ten as extreme."""
+    from larmorx_validation.difftest import runner
+
+    assert runner.night_extreme_share(tmp_path) == gen.EXTREME_SHARE_BEFORE_2026_11_02 == 0.1
+    (tmp_path / "run.json").write_text(json.dumps({"seed": "s"}), encoding="utf-8")
+    assert runner.night_extreme_share(tmp_path) == 0.1
+    (tmp_path / "run.json").write_text(json.dumps({"extreme_share": 0.0}), encoding="utf-8")
+    assert runner.night_extreme_share(tmp_path) == 0.0
 
 
 def test_the_sizing_laws_and_a_case_predicted_over_the_limit():
@@ -591,11 +616,12 @@ def test_the_sizing_laws_and_a_case_predicted_over_the_limit():
         [0.003, 0.003, 0.003, 2.0],
     )
     assert round(ball["sizing"]["radius"]) == 6100 and ball["ants_gib"] > 8000
-    # A realistic case of a sized tool fits; an extreme one may be predicted over the limit.
+    # Drawn with the old share of extreme cases: these realistic cases of a sized tool fit, and an
+    # extreme one may be predicted over the limit.
     tool = tools.get("ants-n4")
     over = None
     for n in range(400):
-        r = core.make_recipe(tool, "guard", n)
+        r = core.make_recipe(tool, "guard", n, gen.EXTREME_SHARE_BEFORE_2026_11_02)
         predicted = runner.predict_case("ants-n4", r)
         if not r["features"]["extreme"]:
             assert predicted is None, (n, predicted)
@@ -603,6 +629,11 @@ def test_the_sizing_laws_and_a_case_predicted_over_the_limit():
             over = predicted
             break
     assert over is not None and max(over["ants_gib"], over["larmorx_gib"]) > over["limit_gib"]
+    # A realistic header does not make every case small: with no extreme share, case 7 is
+    # realistic (1.5 mm voxels, 31 x 15 x 10 x 7) and N4 in 4D with order-5 splines would need
+    # 22 GiB in ANTs; the sizing law catches it before it runs, as it catches an extreme case.
+    heavy = runner.predict_case("ants-n4", core.make_recipe(tool, "guard", 7, 0.0))
+    assert heavy is not None and heavy["ants_gib"] > 20.0 > heavy["limit_gib"]
     # An implementation without a guard is not run: queued, its prediction recorded (3dUnifize's
     # clean-room original has AFNI-75's guard since 2026-10-30, as the replica).
     assert "original" in runner.GUARDED["afni-unifize"]

@@ -31,7 +31,7 @@ from pathlib import Path
 
 import nibabel as nib
 import numpy as np
-from larmorx_validation.difftest import core, inputs, limits, tools
+from larmorx_validation.difftest import core, gen, inputs, limits, tools
 from larmorx_validation.parity import ants_programs
 
 SPATIAL = {"meter": 1000.0, "mm": 1.0, "micron": 0.001, "unknown": 1.0}
@@ -142,7 +142,9 @@ def main() -> int:
 
         recipe = runner.night_recipe(args.night, {"tool": name, "seed": seed, "n": int(n)})
     else:
-        recipe = core.make_recipe(tools.get(name), seed, int(n))
+        recipe = core.make_recipe(
+            tools.get(name), seed, int(n), gen.EXTREME_SHARE_BEFORE_2026_11_02
+        )
     words = core.arguments(recipe)
     args.out.mkdir(parents=True, exist_ok=True)
     spec = recipe["inputs"]["a"]

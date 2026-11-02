@@ -48,13 +48,13 @@ def main() -> int:
     ap.add_argument("cases", nargs="+")
     ap.add_argument("--limit", type=float, default=3600.0)
     a = ap.parse_args()
-    from larmorx_validation.difftest import core, tools
+    from larmorx_validation.difftest import core, gen, tools
     from larmorx_validation.parity import fsl_bet as fb
 
     tool = tools.get("fsl-bet")
     for spec in a.cases:
         seed, n = spec.split(":")
-        recipe = core.make_recipe(tool, seed, int(n))
+        recipe = core.make_recipe(tool, seed, int(n), gen.EXTREME_SHARE_BEFORE_2026_11_02)
         s = tool.case(recipe, "replica").payload
         paths = [fb.input_path(x) for x in s.inputs]
         args = fb._arguments(s, paths)

@@ -12,13 +12,13 @@ from pathlib import Path
 
 
 def main(argv: list[str]) -> int:
-    from larmorx_validation.difftest import core
+    from larmorx_validation.difftest import core, gen
     from larmorx_validation.difftest.tools import fsl_bet as tool
     from larmorx_validation.parity import fsl_bet as fb
 
     seed, n, d = argv[0], int(argv[1]), Path(argv[2])
     d.mkdir(parents=True, exist_ok=True)
-    recipe = core.make_recipe(tool.TOOL, seed, n)
+    recipe = core.make_recipe(tool.TOOL, seed, n, gen.EXTREME_SHARE_BEFORE_2026_11_02)
     s = tool.case(recipe, "original").payload
     paths = []
     for k, name in enumerate(s.inputs):

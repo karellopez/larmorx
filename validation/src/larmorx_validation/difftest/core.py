@@ -112,11 +112,13 @@ def arguments(recipe: dict) -> list[str]:
     return [a for g in recipe["groups"] for a in g["args"]]
 
 
-def make_recipe(tool: Tool, seed: str, n: int) -> dict:
-    """Draws case ``n`` of ``tool`` for the night's ``seed``."""
+def make_recipe(tool: Tool, seed: str, n: int, extreme_share: float | None = None) -> dict:
+    """Draws case ``n`` of ``tool`` for the night's ``seed``; ``extreme_share``: the night's share
+    of extreme cases (``gen.EXTREME_SHARE`` when not given)."""
     d = gen.Draw(f"{tool.name}:{seed}:{n}")
-    # Most cases are realistic; a small share is extreme (gen.EXTREME_SHARE), labelled.
-    d.extreme = d.chance("extreme", gen.EXTREME_SHARE)
+    # Realistic cases; a share of extreme ones only when asked for (gen.EXTREME_SHARE), labelled.
+    share = gen.EXTREME_SHARE if extreme_share is None else extreme_share
+    d.extreme = d.chance("extreme", share)
     body = tool.draw(d)
     recipe = {
         "tool": tool.name,

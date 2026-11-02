@@ -67,13 +67,25 @@ transforms (text in many spellings, MATLAB, HDF5), and small crops of real templ
 `larmorx-testdata` where a tool needs anatomy. Phantoms are functions of world coordinates, so a
 moved copy of one (registration, head motion) is exact and its answer known.
 
-**Realistic cases, and a labelled extreme share** (user, 2026-10-25: "reasonable size tests";
-`gen.EXTREME_SHARE`, `REALISTIC_SPACINGS`, `EXTREME_SPACINGS`). Every case decides first whether
-it is one of the night's *extreme* share (10 %, the case's feature `extreme`): the others are
-realistic, with headers in millimetres (or without units) and voxels of 0.5 to 4 mm (within the
-0.2 to 10 mm of real scanners), matrices of at most 32 voxels per axis and the tools' typical
-options; an extreme case may also have metres or micrometres and voxels of 0.01 to 50 units. The
-report gives each tool's count of extreme cases (column *Extreme*), and the site's panels too.
+**Realistic cases; an extreme share only on request** (user, 2026-10-25: "reasonable size
+tests"; 2026-11-02: realistic cases only while the tools are ported; `gen.EXTREME_SHARE`,
+`REALISTIC_SPACINGS`, `EXTREME_SPACINGS`). Every case is realistic, with headers in millimetres
+(or without units) and voxels of 0.5 to 4 mm (within the 0.2 to 10 mm of real scanners), matrices
+of at most 32 voxels per axis and the tools' typical options, unless a share of *extreme* cases is
+asked for (`difftest --extreme-share 0.1`, or `LARMORX_DIFFTEST_EXTREME_SHARE`; the case's feature
+`extreme`), which may also have metres or micrometres and voxels of 0.01 to 50 units. From
+2026-10-25 to 2026-11-02 every night drew one case in ten as extreme; the extreme cases alone made
+every memory finding (FLIRT's three trials of 2026-11-01: 60 of 60, none among some 200 000
+realistic cases), and re-running them without the memory box took the machine down
+(2026-11-02, CLAUDE.md). The draw is consumed either way, so a realistic case is the same case at
+any share; a night's `run.json` records its share (`extreme_share`; a night without it drew 0.1),
+and `--heavy` draws its queue again with it. A realistic header does not make every case small:
+odd option combinations can still be heavy (an N4 call in 4D with order-5 splines on a 1.5 mm
+image needs 22 GiB in ANTs), and the sizing laws below catch those before they run. Robustness to
+nonsense headers is checked instead by a few fixed cases per tool in its standard tier, kept only
+where the original and larmorx finish within a small box; the extreme share returns, if at all,
+in the final validation phase. The report gives each tool's count of extreme cases (column
+*Extreme*), and the site's panels too.
 
 **Predicted before run** (`difftest/sizing.py`). For the tools whose memory grows with what their
 options and header ask for (N4BiasFieldCorrection's lattice and padding, the resamplers' output
@@ -87,7 +99,7 @@ does not); where larmorx's own need fits, or the implementation has no guard, no
 queued in the night's `heavy.jsonl`, for the heavy box (`difftest --heavy`), and on a larger
 machine when it is beyond this one ("pending: larger machine",
 `validation/investigations/difftest/heavy_pending.py`, with the command line that runs it there).
-The tests: `validation/tests/test_difftest.py::test_most_cases_are_realistic_and_the_extreme_share_is_labelled`
+The tests: `validation/tests/test_difftest.py::test_cases_are_realistic_and_an_extreme_share_is_labelled`, `::test_a_nights_extreme_share`
 and `::test_the_sizing_laws_and_a_case_predicted_over_the_limit`.
 
 | Tool | Parity runner | Implementations | Drawn |

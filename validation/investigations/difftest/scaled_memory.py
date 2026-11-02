@@ -22,7 +22,7 @@ import sys
 from pathlib import Path
 
 import nibabel as nib
-from larmorx_validation.difftest import core, inputs, limits, tools
+from larmorx_validation.difftest import core, gen, inputs, limits, tools
 from larmorx_validation.parity import ants_programs
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
@@ -59,7 +59,9 @@ def main() -> int:
 
         recipe = runner.night_recipe(args.night, {"tool": name, "seed": seed, "n": int(n)})
     else:
-        recipe = core.make_recipe(tools.get(name), seed, int(n))
+        recipe = core.make_recipe(
+            tools.get(name), seed, int(n), gen.EXTREME_SHARE_BEFORE_2026_11_02
+        )
     args.out.mkdir(parents=True, exist_ok=True)
     paths = {}
     for k, spec in recipe["inputs"].items():

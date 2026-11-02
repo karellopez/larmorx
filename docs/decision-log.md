@@ -1740,6 +1740,23 @@ together at the end.
   3dUnifize's `cbrtf` (2026-10-30), where the correctly rounded value is the default, here the more
   precise function moves the result to another equally valid surface and gains nothing.
 
+## 2026-11-02: Random testing with realistic cases only (the user)
+- **The cause.** At 00:08 systemd-oomd killed VS Code with FLIRT part 3's agent and the
+  orchestrator's session: the agent re-ran its trial's 66 findings with 24 workers outside any
+  memory box, memory findings included (FSL alone needs 9 GiB or more on some). Every memory finding
+  of FLIRT's three trials (60 of 60) came from the extreme share (voxels of 0.01 to 50 units, odd
+  units), none from some 200 000 realistic cases.
+- **The user:** "That is not a realistic test. A user probably would never do that"; asked whether
+  it is necessary, the orchestrator recommended realistic cases only while porting, a few fixed
+  nonsense-header cases per tool instead, and the extreme share at most in the final validation
+  phase; the user: "Do that please even for this part, I do not want another crash".
+- **Written:** `gen.EXTREME_SHARE` is 0 by default (`difftest --extreme-share` or
+  `LARMORX_DIFFTEST_EXTREME_SHARE` sets another; a night's `run.json` records it, the nights before
+  name none and drew 0.1); FLIRT part 3 re-checks only its realistic findings, its extreme ones
+  deferred to the final validation phase; each part's standard tier gets fixed nonsense-header cases
+  only where the original and larmorx finish within a 4 GiB box. Every re-check and probe runs in a
+  memory box with the trial's per-case cap (CLAUDE.md, "Every heavy job runs in a memory box").
+
 ## Open decisions (PLAN.md §16)
 
 | # | Decision | Recommended default (used until decided) | Status |

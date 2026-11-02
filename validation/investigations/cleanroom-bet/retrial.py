@@ -15,11 +15,11 @@ from pathlib import Path
 
 
 def one(args: tuple[str, int]) -> tuple[int, str, list[str], str]:
-    from larmorx_validation.difftest import core, runner
+    from larmorx_validation.difftest import core, gen, runner
     from larmorx_validation.difftest.tools import fsl_bet
 
     seed, n = args
-    recipe = core.make_recipe(fsl_bet.TOOL, seed, n)
+    recipe = core.make_recipe(fsl_bet.TOOL, seed, n, gen.EXTREME_SHARE_BEFORE_2026_11_02)
     j = runner.judge_once(fsl_bet.TOOL, recipe, "original")
     return n, j.verdict, list(j.signature), j.detail[:200]
 

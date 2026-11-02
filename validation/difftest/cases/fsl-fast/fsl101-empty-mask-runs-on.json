@@ -1,0 +1,220 @@
+{
+ "defect": null,
+ "description": "FSL-101 (FLIRT cannot write the registered priors: an output type FSL 6.0.7.23 refuses) on an image whose mask is empty: FAST runs on, as no voxel reads the priors it never allocated; reproduce now does the same",
+ "expect": "pass",
+ "found": {
+  "detail": "stdout identical: line 1: FSL 'MeaNsK variance nan', replica '<end>'; stderr identical: line 8: FSL 'ERROR:: Empty mask image', replica '<end>'",
+  "n": 3230,
+  "seed": "fast-trial",
+  "shrink_moves": [
+   "dropped -o (-o fast)",
+   "dropped -P (-P)",
+   "dropped -B (-B)",
+   "dropped -N (--nobias)",
+   "ch1: axis 0 12 -> 6 voxels",
+   "ch1: axis 1 12 -> 6 voxels",
+   "ch1: axis 2 12 -> 6 voxels",
+   "ch1: axis 0 6 -> 3 voxels",
+   "ch1: axis 1 6 -> 3 voxels",
+   "dropped -v (-v)",
+   "ch1: axis 2 6 -> 3 voxels",
+   "ch1: axis 0 3 -> 1 voxels",
+   "ch1: axis 1 3 -> 1 voxels",
+   "ch1: axis 2 3 -> 1 voxels",
+   "ch1 (and its grid): plumb orientation",
+   "ch1 (and its grid): unit spacing",
+   "ch1 (and its grid): sform = qform",
+   "ch1 (and its grid): qform and sform codes 1",
+   "ch1 (and its grid): millimetres",
+   "ch1: float32 storage",
+   "ch1: content head -> blobs"
+  ],
+  "signature": [
+   "stdout identical"
+  ]
+ },
+ "id": "fsl101-empty-mask-runs-on",
+ "implementations": [
+  "replica"
+ ],
+ "reason": "",
+ "recipe": {
+  "extra": {
+   "channels": 1,
+   "classes": 3,
+   "nobias": true,
+   "output_type": "ANALYZE",
+   "probs": false,
+   "tool": "fast"
+  },
+  "features": {
+   "--nopve": false,
+   "-B": true,
+   "-H": false,
+   "-I": false,
+   "-N": true,
+   "-N long": true,
+   "-O": false,
+   "-P": true,
+   "-P long": false,
+   "-R": false,
+   "-S 1": false,
+   "-W": false,
+   "-a": true,
+   "-b": false,
+   "-f": false,
+   "-g": false,
+   "-l": false,
+   "-n": false,
+   "-o": true,
+   "-o long": false,
+   "-p": false,
+   "-t 1": false,
+   "-v": true,
+   "-v long": false,
+   "2D": false,
+   "FSLOUTPUTTYPE": "ANALYZE",
+   "axis0": 0.9,
+   "axis1": 1.15,
+   "axis2": 0.9,
+   "basename": "fast",
+   "bias0": 0.0,
+   "bias1": -0.0075,
+   "bias2": -0.01,
+   "bias3": 0.0025,
+   "brain centre0": -0.04,
+   "brain centre1": 0.0,
+   "brain centre2": 0.04,
+   "brain fraction": 0.3,
+   "centre0": -1.5,
+   "centre1": 4.5,
+   "centre2": -4.0,
+   "content": "head",
+   "dtype": "int16",
+   "extreme": false,
+   "field of view": 24.0,
+   "isotropic": true,
+   "kind": "single",
+   "noise": 0.0,
+   "orientation": "axes",
+   "origin0": 41.5,
+   "origin1": -18.75,
+   "origin2": -14.5,
+   "prior scale": 0.11666666666666667,
+   "prior shift0": 0.0,
+   "prior shift1": -2.0,
+   "prior shift2": 0.0,
+   "qfac": 1,
+   "qform_code": 4,
+   "range": "plain",
+   "sform": "other",
+   "sform_code": 4,
+   "shape": "12x12x12",
+   "shear0": 0.05,
+   "shear1": -0.025,
+   "shear2": -0.1,
+   "size": 27.5,
+   "spacing0": 2.0,
+   "spacing1": 2.0,
+   "spacing2": 0.5,
+   "suffix": ".nii.gz",
+   "tissues": "t2",
+   "units": "unknown",
+   "whole head": false
+  },
+  "groups": [
+   {
+    "args": [
+     "-a",
+     "{in:mat}"
+    ],
+    "name": "-a",
+    "optional": true
+   },
+   {
+    "args": [
+     "{in:ch1}"
+    ],
+    "name": "images",
+    "optional": false
+   }
+  ],
+  "inputs": {
+   "ch1": {
+    "content": {
+     "axes": [
+      1.0,
+      1.0,
+      1.0
+     ],
+     "centre": [
+      0.0,
+      0.0,
+      0.0
+     ],
+     "n": 1,
+     "seed": 1313515967,
+     "size": 12.0,
+     "type": "blobs"
+    },
+    "dtype": "float32",
+    "geometry": {
+     "origin": [
+      11.0,
+      -11.0,
+      -11.0
+     ],
+     "qfac": 1,
+     "qform_code": 1,
+     "quaternion": [
+      1,
+      0,
+      0,
+      0
+     ],
+     "sform": "same",
+     "sform_code": 1,
+     "spacing": [
+      1.0,
+      1.0,
+      1.0
+     ],
+     "units": "mm"
+    },
+    "scaling": null,
+    "shape": [
+     1,
+     1,
+     1
+    ],
+    "suffix": ".nii.gz",
+    "values": {
+     "offset": 0.0,
+     "scale": 1.0
+    }
+   },
+   "mat": {
+    "kind": "text",
+    "suffix": ".mat",
+    "text": "0.116667 0 0 0.500000\n0 0.116667 0 -3.600000\n0 0 0.116667 0.500000\n0 0 0 1\n"
+   }
+  },
+  "n": 3230,
+  "options": [
+   "-B",
+   "-N",
+   "-P",
+   "-a",
+   "-o",
+   "-v",
+   "FSLOUTPUTTYPE=ANALYZE"
+  ],
+  "seed": "fast-trial",
+  "tool": "fsl-fast"
+ },
+ "rule": null,
+ "status": "fixed",
+ "suite": "fsl-fast-replica",
+ "tier": "standard",
+ "tool": "fsl-fast"
+}

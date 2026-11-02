@@ -1223,3 +1223,29 @@ signature = ["FSL-N's correction: the matrix within Ne-N of the replica's (NumPy
 status = "open"
 explanation = "aff2rigid's corrected matrix (FSL-81) against the replica's in 1 of the trial's 170 aff2rigid cases (169 agree): not yet looked at."
 link = "docs/findings/fsl-flirt-original.md"
+
+# ---------------------------------------------------------------- FAST's replica: the trial (2026-11-02)
+
+[[difference]]
+tool = "fsl-fast"
+implementation = "replica"
+signature = ["stdout identical"]
+status = "fixed"
+explanation = "FSL-101 with -v (the trial oracles/difftest/2026-11-02-fsl-fast, half an hour, 17,497 realistic cases: 16,768 agree, 725 rejected by both alike, 4 differ, all FSL-101 where FLIRT cannot write the registered priors in an output type FSL 6.0.7.23 refuses): FAST prints 'Beginning prior-based initialisation' before it crashes on the priors it never allocated; the replica's reproduce stopped before that line (now printed before its refusal)"
+link = "validation/difftest/cases/fsl-fast/fsl101-verbose-before-crash.json"
+
+[[difference]]
+tool = "fsl-fast"
+implementation = "replica"
+signature = ["stderr identical"]
+status = "fixed"
+explanation = "FSL-101 with several channels whose first voxel is in the mask (the trial of 2026-11-02): FAST's bounds-checked access to the unallocated priors throws 'Out of Bounds (time index)' and aborts; the replica's reproduce refused (now throws the same and aborts)"
+link = "validation/difftest/cases/fsl-fast/fsl101-multi-exception.json"
+
+[[difference]]
+tool = "fsl-fast"
+implementation = "replica"
+signature = ["stdout identical", "stderr identical"]
+status = "fixed"
+explanation = "FSL-101 on an image whose brain mask is empty (the trial of 2026-11-02, two findings): FAST runs on, as no voxel reads the priors it never allocated (every class statistic NaN, 'Empty mask image'); the replica's reproduce refused (now runs on as FAST does)"
+link = "validation/difftest/cases/fsl-fast/fsl101-empty-mask-runs-on.json"

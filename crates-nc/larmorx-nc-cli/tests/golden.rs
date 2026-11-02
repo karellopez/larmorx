@@ -434,6 +434,23 @@ const PRINTING: &[&str] = &[
     "fsl makerot",
     "fsl midtrans",
     "fsl extracttxt",
+    "fsl fast",
+];
+
+/// FAST's refusals (rule B, 2026-11-02): `(id, arguments, the defect named)`, refused by
+/// default with exit status 1 and nothing written (recorded by their status): a smoothness that
+/// is not a number (FSL-99), channels of different sizes (FSL-104).
+const FAST_REFUSALS: &[(&str, &[&str], &str)] = &[
+    (
+        "fast.fsl99.nan",
+        &["-o", "out", "-H", "nan", "{brain}"],
+        "FSL-99",
+    ),
+    (
+        "fast.fsl104.sizes",
+        &["-o", "out", "-S", "2", "{one}", "{brain}"],
+        "FSL-104",
+    ),
 ];
 
 /// FLIRT's refusals (rule B, 2026-11-02): `(id, arguments, the defect named)`, refused by
@@ -884,6 +901,100 @@ const BET_CASES: &[BetCase] = &[
         named: &[],
         output_type: "NIFTI",
     },
+    // FAST (2026-11-02), on a three-tissue brain (`{brain}`: zero outside it, an intensity
+    // gradient along x): fMRIPrep's call (no bias field, the probabilities and binary segments;
+    // FSL-96: the probabilities outside the mask, which FAST never writes, are 0), the bias
+    // field with both its outputs, a T2-type two-class run without partial volumes (verbose: its
+    // standard output kept), four classes from given intensities, two channels with their bias
+    // fields, the priors registered with FLIRT (the inputs copied into the run directory:
+    // `@name`; FLIRT's FSL-09 applies to the int16 priors), FSLDIR unset (FSL-100: segmented by default), and the mask's brightest voxels
+    // at 2^24 and above (FSL-103), corrected and reproduced. FAST's cases run with FSLDIR set to
+    // their run directory (no priors there), except `fast.fsldir-unset`.
+    BetCase {
+        id: "fast.fmriprep",
+        tool: "fsl fast",
+        args: &[
+            "-o", "out", "-I", "0", "-N", "-p", "-g", "-S", "1", "{brain}",
+        ],
+        mode: "fix",
+        named: &["FSL-96"],
+        output_type: "NIFTI",
+    },
+    BetCase {
+        id: "fast.bias",
+        tool: "fsl fast",
+        args: &[
+            "-o", "out", "-b", "-B", "-I", "2", "-O", "2", "-l", "15", "{brain}",
+        ],
+        mode: "fix",
+        named: &[],
+        output_type: "NIFTI",
+    },
+    BetCase {
+        id: "fast.t2-n2-nopve-verbose",
+        tool: "fsl fast",
+        args: &[
+            "-o", "out", "-t", "2", "-n", "2", "--nopve", "-v", "-H", "0.2", "{brain}",
+        ],
+        mode: "fix",
+        named: &[],
+        output_type: "NIFTI",
+    },
+    BetCase {
+        id: "fast.n4-manualseg",
+        tool: "fsl fast",
+        args: &[
+            "-o", "out", "-n", "4", "-s", "{means4}", "-R", "0.5", "-W", "5", "-N", "{brain}",
+        ],
+        mode: "fix",
+        named: &[],
+        output_type: "NIFTI",
+    },
+    BetCase {
+        id: "fast.multi",
+        tool: "fsl fast",
+        args: &[
+            "-o", "out", "-S", "2", "-B", "-b", "-p", "-I", "2", "{t2}", "{brain}",
+        ],
+        mode: "fix",
+        named: &["FSL-96"],
+        output_type: "NIFTI",
+    },
+    BetCase {
+        id: "fast.priors",
+        tool: "fsl fast",
+        args: &[
+            "-o", "out", "-a", "@init", "-A", "@brain", "@t2", "@t1", "-P", "-N", "@brain",
+        ],
+        mode: "fix",
+        // FLIRT's registered priors of the int16 images, rounded (FSL-09, FLIRT's default)
+        named: &["FSL-09"],
+        output_type: "NIFTI",
+    },
+    BetCase {
+        id: "fast.fsldir-unset",
+        tool: "fsl fast",
+        args: &["-o", "out", "-N", "--nopve", "{brain}"],
+        mode: "fix",
+        named: &["FSL-100"],
+        output_type: "NIFTI",
+    },
+    BetCase {
+        id: "fast.fsl103",
+        tool: "fsl fast",
+        args: &["-o", "out", "-N", "--nopve", "{big}"],
+        mode: "fix",
+        named: &["FSL-103"],
+        output_type: "NIFTI",
+    },
+    BetCase {
+        id: "fast.fsl103.reproduce",
+        tool: "fsl fast",
+        args: &["-o", "out", "-N", "--nopve", "{big}"],
+        mode: "reproduce",
+        named: &["FSL-103"],
+        output_type: "NIFTI",
+    },
 ];
 
 // ------------------------------------------------------------------------------------------------
@@ -1236,6 +1347,35 @@ fn bet_head_values(levels: [i64; 5], seed: u64) -> Vec<i64> {
 /// A NIfTI-1 single file of the head's grid: 2 mm voxels, an sform and a qform of
 /// `diag(-2, 2, 2)` (radiological storage, as most scanners' files), the data type and values
 /// given.
+/// FAST's brain (2026-11-02): white matter (800) inside grey matter (550) inside CSF (250) in an
+/// ellipsoid, zero outside it, with the head's x gradient (a bias field) and noise.
+fn fast_brain_values(seed: u64) -> Vec<i64> {
+    let [nx, ny, nz] = HEAD;
+    let noise = splitmix64(seed, (nx * ny * nz) as usize);
+    let mut v = Vec::with_capacity(noise.len());
+    for k in 0..nz {
+        for j in 0..ny {
+            for i in 0..nx {
+                let (x, y, z) = (2 * i - 31, 2 * j - 31, 2 * k - 23);
+                let r = x * x + y * y + 2 * z * z;
+                let level = match r {
+                    0..100 => 800,
+                    100..256 => 550,
+                    256..484 => 250,
+                    _ => 0,
+                };
+                let n = (noise[v.len()] % 61) as i64 - 30;
+                v.push(if level == 0 {
+                    0
+                } else {
+                    level * (90 + i) / 100 + n
+                });
+            }
+        }
+    }
+    v
+}
+
 fn bet_nifti(dims: &[i64], datatype: i16, bitpix: i16, data: &[u8]) -> Vec<u8> {
     let mut h = vec![0u8; 352];
     h[0..4].copy_from_slice(&348i32.to_le_bytes());
@@ -1323,6 +1463,18 @@ fn write_bet_inputs(dir: &Path) -> BTreeMap<&'static str, PathBuf> {
     let plane = (nx * ny) as usize;
     let slab = &t1[7 * plane..17 * plane];
     put("slab", bet_nifti(&[nx, ny, 10], 4, 16, &i16_bytes(slab)));
+    // FAST's inputs (2026-11-02): a three-tissue brain, zero outside it; the same as float32
+    // scaled by 2^15 (its maximum above 2^24: FSL-103); four initial class intensities (-s)
+    let brain = fast_brain_values(3);
+    put("brain", bet_nifti(&[nx, ny, nz], 4, 16, &i16_bytes(&brain)));
+    let big: Vec<u8> = brain
+        .iter()
+        .flat_map(|&x| ((x * 32768) as f32).to_le_bytes())
+        .collect();
+    put("big", bet_nifti(&[nx, ny, nz], 16, 32, &big));
+    let p = dir.join("means4.txt");
+    std::fs::write(&p, "200\n420\n600\n830\n").unwrap();
+    paths.insert("means4", p);
     let mat = "0.5 0 0 72\n0 0.5 0 112\n0 0 0.5 62\n0 0 0 1\n";
     let p = dir.join("t1_to_std.mat");
     std::fs::write(&p, mat).unwrap();
@@ -1665,7 +1817,8 @@ fn run_bet(
     output_type: &str,
 ) -> std::process::Output {
     let (family, tool) = tool.split_once(' ').unwrap();
-    Command::new(EXE)
+    let mut command = Command::new(EXE);
+    command
         .arg(family)
         .arg(tool)
         .args(args)
@@ -1675,9 +1828,13 @@ fn run_bet(
         .env("PATH", "")
         .env("FSLOUTPUTTYPE", output_type)
         .env("LARMORX_UPSTREAM_DEFECTS", mode)
-        .env("OMP_NUM_THREADS", "2")
-        .output()
-        .unwrap()
+        .env("OMP_NUM_THREADS", "2");
+    // FAST reads FSLDIR before it segments (FSL-100): its run directory, which holds no priors,
+    // except where the case is FSLDIR unset
+    if tool == "fast" && !cwd.ends_with("fast.fsldir-unset") {
+        command.env("FSLDIR", cwd);
+    }
+    command.output().unwrap()
 }
 
 /// Whether a run named exactly the upstream defects `named` on standard error
@@ -1827,6 +1984,16 @@ fn golden() {
             .map(|a| match *a {
                 "{mesh}" => mesh.display().to_string(),
                 "--binaryMask={mask}" => format!("--binaryMask={}", bet_inputs["mask"].display()),
+                // an input copied into the run directory, named by its file name (FAST's FLIRT
+                // commands go through the shell's words: no path separators of the platform)
+                a if a.starts_with('@') => {
+                    let source = &bet_inputs[&a[1..]];
+                    let name = source.file_name().unwrap();
+                    if !run.join(name).exists() {
+                        std::fs::copy(source, run.join(name)).unwrap();
+                    }
+                    name.to_string_lossy().into_owned()
+                }
                 a if a.starts_with('{') => bet_inputs[a.trim_matches(|c| c == '{' || c == '}')]
                     .display()
                     .to_string(),
@@ -1848,7 +2015,15 @@ fn golden() {
         }
         runs.insert(case.id, run);
     }
-    for &(id, case_args, entry) in FLIRT_REFUSALS {
+    let refusals = FLIRT_REFUSALS
+        .iter()
+        .map(|&(id, a, e)| (id, "fsl flirt", a, e))
+        .chain(
+            FAST_REFUSALS
+                .iter()
+                .map(|&(id, a, e)| (id, "fsl fast", a, e)),
+        );
+    for (id, tool, case_args, entry) in refusals {
         let run = dir.path().join(id);
         std::fs::create_dir(&run).unwrap();
         let args: Vec<String> = case_args
@@ -1860,7 +2035,7 @@ fn golden() {
                 other => other.to_owned(),
             })
             .collect();
-        let out = run_bet(&run, "fsl flirt", &args, "fix", "NIFTI");
+        let out = run_bet(&run, tool, &args, "fix", "NIFTI");
         assert_eq!(out.status.code(), Some(1), "{id}: {out:?}");
         if let Some(problem) = named_problem(&out.stderr, id, "fix", &[entry]) {
             notices.push(problem);

@@ -116,7 +116,7 @@ at a time:
      records re-made in-process: no status change; golden checksums unchanged; `crates-gpl/` keeps
      only the verification tools; CI's `crates-gpl` steps gone (4.0 min a run).
 4. **The ports:** BET's clean-room original (item 7), the clean-room additions mcflirt FSL-20/21
-   and 3dUnifize AFNI-75 (specs first), FLIRT with BBR (the replica's parts 1 to 3 done 2026-11-01/02; the clean-room original's parts 1 and 2 done 2026-11-02), FAST, topup (item 7); field maps,
+   and 3dUnifize AFNI-75 (specs first), FLIRT with BBR (the replica's parts 1 to 3 done 2026-11-01/02; the clean-room original's parts 1 and 2 done 2026-11-02), FAST (the replica done 2026-11-02; the clean-room original next), topup (item 7); field maps,
    FreeSurfer, surfaces, confounds (item 8); larmorprepx (item 9). Each with its site page from
    its smart tests.
 5. **The final validation phase** (after every tool is ported): the data panel for every tool
@@ -436,6 +436,26 @@ The items below keep their history.
    `fugue`/`applywarp` for field maps, `convert_xfm`, `flirt`), `standard_space_roi` (`flirt`,
    `fslmaths`, `fslroi`), `aff2rigid` (`avscale`), `flirt_average` (`flirt`, `fslmaths`,
    `convert_xfm`), `pairreg` (`flirt` with `pairreg*.sch`, `bet`).
+   **FAST: the replica done (2026-11-02, relays 1 to 5).** `crates-nc/larmorx-nc-fast`: `fast`
+   complete (every option, message, exit status and failure case: the single-channel segmentation
+   with its bias field, partial volumes and outputs, one to eight channels with Armadillo's and
+   OpenBLAS's arithmetic followed to 8 × 8 covariances, FSL's tissue priors registered by FLIRT's
+   replica in the same process); `lx.fsl.fast` and `larmorx fsl fast` (replica only until the
+   clean-room original); `larmorx-nc-core` gained the C library's `expf`, `log` and `rand`, FSL's
+   masked sums and percentiles and LAPACK up to 8 × 8 (additive: mcflirt's, BET's and FLIRT's records
+   re-made from the final commit, identical case by case, `compare_records.py`). Record
+   [fsl-fast-replica](validation/fsl-fast-replica.md): 86 cases, 59 of 59 compared cases bit-identical
+   (every file, the messages, the exit status; fMRIPrep's call on ds000005, ds000228 and ds005003,
+   fMRIPrep's own partial-volume maps the same), 26 rejected by both alike, 1 expected divergence
+   (FSL-104, refused). FSL-96 to FSL-104. One random-testing trial (half an hour, 17,497 realistic
+   cases: 4 differences, all FSL-101, fixed in `reproduce`, three permanent cases). Golden: 11 cases.
+   Memory below FSL's on the measured calls (`tests/parity/test_memory_peak.py`); results independent
+   of the thread count (`thread_pools.py`). Its site page (fMRIPrep's call on three runs, the bias
+   field, the priors with FSL-09's correction, three channels). `specs/fast.md` for the clean-room
+   original (its §9.2 lists the rule-D candidates, §9.3 what is not replicated). The full tier
+   (fMRIPrep's call on every oracle run), the data panel and long random testing wait for the final
+   validation phase. **Next: the clean-room original** (another agent, from `specs/fast.md`, built
+   for speed).
 8. **Field maps, FreeSurfer, surfaces, confounds:** sdcflows' field-map estimation (Apache Python:
    the B-spline fit, PEPOLAR and phase-difference preparation) and fMRIPrep's own Python steps;
    FreeSurfer 8.2.0, every program complete, a replica (`larmorx-freesurfer`) and a clean-room
@@ -527,6 +547,21 @@ The items below keep their history.
 - **FSL-111 in the replica** (2026-11-02): `larmorx-nc fsl applyxfm4D` reads a uint8 image as signed
   bytes in both modes (black-box runs of the clean-room part 2, relay 6); by the D13 rules its default
   should read it as stored and name FSL-111, `reproduce` FSL's reading (the clean-room original does).
+- **FAST's `-S 9` and more** (2026-11-02, the orchestrator's decision): refused in both modes with a
+  message (`larmorx-nc: error: fast: -S <n>: more than 8 channels are not replicated ...`, exit 1).
+  Replicating them needs OpenBLAS's aligned `iamax` path (9 to 16 channels: chosen by the column's
+  16-byte alignment, which follows from Armadillo's buffers), its 8-way `ddot`/`daxpy` kernels beyond
+  16 and LAPACK's blocked LU beyond 19; practically unused. The clean-room original may segment
+  them (its thresholds need not OpenBLAS's bits): a decision for its part (`specs/fast.md` §9.3).
+- **FAST's multi-channel initialisation and bias field: measure, then decide (rule D)** (2026-11-02):
+  the k-means starts each channel's class means from that channel's own ascending percentiles and
+  assigns voxels by the square of the summed differences, so channels of opposite contrast can start
+  from empty classes (FAST then ends with every voxel in class 1 and a NaN bias field, exit 0:
+  `multi/s2-opposite-contrasts`); and the multi-channel bias field is estimated from the corrected
+  image but replaces the previous estimate instead of refining it, with no mean removed and other
+  kernels than the single channel's (`specs/fast.md` §9.2). Measure a channel-1-ordered initialisation
+  and a refining field on real T1w and T2w pairs (the data panel's) before deciding A or C; both stay
+  FAST's in both modes until then.
 - **FSL's warp-field libraries** (warpfns, basisfield; 2026-11-01): needed by `applywarp` and `fugue`
   (and so `epi_reg`), and by FLIRT's coordinate programs' `-warp` (refused with a message until then):
   ported with the first tool that needs them, then `-warp` added to `img2imgcoord`, `std2imgcoord` and

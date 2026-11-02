@@ -175,6 +175,12 @@ PAGES = [
         ],
     ),
     (
+        "/tools/fsl-fast/",
+        "FAST",
+        "fsl",
+        [("larmorx-nc replica", "fsl-fast-replica", "experimental", None, None)],
+    ),
+    (
         "/tools/resample-series/",
         "One-shot BOLD resampler",
         "larmorx",

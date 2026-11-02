@@ -241,6 +241,14 @@ pub const REPLICAS: &[Replica] = &[
         location: Location::Program(&LARMORX_NC),
         original: true,
     },
+    // FSL's FAST (2026-11-02): the replica only; the clean-room original is to be written from
+    // specs/fast.md.
+    Replica {
+        family: "fsl",
+        tool: "fast",
+        location: Location::Program(&LARMORX_NC),
+        original: false,
+    },
 ];
 
 /// The tools of `family` that have a replica and no clean-room original yet: the command line
@@ -688,7 +696,7 @@ mod tests {
         );
         assert_eq!(replica_only("afni").count(), 0);
         assert_eq!(replica_only("ants").count(), 0);
-        assert_eq!(replica_only("fsl").count(), 0);
+        assert_eq!(replica_only("fsl").collect::<Vec<_>>(), ["fast"]);
         let betsurf = lookup("fsl", "betsurf").unwrap();
         assert_eq!(betsurf.package().unwrap().env, "LARMORX_NC_BIN");
         assert_eq!(

@@ -1,0 +1,295 @@
+# FAST's replica (relays 1 to 5, 2026-11-02): the exact changes to the shared documents.
+# Apply from the merged checkout: python -P scripts/orchestration/apply_handoff.py <this> [--site <site>] [--check]
+# The reasons: HANDOFF.md beside this file. Afterwards: register_counts.py (the counts below were
+# recounted with it on a copy), `python -m larmorx_validation tables` (the site's status), and the
+# summary's re-export (HANDOFF.md, "The site").
+
+# ---------------------------------------------------------------------------------------------
+# docs/findings/upstream-defects.md: nine rows (behaviour only), the counts, the history
+# paragraph, the restricted section
+
+[[op]]
+do = "insert"
+file = "docs/findings/upstream-defects.md"
+after = "| FSL-93 † |"
+text = '''| FSL-96 † | fast (`-p`) | the probability maps `-p` writes are never computed outside the brain mask (the voxels of value 0 or below), nor anywhere with `--nopve` when FAST runs no initialisation iteration (`-W 0 -O 0`) or starts from priors (`-a`): FAST saves whatever its memory held there (zeros in fMRIPrep's calls on the record's three oracle runs; in two multi-channel cases, values that change from run to run) | a | none in practice (fMRIPrep passes `-p` but keeps only the partial-volume maps and their segmentation) | memory never written (D13, 2026-10-11): 0 in both modes, named in both; FAST's replica 2026-11-02 | – |
+| FSL-97 † | fast (`-S n -N` with `-b` or `-B`) | with several channels and `-N`, the bias field `-b` saves and `-B` divides by is never computed: FAST saves whatever its memory held (infinite fields, and images of zeros inside the brain, were seen) | a | none (fMRIPrep segments one channel) | memory never written: no bias field in both modes (the field 1, each channel's own image), named in both; FAST's replica 2026-11-02 | – |
+| FSL-98 † | fast (`-S n`) | with several channels, sorting the classes by channel 1's means gives each sorted class the covariance, posteriors and other channels' means of another class (the inverse of the sorting permutation): right only when the permutation is its own inverse (no change, a swap, `-t 2`'s reversal), wrong when the classes move in a cycle (seen on MNI152NLin2009cAsym's T1w and T2w named in that order, the T2w being channel 1, and with `-s` intensities in a cyclic order) | c | none (fMRIPrep segments one channel) | rule A: each class keeps its own statistics by default, named when the permutation is not its own inverse; FAST's with `reproduce`; FAST's replica 2026-11-02 (`multi/s2-outputs`: 2,345,041 values change; `multi/s2-manualseg-cycle`: 1,127,023) | – |
+| FSL-99 † | fast | numeric options without meaning are used as given: a smoothness (`-H`, `-f`, `-R`) that is not a finite number (a NaN `-H` passes the check for a negative one and estimates the smoothness against a table of zeros, or with several channels against memory never written), a bias field smoothing extent (`-l`) of 0 or less or not finite (every voxel ends in class 1), fewer than one class (`-n`; FAST aborts, or with `--nopve` and `-n 0` writes an empty segmentation) | e | none (fMRIPrep passes `-I 0` and FAST's defaults) | rule B: refused by default (`larmorx-nc: error: fast: ...`, exit status 1), FAST's arithmetic (and its aborts) with `reproduce`, named; FAST's replica 2026-11-02 | – |
+| FSL-100 † | fast | with `FSLDIR` unset FAST aborts (`std::logic_error`) before it segments, even when no priors are asked for (`-A` avoids it) | a | none (fMRIPrep sets `FSLDIR`) | segments without `FSLDIR` by default (with `-a` and no `-A`: an error asking for the priors' names), FAST's abort with `reproduce`, named; FAST's replica 2026-11-02 | – |
+| FSL-101 † | fast (`-a`) | when FLIRT cannot register the priors (a matrix it cannot read, a prior it cannot resample, an output type it cannot write), FAST prints that the priors are not used, then initialises from priors it never allocated: it crashes; with several channels whose first voxel is in the mask it aborts (`Out of Bounds (time index)`); on an empty mask it runs on | a | none (fMRIPrep does not pass `-a`) | segments without the priors by default, named; `reproduce` gives FAST's messages and its abort, or its run on an empty mask, and refuses where FAST crashes; FAST's replica 2026-11-02 (random testing's trial: three permanent cases) | – |
+| FSL-102 † | fast (`-a`) | the priors are registered by running FLIRT through the shell with the names unquoted: a name with a blank is split into words and the shell's special characters in names are interpreted; with `FSLDIR` unset and `-A` the command starts with the text `(null)`, a syntax error of the shell's | e | none | each name passed whole and FLIRT's replica run in the same process by default (no shell, no `FSLDIR`), named when a name holds a blank or a special character or `FSLDIR` is unset; `reproduce` splits the names at blanks and prints the shell's syntax error, and refuses the special characters (their expansion is not reproduced); FAST's replica 2026-11-02 | – |
+| FSL-103 † | fast | the brain mask (every voxel above 0) leaves out the voxels equal to the image's maximum when the maximum is 2^24 or more (the upper bound, the maximum + 1, rounds to the maximum in single precision) | c | none (fMRIPrep's T1w is far below 2^24) | rule A: every finite voxel above 0 by default, named when it changes the mask; FAST's mask with `reproduce`; FAST's replica 2026-11-02 (`opt/big`: 14,975 values change) | – |
+| FSL-104 † | fast (`-S n`) | channels of different sizes: FAST reads and writes the smaller images past their ends (over channel 1's grid); when channel 1 fits inside every other channel it reads their corners and aborts at the percentiles (`mask and vol have different sizes`) unless `-s` gives every mean | a | none | refused by default; `reproduce` gives FAST's abort where its reads stay inside the images and refuses otherwise (FAST corrupts its heap); FAST's replica 2026-11-02 | – |'''
+
+[[op]]
+do = "edit"
+file = "docs/findings/upstream-defects.md"
+old = '''**Counts** (304 entries, recounted from the table on 2026-11-02, after FLIRT's clean-room original's part 2 (FSL-111)'''
+new = '''**Counts** (313 entries, recounted from the table on 2026-11-02, after FAST's replica (FSL-96 to FSL-104) and FLIRT's clean-room original's part 2 (FSL-111)'''
+
+[[op]]
+do = "edit"
+file = "docs/findings/upstream-defects.md"
+old = '''| (a) crash, undefined behaviour, out of bounds | 64 | |'''
+new = '''| (a) crash, undefined behaviour, out of bounds | 69 | |'''
+
+[[op]]
+do = "edit"
+file = "docs/findings/upstream-defects.md"
+old = '''| (c) deterministic bug that changes results | 140 | 10 |'''
+new = '''| (c) deterministic bug that changes results | 142 | 10 |'''
+
+[[op]]
+do = "edit"
+file = "docs/findings/upstream-defects.md"
+old = '''| (e) command-line or parsing quirk | 51 | |'''
+new = '''| (e) command-line or parsing quirk | 53 | |'''
+
+[[op]]
+do = "insert"
+file = "docs/findings/upstream-defects.md"
+after = "FSL-22 and FSL-68 cover applyxfm4D and midtrans too. No new **decide** entry."
+text = '''
+**2026-11-02, FAST's replica:** FSL-96 to FSL-104 added: FSL-96 and FSL-97 (memory FAST never
+writes: defined values in both modes, named), FSL-98 and FSL-103 (rule A), FSL-99 (rule B),
+FSL-100 and FSL-101 (FAST aborts or crashes: the default segments; FSL-101's `reproduce` refined by
+random testing's trial), FSL-102 (the shell), FSL-104 (out of bounds: refused); each with its
+`reproduce` switch where FAST's behaviour is defined. Inside `-a`, FAST meets FLIRT's FSL-09 and
+FSL-68 (FLIRT's replica). FSL-105 to FSL-110 unused. Kept as FAST's (rule C): the input is the last
+word and parsing stops at the first word that is not an option, `-P` and `-A` without `-a` do
+nothing, a missing input aborts; two rule-D candidates (the multi-channel initialisation and bias
+field) wait for a measurement on real T1w and T2w pairs (next-steps). No new **decide** entry.'''
+
+[[op]]
+do = "append"
+file = "docs/findings/upstream-defects.md"
+text = '''### FSL-96 to FSL-104: FAST (FSL 6.0.7.23, fsl-fast4 2111.3) †
+
+Found while translating FAST for the replica (2026-11-02; `docs/findings/fsl-fast.md`, restricted,
+"Defects (D13): FSL-96 to FSL-104", has the source lines and FSL's runs). FSL-96 and FSL-97 are
+memory FAST never writes (`-p`'s maps outside the mask; the multi-channel `-N` bias field): both
+modes write the defined value (0; no field) and name it, so the record compares FSL's files after
+setting those voxels to the defined values (reported, never cached). FSL-98 (the multi-channel class
+sort's inverse permutation) and FSL-103 (the mask's maximum at 2^24 and above) are corrected by
+default (rule A), FAST's result with `reproduce`. FSL-99 (numeric options without meaning) is
+refused by default (rule B), FAST's arithmetic with `reproduce`. FSL-100 (`FSLDIR` unset) and
+FSL-101 (priors FLIRT could not register) end FAST with an abort or a crash: the default segments;
+`reproduce` gives FAST's abort, its run on an empty mask and its exception with several channels,
+and refuses where FAST writes through a null pointer (the trial's three kinds:
+`validation/difftest/cases/fsl-fast/fsl101-*`). FSL-102 (FLIRT run through the shell with unquoted
+names) passes names whole by default; `reproduce` splits them at blanks. FSL-104 (channels of
+different sizes, read past their ends) is refused by default and, where FAST's reads stay inside
+the images, aborts as FAST does with `reproduce`. Cases: the record's `err/`, `priors/`, `multi/` and
+`difftest/` categories (`fsl-fast-replica`).'''
+
+# ---------------------------------------------------------------------------------------------
+# docs/api/upstream-defects.md: the users' table and the note under it
+
+[[op]]
+do = "insert"
+file = "docs/api/upstream-defects.md"
+after = "| FSL-93 |"
+text = '''| FSL-96 | fast | the replica `larmorx-nc fsl fast` (`larmorx fsl fast`, `lx.fsl.fast`) | `-p`'s probability maps outside the brain mask (and everywhere with `--nopve` and priors or `-W 0 -O 0`) are memory FAST never writes | 0, named in both modes |
+| FSL-97 | fast | the same | several channels with `-N` and `-b` or `-B`: FAST saves a bias field it never computed | no bias field (1, and each channel's image), named in both modes |
+| FSL-98 | fast | the same | several channels: the class sort gives a class another class's covariance and posteriors when the classes move in a cycle | each class its own statistics, named; `reproduce` FAST's |
+| FSL-99 | fast | the same | a smoothness (`-H`, `-f`, `-R`) that is not a finite number, `-l` of 0 or less or not finite, `-n` below 1: used as given | an error (exit status 1), named; `reproduce` FAST's arithmetic |
+| FSL-100 | fast | the same | `FSLDIR` unset: FAST aborts, even without priors | segments (with `-a` and no `-A`: an error asking for the priors' names), named; `reproduce` FAST's abort |
+| FSL-101 | fast | the same | priors FLIRT could not register: FAST says they are not used, then crashes on priors it never allocated | segments without priors, named; `reproduce` FAST's messages and abort (an error where FAST crashes) |
+| FSL-102 | fast | the same | `-a` runs FLIRT through the shell with the names unquoted | each name whole, FLIRT's replica in the same process, named; `reproduce` splits the names at blanks |
+| FSL-103 | fast | the same | the mask leaves out the voxels of the image's maximum at 2^24 and above | every finite voxel above 0, named; `reproduce` FAST's mask |
+| FSL-104 | fast | the same | channels of different sizes are read and written past their ends | an error in both modes (`reproduce`: FAST's abort where its reads stay inside the images) |'''
+
+[[op]]
+do = "edit"
+file = "docs/api/upstream-defects.md"
+old = '''FSL-49 and FSL-57 are kept as FSL's (rule C).'''
+new = '''FSL-49 and FSL-57 are kept as FSL's (rule C). Rows FSL-96 to FSL-104 are FAST's replica's (`larmorx-nc fsl fast`; `larmorx fsl fast` and `lx.fsl.fast` run it); inside `-a` FAST also meets FLIRT's FSL-09 and FSL-68 (FLIRT's replica, in the same process).'''
+
+# ---------------------------------------------------------------------------------------------
+# validation/difftest/triage.toml: the trial's three kinds of difference (four findings)
+
+[[op]]
+do = "append"
+file = "validation/difftest/triage.toml"
+text = '''# ---------------------------------------------------------------- FAST's replica: the trial (2026-11-02)
+
+[[difference]]
+tool = "fsl-fast"
+implementation = "replica"
+signature = ["stdout identical"]
+status = "fixed"
+explanation = "FSL-101 with -v (the trial oracles/difftest/2026-11-02-fsl-fast, half an hour, 17,497 realistic cases: 16,768 agree, 725 rejected by both alike, 4 differ, all FSL-101 where FLIRT cannot write the registered priors in an output type FSL 6.0.7.23 refuses): FAST prints 'Beginning prior-based initialisation' before it crashes on the priors it never allocated; the replica's reproduce stopped before that line (now printed before its refusal)"
+link = "validation/difftest/cases/fsl-fast/fsl101-verbose-before-crash.json"
+
+[[difference]]
+tool = "fsl-fast"
+implementation = "replica"
+signature = ["stderr identical"]
+status = "fixed"
+explanation = "FSL-101 with several channels whose first voxel is in the mask (the trial of 2026-11-02): FAST's bounds-checked access to the unallocated priors throws 'Out of Bounds (time index)' and aborts; the replica's reproduce refused (now throws the same and aborts)"
+link = "validation/difftest/cases/fsl-fast/fsl101-multi-exception.json"
+
+[[difference]]
+tool = "fsl-fast"
+implementation = "replica"
+signature = ["stdout identical", "stderr identical"]
+status = "fixed"
+explanation = "FSL-101 on an image whose brain mask is empty (the trial of 2026-11-02, two findings): FAST runs on, as no voxel reads the priors it never allocated (every class statistic NaN, 'Empty mask image'); the replica's reproduce refused (now runs on as FAST does)"
+link = "validation/difftest/cases/fsl-fast/fsl101-empty-mask-runs-on.json"'''
+
+# ---------------------------------------------------------------------------------------------
+# docs/validation/difftest.md: the descriptor's row
+
+[[op]]
+do = "insert"
+file = "docs/validation/difftest.md"
+after = "| `fsl-flirt-part3` |"
+text = '''| `fsl-fast` | `parity.fsl_fast_replica` (a whole `Run` as the case's payload: inputs as `@dt:` names; `-p` and multi-channel `-N` cases never cached, FSL's never-written voxels set to the defined values as in the suite) | replica vs fast | fMRIPrep's call; one to four channels of one brain-extracted phantom (T1-, T2- and PD-like contrasts, 2D slices, whole heads, crops of a real T1w), every option (short and long names), FSL's tissue priors with a drawn standard-to-input matrix (`-a`, `-P`), `-s`, every stored type, FSL's output types (since 2026-11-02) |'''
+
+# ---------------------------------------------------------------------------------------------
+# docs/validation/golden.md: larmorx-nc's count and FAST's paragraph
+
+[[op]]
+do = "edit"
+file = "docs/validation/golden.md"
+old = '''(../../crates-nc/larmorx-nc-cli/tests/golden.rs): 65 cases, 313 outputs |'''
+new = '''(../../crates-nc/larmorx-nc-cli/tests/golden.rs): 79 cases, 440 outputs |'''
+
+[[op]]
+do = "insert"
+file = "docs/validation/golden.md"
+after = "  these cases. `larmorx-nc`'s checksums recorded on 2026-11-02 from 222e226"
+text = '''
+- **FAST, the replica** (2026-11-02, eleven cases in `crates-nc/larmorx-nc-cli/tests/golden.rs`, on a
+  generated brain of three tissues with an intensity gradient along x, a copy scaled by 2^15 (float),
+  a T2-like copy and a file of four class intensities): `fast.fmriprep` (fMRIPrep's call `-I 0 -N -p -g
+  -S 1`; FSL-96 named), `fast.bias` (`-b -B`), `fast.t2-n2-nopve-verbose` (its standard output kept as
+  `stdout.txt`), `fast.n4-manualseg` (`-s`), `fast.multi` (two channels with their bias fields),
+  `fast.priors` (`-a`, `-A` and `-P`, FLIRT's replica in the same process: FSL-09), `fast.fsldir-unset`
+  (FSL-100 corrected), `fast.fsl103` and its `.reproduce`; and the refusals `fast.fsl99.nan` and
+  `fast.fsl104.sizes`, recorded by their status through the shared refusal loop. `lx.fsl.fast` is a
+  replica-only function (`tests/golden/registry.py`, `REPLICA_ONLY_FUNCTIONS`) until FAST's clean-room
+  original. `larmorx-nc`'s checksums recorded on 2026-11-02 from b42aa20 (committed as bb068f1): 11
+  cases and 124 outputs added; every other checksum unchanged (the core's additions for FAST: the C
+  library's `expf`, `log` and `rand`, FSL's masked sums and percentiles, LAPACK up to 8 × 8, changed no
+  golden output).'''
+
+# ---------------------------------------------------------------------------------------------
+# docs/next-steps.md: item 4, item 7 (FAST's paragraph), the follow-ups
+
+[[op]]
+do = "edit"
+file = "docs/next-steps.md"
+old = '''), FAST, topup (item 7); field maps,'''
+new = '''), FAST (the replica done 2026-11-02; the clean-room original next), topup (item 7); field maps,'''
+
+[[op]]
+do = "insert"
+file = "docs/next-steps.md"
+after = "   `convert_xfm`), `pairreg` (`flirt` with `pairreg*.sch`, `bet`)."
+text = '''   **FAST: the replica done (2026-11-02, relays 1 to 5).** `crates-nc/larmorx-nc-fast`: `fast`
+   complete (every option, message, exit status and failure case: the single-channel segmentation
+   with its bias field, partial volumes and outputs, one to eight channels with Armadillo's and
+   OpenBLAS's arithmetic followed to 8 × 8 covariances, FSL's tissue priors registered by FLIRT's
+   replica in the same process); `lx.fsl.fast` and `larmorx fsl fast` (replica only until the
+   clean-room original); `larmorx-nc-core` gained the C library's `expf`, `log` and `rand`, FSL's
+   masked sums and percentiles and LAPACK up to 8 × 8 (additive: mcflirt's, BET's and FLIRT's records
+   re-made from the final commit, identical case by case, `compare_records.py`). Record
+   [fsl-fast-replica](validation/fsl-fast-replica.md): 86 cases, 59 of 59 compared cases bit-identical
+   (every file, the messages, the exit status; fMRIPrep's call on ds000005, ds000228 and ds005003,
+   fMRIPrep's own partial-volume maps the same), 26 rejected by both alike, 1 expected divergence
+   (FSL-104, refused). FSL-96 to FSL-104. One random-testing trial (half an hour, 17,497 realistic
+   cases: 4 differences, all FSL-101, fixed in `reproduce`, three permanent cases). Golden: 11 cases.
+   Memory below FSL's on the measured calls (`tests/parity/test_memory_peak.py`); results independent
+   of the thread count (`thread_pools.py`). Its site page (fMRIPrep's call on three runs, the bias
+   field, the priors with FSL-09's correction, three channels). `specs/fast.md` for the clean-room
+   original (its §9.2 lists the rule-D candidates, §9.3 what is not replicated). The full tier
+   (fMRIPrep's call on every oracle run), the data panel and long random testing wait for the final
+   validation phase. **Next: the clean-room original** (another agent, from `specs/fast.md`, built
+   for speed).'''
+
+[[op]]
+do = "edit"
+file = "docs/next-steps.md"
+old = '''- **FSL's warp-field libraries** (warpfns, basisfield; 2026-11-01)'''
+new = '''- **FAST's `-S 9` and more** (2026-11-02, the orchestrator's decision): refused in both modes with a
+  message (`larmorx-nc: error: fast: -S <n>: more than 8 channels are not replicated ...`, exit 1).
+  Replicating them needs OpenBLAS's aligned `iamax` path (9 to 16 channels: chosen by the column's
+  16-byte alignment, which follows from Armadillo's buffers), its 8-way `ddot`/`daxpy` kernels beyond
+  16 and LAPACK's blocked LU beyond 19; practically unused. The clean-room original may segment
+  them (its thresholds need not OpenBLAS's bits): a decision for its part (`specs/fast.md` §9.3).
+- **FAST's multi-channel initialisation and bias field: measure, then decide (rule D)** (2026-11-02):
+  the k-means starts each channel's class means from that channel's own ascending percentiles and
+  assigns voxels by the square of the summed differences, so channels of opposite contrast can start
+  from empty classes (FAST then ends with every voxel in class 1 and a NaN bias field, exit 0:
+  `multi/s2-opposite-contrasts`); and the multi-channel bias field is estimated from the corrected
+  image but replaces the previous estimate instead of refining it, with no mean removed and other
+  kernels than the single channel's (`specs/fast.md` §9.2). Measure a channel-1-ordered initialisation
+  and a refining field on real T1w and T2w pairs (the data panel's) before deciding A or C; both stay
+  FAST's in both modes until then.
+- **FSL's warp-field libraries** (warpfns, basisfield; 2026-11-01)'''
+
+# ---------------------------------------------------------------------------------------------
+# README.md: the planned FSL tools (the list was stale: FLIRT's replica, BET's original done)
+
+[[op]]
+do = "edit"
+file = "README.md"
+old = '''2. **FSL-compatible tools:** FAST, FLIRT with BBR, topup, BET's clean-room original (the mcflirt
+   and BET replicas are done).'''
+new = '''2. **FSL-compatible tools:** the clean-room originals of FLIRT (part 1 done) and FAST, topup,
+   `fslmaths` and `fslstats` (the mcflirt, BET, FLIRT and FAST replicas and BET's clean-room
+   original are done).'''
+
+# ---------------------------------------------------------------------------------------------
+# docs/status.md: the FSL row and the FSL bullet (the "Next" sentence: HANDOFF.md §7)
+
+[[op]]
+do = "edit"
+file = "docs/status.md"
+old = ''' | `mri-hmc`, `fsl-mcflirt-replica`, `fsl-mcflirt-replica-full`, `fsl-bet-replica`, `fsl-bet-replica-full`, `fsl-bet`, `fsl-flirt-replica`, `fsl-flirt` |'''
+new = '''; the **FAST** replica (2026-11-02: `larmorx-nc fsl fast`; `lx.fsl.fast`, `larmorx fsl fast`; `experimental`): 59 of 59 compared cases bit-identical to FSL 6.0.7.23 (26 more rejected by both, 1 refused where FSL reads past a smaller channel, FSL-104), fMRIPrep's call on three oracle runs included (fMRIPrep's own partial-volume maps the same), every option, one to eight channels, FSL's tissue priors through FLIRT's replica; FSL-96 to FSL-104; its site page; `specs/fast.md` for the clean-room original | `mri-hmc`, `fsl-mcflirt-replica`, `fsl-mcflirt-replica-full`, `fsl-bet-replica`, `fsl-bet-replica-full`, `fsl-bet`, `fsl-flirt-replica`, `fsl-flirt`, `fsl-fast-replica` |'''
+
+[[op]]
+do = "edit"
+file = "docs/status.md"
+old = '''the mcflirt, BET and FLIRT replicas.'''
+new = '''the mcflirt, BET, FLIRT and FAST replicas.'''
+
+# ---------------------------------------------------------------------------------------------
+# docs/porting-guide.md §1: FAST's source-derived findings, closed to the clean-room implementer
+
+[[op]]
+do = "edit"
+file = "docs/porting-guide.md"
+old = '''[findings/fsl-flirt.md](findings/fsl-flirt.md), [parts/](parts/)'''
+new = '''[findings/fsl-flirt.md](findings/fsl-flirt.md), [findings/fsl-fast.md](findings/fsl-fast.md), [parts/](parts/)'''
+
+# ---------------------------------------------------------------------------------------------
+# The site (larmorx_documentation): the navigation and the roadmap. data/status.yml: regenerate
+# with `tables`; static/evidence/summary.json: re-export (HANDOFF.md, "The site").
+
+[[op]]
+do = "insert"
+file = "site:site.yml"
+after = '''      summary: "Affine and boundary-based registration (flirt) with convert_xfm and FLIRT's other programs: a clean-room original (experimental) and an exact replica in larmorx-nc." }'''
+text = '''  - { title: FAST, url: "/tools/fsl-fast/", eco: fsl,
+      summary: "Tissue segmentation (fast): classes, partial volumes, the bias field, one to eight channels, FSL's tissue priors; an exact replica in larmorx-nc; the clean-room original planned." }'''
+
+[[op]]
+do = "edit"
+file = "site:content/roadmap.md"
+old = '''| 1 | **FAST and topup** | FSL's tissue segmentation and field-map estimation, each a replica and a clean-room original | FAST's replica under way (2026-11-02; its page next); then FAST's clean-room original beside topup's replica |'''
+new = '''| 1 | **FAST and topup** | FSL's tissue segmentation and field-map estimation, each a replica and a clean-room original | FAST's replica complete (2026-11-02): `fast` with every option, one to eight channels and FSL's tissue priors, 59 of 59 compared cases bit-identical to FSL 6.0.7.23, fMRIPrep's call on three oracle runs included; [its page](/tools/fsl-fast/); FAST's clean-room original beside topup's replica next |'''
+
+[[op]]
+do = "edit"
+file = "site:content/roadmap.md"
+old = '''| Completed | Step |
+|---|---|
+'''
+new = '''| Completed | Step |
+|---|---|
+| 2026-11-02 | **FAST's replica.** FSL's tissue segmentation translated from FSL 6.0.7.23's source: the hidden Markov random field, the bias field and the partial volumes, every option, message and failure case, one to eight channels (FSL's matrix arithmetic followed to 8 × 8 covariances) and FSL's tissue priors registered by FLIRT's replica; every file FAST writes bit for bit in every compared case, fMRIPrep's call on three oracle runs included; FSL-96 to FSL-104 corrected by default (memory FAST never writes, the multi-channel class sort, the mask's brightest voxels, meaningless options, FAST's aborts and crashes); [the page](/tools/fsl-fast/) |
+'''

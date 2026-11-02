@@ -266,9 +266,12 @@ def fix_pass(
     settings: dict[str, str | None],
     reproduced_dir: Path,
     reproduced: Completed,
+    *,
+    silent_ok: tuple[str, ...] = _SILENT,
 ) -> None:
     """D13: the replica's default ``fix`` run against its ``reproduce`` run (a defect named
-    exactly when something changed)."""
+    exactly when something changed; ``silent_ok``: the entries that may be named without a
+    visible change)."""
     with tempfile.TemporaryDirectory(prefix="lx-nc-flirt-fix-") as name:
         tmp = Path(name)
         prepare(tmp)
@@ -303,7 +306,7 @@ def fix_pass(
                 except ValueError:
                     others.append(key)
         defects.add_fix_check(
-            checks, entries, change, other_changes="; ".join(others), silent_ok=_SILENT
+            checks, entries, change, other_changes="; ".join(others), silent_ok=silent_ok
         )
 
 

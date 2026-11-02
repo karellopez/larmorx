@@ -13,8 +13,9 @@ corrected, never deleted.
 > mcflirt" were written from AFNI's MCW (GPL) and FSL's (non-commercial) source, through
 > [afni-tshift.md](afni-tshift.md) and [fsl-mcflirt.md](fsl-mcflirt.md); the section "Restricted: AFNI 3dAutomask and
 > 3dUnifize" through [afni-automask.md](afni-automask.md) and [afni-unifize.md](afni-unifize.md); the section
-> "Restricted: FSL BET" through [fsl-bet.md](fsl-bet.md). **Clean-room
-> implementers must not read those sections.** The summary table and the gap lists below
+> "Restricted: FSL BET, FLIRT and FAST" through [fsl-bet.md](fsl-bet.md), [fsl-flirt.md](fsl-flirt.md)
+> and [fsl-fast.md](fsl-fast.md). **Clean-room implementers must not read those sections.** The
+> section "FSL: black-box findings" was found by running FSL's programs: anyone may read it. The summary table and the gap lists below
 > describe every entry, † included, by its observable behaviour only, as a spec would (the
 > spec writer may read the source, the implementer reads the spec; [licensing.md](../licensing.md)),
 > so anyone may read them.
@@ -353,19 +354,28 @@ to add (since 2026-10-25: "Random testing's gaps", below); – = nothing to do. 
 | FSL-91 † | flirt (`-refweight`, `-inweight`) | a weight with no voxel of at least 0.01 (an empty weighting mask: an image of zeros, a mask that misses the image) is accepted: the weighted images are filtered to zeros and every weight is 0, so every cost is constant (BBR's NaN, with a warning at every evaluation), and FLIRT writes, with exit status 0, the matrix its search happens to end at (a rotation of 95 to 143 degrees on the suite's images), deterministically | c | none (fMRIPrep passes no weights to FLIRT) | rule B: a registration with such a weight refused by default (exit status 1, nothing written), FLIRT's run with `reproduce`, named in both modes; FLIRT's replica 2026-11-02; the clean-room original in its part 2 | – |
 | FSL-92 † | flirt | an input or reference of one voxel (1 × 1 × 1) is registered: one value cannot measure an alignment, and FLIRT writes the matrix its search happens to end at (a rotation of 95 to 143 degrees), deterministically | c | none | rule B: refused by default (exit status 1, nothing written), FLIRT's run with `reproduce`, named in both modes; FLIRT's replica 2026-11-02; the clean-room original in its part 2 | – |
 | FSL-93 † | flirt | a voxel size of 0 in the input's or reference's header (which reading the image counts as 1) makes the base scale 0: every voxel size divided by it is infinite, the initial matrix NaN, the pyramid's grid sizes an undefined conversion of infinity, and FLIRT never finishes (still running after 60 minutes, its memory constant); `-basescale 0` the same | a | none (fMRIPrep passes `-basescale 1`) | rule A: a header size of 0 counted as 1 for the base scale too by default, named; refused with `reproduce` (FLIRT never finishes); `-basescale 0` refused in both modes; FLIRT's replica 2026-11-02; the clean-room original in its part 2 | – |
+| FSL-96 † | fast (`-p`) | the probability maps `-p` writes are never computed outside the brain mask (the voxels of value 0 or below), nor anywhere with `--nopve` when FAST runs no initialisation iteration (`-W 0 -O 0`) or starts from priors (`-a`): FAST saves whatever its memory held there (zeros in fMRIPrep's calls on the record's three oracle runs; in two multi-channel cases, values that change from run to run) | a | none in practice (fMRIPrep passes `-p` but keeps only the partial-volume maps and their segmentation) | memory never written (D13, 2026-10-11): 0 in both modes, named in both; FAST's replica 2026-11-02 | – |
+| FSL-97 † | fast (`-S n -N` with `-b` or `-B`) | with several channels and `-N`, the bias field `-b` saves and `-B` divides by is never computed: FAST saves whatever its memory held (infinite fields, and images of zeros inside the brain, were seen) | a | none (fMRIPrep segments one channel) | memory never written: no bias field in both modes (the field 1, each channel's own image), named in both; FAST's replica 2026-11-02 | – |
+| FSL-98 † | fast (`-S n`) | with several channels, sorting the classes by channel 1's means gives each sorted class the covariance, posteriors and other channels' means of another class (the inverse of the sorting permutation): right only when the permutation is its own inverse (no change, a swap, `-t 2`'s reversal), wrong when the classes move in a cycle (seen on MNI152NLin2009cAsym's T1w and T2w named in that order, the T2w being channel 1, and with `-s` intensities in a cyclic order) | c | none (fMRIPrep segments one channel) | rule A: each class keeps its own statistics by default, named when the permutation is not its own inverse; FAST's with `reproduce`; FAST's replica 2026-11-02 (`multi/s2-outputs`: 2,345,041 values change; `multi/s2-manualseg-cycle`: 1,127,023) | – |
+| FSL-99 † | fast | numeric options without meaning are used as given: a smoothness (`-H`, `-f`, `-R`) that is not a finite number (a NaN `-H` passes the check for a negative one and estimates the smoothness against a table of zeros, or with several channels against memory never written), a bias field smoothing extent (`-l`) of 0 or less or not finite (every voxel ends in class 1), fewer than one class (`-n`; FAST aborts, or with `--nopve` and `-n 0` writes an empty segmentation) | e | none (fMRIPrep passes `-I 0` and FAST's defaults) | rule B: refused by default (`larmorx-nc: error: fast: ...`, exit status 1), FAST's arithmetic (and its aborts) with `reproduce`, named; FAST's replica 2026-11-02 | – |
+| FSL-100 † | fast | with `FSLDIR` unset FAST aborts (`std::logic_error`) before it segments, even when no priors are asked for (`-A` avoids it) | a | none (fMRIPrep sets `FSLDIR`) | segments without `FSLDIR` by default (with `-a` and no `-A`: an error asking for the priors' names), FAST's abort with `reproduce`, named; FAST's replica 2026-11-02 | – |
+| FSL-101 † | fast (`-a`) | when FLIRT cannot register the priors (a matrix it cannot read, a prior it cannot resample, an output type it cannot write), FAST prints that the priors are not used, then initialises from priors it never allocated: it crashes; with several channels whose first voxel is in the mask it aborts (`Out of Bounds (time index)`); on an empty mask it runs on | a | none (fMRIPrep does not pass `-a`) | segments without the priors by default, named; `reproduce` gives FAST's messages and its abort, or its run on an empty mask, and refuses where FAST crashes; FAST's replica 2026-11-02 (random testing's trial: three permanent cases) | – |
+| FSL-102 † | fast (`-a`) | the priors are registered by running FLIRT through the shell with the names unquoted: a name with a blank is split into words and the shell's special characters in names are interpreted; with `FSLDIR` unset and `-A` the command starts with the text `(null)`, a syntax error of the shell's | e | none | each name passed whole and FLIRT's replica run in the same process by default (no shell, no `FSLDIR`), named when a name holds a blank or a special character or `FSLDIR` is unset; `reproduce` splits the names at blanks and prints the shell's syntax error, and refuses the special characters (their expansion is not reproduced); FAST's replica 2026-11-02 | – |
+| FSL-103 † | fast | the brain mask (every voxel above 0) leaves out the voxels equal to the image's maximum when the maximum is 2^24 or more (the upper bound, the maximum + 1, rounds to the maximum in single precision) | c | none (fMRIPrep's T1w is far below 2^24) | rule A: every finite voxel above 0 by default, named when it changes the mask; FAST's mask with `reproduce`; FAST's replica 2026-11-02 (`opt/big`: 14,975 values change) | – |
+| FSL-104 † | fast (`-S n`) | channels of different sizes: FAST reads and writes the smaller images past their ends (over channel 1's grid); when channel 1 fits inside every other channel it reads their corners and aborts at the percentiles (`mask and vol have different sizes`) unless `-s` gives every mean | a | none | refused by default; `reproduce` gives FAST's abort where its reads stay inside the images and refuses otherwise (FAST corrupts its heap); FAST's replica 2026-11-02 | – |
 | FSL-111 | applyxfm4D (8-bit unsigned images) | an image stored as uint8 is read as signed bytes: its values 128 to 255 are taken as v − 256 (255 as −1), so the interpolation between values on both sides of 127/128, the background value (the border's 10th percentile) and the spline's coefficients are those of the negative values (a profile 100, 140 interpolated 0.4 of the way gives 13, not 116); nearest neighbour writes the stored bytes back (the output's conversion wraps them to bytes) but for the padding voxels; `flirt -applyxfm` reads the same image as stored | c | none (fMRIPrep resamples with its own resampler) | rule A: read as stored by default in the clean-room original, FSL's reading with `reproduce`, named where a written value changes (2026-11-02); the replica reads them as FSL does in both modes | replica |
 
-**Counts** (304 entries, recounted from the table on 2026-11-02, after FLIRT's clean-room original's part 2 (FSL-111)
+**Counts** (313 entries, recounted from the table on 2026-11-02, after FAST's replica (FSL-96 to FSL-104) and FLIRT's clean-room original's part 2 (FSL-111)
 (`scripts/orchestration/register_counts.py`); an entry with two classes counts under its first; "c (c? until …)"
 entries, decided, count as (c)):
 
 | Class | Entries | of them questionable (c?) |
 |---|---|---|
-| (a) crash, undefined behaviour, out of bounds | 64 | |
+| (a) crash, undefined behaviour, out of bounds | 69 | |
 | (b) race, nondeterminism | 12 | |
-| (c) deterministic bug that changes results | 140 | 10 |
+| (c) deterministic bug that changes results | 142 | 10 |
 | (d) imprecision | 23 | |
-| (e) command-line or parsing quirk | 51 | |
+| (e) command-line or parsing quirk | 53 | |
 | (f) documentation or message only | 12 | |
 | explained, not a defect | 2 | |
 
@@ -524,6 +534,15 @@ do. FSL-112 to FSL-115 unused. The clean-room original follows the replica's dec
 **2026-11-02, FLIRT's replica (part 3):** FSL-78 (rule B), FSL-79, FSL-80 and FSL-81 (rule A)
 added, each with its `reproduce` switch; FSL-75 named in applyxfm4D and in mcflirt's replica; FSL-09,
 FSL-22 and FSL-68 cover applyxfm4D and midtrans too. No new **decide** entry.
+**2026-11-02, FAST's replica:** FSL-96 to FSL-104 added: FSL-96 and FSL-97 (memory FAST never
+writes: defined values in both modes, named), FSL-98 and FSL-103 (rule A), FSL-99 (rule B),
+FSL-100 and FSL-101 (FAST aborts or crashes: the default segments; FSL-101's `reproduce` refined by
+random testing's trial), FSL-102 (the shell), FSL-104 (out of bounds: refused); each with its
+`reproduce` switch where FAST's behaviour is defined. Inside `-a`, FAST meets FLIRT's FSL-09 and
+FSL-68 (FLIRT's replica). FSL-105 to FSL-110 unused. Kept as FAST's (rule C): the input is the last
+word and parsing stops at the first word that is not an option, `-P` and `-A` without `-a` do
+nothing, a missing input aborts; two rule-D candidates (the multi-channel initialisation and bias
+field) wait for a measurement on real T1w and T2w pairs (next-steps). No new **decide** entry.
 
 ## D13 gaps: what the next task switches to "correct by default"
 
@@ -4529,7 +4548,7 @@ follow-up "FSL-111 in the replica").
 - **D13 / gap:** done (2026-10-26): both modes name FSL-22 where NaN border voxels make the
   order undefined (mcflirt's final resampling and `-meanvol`).
 
-## Restricted: FSL BET (source-derived)
+## Restricted: FSL BET, FLIRT and FAST (source-derived)
 
 > **Clean-room implementers: do not read this section.** Written from FSL 6.0.7.17's source
 > (FSL Licence) through [fsl-bet.md](fsl-bet.md), which has the `file:line` references
@@ -4872,3 +4891,22 @@ finishes) is corrected by default (the size counted as 1, as FLIRT's own reading
 refused with `reproduce`; `-basescale 0` is refused in both modes. Cases: `real/anglerep-quaternion`,
 `real/weights-empty-refweight`, `real/weights-empty-inweight`, `edge/one-voxel-input`,
 `edge/zero-voxel-size`, `edge/basescale-0`.
+
+### FSL-96 to FSL-104: FAST (FSL 6.0.7.23, fsl-fast4 2111.3) †
+
+Found while translating FAST for the replica (2026-11-02; `docs/findings/fsl-fast.md`, restricted,
+"Defects (D13): FSL-96 to FSL-104", has the source lines and FSL's runs). FSL-96 and FSL-97 are
+memory FAST never writes (`-p`'s maps outside the mask; the multi-channel `-N` bias field): both
+modes write the defined value (0; no field) and name it, so the record compares FSL's files after
+setting those voxels to the defined values (reported, never cached). FSL-98 (the multi-channel class
+sort's inverse permutation) and FSL-103 (the mask's maximum at 2^24 and above) are corrected by
+default (rule A), FAST's result with `reproduce`. FSL-99 (numeric options without meaning) is
+refused by default (rule B), FAST's arithmetic with `reproduce`. FSL-100 (`FSLDIR` unset) and
+FSL-101 (priors FLIRT could not register) end FAST with an abort or a crash: the default segments;
+`reproduce` gives FAST's abort, its run on an empty mask and its exception with several channels,
+and refuses where FAST writes through a null pointer (the trial's three kinds:
+`validation/difftest/cases/fsl-fast/fsl101-*`). FSL-102 (FLIRT run through the shell with unquoted
+names) passes names whole by default; `reproduce` splits them at blanks. FSL-104 (channels of
+different sizes, read past their ends) is refused by default and, where FAST's reads stay inside
+the images, aborts as FAST does with `reproduce`. Cases: the record's `err/`, `priors/`, `multi/` and
+`difftest/` categories (`fsl-fast-replica`).

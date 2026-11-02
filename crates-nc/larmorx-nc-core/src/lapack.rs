@@ -4,7 +4,8 @@
 // 1992-2023 The University of Tennessee and The University of Tennessee Research Foundation,
 // 2000-2023 The University of California Berkeley, 2006-2023 The University of Colorado
 // Denver). Both notices are in ../NOTICE. Part of larmorx-nc (FSL Licence terms; see LICENSE).
-//! LAPACK's LU factorisation, inverse, triangular inverse and solves for matrices up to 4 × 4,
+//! LAPACK's LU factorisation, inverse, triangular inverse and solves for matrices up to 4 × 4
+//! (and, for FAST's covariances, up to 8 × 8: [`MAX_N`]),
 //! computed as FSL 6.0.7.23's LAPACK computes them.
 //!
 //! FSL 6.0.7.23's matrix layer is Armadillo 14.2.1 (fsl-armawrap 0.7.0), which sends a 4 × 4
@@ -25,6 +26,11 @@
 //! Every routine works on a column-major `n × n` array (`a[c * n + r]`, LAPACK's layout with
 //! `lda = n`), `n` from 1 to 4, and follows the code path OpenBLAS takes for that size; NaNs are
 //! SSE's (`sse.rs`), with each instruction's operand order. Pivots are 1-based, as LAPACK's.
+//! From 5 to 8 rows (FAST's multi-channel covariances) the same routines run OpenBLAS's
+//! general paths for those sizes: `getf2_k`'s strided `ddot` and `dgemv_n` by [`blas`]'s
+//! kernels, `IAMAX_K`'s path for at most seven elements after the first, `dgetri`'s `dgemv`;
+//! there their values are FSL's bit for bit and a NaN's payload may differ (`blas` does not
+//! model which operand's NaN an instruction passes on; `lapack_probe.py`, sizes 5 to 8).
 //!
 //! Upstream files (OpenBLAS 0.3.33 release tarball, SHA-256 `6761af1d9f5d…`):
 //! `interface/lapack/getrf.c`, `gesv.c`, `trtri.c`, `interface/gemv.c`,
@@ -75,6 +81,11 @@ pub mod blas;
 /// The reference LAPACK routines of `dsyevd` and `dgesdd`.
 pub mod reference;
 
+/// The largest matrix the LU routines follow OpenBLAS for: up to 8 × 8, `getf2_k`'s and
+/// `iamax_sse2.S`'s short path (at most 7 elements after the first) and the unblocked
+/// `dtrti2`/`dgetri` (FAST's covariances of up to eight channels).
+pub const MAX_N: usize = 8;
+
 /// `(row, col)` in a column-major `n × n` array.
 #[inline(always)]
 fn at(n: usize, r: usize, c: usize) -> usize {
@@ -122,6 +133,9 @@ fn min_x86(d: f64, s: f64) -> f64 {
 /// compares the first two and otherwise returns the next index unchecked (`getf2_k` clamps an
 /// index past the end).
 fn iamax(x: &[f64]) -> usize {
+    if x.len() > 4 {
+        return iamax_short(x);
+    }
     let a: Vec<f64> = x.iter().map(|v| v.abs()).collect();
     let m = max_x86;
     let max = match a.len() {
@@ -143,10 +157,90 @@ fn iamax(x: &[f64]) -> usize {
     (0..compared).find(|&i| hit(a[i])).unwrap_or(compared) + 1
 }
 
+/// [`iamax`] for 5 to 8 elements: `iamax_sse2.S`'s path for at most 7 elements after the first
+/// (`.L50`, whatever the alignment). Four accumulators of two lanes start at `|x0|`; the
+/// elements after it are folded in with `maxpd` (`d > s ? d : s`): a group of four into the
+/// first two accumulators, a pair into the third, a last one (both lanes) into the fourth; the
+/// accumulators are reduced (`0 = max(0, 1)`, `2 = max(2, 3)`, `0 = max(0, 2)`, then
+/// `max(high lane, low lane)`). The search from `x0` then filters a block of eight with
+/// `cmpeqpd` (never true for a NaN) before comparing its elements with `comisd`/`je` (true for
+/// an unordered pair as well; the eighth returned unchecked), compares a group of four, then a
+/// pair, and returns the next index unchecked.
+fn iamax_short(x: &[f64]) -> usize {
+    let a: Vec<f64> = x.iter().map(|v| v.abs()).collect();
+    let n = a.len();
+    assert!(
+        (5..=8).contains(&n),
+        "iamax's short path is ported for 5 to 8 elements"
+    );
+    let m = max_x86;
+    let mx = |d: [f64; 2], s: [f64; 2]| [m(d[0], s[0]), m(d[1], s[1])];
+    let mut acc = [[a[0]; 2]; 4];
+    let rest = n - 1;
+    let mut k = 1;
+    if rest & 4 != 0 {
+        acc[0] = mx(acc[0], [a[k], a[k + 1]]);
+        acc[1] = mx(acc[1], [a[k + 2], a[k + 3]]);
+        k += 4;
+    }
+    if rest & 2 != 0 {
+        acc[2] = mx(acc[2], [a[k], a[k + 1]]);
+        k += 2;
+    }
+    if rest & 1 != 0 {
+        acc[3] = mx(acc[3], [a[k], a[k]]);
+    }
+    let l0 = mx(acc[0], acc[1]);
+    let l2 = mx(acc[2], acc[3]);
+    let l0 = mx(l0, l2);
+    let max = m(l0[1], l0[0]);
+    let hit = |v: f64| v == max || v.is_nan() || max.is_nan();
+    let mut ret = 0;
+    let mut i = 0;
+    if n >= 8 {
+        if (0..8).any(|j| a[j] == max) {
+            for j in 0..7 {
+                ret += 1;
+                if hit(a[j]) {
+                    return ret;
+                }
+            }
+            return ret + 1;
+        }
+        ret += 8;
+        i = 8;
+    }
+    let rem = n - i;
+    if rem & 4 != 0 {
+        for j in i..i + 4 {
+            ret += 1;
+            if hit(a[j]) {
+                return ret;
+            }
+        }
+        i += 4;
+    }
+    if rem & 2 != 0 {
+        for j in i..i + 2 {
+            ret += 1;
+            if hit(a[j]) {
+                return ret;
+            }
+        }
+    }
+    ret + 1
+}
+
 /// `AMIN_K == 0` then `IAMIN_K` on the diagonal (stride `lda + 1`), as `dtrtri` checks a
 /// non-unit triangular matrix: `Some(1-based index)` when the smallest magnitude is zero
 /// (`amax_sse2.S` and `iamax_sse2.S` built with `USE_MIN`, their strided paths).
 fn zero_on_diagonal(d: &[f64]) -> Option<usize> {
+    if d.len() > 4 {
+        // 5 to 8 diagonal elements: the first zero (a NaN folded in before a zero, which may
+        // hide it from AMIN_K, is not modelled: dgetri's dtrtri never meets a zero, as dgetrf
+        // succeeded, and FAST inverts no triangular matrix of that size)
+        return d.iter().position(|&v| v == 0.0).map(|i| i + 1);
+    }
     let a: Vec<f64> = d.iter().map(|v| v.abs()).collect();
     let n = a.len();
     let mn = min_x86;
@@ -296,7 +390,7 @@ fn axpy(da: f64, x: &[f64], y: &mut [f64]) {
 // The loops keep getf2_k's indices, so the port can be checked line by line.
 #[allow(clippy::needless_range_loop)]
 pub fn getrf(a: &mut [f64], n: usize, ipiv: &mut [i32]) -> i32 {
-    assert!((1..=4).contains(&n) && a.len() >= n * n && ipiv.len() >= n);
+    assert!((1..=MAX_N).contains(&n) && a.len() >= n * n && ipiv.len() >= n);
     let m = n;
     let lda = n;
     let mut info = 0;
@@ -311,18 +405,28 @@ pub fn getrf(a: &mut [f64], n: usize, ipiv: &mut [i32]) -> i32 {
         }
         for i in 1..len {
             // DOTU_K(i, a + i, lda, b, 1): y = b (unit), x = row i (stride lda).
-            let mut t1 = 0.0;
-            for k in 0..i {
-                t1 = add_f64(t1, mul_f64(a[b0 + k], a[at(n, i, k)]));
-            }
-            let dot = add_f64(t1, 0.0);
+            let dot = if n <= 4 {
+                let mut t1 = 0.0;
+                for k in 0..i {
+                    t1 = add_f64(t1, mul_f64(a[b0 + k], a[at(n, i, k)]));
+                }
+                add_f64(t1, 0.0)
+            } else {
+                let row: Vec<f64> = (0..i).map(|k| a[at(n, i, k)]).collect();
+                blas::ddot(&row, lda, &a[b0..b0 + i], 1)
+            };
             a[b0 + i] = sub_f64(a[b0 + i], dot);
         }
         if j < m {
             // GEMV_N(m - j, j, 0, -1, a + j, lda, b, 1, b + j, 1)
             let x: Vec<f64> = a[b0..b0 + j].to_vec();
             let mut y: Vec<f64> = a[b0 + j..b0 + m].to_vec();
-            gemv_n(m - j, j, -1.0, a, j, lda, &x, &mut y);
+            if n <= 4 {
+                gemv_n(m - j, j, -1.0, a, j, lda, &x, &mut y);
+            } else {
+                let am = blas::MatRef { off: j, ld: lda };
+                blas::dgemv_n(m - j, j, -1.0, a, am, &x, 1, 1.0, &mut y);
+            }
             a[b0 + j..b0 + m].copy_from_slice(&y);
             let mut jp = j + iamax(&a[b0 + j..b0 + m]);
             if jp > m {
@@ -475,7 +579,11 @@ fn trsv_u_nonunit(a: &[f64], n: usize, x: &mut [f64]) {
 /// `trsv_NUN`, for several `trsm_LNLU` and `trsm_LNUN` (each column independently: the kernels'
 /// column blocking does not change a column's arithmetic).
 pub fn getrs(lu: &[f64], n: usize, ipiv: &[i32], b: &mut [f64], nrhs: usize) {
-    assert!((1..=4).contains(&n) && lu.len() >= n * n && b.len() >= n * nrhs);
+    assert!((1..=MAX_N).contains(&n) && lu.len() >= n * n && b.len() >= n * nrhs);
+    assert!(
+        n <= 4 || nrhs == 1,
+        "dgetrs with several right-hand sides is ported up to 4 x 4"
+    );
     for col in b.chunks_mut(n).take(nrhs) {
         for i in 0..n {
             let ip = (ipiv[i] - 1) as usize;
@@ -539,7 +647,7 @@ fn trmv_l(a: &[f64], n: usize, s: usize, m: usize, x: &mut [f64]) {
 /// (`1 / a`), the column times the inverted part (`TRMV`), then scaled by minus the reciprocal.
 /// Only the triangle named is read and written.
 pub fn trtri(a: &mut [f64], n: usize, upper: bool) -> i32 {
-    assert!((1..=4).contains(&n) && a.len() >= n * n);
+    assert!((1..=MAX_N).contains(&n) && a.len() >= n * n);
     let diag: Vec<f64> = (0..n).map(|i| a[at(n, i, i)]).collect();
     if let Some(i) = zero_on_diagonal(&diag) {
         return i as i32;
@@ -577,12 +685,12 @@ pub fn trtri(a: &mut [f64], n: usize, upper: bool) -> i32 {
 /// updated by `dgemv` (`y = y - A[:, j+1..] w`, OpenBLAS's interface with beta = 1), then the
 /// column interchanges (`dswap`) in reverse order. Returns `info`.
 pub fn getri(a: &mut [f64], n: usize, ipiv: &[i32]) -> i32 {
-    assert!((1..=4).contains(&n) && a.len() >= n * n);
+    assert!((1..=MAX_N).contains(&n) && a.len() >= n * n);
     let info = trtri(a, n, true);
     if info > 0 {
         return info;
     }
-    let mut work = [0.0f64; 4];
+    let mut work = vec![0.0f64; n];
     for j in (0..n).rev() {
         for i in j + 1..n {
             work[i] = a[at(n, i, j)];
@@ -591,7 +699,15 @@ pub fn getri(a: &mut [f64], n: usize, ipiv: &[i32]) -> i32 {
         if j + 1 < n {
             let x: Vec<f64> = work[j + 1..n].to_vec();
             let mut y: Vec<f64> = a[at(n, 0, j)..at(n, 0, j) + n].to_vec();
-            gemv_n(n, n - j - 1, -1.0, a, at(n, 0, j + 1), n, &x, &mut y);
+            if n <= 4 {
+                gemv_n(n, n - j - 1, -1.0, a, at(n, 0, j + 1), n, &x, &mut y);
+            } else {
+                let am = blas::MatRef {
+                    off: at(n, 0, j + 1),
+                    ld: n,
+                };
+                blas::dgemv_n(n, n - j - 1, -1.0, a, am, &x, 1, 1.0, &mut y);
+            }
             a[at(n, 0, j)..at(n, 0, j) + n].copy_from_slice(&y);
         }
     }
@@ -685,6 +801,40 @@ mod tests {
                 }
             }
         }
+    }
+
+    #[test]
+    fn up_to_eight_rows() {
+        for n in 5..=MAX_N {
+            let m: Vec<f64> = (0..n * n)
+                .map(|i| {
+                    if i % (n + 1) == 0 {
+                        3.0 + (i % 7) as f64
+                    } else {
+                        0.3 * ((i * 7) % 5) as f64 - 0.6
+                    }
+                })
+                .collect();
+            let mut inv = m.clone();
+            let mut ipiv = [0i32; MAX_N];
+            assert_eq!(getrf(&mut inv, n, &mut ipiv), 0);
+            assert_eq!(getri(&mut inv, n, &ipiv), 0);
+            for (x, y) in matmul(&m, &inv, n).iter().zip(eye(n)) {
+                assert!((x - y).abs() < 1e-13, "n {n}");
+            }
+            let mut a = m.clone();
+            let mut b: Vec<f64> = (0..n).map(|i| i as f64 - 2.5).collect();
+            let b0 = b.clone();
+            assert_eq!(gesv(&mut a, n, &mut ipiv, &mut b, 1), 0);
+            for r in 0..n {
+                let s: f64 = (0..n).map(|k| m[at(n, r, k)] * b[k]).sum();
+                assert!((s - b0[r]).abs() < 1e-12, "n {n}");
+            }
+        }
+        // the first element of largest magnitude; a block of eight's last element unchecked
+        assert_eq!(iamax(&[1.0, -3.0, 2.0, 3.0, 0.5]), 2);
+        assert_eq!(iamax(&[1.0, 2.0, 0.0, 0.0, 0.0, 0.0, 0.0, -9.0]), 8);
+        assert_eq!(iamax(&[0.0; 6]), 1);
     }
 
     #[test]

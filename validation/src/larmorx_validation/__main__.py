@@ -40,6 +40,7 @@ PARITY_MODULES = {
     "mri-hmc": "mri_hmc",
     "fsl-mcflirt-replica": "fsl_mcflirt_replica",
     "fsl-flirt-replica": "fsl_flirt_replica",
+    "fsl-fast-replica": "fsl_fast_replica",
     "fsl-flirt": "fsl_flirt",
     "ants-image-math": "ants_image_math",
     "ants-threshold-image": "ants_threshold_image",

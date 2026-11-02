@@ -16,6 +16,7 @@ the original. ``flirt``, ``convert_xfm`` and FLIRT's other programs (``avscale``
 programs ``img2imgcoord``, ``std2imgcoord`` and ``img2stdcoord``, ``rmsdiff``, ``makerot``,
 ``midtrans``, ``pointflirt``, ``applyxfm4d``) and scripts (``pairreg``, ``extracttxt``,
 ``aff2rigid``) have both too (the originals written from ``specs/flirt.md``, since 2026-11-02).
+``fast`` (FSL's tissue segmentation, since 2026-11-02) has its replica only.
 """
 
 from larmorx.fsl.bet import (
@@ -27,6 +28,7 @@ from larmorx.fsl.bet import (
     betsurf,
     read_vtk,
 )
+from larmorx.fsl.fast import FastResult, fast
 from larmorx.fsl.flirt import COSTS, FlirtResult, convert_xfm, flirt
 from larmorx.fsl.flirt_more import (
     aff2rigid,
@@ -52,6 +54,7 @@ __all__ = [
     "AvscaleResult",
     "BetResult",
     "BetsurfResult",
+    "FastResult",
     "FlirtResult",
     "Surface",
     "aff2rigid",
@@ -61,6 +64,7 @@ __all__ = [
     "betsurf",
     "convert_xfm",
     "extracttxt",
+    "fast",
     "flirt",
     "img2imgcoord",
     "img2stdcoord",

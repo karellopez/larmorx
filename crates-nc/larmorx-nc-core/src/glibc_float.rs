@@ -1,12 +1,12 @@
 // SPDX-License-Identifier: LicenseRef-FSL AND MIT
 // Translated to Rust from Arm's Optimized Routines v19.11 (math/sincosf.h, sincosf.c, sinf.c,
-// cosf.c, sincosf_data.c, logf.c, logf_data.c), Copyright (c) 2017-2018, Arm Limited,
+// cosf.c, sincosf_data.c, logf.c, logf_data.c, expf.c, exp2f_data.c), Copyright (c) 2017-2018, Arm Limited,
 // SPDX-License-Identifier: MIT (the notice is in LICENSES/MIT-arm-optimized-routines.txt).
 // Rust translation Copyright 2026 Karel Lopez Vilaret; modified from the originals.
 // Distributed as part of larmorx-nc under the FSL Licence (see LICENSE) and the MIT terms.
-//! The single-precision `sinf`, `cosf`, `sincosf` and `logf` that FSL's Linux binaries call:
-//! glibc 2.35's, as its x86-64 build selects them on a CPU with FMA (`__sinf_fma`,
-//! `__cosf_fma`, `__sincosf_fma`, `__logf_fma`, compiled with `-mfma -mavx2`).
+//! The single-precision `sinf`, `cosf`, `sincosf`, `logf` and `expf` that FSL's Linux binaries
+//! call: glibc 2.35's, as its x86-64 build selects them on a CPU with FMA (`__sinf_fma`,
+//! `__cosf_fma`, `__sincosf_fma`, `__logf_fma`, `__expf_fma`, compiled with `-mfma -mavx2`).
 //!
 //! glibc took these functions from Arm's Optimized Routines (2018) and kept their arithmetic;
 //! this module is translated from Arm's MIT-licensed originals, not from glibc. GCC contracts
@@ -330,6 +330,99 @@ pub fn logf(x: f32) -> f32 {
     y = LOGF_POLY[0].mul_add(r2, y);
     y = y.mul_add(r2, y0 + r);
     y as f32
+}
+
+/// `logf@GLIBC_2.2.5`, the symbol FSL's binaries bind (they are built against an older C
+/// library): glibc's SVID-compatible wrapper (`w_logf_compat.c`) around [`logf`]. For `x <= 0`
+/// it returns `__kernel_standard_f`'s values: `-inf` for `±0`, and for a negative number (or
+/// `-inf`) C's `NAN`, the positive quiet NaN, where [`logf`] gives SSE's default NaN (`-nan`).
+#[must_use]
+pub fn logf_compat(x: f32) -> f32 {
+    if x <= 0.0 {
+        if x == 0.0 {
+            return f32::NEG_INFINITY;
+        }
+        return f32::from_bits(0x7fc0_0000);
+    }
+    logf(x)
+}
+
+/// `__exp2f_data` (Arm's `exp2f_data.c`, `EXP2F_TABLE_BITS` 5, `EXP2F_POLY_ORDER` 3): the parts
+/// `expf` reads, as 64-bit patterns (every word identical to Ubuntu 22.04's libm.so.6, glibc
+/// 2.35-0ubuntu3: `validation/investigations/fsl-fast/arm_glibc_expf_log.py`).
+#[rustfmt::skip]
+mod exp2f_tables {
+    /// `tab`.
+    pub const TAB: [u64; 32] = [
+        0x3ff0000000000000, 0x3fefd9b0d3158574, 0x3fefb5586cf9890f, 0x3fef9301d0125b51,
+        0x3fef72b83c7d517b, 0x3fef54873168b9aa, 0x3fef387a6e756238, 0x3fef1e9df51fdee1,
+        0x3fef06fe0a31b715, 0x3feef1a7373aa9cb, 0x3feedea64c123422, 0x3feece086061892d,
+        0x3feebfdad5362a27, 0x3feeb42b569d4f82, 0x3feeab07dd485429, 0x3feea47eb03a5585,
+        0x3feea09e667f3bcd, 0x3fee9f75e8ec5f74, 0x3feea11473eb0187, 0x3feea589994cce13,
+        0x3feeace5422aa0db, 0x3feeb737b0cdc5e5, 0x3feec49182a3f090, 0x3feed503b23e255d,
+        0x3feee89f995ad3ad, 0x3feeff76f2fb5e47, 0x3fef199bdd85529c, 0x3fef3720dcef9069,
+        0x3fef5818dcfba487, 0x3fef7c97337b9b5f, 0x3fefa4afa2a490da, 0x3fefd0765b6e4540,
+    ];
+    /// `shift` (0x1.8p+52).
+    pub const SHIFT: u64 = 0x4338000000000000;
+    /// `invln2_scaled` (0x1.71547652b82fep+0 * 32).
+    pub const INVLN2_SCALED: u64 = 0x40471547652b82fe;
+    /// `poly_scaled`.
+    pub const POLY_SCALED: [u64; 3] = [0x3ebc6af84b912394, 0x3f2ebfce50fac4f3, 0x3f962e42ff0c52d6];
+}
+
+/// glibc's `expf` (x86-64, FMA build: `__expf_fma`, Arm's `expf.c` compiled with -mfma
+/// -mavx2). GCC fuses five multiply-adds of it (read from `objdump -d` of Ubuntu 22.04's
+/// libm.so.6): the three of the polynomial and both uses of `InvLn2N * xd` (`z + SHIFT` and
+/// `z - kd`), so `r` is `InvLn2N * xd - kd` rounded once. Not correctly rounded (Arm: 0.502
+/// ulp); `tools/glibc-float-verify` compares it with the C library on all 2^32 inputs.
+///
+/// The limits as glibc builds them (`WANT_ERRNO_UFLOW`): below `-0x1.9fe368p6` the result is
+/// `+0` (`__math_uflowf`), down to `-0x1.9d1d9ep6` it is `0x1.4p-75f * 0x1.4p-75f`, the
+/// smallest subnormal (`__math_may_uflowf`), above `0x1.62e42ep6` infinity
+/// (`__math_oflowf`); `-inf` gives `+0`, a NaN or `+inf` `x + x`.
+#[must_use]
+pub fn expf(x: f32) -> f32 {
+    use exp2f_tables::*;
+    let xd = f64::from(x);
+    let abstop = (x.to_bits() >> 20) & 0x7ff;
+    if abstop >= 0x42b {
+        // |x| >= 88 or x is NaN
+        if x.to_bits() == f32::NEG_INFINITY.to_bits() {
+            return 0.0;
+        }
+        if abstop >= 0x7f8 {
+            return crate::sse::add_f32(x, x);
+        }
+        if x > f32::from_bits(0x42b1_7217) {
+            // __math_oflowf(0): 0x1p97f * 0x1p97f
+            return f32::from_bits(0x7000_0000) * f32::from_bits(0x7000_0000);
+        }
+        if x < f32::from_bits(0xc2cf_f1b4) {
+            // __math_uflowf(0): 0x1p-95f * 0x1p-95f
+            return f32::from_bits(0x1000_0000) * f32::from_bits(0x1000_0000);
+        }
+        if x < f32::from_bits(0xc2ce_8ecf) {
+            // __math_may_uflowf(0): 0x1.4p-75f * 0x1.4p-75f
+            return f32::from_bits(0x1a20_0000) * f32::from_bits(0x1a20_0000);
+        }
+    }
+    let invln2n = f64::from_bits(INVLN2_SCALED);
+    let shift = f64::from_bits(SHIFT);
+    // kd = z + SHIFT with z = InvLn2N * xd, fused
+    let mut kd = invln2n.mul_add(xd, shift);
+    let ki = kd.to_bits();
+    kd -= shift;
+    // r = z - kd, fused
+    let r = invln2n.mul_add(xd, -kd);
+    let t = TAB[(ki % 32) as usize].wrapping_add(ki << (52 - 5));
+    let s = f64::from_bits(t);
+    let c = |n: usize| f64::from_bits(POLY_SCALED[n]);
+    let z = c(0).mul_add(r, c(1));
+    let r2 = r * r;
+    let y = c(2).mul_add(r, 1.0);
+    let y = z.mul_add(r2, y);
+    (y * s) as f32
 }
 
 #[cfg(test)]

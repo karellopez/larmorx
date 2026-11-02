@@ -17,7 +17,8 @@ An **image spec** (a JSON object) names everything a NIfTI file holds:
   are quaternions too), the voxel spacing (anisotropic), the origin, the qform and sform codes,
   an sform equal to the qform, absent, or another (sheared) matrix; the spatial units;
 - ``content``: what the values look like (a head-like phantom of nested ellipsoids with a
-  polynomial bias field, polynomial blobs, labels, a ramp, a checkerboard, noise, a constant,
+  polynomial bias field, brain-extracted on request (``"brain"``: zero outside the brain, as
+  after BET), polynomial blobs, labels, a ramp, a checkerboard, noise, a constant,
   zeros, sparse points, a crop of a real image from ``larmorx-testdata``), evaluated in world
   coordinates, so a moved copy of the same phantom is a registration problem with a known
   answer;
@@ -425,7 +426,7 @@ def render(content: dict, points: np.ndarray, *, volume: int = 0) -> np.ndarray:
 
 def _head(content: dict, u: np.ndarray, r2: np.ndarray, rng, shape) -> np.ndarray:
     """Nested ellipsoids: skull, CSF, grey and white matter, ventricles; a polynomial bias
-    field; Irwin-Hall noise."""
+    field; Irwin-Hall noise; the skull and background set to 0 when ``content["brain"]``."""
     t = content.get("tissues", "t1")
     level = {
         "t1": (160, 30, 70, 110, 25),
@@ -448,6 +449,9 @@ def _head(content: dict, u: np.ndarray, r2: np.ndarray, rng, shape) -> np.ndarra
     out = out * bias
     if content.get("noise", 0.0):
         out = np.abs(out + content["noise"] * 2.0 * _irwin_hall(rng, shape))
+    if content.get("brain"):
+        # brain-extracted (as after BET): zero outside the brain (the CSF's ellipsoid)
+        out = np.where(r2 < 1.0, out, 0.0)
     return out
 
 

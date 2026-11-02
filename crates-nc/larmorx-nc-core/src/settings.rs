@@ -13,8 +13,9 @@ use std::sync::Arc;
 
 use crate::nifti::{OpenOptions, Renames};
 
-/// The variables FSL's code on the replicated paths reads.
-pub const FSL_VARIABLES: &[&str] = &["FSLOUTPUTTYPE", "FSL_LOAD_NIFTI_EXTENSIONS"];
+/// The variables FSL's code on the replicated paths reads (`FSLDIR`: where FAST finds its standard
+/// tissue priors).
+pub const FSL_VARIABLES: &[&str] = &["FSLOUTPUTTYPE", "FSL_LOAD_NIFTI_EXTENSIONS", "FSLDIR"];
 
 /// A table of environment settings, with how the image layer opens names (FSL-60: NewNifti
 /// 5.0.0's renaming of names holding ".img", reproduced or not, and the renames met).

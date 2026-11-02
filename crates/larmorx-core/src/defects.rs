@@ -478,6 +478,24 @@ defects! {
         "an input or reference of one voxel (1 x 1 x 1) is registered: one value cannot measure an alignment, and FLIRT writes the matrix its search happens to end at (an arbitrary rotation of its grid)";
     FSL_93 = "FSL-93", "flirt", true,
         "a voxel size of 0 in the input's or reference's header (which reading the image counts as 1) makes the base scale 0: every voxel size divided by it is infinite, the initial matrix NaN, and FLIRT never finishes; -basescale 0 the same";
+    FSL_96 = "FSL-96", "fast", true,
+        "-p's probability maps are never written outside the brain mask (the voxels of value 0 or below), nor anywhere with --nopve when FAST runs no k-means iteration (-W 0 -O 0) or initialises from priors (-a): FAST saves whatever its memory held there, zeros or other values depending on how the memory was reused";
+    FSL_97 = "FSL-97", "fast", true,
+        "with several channels and -N, the bias field -b saves and -B applies is never computed: FAST saves whatever its memory held (infinite fields and zero images were seen)";
+    FSL_98 = "FSL-98", "fast", true,
+        "with several channels, sorting the classes by channel 1's means gives each sorted class the covariance, posteriors and other channels' means of another class (the inverse of the sorting permutation): right only when the permutation is its own inverse (no change, a swap, -t 2's reversal), wrong when classes move in a cycle (for example -s means given in a cyclic order)";
+    FSL_99 = "FSL-99", "fast", true,
+        "numeric options without meaning are used as given: a smoothness (-H, -f, -R) that is not a finite number (a NaN -H passes the check for a negative one and estimates the smoothness against a table of zeros, or with several channels of memory never written), a bias field smoothing extent (-l) of 0 or less or not finite (every voxel ends in class 1), fewer than one class (-n; FAST aborts)";
+    FSL_100 = "FSL-100", "fast", true,
+        "with FSLDIR unset FAST aborts (std::logic_error) before it segments, even when no priors are asked for (-A avoids it)";
+    FSL_101 = "FSL-101", "fast", true,
+        "when FLIRT cannot register the priors (-a naming a matrix FLIRT cannot read, a prior it cannot resample), FAST prints that the priors are not used, then initialises from priors it never allocated and crashes";
+    FSL_102 = "FSL-102", "fast", true,
+        "-a registers the priors by running FLIRT through the shell with the names unquoted: a name with a blank is split into words and the shell's special characters in names are interpreted; with FSLDIR unset and -A the command starts with the text (null), a syntax error of the shell's";
+    FSL_103 = "FSL-103", "fast", true,
+        "the brain mask (every voxel above 0) leaves out the voxels equal to the image's maximum when the maximum is 2^24 or more (the upper bound maximum + 1 rounds to the maximum in single precision)";
+    FSL_104 = "FSL-104", "fast", true,
+        "-S n with images of different sizes reads and writes the smaller images past their ends (over channel 1's grid)";
     FSL_111 = "FSL-111", "applyxfm4D", true,
         "a uint8 image is read into a char image, signed on x86-64: its values 128 to 255 are read as v - 256 (255 as -1), so interpolating across 127 and 128, the background value (the border's 10th percentile) and the spline's coefficients are those of the negative values; the output's own conversion wraps a signed char back to its byte";
     ITK_50 = "ITK-50", "ITK", true,
@@ -728,7 +746,7 @@ mod tests {
             assert!(!d.what.ends_with('.'), "{}", d.id);
             assert_eq!(lookup(d.id), Some(*d));
         }
-        assert!(lookup("FSL-99").is_none());
+        assert!(lookup("NONE-01").is_none());
     }
 
     #[test]

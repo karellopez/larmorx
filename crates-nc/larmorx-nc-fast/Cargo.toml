@@ -1,0 +1,15 @@
+[package]
+name = "larmorx-nc-fast"
+description = "A bit-exact replica of FSL's FAST (tissue segmentation) for larmorx, translated from FSL 6.0.7.23's source (FSL Licence: non-commercial)"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+
+[dependencies]
+larmorx-core.workspace = true
+larmorx-nc-core.workspace = true
+larmorx-nc-flirt.workspace = true
+
+[dev-dependencies]
+tempfile.workspace = true

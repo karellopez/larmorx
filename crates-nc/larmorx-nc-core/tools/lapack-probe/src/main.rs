@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: LicenseRef-FSL
 // Part of larmorx-nc (FSL Licence terms; see LICENSE). Copyright 2026 Karel Lopez Vilaret.
-//! The port's side of `validation/investigations/version-numerics/lapack_probe.py`: reads
+//! The port's side of `validation/investigations/version-numerics/lapack_probe.py` (sizes 1 to
+//! 8, `lapack::MAX_N`): reads
 //! `count` records of little-endian doubles (an `n × n` column-major matrix, then for the solves
 //! an `n × nrhs` right-hand side), runs one operation on each and writes the output words in the
 //! layout the probe writes for FSL's own LAPACK:
@@ -57,7 +58,7 @@ fn main() {
     let mut out: Vec<f64> = Vec::new();
     for r in words.chunks_exact(rec) {
         let mut a = r[..nn].to_vec();
-        let mut ipiv = [0i32; 4];
+        let mut ipiv = [0i32; lapack::MAX_N];
         if op.starts_with("getrf") {
             let info = lapack::getrf(&mut a, n, &mut ipiv);
             out.extend(&a);

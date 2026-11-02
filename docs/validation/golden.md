@@ -15,7 +15,7 @@ Replicas and clean-room originals are covered alike. Written 2026-10-11.
 
 | | `larmorx` (Apache-2.0) | the AFNI replicas (in `larmorx`) | `larmorx-nc` (the FSL replicas) |
 |---|---|---|---|
-| Cases | [`tests/golden/registry.py`](../../tests/golden/registry.py): 168 cases, 1026 outputs | [`crates/larmorx-cli/tests/afni_replica_golden.rs`](../../crates/larmorx-cli/tests/afni_replica_golden.rs): 40 cases, 90 outputs | [`crates-nc/larmorx-nc-cli/tests/golden.rs`](../../crates-nc/larmorx-nc-cli/tests/golden.rs): 65 cases, 313 outputs |
+| Cases | [`tests/golden/registry.py`](../../tests/golden/registry.py): 168 cases, 1026 outputs | [`crates/larmorx-cli/tests/afni_replica_golden.rs`](../../crates/larmorx-cli/tests/afni_replica_golden.rs): 40 cases, 90 outputs | [`crates-nc/larmorx-nc-cli/tests/golden.rs`](../../crates-nc/larmorx-nc-cli/tests/golden.rs): 79 cases, 440 outputs |
 | Checksums | [`tests/golden/golden.json`](../../tests/golden/golden.json) | [`crates/larmorx-cli/tests/afni_replica_golden.tsv`](../../crates/larmorx-cli/tests/afni_replica_golden.tsv) | [`crates-nc/larmorx-nc-cli/tests/golden.tsv`](../../crates-nc/larmorx-nc-cli/tests/golden.tsv) |
 | Test | `tests/golden/test_golden.py` (pytest) | `cargo test` | `cargo test` |
 | Runs in CI | job `test`, on the release wheel, Python 3.12 only (the Python 3.14 run skips `tests/golden`) | job `test`, `cargo test --workspace --locked` (debug) | job `gpl`, `cargo test --workspace --locked` in `crates-nc` |
@@ -133,6 +133,19 @@ What the coverage test enumerates:
   memory and background-value changes changed no golden output). `lx.fsl.avscale`, `img2imgcoord`,
   `std2imgcoord`, `img2stdcoord`, `rmsdiff` and `makerot` joined the replica-only functions, mapped to
   these cases. `larmorx-nc`'s checksums recorded on 2026-11-02 from 222e226 (committed as d2300bb) (FLIRT part 3): 6 cases added, `midtrans.two`, `pointflirt.points`, `applyxfm4D.series` (a matrix per volume, sinc, FSL-09's rounding of the int16 output), `pairreg.heads`, `extracttxt.lines` (a negative relative start) and `aff2rigid.default` (FSL-81 corrected), the printing programs' standard output kept as `stdout.txt`; every other checksum unchanged (the core's new LAPACK, its generic background value and the interpolation of double images changed no golden output). `lx.fsl.midtrans`, `pointflirt`, `applyxfm4d`, `pairreg`, `extracttxt` and `aff2rigid` joined the replica-only functions, mapped to these cases.
+- **FAST, the replica** (2026-11-02, eleven cases in `crates-nc/larmorx-nc-cli/tests/golden.rs`, on a
+  generated brain of three tissues with an intensity gradient along x, a copy scaled by 2^15 (float),
+  a T2-like copy and a file of four class intensities): `fast.fmriprep` (fMRIPrep's call `-I 0 -N -p -g
+  -S 1`; FSL-96 named), `fast.bias` (`-b -B`), `fast.t2-n2-nopve-verbose` (its standard output kept as
+  `stdout.txt`), `fast.n4-manualseg` (`-s`), `fast.multi` (two channels with their bias fields),
+  `fast.priors` (`-a`, `-A` and `-P`, FLIRT's replica in the same process: FSL-09), `fast.fsldir-unset`
+  (FSL-100 corrected), `fast.fsl103` and its `.reproduce`; and the refusals `fast.fsl99.nan` and
+  `fast.fsl104.sizes`, recorded by their status through the shared refusal loop. `lx.fsl.fast` is a
+  replica-only function (`tests/golden/registry.py`, `REPLICA_ONLY_FUNCTIONS`) until FAST's clean-room
+  original. `larmorx-nc`'s checksums recorded on 2026-11-02 from b42aa20 (committed as bb068f1): 11
+  cases and 124 outputs added; every other checksum unchanged (the core's additions for FAST: the C
+  library's `expf`, `log` and `rand`, FSL's masked sums and percentiles, LAPACK up to 8 × 8, changed no
+  golden output).
 
 - **antsAI's blob alignment** (2026-10-23): new cases: `cli.ants.antsAI.blobs` (antsAI -b in 2D: a rigid search from a rotated blob plane,
 an affine one from 12 pairs of a shifted plane), `py.ants.blob_alignment` (the rotated plane

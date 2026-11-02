@@ -6,7 +6,8 @@ mid-size case, each process's peak resident memory from ``/usr/bin/time -v``, la
 D13 modes; its output bit-identical to ANTs' in ``reproduce`` (N4BiasFieldCorrection's and
 DenoiseImage's to ANTs with correctly rounded maths preloaded, the build their records compare
 with; ``validation/investigations/difftest/memory_pair.py`` measures any call by hand). FSL's
-BET programs likewise, against the ``larmorx-nc`` replica (``BET_CASES``).
+BET programs likewise, against the ``larmorx-nc`` replica (``BET_CASES``), and FLIRT's and
+FAST's (``FLIRT_CASES``, ``FAST_CASES``).
 
 The allowance is the user's rule of 2026-10-27, "similar" memory: at most ``RATIO`` times the
 original's peak plus a fixed cost (a 16-voxel call needs 20 MiB in larmorx, 18 in ANTs;
@@ -364,6 +365,65 @@ def test_flirt_replica_needs_no_more_memory_than_fsl(tmp_path, name, program, ar
         )
         if mode == "reproduce":
             assert _blanked(f_dir) == _blanked(r_dir), f"{program} {name}"
+
+
+#: FSL's FAST (FSL 6.0.7.23) against ``python -m larmorx fsl fast`` (the ``larmorx-nc`` replica,
+#: 2026-11-02): fMRIPrep's call on ds000005's T1w brain (``{t1}``, its fMRIPrep input), the bias
+#: field with both its outputs on the 2 mm MNI152NLin2009cAsym T1w (``{mni_t1}``, the suite's
+#: derived input), and two channels (its T1w and T2w) with their bias fields. The outputs
+#: bit-identical in ``reproduce``, but ``-p``'s probability maps: FSL never writes them outside
+#: the mask (FSL-96; the replica writes 0 there in both modes).
+FAST_CASES = [
+    ("fmriprep", "-o out -I 0 -N -p -g -S 1 {t1}"),
+    ("bias", "-o out -b -B {mni_t1}"),
+    ("two-channels", "-o out -S 2 -b -B {mni_t2} {mni_t1}"),
+]
+
+
+@pytest.mark.parametrize(("name", "args"), FAST_CASES)
+def test_fast_replica_needs_no_more_memory_than_fsl(tmp_path, name, args):
+    ff = pytest.importorskip("larmorx_validation.parity.fsl_fast_replica")
+    if ff.replica_binary() is None:
+        pytest.skip("the larmorx-nc program is not built (crates-nc)")
+    if not (ff.fsldir() / "bin" / "fast").is_file() or not Path("/usr/bin/time").is_file():
+        pytest.skip("FSL 6.0.7.23 or /usr/bin/time was not found")
+    calls = [(run, node) for run, node in ff.fmriprep_calls() if run == ff.SOURCE_RUN]
+    t1 = ff.fmriprep_input(calls[0][0], str(calls[0][1])) if calls else None
+    if t1 is None:
+        pytest.skip("the ds000005 fMRIPrep oracle run was not found")
+    derived = ff.inputs()
+    paths = {"t1": t1, "mni_t1": derived / "mni_t1.nii.gz", "mni_t2": derived / "mni_t2.nii.gz"}
+    words = [w.format(**{k: str(v) for k, v in paths.items()}) for w in args.split()]
+    env = {**ff._environment({}), "OMP_NUM_THREADS": "1"}
+    f_dir = tmp_path / "fsl"
+    f_dir.mkdir()
+    code, fsl_mib = _original_peak(
+        [str(ff.fsldir() / "bin" / "fast"), *words], env, "fsl", _emptier(f_dir), f_dir
+    )
+    assert code == 0
+    for mode in ("reproduce", "fix"):
+        r_dir = tmp_path / f"larmorx-{mode}"
+        r_dir.mkdir()
+        l_env = {
+            **env,
+            "LARMORX_NC_BIN": str(ff.replica_binary()),
+            "LARMORX_UPSTREAM_DEFECTS": mode,
+            "PYTHONPATH": os.environ.get("PYTHONPATH", ""),
+        }
+        entry = entry_peak(l_env, r_dir)
+        code, mib = _peak([sys.executable, "-m", "larmorx", "fsl", "fast", *words], l_env, r_dir)
+        assert code == 0
+        print(f"fast {name} ({mode}): larmorx {mib:.1f} MiB, FSL {fsl_mib:.1f}, entry {entry:.1f}")
+        assert mib <= allowance(fsl_mib, entry), (
+            f"fast {name} ({mode}): larmorx {mib:.0f} MiB, FSL {fsl_mib:.0f} MiB, "
+            f"the entry point {entry:.1f} MiB"
+        )
+        if mode == "reproduce":
+            fsl, ours = _blanked(f_dir), _blanked(r_dir)
+            for files in (fsl, ours):
+                for key in [k for k in files if "_prob_" in k]:
+                    del files[key]
+            assert fsl == ours, f"fast {name}"
 
 
 #: FLIRT's clean-room original (``crates/larmorx-fsl``, 2026-11-02) on the same ``flirt`` calls:

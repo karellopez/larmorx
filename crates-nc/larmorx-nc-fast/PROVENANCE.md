@@ -57,5 +57,9 @@ what it translates.
   defined parts with the rest filled deterministically (`_prob_<n>` outside the mask 0, FSL-96;
   the multi-channel `-N` bias field 1, FSL-97; `-H nan`'s table of several channels 0, FSL-99),
   each named on standard error.
-- Up to eight channels; pending: nine and more (`-S 9`: OpenBLAS's `iamax_sse2.S` aligned path,
-  which depends on the column's memory alignment, and beyond 16 its 8-way `ddot` kernel).
+- Up to eight channels. Nine and more are refused in both modes, after the images are read
+  (`larmorx-nc: error: fast: -S <n>: more than 8 channels are not replicated ...`, exit 1; the
+  orchestrator's decision, 2026-11-02): FSL's results there follow OpenBLAS's kernels for larger
+  matrices (`iamax_sse2.S`'s aligned path from 9 to 16, which depends on the column's memory
+  alignment; the 8-way `ddot` and `daxpy` kernels beyond 16; `dgetrf`'s blocked path beyond 19),
+  not ported (`docs/next-steps.md`, follow-ups).

@@ -38,8 +38,8 @@ pub const FAMILIES: &[(&str, &[&str])] = &[
 
 /// The FSL tools, with FSL's command lines: the replica (`larmorx-nc`) when it is installed,
 /// else the clean-room original of the same program (`fsl mcflirt` is `mri hmc`; `fsl bet`,
-/// `fsl bet2`, `fsl betsurf`, `fsl flirt` and `fsl convert_xfm` are `larmorx_fsl::cli`; a test
-/// checks the list).
+/// `fsl bet2`, `fsl betsurf`, `fsl flirt` and `fsl convert_xfm` are `larmorx_fsl::cli`; FLIRT's
+/// other programs and `fsl fast` have their replica only; a test checks the list).
 const FSL_TOOLS: &[&str] = &[
     "mcflirt",
     "bet",
@@ -59,6 +59,7 @@ const FSL_TOOLS: &[&str] = &[
     "pairreg",
     "extracttxt",
     "aff2rigid",
+    "fast",
 ];
 
 /// The AFNI tools: the clean-room originals' (`larmorx_afni::cli::TOOLS`), each with its
@@ -412,7 +413,7 @@ mod tests {
         let (code, out, _) = run_capture(&["lx", "--help"]);
         assert_eq!(code, 0);
         assert!(
-            out.contains("fsl    mcflirt, bet, bet2, betsurf, flirt, convert_xfm, avscale, img2imgcoord, std2imgcoord, img2stdcoord, rmsdiff, makerot, midtrans, pointflirt, applyxfm4D, pairreg, extracttxt, aff2rigid"),
+            out.contains("fsl    mcflirt, bet, bet2, betsurf, flirt, convert_xfm, avscale, img2imgcoord, std2imgcoord, img2stdcoord, rmsdiff, makerot, midtrans, pointflirt, applyxfm4D, pairreg, extracttxt, aff2rigid, fast"),
             "{out}"
         );
         assert!(
@@ -435,6 +436,7 @@ mod tests {
                 "pairreg",
                 "extracttxt",
                 "aff2rigid",
+                "fast",
             ]
         );
         // avscale has no original yet: `original` is an error that says so.

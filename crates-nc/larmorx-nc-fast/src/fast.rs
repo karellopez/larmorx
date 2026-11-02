@@ -872,13 +872,19 @@ fn segment_multi_channel(
         image.display_min = 0.0;
         images.push(image);
     }
-    // (after the images are read: FAST's errors in reading them come first)
+    // (after the images are read: FAST's errors in reading them come first). More than eight
+    // channels are refused in both modes (the orchestrator, 2026-11-02): FSL's results there
+    // follow OpenBLAS's kernels for larger matrices (iamax's aligned path, the 8-way dot
+    // products, getrf's blocked path), which are not ported.
     if nch > MAX_CHANNELS {
-        let _ = writeln!(
-            io.err,
-            "larmorx-nc: fast -S {nch} (more than {MAX_CHANNELS} channels) is not replicated yet"
+        return refuse(
+            io,
+            &format!(
+                "-S {nch}: more than {MAX_CHANNELS} channels are not replicated (FSL's results \
+                 there follow OpenBLAS's kernels for larger matrices, which larmorx does not \
+                 reproduce)"
+            ),
         );
-        return 1;
     }
     let r = prior_registration(a, &input_name, &outname, run, io, notices);
     let priors = match priors_or_exit(r, io, notices) {

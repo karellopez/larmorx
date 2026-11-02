@@ -241,6 +241,14 @@ pub const REPLICAS: &[Replica] = &[
         location: Location::Program(&LARMORX_NC),
         original: false,
     },
+    // FSL's FAST (2026-11-02): the replica only; the clean-room original is to be written from
+    // specs/fast.md.
+    Replica {
+        family: "fsl",
+        tool: "fast",
+        location: Location::Program(&LARMORX_NC),
+        original: false,
+    },
 ];
 
 /// The tools of `family` that have a replica and no clean-room original yet: the command line
@@ -703,6 +711,7 @@ mod tests {
                 "pairreg",
                 "extracttxt",
                 "aff2rigid",
+                "fast",
             ]
         );
         let betsurf = lookup("fsl", "betsurf").unwrap();

@@ -13,7 +13,8 @@ run as a separate process (nothing of it is imported), and their clean-room orig
 the ``bet`` script's ``-R``, ``-F``, ``-Z``, and ``betsurf``; written from ``specs/bet.md``):
 ``implementation="auto"`` (the default) runs the replica when ``larmorx-nc`` is installed, else
 the original. ``flirt`` and ``convert_xfm`` have both too (the original written from
-``specs/flirt.md``, since 2026-11-02); FLIRT's other programs have their replica only.
+``specs/flirt.md``, since 2026-11-02); FLIRT's other programs and ``fast`` (FSL's tissue
+segmentation, since 2026-11-02) have their replica only.
 """
 
 from larmorx.fsl.bet import (
@@ -25,6 +26,7 @@ from larmorx.fsl.bet import (
     betsurf,
     read_vtk,
 )
+from larmorx.fsl.fast import FastResult, fast
 from larmorx.fsl.flirt import COSTS, FlirtResult, convert_xfm, flirt
 from larmorx.fsl.flirt_more import (
     aff2rigid,
@@ -50,6 +52,7 @@ __all__ = [
     "AvscaleResult",
     "BetResult",
     "BetsurfResult",
+    "FastResult",
     "FlirtResult",
     "Surface",
     "aff2rigid",
@@ -59,6 +62,7 @@ __all__ = [
     "betsurf",
     "convert_xfm",
     "extracttxt",
+    "fast",
     "flirt",
     "img2imgcoord",
     "img2stdcoord",

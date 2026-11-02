@@ -64,8 +64,13 @@ __all__ = ["replica_binary", "suite"]
 SUITE = "fsl-fast-replica"
 PROGRAM = "fast"
 FMRIPREP_RUNS = "oracles/fmriprep-25.2.6"
-#: The fMRIPrep runs of the standard tier.
-STANDARD_RUNS = ("ds000005-sub-01-noreconall",)
+#: The fMRIPrep runs of the standard tier: an adult's T1w (no pathology), a 3.5-year-old's (a
+#: small head, child contrast) and a glioma patient's (a lesion inside the brain mask).
+STANDARD_RUNS = (
+    "ds000005-sub-01-noreconall",
+    "ds000228-sub-pixar008-noreconall",
+    "ds005003-sub-RS001-noreconall",
+)
 #: The run the derived inputs come from.
 SOURCE_RUN = "ds000005-sub-01-noreconall"
 

@@ -348,6 +348,9 @@ def programs(d: Path, nc: str | None = None, *, make: bool = True) -> list[Progr
             # FLIRT (2026-11-01): the default schedule, and BBR (its boundary from the T1's
             # bright core, the smoothing of the points' normals threaded).
             "flirt": ["-in", t1, "-ref", t1, "-dof", "6", "-omat", o + "_flirt.mat"],
+            # FAST (2026-11-02): its only parallel work, the bias field's convolutions, with both
+            # bias outputs
+            "fast": ["-o", o + "_fast", "-b", "-B", "-I", "2", "-O", "1", t1],
         }
         fsl_bbr = [
             "-in", t1, "-ref", t1, "-init", str(mat), "-cost", "bbr", "-wmseg", t1,
@@ -361,6 +364,10 @@ def programs(d: Path, nc: str | None = None, *, make: bool = True) -> list[Progr
                             str(mat)), omp))  # fmt: skip
         for name, a in fsl.items():
             out.append(Program(f"fsl {name} (replica, larmorx-nc)", (nc, "fsl", name, *a), omp))
+        # FAST's two channels: each channel's bias field convolved
+        out.append(Program("fsl fast two channels (replica, larmorx-nc)",
+                           (nc, "fsl", "fast", "-o", o + "_fast2", "-S", "2", "-I", "1", "-O",
+                            "1", "-b", f, t1), omp))  # fmt: skip
     return out
 
 

@@ -969,6 +969,8 @@ REPLICA_ONLY_FUNCTIONS: dict[str, str] = {
     "lx.fsl.pairreg": "fsl pairreg",
     "lx.fsl.extracttxt": "fsl extracttxt",
     "lx.fsl.aff2rigid": "fsl aff2rigid",
+    # FAST (2026-11-02): the replica only
+    "lx.fsl.fast": "fsl fast",
 }
 
 #: The replicas' golden cases: the AFNI replicas' (built into larmorx since 2026-10-29, cases

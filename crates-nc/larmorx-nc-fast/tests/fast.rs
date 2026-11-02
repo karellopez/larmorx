@@ -263,6 +263,23 @@ fn two_channels_on_slabs() {
         "{}",
         e.what
     );
+    // nine channels, every image read: refused in both modes (not replicated)
+    let nine: Vec<&str> = ["-S", "9", "-o", "@nine"]
+        .into_iter()
+        .chain(std::iter::repeat_n("@t1.nii", 9))
+        .collect();
+    for mode in [UpstreamDefects::Fix, UpstreamDefects::Reproduce] {
+        let (code, out, err) = run_in(mode, &nine, dir.path(), &s).unwrap();
+        assert_eq!(code, 1);
+        assert_eq!(out, "");
+        assert!(
+            err.starts_with(
+                "larmorx-nc: error: fast: -S 9: more than 8 channels are not replicated"
+            ),
+            "{err}"
+        );
+        assert!(!dir.path().join("nine_seg.nii").exists());
+    }
 }
 
 #[test]

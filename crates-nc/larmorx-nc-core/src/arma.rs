@@ -562,6 +562,18 @@ pub fn dot_arma(a: &[f64], b: &[f64]) -> f64 {
     (val1 + val2).0
 }
 
+/// `arma::dot(a, b)` (NEWMAT's `DotProduct`) of any length: up to 32 elements
+/// `op_dot::direct_dot_arma` ([`dot_arma`]), more by BLAS `ddot` (OpenBLAS's Haswell kernel on
+/// `blas_threads` threads: [`crate::lapack::blas::ddot_unit`]).
+pub fn dot_blas(a: &[f64], b: &[f64], blas_threads: usize) -> f64 {
+    assert_eq!(a.len(), b.len());
+    if a.len() <= 32 {
+        dot_arma(a, b)
+    } else {
+        crate::lapack::blas::ddot_unit(a, b, blas_threads)
+    }
+}
+
 /// `A·Aᵀ` for one object on both sides (`glue_times` hands it to `syrk<false>`): a vector by
 /// `syrk_vec` (the products `aₖ·aᵢ`, mirrored), up to 48 elements by `syrk_emul` (each element
 /// [`dot_arma`] of two rows, mirrored), larger by BLAS `dsyrk` (the upper triangle as `dgemm`

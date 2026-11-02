@@ -68,6 +68,77 @@ pub fn ddot(x: &[f64], incx: usize, y: &[f64], incy: usize) -> f64 {
     t1 + t2
 }
 
+/// `DDOT` with unit strides and any length (`ddot.c`'s `dot_compute`, single thread): the first
+/// `n & -16` elements by the Haswell kernel `ddot_kernel_8` (`ddot_microk_haswell-2.c`: four
+/// accumulators of four lanes, element `16·q + 4·a + l` fused into lane `l` of accumulator `a`;
+/// then each accumulator's high and low halves added, accumulators 0 + 1 and 2 + 3, their sum,
+/// and its two lanes), the rest added one product at a time.
+pub fn ddot_unit_compute(x: &[f64], y: &[f64]) -> f64 {
+    let n = x.len();
+    assert_eq!(n, y.len());
+    let n1 = n & !15;
+    let mut dot = 0.0;
+    if n1 > 0 {
+        let mut acc = [[0.0f64; 4]; 4];
+        let mut i = 0;
+        while i < n1 {
+            for (a, lanes) in acc.iter_mut().enumerate() {
+                for (l, v) in lanes.iter_mut().enumerate() {
+                    let e = i + 4 * a + l;
+                    *v = fma(x[e], y[e], *v);
+                }
+            }
+            i += 16;
+        }
+        let h: Vec<[f64; 2]> = acc.iter().map(|a| [a[0] + a[2], a[1] + a[3]]).collect();
+        let s01 = [h[0][0] + h[1][0], h[0][1] + h[1][1]];
+        let s23 = [h[2][0] + h[3][0], h[2][1] + h[3][1]];
+        let s = [s01[0] + s23[0], s01[1] + s23[1]];
+        dot = s[0] + s[1];
+    }
+    for i in n1..n {
+        dot += y[i] * x[i];
+    }
+    dot
+}
+
+/// `DDOT` with unit strides (`ddot.c`'s `CNAME`) on OpenBLAS's level-1 threads: up to 10000
+/// elements, or one thread, [`ddot_unit_compute`]; above, the vector cut into `nthreads` parts
+/// (`blas_level1_thread_with_return_value`: each part `ceil(left / threads left)` elements),
+/// each part's [`ddot_unit_compute`] added in order to 0. `nthreads` is OpenBLAS's thread
+/// count (`OPENBLAS_NUM_THREADS`, else the machine's cores).
+pub fn ddot_unit(x: &[f64], y: &[f64], nthreads: usize) -> f64 {
+    let n = x.len();
+    assert_eq!(n, y.len());
+    if n <= 10000 || nthreads <= 1 {
+        return ddot_unit_compute(x, y);
+    }
+    let mut parts = Vec::with_capacity(nthreads);
+    let mut start = 0usize;
+    let mut left = n as i64;
+    let mut num_cpu = 0usize;
+    while left > 0 {
+        let threads_left = (nthreads - num_cpu) as i64;
+        let mut width = (left + threads_left - 1) / threads_left;
+        left -= width;
+        if left < 0 {
+            width += left;
+        }
+        let w = width as usize;
+        parts.push(ddot_unit_compute(
+            &x[start..start + w],
+            &y[start..start + w],
+        ));
+        start += w;
+        num_cpu += 1;
+    }
+    let mut dot = 0.0;
+    for p in parts {
+        dot += p;
+    }
+    dot
+}
+
 /// `DAXPY_K` (`daxpy.c`, fewer than 16 elements with unit strides; any count strided):
 /// `y[i] + da·x[i]` (the interface's `alpha == 0` return is the caller's: [`daxpy`]).
 pub fn axpy_k(da: f64, x: &[f64], incx: usize, y: &mut [f64], incy: usize) {
@@ -678,6 +749,67 @@ pub fn dgemm(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// `validation/probes/fsl-basisfield/ddot_threads.c`'s vectors.
+    fn xorshift_vectors(n: usize) -> (Vec<f64>, Vec<f64>) {
+        let mut s: u64 = 88172645463325252;
+        let mut next = || {
+            s ^= s << 13;
+            s ^= s >> 7;
+            s ^= s << 17;
+            s
+        };
+        let mut x = Vec::with_capacity(n);
+        let mut y = Vec::with_capacity(n);
+        for _ in 0..n {
+            x.push((next() % 100000) as f64 / 977.0 - 50.0);
+            y.push((next() % 100000) as f64 / 1013.0 - 40.0);
+        }
+        (x, y)
+    }
+
+    #[test]
+    fn ddot_unit_is_fsls() {
+        // FSL 6.0.7.23's ddot (OpenBLAS 0.3.33, Haswell), OPENBLAS_NUM_THREADS = 1, 2, 4, 32
+        // (ddot_threads.c, 2026-11-03).
+        let cases: [(usize, [u64; 4]); 5] = [
+            (33, [0xc08b4ef4e6416408; 4]),
+            (100, [0x408ab33ce3c749ae; 4]),
+            (
+                10001,
+                [
+                    0x40f373f36a1a26c5,
+                    0x40f373f36a1a26c6,
+                    0x40f373f36a1a26c8,
+                    0x40f373f36a1a26c7,
+                ],
+            ),
+            (
+                10560,
+                [
+                    0x40fc36a8fa57e104,
+                    0x40fc36a8fa57e108,
+                    0x40fc36a8fa57e108,
+                    0x40fc36a8fa57e108,
+                ],
+            ),
+            (
+                50000,
+                [
+                    0x411f944a4c478cb0,
+                    0x411f944a4c478cac,
+                    0x411f944a4c478caf,
+                    0x411f944a4c478caf,
+                ],
+            ),
+        ];
+        for (n, want) in cases {
+            let (x, y) = xorshift_vectors(n);
+            for (t, w) in [1usize, 2, 4, 32].iter().zip(want) {
+                assert_eq!(ddot_unit(&x, &y, *t).to_bits(), w, "n {n}, {t} threads");
+            }
+        }
+    }
 
     #[test]
     fn nrm2_small_cases() {

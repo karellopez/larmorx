@@ -28,6 +28,8 @@
 //!   the self-intersection test, the file formats FSL reads and writes).
 //! - [`stats`]: newimage's masked sums and means (in FSL's blocks), percentiles, `threshold`
 //!   and `binarise`, as FAST uses them.
+//! - [`basisfield`]: fsl-basisfield's B-spline fields (the field and its derivatives, `Jᵀe`,
+//!   `JᵀJ`, the membrane and bending energies, their gradients and Hessians), as topup uses them.
 //! - [`options`]: fsl-utils' command-line options (`Utilities::OptionParser`).
 //! - [`avwutils`]: the parts of `fslval`, `fslroi`, `fslmerge`, `fslmaths` and `fslstats` (and
 //!   fslpy's `imtest`, `remove_ext`, `imglob`) that FSL's scripts run.
@@ -42,6 +44,7 @@
 
 pub mod arma;
 pub mod avwutils;
+pub mod basisfield;
 pub mod bbr;
 pub mod cnum;
 pub mod costfns;

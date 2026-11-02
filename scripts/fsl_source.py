@@ -47,6 +47,7 @@ VERSIONS = {
     "fsl-warpfns": "2501.0",
     "fsl-armawrap": "0.7.0",
     "fsl-fast4": "2111.3",
+    "fsl-basisfield": "2203.4",
 }
 
 #: The original files: every file a translation in crates-nc/ comes from (see each crate's
@@ -156,6 +157,12 @@ FILES = [
     ("fsl-fast4", "mriseg_two.cc"),
     ("fsl-fast4", "multi_mriseg_two.h"),
     ("fsl-fast4", "multi_mriseg_two.cc"),
+    # topup (2026-11-03): fsl-basisfield's spline fields
+    ("fsl-basisfield", "basisfield.h"),
+    ("fsl-basisfield", "basisfield.cpp"),
+    ("fsl-basisfield", "splinefield.h"),
+    ("fsl-basisfield", "splinefield.cpp"),
+    ("fsl-basisfield", "fsl_splines.h"),
 ]
 
 MANIFEST = DEST / "MANIFEST.tsv"

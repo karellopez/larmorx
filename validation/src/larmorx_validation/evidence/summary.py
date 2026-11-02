@@ -169,7 +169,10 @@ PAGES = [
         "/tools/fsl-flirt/",
         "FLIRT",
         "fsl",
-        [("larmorx-nc replica", "fsl-flirt-replica", "experimental", None, None)],
+        [
+            ("clean-room original", "fsl-flirt", "experimental", None, None),
+            ("larmorx-nc replica", "fsl-flirt-replica", "experimental", None, None),
+        ],
     ),
     (
         "/tools/resample-series/",

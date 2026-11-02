@@ -127,7 +127,7 @@ rigid = lx.fsl.aff2rigid("T1w2MNI.mat")                                 # 6-para
 |---|---|---|---|
 | `midtrans [-o file] [--template img] [--separate prefix] [--debug] [-v] t1 t2 ...` | `larmorx fsl midtrans` | `midtrans(transforms, *, template, separate)` → 4 × 4 | the transform from the template space to the "middle" of the transforms (FSL's Procrustes average about the MNI origin or the template's centre of gravity); `--separate` writes each transform composed with it; an error after the arguments exits 1 (FSL 0: **FSL-78**) |
 | `pointflirt -i file -r file [-o file] [--vox --invol=img --refvol=img] [-v]` | `larmorx fsl pointflirt` | `pointflirt(in_points, ref_points, *, in_image, ref_image)` → 4 × 4 | the least-squares affine matrix mapping the input points onto the reference points (mm; voxels scaled by the images' voxel sizes with `--vox`); a warning when the points do not determine it; a file of exactly three points is read with one point per column (as FSL) |
-| `applyxfm4D in ref out mats [-singlematrix] [-fourdigit] [-userprefix p] [-interp m] [-3D] [-v]` | `larmorx fsl applyxfm4D` | `applyxfm4d(in, ref, out, transforms, *, single_matrix, four_digit, user_prefix, interp, three_d)` | each volume resampled onto the reference's grid through one matrix or one per volume (`MAT_0000n`, `MAT_nnnn`, `<prefix>nnnn`), sinc (default), trilinear, nearest neighbour or spline, in the input's data type (char, short, int, float, double); integer outputs rounded and clamped (**FSL-09**); spline on integer images computed as on float ones (**FSL-79**); `-3D` sinc with the rectangular kernel the program asks for (**FSL-80**) |
+| `applyxfm4D in ref out mats [-singlematrix] [-fourdigit] [-userprefix p] [-interp m] [-3D] [-v]` | `larmorx fsl applyxfm4D` | `applyxfm4d(in, ref, out, transforms, *, single_matrix, four_digit, user_prefix, interp, three_d)` | each volume resampled onto the reference's grid through one matrix or one per volume (`MAT_0000n`, `MAT_nnnn`, `<prefix>nnnn`), sinc (default), trilinear, nearest neighbour or spline, in the input's data type (char, short, int, float, double); integer outputs rounded and clamped (**FSL-09**); spline on integer images computed as on float ones (**FSL-79**); `-3D` sinc with the rectangular kernel the program asks for (**FSL-80**); uint8 values read as stored (**FSL-111**: FSL reads them as signed char) |
 | `pairreg brain1 brain2 skull1 skull2 outmat [flirt args]` | `larmorx fsl pairreg` | `pairreg(brain1, brain2, skull1, skull2, *, flirt_args)` → 4 × 4 | brain-to-brain registration refined with the skulls (three FLIRT runs with FSL's `pairreg` schedules, in-process) |
 | `extracttxt word file [count [start]]` | `larmorx fsl extracttxt` | `extracttxt(word, file, trailing_lines, relative_start)` → str | the lines from the first match (a basic regular expression), or `count` of them from `start` lines after it; FSL's messages for ranges before the first line |
 | `aff2rigid in.mat out.mat` | `larmorx fsl aff2rigid` | `aff2rigid(matrix)` → 4 × 4 | the 6-parameter matrix keeping the anterior commissure, the AC-PC line and the mid-sagittal plane of an input-to-standard matrix; FSL 6.0.7.23's script stops with a Python error before writing (**FSL-81**): computed by default, FSL's error with `reproduce` |
@@ -185,7 +185,10 @@ stage `-v` and `--debug` print, FSL-78 (exit status 1 by default, named); `point
 transposition rule, `--vox` and the nullspace warning; `applyxfm4D` on FLIRT's shared resampling
 (no blur, as FSL: observed), in the input's grouped type, a double input's padding in double
 precision, FSL-09, FSL-75, FSL-79 (the spline's coefficients per pass in the image's type with
-`reproduce`) and FSL-80 (the rectangular width-9 kernel with `-3D` by default); `pairreg` as three
+`reproduce`, converted as x86-64 converts them), FSL-80 (the rectangular width-9 kernel with `-3D`
+by default) and FSL-111 (a uint8 image's values read as stored by default, as signed char with
+`reproduce`); with a reference that has neither form, the output carries the input's form through
+the first matrix (as a registration's `-out` does, observed); `pairreg` as three
 runs of the original's `flirt` and one `convert_xfm -fixscaleskew` in this process, FSL's
 schedules read from `$FSLDIR/etc/flirtsch` as the script reads them (FSLDIR unset: refused);
 `extracttxt` with its own POSIX basic regular expressions (GNU grep's extensions) and the script's
@@ -273,7 +276,9 @@ coefficients and values in the image's type: computed as for a float image by de
 where the output changes), **FSL-80** (`applyxfm4D -3D` with sinc uses a blackman kernel of width
 7 instead of the rectangular one of width 9 it asks for: the rectangular kernel by default, named
 where the output changes), **FSL-81** (`aff2rigid` stops with a Python `NameError` under NumPy 2:
-the matrix computed by default). **FSL-75** also in `applyxfm4D` (a volume 3 voxels wide) and in
+the matrix computed by default), **FSL-111** (`applyxfm4D` reads a uint8 image into a signed
+char image: its values 128 to 255 as `v − 256`; read as stored by default, named where a written
+value changes). **FSL-75** also in `applyxfm4D` (a volume 3 voxels wide) and in
 mcflirt's replica (named in both modes, the whole border by default).
 
 Refused in both modes (FLIRT's behaviour is undefined): FSL-21/FSL-66 (`-bins` giving no or negative

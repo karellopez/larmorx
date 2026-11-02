@@ -2055,10 +2055,11 @@ def _edge_cases() -> dict[str, tuple[str, str, Run]]:
     # a single voxel (an empty buffer read)
     add(
         "edge/background-overflow",
-        "a 1-voxel input and an 8 x 1 x 1 reference: FLIRT's pyramid computes the background of a "
-        "3-voxel-wide level, writing past its buffer (FSL-75)",
+        "a 2 x 1 x 1 input and an 8 x 1 x 1 reference: FLIRT's pyramid computes the background of "
+        "a 3-voxel-wide level, writing past its buffer (FSL-75; a 2-voxel input since FSL-92 "
+        "refuses one voxel by default)",
         "-in",
-        "@const:1x1x1:2.5x2.5x2.5:in.nii",
+        "@const:2x1x1:2.5x2.5x2.5:in.nii",
         "-ref",
         "@const:8x1x1:1x1.5x0.5:ref.nii",
         "-omat",

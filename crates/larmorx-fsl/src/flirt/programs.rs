@@ -265,7 +265,8 @@ impl Space {
         f[0][3] = fov;
         let fs = mat::mul(&f, &s);
         let (n, v) = match form {
-            None => (IDENTITY, fs),
+            // no form: the voxel sizes, x not reversed (observed in millimetres, 2026-11-02)
+            None => (IDENTITY, s),
             Some(w) if neurological => {
                 let n = mat::solve(&s, &fs)?;
                 (n, mat::mul(&w, &n))
@@ -276,8 +277,8 @@ impl Space {
     }
 
     /// A destination or standard image read with neither sform nor qform: its world
-    /// coordinates its voxel sizes, x not reversed (observed, 2026-11-02; the source image's are
-    /// reversed, [`Space::of_image`]).
+    /// coordinates its voxel sizes, x not reversed (observed, 2026-11-02), as
+    /// [`Space::of_image`] gives them for any image without forms.
     pub fn unset(voxel: [f32; 3]) -> Space {
         let s = mat::diagonal(voxel.map(f64::from));
         Space {

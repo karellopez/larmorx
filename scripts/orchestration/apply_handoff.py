@@ -32,7 +32,7 @@ all of them apply:
     text = "..."          # the whole block, from its [[tool]] line
 
 --check applies them in memory only and reports. Afterwards: `python -m larmorx_validation tables`,
-`register_counts.py`, and re-read every file the handoff touched (CLAUDE.md, merge step 6).
+`register_counts.py`, and re-read every file the handoff touched (docs/orchestration.md, merge step 6).
 """
 
 import argparse

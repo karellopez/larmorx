@@ -1,7 +1,7 @@
 # Next steps
 
 The ordered plan from here: what runs next, what is waiting for the user, and the follow-ups.
-Keep it current. The present state is in CLAUDE.md ("Where things are"); the scopes of finished
+Keep it current. The present state is in [status.md](status.md) (CLAUDE.md's "Where things are" points to it); the scopes of finished
 parts, as they were planned, are in [status-log.md](status-log.md).
 
 **Ground rules.** Port every tool first, then compare with fMRIPrep at the end (user,
@@ -14,7 +14,7 @@ time, in bounded parts with a stop after each**, for the user's usage check (use
 calls on about three oracle runs, the defects' edge cases, the standard and smoke tiers) and
 publishes its tool's page with figures and metrics from those tests; the very extensive testing
 waits for **the final validation phase** (below), once every tool is ported. Each merge goes
-through CLAUDE.md's checklist. While an agent runs, the orchestrator prepares the next task but
+through the merge checklist (docs/orchestration.md). While an agent runs, the orchestrator prepares the next task but
 starts no other agent.
 
 ## Done since 2026-10-12

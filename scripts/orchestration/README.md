@@ -35,7 +35,7 @@ repository), `LARMORX_VENV` (default: `<workspace>/.venv`), cargo first on the p
 2. **Integrate the handoff** (`<agent scratch>/HANDOFF.md`, `handoff_blocks.py`) into the shared
    documents, and **harmonize** them: the register's table, sections, history and counts
    (`register_counts.py`: every **decide** listed under "Waiting for the user"), its API page,
-   README, the validation index, golden.md, licensing, next-steps, CLAUDE.md "Where things are".
+   README, the validation index, golden.md, licensing, next-steps, CLAUDE.md "Where things are" and `docs/status.md`.
    Commit the merge.
 3. **Verify the committed merge:** for example
    ```bash

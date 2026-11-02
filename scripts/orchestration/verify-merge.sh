@@ -1,6 +1,6 @@
 #!/bin/bash
 # SPDX-License-Identifier: Apache-2.0
-# The merge checklist's checks (CLAUDE.md, "Merging an agent's work"), run on a committed merge.
+# The merge checklist's checks (docs/orchestration.md, "Merging an agent's work"), run on a committed merge.
 # Usage: verify-merge.sh <checkout> <outdir> [options]
 #   --suite "<parity args>"   re-run a standard-tier record (repeatable), e.g. --suite "ants-ai --jobs 6"
 #                             or --suite "afni-tshift --implementation replica"; the suites run side by

@@ -1205,7 +1205,9 @@ def command(case: str) -> str:
                             for w in words)]  # fmt: skip
     env = " ".join(f"{k}={v}" for k, v in run.settings if v is not None)
     files = " ".join(f"(with {n} written first)" for n, _ in run.files)
-    return " ".join(x for x in (env, " ".join(parts), files) if x)
+    text = " ".join(x for x in (env, " ".join(parts), files) if x)
+    # FSL's installation as $FSLDIR, the home directory as ~: no local paths on the site
+    return text.replace(str(_suite().fsldir()), "$FSLDIR").replace(str(Path.home()), "~")
 
 
 #: The register entries the replica corrects by default in FLIRT's runs.

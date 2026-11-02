@@ -17,6 +17,7 @@
 
 use std::io::Write;
 
+use larmorx_core::defects::UpstreamDefects;
 use larmorx_nc_core::cnum;
 use larmorx_nc_core::crand::{RAND_MAX, Rand};
 use larmorx_nc_core::exception;
@@ -61,6 +62,8 @@ pub struct Params {
     pub imagetype: i32,
     /// Threads for the bias field's convolutions (the results do not depend on them).
     pub threads: usize,
+    /// D13's mode (FSL-103: the mask's brightest voxels).
+    pub mode: UpstreamDefects,
 }
 
 /// The standard output and error FAST writes to.
@@ -97,6 +100,9 @@ pub struct Segmentation {
     pub segment: Vec<i32>,
     pub pve_segment: Vec<i32>,
     pub hard_pv: Vec<i32>,
+    /// FSL-103: the voxels of the image's maximum FAST's mask leaves out (when the maximum
+    /// plus 1 rounds to the maximum in `float`, at 2^24 and above): kept in by default.
+    pub max_left_out: usize,
     pv_prob: Vec<f32>,
     mean: Vec<f32>,
     variance: Vec<f32>,
@@ -132,11 +138,26 @@ impl Segmentation {
         let nvox = (nx * ny * nz) as usize;
         let nc = p.nclasses.max(0) as usize;
         let data = image.data[..nvox].to_vec();
-        // m_mask = image; m_mask.binarise(0, m_mask.max() + 1, exclusive)
-        let upper = image.max() + 1.0;
+        // m_mask = image; m_mask.binarise(0, m_mask.max() + 1, exclusive): every voxel above 0,
+        // except (FSL-103) the maximum's when max + 1 rounds to max (2^24 and above); infinite
+        // voxels are left out (max + 1 is infinite then, and so is max)
+        let max = image.max();
+        let upper = max + 1.0;
+        let max_left_out = if upper == max && max.is_finite() {
+            data.iter().filter(|&&v| v == max).count()
+        } else {
+            0
+        };
+        let keep = |v: f32| {
+            if p.mode.fix() {
+                v > 0.0 && v.is_finite()
+            } else {
+                v > 0.0 && v < upper
+            }
+        };
         let mask: Vec<f32> = data
             .iter()
-            .map(|&v| if v > 0.0 && v < upper { 1.0 } else { 0.0 })
+            .map(|&v| if keep(v) { 1.0 } else { 0.0 })
             .collect();
         let mut props = image.clone();
         props.data = Vec::new();
@@ -165,6 +186,7 @@ impl Segmentation {
             segment: vec![0; nvox],
             pve_segment: vec![0; pve],
             hard_pv: Vec::new(),
+            max_left_out,
             pv_prob: Vec::new(),
             mean: Vec::new(),
             variance: Vec::new(),
@@ -268,6 +290,19 @@ impl Segmentation {
         self.rand = Rand::new(u32::MAX); // long seed=-1; srand(seed);
         let nc = self.nc;
         self.rhs = vec![0.0; 100];
+        // volumequant.resize(nClasses + 1), then weight.resize(nClasses, 1): a negative size is
+        // a huge one for std::vector
+        let length_error = |what: &str| FslError {
+            printed: Vec::new(),
+            type_name: "std::length_error",
+            what: what.to_owned(),
+        };
+        if self.p.nclasses < -1 {
+            return Err(length_error("vector::_M_default_append"));
+        }
+        if self.p.nclasses < 0 {
+            return Err(length_error("vector::_M_fill_insert"));
+        }
         self.volumequant = vec![0.0; nc + 1];
         self.mean = vec![0.0; nc + 1];
         self.variance = vec![0.0; nc + 1];
@@ -1079,6 +1114,11 @@ impl Segmentation {
     /// `m_pve[c]`, `members[c]` as image volumes.
     pub fn pve_volume(&self, c: usize) -> Vec<f32> {
         self.pve[c * self.nvox..(c + 1) * self.nvox].to_vec()
+    }
+
+    /// The voxels outside the mask (FSL-96: `members` is never written there).
+    pub fn outside_mask(&self) -> usize {
+        self.mask.iter().filter(|&&m| m != 1.0).count()
     }
 
     pub fn member_volume(&self, c: usize) -> Vec<f32> {

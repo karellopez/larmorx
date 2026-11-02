@@ -10,7 +10,8 @@
 
 use std::io::Write;
 
-use larmorx_core::defects::UpstreamDefects;
+use larmorx_core::defects::{self, Notices, UpstreamDefects};
+use larmorx_nc_core::cnum;
 use larmorx_nc_core::exception;
 use larmorx_nc_core::options::{ArgFlag, Opt, OptionParser, Parsed, Value};
 use larmorx_nc_core::settings::Settings;
@@ -218,35 +219,100 @@ fn args_of(parser: &OptionParser, p: &Parsed) -> Args {
     }
 }
 
-/// `fast`'s `main`: `args[0]` is the program name. Returns the exit status.
+/// `fast`'s `main`: `args[0]` is the program name. Returns the exit status. The notices of
+/// FSL's defects are printed last, as every `larmorx-nc` tool prints them.
 pub fn main(args: &[String], run: &Run, out: &mut dyn Write, err: &mut dyn Write) -> u8 {
+    let mut notices = Notices::new(run.mode);
+    let code = exception::catch(|| {
+        let mut io = Io {
+            out: &mut *out,
+            err: &mut *err,
+        };
+        main_inner(args, run, &mut io, &mut notices)
+    });
+    for n in notices.as_slice() {
+        let _ = writeln!(err, "larmorx-nc: {}", n.line());
+    }
+    // an exception nothing in FAST catches goes on to the program's entry (std::terminate)
+    code.unwrap_or_else(|e| exception::throw(e))
+}
+
+fn main_inner(args: &[String], run: &Run, io: &mut Io, notices: &mut Notices) -> u8 {
     let parser = parser();
     let parsed = match parser.parse_command_line(args, 0, true) {
         Ok(p) => p,
         Err((_, what)) => {
-            let _ = err.write_all(parser.usage().as_bytes());
-            let _ = writeln!(err, "\n{what}");
+            let _ = io.err.write_all(parser.usage().as_bytes());
+            let _ = writeln!(io.err, "\n{what}");
             return 1;
         }
     };
     let help = parsed.get(&parser, "-h,--help").bool();
     if args.len() < 2 || help || parser.check_compulsory(&parsed).is_some() {
-        let _ = err.write_all(parser.usage().as_bytes());
+        let _ = io.err.write_all(parser.usage().as_bytes());
         return 1;
     }
     let a = args_of(&parser, &parsed);
     if a.hyper < 0.0 {
         let _ = writeln!(
-            err,
+            io.err,
             "ERROR: Segmentation smoothness must be positive. Exiting"
         );
         return 1;
     }
-    let mut io = Io { out, err };
-    if a.nchannel == 1 {
-        return segment_single_channel(args, &a, run, &mut io);
+    if let Some(code) = meaningless_options(&a, io, notices) {
+        return code;
     }
-    segment_multi_channel(args, &a, run, &mut io)
+    if a.nchannel == 1 {
+        return segment_single_channel(args, &a, run, io, notices);
+    }
+    segment_multi_channel(args, &a, run, io, notices)
+}
+
+/// A refusal of larmorx's (D13): `larmorx-nc: error: fast: ...`, exit status 1.
+fn refuse(io: &mut Io, what: &str) -> u8 {
+    let _ = writeln!(io.err, "larmorx-nc: error: fast: {what}");
+    1
+}
+
+/// FSL-99 (rule B): the numeric options FAST uses as given although they have no meaning: a
+/// smoothness (`-H`, `-f`, `-R`) that is not a finite number (a NaN `-H` passes FAST's check
+/// for a negative one and estimates the smoothness against a table it never filled), a bias
+/// field smoothing extent (`-l`) that is not a positive finite number, fewer than one class
+/// (`-n`). Refused by default; FAST's run with `reproduce` (which aborts for `-n` below 1).
+fn meaningless_options(a: &Args, io: &mut Io, notices: &mut Notices) -> Option<u8> {
+    let mut bad: Vec<String> = Vec::new();
+    for (opt, v) in [("-H", a.hyper), ("-f", a.fbeta), ("-R", a.mixel)] {
+        if !v.is_finite() {
+            bad.push(format!("{opt} {}", cnum::stream(f64::from(v))));
+        }
+    }
+    if !(a.nblowpass.is_finite() && a.nblowpass > 0.0) {
+        bad.push(format!("-l {}", cnum::stream(f64::from(a.nblowpass))));
+    }
+    if a.nclass < 1 {
+        bad.push(format!("-n {}", a.nclass));
+    }
+    if bad.is_empty() {
+        return None;
+    }
+    let which = bad.join(", ");
+    if notices.fix() {
+        notices.add(&defects::FSL_99, format!("{which} refused"));
+        return Some(refuse(
+            io,
+            &format!(
+                "{which}: a smoothness must be a finite number, the bias field's smoothing \
+                 extent a positive one and the classes at least 1; FAST uses them as given \
+                 (FSL-99)"
+            ),
+        ));
+    }
+    notices.add(
+        &defects::FSL_99,
+        format!("{which} used as FAST uses them, although they have no meaning"),
+    );
+    None
 }
 
 /// `make_basename` of the output name (the input's name without `-o`).
@@ -254,31 +320,204 @@ fn output_name(a: &Args, input: &str) -> String {
     volume::make_basename(a.outname.as_deref().unwrap_or(input))
 }
 
-/// What `prior_registration` returns: the use of priors (0, 1, 2) and the priors.
+/// What `prior_registration` returns: the use of priors (0: none, 1: to initialise, 2:
+/// throughout with `-P`; -1 when FLIRT's outputs are missing) and the priors.
 struct Priors {
     bapused: i32,
     volumes: Option<[Volume; 3]>,
 }
 
-/// `prior_registration(inname, main_prior_vol, pCSF, pGM, pWM)`.
-fn prior_registration(a: &Args, run: &Run, io: &mut Io) -> Result<Priors, FslError> {
-    let _names = match &a.alternate_priors {
-        Some(n) => n.clone(),
-        None => {
-            // string(getenv("FSLDIR")): a null pointer when FSLDIR is unset
-            let Some(dir) = run.fsl.get("FSLDIR") else {
-                return Err(FslError {
-                    printed: Vec::new(),
-                    type_name: "std::logic_error",
-                    what: "basic_string: construction from null is not valid".to_owned(),
-                });
-            };
+/// How `prior_registration` stops FAST: an exit status, or an exception nothing catches.
+enum Stop {
+    Exit(u8),
+    Throw(FslError),
+}
+
+/// `FslFileExists(name)`: an image of that name (any of newimage's extensions) exists.
+fn file_exists(name: &str) -> bool {
+    volume::return_validimagefilename(name).is_ok()
+}
+
+/// `read_volume(v, name)`: newimage's 4D warning printed; its exceptions unwind.
+fn read_image(name: &str, run: &Run, io: &mut Io) -> Volume {
+    match volume::read_volume::<f32>(name, run.fsl) {
+        Ok((v, warning)) => {
+            if let Some(w) = warning {
+                let _ = writeln!(io.err, "{w}");
+            }
+            v
+        }
+        Err(e) => exception::throw(e),
+    }
+}
+
+/// The blanks the shell splits words at, and its special characters (`/bin/sh` reads FAST's
+/// FLIRT commands, the names unquoted).
+fn shell_special(word: &str) -> bool {
+    word.chars().any(|c| "|&;<>()$`\\\"'*?[".contains(c))
+        || word.starts_with('#')
+        || word.starts_with('~')
+}
+
+fn has_blank(word: &str) -> bool {
+    word.chars().any(|c| matches!(c, ' ' | '\t' | '\n'))
+}
+
+/// One of `prior_registration`'s FLIRT runs, `$FSLDIR/bin/flirt -ref <input> -in <prior> -out
+/// <out> -applyxfm -init <matrix>`, which FAST runs with `system()` (`/bin/sh -c`, the names
+/// unquoted): the FLIRT replica, in this process. FSL-102: with `reproduce` the command's words
+/// are the shell's (a name with a blank split into words; a name with the shell's special
+/// characters refused, their expansion not reproduced; FSLDIR unset: the text `(null)`, a
+/// syntax error of the shell's); by default each name is one argument and FLIRT needs no FSLDIR.
+#[allow(clippy::too_many_arguments)]
+fn run_flirt(
+    fsldir: Option<&str>,
+    names: [&str; 4],
+    a: &Args,
+    run: &Run,
+    io: &mut Io,
+    notices: &mut Notices,
+) -> Result<(), Stop> {
+    let [reference, prior, output, matrix] = names;
+    let program = format!("{}/bin/flirt", fsldir.unwrap_or("(null)"));
+    let cmd =
+        format!("{program} -ref {reference} -in {prior} -out {output} -applyxfm -init {matrix}");
+    if a.verbose {
+        let _ = writeln!(io.out, "{cmd}");
+        let _ = io.out.flush();
+    }
+    let odd: Vec<&str> = names
+        .iter()
+        .copied()
+        .filter(|w| has_blank(w) || shell_special(w) || w.is_empty())
+        .collect();
+    let words: Vec<String> = if notices.reproduce() {
+        if fsldir.is_none() {
+            // sprintf's "(null)": "(" starts a subshell the shell cannot parse
+            let _ = writeln!(io.err, "sh: 1: Syntax error: word unexpected");
+            return Ok(());
+        }
+        if let Some(w) = odd.iter().find(|w| shell_special(w)) {
+            let _ = writeln!(
+                io.err,
+                "larmorx-nc: error: fast: -a runs FLIRT through the shell, which would \
+                 interpret the special characters of {w:?}; that is not reproduced (FSL-102)"
+            );
+            return Err(Stop::Exit(1));
+        }
+        if !odd.is_empty() {
+            notices.add(
+                &defects::FSL_102,
+                format!("FLIRT's command split at the blanks of {odd:?}, as the shell splits it"),
+            );
+        }
+        cmd.split([' ', '\t', '\n'])
+            .filter(|w| !w.is_empty())
+            .skip(1)
+            .map(str::to_owned)
+            .collect()
+    } else {
+        if fsldir.is_none() {
+            notices.add(
+                &defects::FSL_102,
+                "FSLDIR unset: FAST's FLIRT command starts with (null), which the shell cannot \
+                 run (FAST then crashes); FLIRT run in this process",
+            );
+        }
+        if !odd.is_empty() {
+            notices.add(
+                &defects::FSL_102,
+                format!(
+                    "{odd:?} passed to FLIRT whole: FAST's shell would split or interpret them"
+                ),
+            );
+        }
+        [
+            "-ref",
+            reference,
+            "-in",
+            prior,
+            "-out",
+            output,
+            "-applyxfm",
+            "-init",
+            matrix,
+        ]
+        .iter()
+        .map(|w| (*w).to_owned())
+        .collect()
+    };
+    // FLIRT's own process: its exceptions end it (std::terminate), not FAST
+    let r = exception::catch(|| {
+        larmorx_nc_flirt::flirt(&words, run.fsl, run.mode, run.threads, io.out, io.err)
+    });
+    if let Err(e) = r {
+        let _ = write!(
+            io.err,
+            "{}terminate called after throwing an instance of '{}'\n  what():  {}\n",
+            e.printed_text(),
+            e.type_name,
+            e.what
+        );
+    }
+    let _ = io.out.flush();
+    Ok(())
+}
+
+/// `prior_registration(inname, main_prior_vol, pCSF, pGM, pWM)`: the tissue priors (FSL's
+/// standard ones in `$FSLDIR/data/standard/tissuepriors`, or `-A`'s), registered to the input
+/// with FLIRT and `-a`'s matrix (FLIRT's outputs `<out>_{csf,gm,wm}_stdspace` stay).
+fn prior_registration(
+    a: &Args,
+    inname: &str,
+    main_prior_vol: &str,
+    run: &Run,
+    io: &mut Io,
+    notices: &mut Notices,
+) -> Result<Priors, Stop> {
+    let fsldir = run.fsl.get("FSLDIR");
+    let names: [String; 3] = match (&a.alternate_priors, fsldir) {
+        (Some(n), _) => n.clone(),
+        (None, Some(dir)) => {
             let root = format!("{dir}/data/standard/tissuepriors/avg152T1_");
             [
                 format!("{root}csf"),
                 format!("{root}gray"),
                 format!("{root}white"),
             ]
+        }
+        // string(getenv("FSLDIR")): a null pointer when FSLDIR is unset (FSL-100)
+        (None, None) if notices.reproduce() || !a.bapriori.is_empty() => {
+            if notices.fix() {
+                notices.add(
+                    &defects::FSL_100,
+                    "FSLDIR unset with -a: FAST aborts; refused",
+                );
+                let _ = refuse(
+                    io,
+                    "-a: FSL's standard tissue priors are read from \
+                     $FSLDIR/data/standard/tissuepriors and FSLDIR is unset; name the priors \
+                     with -A (FSL-100)",
+                );
+                return Err(Stop::Exit(1));
+            }
+            notices.add(
+                &defects::FSL_100,
+                "FSLDIR unset: FAST aborts before it segments, priors asked for or not",
+            );
+            return Err(Stop::Throw(FslError {
+                printed: Vec::new(),
+                type_name: "std::logic_error",
+                what: "basic_string: construction from null is not valid".to_owned(),
+            }));
+        }
+        (None, None) => {
+            notices.add(
+                &defects::FSL_100,
+                "FSLDIR unset: FAST aborts before it segments, although no priors are asked \
+                 for; segmented",
+            );
+            [String::new(), String::new(), String::new()]
         }
     };
     let mut bapused = i32::from(!a.bapriori.is_empty());
@@ -289,25 +528,109 @@ fn prior_registration(a: &Args, run: &Run, io: &mut Io) -> Result<Priors, FslErr
             "Apriori can only be used for 2 or 3-class segmentation"
         );
     }
+    let mut vols: [Option<Volume>; 3] = [None, None, None];
     if bapused > 0 {
-        // The priors are registered with FLIRT ($FSLDIR/bin/flirt -applyxfm), used to
-        // initialise (bapused 1) or throughout with -P (bapused 2); the replica of that path is
-        // not written yet.
-        let _ = writeln!(
-            io.err,
-            "larmorx-nc: fast -a{} (tissue priors registered with FLIRT) is not replicated yet",
-            if a.prior_throughout { " -P" } else { "" }
-        );
-        return Err(FslError {
-            printed: Vec::new(),
-            type_name: "",
-            what: String::new(),
+        for (v, name) in vols.iter_mut().zip(&names) {
+            if file_exists(name) {
+                *v = Some(read_image(name, run, io));
+            } else {
+                let _ = writeln!(
+                    io.err,
+                    "prior image {name} is not found! priors are not used!"
+                );
+                bapused = 0;
+            }
+        }
+    }
+    let tissues = [
+        ("csf", "csf"),
+        ("gm", "grey matter"),
+        ("wm", "white matter"),
+    ];
+    if bapused > 0 {
+        for (i, (t, _)) in tissues.iter().enumerate() {
+            let output = format!("{main_prior_vol}_{t}_stdspace");
+            run_flirt(
+                fsldir,
+                [inname, &names[i], &output, &a.bapriori],
+                a,
+                run,
+                io,
+                notices,
+            )?;
+        }
+        for (i, (t, what)) in tissues.iter().enumerate() {
+            let name = format!("{main_prior_vol}_{t}_stdspace");
+            if file_exists(&name) {
+                vols[i] = Some(read_image(&name, run, io));
+            } else {
+                let _ = writeln!(
+                    io.err,
+                    "{what} prior image not transformed correctly! priors are not used!"
+                );
+                return Ok(Priors {
+                    bapused: -1,
+                    volumes: None,
+                });
+            }
+        }
+        if a.prior_throughout {
+            bapused = 2;
+        }
+        let [c, g, w] = vols;
+        return Ok(Priors {
+            bapused,
+            volumes: Some([c.unwrap(), g.unwrap(), w.unwrap()]),
         });
     }
     Ok(Priors {
         bapused,
         volumes: None,
     })
+}
+
+/// FSL-101: FLIRT's outputs missing (a matrix it cannot read, a prior it cannot register):
+/// FAST says the priors are not used, then initialises from priors it never allocated and
+/// crashes. By default the segmentation runs without them, as the message says; `reproduce`
+/// stops where FAST crashes.
+fn unregistered_priors(priors: &mut Priors, io: &mut Io, notices: &mut Notices) -> Option<u8> {
+    if priors.bapused != -1 {
+        return None;
+    }
+    if notices.fix() {
+        notices.add(
+            &defects::FSL_101,
+            "FLIRT's registered priors are missing: segmented without priors, as FAST's message \
+             says, where FAST crashes",
+        );
+        priors.bapused = 0;
+        return None;
+    }
+    notices.add(
+        &defects::FSL_101,
+        "FLIRT's registered priors are missing: FAST crashes here (memory it never allocated)",
+    );
+    Some(refuse(
+        io,
+        "the registered priors are missing and FAST initialises from priors it never \
+         allocated: it crashes here (FSL-101; the default segments without priors)",
+    ))
+}
+
+/// Resolves `prior_registration`'s outcome: the priors, or FAST's exit.
+fn priors_or_exit(
+    r: Result<Priors, Stop>,
+    io: &mut Io,
+    notices: &mut Notices,
+) -> Result<Priors, u8> {
+    match r {
+        Ok(mut p) => match unregistered_priors(&mut p, io, notices) {
+            Some(code) => Err(code),
+            None => Ok(p),
+        },
+        Err(Stop::Exit(code)) => Err(code),
+        Err(Stop::Throw(e)) => exception::throw(e),
+    }
 }
 
 /// Saves one output: newimage's `descrip`; `Some(status)` when FAST stops.
@@ -337,21 +660,19 @@ fn grid<T: Elem>(props: &Volume, data: Vec<T>) -> Volume<T> {
 }
 
 /// `segmentSingleChannel(argc, argv)`.
-fn segment_single_channel(args: &[String], a: &Args, run: &Run, io: &mut Io) -> u8 {
+fn segment_single_channel(
+    args: &[String],
+    a: &Args,
+    run: &Run,
+    io: &mut Io,
+    notices: &mut Notices,
+) -> u8 {
     if a.verbose {
         let _ = writeln!(io.out, "Starting Single Image Segmentation");
     }
     let input_name = args[args.len() - 1].clone();
     let outname = output_name(a, &input_name);
-    let mut input: Volume = match volume::read_volume::<f32>(&input_name, run.fsl) {
-        Ok((v, warning)) => {
-            if let Some(w) = warning {
-                let _ = writeln!(io.err, "{w}");
-            }
-            v
-        }
-        Err(e) => exception::throw(e),
-    };
+    let mut input: Volume = read_image(&input_name, run, io);
     clear_negative(&mut input);
     if a.verbose {
         let kind = match a.typeofimage {
@@ -372,10 +693,10 @@ fn segment_single_channel(args: &[String], a: &Args, run: &Run, io: &mut Io) -> 
             s(input.zdim())
         );
     }
-    let priors = match prior_registration(a, run, io) {
+    let r = prior_registration(a, &input_name, &outname, run, io, notices);
+    let priors = match priors_or_exit(r, io, notices) {
         Ok(p) => p,
-        Err(e) if e.type_name.is_empty() => return 1,
-        Err(e) => exception::throw(e),
+        Err(code) => return code,
     };
     input.display_max = 0.0;
     input.display_min = 0.0;
@@ -395,8 +716,24 @@ fn segment_single_channel(args: &[String], a: &Args, run: &Run, io: &mut Io) -> 
         mansegfile: a.manualseg.clone(),
         imagetype: a.typeofimage,
         threads: run.threads,
+        mode: run.mode,
     };
     let mut mri = Segmentation::create(&input, params);
+    if mri.max_left_out > 0 {
+        notices.add(
+            &defects::FSL_103,
+            format!(
+                "{} voxel(s) of the image's maximum {} {} the mask",
+                mri.max_left_out,
+                cnum::stream(f64::from(input.max())),
+                if notices.fix() {
+                    "kept in"
+                } else {
+                    "left out of"
+                }
+            ),
+        );
+    }
     let pr = priors.volumes.as_ref().map(|[c, g, w]| [c, g, w]);
     match mri.main(pr, io) {
         Ok(0) => {}
@@ -420,6 +757,7 @@ fn segment_single_channel(args: &[String], a: &Args, run: &Run, io: &mut Io) -> 
         }
     }
     if a.probabilities {
+        unwritten_notice(mri.outside_mask(), notices);
         for i in 0..nc {
             let v: Volume = grid(&props, mri.member_volume(i));
             if let Some(code) = save(&v, &format!("{outname}_prob_{i}"), run, io) {
@@ -461,6 +799,20 @@ fn segment_single_channel(args: &[String], a: &Args, run: &Run, io: &mut Io) -> 
     0
 }
 
+/// FSL-96: `-p`'s probability maps outside the mask, where FAST never writes them (it saves
+/// whatever its memory held): 0 in both modes, named when the mask leaves voxels out.
+fn unwritten_notice(outside: usize, notices: &mut Notices) {
+    if outside > 0 {
+        notices.add(
+            &defects::FSL_96,
+            format!(
+                "-p's probability maps outside the mask ({outside} voxels), which FAST never \
+                 writes (it saves what its memory held): written as 0"
+            ),
+        );
+    }
+}
+
 /// The negative values of an input, as `segment*Channel` treats them: when the 2nd percentile
 /// is negative the minimum is subtracted, otherwise the negative values are set to 0.
 fn clear_negative(input: &mut Volume) {
@@ -482,7 +834,13 @@ fn clear_negative(input: &mut Volume) {
 
 /// `segmentMultiChannel(argc, argv)`: `-S n` reads the last `n` words of the command line,
 /// channel 1 the last one (which also names the outputs and orders the classes).
-fn segment_multi_channel(args: &[String], a: &Args, run: &Run, io: &mut Io) -> u8 {
+fn segment_multi_channel(
+    args: &[String],
+    a: &Args,
+    run: &Run,
+    io: &mut Io,
+    notices: &mut Notices,
+) -> u8 {
     if a.verbose {
         let _ = writeln!(io.out, "Starting Multi Image Segmentation");
     }
@@ -496,14 +854,6 @@ fn segment_multi_channel(args: &[String], a: &Args, run: &Run, io: &mut Io) -> u
     let nch = a.nchannel as usize;
     // argv[argc - c - 1] for c < nchannel: argv[0] (the program) or before it when fewer
     // words follow the program than channels
-    if nch >= args.len() {
-        let _ = writeln!(
-            io.err,
-            "larmorx-nc: fast -S {nch}: fewer images than channels on the command line (FAST \
-             reads the program's own path or memory before the arguments)"
-        );
-        return 1;
-    }
     if nch > MAX_CHANNELS {
         let _ = writeln!(
             io.err,
@@ -515,37 +865,77 @@ fn segment_multi_channel(args: &[String], a: &Args, run: &Run, io: &mut Io) -> u
     let outname = output_name(a, &input_name);
     let mut images: Vec<Volume> = Vec::with_capacity(nch);
     for c in 0..nch {
-        let name = &args[args.len() - c - 1];
-        let mut image: Volume = match volume::read_volume::<f32>(name, run.fsl) {
-            Ok((v, warning)) => {
-                if let Some(w) = warning {
-                    let _ = writeln!(io.err, "{w}");
-                }
-                v
-            }
-            Err(e) => exception::throw(e),
+        // argv[argc - c - 1]: the words before the options and argv[0] (the program's own path,
+        // which never reads as an image: FAST aborts there); before argv[0] is memory
+        let Some(name) = args.len().checked_sub(c + 1).map(|i| &args[i]) else {
+            return refuse(
+                io,
+                &format!("-S {nch}: fewer words than channels before them on the command line"),
+            );
         };
+        let mut image: Volume = read_image(name, run, io);
         clear_negative(&mut image);
         image.display_max = 0.0;
         image.display_min = 0.0;
         images.push(image);
     }
-    let priors = match prior_registration(a, run, io) {
+    let r = prior_registration(a, &input_name, &outname, run, io, notices);
+    let priors = match priors_or_exit(r, io, notices) {
         Ok(p) => p,
-        Err(e) if e.type_name.is_empty() => return 1,
-        Err(e) => exception::throw(e),
+        Err(code) => return code,
     };
     let (nx, ny, nz) = (images[0].xsize(), images[0].ysize(), images[0].zsize());
+    let mut size_error = false;
     if images
         .iter()
         .any(|v| (v.xsize(), v.ysize(), v.zsize()) != (nx, ny, nz))
     {
-        let _ = writeln!(
-            io.err,
-            "larmorx-nc: fast -S {nch}: the channels' images differ in size (FAST reads and \
-             writes past the smaller ones)"
-        );
-        return 1;
+        // FSL-104: FAST works over channel 1's grid, reading every channel at channel 1's voxel
+        // indices. When channel 1 fits inside every other channel those reads stay inside them
+        // (each channel's corner of channel 1's size) and FAST aborts at its first percentile of
+        // another channel (unless -s gives every mean); otherwise it reads past the smaller ones
+        let fits = images
+            .iter()
+            .all(|v| v.xsize() >= nx && v.ysize() >= ny && v.zsize() >= nz);
+        let nc = a.nclass.max(0) as usize;
+        let means_given =
+            !a.manualseg.is_empty() && crate::mriseg::read_floats(&a.manualseg).len() == nc * nch;
+        if notices.reproduce() && fits && !means_given {
+            notices.add(
+                &defects::FSL_104,
+                "-S with images of different sizes: FAST reads each channel's corner of channel \
+                 1's size and aborts at its first percentile of another channel",
+            );
+            for v in images.iter_mut().skip(1) {
+                let (vx, vy) = (v.xsize() as usize, v.ysize() as usize);
+                let mut corner = Vec::with_capacity((nx * ny * nz) as usize);
+                for z in 0..nz as usize {
+                    for y in 0..ny as usize {
+                        let row = (z * vy + y) * vx;
+                        corner.extend_from_slice(&v.data[row..row + nx as usize]);
+                    }
+                }
+                v.dims[0] = nx;
+                v.dims[1] = ny;
+                v.dims[2] = nz;
+                v.dims[3] = 1;
+                v.data = corner;
+            }
+            size_error = true;
+        } else {
+            notices.add(
+                &defects::FSL_104,
+                format!("-S {nch} with images of different sizes refused"),
+            );
+            return refuse(
+                io,
+                &format!(
+                    "-S {nch}: the channels' images differ in size (FAST reads every channel over \
+                     channel 1's grid: past the smaller ones, or a corner of the larger ones \
+                     before it aborts; FSL-104)"
+                ),
+            );
+        }
     }
     let params = MultiParams {
         nclasses: a.nclass,
@@ -563,7 +953,17 @@ fn segment_multi_channel(args: &[String], a: &Args, run: &Run, io: &mut Io) -> u
         mansegfile: a.manualseg.clone(),
         imagetype: a.typeofimage,
         threads: run.threads,
+        mode: run.mode,
+        size_error,
     };
+    if a.nclass < 0 {
+        // TanakaCreate's first matrix, m_mean.ReSize(nclasses, numberofchannels)
+        exception::throw(FslError {
+            printed: Vec::new(),
+            type_name: "std::logic_error",
+            what: "Mat::init(): requested size is too large".to_owned(),
+        });
+    }
     let mut mri = MultiSegmentation::create(&images, params);
     let pr = priors.volumes.as_ref().map(|[c, g, w]| [c, g, w]);
     match mri.main(pr, io) {
@@ -571,6 +971,26 @@ fn segment_multi_channel(args: &[String], a: &Args, run: &Run, io: &mut Io) -> u
         // TanakaMain's -1: main returns -1
         Ok(_) => return 255,
         Err(e) => exception::throw(e),
+    }
+    if mri.sort_not_involution {
+        notices.add(
+            &defects::FSL_98,
+            if notices.fix() {
+                "the classes sorted by channel 1's means with their own covariances, \
+                 posteriors and other channels' means (FAST gives each sorted class another \
+                 class's)"
+            } else {
+                "the classes sorted as FAST sorts them: each sorted class gets another class's \
+                 covariance, posteriors and other channels' means"
+            },
+        );
+    }
+    if a.remove_bias && (a.output_bias || a.output_corrected) {
+        notices.add(
+            &defects::FSL_97,
+            "-N with -b or -B: FAST saves a bias field it never wrote (memory); written as no \
+             bias field (1, and each channel's image)",
+        );
     }
     let mut props = images[0].clone();
     props.data = Vec::new();
@@ -589,6 +1009,7 @@ fn segment_multi_channel(args: &[String], a: &Args, run: &Run, io: &mut Io) -> u
         }
     }
     if a.probabilities {
+        unwritten_notice(mri.outside_mask(), notices);
         for i in 0..nc {
             let v: Volume = grid(&props, mri.member_volume(i));
             if let Some(code) = save(&v, &format!("{outname}_prob_{i}"), run, io) {

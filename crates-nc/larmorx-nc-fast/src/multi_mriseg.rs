@@ -26,6 +26,7 @@
 //! The 4D volumes (`m_post`, `m_prob`, `m_pve`, the priors) hold `nClasses + 1` volumes, the
 //! 0th unused, as FSL's; `members` holds `nClasses`.
 
+use larmorx_core::defects::UpstreamDefects;
 use larmorx_nc_core::arma::{self, Mat};
 use larmorx_nc_core::cnum;
 use larmorx_nc_core::glibc_double::{exp, log_compat as log};
@@ -75,6 +76,12 @@ pub struct MultiParams {
     pub imagetype: i32,
     /// Threads for the bias field's convolutions (the results do not depend on them).
     pub threads: usize,
+    /// D13's mode (FSL-98: the classes' sort).
+    pub mode: UpstreamDefects,
+    /// FSL-104 reproduced: the channels after the first were larger than channel 1 (each now
+    /// its corner of channel 1's size); the first percentile of another channel throws
+    /// newimage's size error, as FAST's does.
+    pub size_error: bool,
 }
 
 /// An exception of Armadillo's (`std::runtime_error`), which nothing in FAST catches.
@@ -117,6 +124,9 @@ pub struct MultiSegmentation {
     pub segment: Vec<i32>,
     pub pve_segment: Vec<i32>,
     pub hard_pv: Vec<i32>,
+    /// FSL-98: the sort of the classes by channel 1's means was a permutation that is not its
+    /// own inverse (FAST then gives each sorted class another class's statistics).
+    pub sort_not_involution: bool,
     pv_prob: Vec<f32>,
     /// `m_mean(c, i)`: `nc` rows (classes 1 to nc) of `nch` values.
     mean: Vec<f64>,
@@ -317,6 +327,7 @@ impl MultiSegmentation {
             segment: vec![0; nvox],
             pve_segment: vec![0; nvox],
             hard_pv: Vec::new(),
+            sort_not_involution: false,
             pv_prob: Vec::new(),
             mean: vec![0.0; nc * nch],
             cov: vec![Mat::zeros(nch, nch); nc + 1],
@@ -602,6 +613,11 @@ impl MultiSegmentation {
             for c in 1..=nc {
                 let v = if input_means.len() == nc * nch {
                     f64::from(logf(input_means[c + nc * n - 1]))
+                } else if self.p.size_error && n > 0 {
+                    return Err(FslError::imthrow(
+                        "mask and vol have different sizes in calc_percentiles",
+                        3,
+                    ));
                 } else {
                     let (v, _) = chan.percentile_masked(perc * c as f32, Some(&maskc))?;
                     f64::from(v)
@@ -1262,9 +1278,22 @@ impl MultiSegmentation {
                 (x, y) => x.cmp(&y),
             });
         }
+        // slot c takes class m where m's channel-1 mean is the c-th smallest (FSL-98's fix);
+        // FAST pairs them the other way round: slot c takes class m where c's mean is the m-th
+        // smallest (the inverse permutation)
+        let means1: Vec<f64> = (1..=nc).map(|c| self.mean_at(c, 0)).collect();
+        let rank = |c: usize| (1..=nc).rfind(|&m| means1[c - 1] == tempmean[m - 1]);
+        let source = |c: usize| (1..=nc).rfind(|&m| means1[m - 1] == tempmean[c - 1]);
+        self.sort_not_involution = (1..=nc).any(|c| rank(c) != source(c));
+        let fix = self.p.mode.fix();
         for c in 1..=nc {
             for m in 1..=nc {
-                if self.mean_at(c, 0) == tempmean[m - 1] {
+                let matched = if fix {
+                    means1[m - 1] == tempmean[c - 1]
+                } else {
+                    self.mean_at(c, 0) == tempmean[m - 1]
+                };
+                if matched {
                     for n in 1..self.nch {
                         *self.mean_mut(c, n) = meancopy[(m - 1) * self.nch + n];
                     }
@@ -1335,6 +1364,11 @@ impl MultiSegmentation {
     }
 
     /// `members[c]`, `m_pve[c]` as image volumes.
+    /// The voxels outside the mask (FSL-96: `members` is never written there).
+    pub fn outside_mask(&self) -> usize {
+        self.mask.iter().filter(|&&m| !m).count()
+    }
+
     pub fn member_volume(&self, c: usize) -> Vec<f32> {
         self.members[c * self.nvox..(c + 1) * self.nvox].to_vec()
     }

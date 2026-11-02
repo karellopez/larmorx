@@ -177,17 +177,86 @@ def _multichannel_inputs(ws: Path, out: Path) -> None:
     (out / "mni_means.txt").write_text("\n".join(rows) + "\n", encoding="utf-8")
 
 
+def _means_file(path: Path, rows: list[list[float]]) -> None:
+    path.write_text("\n".join(" ".join(f"{v:.1f}" for v in r) for r in rows) + "\n", "utf-8")
+
+
+def _single_inputs(out: Path) -> None:
+    """The single-channel edge inputs, from the half-resolution T1w brain: one slice (a 2D
+    image), two volumes (4D), a negative offset (its 2nd percentile below 0), a few negative
+    voxels, NaN voxels, 16-bit integers, values above 2^24, a constant cube (k-means cannot
+    start), an image of zeros; the class intensities for ``-s`` (in order, in a cyclic order,
+    and too few)."""
+    import nibabel as nib
+
+    img = nib.load(str(out / "t1_half.nii.gz"))
+    t = np.asarray(img.dataobj, np.float32)
+    a = img.affine
+    brain = np.argwhere(t > 0)
+    nz = t.shape[2]
+    _save(out / "t1_2d.nii.gz", t[:, :, nz // 2 : nz // 2 + 1], a)
+    _save(out / "t1_4d.nii.gz", np.stack([t, np.float32(0.5) * t], axis=3), a)
+    _save(out / "t1_offset.nii.gz", t - np.float32(40), a)
+    pick = brain[:: max(1, len(brain) // 10)][:10]
+    neg = t.copy()
+    neg[tuple(pick.T)] = -3
+    _save(out / "t1_negvox.nii.gz", neg, a)
+    nan = t.copy()
+    nan[tuple(brain[:: max(1, len(brain) // 5)][:5].T)] = np.nan
+    _save(out / "t1_nan.nii.gz", nan, a)
+    _save(out / "t1_int16.nii.gz", np.round(t), a, np.int16)
+    big = (t * np.float32(2**25 / float(t.max()))).astype(np.float32)
+    _save(out / "t1_big.nii.gz", big, a)
+    const = np.zeros(t.shape, np.float32)
+    const[20:60, 30:70, 30:70] = 100
+    _save(out / "const.nii.gz", const, a)
+    _save(out / "zeros.nii.gz", np.zeros((16, 16, 16), np.float32), a)
+    v = t[t > 0]
+    p = [float(np.percentile(v, q)) for q in (20, 50, 80)]
+    _means_file(out / "t1_means.txt", [p])
+    _means_file(out / "t1_means_cycle.txt", [[p[2], p[0], p[1]]])
+    _means_file(out / "t1_means_two.txt", [p[:2]])
+
+
+def _prior_inputs(ws: Path, out: Path) -> None:
+    """The priors' inputs: FSL's matrix from FSL's standard tissue priors (avg152T1, 91 x 109
+    x 91 at 2 mm, stored radiologically) to MNI152NLin2009cAsym's 2 mm grid (97 x 115 x 97,
+    stored neurologically, which FSL's coordinates flip): the translation that aligns their
+    world coordinates; the identity; ds000005's CSF, GM and WM probability maps on that grid
+    (fMRIPrep's ``space-MNI152NLin2009cAsym_res-2`` outputs, for ``-A``); a T2w ``-s`` file whose classes are in a cyclic order (channel 1, then 2)."""
+    (out / "std2mni.mat").write_text("1 0 0 5.5\n0 1 0 6.5\n0 0 1 6.5\n0 0 0 1\n", encoding="utf-8")
+    (out / "ident.mat").write_text("1 0 0 0\n0 1 0 0\n0 0 1 0\n0 0 0 1\n", encoding="utf-8")
+    anat = ws / FMRIPREP_RUNS / SOURCE_RUN / "out" / "sub-01" / "anat"
+    for label in ("CSF", "GM", "WM"):
+        src = anat / f"sub-01_space-MNI152NLin2009cAsym_res-2_label-{label}_probseg.nii.gz"
+        shutil.copy(src, out / f"tpl_{label.lower()}.nii.gz")
+    # the classes white matter, CSF, grey matter for the T1w and the T1w/T2w ratio (whose
+    # tissues are in the T1w's order): their 80th, 20th and 50th percentiles in the brain, a
+    # cycle once sorted by the T1w's means
+    import nibabel as nib
+
+    pct = []
+    for k in ("t1", "ratio"):
+        v = np.asarray(nib.load(str(out / f"mni_{k}.nii.gz")).dataobj, np.float32)
+        v = v[v > 0]
+        pct.append([float(np.percentile(v, q)) for q in (80, 20, 50)])
+    (out / "mni_means_cycle.txt").write_text(
+        "\n".join(" ".join(f"{x:.4f}" for x in r) for r in pct) + "\n", encoding="utf-8"
+    )
+
+
 @functools.cache
 def inputs() -> Path:
     """The derived inputs (``oracles/inputs/fsl-fast-replica/``), made once, deterministically:
-    ds000005's fMRIPrep T1w brain at half resolution; the multi-channel images
-    (:func:`_multichannel_inputs`)."""
+    ds000005's fMRIPrep T1w brain at half resolution and its edge cases
+    (:func:`_single_inputs`); the multi-channel images (:func:`_multichannel_inputs`); the
+    priors' matrices and maps (:func:`_prior_inputs`)."""
     import nibabel as nib
 
     ws = workspace()
     assert ws is not None
     out = ws / "oracles" / "inputs" / SUITE
-    stamp = out / "DONE-v3"
+    stamp = out / "DONE-v7"
     if stamp.is_file():
         return out
     out.mkdir(parents=True, exist_ok=True)
@@ -198,8 +267,10 @@ def inputs() -> Path:
     t1 = nib.load(str(src))
     t, ta = _strided(t1, 2)
     _save(out / "t1_half.nii.gz", np.asarray(t, np.float32), ta)
+    _single_inputs(out)
     _multichannel_inputs(ws, out)
-    stamp.write_text("derived inputs of the fsl-fast-replica suite, version 3\n", encoding="utf-8")
+    _prior_inputs(ws, out)
+    stamp.write_text("derived inputs of the fsl-fast-replica suite, version 7\n", encoding="utf-8")
     return out
 
 
@@ -223,6 +294,21 @@ class Run:
     #: ``_restore_<n>`` hold what the heap held; they are compared with the defined result (no
     #: bias field: 1, and the channel's image) and their headers with FSL's.
     no_bias_field: bool = False
+    #: A case FSL aborts or crashes on and the default corrects: the replica's ``fix`` run
+    #: finishes, names this entry and writes the segmentation.
+    fix_finishes: str = ""
+    #: A case the replica refuses in both modes (FSL reads or writes outside its memory): FSL's
+    #: run is never cached and only reported; the replica exits 1 naming this entry, writing
+    #: nothing.
+    refused: str = ""
+    #: A case FSL runs or aborts on that the default refuses (rule B): the replica's ``fix`` run
+    #: exits 1 with a refusal naming this entry.
+    fix_refuses: str = ""
+
+
+#: The entries the ``fix`` pass may name without a visible change: FSL-96 and FSL-97 fill the
+#: memory FAST never writes in both modes (the suite compares FSL's files with those values).
+SILENT = ("FSL-96", "FSL-97")
 
 
 def _prepare(run: Run, tmp: Path) -> list[str]:
@@ -237,7 +323,68 @@ def _prepare(run: Run, tmp: Path) -> list[str]:
     return out
 
 
+def _refused_case(run: Run, checks: CheckList) -> None:
+    """:attr:`Run.refused`: FSL's run reported (never cached), the replica's refusal in both
+    modes."""
+    from larmorx_validation.parity.harness import EXPECTED
+
+    settings = dict(run.settings)
+    with tempfile.TemporaryDirectory(prefix="lx-nc-fast-") as a_:
+        a = Path(a_)
+        args = _prepare(run, a)
+        p = oracle_run(args, cwd=a, settings=settings, never=f"undefined behaviour ({run.refused})")
+        fsl = f"FSL exits {p.returncode}: {' '.join(p.stderr.split())[-120:]}"
+    for mode in (defects.REPRODUCE, defects.FIX):
+        with tempfile.TemporaryDirectory(prefix="lx-nc-fast-") as b_:
+            b = Path(b_)
+            r = run_replica(PROGRAM, _prepare(run, b), cwd=b, settings=settings, mode=mode)
+            refusal = next(
+                (ln for ln in r.stderr.splitlines() if ln.startswith("larmorx-nc: error:")), ""
+            )
+            written = sorted(q.name for q in b.glob("seg*"))
+            checks(
+                f"the replica refuses ({mode})",
+                r.code == 1 and run.refused in refusal and not written,
+                detail=f"exit {r.code}: {refusal[:160]}; {fsl}",
+            )
+    if all(c.passed for c in checks.checks):
+        raise Outcome(EXPECTED, f"undefined behaviour of FSL's ({run.refused}); refused. {fsl}")
+
+
+def _fix_finishes(run: Run, checks: CheckList) -> None:
+    """:attr:`Run.fix_finishes`: the default run finishes where FSL stops."""
+    settings = dict(run.settings)
+    with tempfile.TemporaryDirectory(prefix="lx-nc-fast-fix-") as b_:
+        b = Path(b_)
+        r = run_replica(PROGRAM, _prepare(run, b), cwd=b, settings=settings, mode=defects.FIX)
+        named = defects.notices_in(r.stderr)
+        checks(
+            f"the default run finishes and names {run.fix_finishes}",
+            r.code == 0 and run.fix_finishes in named and bool(list(b.glob("*_seg.nii*"))),
+            detail=f"exit {r.code}: {', '.join(named) or 'nothing named'}",
+        )
+
+
+def _fix_refuses(run: Run, checks: CheckList) -> None:
+    """:attr:`Run.fix_refuses`: the default run refuses."""
+    settings = dict(run.settings)
+    with tempfile.TemporaryDirectory(prefix="lx-nc-fast-fix-") as b_:
+        b = Path(b_)
+        r = run_replica(PROGRAM, _prepare(run, b), cwd=b, settings=settings, mode=defects.FIX)
+        refusal = next(
+            (ln for ln in r.stderr.splitlines() if ln.startswith("larmorx-nc: error:")), ""
+        )
+        checks(
+            f"the default run refuses, naming {run.fix_refuses}",
+            r.code == 1 and run.fix_refuses in refusal,
+            detail=f"exit {r.code}: {refusal[:160]}",
+        )
+
+
 def _run_case(run: Run, checks: CheckList) -> None:
+    if run.refused:
+        _refused_case(run, checks)
+        return
     settings = dict(run.settings)
     with (
         tempfile.TemporaryDirectory(prefix="lx-nc-fast-") as a_,
@@ -254,7 +401,20 @@ def _run_case(run: Run, checks: CheckList) -> None:
             _undefined_bias_field(checks, a, args)
         compare(checks, PROGRAM, oracle, replica, a, b)
         if run.fix and replica.code == 0:
-            fix_pass(checks, PROGRAM, lambda t: _prepare(run, t), args, settings, b, replica)
+            fix_pass(
+                checks,
+                PROGRAM,
+                lambda t: _prepare(run, t),
+                args,
+                settings,
+                b,
+                replica,
+                silent_ok=SILENT,
+            )
+    if run.fix_finishes:
+        _fix_finishes(run, checks)
+    if run.fix_refuses:
+        _fix_refuses(run, checks)
     _agree_on_errors(checks, PROGRAM, oracle.code, oracle.stderr)
 
 
@@ -362,7 +522,7 @@ def _fmriprep_case(payload: tuple[str, str], checks: CheckList) -> None:
             def prepare(t: Path) -> None:
                 shutil.copy(src, t / args[-1])
 
-            fix_pass(checks, PROGRAM, prepare, args, {}, b, replica)
+            fix_pass(checks, PROGRAM, prepare, args, {}, b, replica, silent_ok=SILENT)
     _agree_on_errors(checks, PROGRAM, oracle.code, oracle.stderr)
 
 
@@ -505,8 +665,404 @@ def _multi_cases() -> dict[str, tuple[str, str, Run]]:
     return c
 
 
+#: ``-p``'s probability maps: FSL never writes them outside the mask.
+UNWRITTEN_SINGLE = {
+    "never": UNWRITTEN_PROB,
+    "unwritten": tuple(f"_prob_{i}.nii.gz" for i in range(5)),
+}
+
+
+def _option_cases() -> dict[str, tuple[str, str, Run]]:
+    """The single-channel options on the half-resolution T1w brain, one case per path: the
+    bias field (on by default) and its outputs, the image types, the class counts (1, 2, 4:
+    no mixel types, two, their own), ``--nopve``, ``-s`` (in order, cyclic, too few values),
+    every numeric option, ``-v``, ``-o``; the odd inputs (one slice, 4D, negative values both
+    ways, NaN voxels, 16-bit integers, values above 2^24)."""
+    c: dict[str, tuple[str, str, Run]] = {}
+    st = "standard"
+
+    def add(name: str, desc: str, *args: str, tier: str = st, **kw: Any) -> None:
+        c[name] = (tier, desc, Run(tuple(args), **kw))
+
+    t1 = "@t1_half.nii.gz"
+    add(
+        "opt/bias-outputs",
+        "the bias field (default) with -b -B -g",
+        "-b",
+        "-B",
+        "-g",
+        "-o",
+        "seg",
+        t1,
+    )
+    add("opt/type2-verbose", "-t 2 -v: reversed class order, every message", "-t", "2", "-v", t1)
+    add("opt/type3-n2", "-t 3 -n 2 -g: PD-weighted, two classes", "-t", "3", "-n", "2", "-g", t1)
+    add(
+        "opt/n4-probs",
+        "-n 4 -p: four classes, their mixel types",
+        "-n",
+        "4",
+        "-p",
+        "-o",
+        "seg",
+        t1,
+        **UNWRITTEN_SINGLE,
+    )
+    add("opt/n1", "-n 1 -v: one class (no mixel types)", "-n", "1", "-v", "-o", "seg", t1)
+    add("opt/nopve", "--nopve -g -B", "--nopve", "-g", "-B", "-o", "seg", t1)
+    add(
+        "opt/numeric",
+        "every numeric option (-I 2 -O 1 -W 5 -l 30 -f 0.05 -H 0.2 -R 0.5) with -b",
+        *("-I", "2", "-O", "1", "-W", "5", "-l", "30", "-f", "0.05", "-H", "0.2", "-R", "0.5"),
+        *("-b", "-o", "seg", t1),
+    )
+    add("opt/H0-N", "-H 0 -N: no MRF smoothness, no bias field", "-H", "0", "-N", "-o", "seg", t1)
+    add(
+        "opt/long-names",
+        "the long option names",
+        "--class=3",
+        "--iter=1",
+        "--lowpass=15",
+        "--type=1",
+        "--fHard=0.03",
+        "--segments",
+        "--nobias",
+        "--channels=1",
+        "--out=seg",
+        "--init=3",
+        "--mixel=0.2",
+        "--fixed=2",
+        "--Hyper=0.15",
+        "--verbose",
+        t1,
+    )
+    add(
+        "opt/manualseg", "-s: the initial class intensities", "-s", "@t1_means.txt", "-o", "seg", t1
+    )
+    add(
+        "opt/manualseg-cycle",
+        "-s with the classes in a cyclic order (sorted at the end)",
+        "-s",
+        "@t1_means_cycle.txt",
+        "-v",
+        "-o",
+        "seg",
+        t1,
+    )
+    add(
+        "opt/manualseg-two",
+        "-s with too few values (the percentiles instead)",
+        "-s",
+        "@t1_means_two.txt",
+        "-o",
+        "seg",
+        t1,
+    )
+    add(
+        "opt/manualseg-missing",
+        "-s naming no file (the percentiles instead)",
+        "-s",
+        "nofile.txt",
+        "-o",
+        "seg",
+        t1,
+    )
+    add("opt/2d", "a 2D image (one slice) with -B -b", "-B", "-b", "-o", "seg", "@t1_2d.nii.gz")
+    add(
+        "opt/4d",
+        "a 4D image (its first volume, with newimage's warning)",
+        "-o",
+        "seg",
+        "@t1_4d.nii.gz",
+    )
+    add(
+        "opt/offset",
+        "negative values, 2nd percentile below 0 (the minimum subtracted)",
+        "-B",
+        "-o",
+        "seg",
+        "@t1_offset.nii.gz",
+    )
+    add("opt/negvox", "a few negative voxels (set to 0)", "-B", "-o", "seg", "@t1_negvox.nii.gz")
+    add(
+        "opt/nan",
+        "NaN voxels with -B -b -p",
+        "-B",
+        "-b",
+        "-p",
+        "-o",
+        "seg",
+        "@t1_nan.nii.gz",
+        **UNWRITTEN_SINGLE,
+    )
+    add("opt/int16", "a 16-bit integer image", "-g", "-o", "seg", "@t1_int16.nii.gz")
+    add(
+        "opt/big",
+        "values above 2^24 (the brightest voxels and the mask)",
+        "-g",
+        "-o",
+        "seg",
+        "@t1_big.nii.gz",
+    )
+    add(
+        "opt/output-type",
+        "FSLOUTPUTTYPE=NIFTI_PAIR",
+        "-g",
+        "-o",
+        "seg",
+        t1,
+        settings=(("FSLOUTPUTTYPE", "NIFTI_PAIR"),),
+    )
+    add("opt/default-name", "no -o: the outputs named after the input", "-N", "--nopve", t1)
+    return c
+
+
+def _error_cases() -> dict[str, tuple[str, str, Run]]:
+    """The messages, exit statuses and failure cases."""
+    c: dict[str, tuple[str, str, Run]] = {}
+    st = "standard"
+
+    def add(name: str, desc: str, *args: str, tier: str = st, **kw: Any) -> None:
+        c[name] = (tier, desc, Run(tuple(args), **kw))
+
+    q = "@mni4_t1.nii.gz"
+    add("err/no-arguments", "no arguments: the usage")
+    add("err/help", "-h: the usage", "-h")
+    add("err/unknown-option", "an unknown option", "--bogus", q)
+    add("err/missing-value", "an option without its value", "-n")
+    add("err/bad-number", "a value that is not a number", "-n", "abc", q)
+    add("err/H-negative", "-H below 0", "-H", "-0.5", q)
+    add("err/H-nan", "-H nan (passes the check for a negative value)", "-H", "nan", "-o", "seg", q)
+    add("err/H-inf", "-H inf", "-H", "inf", "-o", "seg", q)
+    add("err/l-zero", "-l 0 (no smoothing extent)", "-l", "0", "-o", "seg", q)
+    add("err/f-nan", "-f nan", "-f", "nan", "-o", "seg", q)
+    add("err/R-nan", "-R nan", "-R", "nan", "-o", "seg", q)
+    add("err/n0", "-n 0 (FAST aborts; FSL-99)", "-n", "0", "-o", "seg", q, fix_refuses="FSL-99")
+    add(
+        "err/n-negative",
+        "-n -1 (FAST aborts; FSL-99)",
+        "-n",
+        "-1",
+        "-o",
+        "seg",
+        q,
+        fix_refuses="FSL-99",
+    )
+    add(
+        "err/n-negative-multi",
+        "-S 2 -n -2 (FAST aborts; FSL-99)",
+        *("-S", "2", "-n", "-2", "-o", "seg", "@mni4_t2.nii.gz", q),
+        fix_refuses="FSL-99",
+    )
+    add(
+        "err/n0-multi",
+        "-S 2 -n 0 (FSL-99)",
+        *("-S", "2", "-n", "0", "-o", "seg", "@mni4_t2.nii.gz", q),
+        fix_refuses="FSL-99",
+    )
+    add("err/n-minus2", "-n -2 (FAST aborts; FSL-99)", "-n", "-2", q, fix_refuses="FSL-99")
+    add("err/l-negative", "-l -5 (FSL-99)", "-l", "-5", "-o", "seg", q)
+    add("err/missing-input", "an input that does not exist", "-o", "seg", "nothere.nii.gz")
+    add(
+        "err/option-after-input",
+        "an option after the input (its value read as the image)",
+        "-o",
+        "seg",
+        q,
+        "-n",
+        "2",
+    )
+    add("err/constant", "a constant image (k-means cannot start)", "-o", "seg", "@const.nii.gz")
+    add("err/zeros", "an image of zeros (an empty mask)", "-o", "seg", "@zeros.nii.gz")
+    add(
+        "err/fsldir-unset",
+        "FSLDIR unset (no priors asked for: FAST aborts; FSL-100)",
+        *("-o", "seg", q),
+        settings=(("FSLDIR", None),),
+        fix_finishes="FSL-100",
+    )
+    add(
+        "err/fsldir-unset-a",
+        "FSLDIR unset with -a (FAST aborts; refused by default)",
+        *("-a", "@std2mni.mat", "-o", "seg", q),
+        settings=(("FSLDIR", None),),
+    )
+    add(
+        "err/fsldir-unset-A-a",
+        "FSLDIR unset with -A and -a (FLIRT's command starts with (null): the shell fails and "
+        "FAST crashes; FSL-102, FSL-101)",
+        *("-A", "@tpl_csf.nii.gz", "@tpl_gm.nii.gz", "@tpl_wm.nii.gz", "-a", "@ident.mat"),
+        *("-o", "seg", "@mni_t1.nii.gz"),
+        settings=(("FSLDIR", None),),
+        never="FSL crashes (FSL-101)",
+        fix_finishes="FSL-102",
+    )
+    add(
+        "err/S2-sizes",
+        "-S 2 with images of different sizes, channel 1 the smaller (FAST aborts; FSL-104)",
+        *("-S", "2", "-v", "-o", "seg", "@mni_t1.nii.gz", "@mni4_t1.nii.gz"),
+        fix_refuses="FSL-104",
+    )
+    add(
+        "err/S2-sizes-larger-first",
+        "-S 2 with images of different sizes, channel 1 the larger (refused; FSL-104)",
+        *("-S", "2", "-o", "seg", "@mni4_t1.nii.gz", "@mni_t1.nii.gz"),
+        refused="FSL-104",
+    )
+    add(
+        "err/S4-two-images",
+        "-S 4 with two images (an option word read as an image)",
+        *("-S", "4", "@mni4_t2.nii.gz", q),
+    )
+    add(
+        "err/fsldir-unset-A",
+        "FSLDIR unset with -A (no FSLDIR needed)",
+        *("-A", "a", "b", "c", "-o", "seg", q),
+        settings=(("FSLDIR", None),),
+    )
+    add(
+        "err/S1-two-images",
+        "-S 1 with two images (the last one segmented)",
+        "-o",
+        "seg",
+        "@mni4_t2.nii.gz",
+        q,
+    )
+    return c
+
+
+def _prior_cases() -> dict[str, tuple[str, str, Run]]:
+    """The tissue priors on MNI152NLin2009cAsym's 2 mm T1w: FSL's standard priors registered
+    by ``-a`` (FLIRT's -applyxfm, run by FAST), ``-P`` (throughout), two classes, a class count
+    the priors do not serve, ``-A`` (the template's own CSF, GM and WM maps), ``-A`` alone, a
+    missing prior, a matrix FLIRT cannot read, the multi-channel segmentation."""
+    c: dict[str, tuple[str, str, Run]] = {}
+    st = "standard"
+
+    def add(name: str, desc: str, *args: str, tier: str = st, **kw: Any) -> None:
+        c[name] = (tier, desc, Run(tuple(args), **kw))
+
+    t1 = "@mni_t1.nii.gz"
+    mat = "@std2mni.mat"
+    tpl = ("@tpl_csf.nii.gz", "@tpl_gm.nii.gz", "@tpl_wm.nii.gz")
+    add("priors/a-verbose", "-a with FSL's standard priors, -v", "-a", mat, "-v", "-o", "seg", t1)
+    add(
+        "priors/a-P-probs",
+        "-a -P: the priors throughout, -p -g",
+        "-a",
+        mat,
+        "-P",
+        "-p",
+        "-g",
+        "-o",
+        "seg",
+        t1,
+        **UNWRITTEN_SINGLE,
+    )
+    add("priors/a-n2", "-a -n 2: two classes", "-a", mat, "-n", "2", "-o", "seg", t1)
+    add("priors/a-P-n2", "-a -P -n 2", "-a", mat, "-P", "-n", "2", "-o", "seg", t1)
+    add(
+        "priors/a-n4",
+        "-a -n 4 (priors serve 2 or 3 classes only)",
+        "-a",
+        mat,
+        "-n",
+        "4",
+        "-o",
+        "seg",
+        t1,
+    )
+    add(
+        "priors/A-a",
+        "-A (ds000005's own maps in the template's space) with -a (the identity) and -P",
+        "-A",
+        *tpl,
+        "-a",
+        "@ident.mat",
+        "-P",
+        "-o",
+        "seg",
+        t1,
+    )
+    add("priors/A-alone", "-A without -a (no priors)", "-A", *tpl, "-o", "seg", t1)
+    add("priors/P-alone", "-P without -a (no priors)", "-P", "-o", "seg", "@mni4_t1.nii.gz")
+    add(
+        "priors/missing-prior",
+        "-A naming a missing prior with -a",
+        "-A",
+        "nothere",
+        tpl[1],
+        tpl[2],
+        "-a",
+        "@ident.mat",
+        "-o",
+        "seg",
+        "@mni_t1.nii.gz",
+    )
+    add(
+        "priors/bad-matrix",
+        "-a naming a missing matrix (FLIRT fails; FAST crashes: FSL-101)",
+        *("-a", "nothere.mat", "-o", "seg", t1),
+        never="FSL crashes (FSL-101)",
+        fix_finishes="FSL-101",
+    )
+    add(
+        "priors/name-blank",
+        "-o with a blank: FLIRT's command split by the shell (FSL-102)",
+        *("-a", mat, "-o", "my seg", "@mni4_t1.nii.gz"),
+        never="FSL crashes (FSL-101)",
+        fix_finishes="FSL-102",
+    )
+    add(
+        "priors/multi-a-P",
+        "-S 2 -a -P: the multi-channel segmentation with the priors",
+        "-S",
+        "2",
+        "-a",
+        mat,
+        "-P",
+        "-o",
+        "seg",
+        "@mni_t2.nii.gz",
+        t1,
+    )
+    add(
+        "priors/multi-a-n2",
+        "-S 2 -a -n 2",
+        "-S",
+        "2",
+        "-a",
+        mat,
+        "-n",
+        "2",
+        "-o",
+        "seg",
+        "@mni_t2.nii.gz",
+        t1,
+    )
+    add(
+        "multi/s2-manualseg-cycle",
+        "-S 2 -s (T1w/T2w ratio, T1w) with the classes in a cyclic order (FSL-98)",
+        "-S",
+        "2",
+        "-s",
+        "@mni_means_cycle.txt",
+        "-o",
+        "seg",
+        "@mni_ratio.nii.gz",
+        t1,
+    )
+    return c
+
+
 def _all_cases() -> dict[str, tuple[str, str, Run]]:
-    return {**_real_cases(), **_multi_cases()}
+    return {
+        **_real_cases(),
+        **_multi_cases(),
+        **_option_cases(),
+        **_error_cases(),
+        **_prior_cases(),
+    }
 
 
 def cases(tier: str) -> list[Case]:

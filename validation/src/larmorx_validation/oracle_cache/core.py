@@ -14,11 +14,14 @@ from __future__ import annotations
 
 import contextlib
 import gzip
+import hashlib
 import os
 import re
 import shutil
 import signal
+import statistics
 import subprocess
+import tempfile
 import time
 from collections import Counter
 from collections.abc import Callable, Sequence
@@ -166,6 +169,11 @@ class Completed:
     stderr_bytes: bytes
     cached: bool = False
     seconds: float = 0.0
+    #: with ``run(..., peak=True)``: the program's peak resident memory (MiB), measured by
+    #: ``/usr/bin/time`` or, when served, the median of the peaks its entry keeps for this machine
+    peak_mib: float | None = None
+    #: how many peaks of this machine the entry keeps after the call (0: the run is not stored)
+    peaks_kept: int = 0
 
     @property
     def timed_out(self) -> bool:
@@ -185,19 +193,38 @@ class Completed:
         return self.text("stderr")
 
 
+#: GNU time, which measures a peak (``run(..., peak=True)``)
+TIME = "/usr/bin/time"
+#: The peaks an entry keeps per machine (the newest; a refresh measures again)
+PEAKS_KEPT = 3
+
+
 def _execute(
-    argv: Sequence[str], env: dict[str, str], cwd: Path | None, timeout: float | None
+    argv: Sequence[str],
+    env: dict[str, str],
+    cwd: Path | None,
+    timeout: float | None,
+    peak: bool = False,
 ) -> Completed:
     """Runs ``argv``: every original program the harness runs, served or not (the cache's
     modes, ``verify``, random testing), runs here, under the fixed address-space limit
     (:mod:`larmorx_validation.address_space`: an impossible allocation is refused alike on every
-    machine)."""
+    machine). With ``peak``, under ``/usr/bin/time -v -o <file>``: the streams stay the
+    program's own, the report (its peak and how it ended) goes to the file."""
     from larmorx_validation import address_space
 
+    command = [str(a) for a in argv]
+    report = None
+    if peak:
+        if timeout is not None:
+            raise ValueError("a peak is measured without a timeout (time's child would outlive it)")
+        fd, report = tempfile.mkstemp(prefix="lx-peak-", suffix=".txt")
+        os.close(fd)
+        command = [TIME, "-v", "-o", report, *command]
     start = time.perf_counter()
     try:
         p = subprocess.run(
-            [str(a) for a in argv],
+            command,
             capture_output=True,
             env=env,
             cwd=None if cwd is None else str(cwd),
@@ -208,7 +235,43 @@ def _execute(
         code, out, err = p.returncode, p.stdout, p.stderr
     except subprocess.TimeoutExpired as e:
         code, out, err = None, e.stdout or b"", e.stderr or b""
-    return Completed([str(a) for a in argv], code, out, err, False, time.perf_counter() - start)
+    done = Completed([str(a) for a in argv], code, out, err, False, time.perf_counter() - start)
+    if report is not None:
+        text = Path(report).read_text(encoding="utf-8", errors="replace")
+        Path(report).unlink()
+        m = re.search(r"Maximum resident set size \(kbytes\): (\d+)", text)
+        if m is None:
+            raise RuntimeError(f"{TIME} gave no peak: {text[-300:]!r}")
+        done.peak_mib = int(m.group(1)) / 1024
+        # time exits 128 + N when the program ends by signal N: the program's own status is -N
+        s = re.search(r"Command terminated by signal (\d+)", text)
+        if s is not None:
+            done.returncode = -int(s.group(1))
+    return done
+
+
+def _machine() -> str:
+    """This machine, for the peaks an entry keeps (a digest: the cache never holds a name)."""
+    ident = f"{os.uname().nodename} {os.uname().machine} {os.cpu_count()}"
+    return hashlib.sha256(ident.encode()).hexdigest()[:16]
+
+
+def _peaks(entry: dict) -> list[float]:
+    return [p["mib"] for p in entry.get("peaks", []) if p.get("machine") == _machine()]
+
+
+def _keep_peak(store: Store, key: str, mib: float) -> int:
+    """Adds a fresh run's peak to its stored entry; returns how many this machine's entry keeps."""
+    with store.lock(key):
+        entry = store.read(key)
+        if entry is None or entry.get("disputed"):
+            return 0
+        mine = [p for p in entry.get("peaks", []) if p.get("machine") == _machine()]
+        others = [p for p in entry.get("peaks", []) if p.get("machine") != _machine()]
+        mine = [*mine, {"mib": round(mib, 3), "machine": _machine(), "date": now()}]
+        entry["peaks"] = others + mine[-PEAKS_KEPT:]
+        store.write(entry)
+        return len(mine[-PEAKS_KEPT:])
 
 
 # ------------------------------------------------------------------------------------------------
@@ -648,6 +711,7 @@ def run(
     timeout: float | None = None,
     runner: str = "",
     inputs: Sequence[Path] = (),
+    peak: bool = False,
 ) -> Completed:
     """Run ``argv`` (an original program and its arguments), or replay it from the cache.
 
@@ -657,6 +721,10 @@ def run(
     ``runner`` the suite's name for the entry; ``inputs`` files the program reads that its
     arguments do not name as files (FSL's images named without their extension, found by the
     program: ``bet in out`` reads ``in.nii.gz``), keyed by their content like the named ones.
+    With ``peak`` the result also holds the program's peak resident memory (``peak_mib``): measured
+    by ``/usr/bin/time`` and kept in the entry (the newest :data:`PEAKS_KEPT` per machine), or,
+    served, the median of those this machine measured; an entry without one runs (memory tests,
+    ``tests/parity/test_memory_peak.py``).
     The result is a :class:`Completed`."""
     argv = [str(a) for a in argv]
     env = dict(os.environ if env is None else env)
@@ -684,8 +752,9 @@ def run(
         timeout,
         runner,
         {"kind": "exec", "program": str(program)},
-        lambda: _execute(argv, env, cwd, timeout),
+        lambda: _execute(argv, env, cwd, timeout, peak),
         inputs,
+        peak,
     )
 
 
@@ -747,6 +816,7 @@ def _run(
     launcher: dict,
     execute: Callable[[], Completed],
     inputs: Sequence[Path] = (),
+    peak: bool = False,
 ) -> Completed:
     current = mode()
     if current == "off":
@@ -785,6 +855,7 @@ def _run(
         current == "use"
         and entry is not None
         and (not repeated or identical_runs(entry) >= CONFIRMATIONS)
+        and (not peak or _peaks(entry))
         and _servable(store, entry)
     ):
         try:
@@ -792,6 +863,9 @@ def _run(
         except _Unresolved as e:
             unresolved = f"its entry names {e}, which this run lacks"
         else:
+            if peak:
+                done.peak_mib = statistics.median(_peaks(entry))
+                done.peaks_kept = len(_peaks(entry))
             _case.tally.served += 1
             _case.tally.saved_seconds += entry.get("seconds", 0.0)
             return done
@@ -807,6 +881,8 @@ def _run(
         reason = "its entry is disputed (a run differed)"
     elif entry.get("confirmations", 0) < entry.get("required", 1):
         reason = f"above one thread: not yet {entry['required']} identical runs"
+    elif peak and not _peaks(entry):
+        reason = "no memory peak measured on this machine yet"
     else:
         reason = "its entry's files are missing"
     try:
@@ -833,6 +909,8 @@ def _run(
     except Exception as e:  # the result stands; only the cache missed it
         _warn(f"cannot store a run of {program} ({type(e).__name__}: {e})")
         why = "not storable: an error in the cache"
+    if peak and done.peak_mib is not None and why is None:
+        done.peaks_kept = _keep_peak(store, prep.key, done.peak_mib)
     _fresh(why or reason)
     return done
 

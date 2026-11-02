@@ -17,6 +17,8 @@ The whole design, what is in the key and why, and the commands: ``docs/validatio
 from larmorx_validation.oracle_cache.core import (
     ENV_MODE,
     MODES,
+    PEAKS_KEPT,
+    TIME,
     Completed,
     Tally,
     begin_case,
@@ -43,6 +45,8 @@ __all__ = [
     "ENV_LOCATION",
     "ENV_MODE",
     "MODES",
+    "PEAKS_KEPT",
+    "TIME",
     "VARIES_ABOVE_ONE_THREAD",
     "VARYING_DEFECTS",
     "Completed",

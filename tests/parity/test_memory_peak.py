@@ -17,6 +17,13 @@ every call of this file) has as its fixed cost the peak of ``python -m larmorx -
 measured the same way, in the same environment (:func:`entry_peak`: the interpreter's start-up
 and larmorx's Rust core, about 14 MiB here); a call of the standalone binary keeps
 ``OVERHEAD_MIB`` (:func:`allowance`).
+
+The originals' peaks come from the oracle-output cache (since 2026-11-02, the user: "Didnt we
+agreed on running oracles once and then larmorx program everytime?"): the first time each call
+of an original runs three times (the cache's confirmation runs, its output places emptied before
+each), its peak kept in its entry for this machine and its outputs stored; afterwards the call is
+served, its outputs replayed and its peak the median of the three, and only larmorx runs
+(:func:`_original_peak`; ``--oracle-cache refresh`` measures again, ``off`` measures every time).
 """
 
 from __future__ import annotations
@@ -24,11 +31,13 @@ from __future__ import annotations
 import os
 import re
 import shutil
+import statistics
 import subprocess
 import sys
 from pathlib import Path
 
 import pytest
+from larmorx_validation import oracle_cache
 
 nib = pytest.importorskip("nibabel")
 np = pytest.importorskip("numpy")
@@ -85,6 +94,39 @@ def _peak(cmd: list[str], env: dict[str, str], cwd: Path | None = None) -> tuple
     return p.returncode, int(m.group(1)) / 1024
 
 
+def _emptier(d: Path):
+    """Empties ``d`` (an original's output place) before a repeated measuring run."""
+
+    def empty() -> None:
+        shutil.rmtree(d)
+        d.mkdir()
+
+    return empty
+
+
+def _original_peak(
+    cmd: list[str], env: dict[str, str], family: str, reset, cwd: Path | None = None
+) -> tuple[int, float]:
+    """An original program's exit status and peak (MiB), through the oracle-output cache: served
+    (the median of the peaks its entry keeps for this machine; its outputs replayed), or run
+    under ``/usr/bin/time``, the first time three times (``reset`` empties its output place before
+    each repeat, so each run starts alike), a run the cache never stores once."""
+    policy = oracle_cache.Policy(threads=1, family=family)
+    peaks = []
+    for n in range(3):
+        if n:
+            reset()
+        done = oracle_cache.run(
+            cmd, env=env, cwd=cwd, policy=policy, runner="memory-peak", peak=True
+        )
+        if done.cached:
+            return done.returncode, done.peak_mib
+        peaks.append(done.peak_mib)
+        if done.returncode != 0 or done.peaks_kept in (0, 3):
+            break
+    return done.returncode, statistics.median(peaks)
+
+
 def entry_peak(env: dict[str, str], cwd: Path | None = None) -> float:
     """The peak (MiB) of ``python -m larmorx --version`` in ``env``, measured as the calls are:
     the Python entry point's fixed cost (the interpreter's start-up and larmorx's Rust core),
@@ -131,7 +173,12 @@ def test_larmorx_needs_no_more_memory_than_ants(tmp_path, program, size, spacing
         if lib is None:
             pytest.skip("libcrmath.so (scripts/build_crmath_preload.sh) was not found")
         ants_env["LD_PRELOAD"] = str(lib)
-    code, ants_mib = _peak([str(programs.ants_bin() / program), *argv(a_out)], ants_env)
+    code, ants_mib = _original_peak(
+        [str(programs.ants_bin() / program), *argv(a_out)],
+        ants_env,
+        "itk",
+        lambda: a_out.unlink(missing_ok=True),
+    )
     assert code == 0
     for mode in ("reproduce", "fix"):
         out = tmp_path / f"larmorx-{mode}.nii.gz"
@@ -174,12 +221,12 @@ def _bet_inputs(tmp: Path, fb) -> dict[str, Path]:
     paths["in4d"] = fb._save(np.round(series).astype(np.int16), tmp / "series.nii.gz")
     prep = tmp / "prep"
     prep.mkdir()
-    p = subprocess.run(
+    p = oracle_cache.run(
         [str(fb.fsl_dir() / "bin" / "bet2"), str(paths["in"]), "t1", "-e", "-n"],
         cwd=prep,
         env=fb.environment(),
-        capture_output=True,
-        check=False,
+        policy=oracle_cache.Policy(threads=1, family="fsl"),
+        runner="memory-peak",
     )
     assert p.returncode == 0, p.stderr
     paths["mesh"] = prep / "t1_mesh.vtk"
@@ -212,7 +259,9 @@ def test_larmorx_needs_no_more_memory_than_fsl(tmp_path, tool, args):
     env = {**fb.environment(), "OMP_NUM_THREADS": "1"}
     f_dir = tmp_path / "fsl"
     f_dir.mkdir()
-    code, fsl_mib = _peak([str(fb.fsl_dir() / "bin" / tool), *words], env, f_dir)
+    code, fsl_mib = _original_peak(
+        [str(fb.fsl_dir() / "bin" / tool), *words], env, "fsl", _emptier(f_dir), f_dir
+    )
     assert code == 0
     for mode in ("reproduce", "fix"):
         r_dir = tmp_path / f"larmorx-{mode}"
@@ -290,7 +339,9 @@ def test_flirt_replica_needs_no_more_memory_than_fsl(tmp_path, name, program, ar
     env = {**fr._environment({}), "OMP_NUM_THREADS": "1"}
     f_dir = tmp_path / "fsl"
     f_dir.mkdir()
-    code, fsl_mib = _peak([str(fr.fsldir() / "bin" / program), *words], env, f_dir)
+    code, fsl_mib = _original_peak(
+        [str(fr.fsldir() / "bin" / program), *words], env, "fsl", _emptier(f_dir), f_dir
+    )
     assert code == 0
     for mode in ("reproduce", "fix"):
         r_dir = tmp_path / f"larmorx-{mode}"
@@ -342,7 +393,9 @@ def test_flirt_original_needs_no_more_memory_than_fsl(tmp_path, name, program, a
     env = {**fr._environment({}), "OMP_NUM_THREADS": "1"}
     f_dir = tmp_path / "fsl"
     f_dir.mkdir()
-    code, fsl_mib = _peak([str(fr.fsldir() / "bin" / program), *words], env, f_dir)
+    code, fsl_mib = _original_peak(
+        [str(fr.fsldir() / "bin" / program), *words], env, "fsl", _emptier(f_dir), f_dir
+    )
     assert code == 0
     for mode in ("reproduce", "fix"):
         r_dir = tmp_path / f"larmorx-{mode}"
@@ -396,7 +449,9 @@ def test_bet_original_needs_no_more_memory_than_fsl(tmp_path, tool, args):
     env = {**fb.environment(), "OMP_NUM_THREADS": "1"}
     f_dir = tmp_path / "fsl"
     f_dir.mkdir()
-    code, fsl_mib = _peak([str(fb.fsl_dir() / "bin" / tool), *words], env, f_dir)
+    code, fsl_mib = _original_peak(
+        [str(fb.fsl_dir() / "bin" / tool), *words], env, "fsl", _emptier(f_dir), f_dir
+    )
     assert code == 0
     for mode in ("reproduce", "fix"):
         r_dir = tmp_path / f"larmorx-{mode}"
@@ -525,8 +580,11 @@ def test_larmorx_needs_no_more_memory_than_ants_more(tmp_path, program, args):
 
     a_dir = tmp_path / "ants"
     a_dir.mkdir()
-    code, ants_mib = _peak(
-        [str(programs.ants_bin() / program), *argv(a_dir)], {**env, "LD_PRELOAD": str(lib)}
+    code, ants_mib = _original_peak(
+        [str(programs.ants_bin() / program), *argv(a_dir)],
+        {**env, "LD_PRELOAD": str(lib)},
+        "itk",
+        _emptier(a_dir),
     )
     assert code == 0
     for mode in ("reproduce", "fix"):
@@ -633,7 +691,7 @@ def test_larmorx_needs_no_more_memory_than_afni(tmp_path, program, args):
 
     a_dir = tmp_path / "afni"
     a_dir.mkdir()
-    code, afni_mib = _peak([str(afni), *argv(a_dir)], env, a_dir)
+    code, afni_mib = _original_peak([str(afni), *argv(a_dir)], env, "afni", _emptier(a_dir), a_dir)
     assert code == 0
     for mode in ("reproduce", "fix"):
         r_dir = tmp_path / f"larmorx-{mode}"

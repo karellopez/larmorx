@@ -8,6 +8,7 @@ from __future__ import annotations
 import gzip
 import json
 import os
+import signal
 import stat
 import subprocess
 import sys
@@ -358,6 +359,43 @@ def test_exit_status_and_failures_are_cached(cache, fake, workdir):
     oc.begin_case("another case")
     again = run(fake, src2, dst2, "--exit", "3")
     assert again.cached and again.returncode == 3
+
+
+needs_time = pytest.mark.skipif(not Path(oc.TIME).is_file(), reason="GNU time is not installed")
+
+
+@needs_time
+def test_a_peak_is_measured_kept_and_served(cache, fake, workdir):
+    assert run(fake, *workdir(b"abc")[1:]).peak_mib is None  # stored without a peak
+    oc.begin_case("a memory test")
+    first = run(fake, *workdir(b"abc")[1:], peak=True)  # no peak in its entry: it runs, keeps one
+    assert not first.cached and first.peak_mib > 0 and first.peaks_kept == 1
+    assert first.stderr == "note: in.nii\n" and first.returncode == 0  # the program's own
+    oc.begin_case("the memory test again")
+    served = run(fake, *workdir(b"abc")[1:], peak=True)
+    assert served.cached and served.peaks_kept == 1
+    assert served.peak_mib == pytest.approx(first.peak_mib, abs=1e-3)
+    (e,) = entries(cache)
+    assert len(e["peaks"]) == 1 and len(e["peaks"][0]["machine"]) == 16
+
+
+@needs_time
+def test_a_refresh_keeps_the_newest_three_peaks(cache, fake, workdir):
+    with oc.using("refresh"):
+        kept = [run(fake, *workdir(b"abc")[1:], peak=True).peaks_kept for _ in range(4)]
+    assert kept == [1, 2, 3, 3]
+    (e,) = entries(cache)
+    assert len(e["peaks"]) == 3
+
+
+@needs_time
+def test_a_peak_run_that_ends_by_a_signal_keeps_its_status(cache, tmp_path, workdir):
+    prog = make_program(
+        tmp_path / "bin", "import os, signal\nos.kill(os.getpid(), signal.SIGSEGV)\n", "crash"
+    )
+    r = oc.run([prog], env=env_for(), policy=ONE, peak=True)
+    assert r.returncode == -signal.SIGSEGV and r.peak_mib > 0 and r.peaks_kept == 0
+    assert entries(cache) == []  # a crash is never stored
 
 
 def test_outputs_named_only_by_a_declared_place(cache, fake, workdir):

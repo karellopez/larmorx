@@ -162,6 +162,22 @@ place, every input and every input's name is stored as a placeholder and replaye
 run's: a replayed message names this run's files, as a fresh run would. A file written anywhere
 else, or bytes that still hold the run's temporary paths, and the run is not stored.
 
+## Memory peaks (since 2026-11-02)
+
+The memory tests (`tests/parity/test_memory_peak.py`: larmorx's peak at most 10 % above the
+original's plus a fixed cost) measured the original's peak afresh at every smoke tier, about half
+of its 15 serial minutes (the user, 2026-11-02: "Didnt we agreed on running oracles once and then
+larmorx program everytime?"). `run(..., peak=True)` runs the program under `/usr/bin/time -v -o
+<file>` (its streams stay its own; a run ended by signal N keeps status -N), returns the peak as
+`peak_mib` and keeps it in the entry, the newest three per machine (`peaks`, the machine by a
+digest of its name, architecture and processor count: a peak depends on the machine, an output
+does not). An entry without a peak of this machine runs, then keeps one; a served call returns
+the median of those it keeps. The memory tests ask for each original's call three times the first
+time (the cache's confirmation runs, `CONFIRMATIONS`; the output place emptied before each, so
+each run starts alike) and are served afterwards, outputs replayed for their bit-identity checks:
+only larmorx runs. `refresh` measures again (the newest three are kept); `off` measures every
+time, as before. A run the cache never stores (a clock seed, a crash) is measured once, as before.
+
 ## Differences: findings, never overwritten
 
 When a fresh run of a stored key gives another result (`refresh`, `verify`, a confirmation, two

@@ -134,7 +134,12 @@ fn matrix(settings: &Settings, name: &str, err: &mut dyn Write) -> Result<Mat4, 
         ));
     };
     if mat::inverse(&m).is_none() {
-        return Err(abort(err, "applyxfm4D", "std::runtime_error", mat::SINGULAR));
+        return Err(abort(
+            err,
+            "applyxfm4D",
+            "std::runtime_error",
+            mat::SINGULAR,
+        ));
     }
     Ok(m)
 }

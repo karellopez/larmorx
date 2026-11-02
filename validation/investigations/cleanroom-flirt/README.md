@@ -32,3 +32,8 @@ inside `scripts/orchestration/boxed.sh`, with `PYTHONPATH=python:validation/src`
 FSL's `flirt -verbose 7` (every cost evaluation with its parameters) was the reference for the
 evaluation-by-evaluation comparison of the findings; the original printed its own evaluations
 through a development hook that is no longer in the code.
+| `trial5_tcat.py <trial dir> [kind] [signature] [n]` | part 2, relay 5: a random-testing trial's differing cases by (kind, first failed checks), with examples |
+| `trial5_stderrcat.py`, `trial5_codestat.py`, `trial5_stdcodes.py`, `trial5_a4d.py` (`<trial dir>`) | the trial's standard-error differences by their lines; form-code differences by the reference's unset form; the coordinate programs' by the images' codes; applyxfm4D's by interpolation and stored type |
+| `trial5_dcmp.py <seed> <n> <dir>` | one of the trial's cases by hand (FSL with the cache off, the original in `reproduce`), both directories and streams kept, header fields and voxels that differ |
+| `trial5_isomodel.py <dcmp dirs>` | models of `-applyisoxfm`'s written sform against FSL's (the voxel flip, §4.1's swaps by both grids) |
+| `trial5_bbre.py <dir>` | BBR with an empty `-wmseg` on five small schedules: FSL's and the original's error and NaN lines |

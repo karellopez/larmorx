@@ -26,6 +26,7 @@ What is compared (``specs/flirt.md`` §13):
 
 from __future__ import annotations
 
+import contextlib
 import os
 import re
 import subprocess
@@ -121,10 +122,8 @@ def _masked(text: str) -> str:
 def _numbers(text: str) -> list[float]:
     out = []
     for m in _NUMBER.findall(text):
-        try:
+        with contextlib.suppress(ValueError):
             out.append(float(m))
-        except ValueError:
-            pass
     return out
 
 
@@ -135,7 +134,7 @@ def _reference_mask(path: Path) -> tuple[np.ndarray, np.ndarray] | None:
 
     try:
         img = nib.load(str(path))
-    except Exception:  # noqa: BLE001 - an image FSL reads that nibabel does not
+    except Exception:
         return None
     data = np.asanyarray(img.dataobj)
     if data.ndim > 3:
@@ -218,7 +217,11 @@ def compare(
         if not close:
             wl, gl = want.splitlines(), got.splitlines()
             first = next(
-                (i for i, (x, y) in enumerate(zip(wl, gl, strict=False)) if _masked(x) != _masked(y)),
+                (
+                    i
+                    for i, (x, y) in enumerate(zip(wl, gl, strict=False))
+                    if _masked(x) != _masked(y)
+                ),
                 min(len(wl), len(gl)),
             )
             detail = (
@@ -270,9 +273,7 @@ def compare(
             continue
         if not applying and not is_mat and len(na) == len(nb) and na:
             # a schedule's text output (rows, parameters) of a registration: its numbers
-            rel = float(
-                np.max(np.abs(np.array(na) - np.array(nb)) / np.maximum(np.abs(na), 1.0))
-            )
+            rel = float(np.max(np.abs(np.array(na) - np.array(nb)) / np.maximum(np.abs(na), 1.0)))
             checks(
                 f"{name}: the same numbers within 5 % (a registration's rows)",
                 rel <= 0.05,
@@ -371,7 +372,7 @@ def compare(
                         r = r[..., 0]
                     r = r.reshape(da.shape[:3])
                     rm = r > 0
-                except Exception:  # noqa: BLE001
+                except Exception:
                     rm = None
             if rm is None or not rm.any():
                 rm = np.ones(da.shape[:3], bool)
@@ -446,7 +447,7 @@ def _image_difference(fa: Path, fb: Path) -> str:
     try:
         da = np.asanyarray(nib.load(str(fa)).dataobj).astype(np.float64)
         db = np.asanyarray(nib.load(str(fb)).dataobj).astype(np.float64)
-    except Exception as e:  # noqa: BLE001
+    except Exception as e:
         return f"cannot read: {e}"
     if da.shape != db.shape:
         return f"shapes {da.shape} vs {db.shape}"
@@ -546,7 +547,9 @@ def _run_case(run: rep.Run, checks: CheckList) -> None:
             fix_pass(checks, run.program, lambda t: rep._prepare(run, t), args, settings, b, ours)
     if oracle.code != 0 and all(c.passed for c in checks.checks):
         tail = " ".join(oracle.stderr.split())[:200]
-        raise Outcome(BOTH_ERROR, f"{run.program} exits {oracle.code}; the same from the original. {tail}")
+        raise Outcome(
+            BOTH_ERROR, f"{run.program} exits {oracle.code}; the same from the original. {tail}"
+        )
 
 
 def _undefined_case(run: rep.Run, checks: CheckList) -> None:
@@ -576,7 +579,8 @@ def _undefined_case(run: rep.Run, checks: CheckList) -> None:
         raise Outcome(
             EXPECTED,
             f"FSL {'never finishes' if run.hang else 'crashes'} ({entry}: undefined behaviour); "
-            "the original " + ("finishes naming it" if run.crash_finishes else "refuses in both modes"),
+            "the original "
+            + ("finishes naming it" if run.crash_finishes else "refuses in both modes"),
         )
 
 

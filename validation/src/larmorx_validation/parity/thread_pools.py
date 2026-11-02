@@ -319,6 +319,26 @@ def programs(d: Path, nc: str | None = None, *, make: bool = True) -> list[Progr
     out.append(Program("fsl betsurf with a T2 (clean-room original)",
                        (*lx, "fsl", "betsurf", "-o", "-m", t1, t1, o + "_obet2_mesh.vtk",
                         str(mat), o + "_obs2"), bet))  # fmt: skip
+    # FLIRT's clean-room original (2026-11-02): the default schedule (the search's grids and
+    # the large evaluations' slices in parallel, the pyramid's filters, the output's slices),
+    # weights, the boundary-based cost (its points' normals and terms), -applyxfm with sinc,
+    # convert_xfm.
+    out.append(Program("fsl flirt (clean-room original)",
+                       (*lx, "fsl", "flirt", "-in", t1, "-ref", t1, "-dof", "6", "-out",
+                        o + "_oflirt", "-omat", o + "_oflirt.mat"), bet))  # fmt: skip
+    out.append(Program("fsl flirt weights (clean-room original)",
+                       (*lx, "fsl", "flirt", "-in", t1, "-ref", t1, "-dof", "7", "-nosearch",
+                        "-refweight", mask, "-omat", o + "_oflirtw.mat"), bet))  # fmt: skip
+    out.append(Program("fsl flirt bbr (clean-room original)",
+                       (*lx, "fsl", "flirt", "-in", t1, "-ref", t1, "-init", str(mat), "-cost",
+                        "bbr", "-wmseg", t1, "-schedule", str(_bbr_schedule(d, make)), "-dof",
+                        "6", "-omat", o + "_obbr.mat"), bet))  # fmt: skip
+    out.append(Program("fsl flirt -applyxfm sinc (clean-room original)",
+                       (*lx, "fsl", "flirt", "-in", t1, "-ref", t1, "-init", str(mat),
+                        "-applyxfm", "-interp", "sinc", "-out", o + "_oapply"), bet))  # fmt: skip
+    out.append(Program("fsl convert_xfm (clean-room original)",
+                       (*lx, "fsl", "convert_xfm", "-omat", o + "_oinv.mat", "-inverse",
+                        str(mat)), bet))  # fmt: skip
     if nc:
         fsl = {
             "mcflirt": ["-in", s, "-out", o + "_mcf"],

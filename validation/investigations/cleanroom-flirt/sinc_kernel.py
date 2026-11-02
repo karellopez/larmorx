@@ -90,7 +90,10 @@ def main() -> None:
             tname, kind, dt, order = key
             h = 3.0 if tname == "h3" else 3.5
             t = tables[tname]
-            k = [[lookup(t, f32(p[ax] - f32(base[ax] + d - 3)), h, kind, dt) for d in range(7)] for ax in range(3)]
+            k = [
+                [lookup(t, f32(p[ax] - f32(base[ax] + d - 3)), h, kind, dt) for d in range(7)]
+                for ax in range(3)
+            ]
             s, ws = dt(0), dt(0)
             for kz in range(7):
                 for ky in range(7):

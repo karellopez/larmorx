@@ -69,7 +69,10 @@ impl Log {
         }
     }
     pub fn take(&self) -> Vec<String> {
-        self.lines.lock().map(|mut l| std::mem::take(&mut *l)).unwrap_or_default()
+        self.lines
+            .lock()
+            .map(|mut l| std::mem::take(&mut *l))
+            .unwrap_or_default()
     }
     /// An error that ends the run (FSL's exception, e.g. a singular matrix): the first is kept.
     pub fn fatal(&self, message: impl Into<String>) {
@@ -169,9 +172,8 @@ impl Pair {
     }
 
     fn reference_bins(&self) -> &Volume {
-        self.ref_bins.get_or_init(|| {
-            hcost::bin_grid_mi(&self.reference, self.bins, self.skip_non_finite)
-        })
+        self.ref_bins
+            .get_or_init(|| hcost::bin_grid_mi(&self.reference, self.bins, self.skip_non_finite))
     }
 
     /// Whether weighting is on (`-refweight` or `-inweight`).
@@ -276,9 +278,8 @@ impl Pair {
     ) -> BinMoments {
         let bins = self.bins.max(1);
         let grid = self.reference_bins();
-        let slices = hcost::sample_weighted(grid, tv, b, parallel, weight, || {
-            BinMoments::new(bins)
-        });
+        let slices =
+            hcost::sample_weighted(grid, tv, b, parallel, weight, || BinMoments::new(bins));
         let mut out = BinMoments::new(bins);
         for s in slices {
             for k in 0..bins {
@@ -301,14 +302,13 @@ impl Pair {
     ) -> f32 {
         let input = &self.input;
         let smoothed = tv.weighted() || weight.is_some();
-        let slices = hcost::sample_weighted(&self.reference, tv, b, parallel, weight, || {
-            LabelSlice {
+        let slices =
+            hcost::sample_weighted(&self.reference, tv, b, parallel, weight, || LabelSlice {
                 input,
                 row: (0.0, 0.0),
                 slice: (0.0, 0.0),
                 points: 0,
-            }
-        });
+            });
         let (mut num, mut den) = (0.0f32, 0.0f32);
         let mut points = 0u64;
         for s in &slices {
@@ -380,12 +380,11 @@ fn corr_ratio(m: &BinMoments) -> f32 {
     if var <= 0.0 {
         return 0.0;
     }
-    let within: f64 = m
-        .w
-        .iter()
-        .filter(|st| st[0] > 2.0)
-        .map(|st| st[0] * (st[2] - st[1] * st[1] / st[0]) / (st[0] - 1.0))
-        .sum();
+    let within: f64 =
+        m.w.iter()
+            .filter(|st| st[0] > 2.0)
+            .map(|st| st[0] * (st[2] - st[1] * st[1] / st[0]) / (st[0] - 1.0))
+            .sum();
     (within / (n * var)) as f32
 }
 

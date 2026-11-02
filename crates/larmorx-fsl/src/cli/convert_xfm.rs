@@ -145,13 +145,13 @@ pub fn main(args: &[String], settings: &Settings, out: &mut dyn Write, err: &mut
             }
         }
     }
-    if let Some(name) = &omat {
-        if std::fs::write(settings.path(name), mat::file_text(&m)).is_err() {
-            let _ = writeln!(err, "Could not open file {name} for writing");
-        }
+    if let Some(name) = &omat
+        && std::fs::write(settings.path(name), mat::file_text(&m)).is_err()
+    {
+        let _ = writeln!(err, "Could not open file {name} for writing");
     }
     if verbose > 0 {
-        let _ = write!(out, "{}\n", stream.matrix(&m));
+        let _ = writeln!(out, "{}", stream.matrix(&m));
     }
     0
 }

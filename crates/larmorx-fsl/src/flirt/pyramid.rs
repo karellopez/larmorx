@@ -166,11 +166,7 @@ pub fn halve(v: &Volume) -> Volume {
                 }
             }
         });
-    Volume::new(
-        [mx, my, mz],
-        v.voxel_size.map(|d| d * 2.0),
-        data,
-    )
+    Volume::new([mx, my, mz], v.voxel_size.map(|d| d * 2.0), data)
 }
 
 /// `B = [W ≥ 0.01]`: 1 where the weight is at least 0.01 (and at most its maximum), else 0.

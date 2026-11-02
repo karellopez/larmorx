@@ -186,11 +186,11 @@ pub fn words(line: &str) -> Vec<String> {
     }
     while !r.is_empty() {
         r = r.trim_start_matches(blank);
-        if let Some((i, _)) = r.char_indices().rev().find(|&(_, c)| !blank(c)) {
-            if i > 0 {
-                let end = i + r[i..].chars().next().map_or(1, char::len_utf8);
-                r = &r[..end];
-            }
+        if let Some((i, _)) = r.char_indices().rev().find(|&(_, c)| !blank(c))
+            && i > 0
+        {
+            let end = i + r[i..].chars().next().map_or(1, char::len_utf8);
+            r = &r[..end];
         }
         match r.find(blank) {
             Some(j) => {

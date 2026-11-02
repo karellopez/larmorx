@@ -30,7 +30,9 @@ impl Subset {
             return None;
         }
         let n = cols.len();
-        let mask: Vec<Vec<f64>> = (0..12).map(|i| (0..n).map(|c| cols[c][i]).collect()).collect();
+        let mask: Vec<Vec<f64>> = (0..12)
+            .map(|i| (0..n).map(|c| cols[c][i]).collect())
+            .collect();
         Some(Subset {
             pinv: pinv(&mask, n),
             mask,
@@ -72,16 +74,18 @@ impl Subset {
 /// by a singular value decomposition (one-sided Jacobi), singular values below
 /// `max(12, n)·s₁·ε` dropped.
 fn pinv(p: &[Vec<f64>], n: usize) -> Vec<Vec<f64>> {
-    let simple = p
-        .iter()
-        .all(|row| row.iter().all(|&v| v == 0.0 || v == 1.0) && row.iter().filter(|&&v| v != 0.0).count() <= 1);
+    let simple = p.iter().all(|row| {
+        row.iter().all(|&v| v == 0.0 || v == 1.0) && row.iter().filter(|&&v| v != 0.0).count() <= 1
+    });
     if simple {
         return (0..n)
             .map(|c| {
                 let k = p.iter().filter(|row| row[c] == 1.0).count() as f64;
                 let r = 1.0 / k.sqrt();
                 let v = r * r;
-                (0..12).map(|i| if p[i][c] == 1.0 { v } else { 0.0 }).collect()
+                (0..12)
+                    .map(|i| if p[i][c] == 1.0 { v } else { 0.0 })
+                    .collect()
             })
             .collect();
     }
@@ -123,7 +127,8 @@ fn pinv(p: &[Vec<f64>], n: usize) -> Vec<Vec<f64>> {
                 }
                 off = off.max(gamma.abs() / (alpha * beta).sqrt().max(f64::MIN_POSITIVE));
                 let zeta = (beta - alpha) / (2.0 * gamma);
-                let t = zeta.signum().max(0.0).mul_add(2.0, -1.0) / (zeta.abs() + (1.0 + zeta * zeta).sqrt());
+                let t = zeta.signum().max(0.0).mul_add(2.0, -1.0)
+                    / (zeta.abs() + (1.0 + zeta * zeta).sqrt());
                 let c = 1.0 / (1.0 + t * t).sqrt();
                 let s = c * t;
                 for row in a.iter_mut() {
@@ -263,9 +268,19 @@ fn minimise(
         let ss: f64 = d
             .iter()
             .zip(tol)
-            .map(|(x, &t)| if t.abs() > 1e-15 { (x / f64::from(t)).powi(2) } else { 0.0 })
+            .map(|(x, &t)| {
+                if t.abs() > 1e-15 {
+                    (x / f64::from(t)).powi(2)
+                } else {
+                    0.0
+                }
+            })
             .sum();
-        if ss > 0.0 { (1.0 / ss.sqrt()) as f32 } else { 1.0 }
+        if ss > 0.0 {
+            (1.0 / ss.sqrt()) as f32
+        } else {
+            1.0
+        }
     };
     let mut v = v0;
     let mut best = 0.0f32;
@@ -312,7 +327,9 @@ fn minimise(
             let (m, dm) = deltas
                 .iter()
                 .enumerate()
-                .fold((0usize, f32::INFINITY), |(bi, bv), (i, &d)| if d < bv { (i, d) } else { (bi, bv) });
+                .fold((0usize, f32::INFINITY), |(bi, bv), (i, &d)| {
+                    if d < bv { (i, d) } else { (bi, bv) }
+                });
             let adm = dm.abs();
             let lhs = 2.0 * (f0 - 2.0 * f1 + fe) * (f0 - f1 - adm) * (f0 - f1 - adm);
             let rhs = (f0 - fe) * (f0 - fe) * adm;
@@ -341,7 +358,10 @@ pub fn optimise(
 ) -> Result<(Mat4, f32), String> {
     let x0: Params = rigid::decompose(start, centre);
     let tol: Vec<f32> = (0..12)
-        .map(|i| s.tolerance(i).ok_or_else(|| "Mat::operator(): index out of bounds".to_owned()))
+        .map(|i| {
+            s.tolerance(i)
+                .ok_or_else(|| "Mat::operator(): index out of bounds".to_owned())
+        })
         .collect::<Result<_, _>>()?;
     match subset {
         None => {
@@ -369,7 +389,8 @@ pub fn optimise(
             let mut zero = [0.0; 12];
             for i in 0..12 {
                 tplus[i] = (f64::from(tol[i]) + x0d[i]) - x0d[i];
-                zero[i] = x0d[i] - x0d[i];
+                // x0 - x0 as the spec writes it: 0, or NaN for a parameter that is not finite
+                zero[i] = if x0d[i].is_finite() { 0.0 } else { f64::NAN };
             }
             let a = p.reduce(&tplus);
             let b = p.reduce(&zero);

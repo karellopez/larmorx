@@ -954,10 +954,9 @@ def image_math_operations() -> list[str]:
 #: with the tool: the replica's program is not installed where these tests run, so their golden
 #: cases are the replica's own (``crates-nc/larmorx-nc-cli/tests/golden.rs``, run on every
 #: platform by the replicas' jobs). ``replica_only`` checks that each tool has one there.
-#: Since 2026-11-01: FLIRT's programs (the clean-room originals are still to be written).
+#: Since 2026-11-01: FLIRT's programs but flirt and convert_xfm (their clean-room originals since
+#: 2026-11-02; the others are still to be written).
 REPLICA_ONLY_FUNCTIONS: dict[str, str] = {
-    "lx.fsl.flirt": "fsl flirt",
-    "lx.fsl.convert_xfm": "fsl convert_xfm",
     "lx.fsl.avscale": "fsl avscale",
     "lx.fsl.img2imgcoord": "fsl img2imgcoord",
     "lx.fsl.std2imgcoord": "fsl std2imgcoord",
@@ -3965,6 +3964,200 @@ def _(ctx: Context) -> dict[str, Any]:
         out[f"{name}.outline"] = getattr(s, f"{name}_outline").data
     out["skull_mask"] = s.skull_mask.data
     return out
+
+
+#: A FLIRT schedule using most of its commands on small images (the clean-room original).
+_FLIRT_SCHEDULE = """# every command, small
+setscale 8
+setoption smoothing 8
+setrow UA 1 0 0 0  0 1 0 0  0 0 1 0  0 0 0 1
+setrowparams UA 0.02 -0.01 0.03 1 -1 0.5 1 1 1 0 0 0
+clear U
+measurecost 6 UA 0 0 0 0 0 0 rel
+gridmeasurecost 6 UA:1 -1 1 1  0 0 0 abs
+sort U
+print U:1-2
+printparams U:1
+copy U UB
+dualsort U UB
+setscale 4
+setoption smoothing 4
+setoption boundguess 3 1
+setoption tolerance 0.01 0.01 0.01 0.4 0.4 0.4 0.01 0.01 0.01 0.01 0.01 0.01
+clear U
+optimise 6 UB:1 0 0 0 0 0 0 rel 2
+aligncog UA:1
+setoption optimisationtype powell
+optimise 6 UA:2 1 0 0 0 0 0 rel 2
+setoption paramsubset 3  0 0 1 0 0 0 0 0 0 0 0 0  0 0 0 1 0 0 0 0 0 0 0 0  0 0 0 0 1 0 0 0 0 0 0 0
+optimise 12 UA:1 0 0 0 0 0 0 rel 2
+setoption nosubset 1
+if MAXDOF > 7
+ print UA
+sort U
+save U rows.txt
+saveparams U params.txt
+read UC rows.txt
+readparams UD params.txt
+print UC:1
+frob
+"""
+
+
+def _flirt(ctx: Context, *argv: str, upstream_defects: str = "fix") -> str:
+    """``larmorx fsl flirt <argv...>`` (the clean-room original)."""
+    return _fsl(ctx, "flirt", *argv, upstream_defects=upstream_defects)
+
+
+def _fsl_status(ctx: Context, *argv: str, upstream_defects: str = "fix") -> tuple[int, str, str]:
+    """``larmorx fsl <argv...>`` (the clean-room original) that may fail: its exit status and
+    streams, the run directory's name replaced."""
+    saved = dict(os.environ)
+    os.environ["FSLOUTPUTTYPE"] = "NIFTI_GZ"
+    os.environ["PATH"] = os.fspath(ctx.dir)
+    os.environ["LARMORX_UPSTREAM_DEFECTS"] = upstream_defects
+    try:
+        code, out, err = _core.cli_main(["larmorx", "fsl", *argv], [], "original")
+    finally:
+        os.environ.clear()
+        os.environ.update(saved)
+    d = os.fspath(ctx.dir)
+    return code, out.replace(d, "<dir>"), err.replace(d, "<dir>")
+
+
+@case("cli.fsl.flirt", covers=("cli:fsl flirt",))
+def _(ctx: Context) -> dict[str, Any]:
+    """``larmorx fsl flirt`` (the clean-room original, ``specs/flirt.md``): the default schedule
+    (search, 12 dof, corratio) between two small images, ``-omat`` and ``-out``, verbose."""
+    out = ctx.out("out")
+    stdout = _flirt(ctx, "-in", ctx.file("anat2.nii"), "-ref", ctx.file("anat.nii"), "-omat", f"{out}.mat", "-out", out, "-v")  # fmt: skip
+    return {"matrix": File(f"{out}.mat"), "image": Nifti(f"{out}.nii.gz"), "stdout": stdout}
+
+
+@case("cli.fsl.flirt.costs")
+def _(ctx: Context) -> dict[str, Any]:
+    """Every cost function once (6 dof, a narrow search), weights, ``-2D`` on a plane, and the
+    results printed without ``-omat``."""
+    out: dict[str, Any] = {}
+    for cost in ("mutualinfo", "normmi", "normcorr", "leastsq", "labeldiff", "woods"):
+        m = ctx.out(f"{cost}.mat")
+        _flirt(ctx, "-in", ctx.file("anat2.nii"), "-ref", ctx.file("anat.nii"), "-omat", m, "-dof", "6", "-cost", cost, "-searchcost", cost, "-searchrx", "-10", "10", "-searchry", "-10", "10", "-searchrz", "-10", "10")  # fmt: skip
+        out[cost] = File(m)
+    w = ctx.out("w.mat")
+    _flirt(ctx, "-in", ctx.file("anat2.nii"), "-ref", ctx.file("anat.nii"), "-omat", w, "-dof", "7", "-refweight", ctx.file("mask.nii"), "-nosearch")  # fmt: skip
+    out["weights"] = File(w)
+    out["2d"] = _flirt(ctx, "-in", ctx.file("plane2.nii"), "-ref", ctx.file("plane.nii"), "-2D")
+    return out
+
+
+@case("cli.fsl.flirt.bbr")
+def _(ctx: Context) -> dict[str, Any]:
+    """The boundary-based cost (``-cost bbr``, a white-matter mask) with a short schedule of
+    measurements and an optimisation, and the coordinate form (``-wmcoords``, ``-wmnorms``)."""
+    sch = ctx.dir / "bbr.sch"
+    sch.write_text(
+        "setscale 1 force\nsetoption costfunction bbr\nsetoption bbrstep 2\nclear U\n"
+        "setrow UA 1 0 0 0  0 1 0 0  0 0 1 0  0 0 0 1\nmeasurecost 6 UA 0 0 0 0 0 0 rel\n"
+        "optimise 6 UA:1 0 0 0 0 0 0 rel 2\nsort U\nprint U:1\n"
+    )
+    coords, norms = ctx.dir / "c.txt", ctx.dir / "n.txt"
+    coords.write_text("10 12 14\n20 18 16\n30 20 22\n14 30 9\n")
+    norms.write_text("1 0 0\n0 1 0\n0 0 1\n0.6 0.8 0\n")
+    a, b = ctx.out("a.mat"), ctx.out("b.mat")
+    sa = _flirt(ctx, "-in", ctx.file("anat2.nii"), "-ref", ctx.file("anat.nii"), "-omat", a, "-wmseg", ctx.file("mask.nii"), "-schedule", str(sch), "-dof", "6", "-bbrtype", "local_abs")  # fmt: skip
+    sb = _flirt(ctx, "-in", ctx.file("anat2.nii"), "-ref", ctx.file("anat.nii"), "-omat", b, "-wmcoords", str(coords), "-wmnorms", str(norms), "-schedule", str(sch), "-dof", "6")  # fmt: skip
+    return {"seg": File(a), "coords": File(b), "seg_stdout": sa, "coords_stdout": sb}
+
+
+@case("cli.fsl.flirt.schedule")
+def _(ctx: Context) -> dict[str, Any]:
+    """A schedule using most commands of FLIRT's schedule language (``specs/flirt.md`` §7):
+    its printed rows, the files it saves, and an unknown command's message."""
+    sch = ctx.dir / "all.sch"
+    sch.write_text(_FLIRT_SCHEDULE)
+    m = ctx.out("out.mat")
+    stdout = _flirt(ctx, "-in", ctx.file("anat2.nii"), "-ref", ctx.file("anat.nii"), "-omat", m, "-schedule", str(sch), "-dof", "6")  # fmt: skip
+    return {
+        "stdout": stdout,
+        "rows": File(str(ctx.dir / "rows.txt")),
+        "params": File(str(ctx.dir / "params.txt")),
+        "matrix": File(m),
+    }
+
+
+@case("cli.fsl.flirt.applyxfm")
+def _(ctx: Context) -> dict[str, Any]:
+    """``-applyxfm`` with each interpolation (sinc's window and width, the spline), a data type,
+    ``-paddingsize`` and ``-setbackground``, and ``-applyisoxfm``."""
+    init = ctx.dir / "init.mat"
+    init.write_text("0.99 0.05 0 1.5\n-0.05 0.99 0.02 -2\n0 -0.02 1.01 0.5\n0 0 0 1\n")
+    out: dict[str, Any] = {}
+    for name, extra in (
+        ("trilinear", ("-paddingsize", "1.5")),
+        ("nearestneighbour", ("-datatype", "short")),
+        ("sinc", ("-sincwidth", "5", "-sincwindow", "blackman")),
+        ("spline", ("-setbackground", "3")),
+    ):
+        o = ctx.out(name)
+        _flirt(ctx, "-in", ctx.file("anat2.nii"), "-ref", ctx.file("anat.nii"), "-init", str(init), "-applyxfm", "-interp", name, "-out", o, *extra)  # fmt: skip
+        out[name] = Nifti(f"{o}.nii.gz")
+    iso = ctx.out("iso")
+    _flirt(ctx, "-in", ctx.file("anat2.nii"), "-ref", ctx.file("anat.nii"), "-init", str(init), "-applyisoxfm", "4", "-out", iso)  # fmt: skip
+    out["iso"] = Nifti(f"{iso}.nii.gz")
+    return out
+
+
+@case("cli.fsl.flirt.errors")
+def _(ctx: Context) -> dict[str, Any]:
+    """The command line's messages and exit statuses (§2.1), FSL's error after the scan in both
+    modes (FSL-68: exit 1 by default, 0 with ``reproduce``), and a refusal (FSL-21)."""
+    a2, a = ctx.file("anat2.nii"), ctx.file("anat.nii")
+    calls: list[tuple[str, tuple[str, ...]]] = [
+        ("usage", ()),
+        ("help", ("-bins", "64", "-help")),
+        ("not-option", ("anat",)),
+        ("lacking", ("-in", a, "-ref")),
+        ("bad-cost", ("-in", "a", "-ref", "b", "-cost", "nope")),
+        ("no-ref", ("-in", a)),
+        ("missing-init", ("-in", a2, "-ref", a, "-init", "none.mat", "-omat", ctx.out("x.mat"))),
+        ("bins", ("-in", a2, "-ref", a, "-bins", "4", "-omat", ctx.out("y.mat"))),
+    ]
+    out: dict[str, Any] = {}
+    for name, argv in calls:
+        out[name] = list(_fsl_status(ctx, "flirt", *argv))
+    rep = ("-in", a2, "-ref", a, "-init", "none.mat", "-omat", ctx.out("z.mat"))
+    out["reproduce"] = list(_fsl_status(ctx, "flirt", *rep, upstream_defects=REPRODUCE))
+    return out
+
+
+@case("cli.fsl.convert_xfm", covers=("cli:fsl convert_xfm",))
+def _(ctx: Context) -> dict[str, Any]:
+    """``larmorx fsl convert_xfm`` (the clean-room original, ``specs/flirt.md`` §10):
+    ``-fixscaleskew``, ``-concat`` and ``-inverse`` with ``-v``, the usage."""
+    a, b = ctx.dir / "a.mat", ctx.dir / "b.mat"
+    a.write_text("1.05 0.02 -0.03 2\n-0.01 0.97 0.04 -3\n0.02 -0.05 1.1 1.5\n0 0 0 1\n")
+    b.write_text("0.99 0.1 0 1\n-0.1 0.99 0.05 2\n0 -0.05 1.2 -3\n0 0 0 1\n")
+    o = ctx.out("o.mat")
+    stdout = _fsl(ctx, "convert_xfm", "-v", "-omat", o, "-fixscaleskew", str(b), "-concat", str(b), "-inverse", str(a))  # fmt: skip
+    return {"matrix": File(o), "stdout": stdout, "usage": list(_fsl_status(ctx, "convert_xfm"))}
+
+
+@case("py.fsl.flirt", covers=("lx.fsl.flirt",))
+def _(ctx: Context) -> dict[str, Any]:
+    """``lx.fsl.flirt`` with the clean-room original on in-memory images: a 6-dof registration
+    with its image, and ``apply_xfm``."""
+    r = lx.fsl.flirt(anat2(), anat(), dof=6, implementation="original")
+    a = lx.fsl.flirt(anat2(), anat(), init=r.matrix, apply_xfm=True, interp="sinc", implementation="original")  # fmt: skip
+    assert r.image is not None and a.image is not None
+    return {"matrix": r.matrix, "image": r.image.data, "applied": a.image.data}
+
+
+@case("py.fsl.convert_xfm", covers=("lx.fsl.convert_xfm",))
+def _(ctx: Context) -> dict[str, Any]:
+    """``lx.fsl.convert_xfm`` with the clean-room original: the inverse of a concatenation."""
+    a = np.array([[1.05, 0.02, -0.03, 2], [-0.01, 0.97, 0.04, -3], [0.02, -0.05, 1.1, 1.5], [0, 0, 0, 1]])  # fmt: skip
+    b = np.array([[0.99, 0.1, 0, 1], [-0.1, 0.99, 0.05, 2], [0, -0.05, 1.2, -3], [0, 0, 0, 1]])
+    return {"matrix": lx.fsl.convert_xfm(a, concat=b, inverse=True, implementation="original")}
 
 
 @case("py.fsl.bet", covers=("lx.fsl.bet",))

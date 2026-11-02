@@ -66,15 +66,15 @@ fn read(ctx: &Ctx<'_>, name: &str, all: bool, notices: &mut Vec<Notice>) -> Resu
     let files = crate::cli::bet2::resolve_image(ctx.settings, name, ctx.mode, notices)
         .map_err(|e| End::Error(read_message(name, &e)))?;
     if all {
-        let (vols, input) = image::read(&files, ctx.n_threads)
-            .map_err(|e| End::Error(read_message(name, &e)))?;
+        let (vols, input) =
+            image::read(&files, ctx.n_threads).map_err(|e| End::Error(read_message(name, &e)))?;
         Ok(Image {
             vols: vols.iter().map(to_volume).collect(),
             input,
         })
     } else {
-        let input =
-            image::read_first(&files, ctx.n_threads).map_err(|e| End::Error(read_message(name, &e)))?;
+        let input = image::read_first(&files, ctx.n_threads)
+            .map_err(|e| End::Error(read_message(name, &e)))?;
         Ok(Image {
             vols: vec![to_volume(&input.vol)],
             input,
@@ -218,7 +218,11 @@ fn base_scale(o: &Options, a: &Volume, b: &Volume) -> f32 {
 
 /// Reads a matrix file (§2.2): its rows, `Could not open matrix file` (an empty matrix) or the
 /// numbers' error.
-fn read_matrix(settings: &Settings, name: &str, err: &mut dyn Write) -> Result<Vec<Vec<f64>>, String> {
+fn read_matrix(
+    settings: &Settings,
+    name: &str,
+    err: &mut dyn Write,
+) -> Result<Vec<Vec<f64>>, String> {
     match std::fs::read_to_string(settings.path(name)) {
         Ok(text) => mat::parse_matrix_text(&text),
         Err(_) => {
@@ -234,7 +238,9 @@ fn as_mat4(rows: &[Vec<f64>]) -> Result<Mat4, String> {
     let c = rows.first().map_or(0, Vec::len);
     mat::mat4_of(rows)
         .filter(|_| r == 4 && c == 4)
-        .ok_or_else(|| format!("matrix multiplication: incompatible matrix dimensions: 4x4 and {r}x{c}"))
+        .ok_or_else(|| {
+            format!("matrix multiplication: incompatible matrix dimensions: 4x4 and {r}x{c}")
+        })
 }
 
 /// The run's state while the schedule runs.
@@ -267,15 +273,14 @@ struct State<'a> {
     maxdof: usize,
     init: Mat4,
     qsform: Mat4,
-    weighting: bool,
     fine_counts: [usize; 3],
 }
 
 impl State<'_> {
     fn pair(&self) -> Result<&Arc<Pair>, End> {
-        self.pair
-            .as_ref()
-            .ok_or_else(|| End::Error("no image pair: the schedule has no setscale before its first use".into()))
+        self.pair.as_ref().ok_or_else(|| {
+            End::Error("no image pair: the schedule has no setscale before its first use".into())
+        })
     }
 
     fn check(&self) -> Result<(), End> {
@@ -297,8 +302,9 @@ impl State<'_> {
     }
 
     fn rows(&self, word: &str) -> Result<(Var, Vec<Row>), End> {
-        let (v, r1, r2) = schedule::parse_ref(word, self.maxdof as f64, f64::from(self.min_sampling))
-            .map_err(|m| refuse_name(&m))?;
+        let (v, r1, r2) =
+            schedule::parse_ref(word, self.maxdof as f64, f64::from(self.min_sampling))
+                .map_err(|m| refuse_name(&m))?;
         let l = self.list(v);
         let lo = (r1 as usize).saturating_sub(1).min(l.len());
         let hi = (r2 as usize).min(l.len()).max(lo);
@@ -361,7 +367,9 @@ impl State<'_> {
 }
 
 fn refuse_name(m: &str) -> End {
-    End::Refuse(format!("{m}\nlarmorx: an undefined matrix name in the schedule: FSL reads an uninitialised list there; refused"))
+    End::Refuse(format!(
+        "{m}\nlarmorx: an undefined matrix name in the schedule: FSL reads an uninitialised list there; refused"
+    ))
 }
 
 /// The cost of the trial matrix `t` with `cost`; evaluations of large grids sample their
@@ -411,9 +419,14 @@ pub fn run(o: &Options, ctx: &Ctx<'_>, out: &mut dyn Write, err: &mut dyn Write)
                 UpstreamDefects::Fix => {
                     "FLIRT's error ends the run with exit status 1 (FSL exits 0 after its message)"
                 }
-                UpstreamDefects::Reproduce => "FLIRT's error ends the run with exit status 0, as FSL does",
+                UpstreamDefects::Reproduce => {
+                    "FLIRT's error ends the run with exit status 0, as FSL does"
+                }
             };
-            defects::push_once(&mut notices, Notice::new(&defects::FSL_68, ctx.mode, detail));
+            defects::push_once(
+                &mut notices,
+                Notice::new(&defects::FSL_68, ctx.mode, detail),
+            );
             u8::from(ctx.mode.fix())
         }
     };
@@ -435,21 +448,33 @@ fn run_inner(
     let applying = o.apply_xfm || o.apply_iso.is_some();
     let reference = read(ctx, &ref_name, false, notices)?;
     if reference.input.volumes > 1 && applying {
-        let _ = writeln!(err, "Warning: An input intended to be a single 3D volume has multiple timepoints. Input will be truncated to first volume, but this functionality is deprecated and will be removed in a future release.");
+        let _ = writeln!(
+            err,
+            "Warning: An input intended to be a single 3D volume has multiple timepoints. Input will be truncated to first volume, but this functionality is deprecated and will be removed in a future release."
+        );
     }
     let input = read(ctx, &in_name, applying, notices)?;
     let ref_sform = reference.input.header.sform_code > 0;
     let in_sform = input.input.header.sform_code > 0;
     if o.verbose >= 1 {
         if ref_sform {
-            let _ = writeln!(out, "The output image will use the sform from the reference image");
+            let _ = writeln!(
+                out,
+                "The output image will use the sform from the reference image"
+            );
         }
         if in_sform && !(applying && ref_sform) {
-            let _ = writeln!(out, "The output image will use the transformed sform from the input image");
+            let _ = writeln!(
+                out,
+                "The output image will use the transformed sform from the input image"
+            );
         }
     }
     if ref_sform && in_sform && o.verbose >= 1 {
-        let _ = writeln!(err, "WARNING: Both reference and input images have an sform matrix set");
+        let _ = writeln!(
+            err,
+            "WARNING: Both reference and input images have an sform matrix set"
+        );
     }
     // the initial matrix
     let q_unscaled = qsform(&reference.input, &input.input);
@@ -466,9 +491,29 @@ fn run_inner(
         let _ = write!(out, "Init Matrix = \n{}\n", stream.matrix(&init_unscaled));
     }
     if applying {
-        return apply(o, ctx, &reference, &input, &init_unscaled, out, err, notices);
+        return apply(
+            o,
+            ctx,
+            &reference,
+            &input,
+            &init_unscaled,
+            out,
+            err,
+            notices,
+        );
     }
-    register(o, ctx, reference, input, init_unscaled, q_unscaled, stream, out, err, notices)
+    register(
+        o,
+        ctx,
+        reference,
+        input,
+        init_unscaled,
+        q_unscaled,
+        stream,
+        out,
+        err,
+        notices,
+    )
 }
 
 /// The images of a registration, prepared (§4).
@@ -497,13 +542,20 @@ fn register(
     let b = base_scale(o, &reference.vols[0], &input.vols[0]);
     let ref0 = scaled(&ref0, b);
     let in0 = scaled(&in0, b);
-    let read_weight = |name: &Option<String>, like: &Volume, notices: &mut Vec<Notice>| -> Result<Option<Volume>, End> {
+    let read_weight = |name: &Option<String>,
+                       like: &Volume,
+                       notices: &mut Vec<Notice>|
+     -> Result<Option<Volume>, End> {
         match name {
             Some(n) => {
                 let w = read(ctx, n, false, notices)?;
                 Ok(Some(scaled(&triple(&w.vols[0]), b)))
             }
-            None if weighting => Ok(Some(Volume::new(like.shape, like.voxel_size, vec![1.0; like.len()]))),
+            None if weighting => Ok(Some(Volume::new(
+                like.shape,
+                like.voxel_size,
+                vec![1.0; like.len()],
+            ))),
             None => Ok(None),
         }
     };
@@ -531,12 +583,24 @@ fn register(
             );
             return Err(End::Exit(1));
         }
-        let three = |r: &Vec<f64>| [r[0], r.get(1).copied().unwrap_or(0.0), r.get(2).copied().unwrap_or(0.0)];
-        bbr.coords = Some((cr.iter().map(three).collect(), nr.iter().map(three).collect()));
+        let three = |r: &Vec<f64>| {
+            [
+                r[0],
+                r.get(1).copied().unwrap_or(0.0),
+                r.get(2).copied().unwrap_or(0.0),
+            ]
+        };
+        bbr.coords = Some((
+            cr.iter().map(three).collect(),
+            nr.iter().map(three).collect(),
+        ));
     }
     if let Some(n) = &o.fieldmap {
         if o.pedir == 0 {
-            return Err(End::Refuse("larmorx: -fieldmap needs -pedir (FSL's result is undefined without it): refused".into()));
+            return Err(End::Refuse(
+                "larmorx: -fieldmap needs -pedir (FSL's result is undefined without it): refused"
+                    .into(),
+            ));
         }
         let f = read(ctx, n, false, notices)?;
         let fm = scaled(&triple(&f.vols[0]), b);
@@ -554,11 +618,23 @@ fn register(
         bbr.fieldmap = Some((fm, mask));
     }
     // the minimum sampling (§4.3)
-    let vmin = |v: &Volume| v.voxel_size.iter().map(|d| d.abs()).fold(f32::INFINITY, f32::min);
+    let vmin = |v: &Volume| {
+        v.voxel_size
+            .iter()
+            .map(|d| d.abs())
+            .fold(f32::INFINITY, f32::min)
+    };
     let s_min = vmin(&ref0).max(vmin(&in0)).ceil();
-    let min_sampling = if o.force_scaling { o.min_sampling } else { o.min_sampling.max(s_min) };
+    let min_sampling = if o.force_scaling {
+        o.min_sampling
+    } else {
+        o.min_sampling.max(s_min)
+    };
     // the reference pyramid (§5)
-    let filt = |v: &Volume, w: &Option<Volume>, f: &dyn Fn(&Volume) -> Volume| -> (Volume, Option<Volume>) {
+    let filt = |v: &Volume,
+                w: &Option<Volume>,
+                f: &dyn Fn(&Volume) -> Volume|
+     -> (Volume, Option<Volume>) {
         match w {
             Some(w) => {
                 let (a, b) = pyramid::weighted(v, w, f);
@@ -570,22 +646,42 @@ fn register(
     let (levels, level_weights) = if o.no_resample {
         (
             [ref0.clone(), ref0.clone(), ref0.clone(), ref0.clone()],
-            [ref_weight.clone(), ref_weight.clone(), ref_weight.clone(), ref_weight.clone()],
+            [
+                ref_weight.clone(),
+                ref_weight.clone(),
+                ref_weight.clone(),
+                ref_weight.clone(),
+            ],
         )
     } else {
         let s = min_sampling;
-        let (l1, w1) = filt(&ref0, &ref_weight, &|v| pyramid::isotropic(&pyramid::blur(v, s), s));
+        let (l1, w1) = filt(&ref0, &ref_weight, &|v| {
+            pyramid::isotropic(&pyramid::blur(v, s), s)
+        });
         let halve = |v: &Volume, w: &Option<Volume>, notices: &mut Vec<Notice>| {
             if let Some(bg) = pyramid::background(v, mode) {
-                for n in pyramid::background_notices(&bg, "a level of the reference pyramid", mode) {
+                for n in pyramid::background_notices(&bg, "a level of the reference pyramid", mode)
+                {
                     defects::push_once(notices, n);
                 }
             }
             filt(v, w, &pyramid::halve)
         };
-        let (l2, w2) = if s < 1.9 { halve(&l1, &w1, notices) } else { (l1.clone(), w1.clone()) };
-        let (l4, w4) = if s < 3.9 { halve(&l2, &w2, notices) } else { (l2.clone(), w2.clone()) };
-        let (l8, w8) = if s < 7.9 { halve(&l4, &w4, notices) } else { (l4.clone(), w4.clone()) };
+        let (l2, w2) = if s < 1.9 {
+            halve(&l1, &w1, notices)
+        } else {
+            (l1.clone(), w1.clone())
+        };
+        let (l4, w4) = if s < 3.9 {
+            halve(&l2, &w2, notices)
+        } else {
+            (l2.clone(), w2.clone())
+        };
+        let (l8, w8) = if s < 7.9 {
+            halve(&l4, &w4, notices)
+        } else {
+            (l4.clone(), w4.clone())
+        };
         ([l1, l2, l4, l8], [w1, w2, w4, w8])
     };
     if o.debug {
@@ -609,18 +705,25 @@ fn register(
                 flipped: reference.input.flipped,
                 volumes: 1,
             };
-            write_image(ctx, name, &like, shape, 1, None, v.data.clone(), DataType::F32, err, notices)?;
+            write_image(
+                ctx,
+                name,
+                &like,
+                shape,
+                1,
+                None,
+                v.data.clone(),
+                DataType::F32,
+                err,
+                notices,
+            )?;
         }
     }
     let init = scale_in(&init_unscaled, b);
     let qs = scale_in(&q_unscaled, b);
     let (maxdof, dof_msg) = optimise::clamp_dof(i64::from(o.dof));
     let _ = dof_msg;
-    let ranges = if o.two_d {
-        o.search
-    } else {
-        o.search
-    };
+    let ranges = o.search;
     let fine_counts = [0, 1, 2].map(|k| search::samples(ranges[k], o.fine).len());
     let mut st = State {
         o,
@@ -649,7 +752,6 @@ fn register(
         maxdof: o.dof.max(0) as usize,
         init,
         qsform: qs,
-        weighting,
         fine_counts,
     };
     let _ = maxdof;
@@ -685,9 +787,7 @@ fn register(
         let w = schedule::words(line);
         let r = command(&mut st, &w, out, err, &mut skip);
         st.flush(err);
-        if let Err(e) = r {
-            return Err(e);
-        }
+        r?;
         st.check()?;
     }
     // the result (§9.1)
@@ -745,8 +845,9 @@ fn command(
             if n < 3 {
                 return Err(wrong(cmd, err));
             }
-            let (src, r1, r2) = schedule::parse_ref(&w[1], st.maxdof as f64, f64::from(st.min_sampling))
-                .map_err(|m| refuse_name(&m))?;
+            let (src, r1, r2) =
+                schedule::parse_ref(&w[1], st.maxdof as f64, f64::from(st.min_sampling))
+                    .map_err(|m| refuse_name(&m))?;
             let dst = st.var(&w[2])?;
             let mut i = r1 as usize;
             loop {
@@ -809,7 +910,11 @@ fn command(
             let mut s = String::new();
             for (k, r) in rows.iter().enumerate() {
                 let p = rigid::decompose(&r.m, c);
-                let cost = if cmd == "saveparams" && k == 0 { mat::g(r.cost, 6) } else { st.stream.num(r.cost) };
+                let cost = if cmd == "saveparams" && k == 0 {
+                    mat::g(r.cost, 6)
+                } else {
+                    st.stream.num(r.cost)
+                };
                 s.push_str(&cost);
                 s.push(' ');
                 for v in p {
@@ -852,7 +957,11 @@ fn command(
             }
             let v = st.var(&w[1])?;
             if let Some(l) = st.lists.get_mut(&v) {
-                l.sort_by(|a, b| a.cost.partial_cmp(&b.cost).unwrap_or(std::cmp::Ordering::Equal));
+                l.sort_by(|a, b| {
+                    a.cost
+                        .partial_cmp(&b.cost)
+                        .unwrap_or(std::cmp::Ordering::Equal)
+                });
             }
         }
         "dualsort" => {
@@ -865,7 +974,12 @@ fn command(
                 let _ = write!(err, "Cannot dual sort matrices of unequal size");
             } else {
                 let mut idx: Vec<usize> = (0..la.len()).collect();
-                idx.sort_by(|&i, &j| la[i].cost.partial_cmp(&la[j].cost).unwrap_or(std::cmp::Ordering::Equal));
+                idx.sort_by(|&i, &j| {
+                    la[i]
+                        .cost
+                        .partial_cmp(&la[j].cost)
+                        .unwrap_or(std::cmp::Ordering::Equal)
+                });
                 st.lists.insert(a, idx.iter().map(|&i| la[i]).collect());
                 st.lists.insert(b, idx.iter().map(|&i| lb[i]).collect());
             }
@@ -874,7 +988,11 @@ fn command(
             if n > 2 {
                 return Err(wrong(cmd, err));
             }
-            let dof = if n == 2 { schedule::int_scalar(st.scalar(&w[1])) } else { 12 };
+            let dof = if n == 2 {
+                schedule::int_scalar(st.scalar(&w[1]))
+            } else {
+                12
+            };
             let dof = optimise::clamp_dof(dof.min(st.maxdof as i64)).0;
             run_search(st, dof)?;
         }
@@ -918,10 +1036,22 @@ fn command(
                 let m = st.perturb(&r.m, &p, abs, dof)?;
                 if cmd == "measurecost" {
                     let c = st.eval(&m, st.cost)?;
-                    st.push(Var::U(0), Row { cost: f64::from(c), m });
+                    st.push(
+                        Var::U(0),
+                        Row {
+                            cost: f64::from(c),
+                            m,
+                        },
+                    );
                 } else {
                     let (m2, c) = optimise_row(st, &m, dof, maxit)?;
-                    st.push(Var::U(0), Row { cost: f64::from(c), m: m2 });
+                    st.push(
+                        Var::U(0),
+                        Row {
+                            cost: f64::from(c),
+                            m: m2,
+                        },
+                    );
                 }
                 st.check()?;
             }
@@ -981,7 +1111,13 @@ fn command(
                     .map(|m| pair.cost_of(m, cost, false, &log))
                     .collect();
                 for (m, c) in mats.into_iter().zip(costs) {
-                    st.push(Var::U(0), Row { cost: f64::from(c), m });
+                    st.push(
+                        Var::U(0),
+                        Row {
+                            cost: f64::from(c),
+                            m,
+                        },
+                    );
                 }
                 st.check()?;
             }
@@ -1024,7 +1160,13 @@ fn command(
             }
             let v = st.var(&w[1])?;
             let vals: Vec<f64> = w[2..18].iter().map(|x| st.scalar(x)).collect();
-            st.push(v, Row { cost: 0.0, m: column_major(&vals) });
+            st.push(
+                v,
+                Row {
+                    cost: 0.0,
+                    m: column_major(&vals),
+                },
+            );
         }
         "setrowqsform" => {
             if n < 2 {
@@ -1049,7 +1191,13 @@ fn command(
                 *pk = st.scalar(&w[2 + k]);
             }
             let c = st.pair()?.centre;
-            st.push(v, Row { cost: 0.0, m: rigid::compose(&p, 12, c) });
+            st.push(
+                v,
+                Row {
+                    cost: 0.0,
+                    m: rigid::compose(&p, 12, c),
+                },
+            );
         }
         "setoption" => {
             if n < 3 {
@@ -1174,7 +1322,11 @@ fn set_option(st: &mut State<'_>, w: &[String], err: &mut dyn Write) -> Result<(
         "paramsubset" => {
             let nc = schedule::int_scalar(vals[0]).max(0) as usize;
             if vals.len() < 1 + 12 * nc {
-                let _ = writeln!(err, "Must specify at least {} for a {nc} parameter subset mask", 12 * nc);
+                let _ = writeln!(
+                    err,
+                    "Must specify at least {} for a {nc} parameter subset mask",
+                    12 * nc
+                );
                 return Ok(());
             }
             let cols: Vec<[f64; 12]> = (0..nc)
@@ -1193,7 +1345,8 @@ fn set_option(st: &mut State<'_>, w: &[String], err: &mut dyn Write) -> Result<(
             let k = vals[0] as i64;
             st.bbr_step = k;
             if let Some(p) = &st.pair {
-                p.bbr_step.store(k.max(0) as usize, std::sync::atomic::Ordering::Relaxed);
+                p.bbr_step
+                    .store(k.max(0) as usize, std::sync::atomic::Ordering::Relaxed);
             }
         }
         other => {
@@ -1206,10 +1359,8 @@ fn set_option(st: &mut State<'_>, w: &[String], err: &mut dyn Write) -> Result<(
 /// The current pair with a setting changed (a pair is shared with no one else while the
 /// schedule runs, so it is changed in place when it can be).
 fn rebuild_pair(st: &mut State<'_>, f: impl FnOnce(&mut Pair)) {
-    if let Some(p) = st.pair.as_mut() {
-        if let Some(m) = Arc::get_mut(p) {
-            f(m);
-        }
+    if let Some(m) = st.pair.as_mut().and_then(Arc::get_mut) {
+        f(m);
     }
 }
 
@@ -1227,7 +1378,7 @@ fn set_scale(st: &mut State<'_>, s: f32, force: bool) -> Result<(), End> {
         // the input blurred to the scale (also with -noresample, observed)
         let (inp, w) = match &inw {
             Some(wt) => {
-                let (a, b) = pyramid::weighted(&input, wt, &|v: &Volume| pyramid::blur(v, s));
+                let (a, b) = pyramid::weighted(&input, wt, |v: &Volume| pyramid::blur(v, s));
                 (a, Some(b))
             }
             None => (pyramid::blur(&input, s), None),
@@ -1242,7 +1393,7 @@ fn set_scale(st: &mut State<'_>, s: f32, force: bool) -> Result<(), End> {
                 let f = |v: &Volume| pyramid::isotropic(&pyramid::blur(v, s), s);
                 let (a, b) = match &st.ref_weight {
                     Some(w) => {
-                        let (a, b) = pyramid::weighted(&st.reference, w, &f);
+                        let (a, b) = pyramid::weighted(&st.reference, w, f);
                         (a, Some(b))
                     }
                     None => (f(&st.reference), None),
@@ -1344,7 +1495,8 @@ fn optimise_row(st: &State<'_>, m: &Mat4, dof: usize, maxit: usize) -> Result<(M
     let cost = st.cost;
     let eval = move |t: &Mat4| evaluate(&pair, t, cost, &log);
     let centre = st.pair()?.centre;
-    optimise::optimise(&eval, m, centre, dof, maxit, &st.opt, st.subset.as_ref()).map_err(End::Error)
+    optimise::optimise(&eval, m, centre, dof, maxit, &st.opt, st.subset.as_ref())
+        .map_err(End::Error)
 }
 
 /// The search (§8.1), appending to `S` and `P`.
@@ -1361,26 +1513,50 @@ fn run_search(st: &mut State<'_>, dof: usize) -> Result<(), End> {
     for k in 0..3 {
         rp[3 + k] = c_ref[k] - mc[k];
     }
-    let ranges = if st.o.two_d { st.o.search } else { st.o.search };
+    let ranges = st.o.search;
     let r = Ranges {
         ranges,
         coarse: st.o.coarse,
         fine: st.o.fine,
     };
-    let min_voxel = pair.reference.voxel_size.iter().map(|d| d.abs()).fold(f32::INFINITY, f32::min);
-    let found = search::search(&eval, c_in, rp, dof, &r, &st.opt, min_voxel, true).map_err(End::Error)?;
+    let min_voxel = pair
+        .reference
+        .voxel_size
+        .iter()
+        .map(|d| d.abs())
+        .fold(f32::INFINITY, f32::min);
+    let found =
+        search::search(&eval, c_in, rp, dof, &r, &st.opt, min_voxel, true).map_err(End::Error)?;
     st.check()?;
     for (c, m) in found.results {
-        st.push(Var::S, Row { cost: f64::from(c), m });
+        st.push(
+            Var::S,
+            Row {
+                cost: f64::from(c),
+                m,
+            },
+        );
     }
     for (c, m) in found.starts {
-        st.push(Var::P, Row { cost: f64::from(c), m });
+        st.push(
+            Var::P,
+            Row {
+                cost: f64::from(c),
+                m,
+            },
+        );
     }
     Ok(())
 }
 
 /// The output data type (§9.2) of an input stored as `stored` (`scaled`: a scaled file).
-fn output_type(o: &Options, stored: DataType, scaled: bool, values: &[f32], mode: UpstreamDefects) -> DataType {
+fn output_type(
+    o: &Options,
+    stored: DataType,
+    scaled: bool,
+    values: &[f32],
+    mode: UpstreamDefects,
+) -> DataType {
     if let Some(t) = o.datatype {
         return match t {
             OutType::Char => DataType::U8,
@@ -1403,7 +1579,9 @@ fn output_type(o: &Options, stored: DataType, scaled: bool, values: &[f32], mode
                 }
             }
             DataType::I16 => DataType::I16,
-            DataType::U16 | DataType::I32 | DataType::U32 | DataType::I64 | DataType::U64 => DataType::I32,
+            DataType::U16 | DataType::I32 | DataType::U32 | DataType::I64 | DataType::U64 => {
+                DataType::I32
+            }
             DataType::F64 => DataType::F64,
             _ => DataType::F32,
         }
@@ -1412,7 +1590,9 @@ fn output_type(o: &Options, stored: DataType, scaled: bool, values: &[f32], mode
         let (lo, hi) = values
             .iter()
             .filter(|v| v.is_finite())
-            .fold((f32::INFINITY, f32::NEG_INFINITY), |(l, h), &x| (l.min(x), h.max(x)));
+            .fold((f32::INFINITY, f32::NEG_INFINITY), |(l, h), &x| {
+                (l.min(x), h.max(x))
+            });
         if hi - lo < 1.5 {
             return DataType::F32;
         }
@@ -1461,7 +1641,11 @@ fn write_image(
     };
     let mut template = reference.header.clone();
     // FSL's image layer writes the sform's negative zeros as zeros (observed)
-    for row in [&mut template.srow_x, &mut template.srow_y, &mut template.srow_z] {
+    for row in [
+        &mut template.srow_x,
+        &mut template.srow_y,
+        &mut template.srow_z,
+    ] {
         for v in row.iter_mut() {
             *v += 0.0;
         }
@@ -1482,11 +1666,17 @@ fn write_image(
     };
     let v = match larmorx_mri::hmc::image::integer_range(t) {
         Some((lo, hi)) => {
-            let (data, conv) = larmorx_mri::hmc::image::convert_values(&values, mode, lo, hi, |i| i as f64, |f| f);
+            let (data, conv) =
+                larmorx_mri::hmc::image::convert_values(&values, mode, lo, hi, |i| i as f64, |f| f);
             if conv.rounded + conv.out_of_range > 0 {
                 defects::push_once(
                     notices,
-                    larmorx_mri::hmc::image::fsl09_notice(std::path::Path::new(&name), conv, t, mode),
+                    larmorx_mri::hmc::image::fsl09_notice(
+                        std::path::Path::new(&name),
+                        conv,
+                        t,
+                        mode,
+                    ),
                 );
             }
             match t {
@@ -1505,13 +1695,12 @@ fn write_image(
                 defects::push_once(notices, x);
             }
             // FLIRT's pair headers carry NIfTI's four extension bytes (observed: 352 bytes)
-            if name.ends_with(".hdr") {
-                if let Ok(mut bytes) = std::fs::read(&name) {
-                    if bytes.len() == 348 {
-                        bytes.extend_from_slice(&[0, 0, 0, 0]);
-                        let _ = std::fs::write(&name, bytes);
-                    }
-                }
+            if name.ends_with(".hdr")
+                && let Ok(mut bytes) = std::fs::read(&name)
+                && bytes.len() == 348
+            {
+                bytes.extend_from_slice(&[0, 0, 0, 0]);
+                let _ = std::fs::write(&name, bytes);
             }
             Ok(())
         }
@@ -1556,7 +1745,11 @@ fn write_registered(
             let fm = triple(&f.vols[0]);
             let mask = match &o.fieldmap_mask {
                 Some(mn) => triple(&read(ctx, mn, false, notices)?.vols[0]),
-                None => Volume::new(fm.shape, fm.voxel_size, fm.data.iter().map(|&v| 0.0 * v + 1.0).collect()),
+                None => Volume::new(
+                    fm.shape,
+                    fm.voxel_size,
+                    fm.data.iter().map(|&v| 0.0 * v + 1.0).collect(),
+                ),
             };
             let srcb = BbrSource {
                 fieldmap: Some((fm, mask)),
@@ -1570,14 +1763,27 @@ fn write_registered(
                 Some(b) => b,
                 None => pad_value(src, ctx, notices)?,
             };
-            output::resample_shifted(src, m, refv.shape, refv.voxel_size, pad, &|r| (sh.axis, sh.at(r)))
-                .ok_or_else(|| End::Error(mat::SINGULAR.into()))?
+            output::resample_shifted(src, m, refv.shape, refv.voxel_size, pad, &|r| {
+                (sh.axis, sh.at(r))
+            })
+            .ok_or_else(|| End::Error(mat::SINGULAR.into()))?
         }
         _ => resample_one(o, ctx, src, refv, m, None, notices)?,
     };
     let (stored, scaled) = stored_type(&input.input.header);
     let t = output_type(o, stored, scaled, &values, ctx.mode);
-    write_image(ctx, stem, &reference.input, refv.shape, 1, None, values, t, err, notices)
+    write_image(
+        ctx,
+        stem,
+        &reference.input,
+        refv.shape,
+        1,
+        None,
+        values,
+        t,
+        err,
+        notices,
+    )
 }
 
 /// One volume resampled as §9.2 says; `pad` the padding value when given (else the blurred
@@ -1591,14 +1797,22 @@ fn resample_one(
     pad: Option<f32>,
     notices: &mut Vec<Notice>,
 ) -> Result<Vec<f32>, End> {
-    let ref_min = refv.voxel_size.iter().map(|d| d.abs()).fold(f32::INFINITY, f32::min);
+    let ref_min = refv
+        .voxel_size
+        .iter()
+        .map(|d| d.abs())
+        .fold(f32::INFINITY, f32::min);
     let blur = o.interp != Interp::NearestNeighbour && !o.no_resample_blur;
     let raw_pad = match (o.background, pad) {
         (Some(b), _) => b,
         (None, Some(p)) => p,
         (None, None) => pad_value(src, ctx, notices)?,
     };
-    let blurred = if blur { output::blur_for_output(src, ref_min, raw_pad) } else { src.clone() };
+    let blurred = if blur {
+        output::blur_for_output(src, ref_min, raw_pad)
+    } else {
+        src.clone()
+    };
     let pad_v = match (o.background, pad) {
         (Some(b), _) => b,
         (None, Some(p)) => p,
@@ -1611,14 +1825,19 @@ fn resample_one(
         }
     };
     let kernel = (o.interp == Interp::Sinc).then(|| SincKernel::new(o.sinc_width, o.sinc_window));
-    let padding = if o.two_d { o.padding.max(1.0) } else { o.padding };
+    let padding = if o.two_d {
+        o.padding.max(1.0)
+    } else {
+        o.padding
+    };
     let r = Resampling {
         interp: o.interp,
         sinc: kernel.as_ref(),
         pad: pad_v,
         padding,
     };
-    output::resample(&blurred, m, refv.shape, refv.voxel_size, &r).ok_or_else(|| End::Error(mat::SINGULAR.into()))
+    output::resample(&blurred, m, refv.shape, refv.voxel_size, &r)
+        .ok_or_else(|| End::Error(mat::SINGULAR.into()))
 }
 
 /// `-applyxfm` and `-applyisoxfm` (§9.3).
@@ -1638,25 +1857,47 @@ fn apply(
     if let Some(s) = o.apply_iso {
         refv = pyramid::isotropic(&pyramid::blur(&refv, s), s);
         // the header follows the resampling: the voxel sizes and the dimensions
+        // in FSL's memory order (x reversed for a positive determinant): `W' = W·F_n·D·F_n'`
+        // with `D` the scaling `s/d` (§5), so the x offset follows the new grid (observed)
         let h = &mut ref_input.header;
         let old = [h.pixdim[1], h.pixdim[2], h.pixdim[3]];
+        let flip = |n: usize| -> Mat4 {
+            let mut f = IDENTITY;
+            if reference.input.flipped {
+                f[0][0] = -1.0;
+                f[0][3] = n as f64 - 1.0;
+            }
+            f
+        };
+        let scale = mat::diagonal([0, 1, 2].map(|j| {
+            if old[j] != 0.0 {
+                f64::from(s) / old[j].abs()
+            } else {
+                1.0
+            }
+        }));
+        let step = mat::mul(
+            &mat::mul(&flip(reference.vols[0].shape[0]), &scale),
+            &flip(refv.shape[0]),
+        );
+        let srow = [h.srow_x, h.srow_y, h.srow_z, [0.0, 0.0, 0.0, 1.0]];
+        let new_s = mat::mul(&srow, &step);
+        h.srow_x = new_s[0];
+        h.srow_y = new_s[1];
+        h.srow_z = new_s[2];
+        if let Ok(q) = h.qform() {
+            let nq = mat::mul(q.rows(), &step);
+            h.qoffset_x = nq[0][3];
+            h.qoffset_y = nq[1][3];
+            h.qoffset_z = nq[2][3];
+        }
         h.pixdim[1] = f64::from(s);
         h.pixdim[2] = f64::from(s);
         h.pixdim[3] = f64::from(s);
-        for (k, row) in [&mut h.srow_x, &mut h.srow_y, &mut h.srow_z].into_iter().enumerate() {
-            let _ = k;
-            for j in 0..3 {
-                if old[j] != 0.0 {
-                    row[j] *= f64::from(s) / old[j].abs();
-                }
-            }
-        }
         ref_input.vol.shape = refv.shape;
     }
-    if let Some(name) = &o.omat {
-        if !name.is_empty() {
-            let _ = std::fs::write(ctx.settings.path(name), mat::file_text(init));
-        }
+    if let Some(name) = o.omat.as_ref().filter(|n| !n.is_empty()) {
+        let _ = std::fs::write(ctx.settings.path(name), mat::file_text(init));
     }
     let Some(stem) = &o.out else {
         return Ok(());
@@ -1673,5 +1914,16 @@ fn apply(
     let (stored, scaled) = stored_type(&input.input.header);
     let t = output_type(o, stored, scaled, &values, ctx.mode);
     let tr = (input.vols.len() > 1).then(|| input.input.header.pixdim[4]);
-    write_image(ctx, stem, &ref_input, refv.shape, input.vols.len(), tr, values, t, err, notices)
+    write_image(
+        ctx,
+        stem,
+        &ref_input,
+        refv.shape,
+        input.vols.len(),
+        tr,
+        values,
+        t,
+        err,
+        notices,
+    )
 }

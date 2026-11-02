@@ -119,9 +119,7 @@ pub fn search(
     let mut sorted = scales.clone();
     sorted.sort_by(|a, b| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal));
     let median = sorted[(0.5 * sorted.len() as f64) as usize];
-    for s in &mut scales {
-        *s = median;
-    }
+    scales.fill(median);
     let _ = &mut trans;
     // 6. the fine grid: translations and scale interpolated on the coarse grid
     let [fx, fy, fz] = [fine[0].len(), fine[1].len(), fine[2].len()];
@@ -189,7 +187,9 @@ pub fn search(
     // 7. the threshold, and the points below it optimised (their costs replace the grid's)
     let (cmin, cmax) = costs
         .iter()
-        .fold((f32::INFINITY, f32::NEG_INFINITY), |(l, h), &c| (l.min(c), h.max(c)));
+        .fold((f32::INFINITY, f32::NEG_INFINITY), |(l, h), &c| {
+            (l.min(c), h.max(c))
+        });
     let mut sc: Vec<f32> = costs.clone();
     sc.sort_by(|a, b| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal));
     let pct = sc[((0.2 * sc.len() as f64) as usize).min(sc.len() - 1)];

@@ -11,13 +11,19 @@ use super::cost::{Log, Pair};
 use super::mat::{self, Mat4};
 use super::pyramid;
 
+/// Boundary coordinates and their normals (`-wmcoords`, `-wmnorms`, mm).
+pub type Coords = (Vec<[f64; 3]>, Vec<[f64; 3]>);
+
+/// The field map's values at the grey- and white-matter points inside its mask.
+pub type Inside = (Vec<Option<f32>>, Vec<Option<f32>>);
+
 /// What the boundary-based cost needs besides the pair's images (§4.1, §6.5).
 #[derive(Clone, Debug, Default)]
 pub struct BbrSource {
     /// `-wmseg`, scaled voxel sizes, single slices tripled.
     pub wmseg: Option<Volume>,
     /// `-wmcoords` and `-wmnorms` (mm), when given.
-    pub coords: Option<(Vec<[f64; 3]>, Vec<[f64; 3]>)>,
+    pub coords: Option<Coords>,
     /// `-fieldmap` and its mask, on the reference's grid, and the phase-encoding direction.
     pub fieldmap: Option<(Volume, Volume)>,
     pub pedir: i32,
@@ -34,6 +40,9 @@ pub struct BbrPair {
     pub gm: Vec<[f32; 3]>,
     pub wm: Vec<[f32; 3]>,
     pub kind: Kind,
+    /// The field map's value at each point whose reference voxel lies inside the field map's
+    /// mask (fixed for the pair: only the points outside it search along the direction).
+    pub fmap_inside: std::sync::OnceLock<Inside>,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -119,12 +128,18 @@ pub fn points(src: &BbrSource, ref_voxel: [f32; 3]) -> Result<BbrPair, String> {
                 out
             })
             .collect();
-        for (a, b) in found.into_iter().flatten() {
+        let all: Vec<([f32; 3], [f32; 3])> = found.into_iter().flatten().collect();
+        for (a, b) in all {
             gm.push(a);
             wm.push(b);
         }
     }
-    Ok(BbrPair { gm, wm, kind })
+    Ok(BbrPair {
+        gm,
+        wm,
+        kind,
+        fmap_inside: std::sync::OnceLock::new(),
+    })
 }
 
 /// Trilinear interpolation with neighbours outside the volume 0 (any position).
@@ -183,6 +198,17 @@ impl Shift<'_> {
     pub fn at(&self, r: [f64; 3]) -> f64 {
         f64::from(self.sigma * fieldmap_value(self.fmap, self.mask, r, self.dir))
     }
+
+    /// The field map's value at `r` when `r` lies inside the mask (no search needed).
+    fn inside(&self, r: [f64; 3]) -> Option<f32> {
+        let q = r.map(|c| c as f32);
+        (trilinear_zero(self.mask, q) >= 0.95).then(|| trilinear_zero(self.fmap, q))
+    }
+
+    /// The shift with the field map's value known.
+    fn of_value(&self, v: f32) -> f64 {
+        f64::from(self.sigma * v)
+    }
 }
 
 /// The shift of matrix `a` (input mm → reference mm) for an input of `input_shape` and a
@@ -220,7 +246,9 @@ pub fn cost(pair: &Pair, a: &Mat4, log: &Log) -> f32 {
         log.fatal("BBR cost requested without -wmseg or -wmcoords/-wmnorms");
         return f32::NAN;
     };
-    let pts = pair.bbr.get_or_init(|| points(src, pair.reference.voxel_size));
+    let pts = pair
+        .bbr
+        .get_or_init(|| points(src, pair.reference.voxel_size));
     let pts = match pts {
         Ok(p) => p,
         Err(m) => {
@@ -230,7 +258,8 @@ pub fn cost(pair: &Pair, a: &Mat4, log: &Log) -> f32 {
     };
     if pts.gm.is_empty() {
         log.push("ERROR::set_bbr_seg: could not find any boundary points!");
-        return 0.0f32 / 0.0;
+        // 0 / 0: the default NaN (its sign set, printed -nan)
+        return -f32::NAN;
     }
     let Some(ainv) = mat::inverse(a) else {
         log.fatal(mat::SINGULAR);
@@ -254,19 +283,40 @@ pub fn cost(pair: &Pair, a: &Mat4, log: &Log) -> f32 {
     }
     let in_w = pair.in_weight.as_ref();
     let ref_w = pair.ref_weight.as_ref();
-    let sample = |p: [f32; 3]| -> (f32, f32) {
+    let inside = shift.as_ref().map(|sh| {
+        pts.fmap_inside.get_or_init(|| {
+            let at = |ps: &[[f32; 3]]| -> Vec<Option<f32>> {
+                ps.par_iter()
+                    .map(|p| {
+                        let v = [f64::from(p[0]), f64::from(p[1]), f64::from(p[2]), 1.0];
+                        let r = mat::apply(&s_ref_inv, v);
+                        sh.inside([r[0], r[1], r[2]])
+                    })
+                    .collect()
+            };
+            (at(&pts.gm), at(&pts.wm))
+        })
+    });
+    let sample = |p: [f32; 3], known: Option<f32>| -> (f32, f32) {
         let v = [f64::from(p[0]), f64::from(p[1]), f64::from(p[2]), 1.0];
         let mut q = mat::apply(&t, v);
         if let Some(sh) = &shift {
-            let r = mat::apply(&s_ref_inv, v);
-            q[sh.axis] += sh.at([r[0], r[1], r[2]]);
+            q[sh.axis] += match known {
+                Some(value) => sh.of_value(value),
+                None => {
+                    let r = mat::apply(&s_ref_inv, v);
+                    sh.at([r[0], r[1], r[2]])
+                }
+            };
         }
         let qf = [q[0] as f32, q[1] as f32, q[2] as f32];
         let val = trilinear_zero(&pair.input, qf);
         let w = if in_w.is_some() || ref_w.is_some() {
             let wt = in_w.map_or(1.0, |w| trilinear_zero(w, qf));
             let r = mat::apply(&s_ref_inv, v);
-            let wr = ref_w.map_or(1.0, |w| trilinear_zero(w, [r[0] as f32, r[1] as f32, r[2] as f32]));
+            let wr = ref_w.map_or(1.0, |w| {
+                trilinear_zero(w, [r[0] as f32, r[1] as f32, r[2] as f32])
+            });
             wt * wr
         } else {
             1.0
@@ -279,8 +329,9 @@ pub fn cost(pair: &Pair, a: &Mat4, log: &Log) -> f32 {
         .par_iter()
         .with_min_len(256)
         .map(|&k| {
-            let (g, wg) = sample(pts.gm[k]);
-            let (w, ww) = sample(pts.wm[k]);
+            let (kg, kw) = inside.map_or((None, None), |(a, b)| (a[k], b[k]));
+            let (g, wg) = sample(pts.gm[k], kg);
+            let (w, ww) = sample(pts.wm[k], kw);
             let (g, w) = (f64::from(g), f64::from(w));
             let q = if (g + w).abs() <= 1e-6 {
                 0.0

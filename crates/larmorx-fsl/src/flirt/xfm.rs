@@ -48,7 +48,11 @@ mod tests {
         let got = fix_scale_skew(&a, &b);
         for i in 0..3 {
             for j in 0..4 {
-                assert!((got[i][j] - want[i][j]).abs() < 1e-6, "{i} {j}: {}", got[i][j]);
+                assert!(
+                    (got[i][j] - want[i][j]).abs() < 1e-6,
+                    "{i} {j}: {}",
+                    got[i][j]
+                );
             }
         }
     }

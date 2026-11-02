@@ -243,10 +243,7 @@ pub fn parse_matrix_text(text: &str) -> Result<Vec<Vec<f64>>, String> {
     let mut rows: Vec<Vec<f64>> = Vec::new();
     let mut cols = 0;
     for line in text.lines() {
-        let nums: Vec<f64> = line
-            .split_whitespace()
-            .map_while(stream_number)
-            .collect();
+        let nums: Vec<f64> = line.split_whitespace().map_while(stream_number).collect();
         if nums.is_empty() {
             continue;
         }

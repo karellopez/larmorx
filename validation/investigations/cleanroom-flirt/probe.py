@@ -20,7 +20,6 @@ import time
 from pathlib import Path
 
 import numpy as np
-
 from larmorx_validation.parity import defects
 from larmorx_validation.parity import fsl_flirt as orig
 from larmorx_validation.parity import fsl_flirt_replica as rep
@@ -31,7 +30,7 @@ def header_diff(a: Path, b: Path) -> list[str]:
 
     ha, hb = nib.load(str(a)).header, nib.load(str(b)).header
     out = []
-    for k in ha.keys():
+    for k in ha:
         va, vb = ha[k], hb[k]
         if k == "descrip":
             continue
@@ -48,10 +47,7 @@ def main() -> None:
     ap.add_argument("--program", default="flirt")
     ap.add_argument("--mode", default=defects.REPRODUCE)
     a = ap.parse_args()
-    if a.case:
-        run = rep._all_cases()[a.case][2]
-    else:
-        run = rep.Run(a.program, tuple(shlex.split(a.args)))
+    run = rep._all_cases()[a.case][2] if a.case else rep.Run(a.program, tuple(shlex.split(a.args)))
     out = Path(a.out)
     shutil.rmtree(out, ignore_errors=True)
     fd, od = out / "fsl", out / "orig"
@@ -66,7 +62,9 @@ def main() -> None:
     o = orig.run_original(run.program, args, cwd=od, settings=settings, mode=a.mode)
     t2 = time.time()
     print(f"args: {' '.join(args)}")
-    print(f"FSL exit {f.code} ({t1 - t0:.1f} s, cache may serve it); original exit {o.code} ({t2 - t1:.1f} s)")
+    print(
+        f"FSL exit {f.code} ({t1 - t0:.1f} s, cache may serve it); original exit {o.code} ({t2 - t1:.1f} s)"
+    )
     for name, x in (("FSL", f), ("original", o)):
         (out / f"{name}.stdout").write_text(x.stdout)
         (out / f"{name}.stderr").write_text(x.stderr)

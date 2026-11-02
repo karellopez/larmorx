@@ -3,9 +3,10 @@
 and boundary-based registration (BBR), and its matrix tool (FSL 6.0.7.23's ``flirt`` and
 ``convert_xfm``).
 
-Both run the bit-exact replica from ``larmorx-nc`` as a separate program (``docs/licensing.md``);
-the clean-room original is to be written from ``specs/flirt.md``, so ``implementation="auto"``
-needs ``larmorx-nc`` installed (and ``"original"`` is not available yet).
+Each has two implementations (``docs/licensing.md``): the bit-exact replica from ``larmorx-nc``
+(FSL Licence), run as a separate program, and the clean-room original (Apache-2.0, written from
+``specs/flirt.md``), run in this process; ``implementation="auto"`` runs the replica when it is
+installed, else the original.
 
 FLIRT's matrices map the input's FSL millimetres (voxel index times voxel size, in radiological
 order) onto the reference's, as FSL writes them (``-omat``); they are returned as 4 x 4 float64
@@ -25,7 +26,7 @@ from typing import Any, Literal
 
 import numpy as np
 
-from larmorx import _defects, _replica
+from larmorx import _core, _defects, _replica
 from larmorx._defects import UpstreamDefectsName
 from larmorx._replica import ImplementationName
 from larmorx.fsl.bet import _read_image, _threads, _write_image
@@ -97,9 +98,29 @@ def _warn(stderr: str) -> None:
             warnings.warn(notice, stacklevel=3)
 
 
+@dataclass(frozen=True)
+class _Completed:
+    returncode: int
+    stdout: str
+    stderr: str
+
+
 def _run(
-    selected: _replica.Selected, args: list[str], tmp: str, n_threads: int, upstream_defects: str
+    selected: _replica.Selected | None,
+    args: list[str],
+    tmp: str,
+    n_threads: int,
+    upstream_defects: str,
+    program: str = "flirt",
 ):
+    if selected is None:
+        # the clean-room original, in this process, with FSL's settings of this call
+        env = [("FSLOUTPUTTYPE", "NIFTI"), ("PATH", tmp), (_defects.ENV, upstream_defects)]
+        if n_threads > 0:
+            env.append(("OMP_NUM_THREADS", str(n_threads)))
+        code, out, err = _core.fsl_run_original(program, list(args), env, tmp)
+        _warn(err)
+        return _Completed(code, out, err)
     process = _replica.run(
         selected,
         args,
@@ -170,9 +191,10 @@ def flirt(
     boundary-based registration). The keyword arguments map one to one onto FLIRT's options
     (``docs/api/fsl-flirt.md``). Returns a :class:`FlirtResult`.
 
-    Raises ``ValueError`` for invalid arguments, ``RuntimeError`` when FLIRT ends without a matrix
-    (FLIRT reports its errors with exit status 0; the message is in the error), and
-    :class:`larmorx.ReplicaNotFoundError` without ``larmorx-nc``.
+    Raises ``ValueError`` for invalid arguments and ``RuntimeError`` when FLIRT ends without a
+    matrix (FLIRT reports its errors with exit status 0; the message is in the error).
+    ``implementation``: ``"auto"`` (the replica when ``larmorx-nc`` is installed, else the
+    clean-room original), ``"replica"`` or ``"original"``.
     """
     n_threads = _threads(n_threads)
     _choice("cost", cost, COSTS)
@@ -189,8 +211,7 @@ def flirt(
     if (apply_xfm or apply_isoxfm is not None) and init is None and not use_sqform:
         raise ValueError("apply_xfm needs init (or use_sqform)")
     selected = _replica.select("fsl", "flirt", implementation)
-    assert selected is not None  # no clean-room original yet: select raises otherwise
-    impl = selected.implementation()
+    impl = _replica.ORIGINAL if selected is None else selected.implementation()
     with tempfile.TemporaryDirectory(prefix="larmorx-flirt-") as tmp:
         args = [
             "-in",
@@ -292,7 +313,6 @@ def convert_xfm(
     skews, then ``concat @ matrix``, then inverted; returned as a 4 x 4 array (as FSL writes it:
     10 significant digits)."""
     selected = _replica.select("fsl", "convert_xfm", implementation)
-    assert selected is not None
     with tempfile.TemporaryDirectory(prefix="larmorx-xfm-") as tmp:
         args = ["-omat", "out.mat"]
         if fix_scale_skew is not None:
@@ -302,5 +322,9 @@ def convert_xfm(
         if inverse:
             args.append("-inverse")
         args.append(_matrix_file(matrix, tmp, "in"))
-        _run(selected, args, tmp, 1, "fix")
-        return np.loadtxt(os.path.join(tmp, "out.mat")).reshape(4, 4)
+        p = _run(selected, args, tmp, 1, "fix", program="convert_xfm")
+        mat = os.path.join(tmp, "out.mat")
+        if not os.path.isfile(mat):
+            tail = "\n".join(p.stderr.strip().splitlines()[-20:])
+            raise RuntimeError(f"convert_xfm wrote no matrix:\n{tail}")
+        return np.loadtxt(mat).reshape(4, 4)

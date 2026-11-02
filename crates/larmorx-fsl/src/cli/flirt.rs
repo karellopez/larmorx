@@ -157,7 +157,11 @@ pub fn parse(args: &[String], out: &mut dyn Write, err: &mut dyn Write) -> Parse
             continue;
         }
         if !w.starts_with('-') {
-            let _ = writeln!(err, "Unrecognised option {}", w.chars().next().unwrap_or(' '));
+            let _ = writeln!(
+                err,
+                "Unrecognised option {}",
+                w.chars().next().unwrap_or(' ')
+            );
             return Parsed::Exit(255);
         }
         let rest = args.len() - i - 1;
@@ -336,4 +340,91 @@ pub fn main(args: &[String], settings: &Settings, out: &mut dyn Write, err: &mut
         n_threads: settings.threads(),
     };
     engine::run(&o, &ctx, out, err)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn scan(words: &[&str]) -> (Option<Box<Options>>, u8, String, String) {
+        let args: Vec<String> = words.iter().map(|s| (*s).to_owned()).collect();
+        let (mut out, mut err) = (Vec::new(), Vec::new());
+        let r = parse(&args, &mut out, &mut err);
+        let (o, code) = match r {
+            Parsed::Run(o) => (Some(o), 0),
+            Parsed::Exit(c) => (None, c),
+        };
+        (
+            o,
+            code,
+            String::from_utf8(out).unwrap(),
+            String::from_utf8(err).unwrap(),
+        )
+    }
+
+    #[test]
+    fn the_scans_messages() {
+        let (_, c, out, _) = scan(&[]);
+        assert_eq!(c, 1);
+        assert!(out.starts_with("FLIRT version 6.0\n\nUsage: flirt"));
+        let (_, c, out, _) = scan(&["-bins", "64", "-help"]);
+        assert_eq!(c, 0);
+        assert!(out.contains("(default is 64)"));
+        let (_, c, _, err) = scan(&["epi", "-ref", "t1"]);
+        assert_eq!((c, err.as_str()), (255, "Unrecognised option e\n"));
+        let (_, c, _, err) = scan(&["-in", "a", "-ref", "b", "-frob", "3"]);
+        assert_eq!(
+            (c, err.as_str()),
+            (255, "Lacking argument to option -frob\n")
+        );
+        let (_, c, _, err) = scan(&["-in", "a", "-ref", "b", "-frob", "3", "4"]);
+        assert_eq!((c, err.as_str()), (255, "Unrecognised option -frob\n"));
+        let (_, c, _, err) = scan(&["-in", "a", "-ref", "b", "-searchrx", "3"]);
+        assert_eq!(
+            (c, err.as_str()),
+            (255, "Lacking argument to option -searchrx\n")
+        );
+        let (_, c, _, err) = scan(&["-in", "a", "-ref", "b", "-pedir", "0"]);
+        assert_eq!(c, 255);
+        assert!(err.starts_with("Unrecognised argument to pedir (0)"));
+        let (_, c, _, err) = scan(&["-in", "a", "-ref", "b", "-cost", "nope"]);
+        assert_eq!(
+            (c, err.as_str()),
+            (255, "Unrecognised cost function type: nope\n")
+        );
+        let (_, c, out, err) = scan(&["-in", "a"]);
+        assert_eq!(c, 2);
+        assert_eq!(err, "ERROR:: Reference volume filename not found\n\n");
+        assert!(out.starts_with("FLIRT version 6.0"));
+    }
+
+    #[test]
+    fn options_are_read() {
+        let (o, _, _, _) = scan(&[
+            "-in",
+            "a",
+            "-ref",
+            "b",
+            "-searchrx",
+            "20",
+            "-10",
+            "-nosearch",
+            "-searchry",
+            "-5",
+            "5",
+            "-dof",
+            "7",
+            "-init",
+            "m.mat",
+            "-coarsesearch",
+            "30",
+            "",
+        ]);
+        let o = o.unwrap();
+        assert_eq!(o.search[0], [0.0, 0.0]);
+        assert!((o.search[1][1] - 5f64.to_radians()).abs() < 1e-15);
+        assert_eq!(o.dof, 7);
+        assert!(!o.use_sqform && o.init.as_deref() == Some("m.mat"));
+        assert_eq!(o.coarse, (30.0 * std::f64::consts::PI / 180.0) as f32);
+    }
 }

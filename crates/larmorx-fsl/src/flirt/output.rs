@@ -214,7 +214,8 @@ pub fn resample(
                 let xf = x as f32;
                 let mut p = [0, 1, 2].map(|k| xf * a[k][0] + zf * a[k][2] + a[k][3]);
                 for y in 0..ny {
-                    let pad_out = (0..3).any(|k| p[k] < -r.padding || p[k] > n[k] - 1.0 + r.padding);
+                    let pad_out =
+                        (0..3).any(|k| p[k] < -r.padding || p[k] > n[k] - 1.0 + r.padding);
                     if !pad_out {
                         let extended = (0..3).all(|k| p[k] >= -1.0 && p[k] <= n[k]);
                         let v = if !extended {
@@ -226,13 +227,12 @@ pub fn resample(
                             match r.interp {
                                 Interp::Trilinear => trilinear_extended(src, p[0], p[1], p[2]),
                                 Interp::NearestNeighbour => nearest(src, p),
-                                Interp::Sinc => r
-                                    .sinc
-                                    .and_then(|k| k.value(src, p))
-                                    .unwrap_or(r.pad),
-                                Interp::Spline => spline
-                                    .as_ref()
-                                    .map_or(r.pad, |s| s.value(p, r.pad)),
+                                Interp::Sinc => {
+                                    r.sinc.and_then(|k| k.value(src, p)).unwrap_or(r.pad)
+                                }
+                                Interp::Spline => {
+                                    spline.as_ref().map_or(r.pad, |s| s.value(p, r.pad))
+                                }
                             }
                         };
                         slab[x + nx * y] = v;
@@ -259,7 +259,6 @@ pub fn resample_shifted(
     let din = mat::diagonal(src.voxel_size.map(|d| 1.0 / f64::from(d)));
     let t = mat::mul(&din, &inv);
     let [nx, ny, nz] = shape;
-    let n = src.shape.map(|v| v as f64);
     let mut data = vec![pad; nx * ny * nz];
     let plane = nx * ny;
     data.par_chunks_mut(plane.max(1))
@@ -277,9 +276,7 @@ pub fn resample_shifted(
                     let mut q = mat::apply(&t, pmm);
                     let (axis, d) = shift(o);
                     q[axis] += d;
-                    if (0..3).any(|k| q[k] < 0.0 || q[k] > n[k] - 1.0) {
-                        continue;
-                    }
+                    // by the extraslice rule, no padding test (observed)
                     slab[x + nx * y] =
                         trilinear_extraslice(src, [q[0] as f32, q[1] as f32, q[2] as f32], pad);
                 }

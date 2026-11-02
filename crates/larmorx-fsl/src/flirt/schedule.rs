@@ -282,19 +282,40 @@ pub fn parse_ref(word: &str, maxdof: f64, minsampling: f64) -> Result<(Var, i64,
 /// the depth `2·⌊log₂ n⌋` runs out), then an insertion sort (guarded over the first 16 rows,
 /// unguarded after them). Rows of equal cost keep the order this gives them (not stable).
 pub fn std_sort<T: Clone>(v: &mut [T], less: &impl Fn(&T, &T) -> bool) {
+    std_sort_checked(v, less);
+}
+
+/// [`std_sort`]; returns `false` where libstdc++'s unguarded scans would have read outside the
+/// slice (an inconsistent order, such as `<` with NaN values: the scans stop at its ends here).
+pub fn std_sort_checked<T: Clone>(v: &mut [T], less: &impl Fn(&T, &T) -> bool) -> bool {
     let n = v.len();
     if n < 2 {
-        return;
+        return true;
     }
+    let inside = std::cell::Cell::new(true);
+    let less = |a: &T, b: &T| less(a, b);
+    let guard = Guard { inside: &inside };
     let depth = 2 * (usize::BITS - 1 - n.leading_zeros()) as usize;
-    introsort_loop(v, 0, n, depth, less);
+    introsort_loop(v, 0, n, depth, &less, &guard);
     if n > 16 {
-        insertion_sort(v, 0, 16, less);
+        insertion_sort(v, 0, 16, &less, &guard);
         for i in 16..n {
-            unguarded_linear_insert(v, i, less);
+            unguarded_linear_insert(v, i, &less, &guard);
         }
     } else {
-        insertion_sort(v, 0, n, less);
+        insertion_sort(v, 0, n, &less, &guard);
+    }
+    inside.get()
+}
+
+/// Notes a scan that would have left the slice.
+struct Guard<'a> {
+    inside: &'a std::cell::Cell<bool>,
+}
+
+impl Guard<'_> {
+    fn out(&self) {
+        self.inside.set(false);
     }
 }
 
@@ -304,6 +325,7 @@ fn introsort_loop<T: Clone>(
     mut last: usize,
     mut depth: usize,
     less: &impl Fn(&T, &T) -> bool,
+    guard: &Guard<'_>,
 ) {
     while last - first > 16 {
         if depth == 0 {
@@ -313,8 +335,8 @@ fn introsort_loop<T: Clone>(
         depth -= 1;
         let mid = first + (last - first) / 2;
         move_median_to_first(v, first, first + 1, mid, last - 1, less);
-        let cut = unguarded_partition(v, first + 1, last, first, less);
-        introsort_loop(v, cut, last, depth, less);
+        let cut = unguarded_partition(v, first + 1, last, first, less, guard);
+        introsort_loop(v, cut, last, depth, less, guard);
         last = cut;
     }
 }
@@ -351,14 +373,22 @@ fn unguarded_partition<T>(
     mut last: usize,
     pivot: usize,
     less: &impl Fn(&T, &T) -> bool,
+    guard: &Guard<'_>,
 ) -> usize {
     loop {
         while first < v.len() && less(&v[first], &v[pivot]) {
             first += 1;
         }
+        if first == v.len() {
+            guard.out();
+            return first.min(last);
+        }
         last -= 1;
         while last > 0 && less(&v[pivot], &v[last]) {
             last -= 1;
+        }
+        if last == 0 && less(&v[pivot], &v[0]) {
+            guard.out();
         }
         if first >= last {
             return first;
@@ -373,6 +403,7 @@ fn insertion_sort<T: Clone>(
     first: usize,
     last: usize,
     less: &impl Fn(&T, &T) -> bool,
+    guard: &Guard<'_>,
 ) {
     for i in first + 1..last {
         if less(&v[i], &v[first]) {
@@ -382,17 +413,26 @@ fn insertion_sort<T: Clone>(
             }
             v[first] = x;
         } else {
-            unguarded_linear_insert(v, i, less);
+            unguarded_linear_insert(v, i, less, guard);
         }
     }
 }
 
-fn unguarded_linear_insert<T: Clone>(v: &mut [T], last: usize, less: &impl Fn(&T, &T) -> bool) {
+fn unguarded_linear_insert<T: Clone>(
+    v: &mut [T],
+    last: usize,
+    less: &impl Fn(&T, &T) -> bool,
+    guard: &Guard<'_>,
+) {
     let x = v[last].clone();
     let mut hole = last;
     while hole > 0 && less(&x, &v[hole - 1]) {
         v[hole] = v[hole - 1].clone();
         hole -= 1;
+    }
+    if hole == 0 && last > 0 {
+        // libstdc++ would compare with the value before the slice next
+        guard.out();
     }
     v[hole] = x;
 }

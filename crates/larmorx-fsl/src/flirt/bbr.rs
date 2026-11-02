@@ -80,13 +80,20 @@ pub fn points(src: &BbrSource, ref_voxel: [f32; 3]) -> Result<BbrPair, String> {
         let [nx, ny, nz] = seg.shape;
         let sum = pyramid::box3(seg);
         let vox: [f64; 3] = seg.voxel_size.map(f64::from);
-        let smooth = crate::betsurf::smooth(seg.data.clone(), seg.shape, vox, 2.0);
+        // the segmentation smoothed by a Gaussian of σ = 2 mm (§6.5)
+        let taps = [0, 1, 2].map(|k| gaussian(seg.voxel_size[k]));
+        let smooth = pyramid::convolve(seg, &taps).data;
         let s = |x: i64, y: i64, z: i64| -> f32 {
-            let c = |v: i64, n: usize| v.clamp(0, n as i64 - 1) as usize;
-            smooth[c(x, nx) + nx * (c(y, ny) + ny * c(z, nz))]
+            if x < 0 || y < 0 || z < 0 || x >= nx as i64 || y >= ny as i64 || z >= nz as i64 {
+                return 0.0;
+            }
+            smooth[x as usize + nx * (y as usize + ny * z as usize)]
         };
-        // 3 × 3 × 3 derivative masks: the difference along the axis, [1, 2, 1] across it
-        let wt = [1.0f32, 2.0, 1.0];
+        // the gradient's mask weights: dx·3^(1 − |dy| − |dz|) and its exchanges (single)
+        let weight = |d: [i64; 3], k: usize| -> f32 {
+            let others: i64 = (0..3).filter(|&j| j != k).map(|j| d[j].abs()).sum();
+            (d[k] as f64 * 3f64.powi((1 - others) as i32)) as f32
+        };
         let found: Vec<Vec<([f32; 3], [f32; 3])>> = (0..nz)
             .into_par_iter()
             .map(|z| {
@@ -105,13 +112,7 @@ pub fn points(src: &BbrSource, ref_voxel: [f32; 3]) -> Result<BbrPair, String> {
                                     let v = s(xi + dx, yi + dy, zi + dz);
                                     let d = [dx, dy, dz];
                                     for (k, gk) in g.iter_mut().enumerate() {
-                                        let mut w = d[k] as f32;
-                                        for (j, &dj) in d.iter().enumerate() {
-                                            if j != k {
-                                                w *= wt[(dj + 1) as usize];
-                                            }
-                                        }
-                                        *gk += w * v;
+                                        *gk += v * weight(d, k);
                                     }
                                 }
                             }
@@ -142,6 +143,24 @@ pub fn points(src: &BbrSource, ref_voxel: [f32; 3]) -> Result<BbrPair, String> {
         kind,
         fmap_inside: std::sync::OnceLock::new(),
     })
+}
+
+/// The taps of BBR's Gaussian of σ = 2 mm along an axis of voxel size `d` (§6.5): `σ = 2/d`
+/// voxels (single), radius `2·trunc(σ − 0.001) + 3`, `exp(−j²/((2σ)·σ))` rounded to single and
+/// summed in single in `j` order, each applied as `g_j·(1/Σ)` in double.
+fn gaussian(d: f32) -> Vec<f64> {
+    let sigma = 2.0f32 / d;
+    let r = 2 * (f64::from(sigma) - 0.001).trunc() as i64 + 3;
+    let den = (2.0 * f64::from(sigma)) * f64::from(sigma);
+    let g: Vec<f32> = (-r..=r)
+        .map(|j| larmorx_core::math::exp(-((j * j) as f64) / den) as f32)
+        .collect();
+    let mut sum = 0.0f32;
+    for &v in &g {
+        sum += v;
+    }
+    let inv = 1.0 / f64::from(sum);
+    g.iter().map(|&v| f64::from(v) * inv).collect()
 }
 
 /// Trilinear interpolation with neighbours outside the volume 0 (any position).

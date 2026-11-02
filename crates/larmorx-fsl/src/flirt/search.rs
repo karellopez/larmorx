@@ -427,6 +427,11 @@ pub fn search(
         .iter()
         .map(|&i| {
             if fsl90 && quaternion {
+                // below 7 parameters the 7 are composed first, then the scale dropped
+                // (observed: FLIRT's message twice for each such start with -dof 6)
+                if free < 7 {
+                    let _ = super::param::compose(rep, &fine_params[i], 7, centre, log);
+                }
                 super::param::compose(rep, &fine_params[i], free, centre, log)
             } else {
                 super::param::euler_compose(&fine_params[i], free, centre)

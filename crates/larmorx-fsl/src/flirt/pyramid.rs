@@ -185,6 +185,15 @@ pub fn blur(v: &Volume, r: f32) -> Volume {
     Volume::new(v.shape, v.voxel_size, data)
 }
 
+/// The separable convolution of `v` with `taps[k]` along axis `k`, x then y then z (§5's passes).
+pub fn convolve(v: &Volume, taps: &[Vec<f64>; 3]) -> Volume {
+    let mut data = v.data.clone();
+    for (axis, t) in taps.iter().enumerate() {
+        convolve_axis_in_place(&mut data, v.shape, axis, t);
+    }
+    Volume::new(v.shape, v.voxel_size, data)
+}
+
 /// The 3 × 3 × 3 box sum of `v` (BBR's boundary test, §6.5): the separable convolution with taps
 /// `[1, 1, 1]`.
 pub fn box3(v: &Volume) -> Volume {
@@ -405,7 +414,15 @@ fn shell_background<T: Real>(
     if kept.is_empty() {
         return None;
     }
-    // NaN last (FSL-22 corrected); every other value in order
+    // with reproduce, the order FSL's build gives NaN values (libstdc++'s sort with `<`), unless
+    // that sort would read outside the vector; otherwise NaN last (FSL-22 corrected)
+    if mode.reproduce() && nan {
+        let mut trial = kept.to_vec();
+        if super::schedule::std_sort_checked(&mut trial, &|a: &T, b: &T| a < b) {
+            let n = kept.len();
+            return Some((trial[n / 10], overflow, nan));
+        }
+    }
     kept.sort_unstable_by(|a, b| match (a.nan(), b.nan()) {
         (true, true) => std::cmp::Ordering::Equal,
         (true, false) => std::cmp::Ordering::Greater,

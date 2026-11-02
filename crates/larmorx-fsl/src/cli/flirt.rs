@@ -327,14 +327,12 @@ pub fn main(args: &[String], settings: &Settings, out: &mut dyn Write, err: &mut
         Parsed::Run(o) => o,
         Parsed::Exit(c) => return c,
     };
-    for (on, what) in [(o.debug, "-debug")] {
-        if on {
-            let _ = writeln!(
-                err,
-                "larmorx fsl flirt: {what} is not in the clean-room original yet (the replica, larmorx-nc, has it)"
-            );
-            return 1;
-        }
+    if o.debug {
+        let _ = writeln!(
+            err,
+            "larmorx fsl flirt: -debug is not in the clean-room original yet (the replica, larmorx-nc, has it)"
+        );
+        return 1;
     }
     let ctx = Ctx {
         settings,

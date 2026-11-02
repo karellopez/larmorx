@@ -1938,14 +1938,20 @@ fn apply(
             &mat::mul(&flip(reference.vols[0].shape[0]), &scale),
             &flip(refv.shape[0]),
         );
-        // an unset sform keeps the reference's rows (observed)
-        if h.sform_code > 0 {
-            let srow = [h.srow_x, h.srow_y, h.srow_z, [0.0, 0.0, 0.0, 1.0]];
-            let new_s = mat::mul(&srow, &step);
-            h.srow_x = new_s[0];
-            h.srow_y = new_s[1];
-            h.srow_z = new_s[2];
-        }
+        // an unset sform keeps the reference's rows but for the x flips of the two grids
+        // (`W·F_n·F_n'`, no scaling; observed)
+        let srow = [h.srow_x, h.srow_y, h.srow_z, [0.0, 0.0, 0.0, 1.0]];
+        let new_s = if h.sform_code > 0 {
+            mat::mul(&srow, &step)
+        } else {
+            mat::mul(
+                &mat::mul(&srow, &flip(reference.vols[0].shape[0])),
+                &flip(refv.shape[0]),
+            )
+        };
+        h.srow_x = new_s[0];
+        h.srow_y = new_s[1];
+        h.srow_z = new_s[2];
         if h.qform_code > 0
             && let Ok(q) = h.qform()
         {
@@ -1959,10 +1965,15 @@ fn apply(
         h.pixdim[3] = f64::from(s);
         ref_input.vol.shape = refv.shape;
     }
-    if let Some(name) = o.omat.as_ref().filter(|n| !n.is_empty()) {
-        let _ = std::fs::write(ctx.settings.path(name), mat::file_text(init));
-    }
+    // the image first, then the matrix (observed: an output type FSL cannot write ends the run
+    // before `-omat` is written)
+    let write_omat = || {
+        if let Some(name) = o.omat.as_ref().filter(|n| !n.is_empty()) {
+            let _ = std::fs::write(ctx.settings.path(name), mat::file_text(init));
+        }
+    };
     let Some(stem) = &o.out else {
+        write_omat();
         return Ok(());
     };
     let first_pad = match o.background {
@@ -1988,5 +1999,7 @@ fn apply(
         t,
         err,
         notices,
-    )
+    )?;
+    write_omat();
+    Ok(())
 }

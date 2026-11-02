@@ -14,8 +14,14 @@ pub const SINGULAR: &str = "inv(): matrix is singular";
 /// in each column, the first on ties): the packed factors and the row order; `None` when a
 /// pivot is exactly zero or not finite.
 fn lu(a: &Mat4) -> Option<(Mat4, [usize; 4])> {
+    lu_pivots(a).map(|(m, perm, _)| (m, perm))
+}
+
+/// [`lu`] with the row interchange of each step (LAPACK's `ipiv`).
+fn lu_pivots(a: &Mat4) -> Option<(Mat4, [usize; 4], [usize; 4])> {
     let mut m = *a;
     let mut perm = [0, 1, 2, 3];
+    let mut ipiv = [0, 1, 2, 3];
     for k in 0..4 {
         let mut p = k;
         let mut best = m[k][k].abs();
@@ -28,6 +34,7 @@ fn lu(a: &Mat4) -> Option<(Mat4, [usize; 4])> {
         if best == 0.0 || !best.is_finite() {
             return None;
         }
+        ipiv[k] = p;
         if p != k {
             m.swap(p, k);
             perm.swap(p, k);
@@ -41,7 +48,7 @@ fn lu(a: &Mat4) -> Option<(Mat4, [usize; 4])> {
             }
         }
     }
-    Some((m, perm))
+    Some((m, perm, ipiv))
 }
 
 /// The solution `x` of `a·x = b` by LU with partial pivoting; `None` for a singular `a`.
@@ -84,17 +91,54 @@ pub fn inverse(a: &Mat4) -> Option<Mat4> {
         }
         return Some(out);
     }
-    let (lu, perm) = lu(a)?;
-    let mut out = [[0.0; 4]; 4];
+    // LAPACK's way (§12: `dgetrf` + `dgetri`): the inverse of U in place (`dtrti2`: each column
+    // by the triangular product with the columns already inverted, then scaled by minus its
+    // diagonal's inverse), then the columns from the last solved against L (`dgemv` with -1),
+    // then the interchanges undone column by column from the last. (Observed: so the signs of
+    // FSL's zeros, e.g. convert_xfm -inverse's `-0`.)
+    let (mut m, _, ipiv) = lu_pivots(a)?;
     for j in 0..4 {
-        let mut e = [0.0; 4];
-        e[j] = 1.0;
-        let col = substitute(&lu, &perm, e);
-        for i in 0..4 {
-            out[i][j] = col[i];
+        m[j][j] = 1.0 / m[j][j];
+        let ajj = -m[j][j];
+        let mut x = [0.0f64; 4];
+        for (i, xi) in x.iter_mut().enumerate().take(j) {
+            *xi = m[i][j];
+        }
+        for jj in 0..j {
+            if x[jj] != 0.0 {
+                let temp = x[jj];
+                for i in 0..jj {
+                    x[i] += temp * m[i][jj];
+                }
+                x[jj] *= m[jj][jj];
+            }
+        }
+        for i in 0..j {
+            m[i][j] = x[i] * ajj;
         }
     }
-    Some(out)
+    for j in (0..4).rev() {
+        let mut work = [0.0f64; 4];
+        for i in j + 1..4 {
+            work[i] = m[i][j];
+            m[i][j] = 0.0;
+        }
+        for (jj, &wj) in work.iter().enumerate().skip(j + 1) {
+            let temp = -wj;
+            for row in m.iter_mut() {
+                row[j] += temp * row[jj];
+            }
+        }
+    }
+    for j in (0..3).rev() {
+        let jp = ipiv[j];
+        if jp != j {
+            for row in m.iter_mut() {
+                row.swap(j, jp);
+            }
+        }
+    }
+    Some(m)
 }
 
 /// `inv(a)·b` as a solve (§12); `None` for a singular `a`.
@@ -373,8 +417,22 @@ mod tests {
                 assert!((p[r][c] - want).abs() < 1e-14);
             }
         }
+        // the solve and LAPACK's inverse agree to rounding (their operation orders differ)
         let s = solve(&a, &IDENTITY).unwrap();
-        assert_eq!(s, i);
+        for r in 0..4 {
+            for c in 0..4 {
+                assert!((s[r][c] - i[r][c]).abs() < 1e-15);
+            }
+        }
+        // the sign of a zero as LAPACK leaves it (convert_xfm -inverse, observed)
+        let z: Mat4 = [
+            [0.9905325444, -0.1372781065, 0.0, 1.5],
+            [0.1372781065, 0.9905325444, 0.0, 3.25],
+            [0.0, 0.0, 1.05, 0.0],
+            [0.0, 0.0, 0.0, 1.0],
+        ];
+        let zi = inverse(&z).unwrap();
+        assert!(zi[2][3] == 0.0 && zi[2][3].is_sign_negative());
         let mut sing = IDENTITY;
         sing[1][1] = 0.0;
         assert!(inverse(&sing).is_none());

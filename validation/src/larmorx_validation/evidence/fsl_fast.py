@@ -868,8 +868,11 @@ def command(case: str, defs: dict[str, tuple[str, object]]) -> str:
     if case not in defs or defs[case][1] is None:
         return ""
     run = defs[case][1]
-    words = [_input(a) if a.startswith("@") else a for a in run.args]
-    parts = ["fast", *(shlex.quote(w) if re.search(r"\s", w) or w == "" else w for w in words)]
+    # an input is named by a placeholder (never quoted); a real argument quoted as a shell would
+    parts = ["fast"] + [
+        _input(a) if a.startswith("@") else shlex.quote(a) if re.search(r"\s", a) or a == "" else a
+        for a in run.args
+    ]
     env = " ".join(f"{k}={v}" for k, v in run.settings if v is not None)
     unset = " ".join(f"{k} unset" for k, v in run.settings if v is None)
     return " ".join(x for x in (env, " ".join(parts), f"({unset})" if unset else "") if x)
@@ -887,7 +890,7 @@ def case_verdict(r: dict, dm: dict) -> tuple[str, str]:
                 f" The replica's default mode finishes instead (exit status 0), naming "
                 f"{', '.join(named)}."
                 if code == 0
-                else f" The replica's default mode ends with exit status {code} too, naming "
+                else f" The replica's default mode ends with exit status {code}, naming "
                 f"{', '.join(named)}."
             )
         return verdict, common.clip(why, 600)

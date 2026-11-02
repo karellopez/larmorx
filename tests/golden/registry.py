@@ -4349,7 +4349,8 @@ def _(ctx: Context) -> dict[str, Any]:
     _fsl(ctx, "applyxfm4D", ctx.file("anat2.nii"), ctx.file("anat.nii"), o3, a, "-3D", "-interp", "spline")  # fmt: skip
     return {
         "series": Nifti(f"{o4}.nii.gz"),
-        "names": stdout.replace(os.fspath(ctx.dir), "<dir>"),
+        # the matrix names as printed: Windows joins the directory with "\\", the program adds "/"
+        "names": stdout.replace(os.fspath(ctx.dir), "<dir>").replace("\\", "/"),
         "volume": Nifti(f"{o3}.nii.gz"),
     }
 
@@ -4377,7 +4378,10 @@ def _(ctx: Context) -> dict[str, Any]:
     """``larmorx fsl extracttxt`` (§15.8): two lines from two after the first match of a regular
     expression; signed words read by dc; a range starting before line 1 (sed's option error)."""
     t = ctx.dir / "t.txt"
-    t.write_text("".join(f"line {k} value {k * 3}\n" for k in range(1, 13)))
+    # "\n" on every platform: extracttxt passes a line through whole, "\r" included
+    t.write_text(
+        "".join(f"line {k} value {k * 3}\n" for k in range(1, 13)), encoding="utf-8", newline="\n"
+    )
     return {
         "lines": _fsl(ctx, "extracttxt", "^line.[5-6]", str(t), "2", "2"),
         **_status_outputs("signed", _fsl_status(ctx, "extracttxt", "e.4", str(t), "-0", "+2")),
@@ -4505,7 +4509,10 @@ def _(ctx: Context) -> dict[str, Any]:
 def _(ctx: Context) -> dict[str, Any]:
     """``lx.fsl.extracttxt`` with the clean-room original: three lines from the first match."""
     t = ctx.dir / "t.txt"
-    t.write_text("".join(f"line {k} value {k * 3}\n" for k in range(1, 13)))
+    # "\n" on every platform: extracttxt passes a line through whole, "\r" included
+    t.write_text(
+        "".join(f"line {k} value {k * 3}\n" for k in range(1, 13)), encoding="utf-8", newline="\n"
+    )
     return {"lines": lx.fsl.extracttxt("e.4", t, 3, implementation="original")}
 
 

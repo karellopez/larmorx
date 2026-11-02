@@ -100,3 +100,8 @@ the spec answers; FSL-111 in the replica.
 - For the replica side: FSL-111 in `larmorx-nc fsl applyxfm4D` (next-steps follow-up).
 - An orphaned box of part 1's record workers (idle since 10:39) is still up: stopping it was refused by
   the session's permission check, left to the user.
+- After the push (ffc7c3f), CI failed on Windows x64 and arm64 in three of the part's golden cases, all in the
+  tests: `cli.fsl.extracttxt` and `py.fsl.extracttxt` wrote their input text with Windows line endings
+  (`write_text`), which extracttxt passes through as FSL's script would; `cli.fsl.applyxfm4D`'s printed matrix
+  names join the directory with Windows' separator. Fixed in `tests/golden/registry.py` (the input written with
+  "\n", the separators normalised); the Linux checksums unchanged.

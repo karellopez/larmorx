@@ -7,13 +7,18 @@
 //! count) are read into a table of settings ([`Settings`]): the command line fills it from the
 //! process environment, the Python wrappers give it explicitly (porting guide §9.1).
 
+pub mod avscale;
 pub mod bet;
 pub mod bet2;
 pub mod betsurf;
+pub mod common;
 pub mod convert_xfm;
+pub mod coords;
 pub mod flirt;
 pub mod fmt;
+pub mod makerot;
 pub mod options;
+pub mod rmsdiff;
 
 use std::collections::BTreeMap;
 use std::io::Write;
@@ -22,7 +27,19 @@ use std::path::{Path, PathBuf};
 use larmorx_core::defects::{self, UpstreamDefects};
 
 /// The tools on the command line.
-pub const TOOLS: &[&str] = &["bet", "bet2", "betsurf", "flirt", "convert_xfm"];
+pub const TOOLS: &[&str] = &[
+    "bet",
+    "bet2",
+    "betsurf",
+    "flirt",
+    "convert_xfm",
+    "avscale",
+    "img2imgcoord",
+    "std2imgcoord",
+    "img2stdcoord",
+    "rmsdiff",
+    "makerot",
+];
 
 /// The settings of one run: the environment it reads and the directory relative names start
 /// in.
@@ -30,6 +47,8 @@ pub const TOOLS: &[&str] = &["bet", "bet2", "betsurf", "flirt", "convert_xfm"];
 pub struct Settings {
     pub vars: BTreeMap<String, String>,
     pub dir: Option<PathBuf>,
+    /// Standard input's bytes for the coordinate programs (`None`: the process's own).
+    pub stdin: Option<Vec<u8>>,
 }
 
 impl Settings {
@@ -40,6 +59,7 @@ impl Settings {
                 .filter_map(|(k, v)| Some((k.into_string().ok()?, v.into_string().ok()?)))
                 .collect(),
             dir: None,
+            stdin: None,
         }
     }
 
@@ -91,6 +111,7 @@ pub fn run_in(
     let settings = Settings {
         vars: env.into_iter().collect(),
         dir,
+        stdin: None,
     };
     run_with(tool, args, &settings, out, err)
 }
@@ -109,6 +130,30 @@ pub fn run_with(
         "betsurf" => Some(betsurf::main(args, settings, out, err)),
         "flirt" => Some(flirt::main(args, settings, out, err)),
         "convert_xfm" => Some(convert_xfm::main(args, settings, out, err)),
+        "avscale" => Some(avscale::main(args, settings, out, err)),
+        "img2imgcoord" => Some(coords::main(
+            coords::Program::Img2Img,
+            args,
+            settings,
+            out,
+            err,
+        )),
+        "std2imgcoord" => Some(coords::main(
+            coords::Program::Std2Img,
+            args,
+            settings,
+            out,
+            err,
+        )),
+        "img2stdcoord" => Some(coords::main(
+            coords::Program::Img2Std,
+            args,
+            settings,
+            out,
+            err,
+        )),
+        "rmsdiff" => Some(rmsdiff::main(args, settings, out, err)),
+        "makerot" => Some(makerot::main(args, settings, out, err)),
         _ => None,
     }
 }

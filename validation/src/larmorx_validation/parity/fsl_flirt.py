@@ -4,9 +4,9 @@ larmorx-fsl, Apache-2.0, written from ``specs/flirt.md``) with FSL 6.0.7.23's ``
 ``convert_xfm``.
 
 The cases are the replica suite's (``fsl_flirt_replica``: fMRIPrep's three BBR calls, the real
-cases on ds005040's images, the schedules, the edge cases and ``convert_xfm``), run here against
-the original; FLIRT's other programs (avscale, the coordinate programs, ...) have no original yet
-and are left out. Every FSL run goes through the oracle-output cache with the replica suite's
+cases on ds005040's images, the schedules, the edge cases, ``convert_xfm`` and FLIRT's other
+programs that have an original: ``avscale``, the coordinate programs, ``rmsdiff``, ``makerot``),
+run here against the original; the programs without one yet (``midtrans``, ...) are left out. Every FSL run goes through the oracle-output cache with the replica suite's
 keys, so the runs that suite made are served from it.
 
 What is compared (``specs/flirt.md`` §13):
@@ -21,7 +21,9 @@ What is compared (``specs/flirt.md`` §13):
 - images: bit-identical when the matrices are identical (decompressed, ``descrip`` left out),
   otherwise the normalised correlation with FSL's image inside the reference's mask at least
   0.999;
-- the D13 fix pass: a defect named exactly when the default's outputs differ from ``reproduce``.
+- the D13 fix pass: a defect named exactly when the default's outputs differ from ``reproduce``;
+- FLIRT's other programs (:data:`TEXT_PROGRAMS`): standard output and error identical (where FSL
+  aborts, the original prints the same lines and exits 1), every file identical.
 """
 
 from __future__ import annotations
@@ -56,8 +58,11 @@ from larmorx_validation.parity.harness import (
 )
 
 SUITE = "fsl-flirt"
+#: FLIRT's other programs whose results are their text and files (part 2): compared identical
+#: (§13: every case of the replica's ``programs/`` category, identical in text and exit status).
+TEXT_PROGRAMS = ("avscale", "img2imgcoord", "std2imgcoord", "img2stdcoord", "rmsdiff", "makerot")
 #: The programs with a clean-room original.
-PROGRAMS = ("flirt", "convert_xfm")
+PROGRAMS = ("flirt", "convert_xfm", *TEXT_PROGRAMS)
 #: Options the original does not have yet (part 2): its cases are skipped.
 PENDING = {
     "-debug": "-debug (part 2)",
@@ -207,6 +212,46 @@ def _ncc(a: np.ndarray, b: np.ndarray, mask: np.ndarray) -> float:
     x, y = x - x.mean(), y - y.mean()
     d = np.sqrt((x * x).sum() * (y * y).sum())
     return float((x * y).sum() / d) if d > 0 else (1.0 if np.array_equal(a, b) else 0.0)
+
+
+def compare_text(
+    checks: CheckList, program: str, oracle: Completed, ours: Completed, a: Path, b: Path
+) -> None:
+    """FLIRT's other programs (§13): exit status (where FSL aborts, the original exits 1),
+    standard output and error identical (the original's ``larmorx`` lines left out), the same
+    files with the same bytes."""
+    if oracle.code < 0:
+        checks(
+            f"exit status ({program} is killed; the original exits 1)",
+            ours.code == 1,
+            detail=f"{program} signal {-oracle.code}, original {ours.code}",
+        )
+    else:
+        checks("exit status", oracle.code == ours.code, detail=f"{oracle.code} vs {ours.code}")
+    for stream in ("stdout", "stderr"):
+        want = rep._clean(getattr(oracle, stream), a, program)
+        got = rep._clean(_own(getattr(ours, stream)), b, program)
+        detail = ""
+        if want != got:
+            wl, gl = want.splitlines(), got.splitlines()
+            first = next(
+                (i for i, (x, y) in enumerate(zip(wl, gl, strict=False)) if x != y),
+                min(len(wl), len(gl)),
+            )
+            detail = (
+                f"line {first + 1}: FSL {wl[first] if first < len(wl) else '<end>'!r}, "
+                f"original {gl[first] if first < len(gl) else '<end>'!r}"
+            )
+        checks(f"{stream} identical", want == got, detail=detail)
+    theirs, mine = _files(a, set()), _files(b, set())
+    checks(
+        "files written",
+        set(theirs) == set(mine),
+        detail=f"only FSL {sorted(set(theirs) - set(mine))[:6]}, "
+        f"only the original {sorted(set(mine) - set(theirs))[:6]}",
+    )
+    differ = [n for n in sorted(set(theirs) & set(mine)) if not rep._same_bytes(theirs[n], mine[n])]
+    checks("every file identical", not differ, detail="; ".join(differ[:6]))
 
 
 def compare(
@@ -547,6 +592,9 @@ def fix_pass(
         others = []
         if r.code != reproduced.code:
             others.append(f"exit {reproduced.code} -> {r.code}")
+        if program in TEXT_PROGRAMS and r.stdout != reproduced.stdout:
+            # the programs whose results are printed
+            others.append("standard output")
         a = dict(_files(reproduced_dir, set()))
         bb = dict(_files(tmp, set()))
         if set(a) != set(bb):
@@ -597,7 +645,12 @@ def _run_case(run: rep.Run, checks: CheckList) -> None:
         rep._prepare(run, b)
         oracle = rep.run_oracle(run.program, args, cwd=a, settings=settings)
         ours = run_original(run.program, args, cwd=b, settings=settings, mode=defects.REPRODUCE)
-        compare(checks, run.program, args, oracle, ours, a, b, band=_band(run, args, settings, a))
+        if run.program in TEXT_PROGRAMS:
+            compare_text(checks, run.program, oracle, ours, a, b)
+        else:
+            compare(
+                checks, run.program, args, oracle, ours, a, b, band=_band(run, args, settings, a)
+            )
         if run.fix and ours.code == 0:
             fix_pass(checks, run.program, lambda t: rep._prepare(run, t), args, settings, b, ours)
     if oracle.code != 0 and all(c.passed for c in checks.checks):

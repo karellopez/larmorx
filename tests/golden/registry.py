@@ -955,14 +955,9 @@ def image_math_operations() -> list[str]:
 #: cases are the replica's own (``crates-nc/larmorx-nc-cli/tests/golden.rs``, run on every
 #: platform by the replicas' jobs). ``replica_only`` checks that each tool has one there.
 #: Since 2026-11-01: FLIRT's programs but flirt and convert_xfm (their clean-room originals since
-#: 2026-11-02; the others are still to be written).
+#: 2026-11-02), avscale, the coordinate programs, rmsdiff and makerot (theirs since part 2 of
+#: FLIRT's original); the others are still to be written.
 REPLICA_ONLY_FUNCTIONS: dict[str, str] = {
-    "lx.fsl.avscale": "fsl avscale",
-    "lx.fsl.img2imgcoord": "fsl img2imgcoord",
-    "lx.fsl.std2imgcoord": "fsl std2imgcoord",
-    "lx.fsl.img2stdcoord": "fsl img2stdcoord",
-    "lx.fsl.rmsdiff": "fsl rmsdiff",
-    "lx.fsl.makerot": "fsl makerot",
     "lx.fsl.midtrans": "fsl midtrans",
     "lx.fsl.pointflirt": "fsl pointflirt",
     "lx.fsl.applyxfm4d": "fsl applyxfm4D",
@@ -4171,6 +4166,172 @@ def _(ctx: Context) -> dict[str, Any]:
     a = np.array([[1.05, 0.02, -0.03, 2], [-0.01, 0.97, 0.04, -3], [0.02, -0.05, 1.1, 1.5], [0, 0, 0, 1]])  # fmt: skip
     b = np.array([[0.99, 0.1, 0, 1], [-0.1, 0.99, 0.05, 2], [0, -0.05, 1.2, -3], [0, 0, 0, 1]])
     return {"matrix": lx.fsl.convert_xfm(a, concat=b, inverse=True, implementation="original")}
+
+
+_AFFINE = "1.05 0.02 -0.03 2\n-0.01 0.97 0.04 -3\n0.02 -0.05 1.1 1.5\n0 0 0 1\n"
+_REFLECTION = "-1.1 0.1 0 3\n0.05 0.9 0.2 -1\n0 -0.1 1.2 2\n0 0 0 1\n"
+_COORDS = "10 20 30\n0 0 0\n-5.5 3.25 7\n"
+
+
+def _mat(text: str) -> np.ndarray:
+    """A matrix written as text, as an array."""
+    return np.array([[float(v) for v in line.split()] for line in text.splitlines()])
+
+
+def _flirt_files(ctx: Context) -> tuple[str, str, str]:
+    """An affine matrix, a reflection and three coordinates, in the case's directory."""
+    a, f, c = ctx.dir / "a.mat", ctx.dir / "f.mat", ctx.dir / "coords.txt"
+    a.write_text(_AFFINE)
+    f.write_text(_REFLECTION)
+    c.write_text(_COORDS)
+    return str(a), str(f), str(c)
+
+
+@case("cli.fsl.avscale", covers=("cli:fsl avscale",))
+def _(ctx: Context) -> dict[str, Any]:
+    """``larmorx fsl avscale`` (the clean-room original, ``specs/flirt.md`` §15.1):
+    ``--allparams`` about a volume's centre of gravity, ``--inverteddies`` of a reflection (its
+    half transforms of the matrix made proper), the usage."""
+    a, f, _ = _flirt_files(ctx)
+    return {
+        "allparams": _fsl(ctx, "avscale", "--allparams", a, ctx.file("anat.nii")),
+        "eddies": _fsl(ctx, "avscale", "--inverteddies", f),
+        **_status_outputs("usage", _fsl_status(ctx, "avscale")),
+    }
+
+
+@case("cli.fsl.img2imgcoord", covers=("cli:fsl img2imgcoord",))
+def _(ctx: Context) -> dict[str, Any]:
+    """``larmorx fsl img2imgcoord`` (§15.2) between an oblique image stored with a positive
+    determinant (x reversed in memory) and another: voxels, and millimetres verbose (the sizes
+    and the matrix, then fixed notation)."""
+    a, _, c = _flirt_files(ctx)
+    src, dest = ctx.file("anat.nii"), ctx.file("anat2.nii")
+    return {
+        "vox": _fsl(ctx, "img2imgcoord", "-src", src, "-dest", dest, "-xfm", a, c),
+        "mm": _fsl(ctx, "img2imgcoord", "-src", src, "-dest", dest, "-xfm", a, "-mm", "-v", c),
+    }
+
+
+@case("cli.fsl.std2imgcoord", covers=("cli:fsl std2imgcoord",))
+def _(ctx: Context) -> dict[str, Any]:
+    """``larmorx fsl std2imgcoord`` (§15.2): millimetres verbose (the matrix's inverse as the
+    linear-algebra library prints it), voxels, and without a standard image (its warning)."""
+    a, _, c = _flirt_files(ctx)
+    img, std = ctx.file("anat.nii"), ctx.file("anat2.nii")
+    return {
+        "mm": _fsl(ctx, "std2imgcoord", "-img", img, "-std", std, "-xfm", a, "-verbose", c),
+        "vox": _fsl(ctx, "std2imgcoord", "-img", img, "-std", std, "-xfm", a, "-vox", c),
+        **_status_outputs("nostd", _fsl_status(ctx, "std2imgcoord", "-img", img, c)),
+    }
+
+
+@case("cli.fsl.img2stdcoord", covers=("cli:fsl img2stdcoord",))
+def _(ctx: Context) -> dict[str, Any]:
+    """``larmorx fsl img2stdcoord`` (§15.2): voxels, millimetres verbose, and an unknown
+    option's message."""
+    a, _, c = _flirt_files(ctx)
+    img, std = ctx.file("anat.nii"), ctx.file("anat2.nii")
+    return {
+        "vox": _fsl(ctx, "img2stdcoord", "-img", img, "-std", std, "-xfm", a, c),
+        "mm": _fsl(ctx, "img2stdcoord", "-img", img, "-std", std, "-xfm", a, "-mm", "-verbose", c),
+        **_status_outputs(
+            "unknown", _fsl_status(ctx, "img2stdcoord", "-img", img, "-frob", "x", c)
+        ),
+    }
+
+
+@case("cli.fsl.rmsdiff", covers=("cli:fsl rmsdiff",))
+def _(ctx: Context) -> dict[str, Any]:
+    """``larmorx fsl rmsdiff`` (§15.3): the RMS deviation over 80 mm about a volume's centre of
+    gravity, the largest and RMS displacement over a mask, a matrix of low determinant."""
+    a, f, _ = _flirt_files(ctx)
+    small = ctx.dir / "small.mat"
+    small.write_text("0.1 0 0 0\n0 0.5 0 0\n0 0 1 0\n0 0 0 1\n")
+    vol = ctx.file("anat.nii")
+    return {
+        "rms": _fsl(ctx, "rmsdiff", a, f, vol),
+        "mask": _fsl(ctx, "rmsdiff", a, f, vol, ctx.file("mask.nii")),
+        **_status_outputs("low", _fsl_status(ctx, "rmsdiff", str(small), a, vol)),
+    }
+
+
+@case("cli.fsl.makerot", covers=("cli:fsl makerot",))
+def _(ctx: Context) -> dict[str, Any]:
+    """``larmorx fsl makerot`` (§15.4): an axis not of unit length through a centre (FSL-76:
+    corrected by default, FSL's matrix with ``reproduce``), written with ``-o``; an axis of one
+    value (FSL-77: refused by default)."""
+    o = ctx.out("rot.mat")
+    args = ("-t", "30", "-a", "1,2,3", "-c", "4,5,6")
+    fix = _fsl(ctx, "makerot", *args)
+    _fsl(ctx, "makerot", *args, "-o", o, upstream_defects=REPRODUCE)
+    return {
+        "fix": fix,
+        "reproduce": File(o),
+        **_status_outputs("short", _fsl_status(ctx, "makerot", "-t", "30", "-a", "5")),
+    }
+
+
+@case("py.fsl.avscale", covers=("lx.fsl.avscale",))
+def _(ctx: Context) -> dict[str, Any]:
+    """``lx.fsl.avscale`` with the clean-room original: every parameter about a volume's centre."""
+    m = _mat(_AFFINE)
+    r = lx.fsl.avscale(m, anat(), all_params=True, implementation="original")
+    return {
+        "rt": r.rotation_translation,
+        "params": np.r_[r.rotations, r.translations, r.scales, r.skews],
+        "forward": r.forward_half,
+        "backward": r.backward_half,
+    }
+
+
+@case("py.fsl.img2imgcoord", covers=("lx.fsl.img2imgcoord",))
+def _(ctx: Context) -> dict[str, Any]:
+    """``lx.fsl.img2imgcoord`` with the clean-room original, in voxels."""
+    m = _mat(_AFFINE)
+    pts = [[10, 20, 30], [0, 0, 0], [-5.5, 3.25, 7]]
+    return {"coords": lx.fsl.img2imgcoord(pts, anat(), anat2(), xfm=m, implementation="original")}
+
+
+@case("py.fsl.std2imgcoord", covers=("lx.fsl.std2imgcoord",))
+def _(ctx: Context) -> dict[str, Any]:
+    """``lx.fsl.std2imgcoord`` with the clean-room original, in millimetres."""
+    m = _mat(_AFFINE)
+    pts = [[10, 20, 30], [0, 0, 0], [-5.5, 3.25, 7]]
+    return {"coords": lx.fsl.std2imgcoord(pts, anat(), anat2(), xfm=m, implementation="original")}
+
+
+@case("py.fsl.img2stdcoord", covers=("lx.fsl.img2stdcoord",))
+def _(ctx: Context) -> dict[str, Any]:
+    """``lx.fsl.img2stdcoord`` with the clean-room original, from millimetres."""
+    m = _mat(_AFFINE)
+    pts = [[10, 20, 30], [0, 0, 0], [-5.5, 3.25, 7]]
+    return {
+        "coords": lx.fsl.img2stdcoord(
+            pts, anat(), anat2(), xfm=m, mm=True, implementation="original"
+        )
+    }
+
+
+@case("py.fsl.rmsdiff", covers=("lx.fsl.rmsdiff",))
+def _(ctx: Context) -> dict[str, Any]:
+    """``lx.fsl.rmsdiff`` with the clean-room original: about a volume's centre, over a mask."""
+    a = _mat(_AFFINE)
+    b = _mat(_REFLECTION)
+    return {
+        "rms": lx.fsl.rmsdiff(a, b, anat(), implementation="original"),
+        "mask": np.array(lx.fsl.rmsdiff(a, b, anat(), mask(), implementation="original")),
+    }
+
+
+@case("py.fsl.makerot", covers=("lx.fsl.makerot",))
+def _(ctx: Context) -> dict[str, Any]:
+    """``lx.fsl.makerot`` with the clean-room original: about an axis through a centre (the axis
+    divided by its length, FSL-76's correction, named in a warning)."""
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore")
+        m = lx.fsl.makerot(30, axis=(1, 2, 3), centre=(4, 5, 6), implementation="original")
+    return {"matrix": m}
 
 
 @case("py.fsl.bet", covers=("lx.fsl.bet",))

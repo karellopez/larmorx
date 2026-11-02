@@ -3,10 +3,10 @@
 ``std2imgcoord`` and ``img2stdcoord`` (coordinates mapped between images), ``rmsdiff`` (the
 deviation between two matrices) and ``makerot`` (a rotation matrix), FSL 6.0.7.23's.
 
-Each runs the bit-exact replica from ``larmorx-nc`` as a separate program (``docs/licensing.md``);
-the clean-room originals are to be written from ``specs/flirt.md``, so
-``implementation="auto"`` needs ``larmorx-nc`` installed. The results are what the programs
-print, parsed: FSL prints matrices and parameters with 6 decimals, and coordinates with 6
+Each has two implementations (``docs/licensing.md``): the bit-exact replica from ``larmorx-nc``
+(FSL Licence), run as a separate program, and the clean-room original (Apache-2.0, written from
+``specs/flirt.md``), run in this process; ``implementation="auto"`` runs the replica when it is
+installed, else the original. The results are what the programs print, parsed: FSL prints matrices and parameters with 6 decimals, and coordinates with 6
 significant digits (with 6 decimals once a matrix was printed in verbose mode), and so do these.
 """
 
@@ -108,7 +108,6 @@ def avscale(
     if all_params and inverted_eddies:
         raise ValueError("avscale takes one of all_params and inverted_eddies")
     selected = _replica.select("fsl", "avscale", implementation)
-    assert selected is not None
     with tempfile.TemporaryDirectory(prefix="larmorx-avscale-") as tmp:
         args = []
         if all_params:
@@ -118,7 +117,7 @@ def avscale(
         args.append(_matrix_file(matrix, tmp, "in"))
         if volume is not None:
             args.append(_image_file(volume, tmp, "vol"))
-        process = _run(selected, args, tmp, 1, "fix")
+        process = _run(selected, args, tmp, 1, "fix", program="avscale")
     text = process.stdout
     lines = text.splitlines()
     scales = _values(lines, "Scales (x,y,z) = ")
@@ -149,9 +148,10 @@ def avscale(
 
 def _coords(tool: str, args: list[str], implementation: str) -> np.ndarray:
     selected = _replica.select("fsl", tool, implementation)
-    assert selected is not None
     with tempfile.TemporaryDirectory(prefix=f"larmorx-{tool}-") as tmp:
-        process = _run(selected, args, tmp, 1, "fix")
+        process = _run(selected, args, tmp, 1, "fix", program=tool)
+    if process.returncode != 0:
+        raise RuntimeError(f"{tool} failed (exit {process.returncode}):\n{process.stderr}")
     rows = []
     for line in process.stdout.splitlines():
         words = line.split()
@@ -243,7 +243,6 @@ def rmsdiff(
     over a sphere of radius 80 mm about ``ref``'s centre of gravity; with ``mask``, the largest
     and the RMS displacement over the mask's voxels, as ``(largest, rms)``."""
     selected = _replica.select("fsl", "rmsdiff", implementation)
-    assert selected is not None
     with tempfile.TemporaryDirectory(prefix="larmorx-rmsdiff-") as tmp:
         args = [
             _matrix_file(matrix1, tmp, "m1"),
@@ -252,7 +251,9 @@ def rmsdiff(
         ]
         if mask is not None:
             args.append(_image_file(mask, tmp, "mask"))
-        process = _run(selected, args, tmp, 1, "fix")
+        process = _run(selected, args, tmp, 1, "fix", program="rmsdiff")
+    if process.returncode != 0:
+        raise RuntimeError(f"rmsdiff failed (exit {process.returncode}):\n{process.stderr}")
     values = [float(v) for v in process.stdout.split()]
     if mask is None:
         return values[0]
@@ -275,7 +276,6 @@ def makerot(
     gives FSL's matrix); an axis or centre of other than three values is an error here (FSL-77
     is about the command line, where one word holds them)."""
     selected = _replica.select("fsl", "makerot", implementation)
-    assert selected is not None
 
     def three(v: Any, what: str) -> str:
         a = np.asarray(v, dtype=np.float64).ravel()
@@ -293,5 +293,7 @@ def makerot(
             args.append("--cov=" + _image_file(cov, tmp, "cov"))
         out = os.path.join(tmp, "rot.mat")
         args += ["-o", out]
-        _run(selected, args, tmp, 1, upstream_defects)
+        p = _run(selected, args, tmp, 1, upstream_defects, program="makerot")
+        if p.returncode != 0 or not os.path.isfile(out):
+            raise RuntimeError(f"makerot failed (exit {p.returncode}):\n{p.stderr}")
         return np.loadtxt(out)

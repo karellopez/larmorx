@@ -155,8 +155,8 @@ pub const REPLICAS: &[Replica] = &[
         original: true,
     },
     // FSL's FLIRT and its programs (2026-11-01): flirt and convert_xfm have their clean-room
-    // originals (`larmorx_fsl::cli`, written from specs/flirt.md, 2026-11-02); the other programs
-    // the replica only.
+    // originals (`larmorx_fsl::cli`, written from specs/flirt.md, 2026-11-02), and avscale, the
+    // coordinate programs, rmsdiff and makerot (part 2); the other programs the replica only.
     Replica {
         family: "fsl",
         tool: "flirt",
@@ -173,37 +173,37 @@ pub const REPLICAS: &[Replica] = &[
         family: "fsl",
         tool: "avscale",
         location: Location::Program(&LARMORX_NC),
-        original: false,
+        original: true,
     },
     Replica {
         family: "fsl",
         tool: "img2imgcoord",
         location: Location::Program(&LARMORX_NC),
-        original: false,
+        original: true,
     },
     Replica {
         family: "fsl",
         tool: "std2imgcoord",
         location: Location::Program(&LARMORX_NC),
-        original: false,
+        original: true,
     },
     Replica {
         family: "fsl",
         tool: "img2stdcoord",
         location: Location::Program(&LARMORX_NC),
-        original: false,
+        original: true,
     },
     Replica {
         family: "fsl",
         tool: "rmsdiff",
         location: Location::Program(&LARMORX_NC),
-        original: false,
+        original: true,
     },
     Replica {
         family: "fsl",
         tool: "makerot",
         location: Location::Program(&LARMORX_NC),
-        original: false,
+        original: true,
     },
     Replica {
         family: "fsl",
@@ -691,12 +691,6 @@ mod tests {
         assert_eq!(
             replica_only("fsl").collect::<Vec<_>>(),
             [
-                "avscale",
-                "img2imgcoord",
-                "std2imgcoord",
-                "img2stdcoord",
-                "rmsdiff",
-                "makerot",
                 "midtrans",
                 "pointflirt",
                 "applyxfm4D",

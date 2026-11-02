@@ -12,8 +12,10 @@ a behaviour spec without FSL's code. The same programs run from the command line
 run as a separate process (nothing of it is imported), and their clean-room original (``bet2``,
 the ``bet`` script's ``-R``, ``-F``, ``-Z``, and ``betsurf``; written from ``specs/bet.md``):
 ``implementation="auto"`` (the default) runs the replica when ``larmorx-nc`` is installed, else
-the original. ``flirt`` and ``convert_xfm`` have both too (the original written from
-``specs/flirt.md``, since 2026-11-02); FLIRT's other programs have their replica only.
+the original. ``flirt``, ``convert_xfm``, ``avscale``, the coordinate programs (``img2imgcoord``,
+``std2imgcoord``, ``img2stdcoord``), ``rmsdiff`` and ``makerot`` have both too (the originals
+written from ``specs/flirt.md``, since 2026-11-02); FLIRT's other programs (``midtrans``,
+``pointflirt``, ``applyxfm4d`` and the scripts) have their replica only for now.
 """
 
 from larmorx.fsl.bet import (

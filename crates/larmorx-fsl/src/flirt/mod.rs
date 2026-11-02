@@ -18,6 +18,7 @@ pub mod optimise;
 pub mod output;
 pub mod param;
 pub mod paxes;
+pub mod programs;
 pub mod pyramid;
 pub mod schedule;
 pub mod search;

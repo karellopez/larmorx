@@ -103,6 +103,10 @@ pub struct Segmentation {
     /// FSL-103: the voxels of the image's maximum FAST's mask leaves out (when the maximum
     /// plus 1 rounds to the maximum in `float`, at 2^24 and above): kept in by default.
     pub max_left_out: usize,
+    /// FSL-96: whether `members` was ever written (FAST writes it in the k-means iterations and
+    /// before the partial volumes only: with priors and `--nopve`, or no k-means iteration and
+    /// `--nopve`, `-p` saves memory it never wrote, in the mask too).
+    pub members_written: bool,
     pv_prob: Vec<f32>,
     mean: Vec<f32>,
     variance: Vec<f32>,
@@ -187,6 +191,7 @@ impl Segmentation {
             pve_segment: vec![0; pve],
             hard_pv: Vec::new(),
             max_left_out,
+            members_written: false,
             pv_prob: Vec::new(),
             mean: Vec::new(),
             variance: Vec::new(),
@@ -500,6 +505,7 @@ impl Segmentation {
 
     /// `UpdateMembers(m_post)`.
     fn update_members_post(&mut self) {
+        self.members_written = true;
         let nc = self.nc;
         // FSL loops x outermost; each voxel is independent
         for k in 0..self.nvox {

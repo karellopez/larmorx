@@ -757,7 +757,15 @@ fn segment_single_channel(
         }
     }
     if a.probabilities {
-        unwritten_notice(mri.outside_mask(), notices);
+        if mri.members_written {
+            unwritten_notice(mri.outside_mask(), notices);
+        } else {
+            notices.add(
+                &defects::FSL_96,
+                "-p's probability maps, which FAST never writes with these options (priors, or \
+                 no k-means iteration, with --nopve: it saves what its memory held): written as 0",
+            );
+        }
         for i in 0..nc {
             let v: Volume = grid(&props, mri.member_volume(i));
             if let Some(code) = save(&v, &format!("{outname}_prob_{i}"), run, io) {

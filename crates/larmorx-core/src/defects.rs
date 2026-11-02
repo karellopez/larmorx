@@ -479,7 +479,7 @@ defects! {
     FSL_93 = "FSL-93", "flirt", true,
         "a voxel size of 0 in the input's or reference's header (which reading the image counts as 1) makes the base scale 0: every voxel size divided by it is infinite, the initial matrix NaN, and FLIRT never finishes; -basescale 0 the same";
     FSL_96 = "FSL-96", "fast", true,
-        "-p's probability maps are never written outside the brain mask (the voxels of value 0 or below): FAST saves whatever its memory held there, zeros or other values depending on how the memory was reused";
+        "-p's probability maps are never written outside the brain mask (the voxels of value 0 or below), nor anywhere with --nopve when FAST runs no k-means iteration (-W 0 -O 0) or initialises from priors (-a): FAST saves whatever its memory held there, zeros or other values depending on how the memory was reused";
     FSL_97 = "FSL-97", "fast", true,
         "with several channels and -N, the bias field -b saves and -B applies is never computed: FAST saves whatever its memory held (infinite fields and zero images were seen)";
     FSL_98 = "FSL-98", "fast", true,

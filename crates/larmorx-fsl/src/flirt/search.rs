@@ -438,6 +438,15 @@ pub fn search(
             }
         })
         .collect();
+    // the matrix the optimisation starts from: the start's decomposition composed again
+    // (observed: FLIRT's `Starting with` and `P` show it, under gimbal lock other angles)
+    let starts: Vec<Mat4> = starts
+        .iter()
+        .map(|m| {
+            let x = super::param::decompose(rep, m, centre);
+            super::param::compose(rep, &x, free, centre, log)
+        })
+        .collect();
     let free_settings = Settings {
         tol_x0: None,
         ..user.clone()

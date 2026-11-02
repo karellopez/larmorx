@@ -216,20 +216,25 @@ impl Pair {
         }
         let b = hcost::voxel_map(a, self.input.voxel_size, self.reference.voxel_size);
         let tv = self.test_volume();
-        let ones = |_: usize, _: [f32; 3]| 1.0f32;
         let ref_w = self.ref_weight.as_ref();
         let in_w = self.in_weight.as_ref();
-        let weight_fn = |index: usize, p: [f32; 3]| -> f32 {
+        let edges = tv.weighted();
+        // wt·wr, then the edge factors multiply it one after the other (§6.4)
+        let weight_fn = |index: usize, p: [f32; 3], w: f32| -> f32 {
             let wt = in_w.map_or(1.0, |w| trilinear_inside(w, p[0], p[1], p[2]));
             let wr = ref_w.map_or(1.0, |w| w.data[index]);
-            wt * wr
+            if !edges {
+                return (wt * wr) * w;
+            }
+            let [fx, fy, fz] = tv.edge_factors(p);
+            let v = (((wt * wr) * fx) * fy) * fz;
+            if v < 0.0 { 0.0 } else { v }
         };
         let weight: Option<PointWeight<'_>> = if self.weighted() {
             Some(&weight_fn)
         } else {
             None
         };
-        let _ = ones;
         match cost {
             Cost::NormCorr => {
                 let slices = hcost::sample_weighted(

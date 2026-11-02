@@ -167,6 +167,20 @@ impl<'a> TestVolume<'a> {
     /// The edge weight at `p` (§6.3): per axis `p/σ` within `σ` of 0, `(b − p)/σ` within `σ`
     /// of the bound, else 1; the product of the three in float32.
     #[inline(always)]
+    /// The edge factors `w_x`, `w_y`, `w_z` at `p` (§6.3), before their product.
+    pub fn edge_factors(&self, p: [f32; 3]) -> [f32; 3] {
+        [0, 1, 2].map(|k| {
+            let s = self.sigma[k];
+            if p[k] < s {
+                p[k] / s
+            } else if self.bound[k] - p[k] < s {
+                (self.bound[k] - p[k]) / s
+            } else {
+                1.0
+            }
+        })
+    }
+
     fn weight(&self, p: [f32; 3]) -> f32 {
         let axis = |k: usize| {
             let s = self.sigma[k];
@@ -303,10 +317,12 @@ pub fn sample<A: Accumulator>(
 /// A weight of each contributing point from images of its own: given the grid point's linear
 /// index and its test-voxel position, the factor that multiplies the point's edge weight (FLIRT's
 /// `-refweight` and `-inweight`, `specs/flirt.md` §6.4).
-pub type PointWeight<'a> = &'a (dyn Fn(usize, [f32; 3]) -> f32 + Sync);
+///
+/// The closure receives the point's edge weight `w` (§6.3) and returns the point's weight.
+pub type PointWeight<'a> = &'a (dyn Fn(usize, [f32; 3], f32) -> f32 + Sync);
 
 /// An accumulator whose points are weighted by a [`PointWeight`] first: the point's weight is
-/// `weight(index, p)·w`.
+/// `weight(index, p, w)` (`w` the edge weight).
 pub struct Weighted<'a, A> {
     pub inner: A,
     pub weight: PointWeight<'a>,
@@ -319,7 +335,7 @@ impl<A: Accumulator> Accumulator for Weighted<'_, A> {
     }
     #[inline(always)]
     fn point_at(&mut self, g: f32, v: f32, w: f32, index: usize, p: [f32; 3]) {
-        let ww = (self.weight)(index, p) * w;
+        let ww = (self.weight)(index, p, w);
         self.inner.point(g, v, ww);
     }
     fn end_row(&mut self) {

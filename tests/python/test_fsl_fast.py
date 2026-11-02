@@ -2,7 +2,7 @@
 """``lx.fsl.fast``: with a stand-in for the ``larmorx-nc`` program (written by the test, as in
 ``test_fsl_bet.py``) it passes FAST's options, its channels (channel 1 named last, as FAST reads
 them), FSL's settings and D13's choice, and reads the outputs back; without the program it
-refuses clearly (FAST has no clean-room original yet). The replica itself is checked by its own
+runs the clean-room original. The replica itself is checked by its own
 golden tests (``crates-nc/larmorx-nc-cli/tests/golden.rs``) and by the parity suite against
 FSL."""
 
@@ -94,11 +94,25 @@ def volume(tmp_path: Path, name: str = "t1", offset: int = 0) -> Path:
 
 
 def test_without_the_replica(scripts, tmp_path):
+    """Without ``larmorx-nc``, ``auto`` runs the clean-room original (in this process; one
+    channel so far) and ``replica`` refuses."""
     path = volume(tmp_path)
-    with pytest.raises(lx.ReplicaNotFoundError, match="no clean-room original of fsl fast"):
-        lx.fsl.fast(path)
-    with pytest.raises(NotImplementedError, match="larmorx-nc"):
-        lx.fsl.fast(path, implementation="original")
+    with pytest.warns(lx.UpstreamDefectWarning, match="FSL-96"):
+        r = lx.fsl.fast(path, segments=True, probabilities=True)
+    seg = np.asarray(r.segmentation.data)
+    assert seg.shape == (6, 5, 4) and seg[0, 0, 0] == 0
+    assert set(np.unique(seg)) == {0, 1, 2, 3}
+    assert r.segments is not None and len(r.segments) == 3
+    assert r.partial_volumes is not None and len(r.partial_volumes) == 3
+    pve = np.sum([np.asarray(p.data) for p in r.partial_volumes], axis=0)
+    assert np.allclose(pve[seg > 0], 1.0)
+    o = lx.fsl.fast(path, implementation="original", pve=False, verbose=True)
+    assert np.array_equal(np.asarray(o.segmentation.data), seg)
+    assert o.partial_volumes is None and "Starting Single Image Segmentation" in o.stdout
+    with pytest.raises(lx.ReplicaNotFoundError, match="larmorx-nc"):
+        lx.fsl.fast(path, implementation="replica")
+    with pytest.raises(RuntimeError, match="one channel so far"):
+        lx.fsl.fast([path, path], implementation="original")
 
 
 def test_fmripreps_call(scripts, monkeypatch, tmp_path):

@@ -74,7 +74,14 @@ fn mixes(classes: &[Gauss], a: usize, b: usize, deltas: &[f32]) -> Vec<Mix> {
 
 /// The partial volumes of the mask voxels of `grid` whose (bias-corrected) intensities are `x`,
 /// from the sorted posteriors `post` (`n` per voxel); `mixel_weight` is `-R`.
-pub fn estimate(grid: &Grid, post: &[f32], x: &[f32], n: usize, mixel_weight: f32, len: usize) -> Pve {
+pub fn estimate(
+    grid: &Grid,
+    post: &[f32],
+    x: &[f32],
+    n: usize,
+    mixel_weight: f32,
+    len: usize,
+) -> Pve {
     let nm = grid.len();
     let pairs = mixtures(n);
     let nt = n + pairs.len();
@@ -153,10 +160,14 @@ pub fn estimate(grid: &Grid, post: &[f32], x: &[f32], n: usize, mixel_weight: f3
             }
         }
         let row = &like[i * nt..(i + 1) * nt];
-        types[i] = argmax(
-            row.iter().zip(&k).map(|(&l, &kt)| l * math::expf(r * kt)),
-            -1.0,
-        ) as u8;
+        let mut high = -1f32;
+        for (t, (&l, &kt)) in row.iter().zip(&k).enumerate() {
+            let v = l * math::expf(r * kt);
+            if v > high {
+                high = v;
+                types[i] = t as u8;
+            }
+        }
     }
     types.truncate(nm);
     // the fractions (§4.8.8)

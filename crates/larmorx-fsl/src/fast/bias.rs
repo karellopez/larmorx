@@ -15,7 +15,11 @@ pub fn kernel(sigma: f32) -> Vec<f32> {
         return vec![1.0];
     }
     let t = sigma.trunc();
-    let r = if t >= 0.0 { (t as usize).saturating_mul(2) } else { 0 };
+    let r = if t >= 0.0 {
+        (t as usize).saturating_mul(2)
+    } else {
+        0
+    };
     let s = f64::from(sigma);
     let taps: Vec<f32> = (0..=2 * r)
         .map(|k| {

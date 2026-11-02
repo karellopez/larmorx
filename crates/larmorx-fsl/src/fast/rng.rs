@@ -83,7 +83,7 @@ mod tests {
                 1_604_170_158
             ]
         );
-        for _ in 6..999_999 {
+        for _ in 6..1_000_000 {
             g.next_value();
         }
         assert_eq!(g.next_value(), 422_525_085);

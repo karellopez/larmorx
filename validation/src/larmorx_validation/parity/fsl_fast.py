@@ -27,6 +27,8 @@ What is compared (``specs/fast.md`` §11), each output against FSL's inside FSL'
 
 from __future__ import annotations
 
+import contextlib
+import dataclasses
 import os
 import re
 import shutil
@@ -227,7 +229,10 @@ def compare_images(checks: CheckList, a: Path, b: Path) -> None:
             mean = float(np.mean(d)) if d.size else 0.0
             if kind == "pve":
                 p999 = float(np.percentile(d, 99.9)) if d.size else 0.0
-                tx, ty = float(np.sum(x[m], dtype=np.float64)), float(np.sum(y[m], dtype=np.float64))
+                tx, ty = (
+                    float(np.sum(x[m], dtype=np.float64)),
+                    float(np.sum(y[m], dtype=np.float64)),
+                )
                 total = abs(tx - ty) / max(abs(tx), 1e-30) if tx or ty else 0.0
                 outside = bool(np.array_equal(x[~m], y[~m]))
                 good = mean <= PVE_MEAN and p999 <= PVE_P999 and total <= PVE_TOTAL and outside
@@ -246,7 +251,7 @@ def compare_images(checks: CheckList, a: Path, b: Path) -> None:
             rel = np.where(both_nan, 0.0, rel)
             p = float(np.percentile(rel, 99.9)) if rel.size else 0.0
             outside = bool(np.array_equal(x[~m], y[~m], equal_nan=True))
-            good = (p <= BIAS_REL or np.isnan(p) and False) and outside
+            good = (p <= BIAS_REL or (np.isnan(p) and False)) and outside
             ok["field"] &= bool(good)
             worst["field"].append(
                 f"{fa.name}: rel p99.9 {p:.2g}" + ("" if outside else ", differs outside the mask")
@@ -279,9 +284,30 @@ def compare_images(checks: CheckList, a: Path, b: Path) -> None:
             )
 
 
+def crmath_preload() -> Path | None:
+    """The workspace's CORE-MATH preload (correctly rounded ``exp``, ``log``, ``expf``,
+    ``logf``), which gives FSL's program the last-bit band of §11."""
+    from larmorx_validation.parity.fsl_mcflirt_replica import workspace
+
+    ws = workspace()
+    p = ws / "oracles" / "core-math-preload" / "libcrmath.so" if ws is not None else None
+    return p if p is not None and p.is_file() else None
+
+
 def compare(
-    checks: CheckList, oracle: Completed, ours: Completed, a: Path, b: Path, before: set[str]
+    checks: CheckList,
+    oracle: Completed,
+    ours: Completed,
+    a: Path,
+    b: Path,
+    before: set[str],
+    band=None,
 ) -> None:
+    """The original's run (``b``) against FSL's (``a``). ``band()``, when given, runs FSL with
+    correctly rounded maths (§11's band of a last-bit change) and returns its run and
+    directory: a stream or image check that fails against FSL passes when the original agrees
+    with that run within the same thresholds (FSL's own last bits explain the difference), and
+    says so."""
     code_ok = ours.code == oracle.code or (oracle.code < 0 and ours.code == 1)
     checks(
         "Exit status",
@@ -290,18 +316,53 @@ def compare(
     )
     fa = {k for k in _files(a, set()) if k not in before}
     fb = {k for k in _files(b, set()) if k not in before}
-    checks("Files written", fa == fb, detail=f"FSL only {sorted(fa - fb)[:4]}, original only {sorted(fb - fa)[:4]}")
-    so, why_o = _numbers_close(oracle.stdout.replace(str(a), "{cwd}"), ours.stdout.replace(str(b), "{cwd}"))
-    checks("Standard output (numbers to 4 significant digits)", so, detail=why_o)
+    checks(
+        "Files written",
+        fa == fb,
+        detail=f"FSL only {sorted(fa - fb)[:4]}, original only {sorted(fb - fa)[:4]}",
+    )
+    own_out = ours.stdout.replace(str(b), "{cwd}")
+    so, why_o = _numbers_close(oracle.stdout.replace(str(a), "{cwd}"), own_out)
     se, why_e = _numbers_close(
         oracle.stderr.replace(str(a), "{cwd}"), _own(ours.stderr.replace(str(b), "{cwd}"))
     )
+    images = CheckList()
+    compare_images(images, a, b)
+    banded: tuple[Completed, Path] | None = None
+    if band is not None and (not so or not all(c.passed for c in images.checks)):
+        banded = band()
+    if not so and banded is not None:
+        ok, _why = _numbers_close(banded[0].stdout.replace(str(banded[1]), "{cwd}"), own_out)
+        if ok:
+            so, why_o = (
+                True,
+                f"within FSL's last-bit band (identical to FSL with correctly rounded maths to 4 digits); against FSL: {why_o}",
+            )
+    checks("Standard output (numbers to 4 significant digits)", so, detail=why_o)
     checks("Standard error (the original's own lines left out)", se, detail=why_e)
-    compare_images(checks, a, b)
+    alt: dict[str, Check] = {}
+    if banded is not None:
+        other = CheckList()
+        compare_images(other, banded[1], b)
+        alt = {c.name: c for c in other.checks}
+    for c in images.checks:
+        k = alt.get(c.name)
+        if not c.passed and k is not None and k.passed:
+            c = dataclasses.replace(
+                c,
+                passed=True,
+                detail=f"within FSL's last-bit band: against FSL with correctly rounded maths {k.detail}; against FSL {c.detail}",
+            )
+        checks.add(c)
 
 
 def fix_pass(
-    checks: CheckList, prepare, args: list[str], settings, reproduced_dir: Path, reproduced: Completed
+    checks: CheckList,
+    prepare,
+    args: list[str],
+    settings,
+    reproduced_dir: Path,
+    reproduced: Completed,
 ) -> None:
     """D13: the original's default run against its ``reproduce`` run."""
     from larmorx_validation.parity.fsl_mcflirt_replica import _change
@@ -329,7 +390,15 @@ def fix_pass(
         )
 
 
+#: Single cases waiting for a later step of the original.
+PENDING_CASES: dict[str, str] = {
+    "err/H-nan": "FSL-99's arithmetic with reproduce for a NaN -H (FAST's table of zeros)",
+}
+
+
 def _pending(name: str, args: list[str]) -> str | None:
+    if name in PENDING_CASES:
+        return PENDING_CASES[name]
     if name.startswith("multi/") or name.startswith("priors/"):
         return PENDING[name.split("/")[0]]
     words = list(args)
@@ -344,6 +413,24 @@ def _pending(name: str, args: list[str]) -> str | None:
     if "-a" in words:
         return PENDING["priors"]
     return None
+
+
+def _band_of(stack: contextlib.ExitStack, prepare, args, settings, never: str, unwritten=()):
+    """The band's run (:func:`compare`), made only when a check needs it: FSL with the CORE-MATH
+    preload through the oracle cache (the preload's content is part of the key)."""
+
+    def band() -> tuple[Completed, Path] | None:
+        lib = crmath_preload()
+        if lib is None:
+            return None
+        c = Path(stack.enter_context(tempfile.TemporaryDirectory(prefix="lx-fast-cr_")))
+        prepare(c)
+        p = rep.run_oracle(args, cwd=c, settings={**settings, "LD_PRELOAD": str(lib)}, never=never)
+        if unwritten:
+            rep._clear_unwritten(CheckList(), c, unwritten)
+        return p, c
+
+    return band
 
 
 def _refusal(stderr: str) -> str:
@@ -372,6 +459,7 @@ def _run_case(name: str, run: rep.Run, checks: CheckList) -> None:
     with (
         tempfile.TemporaryDirectory(prefix="lx-fast_") as a_,
         tempfile.TemporaryDirectory(prefix="lx-fast_") as b_,
+        contextlib.ExitStack() as stack,
     ):
         a, b = Path(a_), Path(b_)
         args = rep._prepare(run, a)
@@ -381,7 +469,10 @@ def _run_case(name: str, run: rep.Run, checks: CheckList) -> None:
         ours = run_original(args, cwd=b, settings=settings, mode=defects.REPRODUCE)
         if run.unwritten:
             rep._clear_unwritten(checks, a, run.unwritten)
-        compare(checks, oracle, ours, a, b, before)
+        band = _band_of(
+            stack, lambda t: rep._prepare(run, t), args, settings, run.never, run.unwritten
+        )
+        compare(checks, oracle, ours, a, b, before, band)
         if run.fix and ours.code == 0:
             fix_pass(checks, lambda t: rep._prepare(run, t), args, settings, b, ours)
     if run.fix_finishes:
@@ -414,22 +505,23 @@ def _fmriprep_case(payload: tuple[str, str], checks: CheckList) -> None:
     if src is None:
         raise Outcome(SKIPPED, f"{run}: the input of fMRIPrep's FAST node is not available")
     args = rep.fmriprep_args(Path(node))
+
+    def prepare(t: Path) -> None:
+        shutil.copy(src, t / args[-1])
+
     with (
         tempfile.TemporaryDirectory(prefix="lx-fast-fp_") as a_,
         tempfile.TemporaryDirectory(prefix="lx-fast-fp_") as b_,
+        contextlib.ExitStack() as stack,
     ):
         a, b = Path(a_), Path(b_)
-        shutil.copy(src, a / args[-1])
-        shutil.copy(src, b / args[-1])
+        prepare(a)
+        prepare(b)
         before = set(_files(a, set()))
         oracle = rep.run_oracle(args, cwd=a, settings={})
         ours = run_original(args, cwd=b, settings={}, mode=defects.REPRODUCE)
-        compare(checks, oracle, ours, a, b, before)
+        compare(checks, oracle, ours, a, b, before, _band_of(stack, prepare, args, {}, ""))
         if oracle.code == 0 and ours.code == 0:
-
-            def prepare(t: Path) -> None:
-                shutil.copy(src, t / args[-1])
-
             fix_pass(checks, prepare, args, {}, b, ours)
 
 
@@ -461,7 +553,10 @@ def suite() -> Suite:
             ("Files written", "the same names"),
             ("Standard output and error", "the same lines, numbers to 4 significant digits"),
             ("Segmentations", f"per-class Dice >= {DICE}, >= {SAME:.1%} of mask voxels identical"),
-            ("Partial volumes", f"mean |d| <= {PVE_MEAN}, p99.9 <= {PVE_P999}, totals within 0.1 %"),
+            (
+                "Partial volumes",
+                f"mean |d| <= {PVE_MEAN}, p99.9 <= {PVE_P999}, totals within 0.1 %",
+            ),
             ("Probabilities", f"mean |d| <= {PROB_MEAN}"),
             ("Bias field, restored image", f"relative difference <= {BIAS_REL} at p99.9"),
             ("D13 fix pass", "a defect named exactly when the default's outputs differ"),

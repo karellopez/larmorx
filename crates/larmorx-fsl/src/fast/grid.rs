@@ -68,7 +68,11 @@ pub fn weight(o: [i8; 3], d: [f32; 3]) -> f32 {
 impl Grid {
     /// The grid of an image of `shape` and voxel sizes `voxel`, its mask the voxels for which
     /// `in_mask(index)` holds. `None` when the padded grid has 2^32 voxels or more.
-    pub fn new(shape: [usize; 3], voxel: [f32; 3], in_mask: impl Fn(usize) -> bool) -> Option<Grid> {
+    pub fn new(
+        shape: [usize; 3],
+        voxel: [f32; 3],
+        in_mask: impl Fn(usize) -> bool,
+    ) -> Option<Grid> {
         let [nx, ny, nz] = shape;
         let [px, py, pz] = [nx + 2, ny + 2, nz + 2];
         let total = px.checked_mul(py)?.checked_mul(pz)?;
@@ -166,8 +170,11 @@ mod tests {
         let nb = g.neighbours(12);
         assert!(nb.iter().all(|&j| j < 26));
         assert_eq!(weight([1, 0, 0], [1.0, 2.0, 2.0]), 1.0);
-        assert_eq!(weight([0, 1, 1], [1.0, 2.0, 2.0]), (1.0 / 8f64.sqrt()) as f32);
+        assert_eq!(
+            weight([0, 1, 1], [1.0, 2.0, 2.0]),
+            (1.0 / 8f64.sqrt()) as f32
+        );
         // a voxel at the image's edge: its outside neighbours read the row of zeros
-        assert!(g.neighbours(0).iter().any(|&j| j == 26));
+        assert!(g.neighbours(0).contains(&26));
     }
 }

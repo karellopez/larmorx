@@ -340,8 +340,9 @@ pub fn run(
             "-a: the clean-room original does not register priors yet (the next part of its work); use the replica (larmorx-nc)",
         );
     }
-    // FSL-100: FAST reads FSLDIR (for its standard priors) whether or not -a is given
-    if settings.get("FSLDIR").is_none() {
+    // FSL-100: FAST reads FSLDIR (for its standard priors) whether or not -a is given, unless
+    // -A names the priors (observed: `-A a b c` without FSLDIR segments)
+    if settings.get("FSLDIR").is_none() && o.priors.is_none() {
         match mode {
             UpstreamDefects::Reproduce => {
                 print_notices(
@@ -393,7 +394,11 @@ pub fn run(
                 _ => "T1-weighted image",
             }
         );
-        let _ = writeln!(out, "Imagesize : {} x {} x {}", shape[0], shape[1], shape[2]);
+        let _ = writeln!(
+            out,
+            "Imagesize : {} x {} x {}",
+            shape[0], shape[1], shape[2]
+        );
         let _ = writeln!(
             out,
             "Pixelsize : {} x {} x {}",
@@ -503,7 +508,11 @@ pub fn run(
             return 255;
         }
         Err(Stop::TooLarge) => {
-            return refuse(err, &notices, "the image has too many voxels for larmorx's FAST");
+            return refuse(
+                err,
+                &notices,
+                "the image has too many voxels for larmorx's FAST",
+            );
         }
     };
     write_outputs(
@@ -547,7 +556,10 @@ fn write_outputs(
         }
         Some(t) => t.to_owned(),
     };
-    let root_name = o.out.clone().unwrap_or_else(|| o.images.last().cloned().unwrap_or_default());
+    let root_name = o
+        .out
+        .clone()
+        .unwrap_or_else(|| o.images.last().cloned().unwrap_or_default());
     let root = settings.name(files::strip_image_extension(&root_name));
     let n_threads = settings.threads();
     let ext = settings
@@ -664,7 +676,11 @@ fn write_outputs(
         if !write("_pveseg".into(), Values::I32(label(&p.seg)), &mut notices) {
             return 1;
         }
-        if !write("_mixeltype".into(), Values::I32(label(&p.mixel)), &mut notices) {
+        if !write(
+            "_mixeltype".into(),
+            Values::I32(label(&p.mixel)),
+            &mut notices,
+        ) {
             return 1;
         }
     }
@@ -676,7 +692,14 @@ fn write_outputs(
         }
     };
     if o.restore {
-        let mut v = input.vol.data.clone();
+        // NaN voxels are written as 0, the others outside the mask as they are (observed: a
+        // voxel equal to a maximum of 2^25, outside FSL-103's mask, keeps its value)
+        let mut v: Vec<f32> = input
+            .vol
+            .data
+            .iter()
+            .map(|&x| if x.is_nan() { 0.0 } else { x })
+            .collect();
         for (i, &idx) in grid.index.iter().enumerate() {
             v[idx as usize] *= correction(i);
         }
@@ -712,10 +735,14 @@ mod tests {
             parse(&w(&["--bogus", "x"]), &mut err),
             Parsed::Exit(1)
         ));
-        assert!(String::from_utf8_lossy(&err).ends_with("maps\n\n\n\n--bogus: Option doesn't exist!\n"));
+        assert!(
+            String::from_utf8_lossy(&err).ends_with("maps\n\n\n\n--bogus: Option doesn't exist!\n")
+        );
         let mut err = Vec::new();
-        let Parsed::Run(o) = parse(&w(&["-gp", "-n", "0x2", "-I", "010", "--out=s", "in.nii"]), &mut err)
-        else {
+        let Parsed::Run(o) = parse(
+            &w(&["-gp", "-n", "0x2", "-I", "010", "--out=s", "in.nii"]),
+            &mut err,
+        ) else {
             panic!("parsed")
         };
         assert!(o.segments && o.probabilities);
@@ -723,8 +750,13 @@ mod tests {
         assert_eq!(o.out.as_deref(), Some("s"));
         assert_eq!(o.images, ["in.nii"]);
         let mut err = Vec::new();
-        assert!(matches!(parse(&w(&["-n", "2.5", "x"]), &mut err), Parsed::Exit(1)));
-        assert!(String::from_utf8_lossy(&err).ends_with("-n: Couldn't set_value! valstr=\"2.5 x\"!\n"));
+        assert!(matches!(
+            parse(&w(&["-n", "2.5", "x"]), &mut err),
+            Parsed::Exit(1)
+        ));
+        assert!(
+            String::from_utf8_lossy(&err).ends_with("-n: Couldn't set_value! valstr=\"2.5 x\"!\n")
+        );
         assert_eq!(stream_floats("1 2.5\n3e1 x 4"), vec![1.0, 2.5, 30.0]);
         assert_eq!(stream_floats("1 2abc 3"), vec![1.0, 2.0]);
     }

@@ -11,11 +11,16 @@ larmorx keeps its FSL tools in two implementations ([licensing](../licensing.md)
 **replica**, `larmorx-nc fsl fast` (package `larmorx-nc`, `crates-nc/larmorx-nc-fast`, under the
 FSL Licence's terms; translated from FSL's source:
 [PROVENANCE](../../crates-nc/larmorx-nc-fast/PROVENANCE.md)), done (2026-11-02), and the
-clean-room **original** in the main package (Apache-2.0), to be written from
-[`specs/fast.md`](../../specs/fast.md). Until then `lx.fsl.fast` runs the replica only:
-`implementation="auto"` (the default) and `"replica"` need `larmorx-nc` installed (`pip install
-larmorx-nc`; otherwise `ReplicaNotFoundError`), `"original"` raises `NotImplementedError`. The
-command line chooses alike (`LARMORX_IMPLEMENTATION`).
+clean-room **original** in the main package (crate `larmorx-fsl`, module `fast`, Apache-2.0),
+written from [`specs/fast.md`](../../specs/fast.md), the FAST paper, FSL's documentation and
+black-box runs of FSL's program ([PROVENANCE](../../crates/larmorx-fsl/PROVENANCE.md)), in
+progress since 2026-11-03: it segments **one channel** with every single-channel output so far
+(fMRIPrep's call within the thresholds of `specs/fast.md` §11 on its oracle runs); several
+channels and the tissue priors (`-S 2` and more, `-a`) are its next steps and are refused by it
+until then. `implementation="auto"` (the default) runs the replica when `larmorx-nc` is installed,
+else the original; `"replica"` needs `larmorx-nc` (`pip install larmorx-nc`; otherwise
+`ReplicaNotFoundError`); `"original"` runs the original. The command line chooses alike
+(`LARMORX_IMPLEMENTATION`).
 
 **Status: `experimental`**: the replica against FSL 6.0.7.23 itself
 ([record](../validation/fsl-fast-replica.md), standard tier): fMRIPrep's call bit-identical on
@@ -77,7 +82,7 @@ larmorx fsl fast -S 2 -B -o out T2w_brain.nii.gz T1w_brain.nii.gz   # channel 1 
 | `fsldir` | `FSLDIR` | | the FSL installation whose `data/standard/tissuepriors` the standard priors come from (needed only for `priors_matrix` without `priors`) |
 | `verbose` | `-v` | `False` | FAST's diagnostic messages (in `FastResult.stdout`) |
 | `n_threads` | `OMP_NUM_THREADS` | 1 | threads of the bias field's convolutions (0: all); the results do not depend on it |
-| `implementation` | `LARMORX_IMPLEMENTATION` | `"auto"` | `"auto"`, `"replica"` (`"original"`: not yet) |
+| `implementation` | `LARMORX_IMPLEMENTATION` | `"auto"` | `"auto"`, `"replica"`, `"original"` (one channel, no priors so far) |
 | `upstream_defects` | `LARMORX_UPSTREAM_DEFECTS` | `"fix"` | `"reproduce"`: FSL's defects as FSL has them (below) |
 
 `lx.fsl.fast` returns a `FastResult`: `segmentation` (`_seg`), `segments` (`_seg_<i>`),
@@ -116,9 +121,28 @@ error and as an `UpstreamDefectWarning` ([all of them](upstream-defects.md)):
 - **FSL-103**: the mask leaves out the voxels of the image's maximum at 2^24 and above; corrected.
 - **FSL-104**: channels of different sizes are read past their ends; refused.
 
+## The clean-room original
+
+`larmorx fsl fast` with `LARMORX_IMPLEMENTATION=original` (`implementation="original"`, and
+`"auto"` without `larmorx-nc`): FAST's command line, usage, messages and exit statuses, the
+single-channel segmentation (§4: the mask, the log image, the initialisation, the MRF iterations
+with FSL's random numbers, the bias field, the class order and every output of §3.3 with the
+partial volumes), `-v`'s messages, FSL-96, FSL-99 (its refusals; `-n` below 1 with `reproduce`),
+FSL-100 and FSL-103 in both modes. It is compared with FSL by its own parity suite (`fsl-fast`,
+the replica suite's cases, `specs/fast.md` §11's thresholds); the observations of FSL's behaviour
+that the spec does not state are in [the findings](../findings/fsl-fast-original.md). Built for
+speed: every per-voxel quantity is kept for the brain mask's voxels only, the steps where voxels
+are independent run in parallel (`n_threads`), the MRF sweeps keep FAST's order; fMRIPrep's call
+on a 1 mm T1w brain takes about 5 s (FSL about 25 s).
+
+Not in the original yet (its next steps): several channels (`-S 2` and more: refused with
+`larmorx: error: fast: -S <n>: the clean-room original segments one channel so far ...`), the
+tissue priors (`-a`: refused alike), FSL-99's arithmetic with `reproduce` for a smoothness that is
+not a number, the `ERROR:: Empty mask image` messages of `-s` on an image without a voxel above
+0, the golden cases, the record, the benchmark and its random testing.
+
 ## Not yet
 
-- The clean-room original (`implementation="original"`), from `specs/fast.md`.
 - **More than 8 channels** (`-S 9` and more) are refused in both modes, with a clear message
   (`larmorx-nc: error: fast: -S 9: more than 8 channels are not replicated ...`, exit 1): FSL's
   results there follow OpenBLAS's kernels for larger matrices (its aligned `iamax` path, the 8-way

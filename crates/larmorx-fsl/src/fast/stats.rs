@@ -127,7 +127,8 @@ impl Gauss {
 }
 
 /// Each class's mean and variance from the posteriors `post` (`n` per voxel) and the values
-/// `y` over the mask (§4.4): `μ = Σ p y / Σ p`, `σ² = Σ p y y / Σ p - μ²`.
+/// `y` over the mask (§4.4): `μ = Σ p y / Σ p` rounded to single, `σ² = Σ p y y / Σ p - μ²`
+/// with the quotient in double and `μ²` in single, rounded to single.
 pub fn class_stats(post: &[f32], y: &[f32], n: usize, len: usize) -> Vec<(f32, f32)> {
     let mut sums = vec![[Blocked::new(len); 3]; n];
     for (i, &yi) in y.iter().enumerate() {
@@ -145,8 +146,9 @@ pub fn class_stats(post: &[f32], y: &[f32], n: usize, len: usize) -> Vec<(f32, f
         .map(|s| {
             let w = s[0].value();
             let mean = (s[1].value() / w) as f32;
-            let second = (s[2].value() / w) as f32;
-            let var = (f64::from(second) - f64::from(mean * mean)) as f32;
+            // the second moment stays in double (observed against FSL with correctly rounded
+            // maths, 2026-11-03: the spec's single-precision quotient gives other variances)
+            let var = (s[2].value() / w - f64::from(mean * mean)) as f32;
             (mean, var)
         })
         .collect()
@@ -171,7 +173,7 @@ mod tests {
         assert!(s[3].is_nan());
         assert_eq!(percentile_of_sorted(&s, 0.25), 2.0);
         assert_eq!(percentile(&v, 0.5), 3.0);
-        assert_eq!(percentile(&v, 2.0).is_nan(), true);
+        assert!(percentile(&v, 2.0).is_nan());
         assert_eq!(percentile(&[], 0.5), 0.0);
     }
 }

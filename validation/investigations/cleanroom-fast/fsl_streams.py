@@ -47,7 +47,7 @@ def main() -> None:
             p = rep.run_oracle(args, cwd=d, settings=dict(run.settings))
             files = sorted(q.name for q in d.iterdir() if q.name not in before)
 
-        def esc(s: str) -> str:
+        def esc(s: str, d: Path = d) -> str:
             s = s.replace(str(d), "{cwd}").replace("\n", "|")
             return (s[: a.max] + " ...") if len(s) > a.max else s + "$"
 

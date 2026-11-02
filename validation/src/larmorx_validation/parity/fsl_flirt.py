@@ -5,9 +5,10 @@ larmorx-fsl, Apache-2.0, written from ``specs/flirt.md``) with FSL 6.0.7.23's ``
 
 The cases are the replica suite's (``fsl_flirt_replica``: fMRIPrep's three BBR calls, the real
 cases on ds005040's images, the schedules, the edge cases, ``convert_xfm`` and FLIRT's other
-programs that have an original: ``avscale``, the coordinate programs, ``rmsdiff``, ``makerot``),
-run here against the original; the programs without one yet (``midtrans``, ...) are left out. Every FSL run goes through the oracle-output cache with the replica suite's
-keys, so the runs that suite made are served from it.
+programs and scripts: ``avscale``, the coordinate programs, ``rmsdiff``, ``makerot``,
+``midtrans``, ``pointflirt``, ``applyxfm4D``, ``pairreg``, ``extracttxt``, ``aff2rigid``), run
+here against the original. Every FSL run goes through the oracle-output cache with the replica
+suite's keys, so the runs that suite made are served from it.
 
 What is compared (``specs/flirt.md`` §13):
 
@@ -23,7 +24,14 @@ What is compared (``specs/flirt.md`` §13):
   0.999;
 - the D13 fix pass: a defect named exactly when the default's outputs differ from ``reproduce``;
 - FLIRT's other programs (:data:`TEXT_PROGRAMS`): standard output and error identical (where FSL
-  aborts, the original prints the same lines and exits 1), every file identical.
+  aborts, the original prints the same lines and exits 1), every file identical (``extracttxt``:
+  GNU sed's usage text left out of FSL's standard error);
+- the fits (:data:`FIT_PROGRAMS`): the same text, printed numbers within one unit of their last
+  digit, matrices within 1e-9 of FSL's; ``aff2rigid``'s corrected matrix (FSL-81) against the
+  replica's when its program is built;
+- ``applyxfm4D``: the same text and files, nearest-neighbour and trilinear images bit-identical,
+  sinc and spline images of the same header with a correlation of at least 0.9999;
+- ``pairreg``: as FLIRT's matrices, its first brain the reference.
 """
 
 from __future__ import annotations
@@ -992,10 +1000,10 @@ def suite() -> Suite:
     return Suite(
         name=SUITE,
         title="FLIRT (clean-room original)",
-        tool=f"`larmorx fsl flirt` and `convert_xfm` (larmorx {larmorx.__version__}, crate "
+        tool=f"`larmorx fsl flirt`, `convert_xfm` and FLIRT's other programs (larmorx {larmorx.__version__}, crate "
         "larmorx-fsl: the clean-room original written from specs/flirt.md on the shared "
         "registration engine of larmorx-mri, Apache-2.0)",
-        reference="flirt and convert_xfm from FSL 6.0.7.23 (fsl-flirt 2111.4), the conda build at "
+        reference="flirt, convert_xfm and FLIRT's other programs from FSL 6.0.7.23 (fsl-flirt 2111.4), the conda build at "
         "`~/fsl-6.0.7.23`",
         thresholds=[
             ("Exit status", "the same (where FSL aborts, the original exits 1)"),
@@ -1018,8 +1026,8 @@ def suite() -> Suite:
         run_case=run_case,
         packages=("nibabel", "scipy"),
         notes=(
-            "The cases are the replica suite's (`fsl-flirt-replica`) for `flirt` and "
-            "`convert_xfm`; FSL's runs are served from the oracle cache under that suite's keys. "
+            "The cases are the replica suite's (`fsl-flirt-replica`) for `flirt`, "
+            "`convert_xfm` and FLIRT's other programs; FSL's runs are served from the oracle cache under that suite's keys. "
             "The original is compared in `reproduce` mode (D13) and its default `fix` pass "
             "against the reproduced run. Cases of options the original has not yet "
             "(`-debug`, `-debugsave`, the verbose levels above 1: part 2) are skipped."

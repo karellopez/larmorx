@@ -106,11 +106,17 @@ pub fn scaling(h: &NiftiHeader) -> Option<(f32, f32)> {
 }
 
 fn to_f32_vec<T: RealElement>(a: &ArrayD<T>, scale: Option<(f32, f32)>, n: usize) -> Vec<f32> {
-    // The array is Fortran-ordered as read: its transposed view is contiguous, x fastest.
+    // The array is Fortran-ordered as read: its transposed view is contiguous, x fastest; it is
+    // converted where it lies (2026-11-02: a copy of it first held a third full-size array at
+    // the reading's peak; the values are the same)
     let t = a.t();
-    let src: Vec<T> = match t.as_slice() {
-        Some(s) => s.to_vec(),
-        None => t.iter().copied().collect(),
+    let owned: Vec<T>;
+    let src: &[T] = match t.as_slice() {
+        Some(s) => s,
+        None => {
+            owned = t.iter().copied().collect();
+            &owned
+        }
     };
     let convert = |v: &T| match scale {
         None => v.to_f32(),

@@ -1,0 +1,266 @@
+{
+ "environment": {
+  "cpu": "AMD Ryzen 9 7945HX with Radeon Graphics",
+  "logical_cpus": 32,
+  "platform": "Linux x86_64",
+  "os": "Linux-6.8.0-124-generic-x86_64-with-glibc2.35",
+  "python": "3.12.16",
+  "larmorx_commit": "04f5462b06b7",
+  "load_average_before": 5.54541015625
+ },
+ "repeats": 1,
+ "results": [
+  {
+   "tool": "FSL 6.0.7.23",
+   "operation": "1 thread",
+   "input": "fMRIPrep's BBR call, ds005040",
+   "seconds": [
+    46.69983311195392
+   ],
+   "median": 46.69983311195392
+  },
+  {
+   "tool": "replica (larmorx-nc)",
+   "operation": "1 thread",
+   "input": "fMRIPrep's BBR call, ds005040",
+   "seconds": [
+    56.8599409640301
+   ],
+   "median": 56.8599409640301
+  },
+  {
+   "tool": "original (larmorx)",
+   "operation": "1 thread",
+   "input": "fMRIPrep's BBR call, ds005040",
+   "seconds": [
+    38.74971169605851
+   ],
+   "median": 38.74971169605851
+  },
+  {
+   "tool": "original (larmorx)",
+   "operation": "14 threads",
+   "input": "fMRIPrep's BBR call, ds005040",
+   "seconds": [
+    3.7573293999303132
+   ],
+   "median": 3.7573293999303132
+  },
+  {
+   "tool": "FSL 6.0.7.23",
+   "operation": "1 thread",
+   "input": "fMRIPrep's BBR call, ds003592",
+   "seconds": [
+    35.43782641401049
+   ],
+   "median": 35.43782641401049
+  },
+  {
+   "tool": "replica (larmorx-nc)",
+   "operation": "1 thread",
+   "input": "fMRIPrep's BBR call, ds003592",
+   "seconds": [
+    42.99913358001504
+   ],
+   "median": 42.99913358001504
+  },
+  {
+   "tool": "original (larmorx)",
+   "operation": "1 thread",
+   "input": "fMRIPrep's BBR call, ds003592",
+   "seconds": [
+    28.003532289993018
+   ],
+   "median": 28.003532289993018
+  },
+  {
+   "tool": "original (larmorx)",
+   "operation": "14 threads",
+   "input": "fMRIPrep's BBR call, ds003592",
+   "seconds": [
+    2.710137312998995
+   ],
+   "median": 2.710137312998995
+  },
+  {
+   "tool": "FSL 6.0.7.23",
+   "operation": "1 thread",
+   "input": "fMRIPrep's BBR call, ds000228",
+   "seconds": [
+    18.337951991008595
+   ],
+   "median": 18.337951991008595
+  },
+  {
+   "tool": "replica (larmorx-nc)",
+   "operation": "1 thread",
+   "input": "fMRIPrep's BBR call, ds000228",
+   "seconds": [
+    22.638104333076626
+   ],
+   "median": 22.638104333076626
+  },
+  {
+   "tool": "original (larmorx)",
+   "operation": "1 thread",
+   "input": "fMRIPrep's BBR call, ds000228",
+   "seconds": [
+    14.67116432194598
+   ],
+   "median": 14.67116432194598
+  },
+  {
+   "tool": "original (larmorx)",
+   "operation": "14 threads",
+   "input": "fMRIPrep's BBR call, ds000228",
+   "seconds": [
+    1.3512915839673951
+   ],
+   "median": 1.3512915839673951
+  },
+  {
+   "tool": "FSL 6.0.7.23",
+   "operation": "1 thread",
+   "input": "default 12 dof (BOLD reference to T1w)",
+   "seconds": [
+    0.9691758679691702
+   ],
+   "median": 0.9691758679691702
+  },
+  {
+   "tool": "replica (larmorx-nc)",
+   "operation": "1 thread",
+   "input": "default 12 dof (BOLD reference to T1w)",
+   "seconds": [
+    1.3111487970454618
+   ],
+   "median": 1.3111487970454618
+  },
+  {
+   "tool": "original (larmorx)",
+   "operation": "1 thread",
+   "input": "default 12 dof (BOLD reference to T1w)",
+   "seconds": [
+    1.098445561947301
+   ],
+   "median": 1.098445561947301
+  },
+  {
+   "tool": "original (larmorx)",
+   "operation": "14 threads",
+   "input": "default 12 dof (BOLD reference to T1w)",
+   "seconds": [
+    0.3020601780153811
+   ],
+   "median": 0.3020601780153811
+  },
+  {
+   "tool": "FSL 6.0.7.23",
+   "operation": "1 thread",
+   "input": "6 dof",
+   "seconds": [
+    0.7230292039457709
+   ],
+   "median": 0.7230292039457709
+  },
+  {
+   "tool": "replica (larmorx-nc)",
+   "operation": "1 thread",
+   "input": "6 dof",
+   "seconds": [
+    0.784480400965549
+   ],
+   "median": 0.784480400965549
+  },
+  {
+   "tool": "original (larmorx)",
+   "operation": "1 thread",
+   "input": "6 dof",
+   "seconds": [
+    0.6937560340156779
+   ],
+   "median": 0.6937560340156779
+  },
+  {
+   "tool": "original (larmorx)",
+   "operation": "14 threads",
+   "input": "6 dof",
+   "seconds": [
+    0.20083175494801253
+   ],
+   "median": 0.20083175494801253
+  },
+  {
+   "tool": "FSL 6.0.7.23",
+   "operation": "1 thread",
+   "input": "BBR with a field map and its mask (-pedir -2)",
+   "seconds": [
+    255.61968848702963
+   ],
+   "median": 255.61968848702963
+  },
+  {
+   "tool": "replica (larmorx-nc)",
+   "operation": "1 thread",
+   "input": "BBR with a field map and its mask (-pedir -2)",
+   "seconds": [
+    269.2530501660658
+   ],
+   "median": 269.2530501660658
+  },
+  {
+   "tool": "original (larmorx)",
+   "operation": "1 thread",
+   "input": "BBR with a field map and its mask (-pedir -2)",
+   "seconds": [
+    80.82060048892163
+   ],
+   "median": 80.82060048892163
+  },
+  {
+   "tool": "original (larmorx)",
+   "operation": "14 threads",
+   "input": "BBR with a field map and its mask (-pedir -2)",
+   "seconds": [
+    7.040755884023383
+   ],
+   "median": 7.040755884023383
+  },
+  {
+   "tool": "FSL 6.0.7.23",
+   "operation": "1 thread",
+   "input": "-applyxfm (trilinear)",
+   "seconds": [
+    0.2211045710137114
+   ],
+   "median": 0.2211045710137114
+  },
+  {
+   "tool": "replica (larmorx-nc)",
+   "operation": "1 thread",
+   "input": "-applyxfm (trilinear)",
+   "seconds": [
+    0.210002230014652
+   ],
+   "median": 0.210002230014652
+  },
+  {
+   "tool": "original (larmorx)",
+   "operation": "1 thread",
+   "input": "-applyxfm (trilinear)",
+   "seconds": [
+    0.11538690200541168
+   ],
+   "median": 0.11538690200541168
+  },
+  {
+   "tool": "original (larmorx)",
+   "operation": "14 threads",
+   "input": "-applyxfm (trilinear)",
+   "seconds": [
+    0.039218713995069265
+   ],
+   "median": 0.039218713995069265
+  }
+ ]
+}

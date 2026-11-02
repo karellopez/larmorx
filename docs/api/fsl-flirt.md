@@ -227,12 +227,16 @@ optimisation's paths part from FSL's in the costs' last bits, BBR's normals from
 ill-posed registrations); what the spec does not say is in
 [`docs/findings/fsl-flirt-original.md`](../findings/fsl-flirt-original.md).
 
-**Speed** (one run each, a busy machine; the benchmark report is part 2's): a default 12-dof
-registration of a 3 mm BOLD reference to a T1w at 1.7 mm: FSL 1.01 s, the replica 1.32 s, the
-original 1.18 s on one thread and 0.37 s on eight; a 6-dof one with `-out`: FSL 0.97 s, the
-replica 0.96 s, the original 0.88 s and 0.27 s; fMRIPrep's boundary-based call (ds005040, its
-full-size T1w): FSL 46 s, the replica 57 s, the original 38 s on one thread and 5.9 s on eight
-(`validation/investigations/cleanroom-flirt/speed.py`).
+**Speed** ([benchmark report](../benchmarks/fsl-flirt.md): one run each on a shared machine,
+the original on at most 14 threads): fMRIPrep's boundary-based call on the standard tier's three
+oracle runs 1.2 to 1.3 times FSL's speed on one thread and 12 to 14 times on 14 (ds005040: FSL
+47 s, the replica 57 s, the original 39 s and 3.8 s); the default 12-dof registration of a BOLD
+reference to its T1w at FSL's speed on one thread (FSL 0.97 s, the original 1.10 s) and 3.2 times
+on 14 (0.30 s); BBR with a field map and its mask 3.2 and 36 times (FSL 256 s, the original 81 s
+and 7.0 s); `-applyxfm` 1.9 and 5.6 times. The same bits at any thread count: the correlation
+ratio's bins are summed in parallel with each bin's additions in the sampling order, the search's
+grid points, the boundary pairs and the field map's searches run in parallel and are collected in
+order.
 
 ## Upstream defects (D13)
 

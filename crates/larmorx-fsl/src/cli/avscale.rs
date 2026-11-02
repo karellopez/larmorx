@@ -248,17 +248,13 @@ mod tests {
             "0.000000 0.000000 0.000000 1.000000 \n",
             "\n",
         );
-        // FSL's last check row is `0.000000 0.000000 1.000000 0.000000`: residuals of 1e-10
-        // whose signs follow FSL's own last bits (the findings, "FLIRT's other programs")
+        // FSL's text exactly, the check's residual signs included (§3's decomposition,
+        // relay 6)
         let ours: Vec<&str> = out.lines().collect();
         let theirs: Vec<&str> = want.lines().collect();
         assert_eq!(ours.len(), theirs.len());
         for (k, (a, b)) in ours.iter().zip(&theirs).enumerate() {
-            if k == 31 {
-                assert_eq!(a, &"-0.000000 0.000000 1.000000 0.000000 ");
-            } else {
-                assert_eq!(a, b, "line {k}");
-            }
+            assert_eq!(a, b, "line {k}");
         }
         std::fs::write(
             d.path().join("k.mat"),

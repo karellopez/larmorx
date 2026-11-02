@@ -170,3 +170,17 @@ opened). Its only inputs were:
 | `cli::common::header_bytes` | only the header's bytes read (memory) | observed (FSL's peak) |
 | `cli::applyxfm4d`, `cli::makerot` | FSL-76, FSL-79, FSL-80 named only where they change a value | D13 |
 | `bet::image::write_pieces` | zstd and bzip2 outputs of every stored type | §10.1 |
+
+### Part 2, relay 6 (2026-11-02): the trial's open items (black-box runs of FSL 6.0.7.23)
+
+| Code | Behaviour | Source |
+|---|---|---|
+| `cli::applyxfm4d` (`char_reading`, `x86_convert`) | a uint8 image read as signed char (FSL-111, `reproduce`; as stored by default); FSL-79's `(T)(c + 0.5)` and `(T)v` as x86-64 converts (through a 32-bit integer, wrapped to the type's bits) | §15.7; observed (docs/findings/fsl-flirt-original.md, "The open items of the trial closed") |
+| `flirt::engine::formless_forms` | a reference without forms: the input's form through `W·D_in⁻¹·A⁻¹·D_ref`, as sform and qform with the input's code (`-out`, applyxfm4D's first matrix) | observed |
+| `flirt::engine::Look::quaternion_final`, `bet::image::Output::rewrite_quaternion` | a quaternion computed from a matrix (completed, `-applyisoxfm`'s, a formless reference's) written once | observed |
+| `flirt::engine` (`optimise`, `measurecost`), `flirt::search` | `Erroneous dof` once per row and once per free start, in the warnings' order; FSL-90's starts composed once below 6 dof | §8.2; observed |
+| `flirt::mat::{inverse, upper_inverse, lu_left_looking, solve_vec}` | the 4 × 4 inverse exactly (the upper triangle's own, the left-looking LU, the columns in pairs) | §12 |
+| `flirt::programs::avscale` | §3's decomposition and composition | §15.1, §3 |
+| `cli::common::header_image` | the qform as FSL holds it (`bet::quatern`) | §4.1, §15.2 |
+| `flirt::output::resample` (nearest neighbour) | the nearest index first, then the extraslice rule | §9.2; observed |
+| `larmorx_core::defects::FSL_111` | the new defect's entry | D13, rule A |

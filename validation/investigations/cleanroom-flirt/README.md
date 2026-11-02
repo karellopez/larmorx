@@ -37,3 +37,7 @@ through a development hook that is no longer in the code.
 | `trial5_dcmp.py <seed> <n> <dir>` | one of the trial's cases by hand (FSL with the cache off, the original in `reproduce`), both directories and streams kept, header fields and voxels that differ |
 | `trial5_isomodel.py <dcmp dirs>` | models of `-applyisoxfm`'s written sform against FSL's (the voxel flip, §4.1's swaps by both grids) |
 | `trial5_bbre.py <dir>` | BBR with an empty `-wmseg` on five small schedules: FSL's and the original's error and NaN lines |
+| `relay6_dloop.py <seed> <dir> <n>...` | part 2, relay 6: the trial's cases by hand (FSL through the oracle cache, `use`; the original in `reproduce`): one line per case (exit statuses, streams, every file: images by header and values, others by bytes) |
+| `relay6_u8probe.py <dir> [names]` | applyxfm4D and `flirt -applyxfm` on uint8 and int16 profiles (nearest, trilinear, sinc, spline): FSL-111's signed char and FSL-79's x86 conversions |
+| `relay6_fprobe.py <dir> [names]`, `relay6_fprobe4d.py <dir>` | a reference with neither form: the output forms of applyxfm4D, `-applyxfm` and a registration for five inputs and two matrices; applyxfm4D's per-volume matrices (the first volume's decides) |
+| `relay6_mprobe.py <seed> <n> <dir> [words]`, `relay6_mseq.py <merged text>` | a trial case with standard output and error merged through `sh` (FSL cached as its own entry): where `Erroneous dof` is printed, command by command |

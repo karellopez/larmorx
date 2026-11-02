@@ -14,10 +14,12 @@ what the spec should say is in the part's spec questions (its handoff).
   lines printed as ` >> `, a trailing blank after the 8 mm `optimise`). The original runs and
   prints those lines (`flirt::schedule::DEFAULT_3D`, `DEFAULT_2D`), so `-v` prints FSL's text.
 - `WARNING: Both reference and input images have an sform matrix set` is printed only with `-v`.
-- `Erroneous dof <d> : using 6 instead` (a `-dof` below 6): printed twice for every row a
-  schedule's `optimise` optimises, once for every starting point of the search's free
-  optimisations, never by `measurecost` (73 lines for the default schedule with `-nosearch`:
-  36 optimised rows twice and one minimum).
+- `Erroneous dof <d> : using 6 instead` (a `-dof` below 6): printed once for every row an
+  `optimise` or `measurecost` command processes and once for every starting point of the
+  search's free optimisations, after that start's own messages (corrected by relay 6 of part 2,
+  2026-11-02, from FSL's merged streams: the 73 lines of the default schedule with `-nosearch`
+  are 72 rows and one minimum; part 1 had read "twice per optimised row, never by
+  `measurecost`").
 - `dualsort` of lists of different lengths prints `Cannot dual sort matrices of unequal size`
   with no newline; `setoption` with fewer than three words (also `setoption nosubset`) is
   `Wrong number of args to SETOPTION` (exit 255); a line of blanks prints nothing.
@@ -533,3 +535,65 @@ The thread probes (`tests/parity/test_thread_pools.py`): a one-thread rmsdiff's 
 seen once under its process's name (`python`), before it named itself: the probe now reads such
 a thread's name again 2 ms later (`thread_pools.probe`); every original FLIRT program then stays
 in its pool (6 runs each).
+
+## The open items of the trial closed (part 2, relay 6, 2026-11-02)
+
+Every FSL run below went through the oracle-output cache (`use`); probes in the scratch helpers
+`u8probe.py`, `fprobe.py`, `fprobe4d.py`, `mprobe.py` (standard output and error merged through
+`sh`, cached as their own entries) and `dloop.py` (a trial case by hand), committed as
+`validation/investigations/cleanroom-flirt/relay6_*.py`.
+
+- **applyxfm4D reads a uint8 image as signed char (new defect FSL-111, rule A).** FSL's applyxfm4D
+  keeps an image of the char group in a char image, signed on x86-64: a uint8 value of 128 to 255
+  reads `v − 256`. A profile 100, 140 interpolated 0.4 of the way gives 13 (`100·0.6 − 116·0.4`),
+  not 116; the background value (the border's 10th percentile) is taken over the negative values
+  (180 for a border of 10s and 140 to 250s); nearest neighbour writes the stored bytes back (the
+  output's conversion wraps a signed char to its byte) but for the padding voxels. `flirt
+  -applyxfm` reads uint8 as stored (the same probes agree). By default the original reads the
+  values as stored; with `reproduce` as FSL, named where a written value changes. All 29 uint8
+  applyxfm4D findings of the trial are now FSL's bytes (sinc, spline, trilinear, nearest, 3D and
+  4D).
+- **FSL-79's conversions are x86-64's**: `(T)(c + 0.5)` and `(T)v` truncate through a 32-bit
+  integer and wrap to the type's bits (a char coefficient of 160 reads −96; int16 profiles at
+  30000 to 32767 wrap), not clamped as the original had them: the int16 and uint8 spline probes
+  are FSL's values.
+- **A reference with neither sform nor qform**: a registration's `-out` image and applyxfm4D's
+  output (not `-applyxfm`'s) take the input's voxel-to-world matrix (its sform when set, else its
+  qform, as FSL holds it: swapped for a neurological input) times `D_in⁻¹·A⁻¹·D_ref` (`A` the
+  matrix in mm; applyxfm4D the first volume's), products left to right, rounded to single
+  precision; written as the sform and as the qform (the quaternion of that matrix, its offsets
+  the matrix's), both with the code of the input's form. 25 probes (five inputs: sform and qform
+  of different codes, qform only, sform only, neurological, none; two matrices, one a reflection)
+  bit for bit; the reflection's positive determinant is written as it is (no flip of the data).
+- **Quaternions computed from a matrix are written once**: FSL writes a completed qform (an unset
+  qform from the sform) and `-applyisoxfm`'s from their matrix; the original converted them to
+  their matrix and back a second time, which moved a last bit (`quatern_c` 0.012488983571529388
+  against 0.01248898170888424) and the sign of a zero (`-0` from the negated third column).
+- **`-dof 3`'s messages**: once per row of `optimise` and `measurecost` and once per free
+  optimisation start (above); 15 of 16 sampled trial cases print FSL's count, the 16th (and the
+  trial's #76) differ by the rows their search's list keeps (paths). With `-anglerep quaternion`
+  and FSL-90 reproduced, `-dof` below 6 composes the start once (twice only at 6): FSL's message
+  order start by start.
+- **The 4 × 4 inverse as §12 says**: an upper triangle by the triangle's inverse (its zeros above
+  the diagonal `−0`), the LU factorisation left-looking with the pivot's reciprocal, the solve
+  against `L` with the columns in pairs: the 7 convert_xfm `-inverse` texts of the trial are
+  FSL's. The vector solves (coordinates, avscale's translation, midtrans) use the same
+  factorisation.
+- **avscale on §3's decomposition** (single-precision scales and skews, `atan2f`): 11 of 12
+  sampled avscale findings agree now (the skews' `−0.000000`, the reflection's check row); the
+  12th differs in the sign of one residual of the check `M⁻¹·R·K·S` (`−0.000000` against
+  `0.000000`).
+- **The coordinate programs' qform** is FSL's (the NIfTI-1 library's conversion, x87 steps,
+  single-precision elements, `bet::quatern`): 18 of 18 sampled coordinate findings agree (the 6th
+  digits of relay 5's list).
+- **Nearest neighbour outside the input** (`-applyxfm`, `-applyisoxfm`, `-out`, with a padding
+  size): the nearest index first, then the extraslice rule on it (an index one voxel beyond an
+  edge reads the edge voxel, further ones the background value): positions 1 to 1.5 voxels out
+  take the edge's value (trial #8481: 20 of 120 voxels).
+
+Still open (what the spec does not settle, as spec questions in the handoff):
+- the sinc and spline outputs' last bits of float images (spec question 22; applyxfm4D's spline
+  of float images likewise, 1.7 to 23 % of voxels' last bit in five trial findings);
+- avscale's check residual sign in one of twelve cases;
+- registrations' paths (displacement on ill-posed random pairs, FSL-90's message counts during
+  quaternion line searches, COG-warning counts, pairreg) as relay 5 lists them.

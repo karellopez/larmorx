@@ -1083,6 +1083,23 @@ def _real_cases() -> dict[str, tuple[str, str, Run]]:
             "-omat",
             "out.mat",
         )
+    # FSL-22 in FLIRT's padding (the input's background value of NaN border voxels), on a real
+    # image: the shrunk permanent case of a 1 x 1 x 1 reference stops at FSL-92 by default
+    add(
+        "real/applyxfm-nan-border",
+        st,
+        "-applyxfm of a BOLD reference with NaN voxels in its border and an infinite one: the "
+        "padding's background value (FSL-22: NaN sorted last by default)",
+        "-in",
+        "@nanedge:epi.nii:epi_nanedge.nii",
+        "-ref",
+        T,
+        "-init",
+        "@init.mat",
+        "-applyxfm",
+        "-out",
+        "out",
+    )
     add(
         "real/labeldiff-dseg",
         st,

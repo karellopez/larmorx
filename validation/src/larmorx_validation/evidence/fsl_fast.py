@@ -205,6 +205,27 @@ def _real_run(case: str):
     return _suite()._all_cases()[case][2]
 
 
+def case_table() -> dict[str, tuple[str, object]]:
+    """Every case of the suite, random testing's permanent cases included: id ->
+    (description, its ``Run``; None for fMRIPrep's calls)."""
+    from larmorx_validation.difftest import permanent
+
+    s = _suite().suite()
+    permanent.attach(s)
+    out: dict[str, tuple[str, object]] = {}
+    for c in s.cases("full"):
+        kind, payload = c.payload
+        run = (
+            None
+            if kind == "fmriprep"
+            else payload
+            if kind == "direct"
+            else _suite()._all_cases()[payload][2]
+        )
+        out.setdefault(c.id, (c.description, run))
+    return out
+
+
 def _compute_real(case: str):
     def compute(e: fcache.Entry) -> None:
         fs = _suite()
@@ -248,7 +269,7 @@ def _compute_named(e: fcache.Entry) -> None:
     the register entries it names, for the case explorer's reasons."""
     fs = _suite()
     rec = records.load(e.ctx.repo, RECORD)
-    defs = fs._all_cases()
+    defs = case_table()
     nodes = {f"fmriprep/{r}": n for r, n in fs.fmriprep_calls()}
     exe = fs.replica_binary()
     if exe is None:
@@ -267,7 +288,7 @@ def _compute_named(e: fcache.Entry) -> None:
                 shutil.copy(fs.fmriprep_input(case.split("/")[1], str(node)), d / args[-1])
                 settings: dict[str, str | None] = {}
             else:
-                run = defs[case][2]
+                run = defs[case][1]
                 args = fs._prepare(run, d)
                 settings = dict(run.settings)
             env = {**_environment(settings), "LARMORX_UPSTREAM_DEFECTS": "fix",
@@ -830,14 +851,12 @@ def _input(a: str) -> str:
     return f"<{name}: derived from ds000005's fMRIPrep run>"
 
 
-def command(case: str) -> str:
-    fs = _suite()
+def command(case: str, defs: dict[str, tuple[str, object]]) -> str:
     if case.startswith("fmriprep/"):
         return "fast -I 0 -N -p -g -S 1 <fMRIPrep's T1w brain>"
-    defs = fs._all_cases()
-    if case not in defs:
+    if case not in defs or defs[case][1] is None:
         return ""
-    run = defs[case][2]
+    run = defs[case][1]
     words = [_input(a) if a.startswith("@") else a for a in run.args]
     parts = ["fast", *(shlex.quote(w) if re.search(r"\s", w) or w == "" else w for w in words)]
     env = " ".join(f"{k}={v}" for k, v in run.settings if v is not None)
@@ -894,11 +913,10 @@ def case_verdict(r: dict, dm: dict) -> tuple[str, str]:
 
 
 def cases(rec, examples: dict[str, str], default: dict[str, dict]) -> list[dict]:
-    fs = _suite()
-    descs = {c.id: c.description for c in fs.cases("full")}
+    defs = case_table()
     out = []
     for r in rec.results:
-        desc = descs.get(r["case"], "")
+        desc = defs.get(r["case"], ("", None))[0]
         if r["case"].startswith("fmriprep/"):
             desc = (
                 "fMRIPrep's segmentation call ("
@@ -911,7 +929,7 @@ def cases(rec, examples: dict[str, str], default: dict[str, dict]) -> list[dict]
                 "id": r["case"],
                 "category": r["category"],
                 "description": desc,
-                "command": command(r["case"]),
+                "command": command(r["case"], defs),
                 "results": {
                     "replica": {
                         "outcome": r["status"],

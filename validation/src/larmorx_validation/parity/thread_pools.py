@@ -21,6 +21,7 @@ pool. Linux only. ``tests/parity/test_thread_pools.py`` runs every case;
 
 from __future__ import annotations
 
+import contextlib
 import os
 import subprocess
 import sys
@@ -79,8 +80,16 @@ def probe(p: Program, cwd: Path) -> tuple[int, int, dict[str, int], str]:
     while proc.poll() is None:
         for pid in descendants(proc.pid):
             for tid, name in threads(pid).items():
-                if tid != pid:
-                    seen[(pid, tid)] = name
+                if tid == pid or seen.get((pid, tid), "").startswith("larmorx-"):
+                    continue
+                if not name.startswith("larmorx-"):
+                    # a new thread carries its process's name until it names itself, a moment
+                    # after it starts: a pool thread caught in that moment is read again
+                    # (2026-11-02: a one-thread rmsdiff's pool thread seen once as "python")
+                    time.sleep(0.002)
+                    with contextlib.suppress(OSError):
+                        name = Path(f"/proc/{pid}/task/{tid}/comm").read_text().strip()
+                seen[(pid, tid)] = name
         time.sleep(0.01)
     err = proc.stderr.read() if proc.stderr else ""
     pool = sum(1 for n in seen.values() if n.startswith("larmorx-"))
@@ -339,6 +348,44 @@ def programs(d: Path, nc: str | None = None, *, make: bool = True) -> list[Progr
     out.append(Program("fsl convert_xfm (clean-room original)",
                        (*lx, "fsl", "convert_xfm", "-omat", o + "_oinv.mat", "-inverse",
                         str(mat)), bet))  # fmt: skip
+    # FLIRT's clean-room original, part 2 (2026-11-02): BBR with a field map (the points'
+    # inside test and the field's searches in parallel), gridmeasurecost (its grid's costs in
+    # parallel), -debug (the pyramid, weights and input written), the spline output (its
+    # coefficients' columns), applyxfm4D (sinc and spline, the volumes' slices), pairreg (three
+    # registrations in-process, FSL's schedules from $FSLDIR), and the programs that read
+    # images (avscale, the coordinate programs, rmsdiff, midtrans, pointflirt).
+    fl = (*lx, "fsl")
+    sch = str(_flirt_schedule(d, make, "grid-probe.sch", _GRID_SCHEDULE))
+    fsldir = str(_pairreg_fsldir(d, make))
+    pair = (*bet, ("FSLDIR", fsldir))
+    text = {k: str(_flirt_text(d, make, k, v)) for k, v in _FLIRT_TEXTS.items()}
+    for name, a in (
+        ("flirt bbr -fieldmap", ["flirt", "-in", t1, "-ref", t1, "-init", str(mat), "-cost",
+                                 "bbr", "-wmseg", t1, "-schedule", str(_bbr_schedule(d, make)),
+                                 "-dof", "6", "-fieldmap", mask, "-fieldmapmask", mask,
+                                 "-pedir", "2", "-echospacing", "0.0005", "-omat",
+                                 o + "_ofmap.mat"]),
+        ("flirt gridmeasurecost", ["flirt", "-in", t1, "-ref", t1, "-schedule", sch, "-omat",
+                                   o + "_ogrid.mat"]),
+        ("flirt -debug", ["flirt", "-in", m, "-ref", f, "-dof", "6", "-nosearch", "-debug",
+                          "-omat", o + "_odebug.mat"]),
+        ("flirt -applyxfm spline", ["flirt", "-in", t1, "-ref", t1, "-init", str(mat),
+                                    "-applyxfm", "-interp", "spline", "-out", o + "_ospline"]),
+        ("applyxfm4D", ["applyxfm4D", s, t1, o + "_o4d", str(mat), "-singlematrix"]),
+        ("applyxfm4D spline", ["applyxfm4D", s, t1, o + "_o4ds", str(mat), "-singlematrix",
+                               "-interp", "spline"]),
+        ("avscale", ["avscale", "--allparams", str(mat), t1]),
+        ("img2imgcoord", ["img2imgcoord", "-src", m, "-dest", f, "-xfm", str(mat), "-mm",
+                          text["coords"]]),
+        ("rmsdiff", ["rmsdiff", str(mat), str(mat), t1, mask]),
+        ("midtrans", ["midtrans", f"--template={t1}", "-o", o + "_omid.mat", str(mat),
+                      text["mat2"]]),
+        ("pointflirt", ["pointflirt", "-i", text["pin"], "-r", text["pref"], "-o",
+                        o + "_opf.mat", "--vox", f"--invol={m}", f"--refvol={f}"]),
+    ):  # fmt: skip
+        out.append(Program(f"fsl {name} (clean-room original)", (*fl, *a), bet))
+    out.append(Program("fsl pairreg (clean-room original)",
+                       (*fl, "pairreg", f, m, f, m, o + "_opair.mat"), pair))  # fmt: skip
     if nc:
         fsl = {
             "mcflirt": ["-in", s, "-out", o + "_mcf"],
@@ -362,6 +409,47 @@ def programs(d: Path, nc: str | None = None, *, make: bool = True) -> list[Progr
         for name, a in fsl.items():
             out.append(Program(f"fsl {name} (replica, larmorx-nc)", (nc, "fsl", name, *a), omp))
     return out
+
+
+#: gridmeasurecost on a grid of 3 x 3 relative perturbations of the identity, then sorted.
+_GRID_SCHEDULE = (
+    "setscale 2\nclear U\nsetrow UA 1 0 0 0  0 1 0 0  0 0 1 0  0 0 0 1\n"
+    "gridmeasurecost 6 UA:1  -1 1 1  -1 1 1  0 0 1  0 0 1  0 0 1  0 0 1  rel\nsort U\n"
+)
+#: pairreg's three schedules (one short rigid optimisation each) in the probe's $FSLDIR.
+_PAIRREG_SCHEDULE = (
+    "setscale 2 force\nsetrow UA 1 0 0 0 0 1 0 0 0 0 1 0 0 0 0 1\n"
+    "optimise 6 UA:1 0.0 0.0 0.0 0.0 0.0 0.0 0.0 rel 2\nsort U\n"
+)
+#: The text inputs of the probes of FLIRT's other programs.
+_FLIRT_TEXTS = {
+    "coords": "10 20 30\n-12.5 4 0\n",
+    "mat2": "0.99 0.01 0 1.5\n-0.01 0.99 0.02 -2\n0 -0.02 1.01 0.5\n0 0 0 1\n",
+    "pin": "10 12 8\n40 15 9\n12 50 10\n15 18 30\n35 40 25\n",
+    "pref": "12 13 9\n42 17 9\n13 52 11\n17 18 31\n37 42 26\n",
+}
+
+
+def _flirt_schedule(d: Path, make: bool, name: str, text: str) -> Path:
+    p = d / name
+    if make:
+        p.write_text(text, encoding="utf-8")
+    return p
+
+
+def _flirt_text(d: Path, make: bool, key: str, text: str) -> Path:
+    return _flirt_schedule(d, make, f"{key}.txt", text)
+
+
+def _pairreg_fsldir(d: Path, make: bool) -> Path:
+    """A directory standing for ``$FSLDIR`` with pairreg's three schedules."""
+    root = d / "fsldir"
+    if make:
+        sch = root / "etc" / "flirtsch"
+        sch.mkdir(parents=True, exist_ok=True)
+        for k in (1, 2, 3):
+            (sch / f"pairreg{k}.sch").write_text(_PAIRREG_SCHEDULE, encoding="utf-8")
+    return root
 
 
 def _bbr_schedule(d: Path, make: bool) -> Path:

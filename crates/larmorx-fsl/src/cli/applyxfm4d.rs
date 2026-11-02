@@ -295,12 +295,17 @@ fn run(
     // the sinc kernel: blackman of width 7, or with -3D the rectangular window of width 9 it asks
     // for (FSL-80: FSL uses the first)
     let fsl80 = o.three_d && o.interp == Interp::Sinc;
-    let kernel = if fsl80 && mode.fix() {
-        SincKernel::new(9.0, SincWindow::Rectangular)
+    let asked = SincKernel::new(9.0, SincWindow::Rectangular);
+    let first = SincKernel::new(7.0, SincWindow::Blackman);
+    let (kernel, other_kernel) = if fsl80 && mode.fix() {
+        (&asked, &first)
     } else {
-        SincKernel::new(7.0, SincWindow::Blackman)
+        (&first, &asked)
     };
-    if fsl80 {
+    // each defect is named only where it changes a value (D13): the other mode's volume is
+    // computed until one differs
+    let (mut fsl80_changes, mut fsl79_changes) = (false, false);
+    let name80 = |notices: &mut Vec<Notice>| {
         let detail = match mode {
             UpstreamDefects::Fix => {
                 "applyxfm4D -3D resamples with the rectangular sinc window of full width 9 it asks for (FSL uses the blackman window of width 7 it defined first)"
@@ -313,9 +318,9 @@ fn run(
             notices,
             Notice::new(&defects::FSL_80, mode, detail.to_owned()),
         );
-    }
+    };
     let fsl79 = integer && o.interp == Interp::Spline;
-    if fsl79 {
+    let name79 = |notices: &mut Vec<Notice>| {
         let detail = match mode {
             UpstreamDefects::Fix => {
                 "applyxfm4D's spline of an integer image: its coefficients and values in single precision, as for a float image (FSL keeps them in the image's type)"
@@ -328,7 +333,7 @@ fn run(
             notices,
             Notice::new(&defects::FSL_79, mode, detail.to_owned()),
         );
-    }
+    };
     let single = o.single || o.three_d;
     let one = if single {
         match matrix(ctx.settings, xfm, err) {
@@ -366,31 +371,44 @@ fn run(
             Err(End::Refuse(msg)) => return common::refuse(err, "applyxfm4D", &msg),
             Err(_) => return 1,
         };
-        let spline = (o.interp == Interp::Spline).then(|| {
-            if fsl79 && mode.reproduce() {
-                Spline::with_store(vol, &stored_pass)
-            } else if double {
-                Spline::new(vol)
-            } else {
-                Spline::with_store(vol, &|c| f64::from(c as f32))
+        // one volume resampled with FSL-79 reproduced or not, with `kernel`
+        let resampled = |reproduce79: bool, kernel: &SincKernel| -> Option<Vec<f32>> {
+            let spline = (o.interp == Interp::Spline).then(|| {
+                if fsl79 && reproduce79 {
+                    Spline::with_store(vol, &stored_pass)
+                } else if double {
+                    Spline::new(vol)
+                } else {
+                    Spline::with_store(vol, &|c| f64::from(c as f32))
+                }
+            });
+            let r = Resampling {
+                interp: o.interp,
+                sinc: Some(kernel),
+                pad,
+                padding: 0.0,
+                spline: spline.as_ref(),
+                constant: false,
+            };
+            let mut v = output::resample(vol, &mat, refv.shape, refv.voxel_size, &r)?;
+            if fsl79 && reproduce79 {
+                for x in &mut v {
+                    *x = f64::from(*x).trunc().clamp(lo, hi) as f32;
+                }
             }
-        });
-        let r = Resampling {
-            interp: o.interp,
-            sinc: Some(&kernel),
-            pad,
-            padding: 0.0,
-            spline: spline.as_ref(),
-            constant: false,
+            Some(v)
         };
-        let Some(mut v) = output::resample(vol, &mat, refv.shape, refv.voxel_size, &r) else {
+        let same = |a: &[f32], b: &[f32]| a.iter().zip(b).all(|(x, y)| x.to_bits() == y.to_bits());
+        let Some(v) = resampled(mode.reproduce(), kernel) else {
             return abort(err, "applyxfm4D", "std::runtime_error", mat::SINGULAR);
         };
         // (the matrix was checked invertible when it was read)
-        if fsl79 && mode.reproduce() {
-            for x in &mut v {
-                *x = f64::from(*x).trunc().clamp(lo, hi) as f32;
-            }
+        if fsl80 && !fsl80_changes {
+            fsl80_changes =
+                resampled(mode.reproduce(), other_kernel).is_some_and(|w| !same(&v, &w));
+        }
+        if fsl79 && !fsl79_changes {
+            fsl79_changes = resampled(!mode.reproduce(), kernel).is_some_and(|w| !same(&v, &w));
         }
         if let (Some(d), Some(all)) = (doubles.as_mut(), src.doubles.as_ref()) {
             let part = &all[m * vol.len()..(m + 1) * vol.len()];
@@ -412,8 +430,16 @@ fn run(
         }
         values.extend(v);
     }
+    if fsl80_changes {
+        name80(notices);
+    }
+    if fsl79_changes {
+        name79(notices);
+    }
+    // the reference's unset form completed from the set one (observed)
+    let completed = engine::completed_forms(&reference.input);
     let look = Look {
-        reference: &reference.input,
+        reference: &completed,
         shape: refv.shape,
         volumes: nv,
         tr: Some(src.input.header.pixdim[4]),

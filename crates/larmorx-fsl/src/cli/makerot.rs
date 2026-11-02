@@ -148,7 +148,15 @@ pub fn main(args: &[String], settings: &Settings, out: &mut dyn Write, err: &mut
         print_notices(err, &notices);
         return 1;
     }
-    if len != 1.0 {
+    // named only where FSL's rotation differs from the corrected one (D13: a zero angle, or one
+    // whose two scalings give the same matrix, changes nothing); the rotation decides it, the
+    // translation following from it about any centre
+    let bits = |m: mat::Mat4| m.map(|row| row.map(f64::to_bits));
+    let changes = || {
+        let at = |fsl76| bits(programs::makerot(theta as f32, axis, [0.0; 3], fsl76));
+        at(true) != at(false)
+    };
+    if len != 1.0 && changes() {
         let detail = match mode {
             UpstreamDefects::Fix => format!(
                 "the axis of length {} is divided by its length (FSL divides it by the square root of its length: a rotation by {} degrees, not {})",

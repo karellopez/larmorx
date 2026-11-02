@@ -359,7 +359,22 @@ fn run(
             ),
         };
     }
+    let unset_warning = || {
+        if p == Program::Std2Img {
+            "WARNING:: standard coordinates not set in standard image"
+        } else {
+            "WARNING:: mm coordinate space not set in standard volume"
+        }
+    };
     let target_space = match (p, &dst) {
+        // a destination or standard image without forms: its voxel sizes (observed; the
+        // standard programs warn as for no standard image)
+        (_, Some(h)) if h.form.is_none() => {
+            if p != Program::Img2Img {
+                let _ = writeln!(err, "{}", unset_warning());
+            }
+            Some(Space::unset(h.voxel))
+        }
         (_, Some(h)) => space(h),
         (Program::Img2Img, None) => None,
         (_, None) => {

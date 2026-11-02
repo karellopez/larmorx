@@ -377,6 +377,23 @@ pub fn field_shift<'a>(
     })
 }
 
+/// FSL's set-up of a pair's boundary-based cost (observed, 2026-11-02): without a boundary
+/// voxel its error is printed `times` times (once each time a pair is made with the cost: a
+/// `setscale` makes it twice; once at `setoption costfunction bbr`), before any evaluation.
+pub fn setup_errors(pair: &Pair, log: &Log, times: usize) {
+    let Some(src) = pair.bbr_source.as_ref() else {
+        return;
+    };
+    let pts = pair
+        .bbr
+        .get_or_init(|| points(src, pair.reference.voxel_size));
+    if pts.as_ref().is_ok_and(|p| p.gm.is_empty()) {
+        for _ in 0..times {
+            log.push("ERROR::set_bbr_seg: could not find any boundary points!");
+        }
+    }
+}
+
 /// The boundary-based cost of `a` (reference mm → input mm through `a⁻¹`, §6.5).
 pub fn cost(pair: &Pair, a: &Mat4, log: &Log) -> f32 {
     cost_and_debug(pair, a, log, None)
@@ -404,7 +421,9 @@ pub fn cost_and_debug(pair: &Pair, a: &Mat4, log: &Log, debug: Option<&mut Vec<f
     };
     if pts.gm.is_empty() {
         log.push("ERROR::set_bbr_seg: could not find any boundary points!");
-        // 0 / 0: the default NaN (its sign set, printed -nan)
+        // 0 / 0 over no pairs: the default NaN (its sign set, printed -nan), warned as every
+        // NaN cost is (observed)
+        log.push("WARNING:: Found NaN in BBR cost (2)");
         return -f32::NAN;
     }
     let Some(ainv) = mat::inverse(a) else {
@@ -536,9 +555,12 @@ pub fn cost_and_debug(pair: &Pair, a: &Mat4, log: &Log, debug: Option<&mut Vec<f
         for _ in i..terms.len() {
             log.push("WARNING:: Found NaN in BBR cost");
         }
-        log.push("WARNING:: Found NaN in BBR cost (2)");
     }
     let mut c = num / den;
+    // a NaN cost, a NaN sum's or `Σ w12 = 0`'s (FSL-91), is warned at the end (§6.5)
+    if c.is_nan() {
+        log.push("WARNING:: Found NaN in BBR cost (2)");
+    }
     if pts.kind == Kind::GlobalAbs {
         c = c.min(2.0 - c);
     }

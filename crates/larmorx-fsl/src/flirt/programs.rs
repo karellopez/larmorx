@@ -275,6 +275,18 @@ impl Space {
         Some(Space { s, n, v })
     }
 
+    /// A destination or standard image read with neither sform nor qform: its world
+    /// coordinates its voxel sizes, x not reversed (observed, 2026-11-02; the source image's are
+    /// reversed, [`Space::of_image`]).
+    pub fn unset(voxel: [f32; 3]) -> Space {
+        let s = mat::diagonal(voxel.map(f64::from));
+        Space {
+            s,
+            n: IDENTITY,
+            v: s,
+        }
+    }
+
     /// The standard volume of `std2imgcoord` and `img2stdcoord` without `-std`: no sform or
     /// qform, 1 mm voxels (§15.2).
     pub fn empty() -> Space {

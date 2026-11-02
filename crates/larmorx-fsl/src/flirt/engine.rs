@@ -1811,6 +1811,9 @@ fn set_option(st: &mut State<'_>, w: &[String], err: &mut dyn Write) -> Result<(
                 st.search_cost = c;
                 if c == Cost::Bbr && st.pair.is_some() {
                     announce_bbr(st);
+                    if let Some(p) = st.pair.as_ref() {
+                        super::bbr::setup_errors(p, &st.log, 1);
+                    }
                 }
             }
             None => {
@@ -2002,6 +2005,9 @@ fn set_scale(
         st.bbr_set = false;
         if st.cost == Cost::Bbr {
             announce_bbr(st);
+            if let Some(p) = st.pair.as_ref() {
+                super::bbr::setup_errors(p, &st.log, 1);
+            }
         }
     } else if let Some(p) = st.pair.take() {
         // only the input reset (§7.2)
@@ -2308,6 +2314,42 @@ pub(crate) fn stored_type(h: &NiftiHeader) -> (DataType, bool) {
     (t, larmorx_mri::hmc::image::scaling(h).is_some())
 }
 
+/// The reference's header with an unset form completed from the set one, as a registration's
+/// `-out` image and applyxfm4D's output carry it (observed, 2026-11-02: FSL writes the unset
+/// form as the set one, with its code; `-applyxfm` keeps it unset): an unset sform becomes the
+/// qform's matrix (single precision, §4.1), an unset qform the sform's quaternion (§3's
+/// conversion) and offsets.
+pub(crate) fn completed_forms(input: &Input) -> Input {
+    let mut out = input.clone();
+    let h = &mut out.header;
+    if h.sform_code == 0 && h.qform_code > 0 && h.qform().is_ok() {
+        let r = crate::bet::quatern::quatern_to_mat(
+            h.quatern_b,
+            h.quatern_c,
+            h.quatern_d,
+            [h.pixdim[0], h.pixdim[1], h.pixdim[2], h.pixdim[3]],
+        );
+        let off = [h.qoffset_x, h.qoffset_y, h.qoffset_z].map(|v| f64::from(v as f32));
+        h.srow_x = [r[0][0], r[0][1], r[0][2], off[0]];
+        h.srow_y = [r[1][0], r[1][1], r[1][2], off[1]];
+        h.srow_z = [r[2][0], r[2][1], r[2][2], off[2]];
+        h.sform_code = h.qform_code;
+    } else if h.qform_code == 0 && h.sform_code > 0 {
+        let rows = [h.srow_x, h.srow_y, h.srow_z].map(|r| r.map(|v| f64::from(v as f32)));
+        let rot = rows.map(|r| [r[0], r[1], r[2]]);
+        let ([b, c, d], qfac) = crate::bet::quatern::mat_to_quatern(&rot);
+        h.quatern_b = b;
+        h.quatern_c = c;
+        h.quatern_d = d;
+        h.pixdim[0] = qfac;
+        h.qoffset_x = rows[0][3];
+        h.qoffset_y = rows[1][3];
+        h.qoffset_z = rows[2][3];
+        h.qform_code = h.sform_code;
+    }
+    out
+}
+
 /// Writes `values` (radiological order, every volume) like the reference, in type `t`.
 #[allow(clippy::too_many_arguments)]
 fn write_image(
@@ -2527,7 +2569,7 @@ fn write_registered(
     write_image(
         ctx,
         stem,
-        &reference.input,
+        &completed_forms(&reference.input),
         refv.shape,
         1,
         None,
@@ -2632,48 +2674,67 @@ fn apply(
     let mut ref_input = reference.input.clone();
     if let Some(s) = o.apply_iso {
         refv = pyramid::isotropic(&pyramid::blur(&refv, s), s);
-        // the header follows the resampling: the voxel sizes and the dimensions
-        // in FSL's memory order (x reversed for a positive determinant): `W' = W·F_n·D·F_n'`
-        // with `D` the scaling `s/d` (§5), so the x offset follows the new grid (observed)
+        // the header follows the resampling (§9.3, §4.1): each form as FSL holds it, a
+        // neurological file's swapped by the read grid (`W·D⁻¹·F⁻¹·D`, the field of view in
+        // single precision), a set form composed with `diag(st)` (`st = s/d` in single
+        // precision), swapped back with the new grid's `n_x` and `s`, every element rounded to
+        // single precision; the qform's quaternion then from that matrix (§3's conversion)
         let h = &mut ref_input.header;
         let old = [h.pixdim[1], h.pixdim[2], h.pixdim[3]];
-        let flip = |n: usize| -> Mat4 {
-            let mut f = IDENTITY;
-            if reference.input.flipped {
-                f[0][0] = -1.0;
-                f[0][3] = n as f64 - 1.0;
-            }
-            f
-        };
         let scale = mat::diagonal([0, 1, 2].map(|j| {
             if old[j] != 0.0 {
-                f64::from(s) / old[j].abs()
+                f64::from(s / old[j].abs() as f32)
             } else {
                 1.0
             }
         }));
-        let step = mat::mul(
-            &mat::mul(&flip(reference.vols[0].shape[0]), &scale),
-            &flip(refv.shape[0]),
-        );
-        // an unset sform keeps the reference's rows but for the x flips of the two grids
-        // (`W·F_n·F_n'`, no scaling; observed)
-        let srow = [h.srow_x, h.srow_y, h.srow_z, [0.0, 0.0, 0.0, 1.0]];
-        let new_s = if h.sform_code > 0 {
-            mat::mul(&srow, &step)
-        } else {
-            mat::mul(
-                &mat::mul(&srow, &flip(reference.vols[0].shape[0])),
-                &flip(refv.shape[0]),
-            )
+        let flipped = reference.input.flipped;
+        let swap = |m: &Mat4, d: [f64; 3], n: usize| -> Mat4 {
+            if !flipped {
+                return *m;
+            }
+            let mut f = IDENTITY;
+            f[0][0] = -1.0;
+            f[0][3] = f64::from((n as f32 - 1.0) * (d[0] as f32));
+            let di = mat::diagonal(d.map(|v| 1.0 / v));
+            mat::mul(&mat::mul(&mat::mul(m, &di), &f), &mat::diagonal(d))
         };
+        let d0 = reference.input.vol.voxel.map(|v| f64::from(v.abs() as f32));
+        let d1 = [f64::from(s); 3];
+        let (n0, n1) = (reference.vols[0].shape[0], refv.shape[0]);
+        let through = |m: &Mat4, set: bool| -> Mat4 {
+            let mut a = swap(m, d0, n0);
+            if set {
+                a = mat::mul(&a, &scale);
+            }
+            swap(&a, d1, n1).map(|row| row.map(|v| f64::from(v as f32)))
+        };
+        let srow = [h.srow_x, h.srow_y, h.srow_z, [0.0, 0.0, 0.0, 1.0]];
+        let new_s = through(&srow, h.sform_code > 0);
         h.srow_x = new_s[0];
         h.srow_y = new_s[1];
         h.srow_z = new_s[2];
-        if h.qform_code > 0
-            && let Ok(q) = h.qform()
-        {
-            let nq = mat::mul(q.rows(), &step);
+        if h.qform().is_ok() {
+            let r = crate::bet::quatern::quatern_to_mat(
+                h.quatern_b,
+                h.quatern_c,
+                h.quatern_d,
+                [h.pixdim[0], h.pixdim[1], h.pixdim[2], h.pixdim[3]],
+            );
+            let off = [h.qoffset_x, h.qoffset_y, h.qoffset_z].map(|v| f64::from(v as f32));
+            let q: Mat4 = [
+                [r[0][0], r[0][1], r[0][2], off[0]],
+                [r[1][0], r[1][1], r[1][2], off[1]],
+                [r[2][0], r[2][1], r[2][2], off[2]],
+                [0.0, 0.0, 0.0, 1.0],
+            ];
+            let nq = through(&q, h.qform_code > 0);
+            let rot = [0, 1, 2].map(|i| [nq[i][0], nq[i][1], nq[i][2]]);
+            let ([b, c, d], qfac) = crate::bet::quatern::mat_to_quatern(&rot);
+            h.quatern_b = b;
+            h.quatern_c = c;
+            h.quatern_d = d;
+            h.pixdim[0] = qfac;
             h.qoffset_x = nq[0][3];
             h.qoffset_y = nq[1][3];
             h.qoffset_z = nq[2][3];

@@ -370,9 +370,18 @@ fn write_pieces(
             .write_pieces(pieces, w)
             .map_err(io)
     };
+    // every stored type FSL's programs write (FLIRT's outputs keep the input's: 2026-11-02, a
+    // zstd or bzip2 output of a char or int image was refused here)
     let bytes: &[u8] = match array {
-        DynArray::F32(a) => bytemuck::cast_slice(a.as_slice_memory_order().unwrap_or(&[])),
+        DynArray::U8(a) => a.as_slice_memory_order().unwrap_or(&[]),
+        DynArray::I8(a) => bytemuck::cast_slice(a.as_slice_memory_order().unwrap_or(&[])),
+        DynArray::U16(a) => bytemuck::cast_slice(a.as_slice_memory_order().unwrap_or(&[])),
         DynArray::I16(a) => bytemuck::cast_slice(a.as_slice_memory_order().unwrap_or(&[])),
+        DynArray::U32(a) => bytemuck::cast_slice(a.as_slice_memory_order().unwrap_or(&[])),
+        DynArray::I32(a) => bytemuck::cast_slice(a.as_slice_memory_order().unwrap_or(&[])),
+        DynArray::U64(a) => bytemuck::cast_slice(a.as_slice_memory_order().unwrap_or(&[])),
+        DynArray::I64(a) => bytemuck::cast_slice(a.as_slice_memory_order().unwrap_or(&[])),
+        DynArray::F32(a) => bytemuck::cast_slice(a.as_slice_memory_order().unwrap_or(&[])),
         DynArray::F64(a) => bytemuck::cast_slice(a.as_slice_memory_order().unwrap_or(&[])),
         _ => return Err(ImageError::Invalid("unexpected output type".into())),
     };

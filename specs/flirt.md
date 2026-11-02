@@ -1044,7 +1044,7 @@ ignores values beyond the third; the original refuses it by default (rule B, a m
 FSL-77, exit 1) and reads as FSL does with `reproduce` (named). The centre is (0, 0, 0) unless
 given; `--cov` replaces it by `((n − 1)·d·0.5)` along each axis of the image (size `n`, voxel size
 `d`, in double), whatever `-c` says; an image that cannot be read throws newimage's exception
-(signal 6; the original exits 1 after the same text). The matrix is §8.5's rotation (`make_rot`)
+(signal 6; the original exits 1 after the same text). The matrix is §8.5's rotation
 about the axis scaled by `θ·π/180` (in double, element by element: `((a·θ)·π)/180`) through the
 centre. With `-o` it is written as FLIRT writes matrices (§9.1; a file that cannot be opened:
 `Could not open file <name> for writing`, exit 0); otherwise printed (§15's matrix layout) and

@@ -10,12 +10,13 @@
 //! Each class is a multivariate Gaussian over the channels' log intensities (`log(v + 1)`), its
 //! mean a row of `m_mean` and its covariance an `n × n` NEWMAT matrix (Armadillo 14.2.1 under
 //! fsl-armawrap 0.7.0, `larmorx_nc_core::arma`). The expressions are evaluated on Armadillo's
-//! paths: `row * inv(Σ) * col` is `(row Σ⁻¹) col` (`gemv_emul_tinysq` of `Σ⁻¹ᵀ` with the row,
-//! then BLAS `dgemv_t` of the column with it: OpenBLAS's Haswell kernel, whose tail rows fuse
-//! into multiply-adds), `row * Σ.i() * col` is `row * solve(Σ, col)` (LAPACK `dgesv`, then the
-//! same `dgemv_t`), `Σ.i()` and `Σ.Determinant()` Armadillo's `inv()` and `det()` (closed forms
-//! for 2 × 2 and 3 × 3, LAPACK for 4 × 4). Only up to four channels are translated: LAPACK's
-//! paths are ported up to 4 × 4 (`larmorx_nc_core::lapack`).
+//! paths: `row * inv(Σ) * col` is `(row Σ⁻¹) col` (`gemv_emul_tinysq` of `Σ⁻¹ᵀ` with the row
+//! up to four channels, BLAS `dgemv('T', n, n)` above, then BLAS `dgemv_t` of the column with
+//! it: OpenBLAS's Haswell kernel, whose tail rows fuse into multiply-adds), `row * Σ.i() * col`
+//! is `row * solve(Σ, col)` (LAPACK `dgesv`, then the same `dgemv_t`), `Σ.i()` and
+//! `Σ.Determinant()` Armadillo's `inv()` and `det()` (closed forms for 2 × 2 and 3 × 3, LAPACK
+//! above). Up to eight channels are translated: LAPACK's paths are ported up to 8 × 8
+//! (`larmorx_nc_core::lapack::MAX_N`).
 //!
 //! Unlike the single-channel segmentation, the main loop's MRF sweeps start from the current
 //! posteriors (no random draw), the bias field is estimated per channel from the current
@@ -41,8 +42,8 @@ use crate::mriseg::{Io, read_floats};
 /// `const float PI=3.14159265;`: the literal rounds to the float nearest to pi.
 const PI: f32 = std::f32::consts::PI;
 
-/// The most channels translated (LAPACK's paths are ported up to 4 × 4).
-pub const MAX_CHANNELS: usize = 4;
+/// The most channels translated (LAPACK's paths are ported up to 8 × 8).
+pub const MAX_CHANNELS: usize = 8;
 
 /// What `TanakaCreate` is given (`segmentMultiChannel`'s call, in its own argument order).
 #[derive(Clone, Debug)]
@@ -211,7 +212,15 @@ fn dgemv_t_col(a: &[f64; MAX_CHANNELS], x: &[f64; MAX_CHANNELS], m: usize) -> f6
 /// `(A B) C`).
 #[inline]
 fn quad(d: &[f64; MAX_CHANNELS], m: &[f64], n: usize) -> f64 {
-    let y = tinysq_t(m, n, d);
+    let y = if n <= 4 {
+        tinysq_t(m, n, d)
+    } else {
+        // more than four channels: gemv<true> is BLAS dgemv('T', n, n)
+        let mut y = [0f64; MAX_CHANNELS];
+        let am = lapack::blas::MatRef { off: 0, ld: n };
+        lapack::blas::dgemv_t(n, n, 1.0, m, am, &d[..n], 1, 0.0, &mut y[..n]);
+        y
+    };
     dgemv_t_col(d, &y, n)
 }
 
@@ -1147,7 +1156,7 @@ impl MultiSegmentation {
         struct Energy {
             delta: f32,
             mu: [f64; MAX_CHANNELS],
-            lu: Option<(Vec<f64>, [i32; 4])>,
+            lu: Option<(Vec<f64>, [i32; MAX_CHANNELS])>,
             logdet: f32,
         }
         let mut table: Vec<Vec<Energy>> = Vec::new();
@@ -1158,7 +1167,7 @@ impl MultiSegmentation {
                 .map(|&delta| {
                     let s = MixStep::new(self, delta, a, b);
                     let mut lu = s.sig.as_slice().to_vec();
-                    let mut ipiv = [0i32; 4];
+                    let mut ipiv = [0i32; MAX_CHANNELS];
                     let ok = lapack::getrf(&mut lu, n, &mut ipiv) == 0;
                     Energy {
                         delta: s.delta,

@@ -905,9 +905,12 @@ pub fn det(x: &Mat) -> f64 {
         }
         return val.0;
     }
-    assert!(n <= 4, "det(): LAPACK's path is ported up to 4 x 4");
+    assert!(
+        n <= lapack::MAX_N,
+        "det(): LAPACK's path is ported up to 8 x 8"
+    );
     let mut a = x.data.clone();
-    let mut ipiv = [0i32; 4];
+    let mut ipiv = [0i32; lapack::MAX_N];
     lapack::getrf(&mut a, n, &mut ipiv);
     let mut val = S64(a[0]);
     for i in 1..n {
@@ -1282,7 +1285,10 @@ pub fn inv(x: &Mat) -> Result<Mat, Singular> {
         }
         return Ok(out);
     }
-    assert!(n <= 4, "inv(): LAPACK's path is ported up to 4 x 4");
+    assert!(
+        n <= lapack::MAX_N,
+        "inv(): LAPACK's path is ported up to 8 x 8"
+    );
     let triu = is_triu(x);
     if triu || is_tril(x) {
         return if lapack::trtri(&mut out.data, n, triu) == 0 {
@@ -1291,7 +1297,7 @@ pub fn inv(x: &Mat) -> Result<Mat, Singular> {
             Err(Singular)
         };
     }
-    let mut ipiv = [0i32; 4];
+    let mut ipiv = [0i32; lapack::MAX_N];
     if lapack::getrf(&mut out.data, n, &mut ipiv) != 0 {
         return Err(Singular);
     }
@@ -1406,12 +1412,12 @@ pub fn solve(a: &Mat, b: &Mat) -> Result<Mat, Singular> {
         return Ok(Mat::zeros(a.cols, b.cols));
     }
     assert!(
-        n <= 4 && b.cols <= 4,
-        "solve(): LAPACK's path is ported up to 4 x 4"
+        (n <= 4 && b.cols <= 4) || (n <= lapack::MAX_N && b.cols == 1),
+        "solve(): LAPACK's path is ported up to 4 x 4 (8 x 8 for one column)"
     );
     let mut lu = a.data.clone();
     let mut out = b.clone();
-    let mut ipiv = [0i32; 4];
+    let mut ipiv = [0i32; lapack::MAX_N];
     if lapack::gesv(&mut lu, n, &mut ipiv, &mut out.data, b.cols) != 0 {
         return Err(Singular);
     }

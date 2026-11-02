@@ -58,6 +58,12 @@ OPS = {
     "arma_solve4x4": (4, 4),
     "arma_solve4x1": (4, 1),
     "arma_det4": (4, 0),
+    # FAST's covariances of 5 to 8 channels (fsl-fast-replica, -S 5 and more)
+    **{
+        f"{op}{n}": (n, 0) for n in range(5, 9) for op in ("getrf", "getri", "arma_inv", "arma_det")
+    },
+    **{f"trtri_{u}{n}": (n, 0) for n in range(5, 9) for u in "ul"},
+    **{f"{op}{n}x1": (n, 1) for n in range(5, 9) for op in ("gesv", "arma_solve")},
     "arma_inv3": (3, 0),
     "arma_solve3x3": (3, 3),
 }
@@ -127,6 +133,19 @@ def families(n: int, count: int, seed: int) -> dict[str, np.ndarray]:
         out["translation"] = _homogeneous(
             np.eye(3) * zooms[:, None, :], rng.uniform(-128, 128, size=(count, 3))
         )
+    elif n >= 5:
+        # FAST's covariances: weighted sums over voxels of the outer products of n channels'
+        # centred log intensities (correlated channels, a few scales), and nearly collinear
+        # channels (one channel close to the sum of two others)
+        k = 60
+        base = rng.normal(size=(count, k, n)) * rng.uniform(0.01, 0.5, size=(count, 1, n))
+        x = base @ (np.eye(n) + rng.uniform(-0.6, 0.6, size=(count, n, n)))
+        x -= x.mean(axis=1, keepdims=True)
+        w = rng.uniform(0.0, 1.0, size=(count, k, 1))
+        out["covariance"] = np.einsum("kxi,kxj->kij", w * x, x) / w.sum(axis=1)[:, :, None]
+        y = x.copy()
+        y[:, :, -1] = y[:, :, 0] + y[:, :, 1] + 1e-7 * rng.normal(size=(count, k))
+        out["covariance-collinear"] = np.einsum("kxi,kxj->kij", y, y) / k
     else:
         out["rotation"] = rot
         out["scales"] = np.einsum("ki,ij->kij", zooms, np.eye(3))

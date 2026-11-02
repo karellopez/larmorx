@@ -162,6 +162,12 @@ def _multichannel_inputs(ws: Path, out: Path) -> None:
     with np.errstate(divide="ignore", invalid="ignore"):
         ratio = np.where(chans["t2"] > 0, chans["t1"] / chans["t2"], 0).astype(np.float32)
     chans["ratio"] = np.where(mask, ratio, np.float32(0))
+    # more channels (-S 5 to 8): contrasts derived from the T1w, T2w and BOLD reference
+    t1, t2, bold = chans["t1"], chans["t2"], chans["bold"]
+    chans["sum"] = t1 + t2
+    chans["sqrt"] = np.float32(50) * np.sqrt(np.maximum(t1, np.float32(0)))
+    chans["prod"] = t1 * t2 / np.float32(1000)
+    chans["mix"] = bold + t1 / np.float32(2)
     for k, v in chans.items():
         _save(out / f"mni_{k}.nii.gz", v, t1i.affine)
     for k in ("t1", "t2"):
@@ -275,7 +281,7 @@ def inputs() -> Path:
     ws = workspace()
     assert ws is not None
     out = ws / "oracles" / "inputs" / SUITE
-    stamp = out / "DONE-v8"
+    stamp = out / "DONE-v9"
     if stamp.is_file():
         return out
     out.mkdir(parents=True, exist_ok=True)
@@ -290,7 +296,7 @@ def inputs() -> Path:
     _multichannel_inputs(ws, out)
     _prior_inputs(ws, out)
     _phantom_inputs(out)
-    stamp.write_text("derived inputs of the fsl-fast-replica suite, version 8\n", encoding="utf-8")
+    stamp.write_text("derived inputs of the fsl-fast-replica suite, version 9\n", encoding="utf-8")
     return out
 
 
@@ -675,6 +681,23 @@ def _multi_cases() -> dict[str, tuple[str, str, Run]]:
         "smoke",
         "-S 2 -B -b on the T1w and T2w at 4 mm",
         *("-S", "2", "-B", "-b", "-o", "seg", "@mni4_t2.nii.gz", "@mni4_t1.nii.gz"),
+    )
+    add(
+        "multi/s5",
+        "standard",
+        "-S 5 -B -b (T1w+T2w, T1w/T2w ratio, BOLD reference, T2w, T1w): 5 x 5 covariances "
+        "(LAPACK's LU, inverse and solve beyond 4 x 4)",
+        *("-S", "5", "-B", "-b", "-o", "seg", "@mni_sum.nii.gz", "@mni_ratio.nii.gz"),
+        *("@mni_bold.nii.gz", "@mni_t2.nii.gz", "@mni_t1.nii.gz"),
+    )
+    add(
+        "multi/s8",
+        "standard",
+        "-S 8 -n 2 -g: eight channels (the five, a square root, a product and a mix of the "
+        "T1w and BOLD reference), 8 x 8 covariances",
+        *("-S", "8", "-n", "2", "-g", "-o", "seg", "@mni_mix.nii.gz", "@mni_prod.nii.gz"),
+        *("@mni_sqrt.nii.gz", "@mni_sum.nii.gz", "@mni_ratio.nii.gz", "@mni_bold.nii.gz"),
+        *("@mni_t2.nii.gz", "@mni_t1.nii.gz"),
     )
     add(
         "multi/s0-error",

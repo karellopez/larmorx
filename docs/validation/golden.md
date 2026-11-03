@@ -15,7 +15,7 @@ Replicas and clean-room originals are covered alike. Written 2026-10-11.
 
 | | `larmorx` (Apache-2.0) | the AFNI replicas (in `larmorx`) | `larmorx-nc` (the FSL replicas) |
 |---|---|---|---|
-| Cases | [`tests/golden/registry.py`](../../tests/golden/registry.py): 168 cases, 1026 outputs | [`crates/larmorx-cli/tests/afni_replica_golden.rs`](../../crates/larmorx-cli/tests/afni_replica_golden.rs): 40 cases, 90 outputs | [`crates-nc/larmorx-nc-cli/tests/golden.rs`](../../crates-nc/larmorx-nc-cli/tests/golden.rs): 79 cases, 440 outputs |
+| Cases | [`tests/golden/registry.py`](../../tests/golden/registry.py): 208 cases, 1283 outputs | [`crates/larmorx-cli/tests/afni_replica_golden.rs`](../../crates/larmorx-cli/tests/afni_replica_golden.rs): 40 cases, 90 outputs | [`crates-nc/larmorx-nc-cli/tests/golden.rs`](../../crates-nc/larmorx-nc-cli/tests/golden.rs): 86 cases, 494 outputs |
 | Checksums | [`tests/golden/golden.json`](../../tests/golden/golden.json) | [`crates/larmorx-cli/tests/afni_replica_golden.tsv`](../../crates/larmorx-cli/tests/afni_replica_golden.tsv) | [`crates-nc/larmorx-nc-cli/tests/golden.tsv`](../../crates-nc/larmorx-nc-cli/tests/golden.tsv) |
 | Test | `tests/golden/test_golden.py` (pytest) | `cargo test` | `cargo test` |
 | Runs in CI | job `test`, on the release wheel, Python 3.12 only (the Python 3.14 run skips `tests/golden`) | job `test`, `cargo test --workspace --locked` (debug) | job `gpl`, `cargo test --workspace --locked` in `crates-nc` |
@@ -164,6 +164,24 @@ What the coverage test enumerates:
   (committed with the record as e9024ec), the parity smoke tier's marker of the same commit and build
   reused (2,692 passed): 7 cases added, every other checksum unchanged; each case runs in 0.02 to
   0.15 s.
+- **topup and applytopup, the replica** (2026-11-03, seven cases in
+  `crates-nc/larmorx-nc-cli/tests/golden.rs` on `pe`, a 4D pair made from every second voxel of the
+  T2 head (16 × 16 × 12) shifted by one voxel either way along y, its two volumes `pe_up` and `pe_dn`,
+  `acq.txt` and a two-level configuration `short.cnf`): `topup.two-levels` (every output; two levels,
+  Levenberg-Marquardt with the movements, then scaled conjugate gradients), `topup.float-membrane`
+  (single precision, linear interpolation, membrane energy, quadratic splines, `--scale=1`,
+  `--regrid=0`, `--featout`, `-v`: FSL-117 corrected) and its `.reproduce`, `applytopup.lsr`
+  (FSL-132), `applytopup.jac-trilinear-short` (FSL-09's rounding of the int16 output),
+  `applytopup.vb3d` (FSL-132, FSL-143); the refusal `topup.fsl126.lambda` (a negative `--lambda`, its log asked into a
+  missing directory, which topup skips) by its status. The runner fills `{name}` inside an argument with the input's path
+  relative to the case's directory (`../bet-inputs/<file>`: topup's log records its options as
+  given, so the same text on every platform), and `--topup=@<case>` copies an earlier case's
+  coefficients and movements in. `lx.fsl.topup` and `lx.fsl.applytopup` are replica-only functions
+  (`tests/golden/registry.py`, `REPLICA_ONLY_FUNCTIONS`) until topup's clean-room original.
+  `larmorx-nc`'s checksums recorded on 2026-11-03 from 79dbdf0 (committed as a0e6ccf), then the three
+  topup logs again from 5c26745 (d9fed9c, the relative paths): 7 cases and 54 outputs added, every
+  other checksum unchanged (the core's additions for topup, and its `dgemm` reordered to OpenBLAS's
+  four partial sums, changed no golden output); the topup cases take about 3 s together.
 
 - **antsAI's blob alignment** (2026-10-23): new cases: `cli.ants.antsAI.blobs` (antsAI -b in 2D: a rigid search from a rotated blob plane,
 an affine one from 12 pairs of a shifted plane), `py.ants.blob_alignment` (the rotated plane

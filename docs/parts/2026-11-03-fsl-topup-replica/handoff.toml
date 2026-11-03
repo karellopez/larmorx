@@ -1,0 +1,341 @@
+# The topup replica part (2026-11-03): its changes to the shared documents, applied in order by
+# scripts/orchestration/apply_handoff.py (checked with --check in the part's worktree and the site
+# clone). The reasons: HANDOFF.md beside this file.
+
+# ------------------------------------------------------------------ the register: summary rows
+[[op]]
+do = "insert"
+file = "docs/findings/upstream-defects.md"
+after = "| FSL-111 |"
+text = '''| FSL-116 † | topup (`--nthr`, `FSL_NUM_THREADS`) | above one thread the result changes with the thread count: on fMRIPrep's call on ds005040 at `--nthr=4` the field moves by up to 26 Hz (3.2 Hz inside sdcflows' brain mask) and the corrected images by up to 6,255 (of about 10^5), on ds001600 by up to 5.8 Hz (0.05 Hz inside the mask); `FSL_NUM_THREADS=4` with `--nthr=1` moves the coefficients by up to 3.8e-6 Hz; OpenBLAS's own threads changed nothing on two cases | b | none in its calls (no `--nthr`; fMRIPrep's own outputs are FSL's one-thread result on both oracle runs) | the one-thread result at any thread count, never reproduced (class b); topup's replica 2026-11-03 (`thr/` cases; the site's page shows FSL's band on fMRIPrep's two calls) | – |
+| FSL-117 † | topup (`--regmod=membrane_energy`, Levenberg-Marquardt) | the Hessian of the membrane energy is taken in other units than its cost and gradient (each first derivative divided by the voxel size in mm, where the cost counts in voxels): the steps do not follow the cost they minimise | c | none (sdcflows' configuration uses the bending energy) | rule D measured, then A: the Hessian in the cost's units by default (the final cost 0.00 to 1.66 % lower, never higher), named on every such run with a non-zero λ; FSL's with `reproduce`; topup's replica 2026-11-03 (`opt/membrane-lm`: 22,006 values change) | – |
+| FSL-118 † | topup (`--regrid=1`) | with subsampling factors whose largest does not divide the others (3 and 2) topup stops at the first level that uses a smaller one ("invalid subsampling factor") | c | none (sdcflows' factors are 2 and 1) | rule A: the grid grows by the factors' least common multiple (the same grid wherever FSL runs), named; FSL's error with `reproduce`; topup's replica 2026-11-03 (`err/subsamp-mixed`) | – |
+| FSL-119 † | topup (`--fout`, `--featout`) | the field maps carry the input's intent parameters shifted by one place: (0, p1, p2) instead of (p1, p2, p3) | c | none (fMRIPrep's merged pair has none) | rule A: (p1, p2, p3) by default, named when they differ; FSL's with `reproduce`; topup's replica 2026-11-03 (`opt/intent`) | – |
+| FSL-120 † | topup (`--acqp`) | an `--acqp` file whose rows do not match the images is reported as a mismatch with the empty `--datain` value ("Mismatch between <imain> and ") | f | none (fMRIPrep passes `--datain`) | the message names the `--acqp` file by default; FSL's with `reproduce`; topup's replica 2026-11-03 (`err/acqp-rows`) | – |
+| FSL-121 † | topup (`--config`) | with `FSLDIR` unset and a configuration name not found in the working directory, topup ends with the C++ library's "basic_string: construction from null is not valid" (exit status 1) | a | none (fMRIPrep passes a path) | rule B: an error naming the configuration and `FSLDIR` by default; FSL's message with `reproduce`; topup's replica 2026-11-03 (`cfg/fsldir-unset`) | – |
+| FSL-122 † | topup (`--config`) | a configuration line whose text after its first word exceeds 1023 characters ends the reading: the rest of the file is ignored, silently | e | none | rule A: lines of any length by default, named when a setting followed; FSL's reading with `reproduce`; topup's replica 2026-11-03 (`cfg/long-line`: 25,178 values change) | – |
+| FSL-123 † | topup (`--miter`) | a negative number of iterations is accepted and runs no iteration at that level, silently | e | none | rule B: refused by default, named; FSL's with `reproduce`; topup's replica 2026-11-03 (`err/miter-negative`) | – |
+| FSL-124 † | topup (`--warpres`) | a negative knot spacing whose ratio to the voxel size rounds below 0 gives a spacing of about 4.29 × 10^9 voxels: topup exhausts the memory (killed in a 24 GiB box) | a | none | refused in both modes (the default any negative `--warpres`, `reproduce` where FSL's spacing wraps), named; topup's replica 2026-11-03 (`opt/warpres-negative`: FSL not run, an expected divergence) | – |
+| FSL-125 † | topup (`--fwhm`) | a negative smoothing width is accepted and smooths with a negative-width kernel (results differ from the positive width's) | e | none | rule B: refused by default, named; FSL's with `reproduce`; topup's replica 2026-11-03 (`opt/fwhm-negative`) | – |
+| FSL-126 † | topup (`--lambda`) | a negative regularisation weight is accepted: the cost goes below 0 (−993,254 on the half-resolution pair) and the field to large values | e | none | rule B: refused by default, named; FSL's with `reproduce`; topup's replica 2026-11-03 (`opt/lambda-negative`) | – |
+| FSL-127 † | FSL's warp library (resampling in threads) | an error inside a worker thread ends the program with an abort instead of the error the one-thread run reports | a | none (topup and applytopup never reach it) | the error at any thread count (`larmorx-nc-core`, 2026-11-03); unreachable from topup and applytopup | – |
+| FSL-128 † | FSL's spline interpolator (values with derivatives, one derivative, the gradient) | an argument of the wrong length is not refused (the error is built but never raised): arrays read and written past their ends | a | none (unreachable from topup and applytopup) | refused (`larmorx-nc-core`, 2026-11-03) | – |
+| FSL-129 † | FSL's warp library (resampling a list of slices) | the list of slices is checked only when it is empty: a slice beyond the output is written through its extrapolation | a | none (unreachable) | refused (`larmorx-nc-core`, 2026-11-03) | – |
+| FSL-130 † | FSL's sparse matrices (subtraction) | subtracting one sparse matrix from another returns the second, negated | c | none (topup and applytopup never subtract) | kept as FSL computes it in `larmorx-nc-core` (its member subtraction; `-=` subtracts), to decide by rules A-D when a replica reaches it (2026-11-03) | – |
+| FSL-131 † | FSL's sparse matrices (reading a file) | the rows' order is checked against the entry about to be written rather than the previous one, and a column index of 0 writes before the array | a | none (topup does not read sparse matrices from files) | refused ("File internally inconsistent"; `larmorx-nc-core`, 2026-11-03) | – |
+| FSL-132 † | applytopup (`--interp=spline`, the default) | the first volume of the first image is resampled with trilinear interpolation whatever `--interp` asks (every other volume with spline); the same behaviour as mcflirt's FSL-59 (a volume of a series read before its interpolation is set keeps the earlier one) | c | none (fMRIPrep corrects with its own resampler, not applytopup) | rule A: every volume with the method asked for by default, named; FSL's with `reproduce`; topup's replica 2026-11-03 (`at/lsr-y`: 5,136 values change; `at/jac-y`: 20,480) | – |
+| FSL-133 † | applytopup (`--method=lsr`, `vb2D`, `vb3D`, `vb4D`) | a negative index along a phase-encoding line wraps by 2^32 modulo the line's length instead of around the line: wrong for lengths that do not divide 2^32 (30, 96, 100, …) | c | none | rule A: wrapped around the line by default, named where a value read changes; FSL's with `reproduce`; topup's replica 2026-11-03 (`at/lsr-crop`, lines of 30: up to 1,466 of about 20,000) | – |
+| FSL-134 † | applytopup (a field image as `--topup`; a field on another grid) | with a field image (topup's `--fout`, fugue's), `--method=jac` scales the displacement along y by the x voxel size; a field on another grid is not refused (`jac` lays it out as stored or copies it into the image's grid, `lsr` reads its lines past their end) | c, a | none | rule A: the y voxel size by default; rule B: another grid refused by default, in both modes where FSL reads past the lines; FSL's with `reproduce`; topup's replica 2026-11-03 (`at/jac-field-aniso`, `at/jac-other-grid`, `at/jac-other-shape`, `at/lsr-other-grid`, `at/vb-other-grid`) | – |
+| FSL-135 † | applytopup (`--method`) | an unknown method writes nothing and exits with status 0, silently; `lsr` and the `vb` methods without movements (a field image, or no `_movpar.txt`) abort ("Index i out of bound") | e, a | none | rule B: refusals with the reason by default, named; FSL's with `reproduce`; topup's replica 2026-11-03 (`at/method-unknown`, `at/lsr-no-movements`, `at/vb-no-movements`) | – |
+| FSL-141 † | applytopup (`--method=vb2D`, `vb3D`, `vb4D`, undocumented) | the counts of values in the noise prior's shapes are computed in 32-bit signed integers: beyond 2^31 values (very large `vb4D` inputs) they wrap (undefined behaviour) to wrong, even negative, counts | a | none | 64-bit counts by default, named when they differ; the wrapped values with `reproduce`; topup's replica 2026-11-03 (no case: it needs more than 2^31 values) | – |
+| FSL-142 † | applytopup (`vb3D`, `vb4D`) | the noise prior counts two data points per line whatever the collection holds (`vb2D` counts every image's): with three or more images along one phase-encoding axis it has too few | c | none | rule A: every image's points by default, named; FSL's with `reproduce`; topup's replica 2026-11-03 (`at/vb3d-three`) | – |
+| FSL-143 † | applytopup (`vb3D`, `vb4D`) | the smoothness prior couples neighbouring slices with half the weight of the second-difference operator it is built from (the in-slice coupling has its full weight): the assembled precision is not positive definite (an 8 × 6 × 5 grid: smallest eigenvalue −2.7, +0.40 corrected) and the iterations diverge (`at/vb3d-y`: −3.85 × 10^10 to 3.53 × 10^10 for an input of 0 to 1.09 × 10^5) | c | none | rule A, measured: the full weight by default (−1.68 × 10^4 to 1.18 × 10^5, mean 2.13 × 10^4, as `vb2D`'s), named on every such run; FSL's with `reproduce`; topup's replica 2026-11-03 (every `at/vb3d-*` and `at/vb4d-*` case: 18,852 values change on `at/vb3d-y`) | – |'''
+
+[[op]]
+do = "edit"
+file = "docs/findings/upstream-defects.md"
+old = "| FSL-59 † | mcflirt | FSL 6.0.7.23 only: `-sinc_final` and `-nn_final` resample with trilinear interpolation, whatever the option asks |"
+new = "| FSL-59 † | mcflirt | FSL 6.0.7.23 only: `-sinc_final` and `-nn_final` resample with trilinear interpolation, whatever the option asks (the same behaviour as applytopup's first volume, FSL-132) |"
+
+# ------------------------------------------------------------------ the register: restricted
+[[op]]
+do = "edit"
+file = "docs/findings/upstream-defects.md"
+old = '''> "Restricted: FSL BET, FLIRT and FAST" through [fsl-bet.md](fsl-bet.md), [fsl-flirt.md](fsl-flirt.md)
+> and [fsl-fast.md](fsl-fast.md). **Clean-room implementers must not read those sections.**'''
+new = '''> "Restricted: FSL BET, FLIRT, FAST and topup" through [fsl-bet.md](fsl-bet.md), [fsl-flirt.md](fsl-flirt.md),
+> [fsl-fast.md](fsl-fast.md) and [fsl-topup.md](fsl-topup.md). **Clean-room implementers must not read those sections.**'''
+
+[[op]]
+do = "edit"
+file = "docs/findings/upstream-defects.md"
+old = "## Restricted: FSL BET, FLIRT and FAST (source-derived)"
+new = "## Restricted: FSL BET, FLIRT, FAST and topup (source-derived)"
+
+[[op]]
+do = "edit"
+file = "docs/findings/upstream-defects.md"
+old = '''  resamples trilinearly; both name FSL-59 where the two series differ (rule A, 2026-10-29).
+- **D13 / gap:** No gap.'''
+new = '''  resamples trilinearly; both name FSL-59 where the two series differ (rule A, 2026-10-29).
+- **D13 / gap:** No gap.
+- **See also:** FSL-132 (2026-11-03): applytopup touches the first volume of its first image
+  before it sets the interpolation, so the same cached shadow resamples that volume trilinearly.
+  Of the other FSL replicas only mcflirt meets the cache (this entry); FLIRT's `-applyxfm` on 4D
+  resamples a fresh shadow built from the series, applyxfm4D sets the method before any volume is
+  touched, and BET and FAST interpolate 3D volumes only (`docs/findings/fsl-topup.md`).'''
+
+[[op]]
+do = "insert"
+file = "docs/findings/upstream-defects.md"
+after = "field) wait for a measurement on real T1w and T2w pairs (next-steps). No new **decide** entry."
+text = '''**2026-11-03, topup's replica:** FSL-116 to FSL-135 and FSL-141 to FSL-143 added (FSL-136 to
+FSL-140 were FAST's clean-room part's, unused): FSL-116 (class b: the result depends on the
+thread count; the one-thread result at any count, never reproduced); FSL-117 (rule D measured,
+then A), FSL-118, FSL-119, FSL-122, FSL-132, FSL-133, FSL-142 and FSL-143 (rule A; FSL-143
+measured), FSL-121, FSL-123, FSL-125, FSL-126 and FSL-135 (rule B), FSL-124 (refused in both
+modes: FSL exhausts the memory), FSL-134 (rules A and B), FSL-120 (a message), FSL-141 (a 32-bit
+overflow), each with its `reproduce` switch where FSL's behaviour is defined; FSL-127 to FSL-131
+are defects of FSL's libraries (the warps, the spline interpolator, the sparse matrices) that
+topup and applytopup never reach, translated once into `larmorx-nc-core` for the replicas to
+come. FSL-132 has FSL-59's cause; mcflirt is the only other FSL replica that meets it. Kept as
+FSL's (rule C): `--iout`'s mean written as `<iout>_mean` after the full name, a log file that
+cannot be written skipped, `--rbmout` into a missing directory reported and run on (exit
+status 0), two volumes with the same phase encoding run (the field set by the regularisation
+alone), `--nthr` above the cores taken as the cores, negative as the hardware's count, 0 as
+`FSL_NUM_THREADS` (else 1), `--miter=0` runs no iteration, a phase encoding along z refused by
+FSL's own message; applytopup's `--invert` declared but not accepted, `-v` read but unused,
+`--inindex` read as `atoi` reads it, coefficients without `_movpar.txt` reported and corrected
+without movements, a `_movpar.txt` of 4 × 4 matrices ignored by `jac` and used by `lsr`, the
+`vb` methods' printed counts of the first collection only, their first estimate from the
+one-dimensional prior, their sum of the collections' restorations and their masking at the end.
+No new **decide** entry.'''
+
+[[op]]
+do = "append"
+file = "docs/findings/upstream-defects.md"
+text = '''### FSL-116 to FSL-135, FSL-141 to FSL-143: topup and applytopup (FSL 6.0.7.23, fsl-topup 2203.5) †
+
+Found while translating topup and applytopup and the FSL libraries they use for the replica
+(2026-11-02 and 03; `docs/findings/fsl-topup.md`, restricted, has the source lines, the causes and
+FSL's runs). FSL-116: the Hessians' sparse matrix-vector products split their rows over
+`SpMat::_nt` threads (`--nthr`) and add the per-thread partial vectors; the matrices the
+one-thread JtJ builders make take `NoOfThreads()`'s default, `FSL_NUM_THREADS`; the replica sums
+in the one-thread order at any count (its own threads give the same bits), so FSL's result above
+one thread is never reproduced. FSL-117: the membrane energy's Hessian divides each first
+derivative by the voxel size where its cost and gradient do not (the replica's
+`mem_energy_hess_in_voxels`; `validation/investigations/fsl-topup/membrane_hessian.py` measured the
+final cost). FSL-118: the regridded size grows by the largest subsampling only. FSL-119: the
+field maps' intent parameters copied with an offset of one. FSL-120: the mismatch message names
+`--datain`'s value. FSL-121: `std::string(getenv("FSLDIR"))` on a null pointer. FSL-122: the
+configuration reader's fixed 1024-character line buffer. FSL-123, FSL-125, FSL-126: no sign
+checks. FSL-124: the knot spacing's ratio converted to `unsigned int`. FSL-127 to FSL-131
+(fsl-warpfns, fsl-miscmaths' splinterpolator and SpMat): an exception in a `std::thread` worker
+(`std::terminate`), argument-length exceptions constructed but not thrown, `validate_input`'s
+empty-list check, `SpMat`'s member `operator-` declared unary, `SpMat(fname)`'s row-order check.
+FSL-132: newimage 2601's series cache (`operator[]` returns a cached ShadowVolume whose properties
+were copied at its creation; `interpolate()` reads the member `p_interpmethod`; the cache is
+cleared only by `invalidateSplines()` while the owner is spline, and `setsplineorder(3)` of an
+order already 3 does not call it); applytopup touches `scans[0][0]` for the mask's size before it
+sets the interpolation (FSL-59's mechanism, mcflirt). FSL-133: `CircularArray::operator[]` computes
+`i % _n` with `_n` unsigned. FSL-134: `volume_deffield_2_jacobian`'s path takes the x voxel size;
+no grid check before newimage's `copydata` or the lines' reads. FSL-135: the method switch has no
+default branch; `TopupFileReader::MoveMatrix` throws without movements, uncaught. FSL-141: `n*N/2`
+and `m*N/2` in `int`. FSL-142: `n = 2*m` in vb3D and vb4D (vb2D: `NScans*m`). FSL-143: the prior
+block `Lijk[1][0]` has off-diagonals `1*sf1` where AᵀA has `2*sf1`
+(`validation/investigations/fsl-topup/vb_prior.py` measured the eigenvalues and the restorations).
+Cases: the record's `opt/`, `cfg/`, `err/`, `thr/` and `at/` categories (`fsl-topup-replica`); the
+library entries: the probes `validation/probes/fsl-warpfns/`, `fsl-miscmaths/`.'''
+
+# ------------------------------------------------------------------ the API page of the register
+[[op]]
+do = "insert"
+file = "docs/api/upstream-defects.md"
+after = "| FSL-111 |"
+text = '''| FSL-116 | topup | the replica `larmorx-nc fsl topup` (`larmorx fsl topup`, `lx.fsl.topup`) | above one thread (`--nthr`, `FSL_NUM_THREADS`) the result changes with the thread count | FSL's one-thread result at any thread count (no switch: never reproduced) |
+| FSL-117 | topup | the same | membrane energy with Levenberg-Marquardt: the regulariser's Hessian in other units than its cost and gradient | the Hessian in the cost's units, named; `reproduce` FSL's |
+| FSL-118 | topup | the same | `--regrid=1` with subsampling factors whose largest does not divide the others: topup stops at the first level ("invalid subsampling factor") | the grid grows by their least common multiple, named; `reproduce` FSL's error |
+| FSL-119 | topup | the same | `--fout` and `--featout` shift the input's intent parameters by one place | the parameters in place, named when they differ; `reproduce` FSL's |
+| FSL-120 | topup | the same | an `--acqp` row-count mismatch names the empty `--datain` value | the message names the `--acqp` file; `reproduce` FSL's |
+| FSL-121 | topup | the same | `FSLDIR` unset and a configuration name not found: a C++ library message | an error naming the configuration and `FSLDIR`; `reproduce` FSL's message |
+| FSL-122 | topup | the same | a configuration line longer than 1023 characters after its first word ends the reading silently | lines of any length, named when a setting followed; `reproduce` FSL's |
+| FSL-123, FSL-125, FSL-126 | topup | the same | a negative `--miter`, `--fwhm` or `--lambda` is used as given | an error (exit status 1), named; `reproduce` FSL's arithmetic |
+| FSL-124 | topup | the same | a negative `--warpres`: the knot spacing wraps and FSL exhausts the memory | an error in both modes |
+| FSL-132 | applytopup | the replica `larmorx-nc fsl applytopup` (`larmorx fsl applytopup`, `lx.fsl.applytopup`) | the first volume of the first image resampled trilinearly whatever `--interp` asks | the method asked for on every volume, named; `reproduce` FSL's |
+| FSL-133 | applytopup | the same | `lsr` and the `vb` methods wrap a negative index along a line by 2^32 modulo its length | wrapped around the line, named; `reproduce` FSL's |
+| FSL-134 | applytopup | the same | `jac` with a field image scales the y displacement by the x voxel size; a field on another grid is not refused | the y voxel size, named; another grid refused (in both modes where FSL reads past its lines); `reproduce` FSL's |
+| FSL-135 | applytopup | the same | an unknown `--method` writes nothing (exit status 0); `lsr` and `vb` without movements abort | an error with the reason, named; `reproduce` FSL's |
+| FSL-141 | applytopup | the same | the `vb` methods' counts of values in 32-bit integers wrap on very large inputs | 64-bit counts, named when they differ; `reproduce` the wrapped counts |
+| FSL-142 | applytopup | the same | `vb3D` and `vb4D` count two data points per line whatever the images | every image's points, named; `reproduce` FSL's |
+| FSL-143 | applytopup | the same | `vb3D` and `vb4D` build their prior with half the weight between slices: it is indefinite and the iterations diverge | the full weight, named; `reproduce` FSL's |'''
+
+[[op]]
+do = "edit"
+file = "docs/api/upstream-defects.md"
+old = "Rows FSL-96 to FSL-104 are FAST's replica's (`larmorx-nc fsl fast`; `larmorx fsl fast` and `lx.fsl.fast` run it); inside `-a` FAST also meets FLIRT's FSL-09 and FSL-68 (FLIRT's replica, in the same process)."
+new = "Rows FSL-96 to FSL-104 are FAST's replica's (`larmorx-nc fsl fast`; `larmorx fsl fast` and `lx.fsl.fast` run it); inside `-a` FAST also meets FLIRT's FSL-09 and FSL-68 (FLIRT's replica, in the same process). Rows FSL-116 to FSL-143 are topup's and applytopup's replicas' (`larmorx-nc fsl topup` and `fsl applytopup`; `larmorx fsl topup|applytopup`, `lx.fsl.topup` and `lx.fsl.applytopup` run them until the clean-room original); applytopup with `--datatype` also meets FSL-09 (the integer output's rounding). FSL-127 to FSL-131 are defects of FSL's libraries no tool reaches (the register)."
+
+# ------------------------------------------------------------------ validation/tools.toml
+[[op]]
+do = "insert"
+file = "validation/tools.toml"
+after = 'validation = "original: [{fsl-fast.pass}'
+text = '''
+[[tool]]
+id = "fsl-topup"
+title = "topup and applytopup (the susceptibility field from reversed phase encodings, and its correction)"
+eco = "fsl"
+page = "/tools/fsl-topup/"
+use = ["larmorx fsl topup", "larmorx fsl applytopup", "lx.fsl.topup", "lx.fsl.applytopup"]
+how = "exact replica in `larmorx-nc` (FSL Licence, non-commercial), `experimental` (2026-11-03: every option, message and failure case of both programs, applytopup's undocumented vb2D, vb3D and vb4D included); the clean-room original is to be written from `specs/topup.md`"
+validation = "replica: [{fsl-topup-replica.pass} of {fsl-topup-replica.compared}](record:fsl-topup-replica) compared cases bit-identical to FSL 6.0.7.23 (every file written, the printed messages, the exit status): fMRIPrep's call on {fsl-topup-replica.fmriprep} oracle runs, every option, FSL's configurations, applytopup's five methods; {fsl-topup-replica.both} more rejected by both alike; {fsl-topup-replica.expected} refused where FSL needs more memory than any machine holds (a negative --warpres, FSL-124) or reads a field on another grid past its lines (FSL-134)"'''
+
+[[op]]
+do = "insert"
+file = "validation/tools.toml"
+after = 'status = "`experimental` ({fsl-fast-replica.pass}'
+text = '''
+[[record]]
+id = "fsl-topup-replica"
+larmorx = "`larmorx-nc fsl topup` and `fsl applytopup`; `lx.fsl.topup`, `lx.fsl.applytopup`, `larmorx fsl topup|applytopup` (the replicas, FSL Licence)"
+reference = "topup and applytopup (FSL 6.0.7.23, fsl-topup 2203.5); fMRIPrep's calls also against fMRIPrep's own outputs"
+status = "`experimental` ({fsl-topup-replica.pass} of {fsl-topup-replica.compared} compared cases bit-identical, fMRIPrep's {fsl-topup-replica.fmriprep} calls included; {fsl-topup-replica.both} rejected by both, with the same messages and status; {fsl-topup-replica.expected} expected divergences: refused in both modes, FSL-124 and FSL-134)"'''
+
+# ------------------------------------------------------------------ random testing
+[[op]]
+do = "insert"
+file = "docs/validation/difftest.md"
+after = "| `fsl-fast-original` |"
+text = "| `fsl-topup` | `parity.fsl_topup_replica` (`difftest_case`: a topup `Run`, or FSL's topup run of the case's own pair through the oracle cache and then an applytopup `Run` on its coefficients and movements; inputs as `@dt:` names) | replica vs topup and applytopup | EPI-like phantom heads distorted along their phase encodings by one off-resonance field (gen.py's `distortion`: the intensity times the displacement's Jacobian), small movements; y or x pairs, three or four volumes; topup's per-level options (one to three levels), its global options, `--datain` or `--acqp`, configuration files (the case's own, FSL's shipped ones), every output, `-v`, `--debug`, `--trace`; fMRIPrep's call (sdcflows' b02b0.cnf); applytopup's five methods, `--interp`, `--datatype`, short and long names; FSL's output types (not drawn: phase encodings along z, sizes the subsamplings do not divide, the record's refusals and failures, `--profile`, more than one thread: FSL-116; since 2026-11-03) |"
+
+[[op]]
+do = "edit"
+file = "docs/validation/difftest.md"
+old = "2026-11-02; FAST's clean-room trial of 2026-11-03 was the first: 9,005 cases, a few hundred MB)."
+new = "2026-11-02; FAST's clean-room trial of 2026-11-03 was the first: 9,005 cases, a few hundred MB;\n  topup's replica trial of the same day the second: `oracles/difftest/2026-11-03-topup-replica`, seed\n  `topup-trial`, 27 minutes, 12 jobs at one thread, 1.5 GiB per case: 14,460 cases, every one\n  bit-identical, nothing to triage)."
+
+# ------------------------------------------------------------------ golden
+[[op]]
+do = "edit"
+file = "docs/validation/golden.md"
+old = "79 cases, 440 outputs"
+new = "86 cases, 494 outputs"
+
+[[op]]
+do = "edit"
+file = "docs/validation/golden.md"
+old = "168 cases, 1026 outputs"
+new = "208 cases, 1283 outputs"
+
+[[op]]
+do = "insert"
+file = "docs/validation/golden.md"
+after = "  0.15 s."
+text = '''- **topup and applytopup, the replica** (2026-11-03, seven cases in
+  `crates-nc/larmorx-nc-cli/tests/golden.rs` on `pe`, a 4D pair made from every second voxel of the
+  T2 head (16 × 16 × 12) shifted by one voxel either way along y, its two volumes `pe_up` and `pe_dn`,
+  `acq.txt` and a two-level configuration `short.cnf`): `topup.two-levels` (every output; two levels,
+  Levenberg-Marquardt with the movements, then scaled conjugate gradients), `topup.float-membrane`
+  (single precision, linear interpolation, membrane energy, quadratic splines, `--scale=1`,
+  `--regrid=0`, `--featout`, `-v`: FSL-117 corrected) and its `.reproduce`, `applytopup.lsr`
+  (FSL-132), `applytopup.jac-trilinear-short` (FSL-09's rounding of the int16 output),
+  `applytopup.vb3d` (FSL-132, FSL-143); the refusal `topup.fsl126.lambda` (a negative `--lambda`, its log asked into a
+  missing directory, which topup skips) by its status. The runner fills `{name}` inside an argument with the input's path
+  relative to the case's directory (`../bet-inputs/<file>`: topup's log records its options as
+  given, so the same text on every platform), and `--topup=@<case>` copies an earlier case's
+  coefficients and movements in. `lx.fsl.topup` and `lx.fsl.applytopup` are replica-only functions
+  (`tests/golden/registry.py`, `REPLICA_ONLY_FUNCTIONS`) until topup's clean-room original.
+  `larmorx-nc`'s checksums recorded on 2026-11-03 from 79dbdf0 (committed as a0e6ccf), then the three
+  topup logs again from 5c26745 (d9fed9c, the relative paths): 7 cases and 54 outputs added, every
+  other checksum unchanged (the core's additions for topup, and its `dgemm` reordered to OpenBLAS's
+  four partial sums, changed no golden output); the topup cases take about 3 s together.'''
+
+# ------------------------------------------------------------------ restricted lists
+[[op]]
+do = "edit"
+file = "docs/porting-guide.md"
+old = "[findings/fsl-fast.md](findings/fsl-fast.md), [parts/](parts/)"
+new = "[findings/fsl-fast.md](findings/fsl-fast.md), [findings/fsl-topup.md](findings/fsl-topup.md), [parts/](parts/)"
+
+[[op]]
+do = "edit"
+file = "CLAUDE.md"
+old = "`fsl-mcflirt.md`, `fsl-bet.md`, `fsl-flirt.md`, `fsl-fast.md`"
+new = "`fsl-mcflirt.md`, `fsl-bet.md`, `fsl-flirt.md`, `fsl-fast.md`, `fsl-topup.md`"
+
+# ------------------------------------------------------------------ README, status, next steps
+[[op]]
+do = "edit"
+file = "README.md"
+old = '''2. **FSL-compatible tools:** the clean-room originals of FLIRT (part 1 done) and FAST, topup,
+   `fslmaths` and `fslstats` (the mcflirt, BET, FLIRT and FAST replicas and BET's clean-room
+   original are done).'''
+new = '''2. **FSL-compatible tools:** topup's clean-room original, `fslmaths` and `fslstats` (the
+   mcflirt, BET, FLIRT, FAST and topup replicas and the clean-room originals of BET, FLIRT and
+   FAST are done).'''
+
+[[op]]
+do = "edit"
+file = "docs/status.md"
+old = "the mcflirt, BET, FLIRT and FAST replicas."
+new = "the mcflirt, BET, FLIRT, FAST, topup and applytopup replicas."
+
+[[op]]
+do = "edit"
+file = "docs/status.md"
+old = "Next: topup's replica (under way), then topup's clean-room original beside"
+new = "topup's replica complete (2026-11-03, beside FAST's clean-room original: topup and applytopup, every option, message and failure case; 104 of 104 compared cases bit-identical, fMRIPrep's two calls included; FSL's libraries for B-spline fields, sparse matrices and non-linear optimisers in `larmorx-nc-core`). Next: topup's clean-room original beside"
+
+[[op]]
+do = "edit"
+file = "docs/next-steps.md"
+old = "FAST (the replica done 2026-11-02, the clean-room original 2026-11-03), topup (item 7); field maps,"
+new = "FAST (the replica done 2026-11-02, the clean-room original 2026-11-03), topup (the replica done 2026-11-03; item 7); field maps,"
+
+[[op]]
+do = "insert"
+file = "docs/next-steps.md"
+after = "   site page with both implementations. FSL-136 to FSL-140 unused"
+text = '''   **topup: the replica done (2026-11-03, relays 1 to 11).** `crates-nc/larmorx-nc-topup`: `topup` and
+   `applytopup` complete (every option, message, exit status and failure case; topup's levels,
+   both minimisers in double and single precision, both regularisers, the movements, regridding,
+   FSL's configurations, `--debug`, `--trace`, `--profile`; applytopup's `jac`, `lsr` and the
+   undocumented `vb2D`, `vb3D`, `vb4D`); `lx.fsl.topup`, `lx.fsl.applytopup` and `larmorx fsl
+   topup|applytopup` (replica only until the clean-room original). `larmorx-nc-core` gained FSL's
+   libraries for the FNIRT family too: the B-spline fields (fsl-basisfield) with their bending- and
+   membrane-energy regularisers, the sparse matrices, conjugate gradients and the non-linear
+   optimisers (fsl-miscmaths), the spline interpolator with derivatives and the warps
+   (fsl-warpfns), OpenBLAS's blocked LU, LAPACK's symmetric solver and inverse, each checked against
+   FSL's own libraries by probes (millions of values, 0 differ); its `dgemm` now sums as OpenBLAS's
+   kernel does (four partial sums): mcflirt's, BET's, FLIRT's and FAST's replica records re-made
+   from the final commit, identical case by case (`compare_records.py`). Record
+   [fsl-topup-replica](validation/fsl-topup-replica.md): 173 cases, 104 of 104 compared
+   bit-identical (every file, the messages, the exit status; fMRIPrep's call on ds005040 and
+   ds001600, fMRIPrep's own outputs the same), 66 rejected by both alike, 3 expected divergences
+   (FSL-124, FSL-134: refused in both modes). FSL-116 to FSL-135 and FSL-141 to FSL-143. One
+   random-testing trial (27 minutes, 14,460 realistic cases, FSL through the oracle cache: every
+   one bit-identical). Golden: 7 cases. Memory within FSL's on the measured calls (fMRIPrep's
+   call 94 MiB against FSL's 88; the allowance holds); thread test: topup and applytopup. Its site
+   page (fMRIPrep's two calls with FSL's own thread band beside the replica, FSL-117, applytopup's
+   `lsr`, `jac` and `vb3D` with FSL-132 and FSL-143). `specs/topup.md` for the clean-room original
+   (behaviour, maths, messages, the D13 table, "Built for speed", the validation plan). The full
+   tier, the data panel's other PEPOLAR runs and long random testing wait for the final validation
+   phase.'''
+
+[[op]]
+do = "insert"
+file = "docs/next-steps.md"
+after = "  should read it as stored and name FSL-111, `reproduce` FSL's reading (the clean-room original does)."
+text = '''- **topup's replica: what is not replicated yet** (2026-11-03): applytopup's restorations of lines
+  of fewer than 8 or more than 256 voxels along the phase encoding, and band systems that need
+  LAPACK's blocked band factorisation, are refused in both modes with a message (FSL's arithmetic
+  there follows other OpenBLAS and Armadillo paths: `docs/api/fsl-topup.md`, "Not yet"); to do when
+  a real call needs them. FSL's own thread band on fMRIPrep's real call is large (ds005040 at
+  `--nthr=4`: the field up to 3.2 Hz inside the brain, FSL-116; the site's page): a candidate for
+  an upstream report (`docs/upstream-reports/`), the user decides.'''
+
+# ------------------------------------------------------------------ the site
+[[op]]
+do = "insert"
+file = "site:site.yml"
+after = '''      summary: "Tissue segmentation (fast): classes, partial volumes, the bias field, several channels, FSL's tissue priors; a clean-room original'''
+text = '''  - { title: topup and applytopup, url: "/tools/fsl-topup/", eco: fsl,
+      summary: "The susceptibility field from reversed phase encodings (topup) and its correction (applytopup): an exact replica in larmorx-nc; the clean-room original planned." }'''
+
+[[op]]
+do = "edit"
+file = "site:content/roadmap.md"
+old = "fMRIPrep's call on three oracle runs bit for bit what FSL computes with correctly rounded maths, 9 to 11 times faster than FSL on one thread and 47 to 67 times on 14; topup's replica under way |"
+new = "fMRIPrep's call on three oracle runs bit for bit what FSL computes with correctly rounded maths, 9 to 11 times faster than FSL on one thread and 47 to 67 times on 14; topup's replica complete (2026-11-03): `topup` and `applytopup` with every option and method, 104 of 104 compared cases bit-identical to FSL 6.0.7.23, fMRIPrep's call on two oracle runs included; [its page](/tools/fsl-topup/); topup's clean-room original next |"
+
+[[op]]
+do = "edit"
+file = "site:content/roadmap.md"
+old = "| 2026-11-03 | **FAST's clean-room original.**"
+new = "| 2026-11-03 | **topup's replica.** FSL's susceptibility-field estimation and its correction translated from FSL 6.0.7.23's source, with the FSL libraries they need (B-spline fields and their regularisers, sparse matrices, non-linear optimisers, warps): every option, message and failure case of `topup` and `applytopup`, applytopup's undocumented variational methods included; every file both programs write bit for bit in every compared case, fMRIPrep's call on two oracle runs included (fMRIPrep's own outputs the same); FSL-116 to FSL-143 corrected by default (the thread count, the membrane energy's units, the first volume's interpolation, a divergent prior, options without meaning); [the page](/tools/fsl-topup/) |\n| 2026-11-03 | **FAST's clean-room original.**"
+
+[[op]]
+do = "edit"
+file = "site:data/status.yml"
+old = "    text: BET's clean-room original, FAST, FLIRT with BBR, topup."
+new = "    text: topup's clean-room original, `fslmaths` and `fslstats` (the mcflirt, BET, FLIRT, FAST and topup replicas and the clean-room originals of BET, FLIRT and FAST are done)."

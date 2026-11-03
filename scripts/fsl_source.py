@@ -47,6 +47,8 @@ VERSIONS = {
     "fsl-warpfns": "2501.0",
     "fsl-armawrap": "0.7.0",
     "fsl-fast4": "2111.3",
+    "fsl-basisfield": "2203.4",
+    "fsl-topup": "2203.5",
 }
 
 #: The original files: every file a translation in crates-nc/ comes from (see each crate's
@@ -145,6 +147,9 @@ FILES = [
     ("fsl-utils", "functions.cc"),
     ("fsl-utils", "matches.cc"),
     ("fsl-utils", "check.cc"),
+    # topup's --profile (2026-11-03)
+    ("fsl-utils", "FSLProfiler.h"),
+    ("fsl-utils", "FSLProfiler.cpp"),
     ("fsl-avwutils", "fslstats.cc"),
     ("fsl-avwutils", "fslroi.cc"),
     ("fsl-avwutils", "fslmerge.cc"),
@@ -156,6 +161,39 @@ FILES = [
     ("fsl-fast4", "mriseg_two.cc"),
     ("fsl-fast4", "multi_mriseg_two.h"),
     ("fsl-fast4", "multi_mriseg_two.cc"),
+    # topup (2026-11-03): fsl-basisfield's spline fields
+    ("fsl-basisfield", "basisfield.h"),
+    ("fsl-basisfield", "basisfield.cpp"),
+    ("fsl-basisfield", "splinefield.h"),
+    ("fsl-basisfield", "splinefield.cpp"),
+    ("fsl-basisfield", "fsl_splines.h"),
+    # topup (2026-11-03): fsl-miscmaths' sparse matrices, solvers and optimisers
+    ("fsl-miscmaths", "SpMat.h"),
+    ("fsl-miscmaths", "cg.h"),
+    ("fsl-miscmaths", "bicg.h"),
+    ("fsl-miscmaths", "bfmatrix.h"),
+    ("fsl-miscmaths", "bfmatrix.cpp"),
+    ("fsl-miscmaths", "nonlin.h"),
+    ("fsl-miscmaths", "nonlin.cpp"),
+    # topup (2026-11-03): fsl-warpfns' resampling and the Jacobians of spline fields
+    ("fsl-warpfns", "warpfns.cc"),
+    ("fsl-warpfns", "fnirt_file_reader.h"),
+    ("fsl-warpfns", "fnirt_file_reader.cpp"),
+    # topup (2026-11-03): the program
+    ("fsl-topup", "topup.cpp"),
+    ("fsl-topup", "topupfns.h"),
+    ("fsl-topup", "topupfns.cpp"),
+    ("fsl-topup", "topup_costfunctions.h"),
+    ("fsl-topup", "topup_costfunctions.cpp"),
+    ("fsl-topup", "topup_file_io.h"),
+    ("fsl-topup", "topup_file_io.cpp"),
+    ("fsl-topup", "topup_matrices.h"),
+    ("fsl-topup", "topup_matrices.cpp"),
+    # topup (2026-11-03): applytopup
+    ("fsl-topup", "applytopup.h"),
+    ("fsl-topup", "applytopup.cpp"),
+    ("fsl-topup", "displacement_vector.h"),
+    ("fsl-topup", "displacement_vector.cpp"),
 ]
 
 MANIFEST = DEST / "MANIFEST.tsv"

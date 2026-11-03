@@ -562,6 +562,18 @@ pub fn dot_arma(a: &[f64], b: &[f64]) -> f64 {
     (val1 + val2).0
 }
 
+/// `arma::dot(a, b)` (NEWMAT's `DotProduct`) of any length: up to 32 elements
+/// `op_dot::direct_dot_arma` ([`dot_arma`]), more by BLAS `ddot` (OpenBLAS's Haswell kernel on
+/// `blas_threads` threads: [`crate::lapack::blas::ddot_unit`]).
+pub fn dot_blas(a: &[f64], b: &[f64], blas_threads: usize) -> f64 {
+    assert_eq!(a.len(), b.len());
+    if a.len() <= 32 {
+        dot_arma(a, b)
+    } else {
+        crate::lapack::blas::ddot_unit(a, b, blas_threads)
+    }
+}
+
 /// `A·Aᵀ` for one object on both sides (`glue_times` hands it to `syrk<false>`): a vector by
 /// `syrk_vec` (the products `aₖ·aᵢ`, mirrored), up to 48 elements by `syrk_emul` (each element
 /// [`dot_arma`] of two rows, mirrored), larger by BLAS `dsyrk` (the upper triangle as `dgemm`
@@ -601,6 +613,118 @@ pub fn syrk(a: &Mat) -> Mat {
         for i in 0..=j {
             let v = full.at(i, j);
             c.set(i, j, v);
+            c.set(j, i, v);
+        }
+    }
+    c
+}
+
+/// `sym_helper::is_approx_sym(A, 100)` (Armadillo 14.2.1, the rule `inv(A)*B` uses to choose
+/// the symmetric solver): square, at least 100 rows, a finite diagonal, and every pair
+/// `A(i,j)`, `A(j,i)` within `100·ε` absolutely or relatively to the larger.
+pub fn is_approx_sym(a: &Mat) -> bool {
+    let n = a.rows;
+    if a.rows != a.cols || n < 100 {
+        return false;
+    }
+    let tol = 100.0 * f64::EPSILON;
+    if (0..n).any(|j| !a.at(j, j).is_finite()) {
+        return false;
+    }
+    for j in 0..n.saturating_sub(1) {
+        for i in j + 1..n {
+            let aij = a.at(i, j);
+            let aji = a.at(j, i);
+            let delta = (aij - aji).abs();
+            let amax = if aij.abs() < aji.abs() {
+                aji.abs()
+            } else {
+                aij.abs()
+            };
+            if delta > tol && delta > amax * tol {
+                return false;
+            }
+        }
+    }
+    true
+}
+
+/// `Aᵀ·A` for one object on both sides (`glue_times` hands it to `syrk<true>`): a vector by
+/// `syrk_vec` (a column: its dot product with itself, [`dot_blas`] on one thread; a row: the
+/// products `aₖ·aᵢ`, mirrored), up to 48 elements by `syrk_emul` (each element [`dot_arma`] of
+/// two columns, mirrored), larger by BLAS `dsyrk('U', 'T')`: OpenBLAS's syrk driver (the inner
+/// dimension in blocks of `GEMM_Q` = 256, a remainder between 256 and 512 halved; the columns
+/// in chunks of 32, each a call of the syrk kernel: a GEMM kernel call for the rows above the
+/// chunk and one for its diagonal block into a zeroed buffer), each element's block total
+/// summed as its tile of the GEMM kernel sums it ([`crate::lapack::blocked`]) and added to the
+/// element; the upper triangle mirrored.
+pub fn syrk_t(a: &Mat) -> Mat {
+    let (k, n) = (a.rows, a.cols);
+    let mut c = Mat::zeros(n, n);
+    if a.rows == 1 || a.cols == 1 {
+        if n == 1 {
+            c.data[0] = dot_blas(&a.data, &a.data, 1);
+            return c;
+        }
+        for kk in 0..n {
+            for i in kk..n {
+                let v = a.data[kk] * a.data[i];
+                c.set(kk, i, v);
+                c.set(i, kk, v);
+            }
+        }
+        return c;
+    }
+    if a.data.len() <= 48 {
+        for ca in 0..n {
+            for kk in ca..n {
+                let v = dot_arma(a.colptr(ca), a.colptr(kk));
+                c.set(ca, kk, v);
+                c.set(kk, ca, v);
+            }
+        }
+        return c;
+    }
+    use crate::lapack::blocked::{ksum, tile_sum};
+    const GEMM_Q: usize = 256;
+    // GEMM_UNROLL_MN: the driver's column chunks, each a call of the syrk kernel.
+    const MN: usize = 32;
+    let mut ls = 0;
+    while ls < k {
+        let mut min_l = k - ls;
+        if min_l >= GEMM_Q * 2 {
+            min_l = GEMM_Q;
+        } else if min_l > GEMM_Q {
+            min_l = min_l.div_ceil(2);
+        }
+        let mut jjs = 0;
+        while jjs < n {
+            let nn = (n - jjs).min(MN);
+            for j in jjs..jjs + nn {
+                let cj = a.colptr(j);
+                for i in 0..=j {
+                    let ci = a.colptr(i);
+                    let ab = |l: usize| (ci[ls + l], cj[ls + l]);
+                    if i < jjs {
+                        // The rows above the chunk's diagonal block: GEMM_KERNEL(jjs, nn, k).
+                        let acc = ksum(tile_sum(i, j - jjs, jjs, nn, min_l), min_l, ab);
+                        c.set(i, j, c.at(i, j) + acc * 1.0);
+                    } else {
+                        // The diagonal block: GEMM_KERNEL(nn, nn, k) into a zeroed buffer, whose
+                        // upper triangle is then added.
+                        let acc = ksum(tile_sum(i - jjs, j - jjs, nn, nn, min_l), min_l, ab);
+                        let sub = 0.0 + acc * 1.0;
+                        c.set(i, j, c.at(i, j) + sub);
+                    }
+                }
+            }
+            jjs += nn;
+        }
+        ls += min_l;
+    }
+    for j in 0..n {
+        for i in 0..j {
+            let v = c.at(i, j);
             c.set(j, i, v);
         }
     }
@@ -1246,10 +1370,12 @@ pub fn print_expr(m: &Mat) -> String {
 ///   triangle kept;
 /// - any other: LAPACK `dgetrf` then `dgetri` ([`lapack::getrf`], [`lapack::getri`]).
 ///
-/// Armadillo's symmetric path (`dsytrf`/`dsytri`) needs at least 100 rows
-/// (`sym_helper::is_approx_sym(A, 100)`), so FSL's small matrices never take it. Only sizes up
-/// to 4 × 4 are ported (FSL's NEWMAT layer inverts nothing larger on the replicated paths).
-/// FSL 6.0.7.17's Armadillo 10.5.1 computed these with its closed-form cofactor inverse
+/// Armadillo's symmetric path (`dsytrf`/`dsytri`, [`lapack::sytrf::inv_sym`]) needs at least
+/// 100 rows (`sym_helper::is_approx_sym(A, 100)`). Ported: every path up to 8 × 8, general
+/// (neither diagonal nor triangular) matrices of 9 to 256 rows by OpenBLAS's blocked LU and
+/// `dgetri` (unblocked up to 64 rows, blocked beyond: [`lapack::blocked::getrf_any`],
+/// [`lapack::blocked::getri_any`]), and symmetric ones from 100 rows (applytopup's
+/// `--method=vb2D` and `vb3D`); larger matrices and triangular ones beyond 8 × 8 panic. FSL 6.0.7.17's Armadillo 10.5.1 computed these with its closed-form cofactor inverse
 /// ([`armadillo_10_5_1::inv`]).
 pub fn inv(x: &Mat) -> Result<Mat, Singular> {
     assert_eq!(x.rows, x.cols, "inv(): given matrix must be square sized");
@@ -1285,10 +1411,28 @@ pub fn inv(x: &Mat) -> Result<Mat, Singular> {
         }
         return Ok(out);
     }
-    assert!(
-        n <= lapack::MAX_N,
-        "inv(): LAPACK's path is ported up to 8 x 8"
-    );
+    if n > lapack::MAX_N {
+        assert!(
+            !is_triu(x) && !is_tril(x),
+            "inv(): LAPACK's dtrtri is ported up to 8 x 8"
+        );
+        if n >= 100 && is_approx_sym(x) {
+            let f = lapack::sytrf::inv_sym(&x.data, n).ok_or(Singular)?;
+            return Ok(Mat::from_col_major(n, n, &f));
+        }
+        assert!(
+            n <= 256,
+            "inv(): LAPACK's dgetri is ported up to 256 x 256 (OpenBLAS's GEMM_Q)"
+        );
+        let mut ipiv = vec![0i32; n];
+        if lapack::blocked::getrf_any(&mut out.data, n, n, n, &mut ipiv) != 0 {
+            return Err(Singular);
+        }
+        if lapack::blocked::getri_any(&mut out.data, n, &ipiv) != 0 {
+            return Err(Singular);
+        }
+        return Ok(out);
+    }
     let triu = is_triu(x);
     if triu || is_tril(x) {
         return if lapack::trtri(&mut out.data, n, triu) == 0 {
@@ -1399,11 +1543,15 @@ fn inv_lu(x: &Mat) -> Result<Mat, Singular> {
 }
 
 /// `inv(A) * B` as Armadillo 14.2.1 evaluates it (`glue_times_redirect2_helper`, also for
-/// `inv(A) * B * C` and `A * inv(B) * C`): `auxlib::solve_square_fast`, LAPACK `dgesv`
-/// ([`lapack::gesv`]) for every size FSL meets (the symmetric `dsytrf`/`dsytrs` path needs at
-/// least 100 rows). A zero pivot is an error ("matrix multiplication: problem with matrix
-/// inverse"). Only sizes up to 4 × 4 with up to 4 columns of `B` are ported. FSL 6.0.7.17's
-/// Armadillo 10.5.1 multiplied `B` by its closed-form inverse ([`armadillo_10_5_1::solve`]).
+/// `inv(A) * B * C` and `A * inv(B) * C`): a matrix of at least 100 rows that
+/// [`is_approx_sym`] takes `auxlib::solve_sym_fast`, LAPACK `dsytrf('L')` and `dsytrs('L')`
+/// ([`lapack::sytrf::solve_sym`]: Bunch-Kaufman pivoting, any number of columns of `B`, up to
+/// 2047 rows); any other `auxlib::solve_square_fast`, LAPACK `dgesv` ([`lapack::gesv`] up to
+/// 4 × 4 with up to 4 columns of `B` and up to 8 × 8 for one column, OpenBLAS's blocked
+/// [`lapack::blocked::gesv_any`] up to 256 rows for two or more columns and
+/// [`lapack::blocked::gesv_one`] up to 256 rows for one). A zero pivot is an
+/// error ("matrix multiplication: problem with matrix inverse"). FSL 6.0.7.17's Armadillo
+/// 10.5.1 multiplied `B` by its closed-form inverse ([`armadillo_10_5_1::solve`]).
 pub fn solve(a: &Mat, b: &Mat) -> Result<Mat, Singular> {
     assert_eq!(a.rows, b.rows, "solve(): number of rows must be the same");
     assert_eq!(a.rows, a.cols, "inv(): given matrix must be square sized");
@@ -1411,10 +1559,43 @@ pub fn solve(a: &Mat, b: &Mat) -> Result<Mat, Singular> {
     if n == 0 || b.is_empty() {
         return Ok(Mat::zeros(a.cols, b.cols));
     }
-    assert!(
-        (n <= 4 && b.cols <= 4) || (n <= lapack::MAX_N && b.cols == 1),
-        "solve(): LAPACK's path is ported up to 4 x 4 (8 x 8 for one column)"
-    );
+    if n >= 100 && is_approx_sym(a) {
+        assert!(
+            n < 2048,
+            "solve(): the symmetric path is ported up to 2047 rows (OpenBLAS's dgemv blocks)"
+        );
+        let data = lapack::sytrf::solve_sym(&a.data, n, &b.data, b.cols).ok_or(Singular)?;
+        return Ok(Mat::from_col_major(n, b.cols, &data));
+    }
+    if b.cols == 1 && n > lapack::MAX_N {
+        // One right-hand side: OpenBLAS's dgesv through TRSV.
+        assert!(
+            n <= 256,
+            "solve(): LAPACK's dgesv is ported up to 256 rows for one column"
+        );
+        let mut lu = a.data.clone();
+        let mut out = b.clone();
+        let mut ipiv = vec![0i32; n];
+        if lapack::blocked::gesv_one(&mut lu, n, &mut ipiv, &mut out.data) != 0 {
+            return Err(Singular);
+        }
+        return Ok(out);
+    }
+    if !((n <= 4 && b.cols <= 4) || (n <= lapack::MAX_N && b.cols == 1)) {
+        // Larger systems with several right-hand sides: OpenBLAS's blocked dgesv.
+        assert!(
+            b.cols >= 2 && n <= 256,
+            "solve(): LAPACK's dgesv is ported up to 4 x 4 (8 x 8 for one column; up to \
+             256 rows for several columns)"
+        );
+        let mut lu = a.data.clone();
+        let mut out = b.clone();
+        let mut ipiv = vec![0i32; n];
+        if lapack::blocked::gesv_any(&mut lu, n, &mut ipiv, &mut out.data, b.cols) != 0 {
+            return Err(Singular);
+        }
+        return Ok(out);
+    }
     let mut lu = a.data.clone();
     let mut out = b.clone();
     let mut ipiv = [0i32; lapack::MAX_N];

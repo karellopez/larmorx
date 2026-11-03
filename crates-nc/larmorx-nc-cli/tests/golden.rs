@@ -435,6 +435,8 @@ const PRINTING: &[&str] = &[
     "fsl midtrans",
     "fsl extracttxt",
     "fsl fast",
+    "fsl topup",
+    "fsl applytopup",
 ];
 
 /// FAST's refusals (rule B, 2026-11-02): `(id, arguments, the defect named)`, refused by
@@ -452,6 +454,22 @@ const FAST_REFUSALS: &[(&str, &[&str], &str)] = &[
         "FSL-104",
     ),
 ];
+
+/// topup's refusals (rule B, 2026-11-03): `(id, arguments, the defect named)`, refused by
+/// default with exit status 1 and nothing written: a negative regularisation weight (FSL-126;
+/// the log into a directory that does not exist, which topup skips silently).
+const TOPUP_REFUSALS: &[(&str, &[&str], &str)] = &[(
+    "topup.fsl126.lambda",
+    &[
+        "--imain={pe}",
+        "--datain={acq}",
+        "--out=tu",
+        "--logout=nowhere/tu.log",
+        "--miter=1",
+        "--lambda=-1",
+    ],
+    "FSL-126",
+)];
 
 /// FLIRT's refusals (rule B, 2026-11-02): `(id, arguments, the defect named)`, refused by
 /// default with exit status 1 and nothing written (recorded by their status).
@@ -995,6 +1013,132 @@ const BET_CASES: &[BetCase] = &[
         named: &["FSL-103"],
         output_type: "NIFTI",
     },
+    // topup and applytopup (2026-11-03), on the T2-like head (every second voxel) displaced by
+    // one voxel along y and back (`{pe}`, the pair as one 4D image; `{pe_up}`, `{pe_dn}` its volumes; `{acq}` their
+    // phase encodings and read-out times; `{short}` a two-level configuration: Levenberg-
+    // Marquardt with the movements on the subsampled images, then scaled conjugate gradients):
+    // fMRIPrep's outputs (every one of them); single precision, linear interpolation, the
+    // membrane energy (FSL-117 corrected, and reproduced), quadratic splines, the images scaled
+    // one by one, no regridding, the FEAT outputs, verbose; applytopup's least-squares
+    // restoration of the pair (the default; FSL-132: the first image's spline interpolation),
+    // the Jacobian modulation of one image with trilinear interpolation into 16-bit integers,
+    // and the variational-Bayes restoration across slices (FSL-143 corrected), each with the
+    // first case's coefficients and movements (`--topup=@<case>`: copied into the run
+    // directory as `tu_fieldcoef.nii` and `tu_movpar.txt`).
+    BetCase {
+        id: "topup.two-levels",
+        tool: "fsl topup",
+        args: &[
+            "--imain={pe}",
+            "--datain={acq}",
+            "--config={short}",
+            "--out=tu",
+            "--iout=corrected",
+            "--fout=field",
+            "--jacout=jac",
+            "--logout=tu.log",
+            "--rbmout=xfm",
+            "--dfout=warpfield",
+        ],
+        mode: "fix",
+        named: &[],
+        output_type: "NIFTI",
+    },
+    BetCase {
+        id: "topup.float-membrane",
+        tool: "fsl topup",
+        args: &[
+            "--imain={pe}",
+            "--datain={acq}",
+            "--out=tu",
+            "--logout=tu.log",
+            "--warpres=20",
+            "--fwhm=8",
+            "--miter=3",
+            "--lambda=0.005",
+            "--numprec=float",
+            "--interp=linear",
+            "--regmod=membrane_energy",
+            "--splineorder=2",
+            "--scale=1",
+            "--regrid=0",
+            "--featout=feat",
+            "-v",
+        ],
+        mode: "fix",
+        named: &["FSL-117"],
+        output_type: "NIFTI",
+    },
+    BetCase {
+        id: "topup.float-membrane.reproduce",
+        tool: "fsl topup",
+        args: &[
+            "--imain={pe}",
+            "--datain={acq}",
+            "--out=tu",
+            "--logout=tu.log",
+            "--warpres=20",
+            "--fwhm=8",
+            "--miter=3",
+            "--lambda=0.005",
+            "--numprec=float",
+            "--interp=linear",
+            "--regmod=membrane_energy",
+            "--splineorder=2",
+            "--scale=1",
+            "--regrid=0",
+        ],
+        mode: "reproduce",
+        named: &["FSL-117"],
+        output_type: "NIFTI",
+    },
+    BetCase {
+        id: "applytopup.lsr",
+        tool: "fsl applytopup",
+        args: &[
+            "--imain={pe_up},{pe_dn}",
+            "--inindex=1,2",
+            "--datain={acq}",
+            "--topup=@topup.two-levels",
+            "--out=hifi",
+        ],
+        mode: "fix",
+        named: &["FSL-132"],
+        output_type: "NIFTI",
+    },
+    BetCase {
+        id: "applytopup.jac-trilinear-short",
+        tool: "fsl applytopup",
+        args: &[
+            "--imain={pe_up}",
+            "--inindex=1",
+            "--datain={acq}",
+            "--topup=@topup.two-levels",
+            "--out=hifi",
+            "--method=jac",
+            "--interp=trilinear",
+            "--datatype=short",
+        ],
+        mode: "fix",
+        // the 16-bit output rounded (FSL-09, the FSL replicas' default)
+        named: &["FSL-09"],
+        output_type: "NIFTI",
+    },
+    BetCase {
+        id: "applytopup.vb3d",
+        tool: "fsl applytopup",
+        args: &[
+            "--imain={pe_up},{pe_dn}",
+            "--inindex=1,2",
+            "--datain={acq}",
+            "--topup=@topup.two-levels",
+            "--out=hifi",
+            "--method=vb3D",
+        ],
+        mode: "fix",
+        named: &["FSL-132", "FSL-143"],
+        output_type: "NIFTI",
+    },
 ];
 
 // ------------------------------------------------------------------------------------------------
@@ -1475,6 +1619,48 @@ fn write_bet_inputs(dir: &Path) -> BTreeMap<&'static str, PathBuf> {
     let p = dir.join("means4.txt");
     std::fs::write(&p, "200\n420\n600\n830\n").unwrap();
     paths.insert("means4", p);
+    // topup's and applytopup's inputs (2026-11-03): every second voxel of the T2-like head
+    // (16 x 16 x 12: the restorations' iterations stay quick in the tests' debug build)
+    // displaced by one voxel along y, and by one the other way (edge rows repeated), as one 4D
+    // image of the pair and as its two volumes; their phase encodings (+y, -y) and read-out
+    // times (50 ms); a configuration of two levels (the subsampled images with the movements,
+    // then the full resolution by scaled conjugate gradients)
+    let (sx, sy, sz) = (nx / 2, ny / 2, nz / 2);
+    let shifted = |dj: i64| -> Vec<i64> {
+        let mut v = Vec::with_capacity((sx * sy * sz) as usize);
+        for k in 0..sz {
+            for j in 0..sy {
+                for i in 0..sx {
+                    let js = (j - dj).clamp(0, sy - 1);
+                    v.push(t2[((2 * k * ny + 2 * js) * nx + 2 * i) as usize]);
+                }
+            }
+        }
+        v
+    };
+    let (up, dn) = (shifted(1), shifted(-1));
+    let pair: Vec<i64> = up.iter().chain(&dn).copied().collect();
+    let p = dir.join("pe.nii");
+    std::fs::write(&p, bet_nifti(&[sx, sy, sz, 2], 16, 32, &f32_bytes(&pair))).unwrap();
+    paths.insert("pe", p);
+    let p = dir.join("pe_up.nii");
+    std::fs::write(&p, bet_nifti(&[sx, sy, sz], 16, 32, &f32_bytes(&up))).unwrap();
+    paths.insert("pe_up", p);
+    let p = dir.join("pe_dn.nii");
+    std::fs::write(&p, bet_nifti(&[sx, sy, sz], 16, 32, &f32_bytes(&dn))).unwrap();
+    paths.insert("pe_dn", p);
+    let p = dir.join("acq.txt");
+    std::fs::write(&p, "0 1 0 0.05\n0 -1 0 0.05\n").unwrap();
+    paths.insert("acq", p);
+    let p = dir.join("short.cnf");
+    std::fs::write(
+        &p,
+        "--warpres=20,14\n--subsamp=2,1\n--fwhm=8,4\n--miter=3,2\n--lambda=0.005,0.0001\n\
+         --ssqlambda=1\n--regmod=bending_energy\n--estmov=1,0\n--minmet=0,1\n\
+         --splineorder=3\n--numprec=double\n--interp=spline\n--scale=1\n",
+    )
+    .unwrap();
+    paths.insert("short", p);
     let mat = "0.5 0 0 72\n0 0.5 0 112\n0 0 0.5 62\n0 0 0 1\n";
     let p = dir.join("t1_to_std.mat");
     std::fs::write(&p, mat).unwrap();
@@ -1807,6 +1993,36 @@ fn mismatch_dir() -> PathBuf {
         .join("larmorx-nc")
 }
 
+/// `arg` with every `{name}` replaced by the path of the generated input `name`.
+fn fill(arg: &str, inputs: &BTreeMap<&'static str, PathBuf>) -> String {
+    fill_with(arg, |name| inputs[name].display().to_string())
+}
+
+/// `arg` with every `{name}` replaced by the generated input's path relative to a case's run
+/// directory (`../<inputs' directory>/<file>`, with `/` on every platform): topup's log
+/// records its options as given, so no temporary or platform path enters an output.
+fn fill_relative(arg: &str, inputs: &BTreeMap<&'static str, PathBuf>) -> String {
+    fill_with(arg, |name| {
+        let p = &inputs[name];
+        let dir = p.parent().and_then(Path::file_name).unwrap();
+        let file = p.file_name().unwrap();
+        format!("../{}/{}", dir.to_string_lossy(), file.to_string_lossy())
+    })
+}
+
+fn fill_with(arg: &str, path: impl Fn(&str) -> String) -> String {
+    let mut out = String::new();
+    let mut rest = arg;
+    while let Some(open) = rest.find('{') {
+        let close = open + rest[open..].find('}').expect("a closing brace");
+        out.push_str(&rest[..open]);
+        out.push_str(&path(&rest[open + 1..close]));
+        rest = &rest[close + 1..];
+    }
+    out.push_str(rest);
+    out
+}
+
 /// Runs `larmorx-nc <family> <tool> args` for a BET case in `cwd` (an empty `PATH`: FSL's
 /// programs are never found; FSL-45's branch depends on it).
 fn run_bet(
@@ -1984,6 +2200,16 @@ fn golden() {
             .map(|a| match *a {
                 "{mesh}" => mesh.display().to_string(),
                 "--binaryMask={mask}" => format!("--binaryMask={}", bet_inputs["mask"].display()),
+                // applytopup's --topup: an earlier case's coefficients and movements, copied
+                // in (a base name without the platform's separators: FSL refuses a dot after
+                // the last '/')
+                a if a.starts_with("--topup=@") => {
+                    let source = &runs[&a["--topup=@".len()..]];
+                    for f in ["tu_fieldcoef.nii", "tu_movpar.txt"] {
+                        std::fs::copy(source.join(f), run.join(f)).unwrap();
+                    }
+                    "--topup=tu".to_owned()
+                }
                 // an input copied into the run directory, named by its file name (FAST's FLIRT
                 // commands go through the shell's words: no path separators of the platform)
                 a if a.starts_with('@') => {
@@ -1997,6 +2223,9 @@ fn golden() {
                 a if a.starts_with('{') => bet_inputs[a.trim_matches(|c| c == '{' || c == '}')]
                     .display()
                     .to_string(),
+                // `{name}` inside an argument (topup's `--imain={pe}`, applytopup's lists), as a
+                // path relative to the run directory (topup's log records it)
+                a if a.contains('{') => fill_relative(a, &bet_inputs),
                 other => other.to_owned(),
             })
             .collect();
@@ -2022,6 +2251,11 @@ fn golden() {
             FAST_REFUSALS
                 .iter()
                 .map(|&(id, a, e)| (id, "fsl fast", a, e)),
+        )
+        .chain(
+            TOPUP_REFUSALS
+                .iter()
+                .map(|&(id, a, e)| (id, "fsl topup", a, e)),
         );
     for (id, tool, case_args, entry) in refusals {
         let run = dir.path().join(id);
@@ -2029,9 +2263,7 @@ fn golden() {
         let args: Vec<String> = case_args
             .iter()
             .map(|a| match *a {
-                a if a.starts_with('{') => bet_inputs[a.trim_matches(|c| c == '{' || c == '}')]
-                    .display()
-                    .to_string(),
+                a if a.contains('{') => fill(a, &bet_inputs),
                 other => other.to_owned(),
             })
             .collect();

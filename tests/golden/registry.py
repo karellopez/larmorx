@@ -1006,8 +1006,12 @@ def image_math_operations() -> list[str]:
 #: cases are the replica's own (``crates-nc/larmorx-nc-cli/tests/golden.rs``, run on every
 #: platform by the replicas' jobs). ``replica_only`` checks that each tool has one there.
 #: Since 2026-11-02 every FLIRT program has its clean-room original (part 2 of FLIRT's original),
-#: and since 2026-11-03 FAST has its own (``lx.fsl.fast``'s cases below): none is left.
-REPLICA_ONLY_FUNCTIONS: dict[str, str] = {}
+#: and since 2026-11-03 FAST has its own (``lx.fsl.fast``'s cases below); topup and applytopup
+#: (2026-11-03) have their replicas only, until their clean-room originals are written.
+REPLICA_ONLY_FUNCTIONS: dict[str, str] = {
+    "lx.fsl.topup": "fsl topup",
+    "lx.fsl.applytopup": "fsl applytopup",
+}
 
 #: The replicas' golden cases: the AFNI replicas' (built into larmorx since 2026-10-29, cases
 #: in the larmorx command line's tests, run by ``cargo test`` in every platform's test job) and

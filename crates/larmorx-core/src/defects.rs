@@ -498,6 +498,40 @@ defects! {
         "-S n with images of different sizes reads and writes the smaller images past their ends (over channel 1's grid)";
     FSL_111 = "FSL-111", "applyxfm4D", true,
         "a uint8 image is read into a char image, signed on x86-64: its values 128 to 255 are read as v - 256 (255 as -1), so interpolating across 127 and 128, the background value (the border's 10th percentile) and the spline's coefficients are those of the negative values; the output's own conversion wraps a signed char back to its byte";
+    FSL_117 = "FSL-117", "topup", true,
+        "with --regmod=membrane_energy, Levenberg-Marquardt's steps use a Hessian of the membrane energy measured in mm (each first derivative divided by the voxel size) while the cost and its gradient measure it in voxels: the regularisation's curvature is underestimated by the squared voxel size, so the steps do not follow the cost being minimised";
+    FSL_118 = "FSL-118", "topup", true,
+        "with --regrid=1 (the default), subsamplings whose largest does not divide the others (3 and 2) stop topup at the first level with the smaller one with \"invalid subsampling factor\", although each divides the image and the command line's check accepted them: the grid is the image grown by the largest subsampling, which the smaller one does not divide";
+    FSL_119 = "FSL-119", "topup", true,
+        "--fout and --featout's field maps carry the input's intent parameters shifted by one place: the first is written as 0, the second and third as the input's first and second (its third lost)";
+    FSL_120 = "FSL-120", "topup", true,
+        "with --acqp, an acquisition-parameter file whose number of rows differs from the number of volumes is reported as a mismatch between the image and an empty name (the --datain value, which is not set)";
+    FSL_121 = "FSL-121", "topup", true,
+        "with FSLDIR unset, a --config name that is not found where topup runs stops topup with the C++ library's text basic_string: construction from null is not valid, which does not say what is missing";
+    FSL_122 = "FSL-122", "topup", true,
+        "a line of a --config file whose text after its first word is longer than 1023 characters (a long comment) ends the reading of the file there: every setting after it is silently ignored and its defaults used";
+    FSL_123 = "FSL-123", "topup", true,
+        "a negative --miter at a level runs no iteration there (the level's estimation is skipped silently): the number of iterations is compared as a signed number below an unsigned maximum";
+    FSL_124 = "FSL-124", "topup", true,
+        "a negative --warpres gives a knot spacing of about four billion voxels (a negative number converted to unsigned): the spline field's kernels need more memory than any machine has, so topup is killed or stops with an allocation failure";
+    FSL_125 = "FSL-125", "topup", true,
+        "a negative --fwhm is accepted and smooths the images with a kernel of that negative width, an arbitrary filter";
+    FSL_126 = "FSL-126", "topup", true,
+        "a negative --lambda is accepted: the regularisation rewards a rough field, so the minimisation drives the field to large values and the cost below zero";
+    FSL_132 = "FSL-132", "applytopup", true,
+        "--interp=spline (the default) is not applied to the first volume of the first --imain image: that volume is resampled by trilinear interpolation (the image's interpolation as read) and every other volume by splines, so with --method=jac the first image's first volume, and with --method=lsr its movement correction, differ from the method asked for";
+    FSL_133 = "FSL-133", "applytopup", true,
+        "--method=lsr reads the field's displacement just before a line's first voxel from the wrong place when the line's length (the image's size along the phase encoding) does not divide 2^32 (30, 96, 100, ... voxels; powers of two are right): the line is not wrapped around circularly, so the first rows of each line's restoration matrix use the displacement of a voxel in the middle of the line instead of its last voxel";
+    FSL_134 = "FSL-134", "applytopup", true,
+        "a --topup field other than topup's coefficients on the images' grid: with a field image (topup's --fout or another field map in Hz) --method=jac computes the Jacobian determinant with the y displacements in units of the x voxel size (wrong when the phase encoding is along y and the voxels are not square in x and y); and a field on another grid is not refused: with --method=jac a field with as many voxels as the images but another shape is laid on the images' grid as it is stored, one with another number of voxels stops applytopup with an internal message; with --method=lsr the field's lines are read past their end";
+    FSL_135 = "FSL-135", "applytopup", true,
+        "an unknown --method writes no output and exits with status 0 without a message; --method=lsr (and the undocumented vb2D, vb3D and vb4D) with a --topup that gives no movement parameters (a field image, or coefficients without their _movpar.txt) aborts with an internal index error";
+    FSL_141 = "FSL-141", "applytopup", true,
+        "the undocumented --method=vb2D, vb3D and vb4D count the data points of the noise and regularisation priors (half the number of values) in 32-bit integers: beyond about two billion values (very large 4D images with vb4D) the counts wrap around to wrong, even negative, numbers";
+    FSL_142 = "FSL-142", "applytopup", true,
+        "the undocumented --method=vb3D and vb4D count two images' data points for the noise prior whatever the number of images restored together: with three or more images of one phase-encoding axis the noise precision is estimated from too few data points (vb2D counts them right)";
+    FSL_143 = "FSL-143", "applytopup", true,
+        "the undocumented --method=vb3D and vb4D regularise with a smoothness prior whose coupling between a voxel and the voxels next to its neighbours in the adjacent slices (one step along the phase encoding and one slice away) is half what the squared second-difference operator it is built from gives (the coupling within a slice is right)";
     ITK_50 = "ITK-50", "ITK", true,
         "KdTreeBasedKmeansEstimator never counts the point a k-d tree node is split at when it divides the node between centres: those points are left out of the pass's new centres";
     ITK_51 = "ITK-51", "ITK", true,

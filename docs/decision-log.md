@@ -1799,3 +1799,29 @@ together at the end.
 - **What changed:** the first pair under the new method was to be FLIRT's clean-room original, part 2, beside FAST's replica. The orchestrator put one short replica-side task in front of FAST: answering the clean-room implementer's 20 spec questions (`specs/flirt.md` §14), which only an agent allowed to read FSL's source can do, and without which the clean-room original's 22 open cases cannot close (as BET's spec answers did on 2026-10-30). It was raised with the user after the launch, not before.
 - **User decision:** "lets follow your recommendation": the spec answers first (three relays, done the same day: every answer checked by a model written from the spec's text alone; FSL-90 to FSL-93), then FAST's replica.
 - **For the orchestrator:** a change to the agreed order is named to the user before launching, with the option to keep the old one.
+
+## 2026-11-03: The new method's trial, judged (orchestrator; the user's trial of 2026-11-02)
+- **What ran under it:** two pairs of parts, each part by relay agents (one sub-task each, NOTES.md handed on):
+  FLIRT's clean-room original part 2 (7 relays) beside FAST's replica (6 agents, the spec answers' 3 before
+  it), then FAST's clean-room original (5 relays) beside topup's replica (11 relays: topup, applytopup and
+  about 15,000 lines of FSL's libraries).
+- **Usage** (`tools/claude-usage/usage.py summary`, the weekly window): a relay step re-reads 290 000 to
+  380 000 tokens of context on average (whole-part agents: 450 000 to 560 000, every FLIRT part summarized
+  at least once), each relay 0.6 to 0.9 % of the weekly limit. Per part: FAST's replica 3.1 %, FAST's
+  clean-room original 3.0 %, FLIRT's clean-room part 2 4.8 %, topup's replica 5.6 % (the largest part so
+  far), against 2.8 to 4.4 % for each of FLIRT's single-agent parts (replica parts 1 to 3, clean-room part
+  1), which each did less. The week stood at 36 % on Tuesday morning against a pace line of about 54 %.
+- **Quality:** every record the merges re-made was identical to the agents' (`compare_records`), the
+  earlier tools' records unchanged where shared code moved (FLIRT's and BET's after FAST's ANALYZE reader;
+  mcflirt's, BET's, FLIRT's and FAST's replicas after topup's `dgemm`). CI found three test-side faults the
+  local gates could not (Windows line endings and separators, FSLDIR unset on the runners): fixed in the
+  tests, and `gates-python.sh` now runs `tests/python` and `tests/golden` without FSLDIR and
+  `LARMORX_NC_BIN`, as CI does.
+- **Slips:** one relay broke two rules (boxes over 32 GiB together, a trial with the cache off; the latter
+  partly the random-testing runner's documented default, since given an opt-in cache mode); four
+  clean-room greps printed titles or lines of restricted files (no restricted text exposed). Repeating the
+  key rules in every relay's prompt, and "searching is opening" in the clean-room briefs, stopped both: no
+  later relay repeated them.
+- **The orchestrator's judgment:** keep it (the user may decide otherwise). The same tests and checks at a
+  lower cost per piece of work, two parts finishing together, and no loss of exactness. Unchanged: at most
+  two agents, by role; a stop after each part.

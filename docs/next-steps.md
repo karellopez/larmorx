@@ -116,7 +116,7 @@ at a time:
      records re-made in-process: no status change; golden checksums unchanged; `crates-gpl/` keeps
      only the verification tools; CI's `crates-gpl` steps gone (4.0 min a run).
 4. **The ports:** BET's clean-room original (item 7), the clean-room additions mcflirt FSL-20/21
-   and 3dUnifize AFNI-75 (specs first), FLIRT with BBR (the replica's parts 1 to 3 done 2026-11-01/02; the clean-room original's parts 1 and 2 done 2026-11-02), FAST (the replica done 2026-11-02, the clean-room original 2026-11-03), topup (item 7); field maps,
+   and 3dUnifize AFNI-75 (specs first), FLIRT with BBR (the replica's parts 1 to 3 done 2026-11-01/02; the clean-room original's parts 1 and 2 done 2026-11-02), FAST (the replica done 2026-11-02, the clean-room original 2026-11-03), topup (the replica done 2026-11-03; item 7); field maps,
    FreeSurfer, surfaces, confounds (item 8); larmorprepx (item 9). Each with its site page from
    its smart tests.
 5. **The final validation phase** (after every tool is ported): the data panel for every tool
@@ -479,6 +479,31 @@ The items below keep their history.
    applied, negative voxel-size products radiological) and FLIRT's `-applyxfm` TR (FSL's: the
    input's `|pixdim[4]|`) changed: BET's and FLIRT's records re-made, identical case by case. The
    site page with both implementations. FSL-136 to FSL-140 unused (no new defect).
+   **topup: the replica done (2026-11-03, relays 1 to 11).** `crates-nc/larmorx-nc-topup`: `topup` and
+   `applytopup` complete (every option, message, exit status and failure case; topup's levels,
+   both minimisers in double and single precision, both regularisers, the movements, regridding,
+   FSL's configurations, `--debug`, `--trace`, `--profile`; applytopup's `jac`, `lsr` and the
+   undocumented `vb2D`, `vb3D`, `vb4D`); `lx.fsl.topup`, `lx.fsl.applytopup` and `larmorx fsl
+   topup|applytopup` (replica only until the clean-room original). `larmorx-nc-core` gained FSL's
+   libraries for the FNIRT family too: the B-spline fields (fsl-basisfield) with their bending- and
+   membrane-energy regularisers, the sparse matrices, conjugate gradients and the non-linear
+   optimisers (fsl-miscmaths), the spline interpolator with derivatives and the warps
+   (fsl-warpfns), OpenBLAS's blocked LU, LAPACK's symmetric solver and inverse, each checked against
+   FSL's own libraries by probes (millions of values, 0 differ); its `dgemm` now sums as OpenBLAS's
+   kernel does (four partial sums): mcflirt's, BET's, FLIRT's and FAST's replica records re-made
+   from the final commit, identical case by case (`compare_records.py`). Record
+   [fsl-topup-replica](validation/fsl-topup-replica.md): 173 cases, 104 of 104 compared
+   bit-identical (every file, the messages, the exit status; fMRIPrep's call on ds005040 and
+   ds001600, fMRIPrep's own outputs the same), 66 rejected by both alike, 3 expected divergences
+   (FSL-124, FSL-134: refused in both modes). FSL-116 to FSL-135 and FSL-141 to FSL-143. One
+   random-testing trial (27 minutes, 14,460 realistic cases, FSL through the oracle cache: every
+   one bit-identical). Golden: 7 cases. Memory within FSL's on the measured calls (fMRIPrep's
+   call 94 MiB against FSL's 88; the allowance holds); thread test: topup and applytopup. Its site
+   page (fMRIPrep's two calls with FSL's own thread band beside the replica, FSL-117, applytopup's
+   `lsr`, `jac` and `vb3D` with FSL-132 and FSL-143). `specs/topup.md` for the clean-room original
+   (behaviour, maths, messages, the D13 table, "Built for speed", the validation plan). The full
+   tier, the data panel's other PEPOLAR runs and long random testing wait for the final validation
+   phase.
 8. **Field maps, FreeSurfer, surfaces, confounds:** sdcflows' field-map estimation (Apache Python:
    the B-spline fit, PEPOLAR and phase-difference preparation) and fMRIPrep's own Python steps;
    FreeSurfer 8.2.0, every program complete, a replica (`larmorx-freesurfer`) and a clean-room
@@ -570,6 +595,13 @@ The items below keep their history.
 - **FSL-111 in the replica** (2026-11-02): `larmorx-nc fsl applyxfm4D` reads a uint8 image as signed
   bytes in both modes (black-box runs of the clean-room part 2, relay 6); by the D13 rules its default
   should read it as stored and name FSL-111, `reproduce` FSL's reading (the clean-room original does).
+- **topup's replica: what is not replicated yet** (2026-11-03): applytopup's restorations of lines
+  of fewer than 8 or more than 256 voxels along the phase encoding, and band systems that need
+  LAPACK's blocked band factorisation, are refused in both modes with a message (FSL's arithmetic
+  there follows other OpenBLAS and Armadillo paths: `docs/api/fsl-topup.md`, "Not yet"); to do when
+  a real call needs them. FSL's own thread band on fMRIPrep's real call is large (ds005040 at
+  `--nthr=4`: the field up to 3.2 Hz inside the brain, FSL-116; the site's page): a candidate for
+  an upstream report (`docs/upstream-reports/`), the user decides.
 - **Random testing's permanent cases record the machine's paths** (2026-11-03, found at the merge of FAST's
   clean-room original): a case's `found.detail` keeps the harness's traceback, with the checkout's absolute path
   (`validation/difftest/cases/fsl-fast-original/zstd-outputs.json`, replaced by `<workspace>` at the merge). The writer

@@ -6,8 +6,9 @@ mid-size case, each process's peak resident memory from ``/usr/bin/time -v``, la
 D13 modes; its output bit-identical to ANTs' in ``reproduce`` (N4BiasFieldCorrection's and
 DenoiseImage's to ANTs with correctly rounded maths preloaded, the build their records compare
 with; ``validation/investigations/difftest/memory_pair.py`` measures any call by hand). FSL's
-BET programs likewise, against the ``larmorx-nc`` replica (``BET_CASES``), and FLIRT's and
-FAST's (``FLIRT_CASES``, ``FAST_CASES``), and their clean-room originals (``ORIGINAL_*_CASES``).
+BET programs likewise, against the ``larmorx-nc`` replica (``BET_CASES``), and FLIRT's, FAST's,
+topup's and applytopup's (``FLIRT_CASES``, ``FAST_CASES``, ``TOPUP_CASES``), and their clean-room
+originals (``ORIGINAL_*_CASES``).
 
 The allowance is the user's rule of 2026-10-27, "similar" memory: at most ``RATIO`` times the
 original's peak plus a fixed cost (a 16-voxel call needs 20 MiB in larmorx, 18 in ANTs;
@@ -424,6 +425,88 @@ def test_fast_replica_needs_no_more_memory_than_fsl(tmp_path, name, args):
                 for key in [k for k in files if "_prob_" in k]:
                     del files[key]
             assert fsl == ours, f"fast {name}"
+
+
+#: FSL's topup and applytopup (FSL 6.0.7.23) against ``python -m larmorx fsl topup`` and
+#: ``applytopup`` (the ``larmorx-nc`` replicas, 2026-11-03): fMRIPrep's topup call on ds005040's
+#: pair (``{pair}``, sdcflows' ``b02b0.cnf``, every output), and applytopup's least-squares
+#: restoration, Jacobian modulation and variational-Bayes restoration across slices of the
+#: half-resolution pair (``{half_up}``, ``{half_dn}``) with the suite's topup outputs (``{tu}``).
+#: The outputs bit-identical in ``reproduce``.
+TOPUP_CASES = [
+    (
+        "fmriprep",
+        "topup",
+        "--config={cnf} --datain={acq} --imain={pair} --out=base --iout=corrected --fout=field "
+        "--jacout=jac --logout=topup.log --rbmout=xfm --dfout=warpfield",
+    ),
+    (
+        "lsr",
+        "applytopup",
+        "--imain={half_up},{half_dn} --inindex=1,2 --datain={acq} --topup={tu} --out=hifi",
+    ),
+    (
+        "jac",
+        "applytopup",
+        "--imain={half_up} --inindex=1 --datain={acq} --topup={tu} --out=hifi --method=jac",
+    ),
+    (
+        "vb3d",
+        "applytopup",
+        "--imain={half_up},{half_dn} --inindex=1,2 --datain={acq} --topup={tu} --out=hifi "
+        "--method=vb3D",
+    ),
+]
+
+
+@pytest.mark.parametrize(("name", "program", "args"), TOPUP_CASES)
+def test_topup_replica_needs_no_more_memory_than_fsl(tmp_path, name, program, args):
+    ft = pytest.importorskip("larmorx_validation.parity.fsl_topup_replica")
+    if ft.replica_binary() is None:
+        pytest.skip("the larmorx-nc program is not built (crates-nc)")
+    if not (ft.fsldir() / "bin" / program).is_file() or not Path("/usr/bin/time").is_file():
+        pytest.skip("FSL 6.0.7.23 or /usr/bin/time was not found")
+    if ft._source_node() is None:
+        pytest.skip("the ds005040 fMRIPrep oracle run was not found")
+    derived = ft.inputs()
+    ft.applytopup_inputs()
+    paths = {
+        "cnf": ft.workspace() / ft.SDCFLOWS_CONFIG,
+        "acq": derived / "acq.txt",
+        "pair": derived / "pair.nii.gz",
+        "half_up": derived / "half_up.nii.gz",
+        "half_dn": derived / "half_dn.nii.gz",
+        "tu": ft.topup_outputs("y") / "tu",
+    }
+    words = [w.format(**{k: str(v) for k, v in paths.items()}) for w in args.split()]
+    env = {**ft._environment({}), "OMP_NUM_THREADS": "1"}
+    f_dir = tmp_path / "fsl"
+    f_dir.mkdir()
+    code, fsl_mib = _original_peak(
+        [str(ft.fsldir() / "bin" / program), *words], env, "fsl", _emptier(f_dir), f_dir
+    )
+    assert code == 0
+    for mode in ("reproduce", "fix"):
+        r_dir = tmp_path / f"larmorx-{mode}"
+        r_dir.mkdir()
+        l_env = {
+            **env,
+            "LARMORX_NC_BIN": str(ft.replica_binary()),
+            "LARMORX_UPSTREAM_DEFECTS": mode,
+            "PYTHONPATH": os.environ.get("PYTHONPATH", ""),
+        }
+        entry = entry_peak(l_env, r_dir)
+        code, mib = _peak([sys.executable, "-m", "larmorx", "fsl", program, *words], l_env, r_dir)
+        assert code == 0
+        print(
+            f"{program} {name} ({mode}): larmorx {mib:.1f} MiB, FSL {fsl_mib:.1f}, entry {entry:.1f}"
+        )
+        assert mib <= allowance(fsl_mib, entry), (
+            f"{program} {name} ({mode}): larmorx {mib:.0f} MiB, FSL {fsl_mib:.0f} MiB, "
+            f"the entry point {entry:.1f} MiB"
+        )
+        if mode == "reproduce":
+            assert _blanked(f_dir) == _blanked(r_dir), f"{program} {name}"
 
 
 #: FAST's clean-room original (``crates/larmorx-fsl``, 2026-11-03) on the same calls, at one

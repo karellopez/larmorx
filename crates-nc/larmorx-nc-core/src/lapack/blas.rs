@@ -5,13 +5,16 @@
 //! The BLAS routines the reference LAPACK code of FSL's eigen- and singular-value
 //! decompositions calls, as OpenBLAS 0.3.33 computes them on its **Haswell** kernels (the
 //! kernels the validation pins: `OPENBLAS_CORETYPE=Haswell`), for the small sizes FSL's
-//! programs reach (vectors of fewer than 16 elements, matrices of a few rows and columns).
+//! programs reach (vectors of fewer than 16 elements, matrices of a few rows and columns), and
+//! for the medium sizes of LAPACK's symmetric indefinite solver ([`super::sytrf`]: `daxpy` of any
+//! length, `dger`, `dsyr`, `dgemv` with strided vectors).
 //!
 //! Each routine is the OpenBLAS interface (`interface/*.c`: the quick returns, `beta`'s scaling)
-//! followed by its Haswell kernel (`kernel/x86_64/KERNEL.HASWELL`): `ddot.c`, `daxpy.c`,
-//! `dscal.c`, `drot.c`, `nrm2.S` (x87 extended precision), `dgemv_n_4.c` and
-//! `dgemv_n_microk_haswell-4.c`, `dgemv_t_4.c` and `dgemv_t_microk_haswell-4.c`, `dsymv_U.c`,
-//! `../generic/ger.c`, `interface/syr2.c`. The C kernels were compiled by GCC with `-mavx2` and
+//! followed by its Haswell kernel (`kernel/x86_64/KERNEL.HASWELL`): `ddot.c`, `daxpy.c` and
+//! `daxpy_microk_haswell-2.c`, `dscal.c`, `drot.c`, `nrm2.S` (x87 extended precision),
+//! `dgemv_n_4.c` and `dgemv_n_microk_haswell-4.c`, `dgemv_t_4.c` and
+//! `dgemv_t_microk_haswell-4.c`, `dsymv_U.c`, `../generic/ger.c`, `interface/syr.c`,
+//! `interface/syr2.c`. The C kernels were compiled by GCC with `-mavx2` and
 //! without `-mfma` (`kernel/Makefile`'s `AVX2OPT` for GCC), so their products and sums round
 //! separately; the hand-written assembly fuses where its instructions do (`vfmadd231pd`).
 //! The logic is re-expressed in Rust; no code was copied.
@@ -68,15 +71,91 @@ pub fn ddot(x: &[f64], incx: usize, y: &[f64], incy: usize) -> f64 {
     t1 + t2
 }
 
-/// `DAXPY_K` (`daxpy.c`, fewer than 16 elements with unit strides; any count strided):
-/// `y[i] + da·x[i]` (the interface's `alpha == 0` return is the caller's: [`daxpy`]).
+/// `DDOT` with unit strides and any length (`ddot.c`'s `dot_compute`, single thread): the first
+/// `n & -16` elements by the Haswell kernel `ddot_kernel_8` (`ddot_microk_haswell-2.c`: four
+/// accumulators of four lanes, element `16·q + 4·a + l` fused into lane `l` of accumulator `a`;
+/// then each accumulator's high and low halves added, accumulators 0 + 1 and 2 + 3, their sum,
+/// and its two lanes), the rest added one product at a time.
+pub fn ddot_unit_compute(x: &[f64], y: &[f64]) -> f64 {
+    let n = x.len();
+    assert_eq!(n, y.len());
+    let n1 = n & !15;
+    let mut dot = 0.0;
+    if n1 > 0 {
+        let mut acc = [[0.0f64; 4]; 4];
+        let mut i = 0;
+        while i < n1 {
+            for (a, lanes) in acc.iter_mut().enumerate() {
+                for (l, v) in lanes.iter_mut().enumerate() {
+                    let e = i + 4 * a + l;
+                    *v = fma(x[e], y[e], *v);
+                }
+            }
+            i += 16;
+        }
+        let h: Vec<[f64; 2]> = acc.iter().map(|a| [a[0] + a[2], a[1] + a[3]]).collect();
+        let s01 = [h[0][0] + h[1][0], h[0][1] + h[1][1]];
+        let s23 = [h[2][0] + h[3][0], h[2][1] + h[3][1]];
+        let s = [s01[0] + s23[0], s01[1] + s23[1]];
+        dot = s[0] + s[1];
+    }
+    for i in n1..n {
+        dot += y[i] * x[i];
+    }
+    dot
+}
+
+/// `DDOT` with unit strides (`ddot.c`'s `CNAME`) on OpenBLAS's level-1 threads: up to 10000
+/// elements, or one thread, [`ddot_unit_compute`]; above, the vector cut into `nthreads` parts
+/// (`blas_level1_thread_with_return_value`: each part `ceil(left / threads left)` elements),
+/// each part's [`ddot_unit_compute`] added in order to 0. `nthreads` is OpenBLAS's thread
+/// count (`OPENBLAS_NUM_THREADS`, else the machine's cores).
+pub fn ddot_unit(x: &[f64], y: &[f64], nthreads: usize) -> f64 {
+    let n = x.len();
+    assert_eq!(n, y.len());
+    if n <= 10000 || nthreads <= 1 {
+        return ddot_unit_compute(x, y);
+    }
+    let mut parts = Vec::with_capacity(nthreads);
+    let mut start = 0usize;
+    let mut left = n as i64;
+    let mut num_cpu = 0usize;
+    while left > 0 {
+        let threads_left = (nthreads - num_cpu) as i64;
+        let mut width = (left + threads_left - 1) / threads_left;
+        left -= width;
+        if left < 0 {
+            width += left;
+        }
+        let w = width as usize;
+        parts.push(ddot_unit_compute(
+            &x[start..start + w],
+            &y[start..start + w],
+        ));
+        start += w;
+        num_cpu += 1;
+    }
+    let mut dot = 0.0;
+    for p in parts {
+        dot += p;
+    }
+    dot
+}
+
+/// `DAXPY_K` (`daxpy.c`): with unit strides the first `n & -16` elements by the Haswell kernel
+/// `daxpy_kernel_8` (`daxpy_microk_haswell-2.c`: `vfmadd231pd`, `y = fma(x, da, y)`), the rest
+/// `y[i] + da·x[i]` with two roundings (the C tail is not contracted: measured on FSL's
+/// library); other strides `y[i] + da·x[i]` with two roundings. The kernel computes even for
+/// `da == 0` (the interface's `alpha == 0` return is the caller's: [`daxpy`]; `GER` and `SYR`
+/// call the kernel directly).
 pub fn axpy_k(da: f64, x: &[f64], incx: usize, y: &mut [f64], incy: usize) {
     let n = x.len();
     assert!(y.len() >= n);
-    if incx == 1 && incy == 1 {
-        assert!(n < 16, "daxpy's 16-way kernel is not ported");
+    let n1 = if incx == 1 && incy == 1 { n & !15 } else { 0 };
+    for i in 0..n1 {
+        y[i] = fma(x[i], da, y[i]);
     }
-    for i in 0..n {
+    for i in n1..n {
         y[i] += da * x[i];
     }
 }
@@ -449,6 +528,27 @@ pub fn dgemv_t(
     beta: f64,
     y: &mut [f64],
 ) {
+    dgemv_t_inc(m, n, alpha, a, am, x, incx, beta, y, 1);
+}
+
+/// [`dgemv_t`] with `y`'s increment `incy` (`y` gathered): a `y` of increment other than 1 takes
+/// `dgemv_t_4.c`'s C loop of `add_y` for the totals of the groups of four columns, which GCC
+/// contracts (`y = fma(t, alpha, y)`; the unit increment's `add_y` is assembly: `y + t·alpha`
+/// with two roundings, measured on FSL's library); every other path is the same for every
+/// increment.
+#[allow(clippy::too_many_arguments)]
+pub fn dgemv_t_inc(
+    m: usize,
+    n: usize,
+    alpha: f64,
+    a: &[f64],
+    am: MatRef,
+    x: &[f64],
+    incx: usize,
+    beta: f64,
+    y: &mut [f64],
+    incy: usize,
+) {
     let _ = incx;
     if m == 0 || n == 0 {
         return;
@@ -477,7 +577,11 @@ pub fn dgemv_t(
         for _ in 0..n1 {
             let t: Vec<f64> = (0..4).map(|k| lanes4(col + k)).collect();
             for k in 0..4 {
-                y[col + k] += t[k] * alpha;
+                y[col + k] = if incy == 1 {
+                    y[col + k] + t[k] * alpha
+                } else {
+                    fma(t[k], alpha, y[col + k])
+                };
             }
             col += 4;
         }
@@ -533,23 +637,41 @@ pub fn dgemv_t(
 }
 
 /// `DGER` (`interface/ger.c`, `../generic/ger.c`): `A += alpha·x·yᵀ` for the `m × n` matrix `A`,
-/// one column at a time by `daxpy`'s kernel with `alpha·y[j]`; nothing when `m`, `n` or `alpha` is
-/// zero.
+/// one column at a time by `daxpy`'s kernel ([`axpy_k`] with unit strides: a strided `x` is
+/// copied to a buffer first, and every column of `A` is contiguous) with `alpha·y[j]` (a zero
+/// `y[j]` included); nothing when `m`, `n` or `alpha` is zero. One thread whatever the size
+/// (the threaded driver is compiled only under `SMPTEST`). `x` and `y` are gathered; `y`'s
+/// increment does not change any value.
 pub fn dger(alpha: f64, x: &[f64], y: &[f64], a: &mut [f64], am: MatRef) {
     let m = x.len();
     let n = y.len();
     if m == 0 || n == 0 || alpha == 0.0 {
         return;
     }
-    assert!(
-        m < 16,
-        "dger's columns of 16 or more rows (daxpy's kernel) are not ported"
-    );
     for j in 0..n {
         let da = alpha * y[j];
-        for i in 0..m {
-            let k = am.at(i, j);
-            a[k] += da * x[i];
+        let s = am.at(0, j);
+        axpy_k(da, x, 1, &mut a[s..s + m], 1);
+    }
+}
+
+/// `DSYR` with the lower triangle and a unit increment (`interface/syr.c`'s path for fewer than
+/// 100 rows): `A += alpha·x·xᵀ` on the lower triangle of the `n × n` matrix `A`, column `i` by
+/// `daxpy`'s kernel ([`axpy_k`]) adding `alpha·x[i]·x[i..n]` to its rows `i..n`, skipped when
+/// `x[i]` is zero; nothing when `n` or `alpha` is zero.
+pub fn dsyr_l(alpha: f64, x: &[f64], a: &mut [f64], am: MatRef) {
+    let n = x.len();
+    if n == 0 || alpha == 0.0 {
+        return;
+    }
+    assert!(
+        n < 100,
+        "dsyr's driver for 100 or more rows (driver/level2/syr_k.c) is not ported"
+    );
+    for i in 0..n {
+        if x[i] != 0.0 {
+            let s = am.at(i, i);
+            axpy_k(alpha * x[i], &x[i..], 1, &mut a[s..s + n - i], 1);
         }
     }
 }
@@ -584,6 +706,102 @@ pub fn dsymv_u(alpha: f64, a: &[f64], am: MatRef, x: &[f64], beta: f64, y: &mut 
     }
 }
 
+/// `DSYMV` with the lower triangle (`interface/symv.c`, one thread; Haswell `dsymv_L.c`):
+/// `y = beta·y + alpha·A·x` for the symmetric `n × n` matrix whose lower triangle `a` holds.
+///
+/// The columns in groups of four (`t1 = alpha·x[j..j+4]`): each diagonal term added to `y`, then
+/// the rows below the group's corner. With at least 12 rows below the group's first column, the
+/// corner's rows by the C loops, the rows up to the last multiple of four by the assembly kernel
+/// `dsymv_kernel_4x4` (`dsymv_L_microk_haswell-2.c`: for each row the four columns' `y =
+/// fma(t1, a, y)` in order, and each column's `a·x` fused into four lanes by row modulo 4,
+/// reduced as `(l0 + l2) + (l1 + l3)` and added to the corner's sum), the last rows by the C
+/// loop; otherwise every row by the C loops (each row's four columns interleaved: `y += t1·a`,
+/// `t2 += a·x`, two roundings: the C is not contracted, disassembled); then `y[j+c] +=
+/// alpha·t2[c]`. The last `n mod 4` columns one at a time by the C loop.
+pub fn dsymv_l(alpha: f64, a: &[f64], am: MatRef, x: &[f64], beta: f64, y: &mut [f64]) {
+    let m = x.len();
+    if m == 0 {
+        return;
+    }
+    if beta != 1.0 {
+        scal_beta(beta, &mut y[..m]);
+    }
+    if alpha == 0.0 {
+        return;
+    }
+    let el = |r: usize, c: usize| a[am.at(r, c)];
+    let offset1 = m / 4 * 4;
+    let mut j = 0;
+    while j < offset1 {
+        let tmp1 = [
+            alpha * x[j],
+            alpha * x[j + 1],
+            alpha * x[j + 2],
+            alpha * x[j + 3],
+        ];
+        let mut tmp2 = [0.0f64; 4];
+        for c in 0..4 {
+            y[j + c] += tmp1[c] * el(j + c, j + c);
+        }
+        // the corner: column c's rows j+c+1 .. j+4
+        for c in 0..3 {
+            for i in j + c + 1..j + 4 {
+                let v = el(i, j + c);
+                y[i] += tmp1[c] * v;
+                tmp2[c] += v * x[i];
+            }
+        }
+        let from = j + 1;
+        let mut i = j + 4;
+        if m - from >= 12 {
+            let m2 = m / 4 * 4;
+            if m2 > j + 4 {
+                let mut lanes = [[0.0f64; 4]; 4];
+                while i < m2 {
+                    for l in 0..4 {
+                        let r = i + l;
+                        let mut yv = y[r];
+                        for c in 0..4 {
+                            let v = el(r, j + c);
+                            yv = fma(tmp1[c], v, yv);
+                            lanes[c][l] = fma(x[r], v, lanes[c][l]);
+                        }
+                        y[r] = yv;
+                    }
+                    i += 4;
+                }
+                for c in 0..4 {
+                    let s = (lanes[c][0] + lanes[c][2]) + (lanes[c][1] + lanes[c][3]);
+                    tmp2[c] += s;
+                }
+            }
+        }
+        while i < m {
+            for c in 0..4 {
+                let v = el(i, j + c);
+                y[i] += tmp1[c] * v;
+                tmp2[c] += v * x[i];
+            }
+            i += 1;
+        }
+        for c in 0..4 {
+            y[j + c] += alpha * tmp2[c];
+        }
+        j += 4;
+    }
+    for j in offset1..m {
+        let temp1 = alpha * x[j];
+        let mut temp2 = 0.0f64;
+        y[j] += temp1 * el(j, j);
+        for i in j + 1..m {
+            let v = el(i, j);
+            y[i] += temp1 * v;
+            temp2 += v * x[i];
+        }
+        y[j] += alpha * temp2;
+    }
+}
+
 /// `DSYR2` with the upper triangle (`interface/syr2.c`): for each column `i`, `daxpy`'s kernel
 /// adds `alpha·x[i]·y[0..=i]`, then `alpha·y[i]·x[0..=i]`, to the column's top `i + 1` rows.
 pub fn dsyr2_u(alpha: f64, x: &[f64], y: &[f64], a: &mut [f64], am: MatRef) {
@@ -611,6 +829,8 @@ pub fn dsyr2_u(alpha: f64, x: &[f64], y: &[f64], a: &mut [f64], am: MatRef) {
 const GEMM_Q: usize = 256;
 /// `GEMM_UNROLL_M` for Haswell's double precision.
 const GEMM_UNROLL_M: usize = 4;
+/// `GEMM_P` for Haswell's double precision: the rows of one block.
+const GEMM_P: usize = 512;
 
 /// `DGEMM` (`interface/gemm.c`, `driver/level3/level3.c`, Haswell `dgemm_kernel_4x8_haswell.S`):
 /// `C = beta·C + alpha·op(A)·op(B)` for `op(A)` of `m × k`, `op(B)` of `k × n`.
@@ -620,7 +840,8 @@ const GEMM_UNROLL_M: usize = 4;
 /// when `k` or `alpha` is 0; then the inner dimension in blocks (`GEMM_Q`, the level-3 driver's
 /// split of a remainder between `Q` and `2Q`), each element's block total accumulated by
 /// `vmulpd` then `vfmadd231pd` in the order of `k` (one accumulator per element in every tile
-/// shape), then added as `C + acc·alpha`.
+/// shape but the 4-row, 1-column tile of an odd last column, which keeps four partial sums:
+/// [`super::blocked::ksum`]), then added as `C + acc·alpha`.
 #[allow(clippy::too_many_arguments)]
 pub fn dgemm(
     ta: bool,
@@ -661,15 +882,27 @@ pub fn dgemm(
         } else if min_l > GEMM_Q {
             min_l = (min_l / 2).div_ceil(GEMM_UNROLL_M) * GEMM_UNROLL_M;
         }
-        for j in 0..n {
-            for i in 0..m {
-                let mut acc = ael(i, ls) * bel(ls, j);
-                for l in ls + 1..ls + min_l {
-                    acc = fma(ael(i, l), bel(l, j), acc);
-                }
-                let p = cm.at(i, j);
-                c[p] += acc * alpha;
+        // The rows in chunks of GEMM_P (level3.c's rule), each element summed as its tile of
+        // the kernel sums it (`blocked::tile_sum`: one accumulator, but four partial sums in
+        // the 4-row, 1-column tile of an odd last column).
+        let mut is = 0;
+        while is < m {
+            let mut min_i = m - is;
+            if min_i >= GEMM_P * 2 {
+                min_i = GEMM_P;
+            } else if min_i > GEMM_P {
+                min_i = (min_i / 2).div_ceil(GEMM_UNROLL_M) * GEMM_UNROLL_M;
             }
+            for j in 0..n {
+                for i in is..is + min_i {
+                    let kind = super::blocked::tile_sum(i - is, j, min_i, n, min_l);
+                    let acc =
+                        super::blocked::ksum(kind, min_l, |l| (ael(i, ls + l), bel(ls + l, j)));
+                    let p = cm.at(i, j);
+                    c[p] += acc * alpha;
+                }
+            }
+            is += min_i;
         }
         ls += min_l;
     }
@@ -678,6 +911,67 @@ pub fn dgemm(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// `validation/probes/fsl-basisfield/ddot_threads.c`'s vectors.
+    fn xorshift_vectors(n: usize) -> (Vec<f64>, Vec<f64>) {
+        let mut s: u64 = 88172645463325252;
+        let mut next = || {
+            s ^= s << 13;
+            s ^= s >> 7;
+            s ^= s << 17;
+            s
+        };
+        let mut x = Vec::with_capacity(n);
+        let mut y = Vec::with_capacity(n);
+        for _ in 0..n {
+            x.push((next() % 100000) as f64 / 977.0 - 50.0);
+            y.push((next() % 100000) as f64 / 1013.0 - 40.0);
+        }
+        (x, y)
+    }
+
+    #[test]
+    fn ddot_unit_is_fsls() {
+        // FSL 6.0.7.23's ddot (OpenBLAS 0.3.33, Haswell), OPENBLAS_NUM_THREADS = 1, 2, 4, 32
+        // (ddot_threads.c, 2026-11-03).
+        let cases: [(usize, [u64; 4]); 5] = [
+            (33, [0xc08b4ef4e6416408; 4]),
+            (100, [0x408ab33ce3c749ae; 4]),
+            (
+                10001,
+                [
+                    0x40f373f36a1a26c5,
+                    0x40f373f36a1a26c6,
+                    0x40f373f36a1a26c8,
+                    0x40f373f36a1a26c7,
+                ],
+            ),
+            (
+                10560,
+                [
+                    0x40fc36a8fa57e104,
+                    0x40fc36a8fa57e108,
+                    0x40fc36a8fa57e108,
+                    0x40fc36a8fa57e108,
+                ],
+            ),
+            (
+                50000,
+                [
+                    0x411f944a4c478cb0,
+                    0x411f944a4c478cac,
+                    0x411f944a4c478caf,
+                    0x411f944a4c478caf,
+                ],
+            ),
+        ];
+        for (n, want) in cases {
+            let (x, y) = xorshift_vectors(n);
+            for (t, w) in [1usize, 2, 4, 32].iter().zip(want) {
+                assert_eq!(ddot_unit(&x, &y, *t).to_bits(), w, "n {n}, {t} threads");
+            }
+        }
+    }
 
     #[test]
     fn nrm2_small_cases() {

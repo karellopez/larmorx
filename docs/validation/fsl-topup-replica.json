@@ -1,0 +1,2591 @@
+{
+ "environment": {
+  "cpu": "AMD Ryzen 9 7945HX with Radeon Graphics",
+  "larmorx": "0.0.1",
+  "larmorx_commit": "24cf764e6292",
+  "larmorx_testdata_commit": "52124bc98f9f",
+  "logical_cpus": 32,
+  "os": "Linux-6.8.0-124-generic-x86_64-with-glibc2.35",
+  "packages": {
+   "nibabel": "5.4.2",
+   "numpy": "2.3.5"
+  },
+  "platform": "Linux x86_64",
+  "python": "3.12.16"
+ },
+ "oracle_cache": {
+  "differences": 0,
+  "fresh": {
+   "ended by a signal, SIGABRT (never stored)": 19,
+   "never cached: --profile writes the clock's durations": 2
+  },
+  "location": "<workspace>/oracles/cache",
+  "mode": "use",
+  "ran": 21,
+  "saved_seconds": 192.0,
+  "served": 152
+ },
+ "reference": "topup from FSL 6.0.7.23 (fsl-topup 2203.5, fsl-basisfield 2203.4, fsl-warpfns 2501.0, fsl-newimage 2601.0, fsl-miscmaths 2412.6, fsl-utils 2412.6, OpenBLAS 0.3.33 on one thread; the conda build at `~/fsl-6.0.7.23`, as built)",
+ "results": [
+  {
+   "case": "fmriprep/ds001600-sub-1-noreconall",
+   "category": "fmriprep",
+   "checks_passed": 7,
+   "checks_total": 7,
+   "failed_checks": [],
+   "measured": {
+    "every file bit-identical": "15/15"
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0,
+    "fMRIPrep's outputs (its container's FSL) identical": "9/9"
+   },
+   "seconds": 147.828,
+   "status": "pass"
+  },
+  {
+   "case": "fmriprep/ds005040-sub-002-noreconall",
+   "category": "fmriprep",
+   "checks_passed": 7,
+   "checks_total": 7,
+   "failed_checks": [],
+   "measured": {
+    "every file bit-identical": "15/15"
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0,
+    "fMRIPrep's outputs (its container's FSL) identical": "9/9"
+   },
+   "seconds": 63.288,
+   "status": "pass"
+  },
+  {
+   "case": "debug/one-level",
+   "category": "debug",
+   "checks_passed": 6,
+   "checks_total": 6,
+   "failed_checks": [],
+   "measured": {
+    "every file bit-identical": "42/42"
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 3.147,
+   "status": "pass"
+  },
+  {
+   "case": "debug/movements",
+   "category": "debug",
+   "checks_passed": 6,
+   "checks_total": 6,
+   "failed_checks": [],
+   "measured": {
+    "every file bit-identical": "29/29"
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 3.484,
+   "status": "pass"
+  },
+  {
+   "case": "debug/hessian",
+   "category": "debug",
+   "checks_passed": 6,
+   "checks_total": 6,
+   "failed_checks": [],
+   "measured": {
+    "every file bit-identical": "33/33"
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 1.11,
+   "status": "pass"
+  },
+  {
+   "case": "debug/trace",
+   "category": "debug",
+   "checks_passed": 6,
+   "checks_total": 6,
+   "failed_checks": [],
+   "measured": {
+    "every file bit-identical": "5/5"
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 0.808,
+   "status": "pass"
+  },
+  {
+   "case": "debug/profile",
+   "category": "debug",
+   "checks_passed": 7,
+   "checks_total": 7,
+   "failed_checks": [],
+   "measured": {
+    "every file bit-identical": "6/6"
+   },
+   "reason": "",
+   "seconds": 0.803,
+   "status": "pass"
+  },
+  {
+   "case": "opt/defaults",
+   "category": "opt",
+   "checks_passed": 6,
+   "checks_total": 6,
+   "failed_checks": [],
+   "measured": {
+    "every file bit-identical": "5/5"
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 0.722,
+   "status": "pass"
+  },
+  {
+   "case": "opt/levels",
+   "category": "opt",
+   "checks_passed": 6,
+   "checks_total": 6,
+   "failed_checks": [],
+   "measured": {
+    "every file bit-identical": "16/16"
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 0.857,
+   "status": "pass"
+  },
+  {
+   "case": "opt/numprec-float",
+   "category": "opt",
+   "checks_passed": 6,
+   "checks_total": 6,
+   "failed_checks": [],
+   "measured": {
+    "every file bit-identical": "6/6"
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 1.227,
+   "status": "pass"
+  },
+  {
+   "case": "opt/interp-linear",
+   "category": "opt",
+   "checks_passed": 6,
+   "checks_total": 6,
+   "failed_checks": [],
+   "measured": {
+    "every file bit-identical": "7/7"
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 1.042,
+   "status": "pass"
+  },
+  {
+   "case": "opt/membrane-lm",
+   "category": "opt",
+   "checks_passed": 6,
+   "checks_total": 6,
+   "failed_checks": [],
+   "measured": {
+    "every file bit-identical": "6/6"
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 22006
+   },
+   "seconds": 1.303,
+   "status": "pass"
+  },
+  {
+   "case": "opt/membrane-scg",
+   "category": "opt",
+   "checks_passed": 6,
+   "checks_total": 6,
+   "failed_checks": [],
+   "measured": {
+    "every file bit-identical": "6/6"
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 0.416,
+   "status": "pass"
+  },
+  {
+   "case": "opt/splineorder-2",
+   "category": "opt",
+   "checks_passed": 6,
+   "checks_total": 6,
+   "failed_checks": [],
+   "measured": {
+    "every file bit-identical": "6/6"
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 0.706,
+   "status": "pass"
+  },
+  {
+   "case": "opt/scale",
+   "category": "opt",
+   "checks_passed": 6,
+   "checks_total": 6,
+   "failed_checks": [],
+   "measured": {
+    "every file bit-identical": "7/7"
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 1.13,
+   "status": "pass"
+  },
+  {
+   "case": "opt/ssqlambda-0",
+   "category": "opt",
+   "checks_passed": 6,
+   "checks_total": 6,
+   "failed_checks": [],
+   "measured": {
+    "every file bit-identical": "6/6"
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 1.078,
+   "status": "pass"
+  },
+  {
+   "case": "opt/regrid-0",
+   "category": "opt",
+   "checks_passed": 6,
+   "checks_total": 6,
+   "failed_checks": [],
+   "measured": {
+    "every file bit-identical": "6/6"
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 0.644,
+   "status": "pass"
+  },
+  {
+   "case": "opt/scg",
+   "category": "opt",
+   "checks_passed": 6,
+   "checks_total": 6,
+   "failed_checks": [],
+   "measured": {
+    "every file bit-identical": "5/5"
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 0.481,
+   "status": "pass"
+  },
+  {
+   "case": "opt/scg-movements",
+   "category": "opt",
+   "checks_passed": 6,
+   "checks_total": 6,
+   "failed_checks": [],
+   "measured": {
+    "every file bit-identical": "7/7"
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 0.636,
+   "status": "pass"
+  },
+  {
+   "case": "opt/acqp",
+   "category": "opt",
+   "checks_passed": 6,
+   "checks_total": 6,
+   "failed_checks": [],
+   "measured": {
+    "every file bit-identical": "5/5"
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 1.102,
+   "status": "pass"
+  },
+  {
+   "case": "opt/datain-transposed",
+   "category": "opt",
+   "checks_passed": 6,
+   "checks_total": 6,
+   "failed_checks": [],
+   "measured": {
+    "every file bit-identical": "5/5"
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 1.057,
+   "status": "pass"
+  },
+  {
+   "case": "opt/x-phase-encoding",
+   "category": "opt",
+   "checks_passed": 6,
+   "checks_total": 6,
+   "failed_checks": [],
+   "measured": {
+    "every file bit-identical": "13/13"
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 1.094,
+   "status": "pass"
+  },
+  {
+   "case": "opt/four-volumes",
+   "category": "opt",
+   "checks_passed": 6,
+   "checks_total": 6,
+   "failed_checks": [],
+   "measured": {
+    "every file bit-identical": "19/19"
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 3.207,
+   "status": "pass"
+  },
+  {
+   "case": "opt/oblique-phase-encoding",
+   "category": "opt",
+   "checks_passed": 6,
+   "checks_total": 6,
+   "failed_checks": [],
+   "measured": {
+    "every file bit-identical": "9/9"
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 1.952,
+   "status": "pass"
+  },
+  {
+   "case": "opt/readout-times",
+   "category": "opt",
+   "checks_passed": 6,
+   "checks_total": 6,
+   "failed_checks": [],
+   "measured": {
+    "every file bit-identical": "6/6"
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 1.072,
+   "status": "pass"
+  },
+  {
+   "case": "opt/zero-readout",
+   "category": "opt",
+   "checks_passed": 6,
+   "checks_total": 6,
+   "failed_checks": [],
+   "measured": {
+    "every file bit-identical": "8/8"
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 1.08,
+   "status": "pass"
+  },
+  {
+   "case": "opt/same-direction",
+   "category": "opt",
+   "checks_passed": 6,
+   "checks_total": 6,
+   "failed_checks": [],
+   "measured": {
+    "every file bit-identical": "6/6"
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 1.092,
+   "status": "pass"
+  },
+  {
+   "case": "opt/z-phase-encoding",
+   "category": "opt",
+   "checks_passed": 5,
+   "checks_total": 5,
+   "failed_checks": [],
+   "measured": {
+    "every file bit-identical": "3/3"
+   },
+   "reason": "topup exits 1; the same from the replica. Error occurred when preparing to run topup Exception thrown with message: Topup::TopupScan::TopupScan: third element of pevec must be zero",
+   "seconds": 0.013,
+   "status": "both-error"
+  },
+  {
+   "case": "opt/int16",
+   "category": "opt",
+   "checks_passed": 6,
+   "checks_total": 6,
+   "failed_checks": [],
+   "measured": {
+    "every file bit-identical": "7/7"
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 1.069,
+   "status": "pass"
+  },
+  {
+   "case": "opt/one-volume",
+   "category": "opt",
+   "checks_passed": 6,
+   "checks_total": 6,
+   "failed_checks": [],
+   "measured": {
+    "every file bit-identical": "5/5"
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 4.31,
+   "status": "pass"
+  },
+  {
+   "case": "opt/no-out",
+   "category": "opt",
+   "checks_passed": 6,
+   "checks_total": 6,
+   "failed_checks": [],
+   "measured": {
+    "every file bit-identical": "5/5"
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 1.045,
+   "status": "pass"
+  },
+  {
+   "case": "opt/intent",
+   "category": "opt",
+   "checks_passed": 6,
+   "checks_total": 6,
+   "failed_checks": [],
+   "measured": {
+    "every file bit-identical": "8/8"
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 1.098,
+   "status": "pass"
+  },
+  {
+   "case": "opt/nifti",
+   "category": "opt",
+   "checks_passed": 6,
+   "checks_total": 6,
+   "failed_checks": [],
+   "measured": {
+    "every file bit-identical": "6/6"
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 1.057,
+   "status": "pass"
+  },
+  {
+   "case": "opt/nifti2",
+   "category": "opt",
+   "checks_passed": 6,
+   "checks_total": 6,
+   "failed_checks": [],
+   "measured": {
+    "every file bit-identical": "8/8"
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 1.069,
+   "status": "pass"
+  },
+  {
+   "case": "opt/nifti-pair",
+   "category": "opt",
+   "checks_passed": 6,
+   "checks_total": 6,
+   "failed_checks": [],
+   "measured": {
+    "every file bit-identical": "8/8"
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 1.139,
+   "status": "pass"
+  },
+  {
+   "case": "opt/iout-extension",
+   "category": "opt",
+   "checks_passed": 6,
+   "checks_total": 6,
+   "failed_checks": [],
+   "measured": {
+    "every file bit-identical": "7/7"
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 1.1,
+   "status": "pass"
+  },
+  {
+   "case": "opt/nthr-0",
+   "category": "opt",
+   "checks_passed": 6,
+   "checks_total": 6,
+   "failed_checks": [],
+   "measured": {
+    "every file bit-identical": "5/5"
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 1.04,
+   "status": "pass"
+  },
+  {
+   "case": "opt/warpres-0",
+   "category": "opt",
+   "checks_passed": 6,
+   "checks_total": 6,
+   "failed_checks": [],
+   "measured": {
+    "every file bit-identical": "5/5"
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 0.332,
+   "status": "pass"
+  },
+  {
+   "case": "opt/lambda-negative",
+   "category": "opt",
+   "checks_passed": 7,
+   "checks_total": 7,
+   "failed_checks": [],
+   "measured": {
+    "every file bit-identical": "6/6"
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 0.831,
+   "status": "pass"
+  },
+  {
+   "case": "opt/fwhm-negative",
+   "category": "opt",
+   "checks_passed": 7,
+   "checks_total": 7,
+   "failed_checks": [],
+   "measured": {
+    "every file bit-identical": "6/6"
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 0.585,
+   "status": "pass"
+  },
+  {
+   "case": "opt/warpres-negative",
+   "category": "opt",
+   "checks_passed": 2,
+   "checks_total": 2,
+   "failed_checks": [],
+   "reason": "FSL-124: refused; FSL is not run: its knot spacing of about 4e9 voxels needs more memory than the machine holds (2026-11-03: killed in a 24 GiB memory box)",
+   "seconds": 0.009,
+   "status": "expected-divergence"
+  },
+  {
+   "case": "cfg/b02b0",
+   "category": "cfg",
+   "checks_passed": 6,
+   "checks_total": 6,
+   "failed_checks": [],
+   "measured": {
+    "every file bit-identical": "8/8"
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 1.194,
+   "status": "pass"
+  },
+  {
+   "case": "cfg/b02b0_1",
+   "category": "cfg",
+   "checks_passed": 6,
+   "checks_total": 6,
+   "failed_checks": [],
+   "measured": {
+    "every file bit-identical": "8/8"
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 3.456,
+   "status": "pass"
+  },
+  {
+   "case": "cfg/b02b0_2",
+   "category": "cfg",
+   "checks_passed": 6,
+   "checks_total": 6,
+   "failed_checks": [],
+   "measured": {
+    "every file bit-identical": "8/8"
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 1.27,
+   "status": "pass"
+  },
+  {
+   "case": "cfg/b02b0_4",
+   "category": "cfg",
+   "checks_passed": 6,
+   "checks_total": 6,
+   "failed_checks": [],
+   "measured": {
+    "every file bit-identical": "8/8"
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 1.065,
+   "status": "pass"
+  },
+  {
+   "case": "cfg/b02b0_7T",
+   "category": "cfg",
+   "checks_passed": 6,
+   "checks_total": 6,
+   "failed_checks": [],
+   "measured": {
+    "every file bit-identical": "8/8"
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 1.402,
+   "status": "pass"
+  },
+  {
+   "case": "cfg/test_acqp",
+   "category": "cfg",
+   "checks_passed": 6,
+   "checks_total": 6,
+   "failed_checks": [],
+   "measured": {
+    "every file bit-identical": "8/8"
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 0.291,
+   "status": "pass"
+  },
+  {
+   "case": "cfg/b02b0-extension",
+   "category": "cfg",
+   "checks_passed": 6,
+   "checks_total": 6,
+   "failed_checks": [],
+   "measured": {
+    "every file bit-identical": "5/5"
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 1.163,
+   "status": "pass"
+  },
+  {
+   "case": "cfg/local",
+   "category": "cfg",
+   "checks_passed": 6,
+   "checks_total": 6,
+   "failed_checks": [],
+   "measured": {
+    "every file bit-identical": "7/7"
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 0.593,
+   "status": "pass"
+  },
+  {
+   "case": "cfg/local-no-extension",
+   "category": "cfg",
+   "checks_passed": 6,
+   "checks_total": 6,
+   "failed_checks": [],
+   "measured": {
+    "every file bit-identical": "7/7"
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 0.693,
+   "status": "pass"
+  },
+  {
+   "case": "cfg/command-line-wins",
+   "category": "cfg",
+   "checks_passed": 6,
+   "checks_total": 6,
+   "failed_checks": [],
+   "measured": {
+    "every file bit-identical": "7/7"
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 0.588,
+   "status": "pass"
+  },
+  {
+   "case": "cfg/directory",
+   "category": "cfg",
+   "checks_passed": 6,
+   "checks_total": 6,
+   "failed_checks": [],
+   "measured": {
+    "every file bit-identical": "5/5"
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 0.57,
+   "status": "pass"
+  },
+  {
+   "case": "cfg/not-found",
+   "category": "cfg",
+   "checks_passed": 5,
+   "checks_total": 5,
+   "failed_checks": [],
+   "measured": {
+    "every file bit-identical": "2/2"
+   },
+   "reason": "topup exits 1; the same from the replica. Cannot find config-file nothere",
+   "seconds": 0.017,
+   "status": "both-error"
+  },
+  {
+   "case": "cfg/not-found-path",
+   "category": "cfg",
+   "checks_passed": 5,
+   "checks_total": 5,
+   "failed_checks": [],
+   "measured": {
+    "every file bit-identical": "2/2"
+   },
+   "reason": "topup exits 1; the same from the replica. Cannot find config-file ./nothere",
+   "seconds": 0.027,
+   "status": "both-error"
+  },
+  {
+   "case": "cfg/fsldir-unset",
+   "category": "cfg",
+   "checks_passed": 6,
+   "checks_total": 6,
+   "failed_checks": [],
+   "measured": {
+    "every file bit-identical": "2/2"
+   },
+   "reason": "topup exits 1; the same from the replica. basic_string: construction from null is not valid",
+   "seconds": 0.034,
+   "status": "both-error"
+  },
+  {
+   "case": "cfg/bad-option",
+   "category": "cfg",
+   "checks_passed": 5,
+   "checks_total": 5,
+   "failed_checks": [],
+   "measured": {
+    "every file bit-identical": "3/3"
+   },
+   "reason": "topup exits 1; the same from the replica. Part of FSL (ID: 2412.6-dirty) topup Usage: topup --imain=<some 4D image> --datain=<text file> --config=<text file with parameters> --out=my_topup_results Compulsory arguments (You MUST set one or mor",
+   "seconds": 0.024,
+   "status": "both-error"
+  },
+  {
+   "case": "cfg/long-line",
+   "category": "cfg",
+   "checks_passed": 6,
+   "checks_total": 6,
+   "failed_checks": [],
+   "measured": {
+    "every file bit-identical": "7/7"
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 25178
+   },
+   "seconds": 0.671,
+   "status": "pass"
+  },
+  {
+   "case": "err/no-arguments",
+   "category": "err",
+   "checks_passed": 5,
+   "checks_total": 5,
+   "failed_checks": [],
+   "measured": {
+    "every file bit-identical": "0/0"
+   },
+   "reason": "topup exits 1; the same from the replica. Part of FSL (ID: 2412.6-dirty) topup Usage: topup --imain=<some 4D image> --datain=<text file> --config=<text file with parameters> --out=my_topup_results Compulsory arguments (You MUST set one or mor",
+   "seconds": 0.005,
+   "status": "both-error"
+  },
+  {
+   "case": "err/help",
+   "category": "err",
+   "checks_passed": 5,
+   "checks_total": 5,
+   "failed_checks": [],
+   "measured": {
+    "every file bit-identical": "0/0"
+   },
+   "reason": "topup exits 1; the same from the replica. Part of FSL (ID: 2412.6-dirty) topup Usage: topup --imain=<some 4D image> --datain=<text file> --config=<text file with parameters> --out=my_topup_results Compulsory arguments (You MUST set one or mor",
+   "seconds": 0.005,
+   "status": "both-error"
+  },
+  {
+   "case": "err/help-long",
+   "category": "err",
+   "checks_passed": 5,
+   "checks_total": 5,
+   "failed_checks": [],
+   "measured": {
+    "every file bit-identical": "2/2"
+   },
+   "reason": "topup exits 1; the same from the replica. Part of FSL (ID: 2412.6-dirty) topup Usage: topup --imain=<some 4D image> --datain=<text file> --config=<text file with parameters> --out=my_topup_results Compulsory arguments (You MUST set one or mor",
+   "seconds": 0.008,
+   "status": "both-error"
+  },
+  {
+   "case": "err/unknown-option",
+   "category": "err",
+   "checks_passed": 5,
+   "checks_total": 5,
+   "failed_checks": [],
+   "measured": {
+    "every file bit-identical": "2/2"
+   },
+   "reason": "topup exits 1; the same from the replica. Part of FSL (ID: 2412.6-dirty) topup Usage: topup --imain=<some 4D image> --datain=<text file> --config=<text file with parameters> --out=my_topup_results Compulsory arguments (You MUST set one or mor",
+   "seconds": 0.009,
+   "status": "both-error"
+  },
+  {
+   "case": "err/missing-value",
+   "category": "err",
+   "checks_passed": 5,
+   "checks_total": 5,
+   "failed_checks": [],
+   "measured": {
+    "every file bit-identical": "0/0"
+   },
+   "reason": "topup exits 1; the same from the replica. Part of FSL (ID: 2412.6-dirty) topup Usage: topup --imain=<some 4D image> --datain=<text file> --config=<text file with parameters> --out=my_topup_results Compulsory arguments (You MUST set one or mor",
+   "seconds": 0.005,
+   "status": "both-error"
+  },
+  {
+   "case": "err/no-imain",
+   "category": "err",
+   "checks_passed": 5,
+   "checks_total": 5,
+   "failed_checks": [],
+   "measured": {
+    "every file bit-identical": "1/1"
+   },
+   "reason": "topup exits 1; the same from the replica. Part of FSL (ID: 2412.6-dirty) topup Usage: topup --imain=<some 4D image> --datain=<text file> --config=<text file with parameters> --out=my_topup_results Compulsory arguments (You MUST set one or mor",
+   "seconds": 0.005,
+   "status": "both-error"
+  },
+  {
+   "case": "err/imain-missing",
+   "category": "err",
+   "checks_passed": 5,
+   "checks_total": 5,
+   "failed_checks": [],
+   "measured": {
+    "every file bit-identical": "1/1"
+   },
+   "reason": "topup exits 1; the same from the replica. Image Exception : #63 :: No image files match: nothere Image Exception : #22 :: Failed to read volume nothere.nii.gz Error : No image files match: nothere Part of FSL (ID: 2412.6-dirty) topup Usage: t",
+   "seconds": 0.005,
+   "status": "both-error"
+  },
+  {
+   "case": "err/imain-text",
+   "category": "err",
+   "checks_passed": 5,
+   "checks_total": 5,
+   "failed_checks": [],
+   "measured": {
+    "every file bit-identical": "1/1"
+   },
+   "reason": "topup exits 1; the same from the replica. Image Exception : #63 :: No image files match: acq.txt Image Exception : #22 :: Failed to read volume acq.txt Error : No image files match: acq.txt Part of FSL (ID: 2412.6-dirty) topup Usage: topup --",
+   "seconds": 0.005,
+   "status": "both-error"
+  },
+  {
+   "case": "err/datain-and-acqp",
+   "category": "err",
+   "checks_passed": 5,
+   "checks_total": 5,
+   "failed_checks": [],
+   "measured": {
+    "every file bit-identical": "2/2"
+   },
+   "reason": "topup exits 1; the same from the replica. Part of FSL (ID: 2412.6-dirty) topup Usage: topup --imain=<some 4D image> --datain=<text file> --config=<text file with parameters> --out=my_topup_results Compulsory arguments (You MUST set one or mor",
+   "seconds": 0.008,
+   "status": "both-error"
+  },
+  {
+   "case": "err/no-datain",
+   "category": "err",
+   "checks_passed": 5,
+   "checks_total": 5,
+   "failed_checks": [],
+   "measured": {
+    "every file bit-identical": "1/1"
+   },
+   "reason": "topup exits 1; the same from the replica. Part of FSL (ID: 2412.6-dirty) topup Usage: topup --imain=<some 4D image> --datain=<text file> --config=<text file with parameters> --out=my_topup_results Compulsory arguments (You MUST set one or mor",
+   "seconds": 0.008,
+   "status": "both-error"
+  },
+  {
+   "case": "err/datain-missing",
+   "category": "err",
+   "checks_passed": 5,
+   "checks_total": 5,
+   "failed_checks": [],
+   "measured": {
+    "every file bit-identical": "1/1"
+   },
+   "reason": "topup exits 1; the same from the replica. Could not open matrix file nothere.txt Part of FSL (ID: 2412.6-dirty) topup Usage: topup --imain=<some 4D image> --datain=<text file> --config=<text file with parameters> --out=my_topup_results Compul",
+   "seconds": 0.009,
+   "status": "both-error"
+  },
+  {
+   "case": "err/datain-five-columns",
+   "category": "err",
+   "checks_passed": 5,
+   "checks_total": 5,
+   "failed_checks": [],
+   "measured": {
+    "every file bit-identical": "2/2"
+   },
+   "reason": "topup exits 1; the same from the replica. Part of FSL (ID: 2412.6-dirty) topup Usage: topup --imain=<some 4D image> --datain=<text file> --config=<text file with parameters> --out=my_topup_results Compulsory arguments (You MUST set one or mor",
+   "seconds": 0.009,
+   "status": "both-error"
+  },
+  {
+   "case": "err/datain-text",
+   "category": "err",
+   "checks_passed": 5,
+   "checks_total": 5,
+   "failed_checks": [],
+   "measured": {
+    "every file bit-identical": "2/2"
+   },
+   "reason": "topup exits 1; the same from the replica. Part of FSL (ID: 2412.6-dirty) topup Usage: topup --imain=<some 4D image> --datain=<text file> --config=<text file with parameters> --out=my_topup_results Compulsory arguments (You MUST set one or mor",
+   "seconds": 0.009,
+   "status": "both-error"
+  },
+  {
+   "case": "err/datain-norm",
+   "category": "err",
+   "checks_passed": 5,
+   "checks_total": 5,
+   "failed_checks": [],
+   "measured": {
+    "every file bit-identical": "2/2"
+   },
+   "reason": "topup exits 1; the same from the replica. Part of FSL (ID: 2412.6-dirty) topup Usage: topup --imain=<some 4D image> --datain=<text file> --config=<text file with parameters> --out=my_topup_results Compulsory arguments (You MUST set one or mor",
+   "seconds": 0.009,
+   "status": "both-error"
+  },
+  {
+   "case": "err/datain-rows",
+   "category": "err",
+   "checks_passed": 5,
+   "checks_total": 5,
+   "failed_checks": [],
+   "measured": {
+    "every file bit-identical": "2/2"
+   },
+   "reason": "topup exits 1; the same from the replica. Part of FSL (ID: 2412.6-dirty) topup Usage: topup --imain=<some 4D image> --datain=<text file> --config=<text file with parameters> --out=my_topup_results Compulsory arguments (You MUST set one or mor",
+   "seconds": 0.012,
+   "status": "both-error"
+  },
+  {
+   "case": "err/acqp-rows",
+   "category": "err",
+   "checks_passed": 6,
+   "checks_total": 6,
+   "failed_checks": [],
+   "measured": {
+    "every file bit-identical": "2/2"
+   },
+   "reason": "topup exits 1; the same from the replica. Part of FSL (ID: 2412.6-dirty) topup Usage: topup --imain=<some 4D image> --datain=<text file> --config=<text file with parameters> --out=my_topup_results Compulsory arguments (You MUST set one or mor",
+   "seconds": 0.011,
+   "status": "both-error"
+  },
+  {
+   "case": "err/readout-long",
+   "category": "err",
+   "checks_passed": 5,
+   "checks_total": 5,
+   "failed_checks": [],
+   "measured": {
+    "every file bit-identical": "2/2"
+   },
+   "reason": "topup exits 1; the same from the replica. Part of FSL (ID: 2412.6-dirty) topup Usage: topup --imain=<some 4D image> --datain=<text file> --config=<text file with parameters> --out=my_topup_results Compulsory arguments (You MUST set one or mor",
+   "seconds": 0.011,
+   "status": "both-error"
+  },
+  {
+   "case": "err/readout-two-zero",
+   "category": "err",
+   "checks_passed": 5,
+   "checks_total": 5,
+   "failed_checks": [],
+   "measured": {
+    "every file bit-identical": "2/2"
+   },
+   "reason": "topup exits 1; the same from the replica. Part of FSL (ID: 2412.6-dirty) topup Usage: topup --imain=<some 4D image> --datain=<text file> --config=<text file with parameters> --out=my_topup_results Compulsory arguments (You MUST set one or mor",
+   "seconds": 0.01,
+   "status": "both-error"
+  },
+  {
+   "case": "err/levels-subsamp",
+   "category": "err",
+   "checks_passed": 5,
+   "checks_total": 5,
+   "failed_checks": [],
+   "measured": {
+    "every file bit-identical": "2/2"
+   },
+   "reason": "topup exits 1; the same from the replica. Part of FSL (ID: 2412.6-dirty) topup Usage: topup --imain=<some 4D image> --datain=<text file> --config=<text file with parameters> --out=my_topup_results Compulsory arguments (You MUST set one or mor",
+   "seconds": 0.009,
+   "status": "both-error"
+  },
+  {
+   "case": "err/levels-minmet",
+   "category": "err",
+   "checks_passed": 5,
+   "checks_total": 5,
+   "failed_checks": [],
+   "measured": {
+    "every file bit-identical": "2/2"
+   },
+   "reason": "topup exits 1; the same from the replica. Part of FSL (ID: 2412.6-dirty) topup Usage: topup --imain=<some 4D image> --datain=<text file> --config=<text file with parameters> --out=my_topup_results Compulsory arguments (You MUST set one or mor",
+   "seconds": 0.01,
+   "status": "both-error"
+  },
+  {
+   "case": "err/minmet-2",
+   "category": "err",
+   "checks_passed": 5,
+   "checks_total": 5,
+   "failed_checks": [],
+   "measured": {
+    "every file bit-identical": "2/2"
+   },
+   "reason": "topup exits 1; the same from the replica. Part of FSL (ID: 2412.6-dirty) topup Usage: topup --imain=<some 4D image> --datain=<text file> --config=<text file with parameters> --out=my_topup_results Compulsory arguments (You MUST set one or mor",
+   "seconds": 0.008,
+   "status": "both-error"
+  },
+  {
+   "case": "err/subsamp-incompatible",
+   "category": "err",
+   "checks_passed": 5,
+   "checks_total": 5,
+   "failed_checks": [],
+   "measured": {
+    "every file bit-identical": "2/2"
+   },
+   "reason": "topup exits 1; the same from the replica. Part of FSL (ID: 2412.6-dirty) topup Usage: topup --imain=<some 4D image> --datain=<text file> --config=<text file with parameters> --out=my_topup_results Compulsory arguments (You MUST set one or mor",
+   "seconds": 0.008,
+   "status": "both-error"
+  },
+  {
+   "case": "err/subsamp-0",
+   "category": "err",
+   "checks_passed": 5,
+   "checks_total": 5,
+   "failed_checks": [],
+   "measured": {
+    "every file bit-identical": "2/2"
+   },
+   "reason": "topup exits 1; the same from the replica. Part of FSL (ID: 2412.6-dirty) topup Usage: topup --imain=<some 4D image> --datain=<text file> --config=<text file with parameters> --out=my_topup_results Compulsory arguments (You MUST set one or mor",
+   "seconds": 0.009,
+   "status": "both-error"
+  },
+  {
+   "case": "err/subsamp-mixed",
+   "category": "err",
+   "checks_passed": 6,
+   "checks_total": 6,
+   "failed_checks": [],
+   "measured": {
+    "every file bit-identical": "3/3"
+   },
+   "reason": "topup exits 1; the same from the replica. Error occurred when preparing to run level 2 of topup Exception thrown with message: Topup::TopupScan::SubSample: invalid subsampling factor",
+   "seconds": 0.158,
+   "status": "both-error"
+  },
+  {
+   "case": "err/numprec",
+   "category": "err",
+   "checks_passed": 5,
+   "checks_total": 5,
+   "failed_checks": [],
+   "measured": {
+    "every file bit-identical": "2/2"
+   },
+   "reason": "topup exits 1; the same from the replica. Part of FSL (ID: 2412.6-dirty) topup Usage: topup --imain=<some 4D image> --datain=<text file> --config=<text file with parameters> --out=my_topup_results Compulsory arguments (You MUST set one or mor",
+   "seconds": 0.008,
+   "status": "both-error"
+  },
+  {
+   "case": "err/regmod",
+   "category": "err",
+   "checks_passed": 5,
+   "checks_total": 5,
+   "failed_checks": [],
+   "measured": {
+    "every file bit-identical": "2/2"
+   },
+   "reason": "topup exits 1; the same from the replica. Part of FSL (ID: 2412.6-dirty) topup Usage: topup --imain=<some 4D image> --datain=<text file> --config=<text file with parameters> --out=my_topup_results Compulsory arguments (You MUST set one or mor",
+   "seconds": 0.009,
+   "status": "both-error"
+  },
+  {
+   "case": "err/interp",
+   "category": "err",
+   "checks_passed": 5,
+   "checks_total": 5,
+   "failed_checks": [],
+   "measured": {
+    "every file bit-identical": "2/2"
+   },
+   "reason": "topup exits 1; the same from the replica. Part of FSL (ID: 2412.6-dirty) topup Usage: topup --imain=<some 4D image> --datain=<text file> --config=<text file with parameters> --out=my_topup_results Compulsory arguments (You MUST set one or mor",
+   "seconds": 0.008,
+   "status": "both-error"
+  },
+  {
+   "case": "err/splineorder-4",
+   "category": "err",
+   "checks_passed": 5,
+   "checks_total": 5,
+   "failed_checks": [],
+   "measured": {
+    "every file bit-identical": "2/2"
+   },
+   "reason": "topup exits 1; the same from the replica. Part of FSL (ID: 2412.6-dirty) topup Usage: topup --imain=<some 4D image> --datain=<text file> --config=<text file with parameters> --out=my_topup_results Compulsory arguments (You MUST set one or mor",
+   "seconds": 0.009,
+   "status": "both-error"
+  },
+  {
+   "case": "err/splineorder-negative",
+   "category": "err",
+   "checks_passed": 5,
+   "checks_total": 5,
+   "failed_checks": [],
+   "measured": {
+    "every file bit-identical": "2/2"
+   },
+   "reason": "topup exits 1; the same from the replica. Part of FSL (ID: 2412.6-dirty) topup Usage: topup --imain=<some 4D image> --datain=<text file> --config=<text file with parameters> --out=my_topup_results Compulsory arguments (You MUST set one or mor",
+   "seconds": 0.008,
+   "status": "both-error"
+  },
+  {
+   "case": "err/debug-4",
+   "category": "err",
+   "checks_passed": 5,
+   "checks_total": 5,
+   "failed_checks": [],
+   "measured": {
+    "every file bit-identical": "3/3"
+   },
+   "reason": "topup exits 1; the same from the replica. Error occurred when preparing to run topup Exception thrown with message: Topup::TopupCF::SetDebug: Debug level out of range",
+   "seconds": 0.01,
+   "status": "both-error"
+  },
+  {
+   "case": "err/debug-negative",
+   "category": "err",
+   "checks_passed": 5,
+   "checks_total": 5,
+   "failed_checks": [],
+   "measured": {
+    "every file bit-identical": "3/3"
+   },
+   "reason": "topup exits 1; the same from the replica. Error occurred when preparing to run topup Exception thrown with message: Topup::TopupCF::SetDebug: Debug level out of range",
+   "seconds": 0.01,
+   "status": "both-error"
+  },
+  {
+   "case": "err/miter-negative",
+   "category": "err",
+   "checks_passed": 7,
+   "checks_total": 7,
+   "failed_checks": [],
+   "measured": {
+    "every file bit-identical": "5/5"
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 0.06,
+   "status": "pass"
+  },
+  {
+   "case": "err/out-no-directory",
+   "category": "err",
+   "checks_passed": 5,
+   "checks_total": 5,
+   "failed_checks": [],
+   "measured": {
+    "every file bit-identical": "3/3"
+   },
+   "reason": "topup exits 1; the same from the replica. Error occured while writing output from topup Exception thrown with message: Error: cant open file nodir/o_fieldcoef.nii.gz",
+   "seconds": 0.493,
+   "status": "both-error"
+  },
+  {
+   "case": "err/iout-no-directory",
+   "category": "err",
+   "checks_passed": 5,
+   "checks_total": 5,
+   "failed_checks": [],
+   "measured": {
+    "every file bit-identical": "5/5"
+   },
+   "reason": "topup exits 1; the same from the replica. Error occured while writing output from topup Exception thrown with message: Error: cant open file nodir/c.nii.gz",
+   "seconds": 0.487,
+   "status": "both-error"
+  },
+  {
+   "case": "err/logout-no-directory",
+   "category": "err",
+   "checks_passed": 6,
+   "checks_total": 6,
+   "failed_checks": [],
+   "measured": {
+    "every file bit-identical": "4/4"
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 1.078,
+   "status": "pass"
+  },
+  {
+   "case": "err/rbmout-no-directory",
+   "category": "err",
+   "checks_passed": 6,
+   "checks_total": 6,
+   "failed_checks": [],
+   "measured": {
+    "every file bit-identical": "5/5"
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 1.068,
+   "status": "pass"
+  },
+  {
+   "case": "err/profile-no-directory",
+   "category": "err",
+   "checks_passed": 5,
+   "checks_total": 5,
+   "failed_checks": [],
+   "measured": {
+    "every file bit-identical": "3/3"
+   },
+   "reason": "topup exits 1; the same from the replica. ",
+   "seconds": 0.033,
+   "status": "both-error"
+  },
+  {
+   "case": "err/outputtype-invalid",
+   "category": "err",
+   "checks_passed": 5,
+   "checks_total": 5,
+   "failed_checks": [],
+   "measured": {
+    "every file bit-identical": "3/3"
+   },
+   "reason": "topup exits 1; the same from the replica. ERROR:: Unrecognised value (BOGUS) of environment variable FSLOUTPUTTYPE Legal values are: NIFTI, NIFTI_PAIR, NIFTI2, NIFTI2_PAIR, NIFTI_GZ, NIFTI_PAIR_GZ, NIFTI2_GZ, NIFTI2_PAIR_GZ, NIFTI_ZST, NIFTI_",
+   "seconds": 0.524,
+   "status": "both-error"
+  },
+  {
+   "case": "err/outputtype-unset",
+   "category": "err",
+   "checks_passed": 5,
+   "checks_total": 5,
+   "failed_checks": [],
+   "measured": {
+    "every file bit-identical": "3/3"
+   },
+   "reason": "topup exits 1; the same from the replica. ERROR:: Environment variable FSLOUTPUTTYPE is not set! Please make sure that the appropriate configuration file is sourced by your shell (e.g. by putting it in .profile). e.g. bash or sh users add the",
+   "seconds": 0.585,
+   "status": "both-error"
+  },
+  {
+   "case": "thr/nthr-4",
+   "category": "thr",
+   "checks_passed": 7,
+   "checks_total": 7,
+   "failed_checks": [],
+   "measured": {
+    "every file bit-identical": "8/8"
+   },
+   "reason": "",
+   "reported": {
+    "FSL at 4 threads against FSL at one (its own thread band)": "2/7"
+   },
+   "seconds": 0.267,
+   "status": "pass"
+  },
+  {
+   "case": "thr/fsl-num-threads",
+   "category": "thr",
+   "checks_passed": 7,
+   "checks_total": 7,
+   "failed_checks": [],
+   "measured": {
+    "every file bit-identical": "8/8"
+   },
+   "reason": "",
+   "reported": {
+    "FSL at 4 threads against FSL at one (its own thread band)": "2/7"
+   },
+   "seconds": 0.59,
+   "status": "pass"
+  },
+  {
+   "case": "thr/openblas",
+   "category": "thr",
+   "checks_passed": 7,
+   "checks_total": 7,
+   "failed_checks": [],
+   "measured": {
+    "every file bit-identical": "8/8"
+   },
+   "reason": "",
+   "reported": {
+    "FSL at 4 threads against FSL at one (its own thread band)": "7/7"
+   },
+   "seconds": 0.186,
+   "status": "pass"
+  },
+  {
+   "case": "at/lsr-y",
+   "category": "at",
+   "checks_passed": 6,
+   "checks_total": 6,
+   "failed_checks": [],
+   "measured": {
+    "every file bit-identical": "7/7"
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 5136
+   },
+   "seconds": 0.304,
+   "status": "pass"
+  },
+  {
+   "case": "at/lsr-4d",
+   "category": "at",
+   "checks_passed": 6,
+   "checks_total": 6,
+   "failed_checks": [],
+   "measured": {
+    "every file bit-identical": "7/7"
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 5136
+   },
+   "seconds": 0.34,
+   "status": "pass"
+  },
+  {
+   "case": "at/lsr-x",
+   "category": "at",
+   "checks_passed": 6,
+   "checks_total": 6,
+   "failed_checks": [],
+   "measured": {
+    "every file bit-identical": "6/6"
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 5035
+   },
+   "seconds": 0.324,
+   "status": "pass"
+  },
+  {
+   "case": "at/lsr-four",
+   "category": "at",
+   "checks_passed": 6,
+   "checks_total": 6,
+   "failed_checks": [],
+   "measured": {
+    "every file bit-identical": "8/8"
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 0.096,
+   "status": "pass"
+  },
+  {
+   "case": "at/lsr-three",
+   "category": "at",
+   "checks_passed": 6,
+   "checks_total": 6,
+   "failed_checks": [],
+   "measured": {
+    "every file bit-identical": "7/7"
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 4189
+   },
+   "seconds": 0.275,
+   "status": "pass"
+  },
+  {
+   "case": "at/lsr-trilinear",
+   "category": "at",
+   "checks_passed": 6,
+   "checks_total": 6,
+   "failed_checks": [],
+   "measured": {
+    "every file bit-identical": "7/7"
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 0.233,
+   "status": "pass"
+  },
+  {
+   "case": "at/lsr-crop",
+   "category": "at",
+   "checks_passed": 6,
+   "checks_total": 6,
+   "failed_checks": [],
+   "measured": {
+    "every file bit-identical": "7/7"
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 6612
+   },
+   "seconds": 0.168,
+   "status": "pass"
+  },
+  {
+   "case": "at/lsr-zero-field",
+   "category": "at",
+   "checks_passed": 6,
+   "checks_total": 6,
+   "failed_checks": [],
+   "measured": {
+    "every file bit-identical": "6/6"
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 4698
+   },
+   "seconds": 0.192,
+   "status": "pass"
+  },
+  {
+   "case": "at/vb2d-y",
+   "category": "at",
+   "checks_passed": 6,
+   "checks_total": 6,
+   "failed_checks": [],
+   "measured": {
+    "every file bit-identical": "7/7"
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 5622
+   },
+   "seconds": 15.975,
+   "status": "pass"
+  },
+  {
+   "case": "at/vb3d-y",
+   "category": "at",
+   "checks_passed": 6,
+   "checks_total": 6,
+   "failed_checks": [],
+   "measured": {
+    "every file bit-identical": "7/7"
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 18852
+   },
+   "seconds": 8.81,
+   "status": "pass"
+  },
+  {
+   "case": "at/vb4d-y",
+   "category": "at",
+   "checks_passed": 6,
+   "checks_total": 6,
+   "failed_checks": [],
+   "measured": {
+    "every file bit-identical": "7/7"
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 18852
+   },
+   "seconds": 8.999,
+   "status": "pass"
+  },
+  {
+   "case": "at/lsr-long",
+   "category": "at",
+   "checks_passed": 6,
+   "checks_total": 6,
+   "failed_checks": [],
+   "measured": {
+    "every file bit-identical": "7/7"
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 692
+   },
+   "seconds": 0.431,
+   "status": "pass"
+  },
+  {
+   "case": "at/vb2d-long",
+   "category": "at",
+   "checks_passed": 6,
+   "checks_total": 6,
+   "failed_checks": [],
+   "measured": {
+    "every file bit-identical": "7/7"
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 5276
+   },
+   "seconds": 45.96,
+   "status": "pass"
+  },
+  {
+   "case": "at/vb3d-long",
+   "category": "at",
+   "checks_passed": 6,
+   "checks_total": 6,
+   "failed_checks": [],
+   "measured": {
+    "every file bit-identical": "7/7"
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 5277
+   },
+   "seconds": 26.022,
+   "status": "pass"
+  },
+  {
+   "case": "at/vb4d-long",
+   "category": "at",
+   "checks_passed": 6,
+   "checks_total": 6,
+   "failed_checks": [],
+   "measured": {
+    "every file bit-identical": "7/7"
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 5277
+   },
+   "seconds": 26.142,
+   "status": "pass"
+  },
+  {
+   "case": "at/vb3d-4d",
+   "category": "at",
+   "checks_passed": 6,
+   "checks_total": 6,
+   "failed_checks": [],
+   "measured": {
+    "every file bit-identical": "7/7"
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 37704
+   },
+   "seconds": 17.745,
+   "status": "pass"
+  },
+  {
+   "case": "at/vb4d-4d",
+   "category": "at",
+   "checks_passed": 6,
+   "checks_total": 6,
+   "failed_checks": [],
+   "measured": {
+    "every file bit-identical": "7/7"
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 37704
+   },
+   "seconds": 9.298,
+   "status": "pass"
+  },
+  {
+   "case": "at/vb2d-x",
+   "category": "at",
+   "checks_passed": 6,
+   "checks_total": 6,
+   "failed_checks": [],
+   "measured": {
+    "every file bit-identical": "6/6"
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 5444
+   },
+   "seconds": 16.388,
+   "status": "pass"
+  },
+  {
+   "case": "at/vb3d-x",
+   "category": "at",
+   "checks_passed": 6,
+   "checks_total": 6,
+   "failed_checks": [],
+   "measured": {
+    "every file bit-identical": "6/6"
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 18851
+   },
+   "seconds": 8.836,
+   "status": "pass"
+  },
+  {
+   "case": "at/vb3d-aniso",
+   "category": "at",
+   "checks_passed": 6,
+   "checks_total": 6,
+   "failed_checks": [],
+   "measured": {
+    "every file bit-identical": "6/6"
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 18854
+   },
+   "seconds": 8.77,
+   "status": "pass"
+  },
+  {
+   "case": "at/vb2d-aniso",
+   "category": "at",
+   "checks_passed": 6,
+   "checks_total": 6,
+   "failed_checks": [],
+   "measured": {
+    "every file bit-identical": "6/6"
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 6052
+   },
+   "seconds": 16.057,
+   "status": "pass"
+  },
+  {
+   "case": "at/vb4d-four",
+   "category": "at",
+   "checks_passed": 6,
+   "checks_total": 6,
+   "failed_checks": [],
+   "measured": {
+    "every file bit-identical": "8/8"
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 17263
+   },
+   "seconds": 18.004,
+   "status": "pass"
+  },
+  {
+   "case": "at/vb3d-three",
+   "category": "at",
+   "checks_passed": 6,
+   "checks_total": 6,
+   "failed_checks": [],
+   "measured": {
+    "every file bit-identical": "7/7"
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 18852
+   },
+   "seconds": 8.903,
+   "status": "pass"
+  },
+  {
+   "case": "at/vb2d-three",
+   "category": "at",
+   "checks_passed": 6,
+   "checks_total": 6,
+   "failed_checks": [],
+   "measured": {
+    "every file bit-identical": "7/7"
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 4454
+   },
+   "seconds": 15.997,
+   "status": "pass"
+  },
+  {
+   "case": "at/vb-one-direction",
+   "category": "at",
+   "checks_passed": 5,
+   "checks_total": 5,
+   "failed_checks": [],
+   "measured": {
+    "every file bit-identical": "5/5"
+   },
+   "reason": "applytopup exits -6; the same from the replica. terminate called after throwing an instance of 'TOPUP::ApplyTopupException' what(): ApplyTopup::Invalid combination of phase-encode vectors for least-squares restoration",
+   "seconds": 0.092,
+   "status": "both-error"
+  },
+  {
+   "case": "at/vb-no-movements",
+   "category": "at",
+   "checks_passed": 6,
+   "checks_total": 6,
+   "failed_checks": [],
+   "measured": {
+    "every file bit-identical": "6/6"
+   },
+   "reason": "applytopup exits -6; the same from the replica. terminate called after throwing an instance of 'TOPUP::TopupFileIOException' what(): TopupFileIO::TopupFileReader::MoveMatrix: Index i out of bound",
+   "seconds": 0.041,
+   "status": "both-error"
+  },
+  {
+   "case": "at/vb-other-grid",
+   "category": "at",
+   "checks_passed": 2,
+   "checks_total": 2,
+   "failed_checks": [],
+   "reason": "FSL-134: refused; FSL is not run: FSL reads the field's lines past their end (undefined behaviour)",
+   "seconds": 0.01,
+   "status": "expected-divergence"
+  },
+  {
+   "case": "at/jac-y",
+   "category": "at",
+   "checks_passed": 6,
+   "checks_total": 6,
+   "failed_checks": [],
+   "measured": {
+    "every file bit-identical": "6/6"
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 20480
+   },
+   "seconds": 0.041,
+   "status": "pass"
+  },
+  {
+   "case": "at/jac-pair",
+   "category": "at",
+   "checks_passed": 6,
+   "checks_total": 6,
+   "failed_checks": [],
+   "measured": {
+    "every file bit-identical": "7/7"
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 18848
+   },
+   "seconds": 0.066,
+   "status": "pass"
+  },
+  {
+   "case": "at/jac-4d",
+   "category": "at",
+   "checks_passed": 6,
+   "checks_total": 6,
+   "failed_checks": [],
+   "measured": {
+    "every file bit-identical": "6/6"
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 20480
+   },
+   "seconds": 0.054,
+   "status": "pass"
+  },
+  {
+   "case": "at/jac-trilinear",
+   "category": "at",
+   "checks_passed": 6,
+   "checks_total": 6,
+   "failed_checks": [],
+   "measured": {
+    "every file bit-identical": "6/6"
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 0.041,
+   "status": "pass"
+  },
+  {
+   "case": "at/jac-x",
+   "category": "at",
+   "checks_passed": 6,
+   "checks_total": 6,
+   "failed_checks": [],
+   "measured": {
+    "every file bit-identical": "5/5"
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 18851
+   },
+   "seconds": 0.038,
+   "status": "pass"
+  },
+  {
+   "case": "at/jac-quadratic",
+   "category": "at",
+   "checks_passed": 6,
+   "checks_total": 6,
+   "failed_checks": [],
+   "measured": {
+    "every file bit-identical": "6/6"
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 20478
+   },
+   "seconds": 0.034,
+   "status": "pass"
+  },
+  {
+   "case": "at/jac-field",
+   "category": "at",
+   "checks_passed": 6,
+   "checks_total": 6,
+   "failed_checks": [],
+   "measured": {
+    "every file bit-identical": "6/6"
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 20480
+   },
+   "seconds": 0.086,
+   "status": "pass"
+  },
+  {
+   "case": "at/jac-field-aniso",
+   "category": "at",
+   "checks_passed": 6,
+   "checks_total": 6,
+   "failed_checks": [],
+   "measured": {
+    "every file bit-identical": "6/6"
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 20480
+   },
+   "seconds": 0.083,
+   "status": "pass"
+  },
+  {
+   "case": "at/jac-no-movpar",
+   "category": "at",
+   "checks_passed": 6,
+   "checks_total": 6,
+   "failed_checks": [],
+   "measured": {
+    "every file bit-identical": "5/5"
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 20480
+   },
+   "seconds": 0.043,
+   "status": "pass"
+  },
+  {
+   "case": "at/jac-oblique",
+   "category": "at",
+   "checks_passed": 6,
+   "checks_total": 6,
+   "failed_checks": [],
+   "measured": {
+    "every file bit-identical": "6/6"
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 19134
+   },
+   "seconds": 0.043,
+   "status": "pass"
+  },
+  {
+   "case": "at/jac-z",
+   "category": "at",
+   "checks_passed": 6,
+   "checks_total": 6,
+   "failed_checks": [],
+   "measured": {
+    "every file bit-identical": "6/6"
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 8945
+   },
+   "seconds": 0.042,
+   "status": "pass"
+  },
+  {
+   "case": "at/datatype-preserve",
+   "category": "at",
+   "checks_passed": 6,
+   "checks_total": 6,
+   "failed_checks": [],
+   "measured": {
+    "every file bit-identical": "6/6"
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 20480
+   },
+   "seconds": 0.043,
+   "status": "pass"
+  },
+  {
+   "case": "at/datatype-char",
+   "category": "at",
+   "checks_passed": 6,
+   "checks_total": 6,
+   "failed_checks": [],
+   "measured": {
+    "every file bit-identical": "6/6"
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 18118
+   },
+   "seconds": 0.038,
+   "status": "pass"
+  },
+  {
+   "case": "at/datatype-short",
+   "category": "at",
+   "checks_passed": 6,
+   "checks_total": 6,
+   "failed_checks": [],
+   "measured": {
+    "every file bit-identical": "6/6"
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 18349
+   },
+   "seconds": 0.039,
+   "status": "pass"
+  },
+  {
+   "case": "at/datatype-int",
+   "category": "at",
+   "checks_passed": 6,
+   "checks_total": 6,
+   "failed_checks": [],
+   "measured": {
+    "every file bit-identical": "6/6"
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 18333
+   },
+   "seconds": 0.043,
+   "status": "pass"
+  },
+  {
+   "case": "at/datatype-float",
+   "category": "at",
+   "checks_passed": 6,
+   "checks_total": 6,
+   "failed_checks": [],
+   "measured": {
+    "every file bit-identical": "6/6"
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 20480
+   },
+   "seconds": 0.103,
+   "status": "pass"
+  },
+  {
+   "case": "at/datatype-double",
+   "category": "at",
+   "checks_passed": 6,
+   "checks_total": 6,
+   "failed_checks": [],
+   "measured": {
+    "every file bit-identical": "6/6"
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 20480
+   },
+   "seconds": 0.117,
+   "status": "pass"
+  },
+  {
+   "case": "at/datatype-preserve-int16",
+   "category": "at",
+   "checks_passed": 6,
+   "checks_total": 6,
+   "failed_checks": [],
+   "measured": {
+    "every file bit-identical": "6/6"
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 16761
+   },
+   "seconds": 0.049,
+   "status": "pass"
+  },
+  {
+   "case": "at/datatype-preserve-int8",
+   "category": "at",
+   "checks_passed": 6,
+   "checks_total": 6,
+   "failed_checks": [],
+   "measured": {
+    "every file bit-identical": "6/6"
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 20480
+   },
+   "seconds": 0.047,
+   "status": "pass"
+  },
+  {
+   "case": "at/short-options",
+   "category": "at",
+   "checks_passed": 6,
+   "checks_total": 6,
+   "failed_checks": [],
+   "measured": {
+    "every file bit-identical": "7/7"
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 5136
+   },
+   "seconds": 0.307,
+   "status": "pass"
+  },
+  {
+   "case": "at/nifti",
+   "category": "at",
+   "checks_passed": 6,
+   "checks_total": 6,
+   "failed_checks": [],
+   "measured": {
+    "every file bit-identical": "6/6"
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 20480
+   },
+   "seconds": 0.038,
+   "status": "pass"
+  },
+  {
+   "case": "at/no-arguments",
+   "category": "at",
+   "checks_passed": 5,
+   "checks_total": 5,
+   "failed_checks": [],
+   "measured": {
+    "every file bit-identical": "3/3"
+   },
+   "reason": "applytopup exits 1; the same from the replica. *************************************************** The following COMPULSORY options have not been set: -i,--imain comma separated list of names of input image (to be corrected) -a,--datain name of te",
+   "seconds": 0.009,
+   "status": "both-error"
+  },
+  {
+   "case": "at/help",
+   "category": "at",
+   "checks_passed": 5,
+   "checks_total": 5,
+   "failed_checks": [],
+   "measured": {
+    "every file bit-identical": "3/3"
+   },
+   "reason": "applytopup exits 1; the same from the replica. Part of FSL (ID: 2412.6-dirty) applytopup (Version 1.0) Copyright(c) 2009, University of Oxford (Jesper Andersson) Usage: applytopup -in=topdn,botup --topup=mytu --inindex=1,2 --out=hifi applytopup -i",
+   "seconds": 0.008,
+   "status": "both-error"
+  },
+  {
+   "case": "at/unknown-option",
+   "category": "at",
+   "checks_passed": 5,
+   "checks_total": 5,
+   "failed_checks": [],
+   "measured": {
+    "every file bit-identical": "6/6"
+   },
+   "reason": "applytopup exits 1; the same from the replica. Part of FSL (ID: 2412.6-dirty) applytopup (Version 1.0) Copyright(c) 2009, University of Oxford (Jesper Andersson) Usage: applytopup -in=topdn,botup --topup=mytu --inindex=1,2 --out=hifi applytopup -i",
+   "seconds": 0.013,
+   "status": "both-error"
+  },
+  {
+   "case": "at/invert",
+   "category": "at",
+   "checks_passed": 5,
+   "checks_total": 5,
+   "failed_checks": [],
+   "measured": {
+    "every file bit-identical": "6/6"
+   },
+   "reason": "applytopup exits 1; the same from the replica. Part of FSL (ID: 2412.6-dirty) applytopup (Version 1.0) Copyright(c) 2009, University of Oxford (Jesper Andersson) Usage: applytopup -in=topdn,botup --topup=mytu --inindex=1,2 --out=hifi applytopup -i",
+   "seconds": 0.013,
+   "status": "both-error"
+  },
+  {
+   "case": "at/missing-out",
+   "category": "at",
+   "checks_passed": 5,
+   "checks_total": 5,
+   "failed_checks": [],
+   "measured": {
+    "every file bit-identical": "6/6"
+   },
+   "reason": "applytopup exits 1; the same from the replica. *************************************************** The following COMPULSORY options have not been set: -o,--out basename for output (warped) image *************************************************** ",
+   "seconds": 0.011,
+   "status": "both-error"
+  },
+  {
+   "case": "at/interp-unknown",
+   "category": "at",
+   "checks_passed": 5,
+   "checks_total": 5,
+   "failed_checks": [],
+   "measured": {
+    "every file bit-identical": "6/6"
+   },
+   "reason": "applytopup exits -6; the same from the replica. terminate called after throwing an instance of 'TOPUP::ApplyTopupException' what(): ApplyTopup::Unknown interpolation type cubic",
+   "seconds": 0.034,
+   "status": "both-error"
+  },
+  {
+   "case": "at/lists-mismatch",
+   "category": "at",
+   "checks_passed": 5,
+   "checks_total": 5,
+   "failed_checks": [],
+   "measured": {
+    "every file bit-identical": "6/6"
+   },
+   "reason": "applytopup exits -6; the same from the replica. terminate called after throwing an instance of 'TOPUP::ApplyTopupException' what(): ApplyTopup::Mismatched --in and --inindex lists",
+   "seconds": 0.045,
+   "status": "both-error"
+  },
+  {
+   "case": "at/datatype-unknown",
+   "category": "at",
+   "checks_passed": 5,
+   "checks_total": 5,
+   "failed_checks": [],
+   "measured": {
+    "every file bit-identical": "5/5"
+   },
+   "reason": "applytopup exits -6; the same from the replica. terminate called after throwing an instance of 'TOPUP::ApplyTopupException' what(): ApplyTopup::Unknown data type long",
+   "seconds": 0.037,
+   "status": "both-error"
+  },
+  {
+   "case": "at/datatype-preserve-missing",
+   "category": "at",
+   "checks_passed": 5,
+   "checks_total": 5,
+   "failed_checks": [],
+   "measured": {
+    "every file bit-identical": "4/4"
+   },
+   "reason": "applytopup exits -6; the same from the replica. Image Exception : #63 :: No image files match: nothere terminate called after throwing an instance of 'std::runtime_error' what(): No image files match: nothere",
+   "seconds": 0.032,
+   "status": "both-error"
+  },
+  {
+   "case": "at/imain-missing",
+   "category": "at",
+   "checks_passed": 5,
+   "checks_total": 5,
+   "failed_checks": [],
+   "measured": {
+    "every file bit-identical": "4/4"
+   },
+   "reason": "applytopup exits -6; the same from the replica. Image Exception : #63 :: No image files match: nothere Image Exception : #22 :: Failed to read volume nothere.nii.gz Error : No image files match: nothere terminate called after throwing an instance o",
+   "seconds": 0.031,
+   "status": "both-error"
+  },
+  {
+   "case": "at/images-mismatch",
+   "category": "at",
+   "checks_passed": 5,
+   "checks_total": 5,
+   "failed_checks": [],
+   "measured": {
+    "every file bit-identical": "6/6"
+   },
+   "reason": "applytopup exits -6; the same from the replica. terminate called after throwing an instance of 'TOPUP::ApplyTopupException' what(): ApplyTopup::Mismatched input files crop_dn.nii.gz and half_up.nii.gz",
+   "seconds": 0.038,
+   "status": "both-error"
+  },
+  {
+   "case": "at/datain-missing",
+   "category": "at",
+   "checks_passed": 5,
+   "checks_total": 5,
+   "failed_checks": [],
+   "measured": {
+    "every file bit-identical": "5/5"
+   },
+   "reason": "applytopup exits -6; the same from the replica. Could not open matrix file nothere.txt terminate called after throwing an instance of 'TOPUP::TopupFileIOException' what(): TopupFileIO::TopupDatafileReader:: error reading file nothere.txt",
+   "seconds": 0.042,
+   "status": "both-error"
+  },
+  {
+   "case": "at/datain-norm",
+   "category": "at",
+   "checks_passed": 5,
+   "checks_total": 5,
+   "failed_checks": [],
+   "measured": {
+    "every file bit-identical": "6/6"
+   },
+   "reason": "applytopup exits -6; the same from the replica. terminate called after throwing an instance of 'TOPUP::TopupFileIOException' what(): TopupFileIO::TopupDatafileReader:: phase-encode vectors must be unity length",
+   "seconds": 0.043,
+   "status": "both-error"
+  },
+  {
+   "case": "at/inindex-zero",
+   "category": "at",
+   "checks_passed": 5,
+   "checks_total": 5,
+   "failed_checks": [],
+   "measured": {
+    "every file bit-identical": "5/5"
+   },
+   "reason": "applytopup exits -6; the same from the replica. terminate called after throwing an instance of 'TOPUP::ApplyTopupException' what(): ApplyTopup::Invalid entry in --inindex list",
+   "seconds": 0.038,
+   "status": "both-error"
+  },
+  {
+   "case": "at/inindex-beyond",
+   "category": "at",
+   "checks_passed": 5,
+   "checks_total": 5,
+   "failed_checks": [],
+   "measured": {
+    "every file bit-identical": "5/5"
+   },
+   "reason": "applytopup exits -6; the same from the replica. terminate called after throwing an instance of 'TOPUP::ApplyTopupException' what(): ApplyTopup::Invalid entry in --inindex list",
+   "seconds": 0.041,
+   "status": "both-error"
+  },
+  {
+   "case": "at/topup-extension",
+   "category": "at",
+   "checks_passed": 5,
+   "checks_total": 5,
+   "failed_checks": [],
+   "measured": {
+    "every file bit-identical": "6/6"
+   },
+   "reason": "applytopup exits -6; the same from the replica. terminate called after throwing an instance of 'TOPUP::TopupFileIOException' what(): TopupFileIO::TopupFileReader::TopupFileReader: Filename must be given without extension, fname=tu.nii.gz",
+   "seconds": 0.039,
+   "status": "both-error"
+  },
+  {
+   "case": "at/topup-missing",
+   "category": "at",
+   "checks_passed": 5,
+   "checks_total": 5,
+   "failed_checks": [],
+   "measured": {
+    "every file bit-identical": "6/6"
+   },
+   "reason": "applytopup exits -6; the same from the replica. terminate called after throwing an instance of 'TOPUP::TopupFileIOException' what(): TopupFileIO::TopupFileReader::TopupFileReader: Unable to read file nothere",
+   "seconds": 0.07,
+   "status": "both-error"
+  },
+  {
+   "case": "at/lsr-oblique",
+   "category": "at",
+   "checks_passed": 5,
+   "checks_total": 5,
+   "failed_checks": [],
+   "measured": {
+    "every file bit-identical": "6/6"
+   },
+   "reason": "applytopup exits -6; the same from the replica. terminate called after throwing an instance of 'TOPUP::ApplyTopupException' what(): ApplyTopup::Invalid phase-encode vector for least-squares restoration",
+   "seconds": 0.082,
+   "status": "both-error"
+  },
+  {
+   "case": "at/lsr-same",
+   "category": "at",
+   "checks_passed": 5,
+   "checks_total": 5,
+   "failed_checks": [],
+   "measured": {
+    "every file bit-identical": "6/6"
+   },
+   "reason": "applytopup exits -6; the same from the replica. terminate called after throwing an instance of 'TOPUP::ApplyTopupException' what(): ApplyTopup::Invalid combination of phase-encode vectors for least-squares restoration",
+   "seconds": 0.109,
+   "status": "both-error"
+  },
+  {
+   "case": "at/lsr-one",
+   "category": "at",
+   "checks_passed": 5,
+   "checks_total": 5,
+   "failed_checks": [],
+   "measured": {
+    "every file bit-identical": "5/5"
+   },
+   "reason": "applytopup exits -6; the same from the replica. terminate called after throwing an instance of 'TOPUP::ApplyTopupException' what(): ApplyTopup::Invalid combination of phase-encode vectors for least-squares restoration",
+   "seconds": 0.07,
+   "status": "both-error"
+  },
+  {
+   "case": "at/outputtype-invalid",
+   "category": "at",
+   "checks_passed": 5,
+   "checks_total": 5,
+   "failed_checks": [],
+   "measured": {
+    "every file bit-identical": "5/5"
+   },
+   "reason": "applytopup exits 1; the same from the replica. ERROR:: Unrecognised value (BOGUS) of environment variable FSLOUTPUTTYPE Legal values are: NIFTI, NIFTI_PAIR, NIFTI2, NIFTI2_PAIR, NIFTI_GZ, NIFTI_PAIR_GZ, NIFTI2_GZ, NIFTI2_PAIR_GZ, NIFTI_ZST, NIFTI_",
+   "seconds": 0.043,
+   "status": "both-error"
+  },
+  {
+   "case": "at/method-unknown",
+   "category": "at",
+   "checks_passed": 7,
+   "checks_total": 7,
+   "failed_checks": [],
+   "measured": {
+    "every file bit-identical": "6/6"
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 0.025,
+   "status": "pass"
+  },
+  {
+   "case": "at/lsr-no-movements",
+   "category": "at",
+   "checks_passed": 6,
+   "checks_total": 6,
+   "failed_checks": [],
+   "measured": {
+    "every file bit-identical": "6/6"
+   },
+   "reason": "applytopup exits -6; the same from the replica. terminate called after throwing an instance of 'TOPUP::TopupFileIOException' what(): TopupFileIO::TopupFileReader::MoveMatrix: Index i out of bound",
+   "seconds": 0.044,
+   "status": "both-error"
+  },
+  {
+   "case": "at/jac-other-grid",
+   "category": "at",
+   "checks_passed": 6,
+   "checks_total": 6,
+   "failed_checks": [],
+   "measured": {
+    "every file bit-identical": "5/5"
+   },
+   "reason": "applytopup exits -6; the same from the replica. Image Exception : #2 :: Attempted to copydata with non-matching sizes terminate called after throwing an instance of 'std::runtime_error' what(): Attempted to copydata with non-matching sizes",
+   "seconds": 0.05,
+   "status": "both-error"
+  },
+  {
+   "case": "at/jac-other-shape",
+   "category": "at",
+   "checks_passed": 7,
+   "checks_total": 7,
+   "failed_checks": [],
+   "measured": {
+    "every file bit-identical": "6/6"
+   },
+   "reason": "",
+   "reported": {
+    "D13 fix pass": 0
+   },
+   "seconds": 0.037,
+   "status": "pass"
+  },
+  {
+   "case": "at/lsr-other-grid",
+   "category": "at",
+   "checks_passed": 2,
+   "checks_total": 2,
+   "failed_checks": [],
+   "reason": "FSL-134: refused; FSL is not run: FSL reads the field's lines past their end (undefined behaviour)",
+   "seconds": 0.012,
+   "status": "expected-divergence"
+  }
+ ],
+ "suite": "fsl-topup-replica",
+ "summary": {
+  "both-error": 66,
+  "expected-divergence": 3,
+  "fail": 0,
+  "pass": 104,
+  "skipped": 0
+ },
+ "tier": "standard"
+}

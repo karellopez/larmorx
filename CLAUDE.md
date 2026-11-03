@@ -38,9 +38,9 @@ the decisions waiting for the user: [docs/next-steps.md](docs/next-steps.md)** (
 **Next** (the order: [docs/next-steps.md](docs/next-steps.md), "The order from here"; the earlier
 steps: [docs/status.md](docs/status.md)): ports first, with smart testing per part, the very extensive
 testing in one final validation phase (user, 2026-10-28). FLIRT's clean-room original and FAST's
-replica (2026-11-02) and FAST's clean-room original (2026-11-03) complete; now topup's replica (two
-agents by role, 2026-11-02); then topup's clean-room original beside `fslmaths` and `fslstats`'s replica, field maps, templates, FreeSurfer, surfaces,
-confounds, larmorprepx; each a bounded part with a stop after it and its site page from its tests.
+replica (2026-11-02), FAST's clean-room original and topup's replica (2026-11-03) complete; now
+topup's clean-room original beside `fslmaths` and `fslstats`'s replica (two agents by role,
+2026-11-02); then field maps, templates, FreeSurfer, surfaces, confounds, larmorprepx; each a bounded part with a stop after it and its site page from its tests.
 Then the final validation phase (the data panel's part b and every new tool, full tiers, heavy and
 nightly random testing, the extensive evidence, reviews, the scripts triage) and the comparisons
 with fMRIPrep. Machine-only runs meanwhile: 8 heavy random-testing cases wait for the lab's server.
@@ -121,7 +121,7 @@ larmorx/scripts/bootstrap_workspace.sh --venv .venv --install-rust
      - Workbench (GPL-2.0-or-later): `larmorx-gpl` (GPL-3.0-or-later, `crates-gpl/`, which today holds only the verification tools that keep glibc's LGPL code);
      - FSL: `larmorx-nc` (the FSL Licence's non-commercial terms, `crates-nc/`);
      - FreeSurfer: `larmorx-freesurfer`.
-   - **Original:** a strict clean-room implementation with the same behaviour, Apache-2.0, in the main package. It is needed wherever the replica is not Apache-compatible. The implementer works only from `specs/<tool>.md`, documentation, papers and black-box runs of the upstream binary; never the upstream source, the replica crates (`crates/larmorx-afni-replica` since 2026-10-29, `crates-gpl/tools/glibc-reference`, `crates-nc/`) or source-derived findings (`docs/findings/afni-tshift.md`, `afni-automask.md`, `afni-unifize.md`, `afni-licence-routines.md`, `fsl-mcflirt.md`, `fsl-bet.md`, `fsl-flirt.md`, `fsl-fast.md`, the sections of `upstream-defects.md` marked restricted), nor `docs/parts/` (other parts' briefs, reports and handoffs, some source-derived). Who may read what: `docs/porting-guide.md` §1.
+   - **Original:** a strict clean-room implementation with the same behaviour, Apache-2.0, in the main package. It is needed wherever the replica is not Apache-compatible. The implementer works only from `specs/<tool>.md`, documentation, papers and black-box runs of the upstream binary; never the upstream source, the replica crates (`crates/larmorx-afni-replica` since 2026-10-29, `crates-gpl/tools/glibc-reference`, `crates-nc/`) or source-derived findings (`docs/findings/afni-tshift.md`, `afni-automask.md`, `afni-unifize.md`, `afni-licence-routines.md`, `fsl-mcflirt.md`, `fsl-bet.md`, `fsl-flirt.md`, `fsl-fast.md`, `fsl-topup.md`, the sections of `upstream-defects.md` marked restricted), nor `docs/parts/` (other parts' briefs, reports and handoffs, some source-derived). Who may read what: `docs/porting-guide.md` §1.
    - **Never** move replica code into the main package, even renamed, unless the upstream itself releases it under a licence the main package allows and the user decides the move (AFNI's MCW code, CC BY 4.0, 2026-10-29). Never link code from different licence families into one binary: `larmorx-gpl` and `larmorx-nc` are incompatible with each other.
    - **MSM_HOCR:** no replica can be published (its ELC library forbids public distribution of derivatives, and its FastPD optimiser is patented). Its original must avoid those optimisation methods.
    - **Every file records its origin** with an SPDX header and in its crate's `PROVENANCE.md`.

@@ -28,6 +28,12 @@
 //!   the self-intersection test, the file formats FSL reads and writes).
 //! - [`stats`]: newimage's masked sums and means (in FSL's blocks), percentiles, `threshold`
 //!   and `binarise`, as FAST uses them.
+//! - [`splinterpolator`], [`interp_partial`], [`warpfns`]: miscmaths' B-spline interpolator
+//!   (orders 0 to 7, one to five dimensions, first derivatives), newimage's interpolation with
+//!   extrapolation parameters and partial derivatives, fsl-warpfns' resampling through affine
+//!   transforms and displacement fields and the Jacobians of spline fields, as topup uses them.
+//! - [`basisfield`]: fsl-basisfield's B-spline fields (the field and its derivatives, `Jᵀe`,
+//!   `JᵀJ`, the membrane and bending energies, their gradients and Hessians), as topup uses them.
 //! - [`options`]: fsl-utils' command-line options (`Utilities::OptionParser`).
 //! - [`avwutils`]: the parts of `fslval`, `fslroi`, `fslmerge`, `fslmaths` and `fslstats` (and
 //!   fslpy's `imtest`, `remove_ext`, `imglob`) that FSL's scripts run.
@@ -42,7 +48,9 @@
 
 pub mod arma;
 pub mod avwutils;
+pub mod basisfield;
 pub mod bbr;
+pub mod bfmatrix;
 pub mod cnum;
 pub mod costfns;
 pub mod crand;
@@ -51,6 +59,7 @@ pub mod fdlibm;
 pub mod glibc_double;
 pub mod glibc_float;
 pub mod interp;
+pub mod interp_partial;
 pub mod istream;
 pub mod kernel;
 pub mod lapack;
@@ -58,13 +67,18 @@ pub mod mesh;
 pub mod miscmaths;
 pub mod newimagefns;
 pub mod nifti;
+pub mod nonlin;
 pub mod optimise;
 pub mod options;
+pub mod profiler;
 pub mod settings;
+pub mod splinterpolator;
+pub mod spmat;
 pub mod sse;
 pub mod stats;
 pub mod stdsort;
 pub mod volume;
+pub mod warpfns;
 pub mod x87;
 
 /// The version of the FSL release these translations follow.

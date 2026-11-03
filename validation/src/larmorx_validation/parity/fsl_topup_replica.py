@@ -903,6 +903,15 @@ def _option_cases() -> dict[str, tuple[str, str, Run]]:
         settings=(("FSLOUTPUTTYPE", "NIFTI"),),
     )
     add(
+        "opt/nifti2",
+        "FSLOUTPUTTYPE=NIFTI2_GZ",
+        *HALF,
+        *SHORT,
+        "--fout=f",
+        "--iout=c",
+        settings=(("FSLOUTPUTTYPE", "NIFTI2_GZ"),),
+    )
+    add(
         "opt/nifti-pair",
         "FSLOUTPUTTYPE=NIFTI_PAIR",
         *HALF,

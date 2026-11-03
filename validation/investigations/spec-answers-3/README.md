@@ -178,3 +178,63 @@ while reading file`, exit 1, after the verbose lines; `midtrans` of a matrix who
 overflows (`1e200` scales) uses it (NaN rows, exit 0), a singular one is `Could not read matrix`;
 `pointflirt` gives the same bytes for `1 2 nan` and `1 2 0`, and two missing files crash it
 (signal 11: FSL-204).
+
+## FLIRT (part 2's questions 22 to 25 and 38, relay 3b)
+
+| File | What it shows | How to run |
+|---|---|---|
+| `flirt_models_3b.py` | the models from `specs/flirt.md`'s new text: `sinc` (§9.2: the table with glibc's single-precision sine against a correctly rounded one, every voxel of `real/interp-sinc`, applyxfm4D's sinc of float images on four trial findings), `spline` (§9.3, §15.7: applyxfm4D's spline of float and double images, five trial findings), `leastsq` (§6.2: six costs at 8 mm from the three-level sums), `ties` (§8.2: the line searches with every cost equal, the 8 mm stage of FSL's `-verbose 7` traces of the FSL-91 and FSL-92 cases), `debug` (§9.4: the `-debug` levels' headers and `global_refweight1`'s, two trial findings); `runs` makes FSL's runs through the cache (the part-2 trial's recipes rebuilt from seed 20261103), `original` runs the clean-room original as a black box (`reproduce`) on the same inputs and compares its traces | `flirt_models_3b.py runs <dir>`, then optionally `flirt_models_3b.py original <dir> <larmorx binary>`, then `flirt_models_3b.py check <dir> [sinc spline leastsq ties debug]` (boxed, 12 GiB) |
+| `flirt_probes_3b.txt` | question 23: `real/cost-leastsq` at `-verbose 7`, where the first `leastsq` evaluation is (the 4 mm stage's first free optimisation's start) | `cleanroom-flirt/programs2_fsl.py flirt_probes_3b.txt` |
+| `crates-nc/larmorx-nc-flirt/dev-patches/crtrig_variant.patch` (FSL-licensed, outside this directory on purpose) | question 24: a development hook on the FLIRT replica, `LXNC_CRTRIG=sin|atan|all` making `sinf`/`cosf`/`sincosf`, `atan2f` or both correctly rounded, to find which single-precision function a trace's parting comes from; applied, built, measured, reverted (never in the source) | `git apply` it, build `larmorx-nc`, run the replica with `LARMORX_UPSTREAM_DEFECTS=reproduce` and the variable on a trace's inputs |
+
+What the models gave (2026-11-03; FSL 6.0.7.23 through the cache: the trial findings' runs, the
+FSL-91 and FSL-92 traces and the `leastsq` schedule new and stored, the rest served):
+
+- **Question 22, the sinc.** The default table (full width 7) has 20 samples where glibc's sine and
+  a correctly rounded one differ (`k` = 8, 22, 24, 184, 211, 363, 378, 412, 424, 437, 765, 778,
+  790, 824, 839, 991, 1018, 1178, 1180, 1194); width 9 has six, width 5 fourteen. With glibc's
+  sine the model gives all 840,862 interpolated voxels of `real/interp-sinc` (the other 1,149,794
+  are the one background value); with the correctly rounded sine 808,810, so 32,052 differ: the
+  clean-room count exactly. applyxfm4D's 4D sinc (Blackman, width 7) of float images, findings
+  681, 2358, 6389 and 7134 (6,975, 3,048, 742 and 1,041 interpolated voxels, 11,806): glibc's sine
+  gives FSL's values at all of them, the correctly rounded one the original's at all of them (it
+  differs from FSL at 138, 88, 21 and 30). The clean-room original computes a correctly rounded
+  sine (rule 5): its sinc differences are the C library's last bit, nothing else.
+- **Question 22, the spline.** applyxfm4D's spline, findings 368, 3494 and 6013 (float: 191, 1,368
+  and 827 interpolated voxels) and 4718 and 6140 (double: 9,396 and 1,533): the model of §9.3's
+  spline, with double images read and filtered in double, gives FSL's value at all 13,315; with
+  single-precision coefficients for the double images 4,400 of 9,396 and 1,043 of 1,533. The
+  original differs from FSL at 47, 177, 181, 4,430 and 342 of them (all interpolated voxels); none
+  of twenty other readings gives its values (each pass's storage precision, the order and precision
+  of the weights, a single-precision sum, zero or repeated edge coefficients, positions computed
+  directly, the data mirrored instead of reversed): a departure of the original from §9.3's text
+  for the clean-room part to find with these cases.
+- **Question 23, `leastsq`.** The six costs of `real/cost-leastsq`'s pair at 8 mm (identity and two
+  translations, smoothing 8 and 0), FSL 1613224576, 1518097792, 1435371904, 1289947904, 1435549184,
+  1335922688: the three-level sums give 6 of 6, one-level single sums 0, double sums 3 (the
+  products' order `(w·δ)·δ` against `w·(δ·δ)` does not show on these six).
+- **Question 24, equal costs.** In each of the three traces (`real/weights-empty-refweight`,
+  `real/weights-empty-inweight`, `edge/one-voxel-input`, 140,494 to 140,694 lines) the model of
+  §7.2's line search with every cost equal gives the parameters of all 3,256 evaluations of the
+  52 optimisations of the 8 mm stage. The original follows FSL's trace to line 66,124 (53,205
+  evaluations) in all three (one line earlier in the one-voxel case's, whose trace lacks a form
+  line before); it then prints a near-zero skew as `0.000000` where FSL prints
+  `-0.000000` (line 66,125) and the next start's matrix with `0.951056` for `0.951057` (line
+  66,128), under gimbal lock. The replica with the development hook: a correctly rounded `atan2f`
+  makes it leave FSL's trace at line 66,128 too and follow the original's to line 87,480; correctly
+  rounded `sinf`/`cosf` alone keep FSL's trace (and the skew's sign stays FSL's with every variant:
+  that sign is the original's own arithmetic). On `real/dof6` (7,162 lines) the original parts
+  from FSL at line 4,656 (the 3,983rd evaluation, a translation's 5th decimal); the replica with
+  correctly rounded `sinf`/`cosf` parts at the same line and follows the original's to 4,813;
+  with a correctly rounded `atan2f` alone it parts at 4,814.
+- **Question 38, `-debug`.** The model of §9.4's levels (the isotropic resampling and subsamplings
+  composing only set forms, every form of a neurological reference swapped back with each level's
+  grid) gives the sform rows and quaternion fields of all 8 levels of findings 170 and 2424 bit
+  for bit (2424's unset qform written with offsets 65.5, 65.5, 78 and 85.5 from 58, which the
+  original keeps); `global_refweight1` has `pixdim[4..7]` 1 in both (the original writes 0).
+  Finding 2424 (an all-zero white-matter segmentation): FSL writes `debug` (two volumes of zeros),
+  `out` and the `-init` matrix as `-omat`; the original's matrix is NaN and it stops at
+  `inv(): matrix is singular` (FSL-68's status), against §8.2 (NaN costs move nothing) and §12.
+- **Question 25, mcflirt's centres** (`specs/mcflirt.md` §6.1): from the source (the same function
+  of FSL's image library as FLIRT's centres, which the earlier models reproduce); no mcflirt run
+  shows the centre's last bits directly (the `.par` file prints six decimals), so no model here.

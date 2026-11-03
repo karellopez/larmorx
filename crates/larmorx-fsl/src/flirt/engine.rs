@@ -2853,10 +2853,19 @@ fn apply(
     }
     let (stored, scaled) = stored_type(&input.input.header);
     let t = output_type(o, stored, scaled, &values, ctx.mode);
-    let tr = (input.vols.len() > 1).then(|| input.input.header.pixdim[4]);
+    // the output has the input's TR (§9.3), a 3D input's too (observed: FSL's registered FAST
+    // priors carry the prior's pixdim[4] 0, not the reference's 1;
+    // docs/findings/fsl-flirt-original.md)
+    let tr = Some(input.input.header.pixdim[4]);
     if trace.at(2) {
         let d = refv.voxel_size.map(f64::from);
-        let dims = [d[0], d[1], d[2], tr.unwrap_or(ref_input.header.pixdim[4])];
+        let shown = (input.vols.len() > 1).then(|| input.input.header.pixdim[4]);
+        let dims = [
+            d[0],
+            d[1],
+            d[2],
+            shown.unwrap_or(ref_input.header.pixdim[4]),
+        ];
         trace.info(
             "Resampled volume",
             refv.shape,

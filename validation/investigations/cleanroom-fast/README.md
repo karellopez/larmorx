@@ -1,4 +1,4 @@
-# FAST's clean-room original: development probes (relays 1 and 2, 2026-11-03)
+# FAST's clean-room original: development probes (relays 1 to 3, 2026-11-03)
 
 The tools behind [`docs/findings/fsl-fast-original.md`](../../../docs/findings/fsl-fast-original.md)
 and the original's suite (`validation/src/larmorx_validation/parity/fsl_fast.py`). They run FSL
@@ -23,6 +23,8 @@ original (`LARMORX_FAST_BIN`, a `larmorx` binary, else `python -m larmorx`); eac
 | `self_band.py` | the original against itself with one rounding change in the covariances (`LXM_COV`, `self_band.patch` applied): how far an ill-conditioned case moves (the findings' "Five channels") | apply `self_band.patch` in a scratch copy, build, `self_band.py multi/s5` |
 | `self_band.patch` | the development switch `LXM_COV` (never committed into the crate) | `git apply validation/investigations/cleanroom-fast/self_band.patch` in a scratch copy |
 | `segrule.py` | with `-p`, the voxels where the two runs' `_seg` differ, with their probabilities (near-ties of the posteriors) | `segrule.py "-p -o seg @t1_2d.nii.gz"` |
+| `threads_exact.py` | the speed work (relay 3): two builds' outputs, standard output and error byte for byte, the reference build on 1 thread against the new one on each thread count, on one command per path the speed work touched (no FSL run) | `threads_exact.py --ref <old larmorx> --new target/release/larmorx --threads 1 3 14` |
+| `applyxfm_tr_inputs.py` | the images of FLIRT's `-applyxfm` TR probe (relay 3; FLIRT's findings, "`-applyxfm`'s TR"): a 3D and a 4D input with their own `pixdim[4]`, a reference with another, the identity | `python -I applyxfm_tr_inputs.py <dir>`, then `validation/investigations/cleanroom-flirt/probe.py <out> --args "-in @@<dir>/in.nii.gz -ref @@<dir>/ref.nii.gz -applyxfm -init @@<dir>/ident.mat -out out.nii.gz"` (`LARMORX_FLIRT_BIN` a `larmorx` binary) |
 | `variance_model.py` | numpy models of the initialisation's class statistics against FSL's printed lines: the arithmetic of the variance (the findings' "The class variances") | `python -I variance_model.py <workspace>/oracles/inputs/fsl-fast-replica/t1_half.nii.gz` |
 
 glibc's `rand` (the MRF's random posteriors, `specs/fast.md` §8.1) was checked through ctypes

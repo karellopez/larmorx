@@ -597,3 +597,17 @@ Still open (what the spec does not settle, as spec questions in the handoff):
 - avscale's check residual sign in one of twelve cases;
 - registrations' paths (displacement on ill-posed random pairs, FSL-90's message counts during
   quaternion line searches, COG-warning counts, pairreg) as relay 5 lists them.
+
+## `-applyxfm`'s TR (FAST's clean-room original, relay 3, 2026-11-03)
+
+`-applyxfm` and `-applyisoxfm` write the input's `pixdim[4]` (its TR) for a 3D input too, as §9.3
+says ("the output has the input's TR"); the original wrote the reference's for a 3D input. Found
+by FAST's suite (`priors/A-a`: FSL's registered priors carry the template prior's `pixdim[4] = 0`,
+the original's the reference's 1). Black box (`validation/investigations/cleanroom-fast/
+applyxfm_tr_inputs.py`'s images: a 3D input with `pixdim[4..7] = 2.5, 0, 0, 0`, a reference with
+1, 1, 1, 1; FSL through the oracle cache, FLIRT's `probe.py`): FSL's `-applyxfm -init <identity>`
+and `-applyisoxfm 2` outputs carry `pixdim[4] = 2.5` and the reference's `pixdim[5..7] = 1`; a 4D
+input (TR 3) its own TR (unchanged); after a registration (`-dof 6 -out`) the reference's TR (1,
+unchanged). The original now writes the input's TR in the apply path (`flirt::engine::apply`);
+the three apply outputs' headers are FSL's. `-verbose 2`'s "Resampled volume" line keeps the
+reference's TR for a 3D input, as before (not observed otherwise).

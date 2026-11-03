@@ -174,10 +174,10 @@ negative voxel sizes (neither suite holds one).
 
 With `-A` (the template's float priors, `pixdim[4..7]` 0) and the identity, FSL's registered
 priors carry `pixdim[4] = 0` (the input's) and `pixdim[5..7] = 1` (the reference's); larmorx's
-FLIRT writes the reference's `pixdim[4] = 1` for a 3D input (`priors/A-a`: every image of the
-segmentation bit-identical, the header check of the three `_stdspace` images fails). A finding
-for FLIRT's clean-room original, reported in the handoff (FLIRT's engine is not changed here:
-its suite would have to be re-run).
+FLIRT wrote the reference's `pixdim[4] = 1` for a 3D input (`priors/A-a`: every image of the
+segmentation bit-identical, the header check of the three `_stdspace` images failed). Fixed in
+FLIRT's clean-room original in relay 3 (the apply path writes the input's TR, a 3D input's too:
+black-box evidence in [`fsl-flirt-original.md`](fsl-flirt-original.md), "`-applyxfm`'s TR").
 
 ## `-H nan` (FSL-99 with `reproduce`)
 

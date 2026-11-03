@@ -293,3 +293,21 @@ probes (the suite's own cases `orig/` keep them):
   give 97.862248 (y and z identical): one unit in the sixth decimal, 6e-8 relative, inside
   §10's bound (1e-6); the arithmetic of FSL's mapping back to the file's x is not known (single
   precision at the end gives 97.862251 or 97.862244, neither): a spec question.
+
+## 22. FSL-187 in BET's and FLIRT's clean-room originals, relay 4
+
+`probe_f187.py` ran, on images holding one value far above the rest (1e12 among values in
+[0, 1)), FSL 6.0.7.23 (through the oracle cache) and BET's and FLIRT's clean-room originals in
+both modes, as black boxes:
+- **BET**: FSL's `bet2 -v` prints `thresh2 0.00745139 thresh98 0.961979` (the robust range with
+  the far value in the first bin: `fslstats -r` with `reproduce` gives 0.007451 0.961979); the
+  original prints `thresh2 0.00948339 thresh98 0.971723` in **both** modes (the corrected
+  range, `fslstats -r`'s default 0.009483 0.971723) and names nothing.
+- **FLIRT**: without the far value the costs at the identity are FSL's to every printed digit
+  (`corratio` 0.0958757, `normmi` -1.38717, `mutualinfo` -1.77204); with it `corratio` agrees
+  (0.0981845) and the mutual informations part (`normmi` FSL -1.3816, original -1.38142;
+  `mutualinfo` -1.75546 and -1.75488), the same in both of the original's modes.
+So neither original shows FSL-187's behaviour by default (BET's thresholds are the corrected
+range; FLIRT's costs move only where the far value is), but neither has its `reproduce`
+switch (FSL's first bin) or its notice, which the register's row asks of both: a D13 gap,
+reported for the orchestrator (no record input reaches FSL-187: the register's measurement).

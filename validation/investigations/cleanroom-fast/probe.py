@@ -10,6 +10,7 @@ development tool of FAST's clean-room original (relay 1, 2026-11-02).
         <out-dir> --case opt/type2-verbose [--mode reproduce|fix] [--fsl-only]
     ... probe.py <out-dir> --args "-v -o seg @t1_half.nii.gz"
     ... probe.py <out-dir> --fmriprep ds000005-sub-01-noreconall
+    ... probe.py <out-dir> --finding <a random-testing finding's .json> [--drawn]
 
 Run it inside scripts/orchestration/boxed.sh (it runs FSL and the original on real images).
 """
@@ -17,6 +18,7 @@ Run it inside scripts/orchestration/boxed.sh (it runs FSL and the original on re
 from __future__ import annotations
 
 import argparse
+import json
 import shlex
 import shutil
 import time
@@ -74,6 +76,17 @@ def agreement(a: Path, b: Path) -> None:
                 f"max {d[ok].max():.3g}, rel p99.9 {np.percentile(rel, 99.9):.3g}, NaN {nan}, "
                 f"bit-identical {float(np.mean(xs == ys)):.4f}"
             )
+            xo, yo = x[~m].astype(np.float64), y[~m].astype(np.float64)
+            diff = ~((xo == yo) | (np.isnan(xo) & np.isnan(yo)))
+            if diff.any():
+                idx = np.argwhere(~m)[diff][:4]
+                print(
+                    f"    outside the mask: {int(diff.sum())} of {xo.size} voxels differ, e.g. "
+                    + ", ".join(
+                        f"{tuple(int(v) for v in i)}: {x[tuple(i)]!r} / {y[tuple(i)]!r}"
+                        for i in idx
+                    )
+                )
     extra = sorted(p.name for p in b.iterdir() if not (a / p.name).exists())
     if extra:
         print(f"  only the original's: {extra}")
@@ -85,6 +98,8 @@ def main() -> None:
     ap.add_argument("--case")
     ap.add_argument("--args")
     ap.add_argument("--fmriprep")
+    ap.add_argument("--finding", help="a random-testing finding's JSON: its shrunk recipe")
+    ap.add_argument("--drawn", action="store_true", help="with --finding: the drawn recipe")
     ap.add_argument("--mode", default=defects.REPRODUCE)
     ap.add_argument("--fsl-only", action="store_true")
     ap.add_argument("--quiet", action="store_true", help="streams' first and last lines only")
@@ -95,7 +110,17 @@ def main() -> None:
     fa.mkdir(parents=True)
     fb.mkdir(parents=True)
     settings: dict = {}
-    if a.fmriprep:
+    run = None
+    if a.finding:
+        from larmorx_validation.difftest import tools
+
+        doc = json.loads(Path(a.finding).read_text(encoding="utf-8"))
+        recipe = doc["recipe"] if a.drawn else (doc.get("shrunk") or doc["recipe"])
+        run = tools.get(doc["tool"]).case(recipe, "original").payload[1]
+        settings = dict(run.settings)
+        args = rep._prepare(run, fa)
+        rep._prepare(run, fb)
+    elif a.fmriprep:
         node = next(n for r, n in rep.fmriprep_calls() if r == a.fmriprep)
         src = rep.fmriprep_input(a.fmriprep, str(node))
         args = rep.fmriprep_args(node)
@@ -108,7 +133,8 @@ def main() -> None:
         rep._prepare(run, fb)
     print("args:", " ".join(args))
     t0 = time.time()
-    p = rep.run_oracle(args, cwd=fa, settings=settings)
+    # a case FSL's run must never be cached for (its policy: memory never written) stays so
+    p = rep.run_oracle(args, cwd=fa, settings=settings, never=run.never if run else "")
     t1 = time.time()
     print(f"FSL: exit {p.code} ({t1 - t0:.1f} s, cache-served if fast)")
 

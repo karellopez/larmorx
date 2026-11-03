@@ -666,7 +666,13 @@ pub fn run(
         .map(|t| stream_floats(&t));
     // §4.1: the negative values, the mask
     for c in channels.iter_mut() {
-        fast::single::negative_rule(&mut c.input.vol.data);
+        // on the call's pool (its parallel parts would otherwise use rayon's global pool)
+        let data = &mut c.input.vol.data;
+        if let Err(e) =
+            larmorx_core::parallel::with_threads(n_threads, || fast::single::negative_rule(data))
+        {
+            return refuse(err, &notices, &e.to_string());
+        }
     }
     let bound = fast::single::maximum(&channels[0].input.vol.data) + 1.0;
     if !multi {
@@ -1028,7 +1034,7 @@ fn write_outputs(
     let grid = parts.grid;
     let n = parts.n;
     let multi = channels.len() > 1;
-    let label = |v: &[u8]| -> Vec<i32> { grid.expand(|i| i32::from(v[i]), 0) };
+    let label = |v: &[u8]| -> Vec<i32> { grid.expand_on(n_threads, |i| i32::from(v[i]), 0) };
     if !write(
         "_seg".into(),
         Values::I32(label(parts.seg)),
@@ -1040,7 +1046,7 @@ fn write_outputs(
     if o.segments {
         for c in 0..n {
             let target = (c + 1) as u8;
-            let v = grid.expand(|i| i32::from(parts.seg[i] == target), 0);
+            let v = grid.expand_on(n_threads, |i| i32::from(parts.seg[i] == target), 0);
             if !write(format!("_seg_{c}"), Values::I32(v), &mut notices, &output) {
                 return 1;
             }
@@ -1064,7 +1070,7 @@ fn write_outputs(
                     );
                 }
                 for c in 0..n {
-                    let v = grid.expand(|i| q[i * n + c], 0.0);
+                    let v = grid.expand_on(n_threads, |i| q[i * n + c], 0.0);
                     if !write(format!("_prob_{c}"), Values::F32(v), &mut notices, &output) {
                         return 1;
                     }
@@ -1090,7 +1096,7 @@ fn write_outputs(
     }
     if let Some(p) = parts.pve {
         for c in 0..n {
-            let v = grid.expand(|i| p.frac[i * n + c], 0.0);
+            let v = grid.expand_on(n_threads, |i| p.frac[i * n + c], 0.0);
             if !write(format!("_pve_{c}"), Values::F32(v), &mut notices, &output) {
                 return 1;
             }
@@ -1155,7 +1161,7 @@ fn write_outputs(
     }
     if o.bias_out {
         for c in 0..channels.len() {
-            let v = grid.expand(|i| 1.0 / correction(c, i), 1.0);
+            let v = grid.expand_on(n_threads, |i| 1.0 / correction(c, i), 1.0);
             if !write(suffix("_bias", c), Values::F32(v), &mut notices, &output) {
                 return 1;
             }

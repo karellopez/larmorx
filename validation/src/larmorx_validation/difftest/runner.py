@@ -13,6 +13,10 @@ stopped by killing the group.
 cache off (``LARMORX_ORACLE_CACHE_MODE=off``: nothing is read or stored), so random inputs
 never make it grow; a case that differs is run once more, shrunk, with the cache on, so its
 reproducer's original runs are stored and replay exactly (the parity suites then find them).
+A part's short trial may run them with the cache in ``use`` mode instead
+(``LARMORX_DIFFTEST_CACHE_MODE=use``, :func:`explore_mode`): its original runs are stored, and
+its replays and re-checks are served from the cache (every FSL run of a part through the cache,
+2026-11-03).
 
 **A night** (:func:`night`): tools take turns by their weight until the time budget is spent,
 ``--jobs`` cases at a time; each case's line goes to ``results.jsonl`` as it ends, each
@@ -264,6 +268,19 @@ def _correctly_rounded():
             os.environ["LD_PRELOAD"] = saved
 
 
+#: The cache's mode for random cases: ``off`` (the default) or ``use`` (module docstring).
+ENV_EXPLORE = "LARMORX_DIFFTEST_CACHE_MODE"
+
+
+def explore_mode() -> str:
+    """The oracle cache's mode for random cases: ``LARMORX_DIFFTEST_CACHE_MODE``, ``off`` by
+    default (random inputs never make the cache grow), ``use`` for a part's short trial."""
+    mode = os.environ.get(ENV_EXPLORE) or "off"
+    if mode not in ("off", "use"):
+        raise ValueError(f"{ENV_EXPLORE} must be 'off' or 'use', not {mode!r}")
+    return mode
+
+
 @contextlib.contextmanager
 def cache_mode(mode: str):
     from larmorx_validation import oracle_cache
@@ -356,7 +373,7 @@ def run_case(
         line["verdict"] = next((v for v in (DIFFER, MEMORY, GUARD) if v in verdicts), GUARD)
         return line
     for impl in tool.implementations:
-        j = judge_once(tool, recipe, impl, timeout=timeout)
+        j = judge_once(tool, recipe, impl, explore_mode=explore_mode(), timeout=timeout)
         entry: dict = {
             "verdict": j.verdict,
             "signature": list(j.signature),
@@ -405,7 +422,7 @@ def run_case(
         elif j.verdict == DIFFER and shrink:
 
             def attempt(r: dict, impl: str = impl) -> Judgement:
-                return judge_once(tool, r, impl, timeout=timeout)
+                return judge_once(tool, r, impl, explore_mode=explore_mode(), timeout=timeout)
 
             small, kept, last, runs = shrinking.shrink(
                 recipe, j.signature, attempt, budget_s=shrink_budget, extra=tool.shrink
@@ -702,7 +719,7 @@ def _worker(conn: Connection, threads: int, leaf: limits.Leaf | None = None) -> 
         # Before anything runs: every process this worker starts is held in its leaf.
         leaf.enter()
     limits.watch_exits()
-    os.environ["LARMORX_ORACLE_CACHE_MODE"] = "off"
+    os.environ["LARMORX_ORACLE_CACHE_MODE"] = explore_mode()
     limit_threads(threads)
     while True:
         try:

@@ -237,6 +237,29 @@ impl Grid {
         });
         out
     }
+
+    /// [`Grid::expand`] on the call's own pool of `n_threads` threads (FAST's command line writes
+    /// its outputs after the segmentation's pool has returned: without it, the rows would go to
+    /// rayon's global pool, one thread per CPU, whatever `n_threads` says; found by
+    /// `tests/parity/test_thread_pools.py`). A pool that cannot be made: one row after another,
+    /// the same values.
+    pub fn expand_on<T: Copy + Send + Sync>(
+        &self,
+        n_threads: usize,
+        compact: impl Fn(usize) -> T + Sync + Send,
+        outside: T,
+    ) -> Vec<T> {
+        match larmorx_core::parallel::with_threads(n_threads, || self.expand(&compact, outside)) {
+            Ok(v) => v,
+            Err(_) => {
+                let mut out = vec![outside; self.voxels()];
+                for (i, &at) in self.index.iter().enumerate() {
+                    out[at as usize] = compact(i);
+                }
+                out
+            }
+        }
+    }
 }
 
 #[cfg(test)]

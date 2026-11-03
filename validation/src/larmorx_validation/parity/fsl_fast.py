@@ -136,9 +136,43 @@ def _numbers_close(want: str, got: str) -> tuple[bool, str]:
 
 
 def _load(path: Path):
+    """An image and its values: gzip and plain files through nibabel, zstd and bzip2 ones (FSL
+    6.0.7.23's ``NIFTI_ZST`` and ``*_BZ2`` output types) decompressed first, pairs side by
+    side."""
     import nibabel as nib
 
-    img = nib.load(str(path))
+    from larmorx_validation.parity.fsl_mcflirt_replica import _open_stream
+
+    name = path.name
+    if name.endswith((".hdr.zst", ".hdr.bz2")):
+        data_file = path.with_name(name.replace(".hdr.", ".img."))
+        with tempfile.TemporaryDirectory(prefix="lx-fast-pair_") as t:
+            for src, ext in ((path, ".hdr"), (data_file, ".img")):
+                with _open_stream(src) as f:
+                    (Path(t) / f"x{ext}").write_bytes(f.read())
+            img = nib.load(Path(t) / "x.hdr")
+            return img, np.asarray(img.dataobj).copy()
+    if name.endswith((".zst", ".bz2")):
+        with _open_stream(path) as f:
+            raw = f.read()
+        cls = nib.Nifti2Image if raw[:4] == b"\x1c\x02\x00\x00" else nib.Nifti1Image
+        img = cls.from_bytes(raw)
+        return img, np.asarray(img.dataobj)
+    try:
+        img = nib.load(str(path))
+    except ValueError:
+        if not name.endswith((".nii", ".nii.gz")):
+            raise
+        # a quaternion whose b, c, d squares sum to a little more than 1 (FSL writes such NIfTI-2
+        # headers): nibabel refuses to make its affine; the header and values read without it
+        import gzip
+        import io
+        import types
+
+        raw = (gzip.open if name.endswith(".gz") else open)(path, "rb").read()
+        cls = nib.Nifti2Header if raw[:4] == b"\x1c\x02\x00\x00" else nib.Nifti1Header
+        hdr = cls.from_fileobj(io.BytesIO(raw))
+        return types.SimpleNamespace(header=hdr), np.asarray(hdr.data_from_fileobj(io.BytesIO(raw)))
     return img, np.asarray(img.dataobj)
 
 
@@ -159,7 +193,7 @@ def _same_header(a, b) -> str:
 
 
 def _kind(name: str) -> str:
-    base = re.sub(r"\.(nii(\.gz)?|hdr|img)$", "", name)
+    base = re.sub(r"\.(nii|hdr|img)(\.(gz|zst|bz2))?$", "", name)
     for label in LABELS:
         if base.endswith(label):
             return "label"
@@ -187,7 +221,7 @@ def compare_images(checks: CheckList, a: Path, b: Path) -> None:
     worst: dict[str, list[str]] = {"label": [], "pve": [], "prob": [], "field": [], "header": []}
     ok = {k: True for k in worst}
     for fa in sorted(a.iterdir()):
-        if not _is_image(fa.name) or fa.suffix == ".img":
+        if not _is_image(fa.name) or re.search(r"\.img(\.(gz|zst|bz2))?$", fa.name):
             continue
         fb = b / fa.name
         if not fb.is_file():

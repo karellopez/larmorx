@@ -1,0 +1,3 @@
+# FLIRT part 2's questions 23 and 24 (relay 3b, 2026-11-03), read by flirt_models_3b.py.
+# 23: the suite's real/cost-leastsq at -verbose 7 (every evaluation's parameters and cost).
+flirt -in @epi.nii -ref @t1.nii -cost leastsq -omat out.mat -verbose 7

@@ -611,3 +611,59 @@ Source facts behind `specs/flirt.md` §14's table of 2026-11-03 (FSL 6.0.7.23; t
   default path; the symmetric path needs 100 rows); `inv(A)*v` is Armadillo's `solve` (`dgesv`).
   BBR: `costfn()` calls `setcostfntype(currentcostfn)` before every evaluation, which calls
   `set_bbr_seg` again while `is_bbr_set()` (`no_coords > 0`) is false.
+
+## The spec answers of 2026-11-03 (part 2's questions 22 to 25 and 38, from the source)
+
+Relay 3b of the spec answers (`validation/investigations/spec-answers-3/flirt_models_3b.py`,
+README "FLIRT, questions 22 to 25 and 38"); FSL 6.0.7.23's source:
+
+- **Q22, the sinc's sine.** `kernel.cc`'s `sincfn(float x)` computes `sin(y)/y` with `float y =
+  M_PI*x`: C++'s `sin(float)` is `sinf`, glibc 2.35's (`__sinf_fma` on this CPU), the code the nc
+  core already carries (`glibc_float::sinf`, Arm v19.11). The FLIRT replica is FSL's (it calls it);
+  the clean-room original calls a correctly rounded `sinf`, which accounts exactly for its 32,052
+  voxels on `real/interp-sinc` and for its applyxfm4D sinc differences on float images.
+- **Q22, the spline.** `volume<T>::splineinterpolate` → `Splinterpolator<T>` (`splinterpolator.h`:
+  `calc_coef` copies the data as `T`, `deconv_along` per non-singleton axis, `SplineColumn::Deconv`
+  in double, `Set` back to `T`; `value_at` sums `coef·w_x·wgt2` in double with `wgt2 = (w_z)·w_y`),
+  `static_cast<T>` then `static_cast<float>`; `extraslice` maps to `Constant` (edge coefficient
+  repeated). So `volume<double>` (applyxfm4D's double images) filters in double and rounds the value
+  to float; `volume<float>` stores each pass in float. applyxfm4D's 4D path interpolates
+  `invol[m]`, a `ShadowVolume` whose interpolation settings delegate to the owner; no difference
+  from FLIRT's `-applyxfm` path but the type.
+- **Q23, `leastsq`.** `costfns.cc`'s `p_leastsquares`, `p_leastsquares_smoothed` and
+  `p_leastsquares_fully_weighted`: `sum`/`num` per row, `sumA`/`numA` per slice, `sumB`/`numB`
+  total (all `float`; the unsmoothed count a `long int`), `sum += weight*(valx-valy)*(valx-valy)`
+  (left to right), the weighted form's `weight = wval*refweight(x,y,z)` then the edge factors
+  (`weight *= o1/smoothx`, ...), `lsq = sum/num` when `num > 1`, else `(Max(max,max) − Min(min,
+  min))²`; chosen by `Costfn::cost` (`LeastSq`: smoothed when `smoothsize > 0`, the fully weighted
+  form whenever weights are given).
+- **Q24, the ties.** miscmaths' line search compares with `<` and `>` only; with every cost equal or
+  NaN no step is accepted. Where the clean-room original leaves FSL's trace on the FSL-91 and FSL-92
+  cases is `rotmat2euler`'s `atan2f` (the nc core's `fdlibm::atan2f`, glibc's
+  `__ieee754_atan2f`): measured with a development hook on the replica
+  (`crates-nc/larmorx-nc-flirt/dev-patches/crtrig_variant.patch`, `LXNC_CRTRIG=sin|atan|all`, never
+  committed in the source): with a correctly rounded `atan2f` the replica leaves FSL's trace at the
+  same line as the original (66,128 of `real/weights-empty-refweight`'s) and then follows the
+  original for 21,353 more lines; with correctly rounded `sinf`/`cosf` only it stays FSL's. On
+  `real/dof6` the correctly rounded `sinf`/`cosf` (`make_rot`'s `sincosf`) part at line 4,656 (the
+  original's 3,983rd evaluation), `atan2f` alone at 4,814. The skew's print-only sign three lines
+  before (FSL `-0.000000`, the original `0.000000`, `decompose_aff`'s `c = dot(y0,z)/sz` near 0) is
+  not from these functions (the hooked replica keeps FSL's sign): the original's composition or
+  decomposition arithmetic differs from `compose_aff`/`decompose_aff`'s somewhere.
+- **Q25, mcflirt's centres.** mcflirt's centres are `volume<T>::cog("scaled_mm")` → `calc_cog`
+  (`newimage.cc`): `val = (double)(vol(x,y,z) - vmin)` (the subtraction in `T`), `nlim =
+  max(1000, (int64_t)sqrt(nvoxels))`, the flush when `++n > nlim`, `WARNING::in calculating COG,
+  total = 0.0` below 1e-5; then `sampling_mat() * v`. Both the cost function's `testCog` (the
+  rotations' centre, `Costfn`'s constructor) and `refvol.cog` (`mcflirt.cc`'s `.par`
+  decompositions) use it.
+- **Q38, the levels.** `flirt.cc`'s pyramid: `resample_refvol(refvol, min_sampling)` →
+  `filter_resamp_blur` → `isotropic_resample` (`iso2aniso = diag(step)`, set forms only), then
+  `refvol_2 = subsample_by_2(refvol)` when `min_sampling < 1.9` (else a copy), `refvol_4` from
+  `refvol_2` below 3.9, `refvol_8` from `refvol_4` below 7.9 (`subsample_by_2`: sizes `(n+1)/2`,
+  `setdims(2·d)`, `sub2mat = diag(2,2,2,1)` centred, set forms only; `copyproperties` keeps the
+  unset ones); the debug saves follow (`save_volume(refvol_8, "refvol_8")`, ...). Without weights
+  `global_refweight` is an empty `volume<float>`, filtered to the 1 × 1 × 1 zero volume whose
+  `pixdim[4..7]` are newimage's defaults, 1. BBR without boundary points: `costfn()` re-runs
+  `set_bbr_seg` before each evaluation, the cost is NaN, `optimise` keeps the start, the final
+  matrix is the `-init` one, `final_transform` resamples with it (`affine_transform`; `bbr_resamp`
+  only with a field map); the debug call's `bbr` evaluation writes `debugvol` (zeros).

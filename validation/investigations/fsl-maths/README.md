@@ -54,3 +54,12 @@ Run boxed, with the replica built and the suite's inputs made:
 
 `tan_correctly_rounded.py` is superseded by `validation/probes/glibc-double-maths` (GLIBC-07's
 measurement on 10^8 arguments per function, and the check of `larmorx_core::math::tan`).
+
+## The Python wrappers (sub-task 5b)
+
+- `wrappers_check.py`: every typed wrapper of `lx.fsl` for fslmaths and fslstats (and the
+  generic `fslmaths` and `fslstats`) against the replica's command line it stands for, on small
+  seeded images: the images written, the numbers printed, `tensor_decomp`'s ten images and
+  `roc`'s curve and areas, the error text of a failure. Result (2026-11-03): 56 checks, 0 differ.
+  Run boxed with the replica built: `LARMORX_NC_BIN=crates-nc/target/release/larmorx-nc
+  scripts/orchestration/boxed.sh 4 python -P validation/investigations/fsl-maths/wrappers_check.py`.

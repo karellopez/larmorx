@@ -110,7 +110,7 @@ def inputs() -> Path:
     """The synthetic inputs, made once (seeded; the same bytes every time)."""
     ws = workspace()
     base = (ws / "oracles" / "inputs" if ws else Path(tempfile.gettempdir())) / SUITE
-    marker = base / "v8.done"
+    marker = base / "v9.done"
     if marker.exists():
         return base
     base.mkdir(parents=True, exist_ok=True)
@@ -405,6 +405,30 @@ def _make_inputs(d: Path) -> None:
     far = (np.arange(1001, dtype=np.float64) / 1000).astype(np.float32)
     far[1000] = 1e12
     _save(d / "far3.nii.gz", far.reshape(7, 11, 13), dtype=np.float32)
+    # the reader's paths (sub-task 5b: raw and gzip files read as a stream): a gzip stream and a
+    # raw file cut inside the data, a header that claims far more data than its file holds, and
+    # data after a gap (vox_offset 1024), raw and gzip-compressed
+    import gzip
+
+    raw = (d / "f3.nii").read_bytes()
+    offset = int(np.frombuffer(raw[108:112], "<f4")[0])
+    gz = gzip.compress(raw, mtime=0)
+    _write_once(d / "trunc.nii.gz", gz[: len(gz) * 3 // 5])
+    _write_once(d / "truncraw.nii", raw[: offset + (len(raw) - offset) // 2])
+    huge = bytearray(raw[:offset])
+    huge[42:48] = np.array([1000, 1000, 1000], "<i2").tobytes()
+    _write_once(d / "hugehdr.nii", bytes(huge) + raw[offset : offset + 64])
+    gap = bytearray(raw[:offset])
+    gap[108:112] = np.array([1024], "<f4").tobytes()
+    gapped = bytes(gap) + bytes(1024 - offset) + raw[offset:]
+    _write_once(d / "gap.nii", gapped)
+    _write_once(d / "gap.nii.gz", gzip.compress(gapped, mtime=0))
+
+
+def _write_once(path: Path, data: bytes) -> None:
+    """``data`` written to ``path`` unless it is there (the inputs' bytes never change)."""
+    if not path.exists():
+        path.write_bytes(data)
 
 
 # ------------------------------------------------------------------------------------------------
@@ -884,6 +908,31 @@ def _cases() -> dict[str, tuple[str, str, Run]]:
             _r(F3, "-add", "1", "out", env={"FSLOUTPUTTYPE": "BOGUS"}),
         ),
         "cli/nii-input": (T, "an uncompressed input", _r("@f3.nii", "-add", "1", "out")),
+        "io/truncated-gz": (
+            T,
+            "a gzip stream cut inside the data (FSL's short read)",
+            _r("@trunc.nii.gz", "-add", "1", "out"),
+        ),
+        "io/truncated-raw": (
+            T,
+            "an uncompressed file cut inside the data",
+            _r("@truncraw.nii", "-add", "1", "out"),
+        ),
+        "io/huge-header": (
+            T,
+            "a header claiming 1000 x 1000 x 1000 voxels, its file 64 bytes of data",
+            _r("@hugehdr.nii", "-add", "1", "out"),
+        ),
+        "io/gap-raw": (
+            T,
+            "the data after a gap (vox_offset 1024), uncompressed",
+            _r("@gap.nii", "-mul", "2", "out"),
+        ),
+        "io/gap-gz": (
+            T,
+            "the data after a gap (vox_offset 1024), gzip-compressed",
+            _r("@gap.nii.gz", "-mul", "2", "out"),
+        ),
         "cli/neuro": (
             T,
             "a neurological input (swapped in memory, back on output)",

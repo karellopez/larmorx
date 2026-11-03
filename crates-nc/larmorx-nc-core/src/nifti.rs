@@ -13,15 +13,17 @@
 //! floating field, 64-bit dimensions, the strings as FSL takes them from the raw header), so
 //! that a file read and written again gives FSL's bytes. [`load_image`] reads a header, its
 //! extensions and its data (raw, gzip, zstd or bzip2, whatever the name says: znzlib 2511.3
-//! guesses the format from the file's first bytes); [`save_image`] writes one in the format its
-//! file type says. The quaternion conversions
+//! guesses the format from the file's first bytes); [`open_image`] reads them up to the data,
+//! which [`ImageData::read`] then delivers piece by piece (raw and gzip files as a stream, as
+//! `znzread` reads them, so that an image is held only once, converted; [`load_header`] reads
+//! the header's bytes only); [`save_image`] writes one in the format its file type says. The quaternion conversions
 //! ([`quatern_to_mat44`], [`mat44_to_quatern`]) reproduce the x87 extended precision of FSL's
 //! x86-64 build ([`crate::x87`]).
 //!
 //! Errors carry FSL's messages (`NiftiIO::NiftiException::what()`).
 
 use std::fs::File;
-use std::io::{self, Read, Write};
+use std::io::{self, BufRead, Read, Write};
 use std::path::Path;
 
 use flate2::GzBuilder;
@@ -1302,45 +1304,105 @@ struct Content {
     failure: Option<String>,
 }
 
-impl Content {
+/// FSL's error for a read that needs more bytes than the file holds.
+const SHORT_READ: &str = "Error: short read, file may be truncated";
+
+/// A file opened as znzlib 2511.3 reads it, its format guessed from its first bytes. Raw and
+/// gzip files are read as a stream, as `znzread` reads them: only the bytes a read asks for are
+/// held, so that an image is never held twice, compressed and not (a truncated or damaged gzip
+/// stream gives what it holds, and the read that needs more is FSL's "short read"). zstd and
+/// bzip2 files are decompressed whole first ([`decode_zstd`], [`decode_bzip2`]): a damaged
+/// stream is znzlib's error, met when a read needs the bytes past it.
+struct Source {
+    reader: Box<dyn Read>,
+    failure: Option<String>,
+    /// The most bytes it can deliver: the file's size, a bound of a gzip stream's decompressed
+    /// size (zlib's largest ratio, 1032), the decompressed size of the others.
+    bound: usize,
+}
+
+impl Source {
+    /// The file at `path`; `Err` carries FSL's message for a file that cannot be opened.
+    fn open(path: &Path) -> Result<Source, NiftiError> {
+        let cant = || err(format!("Error: cant open file {}", path.display()));
+        let file = File::open(path).map_err(|_| cant())?;
+        let size = file.metadata().map_or(usize::MAX, |m| {
+            usize::try_from(m.len()).unwrap_or(usize::MAX)
+        });
+        let mut r = io::BufReader::with_capacity(1 << 16, file);
+        let format = {
+            let head = r.fill_buf().map_err(|_| cant())?;
+            format_from_content(head, &path.to_string_lossy())
+        };
+        let whole = |c: Content| Source {
+            bound: c.data.len(),
+            reader: Box::new(io::Cursor::new(c.data)),
+            failure: c.failure,
+        };
+        Ok(match format {
+            ZnzFormat::Raw => Source {
+                reader: Box::new(r),
+                failure: None,
+                bound: size,
+            },
+            ZnzFormat::Gzip => Source {
+                reader: Box::new(MultiGzDecoder::new(r)),
+                failure: None,
+                bound: size.saturating_mul(1032),
+            },
+            ZnzFormat::Zstd | ZnzFormat::Bzip2 => {
+                let mut raw = Vec::new();
+                r.read_to_end(&mut raw).map_err(|_| cant())?;
+                whole(if format == ZnzFormat::Zstd {
+                    decode_zstd(&raw)
+                } else {
+                    decode_bzip2(&raw)
+                })
+            }
+        })
+    }
+
     /// The short read's error, or the stream's own where decompression stopped early.
     fn error(&self, e: NiftiError) -> NiftiError {
         match (&self.failure, e.0.as_str()) {
-            (Some(f), "Error: short read, file may be truncated") => err(f.clone()),
+            (Some(f), SHORT_READ) => err(f.clone()),
             _ => e,
         }
     }
-}
 
-/// The whole content of a file as znzlib 2511.3 reads it: its format guessed from its first
-/// bytes, then decompressed (a truncated gzip or zstd stream gives what it holds, and the read
-/// that needs more is FSL's "short read"; a damaged zstd or bzip2 stream is znzlib's error, met
-/// when a read needs the bytes past it). `Err` carries FSL's message for a file that cannot be
-/// opened.
-fn read_file(path: &Path) -> Result<Content, NiftiError> {
-    let mut f =
-        File::open(path).map_err(|_| err(format!("Error: cant open file {}", path.display())))?;
-    let mut raw = Vec::new();
-    f.read_to_end(&mut raw)
-        .map_err(|_| err(format!("Error: cant open file {}", path.display())))?;
-    Ok(match format_from_content(&raw, &path.to_string_lossy()) {
-        ZnzFormat::Raw => Content {
-            data: raw,
-            failure: None,
-        },
-        ZnzFormat::Gzip => {
-            let mut out = Vec::new();
-            let mut dec = MultiGzDecoder::new(&raw[..]);
-            // A truncated stream: gzread returns what it could decompress.
-            let _ = dec.read_to_end(&mut out);
-            Content {
-                data: out,
-                failure: None,
+    /// The next bytes, up to `limit` (fewer at the end of what can be read).
+    fn read_up_to(&mut self, limit: usize) -> Vec<u8> {
+        let mut out = Vec::new();
+        // a read error ends what can be read, as gzread's short count does
+        let _ = (&mut self.reader).take(limit as u64).read_to_end(&mut out);
+        out
+    }
+
+    /// Exactly `buf.len()` bytes, or the error of the read that needs more.
+    fn read_exact(&mut self, buf: &mut [u8]) -> Result<(), NiftiError> {
+        let mut filled = 0;
+        while filled < buf.len() {
+            match self.reader.read(&mut buf[filled..]) {
+                Ok(0) => return Err(self.error(err(SHORT_READ))),
+                Ok(n) => filled += n,
+                Err(e) if e.kind() == io::ErrorKind::Interrupted => {}
+                Err(_) => return Err(self.error(err(SHORT_READ))),
             }
         }
-        ZnzFormat::Zstd => decode_zstd(&raw),
-        ZnzFormat::Bzip2 => decode_bzip2(&raw),
-    })
+        Ok(())
+    }
+
+    /// `n` bytes passed over, or the error of the read that needs more.
+    fn skip(&mut self, n: usize) -> Result<(), NiftiError> {
+        let mut buf = vec![0u8; n.min(1 << 16)];
+        let mut left = n;
+        while left > 0 {
+            let k = left.min(buf.len());
+            self.read_exact(&mut buf[..k])?;
+            left -= k;
+        }
+        Ok(())
+    }
 }
 
 /// zstd's frames, one after the other, as `zstdReader` decompresses them
@@ -1504,28 +1566,59 @@ pub struct Loaded {
 }
 
 /// `loadHeader(filename)` (NewNifti 5.0.0: the name through `replaceSuffix(".img", ".hdr")`,
-/// FSL-60, with `open`).
+/// FSL-60, with `open`): the header's bytes only are read.
 pub fn load_header(path: &Path, open: &OpenOptions) -> Result<NiftiHeader, NiftiError> {
     let name = open.header_name(&path.to_string_lossy());
-    let content = read_file(Path::new(&name))?;
-    read_header(&content.data).map_err(|e| content.error(e))
+    let mut source = Source::open(Path::new(&name))?;
+    let first = source.read_up_to(540);
+    read_header(&first).map_err(|e| source.error(e))
 }
 
-/// `loadImageROI(filename, buffer, extensions)` for the whole image (NewNifti 5.0.0: the header
-/// file's name through `replaceSuffix(".img", ".hdr")`, FSL-60, with `open`; a pair's data file
-/// is the name with its last ".hdr" made ".img", read in whatever format its bytes say).
-pub fn load_image(path: &Path, open: &OpenOptions) -> Result<Loaded, NiftiError> {
+/// An image whose header and extensions are read ([`open_image`]), its data still to be read
+/// ([`ImageData::read`]).
+pub struct ImageData {
+    /// The header, with `dim` beyond `dim[0]` set to 1.
+    pub header: NiftiHeader,
+    pub extensions: Vec<NiftiExtension>,
+    source: Source,
+    /// The bytes read from `source` so far (the header file's beginning; none for a pair).
+    prefix: Vec<u8>,
+    /// Where the data start in the data file, and their length in bytes.
+    offset: usize,
+    len: usize,
+    width: usize,
+    /// The most bytes the data file can deliver (its size, or a bound of its decompressed size).
+    bound: usize,
+}
+
+/// `loadImageROI(filename, buffer, extensions)` for the whole image, up to its data (NewNifti
+/// 5.0.0: the header file's name through `replaceSuffix(".img", ".hdr")`, FSL-60, with `open`; a
+/// pair's data file is the name with its last ".hdr" made ".img", read in whatever format its
+/// bytes say): the header, the extensions and FSL's ROI check, in FSL's order; the data are read
+/// by [`ImageData::read`].
+pub fn open_image(path: &Path, open: &OpenOptions) -> Result<ImageData, NiftiError> {
     let given = path.to_string_lossy().into_owned();
     let name = open.header_name(&given);
-    let file = read_file(Path::new(&name))?;
-    let content = &file.data;
-    let mut header = read_header(content).map_err(|e| file.error(e))?;
+    let mut source = Source::open(Path::new(&name))?;
+    let mut prefix = source.read_up_to(540);
+    let mut header = read_header(&prefix).map_err(|e| source.error(e))?;
     let d0 = header.dim[0].clamp(-1, 7);
     let from = (d0 + 1).max(0) as usize;
     for d in header.dim.iter_mut().skip(from) {
         *d = 1;
     }
-    let extensions = read_extensions(content, &header).map_err(|e| file.error(e))?;
+    // what the extensions may read: up to vox_offset in a single file (and the 4 bytes of their
+    // flag), the whole header file of a pair
+    let need = if header.single_file() {
+        (header.vox_offset.max(0) as usize).max(header.sizeof_hdr.max(0) as usize + 4)
+    } else {
+        usize::MAX
+    };
+    if prefix.len() == 540 && need > prefix.len() {
+        let more = source.read_up_to(need - prefix.len());
+        prefix.extend_from_slice(&more);
+    }
+    let extensions = read_extensions(&prefix, &header).map_err(|e| source.error(e))?;
     for d in 1..=7 {
         if header.dim[d] < 1 {
             // xmax = dim-1 < xmin = 0: FSL's ROI check.
@@ -1538,29 +1631,83 @@ pub fn load_image(path: &Path, open: &OpenOptions) -> Result<Loaded, NiftiError>
     let width = header.datum_byte_width();
     let n: usize = header.dim[1..=7].iter().map(|&d| d as usize).product();
     let offset = header.nominal_vox_offset().max(0) as usize;
-    let pair;
-    let source = if header.single_file() {
-        &file
-    } else {
+    if !header.single_file() {
         // The data are in the .img beside the .hdr: `replaceSuffix(name, ".hdr", ".img")`, its
         // format guessed from its own bytes (NewNifti 4.1.0 decompressed it only when the
         // header file was compressed).
         let img = replace_suffix(&given, ".hdr", ".img");
-        pair = read_file(Path::new(&img))?;
-        &pair
-    };
-    let bytes = read_at(&source.data, offset, n * width).map_err(|e| source.error(e))?;
-    let mut data = bytes.to_vec();
-    if header.was_wrong_endian && width > 1 {
-        for chunk in data.chunks_mut(width) {
-            chunk.reverse();
-        }
+        source = Source::open(Path::new(&img))?;
+        prefix = Vec::new();
     }
-    Ok(Loaded {
+    let bound = source.bound;
+    Ok(ImageData {
         header,
         extensions,
-        data,
+        source,
+        prefix,
+        offset,
+        len: n.saturating_mul(width),
+        width,
+        bound,
     })
+}
+
+impl ImageData {
+    /// How many values the data hold, as far as the file's size can tell (a reservation that a
+    /// header claiming more than the file holds cannot make huge).
+    pub fn capacity_hint(&self) -> usize {
+        let bytes = self.len.min(self.bound.saturating_sub(self.offset));
+        bytes / self.width.max(1)
+    }
+
+    /// The data, given to `sink` in pieces of whole values in native byte order, in order; the
+    /// header and the extensions returned (with no data: `data` empty). FSL's short read (or the
+    /// stream's own error) when the file holds fewer bytes.
+    pub fn read(mut self, sink: &mut dyn FnMut(&[u8])) -> Result<Loaded, NiftiError> {
+        let w = self.width.max(1);
+        let mut buf = vec![0u8; self.len.min(w << 16)];
+        let mut left = self.len;
+        let held = self.prefix.len();
+        let mut pre: &[u8] = if self.offset < held {
+            &self.prefix[self.offset..]
+        } else {
+            &[]
+        };
+        if self.offset > held {
+            self.source.skip(self.offset - held)?;
+        }
+        while left > 0 {
+            let k = left.min(buf.len());
+            let from_pre = pre.len().min(k);
+            buf[..from_pre].copy_from_slice(&pre[..from_pre]);
+            pre = &pre[from_pre..];
+            if from_pre < k {
+                self.source.read_exact(&mut buf[from_pre..k])?;
+            }
+            if self.header.was_wrong_endian && w > 1 {
+                for value in buf[..k].chunks_mut(w) {
+                    value.reverse();
+                }
+            }
+            sink(&buf[..k]);
+            left -= k;
+        }
+        Ok(Loaded {
+            header: self.header,
+            extensions: self.extensions,
+            data: Vec::new(),
+        })
+    }
+}
+
+/// `loadImageROI(filename, buffer, extensions)` for the whole image ([`open_image`] and
+/// [`ImageData::read`], the data collected).
+pub fn load_image(path: &Path, open: &OpenOptions) -> Result<Loaded, NiftiError> {
+    let image = open_image(path, open)?;
+    let mut data = Vec::with_capacity(image.capacity_hint().saturating_mul(image.width));
+    let mut loaded = image.read(&mut |piece| data.extend_from_slice(piece))?;
+    loaded.data = data;
+    Ok(loaded)
 }
 
 /// The data of an image being saved: its bytes as the file holds them, written in turn (a

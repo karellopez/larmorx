@@ -1314,8 +1314,10 @@ pub fn mat_to_mat44(m: &Mat) -> nifti::Mat44 {
 
 /// `ConvertAndScaleNewNiftiBuffer` into `T`: `(T) v` when the slope is 1 and the intercept 0
 /// (or the file holds `T` itself and needs no scaling), else `(T) (v * slope + intercept)` in
-/// the arithmetic C gives the stored type and a `float` (`double` stays `double`).
-fn convert_buffer<T: Elem>(raw: &[u8], h: &NiftiHeader) -> Option<Vec<T>> {
+/// the arithmetic C gives the stored type and a `float` (`double` stays `double`). The values
+/// of `raw` (whole values, a piece of the data) are appended to `out`; `None` for a datatype
+/// FSL does not read.
+fn convert_buffer<T: Elem>(raw: &[u8], h: &NiftiHeader, out: &mut Vec<T>) -> Option<()> {
     let mut slope = h.scl_slope as f32;
     let mut inter = h.scl_inter as f32;
     if f64::from(slope.abs()) < 1e-30 {
@@ -1328,12 +1330,12 @@ fn convert_buffer<T: Elem>(raw: &[u8], h: &NiftiHeader) -> Option<Vec<T>> {
     let plain = (same && !doscaling) || (slope == 1.0 && inter == 0.0);
     macro_rules! conv {
         ($t:ty, $w:expr, $plain:expr, $scaled:expr) => {{
-            let mut out = Vec::with_capacity(n);
-            for chunk in raw.chunks_exact($w).take(n) {
+            let room = n.saturating_sub(out.len());
+            for chunk in raw.chunks_exact($w).take(room) {
                 let v = <$t>::from_le_bytes(chunk.try_into().expect("width"));
                 out.push(if plain { $plain(v) } else { $scaled(v) });
             }
-            Some(out)
+            Some(())
         }};
     }
     // (S) * float + float: integers become float first; `(T) value` converts the exact value
@@ -1418,8 +1420,21 @@ fn read_general_swap<T: Elem>(
             return Err(out);
         }
     };
-    let loaded =
-        nifti::load_image(Path::new(&valid), &settings.open_options()).map_err(|e| fail(&e.0))?;
+    // the data converted to `T` piece by piece as they are read: the image is held once, in `T`
+    // (FSL holds the file's values, then `T`'s; the same values)
+    let image =
+        nifti::open_image(Path::new(&valid), &settings.open_options()).map_err(|e| fail(&e.0))?;
+    let source_header = image.header.clone();
+    // a datatype FSL does not read is its error once the data are read (a short read first)
+    let supported = convert_buffer::<T>(&[], &source_header, &mut Vec::new()).is_some();
+    let mut data: Vec<T> = Vec::with_capacity(if supported { image.capacity_hint() } else { 0 });
+    let loaded = image
+        .read(&mut |piece: &[u8]| {
+            if supported {
+                let _ = convert_buffer::<T>(piece, &source_header, &mut data);
+            }
+        })
+        .map_err(|e| fail(&e.0))?;
     let mut header = loaded.header;
     let keep_ext = settings
         .get("FSL_LOAD_NIFTI_EXTENSIONS")
@@ -1450,12 +1465,12 @@ fn read_general_swap<T: Elem>(
             header.pixdim[i].abs()
         };
     }
-    let Some(data) = convert_buffer::<T>(&loaded.data, &header) else {
+    if !supported {
         return Err(FslError::imthrow(
             format!("Fslread: DT {} not supported", header.datatype),
             8,
         ));
-    };
+    }
     let dims = [
         header.dim[1],
         header.dim[2],

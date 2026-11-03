@@ -320,7 +320,15 @@ def _open_stream(path: Path):
 
 def _same_streams(a: Path, b: Path, *, blank_descrip: bool) -> bool:
     """Whether two files hold the same bytes once decompressed, ``descrip`` blanked in the
-    headers of images that have one; read in chunks."""
+    headers of images that have one; read in chunks. A stream that cannot be decompressed to
+    its end (a truncated input a case copies in) is compared by its bytes."""
+    try:
+        return _same_decompressed(a, b, blank_descrip=blank_descrip)
+    except (EOFError, OSError):
+        return a.read_bytes() == b.read_bytes()
+
+
+def _same_decompressed(a: Path, b: Path, *, blank_descrip: bool) -> bool:
     with _open_stream(a) as fa, _open_stream(b) as fb:
         ha, hb = fa.read(_HEADER_BYTES), fb.read(_HEADER_BYTES)
         if blank_descrip and len(ha) >= 4 and len(hb) >= 4:

@@ -34,7 +34,6 @@ FSL or larmorx goes in a memory box (`scripts/orchestration/boxed.sh 8 ...`).
 | `t_trans20.py` to `t_trans23.py` | the fitted per-axis matrices against wrap-around models: the penalty `0.005²` times the squares of the two second differences that wrap around the ends matches (finding 11) |
 | `t_trans24.py` | that penalty against probes D to H: FSL's level-2 start fields to single precision (the zero-continued penalty misses by 0.002 to 0.023 Hz rms) |
 | `final_ssd.py` | the last level's SSD recomputed from `--iout` (it equals `-v`'s last SSD): the final cost of runs without `-v`, FSL's at `--nthr=4` included |
-
 | `mov_euler.py`, `mov_order.py` | the rigid-body matrix: the Euler order and signs, the centre of `--rbmout`'s matrices (`debug/movements`, `opt/four-volumes`; finding 13) |
 | `mov_model.py` | the movement model against FSL's corrected volumes of `debug/movements` (the sampling `R^T (x - c - t) + c`, the image's centre; finding 13) |
 | `mov_grad.py`, `mov_grad_at.py`, `mov_fit.py`, `mov_fit_lever.py`, `mov_brute.py`, `mov_mask.py`, `mov_fd.py`, `mov_fd_images.py`, `mov_trilinear.py` | the movement part of FSL's gradients against the exact derivative and the rejected hypotheses (lever arms, centres, units, masks, finite differences; finding 14) |

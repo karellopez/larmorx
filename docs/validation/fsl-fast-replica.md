@@ -1,12 +1,12 @@
 # Parity: FAST replica (bit-exact, FSL Licence)
 
-**All cases agree.** 86 cases on the `standard` tier: 59 pass, 26 rejected by both, 1 expected divergences, 0 failures.
+**All cases agree.** 87 cases on the `standard` tier: 59 pass, 27 rejected by both, 1 expected divergences, 0 failures.
 
 - **Validated:** `larmorx-nc fsl fast` (crate larmorx-nc-fast, translated from FSL 6.0.7.23's source)
 - **Reference:** fast from FSL 6.0.7.23 (fsl-fast4 2111.3, fsl-newimage 2601.0, fsl-miscmaths 2412.6, fsl-utils 2412.6; the conda build at `~/fsl-6.0.7.23`, as built: glibc 2.35's maths and random numbers)
 - **Test data:** larmorx-testdata `52124bc98f9f`, tier `standard`
-- **Generated:** 2026-11-02 on Linux x86_64, with `python -m larmorx_validation parity fsl-fast-replica --tier standard`
-- **Original programs:** 86 runs: 64 from the oracle cache, 22 run (10 never cached: the original varies); cache `<workspace>/oracles/cache`, mode `use`
+- **Generated:** 2026-11-03 on Linux x86_64, with `python -m larmorx_validation parity fsl-fast-replica --tier standard`
+- **Original programs:** 87 runs: 65 from the oracle cache, 22 run (10 never cached: the original varies); cache `<workspace>/oracles/cache`, mode `use`
 
 ## Thresholds
 
@@ -26,7 +26,7 @@
 | err | 29 | 9 | 19 | 1 | 0 |
 | fmriprep | 3 | 3 | 0 | 0 | 0 |
 | multi | 15 | 14 | 1 | 0 | 0 |
-| opt | 22 | 21 | 1 | 0 | 0 |
+| opt | 23 | 21 | 2 | 0 | 0 |
 | priors | 13 | 11 | 2 | 0 | 0 |
 | real | 1 | 1 | 0 | 0 | 0 |
 
@@ -42,6 +42,7 @@
 |---|---|---|
 | `multi/s0-error` | -S 0: fewer than two channels (FAST's error) | fast exits 1; the same from the replica. At least 2 channels required for Multi Channel Segmentation |
 | `opt/offset` | negative values, 2nd percentile below 0 (the minimum subtracted) | fast exits 255; the same from the replica. |
+| `opt/nan-first` | the negative voxels' image with a NaN first voxel (FSL-203: FSL's extrema NaN, the negative voxels kept and the mask empty: the k-means exception, exit 255; the default segments) | fast exits 255; the same from the replica. |
 | `err/no-arguments` | no arguments: the usage | fast exits 1; the same from the replica. Part of FSL (ID: 2412.6-dirty) FAST Copyright(c) 2004-2012, University of Oxford Usage: fast [options] file(s) Optiona… |
 | `err/help` | -h: the usage | fast exits 1; the same from the replica. Part of FSL (ID: 2412.6-dirty) FAST Copyright(c) 2004-2012, University of Oxford Usage: fast [options] file(s) Optiona… |
 | `err/unknown-option` | an unknown option | fast exits 1; the same from the replica. Part of FSL (ID: 2412.6-dirty) FAST Copyright(c) 2004-2012, University of Oxford Usage: fast [options] file(s) Optiona… |
@@ -71,7 +72,7 @@
 
 | Component | Version |
 |---|---|
-| larmorx | 0.0.1 (bb068f13044e) |
+| larmorx | 0.0.1 (53796ce0a606) |
 | larmorx-testdata | 52124bc98f9f |
 | Python | 3.12.16 |
 | Platform | Linux x86_64 (Linux-6.8.0-124-generic-x86_64-with-glibc2.35) |
@@ -121,6 +122,7 @@ The replica runs as a separate program, the FSL replica package's (`larmorx-nc`)
 | `opt/4d` | pass | 6/6 | a 4D image (its first volume, with newimage's warning) |
 | `opt/offset` | both-error | 5/5 | negative values, 2nd percentile below 0 (the minimum subtracted) |
 | `opt/negvox` | pass | 6/6 | a few negative voxels (set to 0) |
+| `opt/nan-first` | both-error | 6/6 | the negative voxels' image with a NaN first voxel (FSL-203: FSL's extrema NaN, the negative voxels kept and the mask em… |
 | `opt/nan` | pass | 7/7 | NaN voxels with -B -b -p |
 | `opt/int16` | pass | 6/6 | a 16-bit integer image |
 | `opt/big` | pass | 6/6 | values above 2^24 (the brightest voxels and the mask) |

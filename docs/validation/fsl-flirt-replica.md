@@ -1,12 +1,12 @@
 # Parity: FLIRT replica (bit-exact, FSL Licence)
 
-**All cases agree.** 302 cases on the `standard` tier: 209 pass, 87 rejected by both, 6 expected divergences, 0 failures.
+**All cases agree.** 305 cases on the `standard` tier: 211 pass, 87 rejected by both, 7 expected divergences, 0 failures.
 
 - **Validated:** `larmorx-nc fsl flirt`, `convert_xfm`, `avscale`, `img2imgcoord`, `std2imgcoord`, `img2stdcoord`, `rmsdiff`, `makerot`, `midtrans`, `pointflirt`, `applyxfm4D` and the scripts `pairreg`, `extracttxt` and `aff2rigid` (crate larmorx-nc-flirt, translated from FSL 6.0.7.23's source)
 - **Reference:** flirt, convert_xfm, avscale, img2imgcoord, std2imgcoord, img2stdcoord, rmsdiff, makerot, midtrans, pointflirt, applyxfm4D, pairreg, extracttxt and aff2rigid from FSL 6.0.7.23 (fsl-flirt 2111.4, fsl-newimage 2601.0, fsl-miscmaths 2412.6, fsl-utils 2412.6, fsl-warpfns 2501.0, fsl-armawrap 0.7.0 with Armadillo 14.2.1; the conda build at `~/fsl-6.0.7.23`, as built: glibc 2.35's maths, OpenBLAS 0.3.33 with its LAPACK on its Haswell kernels; the scripts under dash, GNU grep, dc and sed of Ubuntu 22.04 and FSL's Python with NumPy 2.4.6)
 - **Test data:** larmorx-testdata `52124bc98f9f`, tier `standard`
-- **Generated:** 2026-11-02 on Linux x86_64, with `python -m larmorx_validation parity fsl-flirt-replica --tier standard`
-- **Original programs:** 302 runs: 281 from the oracle cache, 21 run (6 never cached: the original varies); cache `<workspace>/oracles/cache`, mode `use`
+- **Generated:** 2026-11-03 on Linux x86_64, with `python -m larmorx_validation parity fsl-flirt-replica --tier standard`
+- **Original programs:** 305 runs: 283 from the oracle cache, 22 run (7 never cached: the original varies); cache `<workspace>/oracles/cache`, mode `use`
 
 ## Thresholds
 
@@ -27,7 +27,7 @@
 | difftest | 10 | 8 | 2 | 0 | 0 |
 | edge | 35 | 10 | 19 | 6 | 0 |
 | fmriprep | 3 | 3 | 0 | 0 | 0 |
-| programs | 129 | 79 | 50 | 0 | 0 |
+| programs | 132 | 81 | 50 | 1 | 0 |
 | real | 61 | 61 | 0 | 0 | 0 |
 | schedule | 29 | 22 | 7 | 0 | 0 |
 | verbose | 8 | 8 | 0 | 0 | 0 |
@@ -42,6 +42,7 @@
 | `edge/background-empty` | FSL crashes (FSL-75: undefined behaviour); the replica refuses in both modes |
 | `edge/zero-voxel-size` | FLIRT never finishes (FSL-93: undefined behaviour); the replica corrects it by default and refuses with reproduce |
 | `edge/basescale-0` | FLIRT never finishes (FSL-93: undefined behaviour); the replica refuses in both modes |
+| `programs/pointflirt-no-points` | FSL crashes (FSL-204: undefined behaviour); the replica refuses in both modes |
 
 ## Rejected by both
 
@@ -139,7 +140,7 @@
 
 | Component | Version |
 |---|---|
-| larmorx | 0.0.1 (2c21ac663955) |
+| larmorx | 0.0.1 (53796ce0a606) |
 | larmorx-testdata | 52124bc98f9f |
 | Python | 3.12.16 |
 | Platform | Linux x86_64 (Linux-6.8.0-124-generic-x86_64-with-glibc2.35) |
@@ -328,6 +329,8 @@ The replica runs as a separate program, the FSL replica package's (`larmorx-nc`)
 | `programs/applyxfm4D-3d` | pass | 6/6 | -3D (the rectangular sinc of width 9) on a float volume |
 | `programs/applyxfm4D-3d-spline-float` | pass | 6/6 | -3D with spline on a float volume |
 | `programs/applyxfm4D-int8` | pass | 6/6 | an int8 input (FSL-09: written as uint8), trilinear |
+| `programs/applyxfm4D-uint8` | pass | 6/6 | a uint8 input, trilinear (FSL-111: its values 128 to 255 read as signed bytes; read as stored by default) |
+| `programs/applyxfm4D-uint8-3d-spline` | pass | 6/6 | -3D spline on a uint8 volume (FSL-111 with FSL-79's coefficients in the type) |
 | `programs/applyxfm4D-double-sinc` | pass | 6/6 | a double series (sinc sums in double precision; the background value kept in double precision where the mask sets it) |
 | `programs/applyxfm4D-double-3d-spline` | pass | 6/6 | -3D spline on a double volume (its coefficients in double precision) |
 | `programs/applyxfm4D-double-nn` | pass | 6/6 | a double volume, nearest neighbour (values through float) |
@@ -379,6 +382,7 @@ The replica runs as a separate program, the FSL replica package's (`larmorx-nc`)
 | `programs/pointflirt-count` | both-error | 5/5 | files with different numbers of points (its error, exit 255) |
 | `programs/pointflirt-many` | pass | 6/6 | twenty points (x·xᵀ by BLAS dsyrk) |
 | `programs/pointflirt-missing` | both-error | 5/5 | a coordinate file that does not exist (FSL aborts) |
+| `programs/pointflirt-no-points` | expected-divergence | 3/3 | two coordinate files that do not exist (no points: FSL crashes, FSL-204; refused in both modes) |
 | `programs/pointflirt-three` | pass | 6/6 | three points: a square file is read with points as columns |
 | `programs/pointflirt-two` | both-error | 5/5 | two points (two rows of three: FSL reads past its rows, aborts) |
 | `programs/pointflirt-four-columns` | both-error | 5/5 | points of four coordinates (FSL's block sizes clash, aborts) |

@@ -99,3 +99,11 @@ runs only through the oracle cache (`at_case.py`, use mode), the replica as a bl
 Example (in a memory box): `LARMORX_TOPUP_BIN=target/release/larmorx scripts/orchestration/boxed.sh 24
 python -P speed_identity.py run <scratch>/t1.json 1 --jobs 14` (about 20 s), then the same at 7 and
 14 threads (`--jobs 2`, `--jobs 1`) and `compare`.
+
+## Random testing (relay 5)
+
+| Script | What it does |
+|---|---|
+| `recheck.py` | a sample of each group of a trial's findings (kind, movements, quadratic splines, the first exact failure) replayed with `difftest --replay` on the drawn case (not the shrunk one), `--jobs` at a time, each in its own memory leaf; the verdicts per group |
+| `estmov_off.py` | a sample of the trial's findings that estimate the movements, judged again with `--estmov=0` (FSL's variants run once through the cache): how many of the differences the movements' path makes |
+

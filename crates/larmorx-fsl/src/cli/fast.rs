@@ -915,6 +915,8 @@ struct Parts<'a> {
     pve: Option<&'a fast::pve::Pve>,
     /// Each channel's bias field per mask voxel (`None`: no field).
     bias: Option<Vec<&'a [f32]>>,
+    /// The field outside the mask (one channel: NaN when its mean is not finite, else ±0).
+    bias_outside: f32,
 }
 
 /// Writes the outputs (§3.2, §3.3) in FAST's order, then the notices.
@@ -1021,6 +1023,7 @@ fn write_outputs(
             members: s.members.as_deref(),
             pve: s.pve.as_ref(),
             bias: s.bias.as_ref().map(|b| vec![&b[..]]),
+            bias_outside: if s.bias.is_some() { s.bias_outside } else { 0.0 },
         },
         Outputs::Multi(m) => Parts {
             grid: &m.grid,
@@ -1029,6 +1032,7 @@ fn write_outputs(
             members: Some(&m.members[..]),
             pve: m.pve.as_ref(),
             bias: m.bias.as_ref().map(|b| b.iter().map(|v| &v[..]).collect()),
+            bias_outside: 0.0,
         },
     };
     let grid = parts.grid;
@@ -1125,7 +1129,10 @@ fn write_outputs(
             "-N with several channels: no bias field, so _bias_<c> is 1 and _restore_<c> the channel's image; FAST never computes the field it writes (memory never written)",
         ));
     }
-    // the correction exp(-b) of channel c: 1 outside the mask and without a bias field
+    // the correction exp(-b) of channel c: 1 without a bias field; outside the mask exp(-b) of
+    // b's value there (1, or NaN when the field's mean is not finite: FSL's NaN then reaches the
+    // whole image, §4.5's b · M)
+    let outside = larmorx_core::math::expf(-parts.bias_outside);
     let correction = |c: usize, i: usize| -> f32 {
         match &parts.bias {
             Some(b) => larmorx_core::math::expf(-b[c][i]),
@@ -1148,10 +1155,11 @@ fn write_outputs(
                 .vol
                 .data
                 .iter()
-                .map(|&x| if x.is_nan() { 0.0 } else { x })
+                .map(|&x| if x.is_nan() { 0.0 } else { x * outside })
                 .collect();
             for (i, &idx) in grid.index.iter().enumerate() {
-                v[idx as usize] *= correction(c, i);
+                let x = ch.input.vol.data[idx as usize];
+                v[idx as usize] = if x.is_nan() { 0.0 } else { x } * correction(c, i);
             }
             let own = output_of(ch, input.vol.shape, ext, mode, n_threads);
             if !write(suffix("_restore", c), Values::F32(v), &mut notices, &own) {
@@ -1161,7 +1169,7 @@ fn write_outputs(
     }
     if o.bias_out {
         for c in 0..channels.len() {
-            let v = grid.expand_on(n_threads, |i| 1.0 / correction(c, i), 1.0);
+            let v = grid.expand_on(n_threads, |i| 1.0 / correction(c, i), 1.0 / outside);
             if !write(suffix("_bias", c), Values::F32(v), &mut notices, &output) {
                 return 1;
             }

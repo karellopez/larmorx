@@ -113,6 +113,10 @@ pub struct Single {
     pub pve: Option<pve::Pve>,
     /// The bias field `b` in the log domain (`None` with `-N`).
     pub bias: Option<Vec<f32>>,
+    /// `b` outside the mask: `(0 - mean) · 0` (§4.5's last step), ±0, or NaN when the mask's
+    /// mean of the field is not finite (a class of NaN variance: FSL's field and corrections are
+    /// then NaN over the whole image, observed).
+    pub bias_outside: f32,
     /// The tissue volumes (mm³) `-v` prints.
     pub volumes: Vec<f64>,
     /// How many of FSL's masked sums ran over an empty mask (each prints `ERROR:: Empty mask
@@ -438,7 +442,8 @@ fn class_line(out: &mut dyn Write, s: &[(f32, f32)]) {
     let _ = writeln!(out, "{line}");
 }
 
-/// One bias field estimate (§4.5): `b` per mask voxel, from the uncorrected log image `y`.
+/// One bias field estimate (§4.5): `b` per mask voxel, from the uncorrected log image `y`, and
+/// its value outside the mask (`(0 - mean) · 0`: NaN when the mean is not finite).
 fn bias_field(
     grid: &Grid,
     post: &[f32],
@@ -446,7 +451,7 @@ fn bias_field(
     s: &[(f32, f32)],
     kernels: &[Vec<f64>; 3],
     len: usize,
-) -> Vec<f32> {
+) -> (Vec<f32>, f32) {
     let n = s.len();
     // each mask voxel's weight and residual (in parallel), then over the image
     let wr: Vec<(f32, f32)> = (0..grid.len())
@@ -474,7 +479,7 @@ fn bias_field(
         .collect();
     let mean = (stats::sum_par(b.len(), len, |i| f64::from(b[i])) / (b.len().max(1) as f64)) as f32;
     b.par_iter_mut().for_each(|x| *x -= mean);
-    b
+    (b, (0.0 - mean) * 0.0)
 }
 
 /// The bias field's kernels for one channel (§4.5): `σ = 0.51 l / d` voxels along each axis.
@@ -645,9 +650,11 @@ fn finish(
     let nm = grid.len();
     let kernels = kernels(p.lowpass, voxel);
     let mut bias: Option<Vec<f32>> = None;
+    let bias_outside = std::cell::Cell::new(0f32);
     let mut yb = y.clone();
     let estimate = |post: &[f32], s: &[(f32, f32)], yb: &mut Vec<f32>| -> Vec<f32> {
-        let b = bias_field(&grid, post, &y, s, &kernels, len);
+        let (b, outside) = bias_field(&grid, post, &y, s, &kernels, len);
+        bias_outside.set(outside);
         yb.par_iter_mut()
             .zip(y.par_iter())
             .zip(b.par_iter())
@@ -813,6 +820,7 @@ fn finish(
         members: members_out,
         pve,
         bias,
+        bias_outside: bias_outside.get(),
         volumes,
         empty_sums: if nm == 0 { sums } else { 0 },
     })

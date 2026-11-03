@@ -157,8 +157,10 @@ def main():
         g = np.loadtxt(d / f"TopupDebugGradient_level01_iter{it}_attempt00.txt")[-5:]
         print(f"gradient {it} (at iter{prev}'s parameters)")
         for name, a, b, c in zip(names, g, fsl, exact):
-            print(f"  {name}: FSL {a:12.6f}  model {b:12.6f}  exact {c:12.6f}  "
-                  f"model/FSL-1 {b / a - 1:+.1e}  exact/FSL-1 {c / a - 1:+.2e}")
+            print(
+                f"  {name}: FSL {a:12.6f}  model {b:12.6f}  exact {c:12.6f}  "
+                f"model/FSL-1 {b / a - 1:+.1e}  exact/FSL-1 {c / a - 1:+.2e}"
+            )
             worst = max(worst, abs(b / a - 1))
     print(f"largest relative difference model vs FSL: {worst:.2e}")
 

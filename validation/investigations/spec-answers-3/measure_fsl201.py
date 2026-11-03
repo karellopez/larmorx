@@ -59,7 +59,9 @@ def find(d: Path, stem: str) -> Path | None:
     return None
 
 
-def measure(name: str, run, args: list[str], work: Path, node, fmriprep: bool = False) -> dict | None:
+def measure(
+    name: str, run, args: list[str], work: Path, node, fmriprep: bool = False
+) -> dict | None:
     base = work / re.sub(r"[^A-Za-z0-9_.-]", "_", name)
     if base.exists():
         shutil.rmtree(base)
@@ -86,7 +88,9 @@ def measure(name: str, run, args: list[str], work: Path, node, fmriprep: bool = 
         extra.append(f"--fout={field}")
     out = {}
     for who, mode in (("fix", defects.FIX), ("reproduce", defects.REPRODUCE)):
-        r = T.run_replica(run.program, a + extra, cwd=dirs[who], settings=settings, mode=mode, threads=1)
+        r = T.run_replica(
+            run.program, a + extra, cwd=dirs[who], settings=settings, mode=mode, threads=1
+        )
         out[who] = r
         if r.code != 0:
             print(f"{name}: the replica ({who}) exits {r.code}: {r.stderr[-300:]}")
@@ -155,7 +159,9 @@ def main() -> None:
             args = [
                 f"--config={cfg}" if a.startswith("--config=") else a for a in T.fmriprep_args(node)
             ]
-            args = [a for a in args if not a.startswith(("--logout", "--jacout", "--dfout", "--rbmout"))]
+            args = [
+                a for a in args if not a.startswith(("--logout", "--jacout", "--dfout", "--rbmout"))
+            ]
             run = T.Run(tuple(args), timeout=3600)
             results.append(measure(f"fsl-config/{runname}", run, args, work, node, fmriprep=True))
     elif kind == "args":
@@ -175,8 +181,10 @@ def main() -> None:
     done = [r for r in results if r and r["relative"] is not None]
     lower = sum(r["relative"] < -1e-5 for r in done)
     higher = sum(r["relative"] > 1e-5 for r in done)
-    print(f"{len(done)} cases: the exact derivatives end lower in {lower}, higher in {higher}, "
-          f"equal (to the six digits of -v) in {len(done) - lower - higher}")
+    print(
+        f"{len(done)} cases: the exact derivatives end lower in {lower}, higher in {higher}, "
+        f"equal (to the six digits of -v) in {len(done) - lower - higher}"
+    )
     (work / f"summary-{kind}.json").write_text(json.dumps(results, indent=1), encoding="utf-8")
 
 
@@ -191,15 +199,19 @@ def measure_fmriprep(runname: str, node: Path, work: Path) -> dict | None:
         d = base / who
         d.mkdir(parents=True)
         T._prepare_fmriprep(node, d)
-        r = T.run_replica("topup", T.fmriprep_args(node) + ["-v"], cwd=d, settings={}, mode=mode, threads=1)
+        r = T.run_replica(
+            "topup", T.fmriprep_args(node) + ["-v"], cwd=d, settings={}, mode=mode, threads=1
+        )
         res[who] = (r.code, final_cost(r.stdout), "FSL-201" in r.stderr, d)
     same = all(
         (res["fix"][3] / f.name).read_bytes() == f.read_bytes()
         for f in sorted(res["reproduce"][3].iterdir())
         if f.is_file() and f.suffix in (".gz", ".txt", ".nii")
     )
-    print(f"fmriprep {runname}: exit {res['fix'][0]}/{res['reproduce'][0]}; cost {res['fix'][1]} / "
-          f"{res['reproduce'][1]}; FSL-201 named {res['fix'][2]}; every output identical: {same}")
+    print(
+        f"fmriprep {runname}: exit {res['fix'][0]}/{res['reproduce'][0]}; cost {res['fix'][1]} / "
+        f"{res['reproduce'][1]}; FSL-201 named {res['fix'][2]}; every output identical: {same}"
+    )
     return {"case": f"fmriprep/{runname}", "relative": None, "identical": same}
 
 

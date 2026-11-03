@@ -138,8 +138,10 @@ def main():
         S = s_matrix(n)
         f = np.linalg.solve(K.T @ K + 0.01 * S.T @ S, K.T @ np.concatenate(ys))
         err = np.abs(f - want)
-        print(f"{root.name}/{d.name}: largest |model - FSL| {err.max():.2e} "
-              f"(the line's largest {np.abs(want).max():.4g}); at voxels {np.flatnonzero(err > 1e-3)[:6]}")
+        print(
+            f"{root.name}/{d.name}: largest |model - FSL| {err.max():.2e} "
+            f"(the line's largest {np.abs(want).max():.4g}); at voxels {np.flatnonzero(err > 1e-3)[:6]}"
+        )
 
 
 if __name__ == "__main__":

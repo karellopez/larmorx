@@ -284,6 +284,40 @@ fn read_decompressed(
     Ok((header, data))
 }
 
+/// The header and the stored values (unscaled, in the file's order) of the image `files`,
+/// each file read by its content: what [`read_series_files`] converts, for a caller that
+/// computes in the stored type (the clean-room fslmaths, `specs/fslmaths.md` §3.1).
+pub fn read_stored_files(
+    files: &ImageFiles,
+    n_threads: usize,
+) -> Result<(NiftiHeader, DynArray), ImageError> {
+    let path = files.header.as_path();
+    let compression_of = |p: &Path| {
+        Compression::of_file(p).map_err(|e| ImageError::Invalid(format!("{}: {e}", p.display())))
+    };
+    let compression = (
+        compression_of(path)?,
+        files.data.as_deref().map(compression_of).transpose()?,
+    );
+    let plain_or_gzip = |c: Compression| matches!(c, Compression::None | Compression::Gzip);
+    let standard = files.standard_names()
+        && plain_or_gzip(compression.0)
+        && compression.1.is_none_or(plain_or_gzip);
+    if standard {
+        let img = nifti::read(
+            path,
+            &ReadOptions {
+                scaling: Scaling::Raw,
+                n_threads,
+            },
+        )?;
+        Ok((img.header, img.data))
+    } else {
+        parallel::with_threads(n_threads, || read_decompressed(files, compression))
+            .map_err(|e| ImageError::Invalid(e.to_string()))?
+    }
+}
+
 /// Reads a series from its files ([`ImageFiles`]: a header file and, for a pair, a data
 /// file), each by its content.
 pub fn read_series_files(files: &ImageFiles, n_threads: usize) -> Result<Series, ImageError> {

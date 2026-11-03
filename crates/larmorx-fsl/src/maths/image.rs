@@ -130,6 +130,96 @@ impl Stored {
     }
 }
 
+impl Stored {
+    /// [`Stored::values`], the stored values moved instead of copied where they already have the
+    /// computing type and no scaling (mirrored in place for a neurological image; a NaN as the
+    /// conversion gives it), so that reading holds one copy of the image, as FSL does; the stored
+    /// values are dropped either way.
+    pub fn take_values<T: Num>(&mut self, fix: bool) -> (Vec<T>, bool) {
+        let values = std::mem::replace(&mut self.values, StoredValues::Radiological(Vec::new()));
+        let moved = if self.scale.is_some() {
+            Err(values)
+        } else {
+            same_type::<T>(values, self.dims[0].max(1), self.flipped)
+        };
+        match moved {
+            Ok(mut v) => {
+                if T::KIND == Kind::Float {
+                    v.par_iter_mut()
+                        .with_min_len(1 << 16)
+                        .filter(|x| x.is_nan())
+                        .for_each(|x| *x = T::convert(x.to_f64(), fix).0);
+                }
+                (v, false)
+            }
+            Err(values) => {
+                self.values = values;
+                let r = self.values::<T>(fix);
+                self.values = StoredValues::Radiological(Vec::new());
+                r
+            }
+        }
+    }
+}
+
+/// The stored values as a `Vec<T>` without a copy when `T` is their type (radiological order).
+fn same_type<T: Num>(
+    values: StoredValues,
+    nx: usize,
+    flipped: bool,
+) -> Result<Vec<T>, StoredValues> {
+    use std::any::Any;
+    fn file_order<S: Copy + Send>(
+        a: larmorx_core::ndarray::ArrayD<S>,
+        nx: usize,
+        flipped: bool,
+    ) -> Result<Vec<S>, larmorx_core::ndarray::ArrayD<S>> {
+        // Fortran order as read: x fastest in memory, from the buffer's start
+        if !a.t().is_standard_layout() {
+            return Err(a);
+        }
+        let n = a.len();
+        let (v, offset) = a.into_raw_vec_and_offset();
+        let off = offset.unwrap_or(0);
+        // the values from the buffer's offset (a copy only where they are not the whole buffer)
+        let mut v = if off == 0 && v.len() == n {
+            v
+        } else {
+            v[off..off + n].to_vec()
+        };
+        if flipped && nx > 1 {
+            v.par_chunks_mut(nx).for_each(|row| row.reverse());
+        }
+        Ok(v)
+    }
+    fn cast<T: Num, S: 'static>(v: Vec<S>) -> Vec<T> {
+        let b: Box<dyn Any> = Box::new(v);
+        *b.downcast::<Vec<T>>().expect("the same type")
+    }
+    macro_rules! moved {
+        ($a:expr, $variant:ident, $kind:ident) => {
+            if T::KIND == Kind::$kind {
+                return match file_order($a, nx, flipped) {
+                    Ok(v) => Ok(cast::<T, _>(v)),
+                    Err(a) => Err(StoredValues::File(DynArray::$variant(a))),
+                };
+            } else {
+                Err(StoredValues::File(DynArray::$variant($a)))
+            }
+        };
+    }
+    match values {
+        StoredValues::Radiological(v) if T::KIND == Kind::Float => Ok(cast::<T, f32>(v)),
+        StoredValues::File(DynArray::F32(a)) => moved!(a, F32, Float),
+        StoredValues::File(DynArray::F64(a)) => moved!(a, F64, Double),
+        StoredValues::File(DynArray::I16(a)) => moved!(a, I16, Short),
+        StoredValues::File(DynArray::I32(a)) => moved!(a, I32, Int),
+        StoredValues::File(DynArray::U8(a)) => moved!(a, U8, UChar),
+        StoredValues::File(DynArray::I8(a)) => moved!(a, I8, Char),
+        other => Err(other),
+    }
+}
+
 fn convert_array<S: RealElement + Sync, T: Num>(
     a: &larmorx_core::ndarray::ArrayD<S>,
     nx: usize,
@@ -326,6 +416,44 @@ pub fn output_values<T: Num>(img: &Img<T>, w: WriteSpec) -> (Values, bool) {
             (Values::F64(v), c)
         }
     }
+}
+
+/// The values of `img` moved out as the output's where writing them converts nothing (the
+/// output type is the computing type's: float, double, short, int; unsigned char from the
+/// unsigned char computing type, signed char from char's), so that writing holds no second copy
+/// of the image; `None` otherwise (and `img` untouched). A float NaN is quieted, as the
+/// conversion does.
+pub fn identity_values<T: Num>(img: &mut Img<T>, w: WriteSpec) -> Option<Values> {
+    use std::any::Any;
+    let same = matches!(
+        (w.out, T::KIND),
+        (OutType::Float, Kind::Float)
+            | (OutType::Double, Kind::Double)
+            | (OutType::Short, Kind::Short)
+            | (OutType::Int, Kind::Int)
+            | (OutType::Char, Kind::UChar)
+            | (OutType::SChar, Kind::Char)
+    );
+    if !same {
+        return None;
+    }
+    let mut data = std::mem::take(&mut img.data);
+    if T::KIND == Kind::Float {
+        data.par_iter_mut()
+            .with_min_len(1 << 16)
+            .filter(|x| x.is_nan())
+            .for_each(|x| *x = T::convert(x.to_f64(), w.fix).0);
+    }
+    let any: Box<dyn Any> = Box::new(data);
+    let taken = |what: &str| -> ! { unreachable!("{what}: the output type is the computing type") };
+    Some(match w.out {
+        OutType::Float => Values::F32(*any.downcast().unwrap_or_else(|_| taken("float"))),
+        OutType::Double => Values::F64(*any.downcast().unwrap_or_else(|_| taken("double"))),
+        OutType::Short => Values::I16(*any.downcast().unwrap_or_else(|_| taken("short"))),
+        OutType::Int => Values::I32(*any.downcast().unwrap_or_else(|_| taken("int"))),
+        OutType::Char => Values::U8(*any.downcast().unwrap_or_else(|_| taken("char"))),
+        OutType::SChar => Values::I8(*any.downcast().unwrap_or_else(|_| taken("schar"))),
+    })
 }
 
 /// The output type of the computing type `kind` written as it is (`-save`).

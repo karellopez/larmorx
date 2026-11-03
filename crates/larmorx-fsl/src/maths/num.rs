@@ -167,6 +167,12 @@ pub trait Num:
     fn is_nan(self) -> bool;
     /// Whether the value is NaN or infinite.
     fn non_finite(self) -> bool;
+    /// The value as a double by the plain conversion (a NaN's payload as the platform passes
+    /// it): for the fast paths, which recompute every NaN result by the exact rules.
+    #[inline]
+    fn fast_f64(self) -> f64 {
+        self.to_f64()
+    }
 
     /// The conversion of `v` in the mode (`fix`: FSL-151's correction), and whether the two
     /// modes' values differ.
@@ -268,6 +274,10 @@ impl Num for f32 {
     #[inline]
     fn to_f64(self) -> f64 {
         to_f64(self)
+    }
+    #[inline]
+    fn fast_f64(self) -> f64 {
+        f64::from(self)
     }
     #[inline]
     fn from_f64_c(v: f64) -> Self {

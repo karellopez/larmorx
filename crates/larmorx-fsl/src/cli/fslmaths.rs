@@ -290,19 +290,25 @@ fn run(
         fsl157,
         stored_type: stored.stored,
     };
+    let stored = std::sync::Mutex::new(stored);
     // the chain runs on the thread pool of the run's thread count; its messages are gathered
     // and printed after it, each stream in its order
     let (r, o, e, ns) = crate::bet::pooled(n_threads, || {
         let mut o: Vec<u8> = Vec::new();
         let mut e: Vec<u8> = Vec::new();
         let mut ns = Notices::new(mode);
+        // the input moved into the chain (the closure runs once)
+        let mut guard = stored
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner);
+        let stored = &mut *guard;
         let r = match kind {
-            Kind::Char => chain::<i8>(&ctx, &stored, &mut ns, &mut o, &mut e),
-            Kind::UChar => chain::<u8>(&ctx, &stored, &mut ns, &mut o, &mut e),
-            Kind::Short => chain::<i16>(&ctx, &stored, &mut ns, &mut o, &mut e),
-            Kind::Int => chain::<i32>(&ctx, &stored, &mut ns, &mut o, &mut e),
-            Kind::Float => chain::<f32>(&ctx, &stored, &mut ns, &mut o, &mut e),
-            Kind::Double => chain::<f64>(&ctx, &stored, &mut ns, &mut o, &mut e),
+            Kind::Char => chain::<i8>(&ctx, stored, &mut ns, &mut o, &mut e),
+            Kind::UChar => chain::<u8>(&ctx, stored, &mut ns, &mut o, &mut e),
+            Kind::Short => chain::<i16>(&ctx, stored, &mut ns, &mut o, &mut e),
+            Kind::Int => chain::<i32>(&ctx, stored, &mut ns, &mut o, &mut e),
+            Kind::Float => chain::<f32>(&ctx, stored, &mut ns, &mut o, &mut e),
+            Kind::Double => chain::<f64>(&ctx, stored, &mut ns, &mut o, &mut e),
         };
         (r, o, e, ns)
     });
@@ -334,14 +340,15 @@ fn operand<T: Num>(
     let mut ns = Vec::new();
     let s = image::read_stored(ctx.settings, name, notices.mode(), &mut ns, ctx.n_threads);
     notices.extend(ns);
-    let s = s.map_err(|e| read_failure(err, name, &e, false))?;
-    Ok(typed(&s, notices))
+    let mut s = s.map_err(|e| read_failure(err, name, &e, false))?;
+    Ok(typed(&mut s, notices))
 }
 
-/// A stored image in the computing type (FSL-151, FSL-154 noted).
-fn typed<T: Num>(s: &Stored, notices: &mut Notices) -> Img<T> {
+/// A stored image in the computing type (FSL-151, FSL-154 noted); its stored values are moved
+/// or dropped (one copy of the image held).
+fn typed<T: Num>(s: &mut Stored, notices: &mut Notices) -> Img<T> {
     let fix = notices.fix();
-    let (data, changed) = s.values::<T>(fix);
+    let (data, changed) = s.take_values::<T>(fix);
     let uint8_as_char = s.stored == DataType::U8 && s.scale.is_none() && T::KIND == Kind::Char;
     if uint8_as_char {
         // FSL-154 reproduced: the bytes 128-255 read as negative (C's conversion)
@@ -387,7 +394,7 @@ struct State<T> {
 
 fn chain<T: Num>(
     ctx: &Ctx<'_>,
-    stored: &Stored,
+    stored: &mut Stored,
     notices: &mut Notices,
     out: &mut dyn Write,
     err: &mut dyn Write,
@@ -428,13 +435,19 @@ fn chain<T: Num>(
         round: ctx.round,
         fix: notices.fix(),
     };
-    let (values, changed) = image::output_values(&st.img, spec);
+    // FSL-157 decided from the values before they move to the writer (named after FSL-151)
+    let mut n157 = Notices::new(notices.mode());
+    if ctx.fsl157 {
+        note157(ctx, &st.img, &mut n157);
+    }
+    let (values, changed) = match image::identity_values(&mut st.img, spec) {
+        Some(v) => (v, false),
+        None => image::output_values(&st.img, spec),
+    };
     if changed {
         image::fsl151(notices, "the output's values");
     }
-    if ctx.fsl157 {
-        note157(ctx, &st.img, notices);
-    }
+    notices.extend(n157.into_vec());
     write_image(ctx, &st.img, output, values, notices, err)
 }
 

@@ -458,6 +458,13 @@ fn dilall_volume<T: Num>(vol: &mut [T], dims: [usize; 3], fix: bool) -> bool {
 
 /// One axis of a separable filter over one volume: each voxel's weighted mean over the taps
 /// inside the image, the sums kept in single precision.
+///
+/// Built for speed with the same bits: the weights' sum depends on the position along the
+/// axis only (computed once per position, in the taps' order); each row of x is computed at
+/// once, every voxel's taps added in their order (for x itself over the voxels whose taps are
+/// all inside; the voxels at the row's ends one by one); a voxel whose result is NaN is
+/// computed again by x86-64's rules ([`num::nan64`], [`num::acc32`]), so NaN bits do not
+/// depend on the platform.
 fn separable_axis<T: Num>(
     src: &[T],
     dims: [usize; 3],
@@ -466,39 +473,97 @@ fn separable_axis<T: Num>(
     c: i64,
     fix: bool,
 ) -> (Vec<T>, bool) {
+    let [nx, ny, _] = dims;
     let n = dims[axis] as i64;
-    let stride = [1, dims[0], dims[0] * dims[1]][axis];
+    let k = line.len() as i64;
+    let stride = [1, nx, nx * ny][axis];
+    let inside = |p: i64, i: i64| (0..n).contains(&(p + i - c));
+    // the weights' sum at each position (its taps inside the image, in order)
+    let wsum: Vec<f32> = (0..n)
+        .map(|p| {
+            line.iter().enumerate().fold(0.0f32, |w, (i, &kv)| {
+                if inside(p, i as i64) {
+                    num::acc32(w, kv)
+                } else {
+                    w
+                }
+            })
+        })
+        .collect();
+    let finish = |sum: f32, w: f32| -> f32 {
+        if f64::from(w).abs() > 1e-12 {
+            num::nan32(sum, w, sum / w)
+        } else {
+            sum
+        }
+    };
+    // one voxel by x86-64's rules: `idx` its index, `p` its position along the axis
+    let exact = |idx: usize, p: i64| -> f32 {
+        let base = idx - p as usize * stride;
+        let mut sum = 0.0f32;
+        for (i, &kv) in line.iter().enumerate() {
+            if inside(p, i as i64) {
+                let q = (p + i as i64 - c) as usize;
+                let s = src[base + q * stride].to_f64();
+                sum = num::acc32(sum, num::nan64(s, kv, s * kv));
+            }
+        }
+        finish(sum, wsum[p as usize])
+    };
     let mut out = vec![T::zero(); src.len()];
     let changed = out
-        .par_chunks_mut(dims[0].max(1) * 16)
+        .par_chunks_mut(nx.max(1))
         .enumerate()
-        .map(|(b, o)| {
-            let mut ch = false;
-            for (k, ov) in o.iter_mut().enumerate() {
-                let idx = b * dims[0].max(1) * 16 + k;
-                let p = ((idx / stride) % dims[axis]) as i64;
-                let base = idx - p as usize * stride;
-                let (mut sum, mut wsum) = (0.0f32, 0.0f32);
+        .map_init(
+            || vec![0.0f32; nx],
+            |acc, (row, o)| {
+                let base = row * nx;
+                // the row's (y, z), and its position along the axis
+                let p_row = match axis {
+                    1 => (row % ny) as i64,
+                    2 => (row / ny) as i64,
+                    _ => 0,
+                };
+                // the voxels computed at once: x in [xa, xb)
+                let (xa, xb) = if axis == 0 {
+                    let xa = c.max(0) as usize;
+                    let xb = (nx as i64 + c - k + 1).max(0) as usize;
+                    (xa.min(nx), xb.max(xa.min(nx)).min(nx))
+                } else {
+                    (0, nx)
+                };
+                acc[xa..xb].fill(0.0);
                 for (i, &kv) in line.iter().enumerate() {
-                    let q = p + i as i64 - c;
-                    if q < 0 || q >= n {
+                    let i = i as i64;
+                    if xa == xb || (axis != 0 && !inside(p_row, i)) {
                         continue;
                     }
-                    let s = src[base + q as usize * stride].to_f64();
-                    sum = num::acc32(sum, num::nan64(s, kv, s * kv));
-                    wsum = num::acc32(wsum, kv);
+                    // the source of voxel x at tap i: x + d
+                    let d = (i - c) * stride as i64;
+                    let from = (base as i64 + xa as i64 + d) as usize;
+                    let s = &src[from..from + (xb - xa)];
+                    for (a, &v) in acc[xa..xb].iter_mut().zip(s) {
+                        *a = (f64::from(*a) + v.fast_f64() * kv) as f32;
+                    }
                 }
-                let r = if f64::from(wsum).abs() > 1e-12 {
-                    num::nan32(sum, wsum, sum / wsum)
-                } else {
-                    sum
-                };
-                let (t, c) = T::convert(num::to_f64(r), fix);
-                ch |= c;
-                *ov = t;
-            }
-            ch
-        })
+                let mut ch = false;
+                for (x, ov) in o.iter_mut().enumerate() {
+                    let p = if axis == 0 { x as i64 } else { p_row };
+                    let mut r = if (xa..xb).contains(&x) {
+                        finish(acc[x], wsum[p as usize])
+                    } else {
+                        f32::NAN
+                    };
+                    if r.is_nan() {
+                        r = exact(base + x, p);
+                    }
+                    let (t, cv) = T::convert(num::to_f64(r), fix);
+                    ch |= cv;
+                    *ov = t;
+                }
+                ch
+            },
+        )
         .reduce(|| false, |a, b| a || b);
     (out, changed)
 }
@@ -549,10 +614,20 @@ fn fsl_uses_fft(nvox: usize, nker: usize) -> bool {
     (nvox as f32) * (nker as f32) > 44.0 * two * (f64::from(two).log2() as f32)
 }
 
+/// One row of a kernel for the direct sum: its `j`, its `l` and its taps `(i, value)`.
+type TapRow = (i64, i64, Vec<(i64, f32)>);
+
 /// The direct sum of one volume with a kernel (outside the image: 0), in single precision
 /// (a double image's products in double); converted to `T`. Voxel `(i, j, k)` of the kernel
 /// weighs the image at the voxel plus `(i, j, k) − centre` (a correlation; FSL's FFT path is a
 /// true convolution, which the caller gives as the flipped kernel and its own centre).
+///
+/// Built for speed with the same bits: a row of x at once, every voxel's taps added in the
+/// kernel's order (z slowest, x fastest; the taps outside the image left out, and the kernel's
+/// zeros too when the volume is finite: a sum from +0 never changes by a ±0 product); a voxel
+/// whose sum is NaN is computed again by x86-64's rules, so NaN bits do not depend on the
+/// platform. A kernel holding a NaN or an infinity (whose taps outside the image add 0 times it)
+/// is summed voxel by voxel.
 fn direct_volume<T: Num>(
     src: &[T],
     dims: [usize; 3],
@@ -563,54 +638,119 @@ fn direct_volume<T: Num>(
     let [nx, ny, nz] = dims;
     let [kx, ky, kz] = k.size();
     let [cx, cy, cz] = centre;
-    let plane = nx * ny;
     let slow = k.non_finite();
     let double = T::KIND == super::num::Kind::Double;
+    // one voxel by x86-64's rules
+    let exact = |x: usize, y: usize, z: usize| -> f32 {
+        let mut sum = 0.0f32;
+        for l in 0..kz {
+            let pz = z as i64 + l as i64 - cz;
+            let zin = pz >= 0 && pz < nz as i64;
+            for j in 0..ky {
+                let py = y as i64 + j as i64 - cy;
+                let yin = py >= 0 && py < ny as i64;
+                let row = (j + ky * l) * kx;
+                for i in 0..kx {
+                    let px = x as i64 + i as i64 - cx;
+                    let inside = zin && yin && px >= 0 && px < nx as i64;
+                    let kv = k.data[row + i];
+                    let s = if inside {
+                        src[px as usize + nx * (py as usize + ny * pz as usize)]
+                    } else if slow {
+                        T::zero()
+                    } else {
+                        continue;
+                    };
+                    if double {
+                        let (a, b) = (s.to_f64(), f64::from(kv));
+                        sum = num::acc32(sum, num::nan64(a, b, a * b));
+                    } else {
+                        let a = num::to_f32(s.to_f64());
+                        let p = num::nan32(a, kv, a * kv);
+                        sum = num::nan32(sum, p, sum + p);
+                    }
+                }
+            }
+        }
+        sum
+    };
     let mut out = vec![T::zero(); src.len()];
+    let convert = |o: &mut [T], sums: &mut dyn FnMut(usize) -> f32| -> bool {
+        let mut ch = false;
+        for (x, ov) in o.iter_mut().enumerate() {
+            let (t, c) = T::convert(num::to_f64(sums(x)), fix);
+            ch |= c;
+            *ov = t;
+        }
+        ch
+    };
+    if slow {
+        let changed = out
+            .par_chunks_mut(nx.max(1))
+            .enumerate()
+            .map(|(row, o)| convert(o, &mut |x| exact(x, row % ny, row / ny)))
+            .reduce(|| false, |a, b| a || b);
+        return (out, changed);
+    }
+    let finite = !src.par_iter().any(|v| v.non_finite());
+    // the kernel's taps per (j, l) row, in order: (i, value), its zeros left out when the volume
+    // is finite
+    let rows: Vec<TapRow> = (0..kz)
+        .flat_map(|l| (0..ky).map(move |j| (j, l)))
+        .map(|(j, l)| {
+            let taps = (0..kx)
+                .map(|i| (i as i64, k.data[(j + ky * l) * kx + i]))
+                .filter(|&(_, v)| !(finite && v == 0.0))
+                .collect();
+            (j as i64, l as i64, taps)
+        })
+        .collect();
     let changed = out
-        .par_chunks_mut(plane.max(1))
+        .par_chunks_mut(nx.max(1))
         .enumerate()
-        .map(|(z, o)| {
-            let mut ch = false;
-            for y in 0..ny {
-                for x in 0..nx {
-                    let mut sum = 0.0f32;
-                    for l in 0..kz {
-                        let pz = z as i64 + l as i64 - cz;
-                        let zin = pz >= 0 && pz < nz as i64;
-                        for j in 0..ky {
-                            let py = y as i64 + j as i64 - cy;
-                            let yin = py >= 0 && py < ny as i64;
-                            let row = (j + ky * l) * kx;
-                            for i in 0..kx {
-                                let px = x as i64 + i as i64 - cx;
-                                let inside = zin && yin && px >= 0 && px < nx as i64;
-                                let kv = k.data[row + i];
-                                let s = if inside {
-                                    src[px as usize + nx * (py as usize + ny * pz as usize)]
-                                } else if slow {
-                                    T::zero()
-                                } else {
-                                    continue;
-                                };
-                                if double {
-                                    let (a, b) = (s.to_f64(), f64::from(kv));
-                                    sum = num::acc32(sum, num::nan64(a, b, a * b));
-                                } else {
-                                    let a = num::to_f32(s.to_f64());
-                                    let p = num::nan32(a, kv, a * kv);
-                                    sum = num::nan32(sum, p, sum + p);
-                                }
+        .map_init(
+            || vec![0.0f32; nx],
+            |acc, (row, o)| {
+                let (y, z) = ((row % ny) as i64, (row / ny) as i64);
+                acc.fill(0.0);
+                for (j, l, taps) in &rows {
+                    let (py, pz) = (y + j - cy, z + l - cz);
+                    if py < 0 || py >= ny as i64 || pz < 0 || pz >= nz as i64 {
+                        continue;
+                    }
+                    let srow = &src[nx * (py as usize + ny * pz as usize)..][..nx];
+                    for &(i, kv) in taps {
+                        // voxel x reads srow[x + d]: x in [xa, xb)
+                        let d = i - cx;
+                        let xa = (-d).clamp(0, nx as i64) as usize;
+                        let xb = (nx as i64 - d).clamp(xa as i64, nx as i64) as usize;
+                        if xa == xb {
+                            continue;
+                        }
+                        let s = &srow[(xa as i64 + d) as usize..(xb as i64 + d) as usize];
+                        let a = &mut acc[xa..xb];
+                        if double {
+                            let kd = f64::from(kv);
+                            for (a, &v) in a.iter_mut().zip(s) {
+                                *a = (f64::from(*a) + v.fast_f64() * kd) as f32;
+                            }
+                        } else {
+                            for (a, &v) in a.iter_mut().zip(s) {
+                                *a += (v.fast_f64() as f32) * kv;
                             }
                         }
                     }
-                    let (t, c) = T::convert(num::to_f64(sum), fix);
-                    ch |= c;
-                    o[x + nx * y] = t;
                 }
-            }
-            ch
-        })
+                convert(o, &mut |x| {
+                    let r = acc[x];
+                    if r.is_nan() {
+                        exact(x, y as usize, z as usize)
+                    } else {
+                        r
+                    }
+                })
+            },
+        )
         .reduce(|| false, |a, b| a || b);
     (out, changed)
 }
@@ -655,13 +795,18 @@ fn point_symmetric(k: &Kernel) -> bool {
 ///   results differ, which the default computes to know);
 /// - FSL-191: a volume holding a NaN or infinite voxel is NaN throughout in FSL, which the
 ///   default corrects (the direct sum keeps the NaN within the kernel's reach).
-fn convolve_all<T: Num>(
-    img: &Img<T>,
+///
+/// In place, volume by volume (one volume's copy held). `extra_warnings`: the off-centre
+/// warning printed for that many more volumes (a convolution of ones computed on one volume for
+/// a whole series).
+fn convolve_in_place<T: Num>(
+    img: &mut Img<T>,
     k: &Kernel,
     op: &str,
     notices: &mut Notices,
     err: &mut dyn Write,
-) -> (Vec<T>, bool) {
+    extra_warnings: usize,
+) -> bool {
     let fix = notices.fix();
     let (dims, per) = grid(img);
     let fft = fsl_uses_fft(per, k.data.len());
@@ -673,7 +818,6 @@ fn convolve_all<T: Num>(
         (Some((m, c)), false) => (m.clone(), *c),
         _ => (k.clone(), k.centre()),
     };
-    let mut out = Vec::with_capacity(img.data.len());
     let mut changed = false;
     let mut poisoned = false;
     let mut mirrored = false;
@@ -691,7 +835,7 @@ fn convolve_all<T: Num>(
                 .map_or_else(num::default_nan, |v| num::quiet(v.to_f64()));
             let (t_nan, c) = T::convert(nan, fix);
             changed |= c;
-            out.extend(std::iter::repeat_n(t_nan, per));
+            img.data[t * per..(t + 1) * per].fill(t_nan);
             poisoned = true;
             continue;
         }
@@ -713,7 +857,12 @@ fn convolve_all<T: Num>(
             poisoned |= o.par_iter().any(|v| !v.same(t_nan));
         }
         changed |= ch;
-        out.extend_from_slice(&o);
+        img.data[t * per..(t + 1) * per].copy_from_slice(&o);
+    }
+    if warn {
+        for _ in 0..extra_warnings {
+            let _ = writeln!(err, "{OFF_CENTRE_CONV}");
+        }
     }
     if mirrored {
         let detail = match notices.mode() {
@@ -742,7 +891,7 @@ fn convolve_all<T: Num>(
         };
         notices.add(&defects::FSL_191, detail);
     }
-    (out, changed)
+    changed
 }
 
 /// The kernel divided by the sum of its values (a double sum rounded to single precision, as
@@ -783,38 +932,40 @@ pub fn fmean<T: Num>(
         let _ = writeln!(err, "{EMPTY_MASK}");
     }
     let kn = normalised(k);
-    let (conv, ch) = convolve_all(img, &kn, op, notices, err);
-    let mut changed = ch;
+    let mut changed = convolve_in_place(img, &kn, op, notices, err, 0);
     if renormalise {
-        let ones = Img {
-            dims: img.dims,
-            data: vec![T::one(); img.data.len()],
+        // the convolution of ones: the same for every volume, so computed on one (its
+        // messages printed for each)
+        let [nx, ny, nz, nt] = img.dims;
+        let per = nx * ny * nz;
+        let mut ones = Img {
+            dims: [nx, ny, nz, 1],
+            data: vec![T::one(); per],
             header: img.header.clone(),
             flipped: img.flipped,
             cal: img.cal,
         };
-        let (den, ch) = convolve_all(&ones, &kn, op, notices, err);
-        changed |= ch;
+        changed |= convolve_in_place(&mut ones, &kn, op, notices, err, nt.saturating_sub(1));
+        let den = ones.data;
         if T::KIND.is_int() {
             if den.par_iter().any(|&d| d == T::zero()) {
                 return Err(Stop::DivZero(
                     "-fmean's renormalisation divides by 0 under an integer type",
                 ));
             }
-            if conv
-                .par_iter()
-                .zip(den.par_iter())
-                .any(|(&a, &d)| d.to_f64() == -1.0 && a.to_f64() == T::MIN)
-            {
+            if img.data.par_chunks(per.max(1)).any(|vol| {
+                vol.iter()
+                    .zip(&den)
+                    .any(|(&a, &d)| d.to_f64() == -1.0 && a.to_f64() == T::MIN)
+            }) {
                 return Err(Stop::DivZero("the most negative int divided by -1"));
             }
         }
-        img.data
-            .par_iter_mut()
-            .zip(conv.par_iter().zip(den.par_iter()))
-            .for_each(|(v, (&a, &d))| *v = a.div(d));
-    } else {
-        img.data = conv;
+        img.data.par_chunks_mut(per.max(1)).for_each(|vol| {
+            for (v, &d) in vol.iter_mut().zip(&den) {
+                *v = v.div(d);
+            }
+        });
     }
     super::ops::note151(notices, changed, "a filter's results");
     Ok(())
@@ -895,6 +1046,129 @@ pub(crate) mod tests {
         Notices::new(mode)
     }
 
+    /// Values with NaN (two payloads, both signs), infinities, zeros of both signs, from a
+    /// seeded generator.
+    fn awkward(n: usize, seed: u64) -> Vec<f32> {
+        let mut x = seed;
+        (0..n)
+            .map(|_| {
+                x ^= x << 13;
+                x ^= x >> 7;
+                x ^= x << 17;
+                match x % 97 {
+                    0 => f32::from_bits(0x7fc0_1234),
+                    1 => f32::from_bits(0xffa0_0001),
+                    2 => f32::INFINITY,
+                    3 => f32::NEG_INFINITY,
+                    4 => -0.0,
+                    5 => 0.0,
+                    r => (r as f32 - 48.0) * 0.37,
+                }
+            })
+            .collect()
+    }
+
+    /// The separable pass and the direct sum built for speed give the bits of the plain
+    /// per-voxel sums (x86-64's NaN rules), at any thread count.
+    #[test]
+    fn the_fast_sums_are_the_plain_sums() {
+        let dims = [13usize, 7, 6];
+        let n = dims.iter().product::<usize>();
+        for (seed, finite) in [(7u64, false), (11, true)] {
+            let mut src = awkward(n, seed);
+            if finite {
+                src.iter_mut()
+                    .filter(|v| !v.is_finite())
+                    .for_each(|v| *v = 1.5);
+            }
+            // the separable pass, each axis, an odd and an even line
+            for line in [
+                vec![0.25f64, 0.5, 1.0, 0.5, 0.25],
+                vec![1.0, -2.0, 0.5, 3.0],
+            ] {
+                let c = (line.len() as i64 - 1) / 2;
+                for axis in 0..3 {
+                    let stride = [1, dims[0], dims[0] * dims[1]][axis];
+                    let len = dims[axis] as i64;
+                    let want: Vec<f32> = (0..n)
+                        .map(|idx| {
+                            let p = ((idx / stride) % dims[axis]) as i64;
+                            let base = idx - p as usize * stride;
+                            let (mut sum, mut w) = (0.0f32, 0.0f32);
+                            for (i, &kv) in line.iter().enumerate() {
+                                let q = p + i as i64 - c;
+                                if q >= 0 && q < len {
+                                    let s = num::to_f64(src[base + q as usize * stride]);
+                                    sum = num::acc32(sum, num::nan64(s, kv, s * kv));
+                                    w = num::acc32(w, kv);
+                                }
+                            }
+                            if f64::from(w).abs() > 1e-12 {
+                                num::nan32(sum, w, sum / w)
+                            } else {
+                                sum
+                            }
+                        })
+                        .collect();
+                    for threads in [1, 3] {
+                        let (got, _) = larmorx_core::parallel::with_threads(threads, || {
+                            separable_axis(&src, dims, axis, &line, c, true)
+                        })
+                        .unwrap();
+                        assert!(
+                            got.iter()
+                                .zip(&want)
+                                .all(|(a, b)| a.to_bits() == b.to_bits()),
+                            "separable axis {axis}, {threads} threads"
+                        );
+                    }
+                }
+            }
+            // the direct sum, a kernel with zeros, a centre off the middle
+            let kd = [4usize, 3, 2];
+            let values: Vec<f32> = (0..24).map(|v| [0.0, 0.5, -1.25, 2.0][v % 4]).collect();
+            let k = Kernel::from_values(kd, values);
+            let centre = [1i64, 2, 0];
+            let want: Vec<f32> = (0..n)
+                .map(|idx| {
+                    let (x, y, z) = (idx % 13, (idx / 13) % 7, idx / 91);
+                    let mut sum = 0.0f32;
+                    for l in 0..2 {
+                        for j in 0..3 {
+                            for i in 0..4 {
+                                let (px, py, pz) = (
+                                    x as i64 + i - centre[0],
+                                    y as i64 + j - centre[1],
+                                    z as i64 + l - centre[2],
+                                );
+                                if px < 0 || py < 0 || pz < 0 || px >= 13 || py >= 7 || pz >= 6 {
+                                    continue;
+                                }
+                                let a = src[(px + 13 * (py + 7 * pz)) as usize];
+                                let kv = k.data[(i + 4 * (j + 3 * l)) as usize];
+                                let p = num::nan32(a, kv, a * kv);
+                                sum = num::nan32(sum, p, sum + p);
+                            }
+                        }
+                    }
+                    sum
+                })
+                .collect();
+            for threads in [1, 3] {
+                let (got, _) = larmorx_core::parallel::with_threads(threads, || {
+                    direct_volume(&src, dims, &k, centre, true)
+                })
+                .unwrap();
+                assert!(
+                    got.iter()
+                        .zip(&want)
+                        .all(|(a, b)| a.to_bits() == b.to_bits()),
+                    "direct sum, finite {finite}, {threads} threads"
+                );
+            }
+        }
+    }
+
     #[test]
     fn the_window_counts_nan_and_overflows_past_its_count() {
         // a kernel value of exactly 0.5 counts but never enters; NaN counts; +inf enters only
@@ -966,6 +1240,11 @@ pub(crate) mod tests {
 
     #[test]
     fn fsl_192_the_fft_path_mirrors_the_kernel_and_fsl_191() {
+        let conv = |im: &Img<f32>, k: &Kernel, n: &mut Notices, err: &mut Vec<u8>| {
+            let mut im = im.clone();
+            convolve_in_place(&mut im, k, "-fmeanu", n, err, 0);
+            im.data
+        };
         // a 64 x 64 impulse and a 41 x 41 kernel: FSL's FFT path, a true convolution
         let (n, m) = (64, 41);
         let mut data: Vec<f32> = vec![0.0; n * n];
@@ -980,19 +1259,18 @@ pub(crate) mod tests {
         let at = |x: usize, y: usize| x + n * y;
         // reproduce: kernel voxel (i, j) at (32 - 20 + i, 32 - 20 + j) (FSL's FFT)
         let mut rep = notices(UpstreamDefects::Reproduce);
-        let (o, _) = convolve_all(&im, &big, "-fmeanu", &mut rep, &mut err);
+        let o = conv(&im, &big, &mut rep, &mut err);
         assert!(o[at(12, 12)] == 1.0 && o[at(52, 52)] == 1681.0);
         // the default: the correlation of FSL's direct sum, at (32 + 20 - i, 32 + 20 - j)
         let mut fix = notices(UpstreamDefects::Fix);
-        let (o, _) = convolve_all(&im, &big, "-fmeanu", &mut fix, &mut err);
+        let o = conv(&im, &big, &mut fix, &mut err);
         assert!(o[at(52, 52)] == 1.0 && o[at(12, 12)] == 1681.0);
         assert!(fix.contains(&defects::FSL_192) && rep.contains(&defects::FSL_192));
         // a point-symmetric kernel: the same either way, not named
         let mut fix = notices(UpstreamDefects::Fix);
-        convolve_all(
+        conv(
             &im,
             &Kernel::ones([m as i64, m as i64, 1], false),
-            "-fmeanu",
             &mut fix,
             &mut err,
         );
@@ -1000,7 +1278,7 @@ pub(crate) mod tests {
         // an image the orientation does not change (zeros): not named in the default
         let zeros = img([n, n, 1, 1], vec![0.0; n * n]);
         let mut fix = notices(UpstreamDefects::Fix);
-        convolve_all(&zeros, &big, "-fmeanu", &mut fix, &mut err);
+        conv(&zeros, &big, &mut fix, &mut err);
         assert!(!fix.contains(&defects::FSL_192));
         // FSL-191: a NaN on the FFT path poisons the volume only with reproduce
         let w = 64 * 64;
@@ -1010,10 +1288,10 @@ pub(crate) mod tests {
         let k = Kernel::ones([41, 41, 1], false);
         assert!(fsl_uses_fft(w, 41 * 41));
         let mut rep = notices(UpstreamDefects::Reproduce);
-        let (o, _) = convolve_all(&im, &k, "-fmeanu", &mut rep, &mut err);
+        let o = conv(&im, &k, &mut rep, &mut err);
         assert!(o.iter().all(|v| v.is_nan()));
         let mut fix = notices(UpstreamDefects::Fix);
-        let (o, _) = convolve_all(&im, &k, "-fmeanu", &mut fix, &mut err);
+        let o = conv(&im, &k, &mut fix, &mut err);
         assert!(o[w - 1] == 441.0 && o[0].is_nan());
         assert!(fix.contains(&defects::FSL_191) && rep.contains(&defects::FSL_191));
     }

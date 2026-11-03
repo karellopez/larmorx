@@ -540,10 +540,14 @@ defects! {
         "-thr, -thrp, -thrP, -uthr, -uthrp, -uthrP, -bin, -binv and -mas bound their range by the image's maximum plus 1 (or minimum minus 1), which wraps around under -dt char and int and rounds back to the maximum for values from 2^24 (and infinity): the largest (or smallest) voxels are zeroed";
     FSL_153 = "FSL-153", "fslmaths", true,
         "a NaN first voxel makes the image's minimum and maximum NaN: -thr, -uthr, -bin, -binv and -mas then zero every voxel, and -range writes a NaN display range; NaN voxels also count in the lowest bin of the robust range of -thrp, -thrP, -uthrp and -uthrP; along a dimension (-Tmax, -Tmin, -Tmaxn and their X, Y and Z forms) a NaN first value makes the maximum and minimum NaN and the index of the maximum 0, while NaN values elsewhere are left out";
+    FSL_154 = "FSL-154", "fslmaths", true,
+        "-dt char and -dt input on a uint8 image compute in signed 8-bit values, so the voxels from 128 to 255 are read as negative: -thr, -bin, the comparisons, divisions and conversions to other types treat them as negative (additions keep the right low byte)";
     FSL_155 = "FSL-155", "fslmaths", true,
         "-dt input on an image stored as int8, uint16, uint32, int64, uint64 or float128 computes nothing, writes no output and exits with status 0";
     FSL_156 = "FSL-156", "fslmaths", true,
         "an integer division by zero crashes fslmaths (a floating-point exception): -rem by a number or an image value whose integer part is 0, -div by such a number under -dt char, short or int, -grid with a spacing of 0, and the most negative int divided by -1 under -dt int";
+    FSL_157 = "FSL-157", "fslmaths", true,
+        "-odt input on an int8 or uint16 image truncates the result toward zero instead of rounding it as the other integer outputs are, and writes an int8 output as uint8: a negative value becomes another (its byte read as unsigned)";
     FSL_158 = "FSL-158", "fslmaths", true,
         "an operation that takes more arguments than remain before the output name reads past the end of the command line: it crashes, or reads the environment";
     FSL_159 = "FSL-159", "fslmaths", true,

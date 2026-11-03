@@ -71,7 +71,7 @@ STANDARD_RUNS = (
     "ds003592-sub-280-noreconall",
 )
 #: The defects whose notice may name a condition the comparison cannot see.
-_SILENT = ("FSL-158",)
+_SILENT = ("FSL-158", "FSL-154")
 
 
 # ------------------------------------------------------------------------------------------------
@@ -927,6 +927,26 @@ def _cases() -> dict[str, tuple[str, str, Run]]:
             T,
             "-odt input on uint16",
             _r("@u16", "-div", "3", "out", "-odt", "input"),
+        ),
+        "d13/char-uint8-thr": (
+            T,
+            "FSL-154: -dt char on a uint8 image, -thr 100 (values 128-255 read as negative)",
+            _r("-dt", "char", "@u8", "-thr", "100", "out", "-odt", "char"),
+        ),
+        "d13/input-uint8-div": (
+            T,
+            "FSL-154: -dt input on a uint8 image, -div 2, written as float",
+            _r("-dt", "input", "@u8", "-div", "2", "out"),
+        ),
+        "d13/odt-input-int8": (
+            T,
+            "FSL-157: -odt input on an int8 image (truncated, written as uint8)",
+            _r("@i8", "-mul", "0.75", "out", "-odt", "input"),
+        ),
+        "d13/odt-input-uint16-round": (
+            T,
+            "FSL-157: -odt input on a uint16 image, -mul 0.5 (truncated, not rounded)",
+            _r("@u16", "-mul", "0.5", "out", "-odt", "input"),
         ),
         "dt/odt-nan": (
             T,

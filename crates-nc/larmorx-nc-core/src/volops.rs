@@ -133,6 +133,7 @@ macro_rules! int_arith {
 }
 
 int_arith!(i8, i32);
+int_arith!(u8, i32);
 int_arith!(i16, i32);
 int_arith!(i32, i32);
 

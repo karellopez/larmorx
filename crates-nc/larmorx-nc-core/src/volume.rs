@@ -143,6 +143,29 @@ impl Elem for i8 {
     }
 }
 
+/// `unsigned char`: not one of newimage's templates. The FSL replicas use it only where FSL's
+/// `char` template reads uint8 data as negative (fslmaths' FSL-154, corrected): its files are
+/// unsigned bytes, as `char`'s are.
+impl Elem for u8 {
+    const DTYPE: i16 = dt::UNSIGNED_CHAR;
+    const SIZE: usize = 1;
+    fn to_f64(self) -> f64 {
+        f64::from(self)
+    }
+    fn to_f32(self) -> f32 {
+        f32::from(self)
+    }
+    fn from_f32(x: f32) -> Self {
+        cnum::f32_to_i8(x) as u8
+    }
+    fn from_f64(x: f64) -> Self {
+        cnum::f64_to_i32(x) as u8
+    }
+    fn put_le(self, out: &mut Vec<u8>) {
+        out.push(self);
+    }
+}
+
 impl Elem for f64 {
     const DTYPE: i16 = dt::DOUBLE;
     const SIZE: usize = 8;
@@ -1793,6 +1816,31 @@ pub enum Conversion {
 }
 
 impl<T: Elem> Volume<T> {
+    /// [`Volume::save_volume`] with the header's datatype `code` in place of the type's own (a
+    /// type of the same width: fslmaths writes int8 data as int8, FSL-157's correction).
+    pub fn save_volume_coded(
+        &self,
+        filename: &str,
+        settings: &Settings,
+        opts: &SaveOptions,
+        code: i16,
+    ) -> Result<Saved, SaveError> {
+        let encode = |xs: &[T]| {
+            let mut bytes = Vec::with_capacity(xs.len() * T::SIZE);
+            for &x in xs {
+                x.put_le(&mut bytes);
+            }
+            bytes
+        };
+        let values = Values {
+            code,
+            bits: (T::SIZE * 8) as i32,
+            width: T::SIZE,
+            encode,
+        };
+        self.write(filename, settings, opts, None, values)
+    }
+
     /// `save_volume(source, filename)` in the volume's own type.
     pub fn save_volume(
         &self,

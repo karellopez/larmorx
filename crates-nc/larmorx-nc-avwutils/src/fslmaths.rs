@@ -25,12 +25,14 @@
 //! - **Threshold-free cluster enhancement and ROC** (`tfce`): `-tfce`, `-tfceS`, `-tfce_minT`,
 //!   `-tfce_delta`, `-roc`.
 //! - **D13.** FSL-151 (conversions to integers), FSL-152 (the `max() + 1` bound), FSL-153 (a
-//!   NaN first voxel), FSL-155 (`-dt input` of a type without its own), FSL-156 (integer
-//!   division traps), FSL-158 (arguments read past the command line), FSL-159 (images of
+//!   NaN first voxel), FSL-154 (uint8 in the signed `char` template), FSL-155 (`-dt input` of a
+//!   type without its own), FSL-156 (integer division traps), FSL-157 (`-odt input` on int8 and
+//!   uint16), FSL-158 (arguments read past the command line), FSL-159 (images of
 //!   another size), FSL-160 (a zero-width Gaussian), FSL-161 (a kernel without voxels), FSL-162
 //!   (a NaN in a sorted window), FSL-163 (4D subsampling), FSL-164 (4D `-dog_edge`), FSL-165
 //!   (`-fillh` of one slice), FSL-166 (a non-finite tensor), FSL-167 to FSL-172 (`stats`'
-//!   defects), FSL-173 to FSL-180 (`tfce`'s): corrected by default, reproduced
+//!   defects), FSL-173 to FSL-180 (`tfce`'s), FSL-187 (the robust range's bins), GLIBC-07
+//!   (glibc's double functions: correctly rounded by default): corrected by default, reproduced
 //!   with `LARMORX_UPSTREAM_DEFECTS=reproduce` (crashes are refused in both modes).
 
 use std::io::Write;
@@ -266,6 +268,8 @@ fn main_inner(argv: &[String], ctx: &mut Ctx) -> Res<u8> {
     } else {
         file_dtype(ctx, &argv[1])?
     };
+    // FSL-154: the char template of a uint8 image, corrected, computes in unsigned bytes
+    let unsigned = input_type == dt::UNSIGNED_CHAR && !ctx.reproduce();
     let mut output_type = dt::FLOAT;
     if input_type == dt::DOUBLE {
         output_type = dt::DOUBLE;
@@ -333,6 +337,9 @@ fn main_inner(argv: &[String], ctx: &mut Ctx) -> Res<u8> {
                 }
             },
         };
+        if chosen == dt::UNSIGNED_CHAR && unsigned {
+            return input_parser::<u8>(&sub, output_type, ctx);
+        }
         return dispatch(chosen, &sub, output_type, ctx);
     }
     let sub = Args { argv, argc };
@@ -360,8 +367,19 @@ fn dispatch(t: i16, a: &Args, output_dt: i16, ctx: &mut Ctx) -> Res<u8> {
     }
 }
 
-fn read4d<T: Arith>(ctx: &Ctx, name: &str) -> Result<Volume<T>, FslError> {
-    Ok(volume::read_volume4d::<T>(name, ctx.run.fsl)?.0)
+fn read4d<T: Arith>(ctx: &mut Ctx, name: &str) -> Result<Volume<T>, FslError> {
+    let v = volume::read_volume4d::<T>(name, ctx.run.fsl)?.0;
+    if !T::IS_FLOAT && T::MAXV.to_f64() == 255.0 {
+        // the unsigned template of FSL-154's correction: the values FSL's char reads as negative
+        let n = v.data.iter().filter(|x| x.to_f64() >= 128.0).count();
+        if n > 0 {
+            ctx.notice(
+                &defects::FSL_154,
+                format!("{name}: {n} values from 128 to 255 computed as unsigned bytes"),
+            );
+        }
+    }
+    Ok(v)
 }
 
 /// `loadNewImage(oldI, newI, filename)`: the image read; a 3D current image cloned over the
@@ -1226,9 +1244,33 @@ fn input_parser<T: Arith>(a: &Args, output_dt: i16, ctx: &mut Ctx) -> Res<u8> {
         return Err(Stop::Exit(1));
     }
     // a float result rounded before an integer output type (DT_UNSIGNED_CHAR, SIGNED_SHORT,
-    // SIGNED_INT: the datatypes below DT_FLOAT)
+    // SIGNED_INT: the datatypes below DT_FLOAT); FSL-157: int8 and uint16 (-odt input), whose
+    // closest templates are char and int, are truncated by FSL, rounded by default
+    let above = matches!(output_dt, dt::INT8 | dt::UINT16);
     if T::IS_FLOAT && output_dt < dt::FLOAT {
         round_values(ctx, &mut input);
+    } else if T::IS_FLOAT && above {
+        // the values whose rounding (half away from zero, as round_values) is not their
+        // truncation
+        let n = looped_len(&input);
+        let moved = (0..n)
+            .filter(|&k| {
+                let x = input.data[k].to_f64();
+                let r = if x > 0.0 { x + 0.5 } else { x - 0.5 };
+                x.is_finite() && r.trunc() != x.trunc()
+            })
+            .count();
+        if moved > 0 {
+            ctx.notice(
+                &defects::FSL_157,
+                format!(
+                    "-odt input: {moved} values rounded to the integer output type, not truncated"
+                ),
+            );
+        }
+        if !ctx.reproduce() {
+            round_values(ctx, &mut input);
+        }
     }
     if modified {
         input.display_max = 0.0;
@@ -1702,6 +1744,9 @@ fn save<T: Arith>(ctx: &mut Ctx, v: &Volume<T>, name: &str) -> Res<()> {
 /// `save_volume_dtype(vol, name, datatype)`: converted to the closest templated type of
 /// `datatype` (FSL-151: integer types clamped to the values their files hold, NaN as 0).
 fn save_dtype<T: Arith>(ctx: &mut Ctx, v: &Volume<T>, name: &str, datatype: i16) -> Res<()> {
+    if datatype == dt::INT8 {
+        return save_int8(ctx, v, name);
+    }
     match volume::closest_templated_type(datatype) {
         Ok(dt::UNSIGNED_CHAR) => save_as::<T, i8>(ctx, v, name),
         Ok(dt::SIGNED_SHORT) => save_as::<T, i16>(ctx, v, name),
@@ -1714,6 +1759,63 @@ fn save_dtype<T: Arith>(ctx: &mut Ctx, v: &Volume<T>, name: &str, datatype: i16)
             ));
             Ok(())
         }
+    }
+}
+
+/// An int8 output (`-odt input` of an int8 image): FSL writes it in its closest template, `char`,
+/// whose files are unsigned bytes, so a negative value becomes another (FSL-157, with FSL-151's
+/// clamp to 0 by default); corrected, written as int8 with the values clamped to -128..127.
+fn save_int8<T: Arith>(ctx: &mut Ctx, v: &Volume<T>, name: &str) -> Res<()> {
+    if ctx.reproduce() {
+        let n = v.data.iter().filter(|x| x.to_f64() < 0.0).count();
+        if n > 0 {
+            ctx.notice(
+                &defects::FSL_157,
+                format!("-odt input: {n} negative values of an int8 output written as uint8"),
+            );
+        }
+        return save_as::<T, i8>(ctx, v, name);
+    }
+    let mut out = Volume::<i8>::copyconvert(v);
+    let mut changed = 0usize;
+    let mut negative = 0usize;
+    for (o, &x) in out.data.iter_mut().zip(&v.data) {
+        let f = x.to_f64();
+        let c = if f.is_nan() {
+            0.0
+        } else {
+            f.trunc().clamp(-128.0, 127.0)
+        };
+        if c != f.trunc() || f.is_nan() {
+            changed += 1;
+        }
+        if c < 0.0 {
+            negative += 1;
+        }
+        *o = c as i8;
+    }
+    if changed > 0 {
+        ctx.notice(
+            &defects::FSL_151,
+            format!("{changed} values outside the output type's range or NaN"),
+        );
+    }
+    ctx.notice(
+        &defects::FSL_157,
+        format!(
+            "-odt input: an int8 output written as int8 ({negative} negative values), not uint8"
+        ),
+    );
+    let opts = SaveOptions::new(volume::BUILDSTRING.as_bytes()).reproducing_offset(ctx.reproduce());
+    match out.save_volume_coded(name, ctx.run.fsl, &opts, dt::INT8) {
+        Ok(_) => Ok(()),
+        Err(SaveError::OutputType(o)) => {
+            for l in &o.printed {
+                ctx.eput(&format!("{l}\n"));
+            }
+            Err(Stop::Exit(1))
+        }
+        Err(SaveError::Exception(e)) => Err(Stop::Exception(e)),
     }
 }
 

@@ -450,10 +450,16 @@ How `fslstats.cc` computes, and what decides the bits:
   display range; NaN voxels fall into the robust range's lowest bin (`(int) NaN` is `INT_MIN`,
   clamped to bin 0). Corrected: NaN voxels left out of both. Cases: `d13/nan-thr`,
   `d13/nan-bin`, `d13/nan-mas`, `d13/nan-range`, `d13/nan-thrp`.
-- **FSL-154 (c; rule A; not yet corrected, decided): `-dt char` and `-dt input` on uint8 read
-  values 128-255 as negative** (`volume<char>` is signed on x86-64): `-bin`, `-thr` and the
-  comparisons treat them as negative; additions keep the right low byte. To correct (sub-task 5
-  or 6): an unsigned element type for uint8 data.
+- **FSL-154 (c; rule A): `-dt char` and `-dt input` on uint8 read values 128-255 as negative**
+  (`volume<char>` is signed on x86-64): `-bin`, `-thr`, the comparisons, divisions and
+  conversions to other types treat them as negative; additions keep the right low byte.
+  Corrected (2026-11-03): the char template of a uint8 image computes in unsigned bytes (an
+  unsigned element type in `larmorx-nc-core`, `Elem` and `Arith` for `u8`; its files are
+  unsigned bytes as `char`'s are), named where an image holds values from 128 to 255 (they may
+  leave the result unchanged: the suite lists FSL-154 among the notices allowed without a
+  visible change); `-dt char` of an image of another type keeps signed `char` (FSL's).
+  `reproduce`: FSL's signed bytes. Cases: `dt/char`, `dt/input-char`, `d13/char-uint8-thr`
+  (with FSL-152: the unsigned maximum plus 1 wraps too), `d13/input-uint8-div`.
 - **FSL-155 (c; rule A): `-dt input` of a type without its own template** (int8, uint16,
   uint32, int64, uint64, float128): no branch of `main` takes it, `main` returns 0 without a
   word or an output. Corrected: computed in the closest template (as `-odt input` names it).
@@ -463,9 +469,16 @@ How `fslstats.cc` computes, and what decides the bits:
   integer `-dt`, `-grid v 0`, `INT_MIN / -1` and `INT_MIN % -1`: SIGFPE. Refused in both modes.
   Cases: `d13/rem-zero`, `d13/rem-half`, `d13/rem-image-half`, `d13/div-int-half`,
   `d13/grid-zero`.
-- **FSL-157 (c; rule A; not yet corrected, decided): `-odt input` on codes above `DT_FLOAT`**
-  (uint16, int8, ...): the result is truncated, not rounded, and int8 is written as uint8 (the
-  closest template `char`). To correct with FSL-154 (sub-task 5 or 6).
+- **FSL-157 (c; rule A): `-odt input` on int8 and uint16 images.** FSL rounds a float result
+  only before the datatypes below `DT_FLOAT` (uint8, int16, int32), so int8 (256) and uint16
+  (512), whose closest templates are `char` and `int`, are truncated toward zero; and int8 is
+  written in `char`'s files, unsigned bytes, so a negative value becomes another (its byte read
+  as unsigned; FSL-151's correction clamps it to 0). Corrected (2026-11-03): rounded as the other
+  integer outputs (named where a value's rounding is not its truncation), and int8 written as
+  int8 (`Volume::save_volume_coded`, values clamped to -128..127; named whenever an int8 output is
+  written, its datatype being another than FSL's). uint16 stays written as int32, FSL's closest
+  template (its values all fit: rule C). `reproduce`: FSL's. Cases: `d13/odt-input-int8`,
+  `d13/odt-input-uint16-round`, `dt/odt-input-uint16`.
 - **FSL-158 (a): arguments read past the command line.** An operation with more arguments than
   remain before the output reads `argv[argc]` (null: `atoi(NULL)` crashes, `std::string(NULL)`
   throws `std::logic_error`, an abort) or beyond it (the environment's strings). Refused, except

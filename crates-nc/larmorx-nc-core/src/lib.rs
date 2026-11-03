@@ -26,6 +26,9 @@
 //!   `rms_deviation`, `read_ascii_matrix`).
 //! - [`mesh`]: meshclass (triangulated surfaces, their vertex normals and intensity profiles,
 //!   the self-intersection test, the file formats FSL reads and writes).
+//! - [`filters`]: newimage's kernels (`-kernel`), morphological filters (`morphfilter`,
+//!   `dilall`) and convolutions (`generic_convolve`) for every element type, as fslmaths uses
+//!   them.
 //! - [`stats`]: newimage's masked sums and means (in FSL's blocks), percentiles, `threshold`
 //!   and `binarise`, as FAST uses them.
 //! - [`splinterpolator`], [`interp_partial`], [`warpfns`]: miscmaths' B-spline interpolator
@@ -57,6 +60,7 @@ pub mod cprob;
 pub mod crand;
 pub mod exception;
 pub mod fdlibm;
+pub mod filters;
 pub mod glibc_double;
 pub mod glibc_float;
 pub mod interp;

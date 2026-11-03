@@ -101,7 +101,7 @@ def inputs() -> Path:
     """The synthetic inputs, made once (seeded; the same bytes every time)."""
     ws = workspace()
     base = (ws / "oracles" / "inputs" if ws else Path(tempfile.gettempdir())) / SUITE
-    marker = base / "v2.done"
+    marker = base / "v4.done"
     if marker.exists():
         return base
     base.mkdir(parents=True, exist_ok=True)
@@ -215,6 +215,59 @@ def _make_inputs(d: Path) -> None:
     # v2 (2026-11-03): a smaller image of integer divisors (FSL-159's -rem without FSL-156)
     smallint = rng.integers(1, 6, (5, 6, 5)).astype(np.float32)
     _save(d / "smallint.nii.gz", smallint, dtype=np.float32, affine=_affine((5, 6, 5)))
+    # v3 (2026-11-03, sub-task 2): sparse images for the dilations, labels, a binary blob, an
+    # odd-sized anisotropic image, a 2D image and kernel files
+    sparse3 = (rng.integers(1, 4, sh) * (rng.random(sh) > 0.6)).astype(np.float32)
+    sparse3[rng.random(sh) > 0.8] *= -1
+    _save(d / "sparse3.nii.gz", sparse3, dtype=np.float32)
+    sparsenan3 = sparse3.copy()
+    sparsenan3[1, 1, 1] = np.nan
+    sparsenan3[4, 3, 2] = np.nan
+    sparsenan3[6, 5, 4] = np.nan
+    sparsenan3[0, 0, 0] = 0.0
+    _save(d / "sparsenan3.nii.gz", sparsenan3, dtype=np.float32)
+    lab3 = (rng.integers(1, 6, sh) * (rng.random(sh) > 0.55)).astype(np.int16)
+    _save(d / "lab3.nii.gz", lab3, dtype=np.int16)
+    blob3 = np.zeros(sh, dtype=np.uint8)
+    blob3[1:6, 1:5, 0:4] = 1
+    blob3[3, 2, 2] = 0
+    blob3[6, 0, 4] = 1
+    _save(d / "blob3.nii.gz", blob3, dtype=np.uint8)
+    osh = (9, 7, 5)
+    odd3 = (rng.standard_normal(osh) * 30 + 50).astype(np.float32)
+    odd3[rng.random(osh) > 0.7] = 0.0
+    _save(d / "odd3.nii.gz", odd3, dtype=np.float32, affine=_affine(osh, vox=(1.5, 2.0, 2.5)))
+    two2d = (rng.standard_normal((8, 7, 1)) * 10).astype(np.float32)
+    two2d[rng.random((8, 7, 1)) > 0.6] = 0.0
+    _save(d / "two2d.nii.gz", two2d, dtype=np.float32, affine=_affine((8, 7, 1)))
+    levels = np.array([0.0, 0.3, 0.5, 0.7, 1.0, 2.0], dtype=np.float32)
+    kern3 = levels[rng.integers(0, 6, (3, 3, 3))]
+    kern3[1, 1, 1] = 1.0
+    _save(d / "kern3.nii.gz", kern3, dtype=np.float32, affine=_affine((3, 3, 3)))
+    kern_even = (rng.random((2, 3, 3)) > 0.3).astype(np.float32)
+    _save(d / "kern_even.nii.gz", kern_even, dtype=np.float32, affine=_affine((2, 3, 3)))
+    kern_inf = kern3.copy()
+    kern_inf[0, 0, 0] = np.inf
+    _save(d / "kern_inf.nii.gz", kern_inf, dtype=np.float32, affine=_affine((3, 3, 3)))
+    kern4d = levels[rng.integers(0, 6, (3, 3, 3, 2))]
+    _save(d / "kern4d.nii.gz", kern4d, dtype=np.float32, affine=_affine((3, 3, 3)))
+    # v4: an infinite kernel value with no value at 0.5, an even 4D image, masks with holes
+    kern_inf2 = np.ones((3, 3, 3), dtype=np.float32)
+    kern_inf2[0, 0, 0] = np.inf
+    _save(d / "kern_inf2.nii.gz", kern_inf2, dtype=np.float32, affine=_affine((3, 3, 3)))
+    even4 = (rng.standard_normal((6, 4, 4, 2)) * 10).astype(np.float32)
+    _save(d / "even4.nii.gz", even4, dtype=np.float32, affine=_affine((6, 4, 4)))
+    holes3 = np.ones((9, 8, 7), dtype=np.uint8)
+    holes3[0, 0, 0] = 0  # outside, at the corner
+    holes3[1, 1, 1] = 0  # 6-enclosed, 26-connected to the corner
+    holes3[4, 4, 3] = 0  # a cavity
+    holes3[5:7, 5, 2:4] = 0  # a larger cavity
+    holes3[8, 4, 3] = 0  # on a face: touches the edge
+    _save(d / "holes3.nii.gz", holes3, dtype=np.uint8, affine=_affine((9, 8, 7)))
+    blob2d = np.zeros((7, 6, 1), dtype=np.uint8)
+    blob2d[1:6, 1:5, 0] = 1
+    blob2d[3, 2, 0] = 0
+    _save(d / "blob2d.nii.gz", blob2d, dtype=np.uint8, affine=_affine((7, 6, 1)))
 
 
 # ------------------------------------------------------------------------------------------------
@@ -667,7 +720,325 @@ def _cases() -> dict[str, tuple[str, str, Run]]:
             _r(F3, "-min", "@small", "out", undefined="FSL-159"),
         ),
     }
+    c.update(_filter_cases())
     return c
+
+
+def _filter_cases() -> dict[str, tuple[str, str, Run]]:
+    """Sub-task 2: the kernels, morphological filters and convolutions (one case per path)."""
+    S, T = "smoke", "standard"
+    F3 = "@f3"
+    return {
+        # morphfilter, the default 3x3x3 box
+        "morph/dilF": (S, "-dilF (maximum filter, default kernel)", _r(F3, "-dilF", "out")),
+        "morph/dilF-nan": (T, "-dilF with NaN voxels (left out)", _r("@nan3", "-dilF", "out")),
+        "morph/dilM": (T, "-dilM (mean dilation)", _r("@sparse3", "-dilM", "out")),
+        "morph/dilM-nan": (T, "-dilM with NaN neighbours", _r("@sparsenan3", "-dilM", "out")),
+        "morph/dilD": (T, "-dilD (modal dilation)", _r("@sparse3", "-dilD", "out")),
+        "morph/dilD-short": (
+            T,
+            "-dilD of labels under -dt short",
+            _r("-dt", "short", "@lab3", "-dilD", "out", "-odt", "short"),
+        ),
+        "morph/ero": (T, "-ero (zeroing next to zeros)", _r("@blob3", "-ero", "out")),
+        "morph/eroF": (T, "-eroF (minimum filter)", _r(F3, "-eroF", "out")),
+        "morph/eroF-nan": (T, "-eroF with NaN voxels", _r("@nan3", "-eroF", "out")),
+        "morph/fmedian": (T, "-fmedian", _r(F3, "-fmedian", "out")),
+        "morph/fmedian-2D": (T, "-kernel 2D -fmedian", _r(F3, "-kernel", "2D", "-fmedian", "out")),
+        "morph/fmedian-char": (
+            T,
+            "-fmedian under -dt char",
+            _r("-dt", "char", "@u8", "-fmedian", "out", "-odt", "char"),
+        ),
+        "morph/eroF-double": (T, "-eroF of a double image", _r("@d3", "-eroF", "out")),
+        "morph/sphere-4d": (
+            T,
+            "-kernel sphere 4 -dilF on each volume of a 4D image",
+            _r("@f4", "-kernel", "sphere", "4", "-dilF", "out"),
+        ),
+        "morph/boxv-even": (
+            T,
+            "-kernel boxv 2: the off-centre warning",
+            _r(F3, "-kernel", "boxv", "2", "-dilF", "out"),
+        ),
+        "morph/boxv3": (
+            T,
+            "-kernel boxv3 3 1 5 -fmedian",
+            _r(F3, "-kernel", "boxv3", "3", "1", "5", "-fmedian", "out"),
+        ),
+        "morph/box-mm": (
+            T,
+            "-kernel box 4 (mm, anisotropic voxels) -eroF",
+            _r("@odd3", "-kernel", "box", "4", "-eroF", "out"),
+        ),
+        "morph/file": (
+            T,
+            "-kernel file (values around 0.5) -dilF",
+            _r(F3, "-kernel", "file", "@kern3", "-dilF", "out"),
+        ),
+        "morph/file-even": (
+            T,
+            "-kernel file of even size -dilM",
+            _r("@sparse3", "-kernel", "file", "@kern_even", "-dilM", "out"),
+        ),
+        "morph/file-4d": (
+            T,
+            "-kernel file of a 4D image (the first volume, a warning)",
+            _r(F3, "-kernel", "file", "@kern4d", "-eroF", "out"),
+        ),
+        "morph/file-inf": (
+            T,
+            "-kernel file with an infinite value (Armadillo's bounds check)",
+            _r(F3, "-kernel", "file", "@kern_inf", "-dilF", "out"),
+        ),
+        "morph/2d-ero": (
+            T,
+            "-kernel 2D -ero of a 2D image",
+            _r("@two2d", "-kernel", "2D", "-ero", "out"),
+        ),
+        "morph/2d-dilD": (T, "-dilD of a 2D image", _r("@two2d", "-dilD", "out")),
+        "dilall/3d": (T, "-dilall", _r("@sparse3", "-dilall", "out")),
+        "dilall/4d": (
+            T,
+            "-thr 10 -dilall of a 4D image",
+            _r("@f4", "-thr", "10", "-dilall", "out"),
+        ),
+        "dilall/int": (
+            T,
+            "-dilall under -dt int",
+            _r("-dt", "int", "@lab3", "-dilall", "out", "-odt", "int"),
+        ),
+        "dilall/nan": (T, "-dilall with NaN voxels", _r("@sparsenan3", "-dilall", "out")),
+        # convolutions
+        "conv/s": (S, "-s 2 (separable Gaussian)", _r(F3, "-s", "2", "out")),
+        "conv/s-odd": (T, "-s 1.5 of an odd, anisotropic image", _r("@odd3", "-s", "1.5", "out")),
+        "conv/s-4d": (T, "-s 1 of a 4D image", _r("@f4", "-s", "1", "out")),
+        "conv/s-2d": (T, "-s 2 of a 2D image", _r("@two2d", "-s", "2", "out")),
+        "conv/s-nan": (T, "-s 1 with NaN voxels", _r("@nan3", "-s", "1", "out")),
+        "conv/fmean-default": (
+            T,
+            "-fmean with the default kernel (not separable)",
+            _r(F3, "-fmean", "out"),
+        ),
+        "conv/fmean-box": (
+            T,
+            "-kernel box 5 -fmean (separable)",
+            _r("@odd3", "-kernel", "box", "5", "-fmean", "out"),
+        ),
+        "conv/fmean-boxv-even": (
+            T,
+            "-kernel boxv 4 -fmean (separable, even: warnings)",
+            _r(F3, "-kernel", "boxv", "4", "-fmean", "out"),
+        ),
+        "conv/fmean-sphere": (
+            T,
+            "-kernel sphere 3 -fmean (direct sum)",
+            _r("@odd3", "-kernel", "sphere", "3", "-fmean", "out"),
+        ),
+        "conv/fmean-sphere-nan": (
+            T,
+            "-kernel sphere 4 -fmean with NaN voxels",
+            _r("@nan3", "-kernel", "sphere", "4", "-fmean", "out"),
+        ),
+        "conv/fmean-double": (
+            T,
+            "-kernel sphere 4 -fmean of a double image",
+            _r("@d3", "-kernel", "sphere", "4", "-fmean", "out"),
+        ),
+        "conv/fmean-file": (
+            T,
+            "-kernel file -fmean (not separable)",
+            _r(F3, "-kernel", "file", "@kern3", "-fmean", "out"),
+        ),
+        "conv/fmean-file-even": (
+            T,
+            "-kernel file of even size -fmean (warnings)",
+            _r(F3, "-kernel", "file", "@kern_even", "-fmean", "out"),
+        ),
+        "conv/fmean-2D": (T, "-kernel 2D -fmean", _r(F3, "-kernel", "2D", "-fmean", "out")),
+        "conv/separable-kept": (
+            T,
+            "-kernel gauss 1 -kernel 3D -fmean (separable kept from gauss)",
+            _r(F3, "-kernel", "gauss", "1", "-kernel", "3D", "-fmean", "out"),
+        ),
+        "conv/fmeanu": (
+            T,
+            "-kernel sphere 5 -fmeanu",
+            _r(F3, "-kernel", "sphere", "5", "-fmeanu", "out"),
+        ),
+        "conv/fmeanu-gauss": (
+            T,
+            "-kernel gauss 2 -fmeanu (not separable)",
+            _r(F3, "-kernel", "gauss", "2", "-fmeanu", "out"),
+        ),
+        "conv/fmeanu-char": (
+            T,
+            "-kernel sphere 3 -fmeanu under -dt char",
+            _r("-dt", "char", "@u8", "-kernel", "sphere", "3", "-fmeanu", "out", "-odt", "char"),
+        ),
+        "conv/fmean-int": (
+            T,
+            "-kernel boxv 3 -fmean under -dt int (separable)",
+            _r("-dt", "int", "@s3", "-kernel", "boxv", "3", "-fmean", "out"),
+        ),
+        "conv/kernel-no-output": (
+            T,
+            "-kernel box 3 without an output name",
+            _r(F3, "-kernel", "box", "3"),
+        ),
+        "conv/kernel-missing-size": (
+            T,
+            "-kernel box with the output name as its size: no output name left",
+            _r(F3, "-kernel", "box", "out"),
+        ),
+        "morph/file-inf2": (
+            T,
+            "-kernel file with an infinite value and none at 0.5: more values than the vector holds",
+            _r(F3, "-kernel", "file", "@kern_inf2", "-dilF", "out"),
+        ),
+        # subsampling, edges, holes, normalisation
+        "sub/subsamp2": (T, "-subsamp2", _r(F3, "-subsamp2", "out")),
+        "sub/subsamp2offc": (T, "-subsamp2offc", _r(F3, "-subsamp2offc", "out")),
+        "sub/subsamp2-short": (
+            T,
+            "-subsamp2 under -dt short",
+            _r("-dt", "short", "@s3", "-subsamp2", "out", "-odt", "short"),
+        ),
+        "sub/subsamp2offc-int": (
+            T,
+            "-subsamp2offc under -dt int",
+            _r("-dt", "int", "@s3", "-subsamp2offc", "out"),
+        ),
+        "sub/subsamp2offc-double": (
+            T,
+            "-subsamp2offc of a double image",
+            _r("@d3", "-subsamp2offc", "out"),
+        ),
+        "sub/subsamp2-noform": (
+            T,
+            "-subsamp2 without sform or qform",
+            _r("@noform", "-subsamp2", "out"),
+        ),
+        "sub/subsamp2-nan": (T, "-subsamp2 with NaN voxels", _r("@nan3", "-subsamp2", "out")),
+        "edge/3d": (T, "-edge", _r(F3, "-edge", "out")),
+        "edge/4d": (T, "-edge of a 4D image", _r("@f4", "-edge", "out")),
+        "edge/2d": (T, "-edge of a 2D image", _r("@two2d", "-edge", "out")),
+        "edge/short": (T, "-edge under -dt short", _r("-dt", "short", "@s3", "-edge", "out")),
+        "edge/nan": (T, "-edge with NaN voxels", _r("@nan3", "-edge", "out")),
+        "edge/aniso": (T, "-edge with anisotropic voxels", _r("@odd3", "-edge", "out")),
+        "dog/3d": (T, "-dog_edge 1 1.6", _r(F3, "-dog_edge", "1", "1.6", "out")),
+        "dog/aniso": (
+            T,
+            "-dog_edge 0.5 2 of an odd image",
+            _r("@odd3", "-dog_edge", "0.5", "2", "out"),
+        ),
+        "dog/double": (T, "-dog_edge of a double image", _r("@d3", "-dog_edge", "1", "1.6", "out")),
+        "dog/int": (
+            T,
+            "-dog_edge under -dt int",
+            _r("-dt", "int", "@s3", "-dog_edge", "1", "1.6", "out"),
+        ),
+        "dog/radius0": (
+            T,
+            "-dog_edge 0.1 0.2 (radius 0)",
+            _r(F3, "-dog_edge", "0.1", "0.2", "out"),
+        ),
+        "fillh/6": (T, "-fillh", _r("@holes3", "-fillh", "out")),
+        "fillh/26": (T, "-fillh26", _r("@holes3", "-fillh26", "out")),
+        "fillh/blob": (T, "-fillh of a blob at the edge", _r("@blob3", "-fillh", "out")),
+        "fillh/short": (
+            T,
+            "-fillh under -dt short",
+            _r("-dt", "short", "@holes3", "-fillh", "out"),
+        ),
+        "fillh/4d": (T, "-fillh26 of a 4D mask", _r("@m4", "-fillh26", "out")),
+        "norm/inm": (T, "-inm 100 of a 4D image", _r("@f4", "-inm", "100", "out")),
+        "norm/ing": (T, "-ing 100 of a 4D image", _r("@f4", "-ing", "100", "out")),
+        "norm/inm-sparse": (T, "-inm 100 of a sparse image", _r("@sparse3", "-inm", "100", "out")),
+        "norm/inm-empty": (
+            T,
+            "-inm of an image of zeros (an empty mask: NaN)",
+            _r("@sparse3", "-mul", "0", "-inm", "100", "out"),
+        ),
+        "norm/ing-int": (T, "-ing under -dt int", _r("-dt", "int", "@s3", "-ing", "1000", "out")),
+        "norm/inm-nan": (T, "-inm with NaN voxels", _r("@nan3", "-inm", "100", "out")),
+        # D13
+        "d13/kernel-boxv3-null": (
+            T,
+            "FSL-158: -kernel boxv3 without its sizes (reads the null pointer)",
+            _r(F3, "-kernel", "boxv3", "3", "out"),
+        ),
+        "d13/subsamp2-4d": (T, "FSL-163: -subsamp2 of a 4D image", _r("@f4", "-subsamp2", "out")),
+        "d13/subsamp2offc-4d-odd": (
+            T,
+            "FSL-163: -subsamp2offc of a 4D image of odd sizes",
+            _r("@f4", "-subsamp2offc", "out"),
+        ),
+        "d13/subsamp2offc-4d-even": (
+            T,
+            "FSL-163: -subsamp2offc of a 4D image of even sizes (the first volume)",
+            _r("@even4", "-subsamp2offc", "out"),
+        ),
+        "d13/dog-4d": (
+            T,
+            "FSL-164: -dog_edge of a 4D image",
+            _r("@f4", "-dog_edge", "1", "1.6", "out"),
+        ),
+        "d13/dog-negative": (
+            T,
+            "FSL-161: -dog_edge -1 -2 (a kernel without voxels)",
+            _r(F3, "-dog_edge", "-1", "-2", "out"),
+        ),
+        "d13/fillh-2d": (T, "FSL-165: -fillh of a 2D image", _r("@blob2d", "-fillh", "out")),
+        "d13/s-zero": (T, "FSL-160: -s 0", _r(F3, "-s", "0", "out")),
+        "d13/gauss-zero": (
+            T,
+            "FSL-160: -kernel gauss 0 -fmean",
+            _r(F3, "-kernel", "gauss", "0", "-fmean", "out"),
+        ),
+        "d13/gauss-zero-dilF": (
+            T,
+            "FSL-160: -kernel gauss 0 -dilF (no change: no notice)",
+            _r(F3, "-kernel", "gauss", "0", "-dilF", "out"),
+        ),
+        "d13/kernel-boxv0": (
+            T,
+            "FSL-161: -kernel boxv 0 -dilF",
+            _r(F3, "-kernel", "boxv", "0", "-dilF", "out"),
+        ),
+        "d13/kernel-negative": (
+            T,
+            "FSL-161: -kernel boxv -3 -dilF",
+            _r(F3, "-kernel", "boxv", "-3", "-dilF", "out"),
+        ),
+        "d13/kernel-unknown": (
+            T,
+            "FSL-161: -kernel foo 3 -fmean",
+            _r(F3, "-kernel", "foo", "3", "-fmean", "out"),
+        ),
+        "d13/kernel-unknown-dilM": (
+            T,
+            "FSL-161: -kernel foo 3 -dilM",
+            _r(F3, "-kernel", "foo", "3", "-dilM", "out"),
+        ),
+        "d13/gauss-negative": (
+            T,
+            "FSL-161: -kernel gauss -1 -fmean",
+            _r(F3, "-kernel", "gauss", "-1", "-fmean", "out"),
+        ),
+        "d13/s-negative": (T, "FSL-161: -s -1", _r(F3, "-s", "-1", "out")),
+        "d13/fmedian-nan": (T, "FSL-162: -fmedian with NaN voxels", _r("@nan3", "-fmedian", "out")),
+        "d13/dilD-nan": (
+            T,
+            "FSL-162: -dilD with a NaN next to a zero voxel",
+            _r("@sparsenan3", "-dilD", "out"),
+        ),
+        "d13/fmean-int-trap": (
+            T,
+            "FSL-156: -kernel sphere 5 -fmean under -dt int (an integer division by zero)",
+            _r("-dt", "int", "@s3", "-kernel", "sphere", "5", "-fmean", "out"),
+        ),
+    }
 
 
 def cases(tier: str) -> list[Case]:

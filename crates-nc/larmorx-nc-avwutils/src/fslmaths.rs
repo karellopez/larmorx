@@ -28,6 +28,7 @@ use larmorx_nc_core::arma::Mat;
 use larmorx_nc_core::cnum;
 use larmorx_nc_core::cprob::{self, Drand};
 use larmorx_nc_core::crand::Rand;
+use larmorx_nc_core::filters::{self, ConvStop, Kern, Morph};
 use larmorx_nc_core::glibc_double;
 use larmorx_nc_core::miscmaths;
 use larmorx_nc_core::nifti::{self, dt};
@@ -346,10 +347,6 @@ fn dispatch(t: i16, a: &Args, output_dt: i16, ctx: &mut Ctx) -> Res<u8> {
 /// The operations of later sub-tasks (refused until they are translated).
 const NOT_YET: &[&str] = &[
     "-roc",
-    "-kernel",
-    "-s",
-    "-subsamp2",
-    "-subsamp2offc",
     "-pval",
     "-pval0",
     "-cpval",
@@ -357,26 +354,11 @@ const NOT_YET: &[&str] = &[
     "-ptoz",
     "-rank",
     "-ranknorm",
-    "-fillh",
-    "-fillh26",
-    "-dilall",
-    "-dilM",
-    "-dilD",
-    "-dilF",
-    "-ero",
-    "-eroF",
-    "-fmedian",
-    "-fmean",
-    "-fmeanu",
-    "-edge",
-    "-dog_edge",
     "-tfce_minT",
     "-tfce_delta",
     "-tfce",
     "-tfceS",
     "-roi",
-    "-inm",
-    "-ing",
     "-tensor_decomp",
     "-bptf",
 ];
@@ -684,6 +666,11 @@ fn input_parser<T: Arith>(a: &Args, output_dt: i16, ctx: &mut Ctx) -> Res<u8> {
     let argv = a.argv;
     let argc = a.argc;
     let mut input: Volume<T> = read4d::<T>(ctx, &argv[1])?;
+    // the kernel of the spatial filters (default box_kernel(3,3,3)) and whether -fmean filters
+    // separably; FSL-160: the kernel is a Gaussian of zero width
+    let mut kernel = filters::box_kernel_vox(3, 3, 3);
+    let mut separable = false;
+    let mut zero_width = false;
     let mut set_display_range = false;
     let mut modified = false;
     let mut i = 2usize;
@@ -732,6 +719,170 @@ fn input_parser<T: Arith>(a: &Args, output_dt: i16, ctx: &mut Ctx) -> Res<u8> {
                 i += 1;
                 let s = string_arg(ctx, argv, i)?;
                 max_min(ctx, &mut input, s, op == "-max")?;
+            }
+            "-kernel" => {
+                let (xd, yd, zd) = (input.xdim(), input.ydim(), input.zdim());
+                let kind = string_arg(ctx, argv, i + 1)?;
+                zero_width = false;
+                match kind {
+                    "2D" => kernel = filters::box_kernel_vox(3, 3, 1),
+                    "3D" => kernel = filters::box_kernel_vox(3, 3, 3),
+                    _ => {
+                        let size_s = number_arg(ctx, argv, i + 2)?;
+                        let size = cnum::atof(size_s) as f32;
+                        separable = matches!(kind, "box" | "boxv" | "boxv3" | "gauss");
+                        kernel = match kind {
+                            "box" => filters::box_kernel_mm(size, xd, yd, zd),
+                            "boxv" => {
+                                let n = ctx.int_of::<f32>(size, "-kernel boxv");
+                                filters::box_kernel_vox(n, n, n)
+                            }
+                            "boxv3" => {
+                                let a = cnum::atof(number_arg(ctx, argv, i + 2)?);
+                                let b = cnum::atof(number_arg(ctx, argv, i + 3)?);
+                                let c = cnum::atof(number_arg(ctx, argv, i + 4)?);
+                                i += 2;
+                                filters::box_kernel_vox(
+                                    ctx.int_of::<f64>(a, "-kernel boxv3"),
+                                    ctx.int_of::<f64>(b, "-kernel boxv3"),
+                                    ctx.int_of::<f64>(c, "-kernel boxv3"),
+                                )
+                            }
+                            "gauss" => {
+                                let g = filters::gaussian_kernel3d_mm(size, xd, yd, zd, 4.0, false);
+                                zero_width = g.zero_width;
+                                g.kernel
+                            }
+                            "sphere" => filters::spherical_kernel(size, xd, yd, zd),
+                            "file" => {
+                                let name = string_arg(ctx, argv, i + 2)?;
+                                let (v, warning) = volume::read_volume::<f32>(name, ctx.run.fsl)?;
+                                if let Some(w) = warning {
+                                    ctx.eput(&format!("{w}\n"));
+                                }
+                                Kern::from_volume(&v)
+                            }
+                            // kernel.destroy() and nothing built
+                            _ => Kern::filled(0, 0, 0, 0.0),
+                        };
+                        let known =
+                            matches!(kind, "box" | "boxv" | "boxv3" | "gauss" | "sphere" | "file");
+                        if !known || kernel.has_no_voxels() {
+                            no_voxels(ctx, &format!("-kernel {kind}"), known)?;
+                        }
+                        i += 1;
+                    }
+                }
+                i += 1;
+            }
+            "-s" => {
+                i += 1;
+                let sigma = cnum::atof(string_arg(ctx, argv, i)?) as f32;
+                let (xd, yd, zd) = (input.xdim(), input.ydim(), input.zdim());
+                let g = filters::gaussian_kernel3d_mm(sigma, xd, yd, zd, 4.0, false);
+                kernel = g.kernel;
+                zero_width = g.zero_width;
+                separable = true;
+                if kernel.has_no_voxels() {
+                    no_voxels(ctx, "-s", true)?;
+                }
+                convolve(ctx, &mut input, &kernel, zero_width, true, true, op)?;
+            }
+            "-fmean" => convolve(ctx, &mut input, &kernel, zero_width, separable, true, op)?,
+            "-fmeanu" => convolve(ctx, &mut input, &kernel, zero_width, false, false, op)?,
+            "-dilM" | "-dilD" | "-dilF" | "-ero" | "-eroF" | "-fmedian" => {
+                let kind = match op {
+                    "-dilM" => Morph::DilateM,
+                    "-dilD" => Morph::DilateD,
+                    "-dilF" => Morph::Dilate,
+                    "-ero" => Morph::ErodeS,
+                    "-eroF" => Morph::Erode,
+                    _ => Morph::Median,
+                };
+                morph(ctx, &mut input, &kernel, kind, op)?;
+            }
+            "-dilall" => {
+                let nvox = input.nvoxels().max(0) as usize;
+                let dims = [input.xsize(), input.ysize(), input.zsize()];
+                for t in 0..input.tsize().max(0) as usize {
+                    let src = input.data[t * nvox..(t + 1) * nvox].to_vec();
+                    let out = filters::dilall(&src, dims, &mut |x| ctx.conv::<T>(x, op));
+                    input.data[t * nvox..(t + 1) * nvox].copy_from_slice(&out);
+                }
+            }
+            "-subsamp2" | "-subsamp2offc" => {
+                let centred = op == "-subsamp2";
+                subsample(ctx, &mut input, centred, op)?;
+            }
+            "-edge" => {
+                input = filters::edge_strengthen(&input, &mut |x| ctx.conv::<T>(x, op));
+            }
+            "-dog_edge" => {
+                i += 1;
+                let s1 = cnum::atof(number_arg(ctx, argv, i)?) as f32;
+                i += 1;
+                let s2 = cnum::atof(number_arg(ctx, argv, i)?) as f32;
+                if cnum::f32_to_i32(4.0 * s2) < 0 {
+                    no_voxels(ctx, "-dog_edge", true)?;
+                }
+                let mut every = false;
+                if input.tsize() > 1 {
+                    ctx.notice(&defects::FSL_164, "-dog_edge of a 4D image");
+                    every = !ctx.reproduce();
+                }
+                input =
+                    filters::log_edge_detect(&input, s1, s2, every, &mut |x| ctx.conv::<T>(x, op));
+            }
+            "-fillh" | "-fillh26" => {
+                let conn = if op == "-fillh" { 6 } else { 26 };
+                bin_above(ctx, &mut input, T::from_int(0), op);
+                let nvox = input.nvoxels().max(0) as usize;
+                let dims = [input.xsize(), input.ysize(), input.zsize()];
+                let traps = filters::fill_holes_traps(dims);
+                if traps {
+                    if ctx.reproduce() {
+                        return Err(ctx.refuse(
+                            &defects::FSL_165,
+                            &format!(
+                                "{op} of an image with a size of 1: an integer division by zero"
+                            ),
+                        ));
+                    }
+                    ctx.notice(
+                        &defects::FSL_165,
+                        format!("{op} of an image with a size of 1"),
+                    );
+                }
+                for t in 0..input.tsize().max(0) as usize {
+                    let r = &mut input.data[t * nvox..(t + 1) * nvox];
+                    let out = filters::fill_holes(r, dims, conn, traps);
+                    r.copy_from_slice(&out);
+                }
+                bin_above(ctx, &mut input, T::from_int(0), op);
+            }
+            "-inm" | "-ing" => {
+                i += 1;
+                let target = cnum::atof(number_arg(ctx, argv, i)?);
+                let mut mask = input.clone();
+                bin_above(ctx, &mut mask, T::from_int(0), op);
+                let nvox = input.nvoxels().max(0) as usize;
+                let nt = input.tsize().max(0) as usize;
+                let blocks: Vec<(usize, usize)> = if op == "-inm" {
+                    (0..nt).map(|t| (t * nvox, (t + 1) * nvox)).collect()
+                } else {
+                    vec![(0, nt * nvox)]
+                };
+                for (a, b) in blocks {
+                    let (mean, empty) = filters::masked_mean(&input.data[a..b], &mask.data[a..b]);
+                    if empty {
+                        ctx.eput("ERROR:: Empty mask image\n");
+                    }
+                    let tmean = larmorx_nc_core::sse::div_f64(target, mean);
+                    for k in a..b {
+                        let v = larmorx_nc_core::sse::mul_f64(input.data[k].to_f64(), tmean);
+                        input.data[k] = ctx.conv::<T>(v, op);
+                    }
+                }
             }
             "-seed" => {
                 i += 1;
@@ -988,6 +1139,150 @@ fn input_parser<T: Arith>(a: &Args, output_dt: i16, ctx: &mut Ctx) -> Res<u8> {
     let out_name = argv[argc - 1].clone();
     save_dtype(ctx, &input, &out_name, output_dt)?;
     Ok(0)
+}
+
+/// FSL-161: a kernel without voxels (or of an unknown type), with which FSL filters anyway.
+/// Corrected (rule B): refused.
+fn no_voxels(ctx: &mut Ctx, what: &str, known: bool) -> Res<()> {
+    let why = if known {
+        "the kernel has no voxels"
+    } else {
+        "an unknown kernel type"
+    };
+    ctx.notice(&defects::FSL_161, format!("{what}: {why}"));
+    if ctx.reproduce() {
+        return Ok(());
+    }
+    ctx.eput(&format!(
+        "larmorx-nc: error: fslmaths: {what}: {why} ({}; LARMORX_UPSTREAM_DEFECTS=reproduce \
+         filters with it as FSL does)\n",
+        defects::FSL_161.id
+    ));
+    Err(Stop::Exit(1))
+}
+
+/// `generic_convolve(input, kernel, separable, renormalise)` (`-s`, `-fmean`, `-fmeanu`), with
+/// FSL-160's correction: a zero-width Gaussian (its centre NaN) filters as the unit impulse.
+fn convolve<T: Arith>(
+    ctx: &mut Ctx,
+    input: &mut Volume<T>,
+    kernel: &Kern,
+    zero_width: bool,
+    separable: bool,
+    renormalise: bool,
+    op: &str,
+) -> Res<()> {
+    let impulse;
+    let mut k = kernel;
+    if zero_width {
+        ctx.notice(
+            &defects::FSL_160,
+            format!("{op}: a Gaussian kernel of zero width"),
+        );
+        if !ctx.reproduce() {
+            let mut c = kernel.clone();
+            for v in &mut c.data {
+                if v.is_nan() {
+                    *v = 1.0;
+                }
+            }
+            impulse = c;
+            k = &impulse;
+        }
+    }
+    let mut msgs = Vec::new();
+    let r = filters::generic_convolve(input, k, separable, renormalise, &mut msgs, &mut |x| {
+        ctx.conv::<T>(x, op)
+    });
+    for m in msgs {
+        ctx.eput(&format!("{m}\n"));
+    }
+    match r {
+        Ok(v) => {
+            *input = v;
+            Ok(())
+        }
+        Err(ConvStop::Fft) => Err(not_yet(ctx, &format!("{op} by the FFT (a large kernel)"))),
+        Err(ConvStop::Trap) => Err(trap(ctx, op)),
+        Err(ConvStop::Exception(e)) => Err(Stop::Exception(e)),
+    }
+}
+
+/// `subsample_by_2(input, centred)` with extraslice extrapolation; FSL-163: a 4D image (FSL's
+/// exception wherever the smoothing reads outside the volume, else its first volume only) is
+/// subsampled volume by volume.
+fn subsample<T: Arith>(ctx: &mut Ctx, input: &mut Volume<T>, centred: bool, op: &str) -> Res<()> {
+    let dims = [input.xsize(), input.ysize(), input.zsize()];
+    let nt = input.tsize().max(0) as usize;
+    if input.dimensionality() > 3 {
+        ctx.notice(&defects::FSL_163, format!("{op} of a 4D image"));
+        if ctx.reproduce() {
+            if filters::subsample_reads_outside(dims, centred) {
+                return Err(Stop::Exception(FslError::imthrow(
+                    "3D only method called by higher-dimensional volume.",
+                    75,
+                )));
+            }
+        } else {
+            let halves: Vec<Volume<T>> = (0..nt)
+                .map(|t| filters::subsample_by_2(input, t, centred, &mut |x| ctx.conv::<T>(x, op)))
+                .collect();
+            let h = &halves[0];
+            let mut out = Volume::<T>::new(h.xsize(), h.ysize(), h.zsize(), nt as i64);
+            out.copy_properties(h);
+            out.data = halves.iter().flat_map(|v| v.data.iter().copied()).collect();
+            *input = out;
+            return Ok(());
+        }
+    }
+    *input = filters::subsample_by_2(input, 0, centred, &mut |x| ctx.conv::<T>(x, op));
+    Ok(())
+}
+
+/// `morphfilter(input[t], kernel, type)` for each volume, with FSL's messages before each, and
+/// FSL-162's correction (a NaN in a sorted vector left out instead of Armadillo's exception).
+fn morph<T: Arith>(
+    ctx: &mut Ctx,
+    input: &mut Volume<T>,
+    kernel: &Kern,
+    kind: Morph,
+    op: &str,
+) -> Res<()> {
+    let nvox = input.nvoxels().max(0) as usize;
+    let dims = [input.xsize(), input.ysize(), input.zsize()];
+    let msgs = filters::morph_messages(kernel);
+    for t in 0..input.tsize().max(0) as usize {
+        for m in &msgs {
+            ctx.eput(&format!("{m}\n"));
+        }
+        let mut issues = filters::MorphIssues::default();
+        let src = input.data[t * nvox..(t + 1) * nvox].to_vec();
+        let out = filters::morphfilter(
+            &src,
+            dims,
+            kernel,
+            kind,
+            &mut |x| ctx.conv::<T>(x, op),
+            &mut issues,
+        );
+        if issues.overflow {
+            // more values under the kernel than its values in [0.5, FLT_MAX] (a +inf kernel
+            // value): Armadillo's bounds check (`std::out_of_range`)
+            return Err(Stop::Exception(FslError {
+                printed: Vec::new(),
+                type_name: "std::out_of_range",
+                what: "Mat::operator(): index out of bounds".into(),
+            }));
+        }
+        if issues.nan_sorted {
+            ctx.notice(&defects::FSL_162, format!("{op}: a NaN under the kernel"));
+            if ctx.reproduce() {
+                return Err(Stop::Exception(filters::sort_nan_error()));
+            }
+        }
+        input.data[t * nvox..(t + 1) * nvox].copy_from_slice(&out);
+    }
+    Ok(())
 }
 
 fn not_yet(ctx: &mut Ctx, op: &str) -> Stop {

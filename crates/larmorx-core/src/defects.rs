@@ -546,6 +546,18 @@ defects! {
         "an operation that takes more arguments than remain before the output name reads past the end of the command line: it crashes, or reads the environment";
     FSL_159 = "FSL-159", "fslmaths", true,
         "-div, -rem, -max and -min with an image of another size are not refused: -div and -rem take the values of the image's own corner of the same voxel indices (0 outside it), -max and -min read the second image's values at misplaced positions, or past its end when it is smaller";
+    FSL_160 = "FSL-160", "fslmaths", true,
+        "a Gaussian kernel of zero width (-s 0, -kernel gauss 0, or a sigma so small that twice its square is 0 in single precision) divides 0 by 0 at its centre: -s, -fmean and -fmeanu then make every voxel NaN instead of leaving the image as it is";
+    FSL_161 = "FSL-161", "fslmaths", true,
+        "-kernel and -s accept a kernel without voxels (a size of 0 or below along an axis, a negative sigma or radius, or an unknown kernel type) and filter with it: the dilations, erosions and median leave the image as it is, -fmean and -fmeanu make it NaN or 0, -s makes it 0, with the message ERROR:: Empty mask image";
+    FSL_162 = "FSL-162", "fslmaths", true,
+        "-fmedian, and -dilD at a zero voxel, stop the program (an uncaught exception: sort(): detected NaN) when a NaN lies under the kernel, instead of filtering the other values";
+    FSL_163 = "FSL-163", "fslmaths", true,
+        "-subsamp2 and -subsamp2offc of a 4D image stop the program (an uncaught exception: 3D only method called by higher-dimensional volume), except -subsamp2offc of even sizes, which keeps the first volume only";
+    FSL_164 = "FSL-164", "fslmaths", true,
+        "-dog_edge of a 4D image filters the first volume only: the zero crossings of the other volumes are taken from their unfiltered values";
+    FSL_165 = "FSL-165", "fslmaths", true,
+        "-fillh and -fillh26 of an image with a size of 1 along an axis (a single slice) crash (an integer division by zero in the test for the image's edge)";
     ITK_50 = "ITK-50", "ITK", true,
         "KdTreeBasedKmeansEstimator never counts the point a k-d tree node is split at when it divides the node between centres: those points are left out of the pass's new centres";
     ITK_51 = "ITK-51", "ITK", true,

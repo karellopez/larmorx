@@ -17,6 +17,7 @@ use std::path::{Path, PathBuf};
 
 use crate::arma::{self, Mat};
 use crate::cnum;
+use crate::filters;
 use crate::nifti::{self, dt};
 use crate::settings::Settings;
 use crate::sse;
@@ -510,36 +511,26 @@ fn fslmerge_z_t<T: Elem>(
     save(&out, output, fsl, reproduce_offset)
 }
 
-/// `morphfilter(v, box_kernel(3,3,3), "dilate")` on each volume: the maximum of the 3x3x3
-/// neighbourhood inside the image (NEWMAT's `Maximum`: the first value, then larger ones; a
-/// NaN is never larger, and a first NaN stays).
+/// `morphfilter(v, box_kernel(3,3,3), "dilate")` on each volume ([`filters::morphfilter`]): the
+/// maximum of the 3x3x3 neighbourhood inside the image (Armadillo's maximum: NaN values left
+/// out).
 fn dilate_f(v: &Volume) -> Volume {
     let mut r = v.clone();
     let nvox = v.nvoxels() as usize;
-    let (nx, ny, nz) = (v.xsize(), v.ysize(), v.zsize());
-    let nvol = v.data.len() / nvox.max(1);
-    for t in 0..nvol {
-        let base = t * nvox;
-        for z in 0..nz {
-            for y in 0..ny {
-                for x in 0..nx {
-                    let mut best = f64::NEG_INFINITY;
-                    let mut any = false;
-                    for mz in (z - 1).max(0)..=(z + 1).min(nz - 1) {
-                        for my in (y - 1).max(0)..=(y + 1).min(ny - 1) {
-                            for mx in (x - 1).max(0)..=(x + 1).min(nx - 1) {
-                                let val = f64::from(v.data[base + v.idx(mx, my, mz)]);
-                                if !any || val > best {
-                                    best = val;
-                                    any = true;
-                                }
-                            }
-                        }
-                    }
-                    r.data[base + v.idx(x, y, z)] = best as f32;
-                }
-            }
-        }
+    let dims = [v.xsize(), v.ysize(), v.zsize()];
+    let kernel = filters::box_kernel_vox(3, 3, 3);
+    let mut issues = filters::MorphIssues::default();
+    for (t, vol) in r.data.chunks_mut(nvox.max(1)).enumerate() {
+        let src = &v.data[t * nvox..t * nvox + vol.len()];
+        let out = filters::morphfilter(
+            src,
+            dims,
+            &kernel,
+            filters::Morph::Dilate,
+            &mut |x| x as f32,
+            &mut issues,
+        );
+        vol.copy_from_slice(&out);
     }
     r
 }

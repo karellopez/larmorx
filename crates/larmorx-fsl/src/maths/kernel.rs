@@ -87,13 +87,16 @@ impl Kernel {
     }
 
     /// `-kernel gauss σ`: `2 ⌈4σ / d⌉ + 1` voxels along each axis; the values
-    /// `expf(−(i² dx² + j² dy² + k² dz²) / (2σ²))` in single precision, not normalised.
+    /// `expf(−(i² dx² + j² dy² + k² dz²) / (2σ²))` in single precision, not normalised; each
+    /// term `i² (d d)` (the voxel size squared first), the terms added x, y, z, divided by
+    /// `(2σ) σ` (findings 23: FSL's kernel bit for bit at voxel sizes not exact in binary).
     pub fn gauss(sigma: f64, vox: [f64; 3]) -> Kernel {
         let s = sigma as f32;
         let d = vox.map(|v| v as f32);
         let dims = d.map(|v| 2 * c_int((4.0 * s / v).ceil()) + 1);
         let mut k = Kernel::ones(dims, true);
         let den = 2.0 * s * s;
+        let dd = d.map(|v| v * v);
         k.zero_width = den == 0.0 && !k.is_empty();
         if k.is_empty() {
             return k;
@@ -106,9 +109,11 @@ impl Kernel {
                 let dj = y as i64 - cy;
                 for x in 0..nx {
                     let di = x as i64 - cx;
-                    let r2 = (di * di) as f32 * d[0] * d[0]
-                        + (dj * dj) as f32 * d[1] * d[1]
-                        + (dk * dk) as f32 * d[2] * d[2];
+                    // each axis' term `i² (d d)`, added x, y, z (findings 23: FSL's bits at
+                    // voxel sizes not exact in binary)
+                    let r2 = (di * di) as f32 * dd[0]
+                        + (dj * dj) as f32 * dd[1]
+                        + (dk * dk) as f32 * dd[2];
                     let q = num::nan32(-r2, den, -r2 / den);
                     let v = if q.is_nan() { q } else { math::expf(q) };
                     k.data[x + nx * (y + ny * z)] = v;
@@ -217,5 +222,26 @@ mod tests {
         assert_eq!(z.data[0].to_bits(), DEFAULT_NAN_32);
         assert_eq!(z.for_convolution(true).data, vec![1.0]);
         assert!(Kernel::gauss(-1.0, v).is_empty());
+    }
+
+    /// Findings 23: FSL's Gaussian squares the voxel size first (`i² (d d)`) and adds the
+    /// axes' terms x, y, z; at 0.85 mm that differs from `(i² d) d` in some taps.
+    #[test]
+    fn the_gaussian_squares_the_voxel_size_first() {
+        let v = [0.85, 0.8333333, 0.83];
+        let g = Kernel::gauss(5.0, v);
+        assert_eq!(g.dims, [49, 49, 51]);
+        let d = v.map(|x| x as f32);
+        let dd = d.map(|x| x * x);
+        let mut other = 0;
+        for i in -24i64..=24 {
+            let i2 = (i * i) as f32;
+            let (x, y) = ((i + 24) as usize, (i.abs() % 7 + 20) as usize);
+            let j2 = ((y as i64 - 24).pow(2)) as f32;
+            let r2 = i2 * dd[0] + j2 * dd[1];
+            assert_eq!(g.at(x, y, 25), math::expf(-r2 / 50.0), "tap {i}");
+            other += usize::from(math::expf(-(i2 * d[0] * d[0]) / 50.0) != g.at(x, 24, 25));
+        }
+        assert!(other > 0);
     }
 }

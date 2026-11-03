@@ -36,7 +36,7 @@ stand-in: the segmentation's grey matter on the BOLD grid, as the run has no Fre
 | BOLD `-fmedian` | 5.32 (80) | 4.19 (70) | 2.22 (42) | 0.39 (81) | 1 = 14 threads; identical |
 | BOLD `-bptf 25 2` | 1.82 (80) | 5.26 (70) | 0.79 (48) | 0.26 (90) | 1 = 14 threads; identical |
 | BOLD `-kernel boxv 13 -fmeanu` (FSL's FFT path) | 28.73 (113) | 16.12 (95) | 2.98 (42) | 0.43 (89) | 1 = 14 threads; max \|d\| 2.8e-6 of FSL's largest value |
-| T1w `-s 5` | 11.15 (196) | 8.62 (186) | 2.28 (128) | 0.35 (127) | 1 = 14 threads; max \|d\| 2.8e-7 of FSL's largest value, 98.6 % within 4 ulp (below) |
+| T1w `-s 5` | 11.15 (196) | 8.62 (186) | 2.28 (128) | 0.35 (127) | 1 = 14 threads; identical since relay 6's kernel correction (below; before: max \|d\| 2.8e-7 of FSL's largest value, 98.6 % within 4 ulp) |
 | T1w `-dilD` | 3.80 (195) | 1.72 (185) | 1.05 (128) | 0.24 (128) | 1 = 14 threads; identical |
 | T1w `-kernel sphere 6 -fmean` (FSL's FFT path) | 227.71 (4063) | 195.74 (3159) | 5.41 (188) | 0.64 (187) | 1 = 14 threads; max \|d\| 8.4e-6 of FSL's largest value |
 | BET's `fslstats <T1w> -l 0.001 -C` | 0.58 (315) | 0.34 (245) | 0.45 (278) | 0.29 (277) | 1 = 14 threads; 1 of 3 numbers differs, 6.1e-8 relative (findings 21) |
@@ -48,12 +48,12 @@ difference at most 1e-5 of FSL's largest value; §10 of `specs/fslstats.md`: 1e-
 - on FSL's FFT path (§10.2), FSL's FFT rounds relative to the image's largest values, where the
   original sums directly (the suite's expected divergences, findings 9 and 14 of
   [`docs/findings/fsl-maths-original.md`](../findings/fsl-maths-original.md));
-- the T1w's `-s 5` (49- and 51-tap Gaussians at 0.85 and 0.83 mm) differs from FSL's in 30 % of
-  the voxels, by at most 2.8e-7 of the largest value, and 98.6 % of the voxels are within 4 units
-  in the last place, below §21's 99 %; the BOLD series' `-s 5` (3 and 3.3 mm, 15 taps) is
-  identical, so the summation is FSL's and the cause is presumably the kernel's values or extent
-  at these voxel sizes: open (findings 23: FSL's impulse response at these sizes differs in
-  some taps from the spec's form, though its extent is the same and at 1 mm it is identical);
+- the T1w's `-s 5` (49- and 51-tap Gaussians at 0.85 and 0.83 mm) differed from FSL's in 30 % of
+  the voxels at relay 5 (at most 2.8e-7 of the largest value, 98.6 % within 4 units in the last
+  place, below §21's 99 %): the Gaussian's exponent took each term as `(i² d) d` where FSL takes
+  `i² (d d)`, which differs at voxel sizes not exact in binary (findings 23). Corrected in relay 6:
+  the original's output is FSL's bit for bit (re-run at one thread, 2.26 s, 127 MiB; the other
+  timings are relay 5's, the change touches only the kernel's 49 values);
 - fslstats' unmasked `-S` on a volume of many nonzero voxels (`Σ v²` of single-precision
   squares) differs from FSL's in the printed last digits (3e-10 relative; findings 23).
 

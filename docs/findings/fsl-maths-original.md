@@ -331,19 +331,26 @@ The benchmarks of [`docs/benchmarks/fsl-maths.md`](../benchmarks/fsl-maths.md) c
 original's outputs with FSL's on ds005040's images (the suite's cases are small synthetic
 images and fMRIPrep's calls, all identical or within the thresholds):
 - **`-s 5` on the T1w** (191 × 288 × 288, 0.85 × 0.83 × 0.83 mm: Gaussians of 49 and 51 taps):
-  30 % of the voxels differ from FSL's, by at most 2.8e-7 of FSL's largest value (§21's bound:
-  1e-5), but only 98.6 % are within 4 units in the last place, below §21's 99 %. The same
-  operation on the BOLD series (3 × 3 × 3.3 mm, 15 taps) is identical to FSL's in every voxel of
-  63 volumes, so the single-precision sums are FSL's; the cause is presumably the Gaussian's
-  values or extent at voxel sizes that are not exact in binary (§9: `2⌈4σ/d⌉ + 1` taps, `expf` of
-  single-precision products). Impulse probes (`probe_gauss.py`: a line of 81 voxels along y,
-  `-s 5`, voxel sizes 0.8333333, 0.85 and 1 mm): FSL's response has the spec's 49 (41) taps at
-  every size, and at 1 mm it is the original's bit for bit; at 0.8333333 and 0.85 mm 20 and 24 of
-  the 49 taps differ in their last bits from the spec's form (16 from the closest of the other
-  forms of the argument tried) (the products in single or double, `(i d)²`, `i² d²` or `i² (d²)`, `expf` or
-  `exp`, the kernel normalised first). Open: FSL's arithmetic of the Gaussian at voxel sizes not
-  exact in binary is a spec question (the BOLD's 3 and 3.3 mm are identical, the T1w's 0.85 and
-  0.83 mm within the bound).
+  at relay 5, 30 % of the voxels differed from FSL's, by at most 2.8e-7 of FSL's largest value
+  (§21's bound: 1e-5), but only 98.6 % were within 4 units in the last place, below §21's 99 %.
+  The same operation on the BOLD series (3 × 3 × 3.3 mm, 15 taps) was identical to FSL's in every
+  voxel of 63 volumes, so the single-precision sums are FSL's; the cause is the Gaussian's values
+  at voxel sizes that are not exact in binary. **Solved in relay 6** by impulse probes
+  (`probe_gauss.py`): a line of 81 voxels along y, `-s 5`, voxel sizes 0.8333333, 0.85 and 1 mm
+  (49, 49 and 41 taps: the spec's extent), each candidate form of the exponent put through §10.2's
+  separable filter as the spec states it (near the line's ends the normalising sum covers the taps
+  inside the line only: relay 5's comparison had divided every tap by the whole kernel's sum,
+  which is why 16 taps differed for every form). FSL's response is matched in 81 of 81 voxels at
+  every size by exactly one form: **each axis' term `i² (d d)`, the voxel size squared first**, in
+  single precision, divided by `(2σ) σ` (`expf` or `exp` alike); the spec's `(i² d) d` gives 73
+  and 65 of 81 at 0.8333333 and 0.85 mm, `(i d)²` and the forms in double fewer. The three axes'
+  terms are added **x, then y, then z**: `-kernel gauss 1 -fmeanu` on an impulse of 27³ voxels of
+  0.85 × 0.8333333 × 0.83 mm (the direct sum, so its response is the normalised kernel) is matched
+  in 1331 of 1331 taps by `(x + y) + z`, against 1275, 1275 and 1219 by the other orders. The
+  original's `Kernel::gauss` now computes that form: its impulse responses are FSL's bit for bit at
+  the three sizes, and the T1w's `-s 5` is FSL's in every voxel. A spec question (26): §9 writes
+  `i²dx² + j²dy² + k²dz²` without the products' order, which matters at these voxel sizes.
+  `-kernel sphere`'s test `i² dx² + … ≤ r²` keeps the spec's order (no case shows a difference).
 - **fslstats' unmasked `-S`** on a volume with many nonzero voxels (`-t <BOLD> -M -S -r`, 63
   volumes of 136,400 voxels): `-M` and `-r` are FSL's text, `-S` differs in its last printed
   digits in 54 of 63 volumes (at most 3.0e-10 relative; §10's bound 1e-6). §5.2's form (`Σ v²` of

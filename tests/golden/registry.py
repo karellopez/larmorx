@@ -4662,9 +4662,19 @@ def _(ctx: Context) -> dict[str, Any]:
     default, which keeps it and names the correction; the default's refusal of a NaN
     smoothness (FSL-99)."""
     t1 = _fast_input(ctx, "tissue_brain_bright.nii", "t1.nii")
-    _fast(ctx, "-N", "--nopve", "-o", ctx.out("rep"), t1, upstream_defects=REPRODUCE)
-    fix = _fsl_status(ctx, "fast", "-N", "--nopve", "-o", ctx.out("fix"), t1)
-    nan = _fsl_status(ctx, "fast", "-H", "nan", "-o", ctx.out("nan"), t1)
+    # FSLDIR unset (CI's runners) is FSL-100: FAST reproduced aborts, the default names its
+    # correction; a stand-in keeps the case about FSL-103 and FSL-99 on every machine
+    saved = os.environ.get("FSLDIR")
+    os.environ["FSLDIR"] = _fsldir(ctx)
+    try:
+        _fast(ctx, "-N", "--nopve", "-o", ctx.out("rep"), t1, upstream_defects=REPRODUCE)
+        fix = _fsl_status(ctx, "fast", "-N", "--nopve", "-o", ctx.out("fix"), t1)
+        nan = _fsl_status(ctx, "fast", "-H", "nan", "-o", ctx.out("nan"), t1)
+    finally:
+        if saved is None:
+            os.environ.pop("FSLDIR", None)
+        else:
+            os.environ["FSLDIR"] = saved
     return {
         **_fast_outputs(ctx, "rep"),
         **_fast_outputs(ctx, "fix"),

@@ -79,3 +79,8 @@ variance; two speed steps (batched `expf`, the MRF's `exp`); the open case 1840.
 - The agent's 36 scratch scripts not in the branch (its findings' tools are committed under
   `validation/investigations/cleanroom-fast/`) archived in
   `<workspace>/archive/2026-11-03-cleanroom-fast-scratch-scripts/`.
+- After the push (8220300), CI failed on all six platforms in one golden case, `cli.fsl.fast.reproduce`: it ran
+  FAST with FSLDIR taken from the machine, and CI's runners have none, so the reproduced run aborted (FSL-100) and
+  the default run named its correction. Fixed in the test (a stand-in FSLDIR around the case's three calls; the
+  checksums unchanged), and `scripts/orchestration/gates-python.sh` now also runs `tests/python` and
+  `tests/golden` without FSLDIR and `LARMORX_NC_BIN`, as CI does.

@@ -247,12 +247,14 @@ def _combine_calls_table(rec) -> dict:
 
     fs = _suite()
     by = {r["case"]: r for r in rec.results}
+    seen: set[str] = set()
     rows = []
     for run, node in fs.fmriprep_calls():
         rel = node.relative_to(node.parents[4])
         cid = f"fmriprep/{run}/{rel.parts[0]}/{node.parent.name}"
-        if cid not in by:
+        if cid not in by or cid in seen:  # the record's case: the first call of its kind
             continue
+        seen.add(cid)
         r = by[cid]
         args = fs.fmriprep_args(run, node)
         a = np.asanyarray(nib.load(args[0]).dataobj) != 0
@@ -468,12 +470,12 @@ def goodvoxels_entry(ctx: core.Context) -> fcache.Entry:
     )  # fmt: skip
 
 
-def _stats_numbers_table(e: fcache.Entry, values: dict) -> dict:
+def _stats_numbers_table(ctx: core.Context, values: dict) -> dict:
     """goodvoxels' four fslstats calls: FSL's printed numbers (the record's chain) and the
     replica's (``fsl-stats``'s entry)."""
     from larmorx_validation.evidence import fsl_stats
 
-    st = fsl_stats.goodvoxels_entry(e.ctx).info()
+    st = fsl_stats.goodvoxels_entry(ctx).info()
     rows = []
     for node, prog, template in _suite().GOODVOXELS_STEPS:
         if prog != "fslstats":
@@ -615,7 +617,7 @@ def _example_goodvoxels(ctx: core.Context) -> dict:
             ["main", "LARMORX against FSL"],
             ["check", "LARMORX against itself: the modes"],
         ],
-        "tables": [_stats_numbers_table(e, values)],
+        "tables": [_stats_numbers_table(ctx, values)],
         "metrics_note": note(int(np.prod(img.shape[:3]))),
         "provenance": common.provenance(info, f"{TOOL}/{e.case}", [data]),
     }

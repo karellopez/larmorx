@@ -202,3 +202,49 @@ count exactly (3, 4, 16, 17, 28, 65 and 344 messages); the original prints the s
 `Beginning prior-based initialisation`, the class lines all `-nan`, the messages after FLIRT's
 and the prior message (their count there follows the same rule, from the priors' one class
 statistics; not counted from that run).
+
+## Random testing: what the short trial showed (relay 4, 2026-11-03)
+
+One short trial of the descriptor `fsl-fast-original` (seed `cleanroom-fast`, 25 minutes, 3 jobs,
+9,005 realistic cases of the replica's draw, FSL's runs through the oracle cache in `use` mode;
+`oracles/difftest/2026-11-03-cleanroom-fast/`): 8,823 agreed, 182 differed. Every difference was
+replayed (`validation/investigations/cleanroom-fast/replay_findings.py`, the cache serving FSL's
+runs) and looked at with `probe.py --finding` (both runs kept, streams diffed):
+
+- **The bias field outside the mask** (13 cases, 14 on replay; each with a class of NaN variance,
+  FSL's `MeaNsK variance nan` or NaN fields). §4.5's last step `b ← b · M` multiplies the whole
+  image: when the mask's mean of the field is NaN, `b - mean` is NaN everywhere and `NaN · 0` is
+  NaN, so FSL's `_restore` and `_bias` are NaN outside the mask as well (observed in all 14). The
+  original now keeps `(0 - mean) · 0` as the field outside the mask (±0, or NaN): the same
+  outputs. Permanent case `bias-nan-outside-mask`.
+- **A singular covariance during the k-means initialisation with `-v`** (9 cases, several
+  channels): FSL's standard output ends with the class means' lines; the `KMeans Iteration 0` line
+  of the iteration whose covariance is singular is not printed before `inv(): matrix is singular`
+  aborts it. The original prints each iteration's line once its covariances are inverted (the same
+  output where nothing aborts). Whether FSL computes the statistics before printing or loses an
+  unflushed line at the abort cannot be told apart from these runs. Permanent case
+  `singular-kmeans-line`.
+- **FSL-101 with `-v`** (3 cases): FSL prints `Beginning prior-based initialisation` before it
+  crashes (signal 11) or aborts; the original's refusal (and its abort for several channels) now
+  follows that line, as `specs/fast.md` §9.1 says. Permanent case `fsl101-verbose-line`.
+- **A rank-deficient covariance** (1 case: two channels, `-n 4`, one slice): the original's LU
+  meets an exactly zero pivot and aborts as FAST does on a singular matrix; FSL's arithmetic
+  leaves a pivot of rounding size and finishes. Which one a covariance that is singular in exact
+  arithmetic gives is decided by the matrix arithmetic's last bits (§8.6: not followed by the
+  original).
+- **Two noise-free channels** (2 cases): ill-conditioned covariances; the partial volumes (and
+  one class's `_pveseg` Dice, 0.99891) move with the arithmetic's last bits, as `multi/s5` does
+  (above).
+- **Degenerate statistics with several channels** (1 case, open: `cleanroom-fast` 1840, `-n 4`
+  with two channels, `-v`): from the second bias iteration on FSL prints every class's mean as
+  `-nan` where the original prints `1` (a class weight sum of 0, the mean kept at 0 as §5.3 says);
+  their images agree within the thresholds. Treating a non-positive sum as "keep the value"
+  instead of "0" in the members or the likelihoods did not reproduce FSL's lines (tried and
+  reverted). A question for the spec: how FSL's posteriors become NaN after a NaN covariance.
+- **The suite itself** (153 cases): nibabel needs `backports.zstd` for FSL 6.0.7.23's `NIFTI_ZST`
+  images and refuses a NIfTI-2 header whose quaternion's squares sum to a little more than 1
+  (FSL's own output); the suite now reads both. Permanent case `zstd-outputs`.
+
+The thread test found, before the trial, that the outputs' expansion and the negative-value rule
+ran on rayon's global pool (one thread per CPU) after the segmentation's pool had returned; they
+now run on the call's own pool (`fast::grid::Grid::expand_on`).

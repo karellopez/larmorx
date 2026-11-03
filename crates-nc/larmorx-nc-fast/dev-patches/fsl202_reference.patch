@@ -1,0 +1,118 @@
+diff --git a/crates-nc/larmorx-nc-core/src/glibc_double.rs b/crates-nc/larmorx-nc-core/src/glibc_double.rs
+index 2fb523e..e0e9c9b 100644
+--- a/crates-nc/larmorx-nc-core/src/glibc_double.rs
++++ b/crates-nc/larmorx-nc-core/src/glibc_double.rs
+@@ -699,6 +699,9 @@ fn exp_specialcase(tmp: f64, sbits: u64, ki: u64) -> f64 {
+ /// `exp@GLIBC_2.2.5` wrapper FSL's libraries link to returns unchanged (its error handling
+ /// gives the same values). newimage's Gaussian kernels (`smooth`) call it.
+ pub fn exp(x: f64) -> f64 {
++    if crate::dev_crmath() {
++        return larmorx_core::math::exp(x);
++    }
+     let mut abstop = top12(x) & 0x7ff;
+     if abstop.wrapping_sub(0x3c9) >= 0x408 - 0x3c9 {
+         if abstop.wrapping_sub(0x3c9) >= 0x80000000 {
+@@ -912,6 +915,9 @@ fn math_invalid(x: f64) -> f64 {
+ /// Not correctly rounded (Arm: 0.519 ulp); `tools/libm-verify` compares it with the C library.
+ #[must_use]
+ pub fn log(x: f64) -> f64 {
++    if crate::dev_crmath() {
++        return larmorx_core::math::log(x);
++    }
+     use log_tables::*;
+     const LO: u64 = 0x3fee_0000_0000_0000; // asuint64(1.0 - 0x1p-4)
+     const HI: u64 = 0x3ff1_0900_0000_0000; // asuint64(1.0 + 0x1.09p-4)
+diff --git a/crates-nc/larmorx-nc-core/src/glibc_float.rs b/crates-nc/larmorx-nc-core/src/glibc_float.rs
+index bf61fa7..ea73891 100644
+--- a/crates-nc/larmorx-nc-core/src/glibc_float.rs
++++ b/crates-nc/larmorx-nc-core/src/glibc_float.rs
+@@ -297,6 +297,9 @@ const LOGF_POLY: [f64; 3] = [
+ /// glibc's `logf` (x86-64, FMA build).
+ #[must_use]
+ pub fn logf(x: f32) -> f32 {
++    if crate::dev_crmath() {
++        return larmorx_core::math::logf(x);
++    }
+     const OFF: u32 = 0x3f33_0000;
+     let mut ix = x.to_bits();
+     // WANT_ROUNDING: log(1) = +0 in every rounding mode.
+@@ -384,6 +387,9 @@ mod exp2f_tables {
+ /// (`__math_oflowf`); `-inf` gives `+0`, a NaN or `+inf` `x + x`.
+ #[must_use]
+ pub fn expf(x: f32) -> f32 {
++    if crate::dev_crmath() {
++        return larmorx_core::math::expf(x);
++    }
+     use exp2f_tables::*;
+     let xd = f64::from(x);
+     let abstop = (x.to_bits() >> 20) & 0x7ff;
+diff --git a/crates-nc/larmorx-nc-core/src/lib.rs b/crates-nc/larmorx-nc-core/src/lib.rs
+index fe65a84..bf91f03 100644
+--- a/crates-nc/larmorx-nc-core/src/lib.rs
++++ b/crates-nc/larmorx-nc-core/src/lib.rs
+@@ -93,5 +93,13 @@ pub mod vstats;
+ pub mod warpfns;
+ pub mod x87;
+ 
++/// spec-answers-3 measurement hook (never committed): with `LXNC_CRMATH` set, `exp`, `log`,
++/// `expf` and `logf` are correctly rounded, as FSL under the CORE-MATH preload.
++#[must_use]
++pub fn dev_crmath() -> bool {
++    static F: std::sync::OnceLock<bool> = std::sync::OnceLock::new();
++    *F.get_or_init(|| std::env::var_os("LXNC_CRMATH").is_some())
++}
++
+ /// The version of the FSL release these translations follow.
+ pub const FSL_VERSION: &str = "6.0.7.23";
+diff --git a/crates-nc/larmorx-nc-fast/src/mriseg.rs b/crates-nc/larmorx-nc-fast/src/mriseg.rs
+index a200b8a..43f699b 100644
+--- a/crates-nc/larmorx-nc-fast/src/mriseg.rs
++++ b/crates-nc/larmorx-nc-fast/src/mriseg.rs
+@@ -541,6 +541,47 @@ impl Segmentation {
+             let (s_mpm, e3) = stats::masked_sum_by(nvox, |k| (p[k] * mri[k]) * mri[k], mask);
+             let (s_p2, e4) = stats::masked_sum(p, mask);
+             self.variance[c] = (s_mpm / s_p2 - f64::from(self.mean[c] * self.mean[c])) as f32;
++            // spec-answers-3 measurement hook (never committed): LXNC_FAST_VARIANCE
++            match std::env::var("LXNC_FAST_VARIANCE").as_deref() {
++                Ok("double") => {
++                    let mu = s_mp / s_p;
++                    self.variance[c] = (s_mpm / s_p2 - mu * mu) as f32;
++                }
++                Ok("twopass") => {
++                    let mu = s_mp / s_p;
++                    let (mut num, mut den) = (0f64, 0f64);
++                    for k in 0..nvox {
++                        if self.mask[k] > 0.5 {
++                            let d = f64::from(mri[k]) - mu;
++                            num += f64::from(p[k]) * d * d;
++                            den += f64::from(p[k]);
++                        }
++                    }
++                    self.variance[c] = (num / den) as f32;
++                }
++                Ok("reference") => {
++                    // the intended maths: double products, double sums, the weighted mean in
++                    // double and the variance about it (two passes), each rounded once to float
++                    let (mut sp, mut spx) = (0f64, 0f64);
++                    for k in 0..nvox {
++                        if f64::from(self.mask[k]) > stats::MASK_THRESHOLD {
++                            sp += f64::from(p[k]);
++                            spx += f64::from(p[k]) * f64::from(mri[k]);
++                        }
++                    }
++                    let mu = spx / sp;
++                    let mut num = 0f64;
++                    for k in 0..nvox {
++                        if f64::from(self.mask[k]) > stats::MASK_THRESHOLD {
++                            let d = f64::from(mri[k]) - mu;
++                            num += f64::from(p[k]) * d * d;
++                        }
++                    }
++                    self.mean[c] = mu as f32;
++                    self.variance[c] = (num / sp) as f32;
++                }
++                _ => {}
++            }
+             for e in [e1, e2, e3, e4] {
+                 if e {
+                     let _ = writeln!(io.err, "{EMPTY_MASK}");

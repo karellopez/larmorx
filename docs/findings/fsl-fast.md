@@ -261,6 +261,26 @@ source (*read*) and, where cheap, FSL as a black box through the oracle cache (*
   s_mp / s_p` in double, `variance = s_mpm / s_p2 - mu * mu` (the `double` variant of
   `crates-nc/larmorx-nc-fast/dev-patches/variance_variant.patch`), named when a class's variance
   differs from FSL's; `reproduce` as now.
+  Measured whether it helps (spec writer, relay 2b, `variance_reference.py`; the hooks
+  `crates-nc/larmorx-nc-fast/dev-patches/fsl202_reference.patch`, a superset of
+  `variance_variant.patch`: `LXNC_FAST_VARIANCE=reference` replaces `MeansVariances`'s statistics
+  by double products and sums, the double mean and the two-pass variance about it, each rounded
+  once to float into `m_mean`/`m_variance`; `LXNC_CRMATH=1` routes the core's `exp`, `log`,
+  `expf`, `logf` (`glibc_double`, `glibc_float`, so `gaussian_kernel_1d` too) to
+  `larmorx_core::math`'s correctly rounded functions). Sanity: FSL's variance with `LXNC_CRMATH`
+  equals FSL under the CORE-MATH preload bit for bit on seven of seven cases, so the hook is the
+  preload's perturbation. Per case, labels (`_seg` + `_mixeltype` voxels) from the reference,
+  FSL / the `double` default; then the band (C library against correctly rounded maths), FSL /
+  `double`: ds000005 166 / 0, band 11 / 0; ds000228 155 / 0, band 235 / 0; ds005003 844 / 1,
+  band 807 / 0; the half-resolution T1w (`-v`) 7 / 0, band 7 / 0; the bias-field case 10 / 0,
+  band 19 / 0; the 2D slice 1 / 0, band 3 / 0; values above 2^24 483 / 0, band 46 / 0. Partial
+  volumes: FSL's up to 1.0 from the reference (p99.9 0.34 above 2^24), the default's within 0.01
+  at 0 to 92 voxels; the default's band 0.01 at 1 to 37 voxels; the reference's band 0 on every
+  output. FSL with correctly rounded maths is as far from the reference as FSL (ds000005 169,
+  ds005003 187). So most of FSL's own last-bit band is this cancellation (a one-ulp change of the
+  float mean moves `m_mean[c]*m_mean[c]` by about 1e-5, 0.3 % of a white-matter variance).
+  Decided: rule A stays (closer on 7 of 7, fMRIPrep's three calls included; band no wider on 7
+  of 7). Every number: `validation/investigations/spec-answers-3/README.md`.
 - **FSL-203** (class c, rule A): `calculateExtrema` seeds both extrema with the first element; a
   NaN there makes `min()` and `max()` NaN: the negative-value rule is skipped (both channels'
   paths) and the single channel's `m_mask.binarise(0, max + 1, exclusive)` is empty: `kmeansexc`

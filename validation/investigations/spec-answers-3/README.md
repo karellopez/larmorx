@@ -95,6 +95,7 @@ What the models gave (2026-11-03):
 |---|---|---|
 | `fast_probes.py` | FSL's runs behind §4.1 (NaN voxels and the negative-value rule; a NaN first voxel, FSL-203), §7 (standard output at an abort) and §5.3 (a class without weight, case 1840), each against the prediction of a model of the new text (`model_extrema`, `model_restore`, `model_mask_empty`, the expected `-v` lines) | `fast_probes.py <out> [nan-noneg nan-neg nan-background nan-first n0-verbose nan-stats] [--finding <workspace>/oracles/difftest/2026-11-03-cleanroom-fast/findings/fsl-fast-original/cleanroom-fast-01840-original.json]` (derived inputs in `<workspace>/oracles/inputs/spec-answers-3/fast/`) |
 | `variance_measure.py` | FSL-202, rule D measured: the single-channel class variance as FSL computes it against the exact one (the FAST replica with a measurement hook: `double`, `twopass`), beside FSL's own band (FSL with correctly rounded maths), on seven cases; JSON of every metric | `LARMORX_NC_BIN=<the hooked larmorx-nc> variance_measure.py <out.json> [case ...]` (12 GiB box); the hook is FSL-licensed replica code: `crates-nc/larmorx-nc-fast/dev-patches/variance_variant.patch` (a clean-room implementer does not open it), applied in a checkout, built, the binary copied out, the patch reverted |
+| `variance_reference.py` | FSL-202, rule D's second measurement (relay 2b): the distance of FSL's outputs and of the corrected variance's (`double`) to a reference that computes the class statistics in double throughout (double products and sums, the variance about the double mean in two passes, each rounded once to single; everything else as FSL), each taken four ways (either run with the C library's `exp`/`log` or with correctly rounded ones, against the reference with either); and each computation's own band (the C library's `exp`, `log`, `expf`, `logf` against correctly rounded ones, the perturbation of FSL's band). The replica with correctly rounded maths and FSL's variance must equal FSL under the CORE-MATH preload bit for bit (the sanity row) | `LARMORX_NC_BIN=<the hooked larmorx-nc> variance_reference.py run <out dir> <case>` (the seven cases side by side, one thread each, 24 GiB box), then `variance_reference.py summary <out dir>`; the hooks (`LXNC_FAST_VARIANCE=double\|twopass\|reference`, `LXNC_CRMATH=1`) are FSL-licensed replica code: `crates-nc/larmorx-nc-fast/dev-patches/fsl202_reference.patch` (a superset of `variance_variant.patch`; a clean-room implementer does not open it), applied in a checkout, built, the binary copied out, the patch reverted |
 | `sweep_schedule_model.py` | §10: a pipeline of planes (plane `z` two rows behind plane `z − 1`, one step's rows at once) gives the in-place sweep's bits; a lag of one row does not | `python -I sweep_schedule_model.py` |
 | `pv_ties_model.py` | §5.8 and §4.8.8: the fraction search's near ties: how many voxels move, and by how many steps, when the class statistics change in their last bits or the energy is evaluated another way | `python -I pv_ties_model.py` (4 GiB box) |
 
@@ -122,6 +123,33 @@ What the models gave (2026-11-03):
   half-resolution T1w, the last class line's standard deviations, FSL → exact: 226.856 →
   226.863, 109.413 → 109.422, 38.6653 → 38.6909 (the band: 226.843, 109.42, 38.6587).
   Decided: rule A (FSL-202, `specs/fast.md` §4.4, §9.1).
+- `variance_reference.py` (relay 2b; FSL and FSL with correctly rounded maths from the cache,
+  every run served; the hooked replica from this branch at 74466ed, one thread, `reproduce`).
+  Sanity: the replica with FSL's variance and correctly rounded maths equals FSL under the
+  CORE-MATH preload bit for bit on 7 of 7 cases (every label and partial volume). Label voxels
+  that differ (`_seg` + `_mixeltype`) from the reference (the class statistics computed in
+  double throughout), FSL as built (FSL with correctly rounded maths) → the corrected variance
+  (`double`, either maths); then each one's own band (the C library's maths against correctly
+  rounded ones), FSL → corrected:
+
+  | case | FSL to the reference | corrected to the reference | band FSL | band corrected |
+  |---|---|---|---|---|
+  | ds000005 (fMRIPrep's call) | 54 + 112 (52 + 117) | 0 + 0 | 4 + 7 | 0 + 0 |
+  | ds000228 (fMRIPrep's call) | 66 + 89 (56 + 46) | 0 + 0 | 122 + 113 | 0 + 0 |
+  | ds005003 (fMRIPrep's call) | 391 + 453 (84 + 103) | 1 + 0 | 357 + 450 | 0 + 0 |
+  | the half-resolution T1w, `-v` | 5 + 2 (7 + 7) | 0 + 0 | 2 + 5 | 0 + 0 |
+  | the bias-field case | 2 + 8 (2 + 7) | 0 + 0 | 4 + 15 | 0 + 0 |
+  | the 2D slice | 1 + 0 (0 + 2) | 0 + 0 | 1 + 2 | 0 + 0 |
+  | values above 2^24 | 137 + 346 (148 + 341) | 0 + 0 | 17 + 29 | 0 + 0 |
+
+  Partial volumes: FSL's largest difference from the reference 0.01 to 1.0 (99.9th percentile
+  0.34 above 2^24, at most 0.01 elsewhere; 4 to 5,179 voxels differ); the corrected variance's
+  0.01 at 0 to 92 voxels; its band 0.01 at 1 to 37 voxels (FSL's band up to 1.0 at 14 to 7,126
+  voxels); the reference's band 0 on every output of every case. `-v` on the half-resolution
+  T1w, the last class line's standard deviations: FSL 226.856, 109.413, 38.6653; corrected and
+  reference both 226.863, 109.422, 38.6909. Closer to the reference on 7 of 7 (fMRIPrep's three
+  calls included), band no wider on 7 of 7: rule A confirmed (FSL-202). Most of FSL's own
+  last-bit band is FSL-202's cancellation.
 - `sweep_schedule_model.py`: on six random grids (4 to 8 voxels a side, 80 % mask) the pipeline
   of planes equals the serial sweep bit for bit on 6 of 6; a lag of one row on 0 of 6 (72 to 141
   voxels differ).

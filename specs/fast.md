@@ -332,6 +332,23 @@ other use); `reproduce` is FSL's arithmetic above. The same in the partial volum
 §4.8.3. A two-pass form (`Σ p_c (y - μ)² / Σ p_c` in double) gives the same outputs on six of
 the seven measured cases and differs by one or two voxels' class on the seventh (ds005003).
 
+(spec writer, 2026-11-03, measured: whether the correction helps, rule D, then A) Against a
+**reference of the intended maths**, the class statistics computed in double throughout (double
+products and sums, the weighted mean in double and the variance about it in two passes, each
+rounded once to single where FAST keeps them; everything else as FSL), on the same seven cases
+(fMRIPrep's three calls among them): FSL's labels end 1 to 844 voxels (`_seg` plus `_mixeltype`)
+from the reference's (fMRIPrep's calls: ds000005 54 plus 112, ds000228 66 plus 89, ds005003 391
+plus 453; values above 2^24 137 plus 346) and its partial volumes up to a whole fraction (1.0)
+away; the default's labels end 0 voxels from it on six cases and 1 on ds005003, its partial
+volumes within one step (0.01) at 0 to 92 voxels. The default is also **far more stable**: its own
+band (the C library's `exp`, `log`, `expf`, `logf` against correctly rounded ones, the
+perturbation of §11's band) is 0 label voxels on all seven cases (partial volumes one step at 1 to
+37 voxels), where FSL's is 3 to 807 label voxels (partial volumes up to 1.0); the reference's is 0
+on every output. **Most of FSL's own last-bit band is this cancellation** amplifying the last bits
+of the class statistics. The `-v` lines show the same: the half-resolution T1w's last class line,
+standard deviations FSL 226.856, 109.413, 38.6653; the default and the reference both 226.863,
+109.422, 38.6909 **(observed)**.
+
 ### 4.5 The bias field
 
 Smoothing kernels: along x a Gaussian of `σ_x = 0.51 · l / dx` voxels (`l` the `-l` value; the
@@ -804,7 +821,7 @@ single. In both cases `1 - δ` is single precision.
 | FSL-102 | `-a`'s FLIRT runs go through the shell with the names unquoted: blanks split names, special characters are interpreted; FSLDIR unset with `-A`: the command starts with `(null)`, a shell syntax error | each name one argument, no FSLDIR needed for FLIRT; named when a name has a blank or special character, or FSLDIR is unset | splits at blanks as the shell does; prints `sh: 1: Syntax error: word unexpected` for FSLDIR unset; refuses names with the shell's special characters (their expansion is not reproduced) |
 | FSL-103 | the mask leaves out the voxels equal to the maximum when it is 2^24 or more (§4.1) | keeps them (mask: above 0 and finite); named when it changed the mask | FSL's mask; named |
 | FSL-104 | channels of different sizes: FAST reads every channel over channel 1's grid, past the end of smaller ones; when channel 1 fits inside every other one it reads their corners and aborts at the first percentile of another channel (`mask and vol have different sizes in calc_percentiles`) unless `-s` gives every mean | refuses: `-S <n>: the channels' images differ in size ...` | reproduces the corner reads and the abort where channel 1 fits inside the others and no `-s` gives every mean; refuses otherwise |
-| FSL-202 | (spec writer, 2026-11-03) one channel: the class variance `Σ p y y / Σ p - μ²` takes `μ²` as the single-precision square of the single-precision mean, which cancels most digits in the log domain: the variances of small-variance classes are off by up to about 0.3 % (a few % above 2^24), §4.4 | `μ²` from the double-precision mean, in double (§4.4), in the class statistics and the partial volumes' statistics; named when a class's variance differs from FSL's arithmetic (nearly every run) | FSL's arithmetic (§4.4); named |
+| FSL-202 | (spec writer, 2026-11-03) one channel: the class variance `Σ p y y / Σ p - μ²` takes `μ²` as the single-precision square of the single-precision mean, which cancels most digits in the log domain: the variances of small-variance classes are off by up to about 0.3 % (a few % above 2^24), §4.4; the labels end up to 844 voxels from those of the exactly computed statistics (fMRIPrep's call on ds000005: 166), and most of FSL's own last-bit band is this cancellation (measured, spec writer, 2026-11-03) | `μ²` from the double-precision mean, in double (§4.4), in the class statistics and the partial volumes' statistics; named when a class's variance differs from FSL's arithmetic (nearly every run). Measured: 0 or 1 label voxel from the exactly computed statistics on seven of seven cases, and a band of 0 label voxels (§4.4) | FSL's arithmetic (§4.4); named |
 | FSL-203 | (spec writer, 2026-11-03) a NaN first voxel (§4.1's extrema): the minimum and maximum are NaN, so the negative-value rule is skipped and, with one channel, the mask is empty: FAST stops with the k-means exception (exit 255), or with `-s` segments an empty mask **(observed)** | the extrema over the voxels that are not NaN (the negative-value rule as §4.1 says; one channel's mask as FSL-103's default, above 0 and finite); named when the first voxel of an input (any channel) is NaN | FSL's extrema and mask; named |
 
 Each correction that changed a result is named on standard error (`larmorx: upstream defect
@@ -917,6 +934,12 @@ stored FSL runs):
   segmentations by up to about the band on ordinary images and more where FSL's error is large
   (`_mixeltype` 112 voxels on ds000005 against the band's 7; values above 2^24 346 against 29,
   partial volumes' 99.9th percentile 0.34): §11's thresholds compare `reproduce` with FSL.
+  (spec writer, 2026-11-03) Most of that band is FSL-202 itself (§4.4): with the corrected
+  variance the same perturbation moves 0 label voxels on all seven cases (partial volumes one step
+  at 1 to 37 voxels). So the band is the allowance of `reproduce` only; the default is compared
+  with the replica's default (the same corrected variance), and there the band of a last-bit
+  change is that narrow one: a difference wider than it is the original's to explain, not the
+  band's.
   The thresholds are first checked against the band of a last-bit change: the replica with
   correctly rounded `exp`, `log`, `expf` and `logf` (instead of glibc's) on the standard tier,
   against FSL; the band measured there is the original's allowance where it is wider than the
@@ -942,7 +965,7 @@ this spec's text alone and checked against FSL's runs through the oracle cache.
 | 3 | the ICM keeps a voxel's type when no value exceeds -1; the initial type 0 when no likelihood does | §4.8.6, §4.8.7 | right | high (`-R nan`: 99.96 % of the mask as the rule says) |
 | 4 | FSL-100 with `-A` (FSLDIR unset does not abort) | §6.1 | right | high |
 | 5 | `_restore` holds 0 at NaN voxels | §4.1.1 | incomplete: 0 only when the negative-value rule's second branch runs (a negative value, 2nd percentile not negative); NaN otherwise | high: `fast_probes.py` `nan-noneg`, `nan-neg`: the model predicts FSL's 10 of 10 voxels |
-| 6 | the register candidate: the single-precision variance in the log domain (rule D) | §4.4, §9.1 | right: a defect, **FSL-202**, rule A after the measurement | high: `variance_measure.py` (seven cases; see §11) |
+| 6 | the register candidate: the single-precision variance in the log domain (rule D) | §4.4, §9.1 | right: a defect, **FSL-202**, rule A after the measurements | high: `variance_measure.py` (how far the exact variance moves the outputs; seven cases, see §11) and `variance_reference.py` (spec writer, 2026-11-03: the corrected variance closer to the exactly computed statistics than FSL's on seven of seven cases, its last-bit band 0 label voxels against FSL's 3 to 807; §4.4) |
 | 7 | the bias kernel's normalised taps are double values | §4.5 | right | high: the implementer's `conv_model.py` 100 % of the voxels |
 | 8 | several channels' initial assignment: products in double, summed in single | §5.2.2 | right | high |
 | 9 | several channels' bias weights `q / C(i,i)` rounded to single; no tissue volumes with `--nopve` | §5.6 | right | high |

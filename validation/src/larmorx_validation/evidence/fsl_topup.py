@@ -504,14 +504,14 @@ FIX_REASONS = {
     "default, spline, reaches every other volume); the default resamples every volume with "
     "the method asked for. The reproduce mode gives FSL's bytes.",
     "FSL-133": "FSL-133, corrected by default with a notice: the least-squares restoration "
-    "wraps a negative index along a line by 2^32 modulo the line's length; the default wraps "
+    "wraps a negative index along a line by 2³² modulo the line's length; the default wraps "
     "it around the line.",
     "FSL-142": "FSL-142, corrected by default with a notice: vb3D and vb4D count two data "
     "points per line whatever the collection holds; the default counts every image's.",
     "FSL-143": "FSL-143, corrected by default with a notice: vb3D's and vb4D's prior couples "
     "neighbouring slices with half the weight its own construction gives them, so the "
     "precision it builds is not positive definite and the iterations diverge (FSL's output "
-    "here spans about ±4 × 10^10 for an input of 0 to 1.1 × 10^5); the default gives the "
+    "here spans about ±4 × 10¹⁰ for an input of 0 to 1.1 × 10⁵); the default gives the "
     "prior its full weight, and the restoration stays in the input's range, as vb2D's does.",
 }
 

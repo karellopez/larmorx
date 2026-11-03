@@ -94,8 +94,8 @@ def volume(tmp_path: Path, name: str = "t1", offset: int = 0) -> Path:
 
 
 def test_without_the_replica(scripts, tmp_path):
-    """Without ``larmorx-nc``, ``auto`` runs the clean-room original (in this process; one
-    channel so far) and ``replica`` refuses."""
+    """Without ``larmorx-nc``, ``auto`` runs the clean-room original (in this process; any
+    number of channels) and ``replica`` refuses."""
     path = volume(tmp_path)
     with pytest.warns(lx.UpstreamDefectWarning, match="FSL-96"):
         r = lx.fsl.fast(path, segments=True, probabilities=True)
@@ -111,7 +111,30 @@ def test_without_the_replica(scripts, tmp_path):
     assert o.partial_volumes is None and "Starting Single Image Segmentation" in o.stdout
     with pytest.raises(lx.ReplicaNotFoundError, match="larmorx-nc"):
         lx.fsl.fast(path, implementation="replica")
-    with pytest.raises(RuntimeError, match="one channel so far"):
+    # two channels (the second's intensities in another order), and nine: more than the
+    # replica's eight
+    rng = np.random.default_rng(7)
+    other = tmp_path / "with space" / "t2.nii"
+    lx.save(
+        (
+            rng.permutation(np.arange(1, 6 * 5 * 4 + 1, dtype=np.int16)).reshape(6, 5, 4),
+            np.diag([2.0, 2.0, 2.0, 1.0]),
+        ),
+        other,
+    )
+    m = lx.fsl.fast([path, other], implementation="original", bias_iterations=1)
+    assert np.asarray(m.segmentation.data).shape == (6, 5, 4)
+    assert m.partial_volumes is not None and len(m.partial_volumes) == 3
+    chans = []
+    for k in range(9):
+        f = tmp_path / "with space" / f"c{k}.nii"
+        v = rng.integers(1, 1000, size=(6, 5, 4)).astype(np.int16)
+        lx.save((v, np.diag([2.0, 2.0, 2.0, 1.0])), f)
+        chans.append(f)
+    n = lx.fsl.fast(chans, implementation="original", n_classes=2, no_bias=True, pve=False)
+    assert set(np.unique(np.asarray(n.segmentation.data))) <= {0, 1, 2}
+    # the same image twice: a singular covariance, where FAST aborts
+    with pytest.raises(RuntimeError, match="matrix is singular"):
         lx.fsl.fast([path, path], implementation="original")
 
 

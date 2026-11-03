@@ -229,6 +229,7 @@ struct Mrf<'a> {
 
 impl Mrf<'_> {
     /// One MRF iteration (§4.6): random posteriors, then five sweeps in storage order, in place.
+    #[allow(clippy::too_many_arguments)]
     fn iterate(
         &mut self,
         yb: &[f32],

@@ -6,9 +6,9 @@ estimation, on one image or several channels.
 Two implementations (``docs/licensing.md``): the bit-exact replica from ``larmorx-nc``, run as a
 separate program, and the clean-room original of this package (Apache-2.0, written from
 ``specs/fast.md``, run in this process); ``implementation="auto"`` runs the replica when
-``larmorx-nc`` is installed, else the original. The original segments one channel so far
-(several channels and the tissue priors are the next steps of its work: there it fails with
-its message).
+``larmorx-nc`` is installed, else the original. The original segments any number of channels
+(the replica up to ``MAX_CHANNELS``: FSL's results beyond follow OpenBLAS's kernels for larger
+matrices) and registers the tissue priors with larmorx's FLIRT in this process.
 
 The classes are numbered from 0 in intensity order: for a T1-weighted image with three classes,
 0 is CSF, 1 grey matter, 2 white matter (``image_type="T2"`` reverses the order). FSL's
@@ -40,7 +40,8 @@ ImageType = Literal["T1", "T2", "PD"]
 
 _TYPES = {"T1": 1, "T2": 2, "PD": 3}
 
-#: The most channels the replica segments (``-S``; FAST's own limit is the command line).
+#: The most channels the replica segments (``-S``; FAST's own limit is the command line; the
+#: original has none).
 MAX_CHANNELS = 8
 
 
@@ -177,9 +178,9 @@ def fast(
 ) -> FastResult:
     """Segment ``images`` into ``n_classes`` tissue types (FSL's ``fast``).
 
-    ``images`` is one image (a path or :class:`larmorx.Image`), or a sequence of 2 to
-    ``MAX_CHANNELS`` co-registered channels of one grid, channel 1 first (channel 1 orders the
-    classes and gives the outputs their header). The keyword arguments map one to one onto
+    ``images`` is one image (a path or :class:`larmorx.Image`), or a sequence of 2 or more
+    co-registered channels of one grid (the replica: at most ``MAX_CHANNELS``), channel 1
+    first (channel 1 orders the classes and gives the outputs their header). The keyword arguments map one to one onto
     FAST's options (``docs/api/fsl-fast.md``): ``n_classes`` ``-n``; ``image_type`` ``-t``;
     ``bias_iterations`` ``-I``; ``bias_lowpass`` ``-l`` (mm); ``no_bias`` ``-N``;
     ``fixed_iterations`` ``-O``; ``init_iterations`` ``-W``; ``initial_smoothness`` ``-f``;
@@ -203,8 +204,6 @@ def fast(
     if isinstance(images, (list, tuple)) and len(images) == 0:
         raise ValueError("fast needs at least one image")
     n_channels = len(channels)
-    if n_channels > MAX_CHANNELS:
-        raise ValueError(f"fast segments at most {MAX_CHANNELS} channels, not {n_channels}")
     if image_type not in _TYPES:
         raise ValueError(f"image_type must be one of T1, T2, PD, not {image_type!r}")
     if (priors is not None or priors_throughout) and priors_matrix is None:
@@ -220,6 +219,11 @@ def fast(
         )
     selected = _replica.select("fsl", "fast", implementation)
     impl = _replica.ORIGINAL if selected is None else selected.implementation()
+    if selected is not None and n_channels > MAX_CHANNELS:
+        raise ValueError(
+            f"the replica segments at most {MAX_CHANNELS} channels, not {n_channels} "
+            '(implementation="original" segments any number)'
+        )
     with tempfile.TemporaryDirectory(prefix="larmorx-fast-") as tmp:
         args = ["-o", "out", "-n", _positive_int("n_classes", n_classes, 1)]
         args += ["-t", str(_TYPES[image_type])]

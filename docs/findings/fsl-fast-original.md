@@ -109,3 +109,96 @@ about 265 against σ² about 0.002), and a last-bit change of a posterior or a l
 variance noticeably; that is why the band is wide where classes are small. A candidate for the
 register (rule D: measure whether a two-pass or double-precision variance changes the
 segmentation beyond the band before deciding), raised in the handoff.
+
+## Several channels (§5): what the arithmetic is (relay 2)
+
+With the default `-S 2 -B -b` on the MNI T1w and T2w at 4 mm and `-S 2 -n 4` at 2 mm the
+original is bit-identical to FSL with correctly rounded maths inside the mask (`files_cr.py`,
+`verbose_cr.py --full`, each step isolated with `-N`, `-I 0 -O 0`, `-W 0/1/15`, `-l 1` for a
+one-tap kernel). Three conventions decide it where `specs/fast.md` reads otherwise:
+- **The bias field's weights** (§5.6): `t = q_c / C_c(i,i)` is the double quotient rounded to
+  single, `W` sums the `t` in single, `R` adds each `t (y_bi - μ_ci)` in double to its single
+  sum. With `t` kept in double (the spec's reading) 97 % of a one-tap field's voxels are
+  identical, 99.2 % with FSL's kernel; with the convention above 100 %. Of seven variants
+  (double sums, single residuals, a quotient `q (y - μ) / C`) only this one reproduces FSL.
+- **The initial hard assignment** (§5.2): the products `(y_i - μ_ci)(y_j - μ_cj)` in double,
+  summed into a single-precision value (the spec: single precision). Single-precision products
+  move a few voxels' class (8 of 200,000 at 2 mm), and every later statistic with them.
+- **`-v` without partial volumes**: several channels print no tissue volumes with `--nopve`
+  (one channel prints the posteriors' volumes).
+Spec questions for the handoff: §5.6's weights in single precision, §5.2's products in double,
+§5.6's `-v` without the volumes under `--nopve`.
+
+The messages of several channels, observed: the means `<i> <c> <μ>` are printed channel by
+channel as they are computed, so with FSL-104 (channel 1 smaller than the others, no `-s`) FSL
+prints channel 1's lines and then aborts at channel 2's percentile (`Image Exception : #3 :: mask
+and vol have different sizes in calc_percentiles`); `-S 4` with two images reads channel 1, 2,
+then 3 (the word `4`: `No image files match: 4`); a singular covariance (the same image twice)
+aborts with `std::runtime_error`, `inv(): matrix is singular`, without any other line; `-S 2 -n 0`
+writes `_seg`, `_pveseg` and `_mixeltype`, all 0.
+
+## Five channels: an ill-conditioned covariance (`multi/s5`)
+
+`-S 5` with the T1w + T2w sum, the T1w/T2w ratio, the BOLD reference, the T2w and the T1w: the
+first channel is nearly a combination of the last two, so the class covariances are nearly
+singular and their inverses amplify the last bits of the matrix arithmetic. FSL against FSL with
+correctly rounded maths agrees there (Dice 0.99993: the functions it changes do not touch the
+matrices), but the original against itself with one rounding changed in the covariance's
+products (`q (d_i d_j)` instead of `(q d_i) d_j`: `self_band.py` with `self_band.patch`) moves
+further (`_mixeltype` Dice 0.865, `_seg` 0.975) than it lands from FSL (0.907, 0.982). The
+members after the initialisation's first statistics (`-W 0`) differ from FSL's by 5e-5 in 30 % of
+the voxels already: the 5 x 5 inverse (FSL: LAPACK's LU and inverse, OpenBLAS's kernels for the
+quadratic form above four channels) against larmorx's LU. The result of such an input is
+decided by rounding, not by the data: the record reports the case outside §11's thresholds with
+this reason (two, three, four and eight channels on the same images pass). Matching it would need
+LAPACK's and OpenBLAS's exact operation order, which `specs/fast.md` §8.6 leaves to the replica.
+
+## FSL's standard priors: how FSL reads an ANALYZE image
+
+`-a` without `-A` registers `$FSLDIR/data/standard/tissuepriors/avg152T1_{csf,gray,white}`:
+big-endian ANALYZE 7.5 pairs, uint8, voxel sizes `-2 2 2`, a scale field (`funused1`, where NIfTI
+keeps `scl_slope`) of 1/255. FSL's `flirt -applyxfm` of the CSF prior with the identity
+(`analyze_scale.py`, through the oracle cache) writes uint8 0 to 217, and with `-datatype float`
+float 0.0 to 217.0: **FSL does not apply the scale field**. And it samples the prior **as
+stored, without the x reversal** it applies to other ANALYZE images (`specs/bet.md`'s
+observation): a numpy model of `-applyxfm` (`std2mni.mat`, trilinear, truncated) reproduces
+FSL's registered priors exactly with the reference reversed and the prior not (100 % of the
+voxels), and 75 % with both reversed (what larmorx's reader did). The negative product of the
+stored voxel sizes is the difference. larmorx's ANALYZE reader (`bet::image::read_analyze`,
+shared by BET's and FLIRT's clean-room originals) now does both; FAST's registered priors, and
+with them `priors/a-verbose`'s whole segmentation, are bit-identical to FSL's. For the
+orchestrator: this changes BET's and FLIRT's originals on ANALYZE inputs with a scale field or
+negative voxel sizes (neither suite holds one).
+
+## FLIRT's `-applyxfm` output: `pixdim[4]`
+
+With `-A` (the template's float priors, `pixdim[4..7]` 0) and the identity, FSL's registered
+priors carry `pixdim[4] = 0` (the input's) and `pixdim[5..7] = 1` (the reference's); larmorx's
+FLIRT writes the reference's `pixdim[4] = 1` for a 3D input (`priors/A-a`: every image of the
+segmentation bit-identical, the header check of the three `_stdspace` images fails). A finding
+for FLIRT's clean-room original, reported in the handoff (FLIRT's engine is not changed here:
+its suite would have to be re-run).
+
+## `-H nan` (FSL-99 with `reproduce`)
+
+One channel (`-H nan -v` on the MNI T1w at 4 mm): in each `-O` iteration, after the sweeps and
+the class line, FAST prints ` TOTAL <T> RHS 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 ` on standard output
+(also without `-v`; `T` the last sweep's `MRFWeightsTotal`, fifteen zeros each followed by a
+blank) and fourteen lines `0.05 0.05` to `0.7 0.7` on standard error, then ` BETA 0`: the
+estimate of β against a table of zeros is 0, and the next sweeps use `beta=0`. The original
+does the same. Several channels print none of these lines and take a β from memory FAST never
+writes (0.2 in one run, `never`-cached); the original takes the table as zeros (β = 0) and names
+it (FSL-99).
+
+## `ERROR:: Empty mask image` (§8.3)
+
+An image without a voxel above 0 and `-s` means (`-s t1_means.txt` on the zero image): FSL prints
+the message once per masked sum over the empty mask, on standard error: 4 per class for each
+class statistics (the initialisation's `-O + -W` and each main-loop iteration's), 1 per bias
+field estimate, and per class for the tissue volumes (`n` with `--nopve`, `5 n` with the partial
+volumes' statistics and volumes). Nine runs (`-I`, `-O`, `-W` 0 or 1, `-N`, `--nopve`) fit this
+count exactly (3, 4, 16, 17, 28, 65 and 344 messages); the original prints the same number. With
+`-a` and a matrix FLIRT cannot read on the zero image FSL runs on (FSL-101 with `reproduce`):
+`Beginning prior-based initialisation`, the class lines all `-nan`, the messages after FLIRT's
+and the prior message (their count there follows the same rule, from the priors' one class
+statistics; not counted from that run).

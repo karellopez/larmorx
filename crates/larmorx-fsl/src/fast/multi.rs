@@ -176,7 +176,7 @@ pub fn members(post: &[f32], n: usize, nm: usize) -> Vec<f32> {
 /// the products `q y` in single summed in double; the covariances in double; a singular one
 /// stops (FAST aborts).
 pub fn class_stats(q: &[f32], y: &[f32], n: usize, s: usize) -> Result<Vec<Class>, Stop> {
-    let nm = if s == 0 { 0 } else { y.len() / s };
+    let nm = y.len().checked_div(s).unwrap_or(0);
     (0..n)
         .map(|c| {
             let mut sw = 0f32;

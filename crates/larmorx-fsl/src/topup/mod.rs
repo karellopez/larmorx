@@ -24,6 +24,7 @@ pub mod model;
 pub mod movement;
 pub mod spline;
 pub mod stencil;
+pub mod vb;
 
 pub use model::{RegMod, Scan};
 

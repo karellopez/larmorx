@@ -22,6 +22,7 @@ use crate::topup::Scan;
 use crate::topup::apply::{
     self, Corrected, FieldOnGrid, Image, Interp, LsrError, Sampling, wrap_axis,
 };
+use crate::topup::vb::{self, VbError, VbMethod, VbOptions, VbResult};
 
 /// The usage text (standard error).
 pub const USAGE: &str = "\nPart of FSL (ID: 2412.6-dirty)\napplytopup (Version 1.0)\nCopyright(c) 2009, University of Oxford (Jesper Andersson)\n\nUsage: \napplytopup -in=topdn,botup --topup=mytu --inindex=1,2 --out=hifi\napplytopup -in=topdn --topup=mytu --inindex=1 --method=jac --interp=spline --out=hifi\n\n\nCompulsory arguments (You MUST set one or more of):\n\t-i,--imain\tcomma separated list of names of input image (to be corrected)\n\t-a,--datain\tname of text file with PE directions/times\n\t-x,--inindex\tcomma separated list of indicies into --datain of the input image (to be corrected)\n\t-t,--topup\tname of field/movements (from topup)\n\t-o,--out\tbasename for output (warped) image\n\nOptional arguments (You may optionally specify one or more of):\n\t-m,--method\tUse jacobian modulation (jac) or least-squares resampling (lsr), default=lsr.\n\t-n,--interp\tinterpolation method {trilinear,spline}, default=spline\n\t-d,--datatype\tForce output data type [preserve char short int float double].\n\t-v,--verbose\tswitch on diagnostic messages\n\t-h,--help\tdisplay this message\n\n\n";
@@ -236,9 +237,8 @@ pub fn main(args: &[String], settings: &Settings, out: &mut dyn Write, err: &mut
         let _ = writeln!(err, "{stars}");
         return usage_error(err, "");
     }
-    let _ = out;
     let mut notices: Vec<Notice> = Vec::new();
-    match run(&given, settings, mode, &mut notices, err) {
+    match run(&given, settings, mode, &mut notices, out, err) {
         Ok(()) => {
             print_notices(err, &notices);
             0
@@ -252,6 +252,7 @@ fn run(
     settings: &Settings,
     mode: UpstreamDefects,
     notices: &mut Vec<Notice>,
+    out: &mut dyn Write,
     err: &mut dyn Write,
 ) -> Result<(), u8> {
     let get = |k: &str| given.get(k).map(String::as_str);
@@ -486,14 +487,7 @@ fn run(
     // the method
     let method = get("method").unwrap_or("lsr").to_owned();
     match method.as_str() {
-        "jac" | "lsr" => {}
-        "vb2D" | "vb3D" | "vb4D" => {
-            return Err(refuse(
-                err,
-                notices,
-                &format!("--method={method} {NOT_YET}"),
-            ));
-        }
+        "jac" | "lsr" | "vb2D" | "vb3D" | "vb4D" => {}
         _ => {
             let n = Notice::new(
                 &defects::FSL_135,
@@ -522,7 +516,10 @@ fn run(
             };
         }
     }
-    let lsr = method == "lsr";
+    let vb_method = VbMethod::parse(&method);
+    // the restorations (lsr and the vb methods) share the movements, the collections and the
+    // lines
+    let lsr = method == "lsr" || vb_method.is_some();
     let first = &reads[0];
     let dims = first.input.vol.shape;
     let voxel = first.input.vol.voxel;
@@ -552,7 +549,7 @@ fn run(
                 err,
                 &[n],
                 &format!(
-                    "--topup={tu}: {what}; with --method=lsr FSL reads the field's lines past their end (FSL-134: refused in both modes)"
+                    "--topup={tu}: {what}; with --method={method} FSL reads the field's lines past their end (FSL-134: refused in both modes)"
                 ),
             ),
             (UpstreamDefects::Reproduce, false, false) => {
@@ -592,14 +589,14 @@ fn run(
             let n = Notice::new(
                 &defects::FSL_135,
                 mode,
-                "--method=lsr without movement parameters for every image",
+                format!("--method={method} without movement parameters for every image"),
             );
             return Err(match mode {
                 UpstreamDefects::Fix => refuse(
                     err,
                     &[n],
                     &format!(
-                        "--method=lsr needs topup's movement parameters for every image (--topup={tu} gives none for row {i}; FSL-135: FSL aborts with an internal index error)"
+                        "--method={method} needs topup's movement parameters for every image (--topup={tu} gives none for row {i}; FSL-135: FSL aborts with an internal index error)"
                     ),
                 ),
                 UpstreamDefects::Reproduce => {
@@ -672,17 +669,32 @@ fn run(
         jac_y_scale,
     };
     let n_threads = settings.threads();
-    let computed: Result<Result<Corrected, LsrError>, _> =
-        larmorx_core::parallel::with_threads(n_threads, || {
-            if lsr {
-                apply::lsr(&s, &images, &field)
-            } else {
-                Ok(apply::jac(&s, &images, &field))
-            }
+    let vb_options = vb_method.map(|m| VbOptions {
+        method: m,
+        counts_32: mode == UpstreamDefects::Reproduce,
+        count_two: mode == UpstreamDefects::Reproduce,
+        half_coupling: mode == UpstreamDefects::Reproduce,
+    });
+    type Restored = (Corrected, Option<(String, bool, bool)>);
+    let computed: Result<Result<Restored, VbError>, _> =
+        larmorx_core::parallel::with_threads(n_threads, || match &vb_options {
+            Some(o) => vb::vb(&s, o, &images, &field).map(|r| {
+                let VbResult {
+                    corrected,
+                    stdout,
+                    counts_wrap,
+                    count_differs,
+                } = r;
+                (corrected, Some((stdout, counts_wrap, count_differs)))
+            }),
+            None if lsr => apply::lsr(&s, &images, &field)
+                .map(|c| (c, None))
+                .map_err(VbError::Lsr),
+            None => Ok((apply::jac(&s, &images, &field), None)),
         });
-    let corrected = match computed {
+    let (corrected, vb_result) = match computed {
         Ok(Ok(c)) => c,
-        Ok(Err(LsrError::Vector)) => {
+        Ok(Err(VbError::Lsr(LsrError::Vector))) => {
             return Err(fail(
                 err,
                 notices,
@@ -690,7 +702,7 @@ fn run(
                 "ApplyTopup::Invalid phase-encode vector for least-squares restoration",
             ));
         }
-        Ok(Err(LsrError::Combination)) => {
+        Ok(Err(VbError::Lsr(LsrError::Combination))) => {
             return Err(fail(
                 err,
                 notices,
@@ -698,8 +710,51 @@ fn run(
                 "ApplyTopup::Invalid combination of phase-encode vectors for least-squares restoration",
             ));
         }
+        Ok(Err(VbError::Singular)) => {
+            return Err(refuse(
+                err,
+                notices,
+                &format!(
+                    "--method={method}: the restoration's matrix of a line is singular (the noise or smoothness precision has left its range)"
+                ),
+            ));
+        }
         Err(e) => return Err(refuse(err, notices, &e.to_string())),
     };
+    if let (Some((stdout, counts_wrap, count_differs)), Some(o)) = (&vb_result, &vb_options) {
+        let _ = out.write_all(stdout.as_bytes());
+        let _ = out.flush();
+        if *counts_wrap {
+            notices.push(Notice::new(
+                &defects::FSL_141,
+                mode,
+                match mode {
+                    UpstreamDefects::Fix => format!("--method={method}: the priors' counts in 64-bit integers (FSL's 32-bit counts wrap around for this image)"),
+                    UpstreamDefects::Reproduce => format!("--method={method}: the priors' counts wrapped around in 32-bit integers, as FSL's"),
+                },
+            ));
+        }
+        if o.method != VbMethod::Vb2D {
+            if *count_differs {
+                notices.push(Notice::new(
+                    &defects::FSL_142,
+                    mode,
+                    match mode {
+                        UpstreamDefects::Fix => format!("--method={method}: the noise prior counts every image's data points (FSL's: two images' whatever the collection holds)"),
+                        UpstreamDefects::Reproduce => format!("--method={method}: the noise prior counts two images' data points whatever the collection holds, as FSL's"),
+                    },
+                ));
+            }
+            notices.push(Notice::new(
+                &defects::FSL_143,
+                mode,
+                match mode {
+                    UpstreamDefects::Fix => format!("--method={method}: the smoothness prior couples neighbouring slices one step along the phase encoding as the squared second differences give it (FSL's: at half, so its precision is indefinite and its iterations can diverge)"),
+                    UpstreamDefects::Reproduce => format!("--method={method}: the smoothness prior couples neighbouring slices one step along the phase encoding at half the squared second differences' weight, as FSL's"),
+                },
+            ));
+        }
+    }
     // FSL-133: the lines' wrap-around (lengths that do not divide 2^32)
     if lsr {
         let lengths: std::collections::BTreeSet<usize> = images

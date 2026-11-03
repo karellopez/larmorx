@@ -413,7 +413,7 @@ pub fn resampling_matrix(h: &[f64], pt: f64) -> Vec<f64> {
 
 /// The Cholesky factor (lower, row-major) of the symmetric positive definite `a` (`n × n`);
 /// `None` when it is not positive definite.
-fn cholesky(a: &[f64], n: usize) -> Option<Vec<f64>> {
+pub(super) fn cholesky(a: &[f64], n: usize) -> Option<Vec<f64>> {
     let mut l = vec![0.0; n * n];
     for i in 0..n {
         for j in 0..=i {
@@ -434,7 +434,7 @@ fn cholesky(a: &[f64], n: usize) -> Option<Vec<f64>> {
     Some(l)
 }
 
-fn cholesky_solve(l: &[f64], n: usize, b: &mut [f64]) {
+pub(super) fn cholesky_solve(l: &[f64], n: usize, b: &mut [f64]) {
     for i in 0..n {
         let mut s = b[i];
         for k in 0..i {
@@ -484,14 +484,11 @@ fn second_difference_gram(n: usize) -> Vec<f64> {
     g
 }
 
-/// `--method=lsr` (§7.4): each image moved onto the first's space, then each collection's lines
-/// restored and the collections added; a line with an invalid voxel is 0 in the output.
-pub fn lsr(s: &Settings, images: &[Image], field: &FieldOnGrid) -> Result<Corrected, LsrError> {
-    let colls = collections(images)?;
+/// Each image moved onto the first's space (no displacement; positions outside the grid
+/// interpolated periodically), volume by volume, and the mask: every image's validity.
+pub(super) fn moved_images(s: &Settings, images: &[Image]) -> (Vec<Vec<Vec<f64>>>, Vec<bool>) {
     let nvox = s.dims.iter().product::<usize>();
-    let n_vols = images.first().map_or(0, |i| i.volumes.len());
     let mut mask = vec![true; nvox];
-    // each image moved (no displacement), as observed lines
     let mut moved: Vec<Vec<Vec<f64>>> = Vec::with_capacity(images.len());
     for (k, img) in images.iter().enumerate() {
         let (pos, valid) = positions(s, img, None);
@@ -515,24 +512,41 @@ pub fn lsr(s: &Settings, images: &[Image], field: &FieldOnGrid) -> Result<Correc
                 .collect(),
         );
     }
-    let [nx, ny, nz] = s.dims;
+    (moved, mask)
+}
+
+/// The lines along `axis` (x or y) of a grid `dims`: their first voxels in storage order (the
+/// other in-plane axis fastest, then z) and the stride along a line.
+pub(super) fn line_starts(dims: [usize; 3], axis: usize) -> (Vec<usize>, usize) {
+    let [nx, ny, nz] = dims;
+    let stride = if axis == 0 { 1 } else { nx };
+    let starts = (0..nz)
+        .flat_map(|z| {
+            (0..(if axis == 0 { ny } else { nx })).map(move |o| {
+                if axis == 0 {
+                    z * nx * ny + o * nx
+                } else {
+                    z * nx * ny + o
+                }
+            })
+        })
+        .collect();
+    (starts, stride)
+}
+
+/// `--method=lsr` (§7.4): each image moved onto the first's space, then each collection's lines
+/// restored and the collections added; a line with an invalid voxel is 0 in the output.
+pub fn lsr(s: &Settings, images: &[Image], field: &FieldOnGrid) -> Result<Corrected, LsrError> {
+    let colls = collections(images)?;
+    let nvox = s.dims.iter().product::<usize>();
+    let n_vols = images.first().map_or(0, |i| i.volumes.len());
+    let (moved, mask) = moved_images(s, images);
     let mut out = vec![vec![0.0f64; nvox]; n_vols];
     let mut skipped = vec![false; nvox];
     for (axis, members) in &colls {
         let axis = *axis;
         let n = s.dims[axis];
-        let stride = if axis == 0 { 1 } else { nx };
-        let starts: Vec<usize> = (0..nz)
-            .flat_map(|z| {
-                (0..(if axis == 0 { ny } else { nx })).map(move |o| {
-                    if axis == 0 {
-                        z * nx * ny + o * nx
-                    } else {
-                        z * nx * ny + o
-                    }
-                })
-            })
-            .collect();
+        let (starts, stride) = line_starts(s.dims, axis);
         let gram = second_difference_gram(n);
         let pts: Vec<f64> = members
             .iter()

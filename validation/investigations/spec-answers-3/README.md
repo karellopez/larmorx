@@ -86,3 +86,45 @@ What the models gave (2026-11-03):
   (p99), 8.3e-3 (largest relative, at small values), the 2,464 zeros the same; `circular` the
   same (16 divides 2³²); `overlap` 0.131 at the 99th percentile (the original's trial value
   0.1337); the replica's `reproduce` output equals FSL's (largest difference 0).
+
+## FAST
+
+`specs/fast.md` §12 lists the questions and where each is answered (relay 2, 2026-11-03).
+
+| File | What it shows | How to run |
+|---|---|---|
+| `fast_probes.py` | FSL's runs behind §4.1 (NaN voxels and the negative-value rule; a NaN first voxel, FSL-203), §7 (standard output at an abort) and §5.3 (a class without weight, case 1840), each against the prediction of a model of the new text (`model_extrema`, `model_restore`, `model_mask_empty`, the expected `-v` lines) | `fast_probes.py <out> [nan-noneg nan-neg nan-background nan-first n0-verbose nan-stats] [--finding <workspace>/oracles/difftest/2026-11-03-cleanroom-fast/findings/fsl-fast-original/cleanroom-fast-01840-original.json]` (derived inputs in `<workspace>/oracles/inputs/spec-answers-3/fast/`) |
+| `variance_measure.py` | FSL-202, rule D measured: the single-channel class variance as FSL computes it against the exact one (the FAST replica with a measurement hook: `double`, `twopass`), beside FSL's own band (FSL with correctly rounded maths), on seven cases; JSON of every metric | `LARMORX_NC_BIN=<the hooked larmorx-nc> variance_measure.py <out.json> [case ...]` (12 GiB box); the hook is FSL-licensed replica code: `crates-nc/larmorx-nc-fast/dev-patches/variance_variant.patch` (a clean-room implementer does not open it), applied in a checkout, built, the binary copied out, the patch reverted |
+| `sweep_schedule_model.py` | §10: a pipeline of planes (plane `z` two rows behind plane `z − 1`, one step's rows at once) gives the in-place sweep's bits; a lag of one row does not | `python -I sweep_schedule_model.py` |
+| `pv_ties_model.py` | §5.8 and §4.8.8: the fraction search's near ties: how many voxels move, and by how many steps, when the class statistics change in their last bits or the energy is evaluated another way | `python -I pv_ties_model.py` (4 GiB box) |
+
+What the models gave (2026-11-03):
+
+- `fast_probes.py` (FSL's runs new, stored in the cache, but `nan-neg` and `nan-stats`: from it):
+  `nan-noneg` (five NaN voxels, no negative value): FSL's `_restore` NaN at the five, `_bias` 1;
+  `nan-neg` (the replica suite's `t1_nan`: the same voxels, one value −0.00024): `_restore` 0,
+  `_bias` 1; the model predicts all ten. `nan-background` (every background voxel NaN) and
+  `nan-first` (only FSL's first voxel NaN): exit 255, `-v` prints `1 0`, `2 0`, `3 0` and
+  `Exception: Not enough classes detected to init KMeans`; the model: extrema NaN, mask empty.
+  `n0-verbose` (`-v -n 0`): exit 134 (`Mixeltype exceeds allowed types`), standard output's 84
+  lines end with ` BETA 0.1`; the partial-volume heading written before the abort is missing, as
+  §7 predicts. `nan-stats` (case 1840): every class `MEAN 1` in the first main-loop iteration,
+  `MEAN -nan` from the second; `nan-stats-N` (the same with `-N`): `MEAN 1` to the end; both as
+  §5.3 predicts.
+- `variance_measure.py` (FSL and FSL with correctly rounded maths from the cache, but
+  ds000228's and the verbose case's new; the hooked replica from this branch at 0221658): the
+  smallest per-class Dice of `_mixeltype` against FSL (voxels differing), band → exact variance:
+  ds000005 0.99998 (7) → 0.99864 (112); ds000228 0.99976 (113) → 0.99985 (89); ds005003 0.99800
+  (450) → 0.99623 (453); the half-resolution T1w 0.99988 (5) → 0.99993 (2); the bias-field case
+  0.99970 (15) → 0.99988 (8); the 2D slice 0.99761 (2) → 1 (0); values above 2^24 0.99886 (29)
+  → 0.99317 (346), there the partial volumes' 99.9th percentile 0.01 → 0.22 to 0.34. `double`
+  and `twopass` give the same images on six cases, within two voxels on ds005003. `-v` on the
+  half-resolution T1w, the last class line's standard deviations, FSL → exact: 226.856 →
+  226.863, 109.413 → 109.422, 38.6653 → 38.6909 (the band: 226.843, 109.42, 38.6587).
+  Decided: rule A (FSL-202, `specs/fast.md` §4.4, §9.1).
+- `sweep_schedule_model.py`: on six random grids (4 to 8 voxels a side, 80 % mask) the pipeline
+  of planes equals the serial sweep bit for bit on 6 of 6; a lag of one row on 0 of 6 (72 to 141
+  voxels differ).
+- `pv_ties_model.py` (200,000 mixed voxels each): two channels, the statistics changed by 1e-7,
+  1e-6, 1e-5: 22, 143, 1,387 voxels move, every one by one step; the energy through the explicit
+  2 x 2 inverse instead of a solve: 0 move. One channel: 22, 375, 3,361, every one by one step.

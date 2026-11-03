@@ -257,7 +257,11 @@ uses the quaternion:
 
 The input is read once (later readings reuse the first). Its data-type code (from the file; a
 scaled file counts as float, `specs/mcflirt.md` §4.1) becomes the output data type unless
-`-datatype` is given. Then:
+`-datatype` is given. (spec writer, 2026-11-03; FAST's clean-room question of relay 2) An
+ANALYZE 7.5 image is read without a scale field (stored values as they are) and mirrored along x
+only when the product of its stored voxel sizes is positive (`specs/fast.md` §3.1); a TR is read
+as `|pixdim[4]|`, 1 when the image has a time axis (`dim[0]` 4 or more) and a TR of 0 (as every
+voxel size `pixdim[1..dim[0]]`: absolute, a 0 read as 1). Then:
 1. **Single slices**: an image of one slice becomes three slices of the same values (the slice
    repeated above and below), with the slice thickness set to 8 mm and **every other property
    dropped** (no sform or qform, default interpolation); this applies to the input, the reference
@@ -995,6 +999,16 @@ isotropically to `s` mm (§5). For each volume `t` of the input, in order: blurr
 smallest voxel size (unless nearest neighbour or `-noresampblur`), resampled as §9.2 — with the
 **pad value taken from the unblurred first volume**, once — into volume `t` of the output; the output
 has the input's TR. `-omat` writes the initial matrix. The program ends with status 0 after this.
+(spec writer, 2026-11-03; FAST's clean-room questions of relays 2 and 3: the implementer's
+observations were right) **The TR written** is the input's as read (§4.1): `|pixdim[4]|`, and 1
+for an input with a time axis (`dim[0]` 4 or more, one volume or several) whose TR is 0; a 3D
+input's `pixdim[4]` as stored, absolute (0 stays 0); the format does not matter; `pixdim[5..7]`
+are the reference's **(observed:** NIfTI `dim[0] = 3` with TR 0, 2.5, -2 gives 0, 2.5, 2; `dim[0]
+= 4` with TR 0 gives 1, one volume or two; ANALYZE likewise**)**. With `-v` at level 2 or more,
+after each volume's `refvol` and `inputvol` image information, the output's own (`Resampled
+volume:: Size = (nx,ny,nz,nt)`, `:: Dims = (dx,dy,dz,TR)` with that TR, `:: ROI Size`, `::
+Minimum and maximum intensities are: <min> and <max>`) follows once, after the image is written
+(not observed for a 3D input; from the order of the outputs).
 
 (spec writer, 2026-11-02; question 10, observed by the implementer, confirmed) The image is
 written before the matrix: an image FSL cannot write (an output type it does not know) ends the

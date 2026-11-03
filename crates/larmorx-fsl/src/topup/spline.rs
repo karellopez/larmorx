@@ -255,12 +255,26 @@ impl Op1 {
         dims: [usize; 3],
         axis: usize,
     ) -> (Vec<f64>, [usize; 3]) {
+        let mut od = dims;
+        od[axis] = self.out;
+        self.apply_axis_with(data, dims, axis, vec![0.0; od[0] * od[1] * od[2]])
+    }
+
+    /// [`Op1::apply_axis`] into `out`, a zeroed array of the result's size (e.g. one kept for
+    /// reuse, [`crate::topup::model::Pool`]).
+    pub fn apply_axis_with(
+        &self,
+        data: &[f64],
+        dims: [usize; 3],
+        axis: usize,
+        mut out: Vec<f64>,
+    ) -> (Vec<f64>, [usize; 3]) {
         assert_eq!(dims[axis], self.inp, "operator and axis lengths differ");
         let [nx, ny, _nz] = dims;
         let mut od = dims;
         od[axis] = self.out;
         let [ox, oy, _oz] = od;
-        let mut out = vec![0.0; od[0] * od[1] * od[2]];
+        assert_eq!(out.len(), od[0] * od[1] * od[2], "the output's size");
         let width = self.width;
         match axis {
             0 => {

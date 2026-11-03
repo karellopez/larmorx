@@ -9,6 +9,7 @@
 use rayon::prelude::*;
 
 use super::model::dot;
+use super::pool::Pool;
 use super::spline::Op1;
 
 /// A matrix on a grid of coefficients: row `k`, offsets `d ∈ [-3, 3]³` (index
@@ -23,9 +24,14 @@ pub const CENTRE: usize = 171;
 
 impl Stencil {
     pub fn zeros(dims: [usize; 3]) -> Stencil {
+        Stencil::zeros_in(dims, &Pool::default())
+    }
+
+    /// [`Stencil::zeros`] with its array from `pool`.
+    pub fn zeros_in(dims: [usize; 3], pool: &Pool) -> Stencil {
         Stencil {
             dims,
-            data: vec![0.0; dims[0] * dims[1] * dims[2] * 343],
+            data: pool.zeros(dims[0] * dims[1] * dims[2] * 343),
         }
     }
 
@@ -46,10 +52,22 @@ impl Stencil {
         ops_p: [&Op1; 3],
         ops_q: [&Op1; 3],
     ) {
+        self.add_weighted_in(w, grid, ops_p, ops_q, &Pool::default());
+    }
+
+    /// [`Stencil::add_weighted`] with its intermediate arrays from `pool`.
+    pub fn add_weighted_in(
+        &mut self,
+        w: &[f64],
+        grid: [usize; 3],
+        ops_p: [&Op1; 3],
+        ops_q: [&Op1; 3],
+        pool: &Pool,
+    ) {
         let [nx, ny, nz] = grid;
         let [cx, cy, cz] = self.dims;
         // stage x: T1[z][y][kx][dx]
-        let mut t1 = vec![0.0; nz * ny * cx * 7];
+        let mut t1 = pool.zeros(nz * ny * cx * 7);
         t1.par_chunks_mut(ny * cx * 7)
             .enumerate()
             .for_each(|(z, slab)| {
@@ -84,7 +102,7 @@ impl Stencil {
             });
         // stage y: T2[z][ky][dy][kx][dx]
         let blk = cx * 7;
-        let mut t2 = vec![0.0; nz * cy * 7 * blk];
+        let mut t2 = pool.zeros(nz * cy * 7 * blk);
         t2.par_chunks_mut(cy * 7 * blk)
             .enumerate()
             .for_each(|(z, slab)| {
@@ -160,6 +178,8 @@ impl Stencil {
                     }
                 }
             });
+        pool.give(t1);
+        pool.give(t2);
     }
 
     /// `y = H x`.
@@ -299,9 +319,9 @@ struct ByOffset {
 
 impl ByOffset {
     /// `h` with its diagonal multiplied by `1 + damping` (as [`Stencil::damped`]).
-    fn damped(h: &Stencil, damping: f64) -> ByOffset {
+    fn damped(h: &Stencil, damping: f64, pool: &Pool) -> ByOffset {
         let n = h.n();
-        let mut data = vec![0.0; 343 * n];
+        let mut data = pool.zeros(343 * n);
         data.par_chunks_mut(n).enumerate().for_each(|(d, col)| {
             for (k, v) in col.iter_mut().enumerate() {
                 *v = h.data[k * 343 + d];
@@ -390,8 +410,15 @@ fn damped_mul(cc: &ByOffset, cm: &[Vec<f64>], mm: &[f64], x: &[f64], y: &mut [f6
 
 /// Solves `(H + damping · diag(H)) x = b`, i.e. [`pcg`] on [`Hessian::damped`], with the
 /// coefficients' block laid out for fast products (the same arithmetic, the same result).
-pub fn pcg_damped(h: &Hessian, damping: f64, b: &[f64], tol: f64, max_iter: usize) -> Vec<f64> {
-    let cc = ByOffset::damped(&h.cc, damping);
+pub fn pcg_damped(
+    h: &Hessian,
+    damping: f64,
+    b: &[f64],
+    tol: f64,
+    max_iter: usize,
+    pool: &Pool,
+) -> Vec<f64> {
+    let cc = ByOffset::damped(&h.cc, damping, pool);
     let nm = h.cm.len();
     let mut mm = h.mm.clone();
     for p in 0..nm {
@@ -399,9 +426,11 @@ pub fn pcg_damped(h: &Hessian, damping: f64, b: &[f64], tol: f64, max_iter: usiz
     }
     let mut diag = cc.diagonal();
     diag.extend((0..nm).map(|p| mm[p * nm + p]));
-    solve(&diag, b, tol, max_iter, |x, y| {
+    let x = solve(&diag, b, tol, max_iter, |x, y| {
         damped_mul(&cc, &h.cm, &mm, x, y)
-    })
+    });
+    pool.give(cc.data);
+    x
 }
 
 /// Solves `H x = b` by conjugate gradients preconditioned with the diagonal, from `x = 0`, until

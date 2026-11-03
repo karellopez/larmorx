@@ -12,6 +12,7 @@ use rayon::prelude::*;
 
 use super::images::{Grid, LevelImages, interp, sample_op_of, taps_both};
 use super::movement::{Motion, free_parameters};
+use super::pool::Pool;
 use super::spline::{Axis, Op1, apply3, band_op, gram};
 use super::stencil::{Hessian, Stencil};
 
@@ -72,25 +73,39 @@ impl Regulariser {
     /// `R c`: the terms in order, each `w · Z(Y(X c))` (the passes x, y, z) added to the sum;
     /// the terms' x passes computed once per derivative order.
     pub fn apply(&self, c: &[f64]) -> Vec<f64> {
+        self.apply_in(c, &Pool::default())
+    }
+
+    /// [`Regulariser::apply`] with its arrays from `pool`.
+    pub fn apply_in(&self, c: &[f64], pool: &Pool) -> Vec<f64> {
         let dims = self.dims;
-        let mut out = vec![0.0; c.len()];
+        let mut out = pool.zeros(c.len());
         let mut xs: [Option<Vec<f64>>; 3] = [None, None, None];
         for (ds, _) in terms(self.model) {
             if xs[ds[0]].is_none() {
-                xs[ds[0]] = Some(self.ops[0][ds[0]].apply_axis(c, dims, 0).0);
+                xs[ds[0]] = Some(pool.apply_axis(&self.ops[0][ds[0]], c, dims, 0).0);
             }
         }
         for (ds, w) in terms(self.model) {
             let x = xs[ds[0]].as_ref().expect("computed above");
-            let (y, _) = self.ops[1][ds[1]].apply_axis(x, dims, 1);
+            let (y, _) = pool.apply_axis(&self.ops[1][ds[1]], x, dims, 1);
             self.ops[2][ds[2]].accumulate_z(&y, dims, &mut out, *w);
+            pool.give(y);
+        }
+        for x in xs.into_iter().flatten() {
+            pool.give(x);
         }
         out
     }
 
     /// `E = cᵀ R c` and `R c`.
     pub fn energy(&self, c: &[f64]) -> (f64, Vec<f64>) {
-        let rc = self.apply(c);
+        self.energy_in(c, &Pool::default())
+    }
+
+    /// [`Regulariser::energy`] with its arrays from `pool`.
+    pub fn energy_in(&self, c: &[f64], pool: &Pool) -> (f64, Vec<f64>) {
+        let rc = self.apply_in(c, pool);
         let e = dot(c, &rc);
         (e, rc)
     }
@@ -185,6 +200,8 @@ pub struct Level {
     pub membrane_hessian_mm: bool,
     /// The Levenberg-Marquardt Hessian in single precision (`--numprec=float`).
     pub single: bool,
+    /// The large arrays kept for reuse by the level's evaluations.
+    pool: Pool,
 }
 
 /// The predictions at one parameter vector (the coefficients, then [`Level::free`]).
@@ -225,6 +242,10 @@ impl Eval {
             .collect()
     }
 }
+
+/// One slice of the gradient's voxel weights (of `B`, then of `∂_a B` along the displaced axes),
+/// written in place.
+type GradientSlice<'a> = (&'a mut [f64], [Option<&'a mut [f64]>; 3]);
 
 /// One slice of a volume's predictions in [`Level::eval`], written in place.
 struct Slices<'a> {
@@ -399,11 +420,17 @@ impl Level {
             reg_mm,
             membrane_hessian_mm: false,
             single: false,
+            pool: Pool::default(),
         }
     }
 
     pub fn n_coef(&self) -> usize {
         self.axes.iter().map(Axis::ncoef).product()
+    }
+
+    /// The level's arrays kept for reuse.
+    pub fn pool(&self) -> &Pool {
+        &self.pool
     }
 
     /// The number of parameters: the coefficients and the free movement parameters.
@@ -455,22 +482,28 @@ impl Level {
         let c = &c[..self.n_coef()];
         let dims = self.coef_dims();
         let b = &self.basis;
-        let (x0, d1) = b[0][0].apply_axis(c, dims, 0);
-        let (y0, d2) = b[1][0].apply_axis(&x0, d1, 1);
-        let h = b[2][0].apply_axis(&y0, d2, 2).0;
+        let pool = &self.pool;
+        let (x0, d1) = pool.apply_axis(&b[0][0], c, dims, 0);
+        let (y0, d2) = pool.apply_axis(&b[1][0], &x0, d1, 1);
+        let h = pool.apply_axis(&b[2][0], &y0, d2, 2).0;
         let mut dh: [Option<Vec<f64>>; 3] = [None, None, None];
         if self.pe_axes[0] {
-            let (x1, d1) = b[0][1].apply_axis(c, dims, 0);
-            let (y, d2) = b[1][0].apply_axis(&x1, d1, 1);
-            dh[0] = Some(b[2][0].apply_axis(&y, d2, 2).0);
+            let (x1, d1) = pool.apply_axis(&b[0][1], c, dims, 0);
+            let (y, d2) = pool.apply_axis(&b[1][0], &x1, d1, 1);
+            dh[0] = Some(pool.apply_axis(&b[2][0], &y, d2, 2).0);
+            pool.give(x1);
+            pool.give(y);
         }
         if self.pe_axes[1] {
-            let (y, d2) = b[1][1].apply_axis(&x0, d1, 1);
-            dh[1] = Some(b[2][0].apply_axis(&y, d2, 2).0);
+            let (y, d2) = pool.apply_axis(&b[1][1], &x0, d1, 1);
+            dh[1] = Some(pool.apply_axis(&b[2][0], &y, d2, 2).0);
+            pool.give(y);
         }
         if self.pe_axes[2] {
-            dh[2] = Some(b[2][1].apply_axis(&y0, d2, 2).0);
+            dh[2] = Some(pool.apply_axis(&b[2][1], &y0, d2, 2).0);
         }
+        pool.give(x0);
+        pool.give(y0);
         (h, dh)
     }
 
@@ -478,7 +511,37 @@ impl Level {
     fn project(&self, w: &[f64], deriv: Option<usize>) -> Vec<f64> {
         let ops: [&Op1; 3] =
             std::array::from_fn(|a| &self.basis_t[a][usize::from(deriv == Some(a))]);
-        apply3(w, self.nt, [Some(ops[0]), Some(ops[1]), Some(ops[2])]).0
+        // apply3's passes (x, y, z), the intermediate arrays from the pool
+        let pool = &self.pool;
+        let (x, d1) = pool.apply_axis(ops[0], w, self.nt, 0);
+        let (y, d2) = pool.apply_axis(ops[1], &x, d1, 1);
+        let out = pool.apply_axis(ops[2], &y, d2, 2).0;
+        pool.give(x);
+        pool.give(y);
+        out
+    }
+
+    /// Gives an evaluation's arrays back for reuse by the next ones.
+    pub fn recycle(&self, e: Eval) {
+        let pool = &self.pool;
+        pool.give(e.h);
+        for v in e.dh.into_iter().flatten() {
+            pool.give(v);
+        }
+        for v in e.u.into_iter().chain(e.jac).chain(e.f) {
+            pool.give(v);
+        }
+        for fd in e.fd {
+            for v in fd.into_iter().flatten() {
+                pool.give(v);
+            }
+        }
+        for fm in e.fm.into_iter().flatten() {
+            for v in fm {
+                pool.give(v);
+            }
+        }
+        pool.give(e.rc);
     }
 
     /// The position (mm) of level voxel `v`.
@@ -512,14 +575,15 @@ impl Level {
         let mut mask = vec![true; nvox];
         let plane = nx * ny;
         for (i, ev) in self.e.iter().enumerate() {
-            let mut ui = vec![0.0; nvox];
-            let mut ji = vec![0.0; nvox];
-            let mut fi = vec![0.0; nvox];
+            let pool = &self.pool;
+            let mut ui = pool.zeros(nvox);
+            let mut ji = pool.zeros(nvox);
+            let mut fi = pool.zeros(nvox);
             let mut fdi: [Option<Vec<f64>>; 3] =
-                std::array::from_fn(|a| (ev[a] != 0.0).then(|| vec![0.0; nvox]));
+                std::array::from_fn(|a| (ev[a] != 0.0).then(|| pool.zeros(nvox)));
             let est = self.estimated[i];
             let mut fmi: Option<[Vec<f64>; 3]> =
-                est.then(|| std::array::from_fn(|_| vec![0.0; nvox]));
+                est.then(|| std::array::from_fn(|_| pool.zeros(nvox)));
             let motion = motions[i].filter(|m| !m.is_identity());
             let want: [bool; 3] = std::array::from_fn(|a| est || ev[a] != 0.0);
             let e_mm: [f64; 3] = std::array::from_fn(|a| ev[a] * self.vt[a]);
@@ -641,9 +705,9 @@ impl Level {
         let denom = (n_mask.max(1) * (m.max(2) - 1)) as f64;
         let ssd = partial.iter().sum::<f64>() / denom;
         let (energy, rc) = if self.lambda != 0.0 {
-            self.reg.energy(c)
+            self.reg.energy_in(c, &self.pool)
         } else {
-            (0.0, vec![0.0; c.len()])
+            (0.0, self.pool.zeros(c.len()))
         };
         let lam = if self.ssq {
             self.lambda * ssd
@@ -722,43 +786,57 @@ impl Level {
     pub fn gradient(&self, ev: &Eval, c: &[f64]) -> Vec<f64> {
         let nvox = ev.h.len();
         let m = self.e.len();
-        let mut wa = vec![0.0; nvox];
+        let mut wa = self.pool.zeros(nvox);
         let mut wb: [Vec<f64>; 3] = std::array::from_fn(|a| {
             if self.pe_axes[a] {
-                vec![0.0; nvox]
+                self.pool.zeros(nvox)
             } else {
                 Vec::new()
             }
         });
         {
-            let rows: Vec<(f64, [f64; 3])> = (0..nvox)
-                .into_par_iter()
-                .map(|v| {
-                    if !ev.mask[v] {
-                        return (0.0, [0.0; 3]);
-                    }
-                    let mean = ev.u.iter().map(|ui| ui[v]).sum::<f64>() / m as f64;
-                    let mut sa = 0.0;
-                    let mut sb = [0.0; 3];
-                    for i in 0..m {
-                        let r = mean - ev.u[i][v];
-                        let (alpha, beta) = self.alpha_beta(ev, i, v);
-                        sa += r * alpha;
-                        for a in 0..3 {
-                            sb[a] += r * beta[a];
-                        }
-                    }
-                    (sa, sb)
+            // per voxel, slice by slice, written in place
+            let plane = self.nt[0] * self.nt[1];
+            let mut bc = wb
+                .each_mut()
+                .map(|w| (!w.is_empty()).then(|| w.chunks_mut(plane)));
+            let slices: Vec<GradientSlice<'_>> = wa
+                .chunks_mut(plane)
+                .map(|a| {
+                    (
+                        a,
+                        bc.each_mut().map(|o| o.as_mut().and_then(Iterator::next)),
+                    )
                 })
                 .collect();
-            for (v, (sa, sb)) in rows.into_iter().enumerate() {
-                wa[v] = sa;
-                for a in 0..3 {
-                    if self.pe_axes[a] {
-                        wb[a][v] = sb[a];
+            slices
+                .into_par_iter()
+                .enumerate()
+                .for_each(|(z, (wa, mut wb))| {
+                    for (k, out) in wa.iter_mut().enumerate() {
+                        let v = z * plane + k;
+                        if !ev.mask[v] {
+                            continue;
+                        }
+                        let mean = ev.u.iter().map(|ui| ui[v]).sum::<f64>() / m as f64;
+                        let mut sa = 0.0;
+                        let mut sb = [0.0; 3];
+                        for i in 0..m {
+                            let r = mean - ev.u[i][v];
+                            let (alpha, beta) = self.alpha_beta(ev, i, v);
+                            sa += r * alpha;
+                            for a in 0..3 {
+                                sb[a] += r * beta[a];
+                            }
+                        }
+                        *out = sa;
+                        for a in 0..3 {
+                            if let Some(w) = &mut wb[a] {
+                                w[k] = sb[a];
+                            }
+                        }
                     }
-                }
-            }
+                });
         }
         let factor = -2.0 / (ev.n_mask.max(1) * (m.max(2) - 1)) as f64;
         let mut g = self.project(&wa, None);
@@ -768,7 +846,12 @@ impl Level {
                 for (x, y) in g.iter_mut().zip(&p) {
                     *x += y;
                 }
+                self.pool.give(p);
             }
+        }
+        self.pool.give(wa);
+        for w in wb {
+            self.pool.give(w);
         }
         let lam = ev.lambda_eff(self);
         for (k, x) in g.iter_mut().enumerate() {
@@ -835,52 +918,60 @@ impl Level {
             .collect();
         let nt = types.len();
         // per voxel, the weights W_pq = Σ_i (c_ip - c̄_p)(c_iq - c̄_q), masked
-        let weights: Vec<Vec<f64>> = (0..nvox)
-            .into_par_iter()
-            .map(|v| {
-                let mut w = vec![0.0; nt * nt];
-                if !ev.mask[v] {
-                    return w;
-                }
-                let mut comps = vec![vec![0.0; nt]; m];
-                for (i, ci) in comps.iter_mut().enumerate() {
-                    let (alpha, beta) = self.alpha_beta(ev, i, v);
-                    for (j, &t) in types.iter().enumerate() {
-                        ci[j] = if t == 0 { alpha } else { beta[t - 1] };
+        let nn = nt * nt;
+        let mut weights = self.pool.zeros(nvox * nn);
+        let plane = self.nt[0] * self.nt[1];
+        weights
+            .par_chunks_mut(plane * nn)
+            .enumerate()
+            .for_each(|(z, slab)| {
+                let mut comps = vec![0.0; m * nt];
+                let mut mean = vec![0.0; nt];
+                for (k, w) in slab.chunks_mut(nn).enumerate() {
+                    let v = z * plane + k;
+                    if !ev.mask[v] {
+                        continue;
                     }
-                }
-                let mean: Vec<f64> = (0..nt)
-                    .map(|j| comps.iter().map(|c| c[j]).sum::<f64>() / m as f64)
-                    .collect();
-                for c in &comps {
-                    for p in 0..nt {
-                        for q in 0..nt {
-                            w[p * nt + q] += (c[p] - mean[p]) * (c[q] - mean[q]);
+                    for i in 0..m {
+                        let (alpha, beta) = self.alpha_beta(ev, i, v);
+                        for (j, &t) in types.iter().enumerate() {
+                            comps[i * nt + j] = if t == 0 { alpha } else { beta[t - 1] };
+                        }
+                    }
+                    for (j, mj) in mean.iter_mut().enumerate() {
+                        *mj = (0..m).map(|i| comps[i * nt + j]).sum::<f64>() / m as f64;
+                    }
+                    for c in comps.chunks(nt) {
+                        for p in 0..nt {
+                            for q in 0..nt {
+                                w[p * nt + q] += (c[p] - mean[p]) * (c[q] - mean[q]);
+                            }
                         }
                     }
                 }
-                w
-            })
-            .collect();
+            });
         let dims = self.coef_dims();
-        let mut h = Stencil::zeros(dims);
+        let mut h = Stencil::zeros_in(dims, &self.pool);
         let factor = 2.0 / (ev.n_mask.max(1) * (m.max(2) - 1)) as f64;
         for (p, &tp) in types.iter().enumerate() {
             for (q, &tq) in types.iter().enumerate() {
-                let w: Vec<f64> = weights.iter().map(|x| x[p * nt + q] * factor).collect();
+                let w: Vec<f64> = weights.chunks(nn).map(|x| x[p * nt + q] * factor).collect();
                 if w.iter().all(|&x| x == 0.0) {
                     continue;
                 }
                 let dp = |a: usize| usize::from(tp == a + 1);
                 let dq = |a: usize| usize::from(tq == a + 1);
-                h.add_weighted(
+                h.add_weighted_in(
                     &w,
                     self.nt,
                     std::array::from_fn(|a| &self.basis[a][dp(a)]),
                     std::array::from_fn(|a| &self.basis[a][dq(a)]),
+                    &self.pool,
                 );
+                self.pool.give(w);
             }
         }
+        self.pool.give(weights);
         if self.lambda != 0.0 {
             let reg = match (&self.reg_mm, self.membrane_hessian_mm) {
                 (Some(r), true) => r,

@@ -22,6 +22,7 @@ pub mod images;
 pub mod minimise;
 pub mod model;
 pub mod movement;
+pub mod pool;
 pub mod spline;
 pub mod stencil;
 pub mod vb;

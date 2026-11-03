@@ -26,3 +26,15 @@ oracle-output cache, and every run goes in a memory box
   multiply-adds of the FMA build): both tables found as one block each in Ubuntu 22.04's
   libm.so.6 (2026-11-03). The function itself: `crates-nc/larmorx-nc-core/tools/libm-verify`
   (0 of 10 million differ from `powf@GLIBC_2.2.5`).
+
+## fslstats in both D13 modes
+
+- `stats_modes.py [pattern] [v]`: for the `fsl-stats-replica` cases whose name holds `pattern`
+  (default `d13/`), runs the replica in `reproduce` and `fix` mode and prints the exit statuses,
+  whether the output changes and the defects named (`v`: both outputs). It showed which cases
+  reach FSL-181 to FSL-189 (`docs/findings/fsl-maths.md`).
+- `goodvoxels_stats_modes.py`: fMRIPrep's four goodvoxels fslstats calls (`-M`, `-S`) on FSL's
+  own chain, in both modes: the same numbers, no defect named.
+
+Run boxed, with the replica built and the suite's inputs made:
+`scripts/orchestration/boxed.sh 4 python -P validation/investigations/fsl-maths/stats_modes.py`.

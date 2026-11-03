@@ -9,7 +9,7 @@ reproduces the original copyright and MIT notice.
 
 | larmorx | CORE-MATH file (sha256) | Verification |
 |---|---|---|
-| `math/exp.rs` | `src/binary64/exp/exp.c` (`8585fca6a7af…`) | 0 mismatches against mpmath on 2.68 M inputs (all 1.13 M of `exp.wc`); bit-identical to the C built with and without FMA contraction |
+| `math/exp.rs` | `src/binary64/exp/exp.c` (`8585fca6a7af…`) | 0 mismatches against mpmath on 2.68 M inputs (all 1.13 M of `exp.wc`); bit-identical to the C built with and without FMA contraction. `exp_in_place` (added 2026-11-03, larmorx's own: the fast path's operations four values at a time for vectorisation, `exp` for the rest) gives `exp`'s bits on 1.8 M tested inputs, both builds |
 | `math/sin.rs` | `src/binary64/sin/sin.c` (`cd772a06d75d…`) | 0 mismatches against mpmath (precision ≥ 1184 bits) on about 10.5 M inputs (all of `sin.wc` and `cos.wc` at ±x, random, tiny, huge, multiples of π/2); bit-identical to the C |
 | `math/cos.rs` | `src/binary64/cos/cos.c` (`04bffbc8b483…`) | as for `sin` |
 | `math/powf.rs` | `src/binary32/pow/powf.c` | bit-identical to the C (built with gcc 11, `-ffp-contract=off`) on 1.5 M random inputs and on all 460,475 cases of `powf.wc` |

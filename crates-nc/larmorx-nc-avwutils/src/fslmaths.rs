@@ -45,6 +45,8 @@ use larmorx_nc_core::volume::{self, Elem, FslError, SaveError, SaveOptions, Volu
 
 use crate::usage;
 
+mod stats;
+
 /// How the program runs: FSL's environment settings and D13's mode.
 pub struct Run<'a> {
     pub fsl: &'a Settings,
@@ -352,22 +354,7 @@ fn dispatch(t: i16, a: &Args, output_dt: i16, ctx: &mut Ctx) -> Res<u8> {
 }
 
 /// The operations of later sub-tasks (refused until they are translated).
-const NOT_YET: &[&str] = &[
-    "-roc",
-    "-pval",
-    "-pval0",
-    "-cpval",
-    "-ztop",
-    "-ptoz",
-    "-rank",
-    "-ranknorm",
-    "-tfce_minT",
-    "-tfce_delta",
-    "-tfce",
-    "-tfceS",
-    "-roi",
-    "-bptf",
-];
+const NOT_YET: &[&str] = &["-roc", "-tfce_minT", "-tfce_delta", "-tfce", "-tfceS"];
 
 fn read4d<T: Arith>(ctx: &Ctx, name: &str) -> Result<Volume<T>, FslError> {
     Ok(volume::read_volume4d::<T>(name, ctx.run.fsl)?.0)
@@ -685,9 +672,26 @@ fn input_parser<T: Arith>(a: &Args, output_dt: i16, ctx: &mut Ctx) -> Res<u8> {
         let op = argv[i].as_str();
         let b = op.as_bytes();
         if b.len() >= 2 && b[1].is_ascii_uppercase() && b[0] == b'-' {
-            return Err(not_yet(ctx, op));
+            if let Some(code) = stats::reduce(ctx, &mut input, argv, &mut i)? {
+                return Ok(code);
+            }
+            i += 1;
+            continue;
         }
         match op {
+            "-pval" | "-pval0" => stats::pval(ctx, &mut input, op == "-pval0", op),
+            "-cpval" => stats::cpval(ctx, &mut input),
+            "-ztop" => stats::ztop(ctx, &mut input),
+            "-ptoz" => stats::ptoz(ctx, &mut input),
+            "-rank" | "-ranknorm" => stats::rank(ctx, &mut input, op == "-ranknorm")?,
+            "-roi" => {
+                stats::roi(ctx, &mut input, argv, i)?;
+                i += 8;
+            }
+            "-bptf" => {
+                stats::bptf(ctx, &mut input, argv, i)?;
+                i += 2;
+            }
             "-mas" => {
                 i += 1;
                 let name = string_arg(ctx, argv, i)?;

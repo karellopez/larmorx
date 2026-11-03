@@ -30,7 +30,9 @@
 //!   `dilall`) and convolutions (`generic_convolve`) for every element type, as fslmaths uses
 //!   them; [`kissfft`]: Armadillo's FFT engine and newimage's 3D FFT convolution.
 //! - [`stats`]: newimage's masked sums and means (in FSL's blocks), percentiles, `threshold`
-//!   and `binarise`, as FAST uses them.
+//!   and `binarise`, as FAST uses them; [`vstats`]: newimage's statistics of all the values of
+//!   a volume (sums, extrema with their indices, mean, variance, percentiles) for every element
+//!   type, as fslmaths and fslstats use them; [`cprob`]: fsl-cprob's probability functions.
 //! - [`splinterpolator`], [`interp_partial`], [`warpfns`]: miscmaths' B-spline interpolator
 //!   (orders 0 to 7, one to five dimensions, first derivatives), newimage's interpolation with
 //!   extrapolation parameters and partial derivatives, fsl-warpfns' resampling through affine
@@ -85,6 +87,7 @@ pub mod stats;
 pub mod stdsort;
 pub mod volops;
 pub mod volume;
+pub mod vstats;
 pub mod warpfns;
 pub mod x87;
 

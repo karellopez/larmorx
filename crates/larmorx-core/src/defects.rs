@@ -537,7 +537,7 @@ defects! {
     FSL_152 = "FSL-152", "fslmaths", true,
         "-thr, -thrp, -thrP, -uthr, -uthrp, -uthrP, -bin, -binv and -mas bound their range by the image's maximum plus 1 (or minimum minus 1), which wraps around under -dt char and int and rounds back to the maximum for values from 2^24 (and infinity): the largest (or smallest) voxels are zeroed";
     FSL_153 = "FSL-153", "fslmaths", true,
-        "a NaN first voxel makes the image's minimum and maximum NaN: -thr, -uthr, -bin, -binv and -mas then zero every voxel, and -range writes a NaN display range; NaN voxels also count in the lowest bin of the robust range of -thrp, -thrP, -uthrp and -uthrP";
+        "a NaN first voxel makes the image's minimum and maximum NaN: -thr, -uthr, -bin, -binv and -mas then zero every voxel, and -range writes a NaN display range; NaN voxels also count in the lowest bin of the robust range of -thrp, -thrP, -uthrp and -uthrP; along a dimension (-Tmax, -Tmin, -Tmaxn and their X, Y and Z forms) a NaN first value makes the maximum and minimum NaN and the index of the maximum 0, while NaN values elsewhere are left out";
     FSL_155 = "FSL-155", "fslmaths", true,
         "-dt input on an image stored as int8, uint16, uint32, int64, uint64 or float128 computes nothing, writes no output and exits with status 0";
     FSL_156 = "FSL-156", "fslmaths", true,
@@ -551,7 +551,7 @@ defects! {
     FSL_161 = "FSL-161", "fslmaths", true,
         "-kernel and -s accept a kernel without voxels (a size of 0 or below along an axis, a negative sigma or radius, or an unknown kernel type) and filter with it: the dilations, erosions and median leave the image as it is, -fmean and -fmeanu make it NaN or 0, -s makes it 0, with the message ERROR:: Empty mask image";
     FSL_162 = "FSL-162", "fslmaths", true,
-        "-fmedian, and -dilD at a zero voxel, stop the program (an uncaught exception: sort(): detected NaN) when a NaN lies under the kernel, instead of filtering the other values";
+        "-fmedian, and -dilD at a zero voxel, stop the program (an uncaught exception: sort(): detected NaN) when a NaN lies under the kernel, instead of filtering the other values; -rank and -ranknorm stop it the same way at a voxel whose time series holds a NaN, instead of ranking the other values";
     FSL_163 = "FSL-163", "fslmaths", true,
         "-subsamp2 and -subsamp2offc of a 4D image stop the program (an uncaught exception: 3D only method called by higher-dimensional volume), except -subsamp2offc of even sizes, which keeps the first volume only";
     FSL_164 = "FSL-164", "fslmaths", true,
@@ -560,6 +560,18 @@ defects! {
         "-fillh and -fillh26 of an image with a size of 1 along an axis (a single slice) crash (an integer division by zero in the test for the image's edge)";
     FSL_166 = "FSL-166", "fslmaths", true,
         "-tensor_decomp stops the program (an uncaught exception: Mat::operator(): index out of bounds) at a voxel whose tensor holds a NaN or an infinite value, instead of leaving that voxel at 0";
+    FSL_167 = "FSL-167", "fslmaths", true,
+        "the standard deviation along a dimension (-Tstd, -Xstd, -Ystd, -Zstd) and -ranknorm's take the variance as (n / (n - 1)) (mean of squares - squared mean) without the clamp at 0 and the guard for one value that the masked variance has: a nearly constant series whose variance rounds below 0 gives NaN, and a dimension of size 1 (-Tstd of a 3D image) gives NaN instead of 0";
+    FSL_168 = "FSL-168", "fslmaths", true,
+        "the percentiles along a dimension (-Tmedian, -Tperc and their X, Y and Z forms) sort values holding NaN with a comparison NaN breaks: the order is not sorted, so the value taken is arbitrary, and the sort can read and write outside the values (a crash)";
+    FSL_169 = "FSL-169", "fslmaths", true,
+        "-pval, -pval0 and -cpval with NaN statistics: a NaN statistic gets a p-value (the smallest, 1/T, from -pval; 0 from -cpval), a NaN permutation value counts as smaller than the statistic, and -cpval's maximum of each permutation volume is the maximum of the voxels after its last NaN in storage order";
+    FSL_170 = "FSL-170", "fslmaths", true,
+        "-ztop of an infinite z gives NaN instead of 0 (for +inf) or 1 (for -inf)";
+    FSL_171 = "FSL-171", "fslmaths", true,
+        "-bptf with a sigma whose filter half-width is not a valid int (+inf, or a sigma above about 3.6e8 volumes for the high-pass, 5.4e7 for the low-pass): either filter crashes or stops the program (an uncaught exception: std::bad_array_new_length)";
+    FSL_172 = "FSL-172", "fslmaths", true,
+        "-ptoz of a p-value so small that 1 - p rounds to 1 (below about 1.1e-16) gives an infinite z and prints ndtri domain error for each such voxel, instead of the z of that p-value";
     ITK_50 = "ITK-50", "ITK", true,
         "KdTreeBasedKmeansEstimator never counts the point a k-d tree node is split at when it divides the node between centres: those points are left out of the pass's new centres";
     ITK_51 = "ITK-51", "ITK", true,

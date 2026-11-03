@@ -26,9 +26,11 @@
 use std::collections::VecDeque;
 
 use crate::arma;
+use crate::cnum;
+use crate::glibc_double;
 use crate::glibc_float;
 use crate::nifti::dt;
-use crate::sse;
+use crate::sse::{self, S64};
 use crate::stats;
 use crate::stdsort;
 use crate::volops::{Arith, Op};
@@ -1308,6 +1310,179 @@ pub fn fill_holes<T: Arith>(im: &[T], dims: [i64; 3], connectivity: i32, planar:
         .zip(&labels)
         .map(|(&v, l)| if edge.contains(l) { v } else { T::from_int(1) })
         .collect()
+}
+
+// ------------------------------------------------------------------------------------------------
+// Temporal filtering (fslmaths' -bptf)
+
+/// What `bandpass_temporal_filter` meets before filtering, from the half-widths of its two
+/// filters (`(int)(hp_sigma * 3)` and `(int)(lp_sigma * 20) + 2`, x86-64's conversions and
+/// wrapping `int` arithmetic).
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum BptfStop {
+    /// The weights' array has a negative length (`2m + 1` wraps around): `new double[]` throws
+    /// `std::bad_array_new_length`.
+    BadLength,
+    /// A half-width below 0 (`(int)` of an infinite sigma, or of one beyond int's range, is the
+    /// most negative int): the weights' pointer is moved outside its array and FSL crashes
+    /// (a segmentation fault, measured for both filters).
+    Crash,
+}
+
+/// The half-widths `(hp, lp)` of `bandpass_temporal_filter`'s masks (0 for a sigma at or below
+/// 0, and for NaN, which neither filter then uses).
+pub fn bptf_half_widths(hp_sigma: f64, lp_sigma: f64) -> (i32, i32) {
+    let hp = if hp_sigma <= 0.0 || hp_sigma.is_nan() {
+        0
+    } else {
+        cnum::f64_to_i32(hp_sigma * 3.0)
+    };
+    let lp = if lp_sigma <= 0.0 || lp_sigma.is_nan() {
+        0
+    } else {
+        cnum::f64_to_i32(lp_sigma * 20.0).wrapping_add(2)
+    };
+    (hp, lp)
+}
+
+/// Whether FSL stops before filtering with these half-widths (a filter that runs: its sigma
+/// above 0).
+pub fn bptf_stop(hp_sigma: f64, lp_sigma: f64) -> Option<BptfStop> {
+    let (hm, lm) = bptf_half_widths(hp_sigma, lp_sigma);
+    for (on, m) in [(hp_sigma > 0.0, hm), (lp_sigma > 0.0, lm)] {
+        if !on {
+            continue;
+        }
+        if m.wrapping_add(m).wrapping_add(1) < 0 {
+            return Some(BptfStop::BadLength);
+        }
+        if m < 0 {
+            return Some(BptfStop::Crash);
+        }
+    }
+    None
+}
+
+/// `exp(-0.5 * (double)(t * t) / (sigma * sigma))` with `t * t` in wrapping int arithmetic.
+fn bptf_weight(t: i32, sigma: f64) -> f64 {
+    glibc_double::exp(-0.5 * f64::from(t.wrapping_mul(t)) / (sigma * sigma))
+}
+
+/// newimagefns' `bandpass_temporal_filter(source, hp_sigma, lp_sigma)` (sigmas in volumes):
+/// for each voxel's time series in double, the high-pass (a non-linear filter: at each time
+/// point the line fitted by Gaussian-weighted least squares over `±(int)(3 hp_sigma)` points is
+/// subtracted, its first value added back, then the series demeaned) and the Gaussian low-pass
+/// over `±((int)(20 lp_sigma) + 2)` points (weights normalised by their total, then by the sum
+/// of the weights inside the series); each value written back with `conv` (`(T) array[t]`).
+/// A sigma at or below 0 (or NaN) skips its filter. The caller checks [`bptf_stop`] first. The
+/// weights are computed for the offsets the series reach only (FSL fills arrays of `2m + 1`),
+/// and the low-pass total over all `2m + 1` in FSL's order.
+pub fn bandpass_temporal_filter<T: Arith>(
+    source: &Volume<T>,
+    hp_sigma: f64,
+    lp_sigma: f64,
+    conv: &mut impl FnMut(f64) -> T,
+) -> Volume<T> {
+    let (hm, lm) = bptf_half_widths(hp_sigma, lp_sigma);
+    let nt = source.tsize().max(0) as i32;
+    let nvox = source.nvoxels().max(0) as usize;
+    let mut result = source.clone();
+    // the weights at the offsets a series reaches (|dt| <= min(m, nt - 1))
+    let reach = |m: i32| if m < 0 { 0 } else { m.min((nt - 1).max(0)) };
+    let hp_w: Vec<f64> = if hp_sigma > 0.0 {
+        let r = reach(hm);
+        (-r..=r).map(|t| bptf_weight(t, hp_sigma)).collect()
+    } else {
+        Vec::new()
+    };
+    let lp_w: Vec<f64> = if lp_sigma > 0.0 {
+        let mut total = S64(0.0);
+        if lm >= 0 {
+            for t in -lm..=lm {
+                total += bptf_weight(t, lp_sigma);
+            }
+        }
+        let r = reach(lm);
+        (-r..=r)
+            .map(|t| sse::div_f64(bptf_weight(t, lp_sigma), total.0))
+            .collect()
+    } else {
+        Vec::new()
+    };
+    let hr = reach(hm);
+    let lr = reach(lm);
+    let mut array = vec![0f64; nt as usize];
+    let mut array2 = vec![0f64; nt as usize];
+    for v in 0..nvox {
+        for t in 0..nt as usize {
+            array[t] = source.data[t * nvox + v].to_f64();
+        }
+        if hp_sigma > 0.0 {
+            let mut done_c0 = false;
+            let mut c0 = 0.0;
+            let mut mean = S64(0.0);
+            for t in 0..nt {
+                let (mut a, mut b, mut c, mut d, mut n) =
+                    (S64(0.0), S64(0.0), S64(0.0), S64(0.0), S64(0.0));
+                let lo = t.wrapping_sub(hm).max(0);
+                let hi = t.wrapping_add(hm).min(nt - 1);
+                let mut tt = lo;
+                while tt <= hi {
+                    let dt = tt - t;
+                    let w = S64(hp_w[(dt + hr) as usize]);
+                    let x = array[tt as usize];
+                    a += w * f64::from(dt);
+                    b += w * x;
+                    c += w * f64::from(dt) * f64::from(dt);
+                    d += w * f64::from(dt) * x;
+                    n += w;
+                    tt += 1;
+                }
+                let tmpdenom = c * n - a * a;
+                array2[t as usize] = if tmpdenom.0 != 0.0 {
+                    let cc = (b * c - a * d) / tmpdenom;
+                    if !done_c0 {
+                        c0 = cc.0;
+                        done_c0 = true;
+                    }
+                    (S64(c0) + array[t as usize] - cc).0
+                } else {
+                    array[t as usize]
+                };
+                mean += array2[t as usize];
+            }
+            let mean = mean / f64::from(nt);
+            for t in 0..nt as usize {
+                array2[t] = sse::sub_f64(array2[t], mean.0);
+            }
+            array.copy_from_slice(&array2);
+        }
+        if lp_sigma > 0.0 {
+            for t in 0..nt {
+                let mut total = S64(0.0);
+                let mut sum = S64(0.0);
+                let lo = t.wrapping_sub(lm).max(0);
+                let hi = t.wrapping_add(lm).min(nt - 1);
+                let mut tt = lo;
+                while tt <= hi {
+                    let w = lp_w[(tt - t + lr) as usize];
+                    total += S64(array[tt as usize]) * w;
+                    sum += w;
+                    tt += 1;
+                }
+                array2[t as usize] = if sum.0 > 0.0 {
+                    (total / sum).0
+                } else {
+                    total.0
+                };
+            }
+            array.copy_from_slice(&array2);
+        }
+        for t in 0..nt as usize {
+            result.data[t * nvox + v] = conv(array[t]);
+        }
+    }
+    result
 }
 
 // ------------------------------------------------------------------------------------------------

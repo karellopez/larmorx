@@ -15,7 +15,11 @@
 //!   scaled `erfc` times `expx2`'s accurate `exp(-x^2/2)`), with [`erf`] and [`erfc`].
 
 // Cephes' decimal constants are kept as written (the compiler rounds them as FSL's did).
-#![allow(clippy::excessive_precision, clippy::unreadable_literal)]
+#![allow(
+    clippy::excessive_precision,
+    clippy::unreadable_literal,
+    clippy::approx_constant
+)]
 
 use crate::glibc_double;
 use crate::sse;

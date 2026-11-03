@@ -75,7 +75,9 @@ def cprob_values(rng) -> np.ndarray:
     p_float = rng.random(40000).astype(np.float32).astype(float)
     tails = 10.0 ** rng.uniform(-320, -1, 20000)
     upper = 1 - 10.0 ** rng.uniform(-16, -1, 10000)
-    ranks = np.concatenate([(np.arange(1, n + 1) - 0.5) / n for n in (1, 2, 3, 7, 10, 64, 150, 601)])
+    ranks = np.concatenate(
+        [(np.arange(1, n + 1) - 0.5) / n for n in (1, 2, 3, 7, 10, 64, 150, 601)]
+    )
     drand = rng.random(20000)
     return np.concatenate(
         [edges, special, z_float, wide, p_float, tails, upper, ranks, drand]

@@ -107,7 +107,7 @@ def inputs() -> Path:
     """The synthetic inputs, made once (seeded; the same bytes every time)."""
     ws = workspace()
     base = (ws / "oracles" / "inputs" if ws else Path(tempfile.gettempdir())) / SUITE
-    marker = base / "v5.done"
+    marker = base / "v6.done"
     if marker.exists():
         return base
     base.mkdir(parents=True, exist_ok=True)
@@ -296,6 +296,62 @@ def _make_inputs(d: Path) -> None:
     tensornan = tensor.copy()
     tensornan[3, 2, 1, 4] = np.nan
     _save(d / "tensornan.nii.gz", tensornan, dtype=np.float32, affine=_affine(tsh))
+    # v6 (sub-task 3): time series for the reductions along a dimension, the statistics, -roi
+    # and -bptf; permutation statistics; z and p maps
+    ssh = (6, 5, 4, 9)
+    ts = (rng.standard_normal(ssh) * 10 + 100).astype(np.float32)
+    ts[0, 0, 0, :] = 7.0  # constant
+    ts[3, 0, 0, :] = [1, 2, 2, 3, 1, 5, 2, 0, 3]  # ties
+    ts[5, 0, 0, 3], ts[5, 0, 0, 5] = -0.0, 0.0  # signed zeros
+    ts[5, 0, 0, [0, 1, 2, 4, 6, 7, 8]] = [1, 2, 3, 4, 5, 6, 7]
+    tsc = ts.copy()
+    _save(d / "tsc.nii.gz", tsc, dtype=np.float32, affine=_affine(ssh))
+    ts[1, 0, 0, 0] = np.nan  # NaN first value
+    ts[2, 0, 0, 4] = np.nan  # NaN inside
+    ts[4, 0, 0, :] = np.nan  # all NaN
+    ts[1, 2, 3, [2, 6]] = np.nan
+    _save(d / "ts.nii.gz", ts, dtype=np.float32, affine=_affine(ssh))
+    _save(d / "tsd.nii.gz", tsc.astype(np.float64) / 3, dtype=np.float64, affine=_affine(ssh))
+    _save(d / "tss.nii.gz", np.round(tsc * 3 - 250).astype(np.int16), dtype=np.int16)
+    tsi = rng.integers(-60000, 60000, ssh).astype(np.int32)
+    _save(d / "tsi.nii.gz", tsi, dtype=np.int32, affine=_affine(ssh))
+    # nearly constant series of 48 values whose variance rounds below 0 (FSL-167), a constant
+    # one and random ones
+    tsvar = (rng.standard_normal((2, 2, 1, 48)) * 3 + 50).astype(np.float32)
+    for (x, y), base, k in (((0, 0), 445631.21875, 12), ((1, 1), 988971.1875, 29)):
+        tsvar[x, y, 0, :] = np.float32(base)
+        tsvar[x, y, 0, k] = np.nextafter(np.float32(base), np.float32(np.inf))
+    tsvar[0, 1, 0, :] = 3.5
+    _save(d / "tsvar.nii.gz", tsvar, dtype=np.float32, affine=_affine((2, 2, 1)))
+    stsh = (5, 4, 3, 10)
+    stat = rng.standard_normal(stsh).astype(np.float32)
+    stat[..., 0] += np.float32(1.5)
+    _save(d / "stat.nii.gz", stat, dtype=np.float32, affine=_affine(stsh))
+    stat0 = stat.copy()
+    stat0[rng.random(stsh) < 0.3] = 0.0
+    stat0[0, 0, 0, 0] = 0.0
+    _save(d / "stat0.nii.gz", stat0, dtype=np.float32, affine=_affine(stsh))
+    statnan = stat.copy()
+    statnan[1, 1, 1, 0] = np.nan  # a NaN statistic
+    statnan[2, 2, 2, 3] = np.nan  # a NaN permutation value
+    statnan[4, 3, 2, 7] = np.nan
+    _save(d / "statnan.nii.gz", statnan, dtype=np.float32, affine=_affine(stsh))
+    _save(d / "statd.nii.gz", stat.astype(np.float64), dtype=np.float64, affine=_affine(stsh))
+    _save(d / "stats16.nii.gz", np.round(stat * 100).astype(np.int16), dtype=np.int16)
+    zmap = (rng.standard_normal(sh) * 4).astype(np.float32)
+    zmap[0, 0, 0], zmap[1, 0, 0], zmap[2, 0, 0], zmap[3, 0, 0] = 40.0, -40.0, np.nan, 0.0
+    zmap[4, 0, 0], zmap[5, 0, 0] = 8.5, -8.5
+    _save(d / "zmap.nii.gz", zmap, dtype=np.float32)
+    zinf = zmap.copy()
+    zinf[6, 0, 0], zinf[6, 1, 0] = np.inf, -np.inf
+    _save(d / "zinf.nii.gz", zinf, dtype=np.float32)
+    pmap = rng.random(sh).astype(np.float32)
+    pmap[0, 0, 0], pmap[1, 0, 0], pmap[2, 0, 0], pmap[3, 0, 0] = 0.0, 1.0, 1.5, -0.2
+    pmap[4, 0, 0], pmap[5, 0, 0], pmap[6, 0, 0] = np.nan, 0.5, 1e-9
+    _save(d / "pmap.nii.gz", pmap, dtype=np.float32)
+    ptiny = pmap.copy()
+    ptiny[0, 1, 0], ptiny[1, 1, 0], ptiny[2, 1, 0], ptiny[3, 1, 0] = 1e-20, 1e-30, 1e-45, 2e-16
+    _save(d / "ptiny.nii.gz", ptiny, dtype=np.float32)
 
 
 # ------------------------------------------------------------------------------------------------
@@ -442,6 +498,205 @@ def _fmriprep_case(payload: tuple[str, str], checks: CheckList) -> None:
             )
         if oracle.code == 0 and replica.code == 0:
             fix_pass(checks, PROGRAM, lambda t: None, args, {}, b, replica, silent_ok=_SILENT)
+    _agree_on_errors(checks, PROGRAM, oracle.code, oracle.stderr)
+
+
+# ------------------------------------------------------------------------------------------------
+# fMRIPrep's goodvoxels mask (--project-goodvoxels)
+
+#: The oracle run whose BOLD series (in T1w space, as fMRIPrep's workflow takes it) the
+#: goodvoxels calls run on.
+GOODVOXELS_RUN = "ds005040-sub-002-noreconall"
+
+#: fMRIPrep 25.2.6's ``init_goodvoxels_bold_mask_wf`` (``workflows/bold/resampling.py``), node by
+#: node in the workflow's order: ``(node, program, arguments)``. ``{node}`` names an earlier
+#: node's output, ``{bold}`` the BOLD series, ``{ribbon}`` the cortical ribbon on its grid; the
+#: numbers are fslstats' printed values as nipype parses them (``float``), written as nipype's
+#: interfaces write them (``BinaryMaths``: ``%.8f``; ``Threshold``: ``%.10f`` of ``mean + 0.5
+#: std``). The output of each fslmaths node is ``<node>.nii.gz``.
+GOODVOXELS_STEPS: tuple[tuple[str, str, tuple[str, ...]], ...] = (
+    ("stdev_volume", "fslmaths", ("{bold}", "-Tstd")),
+    ("mean_volume", "fslmaths", ("{bold}", "-Tmean")),
+    ("cov_volume", "fslmaths", ("{stdev_volume}", "-div", "{mean_volume}")),
+    ("cov_ribbon", "fslmaths", ("{cov_volume}", "-mas", "{ribbon}")),
+    ("cov_ribbon_mean", "fslstats", ("{cov_ribbon}", "-M")),
+    ("cov_ribbon_std", "fslstats", ("{cov_ribbon}", "-S")),
+    ("cov_ribbon_norm", "fslmaths", ("{cov_ribbon}", "-div", "{cov_ribbon_mean:.8f}")),
+    ("smooth_norm", "fslmaths", ("{cov_ribbon_norm}", "-bin", "-s", "5")),
+    (
+        "cov_ribbon_norm_smooth",
+        "fslmaths",
+        ("{cov_ribbon_norm}", "-s", "5", "-div", "{smooth_norm}", "-dilD"),
+    ),
+    ("cov_norm", "fslmaths", ("{cov_volume}", "-div", "{cov_ribbon_mean:.8f}")),
+    ("cov_norm_modulate", "fslmaths", ("{cov_norm}", "-div", "{cov_ribbon_norm_smooth}")),
+    ("cov_norm_modulate_ribbon", "fslmaths", ("{cov_norm_modulate}", "-mas", "{ribbon}")),
+    ("mod_ribbon_mean", "fslstats", ("{cov_norm_modulate_ribbon}", "-M")),
+    ("mod_ribbon_std", "fslstats", ("{cov_norm_modulate_ribbon}", "-S")),
+    ("bin_mean_volume", "fslmaths", ("{mean_volume}", "-bin")),
+    ("goodvoxels_thr", "fslmaths", ("{cov_norm_modulate}", "-thr", "{upper_thresh:.10f}")),
+    (
+        "goodvoxels_mask",
+        "fslmaths",
+        ("{goodvoxels_thr}", "-bin", "-sub", "{bin_mean_volume}", "-mul", "-1"),
+    ),
+    ("goodvoxels_ribbon_mask", "fslmaths", ("{goodvoxels_mask}", "-mas", "{ribbon}")),
+)
+
+
+def _goodvoxels_sources(run: str) -> tuple[Path, Path] | None:
+    """The run's BOLD series in T1w space and its anatomical segmentation (``dseg``)."""
+    ws = workspace()
+    if ws is None:
+        return None
+    out = ws / FMRIPREP_RUNS / run / "out"
+    bold = next(iter(sorted(out.glob("sub-*/**/func/*_space-T1w_desc-preproc_bold.nii.gz"))), None)
+    dseg = next(iter(sorted(out.glob("sub-*/**/anat/sub-*_dseg.nii.gz"))), None)
+    if bold is None or dseg is None:
+        return None
+    return bold, dseg
+
+
+def _ribbon(bold: Path, dseg: Path, path: Path) -> None:
+    """A stand-in for the cortical ribbon on the BOLD series' grid (the no-reconall runs have no
+    FreeSurfer ribbon): the segmentation's grey matter (label 1, BIDS' order GM, WM, CSF) taken
+    at each BOLD voxel's centre (nearest neighbour), as uint8."""
+    import nibabel as nib
+
+    b = nib.load(str(bold))
+    g = nib.load(str(dseg))
+    lab = np.asarray(g.dataobj)
+    ijk = np.indices(b.shape[:3]).reshape(3, -1).T
+    xyz = ijk @ b.affine[:3, :3].T + b.affine[:3, 3]
+    src = np.rint((xyz - g.affine[:3, 3]) @ np.linalg.inv(g.affine[:3, :3]).T).astype(int)
+    inside = np.all((src >= 0) & (src < np.array(lab.shape)), axis=1)
+    rib = np.zeros(len(ijk), dtype=np.uint8)
+    s = src[inside]
+    rib[inside] = (lab[s[:, 0], s[:, 1], s[:, 2]] == 1).astype(np.uint8)
+    img = nib.Nifti1Image(rib.reshape(b.shape[:3]), b.affine)
+    img.set_sform(b.affine, 1)
+    img.set_qform(b.affine, 1)
+    nib.save(img, str(path))
+
+
+def _stats_run(args: list[str], *, cwd: Path):
+    """FSL's fslstats with ``args`` in ``cwd``, through the oracle-output cache."""
+    from larmorx_validation import oracle_cache
+
+    return oracle_cache.run(
+        [str(fsldir() / "bin" / "fslstats"), *args],
+        env=_environment({}),
+        cwd=cwd,
+        outputs=[cwd],
+        policy=oracle_cache.Policy(threads=1, family="fsl"),
+        runner=SUITE,
+        inputs=[p for p in sorted(cwd.rglob("*")) if p.is_file()],
+        timeout=600,
+    )
+
+
+def _goodvoxels_chain(run: str) -> Path | None:
+    """FSL's goodvoxels chain on ``run``, made once (each node in its own directory under
+    ``oracles/inputs/fsl-maths-replica/goodvoxels/<run>/``, its inputs copied in, FSL through the
+    oracle-output cache); ``values.json`` holds fslstats' numbers. Locked, so parallel cases
+    wait for the first."""
+    import fcntl
+    import json
+
+    src = _goodvoxels_sources(run)
+    if src is None:
+        return None
+    base = inputs() / "goodvoxels" / run
+    done = base / "chain-v1.done"
+    if done.exists():
+        return base
+    base.mkdir(parents=True, exist_ok=True)
+    with open(base.parent / f"{run}.lock", "w", encoding="utf-8") as lock:
+        fcntl.flock(lock, fcntl.LOCK_EX)
+        if done.exists():
+            return base
+        bold, dseg = src
+        files = {"bold": bold, "ribbon": base / "ribbon.nii.gz"}
+        if not files["ribbon"].exists():
+            _ribbon(bold, dseg, files["ribbon"])
+        values: dict[str, float] = {}
+        for node, program, template in GOODVOXELS_STEPS:
+            d = base / node
+            shutil.rmtree(d, ignore_errors=True)
+            d.mkdir()
+            args = _goodvoxels_args(template, files, values, d)
+            if program == "fslstats":
+                p = _stats_run(args, cwd=d)
+                assert p.returncode == 0, p.stderr
+                values[node] = float(p.stdout.split()[0])
+                if node == "mod_ribbon_std":
+                    values["upper_thresh"] = values["mod_ribbon_mean"] + values[node] * 0.5
+            else:
+                p = oracle_run([*args, f"{node}.nii.gz"], cwd=d, settings={})
+                assert p.returncode == 0, p.stderr
+                files[node] = d / f"{node}.nii.gz"
+        (base / "values.json").write_text(json.dumps(values, indent=1) + "\n", encoding="utf-8")
+        done.write_text("1\n", encoding="utf-8")
+    return base
+
+
+def _goodvoxels_args(
+    template: tuple[str, ...], files: dict[str, Path], values: dict[str, float], d: Path
+) -> list[str]:
+    """A node's arguments: the images it reads copied into ``d`` under their own names, the
+    numbers formatted as nipype formats them."""
+    out = []
+    for a in template:
+        if a.startswith("{") and a.endswith("}"):
+            key, _, fmt = a[1:-1].partition(":")
+            if key in files:
+                name = "bold.nii.gz" if key == "bold" else files[key].name
+                if not (d / name).exists():
+                    shutil.copy(files[key], d / name)
+                out.append(name)
+            else:
+                out.append(format(values[key], fmt))
+        else:
+            out.append(a)
+    return out
+
+
+def goodvoxels_cases() -> list[tuple[str, str]]:
+    """``(run, node)`` of each fslmaths call of the goodvoxels workflow."""
+    if _goodvoxels_sources(GOODVOXELS_RUN) is None:
+        return []
+    return [(GOODVOXELS_RUN, n) for n, prog, _ in GOODVOXELS_STEPS if prog == "fslmaths"]
+
+
+def _goodvoxels_case(payload: tuple[str, str], checks: CheckList) -> None:
+    import json
+
+    run, node = payload
+    base = _goodvoxels_chain(run)
+    if base is None:
+        raise Outcome("skipped", f"the oracle run {run} is not available")
+    values = json.loads((base / "values.json").read_text(encoding="utf-8"))
+    files = {"bold": _goodvoxels_sources(run)[0], "ribbon": base / "ribbon.nii.gz"}
+    for n, prog, _ in GOODVOXELS_STEPS:
+        if prog == "fslmaths":
+            files[n] = base / n / f"{n}.nii.gz"
+    template = next(t for n, _, t in GOODVOXELS_STEPS if n == node)
+    with (
+        tempfile.TemporaryDirectory(prefix="lx-nc-maths-gv-") as a_,
+        tempfile.TemporaryDirectory(prefix="lx-nc-maths-gv-") as b_,
+    ):
+        a, b = Path(a_), Path(b_)
+        args = [*_goodvoxels_args(template, files, values, a), f"{node}.nii.gz"]
+        _goodvoxels_args(template, files, values, b)
+        oracle = run_oracle(args, cwd=a, settings={})
+        replica = run_replica(PROGRAM, args, cwd=b, settings={}, mode=defects.REPRODUCE)
+        compare(checks, PROGRAM, oracle, replica, a, b)
+        if oracle.code == 0 and replica.code == 0:
+
+            def prepare(t: Path) -> None:
+                _goodvoxels_args(template, files, values, t)
+
+            fix_pass(checks, PROGRAM, prepare, args, {}, b, replica, silent_ok=_SILENT)
     _agree_on_errors(checks, PROGRAM, oracle.code, oracle.stderr)
 
 
@@ -765,6 +1020,7 @@ def _cases() -> dict[str, tuple[str, str, Run]]:
         ),
     }
     c.update(_filter_cases())
+    c.update(_dim_cases())
     return c
 
 
@@ -1158,6 +1414,253 @@ def _filter_cases() -> dict[str, tuple[str, str, Run]]:
     }
 
 
+def _dim_cases() -> dict[str, tuple[str, str, Run]]:
+    """Sub-task 3: the reductions along a dimension, the statistics, -roi and -bptf (one case
+    per path)."""
+    S, T = "smoke", "standard"
+    TS, TSC = "@ts", "@tsc"
+    c: dict[str, tuple[str, str, Run]] = {
+        "dim/Tmean": (S, "-Tmean", _r(TSC, "-Tmean", "out")),
+        "dim/Tstd": (T, "-Tstd", _r(TSC, "-Tstd", "out")),
+        "dim/Tmax": (T, "-Tmax", _r(TSC, "-Tmax", "out")),
+        "dim/Tmin": (T, "-Tmin", _r(TSC, "-Tmin", "out")),
+        "dim/Tmaxn": (T, "-Tmaxn (ties: the first index)", _r(TSC, "-Tmaxn", "out")),
+        "dim/Tmedian": (T, "-Tmedian (ties, signed zeros)", _r(TSC, "-Tmedian", "out")),
+        "dim/Tperc": (T, "-Tperc 30", _r(TSC, "-Tperc", "30", "out")),
+        "dim/Tperc-0": (T, "-Tperc 0", _r(TSC, "-Tperc", "0", "out")),
+        "dim/Tperc-100": (T, "-Tperc 100", _r(TSC, "-Tperc", "100", "out")),
+        "dim/Tar1": (T, "-Tar1", _r(TSC, "-Tar1", "out")),
+        "dim/Tmean-nan": (T, "-Tmean of series holding NaN", _r(TS, "-Tmean", "out")),
+        "dim/Tar1-nan": (T, "-Tar1 of series holding NaN", _r(TS, "-Tar1", "out")),
+        "dim/Xmean": (T, "-Xmean", _r(TSC, "-Xmean", "out")),
+        "dim/Ymax": (T, "-Ymax", _r(TSC, "-Ymax", "out")),
+        "dim/Zstd": (T, "-Zstd", _r(TSC, "-Zstd", "out")),
+        "dim/Xmaxn": (T, "-Xmaxn", _r(TSC, "-Xmaxn", "out")),
+        "dim/Ymedian": (T, "-Ymedian", _r(TSC, "-Ymedian", "out")),
+        "dim/Zperc": (T, "-Zperc 75", _r(TSC, "-Zperc", "75", "out")),
+        "dim/Xar1": (T, "-Xar1", _r(TSC, "-Xar1", "out")),
+        "dim/Ymin": (T, "-Ymin", _r(TSC, "-Ymin", "out")),
+        "dim/Smean": (T, "-Smean (a capital that reduces nothing)", _r(TSC, "-Smean", "out")),
+        "dim/chain": (
+            T,
+            "-Tmean then -Xmax then -add",
+            _r(TSC, "-Tmean", "-Xmax", "-add", "1", "out"),
+        ),
+        "dim/unknown": (T, "-Tfoo: an unknown reduction", _r(TSC, "-Tfoo", "out")),
+        "dim/empty": (T, "-T alone", _r(TSC, "-T", "out")),
+        "dim/perc-range": (T, "-Tperc 150 (newimage's exception)", _r(TSC, "-Tperc", "150", "out")),
+        "dim/perc-negative": (T, "-Tperc -5", _r(TSC, "-Tperc", "-5", "out")),
+        "dim/perc-nan": (T, "-Tperc nan", _r(TSC, "-Tperc", "nan", "out")),
+        "dim/perc-no-argument": (
+            T,
+            "-Tperc with the output name as its argument",
+            _r(TSC, "-Tperc", "out"),
+        ),
+        "dim/3d-mean": (T, "-Tmean of a 3D image", _r("@f3", "-Tmean", "out")),
+        "dim/Tmean-short": (
+            T,
+            "-Tmean under -dt short",
+            _r("-dt", "short", "@tss", "-Tmean", "out", "-odt", "short"),
+        ),
+        "dim/Tstd-int": (
+            T,
+            "-Tstd under -dt int",
+            _r("-dt", "int", "@tss", "-Tstd", "out", "-odt", "int"),
+        ),
+        "dim/Tar1-short": (
+            T,
+            "-Tar1 under -dt short",
+            _r("-dt", "short", "@tss", "-Tar1", "out", "-odt", "short"),
+        ),
+        "dim/Tar1-int-large": (
+            T,
+            "-Tar1 under -dt int with products beyond int's range",
+            _r("-dt", "int", "@tsi", "-Tar1", "out"),
+        ),
+        "dim/Tmedian-int": (
+            T,
+            "-Tmedian under -dt int",
+            _r("-dt", "int", "@tsi", "-Tmedian", "out", "-odt", "int"),
+        ),
+        "dim/Tmaxn-short": (
+            T,
+            "-Tmaxn under -dt short",
+            _r("-dt", "short", "@tss", "-Tmaxn", "out", "-odt", "short"),
+        ),
+        "dim/Tstd-double": (T, "-Tstd of a double image", _r("@tsd", "-Tstd", "out")),
+        "dim/Tmedian-double": (T, "-Tmedian of a double image", _r("@tsd", "-Tmedian", "out")),
+        "dim/Tmean-long": (T, "-Tmean of 48 time points", _r("@tsvar", "-Tmean", "out")),
+        # statistics over the time points
+        "stat/pval": (S, "-pval", _r("@stat", "-pval", "out")),
+        "stat/pval0": (T, "-pval0 (zeros left out)", _r("@stat0", "-pval0", "out")),
+        "stat/cpval": (T, "-cpval", _r("@stat", "-cpval", "out")),
+        "stat/cpval-double": (T, "-cpval of a double image", _r("@statd", "-cpval", "out")),
+        "stat/cpval-int": (
+            T,
+            "-cpval under -dt int",
+            _r("-dt", "int", "@stats16", "-cpval", "out"),
+        ),
+        "stat/pval-short": (
+            T,
+            "-pval under -dt short",
+            _r("-dt", "short", "@stats16", "-pval", "out", "-odt", "short"),
+        ),
+        "stat/pval-3d": (T, "-pval of a 3D image", _r("@f3", "-pval", "out")),
+        "stat/ztop": (T, "-ztop (with +-40 and NaN)", _r("@zmap", "-ztop", "out")),
+        "stat/ztop-double": (
+            T,
+            "-ztop in double",
+            _r("-dt", "double", "@zmap", "-ztop", "out", "-odt", "double"),
+        ),
+        "stat/ptoz": (T, "-ptoz (with 0, 1, outside [0, 1] and NaN)", _r("@pmap", "-ptoz", "out")),
+        "stat/ztop-ptoz": (T, "-ztop then -ptoz", _r("@zmap", "-ztop", "-ptoz", "out")),
+        "stat/rank": (T, "-rank (ties, signed zeros)", _r(TSC, "-rank", "out")),
+        "stat/ranknorm": (T, "-ranknorm", _r(TSC, "-ranknorm", "out")),
+        "stat/rank-short": (
+            T,
+            "-rank under -dt short",
+            _r("-dt", "short", "@tss", "-rank", "out", "-odt", "short"),
+        ),
+        "stat/rank-3d": (T, "-rank of a 3D image", _r("@f3", "-rank", "out")),
+        "stat/ranknorm-double": (T, "-ranknorm of a double image", _r("@tsd", "-ranknorm", "out")),
+        # -roi
+        "roi/box": (
+            S,
+            "-roi of a box",
+            _r(TSC, "-roi", "1", "3", "0", "2", "1", "2", "2", "4", "out"),
+        ),
+        "roi/full": (
+            T,
+            "-roi with every size -1",
+            _r(TSC, "-roi", "0", "-1", "0", "-1", "0", "-1", "0", "-1", "out"),
+        ),
+        "roi/neuro": (
+            T,
+            "-roi of a neurological image (x mapped to newimage's order)",
+            _r("@neuro", "-roi", "1", "3", "2", "2", "0", "-1", "0", "1", "out"),
+        ),
+        "roi/outside": (
+            T,
+            "-roi of a box outside the image",
+            _r(TSC, "-roi", "10", "2", "0", "1", "0", "1", "0", "1", "out"),
+        ),
+        "roi/negative-size": (
+            T,
+            "-roi with a size of -3",
+            _r(TSC, "-roi", "4", "-3", "0", "-1", "0", "-1", "0", "-1", "out"),
+        ),
+        "roi/into-output": (
+            T,
+            "-roi with the output name as its last argument",
+            _r("@f3", "-roi", "0", "1", "0", "1", "0", "1", "0", "out"),
+        ),
+        "roi/null": (
+            T,
+            "FSL-158: -roi without its last sizes (reads the null pointer)",
+            _r("@f3", "-roi", "1", "2", "out"),
+        ),
+        # -bptf
+        "bptf/hp": (S, "-bptf 2 -1 (high-pass)", _r(TSC, "-bptf", "2", "-1", "out")),
+        "bptf/lp": (T, "-bptf -1 1.5 (low-pass)", _r(TSC, "-bptf", "-1", "1.5", "out")),
+        "bptf/both": (T, "-bptf 3 0.8", _r(TSC, "-bptf", "3", "0.8", "out")),
+        "bptf/none": (T, "-bptf 0 0", _r(TSC, "-bptf", "0", "0", "out")),
+        "bptf/nan": (T, "-bptf nan nan (both skipped)", _r(TSC, "-bptf", "nan", "nan", "out")),
+        "bptf/wide": (
+            T,
+            "-bptf 100 50 (wider than the series)",
+            _r(TSC, "-bptf", "100", "50", "out"),
+        ),
+        "bptf/3d": (T, "-bptf of a 3D image", _r("@f3", "-bptf", "2", "1", "out")),
+        "bptf/long": (T, "-bptf 5 2 of 48 time points", _r("@tsvar", "-bptf", "5", "2", "out")),
+        "bptf/short": (
+            T,
+            "-bptf under -dt short",
+            _r("-dt", "short", "@tss", "-bptf", "2", "1", "out", "-odt", "short"),
+        ),
+        "bptf/double": (T, "-bptf of a double image", _r("@tsd", "-bptf", "2.5", "1", "out")),
+        "bptf/nan-values": (T, "-bptf of series holding NaN", _r(TS, "-bptf", "2", "1", "out")),
+        "bptf/into-output": (
+            T,
+            "-bptf with the output name as its second sigma",
+            _r(TSC, "-bptf", "2", "out"),
+        ),
+        # D13
+        "d13/Tmax-nan": (T, "FSL-153: -Tmax with a NaN first value", _r(TS, "-Tmax", "out")),
+        "d13/Tmin-nan": (T, "FSL-153: -Tmin with a NaN first value", _r(TS, "-Tmin", "out")),
+        "d13/Tmaxn-nan": (T, "FSL-153: -Tmaxn with a NaN first value", _r(TS, "-Tmaxn", "out")),
+        "d13/Tmedian-nan": (
+            T,
+            "FSL-168: -Tmedian of values holding NaN",
+            _r(TS, "-Tmedian", "out"),
+        ),
+        "d13/Tperc-nan": (
+            T,
+            "FSL-168: -Tperc 80 of values holding NaN",
+            _r(TS, "-Tperc", "80", "out"),
+        ),
+        "d13/Tstd-3d": (T, "FSL-167: -Tstd of a 3D image", _r("@f3", "-Tstd", "out")),
+        "d13/Tstd-negative": (
+            T,
+            "FSL-167: -Tstd of series whose variance rounds below 0",
+            _r("@tsvar", "-Tstd", "out"),
+        ),
+        "d13/ranknorm-negative": (
+            T,
+            "FSL-167: -ranknorm of series whose variance rounds below 0",
+            _r("@tsvar", "-ranknorm", "out"),
+        ),
+        "d13/ranknorm-3d": (T, "FSL-167: -ranknorm of a 3D image", _r("@f3", "-ranknorm", "out")),
+        "d13/rank-nan": (
+            T,
+            "FSL-162: -rank of series holding NaN",
+            _r(TS, "-rank", "out", fixed="FSL-162"),
+        ),
+        "d13/ranknorm-nan": (
+            T,
+            "FSL-162: -ranknorm of series holding NaN",
+            _r(TS, "-ranknorm", "out", fixed="FSL-162"),
+        ),
+        "d13/pval-nan": (T, "FSL-169: -pval with NaN statistics", _r("@statnan", "-pval", "out")),
+        "d13/pval0-nan": (
+            T,
+            "FSL-169: -pval0 with NaN statistics",
+            _r("@statnan", "-pval0", "out"),
+        ),
+        "d13/cpval-nan": (
+            T,
+            "FSL-169: -cpval with NaN statistics",
+            _r("@statnan", "-cpval", "out"),
+        ),
+        "d13/ztop-inf": (T, "FSL-170: -ztop of infinite z", _r("@zinf", "-ztop", "out")),
+        "d13/ptoz-tiny": (
+            T,
+            "FSL-172: -ptoz of p-values whose 1 - p rounds to 1",
+            _r("@ptiny", "-ptoz", "out"),
+        ),
+        "d13/bptf-lp-huge": (
+            T,
+            "FSL-171: -bptf -1 2e8 (FSL crashes)",
+            _r(TSC, "-bptf", "-1", "2e8", "out"),
+        ),
+        "d13/bptf-hp-length": (
+            T,
+            "FSL-171: -bptf 4e8 -1 (std::bad_array_new_length)",
+            _r(TSC, "-bptf", "4e8", "-1", "out"),
+        ),
+        "d13/bptf-lp-length": (
+            T,
+            "FSL-171: -bptf -1 6e7 (std::bad_array_new_length)",
+            _r(TSC, "-bptf", "-1", "6e7", "out"),
+        ),
+        "d13/bptf-hp-inf": (
+            T,
+            "FSL-171: -bptf inf -1 (FSL writes outside its array)",
+            _r(TSC, "-bptf", "inf", "-1", "out", undefined="FSL-171"),
+        ),
+    }
+    return c
+
+
 def cases(tier: str) -> list[Case]:
     from larmorx_validation.parity.harness import in_tier
 
@@ -1179,6 +1682,17 @@ def cases(tier: str) -> list[Case]:
                     ("fmriprep", (run, str(node))),
                 )
             )
+    for k, (run, node) in enumerate(goodvoxels_cases()):
+        t = "smoke" if k == 0 else "standard"
+        if in_tier(t, tier):
+            out.append(
+                Case(
+                    f"fmriprep-goodvoxels/{run}/{node}",
+                    "fmriprep",
+                    f"fMRIPrep's goodvoxels mask, node {node} (--project-goodvoxels)",
+                    ("goodvoxels", (run, node)),
+                )
+            )
     for name, (t, desc, _run) in _cases().items():
         if in_tier(t, tier):
             out.append(Case(name, name.split("/")[0], desc, ("run", name)))
@@ -1189,6 +1703,8 @@ def run_case(case: Case, checks: CheckList) -> None:
     kind, payload = case.payload
     if kind == "fmriprep":
         _fmriprep_case(payload, checks)
+    elif kind == "goodvoxels":
+        _goodvoxels_case(payload, checks)
     elif kind == "direct":
         _run_case(payload, checks)
     else:

@@ -159,6 +159,22 @@ impl Ctx<'_, '_> {
     }
 }
 
+/// [`Ctx::conv`] without its notice: `(T) x` as `reproduce` (C's conversion) or the default
+/// (clamped, NaN as 0) gives it.
+fn quiet_conv<T: Arith>(x: f64, reproduce: bool) -> T {
+    if T::IS_FLOAT {
+        return from_f64_nan(x);
+    }
+    let (lo, hi) = int_range::<T>();
+    if reproduce || (!x.is_nan() && x > lo - 1.0 && x < hi + 1.0) {
+        T::from_f64(x)
+    } else if x.is_nan() {
+        T::from_int(0)
+    } else {
+        T::from_f64(x.clamp(lo, hi))
+    }
+}
+
 /// `(T) x` for the floating types, a NaN keeping its sign and payload's top bits as
 /// `cvtsd2ss` keeps them (on every platform).
 fn from_f64_nan<T: Arith>(x: f64) -> T {
@@ -370,14 +386,20 @@ fn dispatch(t: i16, a: &Args, output_dt: i16, ctx: &mut Ctx) -> Res<u8> {
 fn read4d<T: Arith>(ctx: &mut Ctx, name: &str) -> Result<Volume<T>, FslError> {
     let v = volume::read_volume4d::<T>(name, ctx.run.fsl)?.0;
     if !T::IS_FLOAT && T::MAXV.to_f64() == 255.0 {
-        // the unsigned template of FSL-154's correction: the values FSL's char reads as negative
+        // the unsigned template of FSL-154's correction: the values FSL's char reads as
+        // negative, and every intermediate value of the chain held as an unsigned byte where
+        // FSL's signed char holds it otherwise (a difference below 0, a sum above 127: a
+        // difference of Gaussians' signs, random testing 2026-11-03), so named for every image
+        // the unsigned template reads
         let n = v.data.iter().filter(|x| x.to_f64() >= 128.0).count();
-        if n > 0 {
-            ctx.notice(
-                &defects::FSL_154,
-                format!("{name}: {n} values from 128 to 255 computed as unsigned bytes"),
-            );
-        }
+        ctx.notice(
+            &defects::FSL_154,
+            format!(
+                "{name}: computed as unsigned bytes ({n} values from 128 to 255, which FSL's \
+                 signed char reads as negative; intermediate values below 0 or above 127 are \
+                 held as FSL's signed char does not hold them)"
+            ),
+        );
     }
     Ok(v)
 }
@@ -915,13 +937,34 @@ fn input_parser<T: Arith>(a: &Args, output_dt: i16, ctx: &mut Ctx) -> Res<u8> {
                 if cnum::f32_to_i32(4.0 * s2) < 0 {
                     no_voxels(ctx, "-dog_edge", true)?;
                 }
-                let mut every = false;
-                if input.tsize() > 1 {
-                    ctx.notice(&defects::FSL_164, "-dog_edge of a 4D image");
-                    every = !ctx.reproduce();
-                }
-                input =
+                let every = input.tsize() > 1 && !ctx.reproduce();
+                let out =
                     filters::log_edge_detect(&input, s1, s2, every, &mut |x| ctx.conv::<T>(x, op));
+                if input.tsize() > 1 {
+                    // FSL-164 named where filtering every volume changes a voxel (the other
+                    // mode's result, its conversions without notices)
+                    let reproduce = ctx.reproduce();
+                    let other = filters::log_edge_detect(&input, s1, s2, !every, &mut |x| {
+                        quiet_conv::<T>(x, reproduce)
+                    });
+                    let moved = out
+                        .data
+                        .iter()
+                        .zip(&other.data)
+                        .filter(|(a, b)| a.to_f64().to_bits() != b.to_f64().to_bits())
+                        .count();
+                    if moved > 0 {
+                        ctx.notice(
+                            &defects::FSL_164,
+                            format!(
+                                "-dog_edge of a 4D image: {moved} voxels of volumes 1 to {} \
+                                 differ when every volume is filtered",
+                                input.tsize() - 1
+                            ),
+                        );
+                    }
+                }
+                input = out;
             }
             "-fillh" | "-fillh26" => {
                 let conn = if op == "-fillh" { 6 } else { 26 };
@@ -1476,6 +1519,33 @@ fn tensor_decomp<T: Arith>(ctx: &mut Ctx, input: &mut Volume<T>, out: &str) -> R
 fn subsample<T: Arith>(ctx: &mut Ctx, input: &mut Volume<T>, centred: bool, op: &str) -> Res<()> {
     let dims = [input.xsize(), input.ysize(), input.zsize()];
     let nt = input.tsize().max(0) as usize;
+    // FSL-75: subsample_by_2 fills its new volume with the background value first (`halfvol =
+    // refvol.backgroundval()`), whose 2-voxel border buffer is too small for some sizes (a size
+    // of 3 along x or y): FSL writes past it (heap corruption: it may abort, as glibc's `free`
+    // does) or, at 1 x 1 x 1, reads an empty buffer (a crash). Every voxel is then overwritten,
+    // so the value is never used: the result is the same in both modes.
+    let [x, y, z] = dims;
+    match input.background_buffer() {
+        volume::BorderBuffer::Exact => {}
+        volume::BorderBuffer::Empty => {
+            let what = format!(
+                "{op}: the background value of a {x} x {y} x {z} image reads the first value of \
+                 an empty buffer (FSL-75)"
+            );
+            if ctx.reproduce() {
+                return Err(ctx.refuse(&defects::FSL_75, &what));
+            }
+            ctx.notice(&defects::FSL_75, format!("{what}; the value is never used"));
+        }
+        volume::BorderBuffer::Overflow { numbins, written } => ctx.notice(
+            &defects::FSL_75,
+            format!(
+                "{op}: the background value of a {x} x {y} x {z} image: fslmaths writes \
+                 {written} border values into a buffer of {numbins} (heap corruption; fslmaths \
+                 may abort or crash); the value is never used (every voxel is overwritten)"
+            ),
+        ),
+    }
     if input.dimensionality() > 3 {
         ctx.notice(&defects::FSL_163, format!("{op} of a 4D image"));
         if ctx.reproduce() {

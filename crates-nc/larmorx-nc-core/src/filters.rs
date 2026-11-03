@@ -956,10 +956,13 @@ pub fn subsample_by_2<T: Arith>(
 
 /// `edge_strengthen(source)` of every volume: the gradient magnitude `sqrt(sum (d_i / dim_i)^2) /
 /// (2 sqrt(sum 1 / dim_i^2))` from central differences (in `T`'s arithmetic, then `double`;
-/// `pow(x, 2.0)` glibc's), at the voxels inside a one-voxel border (in-plane only when the image
+/// `pow(x, 2.0)` as `x * x`, FSL's build), at the voxels inside a one-voxel border (in-plane only when the image
 /// has at most 2 slices); the border keeps its values. `conv` is `(T)` of the `double`.
 pub fn edge_strengthen<T: Arith>(src: &Volume<T>, conv: &mut impl FnMut(f64) -> T) -> Volume<T> {
-    use crate::glibc_double::pow;
+    // `pow(x, 2.0)` is `x * x` in FSL's build (GCC folds it into a multiplication, the correctly
+    // rounded square): glibc's `pow` differs from it in the last place for some doubles (found by
+    // random testing, 2026-11-03: `validation/investigations/fsl-maths/edge_pow_probe.py`).
+    let pow = |x: f64, _two: f64| sse::mul_f64(x, x);
     let (xd, yd, zd) = (
         f64::from(src.xdim()),
         f64::from(src.ydim()),

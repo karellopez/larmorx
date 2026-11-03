@@ -193,7 +193,15 @@ class Run:
 def _prepare(run: Run, tmp: Path) -> list[str]:
     out = []
     for a in run.args:
-        if a[:1] in "@%":
+        if a.startswith("@dt:"):
+            # a random case's input (differential random testing), built from its recipe
+            from larmorx_validation.difftest import inputs as dt_inputs
+
+            p = dt_inputs.path(a[1:])
+            if not (tmp / p.name).exists():
+                shutil.copy(p, tmp / p.name)
+            out.append(p.name)
+        elif a[:1] in "@%":
             src = inputs() if a[0] == "@" else fsl_tests()
             name = a[1:]
             p = src / name if (src / name).exists() else src / f"{name}.nii.gz"
@@ -736,6 +744,9 @@ def run_case(case: Case, checks: CheckList) -> None:
         _goodvoxels_case(payload, checks)
     elif kind == "bet":
         _bet_case(payload, checks)
+    elif kind == "direct":
+        # a random case of differential random testing (difftest/tools/fsl_avwutils.py)
+        _run_case(payload, checks)
     else:
         _run_case(_cases()[payload][2], checks)
 

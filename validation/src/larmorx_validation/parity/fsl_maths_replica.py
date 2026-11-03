@@ -71,7 +71,7 @@ STANDARD_RUNS = (
     "ds003592-sub-280-noreconall",
 )
 #: The defects whose notice may name a condition the comparison cannot see.
-_SILENT = ("FSL-158", "FSL-154")
+_SILENT = ("FSL-158", "FSL-154", "FSL-75")
 
 
 # ------------------------------------------------------------------------------------------------
@@ -458,7 +458,15 @@ def _prepare(run: Run, tmp: Path) -> list[str]:
     src = inputs()
     out = []
     for a in run.args:
-        if a.startswith("@"):
+        if a.startswith("@dt:"):
+            # a random case's input (differential random testing), built from its recipe
+            from larmorx_validation.difftest import inputs as dt_inputs
+
+            p = dt_inputs.path(a[1:])
+            if not (tmp / p.name).exists():
+                shutil.copy(p, tmp / p.name)
+            out.append(p.name)
+        elif a.startswith("@"):
             name = a[1:]
             p = src / name if (src / name).exists() else src / f"{name}.nii.gz"
             shutil.copy(p, tmp / p.name)

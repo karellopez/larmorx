@@ -525,7 +525,13 @@ defects! {
     FSL_134 = "FSL-134", "applytopup", true,
         "a --topup field other than topup's coefficients on the images' grid: with a field image (topup's --fout or another field map in Hz) --method=jac computes the Jacobian determinant with the y displacements in units of the x voxel size (wrong when the phase encoding is along y and the voxels are not square in x and y); and a field on another grid is not refused: with --method=jac a field with as many voxels as the images but another shape is laid on the images' grid as it is stored, one with another number of voxels stops applytopup with an internal message; with --method=lsr the field's lines are read past their end";
     FSL_135 = "FSL-135", "applytopup", true,
-        "an unknown --method writes no output and exits with status 0 without a message; --method=lsr with a --topup that gives no movement parameters (a field image, or coefficients without their _movpar.txt) aborts with an internal index error";
+        "an unknown --method writes no output and exits with status 0 without a message; --method=lsr (and the undocumented vb2D, vb3D and vb4D) with a --topup that gives no movement parameters (a field image, or coefficients without their _movpar.txt) aborts with an internal index error";
+    FSL_141 = "FSL-141", "applytopup", true,
+        "the undocumented --method=vb2D, vb3D and vb4D count the data points of the noise and regularisation priors (half the number of values) in 32-bit integers: beyond about two billion values (very large 4D images with vb4D) the counts wrap around to wrong, even negative, numbers";
+    FSL_142 = "FSL-142", "applytopup", true,
+        "the undocumented --method=vb3D and vb4D count two images' data points for the noise prior whatever the number of images restored together: with three or more images of one phase-encoding axis the noise precision is estimated from too few data points (vb2D counts them right)";
+    FSL_143 = "FSL-143", "applytopup", true,
+        "the undocumented --method=vb3D and vb4D regularise with a smoothness prior whose coupling between a voxel and the voxels next to its neighbours in the adjacent slices (one step along the phase encoding and one slice away) is half what the squared second-difference operator it is built from gives (the coupling within a slice is right)";
     ITK_50 = "ITK-50", "ITK", true,
         "KdTreeBasedKmeansEstimator never counts the point a k-d tree node is split at when it divides the node between centres: those points are left out of the pass's new centres";
     ITK_51 = "ITK-51", "ITK", true,

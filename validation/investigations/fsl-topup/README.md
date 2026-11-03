@@ -30,3 +30,32 @@ resolution):
 The consistent Hessian never ends at a higher cost and ends lower where the movements or
 several levels are estimated: rule A, corrected by default (the minimised cost itself is
 unchanged); `reproduce` gives FSL's steps.
+
+## `vb_prior.py`: FSL-143, measured (rule A)
+
+applytopup's undocumented `--method=vb3D` and `vb4D` regularise the restored lines with a
+smoothness prior built from blocks of `AᵀA`, `A` the 3D second difference. The block that couples
+a voxel with the voxels one step along the phase encoding in the neighbouring slices holds `sf₁`
+where `AᵀA` holds `2 sf₁` (the same coupling within the slice holds `2 sf₀`, as it should). The
+script (1) assembles the prior's precision matrix from its blocks on a small grid with FSL's block
+and with `AᵀA`'s, and prints the smallest eigenvalues; (2) runs the replica on the suite's
+`at/vb3d-y` and `at/vb4d-y` inputs in `reproduce` mode (FSL's applytopup bit for bit: the suite's
+cases pass) and in the default `fix` mode, and prints the restored image's range:
+
+    PYTHONPATH=<worktree>/validation/src scripts/orchestration/boxed.sh 8 python -P \
+        validation/investigations/fsl-topup/vb_prior.py crates-nc/target/release/larmorx-nc <scratch>/vbprior
+
+Result on 2026-11-03:
+
+| | FSL's block (`reproduce`) | `AᵀA`'s (`fix`) |
+|---|---|---|
+| smallest eigenvalue, 8 × 6 × 5 grid, sf = (1, 0.909) | -2.739 (5 of 240 negative) | +0.4027 |
+| sf = (1.5, 0.909) | -2.533 (4 negative) | +0.6095 |
+| sf = (1, 1) | -3.005 (4 negative) | +0.4499 |
+| `at/vb3d-y` restored image (input: 0 to 1.09e5, mean 2.18e4) | -3.85e10 to 3.53e10, mean 3.39e5 | -1.68e4 to 1.18e5, mean 2.13e4 |
+| `at/vb4d-y` | the same | the same |
+
+FSL's prior is not positive definite, and the variational-Bayes iterations diverge to values five
+orders of magnitude beyond the data; with `AᵀA`'s block the prior is positive definite and the
+restoration stays in the data's range (as `--method=vb2D`'s, whose prior is right). Rule A:
+corrected by default; `reproduce` gives FSL's values.

@@ -9,7 +9,7 @@
 
 use larmorx_nc_core::arma::{Mat, syrk_t};
 use larmorx_nc_core::lapack::blas::{MatRef, axpy_k, dgemm, dgemv_n, dgemv_t_inc, dger, dsyr_l};
-use larmorx_nc_core::lapack::blocked::gesv_any;
+use larmorx_nc_core::lapack::blocked::{gesv_any, gesv_one, getrf_any, getri_any};
 use larmorx_nc_core::lapack::sytrf::{armadillo_lwork, sytrf_l, sytrs_l};
 use std::fmt::Write as _;
 
@@ -42,7 +42,11 @@ fn lapack_probe() {
             let mut a = f64s(&b, 12, n * n);
             let mut x = f64s(&b, 12 + 8 * n * n, n * nrhs);
             let mut ipiv = vec![0i32; n];
-            let info = gesv_any(&mut a, n, &mut ipiv, &mut x, nrhs);
+            let info = if nrhs == 1 {
+                gesv_one(&mut a, n, &mut ipiv, &mut x)
+            } else {
+                gesv_any(&mut a, n, &mut ipiv, &mut x, nrhs)
+            };
             writeln!(out, "info {info}").unwrap();
             for v in &ipiv {
                 writeln!(out, "ipiv {v}").unwrap();
@@ -58,6 +62,23 @@ fn lapack_probe() {
                 // dgesv leaves B as it was when the factorisation failed.
                 for &v in &f64s(&b, 12 + 8 * n * n, n * nrhs) {
                     pd(&mut out, "x", v);
+                }
+            }
+        } else if h[0] == 5 {
+            let n = h[1] as usize;
+            let mut a = f64s(&b, 12, n * n);
+            let mut ipiv = vec![0i32; n];
+            let info = getrf_any(&mut a, n, n, n, &mut ipiv);
+            writeln!(out, "info {info}").unwrap();
+            if info == 0 {
+                if n > 16 {
+                    // dgetri's workspace query: N * NB, NB = 64
+                    writeln!(out, "lwork {}", (n * 64).max(n)).unwrap();
+                }
+                let info2 = getri_any(&mut a, n, &ipiv);
+                writeln!(out, "info2 {info2}").unwrap();
+                for &v in &a {
+                    pd(&mut out, "inv", v);
                 }
             }
         } else if h[0] == 3 {

@@ -94,6 +94,25 @@ of the BLAS they call, `daxpy`'s Haswell kernel fuses its first `n & -16` elemen
 tail, and `dgemv('T')` with a strided `y` adds the totals of its groups of four columns by a
 contracted C loop (`y = fma(t, α, y)`) where the unit increment's assembly rounds twice.
 
+**One right-hand side and the explicit inverse** (topup's sub-task 4b, 2026-11-03: applytopup's
+`--method=vb2D` and `vb3D`). Armadillo's `solve(A, x)` of one column is `dgesv` with `nrhs = 1`,
+which OpenBLAS solves by `TRSV_NLU` and `TRSV_NUN` (blocks of `DTB_ENTRIES` = 64 rows: `daxpy`
+inside a block, `dgemv('N')` below or above it); Armadillo's `inv()` of a general matrix is
+`dgetrf` then `dgetri` with `lwork = max(16, n)` and, beyond 16 rows, `dgetri`'s workspace query
+(`N · 64`: its unblocked code up to 64 rows, after OpenBLAS's `dtrtri`, whose `trti2_U` runs
+`TRMV_NUN` and `DSCAL` per column). `check_lapack.py`'s `one_*` cases (one column, 9 to 256 rows,
+general and diagonally dominant) and `inv_*` cases (kind 5 of `lapack_probe.c`: 9 to 64 rows,
+general and spline normal matrices) compare them with `larmorx_nc_core::lapack::blocked`'s
+`gesv_one` and `getri_any`:
+
+```bash
+scripts/orchestration/boxed.sh 8 python -P validation/probes/fsl-miscmaths/check_lapack.py \
+    --probe <scratch>/lapack_probe --work <scratch>/lpvb --only one_,inv_
+```
+
+Result on 2026-11-03: 46 cases (329,062 lines), 0 lines differ (the workspace size of every
+query included).
+
 Facts it found (for the topup replica's findings, restricted):
 
 - `SpMat`'s sum of two matrices of different sparsity (`add_diff_sparsity_mat_to_me`) restarts

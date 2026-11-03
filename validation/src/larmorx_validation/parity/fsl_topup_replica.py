@@ -1491,6 +1491,109 @@ def _applytopup_cases() -> dict[str, tuple[str, str, Run]]:
         out,
         source="zero",
     )
+    # the undocumented variational-Bayes restorations (--method=vb2D, vb3D, vb4D)
+    dwi = ("--imain=@dwi_up.nii.gz,@dwi_dn.nii.gz", "--inindex=1,2")
+    xpair = ("--imain=@xhalf_up.nii.gz,@xhalf_dn.nii.gz", "--inindex=1,2")
+    add("vb2d-y", "--method=vb2D: phi and lambda per slice", *pair, acq, tu, out, "--method=vb2D")
+    add("vb3d-y", "--method=vb3D: phi and lambda per volume", *pair, acq, tu, out, "--method=vb3D")
+    add("vb4d-y", "--method=vb4D: one phi and lambda", *pair, acq, tu, out, "--method=vb4D")
+    add(
+        "vb3d-4d",
+        "--method=vb3D of two volumes (each on its own)",
+        *dwi,
+        acq,
+        tu,
+        out,
+        "-m",
+        "vb3D",
+    )
+    add("vb4d-4d", "--method=vb4D of two volumes (together)", *dwi, acq, tu, out, "-m", "vb4D")
+    xa = ("--datain=@acq_x.txt", tu, out)
+    add("vb2d-x", "--method=vb2D along x", *xpair, *xa, "--method=vb2D", source="x")
+    add("vb3d-x", "--method=vb3D along x", *xpair, *xa, "--method=vb3D", source="x")
+    add(
+        "vb3d-aniso",
+        "--method=vb3D with voxels of 6 x 4 mm in plane (the prior's scale factors)",
+        "--imain=@half_up_aniso.nii.gz,@half_up_aniso.nii.gz",
+        "--inindex=1,2",
+        acq,
+        tu,
+        out,
+        "--method=vb3D",
+    )
+    add(
+        "vb2d-aniso",
+        "--method=vb2D with voxels of 6 x 4 mm in plane",
+        "--imain=@half_up_aniso.nii.gz,@half_up_aniso.nii.gz",
+        "--inindex=1,2",
+        acq,
+        tu,
+        out,
+        "--method=vb2D",
+    )
+    add(
+        "vb4d-four",
+        "--method=vb4D of two collections (along y and along x)",
+        "--imain=@four_0.nii.gz,@four_1.nii.gz,@four_2.nii.gz,@four_3.nii.gz",
+        "--inindex=1,2,3,4",
+        "--datain=@acq_four.txt",
+        tu,
+        out,
+        "--method=vb4D",
+        source="four",
+    )
+    add(
+        "vb3d-three",
+        "--method=vb3D of three images in one collection (FSL-142: counted as two)",
+        "--imain=@half_up.nii.gz,@half_dn.nii.gz,@half_up.nii.gz",
+        "--inindex=1,2,1",
+        acq,
+        tu,
+        out,
+        "--method=vb3D",
+    )
+    add(
+        "vb2d-three",
+        "--method=vb2D of three images in one collection",
+        "--imain=@half_up.nii.gz,@half_dn.nii.gz,@half_up.nii.gz",
+        "--inindex=1,2,1",
+        acq,
+        tu,
+        out,
+        "--method=vb2D",
+    )
+    add(
+        "vb-one-direction",
+        "--method=vb3D of two images with the same phase encoding (FSL's message)",
+        "--imain=@half_up.nii.gz,@half_up.nii.gz",
+        "--inindex=1,1",
+        acq,
+        tu,
+        out,
+        "--method=vb3D",
+    )
+    add(
+        "vb-no-movements",
+        "--method=vb4D with a field image, which has no movements (FSL-135)",
+        *pair,
+        acq,
+        "--topup=tu_field",
+        out,
+        "--method=vb4D",
+        fix_refuses="FSL-135",
+    )
+    add(
+        "vb-other-grid",
+        "--method=vb2D with a field on another grid (FSL-134)",
+        "--imain=@crop_up.nii.gz,@crop_dn.nii.gz",
+        "--inindex=1,2",
+        acq,
+        tu,
+        out,
+        "--method=vb2D",
+        refused="FSL-134",
+        refused_reason="FSL reads the field's lines past their end (undefined behaviour)",
+    )
     add("jac-y", "Jacobian modulation of one image", *up, acq, tu, out, jac)
     add("jac-pair", "Jacobian modulation of the pair, averaged", *pair, acq, tu, out, jac)
     add(

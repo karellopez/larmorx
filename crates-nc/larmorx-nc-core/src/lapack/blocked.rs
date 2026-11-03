@@ -575,6 +575,179 @@ pub fn gesv_any(a: &mut [f64], n: usize, ipiv: &mut [i32], b: &mut [f64], nrhs: 
     info
 }
 
+/// `DTB_ENTRIES` of FSL's OpenBLAS (DYNAMIC_ARCH, the Haswell table: `DTB_DEFAULT_ENTRIES`):
+/// the block of the level-2 triangular drivers.
+const DTB_ENTRIES: usize = 64;
+
+/// `GEMV_N` as the level-2 drivers call it (the kernel: `y += alpha · A x`, no scaling of `y`).
+fn gemv_n_kernel(m: usize, n: usize, alpha: f64, a: &[f64], am: MatRef, x: &[f64], y: &mut [f64]) {
+    dgemv_n(m, n, alpha, a, am, x, 1, 1.0, y);
+}
+
+/// `TRSV_NLU` (`driver/level2/trsv_L.c`, unit stride): `b = L⁻¹ b` for the unit lower triangle
+/// of the `n × n` array `a` (leading dimension `lda`), in blocks of `DTB_ENTRIES` rows from the
+/// top: inside a block each solved element's multiple of its column subtracted from the block's
+/// later rows by `DAXPY_K` ([`super::blas::axpy_k`]), then the rows below the block updated by
+/// `GEMV_N` with `alpha = −1`.
+pub fn trsv_nlu(a: &[f64], lda: usize, n: usize, b: &mut [f64]) {
+    let mut is = 0;
+    while is < n {
+        let min_i = (n - is).min(DTB_ENTRIES);
+        for i in 0..min_i.saturating_sub(1) {
+            let len = min_i - i - 1;
+            let base = (is + i) * lda + is + i + 1;
+            let da = -b[is + i];
+            super::blas::axpy_k(
+                da,
+                &a[base..base + len],
+                1,
+                &mut b[is + i + 1..is + min_i],
+                1,
+            );
+        }
+        if n - is > min_i {
+            let x = b[is..is + min_i].to_vec();
+            let am = MatRef {
+                off: is + min_i + is * lda,
+                ld: lda,
+            };
+            gemv_n_kernel(
+                n - is - min_i,
+                min_i,
+                -1.0,
+                a,
+                am,
+                &x,
+                &mut b[is + min_i..n],
+            );
+        }
+        is += DTB_ENTRIES;
+    }
+}
+
+/// `TRSV_NUN` (`driver/level2/trsv_U.c`, unit stride): `b = U⁻¹ b` for the upper triangle of
+/// the `n × n` array `a`, in blocks of `DTB_ENTRIES` rows from the bottom: inside a block, from
+/// its last row, each element divided by its diagonal and its multiple of its column subtracted
+/// from the block's earlier rows (`DAXPY_K`), then the rows above the block updated by `GEMV_N`
+/// with `alpha = −1`.
+pub fn trsv_nun(a: &[f64], lda: usize, n: usize, b: &mut [f64]) {
+    let mut is = n;
+    while is > 0 {
+        let min_i = is.min(DTB_ENTRIES);
+        for i in 0..min_i {
+            let r = is - i - 1;
+            b[r] = crate::sse::div_f64(b[r], a[r * lda + r]);
+            if i + 1 < min_i {
+                let len = min_i - i - 1;
+                let base = r * lda + r - len;
+                let da = -b[r];
+                super::blas::axpy_k(da, &a[base..base + len], 1, &mut b[r - len..r], 1);
+            }
+        }
+        if is > min_i {
+            let x = b[is - min_i..is].to_vec();
+            let am = MatRef {
+                off: (is - min_i) * lda,
+                ld: lda,
+            };
+            gemv_n_kernel(is - min_i, min_i, -1.0, a, am, &x, &mut b[..is - min_i]);
+        }
+        is -= min_i;
+    }
+}
+
+/// `dgesv` with one right-hand side (`interface/lapack/gesv.c`, one thread): [`getrf_any`] of
+/// `a` in place, then (when it succeeded) `getrs_N_single`'s path for one column: the
+/// interchanges, [`trsv_nlu`], [`trsv_nun`]. `n` ≤ `GEMM_Q`. Returns `info`.
+pub fn gesv_one(a: &mut [f64], n: usize, ipiv: &mut [i32], b: &mut [f64]) -> i32 {
+    let info = getrf_any(a, n, n, n, ipiv);
+    if info == 0 && n > 0 {
+        laswp_plus(b, n, 0..1, 1, n, ipiv);
+        trsv_nlu(a, n, n, b);
+        trsv_nun(a, n, n, b);
+    }
+    info
+}
+
+/// The largest matrix [`getri_any`] inverts: `dgetri`'s unblocked code (`NB` = 64 is at least
+/// `N`) and OpenBLAS's `dtrti2` (`trtri_U_single` up to `DTB_ENTRIES` rows).
+pub const GETRI_MAX_N: usize = 64;
+
+/// `TRMV_NUN` (`driver/level2/trmv_U.c`, one block: `m` < `DTB_ENTRIES`) of the column `x` of
+/// length `m`: `x = U x` for the leading `m × m` upper triangle of `a`, each element's multiple
+/// of its column added to the elements above it (`DAXPY_K`), then the element times its
+/// diagonal.
+fn trmv_nun_block(a: &[f64], lda: usize, m: usize, x: &mut [f64]) {
+    for i in 0..m {
+        if i > 0 {
+            let xi = x[i];
+            super::blas::axpy_k(xi, &a[i * lda..i * lda + i], 1, &mut x[..i], 1);
+        }
+        x[i] = crate::sse::mul_f64(x[i], a[i * lda + i]);
+    }
+}
+
+/// `dgetri` (reference LAPACK 3.12.0, `SRC/dgetri.f`) after [`getrf_any`] of an `n × n` matrix,
+/// `n` ≤ [`GETRI_MAX_N`] (the unblocked code, whatever work space Armadillo gives it): `dtrtri`
+/// of U (`interface/lapack/trtri.c`: `info` from a zero on the diagonal, else `trti2_U`: for
+/// each column the diagonal's reciprocal, the column times the inverted part ([`TRMV_NUN`]),
+/// then scaled by minus the reciprocal, `DSCAL_K`); then from the last column to the first, the
+/// part of L below the diagonal moved out and the column updated by `DGEMV('N')` with
+/// `alpha = −1` and `beta = 1`; then the column interchanges in reverse order. Returns `info`.
+///
+/// [`TRMV_NUN`]: trmv_nun_block
+pub fn getri_any(a: &mut [f64], n: usize, ipiv: &[i32]) -> i32 {
+    assert!(
+        n <= GETRI_MAX_N && a.len() >= n * n,
+        "getri_any: dgetri's blocked code (more than {GETRI_MAX_N} rows) is not ported"
+    );
+    // dtrtri's check (AMIN_K, IAMIN_K on the diagonal): after a successful dgetrf no pivot is
+    // zero; a NaN on the diagonal is not modelled
+    if let Some(i) = (0..n).find(|&i| a[i * n + i] == 0.0) {
+        return (i + 1) as i32;
+    }
+    for j in 0..n {
+        let ajj = crate::sse::div_f64(1.0, a[j * n + j]);
+        a[j * n + j] = ajj;
+        let mut x = a[j * n..j * n + j].to_vec();
+        trmv_nun_block(a, n, j, &mut x);
+        for v in x.iter_mut() {
+            *v = if ajj == 0.0 {
+                0.0
+            } else {
+                crate::sse::mul_f64(-ajj, *v)
+            };
+        }
+        a[j * n..j * n + j].copy_from_slice(&x);
+    }
+    let mut work = vec![0.0f64; n];
+    for j in (0..n).rev() {
+        for i in j + 1..n {
+            work[i] = a[j * n + i];
+            a[j * n + i] = 0.0;
+        }
+        if j + 1 < n {
+            let x = work[j + 1..n].to_vec();
+            let mut y = a[j * n..j * n + n].to_vec();
+            let am = MatRef {
+                off: (j + 1) * n,
+                ld: n,
+            };
+            dgemv_n(n, n - j - 1, -1.0, a, am, &x, 1, 1.0, &mut y);
+            a[j * n..j * n + n].copy_from_slice(&y);
+        }
+    }
+    for j in (0..n.saturating_sub(1)).rev() {
+        let jp = (ipiv[j] - 1) as usize;
+        if jp != j {
+            for r in 0..n {
+                a.swap(j * n + r, jp * n + r);
+            }
+        }
+    }
+    0
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

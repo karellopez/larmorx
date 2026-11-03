@@ -36,7 +36,8 @@ what it translates.
 | `scan` | fsl-topup `topup_costfunctions.{h,cpp}` | `TopupScan` (`update`, `GetResampled`, `GetMask`, `GetAlpha`, `GetBeta`, `GetGamma`, `GetMovementDerivative`, `GetJacobian`, `GetDisplacementField`, `ReGrid`, `SubSample`, `Smooth`, `SetMovementParameters`, `SetInterpolationModel`, `ImageSize`, `ImageVxs`, `mp_to_matrix`), `TopupScanManager` (the scans' mean, alpha, beta and gamma, the common mask, the movement parameters each scan estimates); not translated: `GetNumericalMovementDerivative` (never called) |
 | `fileio` | fsl-topup `topup_file_io.{h,cpp}`, `topup_matrices.{h,cpp}`; fsl-miscmaths 2412.6 `miscmaths.cc` | `TopupDatafileReader`, `TopupFileWriter` (coefficients, field, movement parameters), `MovePar2Matrix`, `Matrix2MovePar`; `write_ascii_matrix`, `read_ascii_matrix`'s messages |
 | `vol` | fsl-newimage 2601.0 `newimage.cc` | the arithmetic operators of `volume<float>` as topup uses them (in `float`; scalars converted to `float`), `calculateSums`, `mean` |
-| `applytopup` | fsl-topup `applytopup.{h,cpp}` | `main` (the options in FSL's order, the usage, the compulsory options), `applytopup` (the lists, `--datatype`, the reads, the mask, the methods, the output), `jac_resample`, `volume_deffield_2_jacobian`, `resample_using_movement_parameters`, `lsr_resample` (armawrap's `CroutMatrix` inverse: Armadillo's `lu` and two triangular `solve()` calls, OpenBLAS's `dgetrf` and triangular kernels; Armadillo's band detection and band solver for the two triangles: LAPACK `dgbtrf`/`dgbtrs` through `DGER` and OpenBLAS's `tbsv_NUN`), `TopupCollections`, `parse_commaseparated_list`, `parse_commaseparated_numbers`, `row_col_is_alright`, `extract_row_col`, `add_to_rows_cols`, `zero_out_rows_cols`; not translated yet: `vb_resample_2D`, `vb_resample_3D`, `vb_resample_4D` and their helpers (`--method=vb2D`, `vb3D`, `vb4D`: undocumented; refused), LAPACK's blocked `dgbtrf` (a band of 32 or more subdiagonals; refused) |
+| `applytopup` | fsl-topup `applytopup.{h,cpp}` | `main` (the options in FSL's order, the usage, the compulsory options), `applytopup` (the lists, `--datatype`, the reads, the mask, the methods, the output), `jac_resample`, `volume_deffield_2_jacobian`, `resample_using_movement_parameters`, `lsr_resample` (armawrap's `CroutMatrix` inverse: Armadillo's `lu` and two triangular `solve()` calls, OpenBLAS's `dgetrf` and triangular kernels; Armadillo's band detection and band solver for the two triangles: LAPACK `dgbtrf`/`dgbtrs` through `DGER` and OpenBLAS's `tbsv_NUN`), `TopupCollections`, `parse_commaseparated_list`, `parse_commaseparated_numbers`, `row_col_is_alright`, `extract_row_col`, `add_to_rows_cols`, `zero_out_rows_cols`; not translated yet: LAPACK's blocked `dgbtrf` (a band of 32 or more subdiagonals; refused) |
+| `applytopup::vb` | fsl-topup `applytopup.cpp` | `vb_resample_2D`, `vb_resample_3D`, `vb_resample_4D` (`--method=vb2D`, `vb3D`, `vb4D`: undocumented), `GetLijk`, `GetLij`, `GetLii`, both `tau_update`s, `mu_update`, `add_to_slice`, `DispVec::GetSparseK_Matrix`; the NEWMAT expressions as armawrap hands them to Armadillo 14.2.1 (`glue_times_redirect2_helper`'s `inv(A) * B` as a solve, `k * inv(A) * x` as `inv()` and `dgemv` with `alpha = k`, `as_scalar` of `a.t() * b` by `op_dot::direct_dot`, the same product inside a scalar expression by `dgemv('T')`, `trace`); not translated: `tau_update_contrib` (unused by FSL) |
 | `dispvec` | fsl-topup `displacement_vector.{h,cpp}` | `CircularArray` (`operator[]`, `IndexInRange`, `Find`, `set_from_row_or_col`), `DispVec` (`SetFromRow`, `SetFromColumn`, `GetK_Matrix`, `GetS_Matrix`, `get_non_zero_entries_of_row`); not translated: `Inv`, `GetInverseDisplacements`, `GetDisplacements`, `GetSparseK_Matrix`, `RowIsAlright`, `ColumnIsAlright`, `Print` (unused by jac and lsr) |
 | `fileio` (applytopup) | fsl-topup `topup_file_io.{h,cpp}` | `TopupFileReader` (`common_read`, `read_coef_file`, `ReadMovements`, `read_movement`, `FieldAsVolume`, `Field`, `MoveMatrix`, `MoveParValid`) |
 | `cli` | (larmorx) | `fsl topup` and `fsl applytopup` for the `larmorx-nc` program |
@@ -72,11 +73,17 @@ what it translates.
   the interpolation it was read with, as newimage's cache of a series' volumes gives FSL),
   FSL-133 (displacement lines wrapped circularly: `dispvec::CircularArray`), FSL-134 (a field
   image's Jacobian in the y voxel size; a field on another grid refused: `applytopup`), FSL-135
-  (an unknown `--method` and `--method=lsr` without movements refused); `reproduce` gives FSL's
+  (an unknown `--method` and `--method=lsr` or a `vb` method without movements refused), FSL-141
+  (the vb methods' counts of data points in 64 bits), FSL-142 (`vb3D` and `vb4D` count every
+  image of a collection), FSL-143 (`vb3D` and `vb4D`'s prior with `AᵀA`'s coupling between
+  neighbouring slices: `applytopup::vb::get_lijk`); `reproduce` gives FSL's
   behaviour for each (FSL-134 with `--method=lsr`: a refusal there too, FSL reads past the
   field). An uncaught exception ends FSL's applytopup with `std::terminate` (SIGABRT): the
   replica prints the same text and exits with status 1.
 - applytopup: lines of fewer than 8 or more than 256 voxels along the phase encoding, a line whose
   band triangle has 32 or more subdiagonals or would pivot in LAPACK's band factorization, or
   whose condition estimate could fall below machine precision (Armadillo then switches to an
-  approximate solution) are refused with `--method=lsr` (not replicated yet).
+  approximate solution) are refused with `--method=lsr` (not replicated yet); with
+  `--method=vb2D` and `vb3D` also lines of more than 64 voxels (the first estimate's explicit
+  inverse: LAPACK's blocked `dgetri` and, from 100 rows, Armadillo's `dsytri`: not replicated
+  yet).

@@ -1,7 +1,8 @@
 # SPDX-License-Identifier: Apache-2.0
 """Compares larmorx-nc-core's blocked LU solve and ``AᵀA`` with FSL 6.0.7.23's own OpenBLAS.
 
-Generates the cases (seeded): ``dgesv`` of general, nearly singular-pivot, exactly singular and
+Generates the cases (seeded): ``dgesv`` of one column (``one_*``), Armadillo's explicit inverse
+(``inv_*``: ``dgetrf`` and ``dgetri``), ``dgesv`` of general, nearly singular-pivot, exactly singular and
 spline-normal-equation systems of 9 to 120 unknowns with 2 to 70 right-hand sides, and
 ``dsyrk('U', 'T')`` with inner dimensions from 49 to 700 (one, a halved and several blocks) and
 ``dgemm('N', 'N')`` with odd and even column counts and more than 512 rows; the symmetric
@@ -243,6 +244,25 @@ def main() -> int:
             + np.asarray(rng.normal(0, 1, (k, n)), "<f8").T.copy().tobytes()
         )
         names.append(name)
+    # applytopup's --method=vb2D and vb3D: dgesv of one column (OpenBLAS's TRSV, in blocks of
+    # DTB_ENTRIES = 64 rows beyond 64) and Armadillo's explicit inverse (dgetri, its unblocked
+    # code up to 64 rows).
+    rng1 = np.random.default_rng(4545)
+    for n in (9, 16, 17, 31, 32, 33, 63, 64, 65, 100, 129, 200, 256):
+        gesv_case(work / f"one_n{n}.case", rng1.normal(0, 1, (n, n)), rng1.normal(0, 1, (n, 1)))
+        names.append(f"one_n{n}")
+        a = rng1.normal(0, 1, (n, n)) + n * np.eye(n)
+        gesv_case(work / f"one_n{n}_dd.case", a, rng1.normal(0, 1, (n, 1)))
+        names.append(f"one_n{n}_dd")
+    for n in (9, 15, 16, 17, 31, 32, 33, 48, 63, 64):
+        for kind, a in (
+            ("g", rng1.normal(0, 1, (n, n))),
+            ("spd", spline_normal(2 * n, n, rng1) + 0.01 * np.eye(n)),
+        ):
+            (work / f"inv_n{n}_{kind}.case").write_bytes(
+                struct.pack("<III", 5, n, 0) + np.asarray(a, "<f8").T.copy().tobytes()
+            )
+            names.append(f"inv_n{n}_{kind}")
     names += sym_cases(work, np.random.default_rng(4343))
     names += blas_cases(work, np.random.default_rng(4444))
     if args.only:

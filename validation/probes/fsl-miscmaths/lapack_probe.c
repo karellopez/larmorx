@@ -2,12 +2,15 @@
 // lapack_probe: FSL 6.0.7.23's own OpenBLAS (liblapack.so.3, libblas.so) on the systems of one
 // case file: dgesv (the LU factors, the pivots and the solutions), dsyrk('U', 'T'), dgemm, the
 // symmetric indefinite solve as Armadillo 14.2.1's solve_sym_fast calls it (dsytrf('L') after its
-// workspace query, then dsytrs('L')) and the BLAS routines that solve calls, each value printed
+// workspace query, then dsytrs('L')), the BLAS routines that solve calls, and the general inverse
+// as Armadillo 14.2.1's auxlib::inv computes it (dgetrf, then dgetri with lwork = max(16, n) and
+// for n > 16 its workspace query), each value printed
 // as its hexadecimal bits, as the replica's side (crates-nc/larmorx-nc-core/tests/lapack_probe.rs)
 // prints them. See README.md.
 //
 // Usage: lapack_probe <case file>
-// The case file: u32 kind (0 gesv, 1 syrk, 2 gemm, 3 sym, 4 blas); gesv: u32 n, u32 nrhs, A (n*n
+// The case file: u32 kind (0 gesv, 1 syrk, 2 gemm, 3 sym, 4 blas, 5 inv; inv: u32 n, u32 0,
+// A (n*n f64)); gesv: u32 n, u32 nrhs, A (n*n
 // f64, column-major), B (n*nrhs f64); syrk: u32 k, u32 n, A (k*n f64); gemm: u32 m, u32 n, u32 k,
 // A (m*k f64), B (k*n f64): C = A*B; sym: u32 n, u32 nrhs, A (n*n), B (n*nrhs); blas: u32 op,
 // u32 m, u32 n, then op's arrays (see blas_op below).
@@ -24,6 +27,8 @@ extern void dsytrf_(const char* uplo, int* n, double* a, int* lda, int* ipiv, do
                     int* lwork, int* info);
 extern void dsytrs_(const char* uplo, int* n, int* nrhs, double* a, int* lda, int* ipiv, double* b,
                     int* ldb, int* info);
+extern void dgetrf_(int* m, int* n, double* a, int* lda, int* ipiv, int* info);
+extern void dgetri_(int* n, double* a, int* lda, int* ipiv, double* work, int* lwork, int* info);
 extern void daxpy_(int* n, double* da, double* x, int* incx, double* y, int* incy);
 extern void dger_(int* m, int* n, double* alpha, double* x, int* incx, double* y, int* incy,
                   double* a, int* lda);
@@ -150,6 +155,27 @@ int main(int argc, char* argv[])
       dsytrs_("L", &n, &nrhs, a, &n, ipiv, b, &n, &info);
       printf("info2 %d\n", info);
       for (int i = 0; i < n * nrhs; i++) pd("x", b[i]);
+    }
+  } else if (kind == 5) {
+    int n = (int)p, info = 0;
+    double* a = malloc(sizeof(double) * n * n);
+    int* ipiv = malloc(sizeof(int) * n);
+    if (fread(a, 8, (size_t)n * n, f) != (size_t)n * n) return 2;
+    dgetrf_(&n, &n, a, &n, ipiv, &info);
+    printf("info %d\n", info);
+    if (info == 0) {
+      int lwork = n > 16 ? n : 16;
+      if (n > 16) {
+        double q[2] = {0.0, 0.0};
+        int lq = -1;
+        dgetri_(&n, a, &n, ipiv, q, &lq, &info);
+        if ((int)q[0] > lwork) lwork = (int)q[0];
+        printf("lwork %d\n", lwork);
+      }
+      double* work = malloc(sizeof(double) * lwork);
+      dgetri_(&n, a, &n, ipiv, work, &lwork, &info);
+      printf("info2 %d\n", info);
+      for (int i = 0; i < n * n; i++) pd("inv", a[i]);
     }
   } else if (kind == 4) {
     unsigned int nn;

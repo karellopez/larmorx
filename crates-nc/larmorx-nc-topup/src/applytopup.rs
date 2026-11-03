@@ -6,7 +6,9 @@
 //! modulation (`--method=jac`: each image resampled through the field, scaled by the Jacobian
 //! determinant, and the images averaged) or least-squares restoration (`--method=lsr`, the
 //! default: pairs of images with opposite phase encoding, each line along the phase encoding
-//! restored from both by regularised least squares), with FSL's messages and exit statuses.
+//! restored from both by regularised least squares; the undocumented `vb2D`, `vb3D` and `vb4D`
+//! infer the regularisation by variational Bayes: [`vb`]), with FSL's messages and exit
+//! statuses.
 
 use std::io::Write;
 
@@ -28,6 +30,8 @@ use crate::Console;
 use crate::dispvec::DispVec;
 use crate::fileio::{Datafile, TopupFileReader};
 use crate::topup::Run;
+
+mod vb;
 
 const PROGRAM: &str = "applytopup";
 const TITLE: &str =
@@ -324,17 +328,17 @@ fn applytopup(clp: &Clp, run: &Run, con: &Console) -> R<u8> {
             shape_check(con, field_shape, image_shape, false)?;
             jac_resample(&ctx, &mut topupfile, &mut mask, &mut scans)?
         }
-        "lsr" => {
+        m @ ("lsr" | "vb2D" | "vb3D" | "vb4D") => {
             shape_check(con, field_shape, image_shape, true)?;
             if !topupfile.has_moves() {
                 // FSL-135: MoveMatrix's index error ends the program
                 if !con.reproduce() {
                     con.notice(
                         &defects::FSL_135,
-                        "--method=lsr without movements: a clear message",
+                        &format!("--method={m} without movements: a clear message"),
                     );
                     return Err(End::Refuse(format!(
-                        "--method=lsr needs topup's movement parameters ({}_movpar.txt): \
+                        "--method={m} needs topup's movement parameters ({}_movpar.txt): \
                          --topup={} gives none (use --method=jac, which takes none as no \
                          movement) (FSL-135)",
                         clp.topup, clp.topup
@@ -342,17 +346,16 @@ fn applytopup(clp: &Clp, run: &Run, con: &Console) -> R<u8> {
                 }
                 con.notice(
                     &defects::FSL_135,
-                    "--method=lsr without movements: FSL's internal index error",
+                    &format!("--method={m} without movements: FSL's internal index error"),
                 );
             }
             resample_using_movement_parameters(&ctx, &topupfile, &mut mask, &mut scans)?;
-            lsr_resample(&ctx, &mut topupfile, &mask, &scans)?
-        }
-        m @ ("vb2D" | "vb3D" | "vb4D") => {
-            return Err(End::Refuse(format!(
-                "--method={m} (an undocumented variational-Bayes restoration) is not \
-                 replicated yet"
-            )));
+            match m {
+                "lsr" => lsr_resample(&ctx, &mut topupfile, &mask, &scans)?,
+                "vb2D" => vb::vb_resample(&ctx, vb::Vb::D2, &mut topupfile, &scans)?,
+                "vb3D" => vb::vb_resample(&ctx, vb::Vb::D3, &mut topupfile, &scans)?,
+                _ => vb::vb_resample(&ctx, vb::Vb::D4, &mut topupfile, &scans)?,
+            }
         }
         other => {
             // FSL-135 (rule B): FSL writes nothing and exits 0

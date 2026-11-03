@@ -295,7 +295,7 @@ impl TopupFileReader {
         cerr: &mut Vec<String>,
     ) -> Result<TopupFileReader, FslError> {
         if let Some(dot) = fname.rfind('.') {
-            let refuse = match fname.rfind('/') {
+            let refuse = match crate::options::last_separator(fname) {
                 None => true,
                 Some(slash) => dot > slash,
             };

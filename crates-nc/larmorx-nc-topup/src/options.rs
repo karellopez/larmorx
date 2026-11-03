@@ -285,9 +285,19 @@ pub struct Clp {
     pub profile: bool,
 }
 
+/// The last directory separator: `/`, as in FSL; on Windows, where FSL does not run, `\` as well
+/// (a Windows path's directories may hold dots, as `C:\Users\...\.tmp1\b02b0` does).
+pub fn last_separator(fullname: &str) -> Option<usize> {
+    if cfg!(windows) {
+        fullname.rfind(['/', '\\'])
+    } else {
+        fullname.rfind('/')
+    }
+}
+
 /// TOPUP's `path`: up to and including the last `/`.
 pub fn path(fullname: &str) -> String {
-    match fullname.rfind('/') {
+    match last_separator(fullname) {
         Some(i) => fullname[..=i].to_owned(),
         None => String::new(),
     }
@@ -295,7 +305,7 @@ pub fn path(fullname: &str) -> String {
 
 /// TOPUP's `filename`: after the last `/`, up to its first `.`.
 pub fn filename(fullname: &str) -> String {
-    let f = match fullname.rfind('/') {
+    let f = match last_separator(fullname) {
         Some(i) => &fullname[i + 1..],
         None => fullname,
     };
@@ -308,7 +318,7 @@ pub fn filename(fullname: &str) -> String {
 /// TOPUP's `extension`: from the last `.` (after the last `/`).
 pub fn extension(fullname: &str) -> String {
     match fullname.rfind('.') {
-        Some(d) => match fullname.rfind('/') {
+        Some(d) => match last_separator(fullname) {
             Some(e) if d <= e => String::new(),
             _ => fullname[d..].to_owned(),
         },

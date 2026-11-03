@@ -122,6 +122,11 @@ It returns an `ApplytopupResult`: `corrected` (an `lx.Image`) and `stdout` (the 
 iterations). FSL's settings are the call's (CLAUDE.md rule 6): the outputs are NIfTI-1 read
 back, and no FSL variable of the process reaches the program.
 
+**File names on Windows.** FSL finds a name's directory and extension at the last `/`. On Windows,
+where FSL does not run, `\` separates directories as well. So a configuration given without
+`.cnf`, and applytopup's `--topup` base name, behave as on Linux when a directory's name holds a dot
+(`C:\Users\...\.tmp1\b02b0`). On Linux and macOS, `\` stays an ordinary character, as in FSL.
+
 ## Upstream defects (D13)
 
 topup's and applytopup's defects are corrected by default and reproduced with

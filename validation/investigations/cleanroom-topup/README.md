@@ -107,3 +107,17 @@ python -P speed_identity.py run <scratch>/t1.json 1 --jobs 14` (about 20 s), the
 | `recheck.py` | a sample of each group of a trial's findings (kind, movements, quadratic splines, the first exact failure) replayed with `difftest --replay` on the drawn case (not the shrunk one), `--jobs` at a time, each in its own memory leaf; the verdicts per group |
 | `estmov_off.py` | a sample of the trial's findings that estimate the movements, judged again with `--estmov=0` (FSL's variants run once through the cache): how many of the differences the movements' path makes |
 
+
+## Random testing's triage (relay 5b)
+
+Findings 32 to 36 of `docs/findings/fsl-topup-original.md`. Each runs FSL only through the oracle
+cache (`LARMORX_DIFFTEST_CACHE_MODE=use`) and the original named by `LARMORX_TOPUP_BIN`; run them
+inside `scripts/orchestration/boxed.sh`.
+
+| Script | What it does |
+|---|---|
+| `first_step.py` | one finding's images (or subsets of its volumes, other acquisition rows with `FIRST_STEP_ACQ`, other options with `FIRST_STEP_ARGS`) run by FSL and the original with `--debug` and `-v`: the first gradient compared, the costs of every evaluation (`FIRST_STEP_MITER=own`), and with `FIRST_STEP_DEBUG=3` every debug image (Hessian weights, masks, fields). `LX_PROBE_*` variables reach the original (a temporary probe build's switches). FSL-146, the oblique mask, the SCG weight and the quadratic Hessian were found with it |
+| `thread_band.py` | FSL at `--nthr=1` and `--nthr=4` and the original on findings: final costs and the corrected images' p99 (FSL's own thread band on random cases) |
+| `triage_counts.py` | every finding of a trial in one category (its recipe and first failed check), with counts and a reproducer each (finding 36's table) |
+
+`recheck.py` gained the group `mixed axes` (four volumes along y and x: FSL-146).

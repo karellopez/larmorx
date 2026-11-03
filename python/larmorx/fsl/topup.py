@@ -11,8 +11,8 @@ each image or by least-squares restoration of pairs with opposite phase encoding
 Two implementations of each (``docs/licensing.md``): the bit-exact replica from
 ``larmorx-nc``, run as a separate program, and the clean-room original of this package
 (Apache-2.0, written from ``specs/topup.md``, run in this process); ``implementation="auto"``
-runs the replica when ``larmorx-nc`` is installed, else the original. applytopup's original
-does not take the undocumented ``vb2D``, ``vb3D`` and ``vb4D`` methods yet. FSL's deterministic
+runs the replica when ``larmorx-nc`` is installed, else the original (every option of both
+programs, applytopup's undocumented ``vb2D``, ``vb3D`` and ``vb4D`` too). FSL's deterministic
 defects are corrected by default (D13,
 ``docs/api/upstream-defects.md``); ``upstream_defects="reproduce"`` gives FSL's results. FSL's
 environment variables are settings of the call, never read from the process environment
@@ -394,8 +394,7 @@ def applytopup(
     type; float when ``None``); ``verbose`` ``-v``.
 
     ``implementation``: ``"auto"`` (the replica when ``larmorx-nc`` is installed, else the
-    clean-room original), ``"replica"`` or ``"original"`` (which does not take the ``vb``
-    methods yet).
+    clean-room original), ``"replica"`` or ``"original"``.
 
     Raises ``ValueError`` for invalid arguments, :class:`larmorx.ReplicaError` when the replica
     fails, ``RuntimeError`` (applytopup's message) when the original does, and

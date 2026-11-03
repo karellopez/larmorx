@@ -350,7 +350,89 @@ is a question for the spec writer (the part's handoff).
       cases looked at the problem is ill-determined (no regularisation, `Reg = 0`, with
       `--lambda` left out, or a few hundred voxels at the subsampled level) and the original
       ends at the same or a lower cost (3693: 203.02 against FSL's 204.46): the field differs
-      where the objective does not determine it. These wait for the triage's decision (NOTES).
+      where the objective does not determine it. Relay 5b's probes settled them (findings 32
+      to 36, and the triage below).
+
+32. **The mask of an oblique phase encoding** (`first_step.py` with `FIRST_STEP_ACQ`: trial
+    case 3693's images with the rows `0.6 0.8 0` / `-0.6 -0.8 0`, and mixed with `0 1 0`; FSL's
+    `--debug=3` masks): for a volume displaced along more than one axis no axis wraps; a voxel
+    whose sample leaves the level image (`[0, n - 1]` in the level image's voxels) along a
+    displaced axis is invalid. The rule reproduces FSL's mask after the first step voxel for
+    voxel (190 of 190; the original had kept every voxel, 288, and so a cost 4 % lower at FSL's
+    own field: 627.905 against 654.757); since then the oblique probes' costs agree to 6
+    digits. A convention the spec leaves open (§4.3 names one phase-encoding axis): followed in
+    both modes. Spec question.
+
+33. **`--debug`'s images are in FSL's order.** FSL writes them as it holds them (radiological),
+    with no qform or sform: for an input stored neurologically (a positive determinant, trial
+    case 12747) its debug fields are mirrored along x against the input's storage, and the
+    original flipped them back (its debug fields equalled FSL's mirrored to 1e-6). Now written
+    unflipped (12747: 1.1e-6 of 6.6 Hz). The suite compares only the debug files' names, so
+    the trial did not see it; a larmorx mistake, fixed.
+
+34. **The scaled conjugate gradients' probe gradient** (trial cases 12747, 395, 2724, 12118 with
+    `--debug=1 -v`; a probe build that printed the original's `γ`, `κ`, `μ`, `β`, `δ`, `α`):
+    the first step of an SCG level whose start has `Reg > 0` was 1.43 times FSL's (12747: the
+    same direction to 3e-7; the curvature probes `g(x + σd) - g(x)` equal to 1e-3), because the
+    original's gradient at `x + σd` took `λ' = λ·SSD` of `x + σd`. FSL evaluates no cost there,
+    so its `λ'` stays the current point's (the last cost evaluated): with that weight the four
+    cases follow FSL's costs to 6 digits (12747's level-2 step 5696.38 = FSL's; before 6862.3).
+    A convention the spec leaves open (§4.6: "SSD the current first term"): followed in both
+    modes. In the trial's re-check sample its no-movement cubic group went from 3 to 10 of 20
+    agreeing. Spec question.
+
+35. **FSL-146: volumes encoded along different axes** (trial case 3693: four volumes along y,
+    -y, x, -x; `first_step.py` on its volume subsets; temporary builds that wrote the
+    original's per-volume gradient pieces, fitted to FSL's first gradient by least squares). A
+    y pair or an x pair alone gives FSL's first gradient (5e-6); one y and one x volume gives a
+    gradient 0.78 times as long, and FSL's own first Levenberg-Marquardt attempt then raises the
+    cost (1604.65 to 4048.2) while the Gauss-Newton Hessian (FSL's `--debug=3` weights equal
+    the original's to 4e-4) predicts a fall. FSL's gradient is reproduced to the float
+    precision of its debug files (1e-4 of 17 to 28, all subsets, also with oblique phase
+    encodings) by: per axis `a`, the Jacobian term summed over the volumes displaced along `a`
+    of `(ū - u_i)(β_ia - β̄_a)` (`β_ia = t_i p_ia f_i`, `β̄_a = (1/m) Σ_k β_ka`): the volumes
+    not displaced along `a` leave out their `(ū - u_j)(-∂ū/∂c)`, which the cost's own gradient
+    has. With it, the original's reproduce runs follow FSL's costs to 6 digits (3693: 204.456
+    against 204.458; its rejected 4048.27). The input makes sense (AP, PA, LR, RL acquisitions)
+    and the result is wrong: the minimisers step along a direction that is not the cost's
+    gradient and stop where it vanishes (rule A): the default keeps the cost's gradient (a unit
+    test checks it against central differences of the cost) and names FSL-146 whenever some
+    axis has displaced and undisplaced volumes; `reproduce` gives FSL's (on those axes only:
+    elsewhere its term is 0 but for rounding). Measured on the trial's differing four-volume
+    cases: the default's final cost is lower than or equal to FSL's in 86 % (with movements,
+    median 1.6 % lower) and 89 % (without). fMRIPrep's calls (one axis) are not concerned.
+
+36. **Random testing's trial: the triage** (`triage_counts.py`: every one of the 6,999
+    findings in one category by its recipe and first failed check; `recheck.py --per-group 20
+    --seed 3` replayed 513 of them with each fix; `thread_band.py` measured FSL at `--nthr=4`):
+
+    | Findings | Category | Reproducer |
+    |---|---|---|
+    | 4,462 | explained: finding 14 (FSL's movement derivatives; the record's expected divergences) | 6 |
+    | 895 | FSL-146 (rule A; the reproduce runs agree: 17 of 20 without movements in the sample), and with movements finding 14 | 10280 |
+    | 484 | explained: FSL-133 (applytopup's lines whose length does not divide 2^32) | 5 |
+    | 429 | larmorx mistake, fixed: the quadratic B-splines' count (finding 29) | 11095 |
+    | 276 | the suite's mistake, fixed: the transposed acquisition file | 27 |
+    | 216 | partly the SCG weight (finding 34, fixed), the rest explained: the path of ill-determined fits (FSL's own band: at `--nthr=4` 0 on three of four, 5.3e-4 on 12118 against the original's 2.2e-3; cases just past a threshold, 2724: 0.11 Hz for 0.1) | 12118 |
+    | 62 | the suite's mistake, fixed: outputs named by a configuration file | 12 |
+    | 51 | explained: FSL-143 (vb3D/vb4D's indefinite prior, reproduced) | 275 |
+    | 47 | open: quadratic splines' regulariser Hessian at an even knot spacing | 10753 |
+    | 47 | the suite's mistake, fixed: `--trace` with `-v` | 1142 |
+    | 17 | explained: `--debug`'s attempt files (the minimisation's path) | 2150 |
+    | 8 | open: applytopup `lsr` on lines that divide 2^32 (p99 1.4e-3 to 0.13) | 8089 |
+    | 4 | explained: integer outputs (`char`, `short`: values a rounding apart land on neighbouring integers) | 7321 |
+    | 1 | explained: vb2D's transients (the record's `at/vb2d-aniso`) | 13346 |
+
+    The open quadratic item: with `--splineorder=2` and an even knot spacing the knots fall on
+    voxels, where a quadratic B-spline's second derivative jumps; the Levenberg-Marquardt
+    Hessian's regulariser part differs from FSL's (`--debug=3`, case 10753: the data part
+    equal to 2e-7, the regulariser's entries up to 3.4 % apart) while the first gradient and
+    cost agree. Four knot conventions were tried in a probe build (the outer piece, the inner,
+    the left or right limit, their average) and the exact integral and the image's voxels only:
+    the average comes closest (Hessian 4.8e-6 apart instead of 1.4e-5) but none is FSL's. Spec
+    question (§4.6: how is the bending energy of quadratic B-splines evaluated where a knot
+    falls on a voxel?). Case 7283 (`--regrid=0`, a level of 4 x 4 x 4 voxels) differs from the
+    first cost on, as finding 27's short axes do.
 
 ## What the remaining differences are
 

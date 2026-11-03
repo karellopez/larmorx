@@ -459,20 +459,20 @@ pub fn segment(
             }
         }
         // the hard assignment by the smallest square of the summed differences
-        let mf: Vec<Vec<f32>> = means
-            .iter()
-            .map(|m| m.iter().map(|&v| v as f32).collect())
-            .collect();
         post[..nm * n]
             .par_chunks_mut(n)
             .zip(y.par_chunks(s))
             .for_each(|(row, yv)| {
                 let (mut best, mut low) = (0usize, 1e31f32);
                 for c in 0..n {
+                    // the differences and their products in double, the sum single (observed:
+                    // single-precision products move the assignment of a few voxels)
                     let mut d = 0f32;
                     for i in 0..s {
+                        let a = f64::from(yv[i]) - means[i][c];
                         for j in 0..s {
-                            d += (yv[i] - mf[i][c]) * (yv[j] - mf[j][c]);
+                            let b = f64::from(yv[j]) - means[j][c];
+                            d = (f64::from(d) + a * b) as f32;
                         }
                     }
                     if d < low {
@@ -635,7 +635,8 @@ pub fn segment(
     let volumes: Vec<f64> = (0..n)
         .map(|c| (0..nm).map(|i| f64::from(source[i * n + c])).sum::<f64>() * vox)
         .collect();
-    if p.verbose {
+    if p.verbose && p.pve {
+        // the tissue volumes follow the partial volumes only (observed: none with --nopve)
         let mut total = 0f64;
         for (c, v) in volumes.iter().enumerate() {
             let _ = write!(out, "\n tissue {} {}", c + 1, g(*v));

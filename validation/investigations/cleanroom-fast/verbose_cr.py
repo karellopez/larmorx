@@ -26,7 +26,7 @@ from band import preload
 
 
 def main() -> None:
-    for line in sys.argv[1:]:
+    for line in [a for a in sys.argv[1:] if a != "--full"]:
         run = rep.Run(tuple(shlex.split(line)))
         with (
             tempfile.TemporaryDirectory(prefix="lx-fast-vcr_") as a_,
@@ -40,6 +40,9 @@ def main() -> None:
         pl, ql = p.stdout.splitlines(), q.stdout.splitlines()
         diff = [(k, x, y) for k, (x, y) in enumerate(zip(pl, ql, strict=False)) if x != y]
         print(f"== {line}: {len(pl)} / {len(ql)} lines, {len(diff)} differ")
+        if "--full" in sys.argv:
+            print("   FSL+CR:", " | ".join(pl))
+            print("   orig:  ", " | ".join(ql))
         for k, x, y in diff[:6]:
             print(f"   {k}: FSL+CR {x[:150]}")
             print(f"   {k}: orig   {y[:150]}")

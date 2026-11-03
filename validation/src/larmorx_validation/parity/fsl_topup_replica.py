@@ -354,8 +354,12 @@ class Run:
 
 #: The entries the ``fix`` pass may name without a visible change: applytopup's FSL-132 (the
 #: first volume's interpolation) and FSL-133 (the lines' wrap) change values that the
-#: restoration and the output's single precision can round back to the same numbers.
-SILENT: tuple[str, ...] = ("FSL-132", "FSL-133")
+#: restoration and the output's single precision can round back to the same numbers; topup's
+#: FSL-201 (the movements' derivatives, named whenever they are computed) changes nothing when
+#: the minimiser takes no step (``opt/defaults``, ``cfg/directory``: every attempt of FSL's
+#: defaults on the half-resolution pair raises the cost, so the field and the movements stay 0
+#: in both modes, 2026-11-03).
+SILENT: tuple[str, ...] = ("FSL-132", "FSL-133", "FSL-201")
 #: How a profile's durations are masked.
 _DURATION = re.compile(r"Duration: \S+")
 #: The profile's name after ``--out``'s base name (``"_" + __FILE__ + "_" + __func__ + ".txt"``).

@@ -534,6 +534,8 @@ defects! {
         "the undocumented --method=vb3D and vb4D regularise with a smoothness prior whose coupling between a voxel and the voxels next to its neighbours in the adjacent slices (one step along the phase encoding and one slice away) is half what the squared second-difference operator it is built from gives (the coupling within a slice is right)";
     FSL_144 = "FSL-144", "applytopup", true,
         "--method=jac with a phase encoding that has a z component (an acquisition row whose third element is not 0, which topup refuses: it estimates no field for one) silently leaves that component out: the image is displaced along x and y only, so an image encoded along z alone is written uncorrected";
+    FSL_145 = "FSL-145", "topup", true,
+        "with --splineorder=2, an axis shorter than two knot spacings gets two B-spline coefficients (every other axis ceil((2n + k - 4) / (2k)) + 2, which would be four): the field's support ends inside the axis, so the field is forced towards 0 at its far end (exactly 0 from 1.5 spacings on) whatever the images show";
     ITK_50 = "ITK-50", "ITK", true,
         "KdTreeBasedKmeansEstimator never counts the point a k-d tree node is split at when it divides the node between centres: those points are left out of the pass's new centres";
     ITK_51 = "ITK-51", "ITK", true,

@@ -52,7 +52,17 @@ pub fn coefficient_field(
     k: [usize; 3],
     order: u8,
 ) -> Option<FieldOnGrid> {
-    let axes: [Axis; 3] = std::array::from_fn(|a| Axis::of_order(n[a], k[a], order));
+    // the layout whose count is the file's (FSL-145: FSL writes two quadratic coefficients on
+    // an axis shorter than two knot spacings, the default four)
+    let axes: [Axis; 3] = std::array::from_fn(|a| {
+        let axis = Axis::of_order(n[a], k[a], order);
+        let fsl = axis.with_fsl145(true);
+        if axis.ncoef() != cdims[a] && fsl.ncoef() == cdims[a] {
+            fsl
+        } else {
+            axis
+        }
+    });
     if (0..3).any(|a| axes[a].ncoef() != cdims[a]) || coef.len() != cdims.iter().product() {
         return None;
     }

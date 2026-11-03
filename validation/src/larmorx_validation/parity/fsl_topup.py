@@ -346,7 +346,7 @@ def compare_stdout(checks: CheckList, want: str, got: str, band: str | None = No
             b = abs(cb[-1][-1] - cw[-1][-1]) / max(abs(cw[-1][-1]), 1e-300)
             detail += f"; FSL's own band {b:.3g}"
             if not passed and last <= b:
-                passed, detail = True, f"within FSL's own thread band: {detail}"
+                passed, detail = True, f"within FSL's own band: {detail}"
     checks.add(
         Check(
             "-v: the final cost",
@@ -428,7 +428,7 @@ def field_of_coefficients(img) -> np.ndarray | None:
     """The field (Hz) a cubic (intent 2016) or quadratic (2017) ``_fieldcoef`` image defines on
     the input's grid (its knot spacings are its voxel sizes, the field's size its qform's
     translation; coefficient ``i`` centred at voxel ``(i - 1) k``, or ``i`` with ``k = 1``, for
-    both orders: observed); ``None`` for another layout."""
+    both orders, with each order's count: observed); ``None`` for another layout."""
     h = img.header
     code = int(h["intent_code"])
     if code not in (2016, 2017):
@@ -446,7 +446,15 @@ def field_of_coefficients(img) -> np.ndarray | None:
                 return None
             centres = np.arange(nc, dtype=float)
         else:
-            if nc != -(-(n[a] + 1) // k[a]) + 2:
+            if code == 2016:
+                counts = {-(-(n[a] + 1) // k[a]) + 2}
+            else:
+                # quadratic: ceil((2n + k - 4) / 2k) + 2, and FSL's two on an axis shorter than
+                # two spacings (FSL-145; findings of the trial of 2026-11-03)
+                counts = {-(-max(2 * n[a] + k[a] - 4, 0) // (2 * k[a])) + 2}
+                if n[a] < 2 * k[a]:
+                    counts.add(2)
+            if nc not in counts:
                 return None
             centres = (np.arange(nc) - 1.0) * k[a]
         x = np.arange(n[a], dtype=float)
@@ -486,9 +494,32 @@ def _acquisition(d: Path, args: list[str]) -> np.ndarray | None:
     if not name or not (d / name).is_file():
         return None
     try:
-        return np.loadtxt(d / name, ndmin=2)
+        m = np.loadtxt(d / name, ndmin=2)
     except ValueError:
         return None
+    # the transposed form: four rows (the vectors' components, the read-out times)
+    return m.T if m.shape[0] == 4 and m.shape[1] != 4 else m
+
+
+def effective_args(d: Path, args: list[str]) -> list[str]:
+    """``args`` with the options of their ``--config`` file (the case's own in ``d``, or one of
+    FSL's shipped configurations) that the command line does not give: FSL's ``test_acqp``
+    names outputs (``--fout=field_test``, ``--iout=iout_test``)."""
+    name = _option(args, "--config")
+    if not name:
+        return args
+    cands = [d / name, d / f"{name}.cnf"]
+    cands += [rep.fsldir() / "etc" / "flirtsch" / n for n in (name, f"{name}.cnf")]
+    path = next((c for c in cands if c.is_file()), None)
+    if path is None:
+        return args
+    given = {a.split("=", 1)[0] for a in args}
+    extra = []
+    for ln in path.read_text(encoding="utf-8", errors="replace").splitlines():
+        ln = ln.strip()
+        if ln.startswith("--") and "=" in ln and ln.split("=", 1)[0] not in given:
+            extra.append(ln)
+    return [*args, *extra]
 
 
 def _image_in(d: Path, name: str | None) -> Path | None:
@@ -738,6 +769,7 @@ def compare(
     before: set[str],
     band: Callable[[], tuple[rep.Completed, Path] | None] | None = None,
     program: str = PROGRAM,
+    band_name: str = f"--nthr={BAND_THREADS} against 1",
 ) -> None:
     """The original's run (``b``) against FSL's (``a``). ``band()``, when given, returns FSL's
     run at another thread count (its own last-bit band, FSL-116) and its directory: a metric
@@ -748,6 +780,7 @@ def compare(
         detail=f"FSL {oracle.code}, the original {ours.code}",
     )
     fa, fb = _files(a, before), _files(b, before)
+    args = effective_args(a, args)
     checks(
         "Files written",
         set(fa) == set(fb),
@@ -795,9 +828,9 @@ def compare(
         passed, detail = m.passes(), ""
         bv = band_values.get(m.name)
         if bv is not None:
-            detail = f"FSL's own band (--nthr={BAND_THREADS} against 1): {bv:.3g}"
+            detail = f"FSL's own band ({band_name}): {bv:.3g}"
             if not passed and np.isfinite(bv) and m.passes(bv):
-                passed, detail = True, f"within FSL's own thread band: {detail}"
+                passed, detail = True, f"within FSL's own band: {detail}"
         checks.add(
             Check(
                 m.name,
@@ -810,11 +843,18 @@ def compare(
         )
 
 
+_STAGE = re.compile(r"(?:Entering|Leaving) [^\n]*(?:\n|$)")
+
+
 def _split_trace(text: str) -> tuple[str, list[str]]:
-    """``--trace``'s lines (``Entering``/``Leaving`` a stage, FSL's update notes) taken out."""
-    keep, stages = [], []
-    for ln in text.split("\n"):
-        if ln.startswith(("Entering ", "Leaving ")) or "Things not up to date" in ln:
+    """``--trace``'s lines (``Entering``/``Leaving`` a stage, FSL's update notes) taken out,
+    within a line too: with ``-v`` FSL's stages interrupt a cost line where they run (``SSD =
+    6519.96\tn = 2240Entering TopupCF::FieldEnergy``), and the line goes on after them."""
+    stages = [m.group(0).rstrip("\n") for m in _STAGE.finditer(text)]
+    rest = _STAGE.sub("", text)
+    keep = []
+    for ln in rest.split("\n"):
+        if "Things not up to date" in ln:
             stages.append(ln)
         else:
             keep.append(ln)
@@ -898,7 +938,51 @@ def _expected_divergence(checks: CheckList, name: str) -> None:
     raise Outcome(EXPECTED, f"{reason}. Outside the thresholds: {worst}")
 
 
-def _run_case(run: rep.Run, checks: CheckList, name: str = "") -> None:
+#: The relative change of the read-out times in random cases' band: one bit of a float's
+#: mantissa (2^-23).
+LAST_BIT = 2.0**-23
+
+
+def _perturbed_acquisition(d: Path, args: list[str]) -> bool:
+    """The acquisition file ``args`` name in ``d`` rewritten with every read-out time changed
+    in its last float bit (times ``1 + LAST_BIT``), in its own layout; whether it was."""
+    name = _option(args, "--datain") or _option(args, "--acqp")
+    if not name or not (d / name).is_file():
+        return False
+    try:
+        m = np.loadtxt(d / name, ndmin=2)
+    except ValueError:
+        return False
+    transposed = m.shape[0] == 4 and m.shape[1] != 4
+    if transposed:
+        m[3, :] *= 1.0 + LAST_BIT
+    elif m.shape[1] == 4:
+        m[:, 3] *= 1.0 + LAST_BIT
+    else:
+        return False
+    text = "".join(" ".join(f"{v:.17g}" for v in row) + "\n" for row in m)
+    (d / name).write_text(text, encoding="utf-8")
+    return True
+
+
+def _random_band(run: rep.Run, node, settings, stack: contextlib.ExitStack):
+    """A random case's band: FSL's run with its read-out times changed in their last float bit
+    (through the oracle cache), a measure of how far FSL's own result moves for a last-bit
+    change of its inputs on this case (its minimisation's conditioning: short iterations on
+    small phantoms, unregularised fits); ``None`` when it cannot be made."""
+
+    def band() -> tuple[rep.Completed, Path] | None:
+        c = Path(stack.enter_context(tempfile.TemporaryDirectory(prefix="lx-topup-bit_")))
+        args = rep._prepare(run, c, node)
+        if not _perturbed_acquisition(c, args):
+            return None
+        r = rep._oracle(run, args, c, settings)
+        return (r, c) if r.code == 0 else None
+
+    return band
+
+
+def _run_case(run: rep.Run, checks: CheckList, name: str = "", random_case: bool = False) -> None:
     node = rep._source_node()
     settings = dict(run.settings)
     prog = run.program
@@ -939,9 +1023,10 @@ def _run_case(run: rep.Run, checks: CheckList, name: str = "") -> None:
         tempfile.TemporaryDirectory(prefix="lx-topup_") as a_,
         tempfile.TemporaryDirectory(prefix="lx-topup_") as b_,
         tempfile.TemporaryDirectory(prefix="lx-topup-band_") as n_,
+        contextlib.ExitStack() as stack,
     ):
         a, b, an = Path(a_), Path(b_), Path(n_)
-        band = None
+        band = _random_band(run, node, settings, stack) if random_case else None
         if run.single is not None:
             # a thread case: the original at this thread count against FSL at one; FSL's own
             # run at this thread count is its band
@@ -969,7 +1054,20 @@ def _run_case(run: rep.Run, checks: CheckList, name: str = "") -> None:
         )
         if _not_yet(ours):
             raise Outcome(SKIPPED, f"the original does not take this yet: {_not_yet(ours)}")
-        compare(checks, oracle, ours, a, b, args, before, band, program=prog)
+        compare(
+            checks,
+            oracle,
+            ours,
+            a,
+            b,
+            args,
+            before,
+            band,
+            program=prog,
+            band_name="its read-out times changed in their last float bit"
+            if random_case
+            else f"--nthr={BAND_THREADS} against 1",
+        )
         if run.fix and ours.code == 0 and not run.profile:
             fix_pass(
                 checks,
@@ -1054,7 +1152,7 @@ def difftest_case(payload: tuple[rep.Run, rep.Run | None], checks: CheckList) ->
     and movements, as the replica suite's :func:`~.fsl_topup_replica.difftest_case` does."""
     topup, at = payload
     if at is None:
-        _run_case(topup, checks)
+        _run_case(topup, checks, random_case=True)
         return
     with (
         tempfile.TemporaryDirectory(prefix="lx-topup-dts_") as s_,
@@ -1073,7 +1171,7 @@ def difftest_case(payload: tuple[rep.Run, rep.Run | None], checks: CheckList) ->
                     found = found or stem == "_fieldcoef"
         if not found:
             raise Outcome(SKIPPED, "FSL's topup (applytopup's source) wrote no coefficients")
-        _run_case(dataclasses.replace(at, source_dir=str(src)), checks)
+        _run_case(dataclasses.replace(at, source_dir=str(src)), checks, random_case=True)
 
 
 def cases(tier: str) -> list[Case]:

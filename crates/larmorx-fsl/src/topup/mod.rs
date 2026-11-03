@@ -69,10 +69,35 @@ pub struct Params {
     pub single: bool,
     /// FSL-117 reproduced: the membrane energy's Levenberg-Marquardt Hessian per mm.
     pub membrane_hessian_mm: bool,
+    /// FSL-145 reproduced: two quadratic coefficients on an axis shorter than two knot spacings.
+    pub fsl145: bool,
     /// Trilinear interpolation of the images (`--interp=linear`).
     pub linear: bool,
     /// The field's B-spline order (`--splineorder`: 3 or 2).
     pub order: u8,
+}
+
+/// Whether a level's or the output's layout has quadratic B-splines on an axis shorter than two
+/// knot spacings (FSL-145: the two modes lay it differently).
+pub fn meets_fsl145(params: &Params, dims: [usize; 3], voxel: [f64; 3]) -> bool {
+    if params.order != 2 {
+        return false;
+    }
+    let short = |n: [usize; 3], k: [usize; 3]| {
+        (0..3).any(|a| Axis::of_order(n[a], k[a], 2).short_quadratic())
+    };
+    let level = |spec: &LevelSpec| {
+        let s = spec.subsamp.max(1);
+        short(
+            dims.map(|n| (n / s).max(1)),
+            knot_spacing(spec.warpres, voxel.map(|v| v * s as f64)),
+        )
+    };
+    params.levels.iter().any(level)
+        || params
+            .levels
+            .last()
+            .is_some_and(|l| l.subsamp > 1 && short(dims, knot_spacing(l.warpres, voxel)))
 }
 
 /// The knot spacing (voxels) for a resolution of `warpres` mm on voxels of `voxel` mm (§4.2).
@@ -232,7 +257,7 @@ pub fn estimate(
                 f
             }
             _ => Field::zeros(std::array::from_fn(|a| {
-                Axis::of_order(nt[a], k[a], params.order)
+                Axis::of_order(nt[a], k[a], params.order).with_fsl145(params.fsl145)
             })),
         };
         let imgs = match &cached {

@@ -869,6 +869,7 @@ fn settle(
         extra,
         single: given.get("numprec") == Some("float"),
         membrane_hessian_mm: mode == UpstreamDefects::Reproduce,
+        fsl145: mode == UpstreamDefects::Reproduce,
         linear: given.get("interp") == Some("linear"),
         order: if splineorder == 2 { 2 } else { 3 },
     };
@@ -888,6 +889,21 @@ fn settle(
                 }
                 UpstreamDefects::Reproduce => {
                     "Levenberg-Marquardt's Hessian of the membrane energy in mm, as FSL's (its cost in voxels)"
+                }
+            },
+        ));
+    }
+    // FSL-145: quadratic B-splines on an axis shorter than two knot spacings
+    if topup::meets_fsl145(&params, input.vol.shape, input.vol.voxel) {
+        notices.push(Notice::new(
+            &defects::FSL_145,
+            mode,
+            match mode {
+                UpstreamDefects::Fix => {
+                    "an axis shorter than two knot spacings laid with the quadratic B-splines' full count (FSL's two coefficients force the field towards 0 at its far end)"
+                }
+                UpstreamDefects::Reproduce => {
+                    "an axis shorter than two knot spacings laid with two quadratic B-spline coefficients, as FSL's"
                 }
             },
         ));

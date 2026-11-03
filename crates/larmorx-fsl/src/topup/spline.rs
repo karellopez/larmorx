@@ -105,6 +105,9 @@ pub struct Axis {
     pub n: usize,
     pub k: usize,
     pub order: u8,
+    /// FSL-145 reproduced: quadratic B-splines on an axis shorter than two knot spacings get two
+    /// coefficients, as FSL's (which cannot represent a field over the whole axis).
+    pub two_when_short: bool,
 }
 
 impl Axis {
@@ -120,18 +123,44 @@ impl Axis {
             n,
             k: k.max(1),
             order,
+            two_when_short: false,
         }
     }
 
-    /// The same order on another grid or spacing.
-    pub fn like(&self, n: usize, k: usize) -> Axis {
-        Axis::of_order(n, k, self.order)
+    /// The axis with FSL-145 reproduced (`on`) or not.
+    #[must_use]
+    pub fn with_fsl145(self, on: bool) -> Axis {
+        Axis {
+            two_when_short: on,
+            ..self
+        }
     }
 
-    /// The number of coefficients.
+    /// The same order on another grid or spacing (FSL-145's choice kept).
+    pub fn like(&self, n: usize, k: usize) -> Axis {
+        Axis::of_order(n, k, self.order).with_fsl145(self.two_when_short)
+    }
+
+    /// Quadratic B-splines on an axis shorter than two knot spacings (FSL-145: FSL lays two
+    /// coefficients there).
+    pub fn short_quadratic(&self) -> bool {
+        self.order == 2 && self.k > 1 && self.n < 2 * self.k
+    }
+
+    /// The number of coefficients: `ceil((n + 1) / k) + 2` for cubic B-splines; for quadratic
+    /// ones `ceil((2n + k - 4) / (2k)) + 2` (observed: FSL's `_fieldcoef` of 45 grids in random
+    /// testing's trial of 2026-11-03, `docs/findings/fsl-topup-original.md`), FSL's two on an
+    /// axis shorter than two spacings with FSL-145 reproduced; the voxels themselves when `k`
+    /// is 1.
     pub fn ncoef(&self) -> usize {
         if self.k == 1 {
             self.n
+        } else if self.order == 2 {
+            if self.two_when_short && self.short_quadratic() {
+                2
+            } else {
+                (2 * self.n + self.k).saturating_sub(4).div_ceil(2 * self.k) + 2
+            }
         } else {
             (self.n + 1).div_ceil(self.k) + 2
         }
@@ -568,6 +597,18 @@ mod tests {
         assert_eq!(Axis::new(64, 5).ncoef(), 15);
         assert_eq!(Axis::new(40, 4).ncoef(), 13);
         assert_eq!(Axis::new(64, 1).ncoef(), 64);
+        // quadratic: FSL's counts (n, k, count) of the trial's grids, and FSL-145's two
+        for (n, k, c) in [(12, 2, 8), (24, 2, 14), (10, 3, 6), (12, 3, 6), (20, 3, 9), (24, 3, 10),
+            (12, 4, 5), (14, 4, 6), (20, 4, 7), (10, 5, 5), (14, 5, 5), (20, 5, 7), (12, 6, 5),
+            (20, 6, 6), (24, 6, 7), (14, 7, 5), (20, 7, 6), (24, 7, 6), (16, 8, 5), (24, 10, 5)]
+        {
+            assert_eq!(Axis::of_order(n, k, 2).ncoef(), c, "n {n} k {k}");
+        }
+        for (n, k) in [(10, 6), (10, 10), (12, 7), (14, 8), (16, 10)] {
+            assert_eq!(Axis::of_order(n, k, 2).with_fsl145(true).ncoef(), 2, "n {n} k {k}");
+            assert_eq!(Axis::of_order(n, k, 2).ncoef(), 4, "n {n} k {k}");
+        }
+        assert_eq!(Axis::of_order(10, 6, 3).with_fsl145(true).ncoef(), 4);
     }
 
     #[test]

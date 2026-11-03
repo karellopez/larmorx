@@ -301,6 +301,57 @@ is a question for the spec writer (the part's handoff).
     default refuses (exit 1, naming FSL-144), `reproduce` gives FSL's output (the suite's
     `at/jac-z`: FSL's output in `reproduce` mode, the default's refusal).
 
+29. **The quadratic B-splines' count** (random testing's trial of 2026-11-03: 486 cases with
+    `--splineorder=2` whose `_fieldcoef` had another grid than FSL's; FSL's `_fieldcoef` of 45
+    distinct `(n, k)` axes from the oracle cache, `coef_probe.py`-style listing in the trial's
+    triage, and the layout fitted to FSL's `--fout` where the case wrote one): FSL lays
+    `ceil((2n + k - 4) / (2k)) + 2` quadratic coefficients on an axis of `n` voxels at knot
+    spacing `k > 1` (35 of 35 axes with `n >= 2k`; the cubic rule, `ceil((n + 1) / k) + 2`,
+    which finding 16 had taken for both orders, agrees only where the two coincide, as for
+    `opt/splineorder-2`'s 32 voxels at spacing 3), coefficient `i` centred at `(i - 1) k` as for
+    the cubic (FSL's `--fout` reproduced to 1e-7 Hz from its `_fieldcoef` on 12 axes). Spec
+    question (§4.2 gives one count for both orders).
+
+30. **FSL-145: two quadratic coefficients on a short axis.** On every axis shorter than two knot
+    spacings (`n < 2k`: 10 of the 45 axes, e.g. 10 slices at spacing 6, 16 voxels at spacing
+    10) FSL lays 2 quadratic coefficients, centred at `-k` and `0`, where the rule above gives 4
+    (`n = 2k` gives 5: no case between). Their support ends at `1.5 k`, inside the axis: FSL's
+    field is forced towards 0 at the axis' far end (in FSL's own voxel order: the stored first
+    voxel of an x axis it reads flipped), exactly 0 from `1.5 k` on, whatever the images show
+    (trial cases 601 and 377 with `--fout`: FSL's |field| per voxel along the short axis falls
+    from 10.5 Hz to 0.0, from 4754 Hz to 6.9; the original's default stays at 8.6 and 119 Hz).
+    The input makes sense and the result is wrong (rule A): the default lays the axis with the
+    count of every other size and names FSL-145 (`larmorx_core::defects::FSL_145`), `reproduce`
+    lays FSL's two (bit-for-bit the same layout; `with_fsl145`). applytopup reads either count
+    from a `_fieldcoef` file (the file's count decides). A topup run names FSL-145 when one of
+    its levels' grids or its output's (`topup::meets_fsl145`) has such an axis.
+
+31. **Random testing's trial** (2026-11-03, `oracles/difftest/2026-11-03-topup-original`: seed
+    `topup-trial`, the replica trial's cases drawn again, so every FSL run was served from the
+    oracle cache; 14,400 cases in 11 minutes, 12 jobs at one thread, 1.5 GiB per case; the
+    build of `f1288d8`'s Rust): 7,401 agree, 6,999 differ. What it found besides the quadratic
+    count and FSL-145, and what was done (`recheck.py` replays a sample of each group with the
+    fixes: `<scratch>`'s re-check of 427 findings):
+    - the suite's own mistakes, fixed: the transposed acquisition file (four rows) read as rows
+      (277 cases ended in an exception); outputs named by a configuration file (FSL's
+      `test_acqp` names `--fout=field_test` and `--iout=iout_test`) compared as exact files (127
+      cases); `--trace` with `-v`, whose stages FSL prints inside a cost line (47 cases); the
+      field of a quadratic `_fieldcoef` with the new counts;
+    - every exact difference left is a consequence of the minimisations' paths: `--debug`'s
+      attempt files (the number of Levenberg-Marquardt attempts at a level, 25 cases);
+    - the metrics: in cases that estimate the movements, 70 to 98 % differ (fMRIPrep's call on
+      the drawn pairs 89 %), with or without true movements, by medians of 4 to 13 times the
+      thresholds: the movement derivatives of finding 14 (the original's are the cost's exact
+      derivatives, FSL's are not), which the record's expected divergences already name; in
+      cases without movements, 16 to 23 % differ (cubic splines). Their FSL band (FSL's run with
+      its read-out times changed in their last float bit, `parity/fsl_topup.py`'s
+      `_random_band`) is small (e.g. case 3693: 1.2e-4 for the corrected images' p99 against the
+      original's 3.0): FSL's own result does not move, the original's path differs. In the
+      cases looked at the problem is ill-determined (no regularisation, `Reg = 0`, with
+      `--lambda` left out, or a few hundred voxels at the subsampled level) and the original
+      ends at the same or a lower cost (3693: 203.02 against FSL's 204.46): the field differs
+      where the objective does not determine it. These wait for the triage's decision (NOTES).
+
 ## What the remaining differences are
 
 With the transitions settled, fMRIPrep's two calls differ from FSL as FSL differs from itself at

@@ -186,6 +186,7 @@ METRICS: dict[str, Callable[[dict], dict[str, int]]] = {
     # as BET's
     "fsl-fast-replica": _bet,
     "fsl-fast": _bet,
+    "fsl-topup-replica": _bet,
     # The data panel's records of the ANTs tools (2026-10-26): the same metrics as their
     # standard records.
     "ants-apply-transforms-panel": _bit_identical(),

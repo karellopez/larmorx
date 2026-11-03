@@ -103,6 +103,7 @@ def main() -> None:
     ap.add_argument("--mode", default=defects.REPRODUCE)
     ap.add_argument("--fsl-only", action="store_true")
     ap.add_argument("--quiet", action="store_true", help="streams' first and last lines only")
+    ap.add_argument("--diff", action="store_true", help="the streams' differences only")
     a = ap.parse_args()
     out = Path(a.out)
     shutil.rmtree(out, ignore_errors=True)
@@ -146,16 +147,26 @@ def main() -> None:
         for ln in lines:
             print("  " + ln)
 
-    show("FSL stdout", p.stdout)
-    show("FSL stderr", p.stderr)
+    if not a.diff:
+        show("FSL stdout", p.stdout)
+        show("FSL stderr", p.stderr)
     if a.fsl_only:
         return
     t0 = time.time()
     q = _run_original(args, fb, settings, a.mode)
     t1 = time.time()
     print(f"original: exit {q.code} ({t1 - t0:.1f} s)")
-    show("original stdout", q.stdout)
-    show("original stderr", q.stderr)
+    if a.diff:
+        import difflib
+
+        for name, x, y in (("stdout", p.stdout, q.stdout), ("stderr", p.stderr, q.stderr)):
+            d = list(difflib.unified_diff(x.splitlines(), y.splitlines(), "FSL", "original", n=1))
+            print(f"--- {name}: " + ("identical" if not d else f"{len(d)} diff lines"))
+            for ln in d[2:]:
+                print("  " + ln)
+    else:
+        show("original stdout", q.stdout)
+        show("original stderr", q.stderr)
     agreement(fa, fb)
 
 

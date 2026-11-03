@@ -769,6 +769,10 @@ pub fn run(
                     .iter()
                     .all(|c| c.input.vol.data.first().is_some_and(|&v| v > 0.0))
             {
+                if o.verbose {
+                    // FAST starts the prior-based initialisation before it fails (observed)
+                    let _ = writeln!(out, "Beginning prior-based initialisation");
+                }
                 print_notices(err, &notices);
                 let _ = writeln!(err, "Image Exception : #5 :: Out of Bounds (time index)");
                 return abort(
@@ -778,6 +782,9 @@ pub fn run(
                     "Out of Bounds (time index)",
                 );
             } else {
+                if o.verbose {
+                    let _ = writeln!(out, "Beginning prior-based initialisation");
+                }
                 return refuse(
                     err,
                     &notices,

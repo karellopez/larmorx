@@ -581,11 +581,13 @@ pub fn segment(
                 row[best] = 1.0;
             });
         for it in 0..p.init_iterations.max(0) {
+            q = members(&post, n, nm);
+            classes = class_stats(&q, &y, n, s)?;
+            // printed once the iteration's covariances are inverted: where one is singular FAST
+            // aborts without this line (observed)
             if p.verbose {
                 let _ = writeln!(out, "KMeans Iteration {it}");
             }
-            q = members(&post, n, nm);
-            classes = class_stats(&q, &y, n, s)?;
             likelihoods(&classes, &y, s, &mut post);
         }
         q = members(&post, n, nm);

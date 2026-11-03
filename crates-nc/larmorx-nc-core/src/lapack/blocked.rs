@@ -523,7 +523,14 @@ pub fn getrs_any(
         "getrs_any: one right-hand side takes TRSV (not this path)"
     );
     laswp_plus(b, ldb, 0..nrhs, 1, n, ipiv);
-    // trsm_L.c: the columns in chunks of 24 while that many remain, then of 8, then the rest.
+    let calls = trsm_calls(nrhs);
+    trsm_lt_unit(Some(lu), b, lda, 0, n, ldb, 0, &calls);
+    trsm_ln_nonunit(lu, lda, n, b, ldb, &calls);
+}
+
+/// trsm_L.c's kernel calls over `nrhs` columns: chunks of 24 while that many remain, then of
+/// 8, then the rest.
+fn trsm_calls(nrhs: usize) -> Vec<(usize, usize)> {
     let mut calls = Vec::new();
     let mut jjs = 0;
     while jjs < nrhs {
@@ -538,8 +545,23 @@ pub fn getrs_any(
         calls.push((jjs, w));
         jjs += w;
     }
-    trsm_lt_unit(Some(lu), b, lda, 0, n, ldb, 0, &calls);
-    trsm_ln_nonunit(lu, lda, n, b, ldb, &calls);
+    calls
+}
+
+/// `TRSM_LNLU` (one thread), `X = L⁻¹B` in place for the unit lower triangle of the `n × n`
+/// array `l` and `nrhs` ≥ 2 columns of `b`, `n` ≤ `GEMM_Q`: [`getrs_any`]'s first solve
+/// (`dtrtrs('L', 'N', 'N')` of a triangle with ones on its diagonal gives the same values: the
+/// kernel multiplies by the packed reciprocal 1).
+pub fn trsm_lnlu_any(l: &[f64], n: usize, lda: usize, b: &mut [f64], ldb: usize, nrhs: usize) {
+    assert!(n <= GEMM_Q && nrhs >= 2, "trsm_lnlu_any: not this path");
+    trsm_lt_unit(Some(l), b, lda, 0, n, ldb, 0, &trsm_calls(nrhs));
+}
+
+/// `TRSM_LNUN` (one thread), `X = U⁻¹B` in place for the upper triangle of the `n × n` array
+/// `u` (`dtrtrs('U', 'N', 'N')`), `nrhs` ≥ 2, `n` ≤ `GEMM_Q`: [`getrs_any`]'s second solve.
+pub fn trsm_lnun_any(u: &[f64], n: usize, ldu: usize, b: &mut [f64], ldb: usize, nrhs: usize) {
+    assert!(n <= GEMM_Q && nrhs >= 2, "trsm_lnun_any: not this path");
+    trsm_ln_nonunit(u, ldu, n, b, ldb, &trsm_calls(nrhs));
 }
 
 /// `dgesv` of the `n × n` matrix `a` (overwritten by its LU factors) and the `n × nrhs`

@@ -726,19 +726,19 @@ impl Collections {
     }
 }
 
-/// Armadillo's `band_helper::is_band(KL, KU, A, 32)`: whether `solve()` would take its band
-/// solver for the square matrix `a` (the corners zero and few enough diagonals).
-fn is_band(a: &Mat) -> bool {
+/// Armadillo's `band_helper::is_band(KL, KU, A, 32)`: `Some((KL, KU))` when `solve()` would take
+/// its band solver for the square matrix `a` (its corners zero and few enough diagonals).
+fn is_band(a: &Mat) -> Option<(usize, usize)> {
     let n = a.rows();
     if n < 32 {
-        return false;
+        return None;
     }
     let at = |r: usize, c: usize| a.at(r, c);
     if at(n - 2, 0) != 0.0 || at(n - 1, 0) != 0.0 || at(n - 2, 1) != 0.0 || at(n - 1, 1) != 0.0 {
-        return false;
+        return None;
     }
     if at(0, n - 2) != 0.0 || at(1, n - 2) != 0.0 || at(0, n - 1) != 0.0 || at(1, n - 1) != 0.0 {
-        return false;
+        return None;
     }
     let threshold = (n * n) / 4;
     let (mut kl, mut ku) = (0usize, 0usize);
@@ -762,11 +762,11 @@ fn is_band(a: &Mat) -> bool {
             ku = ku.max(uc);
             let nnz = n * (kl + ku + 1) - (kl * (kl + 1) + ku * (ku + 1)) / 2;
             if nnz > threshold {
-                return false;
+                return None;
             }
         }
     }
-    true
+    Some((kl, ku))
 }
 
 /// The 1-norm (largest column sum of magnitudes); NaN propagates.
@@ -782,12 +782,73 @@ fn norm1(a: &Mat) -> f64 {
     m
 }
 
+/// `solve()`'s band solver (`auxlib::solve_band_rcond`: LAPACK `dgbtrf`, then `dgbtrs`) on
+/// `b` in place, for the two band matrices armawrap's inverse meets: the unit lower triangle `L`
+/// of an LU (`ku` = 0, every multiplier below 1 in magnitude, so `dgbtf2` neither swaps nor
+/// changes it: `dgbtrs` then subtracts each row's multiples with `DGER`, and divides by the unit
+/// diagonal with `DTBSV`) and the upper triangle `U` (`kl` = 0: `DTBSV`'s back substitution,
+/// OpenBLAS's `tbsv_NUN`: each element divided by its diagonal, then `AXPY` of its column).
+fn band_solve(a: &Mat, kl: usize, ku: usize, b: &mut Mat) -> Result<(), String> {
+    use larmorx_nc_core::lapack::blas::{self, MatRef};
+    let (n, nrhs) = (a.rows(), b.cols());
+    if kl >= 32 || (kl > 0 && ku > 0) {
+        return Err(
+            "a band system of this shape (Armadillo's band solver: LAPACK's blocked dgbtrf) is \
+             not replicated yet"
+                .to_owned(),
+        );
+    }
+    if kl > 0 {
+        // dgbtf2: IDAMAX keeps the diagonal (1) unless a multiplier is as large or larger
+        for j in 0..n {
+            for i in j + 1..(j + 1 + kl).min(n) {
+                let v = a.at(i, j).abs();
+                if v.is_nan() || v >= 1.0 {
+                    return Err(
+                        "a band system whose LAPACK factorization would pivot is not \
+                         replicated yet"
+                            .to_owned(),
+                    );
+                }
+            }
+        }
+        let data = b.as_mut_slice();
+        for j in 0..n.saturating_sub(1) {
+            let lm = kl.min(n - 1 - j);
+            if lm == 0 {
+                continue;
+            }
+            let x: Vec<f64> = (0..lm).map(|r| a.at(j + 1 + r, j)).collect();
+            let y: Vec<f64> = (0..nrhs).map(|c| data[c * n + j]).collect();
+            blas::dger(-1.0, &x, &y, data, MatRef { off: j + 1, ld: n });
+        }
+    }
+    let k = kl + ku;
+    for c in 0..nrhs {
+        let col = &mut b.as_mut_slice()[c * n..(c + 1) * n];
+        for i in (0..n).rev() {
+            col[i] /= a.at(i, i);
+            let length = i.min(k);
+            if length > 0 {
+                // the band column above the diagonal: U's, or the zeroed fill-in of L's
+                let x: Vec<f64> = (0..length)
+                    .map(|r| if kl > 0 { 0.0 } else { a.at(i - length + r, i) })
+                    .collect();
+                let da = -col[i];
+                blas::axpy_k(da, &x, 1, &mut col[i - length..i], 1);
+            }
+        }
+    }
+    Ok(())
+}
+
 /// `CroutMatrix XtX = KtK; XtX.i()`: armawrap's LU (`arma::lu`: LAPACK `dgetrf`, then `L`
 /// with its unit diagonal and `U` apart, `P` from the pivots) and the inverse its constructor
-/// computes, `U⁻¹ (L⁻¹ (P I))`, by two `solve()` calls on triangular matrices (LAPACK
-/// `dtrtrs`: OpenBLAS's triangular kernels, the same as `dgetrs`'s on the identity). `Err`
-/// where Armadillo would take another solver (a band matrix) or its approximate solution (a
-/// condition estimate below machine precision), neither replicated.
+/// computes, `U⁻¹ (L⁻¹ (P I))`, by two `solve()` calls: each a band solve when Armadillo finds the
+/// triangle banded (at least 32 rows), else a triangular one (LAPACK `dtrtrs`: OpenBLAS's
+/// triangular kernels, as `dgetrs` uses them). `Err` where Armadillo would take a path not
+/// replicated (its approximate solution for a condition estimate below machine precision,
+/// blocked band factorizations).
 fn crout_inverse(ktk: &Mat) -> Result<Mat, String> {
     let n = ktk.rows();
     if n > 256 {
@@ -818,17 +879,27 @@ fn crout_inverse(ktk: &Mat) -> Result<Mat, String> {
         }
         l.set(c, c, 1.0);
     }
-    if is_band(&l) || is_band(&u) {
-        return Err(
-            "the field gives a band system on this line (it is zero at both ends of the line): \
-             Armadillo's band solver is not replicated yet"
-                .to_owned(),
-        );
+    // P I: the identity's rows interchanged as the pivots say
+    let mut perm: Vec<usize> = (0..n).collect();
+    for (i, &p) in ipiv.iter().enumerate() {
+        perm.swap(i, p as usize - 1);
     }
-    let mut b = Mat::eye(n);
-    blocked::getrs_any(&lu, n, n, &ipiv, b.as_mut_slice(), n, n);
-    // dtrcon's estimates are at least the true reciprocal condition numbers, which are at
-    // least 1 / (|L| |U| |inverse|): far above machine precision, Armadillo keeps the solution
+    let mut b = Mat::zeros(n, n);
+    for (row, &src) in perm.iter().enumerate() {
+        b.set(row, src, 1.0);
+    }
+    match is_band(&l) {
+        Some((kl, ku)) => band_solve(&l, kl, ku, &mut b)?,
+        // a diagonal L (the identity) is upper triangular too: either solve gives P
+        None => blocked::trsm_lnlu_any(&lu, n, n, b.as_mut_slice(), n, n),
+    }
+    match is_band(&u) {
+        Some((kl, ku)) => band_solve(&u, kl, ku, &mut b)?,
+        None => blocked::trsm_lnun_any(&lu, n, n, b.as_mut_slice(), n, n),
+    }
+    // dtrcon's (and dgbcon's) estimates are at least the true reciprocal condition numbers,
+    // which are at least 1 / (|L| |U| |inverse|): far above machine precision, Armadillo keeps
+    // the solution
     let g = 1.0 / (norm1(&l) * norm1(&u) * norm1(&b));
     if g.is_nan() || g <= 1e-12 {
         return Err(

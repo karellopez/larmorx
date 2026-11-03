@@ -1369,6 +1369,8 @@ def topup_outputs(source: str) -> Path:
     """FSL's topup outputs for :data:`TOPUP_SOURCES` ``source`` (its coefficients, movements
     and --fout field as ``tu_fieldcoef.nii.gz``, ``tu_movpar.txt``, ``tu_field.nii.gz``),
     from a run through the oracle cache, kept in ``applytopup-v2/<source>/``."""
+    if source == "zero":
+        return _zero_source()
     spec = TOPUP_SOURCES[source]
     run = _option_cases()[spec][2] if isinstance(spec, str) else spec
 
@@ -1387,6 +1389,24 @@ def topup_outputs(source: str) -> Path:
                     shutil.copy(t / name, d / new)
 
     return _atomic_dir(inputs() / f"applytopup-v{AT_VERSION}" / source, make)
+
+
+def _zero_source() -> Path:
+    """The ``y`` source's coefficients with every value 0 (the header's bytes kept: the data
+    replaced in the decompressed file), its movements: a field with no displacement, whose
+    least-squares systems are band matrices."""
+    import gzip
+
+    y = topup_outputs("y")
+
+    def make(d: Path) -> None:
+        raw = bytearray(gzip.decompress((y / "tu_fieldcoef.nii.gz").read_bytes()))
+        offset = int(np.frombuffer(bytes(raw[108:112]), "<f4")[0])
+        raw[offset:] = bytes(len(raw) - offset)
+        (d / "tu_fieldcoef.nii.gz").write_bytes(gzip.compress(bytes(raw), mtime=0))
+        shutil.copy(y / "tu_movpar.txt", d / "tu_movpar.txt")
+
+    return _atomic_dir(inputs() / f"applytopup-v{AT_VERSION}" / "zero", make)
 
 
 def _applytopup_cases() -> dict[str, tuple[str, str, Run]]:
@@ -1461,6 +1481,15 @@ def _applytopup_cases() -> dict[str, tuple[str, str, Run]]:
         tu,
         out,
         source="crop",
+    )
+    add(
+        "lsr-zero-field",
+        "least-squares restoration with a field of zeros (band systems: Armadillo's band solver)",
+        *pair,
+        acq,
+        tu,
+        out,
+        source="zero",
     )
     add("jac-y", "Jacobian modulation of one image", *up, acq, tu, out, jac)
     add("jac-pair", "Jacobian modulation of the pair, averaged", *pair, acq, tu, out, jac)

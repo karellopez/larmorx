@@ -184,6 +184,12 @@ PAGES = [
         ],
     ),
     (
+        "/tools/fsl-topup/",
+        "topup and applytopup",
+        "fsl",
+        [("larmorx-nc replica", "fsl-topup-replica", "experimental", None, None)],
+    ),
+    (
         "/tools/resample-series/",
         "One-shot BOLD resampler",
         "larmorx",

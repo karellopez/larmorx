@@ -20,7 +20,9 @@ larmorx-nc`; otherwise `ReplicaNotFoundError`), `"original"` raises `NotImplemen
 command line chooses alike (`LARMORX_IMPLEMENTATION`).
 
 **Status: `experimental`**: the replica against FSL 6.0.7.23 itself (the parity suite
-`fsl-topup-replica`; its record is made with the part's last step): fMRIPrep's topup call
+`fsl-topup-replica`, record [fsl-topup-replica](../validation/fsl-topup-replica.md), 2026-11-03:
+104 of 104 compared cases bit-identical, 66 more rejected by both alike, 3 refused in both modes;
+random testing's trial: 14,460 cases, every one bit-identical): fMRIPrep's topup call
 bit-identical on its two oracle runs (ds005040 and ds001600: every file topup writes), every
 option of topup (precision, interpolation, both regularisers, spline orders, scaling,
 regridding, the minimisers per level, the movements, FSL's shipped configurations, x and y and
@@ -155,6 +157,6 @@ changes a result is named on standard error and as an `UpstreamDefectWarning`
   encoding, and band systems that need LAPACK's blocked band factorisation, are refused in both
   modes with a clear message (`larmorx-nc: ... not replicated`): FSL's arithmetic there follows
   other OpenBLAS and Armadillo paths, which the replica does not reproduce yet.
-- The record (`docs/validation/fsl-topup-replica.md`), the random-testing trial and the site's
-  page: the part's last steps. The full tier, the data panel's PEPOLAR runs and long random
-  testing: in the final validation phase.
+- The full tier, the data panel's PEPOLAR runs and long random testing: in the final validation
+  phase (the record's standard tier holds fMRIPrep's calls on its two oracle runs; the site's page,
+  `/tools/fsl-topup/`, shows them with every case of the record).

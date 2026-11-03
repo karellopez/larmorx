@@ -29,6 +29,7 @@ TOOLS: dict[str, str] = {
     "fsl-bet": "fsl_bet",
     "fsl-flirt": "fsl_flirt",
     "fsl-fast": "fsl_fast",
+    "fsl-topup": "fsl_topup",
     "mri-hmc": "mri_hmc",
     "resample-series": "resample_series",
     "nifti-io": "nifti_io",

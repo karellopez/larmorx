@@ -10,12 +10,14 @@
 
 use std::io::Write;
 
+use larmorx_core::defects;
 use larmorx_nc_core::bfmatrix::Precision;
 use larmorx_nc_core::nonlin::NlMethod;
 use larmorx_nc_core::options::{ArgFlag, Opt, OptionParser, Parsed, Value};
 use larmorx_nc_core::settings::Settings;
 use larmorx_nc_core::volume::{self, FslError};
 
+use crate::Console;
 use crate::costfn::Regularisation;
 use crate::fileio::Datafile;
 use crate::scan::{InterpType, topup_error};
@@ -366,6 +368,7 @@ impl Clp {
         fsl: &Settings,
         cerr: &mut Vec<String>,
         warnings: &mut Vec<String>,
+        con: &Console,
     ) -> Result<Clp, FslError> {
         let st = |k: &str| r.get(p, k);
         let imain = st("--imain").str().to_owned();
@@ -384,9 +387,24 @@ impl Clp {
         let dname = if datain.set { datain.str() } else { acqp.str() };
         let datafile = Datafile::read(dname, cerr)?;
         if datafile.n() as i64 != nvols {
-            return Err(topup_error(&format!(
-                "topup_clp::topup_clp: Mismatch between {imain} and {}",
+            // FSL-120: FSL names --datain's value, empty when --acqp gave the file
+            let named = if acqp.set && !con.reproduce() {
+                con.notice(
+                    &defects::FSL_120,
+                    "the mismatch names the --acqp file, not --datain's empty value",
+                );
+                acqp.str()
+            } else {
+                if acqp.set {
+                    con.notice(
+                        &defects::FSL_120,
+                        "the mismatch names --datain's empty value, not the --acqp file",
+                    );
+                }
                 datain.str()
+            };
+            return Err(topup_error(&format!(
+                "topup_clp::topup_clp: Mismatch between {imain} and {named}"
             )));
         }
         let mut zero_i = 9999usize;
@@ -615,6 +633,11 @@ impl Clp {
         Ok(f64::from(self.lambda[self.check(level, "Lambda")?]))
     }
 
+    /// `--miter` at `level` as given (FSL-123: a negative value).
+    pub fn max_iter_signed(&self, level: usize) -> i32 {
+        self.miter.get(level.wrapping_sub(1)).copied().unwrap_or(0)
+    }
+
     pub fn max_iter(&self, level: usize) -> Result<u32, FslError> {
         Ok(self.miter[self.check(level, "MaxIter")?] as u32)
     }
@@ -655,6 +678,7 @@ pub fn parse(
     fsl: &Settings,
     cout: &mut dyn Write,
     cerr: &mut dyn Write,
+    con: &Console,
 ) -> ParseEnd {
     let p = parser();
     let usage = |cerr: &mut dyn Write| {
@@ -673,7 +697,23 @@ pub fn parse(
         let fname = match existing_conf_file(config.str(), fsl) {
             Ok(f) => f,
             Err(what) => {
-                let _ = write!(cerr, "\n{what}\n");
+                // FSL-121 (rule B): string(getenv("FSLDIR")) of a null pointer
+                if con.reproduce() {
+                    con.notice(
+                        &defects::FSL_121,
+                        "FSLDIR unset: the C++ library's text instead of what is missing",
+                    );
+                    let _ = write!(cerr, "\n{what}\n");
+                    return ParseEnd::Exit(1);
+                }
+                con.notice(&defects::FSL_121, "FSLDIR unset: a clear message");
+                let _ = writeln!(
+                    cerr,
+                    "larmorx-nc: error: topup: --config={}: no such file here, and FSLDIR is \
+                     unset, so FSL's configurations ($FSLDIR/etc/flirtsch) cannot be searched \
+                     (FSL-121)",
+                    config.str()
+                );
                 return ParseEnd::Exit(1);
             }
         };
@@ -681,10 +721,22 @@ pub fn parse(
             let _ = writeln!(cerr, "Cannot find config-file {}", config.str());
             return ParseEnd::Exit(1);
         }
-        if let Err(msg) = p.parse_config_file(&mut parsed, &fname) {
-            usage(cerr);
-            let _ = write!(cerr, "\n{msg}\n");
-            return ParseEnd::Exit(1);
+        // FSL-122 (rule A): FSL's reading ends at a line longer than 1023 characters
+        match p.parse_config_file_lines(&mut parsed, &fname, !con.reproduce()) {
+            Err(msg) => {
+                usage(cerr);
+                let _ = write!(cerr, "\n{msg}\n");
+                return ParseEnd::Exit(1);
+            }
+            Ok(true) => con.notice(
+                &defects::FSL_122,
+                if con.reproduce() {
+                    "the settings after a configuration line of more than 1023 characters ignored"
+                } else {
+                    "the settings after a configuration line of more than 1023 characters read"
+                },
+            ),
+            Ok(false) => {}
         }
     }
     if parsed.get(&p, "-h,--help").bool() || p.check_compulsory(&parsed).is_some() {
@@ -692,7 +744,7 @@ pub fn parse(
         return ParseEnd::Exit(1);
     }
     let (mut lines, mut warnings) = (Vec::new(), Vec::new());
-    let made = Clp::new(&p, &parsed, fsl, &mut lines, &mut warnings);
+    let made = Clp::new(&p, &parsed, fsl, &mut lines, &mut warnings, con);
     for w in &warnings {
         let _ = writeln!(cout, "{w}");
     }

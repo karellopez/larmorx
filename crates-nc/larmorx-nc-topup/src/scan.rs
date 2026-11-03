@@ -557,7 +557,7 @@ impl Scan {
             self.subsamp = None;
             self.smooth = None;
         }
-        con.trace(self.tp, "Leaving TopupScan::Regrid");
+        con.trace(self.tp, "Leaving TopupScan::ReGrid");
         Ok(())
     }
 
@@ -998,14 +998,18 @@ impl ScanManager {
         Ok(&self.mean)
     }
 
-    /// Updates the means (`update(field)`) and returns them: the mean, its alpha, beta and
-    /// gamma, and the mask.
+    /// Updates the means and returns them: the mean, its alpha, beta and gamma, and the mask.
+    /// `getters`: how many of FSL's `GetMean`, `GetMeanAlpha`, ..., `GetMask` the caller makes,
+    /// each an `update(field)` (with `--trace`, each prints its entry and exit).
     pub fn means(
         &mut self,
         con: &Console,
         field: &mut SplineField,
+        getters: usize,
     ) -> Result<(Volume, Volume, Volume, Volume, Volume<i8>), FslError> {
-        self.update(con, field)?;
+        for _ in 0..getters.max(1) {
+            self.update(con, field)?;
+        }
         Ok((
             self.mean.clone(),
             self.mean_alpha.clone(),

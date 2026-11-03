@@ -498,6 +498,26 @@ defects! {
         "-S n with images of different sizes reads and writes the smaller images past their ends (over channel 1's grid)";
     FSL_111 = "FSL-111", "applyxfm4D", true,
         "a uint8 image is read into a char image, signed on x86-64: its values 128 to 255 are read as v - 256 (255 as -1), so interpolating across 127 and 128, the background value (the border's 10th percentile) and the spline's coefficients are those of the negative values; the output's own conversion wraps a signed char back to its byte";
+    FSL_117 = "FSL-117", "topup", true,
+        "with --regmod=membrane_energy, Levenberg-Marquardt's steps use a Hessian of the membrane energy measured in mm (each first derivative divided by the voxel size) while the cost and its gradient measure it in voxels: the regularisation's curvature is underestimated by the squared voxel size, so the steps do not follow the cost being minimised";
+    FSL_118 = "FSL-118", "topup", true,
+        "with --regrid=1 (the default), subsamplings whose largest does not divide the others (3 and 2) stop topup at the first level with the smaller one with \"invalid subsampling factor\", although each divides the image and the command line's check accepted them: the grid is the image grown by the largest subsampling, which the smaller one does not divide";
+    FSL_119 = "FSL-119", "topup", true,
+        "--fout and --featout's field maps carry the input's intent parameters shifted by one place: the first is written as 0, the second and third as the input's first and second (its third lost)";
+    FSL_120 = "FSL-120", "topup", true,
+        "with --acqp, an acquisition-parameter file whose number of rows differs from the number of volumes is reported as a mismatch between the image and an empty name (the --datain value, which is not set)";
+    FSL_121 = "FSL-121", "topup", true,
+        "with FSLDIR unset, a --config name that is not found where topup runs stops topup with the C++ library's text basic_string: construction from null is not valid, which does not say what is missing";
+    FSL_122 = "FSL-122", "topup", true,
+        "a line of a --config file whose text after its first word is longer than 1023 characters (a long comment) ends the reading of the file there: every setting after it is silently ignored and its defaults used";
+    FSL_123 = "FSL-123", "topup", true,
+        "a negative --miter at a level runs no iteration there (the level's estimation is skipped silently): the number of iterations is compared as a signed number below an unsigned maximum";
+    FSL_124 = "FSL-124", "topup", true,
+        "a negative --warpres gives a knot spacing of about four billion voxels (a negative number converted to unsigned): the spline field's kernels need more memory than any machine has, so topup is killed or stops with an allocation failure";
+    FSL_125 = "FSL-125", "topup", true,
+        "a negative --fwhm is accepted and smooths the images with a kernel of that negative width, an arbitrary filter";
+    FSL_126 = "FSL-126", "topup", true,
+        "a negative --lambda is accepted: the regularisation rewards a rough field, so the minimisation drives the field to large values and the cost below zero";
     ITK_50 = "ITK-50", "ITK", true,
         "KdTreeBasedKmeansEstimator never counts the point a k-d tree node is split at when it divides the node between centres: those points are left out of the pass's new centres";
     ITK_51 = "ITK-51", "ITK", true,

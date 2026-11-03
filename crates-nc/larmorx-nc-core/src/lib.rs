@@ -70,6 +70,7 @@ pub mod nifti;
 pub mod nonlin;
 pub mod optimise;
 pub mod options;
+pub mod profiler;
 pub mod settings;
 pub mod splinterpolator;
 pub mod spmat;

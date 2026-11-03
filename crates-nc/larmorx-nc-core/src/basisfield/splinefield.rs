@@ -768,6 +768,14 @@ impl SplineField {
         self.memen_bender_h(EnergyType::MemEn)
     }
 
+    /// The membrane energy's Hessian in the units of [`Self::mem_energy`] and
+    /// [`Self::mem_energy_grad`] (first derivatives in voxels, twice): not FSL's, which divides
+    /// each derivative by the voxel size (FSL-117; larmorx's correction of topup's
+    /// Levenberg-Marquardt steps).
+    pub fn mem_energy_hess_in_voxels(&self) -> Result<Csc, FslError> {
+        self.memen_bender_h(EnergyType::MemEnVoxels)
+    }
+
     /// `BendEnergyHess(prec)`: the bending energy's Hessian.
     pub fn bend_energy_hess(&self) -> Result<Csc, FslError> {
         self.memen_bender_h(EnergyType::BendEn)
@@ -782,12 +790,14 @@ impl SplineField {
         let vxs = self.vxs;
         let mut helpers: Vec<MemenHelper> = Vec::with_capacity(6);
         match et {
-            EnergyType::MemEn => {
+            EnergyType::MemEn | EnergyType::MemEnVoxels => {
                 for d in 0..3 {
                     let mut deriv = [0u32; 3];
                     deriv[d] = 1;
                     let mut spd = Spline3D::new(ord, lksp, deriv)?;
-                    spd.divide(vxs[d])?;
+                    if et == EnergyType::MemEn {
+                        spd.divide(vxs[d])?;
+                    }
                     let mut h = MemenHelper::new(&spd)?;
                     h.scale(2.0);
                     helpers.push(h);
@@ -856,6 +866,8 @@ impl SplineField {
 #[derive(Clone, Copy, PartialEq, Eq)]
 enum EnergyType {
     MemEn,
+    /// The membrane energy without the voxel sizes (larmorx's, FSL-117).
+    MemEnVoxels,
     BendEn,
 }
 

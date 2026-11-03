@@ -7,12 +7,15 @@
 //! coefficients, the field and the movement parameters (`TopupFileWriter`), and the
 //! movement-parameter matrices (`MovePar2Matrix`, `Matrix2MovePar`).
 
+use larmorx_core::defects;
 use larmorx_nc_core::arma::Mat;
 use larmorx_nc_core::basisfield::{FieldIndex, SplineField};
 use larmorx_nc_core::cnum;
 use larmorx_nc_core::miscmaths::{self, MatrixFileError};
 use larmorx_nc_core::nifti;
 use larmorx_nc_core::volume::{FslError, Volume};
+
+use crate::Console;
 
 /// `FSL_TOPUP_CUBIC_SPLINE_COEFFICIENTS`.
 pub const CUBIC_SPLINE_COEFFICIENTS: i32 = 2016;
@@ -198,7 +201,12 @@ pub fn coefficient_volume(field: &SplineField) -> Result<Volume, FslError> {
 /// intent `FSL_TOPUP_FIELD` with `ref`'s intent parameters shifted by one (FSL passes
 /// `intent_param(0)`, which is 0, `intent_param(1)` and `intent_param(2)`), no display range,
 /// scaled by `sf` unless it is 1.
-pub fn field_volume(rf: &Volume, field: &mut SplineField, sf: f64) -> Result<Volume, FslError> {
+pub fn field_volume(
+    rf: &Volume,
+    field: &mut SplineField,
+    sf: f64,
+    con: &Console,
+) -> Result<Volume, FslError> {
     let fsz = field.field_size();
     if rf.xsize() != i64::from(fsz[0])
         || rf.ysize() != i64::from(fsz[1])
@@ -221,7 +229,19 @@ pub fn field_volume(rf: &Volume, field: &mut SplineField, sf: f64) -> Result<Vol
     field.as_volume(&mut out, FieldIndex::Field)?;
     let p = out.intent_params;
     out.intent_code = TOPUP_FIELD;
-    out.intent_params = [0.0, p[0], p[1]];
+    // FSL-119 (rule A): FSL passes intent_param(0), (1), (2) of newimage's 1-based parameters
+    let shifted = [0.0, p[0], p[1]];
+    if shifted != p {
+        con.notice(
+            &defects::FSL_119,
+            if con.reproduce() {
+                "the field's intent parameters shifted by one place"
+            } else {
+                "the field's intent parameters as the input's"
+            },
+        );
+    }
+    out.intent_params = if con.reproduce() { shifted } else { p };
     out.display_max = 0.0;
     out.display_min = 0.0;
     if sf != 1.0 {

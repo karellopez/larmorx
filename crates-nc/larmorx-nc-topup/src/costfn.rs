@@ -11,10 +11,11 @@
 //! it (the coefficients, the field, the corrected scans, the movement parameters and matrices,
 //! displacement fields, Jacobians, and the debug files of `--debug`).
 
-use larmorx_core::defects::UpstreamDefects;
+use larmorx_core::defects::{self, UpstreamDefects};
 use larmorx_nc_core::arma::Mat;
 use larmorx_nc_core::basisfield::SplineField;
 use larmorx_nc_core::bfmatrix::{BFMatrix, Precision};
+use larmorx_nc_core::cnum;
 use larmorx_nc_core::nonlin::NonlinCf;
 use larmorx_nc_core::settings::Settings;
 use larmorx_nc_core::volume::{self, Elem, FslError, SaveError, SaveOptions, Volume};
@@ -35,7 +36,8 @@ pub enum Regularisation {
 const SPMAT_THREADS: u32 = 1;
 
 /// The knot spacing for warp resolution `wr` (mm) and voxel size `vxs`: `round(wr / vxs)`, at
-/// least 1.
+/// least 1. A negative rounded spacing, which FSL converts to about four billion voxels
+/// (kernels no memory holds: FSL-124), is refused in both modes, where FSL meets it.
 fn knot_spacing(wr: f64, vxs: &[f64; 3]) -> [u32; 3] {
     [0, 1, 2].map(|i| {
         let r = wr / vxs[i];
@@ -43,8 +45,19 @@ fn knot_spacing(wr: f64, vxs: &[f64; 3]) -> [u32; 3] {
             (r + 0.5) as i32
         } else {
             (r - 0.5) as i32
-        } as u32;
-        if k != 0 { k } else { 1 }
+        };
+        if k < 0 {
+            std::panic::resume_unwind(Box::new(ExitNow {
+                code: 1,
+                printed: vec![format!(
+                    "larmorx-nc: error: topup: --warpres {}: a negative warp resolution gives a \
+                     knot spacing of {} voxels (FSL-124), kernels no memory holds",
+                    cnum::stream(wr),
+                    k as u32
+                )],
+            }));
+        }
+        if k != 0 { k as u32 } else { 1 }
     })
 }
 
@@ -440,7 +453,7 @@ impl<'a, 'w> TopupCf<'a, 'w> {
     fn write_field_debug(&mut self, fname: &str) -> Result<(), FslError> {
         self.con.trace(self.tp, "Entering TopupCF::WriteField");
         let rf = self.sm.get_scan(self.con, 0, &mut self.field)?;
-        let out = fileio::field_volume(&rf, &mut self.field, 1.0)?;
+        let out = fileio::field_volume(&rf, &mut self.field, 1.0, self.con)?;
         self.save(&out, fname)?;
         self.con.trace(self.tp, "Leaving TopupCF::WriteField");
         Ok(())
@@ -450,7 +463,7 @@ impl<'a, 'w> TopupCf<'a, 'w> {
     pub fn write_field(&mut self, fname: &str, hdr: &Volume, sf: f64) -> Result<(), FslError> {
         self.con.trace(self.tp, "Entering TopupCF::WriteField");
         let rf = hdr.sub_volume(0)?;
-        let out = fileio::field_volume(&rf, &mut self.field, sf)?;
+        let out = fileio::field_volume(&rf, &mut self.field, sf, self.con)?;
         self.save(&out, fname)?;
         self.con.trace(self.tp, "Leaving TopupCF::WriteField");
         Ok(())
@@ -488,7 +501,7 @@ impl<'a, 'w> TopupCf<'a, 'w> {
         let ns = self.sm.n_scans();
         let (sx, sy, sz3) = (i64::from(sz[0]), i64::from(sz[1]), i64::from(sz[2]));
         let mut out = Volume::new(sx, sy, sz3, ns as i64);
-        let (mean, _, _, _, mask) = self.sm.means(self.con, &mut self.field)?;
+        let (mean, _, _, _, mask) = self.sm.means(self.con, &mut self.field, 2)?;
         let n = (sx * sy * sz3) as usize;
         for s in 0..ns {
             out.data[s * n..(s + 1) * n].fill(0.0);
@@ -578,7 +591,21 @@ impl<'a, 'w> TopupCf<'a, 'w> {
         self.con.trace(self.tp, "Entering TopupCF::FieldEnergyHess");
         let c = match self.rt {
             Regularisation::BendingEnergy => self.field.bend_energy_hess()?,
-            Regularisation::MembraneEnergy => self.field.mem_energy_hess()?,
+            // FSL-117: FSL's Hessian measures the derivatives in mm, its cost in voxels
+            Regularisation::MembraneEnergy if self.mode.reproduce() => {
+                self.con.notice(
+                    &defects::FSL_117,
+                    "Levenberg-Marquardt's membrane-energy Hessian in mm, its cost in voxels",
+                );
+                self.field.mem_energy_hess()?
+            }
+            Regularisation::MembraneEnergy => {
+                self.con.notice(
+                    &defects::FSL_117,
+                    "Levenberg-Marquardt's membrane-energy Hessian in the cost's units",
+                );
+                self.field.mem_energy_hess_in_voxels()?
+            }
         };
         let h = BFMatrix::sparse_from_csc(&c, self.hp, SPMAT_THREADS)?;
         self.con.trace(self.tp, "Leaving TopupCF::FieldEnergyHess");
@@ -720,7 +747,7 @@ impl NonlinCf for TopupCf<'_, '_> {
         }
         self.set_field_params(p)?;
         self.set_movement_params(p)?;
-        let (mean, _, _, _, mask) = self.sm.means(self.con, &mut self.field)?;
+        let (mean, _, _, _, mask) = self.sm.means(self.con, &mut self.field, 2)?;
         let mut ssd = 0.0f64;
         let (n, m) = Self::nm(&mask, self.sm.n_scans());
         for s in 0..self.sm.n_scans() {
@@ -776,7 +803,7 @@ impl NonlinCf for TopupCf<'_, '_> {
         let nd = self.ndefpar();
         let mut gradient = vec![0.0f64; npar];
         let (mean, mean_alpha, mean_beta, mean_gamma, mask) =
-            self.sm.means(self.con, &mut self.field)?;
+            self.sm.means(self.con, &mut self.field, 5)?;
         let (n, m) = Self::nm(&mask, self.sm.n_scans());
         let zeros = || {
             let mut v = vol::grid(
@@ -867,7 +894,7 @@ impl NonlinCf for TopupCf<'_, '_> {
             self.set_movement_params(p)?;
         }
         let (mean, mean_alpha, mean_beta, mean_gamma, mask) =
-            self.sm.means(self.con, &mut self.field)?;
+            self.sm.means(self.con, &mut self.field, 5)?;
         let (n, m) = Self::nm(&mask, self.sm.n_scans());
         let zeros = || {
             let mut v = vol::grid(

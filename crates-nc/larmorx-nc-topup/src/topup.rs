@@ -9,9 +9,10 @@
 
 use std::io::Write;
 
-use larmorx_core::defects::UpstreamDefects;
+use larmorx_core::defects::{self, UpstreamDefects};
 use larmorx_nc_core::exception;
 use larmorx_nc_core::nonlin::{self, NlMethod, NonlinParam};
+use larmorx_nc_core::profiler::Profiler;
 use larmorx_nc_core::settings::Settings;
 use larmorx_nc_core::volume::{self, FslError, Volume};
 
@@ -42,9 +43,15 @@ fn report(con: &Console, msg: &str, e: &FslError) {
 
 /// `topup [options]`: the exit status.
 pub fn main(argv: &[String], run: &Run, out: &mut dyn Write, err: &mut dyn Write) -> u8 {
-    let con = Console::new(out, err);
+    let con = Console::with_mode(out, err, run.mode);
+    let code = main_streams(argv, run, &con);
+    con.print_notices();
+    code
+}
+
+fn main_streams(argv: &[String], run: &Run, con: &Console) -> u8 {
     let r = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
-        exception::catch(|| body(argv, run, &con))
+        exception::catch(|| body(argv, run, con))
     }));
     match r {
         Ok(Ok(code)) => code,
@@ -69,7 +76,7 @@ pub fn main(argv: &[String], run: &Run, out: &mut dyn Write, err: &mut dyn Write
 fn body(argv: &[String], run: &Run, con: &Console) -> u8 {
     let clp = {
         let (mut o, mut e) = (Vec::new(), Vec::new());
-        let end = options::parse(argv, run.fsl, &mut o, &mut e);
+        let end = options::parse(argv, run.fsl, &mut o, &mut e, con);
         con.put(&String::from_utf8_lossy(&o));
         con.err_put(&String::from_utf8_lossy(&e));
         match end {
@@ -77,6 +84,12 @@ fn body(argv: &[String], run: &Run, con: &Console) -> u8 {
             ParseEnd::Exit(code) => return code,
         }
     };
+    // --profile: <out>.topup_profile + "_" + __FILE__ + "_" + __func__ + ".txt"; a file that
+    // cannot be opened throws out of main's body
+    let base = clp.profile.then(|| clp.profile_fname());
+    let mut prof = Profiler::new(base.as_deref(), "_topup.cpp_main.txt")
+        .unwrap_or_else(|e| exception::throw(e));
+    let total_key = prof.start_entry("Begins topup run");
     let mut inv: Volume = match volume::read_volume4d::<f32>(&clp.imain, run.fsl) {
         Ok((v, _, _)) => v,
         Err(e) => {
@@ -88,6 +101,9 @@ fn body(argv: &[String], run: &Run, con: &Console) -> u8 {
             return 1;
         }
     };
+    if let Some(code) = meaningless_settings(&clp, con) {
+        return code;
+    }
     // scaled to a mean of 100: one weight against the regularisation
     let nt = inv.tsize() as usize;
     let nv = inv.nvoxels() as usize;
@@ -119,11 +135,14 @@ fn body(argv: &[String], run: &Run, con: &Console) -> u8 {
             return 1;
         }
     };
+    let level_key = prof.start_entry("Begins topup level 1");
     if let Err(e) = guarded(|| nonlin::nonlin(&mut nlpar, &mut cf).map(|_| ())) {
         report(con, "Error occurred when running first level of topup", &e);
         return 1;
     }
+    prof.end_entry(level_key);
     for l in 2..=clp.nlev {
+        let level_key = prof.start_entry(&format!("Begins topup level {l}"));
         if clp.verbose {
             con.line("***Going to next resolution level***");
         }
@@ -155,11 +174,14 @@ fn body(argv: &[String], run: &Run, con: &Console) -> u8 {
             );
             return 1;
         }
+        prof.end_entry(level_key);
     }
     if let Err(e) = guarded(|| write_outputs(&clp, &mut cf, &inv, gmean)) {
         report(con, "Error occured while writing output from topup", &e);
         return 1;
     }
+    prof.end_entry(total_key);
+    // exit(EXIT_SUCCESS): the profiler is never destroyed (no line for open entries)
     0
 }
 
@@ -189,7 +211,7 @@ fn prepare<'a, 'w>(
     cf.set_level(1);
     cf.set_interpolation_model(clp.interp);
     let size = [inv.xsize() as u32, inv.ysize() as u32, inv.zsize() as u32];
-    cf.set_regridding(clp.regridding(size)?)?;
+    cf.set_regridding(regridding(clp, size, con)?)?;
     cf.subsample(clp.subsampling(1)?)?;
     cf.smooth(clp.fwhm(1)?);
     cf.set_movements_fixed(!clp.estimate_movements(1)?);
@@ -198,6 +220,83 @@ fn prepare<'a, 'w>(
     cf.set_hessian_precision(clp.numprec);
     let np = new_nonlin(clp, 1, &cf, false)?;
     Ok((cf, np))
+}
+
+/// `Regridding(invols)`; FSL-118 (rule A): with subsamplings whose largest does not divide
+/// the others (3 and 2), FSL's grid (the image grown by the largest) cannot be subsampled by
+/// the others, and topup stops at the first such level; corrected, the grid grows by their
+/// least common multiple (the same grid wherever FSL's runs).
+fn regridding(clp: &Clp, size: [u32; 3], con: &Console) -> Result<[u32; 3], FslError> {
+    let fsl = clp.regridding(size)?;
+    if fsl == size {
+        return Ok(fsl);
+    }
+    let mut lcm = 1u32;
+    for l in 1..=clp.nlev {
+        let s = clp.subsampling(l)?;
+        let (mut a, mut b) = (lcm, s);
+        while b != 0 {
+            (a, b) = (b, a % b);
+        }
+        lcm = lcm / a * s;
+    }
+    let maxss = fsl[0] - size[0];
+    if lcm == maxss {
+        return Ok(fsl);
+    }
+    if con.reproduce() {
+        con.notice(
+            &defects::FSL_118,
+            "the grid grown by the largest subsampling, which the others do not divide",
+        );
+        return Ok(fsl);
+    }
+    con.notice(
+        &defects::FSL_118,
+        &format!("the grid grown by the subsamplings' least common multiple, {lcm}"),
+    );
+    Ok(size.map(|s| s + lcm))
+}
+
+/// D13 (rule B): settings FSL accepts although they have no meaning, refused by default
+/// (`reproduce` runs them as FSL does): a negative number of iterations (FSL-123: no
+/// iteration), warp resolution (FSL-124: also refused with `reproduce` where FSL's knot spacing
+/// wraps), smoothing width (FSL-125) or regularisation weight (FSL-126).
+fn meaningless_settings(clp: &Clp, con: &Console) -> Option<u8> {
+    let mut bad: Vec<(&'static defects::Defect, String)> = Vec::new();
+    for l in 1..=clp.nlev {
+        let (m, w) = (clp.max_iter_signed(l), clp.warp_res(l).unwrap_or(0.0));
+        let (f, la) = (clp.fwhm(l).unwrap_or(0.0), clp.lambda(l).unwrap_or(0.0));
+        if m < 0 {
+            bad.push((
+                &defects::FSL_123,
+                format!("--miter {m} at level {l} (no iteration)"),
+            ));
+        }
+        if w < 0.0 {
+            bad.push((&defects::FSL_124, format!("--warpres {w} at level {l}")));
+        }
+        if f < 0.0 {
+            bad.push((&defects::FSL_125, format!("--fwhm {f} at level {l}")));
+        }
+        if la < 0.0 {
+            bad.push((&defects::FSL_126, format!("--lambda {la} at level {l}")));
+        }
+    }
+    let (d, what) = bad.first()?.clone();
+    if con.reproduce() {
+        for (d, what) in &bad {
+            if d.id != defects::FSL_124.id {
+                con.notice(d, &format!("{what}: run as FSL does"));
+            }
+        }
+        return None;
+    }
+    con.notice(d, &format!("{what}: refused"));
+    Some(con.refuse(&format!(
+        "{what}: a negative value has no meaning ({})",
+        d.id
+    )))
 }
 
 /// `NonlinParam(cf->NPar(), method, start)`: zeros at the first level, `cf->Par()` after;

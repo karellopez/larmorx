@@ -30,11 +30,14 @@ rule. Every original run goes through the oracle-output cache (:func:`oracle_run
 from __future__ import annotations
 
 import json
+import re
 import shutil
 import tempfile
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
+
+import numpy as np
 
 from larmorx_validation.parity import defects, fsl_versions
 from larmorx_validation.parity.fsl_flirt_replica import (
@@ -75,7 +78,15 @@ SDCFLOWS_CONFIG = "sdcflows/sdcflows/data/flirtsch/b02b0.cnf"
 # The programs
 
 
-def oracle_run(args: list[str], *, cwd: Path, settings: dict[str, str | None], never: str = ""):
+def oracle_run(
+    args: list[str],
+    *,
+    cwd: Path,
+    settings: dict[str, str | None],
+    never: str = "",
+    threads: int = 1,
+    timeout: int = 36000,
+):
     """FSL's ``topup`` with ``args`` in ``cwd``, through the oracle-output cache: topup at one
     thread is deterministic, so a run is served once it ran (unless ``never`` says why not);
     every file it writes is in ``cwd`` and every file there counts by its content."""
@@ -87,10 +98,10 @@ def oracle_run(args: list[str], *, cwd: Path, settings: dict[str, str | None], n
         env=_environment(settings),
         cwd=cwd,
         outputs=[cwd],
-        policy=oracle_cache.Policy(threads=1, family="fsl").but_never(never),
+        policy=oracle_cache.Policy(threads=threads, family="fsl").but_never(never),
         runner=SUITE,
         inputs=[p for p in sorted(cwd.rglob("*")) if p.is_file()],
-        timeout=36000,
+        timeout=timeout,
     )
 
 
@@ -172,56 +183,363 @@ def _prepare_fmriprep(node: Path, d: Path) -> bool:
     return True
 
 
+def _source_node() -> Path | None:
+    return next((n for r, n in fmriprep_calls() if r == SOURCE_RUN), None)
+
+
+# ------------------------------------------------------------------------------------------------
+# Derived inputs
+
+#: The derived inputs' version: a new version makes them again.
+INPUTS_VERSION = 1
+#: ds005040's read-out time (s), as nipype's encoding file writes it.
+RT = "0.01379510"
+#: The text inputs: acquisition-parameter files (one row per volume: the phase-encoding vector
+#: and the read-out time) and configuration files.
+TEXTS = {
+    "acq.txt": f"0 1 0 {RT}\n0 -1 0 {RT}\n",
+    "acq_x.txt": f"1 0 0 {RT}\n-1 0 0 {RT}\n",
+    "acq_four.txt": f"0 1 0 {RT}\n0 -1 0 {RT}\n1 0 0 {RT}\n-1 0 0 {RT}\n",
+    "acq_t.txt": f"0 0\n1 -1\n0 0\n{RT} {RT}\n",
+    "acq_oblique.txt": f"0.6 0.8 0 {RT}\n-0.6 -0.8 0 {RT}\n",
+    "acq_z.txt": f"0 0 1 {RT}\n0 0 -1 {RT}\n",
+    "acq_same.txt": f"0 1 0 {RT}\n0 1 0 {RT}\n",
+    "acq_rts.txt": f"0 1 0 {RT}\n0 -1 0 0.02000000\n",
+    "acq_zero.txt": f"0 1 0 {RT}\n0 -1 0 0\n",
+    "acq_two_zero.txt": "0 1 0 0\n0 -1 0 0\n",
+    "acq_long_rt.txt": "0 1 0 0.5\n0 -1 0 0.5\n",
+    "acq_norm.txt": f"0 0.9 0 {RT}\n0 -1 0 {RT}\n",
+    "acq_three.txt": f"0 1 0 {RT}\n0 -1 0 {RT}\n0 1 0 {RT}\n",
+    "acq_five.txt": f"0 1 0 {RT} 1\n0 -1 0 {RT} 1\n",
+    "acq_text.txt": "zero one zero time\nzero minus zero time\n",
+    "acq_one.txt": f"0 1 0 {RT}\n",
+    "short.cnf": (
+        "# two levels: Levenberg-Marquardt with the movements, then scaled conjugate gradients\n"
+        "--warpres=20,14\n--subsamp=2,1\n--fwhm=8,4\n--miter=3,2\n--lambda=0.005,0.0001\n"
+        "--ssqlambda=1\n--regmod=bending_energy\n--estmov=1,0\n--minmet=0,1\n"
+        "--splineorder=3\n--numprec=double\n--interp=spline\n--scale=1\n"
+    ),
+    "bad_option.cnf": "--warpres=20\n--bogus=1\n",
+    # a comment line of more than 1023 characters after its first word, then two settings
+    "long_line.cnf": "# " + "word " * 250 + "\n--warpres=20\n--miter=2\n",
+}
+
+
+def _save(path: Path, data: np.ndarray, affine: np.ndarray, dtype: Any = np.float32) -> Any:
+    import nibabel as nib
+
+    img = nib.Nifti1Image(np.asarray(data, dtype=dtype), affine)
+    img.header.set_xyzt_units("mm", "sec")
+    img.set_qform(affine, 1)
+    img.set_sform(affine, 1)
+    nib.save(img, str(path))
+    return img
+
+
+def inputs() -> Path:
+    """The derived inputs (``oracles/inputs/fsl-topup-replica/``), made once, deterministically,
+    from ds005040's merged pair (64 x 64 x 40, phase encoding along y): ``pair`` (the pair as
+    fMRIPrep merged it), ``half`` (every second voxel: 32 x 32 x 20 of 6 x 6 x 6.6 mm, the
+    option cases' image), ``xhalf`` (x and y exchanged: phase encoding along x), ``four`` (both
+    pairs: four volumes), ``half_i16`` (16-bit integers, a quarter of the values), ``crop``
+    (30 x 30 x 18: divisible by 2 and 3), ``one`` (one volume, 3D), ``half_intent`` (intent
+    parameters in the header); and :data:`TEXTS`."""
+    ws = workspace()
+    assert ws is not None
+    out = ws / "oracles" / "inputs" / SUITE
+    stamp = out / f"DONE-v{INPUTS_VERSION}"
+    if stamp.is_file():
+        return out
+    import nibabel as nib
+
+    out.mkdir(parents=True, exist_ok=True)
+    node = _source_node()
+    assert node is not None, f"{SOURCE_RUN}'s topup node is missing"
+    img = _fmriprep_image(node)
+    assert img is not None
+    src = nib.load(str(img))
+    full = np.asarray(src.dataobj, np.float32)
+    _save(out / "pair.nii.gz", full, src.affine)
+    half = full[::2, ::2, ::2]
+    aff = src.affine.copy()
+    aff[:3, :3] = aff[:3, :3] * 2
+    _save(out / "half.nii.gz", half, aff)
+    xhalf = np.ascontiguousarray(np.transpose(half, (1, 0, 2, 3)))
+    _save(out / "xhalf.nii.gz", xhalf, aff)
+    _save(out / "four.nii.gz", np.concatenate([half, xhalf], axis=3), aff)
+    _save(out / "half_i16.nii.gz", np.round(half * 0.25), aff, np.int16)
+    _save(out / "crop.nii.gz", half[1:31, 1:31, 1:19], aff)
+    _save(out / "one.nii.gz", half[..., 0], aff)
+    intent = nib.Nifti1Image(half, aff)
+    intent.header.set_xyzt_units("mm", "sec")
+    intent.set_qform(aff, 1)
+    intent.set_sform(aff, 1)
+    intent.header.set_intent("estimate", (), name="")
+    intent.header["intent_p1"] = 1.5
+    intent.header["intent_p2"] = 2.5
+    intent.header["intent_p3"] = 3.5
+    nib.save(intent, str(out / "half_intent.nii.gz"))
+    for name, text in TEXTS.items():
+        (out / name).write_text(text, encoding="utf-8")
+    stamp.write_text(
+        f"derived inputs of the {SUITE} suite, version {INPUTS_VERSION}\n", encoding="utf-8"
+    )
+    return out
+
+
 # ------------------------------------------------------------------------------------------------
 # Cases
 
 
 @dataclass(frozen=True)
 class Run:
-    """A case on the source run's fMRIPrep inputs: the arguments (``{imain}`` and ``{datain}``
-    are the images' and the encoding file's names), the environment."""
+    """A case: the arguments (``{imain}`` and ``{datain}`` name fMRIPrep's images and encoding
+    file on the source run, copied into the run directory with sdcflows' configuration;
+    ``@name`` a derived input, copied too), the environment."""
 
     args: tuple[str, ...]
     settings: tuple[tuple[str, str | None], ...] = ()
     fix: bool = True
+    #: Derived inputs copied into the run directory although no argument names them.
+    files: tuple[str, ...] = ()
+    #: Why FSL's run is never cached.
+    never: str = ""
+    #: FSL's thread count (``--nthr``, ``FSL_NUM_THREADS``, OpenBLAS's) for the cache's policy.
+    threads: int = 1
+    #: ``--profile``: the profile's durations (the clock's) are masked before the files are
+    #: compared.
+    profile: bool = False
+    #: A thread-dependence case: the replica's run is compared with FSL's run of these
+    #: arguments and settings at one thread (D13 class (b)); FSL's own run of :attr:`args` is
+    #: measured against it.
+    single: tuple[tuple[str, ...], tuple[tuple[str, str | None], ...]] | None = None
+    #: A case FSL runs or stops on that the default refuses (rules B and A): the replica's
+    #: ``fix`` run exits 1 with a refusal naming this entry.
+    fix_refuses: str = ""
+    #: A case FSL runs or stops on that the default corrects (rule A): the replica's ``fix``
+    #: run finishes (exit 0), naming this entry.
+    fix_finishes: str = ""
+    #: A case whose default run prints this text on standard error (a corrected message).
+    fix_says: str = ""
+    #: A case the replica refuses in both modes, naming this entry, where FSL needs more memory
+    #: than the machine holds: FSL is not run (its run was measured once; the reason).
+    refused: str = ""
+    refused_reason: str = ""
+    #: Seconds before FSL's run is stopped.
+    timeout: int = 36000
 
 
-def _source_node() -> Path | None:
-    return next((n for r, n in fmriprep_calls() if r == SOURCE_RUN), None)
+#: The entries the ``fix`` pass may name without a visible change.
+SILENT: tuple[str, ...] = ()
+#: How a profile's durations are masked.
+_DURATION = re.compile(r"Duration: \S+")
+#: The profile's name after ``--out``'s base name (``"_" + __FILE__ + "_" + __func__ + ".txt"``).
+PROFILE_SUFFIX = ".topup_profile_topup.cpp_main.txt"
 
 
-def _run_args(run: Run, node: Path) -> list[str]:
-    args = fmriprep_args(node)
-    names = {a.partition("=")[0]: a.partition("=")[2] for a in args if "=" in a}
-    return [a.format(imain=names["--imain"], datain=names["--datain"]) for a in run.args]
+def _prepare(run: Run, d: Path, node: Path | None) -> list[str]:
+    """``run``'s inputs in ``d``; its arguments as the programs get them."""
+    if any("{" in a for a in run.args) and (node is None or not _prepare_fmriprep(node, d)):
+        raise Outcome("skipped", f"{SOURCE_RUN}'s topup inputs are not available")
+    out = []
+    for a in run.args:
+        if node is not None:
+            names = {k: v for k, _, v in (x.partition("=") for x in fmriprep_args(node))}
+            a = a.format(imain=names["--imain"], datain=names["--datain"])
+        key, sep, value = a.partition("=")
+        if sep and value.startswith("@"):
+            shutil.copy(inputs() / value[1:], d / value[1:])
+            a = f"{key}={value[1:]}"
+        elif a.startswith("@"):
+            shutil.copy(inputs() / a[1:], d / a[1:])
+            a = a[1:]
+        out.append(a)
+    for f in run.files:
+        shutil.copy(inputs() / f, d / f)
+    return out
+
+
+def _mask_profiles(checks: CheckList, a: Path, b: Path) -> None:
+    """``--profile``'s files with their durations masked: FSL's lines have the form the
+    replica writes, the clock decides the numbers."""
+    for d, who in ((a, "FSL"), (b, "the replica")):
+        for p in sorted(d.glob(f"*{PROFILE_SUFFIX}")):
+            text = p.read_text(encoding="utf-8")
+            lines = text.splitlines()
+            ok = all(re.fullmatch(r"Entry: .* Duration: [0-9.e+-]+", ln) for ln in lines)
+            checks(f"{who}'s profile lines (Entry: ... Duration: <seconds>)", ok, detail=text[:200])
+            p.write_text(_DURATION.sub("Duration: <t>", text), encoding="utf-8")
+
+
+def _oracle(run: Run, args: list[str], d: Path, settings: dict[str, str | None]) -> Completed:
+    never = run.never or ("--profile writes the clock's durations" if run.profile else "")
+    p = oracle_run(
+        args, cwd=d, settings=settings, never=never, threads=run.threads, timeout=run.timeout
+    )
+    code = -9 if p.returncode is None else p.returncode
+    return Completed(code, p.stdout, p.stderr)
+
+
+def _fix_refuses(run: Run, node: Path | None, checks: CheckList) -> None:
+    """:attr:`Run.fix_refuses`: the default run refuses."""
+    settings = dict(run.settings)
+    with tempfile.TemporaryDirectory(prefix="lx-nc-topup-fix-") as b_:
+        b = Path(b_)
+        args = _prepare(run, b, node)
+        r = run_replica(PROGRAM, args, cwd=b, settings=settings, mode=defects.FIX)
+        refusal = next(
+            (ln for ln in r.stderr.splitlines() if ln.startswith("larmorx-nc: error:")), ""
+        )
+        checks(
+            f"the default run refuses, naming {run.fix_refuses}",
+            r.code == 1 and run.fix_refuses in refusal,
+            detail=f"exit {r.code}: {refusal[:200]}",
+        )
+
+
+def _fix_finishes(run: Run, node: Path | None, checks: CheckList) -> None:
+    """:attr:`Run.fix_finishes`: the default run finishes where FSL stops."""
+    with tempfile.TemporaryDirectory(prefix="lx-nc-topup-fix-") as b_:
+        b = Path(b_)
+        args = _prepare(run, b, node)
+        r = run_replica(PROGRAM, args, cwd=b, settings=dict(run.settings), mode=defects.FIX)
+        named = defects.notices_in(r.stderr)
+        checks(
+            f"the default run finishes and names {run.fix_finishes}",
+            r.code == 0 and run.fix_finishes in named,
+            detail=f"exit {r.code}: {', '.join(named) or 'nothing named'}",
+        )
+
+
+def _fix_says(run: Run, node: Path | None, checks: CheckList) -> None:
+    """:attr:`Run.fix_says`: the default run's corrected message."""
+    with tempfile.TemporaryDirectory(prefix="lx-nc-topup-fix-") as b_:
+        b = Path(b_)
+        args = _prepare(run, b, node)
+        r = run_replica(PROGRAM, args, cwd=b, settings=dict(run.settings), mode=defects.FIX)
+        named = defects.notices_in(r.stderr)
+        checks(
+            f"the default run's message ({', '.join(named) or 'nothing named'})",
+            run.fix_says in r.stderr and bool(named),
+            detail=" ".join(r.stderr.split())[-200:],
+        )
+
+
+def _refused_case(run: Run, node: Path | None, checks: CheckList) -> None:
+    """:attr:`Run.refused`: the replica refuses in both modes; FSL is not run."""
+    from larmorx_validation.parity.harness import EXPECTED
+
+    for mode in (defects.REPRODUCE, defects.FIX):
+        with tempfile.TemporaryDirectory(prefix="lx-nc-topup-") as b_:
+            b = Path(b_)
+            args = _prepare(run, b, node)
+            r = run_replica(PROGRAM, args, cwd=b, settings=dict(run.settings), mode=mode)
+            refusal = next(
+                (ln for ln in r.stderr.splitlines() if ln.startswith("larmorx-nc: error:")), ""
+            )
+            written = sorted(q.name for q in b.iterdir() if "_fieldcoef" in q.name)
+            checks(
+                f"the replica refuses ({mode})",
+                r.code == 1 and run.refused in refusal and not written,
+                detail=f"exit {r.code}: {refusal[:200]}",
+            )
+    if all(c.passed for c in checks.checks):
+        raise Outcome(EXPECTED, f"{run.refused}: refused; FSL is not run: {run.refused_reason}")
+
+
+def _thread_case(run: Run, node: Path | None, checks: CheckList) -> None:
+    """D13 class (b): the replica at :attr:`Run.args`' thread count gives FSL's one-thread
+    result (:attr:`Run.single`); FSL's own run at that thread count is measured against it."""
+    assert run.single is not None
+    s_args, s_settings = run.single
+    with (
+        tempfile.TemporaryDirectory(prefix="lx-nc-topup-t1-") as a1_,
+        tempfile.TemporaryDirectory(prefix="lx-nc-topup-tn-") as an_,
+        tempfile.TemporaryDirectory(prefix="lx-nc-topup-lx-") as b_,
+    ):
+        a1, an, b = Path(a1_), Path(an_), Path(b_)
+        one = Run(s_args, s_settings, timeout=run.timeout)
+        oracle1 = _oracle(one, _prepare(one, a1, node), a1, dict(s_settings))
+        args = _prepare(run, an, node)
+        oraclen = _oracle(run, args, an, dict(run.settings))
+        _prepare(run, b, node)
+        replica = run_replica(
+            PROGRAM, args, cwd=b, settings=dict(run.settings), mode=defects.REPRODUCE
+        )
+        # the log records the options as given: FSL's at this thread count
+        for log in an.glob("*.topup_log"):
+            shutil.copy(log, a1 / log.name)
+        compare(checks, PROGRAM, oracle1, replica, a1, b)
+        checks(
+            f"FSL at {run.threads} threads exits as at one",
+            oraclen.code == oracle1.code,
+            detail=f"{oraclen.code} vs {oracle1.code}",
+        )
+        same, total, notes = 0, 0, []
+        for p in sorted(an.iterdir()):
+            q = a1 / p.name
+            if not q.is_file() or p.name.endswith(".topup_log"):
+                continue
+            total += 1
+            if p.name.endswith(".nii.gz"):
+                ok = _same_streams(p, q, blank_descrip=True)
+                if not ok:
+                    notes.append(f"{p.name}: {_differing_values(p, q)}")
+            else:
+                ok = _same_bytes(p, q)
+                if not ok:
+                    notes.append(p.name)
+            same += ok
+        checks.add(
+            Check(
+                f"FSL at {run.threads} threads against FSL at one (its own thread band)",
+                True,
+                metric="files identical",
+                value=f"{same}/{total}",
+                threshold="reported",
+                detail="; ".join(notes[:4]),
+            )
+        )
 
 
 def _run_case(run: Run, checks: CheckList) -> None:
     node = _source_node()
-    if node is None:
-        raise Outcome("skipped", f"{SOURCE_RUN}'s topup node is not available")
+    if run.single is not None:
+        _thread_case(run, node, checks)
+        return
+    if run.refused:
+        _refused_case(run, node, checks)
+        return
     settings = dict(run.settings)
-    args = _run_args(run, node)
     with (
         tempfile.TemporaryDirectory(prefix="lx-nc-topup-") as a_,
         tempfile.TemporaryDirectory(prefix="lx-nc-topup-") as b_,
     ):
         a, b = Path(a_), Path(b_)
-        if not (_prepare_fmriprep(node, a) and _prepare_fmriprep(node, b)):
-            raise Outcome("skipped", f"{SOURCE_RUN}'s topup inputs are not available")
-        oracle = run_oracle(args, cwd=a, settings=settings)
+        args = _prepare(run, a, node)
+        _prepare(run, b, node)
+        oracle = _oracle(run, args, a, settings)
         replica = run_replica(PROGRAM, args, cwd=b, settings=settings, mode=defects.REPRODUCE)
+        if run.profile:
+            _mask_profiles(checks, a, b)
         compare(checks, PROGRAM, oracle, replica, a, b)
-        if run.fix and replica.code == 0:
+        if run.fix and replica.code == 0 and not run.profile:
             fix_pass(
                 checks,
                 PROGRAM,
-                lambda t: _prepare_fmriprep(node, t),
+                lambda t: _prepare(run, t, node),
                 args,
                 settings,
                 b,
                 replica,
+                silent_ok=SILENT,
             )
+    if run.fix_refuses:
+        _fix_refuses(run, node, checks)
+    if run.fix_finishes:
+        _fix_finishes(run, node, checks)
+    if run.fix_says:
+        _fix_says(run, node, checks)
     _agree_on_errors(checks, PROGRAM, oracle.code, oracle.stderr)
 
 
@@ -274,8 +592,23 @@ def _fmriprep_outputs(checks: CheckList, node: Path, replica_dir: Path) -> None:
     )
 
 
-#: The cases on the source run's inputs: name -> (tier, description, run).
-def _all_cases() -> dict[str, tuple[str, str, Run]]:
+#: The cases' common arguments: the half-resolution pair, its acquisition parameters, the
+#: output's base name; a short estimation (one level, three iterations).
+HALF = ("--imain=@half.nii.gz", "--datain=@acq.txt", "--out=o")
+SHORT = ("--warpres=20", "--fwhm=8", "--miter=3", "--lambda=0.005")
+LEVELS = (
+    "--warpres=20,14",
+    "--subsamp=2,1",
+    "--fwhm=8,4",
+    "--miter=3,2",
+    "--lambda=0.005,0.0001",
+    "--estmov=1,0",
+    "--minmet=0,1",
+)
+
+
+def _debug_cases() -> dict[str, tuple[str, str, Run]]:
+    """``--debug`` on fMRIPrep's own inputs (ds005040's pair at full resolution)."""
     c: dict[str, tuple[str, str, Run]] = {}
 
     def add(name: str, tier: str, desc: str, *args: str, **kw: Any) -> None:
@@ -328,7 +661,582 @@ def _all_cases() -> dict[str, tuple[str, str, Run]]:
         "--rbmout=mov_xfm",
         "-v",
     )
+    add(
+        "debug/hessian",
+        "standard",
+        "--debug=3 on the half-resolution pair: one iteration's every debug file, the Hessian's "
+        "text included",
+        *HALF,
+        "--warpres=20",
+        "--miter=1",
+        "--estmov=0",
+        "--debug=3",
+    )
+    add(
+        "debug/trace",
+        "standard",
+        "--trace: every routine's entry and exit printed, two levels",
+        *HALF,
+        *LEVELS,
+        "--trace",
+    )
+    add(
+        "debug/profile",
+        "standard",
+        "--profile: the levels' durations in <out>.topup_profile_topup.cpp_main.txt (the "
+        "clock's numbers masked)",
+        *HALF,
+        *LEVELS,
+        "--profile",
+        profile=True,
+    )
     return c
+
+
+def _option_cases() -> dict[str, tuple[str, str, Run]]:
+    """Every option on the half-resolution pair (32 x 32 x 20), one case per path."""
+    c: dict[str, tuple[str, str, Run]] = {}
+    st = "standard"
+
+    def add(name: str, desc: str, *args: str, tier: str = st, **kw: Any) -> None:
+        c[name] = (tier, desc, Run(tuple(args), **kw))
+
+    add("opt/defaults", "every default (warpres 10, fwhm 8, five LM iterations, movements)", *HALF)
+    add(
+        "opt/levels",
+        "two levels: subsampling 2 with Levenberg-Marquardt and the movements, then full "
+        "resolution with scaled conjugate gradients; every output",
+        *HALF,
+        *LEVELS,
+        "--iout=c",
+        "--fout=f",
+        "--dfout=d",
+        "--rbmout=r",
+        "--jacout=j",
+        "--featout=feat",
+        "-v",
+        tier="smoke",
+    )
+    add("opt/numprec-float", "--numprec=float", *HALF, *SHORT, "--numprec=float", "--fout=f")
+    add("opt/interp-linear", "--interp=linear", *HALF, *SHORT, "--interp=linear", "--iout=c")
+    add(
+        "opt/membrane-lm",
+        "--regmod=membrane_energy with Levenberg-Marquardt (the energy's Hessian)",
+        *HALF,
+        *SHORT,
+        "--regmod=membrane_energy",
+        "--fout=f",
+    )
+    add(
+        "opt/membrane-scg",
+        "--regmod=membrane_energy with scaled conjugate gradients (the energy's gradient)",
+        *HALF,
+        *SHORT,
+        "--regmod=membrane_energy",
+        "--minmet=1",
+        "--estmov=0",
+        "--fout=f",
+    )
+    add("opt/splineorder-2", "--splineorder=2", *HALF, *SHORT, "--splineorder=2", "--fout=f")
+    add(
+        "opt/scale",
+        "--scale=1: each volume scaled to the mean",
+        *HALF,
+        *SHORT,
+        "--scale=1",
+        "--iout=c",
+    )
+    add(
+        "opt/ssqlambda-0",
+        "--ssqlambda=0: lambda as given",
+        *HALF,
+        "--warpres=20",
+        "--miter=3",
+        "--lambda=50",
+        "--ssqlambda=0",
+        "--fout=f",
+    )
+    add(
+        "opt/regrid-0",
+        "--regrid=0: the image's own grid, two levels",
+        *HALF,
+        *LEVELS,
+        "--regrid=0",
+        "--fout=f",
+    )
+    add("opt/scg", "--minmet=1 without movements", *HALF, *SHORT, "--minmet=1", "--estmov=0")
+    add(
+        "opt/scg-movements",
+        "--minmet=1 with the movements: FSL's warning",
+        *HALF,
+        *SHORT,
+        "--minmet=1",
+        "--estmov=1",
+        "--rbmout=r",
+    )
+    add(
+        "opt/acqp",
+        "--acqp instead of --datain",
+        "--imain=@half.nii.gz",
+        "--acqp=@acq.txt",
+        "--out=o",
+        *SHORT,
+    )
+    add(
+        "opt/datain-transposed",
+        "an acquisition-parameter file of four rows",
+        "--imain=@half.nii.gz",
+        "--datain=@acq_t.txt",
+        "--out=o",
+        *SHORT,
+    )
+    add(
+        "opt/x-phase-encoding",
+        "phase encoding along x (the translation along x left out), the movements",
+        "--imain=@xhalf.nii.gz",
+        "--datain=@acq_x.txt",
+        "--out=o",
+        *SHORT,
+        "--iout=c",
+        "--rbmout=r",
+        "--jacout=j",
+        "--dfout=d",
+    )
+    add(
+        "opt/four-volumes",
+        "four volumes along x and y: six movement parameters for each moving scan",
+        "--imain=@four.nii.gz",
+        "--datain=@acq_four.txt",
+        "--out=o",
+        *SHORT,
+        "--iout=c",
+        "--rbmout=r",
+        "--jacout=j",
+        "--dfout=d",
+    )
+    add(
+        "opt/oblique-phase-encoding",
+        "a phase-encoding vector along x and y (the Jacobian of both displacements)",
+        "--imain=@half.nii.gz",
+        "--datain=@acq_oblique.txt",
+        "--out=o",
+        *SHORT,
+        "--jacout=j",
+        "--dfout=d",
+    )
+    add(
+        "opt/readout-times",
+        "different read-out times",
+        "--imain=@half.nii.gz",
+        "--datain=@acq_rts.txt",
+        "--out=o",
+        *SHORT,
+        "--fout=f",
+    )
+    add(
+        "opt/zero-readout",
+        "one read-out time of 0 (a synthesised undistorted image)",
+        "--imain=@half.nii.gz",
+        "--datain=@acq_zero.txt",
+        "--out=o",
+        *SHORT,
+        "--fout=f",
+        "--iout=c",
+    )
+    add(
+        "opt/same-direction",
+        "both volumes with the same phase encoding",
+        "--imain=@half.nii.gz",
+        "--datain=@acq_same.txt",
+        "--out=o",
+        *SHORT,
+        "--fout=f",
+    )
+    add(
+        "opt/z-phase-encoding",
+        "phase encoding along z",
+        "--imain=@half.nii.gz",
+        "--datain=@acq_z.txt",
+        "--out=o",
+        *SHORT,
+    )
+    add(
+        "opt/int16",
+        "a 16-bit integer image",
+        "--imain=@half_i16.nii.gz",
+        "--datain=@acq.txt",
+        "--out=o",
+        *SHORT,
+        "--iout=c",
+    )
+    add(
+        "opt/one-volume",
+        "a single 3D volume",
+        "--imain=@one.nii.gz",
+        "--datain=@acq_one.txt",
+        "--out=o",
+        *SHORT,
+    )
+    add(
+        "opt/no-out",
+        "no --out: the base name from --imain",
+        "--imain=@half.nii.gz",
+        "--datain=@acq.txt",
+        *SHORT,
+    )
+    add(
+        "opt/intent",
+        "an image with intent parameters: the field's header",
+        "--imain=@half_intent.nii.gz",
+        "--datain=@acq.txt",
+        "--out=o",
+        *SHORT,
+        "--fout=f",
+        "--featout=feat",
+    )
+    add(
+        "opt/nifti",
+        "FSLOUTPUTTYPE=NIFTI",
+        *HALF,
+        *SHORT,
+        "--fout=f",
+        settings=(("FSLOUTPUTTYPE", "NIFTI"),),
+    )
+    add(
+        "opt/nifti-pair",
+        "FSLOUTPUTTYPE=NIFTI_PAIR",
+        *HALF,
+        *SHORT,
+        "--fout=f",
+        settings=(("FSLOUTPUTTYPE", "NIFTI_PAIR"),),
+    )
+    add(
+        "opt/iout-extension",
+        "--iout with .nii.gz: the mean as <name>.nii.gz_mean",
+        *HALF,
+        *SHORT,
+        "--iout=c.nii.gz",
+    )
+    add(
+        "opt/nthr-0",
+        "--nthr=0: the default thread count (FSL_NUM_THREADS unset: one)",
+        *HALF,
+        *SHORT,
+        "--nthr=0",
+    )
+    add(
+        "opt/warpres-0",
+        "--warpres=0: a knot every voxel",
+        *HALF,
+        "--warpres=0",
+        "--miter=2",
+        "--estmov=0",
+        "--minmet=1",
+    )
+    add(
+        "opt/lambda-negative",
+        "a negative --lambda",
+        *HALF,
+        "--warpres=20",
+        "--miter=3",
+        "--lambda=-0.005",
+        "--fout=f",
+        fix_refuses="FSL-126",
+    )
+    add(
+        "opt/fwhm-negative",
+        "a negative --fwhm",
+        *HALF,
+        "--warpres=20",
+        "--miter=3",
+        "--fwhm=-8",
+        "--fout=f",
+        fix_refuses="FSL-125",
+    )
+    add(
+        "opt/warpres-negative",
+        "a negative --warpres",
+        *HALF,
+        "--warpres=-20",
+        "--miter=2",
+        "--fout=f",
+        refused="FSL-124",
+        refused_reason="its knot spacing of about 4e9 voxels needs more memory than the machine holds (2026-11-03: killed in a 24 GiB memory box)",
+    )
+    return c
+
+
+def _config_cases() -> dict[str, tuple[str, str, Run]]:
+    """``--config``: FSL's shipped configurations by name (in ``$FSLDIR/etc/flirtsch``, with
+    one iteration per level from the command line), local files, the failures."""
+    c: dict[str, tuple[str, str, Run]] = {}
+    st = "standard"
+
+    def add(name: str, desc: str, *args: str, tier: str = st, **kw: Any) -> None:
+        c[name] = (tier, desc, Run(tuple(args), **kw))
+
+    for cnf in ("b02b0", "b02b0_1", "b02b0_2", "b02b0_4", "b02b0_7T", "test_acqp"):
+        add(
+            f"cfg/{cnf}",
+            f"FSL's {cnf}.cnf by name, one iteration per level",
+            *HALF,
+            f"--config={cnf}",
+            "--miter=1",
+            "--iout=c",
+            "--fout=f",
+        )
+    add(
+        "cfg/b02b0-extension",
+        "FSL's b02b0.cnf by name with its extension",
+        *HALF,
+        "--config=b02b0.cnf",
+        "--miter=1",
+    )
+    add("cfg/local", "a local configuration file", *HALF, "--config=@short.cnf", "--fout=f")
+    add(
+        "cfg/local-no-extension",
+        "a local configuration named without .cnf",
+        *HALF,
+        "--config=short",
+        "--fout=f",
+        files=("short.cnf",),
+    )
+    add(
+        "cfg/command-line-wins",
+        "options on the command line take precedence",
+        *HALF,
+        "--config=@short.cnf",
+        "--warpres=30,20",
+        "--fout=f",
+    )
+    add(
+        "cfg/directory",
+        "a directory as the configuration (read as empty)",
+        *HALF,
+        "--config=.",
+        "--miter=2",
+    )
+    add("cfg/not-found", "a configuration that does not exist", *HALF, "--config=nothere")
+    add(
+        "cfg/not-found-path",
+        "a configuration with a path that does not exist",
+        *HALF,
+        "--config=./nothere",
+    )
+    add(
+        "cfg/fsldir-unset",
+        "FSLDIR unset and a name to look up there",
+        *HALF,
+        "--config=b02b0",
+        settings=(("FSLDIR", None),),
+        fix_refuses="FSL-121",
+    )
+    add(
+        "cfg/bad-option",
+        "an unknown option in the configuration",
+        *HALF,
+        "--config=@bad_option.cnf",
+    )
+    add(
+        "cfg/long-line",
+        "a comment line of more than 1023 characters before two settings",
+        *HALF,
+        "--config=@long_line.cnf",
+        "--fout=f",
+    )
+    return c
+
+
+def _error_cases() -> dict[str, tuple[str, str, Run]]:
+    """The messages, exit statuses and failure cases."""
+    c: dict[str, tuple[str, str, Run]] = {}
+    st = "standard"
+
+    def add(name: str, desc: str, *args: str, tier: str = st, **kw: Any) -> None:
+        c[name] = (tier, desc, Run(tuple(args), **kw))
+
+    i, d = "--imain=@half.nii.gz", "--datain=@acq.txt"
+    add("err/no-arguments", "no arguments: the usage")
+    add("err/help", "-h: the usage", "-h")
+    add("err/help-long", "--help with the compulsory options set", i, d, "--help")
+    add("err/unknown-option", "an unknown option", i, d, "--bogus=1")
+    add("err/missing-value", "an option without its value", "--imain")
+    add("err/no-imain", "no --imain", d, tier="smoke")
+    add("err/imain-missing", "an --imain that does not exist", "--imain=nothere.nii.gz", d)
+    add("err/imain-text", "an --imain that is not an image", "--imain=@acq.txt", d)
+    add("err/datain-and-acqp", "both --datain and --acqp", i, d, "--acqp=@acq.txt")
+    add("err/no-datain", "neither --datain nor --acqp", i)
+    add("err/datain-missing", "a --datain that does not exist", i, "--datain=nothere.txt")
+    add("err/datain-five-columns", "a --datain of five columns", i, "--datain=@acq_five.txt")
+    add("err/datain-text", "a --datain of words", i, "--datain=@acq_text.txt")
+    add(
+        "err/datain-norm", "a phase-encoding vector not of unit length", i, "--datain=@acq_norm.txt"
+    )
+    add("err/datain-rows", "three rows for two volumes", i, "--datain=@acq_three.txt")
+    add(
+        "err/acqp-rows",
+        "three rows for two volumes, given with --acqp",
+        i,
+        "--acqp=@acq_three.txt",
+        fix_says="Mismatch between half.nii.gz and acq_three.txt",
+    )
+    add("err/readout-long", "a read-out time above 0.2 s", i, "--datain=@acq_long_rt.txt")
+    add("err/readout-two-zero", "two read-out times of 0", i, "--datain=@acq_two_zero.txt")
+    add(
+        "err/levels-subsamp",
+        "--subsamp of three levels against two",
+        *HALF,
+        "--warpres=20,14",
+        "--subsamp=2,1,1",
+    )
+    add(
+        "err/levels-minmet",
+        "--minmet of three levels against two",
+        *HALF,
+        "--warpres=20,14",
+        "--minmet=0,1,1",
+    )
+    add("err/minmet-2", "--minmet=2", *HALF, "--minmet=2")
+    add("err/subsamp-incompatible", "--subsamp=3 on a 32-voxel axis", *HALF, "--subsamp=3")
+    add("err/subsamp-0", "--subsamp=0", *HALF, "--subsamp=0")
+    add(
+        "err/subsamp-mixed",
+        "subsamplings 3 and 2 on a 30 x 30 x 18 image (each divides it; the regridded grid of "
+        "33 does not divide by 2)",
+        "--imain=@crop.nii.gz",
+        d,
+        "--out=o",
+        "--warpres=20,14",
+        "--subsamp=3,2",
+        "--miter=2",
+        fix_finishes="FSL-118",
+    )
+    add("err/numprec", "an unknown --numprec", *HALF, "--numprec=single")
+    add("err/regmod", "an unknown --regmod", *HALF, "--regmod=sobolev")
+    add("err/interp", "an unknown --interp", *HALF, "--interp=cubic")
+    add("err/splineorder-4", "--splineorder=4", *HALF, "--splineorder=4")
+    add("err/splineorder-negative", "--splineorder=-1", *HALF, "--splineorder=-1")
+    add("err/debug-4", "--debug=4", *HALF, *SHORT, "--debug=4")
+    add("err/debug-negative", "--debug=-1", *HALF, *SHORT, "--debug=-1")
+    add(
+        "err/miter-negative",
+        "--miter=-1 (about 4e9 iterations)",
+        *HALF,
+        "--warpres=20",
+        "--estmov=0",
+        "--miter=-1",
+        timeout=900,
+        fix_refuses="FSL-123",
+    )
+    add(
+        "err/out-no-directory",
+        "--out in a directory that does not exist",
+        *HALF[:2],
+        "--out=nodir/o",
+        *SHORT,
+    )
+    add(
+        "err/iout-no-directory",
+        "--iout in a directory that does not exist",
+        *HALF,
+        *SHORT,
+        "--iout=nodir/c",
+    )
+    add(
+        "err/logout-no-directory",
+        "--logout in a directory that does not exist",
+        *HALF,
+        *SHORT,
+        "--logout=nodir/log",
+    )
+    add(
+        "err/rbmout-no-directory",
+        "--rbmout in a directory that does not exist",
+        *HALF,
+        *SHORT,
+        "--rbmout=nodir/r",
+    )
+    add(
+        "err/profile-no-directory",
+        "--profile with --out in a directory that does not exist",
+        *HALF[:2],
+        "--out=nodir/o",
+        *SHORT,
+        "--profile",
+        profile=True,
+    )
+    add(
+        "err/outputtype-invalid",
+        "FSLOUTPUTTYPE=BOGUS",
+        *HALF,
+        *SHORT,
+        "--fout=f",
+        settings=(("FSLOUTPUTTYPE", "BOGUS"),),
+    )
+    add(
+        "err/outputtype-unset",
+        "FSLOUTPUTTYPE unset",
+        *HALF,
+        *SHORT,
+        "--fout=f",
+        settings=(("FSLOUTPUTTYPE", None),),
+    )
+    return c
+
+
+def _thread_cases() -> dict[str, tuple[str, str, Run]]:
+    """The thread dependence (D13 class (b)): the replica gives FSL's one-thread result at
+    any thread count; FSL's own runs at four threads are measured against it."""
+    c: dict[str, tuple[str, str, Run]] = {}
+    st = "standard"
+    base = (*HALF, *LEVELS, "--fout=f", "--iout=c")
+    lm = (*HALF, *SHORT, "--fout=f", "--iout=c")
+    scg = (
+        *HALF,
+        "--warpres=4",
+        "--fwhm=4",
+        "--miter=2",
+        "--lambda=0.005",
+        "--estmov=0",
+        "--minmet=1",
+        "--fout=f",
+        "--iout=c",
+    )
+    c["thr/nthr-4"] = (
+        st,
+        "--nthr=4 (the spline field's threaded products and the Hessians' threaded sparse "
+        "products) against --nthr=1",
+        Run((*base, "--nthr=4"), threads=4, single=((*base, "--nthr=1"), ())),
+    )
+    c["thr/fsl-num-threads"] = (
+        st,
+        "FSL_NUM_THREADS=4 with --nthr=1 (the default thread count of the Hessian's sparse "
+        "matrices) against it unset",
+        Run(lm, (("FSL_NUM_THREADS", "4"),), threads=4, single=(lm, ())),
+    )
+    c["thr/openblas"] = (
+        st,
+        "FSL_SKIP_GLOBAL=1 and OPENBLAS_NUM_THREADS=4 (OpenBLAS's own threads: its dot product "
+        "of more than 10,000 values) against OpenBLAS on one thread, with scaled conjugate "
+        "gradients on a knot every voxel (about 31,000 coefficients)",
+        Run(
+            scg,
+            (("FSL_SKIP_GLOBAL", "1"), ("OPENBLAS_NUM_THREADS", "4")),
+            threads=4,
+            single=(scg, ()),
+        ),
+    )
+    return c
+
+
+def _all_cases() -> dict[str, tuple[str, str, Run]]:
+    return {
+        **_debug_cases(),
+        **_option_cases(),
+        **_config_cases(),
+        **_error_cases(),
+        **_thread_cases(),
+    }
 
 
 def cases(tier: str) -> list[Case]:
@@ -356,8 +1264,6 @@ def run_case(case: Case, checks: CheckList) -> None:
     kind, payload = case.payload
     if kind == "fmriprep":
         _fmriprep_case(payload, checks)
-    elif kind == "direct":
-        _run_case(payload, checks)
     else:
         _run_case(_all_cases()[payload][2], checks)
 

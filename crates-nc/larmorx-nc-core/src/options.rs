@@ -276,6 +276,12 @@ struct ConfigReader<'a> {
     pos: usize,
     eof: bool,
     fail: bool,
+    /// Lines of any length (larmorx's reading; FSL's `getline(buffer, 1024)` fails the stream
+    /// on a longer one).
+    long_lines: bool,
+    /// A line longer than `getline`'s 1023 characters was met with more text after it: FSL's
+    /// reading ends there, before that text.
+    cut: bool,
 }
 
 impl ConfigReader<'_> {
@@ -311,8 +317,19 @@ impl ConfigReader<'_> {
             return String::new();
         }
         let start = self.pos;
+        let line_end = self.b[start..]
+            .iter()
+            .position(|&c| c == b'\n')
+            .map_or(self.b.len(), |i| start + i);
+        if line_end - start >= 1024 && self.b[line_end..].iter().skip(1).any(|&c| !is_space(c)) {
+            // FSL's stream fails on this line: the text after it is never read
+            self.cut = true;
+        }
         let mut n = 0;
-        while n + 1 < 1024 && self.pos < self.b.len() && self.b[self.pos] != b'\n' {
+        while (self.long_lines || n + 1 < 1024)
+            && self.pos < self.b.len()
+            && self.b[self.pos] != b'\n'
+        {
             self.pos += 1;
             n += 1;
         }
@@ -556,6 +573,19 @@ impl OptionParser {
     /// does not exist, a value that cannot be set, or a file that cannot be opened). A
     /// directory opens and reads as an empty file, as `ifstream` reads it.
     pub fn parse_config_file(&self, parsed: &mut Parsed, filename: &str) -> Result<(), String> {
+        self.parse_config_file_lines(parsed, filename, false)
+            .map(|_| ())
+    }
+
+    /// [`Self::parse_config_file`], with lines of any length when `long_lines` (FSL ends its
+    /// reading at a line whose text after the first word is longer than 1023 characters).
+    /// `Ok(true)`: such a line was met with more text after it (FSL ignores that text).
+    pub fn parse_config_file_lines(
+        &self,
+        parsed: &mut Parsed,
+        filename: &str,
+        long_lines: bool,
+    ) -> Result<bool, String> {
         let path = std::path::Path::new(filename);
         let bytes = if path.is_dir() {
             Vec::new()
@@ -567,6 +597,8 @@ impl OptionParser {
             pos: 0,
             eof: false,
             fail: false,
+            long_lines,
+            cut: false,
         };
         while let Some(optstr) = cf.word() {
             if optstr.starts_with('#') {
@@ -583,7 +615,7 @@ impl OptionParser {
                 })?;
             }
         }
-        Ok(())
+        Ok(cf.cut)
     }
 
     /// `parse_option` in overwrite mode `Ignore`: an option that does not exist is an error,
@@ -890,5 +922,21 @@ mod tests {
         std::fs::write(&cnf, format!("# {}\n--n=4\n", "x".repeat(1100))).unwrap();
         p.parse_config_file(&mut r, cnf.to_str().unwrap()).unwrap();
         assert_eq!(r.get(&p, "--n").int(), 1);
+        // the same with lines of any length (larmorx's reading, topup's FSL-122): read on, and
+        // the long line reported either way
+        let c = cnf.to_str().unwrap();
+        assert_eq!(p.parse_config_file_lines(&mut r, c, false), Ok(true));
+        assert_eq!(r.get(&p, "--n").int(), 1);
+        assert_eq!(p.parse_config_file_lines(&mut r, c, true), Ok(true));
+        assert_eq!(r.get(&p, "--n").int(), 4);
+        // 1023 characters fit; a long last line cuts nothing
+        let mut r = p.parse_command_line(&argv(&[]), 0, false).ok().unwrap();
+        std::fs::write(
+            &cnf,
+            format!("#{}\n--n=5\n# {}", " ".repeat(1023), "y ".repeat(600)),
+        )
+        .unwrap();
+        assert_eq!(p.parse_config_file_lines(&mut r, c, false), Ok(false));
+        assert_eq!(r.get(&p, "--n").int(), 5);
     }
 }

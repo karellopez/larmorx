@@ -25,6 +25,8 @@
 use std::cell::RefCell;
 use std::io::Write;
 
+use larmorx_core::defects::{Defect, Notices, UpstreamDefects};
+
 pub mod cli;
 pub mod costfn;
 pub mod fileio;
@@ -35,18 +37,61 @@ pub mod vol;
 
 pub use cli::topup;
 
-/// The program's two streams (`cout`, `cerr`), shared by every part that prints.
+/// The program's two streams (`cout`, `cerr`), shared by every part that prints, with D13's
+/// mode and the notices of the defects met.
 pub struct Console<'a> {
     out: RefCell<&'a mut dyn Write>,
     err: RefCell<&'a mut dyn Write>,
+    notices: RefCell<Notices>,
 }
 
 impl<'a> Console<'a> {
+    /// The streams, in D13's default mode (`fix`).
     pub fn new(out: &'a mut dyn Write, err: &'a mut dyn Write) -> Console<'a> {
+        Console::with_mode(out, err, UpstreamDefects::Fix)
+    }
+
+    /// The streams in `mode`.
+    pub fn with_mode(
+        out: &'a mut dyn Write,
+        err: &'a mut dyn Write,
+        mode: UpstreamDefects,
+    ) -> Console<'a> {
         Console {
             out: RefCell::new(out),
             err: RefCell::new(err),
+            notices: RefCell::new(Notices::new(mode)),
         }
+    }
+
+    /// D13's mode.
+    pub fn mode(&self) -> UpstreamDefects {
+        self.notices.borrow().mode()
+    }
+
+    /// Whether FSL's defects are reproduced.
+    pub fn reproduce(&self) -> bool {
+        self.mode().reproduce()
+    }
+
+    /// Notes that `defect` changed this result (or, reproduced, would have).
+    pub fn notice(&self, defect: &'static Defect, detail: &str) {
+        self.notices.borrow_mut().add(defect, detail);
+    }
+
+    /// The notices' lines on `cerr` (`larmorx-nc: upstream defect ...`).
+    pub fn print_notices(&self) {
+        let n = self.notices.borrow();
+        let mut e = self.err.borrow_mut();
+        for x in n.as_slice() {
+            let _ = writeln!(e, "larmorx-nc: {}", x.line());
+        }
+    }
+
+    /// A refusal of the default mode: `larmorx-nc: error: topup: <what>` on `cerr`; exit 1.
+    pub fn refuse(&self, what: &str) -> u8 {
+        self.err_line(&format!("larmorx-nc: error: topup: {what}"));
+        1
     }
 
     /// `cout << s`.

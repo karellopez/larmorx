@@ -273,17 +273,33 @@ fn likelihoods(classes: &[Class], y: &[f32], s: usize, post: &mut [f32]) {
     let n = classes.len();
     let nm = y.len() / s;
     let gs = neg_logs(classes, y, s, nm);
+    // a batch of voxels at a time (`math::exp_in_place`: the same bits as one by one)
+    const BATCH: usize = 64;
     post[..nm * n]
-        .par_chunks_mut(n)
-        .zip(gs.par_chunks(n))
-        .for_each(|(row, gr)| {
-            let mut t = 0f32;
-            for (p, &gc) in row.iter_mut().zip(gr) {
-                *p = math::exp(-f64::from(gc)) as f32;
-                t += *p;
+        .par_chunks_mut(n * BATCH)
+        .zip(gs.par_chunks(n * BATCH))
+        .for_each(|(rows, gr)| {
+            let mut e = [0f64; 8 * BATCH];
+            let mut e_vec = Vec::new();
+            let e: &mut [f64] = if gr.len() <= e.len() {
+                &mut e[..gr.len()]
+            } else {
+                e_vec.resize(gr.len(), 0.0);
+                &mut e_vec
+            };
+            for (v, &gc) in e.iter_mut().zip(gr) {
+                *v = -f64::from(gc);
             }
-            for p in row.iter_mut() {
-                *p = if t > 0.0 { *p / t } else { 0.0 };
+            math::exp_in_place(e);
+            for (row, er) in rows.chunks_exact_mut(n).zip(e.chunks_exact(n)) {
+                let mut t = 0f32;
+                for (p, &ec) in row.iter_mut().zip(er) {
+                    *p = ec as f32;
+                    t += *p;
+                }
+                for p in row.iter_mut() {
+                    *p = if t > 0.0 { *p / t } else { 0.0 };
+                }
             }
         });
 }
@@ -825,34 +841,55 @@ fn partial_volumes(
         .iter()
         .map(|c| norm_single(c.det as f32, tp))
         .collect();
+    // a batch of voxels at a time: each term's `exp` for the whole batch at once
+    // (`math::exp_in_place`, the same bits as one by one), each voxel's sum in fraction order
+    const BATCH: usize = 64;
     let mut like = vec![0f32; nm * nt];
-    like.par_chunks_mut(nt).zip(yb.par_chunks(s)).for_each_init(
-        || vec![0f64; s],
-        |d, (row, yv)| {
-            for (c, cl) in classes.iter().enumerate() {
-                let gc = if n == 3 {
-                    cl.neg_log(yv, pure_norm[c], d)
-                } else {
-                    for (k, dk) in d.iter_mut().enumerate() {
-                        *dk = f64::from(yv[k]) - cl.mean[k];
+    like.par_chunks_mut(nt * BATCH)
+        .zip(yb.par_chunks(s * BATCH))
+        .for_each_init(
+            || vec![0f64; s],
+            |d, (rows, ys)| {
+                let k = ys.len() / s;
+                let mut g = [0f64; BATCH];
+                for (c, cl) in classes.iter().enumerate() {
+                    for (gl, yv) in g.iter_mut().zip(ys.chunks_exact(s)) {
+                        let gc = if n == 3 {
+                            cl.neg_log(yv, pure_norm[c], d)
+                        } else {
+                            for (k, dk) in d.iter_mut().enumerate() {
+                                *dk = f64::from(yv[k]) - cl.mean[k];
+                            }
+                            0.5 * (quad(&cl.inv, d) as f32) + pure_single[c]
+                        };
+                        *gl = -f64::from(gc);
                     }
-                    0.5 * (quad(&cl.inv, d) as f32) + pure_single[c]
-                };
-                row[c] = math::exp(-f64::from(gc)) as f32;
-            }
-            for (t, table) in tables.iter().enumerate() {
-                let mut acc = 0f32;
-                for f in table {
-                    for (k, dk) in d.iter_mut().enumerate() {
-                        *dk = f64::from(yv[k]) - f.mean[k];
+                    math::exp_in_place(&mut g[..k]);
+                    for (row, &e) in rows.chunks_exact_mut(nt).zip(&g[..k]) {
+                        row[c] = e as f32;
                     }
-                    let gp = 0.5 * (quad(&f.inv, d) as f32) + f.norm;
-                    acc = (f64::from(acc) + math::exp(-f64::from(gp)) * f64::from(step)) as f32;
                 }
-                row[n + t] = acc;
-            }
-        },
-    );
+                for (t, table) in tables.iter().enumerate() {
+                    let mut acc = [0f32; BATCH];
+                    for f in table {
+                        for (gl, yv) in g.iter_mut().zip(ys.chunks_exact(s)) {
+                            for (k, dk) in d.iter_mut().enumerate() {
+                                *dk = f64::from(yv[k]) - f.mean[k];
+                            }
+                            let gp = 0.5 * (quad(&f.inv, d) as f32) + f.norm;
+                            *gl = -f64::from(gp);
+                        }
+                        math::exp_in_place(&mut g[..k]);
+                        for (al, &e) in acc.iter_mut().zip(&g[..k]) {
+                            *al = (f64::from(*al) + e * f64::from(step)) as f32;
+                        }
+                    }
+                    for (row, &al) in rows.chunks_exact_mut(nt).zip(&acc[..k]) {
+                        row[n + t] = al;
+                    }
+                }
+            },
+        );
     let types = pve::icm(grid, &like, n, &pairs, mixel);
     let mut frac = vec![0f32; nm * n];
     frac.par_chunks_mut(n)

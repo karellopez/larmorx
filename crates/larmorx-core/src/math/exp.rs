@@ -25,6 +25,11 @@
 //!   loop would spin forever) returns its input `f`; the tests run every database entry.
 //! - Hex float literals are written as `f64` bit patterns, generated from the C source and
 //!   checked against it; each table line carries the original literals as a comment.
+//! - Added (not in the C file): [`exp_in_place`], larmorx's batched form for speed: the fast
+//!   path's operations four values at a time without branches (so that they vectorise), `t`'s
+//!   integer read from the bits of `t + 1.5 · 2^52` (exact for these `|t| < 2^23`), and [`exp`]
+//!   itself for every value outside the fast path or failing its rounding test: each result
+//!   has [`exp`]'s bits (tested).
 
 // Copyright (c) 2022-2025 Alexei Sibidanov.
 //
@@ -524,9 +529,70 @@ pub fn exp(x: f64) -> f64 {
     fh
 }
 
+/// `0x1.8p52`: added to an integral `f64` below 2^51 in magnitude, its integer is in the low
+/// bits of the sum's bit pattern (exactly).
+const MAGIC: f64 = fb(0x4338000000000000);
+
+/// [`exp`]'s fast path for four values at once, written lane by lane (no branches) so that it
+/// vectorises: the same operations in the same order as [`exp`]'s, so each lane's result has
+/// its bits. A lane is `false` in the second array when [`exp`] itself must give it: `x` outside
+/// the fast path's range (`|x| <= 0x1p-54`, overflow, underflow, a subnormal result, NaN) or the
+/// rounding test fails (its accurate path).
+#[inline(always)]
+fn fast4(x: [f64; 4]) -> ([f64; 4], [bool; 4]) {
+    let mut out = [0f64; 4];
+    let mut ok = [false; 4];
+    for l in 0..4 {
+        let ix = x[l].to_bits();
+        let aix = ix & (u64::MAX >> 1);
+        let inside =
+            aix > 0x3c90000000000000 && aix < 0x40862e42fefa39f0 && ix <= 0xc086232bdd7abcd2;
+        // a lane outside computes on 1.0 instead (its result is not used)
+        let xl = if inside { x[l] } else { 1.0 };
+        let t = (xl * S).round_ties_even();
+        // |t| < 2^23 here: its integer from the bits of t + 1.5 · 2^52 (`t as i64` exactly)
+        let jt = ((t + MAGIC).to_bits() as i64).wrapping_sub(MAGIC.to_bits() as i64);
+        let i0 = ((jt >> 6) & 0x3f) as usize;
+        let i1 = (jt & 0x3f) as usize;
+        let ie = jt >> 12;
+        let (t0h, t0l) = (T0[i0][1], T0[i0][0]);
+        let (t1h, t1l) = (T1[i1][1], T1[i1][0]);
+        let (th, tl) = muldd(t0h, t0l, t1h, t1l);
+        let dx = (xl - L2H * t) + L2L * t;
+        let dx2 = dx * dx;
+        let p = (CH_FAST[0] + dx * CH_FAST[1]) + dx2 * (CH_FAST[2] + dx * CH_FAST[3]);
+        let fh = th;
+        let tx = th * dx;
+        let fl = tl + tx * p;
+        let eps = 1.64e-19;
+        let ub = fh + (fl + eps);
+        let lb = fh + (fl - eps);
+        ok[l] = inside && ub == lb;
+        out[l] = as_ldexp(lb, ie);
+    }
+    (out, ok)
+}
+
+/// [`exp`] of every value of `x`, in place, with exactly [`exp`]'s bits: four values at a time
+/// through [`fast4`], [`exp`] itself for the lanes it leaves and the last `len % 4` values.
+#[inline(always)]
+pub fn exp_in_place(x: &mut [f64]) {
+    let (chunks, rest) = x.as_chunks_mut::<4>();
+    for c in chunks {
+        let v = *c;
+        let (r, ok) = fast4(v);
+        for l in 0..4 {
+            c[l] = if ok[l] { r[l] } else { exp(v[l]) };
+        }
+    }
+    for v in rest {
+        *v = exp(*v);
+    }
+}
+
 #[cfg(test)]
 mod tests {
-    use super::{DB, exp};
+    use super::{DB, exp, exp_in_place};
 
     fn check(cases: &[(u64, u64)]) {
         for &(x, y) in cases {
@@ -549,6 +615,62 @@ mod tests {
         assert!(exp(f64::NAN).is_nan());
         assert!(exp(-f64::NAN).is_nan());
         assert!(exp(f64::from_bits(0x7ff0000000000001)).is_nan()); // signalling NaN
+    }
+
+    /// [`exp_in_place`] gives [`exp`]'s bits for every value (both builds: the baseline here,
+    /// the AVX2 one through `math::exp_in_place` in `math`'s tests): each range of the fast
+    /// path and its boundaries, the database's inputs (their rounding test fails), special
+    /// values and a sweep of bit patterns.
+    #[test]
+    fn in_place_is_exp() {
+        let mut v: Vec<f64> = Vec::new();
+        let mut z = 0x9e3779b97f4a7c15u64;
+        for _ in 0..400_000 {
+            z ^= z << 13;
+            z ^= z >> 7;
+            z ^= z << 17;
+            // uniform in [-760, 760], uniform bit patterns, and small magnitudes
+            v.push((z >> 11) as f64 / (1u64 << 53) as f64 * 1520.0 - 760.0);
+            v.push(f64::from_bits(z));
+            v.push(f64::from_bits(
+                (z & 0x800f_ffff_ffff_ffff)
+                    | (0x3c00_0000_0000_0000 + ((z >> 52) & 0x3ff) * (1 << 52) / 4),
+            ));
+        }
+        for &b in &[
+            0x3c90000000000000u64,
+            0x40862e42fefa39f0,
+            0xc086232bdd7abcd2,
+            0x40874910d52d3052,
+        ] {
+            for d in -3i64..=3 {
+                for sign in [0u64, 1 << 63] {
+                    v.push(f64::from_bits((b as i64 + d) as u64 ^ sign));
+                }
+            }
+        }
+        v.extend(DB.iter().map(|&x| f64::from_bits(x)));
+        v.extend([
+            0.0,
+            -0.0,
+            f64::INFINITY,
+            f64::NEG_INFINITY,
+            f64::NAN,
+            -f64::NAN,
+            1e-300,
+            -1e-300,
+        ]);
+        for off in 0..4 {
+            let mut got = v[off..].to_vec();
+            exp_in_place(&mut got);
+            for (k, (&x, &y)) in v[off..].iter().zip(&got).enumerate() {
+                let e = exp(x);
+                assert!(
+                    e.to_bits() == y.to_bits() || (e.is_nan() && y.is_nan()),
+                    "{k}: exp({x:e}) = {e:e}, in place {y:e}"
+                );
+            }
+        }
     }
 
     /// Expected values are e^x rounded to nearest (mpmath, 300 bits, rounding certified).

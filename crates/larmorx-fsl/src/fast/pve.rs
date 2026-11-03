@@ -106,20 +106,38 @@ pub fn estimate(
         .map(|&(a, b)| mixes(&classes, a, b, &deltas))
         .collect();
     // the types' likelihoods (§4.8.5)
+    // a batch of voxels at a time: each term's `exp` for the whole batch at once
+    // (`math::exp_in_place`, the same bits as one by one), each voxel's sum in fraction order
+    const BATCH: usize = 64;
     let mut like = vec![0f32; nm * nt];
-    like.par_chunks_mut(nt)
-        .zip(x.par_iter())
-        .for_each(|(row, &xi)| {
-            for (c, g) in classes.iter().enumerate() {
-                row[c] = math::exp(-f64::from(g.neg_log(xi))) as f32;
+    like.par_chunks_mut(nt * BATCH)
+        .zip(x.par_chunks(BATCH))
+        .for_each(|(rows, xs)| {
+            let k = xs.len();
+            let mut g = [0f64; BATCH];
+            for (c, cl) in classes.iter().enumerate() {
+                for (gl, &xi) in g.iter_mut().zip(xs) {
+                    *gl = -f64::from(cl.neg_log(xi));
+                }
+                math::exp_in_place(&mut g[..k]);
+                for (row, &e) in rows.chunks_exact_mut(nt).zip(&g[..k]) {
+                    row[c] = e as f32;
+                }
             }
             for (t, table) in tables.iter().enumerate() {
-                let mut s = 0f32;
+                let mut s = [0f32; BATCH];
                 for m in table {
-                    let term = math::exp(-f64::from(m.gauss.neg_log(xi))) * 0.01;
-                    s = (f64::from(s) + term) as f32;
+                    for (gl, &xi) in g.iter_mut().zip(xs) {
+                        *gl = -f64::from(m.gauss.neg_log(xi));
+                    }
+                    math::exp_in_place(&mut g[..k]);
+                    for (sl, &e) in s.iter_mut().zip(&g[..k]) {
+                        *sl = (f64::from(*sl) + e * 0.01) as f32;
+                    }
                 }
-                row[n + t] = s;
+                for (row, &sl) in rows.chunks_exact_mut(nt).zip(&s[..k]) {
+                    row[n + t] = sl;
+                }
             }
         });
     let types = icm(grid, &like, n, &pairs, mixel_weight);

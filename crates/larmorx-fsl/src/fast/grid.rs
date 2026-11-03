@@ -12,6 +12,8 @@
 use std::ops::Range;
 use std::sync::atomic::{AtomicUsize, Ordering};
 
+use rayon::prelude::*;
+
 /// The 18 neighbours with a weight (the 6 face and 12 edge neighbours of the 3 × 3 × 3 block),
 /// in §4.2's order: z offset outermost, then y, then x; the 8 corners and the voxel itself have
 /// weight 0 and are left out.
@@ -216,12 +218,23 @@ impl Grid {
     }
 
     /// A per-voxel quantity over the whole image: `compact[i]` at mask voxel `i`, `outside`
-    /// elsewhere.
-    pub fn expand<T: Copy>(&self, compact: impl Fn(usize) -> T, outside: T) -> Vec<T> {
+    /// elsewhere (row by row, in parallel).
+    pub fn expand<T: Copy + Send + Sync>(
+        &self,
+        compact: impl Fn(usize) -> T + Sync,
+        outside: T,
+    ) -> Vec<T> {
+        let nx = self.shape[0];
         let mut out = vec![outside; self.voxels()];
-        for (i, &v) in self.index.iter().enumerate() {
-            out[v as usize] = compact(i);
+        if nx == 0 {
+            return out;
         }
+        out.par_chunks_mut(nx).enumerate().for_each(|(r, row)| {
+            let base = r * nx;
+            for i in self.row_start[r] as usize..self.row_start[r + 1] as usize {
+                row[self.index[i] as usize - base] = compact(i);
+            }
+        });
         out
     }
 }

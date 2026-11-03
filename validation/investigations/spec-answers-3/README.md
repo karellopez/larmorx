@@ -13,6 +13,8 @@ plenty; 12 for `measure_fsl201.py`), with `PYTHONPATH=python:validation/src` and
 |---|---|---|
 | `rotation_model.py` | §4.3 and §4.6: the movement matrices as FSL builds them (single-precision angle, cosine and sine, the axis entry `q²`) and its movement derivatives (a forward difference of the sampling positions, steps 1e-4 mm and 1e-5 rad): the movement part of FSL's three gradients of the replica suite's case `debug/movements` (`TopupDebugGradient_*`), against the cost's exact derivative. `--variant double-matrix`: the same forward difference of matrices built in double precision gives the exact derivative (the rounding, not the step, is FSL-201's cause) | `rotation_model.py <FSL run of debug/movements>` (made by `cleanroom-topup/fsl_case.py case debug/movements <dir>`) |
 | `refit_model.py` | §4.4: the refit between levels (the samples, the intermediate knot spacing, the refit when `--warpres` changes at the same spacing, the penalty of only the two wrap-around second differences) against FSL's level-2 start fields and coefficients of the clean-room implementer's probes D to H. `--variant interior`, `zero`, `none`: the other penalties part from FSL | `refit_model.py <runs dir>` (the probes made by `TOPUP_RUNS=<runs dir> cleanroom-topup/probes.py D E F G H`) |
+| `lsr_model.py` | §7.4: applytopup's least-squares restoration with the matrices built row by row (each observed voxel's extent mapped back by FSL's walk; the mapping at a negative index read as FSL-133 reads it) against FSL's restorations of the probe lines. `--variant circular`: the circular read (misses lines of 30 voxels); `--variant overlap`: the matrices column by column with every folded part counted (misses folded lines) | `lsr_model.py <dir of probe directories>` |
+| `fold_probe.py` | the probes of lines whose mapping folds: 16 voxels, the field rising 1 or 3 Hz per voxel (at 3 Hz the mapping steps back across the wrap-around) | `fold_probe.py <dir>/p_2_<y>_2 <y> <slope> <t> [n]`, then `cleanroom-topup/at_case.py args <dir>/p_2_<y>_2 - -- --imain=pu.nii.gz,pd.nii.gz --inindex=1,2 --datain=acqw.txt --topup=tu --out=hifi` |
 | `measure_fsl201.py` | FSL-201, rule D measured: topup with FSL's movement derivatives (the replica's `reproduce`, checked against FSL's run from the cache) against the exact derivatives (the replica's default): final cost, field, movements | `measure_fsl201.py <work dir> case <suite cases>`, `... fmriprep`, `... fmriprep-fsl-config`, `... finding <finding JSON>...`, `... args <name> -- <topup arguments>` |
 
 What the models gave (2026-11-03):
@@ -48,3 +50,9 @@ What the models gave (2026-11-03):
     the 99th percentile).
   In all, lower or equal in 18 of 22 runs; higher by 0.004 to 0.13 % in 4 runs cut short.
   Decided: rule A (`specs/topup.md` §10.1).
+- `lsr_model.py` (2026-11-03; FSL's runs new, stored in the cache: probe133's lines of 30 and 32
+  voxels with the bright voxel at 0, 1, 15, 29 (`cleanroom-topup/wrap_probe.py <dir> 2 <y> 2 6
+  <n>`), and `fold_probe.py`'s lines of 16 voxels, slope 3 Hz with the bright voxel at 0, 8, 15
+  and slope 1 at 0, 8, read-out time 0.045 s): FSL's reading 7.4e-6 to 3.0e-5 from FSL on all 13
+  lines (of 620 to 936); `circular` 3.1, 16.7 and 19.7 on the 30-voxel lines (exact elsewhere);
+  `overlap` 111 to 383 on the three folded lines (and the 30-voxel lines' misses).

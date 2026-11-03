@@ -609,7 +609,37 @@ skipped and written 0 in every collection's output):
 - `K_a(i, j)` = the length (in undistorted voxels) of the part of voxel `j`'s extent `[j - 1/2,
   j + 1/2]` that `φ_a` maps into observed voxel `i`'s extent `[i - 1/2, i + 1/2]`: the
   intensity-conserving resampling matrix of Andersson et al. (2003); `K` stacks the collection's
-  `K_a`;
+  `K_a`. **How FSL builds it** (spec writer, 2026-11-03), and what the original follows in both
+  modes but for FSL-133's read:
+  - row by row: for observed voxel `i` the two points `u₁`, `u₂` (in undistorted voxels) where
+    the piecewise-linear `φ_a` (through the points `(k, φ_a(k))`, `k` integer) reaches `i − 1/2`
+    and `i + 1/2`, each found by a walk: for a target `x`, from `k = ⌈x⌉`: if `x > φ_a(k)`,
+    step up while `x > φ_a(k)` and take the last `k` below; if `x = φ_a(k)`, that `k`;
+    otherwise step down while `x < φ_a(k − 1)` and take `k − 1`; then `u = k + (x −
+    φ_a(k)) / (φ_a(k + 1) − φ_a(k))`;
+  - `K_a(i, j mod n)` = the length of `[u₁, u₂] ∩ [j − 1/2, j + 1/2]` for every integer `j`
+    (the columns wrap circularly);
+  - the mapping at an index outside the line (which the walk reaches near the line's ends):
+    `φ_a(k) = k + p_a t_a h_{w(k)}` with `w(k) = k mod n` for `k ≥ n`, and for `k < 0` FSL
+    reads `w(k) = (k + 2³²) mod n`, which is the circular `n + k` only when `n` divides 2³²
+    (a power of two): FSL-133 (30 voxels: `φ(−1)` takes voxel 15's field, `φ(−2)` voxel
+    14's); the default reads `n + k`;
+  - where `φ_a` increases this is the overlap above. Where it steps back (it folds: the field
+    changes by more than `1/|p_a t_a|` Hz between neighbours, in particular across the
+    wrap-around, where the line's two end values can differ that much), FSL's walk takes the
+    crossing it meets and `K_a` is **not** the overlap of every folded part: kept as FSL's
+    (rule C, §10.2; folding lies outside the restoration's model, and neither reading is the
+    physical one).
+  **(observed:** `lsr_model.py` of `validation/investigations/spec-answers-3/`, written from
+  this text, gives FSL's restorations of the clean-room implementer's probe133 lines of 30 and
+  32 voxels (one bright voxel at 0, 1, 15, 29) and of five lines of 16 voxels whose field rises
+  by 1 or 3 Hz per voxel (`fold_probe.py`; at 3 Hz the mapping folds across the wrap-around)
+  to 3e-5; the circular read misses the 30-voxel lines by up to 19.7 of 650, the overlap
+  reading the folded lines by up to 383 of 686**)**. The random-testing cases of lines that
+  divide 2³² which the original missed (reproducer 8089: 16 voxels along x, a field with a
+  gradient along the line) are this fold; the original's matrices, built column by column with
+  every folded part counted, differed there (confidence: high for the construction, medium
+  for 8089 itself, which the model did not re-run) (spec writer, 2026-11-03).
 - `S` the second-difference matrix of the line (rows `(-1, 2, -1)`, the first and last rows
   `(1, -1)` and `(-1, 1)`);
 - the restored line `f = (KᵀK + 0.01 SᵀS)⁻¹ Kᵀ y`, `y` the collection's observed lines stacked,
@@ -699,7 +729,7 @@ is banded, e.g. a zero field). The vb methods' traces and solves follow Armadill
 | FSL-125 | a negative `--fwhm` smooths with a negative-width kernel | refused | FSL's |
 | FSL-126 | a negative `--lambda` makes the cost negative, the field large | refused | FSL's |
 | FSL-132 | applytopup: the first volume of the first image is resampled trilinearly whatever `--interp` says (the default spline) | every volume with the method asked for; named | that volume trilinear |
-| FSL-133 | applytopup `lsr`/`vb`: a line's wrap-around reads the wrong voxel for line lengths that do not divide 2³² (30, 96, 100, ...) | the circular wrap; named when a read differs | FSL's |
+| FSL-133 | applytopup `lsr`/`vb`: a line's wrap-around reads the wrong voxel for line lengths that do not divide 2³² (30, 96, 100, ...): the mapping at an index `k < 0` takes the field of voxel `(k + 2³²) mod n` instead of `n + k` (§7.4; spec writer, 2026-11-03) | the circular wrap; named when a read differs | FSL's |
 | FSL-134 | applytopup with a field image: `jac` scales the y displacement by the x voxel size; a field on another grid than the images is not refused (laid as stored, or read past its lines with `lsr`) | the y voxel size; other grids refused | FSL's (`lsr` with another grid refused in both modes) |
 | FSL-135 | applytopup: an unknown `--method` writes nothing and exits 0; `lsr`/`vb` without movements abort (`TopupFileReader::MoveMatrix: Index i out of bound`) | clear refusals | FSL's |
 | FSL-141 | `vb*`: the Gamma shapes' counts in 32-bit integers wrap beyond 2³¹ values | 64-bit counts | the wrapped values |
@@ -723,6 +753,8 @@ methods' printed collection-1 count, the first VB estimate's line prior, `vb2D`'
 `relative`; the integer halving of the vb counts (rule C: 0.5 in thousands).
 The refit's penalty of only the two wrap-around second differences of the coefficients (§4.4:
 a small regularisation of the end coefficients, FSL's design; spec writer, 2026-11-03).
+applytopup's resampling matrices of a line whose mapping folds, built row by row by FSL's walk
+(§7.4; spec writer, 2026-11-03).
 
 ### 10.3 Not replicated
 
@@ -803,8 +835,8 @@ precision answer is checked by a model written from this spec's text
 | 1 | FSL's rotation derivatives of the movements (finding 14) | §4.3, §4.6, §4.7, §10.1 (FSL-201) | right (not the cost's); the cause: forward differences of single-precision rotation matrices | high: `rotation_model.py` gives the rotation entries of FSL's three gradients to 2e-5 to 1.5e-4; FSL-201 decided by rule A after measurement |
 | 2 | the refit between levels: the penalty's rows and weight; the refit when `--warpres` changes at the same spacing; the intermediate spacing (finding 11, probes A to H) | §4.4, §10.2 | right on all three | high: `refit_model.py` gives FSL's level-2 start fields of probes D to H to 7e-7 Hz rms; the other penalties miss by 1e-3 to 3e-2 |
 | 3 | the quadratic splines' bending energy where a knot falls on a voxel (finding 36, reproducer 10753) | (to be answered) | | |
-| 4 | applytopup `lsr` on lines whose length divides 2³² (reproducer 8089) | (to be answered) | | |
-| 5 | FSL-133: what FSL reads at the wrap-around of lines whose length does not divide 2³² (finding 21, probe133) | (to be answered) | | |
+| 4 | applytopup `lsr` on lines whose length divides 2³² (reproducer 8089) | §7.4, §10.2 | the lines are not the cause: the mapping folds (across the wrap-around) and FSL builds the matrices row by row by its walk, the original column by column | high for the construction (`lsr_model.py`: FSL's folded probe lines to 3e-5, the overlap reading off by up to 383 of 686); medium for 8089 itself (not re-run) |
+| 5 | FSL-133: what FSL reads at the wrap-around of lines whose length does not divide 2³² (finding 21, probe133) | §7.4, §10.1 | incomplete: the register's `(2³² − 1) mod n` is right for `φ(−1)` (voxel 15 of 30), but FSL's matrices are built row by row, so the misread position enters the rows near the line's start, not the columns the implementer's column-wise model gave it | high: `lsr_model.py` gives FSL's restorations of probe133's 30- and 32-voxel lines to 2.6e-5 |
 | 6 | FSL-134: a field of the images' voxel count in another shape (finding 22, probe134); the field image's Jacobian scale (finding 18) | (to be answered) | | |
 | 7 | the resampling of images with an axis of 8 voxels or fewer (finding 27) | (to be answered) | | |
 | 8 | the conventions the original follows as measured (the handoff's list: findings 1, 2, 3, 5, 7, 12, 13, 15, 16, 23 to 25, 29, 30, 32 to 34, FSL-121, FSL-125, FSL-143, the log, the messages, `--debug`, `--trace`, applytopup's mask and movements) | (to be answered; finding 13 confirmed in §4.3, finding 12 in §4.4) | | |

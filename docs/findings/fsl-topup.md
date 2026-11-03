@@ -231,6 +231,15 @@ routines named (the spec states the behaviour only). Models: `validation/investi
   level loop calls `SubSample`, `Smooth`, `SetWarpResolution`, `SetMovementsFixed`,
   `SetRegularisation` in that order; after the last level `Smooth(0.0); SubSample(1)` only when
   its subsampling is above 1 (the clean-room implementer's finding 12, right).
+- **FSL-133 and the folded lines** (*read*, *verified* by `lsr_model.py` on FSL's probe runs).
+  `DispVec::GetK_Matrix` fills `K` row by row from `get_non_zero_entries_of_row(i)`: `i1 =
+  _ca.Find(i-0.5)`, `i2 = _ca.Find(i+0.5)`, the crossings' fractions `x1`, `x2`, the entries
+  by the cases `i1 == i2`, `i2-i1 == 1`, `> 1`, columns by `IndexInRange` (circular, right).
+  `CircularArray::Find` walks from `ceil(x)` (up while `x > (*this)[i]`, down while `x <
+  (*this)[i-1]`); `operator[](int i)` returns `i + _sf*_v[i % _n]` with `_n` unsigned, so a
+  negative `i` reads `_v[(i + 2³²) mod n]` (FSL-133). Under a folded mapping `Find` stops at
+  the first crossing of its walk: `K` is then not the overlap of every folded part (rule C).
+  `lsr_resample` uses `GetS_Matrix(false)` (the unwrapped second differences).
 - **The axis entry on `--rbmout`** (*read*). `TopupCF::WriteRigidBodyMatrices` writes
   `mp_to_matrix(_mp)` about the full-resolution regridded image's centre: the diagonal's 5e-8 the
   clean-room implementer saw (finding 13) is `q²`.

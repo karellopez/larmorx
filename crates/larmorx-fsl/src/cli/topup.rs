@@ -372,16 +372,46 @@ pub fn main(args: &[String], settings: &Settings, out: &mut dyn Write, err: &mut
             let text = std::fs::read(&path).unwrap_or_default();
             let text = String::from_utf8_lossy(&text);
             let mut from_file = Given::default();
+            // FSL-122: a line whose text after its first word exceeds 1023 characters ends FSL's
+            // reading (observed: the settings after it are ignored)
+            let mut cut = false;
+            let mut after_cut = false;
             for line in text.lines() {
                 let Some(word) = line.split_whitespace().next() else {
                     continue;
                 };
+                if cut {
+                    if !word.starts_with('#') {
+                        after_cut = true;
+                    }
+                    if mode == UpstreamDefects::Reproduce {
+                        continue;
+                    }
+                }
+                let rest = line.trim_start().len() - word.len();
+                if rest > 1023 {
+                    cut = true;
+                }
                 if word.starts_with('#') {
                     continue;
                 }
                 if let Err(m) = parse_word(word, &mut from_file) {
                     return usage_error(err, &notices, &m);
                 }
+            }
+            if after_cut {
+                notices.push(Notice::new(
+                    &defects::FSL_122,
+                    mode,
+                    match mode {
+                        UpstreamDefects::Fix => {
+                            "the configuration's settings after a line of more than 1023 characters are read (FSL ignores them)"
+                        }
+                        UpstreamDefects::Reproduce => {
+                            "the configuration's settings after a line of more than 1023 characters are ignored, as FSL ignores them"
+                        }
+                    },
+                ));
             }
             for (k, v) in from_file.values {
                 given.values.entry(k).or_insert(v);
@@ -402,6 +432,8 @@ struct Settled {
     input: image::Input,
     verbose: bool,
     n_threads: usize,
+    /// The levels that estimate the movements with scaled conjugate gradients (FSL's warning).
+    scg_movements: usize,
 }
 
 fn run(
@@ -416,6 +448,12 @@ fn run(
         Ok(s) => s,
         Err(code) => return code,
     };
+    for _ in 0..s.scg_movements {
+        let _ = writeln!(
+            out,
+            "topup_clp::topup_clp: WARNING, it is generally NOT a good idea to include movements when using the Scaled Conjugate Gradient method."
+        );
+    }
     write_log(given, settings, &s.logout);
     if let Some(d) = given.get("debug") {
         let level = atoi(d);
@@ -434,6 +472,14 @@ fn run(
                 "--debug is not implemented yet in the clean-room original",
             );
         }
+    }
+    if s.scans.iter().any(|sc| sc.pe[2] != 0.0) {
+        print_notices(err, notices);
+        let _ = writeln!(
+            err,
+            "Error occurred when preparing to run topup\nException thrown with message: Topup::TopupScan::TopupScan: third element of pevec must be zero"
+        );
+        return 1;
     }
     for flag in ["trace", "profile"] {
         if given.has(flag) {
@@ -475,14 +521,14 @@ struct Printer<'a> {
 }
 
 impl Progress for Printer<'_> {
-    fn evaluated(&mut self, level: &topup::model::Level, e: &topup::model::Eval) {
+    fn evaluated(&mut self, _level: &topup::model::Level, e: &topup::model::Eval) {
         if self.verbose {
             let reg = e.cost - e.ssd;
             let _ = writeln!(
                 self.out,
                 "SSD = {}\tn = {}\tReg = {}\tCost = {}",
                 g(e.ssd),
-                level.n_mask,
+                e.n_mask,
                 g(reg),
                 g(e.cost)
             );
@@ -691,13 +737,6 @@ fn settle(
     }
     // what this original does not do yet
     let not_yet = |what: &str| format!("{what} is not implemented yet in the clean-room original");
-    if (0..n_levels).any(|l| ati(&estmov, l) != 0) {
-        return Err(refuse(
-            err,
-            notices,
-            &not_yet("--estmov=1 (the movements' estimation)"),
-        ));
-    }
     if splineorder == 2 {
         return Err(refuse(err, notices, &not_yet("--splineorder=2")));
     }
@@ -733,6 +772,9 @@ fn settle(
             &not_yet("subsamplings whose largest the others do not divide (FSL-118)"),
         ));
     }
+    let scg_movements = (0..n_levels)
+        .filter(|&l| ati(&estmov, l) != 0 && ati(&minmet, l) == 1)
+        .count();
     let levels: Vec<LevelSpec> = (0..n_levels)
         .map(|l| LevelSpec {
             warpres: at(&warpres, l),
@@ -758,6 +800,7 @@ fn settle(
         },
         scale: given.get("scale").map_or(0, atoi) != 0,
         regrid: given.get("regrid").map_or(1, atoi) != 0,
+        single: given.get("numprec") == Some("float"),
     };
     let scans: Vec<Scan> = acq
         .iter()
@@ -766,14 +809,6 @@ fn settle(
             t: r[3],
         })
         .collect();
-    if scans.iter().any(|s| s.pe[2] != 0.0) {
-        print_notices(err, notices);
-        let _ = writeln!(
-            err,
-            "Error occurred when preparing to run topup\nException thrown with message: Topup::TopupScan::TopupScan: third element of pevec must be zero"
-        );
-        return Err(1);
-    }
     let stem = default_stem(&imain);
     let out = given.get("out").map_or_else(|| stem.clone(), str::to_owned);
     let logout = given
@@ -809,6 +844,7 @@ fn settle(
         input,
         verbose: given.has("verbose"),
         n_threads,
+        scg_movements,
     })
 }
 
@@ -834,7 +870,8 @@ fn write_log(given: &Given, settings: &Settings, logout: &str) {
             "lambda" => v.map_or("0".into(), |s| join_f(&float_list(s))),
             "subsamp" => v.map_or("1".into(), |s| join_i(&int_list(s))),
             "miter" => v.map_or("5".into(), |s| join_i(&int_list(s))),
-            "estmov" => v.map_or("1".into(), |s| join_i(&int_list(s))),
+            // FSL's log prints the default as 100 (observed; rule C: the log only)
+            "estmov" => v.map_or("100".into(), |s| join_i(&int_list(s))),
             "minmet" => v.map_or("0".into(), |s| join_i(&int_list(s))),
             "ssqlambda" | "regrid" => v.map_or(1, atoi).to_string(),
             "scale" => v.map_or(0, atoi).to_string(),
@@ -1050,11 +1087,13 @@ fn write_outputs(
     ) {
         return write_failed(err, notices, &name);
     }
-    // the movements: none estimated
-    let movpar: String = (0..n_vols)
-        .map(|_| {
-            (0..6)
-                .map(|_| format!("{}  ", g10(0.0)))
+    // the movements (§6)
+    let movpar: String = est
+        .movements
+        .iter()
+        .map(|p| {
+            p.iter()
+                .map(|&v| format!("{}  ", g10(v)))
                 .collect::<String>()
                 + "\n"
         })
@@ -1064,12 +1103,30 @@ fn write_outputs(
         return write_failed(err, notices, &movpar_name);
     }
     let field32: Vec<f32> = ev.h.iter().map(|&v| v as f32).collect();
-    let mask = level.mask();
+    let mask = &ev.mask;
+    let _ = &level;
     // the field (FSL-119: the intent parameters)
+    let (p1, p2, p3) = (
+        input.header.intent_p1,
+        input.header.intent_p2,
+        input.header.intent_p3,
+    );
+    if given.get("fout").is_none()
+        && given.get("featout").is_some()
+        && (p1, p2, p3) != (0.0, p1, p2)
+    {
+        notices.push(Notice::new(
+            &defects::FSL_119,
+            mode,
+            match mode {
+                UpstreamDefects::Fix => "the field map keeps the input's intent parameters (FSL's are shifted by one place)",
+                UpstreamDefects::Reproduce => "the field map's intent parameters are the input's shifted by one place, as FSL's",
+            },
+        ));
+    }
     if let Some(fout) = given.get("fout") {
         let mut fh = input.header.clone();
         fh.intent_code = 2018;
-        let (p1, p2, p3) = (fh.intent_p1, fh.intent_p2, fh.intent_p3);
         if (p1, p2, p3) != (0.0, p1, p2) {
             notices.push(Notice::new(
                 &defects::FSL_119,
@@ -1156,6 +1213,12 @@ fn write_outputs(
                 .collect();
         let mut fh = input.header.clone();
         fh.intent_code = 2018;
+        if mode == UpstreamDefects::Reproduce {
+            let (p1, p2) = (fh.intent_p1, fh.intent_p2);
+            fh.intent_p1 = 0.0;
+            fh.intent_p2 = p1;
+            fh.intent_p3 = p2;
+        }
         if let Err(name) = put(
             &format!("{feat}_fieldmap_rads"),
             &fh,
@@ -1169,9 +1232,10 @@ fn write_outputs(
         ) {
             return write_failed(err, notices, &name);
         }
+        // the magnitude keeps the input's header, its intent included (observed)
         if let Err(name) = put(
             &format!("{feat}_fieldmap_mag"),
-            &ih,
+            &input.header,
             input.flipped,
             dims,
             1,
@@ -1235,10 +1299,15 @@ fn write_outputs(
     if let Some(rbm) = given.get("rbmout") {
         for i in 0..n_vols {
             let name = format!("{rbm}_{:02}.mat", i + 1);
-            let text: String = (0..4)
-                .map(|r| {
-                    (0..4)
-                        .map(|c| format!("{}  ", g10(if r == c { 1.0 } else { 0.0 })))
+            // about the input's centre (observed: FSL's matrices, findings)
+            let centre: [f64; 3] =
+                std::array::from_fn(|a| (dims[a] as f64 - 1.0) * input.vol.voxel[a] / 2.0);
+            let m = topup::movement::matrix(est.movements[i], centre);
+            let text: String = m
+                .iter()
+                .map(|row| {
+                    row.iter()
+                        .map(|&v| format!("{}  ", g10(v)))
                         .collect::<String>()
                         + "\n"
                 })

@@ -19,6 +19,7 @@
 pub mod images;
 pub mod minimise;
 pub mod model;
+pub mod movement;
 pub mod spline;
 pub mod stencil;
 
@@ -56,6 +57,8 @@ pub struct Params {
     /// Each volume scaled to a mean of 100 by itself (`--scale=1`).
     pub scale: bool,
     pub regrid: bool,
+    /// The Levenberg-Marquardt Hessian in single precision (`--numprec=float`).
+    pub single: bool,
 }
 
 /// The knot spacing (voxels) for a resolution of `warpres` mm on voxels of `voxel` mm (§4.2).
@@ -136,6 +139,8 @@ pub struct Estimate {
     pub field: Field,
     pub prepared: Prepared,
     pub warpres_last: f64,
+    /// Each volume's movement (tx, ty, tz, rx, ry, rz; the first volume's 0).
+    pub movements: Vec<[f64; 6]>,
     /// The smoothing (FWHM, mm) of the outputs' predictions: the last level's when it was not
     /// subsampled, else none (§6: a subsampled last level's smoothing and subsampling are
     /// removed; observed, `thr/openblas`: one level of FWHM 4 mm, FSL's `--iout` is smoothed).
@@ -163,6 +168,7 @@ pub fn estimate(
     let mut field: Option<Field> = None;
     let mut prev: Option<LevelSpec> = None;
     let mut cached: Option<(usize, f64, LevelImages)> = None;
+    let mut mov = vec![[0.0; 6]; scans.len()];
     for (l, spec) in params.levels.iter().enumerate() {
         let s = spec.subsamp.max(1);
         let nt = dims.map(|n| (n / s).max(1));
@@ -193,7 +199,7 @@ pub fn estimate(
                 im
             }
         };
-        let level = Level::new(
+        let mut level = Level::new(
             imgs,
             dims,
             voxel,
@@ -203,16 +209,22 @@ pub fn estimate(
             spec.lambda,
             params.ssqlambda,
             params.regmod,
+            &mov,
+            spec.estmov,
         );
+        level.single = params.single;
         let mut rep = |lv: &Level, e: &Eval| progress.evaluated(lv, e);
-        f.coef = match spec.minmet {
+        let theta = level.start(std::mem::take(&mut f.coef));
+        let theta = match spec.minmet {
             Minimiser::LevenbergMarquardt => {
-                minimise::levenberg_marquardt(&level, f.coef, spec.miter, &mut rep)
+                minimise::levenberg_marquardt(&level, theta, spec.miter, &mut rep)
             }
             Minimiser::ScaledConjugateGradients => {
-                minimise::scaled_conjugate_gradients(&level, f.coef, spec.miter, &mut rep)
+                minimise::scaled_conjugate_gradients(&level, theta, spec.miter, &mut rep)
             }
         };
+        mov = level.movements(&theta);
+        f.coef = theta[..level.n_coef()].to_vec();
         field = Some(f);
         prev = Some(*spec);
     }
@@ -229,6 +241,7 @@ pub fn estimate(
         field: f,
         prepared,
         warpres_last: last.warpres,
+        movements: mov,
         fwhm_out: if last.subsamp > 1 { 0.0 } else { last.fwhm },
     }
 }
@@ -248,6 +261,8 @@ pub fn full_resolution(est: &Estimate, scans: &[Scan], regmod: RegMod) -> (Level
         0.0,
         false,
         regmod,
+        &est.movements,
+        false,
     );
     let ev = level.eval(&est.field.coef);
     (level, ev)

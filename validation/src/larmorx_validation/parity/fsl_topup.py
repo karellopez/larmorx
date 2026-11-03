@@ -672,7 +672,11 @@ def fix_pass(
             if key.endswith(".topup_log"):
                 continue
             if _is_image(key):
-                change = change + defects.Change.of(_data(_load(y[key])), _data(_load(x[key])))
+                ix, iy = _load(x[key]), _load(y[key])
+                change = change + defects.Change.of(_data(iy), _data(ix))
+                why = _header_difference(ix, iy)
+                if why:
+                    others.append(f"{key} header ({why})")
             elif x[key].read_bytes() != y[key].read_bytes():
                 others.append(key)
         defects.add_fix_check(

@@ -210,9 +210,85 @@ impl Stencil {
     }
 }
 
+/// The Levenberg-Marquardt Hessian of a level (§4.7): the coefficients' block as a stencil, the
+/// movements' coupling to the coefficients (one dense column per free movement parameter) and
+/// the movements' dense block.
+#[derive(Clone, Debug)]
+pub struct Hessian {
+    pub cc: Stencil,
+    /// `cm[p]`: the column of movement parameter `p` against every coefficient.
+    pub cm: Vec<Vec<f64>>,
+    /// The movements' block, `nm × nm` by rows.
+    pub mm: Vec<f64>,
+}
+
+impl Hessian {
+    pub fn n(&self) -> usize {
+        self.cc.n() + self.cm.len()
+    }
+
+    pub fn diagonal(&self) -> Vec<f64> {
+        let nm = self.cm.len();
+        let mut d = self.cc.diagonal();
+        d.extend((0..nm).map(|p| self.mm[p * nm + p]));
+        d
+    }
+
+    /// `y = H x`.
+    pub fn mul(&self, x: &[f64], y: &mut [f64]) {
+        let nc = self.cc.n();
+        let nm = self.cm.len();
+        self.cc.mul(&x[..nc], &mut y[..nc]);
+        if nm == 0 {
+            return;
+        }
+        let (xc, xm) = x.split_at(nc);
+        {
+            let yc = &mut y[..nc];
+            for (p, col) in self.cm.iter().enumerate() {
+                let w = xm[p];
+                if w != 0.0 {
+                    for (o, v) in yc.iter_mut().zip(col) {
+                        *o += w * v;
+                    }
+                }
+            }
+        }
+        for p in 0..nm {
+            let mut s = dot(&self.cm[p], xc);
+            for q in 0..nm {
+                s += self.mm[p * nm + q] * xm[q];
+            }
+            y[nc + p] = s;
+        }
+    }
+
+    /// The diagonal multiplied by `1 + damping`.
+    pub fn damped(&self, damping: f64) -> Hessian {
+        let nm = self.cm.len();
+        let mut h = Hessian {
+            cc: self.cc.damped(damping),
+            cm: self.cm.clone(),
+            mm: self.mm.clone(),
+        };
+        for p in 0..nm {
+            h.mm[p * nm + p] *= 1.0 + damping;
+        }
+        h
+    }
+
+    /// Every entry rounded to single precision (`--numprec=float`, §4.7).
+    pub fn to_single(&mut self) {
+        let r = |v: &mut f64| *v = f64::from(*v as f32);
+        self.cc.data.iter_mut().for_each(r);
+        self.cm.iter_mut().flatten().for_each(r);
+        self.mm.iter_mut().for_each(r);
+    }
+}
+
 /// Solves `H x = b` by conjugate gradients preconditioned with the diagonal, from `x = 0`, until
 /// `|r| / |b| < tol` or `max_iter` iterations (§4.7).
-pub fn pcg(h: &Stencil, b: &[f64], tol: f64, max_iter: usize) -> Vec<f64> {
+pub fn pcg(h: &Hessian, b: &[f64], tol: f64, max_iter: usize) -> Vec<f64> {
     let n = b.len();
     let diag = h.diagonal();
     let minv: Vec<f64> = diag

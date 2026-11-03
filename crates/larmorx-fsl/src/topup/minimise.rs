@@ -26,7 +26,8 @@ impl<F: FnMut(&Level, &Eval)> Report for F {
 const CG_TOLERANCE: f64 = 1e-3;
 const CG_MAX_ITER: usize = 500;
 
-/// Levenberg-Marquardt from `c`, at most `miter` accepted steps.
+/// Levenberg-Marquardt from `c` (the coefficients and the free movement parameters), at most
+/// `miter` accepted steps.
 pub fn levenberg_marquardt(
     level: &Level,
     mut c: Vec<f64>,
@@ -40,9 +41,19 @@ pub fn levenberg_marquardt(
     }
     let mut g = level.gradient(&ev, &c);
     let mut h = level.hessian(&ev);
+    if level.single {
+        h.to_single();
+    }
     let mut damping = 0.1;
     let mut accepted = 0;
     loop {
+        // a parameter the data and the regulariser leave free (a zero diagonal: λ = 0 and a
+        // coefficient whose support lies outside the mask) ends the level without a step
+        // (observed: FSL's default run on the half-resolution pair prints the first cost only
+        // and returns a zero field)
+        if h.diagonal().iter().any(|d| !(*d > 0.0)) {
+            break;
+        }
         let hd = h.damped(damping);
         let b: Vec<f64> = g.iter().map(|x| -x).collect();
         let step = pcg(&hd, &b, CG_TOLERANCE, CG_MAX_ITER);
@@ -61,6 +72,9 @@ pub fn levenberg_marquardt(
             }
             g = level.gradient(&ev, &c);
             h = level.hessian(&ev);
+            if level.single {
+                h.to_single();
+            }
         } else {
             damping *= 10.0;
             if damping > 1e20 {

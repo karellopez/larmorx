@@ -667,3 +667,17 @@ README "FLIRT, questions 22 to 25 and 38"); FSL 6.0.7.23's source:
   `set_bbr_seg` before each evaluation, the cost is NaN, `optimise` keeps the start, the final
   matrix is the `-init` one, `final_transform` resamples with it (`affine_transform`; `bbr_resamp`
   only with a field map); the debug call's `bbr` evaluation writes `debugvol` (zeros).
+
+## The replica's switches (2026-11-03, sub-task 4 of the spec answers)
+
+- **FSL-111** (`applyxfm4d.rs`): a `DT_UNSIGNED_CHAR` file (not int8) is templated on `u8` in the
+  default mode (`typed_main::<u8>`): read as stored, resampled with float spline coefficients (no
+  FSL-79 comparison in that type), FSL-09's rounding clamped to 0..255. Beside it, volume by
+  volume (`signed_bytes`), the signed reading FSL's `char` template makes is resampled as the
+  default resamples an int8 image (its FSL-79 and FSL-09 notices kept); FSL-111 is named when the
+  bytes written differ. `reproduce` keeps the `i8` template (FSL's). The cost: twice the
+  resampling for uint8 inputs in the default mode only.
+- **FSL-204** (`pointflirt.rs`, `procrustes`): `n == 0` with both matrices 0 x 0 (after the
+  `--vox` and `-v` steps, whose lines FSL prints first) is refused in both modes (`End::Refuse`,
+  `larmorx-nc: error: pointflirt: no points in the coordinate files (FSL-204)`, exit 1), where
+  FSL's later submatrix copies of the empty products crash (signal 11).

@@ -289,3 +289,17 @@ source (*read*) and, where cheap, FSL as a black box through the oracle cache (*
   NaN; `reproduce` as now. (`calculateExtrema` is newimage's: every FSL tool's `min()`/`max()`
   shares it; BET's, FLIRT's and fslmaths' replicas follow it as FSL does; whether a NaN first
   voxel changes their results is not checked here.)
+
+### The replica's switches (2026-11-03, sub-task 4 of the spec answers)
+
+- **FSL-202** (`mriseg.rs`, `means_variances`): both variances computed; the default stores
+  `(s_mpm / s_p2 - mu * mu) as f32` with `mu = s_mp / s_p` in double, `reproduce` FSL's
+  `(s_mpm / s_p2 - (double)(m_mean * m_mean))`; `Segmentation::fsl202_differs` is set when any
+  call's two values differ in their bits (NaN equal to NaN), and `fast.rs` names FSL-202 after
+  `main` (in both modes). The suite's fix pass lists FSL-202 among the entries that may be named
+  without a visible change (a variance's last bits that the outputs round back).
+- **FSL-203** (`fast.rs`, `clear_negative`): when the first voxel is NaN, the default takes the
+  extrema over the values that are not NaN (FSL's `calculateExtrema` order otherwise); one channel
+  names FSL-203 whenever the first voxel is NaN (FSL's mask is then empty), several channels only
+  when a value that is not NaN is negative (their mask has no upper bound). The one-channel mask
+  is FSL-103's default already (above 0 and finite).

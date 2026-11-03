@@ -278,7 +278,7 @@ where the output changes), **FSL-80** (`applyxfm4D -3D` with sinc uses a blackma
 where the output changes), **FSL-81** (`aff2rigid` stops with a Python `NameError` under NumPy 2:
 the matrix computed by default), **FSL-111** (`applyxfm4D` reads a uint8 image into a signed
 char image: its values 128 to 255 as `v − 256`; read as stored by default, named where a written
-value changes). **FSL-75** also in `applyxfm4D` (a volume 3 voxels wide) and in
+value changes; in the replica too since 2026-11-03). **FSL-75** also in `applyxfm4D` (a volume 3 voxels wide) and in
 mcflirt's replica (named in both modes, the whole border by default).
 The spec answers (2026-11-02, the replica): **FSL-90** (`-anglerep quaternion`: the search's
 starting points, Euler angles, composed as Euler angles by default; FLIRT reads them as a
@@ -289,7 +289,10 @@ the base scale by default, as reading the image counts it; FLIRT's base scale is
 finishes, so `reproduce` refuses; `-basescale 0` refused in both modes). Each named in both modes
 (`upstream defect FSL-9n (flirt) corrected: ...`); the clean-room original follows in its part 2.
 
-Refused in both modes (FLIRT's behaviour is undefined): FSL-21/FSL-66 (`-bins` giving no or negative
+Refused in both modes (FLIRT's behaviour is undefined): **FSL-204** (`pointflirt` with two
+coordinate files both empty or missing: FSL crashes after its `Could not open matrix file` lines;
+`larmorx-nc: error: pointflirt: no points in the coordinate files (FSL-204)`, exit 1; the replica
+since 2026-11-03, the clean-room original in a later part), FSL-21/FSL-66 (`-bins` giving no or negative
 bins at a scale), FSL-70 (a schedule matrix name FLIRT cannot interpret), FSL-71 (`bbrstep` below 1
 with BBR: FLIRT never finishes), FSL-72 (a schedule `read` of a file that is not numbers: FLIRT reads
 for ever), FSL-73 (`-pedir` without a field map read), the background value of a single voxel

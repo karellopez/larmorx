@@ -180,7 +180,8 @@ changes a result is named on standard error and as an `UpstreamDefectWarning`
 - **FSL-120**: a row-count mismatch with `--acqp` names an empty file: corrected.
 - **FSL-121**: FSLDIR unset with a configuration name not found: a clear message.
 - **FSL-122**: a configuration line longer than 1023 characters silently ends the file: read whole.
-- **FSL-123** to **FSL-126**: a negative `--miter`, `--warpres`, `--fwhm` or `--lambda`: refused.
+- **FSL-123** to **FSL-126**: a negative `--miter`, `--warpres`, `--fwhm` (which FSL takes as no
+  smoothing) or `--lambda`: refused.
 - **FSL-132**: applytopup resamples the first volume trilinearly whatever `--interp` asks: corrected.
 - **FSL-133**: applytopup's restoration wraps a line wrongly for lengths that do not divide 2³²:
   corrected.
@@ -191,12 +192,19 @@ changes a result is named on standard error and as an `UpstreamDefectWarning`
 - **FSL-141** to **FSL-143**: the vb methods' counts in 32-bit integers, `vb3D`/`vb4D`'s count of
   data points and their prior across slices (indefinite: FSL's iterations diverge): corrected.
 - **FSL-144**: `--method=jac` with a phase encoding along z (which topup does not estimate)
-  leaves the image uncorrected silently: refused (the original).
+  leaves the image uncorrected silently: refused (both implementations; the replica since
+  2026-11-03).
 - **FSL-145**: `--splineorder=2` lays two coefficients on an axis shorter than two knot
-  spacings, so the field is forced towards 0 at its far end: the full count by default (the
-  original).
+  spacings (one on an axis shorter than one spacing, whose refit between levels stops topup),
+  so the field is forced towards 0 at its far end: the full count by default (both
+  implementations; the replica since 2026-11-03, which also reads a coefficient file laid so in
+  applytopup).
 - **FSL-146**: with volumes encoded along different axes (AP, PA, LR, RL) the gradient is not
-  the cost's: corrected, the cost's own (the original).
+  the cost's: corrected, the cost's own (both implementations; the replica since 2026-11-03).
+- **FSL-201**: with the movements estimated, the derivatives with respect to the rotations are
+  forward differences of rotation matrices built in single precision, so the minimisers end
+  elsewhere than the cost's minimum: the exact derivatives by default (both implementations; the
+  replica since 2026-11-03; fMRIPrep's calls, which estimate no movements, unchanged).
 
 ## Not yet
 

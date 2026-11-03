@@ -29,6 +29,9 @@ pub struct Spline1D {
     deriv: u32,
     n: u32,
     sp: Vec<f64>,
+    /// larmorx (FSL-145 corrected): the quadratic splines' coefficient count grows on every
+    /// axis, short ones included ([`Spline1D::ncoef`]); `false` is FSL's count.
+    general: bool,
 }
 
 impl Spline1D {
@@ -57,7 +60,21 @@ impl Spline1D {
             deriv,
             n,
             sp,
+            general: false,
         })
+    }
+
+    /// The same spline with the quadratic coefficient count corrected (`true`, FSL-145) or
+    /// FSL's (`false`, as [`Spline1D::new`] makes it).
+    #[must_use]
+    pub fn with_general_count(mut self, on: bool) -> Spline1D {
+        self.general = on;
+        self
+    }
+
+    /// Whether the coefficient count is the corrected one (FSL-145).
+    pub fn general_count(&self) -> bool {
+        self.general
     }
 
     pub fn order(&self) -> u32 {
@@ -90,22 +107,48 @@ impl Spline1D {
         }
     }
 
-    /// `NCoef(isz)`.
+    /// `NCoef(isz)`; with [`Spline1D::with_general_count`], the corrected quadratic count
+    /// (FSL-145).
     pub fn ncoef(&self, isz: u32) -> u32 {
+        if self.general {
+            self.ncoef_general(isz)
+        } else {
+            self.ncoef_fsl(isz)
+        }
+    }
+
+    /// FSL's `NCoef(isz)`: `OffsetIntoField(nc)-KernelSize()/2 < isz-1` is an int minus an
+    /// unsigned int, compared as unsigned, so on a quadratic axis shorter than two knot
+    /// spacings (one when the spacing is 2) the negative difference wraps to a large number and
+    /// the count is not grown: 2 coefficients, 1 when the axis is shorter than one spacing
+    /// (FSL-145).
+    pub fn ncoef_fsl(&self, isz: u32) -> u32 {
         if self.ksp == 1 {
             isz
         } else if self.order == 3 {
             ((f64::from(isz + 1) / f64::from(self.ksp)).ceil() as u32) + 2
         } else {
             let mut nc = isz / self.ksp + self.order / 2;
-            // `OffsetIntoField(nc)-KernelSize()/2 < isz-1`: an int minus an unsigned int,
-            // compared as unsigned.
             while (self.offset_into_field(nc) as u32).wrapping_sub(self.n / 2) < isz.wrapping_sub(1)
             {
                 nc += 1;
             }
             nc
         }
+    }
+
+    /// larmorx (FSL-145 corrected): FSL's count with its test in signed arithmetic, so the
+    /// quadratic count grows until the last spline's sampled extent reaches the last voxel on
+    /// every axis (`ceil((2n + k - 4) / (2k)) + 2`); the cubic count and `k = 1` as FSL's.
+    pub fn ncoef_general(&self, isz: u32) -> u32 {
+        if self.ksp == 1 || self.order == 3 {
+            return self.ncoef_fsl(isz);
+        }
+        let mut nc = isz / self.ksp + self.order / 2;
+        while i64::from(self.offset_into_field(nc)) - i64::from(self.n / 2) < i64::from(isz) - 1 {
+            nc += 1;
+        }
+        nc
     }
 
     /// `OffsetIntoField(cindx)`: the voxel of the spline's centre (unsigned products read as
@@ -360,6 +403,21 @@ impl Spline3D {
             sp,
             premul: false,
         })
+    }
+
+    /// The same spline with the quadratic coefficient count corrected (`true`, FSL-145) or
+    /// FSL's (`false`) along every direction.
+    #[must_use]
+    pub fn with_general_count(mut self, on: bool) -> Spline3D {
+        for v in &mut self.v {
+            v.general = on;
+        }
+        self
+    }
+
+    /// Whether the coefficient counts are the corrected ones (FSL-145).
+    pub fn general_count(&self) -> bool {
+        self.v[0].general
     }
 
     /// The copy constructor: a pre-multiplied spline's values are copied with it; otherwise the

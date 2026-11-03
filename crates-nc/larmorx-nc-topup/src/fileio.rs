@@ -283,15 +283,24 @@ pub struct TopupFileReader {
     moves: Vec<Mat>,
     coef: Option<SplineField>,
     vol: Option<Volume>,
+    /// The coefficients may be laid with the quadratic B-splines' full count (FSL-145
+    /// corrected: topup's default writes it); FSL's count only when `false`.
+    general: bool,
+    /// FSL-145: a coefficient file laid with the full count on a short axis was read (FSL
+    /// refuses it as internally inconsistent).
+    pub fsl145: bool,
 }
 
 impl TopupFileReader {
     /// `TopupFileReader(fname)`: `<fname>_fieldcoef` and `<fname>_movpar.txt`; if either fails,
     /// `fname` itself as a field image. A name with an extension is refused. The lines FSL
     /// prints on the way (a movement file it cannot open, exceptions it catches) go to `cerr`.
+    /// With `general` (D13's default), a quadratic coefficient file laid with the full count
+    /// on an axis shorter than two knot spacings (FSL-145) is read too; FSL's count is always.
     pub fn read(
         fname: &str,
         fsl: &larmorx_nc_core::settings::Settings,
+        general: bool,
         cerr: &mut Vec<String>,
     ) -> Result<TopupFileReader, FslError> {
         if let Some(dot) = fname.rfind('.') {
@@ -313,6 +322,8 @@ impl TopupFileReader {
             moves: Vec::new(),
             coef: None,
             vol: None,
+            general,
+            fsl145: false,
         };
         let first = r
             .common_read(&format!("{fname}_fieldcoef"), fsl, cerr)
@@ -347,7 +358,9 @@ impl TopupFileReader {
         match hdr.intent_code {
             CUBIC_SPLINE_COEFFICIENTS | QUADRATIC_SPLINE_COEFFICIENTS => {
                 let (v, _, _) = volume::read_orig_volume::<f32>(fname, fsl)?;
-                self.coef = Some(read_coef_file(&v)?);
+                let (field, fsl145) = read_coef_file(&v, self.general)?;
+                self.coef = Some(field);
+                self.fsl145 = fsl145;
                 self.vol = None;
                 self.ft = FieldFileType::Spline;
             }
@@ -460,8 +473,10 @@ impl TopupFileReader {
 
 /// `read_coef_file(vcoef)`: the field's size from the qform's translation, its voxel sizes
 /// from the intent parameters, the knot spacings from the voxel sizes (rounded), the order
-/// from the intent.
-fn read_coef_file(v: &Volume) -> Result<SplineField, FslError> {
+/// from the intent. With `general`, a file laid with the quadratic B-splines' full count on a
+/// short axis is accepted as well as FSL's layout (FSL-145; the second value says that such a
+/// file, which FSL refuses, was read).
+fn read_coef_file(v: &Volume, general: bool) -> Result<(SplineField, bool), FslError> {
     let q = &v.qform;
     let sz = [d2u(q.at(0, 3)), d2u(q.at(1, 3)), d2u(q.at(2, 3))];
     let vxs = [
@@ -479,17 +494,27 @@ fn read_coef_file(v: &Volume) -> Result<SplineField, FslError> {
         d2u(f64::from(v.ydim()) + 0.5),
         d2u(f64::from(v.zdim()) + 0.5),
     ];
+    let fits = |f: &SplineField| {
+        let cs = f.coef_size();
+        i64::from(cs[0]) == v.xsize()
+            && i64::from(cs[1]) == v.ysize()
+            && i64::from(cs[2]) == v.zsize()
+    };
     let mut field = SplineField::new(&sz, &vxs, &ksp, order, 1)?;
-    let cs = field.coef_size();
-    if i64::from(cs[0]) != v.xsize()
-        || i64::from(cs[1]) != v.ysize()
-        || i64::from(cs[2]) != v.zsize()
-    {
+    let mut fsl145 = false;
+    if !fits(&field) && general {
+        let full = SplineField::new_counted(&sz, &vxs, &ksp, order, 1, true)?;
+        if fits(&full) {
+            field = full;
+            fsl145 = true;
+        }
+    }
+    if !fits(&field) {
         return Err(fileio_error(
             "read_coef_file: Internally inconsistent coef-file",
         ));
     }
     let c: Vec<f64> = v.data.iter().map(|&x| f64::from(x)).collect();
     field.set_coef(&c)?;
-    Ok(field)
+    Ok((field, fsl145))
 }

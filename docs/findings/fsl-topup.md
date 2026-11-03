@@ -302,6 +302,31 @@ routines named (the spec states the behaviour only). Models: `validation/investi
   at `k_0 θ_0 = l_0 τ_0 = 1`, `φ`, `tau_update` with the previous `Lambda`, `mu_update` in
   storage order).
 
+### The replica's switches (2026-11-03, sub-task 4 of the spec answers)
+
+- **FSL-144** (`applytopup.rs`, `fsl144_check`): `--method=jac` with any `--inindex` row whose
+  third element is not 0 is refused by default before the field is read (`Refuse`, exit 1);
+  `reproduce` names it and runs FSL's `jac_resample` (z displacement 0).
+- **FSL-145** (`larmorx-nc-core` basisfield): `Spline1D` carries `general` (default `false`, FSL's
+  `NCoef`); `ncoef_general` evaluates `NCoef`'s test `OffsetIntoField(nc) - KernelSize()/2 <
+  isz-1` in signed arithmetic. FSL's unsigned test wraps only when the starting count `isz/ksp +
+  1` gives `(isz/ksp) * ksp < KernelSize()/2`: every `isz < 2 ksp` for `ksp >= 3`, but only
+  `isz = 1` for `ksp = 2` (`KernelSize()/2 = 2`): axes of 2 and 3 voxels at spacing 2 get the
+  general count (checked on FSL: `quad_count.py`'s spacing-2 probes). `SplineField::new_counted`
+  passes the flag to every `Spline3D` it builds (`spline3`), so `JtJ`, `Jte`, the energies and
+  their Hessians count as the field does; topup's `TopupCF` builds its fields with
+  `mode.fix()` and names FSL-145 (`note_fsl145`) when a level's (`cf`) or a new grid's
+  (`new_field`) counts differ. `get_coefs_one_dim` with `csz < 2` throws FSL's
+  `std::out_of_range` (`Mat::operator(): index out of bounds`, `get_s_matrix`'s `S(1,2)`), which
+  topup reports as FSL does (`Error occurred when preparing to run topup`); the replica's text
+  before (`fewer than 2 coefficients`) was not FSL's. applytopup's `read_coef_file` accepts, by
+  default, a file of the general count when FSL's does not fit (`TopupFileReader::fsl145`).
+- **FSL-146** (`costfn.rs`, `grad`): for a scan without `HasBeta(i)` (or `HasGamma(i)`) while the
+  manager has betas, the default adds `mean_beta * diff` to `abf[1]` (`mean_gamma * diff` to
+  `abf[2]`), the cost's own term; `reproduce` skips it as `TopupCF::grad` does. Named whenever
+  such a scan enters the gradient.
+- **FSL-201**: relay 1a's switch, unchanged.
+
 ## Kept as FSL's (not registered)
 
 As `specs/topup.md` §10.2 lists (rule C): `--iout`'s `_mean` naming, the silent log, `--rbmout`'s

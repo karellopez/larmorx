@@ -288,6 +288,7 @@ def inputs() -> Path:
     out = ws / "oracles" / "inputs" / SUITE
     stamp = out / "DONE-v9"
     if stamp.is_file():
+        _nan_first_input(out)
         return out
     out.mkdir(parents=True, exist_ok=True)
     call = next((n for r, n in fmriprep_calls() if r == SOURCE_RUN), None)
@@ -301,8 +302,28 @@ def inputs() -> Path:
     _multichannel_inputs(ws, out)
     _prior_inputs(ws, out)
     _phantom_inputs(out)
+    _nan_first_input(out)
     stamp.write_text("derived inputs of the fsl-fast-replica suite, version 9\n", encoding="utf-8")
     return out
+
+
+def _nan_first_input(out: Path) -> None:
+    """FSL-203's input (added 2026-11-03, beside version 9's, which stay as they are):
+    ``t1_negvox`` with its first voxel in FSL's storage order NaN (stored at (0, 0, 0), or at
+    (nx - 1, 0, 0) when FSL mirrors x on reading: a positive-determinant affine), so FSL's
+    extrema are NaN: the negative voxels kept, the mask empty."""
+    import nibabel as nib
+
+    dst = out / "t1_nanfirst.nii.gz"
+    if dst.is_file():
+        return
+    img = nib.load(str(out / "t1_negvox.nii.gz"))
+    a = np.asarray(img.dataobj, np.float32).copy()
+    first = (a.shape[0] - 1, 0, 0) if np.linalg.det(img.affine[:3, :3]) > 0 else (0, 0, 0)
+    a[first] = np.nan
+    tmp = out / "t1_nanfirst.tmp.nii.gz"
+    _save(tmp, a, img.affine)
+    tmp.replace(dst)
 
 
 # ------------------------------------------------------------------------------------------------
@@ -338,8 +359,10 @@ class Run:
 
 
 #: The entries the ``fix`` pass may name without a visible change: FSL-96 and FSL-97 fill the
-#: memory FAST never writes in both modes (the suite compares FSL's files with those values).
-SILENT = ("FSL-96", "FSL-97")
+#: memory FAST never writes in both modes (the suite compares FSL's files with those values);
+#: FSL-202 is named whenever a class variance's last bits differ from FSL's arithmetic, which
+#: the labels and the outputs' single precision can round back to the same values.
+SILENT = ("FSL-96", "FSL-97", "FSL-202")
 
 
 def _prepare(run: Run, tmp: Path) -> list[str]:
@@ -841,6 +864,16 @@ def _option_cases() -> dict[str, tuple[str, str, Run]]:
         "@t1_offset.nii.gz",
     )
     add("opt/negvox", "a few negative voxels (set to 0)", "-B", "-o", "seg", "@t1_negvox.nii.gz")
+    add(
+        "opt/nan-first",
+        "the negative voxels' image with a NaN first voxel (FSL-203: FSL's extrema NaN, the "
+        "negative voxels kept and the mask empty: the k-means exception, exit 255; the default "
+        "segments)",
+        "-o",
+        "seg",
+        "@t1_nanfirst.nii.gz",
+        fix_finishes="FSL-203",
+    )
     add(
         "opt/nan",
         "NaN voxels with -B -b -p",

@@ -538,6 +538,25 @@ def _prepare(run: Run, tmp: Path) -> list[str]:
                 h.set_data_dtype(np.int8)
                 nib.save(nib.Nifti1Image(arr.astype(np.int8), img.affine, h), str(dst))
             out.append(name)
+        elif a.startswith("@uint8:"):
+            # an input stored as uint8 (its values scaled so that the 99.5th percentile is
+            # 250, rounded, clipped to 0..255: about half of the brain above 127, FSL-111):
+            # @uint8:<input>:<name>
+            import nibabel as nib
+
+            _, src_name, name = a.split(":")
+            dst = tmp / name
+            if not dst.exists():
+                base = base or inputs()
+                img = nib.load(str(base / src_name))
+                v = np.asanyarray(img.dataobj).astype(np.float64)
+                scale = 250.0 / float(np.percentile(v, 99.5))
+                arr = np.clip(np.round(v * scale), 0, 255)
+                h = img.header.copy()
+                h.set_data_dtype(np.uint8)
+                h["scl_slope"], h["scl_inter"] = 1.0, 0.0
+                nib.save(nib.Nifti1Image(arr.astype(np.uint8), img.affine, h), str(dst))
+            out.append(name)
         elif a.startswith("@double:"):
             # an input stored as float64, its values divided by 7 (not exact in single
             # precision): @double:<input>:<name>
@@ -2219,6 +2238,12 @@ def _program_cases() -> dict[str, tuple[str, str, Run]]:
     add("applyxfm4D-int8", "an int8 input (FSL-09: written as uint8), trilinear", X,
         "@int8:epi.nii:epi_i8.nii", E, "out.nii.gz", "one.mat", "-singlematrix",
         "-interp", "trilinear", files=one)  # fmt: skip
+    add("applyxfm4D-uint8", "a uint8 input, trilinear (FSL-111: its values 128 to 255 read as "
+        "signed bytes; read as stored by default)", X, "@uint8:epi.nii:epi_u8.nii", E,
+        "out.nii.gz", "one.mat", "-singlematrix", "-interp", "trilinear", files=one)  # fmt: skip
+    add("applyxfm4D-uint8-3d-spline", "-3D spline on a uint8 volume (FSL-111 with FSL-79's "
+        "coefficients in the type)", X, "@uint8:epi.nii:epi_u8.nii", E, "out.nii.gz",
+        "one.mat", "-3D", "-interp", "spline", files=one)  # fmt: skip
     add("applyxfm4D-double-sinc", "a double series (sinc sums in double precision; the "
         "background value kept in double precision where the mask sets it)", X,
         "@double:bold4.nii:bold4_f64.nii", E, "out.nii.gz", "mats", files=mats)  # fmt: skip
@@ -2343,6 +2368,9 @@ def _program_cases() -> dict[str, tuple[str, str, Run]]:
         "ref20.txt", files=(("in20.txt", _PTS20), ("ref20.txt", _PTS20_REF)))  # fmt: skip
     add("pointflirt-missing", "a coordinate file that does not exist (FSL aborts)", P, "-i",
         "none.txt", "-r", "ref.txt", files=pf)  # fmt: skip
+    add("pointflirt-no-points", "two coordinate files that do not exist (no points: FSL crashes, "
+        "FSL-204; refused in both modes)", P, "-i", "none1.txt", "-r", "none2.txt",
+        crash="FSL-204")  # fmt: skip
     three = "".join(_PTS_IN.splitlines(True)[:3])
     three_ref = "".join(_PTS_REF.splitlines(True)[:3])
     add("pointflirt-three", "three points: a square file is read with points as columns", P,

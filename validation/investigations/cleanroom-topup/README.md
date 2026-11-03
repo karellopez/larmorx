@@ -14,7 +14,7 @@ FSL or larmorx goes in a memory box (`scripts/orchestration/boxed.sh 8 ...`).
 | Script | What it does |
 |---|---|
 | `fsl_case.py` | FSL's run of one case of the replica suite (`case <name> <dir>`), of fMRIPrep's call on an oracle run (`fmriprep <run> <dir>`) or of given arguments (`args <dir> -- ...`, `@name` the suite's derived inputs, `{imain}`/`{datain}` fMRIPrep's), through the cache; the streams in `STDOUT.txt`/`STDERR.txt`, the arguments in `ARGS.txt` |
-| `probes.py` | the transition probes A to E (the half-resolution pair, two levels, `--debug=1 -v`) into `$TOPUP_RUNS/fsl-probe-<name>` |
+| `probes.py` | the transition probes A to H (the half-resolution pair, two levels, `--debug=1 -v`; D, F, G and H end with a level of `--miter=0` at full resolution, so their `_fieldcoef` holds FSL's refitted coefficients exactly) into `$TOPUP_RUNS/fsl-probe-<name>` |
 | `err_cases.py` | FSL's streams for the suite's `err/` cases, compactly |
 | `mine.py` | the original (`target/release/larmorx fsl topup`, `LARMORX_IMPLEMENTATION=original`) on an FSL run directory's inputs, with a comparison of `-v`'s lines and every output |
 | `metrics.py` | §12's metrics between an FSL run and the original's on fMRIPrep's call (the field inside the brain, the corrected volumes, the Jacobians, the displacement fields) |
@@ -28,6 +28,12 @@ FSL or larmorx goes in a memory box (`scripts/orchestration/boxed.sh 8 ...`).
 | `t_iout.py` | the corrected volumes and their mean from FSL's coefficients (finding 10) |
 | `t_trans.py` to `t_trans13.py` | the level transitions: sampling positions, intermediate knot spacings, refit penalties, energies (the transitions' section) |
 | `t_trans14.py` | a rejected hypothesis: the refits solved approximately by conjugate gradients (3D) change the field more than FSL's do |
+| `t_trans15.py`, `t_trans16.py` | probes E and D: where FSL's refit changes the coefficients (the weakly sampled end coefficients; the 1D basis' smallest singular values, about 0.003 at knot spacing 2) |
+| `t_trans17.py`, `t_trans18.py` | probes G and F (one refit each, FSL's exact coefficients): 18 penalty models (coefficients' or field's differences, zero-continued, periodic, interior, joint 3D) none of which gives FSL's change; the change in the normal matrix' eigenbasis |
+| `t_trans19.py` | probe G: the refit is separable (per-axis matrices fitted by alternating least squares explain FSL's change to 1 %), and its deviation from the identity sits in the columns of the two end coefficients at each end, coupling the ends |
+| `t_trans20.py` to `t_trans23.py` | the fitted per-axis matrices against wrap-around models: the penalty `0.005²` times the squares of the two second differences that wrap around the ends matches (finding 11) |
+| `t_trans24.py` | that penalty against probes D to H: FSL's level-2 start fields to single precision (the zero-continued penalty misses by 0.002 to 0.023 Hz rms) |
+| `final_ssd.py` | the last level's SSD recomputed from `--iout` (it equals `-v`'s last SSD): the final cost of runs without `-v`, FSL's at `--nthr=4` included |
 
 Example: `TOPUP_RUNS=<scratch>/runs python -P fsl_case.py case debug/one-level $TOPUP_RUNS/fsl-debug1`
 then `python -I proto3.py $TOPUP_RUNS/fsl-debug1`.

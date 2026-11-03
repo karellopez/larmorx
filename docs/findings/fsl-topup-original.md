@@ -63,33 +63,53 @@ is a question for the spec writer (the part's handoff).
     knot spacings as its voxel sizes, intent 2016 with the field's voxel sizes, a qform of code 1
     with the identity rotation and the field's size as its offset, no sform.
 
-## Partly settled: the level transitions
+11. **The level transitions** (probes A to H: the half-resolution pair, two levels,
+    `--debug=1 -v`; D, F, G and H end with a level of `--miter=0` on the input's grid, so their
+    `_fieldcoef` holds FSL's refitted coefficients exactly):
+    - nothing changes the field when neither the subsampling nor `--warpres` changes (probe A:
+      only the smoothing changed; the next level starts from the same field to 2e-6 Hz);
+    - a change of subsampling samples the field at the new voxels' centres, `(step - 1) / 2 +
+      j · step` old voxels, as the spec says, and refits it with the knot spacing the
+      *previous level's* `--warpres` gives on the new grid (20 mm on 6 mm voxels: 3; probe H);
+    - a change of `--warpres` then refits the field at the new knot spacing, **even when the
+      spacing stays the same** (probes E and G: the field changes by 0.014 and 0.0014 Hz rms);
+    - **each refit** (per axis, one axis after the other) minimises the squared error at the
+      voxels plus `0.005²` times the squares of **only the two second differences of the
+      coefficients that wrap around the ends**, `c[n-1] - 2 c[0] + c[1]` and `c[n-2] - 2 c[n-1]
+      + c[0]`: with it the refits of probes D to H give FSL's level-2 start fields to single
+      precision (rms 1e-6 Hz or less), and fMRIPrep's call on ds005040 follows `-v`'s costs to
+      five or six digits through the first four levels. The interior second differences take no
+      part (with them, or with the differences continued by zeros beyond the ends, as §4.4
+      reads, the refits miss by 0.002 to 0.023 Hz rms). The penalty acts on the end
+      coefficients, which the samples constrain weakly (the 1D basis' smallest singular value
+      is about 0.003 at knot spacing 2), and couples the two ends; a field in its own space
+      therefore changes where those coefficients reach the grid. Found by fitting the refit's
+      per-axis matrices to probe G's coefficients (alternating least squares: separable to 1 %
+      of the change; the deviation from the identity only in the columns of the two end
+      coefficients at each end) and testing penalties on those rows.
 
-Probes A to E (the half-resolution pair, two levels, `--debug=1 -v`) show:
+## What the remaining differences are
 
-- nothing changes the field when neither the subsampling nor `--warpres` changes (probe A:
-  only the smoothing changed; the next level starts from the same field to 2e-6 Hz);
-- **a change of `--warpres` refits the field even when the knot spacing stays** (probe E,
-  warpres 20 to 22 at 12 mm voxels, both spacing 2: the field changes by 0.014 Hz rms and its
-  energy from 20.8 to 23.7);
-- a change of knot spacing on the same grid (probe B, 2 to 1) is reproduced by the refit of
-  §4.4 with the second differences continued by zeros beyond the coefficients (0.002 Hz rms,
-  energy 59.78 against FSL's 59.80); without the continuation (only the interior second
-  differences) the edge coefficients are freer (0.0026 Hz, and much larger energies at the
-  grid changes below);
-- **a change of subsampling** (2 to 1) samples the field at the new voxels' centres, `(step -
-  1) / 2 + j · step` old voxels, as the spec says, and refits it with the knot spacing the
-  *previous level's `--warpres`* gives on the new grid (20 mm on 6 mm voxels: 3), then with the
-  new level's: 0.015 Hz rms from FSL's next start (probe scg); any other intermediate spacing
-  misses by 0.2 Hz or more.
+With the transitions settled, fMRIPrep's two calls differ from FSL as FSL differs from itself at
+another thread count (FSL-116, the replica part's evidence: FSL at `--nthr=4` against one, from
+the oracle cache):
 
-Not settled: the refits' exact regularisation. The remaining differences (0.015 Hz rms in-grid,
-the energy 258 against FSL's 268 in probe scg; 0.014 Hz in probe E) sit in the coefficients at
-the grid's ends, which the samples constrain weakly. On fMRIPrep's call they make the
-full-resolution levels start from a slightly different field (SSD 118.1 against FSL's 118.7 at
-level 4), which the 60 scaled-conjugate-gradient iterations of the fine levels carry to the end:
-the field's 99th percentile of the absolute difference inside the brain is 0.55 to 0.61 Hz (the
-threshold 0.5) and the corrected volumes' relative difference 1e-2 at the 99th percentile (the
-threshold 1e-3; their mean 2e-3), dominated by the Jacobian's (the field's derivative at knot
-spacing 1, almost unregularised). Spec question: the refits' penalty (rows beyond the ends, its
-weight) and the samples they use.
+| Call | Metric (§12) | Original − FSL | FSL `--nthr=4` − FSL | §12 |
+|---|---|---|---|---|
+| ds005040 | field, p99 \|d\| in the brain (Hz) | 0.61 | 0.64 | 0.5 |
+| ds005040 | `--iout`, relative \|d\| p99 | 1.0e-2 | 1.0e-2 | 1e-3 |
+| ds005040 | Jacobian, p99 \|d\| | 8.2e-3 | 8.4e-3 | 6.9e-3 |
+| ds005040 | displacement, p99 \|d\| (mm) | 0.025 | 0.026 | 0.021 |
+| ds005040 | final cost (relative) | 7.8e-3 | 8.7e-3 | 1e-3 |
+| ds001600 | field, p99 \|d\| in the brain (Hz) | 0.022 | 0.030 | 0.5 |
+| ds001600 | `--iout`, relative \|d\| p99 | 9.4e-4 | 1.6e-3 | 1e-3 |
+| ds001600 | final cost (relative) | 5.4e-4 | 9.2e-4 | 1e-3 |
+
+On ds005040 the scaled conjugate gradients of the full-resolution levels (60 iterations, almost
+no regularisation at knot spacing 1) amplify any last-bit difference: the original follows
+FSL's costs to six digits for the first five iterations of level 4, then drifts as FSL at four
+threads does (the final cost of the original 61.39, of FSL 61.88 at one thread and 61.34 at
+four). Each of its metrics lies inside FSL's own band. ds001600 meets §12's thresholds.
+(The final costs of the runs without `-v` are recomputed from `--iout`, `final_ssd.py`: the
+last level has no smoothing and no subsampling, so its predictions are `--iout` times `100 /
+g`.)

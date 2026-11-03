@@ -261,8 +261,9 @@ pub fn apply3(data: &[f64], dims: [usize; 3], ops: [Option<&Op1>; 3]) -> (Vec<f6
 }
 
 /// The 1D refit of a sampled field (§4.4): the coefficients minimising the squared error at
-/// the voxels plus `0.005²` times the squared second differences of the coefficients (zero
-/// beyond the ends), as a dense operator from the `n` samples to the coefficients.
+/// the voxels plus `0.005²` times the squares of the two second differences of the
+/// coefficients that wrap around the ends (observed), as a dense operator from the `n` samples
+/// to the coefficients.
 pub fn refit_op(axis: Axis) -> Op1 {
     const LAMBDA: f64 = 0.005;
     let nc = axis.ncoef();
@@ -284,15 +285,15 @@ pub fn refit_op(axis: Axis) -> Op1 {
         }
     }
     let l2 = LAMBDA * LAMBDA;
-    // the second differences of the coefficients continued by zeros beyond both ends (one row
-    // per coefficient: observed, the energies of FSL's refitted fields, findings)
-    for j in 0..nc as isize {
+    // the two second differences of the coefficients that wrap around the ends,
+    // `c[n-1] - 2 c[0] + c[1]` and `c[n-2] - 2 c[n-1] + c[0]` (observed: FSL's refitted fields
+    // of probes D to H to single precision, findings; the interior differences take no part)
+    let ncs = nc as isize;
+    for j in [0isize, ncs - 1] {
         let row = [(j - 1, 1.0), (j, -2.0), (j + 1, 1.0)];
         for &(p, wp) in &row {
             for &(q, wq) in &row {
-                if (0..nc as isize).contains(&p) && (0..nc as isize).contains(&q) {
-                    a[p as usize][q as usize] += l2 * wp * wq;
-                }
+                a[p.rem_euclid(ncs) as usize][q.rem_euclid(ncs) as usize] += l2 * wp * wq;
             }
         }
     }
@@ -429,8 +430,19 @@ mod tests {
         let f = a.at_voxels(0).apply_axis(&c, [a.ncoef(), 1, 1], 0).0;
         let c2 = refit_op(a).apply_axis(&f, [30, 1, 1], 0).0;
         let f2 = a.at_voxels(0).apply_axis(&c2, [a.ncoef(), 1, 1], 0).0;
+        // the wrapped differences move the weakly sampled end coefficients: the ends' voxels
+        // change, the interior keeps the field
+        for (x, y) in f.iter().zip(&f2).take(24).skip(6) {
+            assert!((x - y).abs() < 1e-3, "{x} {y}");
+        }
+        // with knot spacing 1 every coefficient is well sampled: the refit keeps every voxel
+        let a = Axis::new(32, 1);
+        let c: Vec<f64> = (0..32).map(|i| ((i % 8) as f64 - 3.5).abs()).collect();
+        let f = a.at_voxels(0).apply_axis(&c, [32, 1, 1], 0).0;
+        let c2 = refit_op(a).apply_axis(&f, [32, 1, 1], 0).0;
+        let f2 = a.at_voxels(0).apply_axis(&c2, [32, 1, 1], 0).0;
         for (x, y) in f.iter().zip(&f2) {
-            assert!((x - y).abs() < 1e-3);
+            assert!((x - y).abs() < 1e-3, "{x} {y}");
         }
     }
 }

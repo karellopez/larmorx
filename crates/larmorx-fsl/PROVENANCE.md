@@ -246,7 +246,7 @@ permanent cases or the history of replica and spec-writer commits. Its only inpu
 | larmorx | Behaviour reproduced | Source |
 |---|---|---|
 | `topup::images` | the intensity scaling, the regridding (periodic cubic spline), the subsampling, the Gaussian smoothing, each level's periodic cubic spline coefficients (cyclic tridiagonal solve) and their interpolation | §4.1, §4.4, §4.5; findings |
-| `topup::spline` | the cubic B-spline basis and FSL's coefficient layout, the separable one-axis operators (each output value one row's sum: thread-independent), the refits (second differences continued by zeros), the regulariser's 1D Gram matrices | §4.2, §4.4, §4.6; findings |
+| `topup::spline` | the cubic B-spline basis and FSL's coefficient layout, the separable one-axis operators (each output value one row's sum: thread-independent), the refits (penalty: the two second differences that wrap around the ends), the regulariser's 1D Gram matrices | §4.2, §4.4, §4.6; findings |
 | `topup::model` | one level's predictions (a line sampler when the displacement is along one axis), the mask, the cost, its gradient and the Gauss-Newton Hessian's voxel weights, the bending energy | §4.3, §4.6; findings |
 | `topup::stencil` | the Hessian as a 7 × 7 × 7 stencil per coefficient, assembled by contracting one axis at a time, its product and the preconditioned conjugate-gradient solve | §4.7, §11; larmorx's own design |
 | `topup::minimise` | Levenberg-Marquardt (damping, retries, the early end) and the scaled conjugate gradients | §4.7; Møller; findings |

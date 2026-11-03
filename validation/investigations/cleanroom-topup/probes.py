@@ -65,6 +65,36 @@ PROBES = {
         "--minmet=0,0",
         "--fout=pr_field",
     ],
+    "F": HALF
+    + [
+        "--warpres=20,14",
+        "--subsamp=1,1",
+        "--fwhm=8,8",
+        "--miter=3,0",
+        "--lambda=0.005,0.0001",
+        "--minmet=0,0",
+        "--fout=pr_field",
+    ],
+    "G": HALF
+    + [
+        "--warpres=18,20",
+        "--subsamp=1,1",
+        "--fwhm=8,8",
+        "--miter=3,0",
+        "--lambda=0.005,0.0001",
+        "--minmet=0,0",
+        "--fout=pr_field",
+    ],
+    "H": HALF
+    + [
+        "--warpres=20,20",
+        "--subsamp=2,1",
+        "--fwhm=8,8",
+        "--miter=3,0",
+        "--lambda=0.005,0.0001",
+        "--minmet=0,0",
+        "--fout=pr_field",
+    ],
 }
 
 

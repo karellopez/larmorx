@@ -74,6 +74,12 @@ SUITE = "fsl-topup"
 PROGRAM = "topup"
 _NUMBER = re.compile(r"[-+]?(?:nan|inf|(?:\d+\.?\d*|\.\d+)(?:[eE][-+]?\d+)?)")
 _COST = re.compile(r"Cost = (\S+)")
+#: The vb methods' iteration lines (``specs/topup.md`` §7.5): their three numbers.
+_VB = re.compile(
+    r"([Rr]elative lambda = )(\S+?)(,\s+phi = )(\S+?)(,\s+lambda = )(\S+)$", re.MULTILINE
+)
+#: The printed values' threshold: 4 significant digits.
+VB_REL = 5e-4
 #: The thresholds of §12.
 FIELD_P99, FIELD_MEAN, FIELD_CORR = 0.5, 0.1, 0.999
 TRANS, ROT = 0.05, 0.001
@@ -115,8 +121,22 @@ EXPECTED_DIVERGENCES: dict[str, str] = {
         "ends, outside the brain) is not known from the spec and the black-box probes (findings "
         "21); the original wraps circularly in both modes (exact for lines of 32 voxels, where "
         "FSL's wrap is circular)"
-        for name in ("at/lsr-long",)
+        for name in ("at/lsr-long", "at/vb2d-long", "at/vb3d-long", "at/vb4d-long")
     },
+    **{
+        name: "FSL-143 reproduced: FSL's smoothness prior is indefinite, so its iterations "
+        "diverge (lambda below 0 in the first iterations, then phi and lambda fall towards "
+        "1e-23 to 1e-206, the image following their ratio): the divergence amplifies the moved "
+        "images' float-level differences in the printed values (and, for vb3d-three, in the "
+        "image); the default, the consistent prior, agrees with the replica's default to 1e-5 "
+        "(findings 26)"
+        for name in ("at/vb3d-aniso", "at/vb4d-four", "at/vb3d-three")
+    },
+    "at/vb2d-aniso": "the printed phi and lambda of the top slices (few voxels in the brain) "
+    "part from FSL's in the 4th digit during the iterations (8e-4) and meet again (their final "
+    "values within 1e-5): the iterations amplify the moved images' float-level differences "
+    "there; the image within 1e-5 (p99), and the same against the replica's default (findings "
+    "26)",
 }
 #: Cases whose FSL behaviour the original does not reproduce and refuses in ``reproduce`` mode
 #: too (its refusal must name the entry), and why.
@@ -126,6 +146,12 @@ ORIGINAL_REFUSES: dict[str, tuple[str, str]] = {
         "FSL lays a field of as many voxels as the images in another shape on the images' grid; "
         "how it does is not known from the spec and the black-box runs (findings 22)",
     ),
+}
+#: Cases whose default run the original refuses where the replica suite's case does not say so
+#: (defects found by the original's part, rule B), with the entry its refusal names.
+FIX_REFUSES: dict[str, str] = {
+    # jac with a phase encoding along z, which topup refuses: FSL leaves the component out
+    "at/jac-z": "FSL-144",
 }
 #: The checks of an expected divergence that must still pass (everything but §12's metrics).
 _EXACT_KINDS = (
@@ -245,14 +271,47 @@ def _split_costs(text: str) -> tuple[str, list[list[float]]]:
     return "\n".join(lines), levels
 
 
+def _split_vb(text: str) -> tuple[str, list[float]]:
+    """The vb methods' iteration lines with their numbers replaced by ``#``, and the numbers."""
+    values: list[float] = []
+
+    def take(m: re.Match) -> str:
+        for g in (2, 4, 6):
+            values.append(float(m.group(g)))
+        return f"{m.group(1)}#{m.group(3)}#{m.group(5)}#"
+
+    return _VB.sub(take, text), values
+
+
 def compare_stdout(checks: CheckList, want: str, got: str, band: str | None = None) -> None:
     """Standard output: with ``-v``'s cost lines, the same levels, the first cost to 4
     significant digits, the final cost within 0.1 % (or within FSL's own band ``band``'s final
-    cost, when given); the other lines to 4 significant digits."""
+    cost, when given); the vb methods' printed values to 4 significant digits as a metric (FSL-143
+    makes FSL's iterations diverge); the other lines to 4 significant digits."""
     tw, cw = _split_costs(want)
     tg, cg = _split_costs(got)
+    tw, vw = _split_vb(tw)
+    tg, vg = _split_vb(tg)
     ok, why = _numbers_close(tw, tg)
     checks("Standard output (numbers to 4 significant digits)", ok, detail=why)
+    if vw or vg:
+        worst, where = 0.0, ""
+        for k, (a, b) in enumerate(zip(vw, vg, strict=False)):
+            r = abs(a - b) / max(abs(a), abs(b), 1e-300) if a != b else 0.0
+            if not np.isfinite(r):
+                r = float("inf")
+            if r > worst:
+                worst, where = r, f"value {k + 1} of {len(vw)}: FSL {a:.6g}, the original {b:.6g}"
+        checks.add(
+            Check(
+                "vb: the printed phi, lambda and their ratio",
+                len(vw) == len(vg) and worst <= VB_REL,
+                metric="max relative difference",
+                value=float(f"{worst:.3g}"),
+                threshold="4 significant digits",
+                detail=where if len(vw) == len(vg) else f"FSL {len(vw)} values, the original {len(vg)}",
+            )
+        )
     if not cw:
         return
     checks(
@@ -918,7 +977,7 @@ def _run_case(run: rep.Run, checks: CheckList, name: str = "") -> None:
                 program=prog,
             )
     for attr, how in (("fix_refuses", "refuses"), ("fix_finishes", "finishes")):
-        entry = getattr(run, attr)
+        entry = getattr(run, attr) or (FIX_REFUSES.get(name, "") if how == "refuses" else "")
         if not entry:
             continue
         with tempfile.TemporaryDirectory(prefix="lx-topup-fix_") as b_:

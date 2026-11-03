@@ -16,6 +16,7 @@ use larmorx_mri::hmc::files;
 use super::Settings;
 use super::bet2::{FSLOUTPUTTYPE_UNSET, resolve_image};
 use super::common::{abort, image_exception, print_notices, read_rows};
+use super::fmt;
 use super::options::atof;
 use crate::bet::image::{self, Output, Values};
 use crate::topup::Scan;
@@ -630,6 +631,45 @@ fn run(
         .collect();
     let first_input = reads[0].input.clone();
     drop(reads);
+    // FSL-144: jac leaves a phase encoding's z component out (topup estimates no field for one)
+    if !lsr && let Some((k, img)) = images.iter().enumerate().find(|(_, i)| i.scan.pe[2] != 0.0) {
+        let row = index[k];
+        let pe = img.scan.pe;
+        let n = Notice::new(
+            &defects::FSL_144,
+            mode,
+            match mode {
+                UpstreamDefects::Fix => format!(
+                    "--method=jac: image {} has a phase encoding with a z component ({} {} {}, row {row} of --datain): refused (FSL leaves the component out silently)",
+                    k + 1,
+                    fmt::g(pe[0]),
+                    fmt::g(pe[1]),
+                    fmt::g(pe[2])
+                ),
+                UpstreamDefects::Reproduce => format!(
+                    "--method=jac: the z component of image {}'s phase encoding left out, as FSL's (the image displaced along x and y only)",
+                    k + 1
+                ),
+            },
+        );
+        match mode {
+            UpstreamDefects::Fix => {
+                return Err(refuse(
+                    err,
+                    &[n],
+                    &format!(
+                        "--method=jac: image {} ({}) has a phase encoding with a z component (row {row} of --datain: {} {} {}); topup estimates no field for such an acquisition (its --datain refuses one), and FSL would leave the component out silently (FSL-144)",
+                        k + 1,
+                        names.get(k).map_or("", String::as_str),
+                        fmt::g(pe[0]),
+                        fmt::g(pe[1]),
+                        fmt::g(pe[2])
+                    ),
+                ));
+            }
+            UpstreamDefects::Reproduce => notices.push(n),
+        }
+    }
     // FSL-132: the first volume of the first image (trilinear in FSL)
     let first_interpolated = !lsr || images[0].sampling.is_some_and(|s| !s.is_identity());
     if interp == Interp::Spline && first_interpolated {

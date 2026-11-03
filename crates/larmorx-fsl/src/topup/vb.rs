@@ -24,8 +24,9 @@
 //!   λ Q_ll)⁻¹`, `f_l = Σ_l (φ K_lᵀ y_l - λ Σ_{m ≠ l} Q_lm f_m)`;
 //! - `N_λ` the block's voxels, `N_φ` its data points: every image's (`vb2D`); FSL-142: two per
 //!   voxel whatever the collection holds (`vb3D`, `vb4D`); FSL-141: both in 32-bit integers;
-//! - no line is skipped: the invalid voxels' moved values enter the restoration, and the
-//!   output's lines with an invalid voxel are 0 (as `lsr`'s); the collections added.
+//! - no line is skipped: the invalid voxels' moved values (interpolated periodically) enter the
+//!   restoration; the collections added, then every invalid voxel 0 (the mask voxel by voxel,
+//!   not `lsr`'s whole lines).
 
 use rayon::prelude::*;
 
@@ -368,13 +369,16 @@ struct Block {
 
 /// A block's state: per volume, per line of the block, its values.
 struct State {
-    f: Vec<Vec<Vec<f64>>>,
-    kty: Vec<Vec<Vec<f64>>>,
+    f: Lines3,
+    kty: Lines3,
     /// The traces `tr(KᵀK Σ)` and `tr(Q_ll Σ)` of each line's last factor (shared by the
     /// volumes of a block).
     tr_k: Vec<f64>,
     tr_q: Vec<f64>,
 }
+
+/// A block's restored lines: per volume, per line of the block, its values.
+type Lines3 = Vec<Vec<Vec<f64>>>;
 
 /// Lines per batch of factors computed in parallel.
 const BATCH: usize = 64;
@@ -390,7 +394,7 @@ fn restore_block(
     o: &VbOptions,
     n_images: usize,
     out: &mut String,
-) -> Result<(Vec<Vec<Vec<f64>>>, bool), VbError> {
+) -> Result<(Lines3, bool), VbError> {
     let n = lines.n;
     let nl = block.lines.len();
     let nv = block.vols.len();
@@ -589,7 +593,6 @@ pub fn vb(
     let n_vols = images.first().map_or(0, |i| i.volumes.len());
     let (moved, mask) = moved_images(s, images);
     let mut total = vec![vec![0.0f64; nvox]; n_vols];
-    let mut skipped = vec![false; nvox];
     let mut stdout = format!(
         "NCollections = {}\nNScans = {}\n",
         colls.len(),
@@ -657,7 +660,7 @@ pub fn vb(
             count_differs = true;
         }
         // independent blocks in parallel, their output in order
-        type BlockOut = Result<(Vec<Vec<Vec<f64>>>, bool, String), VbError>;
+        type BlockOut = Result<(Lines3, bool, String), VbError>;
         let results: Vec<BlockOut> = blocks
             .par_iter()
             .map(|block| {
@@ -694,24 +697,18 @@ pub fn vb(
                 }
             }
         }
-        for &s0 in &lines.starts {
-            if (0..n).any(|j| !mask[s0 + j * stride]) {
-                for j in 0..n {
-                    skipped[s0 + j * stride] = true;
-                }
-            }
-        }
     }
+    // the output masked voxel by voxel (observed: unlike lsr's, whose lines with an invalid voxel
+    // are 0 whole)
     let volumes = total
         .into_iter()
         .map(|o| {
             o.iter()
-                .zip(&skipped)
-                .map(|(&x, &sk)| if sk { 0.0 } else { x as f32 })
+                .zip(&mask)
+                .map(|(&x, &ok)| if ok { x as f32 } else { 0.0 })
                 .collect()
         })
         .collect();
-    let mask = skipped.iter().map(|&sk| !sk).collect();
     Ok(VbResult {
         corrected: Corrected { volumes, mask },
         stdout,

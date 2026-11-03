@@ -172,8 +172,14 @@ def test_without_the_replica(scripts, tmp_path):
     assert np.isfinite(np.asarray(j.corrected.data)).all()
     with pytest.raises(lx.ReplicaNotFoundError, match="larmorx-nc"):
         lx.fsl.applytopup(path, ACQ, [1], r, implementation="replica")
-    with pytest.raises(RuntimeError, match=r"(?s)applytopup \(the clean-room original\).*vb2D"):
-        lx.fsl.applytopup(pair_imgs, ACQ, [1, 2], r, method="vb2D")
+    # the undocumented variational-Bayes restoration: its iterations on standard output
+    v = lx.fsl.applytopup(pair_imgs, ACQ, [1, 2], r, method="vb2D")
+    assert v.stdout.startswith("NCollections = 1\nNScans = 2\nslice = 0\nrelative lambda = 1,")
+    assert np.asarray(v.corrected.data).shape == (12, 10, 6, 2)
+    assert np.isfinite(np.asarray(v.corrected.data)).all()
+    # FSL-144: jac with a phase encoding along z (which topup refuses) is refused by default
+    with pytest.raises(RuntimeError, match=r"(?s)applytopup \(the clean-room original\).*FSL-144"):
+        lx.fsl.applytopup(path, [[0, 0, 1, 0.05]], [1], r, method="jac")
 
 
 def test_fmripreps_call(scripts, monkeypatch, tmp_path):
